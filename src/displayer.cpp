@@ -967,7 +967,6 @@ void multiViewerCanvas::loadBackupSelection(bool do_ask)
 
 		boxes[ipos]->setSelect(selected[my_sorted_ipos]);
 	}
-
 }
 
 void multiViewerCanvas::clearSelection()
@@ -1790,7 +1789,7 @@ void pickerViewerCanvas::draw()
 
 		if (do_startend)
 		{
-			if (icoord%2==1)
+			if (icoord % 2 == 1)
 			{
 				xcoori_start = xcoori;
 				ycoori_start = ycoori;
@@ -1833,6 +1832,7 @@ int pickerViewerCanvas::handle(int ev)
 			}
 			RFLOAT aux = -999., zero = 0.;
 			int iaux = -999;
+
 			// Else store new coordinate
 			if (!MDcoords.isEmpty())
 			{
@@ -2032,7 +2032,6 @@ void pickerViewerCanvas::findColorColumnForCoordinates()
 			iimg--; // counting starts at 1 in STAR file!
 
 			// Check that this entry in the coord file has the same xpos and ypos
-			// TODO: coord_scale
 			RFLOAT my_xpos, my_ypos;
 			MDcoords.getValue(EMDL_IMAGE_COORD_X, my_xpos, iimg);
 			MDcoords.getValue(EMDL_IMAGE_COORD_Y, my_ypos, iimg);

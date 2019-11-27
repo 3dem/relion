@@ -201,7 +201,10 @@ class basisViewerWindow : public Fl_Window
 {
 public:
 	// Constructor with w x h size of the window and a title
-	basisViewerWindow(int W, int H, const char* title=0): Fl_Window(W, H, title){}
+	basisViewerWindow(int W, int H, const char* title=0): Fl_Window(W, H, title)
+	{
+		current_selection_type = 1;
+	}
 
 	int fillCanvas(int viewer_type, MetaDataTable &MDin, ObservationModel *obsModel, EMDLabel display_label, EMDLabel text_label, bool _do_read_whole_stacks, bool _do_apply_orient,
 	               RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast,
@@ -320,7 +323,6 @@ public:
 	// Constructor with w x h size of the window and a title
 	multiViewerCanvas(int X,int Y, int W, int H, const char* title=0): basisViewerCanvas(X,Y,W, H, title)
 	{
-		current_selection_type= 1;
 	}
 
 private:
