@@ -333,17 +333,17 @@ void manualpickerGuiWindow::readOutputStarfile()
 	{
 		for (int imic = 0; imic < selected.size(); imic++)
 			selected[imic] = false;
-		MetaDataTable MDout;
+		MetaDataTable MDmics;
 
-		ObservationModel::loadSafely(fn_sel, obsModel, MDout, "micrographs");
+		ObservationModel::loadSafely(fn_sel, obsModel, MDmics, "micrographs");
 		FileName fn_mic, fn_mic_in;
 		for (int imic = 0; imic < selected.size(); imic++)
 		{
 			MDin.getValue(EMDL_MICROGRAPH_NAME, fn_mic_in, imic);
 			bool has_found = false;
-			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDout)
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDmics)
 			{
-				MDout.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
+				MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
 				// Which one in the input metadatatable was this one?
 				if (fn_mic == fn_mic_in)
 				{
@@ -378,25 +378,41 @@ void manualpickerGuiWindow::readOutputStarfile()
 	}
 }
 
-void manualpickerGuiWindow::writeOutputStarfile()
+void manualpickerGuiWindow::writeOutputStarfiles(bool verb)
 {
-	MetaDataTable MDout;
+	MDcoords.clear();
+	MetaDataTable MDmics;
 	for (int imic = 0; imic < selected.size(); imic++)
 	{
 		if (selected[imic])
 		{
-			MDout.addObject(MDin.getObject(imic));
+			MDmics.addObject(MDin.getObject(imic));
+			FileName fn_pre, fn_jobnr, fn_post;
+			decomposePipelineSymlinkName(global_fn_mics[imic], fn_pre, fn_jobnr, fn_post);
+			FileName fn_coord = global_fn_odir + fn_post.withoutExtension() + "_" + global_pickname + ".star";
+			if (exists(fn_coord))
+			{
+				MDcoords.addObject();
+				MDcoords.setValue(EMDL_MICROGRAPH_NAME, global_fn_mics[imic]);
+				MDcoords.setValue(EMDL_MICROGRAPH_COORDINATES, fn_coord);
+			}
 		}
 	}
 
 	if (obsModel.opticsMdt.numberOfObjects() > 0)
 	{
-		obsModel.save(MDout, fn_sel, "micrographs");
+		obsModel.save(MDmics, fn_sel, "micrographs");
 	}
 	else
 	{
-		MDout.write(fn_sel);
+		MDmics.write(fn_sel);
 	}
+	if (verb) std::cout << " Saved list of selected micrographs in: " << fn_sel << std::endl;
+
+	FileName fn_coords = global_fn_odir + global_pickname + ".star";
+	MDcoords.write(fn_coords);
+	if (verb) std::cout << " Saved list of coordinate files in: " << fn_coords << std::endl;
+
 }
 void manualpickerGuiWindow::cb_menubar_save(Fl_Widget* w, void* v)
 {
@@ -406,8 +422,7 @@ void manualpickerGuiWindow::cb_menubar_save(Fl_Widget* w, void* v)
 
 void manualpickerGuiWindow::cb_menubar_save_i()
 {
-	writeOutputStarfile();
-	std::cout << " Saved " << fn_sel << std::endl;
+	writeOutputStarfiles();
 	RELION_EXIT_SUCCESS;
 }
 
@@ -502,6 +517,7 @@ void manualpickerGuiWindow::cb_menubar_recount_i()
 		number_picked[imic] = my_nr_picked;
 	}
 	std::cout << " Total number of picked particles: " << global_total_count << " from " << nr_sel_mic << " selected micrographs." << std::endl;
+	writeOutputStarfiles();
 }
 
 
@@ -597,6 +613,10 @@ void ManualPicker::initialise()
 			global_lowpass = new_nyquist;
 		std::cout << " Set low-pass filter to " << global_lowpass << " due to downscaling of " << global_micscale << std::endl;
 	}
+
+	std::cerr << " NOTE: in order to write the new list of coordinate STAR files, you need to re-count the particles or quite this program through the File menu. Do NOT kill the program using the operating system's window manager!" << std::endl;
+
+
 }
 
 void ManualPicker::run()
@@ -607,6 +627,7 @@ void ManualPicker::run()
 
 	// Transfer all parameters to the gui
 	win.MDin = MDin;
+	win.MDcoords = MDcoords;
 	win.obsModel = obsModel;
 	win.fn_sel = fn_sel;
 	win.do_allow_save = do_allow_save;
