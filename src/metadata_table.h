@@ -110,7 +110,6 @@ class MetaDataTable
 	// The version number of the file format (multiplied by 10,000)
 	int version;
 
-
 public:
 
 	/** What labels have been read from a docfile/metadata file
@@ -166,7 +165,6 @@ public:
 
 	bool setUnknownValue(int labelPosition, const std::string &value);
 	bool setValueFromString(EMDLabel label, const std::string &value, long int objectID = -1);
-
 
 	// Sort the order of the elements based on the values in the input label
 	// (only numbers, no strings/bools)
@@ -339,10 +337,25 @@ MetaDataTable subsetMetaDataTable(MetaDataTable &MDin, EMDLabel label, std::stri
 // OriginX/Y are multiplied by origin_scale before added to CoordinateX/Y to compensate for down-sampling
 MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label, RFLOAT threshold, RFLOAT origin_scale=1.0, FileName fn_removed="", bool verb=true);
 
+#ifdef MD_TYPE_CHECK
+template<class T>
+bool MetaDataTable::isTypeCompatible(EMDLabel label, T& value) const
+{
+	// TODO: implement type check using
+	// std::is_same<std::make_signed<std::remove_cv<T> >, U >::value;
+	// types are EMDL_INT, EMDL_BOOL, EMDL_DOUBLE, EMDL_FLOAT, EMDL_STRING, EMDL_DOUBLE_VECTOR, EMDL_UNKNOWN
+	return true;
+}
+#endif
+
 template<class T>
 bool MetaDataTable::getValue(EMDLabel label, T& value, long objectID) const
 {
 	if (label < 0 || label >= EMDL_LAST_LABEL) return false;
+
+#ifdef MD_TYPE_CHECK
+	isTypeCompatible(label, value);
+#endif
 
 	const long off = label2offset[label];
 	if (off > -1)
@@ -367,6 +380,10 @@ template<class T>
 bool MetaDataTable::setValue(EMDLabel name, const T &value, long int objectID)
 {
 	if (name < 0 || name >= EMDL_LAST_LABEL) return false;
+
+#ifdef MD_TYPE_CHECK
+	isTypeCompatible(label, value);
+#endif
 
 	long off = label2offset[name];
 
