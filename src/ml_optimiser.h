@@ -902,7 +902,8 @@ public:
 			std::vector<int> &exp_pointer_dir_nonzeroprior,
 			std::vector<int> &exp_pointer_psi_nonzeroprior,
 			std::vector<RFLOAT> &exp_directions_prior,
-			std::vector<RFLOAT> &exp_psi_prior);
+			std::vector<RFLOAT> &exp_psi_prior,
+			std::vector<MultidimArray<RFLOAT> > &exp_STweight);
 
 	/* Store all shifted FourierTransforms in a vector
 	 * also store precalculated 2D matrices with 1/sigma2_noise
@@ -917,7 +918,9 @@ public:
 			std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted_nomask,
 			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
 			std::vector<RFLOAT> &exp_local_sqrtXi2,
-			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2);
+			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2,
+			std::vector<MultidimArray<RFLOAT> > &exp_STweight,
+			std::vector<MultidimArray<RFLOAT> > &exp_local_STweight);
 
 	// Given exp_Mcoarse_significant, check for iorient whether any of the particles has any significant (coarsely sampled) translation
 	bool isSignificantAnyImageAnyTranslation(long int iorient,
@@ -939,7 +942,9 @@ public:
 			std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted,
 			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2,
 			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
-			std::vector<RFLOAT> &exp_local_sqrtXi);
+			std::vector<RFLOAT> &exp_local_sqrtXi,
+			std::vector<MultidimArray<RFLOAT> > &exp_STweight,
+			std::vector<MultidimArray<RFLOAT> > &exp_local_STweight);
 
 	// Convert all squared difference terms to weights.
 	// Also calculates exp_sum_weight and, for adaptive approach, also exp_significant_weight
@@ -977,7 +982,9 @@ public:
 			std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted_nomask,
 			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2,
 			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
-			std::vector<RFLOAT> &exp_local_sqrtXi2);
+			std::vector<RFLOAT> &exp_local_sqrtXi2,
+			std::vector<MultidimArray<RFLOAT> > &exp_STweight,
+			std::vector<MultidimArray<RFLOAT> > &exp_local_STweight);
 
 	/** Monitor the changes in the optimal translations, orientations and class assignments for some particles */
 	void monitorHiddenVariableChanges(long int my_first_part_id, long int my_last_part_id);

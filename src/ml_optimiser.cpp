@@ -3605,7 +3605,7 @@ void MlOptimiser::expectationOneParticle(long int part_id, int thread_id)
 		// Here define all kind of local arrays that will be needed
 		std::vector<MultidimArray<Complex > > exp_Fimg, exp_Fimg_nomask;
 		std::vector<std::vector<MultidimArray<Complex > > > exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask;
-		std::vector<MultidimArray<RFLOAT> > exp_Fctf, exp_local_Fctf, exp_local_Minvsigma2;
+		std::vector<MultidimArray<RFLOAT> > exp_Fctf, exp_local_Fctf, exp_local_Minvsigma2,exp_STweight, exp_local_STweight;
 		std::vector<int> exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior;
 		std::vector<RFLOAT> exp_directions_prior, exp_psi_prior, exp_local_sqrtXi2;
 		int exp_current_image_size, exp_current_oversampling;
@@ -3637,6 +3637,9 @@ void MlOptimiser::expectationOneParticle(long int part_id, int thread_id)
 		exp_old_offset.resize(my_nr_images);
 		exp_prior.resize(my_nr_images);
 
+		if (mydata.is_3D)
+            exp_STweight.resize(my_nr_images);
+
 		// Then calculate all Fourier Transform of masked and unmasked image and the CTF
 #ifdef TIMING
 		if (part_id == exp_my_first_part_id)
@@ -3647,7 +3650,8 @@ void MlOptimiser::expectationOneParticle(long int part_id, int thread_id)
 #endif
 		getFourierTransformsAndCtfs(part_id, ibody, metadata_offset, exp_Fimg, exp_Fimg_nomask, exp_Fctf,
 				exp_old_offset, exp_prior, exp_power_imgs, exp_highres_Xi2_img,
-				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior);
+				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior,
+				exp_directions_prior, exp_psi_prior, exp_STweight);
 
 #ifdef TIMING
 		if (part_id == exp_my_first_part_id)
@@ -3727,7 +3731,8 @@ void MlOptimiser::expectationOneParticle(long int part_id, int thread_id)
 					exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max, exp_min_diff2, exp_highres_Xi2_img,
 					exp_Fimg, exp_Fctf, exp_Mweight, exp_Mcoarse_significant,
 					exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
-					exp_local_Fimgs_shifted, exp_local_Minvsigma2, exp_local_Fctf, exp_local_sqrtXi2);
+					exp_local_Fimgs_shifted, exp_local_Minvsigma2, exp_local_Fctf, exp_local_sqrtXi2,
+					exp_STweight, exp_local_STweight);
 
 
 #ifdef DEBUG_ESP_MEM
@@ -3837,7 +3842,8 @@ void MlOptimiser::expectationOneParticle(long int part_id, int thread_id)
 				exp_power_imgs, exp_old_offset, exp_prior, exp_Mweight, exp_Mcoarse_significant,
 				exp_significant_weight, exp_sum_weight, exp_max_weight,
 				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
-				exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask, exp_local_Minvsigma2, exp_local_Fctf, exp_local_sqrtXi2);
+				exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask, exp_local_Minvsigma2, exp_local_Fctf,
+				exp_local_sqrtXi2, exp_STweight, exp_local_STweight);
 
 #ifdef RELION_TESTING
 //		std::string mode;
@@ -4818,7 +4824,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		std::vector<int> &exp_pointer_dir_nonzeroprior,
 		std::vector<int> &exp_pointer_psi_nonzeroprior,
 		std::vector<RFLOAT> &exp_directions_prior,
-		std::vector<RFLOAT> &exp_psi_prior)
+		std::vector<RFLOAT> &exp_psi_prior,
+		std::vector<MultidimArray<RFLOAT> > &exp_STweight)
 {
 
 	FourierTransformer transformer;
@@ -4826,7 +4833,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 	{
 		Image<RFLOAT> img, rec_img;
 		MultidimArray<Complex > Fimg, Faux;
-		MultidimArray<RFLOAT> Fctf;
+		MultidimArray<RFLOAT> Fctf, Fstw; // SubtomoWeights
 		Matrix2D<RFLOAT> Aori;
 		Matrix1D<RFLOAT> my_projected_com(mymodel.data_dim), my_refined_ibody_offset(mymodel.data_dim);
 
@@ -5412,6 +5419,10 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		// Also store its CTF
 		Fctf.resize(Fimg);
 
+		bool do_subtomo_weights = false;
+		if (mydata.is_3D)
+			Fstw.resize(Fimg);
+
 		// Now calculate the actual CTF
 		if (do_ctf_correction)
 		{
@@ -5455,7 +5466,27 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 				// otherwise, just window the CTF to the current resolution
 				else if (XSIZE(Ictf()) == YSIZE(Ictf()) / 2 + 1)
 				{
-					windowFourierTransform(Ictf(), Fctf, YSIZE(Fctf));
+					if (ZSIZE(Ictf()) == YSIZE(Ictf()))
+					{
+						windowFourierTransform(Ictf(), Fctf, YSIZE(Fctf));
+					}
+					else if (ZSIZE(Ictf()) == YSIZE(Ictf())*2) // Subtomo weights included in the CTF file
+					{
+						do_subtomo_weights = true;
+						MultidimArray<RFLOAT> &Mctf = Ictf();
+						long int max_r2 = (XSIZE(Mctf) -1) * (XSIZE(Mctf) - 1);
+						FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+								{
+									// Make sure windowed FT has nothing in the corners, otherwise we end up with an asymmetric FT!
+									if (kp*kp + ip*ip + jp*jp <= max_r2)
+									{
+										FFTW_ELEM(Fctf, kp, ip, jp) = DIRECT_A3D_ELEM(Mctf, ((kp < 0) ? (kp + YSIZE(Mctf)) : (kp)), \
+										((ip < 0) ? (ip + YSIZE(Mctf)) : (ip)), jp);
+										FFTW_ELEM(Fstw, kp, ip, jp) = DIRECT_A3D_ELEM(Mctf, ((kp < 0) ? (kp + ZSIZE(Mctf)) : (kp + YSIZE(Mctf))), \
+										((ip < 0) ? (ip + YSIZE(Mctf)) : (ip)), jp);
+									}
+								}
+					}
 				}
 				// if dimensions are neither cubical nor FFTW, stop
 				else
@@ -5512,6 +5543,9 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 
 		// Store Fctf
 		exp_Fctf[img_id] = Fctf;
+		if (do_subtomo_weights)
+			exp_STweight[img_id] = Fstw;
+
 
 		// If we're doing multibody refinement, now subtract projections of the other bodies from both the masked and the unmasked particle
 		if (mymodel.nr_bodies > 1)
@@ -5725,7 +5759,9 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 		std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted_nomask,
 		std::vector<MultidimArray<RFLOAT> >&exp_local_Fctf,
 		std::vector<RFLOAT> &exp_local_sqrtXi2,
-		std::vector<MultidimArray<RFLOAT> >&exp_local_Minvsigma2)
+		std::vector<MultidimArray<RFLOAT> >&exp_local_Minvsigma2,
+		std::vector<MultidimArray<RFLOAT> > &exp_STweight,
+		std::vector<MultidimArray<RFLOAT> > &exp_local_STweight)
 {
 
 #ifdef TIMING
@@ -5751,6 +5787,13 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 	exp_local_Minvsigma2.resize(exp_nr_images);
 	exp_local_Fctf.resize(exp_nr_images);
 	exp_local_sqrtXi2.resize(exp_nr_images);
+
+	bool do_subtomo_weights = false;
+	if (ZSIZE(exp_STweight[0]) > 0)
+	{
+		do_subtomo_weights = true;
+		exp_local_STweight.resize(exp_nr_images);
+	}
 
 	MultidimArray<Complex > Fimg, Fimg_nomask;
 	for (int img_id = 0, my_trans_image = 0; img_id < exp_nr_images; img_id++)
@@ -5817,6 +5860,9 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 			// In the second pass of the adaptive approach this will have no effect,
 			// since then exp_current_image_size will be the same as the size of exp_Fctfs
 			windowFourierTransform(exp_Fctf[img_id], exp_local_Fctf[img_id], exp_current_image_size);
+
+			if (do_subtomo_weights)
+				windowFourierTransform(exp_STweight[img_id], exp_local_STweight[img_id], exp_current_image_size);
 
 			// Also prepare Minvsigma2
 			if (mymodel.data_dim == 3)
@@ -6018,7 +6064,9 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 		std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted,
 		std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2,
 		std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
-		std::vector<RFLOAT> &exp_local_sqrtXi2)
+		std::vector<RFLOAT> &exp_local_sqrtXi2,
+		std::vector<MultidimArray<RFLOAT> > &exp_STweight,
+		std::vector<MultidimArray<RFLOAT> > &exp_local_STweight)
 {
 
 #ifdef TIMING
@@ -6060,7 +6108,9 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 
 	precalculateShiftedImagesCtfsAndInvSigma2s(false, false, part_id, exp_current_oversampling, metadata_offset,
 			exp_itrans_min, exp_itrans_max, exp_Fimg, dummy, exp_Fctf, exp_local_Fimgs_shifted, dummy2,
-			exp_local_Fctf, exp_local_sqrtXi2, exp_local_Minvsigma2);
+			exp_local_Fctf, exp_local_sqrtXi2, exp_local_Minvsigma2, exp_STweight, exp_local_STweight);
+
+	bool do_subtomo_weights = (exp_local_STweight.size() > 0);
 
 	// Loop only from exp_iclass_min to exp_iclass_max to deal with seed generation in first iteration
 	for (int exp_iclass = exp_iclass_min; exp_iclass <= exp_iclass_max; exp_iclass++)
@@ -6338,11 +6388,28 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 												// Negative values because smaller is worse in this case
 												diff2 = 0.;
 												RFLOAT suma2 = 0.;
-												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Frefctf)
+
+												if (do_subtomo_weights)
 												{
-													diff2 -= (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real * (*(Fimg_shift + n)).real;
-													diff2 -= (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag * (*(Fimg_shift + n)).imag;
-													suma2 += norm(DIRECT_MULTIDIM_ELEM(Frefctf, n));
+													FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Frefctf)
+													{
+														RFLOAT stweight = DIRECT_MULTIDIM_ELEM(exp_local_STweight[img_id], n);
+														if (stweight > 0)
+														{
+															diff2 -= stweight*(DIRECT_MULTIDIM_ELEM(Frefctf, n)).real * (*(Fimg_shift + n)).real;
+															diff2 -= stweight*(DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag * (*(Fimg_shift + n)).imag;
+															suma2 += norm(DIRECT_MULTIDIM_ELEM(Frefctf, n)) * stweight;
+														}
+													}
+												}
+												else
+												{
+													FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Frefctf)
+													{
+														diff2 -= (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real * (*(Fimg_shift + n)).real;
+														diff2 -= (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag * (*(Fimg_shift + n)).imag;
+														suma2 += norm(DIRECT_MULTIDIM_ELEM(Frefctf, n));
+													}
 												}
 												// Normalised cross-correlation coefficient: divide by power of reference (power of image is a constant)
 												diff2 /= sqrt(suma2) * exp_local_sqrtXi2[img_id];
@@ -6354,11 +6421,28 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 												// all |Xij|2 terms that lie between current_size and ori_size
 												// Factor two because of factor 2 in division below, NOT because of 2-dimensionality of the complex plane!
 												diff2 = exp_highres_Xi2_img[img_id] / 2.;
-												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Frefctf)
+
+												if (do_subtomo_weights)
 												{
-													RFLOAT diff_real = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real - (*(Fimg_shift + n)).real;
-													RFLOAT diff_imag = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag - (*(Fimg_shift + n)).imag;
-													diff2 += (diff_real * diff_real + diff_imag * diff_imag) * 0.5 * (*(Minvsigma2 + n));
+													FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Frefctf)
+													{
+														RFLOAT stweight = DIRECT_MULTIDIM_ELEM(exp_local_STweight[img_id], n);
+														if (stweight > 0)
+														{
+															RFLOAT diff_real = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real - (*(Fimg_shift + n)).real;
+															RFLOAT diff_imag = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag - (*(Fimg_shift + n)).imag;
+															diff2 += (diff_real * diff_real + diff_imag * diff_imag) * 0.5 * (*(Minvsigma2 + n)) * stweight;
+														}
+													}
+												}
+												else
+												{
+													FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Frefctf)
+													{
+														RFLOAT diff_real = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real - (*(Fimg_shift + n)).real;
+														RFLOAT diff_imag = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag - (*(Fimg_shift + n)).imag;
+														diff2 += (diff_real * diff_real + diff_imag * diff_imag) * 0.5 * (*(Minvsigma2 + n));
+													}
 												}
 											}
 #ifdef TIMING
@@ -7149,7 +7233,9 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 		std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted_nomask,
 		std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2,
 		std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
-		std::vector<RFLOAT> &exp_local_sqrtXi2)
+		std::vector<RFLOAT> &exp_local_sqrtXi2,
+		std::vector<MultidimArray<RFLOAT> > &exp_STweight,
+		std::vector<MultidimArray<RFLOAT> > &exp_local_STweight)
 {
 #ifdef TIMING
 	if (part_id == exp_my_first_part_id)
@@ -7166,7 +7252,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 	// Re-do below because now also want unmasked images AND if (stricht_highres_exp >0.) then may need to resize
 	precalculateShiftedImagesCtfsAndInvSigma2s(true, true, part_id, exp_current_oversampling, metadata_offset,
 			exp_itrans_min, exp_itrans_max, exp_Fimg, exp_Fimg_nomask, exp_Fctf, exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask,
-			exp_local_Fctf, exp_local_sqrtXi2, exp_local_Minvsigma2);
+			exp_local_Fctf, exp_local_sqrtXi2, exp_local_Minvsigma2, exp_STweight, exp_local_STweight);
 
 	// In doThreadPrecalculateShiftedImagesCtfsAndInvSigma2s() the origin of the exp_local_Minvsigma2s was omitted.
 	// Set those back here
@@ -7217,7 +7303,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 	std::vector<RFLOAT> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
 	Matrix2D<RFLOAT> A, Abody, Aori;
 	MultidimArray<Complex > Fimg, Fref, Frefctf, Fimg_otfshift, Fimg_otfshift_nomask, Fimg_store_sgd;
-	MultidimArray<RFLOAT> Minvsigma2, Mctf, Fweight;
+	MultidimArray<RFLOAT> Minvsigma2, Mctf, Fweight, STweight;
 	RFLOAT rot, tilt, psi;
 	bool have_warned_small_scale = false;
 	// Initialising... exp_Fimgs[0] has image_current_size[optics_group] (not coarse_size!)
@@ -7241,6 +7327,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 		Fimg_store_sgd.resize(Frefctf);
 	}
 
+	bool do_subtomo_weights = (exp_local_STweight.size() > 0);
 
 	if (mymodel.nr_bodies > 1)
 	{
@@ -7541,18 +7628,22 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 												timer.tic(TIMING_WSUM_DIFF2);
 											}
 #endif
-
 											// Store weighted sum of squared differences for sigma2_noise estimation
 											// Suggestion Robert Sinkovitz: merge difference and scale steps to make better use of cache
+											if (do_subtomo_weights)
+												STweight = exp_local_STweight[img_id];
+											RFLOAT mystweight = 1.;
 											FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mresol_fine[optics_group])
 											{
+												if (do_subtomo_weights)
+													mystweight = DIRECT_MULTIDIM_ELEM(STweight, n);
 												int ires = DIRECT_MULTIDIM_ELEM(Mresol_fine[optics_group], n);
-												if (ires > -1)
+												if (ires > -1 && mystweight > 0)
 												{
 													// Use FT of masked image for noise estimation!
 													RFLOAT diff_real = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real - (*(Fimg_shift + n)).real;
 													RFLOAT diff_imag = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag - (*(Fimg_shift + n)).imag;
-													RFLOAT wdiff2 = weight * (diff_real*diff_real + diff_imag*diff_imag);
+													RFLOAT wdiff2 = weight * (diff_real*diff_real + diff_imag*diff_imag) * mystweight;
 													// group-wise sigma2_noise
 													DIRECT_MULTIDIM_ELEM(thr_wsum_sigma2_noise[img_id], ires) += wdiff2;
 													// For norm_correction
@@ -7562,10 +7653,10 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 														RFLOAT sumXA, sumA2;
 														sumXA = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real * (*(Fimg_shift + n)).real;
 														sumXA += (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag * (*(Fimg_shift + n)).imag;
-														exp_wsum_scale_correction_XA[img_id] += weight * sumXA;
+														exp_wsum_scale_correction_XA[img_id] += weight * sumXA * mystweight;
 														sumA2 = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real * (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real;
 														sumA2 += (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag * (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag;
-														exp_wsum_scale_correction_AA[img_id] += weight * sumA2;
+														exp_wsum_scale_correction_AA[img_id] += weight * sumA2 * mystweight;
 													}
 												}
 											}
@@ -7691,15 +7782,35 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 											// Use the FT of the unmasked image to back-project in order to prevent reconstruction artefacts! SS 25oct11
 											if (ctf_premultiplied)
 											{
-												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fimg)
+												if (do_subtomo_weights) // Subtomo should be processed with ctf_premultiplied
 												{
-													RFLOAT myctf = DIRECT_MULTIDIM_ELEM(Mctf, n);
-													RFLOAT weightxinvsigma2 = weight * DIRECT_MULTIDIM_ELEM(Minvsigma2, n);
-													// now Fimg stores sum of all shifted w*Fimg
-													(DIRECT_MULTIDIM_ELEM(Fimg, n)).real += (*(Fimg_store + n)).real * weightxinvsigma2;
-													(DIRECT_MULTIDIM_ELEM(Fimg, n)).imag += (*(Fimg_store + n)).imag * weightxinvsigma2;
-													// now Fweight stores sum of all w and multiply by CTF^2
-													DIRECT_MULTIDIM_ELEM(Fweight, n) += weightxinvsigma2 * myctf * myctf;
+													FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fimg)
+													{
+														mystweight = DIRECT_MULTIDIM_ELEM(STweight, n);
+														if (mystweight > 0)
+														{
+														RFLOAT myctf = DIRECT_MULTIDIM_ELEM(Mctf, n);
+														RFLOAT weightxinvsigma2 = weight * DIRECT_MULTIDIM_ELEM(Minvsigma2, n) * mystweight;
+														// now Fimg stores sum of all shifted w*Fimg
+														(DIRECT_MULTIDIM_ELEM(Fimg, n)).real += (*(Fimg_store + n)).real * weightxinvsigma2;
+														(DIRECT_MULTIDIM_ELEM(Fimg, n)).imag += (*(Fimg_store + n)).imag * weightxinvsigma2;
+														// now Fweight stores sum of all w and multiply by CTF^2
+														DIRECT_MULTIDIM_ELEM(Fweight, n) += weightxinvsigma2 * myctf * myctf;
+														}
+													}
+												}
+												else
+												{
+													FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fimg)
+													{
+														RFLOAT myctf = DIRECT_MULTIDIM_ELEM(Mctf, n);
+														RFLOAT weightxinvsigma2 = weight * DIRECT_MULTIDIM_ELEM(Minvsigma2, n);
+														// now Fimg stores sum of all shifted w*Fimg
+														(DIRECT_MULTIDIM_ELEM(Fimg, n)).real += (*(Fimg_store + n)).real * weightxinvsigma2;
+														(DIRECT_MULTIDIM_ELEM(Fimg, n)).imag += (*(Fimg_store + n)).imag * weightxinvsigma2;
+														// now Fweight stores sum of all w and multiply by CTF^2
+														DIRECT_MULTIDIM_ELEM(Fweight, n) += weightxinvsigma2 * myctf * myctf;
+													}
 												}
 											}
 											else
@@ -7822,7 +7933,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 												DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_CLASS) = (RFLOAT)exp_iclass + 1;
 												DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_PMAX) = exp_max_weight[img_id];
 											}
-										}
+										} // end if weight > exp_max_weight[img_id]
 									} // end if weight >= exp_significant_weight
 								} // end loop iover_trans
 							} // end loop itrans
