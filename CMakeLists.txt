@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
 
-#
 #if(POLICY CMP0048)
 #  cmake_policy(SET CMP0048 NEW)
 #endif()
@@ -17,6 +16,11 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 add_definitions(-DINSTALL_LIBRARY_DIR=${CMAKE_INSTALL_PREFIX}/lib/)
 add_definitions(-DSOURCE_DIR=${CMAKE_SOURCE_DIR}/src/)
+
+if(MDT_TYPE_CHECK)
+    message(" DEVELOPER MODE: MetaDataTable type check is enabled.")
+    add_definitions(-DMETADATA_TABLE_TYPE_CHECK)
+endif()
 
 # message(STATUS "INSTALL_LIBRARY_DIR set to ${CMAKE_INSTALL_PREFIX}/lib/")
 # message(STATUS "SOURCE_DIR set to ${CMAKE_SOURCE_DIR}/src/")
