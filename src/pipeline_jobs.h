@@ -153,12 +153,14 @@ static bool do_allow_change_minimum_dedicated;
 #define NODE_MIC_COORDS		2 // Suffix for particle coordinates in micrographs (e.g. autopick.star or .box)
 #define NODE_PART_DATA		3 // A metadata (STAR) file with particles (e.g. particles.star or run1_data.star)
 //#define NODE_MOVIE_DATA		4 // A metadata (STAR) file with particle movie-frames (e.g. particles_movie.star or run1_ct27_data.star)
-#define NODE_2DREFS       	5 // A STAR file with one or multiple 2D references, e.g. autopick_references.star
+#define NODE_REFS       	5 // A STAR file with one or multiple references, e.g. autopick_references.star
 #define NODE_3DREF       	6 // A single 3D-reference, e.g. map.mrc
 #define NODE_MASK			7 // 3D mask, e.g. mask.mrc or masks.star
+// SHWS 28nov2019: NODE_MODEL should disappear now, only here for backwards compatbility
 #define NODE_MODEL		    8 // A model STAR-file for class selection
 #define NODE_OPTIMISER		9 // An optimiser STAR-file for job continuation
 #define NODE_HALFMAP		10// Unfiltered half-maps from 3D auto-refine, e.g. run1_half?_class001_unfil.mrc
+// SHWS 28nov2019: NODE_FINALMAP should disappear now, only here for backwards compatbility
 #define NODE_FINALMAP		11// Sharpened final map from post-processing (cannot be used as input)
 #define NODE_RESMAP			12// Resmap with local resolution (cannot be used as input)
 #define NODE_PDF_LOGFILE    13// PDF logfile
@@ -169,14 +171,11 @@ static bool do_allow_change_minimum_dedicated;
 #define NODE_MICS_LABEL			 "rlnMicrographStar"
 #define NODE_MIC_COORDS_LABEL	 "rlnCoordinateStar"
 #define NODE_PART_DATA_LABEL	 "rlnParticleStar"
-//#define NODE_MOVIE_DATA_LABEL
-#define NODE_2DREFS_LABEL        "rlnReferenceStar"
-#define NODE_3DREF_LABEL       	 "rlnReferenceMap"
+#define NODE_REFS_LABEL          "rlnReferenceStar"
+#define NODE_3DREF_LABEL       	 "rlnDensityMap"
 #define NODE_MASK_LABEL			 "rlnMask"
-#define NODE_MODEL_LABEL		 "rlnModelStar"
 #define NODE_OPTIMISER_LABEL	 "rlnOptimiserStar"
 #define NODE_HALFMAP_LABEL		 "rlnHalfMap"
-#define NODE_FINALMAP_LABEL		 "rlnFinalMap"
 #define NODE_RESMAP_LABEL		 "rlnLocalResolutionMap"
 #define NODE_PDF_LOGFILE_LABEL   "rlnPdfLogfile"
 #define NODE_POST_LABEL          "rlnPostprocessStar"
@@ -186,14 +185,14 @@ static std::map<int, std::string> node_type2label = {{NODE_MOVIES, NODE_MOVIES_L
 		{NODE_MICS, NODE_MICS_LABEL},
 		{NODE_MIC_COORDS, NODE_MIC_COORDS_LABEL},
 		{NODE_PART_DATA, NODE_PART_DATA_LABEL},
-		{NODE_2DREFS, NODE_2DREFS_LABEL},
+		{NODE_REFS, NODE_REFS_LABEL},
 		{NODE_3DREF, NODE_3DREF_LABEL},
 		{NODE_MASK, NODE_MASK_LABEL},
-		{NODE_MODEL, NODE_MODEL_LABEL},
+		{NODE_MODEL, NODE_OPTIMISER_LABEL}, // SHWS 27nov2019: no longer distinguish between MODEL and OPTIMISER nodes ... keep integer NODE for backwards compatibility
 		{NODE_OPTIMISER, NODE_OPTIMISER_LABEL},
 		{NODE_HALFMAP, NODE_HALFMAP_LABEL},
-		{NODE_FINALMAP, NODE_FINALMAP_LABEL},
-		{NODE_RESMAP, NODE_RESMAP_LABEL},
+		{NODE_FINALMAP, NODE_3DREF_LABEL}, // SHWS 27nov2019: no longer distinguish between 3DREF and FINAL maps ... keep integer NODE for backwards compatibility
+		{NODE_RESMAP, NODE_3DREF_LABEL},
 		{NODE_PDF_LOGFILE, NODE_PDF_LOGFILE_LABEL},
 		{NODE_POST, NODE_POST_LABEL},
 		{NODE_POLISH_PARAMS, NODE_POLISH_PARAMS_LABEL}};
@@ -202,13 +201,13 @@ static std::map<std::string, int> node_label2type = {{NODE_MOVIES_LABEL, NODE_MO
 		{NODE_MICS_LABEL, NODE_MICS},
 		{NODE_MIC_COORDS_LABEL, NODE_MIC_COORDS},
 		{NODE_PART_DATA_LABEL, NODE_PART_DATA},
-		{NODE_2DREFS_LABEL, NODE_2DREFS},
+		{NODE_REFS_LABEL, NODE_REFS},
 		{NODE_3DREF_LABEL, NODE_3DREF},
 		{NODE_MASK_LABEL, NODE_MASK},
-		{NODE_MODEL_LABEL, NODE_MODEL},
+//		{NODE_MODEL_LABEL, NODE_MODEL},
 		{NODE_OPTIMISER_LABEL, NODE_OPTIMISER},
 		{NODE_HALFMAP_LABEL, NODE_HALFMAP},
-		{NODE_FINALMAP_LABEL, NODE_FINALMAP},
+//		{NODE_FINALMAP_LABEL, NODE_FINALMAP},
 		{NODE_RESMAP_LABEL, NODE_RESMAP},
 		{NODE_PDF_LOGFILE_LABEL, NODE_PDF_LOGFILE},
 		{NODE_POST_LABEL, NODE_POST},
@@ -227,13 +226,13 @@ static std::map<std::string, int> node_label2type = {{NODE_MOVIES_LABEL, NODE_MO
 #define PROC_2DCLASS_LABEL 		 "Class2D"      // 2D classification (from input particles)
 #define PROC_3DCLASS_LABEL		 "Class3D"      // 3D classification (from input 2D/3D particles, an input 3D-reference, and possibly a 3D mask)
 #define PROC_3DAUTO_LABEL        "Refine3D"     // 3D auto-refine (from input particles, an input 3Dreference, and possibly a 3D mask)
-//#define PROC_POLISH_NAME	     "Polish"       // Particle-polishing (from movie-particles)
+//#define PROC_POLISH_LABEL	     "Polish"       // Particle-polishing (from movie-particles)
 #define PROC_MASKCREATE_LABEL    "MaskCreate"   // Process to create masks from input maps
 #define PROC_JOINSTAR_LABEL      "JoinStar"     // Process to create masks from input maps
 #define PROC_SUBTRACT_LABEL      "Subtract"     // Process to subtract projections of parts of the reference from experimental images
 #define PROC_POST_LABEL			 "PostProcess"  // Post-processing (from unfiltered half-maps and a possibly a 3D mask)
 #define PROC_RESMAP_LABEL  	     "LocalRes"     // Local resolution estimation (from unfiltered half-maps and a 3D mask)
-//#define PROC_MOVIEREFINE_NAME  "MovieRefine"  // Movie-particle extraction and refinement combined
+//#define PROC_MOVIEREFINE_LABEL "MovieRefine"  // Movie-particle extraction and refinement combined
 #define PROC_INIMODEL_LABEL		 "InitialModel" // De-novo generation of 3D initial model (using SGD)
 #define PROC_MULTIBODY_LABEL	 "MultiBody"    // Multi-body refinement
 #define PROC_MOTIONREFINE_LABEL  "Polish"       // Jasenko's motion fitting program for Bayesian polishing (to replace MovieRefine?)

@@ -1145,6 +1145,8 @@ bool PipeLine::markAsFinishedJob(int this_job, std::string &error_message, bool 
 		{
 
 			fn_opt = fn_opts[fn_opts.size()-1]; // the last one
+			Node node3(fn_opt, NODE_OPTIMISER);
+			addNewOutputEdge(this_job, node3);
 
 			// Also get data.star
 			FileName fn_data = fn_opt.without("_optimiser.star") + "_data.star";
@@ -1154,11 +1156,6 @@ bool PipeLine::markAsFinishedJob(int this_job, std::string &error_message, bool 
 			FileName fn_root = fn_opt.without("_optimiser.star");
 			if (processList[this_job].type == PROC_3DAUTO)
 				fn_root += "_half1";
-
-			FileName fn_model = fn_root + "_model.star";
-			Node node3(fn_model, NODE_MODEL);
-			addNewOutputEdge(this_job, node3);
-
 
 			FileName fn_map = fn_root + "_class???.mrc";
 			std::vector<FileName> fn_maps;
@@ -1609,13 +1606,6 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 		}
 
 	} // end if subtract
-	else if (processList[this_job].type == PROC_POST)
-	{
-
-		fn_pattern = processList[this_job].name + "*masked.mrc";
-		fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
-
-	} // end if postprocess
 
 
 	// Now actually move all the files
@@ -2322,14 +2312,14 @@ std::string PipeLineFlowChart::getDownwardsArrowLabel(PipeLine &pipeline, long i
 			mylabel = integerToString(nr_obj) + " particles";
 			break;
 		}
-		case NODE_2DREFS:
+		case NODE_REFS:
 		{
 			mylabel = "2Drefs";
 			break;
 		}
 		case NODE_3DREF:
 		{
-			mylabel = "3D ref";
+			mylabel = "3D map";
 			break;
 		}
 		case NODE_MASK:
@@ -2337,12 +2327,15 @@ std::string PipeLineFlowChart::getDownwardsArrowLabel(PipeLine &pipeline, long i
 			mylabel = "mask";
 			break;
 		}
+/*
+		SHWS 27nov2019: this no longer works, as I replaved NODE_MODEL by NODE_OPTIMISER. Bt then, flowchart generation isn't very much used anyway...
 		case NODE_MODEL:
 		{
 			nr_obj = MD.read(pipeline.nodeList[mynode].name, "model_classes", NULL, "", true); // true means: only count nr entries;
 			mylabel = integerToString(nr_obj) + " classes";
 			break;
 		}
+*/
 		case NODE_OPTIMISER:
 		{
 			mylabel = "continue";
@@ -2351,11 +2344,6 @@ std::string PipeLineFlowChart::getDownwardsArrowLabel(PipeLine &pipeline, long i
 		case NODE_HALFMAP:
 		{
 			mylabel = "half-map";
-			break;
-		}
-		case NODE_FINALMAP:
-		{
-			mylabel = "final map";
 			break;
 		}
 		case NODE_RESMAP:
@@ -2446,7 +2434,7 @@ long int PipeLineFlowChart::addProcessToUpwardsFlowChart(std::ofstream &fh, Pipe
 
 	        if (pipeline.processList[new_process].type == PROC_AUTOPICK)
 	        {
-	        	is_right = (mynodetype == NODE_2DREFS);
+	        	is_right = (mynodetype == NODE_REFS);
 	        	right_label="2D refs";
 	        }
 	        else if (pipeline.processList[new_process].type == PROC_EXTRACT)

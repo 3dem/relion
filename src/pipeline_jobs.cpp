@@ -58,7 +58,8 @@ std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, 
 		if (iter > 0)
 		{
 			// For classifications: output node model.star to make selections
-			Node node2(fn_out + "_model.star", NODE_MODEL);
+			// SHWS 27nov2019: as optimiser.star already is a node type, and it contains model.star, only keep NODE_OPTIMISER
+			Node node2(fn_out + "_optimiser.star", NODE_OPTIMISER);
 			result.push_back(node2);
 		}
 		else
@@ -1172,8 +1173,8 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 			int mynodetype;
 			if (node_type == "Particles STAR file (.star)")
 				mynodetype = NODE_PART_DATA;
-			else if (node_type == "2D references (.star or .mrcs)")
-				mynodetype = NODE_2DREFS;
+			else if (node_type == "Multiple (2D/3D) references (.star or .mrcs)")
+				mynodetype = NODE_REFS;
 			else if (node_type == "3D reference (.mrc)")
 				mynodetype = NODE_3DREF;
 			else if (node_type == "3D mask (.mrc)")
@@ -1719,7 +1720,7 @@ void RelionJob::initialiseAutopickJob()
 	joboptions["log_adjust_thr"] = JobOption("Adjust default threshold (stddev):", 0, -1., 1., 0.05, "Use this to pick more (negative number -> lower threshold) or less (positive number -> higher threshold) particles compared to the default setting. The threshold is moved this many standard deviations away from the average.");
 	joboptions["log_upper_thr"] = JobOption("Upper threshold (stddev):", 999., 0., 10., 0.5, "Use this to discard picks with LoG thresholds that are this many standard deviations above the average, e.g. to avoid high contrast contamination like ice and ethane droplets. Good values depend on the contrast of micrographs and need to be interactively explored; for low contrast micrographs, values of ~ 1.5 may be reasonable, but the same value will be too low for high-contrast micrographs.");
 
-	joboptions["fn_refs_autopick"] = JobOption("2D references:", NODE_2DREFS, "", "Input references (*.{star,mrcs})", "Input STAR file or MRC stack with the 2D references to be used for picking. Note that the absolute greyscale needs to be correct, so only use images created by RELION itself, e.g. by 2D class averaging or projecting a RELION reconstruction.");
+	joboptions["fn_refs_autopick"] = JobOption("2D references:", NODE_REFS, "", "Input references (*.{star,mrcs})", "Input STAR file or MRC stack with the 2D references to be used for picking. Note that the absolute greyscale needs to be correct, so only use images created by RELION itself, e.g. by 2D class averaging or projecting a RELION reconstruction.");
 	joboptions["do_ref3d"]= JobOption("OR: provide a 3D reference?", false, "Set this option to Yes if you want to provide a 3D map, which will be projected into multiple directions to generate 2D references.");
 	joboptions["fn_ref3d_autopick"] = JobOption("3D reference:", NODE_3DREF, "", "Input reference (*.{mrc})", "Input MRC file with the 3D reference maps, from which 2D references will be made by projection. Note that the absolute greyscale needs to be correct, so only use maps created by RELION itself from this data set.");
 	joboptions["ref3d_symmetry"] = JobOption("Symmetry:", std::string("C1"), "Symmetry point group of the 3D reference. Only projections in the asymmetric part of the sphere will be generated.");
@@ -1857,7 +1858,7 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 			}
 
 			command += " --ref " + joboptions["fn_refs_autopick"].getString();
-			Node node2(joboptions["fn_refs_autopick"].getString(), NODE_2DREFS);
+			Node node2(joboptions["fn_refs_autopick"].getString(), NODE_REFS);
 			inputNodes.push_back(node2);
 		}
 
@@ -2148,7 +2149,7 @@ void RelionJob::initialiseSelectJob()
 {
 	hidden_name = ".gui_select";
 
-	joboptions["fn_model"] = JobOption("Select classes from model.star:", NODE_MODEL, "", "STAR files (*.star)", "A _model.star file from a previous 2D or 3D classification run to select classes from.");
+	joboptions["fn_model"] = JobOption("Select classes from job:", NODE_OPTIMISER, "", "STAR files (*_optimiser.star)", "A _optimiser.star (or for backwards compatibility also a _model.star) file from a previous 2D or 3D classification run to select classes from.");
 	joboptions["fn_mic"] = JobOption("OR select from micrographs.star:", NODE_MICS, "", "STAR files (*.star)", "A micrographs.star file to select micrographs from.");
 	joboptions["fn_data"] = JobOption("OR select from particles.star:", NODE_PART_DATA, "", "STAR files (*.star)", "A particles.star file to select individual particles from.");
 	joboptions["fn_coords"] = JobOption("OR select from picked coords:", NODE_MIC_COORDS, "", "STAR files (coords_suffix*.star)", "A coordinate suffix .star file to select micrographs while inspecting coordinates (and/or CTFs).");
@@ -2349,7 +2350,7 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 			{
 				FileName fn_imgs = outputname+"class_averages.star";
 				command += " --fn_imgs " + fn_imgs;
-				Node node3(fn_imgs, NODE_2DREFS);
+				Node node3(fn_imgs, NODE_REFS);
 				outputNodes.push_back(node3);
 
 				if (joboptions["do_recenter"].getBoolean())
@@ -3875,7 +3876,7 @@ void RelionJob::initialiseMultiBodyJob()
 
 	hidden_name = ".gui_multibody";
 
-	joboptions["fn_in"] = JobOption("Consensus refinement optimiser.star: ", std::string(""), "STAR Files (*_optimiser.star)", "Refine3D/", "Select the *_optimiser.star file for the iteration of the consensus refinement \
+	joboptions["fn_in"] = JobOption("Consensus refinement optimiser.star: ", NODE_OPTIMISER, "", "STAR Files (*_optimiser.star)", "Select the *_optimiser.star file for the iteration of the consensus refinement \
 from which you want to start multi-body refinement.");
 
 	joboptions["fn_cont"] = JobOption("Continue from here: ", std::string(""), "STAR Files (*_optimiser.star)", "CURRENT_ODIR", "Select the *_optimiser.star file for the iteration \
@@ -4404,7 +4405,7 @@ void RelionJob::initialiseSubtractJob()
 {
 	hidden_name = ".gui_subtract";
 
-	joboptions["fn_opt"] = JobOption("Input optimiser.star: ", std::string(""), "STAR Files (*_optimiser.star)", "./", "Select the *_optimiser.star file for the iteration of the 3D refinement/classification \
+	joboptions["fn_opt"] = JobOption("Input optimiser.star: ", NODE_OPTIMISER, "", "STAR Files (*_optimiser.star)", "Select the *_optimiser.star file for the iteration of the 3D refinement/classification \
 which you want to use for subtraction. It will use the maps from this run for the subtraction, and of no particles input STAR file is given below, it will use all of the particles from this run.");
 	joboptions["fn_mask"] = JobOption("Mask of the signal to keep:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a soft mask where the protein density you wish to subtract from the experimental particles is black (0) and the density you wish to keep is white (1).");
 	joboptions["do_data"] = JobOption("Use different particles?", false, "If set to Yes, subtraction will be performed on the particles in the STAR file below, instead of on all the particles of the 3D refinement/classification from the optimiser.star file.");
@@ -4575,9 +4576,9 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 	// The output name contains a directory: use it for output
 	command += " --o " + outputname + "postprocess";
 	command += "  --angpix " + joboptions["angpix"].getString();
-	Node node1(outputname+"postprocess.mrc", NODE_FINALMAP);
+	Node node1(outputname+"postprocess.mrc", NODE_3DREF);
 	outputNodes.push_back(node1);
-	Node node2(outputname+"postprocess_masked.mrc", NODE_FINALMAP);
+	Node node2(outputname+"postprocess_masked.mrc", NODE_3DREF);
 	outputNodes.push_back(node2);
 
 	Node node2b(outputname+"logfile.pdf", NODE_PDF_LOGFILE);
@@ -4754,7 +4755,7 @@ bool RelionJob::getCommandsLocalresJob(std::string &outputname, std::vector<std:
 			outputNodes.push_back(node0);
 		}
 
-		Node node1(outputname+"relion_locres_filtered.mrc", NODE_FINALMAP);
+		Node node1(outputname+"relion_locres_filtered.mrc", NODE_3DREF);
 		outputNodes.push_back(node1);
 		Node node2(outputname+"relion_locres.mrc", NODE_RESMAP);
 		outputNodes.push_back(node2);

@@ -450,6 +450,9 @@ enum EMDLabel
 	EMDL_POSTPROCESS_RANDOMISE_FROM,
 	EMDL_POSTPROCESS_UNFIL_HALFMAP1,
 	EMDL_POSTPROCESS_UNFIL_HALFMAP2,
+	EMDL_POSTPROCESSED_MAP,
+	EMDL_POSTPROCESSED_MAP_MASKED,
+
 
 	EMDL_SAMPLING_IS_3D,
 	EMDL_SAMPLING_IS_3D_TRANS,
@@ -984,6 +987,8 @@ private:
 		EMDL::addLabel(EMDL_POSTPROCESS_RANDOMISE_FROM, EMDL_DOUBLE, "rlnRandomiseFrom", "Resolution (in A) from which the phases are randomised in the postprocessing step");
 		EMDL::addLabel(EMDL_POSTPROCESS_UNFIL_HALFMAP1, EMDL_STRING, "rlnUnfilteredMapHalf1", "Name of the unfiltered map from halfset 1");
 		EMDL::addLabel(EMDL_POSTPROCESS_UNFIL_HALFMAP2, EMDL_STRING, "rlnUnfilteredMapHalf2", "Name of the unfiltered map from halfset 2");
+		EMDL::addLabel(EMDL_POSTPROCESSED_MAP, EMDL_STRING, "rlnPostprocessedMap", "Name of the postprocssed map");
+		EMDL::addLabel(EMDL_POSTPROCESSED_MAP_MASKED, EMDL_STRING, "rlnPostprocessedMapMasked", "Name of the masked postprocssed map");
 
 		EMDL::addLabel(EMDL_SAMPLING_IS_3D, EMDL_BOOL, "rlnIs3DSampling", "Flag to indicate this concerns a 3D sampling ");
 		EMDL::addLabel(EMDL_SAMPLING_IS_3D_TRANS, EMDL_BOOL, "rlnIs3DTranslationalSampling", "Flag to indicate this concerns a x,y,z-translational sampling ");
