@@ -31,7 +31,6 @@
 class FlexAnalyser
 {
 public:
-
 	// I/O Parser
 	IOParser parser;
 
@@ -116,11 +115,11 @@ public:
 
 	// Output logfile.pdf with histograms of all eigenvalues
 	void makePCAhistograms(std::vector< std::vector<double> > &projected_input,
-			std::vector<double> &eigenvalues, std::vector<double> &means);
+	                       std::vector<double> &eigenvalues, std::vector<double> &means);
 
 	// Generate maps to make movies of the variance along the most significant eigenvectors
 	void make3DModelsAlongPrincipalComponents(std::vector< std::vector<double> > &projected_input,
-			std::vector< std::vector<double> > &eigenvectors, std::vector<double> &means);
+	                                          std::vector< std::vector<double> > &eigenvectors, std::vector<double> &means);
 
 	// Dump all projections to a text file
 	void writeAllPCAProjections(std::vector< std::vector<double> > &projected_input);
@@ -131,10 +130,8 @@ public:
 };
 
 void principalComponentsAnalysis(const std::vector< std::vector<double> > &input,
-		std::vector< std::vector<double> > &eigenvectors,
-		std::vector<double> &eigenvalues, std::vector<double> &means,
-		std::vector< std::vector<double> > &projected_input);
-
-
+                                 std::vector< std::vector<double> > &eigenvectors,
+                                 std::vector<double> &eigenvalues, std::vector<double> &means,
+                                 std::vector< std::vector<double> > &projected_input);
 
 #endif /* SRC_FLEX_ANALYSER_H_ */

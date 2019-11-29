@@ -982,7 +982,7 @@ std::vector<std::pair<int, std::vector<int>>> ObservationModel::splitParticlesBy
 
 const Image<RFLOAT>& ObservationModel::getMtfImage(int optGroup, int s)
 {
-	#pragma omp critical
+	#pragma omp critical(getmtf)
 	{
 		if (mtfImage[optGroup].find(s) == mtfImage[optGroup].end())
 		{
@@ -1062,7 +1062,7 @@ const Image<RFLOAT>& ObservationModel::getMtfImage(int optGroup, int s)
 
 const Image<RFLOAT>& ObservationModel::getAverageMtfImage(int s)
 {
-	#pragma omp critical
+	#pragma omp critical(getavgmtf)
 	{
 
 		if (avgMtfImage.find(s) == avgMtfImage.end())
