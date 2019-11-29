@@ -639,11 +639,13 @@ void Postprocessing::writeOutput()
 	MDlist.setValue(EMDL_POSTPROCESS_BFACTOR, global_bfactor );
 	MDlist.setValue(EMDL_POSTPROCESS_UNFIL_HALFMAP1, fn_I1);
 	MDlist.setValue(EMDL_POSTPROCESS_UNFIL_HALFMAP2, fn_I2);
+	MDlist.setValue(EMDL_POSTPROCESSED_MAP, fn_out + ".mrc");
 	if (do_mask)
 	{
 		RFLOAT randomize_at_Ang = XSIZE(I1())* angpix / randomize_at;
 		MDlist.setValue(EMDL_MASK_NAME, fn_mask);
 		MDlist.setValue(EMDL_POSTPROCESS_RANDOMISE_FROM, randomize_at_Ang);
+		MDlist.setValue(EMDL_POSTPROCESSED_MAP_MASKED, fn_out + "_masked.mrc");
 	}
 	if (do_auto_bfac)
 	{
@@ -1035,7 +1037,7 @@ void Postprocessing::run_locres(int rank, int size)
 		fn_tmp = fn_out + "_locres_filtered.mrc";
 		I2.setSamplingRateInHeader(angpix);
 		I2.write(fn_tmp);
-		
+
 #ifdef DEBUG
 		I1() = Isumw;
 		fn_tmp = fn_out + "_locres_sumw.mrc";
@@ -1056,7 +1058,7 @@ void Postprocessing::run_locres(int rank, int size)
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Imask())
 				if (DIRECT_MULTIDIM_ELEM(Imask(), n) > 0.5)
 					values.push_back(DIRECT_MULTIDIM_ELEM(I1(), n));
-			
+
 			std::vector <RFLOAT> histX, histY;
 			CPlot2D *plot2D=new CPlot2D("");
                 	FileName fn_eps = fn_out + "_histogram.eps";
