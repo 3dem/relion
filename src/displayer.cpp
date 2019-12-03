@@ -402,7 +402,7 @@ int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, Observat
 }
 
 int basisViewerWindow::fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast,
-                                              RFLOAT _scale, int _particle_radius, bool _do_startend, FileName _fn_coords,
+                                              RFLOAT _scale, RFLOAT _coord_scale, int _particle_radius, bool _do_startend, FileName _fn_coords,
                                               FileName _fn_color, FileName _fn_mic, FileName _color_label, RFLOAT _color_blue_value, RFLOAT _color_red_value)
 {
 	// Scroll bars
@@ -412,6 +412,7 @@ int basisViewerWindow::fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOA
 	pickerViewerCanvas canvas(0, 0, xsize_canvas, ysize_canvas);
 	canvas.particle_radius = _particle_radius;
 	canvas.do_startend = _do_startend;
+	canvas.coord_scale = _coord_scale;
 	canvas.SetScroll(&scroll);
 	canvas.fill(image, _minval, _maxval, _sigma_contrast, _scale);
 	canvas.fn_coords = _fn_coords;
@@ -430,7 +431,6 @@ int basisViewerWindow::fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOA
 	resizable(*this);
 	show();
 	return Fl::run();
-
 }
 
 int basisViewerWindow::fillSingleViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale)
@@ -1804,8 +1804,8 @@ void pickerViewerCanvas::draw()
 			fl_color(FL_GREEN);
 		}
 		int xcoori, ycoori;
-		xcoori = ROUND(xcoor * scale) + scroll->x() - scroll->hscrollbar.value();
-		ycoori = ROUND(ycoor * scale) + scroll->y() - scroll->scrollbar.value();
+		xcoori = ROUND(xcoor * coord_scale * scale) + scroll->x() - scroll->hscrollbar.value();
+		ycoori = ROUND(ycoor * coord_scale * scale) + scroll->y() - scroll->scrollbar.value();
 		fl_circle(xcoori, ycoori, particle_radius);
 
 		if (do_startend)
@@ -1833,9 +1833,9 @@ int pickerViewerCanvas::handle(int ev)
 		RFLOAT scale = boxes[0]->scale;
 		int xc = (int)Fl::event_x() - scroll->x() + scroll->hscrollbar.value();
 		int yc = (int)Fl::event_y() - scroll->y() + scroll->scrollbar.value();
-		RFLOAT xcoor = (RFLOAT)ROUND(xc/scale);
-		RFLOAT ycoor = (RFLOAT)ROUND(yc/scale);
-		RFLOAT rad2 = particle_radius*particle_radius/(scale*scale);
+		RFLOAT xcoor = (RFLOAT)ROUND(xc / (coord_scale * scale));
+		RFLOAT ycoor = (RFLOAT)ROUND(yc / (coord_scale * scale));
+		RFLOAT rad2 = particle_radius * particle_radius / (scale * scale);
 		if (button == FL_LEFT_MOUSE && !with_shift && !with_control)
 		{
 			// Left mouse for picking
@@ -2061,6 +2061,7 @@ void pickerViewerCanvas::findColorColumnForCoordinates()
 			iimg--; // counting starts at 1 in STAR file!
 
 			// Check that this entry in the coord file has the same xpos and ypos
+			// TODO: coord_scale
 			RFLOAT my_xpos, my_ypos;
 			MDcoords.getValue(EMDL_IMAGE_COORD_X, my_xpos, iimg);
 			MDcoords.getValue(EMDL_IMAGE_COORD_Y, my_ypos, iimg);
@@ -2486,7 +2487,6 @@ void displayerGuiWindow::cb_display_i()
 
 void Displayer::read(int argc, char **argv)
 {
-
 	parser.setCommandLine(argc, argv);
 
 	int gen_section = parser.addSection("General options");
@@ -2533,7 +2533,9 @@ void Displayer::read(int argc, char **argv)
 	do_pick = parser.checkOption("--pick", "Pick coordinates in input image");
 	do_pick_startend = parser.checkOption("--pick_start_end", "Pick start-end coordinates in input image");
 	fn_coords = parser.getOption("--coords", "STAR file with picked particle coordinates", "");
+	coord_scale = textToFloat(parser.getOption("--coord_scale", "Scale particle coordinates before display", "1.0"));
 	particle_radius = textToFloat(parser.getOption("--particle_radius", "Particle radius in pixels", "100"));
+	particle_radius *= coord_scale;
 	lowpass = textToFloat(parser.getOption("--lowpass", "Lowpass filter (in A) to filter micrograph before displaying", "0"));
 	highpass = textToFloat(parser.getOption("--highpass", "Highpass filter (in A) to filter micrograph before displaying", "0"));
 	fn_color = parser.getOption("--color_star", "STAR file with a column for red-blue coloring (a subset of) the particles", "");
@@ -2800,7 +2802,7 @@ void Displayer::run()
 		basisViewerWindow win(CEIL(scale*XSIZE(img())), CEIL(scale*YSIZE(img())), fn_in.c_str());
 		if (fn_coords=="")
 			fn_coords = fn_in.withoutExtension()+"_coords.star";
-		win.fillPickerViewerCanvas(img(), minval, maxval, sigma_contrast, scale, ROUND(scale*particle_radius), do_pick_startend, fn_coords,
+		win.fillPickerViewerCanvas(img(), minval, maxval, sigma_contrast, scale, coord_scale, ROUND(scale*particle_radius), do_pick_startend, fn_coords,
     		fn_color, fn_in, color_label, color_blue_value, color_red_value);
 	}
 	else if (fn_in.isStarFile())

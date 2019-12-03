@@ -36,7 +36,7 @@ public:
 	void run();
 
 	template <typename T>
-	static void write_tiff_one_page(TIFF *tif, MultidimArray<T> buf, const int filter=COMPRESSION_LZW, const int level=6, const bool strip_per_line=false)
+	static void write_tiff_one_page(TIFF *tif, MultidimArray<T> buf, const float pixel_size=-1, const int filter=COMPRESSION_LZW, const int level=6, const bool strip_per_line=false)
 	{
 		TIFFSetField(tif, TIFFTAG_SOFTWARE, "RELION");
 		TIFFSetField(tif, TIFFTAG_IMAGEWIDTH, XSIZE(buf));
@@ -78,6 +78,13 @@ public:
 			if (level <= 0 || level > 9)
 				REPORT_ERROR("Deflate level must be 1, 2, ..., 9");
 			TIFFSetField(tif, TIFFTAG_ZIPQUALITY, level);
+		}
+
+		if (pixel_size > 0)
+		{
+			TIFFSetField(tif, TIFFTAG_RESOLUTIONUNIT, RESUNIT_CENTIMETER); // 1 cm = 1E8 A
+			TIFFSetField(tif, TIFFTAG_XRESOLUTION, 1E8 / pixel_size); // pixels / 1 cm
+			TIFFSetField(tif, TIFFTAG_YRESOLUTION, 1E8 / pixel_size);
 		}
 
 		// Have to flip the Y axis

@@ -209,7 +209,7 @@ void Micrograph::write(FileName filename)
 	if (model != NULL) {
 		MD.setValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model->getModelVersion());
 	} else {
-		MD.setValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, MOTION_MODEL_NULL);
+		MD.setValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, (int)MOTION_MODEL_NULL);
 	}
 	MD.write(fh);
 
@@ -433,7 +433,7 @@ void Micrograph::read(FileName fn_in, bool read_hotpixels)
 	if (MDglobal.getValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model_version)) {
 		if (model_version == MOTION_MODEL_THIRD_ORDER_POLYNOMIAL) {
 			model = new ThirdOrderPolynomialModel();
-		} else if (model_version == MOTION_MODEL_NULL) {
+		} else if (model_version == (int)MOTION_MODEL_NULL) {
 			model = NULL;
 		} else {
 			std::cerr << "Warning: Ignoring unknown motion model " << model_version << std::endl;
