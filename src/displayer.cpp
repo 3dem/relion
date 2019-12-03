@@ -1824,7 +1824,7 @@ int pickerViewerCanvas::handle(int ev)
 		int yc = (int)Fl::event_y() - scroll->y() + scroll->scrollbar.value();
 		RFLOAT xcoor = (RFLOAT)ROUND(xc / (coord_scale * scale));
 		RFLOAT ycoor = (RFLOAT)ROUND(yc / (coord_scale * scale));
-		RFLOAT rad2 = particle_radius * particle_radius / (scale * scale);
+		RFLOAT rad2 = particle_radius * particle_radius / (coord_scale * coord_scale * scale * scale);
 		if (button == FL_LEFT_MOUSE && !with_shift && !with_control)
 		{
 			// Left mouse for picking
