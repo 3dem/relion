@@ -36,6 +36,7 @@ const Fl_Menu_Item color_choices[] =
 	{"Yellow (6)",  0, (Fl_Callback*)0, (void*)6, 0, 0, 0, 0, FL_YELLOW},
 	{0} // sentinel
 };
+const int NUM_COLORS = 6;
 
 /************************************************************************/
 void DisplayBox::draw()
@@ -392,6 +393,8 @@ int basisViewerWindow::fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOA
                                               RFLOAT _scale, RFLOAT _coord_scale, int _particle_radius, bool _do_startend, FileName _fn_coords,
                                               FileName _fn_color, FileName _fn_mic, FileName _color_label, RFLOAT _color_blue_value, RFLOAT _color_red_value)
 {
+	current_selection_type = 2; // Green
+
 	// Scroll bars
 	Fl_Scroll scroll(0, 0, w(), h());
 	int xsize_canvas = CEIL(XSIZE(image)*_scale);
@@ -435,13 +438,11 @@ int basisViewerWindow::fillSingleViewerCanvas(MultidimArray<RFLOAT> image, RFLOA
 	resizable(*this);
 	show();
 	return Fl::run();
-
 }
 
 void basisViewerCanvas::fill(MetaDataTable &MDin, ObservationModel *obsModel, EMDLabel display_label, EMDLabel text_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
                             RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol, bool _do_recenter, long int max_images, RFLOAT lowpass, RFLOAT highpass)
 {
-
 	ncol = _ncol;
 	int nr_imgs = MDin.numberOfObjects();
 	if (nr_imgs > 1)
@@ -1727,7 +1728,6 @@ int popupSetContrastWindow::fill()
 }
 */
 
-
 void pickerViewerCanvas::draw()
 {
 	RFLOAT scale = boxes[0]->scale;
@@ -1748,40 +1748,50 @@ void pickerViewerCanvas::draw()
 			if (EMDL::isInt(color_label))
 			{
 				int ival;
-				MDcoords.getValue(color_label, ival);
+				if (!MDcoords.getValue(color_label, ival))
+				{
+					ival = 2; // populate as green if absent
+					MDcoords.setValue(color_label, ival);
+				}
 				colval = (RFLOAT)ival;
+				if (ival >= 1 && ival <= NUM_COLORS)
+					fl_color(color_choices[ival - 1].labelcolor_);
+				else
+					fl_color(FL_GREEN);
 			}
 			else
 			{
 				MDcoords.getValue(color_label, colval);
-			}
-			// Assume undefined values are set to -999....
-			if ((colval + 999.) < XMIPP_EQUAL_ACCURACY)
-			{
-				fl_color(FL_GREEN);
-			}
-			else
-			{
-				colval = XMIPP_MAX(colval, smallest_color_value);
-				colval = XMIPP_MIN(colval, biggest_color_value);
-				unsigned char red, blue;
-				if (do_blue_to_red)
+
+				// Assume undefined values are set to -999....
+				if ((colval + 999.) < XMIPP_EQUAL_ACCURACY)
 				{
-					red  = ROUND(255. * (colval - smallest_color_value) / (biggest_color_value - smallest_color_value));
-					blue = ROUND(255. * (biggest_color_value - colval)  / (biggest_color_value - smallest_color_value));
+					fl_color(FL_GREEN);
 				}
 				else
 				{
-					blue = ROUND(255. * (colval - smallest_color_value) / (biggest_color_value - smallest_color_value));
-					red  = ROUND(255. * (biggest_color_value - colval)  / (biggest_color_value - smallest_color_value));
+					colval = XMIPP_MAX(colval, smallest_color_value);
+					colval = XMIPP_MIN(colval, biggest_color_value);
+					unsigned char red, blue;
+					if (do_blue_to_red)
+					{
+						red  = ROUND(255. * (colval - smallest_color_value) / (biggest_color_value - smallest_color_value));
+						blue = ROUND(255. * (biggest_color_value - colval)  / (biggest_color_value - smallest_color_value));
+					}
+					else
+					{
+						blue = ROUND(255. * (colval - smallest_color_value) / (biggest_color_value - smallest_color_value));
+						red  = ROUND(255. * (biggest_color_value - colval)  / (biggest_color_value - smallest_color_value));
+					}
+					fl_color(red, 0, blue);
 				}
-				fl_color(red,0,blue);
 			}
 		}
 		else
 		{
 			fl_color(FL_GREEN);
 		}
+
 		int xcoori, ycoori;
 		xcoori = ROUND(xcoor * coord_scale * scale) + scroll->x() - scroll->hscrollbar.value();
 		ycoori = ROUND(ycoor * coord_scale * scale) + scroll->y() - scroll->scrollbar.value();
@@ -1831,7 +1841,8 @@ int pickerViewerCanvas::handle(int ev)
 					return 0;
 			}
 			RFLOAT aux = -999., zero = 0.;
-			int iaux = -999;
+			int iaux = current_selection_type;
+			std::cout << "picked with type = " << iaux << std::endl;
 
 			// Else store new coordinate
 			if (!MDcoords.isEmpty())
