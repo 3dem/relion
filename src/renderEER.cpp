@@ -10,6 +10,10 @@
 #include <src/image.h>
 #include <src/renderEER.h>
 
+#ifdef HAVE_TIFF
+#include <tiffio.h>
+#endif
+
 //#define DEBUG_EER
 
 //#define TIMING
@@ -32,8 +36,11 @@ int EER_upsample = 2;
 
 const char EERRenderer::EER_FOOTER_OK[]  = "ThermoFisherECComprOK000";
 const char EERRenderer::EER_FOOTER_ERR[] = "ThermoFisherECComprERR00";
-const int EERRenderer::EER_IMAGE_PIXELS = 4096 * 4096;
+const int EERRenderer::EER_IMAGE_WIDTH = 4096;
+const int EERRenderer::EER_IMAGE_HEIGHT = 4096;
+const int EERRenderer::EER_IMAGE_PIXELS = EERRenderer::EER_IMAGE_WIDTH * EERRenderer::EER_IMAGE_HEIGHT;
 const unsigned int EERRenderer::EER_LEN_FOOTER = 24;
+const uint16_t EERRenderer::TIFF_COMPRESSION_EER = 65000;
 
 template <typename T>
 void EERRenderer::render8K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons)
@@ -60,6 +67,7 @@ void EERRenderer::render4K(MultidimArray<T> &image, std::vector<unsigned int> &p
 EERRenderer::EERRenderer()
 {
 	ready = false;
+	is_legacy = false;
 }
 
 EERRenderer::EERRenderer(FileName fn_movie)
@@ -68,6 +76,86 @@ EERRenderer::EERRenderer(FileName fn_movie)
 }
 
 void EERRenderer::read(FileName fn_movie)
+{
+#ifndef HAVE_TIFF
+	REPORT_ERROR("To use EER, you have to re-compile RELION with libtiff.");
+#else
+	TIFF* ftiff = TIFFOpen(fn_movie.c_str(), "r");
+	if (ftiff == NULL)
+	{
+		is_legacy = true;
+		readLegacy(fn_movie);
+	}
+	else
+	{
+		is_legacy = false;
+
+		// Check width & size
+
+		FILE *fh = fopen(fn_movie.c_str(), "r");
+		if (fh == NULL)
+			REPORT_ERROR("Failed to check file size of " + fn_movie);
+
+		fseek(fh, 0, SEEK_END);
+		long long file_size = ftell(fh);
+		fseek(fh, 0, SEEK_SET);
+
+		int width, height;
+		TIFFGetField(ftiff, TIFFTAG_IMAGEWIDTH, &width);
+		TIFFGetField(ftiff, TIFFTAG_IMAGELENGTH, &height);
+#ifdef DEBUG_EER
+		printf("EER in TIFF: %s size = %ld, width = %d, height = %d\n", fn_movie.c_str(), file_size, width, height);
+#endif
+		if (width != EER_IMAGE_WIDTH || height != EER_IMAGE_HEIGHT)
+			REPORT_ERROR("Currently we support only 4096x4096 pixel EER movies.");
+
+		// Find the number of frames
+		int nframes = 1;
+		while (TIFFSetDirectory(ftiff, nframes) != 0) nframes++;
+
+#ifdef DEBUG_EER
+		printf("EER in TIFF: %s nframes = %d\n", fn_movie.c_str(), nframes);
+#endif
+
+		// TODO: defer reading???
+
+		frame_starts.resize(nframes, 0);
+		frame_sizes.resize(nframes, 0);
+		buf = (unsigned char*)malloc(file_size); // This is big enough
+		if (buf == NULL)
+			REPORT_ERROR("Failed to allocate the buffer for " + fn_movie);
+		long long pos = 0;
+
+		// Read everything
+		for (int frame = 0; frame < nframes; frame++)
+		{
+			TIFFSetDirectory(ftiff, frame);
+			const int nstrips = TIFFNumberOfStrips(ftiff);
+			frame_starts[frame] = pos;
+
+			for (int strip = 0; strip < nstrips; strip++)
+			{
+				const int strip_size = TIFFRawStripSize(ftiff, strip);
+				if (pos + strip_size >= file_size)
+					REPORT_ERROR("EER: buffer overflow when reading raw strips.");
+
+				TIFFReadRawStrip(ftiff, strip, buf + pos, strip_size);
+				pos += strip_size;
+				frame_sizes[frame] += strip_size;
+			}
+#ifdef DEBUG_EER
+			printf("EER in TIFF: Read frame %d from %s, nstrips = %d, current pos in buffer = %lld / %lld\n", frame, fn_movie.c_str(), nstrips, pos, file_size);
+#endif
+		}
+	
+		TIFFClose(ftiff);
+	}
+
+	ready = true;
+#endif
+}
+
+void EERRenderer::readLegacy(FileName fn_movie)
 {
 	/* Check file size and load everything */
 	RCTIC(TIMING_READ_EER);
@@ -114,8 +202,6 @@ void EERRenderer::read(FileName fn_movie)
 	std::reverse(frame_starts.begin(), frame_starts.end());
 	std::reverse(frame_sizes.begin(), frame_sizes.end());
 	RCTOC(TIMING_BUILD_INDEX);
-
-	ready = true;	
 }
 
 EERRenderer::~EERRenderer()
@@ -137,7 +223,7 @@ int EERRenderer::getWidth()
 	if (!ready)
 		REPORT_ERROR("EERRenderer::getNFrames called before ready.");
 
-	return 4096 * EER_upsample;
+	return EER_IMAGE_WIDTH * EER_upsample;
 }
 
 int EERRenderer::getHeight()
@@ -145,7 +231,7 @@ int EERRenderer::getHeight()
 	if (!ready)
 		REPORT_ERROR("EERRenderer::getNFrames called before ready.");
 
-	return getWidth();
+	return EER_IMAGE_HEIGHT * EER_upsample;
 }
 
 template <typename T>
@@ -219,7 +305,6 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 				n_electron++;
 				n_pix++;
 			}
-
 #ifdef DEBUG_EER_DETAIL
 			printf("%d: %u %u, %u %u %d\n", pos, p1, s1, p2, s2, n_pix);
 #endif
@@ -258,5 +343,5 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 
 // Instantiate for Polishing
 template long long EERRenderer::renderFrames<float>(int frame_start, int frame_end, MultidimArray<float> &image);
-template long long EERRenderer::renderFrames<signed short>(int frame_start, int frame_end, MultidimArray<signed short> &image);
+template long long EERRenderer::renderFrames<unsigned short>(int frame_start, int frame_end, MultidimArray<unsigned short> &image);
 template long long EERRenderer::renderFrames<char>(int frame_start, int frame_end, MultidimArray<char> &image);

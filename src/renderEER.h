@@ -17,14 +17,16 @@ class EERRenderer {
 	int n_threads;
 
 	bool ready;
+	bool is_legacy;
 
 	std::vector<long long> frame_starts, frame_sizes;
 	unsigned char* buf;
 
 	static const char EER_FOOTER_OK[];
 	static const char EER_FOOTER_ERR[];
-	static const int EER_IMAGE_PIXELS;
+	static const int EER_IMAGE_WIDTH, EER_IMAGE_HEIGHT, EER_IMAGE_PIXELS;
 	static const unsigned int EER_LEN_FOOTER;
+	static const uint16_t TIFF_COMPRESSION_EER;
 
 	template <typename T>
 	void render8K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons);
@@ -50,6 +52,8 @@ class EERRenderer {
 	}
 
 	void read(FileName fn_movie);
+
+	void readLegacy(FileName fn_movie);
 	
 	int getNFrames();
 	int getWidth();
