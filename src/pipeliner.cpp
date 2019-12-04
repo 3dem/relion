@@ -739,8 +739,16 @@ int PipeLine::addScheduledJob(int job_type, std::string fn_options)
 }
 
 // Adds a scheduled job to the pipeline from the command line
-int PipeLine::addScheduledJob(RelionJob &job)
+int PipeLine::addScheduledJob(RelionJob &job, std::string fn_options)
 {
+	if (fn_options != "")
+	{
+		std::vector<std::string> options;
+		splitString(fn_options, ";", options);
+		for (long int iopt = 0; iopt < options.size(); iopt++)
+			job.setOption(options[iopt]);
+	}
+
 	std::string error_message;
 	int current_job = processList.size();
 	if (!runJob(job, current_job, true, job.is_continue, false, false, error_message)) // true is only_schedule, false means !is_scheduled, 2nd false means dont overwrite current

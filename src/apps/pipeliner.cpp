@@ -31,7 +31,7 @@
 class pipeliner_parameters
 {
 public:
-	FileName fn_sched, fn_jobids, fn_options, fn_alias, run_schedule, abort_schedule;
+	FileName fn_sched, fn_jobids, fn_options, fn_alias, run_schedule, abort_schedule, add_job_star;
 	int nr_repeat;
 	bool do_check_complete, do_overwrite_current;
 	long int minutes_wait, minutes_wait_before, seconds_wait_after, gentle_clean, harsh_clean;
@@ -56,8 +56,9 @@ public:
 		int check_section = parser.addSection("Check job completion options");
 		do_check_complete = parser.checkOption("--check_job_completion", "Use this flag to only check whether running jobs have completed");
 		int add_section = parser.addSection("Add scheduled jobs options");
+		add_job_star = parser.getOption("--addJobFromStar", "Add a job with the type and options as in this job.star to the pipeline","");
 		add_type = parser.getOption("--addJob", "Add a job of this type to the pipeline","");
-		fn_options = parser.getOption("--addJobOptions", "Options for this job","");
+		fn_options = parser.getOption("--addJobOptions", "Options for this job (either through --addJobFromStar or --addJob)","");
 		fn_alias = parser.getOption("--setJobAlias", "Set an alias to this job", "");
 		int run_section = parser.addSection("Run scheduled jobs options");
 		fn_jobids  = parser.getOption("--RunJobs", "Run these jobs", "");
@@ -84,6 +85,21 @@ public:
 		if (do_check_complete)
 		{
 			pipeline.checkProcessCompletion();
+		}
+		else if (add_job_star != "")
+		{
+			RelionJob job;
+			bool is_continue;
+			job.read(add_job_star, is_continue);
+			int job_num =pipeline.addScheduledJob(job);
+			if (fn_alias != "")
+			{
+				std::string error_message;
+				if (!pipeline.setAliasJob(job_num, fn_alias, error_message))
+				{
+					std::cerr << "WARNING: Failed to set the job alias to " << fn_alias << ". The job name remains the default." << std::endl;
+				}
+			}
 		}
 		else if (add_type != "")
 		{
