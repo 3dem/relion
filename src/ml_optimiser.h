@@ -179,6 +179,9 @@ public:
 	// Flag whether to split data from the beginning into two random halves
 	bool do_split_random_halves;
 
+	// Debug flag to process 1 half when doing do_split_random_halves, without using MPI
+	int debug_split_random_half;
+
 	// For safe-guarding the gold-standard separation
 	int my_halfset;
 
@@ -727,6 +730,7 @@ public:
 		max_coarse_size(0),
 		autosampling_hporder_local_searches(0),
 		do_split_random_halves(0),
+		debug_split_random_half(0),
 		random_seed(0),
 		do_gpu(0),
 		anticipate_oom(0),
