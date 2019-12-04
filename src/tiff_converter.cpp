@@ -60,65 +60,6 @@ void TIFFConverter::read(int argc, char **argv)
 		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 }
 
-template <typename T>
-void TIFFConverter::write_tiff_one_page(TIFF *tif, MultidimArray<T> buf, const int filter, const int level, const float pixel_size)
-{
-	TIFFSetField(tif, TIFFTAG_SOFTWARE, "relion_convert_to_tiff");
-	TIFFSetField(tif, TIFFTAG_IMAGEWIDTH, XSIZE(buf));
-	TIFFSetField(tif, TIFFTAG_IMAGELENGTH, YSIZE(buf));
-	TIFFSetField(tif, TIFFTAG_ROWSPERSTRIP, line_by_line ? 1 : YSIZE(buf));
-	TIFFSetField(tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
-	TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);
-	TIFFSetField(tif, TIFFTAG_SAMPLESPERPIXEL, 1);		
-
-	if (std::is_same<T, float>::value)
-	{
-		TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, 32);
-		TIFFSetField(tif, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_IEEEFP);
-	}
-	else if (std::is_same<T, unsigned short>::value)
-	{
-		TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, 16);
-		TIFFSetField(tif, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_UINT);
-	}
-	else if (std::is_same<T, short>::value)
-	{
-		TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, 16);
-		TIFFSetField(tif, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_INT);
-	}
-	else if (std::is_same<T, char>::value || std::is_same<T, unsigned char>::value )
-	{
-		TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, 8);
-		TIFFSetField(tif, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_UINT);
-	}
-	else
-	{
-		REPORT_ERROR("write_tiff_one_page: unknown data type");
-	}
-
-	// compression is COMPRESSION_LZW or COMPRESSION_DEFLATE or COMPRESSION_NONE
-	TIFFSetField(tif, TIFFTAG_COMPRESSION, filter);
-	if (filter == COMPRESSION_DEFLATE)
-	{
-		if (level <= 0 || level > 9)
-			REPORT_ERROR("Deflate level must be 1, 2, ..., 9");
-		TIFFSetField(tif, TIFFTAG_ZIPQUALITY, level);
-	}
-
-	if (pixel_size > 0)
-	{
-		TIFFSetField(tif, TIFFTAG_RESOLUTIONUNIT, RESUNIT_CENTIMETER); // 1 cm = 1E8 A
-		TIFFSetField(tif, TIFFTAG_XRESOLUTION, 1E8 / pixel_size); // pixels / 1 cm
-		TIFFSetField(tif, TIFFTAG_YRESOLUTION, 1E8 / pixel_size);
-	}
-
-	// Have to flip the Y axis
-	for (int iy = 0; iy < YSIZE(buf); iy++)
-		TIFFWriteScanline(tif, buf.data + (ny - 1 - iy) * XSIZE(buf), iy, 0);
-
-	TIFFWriteDirectory(tif);
-}
-
 void TIFFConverter::estimate(FileName fn_movie)
 {
 	Image<float> frame;
@@ -290,7 +231,8 @@ void TIFFConverter::unnormalise(FileName fn_movie, FileName fn_tiff)
 			DIRECT_MULTIDIM_ELEM(buf, n) = ival;
 		}
 
-		write_tiff_one_page(tif, buf, decide_filter(nx), deflate_level, angpix);
+		write_tiff_one_page(tif, buf, angpix, decide_filter(nx), deflate_level, line_by_line);
+
 		printf(" %s Frame %3d / %3d #Error %10d\n", fn_movie.c_str(), iframe + 1, nframes, error);
 	}
 
@@ -314,7 +256,7 @@ void TIFFConverter::only_compress(FileName fn_movie, FileName fn_tiff)
 	for (int iframe = 0; iframe < nframes; iframe++)
 	{
 		frame.read(fn_movie, true, iframe, false, true);
-		write_tiff_one_page(tif, frame(), decide_filter(nx), deflate_level, angpix);
+		write_tiff_one_page(tif, frame(), angpix, decide_filter(nx), deflate_level, line_by_line);
 		printf(" %s Frame %3d / %3d\n", fn_movie.c_str(), iframe + 1, nframes);
 	}
 
