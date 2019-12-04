@@ -29,7 +29,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 		FileName fn_img;
 		Image<RFLOAT> img, rec_img;
 		MultidimArray<Complex > Fimg;
-		MultidimArray<Complex > Faux(accMLO->transformer.fFourier,true);
+		MultidimArray<Complex > Faux;
 		MultidimArray<RFLOAT> Fctf;
 		Matrix2D<RFLOAT> Aori;
 		Matrix1D<RFLOAT> my_projected_com(baseMLO->mymodel.data_dim), my_refined_ibody_offset(baseMLO->mymodel.data_dim);
