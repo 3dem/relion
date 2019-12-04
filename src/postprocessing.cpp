@@ -758,7 +758,7 @@ void Postprocessing::writeOutput()
 	delete plot2D;
 
 	// Write a plot with the FSC curves
-
+	/*
 	std::string title2= "RELION/cisTEM FSC comparison; MW_mask = " +  floatToString(molweight_frommask/1000., 8,2) + " kDa";
 	CPlot2D *plot2Db = new CPlot2D(title2);
 	plot2Db->SetXAxisSize(600);
@@ -771,6 +771,7 @@ void Postprocessing::writeOutput()
 	plot2Db->SetYAxisTitle("Fourier Shell Correlation");
 	plot2Db->OutputPostScriptPlot(fn_out + "_fsc_part.eps");
 	delete plot2Db;
+	*/
 
 	// Also write XML file with FSC_true curve for EMDB submission
 	writeFscXml(MDfsc);
