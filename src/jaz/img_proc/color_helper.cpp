@@ -13,10 +13,9 @@ dRGB ColorHelper::signedToRedBlue(double d, double scale, double rbFract)
 	const double d_rb = d / (scale * rbFract);
 	const double d_g = (std::abs(d)/scale - rbFract) / (1.0 - rbFract);
 
-	return dRGB(
-		std::min(1.0, std::max(0.0,  d_rb)),
-		std::min(1.0, std::max(0.0,  d_g)),
-		std::min(1.0, std::max(0.0, -d_rb)) );
+	return dRGB(std::min(1.0, std::max(0.0,  d_rb)),
+	            std::min(1.0, std::max(0.0,  d_g)),
+	            std::min(1.0, std::max(0.0, -d_rb)));
 }
 
 void ColorHelper::writeAngleToPNG(const Image<RFLOAT> &img, std::string filename)
@@ -44,11 +43,9 @@ void ColorHelper::writeSignedToPNG(const Image<RFLOAT> &img, std::string filenam
 	#endif
 }
 
-
 void ColorHelper::writeSignedToEPS(std::string filename, int col, const std::vector<Image<RFLOAT> > &imgs,
 		const std::vector<double> &scales, const std::vector<std::string> &labels)
 {
-
 	// Check all images have the same size
 	int xdim = imgs[0].data.xdim;
 	int ydim = imgs[0].data.ydim;
@@ -60,10 +57,9 @@ void ColorHelper::writeSignedToEPS(std::string filename, int col, const std::vec
 	}
 
 	std::ofstream outputFile;
-    FileName fn_out = filename + ".eps";
+	FileName fn_out = filename + ".eps";
 	outputFile.open(fn_out.c_str());
 
-	//
 	int delta = 15;
 	int row = CEIL(nimgs/(RFLOAT)col);
 	int width = col * xdim + (col-1)*delta;
@@ -80,41 +76,46 @@ void ColorHelper::writeSignedToEPS(std::string filename, int col, const std::vec
 	}
 
 	// header
-    outputFile << "%!PS-Adobe-2.0 EPSF-1.2" << "\n";
-    outputFile << "%%BoundingBox: 0 0 " << ROUND(width/rescale)<< " " <<  ROUND(height/rescale) << "\n";
-    outputFile << "%%Pages: 1" << "\n";
-    outputFile << "%%EndComments" << "\n";
-    outputFile << "/Times-Roman findfont\n";
+	outputFile << "%!PS-Adobe-2.0 EPSF-1.2" << "\n";
+	outputFile << "%%BoundingBox: 0 0 " << ROUND(width/rescale)<< " " <<  ROUND(height/rescale) << "\n";
+	outputFile << "%%Pages: 1" << "\n";
+	outputFile << "%%EndComments" << "\n";
+	outputFile << "/Times-Roman findfont\n";
 	outputFile << ROUND(10/rescale) << " scalefont\n";
 	outputFile << "setfont\n";
 
 	// First put all the labels (without scale argument!)
 	int xcoord, ycoord, xpos, ypos;
-    for (int i = 0; i < imgs.size(); i++)
+	for (int i = 0; i < imgs.size(); i++)
 	{
-    	xpos = i%col;
-    	ypos = (row - 1) - i/col;
-    	xcoord = xpos * ROUND((xdim+delta)/rescale);
-    	ycoord = ypos * ROUND((ydim+delta)/rescale) + ROUND(ydim/rescale);
+		xpos = i%col;
+		ypos = (row - 1) - i/col;
+		xcoord = xpos * ROUND((xdim+delta)/rescale);
+		ycoord = ypos * ROUND((ydim+delta)/rescale) + ROUND(ydim/rescale);
 
 		// Print the label
-    	outputFile << "newpath\n";
+		outputFile << "newpath\n";
 		outputFile << (int)(xcoord) << " " << (int)(ycoord + ROUND(5/rescale)) << " moveto\n";
 		outputFile << "(" << labels[i] << ") show\n";
 	}
 
-    // one scale statement only!
+	// one scale statement only!
 	outputFile << ROUND(xdim/rescale) << " " << ROUND(ydim/rescale) << "  scale\n";
-    for (int i = 0; i < imgs.size(); i++)
+	for (int i = 0; i < imgs.size(); i++)
 	{
-    	xpos = i%col;
-    	ypos = (row - 1) - i/col;
-    	xcoord = xpos * (xdim + delta);
-    	ycoord = ypos * (ydim+delta) + ydim;
+		xpos = i%col;
+		ypos = (row - 1) - i/col;
+		xcoord = xpos * (xdim + delta);
+		ycoord = ypos * (ydim+delta) + ydim;
 
 		// The actual image
+		// Note that the number of elements in a string or array literal should be less than 64 K.
+		// Otherwise, earlier versions of Ghostscript and Preview in MacOS fails.
+		// Ref: https://stackoverflow.com/questions/7595532/postcript-maximum-array-size
+		//      http://paulbourke.net/dataformats/postscript/
 		outputFile << xdim << " " << ydim <<" 8 [" << xdim << " 0 0 -" << ydim << " -"<<xcoord << " " << ycoord<<"]\n";
-		outputFile << "{<\n";
+		outputFile << "{currentfile " << (xdim * 3) << " string readhexstring pop} bind\n";
+		outputFile << "false 3 colorimage\n";
 
 		long ii=0;
 		for (int y = 0; y < ydim; y++)
@@ -133,9 +134,7 @@ void ColorHelper::writeSignedToEPS(std::string filename, int col, const std::vec
 			}
 		}
 		if (ii!=0) outputFile << "\n";
-    	outputFile << std::dec;
-		outputFile << ">}\n";
-		outputFile << "false 3 colorimage\n";
+		outputFile << std::dec;
 		outputFile << "\n";
 	}
 

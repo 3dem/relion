@@ -3,8 +3,17 @@
 # Because gcc is compliant with a float128 type, fftw has become as well. nvcc is NOT. 
 # So -D__INTEL_COMPILER just manages to avoid compiling float128-targets (see fftw3.h, for instance).
 # Add -G to allow cuda-gdb to break inside kernels.
-set(EXTRA_NVCC_FLAGS "-D__INTEL_COMPILER --default-stream per-thread") 
+set(EXTRA_NVCC_FLAGS "-D__INTEL_COMPILER --default-stream per-thread")
 
+if(MDT_TYPE_CHECK)
+   # Unfortunately -std=c++0x is not supported. -Xcompiler=-std=c++0x also does not work.
+   # This flag is only for developers, so we don't have to worry about old compilers.
+   set(EXTRA_NVCC_FLAGS "${EXTRA_NVCC_FLAGS} -std=c++11")
+endif()
+
+#if(OPENMP_FOUND)
+#   set(EXTRA_NVCC_FLAGS "${EXTRA_NVCC_FLAGS} -fopenmp")
+#endif()
 set(RELION_NVCC_FLAGS "${CUDARCH} ${WARN_DBL} ${EXTRA_NVCC_FLAGS}" CACHE STRING "" FORCE)
 #message(STATUS "RELION_NVCC_FLAGS: ${RELION_NVCC_FLAGS}")
 

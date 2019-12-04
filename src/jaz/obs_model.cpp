@@ -982,7 +982,7 @@ std::vector<std::pair<int, std::vector<int>>> ObservationModel::splitParticlesBy
 
 const Image<RFLOAT>& ObservationModel::getMtfImage(int optGroup, int s)
 {
-	#pragma omp critical(getmtf)
+	#pragma omp critical(ObservationModel_getMtfImage)
 	{
 		if (mtfImage[optGroup].find(s) == mtfImage[optGroup].end())
 		{
@@ -1062,7 +1062,7 @@ const Image<RFLOAT>& ObservationModel::getMtfImage(int optGroup, int s)
 
 const Image<RFLOAT>& ObservationModel::getAverageMtfImage(int s)
 {
-	#pragma omp critical(getavgmtf)
+	#pragma omp critical(ObservationModel_getAverageMtfImage)
 	{
 
 		if (avgMtfImage.find(s) == avgMtfImage.end())
@@ -1084,7 +1084,7 @@ const Image<RFLOAT>& ObservationModel::getAverageMtfImage(int s)
 
 const Image<Complex>& ObservationModel::getPhaseCorrection(int optGroup, int s)
 {
-	#pragma omp critical
+	#pragma omp critical(ObservationModel_getPhaseCorrection)
 	{
 		if (phaseCorr[optGroup].find(s) == phaseCorr[optGroup].end())
 		{
@@ -1126,7 +1126,7 @@ const Image<Complex>& ObservationModel::getPhaseCorrection(int optGroup, int s)
 
 const Image<RFLOAT>& ObservationModel::getGammaOffset(int optGroup, int s)
 {
-	#pragma omp critical
+	#pragma omp critical(ObservationModel_getGammaOffset)
 	{
 		if (gammaOffset[optGroup].find(s) == gammaOffset[optGroup].end())
 		{
