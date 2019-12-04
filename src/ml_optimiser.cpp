@@ -5675,7 +5675,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 			}
 
 			// For the masked one, have to mask outside the circular mask to prevent negative values outside the mask in the subtracted image!
-			windowFourierTransform(Fsum_obody, Faux, mymodel.ori_size);
+			windowFourierTransform(Fsum_obody, Faux, image_full_size[optics_group]);
 			transformer.inverseFourierTransform(Faux, img());
 			CenterFFT(img(), false);
 
