@@ -104,6 +104,8 @@ void getFourierTransformsAndCtfs(long int part_id,
 					            DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_TILT),
 								DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_PSI), Aori, false);
 			my_projected_com = Aori * baseMLO->mymodel.com_bodies[ibody];
+			// This will have made my_projected_com of size 3 again! resize to mymodel.data_dim
+			my_projected_com.resize(baseMLO->mymodel.data_dim);
 
 			// Subtract the projected COM offset, to position this body in the center
 			// Also keep the my_old_offset in my_old_offset_ori
@@ -813,6 +815,8 @@ void getFourierTransformsAndCtfs(long int part_id,
 
 					// Projected COM for this body (using Aori, just like above for ibody and my_projected_com!!!)
 					other_projected_com = Aori * (baseMLO->mymodel.com_bodies[obody]);
+					// This will have made other_projected_com of size 3 again! resize to mymodel.data_dim
+					other_projected_com.resize(baseMLO->mymodel.data_dim);
 
 					// Do the exact same as was done for the ibody, but DONT selfROUND here, as later phaseShift applied to ibody below!!!
 					other_projected_com -= my_old_offset_ori;
