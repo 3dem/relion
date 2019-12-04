@@ -56,9 +56,9 @@ public:
 		int check_section = parser.addSection("Check job completion options");
 		do_check_complete = parser.checkOption("--check_job_completion", "Use this flag to only check whether running jobs have completed");
 		int add_section = parser.addSection("Add scheduled jobs options");
-		add_job_star = parser.getOption("--addJobFromStar", "Add a job with the type and options as in this job.star to the pipeline","");
-		add_type = parser.getOption("--addJob", "Add a job of this type to the pipeline","");
-		fn_options = parser.getOption("--addJobOptions", "Options for this job (either through --addJobFromStar or --addJob)","");
+		add_job_star = parser.getOption("--addJobFromStar", "Add a job with the type and options as in this job.star to the pipeline", "");
+		add_type = parser.getOption("--addJob", "Add a job of this type to the pipeline", "");
+		fn_options = parser.getOption("--addJobOptions", "Options for this job (either through --addJobFromStar or --addJob)", "");
 		fn_alias = parser.getOption("--setJobAlias", "Set an alias to this job", "");
 		int run_section = parser.addSection("Run scheduled jobs options");
 		fn_jobids  = parser.getOption("--RunJobs", "Run these jobs", "");
@@ -90,8 +90,9 @@ public:
 		{
 			RelionJob job;
 			bool is_continue;
-			job.read(add_job_star, is_continue);
-			int job_num =pipeline.addScheduledJob(job);
+			job.read(add_job_star, is_continue, true); // true = do_initialise
+			job.is_continue = false;
+			int job_num = pipeline.addScheduledJob(job, fn_options);
 			if (fn_alias != "")
 			{
 				std::string error_message;
