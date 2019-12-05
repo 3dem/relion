@@ -315,6 +315,7 @@ public:
 						bool printTimes= false);
 
 	void sgd_step(MultidimArray<Complex > &Fprev,
+			MultidimArray<RFLOAT > &tau2,
 		      MultidimArray<Complex > &Fgrad);
 
 	/*	Enforce Hermitian symmetry, apply helical symmetry as well as point-group symmetry

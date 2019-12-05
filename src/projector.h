@@ -213,9 +213,23 @@ public:
 	* Go from the Projector-centered fourier transform back to FFTW-uncentered one
 	*/
 	template <typename T>
-	void decenter(MultidimArray<T> &Min, MultidimArray<T> &Mout, int my_rmax2)
+	void decenter(MultidimArray<T> &Mout)
 	{
+		const int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
+		Mout.initZeros(data);
+		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Mout)
+		{
+			if (kp*kp + ip*ip + jp*jp <= max_r2)
+				DIRECT_A3D_ELEM(Mout, k, i, j) = A3D_ELEM(data, kp, ip, jp);
+		}
+	}
 
+	/*
+	* Go from the Projector-centered fourier transform back to FFTW-uncentered one
+	*/
+	template <typename T>
+	static void decenter(MultidimArray<T> &Min, MultidimArray<T> &Mout, int my_rmax2)
+	{
 		// Mout should already have the right size
 		// Initialize to zero
 		Mout.initZeros();
