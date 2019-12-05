@@ -1797,38 +1797,43 @@ void BackProjector::sgd_step(
 	Fgrad.reshape(Fprev);
 	Fgrad.initZeros();
 
+//	MultidimArray<RFLOAT> tau2_;
+//	tau2_.initZeros(ori_size / 2 + 1);
+//	MultidimArray<RFLOAT> counter(tau2_);
+//
+//	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fprev)
+//	{
+//		int r2 = kp*kp + ip*ip + jp*jp;
+//		if (r2 <= max_r2)
+//		{
+//			int r = ROUND( sqrt((RFLOAT)r2) );
+//			DIRECT_A1D_ELEM(tau2_, r) += norm(DIRECT_A3D_ELEM(Fprev, k, i, j) * std::pow(ori_size, 3)) / 2.;
+//			DIRECT_A1D_ELEM(counter, r) += 1;
+//		}
+//	}
+//
+//	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(tau2_)
+//	{
+//		RFLOAT t = 0;
+//		if (DIRECT_A1D_ELEM(counter, i) > 0.)
+//			t = DIRECT_A1D_ELEM(tau2_, i) / DIRECT_A1D_ELEM(counter, i);
+//
+//		if (i > 0)
+//			if (t == 0)
+//			{
+//				DIRECT_A1D_ELEM(tau2_, i) = DIRECT_A1D_ELEM(tau2_, i-1)*0.1; //This is so that the model can grow
+//				break;
+//			}
+//			else
+//				t = XMIPP_MIN(t, DIRECT_A1D_ELEM(tau2_, i-1)*0.95); //This imposes a decay in tau by at least 5%
+//
+//		DIRECT_A1D_ELEM(tau2_, i) = t;
+//	}
+
 	MultidimArray<RFLOAT> tau2_;
 	tau2_.initZeros(ori_size / 2 + 1);
-	MultidimArray<RFLOAT> counter(tau2_);
-
-	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fprev)
-	{
-		int r2 = kp*kp + ip*ip + jp*jp;
-		if (r2 <= max_r2)
-		{
-			int r = ROUND( sqrt((RFLOAT)r2) );
-			DIRECT_A1D_ELEM(tau2_, r) += norm(DIRECT_A3D_ELEM(Fprev, k, i, j) * std::pow(Fprev.ydim, 3)) / 2.;
-			DIRECT_A1D_ELEM(counter, r) += 1;
-		}
-	}
-
-	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(tau2_)
-	{
-		RFLOAT t = 0;
-		if (DIRECT_A1D_ELEM(counter, i) > 0.)
-			t = DIRECT_A1D_ELEM(tau2_, i) / DIRECT_A1D_ELEM(counter, i);
-
-		if (i > 0)
-			if (t == 0)
-			{
-				DIRECT_A1D_ELEM(tau2_, i) = DIRECT_A1D_ELEM(tau2_, i-1)*0.1;
-				break;
-			}
-			else
-				t = XMIPP_MIN(t, DIRECT_A1D_ELEM(tau2_, i-1)*0.9);
-
-		DIRECT_A1D_ELEM(tau2_, i) = t;
-	}
+	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(tau2)
+		DIRECT_A1D_ELEM(tau2_, i) = DIRECT_A1D_ELEM(tau2, i) * std::pow(ori_size, 2);
 
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fweight)
 	{
@@ -1843,7 +1848,7 @@ void BackProjector::sgd_step(
 						( DIRECT_A3D_ELEM(Fdata, k, i, j) - DIRECT_A3D_ELEM(Fprev, k, i, j) * 1. / t ) /
 						( DIRECT_A3D_ELEM(Fweight, k, i, j) + 1. / t );
 			}
-			else //If tau2 is too small we take the limit of our gradient expression
+			else //If tau2 is too small we simply use this limit of the gradient expression
 				DIRECT_A3D_ELEM(Fgrad, k, i, j) -= DIRECT_A3D_ELEM(Fprev, k, i, j);
 		}
 	}
