@@ -240,6 +240,11 @@ bool JobOption::readValue(std::ifstream& in)
 		std::string search_for = label;
 		if (label == "Estimate beamtilt?") // 3.0 compatibility
 			search_for = "Perform beamtilt estimation?";
+		else if (label == "Perform MTF correction?")
+		{
+			std::cerr << "A legacy job option \"Perform MTF correction?\" is ignored. If an MTF file name is supplied, MTF correction will be applied." << std::endl;
+			return false;
+		}
 
 		// Start reading the ifstream at the top
 		in.clear(); // reset eof if happened...

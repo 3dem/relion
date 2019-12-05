@@ -162,21 +162,6 @@ def load_star(filename):
 
     return datasets
 
-def appendJobOptionsFromRunJobFile(filename, job_options):
-    f = open(filename,'r')
-    for line in f: 
-        label = line.split(' == ')[0]
-        already_have_label = False
-        if not (('job_type' in label) or ('is_continue' in label)):
-            # search for this label in the input job_options
-            for option in job_options:
-                if ( label in option ):
-                    already_have_label = True
-            if not already_have_label:
-                job_options.append(line.replace('\n',''))
-    f.close()
-    return
-
 def getJobName(name_in_script, done_file):
     jobname = None
     # See if we've done this job before, i.e. whether it is in the done_file
@@ -192,7 +177,7 @@ def getJobName(name_in_script, done_file):
 
     return jobname
 
-def addJob(jobtype, name_in_script, done_file, options, alias=None):
+def addJob(jobtype, name_in_script, done_file, options, template=None, alias=None):
     jobname = getJobName(name_in_script, done_file)
 
     # If we hadn't done it before, add it now
@@ -204,10 +189,18 @@ def addJob(jobtype, name_in_script, done_file, options, alias=None):
         for opt in options[:]:
             optionstring += opt + ';'
 
-        command = 'relion_pipeliner --addJob ' + jobtype + ' --addJobOptions "' + optionstring + '"'
+        command = 'relion_pipeliner'
+
+        if template is None:
+            command += ' --addJob ' + jobtype
+        else:
+            command += ' --addJobFromStar ' + template
+
+        command += ' --addJobOptions "' + optionstring + '"'
         if alias is not None:
             command += ' --setJobAlias "' + alias + '"'
 
+        #print("Debug: addJob executes " + command)
         os.system(command)
 
         pipeline = load_star(PIPELINE_STAR)
@@ -229,6 +222,7 @@ def RunJobs(jobs, repeat, wait, schedulename):
 
     command = 'relion_pipeliner --schedule ' + schedulename + ' --repeat ' + str(repeat) + ' --min_wait ' + str(wait) + ' --RunJobs "' + runjobsstring + '" &' 
 
+    #print("Debug: RunJobs executes " + command)
     os.system(command)
 
 def CheckForExit():
@@ -316,14 +310,20 @@ def run_pipeline(opts):
                      'Minimum dedicated cores per node: == {}'.format(opts.queue_minimum_dedicated)]
 
     # Get the original STAR file
-    refine3d_run_file = opts.input_refine3d_job+'run.job'
-    f = open(refine3d_run_file,'r')
-    all_particles_star_file = ''
-    for line in f: 
-        if 'Input images STAR file' in line:
-            all_particles_star_file = line.split(' == ')[1].replace('\n','')
-            break
-    if (all_particles_star_file == ''):
+    refine3d_run_file = opts.input_refine3d_job+'job.star'
+    all_particles_star_file = None
+    if os.path.exists(refine3d_run_file):
+        for line in open(refine3d_run_file,'r'):
+            if 'fn_img' in line:
+                all_particles_star_file = line.split()[1].replace('\n','')
+                break
+    else:
+        refine3d_run_file = opts.input_refine3d_job+'run.job' # old style
+        for line in open(refine3d_run_file,'r'):
+            if 'Input images STAR file' in line:
+                all_particles_star_file = line.split(' == ')[1].replace('\n','')
+                break
+    if all_particles_star_file is None:
         print(' ERROR: cannot find input STAR file in', refine3d_run_file)
         exit(1)
 
@@ -349,7 +349,7 @@ def run_pipeline(opts):
 
         split_job_name = 'split_job_' + str(current_nr_particles)
         split_alias = opts.prefix + 'split_' + str(current_nr_particles)
-        split_job, already_had_it = addJob('Select', split_job_name, SETUP_CHECK_FILE, split_options, split_alias)
+        split_job, already_had_it = addJob('Select', split_job_name, SETUP_CHECK_FILE, split_options, None, split_alias)
         if not already_had_it:
             RunJobs([split_job], 1, 0, schedule_name)
             WaitForJob(split_job, 30)
@@ -386,10 +386,9 @@ def run_pipeline(opts):
         else:
             refine_options.append('Submit to queue? == No')
 
-        appendJobOptionsFromRunJobFile(refine3d_run_file, refine_options)
         refine_job_name = 'refine_job_' + str(current_nr_particles)
         refine_alias = opts.prefix + str(current_nr_particles)
-        refine_job, already_had_it = addJob('Refine3D', refine_job_name, SETUP_CHECK_FILE, refine_options, refine_alias)
+        refine_job, already_had_it = addJob('Refine3D', refine_job_name, SETUP_CHECK_FILE, refine_options, refine3d_run_file, refine_alias)
         if not already_had_it:
             RunJobs([refine_job], 1, 0, schedule_name)
             WaitForJob(refine_job, 30)
@@ -409,12 +408,13 @@ def run_pipeline(opts):
 
         if halfmap_filename is not None:
             # C. Run PostProcess
-            postprocess_run_file = opts.input_postprocess_job+'run.job'
+            postprocess_run_file = opts.input_postprocess_job+'job.star'
+            if not os.path.exists(postprocess_run_file):
+                postprocess_run_file = opts.input_postprocess_job+'run.job'
             post_options = ['One of the 2 unfiltered half-maps: == {}'.format(halfmap_filename)]
-            appendJobOptionsFromRunJobFile(postprocess_run_file, post_options)
             post_job_name = 'post_job_' + str(current_nr_particles)
             post_alias = opts.prefix + str(current_nr_particles)
-            post_job, already_had_it = addJob('PostProcess', post_job_name, SETUP_CHECK_FILE, post_options, post_alias)
+            post_job, already_had_it = addJob('PostProcess', post_job_name, SETUP_CHECK_FILE, post_options, postprocess_run_file, post_alias)
             if not already_had_it:
                 RunJobs([post_job], 1, 0, schedule_name)
                 WaitForJob(post_job, 30)
