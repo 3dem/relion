@@ -880,7 +880,7 @@ void MlOptimiserMpi::expectation()
 		timer.tic(TIMING_EXP_3);
 #endif
 	// D. Update the angular sampling (all nodes except master)
-	if (!node->isMaster() && (do_auto_refine || do_sgd) && iter > 1)
+	if (!node->isMaster() && (do_auto_refine) && iter > 1)
 		updateAngularSampling(node->rank == 1);
 
 	// The master needs to know about the updated parameters from updateAngularSampling
