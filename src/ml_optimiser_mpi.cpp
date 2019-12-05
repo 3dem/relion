@@ -2091,7 +2091,7 @@ void MlOptimiserMpi::maximization()
 							{
 								(wsum_model.BPref[ith_recons]).reconstructNGD(mymodel.Iref[ith_recons],
 										mymodel.tau2_class[ith_recons],
-										mymodel.tau2_fudge_factor,
+										(mydata.numberOfParticles()/subset_size) * mymodel.tau2_fudge_factor,
 										sgd_stepsize,
 										(iclass==0));
 							}
@@ -2101,7 +2101,7 @@ void MlOptimiserMpi::maximization()
 										gridding_nr_iter,
 										do_map,
 										mymodel.tau2_class[ith_recons],
-										(mydata.numberOfParticles()/subset_size) * mymodel.tau2_fudge_factor,
+										mymodel.tau2_fudge_factor,
 										wsum_model.pdf_class[iclass],
 										minres_map,
 										false);
