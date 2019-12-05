@@ -477,12 +477,12 @@ def run_pipeline(opts):
         ax1.set_title("Rosenthal & Henderson plot: B = 2.0 / slope = {:.1f}".format(b_factor));
 
         ax2 = ax1.twiny()
-        ax2.set_xlabel("#particles")
         ax2.xaxis.set_ticks_position("bottom")
         ax2.xaxis.set_label_position("bottom")
         ax2.set_xlim(ax1.get_xlim())
+        ax2.spines["bottom"].set_position(("axes", -0.15)) # In matplotlib 1.2, the order seems to matter
+        ax2.set_xlabel("#particles")
         ax2.set_xticklabels(np.exp(ax1.get_xticks()).astype(np.int))
-        ax2.spines["bottom"].set_position(("axes", -0.15))
 
         ax3 = ax1.twinx()
         ax3.set_ylabel("Resolution in $\AA$")
