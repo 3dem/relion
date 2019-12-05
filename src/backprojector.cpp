@@ -1412,7 +1412,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 
 		// Prevent divisions by zero: set Fweight to at least 1/1000th of the radially averaged weight at that resolution
 		// beyond r_max, set Fweight to at least 1/1000th of the radially averaged weight at r_max;
-//		std::cerr << " max_r2 = " << max_r2 << " r_max = " << r_max << " padding_factor = " << padding_factor 
+//		std::cerr << " max_r2 = " << max_r2 << " r_max = " << r_max << " padding_factor = " << padding_factor
 //	                  << " ROUND(sqrt(max_r2)) = " << ROUND(sqrt(max_r2)) << " ROUND(r_max * padding_factor) = " << ROUND(r_max * padding_factor) << std::endl;
 		MultidimArray<RFLOAT> radavg_weight(r_max), counter(r_max);
 		const int round_max_r2 = ROUND(r_max * padding_factor * r_max * padding_factor);
@@ -1464,7 +1464,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 				if (!have_warned)
 				{
 					std::cerr << " WARNING: ignoring divide by zero in skip_gridding: ires = " << ires << " kp = " << kp << " ip = " << ip << " jp = " << jp << std::endl;
-					std::cerr << " max_r2 = " << max_r2 << " r_max = " << r_max << " padding_factor = " << padding_factor 
+					std::cerr << " max_r2 = " << max_r2 << " r_max = " << r_max << " padding_factor = " << padding_factor
 					           << " ROUND(sqrt(max_r2)) = " << ROUND(sqrt(max_r2)) << " ROUND(r_max * padding_factor) = " << ROUND(r_max * padding_factor) << std::endl;
 					have_warned = true;
 				}
@@ -1775,10 +1775,122 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 
 }
 
+
+void BackProjector::reconstructNGD(
+		MultidimArray<RFLOAT> &vol_out,
+        const MultidimArray<RFLOAT> &tau2,
+        RFLOAT tau2_fudge,
+		RFLOAT ngd_stepsize,
+		bool printTimes)
+{
+
+	MultidimArray<RFLOAT> dummy;
+	Projector PPref(ori_size, interpolator, padding_factor, r_min_nn, data_dim);
+	PPref.computeFourierTransformMap(vol_out, dummy, r_max*2, 1, false); // false means no gridding correction
+
+	// Set Fconv to the right size
+	if (ref_dim == 2)
+		vol_out.setDimensions(pad_size, pad_size, 1, 1);
+	else
+        // Too costly to actually allocate the space
+        // Trick transformer with the right dimensions
+        vol_out.setDimensions(pad_size, pad_size, pad_size, 1);
+	FourierTransformer transformer;
+	transformer.setReal(vol_out); // Fake set real. 1. Allocate space for Fconv 2. calculate plans.
+	MultidimArray<Complex>& Fconv = transformer.getFourierReference();
+
+	const int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
+	RFLOAT oversampling_correction = (ref_dim == 3) ? (padding_factor * padding_factor * padding_factor) : (padding_factor * padding_factor);
+
+//#define DEBUG_NGD
+#ifdef DEBUG_NGD
+	std::cerr << " oversampling_correction= " << oversampling_correction << std::endl;
+	std::cerr << " pad_size= " << pad_size << " PPref.pad_size= " << PPref.pad_size << std::endl;
+	std::cerr << " r_max= " << r_max << " PPref.r_max= " << PPref.r_max << std::endl;
+	std::cerr << "PPref.data "; PPref.data.printShape(std::cerr);
+	std::cerr << "data "; data.printShape(std::cerr);
+	std::cerr << "weight "; weight.printShape(std::cerr);
+	std::cerr << "Fconv "; Fconv.printShape(std::cerr);
+#endif
+
+//#define WRITE_DIFF
+#ifdef WRITE_DIFF
+	MultidimArray<Complex> Fdiff_cen(PPref.data);
+#endif
+
+	FOR_ALL_ELEMENTS_IN_ARRAY3D(PPref.data)
+	{
+		const int r2 = k * k + i * i + j * j;
+		if (r2 < max_r2)
+		{
+			int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
+
+			RFLOAT invtau2;
+			Complex Fgrad;
+
+#ifdef WRITE_DIFF
+			invtau2 = 1. / (oversampling_correction * tau2_fudge * DIRECT_A1D_ELEM(tau2, ires));
+			if (A3D_ELEM(weight, k, i, j) > 1e-20)
+			{
+				A3D_ELEM(Fdiff_cen, k, i, j) = (A3D_ELEM(data, k, i, j) ) / (A3D_ELEM(weight, k, i, j) );
+			}
+			else
+			{
+				A3D_ELEM(Fdiff_cen, k, i, j) = 0.;
+			}
+#endif
+
+			if (DIRECT_A1D_ELEM(tau2, ires) > 1e-20)
+			{
+				// Calculate inverse of tau2
+				invtau2 = 1. / (oversampling_correction * tau2_fudge * DIRECT_A1D_ELEM(tau2, ires));
+				// Fgrad = (BP.data - Fprev/tau2)/ (BP.weight + 1/tau2)
+				Fgrad = (A3D_ELEM(data, k, i, j) - A3D_ELEM(PPref.data, k, i, j) * invtau2 ) /  (A3D_ELEM(weight, k, i, j) + invtau2);
+			}
+			else
+			{
+				// If tau2 is zero, Fgrad = -Fprev
+				Fgrad = - A3D_ELEM(PPref.data, k, i, j);
+			}
+
+			// NGD update: Fprev += sgd_stepsize * Fgrad
+			//if (k==0 && i==10 && j==0) std::cerr << " abs(A3D_ELEM(PPref.data, k, i, j))= " << abs(A3D_ELEM(PPref.data, k, i, j)) << " abs(Fgrad)= " << abs(Fgrad) << std::endl;
+			A3D_ELEM(PPref.data, k, i, j) += ngd_stepsize * Fgrad;
+		}
+	}
+
+#ifdef WRITE_DIFF
+	Projector::decenter(Fdiff_cen, Fconv, max_r2);
+	Image<RFLOAT> Idiff;
+	windowToOridimRealSpace(transformer, Idiff(), printTimes);
+	Idiff()=grad_out;
+	Idiff.write("diff.spi");
+	transformer.setReal(vol_out);
+#endif
+
+
+	// Now do inverse FFT and window to original size in real-space
+	// Pass the transformer to prevent making and clearing a new one before clearing the one declared above....
+	// The latter may give memory problems as detected by electric fence....
+	Projector::decenter(PPref.data, Fconv, max_r2);
+	RCTIC(ReconTimer,ReconS_17);
+	windowToOridimRealSpace(transformer, vol_out, printTimes);
+	RCTOC(ReconTimer,ReconS_17);
+
+#ifdef DEBUG_NGD
+	Image<RFLOAT> Itmp;
+	Itmp()=vol_out;
+	Itmp.write("debug.spi");
+#endif
+
+}
+
+
 void BackProjector::sgd_step(
 		MultidimArray<Complex > &Fprev,
 		MultidimArray<Complex > &Fgrad)
 {
+
 	const int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
 
 	MultidimArray<RFLOAT> Fweight;

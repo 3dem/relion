@@ -308,6 +308,12 @@ public:
 	                 bool printTimes= false,
 	                 Image<RFLOAT>* weight_out = 0);
 
+	void reconstructNGD(MultidimArray<RFLOAT> &vol_out,
+						const MultidimArray<RFLOAT> &tau2,
+						RFLOAT tau2_fudge,
+						RFLOAT ngd_stepsize = 0.1,
+						bool printTimes= false);
+
 	void sgd_step(MultidimArray<Complex > &Fprev,
 		      MultidimArray<Complex > &Fgrad);
 

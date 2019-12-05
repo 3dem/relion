@@ -3041,8 +3041,11 @@ void MlOptimiser::expectation()
 #endif
 
 	// Clean up some memory
-	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
-		mymodel.PPref[iclass].data.clear();
+	if (!do_sgd) // NGD still needs PPref!
+	{
+		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+			mymodel.PPref[iclass].data.clear();
+	}
 
 #ifdef DEBUG_EXP
 	std::cerr << "Expectation: done " << std::endl;
@@ -4009,8 +4012,6 @@ void MlOptimiser::maximization()
 
 			if ((wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY)
 			{
-				MultidimArray<RFLOAT> Iref_old;
-
 				(wsum_model.BPref[iclass]).updateSSNRarrays(mymodel.tau2_fudge_factor,
 						mymodel.tau2_class[iclass],
 						mymodel.sigma2_class[iclass],
@@ -4038,22 +4039,14 @@ void MlOptimiser::maximization()
 				{
 					if(do_sgd)
 					{
-						FourierTransformer transformer;
-						MultidimArray<Complex > Fprev, Fgrad;
-
-						CenterFFT(mymodel.Iref[iclass], true);
-						transformer.FourierTransform(mymodel.Iref[iclass], Fprev);
-						windowFourierTransform(Fprev, wsum_model.BPref[iclass].data.zdim);
-
-						//Should we normalise with pdf_class?
-						wsum_model.BPref[iclass].sgd_step(Fprev, Fgrad);
-						Fprev += sgd_stepsize * Fgrad;
-
-						windowFourierTransform(Fprev, mymodel.ori_size);
-						transformer.inverseFourierTransform(Fprev, mymodel.Iref[iclass]);
-						CenterFFT(mymodel.Iref[iclass], false);
+						(wsum_model.BPref[iclass]).reconstructNGD(mymodel.Iref[iclass],
+								mymodel.tau2_class[iclass],
+								(mydata.numberOfParticles()/subset_size) * mymodel.tau2_fudge_factor,
+								sgd_stepsize,
+								(iclass==0));
 					}
 					else
+					{
 						(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass],
 								gridding_nr_iter,
 								do_map,
@@ -4062,6 +4055,7 @@ void MlOptimiser::maximization()
 								wsum_model.pdf_class[iclass],
 								minres_map,
 								(iclass==0));
+					}
 				}
 			}
 		}
@@ -4071,8 +4065,8 @@ void MlOptimiser::maximization()
 			if (!do_sgd)
 				mymodel.Iref[iclass].initZeros();
 			// When doing SGD also re-initialise the gradient to zero
-			if (do_sgd)
-				mymodel.Igrad[iclass].initZeros();
+			//if (do_sgd)
+			//	mymodel.Igrad[iclass].initZeros();
 		}
 		RCTOC(timer,RCT_1);
 		if (verb > 0)
@@ -4362,6 +4356,7 @@ void MlOptimiser::solventFlatten()
 
 
 	// If we're doing SGD: enforce non-negativity during the first sgd_ini_iter iterations
+	/*
 	if (do_sgd && iter < sgd_ini_iter)
 	{
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
@@ -4372,6 +4367,7 @@ void MlOptimiser::solventFlatten()
 			}
 		}
 	}
+	*/
 
 	// First read solvent mask from disc, or pre-calculate it
 	Image<RFLOAT> Isolvent, Isolvent2, Ilowpass;
@@ -4479,6 +4475,7 @@ void MlOptimiser::updateCurrentResolution()
 	std::cerr << "Entering MlOptimiser::updateCurrentResolution" << std::endl;
 #endif
 
+	/*
 	if (do_sgd && !do_split_random_halves)
 	{
 		// Do initial iterations with completely identical K references, 100-particle batch size, enforce non-negativity and 35A resolution limit
@@ -4497,6 +4494,7 @@ void MlOptimiser::updateCurrentResolution()
 		}
 	}
 	else
+	*/
 	{
 
 
