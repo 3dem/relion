@@ -1915,7 +1915,10 @@ void GuiMainWindow::cb_delete_scheduler_edge_i()
 {
 	int idx = scheduler_edge_browser->value();
 	if (idx <= 0)
+	{
+		fl_message("Please select a job.");
 		return;
+	}
 
 	std::string ask = "Are you sure you want to delete this edge?";
 	int proceed =  fl_choice("%s", "Cancel", "Delete!", NULL, ask.c_str());
@@ -2457,7 +2460,7 @@ void GuiMainWindow::cb_print_cl_i()
 
 	std::string error_message;
 	if (!pipeline.getCommandLineJob(gui_jobwindows[iwin]->myjob, current_job, is_main_continue, false,
-			DONT_MKDIR, do_overwrite_continue, commands, final_command, error_message))
+	                                DONT_MKDIR, do_overwrite_continue, commands, final_command, error_message))
 	{
 		fl_message("%s",error_message.c_str());
 	}
@@ -2469,8 +2472,9 @@ void GuiMainWindow::cb_print_cl_i()
 			if (icom > 0) command += " && ";
 			command += commands[icom];
 		}
-		const char* tt = fl_input("%s", command.c_str(), mesg.c_str());
-		free((void*)tt);
+		fl_input("%s", command.c_str(), mesg.c_str());
+		// Don't free the returned string! It comes from Fl_Input::value(), which returns
+		// "pointer to an internal buffer - do not free() this".
 	}
 }
 
@@ -2659,7 +2663,7 @@ void GuiMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 {
 	if (current_job < 0)
 	{
-		std::cout << " You can only delete existing jobs ... " << std::endl;
+		fl_message("Please select a job.");
 		return;
 	}
 
@@ -2731,9 +2735,9 @@ e.g. by using \"touch Polish/job045/NO_HARSH_CLEAN\". Below is a list of current
 		for (int myjob = 0; myjob < pipeline.processList.size(); myjob++)
 		{
 			if (pipeline.processList[myjob].status == PROC_FINISHED_SUCCESS &&
-					(pipeline.processList[myjob].type == PROC_MOTIONCORR ||
-					pipeline.processList[myjob].type == PROC_EXTRACT ||
-					pipeline.processList[myjob].type == PROC_SUBTRACT) )
+			    (pipeline.processList[myjob].type == PROC_MOTIONCORR ||
+			     pipeline.processList[myjob].type == PROC_EXTRACT ||
+			     pipeline.processList[myjob].type == PROC_SUBTRACT))
 			{
 				if (exists(pipeline.processList[myjob].name + "NO_HARSH_CLEAN"))
 					ask += pipeline.processList[myjob].name + " \n";
@@ -2776,7 +2780,14 @@ void GuiMainWindow::cb_cleanup_i(int myjob, bool do_verb, bool do_harsh)
 {
 	// Allow cleaning the currently selected job from the GUI
 	if (myjob < 0)
+	{
+		if (current_job < 0)
+		{
+			fl_message("Please select a job.");
+			return;
+		}
 		myjob = current_job;
+	}
 
 	int proceed = 1;
 	if (do_verb)
@@ -2803,6 +2814,12 @@ void GuiMainWindow::cb_set_alias(Fl_Widget* o, void* v)
 
 void GuiMainWindow::cb_set_alias_i(std::string alias)
 {
+	if (current_job < 0)
+	{
+		fl_message("Please select a job.");
+		return;
+	}
+
 	FileName fn_pre, fn_jobnr, fn_post, fn_dummy, default_ask;
 	if (!decomposePipelineFileName(pipeline.processList[current_job].name, fn_pre, fn_jobnr, fn_post))
 		REPORT_ERROR("GuiMainWindow::cb_set_alias_i ERROR: invalid pipeline process name: " + pipeline.processList[current_job].name);
@@ -2853,6 +2870,12 @@ void GuiMainWindow::cb_abort(Fl_Widget* o, void* v)
 
 void GuiMainWindow::cb_abort_i(std::string alias)
 {
+	if (current_job < 0)
+	{
+		fl_message("Please select a job.");
+		return;
+	}
+
 	if (pipeline.processList[current_job].status != PROC_RUNNING)
 	{
 		std::string error_message = "You can only abort running jobs ... ";
@@ -2908,6 +2931,12 @@ void GuiMainWindow::cb_make_flowchart(Fl_Widget* o, void* v)
 
 void GuiMainWindow::cb_make_flowchart_i()
 {
+	if (current_job < 0)
+	{
+		fl_message("Please select a job.");
+		return;
+	}
+
 	std::string error_message;
 	if (!pipeline.makeFlowChart(current_job, true, error_message))
 		fl_message("%s",error_message.c_str());
@@ -3012,7 +3041,7 @@ void GuiMainWindow::cb_undelete_job_i()
 		return;
 
 	char relname[FL_PATH_MAX];
-    fl_filename_relative(relname,sizeof(relname),chooser.value());
+	fl_filename_relative(relname,sizeof(relname),chooser.value());
 	FileName fn_pipe(relname);
 
 	pipeline.undeleteJob(fn_pipe);

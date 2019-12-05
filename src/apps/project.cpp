@@ -66,7 +66,7 @@ public:
 		do_ctf_intact_1st_peak = parser.checkOption("--ctf_intact_first_peak", "Ignore CTFs until their first peak?");
 		angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "-1"));
 		fn_mask = parser.getOption("--mask", "Mask that will be applied to the input map prior to making projections", "");
-		fn_ang = parser.getOption("--ang", "STAR file with orientations for multiple projections (if None, assume single projection)","None");
+		fn_ang = parser.getOption("--ang", "Particle STAR file with orientations and CTF for multiple projections (if None, assume single projection)", "None");
 		nr_uniform = textToInteger(parser.getOption("--nr_uniform", " OR get this many random samples from a uniform angular distribution", "-1"));
 		sigma_offset = textToFloat(parser.getOption("--sigma_offset", "Apply Gaussian errors with this stddev to the XY-offsets", "0"));
 		rot = textToFloat(parser.getOption("--rot", "First Euler angle (for a single projection)", "0"));
@@ -105,12 +105,10 @@ public:
 		// Check for errors in the command-line option
 		if (parser.checkForErrors())
 			REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
-
 	}
 
 	void project()
 	{
-
 		MetaDataTable DFo, MDang, MDang_sim;
 		Matrix2D<RFLOAT> A3D;
 		FileName fn_expimg;
@@ -136,7 +134,6 @@ public:
 
 		if (nr_uniform > 0)
 		{
-
 			std::cout << " Generating " << nr_uniform << " projections taken randomly from a uniform angular distribution ..." << std::endl;
 			MDang.clear();
 			randomize_random_generator();
@@ -196,7 +193,6 @@ public:
 					REPORT_ERROR("ERROR: STAR file with angles for simulated images has fewer entries than the input STAR file with all angles.");
 				}
 			}
-
 		}
 
 		if (angpix < 0.)
@@ -462,7 +458,6 @@ public:
 					img() = expimg() - img();
 				}
 
-
 				// If we're simulating realistic images, then now add CTF-affected projection again
 				if (do_simulate)
 				{
@@ -486,11 +481,9 @@ public:
 						xoff /= angpix;
 						yoff /= angpix;
 						zoff /= angpix;
-
 					}
 					else
 					{
-
 						MDang_sim.getValue(EMDL_ORIENT_ROT, rot, imgno);
 						MDang_sim.getValue(EMDL_ORIENT_TILT, tilt, imgno);
 						MDang_sim.getValue(EMDL_ORIENT_PSI, psi, imgno);
@@ -502,7 +495,6 @@ public:
 						xoff /= angpix;
 						yoff /= angpix;
 						zoff /= angpix;
-
 					}
 
 					Euler_rotation3DMatrix(rot, tilt, psi, A3D);
@@ -631,7 +623,6 @@ public:
 			std::cout<<" Done writing "<<imgno<<" images in "<<fn_img<<std::endl;
 
 		} // end else do_only_one
-
 	}// end project function
 };
 

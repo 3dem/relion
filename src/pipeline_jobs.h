@@ -74,6 +74,7 @@
 #define DEFAULTNRTHREADS 1
 #define DEFAULTTHREADMAX 16
 #define DEFAULTMPIRUN "mpirun"
+#define DEFAULTSCRATCHDIR ""
 
 static const std::vector<std::string> job_undefined_options{
 	"undefined"
@@ -393,6 +394,7 @@ public:
 	void setOption(std::string setOptionLine);
 
 	// write/read settings to disc
+	// fn is a directory name (e.g. Refine3D/job123/) or a STAR file
 	bool read(std::string fn, bool &_is_continue, bool do_initialise = false); // return false if unsuccessful
 	void write(std::string fn);
 
