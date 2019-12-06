@@ -92,15 +92,15 @@ void MlOptimiserMpi::initialise()
 {
 
 #ifdef DEBUG
-    std::cerr<<"MlOptimiserMpi::initialise Entering"<<std::endl;
+	std::cerr<<"MlOptimiserMpi::initialise Entering"<<std::endl;
 #endif
 
 	// Print information about MPI nodes:
-    printMpiNodesMachineNames(*node, nr_threads);
+	printMpiNodesMachineNames(*node, nr_threads);
 #ifdef CUDA
     /************************************************************************/
 	//Setup GPU related resources
-    int devCount, deviceAffinity;
+	int devCount, deviceAffinity;
 	bool is_split(false);
 
 	if (do_gpu)
@@ -274,7 +274,6 @@ void MlOptimiserMpi::initialise()
 					std::cout << " Thread " << i << " on slave " << rank << " mapped to device " << dev_id << std::endl;
 					node->relion_MPI_Send(&dev_id, 1, MPI_INT, rank, MPITAG_INT, MPI_COMM_WORLD);
 				}
-
 			}
 		}
 		else
@@ -340,8 +339,8 @@ void MlOptimiserMpi::initialise()
 			std::vector<int> uniqueDeviceIdentifierCounts;
 			std::vector<int> deviceCounts(node->size-1,0);
 
-	        for (int slave = 1; slave < node->size; slave++)
-	        {
+		        for (int slave = 1; slave < node->size; slave++)
+		        {
 	        	node->relion_MPI_Recv(&devCount, 1, MPI_INT, slave, MPITAG_INT, MPI_COMM_WORLD, status);
 
 	        	deviceCounts[slave-1] = devCount;
@@ -349,7 +348,7 @@ void MlOptimiserMpi::initialise()
 				for (int i = 0; i < devCount; i++)
 				{
 					char buffer[BUFSIZ];
-		        	node->relion_MPI_Recv(&buffer, BUFSIZ, MPI_CHAR, slave, MPITAG_IDENTIFIER, MPI_COMM_WORLD, status);
+			        	node->relion_MPI_Recv(&buffer, BUFSIZ, MPI_CHAR, slave, MPITAG_IDENTIFIER, MPI_COMM_WORLD, status);
 					std::string deviceIdentifier(buffer);
 
 					deviceIdentifiers.push_back(deviceIdentifier);
@@ -459,9 +458,9 @@ will still yield good performance and possibly a more stable execution. \n" << s
 #endif // CUDA
 
 
-    MlOptimiser::initialiseGeneral(node->rank);
+	MlOptimiser::initialiseGeneral(node->rank);
 
-    initialiseWorkLoad();
+	initialiseWorkLoad();
 
 #ifdef ALTCPU
 	// Don't start threading until after most I/O is over
@@ -503,7 +502,6 @@ will still yield good performance and possibly a more stable execution. \n" << s
 		// Use the same spectrum for all classes
 		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
 			mymodel.sigma2_noise[igroup] =  mymodel.sigma2_noise[0];
-
 	}
 	else if (do_calculate_initial_sigma_noise || do_average_unaligned)
 	{
@@ -558,7 +556,6 @@ will still yield good performance and possibly a more stable execution. \n" << s
 		}
 	}
 
-
 #ifdef DEBUG
     std::cerr<<"MlOptimiserMpi::initialise Done"<<std::endl;
 #endif
@@ -566,7 +563,6 @@ will still yield good performance and possibly a more stable execution. \n" << s
 
 void MlOptimiserMpi::initialiseWorkLoad()
 {
-
 	if (do_split_random_halves)
 	{
 		if (node->size <= 2)
@@ -583,8 +579,8 @@ void MlOptimiserMpi::initialiseWorkLoad()
 		if (node->isMaster())
 		{
 			random_seed = time(NULL);
-	        for (int slave = 1; slave < node->size; slave++)
-	        	node->relion_MPI_Send(&random_seed, 1, MPI_INT, slave, MPITAG_RANDOMSEED, MPI_COMM_WORLD);
+		        for (int slave = 1; slave < node->size; slave++)
+	        		node->relion_MPI_Send(&random_seed, 1, MPI_INT, slave, MPITAG_RANDOMSEED, MPI_COMM_WORLD);
 		}
 		else
 		{
@@ -593,10 +589,10 @@ void MlOptimiserMpi::initialiseWorkLoad()
 		}
 	}
 
-    // Also randomize random-number-generator for perturbations on the angles
-    init_random_generator(random_seed);
+	// Also randomize random-number-generator for perturbations on the angles
+	init_random_generator(random_seed);
 
-    // Split the data into two random halves
+	// Split the data into two random halves
 	if (do_split_random_halves)
 	{
 		mydata.divideParticlesInRandomHalves(random_seed, do_helical_refine);
@@ -613,34 +609,33 @@ void MlOptimiserMpi::initialiseWorkLoad()
 	{
 		if (do_split_random_halves)
 		{
-	    	int nr_slaves_halfset1 = (node->size - 1) / 2;
-	    	int nr_slaves_halfset2 = nr_slaves_halfset1;
-	    	if ( (node->size - 1) % 2 != 0)
-	    		nr_slaves_halfset1 += 1;
-	    	if (node->myRandomSubset() == 1)
-	    	{
-	    		// Divide first half of the images
-	    		divide_equally(mydata.numberOfParticles(1), nr_slaves_halfset1, node->rank / 2, my_first_particle_id, my_last_particle_id);
-	    	}
-	    	else
-	    	{
-	    		// Divide second half of the images
-	    		divide_equally(mydata.numberOfParticles(2), nr_slaves_halfset2, node->rank / 2 - 1, my_first_particle_id, my_last_particle_id);
-	    		my_first_particle_id += mydata.numberOfParticles(1);
-	    		my_last_particle_id += mydata.numberOfParticles(1);
-	    	}
+			int nr_slaves_halfset1 = (node->size - 1) / 2;
+			int nr_slaves_halfset2 = nr_slaves_halfset1;
+			if ((node->size - 1) % 2 != 0)
+				nr_slaves_halfset1 += 1;
+		    	if (node->myRandomSubset() == 1)
+		    	{
+	 			// Divide first half of the images
+				divide_equally(mydata.numberOfParticles(1), nr_slaves_halfset1, node->rank / 2, my_first_particle_id, my_last_particle_id);
+			}
+			else
+			{
+				// Divide second half of the images
+				divide_equally(mydata.numberOfParticles(2), nr_slaves_halfset2, node->rank / 2 - 1, my_first_particle_id, my_last_particle_id);
+				my_first_particle_id += mydata.numberOfParticles(1);
+				my_last_particle_id += mydata.numberOfParticles(1);
+			}
 		}
 		else
 		{
 			int nr_slaves = (node->size - 1);
 			divide_equally(mydata.numberOfParticles(), nr_slaves, node->rank - 1, my_first_particle_id, my_last_particle_id);
 		}
-
 	}
 
 	// Now copy particle stacks to scratch if needed
-    if (fn_scratch != "" && !do_preread_images)
-    {
+	if (fn_scratch != "" && !do_preread_images)
+	{
 		mydata.setScratchDirectory(fn_scratch, do_reuse_scratch, verb);
 
 		if (!do_reuse_scratch)
@@ -648,7 +643,6 @@ void MlOptimiserMpi::initialiseWorkLoad()
 			bool also_do_ctfimage = (mymodel.data_dim == 3 && do_ctf_correction);
 			if (do_parallel_disc_io)
 			{
-
 				FileName fn_lock = mydata.initialiseScratchLock(fn_scratch, fn_out);
 				// One rank after the other, all slaves pass through mydata.prepareScratchDirectory()
 				// This way, only the first rank on each hostname will actually copy the particle stacks
@@ -669,7 +663,12 @@ void MlOptimiserMpi::initialiseWorkLoad()
 				}
 
 				int myverb = (node->rank == 1) ? ori_verb : 0; // Only the first slave
-				mydata.copyParticlesToScratch(myverb, need_to_copy, also_do_ctfimage, keep_free_scratch_Gb);
+				if (need_to_copy)
+					mydata.copyParticlesToScratch(myverb, true, also_do_ctfimage, keep_free_scratch_Gb);
+
+				MPI_Barrier(MPI_COMM_WORLD);
+				if (!need_to_copy) // This initialises nr_parts_on_scratch on non-first ranks by pretending --reuse_scratch
+					mydata.setScratchDirectory(fn_scratch, true, verb);
 			}
 			else
 			{
@@ -685,14 +684,14 @@ void MlOptimiserMpi::initialiseWorkLoad()
 				}
 			}
 		}
-    }
+	}
 
-    MPI_Barrier(MPI_COMM_WORLD);
+	MPI_Barrier(MPI_COMM_WORLD);
 
-    if(!do_split_random_halves)
+	if(!do_split_random_halves)
 	{
-    	if(!node->isMaster())
-    	{
+		if(!node->isMaster())
+		{
 			/* Set up a bool-array with reference responsibilities for each rank. That is;
 			 * if(PPrefRank[i]==true)  //on this rank
 			 * 		(set up reference vol and MPI_Bcast)
@@ -737,13 +736,12 @@ void MlOptimiserMpi::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFL
 	// When doing random halves, the wsum_model.sumw_group[igroup], which will be used to divide Mavg by is only calculated over half the particles!
 	if (do_split_random_halves)
 		Mavg /= 2.;
-
 }
 
 void MlOptimiserMpi::expectation()
 {
 #ifdef TIMING
-		timer.tic(TIMING_EXP_1);
+	timer.tic(TIMING_EXP_1);
 #endif
 #ifdef DEBUG
 	std::cerr << "MlOptimiserMpi::expectation: Entering " << std::endl;
@@ -768,7 +766,7 @@ void MlOptimiserMpi::expectation()
 	// B. Set the PPref Fourier transforms, initialise wsum_model, etc.
 	// The master only holds metadata, it does not set up the wsum_model (to save memory)
 #ifdef TIMING
-		timer.tic(TIMING_EXP_1a);
+	timer.tic(TIMING_EXP_1a);
 #endif
 	if (!node->isMaster())
 	{
@@ -783,7 +781,7 @@ void MlOptimiserMpi::expectation()
 
 	MPI_Barrier(MPI_COMM_WORLD);
 #ifdef TIMING
-		timer.toc(TIMING_EXP_1a);
+	timer.toc(TIMING_EXP_1a);
 #endif
 
 	if(!do_split_random_halves)
@@ -804,11 +802,11 @@ void MlOptimiserMpi::expectation()
 #endif
 					// Communicating over all slaves means we don't have to allocate on the master.
 					node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.PPref[i].data),
-							MULTIDIM_SIZE(mymodel.PPref[0].data), MY_MPI_COMPLEX, sender, node->slaveC);
+					                       MULTIDIM_SIZE(mymodel.PPref[0].data), MY_MPI_COMPLEX, sender, node->slaveC);
 					// For multibody refinement with overlapping bodies, there may be more PPrefs than bodies!
 					if (i < mymodel.nr_classes * mymodel.nr_bodies)
 						node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.tau2_class[i]),
-								MULTIDIM_SIZE(mymodel.tau2_class[0]), MY_MPI_DOUBLE, sender, node->slaveC);
+						                       MULTIDIM_SIZE(mymodel.tau2_class[0]), MY_MPI_DOUBLE, sender, node->slaveC);
 				}
 			}
 		}
@@ -824,15 +822,15 @@ void MlOptimiserMpi::expectation()
 			std::ofstream f;
 			f.open(fn_tmp.c_str());
 			for (unsigned long j = 0; j < mymodel.PPref[i].data.nzyxdim; j++)
-					f << mymodel.PPref[i].data.data[j].real << std::endl;
+				f << mymodel.PPref[i].data.data[j].real << std::endl;
 			f.close();
 		}
 	}
 #endif
 
 #ifdef TIMING
-		timer.toc(TIMING_EXP_1);
-		timer.tic(TIMING_EXP_2);
+	timer.toc(TIMING_EXP_1);
+	timer.tic(TIMING_EXP_2);
 #endif
 	// C. Calculate expected angular errors
 	// Do not do this for maxCC
@@ -931,16 +929,16 @@ void MlOptimiserMpi::expectation()
 	node->relion_MPI_Bcast(&has_converged, 1, MPI_INT, first_slave, MPI_COMM_WORLD);
 	node->relion_MPI_Bcast(&do_join_random_halves, 1, MPI_INT, first_slave, MPI_COMM_WORLD);
 #ifdef TIMING
-		timer.toc(TIMING_EXP_3);
-		timer.tic(TIMING_EXP_4);
-		timer.tic(TIMING_EXP_4a);
+	timer.toc(TIMING_EXP_3);
+	timer.tic(TIMING_EXP_4);
+	timer.tic(TIMING_EXP_4a);
 #endif
 
 	// Wait until expected angular errors have been calculated
 	MPI_Barrier(MPI_COMM_WORLD);
 	sleep(1);
 #ifdef TIMING
-		timer.toc(TIMING_EXP_4a);
+	timer.toc(TIMING_EXP_4a);
 #endif
 	// Now perform real expectation step in parallel, use an on-demand master-slave system
 #define JOB_FIRST (first_last_nr_images(0))
@@ -957,7 +955,6 @@ void MlOptimiserMpi::expectation()
 
 	std::vector<size_t> allocationSizes;
 	MPI_Barrier(MPI_COMM_WORLD);
-
 
 	if (do_gpu && ! node->isMaster())
 	{
@@ -1092,17 +1089,16 @@ void MlOptimiserMpi::expectation()
 #endif
 
 #ifdef TIMING
-		timer.toc(TIMING_EXP_4);
+	timer.toc(TIMING_EXP_4);
 #endif
 	long int my_nr_particles = (subset_size > 0) ? subset_size : mydata.numberOfParticles();
 	if (node->isMaster())
-    {
+	{
 #ifdef TIMING
 		timer.tic(TIMING_EXP_5);
 #endif
-        try
-        {
-
+		try
+		{
 			long int progress_bar_step_size = XMIPP_MAX(1, my_nr_particles / 60);
 			long int prev_barstep = 0;
 			long int my_first_particle = 0.;
@@ -1121,23 +1117,23 @@ void MlOptimiserMpi::expectation()
 					progress_bar_step_size = XMIPP_MAX(1, my_nr_particles * 2 / 60);
 			}
 
-        	if (verb > 0)
-        	{
-        		if (do_sgd)
-        		{
-        			std::cout << " Stochastic Gradient Descent iteration " << iter << " of " << nr_iter;
-        		}
-        		else
-        		{
-        			std::cout << " Expectation iteration " << iter;
-        			if (!do_auto_refine)
-        				std::cout << " of " << nr_iter;
-        			if (my_nr_particles < mydata.numberOfParticles())
-        				std::cout << " (with " << my_nr_particles << " particles)";
-        		}
-        		std::cout << std::endl;
-        		init_progress_bar(my_nr_particles);
-        	}
+			if (verb > 0)
+			{
+				if (do_sgd)
+				{
+					std::cout << " Stochastic Gradient Descent iteration " << iter << " of " << nr_iter;
+				}
+				else
+				{
+					std::cout << " Expectation iteration " << iter;
+					if (!do_auto_refine)
+						std::cout << " of " << nr_iter;
+					if (my_nr_particles < mydata.numberOfParticles())
+						std::cout << " (with " << my_nr_particles << " particles)";
+				}
+				std::cout << std::endl;
+				init_progress_bar(my_nr_particles);
+			}
 
 			// Master distributes all packages of SomeParticles
 			int nr_slaves_done = 0;
@@ -1260,6 +1256,10 @@ void MlOptimiserMpi::expectation()
 					}
 					else
 					{
+						// new in 3.1: first send the image_size of these particles (as no longer necessarily the same as mymodel.ori_size...)
+						int my_image_size = mydata.getOpticsImageSize(mydata.getOpticsGroup(JOB_FIRST, 0));
+						node->relion_MPI_Send(&my_image_size, 1, MPI_INT, this_slave, MPITAG_IMAGE_SIZE, MPI_COMM_WORLD);
+
 						// Send imagedata to the slaves
 						node->relion_MPI_Send(MULTIDIM_ARRAY(exp_imagedata), MULTIDIM_SIZE(exp_imagedata), MY_MPI_DOUBLE, this_slave, MPITAG_IMAGE, MPI_COMM_WORLD);
 					}
@@ -1280,34 +1280,33 @@ void MlOptimiserMpi::expectation()
 					}
 				}
 			}
-        }
-        catch (RelionError XE)
-        {
-            std::cerr << "master encountered error: " << XE;
-            MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_FAILURE);
-        }
+		}
+		catch (RelionError XE)
+		{
+			std::cerr << "master encountered error: " << XE;
+			MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_FAILURE);
+		}
 #ifdef TIMING
 		timer.toc(TIMING_EXP_5);
 #endif
-    }
-    else  // if not Master
-    {
+	}
+	else  // if not Master
+	{
 #ifdef TIMING
 		timer.tic(TIMING_EXP_6);
 #endif
-    	try
-    	{
+		try
+		{
+			if (halt_all_slaves_except_this > 0)
+			{
+				// Let all slaves except this one sleep forever
+				if (node->rank != halt_all_slaves_except_this)
+					while (true)
+						sleep(1000);
+			}
 
-    		if (halt_all_slaves_except_this > 0)
-    		{
-    			// Let all slaves except this one sleep forever
-        		if (node->rank != halt_all_slaves_except_this)
-        			while (true)
-        				sleep(1000);
-    		}
-
-    		// Slaves do the real work (The slave does not need to know to which random_halfset he belongs)
-    		// Start off with an empty job request
+			// Slaves do the real work (The slave does not need to know to which random_halfset he belongs)
+			// Start off with an empty job request
 			JOB_FIRST = 0;
 			JOB_LAST = -1; // So that initial nr_particles (=JOB_LAST-JOB_FIRST+1) is zero!
 			JOB_NIMG = 0;
@@ -1350,56 +1349,56 @@ void MlOptimiserMpi::expectation()
 					if (do_parallel_disc_io)
 					{
 						// Resize the exp_fn_img strings
-				        char* rec_buf;
-				        rec_buf = (char *) malloc(JOB_LEN_FN_IMG);
-				        node->relion_MPI_Recv(rec_buf, JOB_LEN_FN_IMG, MPI_CHAR, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
-				        exp_fn_img = rec_buf;
-				        free(rec_buf);
+						char* rec_buf;
+						rec_buf = (char *) malloc(JOB_LEN_FN_IMG);
+						node->relion_MPI_Recv(rec_buf, JOB_LEN_FN_IMG, MPI_CHAR, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
+						exp_fn_img = rec_buf;
+						free(rec_buf);
 						if (JOB_LEN_FN_CTF > 1)
 						{
-					        char* rec_buf2;
-					        rec_buf2 = (char *) malloc(JOB_LEN_FN_CTF);
-					        node->relion_MPI_Recv(rec_buf2, JOB_LEN_FN_CTF, MPI_CHAR, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
-					        exp_fn_ctf = rec_buf2;
-					        free(rec_buf2);
-
+							char* rec_buf2;
+							rec_buf2 = (char *) malloc(JOB_LEN_FN_CTF);
+							node->relion_MPI_Recv(rec_buf2, JOB_LEN_FN_CTF, MPI_CHAR, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
+							exp_fn_ctf = rec_buf2;
+							free(rec_buf2);
 						}
 						if (JOB_LEN_FN_RECIMG > 1)
 						{
-					        char* rec_buf3;
-					        rec_buf3 = (char *) malloc(JOB_LEN_FN_RECIMG);
-					        node->relion_MPI_Recv(rec_buf3, JOB_LEN_FN_RECIMG, MPI_CHAR, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
-					        exp_fn_recimg = rec_buf3;
-					        free(rec_buf3);
+							char* rec_buf3;
+							rec_buf3 = (char *) malloc(JOB_LEN_FN_RECIMG);
+							node->relion_MPI_Recv(rec_buf3, JOB_LEN_FN_RECIMG, MPI_CHAR, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
+							exp_fn_recimg = rec_buf3;
+							free(rec_buf3);
 						}
 					}
 					else
 					{
+						int mysize;
+						node->relion_MPI_Recv(&mysize, 1, MPI_INT, 0, MPITAG_IMAGE_SIZE, MPI_COMM_WORLD, status);
 						// resize the exp_imagedata array
 						if (mymodel.data_dim == 3)
 						{
-
 							if (do_ctf_correction)
 							{
 								if (has_converged && do_use_reconstruct_images)
-									exp_imagedata.resize(3*mymodel.ori_size, mymodel.ori_size, mymodel.ori_size);
+									exp_imagedata.resize(3*mysize, mysize, mysize);
 								else
-									exp_imagedata.resize(2*mymodel.ori_size, mymodel.ori_size, mymodel.ori_size);
+									exp_imagedata.resize(2*mysize, mysize, mysize);
 							}
 							else
 							{
 								if (has_converged && do_use_reconstruct_images)
-									exp_imagedata.resize(2*mymodel.ori_size, mymodel.ori_size, mymodel.ori_size);
+									exp_imagedata.resize(2*mysize, mysize, mysize);
 								else
-									exp_imagedata.resize(mymodel.ori_size, mymodel.ori_size, mymodel.ori_size);
+									exp_imagedata.resize(mysize, mysize, mysize);
 							}
 						}
 						else
 						{
 							if (has_converged && do_use_reconstruct_images)
-								exp_imagedata.resize(2*JOB_NIMG, mymodel.ori_size, mymodel.ori_size);
+								exp_imagedata.resize(2*JOB_NIMG, mysize, mysize);
 							else
-								exp_imagedata.resize(JOB_NIMG, mymodel.ori_size, mymodel.ori_size);
+								exp_imagedata.resize(JOB_NIMG, mysize, mysize);
 						}
 						node->relion_MPI_Recv(MULTIDIM_ARRAY(exp_imagedata), MULTIDIM_SIZE(exp_imagedata), MY_MPI_DOUBLE, 0, MPITAG_IMAGE, MPI_COMM_WORLD, status);
 					}
@@ -1429,11 +1428,8 @@ void MlOptimiserMpi::expectation()
 #ifdef TIMING
 					timer.toc(TIMING_MPISLAVEWAIT3);
 #endif
-
 				}
-
 			}
-
 //		TODO: define MPI_COMM_SLAVES!!!!	MPI_Barrier(node->MPI_COMM_SLAVES);
 
 #ifdef CUDA
@@ -1558,17 +1554,16 @@ void MlOptimiserMpi::expectation()
 				tbbCpuOptimiser.clear();
 			}
 #endif  // ALTCPU
-
-    	}
-        catch (RelionError XE)
-        {
-            std::cerr << "slave "<< node->rank << " encountered error: " << XE;
-            MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_FAILURE);
-        }
+		}
+		catch (RelionError XE)
+		{
+			std::cerr << "slave "<< node->rank << " encountered error: " << XE;
+			MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_FAILURE);
+		}
 #ifdef TIMING
 		timer.toc(TIMING_EXP_6);
 #endif
-    }  // Slave node
+	}  // Slave node
 
 #ifdef  MKLFFT
 	// Allow parallel FFTW execution to continue now that we are outside the parallel
@@ -1576,7 +1571,7 @@ void MlOptimiserMpi::expectation()
 	fftw_plan_with_nthreads(nr_threads);
 #endif
 
-    // Just make sure the temporary arrays are empty...
+	// Just make sure the temporary arrays are empty...
 	exp_imagedata.clear();
 	exp_metadata.clear();
 
@@ -1586,10 +1581,10 @@ void MlOptimiserMpi::expectation()
 	}
 
 #ifdef TIMING
-    // Measure how long I have to wait for the rest
-    timer.tic(TIMING_MPIWAIT);
-    node->barrierWait();
-    timer.toc(TIMING_MPIWAIT);
+	// Measure how long I have to wait for the rest
+	timer.tic(TIMING_MPIWAIT);
+	node->barrierWait();
+	timer.toc(TIMING_MPIWAIT);
 #endif
 
 	// Wait until expected angular errors have been calculated
@@ -1606,15 +1601,13 @@ void MlOptimiserMpi::expectation()
 #ifdef DEBUG
 	std::cerr << "MlOptimiserMpi::expectation: done" << std::endl;
 #endif
-
 }
-
 
 void MlOptimiserMpi::combineAllWeightedSumsViaFile()
 {
 
 #ifdef TIMING
-    timer.tic(TIMING_MPICOMBINEDISC);
+	timer.tic(TIMING_MPICOMBINEDISC);
 #endif
 	MultidimArray<RFLOAT> Mpack;
 	FileName fn_pack;
@@ -1666,7 +1659,6 @@ void MlOptimiserMpi::combineAllWeightedSumsViaFile()
 		}
 		MPI_Barrier(MPI_COMM_WORLD);
 
-
 		// D. All other slaves read the summed Mpack from their first_slave
 		// Again, do this SEQUENTIALLY to prevent heavy load on disc I/O
 		for (int this_slave = nr_halfsets + 1; this_slave < node->size; this_slave++ )
@@ -1710,19 +1702,18 @@ void MlOptimiserMpi::combineAllWeightedSumsViaFile()
 
 	} // end if ((node->size - 1)/nr_halfsets > 1)
 #ifdef TIMING
-    timer.toc(TIMING_MPICOMBINEDISC);
+	timer.toc(TIMING_MPICOMBINEDISC);
 #endif
 
 }
 
 void MlOptimiserMpi::combineAllWeightedSums()
 {
-
 #ifdef TIMING
-    timer.tic(TIMING_MPICOMBINENETW);
+	timer.tic(TIMING_MPICOMBINENETW);
 #endif
 
-    // Pack all weighted sums in Mpack
+	// Pack all weighted sums in Mpack
 	MultidimArray<RFLOAT> Mpack, Msum;
 	MPI_Status status;
 
@@ -1856,9 +1847,8 @@ void MlOptimiserMpi::combineAllWeightedSums()
 	}
 
 #ifdef TIMING
-    timer.toc(TIMING_MPICOMBINENETW);
+	timer.toc(TIMING_MPICOMBINENETW);
 #endif
-
 }
 
 void MlOptimiserMpi::combineWeightedSumsTwoRandomHalvesViaFile()
@@ -1912,7 +1902,6 @@ void MlOptimiserMpi::combineWeightedSumsTwoRandomHalvesViaFile()
 	// Then everyone except the master unpacks
 	if (!node->isMaster())
 		wsum_model.unpack(Mpack);
-
 }
 
 void MlOptimiserMpi::combineWeightedSumsTwoRandomHalves()
@@ -1984,11 +1973,8 @@ void MlOptimiserMpi::combineWeightedSumsTwoRandomHalves()
 			// Everyone unpacks the new Mpack
 			wsum_model.unpack(Mpack, piece - 1);
 			Mpack.clear();
-
 		}
-
 	}
-
 }
 
 void MlOptimiserMpi::maximization()
@@ -1998,7 +1984,7 @@ void MlOptimiserMpi::maximization()
 #endif
 
 #ifdef TIMING
-		timer.tic(TIMING_RECONS);
+	timer.tic(TIMING_RECONS);
 #endif
 
 	// For multi-body refinement: check if all bodies are fixed. If so, just return
@@ -2500,7 +2486,6 @@ void MlOptimiserMpi::maximization()
 #ifdef DEBUG
 	std::cerr << "MlOptimiserMpi::maximization: done" << std::endl;
 #endif
-
 }
 
 void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
@@ -2607,16 +2592,13 @@ void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
 		}
 	}
 
-
 #ifdef DEBUG
 	std::cerr << "MlOptimiserMpi::joinTwoHalvesAtLowResolution: done" << std::endl;
 #endif
-
 }
 
 void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC()
 {
-
 	if (do_sgd || subset_size > 0)
 		REPORT_ERROR("BUG! You cannot do solvent-corrected FSCs and subsets!");
 
@@ -2794,12 +2776,10 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.fsc_halves_class[ibody]), MULTIDIM_SIZE(mymodel.fsc_halves_class[ibody]), MY_MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
 	} // end loop over all bodies
-
 }
 
 void MlOptimiserMpi::writeTemporaryDataAndWeightArrays()
 {
-
 	if ( (node->rank == 1 || (do_split_random_halves && node->rank == 2) ) )
 	{
 		Image<RFLOAT> It;
@@ -2840,10 +2820,9 @@ void MlOptimiserMpi::writeTemporaryDataAndWeightArrays()
 				}
 			}
 		}
-    }
+	 }
 
 	MPI_Barrier(MPI_COMM_WORLD);
-
 }
 
 void MlOptimiserMpi::readTemporaryDataAndWeightArraysAndReconstruct(int iclass, int ihalf)
@@ -2852,7 +2831,7 @@ void MlOptimiserMpi::readTemporaryDataAndWeightArraysAndReconstruct(int iclass, 
 	Image<RFLOAT> Iunreg, Itmp;
 
 #ifdef DEBUG_RECONSTRUCTION
-		FileName fn_root = fn_out + "_it" + integerToString(iter, 3) + "_half" + integerToString(node->rank);;
+	FileName fn_root = fn_out + "_it" + integerToString(iter, 3) + "_half" + integerToString(node->rank);;
 #else
 	FileName fn_root = fn_out + "_half" + integerToString(ihalf);;
 #endif
@@ -2929,7 +2908,6 @@ void MlOptimiserMpi::readTemporaryDataAndWeightArraysAndReconstruct(int iclass, 
 		remove((fn_root+"_weight.mrc").c_str());
 	}
 #endif
-
 }
 
 void MlOptimiserMpi::compareTwoHalves()
@@ -2948,7 +2926,6 @@ void MlOptimiserMpi::compareTwoHalves()
 	// TODO: Rank 0 and 1 do all bodies sequentially here... That parallelisation could be improved...
 	for (int ibody = 0; ibody< mymodel.nr_bodies; ibody++ )
 	{
-
 		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
 			continue;
 
@@ -3371,6 +3348,4 @@ void MlOptimiserMpi::iterate()
 	// delete threads etc.
 	MlOptimiser::iterateWrapUp();
 	MPI_Barrier(MPI_COMM_WORLD);
-
 }
-

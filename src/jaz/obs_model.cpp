@@ -174,8 +174,8 @@ ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt, bool do_die_
 	if (!(opticsMdt.containsLabel(EMDL_IMAGE_PIXEL_SIZE) ||
 	      opticsMdt.containsLabel(EMDL_MICROGRAPH_PIXEL_SIZE) ||
 	      opticsMdt.containsLabel(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE))
-	 || !opticsMdt.containsLabel(EMDL_CTF_VOLTAGE)
-	 || !opticsMdt.containsLabel(EMDL_CTF_CS))
+	  || !opticsMdt.containsLabel(EMDL_CTF_VOLTAGE)
+	  || !opticsMdt.containsLabel(EMDL_CTF_CS))
 	{
 		if (do_die_upon_error)
 		{
@@ -284,6 +284,17 @@ ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt, bool do_die_
 
 		magMatrices[i] = Matrix2D<RFLOAT>(2,2);
 		magMatrices[i].initIdentity();
+
+		// See if there is more than one MTF, for more rapid divideByMtf
+		hasMultipleMtfs = false;
+		for (int i = 1; i < fnMtfs.size(); i++)
+		{
+			if (fnMtfs[i] != fnMtfs[0])
+			{
+				hasMultipleMtfs = true;
+				break;
+			}
+		}
 
 		if (hasMagMatrices)
 		{
@@ -474,41 +485,70 @@ Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(Projector &pr
 }
 
 void ObservationModel::divideByMtf(const MetaDataTable& partMdt, long particle, MultidimArray<Complex>& obsImage,
-                                   bool do_multiply_instead)
+                                   bool do_multiply_instead, bool do_correct_average_mtf)
 {
 	int opticsGroup;
 	partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
 	opticsGroup--;
 
-	divideByMtf(opticsGroup, obsImage, do_multiply_instead);
+	divideByMtf(opticsGroup, obsImage, do_multiply_instead, do_correct_average_mtf);
 }
 
 void ObservationModel::divideByMtf(int opticsGroup, MultidimArray<Complex>& obsImage,
-                                   bool do_multiply_instead)
+                                   bool do_multiply_instead, bool do_correct_average_mtf)
 {
 	const int s = obsImage.ydim;
 	const int sh = obsImage.xdim;
 
+	// If there is only a single MTF and we are correcting for the average, then do nothing...
+	if (do_correct_average_mtf && !hasMultipleMtfs) return;
+
 	if (fnMtfs.size() > opticsGroup)
 	{
 		const Image<RFLOAT>& mtf = getMtfImage(opticsGroup, s);
+		const Image<RFLOAT>& avgmtf = getAverageMtfImage(s);
 
 		if (do_multiply_instead)
 		{
-			for (int y = 0; y < s;  y++)
-			for (int x = 0; x < sh; x++)
+			if (do_correct_average_mtf)
 			{
-				obsImage(y,x) *= mtf(y,x);
+				for (int y = 0; y < s;  y++)
+				for (int x = 0; x < sh; x++)
+				{
+					obsImage(y,x) *= mtf(y,x);
+					obsImage(y,x) /= avgmtf(y,x);
+				}
+			}
+			else
+			{
+				for (int y = 0; y < s;  y++)
+				for (int x = 0; x < sh; x++)
+				{
+					obsImage(y,x) *= mtf(y,x);
+				}
 			}
 		}
 		else
 		{
-			for (int y = 0; y < s;  y++)
-			for (int x = 0; x < sh; x++)
+			if (do_correct_average_mtf)
 			{
-				obsImage(y,x) /= mtf(y,x);
+				for (int y = 0; y < s;  y++)
+				for (int x = 0; x < sh; x++)
+				{
+					obsImage(y,x) /= mtf(y,x);
+					obsImage(y,x) *= avgmtf(y,x);
+				}
+			}
+			else
+			{
+				for (int y = 0; y < s;  y++)
+				for (int x = 0; x < sh; x++)
+				{
+					obsImage(y,x) /= mtf(y,x);
+				}
 			}
 		}
+
 	}
 }
 
@@ -942,7 +982,7 @@ std::vector<std::pair<int, std::vector<int>>> ObservationModel::splitParticlesBy
 
 const Image<RFLOAT>& ObservationModel::getMtfImage(int optGroup, int s)
 {
-	#pragma omp critical
+	#pragma omp critical(ObservationModel_getMtfImage)
 	{
 		if (mtfImage[optGroup].find(s) == mtfImage[optGroup].end())
 		{
@@ -1020,9 +1060,31 @@ const Image<RFLOAT>& ObservationModel::getMtfImage(int optGroup, int s)
 	return mtfImage[optGroup][s];
 }
 
+const Image<RFLOAT>& ObservationModel::getAverageMtfImage(int s)
+{
+	#pragma omp critical(ObservationModel_getAverageMtfImage)
+	{
+
+		if (avgMtfImage.find(s) == avgMtfImage.end())
+		{
+			// get first mtfImage
+			avgMtfImage[s] = getMtfImage(0, s);
+			// Then add rest of optics groups
+			for (int i = 1; i < mtfImage.size(); i++)
+			{
+				avgMtfImage[s].data += getMtfImage(i, s).data;
+			}
+			avgMtfImage[s].data /= (RFLOAT)mtfImage.size();
+		}
+
+	}
+
+	return avgMtfImage[s];
+}
+
 const Image<Complex>& ObservationModel::getPhaseCorrection(int optGroup, int s)
 {
-	#pragma omp critical
+	#pragma omp critical(ObservationModel_getPhaseCorrection)
 	{
 		if (phaseCorr[optGroup].find(s) == phaseCorr[optGroup].end())
 		{
@@ -1064,7 +1126,7 @@ const Image<Complex>& ObservationModel::getPhaseCorrection(int optGroup, int s)
 
 const Image<RFLOAT>& ObservationModel::getGammaOffset(int optGroup, int s)
 {
-	#pragma omp critical
+	#pragma omp critical(ObservationModel_getGammaOffset)
 	{
 		if (gammaOffset[optGroup].find(s) == gammaOffset[optGroup].end())
 		{

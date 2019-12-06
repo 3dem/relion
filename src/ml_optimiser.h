@@ -179,6 +179,9 @@ public:
 	// Flag whether to split data from the beginning into two random halves
 	bool do_split_random_halves;
 
+	// Debug flag to process 1 half when doing do_split_random_halves, without using MPI
+	int debug_split_random_half;
+
 	// For safe-guarding the gold-standard separation
 	int my_halfset;
 
@@ -407,7 +410,7 @@ public:
 	FileName fn_scratch;
 
 	// Amount of scratch space to be left free (in Gb)
-	int keep_free_scratch_Gb;
+	RFLOAT keep_free_scratch_Gb;
 
 	// Re-use data on scratch dir, i.e. dont delete data already there and copy again
 	bool do_reuse_scratch;
@@ -418,11 +421,11 @@ public:
 	// Print the symmetry transformation matrices
 	bool do_print_symmetry_ops;
 
-    /** Name of the multiple symmetry groups */
-    std::vector<FileName> fn_multi_sym;
+	/** Name of the multiple symmetry groups */
+	std::vector<FileName> fn_multi_sym;
 
-    /** Perform reconstruction outside of relion_refine, e.g. for learned priors */
-    bool do_external_reconstruct;
+	/** Perform reconstruction outside of relion_refine, e.g. for learned priors */
+	bool do_external_reconstruct;
 
 	/* Flag whether to use the Adaptive approach as by Tagare et al (2010) J. Struc. Biol.
 	 * where two passes through the integrations are made: a first one with a coarse angular sampling and
@@ -730,6 +733,7 @@ public:
 		max_coarse_size(0),
 		autosampling_hporder_local_searches(0),
 		do_split_random_halves(0),
+		debug_split_random_half(0),
 		random_seed(0),
 		do_gpu(0),
 		anticipate_oom(0),

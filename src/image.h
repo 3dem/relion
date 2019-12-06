@@ -552,7 +552,7 @@ public:
 	/** Cast a page of data from type dataType to type Tdest
 	 *	  input pointer  char *
 	 */
-	void castPage2T(char * page, T * ptrDest, DataType datatype, size_t pageSize )
+	void castPage2T(char *page, T *ptrDest, DataType datatype, size_t pageSize )
 	{
 		switch (datatype)
 		{
@@ -564,7 +564,7 @@ public:
 					memcpy(ptrDest, page, pageSize * sizeof(T));
 				else
 				{
-					unsigned char * ptr = (unsigned char *)page;
+					unsigned char *ptr = (unsigned char *)page;
 					for (size_t i = 0; i < pageSize; i++)
 						ptrDest[i] = (T)ptr[i];
 				}
@@ -578,7 +578,7 @@ public:
 				}
 				else
 				{
-					signed char * ptr = (signed char *)page;
+					signed char *ptr = (signed char *)page;
 					for (size_t i = 0; i < pageSize; i++)
 						ptrDest[i] = (T)ptr[i];
 				}
@@ -592,7 +592,7 @@ public:
 				}
 				else
 				{
-					unsigned short * ptr = (unsigned short *)page;
+					unsigned short *ptr = (unsigned short *)page;
 					for(size_t i = 0; i < pageSize; i++)
 						ptrDest[i] = (T)ptr[i];
 				}
@@ -606,7 +606,7 @@ public:
 				}
 				else
 				{
-					short * ptr = (short *)page;
+					short *ptr = (short *)page;
 					for(size_t i = 0; i < pageSize; i++)
 						ptrDest[i] = (T)ptr[i];
 				}
@@ -620,7 +620,7 @@ public:
 				}
 				else
 				{
-					unsigned int * ptr = (unsigned int *)page;
+					unsigned int *ptr = (unsigned int *)page;
 					for(size_t i = 0; i < pageSize; i++)
 						ptrDest[i] = (T)ptr[i];
 				}
@@ -634,7 +634,7 @@ public:
 				}
 				else
 				{
-					int * ptr = (int *)page;
+					int *ptr = (int *)page;
 					for(size_t i = 0; i < pageSize; i++)
 						ptrDest[i] = (T)ptr[i];
 				}
@@ -648,7 +648,7 @@ public:
 				}
 				else
 				{
-					long * ptr = (long *)page;
+					long *ptr = (long *)page;
 					for(size_t i = 0; i < pageSize; i++)
 						ptrDest[i] = (T)ptr[i];
 				}
@@ -662,7 +662,7 @@ public:
 				}
 				else
 				{
-					float * ptr = (float *)page;
+					float *ptr = (float *)page;
 					for(size_t i = 0; i < pageSize; i++)
 						ptrDest[i] = (T)ptr[i];
 				}
@@ -676,7 +676,7 @@ public:
 				}
 				else
 				{
-					RFLOAT * ptr = (RFLOAT *)page;
+					RFLOAT *ptr = (RFLOAT *)page;
 					for(size_t i = 0; i < pageSize; i++)
 						ptrDest[i] = (T)ptr[i];
 				}
@@ -708,9 +708,9 @@ public:
 	}
 
 	/** Cast page from T to datatype
-	 *	input pointer char *
+	 *  input pointer char *
 	 */
-	void castPage2Datatype(T * srcPtr, char * page, DataType datatype, size_t pageSize )
+	void castPage2Datatype(T *srcPtr, char *page, DataType datatype, size_t pageSize)
 	{
 		switch (datatype)
 		{
@@ -722,8 +722,8 @@ public:
 				}
 				else
 				{
-					float * ptr = (float *) page;
-					for(size_t i=0; i<pageSize; i++)
+					float *ptr = (float *)page;
+					for (size_t i = 0; i < pageSize; i++)
 						ptr[i] = (float)srcPtr[i];
 				}
 				break;
@@ -736,13 +736,27 @@ public:
 				}
 				else
 				{
-					RFLOAT * ptr = (RFLOAT *) page;
-					for(size_t i=0; i<pageSize; i++)
+					RFLOAT *ptr = (RFLOAT *)page;
+					for (size_t i = 0; i < pageSize; i++)
 						ptr[i] = (RFLOAT)srcPtr[i];
 				}
 				break;
 			}
-	   case UShort:
+		case Short: 
+			{
+				if (typeid(T) == typeid(short))
+				{
+					memcpy(page, srcPtr, pageSize*sizeof(T));
+				}
+				else
+				{
+					short *ptr = (short *)page;
+					for (size_t i = 0; i < pageSize; i++)
+						ptr[i] = (short)srcPtr[i];
+				}
+				break;
+			}
+		case UShort:
 			{
 				if (typeid(T) == typeid(unsigned short))
 				{
@@ -750,8 +764,8 @@ public:
 				}
 				else
 				{
-					unsigned short * ptr = (unsigned short *) page;
-					for(size_t i=0; i<pageSize; i++)
+					unsigned short *ptr = (unsigned short *)page;
+					for (size_t i = 0; i < pageSize; i++)
 						ptr[i] = (unsigned short)srcPtr[i];
 				}
 				break;
@@ -764,15 +778,15 @@ public:
 				}
 				else
 				{
-					unsigned char * ptr = (unsigned char *) page;
-					for(size_t i=0; i<pageSize; i++)
+					unsigned char *ptr = (unsigned char *)page;
+					for (size_t i = 0; i < pageSize; i++)
 						ptr[i] = (unsigned char)srcPtr[i];
 				}
 				break;
 			}
 		default:
 				{
-					std::cerr<<"outputDatatype= "<<datatype<<std::endl;
+					std::cerr << "outputDatatype= " << datatype << std::endl;
 					REPORT_ERROR(" ERROR: cannot cast T to outputDatatype");
 				}
 			}
@@ -852,7 +866,7 @@ public:
 			}
 		default:
 			{
-				std::cerr<<"Datatype= "<<datatype<<std::endl;
+				std::cerr << "Datatype= " << datatype << std::endl;
 				REPORT_ERROR(" ERROR: cannot cast datatype to T");
 			}
 		}
