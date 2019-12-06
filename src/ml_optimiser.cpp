@@ -4038,7 +4038,7 @@ void MlOptimiser::maximization()
 					{
 						(wsum_model.BPref[iclass]).reconstructNGD(mymodel.Iref[iclass],
 								mymodel.tau2_class[iclass],
-								(mydata.numberOfParticles()/subset_size) * mymodel.tau2_fudge_factor,
+								(effective_setsize/subset_size) * mymodel.tau2_fudge_factor,
 								sgd_stepsize,
 								(iclass==0));
 					}
@@ -8699,6 +8699,11 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 	if (myverb && subset_size != old_subset_size)
 		std::cout << " Setting subset size to " << subset_size << " particles" << std::endl;
 
+	// Update effective_subsetsize
+	// TODO: BETTER??? sqrt(sgd_stepsize) or sgd_stepsize^2 ???
+	// TODO: read in effective_setsize from optimiser.star for restarts
+	effective_setsize += sgd_stepsize * subset_size;
+	effective_setsize = XMIPP_MIN(effective_setsize, mydata.numberOfParticles());
 }
 
 void MlOptimiser::checkConvergence(bool myverb)

@@ -339,6 +339,9 @@ public:
 	//Size of the subsets used in the final iterations
 	int sgd_fin_subset_size;
 
+	// Effective size of subsets
+	int effective_setsize;
+
 	// The resolution in the initial iterations
 	RFLOAT sgd_ini_resol; // in A
 

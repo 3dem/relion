@@ -2091,7 +2091,7 @@ void MlOptimiserMpi::maximization()
 							{
 								(wsum_model.BPref[ith_recons]).reconstructNGD(mymodel.Iref[ith_recons],
 										mymodel.tau2_class[ith_recons],
-										(mydata.numberOfParticles()/subset_size) * mymodel.tau2_fudge_factor,
+										(effective_setsize/subset_size) * mymodel.tau2_fudge_factor,
 										sgd_stepsize,
 										(iclass==0));
 							}
@@ -2218,7 +2218,7 @@ void MlOptimiserMpi::maximization()
 								{
 									(wsum_model.BPref[ith_recons]).reconstructNGD(mymodel.Iref[ith_recons],
 											mymodel.tau2_class[ith_recons],
-											(mydata.numberOfParticles()/subset_size) * mymodel.tau2_fudge_factor,
+											(effective_setsize/subset_size) * mymodel.tau2_fudge_factor,
 											sgd_stepsize,
 											false);
 								}
