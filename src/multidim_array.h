@@ -2582,6 +2582,71 @@ public:
         return;
     }
 
+    RFLOAT computeStddev() const
+    {
+        if (NZYXSIZE(*this) <= 1)
+            return 0;
+
+        RFLOAT avg = 0, stddev = 0;
+
+        T* ptr=NULL;
+        long int n;
+
+
+#ifdef RELION_SINGLE_PRECISION
+        // Two-passes through the data, as single-precision is not enough for a single-pass
+        // Also: averages of large arrays will give trouble: computer median first....
+        RFLOAT median = 0.;
+        if (NZYXSIZE(*this) > 1e6)
+                median = computeMedian();
+
+        FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
+        {
+                RFLOAT val=static_cast< RFLOAT >(*ptr);
+                avg += val - median;
+        }
+        avg /= NZYXSIZE(*this);
+        avg += median;
+
+        FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
+        {
+                RFLOAT val=static_cast< RFLOAT >(*ptr);
+            stddev += (val - avg) * (val - avg);
+        }
+
+        if (NZYXSIZE(*this) > 1)
+        {
+            stddev = stddev / (NZYXSIZE(*this) - 1);
+            // Foreseeing numerical instabilities
+            stddev = sqrt(static_cast< RFLOAT >(ABS(stddev)));
+        }
+        else
+            stddev = 0;
+
+#else
+        FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
+        {
+            RFLOAT val=static_cast< RFLOAT >(*ptr);
+            avg += val;
+            stddev += val * val;
+        }
+        avg /= NZYXSIZE(*this);
+
+        if (NZYXSIZE(*this) > 1)
+        {
+            stddev = stddev / NZYXSIZE(*this) - avg * avg;
+            stddev *= NZYXSIZE(*this) / (NZYXSIZE(*this) - 1);
+
+            // Foreseeing numerical instabilities
+            stddev = sqrt(static_cast< RFLOAT >(ABS(stddev)));
+        }
+        else
+            stddev = 0;
+#endif
+
+        return stddev;
+    }
+
     /** Compute statistics.
      *
      * The average, standard deviation, minimum and maximum value are
