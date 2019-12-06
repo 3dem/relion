@@ -314,10 +314,6 @@ public:
 						RFLOAT ngd_stepsize = 0.1,
 						bool printTimes= false);
 
-	void sgd_step(MultidimArray<Complex > &Fprev,
-			MultidimArray<RFLOAT > &tau2,
-		      MultidimArray<Complex > &Fgrad);
-
 	/*	Enforce Hermitian symmetry, apply helical symmetry as well as point-group symmetry
 	 */
 	void symmetrise(int nr_helical_asu = 1, RFLOAT helical_twist = 0., RFLOAT helical_rise = 0., int threads = 1);
