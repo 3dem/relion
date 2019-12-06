@@ -1863,7 +1863,6 @@ void BackProjector::reconstructNGD(
 	Projector::decenter(Fdiff_cen, Fconv, max_r2);
 	Image<RFLOAT> Idiff;
 	windowToOridimRealSpace(transformer, Idiff(), printTimes);
-	Idiff()=grad_out;
 	Idiff.write("diff.spi");
 	transformer.setReal(vol_out);
 #endif
