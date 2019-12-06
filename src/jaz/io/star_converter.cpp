@@ -186,14 +186,14 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 					img.read(fn_img, false); // false means read only header, skip real data
 					int image_size = img().xdim;
 
-					if (image_size%2 != 0)
+					if (image_size % 2 != 0)
 					{
 						REPORT_ERROR("ERROR: this program only works with even values for the image dimensions!");
 					}
 
 					if (image_size != img().ydim)
 					{
-						REPORT_ERROR("ERROR: xsize != ysize: only squared images allowed");
+						REPORT_ERROR("ERROR: xsize != ysize: only squared images are allowed");
 					}
 
 					outOptics.setValue(EMDL_IMAGE_SIZE, image_size, g);
@@ -256,12 +256,13 @@ void StarConverter::unifyPixelSize(MetaDataTable& outOptics, std::string tablena
 			if (tablename == "particles" || tablename == "")
 			{
 				outOptics.setValue(EMDL_IMAGE_PIXEL_SIZE, angpix, i);
+				// Do not set EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, because particles might have been down-sampled.
 			}
 			else if (tablename == "micrographs")
 			{
 				outOptics.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, angpix, i);
+		 		outOptics.setValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix, i);
 			}
-			outOptics.setValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix, i);
 		}
 
 		outOptics.deactivateLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE);

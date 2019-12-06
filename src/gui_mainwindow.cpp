@@ -1760,9 +1760,9 @@ void GuiMainWindow::cb_display_io_node_i()
 		}
 
 		// Get the name of the micrograph STAR file from reading the suffix file
-	    FileName fn_suffix = pipeline.nodeList[mynode].name;
-	    if (fn_suffix.getExtension() == "star")
-	    {
+		FileName fn_suffix = pipeline.nodeList[mynode].name;
+		if (fn_suffix.getExtension() == "star")
+		{
 			std::ifstream in(fn_suffix.data(), std::ios_base::in);
 			FileName fn_star;
 			in >> fn_star ;
@@ -1817,11 +1817,11 @@ void GuiMainWindow::cb_display_io_node_i()
 			{
 				fl_message("Only coordinates in .star format, generated in the pipeline, can be displayed here.");
 			}
-	    }
-	    else
-	    {
-	    	fl_message("Only coordinates in .star format, generated in the pipeline, can be displayed here.");
-	    }
+		}
+		else
+		{
+			fl_message("Only coordinates in .star format, generated in the pipeline, can be displayed here.");
+		}
 	}
 	else if (pipeline.nodeList[mynode].type == NODE_PDF_LOGFILE)
 	{
@@ -1833,6 +1833,10 @@ void GuiMainWindow::cb_display_io_node_i()
 		}
 		std::string myviewer(default_pdf_viewer);
 		command = myviewer + " " + pipeline.nodeList[mynode].name + "&";
+	}
+	else if (pipeline.nodeList[mynode].type == NODE_POLISH_PARAMS)
+	{
+		command = "cat " + pipeline.nodeList[mynode].name;
 	}
 	else if (pipeline.nodeList[mynode].type != NODE_POST)
 	{
@@ -1874,7 +1878,6 @@ void GuiMainWindow::cb_add_scheduler_edge_i()
 		output = scheduler_edge_output->text(idx);
 	}
 
-
 	idx = scheduler_edge_boolean->value();
 	if (idx >= 0)
 	{
@@ -1912,7 +1915,10 @@ void GuiMainWindow::cb_delete_scheduler_edge_i()
 {
 	int idx = scheduler_edge_browser->value();
 	if (idx <= 0)
+	{
+		fl_message("Please select a job.");
 		return;
+	}
 
 	std::string ask = "Are you sure you want to delete this edge?";
 	int proceed =  fl_choice("%s", "Cancel", "Delete!", NULL, ask.c_str());
@@ -1942,7 +1948,6 @@ void GuiMainWindow::cb_select_scheduler_edge(Fl_Widget *o, void* v)
 
 void GuiMainWindow::cb_select_scheduler_edge_i()
 {
-
 	// Get position of the browser:
 	int idx = scheduler_edge_browser->value();
 	if (idx >= 1)
@@ -2091,11 +2096,18 @@ void GuiMainWindow::cb_delete_scheduler_operator_i()
 		return;
 	}
 
-	std::string type = scheduler_operator_type->text(scheduler_operator_type->value());
-	std::string output = scheduler_operator_output->text(scheduler_operator_output->value());
-	std::string input1 = scheduler_operator_input1->text(scheduler_operator_input1->value());
-	std::string input2 = scheduler_operator_input2->text(scheduler_operator_input2->value());
-	std::string name = schedule.getOperatorName(type, input1, input2, output);
+	const std::string type = scheduler_operator_type->text(scheduler_operator_type->value());
+	std::string output = "", input1 = "", input2 = "";
+
+	// Some operators do not have these arguments.
+	if (scheduler_operator_output->value() >= 0)
+		output = scheduler_operator_output->text(scheduler_operator_output->value());
+	if (scheduler_operator_input1->value() >= 0)
+		input1 = scheduler_operator_input1->text(scheduler_operator_input1->value());
+	if (scheduler_operator_input2->value() >= 0)
+		input2 = scheduler_operator_input2->text(scheduler_operator_input2->value());
+
+	const std::string name = schedule.getOperatorName(type, input1, input2, output);
 
 	schedule.read(DO_LOCK);
 	schedule.removeOperator(name);
@@ -2448,7 +2460,7 @@ void GuiMainWindow::cb_print_cl_i()
 
 	std::string error_message;
 	if (!pipeline.getCommandLineJob(gui_jobwindows[iwin]->myjob, current_job, is_main_continue, false,
-			DONT_MKDIR, do_overwrite_continue, commands, final_command, error_message))
+	                                DONT_MKDIR, do_overwrite_continue, commands, final_command, error_message))
 	{
 		fl_message("%s",error_message.c_str());
 	}
@@ -2460,8 +2472,9 @@ void GuiMainWindow::cb_print_cl_i()
 			if (icom > 0) command += " && ";
 			command += commands[icom];
 		}
-		const char* tt = fl_input("%s", command.c_str(), mesg.c_str());
-		free((void*)tt);
+		fl_input("%s", command.c_str(), mesg.c_str());
+		// Don't free the returned string! It comes from Fl_Input::value(), which returns
+		// "pointer to an internal buffer - do not free() this".
 	}
 }
 
@@ -2650,7 +2663,7 @@ void GuiMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 {
 	if (current_job < 0)
 	{
-		std::cout << " You can only delete existing jobs ... " << std::endl;
+		fl_message("Please select a job.");
 		return;
 	}
 
@@ -2722,9 +2735,9 @@ e.g. by using \"touch Polish/job045/NO_HARSH_CLEAN\". Below is a list of current
 		for (int myjob = 0; myjob < pipeline.processList.size(); myjob++)
 		{
 			if (pipeline.processList[myjob].status == PROC_FINISHED_SUCCESS &&
-					(pipeline.processList[myjob].type == PROC_MOTIONCORR ||
-					pipeline.processList[myjob].type == PROC_EXTRACT ||
-					pipeline.processList[myjob].type == PROC_SUBTRACT) )
+			    (pipeline.processList[myjob].type == PROC_MOTIONCORR ||
+			     pipeline.processList[myjob].type == PROC_EXTRACT ||
+			     pipeline.processList[myjob].type == PROC_SUBTRACT))
 			{
 				if (exists(pipeline.processList[myjob].name + "NO_HARSH_CLEAN"))
 					ask += pipeline.processList[myjob].name + " \n";
@@ -2767,7 +2780,14 @@ void GuiMainWindow::cb_cleanup_i(int myjob, bool do_verb, bool do_harsh)
 {
 	// Allow cleaning the currently selected job from the GUI
 	if (myjob < 0)
+	{
+		if (current_job < 0)
+		{
+			fl_message("Please select a job.");
+			return;
+		}
 		myjob = current_job;
+	}
 
 	int proceed = 1;
 	if (do_verb)
@@ -2794,6 +2814,12 @@ void GuiMainWindow::cb_set_alias(Fl_Widget* o, void* v)
 
 void GuiMainWindow::cb_set_alias_i(std::string alias)
 {
+	if (current_job < 0)
+	{
+		fl_message("Please select a job.");
+		return;
+	}
+
 	FileName fn_pre, fn_jobnr, fn_post, fn_dummy, default_ask;
 	if (!decomposePipelineFileName(pipeline.processList[current_job].name, fn_pre, fn_jobnr, fn_post))
 		REPORT_ERROR("GuiMainWindow::cb_set_alias_i ERROR: invalid pipeline process name: " + pipeline.processList[current_job].name);
@@ -2844,6 +2870,12 @@ void GuiMainWindow::cb_abort(Fl_Widget* o, void* v)
 
 void GuiMainWindow::cb_abort_i(std::string alias)
 {
+	if (current_job < 0)
+	{
+		fl_message("Please select a job.");
+		return;
+	}
+
 	if (pipeline.processList[current_job].status != PROC_RUNNING)
 	{
 		std::string error_message = "You can only abort running jobs ... ";
@@ -2899,6 +2931,12 @@ void GuiMainWindow::cb_make_flowchart(Fl_Widget* o, void* v)
 
 void GuiMainWindow::cb_make_flowchart_i()
 {
+	if (current_job < 0)
+	{
+		fl_message("Please select a job.");
+		return;
+	}
+
 	std::string error_message;
 	if (!pipeline.makeFlowChart(current_job, true, error_message))
 		fl_message("%s",error_message.c_str());
@@ -2939,7 +2977,6 @@ void GuiMainWindow::cb_edit_note_i(bool is_project_note)
 	}
 	NoteEditorWindow* w = new NoteEditorWindow(660, 400, title.c_str(), fn_note, !maingui_do_read_only);
 	w->show();
-
 }
 
 // Save button call-back function
@@ -2962,7 +2999,6 @@ void GuiMainWindow::cb_save_i()
 	}
 	// Write the hidden file
 	gui_jobwindows[iwin]->myjob.write("");
-
 }
 
 // Load button call-back function
@@ -3005,7 +3041,7 @@ void GuiMainWindow::cb_undelete_job_i()
 		return;
 
 	char relname[FL_PATH_MAX];
-    fl_filename_relative(relname,sizeof(relname),chooser.value());
+	fl_filename_relative(relname,sizeof(relname),chooser.value());
 	FileName fn_pipe(relname);
 
 	pipeline.undeleteJob(fn_pipe);
@@ -3338,7 +3374,6 @@ void GuiMainWindow::cb_start_pipeliner_i()
 	}
 	SchedulerWindow* w = new SchedulerWindow(400, 300, "Select which jobs to execute");
 	w->fill(pipeline.name, job_names);
-
 }
 
 void GuiMainWindow::cb_stop_pipeliner(Fl_Widget* o, void* v)
@@ -3401,7 +3436,6 @@ void GuiMainWindow::cb_toggle_expand_stdout_i()
 		expand_stdout_button->label("Job view");
 		show_expand_stdout = true;
 	}
-
 }
 
 void GuiMainWindow::cb_about(Fl_Widget* o, void* v)
@@ -3483,4 +3517,3 @@ void GuiMainWindow::cb_quit_i()
 {
 	exit(0);
 }
-

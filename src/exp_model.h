@@ -214,7 +214,10 @@ public:
 };
 
 // for sorting particles based on the optics_group of their first image;
-bool compareOpticsGroupsParticles(ExpParticle a, ExpParticle b);
+bool compareOpticsGroupsParticles(const ExpParticle &a, const ExpParticle &b);
+
+// for sorting particles based on the random subset
+bool compareRandomSubsetParticles(const ExpParticle &a, const ExpParticle &b);
 
 class Experiment
 {
@@ -256,7 +259,7 @@ public:
 	std::vector<long int> nr_parts_on_scratch;
 
 	// Number of Gb on scratch disk before copying particles
-	long int free_space_Gb;
+	RFLOAT free_space_Gb;
 
 	// Is this sub-tomograms?
 	bool is_3D;
@@ -382,7 +385,7 @@ public:
 	// Copy particles from their original position to a scratch directory
 	// Monitor when the scratch disk gets to have fewer than free_scratch_Gb space,
 	// in that case, stop copying, and keep reading particles from where they were...
-	void copyParticlesToScratch(int verb, bool do_copy = true, bool also_do_ctf_image = false, long int free_scratch_Gb = 10);
+	void copyParticlesToScratch(int verb, bool do_copy = true, bool also_do_ctf_image = false, RFLOAT free_scratch_Gb = 10);
 
 	// Read from file
 	void read(

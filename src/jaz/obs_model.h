@@ -33,90 +33,74 @@ class BackProjector;
 class ObservationModel
 {
     public:
-
 		// tablename can be "particles", "micrographs" or "movies".
 		// If tablename is "discover", the function will try to read the data table with all three names (in that order).
-		static void loadSafely(
-				std::string filename,
-				ObservationModel& obsModel,
-				MetaDataTable& particlesMdt, std::string tablename = "particles", int verb = 0, bool do_die_upon_error = true);
+		static void loadSafely(std::string filename, ObservationModel& obsModel,
+		                       MetaDataTable& particlesMdt, std::string tablename = "particles", int verb = 0, bool do_die_upon_error = true);
 
-		static void saveNew(
-				MetaDataTable& particlesMdt,
-				MetaDataTable& opticsMdt,
-				std::string filename, std::string _tablename = "particles");
+		static void saveNew(MetaDataTable& particlesMdt, MetaDataTable& opticsMdt,
+		                    std::string filename, std::string _tablename = "particles");
 
-		void save(
-				MetaDataTable& particlesMdt,
-				std::string filename, std::string _tablename = "particles");
+		void save(MetaDataTable& particlesMdt, std::string filename, std::string _tablename = "particles");
 
 		static bool containsAllColumnsNeededForPrediction(const MetaDataTable& partMdt);
 
+	        ObservationModel();
+	        ObservationModel(const MetaDataTable &opticsMdt, bool do_die_upon_error = true);
 
-        ObservationModel();
-        ObservationModel(const MetaDataTable &opticsMdt, bool do_die_upon_error = true);
-
-
-			MetaDataTable opticsMdt;
-			bool hasEvenZernike, hasOddZernike, hasMagMatrices, hasBoxSizes;
+		MetaDataTable opticsMdt;
+		bool hasEvenZernike, hasOddZernike, hasMagMatrices, hasBoxSizes, hasMultipleMtfs;
 
 	protected:
+		// cached values - protected to prevent users from accidentally changing them,
+		// expecting the changes to propagate into the optics star-file
+		std::vector<double> angpix, originalAngpix, lambda, Cs;
+		std::vector<int> boxSizes;
+		std::vector<bool> CtfPremultiplied;
+		std::vector<std::vector<double> > evenZernikeCoeffs, oddZernikeCoeffs;
+		std::vector<Matrix2D<RFLOAT> > magMatrices;
+		std::vector<std::string> fnMtfs, groupNames;
 
-			// cached values - protected to prevent users from accidentally changing them,
-			// expecting the changes to propagate into the optics star-file
-			std::vector<double> angpix, originalAngpix, lambda, Cs;
-			std::vector<int> boxSizes;
-			std::vector<bool> CtfPremultiplied;
-			std::vector<std::vector<double> > evenZernikeCoeffs, oddZernikeCoeffs;
-			std::vector<Matrix2D<RFLOAT> > magMatrices;
-			std::vector<std::string> fnMtfs, groupNames;
-
-			// cached aberration effects for a set of given image sizes
-			// e.g.: phaseCorr[opt. group][img. height](y,x)
-			std::vector<std::map<int,Image<Complex> > > phaseCorr;
-			std::vector<std::map<int,Image<RFLOAT> > > gammaOffset, mtfImage;
+		// cached aberration effects for a set of given image sizes
+		// e.g.: phaseCorr[opt. group][img. height](y,x)
+		std::vector<std::map<int,Image<Complex> > > phaseCorr;
+		std::vector<std::map<int,Image<RFLOAT> > > gammaOffset, mtfImage;
+		std::map<int,Image<RFLOAT> > avgMtfImage;
 
 	public:
 
-	// Prediction //
+		// Prediction //
+		void predictObservation(Projector &proj, const MetaDataTable &partMdt, long int particle,
+		                        MultidimArray<Complex>& dest, double angpix_ref,
+		                        bool applyCtf = true, bool shiftPhases = true, bool applyShift = true, bool applyMtf = true,
+		                        bool applyCtfPadding = false);
 
-		void predictObservation(
-				Projector &proj, const MetaDataTable &partMdt, long int particle,
-				MultidimArray<Complex>& dest, double angpix_ref,
-				bool applyCtf = true, bool shiftPhases = true, bool applyShift = true, bool applyMtf = true,
-				bool applyCtfPadding = false);
-
-		Volume<gravis::t2Vector<Complex> > predictComplexGradient(
-				Projector &proj, const MetaDataTable &partMdt, long int particle, double angpix_ref,
-				bool applyCtf = true, bool shiftPhases = true, bool applyShift = true, bool applyMtf = true,
-				bool applyCtfPadding = false);
+		Volume<gravis::t2Vector<Complex> > predictComplexGradient(Projector &proj, const MetaDataTable &partMdt,
+		                                                          long int particle, double angpix_ref,
+		                                                          bool applyCtf = true, bool shiftPhases = true, bool applyShift = true,
+		                                                          bool applyMtf = true,	bool applyCtfPadding = false);
 
 		// Correction //
 
 		// divide by MTF of detector (using cache)
-		void divideByMtf(
-				const MetaDataTable& partMdt, long particle, MultidimArray<Complex>& obsImage,
-				bool do_multiply_instead = false);
+		void divideByMtf(const MetaDataTable& partMdt, long particle, MultidimArray<Complex>& obsImage,
+		                 bool do_multiply_instead = false, bool do_correct_average_mtf = true);
 
-		void divideByMtf(
-				int opticsGroup, MultidimArray<Complex>& obsImage,
-				bool do_multiply_instead = false);
+		void divideByMtf(int opticsGroup, MultidimArray<Complex>& obsImage,
+		                 bool do_multiply_instead = false, bool do_correct_average_mtf = true);
 
 		// 2D image with the MTF (cached)
 		const Image<RFLOAT>& getMtfImage(int optGroup, int s);
 
+		// 2D image with the average MTF (cached)
+		const Image<RFLOAT>& getAverageMtfImage(int s);
+
 		// apply effect of antisymmetric aberration (using cache)
-		void demodulatePhase(
-				int optGroup,
-				MultidimArray<Complex>& obsImage,
-				bool do_modulate_instead = false);
+		void demodulatePhase(int optGroup, MultidimArray<Complex>& obsImage, bool do_modulate_instead = false);
 
 		// syntactic sugar
-		void demodulatePhase(
-				const MetaDataTable &partMdt,
-				long int particle,
-				MultidimArray<Complex>& obsImage,
-				bool do_modulate_instead = false);
+		void demodulatePhase(const MetaDataTable &partMdt, long int particle, MultidimArray<Complex>& obsImage,
+		                     bool do_modulate_instead = false);
 
 		// effect of antisymmetric aberration (cached)
 		const Image<Complex>& getPhaseCorrection(int optGroup, int s);
@@ -124,16 +108,11 @@ class ObservationModel
 		// effect of symmetric aberration (cached)
 		const Image<RFLOAT>& getGammaOffset(int optGroup, int s);
 
-		Matrix2D<RFLOAT> applyAnisoMag(
-				Matrix2D<RFLOAT> A3D, int opticsGroup);
+		Matrix2D<RFLOAT> applyAnisoMag(Matrix2D<RFLOAT> A3D, int opticsGroup);
 
-		Matrix2D<RFLOAT> applyScaleDifference(
-				Matrix2D<RFLOAT> A3D, int opticsGroup,
-				int s3D, double angpix3D);
+		Matrix2D<RFLOAT> applyScaleDifference(Matrix2D<RFLOAT> A3D, int opticsGroup, int s3D, double angpix3D);
 
-
-
-	// Bureaucracy
+		// Bureaucracy
 
 		bool allPixelSizesIdentical() const;
 		bool allBoxSizesIdentical() const;
@@ -151,8 +130,11 @@ class ObservationModel
 		std::vector<double> getSphericalAberrations() const;
 
 		int getBoxSize(int opticsGroup) const;
-		void setBoxSize(int opticsGroup, int newBoxSize);
 		void getBoxSizes(std::vector<int>& sDest, std::vector<int>& shDest) const;
+
+		// This does NOT update the metadata table!
+		// This is only to change prediction etc.
+		void setBoxSize(int opticsGroup, int newBoxSize);
 
 		Matrix2D<RFLOAT> getMagMatrix(int opticsGroup) const;
 		std::vector<Matrix2D<RFLOAT> > getMagMatrices() const;
@@ -194,10 +176,6 @@ class ObservationModel
 		/* Return the set of optics groups present in partMdt */
 		std::vector<int> getOptGroupsPresent_zeroBased(const MetaDataTable& partMdt) const;
 
-		std::vector<std::pair<int, std::vector<int> > > splitParticlesByOpticsGroup(
-				const MetaDataTable& partMdt) const;
-
-
+		std::vector<std::pair<int, std::vector<int> > > splitParticlesByOpticsGroup(const MetaDataTable& partMdt) const;
 };
-
 #endif

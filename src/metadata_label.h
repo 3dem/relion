@@ -470,8 +470,12 @@ enum EMDLabel
 
 	EMDL_POSTPROCESS_BFACTOR,
 	EMDL_POSTPROCESS_FINAL_RESOLUTION,
+	EMDL_POSTPROCESS_FRACTION_MOLWEIGHT,
+	EMDL_POSTPROCESS_FRACTION_SOLVENT_MASK,
 	EMDL_POSTPROCESS_FSC_GENERAL,
 	EMDL_POSTPROCESS_FSC_TRUE,
+	EMDL_POSTPROCESS_FSC_PART_MOLWEIGHT,
+	EMDL_POSTPROCESS_FSC_PART_FRACMASK,
 	EMDL_POSTPROCESS_FSC_MASKED,
 	EMDL_POSTPROCESS_FSC_UNMASKED,
 	EMDL_POSTPROCESS_FSC_RANDOM_MASKED,
@@ -488,6 +492,7 @@ enum EMDLabel
 	EMDL_POSTPROCESS_GUINIER_VALUE_SHARPENED,
 	EMDL_POSTPROCESS_GUINIER_VALUE_INTERCEPT,
 	EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED,
+	EMDL_POSTPROCESS_MOLWEIGHT,
 	EMDL_POSTPROCESS_MTF_VALUE, ///< Detector MTF value
 	EMDL_POSTPROCESS_RANDOMISE_FROM,
 	EMDL_POSTPROCESS_UNFIL_HALFMAP1,
@@ -559,7 +564,7 @@ enum EMDLabel
 
 enum EMDLabelType
 {
-	EMDL_INT, EMDL_BOOL, EMDL_DOUBLE, EMDL_FLOAT, EMDL_STRING, EMDL_DOUBLE_VECTOR, EMDL_UNKNOWN
+	EMDL_INT, EMDL_BOOL, EMDL_DOUBLE, EMDL_STRING, EMDL_DOUBLE_VECTOR, EMDL_UNKNOWN
 };
 
 class EMDL
@@ -1046,8 +1051,12 @@ private:
 
 		EMDL::addLabel(EMDL_POSTPROCESS_FINAL_RESOLUTION, EMDL_DOUBLE, "rlnFinalResolution", "Final estimated resolution after postprocessing (in Angstroms)");
 		EMDL::addLabel(EMDL_POSTPROCESS_BFACTOR, EMDL_DOUBLE, "rlnBfactorUsedForSharpening", "Applied B-factor in the sharpening of the map");
+		EMDL::addLabel(EMDL_POSTPROCESS_FRACTION_MOLWEIGHT, EMDL_DOUBLE, "rlnParticleBoxFractionMolecularWeight", "Fraction of protein voxels in the box, based on ordered molecular weight estimate, for calculating cisTEM-like part_FSC");
+		EMDL::addLabel(EMDL_POSTPROCESS_FRACTION_SOLVENT_MASK, EMDL_DOUBLE, "rlnParticleBoxFractionSolventMask", "Fraction of protein voxels in the box, based on the solvent mask, for calculating cisTEM-like part_FSC");
 		EMDL::addLabel(EMDL_POSTPROCESS_FSC_GENERAL, EMDL_DOUBLE, "rlnFourierShellCorrelation", "FSC value (of unspecified type, e.g. masked or unmasked)");
 		EMDL::addLabel(EMDL_POSTPROCESS_FSC_TRUE, EMDL_DOUBLE, "rlnFourierShellCorrelationCorrected", "Final FSC value: i.e. after correction based on masking of randomized-phases maps");
+		EMDL::addLabel(EMDL_POSTPROCESS_FSC_PART_MOLWEIGHT, EMDL_DOUBLE, "rlnFourierShellCorrelationParticleMolWeight", "CisTEM-like correction of unmasked FSCs, based on ordered molecular weight estimate");
+		EMDL::addLabel(EMDL_POSTPROCESS_FSC_PART_FRACMASK, EMDL_DOUBLE, "rlnFourierShellCorrelationParticleMaskFraction", "CisTEM-like correction of unmasked FSCs, based on fraction of white pixels in solvent mask");
 		EMDL::addLabel(EMDL_POSTPROCESS_FSC_MASKED, EMDL_DOUBLE, "rlnFourierShellCorrelationMaskedMaps", "FSC value after masking of the original maps");
 		EMDL::addLabel(EMDL_POSTPROCESS_FSC_UNMASKED, EMDL_DOUBLE, "rlnFourierShellCorrelationUnmaskedMaps", "FSC value before masking of the original maps");
 		EMDL::addLabel(EMDL_POSTPROCESS_FSC_RANDOM_MASKED, EMDL_DOUBLE, "rlnCorrectedFourierShellCorrelationPhaseRandomizedMaskedMaps", "FSC value after masking of the randomized-phases maps");
@@ -1064,6 +1073,7 @@ private:
 		EMDL::addLabel(EMDL_POSTPROCESS_GUINIER_VALUE_SHARPENED, EMDL_DOUBLE, "rlnLogAmplitudesSharpened", "Y-value for Guinier plot: the logarithm of the radially averaged amplitudes after sharpening");
 		EMDL::addLabel(EMDL_POSTPROCESS_GUINIER_VALUE_INTERCEPT, EMDL_DOUBLE, "rlnLogAmplitudesIntercept", "Y-value for Guinier plot: the fitted plateau of the logarithm of the radially averaged amplitudes");
 		EMDL::addLabel(EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_DOUBLE, "rlnResolutionSquared", "X-value for Guinier plot: squared resolution in 1/Angstrom^2");
+		EMDL::addLabel(EMDL_POSTPROCESS_MOLWEIGHT, EMDL_DOUBLE, "rlnMolecularWeight", "Molecular weight of the ordered mass inside the box for calculating cisTEM-like part.FSC (in kDa)");
 		EMDL::addLabel(EMDL_POSTPROCESS_MTF_VALUE, EMDL_DOUBLE, "rlnMtfValue", "Value of the detectors modulation transfer function (between 0 and 1)");
 		EMDL::addLabel(EMDL_POSTPROCESS_RANDOMISE_FROM, EMDL_DOUBLE, "rlnRandomiseFrom", "Resolution (in A) from which the phases are randomised in the postprocessing step");
 		EMDL::addLabel(EMDL_POSTPROCESS_UNFIL_HALFMAP1, EMDL_STRING, "rlnUnfilteredMapHalf1", "Name of the unfiltered map from halfset 1");

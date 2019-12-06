@@ -20,7 +20,6 @@
 #include "src/exp_model.h"
 #include <sys/statvfs.h>
 
-
 long int Experiment::numberOfParticles(int random_subset)
 {
 	if (random_subset == 0)
@@ -38,7 +37,6 @@ long int Experiment::numberOfImagesInParticle(long int part_id)
 {
 	return particles[part_id].images.size();
 }
-
 
 long int Experiment::numberOfMicrographs()
 {
@@ -122,7 +120,6 @@ long int Experiment::addParticle(std::string part_name, int random_subset)
 
 	// Return the current part_id in the particles vector
 	return particles.size() - 1;
-
 }
 
 int Experiment::addImageToParticle(long int part_id, std::string img_name, long int ori_img_id, long int group_id, long int micrograph_id,
@@ -156,9 +153,7 @@ int Experiment::addImageToParticle(long int part_id, std::string img_name, long 
 	(micrographs[micrograph_id].image_ids).push_back(img.id);
 
 	return particles[part_id].images.size() - 1;
-
 }
-
 
 long int Experiment::addGroup(std::string group_name, int _optics_group)
 {
@@ -173,7 +168,6 @@ long int Experiment::addGroup(std::string group_name, int _optics_group)
 
 	// Return the id in the micrographs vector
 	return group.id;
-
 }
 
 long int Experiment::addMicrograph(std::string mic_name)
@@ -188,12 +182,10 @@ long int Experiment::addMicrograph(std::string mic_name)
 
 	// Return the id in the micrographs vector
 	return micrograph.id;
-
 }
 
 void Experiment::divideParticlesInRandomHalves(int seed, bool do_helical_refine)
 {
-
 	// Only do this if the random_subset of all original_particles is zero
 	bool all_are_zero = true;
 	bool some_are_zero = false;
@@ -308,17 +300,14 @@ void Experiment::divideParticlesInRandomHalves(int seed, bool do_helical_refine)
 				}
 				particles[part_id].random_subset = map_mics[mic_name];
 			}
-
 		}
 		else
 		{
-
 			for (long int part_id = 0; part_id < particles.size(); part_id++)
 			{
 				int random_subset = rand() % 2 + 1;
 				particles[part_id].random_subset = random_subset; // randomly 1 or 2
 			}
-
 		}
 
 		// Now that random subsets have been assigned, count the number of particles in each subset and set new labels in entire MDimg
@@ -339,35 +328,24 @@ void Experiment::divideParticlesInRandomHalves(int seed, bool do_helical_refine)
 				MDimg.setValue(EMDL_PARTICLE_RANDOM_SUBSET, random_subset, ori_img_id);
 			}
 		}
-
 	}
-
-	// Now re-order such that half1 is in first half, and half2 is in second half of the particle list (for MPI_parallelisattion)
-	std::vector<ExpParticle> new_particles_set1, new_particles_set2;
-	for (long int i = 0; i < particles.size(); i++)
-	{
-		int random_subset = particles[i].random_subset;
-		if (random_subset == 1)
-			new_particles_set1.push_back(particles[i]);
-		else if (random_subset == 2)
-			new_particles_set2.push_back(particles[i]);
-		else
-			REPORT_ERROR("ERROR: invalid number for random subset (i.e. not 1 or 2): " + integerToString(random_subset));
-	}
-	particles.clear();
-	particles.insert(particles.end(), new_particles_set1.begin(), new_particles_set1.end());
-	particles.insert(particles.end(), new_particles_set2.begin(), new_particles_set2.end());
 
 	if (nr_particles_subset2 == 0 || nr_particles_subset1 == 0)
 		REPORT_ERROR("ERROR: one of your half sets has no segments. Is rlnRandomSubset set to 1 or 2 in your particles STAR file? Or in case you're doing helical, half-sets are always per-filament, so provide at least 2 filaments.");
 
-
+	std::stable_sort(particles.begin(), particles.end(), compareRandomSubsetParticles);
 }
 
 // for sorting particles, based on the optics group of their first image
-bool compareOpticsGroupsParticles(ExpParticle a, ExpParticle b)
+bool compareOpticsGroupsParticles(const ExpParticle &a, const ExpParticle &b)
 {
 	return (a.images[0].optics_group < b.images[0].optics_group);
+}
+
+// for sorting particles, based on the random subset
+bool compareRandomSubsetParticles(const ExpParticle &a, const ExpParticle &b)
+{
+	return (a.random_subset < b.random_subset);
 }
 
 void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, bool do_subsets)
@@ -376,45 +354,38 @@ void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, 
 	static bool randomised = false;
 	if (!randomised || do_subsets)
 	{
-
 		srand(seed);
 
 		if (do_split_random_halves)
 		{
-			std::vector<ExpParticle> particle_list1, particle_list2;
-			particle_list1.clear();
-			particle_list2.clear();
-			// Fill the two particle lists
+			std::stable_sort(particles.begin(), particles.end(), compareRandomSubsetParticles);
+
+			// sanity check
+			long int nr_half1 = 0, nr_half2 = 0;
 			for (long int i = 0; i < particles.size(); i++)
 			{
-				int random_subset = particles[i].random_subset;
+				const int random_subset = particles[i].random_subset;
 				if (random_subset == 1)
-					particle_list1.push_back(particles[i]);
+					nr_half1++;
 				else if (random_subset == 2)
-					particle_list2.push_back(particles[i]);
+					nr_half2++;
 				else
 					REPORT_ERROR("ERROR Experiment::randomiseParticlesOrder: invalid number for random subset (i.e. not 1 or 2): " + integerToString(random_subset));
 			}
 
-			// Just a silly check for the sizes of the ori_particle_lists (to be sure)
-			if (particle_list1.size() != nr_particles_subset1)
-				REPORT_ERROR("ERROR Experiment::randomiseParticlesOrder: invalid particle_list1 size:" + integerToString(particle_list1.size()) + " != " + integerToString(nr_particles_subset1));
-			if (particle_list2.size() != nr_particles_subset2)
-				REPORT_ERROR("ERROR Experiment::randomiseParticlesOrder: invalid particle_list2 size:" + integerToString(particle_list2.size()) + " != " + integerToString(nr_particles_subset2));
+			if (nr_half1 != nr_particles_subset1)
+				REPORT_ERROR("ERROR Experiment::randomiseParticlesOrder: invalid half1 size:" + integerToString(nr_half1) + " != " + integerToString(nr_particles_subset1));
+			if (nr_half2 != nr_particles_subset2)
+				REPORT_ERROR("ERROR Experiment::randomiseParticlesOrder: invalid half2 size:" + integerToString(nr_half2) + " != " + integerToString(nr_particles_subset2));
 
 			// Randomise the two particle lists
-			std::random_shuffle(particle_list1.begin(), particle_list1.end());
-			std::random_shuffle(particle_list2.begin(), particle_list2.end());
+			std::random_shuffle(particles.begin(), particles.begin() + nr_half1);
+			std::random_shuffle(particles.begin() + nr_half1, particles.end());
 
 			// Make sure the particles are sorted on their optics_group.
 			// Otherwise CudaFFT re-calculation of plans every time image size changes slows down things a lot!
-			std::stable_sort(particle_list1.begin(), particle_list1.end(), compareOpticsGroupsParticles);
-			std::stable_sort(particle_list2.begin(), particle_list2.end(), compareOpticsGroupsParticles);
-
-			// First fill new_ori_particles with the first subset, then with the second
-			particles = particle_list1;
-			particles.insert(particles.end(), particle_list2.begin(), particle_list2.end());
-
+			std::stable_sort(particles.begin(), particles.begin() + nr_half1, compareOpticsGroupsParticles);
+			std::stable_sort(particles.begin() + nr_half1, particles.end(), compareOpticsGroupsParticles);
 		}
 		else
 		{
@@ -427,7 +398,6 @@ void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, 
 		}
 
 		randomised = true;
-
 	}
 }
 
@@ -467,13 +437,16 @@ void Experiment::initialiseBodies(int _nr_bodies)
 			MDbodies[ibody].setName(tablename);
 		}
 	}
-
 }
 
 bool Experiment::getImageNameOnScratch(long int part_id, int img_id, FileName &fn_img, bool is_ctf_image)
 {
 	int optics_group = getOpticsGroup(part_id, img_id);
 	long int my_id = particles[part_id].images[img_id].optics_group_id;
+
+#ifdef DEBUG_SCRATCH
+	std::cerr << "part_id = " << part_id << " img_id = " << img_id << " my_id = " << my_id << " nr_parts_on_scratch[" << optics_group << "] = " << nr_parts_on_scratch[optics_group] << std::endl;
+#endif
 
 	if (fn_scratch != "" && my_id < nr_parts_on_scratch[optics_group])
 	{
@@ -531,12 +504,13 @@ void Experiment::setScratchDirectory(FileName _fn_scratch, bool do_reuse_scratch
 					Itmp.read(fn_tmp, false);
 					nr_parts_on_scratch[optics_group] = NSIZE(Itmp());
 				}
+#ifdef DEBUG_SCRATCH
 				if (verb > 0)
 					std::cerr << " optics_group= " << (optics_group + 1) << " nr_parts_on_scratch[optics_group]= " << nr_parts_on_scratch[optics_group] << std::endl;
+#endif
 			}
 		}
 	}
-
 }
 
 FileName Experiment::initialiseScratchLock(FileName _fn_scratch, FileName _fn_out)
@@ -561,11 +535,10 @@ bool Experiment::prepareScratchDirectory(FileName _fn_scratch, FileName fn_lock)
 		// Still measure how much free space there is
 		struct statvfs vfs;
 		statvfs(_fn_scratch.c_str(), &vfs);
-		long int free_Gb = vfs.f_bsize*vfs.f_bfree/(1024*1024*1024);
 		char nodename[64] = "undefined";
 		gethostname(nodename,sizeof(nodename));
 		std::string myhost(nodename);
-		free_space_Gb = vfs.f_bsize*vfs.f_bfree/(1024*1024*1024);
+		free_space_Gb = (RFLOAT)vfs.f_bsize * vfs.f_bfree / (1024 * 1024 * 1024);
 
 		return false;
 	}
@@ -592,18 +565,16 @@ bool Experiment::prepareScratchDirectory(FileName _fn_scratch, FileName fn_lock)
 		// Measure how much free space there is
 		struct statvfs vfs;
 		statvfs(_fn_scratch.c_str(), &vfs);
-		long int free_Gb = vfs.f_bsize*vfs.f_bfree/(1024*1024*1024);
 		char nodename[64] = "undefined";
 		gethostname(nodename,sizeof(nodename));
 		std::string myhost(nodename);
-		free_space_Gb = vfs.f_bsize*vfs.f_bfree/(1024*1024*1024);
+		free_space_Gb = (RFLOAT)vfs.f_bsize * vfs.f_bfree / (1024 * 1024 * 1024);
 		std::cout << " + On host " << myhost << ": free scratch space = " << free_space_Gb << " Gb." << std::endl;
 
 		return true;
 	}
-
-
 }
+
 void Experiment::deleteDataOnScratch()
 {
 	// Wipe the scratch directory
@@ -613,10 +584,9 @@ void Experiment::deleteDataOnScratch()
 		if (system(command.c_str()))
 			REPORT_ERROR("ERROR: cannot execute: " + command);
 	}
-
 }
 
-void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf_image, long int keep_free_scratch_Gb)
+void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf_image, RFLOAT keep_free_scratch_Gb)
 {
 	// This function relies on prepareScratchDirectory() being called before!
 
@@ -630,8 +600,11 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 	}
 
 	long int one_part_space, used_space = 0.;
-	long int max_space = (free_space_Gb - keep_free_scratch_Gb)*1024*1024*1024; // in bytes
-
+	long int max_space = (free_space_Gb - keep_free_scratch_Gb) * 1024 * 1024 * 1024; // in bytes
+#ifdef DEBUG_SCRATCH
+	std::cerr << " free_space_Gb = " << free_space_Gb << " GB, keep_free_scratch_Gb = " << keep_free_scratch_Gb << " GB.\n";
+	std::cerr << " Max space RELION can use = " << max_space << " bytes" << std::endl;
+#endif
 	// Loop over all particles and copy them one-by-one
 	FileName fn_open_stack = "";
 	fImageHandler hFile;
@@ -644,7 +617,6 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 	int prev_optics_group = -999;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
 	{
-
 		// TODO: think about MPI_Abort here....
 		if (current_object % check_abort_frequency == 0 && pipeline_control_check_abort_job())
 			exit(RELION_EXIT_ABORTED);
@@ -677,12 +649,18 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 				if (also_do_ctf_image)
 					one_part_space *= 2;
 			}
+#ifdef DEBUG_SCRATCH
+			std::cerr << "one_part_space[" << optics_group << "] = " << one_part_space << std::endl;
+#endif
 		}
 
 		bool is_duplicate = (prev_img_name == fn_img && prev_optics_group == optics_group);
 		// Read in the particle image, and write out on scratch
 		if (do_copy && !is_duplicate)
 		{
+#ifdef DEBUG_SCRATCH
+			std::cerr << "used_space = " << used_space << std::endl;
+#endif
 			// Now we have the particle in memory
 			// See how much space it occupies
 			used_space += one_part_space;
@@ -765,7 +743,6 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 		if (system(command.c_str()))
 			REPORT_ERROR("ERROR in executing: " + command);
 	}
-
 }
 
 // Read from file
@@ -847,7 +824,6 @@ void Experiment::read(FileName fn_exp, bool do_ignore_particle_name, bool do_ign
 			MDimg.setValue(EMDL_IMAGE_NAME, fn_img, part_id);
 			MDimg.setValue(EMDL_IMAGE_OPTICS_GROUP, 1, part_id);
 		}
-
 	}
 	else
 	{
@@ -905,13 +881,11 @@ void Experiment::read(FileName fn_exp, bool do_ignore_particle_name, bool do_ign
 		// Now Loop over all objects in the metadata file and fill the logical tree of the experiment
 		long int last_part_id = -1;
 
-
 		FileName prev_img_name = "/Unlikely$filename$?*!";
 		int prev_optics_group = -999;
 		//FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
 		for (long int ori_img_id = 0; ori_img_id < MDimg.numberOfObjects(); ori_img_id++)
 		{
-
 			// Get the optics group of this particle
 			int optics_group = obsModel.getOpticsGroup(MDimg, ori_img_id);
 
@@ -1099,7 +1073,6 @@ void Experiment::read(FileName fn_exp, bool do_ignore_particle_name, bool do_ign
 		}
 		// Even if we don't do multi-body refinement, then nr_bodies is still 1
 		nr_bodies = XMIPP_MAX(nr_bodies, 1);
-
 	}
 
 #ifdef DEBUG_READ
@@ -1107,7 +1080,6 @@ void Experiment::read(FileName fn_exp, bool do_ignore_particle_name, bool do_ign
 	//std::cerr << "Press any key to continue..." << std::endl;
 	//std::cin >> c;
 #endif
-
 
 	// Make sure some things are always set in the MDimg
 	bool have_rot  = MDimg.containsLabel(EMDL_ORIENT_ROT);

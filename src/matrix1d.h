@@ -629,7 +629,7 @@ public:
      */
     Matrix1D<T> operator*(T op1) const
     {
-        Matrix1D<T> tmp(*this);
+    	Matrix1D<T> tmp(*this);
         for (int i=0; i < vdim; i++)
         	tmp.vdata[i] = vdata[i] * op1;
         return tmp;
@@ -771,6 +771,9 @@ public:
      */
      Matrix1D<T> operator*(const Matrix1D<T>& op1) const
     {
+         if (vdim != op1.vdim)
+             REPORT_ERROR("Not same sizes in vector multiplication");
+
          Matrix1D<T> tmp(op1);
          for (int i=0; i < vdim; i++)
          	tmp.vdata[i] = vdata[i] * op1.vdata[i];
@@ -781,6 +784,9 @@ public:
      */
      Matrix1D<T> operator/(const Matrix1D<T>& op1) const
     {
+         if (vdim != op1.vdim)
+             REPORT_ERROR("Not same sizes in vector division");
+
          Matrix1D<T> tmp(op1);
          for (int i=0; i < vdim; i++)
          	tmp.vdata[i] = vdata[i] / op1.vdata[i];
@@ -790,6 +796,9 @@ public:
      */
      Matrix1D<T> operator+(const Matrix1D<T>& op1) const
     {
+         if (vdim != op1.vdim)
+             REPORT_ERROR("Not same sizes in vector summation");
+
          Matrix1D<T> tmp(op1);
          for (int i=0; i < vdim; i++)
          	tmp.vdata[i] = vdata[i] + op1.vdata[i];
@@ -800,6 +809,9 @@ public:
      */
      Matrix1D<T> operator-(const Matrix1D<T>& op1) const
     {
+         if (vdim != op1.vdim)
+             REPORT_ERROR("Not same sizes in vector subtraction");
+
          Matrix1D<T> tmp(op1);
          for (int i=0; i < vdim; i++)
          	tmp.vdata[i] = vdata[i] - op1.vdata[i];
@@ -810,6 +822,9 @@ public:
      */
     void operator*=(const Matrix1D<T>& op1)
     {
+        if (vdim != op1.vdim)
+             REPORT_ERROR("Not same sizes in vector multiplication");
+
         for (int i=0; i < vdim; i++)
         	vdata[i] *= op1.vdata[i];
     }
@@ -818,6 +833,9 @@ public:
      */
     void operator/=(const Matrix1D<T>& op1)
     {
+        if (vdim != op1.vdim)
+            REPORT_ERROR("Not same sizes in vector division");
+
         for (int i=0; i < vdim; i++)
          	vdata[i] /= op1.vdata[i];
     }
@@ -826,6 +844,9 @@ public:
      */
     void operator+=(const Matrix1D<T>& op1)
     {
+        if (vdim != op1.vdim)
+             REPORT_ERROR("Not same sizes in vector summation");
+
         for (int i=0; i < vdim; i++)
         	vdata[i] += op1.vdata[i];
     }
@@ -834,6 +855,9 @@ public:
      */
     void operator-=(const Matrix1D<T>& op1)
     {
+        if (vdim != op1.vdim)
+            REPORT_ERROR("Not same sizes in vector subtraction");
+
         for (int i=0; i < vdim; i++)
          	vdata[i] -= op1.vdata[i];
     }
