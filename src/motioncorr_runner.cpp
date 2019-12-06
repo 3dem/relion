@@ -962,7 +962,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	// EER related things
 	// TODO: will be refactored
 	EERRenderer renderer;
-	const bool isEER = (mic.getMovieFilename().getExtension() == "ecc");
+	const bool isEER = EERRenderer::isEER(mic.getMovieFilename());
 
 	int n_io_threads = n_threads;
 	logfile << "Working on " << fn_mic << " with " << n_threads << " thread(s)." << std::endl << std::endl;

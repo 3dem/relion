@@ -434,7 +434,7 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 			std::cout << "-> hasdefect: " << (hasDefect ? 1 : 0) << std::endl;
 		}
 
-		const bool isEER = (mgFn.getExtension() == "ecc");
+		const bool isEER = EERRenderer::isEER(mgFn);
 
 		bool mgHasGain = false;
 

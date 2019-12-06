@@ -7,6 +7,10 @@
 
 #include <src/image.h>
 
+#ifdef HAVE_TIFF
+#include <tiffio.h>
+#endif
+
 extern int EER_grouping; // TODO: TAKANORI: Make this a command-line argument
 extern int EER_upsample;
 
@@ -14,10 +18,13 @@ class EERRenderer {
 	private:
 
 	FileName fn_movie;
-	int n_threads;
+#ifdef HAVE_TIFF
+	TIFF *ftiff;
+#endif
 
 	bool ready;
 	bool is_legacy;
+	bool read_data;
 
 	std::vector<long long> frame_starts, frame_sizes;
 	unsigned char* buf;
@@ -28,6 +35,11 @@ class EERRenderer {
 	static const unsigned int EER_LEN_FOOTER;
 	static const uint16_t TIFF_COMPRESSION_EER;
 
+	int nframes;
+	long long file_size;
+	void readLegacy(FILE *fh);
+	void lazyReadFrames();
+
 	template <typename T>
 	void render8K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons);
 
@@ -37,7 +49,6 @@ class EERRenderer {
 	public:
 
 	EERRenderer();
-	EERRenderer(FileName fn_movie);
 	~EERRenderer();
 
 	//TODO: Implement proper copy constructors. Currently, they are disabled to prevent memory corruption.
@@ -51,10 +62,8 @@ class EERRenderer {
 		REPORT_ERROR("Copy assignment operator for EERRenderer not implemented yet.");
 	}
 
-	void read(FileName fn_movie);
+	void read(FileName _fn_movie);
 
-	void readLegacy(FileName fn_movie);
-	
 	int getNFrames();
 	int getWidth();
 	int getHeight();
@@ -95,5 +104,11 @@ class EERRenderer {
 			return;
 		else
 			REPORT_ERROR("Invalid EER_upsample");
+	}
+
+	static bool isEER(FileName fn_movie)
+	{
+		FileName ext = fn_movie.getExtension();
+		return (ext == "eer"  || ext == "ecc");
 	}
 };

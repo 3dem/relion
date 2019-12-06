@@ -10,10 +10,6 @@
 #include <src/image.h>
 #include <src/renderEER.h>
 
-#ifdef HAVE_TIFF
-#include <tiffio.h>
-#endif
-
 //#define DEBUG_EER
 
 //#define TIMING
@@ -67,39 +63,42 @@ void EERRenderer::render4K(MultidimArray<T> &image, std::vector<unsigned int> &p
 EERRenderer::EERRenderer()
 {
 	ready = false;
-	is_legacy = false;
+	read_data = false;
+	buf = NULL;
 }
 
-EERRenderer::EERRenderer(FileName fn_movie)
+void EERRenderer::read(FileName _fn_movie)
 {
-	read(fn_movie);
-}
+	if (ready)
+		REPORT_ERROR("Logic error: you cannot recycle EERRenderer for multiple files (now)");
 
-void EERRenderer::read(FileName fn_movie)
-{
 #ifndef HAVE_TIFF
 	REPORT_ERROR("To use EER, you have to re-compile RELION with libtiff.");
 #else
-	TIFF* ftiff = TIFFOpen(fn_movie.c_str(), "r");
+	fn_movie = _fn_movie;
+
+	// First of all, check the file size
+	FILE *fh = fopen(fn_movie.c_str(), "r");
+	if (fh == NULL)
+		REPORT_ERROR("Failed to open " + fn_movie);
+
+	fseek(fh, 0, SEEK_END);
+	file_size = ftell(fh);
+	fseek(fh, 0, SEEK_SET);
+
+	// Try reading as TIFF; this handle is kept open
+	ftiff = TIFFOpen(fn_movie.c_str(), "r");
+
 	if (ftiff == NULL)
 	{
 		is_legacy = true;
-		readLegacy(fn_movie);
+		readLegacy(fh);
 	}
 	else
 	{
 		is_legacy = false;
 
 		// Check width & size
-
-		FILE *fh = fopen(fn_movie.c_str(), "r");
-		if (fh == NULL)
-			REPORT_ERROR("Failed to check file size of " + fn_movie);
-
-		fseek(fh, 0, SEEK_END);
-		long long file_size = ftell(fh);
-		fseek(fh, 0, SEEK_SET);
-
 		int width, height;
 		TIFFGetField(ftiff, TIFFTAG_IMAGEWIDTH, &width);
 		TIFFGetField(ftiff, TIFFTAG_IMAGELENGTH, &height);
@@ -110,71 +109,27 @@ void EERRenderer::read(FileName fn_movie)
 			REPORT_ERROR("Currently we support only 4096x4096 pixel EER movies.");
 
 		// Find the number of frames
-		int nframes = 1;
+		nframes = 1;
 		while (TIFFSetDirectory(ftiff, nframes) != 0) nframes++;
 
 #ifdef DEBUG_EER
 		printf("EER in TIFF: %s nframes = %d\n", fn_movie.c_str(), nframes);
 #endif
-
-		// TODO: defer reading???
-
-		frame_starts.resize(nframes, 0);
-		frame_sizes.resize(nframes, 0);
-		buf = (unsigned char*)malloc(file_size); // This is big enough
-		if (buf == NULL)
-			REPORT_ERROR("Failed to allocate the buffer for " + fn_movie);
-		long long pos = 0;
-
-		// Read everything
-		for (int frame = 0; frame < nframes; frame++)
-		{
-			TIFFSetDirectory(ftiff, frame);
-			const int nstrips = TIFFNumberOfStrips(ftiff);
-			frame_starts[frame] = pos;
-
-			for (int strip = 0; strip < nstrips; strip++)
-			{
-				const int strip_size = TIFFRawStripSize(ftiff, strip);
-				if (pos + strip_size >= file_size)
-					REPORT_ERROR("EER: buffer overflow when reading raw strips.");
-
-				TIFFReadRawStrip(ftiff, strip, buf + pos, strip_size);
-				pos += strip_size;
-				frame_sizes[frame] += strip_size;
-			}
-#ifdef DEBUG_EER
-			printf("EER in TIFF: Read frame %d from %s, nstrips = %d, current pos in buffer = %lld / %lld\n", frame, fn_movie.c_str(), nstrips, pos, file_size);
-#endif
-		}
-	
-		TIFFClose(ftiff);
 	}
 
+	fclose(fh);
 	ready = true;
 #endif
 }
 
-void EERRenderer::readLegacy(FileName fn_movie)
+void EERRenderer::readLegacy(FILE *fh)
 {
-	/* Check file size and load everything */
+	/* Load everything first */
 	RCTIC(TIMING_READ_EER);
-	FILE *fh = fopen(fn_movie.c_str(), "r");
-	if (fh == NULL)
-		REPORT_ERROR("Failed to open the EER file: " + fn_movie);
-
-	fseek(fh, 0, SEEK_END);
-	long long file_size = ftell(fh);
-	fseek(fh, 0, SEEK_SET);
-#ifdef DEBUG_EER
-	printf("File size: %ld\n", file_size);
-#endif
-
 	buf = (unsigned char*)malloc(file_size);
 	if (buf == NULL)
 		REPORT_ERROR("Failed to allocate the buffer.");
 	fread(buf, sizeof(char), file_size, fh);
-	fclose(fh);
 	RCTOC(TIMING_READ_EER);
 
 	/* Build frame index */
@@ -202,6 +157,51 @@ void EERRenderer::readLegacy(FileName fn_movie)
 	std::reverse(frame_starts.begin(), frame_starts.end());
 	std::reverse(frame_sizes.begin(), frame_sizes.end());
 	RCTOC(TIMING_BUILD_INDEX);
+
+	nframes = frame_starts.size();
+	read_data = true;
+}
+
+void EERRenderer::lazyReadFrames()
+{
+	#pragma omp critical(EERRenderer_lazyReadFrames)
+	{
+		if (!read_data) // cannot return from within omp critical
+		{	
+			frame_starts.resize(nframes, 0);
+			frame_sizes.resize(nframes, 0);
+			buf = (unsigned char*)malloc(file_size); // This is big enough
+			if (buf == NULL)
+				REPORT_ERROR("Failed to allocate the buffer for " + fn_movie);
+			long long pos = 0;
+
+			// Read everything
+			for (int frame = 0; frame < nframes; frame++)
+			{
+				TIFFSetDirectory(ftiff, frame);
+				const int nstrips = TIFFNumberOfStrips(ftiff);
+				frame_starts[frame] = pos;
+
+				for (int strip = 0; strip < nstrips; strip++)
+				{
+					const int strip_size = TIFFRawStripSize(ftiff, strip);
+					if (pos + strip_size >= file_size)
+						REPORT_ERROR("EER: buffer overflow when reading raw strips.");
+
+					TIFFReadRawStrip(ftiff, strip, buf + pos, strip_size);
+					pos += strip_size;
+					frame_sizes[frame] += strip_size;
+				}
+	#ifdef DEBUG_EER
+				printf("EER in TIFF: Read frame %d from %s, nstrips = %d, current pos in buffer = %lld / %lld\n", frame, fn_movie.c_str(), nstrips, pos, file_size);
+	#endif
+			}
+
+			TIFFClose(ftiff);
+
+			read_data = true;
+		}
+	}
 }
 
 EERRenderer::~EERRenderer()
@@ -215,7 +215,7 @@ int EERRenderer::getNFrames()
 	if (!ready)
 		REPORT_ERROR("EERRenderer::getNFrames called before ready.");
 
-	return frame_sizes.size();
+	return nframes;
 }
 
 int EERRenderer::getWidth()
@@ -239,6 +239,8 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 {
 	if (!ready)
 		REPORT_ERROR("EERRenderer::renderNFrames called before ready.");
+
+	lazyReadFrames();
 
 	if (frame_start <= 0 || frame_start > getNFrames() ||
 	    frame_end < frame_start || frame_end > getNFrames())

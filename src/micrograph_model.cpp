@@ -483,9 +483,10 @@ void Micrograph::read(FileName fn_in, bool read_hotpixels)
 
 void Micrograph::setMovie(FileName fnMovie, FileName fnGain, RFLOAT binning)
 {
-	if (fnMovie.getExtension() == "ecc")
+	if (EERRenderer::isEER(fnMovie))
 	{
-		EERRenderer renderer(fnMovie); // TODO WIP: This reads whole movie, which is too expensive!
+		EERRenderer renderer;
+		renderer.read(fnMovie);
 		width = renderer.getWidth();
 		height = renderer.getHeight();
 		n_frames = renderer.getNFrames() / EER_grouping;
