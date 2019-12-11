@@ -394,6 +394,7 @@ public:
 	void setOption(std::string setOptionLine);
 
 	// write/read settings to disc
+	// fn is a directory name (e.g. Refine3D/job123/) or a STAR file
 	bool read(std::string fn, bool &_is_continue, bool do_initialise = false); // return false if unsuccessful
 	void write(std::string fn);
 

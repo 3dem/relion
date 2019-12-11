@@ -240,6 +240,11 @@ bool JobOption::readValue(std::ifstream& in)
 		std::string search_for = label;
 		if (label == "Estimate beamtilt?") // 3.0 compatibility
 			search_for = "Perform beamtilt estimation?";
+		else if (label == "Perform MTF correction?")
+		{
+			std::cerr << "A legacy job option \"Perform MTF correction?\" is ignored. If an MTF file name is supplied, MTF correction will be applied." << std::endl;
+			return false;
+		}
 
 		// Start reading the ifstream at the top
 		in.clear(); // reset eof if happened...
@@ -308,7 +313,7 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 	bool have_read = false;
 
 	// For backwards compatibility
-	if (exists(myfilename+"run.job"))
+	if (exists(myfilename + "run.job"))
 	{
 		std::ifstream fh;
 		fh.open((myfilename+"run.job").c_str(), std::ios_base::in);
@@ -327,7 +332,7 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 
 			type = (int)textToFloat((line.substr(idx+1,line.length()-idx)).c_str());
 
-				// Get is_continue from second line
+			// Get is_continue from second line
 			getline(fh, line, '\n');
 			if (line.rfind("is_continue == true") == 0)
 				is_continue = true;
@@ -350,20 +355,27 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 
 		fh.close();
 	}
-	else if (exists(myfilename+"job.star"))
+
+	if (!have_read)
 	{
 		// Read from STAR
 		MetaDataTable MDhead;
 		MetaDataTable MDvals;
 
-		MDhead.read(myfilename+"job.star", "job");
+		FileName fn_star = myfilename;
+		if (fn_star.back() == '/')
+			fn_star += "job.star";
+		if (!exists(fn_star))
+			return false;
+
+		MDhead.read(fn_star, "job");
 		MDhead.getValue(EMDL_JOB_TYPE, type);
 		MDhead.getValue(EMDL_JOB_IS_CONTINUE, is_continue);
 		_is_continue = is_continue;
 		if (do_initialise)
 			initialise(type);
 
-		MDvals.read(myfilename+"job.star", "joboptions_values");
+		MDvals.read(fn_star, "joboptions_values");
 		std::string label, value;
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDvals)
 		{
@@ -385,25 +397,25 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 	{
 		// Just check that went OK
 		if (type != PROC_IMPORT &&
-			type != PROC_MOTIONCORR &&
-			type != PROC_CTFFIND &&
-			type != PROC_MANUALPICK &&
-			type != PROC_AUTOPICK &&
-			type != PROC_EXTRACT &&
-			type != PROC_CLASSSELECT &&
-			type != PROC_2DCLASS &&
-			type != PROC_3DCLASS &&
-			type != PROC_3DAUTO &&
-			type != PROC_MULTIBODY &&
-			type != PROC_MASKCREATE &&
-			type != PROC_JOINSTAR &&
-			type != PROC_SUBTRACT &&
-			type != PROC_POST &&
-			type != PROC_RESMAP &&
-			type != PROC_INIMODEL &&
-			type != PROC_MOTIONREFINE &&
-			type != PROC_CTFREFINE &&
-			type != PROC_EXTERNAL)
+		    type != PROC_MOTIONCORR &&
+		    type != PROC_CTFFIND &&
+		    type != PROC_MANUALPICK &&
+		    type != PROC_AUTOPICK &&
+		    type != PROC_EXTRACT &&
+		    type != PROC_CLASSSELECT &&
+		    type != PROC_2DCLASS &&
+		    type != PROC_3DCLASS &&
+		    type != PROC_3DAUTO &&
+		    type != PROC_MULTIBODY &&
+		    type != PROC_MASKCREATE &&
+		    type != PROC_JOINSTAR &&
+		    type != PROC_SUBTRACT &&
+		    type != PROC_POST &&
+		    type != PROC_RESMAP &&
+		    type != PROC_INIMODEL &&
+		    type != PROC_MOTIONREFINE &&
+		    type != PROC_CTFREFINE &&
+		    type != PROC_EXTERNAL)
 			REPORT_ERROR("ERROR: cannot find correct job type in " + myfilename + "run.job, with type= " + integerToString(type));
 
 		return true;
@@ -1024,7 +1036,7 @@ bool RelionJob::getCommands(std::string &outputname, std::vector<std::string> &c
 	}
 	else
 	{
-		REPORT_ERROR("ERROR: unrecognised job-type");
+		REPORT_ERROR("ERROR: unrecognised job-type: type = " + integerToString(type));
 	}
 
 	return result;
