@@ -2076,10 +2076,11 @@ void MlOptimiserMpi::maximization()
 							if(do_sgd)
 							{
 								(wsum_model.BPref[ith_recons]).reconstructNGD(mymodel.Iref[ith_recons],
-										mymodel.tau2_class[ith_recons],
-										(effective_setsize/subset_size) * mymodel.tau2_fudge_factor,
 										sgd_stepsize,
-										(iclass==0));
+										mymodel.tau2_fudge_factor,
+										mymodel.fsc_halves_class[ith_recons],
+										do_split_random_halves,
+										node->rank==1);
 							}
 							else
 							{
@@ -2203,9 +2204,10 @@ void MlOptimiserMpi::maximization()
 								if(do_sgd)
 								{
 									(wsum_model.BPref[ith_recons]).reconstructNGD(mymodel.Iref[ith_recons],
-											mymodel.tau2_class[ith_recons],
-											(effective_setsize/subset_size) * mymodel.tau2_fudge_factor,
 											sgd_stepsize,
+											mymodel.tau2_fudge_factor,
+											mymodel.fsc_halves_class[ith_recons],
+											do_split_random_halves,
 											false);
 								}
 								else

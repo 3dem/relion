@@ -309,9 +309,10 @@ public:
 	                 Image<RFLOAT>* weight_out = 0);
 
 	void reconstructNGD(MultidimArray<RFLOAT> &vol_out,
-						const MultidimArray<RFLOAT> &tau2,
-						RFLOAT tau2_fudge,
-						RFLOAT ngd_stepsize = 0.1,
+						RFLOAT ngd_stepsize,
+		       	   	    RFLOAT tau2_fudge,
+					    const MultidimArray<RFLOAT> &fsc,
+					    bool use_fsc = false,
 						bool printTimes= false);
 
 	/*	Enforce Hermitian symmetry, apply helical symmetry as well as point-group symmetry

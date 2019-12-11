@@ -4064,9 +4064,10 @@ void MlOptimiser::maximization()
 					if(do_sgd)
 					{
 						(wsum_model.BPref[iclass]).reconstructNGD(mymodel.Iref[iclass],
-								mymodel.tau2_class[iclass],
-								(effective_setsize/subset_size) * mymodel.tau2_fudge_factor,
 								sgd_stepsize,
+								mymodel.tau2_fudge_factor,
+								mymodel.fsc_halves_class[iclass],
+								do_split_random_halves,
 								(iclass==0));
 					}
 					else
@@ -4128,25 +4129,27 @@ void MlOptimiser::maximizationOtherParameters()
 
 
 	// Annealing of multiple-references in SGD
-//	if (do_sgd && !do_sgd_skip_anneal && mymodel.nr_classes > 1 && iter < sgd_ini_iter + sgd_inbetween_iter)
-//	{
-//		MultidimArray<RFLOAT> Iavg;
-//		Iavg.initZeros(mymodel.Iref[0]);
-//		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
-//			Iavg += mymodel.Iref[iclass];
-//		Iavg /= (RFLOAT)mymodel.nr_classes;
-//
-//		int diffiter = iter - sgd_ini_iter;
-//		RFLOAT frac = RFLOAT(iter - sgd_ini_iter)/RFLOAT(sgd_inbetween_iter);
-//		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
-//		{
-//			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iavg)
-//			{
-//				DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n) *= frac;
-//				DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n) += (1.-frac)*DIRECT_MULTIDIM_ELEM(Iavg, n);
-//			}
-//		}
-//	}
+	/*
+	if (do_sgd && !do_sgd_skip_anneal && mymodel.nr_classes > 1 && iter < sgd_ini_iter + sgd_inbetween_iter)
+	{
+		MultidimArray<RFLOAT> Iavg;
+		Iavg.initZeros(mymodel.Iref[0]);
+		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+			Iavg += mymodel.Iref[iclass];
+		Iavg /= (RFLOAT)mymodel.nr_classes;
+
+		int diffiter = iter - sgd_ini_iter;
+		RFLOAT frac = RFLOAT(iter - sgd_ini_iter)/RFLOAT(sgd_inbetween_iter);
+		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+		{
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iavg)
+			{
+				DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n) *= frac;
+				DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n) += (1.-frac)*DIRECT_MULTIDIM_ELEM(Iavg, n);
+			}
+		}
+	}
+	*/
 
 	// Update average norm_correction, don't update norm corrections anymore for multi-body refinements!
 	if (do_norm_correction  && mymodel.nr_bodies == 1)
@@ -8735,11 +8738,6 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 	if (myverb && subset_size != old_subset_size)
 		std::cout << " Setting subset size to " << subset_size << " particles" << std::endl;
 
-	// Update effective_subsetsize
-	// TODO: BETTER??? sqrt(sgd_stepsize) or sgd_stepsize^2 ???
-	// TODO: read in effective_setsize from optimiser.star for restarts
-	effective_setsize += sgd_stepsize * subset_size;
-	effective_setsize = XMIPP_MIN(effective_setsize, mydata.numberOfParticles());
 }
 
 void MlOptimiser::checkConvergence(bool myverb)
