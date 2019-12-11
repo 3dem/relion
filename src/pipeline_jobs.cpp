@@ -363,10 +363,12 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 		MetaDataTable MDvals;
 
 		FileName fn_star = myfilename;
-		if (fn_star.back() == '/')
-			fn_star += "job.star";
-		if (!exists(fn_star))
-			return false;
+		if (!exists(fn_star)) // full name was given
+		{
+			fn_star += "job.star"; // "Refine3D/job123" OR ".gui_auto3d"
+			if (!exists(fn_star))
+				return false;
+		}
 
 		MDhead.read(fn_star, "job");
 		MDhead.getValue(EMDL_JOB_TYPE, type);

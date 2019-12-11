@@ -764,6 +764,7 @@ void Postprocessing::writeOutput()
 	plot2D->OutputPostScriptPlot(fn_out + "_fsc.eps");
 	delete plot2D;
 
+//#define CISTEMFSC
 #ifdef CISTEMFSC
 	// Write a plot with the FSC curves
 	std::string title2= "RELION/cisTEM FSC comparison; MW_mask = " +  floatToString(molweight_frommask/1000., 8,2) + " kDa";
