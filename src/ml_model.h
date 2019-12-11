@@ -425,6 +425,9 @@ public:
 	// current_size will determine the size of the transform (in number of Fourier shells) to be held in the projector ( thisClass == -1  => do all classes this call)
 	void setFourierTransformMaps(bool update_tau2_spectra, std::vector<bool> ListCheapSetup, int nr_threads = 1, RFLOAT strict_lowres_exp = -1);
 
+    //Calculate average power of noise of the entire dataset
+	MultidimArray<RFLOAT> getAverageSigma2Noise();
+
 	/* Initialises the radial average of the data-versus-prior ratio
 	 */
 	void initialiseDataVersusPrior(bool fix_tau);

@@ -1383,6 +1383,31 @@ void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads, 
 
 }
 
+MultidimArray<RFLOAT> MlModel::getAverageSigma2Noise()
+{
+
+	MultidimArray<RFLOAT> avg_sigma2_noise;
+
+    // Get total number of particles
+	RFLOAT nr_particles = 0.;
+	for (int igroup = 0; igroup < nr_particles_per_group.size(); igroup++)
+	{
+		 nr_particles += (RFLOAT)nr_particles_per_group[igroup];
+	}
+
+	// Calculate average sigma2_noise over all image groups
+	avg_sigma2_noise.initZeros(ori_size /2 + 1);
+	for (int igroup = 0; igroup < nr_particles_per_group.size(); igroup++)
+	{
+		 avg_sigma2_noise += (RFLOAT)(nr_particles_per_group[igroup]) * sigma2_noise[igroup];
+	}
+	avg_sigma2_noise /= nr_particles;
+
+	return avg_sigma2_noise;
+
+}
+
+
 void MlModel::initialiseDataVersusPrior(bool fix_tau)
 {
 
