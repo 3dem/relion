@@ -2864,7 +2864,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				op.local_Minvsigma2[img_id].zdim,
 				orientation_num,
 				accMLO->dataIs3D,
-				(baseMLO->do_sgd && !baseMLO->do_avoid_sgd),
+				(baseMLO->do_vmgd),
 				ctf_premultiplied,
 				accMLO->classStreams[iclass]);
 

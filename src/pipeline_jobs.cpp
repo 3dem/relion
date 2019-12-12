@@ -2763,36 +2763,29 @@ void RelionJob::initialiseInimodelJob()
 {
 	hidden_name = ".gui_inimodel";
 
-	joboptions["fn_img"] = JobOption("Input images STAR file:", NODE_PART_DATA, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \
-In SGD, it is very important that there are particles from enough different orientations. One only needs a few thousand to 10k particles. When selecting good 2D classes in the Subset Selection jobtype, use the option to select a maximum number of particles from each class to generate more even angular distributions for SGD.\
-\n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
-nor will it be possible to perform noise spectra estimation or intensity scale corrections in image groups. Therefore, running RELION with an input stack will in general provide sub-optimal results and is therefore not recommended!! Use the Preprocessing procedure to get the input STAR file in a semi-automated manner. Read the RELION wiki for more information.");
+	joboptions["fn_img"] = JobOption("Input images STAR file:", NODE_PART_DATA, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata).");
 	joboptions["fn_cont"] = JobOption("Continue from here: ", std::string(""), "STAR Files (*_optimiser.star)", "CURRENT_ODIR", "Select the *_optimiser.star file for the iteration \
 from which you want to continue a previous run. \
 Note that the Output rootname of the continued run and the rootname of the previous run cannot be the same. \
 If they are the same, the program will automatically add a '_ctX' to the output rootname, \
 with X being the iteration from which one continues the previous run.");
 
-	joboptions["sgd_ini_iter"] = JobOption("Number of initial iterations:", 50, 10, 300, 10, "Number of initial SGD iterations, at which the initial resolution cutoff and the initial subset size will be used, and multiple references are kept the same. 50 seems to work well in many cases. Increase if the correct solution is not found.");
-	joboptions["sgd_inbetween_iter"] = JobOption("Number of in-between iterations:", 200, 50, 500, 50, "Number of SGD iterations between the initial and final ones. During these in-between iterations, the resolution is linearly increased, \
+	joboptions["vmgd_ini_iter"] = JobOption("Number of initial iterations:", 50, 10, 300, 10, "Number of initial VMGD iterations, at which the initial resolution cutoff and the initial subset size will be used, and multiple references are kept the same. 50 seems to work well in many cases. Increase if the correct solution is not found.");
+	joboptions["vmgd_inbetween_iter"] = JobOption("Number of in-between iterations:", 200, 50, 500, 50, "Number of VMGD iterations between the initial and final ones. During these in-between iterations, the resolution is linearly increased, \
 together with the mini-batch or subset size. In case of a multi-class refinement, the different references are also increasingly left to become dissimilar. 200 seems to work well in many cases. Increase if multiple references have trouble separating, or the correct solution is not found.");
-	joboptions["sgd_fin_iter"] = JobOption("Number of final iterations:", 50, 10, 300, 10, "Number of final SGD iterations, at which the final resolution cutoff and the final subset size will be used, and multiple references are left dissimilar. 50 seems to work well in many cases. Perhaps increase when multiple reference have trouble separating.");
+	joboptions["vmgd_fin_iter"] = JobOption("Number of final iterations:", 50, 10, 300, 10, "Number of final VMGD iterations, at which the final resolution cutoff and the final subset size will be used, and multiple references are left dissimilar. 50 seems to work well in many cases. Perhaps increase when multiple reference have trouble separating.");
 
-	joboptions["sgd_ini_resol"] = JobOption("Initial resolution (A):", 35, 10, 60, 5, "This is the resolution cutoff (in A) that will be applied during the initial SGD iterations. 35A seems to work well in many cases.");
-	joboptions["sgd_fin_resol"] = JobOption("Final resolution (A):", 15, 5, 30, 5, "This is the resolution cutoff (in A) that will be applied during the final SGD iterations. 15A seems to work well in many cases.");
+	joboptions["vmgd_ini_subset_size"] = JobOption("Initial mini-batch size:", 100, 30, 300, 10, "The number of particles that will be processed during the initial iterations. 100 seems to work well in many cases. Lower values may result in wider searches of the energy landscape, but possibly at reduced resolutions.");
+	joboptions["vmgd_fin_subset_size"] = JobOption("Final mini-batch size:", 500, 100, 2000, 100, "The number of particles that will be processed during the final iterations. 500-1000 seems to work well in many cases. Higher values may result in increased resolutions, but at increased computational costs.");
 
-	joboptions["sgd_ini_subset_size"] = JobOption("Initial mini-batch size:", 100, 30, 300, 10, "The number of particles that will be processed during the initial iterations. 100 seems to work well in many cases. Lower values may result in wider searches of the energy landscape, but possibly at reduced resolutions.");
-	joboptions["sgd_fin_subset_size"] = JobOption("Final mini-batch size:", 500, 100, 2000, 100, "The number of particles that will be processed during the final iterations. 300-500 seems to work well in many cases. Higher values may result in increased resolutions, but at increased computational costs and possibly reduced searches of the energy landscape, but possibly at reduced resolutions.");
+	joboptions["vmgd_write_iter"] = JobOption("Write-out frequency (iter):", 10, 1, 50, 1, "Every how many iterations do you want to write the model to disk?");
 
-	joboptions["sgd_write_iter"] = JobOption("Write-out frequency (iter):", 10, 1, 50, 1, "Every how many iterations do you want to write the model to disk?");
 
-	joboptions["sgd_sigma2fudge_halflife"] = JobOption("Increased noise variance half-life:", -1, -100, 10000, 100, "When set to a positive value, the initial estimates of the noise variance will internally be multiplied by 8, and then be gradually reduced, \
-having 50% after this many particles have been processed. By default, this option is switched off by setting this value to a negative number. \
-In some difficult cases, switching this option on helps. In such cases, values around 1000 have been found to be useful. Change the factor of eight with the additional argument --sgd_sigma2fudge_ini");
+	joboptions["nr_classes"] = JobOption("Number of classes:", 1, 1, 50, 1, "The number of classes (K) for a multi-reference ab initio VMGD refinement. \
+These classes will be made in an unsupervised manner, starting from randomly oriented subset averages.");
+	joboptions["vmgd_anneal"] = JobOption("Anneal multiple classes?", true, "If set to Yes, during the initial iterations of the VMGD, the different classes will be kept identical. Then during the inbetween iterations, the references will become increasingly dissimilar, while they are completely free to diverge in the final iterations.");
 
-	joboptions["nr_classes"] = JobOption("Number of classes:", 1, 1, 50, 1, "The number of classes (K) for a multi-reference ab initio SGD refinement. \
-These classes will be made in an unsupervised manner, starting from a single reference in the initial iterations of the SGD, and the references will become increasingly dissimilar during the inbetween iterations.");
-	joboptions["sym_name"] = JobOption("Symmetry:", std::string("C1"), "SGD sometimes works better in C1. If you make an initial model in C1 but want to run Class3D/Refine3D with a higher point group symmetry, the reference model must be rotated to conform the symmetry convention. You can do this by the relion_align_symmetry command.");
+	joboptions["sym_name"] = JobOption("Symmetry:", std::string("C1"), "VMGD sometimes works better in C1. If you make an initial model in C1 but want to run Class3D/Refine3D with a higher point group symmetry, the reference model must be rotated to conform the symmetry convention. You can do this by the relion_align_symmetry command.");
 	joboptions["particle_diameter"] = JobOption("Mask diameter (A):", 200, 0, 1000, 10, "The experimental images will be masked with a soft \
 circular mask with this diameter. Make sure this radius is not set too small because that may mask away part of the signal! \
 If set to a value larger than the image size no masking will be performed.\n\n\
@@ -2884,13 +2877,13 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 
 	command += " --o " + outputname + fn_run;
 
-	int total_nr_iter = joboptions["sgd_ini_iter"].getNumber(error_message);
+	int total_nr_iter = joboptions["vmgd_ini_iter"].getNumber(error_message);
 	if (error_message != "") return false;
 
-	total_nr_iter += joboptions["sgd_inbetween_iter"].getNumber(error_message);
+	total_nr_iter += joboptions["vmgd_inbetween_iter"].getNumber(error_message);
 	if (error_message != "") return false;
 
-	total_nr_iter += joboptions["sgd_fin_iter"].getNumber(error_message);
+	total_nr_iter += joboptions["vmgd_fin_iter"].getNumber(error_message);
 	if (error_message != "") return false;
 
 	int nr_classes = joboptions["nr_classes"].getNumber(error_message);
@@ -2898,18 +2891,17 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 
 	outputNodes = getOutputNodesRefine(outputname + fn_run, total_nr_iter, nr_classes, 3, 1);
 
-	command += " --sgd_ini_iter " + joboptions["sgd_ini_iter"].getString();
-	command += " --sgd_inbetween_iter " + joboptions["sgd_inbetween_iter"].getString();
-	command += " --sgd_fin_iter " + joboptions["sgd_fin_iter"].getString();
-	command += " --sgd_write_iter " + joboptions["sgd_write_iter"].getString();
-	command += " --sgd_ini_resol " + joboptions["sgd_ini_resol"].getString();
-	command += " --sgd_fin_resol " + joboptions["sgd_fin_resol"].getString();
-	command += " --sgd_ini_subset " + joboptions["sgd_ini_subset_size"].getString();
-	command += " --sgd_fin_subset " + joboptions["sgd_fin_subset_size"].getString();
+	command += " --vmgd_ini_iter " + joboptions["vmgd_ini_iter"].getString();
+	command += " --vmgd_inbetween_iter " + joboptions["vmgd_inbetween_iter"].getString();
+	command += " --vmgd_fin_iter " + joboptions["vmgd_fin_iter"].getString();
+	command += " --vmgd_write_iter " + joboptions["vmgd_write_iter"].getString();
+	command += " --vmgd_ini_subset " + joboptions["vmgd_ini_subset_size"].getString();
+	command += " --vmgd_fin_subset " + joboptions["vmgd_fin_subset_size"].getString();
+	if (joboptions["vmgd_anneal"].getBoolean()) command += " --vmgd_anneal";
 
 	if (!is_continue)
 	{
-		command += " --sgd ";
+		command += " --vmgd ";
 
 		if (joboptions["fn_img"].getString() == "")
 		{
@@ -2921,14 +2913,12 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 		inputNodes.push_back(node);
 
 		// CTF stuff
-#ifdef ALLOW_CTF_IN_SGD
-                if (joboptions["do_ctf_correction"].getBoolean())
-                {
-                        command += " --ctf";
-                        if (joboptions["ctf_intact_first_peak"].getBoolean())
-                                command += " --ctf_intact_first_peak";
-                }
-#endif
+		if (joboptions["do_ctf_correction"].getBoolean())
+		{
+				command += " --ctf";
+				if (joboptions["ctf_intact_first_peak"].getBoolean())
+						command += " --ctf_intact_first_peak";
+		}
 
 		command += " --K " + joboptions["nr_classes"].getString();
 		command += " --sym " + joboptions["sym_name"].getString();

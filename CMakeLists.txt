@@ -99,13 +99,6 @@ option(DoublePrec_CPU "DoublePrec_CPU" ON)
 option(DoublePrec_ACC "Accelerated Code use double-precision" OFF)
 option(MKLFFT "Use MKL rather than FFTW for FFT" OFF)
 option(CudaTexture "CudaTexture" ON)
-option(ALLOW_CTF_IN_SGD "Allow CTF-modulation in SGD, as specified in Claim 1 of patent US10,282,513B2" ON)
-
-if(ALLOW_CTF_IN_SGD)
-#    message(STATUS "ALLOW_CTF_IN_SGD enabled - This build of RELION allows modulation of particle images by a contrast transfer function inside stochastic gradient descent, as specified in Claim 1 of patent US10,282,513B2")
-else()
-    message(STATUS "ALLOW_CTF_IN_SGD disabled - This build of RELION does not allow modulation of particle images by a contrast transfer function inside stochastic gradient descent, as specified in Claim 1 of patent US10,282,513B2")
-endif()
 
 if(ALTCPU)
     message(STATUS "ALTCPU enabled - Building CPU-accelerated version of RELION")
@@ -272,10 +265,6 @@ if(ALTCPU)
     add_definitions(-DALTCPU)
 endif()
 
-if(ALLOW_CTF_IN_SGD)
-    add_definitions(-DALLOW_CTF_IN_SGD)
-endif()
-
 # ---------------------------------------------------------------USE TEXTURES OR NOT--
 if(NOT CudaTexture OR ALTCPU)
     add_definitions(-DPROJECTOR_NO_TEXTURES)
@@ -401,7 +390,6 @@ ADD_SUBDIRECTORY(src/apps)
 
 #message(STATUS "CUDA option = ${CUDA}")
 #message(STATUS "ALTCPU option = ${ALTCPU}")
-#message(STATUS "ALLOW_CTF_IN_SGD option = ${ALLOW_CTF_IN_SGD}")
 #message(STATUS "DoublePrec_CPU option = ${DoublePrec_CPU}")
 #message(STATUS "DoublePrec_ACC option = ${DoublePrec_ACC}")
 #message(STATUS "MKLFFT option = ${MKLFFT}")

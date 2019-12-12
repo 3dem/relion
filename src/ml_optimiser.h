@@ -321,61 +321,48 @@ public:
 	int nr_pool;
 
 	//////////////// Stochastic gradient descent
-	bool do_sgd;
-
-	// Avoid problems with SGD patent in cryoSPARC: don't accumulate gradient, but do minibatch maximisation steps instead
-	bool do_avoid_sgd;
+	bool do_vmgd;
 
 	// Number of initial iterations at low resolution, and without annealing of references
-	int sgd_ini_iter;
+	int vmgd_ini_iter;
 
 	// Number of final iterations at high resolution, and without annealing of reference
-	int sgd_fin_iter;
+	int vmgd_fin_iter;
 
 	// Number of iterations between the initial and the final ones
-	// (during which a linear transform from sgd_ini_resol->sgd_fin_resol and sgd_ini_subset_size->sgd_fin_subset_size will be done)
-	int sgd_inbetween_iter;
+	// (during which a linear transform from vmgd_ini_resol->vmgd_fin_resol and vmgd_ini_subset_size->vmgd_fin_subset_size will be done)
+	int vmgd_inbetween_iter;
 
 	// Size of the subsets used in the initial iterations
-	int sgd_ini_subset_size;
+	int vmgd_ini_subset_size;
 
 	//Size of the subsets used in the final iterations
-	int sgd_fin_subset_size;
+	int vmgd_fin_subset_size;
 
 	// Effective size of subsets
 	int effective_setsize;
 
 	// The resolution in the initial iterations
-	RFLOAT sgd_ini_resol; // in A
+	RFLOAT vmgd_ini_resol; // in A
 
 	// The resolution in the final iterations
-	RFLOAT sgd_fin_resol; // in A
+	RFLOAT vmgd_fin_resol; // in A
 
 	// Skip annealing of multiple reference in SGD
-	// (by default refs are kept the same during sgd_nr_iter_initial and then slowly annealed during sgd_nr_iter_inbetween)
-	bool do_sgd_skip_anneal;
+	// (by default refs are kept the same during vmgd_nr_iter_initial and then slowly annealed during vmgd_nr_iter_inbetween)
+	bool do_vmgd_skip_anneal;
 
 	// Momentum update parameter
 	RFLOAT mu;
 
 	// Step size of the gradient updates
-	RFLOAT sgd_stepsize;
+	RFLOAT vmgd_stepsize;
 
 	// Size of the random subsets
 	long int subset_size;
 
 	// Every how many iterations should be written to disk when using subsets
-	int write_every_sgd_iter;
-
-	// Number of particles at which initial sigma2_fudge is reduced by 50%
-	long int sgd_sigma2fudge_halflife;
-
-	// Initial sigma2fudge for SGD
-	RFLOAT sgd_sigma2fudge_ini;
-
-	// derived from the above, so not given by user:
-	int sgd_inires_pix; // resolution in pixels at beginning of SGD
-	int sgd_finres_pix; // resolution in pixels at end of SGD
+	int write_every_vmgd_iter;
 
 	// Use subsets like in cisTEM to speed up 2D/3D classification
 	bool do_fast_subsets;
@@ -999,7 +986,7 @@ public:
 	// Adjust angular sampling based on the expected angular accuracies for auto-refine procedure
 	void updateAngularSampling(bool verb = true);
 
-	// Adjust subset size in fast_subsets or SGD algorithms
+	// Adjust subset size in fast_subsets or VMGD algorithms
 	void updateSubsetSize(bool verb = true);
 
 	// Check convergence for auto-refine procedure

@@ -1776,9 +1776,9 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 }
 
 
-void BackProjector::reconstructNGD(
+void BackProjector::reconstructVMGD(
 		MultidimArray<RFLOAT> &vol_out,
-        RFLOAT ngd_stepsize,
+        RFLOAT vmgd_stepsize,
 		RFLOAT tau2_fudge,
         const MultidimArray<RFLOAT> &fsc,
 		bool use_fsc,
@@ -1865,7 +1865,6 @@ void BackProjector::reconstructNGD(
 			}
 		}
 
-		std::cerr << std::endl;
 		//Average power spectra and calculate FSC estimate
 		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(counter)
 		{
@@ -1927,7 +1926,7 @@ void BackProjector::reconstructNGD(
 
 			Fgrad *= fsc;
 			Fgrad -= (1. - fsc) * A3D_ELEM(PPref.data, k, i, j);
-			A3D_ELEM(PPref.data, k, i, j) += ngd_stepsize * Fgrad;
+			A3D_ELEM(PPref.data, k, i, j) += vmgd_stepsize * Fgrad;
 		}
 	}
 

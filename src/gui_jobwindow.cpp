@@ -1218,7 +1218,6 @@ void JobWindow::initialiseInimodelWindow()
 	group1->end();
 
 	resetHeight();
-#ifdef ALLOW_CTF_IN_SGD
 
 	place("do_ctf_correction", TOGGLE_DEACTIVATE, group1);
 
@@ -1228,25 +1227,6 @@ void JobWindow::initialiseInimodelWindow()
 
 	guientries["do_ctf_correction"].cb_menu_i(); // To make default effective
 
-#else
-
-	Fl_Text_Buffer *textbuff1 = new Fl_Text_Buffer();
-	textbuff1->text("CTF-modulation, as mentioned in claim 1 of patent US10,282,513B2, is disabled\nYou can enable it by rebuilding, using -DALLOW_CTF_IN_SGD=ON in cmake.");
-	Fl_Text_Display* textdisp1 = new Fl_Text_Display(XCOL1, current_y, WCOL1+WCOL2+WCOL3+10, STEPY*1.8);
-	textdisp1->textsize(11);
-	textdisp1->color(GUI_BACKGROUND_COLOR);
-	textdisp1->buffer(textbuff1);
-
-	current_y += STEPY*2.5;
-
-	place("do_ctf_correction", TOGGLE_ALWAYS_DEACTIVATE);
-
-	group1->begin();
-	place("ctf_phase_flipped", TOGGLE_ALWAYS_DEACTIVATE);
-	place("ctf_intact_first_peak", TOGGLE_ALWAYS_DEACTIVATE);
-	group1->end();
-
-#endif
 	tab2->end();
 
 	tab3->begin();
@@ -1254,6 +1234,7 @@ void JobWindow::initialiseInimodelWindow()
 	resetHeight();
 
 	place("nr_classes", TOGGLE_DEACTIVATE);
+	place("vmgd_anneal", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -1271,31 +1252,20 @@ void JobWindow::initialiseInimodelWindow()
 
 	tab3->end();
 	tab4->begin();
-	tab4->label("SGD");
+	tab4->label("VMGD");
 
 	resetHeight();
 
-	place("sgd_ini_iter");
-	place("sgd_inbetween_iter");
-	place("sgd_fin_iter");
-	place("sgd_write_iter");
+	place("vmgd_ini_iter");
+	place("vmgd_inbetween_iter");
+	place("vmgd_fin_iter");
+	place("vmgd_write_iter");
 
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	place("sgd_ini_resol");
-	place("sgd_fin_resol");
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	place("sgd_ini_subset_size");
-	place("sgd_fin_subset_size");
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	place("sgd_sigma2fudge_halflife", TOGGLE_DEACTIVATE);
+	place("vmgd_ini_subset_size");
+	place("vmgd_fin_subset_size");
 
 	tab4->end();
 

@@ -308,8 +308,8 @@ public:
 	                 bool printTimes= false,
 	                 Image<RFLOAT>* weight_out = 0);
 
-	void reconstructNGD(MultidimArray<RFLOAT> &vol_out,
-						RFLOAT ngd_stepsize,
+	void reconstructVMGD(MultidimArray<RFLOAT> &vol_out,
+						RFLOAT vmgd_stepsize,
 		       	   	    RFLOAT tau2_fudge,
 					    const MultidimArray<RFLOAT> &fsc,
 					    bool use_fsc = false,
