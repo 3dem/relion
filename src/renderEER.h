@@ -11,8 +11,9 @@
 #include <tiffio.h>
 #endif
 
-extern int EER_grouping; // TODO: TAKANORI: Make this a command-line argument
-extern int EER_upsample;
+extern int EER_grouping; // TODO: avoid global variable!
+extern int EER_upsample; //       design better way; MicrographModel also needs to change
+                         //       allow non-uniform slicing?
 
 class EERRenderer {
 	private:
@@ -78,32 +79,43 @@ class EERRenderer {
 	template <typename T>
 	static void upsampleEERGain(MultidimArray<T> &gain)
 	{
-		if (EER_upsample == 2)
+		const long long size = EER_IMAGE_WIDTH * EER_upsample;
+		RFLOAT sum = 0;
+
+		if (EER_upsample == 2 && XSIZE(gain) == EER_IMAGE_WIDTH && YSIZE(gain) == EER_IMAGE_HEIGHT) // gain = 4K and grid = 8K
 		{
-			const long long size = 4096 * EER_upsample;
 			MultidimArray<T> original = gain;
 
 			gain.resize(size, size);
-			RFLOAT sum = 0;
 			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(gain)
 			{
 				DIRECT_A2D_ELEM(gain, i, j) = DIRECT_A2D_ELEM(original, i / 2, j / 2);
 				sum += DIRECT_A2D_ELEM(gain, i, j);
 			}
-			sum /= size * size;
-
-			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(gain)
+		}
+		else if ((EER_upsample == 1 && XSIZE(gain) == EER_IMAGE_WIDTH && YSIZE(gain) == EER_IMAGE_HEIGHT) || // gain = 4K and grid = 4K
+		         (EER_upsample == 2 && XSIZE(gain) == EER_IMAGE_WIDTH * 2 && YSIZE(gain) == EER_IMAGE_HEIGHT * 2)) // gain = 8K and grid = 8K
+		{
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(gain)
 			{
-				if (DIRECT_A2D_ELEM(gain, i, j) != 0)
-				{
-					DIRECT_A2D_ELEM(gain, i, j) = sum / DIRECT_A2D_ELEM(gain, i, j);
-				}
+				sum += DIRECT_MULTIDIM_ELEM(gain, n);
+			}
+		}	
+	
+		else
+		{
+			std::cerr << "Size of input gain: X = " << XSIZE(gain) << " Y = " << YSIZE(gain) << " Expected: X = " << (EER_IMAGE_WIDTH * 2) << " Y = " << (EER_IMAGE_HEIGHT * 2) << std::endl;
+			REPORT_ERROR("Invalid gain size in EERRenderer::upsampleEERGain()");
+		}
+
+		sum /= size * size;
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(gain)
+		{
+			if (DIRECT_MULTIDIM_ELEM(gain, n) != 0)
+			{
+				DIRECT_MULTIDIM_ELEM(gain, n) = sum / DIRECT_MULTIDIM_ELEM(gain, n);
 			}
 		}
-		else if (EER_upsample == 1)
-			return;
-		else
-			REPORT_ERROR("Invalid EER_upsample");
 	}
 
 	static bool isEER(FileName fn_movie)
