@@ -1842,7 +1842,6 @@ int pickerViewerCanvas::handle(int ev)
 			}
 			RFLOAT aux = -999., zero = 0.;
 			int iaux = current_selection_type;
-			std::cout << "picked with type = " << iaux << std::endl;
 
 			// Else store new coordinate
 			if (!MDcoords.isEmpty())
