@@ -283,7 +283,7 @@ void TIFFConverter::initialise(int _rank, int _total_ranks)
 	if (do_estimate && total_ranks != 1)
 		REPORT_ERROR("MPI parallelisation is not avaialble for --estimate_gain");
 
-	if (fn_out.back() != '/')
+	if (fn_out[fn_out.size() - 1] != '/')
 		fn_out += "/";
 
 	FileName fn_first;
