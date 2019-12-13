@@ -4127,8 +4127,8 @@ void MlOptimiser::maximizationOtherParameters()
 			Iavg += mymodel.Iref[iclass];
         Iavg /= (RFLOAT)mymodel.nr_classes;
 
-		int diffiter = iter - vmgd_ini_iter;
-		RFLOAT frac = RFLOAT(iter - vmgd_ini_iter)/RFLOAT(vmgd_inbetween_iter);
+		int diffiter = XMIPP_MAX(0, iter - vmgd_ini_iter);
+		RFLOAT frac = RFLOAT(diffiter)/RFLOAT(vmgd_inbetween_iter);
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 		{
 			 FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iavg)
