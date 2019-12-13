@@ -320,8 +320,13 @@ public:
 	// Number of particles to be processed simultaneously
 	int nr_pool;
 
-	//////////////// Stochastic gradient descent
+	//////////////// Gradient optimisation
 	bool do_vmgd;
+	bool do_mom1;
+	bool do_mom2;
+
+	// Avoid problems with SGD patent in cryoSPARC: don't accumulate gradient, but do minibatch maximisation steps instead
+	bool do_avoid_sgd;
 
 	// Number of initial iterations at low resolution, and without annealing of references
 	int vmgd_ini_iter;

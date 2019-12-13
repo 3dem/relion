@@ -308,6 +308,11 @@ public:
 	                 bool printTimes= false,
 	                 Image<RFLOAT>* weight_out = 0);
 
+	/*
+	 * Calculate the first or second moment of the gradient
+	 */
+	void updateMoment(MultidimArray<RFLOAT> &moment, RFLOAT lambda, bool mom2=false);
+
 	void reconstructVMGD(MultidimArray<RFLOAT> &vol_out,
 						RFLOAT vmgd_stepsize,
 		       	   	    RFLOAT tau2_fudge,

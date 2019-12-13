@@ -630,7 +630,9 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 
 	// SGD stuff
 	int vmgd_section = parser.addSection("Stochastic Gradient Descent");
-	do_vmgd = parser.checkOption("--vmgd", "Perform stochastic gradient descent instead of default expectation-maximization");
+	do_vmgd = parser.checkOption("--grad", "Perform gradient based optimisation (instead of default expectation-maximization)");
+	do_mom1 = parser.checkOption("--mom1", "Track the first moment of the gradient");
+	do_mom2 = parser.checkOption("--mom2", "Track the second moment of the gradient");
 	// Stochastic EM is implemented as a variant of SGD, though it is really a different algorithm!
 	vmgd_ini_iter = textToInteger(parser.getOption("--vmgd_ini_iter", "Number of initial SGD iterations", "50"));
 	vmgd_fin_iter = textToInteger(parser.getOption("--vmgd_fin_iter", "Number of final SGD iterations", "50"));
@@ -4125,7 +4127,7 @@ void MlOptimiser::maximizationOtherParameters()
 		Iavg.initZeros(mymodel.Iref[0]);
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 			Iavg += mymodel.Iref[iclass];
-        Iavg /= (RFLOAT)mymodel.nr_classes;
+		Iavg /= (RFLOAT)mymodel.nr_classes;
 
 		int diffiter = XMIPP_MAX(0, iter - vmgd_ini_iter);
 		RFLOAT frac = RFLOAT(diffiter)/RFLOAT(vmgd_inbetween_iter);

@@ -61,8 +61,9 @@ public:
 	// Number of image groups with separate sigma2_noise spectra
 	int nr_groups;
 
-	// Perform SGD instead of expectation maximization?
-	bool do_sgd;
+	// Keep track of the first and/or second moment of the gradient
+	bool do_mom1;
+	bool do_mom2;
 
 	// Number of particles in each group
 	std::vector<long int> nr_particles_per_group;
@@ -97,8 +98,9 @@ public:
 	// Vector with all reference images
 	std::vector<MultidimArray<RFLOAT> > Iref;
 
-	// Vector with all SGD gradients
-	std::vector<MultidimArray<RFLOAT> > Igrad;
+	// Vector with all gradient moments
+	std::vector<MultidimArray<RFLOAT> > Igrad1;
+	std::vector<MultidimArray<RFLOAT> > Igrad2;
 
 	// Vector with masks for all bodies in multi-body refinement
 	std::vector<MultidimArray<RFLOAT> > masks_bodies;
@@ -281,7 +283,8 @@ public:
 			nr_classes = MD.nr_classes;
 			nr_bodies = MD.nr_bodies;
 			nr_groups = MD.nr_groups;
-			do_sgd = MD.do_sgd;
+			do_mom1 = MD.do_mom1;
+			do_mom2 = MD.do_mom2;
 			nr_directions = MD.nr_directions;
 			LL = MD.LL;
 			padding_factor = MD.padding_factor;
@@ -304,7 +307,8 @@ public:
 			helical_rise_max = MD.helical_rise_max;
 			helical_rise_inistep= MD.helical_rise_inistep;
 			Iref = MD.Iref;
-			Igrad = MD.Igrad;
+			Igrad1 = MD.Igrad1;
+			Igrad2 = MD.Igrad2;
 			masks_bodies = MD.masks_bodies;
 			com_bodies = MD.com_bodies;
 			orient_bodies = MD.orient_bodies;
@@ -343,7 +347,8 @@ public:
 	void clear()
 	{
 		Iref.clear();
-		Igrad.clear();
+		Igrad1.clear();
+		Igrad2.clear();
 		masks_bodies.clear();
 		com_bodies.clear();
 		orient_bodies.clear();
@@ -378,11 +383,12 @@ public:
 		orientability_contrib.clear();
 		helical_twist.clear();
 		helical_rise.clear();
-		do_sgd=false;
+		do_mom1=false;
+		do_mom2=false;
 	}
 
 	// Initialise vectors with the right size
-	void initialise(bool _do_sgd = false);
+	void initialise(bool _do_mom1 = false, bool _do_mom2 = false);
 
 	//Read a model from a file
 	void read(FileName fn_in);
@@ -396,7 +402,9 @@ public:
 	// Read images from disc and initialise
 	// Also set do_average_unaligned and do_generate_seeds flags
 	void initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experiment &_mydata,
-			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected, RFLOAT ref_angpix = -1., bool _do_sgd = false, bool verb = false);
+			bool &do_average_unaligned, bool &do_generate_seeds,
+			bool &refs_are_ctf_corrected, RFLOAT ref_angpix = -1.,
+			bool _do_mom1 = false, bool _do_mom2 = false, bool verb = false);
 
 	RFLOAT getResolution(int ipix)	{ return (RFLOAT)ipix/(pixel_size * ori_size); }
 

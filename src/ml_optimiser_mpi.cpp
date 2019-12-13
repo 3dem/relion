@@ -2292,9 +2292,6 @@ void MlOptimiserMpi::maximization()
 				// When not doing SGD, initialise to zero, but when doing SGD just keep the previous reference
 				if (!do_vmgd)
 					mymodel.Iref[ith_recons].initZeros();
-				// When doing SGD also re-initialise the gradient to zero
-				//if (do_vmgd)
-				//	mymodel.Igrad[ith_recons].initZeros();
 			}
 			RCTOC(timer,RCT_1);
 //#define DEBUG_RECONSTRUCT
@@ -2380,9 +2377,12 @@ void MlOptimiserMpi::maximization()
 				// Broadcast the reconstructed references to all other MPI nodes
 				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Iref[ith_recons]),
 						MULTIDIM_SIZE(mymodel.Iref[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
-				//if (do_vmgd)
-				//	node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Igrad[ith_recons]),
-				//		MULTIDIM_SIZE(mymodel.Igrad[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
+				if (do_mom1)
+					node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Igrad1[ith_recons]),
+						MULTIDIM_SIZE(mymodel.Igrad1[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
+				if (do_mom2)
+					node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Igrad2[ith_recons]),
+						MULTIDIM_SIZE(mymodel.Igrad2[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
 				// Broadcast the data_vs_prior spectra to all other MPI nodes
 				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[ith_recons]),
 						MULTIDIM_SIZE(mymodel.data_vs_prior_class[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);

@@ -1201,7 +1201,7 @@ void BackProjector::externalReconstruct(MultidimArray<RFLOAT> &vol_out,
                                         const MultidimArray<RFLOAT> &fsc_halves,
                                         const MultidimArray<RFLOAT> &tau2,
                                         RFLOAT tau2_fudge,
-			                RFLOAT sgd_stepsize,
+                                        RFLOAT sgd_stepsize,
                                         int verb)
 {
 
@@ -1775,6 +1775,35 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 
 }
 
+void BackProjector::updateMoment(MultidimArray<RFLOAT> &moment, RFLOAT lambda, bool second)
+{
+	const int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
+
+	MultidimArray<RFLOAT> dummy;
+	Projector PPref(ori_size, interpolator, padding_factor, r_min_nn, data_dim);
+	PPref.computeFourierTransformMap(moment, dummy, r_max*2, 1, false);
+
+	FOR_ALL_ELEMENTS_IN_ARRAY3D(PPref.data)
+	{
+		const int r2 = k * k + i * i + j * j;
+		if (r2 < max_r2)
+		{
+			Complex mom = A3D_ELEM(data, k, i, j) / A3D_ELEM(weight, k, i, j);
+			if (second)
+				mom = sqrt(norm(mom));
+			A3D_ELEM(PPref.data, k, i, j) = lambda * A3D_ELEM(PPref.data, k, i, j) +
+					(1-lambda) * mom;
+		}
+	}
+
+	FourierTransformer transformer;
+	transformer.setReal(moment);
+	MultidimArray<Complex>& Fconv = transformer.getFourierReference();
+	Projector::decenter(PPref.data, Fconv, max_r2);
+	RCTIC(ReconTimer,ReconS_17);
+	windowToOridimRealSpace(transformer, moment, false);
+	RCTOC(ReconTimer,ReconS_17);
+}
 
 void BackProjector::reconstructVMGD(
 		MultidimArray<RFLOAT> &vol_out,
@@ -1953,7 +1982,6 @@ void BackProjector::reconstructVMGD(
 	Itmp.write("debug.spi");
 #endif
 }
-
 
 void BackProjector::symmetrise(int nr_helical_asu, RFLOAT helical_twist, RFLOAT helical_rise, int threads)
 {
