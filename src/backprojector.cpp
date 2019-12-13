@@ -1805,12 +1805,16 @@ void BackProjector::updateMoment(MultidimArray<RFLOAT> &moment, RFLOAT lambda, b
 	RCTOC(ReconTimer,ReconS_17);
 }
 
-void BackProjector::reconstructVMGD(
-		MultidimArray<RFLOAT> &vol_out,
-        RFLOAT vmgd_stepsize,
+void BackProjector::reconstructGrad(
+		MultidimArray<RFLOAT> &vol_out, //Should be const
+        RFLOAT grad_stepsize,
 		RFLOAT tau2_fudge,
         const MultidimArray<RFLOAT> &fsc,
 		bool use_fsc,
+		MultidimArray<RFLOAT> &mom1, //Should be const
+		bool use_mom1,
+		MultidimArray<RFLOAT> &mom2, //Should be const
+		bool use_mom2,
 		bool printTimes)
 {
 
@@ -1821,6 +1825,13 @@ void BackProjector::reconstructVMGD(
 	MultidimArray<RFLOAT> dummy;
 	Projector PPref(ori_size, interpolator, padding_factor, r_min_nn, data_dim);
 	PPref.computeFourierTransformMap(vol_out, dummy, r_max*2, 1, false); // false means no gridding correction
+
+	Projector PPmom1(ori_size, interpolator, padding_factor, r_min_nn, data_dim);
+	Projector PPmom2(ori_size, interpolator, padding_factor, r_min_nn, data_dim);
+	if (use_mom1)
+		PPmom1.computeFourierTransformMap(mom1, dummy, r_max*2, 1, false);
+	if (use_mom2)
+		PPmom2.computeFourierTransformMap(mom2, dummy, r_max*2, 1, false);
 
 	// Set Fconv to the right size
 	if (ref_dim == 2)
@@ -1862,12 +1873,9 @@ void BackProjector::reconstructVMGD(
     MultidimArray<RFLOAT> fsc_spectrum;
 
 	if (use_fsc)
-	{
 		fsc_spectrum = fsc;
-	}
 	else
 	{
-
 	    MultidimArray<RFLOAT> prev_power;
 	    prev_power.initZeros(ori_size / 2 + 1);
 	    MultidimArray<RFLOAT> diff_power(prev_power);
@@ -1890,7 +1898,6 @@ void BackProjector::reconstructVMGD(
 				DIRECT_A1D_ELEM(prev_power, ires) += norm(A3D_ELEM(PPref.data, kp, ip, jp))/2.;
 				DIRECT_A1D_ELEM(diff_power, ires) += norm(diff)/2.;
 				DIRECT_A1D_ELEM(counter, ires) += 1;
-
 			}
 		}
 
@@ -1905,7 +1912,7 @@ void BackProjector::reconstructVMGD(
 			{
 				prev = DIRECT_A1D_ELEM(prev_power, i) / DIRECT_A1D_ELEM(counter, i);
 				diff = DIRECT_A1D_ELEM(diff_power, i) / DIRECT_A1D_ELEM(counter, i);
-				myfsc = tau2_fudge * prev / (tau2_fudge * prev + diff);
+				myfsc = prev / (prev + diff/tau2_fudge);
 
 #ifdef DEBUG_NGD
 				std::cerr << i << " prev= " << prev
@@ -1916,10 +1923,11 @@ void BackProjector::reconstructVMGD(
 			}
 		}
 
+		// Always keep fsc(0) to 1
+	    DIRECT_A1D_ELEM(fsc_spectrum, 0) = 1.;
 	}
 
-	// Always keep fsc(0) to 1
-    DIRECT_A1D_ELEM(fsc_spectrum, 0) = 1.;
+    //---------------------- Make gradient update ----------------------//
 
 	FOR_ALL_ELEMENTS_IN_ARRAY3D(PPref.data)
 	{
@@ -1927,7 +1935,6 @@ void BackProjector::reconstructVMGD(
 		if (r2 < max_r2)
 		{
 			int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
-
 
 #ifdef WRITE_DIFF
 			invtau2 = 1. / (oversampling_correction * tau2_fudge * DIRECT_A1D_ELEM(tau2, ires));
@@ -1944,18 +1951,19 @@ void BackProjector::reconstructVMGD(
 			RFLOAT fsc = DIRECT_A1D_ELEM(fsc_spectrum, ires);
 			Complex Fgrad;
 
-			if (A3D_ELEM(weight, k, i, j) > 1.E-20)
-			{
-				Fgrad = A3D_ELEM(data, k, i, j) / A3D_ELEM(weight, k, i, j);
-			}
+			if (use_mom1)
+				Fgrad = A3D_ELEM(PPmom1.data, k, i, j);
 			else
-			{
-				Fgrad = 0.;
-			}
+				if (A3D_ELEM(weight, k, i, j) > 1.E-20)
+					Fgrad = A3D_ELEM(data, k, i, j) / A3D_ELEM(weight, k, i, j);
+				else
+					Fgrad = 0.;
 
-			Fgrad *= fsc;
-			Fgrad -= (1. - fsc) * A3D_ELEM(PPref.data, k, i, j);
-			A3D_ELEM(PPref.data, k, i, j) += vmgd_stepsize * Fgrad;
+			if (use_mom2)
+				Fgrad = Fgrad / (A3D_ELEM(PPmom2.data, k, i, j) + 1.E-8);
+
+			Fgrad = fsc * Fgrad - (1. - fsc) * A3D_ELEM(PPref.data, k, i, j);
+			A3D_ELEM(PPref.data, k, i, j) += grad_stepsize * Fgrad;
 		}
 	}
 

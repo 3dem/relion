@@ -2075,16 +2075,28 @@ void MlOptimiserMpi::maximization()
 						{
 							if(do_vmgd)
 							{
-								(wsum_model.BPref[ith_recons]).reconstructVMGD(mymodel.Iref[ith_recons],
+								if (do_mom1)
+									(wsum_model.BPref[iclass]).updateMoment(mymodel.Igrad1[iclass], 0.9, false);
+
+								if (do_mom2)
+									(wsum_model.BPref[iclass]).updateMoment(mymodel.Igrad1[iclass], 0.999, true);
+
+								(wsum_model.BPref[ith_recons]).reconstructGrad(
+										mymodel.Iref[ith_recons],
 										vmgd_stepsize,
 										mymodel.tau2_fudge_factor,
 										mymodel.fsc_halves_class[ith_recons],
 										do_split_random_halves,
+										mymodel.Igrad1[ith_recons],
+										do_mom1,
+										mymodel.Igrad2[ith_recons],
+										do_mom2,
 										node->rank==1);
 							}
 							else
 							{
-								(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons],
+								(wsum_model.BPref[ith_recons]).reconstruct(
+										mymodel.Iref[ith_recons],
 										gridding_nr_iter,
 										do_map,
 										mymodel.tau2_class[ith_recons],
@@ -2203,11 +2215,22 @@ void MlOptimiserMpi::maximization()
 							{
 								if(do_vmgd)
 								{
-									(wsum_model.BPref[ith_recons]).reconstructVMGD(mymodel.Iref[ith_recons],
+									if (do_mom1)
+										(wsum_model.BPref[iclass]).updateMoment(mymodel.Igrad1[iclass], 0.9, false);
+
+									if (do_mom2)
+										(wsum_model.BPref[iclass]).updateMoment(mymodel.Igrad1[iclass], 0.999, true);
+
+									(wsum_model.BPref[ith_recons]).reconstructGrad(
+											mymodel.Iref[ith_recons],
 											vmgd_stepsize,
 											mymodel.tau2_fudge_factor,
 											mymodel.fsc_halves_class[ith_recons],
 											do_split_random_halves,
+											mymodel.Igrad1[ith_recons],
+											do_mom1,
+											mymodel.Igrad2[ith_recons],
+											do_mom2,
 											false);
 								}
 								else

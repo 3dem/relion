@@ -313,11 +313,15 @@ public:
 	 */
 	void updateMoment(MultidimArray<RFLOAT> &moment, RFLOAT lambda, bool mom2=false);
 
-	void reconstructVMGD(MultidimArray<RFLOAT> &vol_out,
+	void reconstructGrad(MultidimArray<RFLOAT> &vol_out,
 						RFLOAT vmgd_stepsize,
 		       	   	    RFLOAT tau2_fudge,
 					    const MultidimArray<RFLOAT> &fsc,
-					    bool use_fsc = false,
+					    bool use_fsc,
+						MultidimArray<RFLOAT> &mom1,
+						bool use_mom1,
+						MultidimArray<RFLOAT> &mom2,
+						bool use_mom2,
 						bool printTimes= false);
 
 	/*	Enforce Hermitian symmetry, apply helical symmetry as well as point-group symmetry

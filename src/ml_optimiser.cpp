@@ -4055,11 +4055,22 @@ void MlOptimiser::maximization()
 				{
 					if(do_vmgd)
 					{
-						(wsum_model.BPref[iclass]).reconstructVMGD(mymodel.Iref[iclass],
+						if (do_mom1)
+							(wsum_model.BPref[iclass]).updateMoment(mymodel.Igrad1[iclass], 0.9, false);
+
+						if (do_mom2)
+							(wsum_model.BPref[iclass]).updateMoment(mymodel.Igrad1[iclass], 0.999, true);
+
+						(wsum_model.BPref[iclass]).reconstructGrad(
+								mymodel.Iref[iclass],
 								vmgd_stepsize,
 								mymodel.tau2_fudge_factor,
 								mymodel.fsc_halves_class[iclass],
 								do_split_random_halves,
+								mymodel.Igrad1[iclass],
+								do_mom1,
+								mymodel.Igrad2[iclass],
+								do_mom2,
 								(iclass==0));
 					}
 					else
