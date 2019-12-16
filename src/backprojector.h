@@ -311,18 +311,18 @@ public:
 	/*
 	 * Calculate the first or second moment of the gradient
 	 */
-	void updateMoment(MultidimArray<RFLOAT> &moment, RFLOAT lambda, bool mom2=false);
+	void reweightGrad(
+			MultidimArray<RFLOAT> &mom1, RFLOAT lambda1,
+			MultidimArray<RFLOAT> &mom2, RFLOAT lambda2,
+			bool init_mom);
 
-	void reconstructGrad(MultidimArray<RFLOAT> &vol_out,
-						RFLOAT vmgd_stepsize,
-		       	   	    RFLOAT tau2_fudge,
-					    const MultidimArray<RFLOAT> &fsc,
-					    bool use_fsc,
-						MultidimArray<RFLOAT> &mom1,
-						bool use_mom1,
-						MultidimArray<RFLOAT> &mom2,
-						bool use_mom2,
-						bool printTimes= false);
+	void reconstructGrad(
+			MultidimArray<RFLOAT> &vol_out,
+			RFLOAT vmgd_stepsize,
+			RFLOAT tau2_fudge,
+			const MultidimArray<RFLOAT> &fsc,
+			bool use_fsc,
+			bool printTimes= false);
 
 	/*	Enforce Hermitian symmetry, apply helical symmetry as well as point-group symmetry
 	 */

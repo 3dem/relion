@@ -408,6 +408,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 
 		if (do_mom1)
 		{
+			Image<RFLOAT> img(XSIZE(Igrad1[0]), YSIZE(Igrad1[0]), 1, nr_classes_bodies);
 			for (int iclass = 0; iclass < nr_classes; iclass++)
 			{
 				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(Igrad1[iclass])
@@ -415,11 +416,12 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 					DIRECT_NZYX_ELEM(img(), iclass, 0, i, j) = DIRECT_A2D_ELEM(Igrad1[iclass], i, j);
 				}
 			}
-			img.write(fn_out + "_moment1.mrcs");
+			img.write(fn_out + "_1moment.mrcs");
 		}
 
 		if (do_mom2)
 		{
+			Image<RFLOAT> img(XSIZE(Igrad2[0]), YSIZE(Igrad2[0]), 1, nr_classes_bodies);
 			for (int iclass = 0; iclass < nr_classes; iclass++)
 			{
 				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(Igrad2[iclass])
@@ -427,7 +429,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 					DIRECT_NZYX_ELEM(img(), iclass, 0, i, j) = DIRECT_A2D_ELEM(Igrad2[iclass], i, j);
 				}
 			}
-			img.write(fn_out + "_moment2.mrcs");
+			img.write(fn_out + "_2moment.mrcs");
 		}
 	}
 	else
@@ -455,7 +457,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 		{
 			for (int iclass = 0; iclass < nr_classes; iclass++)
 			{
-				fn_tmp.compose(fn_out+"_moment1", iclass+1, "mrc", 3);
+				fn_tmp.compose(fn_out+"_1moment", iclass+1, "mrc", 3);
 
 				img() = Igrad1[iclass];
 				img.write(fn_tmp);
@@ -466,7 +468,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 		{
 			for (int iclass = 0; iclass < nr_classes; iclass++)
 			{
-				fn_tmp.compose(fn_out+"_moment2", iclass+1, "mrc", 3);
+				fn_tmp.compose(fn_out+"_2moment", iclass+1, "mrc", 3);
 
 				img() = Igrad2[iclass];
 				img.write(fn_tmp);
@@ -823,9 +825,14 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 				ref_dim = img().getDim();
 				Iref.push_back(img());
 				if (_do_mom1)
-					Igrad1.push_back(img()*0);
+					Igrad1.push_back(img()*0.);
 				if (_do_mom2)
-					Igrad2.push_back(img()*0);
+				{
+					MultidimArray<RFLOAT> zeros;
+					int pad_size = 2 * (ROUND(padding_factor * XSIZE(Iref[0])) + 1) + 1;
+					zeros.initZeros(pad_size, pad_size, pad_size/2 + 1);
+					Igrad2.push_back(zeros);
+				}
 				nr_classes++;
 			}
 		}
@@ -876,7 +883,12 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 					if (_do_mom1)
 						Igrad1.push_back(img()*0.);
 					if (_do_mom2)
-						Igrad2.push_back(img()*0.);
+					{
+						MultidimArray<RFLOAT> zeros;
+						int pad_size = 2 * (ROUND(padding_factor * XSIZE(Iref[0])) + 1) + 1;
+						zeros.initZeros(pad_size, pad_size, pad_size/2 + 1);
+						Igrad2.push_back(zeros);
+					}
 				}
 			}
 			if (nr_classes > 1)
@@ -996,9 +1008,14 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 		{
 			Iref.push_back(img());
 			if (_do_mom1)
-				Igrad1.push_back(img()*0);
+				Igrad1.push_back(img()*0.);
 			if (_do_mom2)
-				Igrad2.push_back(img()*0);
+			{
+				MultidimArray<RFLOAT> zeros;
+				int pad_size = 2 * (ROUND(padding_factor * XSIZE(Iref[0])) + 1) + 1;
+				zeros.initZeros(pad_size, pad_size, pad_size/2 + 1);
+				Igrad2.push_back(zeros);
+			}
 		}
 	}
 

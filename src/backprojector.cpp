@@ -1772,37 +1772,92 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			}
 		}
 	}
-
 }
 
-void BackProjector::updateMoment(MultidimArray<RFLOAT> &moment, RFLOAT lambda, bool second)
+void BackProjector::reweightGrad(
+		MultidimArray<RFLOAT> &mom1, RFLOAT lambda1,
+		MultidimArray<RFLOAT> &mom2, RFLOAT lambda2,
+		bool init_mom)
 {
 	const int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
 
 	MultidimArray<RFLOAT> dummy;
-	Projector PPref(ori_size, interpolator, padding_factor, r_min_nn, data_dim);
-	PPref.computeFourierTransformMap(moment, dummy, r_max*2, 1, false);
+	Projector PPmom1(ori_size, interpolator, padding_factor, r_min_nn, data_dim);
 
-	FOR_ALL_ELEMENTS_IN_ARRAY3D(PPref.data)
+	std::cout << "BackProjector::reweightGrad(" <<  lambda1 << ", "
+			<<  lambda2 << ", " <<  init_mom << ")" << std::endl;
+
+	if (lambda1 > 0.)
+		PPmom1.computeFourierTransformMap(mom1, dummy, r_max*2, 1, false);
+
+	if (lambda2 > 0.)
 	{
-		const int r2 = k * k + i * i + j * j;
+		mom2.setXmippOrigin();
+		mom2.xinit = 0;
+	}
+
+	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(data) // This will also work for 2D
+	{
+		int r2 = kp*kp + ip*ip + jp*jp;
 		if (r2 < max_r2)
 		{
-			Complex mom = A3D_ELEM(data, k, i, j) / A3D_ELEM(weight, k, i, j);
-			if (second)
-				mom = sqrt(norm(mom));
-			A3D_ELEM(PPref.data, k, i, j) = lambda * A3D_ELEM(PPref.data, k, i, j) +
-					(1-lambda) * mom;
+			if (init_mom)
+			{
+				if (lambda1 > 0.)
+				{
+					A3D_ELEM(PPmom1.data, kp, ip, jp).real = 0;
+					A3D_ELEM(PPmom1.data, kp, ip, jp).imag = 0;
+				}
+				if (lambda2 > 0.)
+				{
+					A3D_ELEM(mom2, kp, ip, jp) = 1;
+				}
+			}
+
+			Complex g = 0;
+
+			if (A3D_ELEM(weight, kp, ip, jp) > 0.)
+				g = A3D_ELEM(data, kp, ip, jp) / A3D_ELEM(weight, kp, ip, jp);
+			else
+			{
+				A3D_ELEM(data, kp, ip, jp) = 0;
+				continue; //We only update moments if any information was added (weight > 0.)
+			}
+
+			Complex v = g;
+			if (lambda1 > 0.)
+			{
+				v = lambda1 * A3D_ELEM(PPmom1.data, kp, ip, jp) +
+						(1-lambda1) * g;
+				A3D_ELEM(PPmom1.data, kp, ip, jp) = v;
+			}
+
+			if (lambda2 > 0.)
+			{
+				A3D_ELEM(mom2, kp, ip, jp) = lambda2 * A3D_ELEM(mom2, kp, ip, jp) +
+						(1-lambda2) * sqrt(g.real*g.real + g.imag*g.imag);
+				v /= A3D_ELEM(mom2, kp, ip, jp) + 1E-8;
+
+				if (r2 == 0)
+					std::cout << v.real << " " << A3D_ELEM(mom2, kp, ip, jp) << std::endl;
+			}
+
+			A3D_ELEM(data, kp, ip, jp) = v;
+
 		}
 	}
 
 	FourierTransformer transformer;
-	transformer.setReal(moment);
-	MultidimArray<Complex>& Fconv = transformer.getFourierReference();
-	Projector::decenter(PPref.data, Fconv, max_r2);
-	RCTIC(ReconTimer,ReconS_17);
-	windowToOridimRealSpace(transformer, moment, false);
-	RCTOC(ReconTimer,ReconS_17);
+
+	if (lambda1 > 0.)
+	{
+		transformer.setReal(mom1);
+		MultidimArray<Complex>& Fconv = transformer.getFourierReference();
+		Projector::decenter(PPmom1.data, Fconv, max_r2);
+		RCTIC(ReconTimer,ReconS_17);
+		windowToOridimRealSpace(transformer, mom1, false);
+		RCTOC(ReconTimer,ReconS_17);
+	}
 }
 
 void BackProjector::reconstructGrad(
@@ -1811,10 +1866,6 @@ void BackProjector::reconstructGrad(
 		RFLOAT tau2_fudge,
         const MultidimArray<RFLOAT> &fsc,
 		bool use_fsc,
-		MultidimArray<RFLOAT> &mom1, //Should be const
-		bool use_mom1,
-		MultidimArray<RFLOAT> &mom2, //Should be const
-		bool use_mom2,
 		bool printTimes)
 {
 
@@ -1828,10 +1879,6 @@ void BackProjector::reconstructGrad(
 
 	Projector PPmom1(ori_size, interpolator, padding_factor, r_min_nn, data_dim);
 	Projector PPmom2(ori_size, interpolator, padding_factor, r_min_nn, data_dim);
-	if (use_mom1)
-		PPmom1.computeFourierTransformMap(mom1, dummy, r_max*2, 1, false);
-	if (use_mom2)
-		PPmom2.computeFourierTransformMap(mom2, dummy, r_max*2, 1, false);
 
 	// Set Fconv to the right size
 	if (ref_dim == 2)
@@ -1883,20 +1930,14 @@ void BackProjector::reconstructGrad(
 	    fsc_spectrum.initZeros(ori_size / 2 + 1);
 
 	    // First get average Delta^2 from the accumulated gradient in data and weight
-		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(PPref.data) // This will also work for 2D
+		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(data) // This will also work for 2D
 		{
 			int r2 = kp*kp + ip*ip + jp*jp;
 			if (r2 <= max_r2)
 			{
-
 				int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
-
-				Complex diff = 0.;
-				if (A3D_ELEM(weight, kp, ip, jp) > 0.)
-					diff = A3D_ELEM(data, kp, ip, jp) / A3D_ELEM(weight, kp, ip, jp);
-
 				DIRECT_A1D_ELEM(prev_power, ires) += norm(A3D_ELEM(PPref.data, kp, ip, jp))/2.;
-				DIRECT_A1D_ELEM(diff_power, ires) += norm(diff)/2.;
+				DIRECT_A1D_ELEM(diff_power, ires) += norm(A3D_ELEM(data, kp, ip, jp))/2.;
 				DIRECT_A1D_ELEM(counter, ires) += 1;
 			}
 		}
@@ -1929,7 +1970,7 @@ void BackProjector::reconstructGrad(
 
     //---------------------- Make gradient update ----------------------//
 
-	FOR_ALL_ELEMENTS_IN_ARRAY3D(PPref.data)
+	FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
 	{
 		const int r2 = k * k + i * i + j * j;
 		if (r2 < max_r2)
@@ -1949,20 +1990,7 @@ void BackProjector::reconstructGrad(
 #endif
 
 			RFLOAT fsc = DIRECT_A1D_ELEM(fsc_spectrum, ires);
-			Complex Fgrad;
-
-			if (use_mom1)
-				Fgrad = A3D_ELEM(PPmom1.data, k, i, j);
-			else
-				if (A3D_ELEM(weight, k, i, j) > 1.E-20)
-					Fgrad = A3D_ELEM(data, k, i, j) / A3D_ELEM(weight, k, i, j);
-				else
-					Fgrad = 0.;
-
-			if (use_mom2)
-				Fgrad = Fgrad / (A3D_ELEM(PPmom2.data, k, i, j) + 1.E-8);
-
-			Fgrad = fsc * Fgrad - (1. - fsc) * A3D_ELEM(PPref.data, k, i, j);
+			Complex Fgrad = fsc * A3D_ELEM(data, k, i, j) - (1. - fsc) * A3D_ELEM(PPref.data, k, i, j);
 			A3D_ELEM(PPref.data, k, i, j) += grad_stepsize * Fgrad;
 		}
 	}

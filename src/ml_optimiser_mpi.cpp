@@ -2075,22 +2075,12 @@ void MlOptimiserMpi::maximization()
 						{
 							if(do_vmgd)
 							{
-								if (do_mom1)
-									(wsum_model.BPref[iclass]).updateMoment(mymodel.Igrad1[iclass], 0.9, false);
-
-								if (do_mom2)
-									(wsum_model.BPref[iclass]).updateMoment(mymodel.Igrad1[iclass], 0.999, true);
-
 								(wsum_model.BPref[ith_recons]).reconstructGrad(
 										mymodel.Iref[ith_recons],
 										vmgd_stepsize,
 										mymodel.tau2_fudge_factor,
 										mymodel.fsc_halves_class[ith_recons],
 										do_split_random_halves,
-										mymodel.Igrad1[ith_recons],
-										do_mom1,
-										mymodel.Igrad2[ith_recons],
-										do_mom2,
 										node->rank==1);
 							}
 							else
@@ -2215,22 +2205,12 @@ void MlOptimiserMpi::maximization()
 							{
 								if(do_vmgd)
 								{
-									if (do_mom1)
-										(wsum_model.BPref[iclass]).updateMoment(mymodel.Igrad1[iclass], 0.9, false);
-
-									if (do_mom2)
-										(wsum_model.BPref[iclass]).updateMoment(mymodel.Igrad1[iclass], 0.999, true);
-
 									(wsum_model.BPref[ith_recons]).reconstructGrad(
 											mymodel.Iref[ith_recons],
 											vmgd_stepsize,
 											mymodel.tau2_fudge_factor,
 											mymodel.fsc_halves_class[ith_recons],
 											do_split_random_halves,
-											mymodel.Igrad1[ith_recons],
-											do_mom1,
-											mymodel.Igrad2[ith_recons],
-											do_mom2,
 											false);
 								}
 								else
@@ -3126,6 +3106,15 @@ void MlOptimiserMpi::iterate()
 		if ((do_auto_refine && has_converged) || do_keep_debug_reconstruct_files)
 #endif
 			writeTemporaryDataAndWeightArrays();
+
+		if (do_vmgd)
+			for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+			{
+				(wsum_model.BPref[iclass]).reweightGrad(
+						mymodel.Igrad1[iclass], do_mom1 ? 0.9 : 0.,
+						mymodel.Igrad2[iclass], do_mom2 ? 0.999 : 0.,
+						iter==1);
+			}
 
 		// Inside iterative refinement: do FSC-calculation BEFORE the solvent flattening, otherwise over-estimation of resolution
 		// anyway, now that this is done inside BPref, there would be no other way...

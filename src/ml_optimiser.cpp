@@ -1586,8 +1586,8 @@ void MlOptimiser::initialiseGeneral(int rank)
 		// Read in the reference(s) and initialise mymodel
 		int refdim = (fn_ref == "denovo") ? 3 : 2;
 		mymodel.initialiseFromImages(fn_ref, is_3d_model, mydata,
-				do_average_unaligned, do_generate_seeds, refs_are_ctf_corrected, ref_angpix, do_vmgd, (rank==0));
-
+				do_average_unaligned, do_generate_seeds, refs_are_ctf_corrected,
+				ref_angpix, do_mom1, do_mom2, (rank==0));
 	}
 
 	if (mymodel.nr_classes > 1 && do_split_random_halves)
@@ -4055,11 +4055,12 @@ void MlOptimiser::maximization()
 				{
 					if(do_vmgd)
 					{
-						if (do_mom1)
-							(wsum_model.BPref[iclass]).updateMoment(mymodel.Igrad1[iclass], 0.9, false);
-
-						if (do_mom2)
-							(wsum_model.BPref[iclass]).updateMoment(mymodel.Igrad1[iclass], 0.999, true);
+						(wsum_model.BPref[iclass]).reweightGrad(
+								mymodel.Igrad1[iclass],
+								do_mom1 ? 0.9 : 0.,
+								mymodel.Igrad2[iclass],
+								do_mom2 ? 0.999 : 0.,
+								iter==1);
 
 						(wsum_model.BPref[iclass]).reconstructGrad(
 								mymodel.Iref[iclass],
@@ -4067,10 +4068,6 @@ void MlOptimiser::maximization()
 								mymodel.tau2_fudge_factor,
 								mymodel.fsc_halves_class[iclass],
 								do_split_random_halves,
-								mymodel.Igrad1[iclass],
-								do_mom1,
-								mymodel.Igrad2[iclass],
-								do_mom2,
 								(iclass==0));
 					}
 					else
