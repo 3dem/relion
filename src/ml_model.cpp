@@ -831,6 +831,8 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 					MultidimArray<RFLOAT> zeros;
 					int pad_size = 2 * (ROUND(padding_factor * XSIZE(Iref[0])) + 1) + 1;
 					zeros.initZeros(pad_size, pad_size, pad_size/2 + 1);
+					zeros.setXmippOrigin();
+					zeros.xinit = 0;
 					Igrad2.push_back(zeros);
 				}
 				nr_classes++;
@@ -887,6 +889,8 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 						MultidimArray<RFLOAT> zeros;
 						int pad_size = 2 * (ROUND(padding_factor * XSIZE(Iref[0])) + 1) + 1;
 						zeros.initZeros(pad_size, pad_size, pad_size/2 + 1);
+						zeros.setXmippOrigin();
+						zeros.xinit = 0;
 						Igrad2.push_back(zeros);
 					}
 				}
@@ -1014,6 +1018,8 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 				MultidimArray<RFLOAT> zeros;
 				int pad_size = 2 * (ROUND(padding_factor * XSIZE(Iref[0])) + 1) + 1;
 				zeros.initZeros(pad_size, pad_size, pad_size/2 + 1);
+				zeros.setXmippOrigin();
+				zeros.xinit = 0;
 				Igrad2.push_back(zeros);
 			}
 		}

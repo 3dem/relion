@@ -1784,17 +1784,8 @@ void BackProjector::reweightGrad(
 	MultidimArray<RFLOAT> dummy;
 	Projector PPmom1(ori_size, interpolator, padding_factor, r_min_nn, data_dim);
 
-	std::cout << "BackProjector::reweightGrad(" <<  lambda1 << ", "
-			<<  lambda2 << ", " <<  init_mom << ")" << std::endl;
-
 	if (lambda1 > 0.)
 		PPmom1.computeFourierTransformMap(mom1, dummy, r_max*2, 1, false);
-
-	if (lambda2 > 0.)
-	{
-		mom2.setXmippOrigin();
-		mom2.xinit = 0;
-	}
 
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(data) // This will also work for 2D
 	{
@@ -1836,10 +1827,9 @@ void BackProjector::reweightGrad(
 			{
 				A3D_ELEM(mom2, kp, ip, jp) = lambda2 * A3D_ELEM(mom2, kp, ip, jp) +
 						(1-lambda2) * sqrt(g.real*g.real + g.imag*g.imag);
-				v /= A3D_ELEM(mom2, kp, ip, jp) + 1E-8;
 
-				if (r2 == 0)
-					std::cout << v.real << " " << A3D_ELEM(mom2, kp, ip, jp) << std::endl;
+				if (A3D_ELEM(mom2, kp, ip, jp) > 0.)
+					v /= A3D_ELEM(mom2, kp, ip, jp);
 			}
 
 			A3D_ELEM(data, kp, ip, jp) = v;
