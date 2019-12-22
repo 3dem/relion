@@ -291,7 +291,7 @@ void TIFFConverter::initialise(int _rank, int _total_ranks)
 
 	if (fn_in_ext == "star")
 	{
-		MD.read(fn_in, "movie");
+		MD.read(fn_in, "movies");
 
 		// Support non-optics group STAR files
 		if (MD.numberOfObjects() == 0)
