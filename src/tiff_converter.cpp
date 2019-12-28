@@ -194,7 +194,7 @@ void TIFFConverter::unnormalise(FileName fn_movie, FileName fn_tiff)
 			const float expected = gain_here * ival;
 			if (fabs(expected - val) > 0.0001)
 			{
-				snprintf(msg, 255, " mismatch: %s frame %2d pos %4d %4d status %5d obs % 8.4f expected % 8.4f gain %.4f\n",
+				snprintf(msg, 255, " mismatch: %s frame %2d pos %4ld %4ld obs % 8.4f status %d expected % 8.4f gain %.4f\n",
 					 fn_movie.c_str(), iframe, n / nx, n % ny, (double)val, DIRECT_MULTIDIM_ELEM(defects(), n),
 					 (double)expected, (double)gain_here);
 				std::cerr << msg << std::endl;
@@ -213,7 +213,7 @@ void TIFFConverter::unnormalise(FileName fn_movie, FileName fn_tiff)
 					ival = underflow;
 					error++;
 					
-					printf(" underflow: %s frame %2d pos %4d %4d obs % 8.4f expected % 8.4f gain %.4f\n",
+					printf(" underflow: %s frame %2d pos %4ld %4ld obs % 8.4f expected % 8.4f gain %.4f\n",
 					       fn_movie.c_str(), iframe, n / nx, n % ny, (double)val,
 					       (double)expected, (double)gain_here);
 				}
@@ -222,7 +222,7 @@ void TIFFConverter::unnormalise(FileName fn_movie, FileName fn_tiff)
 					ival = overflow;
 					error++;
 
-					printf(" overflow: %s frame %2d pos %4d %4d obs % 8.4f expected % 8.4f gain %.4f\n",
+					printf(" overflow: %s frame %2d pos %4ld %4ld obs % 8.4f expected % 8.4f gain %.4f\n",
 					       fn_movie.c_str(), iframe, n / nx, n % ny, (double)val,
 					       (double)expected, (double)gain_here);
 				}
