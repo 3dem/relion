@@ -1787,9 +1787,6 @@ void BackProjector::reweightGrad(
 	if (lambda1 > 0.)
 		PPmom1.computeFourierTransformMap(mom1, dummy, r_max*2, 1, false);
 
-    RFLOAT mom2_sum(0);
-    int counter(0);
-
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(data) // This will also work for 2D
 	{
 		int r2 = kp*kp + ip*ip + jp*jp;
@@ -1818,50 +1815,67 @@ void BackProjector::reweightGrad(
 				continue; //We only update moments if any information was added (weight > 0.)
 			}
 
-			Complex v = g;
 			if (lambda1 > 0.)
 			{
-				v = lambda1 * A3D_ELEM(PPmom1.data, kp, ip, jp) +
+				Complex m = lambda1 * A3D_ELEM(PPmom1.data, kp, ip, jp) +
 						(1-lambda1) * g;
-				A3D_ELEM(PPmom1.data, kp, ip, jp) = v;
+				A3D_ELEM(PPmom1.data, kp, ip, jp) = m;
+				A3D_ELEM(data, kp, ip, jp) = m;
 			}
+			else
+				A3D_ELEM(data, kp, ip, jp) = g;
 
-			A3D_ELEM(data, kp, ip, jp) = v;
 
 			if (lambda2 > 0.)
-			{
 				A3D_ELEM(mom2, kp, ip, jp) = lambda2 * A3D_ELEM(mom2, kp, ip, jp) +
 						(1-lambda2) * sqrt(g.real*g.real + g.imag*g.imag);
-
-				if (A3D_ELEM(mom2, kp, ip, jp) > 0)
-				{
-					A3D_ELEM(data, kp, ip, jp) /= A3D_ELEM(mom2, kp, ip, jp);
-					mom2_sum += 1/A3D_ELEM(mom2, kp, ip, jp);
-					counter += 1;
-				}
-			}
 		}
 	}
-
-	if (lambda2 > 0.)
-	{
-		mom2_sum /= counter;
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(data)
-		{
-			DIRECT_MULTIDIM_ELEM(data, n) /= mom2_sum;
-		}
-	}
-
-	FourierTransformer transformer;
 
 	if (lambda1 > 0.)
 	{
+		FourierTransformer transformer;
 		transformer.setReal(mom1);
 		MultidimArray<Complex>& Fconv = transformer.getFourierReference();
 		Projector::decenter(PPmom1.data, Fconv, max_r2);
 		RCTIC(ReconTimer,ReconS_17);
 		windowToOridimRealSpace(transformer, mom1, false);
 		RCTOC(ReconTimer,ReconS_17);
+	}
+
+	if (lambda2 > 0.)
+	{
+	    MultidimArray<RFLOAT> norm(ori_size / 2 + 1);
+	    MultidimArray<RFLOAT> count(ori_size / 2 + 1);
+		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(mom2)
+		{
+			const int r2 = k * k + i * i + j * j;
+			if (r2 < max_r2)
+			{
+				int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
+				DIRECT_A1D_ELEM(norm, ires) += A3D_ELEM(mom2, kp, ip, jp); //mom2 is always positive
+				DIRECT_A1D_ELEM(count, ires) += 1;
+			}
+		}
+
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(norm)
+		{
+			if (DIRECT_A1D_ELEM(count, i) > 0.)
+				DIRECT_A1D_ELEM(norm, i) /= DIRECT_A1D_ELEM(count, i);
+		}
+
+		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(mom2)
+		{
+			const int r2 = k * k + i * i + j * j;
+			if (r2 < max_r2)
+			{
+				int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
+				RFLOAT corr = 1.;
+				if (DIRECT_A1D_ELEM(norm, ires) > 0. && A3D_ELEM(mom2, kp, ip, jp) > 0.)
+					corr = A3D_ELEM(mom2, kp, ip, jp) / DIRECT_A1D_ELEM(norm, ires);
+				A3D_ELEM(data, kp, ip, jp) /= corr;
+			}
+		}
 	}
 }
 
@@ -1995,7 +2009,7 @@ void BackProjector::reconstructGrad(
 #endif
 
 			RFLOAT fsc = DIRECT_A1D_ELEM(fsc_spectrum, ires);
-			Complex Fgrad = fsc * A3D_ELEM(data, k, i, j) - (1. - fsc) / tau2_fudge * A3D_ELEM(PPref.data, k, i, j);
+			Complex Fgrad = fsc * A3D_ELEM(data, k, i, j) - (1. - fsc) * A3D_ELEM(PPref.data, k, i, j);
 			A3D_ELEM(PPref.data, k, i, j) += grad_stepsize * Fgrad;
 		}
 	}
