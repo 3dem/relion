@@ -1820,7 +1820,7 @@ void BackProjector::reweightGrad(
 				Complex m = lambda1 * A3D_ELEM(PPmom1.data, kp, ip, jp) +
 						(1-lambda1) * g;
 				A3D_ELEM(PPmom1.data, kp, ip, jp) = m;
-				A3D_ELEM(data, kp, ip, jp) = m;
+				A3D_ELEM(data, kp, ip, jp) = m / (1-lambda1); // Debiasing
 			}
 			else
 				A3D_ELEM(data, kp, ip, jp) = g;
@@ -1853,7 +1853,7 @@ void BackProjector::reweightGrad(
 			if (r2 < max_r2)
 			{
 				int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
-				DIRECT_A1D_ELEM(norm, ires) += A3D_ELEM(mom2, kp, ip, jp); //mom2 is always positive
+				DIRECT_A1D_ELEM(norm, ires) += A3D_ELEM(mom2, kp, ip, jp) / (1-lambda2); //mom2 is always positive
 				DIRECT_A1D_ELEM(count, ires) += 1;
 			}
 		}
@@ -1873,7 +1873,7 @@ void BackProjector::reweightGrad(
 				RFLOAT corr = 1.;
 				if (DIRECT_A1D_ELEM(norm, ires) > 0. && A3D_ELEM(mom2, kp, ip, jp) > 0.)
 					corr = A3D_ELEM(mom2, kp, ip, jp) / DIRECT_A1D_ELEM(norm, ires);
-				A3D_ELEM(data, kp, ip, jp) /= corr;
+				A3D_ELEM(data, kp, ip, jp) /= corr / (1-lambda2); // Debiasing
 			}
 		}
 	}
