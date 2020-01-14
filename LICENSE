@@ -235,19 +235,19 @@ countries not thus excluded.  In such case, this License incorporates
 the limitation as if written in the body of this License.
 
 This version of RELION uses a stochastic average gradient descent (SAGD) method in
-conjunction with a modulation by a contract transfer function of the particle images
+conjunction with a modulation by a contrast transfer function of the particle images
 for ab-initio single-particle reconstruction.
 
 Should you wish to use RELION with the SAGD method in conjunction with a modulation
-by a contract transfer function of the particle images for ab-initio single-particle
+by a contrast transfer function of the particle images for ab-initio single-particle
 reconstruction, please note that this functionality may be covered in the USA by
 US Patent No. 10,282,513. Non-profit academic research uses of the patented IP are
 freely licensed under the terms of the license agreement available at
 https://cryosparc.com/patent-faqs.
 
-Should you wish to use RELION without modulation by a contract transfer function of
+Should you wish to use RELION without modulation by a contrast transfer function of
 the particle images in the SAGD method for ab-initio single-particle reconstruction,
-you may disable this functionality using -DALLOW_CTF_IN_SGD=OFF at the stage of
+you may disable this functionality using -DALLOW_CTF_IN_SAGD=OFF at the stage of
 configuration, i.e. before compilation of the code.
 
   9. The Free Software Foundation may publish revised and/or new versions
