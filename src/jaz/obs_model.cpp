@@ -303,9 +303,9 @@ ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt, bool do_die_
 
 		// See if there is more than one MTF, for more rapid divideByMtf
 		hasMultipleMtfs = false;
-		for (int i = 1; i < fnMtfs.size(); i++)
+		for (int j = 1; j < fnMtfs.size(); j++)
 		{
-			if (fnMtfs[i] != fnMtfs[0])
+			if (fnMtfs[j] != fnMtfs[0])
 			{
 				hasMultipleMtfs = true;
 				break;
