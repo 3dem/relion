@@ -2060,6 +2060,9 @@ void MlOptimiserMpi::maximization()
 									fn_ext_root,
 									mymodel.fsc_halves_class[ith_recons],
 									mymodel.tau2_class[ith_recons],
+									mymodel.sigma2_class[ith_recons],
+									mymodel.data_vs_prior_class[ith_recons],
+									(do_join_random_halves || do_always_join_random_halves),
 									mymodel.tau2_fudge_factor,
 									node->rank==1); // only first slaves is verbose
 						}
@@ -2212,6 +2215,9 @@ void MlOptimiserMpi::maximization()
 										fn_ext_root,
 										mymodel.fsc_halves_class[ith_recons],
 										mymodel.tau2_class[ith_recons],
+										mymodel.sigma2_class[ith_recons],
+										mymodel.data_vs_prior_class[ith_recons],
+										(do_join_random_halves || do_always_join_random_halves),
 										mymodel.tau2_fudge_factor);
 							}
 							else
