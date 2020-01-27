@@ -1,8 +1,7 @@
 #include "star_converter.h"
 
-void StarConverter::convert_3p0_particlesTo_3p1(
-		const MetaDataTable &in, MetaDataTable &outParticles, MetaDataTable &outOptics,
-		std::string tablename, bool do_die_upon_error)
+void StarConverter::convert_3p0_particlesTo_3p1(const MetaDataTable &in, MetaDataTable &outParticles, MetaDataTable &outOptics,
+                                                std::string tablename, bool do_die_upon_error)
 {
 	int ver = in.getVersion();
 	int curVer = MetaDataTable::getCurrentVersion();
@@ -118,6 +117,17 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 		outParticles.setValue(EMDL_IMAGE_OPTICS_GROUP, opticsClasses[p] + 1, p);
 	}
 
+	// Determine the data type
+	if (tablename == "")
+	{
+		if (in.containsLabel(EMDL_IMAGE_NAME))
+			tablename = "particles";
+		else if (in.containsLabel(EMDL_MICROGRAPH_METADATA_NAME))
+			tablename = "movies";
+		else
+			tablename = "micrographs";
+	}
+
 	outParticles.setName(tablename);
 	outParticles.setVersion(curVer);
 
@@ -144,7 +154,7 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 		}
 	}
 
-	// set IMAGE_PIXEL_SIZE instead of DETECTOR_PIXEL_SIZE and MAGNIFICATION
+	// set IMAGE_PIXEL_SIZE/MICROGRAPH_PIXEL_SIZE instead of DETECTOR_PIXEL_SIZE and MAGNIFICATION
 	// This does not do anything if DETECTOR_PIXEL_SIZE or MAGNIFICATION are not in the input STAR file
 	unifyPixelSize(outOptics, tablename);
 

@@ -229,7 +229,9 @@ void AutoPicker::initialise()
 			fn_micrographs.push_back(fn_mic);
 		}
 
-        	// Check all optics groups have the same pixel size (check for same micrograph size is performed while running through all of them)
+		// Check all optics groups have the same pixel size (check for same micrograph size is performed while running through all of them)
+		if (!obsModel.opticsMdt.containsLabel(EMDL_MICROGRAPH_PIXEL_SIZE))
+			REPORT_ERROR("The input does not contain the rlnMicrographPixelSize column.");
 		obsModel.opticsMdt.getValue(EMDL_MICROGRAPH_PIXEL_SIZE, angpix, 0);
 		for (int optics_group = 1; optics_group < obsModel.numberOfOpticsGroups(); optics_group++)
 		{
