@@ -31,6 +31,10 @@
 #include "src/acc/acc_ptr.h"
 void run_griddingCorrect(RFLOAT *vol, int interpolator, RFLOAT rrval, RFLOAT r_min_nn,
 						 size_t iX, size_t iY, size_t iZ);
+void run_padTranslatedMap(RFLOAT *d_in, RFLOAT *d_out,
+						  size_t isX, size_t ieX, size_t isY, size_t ieY, size_t isZ, size_t ieZ, //Input dimensions
+						  size_t osX, size_t oeX, size_t osY, size_t oeY, size_t osZ, size_t oeZ,  //Output dimensions
+						  cudaStream_t stream = 0);
 #endif
 
 

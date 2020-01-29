@@ -842,4 +842,31 @@ __global__ void cuda_kernel_window_fourier_transform(
 #define TRILINEAR 1
 __global__ void cuda_kernel_griddingCorrect(RFLOAT *vol, int interpolator, RFLOAT rrval, RFLOAT r_min_nn,
 											size_t iX, size_t iY, size_t iZ);
+
+// output is bigger than input
+template <typename T>
+__global__ void cuda_kernel_window_transform(
+				T *d_in, T *d_out,
+				int iszX, int iszY, int iszZ,  //Input dimensions
+				int oftX, int oftY, int oftZ, int oszX, int oszY, int oszZ  //Output dimensions
+				)
+{
+	int idx = blockIdx.x*blockDim.x + threadIdx.x;
+	int idy = blockIdx.y*blockDim.y + threadIdx.y;
+	int idz = blockIdx.z*blockDim.z + threadIdx.z;
+
+	if(idx < oszX && idy < oszY && idz <oszZ){
+		if( (idx>=oftX) && (idx<oftX+iszX) &&
+			(idy>=oftY) && (idy<oftY+iszY) &&
+			(idz>=oftZ) && (idz<oftZ+iszZ))
+		{
+			d_out[idz*oszX*oszY + idy*oszX + idx] = d_in[(idz - oftZ)*iszX*iszY+(idy - oftY)*iszX+(idx - oftX)];
+		}
+		else
+		{
+			d_out[idz*oszX*oszY + idy*oszX + idx] = 0.0;
+		}
+	}
+}
+
 #endif /* CUDA_HELPER_KERNELS_CUH_ */

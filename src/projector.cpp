@@ -191,7 +191,6 @@ void Projector::computeFourierTransformMap(
 			vol_in.setXmippOrigin();
 			run_griddingCorrect(~dvol, interpolator, (RFLOAT)(ori_size * padding_factor), r_min_nn,
 							    XSIZE(vol_in), YSIZE(vol_in), ZSIZE(vol_in));
-			dvol.cpToHost();
 		}
 #endif
 		else
@@ -205,9 +204,21 @@ void Projector::computeFourierTransformMap(
 	// Pad translated map with zeros
 	vol_in.setXmippOrigin();
 	Mpad.setXmippOrigin();
-	FOR_ALL_ELEMENTS_IN_ARRAY3D(vol_in) // This will also work for 2D
-		A3D_ELEM(Mpad, k, i, j) = A3D_ELEM(vol_in, k, i, j);
-
+	if(do_heavy)
+	{
+#ifdef CUDA
+		dMpad.accAlloc();
+		run_padTranslatedMap(~dvol, ~dMpad,
+				STARTINGX(vol_in),FINISHINGX(vol_in),STARTINGY(vol_in),FINISHINGY(vol_in),STARTINGZ(vol_in),FINISHINGZ(vol_in),   //Input dimensions
+				STARTINGX(Mpad),  FINISHINGX(Mpad),  STARTINGY(Mpad),  FINISHINGY(Mpad),  STARTINGZ(Mpad),  FINISHINGZ(Mpad)      //Output dimensions
+				);
+		dMpad.setHostPtr(MULTIDIM_ARRAY(Mpad));
+		dMpad.cpToHost();
+#else
+		FOR_ALL_ELEMENTS_IN_ARRAY3D(vol_in) // This will also work for 2D
+			A3D_ELEM(Mpad, k, i, j) = A3D_ELEM(vol_in, k, i, j);
+#endif
+	}
 	TIMING_TOC(TIMING_PAD);
 
 	TIMING_TIC(TIMING_TRANS);
