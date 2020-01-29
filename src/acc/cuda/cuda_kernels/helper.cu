@@ -1043,3 +1043,27 @@ __global__ void cuda_kernel_initOrientations(RFLOAT *pdfs, XFLOAT *pdf_orientati
 	}
 }
 
+__global__ void cuda_kernel_griddingCorrect(RFLOAT *vol, int interpolator, RFLOAT rrval, RFLOAT r_min_nn,
+											size_t iX, size_t iY, size_t iZ)
+
+{
+	int idx = blockIdx.x*blockDim.x + threadIdx.x;
+	int idy = blockIdx.y*blockDim.y + threadIdx.y;
+	int idz = blockIdx.z*blockDim.z + threadIdx.z;
+	if(idx<iX && idy<iY && idz<iZ){
+		int j = idx - iX/2;
+		int i = idy - iY/2;
+		int k = idz - iZ/2;
+		RFLOAT r = sqrt((RFLOAT)(k*k+i*i+j*j));
+		if (r > 0.)
+		{
+			RFLOAT rval = r / rrval;
+			RFLOAT sinc = sin(PI * rval) / ( PI * rval);
+			if (interpolator==NEAREST_NEIGHBOUR && r_min_nn == 0)
+				vol[idz*iX*iY + idy*iX + idx] /= sinc;
+			else if (interpolator==TRILINEAR || (interpolator==NEAREST_NEIGHBOUR && r_min_nn > 0) )
+				vol[idz*iX*iY + idy*iX + idx] /= sinc * sinc;
+		}
+	}
+}
+

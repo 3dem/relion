@@ -20,6 +20,7 @@
 #include "src/projector.h"
 #include "src/jaz/gravis/t3Vector.h"
 #include <src/time.h>
+
 //#define DEBUG
 
 //#define PROJ_TIMING
@@ -151,6 +152,28 @@ void Projector::computeFourierTransformMap(
 	default:
 		REPORT_ERROR("Projector::computeFourierTransformMap%%ERROR: Dimension of the data array should be 2 or 3");
 	}
+#ifdef CUDA
+	size_t mem_req;
+
+	mem_req =  (size_t)1024;
+	if(do_heavy)
+		mem_req = (size_t)sizeof(RFLOAT)*MULTIDIM_SIZE(vol_in) +                   // dvol
+				  (size_t)sizeof(Complex)*(padoridim*padoridim*(padoridim/2+1)) +  // dFaux
+				  (size_t)sizeof(RFLOAT)*MULTIDIM_SIZE(Mpad);                      // dMpad
+
+	CudaCustomAllocator *allocator = new CudaCustomAllocator(mem_req, (size_t)16);
+
+	AccPtrFactory ptrFactory(allocator);
+	AccPtr<RFLOAT> dMpad = ptrFactory.make<RFLOAT>(MULTIDIM_SIZE(Mpad));
+	AccPtr<Complex> dFaux = ptrFactory.make<Complex>(padoridim*padoridim*(padoridim/2+1));
+	AccPtr<RFLOAT> dvol = ptrFactory.make<RFLOAT>(MULTIDIM_SIZE(vol_in));
+	if(do_heavy)
+	{
+		dvol.setHostPtr(MULTIDIM_ARRAY(vol_in));
+		dvol.accAlloc();
+		dvol.cpToDevice();
+	}
+#endif
 	TIMING_TOC(TIMING_INIT1);
 
 	TIMING_TIC(TIMING_GRID);
@@ -161,7 +184,16 @@ void Projector::computeFourierTransformMap(
 	if (do_gridding)// && data_dim != 3)
 	{
 		if(do_heavy)
+#ifndef CUDA
 			griddingCorrect(vol_in);
+#else
+		{
+			vol_in.setXmippOrigin();
+			run_griddingCorrect(~dvol, interpolator, (RFLOAT)(ori_size * padding_factor), r_min_nn,
+							    XSIZE(vol_in), YSIZE(vol_in), ZSIZE(vol_in));
+			dvol.cpToHost();
+		}
+#endif
 		else
 			vol_in.setXmippOrigin();
 	}
@@ -271,6 +303,13 @@ void Projector::computeFourierTransformMap(
 	TIMING_TOC(TIMING_POW);
 
 	TIMING_TOC(TIMING_TOP);
+#ifdef CUDA
+	dvol.freeIfSet();
+	dMpad.freeIfSet();
+	dFaux.freeIfSet();
+
+	delete allocator;
+#endif
 
 #ifdef PROJ_TIMING
 	proj_timer.printTimes(false);

@@ -655,6 +655,18 @@ void kernel_exponentiate_weights_fine(	XFLOAT *g_pdf_orientation,
 
 };  // namespace AccUtilities
 
+void run_griddingCorrect(RFLOAT *vol, int interpolator, RFLOAT rrval, RFLOAT r_min_nn,
+								size_t iX, size_t iY, size_t iZ)
+{
+#ifdef CUDA
+	dim3 bs(32,4,2);
+	dim3 gs(ceil(iX/(float)bs.x), ceil(iY/(float)bs.y), ceil(iZ/(float)bs.z));
+	cuda_kernel_griddingCorrect<<<gs,bs>>>(vol, interpolator, rrval, r_min_nn, iX, iY, iZ);
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
+#endif
+}
+
+
 
 #endif //ACC_UTILITIES_H_
 

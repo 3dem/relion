@@ -26,6 +26,12 @@
 
 #include "src/jaz/volume.h"
 #include "src/jaz/gravis/t2Vector.h"
+#ifdef CUDA
+#include "src/acc/cuda/cuda_mem_utils.h"
+#include "src/acc/acc_ptr.h"
+void run_griddingCorrect(RFLOAT *vol, int interpolator, RFLOAT rrval, RFLOAT r_min_nn,
+						 size_t iX, size_t iY, size_t iZ);
+#endif
 
 
 #define NEAREST_NEIGHBOUR 0

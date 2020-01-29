@@ -838,4 +838,8 @@ __global__ void cuda_kernel_window_fourier_transform(
 	g_out[out_idx + oOFF] =  g_in[in_idx + iOFF];
 }
 
+#define NEAREST_NEIGHBOUR 0
+#define TRILINEAR 1
+__global__ void cuda_kernel_griddingCorrect(RFLOAT *vol, int interpolator, RFLOAT rrval, RFLOAT r_min_nn,
+											size_t iX, size_t iY, size_t iZ);
 #endif /* CUDA_HELPER_KERNELS_CUH_ */

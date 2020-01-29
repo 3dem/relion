@@ -295,6 +295,7 @@ void MlOptimiserMpi::initialise()
 					cudaDevices.push_back(deviceAffinity);
 					cudaDeviceShares.push_back(1);
 				}
+				HANDLE_ERROR(cudaSetDevice(deviceAffinity));
 				cudaOptimiserDeviceMap.push_back(bundleId);
 			}
 		}
