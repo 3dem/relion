@@ -20,7 +20,6 @@
 #include "src/projector.h"
 #include "src/jaz/gravis/t3Vector.h"
 #include <src/time.h>
-
 //#define DEBUG
 
 //#define PROJ_TIMING
@@ -214,6 +213,7 @@ void Projector::computeFourierTransformMap(
 				);
 		dMpad.setHostPtr(MULTIDIM_ARRAY(Mpad));
 		dMpad.cpToHost();
+		dMpad.freeIfSet();
 #else
 		FOR_ALL_ELEMENTS_IN_ARRAY3D(vol_in) // This will also work for 2D
 			A3D_ELEM(Mpad, k, i, j) = A3D_ELEM(vol_in, k, i, j);
@@ -230,7 +230,17 @@ void Projector::computeFourierTransformMap(
 	TIMING_TIC(TIMING_CENTER);
 	// Translate padded map to put origin of FT in the center
 	if(do_heavy)
+#ifdef CUDA
+	{
+		dFaux.setHostPtr(MULTIDIM_ARRAY(Faux));
+		dFaux.accAlloc();
+		dFaux.cpToDevice();
+		run_CenterFFTbySign(~dFaux, XSIZE(Faux), YSIZE(Faux), ZSIZE(Faux));
+		dFaux.cpToHost();
+	}
+#else
 		CenterFFTbySign(Faux);
+#endif
 	TIMING_TOC(TIMING_CENTER);
 
 	TIMING_TIC(TIMING_INIT2);

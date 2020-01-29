@@ -672,6 +672,7 @@ void run_padTranslatedMap(
 		size_t osX, size_t oeX, size_t osY, size_t oeY, size_t osZ, size_t oeZ,  //Output dimensions
 		cudaStream_t stream)
 {
+#ifdef CUDA
 	size_t iszX = ieX - isX + 1; 
 	size_t iszY = ieY - isY + 1; 
 	size_t iszZ = ieZ - isZ + 1; 
@@ -679,7 +680,6 @@ void run_padTranslatedMap(
 	size_t oszY = oeY - osY + 1; 
 	size_t oszZ = oeZ - osZ + 1; 
    
-#ifdef CUDA
 	if(iszX == oszX && iszY == oszY && iszZ == oszZ)
 	{
 		cudaCpyDeviceToDevice(d_in, d_out, iszX*iszY*iszZ*sizeof(RFLOAT), stream);
@@ -695,10 +695,30 @@ void run_padTranslatedMap(
 				);
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	}
-
 #endif
 }
 
+void run_CenterFFTbySign(Complex *img_in, int xSize, int ySize, int zSize, cudaStream_t stream)
+{
+#ifdef CUDA
+	dim3 bs(32,4,2);
+	dim3 gs(ceil(xSize/(float)bs.x), ceil(ySize/(float)bs.y), ceil(zSize/(float)bs.z));
+
+	if(sizeof(RFLOAT) == sizeof(double))
+		cuda_kernel_centerFFTbySign<<<gs,bs, 0, stream>>>(
+				(double2*)img_in,
+				xSize,
+				ySize,
+				zSize);
+	else
+		cuda_kernel_centerFFTbySign<<<gs,bs, 0, stream>>>(
+				(float2*)img_in,
+				xSize,
+				ySize,
+				zSize);
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
+#endif
+}
 
 #endif //ACC_UTILITIES_H_
 

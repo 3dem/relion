@@ -491,70 +491,6 @@ __global__ void cuda_kernel_cosineFilter(	XFLOAT *vol,
 	}
 }
 
-__global__ void cuda_kernel_centerFFT_2D(XFLOAT *img_in,
-										 int image_size,
-										 int xdim,
-										 int ydim,
-										 int xshift,
-										 int yshift)
-{
-
-	int pixel = threadIdx.x + blockIdx.x*blockDim.x;
-	long int image_offset = image_size*blockIdx.y;
-//	int pixel_pass_num = ceilfracf(image_size, CFTT_BLOCK_SIZE);
-
-//	for (int pass = 0; pass < pixel_pass_num; pass++, pixel+=CFTT_BLOCK_SIZE)
-//	{
-		if(pixel<(image_size/2))
-		{
-			int y = floorf((XFLOAT)pixel/(XFLOAT)xdim);
-			int x = pixel % xdim;				// also = pixel - y*xdim, but this depends on y having been calculated, i.e. serial evaluation
-
-			int yp = (y + yshift + ydim)%ydim;
-			int xp = (x + xshift + xdim)%xdim;
-			int n_pixel = yp*xdim + xp;
-
-			XFLOAT buffer                  = img_in[image_offset + n_pixel];
-			img_in[image_offset + n_pixel] = img_in[image_offset + pixel];
-			img_in[image_offset + pixel]   = buffer;
-		}
-//	}
-}
-
-__global__ void cuda_kernel_centerFFT_3D(XFLOAT *img_in,
-										 int image_size,
-										 int xdim,
-										 int ydim,
-										 int zdim,
-										 int xshift,
-										 int yshift,
-									 	 int zshift)
-{
-
-	int pixel = threadIdx.x + blockIdx.x*blockDim.x;
-	long int image_offset = image_size*blockIdx.y;
-
-		int xydim = xdim*ydim;
-		if(pixel<(image_size/2))
-		{
-			int z = floorf((XFLOAT)pixel/(XFLOAT)(xydim));
-			int xy = pixel % xydim;
-			int y = floorf((XFLOAT)xy/(XFLOAT)xdim);
-			int x = xy % xdim;
-
-			int xp = (x + xshift + xdim)%xdim;
-			int yp = (y + yshift + ydim)%ydim;
-			int zp = (z + zshift + zdim)%zdim;
-
-			int n_pixel = zp*xydim + yp*xdim + xp;
-
-			XFLOAT buffer                  = img_in[image_offset + n_pixel];
-			img_in[image_offset + n_pixel] = img_in[image_offset + pixel];
-			img_in[image_offset + pixel]   = buffer;
-		}
-}
-
-
 __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 										XFLOAT *d_Mpsi,
 										XFLOAT *d_Maux,
@@ -1045,7 +981,6 @@ __global__ void cuda_kernel_initOrientations(RFLOAT *pdfs, XFLOAT *pdf_orientati
 
 __global__ void cuda_kernel_griddingCorrect(RFLOAT *vol, int interpolator, RFLOAT rrval, RFLOAT r_min_nn,
 											size_t iX, size_t iY, size_t iZ)
-
 {
 	int idx = blockIdx.x*blockDim.x + threadIdx.x;
 	int idy = blockIdx.y*blockDim.y + threadIdx.y;
@@ -1059,7 +994,7 @@ __global__ void cuda_kernel_griddingCorrect(RFLOAT *vol, int interpolator, RFLOA
 		{
 			RFLOAT rval = r / rrval;
 			RFLOAT sinc = sin(PI * rval) / ( PI * rval);
-			if (interpolator==NEAREST_NEIGHBOUR && r_min_nn == 0)
+			if (interpolator==NEAREST_NEIGHBOUR && r_min_nn == 0.)
 				vol[idz*iX*iY + idy*iX + idx] /= sinc;
 			else if (interpolator==TRILINEAR || (interpolator==NEAREST_NEIGHBOUR && r_min_nn > 0) )
 				vol[idz*iX*iY + idy*iX + idx] /= sinc * sinc;

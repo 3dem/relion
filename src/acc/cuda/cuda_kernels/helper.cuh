@@ -356,22 +356,6 @@ __global__ void cuda_kernel_translate3D(	T * g_image_in,
 //											XFLOAT * g_highres_Xi2);
 
 //----------------------------------------------------------------------------
-__global__ void cuda_kernel_centerFFT_2D(XFLOAT *img_in,
-										 int image_size,
-										 int xdim,
-										 int ydim,
-										 int xshift,
-										 int yshift);
-
-__global__ void cuda_kernel_centerFFT_3D(XFLOAT *img_in,
-										 int image_size,
-										 int xdim,
-										 int ydim,
-										 int zdim,
-										 int xshift,
-										 int yshift,
-										 int zshift);
-//----------------------------------------------------------------------------
 __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 										XFLOAT *d_Mpsi,
 										XFLOAT *d_Maux,
@@ -843,7 +827,6 @@ __global__ void cuda_kernel_window_fourier_transform(
 __global__ void cuda_kernel_griddingCorrect(RFLOAT *vol, int interpolator, RFLOAT rrval, RFLOAT r_min_nn,
 											size_t iX, size_t iY, size_t iZ);
 
-// output is bigger than input
 template <typename T>
 __global__ void cuda_kernel_window_transform(
 				T *d_in, T *d_out,
@@ -868,5 +851,93 @@ __global__ void cuda_kernel_window_transform(
 		}
 	}
 }
+
+template <typename T>
+__global__ void cuda_kernel_centerFFT_2D(T *img_in,
+										 int image_size,
+										 int xdim,
+										 int ydim,
+										 int xshift,
+										 int yshift)
+{
+	int pixel = threadIdx.x + blockIdx.x*blockDim.x;
+	long int image_offset = image_size*blockIdx.y;
+
+	if(pixel<(image_size/2))
+	{
+		int y = floorf((XFLOAT)pixel/(XFLOAT)xdim);
+		int x = pixel % xdim;				// also = pixel - y*xdim, but this depends on y having been calculated, i.e. serial evaluation
+
+		int xp = (x + xshift + xdim)%xdim;
+		int yp = (y + yshift + ydim)%ydim;
+		int n_pixel = yp*xdim + xp;
+
+		T buffer                       = img_in[image_offset + n_pixel];
+		img_in[image_offset + n_pixel] = img_in[image_offset + pixel];
+		img_in[image_offset + pixel]   = buffer;
+	}
+}
+template __global__ void cuda_kernel_centerFFT_2D<double>(double*, int, int, int, int, int);
+template __global__ void cuda_kernel_centerFFT_2D<float>(float*, int, int, int, int, int);
+
+template <typename T>
+__global__ void cuda_kernel_centerFFT_3D(T *img_in,
+										 int image_size,
+										 int xdim,
+										 int ydim,
+										 int zdim,
+										 int xshift,
+										 int yshift,
+									 	 int zshift)
+{
+	int pixel = threadIdx.x + blockIdx.x*blockDim.x;
+	long int image_offset = image_size*blockIdx.y;
+
+	int xydim = xdim*ydim;
+	if(pixel<(image_size/2))
+	{
+		int z = floorf((XFLOAT)pixel/(XFLOAT)(xydim));
+		int xy = pixel % xydim;
+		int y = floorf((XFLOAT)xy/(XFLOAT)xdim);
+		int x = xy % xdim;
+
+		int xp = (x + xshift + xdim)%xdim;
+		int yp = (y + yshift + ydim)%ydim;
+		int zp = (z + zshift + zdim)%zdim;
+
+		int n_pixel = zp*xydim + yp*xdim + xp;
+
+		T buffer                       = img_in[image_offset + n_pixel];
+		img_in[image_offset + n_pixel] = img_in[image_offset + pixel];
+		img_in[image_offset + pixel]   = buffer;
+	}
+}
+
+template __global__ void cuda_kernel_centerFFT_3D<double>(double*, int, int, int, int, int, int, int);
+template __global__ void cuda_kernel_centerFFT_3D<float>(float*, int, int, int, int, int, int, int);
+
+template <typename T>
+__global__ void cuda_kernel_centerFFTbySign(T *img_in,
+										 int xdim,
+										 int ydim,
+										 int zdim)
+{
+	int x = threadIdx.x + blockIdx.x*blockDim.x;
+	int y = threadIdx.y + blockIdx.y*blockDim.y;
+	int z = threadIdx.z + blockIdx.z*blockDim.z;
+
+	int pixel = z*xdim*ydim + y*xdim + x;
+	if(x<xdim && y<ydim && z<zdim)
+	{
+		if((x ^ y ^ z)&1 != 0)
+		{
+			img_in[pixel].x *= -1;
+			img_in[pixel].y *= -1;
+		}
+	}
+}
+
+template __global__ void cuda_kernel_centerFFTbySign<double2>(double2*, int, int, int);
+template __global__ void cuda_kernel_centerFFTbySign<float2>(float2*, int, int, int);
 
 #endif /* CUDA_HELPER_KERNELS_CUH_ */
