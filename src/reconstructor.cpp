@@ -761,7 +761,7 @@ void Reconstructor::reconstruct()
 			FileName fn_root = fn_out.withoutExtension();
 			backprojector.externalReconstruct(vol(),
 					fn_root,
-					tau2, 1., 1);
+					tau2, dummy, dummy, dummy, false, 1., 1);
 		}
 		else
 		{
