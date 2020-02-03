@@ -166,36 +166,36 @@ void Reconstructor::initialise()
 			data_dim = 3;
 		else // If not specifically provided, we autodetect it
 		{
-            if (do_ignore_optics)
+			if (do_ignore_optics)
 			{
 				data_dim = img0().getDim();
 				std::cout << " + Taking data dimensions from the first image: " << data_dim << std::endl;
 			}
 			else
-            {
-                obsModel.opticsMdt.getValue(EMDL_IMAGE_DIMENSIONALITY, data_dim, 0);
-                std::cout << " + Taking data dimensions from the first optics group: " << data_dim << std::endl;
-            }
-        }
+			{
+				obsModel.opticsMdt.getValue(EMDL_IMAGE_DIMENSIONALITY, data_dim, 0);
+				std::cout << " + Taking data dimensions from the first optics group: " << data_dim << std::endl;
+			}
+		}
 	}
 
 	if (angpix < 0.)
 	{
 		if (do_ignore_optics)
 		{
-	        if (DF.containsLabel(EMDL_CTF_MAGNIFICATION) && DF.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
-	        {
-	                RFLOAT mag, dstep;
-	                DF.getValue(EMDL_CTF_MAGNIFICATION, mag);
-	                DF.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
-	                angpix = 10000. * dstep / mag;
-	                if (verb > 0)
-	                        std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << angpix << std::endl;
-	        }
-	        else
-	        {
-	        	REPORT_ERROR("ERROR: cannot find pixel size in input STAR file, provide it using --angpix");
-	        }
+			if (DF.containsLabel(EMDL_CTF_MAGNIFICATION) && DF.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+			{
+				RFLOAT mag, dstep;
+				DF.getValue(EMDL_CTF_MAGNIFICATION, mag);
+				DF.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+				angpix = 10000. * dstep / mag;
+				if (verb > 0)
+					std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << angpix << std::endl;
+			}
+			else
+			{
+				REPORT_ERROR("ERROR: cannot find pixel size in input STAR file, provide it using --angpix");
+			}
 		}
 		else
 		{
@@ -208,7 +208,6 @@ void Reconstructor::initialise()
 		r_max = -1;
 	else
 		r_max = CEIL(mysize * angpix / maxres);
-
 }
 
 void Reconstructor::run()
@@ -420,8 +419,7 @@ void Reconstructor::backprojectOneParticle(long int p)
 
 		if (ABS(XX(trans)) > 0. || ABS(YY(trans)) > 0. || ABS(ZZ(trans)) > 0. ) // ZZ(trans) is 0 in case data_dim=2
 		{
-			shiftImageInFourierTransform(F2D, F2D,
-										 XSIZE(img()), XX(trans), YY(trans), ZZ(trans));
+			shiftImageInFourierTransform(F2D, F2D, XSIZE(img()), XX(trans), YY(trans), ZZ(trans));
 		}
 	}
 	else
