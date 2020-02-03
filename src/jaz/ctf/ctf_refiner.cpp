@@ -22,14 +22,14 @@
 #include "tilt_helper.h"
 
 #include <src/jaz/image_log.h>
-#include <src/jaz/filter_helper.h>
+#include <src/jaz/img_proc/filter_helper.h>
 #include <src/jaz/complex_io.h>
 #include <src/jaz/fftw_helper.h>
 #include <src/jaz/resampling_helper.h>
 #include <src/jaz/ctf_helper.h>
 #include <src/jaz/refinement_helper.h>
 #include <src/jaz/stack_helper.h>
-#include <src/jaz/image_op.h>
+#include <src/jaz/img_proc/image_op.h>
 #include <src/jaz/parallel_ft.h>
 
 #include <src/ctf.h>
@@ -38,7 +38,6 @@
 #include <src/time.h>
 
 #include <omp.h>
-
 
 using namespace gravis;
 
@@ -52,32 +51,45 @@ void CtfRefiner::read(int argc, char **argv)
 
 	parser.setCommandLine(argc, argv);
 	int gen_section = parser.addSection("General options");
-	starFn = parser.getOption("--i", "Input STAR file");
+	starFn = parser.getOption("--i", "Input STAR file containing the particles");
 
 	reference.read(parser, argc, argv);
 
 	outPath = parser.getOption("--o", "Output directory, e.g. CtfRefine/job041/");
-	only_do_unfinished = parser.checkOption("--only_do_unfinished", 
+	only_do_unfinished = parser.checkOption("--only_do_unfinished",
 		"Skip those steps for which output files already exist.");
 
+	do_ctf_padding = parser.checkOption("--ctf_pad", "Use larger box to calculate CTF and then downscale to mimic boxing operation in real space");
 	diag = parser.checkOption("--diag", "Write out diagnostic data (slower)");
 
 	int fit_section = parser.addSection("Defocus fit options");
-	do_defocus_fit = parser.checkOption("--fit_defocus", 
+	do_defocus_fit = parser.checkOption("--fit_defocus",
 		"Perform refinement of per-particle defocus values?");
-	
+
 	defocusEstimator.read(parser, argc, argv);
 
+	int bfac_section = parser.addSection("B-factor options");
+	do_bfac_fit = parser.checkOption("--fit_bfacs",
+		"Estimate CTF B-factors");
+
+	bfactorEstimator.read(parser, argc, argv);
+
 	int tilt_section = parser.addSection("Beam-tilt options");
-	do_tilt_fit = parser.checkOption("--fit_beamtilt", 
+	do_tilt_fit = parser.checkOption("--fit_beamtilt",
 		"Perform refinement of beamtilt");
-	
+
 	tiltEstimator.read(parser, argc, argv);
 
+	int aberr_section = parser.addSection("Symmetric aberrations options");
+	do_aberr_fit = parser.checkOption("--fit_aberr",
+		"Estimate symmetric aberrations");
+
+	aberrationEstimator.read(parser, argc, argv);
+
 	int aniso_section = parser.addSection("Anisotropic magnification options");
-	do_mag_fit = parser.checkOption("--fit_aniso", 
+	do_mag_fit = parser.checkOption("--fit_aniso",
 		"Estimate anisotropic magnification");
-	
+
 	magnificationEstimator.read(parser, argc, argv);
 
 	int comp_section = parser.addSection("Computational options");
@@ -88,35 +100,6 @@ void CtfRefiner::read(int argc, char **argv)
 	debug = parser.checkOption("--debug", "Write debugging data");
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
 
-	int expert_section = parser.addSection("Expert options");
-	angpix = textToFloat(parser.getOption("--angpix", "Pixel resolution (angst/pix) - read from STAR file by default", "-1"));
-	Cs = textToFloat(parser.getOption("--Cs", "Spherical aberration - read from STAR file by default", "-1"));
-	kV = textToFloat(parser.getOption("--kV", "Electron energy (keV) - read from STAR file by default", "-1"));
-	
-	beamtilt_x = 0.0;
-	beamtilt_y = 0.0;
-	
-	clTilt = false;
-	
-	std::string beamtilt_x_str = parser.getOption("--beamtilt_x", "Beamtilt in X-direction (in mrad)", "none");
-	std::string beamtilt_y_str = parser.getOption("--beamtilt_y", "Beamtilt in Y-direction (in mrad)", "none");
-	
-	if (beamtilt_x_str != "none")
-	{
-		beamtilt_x = textToFloat(beamtilt_x_str);
-		clTilt = true;
-	}
-	
-	if (beamtilt_y_str != "none")
-	{
-		beamtilt_y = textToFloat(beamtilt_y_str);
-		clTilt = true;
-	}
-	
-	beamtilt_xx = textToFloat(parser.getOption("--beamtilt_xx", "Anisotropic beamtilt, XX-coefficient", "1."));
-	beamtilt_xy = textToFloat(parser.getOption("--beamtilt_xy", "Anisotropic beamtilt, XY-coefficient", "0."));
-	beamtilt_yy = textToFloat(parser.getOption("--beamtilt_yy", "Anisotropic beamtilt, YY-coefficient", "1."));
-
 	JazConfig::writeMrc = !debug;
 	JazConfig::writeVtk = debug;
 
@@ -126,10 +109,13 @@ void CtfRefiner::read(int argc, char **argv)
 		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
 
-	// Make sure outPath ends with a slash
+	// Make sure outPath ends with a slash and exists
 	if (outPath[outPath.length()-1] != '/')
 	{
 		outPath += "/";
+
+		std::string command = " mkdir -p " + outPath;
+		int ret = system(command.c_str());
 	}
 }
 
@@ -140,103 +126,33 @@ void CtfRefiner::init()
 		std::cout << " + Reading " << starFn << "..." << std::endl;
 	}
 
-	mdt0.read(starFn);
-
-	if (!ObservationModel::containsAllNeededColumns(mdt0))
+	// Make sure output directory ends in a '/'
+	if (outPath[outPath.length()-1] != '/')
 	{
-		REPORT_ERROR_STR(starFn << " does not contain all of the required columns ("
-			<< "rlnOriginX, rlnOriginY, rlnAngleRot, rlnAngleTilt, rlnAnglePsi and rlnRandomSubset)");
+		outPath += "/";
 	}
 
-	if (Cs < 0.0)
-	{
-		mdt0.getValue(EMDL_CTF_CS, Cs, 0);
+	ObservationModel::loadSafely(starFn, obsModel, mdt0);
 
-		if (verb > 0)
-		{
-			std::cout << "   - Using spherical aberration from the input STAR file: " << Cs << std::endl;
-		}
-	}
-	else
+	if (!ObservationModel::containsAllColumnsNeededForPrediction(mdt0))
 	{
-		for (int i = 0; i < mdt0.numberOfObjects(); i++)
-		{
-			mdt0.setValue(EMDL_CTF_CS, Cs, i);
-		}
+		REPORT_ERROR_STR(starFn << " does not contain all columns needed for view prediction: \n"
+						 << "rlnOriginXAngst, rlnOriginYAngst, "
+						 << "rlnAngleRot, rlnAngleTilt, rlnAnglePsi and rlnRandomSubset");
 	}
 
+
+/* // TAKANORI: TODO Put it somewhere
 	if (Cs <= 0.1 && verb > 0)
 	{
 		std::cerr << "WARNING: Your Cs value is very small. Beam tilt refinement might be unnecessary. Sometimes it gives unrealistically large tilts." << std::endl;
 	}
+*/
 
-	if (kV < 0.0)
-	{
-		mdt0.getValue(EMDL_CTF_VOLTAGE, kV, 0);
+	// after all the necessary changes to mdt0 have been applied
+	// in ObservationModel::loadSafely(), split it by micrograph
 
-		if (verb > 0)
-		{
-			std::cout << "   - Using voltage from the input STAR file: " << kV << " kV" << std::endl;
-		}
-	}
-	else
-	{
-		for (int i = 0; i < mdt0.numberOfObjects(); i++)
-		{
-			mdt0.setValue(EMDL_CTF_VOLTAGE, kV, i);
-		}
-	}
-
-	if (angpix <= 0.0)
-	{
-		RFLOAT mag, dstep;
-		mdt0.getValue(EMDL_CTF_MAGNIFICATION, mag, 0);
-		mdt0.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep, 0);
-		angpix = 10000 * dstep / mag;
-
-		if (verb > 0)
-		{
-			std::cout << "   - Using pixel size calculated from magnification and detector "
-			          << "pixel size in the input STAR file: " << angpix << std::endl;
-		}
-	}
-	else
-	{
-		for (int i = 0; i < mdt0.numberOfObjects(); i++)
-		{
-			mdt0.setValue(EMDL_CTF_MAGNIFICATION, 10000.0);
-			mdt0.setValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, angpix);
-		}
-	}
-
-	if (clTilt)
-	{
-		if (verb > 0)
-		{
-			std::cout << "   - Using beam tilt from command line: " 
-					  << beamtilt_x << ", " << beamtilt_y << std::endl;
-		}
-		
-		for (int i = 0; i < mdt0.numberOfObjects(); i++)
-		{
-			mdt0.setValue(EMDL_IMAGE_BEAMTILT_X, beamtilt_x);
-			mdt0.setValue(EMDL_IMAGE_BEAMTILT_Y, beamtilt_y);
-		}
-	}
-	else if (verb > 0)
-	{
-		if (   mdt0.containsLabel(EMDL_IMAGE_BEAMTILT_X)
-			|| mdt0.containsLabel(EMDL_IMAGE_BEAMTILT_Y))
-		{
-			std::cout << "   - Using beam tilt from star file." << std::endl;
-		}
-		else
-		{
-			std::cout << "   - Beam tilt not present in star file: assuming zero beam tilt." << std::endl;
-		}
-	}
-
-	allMdts = StackHelper::splitByMicrographName(&mdt0);
+	allMdts = StackHelper::splitByMicrographName(mdt0);
 
 	// Only work on a user-specified subset of the micrographs
 	if (maxMG < 0 || maxMG >= allMdts.size())
@@ -267,21 +183,6 @@ void CtfRefiner::init()
 		allMdts = todo_mdts;
 	}
 
-	// Make sure output directory ends in a '/'
-	if (outPath[outPath.length()-1] != '/')
-	{
-		outPath+="/";
-	}
-
-	RFLOAT V = kV * 1e3;
-	lambda = 12.2643247 / sqrt(V * (1.0 + V * 0.978466e-6));
-		
-	obsModel = ObservationModel(angpix, Cs, kV * 1e3);
-
-    if (anisoTilt)
-	{
-		obsModel.setAnisoTilt(beamtilt_xx, beamtilt_xy, beamtilt_yy);
-	}
 
 	if (verb > 0)
 	{
@@ -291,12 +192,13 @@ void CtfRefiner::init()
 	reference.load(verb, debug);
 
 	// Get dimensions
-	s = reference.s;
-	sh = s/2 + 1;
+	int s = reference.s;
 
-	tiltEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, mdt0, &reference, &obsModel);
-	defocusEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
-	magnificationEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
+	tiltEstimator.init(verb, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
+	aberrationEstimator.init(verb, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
+	defocusEstimator.init(verb && do_defocus_fit, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
+	bfactorEstimator.init(verb, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
+	magnificationEstimator.init(verb, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 
 	// check whether output files exist and skip the micrographs for which they do
 	if (only_do_unfinished)
@@ -304,20 +206,31 @@ void CtfRefiner::init()
 		for (long int g = minMG; g <= maxMG; g++ )
 		{
 			bool is_done =
-				   (!do_tilt_fit || tiltEstimator.isFinished(allMdts[g]))
-				&& (!do_defocus_fit || defocusEstimator.isFinished(allMdts[g]))
-				&& (!do_mag_fit || magnificationEstimator.isFinished(allMdts[g]));
+				   (!do_defocus_fit || defocusEstimator.isFinished(allMdts[g]))
+				&& (!do_bfac_fit    || bfactorEstimator.isFinished(allMdts[g]))
+				&& (!do_tilt_fit    || tiltEstimator.isFinished(allMdts[g]))
+				&& (!do_aberr_fit   || aberrationEstimator.isFinished(allMdts[g]))
+				&& (!do_mag_fit     || magnificationEstimator.isFinished(allMdts[g]));
 
 			if (!is_done)
 			{
 				unfinishedMdts.push_back(allMdts[g]);
 			}
 		}
+
 		if (verb > 0)
 		{
-			std::cout << "   - Will only process " << unfinishedMdts.size()
+			if (unfinishedMdts.size() < allMdts.size())
+			{
+				std::cout << "   - Will only process " << unfinishedMdts.size()
 					  << " unfinished (out of " << allMdts.size()
 					  << ") micrographs" << std::endl;
+			}
+			else
+			{
+				std::cout << "   - Will process all " << unfinishedMdts.size()
+					  << " micrographs" << std::endl;
+			}
 		}
 	}
 	else
@@ -345,10 +258,14 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 
 	for (long g = g_start; g <= g_end; g++)
 	{
+		// Abort through the pipeline_control system, TODO: check how this goes with MPI....
+		if (pipeline_control_check_abort_job())
+			exit(RELION_EXIT_ABORTED);
+
 		std::vector<Image<Complex> > obs;
 
-		// both defocus_tit and tilt_fit need the same observations
-		obs = StackHelper::loadStackFS(&unfinishedMdts[g], "", nr_omp_threads, &fts, true);
+		// all CTF-refinement programs need the same observations
+		obs = StackHelper::loadStackFS(unfinishedMdts[g], "", nr_omp_threads, true, &obsModel);
 
 		// Make sure output directory exists
 		FileName newdir = getOutputFilenameRoot(unfinishedMdts[g], outPath);
@@ -360,37 +277,66 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 			int res = system(command.c_str());
 		}
 
-		std::vector<Image<Complex>> predSame, predOpp;
+		std::vector<Image<Complex>>
+				predSameT, // phase-demodulated (defocus)
+				predOppNT, // not phase-demodulated (tilt)
+				predOppT;  // phase-demodulated (mag and aberr)
+		// applyMtf is always true
 
+		// Four booleans in predictAll are applyCtf, applyTilt, applyShift, applyMtf.
 		// use prediction from same half-set for defocus estimation (overfitting danger):
-		if (do_defocus_fit)
+		if (do_defocus_fit || do_bfac_fit)
 		{
-			predSame = reference.predictAll(
+			predSameT = reference.predictAll(
 				unfinishedMdts[g], obsModel, ReferenceMap::Own, nr_omp_threads,
-				false, true, false);
+				false, true, false, true, do_ctf_padding);
 		}
 
-		// use prediction from opposite half-set otherwise:
-		if (do_tilt_fit || do_mag_fit)
+		// use predictions from opposite half-set otherwise:
+		if (do_tilt_fit)
 		{
-			predOpp = reference.predictAll(
+			predOppNT = reference.predictAll(
 				unfinishedMdts[g], obsModel, ReferenceMap::Opposite, nr_omp_threads,
-				false, false, false);
+				false, false, false, true, do_ctf_padding);
+		}
+
+		if (do_aberr_fit || do_mag_fit)
+		{
+			predOppT = reference.predictAll(
+				unfinishedMdts[g], obsModel, ReferenceMap::Opposite, nr_omp_threads,
+				false, true, false, true, do_ctf_padding);
 		}
 
 		if (do_defocus_fit)
 		{
-			defocusEstimator.processMicrograph(g, unfinishedMdts[g], obs, predSame);
+			defocusEstimator.processMicrograph(g, unfinishedMdts[g], obs, predSameT);
+		}
+
+		// B-factor fit is always performed after the defocus fit (so it can use the optimal CTFs)
+		// The prediction is *not* CTF-weighted, so an up-to-date CTF can be used internally
+		if (do_bfac_fit)
+		{
+			bfactorEstimator.processMicrograph(g, unfinishedMdts[g], obs, predSameT, do_ctf_padding);
 		}
 
 		if (do_tilt_fit)
 		{
-			tiltEstimator.processMicrograph(g, unfinishedMdts[g], obs, predOpp);
+			tiltEstimator.processMicrograph(g, unfinishedMdts[g], obs, predOppNT, do_ctf_padding);
+		}
+
+		if (do_aberr_fit)
+		{
+			aberrationEstimator.processMicrograph(g, unfinishedMdts[g], obs, predOppT);
 		}
 
 		if (do_mag_fit)
 		{
-			magnificationEstimator.processMicrograph(g, unfinishedMdts[g], obs, predOpp);
+			std::vector<Volume<t2Vector<Complex>>> predGradient =
+				reference.predictAllComplexGradients(
+					unfinishedMdts[g], obsModel, ReferenceMap::Opposite, nr_omp_threads,
+					false, true, false, true, do_ctf_padding);
+
+			magnificationEstimator.processMicrograph(g, unfinishedMdts[g], obs, predOppT, predGradient, do_ctf_padding);
 		}
 
 		nr_done++;
@@ -409,7 +355,7 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 
 void CtfRefiner::run()
 {
-	if (do_defocus_fit || do_tilt_fit || do_mag_fit)
+	if (do_defocus_fit || do_bfac_fit || do_tilt_fit || do_aberr_fit || do_mag_fit)
 	{
 		// The subsets will be used in openMPI parallelisation:
 		// instead of over g0->gc, they will be over smaller subsets
@@ -421,39 +367,123 @@ void CtfRefiner::run()
 
 void CtfRefiner::finalise()
 {
-	MetaDataTable mdtOut = mdt0;
+	std::vector<MetaDataTable> mdtOut;
+	std::vector<FileName> fn_eps, fn_eps_earlier, fn_eps_later;
 
-	// Read back from disk the metadata-tables and eps-plots for the defocus fit
-	// Note: only micrographs for which the defoci were estimated (either now or before)
+	// Read back from disk the metadata-tables and eps-plots for the B-factor or defocus fit.
+	// Note: only micrographs for which the defoci or B-factors were estimated (either now or before)
 	// will end up in mdtOut - micrographs excluded through min_MG and max_MG will not.
-	if (do_defocus_fit)
+
+	if (do_bfac_fit || do_defocus_fit)
 	{
-		defocusEstimator.merge(allMdts, mdtOut);
+		mdtOut = merge(allMdts, fn_eps_later);
 	}
 	else
 	{
-		mdtOut = mdt0;
+		mdtOut = allMdts;
+	}
+
+	// ...and for the magnification fit
+	if (do_mag_fit)
+	{
+		magnificationEstimator.parametricFit(mdtOut, obsModel.opticsMdt, fn_eps_earlier);
 	}
 
 	// Sum up the per-pixel beamtilt fits of all micrographs and fit a parametric model to them.
-	// Then, write the beamtilt parameters into mdtOut
+	// Then, write the beamtilt parameters into obsModel.opticsMdt
 	if (do_tilt_fit)
 	{
-		tiltEstimator.parametricFit(allMdts, Cs, lambda, mdtOut);
+		tiltEstimator.parametricFit(mdtOut, obsModel.opticsMdt, fn_eps_earlier);
 	}
 
-	// Do the equivalent for mag. fit
-	if (do_mag_fit)
+	// Do the equivalent for the symmetrical aberrations...
+	if (do_aberr_fit)
 	{
-		magnificationEstimator.parametricFit(allMdts, mdtOut);
+		aberrationEstimator.parametricFit(mdtOut, obsModel.opticsMdt, fn_eps_earlier);
 	}
 
-	mdtOut.write(outPath + "particles_ctf_refine.star");
+	// Make sure to have the EPS from fn_eps_earlier before the ones from fn_eps_later
+	// Sort earlier fn_eps, because openMP may have resulted in random order in optics groups
+	std::sort(fn_eps_earlier.begin(), fn_eps_earlier.end());
+	fn_eps.reserve( fn_eps_earlier.size() + fn_eps_later.size() ); // preallocate memory
+	fn_eps.insert( fn_eps.end(), fn_eps_earlier.begin(), fn_eps_earlier.end() );
+	fn_eps.insert( fn_eps.end(), fn_eps_later.begin(), fn_eps_later.end() );
+	if (fn_eps.size() > 0)
+	{
+		joinMultipleEPSIntoSinglePDF(outPath + "logfile.pdf", fn_eps);
+		if (verb > 0)
+		{
+			std::cout << " + Written out : " << outPath << "logfile.pdf" << std::endl;
+		}
+	}
+
+	MetaDataTable mdtOutAll = StackHelper::merge(mdtOut);
+
+	obsModel.save(mdtOutAll, outPath + "particles_ctf_refine.star");
 
 	if (verb > 0)
 	{
 		std::cout << " + Done! Written out : " << outPath << "particles_ctf_refine.star" << std::endl;
 	}
+}
+
+std::vector<MetaDataTable> CtfRefiner::merge(const std::vector<MetaDataTable>& mdts, std::vector<FileName> &fn_eps )
+{
+	int gc = mdts.size();
+	int barstep;
+
+	if (verb > 0)
+	{
+		std::cout << " + Combining data for all micrographs " << std::endl;
+		init_progress_bar(gc);
+		barstep = 1;
+	}
+
+	std::vector<MetaDataTable> mdtOut;
+
+	for (long g = 0; g < gc; g++)
+	{
+		std::string outRoot = getOutputFilenameRoot(mdts[g], outPath);
+
+		MetaDataTable mdt;
+
+		// If a B-factor fit has been performed, then this has been done after a potential defocus fit,
+		// so the B-factor fit files are always more up-to-date.
+		if (do_bfac_fit)
+		{
+			// Read in STAR file with B-factor fit data
+			mdt.read(outRoot+"_bfactor_fit.star");
+		}
+		else if (do_defocus_fit)
+		{
+			// Read in STAR file with defocus fit data
+			mdt.read(outRoot+"_defocus_fit.star");
+		}
+
+		mdtOut.push_back(mdt);
+
+		if (exists(outRoot+"_ctf-refine_fit.eps"))
+		{
+			fn_eps.push_back(outRoot+"_ctf-refine_fit.eps");
+		}
+
+		if (exists(outRoot+"_bfactor_fit.eps"))
+		{
+			fn_eps.push_back(outRoot+"_bfactor_fit.eps");
+		}
+
+		if (verb > 0)
+		{
+			progress_bar(g);
+		}
+	}
+
+	if (verb > 0)
+	{
+		progress_bar(gc);
+	}
+
+	return mdtOut;
 }
 
 int CtfRefiner::getVerbosityLevel()

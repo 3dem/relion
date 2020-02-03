@@ -16,11 +16,11 @@ class AccBackprojector
 {
 
 public:
-	int mdlX, mdlY, mdlZ, 
+	int mdlX, mdlY, mdlZ,
 	    mdlInitY, mdlInitZ,
-	    maxR, maxR2,
-	    padding_factor;
-		size_t mdlXYZ;
+	    maxR, maxR2;
+	XFLOAT padding_factor;
+	size_t mdlXYZ;
 
 #ifndef CUDA
 	tbb::spin_mutex *mutexes;
@@ -51,7 +51,7 @@ public:
 	size_t setMdlDim(
 			int xdim, int ydim, int zdim,
 			int inity, int initz,
-			int max_r, int paddingFactor);
+			int max_r, XFLOAT paddingFactor);
 
 	void initMdl();
 

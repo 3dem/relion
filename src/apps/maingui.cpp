@@ -20,8 +20,6 @@
 
 #include <unistd.h>
 #include <string.h>
-#include <FL/Fl.H>
-#include <FL/Fl_Window.H>
 #include "src/gui_mainwindow.h"
 #include <src/args.h>
 
@@ -59,9 +57,8 @@ int main(int argc, char *argv[])
 		short_dir[i] = '\0';
 	}
 
-	char titletext[67];
-#define TITLE ("RELION-" RELION_VERSION)
-	strcpy (titletext,TITLE);
+	char titletext[256];
+	snprintf(titletext, 256, "RELION-%s", g_RELION_VERSION);
 #ifdef PACKAGE_VERSION
 	strcat(titletext,PACKAGE_VERSION);
 #endif
@@ -77,16 +74,22 @@ int main(int argc, char *argv[])
 			std::cerr << " [--refresh=2]  : refresh rate in seconds" << std::endl;
 			std::cerr << " [--idle=3600]  : quit GUI after this many second" << std::endl;
 			std::cerr << " [--readonly]   : limited version of GUI that does not touch any files" << std::endl;
-			std::cerr << " [--oldstyle]   : old-style GUI without pipeline functionality, only print commands" << std::endl;
+			std::cerr << " [--version]    : show the version of this program" << std::endl;
+			exit(0);
+		}
+		else if (checkParameter(argc, argv, "--version"))
+		{
+			// Although our parser checks for --version, we do it here. Otherwise GuiMainWindow asks for a new project directory.
+			PRINT_VERSION_INFO();
 			exit(0);
 		}
 		FileName fn_pipe = getParameter(argc, argv, "--pipeline", "default");
+		FileName fn_sched = getParameter(argc, argv, "--schedule", "");
+		if (fn_sched != "") fn_sched = "Schedules/" + fn_sched;
 		int _update_every_sec = textToInteger(getParameter(argc, argv, "--refresh", "2"));
 		int _exit_after_sec = textToInteger(getParameter(argc, argv, "--idle", "3600"));
 		bool _do_read_only = checkParameter(argc, argv, "--readonly");
-		bool _do_old_style = checkParameter(argc, argv, "--oldstyle");
-		int height = _do_old_style ? GUIHEIGHT_OLD : GUIHEIGHT_EXT;
-		GuiMainWindow window(GUIWIDTH, height, titletext, fn_pipe, _update_every_sec, _exit_after_sec, _do_read_only, _do_old_style);
+		GuiMainWindow window(GUIWIDTH, GUIHEIGHT_EXT, titletext, fn_pipe, fn_sched, _update_every_sec, _exit_after_sec, _do_read_only);
 
 		// Show and run the window
 		window.show();
@@ -95,9 +98,9 @@ int main(int argc, char *argv[])
 	catch (RelionError XE)
 	{
 		std::cerr << XE;
-		exit(1);
+		return RELION_EXIT_FAILURE;
 	}
 
 	//return Fl::run();
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }

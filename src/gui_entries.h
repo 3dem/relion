@@ -67,6 +67,9 @@
 // forward declaration current_browse_directory, which allows CURRENT_ODIR browse buttons
 extern std::string current_browse_directory;
 
+// Create the scheduler GUI: without sliders or pull-down menus
+extern bool create_scheduler_gui;
+
 
 // Gui layout
 //#define XCOL1 10
@@ -78,7 +81,7 @@ extern std::string current_browse_directory;
 //environment variable RELION_QSUB_EXTRA_COUNT
 #define GUIEXTRA \
 	( (getenv ("RELION_QSUB_EXTRA_COUNT"))? \
-	((atoi(getenv ("RELION_QSUB_EXTRA_COUNT"))-4)*STEPY) : 0 )
+	(std::max(0,(atoi(getenv ("RELION_QSUB_EXTRA_COUNT"))-4))*STEPY) : 0 )
 #define MENUHEIGHT 30
 #define TABHEIGHT 25
 #define GUIWIDTH 800
@@ -117,19 +120,24 @@ extern std::string current_browse_directory;
 //version-2.1 #define GUI_BUTTON_COLOR (fl_rgb_color(100, 200, 50))
 //version-2.1 #define GUI_BUTTON_DARK_COLOR (fl_rgb_color(70, 140, 30))
 //version-2.1 #define GUI_RUNBUTTON_COLOR (fl_rgb_color(0, 130, 0))
-//version-3.0
-#define GUI_BUTTON_COLOR (fl_rgb_color(255, 180, 132))
-#define GUI_BUTTON_DARK_COLOR (fl_rgb_color(250, 150, 124))
-#define GUI_RUNBUTTON_COLOR (fl_rgb_color(235, 130, 0))
+//version-3.0 #define GUI_BUTTON_COLOR (fl_rgb_color(255, 180, 132))
+//version-3.0 #define GUI_BUTTON_DARK_COLOR (fl_rgb_color(250, 150, 124))
+//version-3.0 #define GUI_RUNBUTTON_COLOR (fl_rgb_color(235, 130, 0))
+//version-3.1
+#define GUI_BUTTON_COLOR (fl_rgb_color(238,130,238))
+#define GUI_BUTTON_DARK_COLOR (fl_rgb_color(200, 110, 200))
+#define GUI_RUNBUTTON_COLOR (fl_rgb_color(170, 0, 170))
+#define GUI_BACKGROUND_COLOR (fl_rgb_color(230,230,240)) // slightly blue because of blue buttons in 2.0!
+#define GUI_BACKGROUND_COLOR2 (fl_rgb_color(180,180,190)) // slightly blue because of blue buttons in 2.0!
 // devel-version
 //#define GUI_BUTTON_COLOR (fl_rgb_color(255, 150, 150))
 //#define GUI_BUTTON_DARK_COLOR (fl_rgb_color(200, 120, 120))
 //#define GUI_RUNBUTTON_COLOR (fl_rgb_color(170, 0, 0))
+//#define GUI_BACKGROUND_COLOR (fl_rgb_color(255,200,200)) // slightly red
+//#define GUI_BACKGROUND_COLOR2 (fl_rgb_color(230,180,180)) // slightly red
 //possible?#define GUI_BUTTON_COLOR (fl_rgb_color(50, 200, 255))
 //devel-version
 //possible #define GUI_RUNBUTTON_COLOR (fl_rgb_color(205,0,155))
-#define GUI_BACKGROUND_COLOR (fl_rgb_color(230,230,240)) // slightly blue because of blue buttons in 2.0!
-#define GUI_BACKGROUND_COLOR2 (fl_rgb_color(180,180,190)) // slightly blue because of blue buttons in 2.0!
 #define GUI_INPUT_COLOR (fl_rgb_color(255,255,230))
 
 #define TOGGLE_DEACTIVATE 0
@@ -137,46 +145,6 @@ extern std::string current_browse_directory;
 #define TOGGLE_ALWAYS_DEACTIVATE 2
 #define TOGGLE_LEAVE_ACTIVE 3
 
-static Fl_Menu_Item fl_sampling_options[] = {
-	{job_sampling_options[0]},
-	{job_sampling_options[1]},
-	{job_sampling_options[2]},
-	{job_sampling_options[3]},
-	{job_sampling_options[4]},
-	{job_sampling_options[5]},
-	{job_sampling_options[6]},
-	{job_sampling_options[7]},
-	{job_sampling_options[8]},
-	{0} // this should be the last entry
-};
-
-static Fl_Menu_Item fl_node_type_options[] = {
-	{job_nodetype_options[0]},
-	{job_nodetype_options[1]},
-	{job_nodetype_options[2]},
-	{job_nodetype_options[3]},
-	{job_nodetype_options[4]},
-	{job_nodetype_options[5]},
-	{job_nodetype_options[6]},
-	{job_nodetype_options[7]},
-	{job_nodetype_options[8]},
-	{job_nodetype_options[9]},
-	{0} // this should be the last entry
-};
-
-static Fl_Menu_Item fl_gain_rotation_options[] = {
-	{job_gain_rotation_options[0]},
-	{job_gain_rotation_options[1]},
-	{job_gain_rotation_options[2]},
-	{job_gain_rotation_options[3]},
-	{0} // this should be the last entry
-};
-static Fl_Menu_Item fl_gain_flip_options[] = {
-	{job_gain_flip_options[0]},
-	{job_gain_flip_options[1]},
-	{job_gain_flip_options[2]},
-	{0} // this should be the last entry
-};
 static Fl_Menu_Item bool_options[] = {
 			      {"Yes"},
 			      {"No"},
@@ -235,9 +203,6 @@ public:
     // The slider
     Fl_Slider * slider;
 
-    // oldstyle behaviour
-    bool do_oldstyle;
-
     /** Constructor with x,y-position from top left
 	 *  wcol1, wcol2 and wcol3 are the widths of the three columns described above
 	 *  title is the value displayed in the first column
@@ -255,7 +220,6 @@ public:
 		my_deactivate_group = NULL;
 		actually_activate = false;
 		slider = NULL;
-		do_oldstyle = false;
     };
 
     /** Empty destructor
@@ -272,7 +236,7 @@ public:
 	/** Place an entry on a window
 	 */
 	void place(JobOption &joboption, int &y, int _deactivate_option = TOGGLE_LEAVE_ACTIVE, Fl_Group * deactivate_this_group = NULL, bool actually_activate = false,
-	           bool _do_oldstyle = false, int x = XCOL2, int h = STEPY, int wcol2 = WCOL2, int wcol3 = WCOL3 );
+	           int x = XCOL2, int h = STEPY, int wcol2 = WCOL2, int wcol3 = WCOL3 );
 
     // Set _value in the Fl_Input on the GUI, and also in the joboptions. Also update menu/slider if necessary
     void setValue(std::string _value);

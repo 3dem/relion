@@ -37,7 +37,7 @@ class DefocusEstimator
 		void read(IOParser& parser, int argc, char *argv[]);
 
         void init(
-				int verb, int s, int nr_omp_threads,
+				int verb, int nr_omp_threads,
 				bool debug, bool diag,
 				std::string outPath,
 				ReferenceMap* reference,
@@ -49,9 +49,6 @@ class DefocusEstimator
 				long g, MetaDataTable& mdt, 
 				const std::vector<Image<Complex>>& obs,
 				const std::vector<Image<Complex>>& pred);
-		
-		// Combine all .stars and .eps files
-		void merge(const std::vector<MetaDataTable>& mdts, MetaDataTable& mdtOut);
 	
 		// Write PostScript file with per-particle defocus 
 		// plotted onto micrograph in blue-red color scale
@@ -65,20 +62,31 @@ class DefocusEstimator
 		
 		// cmd. line options (see read()):
 		double defocusRange, kmin;	
-		bool fitAstigmatism, noGlobAstig, fitPhase, fitCs, globOnly;
+		int max_iters;
+		bool fitAstigmatism, bruteForcePre, bruteForcePost, bruteForceOnly;
+		std::string fittingMode;
 		
 		// set at init:
-		int verb, s, sh, nr_omp_threads;
+		int verb, nr_omp_threads;
 		bool debug, diag;
 		std::string outPath;
-		double angpix;
 		
-		Image<RFLOAT> freqWeight;
+		std::vector<int> s, sh;
+		std::vector<double> angpix;		
+		std::vector<Image<RFLOAT> > freqWeights;
 		
 		ReferenceMap* reference;
 		ObservationModel* obsModel;
 		
 		bool ready;
+		
+		
+		void bruteForceFit(
+				long g, MetaDataTable& mdt, 
+				const std::vector<Image<Complex>>& obs,
+				const std::vector<Image<Complex>>& pred,
+				std::string tag);
+		
 };
 
 #endif

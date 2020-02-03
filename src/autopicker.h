@@ -13,6 +13,7 @@
 #include "src/projector.h"
 #include "src/healpix_sampling.h"
 #include "src/projector.h"
+#include "src/jaz/obs_model.h"
 #include "src/ctf.h"
 #include "src/fftw.h"
 #include "src/time.h"
@@ -114,6 +115,9 @@ public:
 
 	// Metadata of the micrographs
 	MetaDataTable MDmic;
+
+	// Optics group information
+	ObservationModel obsModel;
 
 	// Particle diameter (in Angstroms)
 	RFLOAT particle_diameter;

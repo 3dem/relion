@@ -40,7 +40,7 @@ class MotionEstimator
 
         void read(IOParser& parser, int argc, char *argv[]);
 
-        void init(int verb, int s, int fc, int nr_omp_threads,
+        void init(int verb, int fc, int nr_omp_threads,
                   bool debug, std::string outPath,
                   ReferenceMap* reference,
                   ObservationModel* obsModel,
@@ -55,7 +55,8 @@ class MotionEstimator
         void prepMicrograph(
             // in:
             const MetaDataTable& mdt, std::vector<ParFourierTransformer>& fts,
-            const std::vector<Image<RFLOAT>>& dmgWeight,
+			const std::vector<Image<RFLOAT>>& dmgWeight,
+			int ogmg,
             // out:
             std::vector<std::vector<Image<Complex>>>& movie,
             std::vector<std::vector<Image<RFLOAT>>>& movieCC,
@@ -79,8 +80,8 @@ class MotionEstimator
             const std::vector<gravis::d2Vector>& positions,
             const std::vector<gravis::d2Vector>& globComp) const;
 
-        const std::vector<Image<RFLOAT>>& getDamageWeights();
-
+	std::vector<Image<RFLOAT>> computeDamageWeights(int opticsGroup);
+		
         bool isReady();
 
         double getDosePerFrame();
@@ -93,9 +94,9 @@ class MotionEstimator
 
         // translates the given parameters (in A or A/dose) into pixels
         // done in one place to ensure consistency
-        double normalizeSigVel(double sig_vel);
-        double normalizeSigDiv(double sig_div);
-        double normalizeSigAcc(double sig_acc);
+        double normalizeSigVel(double sig_vel, double angpix);
+        double normalizeSigDiv(double sig_div, double angpix);
+        double normalizeSigAcc(double sig_acc, double angpix);
 
 
     protected:
@@ -103,7 +104,7 @@ class MotionEstimator
             bool paramsRead, ready;
 
             // read from cmd line
-            int maxEDs, maxIters, globOffMax;
+            int maxEDs, maxIters, globOffMax, group;
 
             bool unregGlob, globOff, cutoffOut,
                 diag, expKer, global_init, debugOpt,
@@ -115,12 +116,16 @@ class MotionEstimator
 			
 			std::string paramsFn;
 
+			// @TODO: allow for varying fc (frame count)
             // set at init
-            int s, sh, fc, verb, nr_omp_threads;
-            double angpix;
-            bool debug, no_whitening;
-
-            std::vector<Image<RFLOAT>> dmgWeight;
+            int fc, verb, nr_omp_threads, s_ref, sh_ref;
+			std::vector<int> s, sh;
+			
+			double angpix_ref;
+            std::vector<double> angpix;			
+            bool debug, no_whitening, all_groups;
+			
+			std::vector<std::vector<Image<RFLOAT>>> damageWeights;
 
             std::string outPath;
 
@@ -139,6 +144,7 @@ class MotionEstimator
 
         void writeOutput(
             const std::vector<std::vector<gravis::d2Vector>>& tracks,
+			double angpix_mg,
             const std::vector<Image<RFLOAT>>& fccData,
             const std::vector<Image<RFLOAT>>& fccWeight0,
             const std::vector<Image<RFLOAT>>& fccWeight1,

@@ -32,6 +32,7 @@
 #include "src/image.h"
 #include "src/micrograph_model.h"
 #include "src/jaz/new_ft.h"
+#include "src/jaz/obs_model.h"
 
 class MotioncorrRunner
 {
@@ -53,6 +54,12 @@ public:
 	// Filenames of all the micrographs to run Motioncorr on
 	std::vector<FileName> fn_micrographs, fn_ori_micrographs;
 
+	// Optics group number for all original micrographs
+	std::vector<int> optics_group_micrographs, optics_group_ori_micrographs;
+
+	// Information about the optics groups
+	ObservationModel obsModel;
+
 	// Use our own implementation
 	bool do_own;
 	bool interpolate_shifts;
@@ -70,6 +77,10 @@ public:
 	// First and last movie frames to use in alignment and written-out corrected average and movie (default: do all)
 	int first_frame_ali, last_frame_ali, first_frame_sum, last_frame_sum;
 
+	// Group this number of frames and write summed power spectrum. -1 == do not write
+	int grouping_for_ps;
+	int ps_size;
+
 	// Binning factor for binning inside MOTIONCORR/MOTIONCOR2
 	double bin_factor;
 
@@ -84,9 +95,6 @@ public:
 
 	// Dose at which to distinguish between early/late global motion in output statistics
 	double dose_motionstats_cutoff;
-
-	// Also save the aligned movies?
-	bool do_save_movies;
 
 	// Additional arguments that need to be passed to MOTIONCORR
 	FileName fn_other_motioncor2_args;
@@ -118,12 +126,6 @@ public:
 
 	// How many frames to group in MOTIONCOR2
 	int group;
-
-	// Use Unblur/summovie instead of MOTIONCORR?
-	bool do_unblur;
-
-	// UNBLUR, SUMMOVIE executable
-	FileName fn_unblur_exe, fn_summovie_exe;
 
 	// Pixel size for UNBLUR
 	double angpix;
@@ -158,7 +160,7 @@ public:
 	void run();
 
 	// Given an input fn_mic filename, this function will determine the names of the output corrected image (fn_avg) and the corrected movie (fn_mov).
-	void getOutputFileNames(FileName fn_mic, FileName &fn_avg, FileName &fn_mov);
+	FileName getOutputFileNames(FileName fn_mic);
 
 	// Execute MOTIONCOR2 for a single micrograph
 	bool executeMotioncor2(Micrograph &mic, int rank = 0);
@@ -166,17 +168,8 @@ public:
 	// Get the shifts from MOTIONCOR2
 	void getShiftsMotioncor2(FileName fn_log, Micrograph &mic);
 
-	// Execute UNBLUR for a single micrograph
-	bool executeUnblur(Micrograph &mic);
-
 	// Execute our own implementation for a single micrograph
 	bool executeOwnMotionCorrection(Micrograph &mic);
-
-	// Get the shifts from UNBLUR
-	void getShiftsUnblur(FileName fn_mic, Micrograph &mic);
-
-	// Plot the FRC curve from SUMMOVIE
-	void plotFRC(FileName fn_frc);
 
 	// Plot the shifts
 	void plotShifts(FileName fn_mic, Micrograph &mic);
@@ -190,6 +183,12 @@ public:
 	// Write out final STAR file
 	void writeSTAR();
 
+	// Read fn_defect (defect map, where 1 is bad, or defect text in the UCSF MotionCor2 format, x y w h) and fill bBad.
+	static void fillDefectMask(MultidimArray<bool> &bBad, FileName fn_defect, int n_threads=1);
+
+	// Check if fn_defect is Serial EM's defect file
+	static bool detectSerialEMDefectText(FileName fn_defect);
+
 private:
 	// shiftx, shifty is relative to the (real space) image size
 	void shiftNonSquareImageInFourierTransform(MultidimArray<fComplex> &frame, RFLOAT shiftx, RFLOAT shifty);
@@ -197,8 +196,6 @@ private:
 	bool alignPatch(std::vector<MultidimArray<fComplex> > &Fframes, const int pnx, const int pny, const RFLOAT scaled_B, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, std::ostream &logfile);
 
 	void binNonSquareImage(Image<float> &Iwork, RFLOAT bin_factor);
-
-	void cropInFourierSpace(MultidimArray<fComplex> &Fref, MultidimArray<fComplex> &Fbinned);
 
 	int findGoodSize(int request);
 

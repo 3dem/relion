@@ -34,39 +34,64 @@
 class MagnificationHelper
 {
 	public:
-		
-		static void updateScaleFreq( 
+
+		static Matrix2D<RFLOAT> polarToMatrix(
+						double scaleMajor = 1.0,
+						double scaleMinor = 1.0,
+						double angleDeg = 0.0);
+
+		static void matrixToPolar(
+						const Matrix2D<RFLOAT>& mat,
+						RFLOAT& scaleMajor,
+						RFLOAT& scaleMinor,
+						RFLOAT& angleDeg);
+
+		static void matrixToPolar(
+						const gravis::d2Matrix& mat,
+						RFLOAT& scaleMajor,
+						RFLOAT& scaleMinor,
+						RFLOAT& angleDeg);
+
+		static void updateScaleFreq(
 						const Image<Complex>& prediction,
+						const Volume<gravis::t2Vector<Complex>>& predGradient,
 						const Image<Complex>& observation,
 						CTF& ctf, double angpix,
-						Volume<Equation2x2>& eqs);
-		
-		static void updateScaleReal( 
+						Volume<Equation2x2>& eqs,
+						bool do_ctf_padding = false);
+
+		static void updateScaleReal(
 						const Image<Complex>& prediction,
 						const Image<Complex>& observation,
 						const Image<RFLOAT>& snr,
 						CTF& ctf, double angpix,
-						Volume<Equation2x2>& eqs);
-		
-		static void solvePerPixel( 
+						Volume<Equation2x2>& eqs,
+						bool do_ctf_padding = false);
+
+		static void solvePerPixel(
 						const Volume<Equation2x2>& eqs,
 						Image<RFLOAT>& vx, Image<RFLOAT>& vy);
-		
-		static void solveLinearlyFreq( 
+
+		static Matrix2D<RFLOAT> solveLinearlyFreq(
 						const Volume<Equation2x2>& eqs,
 						const Image<RFLOAT>& snr,
-						Image<RFLOAT>& mat,
 						Image<RFLOAT>& vx, Image<RFLOAT>& vy);
-		
+
 		static void readEQs(std::string path, Volume<Equation2x2>& eqs);
 		static void writeEQs(const Volume<Equation2x2>& eqs, std::string path);
-		
+
 		static void updatePowSpec(
 						const Image<Complex>& prediction,
 						const Image<Complex>& observation,
 						CTF& ctf, double angpix,
 						Image<RFLOAT>& powSpecPred,
-						Image<RFLOAT>& powSpecObs);
+						Image<RFLOAT>& powSpecObs,
+						bool do_ctf_padding = false);
+
+		static void adaptAstigmatism(
+						const std::vector<Matrix2D<RFLOAT>>& dMs,
+						std::vector<MetaDataTable>& partMdts,
+						bool perParticle, ObservationModel* obsModel);
 };
 
 #endif

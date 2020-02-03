@@ -997,15 +997,37 @@ __global__ void cuda_kernel_make_eulers_3D(
 
 	if(invert)
 	{
-		eulers[9 * oid + 0] = B[0];//00
-		eulers[9 * oid + 1] = B[3];//01
-		eulers[9 * oid + 2] = B[6];//02
-		eulers[9 * oid + 3] = B[1];//10
-		eulers[9 * oid + 4] = B[4];//11
-		eulers[9 * oid + 5] = B[7];//12
-		eulers[9 * oid + 6] = B[2];//20
-		eulers[9 * oid + 7] = B[5];//21
-		eulers[9 * oid + 8] = B[8];//22
+
+		if (doL) // this could have anisotropy, so inverse neq transpose!!!
+		{
+			XFLOAT det;
+			det =     B[0] * (B[4] * B[8] - B[7] * B[5])
+					- B[1] * (B[3] * B[8] - B[6] * B[5])
+					+ B[2] * (B[3] * B[7] - B[6] * B[4]);
+
+			eulers[9 * oid + 0] = (B[4] * B[8] - B[7] * B[5]) / det;
+			eulers[9 * oid + 1] = (B[7] * B[2] - B[1] * B[8]) / det;
+			eulers[9 * oid + 2] = (B[1] * B[5] - B[4] * B[2]) / det;
+			eulers[9 * oid + 3] = (B[5] * B[6] - B[8] * B[3]) / det;
+			eulers[9 * oid + 4] = (B[8] * B[0] - B[2] * B[6]) / det;
+			eulers[9 * oid + 5] = (B[2] * B[3] - B[5] * B[0]) / det;
+			eulers[9 * oid + 6] = (B[3] * B[7] - B[6] * B[4]) / det;
+			eulers[9 * oid + 7] = (B[6] * B[1] - B[0] * B[7]) / det;
+			eulers[9 * oid + 8] = (B[0] * B[4] - B[3] * B[1]) / det;
+		}
+		else
+		{
+
+			eulers[9 * oid + 0] = B[0];//00
+			eulers[9 * oid + 1] = B[3];//01
+			eulers[9 * oid + 2] = B[6];//02
+			eulers[9 * oid + 3] = B[1];//10
+			eulers[9 * oid + 4] = B[4];//11
+			eulers[9 * oid + 5] = B[7];//12
+			eulers[9 * oid + 6] = B[2];//20
+			eulers[9 * oid + 7] = B[5];//21
+			eulers[9 * oid + 8] = B[8];//22
+		}
 	}
 	else
 	{

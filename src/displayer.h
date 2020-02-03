@@ -21,14 +21,8 @@
 #ifndef DISPLAYER_H_
 #define DISPLAYER_H_
 
-#include "src/image.h"
-#include "src/metadata_label.h"
-#include "src/metadata_table.h"
-#include <src/matrix2d.h>
-#include <src/fftw.h>
-#include <src/time.h>
-#include <src/args.h>
-
+// this define, and the undef below the FL includes, protects against another Complex definition in fltk
+#define Complex tmpComplex
 #include <FL/Fl.H>
 #include <FL/Fl_Shared_Image.H>
 #include <FL/Fl_Double_Window.H>
@@ -41,12 +35,21 @@
 #include <FL/Fl_File_Chooser.H>
 #include <FL/Fl_Float_Input.H>
 #include <FL/Fl_Text_Display.H>
+#undef Complex
+
+#include "src/image.h"
+#include "src/metadata_label.h"
+#include "src/metadata_table.h"
+#include "src/jaz/obs_model.h"
+#include <src/matrix2d.h>
+#include <src/fftw.h>
+#include <src/time.h>
+#include <src/args.h>
+
 
 #define GUI_BACKGROUND_COLOR (fl_rgb_color(240,240,240))
 #define GUI_INPUT_COLOR (fl_rgb_color(255,255,230))
-#define GUI_RUNBUTTON_COLOR (fl_rgb_color(255, 180, 132))
-// devel-version
-//#define GUI_RUNBUTTON_COLOR (fl_rgb_color(170, 0, 0))
+#define GUI_RUNBUTTON_COLOR (fl_rgb_color(238,130,238))
 
 #define SELECTED 1
 #define NOTSELECTED 0
@@ -69,22 +72,83 @@ static bool has_shift;
 static int preshift_ipos;
 
 static int current_selection_type;
-/*
-static RFLOAT current_minval;
-static RFLOAT current_maxval;
-static RFLOAT current_scale;
-static RFLOAT current_sigma_contrast;
-*/
+static int colour_scheme;
+#define GREYSCALE 0
+#define BLACKGREYREDSCALE 1
+#define BLUEGREYWHITESCALE 2
+#define BLUEGREYREDSCALE 3
+#define RAINBOWSCALE 4
+#define CYANBLACKYELLOWSCALE 5
+
+
+inline void greyToRGB(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue)
+{
+	switch (colour_scheme)
+	{
+	case (BLACKGREYREDSCALE):
+	{
+		if (grey >= 128) { red = 255; blue = green = FLOOR((RFLOAT)(255.-grey)*2.); }
+		else { red = green = blue = FLOOR((RFLOAT)(grey*2.)); }
+		break;
+	}
+	case (BLUEGREYWHITESCALE):
+	{
+		if (grey >= 128) { red = green = blue = FLOOR((RFLOAT)((grey-128.)*2.)); }
+		else { red = 0; blue = green = FLOOR((RFLOAT)(255.-2.*grey)); }
+		break;
+	}
+	case (BLUEGREYREDSCALE):
+	{
+		RFLOAT a=(grey)/85.;	//group
+		int X=FLOOR(a);	//this is the integer part
+		unsigned char Y = FLOOR(255*(a-X)); //fractional part from 0 to 255
+		switch(X)
+		{
+		    case 0: red=0;green=255-Y;blue=255-Y;break;
+		    case 1: red=Y;green=Y;blue=Y;break;
+		    case 2: red=255;green=255-Y;blue=255-Y;break;
+		    case 3: red=255;green=0;blue=0;break;
+		}
+
+		break;
+	}
+	case (RAINBOWSCALE):
+	{
+		RFLOAT a=(255-grey)/64.;	//invert and group
+		int X=FLOOR(a);	//this is the integer part
+		unsigned char Y = FLOOR(255*(a-X)); //fractional part from 0 to 255
+		switch(X)
+		{
+		    case 0: red=255;green=Y;blue=0;break;
+		    case 1: red=255-Y;green=255;blue=0;break;
+		    case 2: red=0;green=255;blue=Y;break;
+		    case 3: red=0;green=255-Y;blue=255;break;
+		    case 4: red=0;green=0;blue=255;break;
+		}
+
+		break;
+	}
+	case (CYANBLACKYELLOWSCALE):
+	{
+		const RFLOAT d_rb = 3. * (grey - 128);
+		const RFLOAT d_g = 3. * (std::abs(grey - 128) - 42);
+		red   = (unsigned char)(FLOOR(XMIPP_MIN(255., XMIPP_MAX(0.0,  d_rb))));
+		green = (unsigned char)(FLOOR(XMIPP_MIN(255., XMIPP_MAX(0.0,  d_g))));
+		blue  = (unsigned char)(FLOOR(XMIPP_MIN(255., XMIPP_MAX(0.0, -d_rb))));
+
+		break;
+	}
+	}
+	return;
+}
 
 class DisplayBox : public Fl_Box
 {
 protected:
-
 	// Draw the actual box on the screen (this function is used by redraw())
 	void draw();
 
 public:
-
 	int xsize_data;
 	int ysize_data;
 	int xoff;
@@ -100,7 +164,8 @@ public:
 	MetaDataTable MDimg;
 
 	// The actual image data array
-	char * img_data;
+	unsigned char * img_data;
+	std::string img_label;
 
 	// For getting back close the original image values from the uchar ones...
 	RFLOAT minval;
@@ -108,10 +173,10 @@ public:
 	RFLOAT scale;
 
 	// Constructor with an image and its metadata
-	DisplayBox(int X, int Y, int W, int H, const char *L=0) : Fl_Box(X,Y,W,H,L) { img_data = NULL; MDimg.clear(); }
+	DisplayBox(int X, int Y, int W, int H, const char *L=0) : Fl_Box(X,Y,W,H,L) { img_data = NULL; img_label = ""; MDimg.clear(); }
 
 	void setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, int ipos, RFLOAT minval, RFLOAT maxval,
-			RFLOAT _scale, bool do_relion_scale = false);
+	             RFLOAT _scale, bool do_relion_scale = false);
 
 	// Destructor
 	~DisplayBox()
@@ -129,31 +194,28 @@ public:
 	int select();
 	// unSelect, redraw and return new selected status
 	int unSelect();
-
 };
-
 
 // This class only puts scrollbars around the resizable canvas
 class basisViewerWindow : public Fl_Window
 {
-
 public:
-
 	// Constructor with w x h size of the window and a title
-	basisViewerWindow(int W, int H, const char* title=0): Fl_Window(W, H, title){}
+	basisViewerWindow(int W, int H, const char* title=0): Fl_Window(W, H, title)
+	{
+		current_selection_type = 1;
+	}
 
-	int fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel display_label, bool _do_read_whole_stacks, bool _do_apply_orient,
-			RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast,
-			RFLOAT _scale, RFLOAT _ori_scale, int _ncol, long int max_nr_images = -1, RFLOAT lowpass = -1.0 , RFLOAT highpass = -1.0,
-			bool do_class = false, MetaDataTable *MDdata = NULL,
-			int _nr_regroup = -1, bool do_recenter = false, bool _is_data = false, MetaDataTable *MDgroups = NULL,
-			bool do_allow_save = false, FileName fn_selected_imgs="", FileName fn_selected_parts="", int max_nr_parts_per_class = -1);
+	int fillCanvas(int viewer_type, MetaDataTable &MDin, ObservationModel *obsModel, EMDLabel display_label, EMDLabel text_label, bool _do_read_whole_stacks, bool _do_apply_orient,
+	               RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast,
+	               RFLOAT _scale, RFLOAT _ori_scale, int _ncol, long int max_nr_images = -1, RFLOAT lowpass = -1.0 , RFLOAT highpass = -1.0,
+	               bool do_class = false, MetaDataTable *MDdata = NULL,
+	               int _nr_regroup = -1, bool do_recenter = false, bool _is_data = false, MetaDataTable *MDgroups = NULL,
+	               bool do_allow_save = false, FileName fn_selected_imgs="", FileName fn_selected_parts="", int max_nr_parts_per_class = -1);
 	int fillSingleViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale);
-	int fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale,
-			int _particle_radius, bool do_startend = false, FileName _fn_coords = "",
-			FileName _fn_color = "", FileName _fn_mic= "", FileName _color_label = "", RFLOAT _color_blue_value = 0., RFLOAT _color_red_value = 1.);
-
-
+	int fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale, RFLOAT _coord_scale,
+	                           int _particle_radius, bool do_startend = false, FileName _fn_coords = "",
+	                           FileName _fn_color = "", FileName _fn_mic= "", FileName _color_label = "", RFLOAT _color_blue_value = 0., RFLOAT _color_red_value = 1.);
 };
 
 class basisViewerCanvas : public Fl_Widget
@@ -161,6 +223,7 @@ class basisViewerCanvas : public Fl_Widget
 protected:
 
 	void draw();
+	void saveImage(int ipos=0);
 
 public:
 
@@ -185,14 +248,14 @@ public:
 
 	void SetScroll(Fl_Scroll *val) { scroll = val; }
 
-	void fill(MetaDataTable &MDin, EMDLabel display_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
-			RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol, bool do_recenter = false, long int max_images = -1,
-			RFLOAT lowpass = -1.0, RFLOAT highpass = -1.0);
+	void fill(MetaDataTable &MDin, ObservationModel *obsModel, EMDLabel display_label, EMDLabel text_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
+	          RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol, bool do_recenter = false, long int max_images = -1,
+	          RFLOAT lowpass = -1.0, RFLOAT highpass = -1.0);
 	void fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale = 1.);
+	void setSelectionType();
 
 private:
 	void getImageContrast(MultidimArray<RFLOAT> &image, RFLOAT &minval, RFLOAT &maxval, RFLOAT &sigma_contrast);
-
 };
 
 class multiViewerCanvas : public basisViewerCanvas
@@ -230,6 +293,9 @@ public:
 	// pointer to the MetaDataTable for the individually aligned particles when do_class (the data.star file)
 	MetaDataTable *MDdata;
 
+	// pointer to the MetaDataTable for the optics groups
+	ObservationModel *obsModel;
+
 	// pointer to the MetaDataTable for the groups when do_class and do_regroup (the data.star file)
 	MetaDataTable *MDgroups;
 
@@ -242,16 +308,21 @@ public:
 	// To know which original image to display
 	EMDLabel display_label;
 
+	// Label for text display
+	EMDLabel text_label;
+
 	// To know which contrast to apply to original image display
-	RFLOAT sigma_contrast;
+	RFLOAT sigma_contrast, minval, maxval;
 
 	// Limit number of images to be shown
 	long int multi_max_nr_images;
 
+	// Name of the metadata table
+	std::string metadata_table_name;
+
 	// Constructor with w x h size of the window and a title
 	multiViewerCanvas(int X,int Y, int W, int H, const char* title=0): basisViewerCanvas(X,Y,W, H, title)
 	{
-		current_selection_type= 1;
 	}
 
 private:
@@ -273,11 +344,9 @@ private:
 	void saveTrainingSet();
 	void saveSelected(int save_selected);
 	void saveBackupSelection();
-	void setSelectionType();
 	// Allow re-loading of existing backup selection
 public:
 	void loadBackupSelection(bool do_ask = true);
-
 };
 
 // Generally accessible function
@@ -297,18 +366,18 @@ public:
 	static void cb_set(Fl_Widget* o, void* v)
 	{
 		popupSelectionTypeWindow* T=(popupSelectionTypeWindow*)v;
-	    T->cb_set_i();
+		T->cb_set_i();
 	}
 	inline void cb_set_i()
 	{
-		// Careful with setting the right value! Look at handle function of multiviewerCanvas
-		current_selection_type =  choice->value() + 1;
+		// void* to (small) int
+		current_selection_type = static_cast<int>(reinterpret_cast<intptr_t>(choice->mvalue()->user_data()));
 	}
 
 	static void cb_close(Fl_Widget* o, void* v)
 	{
 		popupSelectionTypeWindow* T=(popupSelectionTypeWindow*)v;
-	    T->hide();
+		T->hide();
 	}
 
 };
@@ -331,8 +400,6 @@ private:
 
 	// explain functionality of clicks
 	void printHelp();
-
-
 };
 
 /*
@@ -351,7 +418,7 @@ public:
 	static void cb_set(Fl_Widget* o, void* v)
 	{
 		popupSelectionTypeWindow* T=(popupSelectionTypeWindow*)v;
-	    T->cb_set_i();
+		T->cb_set_i();
 	}
 	inline void cb_set_i()
 	{
@@ -365,16 +432,14 @@ public:
 	static void cb_close(Fl_Widget* o, void* v)
 	{
 		popupSetContrastWindow* T=(popupSetContrastWindow*)v;
-	    T->hide();
+		T->hide();
 	}
 
 };
 */
 
-
 class pickerViewerCanvas : public basisViewerCanvas
 {
-
 protected:
 	int handle(int ev);
 	void draw();
@@ -384,6 +449,9 @@ public:
 	MetaDataTable MDcoords;
 
 	int particle_radius;
+
+	// Scale for rlnCoordinateX/Y
+	RFLOAT coord_scale;
 
 	// Filename of the picked coordinate files
 	FileName fn_coords;
@@ -456,8 +524,14 @@ public:
 	// Recenter images?
 	bool do_recenter;
 
+	// Pipeline control
+	std::string pipeline_control;
+
 	// Maximum number of images to show
 	long int max_nr_images;
+
+	// Display image in color
+	int colour_scheme;
 
 	// FileName for selected class average images and particles
 	FileName fn_imgs, fn_parts;
@@ -465,12 +539,13 @@ public:
 	// Label option to display or to sort on
 	std::vector<std::string> display_labels;
 	std::vector<std::string> sort_labels;
+	std::vector<std::string> colour_schemes;
 
 	// Input for the display parameters
 	Fl_Input *black_input, *white_input, *sigma_contrast_input, *scale_input, *lowpass_input, *highpass_input, *angpix_input;
 	Fl_Input *col_input, *ori_scale_input, *max_nr_images_input, *max_parts_per_class_input;
 	Fl_Check_Button *sort_button, *reverse_sort_button, *apply_orient_button, *read_whole_stack_button;
-	Fl_Choice *display_choice, *sort_choice;
+	Fl_Choice *display_choice, *sort_choice, *colour_scheme_choice;
 
 	// Constructor with w x h size of the window and a title
 	displayerGuiWindow(int W, int H, const char* title=0): Fl_Window(W, H, title),	sort_button(NULL), reverse_sort_button(NULL), apply_orient_button(NULL), read_whole_stack_button(NULL) {}
@@ -509,7 +584,7 @@ public:
 	int verb;
 
 	// Which metadatalabel to display
-	EMDLabel display_label, sort_label;
+	EMDLabel display_label, sort_label, text_label;
 
 	// Use random sort
 	bool random_sort;
@@ -538,8 +613,14 @@ public:
 	// Particle diameter
 	int particle_radius;
 
+	// Scale for rlnCoordinateX/Y
+	RFLOAT coord_scale;
+
 	// Input & Output rootname
 	FileName fn_in;
+
+	// Ignore optics groups
+	bool do_ignore_optics;
 
 	// Filename for coordinates star file
 	FileName fn_coords;
@@ -587,8 +668,14 @@ public:
 	// Flag for reading whole stacks instead of individual images
 	bool do_read_whole_stacks;
 
+	// Flag to show colour scalebar image
+	bool do_colourbar;
+
 	// data.star metadata (for do_class)
 	MetaDataTable MDdata;
+
+	// Observation model
+	ObservationModel obsModel;
 
 	// model_groups  metadata (for do_class and regrouping)
 	MetaDataTable MDgroups;
@@ -605,7 +692,7 @@ public:
 	// Highpass filter for picker images
 	RFLOAT highpass;
 
-	// Pixel size to calculate lowpass filter in Angstroms
+	// Pixel size to calculate lowpass filter in Angstroms and translations in apply_orient
 	RFLOAT angpix;
 
 	// Show Fourier amplitudes?

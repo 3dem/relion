@@ -32,6 +32,7 @@
 #include "src/metadata_table.h"
 #include "src/ctffind_runner.h"
 #include "src/helix.h"
+#include "src/jaz/obs_model.h"
 #include <src/fftw.h>
 #include <src/time.h>
 
@@ -46,10 +47,10 @@ public:
 	int verb;
 
 	// Name for directory of output Particle stacks and Particle STAR file
-	FileName fn_part_dir, fn_part_star, fn_list_star;
+	FileName fn_part_dir, fn_part_star;
 
-	// Does the input micrograph STAR file have CTF information?
-	bool star_has_ctf;
+	// Does the input micrograph STAR file or the input data STAR file have CTF information?
+	bool mic_star_has_ctf, data_star_has_ctf;
 
 	// If input micrograph STAR file has CTF and so does input particle STAR (fn_data), then
 	// by default the fn_data CTF parameters will be in the output particles.star file (as they could have been refined in ctf_refine)
@@ -60,7 +61,6 @@ public:
 	bool do_phase_flip;
 	bool do_premultiply_ctf;
 	bool do_ctf_intact_first_peak;
-	bool use_ctf_in_mic;
 	RFLOAT angpix, output_angpix;
 
 	////////////////// Extract particles from the micrographs
@@ -72,24 +72,6 @@ public:
 
 	// Skip gathering CTF information from the ctffind logfiles (e.g. when the info is already there from Gctf)?
 	bool do_skip_ctf_logfiles;
-
-	// Extract particles from movies instead of single micrographs
-	bool do_movie_extract;
-
-	// Movie identifier for extraction from movies (e.g. movie for movies called _movie.mrcs or _movie.mrc)
-	FileName movie_name;
-
-	// First frame to extract from movies
-	int movie_first_frame;
-
-	// Last frame to extract from movies
-	int movie_last_frame;
-
-	// Number of individual movie frames to average over
-	int avg_n_frames;
-
-	// Rootname to identify movies, e.g. mic001_movie.mrcs will be the movie of mic001.mrc if fn_movie="movie"
-	FileName fn_movie;
 
 	// STAR file with all (selected) micrographs, the suffix of the coordinates files, and the directory where the coordinate files are
 	FileName fn_star_in, fn_coord_suffix, fn_coord_dir ;
@@ -110,7 +92,8 @@ public:
 	RFLOAT recenter_x, recenter_y, recenter_z;
 
 	// MetadataTable with all refined particle coordinates (given through fn_data)
-	//MetaDataTable MDdata;
+	MetaDataTable MDimg;
+	ObservationModel obsModelMic, obsModelPart;
 
 	// Filenames of all the coordinate files to use for particle extraction
 	std::vector<FileName> fn_coords;
@@ -129,6 +112,9 @@ public:
 
 	// Box size to extract the particles in
 	int extract_size;
+
+	// Box size to extract the particle for premultiplication with the CTF
+	int premultiply_ctf_extract_size;
 
 	// Bias in picked coordinates in X and in Y direction (in pixels)
 	RFLOAT extract_bias_x, extract_bias_y;
@@ -184,9 +170,6 @@ public:
 	// Name of output stack (only when fn_operate in is given)
 	FileName fn_operate_out;
 
-	// Manually set pixel size (rlnMagnification and rlnDetectorPixelSize) in the output STAR file
-	RFLOAT set_angpix;
-
 public:
 	// Read command line arguments
 	void read(int argc, char **argv, int rank = 0);
@@ -216,9 +199,9 @@ public:
 	// For the given coordinate file, read the micrograph and/or movie and extract all particles
 	bool extractParticlesFromFieldOfView(FileName fn_mic, long int imic);
 
-	// Actually extract particles. This can be from one (average) micrgraph or from a single frame from a movie
-	void extractParticlesFromOneFrame(MetaDataTable &MD,
-			FileName fn_mic, int ipos, int iframe, int n_frames, FileName fn_output_img_root, FileName fn_oristack,
+	// Actually extract particles. This can be from one micrgraph
+	void extractParticlesFromOneMicrograph(MetaDataTable &MD,
+			FileName fn_mic, int ipos, FileName fn_output_img_root, FileName fn_oristack,
 			long int &my_current_nr_images, long int my_total_nr_images,
 			RFLOAT &all_avg, RFLOAT &all_stddev, RFLOAT &all_minval, RFLOAT &all_maxval);
 
@@ -230,7 +213,6 @@ public:
 	void performPerImageOperations(
 			Image<RFLOAT> &Ipart,
 			FileName fn_output_img_root,
-			int nframes,
 			long int image_nr,
 			long int nr_of_images,
 			RFLOAT tilt_deg,

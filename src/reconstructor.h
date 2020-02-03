@@ -28,32 +28,32 @@
 #include <src/euler.h>
 #include <src/time.h>
 #include <src/ml_model.h>
+#include <src/jaz/obs_model.h>
 
 class Reconstructor
 {
 public:
-
 	// I/O Parser
 	IOParser parser;
 
 	FileName fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_fsc, fn_debug, fn_noise, image_path;
 
 	MetaDataTable DF;
+	ObservationModel obsModel;
 	MlModel model;
 
 	int r_max, r_min_nn, blob_order, ref_dim, interpolator, iter,
 	    debug_ori_size, debug_size,
-	    ctf_dim, nr_helical_asu, newbox, width_mask_edge, nr_sectors, subset,
+	    ctf_dim, nr_helical_asu, newbox, width_mask_edge, nr_sectors, subset, chosen_class,
 	    data_dim, mysize, verb;
 
 	RFLOAT blob_radius, blob_alpha, angular_error, shift_error, angpix, maxres,
-	       beamtilt_x, beamtilt_y,
 	       helical_rise, helical_twist;
 
-	bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, ctf_premultiplied,
-	     do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt, cl_beamtilt, do_ewald, skip_weighting, skip_mask, do_debug;
+	bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak,
+	     do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_ewald, skip_weighting, skip_mask, do_debug, do_ignore_optics;
 
-	bool skip_gridding, do_reconstruct_ctf2, do_reconstruct_meas, is_reverse, read_weights;
+	bool skip_gridding, do_reconstruct_ctf2, do_reconstruct_meas, is_reverse, read_weights, do_external_reconstruct;
 
 	float padding_factor, mask_diameter;
 
@@ -64,7 +64,6 @@ public:
 	Projector projector;
 
 public:
-
 	/** Empty constructor
 	 *
 	 * A default Projector is created.
@@ -101,8 +100,6 @@ public:
 
 	void applyCTFPandCTFQ(MultidimArray<Complex> &Fin, CTF &ctf, FourierTransformer &transformer,
 	                      MultidimArray<Complex> &outP, MultidimArray<Complex> &outQ, bool skip_mask=false);
-
 };
-
 
 #endif /* SRC_RECONSTRUCTOR_H_ */

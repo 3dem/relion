@@ -52,7 +52,7 @@ void CtfRefinerMpi::run()
 	long int my_first_micrograph, my_last_micrograph;
 	divide_equally(total_nr_micrographs, node->size, node->rank, my_first_micrograph, my_last_micrograph);
 	
-	if (do_defocus_fit || do_tilt_fit || do_mag_fit)
+	if (do_defocus_fit || do_bfac_fit || do_tilt_fit || do_aberr_fit || do_mag_fit)
     {
     	processSubsetMicrographs(my_first_micrograph, my_last_micrograph);
     }

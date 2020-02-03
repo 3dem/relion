@@ -32,19 +32,22 @@
 #include <src/ml_model.h>
 #include <src/exp_model.h>
 #include <src/healpix_sampling.h>
+#include <src/jaz/obs_model.h>
 class project_parameters
 {
 public:
 
-	FileName fn_map, fn_ang, fn_out, fn_img, fn_model, fn_sym, fn_mask;
+	FileName fn_map, fn_ang, fn_out, fn_img, fn_model, fn_sym, fn_mask, fn_ang_simulate;
 	RFLOAT rot, tilt, psi, xoff, yoff, zoff, angpix, maxres, stddev_white_noise, particle_diameter, ana_prob_range, ana_prob_step, sigma_offset;
 	int padding_factor;
 	int r_max, r_min_nn, interpolator, nr_uniform;
 	bool do_only_one, do_ctf, do_ctf2, ctf_phase_flipped, do_ctf_intact_1st_peak, do_timing, do_add_noise, do_subtract_exp, do_ignore_particle_name, do_3d_rot;
+	bool do_simulate;
+	RFLOAT simulate_SNR;
 	// I/O Parser
 	IOParser parser;
 	MlModel model;
-
+	ObservationModel obsModel;
 
 	void usage()
 	{
@@ -63,8 +66,8 @@ public:
 		do_ctf_intact_1st_peak = parser.checkOption("--ctf_intact_first_peak", "Ignore CTFs until their first peak?");
 		angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "-1"));
 		fn_mask = parser.getOption("--mask", "Mask that will be applied to the input map prior to making projections", "");
-		fn_ang = parser.getOption("--ang", "STAR file with orientations for multiple projections (if None, assume single projection)","None");
-		nr_uniform = textToInteger(parser.getOption("--nr_uniform", " OR get this many samples from a uniform angular distribution", "-1"));
+		fn_ang = parser.getOption("--ang", "Particle STAR file with orientations and CTF for multiple projections (if None, assume single projection)", "None");
+		nr_uniform = textToInteger(parser.getOption("--nr_uniform", " OR get this many random samples from a uniform angular distribution", "-1"));
 		sigma_offset = textToFloat(parser.getOption("--sigma_offset", "Apply Gaussian errors with this stddev to the XY-offsets", "0"));
 		rot = textToFloat(parser.getOption("--rot", "First Euler angle (for a single projection)", "0"));
 		tilt = textToFloat(parser.getOption("--tilt", "Second Euler angle (for a single projection)", "0"));
@@ -79,6 +82,9 @@ public:
 		do_ignore_particle_name = parser.checkOption("--ignore_particle_name", "Ignore the rlnParticleName column (in --ang)");
 		do_only_one = (fn_ang == "None" && nr_uniform < 0);
 		do_3d_rot = parser.checkOption("--3d_rot", "Perform 3D rotations instead of projection into 2D images");
+		do_simulate = parser.checkOption("--simulate", "Simulate data with known ground-truth by subtracting signal and adding projection in random orientation.");
+		simulate_SNR = textToFloat(parser.getOption("--adjust_simulation_SNR", "Relative SNR compared to input images for realistic simulation of data", "1."));
+		fn_ang_simulate = parser.getOption("--ang_simulate", "STAR file with orientations for projections of realistic simulations (random from --ang STAR file by default)", "");
 
 		maxres = textToFloat(parser.getOption("--maxres", "Maximum resolution (in Angstrom) to consider in Fourier space (default Nyquist)", "-1"));
 		padding_factor = textToInteger(parser.getOption("--pad", "Padding factor", "2"));
@@ -91,16 +97,19 @@ public:
 		// Hidden
 		r_min_nn = textToInteger(getParameter(argc, argv, "--r_min_nn", "10"));
 
+		if (do_simulate)
+		{
+			do_ctf = true;
+		}
+
 		// Check for errors in the command-line option
 		if (parser.checkForErrors())
 			REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
-
 	}
 
 	void project()
 	{
-
-		MetaDataTable DFo, MDang;
+		MetaDataTable DFo, MDang, MDang_sim;
 		Matrix2D<RFLOAT> A3D;
 		FileName fn_expimg;
 
@@ -125,7 +134,6 @@ public:
 
 		if (nr_uniform > 0)
 		{
-
 			std::cout << " Generating " << nr_uniform << " projections taken randomly from a uniform angular distribution ..." << std::endl;
 			MDang.clear();
 			randomize_random_generator();
@@ -149,26 +157,51 @@ public:
 				MDang.setValue(EMDL_ORIENT_PSI, psi);
 				MDang.setValue(EMDL_ORIENT_ORIGIN_X, xoff);
 				MDang.setValue(EMDL_ORIENT_ORIGIN_Y, yoff);
+				MDang.setValue(EMDL_IMAGE_OPTICS_GROUP, 1);
 			}
+
+			std::cout << " Setting default values for optics table, though CTFs are not used in the projections ... " << std::endl;
+			MetaDataTable MDopt;
+			MDopt.addObject();
+			MDopt.setValue(EMDL_IMAGE_OPTICS_GROUP, 1);
+			std::string name = "optics1";
+			MDopt.setValue(EMDL_IMAGE_OPTICS_GROUP_NAME, name);
+			MDopt.setValue(EMDL_CTF_VOLTAGE, 300.);
+			MDopt.setValue(EMDL_CTF_CS, 2.7);
+			vol.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, angpix);
+			MDopt.setValue(EMDL_IMAGE_PIXEL_SIZE, angpix);
+			MDopt.setValue(EMDL_IMAGE_SIZE, XSIZE(vol()));
+			int mydim = (do_3d_rot) ? 3 : 2;
+			MDopt.setValue(EMDL_IMAGE_DIMENSIONALITY, mydim);
+
+			obsModel = ObservationModel(MDopt);
 		}
 		else if (!do_only_one)
 		{
 			std::cout << " Reading STAR file with all angles " << fn_ang << std::endl;
-			MDang.read(fn_ang);
+			ObservationModel::loadSafely(fn_ang, obsModel, MDang);
 			std::cout << " Done reading STAR file!" << std::endl;
-		}
 
+
+			if (do_simulate && fn_ang_simulate != "")
+			{
+				std::cout << " Reading STAR file with angles for simulated images " << fn_ang << std::endl;
+				MDang_sim.read(fn_ang_simulate);
+				std::cout << " Done reading STAR file with angles for simulated images!" << std::endl;
+				if (MDang_sim.numberOfObjects() < MDang.numberOfObjects())
+				{
+					REPORT_ERROR("ERROR: STAR file with angles for simulated images has fewer entries than the input STAR file with all angles.");
+				}
+			}
+		}
 
 		if (angpix < 0.)
 		{
-			if (!do_only_one && MDang.containsLabel(EMDL_CTF_MAGNIFICATION) && MDang.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+			if (!do_only_one)
 			{
-				MDang.goToObject(0);
-				RFLOAT mag, dstep;
-				MDang.getValue(EMDL_CTF_MAGNIFICATION, mag);
-				MDang.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
-				angpix = 10000. * dstep / mag;
-				std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << angpix << std::endl;
+				// Get angpix from the first optics group in the obsModel
+				angpix = obsModel.getPixelSize(0);
+				std::cout << " + Using pixel size from the first optics group in the --ang STAR file: " << angpix << std::endl;
 			}
 			else
 			{
@@ -201,7 +234,7 @@ public:
 		{
 			Euler_rotation3DMatrix(rot, tilt, psi, A3D);
 			F2D.initZeros();
-			projector.get2DFourierTransform(F2D, A3D, IS_NOT_INV);
+			projector.get2DFourierTransform(F2D, A3D);
 			if (ABS(xoff) > 0.001 || ABS(yoff) > 0.001 || (do_3d_rot && ABS(zoff) > 0.001) )
 			{
 				Matrix1D<RFLOAT> shift(2);
@@ -233,7 +266,7 @@ public:
 				}
 			}
 
-			transformer.inverseFourierTransform();
+			transformer.inverseFourierTransform(F2D, img());
 			// Shift the image back to the center...
 			CenterFFT(img(), false);
 			img.setSamplingRateInHeader(angpix);
@@ -259,19 +292,24 @@ public:
 			}
 
 			long int imgno = 0;
+			long int max_imgno = MDang.numberOfObjects() - 1;
 			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDang)
 			{
 				MDang.getValue(EMDL_ORIENT_ROT, rot);
 				MDang.getValue(EMDL_ORIENT_TILT, tilt);
 				MDang.getValue(EMDL_ORIENT_PSI, psi);
-				MDang.getValue(EMDL_ORIENT_ORIGIN_X, xoff);
-				MDang.getValue(EMDL_ORIENT_ORIGIN_Y, yoff);
+				MDang.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff);
+				MDang.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff);
 				if (do_3d_rot)
-					MDang.getValue(EMDL_ORIENT_ORIGIN_Z, zoff);
+					MDang.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, zoff);
+
+				xoff /= angpix;
+				yoff /= angpix;
+				zoff /= angpix;
 
 				Euler_rotation3DMatrix(rot, tilt, psi, A3D);
 				F2D.initZeros();
-				projector.get2DFourierTransform(F2D, A3D, IS_NOT_INV);
+				projector.get2DFourierTransform(F2D, A3D);
 
 				if (ABS(xoff) > 0.001 || ABS(yoff) > 0.001 || (do_3d_rot && ABS(zoff) > 0.001) )
 				{
@@ -327,7 +365,7 @@ public:
 					}
 					else
 					{
-						ctf.read(MDang, MDang);
+						ctf.readByGroup(MDang, &obsModel); // This MDimg only contains one particle!
 						Fctf.resize(F2D);
 						ctf.getFftwImage(Fctf, XSIZE(vol()), XSIZE(vol()), angpix, ctf_phase_flipped, false,  do_ctf_intact_1st_peak, true);
 					}
@@ -406,17 +444,139 @@ public:
 					}
 				}
 
-				transformer.inverseFourierTransform();
+				img().initZeros();
+				transformer.inverseFourierTransform(F2D, img());
 				// Shift the image back to the center...
 				CenterFFT(img(), false);
 
 				// Subtract the projection from the corresponding experimental image
-				if (do_subtract_exp)
+				if (do_subtract_exp || do_simulate)
 				{
 					MDang.getValue(EMDL_IMAGE_NAME, fn_expimg);
 					MDang.setValue(EMDL_IMAGE_ORI_NAME, fn_expimg); // Store fn_expimg in rlnOriginalParticleName
 					expimg.read(fn_expimg);
 					img() = expimg() - img();
+				}
+
+				// If we're simulating realistic images, then now add CTF-affected projection again
+				if (do_simulate)
+				{
+					// Take random orientation from the input STAR file is fn_ang_simulate is empty. Otherwise, use fn_ang_simulate
+					if (fn_ang_simulate == "")
+					{
+						long int random_imgno = -1;
+						while (random_imgno < 0 || random_imgno > max_imgno)
+						{
+							random_imgno = rnd_unif()*max_imgno;
+						}
+
+						MDang.getValue(EMDL_ORIENT_ROT, rot, random_imgno);
+						MDang.getValue(EMDL_ORIENT_TILT, tilt, random_imgno);
+						MDang.getValue(EMDL_ORIENT_PSI, psi, random_imgno);
+						MDang.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, random_imgno);
+						MDang.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, random_imgno);
+						if (do_3d_rot)
+							MDang.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, zoff, random_imgno);
+
+						xoff /= angpix;
+						yoff /= angpix;
+						zoff /= angpix;
+					}
+					else
+					{
+						MDang_sim.getValue(EMDL_ORIENT_ROT, rot, imgno);
+						MDang_sim.getValue(EMDL_ORIENT_TILT, tilt, imgno);
+						MDang_sim.getValue(EMDL_ORIENT_PSI, psi, imgno);
+						MDang_sim.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, imgno);
+						MDang_sim.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, imgno);
+						if (do_3d_rot)
+							MDang_sim.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, zoff, imgno);
+
+						xoff /= angpix;
+						yoff /= angpix;
+						zoff /= angpix;
+					}
+
+					Euler_rotation3DMatrix(rot, tilt, psi, A3D);
+					F2D.initZeros();
+					projector.get2DFourierTransform(F2D, A3D);
+
+					if (ABS(xoff) > 0.001 || ABS(yoff) > 0.001 || (do_3d_rot && ABS(zoff) > 0.001) )
+					{
+						Matrix1D<RFLOAT> shift(2);
+						XX(shift) = -xoff;
+						YY(shift) = -yoff;
+
+						if (do_3d_rot)
+						{
+							shift.resize(3);
+							ZZ(shift) = -zoff;
+							shiftImageInFourierTransform(F2D, F2D, XSIZE(vol()), XX(shift), YY(shift), ZZ(shift) );
+						}
+						else
+							shiftImageInFourierTransform(F2D, F2D, XSIZE(vol()), XX(shift), YY(shift) );
+					}
+
+					// Apply CTF
+					CTF ctf;
+					if (do_ctf || do_ctf2)
+					{
+						if (do_3d_rot)
+						{
+							Image<RFLOAT> Ictf;
+							FileName fn_ctf;
+							MDang.getValue(EMDL_CTF_IMAGE, fn_ctf);
+							Ictf.read(fn_ctf);
+							Ictf().setXmippOrigin();
+
+							// If there is a redundant half, get rid of it
+							if (XSIZE(Ictf()) == YSIZE(Ictf()))
+							{
+								Ictf().setXmippOrigin();
+								FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+								{
+									// Use negative kp,ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
+									DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf(), -kp, -ip, -jp);
+								}
+							}
+							// otherwise, just window the CTF to the current resolution
+							else if (XSIZE(Ictf()) == YSIZE(Ictf()) / 2 + 1)
+							{
+								windowFourierTransform(Ictf(), Fctf, YSIZE(Fctf));
+							}
+							// if dimensions are neither cubical nor FFTW, stop
+							else
+							{
+								REPORT_ERROR("3D CTF volume must be either cubical or adhere to FFTW format!");
+							}
+						}
+						else
+						{
+							ctf.read(MDang, MDang, imgno);
+							Fctf.resize(F2D);
+							ctf.getFftwImage(Fctf, XSIZE(vol()), XSIZE(vol()), angpix, ctf_phase_flipped, false,  do_ctf_intact_1st_peak, true);
+						}
+						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
+						{
+							DIRECT_MULTIDIM_ELEM(F2D, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+							if (do_ctf2)
+								DIRECT_MULTIDIM_ELEM(F2D, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+						}
+					}
+
+					expimg().initZeros();
+					transformer.inverseFourierTransform(F2D, expimg());
+					// Shift the image back to the center...
+					CenterFFT(expimg(), false);
+
+					// Modify the strength of the signal
+					if (fabs(simulate_SNR - 1.) > 0.000001)
+					{
+						expimg() *= simulate_SNR;
+					}
+
+					img() += expimg();
+
 				}
 
 				img.setSamplingRateInHeader(angpix);
@@ -441,6 +601,17 @@ public:
 				DFo.setObject(MDang.getObject());
 				DFo.setValue(EMDL_IMAGE_NAME,fn_img);
 
+				if (do_simulate)
+				{
+					DFo.setValue(EMDL_ORIENT_ROT, rot);
+					DFo.setValue(EMDL_ORIENT_TILT, tilt);
+					DFo.setValue(EMDL_ORIENT_PSI, psi);
+					DFo.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff * angpix);
+					DFo.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff * angpix);
+					if (do_3d_rot)
+						DFo.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, zoff * angpix);
+				}
+
 				if (imgno%60==0) progress_bar(imgno);
 				imgno++;
 			}
@@ -448,11 +619,10 @@ public:
 
 			// Write out STAR file with all information
 			fn_img = fn_out + ".star";
-			DFo.write(fn_img);
+			obsModel.save(DFo, fn_img);
 			std::cout<<" Done writing "<<imgno<<" images in "<<fn_img<<std::endl;
 
 		} // end else do_only_one
-
 	}// end project function
 };
 
@@ -470,8 +640,8 @@ int main(int argc, char *argv[])
 	{
 	        //prm.usage();
         	std::cerr << XE;
-	        exit(1);
+	        return RELION_EXIT_FAILURE;
 	}
 
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }

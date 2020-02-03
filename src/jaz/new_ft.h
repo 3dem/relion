@@ -207,7 +207,6 @@ class NewFFT
 		
 	public:
 
-
         /* These plan classes can be copied freely.
            The corresponding pairs of fftw_plan instances
            will be automatically deallocated using fftw_destroy_plan()
@@ -257,10 +256,10 @@ class NewFFT
 							&& (reusable || complexPtr == (double*)MULTIDIM_ARRAY(complex));
                 }
 				
-				bool isReusable() const
-				{
-					return reusable;
-				}
+		bool isReusable() const
+		{
+			return reusable;
+		}
 
             private:
 
@@ -324,18 +323,16 @@ class NewFFT
 							&& (reusable || complexPtr == (float*)MULTIDIM_ARRAY(complex));
                 }
 				
-				bool isReusable() const
-				{
-					return reusable;
-				}
-
-
+		bool isReusable() const
+		{
+			return reusable;
+		}
 
             private:
 
                 class Plan
                 {
-                    public:
+                	public:
 
                         Plan(fftwf_plan forward, fftwf_plan backward)
                         :   forward(forward), backward(backward)
@@ -361,6 +358,19 @@ class NewFFT
         };
 
         static pthread_mutex_t fftw_plan_mutex_new;
+};
+
+// This is to get NewFFTPlan::Plan<RFLOAT>
+template <typename T> struct NewFFTPlan {};
+
+template <> struct NewFFTPlan<double>
+{
+	typedef NewFFT::DoublePlan type;
+};
+
+template <> struct NewFFTPlan<float>
+{
+	typedef NewFFT::FloatPlan type;
 };
 
 #endif

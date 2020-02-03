@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
 
-#
 #if(POLICY CMP0048)
 #  cmake_policy(SET CMP0048 NEW)
 #endif()
@@ -17,6 +16,11 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 add_definitions(-DINSTALL_LIBRARY_DIR=${CMAKE_INSTALL_PREFIX}/lib/)
 add_definitions(-DSOURCE_DIR=${CMAKE_SOURCE_DIR}/src/)
+
+if(MDT_TYPE_CHECK)
+    message(" DEVELOPER MODE: MetaDataTable type check is enabled.")
+    add_definitions(-DMETADATA_TABLE_TYPE_CHECK)
+endif()
 
 # message(STATUS "INSTALL_LIBRARY_DIR set to ${CMAKE_INSTALL_PREFIX}/lib/")
 # message(STATUS "SOURCE_DIR set to ${CMAKE_SOURCE_DIR}/src/")
@@ -79,6 +83,7 @@ endif(NOT DEFINED CUDA_ARCH)
     
 # -------------------------------------------------------------------FURTHER OPTIONS--
 
+
 # CUDA on by default, so check for CPU-accelration request and possible conflicting dual-request
 option(ALTCPU "Enable Accelerated CPU version" OFF)
 if(ALTCPU)
@@ -94,6 +99,13 @@ option(DoublePrec_CPU "DoublePrec_CPU" ON)
 option(DoublePrec_ACC "Accelerated Code use double-precision" OFF)
 option(MKLFFT "Use MKL rather than FFTW for FFT" OFF)
 option(CudaTexture "CudaTexture" ON)
+option(ALLOW_CTF_IN_SAGD "Allow CTF-modulation in SAGD, as specified in Claim 1 of patent US10,282,513B2" ON)
+
+if(ALLOW_CTF_IN_SAGD)
+    message(STATUS "ALLOW_CTF_IN_SAGD enabled - This build of RELION allows modulation of particle images by a contrast transfer function inside stochastic average gradient descent, as specified in Claim 1 of patent US10,282,513B2")
+else()
+    message(STATUS "ALLOW_CTF_IN_SAGD disabled - This build of RELION does not allow modulation of particle images by a contrast transfer function inside stochastic average gradient descent, as specified in Claim 1 of patent US10,282,513B2")
+endif()
 
 if(ALTCPU)
     message(STATUS "ALTCPU enabled - Building CPU-accelerated version of RELION")
@@ -260,6 +272,10 @@ if(ALTCPU)
     add_definitions(-DALTCPU)
 endif()
 
+if(ALLOW_CTF_IN_SAGD)
+    add_definitions(-DALLOW_CTF_IN_SGD)
+endif()
+
 # ---------------------------------------------------------------USE TEXTURES OR NOT--
 if(NOT CudaTexture OR ALTCPU)
     add_definitions(-DPROJECTOR_NO_TEXTURES)
@@ -333,6 +349,12 @@ if(TIFF_FOUND)
 	add_definitions(-DHAVE_TIFF)
 endif()
 
+find_package(ZLIB)
+find_package(PNG)
+if(PNG_FOUND)
+	add_definitions(-DHAVE_PNG)
+endif()
+
 # ----------------------------------------------------------------------COPY SCRIPTS--
 
 if(FORCE_OWN_FFTW)
@@ -366,8 +388,7 @@ if(INSTALL_OWN_FLTK)
 endif()
 
 # -----------------------------------------------------------------RELION COMPONENTS--
-option(BUILD_SHARED_LIBS "BUILD_SHARED_LIBS" ON)
-set(BUILD_SHARED_LIBS OFF)
+option(BUILD_SHARED_LIBS "BUILD_SHARED_LIBS" OFF)
 message("BUILD_SHARED_LIBS = ${BUILD_SHARED_LIBS}")
 if(BUILD_SHARED_LIBS)
     message(STATUS "Building shared libs (smaller build size and binaries)")
@@ -380,6 +401,7 @@ ADD_SUBDIRECTORY(src/apps)
 
 #message(STATUS "CUDA option = ${CUDA}")
 #message(STATUS "ALTCPU option = ${ALTCPU}")
+#message(STATUS "ALLOW_CTF_IN_SAGD option = ${ALLOW_CTF_IN_SAGD}")
 #message(STATUS "DoublePrec_CPU option = ${DoublePrec_CPU}")
 #message(STATUS "DoublePrec_ACC option = ${DoublePrec_ACC}")
 #message(STATUS "MKLFFT option = ${MKLFFT}")

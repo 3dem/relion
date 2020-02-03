@@ -28,62 +28,71 @@
 class IOParser;
 class ObservationModel;
 class MicrographHandler;
+class ReferenceMap;
 
 class FrameRecombiner
 {
-    public:
+	public:
 
-        FrameRecombiner();
+		FrameRecombiner();
 
+		void read(IOParser& parser, int argc, char *argv[]);
 
-        void read(IOParser& parser, int argc, char *argv[]);
+		void init(const std::vector<MetaDataTable>& allMdts,
+		          int verb, int s_ref, int fc, 
+		          double maxFreq, double angpix_ref,
+		          int nr_omp_threads,
+		          std::string outPath, bool debug,
+		          ReferenceMap* reference,
+		          ObservationModel* obsModel,
+		          MicrographHandler* micrographHandler);
 
-        void init(const std::vector<MetaDataTable>& allMdts,
-                  int verb, int s_ref, int fc, 
-				  double maxFreq, int nr_omp_threads,
-                  std::string outPath, bool debug,
-                  ObservationModel* obsModel,
-                  MicrographHandler* micrographHandler);
+		void process(const std::vector<MetaDataTable>& mdts, long g_start, long g_end);
 
-        void process(const std::vector<MetaDataTable>& mdts, long g_start, long g_end);
-
-
-        bool doingRecombination();
+		bool doingRecombination();
 		
 		// has a max. freq. parameter been supplied?
 		bool outerFreqKnown();
 
+		std::vector<MetaDataTable> findUnfinishedJobs(const std::vector<MetaDataTable>& mdts,
+		                                              std::string path);
+		
+		double getOutputPixelSize(int opticsGroup);
+		int getOutputBoxSize(int opticsGroup);
+		std::string getOutputSuffix();
+		bool isCtfMultiplied(int opticsGroup);
 
-        static std::vector<MetaDataTable> findUnfinishedJobs(
-                const std::vector<MetaDataTable>& mdts, std::string path);
+	protected:
 
+		// read from cmd. line:
+		bool doCombineFrames, bfac_diag, do_ctf_multiply, do_recenter;
+		int k0, k1, box_arg, scale_arg, crop_arg;
+		double k0a, k1a, recenter_x, recenter_y, recenter_z;
+		std::string bfacFn, suffix;
 
-    protected:
+		// set at init:
+		int s_ref, sh_ref, fc;
+		std::vector<int> s_mov, s_out, sh_out;
+		int verb, nr_omp_threads;
+		std::string outPath;
+		bool debug;
+		double angpix_ref, maxFreq;
+		std::vector<double> angpix_out;
 
-            // read from cmd. line:
-            bool doCombineFrames, bfac_diag;
-            int k0, k1, box_arg, scale_arg;
-            double k0a, k1a;
-            std::string bfacFn;
+		ReferenceMap* reference;
+		ObservationModel* obsModel;
+		MicrographHandler* micrographHandler;
 
-            // set at init:
-            int s_ref, sh_ref, fc, s_out, sh_out;
-            int verb, nr_omp_threads;
-            std::string outPath;
-            bool debug;
-            double angpix_ref, angpix_out, maxFreq;
+		// computed by weightsFromFCC or weightsFromBfacs:
+		std::vector<std::vector<Image<RFLOAT>>> freqWeights;
 
-            ObservationModel* obsModel;
-            MicrographHandler* micrographHandler;
+		std::vector<Image<RFLOAT>> weightsFromFCC(const std::vector<MetaDataTable>& allMdts,
+		                                          int s, double angpix, std::string og_name);
+		
+		std::vector<Image<RFLOAT>> weightsFromBfacs(const std::vector<MetaDataTable>& allMdts,
+		                                            int s, double angpix);
 
-            // computed by weightsFromFCC or weightsFromBfacs:
-            std::vector<Image<RFLOAT>> freqWeights;
-
-
-        std::vector<Image<RFLOAT>> weightsFromFCC(const std::vector<MetaDataTable>& allMdts);
-        std::vector<Image<RFLOAT>> weightsFromBfacs();
-
-        static bool isJobFinished(std::string filenameRoot);
+		bool isJobFinished(std::string filenameRoot);
 };
 
 #endif

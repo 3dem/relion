@@ -85,6 +85,13 @@ else()
 	#	LOG_BUILD
 	LOG_INSTALL)
 	
+
+	add_custom_command(
+		COMMAND ${CMAKE_COMMAND} -E echo "Registering own FFTW byproducts"
+		OUTPUT "${FFTW_EXTERNAL_PATH}/lib/libfftw3.so"
+		DEPENDS own_fftw_lib)
+	add_custom_target(own_fftw_lib_byproducts
+		DEPENDS "${FFTW_EXTERNAL_PATH}/lib/libfftw3.so")
 	
 	if (FFTW_DOUBLE_REQUIRED AND FFTW_SINGLE_REQUIRED)
 		
@@ -102,6 +109,13 @@ else()
 		LOG_INSTALL)
 	
 		add_dependencies(own_fftwf_lib own_fftw_lib)
+
+		add_custom_command(
+			COMMAND ${CMAKE_COMMAND} -E echo "Registering own FFTWf byproducts"
+			OUTPUT "${FFTW_EXTERNAL_PATH}/lib/libfftw3f.so"
+			DEPENDS own_fftwf_lib)
+		add_custom_target(own_fftwf_lib_byproducts
+			DEPENDS "${FFTW_EXTERNAL_PATH}/lib/libfftw3f.so")
 	endif()
 
 endif()

@@ -21,6 +21,7 @@
 #include "src/micrograph_model.h"
 #include "src/metadata_table.h"
 #include "src/image.h"
+#include "src/motioncorr_runner.h"
 
 // TODO: Think about first frame for local model
 
@@ -204,7 +205,7 @@ void Micrograph::write(FileName filename)
 	if (model != NULL) {
 		MD.setValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model->getModelVersion());
 	} else {
-		MD.setValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, MOTION_MODEL_NULL);
+		MD.setValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, (int)MOTION_MODEL_NULL);
 	}
 	MD.write(fh);
 
@@ -222,6 +223,39 @@ void Micrograph::write(FileName filename)
 		std::string block_name = "local_motion_model";
 		model->write(fh, block_name);
 	}
+
+	MD.clear();
+	MD.setName("hot_pixels");
+	
+	if (hotpixelX.size() != hotpixelY.size())
+		REPORT_ERROR("Logic error: hotpixelX.size() != hotpixelY.size()");
+	for (int i = 0, ilim = hotpixelX.size(); i < ilim; i++)
+	{
+		MD.addObject();
+		MD.setValue(EMDL_IMAGE_COORD_X, (RFLOAT)hotpixelX[i]);
+		MD.setValue(EMDL_IMAGE_COORD_Y, (RFLOAT)hotpixelY[i]);
+	}
+	MD.write(fh);
+	
+	MD.clear();
+	MD.setName("local_shift");
+
+	int n_local_trajectory = localShiftX.size();
+	if (n_local_trajectory != localShiftY.size() || 
+	    n_local_trajectory != patchX.size() ||
+	    n_local_trajectory != patchY.size() ||
+	    n_local_trajectory != patchZ.size())
+		REPORT_ERROR("Logic error: inconsistent local trajectory");
+	for (int i = 0; i < n_local_trajectory; i++)
+	{
+		MD.addObject();
+		MD.setValue(EMDL_MICROGRAPH_FRAME_NUMBER, (int)patchZ[i]);
+		MD.setValue(EMDL_IMAGE_COORD_X, patchX[i]);
+		MD.setValue(EMDL_IMAGE_COORD_Y, patchY[i]);
+		MD.setValue(EMDL_MICROGRAPH_SHIFT_X, localShiftX[i]);
+		MD.setValue(EMDL_MICROGRAPH_SHIFT_Y, localShiftY[i]);
+	}
+	MD.write(fh);
 
 	fh.close();
 }
@@ -248,6 +282,31 @@ int Micrograph::getHeight() const {
 
 int Micrograph::getNframes() const {
 	return n_frames;
+}
+
+void Micrograph::fillDefectAndHotpixels(MultidimArray<bool> &mask) const
+{
+	checkReadyFlag("getShiftAt");
+
+	mask.initZeros(height, width);
+
+	bool fix_defect = (fnDefect != "");
+	if (fnDefect.getExtension() == "txt" && MotioncorrRunner::detectSerialEMDefectText(fnDefect))
+	{	
+                std::cerr << "WARNING: The defect file specified in the micrograph metadata STAR file seems to be a SerialEM's defect file and not in the MotionCor2's format (x y w h). The defect file is ignored." << std::endl;
+		fix_defect = false;
+        }
+
+	if (fix_defect)
+		MotioncorrRunner::fillDefectMask(mask, fnDefect);
+
+	if (hotpixelX.size() != hotpixelY.size())
+		REPORT_ERROR("Logic error: hotpixelX.size() != hotpixelY.size()");
+
+	for (int i = 0, ilim = hotpixelX.size(); i < ilim; i++)
+	{
+		DIRECT_A2D_ELEM(mask, hotpixelY[i], hotpixelX[i]) = true;
+	}
 }
 
 int Micrograph::getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty, bool use_local, bool normalise) const
@@ -308,7 +367,7 @@ void Micrograph::setGlobalShift(int frame, RFLOAT shiftx, RFLOAT shifty)
 	globalShiftY[frame] = shifty;
 }
 
-void Micrograph::read(FileName fn_in)
+void Micrograph::read(FileName fn_in, bool read_hotpixels)
 {
 	if (model != NULL)
 	{
@@ -325,7 +384,7 @@ void Micrograph::read(FileName fn_in)
 		REPORT_ERROR( (std::string) "MicrographModel::read: File " + fn_in + " cannot be read." );
 	}
 
-	MetaDataTable MDglobal;
+	MetaDataTable MDglobal, MDhot;
 
 	// Read Image metadata
 	MDglobal.readStar(in, "general");
@@ -370,7 +429,7 @@ void Micrograph::read(FileName fn_in)
 	if (MDglobal.getValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model_version)) {
 		if (model_version == MOTION_MODEL_THIRD_ORDER_POLYNOMIAL) {
 			model = new ThirdOrderPolynomialModel();
-		} else if (model_version == MOTION_MODEL_NULL) {
+		} else if (model_version == (int)MOTION_MODEL_NULL) {
 			model = NULL;
 		} else {
 			std::cerr << "Warning: Ignoring unknown motion model " << model_version << std::endl;
@@ -399,7 +458,22 @@ void Micrograph::read(FileName fn_in)
 
 		// frame is 1-indexed!
 		globalShiftX[frame - 1] = shiftX;
-        globalShiftY[frame - 1] = shiftY;
+	        globalShiftY[frame - 1] = shiftY;
+	}
+
+	if (read_hotpixels)
+	{
+		MDhot.readStar(in, "hot_pixels");
+		RFLOAT x, y;
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDhot)
+		{
+			if (!MDhot.getValue(EMDL_IMAGE_COORD_X, x) ||
+			    !MDhot.getValue(EMDL_IMAGE_COORD_Y, y))
+				REPORT_ERROR("MicrographModel::read: incorrect hot_pixels table");
+
+			hotpixelX.push_back((int)x);
+			hotpixelY.push_back((int)y);
+		}
 	}
 }
 
@@ -438,6 +512,9 @@ void Micrograph::clearFields()
 	fnGain = "";
 	fnDefect = "";
 
+	hotpixelX.resize(0);
+	hotpixelY.resize(0);
+
 	globalShiftX.resize(0);
 	globalShiftY.resize(0);
 
@@ -468,6 +545,9 @@ void Micrograph::copyFieldsFrom(const Micrograph& m)
 	fnMovie = m.fnMovie;
 	fnGain = m.fnGain;
 	fnDefect = m.fnDefect;
+
+	hotpixelX = m.hotpixelX;
+	hotpixelY = m.hotpixelY;
 
 	globalShiftX = m.globalShiftX;
 	globalShiftY = m.globalShiftY;

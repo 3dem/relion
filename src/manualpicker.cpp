@@ -34,10 +34,10 @@ std::vector<Fl_Check_Button*> check_buttons;
 int last_pick_viewed;
 int last_ctf_viewed;
 
-
 bool   global_has_ctf;
 bool   global_pick_startend;
 RFLOAT global_angpix;
+RFLOAT global_coord_scale;
 RFLOAT global_lowpass;
 RFLOAT global_highpass;
 RFLOAT global_particle_diameter;
@@ -58,7 +58,6 @@ bool global_do_color;
 
 void cb_viewmic(Fl_Widget* w, void* data)
 {
-
 	// Get my own number back
 	int *iptr = (int*)data;
 	int imic = *iptr;
@@ -87,7 +86,6 @@ void cb_viewmic(Fl_Widget* w, void* data)
 		count_displays[last_pick_viewed]->redraw();
 	}
 
-
 	FileName fn_pre, fn_jobnr, fn_post;
 	decomposePipelineSymlinkName(global_fn_mics[imic], fn_pre, fn_jobnr, fn_post);
 	FileName fn_coord = global_fn_odir + fn_post.withoutExtension() + "_" + global_pickname + ".star";
@@ -97,6 +95,7 @@ void cb_viewmic(Fl_Widget* w, void* data)
 	command =  "relion_display --pick  --i " + global_fn_mics[imic];
 	command += "  --coords " + fn_coord;
 	command += " --scale " + floatToString(global_micscale);
+	command += " --coord_scale " + floatToString(global_coord_scale);
 	command += " --black "  + floatToString(global_black_val);
 	command += " --white "  + floatToString(global_white_val);
 	command += " --sigma_contrast "  + floatToString(global_sigma_contrast);
@@ -131,13 +130,10 @@ void cb_viewmic(Fl_Widget* w, void* data)
 			viewmic_buttons[i]->color(GUI_BUTTON_COLOR, GUI_BUTTON_COLOR);
 		}
 	}
-
-
 }
 
 void cb_viewctf(Fl_Widget* w, void* data)
 {
-
 	// Get my own number back
 	int *iptr = (int*)data;
 	int imic = *iptr;
@@ -161,13 +157,10 @@ void cb_viewctf(Fl_Widget* w, void* data)
 			viewctf_buttons[i]->color(GUI_BUTTON_COLOR, GUI_BUTTON_COLOR);
 		}
 	}
-
-
 }
 
 void cb_selectmic(Fl_Widget* w, void* data)
 {
-
 	// Get my own number back
 	int *iptr = (int*)data;
 	int imic = *iptr;
@@ -206,28 +199,26 @@ void cb_selectmic(Fl_Widget* w, void* data)
 			defocus_displays[imic]->deactivate();
 		}
 	}
-
 }
 
 int manualpickerGuiWindow::fill()
 {
-
 	color(GUI_BACKGROUND_COLOR);
 
 
 	Fl_Menu_Bar *menubar = new Fl_Menu_Bar(0, 0, w(), 25);
-    if (do_allow_save)
-    {
-    	menubar->add("File/Save selection",  FL_ALT+'s', cb_menubar_save, this);
-    	menubar->add("File/Invert selection",  FL_ALT+'i', cb_menubar_invert_selection, this);
-    }
-    menubar->add("File/Recount picked particles",  FL_ALT+'c', cb_menubar_recount, this);
-    menubar->add("File/Quit", FL_ALT+'q', cb_menubar_quit, this);
-    int current_y = 25;
+	if (do_allow_save)
+	{
+		menubar->add("File/Save selection",  FL_ALT+'s', cb_menubar_save, this);
+		menubar->add("File/Invert selection",  FL_ALT+'i', cb_menubar_invert_selection, this);
+	}
+	menubar->add("File/Recount picked particles",  FL_ALT+'c', cb_menubar_recount, this);
+	menubar->add("File/Quit", FL_ALT+'q', cb_menubar_quit, this);
+	int current_y = 25;
 
-    // Scroll bars
-    Fl_Scroll scroll(0, current_y, w(), h()-current_y);
-    scroll.type(Fl_Scroll::VERTICAL);
+	// Scroll bars
+	Fl_Scroll scroll(0, current_y, w(), h()-current_y);
+	scroll.type(Fl_Scroll::VERTICAL);
 
 	selected.clear();
 	number_picked.clear();
@@ -270,8 +261,8 @@ int manualpickerGuiWindow::fill()
 		int ystep2 = (fn_mic.length() > MWCOL1/12) ? ystep - 5 : ystep - 10;
 		Fl_Text_Display* mydisp = new Fl_Text_Display(MXCOL0, current_y, MWCOL1, ystep2);
 		mydisp->scrollbar_width(5);
-		mydisp->scroll(0,MWCOL1);
 		mydisp->buffer(textbuff);
+		mydisp->scroll(0, 9999);
 		mydisp->color(GUI_INPUT_COLOR, GUI_INPUT_COLOR);
 		text_displays.push_back(mydisp);
 
@@ -334,18 +325,17 @@ int manualpickerGuiWindow::fill()
 	resizable(*this);
 	show();
 	return Fl::run();
-
 }
 
 void manualpickerGuiWindow::readOutputStarfile()
 {
-
 	if (exists(fn_sel))
 	{
 		for (int imic = 0; imic < selected.size(); imic++)
 			selected[imic] = false;
 		MetaDataTable MDout;
-		MDout.read(fn_sel);
+
+		ObservationModel::loadSafely(fn_sel, obsModel, MDout, "micrographs");
 		FileName fn_mic, fn_mic_in;
 		for (int imic = 0; imic < selected.size(); imic++)
 		{
@@ -388,7 +378,6 @@ void manualpickerGuiWindow::readOutputStarfile()
 	}
 }
 
-
 void manualpickerGuiWindow::writeOutputStarfile()
 {
 	MetaDataTable MDout;
@@ -400,27 +389,32 @@ void manualpickerGuiWindow::writeOutputStarfile()
 		}
 	}
 
-	MDout.write(fn_sel);
-
+	if (obsModel.opticsMdt.numberOfObjects() > 0)
+	{
+		obsModel.save(MDout, fn_sel, "micrographs");
+	}
+	else
+	{
+		MDout.write(fn_sel);
+	}
 }
 void manualpickerGuiWindow::cb_menubar_save(Fl_Widget* w, void* v)
 {
 	manualpickerGuiWindow* T=(manualpickerGuiWindow*)v;
-    T->cb_menubar_save_i();
-
+	T->cb_menubar_save_i();
 }
 
 void manualpickerGuiWindow::cb_menubar_save_i()
 {
 	writeOutputStarfile();
 	std::cout << " Saved " << fn_sel << std::endl;
+	RELION_EXIT_SUCCESS;
 }
 
 void manualpickerGuiWindow::cb_menubar_invert_selection(Fl_Widget* w, void* v)
 {
 	manualpickerGuiWindow* T=(manualpickerGuiWindow*)v;
-    T->cb_menubar_invert_selection_i();
-
+	T->cb_menubar_invert_selection_i();
 }
 
 void manualpickerGuiWindow::cb_menubar_invert_selection_i()
@@ -451,15 +445,14 @@ void manualpickerGuiWindow::cb_menubar_invert_selection_i()
 				viewctf_buttons[imic]->deactivate();
 		}
 	}
-
 }
 
 void manualpickerGuiWindow::cb_menubar_quit(Fl_Widget* w, void* v)
 {
 	manualpickerGuiWindow* T=(manualpickerGuiWindow*)v;
-    T->cb_menubar_quit_i();
-
+	T->cb_menubar_quit_i();
 }
+
 void manualpickerGuiWindow::cb_menubar_quit_i()
 {
 	cb_menubar_save_i();
@@ -469,8 +462,7 @@ void manualpickerGuiWindow::cb_menubar_quit_i()
 void manualpickerGuiWindow::cb_menubar_recount(Fl_Widget* w, void* v)
 {
 	manualpickerGuiWindow* T=(manualpickerGuiWindow*)v;
-    T->cb_menubar_recount_i();
-
+	T->cb_menubar_recount_i();
 }
 void manualpickerGuiWindow::cb_menubar_recount_i()
 {
@@ -510,7 +502,6 @@ void manualpickerGuiWindow::cb_menubar_recount_i()
 		number_picked[imic] = my_nr_picked;
 	}
 	std::cout << " Total number of picked particles: " << global_total_count << " from " << nr_sel_mic << " selected micrographs." << std::endl;
-
 }
 
 
@@ -525,6 +516,7 @@ void ManualPicker::read(int argc, char **argv)
 	fn_sel = parser.getOption("--selection", "STAR file with selected micrographs", "micrographs_selected.star");
 	global_pickname = parser.getOption("--pickname", "Rootname for the picked coordinate files", "manualpick");
 	global_angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "-1."));
+	global_coord_scale = textToFloat(parser.getOption("--coord_scale", "Scale coordinates before display", "1.0"));
 	global_particle_diameter = textToFloat(parser.getOption("--particle_diameter", "Diameter of the circles that will be drawn around each picked particle (in Angstroms)"));
 	global_pick_startend = parser.checkOption("--pick_start_end", "Pick start-end coordinates of helices");
 	do_allow_save = parser.checkOption("--allow_save", "Allow saving of the selected micrographs");
@@ -559,55 +551,26 @@ void ManualPicker::usage()
 
 void ManualPicker::initialise()
 {
-
-	if (global_angpix < 0.)
+	if (fn_in.isStarFile())
 	{
-		if (fn_in.isStarFile())
+		ObservationModel::loadSafely(fn_in, obsModel, MDin, "micrographs");
+		if (obsModel.opticsMdt.containsLabel(EMDL_MICROGRAPH_PIXEL_SIZE))
 		{
-			MetaDataTable MDt;
-			MDt.read(fn_in);
-
-			if (MDt.containsLabel(EMDL_CTF_MAGNIFICATION) && MDt.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
-			{
-				RFLOAT mag, dstep;
-				MDt.getValue(EMDL_CTF_MAGNIFICATION, mag);
-				MDt.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
-				global_angpix = 10000. * dstep / mag;
-				std::cout << " Setting angpix to " << global_angpix << " based on the input STAR file... " << std::endl;
-			}
-			else
-			{
-				std::cerr << " WARNING: no --angpix provided and no information about pixel size in input STAR file. Setting angpix to 1..." << std::endl;
-				global_angpix = 1.;
-			}
+			obsModel.opticsMdt.getValue(EMDL_MICROGRAPH_PIXEL_SIZE, global_angpix, 0);
+			std::cout << " Setting angpix to " << global_angpix << " based on the input STAR file... " << std::endl;
 		}
 		else
 		{
-			std::cerr << " WARNING: no --angpix provided and no information about pixel size in input STAR file. Setting angpix to 1..." << std::endl;
-			global_angpix = 1.;
+			if (global_angpix < 0.)
+			{
+				REPORT_ERROR("ERROR: the input STAR file does not contain the micrograph pixel size, and it is not given through --angpix.");
+			}
+			std::cout << " Setting angpix to " << global_angpix << " based on command-line input... " << std::endl;
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
+			{
+				obsModel.opticsMdt.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, global_angpix);
+			}
 		}
-	}
-
-
-	// If we down-scale the micrograph: always low-pass filter to get better displays
-	if (global_micscale < 1.)
-	{
-		RFLOAT new_nyquist = global_angpix * 2. / global_micscale;
-		if (new_nyquist > global_lowpass)
-			global_lowpass = new_nyquist;
-		std::cout << " Set low-pass filter to " << global_lowpass << " due to downscaling of " << global_micscale << std::endl;
-	}
-
-}
-
-void ManualPicker::run()
-{
-	Fl::scheme("gtk+");
-
-	manualpickerGuiWindow win(TOTALWIDTH, TOTALHEIGHT, "RELION manual-picking GUI");
-	if (fn_in.isStarFile())
-	{
-		MDin.read(fn_in);
 	}
 	else
 	{
@@ -618,13 +581,35 @@ void ManualPicker::run()
 			MDin.addObject();
 			MDin.setValue(EMDL_MICROGRAPH_NAME, glob_fn_mics[imic]);
 		}
+
+		if (global_angpix < 0.)
+		{
+			std::cerr << " WARNING: no --angpix provided and no information about pixel size in input STAR file. Setting angpix to 1..." << std::endl;
+			global_angpix = 1.;
+		}
 	}
+
+	// If we down-scale the micrograph: always low-pass filter to get better displays
+	if (global_micscale < 1.)
+	{
+		RFLOAT new_nyquist = global_angpix * 2. / global_micscale;
+		if (new_nyquist > global_lowpass)
+			global_lowpass = new_nyquist;
+		std::cout << " Set low-pass filter to " << global_lowpass << " due to downscaling of " << global_micscale << std::endl;
+	}
+}
+
+void ManualPicker::run()
+{
+	Fl::scheme("gtk+");
+
+	manualpickerGuiWindow win(TOTALWIDTH, TOTALHEIGHT, "RELION manual-picking GUI");
 
 	// Transfer all parameters to the gui
 	win.MDin = MDin;
+	win.obsModel = obsModel;
 	win.fn_sel = fn_sel;
 	win.do_allow_save = do_allow_save;
 	win.do_fast_save = do_fast_save;
 	win.fill();
-
 }

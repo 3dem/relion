@@ -21,9 +21,10 @@
 #include <src/jaz/refinement_helper.h>
 #include <src/jaz/slice_helper.h>
 #include <src/projector.h>
-#include <src/jaz/filter_helper.h>
+#include <src/jaz/img_proc/filter_helper.h>
 #include <src/jaz/optimization/nelder_mead.h>
 #include <src/jaz/gravis/t4Matrix.h>
+#include <src/jaz/vtk_helper.h>
 
 
 using namespace gravis;
@@ -233,8 +234,9 @@ double RefinementHelper::squaredDiff(
     const long h = prediction.data.ydim;
 
     double out = 0.0;
-
-    const RFLOAT as = (RFLOAT)h * angpix;
+	
+	Image<RFLOAT> ctfImg(w,h);
+	ctf.getFftwImage(ctfImg(), h, h, angpix);
 
     for (long y = 0; y < h; y++)
     for (long x = 0; x < w; x++)
@@ -243,17 +245,9 @@ double RefinementHelper::squaredDiff(
         const Complex vy = DIRECT_A2D_ELEM(observation.data, y, x);
         const RFLOAT vw = DIRECT_A2D_ELEM(weight.data, y, x);
 
-        const double xf = x;
-        const double yf = y < w? y : y - h;
-
-        RFLOAT vm = ctf.getCTF(xf/as, yf/as);
-
-        /*if (vm > 0) vm = 1;
-        else if (vm < 0) vm = -1;*/
-
-        //out += vw * vx.norm() * (vy - vm * vx).norm();
+        RFLOAT vm = ctfImg(y,x);
+		
         out += vw * (vy - vm * vx).norm();
-        //out += vw * vm * (vy.real * vx.real + vy.imag * vx.imag);
     }
 
     return out;

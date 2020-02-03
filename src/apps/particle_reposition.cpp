@@ -20,6 +20,7 @@
 
 #include <src/args.h>
 #include <src/ml_optimiser.h>
+#include <src/jaz/obs_model.h>
 #include <stdlib.h>
 
 class particle_reposition_parameters
@@ -30,6 +31,7 @@ public:
 
 	RFLOAT micrograph_background;
 	bool do_invert;
+    ObservationModel obsModel;
 
 	// I/O Parser
 	IOParser parser;
@@ -62,7 +64,7 @@ public:
 	{
 		int xdim, ydim, radius;
 		MetaDataTable DFi, DFopt;
-		DFi.read(fn_in);
+                ObservationModel::loadSafely(fn_in, obsModel, DFi, "micrographs");
 
 		MlOptimiser optimiser;
 		optimiser.do_preread_images = false;
@@ -75,6 +77,7 @@ public:
 		// Use a user-provided subset of particles instead of all of them?
 		if (fn_dat != "")
 		{
+                    std::cerr <<"Reading data ..." << std::endl;
 			MetaDataTable MDdata;
 			MDdata.read(fn_dat);
 			optimiser.mydata.MDimg = MDdata;
@@ -178,7 +181,7 @@ public:
 					Euler_angles2matrix(rot, tilt, psi, A, false);
 
 					// Get the 2D image (in its ori_size)
-					(optimiser.mymodel.PPref[iclass-1]).get2DFourierTransform(Fref_current_size, A, IS_NOT_INV);
+					(optimiser.mymodel.PPref[iclass-1]).get2DFourierTransform(Fref_current_size, A);
 					windowFourierTransform(Fref_current_size, Frefp, optimiser.mymodel.ori_size);
 
 					if (optimiser.mymodel.data_dim == 2)
@@ -267,8 +270,8 @@ int main(int argc, char *argv[])
 	{
 		//prm.usage();
 		std::cerr << XE;
-		exit(1);
+		return RELION_EXIT_FAILURE;
 	}
 
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }

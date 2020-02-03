@@ -30,52 +30,52 @@ class ObservationModel;
 class TiltEstimator
 {
 	public:
-		
+
 		TiltEstimator();
-		
-		
+
+
 		void read(IOParser& parser, int argc, char *argv[]);
-		
+
 		void init(
-				int verb, int s, int nr_omp_threads,
+				int verb, int nr_omp_threads,
 				bool debug, bool diag, std::string outPath,
-				MetaDataTable& mdt0,
 				ReferenceMap* reference, ObservationModel* obsModel);
-		
+
 		// Compute per-pixel information for one micrograph
 		void processMicrograph(
-				long g, MetaDataTable& mdt, 
+				long g, MetaDataTable& mdt,
 				const std::vector<Image<Complex>>& obs,
-				const std::vector<Image<Complex>>& pred);
-		
-		// Sum up per-pixel information from all micrographs, 
+				const std::vector<Image<Complex>>& pred,
+				bool do_ctf_padding = false);
+
+		// Sum up per-pixel information from all micrographs,
 		// then fit beam-tilt model to the per-pixel fit
 		void parametricFit(
-				const std::vector<MetaDataTable>& mdts, 
-				double Cs, double lambda, 
-				MetaDataTable& mdtOut);
-		
+				const std::vector<MetaDataTable>& mdts,
+				MetaDataTable& optOut, std::vector <FileName> &fn_eps);
+
 		// Has this mdt been processed already?
 		bool isFinished(const MetaDataTable& mdt);
-		
+
+
 	private:
-				
+
 		// cmd. line options (see read())
-		bool aniso;
 		double kmin;
-		
+		int aberr_n_max;
+		double xring0, xring1;
+
 		// parameters obtained through init()
-		int verb, s, sh, nr_omp_threads;
+		int verb, nr_omp_threads;
 		bool debug, diag, ready;
 		std::string outPath;
-		double angpix;
-		
-		std::vector<int> tiltClasses;
-		std::map<int,int> classNameToIndex;
-		
+
+		std::vector<int> s, sh;
+		std::vector<double> angpix;
+
 		ReferenceMap* reference;
 		ObservationModel* obsModel;
-		
+
 };
 
 #endif

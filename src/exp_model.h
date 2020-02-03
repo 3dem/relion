@@ -25,6 +25,8 @@
 #include "src/multidim_array.h"
 #include "src/metadata_table.h"
 #include "src/time.h"
+#include "src/ctf.h"
+#include "src/jaz/obs_model.h"
 
 /// Reserve large vectors with some reasonable estimate
 // Larger numbers will still be OK, but memory management might suffer
@@ -32,89 +34,111 @@
 #define MAX_NR_MICROGRAPHS 2000
 #define MAX_NR_FRAMES_PER_MOVIE 100
 
-////////////// Hierarchical metadata model for tilt series
+////////////// Hierarchical metadata model
 
-class ExpParticle
+class ExpImage
 {
 public:
-	// Particle id
+	// Position of the image in the original input STAR file
 	long int id;
 
-	// ID of the micrograph that this particle comes from
+	// To which particle does this image belong
+	long int particle_id;
+
+	// This is the Nth image in this optics_group, for writing to scratch disk: filenames
+	long int optics_group_id;
+
+	// Name of this image (by this name it will be recognised upon reading)
+	std::string name;
+
+	// ID of the micrograph that this image comes from
 	long int micrograph_id;
 
-	// ID of the group that this particle comes from
+	// ID of the group that this image comes from
 	long int group_id;
 
-	// Random subset this particle belongs to
-	int random_subset;
+	// The optics group for this image
+	int optics_group;
 
 	// Pre-read array of the image in RAM
 	MultidimArray<float> img;
 
 	// Empty Constructor
-	ExpParticle()
-	{
-		clear();
-	}
+	ExpImage() {}
 
 	// Destructor needed for work with vectors
-	~ExpParticle()
+	~ExpImage() {}
+
+	// Copy constructor needed for work with vectors
+	ExpImage(ExpImage const& copy)
 	{
-		clear();
+		id = copy.id;
+		particle_id = copy.particle_id;
+		optics_group_id = copy.optics_group_id;
+		name = copy.name;
+		micrograph_id = copy.micrograph_id;
+		group_id = copy.group_id;
+		optics_group = copy.optics_group;
+		img = copy.img;
+
 	}
 
-	// Initialise
-	void clear()
+	// Define assignment operator in terms of the copy constructor
+	ExpImage& operator=(ExpImage const& copy)
 	{
-		id = micrograph_id = group_id = -1;
-		random_subset = 0;
-		img.clear();
+		id = copy.id;
+		particle_id = copy.particle_id;
+		optics_group_id = copy.optics_group_id;
+		name = copy.name;
+		micrograph_id = copy.micrograph_id;
+		group_id = copy.group_id;
+		optics_group = copy.optics_group;
+		img = copy.img;
+		return *this;
 	}
-
 };
 
-class ExpOriginalParticle
+class ExpParticle
 {
 public:
-	// Name of this particle (by this name it will be recognised upon reading)
+
+	// Name of this particle (by this name all the images inside it will be grouped)
 	std::string name;
 
-	// Random subset this original_particle belongs to
+	// Random subset this particle belongs to
 	int random_subset;
 
-	// All the id's of the particles that were derived from this original particle
-	std::vector<long int> particles_id;
-
-	// Order of those particles in the original particle (extracted from mic_name)
-	std::vector<int> particles_order;
+	// Vector of all the images for this particle
+	std::vector<ExpImage> images;
 
 	// Empty Constructor
-	ExpOriginalParticle()
-	{
-		clear();
-	}
+	ExpParticle() {}
 
 	// Destructor needed for work with vectors
-	~ExpOriginalParticle()
+	~ExpParticle() {}
+
+	// Copy constructor needed for work with vectors
+	ExpParticle(ExpParticle const& copy)
 	{
-		clear();
+		name = copy.name;
+		random_subset = copy.random_subset;
+		images = copy.images;
 	}
 
-	// Initialise
-	void clear()
+	// Define assignment operator in terms of the copy constructor
+	ExpParticle& operator=(ExpParticle const& copy)
 	{
-		name="undefined";
-		particles_id.clear();
-		particles_order.clear();
-		particles_id.reserve(MAX_NR_FRAMES_PER_MOVIE);
-		particles_order.reserve(MAX_NR_FRAMES_PER_MOVIE);
+		name = copy.name;
+		random_subset = copy.random_subset;
+		images = copy.images;
+		return *this;
 	}
 
-	void addParticle(long int _particle_id, int _random_subset, int _order);
-
+	int numberOfImages()
+	{
+		return images.size();
+	}
 };
-
 
 class ExpMicrograph
 {
@@ -125,31 +149,21 @@ public:
 	// Name of this micrograph (by this name it will be recognised upon reading)
 	std::string name;
 
-	// All the particles that were recorded on this micrograph
-	std::vector<long int> particle_ids;
-
-	// All the original particles that were recorded on this average micrograph
-	std::vector<long int> ori_particle_ids;
+	// All the original images that were recorded on this micrograph
+	std::vector<long int> image_ids;
 
 	// Empty Constructor
-	ExpMicrograph()
-	{
-		clear();
-	}
+	ExpMicrograph() {}
 
 	// Destructor needed for work with vectors
-	~ExpMicrograph()
-	{
-		clear();
-	}
+	~ExpMicrograph() {}
 
 	// Copy constructor needed for work with vectors
 	ExpMicrograph(ExpMicrograph const& copy)
 	{
 		id = copy.id;
 		name = copy.name;
-		particle_ids = copy.particle_ids;
-		ori_particle_ids = copy.ori_particle_ids;
+		image_ids = copy.image_ids;
 
 	}
 
@@ -158,21 +172,9 @@ public:
 	{
 		id = copy.id;
 		name = copy.name;
-		particle_ids = copy.particle_ids;
-		ori_particle_ids = copy.ori_particle_ids;
+		image_ids = copy.image_ids;
 		return *this;
 	}
-
-	// Initialise
-	void clear()
-	{
-		id = -1;
-		name="";
-		particle_ids.clear();
-		particle_ids.reserve(MAX_NR_PARTICLES_PER_MICROGRAPH);
-		ori_particle_ids.clear();
-	}
-
 };
 
 class ExpGroup
@@ -181,25 +183,23 @@ public:
 	// ID of this group
 	long int id;
 
+	// The optics_group for this group
+	int optics_group;
+
 	// Name of this group (by this name it will be recognised upon reading)
 	std::string name;
 
 	// Empty Constructor
-	ExpGroup()
-	{
-		clear();
-	}
+	ExpGroup() {}
 
 	// Destructor needed for work with vectors
-	~ExpGroup()
-	{
-		clear();
-	}
+	~ExpGroup() {}
 
 	// Copy constructor needed for work with vectors
 	ExpGroup(ExpGroup const& copy)
 	{
 		id = copy.id;
+		optics_group = copy.optics_group;
 		name = copy.name;
 	}
 
@@ -207,19 +207,17 @@ public:
 	ExpGroup& operator=(ExpGroup const& copy)
 	{
 		id = copy.id;
+		optics_group = copy.optics_group;
 		name = copy.name;
 		return *this;
 	}
-
-	// Initialise
-	void clear()
-	{
-		id = -1;
-		name="";
-	}
-
 };
 
+// for sorting particles based on the optics_group of their first image;
+bool compareOpticsGroupsParticles(const ExpParticle &a, const ExpParticle &b);
+
+// for sorting particles based on the random subset
+bool compareRandomSubsetParticles(const ExpParticle &a, const ExpParticle &b);
 
 class Experiment
 {
@@ -233,38 +231,38 @@ public:
 	// All particles in the experiment
 	std::vector<ExpParticle> particles;
 
-	// All original particles in the experiment
-	std::vector<ExpOriginalParticle> ori_particles;
-
 	// Number of particles in random subsets 1 and 2;
-	long int nr_ori_particles_subset1, nr_ori_particles_subset2;
+	long int nr_particles_subset1, nr_particles_subset2;
 
-	// Experiment-related metadata
-    MetaDataTable MDexp;
+	// Number of images per optics group
+	std::vector<long int> nr_images_per_optics_group;
 
-    // One large MetaDataTable for all images
-    MetaDataTable MDimg;
+	// One large MetaDataTable for all images
+	MetaDataTable MDimg;
 
-    // Number of bodies in multi-body refinement
-    int nr_bodies;
+	// Number of bodies in multi-body refinement
+	int nr_bodies;
 
-    // Vector with MetaDataTables for orientations of different bodies in the multi-body refinement
-    std::vector<MetaDataTable> MDbodies;
+	// Vector with MetaDataTables for orientations of different bodies in the multi-body refinement
+	std::vector<MetaDataTable> MDbodies;
 
-    // One large MetaDataTable for all micrographs
-    MetaDataTable MDmic;
+	// Removed: One large MetaDataTable for all micrographs
+	// MetaDataTable MDmic;
 
-    // Directory on scratch disk to copy particles to
-    FileName fn_scratch;
+	// Observation model holding the data for all optics groups
+	ObservationModel obsModel;
 
-    // Number of particles saved on the scratchdir
-    long int nr_parts_on_scratch;
+	// Directory on scratch disk to copy particles to
+	FileName fn_scratch;
 
-    // Number of Gb on scratch disk before copying particles
-    long int free_space_Gb;
+	// Number of particles saved on the scratchdir, one for each optics_group
+	std::vector<long int> nr_parts_on_scratch;
 
-    // Is this sub-tomograms?
-    bool is_3D;
+	// Number of Gb on scratch disk before copying particles
+	RFLOAT free_space_Gb;
+
+	// Is this sub-tomograms?
+	bool is_3D;
 
 	// Empty Constructor
 	Experiment()
@@ -284,30 +282,23 @@ public:
 		micrographs.clear();
 		micrographs.reserve(MAX_NR_MICROGRAPHS);
 		particles.clear(); // reserve upon reading
-		ori_particles.clear(); // TODO: reserve upon reading
-		nr_ori_particles_subset1 = nr_ori_particles_subset2 = 0;
+		nr_particles_subset1 = nr_particles_subset2 = 0;
 		nr_bodies = 1;
 		fn_scratch = "";
-		nr_parts_on_scratch = 0;
+		nr_parts_on_scratch.clear();
 		free_space_Gb = 10;
 		is_3D = false;
-		MDexp.clear();
-		MDexp.setIsList(true);
 		MDimg.clear();
 		MDimg.setIsList(false);
 		MDbodies.clear();
-		MDmic.clear();
-		MDmic.setIsList(false);
 		MDimg.setName("images");
-		MDmic.setName("micrographs");
-		MDexp.setName("experiment");
 	}
 
 	// Calculate the total number of particles in this experiment
 	long int numberOfParticles(int random_subset = 0);
 
-	// Calculate the total number of particles in this experiment
-	long int numberOfOriginalParticles(int random_subset = 0);
+	// Get the total number of images in a given particle
+	long int numberOfImagesInParticle(long int part_id);
 
 	// Calculate the total number of micrographs in this experiment
 	long int numberOfMicrographs();
@@ -315,49 +306,67 @@ public:
 	// Calculate the total number of groups in this experiment
 	long int numberOfGroups();
 
+	// Calculate the total number of optics groups in this experiment
+	int numberOfOpticsGroups();
+
+	// Is any of the optics groups CTF-premultiplied?
+	bool hasCtfPremultiplied();
+
+	// Get the pixel size for this optics group
+	RFLOAT getOpticsPixelSize(int optics_group);
+
+	// Get the original image size for this optics group
+	int getOpticsImageSize(int optics_group);
+
 	// Get the random_subset for this particle
 	int getRandomSubset(long int part_id);
 
 	// Get the micrograph_id for the N'th image for this particle
-	long int getMicrographId(long int part_id);
+	long int getMicrographId(long int part_id, int img_id);
 
 	// Get the group_id for the N'th image for this particle
-	long int getGroupId(long int part_id);
+	long int getGroupId(long int part_id, int img_id);
+
+	// Get the optics group to which the N'th image for this particle belongs
+	int getOpticsGroup(long int part_id, int img_id);
+
+	// Get the original position in the input STAR file for the N'th image for this particle
+	int getOriginalImageId(long int part_id, int img_id);
+
+	// Get the pixel size for the N-th image of this particle
+	RFLOAT getImagePixelSize(long int part_id, int img_id);
 
 	// Get the metadata-row for this image in a separate MetaDataTable
-	MetaDataTable getMetaDataImage(long int part_id);
+	MetaDataTable getMetaDataImage(long int part_id, int img_id);
 
 	// Add a particle
-	long int addParticle(long int group_id, long int micrograph_id, int random_subset = 0);
+	long int addParticle(std::string part_name, int random_subset = 0);
 
-	// Add an original particle
-	long int addOriginalParticle(std::string part_name, int random_subset = 0);
+ 	// Add an image to the given particle
+	int addImageToParticle(long int part_id, std::string img_name, long int ori_img_id, long int group_id, long int micrograph_id,
+	                       int optics_group, bool unique);
 
 	// Add a group
-	long int addGroup(std::string mic_name);
+	long int addGroup(std::string mic_name, int optics_group);
 
 	// Add a micrograph
 	long int addMicrograph(std::string mic_name);
 
 	// for separate refinement of random halves of the data
-	void divideOriginalParticlesInRandomHalves(int seed, bool do_helical_refine = false);
+	void divideParticlesInRandomHalves(int seed, bool do_helical_refine = false);
 
-	// Randomise the order of the original_particles
-	void randomiseOriginalParticlesOrder(int seed, bool do_split_random_halves = false, bool do_subsets = false);
+	// Randomise the order of the particles
+	void randomiseParticlesOrder(int seed, bool do_split_random_halves = false, bool do_subsets = false);
 
-	// calculate maximum number of images for a particle (possibly within a range of particles)
-	int maxNumberOfImagesPerOriginalParticle(long int first_particle_id = -1, long int last_particle_id = -1);
-
-	// Make sure the particles inside each orriginal_particle are in the right order
-	// After they have been ordered, get rid of the particles_order vector inside the ori_particles
-	void orderParticlesInOriginalParticles();
+	// Make sure the images inside each particle are in the right order
+	void orderImagesInParticles();
 
 	// Add a given number of new bodies (for multi-body refinement) to the Experiment,
 	// by copying the relevant entries from MDimg into MDbodies
 	void initialiseBodies(int _nr_bodies);
 
-	// Get the image name for a given particle_id
-	bool getImageNameOnScratch(long int particle_id, FileName &fn_img, bool is_ctf_image = false);
+	// Get the image name for a given part_id
+	bool getImageNameOnScratch(long int part_id, int img_id, FileName &fn_img, bool is_ctf_image = false);
 
 	// For parallel executions, lock the scratch directory with a unique code, so we won't copy the same data many times to the same position
 	// This determines the lockname and removes the lock if it exists
@@ -368,7 +377,7 @@ public:
 	// Also checks how much free space there is on the scratch dir
 	bool prepareScratchDirectory(FileName _fn_scratch, FileName fn_lock = "");
 
-	void setScratchDirectory(FileName _fn_scratch);
+	void setScratchDirectory(FileName _fn_scratch, bool do_reuse_scratch, int verb=0);
 
 	// Wipe the generic scratch directory clean
 	void deleteDataOnScratch();
@@ -376,22 +385,17 @@ public:
 	// Copy particles from their original position to a scratch directory
 	// Monitor when the scratch disk gets to have fewer than free_scratch_Gb space,
 	// in that case, stop copying, and keep reading particles from where they were...
-	void copyParticlesToScratch(int verb, bool do_copy = true, bool also_do_ctf_image = false, long int free_scratch_Gb = 10);
-
-
-	// Print help message for possible command-line options
-	void usage();
+	void copyParticlesToScratch(int verb, bool do_copy = true, bool also_do_ctf_image = false, RFLOAT free_scratch_Gb = 10);
 
 	// Read from file
-	void read(FileName fn_in, bool do_ignore_original_particle_name = false,
-			bool do_ignore_group_name = false, bool do_preread_images = false,
-			bool need_tiltpsipriors_for_helical_refine = false);
+	void read(
+		FileName fn_in,
+		bool do_ignore_particle_name = false,
+		bool do_ignore_group_name = false, bool do_preread_images = false,
+		bool need_tiltpsipriors_for_helical_refine = false, int verb = 0);
 
 	// Write
 	void write(FileName fn_root);
-
-
-
 };
 
 #endif /* METADATA_MODEL_H_ */

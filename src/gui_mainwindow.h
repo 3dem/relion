@@ -20,9 +20,13 @@
 
 #ifndef SRC_GUI_MAINWINDOW_H_
 #define SRC_GUI_MAINWINDOW_H_
+#define Complex tmpComplex
 #include <FL/Fl_Scroll.H>
 #include "src/gui_jobwindow.h"
+#undef Complex
 #include "src/pipeliner.h"
+#include "src/scheduler.h"
+
 
 #include <time.h>
 #include <signal.h>
@@ -62,6 +66,12 @@
 static Fl_Hold_Browser *browser;
 static Fl_Group *browse_grp[NR_BROWSE_TABS];
 static Fl_Group *background_grp;
+static Fl_Group *pipeliner_jobs_grp;
+static Fl_Group *pipeliner_grp;
+static Fl_Group *scheduler_grp;
+static Fl_Group *scheduler_run_grp;
+static Fl_Group *scheduler_jobs_grp;
+static Fl_Group *expand_stdout_grp;
 static Fl_Choice *display_io_node;
 static Fl_Select_Browser *finished_job_browser, *running_job_browser, *scheduled_job_browser, *input_job_browser, *output_job_browser;
 static Fl_Box *image_box;
@@ -69,6 +79,7 @@ static Fl_Pixmap *xpm_image;
 // For keeping track of which process to use in the process browser on the GUI
 static std::vector<long int> running_processes, finished_processes, scheduled_processes, input_processes, output_processes, io_nodes;
 static bool is_main_continue;
+static bool do_overwrite_continue;
 
 static JobWindow *gui_jobwindows[NR_BROWSE_TABS];
 
@@ -77,7 +88,87 @@ static JobWindow *gui_jobwindows[NR_BROWSE_TABS];
 static Fl_Button *run_button;
 static Fl_Button *print_CL_button;
 static Fl_Button *schedule_button;
+static Fl_Button *expand_stdout_button;
 static Fl_Input *alias_current_job;
+
+// Sjors 27May2019: scheduler
+static Fl_Input *scheduler_job_name;
+static Fl_Button *add_job_button;
+static Fl_Choice *scheduler_job_mode, *scheduler_job_has_started;
+static Fl_Menu_Item job_mode_options[] = {
+			      {"new"},
+			      {"continue"},
+			      {"overwrite"},
+			      {0} // this should be the last entry
+			      };
+static Fl_Menu_Item job_has_started_options[] = {
+			      {"has started"},
+			      {"has not started"},
+			      {0} // this should be the last entry
+			      };
+// Scheduler variables
+static Fl_Hold_Browser *scheduler_variable_browser;
+static Fl_Button *set_scheduler_variable_button, *add_scheduler_operator_button;
+static Fl_Button *delete_scheduler_variable_button, *delete_scheduler_operator_button;
+static Fl_Input *scheduler_variable_name, *scheduler_variable_value;
+//Scheduler Operators
+static Fl_Hold_Browser *scheduler_operator_browser;
+static std::vector<std::string> operators_list;
+static Fl_Menu_Item operator_type_options[] = {
+	   {SCHEDULE_FLOAT_OPERATOR_SET},
+	   {SCHEDULE_FLOAT_OPERATOR_PLUS},
+	   {SCHEDULE_FLOAT_OPERATOR_MINUS},
+	   {SCHEDULE_FLOAT_OPERATOR_MULT},
+	   {SCHEDULE_FLOAT_OPERATOR_DIVIDE},
+	   {SCHEDULE_FLOAT_OPERATOR_ROUND},
+	   {SCHEDULE_FLOAT_OPERATOR_COUNT_IMAGES},
+	   {SCHEDULE_FLOAT_OPERATOR_COUNT_WORDS},
+	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR},
+	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX},
+	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN},
+	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG},
+	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX},
+	   {SCHEDULE_BOOLEAN_OPERATOR_AND},
+	   {SCHEDULE_BOOLEAN_OPERATOR_OR},
+	   {SCHEDULE_BOOLEAN_OPERATOR_NOT},
+	   {SCHEDULE_BOOLEAN_OPERATOR_GT},
+	   {SCHEDULE_BOOLEAN_OPERATOR_LT},
+	   {SCHEDULE_BOOLEAN_OPERATOR_EQ},
+	   {SCHEDULE_BOOLEAN_OPERATOR_GE},
+	   {SCHEDULE_BOOLEAN_OPERATOR_LE},
+	   {SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS},
+	   {SCHEDULE_BOOLEAN_OPERATOR_READ_STAR},
+	   {SCHEDULE_STRING_OPERATOR_JOIN},
+	   {SCHEDULE_STRING_OPERATOR_BEFORE_FIRST},
+	   {SCHEDULE_STRING_OPERATOR_BEFORE_LAST},
+	   {SCHEDULE_STRING_OPERATOR_AFTER_FIRST},
+	   {SCHEDULE_STRING_OPERATOR_AFTER_LAST},
+	   {SCHEDULE_STRING_OPERATOR_READ_STAR},
+	   {SCHEDULE_STRING_OPERATOR_GLOB},
+	   {SCHEDULE_STRING_OPERATOR_NTH_WORD},
+	   {SCHEDULE_OPERATOR_TOUCH_FILE},
+	   {SCHEDULE_OPERATOR_COPY_FILE},
+	   {SCHEDULE_OPERATOR_MOVE_FILE},
+	   {SCHEDULE_OPERATOR_DELETE_FILE},
+	   {SCHEDULE_WAIT_OPERATOR_SINCE_LAST_TIME},
+	   {SCHEDULE_EMAIL_OPERATOR},
+	   {SCHEDULE_EXIT_OPERATOR},
+	   {0} // this should be the last entry
+	   };
+static Fl_Choice *scheduler_operator_type, *scheduler_operator_output, *scheduler_operator_input1, *scheduler_operator_input2;
+// Scheduler jobs
+static Fl_Hold_Browser *scheduler_job_browser, *scheduler_input_job_browser, *scheduler_output_job_browser;
+static Fl_Button *scheduler_delete_job_button;
+
+//Scheduler Edges
+static Fl_Choice *scheduler_edge_input, *scheduler_edge_output, *scheduler_edge_boolean, *scheduler_edge_outputtrue;
+static Fl_Hold_Browser *scheduler_edge_browser;
+static Fl_Button *delete_scheduler_edge_button, *add_scheduler_edge_button;
+// Scheduler current state
+static Fl_Choice *scheduler_current_node;
+static Fl_Button *scheduler_run_button, *scheduler_reset_button, *scheduler_set_current_button;
+static Fl_Button *scheduler_next_button, *scheduler_prev_button;
+static Fl_Button *scheduler_abort_button, *scheduler_unlock_button;
 
 static Fl_Text_Buffer *textbuff_stdout;
 static Fl_Text_Buffer *textbuff_stderr;
@@ -86,11 +177,17 @@ static void Gui_Timer_CB(void *userdata);
 
 // Read-only GUI?
 static bool maingui_do_read_only;
-// Old-style GUI?
-static bool maingui_do_old_style;
+// Show the scheduler view
+extern bool show_scheduler;
+// Show expand stdout view
+extern bool show_expand_stdout;
 
-// Store all the history
+// The pipeline this GUI is acting on
 static PipeLine pipeline;
+
+// The current Scheduler
+static Schedule schedule;
+
 // Which is the current job being displayed?
 static int current_job;
 static FileName global_outputname;
@@ -111,8 +208,8 @@ public:
 	int handle(int ev);
 };
 
-static StdOutDisplay *disp_stdout;
-static StdOutDisplay *disp_stderr;
+static StdOutDisplay *disp_stdout, *disp_expand_stdout;
+static StdOutDisplay *disp_stderr, *disp_expand_stderr;
 
 class NoteEditorWindow : public Fl_Window
 {
@@ -163,6 +260,31 @@ private:
 
 };
 
+/*
+class SchedulerAddVariableOperatorWindow : public Fl_Window
+{
+public:
+
+	Fl_Input *name, *value, *type, *input1, *input2, *output;
+
+	SchedulerAddVariableOperatorWindow(int w, int h, const char* title): Fl_Window(w, h, title){}
+
+	~SchedulerAddVariableOperatorWindow() {};
+
+	int fill(bool is_variable, bool is_add);
+
+private:
+
+	static void cb_add(Fl_Widget*, void*);
+	inline void cb_add_i();
+
+	static void cb_cancel(Fl_Widget*, void*);
+	inline void cb_cancel_i();
+
+
+};
+*/
+
 class GuiMainWindow : public Fl_Window
 {
 
@@ -185,7 +307,7 @@ public:
     std::vector<std::string> commands;
 
     // Constructor with w x h size of the window and a title
-	GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, int _update_every_sec, int _exit_after_sec, bool _do_read_only = false, bool _do_oldstyle= false);
+	GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, FileName fn_sched, int _update_every_sec, int _exit_after_sec, bool _do_read_only = false);
 
     // Destructor
     ~GuiMainWindow(){ clear(); };
@@ -201,6 +323,8 @@ public:
 
     // Update the content of the input and output job lists for the current job
     void fillToAndFromJobLists();
+
+    void fillSchedulerNodesAndVariables();
 
     // Need public access for auto-updating the GUI
     void fillStdOutAndErr();
@@ -254,11 +378,62 @@ private:
     static void cb_display_io_node(Fl_Widget*, void*);
     inline void cb_display_io_node_i();
 
+    static void cb_add_scheduler_edge(Fl_Widget*, void*);
+    inline void cb_add_scheduler_edge_i();
+
+    static void cb_delete_scheduler_edge(Fl_Widget*, void*);
+    inline void cb_delete_scheduler_edge_i();
+
+    static void cb_select_scheduler_edge(Fl_Widget*, void*);
+    inline void cb_select_scheduler_edge_i();
+
+    static void cb_set_scheduler_variable(Fl_Widget*, void*);
+    inline void cb_set_scheduler_variable_i();
+
+    static void cb_delete_scheduler_variable(Fl_Widget*, void*);
+    inline void cb_delete_scheduler_variable_i();
+
+    static void cb_select_scheduler_variable(Fl_Widget*, void*);
+    inline void cb_select_scheduler_variable_i();
+
+    static void cb_add_scheduler_operator(Fl_Widget*, void*);
+    inline void cb_add_scheduler_operator_i();
+
+    static void cb_delete_scheduler_operator(Fl_Widget*, void*);
+    inline void cb_delete_scheduler_operator_i();
+
+    static void cb_select_scheduler_operator(Fl_Widget*, void*);
+    inline void cb_select_scheduler_operator_i();
+
+    static void cb_delete_scheduler_job(Fl_Widget*, void*);
+    inline void cb_delete_scheduler_job_i();
+
+    static void cb_scheduler_add_job(Fl_Widget*, void*);
+    inline void cb_scheduler_add_job_i();
+
+    static void cb_scheduler_set_current(Fl_Widget*, void*);
+    inline void cb_scheduler_set_current_i();
+
+    static void cb_scheduler_next(Fl_Widget*, void*);
+    inline void cb_scheduler_next_i();
+
+    static void cb_scheduler_prev(Fl_Widget*, void*);
+    inline void cb_scheduler_prev_i();
+
+    static void cb_scheduler_unlock(Fl_Widget*, void*);
+    inline void cb_scheduler_unlock_i();
+
+    static void cb_scheduler_abort(Fl_Widget*, void*);
+    inline void cb_scheduler_abort_i();
+
+    static void cb_scheduler_reset(Fl_Widget*, void*);
+    inline void cb_scheduler_reset_i();
+
+    static void cb_scheduler_run(Fl_Widget*, void*);
+    inline void cb_scheduler_run_i();
+
     static void cb_display(Fl_Widget*, void*);
     inline void cb_display_i();
-
-    static void cb_toggle_continue_oldstyle(Fl_Widget*, void*);
-    inline void cb_toggle_continue_oldstyle_i();
 
     inline void cb_toggle_continue_i();
 
@@ -280,8 +455,12 @@ private:
     static void cb_set_alias(Fl_Widget*, void*);
     inline void cb_set_alias_i(std::string newalias = "");
 
+    static void cb_abort(Fl_Widget*, void*);
+    inline void cb_abort_i(std::string newalias = "");
+
     static void cb_mark_as_finished(Fl_Widget*, void*);
-    inline void cb_mark_as_finished_i();
+    static void cb_mark_as_failed(Fl_Widget*, void*);
+    inline void cb_mark_as_finished_i(bool is_failed = false);
 
     static void cb_make_flowchart(Fl_Widget*, void*);
     inline void cb_make_flowchart_i();
@@ -326,14 +505,29 @@ private:
     static void cb_reactivate_runbutton(Fl_Widget*, void*);
     inline void cb_reactivate_runbutton_i();
 
+    static void cb_toggle_overwrite_continue(Fl_Widget*, void*);
+    inline void cb_toggle_overwrite_continue_i();
+
     static void cb_show_initial_screen(Fl_Widget*, void*);
     inline void cb_show_initial_screen_i();
+
+    static void cb_toggle_pipeliner_scheduler(Fl_Widget*, void*);
+    inline void cb_toggle_pipeliner_scheduler_i();
+
+    static void cb_copy_schedule(Fl_Widget*, void*);
+    static void cb_toggle_schedule(Fl_Widget*, void*);
+    static void cb_toggle_pipeline(Fl_Widget*, void*);
+    static void cb_create_schedule(Fl_Widget*, void*);
+    inline void cb_toggle_schedule_i(bool do_pipeline, FileName fn_new_schedule = "");
 
     static void cb_start_pipeliner(Fl_Widget*, void*);
     inline void cb_start_pipeliner_i();
 
     static void cb_stop_pipeliner(Fl_Widget*, void*);
     inline void cb_stop_pipeliner_i();
+
+    static void cb_toggle_expand_stdout(Fl_Widget*, void*);
+    inline void cb_toggle_expand_stdout_i();
 
     static void cb_about(Fl_Widget*, void*);
     inline void cb_about_i();

@@ -23,7 +23,7 @@ public:
 	nr_trans,
 	nr_oversampled_rot,
 	nr_oversampled_trans,
-	nr_particles,
+	nr_images,
 	current_oversampling,
 	current_image_size,
 	iclass_min, iclass_max,
@@ -38,7 +38,7 @@ public:
 		nr_trans(0),
 		nr_oversampled_rot(0),
 		nr_oversampled_trans(0),
-		nr_particles(0),
+		nr_images(0),
 		current_oversampling(0),
 		current_image_size(0),
 		iclass_min(0), iclass_max(0),
@@ -134,33 +134,33 @@ class OptimisationParamters
 public:
 	unsigned metadata_offset;
 
-	unsigned long my_ori_particle;
+	unsigned long part_id;
 
-	std::vector<MultidimArray<Complex > > Fimgs, Fimgs_nomask, local_Fimgs_shifted, local_Fimgs_shifted_nomask;
-	std::vector<MultidimArray<RFLOAT> > Fctfs, local_Fctfs, local_Minvsigma2s;
+	std::vector<MultidimArray<Complex > > Fimg, Fimg_nomask, local_Fimgs_shifted, local_Fimgs_shifted_nomask;
+	std::vector<MultidimArray<RFLOAT> > Fctf, local_Fctf, local_Minvsigma2;
 	std::vector<int> pointer_dir_nonzeroprior, pointer_psi_nonzeroprior;
 	std::vector<RFLOAT> directions_prior, psi_prior, local_sqrtXi2;
-	std::vector<RFLOAT> highres_Xi2_imgs, min_diff2;
+	std::vector<RFLOAT> highres_Xi2_img, min_diff2;
 	MultidimArray<bool> Mcoarse_significant;
 	// And from storeWeightedSums
 	std::vector<RFLOAT> sum_weight, significant_weight, max_weight;
 	std::vector<Matrix1D<RFLOAT> > old_offset, prior;
-	std::vector<MultidimArray<RFLOAT> > power_imgs;
+	std::vector<MultidimArray<RFLOAT> > power_img;
 	MultidimArray<XFLOAT> Mweight;
 	std::vector<Indices> max_index;
 
-	OptimisationParamters (unsigned nr_particles, unsigned long my_ori_particle):
+	OptimisationParamters (unsigned nr_images, unsigned long part_id):
 		metadata_offset(0),
-		my_ori_particle(my_ori_particle)
+		part_id(part_id)
 	{
-		power_imgs.resize(nr_particles);
-		highres_Xi2_imgs.resize(nr_particles);
-		Fimgs.resize(nr_particles);
-		Fimgs_nomask.resize(nr_particles);
-		Fctfs.resize(nr_particles);
-		old_offset.resize(nr_particles);
-		prior.resize(nr_particles);
-		max_index.resize(nr_particles);
+		power_img.resize(nr_images);
+		highres_Xi2_img.resize(nr_images);
+		Fimg.resize(nr_images);
+		Fimg_nomask.resize(nr_images);
+		Fctf.resize(nr_images);
+		old_offset.resize(nr_images);
+		prior.resize(nr_images);
+		max_index.resize(nr_images);
 	};
 };
 

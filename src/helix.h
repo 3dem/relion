@@ -3,6 +3,8 @@
  * Author: "Shaoda He"
  * MRC Laboratory of Molecular Biology
  *
+ * Kent Thurber from the NIH provided code for rot-angle priors (indicated with // KThurber comments)
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -29,6 +31,8 @@
 #include "src/transformations.h"
 #include "src/euler.h"
 #include "src/assembly.h"
+#include "src/jaz/obs_model.h"
+#include "src/time.h"
 #include <set>
 
 #define CART_TO_HELICAL_COORDS true
@@ -98,9 +102,9 @@ bool localSearchHelicalSymmetry(
 		std::ostream* o_ptr = NULL);
 
 RFLOAT getHelicalSigma2Rot(
-		RFLOAT helical_rise_pix,
+		RFLOAT helical_rise_Angst,
 		RFLOAT helical_twist_deg,
-		RFLOAT helical_offset_step_pix,
+		RFLOAT helical_offset_step_Angst,
 		RFLOAT rot_step_deg,
 		RFLOAT old_sigma2_rot);
 
@@ -132,44 +136,6 @@ void imposeHelicalSymmetryInRealSpace(
 		RFLOAT rise_A,
 		RFLOAT twist_deg,
 		RFLOAT cosine_width_pix);
-
-/*
-void searchCnZSymmetry(
-		const MultidimArray<RFLOAT>& v,
-		RFLOAT r_min_pix,
-		RFLOAT r_max_pix,
-		int cn_start,
-		int cn_end,
-		std::vector<RFLOAT>& cn_list,
-		std::vector<RFLOAT>& cc_list,
-		std::vector<int>& nr_asym_voxels_list,
-		std::ofstream* fout_ptr = NULL);
-*/
-
-/*
-RFLOAT calcCCofPsiFor2DHelicalSegment(
-		const MultidimArray<RFLOAT>& v,
-		RFLOAT psi_deg,
-		RFLOAT pixel_size_A,
-		RFLOAT sphere_radius_A,
-		RFLOAT cyl_outer_radius_A);
-
-
-RFLOAT localSearchPsiFor2DHelicalSegment(
-		const MultidimArray<RFLOAT>& v,
-		RFLOAT pixel_size_A,
-		RFLOAT sphere_radius_A,
-		RFLOAT cyl_outer_radius_A,
-		RFLOAT ori_psi_deg,
-		RFLOAT search_half_range_deg,
-		RFLOAT search_step_deg);
-
-RFLOAT searchPsiFor2DHelicalSegment(
-		const MultidimArray<RFLOAT>& v,
-		RFLOAT pixel_size_A,
-		RFLOAT sphere_radius_A,
-		RFLOAT cyl_outer_radius_A);
-*/
 
 // Some functions only for specific testing
 void calcRadialAverage(
@@ -217,14 +183,6 @@ void transformCartesianAndHelicalCoords(
 		int dim,
 		bool direction);
 
-/*
-void makeBlot(
-		MultidimArray<RFLOAT>& v,
-		RFLOAT y,
-		RFLOAT x,
-		RFLOAT r);
-*/
-
 // C1 Helix
 // If radius_A < 0, detect the radius of original assembly and calculate r as sqrt(x^2 + y^2)
 void makeSimpleHelixFromPDBParticle(
@@ -235,15 +193,6 @@ void makeSimpleHelixFromPDBParticle(
 		RFLOAT rise_A,
 		int nr_copy,
 		bool do_center = false);
-
-/*
-void normalise2DImageSlices(
-		const FileName& fn_in,
-		const FileName& fn_out,
-		int bg_radius,
-		RFLOAT white_dust_stddev = -1.,
-		RFLOAT black_dust_stddev = -1.);
-*/
 
 void applySoftSphericalMask(
 		MultidimArray<RFLOAT>& v,
@@ -282,13 +231,6 @@ void combineParticlePriorsWithKaiLocalCTF(
 		FileName& fn_local_ctf,
 		FileName& fn_combined);
 
-/*
-void addPriorsToParticleDataFile(
-		FileName& fn_priors,
-		FileName& fn_data,
-		FileName& fn_out);
-*/
-
 // Files of priors: mic1_priors.star, files of local CTF: mic1_local.star
 // Then suffix_priors = _priors.star, suffix_local_ctf = _local.star
 void combineParticlePriorsWithKaiLocalCTF_Multiple(
@@ -314,6 +256,7 @@ void convertHelicalSegmentCoordsToStarFile_Multiple(
 		FileName& suffix_coords,
 		FileName& suffix_out,
 		int format_tag,
+		RFLOAT pixel_size_A,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT boxsize,
@@ -335,6 +278,7 @@ void convertXimdispHelicalSegmentCoordsToMetaDataTable(
 		MetaDataTable& MD_out,
 		int& total_segments,
 		int& total_tubes,
+		RFLOAT pixel_size_A,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
@@ -359,6 +303,7 @@ void convertEmanHelicalSegmentCoordsToMetaDataTable(
 		MetaDataTable& MD_out,
 		int& total_segments,
 		int& total_tubes,
+		RFLOAT pixel_size_A,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
@@ -378,13 +323,6 @@ void convertEmanHelicalTubeCoordsToMetaDataTable(
 		bool bimodal_angular_priors = true,
 		bool cut_into_segments = true);
 
-/*
-void divideHelicalSegmentsFromMultipleMicrographsIntoRandomHalves(
-		FileName& fn_in,
-		FileName& fn_out,
-		int random_seed = -1);
-*/
-
 void makeHelicalReference2D(
 		MultidimArray<RFLOAT>& out,
 		int box_size,
@@ -392,18 +330,6 @@ void makeHelicalReference2D(
 		RFLOAT tube_diameter_A,
 		RFLOAT pixel_size_A,
 		bool is_tube_white = true);
-
-/*
-void makeHelicalReference3D(
-		MultidimArray<RFLOAT>& out,
-		int box_size,
-		RFLOAT pixel_size_A,
-		RFLOAT twist_deg,
-		RFLOAT rise_A,
-		RFLOAT tube_diameter_A,
-		RFLOAT particle_diameter_A,
-		int sym_Cn);
-*/
 
 void makeHelicalReference3DWithPolarity(
 		MultidimArray<RFLOAT>& out,
@@ -417,18 +343,6 @@ void makeHelicalReference3DWithPolarity(
 		RFLOAT topbottom_ratio,
 		int sym_Cn = 1,
 		int nr_filaments_helix_with_seam = -1);
-
-/*
-void makeHelicalReconstructionStarFileFromSingle2DClassAverage(
-		FileName& fn_in_class2D,
-		FileName& fn_out_star,
-		RFLOAT pixel_size_A,
-		RFLOAT twist_deg,
-		RFLOAT rise_A,
-		RFLOAT tilt_deg,
-		RFLOAT psi_deg,
-		int nr_projections);
-*/
 
 void divideStarFile(
 		FileName& fn_in,
@@ -497,14 +411,15 @@ public:
 	std::string helical_tube_name;
 	long int MDobjectID;
 	RFLOAT rot_deg, psi_deg, tilt_deg;
-	RFLOAT dx_pix, dy_pix, dz_pix;
-	RFLOAT track_pos_pix;
-	bool has_wrong_polarity;
+	RFLOAT dx_A, dy_A, dz_A;
+	RFLOAT track_pos_A;
+	bool has_wrong_polarity, has_wrong_rot;	// KThurber
 	int subset, classID;
 
-	RFLOAT psi_prior_deg, tilt_prior_deg;
-	RFLOAT dx_prior_pix, dy_prior_pix, dz_prior_pix;
-	RFLOAT psi_flip_ratio;
+	RFLOAT rot_prior_deg, psi_prior_deg, tilt_prior_deg;  // KThurber
+	RFLOAT dx_prior_A, dy_prior_A, dz_prior_A;
+	RFLOAT psi_flip_ratio, rot_flip_ratio;	// KThurber
+	bool psi_prior_flip;	// KThurber
 
 	void clear();
 
@@ -523,16 +438,48 @@ void flipPsiTiltForHelicalSegment(
 		RFLOAT& new_psi,
 		RFLOAT& new_tilt);
 
+// KThurber add this function
+void flipRotPsiTiltForHelicalSegment(
+		RFLOAT old_rot,
+		RFLOAT old_psi,
+		RFLOAT old_tilt,
+		RFLOAT& new_rot,
+		RFLOAT& new_psi,
+		RFLOAT& new_tilt);
+
+// KThurber add this function
+void flipRotPsiTiltPriorsForHelicalSegment(
+		RFLOAT old_rot,
+		RFLOAT old_psi,
+		RFLOAT old_tilt,
+		RFLOAT old_pitch,
+		bool old_psi_prior_flip,
+		RFLOAT& new_rot,
+		RFLOAT& new_psi,
+		RFLOAT& new_tilt,
+		RFLOAT& new_pitch,
+		bool& new_psi_prior_flip);
+
+// KThurber add this function
+void flipRotForHelicalSegment(
+		RFLOAT old_rot,
+		RFLOAT& new_rot);
+
 void updatePriorsForOneHelicalTube(
 		std::vector<HelicalSegmentPriorInfoEntry>& list,
 		int sid,
 		int eid,
 		int& nr_wrong_polarity,
+		int& nr_wrong_rot,	// KThurber
 		RFLOAT sigma_segment_dist,
+		std::vector<RFLOAT> helical_rise,
+		std::vector<RFLOAT> helical_twist,
 		bool is_3D,
 		bool do_auto_refine,
 		bool do_local_angular_searches,
 		bool do_exclude_out_of_range_trans,
+		bool psi_prior_flip,     // KThurber
+		RFLOAT sigma2_rot,       // KThurber
 		RFLOAT sigma2_tilt,
 		RFLOAT sigma2_psi,
 		RFLOAT sigma2_offset,
@@ -541,7 +488,10 @@ void updatePriorsForOneHelicalTube(
 void updatePriorsForHelicalReconstruction(
 		MetaDataTable& MD,
 		int& total_opposite_polarity,
+		int& total_opposite_rot,	// KThurber
 		RFLOAT sigma_segment_dist,
+		std::vector<RFLOAT> helical_rise,
+		std::vector<RFLOAT> helical_twist,
 		bool is_3D,
 		bool do_auto_refine,
 		bool do_local_angular_searches,
@@ -560,6 +510,8 @@ void updateAngularPriorsForHelicalReconstruction(
 void testDataFileTransformXY(MetaDataTable& MD);
 
 void setPsiFlipRatioInStarFile(MetaDataTable& MD, RFLOAT ratio = 0.);
+
+void setRotFlipRatioInStarFile(MetaDataTable& MD, RFLOAT ratio = 0.);	// KThurber
 
 void plotLatticePoints(MetaDataTable& MD,
 		int x1, int y1, int x2, int y2);
@@ -640,5 +592,12 @@ void select3DsubtomoFrom2Dproj(
 		MetaDataTable& MD_2d,
 		MetaDataTable& MD_3d,
 		MetaDataTable& MD_out);
+
+void averageAsymmetricUnits2D(
+		ObservationModel& obsModel,
+		MetaDataTable &MDimgs,
+		FileName fn_o_root,
+		int nr_asu,
+		RFLOAT rise);
 
 #endif /* HELIX_H_ */

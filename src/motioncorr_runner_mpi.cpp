@@ -49,8 +49,6 @@ void MotioncorrRunnerMpi::run()
 	{
 		if (do_own)
 			 std::cout << " Correcting beam-induced motions using our own implementation ..." << std::endl;
-		else if (do_unblur)
-			std::cout << " Correcting beam-induced motions using Tim Grant's UNBLUR ..." << std::endl;
 		else if (do_motioncor2)
 			std::cout << " Correcting beam-induced motions using Shawn Zheng's MOTIONCOR2 ..." << std::endl;
 		else
@@ -65,13 +63,19 @@ void MotioncorrRunnerMpi::run()
 		if (verb > 0 && imic % barstep == 0)
 			progress_bar(imic);
 
+		// Abort through the pipeline_control system
+		if (pipeline_control_check_abort_job())
+			MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
+
 		Micrograph mic(fn_micrographs[imic], fn_gain_reference, bin_factor);
+
+		// Get angpix and voltage from the optics groups:
+		obsModel.opticsMdt.getValue(EMDL_CTF_VOLTAGE, voltage, optics_group_micrographs[imic]-1);
+		obsModel.opticsMdt.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix, optics_group_micrographs[imic]-1);
 
 		bool result;
 		if (do_own)
 			result = executeOwnMotionCorrection(mic);
-		else if (do_unblur)
-			result = executeUnblur(mic);
 		else if (do_motioncor2)
 			result = executeMotioncor2(mic, node->rank);
 		else

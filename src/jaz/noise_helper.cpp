@@ -21,7 +21,7 @@
 #include "src/jaz/noise_helper.h"
 #include "src/jaz/vtk_helper.h"
 #include "src/jaz/distribution_helper.h"
-#include "src/jaz/filter_helper.h"
+#include "src/jaz/img_proc/filter_helper.h"
 #include <omp.h>
 
 
@@ -66,7 +66,7 @@ Image<RFLOAT> NoiseHelper::predictCCNoise(Projector &prj, double sigma2,
 
         spec.data.initZeros();
 
-        prj.get2DFourierTransform(spec.data, A3D, false);
+        prj.get2DFourierTransform(spec.data, A3D);
 
         double defocus = DistributionHelper::sampleGauss(defocusMu, defocusSigma);
 
@@ -449,6 +449,76 @@ Image<Complex> NoiseHelper::radialMap(std::vector<Complex> &radAvg)
             DIRECT_A2D_ELEM(out.data, yy, xx) = radAvg[b-1];
         }
     }
+
+	return out;
+}
+
+std::vector<std::pair<double,double>> NoiseHelper::radialAverageAndStdDevFFTW(Image<RFLOAT> &map)
+{
+	const int w = map.data.xdim;
+    const int h = map.data.ydim;
+    const int b = w;
+
+    std::vector<double> avg(b, 0.0);
+	std::vector<double> wgh(b, 0.0);
+	std::vector<double> var(b, 0.0);
+
+    for (int yy = 0; yy < h; yy++)
+    for (int xx = 0; xx < w; xx++)
+    {
+        double x = xx;
+        double y = yy < h/2.0? yy : yy - h;
+        double rd = sqrt(x*x + y*y);
+
+        int r = (int)(rd+0.5);
+
+        if (r < b)
+        {
+            avg[r] += DIRECT_A2D_ELEM(map.data, yy, xx);
+            wgh[r] += 1.0;
+        }
+    }
+
+    for (int i = 0; i < b; i++)
+    {
+        if (wgh[i] > 0.0)
+        {
+            avg[i] /= wgh[i];
+        }
+    }
+
+	for (int yy = 0; yy < h; yy++)
+    for (int xx = 0; xx < w; xx++)
+    {
+        double x = xx;
+        double y = yy < h/2.0? yy : yy - h;
+        double rd = sqrt(x*x + y*y);
+
+		int r = (int)(rd+0.5);
+
+		double mu = avg[r];
+		double v = DIRECT_A2D_ELEM(map.data, yy, xx) - mu;
+
+        if (r < b)
+        {
+            var[r] += v*v;
+        }
+    }
+
+	for (int i = 0; i < b; i++)
+    {
+        if (wgh[i] > 1.0)
+        {
+            var[i] /= (wgh[i]-1);
+        }
+    }
+
+	std::vector<std::pair<double,double>> out(b);
+
+	for (int i = 0; i < b; i++)
+    {
+		out[i] = std::make_pair(avg[i], sqrt(var[i]));
+	}
 
     return out;
 }

@@ -38,8 +38,8 @@ MicrographHandler::MicrographHandler()
 
 void MicrographHandler::init(
 		// in:
-		const MetaDataTable& mdt,
-		double angpix, bool verb,
+		const std::vector<MetaDataTable>& mdts,
+		bool verb,
 		int nr_omp_threads,
 		// out:
 		int& fc,
@@ -53,7 +53,9 @@ void MicrographHandler::init(
 	if (corrMicFn != "")
 	{
 		MetaDataTable corrMic;
-		corrMic.read(corrMicFn);
+		ObservationModel obsModel;
+		// Don't die even if conversion failed. Polishing does not use obsModel from a motion correction STAR file
+		ObservationModel::loadSafely(corrMicFn, obsModel, corrMic, "micrographs", verb, false);
 		mic2meta.clear();
 
 		std::string micName, metaName;
@@ -75,6 +77,7 @@ void MicrographHandler::init(
 			FileName fn_pre, fn_jobnr, fn_post;
 			decomposePipelineFileName(micName, fn_pre, fn_jobnr, fn_post);
 
+//			std::cout << fn_post << " => " << metaName << std::endl;
 			mic2meta[fn_post] = metaName;
 		}
 
@@ -85,9 +88,7 @@ void MicrographHandler::init(
 		hasCorrMic = false;
 	}
 
-	loadInitial(
-				mdt, angpix, verb,
-				fc, dosePerFrame, metaFn);
+	loadInitial(mdts, verb, fc, dosePerFrame, metaFn);
 
 	ready = true;
 }
@@ -97,7 +98,7 @@ std::vector<MetaDataTable> MicrographHandler::cullMissingMovies(
 {
 	if (!ready)
 	{
-		REPORT_ERROR("ERROR: MicrographHandler::loadMovie - MicrographHandler not initialized.");
+//		REPORT_ERROR("ERROR: MicrographHandler::cullMissingMovies - MicrographHandler not initialized.");
 	}
 
 	std::vector<MetaDataTable> good(0);
@@ -107,13 +108,15 @@ std::vector<MetaDataTable> MicrographHandler::cullMissingMovies(
 
 	for (int m = 0; m < mc; m++)
 	{
-		if (isMoviePresent(mdts[m]))
+		if (isMoviePresent(mdts[m], false))
 		{
 			good.push_back(mdts[m]);
 		}
 		else
 		{
-			bad.push_back(getMovieFilename(mdts[m]));
+			FileName fn_movie;
+			mdts[m].getValueToString(EMDL_MICROGRAPH_NAME, fn_movie, 0);
+			bad.push_back(fn_movie);
 		}
 	}
 
@@ -121,11 +124,11 @@ std::vector<MetaDataTable> MicrographHandler::cullMissingMovies(
 	{
 		if (bad.size() == 1)
 		{
-			std::cerr << " - The following micrograph is missing:\n";
+			std::cerr << " - The movie for the following micrograph is missing:\n";
 		}
 		else
 		{
-			std::cerr << " - The following micrographs are missing:\n";
+			std::cerr << " - Movies for the following micrographs are missing:\n";
 		}
 
 		for (int i = 0; i < bad.size(); i++)
@@ -142,7 +145,7 @@ void MicrographHandler::findLowestFrameCount(
 {
 	if (!ready)
 	{
-		REPORT_ERROR("ERROR: MicrographHandler::loadMovie - MicrographHandler not initialized.");
+		REPORT_ERROR("ERROR: MicrographHandler::findLowestFrameCount - MicrographHandler not initialized.");
 	}
 
 	int fcmin = std::numeric_limits<int>::max();
@@ -180,7 +183,7 @@ std::vector<MetaDataTable> MicrographHandler::findLongEnoughMovies(
 {
 	if (!ready)
 	{
-		REPORT_ERROR("ERROR: MicrographHandler::loadMovie - MicrographHandler not initialized.");
+		REPORT_ERROR("ERROR: MicrographHandler::findLongEnoughMovies - MicrographHandler not initialized.");
 	}
 
 	std::vector<MetaDataTable> good(0);
@@ -230,20 +233,32 @@ std::vector<MetaDataTable> MicrographHandler::findLongEnoughMovies(
 	return good;
 }
 
+// This reads pixel sizes from a single metadata star file.
+// For multi optics group scenarios, we should process only micrographs
+// in the given MotionCorr STAR file. Then we can safely assume all pixel sizes are the same.
+// TODO: TAKANORI: make sure in MotionCorr runner and Polish
 void MicrographHandler::loadInitial(
-		const MetaDataTable& mdt, double angpix, bool verb,
+		const std::vector<MetaDataTable>& mdts, bool verb,
 		int& fc, double& dosePerFrame, std::string& metaFn)
 {
 	if (hasCorrMic)
 	{
 		std::string mgFn;
-		mdt.getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
-
-		// remove the pipeline job prefix
 		FileName fn_pre, fn_jobnr, fn_post;
-		decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);
 
-		metaFn = getMetaName(fn_post);
+		for (int i = 0, ilim = mdts.size(); i < ilim; i++)
+		{
+			mdts[i].getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
+
+			// remove the pipeline job prefix
+			decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);
+
+			metaFn = getMetaName(fn_post, false);
+			if (metaFn != "") break;
+		}
+
+		if (metaFn == "")
+			REPORT_ERROR("There is no movie metadata STAR file for any micrographs!");
 
 		if (debug)
 		{
@@ -315,7 +330,7 @@ void MicrographHandler::loadInitial(
 	else
 	{
 		std::string mgFn0;
-		mdt.getValueToString(EMDL_MICROGRAPH_NAME, mgFn0, 0);
+		mdts[0].getValueToString(EMDL_MICROGRAPH_NAME, mgFn0, 0);
 		FileName fn_pre, fn_jobnr, fn_post;
 		decomposePipelineFileName(mgFn0, fn_pre, fn_jobnr, fn_post);
 
@@ -344,10 +359,15 @@ void MicrographHandler::loadInitial(
 			}
 		}
 	}
+}
+
+void MicrographHandler::validatePixelSize(RFLOAT angpix) const
+{
+//	std::cout << "angpix = " << angpix << " coords_angpix = " << coords_angpix << " movie_angpix = " << movie_angpix << std::endl;
 
 	if (angpix < coords_angpix - 1e-9)
 	{
-		std::cerr << "WARNING: pixel size (--angpix) is greater than the AutoPick pixel size (--coords_angpix)\n";
+		std::cerr << "WARNING: pixel size (--angpix) is smaller than the AutoPick pixel size (--coords_angpix)\n";
 
 		if (coords_angpix < angpix + 0.01)
 		{
@@ -359,7 +379,7 @@ void MicrographHandler::loadInitial(
 
 	if (angpix < movie_angpix - 1e-9)
 	{
-		std::cerr << "WARNING: pixel size (--angpix) is greater than the movie pixel size (--movie_angpix)\n";
+		std::cerr << "WARNING: pixel size (--angpix) is smaller than the movie pixel size (--movie_angpix)\n";
 
 		if (movie_angpix < angpix + 0.01)
 		{
@@ -397,6 +417,11 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 
 		std::string mgFn = micrograph.getMovieFilename();
 		std::string gainFn = micrograph.getGainFilename();
+		MultidimArray<bool> defectMask;
+
+		bool hasDefect = (micrograph.fnDefect != "" || micrograph.hotpixelX.size() != 0);
+		if (hasDefect)
+			micrograph.fillDefectAndHotpixels(defectMask);
 
 		if (debug)
 		{
@@ -420,18 +445,14 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 		}
 
 		movie = StackHelper::extractMovieStackFS(
-					&mdt, mgHasGain? &lastGainRef : 0,
+					&mdt, mgHasGain? &lastGainRef : 0, hasDefect ? &defectMask : 0,
 					mgFn, angpix, coords_angpix, movie_angpix, s,
 					nr_omp_threads, true, firstFrame, lastFrame,
 					hotCutoff, debug, saveMem, offsets_in, offsets_out);
 	}
 	else
 	{
-		movie = StackHelper::extractMovieStackFS(
-					&mdt, 0,
-					fn_post, angpix, coords_angpix, movie_angpix, s,
-					nr_omp_threads, true, firstFrame, lastFrame,
-					hotCutoff, debug, saveMem, offsets_in, offsets_out);
+		REPORT_ERROR("You can no longer use this program without micrograph metadata STAR files.");
 	}
 
 	const int pc = movie.size();
@@ -519,14 +540,18 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 	return out;
 }
 
-std::string MicrographHandler::getMetaName(std::string micName)
+std::string MicrographHandler::getMetaName(std::string micName, bool die_on_error)
 {
+//	std::cout << "MicrographHandler::getMetaName " << micName << std::endl;
 	std::map<std::string, std::string>::iterator it = mic2meta.find(micName);
 
 	if (it == mic2meta.end())
 	{
-		REPORT_ERROR("ERROR: MicrographHandler::getMetaName: no metadata star-file for "
-					 +micName+" found in "+corrMicFn+".");
+		if (die_on_error)
+			REPORT_ERROR("ERROR: MicrographHandler::getMetaName: no metadata star-file for "
+			              +micName+" found in "+corrMicFn+".");
+		else
+			return "";
 	}
 	else
 	{
@@ -572,18 +597,16 @@ int MicrographHandler::determineFrameCount(const MetaDataTable &mdt)
 	return fc;
 }
 
-bool MicrographHandler::isMoviePresent(const MetaDataTable &mdt)
+bool MicrographHandler::isMoviePresent(const MetaDataTable &mdt, bool die_on_error)
 {
 	std::string mgFn;
-	mdt.getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
-
 	FileName fn_pre, fn_jobnr, fn_post;
+	mdt.getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
 	decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);
 
 	if (hasCorrMic)
 	{
-		std::string metaFn = getMetaName(fn_post);
-
+		std::string metaFn = getMetaName(fn_post, die_on_error);
 		if (exists(metaFn))
 		{
 			micrograph = Micrograph(metaFn);
@@ -601,7 +624,7 @@ bool MicrographHandler::isMoviePresent(const MetaDataTable &mdt)
 	}
 }
 
-std::string MicrographHandler::getMovieFilename(const MetaDataTable& mdt)
+std::string MicrographHandler::getMovieFilename(const MetaDataTable& mdt, bool die_on_error)
 {
 	std::string mgFn;
 	mdt.getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
@@ -611,7 +634,7 @@ std::string MicrographHandler::getMovieFilename(const MetaDataTable& mdt)
 
 	if (hasCorrMic)
 	{
-		std::string metaFn = getMetaName(fn_post);
+		std::string metaFn = getMetaName(fn_post, die_on_error);
 
 		if (exists(metaFn))
 		{

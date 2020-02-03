@@ -68,8 +68,7 @@ public:
 	// set up the tabs
 	void setupTabs(int nr_tabs);
 
-	// General initialise
-	void initialise(int my_job_type, bool _do_oldstyle = false);
+	void initialise(int my_job_type);
 
 	void resetHeight();
 
@@ -104,6 +103,7 @@ private:
 	static void cb_menu_continue(Fl_Widget*, void*);
 	inline void cb_menu_continue_i();
 
+
 	// initialise the window for each of the jobtypes
 	void initialiseImportWindow();
 	void initialiseMotioncorrWindow();
@@ -111,15 +111,12 @@ private:
 	void initialiseManualpickWindow();
 	void initialiseAutopickWindow();
 	void initialiseExtractWindow();
-	void initialiseSortWindow();
 	void initialiseSelectWindow();
 	void initialiseClass2DWindow();
 	void initialiseInimodelWindow();
 	void initialiseClass3DWindow();
 	void initialiseAutorefineWindow();
 	void initialiseMultiBodyWindow();
-	void initialiseMovierefineWindow();
-	void initialisePolishWindow();
 	void initialiseMaskcreateWindow();
 	void initialiseJoinstarWindow();
 	void initialiseSubtractWindow();
@@ -127,6 +124,7 @@ private:
 	void initialiseLocresWindow();
 	void initialiseMotionrefineWindow();
 	void initialiseCtfrefineWindow();
+	void initialiseExternalWindow();
 
 };
 

@@ -31,7 +31,6 @@
 class FlexAnalyser
 {
 public:
-
 	// I/O Parser
 	IOParser parser;
 
@@ -40,12 +39,6 @@ public:
 
 	// Output rootname
 	FileName fn_out;
-
-	// CTF settings
-	bool do_ctf;
-	bool intact_ctf_first_peak;
-	bool ctf_phase_flipped;
-	bool ctf_premultiplied;
 
 	// The model and the data from the refinement to be analysed
 	FileName fn_model, fn_data;
@@ -97,27 +90,8 @@ public:
 	// Write out text file with eigenvalues for all particles
 	bool do_write_all_pca_projections;
 
-	// Write out subtracted particles
-	bool do_subtract;
-
-	// Which orientations/masks to use for the subtraction, i.e. relative to which body?
-	int subtract_body;
-
-	// Boxsize of the output particles
-	int boxsize;
-
-	// Perform norm and scale corrections in the subtraction?
-	bool do_norm;
-	bool do_scale;
-
-	// Mask with density to keep when doing subtractions
-	FileName fn_keepmask;
-
 	// center of mass of the above
 	Matrix1D<RFLOAT> com_mask;
-
-	// background radius for normalisation
-	float bg_radius;
 
 	// Pre-calculated rotation matrix for (0,90,0) rotation, and its transpose
 	Matrix2D<RFLOAT> A_rot90, A_rot90T;
@@ -136,16 +110,16 @@ public:
 
 	void loopThroughParticles(int rank = 0, int size = 1);
 
-	void subtractOneParticle(long int ori_particle, long int imgno, int rank = 0, int size = 1);
-	void make3DModelOneParticle(long int ori_particle, long int imgno, std::vector<double> &datarow, int rank = 0, int size = 1);
+	void subtractOneParticle(long int part_id, long int imgno, int rank = 0, int size = 1);
+	void make3DModelOneParticle(long int part_id, long int imgno, std::vector<double> &datarow, int rank = 0, int size = 1);
 
 	// Output logfile.pdf with histograms of all eigenvalues
 	void makePCAhistograms(std::vector< std::vector<double> > &projected_input,
-			std::vector<double> &eigenvalues, std::vector<double> &means);
+	                       std::vector<double> &eigenvalues, std::vector<double> &means);
 
 	// Generate maps to make movies of the variance along the most significant eigenvectors
 	void make3DModelsAlongPrincipalComponents(std::vector< std::vector<double> > &projected_input,
-			std::vector< std::vector<double> > &eigenvectors, std::vector<double> &means);
+	                                          std::vector< std::vector<double> > &eigenvectors, std::vector<double> &means);
 
 	// Dump all projections to a text file
 	void writeAllPCAProjections(std::vector< std::vector<double> > &projected_input);
@@ -156,10 +130,8 @@ public:
 };
 
 void principalComponentsAnalysis(const std::vector< std::vector<double> > &input,
-		std::vector< std::vector<double> > &eigenvectors,
-		std::vector<double> &eigenvalues, std::vector<double> &means,
-		std::vector< std::vector<double> > &projected_input);
-
-
+                                 std::vector< std::vector<double> > &eigenvectors,
+                                 std::vector<double> &eigenvalues, std::vector<double> &means,
+                                 std::vector< std::vector<double> > &projected_input);
 
 #endif /* SRC_FLEX_ANALYSER_H_ */

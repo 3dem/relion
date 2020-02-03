@@ -90,7 +90,6 @@ bool ccfPeak::refresh()
 
 void AutoPicker::read(int argc, char **argv)
 {
-
 	parser.setCommandLine(argc, argv);
 
 	int gen_section = parser.addSection("General options");
@@ -138,7 +137,7 @@ void AutoPicker::read(int argc, char **argv)
 	LoG_invert = parser.checkOption("--Log_invert", "Use this option if the particles are white instead of black");
 	LoG_adjust_threshold = textToFloat(parser.getOption("--LoG_adjust_threshold", "Use this option to adjust the picking threshold: positive for less particles, negative for more", "0."));
 	LoG_upper_limit = textToFloat(parser.getOption("--LoG_upper_threshold", "Use this option to set the upper limit of the picking threshold", "99999"));
-//	LoG_use_ctf = parser.checkOption("--LoG_use_ctf", "Use CTF until the first peak in Laplacian-of-Gaussian picker");
+	LoG_use_ctf = parser.checkOption("--LoG_use_ctf", "Use CTF until the first peak in Laplacian-of-Gaussian picker");
 
 	if (do_gpu && do_LoG)
 	{
@@ -188,7 +187,6 @@ void AutoPicker::usage()
 
 void AutoPicker::initialise()
 {
-
 #ifdef TIMING
 	TIMING_A0  =           timer.setNew("Initialise()");
 	TIMING_A1  =           timer.setNew("--Init");
@@ -215,12 +213,11 @@ void AutoPicker::initialise()
 		timer.tic(TIMING_A0);
 		timer.tic(TIMING_A1);
 #endif
-
 	if (random_seed == -1) random_seed = time(NULL);
 
 	if (fn_in.isStarFile())
 	{
-		MDmic.read(fn_in);
+		ObservationModel::loadSafely(fn_in, obsModel, MDmic, "micrographs", verb);
 		fn_micrographs.clear();
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDmic)
 		{
@@ -229,25 +226,22 @@ void AutoPicker::initialise()
 			fn_micrographs.push_back(fn_mic);
 		}
 
-        RFLOAT mag, dstep;
-        if (MDmic.containsLabel(EMDL_CTF_MAGNIFICATION) && MDmic.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
-        {
-			MDmic.goToObject(0);
-	        	MDmic.getValue(EMDL_CTF_MAGNIFICATION, mag);
-			MDmic.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
-			angpix = 10000. * dstep / mag;
-			if (verb > 0)
-				std::cout << " + Using (micrograph) pixel size from input STAR file of " << angpix << " Angstroms" << std::endl;
-        }
-        else if (verb > 0 )
-        {
-        	std::cout << " + Warning: input (micrograph) STAR file does not contain information about pixel size!" << std::endl;
-        	std::cout << " + Warning: use --angpix_ref to provide the correct value. Now using " << angpix << " Angstroms" << std::endl;
-        }
+		// Check all optics groups have the same pixel size (check for same micrograph size is performed while running through all of them)
+		if (!obsModel.opticsMdt.containsLabel(EMDL_MICROGRAPH_PIXEL_SIZE))
+			REPORT_ERROR("The input does not contain the rlnMicrographPixelSize column.");
+		obsModel.opticsMdt.getValue(EMDL_MICROGRAPH_PIXEL_SIZE, angpix, 0);
+		for (int optics_group = 1; optics_group < obsModel.numberOfOpticsGroups(); optics_group++)
+		{
+			RFLOAT my_angpix;
+			obsModel.opticsMdt.getValue(EMDL_MICROGRAPH_PIXEL_SIZE, my_angpix, optics_group);
+			if (fabs(angpix - my_angpix) > 0.01)
+			{
+				REPORT_ERROR("ERROR: different pixel size for the different optics groups, perform autopicking separately per optics group.");
+			}
+		}
 	}
 	else
 	{
-
 		if (do_ctf)
 			REPORT_ERROR("AutoPicker::initialise ERROR: use an input STAR file with the CTF information when using --ctf");
 
@@ -329,19 +323,20 @@ void AutoPicker::initialise()
 		for (int i = 2; i <= LoG_max_search; i++)
 			diams_LoG.push_back(ROUND(LoG_max_diameter*(RFLOAT)(i)));
 
-		std::cout << " + Will use following diameters for Laplacian-of-Gaussian filter: " << std::endl;
-		for (int i = 0; i < diams_LoG.size(); i++)
+		if (verb > 0)
 		{
-			RFLOAT myd = diams_LoG[i];
-			if (myd < LoG_min_diameter)
-				std::cout << "   * " << myd << " (too low)" << std::endl;
-			else if (myd > LoG_max_diameter)
-				std::cout << "   * " << myd << " (too high)" << std::endl;
-			else
-				std::cout << "   * " << myd << " (ok)" << std::endl;
-
+			std::cout << " + Will use following diameters for Laplacian-of-Gaussian filter: " << std::endl;
+			for (int i = 0; i < diams_LoG.size(); i++)
+			{
+				RFLOAT myd = diams_LoG[i];
+				if (myd < LoG_min_diameter)
+					std::cout << "   * " << myd << " (too low)" << std::endl;
+				else if (myd > LoG_max_diameter)
+					std::cout << "   * " << myd << " (too high)" << std::endl;
+				else
+					std::cout << "   * " << myd << " (ok)" << std::endl;
+			}
 		}
-
 	}
 	else if (fn_ref == "")
 	{
@@ -396,35 +391,30 @@ void AutoPicker::initialise()
 			Iref().setXmippOrigin();
 			Mrefs.push_back(Iref());
 
-			if (Mrefs.size() == 1 && verb > 0)
+			if (Mrefs.size() == 1) // Check only the first reference
 			{
-
 				// Check pixel size in the header is consistent with angpix_ref. Otherwise, raise a warning
 				RFLOAT angpix_header = Iref.samplingRateX();
 				if (angpix_ref < 0)
 				{
-					if (fabs(angpix_header - angpix) > 1e-3)
+					if (verb > 0 && fabs(angpix_header - angpix) > 1e-3)
 					{
-						std::cerr << " WARNING!!! Pixel size in reference image header= " << angpix_header << " but you have not provided --angpix_ref" << std::endl;
+						std::cout << " + Using pixel size in reference image header= " << angpix_header << std::endl;
 					}
+					angpix_ref = angpix_header;
 				}
 				else
 				{
-					if (fabs(angpix_header - angpix_ref) > 1e-3)
+					if (verb > 0 && fabs(angpix_header - angpix_ref) > 1e-3)
 					{
 						std::cerr << " WARNING!!! Pixel size in reference image header= " << angpix_header << " but you have provided --angpix_ref " << angpix_ref << std::endl;
 					}
 				}
-
 			}
-
 		}
 	}
 	else
 	{
-
-
-
 		Image<RFLOAT> Istk, Iref;
 		Istk.read(fn_ref);
 
@@ -497,7 +487,7 @@ void AutoPicker::initialise()
 
 				Euler_angles2matrix(rot, tilt, 0., A, false);
 				Fref.initZeros();
-				projector.get2DFourierTransform(Fref, A, IS_NOT_INV);
+				projector.get2DFourierTransform(Fref, A);
 				transformer.inverseFourierTransform();
 				// Shift the image back to the center...
 				CenterFFT(Mref, false);
@@ -608,19 +598,18 @@ void AutoPicker::initialise()
 
 		if (particle_diameter > particle_size * angpix)
 		{
-			std::cerr << " particle_diameter (A): " << particle_diameter << " box_size (pix): " << particle_size << " pixel size (A): " << angpix << std::endl;
-			REPORT_ERROR("ERROR: the particle diameter is larger than the size of the box.");
+			std::cerr << " mask_diameter (A): " << particle_diameter << " box_size (pix): " << particle_size << " pixel size (A): " << angpix << std::endl;
+			REPORT_ERROR("ERROR: the particle mask diameter is larger than the size of the box.");
 		}
 
 
 		if ( (verb > 0) && (autopick_helical_segments))
 		{
 			std::cout << " + Helical tube diameter = " << helical_tube_diameter << " Angstroms " << std::endl;
-			std::cout << " + Helical tube diameter should be smaller than the particle (background) diameter" << std::endl;
 		}
 		if ( (autopick_helical_segments) && (helical_tube_diameter > particle_diameter) )
 		{
-			REPORT_ERROR("Error: Helical tube diameter should be smaller than the particle (background) diameter!");
+			REPORT_ERROR("Error: Helical tube diameter should be smaller than the particle mask diameter!");
 		}
 
 
@@ -681,7 +670,6 @@ void AutoPicker::initialise()
 	 * the input micrographs, we simply adjust the frequencies used in fourier space by cropping the frequency-space images in
 	 * intermediate calculations.
 	 */
-
 
 	if(workFrac>1) // set size directly
 	{
@@ -876,7 +864,6 @@ void AutoPicker::initialise()
 #ifdef DEBUG
 	std::cerr << "Finishing initialise" << std::endl;
 #endif
-
 }
 
 #ifdef CUDA
@@ -918,6 +905,11 @@ void AutoPicker::run()
 	FileName fn_olddir="";
 	for (long int imic = 0; imic < fn_micrographs.size(); imic++)
 	{
+
+		// Abort through the pipeline_control system
+		if (pipeline_control_check_abort_job())
+			exit(RELION_EXIT_ABORTED);
+
 		if (verb > 0 && imic % barstep == 0)
 			progress_bar(imic);
 
@@ -965,7 +957,7 @@ void AutoPicker::generatePDFLogfile()
 		if (exists(fn_pick))
 		{
 			MD.read(fn_pick);
-			long nr_pick = (RFLOAT) MD.numberOfObjects();
+			long nr_pick = MD.numberOfObjects();
 			total_nr_picked += nr_pick;
 			if (MD.containsLabel(EMDL_PARTICLE_AUTOPICK_FOM))
 			{
@@ -1396,8 +1388,9 @@ void AutoPicker::pickAmyloids(
 	MDout.addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
 	MDout.addLabel(EMDL_ORIENT_TILT_PRIOR);
 	MDout.addLabel(EMDL_ORIENT_PSI_PRIOR);
-	MDout.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH);
+	MDout.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM);
 	MDout.addLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO);
+	MDout.addLabel(EMDL_ORIENT_ROT_PRIOR_FLIP_RATIO);	// KThurber
 
 
 	float interbox_dist = (min_particle_distance / angpix);
@@ -1440,8 +1433,9 @@ void AutoPicker::pickAmyloids(
 				MDout.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, ihelix+1); // start counting at 1
 				MDout.setValue(EMDL_ORIENT_TILT_PRIOR, 90.);
 				MDout.setValue(EMDL_ORIENT_PSI_PRIOR, myang);
-				MDout.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, tube_length);
+				MDout.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM, angpix * tube_length);
 				MDout.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, 0.5);
+				MDout.setValue(EMDL_ORIENT_ROT_PRIOR_FLIP_RATIO, 0.5);	// KThurber
 
 				leftover_dist = interbox_dist + (distnex - position);
 				tube_length += interbox_dist;
@@ -2462,8 +2456,9 @@ void AutoPicker::exportHelicalTubes(
 	MDout.addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
 	MDout.addLabel(EMDL_ORIENT_TILT_PRIOR);
 	MDout.addLabel(EMDL_ORIENT_PSI_PRIOR);
-	MDout.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH);
+	MDout.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM);
 	MDout.addLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO);
+	MDout.addLabel(EMDL_ORIENT_ROT_PRIOR_FLIP_RATIO);  //KThurber
 
 	helical_tube_id = 0;
 	for (int itube = 0; itube < tube_coord_list.size(); itube++)
@@ -2514,8 +2509,9 @@ void AutoPicker::exportHelicalTubes(
 			MDout.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, helical_tube_id);
 			MDout.setValue(EMDL_ORIENT_TILT_PRIOR, 90.);
 			MDout.setValue(EMDL_ORIENT_PSI_PRIOR, (-1.) * (tube_coord_list[itube][icoord].psi)); // Beware! Multiplied by -1!
-			MDout.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, helical_tube_len);
+			MDout.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM, angpix * helical_tube_len);
 			MDout.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, BIMODAL_PSI_PRIOR_FLIP_RATIO);
+			MDout.setValue(EMDL_ORIENT_ROT_PRIOR_FLIP_RATIO, BIMODAL_PSI_PRIOR_FLIP_RATIO);	// KThurber
 		}
 	}
 
@@ -2599,7 +2595,7 @@ void AutoPicker::autoPickLoGOneMicrograph(FileName &fn_mic, long int imic)
 
 		// Use downsized FFTs
 		windowFourierTransform(Faux, Fmic, workSize);
-/*
+
 		if (LoG_use_ctf)
 		{
 			MultidimArray<RFLOAT> Fctf(YSIZE(Fmic), XSIZE(Fmic));
@@ -2627,7 +2623,7 @@ void AutoPicker::autoPickLoGOneMicrograph(FileName &fn_mic, long int imic)
 				DIRECT_MULTIDIM_ELEM(Fmic, n) /= DIRECT_MULTIDIM_ELEM(Fctf, n);
 			}
 		}
-*/
+
 		Image<RFLOAT> Maux(workSize, workSize);
 		
 //		transformer.inverseFourierTransform(Fmic, Maux());
@@ -2926,7 +2922,7 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 			MDmic.getValue(EMDL_MICROGRAPH_NAME, fn_tmp);
 			if (fn_tmp==fn_mic)
 			{
-				ctf.read(MDmic, MDmic);
+				ctf.readByGroup(MDmic, &obsModel);
 				Fctf.resize(downsize_mic, downsize_mic/2 + 1);
 				ctf.getFftwImage(Fctf, micrograph_size, micrograph_size, angpix, false, false, intact_ctf_first_peak, true);
 				found = true;
@@ -3137,7 +3133,7 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 
 				// Now get the FT of the rotated (non-ctf-corrected) template
 				Faux.initZeros(downsize_mic, downsize_mic/2 + 1);
-				PPref[iref].get2DFourierTransform(Faux, A, IS_NOT_INV);
+				PPref[iref].get2DFourierTransform(Faux, A);
 
 #ifdef DEBUG
 				std::cerr << " psi= " << psi << std::endl;

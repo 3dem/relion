@@ -49,6 +49,7 @@
 #include <execinfo.h>
 #endif
 
+
 // Object Constructor
 RelionError::RelionError(const std::string &what, const std::string &fileArg, const long lineArg)
 {
@@ -63,6 +64,8 @@ RelionError::RelionError(const std::string &what, const std::string &fileArg, co
     line=lineArg;
 
     std::cerr << "in: " << file << ", line " << line << "\n";
+	std::cerr << msg << std::endl;
+
 }
 
 // Show message

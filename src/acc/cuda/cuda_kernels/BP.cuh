@@ -15,6 +15,7 @@
  *   	BP KERNELS
  */
 
+template < bool CTF_PREMULTIPLIED >
 __global__ void cuda_kernel_backproject2D(
 		XFLOAT *g_img_real,
 		XFLOAT *g_img_imag,
@@ -41,7 +42,10 @@ __global__ void cuda_kernel_backproject2D(
 {
 	unsigned tid = threadIdx.x;
 	unsigned img = blockIdx.x;
-
+	
+	int img_y_half = img_y / 2;
+	int max_r2_out = max_r2 * padding_factor * padding_factor;
+	
 	__shared__ XFLOAT s_eulers[4];
 
 	XFLOAT minvsigma2, ctf, img_real, img_imag, Fweight, real, imag, weight;
@@ -69,17 +73,10 @@ __global__ void cuda_kernel_backproject2D(
 		int x = pixel % img_x;
 		int y = (int)floorf( (float)pixel / (float)img_x);
 
-		// Don't search beyond square with side max_r
-		if (y > max_r)
+		if (y > img_y_half)
 		{
-			if (y >= img_y - max_r)
-				y -= img_y;
-			else
-				continue;
+			y -= img_y;
 		}
-
-		if (x * x + y * y > max_r2)
-			continue;
 
 		//WAVG
 		minvsigma2 = __ldg(&g_Minvsigma2s[pixel]);
@@ -98,8 +95,16 @@ __global__ void cuda_kernel_backproject2D(
 
 			if (weight >= significant_weight)
 			{
-				weight = (weight / weight_norm) * ctf * minvsigma2;
-				Fweight += weight * ctf;
+				if(CTF_PREMULTIPLIED)
+				{
+					weight = (weight / weight_norm) * minvsigma2;
+					Fweight += weight * ctf * ctf;
+				}
+				else
+				{
+					weight = (weight / weight_norm) * ctf * minvsigma2;
+					Fweight += weight * ctf;
+				}
 
 				translatePixel(x, y, g_trans_x[itrans], g_trans_y[itrans], img_real, img_imag, temp_real, temp_imag);
 
@@ -115,7 +120,12 @@ __global__ void cuda_kernel_backproject2D(
 			// Get logical coordinates in the 3D map
 			XFLOAT xp = (s_eulers[0] * x + s_eulers[1] * y );
 			XFLOAT yp = (s_eulers[2] * x + s_eulers[3] * y );
-
+			
+			// Only consider pixels that are projected inside the allowed circle in output coordinates.
+			//     --JZ, Nov. 26th 2018			
+			if ( ( xp * xp + yp * yp ) > max_r2_out )
+				continue;
+			
 			// Only asymmetric half is stored
 			if (xp < 0)
 			{
@@ -161,7 +171,7 @@ __global__ void cuda_kernel_backproject2D(
 	}
 }
 
-template < bool DATA3D >
+template < bool DATA3D, bool CTF_PREMULTIPLIED >
 __global__ void cuda_kernel_backproject3D(
 		XFLOAT *g_img_real,
 		XFLOAT *g_img_imag,
@@ -192,6 +202,11 @@ __global__ void cuda_kernel_backproject3D(
 {
 	unsigned tid = threadIdx.x;
 	unsigned img = blockIdx.x;
+	
+	int img_y_half = img_y / 2;
+	int img_z_half = img_z / 2;
+	
+	int max_r2_vol = max_r2 * padding_factor * padding_factor;
 
 	__shared__ XFLOAT s_eulers[9];
 	XFLOAT minvsigma2, ctf, img_real, img_imag, Fweight, real, imag, weight;
@@ -226,12 +241,10 @@ __global__ void cuda_kernel_backproject3D(
 			xy = pixel % (img_x*img_y);
 			x =             xy  % img_x;
 			y = floorfracf( xy,   img_x);
-			if (z > max_r)
+			
+			if (z > img_z_half)
 			{
-				if (z >= img_z - max_r)
-					z = z - img_z;
-				else
-					continue;
+				z = z - img_z;
 
 				if(x==0)
 					continue;
@@ -242,21 +255,11 @@ __global__ void cuda_kernel_backproject3D(
 			x =             pixel % img_x;
 			y = floorfracf( pixel , img_x);
 		}
-		if (y > max_r)
+		if (y > img_y_half)
 		{
-			if (y >= img_y - max_r)
-				y = y - img_y;
-			else
-				continue;
+			y = y - img_y;
 		}
-
-		if(DATA3D)
-			if ( ( x * x + y * y  + z * z ) > max_r2)
-				continue;
-		else
-			if ( ( x * x + y * y ) > max_r2)
-				continue;
-
+		
 		//WAVG
 		minvsigma2 = __ldg(&g_Minvsigma2s[pixel]);
 		ctf = __ldg(&g_ctfs[pixel]);
@@ -274,9 +277,17 @@ __global__ void cuda_kernel_backproject3D(
 
 			if (weight >= significant_weight)
 			{
-				weight = (weight / weight_norm) * ctf * minvsigma2;
-				Fweight += weight * ctf;
-
+				if(CTF_PREMULTIPLIED)
+				{
+					weight = (weight / weight_norm) * minvsigma2;
+					Fweight += weight * ctf * ctf;
+				}
+				else
+				{
+					weight = (weight / weight_norm) * ctf * minvsigma2;
+					Fweight += weight * ctf;
+				}
+				
 				if(DATA3D)
 					translatePixel(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, temp_real, temp_imag);
 				else
@@ -305,6 +316,12 @@ __global__ void cuda_kernel_backproject3D(
 				yp = (s_eulers[3] * x + s_eulers[4] * y ) * padding_factor;
 				zp = (s_eulers[6] * x + s_eulers[7] * y ) * padding_factor;
 			}
+			
+			// Only consider pixels that are projected inside the sphere in output coordinates.
+			//     --JZ, Oct. 18. 2018			
+			if ( ( xp * xp + yp * yp  + zp * zp ) > max_r2_vol)
+				continue;
+		
 			// Only asymmetric half is stored
 			if (xp < (XFLOAT) 0.0)
 			{
@@ -386,7 +403,7 @@ __global__ void cuda_kernel_backproject3D(
 }
 
 
-template < bool DATA3D >
+template < bool DATA3D, bool CTF_PREMULTIPLIED >
 __global__ void cuda_kernel_backprojectSGD(
 		AccProjectorKernel projector,
 		XFLOAT *g_img_real,
@@ -418,6 +435,11 @@ __global__ void cuda_kernel_backprojectSGD(
 {
 	unsigned tid = threadIdx.x;
 	unsigned img = blockIdx.x;
+	
+	int img_y_half = img_y / 2;
+	int img_z_half = img_z / 2;
+	
+	int max_r2_vol = max_r2 * padding_factor * padding_factor;
 
 	__shared__ XFLOAT s_eulers[9];
 	XFLOAT minvsigma2, ctf, img_real, img_imag, Fweight, real, imag, weight;
@@ -452,12 +474,10 @@ __global__ void cuda_kernel_backprojectSGD(
 			xy = pixel % (img_x*img_y);
 			x =             xy  % img_x;
 			y = floorfracf( xy,   img_x);
-			if (z > max_r)
+			
+			if (z > img_z_half)
 			{
-				if (z >= img_z - max_r)
-					z = z - img_z;
-				else
-					continue;
+				z = z - img_z;
 
 				if(x==0)
 					continue;
@@ -468,20 +488,10 @@ __global__ void cuda_kernel_backprojectSGD(
 			x =             pixel % img_x;
 			y = floorfracf( pixel , img_x);
 		}
-		if (y > max_r)
+		if (y > img_y_half)
 		{
-			if (y >= img_y - max_r)
-				y = y - img_y;
-			else
-				continue;
+			y = y - img_y;
 		}
-
-		if(DATA3D)
-			if ( ( x * x + y * y  + z * z ) > max_r2)
-				continue;
-		else
-			if ( ( x * x + y * y ) > max_r2)
-				continue;
 
 		XFLOAT ref_real = (XFLOAT) 0.0;
 		XFLOAT ref_imag = (XFLOAT) 0.0;
@@ -520,9 +530,16 @@ __global__ void cuda_kernel_backprojectSGD(
 
 			if (weight >= significant_weight)
 			{
-				weight = (weight / weight_norm) * ctf * minvsigma2;
-				Fweight += weight * ctf;
-
+				if(CTF_PREMULTIPLIED)
+				{
+					weight = (weight / weight_norm) * minvsigma2;
+					Fweight += weight * ctf * ctf;
+				}
+				else
+				{
+					weight = (weight / weight_norm) * ctf * minvsigma2;
+					Fweight += weight * ctf;
+				}
 				if(DATA3D)
 					translatePixel(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, temp_real, temp_imag);
 				else
@@ -551,6 +568,12 @@ __global__ void cuda_kernel_backprojectSGD(
 				yp = (s_eulers[3] * x + s_eulers[4] * y ) * padding_factor;
 				zp = (s_eulers[6] * x + s_eulers[7] * y ) * padding_factor;
 			}
+			
+			// Only consider pixels that are projected inside the sphere in output coordinates.
+			//     --JZ, Nov. 26th 2018			
+			if ( ( xp * xp + yp * yp  + zp * zp ) > max_r2_vol)
+				continue;
+			
 			// Only asymmetric half is stored
 			if (xp < (XFLOAT) 0.0)
 			{

@@ -27,76 +27,68 @@
 
 #include "tilt_estimator.h"
 #include "defocus_estimator.h"
+#include "bfactor_refiner.h"
 #include "magnification_estimator.h"
+#include "aberration_estimator.h"
 
 class CtfRefiner
-{	
+{
 	public:
-		
+
 		CtfRefiner();
-		
-		
-		void read(int argc, char **argv);		
-		void init();		
-		void run();		
+
+
+		void read(int argc, char **argv);
+		void init();
+		void run();
 		void finalise();
-		
-		
+
+
 		int getVerbosityLevel();
-		
+
 		static FileName getOutputFilenameRoot(
 				const MetaDataTable& mdt, std::string outPath);
-		
-		
+
+
 	protected:
-	
-		RFLOAT Cs, lambda, kV;
-		
+
 		ObservationModel obsModel;
 		ReferenceMap reference;
-		
+
 		TiltEstimator tiltEstimator;
 		DefocusEstimator defocusEstimator;
+		BFactorRefiner bfactorEstimator;
+		AberrationEstimator aberrationEstimator;
 		MagnificationEstimator magnificationEstimator;
-	
+
 		// Verbosity
 		int verb;
-	
+
 		// Allow continuation of crashed jobs
 		bool only_do_unfinished;
-	
-		// Estimate per-particle defocus?
-		bool do_defocus_fit;
-	
-		// Estimate beamtilt?
-		bool do_tilt_fit;
-		
-		// Estimate anisotropic magnification?
-		bool do_mag_fit;
-	
+
+		// Whether to estimate defoci, B-factors, antisymmetric aberrations (incl. beam tilt),
+		// symmetric aberrations and anisotropic magnification, respectively
+		bool do_defocus_fit, do_bfac_fit, do_tilt_fit, do_aberr_fit, do_mag_fit, do_ctf_padding;
+
+
 		bool debug,     // write out debugging info
-		     diag,      // write out diagnostic info
-		     clTilt,    // tilt from cmd. line
-		     anisoTilt; // use experimental anisotropic tilt model
-	
+		     diag;      // write out diagnostic info
+
 		long maxMG, minMG;
-	
-		RFLOAT angpix,
-			beamtilt_x, beamtilt_y,
-			beamtilt_xx, beamtilt_xy, beamtilt_yy;
-	
+
 		int nr_omp_threads;
-	
+
 		std::string starFn, outPath;
-	
+
 		MetaDataTable mdt0;
-		std::vector<MetaDataTable> allMdts, unfinishedMdts;	
-		
-		// s: full image size, sh: half-size + 1, fc: frame count
-		int s, sh, fc;
-			
+		std::vector<MetaDataTable> allMdts, unfinishedMdts;
+
 		// Fit CTF parameters for all particles on a subset of the micrographs micrograph
 		void processSubsetMicrographs(long g_start, long g_end);
+
+		// Combine all .stars and .eps files
+		std::vector<MetaDataTable> merge(const std::vector<MetaDataTable>& mdts, std::vector <FileName> &fn_eps);
 };
 
 

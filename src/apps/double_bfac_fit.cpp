@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
 	std::string outPath = parser.getOption("--o", "output path");
 	
 	
-	if (parser.checkForErrors()) return 1;
+	if (parser.checkForErrors()) return RELION_EXIT_FAILURE;
 	
 	Image<RFLOAT> fcc0, fcc1;
 	fcc0.read(fccFn0);
@@ -161,5 +161,5 @@ int main(int argc, char *argv[])
 	std::cout << "avg1 = " << avg1 << "\n";
 	std::cout << "avg diff = " << (avg1 - avg0) << "\n";
 	
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }

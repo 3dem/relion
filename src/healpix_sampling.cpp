@@ -56,7 +56,7 @@ void HealpixSampling::initialise(
 		bool do_warnpsi,
 		bool do_local_searches,
 		bool do_helical_refine,
-		RFLOAT rise_pix,
+		RFLOAT rise_Angst,
 		RFLOAT twist_deg)
 {
 
@@ -118,7 +118,7 @@ void HealpixSampling::initialise(
 	// Store the not-oversampled translations, and make sure oversampled sampling is 1 pixel
 	//setTranslations();
 	// May06,2015 - Shaoda & Sjors, Helical translational searches
-	setTranslations(-1, -1, do_local_searches, do_helical_refine, -1, rise_pix, twist_deg);
+	setTranslations(-1, -1, do_local_searches, do_helical_refine, -1, rise_Angst, twist_deg);
 
 	// Store the non-oversampled projection directions
 	setOrientations(-1, -1.);
@@ -269,7 +269,7 @@ void HealpixSampling::setTranslations(
 		bool do_local_searches,
 		bool do_helical_refine,
 		RFLOAT new_helical_offset_step,
-		RFLOAT helical_rise_pix,
+		RFLOAT helical_rise_Angst,
 		RFLOAT helical_twist_deg)
 {
 	// Ordinary single particles
@@ -284,11 +284,6 @@ void HealpixSampling::setTranslations(
 	old_offset_step = offset_step;  // can be < 0 ??????
 	old_offset_range = offset_range;  // can be < 0 ??????
 	old_helical_offset_step = helical_offset_step;  // can be < 0
-	//if (!(offset_step > 0.))
-	//{
-	//	std::cerr << " offset_range= " << offset_range << " offset_step= " << offset_step << std::endl;
-	//	REPORT_ERROR("HealpixSampling::setTranslations BUG %% Old translation step and range are uninitialised!");
-	//}
 	if ( (new_offset_step > 0.) && (new_offset_range >= 0.) )
 	{
 		offset_step = new_offset_step;
@@ -313,11 +308,11 @@ void HealpixSampling::setTranslations(
 	if (do_helical_refine)
 	{
 		// Assume all helical parameters are valid (this should be checked before in ml_optimiser.cpp)
-		helical_rise_pix = fabs(helical_rise_pix);
+		helical_rise_Angst = fabs(helical_rise_Angst);
 		helical_twist_deg = fabs(helical_twist_deg);
 
 		// Search range (half) along helical axis = (-0.5 * rise, +0.5 * rise)
-		h_range = (helical_rise_pix / 2.);
+		h_range = (helical_rise_Angst / 2.);
 
 		// If continue from old run or new offset is not applicable...
 		if (new_helical_offset_step < 0.)
@@ -331,7 +326,7 @@ void HealpixSampling::setTranslations(
 		if ( (new_helical_offset_step < 0.)
 				|| ( (new_helical_offset_step > old_helical_offset_step) && (old_helical_offset_step > 0.) )
 				|| (new_helical_offset_step > new_offset_step)
-				|| ((helical_rise_pix / new_helical_offset_step) < 3.) )
+				|| ((helical_rise_Angst / new_helical_offset_step) < 3.) )
 		{
 			// First try 'new_offset_step'
 			new_helical_offset_step = new_offset_step;
@@ -339,8 +334,8 @@ void HealpixSampling::setTranslations(
 			if ( (old_helical_offset_step > 0.) && (new_helical_offset_step > old_helical_offset_step) )
 				new_helical_offset_step = old_helical_offset_step;
 			// New_helical_offset_step should be finer than 1/3 the helical rise
-			if ( (helical_rise_pix / new_helical_offset_step) < 3.)
-				new_helical_offset_step = helical_rise_pix / 3.;
+			if ( (helical_rise_Angst / new_helical_offset_step) < 3.)
+				new_helical_offset_step = helical_rise_Angst / 3.;
 		}
 
 		maxh = CEIL(h_range / new_helical_offset_step); // Out of range samplings will be excluded next
@@ -353,9 +348,9 @@ void HealpixSampling::setTranslations(
 			if ( (old_helical_offset_step > 0.) && ((old_helical_offset_step / new_helical_offset_step) > 3) )
 				maxh = FLOOR(old_helical_offset_step / new_helical_offset_step); // Use FLOOR here!
 			// Local searches should not be wider than 1/3 of the helical rise
-			if ( ((new_helical_offset_step * maxh) > (helical_rise_pix / 6.)) )
+			if ( ((new_helical_offset_step * maxh) > (helical_rise_Angst / 6.)) )
 			{
-				maxh = FLOOR(helical_rise_pix / 6. / new_helical_offset_step); // Use FLOOR here!
+				maxh = FLOOR(helical_rise_Angst / 6. / new_helical_offset_step); // Use FLOOR here!
 				if (maxh < 1) // At least we should do some searches...
 					maxh = 1;
 			}
@@ -381,7 +376,7 @@ void HealpixSampling::setTranslations(
 		// For helices use a different step size along helical axis X
 		xoff = (do_helical_refine) ? (ix * helical_offset_step) : (ix * offset_step);
 		// For helical refinement, exclude xoff outside the range of (-0.5 * rise, +0.5 * rise)
-		if ( (do_helical_refine) && (ix != 0) && (fabs(xoff) > fabs(helical_rise_pix / 2.)) )
+		if ( (do_helical_refine) && (ix != 0) && (fabs(xoff) > fabs(helical_rise_Angst / 2.)) )
 			continue;
 
 		for (long int iy = -maxp; iy <= maxp; iy++)
@@ -413,7 +408,7 @@ void HealpixSampling::setTranslations(
 			}
 			else
 			{
-				if (max2 <= (offset_range * offset_range))
+				if (max2 < (offset_range * offset_range) + 0.001)  // +0.001 prevent precision errors in relion-3.1
 				{
 					translations_x.push_back(xoff);
 					translations_y.push_back(yoff);
@@ -714,6 +709,8 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 				RFLOAT diffang = ACOSD( dotProduct(best_direction, prior_direction) );
 				if (diffang > 180.)
 					diffang = ABS(diffang - 360.);
+				if (do_bimodal_search_psi && (diffang > 90.))  // KThurber
+					diffang = ABS(diffang - 180.);	// KThurber
 
 				// Only consider differences within sigma_cutoff * sigma_rot
 				// TODO: If sigma_rot and sigma_tilt are not the same (NOT for helices)?
@@ -1087,6 +1084,7 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalR
 		std::vector<int> &pointer_psi_nonzeroprior, std::vector<RFLOAT> &psi_prior,
 		bool do_auto_refine_local_searches,
 		RFLOAT prior_psi_flip_ratio,
+		RFLOAT prior_rot_flip_ratio,  // KThurber
 		RFLOAT sigma_cutoff)
 {
 	// Helical references are always along Z axis in 3D helical reconstructions
@@ -1101,6 +1099,7 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalR
 	// It also saves time when sigma_rot is much larger than sigma_tilt (during local searches in 3D auto-refine)
 
 	RFLOAT prior_psi_flip_ratio_thres_min = 0.01;
+	RFLOAT prior_rot_flip_ratio_thres_min = 0.01; 	// KThurber
 
 	pointer_dir_nonzeroprior.clear();
 	directions_prior.clear();
@@ -1150,7 +1149,8 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalR
 				{
 					// Assume tilt = (0, +180)
 					// TODO: Check if "(tilt_angles[idir] > 0.01) && (tilt_angles[idir] < 179.99)" is needed
-					if (prior_psi_flip_ratio > prior_psi_flip_ratio_thres_min)
+					//if (prior_psi_flip_ratio > prior_psi_flip_ratio_thres_min)
+					if (prior_psi_flip_ratio > -1.)		// KThurber above line changed to primarily dummy if
 					{
 						Matrix1D<RFLOAT> my_direction2, sym_direction2, best_direction2;
 
@@ -1185,6 +1185,19 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalR
 				diff_rot = ABS(sym_rot - prior_rot);
 				if (diff_rot > 180.)
 					diff_rot = ABS(diff_rot - 360.);
+
+				// KThurber begin add
+				bool is_rot_flipped = false;
+				if (!do_auto_refine_local_searches)
+				{
+					if (diff_rot > 90.)
+					{
+						diff_rot = ABS(diff_rot - 180.);
+						is_rot_flipped = true;
+					}
+				}
+				// KThurber end add
+
 				diff_tilt = ABS(sym_tilt - prior_tilt);
 				if (diff_tilt > 180.)
 					diff_tilt = ABS(diff_tilt - 360.);
@@ -1193,6 +1206,15 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalR
 				{
 					// TODO!!! If tilt is zero then any rot will be OK!!!!!
 					RFLOAT prior = gaussian2D(diff_rot, diff_tilt, sigma_rot, sigma_tilt, 0.);
+					// KThurber begin add
+					if (!do_auto_refine_local_searches)
+					{
+						if (is_rot_flipped)
+							prior *= prior_rot_flip_ratio;
+						else
+							prior *= (1. - prior_rot_flip_ratio);
+					}
+					// KThurber end add
 					pointer_dir_nonzeroprior.push_back(idir);
 					directions_prior.push_back(prior);
 					sumprior += prior;
@@ -1249,7 +1271,8 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalR
 				{
 					// Assume tilt = (0, +180)
 					// TODO: Check if "(tilt_angles[idir] > 0.01) && (tilt_angles[idir] < 179.99)" is needed
-					if (prior_psi_flip_ratio > prior_psi_flip_ratio_thres_min)
+					//if (prior_psi_flip_ratio > prior_psi_flip_ratio_thres_min)
+					if (prior_psi_flip_ratio > -1.)		// KThurber above line changed to primarily dummy if
 					{
 						Matrix1D<RFLOAT> my_direction2, sym_direction2;
 
@@ -1610,7 +1633,7 @@ void HealpixSampling::getPsiAngle(long int ipsi, RFLOAT &psi)
 	psi = psi_angles[ipsi];
 }
 
-void HealpixSampling::getTranslation(long int itrans, RFLOAT &trans_x, RFLOAT &trans_y, RFLOAT &trans_z)
+void HealpixSampling::getTranslationInPixel(long int itrans, RFLOAT my_pixel_size, RFLOAT &trans_x, RFLOAT &trans_y, RFLOAT &trans_z)
 {
 #ifdef DEBUG_CHECKSIZES
 if (itrans >= translations_x.size())
@@ -1619,11 +1642,12 @@ if (itrans >= translations_x.size())
 	REPORT_ERROR("itrans >= translations_x.size()");
 }
 #endif
-	trans_x = translations_x[itrans];
-	trans_y = translations_y[itrans];
+	trans_x = translations_x[itrans] / my_pixel_size;
+	trans_y = translations_y[itrans] / my_pixel_size;
 	if (is_3d_trans)
-		trans_z = translations_z[itrans];
+		trans_z = translations_z[itrans] / my_pixel_size;
 }
+
 
 long int HealpixSampling::getPositionSamplingPoint(int iclass, long int idir, long int ipsi, long int itrans)
 {
@@ -1645,13 +1669,11 @@ long int HealpixSampling::getPositionOversampledSamplingPoint(long int ipos, int
 
 }
 
-void HealpixSampling::getTranslations(long int itrans, int oversampling_order,
+void HealpixSampling::getTranslationsInPixel(long int itrans, int oversampling_order, RFLOAT my_pixel_size,
 		std::vector<RFLOAT > &my_translations_x,
 		std::vector<RFLOAT > &my_translations_y,
 		std::vector<RFLOAT > &my_translations_z,
-		bool do_helical_refine,
-		RFLOAT rise_pix,
-		RFLOAT twist_deg)
+		bool do_helical_refine)
 {
 
 #ifdef DEBUG_CHECKSIZES
@@ -1666,10 +1688,10 @@ void HealpixSampling::getTranslations(long int itrans, int oversampling_order,
 	my_translations_z.clear();
 	if (oversampling_order == 0)
 	{
-		my_translations_x.push_back(translations_x[itrans]);
-		my_translations_y.push_back(translations_y[itrans]);
+		my_translations_x.push_back(translations_x[itrans] / my_pixel_size);
+		my_translations_y.push_back(translations_y[itrans] / my_pixel_size);
 		if (is_3d_trans)
-			my_translations_z.push_back(translations_z[itrans]);
+			my_translations_z.push_back(translations_z[itrans] / my_pixel_size);
 	}
 	else
 	{
@@ -1686,9 +1708,6 @@ void HealpixSampling::getTranslations(long int itrans, int oversampling_order,
 		if (do_helical_refine)
 		{
 			h_step = helical_offset_step;
-			// Assume all helical parameters are correct
-			rise_pix = fabs(rise_pix);
-			twist_deg = fabs(twist_deg);
 		}
 		if (h_step < 0.)
 		{
@@ -1715,15 +1734,15 @@ void HealpixSampling::getTranslations(long int itrans, int oversampling_order,
 						else
 							over_zoff = translations_z[itrans] - 0.5 * offset_step + (0.5 + itrans_overz) * offset_step / nr_oversamples;
 
-						my_translations_x.push_back(over_xoff);
-						my_translations_y.push_back(over_yoff);
-						my_translations_z.push_back(over_zoff);
+						my_translations_x.push_back(over_xoff / my_pixel_size);
+						my_translations_y.push_back(over_yoff / my_pixel_size);
+						my_translations_z.push_back(over_zoff / my_pixel_size);
 					}
 				}
 				else
 				{
-					my_translations_x.push_back(over_xoff);
-					my_translations_y.push_back(over_yoff);
+					my_translations_x.push_back(over_xoff / my_pixel_size);
+					my_translations_y.push_back(over_yoff / my_pixel_size);
 				}
 			}
 		}
@@ -1732,18 +1751,18 @@ void HealpixSampling::getTranslations(long int itrans, int oversampling_order,
 		// AVOID THIS BY CHOOSING AN INITIAL ANGULAR SAMPLING FINER THAN HALF OF THE TWIST !!!!!!
 		if ( (do_helical_refine) && (my_translations_x.size() < 1) )
 		{
-			my_translations_x.push_back(translations_x[itrans]);
-			my_translations_y.push_back(translations_y[itrans]);
+			my_translations_x.push_back(translations_x[itrans] / my_pixel_size);
+			my_translations_y.push_back(translations_y[itrans] / my_pixel_size);
 			if (is_3d_trans)
-				my_translations_z.push_back(translations_z[itrans]);
+				my_translations_z.push_back(translations_z[itrans] / my_pixel_size);
 		}
 	}
 
 	if (ABS(random_perturbation) > 0.)
 	{
-		RFLOAT myperturb = random_perturbation * offset_step;
+		RFLOAT myperturb = random_perturbation * offset_step / my_pixel_size;
 		// Oct31,2015 - Shaoda - TODO: Please consider this!!!
-		RFLOAT myperturb_helical = random_perturbation * helical_offset_step;
+		RFLOAT myperturb_helical = random_perturbation * helical_offset_step / my_pixel_size;
 		for (int iover = 0; iover < my_translations_x.size(); iover++)
 		{
 			// If doing helical refinement, DONT put perturbation onto translations along helical axis???

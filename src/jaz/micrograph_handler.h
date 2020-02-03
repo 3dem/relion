@@ -32,82 +32,81 @@
 
 class MicrographHandler
 {
-    public:
+	public:
 
-        MicrographHandler();
+	MicrographHandler();
 
-            int nr_omp_threads, firstFrame, lastFrame;
-            double movie_angpix, coords_angpix, hotCutoff;
+	int nr_omp_threads, firstFrame, lastFrame;
+	double movie_angpix, coords_angpix, hotCutoff;
 
-            bool debug, saveMem, ready;
+	bool debug, saveMem, ready;
 
-            std::string corrMicFn;
-            std::string last_gainFn; // make protected
+	std::string corrMicFn;
+	std::string last_gainFn; // make protected
 
-            gravis::t2Vector<int> micrograph_size;
+	gravis::t2Vector<int> micrograph_size;
 
 
-        // initialise corrected/uncorrected micrograph dictionary, then
-        // load first movie (or read corrected_micrographs.star) to obtain:
-        //  fc, micrograph_xsize, micrograph_ysize, motionEstimator.dosePerFrame
-        void init(
-            // in:
-                const MetaDataTable& mdt,
-                double angpix, bool verb,
-                int nr_omp_threads,
-            // out:
-                int& fc,
-                double& dosePerFrame,
-                std::string& metaFn);
-		
-		// remove movies from the list for which either the meta-star or the movie itself is missing
-		std::vector<MetaDataTable> 
-			cullMissingMovies(const std::vector<MetaDataTable>& mdts, int verb);
+	// initialise corrected/uncorrected micrograph dictionary, then
+	// load first movie (or read corrected_micrographs.star) to obtain:
+	//   fc, micrograph_xsize, micrograph_ysize, motionEstimator.dosePerFrame
+	void init(
+		// in:
+		const std::vector<MetaDataTable>& mdts,
+		bool verb,
+		int nr_omp_threads,
+		// out:
+		int& fc,
+		double& dosePerFrame,
+		std::string& metaFn);
 
-        // find the greatest number of frames available in all micrographs
-        void findLowestFrameCount(const std::vector<MetaDataTable>& mdts, int verb);
+	void validatePixelSize(RFLOAT angpix) const;
 
-        // find all movies of sufficient length
-        std::vector<MetaDataTable> findLongEnoughMovies(
-                const std::vector<MetaDataTable>& mdts,
-                int fc, int verb);
+	// remove movies from the list for which either the meta-star or the movie itself is missing
+	std::vector<MetaDataTable> 
+		cullMissingMovies(const std::vector<MetaDataTable>& mdts, int verb);
 
-        // load a movie and extract all particles
-        // returns a per-particle vector of per-frame images of size (s/2+1) x s
-        std::vector<std::vector<Image<Complex>>> loadMovie(const MetaDataTable& mdt, int s,
-                double angpix, std::vector<ParFourierTransformer>& fts,
-				const std::vector<std::vector<gravis::d2Vector>>* offsets_in = 0,
-				std::vector<std::vector<gravis::d2Vector>>* offsets_out = 0);
+	// find the greatest number of frames available in all micrographs
+	void findLowestFrameCount(const std::vector<MetaDataTable>& mdts, int verb);
 
-        /* Load a movie as above and also write tracks of particles at 'pos' into 'tracks'.
-           If 'unregGlob' is set, also write the global component of motion into 'globComp'.*/
-        std::vector<std::vector<Image<Complex>>> loadMovie(
-                const MetaDataTable& mdt, int s, double angpix,
-                std::vector<ParFourierTransformer>& fts,
-                const std::vector<gravis::d2Vector>& pos,
-                std::vector<std::vector<gravis::d2Vector>>& tracks,
-                bool unregGlob, std::vector<gravis::d2Vector>& globComp,
-				const std::vector<std::vector<gravis::d2Vector>>* offsets_in = 0,
-				std::vector<std::vector<gravis::d2Vector>>* offsets_out = 0);
+	// find all movies of sufficient length
+	std::vector<MetaDataTable> findLongEnoughMovies(
+		const std::vector<MetaDataTable>& mdts,
+		int fc, int verb);
 
-    protected:
+	// load a movie and extract all particles
+	// returns a per-particle vector of per-frame images of size (s/2+1) x s
+	std::vector<std::vector<Image<Complex>>> loadMovie(const MetaDataTable& mdt, int s,
+		double angpix, std::vector<ParFourierTransformer>& fts,
+		const std::vector<std::vector<gravis::d2Vector>>* offsets_in = 0,
+		std::vector<std::vector<gravis::d2Vector>>* offsets_out = 0);
 
-            Micrograph micrograph;
-            Image<RFLOAT> lastGainRef;
+	/* Load a movie as above and also write tracks of particles at 'pos' into 'tracks'.
+	   If 'unregGlob' is set, also write the global component of motion into 'globComp'.*/
+	std::vector<std::vector<Image<Complex>>> loadMovie(
+		const MetaDataTable& mdt, int s, double angpix,
+		std::vector<ParFourierTransformer>& fts,
+		const std::vector<gravis::d2Vector>& pos,
+		std::vector<std::vector<gravis::d2Vector>>& tracks,
+		bool unregGlob, std::vector<gravis::d2Vector>& globComp,
+		const std::vector<std::vector<gravis::d2Vector>>* offsets_in = 0,
+		std::vector<std::vector<gravis::d2Vector>>* offsets_out = 0);
 
-            bool hasCorrMic;
-            std::map<std::string, std::string> mic2meta;
+	protected:
 
-        void loadInitial(
-                const MetaDataTable& mdt, double angpix, bool verb,
-                int& fc, double& dosePerFrame, std::string& metaFn);
+	Micrograph micrograph;
+	Image<RFLOAT> lastGainRef;
 
-        std::string getMetaName(std::string micName);
+	bool hasCorrMic;
+	std::map<std::string, std::string> mic2meta;
 
-        int determineFrameCount(const MetaDataTable& mdt);
-		bool isMoviePresent(const MetaDataTable& mdt);
-        std::string getMovieFilename(const MetaDataTable& mdt);
-
+	void loadInitial(
+		const std::vector<MetaDataTable>& mdts, bool verb,
+		int& fc, double& dosePerFrame, std::string& metaFn);
+	std::string getMetaName(std::string micName, bool die_on_error=true);
+	int determineFrameCount(const MetaDataTable& mdt);
+	bool isMoviePresent(const MetaDataTable& mdt, bool die_on_error=true);
+	std::string getMovieFilename(const MetaDataTable& mdt, bool die_on_error=true);
 };
 
 #endif

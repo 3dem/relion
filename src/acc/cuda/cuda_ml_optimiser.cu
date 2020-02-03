@@ -276,10 +276,9 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 	if (thread_id == 0)
 		baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_A);
 #endif
-			unsigned my_ori_particle = baseMLO->exp_my_first_ori_particle + ipart;
 
 			AccPtrFactory ptrFactory(allocator, cudaStreamPerThread);
-            accDoExpectationOneParticle<MlOptimiserCuda>(this, my_ori_particle, thread_id, ptrFactory);
+            accDoExpectationOneParticle<MlOptimiserCuda>(this, baseMLO->exp_my_first_part_id + ipart, thread_id, ptrFactory);
 
 		}
 		CTOC(timer,"oneTask");

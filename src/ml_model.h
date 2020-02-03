@@ -65,7 +65,7 @@ public:
 	bool do_sgd;
 
 	// Number of particles in each group
-	std::vector<long int> nr_particles_group;
+	std::vector<long int> nr_particles_per_group;
 
 	// Number of directions (size of pdf_direction);
 	long long int nr_directions;
@@ -176,7 +176,7 @@ public:
 	// Is this body kept fixed in refinement?
 	std::vector<int> keep_fixed_bodies;
 
-	// Maximum radius of mask
+	// Maximum radius of mask (in Angstrom!)
 	std::vector<int> max_radius_mask_bodies;
 
 	// 2D Matrix with pointers to the PPrefs for overlapping bodies
@@ -219,7 +219,7 @@ public:
 
 	// Normalize overlapping regions in multibody masks
 	bool norm_body_mask_overlap;
-	
+
 public:
 
 	// Constructor
@@ -265,82 +265,81 @@ public:
 		clear();
 	}
 
-    /** Assignment operator
-     */
-    MlModel& operator =(const MlModel &MD)
-    {
-        if (this != &MD)
-        {
-            clear();
-            ref_dim = MD.ref_dim;
-    		data_dim = MD.data_dim;
-    		ori_size = MD.ori_size;
-    		pixel_size = MD.pixel_size;
-    		current_size = MD.current_size;
-    		current_resolution = MD.current_resolution;
-    		nr_classes = MD.nr_classes;
-    		nr_bodies = MD.nr_bodies;
-    		nr_groups = MD.nr_groups;
-    		do_sgd = MD.do_sgd;
-    		nr_directions = MD.nr_directions;
-    		LL = MD.LL;
-    		padding_factor = MD.padding_factor;
-    		interpolator = MD.interpolator;
-    		r_min_nn = MD.r_min_nn;
-    		ave_Pmax = MD.ave_Pmax;
-    		avg_norm_correction = MD.avg_norm_correction;
-    		sigma2_offset = MD.sigma2_offset;
-    		tau2_fudge_factor = MD.tau2_fudge_factor;
-    		orientational_prior_mode = MD.orientational_prior_mode;
-    		sigma2_rot = MD.sigma2_rot;
-    		sigma2_tilt = MD.sigma2_tilt;
-    		sigma2_psi = MD.sigma2_psi;
-    		is_helix = MD.is_helix;
-    		helical_nr_asu = MD.helical_nr_asu;
-    		helical_twist_min = MD.helical_twist_min;
-    		helical_twist_max = MD.helical_twist_max;
-    		helical_twist_inistep = MD.helical_twist_inistep;
-    		helical_rise_min = MD.helical_rise_min;
-    		helical_rise_max = MD.helical_rise_max;
-    		helical_rise_inistep= MD.helical_rise_inistep;
-    		Iref = MD.Iref;
-    		Igrad = MD.Igrad;
-    		masks_bodies = MD.masks_bodies;
-    		com_bodies = MD.com_bodies;
-    		orient_bodies = MD.orient_bodies;
-    		sigma_tilt_bodies = MD.sigma_tilt_bodies;
-    		sigma_psi_bodies = MD.sigma_psi_bodies;
-    		sigma_offset_bodies = MD.sigma_offset_bodies;
-    		keep_fixed_bodies = MD.keep_fixed_bodies;
-    		max_radius_mask_bodies = MD.max_radius_mask_bodies;
+	/** Assignment operator
+	 */
+	MlModel& operator =(const MlModel &MD)
+	{
+		if (this != &MD)
+		{
+			clear();
+			ref_dim = MD.ref_dim;
+			data_dim = MD.data_dim;
+			ori_size = MD.ori_size;
+			pixel_size = MD.pixel_size;
+			current_size = MD.current_size;
+			current_resolution = MD.current_resolution;
+			nr_classes = MD.nr_classes;
+			nr_bodies = MD.nr_bodies;
+			nr_groups = MD.nr_groups;
+			do_sgd = MD.do_sgd;
+			nr_directions = MD.nr_directions;
+			LL = MD.LL;
+			padding_factor = MD.padding_factor;
+			interpolator = MD.interpolator;
+			r_min_nn = MD.r_min_nn;
+			ave_Pmax = MD.ave_Pmax;
+			avg_norm_correction = MD.avg_norm_correction;
+			sigma2_offset = MD.sigma2_offset;
+			tau2_fudge_factor = MD.tau2_fudge_factor;
+			orientational_prior_mode = MD.orientational_prior_mode;
+			sigma2_rot = MD.sigma2_rot;
+			sigma2_tilt = MD.sigma2_tilt;
+			sigma2_psi = MD.sigma2_psi;
+			is_helix = MD.is_helix;
+			helical_nr_asu = MD.helical_nr_asu;
+			helical_twist_min = MD.helical_twist_min;
+			helical_twist_max = MD.helical_twist_max;
+			helical_twist_inistep = MD.helical_twist_inistep;
+			helical_rise_min = MD.helical_rise_min;
+			helical_rise_max = MD.helical_rise_max;
+			helical_rise_inistep= MD.helical_rise_inistep;
+			Iref = MD.Iref;
+			Igrad = MD.Igrad;
+			masks_bodies = MD.masks_bodies;
+			com_bodies = MD.com_bodies;
+			orient_bodies = MD.orient_bodies;
+			sigma_tilt_bodies = MD.sigma_tilt_bodies;
+			sigma_psi_bodies = MD.sigma_psi_bodies;
+			sigma_offset_bodies = MD.sigma_offset_bodies;
+			keep_fixed_bodies = MD.keep_fixed_bodies;
+			max_radius_mask_bodies = MD.max_radius_mask_bodies;
 			PPref = MD.PPref;
-    		PPrefRank = MD.PPrefRank;
-    		group_names = MD.group_names;
-    		sigma2_noise = MD.sigma2_noise;
-    		scale_correction = MD.scale_correction;
-    		bfactor_correction = MD.bfactor_correction;
-    		tau2_class = MD.tau2_class;
-    		sigma2_class = MD.sigma2_class;
-    		fsc_halves_class = MD.fsc_halves_class;
-    		data_vs_prior_class = MD.data_vs_prior_class;
-    		fourier_coverage_class = MD.fourier_coverage_class;
-    		pdf_class = MD.pdf_class;
-    		pdf_direction = MD.pdf_direction;
-    		prior_offset_class = MD.prior_offset_class;
-    		nr_particles_group = MD.nr_particles_group;
-    		acc_rot = MD.acc_rot;
-    		acc_trans = MD.acc_trans;
-    		estimated_resolution = MD.estimated_resolution;
-    		total_fourier_coverage = MD.total_fourier_coverage;
-    		orientability_contrib = MD.orientability_contrib;
-    		helical_twist = MD.helical_twist;
-    		helical_rise = MD.helical_rise;
+			PPrefRank = MD.PPrefRank;
+			group_names = MD.group_names;
+			sigma2_noise = MD.sigma2_noise;
+			scale_correction = MD.scale_correction;
+			bfactor_correction = MD.bfactor_correction;
+			tau2_class = MD.tau2_class;
+			sigma2_class = MD.sigma2_class;
+			fsc_halves_class = MD.fsc_halves_class;
+			data_vs_prior_class = MD.data_vs_prior_class;
+			fourier_coverage_class = MD.fourier_coverage_class;
+			pdf_class = MD.pdf_class;
+			pdf_direction = MD.pdf_direction;
+			prior_offset_class = MD.prior_offset_class;
+			nr_particles_per_group = MD.nr_particles_per_group;
+			acc_rot = MD.acc_rot;
+			acc_trans = MD.acc_trans;
+			estimated_resolution = MD.estimated_resolution;
+			total_fourier_coverage = MD.total_fourier_coverage;
+			orientability_contrib = MD.orientability_contrib;
+			helical_twist = MD.helical_twist;
+			helical_rise = MD.helical_rise;
+	        }
+        	return *this;
+	}
 
-        }
-        return *this;
-    }
-
-    // Clear everything
+	// Clear everything
 	void clear()
 	{
 		Iref.clear();
@@ -367,7 +366,7 @@ public:
 		prior_offset_class.clear();
 		pdf_class.clear();
 		pdf_direction.clear();
-		nr_particles_group.clear();
+		nr_particles_per_group.clear();
 		ref_dim = data_dim = ori_size = nr_classes = nr_bodies = nr_groups = nr_directions = interpolator = r_min_nn;
 		padding_factor = 0.;
 		ave_Pmax = avg_norm_correction = LL = sigma2_offset = tau2_fudge_factor = 0.;
@@ -396,12 +395,8 @@ public:
 
 	// Read images from disc and initialise
 	// Also set do_average_unaligned and do_generate_seeds flags
-	void readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, Experiment &_mydata,
-			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected, bool _do_sgd = false);
-
-	// The group numbering in mydata may be different from the one in this model.
-	// Readjust all group_ids in the Experiment based on their group names
-	void reassignGroupsForMovies(Experiment &mydata, std::string &movie_name);
+	void initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experiment &_mydata,
+			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected, RFLOAT ref_angpix = -1., bool _do_sgd = false, bool verb = false);
 
 	RFLOAT getResolution(int ipix)	{ return (RFLOAT)ipix/(pixel_size * ori_size); }
 
@@ -414,7 +409,7 @@ public:
 	* If they were not empty, check that the new size is equal to the old one, and otherwise throw an exception
 	* because one cannot use an old pdf_orient with size unequal to the new one
 	*/
-	void initialisePdfDirection(int newsize);
+	void initialisePdfDirection(long long int newsize);
 
 	/** Read in the binary masks provided by the user and then make a soft edge on those */
 	void initialiseBodies(FileName fn_masks, FileName fn_root_out, bool also_initialise_rest = false, int rank = 0);
@@ -424,10 +419,11 @@ public:
 
 	// Set FourierTransforms in Projector of each class
 	// current_size will determine the size of the transform (in number of Fourier shells) to be held in the projector ( thisClass == -1  => do all classes this call)
-	void setFourierTransformMaps(bool update_tau2_spectra, int nr_threads = 1, bool do_gpu = false);
+	void setFourierTransformMaps(bool update_tau2_spectra, int nr_threads = 1, RFLOAT strict_lowres_exp = -1,
+			   const MultidimArray<RFLOAT> *fourier_mask = NULL );
 
 	// current_size will determine the size of the transform (in number of Fourier shells) to be held in the projector ( thisClass == -1  => do all classes this call)
-	void setFourierTransformMaps(bool update_tau2_spectra, std::vector<bool> ListCheapSetup, int nr_threads = 1, bool do_gpu = false);
+	void setFourierTransformMaps(bool update_tau2_spectra, std::vector<bool> ListCheapSetup, int nr_threads = 1, RFLOAT strict_lowres_exp = -1);
 
 	/* Initialises the radial average of the data-versus-prior ratio
 	 */
@@ -450,10 +446,10 @@ public:
 
 	// For the refinement of group intensity scales and bfactors
 	// For each group store weighted sums of experimental image times reference image as a function of resolution
-	std::vector<MultidimArray<RFLOAT > > wsum_signal_product_spectra;
+	std::vector<RFLOAT > wsum_signal_product;
 
 	// For each group store weighted sums of squared reference as a function of resolution
-	std::vector<MultidimArray<RFLOAT > > wsum_reference_power_spectra;
+	std::vector<RFLOAT > wsum_reference_power;
 
 	// Constructor
 	MlWsumModel()
@@ -490,7 +486,7 @@ public:
 
 	// Pack entire structure into one large MultidimArray<RFLOAT> for shipping over with MPI
 	// To save memory, the model itself will be cleared after packing.
-    // If the whole thing becomes bigger than 1Gb (see MAX_PACK_SIZE in ml_model.cpp), then break it up into pieces because MPI cannot handle very large messages
+	// If the whole thing becomes bigger than 1Gb (see MAX_PACK_SIZE in ml_model.cpp), then break it up into pieces because MPI cannot handle very large messages
 	// When broken up: nr_pieces > 1
 	void pack(MultidimArray<RFLOAT> &packed, int &piece, int &nr_pieces, bool do_clear=true);
 

@@ -46,6 +46,8 @@
 #include "src/metadata_container.h"
 #include "src/metadata_label.h"
 
+#define CURRENT_MDT_VERSION 30001
+
 /** For all objects.
  @code
  FOR_ALL_OBJECTS_IN_METADATA(metadata) {
@@ -86,11 +88,15 @@ class MetaDataTable
 	//	 objects[r]->strings[label2offset[EMDL_IMAGE_NAME]]
 	std::vector<long> label2offset;
 
+	//// TODO: add these to the clear, copy etc
+	std::vector<std::string> unknownLabelNames;
+	std::map<long, long> unknownLabelPosition2Offset;
+
 	// Current object id
 	long current_objectID;
 
 	// Number of labels of each type
-	long doubleLabels, intLabels, boolLabels, stringLabels;
+	long doubleLabels, intLabels, boolLabels, stringLabels, doubleVectorLabels, unknownLabels;
 
 	// Is this a 2D table or a 1D list?
 	bool isList;
@@ -101,6 +107,8 @@ class MetaDataTable
 	// A comment for the metadata table
 	std::string comment;
 
+	// The version number of the file format (multiplied by 10,000)
+	int version;
 
 public:
 
@@ -109,15 +117,6 @@ public:
 	 *  called
 	 **/
 	std::vector<EMDLabel> activeLabels;
-
-	/** When reading a column formated file, if a label is found that
-	 *  does not exists as a EMDLabel, it is ignored. For further
-	 *  file processing, such columns must be ignored and this structure
-	 *  allows to do that
-	 **/
-	std::vector<unsigned int> ignoreLabels;
-
-
 
 	MetaDataTable();
 
@@ -129,12 +128,16 @@ public:
 	~MetaDataTable();
 
 
+	bool isAList()
+	{
+		return isList;
+	}
 
 	void setIsList(bool is_list);
 
 	bool isEmpty() const;
 	size_t numberOfObjects() const;
-	size_t size(void); // @TODO: redundant
+	size_t size(void) const; // @TODO: redundant
 	void clear();
 
 	void setComment(const std::string Comment);
@@ -144,20 +147,26 @@ public:
 	void setName(const std::string Name);
 	std::string getName() const;
 
+	void setVersion(int v);
+	int getVersion() const;
+	static int getCurrentVersion();
+
 
 	// getValue: returns true if the label exists
+	// objectID is 0-indexed.
 	template<class T>
 	bool getValue(EMDLabel label, T& value, long objectID = -1) const;
 
-	bool getValueToString(EMDLabel label, std::string &value, long int objectID = -1) const;
+	bool getValueToString(EMDLabel label, std::string &value, long int objectID = -1, bool escape=false) const;
 
 	// Set the value of label for a specified object.
 	// If no objectID is given, the internal iterator 'current_objectID' is used
+	// objectID is 0-indexed.
 	template<class T>
 	bool setValue(EMDLabel name, const T &value, long int objectID = -1);
 
+	bool setUnknownValue(int labelPosition, const std::string &value);
 	bool setValueFromString(EMDLabel label, const std::string &value, long int objectID = -1);
-
 
 	// Sort the order of the elements based on the values in the input label
 	// (only numbers, no strings/bools)
@@ -264,15 +273,20 @@ public:
 	long int read(const FileName &filename, const std::string &name = "", std::vector<EMDLabel> *labelsVector = NULL, std::string grep_pattern = "", bool do_only_count = false);
 
 	// Write a MetaDataTable in STAR format
-	void write(std::ostream& out = std::cout) const;
+	void write(std::ostream& out = std::cout);
 
 	// Write to a single file
-	void write(const FileName & fn_out) const;
+	void write(const FileName & fn_out);
 
 	// Make a histogram of a column
-	void columnHistogram(EMDLabel label, std::vector<RFLOAT> &histX, std::vector<RFLOAT> &histY, int verb = 0, CPlot2D * plot2D = NULL,
+	void columnHistogram(EMDLabel label, std::vector<RFLOAT> &histX, std::vector<RFLOAT> &histY, int verb = 0, CPlot2D *plot2D = NULL,
 	                     long int nr_bin = -1, RFLOAT hist_min = -LARGE_NUMBER, RFLOAT hist_max = LARGE_NUMBER,
 	                     bool do_fractional_instead = false, bool do_cumulative_instead = false);
+
+	static void histogram(std::vector<RFLOAT> &values, std::vector<RFLOAT> &histX, std::vector<RFLOAT> &histY, int verb = 0,
+	                      std::string title="Histogram", CPlot2D *plot2D = NULL,
+	                      long int nr_bin = -1, RFLOAT hist_min = -LARGE_NUMBER, RFLOAT hist_max = LARGE_NUMBER,
+	                      bool do_fractional_instead = false, bool do_cumulative_instead = false);
 
 	void addToCPlot2D(CPlot2D *plot2D, EMDLabel xaxis, EMDLabel yaxis,
 	                  double red=0., double green=0., double blue=0., double linewidth = 1.0, std::string marker="");
@@ -292,6 +306,9 @@ public:
 		NO_MORE_OBJECTS = -2,
 		NO_OBJECT_FOUND = -3
 	};
+
+	template<class T>
+	bool isTypeCompatible(EMDLabel label, T& value) const;
 
 private:
 
@@ -325,10 +342,46 @@ MetaDataTable subsetMetaDataTable(MetaDataTable &MDin, EMDLabel label, std::stri
 // OriginX/Y are multiplied by origin_scale before added to CoordinateX/Y to compensate for down-sampling
 MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label, RFLOAT threshold, RFLOAT origin_scale=1.0, FileName fn_removed="", bool verb=true);
 
+#ifdef METADATA_TABLE_TYPE_CHECK
+//#pragma message("typecheck enabled")
+template<class T>
+bool MetaDataTable::isTypeCompatible(EMDLabel label, T& value) const
+{
+	// remove const appended by setValue()
+	typedef typename std::remove_const<T>::type U;
+
+	// In C++11, this repeat can be avoided by using "if constexpr(...) else static_assert"
+	static_assert(std::is_same<bool, U>::value ||
+	              std::is_same<FileName, U>::value || std::is_same<std::string, U>::value ||
+	              std::is_same<double, U>::value || std::is_same<float, U>::value ||
+	              std::is_same<int, U>::value || std::is_same<long, U>::value ||
+	              std::is_same<std::vector<double>, U>::value || std::is_same<std::vector<float>, U>::value,
+	              "Compile error: wrong type given to MetaDataTable::getValur or setValue");
+
+	if (std::is_same<bool, U>::value)
+		return EMDL::isBool(label);
+	else if (std::is_same<FileName, U>::value || std::is_same<std::string, U>::value)
+		return EMDL::isString(label);
+	else if (std::is_same<double, U>::value || std::is_same<float, U>::value)
+		return EMDL::isDouble(label);
+	else if (std::is_same<int, U>::value || std::is_same<long, U>::value)
+		return EMDL::isInt(label);
+	else if (std::is_same<std::vector<double>, U>::value || std::is_same<std::vector<float>, U>::value)
+		return EMDL::isVector(label);
+	else
+		return false;
+}
+#endif
+
 template<class T>
 bool MetaDataTable::getValue(EMDLabel label, T& value, long objectID) const
 {
 	if (label < 0 || label >= EMDL_LAST_LABEL) return false;
+
+#ifdef METADATA_TABLE_TYPE_CHECK
+	if (!isTypeCompatible(label, value))
+		REPORT_ERROR("Runtime error: wrong type given to MetaDataTable::getValue for label " + EMDL::label2Str(label));
+#endif
 
 	const long off = label2offset[label];
 	if (off > -1)
@@ -350,16 +403,21 @@ bool MetaDataTable::getValue(EMDLabel label, T& value, long objectID) const
 }
 
 template<class T>
-bool MetaDataTable::setValue(EMDLabel name, const T &value, long int objectID)
+bool MetaDataTable::setValue(EMDLabel label, const T &value, long int objectID)
 {
-	if (name < 0 || name >= EMDL_LAST_LABEL) return false;
+	if (label < 0 || label >= EMDL_LAST_LABEL) return false;
 
-	long off = label2offset[name];
+#ifdef METADATA_TABLE_TYPE_CHECK
+	if (!isTypeCompatible(label, value))
+		REPORT_ERROR("Runtime error: wrong type given to MetaDataTable::setValue for label " + EMDL::label2Str(label));
+#endif
+
+	long off = label2offset[label];
 
 	if (off < 0)
 	{
-		addLabel(name);
-		off = label2offset[name];
+		addLabel(label);
+		off = label2offset[label];
 	}
 
 	if (objectID < 0)

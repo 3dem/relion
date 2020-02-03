@@ -68,13 +68,18 @@ class tComplex
 
             return *this;
         }
-
-        tComplex& operator -= (const tComplex& arg)
+		
+		tComplex& operator -= (const tComplex& arg)
         {
             real -= arg.real;
             imag -= arg.imag;
 
             return *this;
+        }
+		
+		tComplex operator - () const
+        {
+            return tComplex<T>(-real, -imag);
         }
 
         tComplex& operator *= (const tComplex& arg)
@@ -100,6 +105,21 @@ class tComplex
 
             return *this;
         }
+		
+		bool operator == (const tComplex& arg) const
+		{
+			return (real == arg.real && imag == arg.imag);
+		}
+  
+		bool operator != (const tComplex& arg) const
+		{
+			return !(*this == arg);
+		}
+		
+		operator T() const
+		{
+			return real;
+		}
 
         tComplex conj() const
         {
@@ -156,6 +176,12 @@ template <class T1, class T2> inline
 tComplex<T1> operator - (const tComplex<T1>& z, const tComplex<T2>& w)
 {
     return tComplex<T1>(z.real - w.real, z.imag - w.imag);
+}
+
+template <class T1, class T2> inline
+tComplex<T1> operator - (const tComplex<T1>& z)
+{
+    return tComplex<T1>(-z.real, -z.imag);
 }
 
 template <class T1, class T2> inline

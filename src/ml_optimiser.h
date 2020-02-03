@@ -62,23 +62,20 @@
 #define METADATA_CTF_DEFOCUS_U 11
 #define METADATA_CTF_DEFOCUS_V 12
 #define METADATA_CTF_DEFOCUS_ANGLE 13
-#define METADATA_CTF_VOLTAGE 14
-#define METADATA_CTF_Q0 15
-#define METADATA_CTF_CS 16
-#define METADATA_CTF_BFAC 17
-#define METADATA_CTF_PHASE_SHIFT 18
+#define METADATA_CTF_BFACTOR 14
+#define METADATA_CTF_KFACTOR 15
+#define METADATA_CTF_PHASE_SHIFT 16
 
-#define METADATA_ROT_PRIOR 19
-#define METADATA_TILT_PRIOR 20
-#define METADATA_PSI_PRIOR 21
-#define METADATA_XOFF_PRIOR 22
-#define METADATA_YOFF_PRIOR 23
-#define METADATA_ZOFF_PRIOR 24
-#define METADATA_PSI_PRIOR_FLIP_RATIO 25
+#define METADATA_ROT_PRIOR 17
+#define METADATA_TILT_PRIOR 18
+#define METADATA_PSI_PRIOR 19
+#define METADATA_XOFF_PRIOR 20
+#define METADATA_YOFF_PRIOR 21
+#define METADATA_ZOFF_PRIOR 22
+#define METADATA_PSI_PRIOR_FLIP_RATIO 23
+#define METADATA_ROT_PRIOR_FLIP_RATIO 24 	// KThurber
 
-#define METADATA_BEAMTILT_X 26
-#define METADATA_BEAMTILT_Y 27
-#define METADATA_LINE_LENGTH_BEFORE_BODIES 28
+#define METADATA_LINE_LENGTH_BEFORE_BODIES 25
 #define METADATA_NR_BODY_PARAMS 6
 
 #define DO_WRITE_DATA true
@@ -149,6 +146,9 @@ public:
 	// Generate a 3D model from 2D particles de novo?
 	bool is_3d_model;
 
+	//User-specified pixel size for the reference
+	RFLOAT ref_angpix;
+
 	// Filename for input tau2-spectrum
 	FileName fn_tau;
 
@@ -171,13 +171,16 @@ public:
 	RFLOAT debug1, debug2, debug3;
 
 	// Starting and finishing particles (for parallelisation)
-	long int my_first_ori_particle_id, my_last_ori_particle_id;
+	long int my_first_particle_id, my_last_particle_id;
 
 	// Total number iterations and current iteration
-	int iter, nr_iter;
+	int iter, nr_iter, nr_iter_max;
 
 	// Flag whether to split data from the beginning into two random halves
 	bool do_split_random_halves;
+
+	// Debug flag to process 1 half when doing do_split_random_halves, without using MPI
+	int debug_split_random_half;
 
 	// For safe-guarding the gold-standard separation
 	int my_halfset;
@@ -200,14 +203,14 @@ public:
 	// Do not correct CTFs until after the first peak
 	bool intact_ctf_first_peak;
 
+	// Calculate CTF in 2x larger window, and then rescale it to mimic PSF of boxing out small particles (this deals with CTF aliaising)
+	bool do_ctf_padding;
+
 	// Pnly perform phase-flipping CTF correction
 	bool only_flip_phases;
 
 	// Images have been CTF phase flipped al;ready
 	bool ctf_phase_flipped;
-
-	// Images have been premultiplied with the CTF
-	bool ctf_premultiplied;
 
 	// Flag whether current references are ctf corrected
 	bool refs_are_ctf_corrected;
@@ -250,8 +253,8 @@ public:
 	// Number of iterations without a decrease in OffsetChanges
 	int nr_iter_wo_large_hidden_variable_changes;
 
-	// Strict high-res limit in the expectation step
-	RFLOAT strict_highres_exp;
+	// Strict resolution limits in the expectation step
+	RFLOAT strict_highres_exp, strict_lowres_exp;
 
 	// Flag to indicate to estimate angular accuracy until current_size (and not coarse_size) when restricting high-res limit in the expectation step
 	// This is used for testing purposes only
@@ -269,8 +272,8 @@ public:
 	// Flag to indicate that angular sampling in auto-sampling has reached its limit
 	bool has_fine_enough_angular_sampling;
 
-	// Minimum angular sampling to achieve in auto-refinement (in degrees)
-	RFLOAT minimum_angular_sampling;
+	// Minimum and maximum angular sampling to achieve in auto-refinement (in degrees)
+	RFLOAT minimum_angular_sampling, maximum_angular_sampling;
 
 	// Flag to keep sigma2_offset fixed
 	bool fix_sigma_offset;
@@ -278,8 +281,9 @@ public:
 	// Flag to keep sigma2_noise fixed
 	bool fix_sigma_noise;
 
-	//  Use images only up to a certain resolution in the expectation step
-	int coarse_size;
+	//  Use images only up to a certain resolution in the expectation step (one for each optics_group)
+	// image_coarse_size is for first pass, image_current_size is for second pass, image_full_size is original image size
+	std::vector<int> image_coarse_size, image_current_size, image_full_size;
 
 	// Use images only up to a certain resolution in the expectation step
 	int max_coarse_size;
@@ -306,6 +310,10 @@ public:
 	// This solvent mask will have its own average density and may be useful for example to fill the interior of an icosahedral virus
 	FileName fn_mask2;
 
+	// Mask for regions to be low-pass filtered
+	FileName fn_lowpass_mask;
+	RFLOAT lowpass;
+
 	// Width of the soft-edges of the circular masks
 	int width_mask_edge;
 
@@ -315,7 +323,9 @@ public:
 	//////////////// Stochastic gradient descent
 	bool do_sgd;
 
-	// 12Feb2018: new parameters to follow cryoSPARC more closely
+	// Avoid problems with SGD patent in cryoSPARC: don't accumulate gradient, but do minibatch maximisation steps instead
+	bool do_avoid_sgd;
+
 	// Number of initial iterations at low resolution, and without annealing of references
 	int sgd_ini_iter;
 
@@ -397,7 +407,7 @@ public:
 	FileName fn_scratch;
 
 	// Amount of scratch space to be left free (in Gb)
-	int keep_free_scratch_Gb;
+	RFLOAT keep_free_scratch_Gb;
 
 	// Re-use data on scratch dir, i.e. dont delete data already there and copy again
 	bool do_reuse_scratch;
@@ -408,8 +418,11 @@ public:
 	// Print the symmetry transformation matrices
 	bool do_print_symmetry_ops;
 
-    /** Name of the multiple symmetry groups */
-    std::vector<FileName> fn_multi_sym;
+	/** Name of the multiple symmetry groups */
+	std::vector<FileName> fn_multi_sym;
+
+	/** Perform reconstruction outside of relion_refine, e.g. for learned priors */
+	bool do_external_reconstruct;
 
 	/* Flag whether to use the Adaptive approach as by Tagare et al (2010) J. Struc. Biol.
 	 * where two passes through the integrations are made: a first one with a coarse angular sampling and
@@ -474,28 +487,6 @@ public:
 	// Flag to switch off error message about normalisation
 	bool dont_raise_norm_error;
 
-	///////// Re-align individual frames of movies /////////////
-
-	// Flag whether to realign frames of movies
-	bool do_realign_movies;
-
-	// Process movies one micrograph at a time?
-	// This prevents memory problems with very large data sets, but may negatively affect overall parallelization efficiency
-	bool do_movies_in_batches;
-
-	// Starfile with the movie-frames
-	FileName fn_data_movie;
-
-	// Movie identifier string
-	FileName movie_identifier;
-
-	// How many individual frames contribute to the priors?
-	int nr_frames_per_prior;
-
-	// How wide are the running averages of the frames to use for alignment?
-	// If set to 1, then running averages will be n-1, n, n+1, i.e. 3 frames wide
-	int movie_frame_running_avg_side;
-
 	///////////// Helical symmetry /////////////
 	// Flag whether to do helical refinement
 	bool do_helical_refine;
@@ -521,22 +512,21 @@ public:
 	// Flag whether to do local refinement of helical parameters
 	bool do_helical_symmetry_local_refinement;
 
-	// Sigma of distance along the helical tracks
+	// Sigma of distance along the helical tracks (in Angstroms)
 	RFLOAT helical_sigma_distance;
 
 	// Keep helical tilt priors fixed (at 90 degrees) in global angular searches?
 	bool helical_keep_tilt_prior_fixed;
 
-	// Apply directional filter (with this many Angstroms in X) to the references, this can sometimes help in 2D classification of amyloids
-	//RFLOAT directional_lowpass;
+	// Apply fourier_mask for helical refinements
+	std::string helical_fourier_mask_resols;
+	FileName fn_fourier_mask;
+	MultidimArray<RFLOAT> helical_fourier_mask;
 
 	///////// Hidden stuff, does not work with read/write: only via command-line ////////////////
 
 	// Skip gridding in reconstruction
 	bool skip_gridding;
-
-	// Use do_fsc0999 in reconstructions for unfil.mrc maps
-	bool do_fsc0999;
 
 	// Number of iterations for gridding preweighting reconstruction
 	int gridding_nr_iter;
@@ -580,8 +570,9 @@ public:
 
 	/////////// Some internal stuff ////////////////////////
 
-	// Array with pointers to the resolution of each point in a Fourier-space FFTW-like array
-	MultidimArray<int> Mresol_fine, Mresol_coarse, Npix_per_shell;
+	// Array with pointers to the resolution of each point in a Fourier-space FFTW-like array (one for each optics_group)
+	std::vector<MultidimArray<int> > Mresol_fine, Mresol_coarse;
+	MultidimArray<int> Npix_per_shell;
 
 	// Verbosity flag
 	int verb;
@@ -596,16 +587,15 @@ public:
 	//for catching exceptions in threads
 	RelionError * threadException;
 
-	long int exp_my_first_ori_particle, exp_my_last_ori_particle;
+	long int exp_my_first_part_id, exp_my_last_part_id;
 	MultidimArray<RFLOAT> exp_metadata, exp_imagedata;
 	std::string exp_fn_img, exp_fn_ctf, exp_fn_recimg;
 	std::vector<MultidimArray<RFLOAT> > exp_imgs;
 	std::vector<int> exp_random_class_some_particles;
-	int exp_nr_images;
 
 	// Calculate translated images on-the-fly
 	bool do_shifts_onthefly;
-	std::vector<MultidimArray<Complex> > global_fftshifts_ab_coarse, global_fftshifts_ab_current, global_fftshifts_ab2_coarse, global_fftshifts_ab2_current;
+	std::vector< std::vector<MultidimArray<Complex> > > global_fftshifts_ab_coarse, global_fftshifts_ab_current, global_fftshifts_ab2_coarse, global_fftshifts_ab2_current;
 
 	//TMP DEBUGGING
 	MultidimArray<RFLOAT> DEBUGGING_COPY_exp_Mweight;
@@ -614,7 +604,7 @@ public:
 	bool asymmetric_padding;
 
 	//Maximum number of significant weights in coarse pass of expectation
-	unsigned maximum_significants;
+	int maximum_significants;
 
 	// Tabulated sine and cosine values (for 3D helical sub-tomogram averaging with on-the-fly shifts)
 	TabSine tab_sin;
@@ -661,7 +651,6 @@ public:
 		do_write_unmasked_refs(0),
 		do_generate_seeds(0),
 		sum_changes_count(0),
-		coarse_size(0),
 		current_changes_optimal_orientations(0),
 		do_average_unaligned(0),
 		sigma2_fudge(0),
@@ -683,7 +672,6 @@ public:
 		do_use_reconstruct_images(0),
 		fix_sigma_noise(0),
 		current_changes_optimal_offsets(0),
-		nr_frames_per_prior(0),
 		smallest_changes_optimal_classes(0),
 		do_print_metadata_labels(0),
 		adaptive_fraction(0),
@@ -693,7 +681,7 @@ public:
 		minres_map(0),
 		debug2(0),
 		do_always_join_random_halves(0),
-		my_first_ori_particle_id(0),
+		my_first_particle_id(0),
 		x_pool(1),
 		nr_threads(0),
 		do_shifts_onthefly(0),
@@ -709,7 +697,6 @@ public:
 		sum_changes_optimal_offsets(0),
 		do_scale_correction(0),
 		ctf_phase_flipped(0),
-		exp_nr_images(0),
 		nr_iter_wo_large_hidden_variable_changes(0),
 		adaptive_oversampling(0),
 		nr_iter(0),
@@ -719,12 +706,11 @@ public:
 		do_calculate_initial_sigma_noise(0),
 		fix_sigma_offset(0),
 		do_firstiter_cc(0),
-		exp_my_last_ori_particle(0),
+		exp_my_last_part_id(0),
 		particle_diameter(0),
 		smallest_changes_optimal_orientations(0),
 		verb(0),
 		do_norm_correction(0),
-		movie_frame_running_avg_side(0),
 		fix_tau(0),
 		directions_have_changed(0),
 		acc_rot(0),
@@ -736,16 +722,15 @@ public:
 		do_map(0),
 		combine_weights_thru_disc(0),
 		smallest_changes_optimal_offsets(0),
-		exp_my_first_ori_particle(0),
+		exp_my_first_part_id(0),
 		iter(0),
-		my_last_ori_particle_id(0),
+		my_last_particle_id(0),
 		ini_high(0),
-		do_realign_movies(0),
-		do_movies_in_batches(0),
 		do_ctf_correction(0),
 		max_coarse_size(0),
 		autosampling_hporder_local_searches(0),
 		do_split_random_halves(0),
+		debug_split_random_half(0),
 		random_seed(0),
 		do_gpu(0),
 		anticipate_oom(0),
@@ -761,7 +746,7 @@ public:
 		helical_keep_tilt_prior_fixed(0),
 		//directional_lowpass(0),
 		asymmetric_padding(false),
-		maximum_significants(0),
+		maximum_significants(-1),
 		threadException(NULL),
 #ifdef ALTCPU
 		tbbSchedulerInit(tbb::task_scheduler_init::deferred ),
@@ -788,7 +773,7 @@ public:
 	void parseContinue(int argc, char **argv);
 
 	/// Read from STAR file
-	void read(FileName fn_in, int rank = 0);
+	void read(FileName fn_in, int rank = 0, bool do_prevent_preread = false);
 
 	// Write files to disc
 	void write(bool do_write_sampling, bool do_write_data, bool do_write_optimiser, bool do_write_model, int random_subset = 0);
@@ -797,6 +782,9 @@ public:
 
 	// Initialise the whole optimiser
 	void initialise();
+
+	// Check the mask is thr ight size
+	void checkMask(FileName &_fn_mask, int solvent_nr, int rank);
 
 	// Some general stuff that is shared between MPI and sequential code
 	void initialiseGeneral(int rank = 0);
@@ -858,7 +846,7 @@ public:
 	void doThreadExpectationSomeParticles(int thread_id);
 
 	/* Perform the expectation integration over all k, phi and series elements for a given particle */
-	void expectationOneParticle(long int my_ori_particle, int thread_id);
+	void expectationOneParticle(long int part_id, int thread_id);
 
 	/* Function to call symmetrise of BackProjector helical objects for each class or body
 	 * Do rise and twist for all asymmetrical units in Fourier space
@@ -905,23 +893,16 @@ public:
 	 */
 	void updateImageSizeAndResolutionPointers();
 
-	/* From the vectors of Fourier transforms of the images, calculate running averages over the movie frames
-	 */
-	void calculateRunningAveragesOfMovieFrames(long int my_ori_particle,
-		std::vector<MultidimArray<Complex > > &exp_Fimgs,
-		std::vector<MultidimArray<RFLOAT> > &exp_power_imgs,
-		std::vector<RFLOAT> &exp_highres_Xi2_imgs);
-
 	/* Read image and its metadata from disc (threaded over all pooled particles)
 	 */
-	void getFourierTransformsAndCtfs(long int my_ori_particle, int ibody, int metadata_offset,
-			std::vector<MultidimArray<Complex > > &exp_Fimgs,
-			std::vector<MultidimArray<Complex > > &exp_Fimgs_nomask,
-			std::vector<MultidimArray<RFLOAT> > &exp_Fctfs,
+	void getFourierTransformsAndCtfs(long int part_id, int ibody, int metadata_offset,
+			std::vector<MultidimArray<Complex > > &exp_Fimg,
+			std::vector<MultidimArray<Complex > > &exp_Fimg_nomask,
+			std::vector<MultidimArray<RFLOAT> > &exp_Fctf,
 			std::vector<Matrix1D<RFLOAT> > &exp_old_offset,
 			std::vector<Matrix1D<RFLOAT> > &exp_prior,
-			std::vector<MultidimArray<RFLOAT> > &exp_power_imgs,
-			std::vector<RFLOAT> &exp_highres_Xi2_imgs,
+			std::vector<MultidimArray<RFLOAT> > &exp_power_img,
+			std::vector<RFLOAT> &exp_highres_Xi2_img,
 			std::vector<int> &exp_pointer_dir_nonzeroprior,
 			std::vector<int> &exp_pointer_psi_nonzeroprior,
 			std::vector<RFLOAT> &exp_directions_prior,
@@ -930,64 +911,63 @@ public:
 	/* Store all shifted FourierTransforms in a vector
 	 * also store precalculated 2D matrices with 1/sigma2_noise
 	 */
-	void precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmasked, long int my_ori_particle,
-			int exp_current_image_size, int exp_current_oversampling, int metadata_offset,
+	void precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmasked, bool is_for_store_wsums, long int my_particle,
+			int exp_current_oversampling, int metadata_offset,
 			int exp_itrans_min, int exp_itrans_max,
-			std::vector<MultidimArray<Complex > > &exp_Fimgs,
-			std::vector<MultidimArray<Complex > > &exp_Fimgs_nomask,
-			std::vector<MultidimArray<RFLOAT> > &exp_Fctfs,
-			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted,
-			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted_nomask,
-			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctfs,
+			std::vector<MultidimArray<Complex > > &exp_Fimg,
+			std::vector<MultidimArray<Complex > > &exp_Fimg_nomask,
+			std::vector<MultidimArray<RFLOAT> > &exp_Fctf,
+			std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted,
+			std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted_nomask,
+			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
 			std::vector<RFLOAT> &exp_local_sqrtXi2,
-			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2s);
+			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2);
 
 	// Given exp_Mcoarse_significant, check for iorient whether any of the particles has any significant (coarsely sampled) translation
-	bool isSignificantAnyParticleAnyTranslation(long int iorient,
+	bool isSignificantAnyImageAnyTranslation(long int iorient,
 			int exp_itrans_min, int exp_itrans_max, MultidimArray<bool> &exp_Mcoarse_significant);
 
 	// Get squared differences for all iclass, idir, ipsi and itrans...
-	void getAllSquaredDifferences(long int my_ori_particle, int ibody, int exp_current_image_size,
+	void getAllSquaredDifferences(long int part_id, int ibody,
 			int exp_ipass, int exp_current_oversampling, int metadata_offset,
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,
 			std::vector<RFLOAT> &exp_min_diff2,
-			std::vector<RFLOAT> &exp_highres_Xi2_imgs,
-			std::vector<MultidimArray<Complex > > &exp_Fimgs,
-			std::vector<MultidimArray<RFLOAT> > &exp_Fctfs,
+			std::vector<RFLOAT> &exp_highres_Xi2_img,
+			std::vector<MultidimArray<Complex > > &exp_Fimg,
+			std::vector<MultidimArray<RFLOAT> > &exp_Fctf,
 			MultidimArray<RFLOAT> &exp_Mweight,
 			MultidimArray<bool> &exp_Mcoarse_significant,
 			std::vector<int> &exp_pointer_dir_nonzeroprior, std::vector<int> &exp_pointer_psi_nonzeroprior,
 			std::vector<RFLOAT> &exp_directions_prior, std::vector<RFLOAT> &exp_psi_prior,
-			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted,
-			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2s,
-			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctfs,
-			std::vector<RFLOAT> &exp_local_sqrtXi2);
+			std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted,
+			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2,
+			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
+			std::vector<RFLOAT> &exp_local_sqrtXi);
 
 	// Convert all squared difference terms to weights.
 	// Also calculates exp_sum_weight and, for adaptive approach, also exp_significant_weight
-	void convertAllSquaredDifferencesToWeights(long int my_ori_particle, int ibody, int exp_ipass,
+	void convertAllSquaredDifferencesToWeights(long int part_id, int ibody, int exp_ipass,
 			int exp_current_oversampling, int metadata_offset,
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,
 			MultidimArray<RFLOAT> &exp_Mweight, MultidimArray<bool> &exp_Mcoarse_significant,
 			std::vector<RFLOAT> &exp_significant_weight, std::vector<RFLOAT> &exp_sum_weight,
-			std::vector<Matrix1D<RFLOAT> > &exp_old_offset, std::vector<Matrix1D<RFLOAT> > &exp_prior,
-			std::vector<RFLOAT> &exp_min_diff2,
+			std::vector<Matrix1D<RFLOAT> > &exp_old_offset, std::vector<Matrix1D<RFLOAT> > &exp_prior, std::vector<RFLOAT> &exp_min_diff2,
 			std::vector<int> &exp_pointer_dir_nonzeroprior, std::vector<int> &exp_pointer_psi_nonzeroprior,
 			std::vector<RFLOAT> &exp_directions_prior, std::vector<RFLOAT> &exp_psi_prior);
 
 	// Store all relevant weighted sums, also return optimal hidden variables, max_weight and dLL
-	void storeWeightedSums(long int my_ori_particle, int ibody, int exp_current_image_size,
+	void storeWeightedSums(long int part_id, int ibody,
 			int exp_current_oversampling, int metadata_offset,
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,
 			std::vector<RFLOAT> &exp_min_diff2,
-			std::vector<RFLOAT> &exp_highres_Xi2_imgs,
-			std::vector<MultidimArray<Complex > > &exp_Fimgs,
-			std::vector<MultidimArray<Complex > > &exp_Fimgs_nomask,
-			std::vector<MultidimArray<RFLOAT> > &exp_Fctfs,
-			std::vector<MultidimArray<RFLOAT> > &exp_power_imgs,
+			std::vector<RFLOAT> &exp_highres_Xi2_img,
+			std::vector<MultidimArray<Complex > > &exp_Fimg,
+			std::vector<MultidimArray<Complex > > &exp_Fimg_nomask,
+			std::vector<MultidimArray<RFLOAT> > &exp_Fctf,
+			std::vector<MultidimArray<RFLOAT> > &exp_power_img,
 			std::vector<Matrix1D<RFLOAT> > &exp_old_offset,
 			std::vector<Matrix1D<RFLOAT> > &exp_prior,
 			MultidimArray<RFLOAT> &exp_Mweight,
@@ -997,21 +977,21 @@ public:
 			std::vector<RFLOAT> &exp_max_weight,
 			std::vector<int> &exp_pointer_dir_nonzeroprior, std::vector<int> &exp_pointer_psi_nonzeroprior,
 			std::vector<RFLOAT> &exp_directions_prior, std::vector<RFLOAT> &exp_psi_prior,
-			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted,
-			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted_nomask,
-			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2s,
-			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctfs,
+			std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted,
+			std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted_nomask,
+			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2,
+			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
 			std::vector<RFLOAT> &exp_local_sqrtXi2);
 
 	/** Monitor the changes in the optimal translations, orientations and class assignments for some particles */
-	void monitorHiddenVariableChanges(long int my_first_ori_particle, long int my_last_ori_particle);
+	void monitorHiddenVariableChanges(long int my_first_part_id, long int my_last_part_id);
 
 	// Updates the overall changes in the hidden variables and keeps track of nr_iter_wo_large_changes_in_hidden_variables
 	void updateOverallChangesInHiddenVariables();
 
 	// Calculate expected error in orientational assignments
 	// Based on comparing projections of the model and see how many degrees apart gives rise to difference of power > 3*sigma^ of the noise
-	void calculateExpectedAngularErrors(long int my_first_ori_particle, long int my_last_ori_particle);
+	void calculateExpectedAngularErrors(long int my_first_part_id, long int my_last_part_id);
 
 	// Adjust angular sampling based on the expected angular accuracies for auto-refine procedure
 	void updateAngularSampling(bool verb = true);
@@ -1024,10 +1004,10 @@ public:
 	void checkConvergence(bool myverb = true);
 
 	// Set metadata of a subset of particles to the experimental model
-	void setMetaDataSubset(int first_ori_particle_id, int last_ori_particle_id);
+	void setMetaDataSubset(long int my_first_part_id, long int my_last_part_id);
 
 	// Get metadata array of a subset of particles from the experimental model
-	void getMetaAndImageDataSubset(int first_ori_particle_id, int last_ori_particle_id, bool do_also_imagedata = true);
+	void getMetaAndImageDataSubset(long int my_first_part_id, long int my_last_part_id, bool do_also_imagedata = true);
 
 };
 

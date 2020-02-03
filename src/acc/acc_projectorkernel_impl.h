@@ -15,8 +15,8 @@ public:
 	int mdlX, mdlXY, mdlZ,
 		imgX, imgY, imgZ,
 		mdlInitY, mdlInitZ,
-		padding_factor,
-		maxR, maxR2;
+		maxR, maxR2, maxR2_padded;
+	XFLOAT 	padding_factor;
 
 	PROJECTOR_PTR_TYPE mdlReal;
 	PROJECTOR_PTR_TYPE mdlImag;
@@ -30,7 +30,7 @@ public:
 			int mdlX, int mdlY, int mdlZ,
 			int imgX, int imgY, int imgZ,
 			int mdlInitY, int mdlInitZ,
-			int padding_factor,
+			XFLOAT padding_factor,
 			int maxR,
 #ifdef CUDA
 			PROJECTOR_PTR_TYPE mdlComplex
@@ -42,7 +42,7 @@ public:
 			imgX(imgX), imgY(imgY), imgZ(imgZ),
 			mdlInitY(mdlInitY), mdlInitZ(mdlInitZ),
 			padding_factor(padding_factor),
-			maxR(maxR), maxR2(maxR*maxR),
+			maxR(maxR), maxR2(maxR*maxR), maxR2_padded(maxR*maxR*padding_factor*padding_factor),
 			mdlComplex(mdlComplex)
 		{};
 
@@ -50,7 +50,7 @@ public:
 			int mdlX, int mdlY, int mdlZ,
 			int imgX, int imgY, int imgZ,
 			int mdlInitY, int mdlInitZ,
-			int padding_factor,
+			XFLOAT padding_factor,
 			int maxR,
 			PROJECTOR_PTR_TYPE mdlReal, PROJECTOR_PTR_TYPE mdlImag
 			):
@@ -58,14 +58,14 @@ public:
 				imgX(imgX), imgY(imgY), imgZ(imgZ),
 				mdlInitY(mdlInitY), mdlInitZ(mdlInitZ),
 				padding_factor(padding_factor),
-				maxR(maxR), maxR2(maxR*maxR),
+				maxR(maxR), maxR2(maxR*maxR), maxR2_padded(maxR*maxR*padding_factor*padding_factor),
 				mdlReal(mdlReal), mdlImag(mdlImag)
 			{
-#ifndef CUDA		
+#ifndef CUDA
 				std::complex<XFLOAT> *pData = mdlComplex;
 				for(size_t i=0; i<(size_t)mdlX * (size_t)mdlY * (size_t)mdlZ; i++) {
 					std::complex<XFLOAT> arrayval(*mdlReal ++, *mdlImag ++);
-					pData[i] = arrayval;		        
+					pData[i] = arrayval;
 				}
 #endif
 			};
@@ -90,16 +90,18 @@ public:
 			XFLOAT &imag)
 	{
 		int r2;
-		
+
         real=(XFLOAT)0;
 		imag=(XFLOAT)0;
 
-		r2 = x*x + y*y + z*z;
-		if (r2 <= maxR2)
+		XFLOAT xp = (e0 * x + e1 * y + e2 * z) * padding_factor;
+		XFLOAT yp = (e3 * x + e4 * y + e5 * z) * padding_factor;
+		XFLOAT zp = (e6 * x + e7 * y + e8 * z) * padding_factor;
+
+		r2 = xp*xp + yp*yp + zp*zp;
+
+		if (r2 <= maxR2_padded)
 		{
-			XFLOAT xp = (e0 * x + e1 * y + e2 * z ) * padding_factor;
-			XFLOAT yp = (e3 * x + e4 * y + e5 * z ) * padding_factor;
-			XFLOAT zp = (e6 * x + e7 * y + e8 * z ) * padding_factor;
 
 #ifdef PROJECTOR_NO_TEXTURES
 			bool invers(xp < 0);
@@ -114,13 +116,13 @@ public:
 			real =   no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 			imag = - no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 #else
-			CpuKernels::complex3D(mdlComplex, real, imag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);	
+			CpuKernels::complex3D(mdlComplex, real, imag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 #endif
-			
+
 			if(invers)
 			    imag = -imag;
 
-			
+
 #else
 			if (xp < 0)
 			{
@@ -168,16 +170,18 @@ public:
 			XFLOAT &imag)
 	{
 		int r2;
-		
+
         real=(XFLOAT)0;
 		imag=(XFLOAT)0;
 
-		r2 = x*x + y*y;
-		if (r2 <= maxR2)
+		XFLOAT xp = (e0 * x + e1 * y ) * padding_factor;
+		XFLOAT yp = (e3 * x + e4 * y ) * padding_factor;
+		XFLOAT zp = (e6 * x + e7 * y ) * padding_factor;
+
+		r2 = xp*xp + yp*yp + zp*zp;
+
+		if (r2 <= maxR2_padded)
 		{
-			XFLOAT xp = (e0 * x + e1 * y ) * padding_factor;
-			XFLOAT yp = (e3 * x + e4 * y ) * padding_factor;
-			XFLOAT zp = (e6 * x + e7 * y ) * padding_factor;
 
 #ifdef PROJECTOR_NO_TEXTURES
 			bool invers(xp < 0);
@@ -187,14 +191,14 @@ public:
 				yp = -yp;
 				zp = -zp;
 			}
-			
+
 	#ifdef CUDA
 			real = no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 			imag = no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 	#else
 				CpuKernels::complex3D(mdlComplex, real, imag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 	#endif
-			
+
 			if(invers)
 			    imag = -imag;
 #else
@@ -245,12 +249,14 @@ public:
 
         real=(XFLOAT)0;
 		imag=(XFLOAT)0;
-		
-		r2 = x*x + y*y;
-		if (r2 <= maxR2)
+
+		XFLOAT xp = (e0 * x + e1 * y ) * padding_factor;
+		XFLOAT yp = (e3 * x + e4 * y ) * padding_factor;
+
+		r2 = xp*xp + yp*yp;
+
+		if (r2 <= maxR2_padded)
 		{
-			XFLOAT xp = (e0 * x + e1 * y ) * padding_factor;
-			XFLOAT yp = (e3 * x + e4 * y ) * padding_factor;
 #ifdef PROJECTOR_NO_TEXTURES
 			bool invers(xp < 0);
 			if (invers)
@@ -258,17 +264,17 @@ public:
 				xp = -xp;
 				yp = -yp;
 			}
-			
+
 	#ifdef CUDA
 			real = no_tex2D(mdlReal, xp, yp, mdlX, mdlInitY);
 			imag = no_tex2D(mdlImag, xp, yp, mdlX, mdlInitY);
 	#else
-			CpuKernels::complex2D(mdlComplex, real, imag, xp, yp, mdlX, mdlInitY);	
+			CpuKernels::complex2D(mdlComplex, real, imag, xp, yp, mdlX, mdlInitY);
 	#endif
-			
+
 			if(invers)
 			    imag = -imag;
-			
+
 #else
 			if (xp < 0)
 			{

@@ -24,6 +24,7 @@
 #include <src/fftw.h>
 #include <src/time.h>
 #include <src/symmetries.h>
+#include <src/jaz/obs_model.h>
 
 #include <map>
 
@@ -31,13 +32,14 @@ class image_handler_parameters
 {
 	public:
    	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_fsc, fn_adjust_power, fn_correct_ampl, fn_fourfilter, fn_cosDPhi;
-	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box, minr_ampl_corr;
-	bool do_add_edge, do_invert_hand, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_calc_com, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan, do_average_all_frames, do_power;
+	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box, minr_ampl_corr, my_new_box_size;
+	bool do_add_edge, do_invert_hand, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_calc_com, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan, do_average_all_frames, do_power, do_ignore_optics;
 	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, new_angpix, lowpass, highpass, logfilter, bfactor, shift_x, shift_y, shift_z, replace_nan, randomize_at;
 	std::string directional;
    	int verb;
 	// I/O Parser
 	IOParser parser;
+	ObservationModel obsModel;
 
 	Image<RFLOAT> Iout;
 	Image<RFLOAT> Iop;
@@ -142,16 +144,13 @@ class image_handler_parameters
 			REPORT_ERROR("Please specify the output file name with --o.");
 	}
 
-
-
 	void perImageOperations(Image<RFLOAT> &Iin, FileName &my_fn_out, RFLOAT psi = 0.)
 	{
-
 		Image<RFLOAT> Iout;
 		Iout().resize(Iin());
 
-		if (angpix < 0 && (new_angpix > 0 || fn_fsc != "" || randomize_at > 0 || 
-		                   do_power || fn_cosDPhi != "" || fn_correct_ampl != "" || 
+		if (angpix < 0 && (new_angpix > 0 || fn_fsc != "" || randomize_at > 0 ||
+		                   do_power || fn_cosDPhi != "" || fn_correct_ampl != "" ||
 		                   fabs(bfactor) > 0 || logfilter > 0 || lowpass > 0 || highpass > 0))
 		{
 			angpix = Iin.samplingRateX();
@@ -443,7 +442,7 @@ class image_handler_parameters
 				long int dest_x = (j == 0) ? 0 : (XSIZE(Iin()) - j);
 				DIRECT_A3D_ELEM(Iout(), k, i, j) = A3D_ELEM(Iin(), k, i, dest_x);
 			}
-		}	
+		}
 
 		// Shifting
 		if (do_shiftCOM)
@@ -479,6 +478,7 @@ class image_handler_parameters
 			int newsize = ROUND(oldsize * (angpix / new_angpix));
 			newsize -= newsize%2; //make even in case it is not already
 			resizeMap(Iout(), newsize);
+			my_new_box_size = newsize;
 
 			if ( oldxsize != oldysize && Iout().getDim() == 2)
 			{
@@ -494,8 +494,9 @@ class image_handler_parameters
 			// Also reset the sampling rate in the header
 			Iout.setSamplingRateInHeader(new_angpix);
 		}
+
 		// Re-window
-		if (new_box > 0)
+		if (new_box > 0 && XSIZE(Iout()) != new_box)
 		{
 			Iout().setXmippOrigin();
 			if (Iout().getDim() == 2)
@@ -508,6 +509,7 @@ class image_handler_parameters
 				Iout().window(FIRST_XMIPP_INDEX(new_box), FIRST_XMIPP_INDEX(new_box), FIRST_XMIPP_INDEX(new_box),
 						   LAST_XMIPP_INDEX(new_box),  LAST_XMIPP_INDEX(new_box),  LAST_XMIPP_INDEX(new_box));
 			}
+			my_new_box_size = new_box;
 		}
 
 		if (fn_sym != "")
@@ -548,11 +550,12 @@ class image_handler_parameters
 		}
 		else
 			Iout.write(my_fn_out);
-
 	}
 
 	void run()
 	{
+		my_new_box_size = -1;
+
 		bool input_is_stack = (fn_in.getExtension() == "mrcs" || fn_in.getExtension() == "tif" || fn_in.getExtension() == "tiff") && !fn_in.contains("@");
 		bool input_is_star = (fn_in.getExtension() == "star");
 		// By default: write single output images
@@ -560,7 +563,14 @@ class image_handler_parameters
 		// Get a MetaDataTable
 		if (input_is_star)
 		{
-			MD.read(fn_in);
+			do_ignore_optics = false;
+			ObservationModel::loadSafely(fn_in, obsModel, MD, "discover", verb, false); // false means don't die upon failure
+			if (obsModel.opticsMdt.numberOfObjects() == 0)
+			{
+				do_ignore_optics = true;
+				std::cout << " + WARNING: reading input STAR file without optics groups ..." << std::endl;
+				MD.read(fn_in);
+			}
 			if (fn_out.getExtension() != "mrcs")
 				std::cout << "NOTE: the input (--i) is a STAR file but the output (--o) does not have .mrcs extension. The output is treated as a suffix, not a path." << std::endl;
 			input_is_stack = true;
@@ -692,7 +702,6 @@ class image_handler_parameters
 				}
 
 			}
-
 
 			if (do_stats) // only write statistics to screen
 			{
@@ -831,7 +840,7 @@ class image_handler_parameters
 							FileName fn_tmp;
 							my_fn_out.decompose(dummy, fn_tmp);
 							n_images[fn_tmp]++; // this is safe. see https://stackoverflow.com/questions/16177596/stdmapstring-int-default-initialization-of-value.
-							my_fn_out.compose(n_images[fn_tmp], fn_tmp); 
+							my_fn_out.compose(n_images[fn_tmp], fn_tmp);
 						}
 					}
 					else
@@ -863,15 +872,34 @@ class image_handler_parameters
 		if (do_md_out && fn_in.getExtension() == "star")
 		{
 			FileName fn_md_out = fn_in.insertBeforeExtension("_" + fn_out);
+
+			if (do_ignore_optics)
+			{
+				MD.write(fn_md_out);
+			}
+			else
+			{
+				if (my_new_box_size > 0)
+				{
+					FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
+					{
+						obsModel.opticsMdt.setValue(EMDL_IMAGE_SIZE, my_new_box_size);
+					}
+				}
+				if (new_angpix > 0)
+				{
+					FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
+					{
+						obsModel.opticsMdt.setValue(EMDL_IMAGE_PIXEL_SIZE, new_angpix);
+					}
+				}
+				obsModel.save(MD, fn_md_out);
+			}
+
 			std::cout << " Written out new STAR file: " << fn_md_out << std::endl;
-			MD.write(fn_md_out);
 		}
-
 	}
-
-
 };
-
 
 int main(int argc, char *argv[])
 {
@@ -888,10 +916,7 @@ int main(int argc, char *argv[])
 	{
         	//prm.usage();
 	        std::cerr << XE;
-        	exit(1);
+        	return RELION_EXIT_FAILURE;
 	}
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }
-
-
-

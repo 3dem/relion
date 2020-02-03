@@ -19,8 +19,8 @@
  ***************************************************************************/
 /***************************************************************************
  *
- * Authors:    Roberto Marabini                 (roberto@cnb.csic.es)
- *             Carlos Oscar S. Sorzano          (coss@cnb.csic.es)
+ * Authors:    Roberto Marabini					(roberto@cnb.csic.es)
+ *			   Carlos Oscar S. Sorzano			(coss@cnb.csic.es)
  *
  * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
  *
@@ -39,8 +39,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
  * 02111-1307  USA
  *
- *  All comments concerning this program package may be sent to the
- *  e-mail address 'xmipp@cnb.csic.es'
+ *	All comments concerning this program package may be sent to the
+ *	e-mail address 'xmipp@cnb.csic.es'
  ***************************************************************************/
 
 #include "src/macros.h"
@@ -72,18 +72,18 @@ static pthread_mutex_t fftw_plan_mutex = PTHREAD_MUTEX_INITIALIZER;
 FourierTransformer::FourierTransformer():
 		plans_are_set(false)
 {
-    init();
+	init();
 
 #ifdef DEBUG_PLANS
-    std::cerr << "INIT this= "<<this<< std::endl;
+	std::cerr << "INIT this= "<<this<< std::endl;
 #endif
 }
 
 FourierTransformer::~FourierTransformer()
 {
-    clear();
+	clear();
 #ifdef DEBUG_PLANS
-    std::cerr << "CLEARED this= "<<this<< std::endl;
+	std::cerr << "CLEARED this= "<<this<< std::endl;
 #endif
 }
 
@@ -93,385 +93,387 @@ FourierTransformer::FourierTransformer(const FourierTransformer& op) :
 	// Clear current object
 	clear();
 	// New object is an extact copy of op
-    *this = op;
+	*this = op;
 }
 
 void FourierTransformer::init()
 {
-    fReal            = NULL;
-    fComplex         = NULL;
-    fPlanForward     = NULL;
-    fPlanBackward    = NULL;
-    dataPtr          = NULL;
-    complexDataPtr   = NULL;
+	fReal = NULL;
+	fComplex = NULL;
+	fPlanForward = NULL;
+	fPlanBackward = NULL;
+	dataPtr = NULL;
+	complexDataPtr = NULL;
 }
 
 void FourierTransformer::clear()
 {
-    fFourier.clear();
-    // Clean-up all other FFTW-allocated memory
-    destroyPlans();
-    // Initialise all pointers to NULL
-    init();
+	fFourier.clear();
+	// Clean-up all other FFTW-allocated memory
+	destroyPlans();
+	// Initialise all pointers to NULL
+	init();
 
 }
 
 void FourierTransformer::cleanup()
 {
 	// First clear object and destroy plans
-    clear();
-    // Then clean up all the junk fftw keeps lying around
-    // SOMEHOW THE FOLLOWING IS NOT ALLOWED WHEN USING MULTPLE TRANSFORMER OBJECTS....
+	clear();
+	// Then clean up all the junk fftw keeps lying around
+	// SOMEHOW THE FOLLOWING IS NOT ALLOWED WHEN USING MULTPLE TRANSFORMER OBJECTS....
 #ifdef RELION_SINGLE_PRECISION
-    fftwf_cleanup();
+	fftwf_cleanup();
 #else
-    fftw_cleanup();
+	fftw_cleanup();
 #endif
 
 #ifdef DEBUG_PLANS
-    std::cerr << "CLEANED-UP this= "<<this<< std::endl;
+	std::cerr << "CLEANED-UP this= "<<this<< std::endl;
 #endif
 
 }
 
 void FourierTransformer::destroyPlans()
 {
-    // Anything to do with plans has to be protected for threads!
-    pthread_mutex_lock(&fftw_plan_mutex);
+	// Anything to do with plans has to be protected for threads!
+	pthread_mutex_lock(&fftw_plan_mutex);
 
-    if (plans_are_set)
-    {
+	if (plans_are_set)
+	{
 #ifdef RELION_SINGLE_PRECISION
-    	fftwf_destroy_plan(fPlanForward);
-    	fftwf_destroy_plan(fPlanBackward);
+		fftwf_destroy_plan(fPlanForward);
+		fftwf_destroy_plan(fPlanBackward);
 #else
-    	fftw_destroy_plan(fPlanForward);
-    	fftw_destroy_plan(fPlanBackward);
+		fftw_destroy_plan(fPlanForward);
+		fftw_destroy_plan(fPlanBackward);
 #endif
-    	plans_are_set = false;
-    }
+		plans_are_set = false;
+	}
 
-    pthread_mutex_unlock(&fftw_plan_mutex);
+	pthread_mutex_unlock(&fftw_plan_mutex);
 
 }
 
 // Initialization ----------------------------------------------------------
 const MultidimArray<RFLOAT> &FourierTransformer::getReal() const
 {
-    return (*fReal);
+	return (*fReal);
 }
 
 const MultidimArray<Complex > &FourierTransformer::getComplex() const
 {
-    return (*fComplex);
+	return (*fComplex);
 }
 
 
-void FourierTransformer::setReal(MultidimArray<RFLOAT> &input)
+void FourierTransformer::setReal(MultidimArray<RFLOAT> &input, bool force_new_plans)
 {
 	bool recomputePlan = false;
 
-	if (   fReal == NULL
-		|| dataPtr != MULTIDIM_ARRAY(input)
-		|| !fReal->sameShape(input)
-		|| complexDataPtr != MULTIDIM_ARRAY(fFourier))
+	if (   (fReal == NULL)
+	    || (dataPtr != MULTIDIM_ARRAY(input))
+	    || (!fReal->sameShape(input))
+		|| (XSIZE(fFourier) != XSIZE(input)/2+1)
+	    || (complexDataPtr != MULTIDIM_ARRAY(fFourier)) )
 	{
 		recomputePlan = true;
 	}
 
-    if (recomputePlan)
-    {
+	if (recomputePlan || force_new_plans)
+	{
 		fFourier.reshape(ZSIZE(input),YSIZE(input),XSIZE(input)/2+1);
 		fReal=&input;
 
-        int ndim=3;
-        if (ZSIZE(input)==1)
-        {
-            ndim=2;
-            if (YSIZE(input)==1)
-                ndim=1;
-        }
-        int *N = new int[ndim];
-        switch (ndim)
-        {
-        case 1:
-            N[0]=XSIZE(input);
-            break;
-        case 2:
-            N[0]=YSIZE(input);
-            N[1]=XSIZE(input);
-            break;
-        case 3:
-            N[0]=ZSIZE(input);
-            N[1]=YSIZE(input);
-            N[2]=XSIZE(input);
-            break;
-        }
+		int ndim=3;
+		if (ZSIZE(input)==1)
+		{
+			ndim=2;
+			if (YSIZE(input)==1)
+				ndim=1;
+		}
+		int *N = new int[ndim];
+		switch (ndim)
+		{
+		case 1:
+			N[0]=XSIZE(input);
+			break;
+		case 2:
+			N[0]=YSIZE(input);
+			N[1]=XSIZE(input);
+			break;
+		case 3:
+			N[0]=ZSIZE(input);
+			N[1]=YSIZE(input);
+			N[2]=XSIZE(input);
+			break;
+		}
 
-        // Destroy both forward and backward plans if they already exist
-        destroyPlans();
+		// Destroy both forward and backward plans if they already exist
+		destroyPlans();
 
-        // Make new plans
-        plans_are_set = true;
+		// Make new plans
+		plans_are_set = true;
 
-	RCTIC(TIMING_FFTW_PLAN);
-        pthread_mutex_lock(&fftw_plan_mutex);
+		RCTIC(TIMING_FFTW_PLAN);
+		pthread_mutex_lock(&fftw_plan_mutex);
 #ifdef RELION_SINGLE_PRECISION
-        fPlanForward = fftwf_plan_dft_r2c(ndim, N, MULTIDIM_ARRAY(*fReal),
-                                         (fftwf_complex*) MULTIDIM_ARRAY(fFourier), FFTW_ESTIMATE);
-        fPlanBackward = fftwf_plan_dft_c2r(ndim, N,
-                                          (fftwf_complex*) MULTIDIM_ARRAY(fFourier), MULTIDIM_ARRAY(*fReal),
-                                          FFTW_ESTIMATE);
+		fPlanForward = fftwf_plan_dft_r2c(ndim, N, MULTIDIM_ARRAY(*fReal),
+		                                  (fftwf_complex*) MULTIDIM_ARRAY(fFourier), FFTW_ESTIMATE);
+		fPlanBackward = fftwf_plan_dft_c2r(ndim, N,
+		                                   (fftwf_complex*) MULTIDIM_ARRAY(fFourier), MULTIDIM_ARRAY(*fReal),
+		                                   FFTW_ESTIMATE);
 #else
-        fPlanForward = fftw_plan_dft_r2c(ndim, N, MULTIDIM_ARRAY(*fReal),
-                                         (fftw_complex*) MULTIDIM_ARRAY(fFourier), FFTW_ESTIMATE);
-        fPlanBackward = fftw_plan_dft_c2r(ndim, N,
-                                          (fftw_complex*) MULTIDIM_ARRAY(fFourier), MULTIDIM_ARRAY(*fReal),
-                                          FFTW_ESTIMATE);
+		fPlanForward = fftw_plan_dft_r2c(ndim, N, MULTIDIM_ARRAY(*fReal),
+		                                 (fftw_complex*) MULTIDIM_ARRAY(fFourier), FFTW_ESTIMATE);
+		fPlanBackward = fftw_plan_dft_c2r(ndim, N,
+		                                  (fftw_complex*) MULTIDIM_ARRAY(fFourier), MULTIDIM_ARRAY(*fReal),
+		                                  FFTW_ESTIMATE);
 #endif
-        pthread_mutex_unlock(&fftw_plan_mutex);
-	RCTOC(TIMING_FFTW_PLAN);
+		pthread_mutex_unlock(&fftw_plan_mutex);
+		RCTOC(TIMING_FFTW_PLAN);
 
-        if (fPlanForward == NULL || fPlanBackward == NULL)
-            REPORT_ERROR("FFTW plans cannot be created");
+		if (fPlanForward == NULL || fPlanBackward == NULL)
+			REPORT_ERROR("FFTW plans cannot be created");
 
 #ifdef DEBUG_PLANS
-        std::cerr << " SETREAL fPlanForward= " << fPlanForward << " fPlanBackward= " << fPlanBackward  <<" this= "<<this<< std::endl;
+		std::cerr << " SETREAL fPlanForward= " << fPlanForward << " fPlanBackward= " << fPlanBackward  <<" this= "<<this<< std::endl;
 #endif
 
-        delete [] N;
-        dataPtr=MULTIDIM_ARRAY(*fReal);
+		delete [] N;
+		dataPtr=MULTIDIM_ARRAY(*fReal);
 		complexDataPtr = MULTIDIM_ARRAY(fFourier);
 
 	}
 }
 
-void FourierTransformer::setReal(MultidimArray<Complex > &input)
+void FourierTransformer::setReal(MultidimArray<Complex > &input, bool force_new_plans)
 {
-    bool recomputePlan=false;
-    if (fComplex==NULL)
-        recomputePlan=true;
-    else if (complexDataPtr!=MULTIDIM_ARRAY(input))
-        recomputePlan=true;
-    else
-        recomputePlan=!(fComplex->sameShape(input));
+	bool recomputePlan=false;
+	if (fComplex==NULL)
+		recomputePlan=true;
+	else if (complexDataPtr!=MULTIDIM_ARRAY(input))
+		recomputePlan=true;
+	else
+		recomputePlan=!(fComplex->sameShape(input));
 
-    fFourier.resize(input);
-    fComplex=&input;
+	fFourier.resize(input);
+	fComplex=&input;
 
-    if (recomputePlan)
-    {
-        int ndim=3;
-        if (ZSIZE(input)==1)
-        {
-            ndim=2;
-            if (YSIZE(input)==1)
-                ndim=1;
-        }
-        int *N = new int[ndim];
-        switch (ndim)
-        {
-        case 1:
-            N[0]=XSIZE(input);
-            break;
-        case 2:
-            N[0]=YSIZE(input);
-            N[1]=XSIZE(input);
-            break;
-        case 3:
-            N[0]=ZSIZE(input);
-            N[1]=YSIZE(input);
-            N[2]=XSIZE(input);
-            break;
-        }
+	if (recomputePlan || force_new_plans)
+	{
+		int ndim=3;
+		if (ZSIZE(input)==1)
+		{
+			ndim=2;
+			if (YSIZE(input)==1)
+				ndim=1;
+		}
+		int *N = new int[ndim];
+		switch (ndim)
+		{
+		case 1:
+			N[0]=XSIZE(input);
+			break;
+		case 2:
+			N[0]=YSIZE(input);
+			N[1]=XSIZE(input);
+			break;
+		case 3:
+			N[0]=ZSIZE(input);
+			N[1]=YSIZE(input);
+			N[2]=XSIZE(input);
+			break;
+		}
 
-        // Destroy both forward and backward plans if they already exist
-        destroyPlans();
+		// Destroy both forward and backward plans if they already exist
+		destroyPlans();
 
-        plans_are_set = true;
+		plans_are_set = true;
 
-	RCTIC(TIMING_FFTW_PLAN);
-        pthread_mutex_lock(&fftw_plan_mutex);
+		RCTIC(TIMING_FFTW_PLAN);
+		pthread_mutex_lock(&fftw_plan_mutex);
 #ifdef RELION_SINGLE_PRECISION
-        fPlanForward = fftwf_plan_dft(ndim, N, (fftwf_complex*) MULTIDIM_ARRAY(*fComplex),
-                                     (fftwf_complex*) MULTIDIM_ARRAY(fFourier), FFTW_FORWARD, FFTW_ESTIMATE);
-        fPlanBackward = fftwf_plan_dft(ndim, N, (fftwf_complex*) MULTIDIM_ARRAY(fFourier),
-                                      (fftwf_complex*) MULTIDIM_ARRAY(*fComplex), FFTW_BACKWARD, FFTW_ESTIMATE);
+		fPlanForward = fftwf_plan_dft(ndim, N, (fftwf_complex*) MULTIDIM_ARRAY(*fComplex),
+		                              (fftwf_complex*) MULTIDIM_ARRAY(fFourier), FFTW_FORWARD, FFTW_ESTIMATE);
+		fPlanBackward = fftwf_plan_dft(ndim, N, (fftwf_complex*) MULTIDIM_ARRAY(fFourier),
+		                               (fftwf_complex*) MULTIDIM_ARRAY(*fComplex), FFTW_BACKWARD, FFTW_ESTIMATE);
 #else
-        fPlanForward = fftw_plan_dft(ndim, N, (fftw_complex*) MULTIDIM_ARRAY(*fComplex),
-                                     (fftw_complex*) MULTIDIM_ARRAY(fFourier), FFTW_FORWARD, FFTW_ESTIMATE);
-        fPlanBackward = fftw_plan_dft(ndim, N, (fftw_complex*) MULTIDIM_ARRAY(fFourier),
-                                      (fftw_complex*) MULTIDIM_ARRAY(*fComplex), FFTW_BACKWARD, FFTW_ESTIMATE);
+		fPlanForward = fftw_plan_dft(ndim, N, (fftw_complex*) MULTIDIM_ARRAY(*fComplex),
+		                             (fftw_complex*) MULTIDIM_ARRAY(fFourier), FFTW_FORWARD, FFTW_ESTIMATE);
+		fPlanBackward = fftw_plan_dft(ndim, N, (fftw_complex*) MULTIDIM_ARRAY(fFourier),
+		                              (fftw_complex*) MULTIDIM_ARRAY(*fComplex), FFTW_BACKWARD, FFTW_ESTIMATE);
 #endif
-        pthread_mutex_unlock(&fftw_plan_mutex);
-	RCTOC(TIMING_FFTW_PLAN);
+		pthread_mutex_unlock(&fftw_plan_mutex);
+		RCTOC(TIMING_FFTW_PLAN);
 
-        if (fPlanForward == NULL || fPlanBackward == NULL)
-            REPORT_ERROR("FFTW plans cannot be created");
+		if (fPlanForward == NULL || fPlanBackward == NULL)
+			REPORT_ERROR("FFTW plans cannot be created");
 
-        delete [] N;
-        complexDataPtr=MULTIDIM_ARRAY(*fComplex);
-    }
+		delete [] N;
+		complexDataPtr=MULTIDIM_ARRAY(*fComplex);
+	}
 }
 
 void FourierTransformer::setFourier(const MultidimArray<Complex> &inputFourier)
 {
-    RCTIC(TIMING_FFTW_COPY);
-    memcpy(MULTIDIM_ARRAY(fFourier),MULTIDIM_ARRAY(inputFourier),
-           MULTIDIM_SIZE(inputFourier)*2*sizeof(RFLOAT));
-    RCTOC(TIMING_FFTW_COPY);
+	RCTIC(TIMING_FFTW_COPY);
+
+	if (!fFourier.sameShape(inputFourier))
+	{
+		std::cerr << " fFourier= "; fFourier.printShape(std::cerr);
+		std::cerr << " inputFourier= "; inputFourier.printShape(std::cerr);
+		REPORT_ERROR("BUG: incompatible shaped in setFourier part of FFTW transformer");
+	}
+	memcpy(MULTIDIM_ARRAY(fFourier),MULTIDIM_ARRAY(inputFourier),
+		   MULTIDIM_SIZE(inputFourier)*2*sizeof(RFLOAT));
+	RCTOC(TIMING_FFTW_COPY);
 }
 
 // Transform ---------------------------------------------------------------
 void FourierTransformer::Transform(int sign)
 {
-    if (sign == FFTW_FORWARD)
-    {
-	RCTIC(TIMING_FFTW_EXECUTE);
+	if (sign == FFTW_FORWARD)
+	{
+		RCTIC(TIMING_FFTW_EXECUTE);
 #ifdef RELION_SINGLE_PRECISION
-        fftwf_execute_dft_r2c(fPlanForward,MULTIDIM_ARRAY(*fReal),
-                (fftwf_complex*) MULTIDIM_ARRAY(fFourier));
+		fftwf_execute_dft_r2c(fPlanForward,MULTIDIM_ARRAY(*fReal),
+				(fftwf_complex*) MULTIDIM_ARRAY(fFourier));
 #else
-        fftw_execute_dft_r2c(fPlanForward,MULTIDIM_ARRAY(*fReal),
-                (fftw_complex*) MULTIDIM_ARRAY(fFourier));
+		fftw_execute_dft_r2c(fPlanForward,MULTIDIM_ARRAY(*fReal),
+				(fftw_complex*) MULTIDIM_ARRAY(fFourier));
 #endif
-	RCTOC(TIMING_FFTW_EXECUTE);
+		RCTOC(TIMING_FFTW_EXECUTE);
 
-        // Normalisation of the transform
-        unsigned long int size=0;
-        if(fReal!=NULL)
-            size = MULTIDIM_SIZE(*fReal);
-        else if (fComplex!= NULL)
-            size = MULTIDIM_SIZE(*fComplex);
-        else
-            REPORT_ERROR("No complex nor real data defined");
+		// Normalisation of the transform
+		unsigned long int size=0;
+		if(fReal!=NULL)
+			size = MULTIDIM_SIZE(*fReal);
+		else if (fComplex!= NULL)
+			size = MULTIDIM_SIZE(*fComplex);
+		else
+			REPORT_ERROR("No complex nor real data defined");
 
-	RCTIC(TIMING_FFTW_NORMALISE);
-        FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(fFourier)
-            DIRECT_MULTIDIM_ELEM(fFourier,n) /= size;
-	RCTOC(TIMING_FFTW_NORMALISE);
-    }
-    else if (sign == FFTW_BACKWARD)
-    {
-	RCTIC(TIMING_FFTW_EXECUTE);
+		RCTIC(TIMING_FFTW_NORMALISE);
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(fFourier)
+			DIRECT_MULTIDIM_ELEM(fFourier,n) /= size;
+		RCTOC(TIMING_FFTW_NORMALISE);
+	}
+	else if (sign == FFTW_BACKWARD)
+	{
+		RCTIC(TIMING_FFTW_EXECUTE);
 #ifdef RELION_SINGLE_PRECISION
-        fftwf_execute_dft_c2r(fPlanBackward,
-                (fftwf_complex*) MULTIDIM_ARRAY(fFourier), MULTIDIM_ARRAY(*fReal));
+		fftwf_execute_dft_c2r(fPlanBackward,
+				(fftwf_complex*) MULTIDIM_ARRAY(fFourier), MULTIDIM_ARRAY(*fReal));
 #else
-        fftw_execute_dft_c2r(fPlanBackward,
-                (fftw_complex*) MULTIDIM_ARRAY(fFourier), MULTIDIM_ARRAY(*fReal));
+		fftw_execute_dft_c2r(fPlanBackward,
+				(fftw_complex*) MULTIDIM_ARRAY(fFourier), MULTIDIM_ARRAY(*fReal));
 #endif
-	RCTOC(TIMING_FFTW_EXECUTE);
-    }
+		RCTOC(TIMING_FFTW_EXECUTE);
+	}
 }
 
 void FourierTransformer::FourierTransform()
 {
-    Transform(FFTW_FORWARD);
+	Transform(FFTW_FORWARD);
 }
 
 void FourierTransformer::inverseFourierTransform()
 {
-    Transform(FFTW_BACKWARD);
+	Transform(FFTW_BACKWARD);
 }
 
 // Inforce Hermitian symmetry ---------------------------------------------
 void FourierTransformer::enforceHermitianSymmetry()
 {
-    int ndim=3;
-    if (ZSIZE(*fReal)==1)
-    {
-        ndim=2;
-        if (YSIZE(*fReal)==1)
-            ndim=1;
-    }
-    long int yHalf=YSIZE(*fReal)/2;
-    if (YSIZE(*fReal)%2==0)
-        yHalf--;
-    long int zHalf=ZSIZE(*fReal)/2;
-    if (ZSIZE(*fReal)%2==0)
-        zHalf--;
-    switch (ndim)
-    {
-    case 2:
-        for (long int i=1; i<=yHalf; i++)
-        {
-        	long int isym=intWRAP(-i,0,YSIZE(*fReal)-1);
-            Complex mean=0.5*(
-                                          DIRECT_A2D_ELEM(fFourier,i,0)+
-                                          conj(DIRECT_A2D_ELEM(fFourier,isym,0)));
-            DIRECT_A2D_ELEM(fFourier,i,0)=mean;
-            DIRECT_A2D_ELEM(fFourier,isym,0)=conj(mean);
-        }
-        break;
-    case 3:
-        for (long int k=0; k<ZSIZE(*fReal); k++)
-        {
-        	long int ksym=intWRAP(-k,0,ZSIZE(*fReal)-1);
-            for (long int i=1; i<=yHalf; i++)
-            {
-            	long int isym=intWRAP(-i,0,YSIZE(*fReal)-1);
-                Complex mean=0.5*(
-                                              DIRECT_A3D_ELEM(fFourier,k,i,0)+
-                                              conj(DIRECT_A3D_ELEM(fFourier,ksym,isym,0)));
-                DIRECT_A3D_ELEM(fFourier,k,i,0)=mean;
-                DIRECT_A3D_ELEM(fFourier,ksym,isym,0)=conj(mean);
-            }
-        }
-        for (long int k=1; k<=zHalf; k++)
-        {
-        	long int ksym=intWRAP(-k,0,ZSIZE(*fReal)-1);
-            Complex mean=0.5*(
-                                          DIRECT_A3D_ELEM(fFourier,k,0,0)+
-                                          conj(DIRECT_A3D_ELEM(fFourier,ksym,0,0)));
-            DIRECT_A3D_ELEM(fFourier,k,0,0)=mean;
-            DIRECT_A3D_ELEM(fFourier,ksym,0,0)=conj(mean);
-        }
-        break;
-    }
+	int ndim = 3;
+	if (ZSIZE(*fReal) == 1)
+	{
+		ndim = 2;
+		if (YSIZE(*fReal) == 1)
+			ndim = 1;
+	}
+	long int yHalf = YSIZE(*fReal) / 2;
+	if (YSIZE(*fReal) % 2 == 0)
+		yHalf--;
+	long int zHalf = ZSIZE(*fReal) / 2;
+	if (ZSIZE(*fReal) % 2 == 0)
+		zHalf--;
+	switch (ndim)
+	{
+	case 2:
+		for (long int i = 1; i <= yHalf; i++)
+		{
+			long int isym = intWRAP(-i, 0, YSIZE(*fReal) - 1);
+			Complex mean = 0.5 * (DIRECT_A2D_ELEM(fFourier, i, 0) + conj(DIRECT_A2D_ELEM(fFourier, isym, 0)));
+			DIRECT_A2D_ELEM(fFourier, i, 0) = mean;
+			DIRECT_A2D_ELEM(fFourier, isym, 0) = conj(mean);
+		}
+		break;
+	case 3:
+		for (long int k  =0; k < ZSIZE(*fReal); k++)
+		{
+			long int ksym = intWRAP(-k, 0, ZSIZE(*fReal) - 1);
+			for (long int i = 1; i <= yHalf; i++)
+			{
+				long int isym = intWRAP(-i, 0, YSIZE(*fReal) - 1);
+				Complex mean = 0.5 * (DIRECT_A3D_ELEM(fFourier, k, i, 0) + conj(DIRECT_A3D_ELEM(fFourier, ksym, isym, 0)));
+				DIRECT_A3D_ELEM(fFourier, k, i, 0) = mean;
+				DIRECT_A3D_ELEM(fFourier, ksym, isym, 0) = conj(mean);
+			}
+		}
+		for (long int k = 1; k <= zHalf; k++)
+		{
+			long int ksym = intWRAP(-k, 0, ZSIZE(*fReal) - 1);
+			Complex mean = 0.5*(DIRECT_A3D_ELEM(fFourier, k, 0, 0) + conj(DIRECT_A3D_ELEM(fFourier, ksym, 0, 0)));
+			DIRECT_A3D_ELEM(fFourier, k, 0, 0) = mean;
+			DIRECT_A3D_ELEM(fFourier, ksym, 0, 0) = conj(mean);
+		}
+		break;
+	}
 }
 
 
 void randomizePhasesBeyond(MultidimArray<RFLOAT> &v, int index)
 {
-    MultidimArray< Complex > FT;
-    FourierTransformer transformer;
+	MultidimArray< Complex > FT;
+	FourierTransformer transformer;
 
-    transformer.FourierTransform(v, FT, false);
+	transformer.FourierTransform(v, FT, false);
 
-    int index2 = index*index;
-    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
-    {
-    	if (kp*kp + ip*ip + jp*jp >= index2)
-    	{
-    		RFLOAT mag = abs(DIRECT_A3D_ELEM(FT, k, i, j));
-    		RFLOAT phas = rnd_unif(0., 2.*PI);
-    		RFLOAT realval = mag * cos(phas);
-    		RFLOAT imagval = mag * sin(phas);
-    		DIRECT_A3D_ELEM(FT, k, i, j) = Complex(realval, imagval);
-    	}
-    }
+	int index2 = index*index;
+	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
+	{
+		if (kp*kp + ip*ip + jp*jp >= index2)
+		{
+			RFLOAT mag = abs(DIRECT_A3D_ELEM(FT, k, i, j));
+			RFLOAT phas = rnd_unif(0., 2.*PI);
+			RFLOAT realval = mag * cos(phas);
+			RFLOAT imagval = mag * sin(phas);
+			DIRECT_A3D_ELEM(FT, k, i, j) = Complex(realval, imagval);
+		}
+	}
 
-    // Inverse transform
-    transformer.inverseFourierTransform();
+	// Inverse transform
+	transformer.inverseFourierTransform();
 
 }
 
 /*
 void randomizePhasesBeyond(MultidimArray<Complex> &v, int index)
 {
-    int index2 = index*index;
-    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(v)
-    {
-       if (kp*kp + ip*ip + jp*jp >= index2)
-       {
-               RFLOAT mag = abs(DIRECT_A3D_ELEM(v, k, i, j));
-               RFLOAT phas = rnd_unif(0., 2.*PI);
-               RFLOAT realval = mag * cos(phas);
-               RFLOAT imagval = mag * sin(phas);
-               DIRECT_A3D_ELEM(v, k, i, j) = Complex(realval, imagval);
-       }
-    }
+	int index2 = index*index;
+	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(v)
+	{
+	   if (kp*kp + ip*ip + jp*jp >= index2)
+	   {
+			   RFLOAT mag = abs(DIRECT_A3D_ELEM(v, k, i, j));
+			   RFLOAT phas = rnd_unif(0., 2.*PI);
+			   RFLOAT realval = mag * cos(phas);
+			   RFLOAT imagval = mag * sin(phas);
+			   DIRECT_A3D_ELEM(v, k, i, j) = Complex(realval, imagval);
+	   }
+	}
 }
 */
 
@@ -482,39 +484,39 @@ void getFSC(MultidimArray< Complex > &FT1,
 			MultidimArray< RFLOAT > &fsc)
 {
 	if (!FT1.sameShape(FT2))
-        REPORT_ERROR("fourierShellCorrelation ERROR: MultidimArrays have different shapes!");
+		REPORT_ERROR("fourierShellCorrelation ERROR: MultidimArrays have different shapes!");
 
-    MultidimArray<RFLOAT> num(XSIZE(FT1)), den1(XSIZE(FT1)), den2(XSIZE(FT1));
-    Matrix1D<RFLOAT> f(3);
-    num.initZeros();
-    den1.initZeros();
-    den2.initZeros();
-    fsc.initZeros(num);
-    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT1)
-    {
-    	int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
-        if (idx >= XSIZE(FT1))
-        	continue;
-        Complex z1=DIRECT_A3D_ELEM(FT1, k, i, j);
-        Complex z2=DIRECT_A3D_ELEM(FT2, k, i, j);
-        RFLOAT absz1=abs(z1);
-        RFLOAT absz2=abs(z2);
-        num(idx)+= (conj(z1) * z2).real;
-        den1(idx)+= absz1*absz1;
-        den2(idx)+= absz2*absz2;
-    }
+	MultidimArray<RFLOAT> num(XSIZE(FT1)), den1(XSIZE(FT1)), den2(XSIZE(FT1));
+	Matrix1D<RFLOAT> f(3);
+	num.initZeros();
+	den1.initZeros();
+	den2.initZeros();
+	fsc.initZeros(num);
+	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT1)
+	{
+		int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
+		if (idx >= XSIZE(FT1))
+			continue;
+		Complex z1=DIRECT_A3D_ELEM(FT1, k, i, j);
+		Complex z2=DIRECT_A3D_ELEM(FT2, k, i, j);
+		RFLOAT absz1=abs(z1);
+		RFLOAT absz2=abs(z2);
+		num(idx)+= (conj(z1) * z2).real;
+		den1(idx)+= absz1*absz1;
+		den2(idx)+= absz2*absz2;
+	}
 
-    FOR_ALL_ELEMENTS_IN_ARRAY1D(fsc)
-    {
-        fsc(i) = num(i)/sqrt(den1(i)*den2(i));
-    }
+	FOR_ALL_ELEMENTS_IN_ARRAY1D(fsc)
+	{
+		fsc(i) = num(i)/sqrt(den1(i)*den2(i));
+	}
 
 }
 
 
 void getFSC(MultidimArray< RFLOAT > &m1,
-		    MultidimArray< RFLOAT > &m2,
-		    MultidimArray< RFLOAT > &fsc)
+			MultidimArray< RFLOAT > &m2,
+			MultidimArray< RFLOAT > &fsc)
 {
 	MultidimArray< Complex > FT1, FT2;
 	FourierTransformer transformer;
@@ -524,83 +526,83 @@ void getFSC(MultidimArray< RFLOAT > &m1,
 }
 
 void getAmplitudeCorrelationAndDifferentialPhaseResidual(MultidimArray< Complex > &FT1,
-		    MultidimArray< Complex > &FT2,
-		    MultidimArray< RFLOAT > &acorr,
-		    MultidimArray< RFLOAT > &dpr)
+			MultidimArray< Complex > &FT2,
+			MultidimArray< RFLOAT > &acorr,
+			MultidimArray< RFLOAT > &dpr)
 {
 
 	MultidimArray< int > radial_count(XSIZE(FT1));
-    MultidimArray<RFLOAT> num, mu1, mu2, sig1, sig2;
-    Matrix1D<RFLOAT> f(3);
-    mu1.initZeros(radial_count);
-    mu2.initZeros(radial_count);
-    sig1.initZeros(radial_count);
-    sig2.initZeros(radial_count);
-    acorr.initZeros(radial_count);
-    dpr.initZeros(radial_count);
-    num.initZeros(radial_count);
-    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT1)
-    {
-    	// Amplitudes
-    	int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
-        if (idx >= XSIZE(FT1))
-        	continue;
-        RFLOAT abs1 = abs(DIRECT_A3D_ELEM(FT1, k, i, j));
-        RFLOAT abs2 = abs(DIRECT_A3D_ELEM(FT2, k, i, j));
-        mu1(idx)+= abs1;
-        mu2(idx)+= abs2;
-        radial_count(idx)++;
+	MultidimArray<RFLOAT> num, mu1, mu2, sig1, sig2;
+	Matrix1D<RFLOAT> f(3);
+	mu1.initZeros(radial_count);
+	mu2.initZeros(radial_count);
+	sig1.initZeros(radial_count);
+	sig2.initZeros(radial_count);
+	acorr.initZeros(radial_count);
+	dpr.initZeros(radial_count);
+	num.initZeros(radial_count);
+	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT1)
+	{
+		// Amplitudes
+		int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
+		if (idx >= XSIZE(FT1))
+			continue;
+		RFLOAT abs1 = abs(DIRECT_A3D_ELEM(FT1, k, i, j));
+		RFLOAT abs2 = abs(DIRECT_A3D_ELEM(FT2, k, i, j));
+		mu1(idx)+= abs1;
+		mu2(idx)+= abs2;
+		radial_count(idx)++;
 
-        //phases
-        RFLOAT phas1 = RAD2DEG(atan2((DIRECT_A3D_ELEM(FT1, k, i, j)).imag, (DIRECT_A3D_ELEM(FT1, k, i, j)).real));
-        RFLOAT phas2 = RAD2DEG(atan2((DIRECT_A3D_ELEM(FT2, k, i, j)).imag, (DIRECT_A3D_ELEM(FT2, k, i, j)).real));
-        RFLOAT delta_phas = phas1 - phas2;
-        if (delta_phas > 180.)
-        	delta_phas -= 360.;
-        else if (delta_phas < -180.)
-        	delta_phas += 360.;
-        dpr(idx) += delta_phas*delta_phas*(abs1+abs2);
-        num(idx) += (abs1+abs2);
-    }
+		//phases
+		RFLOAT phas1 = RAD2DEG(atan2((DIRECT_A3D_ELEM(FT1, k, i, j)).imag, (DIRECT_A3D_ELEM(FT1, k, i, j)).real));
+		RFLOAT phas2 = RAD2DEG(atan2((DIRECT_A3D_ELEM(FT2, k, i, j)).imag, (DIRECT_A3D_ELEM(FT2, k, i, j)).real));
+		RFLOAT delta_phas = phas1 - phas2;
+		if (delta_phas > 180.)
+			delta_phas -= 360.;
+		else if (delta_phas < -180.)
+			delta_phas += 360.;
+		dpr(idx) += delta_phas*delta_phas*(abs1+abs2);
+		num(idx) += (abs1+abs2);
+	}
 
-    // Get average amplitudes in each shell for both maps
-    FOR_ALL_ELEMENTS_IN_ARRAY1D(mu1)
-    {
-        if (radial_count(i) > 0)
-        {
+	// Get average amplitudes in each shell for both maps
+	FOR_ALL_ELEMENTS_IN_ARRAY1D(mu1)
+	{
+		if (radial_count(i) > 0)
+		{
 			mu1(i) /= radial_count(i);
 			mu2(i) /= radial_count(i);
 			dpr(i) = sqrt(dpr(i)/num(i));
-        }
-    }
+		}
+	}
 
-    // Now calculate Pearson's correlation coefficient
-    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT1)
-    {
-    	int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
-        if (idx >= XSIZE(FT1))
-        	continue;
-        RFLOAT z1=abs(DIRECT_A3D_ELEM(FT1, k, i, j)) - mu1(idx);
-        RFLOAT z2=abs(DIRECT_A3D_ELEM(FT2, k, i, j)) - mu2(idx);
-        acorr(idx)  += z1*z2;
-        sig1(idx) += z1*z1;
-        sig2(idx) += z2*z2;
-    }
+	// Now calculate Pearson's correlation coefficient
+	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT1)
+	{
+		int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
+		if (idx >= XSIZE(FT1))
+			continue;
+		RFLOAT z1=abs(DIRECT_A3D_ELEM(FT1, k, i, j)) - mu1(idx);
+		RFLOAT z2=abs(DIRECT_A3D_ELEM(FT2, k, i, j)) - mu2(idx);
+		acorr(idx)	+= z1*z2;
+		sig1(idx) += z1*z1;
+		sig2(idx) += z2*z2;
+	}
 
-    FOR_ALL_ELEMENTS_IN_ARRAY1D(acorr)
-    {
-        RFLOAT aux = sqrt(sig1(i))*sqrt(sig2(i));
-        if (aux > 0.)
-        	acorr(i) /= sqrt(sig1(i))*sqrt(sig2(i));
-        else
-        	acorr(i) = 1.;
-    }
+	FOR_ALL_ELEMENTS_IN_ARRAY1D(acorr)
+	{
+		RFLOAT aux = sqrt(sig1(i))*sqrt(sig2(i));
+		if (aux > 0.)
+			acorr(i) /= sqrt(sig1(i))*sqrt(sig2(i));
+		else
+			acorr(i) = 1.;
+	}
 
 }
 
 void getCosDeltaPhase(MultidimArray< Complex > &FT1,
-                      MultidimArray< Complex > &FT2,
-                      MultidimArray< RFLOAT > &cosPhi)
+					  MultidimArray< Complex > &FT2,
+					  MultidimArray< RFLOAT > &cosPhi)
 {
 	MultidimArray< int > radial_count(XSIZE(FT1));
 	cosPhi.initZeros(XSIZE(FT1));
@@ -625,9 +627,9 @@ void getCosDeltaPhase(MultidimArray< Complex > &FT1,
 }
 
 void getAmplitudeCorrelationAndDifferentialPhaseResidual(MultidimArray< RFLOAT > &m1,
-		    MultidimArray< RFLOAT > &m2,
-		    MultidimArray< RFLOAT > &acorr,
-		    MultidimArray< RFLOAT > &dpr)
+			MultidimArray< RFLOAT > &m2,
+			MultidimArray< RFLOAT > &acorr,
+			MultidimArray< RFLOAT > &dpr)
 {
 	MultidimArray< Complex > FT1, FT2;
 	FourierTransformer transformer;
@@ -641,42 +643,42 @@ void getAmplitudeCorrelationAndDifferentialPhaseResidual(MultidimArray< RFLOAT >
 void selfScaleToSizeFourier(long int Ydim, long int Xdim, MultidimArray<RFLOAT>& Mpmem, int nThreads)
 {
 
-    //Mmem = *this
-    //memory for fourier transform output
-    MultidimArray<Complex > MmemFourier;
-    // Perform the Fourier transform
-    FourierTransformer transformerM;
-    transformerM.setThreadsNumber(nThreads);
-    transformerM.FourierTransform(Mpmem, MmemFourier, true);
+	//Mmem = *this
+	//memory for fourier transform output
+	MultidimArray<Complex > MmemFourier;
+	// Perform the Fourier transform
+	FourierTransformer transformerM;
+	transformerM.setThreadsNumber(nThreads);
+	transformerM.FourierTransform(Mpmem, MmemFourier, true);
 
-    // Create space for the downsampled image and its Fourier transform
-    Mpmem.resize(Ydim, Xdim);
-    MultidimArray<Complex > MpmemFourier;
-    FourierTransformer transformerMp;
-    transformerMp.setReal(Mpmem);
-    transformerMp.getFourierAlias(MpmemFourier);
-    long int ihalf = XMIPP_MIN((YSIZE(MpmemFourier)/2+1),(YSIZE(MmemFourier)/2+1));
-    long int xsize = XMIPP_MIN((XSIZE(MmemFourier)),(XSIZE(MpmemFourier)));
-    //Init with zero
-    MpmemFourier.initZeros();
-    for (long int i=0; i<ihalf; i++)
-        for (long int j=0; j<xsize; j++)
-            MpmemFourier(i,j)=MmemFourier(i,j);
-    for (long int i=YSIZE(MpmemFourier)-1, n=1; n < ihalf-1; i--, n++)
-    {
-    	long int ip = YSIZE(MmemFourier) - n;
-    	for (long int j=0; j<xsize; j++)
-            MpmemFourier(i,j)=MmemFourier(ip,j);
-    }
+	// Create space for the downsampled image and its Fourier transform
+	Mpmem.resize(Ydim, Xdim);
+	MultidimArray<Complex > MpmemFourier;
+	FourierTransformer transformerMp;
+	transformerMp.setReal(Mpmem);
+	transformerMp.getFourierAlias(MpmemFourier);
+	long int ihalf = XMIPP_MIN((YSIZE(MpmemFourier)/2+1),(YSIZE(MmemFourier)/2+1));
+	long int xsize = XMIPP_MIN((XSIZE(MmemFourier)),(XSIZE(MpmemFourier)));
+	//Init with zero
+	MpmemFourier.initZeros();
+	for (long int i=0; i<ihalf; i++)
+		for (long int j=0; j<xsize; j++)
+			MpmemFourier(i,j)=MmemFourier(i,j);
+	for (long int i=YSIZE(MpmemFourier)-1, n=1; n < ihalf-1; i--, n++)
+	{
+		long int ip = YSIZE(MmemFourier) - n;
+		for (long int j=0; j<xsize; j++)
+			MpmemFourier(i,j)=MmemFourier(ip,j);
+	}
 
-    // Transform data
-    transformerMp.inverseFourierTransform();
+	// Transform data
+	transformerMp.inverseFourierTransform();
 }
 */
 
 
 void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
-        MultidimArray<Complex > &out,
+		MultidimArray<Complex > &out,
 		  RFLOAT oridim, RFLOAT xshift, RFLOAT yshift, RFLOAT zshift)
 {
 	out.resize(in);
@@ -690,9 +692,9 @@ void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
 			x = j;
 			dotp = 2 * PI * (x * xshift);
 #ifdef RELION_SINGLE_PRECISION
-                        SINCOSF(dotp, &b, &a);
+						SINCOSF(dotp, &b, &a);
 #else
-                        SINCOS(dotp, &b, &a);
+						SINCOS(dotp, &b, &a);
 #endif
 			DIRECT_A1D_ELEM(out, j) = Complex(a, b);
 		}
@@ -707,9 +709,9 @@ void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
 				y = i;
 				dotp = 2 * PI * (x * xshift + y * yshift);
 #ifdef RELION_SINGLE_PRECISION
-                SINCOSF(dotp, &b, &a);
+				SINCOSF(dotp, &b, &a);
 #else
-                SINCOS(dotp, &b, &a);
+				SINCOS(dotp, &b, &a);
 #endif
 				DIRECT_A2D_ELEM(out, i, j) = Complex(a, b);
 			}
@@ -721,9 +723,9 @@ void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
 				x = j;
 				dotp = 2 * PI * (x * xshift + y * yshift);
 #ifdef RELION_SINGLE_PRECISION
-                SINCOSF(dotp, &b, &a);
+				SINCOSF(dotp, &b, &a);
 #else
-                SINCOS(dotp, &b, &a);
+				SINCOS(dotp, &b, &a);
 #endif
 				DIRECT_A2D_ELEM(out, i, j) = Complex(a, b);
 			}
@@ -744,9 +746,9 @@ void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
 					x = j;
 					dotp = 2 * PI * (x * xshift + y * yshift + z * zshift);
 #ifdef RELION_SINGLE_PRECISION
-                    SINCOSF(dotp, &b, &a);
+					SINCOSF(dotp, &b, &a);
 #else
-                    SINCOS(dotp, &b, &a);
+					SINCOS(dotp, &b, &a);
 #endif
 					DIRECT_A3D_ELEM(out, k, i, j) = Complex(a, b);
 				}
@@ -759,35 +761,35 @@ void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
 }
 
 void shiftImageInFourierTransformWithTabSincos(MultidimArray<Complex > &in,
-		                          MultidimArray<Complex > &out,
-		                          RFLOAT oridim, long int newdim,
-		                          TabSine& tabsin, TabCosine& tabcos,
-		                          RFLOAT xshift, RFLOAT yshift, RFLOAT zshift)
+								  MultidimArray<Complex > &out,
+								  RFLOAT oridim, long int newdim,
+								  TabSine& tabsin, TabCosine& tabcos,
+								  RFLOAT xshift, RFLOAT yshift, RFLOAT zshift)
 {
 	RFLOAT a = 0., b = 0., c = 0., d = 0., ac = 0., bd = 0., ab_cd = 0., dotp = 0., x = 0., y = 0., z = 0.;
 	RFLOAT twopi = 2. * PI;
 
 	if (&in == &out)
 		REPORT_ERROR("shiftImageInFourierTransformWithTabSincos ERROR: Input and output images should be different!");
-    // Check size of the input array
-    if ( (YSIZE(in) > 1) && ( (YSIZE(in)/2 + 1) != XSIZE(in) ) )
-        REPORT_ERROR("shiftImageInFourierTransformWithTabSincos ERROR: the Fourier transform should be of an image with equal sizes in all dimensions!");
+	// Check size of the input array
+	if ( (YSIZE(in) > 1) && ( (YSIZE(in)/2 + 1) != XSIZE(in) ) )
+		REPORT_ERROR("shiftImageInFourierTransformWithTabSincos ERROR: the Fourier transform should be of an image with equal sizes in all dimensions!");
 
-    long int newhdim = newdim/2 + 1;
-    if (newhdim > XSIZE(in))
-    	REPORT_ERROR("shiftImageInFourierTransformWithTabSincos ERROR: 'newdim' should be equal or smaller than the size of the original array!");
+	long int newhdim = newdim/2 + 1;
+	if (newhdim > XSIZE(in))
+		REPORT_ERROR("shiftImageInFourierTransformWithTabSincos ERROR: 'newdim' should be equal or smaller than the size of the original array!");
 
-    // Initialise output array
-    out.clear();
-    switch (in.getDim())
-    {
-    case 2: out.initZeros(newdim, newhdim); break;
-    case 3: out.initZeros(newdim, newdim, newhdim); break;
-    default: REPORT_ERROR("shiftImageInFourierTransformWithTabSincos ERROR: dimension should be 2 or 3!");
-    }
+	// Initialise output array
+	out.clear();
+	switch (in.getDim())
+	{
+	case 2: out.initZeros(newdim, newhdim); break;
+	case 3: out.initZeros(newdim, newdim, newhdim); break;
+	default: REPORT_ERROR("shiftImageInFourierTransformWithTabSincos ERROR: dimension should be 2 or 3!");
+	}
 
-    if (in.getDim() == 2)
-    {
+	if (in.getDim() == 2)
+	{
 		xshift /= -oridim;
 		yshift /= -oridim;
 		if ( (ABS(xshift) < XMIPP_EQUAL_ACCURACY) && (ABS(yshift) < XMIPP_EQUAL_ACCURACY) )
@@ -802,16 +804,16 @@ void shiftImageInFourierTransformWithTabSincos(MultidimArray<Complex > &in,
 
 			a = tabcos(dotp);
 			b = tabsin(dotp);
-			c = FFTW2D_ELEM(in, ip, jp).real;
-			d = FFTW2D_ELEM(in, ip, jp).imag;
+			c = DIRECT_A2D_ELEM(in, i, j).real;
+			d = DIRECT_A2D_ELEM(in, i, j).imag;
 			ac = a * c;
 			bd = b * d;
 			ab_cd = (a + b) * (c + d);
-			FFTW2D_ELEM(out, ip, jp) = Complex(ac - bd, ab_cd - ac - bd);
+			DIRECT_A2D_ELEM(out, i, j) = Complex(ac - bd, ab_cd - ac - bd);
 		}
-    }
-    else if (in.getDim() == 3)
-    {
+	}
+	else if (in.getDim() == 3)
+	{
 		xshift /= -oridim;
 		yshift /= -oridim;
 		zshift /= -oridim;
@@ -827,20 +829,20 @@ void shiftImageInFourierTransformWithTabSincos(MultidimArray<Complex > &in,
 
 			a = tabcos(dotp);
 			b = tabsin(dotp);
-			c = FFTW_ELEM(in, kp, ip, jp).real;
-			d = FFTW_ELEM(in, kp, ip, jp).imag;
+			c = DIRECT_A3D_ELEM(in, k, i, j).real;
+			d = DIRECT_A3D_ELEM(in, k, i, j).imag;
 			ac = a * c;
 			bd = b * d;
 			ab_cd = (a + b) * (c + d);
-			FFTW_ELEM(out, kp, ip, jp) = Complex(ac - bd, ab_cd - ac - bd);
+			DIRECT_A3D_ELEM(out, k, i, j) = Complex(ac - bd, ab_cd - ac - bd);
 		}
-    }
+	}
 }
 
 // Shift an image through phase-shifts in its Fourier Transform (without pretabulated sine and cosine)
 void shiftImageInFourierTransform(MultidimArray<Complex > &in,
-		                          MultidimArray<Complex > &out,
-		                          RFLOAT oridim, RFLOAT xshift, RFLOAT yshift, RFLOAT zshift)
+								  MultidimArray<Complex > &out,
+								  RFLOAT oridim, RFLOAT xshift, RFLOAT yshift, RFLOAT zshift)
 {
 	out.resize(in);
 	RFLOAT dotp, a, b, c, d, ac, bd, ab_cd, x, y, z;
@@ -858,11 +860,11 @@ void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 			x = j;
 			dotp = 2 * PI * (x * xshift);
 #ifdef RELION_SINGLE_PRECISION
-            SINCOSF(dotp, &b, &a);
+			SINCOSF(dotp, &b, &a);
 #else
-            SINCOS(dotp, &b, &a);
+			SINCOS(dotp, &b, &a);
 #endif
-  			c = DIRECT_A1D_ELEM(in, j).real;
+			c = DIRECT_A1D_ELEM(in, j).real;
 			d = DIRECT_A1D_ELEM(in, j).imag;
 			ac = a * c;
 			bd = b * d;
@@ -885,9 +887,9 @@ void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 				y = i;
 				dotp = 2 * PI * (x * xshift + y * yshift);
 #ifdef RELION_SINGLE_PRECISION
-                SINCOSF(dotp, &b, &a);
+				SINCOSF(dotp, &b, &a);
 #else
-                SINCOS(dotp, &b, &a);
+				SINCOS(dotp, &b, &a);
 #endif
 				c = DIRECT_A2D_ELEM(in, i, j).real;
 				d = DIRECT_A2D_ELEM(in, i, j).imag;
@@ -904,9 +906,9 @@ void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 				x = j;
 				dotp = 2 * PI * (x * xshift + y * yshift);
 #ifdef RELION_SINGLE_PRECISION
-                SINCOSF(dotp, &b, &a);
+				SINCOSF(dotp, &b, &a);
 #else
-                SINCOS(dotp, &b, &a);
+				SINCOS(dotp, &b, &a);
 #endif
 				c = DIRECT_A2D_ELEM(in, i, j).real;
 				d = DIRECT_A2D_ELEM(in, i, j).imag;
@@ -937,9 +939,9 @@ void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 					x = j;
 					dotp = 2 * PI * (x * xshift + y * yshift + z * zshift);
 #ifdef RELION_SINGLE_PRECISION
-                    SINCOSF(dotp, &b, &a);
+					SINCOSF(dotp, &b, &a);
 #else
-                    SINCOS(dotp, &b, &a);
+					SINCOS(dotp, &b, &a);
 #endif
 					c = DIRECT_A3D_ELEM(in, k, i, j).real;
 					d = DIRECT_A3D_ELEM(in, k, i, j).imag;
@@ -957,104 +959,104 @@ void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 }
 
 void getSpectrum(MultidimArray<RFLOAT> &Min,
-                 MultidimArray<RFLOAT> &spectrum,
-                 int spectrum_type)
+				 MultidimArray<RFLOAT> &spectrum,
+				 int spectrum_type)
 {
 
-    MultidimArray<Complex > Faux;
-    int xsize = XSIZE(Min);
-    // Takanori: The above line should be XSIZE(Min) / 2 + 1 but for compatibility reasons, I keep this as it is.
-    Matrix1D<RFLOAT> f(3);
-    MultidimArray<RFLOAT> count(xsize);
-    FourierTransformer transformer;
+	MultidimArray<Complex > Faux;
+	int xsize = XSIZE(Min);
+	// Takanori: The above line should be XSIZE(Min) / 2 + 1 but for compatibility reasons, I keep this as it is.
+	Matrix1D<RFLOAT> f(3);
+	MultidimArray<RFLOAT> count(xsize);
+	FourierTransformer transformer;
 
-    spectrum.initZeros(xsize);
-    count.initZeros();
-    transformer.FourierTransform(Min, Faux, false);
-    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux)
-    {
-    	long int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
-        if (spectrum_type == AMPLITUDE_SPECTRUM)
-            spectrum(idx) += abs(dAkij(Faux, k, i, j));
-        else
-            spectrum(idx) += norm(dAkij(Faux, k, i, j));
-        count(idx) += 1.;
-    }
+	spectrum.initZeros(xsize);
+	count.initZeros();
+	transformer.FourierTransform(Min, Faux, false);
+	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux)
+	{
+		long int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
+		if (spectrum_type == AMPLITUDE_SPECTRUM)
+			spectrum(idx) += abs(dAkij(Faux, k, i, j));
+		else
+			spectrum(idx) += norm(dAkij(Faux, k, i, j));
+		count(idx) += 1.;
+	}
 
-    for (long int i = 0; i < xsize; i++)
-        if (count(i) > 0.)
-            spectrum(i) /= count(i);
+	for (long int i = 0; i < xsize; i++)
+		if (count(i) > 0.)
+			spectrum(i) /= count(i);
 
 }
 
 void divideBySpectrum(MultidimArray<RFLOAT> &Min,
-                      MultidimArray<RFLOAT> &spectrum,
-                      bool leave_origin_intact)
+					  MultidimArray<RFLOAT> &spectrum,
+					  bool leave_origin_intact)
 {
 
-    MultidimArray<RFLOAT> div_spec(spectrum);
-    FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(spectrum)
-    {
-        if (ABS(dAi(spectrum,i)) > 0.)
-            dAi(div_spec,i) = 1./dAi(spectrum,i);
-        else
-            dAi(div_spec,i) = 1.;
-    }
-    multiplyBySpectrum(Min,div_spec,leave_origin_intact);
+	MultidimArray<RFLOAT> div_spec(spectrum);
+	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(spectrum)
+	{
+		if (ABS(dAi(spectrum,i)) > 0.)
+			dAi(div_spec,i) = 1./dAi(spectrum,i);
+		else
+			dAi(div_spec,i) = 1.;
+	}
+	multiplyBySpectrum(Min,div_spec,leave_origin_intact);
 }
 
 void multiplyBySpectrum(MultidimArray<RFLOAT> &Min,
-                        MultidimArray<RFLOAT> &spectrum,
-                        bool leave_origin_intact)
+						MultidimArray<RFLOAT> &spectrum,
+						bool leave_origin_intact)
 {
 
-    MultidimArray<Complex > Faux;
-    Matrix1D<RFLOAT> f(3);
-    MultidimArray<RFLOAT> lspectrum;
-    FourierTransformer transformer;
-    //RFLOAT dim3 = XSIZE(Min)*YSIZE(Min)*ZSIZE(Min);
-    transformer.FourierTransform(Min, Faux, false);
-    lspectrum=spectrum;
-    if (leave_origin_intact)
-        lspectrum(0)=1.;
-    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux)
-    {
-    	long int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
-        dAkij(Faux, k, i, j) *=  lspectrum(idx);// * dim3;
-    }
-    transformer.inverseFourierTransform();
+	MultidimArray<Complex > Faux;
+	Matrix1D<RFLOAT> f(3);
+	MultidimArray<RFLOAT> lspectrum;
+	FourierTransformer transformer;
+	//RFLOAT dim3 = XSIZE(Min)*YSIZE(Min)*ZSIZE(Min);
+	transformer.FourierTransform(Min, Faux, false);
+	lspectrum=spectrum;
+	if (leave_origin_intact)
+		lspectrum(0)=1.;
+	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux)
+	{
+		long int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
+		dAkij(Faux, k, i, j) *=  lspectrum(idx);// * dim3;
+	}
+	transformer.inverseFourierTransform();
 
 }
 
 
 void whitenSpectrum(MultidimArray<RFLOAT> &Min,
-                    MultidimArray<RFLOAT> &Mout,
-                    int spectrum_type,
-                    bool leave_origin_intact)
+					MultidimArray<RFLOAT> &Mout,
+					int spectrum_type,
+					bool leave_origin_intact)
 {
 
-    MultidimArray<RFLOAT> spectrum;
-    getSpectrum(Min,spectrum,spectrum_type);
-    Mout=Min;
-    divideBySpectrum(Mout,spectrum,leave_origin_intact);
+	MultidimArray<RFLOAT> spectrum;
+	getSpectrum(Min,spectrum,spectrum_type);
+	Mout=Min;
+	divideBySpectrum(Mout,spectrum,leave_origin_intact);
 
 }
 
 void adaptSpectrum(MultidimArray<RFLOAT> &Min,
-                   MultidimArray<RFLOAT> &Mout,
-                   const MultidimArray<RFLOAT> &spectrum_ref,
-                   int spectrum_type,
-                   bool leave_origin_intact)
+				   MultidimArray<RFLOAT> &Mout,
+				   const MultidimArray<RFLOAT> &spectrum_ref,
+				   int spectrum_type,
+				   bool leave_origin_intact)
 {
 
-    MultidimArray<RFLOAT> spectrum;
-    getSpectrum(Min,spectrum,spectrum_type);
-    FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(spectrum)
-    {
-        dAi(spectrum, i) = (dAi(spectrum, i) > 0.) ? dAi(spectrum_ref,i)/ dAi(spectrum, i) : 1.;
-    }
-    Mout=Min;
-    multiplyBySpectrum(Mout,spectrum,leave_origin_intact);
+	MultidimArray<RFLOAT> spectrum;
+	getSpectrum(Min,spectrum,spectrum_type);
+	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(spectrum)
+	{
+		dAi(spectrum, i) = (dAi(spectrum, i) > 0.) ? dAi(spectrum_ref,i)/ dAi(spectrum, i) : 1.;
+	}
+	Mout=Min;
+	multiplyBySpectrum(Mout,spectrum,leave_origin_intact);
 }
 
 /** Kullback-Leibler divergence */
@@ -1159,10 +1161,10 @@ void resizeMap(MultidimArray<RFLOAT > &img, int newsize)
 	MultidimArray<Complex > FT, FT2;
 	transformer.FourierTransform(img, FT, false);
 	windowFourierTransform(FT, FT2, newsize);
-    if (img.getDim() == 2)
-    	img.resize(newsize, newsize);
-    else if (img.getDim() == 3)
-    	img.resize(newsize, newsize, newsize);
+	if (img.getDim() == 2)
+		img.resize(newsize, newsize);
+	else if (img.getDim() == 3)
+		img.resize(newsize, newsize, newsize);
 	transformer.inverseFourierTransform(FT2, img);
 
 }
@@ -1171,11 +1173,11 @@ void applyBFactorToMap(MultidimArray<Complex > &FT, int ori_size, RFLOAT bfactor
 {
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
 	{
-    	int r2 = kp * kp + ip * ip + jp * jp;
-    	RFLOAT res = sqrt((RFLOAT)r2)/(ori_size * angpix); // get resolution in 1/Angstrom
-    	if (res <= 1. / (angpix * 2.) ) // Apply B-factor sharpening until Nyquist, then low-pass filter later on (with a soft edge)
+		int r2 = kp * kp + ip * ip + jp * jp;
+		RFLOAT res = sqrt((RFLOAT)r2)/(ori_size * angpix); // get resolution in 1/Angstrom
+		if (res <= 1. / (angpix * 2.) ) // Apply B-factor sharpening until Nyquist, then low-pass filter later on (with a soft edge)
 		{
-    		DIRECT_A3D_ELEM(FT, k, i, j) *= exp( -(bfactor / 4.)  * res * res);
+			DIRECT_A3D_ELEM(FT, k, i, j) *= exp( -(bfactor / 4.)  * res * res);
 		}
 		else
 		{
@@ -1211,7 +1213,7 @@ void LoGFilterMap(MultidimArray<Complex > &FT, int ori_size, RFLOAT sigma, RFLOA
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
 	{
 		RFLOAT r2 = (RFLOAT)kp * (RFLOAT)kp + (RFLOAT)ip * (RFLOAT)ip + (RFLOAT)jp * (RFLOAT)jp;
-    	DIRECT_A3D_ELEM(FT, k, i, j) *= r2 * exp(-0.5*r2/isigma2) / isigma2;
+		DIRECT_A3D_ELEM(FT, k, i, j) *= r2 * exp(-0.5*r2/isigma2) / isigma2;
 	}
 
 }
@@ -1267,7 +1269,7 @@ void LoGFilterMap(MultidimArray<RFLOAT > &img, RFLOAT sigma, RFLOAT angpix)
 		if (img.getDim() == 2)
 		{
 			img.window(FIRST_XMIPP_INDEX(my_ysize), FIRST_XMIPP_INDEX(my_xsize),
-					   LAST_XMIPP_INDEX(my_ysize),  LAST_XMIPP_INDEX(my_xsize));
+					   LAST_XMIPP_INDEX(my_ysize),	LAST_XMIPP_INDEX(my_xsize));
 		}
 		else
 		{
@@ -1294,27 +1296,27 @@ void lowPassFilterMap(MultidimArray<Complex > &FT, int ori_size,
 	// Put a raised cosine from edge_low to edge_high
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
 	{
-    	RFLOAT r2 = (RFLOAT)kp * (RFLOAT)kp + (RFLOAT)ip * (RFLOAT)ip + (RFLOAT)jp * (RFLOAT)jp;
-    	RFLOAT res = sqrt((RFLOAT)r2)/ori_size; // get resolution in 1/pixel
+		RFLOAT r2 = (RFLOAT)kp * (RFLOAT)kp + (RFLOAT)ip * (RFLOAT)ip + (RFLOAT)jp * (RFLOAT)jp;
+		RFLOAT res = sqrt((RFLOAT)r2)/ori_size; // get resolution in 1/pixel
 
-    	if (do_highpass_instead)
-    	{
+		if (do_highpass_instead)
+		{
 			if (res < edge_low)
 				DIRECT_A3D_ELEM(FT, k, i, j) = 0.;
 			else if (res > edge_high)
 				continue;
 			else
 				DIRECT_A3D_ELEM(FT, k, i, j) *= 0.5 - 0.5 * cos( PI * (res-edge_low)/edge_width);
-    	}
-    	else
-    	{
+		}
+		else
+		{
 			if (res < edge_low)
 				continue;
 			else if (res > edge_high)
 				DIRECT_A3D_ELEM(FT, k, i, j) = 0.;
 			else
 				DIRECT_A3D_ELEM(FT, k, i, j) *= 0.5 + 0.5 * cos( PI * (res-edge_low)/edge_width);
-    	}
+		}
 	}
 
 
@@ -1370,7 +1372,7 @@ void lowPassFilterMap(MultidimArray<RFLOAT > &img, RFLOAT low_pass, RFLOAT angpi
 		if (img.getDim() == 2)
 		{
 			img.window(FIRST_XMIPP_INDEX(my_ysize), FIRST_XMIPP_INDEX(my_xsize),
-					   LAST_XMIPP_INDEX(my_ysize),  LAST_XMIPP_INDEX(my_xsize));
+					   LAST_XMIPP_INDEX(my_ysize),	LAST_XMIPP_INDEX(my_xsize));
 		}
 		else
 		{
@@ -1508,7 +1510,7 @@ void directionalFilterMap(MultidimArray<RFLOAT > &img, RFLOAT low_pass, RFLOAT a
 		if (img.getDim() == 2)
 		{
 			img.window(FIRST_XMIPP_INDEX(my_ysize), FIRST_XMIPP_INDEX(my_xsize),
-					   LAST_XMIPP_INDEX(my_ysize),  LAST_XMIPP_INDEX(my_xsize));
+					   LAST_XMIPP_INDEX(my_ysize),	LAST_XMIPP_INDEX(my_xsize));
 		}
 		else
 		{
@@ -1528,51 +1530,51 @@ void applyBeamTilt(const MultidimArray<Complex > &Fin, MultidimArray<Complex > &
 }
 
 void selfApplyBeamTilt(MultidimArray<Complex > &Fimg, RFLOAT beamtilt_x, RFLOAT beamtilt_y,
-        RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size)
+		RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size)
 {
-    if (Fimg.getDim() != 2)
-        REPORT_ERROR("applyBeamTilt can only be done on 2D Fourier Transforms!");
+	if (Fimg.getDim() != 2)
+		REPORT_ERROR("applyBeamTilt can only be done on 2D Fourier Transforms!");
 
-    RFLOAT boxsize = angpix * ori_size;
-    RFLOAT factor = 0.360 * Cs * 10000000 * wavelength * wavelength / (boxsize * boxsize * boxsize);
-    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(Fimg)
-    {
-        RFLOAT delta_phase = factor * (ip * ip + jp * jp) * (ip * beamtilt_y + jp * beamtilt_x);
-        RFLOAT realval = DIRECT_A2D_ELEM(Fimg, i, j).real;
-        RFLOAT imagval = DIRECT_A2D_ELEM(Fimg, i, j).imag;
-        RFLOAT mag = sqrt(realval * realval + imagval * imagval);
-        RFLOAT phas = atan2(imagval, realval) + DEG2RAD(delta_phase); // apply phase shift!
-        realval = mag * cos(phas);
-        imagval = mag * sin(phas);
-        DIRECT_A2D_ELEM(Fimg, i, j) = Complex(realval, imagval);
-    }
+	RFLOAT boxsize = angpix * ori_size;
+	RFLOAT factor = 0.360 * Cs * 10000000 * wavelength * wavelength / (boxsize * boxsize * boxsize);
+	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(Fimg)
+	{
+		RFLOAT delta_phase = factor * (ip * ip + jp * jp) * (ip * beamtilt_y + jp * beamtilt_x);
+		RFLOAT realval = DIRECT_A2D_ELEM(Fimg, i, j).real;
+		RFLOAT imagval = DIRECT_A2D_ELEM(Fimg, i, j).imag;
+		RFLOAT mag = sqrt(realval * realval + imagval * imagval);
+		RFLOAT phas = atan2(imagval, realval) + DEG2RAD(delta_phase); // apply phase shift!
+		realval = mag * cos(phas);
+		imagval = mag * sin(phas);
+		DIRECT_A2D_ELEM(Fimg, i, j) = Complex(realval, imagval);
+	}
 
 }
 
 void selfApplyBeamTilt(MultidimArray<Complex > &Fimg,
-        RFLOAT beamtilt_x, RFLOAT beamtilt_y,
-        RFLOAT beamtilt_xx, RFLOAT beamtilt_xy, RFLOAT beamtilt_yy,
-        RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size)
+		RFLOAT beamtilt_x, RFLOAT beamtilt_y,
+		RFLOAT beamtilt_xx, RFLOAT beamtilt_xy, RFLOAT beamtilt_yy,
+		RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size)
 {
-    if (Fimg.getDim() != 2)
-        REPORT_ERROR("applyBeamTilt can only be done on 2D Fourier Transforms!");
+	if (Fimg.getDim() != 2)
+		REPORT_ERROR("applyBeamTilt can only be done on 2D Fourier Transforms!");
 
-    RFLOAT boxsize = angpix * ori_size;
-    RFLOAT factor = 0.360 * Cs * 10000000 * wavelength * wavelength / (boxsize * boxsize * boxsize);
+	RFLOAT boxsize = angpix * ori_size;
+	RFLOAT factor = 0.360 * Cs * 10000000 * wavelength * wavelength / (boxsize * boxsize * boxsize);
 
-    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(Fimg)
-    {
-        RFLOAT q = beamtilt_xx * jp * jp + 2.0 * beamtilt_xy * ip * jp + beamtilt_yy * ip * ip;
+	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(Fimg)
+	{
+		RFLOAT q = beamtilt_xx * jp * jp + 2.0 * beamtilt_xy * ip * jp + beamtilt_yy * ip * ip;
 
-        RFLOAT delta_phase = factor * q * (ip * beamtilt_y + jp * beamtilt_x);
-        RFLOAT realval = DIRECT_A2D_ELEM(Fimg, i, j).real;
-        RFLOAT imagval = DIRECT_A2D_ELEM(Fimg, i, j).imag;
-        RFLOAT mag = sqrt(realval * realval + imagval * imagval);
-        RFLOAT phas = atan2(imagval, realval) + DEG2RAD(delta_phase); // apply phase shift!
-        realval = mag * cos(phas);
-        imagval = mag * sin(phas);
-        DIRECT_A2D_ELEM(Fimg, i, j) = Complex(realval, imagval);
-    }
+		RFLOAT delta_phase = factor * q * (ip * beamtilt_y + jp * beamtilt_x);
+		RFLOAT realval = DIRECT_A2D_ELEM(Fimg, i, j).real;
+		RFLOAT imagval = DIRECT_A2D_ELEM(Fimg, i, j).imag;
+		RFLOAT mag = sqrt(realval * realval + imagval * imagval);
+		RFLOAT phas = atan2(imagval, realval) + DEG2RAD(delta_phase); // apply phase shift!
+		realval = mag * cos(phas);
+		imagval = mag * sin(phas);
+		DIRECT_A2D_ELEM(Fimg, i, j) = Complex(realval, imagval);
+	}
 
 }
 
@@ -1584,7 +1586,7 @@ void padAndFloat2DMap(const MultidimArray<RFLOAT > &v, MultidimArray<RFLOAT> &ou
 	out.clear();
 
 	// Check dimensions
-    v.getDimensions(Xdim, Ydim, Zdim, Ndim);
+	v.getDimensions(Xdim, Ydim, Zdim, Ndim);
 	if ( (Zdim > 1) || (Ndim > 1) )
 		REPORT_ERROR("fftw.cpp::padAndFloat2DMap(): ERROR MultidimArray should be 2D.");
 	if (Xdim * Ydim <= 16)
@@ -1643,31 +1645,31 @@ void amplitudeOrPhaseMap(const MultidimArray<RFLOAT > &v, MultidimArray<RFLOAT >
 
 	// Fourier Transform
 	CenterFFT(out, true);
-    transformer.FourierTransform(out, Faux, false); // TODO: false???
+	transformer.FourierTransform(out, Faux, false); // TODO: false???
 
-    // Write to output files
-    out.setXmippOrigin();
-    out.initZeros(XYdim, XYdim);
-    maxr2 = (XYdim - 1) * (XYdim - 1) / 4;
-    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(Faux)
-    {
-    	if ( (ip > STARTINGY(out)) && (ip < FINISHINGY(out))
-    			&& (jp > STARTINGX(out)) && (jp < FINISHINGX(out))
-    			&& ((ip * ip + jp * jp) < maxr2) )
-    	{
-    		if (output_map_type == AMPLITUDE_MAP)
-    			val = FFTW2D_ELEM(Faux, ip, jp).abs();
-    		else if (output_map_type == PHASE_MAP)
-    			val = (180.) * (FFTW2D_ELEM(Faux, ip, jp).arg()) / PI;
-    		else
-    			REPORT_ERROR("fftw.cpp::amplitudeOrPhaseMap(): ERROR Unknown type of output map.");
+	// Write to output files
+	out.setXmippOrigin();
+	out.initZeros(XYdim, XYdim);
+	maxr2 = (XYdim - 1) * (XYdim - 1) / 4;
+	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(Faux)
+	{
+		if ( (ip > STARTINGY(out)) && (ip < FINISHINGY(out))
+				&& (jp > STARTINGX(out)) && (jp < FINISHINGX(out))
+				&& ((ip * ip + jp * jp) < maxr2) )
+		{
+			if (output_map_type == AMPLITUDE_MAP)
+				val = FFTW2D_ELEM(Faux, ip, jp).abs();
+			else if (output_map_type == PHASE_MAP)
+				val = (180.) * (FFTW2D_ELEM(Faux, ip, jp).arg()) / PI;
+			else
+				REPORT_ERROR("fftw.cpp::amplitudeOrPhaseMap(): ERROR Unknown type of output map.");
 
-    		A2D_ELEM(out, -ip, -jp) = A2D_ELEM(out, ip, jp) = val;
-    	}
-    }
-    A2D_ELEM(out, 0, 0) = 0.;
-    amp.clear();
-    amp = out;
+			A2D_ELEM(out, -ip, -jp) = A2D_ELEM(out, ip, jp) = val;
+		}
+	}
+	A2D_ELEM(out, 0, 0) = 0.;
+	amp.clear();
+	amp = out;
 }
 
 void helicalLayerLineProfile(const MultidimArray<RFLOAT > &v, std::string title, std::string fn_eps)
@@ -1692,39 +1694,39 @@ void helicalLayerLineProfile(const MultidimArray<RFLOAT > &v, std::string title,
 
 	// Fourier Transform
 	CenterFFT(out, true);
-    transformer.FourierTransform(out, Faux, false); // TODO: false???
+	transformer.FourierTransform(out, Faux, false); // TODO: false???
 
-    // Statistics
-    out.setXmippOrigin();
-    maxr2 = (XYdim - 1) * (XYdim - 1) / 4;
-    ampl_list.resize(XSIZE(Faux) + 2);
-    ampr_list.resize(XSIZE(Faux) + 2);
-    nr_pix_list.resize(XSIZE(Faux) + 2);
-    for (int ii = 0; ii < ampl_list.size(); ii++)
-    	ampl_list[ii] = ampr_list[ii] = nr_pix_list[ii] = 0.;
+	// Statistics
+	out.setXmippOrigin();
+	maxr2 = (XYdim - 1) * (XYdim - 1) / 4;
+	ampl_list.resize(XSIZE(Faux) + 2);
+	ampr_list.resize(XSIZE(Faux) + 2);
+	nr_pix_list.resize(XSIZE(Faux) + 2);
+	for (int ii = 0; ii < ampl_list.size(); ii++)
+		ampl_list[ii] = ampr_list[ii] = nr_pix_list[ii] = 0.;
 
-    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(Faux)
-    {
-    	if ( ((ip * ip + jp * jp) < maxr2) && (ip > 0) )
-    	{
-    		nr_pix_list[jp] += 1.;
-    		ampl_list[jp] += FFTW2D_ELEM(Faux, ip, jp).abs();
-    		ampr_list[jp] += FFTW2D_ELEM(Faux, -ip, jp).abs();
-    	}
-    }
-    CDataSet dataSetAmpl, dataSetAmpr;
-    RFLOAT linewidth = 1.0;
-    std::string figTitle = "Helical Layer Line Profile - " + title;
-    std::string yTitle = "Reciprocal pixels (padded box size = " + integerToString(XYdim) + ")";
-    for (int ii = 0; ii < (3 * ampl_list.size() / 4 + 1); ii++)
-    {
-    	if (nr_pix_list[ii] < 1.)
-    		break; // TODO: IS THIS CORRECT?
-    	dataSetAmpl.AddDataPoint(CDataPoint(ii, log(ampl_list[ii] / nr_pix_list[ii])));
-    	dataSetAmpr.AddDataPoint(CDataPoint(ii, log(ampr_list[ii] / nr_pix_list[ii])));
-    }
-    dataSetAmpl.SetDrawMarker(false);
-    dataSetAmpl.SetLineWidth(linewidth);
+	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(Faux)
+	{
+		if ( ((ip * ip + jp * jp) < maxr2) && (ip > 0) )
+		{
+			nr_pix_list[jp] += 1.;
+			ampl_list[jp] += FFTW2D_ELEM(Faux, ip, jp).abs();
+			ampr_list[jp] += FFTW2D_ELEM(Faux, -ip, jp).abs();
+		}
+	}
+	CDataSet dataSetAmpl, dataSetAmpr;
+	RFLOAT linewidth = 1.0;
+	std::string figTitle = "Helical Layer Line Profile - " + title;
+	std::string yTitle = "Reciprocal pixels (padded box size = " + integerToString(XYdim) + ")";
+	for (int ii = 0; ii < (3 * ampl_list.size() / 4 + 1); ii++)
+	{
+		if (nr_pix_list[ii] < 1.)
+			break; // TODO: IS THIS CORRECT?
+		dataSetAmpl.AddDataPoint(CDataPoint(ii, log(ampl_list[ii] / nr_pix_list[ii])));
+		dataSetAmpr.AddDataPoint(CDataPoint(ii, log(ampr_list[ii] / nr_pix_list[ii])));
+	}
+	dataSetAmpl.SetDrawMarker(false);
+	dataSetAmpl.SetLineWidth(linewidth);
 	dataSetAmpl.SetDatasetColor(1., 0., 0.);
 	dataSetAmpl.SetDatasetTitle("ln(amplitudes) (left)");
 	dataSetAmpr.SetDrawMarker(false);
@@ -1740,4 +1742,25 @@ void helicalLayerLineProfile(const MultidimArray<RFLOAT > &v, std::string title,
 	plot2D->AddDataSet(dataSetAmpr);
 	plot2D->OutputPostScriptPlot(fn_eps);
 	delete plot2D;
+}
+
+void generateBinaryHelicalFourierMask(MultidimArray<RFLOAT> &mask, std::vector<RFLOAT> exclude_begin, std::vector<RFLOAT> exclude_end, RFLOAT angpix)
+{
+	if (exclude_begin.size() != exclude_end.size()) REPORT_ERROR("BUG: generateHelicalFourierMask: provide start-end resolutions for each shell.");
+
+	mask.initConstant(1.);
+
+	bool is_2d = (mask.getDim() == 2);
+	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(mask)
+	{
+		RFLOAT res;
+		if (is_2d) res = (jp == 0) ? 999. : YSIZE(mask) * angpix / fabs(jp); // helical axis along X-axis, so only jp matters!
+		else res = (kp == 0) ? 999. : ZSIZE(mask) * angpix / fabs(kp); // helical axis along Z-axis, so only kp matters!
+
+		for (int ishell = 0; ishell < exclude_begin.size(); ishell++)
+		{
+			if (res <= exclude_begin[ishell] && res >= exclude_end[ishell]) DIRECT_A3D_ELEM(mask, k, i, j) = 0.;
+		}
+	}
+
 }

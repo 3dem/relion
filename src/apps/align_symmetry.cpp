@@ -67,7 +67,7 @@ public:
 		search_range = textToInteger(parser.getOption("--local_search_range", "Local search range (1 + 2 * this number)", "2"));
 		search_step = textToFloat(parser.getOption("--local_search_step", "Local search step (in degrees)", "2"));
 		padding_factor = textToInteger(parser.getOption("--pad", "Padding factor", "2"));
-		
+
 		if (parser.checkOption("--NN", "Use nearest-neighbour instead of linear interpolation"))
 			interpolator = NEAREST_NEIGHBOUR;
 		else
@@ -97,7 +97,7 @@ public:
 
 			Euler_rotation3DMatrix(rot, tilt, psi, A3D);
 			F2D.initZeros();
-			projector.get2DFourierTransform(F2D, A3D, IS_NOT_INV);
+			projector.get2DFourierTransform(F2D, A3D);
 
 			transformer.inverseFourierTransform();
 			CenterFFT(rotated, false);
@@ -106,9 +106,9 @@ public:
 
 			// non-weighted real-space squared difference
 			double diff2 = 0;
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(rotated)	
-			{                                
-				diff2 += (DIRECT_MULTIDIM_ELEM(rotated, n) - DIRECT_MULTIDIM_ELEM(symmetrised, n)) * 
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(rotated)
+			{
+				diff2 += (DIRECT_MULTIDIM_ELEM(rotated, n) - DIRECT_MULTIDIM_ELEM(symmetrised, n)) *
 				         (DIRECT_MULTIDIM_ELEM(rotated, n) - DIRECT_MULTIDIM_ELEM(symmetrised, n));
 			}
 			if (best_diff2 > diff2)
@@ -119,7 +119,7 @@ public:
 
 			if (current_object % 30 == 0) progress_bar(current_object);
 #ifdef DEBUG
-			std::cout << rot << " " << tilt << " " << psi << " " << diff2 << std::endl; 
+			std::cout << rot << " " << tilt << " " << psi << " " << diff2 << std::endl;
 #endif
 		} // end search
 
@@ -160,7 +160,7 @@ public:
 		resizeMap(vol_work(), boxsize);
 		work_angpix = angpix * orig_size / boxsize;
 		std::cout << " Downsampled to the working box size " << boxsize << " px. This corresponds to " << work_angpix << " A/px." << std::endl;
-		
+
 		if (nr_uniform > 0)
 		{
 			std::cout << " Generating " << nr_uniform << " projections taken randomly from a uniform angular distribution." << std::endl;
@@ -219,7 +219,7 @@ public:
 		std::cout << " The best solution is ROT = " << rot << " TILT = " << tilt << " PSI = " << psi << std::endl << std::endl;
 
 		// Local refinement
-		std::cout << " Refining locally ..." << std::endl;	
+		std::cout << " Refining locally ..." << std::endl;
 		MDang.clear();
 
 		for (int i = -search_range; i <= search_range; i++)
@@ -240,7 +240,7 @@ public:
 			}
 		}
 		best_at = search(MDang, projector);
-		
+
 		MDang.getValue(EMDL_ORIENT_ROT, rot, best_at);
 		MDang.getValue(EMDL_ORIENT_TILT, tilt, best_at);
 		MDang.getValue(EMDL_ORIENT_PSI, psi, best_at);
@@ -255,7 +255,7 @@ public:
 		Euler_rotation3DMatrix(rot, tilt, psi, A3D);
 		F2D.initZeros(orig_size, orig_size, orig_size / 2 + 1);
 		vol_out().reshape(vol_in());
-		full_projector.get2DFourierTransform(F2D, A3D, IS_NOT_INV);
+		full_projector.get2DFourierTransform(F2D, A3D);
 
 		transformer.inverseFourierTransform(F2D, vol_out());
 		CenterFFT(vol_out(), false);
@@ -280,8 +280,8 @@ int main(int argc, char *argv[])
 	{
 	        //prm.usage();
         	std::cerr << XE;
-	        exit(1);
+	        return RELION_EXIT_FAILURE;
 	}
 
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }

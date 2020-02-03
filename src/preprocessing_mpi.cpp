@@ -37,13 +37,10 @@ void PreprocessingMpi::read(int argc, char **argv)
 
 	// Print out MPI info
 	printMpiNodesMachineNames(*node);
-
 }
-
 
 void PreprocessingMpi::runExtractParticles()
 {
-
 	// Total number of nodes is limited to max_mpi_nodes
 	long int my_nr_mics;
 	if (node->rank < max_mpi_nodes)
@@ -72,10 +69,20 @@ void PreprocessingMpi::runExtractParticles()
 		{
 			if (imic >= my_first_mic && imic <= my_last_mic)
 			{
-				if (do_movie_extract)
-					MDmics.getValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_mic);
-				else
-					MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
+
+				// Abort through the pipeline_control system
+				if (pipeline_control_check_abort_job())
+					MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
+
+				MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
+				int optics_group = obsModelMic.getOpticsGroup(MDmics);
+
+				// Set the pixel size for this micrograph
+				angpix = obsModelMic.getPixelSize(optics_group);
+				// Also set the output_angpix (which could be rescaled)
+				output_angpix = angpix;
+				if (do_rescale)
+					output_angpix *= (RFLOAT)extract_size / (RFLOAT)scale;
 
 				// Check new-style outputdirectory exists and make it if not!
 				FileName fn_dir = getOutputFileNameRoot(fn_mic);
@@ -105,36 +112,14 @@ void PreprocessingMpi::runExtractParticles()
 			progress_bar(my_nr_mics);
 		Preprocessing::joinAllStarFiles();
 	}
-
 }
-
-
 
 void PreprocessingMpi::run()
 {
-
 	// Extract and operate on particles in parallel
 	if (do_extract)
 	{
-
-		if (only_extract_unfinished)
-		{
-			bool do_work = false;
-			if (fn_part_star != "" && !exists(fn_part_star))
-				do_work = true;
-			if (fn_list_star != "" && !exists(fn_list_star))
-				do_work = true;
-
-			if (!do_work)
-			{
-				if (verb > 0)
-					std::cout << " Output STAR file(s) " << fn_part_star << " "<< fn_list_star << " already exist. Skipping extraction..." << std::endl;
-				return;
-			}
-		}
-
 		runExtractParticles();
-
 	}
 	// The following has not been parallelised....
 	else if (fn_operate_in != "" && node->isMaster())
@@ -142,5 +127,4 @@ void PreprocessingMpi::run()
 
 	if (verb > 0)
 		std::cout << " Done preprocessing!" <<std::endl;
-
 }

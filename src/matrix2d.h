@@ -460,10 +460,17 @@ public:
 
     /** Matrix element access
      */
-    T& operator()(int i, int j) const
+	T& operator()(int i, int j)
     {
         return MAT_ELEM((*this),i,j);
     }
+	
+	// for constant matrices (the compiler will pick the right version)
+	const T& operator()(int i, int j) const
+    {
+        return MAT_ELEM((*this),i,j);
+    }
+	
     /** Parenthesis operator for phyton
     */
     void setVal(T val,int y, int x)

@@ -22,7 +22,7 @@ namespace CpuKernels
 
 /*
  * This draft of a kernel assumes input that has jobs which have a single orientation and sequential translations within each job.
- * 
+ *
  */
 void exponentiate_weights_fine(
 		XFLOAT *g_pdf_orientation,
@@ -131,9 +131,9 @@ void softMaskBackgroundValue(	int      block_dim,
 								XFLOAT  *g_sum,
 								XFLOAT  *g_sum_bg)
 {
-	for(int bid=0; bid<block_dim; bid++) 
+	for(int bid=0; bid<block_dim; bid++)
 	{
-		for(int tid=0; tid<block_size; tid++) 
+		for(int tid=0; tid<block_size; tid++)
 		{
 	//		vol.setXmippOrigin(); // sets xinit=xdim , also for y z
 			XFLOAT r, raisedcos;
@@ -200,9 +200,9 @@ void cosineFilter(	int      block_dim,
 					XFLOAT   cosine_width,
 					XFLOAT   bg_value)
 {
-	for(int bid=0; bid<block_dim; bid++) 
+	for(int bid=0; bid<block_dim; bid++)
 	{
-		for(int tid=0; tid<block_size; tid++) 
+		for(int tid=0; tid<block_size; tid++)
 		{
 //		vol.setXmippOrigin(); // sets xinit=xdim , also for y z
 			XFLOAT r, raisedcos, defVal;
@@ -264,7 +264,7 @@ void cpu_translate2D(T *	g_image_in,
 {
 	int x,y,xp,yp;
 	size_t new_pixel;
-	
+
 #ifdef DEBUG_CUDA
 	if (image_size > (size_t)std::numeric_limits<int>::max())
 		ACC_PTR_DEBUG_INFO("cpu_translate2D: image_size > std::numeric_limits<int>::max()");
@@ -303,7 +303,7 @@ void cpu_translate3D(T *	g_image_in,
 #ifdef DEBUG_CUDA
 	if (image_size > (size_t)std::numeric_limits<int>::max())
 		ACC_PTR_DEBUG_INFO("cpu_translate3D: image_size > std::numeric_limits<int>::max()");
-#endif	
+#endif
 	for(size_t voxel=0; voxel<image_size; voxel++)
 	{
 		int xydim = xdim*ydim;
@@ -450,7 +450,7 @@ void centerFFT_3D(	int     batch_size,
 			else if (zp >= zdim)
 				zp -= zdim;
 
-			size_t n_pixel = (size_t)zp*(size_t)xydim + (size_t)yp*(size_t)xdim 
+			size_t n_pixel = (size_t)zp*(size_t)xydim + (size_t)yp*(size_t)xdim
 					+ (size_t)xp;
 
 			T buffer                       = img_in[image_offset + n_pixel];
@@ -487,7 +487,7 @@ template void centerFFT_3D<double>(  	int     batch_size,
 /* TODO - if create optimized CPU version of autopicker
  * All these functions need to be converted to use internal loops rather than
  * block and thread indices to operate like other active functions seen in this file
-void probRatio( int       blockIdx_x,  
+void probRatio( int       blockIdx_x,
 				int       threadIdx_x,
 				XFLOAT   *d_Mccf,
 				XFLOAT   *d_Mpsi,
@@ -553,8 +553,8 @@ void probRatio( int       blockIdx_x,
 	}
 }
 
-void rotateOnly(int              blockIdx_x, 
-				int              blockIdx_y, 
+void rotateOnly(int              blockIdx_x,
+				int              blockIdx_y,
 				int              threadIdx_x,
 				ACCCOMPLEX     *d_Faux,
 				XFLOAT           psi,
@@ -584,7 +584,7 @@ void rotateOnly(int              blockIdx_x,
 #else
 		sincosf((proj+startPsi)*psi, &sa, &ca);
 #endif
-            
+
 		ACCCOMPLEX val;
 
 		projector.project2Dmodel(	 x,y,
@@ -601,8 +601,8 @@ void rotateOnly(int              blockIdx_x,
 	}
 }
 
-void rotateAndCtf(  int              blockIdx_x, 
-					int              blockIdx_y, 
+void rotateAndCtf(  int              blockIdx_x,
+					int              blockIdx_y,
 					int              threadIdx_x,
 					ACCCOMPLEX     *d_Faux,
 					XFLOAT          *d_ctf,
@@ -667,7 +667,7 @@ void convol_A(  int           blockIdx_x,
 	}
 }
 
-void convol_A(  int          blockIdx_x, 
+void convol_A(  int          blockIdx_x,
 				int          threadIdx_x,
 				ACCCOMPLEX *d_A,
 				ACCCOMPLEX *d_B,
@@ -684,8 +684,8 @@ void convol_A(  int          blockIdx_x,
 	}
 }
 
-void batch_convol_A(int           blockIdx_x, 
-					int           blockIdx_y, 
+void batch_convol_A(int           blockIdx_x,
+					int           blockIdx_y,
 					int           threadIdx_x,
 					ACCCOMPLEX  *d_A,
 					ACCCOMPLEX  *d_B,
@@ -702,8 +702,8 @@ void batch_convol_A(int           blockIdx_x,
 	}
 }
 
-void batch_convol_A(int           blockIdx_x, 
-					int           blockIdx_y, 
+void batch_convol_A(int           blockIdx_x,
+					int           blockIdx_y,
 					int           threadIdx_x,
 					ACCCOMPLEX  *d_A,
 					ACCCOMPLEX  *d_B,
@@ -721,7 +721,7 @@ void batch_convol_A(int           blockIdx_x,
 	}
 }
 
-void convol_B(  int          blockIdx_x, 
+void convol_B(  int          blockIdx_x,
 				int          threadIdx_x,
 				ACCCOMPLEX *d_A,
 				ACCCOMPLEX *d_B,
@@ -737,7 +737,7 @@ void convol_B(  int          blockIdx_x,
 	}
 }
 
-void convol_B(  int           blockIdx_x, 
+void convol_B(  int           blockIdx_x,
 				int           threadIdx_x,
 				ACCCOMPLEX  *d_A,
 				ACCCOMPLEX  *d_B,
@@ -754,8 +754,8 @@ void convol_B(  int           blockIdx_x,
 	}
 }
 
-void batch_convol_B(int          blockIdx_x, 
-					int          blockIdx_y, 
+void batch_convol_B(int          blockIdx_x,
+					int          blockIdx_y,
 					int          threadIdx_x,
 					ACCCOMPLEX *d_A,
 					ACCCOMPLEX *d_B,
@@ -828,7 +828,7 @@ void batch_multi(   int     blockIdx_x,
 		OUT[pixel + blockIdx_y*image_size] = A[pixel + blockIdx_y*image_size]*B[pixel + blockIdx_y*image_size]*S;
 }
  */
-/* TODO - CPU-optimized autopicker 
+/* TODO - CPU-optimized autopicker
 void finalizeMstddev(   int     blockIdx_x,
 						int     threadIdx_x,
 						XFLOAT *Mstddev,
@@ -868,7 +868,7 @@ void cpu_kernel_make_eulers_2D(int grid_size, int block_size,
 		ACC_PTR_DEBUG_INFO("cpu_kernel_make_eulers_2D: grid_size*block_size > std::numeric_limits<int>::max()");
 #endif
 	for(int blockIdx_x=0; blockIdx_x<(int)(grid_size); blockIdx_x++) {
-		for(int threadIdx_x=0; threadIdx_x<block_size; threadIdx_x++)  {							
+		for(int threadIdx_x=0; threadIdx_x<block_size; threadIdx_x++)  {
 			unsigned long oid = (unsigned long)blockIdx_x * (unsigned long)block_size + threadIdx_x; //Orientation id
 
 			if (oid >= orientation_num)
@@ -998,15 +998,35 @@ void cpu_kernel_make_eulers_3D(int grid_size, int block_size,
 
 			if(invert)
 			{
-				eulers[9 * oid + 0] = B[0];//00
-				eulers[9 * oid + 1] = B[3];//01
-				eulers[9 * oid + 2] = B[6];//02
-				eulers[9 * oid + 3] = B[1];//10
-				eulers[9 * oid + 4] = B[4];//11
-				eulers[9 * oid + 5] = B[7];//12
-				eulers[9 * oid + 6] = B[2];//20
-				eulers[9 * oid + 7] = B[5];//21
-				eulers[9 * oid + 8] = B[8];//22
+				if (doL) // this could have anisotropy, so inverse neq transpose!!!
+				{
+					XFLOAT det;
+					det =     B[0] * (B[4] * B[8] - B[7] * B[5])
+							- B[1] * (B[3] * B[8] - B[6] * B[5])
+							+ B[2] * (B[3] * B[7] - B[6] * B[4]);
+
+					eulers[9 * oid + 0] = (B[4] * B[8] - B[7] * B[5]) / det;
+					eulers[9 * oid + 1] = (B[7] * B[2] - B[1] * B[8]) / det;
+					eulers[9 * oid + 2] = (B[1] * B[5] - B[4] * B[2]) / det;
+					eulers[9 * oid + 3] = (B[5] * B[6] - B[8] * B[3]) / det;
+					eulers[9 * oid + 4] = (B[8] * B[0] - B[2] * B[6]) / det;
+					eulers[9 * oid + 5] = (B[2] * B[3] - B[5] * B[0]) / det;
+					eulers[9 * oid + 6] = (B[3] * B[7] - B[6] * B[4]) / det;
+					eulers[9 * oid + 7] = (B[6] * B[1] - B[0] * B[7]) / det;
+					eulers[9 * oid + 8] = (B[0] * B[4] - B[3] * B[1]) / det;
+				}
+				else
+				{
+					eulers[9 * oid + 0] = B[0];//00
+					eulers[9 * oid + 1] = B[3];//01
+					eulers[9 * oid + 2] = B[6];//02
+					eulers[9 * oid + 3] = B[1];//10
+					eulers[9 * oid + 4] = B[4];//11
+					eulers[9 * oid + 5] = B[7];//12
+					eulers[9 * oid + 6] = B[2];//20
+					eulers[9 * oid + 7] = B[5];//21
+					eulers[9 * oid + 8] = B[8];//22
+				}
 			}
 			else
 			{
@@ -1054,9 +1074,9 @@ template void CpuKernels::cpu_kernel_make_eulers_3D<false,false,true>(int, int,
 template void CpuKernels::cpu_kernel_make_eulers_3D<false,false,false>(int, int,
 		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned long, XFLOAT *, XFLOAT *);
 
-template void CpuKernels::cpu_kernel_make_eulers_2D<true>(int, int, 
+template void CpuKernels::cpu_kernel_make_eulers_2D<true>(int, int,
 		XFLOAT *, XFLOAT *, unsigned long);
-template void CpuKernels::cpu_kernel_make_eulers_2D<false>(int, int, 
+template void CpuKernels::cpu_kernel_make_eulers_2D<false>(int, int,
 		XFLOAT *, XFLOAT *, unsigned long);
 // ----------------------------------------------------------------------
 

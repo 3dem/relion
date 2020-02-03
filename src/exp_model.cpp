@@ -20,49 +20,23 @@
 #include "src/exp_model.h"
 #include <sys/statvfs.h>
 
-void ExpOriginalParticle::addParticle(long int _particle_id, int _random_subset, int _order)
-{
-	// Keep random_subsets equal in each original particle
-	if (random_subset != _random_subset)
-	{
-		std::cerr << " random_subset= " << random_subset << " _random_subset= " << _random_subset << std::endl;
-		std::cerr << " particles_id.size()= " << particles_id.size() << " name= "<<name << std::endl;
-		REPORT_ERROR("ExpOriginalParticle:addParticle: incompatible random subsets between particle and its original particle.");
-	}
-	particles_id.push_back(_particle_id);
-	particles_order.push_back(_order);
-}
-
 long int Experiment::numberOfParticles(int random_subset)
 {
 	if (random_subset == 0)
 		return particles.size();
-	else
-	{
-		long int result = 0;
-		for (long int i = 0; i < ori_particles.size(); i++)
-		{
-			if (ori_particles[i].random_subset == random_subset)
-			{
-				result += ori_particles[i].particles_id.size();
-			}
-		}
-		return result;
-	}
-}
-
-long int Experiment::numberOfOriginalParticles(int random_subset)
-{
-	if (random_subset == 0)
-		return ori_particles.size();
 	else if (random_subset == 1)
-		return nr_ori_particles_subset1;
+		return nr_particles_subset1;
 	else if (random_subset == 2)
-		return nr_ori_particles_subset2;
+		return nr_particles_subset2;
 	else
-		REPORT_ERROR("ERROR: Experiment::numberOfOriginalParticles invalid random_subset: " + integerToString(random_subset));
+		REPORT_ERROR("ERROR: Experiment::numberOfParticles invalid random_subset: " + integerToString(random_subset));
 }
 
+// Get the total number of images in a given particle
+long int Experiment::numberOfImagesInParticle(long int part_id)
+{
+	return particles[part_id].images.size();
+}
 
 long int Experiment::numberOfMicrographs()
 {
@@ -74,28 +48,42 @@ long int Experiment::numberOfGroups()
 	return groups.size();
 }
 
-long int Experiment::getMicrographId(long int part_id)
+int Experiment::numberOfOpticsGroups()
 {
-#ifdef DEBUG_CHECKSIZES
-	if (part_id >= particles.size())
-	{
-		std::cerr<< "part_id= "<<part_id<<" particles.size()= "<< particles.size() <<std::endl;
-		REPORT_ERROR("part_id >= particles.size()");
-	}
-#endif
-	return (particles[part_id]).micrograph_id;
+	return obsModel.numberOfOpticsGroups();
 }
 
-long int Experiment::getGroupId(long int part_id)
+bool Experiment::hasCtfPremultiplied()
 {
-#ifdef DEBUG_CHECKSIZES
-	if (part_id >= particles.size())
-	{
-		std::cerr<< "part_id= "<<part_id<<" particles.size()= "<< particles.size() <<std::endl;
-		REPORT_ERROR("part_id >= particles.size()");
-	}
-#endif
-	return (particles[part_id]).group_id;
+	for (int og = 0; og < numberOfOpticsGroups(); og++)
+		if (obsModel.getCtfPremultiplied(og)) return true;
+
+	return false;
+}
+
+RFLOAT Experiment::getOpticsPixelSize(int optics_group)
+{
+	return obsModel.getPixelSize(optics_group);
+}
+
+int Experiment::getOpticsImageSize(int optics_group)
+{
+	return obsModel.getBoxSize(optics_group);
+}
+
+long int Experiment::getMicrographId(long int part_id, int img_id)
+{
+	return (particles[part_id].images[img_id]).micrograph_id;
+}
+
+long int Experiment::getGroupId(long int part_id, int img_id)
+{
+	return (particles[part_id].images[img_id]).group_id;
+}
+
+int Experiment::getOpticsGroup(long part_id, int img_id)
+{
+	return particles[part_id].images[img_id].optics_group;
 }
 
 int Experiment::getRandomSubset(long int part_id)
@@ -103,56 +91,76 @@ int Experiment::getRandomSubset(long int part_id)
 	return particles[part_id].random_subset;
 }
 
-MetaDataTable Experiment::getMetaDataImage(long int part_id)
+int Experiment::getOriginalImageId(long part_id, int img_id)
+{
+	return particles[part_id].images[img_id].id;
+}
+RFLOAT Experiment::getImagePixelSize(long int part_id, int img_id)
+{
+	int optics_group = particles[part_id].images[img_id].optics_group;
+	return obsModel.getPixelSize(optics_group);
+}
+
+MetaDataTable Experiment::getMetaDataImage(long int part_id, int img_id)
 {
 	MetaDataTable result;
-	result.addObject(MDimg.getObject(part_id));
+	result.addObject(MDimg.getObject(getOriginalImageId(part_id, img_id)));
 	return result;
 }
 
-long int Experiment::addParticle(long int group_id,
-		long int micrograph_id, int random_subset)
+long int Experiment::addParticle(std::string part_name, int random_subset)
 {
-
-	if (group_id >= groups.size())
-		REPORT_ERROR("Experiment::addImage: group_id out of range");
-
-	if (micrograph_id >= micrographs.size())
-		REPORT_ERROR("Experiment::addImage: micrograph_id out of range");
 
 	ExpParticle particle;
-	particle.id = particles.size();
-	particle.group_id = group_id;
-	particle.micrograph_id = micrograph_id;
+	particle.name = part_name;
 	particle.random_subset = random_subset;
+
 	// Push back this particle in the particles vector
 	particles.push_back(particle);
-	(micrographs[micrograph_id].particle_ids).push_back(particle.id);
 
-	// Return the id in the particles vector
-	return particle.id;
-
+	// Return the current part_id in the particles vector
+	return particles.size() - 1;
 }
 
-long int Experiment::addOriginalParticle(std::string part_name, int _random_subset)
+int Experiment::addImageToParticle(long int part_id, std::string img_name, long int ori_img_id, long int group_id, long int micrograph_id,
+                                   int optics_group, bool unique)
 {
+	if (group_id >= groups.size())
+		REPORT_ERROR("Experiment::addImageToParticle: group_id out of range");
 
-	ExpOriginalParticle ori_particle;
-	ori_particle.random_subset = _random_subset;
-	ori_particle.name = part_name;
-	long int id = ori_particles.size();
-	ori_particles.push_back(ori_particle);
+	if (micrograph_id >= micrographs.size())
+		REPORT_ERROR("Experiment::addImageToParticle: micrograph_id out of range");
 
-	// Return the id in the ori_particles vector
-	return id;
+	if (optics_group >= obsModel.numberOfOpticsGroups())
+		REPORT_ERROR("Experiment::addImageToParticle: optics_group out of range");
 
+	ExpImage img;
+	img.name = img_name;
+	img.id = ori_img_id;
+	img.particle_id = part_id;
+	img.group_id = group_id;
+	img.micrograph_id = micrograph_id;
+	img.optics_group = optics_group;
+	if (unique)
+		nr_images_per_optics_group[optics_group]++;
+	img.optics_group_id = nr_images_per_optics_group[optics_group] - 1;
+
+	if (img.optics_group_id < 0)
+		REPORT_ERROR("Logic error in Experiment::addImageToParticle.");
+
+	// Push back this particle in the particles vector
+	particles[part_id].images.push_back(img);
+	(micrographs[micrograph_id].image_ids).push_back(img.id);
+
+	return particles[part_id].images.size() - 1;
 }
 
-long int Experiment::addGroup(std::string group_name)
+long int Experiment::addGroup(std::string group_name, int _optics_group)
 {
 	// Add new group to this Experiment
 	ExpGroup group;
 	group.id = groups.size(); // start counting groups at 0!
+	group.optics_group = _optics_group;
 	group.name = group_name;
 
 	// Push back this micrograph
@@ -160,7 +168,6 @@ long int Experiment::addGroup(std::string group_name)
 
 	// Return the id in the micrographs vector
 	return group.id;
-
 }
 
 long int Experiment::addMicrograph(std::string mic_name)
@@ -175,28 +182,26 @@ long int Experiment::addMicrograph(std::string mic_name)
 
 	// Return the id in the micrographs vector
 	return micrograph.id;
-
 }
 
-void Experiment::divideOriginalParticlesInRandomHalves(int seed, bool do_helical_refine)
+void Experiment::divideParticlesInRandomHalves(int seed, bool do_helical_refine)
 {
-
 	// Only do this if the random_subset of all original_particles is zero
 	bool all_are_zero = true;
 	bool some_are_zero = false;
-	nr_ori_particles_subset1 = 0;
-	nr_ori_particles_subset2 = 0;
-	for (long int i = 0; i < ori_particles.size(); i++)
+	nr_particles_subset1 = 0;
+	nr_particles_subset2 = 0;
+	for (long int i = 0; i < particles.size(); i++)
 	{
-		int random_subset = ori_particles[i].random_subset;
+		int random_subset = particles[i].random_subset;
 		if (random_subset != 0)
 		{
 			all_are_zero = false;
 			// Keep track of how many particles there are in each subset
 			if (random_subset == 1)
-				nr_ori_particles_subset1++;
+				nr_particles_subset1++;
 			else if (random_subset == 2)
-				nr_ori_particles_subset2++;
+				nr_particles_subset2++;
 			else
 				REPORT_ERROR("ERROR Experiment::divideParticlesInRandomHalves: invalid number for random subset (i.e. not 1 or 2): " + integerToString(random_subset));
 		}
@@ -215,38 +220,25 @@ void Experiment::divideOriginalParticlesInRandomHalves(int seed, bool do_helical
 		{
 			std::string mic_name, img_name;
 			int nr_swaps, nr_segments_subset1, nr_segments_subset2, helical_tube_id;
-			bool divide_according_to_helical_tube_id;
 			std::map<std::string, int> map_mics;
 			std::map<std::string, int>::const_iterator ii_map;
 			std::vector<std::pair<std::string, int> > vec_mics;
 
-			for (long int i = 0; i < ori_particles.size(); i++)
-			{
-				if ( ((ori_particles[i]).particles_id.size() != 1) || ((ori_particles[i]).particles_order.size() != 1) )
-					REPORT_ERROR("ERROR Experiment::divideParticlesInRandomHalves: cannot divide helical segments into random halves with tilt series or movie frames!");
-			}
-
-			if ( (!MDimg.containsLabel(EMDL_IMAGE_NAME)) || (!MDimg.containsLabel(EMDL_MICROGRAPH_NAME)) )
-				REPORT_ERROR("ERROR Experiment::divideParticlesInRandomHalves: Input MetadataTable should contain rlnImageName and rlnMicrographName!");
-
-			divide_according_to_helical_tube_id = false;
+			bool divide_according_to_helical_tube_id = false;
 			if (MDimg.containsLabel(EMDL_PARTICLE_HELICAL_TUBE_ID))
 				divide_according_to_helical_tube_id = true;
 
 			// Count micrograph names
 			map_mics.clear();
-			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
+			for (long int part_id = 0; part_id < particles.size(); part_id++)
 			{
-				// == OLD ==
-				//MDimg.getValue(EMDL_IMAGE_NAME, img_name);
-				//mic_name = img_name.substr(img_name.find("@") + 1);
-				// == NEW == compatible with 3D subtomograms
-				MDimg.getValue(EMDL_MICROGRAPH_NAME, img_name);
-				mic_name = img_name;
-
+				// Get name of micrograph of the first image in this particle
+				long int mic_id = particles[part_id].images[0].micrograph_id;
+				mic_name = micrographs[mic_id].name;
 				if (divide_according_to_helical_tube_id)
 				{
-					MDimg.getValue(EMDL_PARTICLE_HELICAL_TUBE_ID, helical_tube_id);
+					long int ori_img_id = getOriginalImageId(part_id, 0);
+					MDimg.getValue(EMDL_PARTICLE_HELICAL_TUBE_ID, helical_tube_id, ori_img_id);
 					if (helical_tube_id < 1)
 						REPORT_ERROR("ERROR Experiment::divideParticlesInRandomHalves: Helical tube ID should be positive integer!");
 					mic_name += std::string("_TUBEID_");
@@ -255,30 +247,11 @@ void Experiment::divideOriginalParticlesInRandomHalves(int seed, bool do_helical
 				if ((map_mics.insert(std::make_pair(mic_name, 1))).second == false)
 					map_mics[mic_name]++;
 			}
+
 			vec_mics.clear();
 			for (ii_map = map_mics.begin(); ii_map != map_mics.end(); ii_map++)
 				vec_mics.push_back(*ii_map);
 
-//#define OLD_RANDOMISATION
-#ifdef OLD_RANDOMISATION
-			// Perform swaps (OLD RANDOMISATION - not perfect)
-			nr_swaps = ROUND(rnd_unif(vec_mics.size(), 2. * vec_mics.size()));
-			for (int ii = 0; ii < nr_swaps; ii++)
-			{
-				int ptr_a, ptr_b;
-				std::pair<std::string, int> tmp;
-				ptr_a = ROUND(rnd_unif(0, vec_mics.size()));
-				ptr_b = ROUND(rnd_unif(0, vec_mics.size()));
-				if ( (ptr_a == ptr_b) || (ptr_a < 0) || (ptr_b < 0) || (ptr_a >= vec_mics.size()) || (ptr_b >= vec_mics.size()) )
-					continue;
-				tmp = vec_mics[ptr_a];
-				vec_mics[ptr_a] = vec_mics[ptr_b];
-				vec_mics[ptr_b] = tmp;
-
-				// DEBUG
-				//std::cout << " Swap mic_id= " << ptr_a << " with mic_id= " << ptr_b << "." << std::endl;
-			}
-#else
 			// NEW RANDOMISATION (better than the old one)
 			nr_swaps = 0;
 			for (int ptr_a = 0; ptr_a < (vec_mics.size() - 1); ptr_a++)
@@ -291,16 +264,7 @@ void Experiment::divideOriginalParticlesInRandomHalves(int seed, bool do_helical
 				tmp = vec_mics[ptr_a];
 				vec_mics[ptr_a] = vec_mics[ptr_b];
 				vec_mics[ptr_b] = tmp;
-
-				// DEBUG
-				//std::cout << " Swap mic_id= " << ptr_a << " with mic_id= " << ptr_b << "." << std::endl;
 			}
-#endif
-			// DEBUG
-			//if (divide_according_to_helical_tube_id)
-			//	std::cout << " Helical tubes= " << vec_mics.size() << ", nr_swaps= " << nr_swaps << std::endl;
-			//else
-			//	std::cout << " Micrographs= " << vec_mics.size() << ", nr_swaps= " << nr_swaps << std::endl;
 
 			// Divide micrographs into halves
 			map_mics.clear();
@@ -320,196 +284,121 @@ void Experiment::divideOriginalParticlesInRandomHalves(int seed, bool do_helical
 				map_mics.insert(vec_mics[ii]);
 			}
 
-			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
+			for (long int part_id = 0; part_id < particles.size(); part_id++)
 			{
-				MDimg.getValue(EMDL_MICROGRAPH_NAME, img_name);
-				mic_name = img_name;
-
+				// Get name of micrograph of the first image in this particle
+				long int mic_id = particles[part_id].images[0].micrograph_id;
+				mic_name = micrographs[mic_id].name;
 				if (divide_according_to_helical_tube_id)
 				{
-					MDimg.getValue(EMDL_PARTICLE_HELICAL_TUBE_ID, helical_tube_id);
+					long int ori_img_id = getOriginalImageId(part_id, 0);
+					MDimg.getValue(EMDL_PARTICLE_HELICAL_TUBE_ID, helical_tube_id, ori_img_id);
 					if (helical_tube_id < 1)
 						REPORT_ERROR("ERROR Experiment::divideParticlesInRandomHalves: Helical tube ID should be positive integer!");
 					mic_name += std::string("_TUBEID_");
 					mic_name += std::string(integerToString(helical_tube_id));
 				}
-				MDimg.setValue(EMDL_PARTICLE_RANDOM_SUBSET, map_mics[mic_name]);
-			}
-
-			nr_ori_particles_subset1 = nr_segments_subset1;
-			nr_ori_particles_subset2 = nr_segments_subset2;
-
-			// DEBUG
-			//std::cout << " Helical segments in two half sets = " << nr_ori_particles_subset1 << ", " << nr_ori_particles_subset2 << std::endl;
-
-			// Loop over all particles in each ori_particle and set their random_subset
-			for (long int i = 0; i < ori_particles.size(); i++)
-			{
-				int random_subset;
-				long int part_id = (ori_particles[i]).particles_id[0];
-				MDimg.getValue(EMDL_PARTICLE_RANDOM_SUBSET, random_subset, part_id);
-				ori_particles[i].random_subset = random_subset;
-				particles[part_id].random_subset = random_subset;
+				particles[part_id].random_subset = map_mics[mic_name];
 			}
 		}
 		else
 		{
-			for (long int i = 0; i < ori_particles.size(); i++)
+			for (long int part_id = 0; part_id < particles.size(); part_id++)
 			{
 				int random_subset = rand() % 2 + 1;
-				ori_particles[i].random_subset = random_subset; // randomly 1 or 2
-				if (random_subset == 1)
-					nr_ori_particles_subset1++;
-				else if (random_subset == 2)
-					nr_ori_particles_subset2++;
-				else
-					REPORT_ERROR("ERROR Experiment::divideParticlesInRandomHalves: invalid number for random subset (i.e. not 1 or 2): " + integerToString(random_subset));
+				particles[part_id].random_subset = random_subset; // randomly 1 or 2
+			}
+		}
 
-				// Loop over all particles in each ori_particle and set their random_subset
-				for (long int j = 0; j < ori_particles[i].particles_id.size(); j++)
-				{
-					long int part_id = (ori_particles[i]).particles_id[j];
-					{
-						particles[part_id].random_subset = random_subset;
-						MDimg.setValue(EMDL_PARTICLE_RANDOM_SUBSET, random_subset, part_id);
-					}
-				}
+		// Now that random subsets have been assigned, count the number of particles in each subset and set new labels in entire MDimg
+		for (long int part_id = 0; part_id < particles.size(); part_id++)
+		{
+			int random_subset = getRandomSubset(part_id);
+
+			if (random_subset == 1)
+				nr_particles_subset1++;
+			else if (random_subset == 2)
+				nr_particles_subset2++;
+			else
+				REPORT_ERROR("ERROR Experiment::divideParticlesInRandomHalves: invalid number for random subset (i.e. not 1 or 2): " + integerToString(random_subset));
+
+			for (int img_id = 0; img_id < numberOfImagesInParticle(part_id); img_id++)
+			{
+				long int ori_img_id = getOriginalImageId(part_id, img_id);
+				MDimg.setValue(EMDL_PARTICLE_RANDOM_SUBSET, random_subset, ori_img_id);
 			}
 		}
 	}
 
+	if (nr_particles_subset2 == 0 || nr_particles_subset1 == 0)
+		REPORT_ERROR("ERROR: one of your half sets has no segments. Is rlnRandomSubset set to 1 or 2 in your particles STAR file? Or in case you're doing helical, half-sets are always per-filament, so provide at least 2 filaments.");
 
-	// Now re-order such that half1 is in first half, and half2 is in second half of the particle list (for MPI_parallelisattion)
-
-	std::vector<long int> ori_particle_list1, ori_particle_list2;
-	// Fill the two particle lists
-	for (long int i = 0; i < ori_particles.size(); i++)
-	{
-		int random_subset = ori_particles[i].random_subset;
-		if (random_subset == 1)
-			ori_particle_list1.push_back(i);
-		else if (random_subset == 2)
-			ori_particle_list2.push_back(i);
-		else
-			REPORT_ERROR("ERROR: invalid number for random subset (i.e. not 1 or 2): " + integerToString(random_subset));
-	}
-
-	// Just a silly check for the sizes of the ori_particle_lists (to be sure)
-	if (ori_particle_list1.size() != nr_ori_particles_subset1)
-		REPORT_ERROR("ERROR: invalid ori_particle_list1 size:" + integerToString(ori_particle_list1.size()) + " != " + integerToString(nr_ori_particles_subset1));
-	if (ori_particle_list2.size() != nr_ori_particles_subset2)
-		REPORT_ERROR("ERROR: invalid ori_particle_list2 size:" + integerToString(ori_particle_list2.size()) + " != " + integerToString(nr_ori_particles_subset2));
-
-	// First fill new_ori_particles with the first subset, then with the second
-	std::vector<ExpOriginalParticle> new_ori_particles;
-
-	for (long int i = 0; i < ori_particle_list1.size(); i++)
-		new_ori_particles.push_back(ori_particles[ori_particle_list1[i]]);
-	for (long int i = 0; i < ori_particle_list2.size(); i++)
-		new_ori_particles.push_back(ori_particles[ori_particle_list2[i]]);
-
-	ori_particles=new_ori_particles;
-
-	if (nr_ori_particles_subset2 == 0 || nr_ori_particles_subset1 == 0)
-		REPORT_ERROR("ERROR: one of your half sets has no segments. Helical half-sets are always per-filament. Provide at least 2 filaments.");
-
-
+	std::stable_sort(particles.begin(), particles.end(), compareRandomSubsetParticles);
 }
 
-void Experiment::randomiseOriginalParticlesOrder(int seed, bool do_split_random_halves, bool do_subsets)
+// for sorting particles, based on the optics group of their first image
+bool compareOpticsGroupsParticles(const ExpParticle &a, const ExpParticle &b)
+{
+	return (a.images[0].optics_group < b.images[0].optics_group);
+}
+
+// for sorting particles, based on the random subset
+bool compareRandomSubsetParticles(const ExpParticle &a, const ExpParticle &b)
+{
+	return (a.random_subset < b.random_subset);
+}
+
+void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, bool do_subsets)
 {
 	//This static flag is for only randomize once
 	static bool randomised = false;
 	if (!randomised || do_subsets)
 	{
-
 		srand(seed);
-		std::vector<ExpOriginalParticle> new_ori_particles;
 
 		if (do_split_random_halves)
 		{
-			std::vector<long int> ori_particle_list1, ori_particle_list2;
-			ori_particle_list1.clear();
-			ori_particle_list2.clear();
-			// Fill the two particle lists
-			for (long int i = 0; i < ori_particles.size(); i++)
+			std::stable_sort(particles.begin(), particles.end(), compareRandomSubsetParticles);
+
+			// sanity check
+			long int nr_half1 = 0, nr_half2 = 0;
+			for (long int i = 0; i < particles.size(); i++)
 			{
-				int random_subset = ori_particles[i].random_subset;
+				const int random_subset = particles[i].random_subset;
 				if (random_subset == 1)
-					ori_particle_list1.push_back(i);
+					nr_half1++;
 				else if (random_subset == 2)
-					ori_particle_list2.push_back(i);
+					nr_half2++;
 				else
 					REPORT_ERROR("ERROR Experiment::randomiseParticlesOrder: invalid number for random subset (i.e. not 1 or 2): " + integerToString(random_subset));
 			}
 
-			// Just a silly check for the sizes of the ori_particle_lists (to be sure)
-			if (ori_particle_list1.size() != nr_ori_particles_subset1)
-				REPORT_ERROR("ERROR Experiment::randomiseParticlesOrder: invalid ori_particle_list1 size:" + integerToString(ori_particle_list1.size()) + " != " + integerToString(nr_ori_particles_subset1));
-			if (ori_particle_list2.size() != nr_ori_particles_subset2)
-				REPORT_ERROR("ERROR Experiment::randomiseParticlesOrder: invalid ori_particle_list2 size:" + integerToString(ori_particle_list2.size()) + " != " + integerToString(nr_ori_particles_subset2));
+			if (nr_half1 != nr_particles_subset1)
+				REPORT_ERROR("ERROR Experiment::randomiseParticlesOrder: invalid half1 size:" + integerToString(nr_half1) + " != " + integerToString(nr_particles_subset1));
+			if (nr_half2 != nr_particles_subset2)
+				REPORT_ERROR("ERROR Experiment::randomiseParticlesOrder: invalid half2 size:" + integerToString(nr_half2) + " != " + integerToString(nr_particles_subset2));
 
 			// Randomise the two particle lists
-			std::random_shuffle(ori_particle_list1.begin(), ori_particle_list1.end());
-			std::random_shuffle(ori_particle_list2.begin(), ori_particle_list2.end());
+			std::random_shuffle(particles.begin(), particles.begin() + nr_half1);
+			std::random_shuffle(particles.begin() + nr_half1, particles.end());
 
-			// First fill new_ori_particles with the first subset, then with the second
-			for (long int i = 0; i < ori_particle_list1.size(); i++)
-				new_ori_particles.push_back(ori_particles[ori_particle_list1[i]]);
-			for (long int i = 0; i < ori_particle_list2.size(); i++)
-				new_ori_particles.push_back(ori_particles[ori_particle_list2[i]]);
-
+			// Make sure the particles are sorted on their optics_group.
+			// Otherwise CudaFFT re-calculation of plans every time image size changes slows down things a lot!
+			std::stable_sort(particles.begin(), particles.begin() + nr_half1, compareOpticsGroupsParticles);
+			std::stable_sort(particles.begin() + nr_half1, particles.end(), compareOpticsGroupsParticles);
 		}
 		else
 		{
+			// Just randomise the entire vector
+			std::random_shuffle(particles.begin(), particles.end());
 
-			// First fill in order
-			std::vector<long int> ori_particle_list;
-			ori_particle_list.resize(ori_particles.size());
-			for (long int i = 0; i < ori_particle_list.size(); i++)
-				ori_particle_list[i] = i;
-
-			// Randomise
-			std::random_shuffle(ori_particle_list.begin(), ori_particle_list.end());
-
-			// Refill new_ori_particles
-			for (long int i = 0; i < ori_particle_list.size(); i++)
-				new_ori_particles.push_back(ori_particles[ori_particle_list[i]]);
+			// Make sure the particles are sorted on their optics_group.
+			// Otherwise CudaFFT re-calculation of plans every time image size changes slows down things a lot!
+ 			std::stable_sort(particles.begin(), particles.end(), compareOpticsGroupsParticles);
 		}
 
-		ori_particles=new_ori_particles;
 		randomised = true;
-
 	}
-}
-
-
-void Experiment::orderParticlesInOriginalParticles()
-{
-	// If the orders are negative (-1) then dont sort anything
-	if (ori_particles[0].particles_order[0] < 0)
-		return;
-
-	for (long int i = 0; i < ori_particles.size(); i++)
-	{
-		int nframe = ori_particles[i].particles_order.size();
-
-		std::vector<std::pair<long int, long int> > vp;
-        vp.reserve(nframe);
-        for (long int j = 0; j < nframe; j++)
-        	vp.push_back(std::make_pair(ori_particles[i].particles_order[j], j));
-        // Sort on the first elements of the pairs
-        std::sort(vp.begin(), vp.end());
-
-        // tmp copy of particles_id
-        std::vector<long int> _particles_id = ori_particles[i].particles_id;
-        for (int j = 0; j < nframe; j++)
-			ori_particles[i].particles_id[j] = _particles_id[vp[j].second];
-
-		// We now no longer need the particles_order vector, clear it to save memory
-		ori_particles[i].particles_order.clear();
-	}
-
 }
 
 void Experiment::initialiseBodies(int _nr_bodies)
@@ -529,15 +418,15 @@ void Experiment::initialiseBodies(int _nr_bodies)
 			MDbody.addObject();
 			RFLOAT norm, zero=0., ninety=90.;
 			MDimg.getValue(EMDL_IMAGE_NORM_CORRECTION, norm);
-			MDbody.setValue(EMDL_ORIENT_ORIGIN_X, zero);
-			MDbody.setValue(EMDL_ORIENT_ORIGIN_Y, zero);
+			MDbody.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, zero);
+			MDbody.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, zero);
 			MDbody.setValue(EMDL_ORIENT_ROT, zero);
 			MDbody.setValue(EMDL_ORIENT_TILT, ninety);
 			MDbody.setValue(EMDL_ORIENT_PSI, zero);
 			MDbody.setValue(EMDL_IMAGE_NORM_CORRECTION, norm);
 			if (is_3d)
 			{
-				MDbody.setValue(EMDL_ORIENT_ORIGIN_Z, zero);
+				MDbody.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, zero);
 			}
 		}
 		// Now just fill all bodies with that MDbody
@@ -548,49 +437,80 @@ void Experiment::initialiseBodies(int _nr_bodies)
 			MDbodies[ibody].setName(tablename);
 		}
 	}
-
 }
 
-bool Experiment::getImageNameOnScratch(long int part_id, FileName &fn_img, bool is_ctf_image)
+bool Experiment::getImageNameOnScratch(long int part_id, int img_id, FileName &fn_img, bool is_ctf_image)
 {
-	if (fn_scratch != "" && part_id < nr_parts_on_scratch)
+	int optics_group = getOpticsGroup(part_id, img_id);
+	long int my_id = particles[part_id].images[img_id].optics_group_id;
+
+#ifdef DEBUG_SCRATCH
+	std::cerr << "part_id = " << part_id << " img_id = " << img_id << " my_id = " << my_id << " nr_parts_on_scratch[" << optics_group << "] = " << nr_parts_on_scratch[optics_group] << std::endl;
+#endif
+
+	if (fn_scratch != "" && my_id < nr_parts_on_scratch[optics_group])
 	{
 		if (is_3D)
 		{
 			if (is_ctf_image)
-				fn_img = fn_scratch + "particle_ctf" + integerToString(part_id+1, 5)+".mrc";
+				fn_img = fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particle_ctf" + integerToString(my_id+1)+".mrc";
 			else
-				fn_img = fn_scratch + "particle" + integerToString(part_id+1, 5)+".mrc";
+				fn_img = fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particle" + integerToString(my_id+1)+".mrc";
 		}
 		else
 		{
-
-			if (ori_particles[part_id].particles_id.size() > 1)
-			{
-				std::cerr << " part_id= " << part_id << " ori_particles[part_id].particles_id.size()= " << ori_particles[part_id].particles_id.size() << " ori_particles[part_id].name= " << ori_particles[part_id].name << std::endl;
-				REPORT_ERROR("BUG: getImageNameOnScratch cannot work with movies!");
-			}
-			fn_img.compose(part_id+1, fn_scratch + "particles.mrcs");
+			// Write different optics groups into different stacks, as sizes might be different
+			FileName fn_tmp = fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particles.mrcs";
+			fn_img.compose(my_id+1, fn_tmp);
 		}
+
+#ifdef DEBUG_SCRATCH
+		std::cerr << "getImageNameOnScratch: " << particles[part_id].name << " is cached at " << fn_img << std::endl;
+#endif
 		return true;
 	}
 	else
 	{
 		return false;
 	}
-
 }
 
-void Experiment::setScratchDirectory(FileName _fn_scratch)
+void Experiment::setScratchDirectory(FileName _fn_scratch, bool do_reuse_scratch, int verb)
 {
 	// Make sure fn_scratch ends with a slash
 	if (_fn_scratch[_fn_scratch.length()-1] != '/')
 		_fn_scratch += '/';
 	fn_scratch = _fn_scratch + "relion_volatile/";
 
-	// This is updated in copyParticlesToScratch()
-	// FIXME: --reuse_scratch will not work with --keep_free_scratch_Gb
-	nr_parts_on_scratch = MDimg.numberOfObjects();
+	if (do_reuse_scratch)
+	{
+		nr_parts_on_scratch.resize(numberOfOpticsGroups(), 0);
+		for (int optics_group = 0; optics_group < numberOfOpticsGroups(); optics_group++)
+		{
+			if (is_3D)
+			{
+				FileName fn_tmp = fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particle*.mrc";
+				std::vector<FileName> fn_all;
+				fn_tmp.globFiles(fn_all, true);
+				nr_parts_on_scratch[optics_group] = fn_all.size();
+
+			}
+			else
+			{
+				FileName fn_tmp = fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particles.mrcs";
+				if (exists(fn_tmp))
+				{
+					Image<RFLOAT> Itmp;
+					Itmp.read(fn_tmp, false);
+					nr_parts_on_scratch[optics_group] = NSIZE(Itmp());
+				}
+#ifdef DEBUG_SCRATCH
+				if (verb > 0)
+					std::cerr << " optics_group= " << (optics_group + 1) << " nr_parts_on_scratch[optics_group]= " << nr_parts_on_scratch[optics_group] << std::endl;
+#endif
+			}
+		}
+	}
 }
 
 FileName Experiment::initialiseScratchLock(FileName _fn_scratch, FileName _fn_out)
@@ -615,11 +535,10 @@ bool Experiment::prepareScratchDirectory(FileName _fn_scratch, FileName fn_lock)
 		// Still measure how much free space there is
 		struct statvfs vfs;
 		statvfs(_fn_scratch.c_str(), &vfs);
-		long int free_Gb = vfs.f_bsize*vfs.f_bfree/(1024*1024*1024);
 		char nodename[64] = "undefined";
 		gethostname(nodename,sizeof(nodename));
 		std::string myhost(nodename);
-		free_space_Gb = vfs.f_bsize*vfs.f_bfree/(1024*1024*1024);
+		free_space_Gb = (RFLOAT)vfs.f_bsize * vfs.f_bfree / (1024 * 1024 * 1024);
 
 		return false;
 	}
@@ -646,18 +565,16 @@ bool Experiment::prepareScratchDirectory(FileName _fn_scratch, FileName fn_lock)
 		// Measure how much free space there is
 		struct statvfs vfs;
 		statvfs(_fn_scratch.c_str(), &vfs);
-		long int free_Gb = vfs.f_bsize*vfs.f_bfree/(1024*1024*1024);
 		char nodename[64] = "undefined";
 		gethostname(nodename,sizeof(nodename));
 		std::string myhost(nodename);
-		free_space_Gb = vfs.f_bsize*vfs.f_bfree/(1024*1024*1024);
+		free_space_Gb = (RFLOAT)vfs.f_bsize * vfs.f_bfree / (1024 * 1024 * 1024);
 		std::cout << " + On host " << myhost << ": free scratch space = " << free_space_Gb << " Gb." << std::endl;
 
 		return true;
 	}
-
-
 }
+
 void Experiment::deleteDataOnScratch()
 {
 	// Wipe the scratch directory
@@ -667,16 +584,15 @@ void Experiment::deleteDataOnScratch()
 		if (system(command.c_str()))
 			REPORT_ERROR("ERROR: cannot execute: " + command);
 	}
-
 }
 
-void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf_image, long int keep_free_scratch_Gb)
+void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf_image, RFLOAT keep_free_scratch_Gb)
 {
 	// This function relies on prepareScratchDirectory() being called before!
 
 	long int nr_part = MDimg.numberOfObjects();
 	int barstep;
-	if (verb > 0)
+	if (verb > 0 && do_copy)
 	{
 		std::cout << " Copying particles to scratch directory: " << fn_scratch << std::endl;
 		init_progress_bar(nr_part);
@@ -684,21 +600,40 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 	}
 
 	long int one_part_space, used_space = 0.;
-	long int max_space = (free_space_Gb - keep_free_scratch_Gb)*1024*1024*1024; // in bytes
-
+	long int max_space = (free_space_Gb - keep_free_scratch_Gb) * 1024 * 1024 * 1024; // in bytes
+#ifdef DEBUG_SCRATCH
+	std::cerr << " free_space_Gb = " << free_space_Gb << " GB, keep_free_scratch_Gb = " << keep_free_scratch_Gb << " GB.\n";
+	std::cerr << " Max space RELION can use = " << max_space << " bytes" << std::endl;
+#endif
 	// Loop over all particles and copy them one-by-one
 	FileName fn_open_stack = "";
 	fImageHandler hFile;
-	nr_parts_on_scratch = 0;
+	long int total_nr_parts_on_scratch = 0;
+	nr_parts_on_scratch.resize(numberOfOpticsGroups(), 0);
+
+	const int check_abort_frequency=100;
+
+	FileName prev_img_name = "/Unlikely$filename$?*!";
+	int prev_optics_group = -999;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
 	{
+		// TODO: think about MPI_Abort here....
+		if (current_object % check_abort_frequency == 0 && pipeline_control_check_abort_job())
+			exit(RELION_EXIT_ABORTED);
+
 		long int imgno;
 		FileName fn_img, fn_ctf, fn_stack, fn_new;
 		Image<RFLOAT> img;
 		MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
 
+		int optics_group = 0;
+		if (MDimg.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group))
+		{
+			optics_group--;
+		}
+
 		// Get the size of the first particle
-		if (nr_parts_on_scratch == 0)
+		if (nr_parts_on_scratch[optics_group] == 0)
 		{
 			Image<RFLOAT> tmp;
 			tmp.read(fn_img, false); // false means: only read the header!
@@ -714,36 +649,43 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 				if (also_do_ctf_image)
 					one_part_space *= 2;
 			}
+#ifdef DEBUG_SCRATCH
+			std::cerr << "one_part_space[" << optics_group << "] = " << one_part_space << std::endl;
+#endif
 		}
 
-		// Now we have the particle in memory
-		// See how much space it occupies
-		used_space += one_part_space;
-		// If there is no more space, exit the loop over all objects to stop copying files and change filenames in MDimg
-		if (used_space > max_space)
-		{
-			char nodename[64] = "undefined";
-			gethostname(nodename,sizeof(nodename));
-			std::string myhost(nodename);
-			std::cerr << " Warning: scratch space full on " << myhost << ". Remaining " << nr_part - nr_parts_on_scratch << " particles will be read from where they were."<< std::endl;
-			break;
-		}
-
+		bool is_duplicate = (prev_img_name == fn_img && prev_optics_group == optics_group);
 		// Read in the particle image, and write out on scratch
-		if (do_copy)
+		if (do_copy && !is_duplicate)
 		{
+#ifdef DEBUG_SCRATCH
+			std::cerr << "used_space = " << used_space << std::endl;
+#endif
+			// Now we have the particle in memory
+			// See how much space it occupies
+			used_space += one_part_space;
+			// If there is no more space, exit the loop over all objects to stop copying files and change filenames in MDimg
+			if (used_space > max_space)
+			{
+				char nodename[64] = "undefined";
+				gethostname(nodename,sizeof(nodename));
+				std::string myhost(nodename);
+				std::cerr << " Warning: scratch space full on " << myhost << ". Remaining " << nr_part - total_nr_parts_on_scratch << " particles will be read from where they were."<< std::endl;
+				break;
+			}
+
 			if (is_3D)
 			{
 				// For subtomograms, write individual .mrc files,possibly also CTF images
 				img.read(fn_img);
-				fn_new = fn_scratch + "particle" + integerToString(nr_parts_on_scratch+1, 5)+".mrc";
+				fn_new = fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particle" + integerToString(nr_parts_on_scratch[optics_group]+1)+".mrc";
 				img.write(fn_new);
 				if (also_do_ctf_image)
 				{
 					FileName fn_ctf;
 					MDimg.getValue(EMDL_CTF_IMAGE, fn_ctf);
 					img.read(fn_ctf);
-					fn_new = fn_scratch + "particle_ctf" + integerToString(nr_parts_on_scratch+1, 5)+".mrc";
+					fn_new = fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particle_ctf" + integerToString(nr_parts_on_scratch[optics_group]+1)+".mrc";
 					img.write(fn_new);
 				}
 			}
@@ -762,45 +704,50 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 				}
 				img.readFromOpenFile(fn_img, hFile, -1, false);
 
-				fn_new.compose(nr_parts_on_scratch+1, fn_scratch + "particles.mrcs");
-				if (nr_parts_on_scratch == 0)
+				fn_new.compose(nr_parts_on_scratch[optics_group]+1, fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particles.mrcs");
+				if (nr_parts_on_scratch[optics_group] == 0)
 					img.write(fn_new, -1, false, WRITE_OVERWRITE);
 				else
 					img.write(fn_new, -1, true, WRITE_APPEND);
+
+#ifdef DEBUG_SCRATCH
+				std::cerr << "Cached " << fn_img << " to " << fn_new << std::endl;
+#endif
 			}
 		}
 
 		// Update the counter and progress bar
-		nr_parts_on_scratch++;
+		if (!is_duplicate)
+			nr_parts_on_scratch[optics_group]++;
+		total_nr_parts_on_scratch++;
 
-		if (verb > 0 && nr_parts_on_scratch % barstep == 0)
-			progress_bar(nr_parts_on_scratch);
+		prev_img_name = fn_img;
+		prev_optics_group = optics_group;
 
+		if (verb > 0 && total_nr_parts_on_scratch % barstep == 0)
+			progress_bar(total_nr_parts_on_scratch);
 	}
 
-	if (verb > 0)
+	if (verb)
+	{
 		progress_bar(nr_part);
+		for (int i = 0; i < nr_parts_on_scratch.size(); i++)
+		{
+			std::cout << " For optics_group " << (i + 1) << ", there are " << nr_parts_on_scratch[i] << " particles on the scratch disk." << std::endl;
+		}
+	}
 
-	if (do_copy && nr_parts_on_scratch>1)
+	if (do_copy && total_nr_parts_on_scratch>1)
 	{
 		std::string command = " chmod -R 777 " + fn_scratch + "/";
 		if (system(command.c_str()))
 			REPORT_ERROR("ERROR in executing: " + command);
 	}
-
-}
-
-void Experiment::usage()
-{
-	std::cout
-	<< "  -i                     : Starfile with input images\n"
-	;
 }
 
 // Read from file
-void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
-		bool do_ignore_group_name, bool do_preread_images,
-		bool need_tiltpsipriors_for_helical_refine)
+void Experiment::read(FileName fn_exp, bool do_ignore_particle_name, bool do_ignore_group_name, bool do_preread_images,
+                      bool need_tiltpsipriors_for_helical_refine, int verb)
 {
 
 //#define DEBUG_READ
@@ -812,7 +759,6 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 	int tsort = timer.setNew("sort");
 	int tfill = timer.setNew("fill");
 	int tgroup = timer.setNew("find group");
-	int tori = timer.setNew("find ori_particle");
 	int tdef = timer.setNew("set defaults");
 	int tend = timer.setNew("ending");
 	char c;
@@ -827,13 +773,14 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 
 	// Initialize by emptying everything
 	clear();
-	long int group_id, mic_id, part_id;
+	long int group_id = 0, mic_id = 0, part_id = 0;
 
 	if (!fn_exp.isStarFile())
 	{
 		// Read images from stack. Ignore all metadata, just use filenames
+
 		// Add a single Micrograph
-		group_id = addGroup("group");
+		group_id = addGroup("group", 0);
 		mic_id = addMicrograph("micrograph");
 
 		// Check that a MRC stack ends in .mrcs, not .mrc (which will be read as a MRC 3D map!)
@@ -846,14 +793,19 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 
 		// allocate 1 block of memory
 		particles.reserve(NSIZE(img()));
-		ori_particles.reserve(NSIZE(img()));
+		nr_images_per_optics_group.resize(1, 0);
+
 		for (long int n = 0; n <  NSIZE(img()); n++)
 		{
 			FileName fn_img;
 			fn_img.compose(n+1, fn_exp); // fn_img = integerToString(n) + "@" + fn_exp;
 			// Add the particle to my_area = 0
-			part_id = addParticle(group_id, mic_id);
+			part_id = addParticle(fn_img, 0);
+			// Just add a single image per particle
+			addImageToParticle(part_id, fn_img, n, 0, 0, 0, true);
+
 			MDimg.addObject();
+
 			if (do_preread_images)
 			{
 				Image<float> img;
@@ -865,34 +817,20 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 				}
 				img.readFromOpenFile(fn_img, hFile, -1, false);
 				img().setXmippOrigin();
-				particles[part_id].img = img();
+				particles[part_id].images[0].img = img();
 			}
-			// Also add OriginalParticle
-			(ori_particles[addOriginalParticle("particle")]).addParticle(part_id, 0, -1);
+
 			// Set the filename and other metadata parameters
 			MDimg.setValue(EMDL_IMAGE_NAME, fn_img, part_id);
+			MDimg.setValue(EMDL_IMAGE_OPTICS_GROUP, 1, part_id);
 		}
-
 	}
 	else
 	{
-		// Just read first data block
-		MDimg.read(fn_exp);
-
-		// If this for movie-processing, then the STAR file might be a list of STAR files with original movie particles.
-		// If that is the case: then just append all into a new MDimg.
-		if (MDimg.containsLabel(EMDL_STARFILE_MOVIE_PARTICLES))
-		{
-			MetaDataTable MDjoined, MDone;
-			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
-			{
-				FileName fn_star;
-				MDimg.getValue(EMDL_STARFILE_MOVIE_PARTICLES, fn_star);
-				MDone.read(fn_star);
-				MDjoined.append(MDone);
-			}
-			MDimg = MDjoined;
-		}
+		// MDimg and MDopt have to be read at the same time, so that the optics groups can be
+		// renamed in case they are non-contiguous or not sorted
+		ObservationModel::loadSafely(fn_exp, obsModel, MDimg, "particles", verb);
+		nr_images_per_optics_group.resize(obsModel.numberOfOpticsGroups(), 0);
 
 #ifdef DEBUG_READ
 		std::cerr << "Done reading MDimg" << std::endl;
@@ -922,28 +860,35 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 			}
 
 			if (do_ignore_group_name)
-				group_id = addGroup("group");
+				group_id = addGroup("group", 0);
 		}
 		else
 		{
 			// If there is no EMDL_MICROGRAPH_NAME, then just use a single group and micrograph
-			group_id = addGroup("group");
+			group_id = addGroup("group", 0);
 			mic_id = addMicrograph("micrograph");
 		}
 #ifdef DEBUG_READ
-	std::cerr << "Done sorting MDimg" << std::endl;
-	std::cerr << " MDimg.numberOfObjects()= " << MDimg.numberOfObjects() << std::endl;
-	timer.toc(tsort);
-	timer.tic(tfill);
-	long nr_read = 0;
+		std::cerr << "Done sorting MDimg" << std::endl;
+		std::cerr << " MDimg.numberOfObjects()= " << MDimg.numberOfObjects() << std::endl;
+		timer.toc(tsort);
+		timer.tic(tfill);
+		long nr_read = 0;
 #endif
 		// allocate 1 block of memory
 		particles.reserve(MDimg.numberOfObjects());
 
 		// Now Loop over all objects in the metadata file and fill the logical tree of the experiment
-		long int last_oripart_idx = -1;
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
+		long int last_part_id = -1;
+
+		FileName prev_img_name = "/Unlikely$filename$?*!";
+		int prev_optics_group = -999;
+		//FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
+		for (long int ori_img_id = 0; ori_img_id < MDimg.numberOfObjects(); ori_img_id++)
 		{
+			// Get the optics group of this particle
+			int optics_group = obsModel.getOpticsGroup(MDimg, ori_img_id);
+
 			// Add new micrographs or get mic_id for existing micrograph
 			FileName mic_name=""; // Filename instead of string because will decompose below
 			if (star_contains_micname)
@@ -951,7 +896,7 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 				long int idx = micrographs.size();
 				std::string last_mic_name = (idx > 0) ? micrographs[idx-1].name : "";
 
-				MDimg.getValue(EMDL_MICROGRAPH_NAME, mic_name);
+				MDimg.getValue(EMDL_MICROGRAPH_NAME, mic_name, ori_img_id);
 
 				// All frames of a movie belong to the same micrograph
 				if (is_mic_a_movie)
@@ -966,7 +911,7 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 				else
 				{
 					// A new micrograph
-					last_oripart_idx = ori_particles.size();
+					last_part_id = particles.size();
 				}
 
 				// Make a new micrograph
@@ -984,7 +929,7 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 					// Check whether there is a group label, if not use a group for each micrograph
 					if (MDimg.containsLabel(EMDL_MLMODEL_GROUP_NAME))
 					{
-						MDimg.getValue(EMDL_MLMODEL_GROUP_NAME, group_name);
+						MDimg.getValue(EMDL_MLMODEL_GROUP_NAME, group_name, ori_img_id);
 					}
 					else
 					{
@@ -1004,7 +949,9 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 						}
 					}
 					if (group_id < 0)
-						group_id = addGroup(group_name);
+					{
+						group_id = addGroup(group_name, optics_group);
+					}
 				}
 
 #ifdef DEBUG_READ
@@ -1014,18 +961,65 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 			}
 			else
 			{
-				// All images belong to the same micrograph
+				// All images belong to the same micrograph and group
 				mic_id = 0;
 				group_id = 0;
 			}
 
 			// If there is an EMDL_PARTICLE_RANDOM_SUBSET entry in the input STAR-file, then set the random_subset, otherwise use default (0)
 			int my_random_subset;
-			if (!MDimg.getValue(EMDL_PARTICLE_RANDOM_SUBSET, my_random_subset))
+			if (!MDimg.getValue(EMDL_PARTICLE_RANDOM_SUBSET, my_random_subset, ori_img_id))
+			{
 				my_random_subset = 0;
+			}
 
-			// Create a new particle
-			part_id = addParticle(group_id, mic_id, my_random_subset);
+			// Add this image to an existing particle, or create a new particle
+			std::string part_name;
+			long int part_id = -1;
+
+			if (MDimg.containsLabel(EMDL_PARTICLE_NAME))
+				MDimg.getValue(EMDL_PARTICLE_NAME, part_name, ori_img_id);
+			else
+				MDimg.getValue(EMDL_IMAGE_NAME, part_name, ori_img_id);
+
+			if (MDimg.containsLabel(EMDL_PARTICLE_NAME) && !do_ignore_particle_name)
+			{
+				// Only search ori_particles for the last (original) micrograph
+				for (long int i = last_part_id; i < particles.size(); i++)
+				{
+					if (particles[i].name == part_name)
+					{
+						part_id = i;
+						break;
+					}
+				}
+			}
+
+			// If no particles with this name was found,
+			// or if no EMDL_PARTICLE_NAME in the input file, or if do_ignore_original_particle_name
+			// then add a new particle
+			if (part_id < 0)
+			{
+				part_id = addParticle(part_name, my_random_subset);
+			}
+
+			// Create a new image in this particle
+			FileName img_name;
+			MDimg.getValue(EMDL_IMAGE_NAME, img_name, ori_img_id);
+
+			bool do_cache = (prev_img_name != img_name || prev_optics_group != optics_group);
+#ifdef DEBUG_SCRATCH
+			std::cerr << "prev_img_name = " << prev_img_name << " img_name = " << img_name << " prev_optics_group = " << prev_optics_group << " optics_group = " << optics_group << " do_cache = " << do_cache << std::endl;
+#endif
+			prev_img_name = img_name;
+			prev_optics_group = optics_group;
+
+			int img_id = addImageToParticle(part_id, img_name, ori_img_id, group_id, mic_id, optics_group, do_cache);
+
+			// The group number is only set upon reading: it is not read from the STAR file itself,
+			// there the only thing that matters is the order of the micrograph_names
+			// Write igroup+1, to start numbering at one instead of at zero
+			MDimg.setValue(EMDL_MLMODEL_GROUP_NO, group_id + 1, ori_img_id);
 
 #ifdef DEBUG_READ
 			timer.tic(tori);
@@ -1033,79 +1027,31 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 
 			if (do_preread_images)
 			{
-				FileName fn_img;
-				MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
 				Image<float> img;
-				fn_img.decompose(dump, fn_stack);
+				img_name.decompose(dump, fn_stack);
 				if (fn_stack != fn_open_stack)
 				{
 					hFile.openFile(fn_stack, WRITE_READONLY);
 					fn_open_stack = fn_stack;
 				}
-				img.readFromOpenFile(fn_img, hFile, -1, false);
+				img.readFromOpenFile(img_name, hFile, -1, false);
 				img().setXmippOrigin();
-				particles[part_id].img = img();
+				particles[part_id].images[img_id].img = img();
 			}
 
-			// Add this particle to an existing OriginalParticle, or create a new OriginalParticle
-			std::string ori_part_name;
-			long int ori_part_id = -1;
-
-			if (MDimg.containsLabel(EMDL_PARTICLE_ORI_NAME))
-				MDimg.getValue(EMDL_PARTICLE_ORI_NAME, ori_part_name);
-			else
-				MDimg.getValue(EMDL_IMAGE_NAME, ori_part_name);
-
-			if (MDimg.containsLabel(EMDL_PARTICLE_ORI_NAME) && !do_ignore_original_particle_name)
-			{
-				// Only search ori_particles for the last (original) micrograph
-				for (long int i = last_oripart_idx; i < ori_particles.size(); i++)
-				{
-					if (ori_particles[i].name == ori_part_name)
-					{
-						ori_part_id = i;
-						break;
-					}
-				}
-			}
-
-			// If no OriginalParticles with this name was found,
-			// or if no EMDL_PARTICLE_ORI_NAME in the input file, or if do_ignore_original_particle_name
-			// then add a new ori_particle
-			if (ori_part_id < 0)
-			{
-				ori_part_id = addOriginalParticle(ori_part_name, my_random_subset);
-				// Also add this original_particle to an original_micrograph (only for movies)
-				if (is_mic_a_movie)
-				{
-					micrographs[mic_id].ori_particle_ids.push_back(ori_part_id);
-				}
-			}
 #ifdef DEBUG_READ
 			timer.toc(tori);
 #endif
 
-
-			// Add this particle to the OriginalParticle
-			std::string fnt;
-			long int my_order;
-			mic_name.decompose(my_order, fnt);
-			(ori_particles[ori_part_id]).addParticle(part_id, my_random_subset, my_order);
-
-			// The group number is only set upon reading: it is not read from the STAR file itself,
-			// there the only thing that matters is the order of the micrograph_names
-			// Write igroup+1, to start numbering at one instead of at zero
-			MDimg.setValue(EMDL_MLMODEL_GROUP_NO, group_id + 1, part_id);
-
 #ifdef DEBUG_READ
 			nr_read++;
 #endif
-		} // end loop over all objects in MDimg
+		} // end loop over all objects in MDimg (ori_part_id)
 
 #ifdef DEBUG_READ
 		timer.toc(tfill);
 		timer.tic(tdef);
-		std::cerr << " nr_read= " << nr_read << " particles.size()= " << particles.size() << " ori_particles.size()= " << ori_particles.size()  << " micrographs.size()= " << micrographs.size() << " groups.size()= " << groups.size() << std::endl;
+		std::cerr << " nr_read= " << nr_read << " particles.size()= " << particles.size() << " micrographs.size()= " << micrographs.size() << " groups.size()= " << groups.size() << std::endl;
 #endif
 
 		// Check for the presence of multiple bodies (for multi-body refinement)
@@ -1127,7 +1073,6 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 		}
 		// Even if we don't do multi-body refinement, then nr_bodies is still 1
 		nr_bodies = XMIPP_MAX(nr_bodies, 1);
-
 	}
 
 #ifdef DEBUG_READ
@@ -1140,9 +1085,9 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 	bool have_rot  = MDimg.containsLabel(EMDL_ORIENT_ROT);
 	bool have_tilt = MDimg.containsLabel(EMDL_ORIENT_TILT);
 	bool have_psi  = MDimg.containsLabel(EMDL_ORIENT_PSI);
-	bool have_xoff = MDimg.containsLabel(EMDL_ORIENT_ORIGIN_X);
-	bool have_yoff = MDimg.containsLabel(EMDL_ORIENT_ORIGIN_Y);
-	bool have_zoff = MDimg.containsLabel(EMDL_ORIENT_ORIGIN_Z);
+	bool have_xoff = MDimg.containsLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM);
+	bool have_yoff = MDimg.containsLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM);
+	bool have_zoff = MDimg.containsLabel(EMDL_ORIENT_ORIGIN_Z_ANGSTROM);
 	bool have_zcoord = MDimg.containsLabel(EMDL_IMAGE_COORD_Z);
 	bool have_clas = MDimg.containsLabel(EMDL_PARTICLE_CLASS);
 	bool have_norm = MDimg.containsLabel(EMDL_IMAGE_NORM_CORRECTION);
@@ -1171,11 +1116,11 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 		if (!have_psi)
 			MDimg.setValue(EMDL_ORIENT_PSI, dzero);
 		if (!have_xoff)
-			MDimg.setValue(EMDL_ORIENT_ORIGIN_X, dzero);
+			MDimg.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, dzero);
 		if (!have_yoff)
-			MDimg.setValue(EMDL_ORIENT_ORIGIN_Y, dzero);
+			MDimg.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, dzero);
 		if ( (!have_zoff) && (have_zcoord) )
-			MDimg.setValue(EMDL_ORIENT_ORIGIN_Z, dzero);
+			MDimg.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, dzero);
 		if (!have_clas)
 			MDimg.setValue(EMDL_PARTICLE_CLASS, izero);
 		if (!have_norm)
@@ -1196,49 +1141,14 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 		}
 	}
 
+	// Set is_3D from MDopt
+	int mydim;
+	obsModel.opticsMdt.getValue(EMDL_IMAGE_DIMENSIONALITY, mydim, 0);
+	is_3D = (mydim == 3);
+
 #ifdef DEBUG_READ
 	timer.toc(tdef);
 	std::cerr << "Done setting defaults MDimg" << std::endl;
-	timer.tic(tend);
-	//std::cerr << "Press any key to continue..." << std::endl;
-	//std::cin >> c;
-#endif
-
-	// Also set the image_size (use the last image for that, still in fn_img)
-	FileName fn_img;
-	Image<RFLOAT> img;
-	MDimg.getValue(EMDL_IMAGE_NAME, fn_img, MDimg.firstObject());
-	if (fn_img != "")
-	{
-		img.read(fn_img, false); //false means read only header, skip real data
-		is_3D = (ZSIZE(img()) > 1);
-		int image_size = XSIZE(img());
-		if (image_size != YSIZE(img()))
-			REPORT_ERROR("Experiment::read: xsize != ysize: only squared images allowed");
-		// Add a single object to MDexp
-		MDexp.addObject();
-		MDexp.setValue(EMDL_IMAGE_SIZE, image_size);
-		if (ZSIZE(img()) > 1)
-		{
-			if (image_size != ZSIZE(img()))
-				REPORT_ERROR("Experiment::read: xsize != zsize: only cubed images allowed");
-			MDexp.setValue(EMDL_IMAGE_DIMENSIONALITY, 3);
-		}
-		else
-		{
-			MDexp.setValue(EMDL_IMAGE_DIMENSIONALITY, 2);
-		}
-	}
-	else
-	{
-		REPORT_ERROR("There are no images read in: please check your input file...");
-	}
-
-	// Order the particles in each ori_particle (only useful for realignment of movie frames)
-	orderParticlesInOriginalParticles();
-
-#ifdef DEBUG_READ
-	timer.toc(tend);
 	timer.toc(tall);
 	timer.printTimes(false);
 	//std::cerr << "Writing out debug_data.star" << std::endl;
@@ -1250,14 +1160,17 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 // Write to file
 void Experiment::write(FileName fn_root)
 {
-
 	std::ofstream  fh;
 	FileName fn_tmp = fn_root+"_data.star";
 	fh.open((fn_tmp).c_str(), std::ios::out);
 	if (!fh)
 		REPORT_ERROR( (std::string)"Experiment::write: Cannot write file: " + fn_tmp);
 
+	obsModel.opticsMdt.setName("optics");
+	obsModel.opticsMdt.write(fh);
+
 	// Always write MDimg
+	MDimg.setName("particles");
 	MDimg.write(fh);
 
 	if (nr_bodies > 1)
@@ -1269,5 +1182,4 @@ void Experiment::write(FileName fn_root)
 	}
 
 	fh.close();
-
 }

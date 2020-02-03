@@ -36,8 +36,12 @@ class NoiseHelper
 
         static std::vector<double> radialAverage(Image<RFLOAT>& map, bool half);
         static Image<RFLOAT> radialMap(std::vector<double>& radAvg, bool centered);
+		
         static std::vector<Complex> radialAverage(Image<Complex>& map, bool skipAxes);
-        static Image<Complex> radialMap(std::vector<Complex>& radAvg);
+        static Image<Complex> radialMap(std::vector<Complex>& radAvg);		
+		
+		static std::vector<std::pair<double,double>> radialAverageAndStdDevFFTW(Image<RFLOAT>& map);
+		
 
         static std::vector<double> radialWeight(int w, int h, bool half);
         static std::vector<double> fill(Image<RFLOAT>& confusion, double lambda, int iterations);

@@ -45,10 +45,12 @@
 #ifndef MACROS_H
 #define MACROS_H
 
-#define RELION_VERSION "3.0.8"
+#define RELION_SHORT_VERSION "3.1-beta"
+extern const char *g_RELION_VERSION;
 
 #include <math.h>
 #include <signal.h>
+#include "src/pipeline_control.h"
 #include "src/error.h"
 
 #ifndef _CYGWIN
@@ -70,12 +72,12 @@
 #define RFLOAT float
 #define LARGE_NUMBER 99e36
 #define MY_MPI_DOUBLE  MPI_FLOAT
-#define MY_MPI_COMPLEX MPI_COMPLEX
+#define MY_MPI_COMPLEX MPI_C_COMPLEX
 #else
 #define RFLOAT double
 #define LARGE_NUMBER 99e99
 #define MY_MPI_DOUBLE  MPI_DOUBLE
-#define MY_MPI_COMPLEX MPI_DOUBLE_COMPLEX
+#define MY_MPI_COMPLEX MPI_C_DOUBLE_COMPLEX
 #endif
 
 #if defined CUDA and DEBUG_CUDA
@@ -405,7 +407,7 @@ static void SINCOSF(float x, float *s, float *c) { *s = sinf(x); *c = cosf(x); }
 
 static void PRINT_VERSION_INFO()
 {
-	std::cout << "RELION version: " << RELION_VERSION << " "
+	std::cout << "RELION version: " << g_RELION_VERSION << " "
 #if defined(DEBUG) || defined(DEBUG_CUDA)
 	<< "(debug-build) "
 #endif

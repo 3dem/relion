@@ -23,6 +23,7 @@
 #include <src/symmetries.h>
 #include <src/euler.h>
 #include <src/time.h>
+#include <src/jaz/obs_model.h>
 
 class particle_symmetry_expand_parameters
 {
@@ -31,10 +32,11 @@ public:
 	FileName fn_sym, fn_in, fn_out;
 
 	// Helical symmetry
-	bool do_helix;
+	bool do_helix, do_ignore_optics;
 	RFLOAT twist, rise, angpix;
 	int nr_asu, frac_sampling;
 	RFLOAT frac_range;
+	ObservationModel obsModel;
 
 	// I/O Parser
 	IOParser parser;
@@ -64,6 +66,7 @@ public:
 		nr_asu = textToFloat(parser.getOption("--asu", "Number of asymmetrical units to expand", "1"));
 		frac_sampling = textToFloat(parser.getOption("--frac_sampling", "Number of samplings in between a single asymmetrical unit", "1"));
 		frac_range = textToFloat(parser.getOption("--frac_range", "Range of the rise [-0.5, 0.5> to be sampled", "0.5"));
+		do_ignore_optics = parser.checkOption("--ignore_optics", "Provide this option for relion-3.0 functionality, without optics groups");
 
 		// Check for errors in the command-line option
 		if (parser.checkForErrors())
@@ -81,7 +84,6 @@ public:
 
 	void run()
 	{
-
 		MetaDataTable DFi, DFo;
 		RFLOAT rot, tilt, psi, x, y;
 		RFLOAT rotp, tiltp, psip, xp, yp;
@@ -116,7 +118,21 @@ public:
 				REPORT_ERROR("ERROR Nothing to do. Provide a point group with symmetry!");
 		}
 
-		DFi.read(fn_in);
+		if (do_ignore_optics)
+		{
+			DFi.read(fn_in);
+		}
+		else
+		{
+			ObservationModel::loadSafely(fn_in, obsModel, DFi, "particles", 1, false);
+			if (obsModel.opticsMdt.numberOfObjects() == 0)
+			{
+				std::cerr << " + WARNGING: could not read optics groups table, proceeding without it ..." << std::endl;
+				DFi.read(fn_in);
+				do_ignore_optics = true;
+			}
+		}
+
 		int barstep = XMIPP_MAX(1, DFi.numberOfObjects()/ 60);
 		init_progress_bar(DFi.numberOfObjects());
 		DFo.clear();
@@ -128,8 +144,8 @@ public:
 			DFi.getValue(EMDL_ORIENT_ROT, rot);
 			DFi.getValue(EMDL_ORIENT_TILT, tilt);
 			DFi.getValue(EMDL_ORIENT_PSI, psi);
-			DFi.getValue(EMDL_ORIENT_ORIGIN_X, x);
-			DFi.getValue(EMDL_ORIENT_ORIGIN_Y, y);
+			DFi.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, x);
+			DFi.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, y);
 
 			if (do_helix)
 			{
@@ -140,15 +156,15 @@ public:
 					{
 						// Translation along the X-axis in the rotated image is along the helical axis in 3D.
 						// Tilted images shift less: sin(tilt)
-						RFLOAT xxt = SIND(tilt) * z_pos * rise / angpix;
+						RFLOAT xxt = SIND(tilt) * z_pos * rise;
 						xp = x + COSD(-psi) * xxt;
 						yp = y + SIND(-psi) * xxt;
 						rotp = rot - z_pos * twist;
 						DFo.addObject();
 						DFo.setObject(DFi.getObject());
 						DFo.setValue(EMDL_ORIENT_ROT, rotp);
-						DFo.setValue(EMDL_ORIENT_ORIGIN_X, xp);
-						DFo.setValue(EMDL_ORIENT_ORIGIN_Y, yp);
+						DFo.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xp);
+						DFo.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yp);
 					}
 				}
 			}
@@ -160,7 +176,6 @@ public:
 				// And loop over all symmetry mates
 				for (int isym = 0; isym < SL.SymsNo(); isym++)
 				{
-
 					SL.get_matrices(isym, L, R);
 					L.resize(3, 3); // Erase last row and column
 					R.resize(3, 3); // as only the relative orientation is useful and not the translation
@@ -170,7 +185,6 @@ public:
 					DFo.setValue(EMDL_ORIENT_ROT, rotp);
 					DFo.setValue(EMDL_ORIENT_TILT, tiltp);
 					DFo.setValue(EMDL_ORIENT_PSI, psip);
-
 				}
 			}
 
@@ -180,7 +194,15 @@ public:
 		} // end loop over input MetadataTable
 		progress_bar(DFi.numberOfObjects());
 
-		DFo.write(fn_out);
+
+		if (do_ignore_optics)
+		{
+			DFo.write(fn_out);
+		}
+		else
+		{
+			obsModel.save(DFo, fn_out, "particles");
+		}
 		std::cout << " Done! Written: " << fn_out << " with the expanded particle set." << std::endl;
 
 	}// end run function
@@ -200,8 +222,8 @@ int main(int argc, char *argv[])
 	{
 		//prm.usage();
 		std::cerr << XE;
-		exit(1);
+		return RELION_EXIT_FAILURE;
 	}
 
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }

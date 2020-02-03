@@ -50,7 +50,7 @@ public:
 	Image<RFLOAT> I1, I2, Im;
 
 	// Pixel size in Angstroms
-	RFLOAT angpix;
+	RFLOAT angpix, mtf_angpix;
 
 	/////// Masking
 
@@ -77,6 +77,12 @@ public:
 
 	// Filename for a user-provided mask
 	FileName fn_mask;
+
+	// Fraction of pixels corresponding to protein (i.e. white) in the solvent mask or calculated from moweight
+	RFLOAT frac_solvent_mask, frac_molweight;
+
+	// The user-provided Molecular Weight (in kDa) or the molecular weight contained in the solvent mask
+	RFLOAT molweight, molweight_frommask;
 
 	// Use the mask even when the resolution becomes worse
 	bool force_mask;
@@ -137,7 +143,7 @@ public:
 
 	// Arrays to store FSC, Guinier curves etc
 	MultidimArray<RFLOAT> fsc_unmasked, acorr_unmasked, acorr_masked, dpr_unmasked, dpr_masked;
-	MultidimArray<RFLOAT> fsc_masked, fsc_random_masked, fsc_true;
+	MultidimArray<RFLOAT> fsc_masked, fsc_random_masked, fsc_true, fsc_part_molweight, fsc_part_fracmask;
 	RFLOAT global_intercept, global_slope, global_corr_coeff, global_bfactor, global_resol;
 	// The Guinier plots
 	std::vector<fit_point2D>  guinierin, guinierinvmtf, guinierweighted, guiniersharpen;
@@ -158,9 +164,6 @@ public:
 	// Generate the mask (or read it from file)
 	// Returns true if masking needs to be done, false otherwise
 	bool getMask();
-
-	// Make a mask automatically based on initial density threshold
-	void getAutoMask();
 
 	// Divide by MTF and perform FSC-weighted B-factor sharpening, as in Rosenthal and Henderson, 2003
 	// Returns the applied filter resolution
@@ -183,6 +186,9 @@ public:
 	// Use Richard's formula to calculate FSC_true
 	void calculateFSCtrue(MultidimArray<RFLOAT> &fsc_true, MultidimArray<RFLOAT> &fsc_unmasked,
 			MultidimArray<RFLOAT> &fsc_masked, MultidimArray<RFLOAT> &fsc_random_masked, int randomize_at );
+
+	// cisTEM-like FSC corrected for fraction of solvent mask
+	void calculateFSCpart(const MultidimArray<RFLOAT> fsc_unmasked, RFLOAT fraction, MultidimArray<RFLOAT> &fsc_part);
 
 	// Apply sqrt(2FSC/(FSC=1)) weighting prior to B-factor sharpening
 	void applyFscWeighting(MultidimArray<Complex > &FT, MultidimArray<RFLOAT> my_fsc);

@@ -42,15 +42,16 @@ int main(int argc, char *argv[])
 			prm.run_locres(rank, size);
 		else
 			prm.run();
-
-		MPI_Finalize();
 	}
 	catch (RelionError XE)
 	{
 		//prm.usage();
 		std::cerr << XE;
-		exit(1);
+		return RELION_EXIT_FAILURE;
 	}
 
-	return 0;
+        MPI_Barrier(MPI_COMM_WORLD);
+	MPI_Finalize();
+
+	return RELION_EXIT_SUCCESS;
 }

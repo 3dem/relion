@@ -33,8 +33,8 @@
 
 class Process
 {
+public:
 
-	public:
 	std::string name;
 	std::string alias;
 	int type;
@@ -65,11 +65,12 @@ class Process
 // Forward definition
 class PipeLineFlowChart;
 
+
 #define PIPELINE_HAS_CHANGED ".pipeline_has_changed"
 class PipeLine
 {
+public:
 
-	public:
 	int job_counter;
 	bool do_read_only;
 
@@ -142,14 +143,16 @@ class PipeLine
 	bool checkProcessCompletion();
 
 	// Get the command line arguments for thisjob
-	bool getCommandLineJob(RelionJob &thisjob, int current_job, bool is_main_continue, bool is_scheduled, bool do_makedir, std::vector<std::string> &commands,
-			std::string &final_command, std::string &error_message);
+	bool getCommandLineJob(RelionJob &thisjob, int current_job, bool is_main_continue,
+			bool is_scheduled, bool do_makedir, bool do_overwrite_current,
+			std::vector<std::string> &commands, std::string &final_command, std::string &error_message);
 
 	// Adds _job to the pipeline and return the id of the newprocess
-	long int addJob(RelionJob &_job, int as_status, bool do_overwrite);
+	long int addJob(RelionJob &_job, int as_status, bool do_overwrite, bool do_write_minipipeline = true);
 
 	// Runs a job and adds it to the pipeline
-	bool runJob(RelionJob &_job, int &current_job, bool only_schedule, bool is_main_continue, bool is_scheduled, std::string &error_message);
+	bool runJob(RelionJob &_job, int &current_job, bool only_schedule, bool is_main_continue,
+			bool is_scheduled, bool do_overwrite_current, std::string &error_message);
 
 	// Adds a scheduled job to the pipeline from the command line (with a name for job type)
 	int addScheduledJob(std::string job_type, std::string fn_options);
@@ -157,8 +160,14 @@ class PipeLine
 	// Adds a scheduled job to the pipeline from the command line (with integer job type)
 	int addScheduledJob(int job_type, std::string fn_options);
 
+	// Add this RelionJob as scheduled to the pipeline
+	int addScheduledJob(RelionJob &job, std::string fn_options="");
+
+	void waitForJobToFinish(int current_job, bool &is_failure, bool &is_abort);
+
 	// Runs a series of scheduled jobs, possibly in a loop, from the command line
-	void runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat, long int minutes_wait, long int minutes_wait_before = 0, long int seconds_wait_after = 10);
+	void runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat,
+			long int minutes_wait, long int minutes_wait_before = 0, long int seconds_wait_after = 10, bool do_overwrite_current = false);
 
 	// If I'm deleting this_job from the pipeline, which Nodes and which Processes need to be deleted?
 	void deleteJobGetNodesAndProcesses(int this_job, bool do_recursive, std::vector<bool> &deleteNodes, std::vector<bool> &deleteProcesses);
@@ -166,8 +175,11 @@ class PipeLine
 	// Given the lists of which Nodes and Processes to delete, now do the actual deleting
 	void deleteNodesAndProcesses(std::vector<bool> &deleteNodes, std::vector<bool> &deleteProcesses);
 
+	// Check the presence of a file called RELION_OUTPUT_NODES.star, and add the nodes in that STAR file as output nodes for this job
+	void getOutputNodesFromStarFile(int this_job);
+
 	// Changes the status of this_job to finished in the pipeline, returns false is job hadn't started yet
-	bool markAsFinishedJob(int this_job, std::string &error_message);
+	bool markAsFinishedJob(int this_job, std::string &error_message, bool is_failed = false);
 
 	// Set the alias for a job, return true for success, false otherwise
 	bool setAliasJob(int this_job, std::string alias, std::string &error_message);
@@ -202,10 +214,7 @@ class PipeLine
 
 	// Read in the pipeline from a STAR file
 	void read(bool do_lock = false, std::string lock_message = "Undefined lock message");
-
 };
-
-
 
 class PipeLineFlowChart
 {
@@ -253,8 +262,6 @@ public:
 	void openFlowChartFile(FileName &fn_out, std::ofstream &fh);
 
 	void closeFlowChartFile(std::ofstream &fh);
-
-
 };
 
 #endif /* PIPELINER_H_ */

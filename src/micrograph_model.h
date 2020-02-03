@@ -23,6 +23,7 @@
 #include <vector>
 #include "src/filename.h"
 #include "src/matrix1d.h"
+#include "src/multidim_array.h"
 
 enum MotionModelVersion {
 	MOTION_MODEL_NULL = 0,
@@ -85,8 +86,9 @@ public:
 	int first_frame; // First frame for local motion model. 1-indexed.
 	MotionModel *model;
 
-	// Local trajectories (not written, not read from STAR files)
+	// Local trajectories (not read from STAR files)
 	std::vector<RFLOAT> localShiftX, localShiftY, localFitX, localFitY, patchX, patchY, patchZ, patchW, patchH;
+	std::vector<int> hotpixelX, hotpixelY;
 
 	// Default constructor
 	Micrograph();
@@ -129,6 +131,9 @@ public:
 	// (shiftx, shifty) is UNBINNED pixels in the original movie
 	void setGlobalShift(int frame, RFLOAT shiftx, RFLOAT shifty);
 
+	// Fills a pixel mask where defect and hot pixels are true
+	void fillDefectAndHotpixels(MultidimArray<bool> &mask) const;
+
 private:
 
 	int width, height, n_frames;
@@ -139,7 +144,7 @@ private:
 	std::vector<RFLOAT> globalShiftX, globalShiftY;
 
 	// Read micrograph model from a STAR file
-	void read(FileName filename);
+	void read(FileName filename, bool read_hotpixels=true);
 
 	// Set target movie file
 	void setMovie(FileName fnMovie, FileName fnGain="", RFLOAT binning=1.0);

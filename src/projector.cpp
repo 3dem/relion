@@ -18,21 +18,22 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/projector.h"
+#include "src/jaz/gravis/t3Vector.h"
 #include <src/time.h>
 //#define DEBUG
 
 //#define PROJ_TIMING
 #ifdef PROJ_TIMING
-    Timer proj_timer;
-	int TIMING_TOP = 		proj_timer.setNew("PROJECTOR - computeFourierTransformMap");
-	int TIMING_GRID = 		proj_timer.setNew("PROJECTOR - gridCorr");
-	int TIMING_PAD = 		proj_timer.setNew("PROJECTOR - padTransMap");
-	int TIMING_CENTER = 	proj_timer.setNew("PROJECTOR - centerFFT");
-	int TIMING_TRANS = 		proj_timer.setNew("PROJECTOR - transform");
-	int TIMING_FAUX =		proj_timer.setNew("PROJECTOR - Faux");
-	int TIMING_POW =		proj_timer.setNew("PROJECTOR - power_spectrum");
-	int TIMING_INIT1 =		proj_timer.setNew("PROJECTOR - init1");
-	int TIMING_INIT2 = 		proj_timer.setNew("PROJECTOR - init2");
+	Timer proj_timer;
+	int TIMING_TOP = proj_timer.setNew("PROJECTOR - computeFourierTransformMap");
+	int TIMING_GRID = proj_timer.setNew("PROJECTOR - gridCorr");
+	int TIMING_PAD = proj_timer.setNew("PROJECTOR - padTransMap");
+	int TIMING_CENTER = proj_timer.setNew("PROJECTOR - centerFFT");
+	int TIMING_TRANS = proj_timer.setNew("PROJECTOR - transform");
+	int TIMING_FAUX = proj_timer.setNew("PROJECTOR - Faux");
+	int TIMING_POW = proj_timer.setNew("PROJECTOR - power_spectrum");
+	int TIMING_INIT1 = proj_timer.setNew("PROJECTOR - init1");
+	int TIMING_INIT2 = proj_timer.setNew("PROJECTOR - init2");
 #define TIMING_TIC(id) proj_timer.tic(id)
 #define TIMING_TOC(id) proj_timer.toc(id)
 #else
@@ -40,7 +41,7 @@
 #define TIMING_TOC(id)
 #endif
 
-
+using namespace gravis;
 
 void Projector::initialiseData(int current_size)
 {
@@ -60,13 +61,13 @@ void Projector::initialiseData(int current_size)
 	switch (ref_dim)
 	{
 	case 2:
-	   data.resize(pad_size, pad_size / 2 + 1);
-	   break;
+		data.resize(pad_size, pad_size / 2 + 1);
+		break;
 	case 3:
-	   data.resize(pad_size, pad_size, pad_size / 2 + 1);
-	   break;
+		data.resize(pad_size, pad_size, pad_size / 2 + 1);
+		break;
 	default:
-	   REPORT_ERROR("Projector::resizeData%%ERROR: Dimension of the data array should be 2 or 3");
+		REPORT_ERROR("Projector::resizeData%%ERROR: Dimension of the data array should be 2 or 3");
 	}
 
 	// Set origin in the y.z-center, but on the left side for x.
@@ -86,27 +87,31 @@ long int Projector::getSize()
 	switch (ref_dim)
 	{
 		case 2:
-		   return pad_size * (pad_size / 2 + 1);
-		   break;
+			return pad_size * (pad_size / 2 + 1);
+			break;
 		case 3:
-		   return pad_size * pad_size * (pad_size / 2 + 1);
-		   break;
+			return pad_size * pad_size * (pad_size / 2 + 1);
+			break;
 		default:
-		   REPORT_ERROR("Projector::resizeData%%ERROR: Dimension of the data array should be 2 or 3");
+			REPORT_ERROR("Projector::resizeData%%ERROR: Dimension of the data array should be 2 or 3");
 	}
 
 }
 
+
 // Fill data array with oversampled Fourier transform, and calculate its power spectrum
-void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, MultidimArray<RFLOAT> &power_spectrum, int current_size, int nr_threads, bool do_gridding, bool do_heavy)
+void Projector::computeFourierTransformMap(
+		MultidimArray<RFLOAT> &vol_in, MultidimArray<RFLOAT> &power_spectrum,
+		int current_size, int nr_threads, bool do_gridding, bool do_heavy, int min_ires,
+		const MultidimArray<RFLOAT>* fourier_mask)
 {
 	TIMING_TIC(TIMING_TOP);
 
 	TIMING_TIC(TIMING_INIT1);
 	MultidimArray<RFLOAT> Mpad;
 	MultidimArray<Complex > Faux;
-    FourierTransformer transformer;
-    RFLOAT normfft;
+	FourierTransformer transformer;
+	RFLOAT normfft;
 
 	// Size of padded real-space volume
 	int padoridim = ROUND(padding_factor * ori_size);
@@ -117,6 +122,8 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
 
 	// Initialize data array of the oversampled transform
 	ref_dim = vol_in.getDim();
+
+	bool do_fourier_mask = (fourier_mask != NULL);
 
 	// Make Mpad
 	switch (ref_dim)
@@ -130,19 +137,19 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
 			normfft = (RFLOAT)(padding_factor * padding_factor);
 		else
 			normfft = (RFLOAT)(padding_factor * padding_factor * ori_size);
-	   break;
+		break;
 	case 3:
 		if(do_heavy)
 			Mpad.initZeros(padoridim, padoridim, padoridim);
 		else
 			Mpad.reshape(padoridim, padoridim, padoridim);
-	   if (data_dim == 3)
-		   normfft = (RFLOAT)(padding_factor * padding_factor * padding_factor);
-	   else
-		   normfft = (RFLOAT)(padding_factor * padding_factor * padding_factor * ori_size);
-	   break;
+		if (data_dim == 3)
+			normfft = (RFLOAT)(padding_factor * padding_factor * padding_factor);
+		else
+			normfft = (RFLOAT)(padding_factor * padding_factor * padding_factor * ori_size);
+		break;
 	default:
-	   REPORT_ERROR("Projector::computeFourierTransformMap%%ERROR: Dimension of the data array should be 2 or 3");
+		REPORT_ERROR("Projector::computeFourierTransformMap%%ERROR: Dimension of the data array should be 2 or 3");
 	}
 	TIMING_TOC(TIMING_INIT1);
 
@@ -200,28 +207,59 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
 
 	TIMING_TIC(TIMING_FAUX);
 	int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
+	int min_r2 = -1;
+	if (min_ires > 0)
+	{
+		min_r2 = ROUND(min_ires * padding_factor) * ROUND(min_ires * padding_factor);
+	}
+
 	if(do_heavy)
+	{
+		RFLOAT weight = 1.;
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux) // This will also work for 2D
 		{
 			int r2 = kp*kp + ip*ip + jp*jp;
 			// The Fourier Transforms are all "normalised" for 2D transforms of size = ori_size x ori_size
+			// Set data array
 			if (r2 <= max_r2)
 			{
+				if (do_fourier_mask) weight = FFTW_ELEM(*fourier_mask, ROUND(kp/padding_factor), ROUND(ip/padding_factor), ROUND(jp/padding_factor));
 				// Set data array
-				A3D_ELEM(data, kp, ip, jp) = DIRECT_A3D_ELEM(Faux, k, i, j) * normfft;
+				A3D_ELEM(data, kp, ip, jp) = weight * DIRECT_A3D_ELEM(Faux, k, i, j) * normfft;
 
 				// Calculate power spectrum
 				int ires = ROUND( sqrt((RFLOAT)r2) / padding_factor );
 				// Factor two because of two-dimensionality of the complex plane
 				DIRECT_A1D_ELEM(power_spectrum, ires) += norm(A3D_ELEM(data, kp, ip, jp)) / 2.;
-				DIRECT_A1D_ELEM(counter, ires) += 1.;
+				DIRECT_A1D_ELEM(counter, ires) += weight;
+
+				// Apply high pass filter of the reference only after calculating the power spectrum
+				if (r2 <= min_r2)
+					A3D_ELEM(data, kp, ip, jp) = 0;
 			}
 		}
+	}
 	TIMING_TOC(TIMING_FAUX);
+
+	/*
+	FourierTransformer ft2;
+	MultidimArray<Complex> Faux2(padding_factor * ori_size, (padding_factor * ori_size)/2+1);
+	Image<RFLOAT> tt2(padding_factor * ori_size, padding_factor * ori_size);
+	decenter(data, Faux2, max_r2);
+	windowFourierTransform(Faux2, padding_factor * ori_size);
+	ft2.inverseFourierTransform(Faux2, tt2());
+	CenterFFT(tt2(), true);
+	tt2().setXmippOrigin();
+	tt2().window(FIRST_XMIPP_INDEX(ori_size), FIRST_XMIPP_INDEX(ori_size), LAST_XMIPP_INDEX(ori_size), LAST_XMIPP_INDEX(ori_size));
+	tt2.write("Fdata_proj.spi");
+	std::cerr << "written Fdata_proj.spi" << std::endl;
+	REPORT_ERROR("STOP");
+	*/
 
 	TIMING_TIC(TIMING_POW);
 	// Calculate radial average of power spectrum
 	if(do_heavy)
+	{
 		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(power_spectrum)
 		{
 			if (DIRECT_A1D_ELEM(counter, i) < 1.)
@@ -229,56 +267,13 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
 			else
 				DIRECT_A1D_ELEM(power_spectrum, i) /= DIRECT_A1D_ELEM(counter, i);
 		}
+	}
 	TIMING_TOC(TIMING_POW);
 
 	TIMING_TOC(TIMING_TOP);
 
 #ifdef PROJ_TIMING
-    proj_timer.printTimes(false);
-#endif
-
-}
-
-void Projector::applyFourierMask(int mask_r_min, int mask_r_max, RFLOAT mask_ang)
-{
-
-	if (mask_r_max < 0)
-		mask_r_max = r_max;
-	int mask_r_min2 = ROUND(mask_r_min * padding_factor) * ROUND(mask_r_min * padding_factor);
-	int mask_r_max2 = ROUND(mask_r_max * padding_factor) * ROUND(mask_r_max * padding_factor);
-	float mask_ang_rad = DEG2RAD(mask_ang);
-
-	FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
-	{
-
-		int myr2 = k*k + i*i + j*j;
-
-		// Select resolutions
-		if (myr2 < mask_r_min2 || myr2 > mask_r_max2)
-			A3D_ELEM(data, k, i, j) = 0.;
-
-		// Select opening angle along z
-		if (mask_ang > 0.)
-		{
-			float myang = atan(sqrt((float)(i*i+j*j))/fabs((float)(k)));
-			if (myang > mask_ang_rad)
-				A3D_ELEM(data, k, i, j) = 0.;
-		}
-	}
-
-//#define DEBUG_MASK
-#ifdef DEBUG_MASK
-	Image<RFLOAT> ttt;
-	ttt().resize(data);
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(ttt())
-	{
-		if (abs(DIRECT_MULTIDIM_ELEM(data, n)) > 0.)
-			DIRECT_MULTIDIM_ELEM(ttt(), n) = 1.;
-		else
-			DIRECT_MULTIDIM_ELEM(ttt(), n) = 0.;
-	}
-	ttt.write("fourier_mask.spi");
-	std::cerr << " written out fourier_mask.spi" << std::endl;
+	proj_timer.printTimes(false);
 #endif
 
 }
@@ -300,7 +295,7 @@ void Projector::griddingCorrect(MultidimArray<RFLOAT> &vol_in)
 			if (interpolator==NEAREST_NEIGHBOUR && r_min_nn == 0)
 			{
 				// NN interpolation is convolution with a rectangular pulse, which FT is a sinc function
-            	A3D_ELEM(vol_in, k, i, j) /= sinc;
+				A3D_ELEM(vol_in, k, i, j) /= sinc;
 			}
 			else if (interpolator==TRILINEAR || (interpolator==NEAREST_NEIGHBOUR && r_min_nn > 0) )
 			{
@@ -318,144 +313,166 @@ void Projector::griddingCorrect(MultidimArray<RFLOAT> &vol_in)
 	}
 }
 
-void Projector::project(MultidimArray<Complex > &f2d, Matrix2D<RFLOAT> &A, bool inv)
+void Projector::project(MultidimArray<Complex > &f2d, Matrix2D<RFLOAT> &A)
 {
-	RFLOAT fx, fy, fz, xp, yp, zp;
-	int x0, x1, y0, y1, z0, z1, y, y2, r2;
-	bool is_neg_x;
-	Complex d000, d001, d010, d011, d100, d101, d110, d111;
-	Complex dx00, dx01, dx10, dx11, dxy0, dxy1;
-	Matrix2D<RFLOAT> Ainv;
-
-    // f2d should already be in the right size (ori_size,orihalfdim)
-    // AND the points outside r_max should already be zero...
-    // f2d.initZeros();
+	// f2d should already be in the right size (ori_size,orihalfdim)
+	// AND the points outside r_max should already be zero...
+	// f2d.initZeros();
 
 	// Use the inverse matrix
-    if (inv)
-    	Ainv = A;
-    else
-    	Ainv = A.transpose();
 
-    // The f2d image may be smaller than r_max, in that case also make sure not to fill the corners!
-    int my_r_max = XMIPP_MIN(r_max, XSIZE(f2d) - 1);
+	Matrix2D<RFLOAT> Ainv = A.inv();
+	Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
 
-    // Go from the 2D slice coordinates to the 3D coordinates
-    Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
-    int max_r2 = my_r_max * my_r_max;
-    int min_r2_nn = r_min_nn * r_min_nn;
+	// The f2d image may be smaller than r_max, in that case also make sure not to fill the corners!
+	const int r_max_out = XSIZE(f2d) - 1;
+	const int r_max_out_2 = r_max_out * r_max_out;
+
+	const int r_max_ref = r_max * padding_factor;
+	const int r_max_ref_2 = r_max_ref * r_max_ref;
+
+	const int r_min_NN_ref_2 = r_min_nn * r_min_nn * padding_factor * padding_factor;
 
 //#define DEBUG
 #ifdef DEBUG
-    std::cerr << " XSIZE(f2d)= "<< XSIZE(f2d) << std::endl;
-    std::cerr << " YSIZE(f2d)= "<< YSIZE(f2d) << std::endl;
-    std::cerr << " XSIZE(data)= "<< XSIZE(data) << std::endl;
-    std::cerr << " YSIZE(data)= "<< YSIZE(data) << std::endl;
-    std::cerr << " STARTINGX(data)= "<< STARTINGX(data) << std::endl;
-    std::cerr << " STARTINGY(data)= "<< STARTINGY(data) << std::endl;
-    std::cerr << " STARTINGZ(data)= "<< STARTINGZ(data) << std::endl;
-    std::cerr << " max_r= "<< r_max << std::endl;
-    std::cerr << " Ainv= " << Ainv << std::endl;
+	std::cerr << " XSIZE(f2d)= "<< XSIZE(f2d) << std::endl;
+	std::cerr << " YSIZE(f2d)= "<< YSIZE(f2d) << std::endl;
+	std::cerr << " XSIZE(data)= "<< XSIZE(data) << std::endl;
+	std::cerr << " YSIZE(data)= "<< YSIZE(data) << std::endl;
+	std::cerr << " STARTINGX(data)= "<< STARTINGX(data) << std::endl;
+	std::cerr << " STARTINGY(data)= "<< STARTINGY(data) << std::endl;
+	std::cerr << " STARTINGZ(data)= "<< STARTINGZ(data) << std::endl;
+	std::cerr << " max_r= "<< r_max << std::endl;
+	std::cerr << " Ainv= " << Ainv << std::endl;
 #endif
 
-	for (int i=0; i < YSIZE(f2d); i++)
+	for (int i = 0; i < YSIZE(f2d); i++)
 	{
-		// Dont search beyond square with side max_r
-		if (i <= my_r_max)
-		{
-			y = i;
-		}
-		else if (i >= YSIZE(f2d) - my_r_max)
-		{
-			y = i - YSIZE(f2d);
-		}
-		else
-			continue;
+		const int y = (i <= r_max_out)? i : i - YSIZE(f2d);
+		const int y2 = y * y;
 
-		y2 = y * y;
-		for (int x=0; x <= my_r_max; x++)
+		const int x_max = FLOOR(sqrt(r_max_out_2 - y2));
+
+		for (int x = 0; x <= x_max; x++)
 		{
-	    	// Only include points with radius < max_r (exclude points outside circle in square)
-			r2 = x * x + y2;
-			if (r2 > max_r2)
-				continue;
+			// sqrt(x*x + y*y) guaranteed to be < r_max_out
 
 			// Get logical coordinates in the 3D map
-			xp = Ainv(0,0) * x + Ainv(0,1) * y;
-			yp = Ainv(1,0) * x + Ainv(1,1) * y;
-			zp = Ainv(2,0) * x + Ainv(2,1) * y;
+			RFLOAT xp = Ainv(0,0) * x + Ainv(0,1) * y;
+			RFLOAT yp = Ainv(1,0) * x + Ainv(1,1) * y;
+			RFLOAT zp = Ainv(2,0) * x + Ainv(2,1) * y;
 
-			if (interpolator == TRILINEAR || r2 < min_r2_nn)
+			const RFLOAT r_ref_2 = xp*xp + yp*yp + zp*zp;
+
+			if (r_ref_2 > r_max_ref_2) continue;
+
+			if (interpolator == TRILINEAR || r_ref_2 < r_min_NN_ref_2)
 			{
-
 				// Only asymmetric half is stored
-				if (xp < 0)
+
+				bool is_neg_x = (xp < 0);
+
+				if (is_neg_x)
 				{
 					// Get complex conjugated hermitian symmetry pair
 					xp = -xp;
 					yp = -yp;
 					zp = -zp;
-					is_neg_x = true;
-				}
-				else
-				{
-					is_neg_x = false;
 				}
 
 				// Trilinear interpolation (with physical coords)
 				// Subtract STARTINGY and STARTINGZ to accelerate access to data (STARTINGX=0)
 				// In that way use DIRECT_A3D_ELEM, rather than A3D_ELEM
-    			x0 = FLOOR(xp);
-				fx = xp - x0;
-				x1 = x0 + 1;
+				const int x0 = FLOOR(xp);
+				const RFLOAT fx = xp - x0;
+				const int x1 = x0 + 1;
 
-				y0 = FLOOR(yp);
-				fy = yp - y0;
+				int y0 = FLOOR(yp);
+				const RFLOAT fy = yp - y0;
 				y0 -=  STARTINGY(data);
-				y1 = y0 + 1;
+				const int y1 = y0 + 1;
 
-				z0 = FLOOR(zp);
-				fz = zp - z0;
+				int z0 = FLOOR(zp);
+				const RFLOAT fz = zp - z0;
 				z0 -= STARTINGZ(data);
-				z1 = z0 + 1;
+				const int z1 = z0 + 1;
+
+				// Avoid reading outside the box
+				if (x0 < 0 || x0+1 >= data.xdim
+				 || y0 < 0 || y0+1 >= data.ydim
+				 || z0 < 0 || z0+1 >= data.zdim)
+				{
+					continue;
+				}
 
 				// Matrix access can be accelerated through pre-calculation of z0*xydim etc.
-				d000 = DIRECT_A3D_ELEM(data, z0, y0, x0);
-				d001 = DIRECT_A3D_ELEM(data, z0, y0, x1);
-				d010 = DIRECT_A3D_ELEM(data, z0, y1, x0);
-				d011 = DIRECT_A3D_ELEM(data, z0, y1, x1);
-				d100 = DIRECT_A3D_ELEM(data, z1, y0, x0);
-				d101 = DIRECT_A3D_ELEM(data, z1, y0, x1);
-				d110 = DIRECT_A3D_ELEM(data, z1, y1, x0);
-				d111 = DIRECT_A3D_ELEM(data, z1, y1, x1);
+				const Complex d000 = DIRECT_A3D_ELEM(data, z0, y0, x0);
+				const Complex d001 = DIRECT_A3D_ELEM(data, z0, y0, x1);
+				const Complex d010 = DIRECT_A3D_ELEM(data, z0, y1, x0);
+				const Complex d011 = DIRECT_A3D_ELEM(data, z0, y1, x1);
+				const Complex d100 = DIRECT_A3D_ELEM(data, z1, y0, x0);
+				const Complex d101 = DIRECT_A3D_ELEM(data, z1, y0, x1);
+				const Complex d110 = DIRECT_A3D_ELEM(data, z1, y1, x0);
+				const Complex d111 = DIRECT_A3D_ELEM(data, z1, y1, x1);
 
 				// Set the interpolated value in the 2D output array
-				dx00 = LIN_INTERP(fx, d000, d001);
-				dx01 = LIN_INTERP(fx, d100, d101);
-				dx10 = LIN_INTERP(fx, d010, d011);
-				dx11 = LIN_INTERP(fx, d110, d111);
-				dxy0 = LIN_INTERP(fy, dx00, dx10);
-				dxy1 = LIN_INTERP(fy, dx01, dx11);
+				const Complex dx00 = LIN_INTERP(fx, d000, d001);
+				const Complex dx01 = LIN_INTERP(fx, d100, d101);
+				const Complex dx10 = LIN_INTERP(fx, d010, d011);
+				const Complex dx11 = LIN_INTERP(fx, d110, d111);
+				const Complex dxy0 = LIN_INTERP(fy, dx00, dx10);
+				const Complex dxy1 = LIN_INTERP(fy, dx01, dx11);
+
 				DIRECT_A2D_ELEM(f2d, i, x) = LIN_INTERP(fz, dxy0, dxy1);
 
 				// Take complex conjugated for half with negative x
 				if (is_neg_x)
+				{
 					DIRECT_A2D_ELEM(f2d, i, x) = conj(DIRECT_A2D_ELEM(f2d, i, x));
+				}
 
 			} // endif TRILINEAR
-			else if (interpolator == NEAREST_NEIGHBOUR )
+			else if (interpolator == NEAREST_NEIGHBOUR ) // never actually used
 			{
-				x0 = ROUND(xp);
-				y0 = ROUND(yp);
-				z0 = ROUND(zp);
-				if (x0 < 0)
-					DIRECT_A2D_ELEM(f2d, i, x) = conj(A3D_ELEM(data, -z0, -y0, -x0));
+				int x0 = ROUND(xp);
+				int y0 = ROUND(yp);
+				int z0 = ROUND(zp);
+
+				const bool is_neg_x = (x0 < 0);
+
+				if (is_neg_x)
+				{
+					// Get complex conjugated hermitian symmetry pair
+					x0 = -x0;
+					y0 = -y0;
+					z0 = -z0;
+				}
+
+				const int xr = x0 - STARTINGX(data);
+				const int yr = y0 - STARTINGY(data);
+				const int zr = z0 - STARTINGZ(data);
+
+				if (xr < 0 || xr >= data.xdim
+				 || yr < 0 || yr >= data.ydim
+				 || zr < 0 || zr >= data.zdim)
+				{
+					continue;
+				}
+
+				if (is_neg_x)
+				{
+					DIRECT_A2D_ELEM(f2d, i, x) = conj(DIRECT_A3D_ELEM(data, zr, yr, xr));
+				}
 				else
-					DIRECT_A2D_ELEM(f2d, i, x) = A3D_ELEM(data, z0, y0, x0);
+				{
+					DIRECT_A2D_ELEM(f2d, i, x) = A3D_ELEM(data, zr, yr, xr);
+				}
 
 			} // endif NEAREST_NEIGHBOUR
 			else
+			{
 				REPORT_ERROR("Unrecognized interpolator in Projector::project");
+			}
 
 		} // endif x-loop
 	} // endif y-loop
@@ -465,45 +482,42 @@ void Projector::project(MultidimArray<Complex > &f2d, Matrix2D<RFLOAT> &A, bool 
     std::cerr << "done with project..." << std::endl;
 #endif
 }
-void Projector::project2Dto1D(MultidimArray<Complex > &f1d, Matrix2D<RFLOAT> &A, bool inv)
+
+void Projector::projectGradient(Volume<t2Vector<Complex>>& img_out, Matrix2D<RFLOAT>& At)
 {
-	RFLOAT fx, fy, xp, yp;
-	int x0, x1, y0, y1, y, y2, r2;
-	bool is_neg_x;
-	Complex d00, d01, d10, d11;
-	Complex dx0, dx1;
-	Matrix2D<RFLOAT> Ainv;
+	const int s = img_out.dimy;
+	const int sh = img_out.dimx;
 
-    // f1d should already be in the right size (ori_size,orihalfdim)
-    // AND the points outside r_max should already be zero...
-    // f1d.initZeros();
+	Matrix2D<RFLOAT> Ainv = At.inv();
 
-	// Use the inverse matrix
-    if (inv)
-    	Ainv = A;
-    else
-    	Ainv = A.transpose();
+	// Go from the 2D slice coordinates to the 3D coordinates
+	Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
 
-    // The f2d image may be smaller than r_max, in that case also make sure not to fill the corners!
-    int my_r_max = XMIPP_MIN(r_max, XSIZE(f1d) - 1);
-
-    // Go from the 2D slice coordinates to the 3D coordinates
-    Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
-
-	for (int x=0; x <= my_r_max; x++)
+	for (int yy = 0; yy < s; yy++)
 	{
+		const double y = yy < sh? yy : yy - s;
+		const double y2 = y * y;
 
-		// Get logical coordinates in the 2D map
-		xp = Ainv(0,0) * x;
-		yp = Ainv(1,0) * x;
-		if (interpolator == TRILINEAR || x < r_min_nn)
+		for (int xx = 0; xx < sh; xx++)
 		{
+			const double x = xx;
+
+			if (x*x + y2 > sh*sh) continue;
+
+			// Get logical coordinates in the 3D map
+			double xp = Ainv(0,0) * x + Ainv(0,1) * y;
+			double yp = Ainv(1,0) * x + Ainv(1,1) * y;
+			double zp = Ainv(2,0) * x + Ainv(2,1) * y;
+
+			bool is_neg_x;
+
 			// Only asymmetric half is stored
 			if (xp < 0)
 			{
 				// Get complex conjugated hermitian symmetry pair
 				xp = -xp;
 				yp = -yp;
+				zp = -zp;
 				is_neg_x = true;
 			}
 			else
@@ -512,325 +526,427 @@ void Projector::project2Dto1D(MultidimArray<Complex > &f1d, Matrix2D<RFLOAT> &A,
 			}
 
 			// Trilinear interpolation (with physical coords)
-			// Subtract STARTINGY to accelerate access to data (STARTINGX=0)
+			// Subtract STARTINGY and STARTINGZ to accelerate access to data (STARTINGX=0)
 			// In that way use DIRECT_A3D_ELEM, rather than A3D_ELEM
-			x0 = FLOOR(xp);
-			fx = xp - x0;
-			x1 = x0 + 1;
 
-			y0 = FLOOR(yp);
-			fy = yp - y0;
+			int x0 = FLOOR(xp);
+			double fx = xp - x0;
+			int x1 = x0 + 1;
+
+			int y0 = FLOOR(yp);
+			double fy = yp - y0;
 			y0 -=  STARTINGY(data);
-			y1 = y0 + 1;
+			int y1 = y0 + 1;
 
-			// Matrix access can be accelerated through pre-calculation of z0*xydim etc.
-			d00 = DIRECT_A2D_ELEM(data, y0, x0);
-			d01 = DIRECT_A2D_ELEM(data, y0, x1);
-			d10 = DIRECT_A2D_ELEM(data, y1, x0);
-			d11 = DIRECT_A2D_ELEM(data, y1, x1);
+			int z0 = FLOOR(zp);
+			double fz = zp - z0;
+			z0 -= STARTINGZ(data);
+			int z1 = z0 + 1;
 
-			// Set the interpolated value in the 2D output array
-			dx0 = LIN_INTERP(fx, d00, d01);
-			dx1 = LIN_INTERP(fx, d10, d11);
-			DIRECT_A1D_ELEM(f1d, x) = LIN_INTERP(fy, dx0, dx1);
+			if (x0 < 0 || x0+1 >= data.xdim
+			 || y0 < 0 || y0+1 >= data.ydim
+			 || z0 < 0 || z0+1 >= data.zdim)
+			{
+				img_out(xx, yy, 0) = t2Vector<Complex>(Complex(0.0, 0.0), Complex(0.0, 0.0));
+				continue;
+			}
+
+			Complex v000 = DIRECT_A3D_ELEM(data, z0, y0, x0);
+			Complex v001 = DIRECT_A3D_ELEM(data, z0, y0, x1);
+			Complex v010 = DIRECT_A3D_ELEM(data, z0, y1, x0);
+			Complex v011 = DIRECT_A3D_ELEM(data, z0, y1, x1);
+			Complex v100 = DIRECT_A3D_ELEM(data, z1, y0, x0);
+			Complex v101 = DIRECT_A3D_ELEM(data, z1, y0, x1);
+			Complex v110 = DIRECT_A3D_ELEM(data, z1, y1, x0);
+			Complex v111 = DIRECT_A3D_ELEM(data, z1, y1, x1);
+
+			Complex v00 = LIN_INTERP(fx, v000, v001);
+			Complex v10 = LIN_INTERP(fx, v100, v101);
+			Complex v01 = LIN_INTERP(fx, v010, v011);
+			Complex v11 = LIN_INTERP(fx, v110, v111);
+
+			Complex v0 = LIN_INTERP(fy, v00, v01);
+			Complex v1 = LIN_INTERP(fy, v10, v11);
+
+			// Complex v = LIN_INTERP(fz, v0, v1);
+
+			Complex v00_dx = v001 - v000;
+			Complex v10_dx = v101 - v100;
+			Complex v01_dx = v011 - v010;
+			Complex v11_dx = v111 - v110;
+			Complex v0_dx = LIN_INTERP(fy, v00_dx, v01_dx);
+			Complex v1_dx = LIN_INTERP(fy, v10_dx, v11_dx);
+			Complex v_dx = LIN_INTERP(fz, v0_dx, v1_dx);
+
+			Complex v0_dy = v01 - v00;
+			Complex v1_dy = v11 - v10;
+			Complex v_dy = LIN_INTERP(fz, v0_dy, v1_dy);
+
+			Complex v_dz = v1 - v0;
+
+			t3Vector<Complex> grad3D(v_dx, v_dy, v_dz);
+
 			// Take complex conjugated for half with negative x
 			if (is_neg_x)
+			{
+				grad3D.x = -(grad3D.x).conj();
+				grad3D.y = -(grad3D.y).conj();
+				grad3D.z = -(grad3D.z).conj();
+			}
+
+			img_out(xx, yy, 0).x = Ainv(0,0) * grad3D.x + Ainv(1,0) * grad3D.y + Ainv(2,0) * grad3D.z;
+			img_out(xx, yy, 0).y = Ainv(0,1) * grad3D.x + Ainv(1,1) * grad3D.y + Ainv(2,1) * grad3D.z;
+		} // endif x-loop
+	} // endif y-loop
+}
+
+// Never actually used:
+void Projector::project2Dto1D(MultidimArray<Complex > &f1d, Matrix2D<RFLOAT> &A)
+{
+	// f1d should already be in the right size (ori_size,orihalfdim)
+	// AND the points outside r_max should already be zero...
+	// f1d.initZeros();
+
+	Matrix2D<RFLOAT> Ainv = A.inv();
+	Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
+
+	// The f2d image may be smaller than r_max, in that case also make sure not to fill the corners!
+	const int r_max_out = XSIZE(f1d) - 1;
+
+	const int r_max_ref = r_max * padding_factor;
+	const int r_max_ref_2 = r_max_ref * r_max_ref;
+
+	const int r_min_NN_ref_2 = r_min_nn * r_min_nn * padding_factor * padding_factor;
+
+
+	for (int x = 0; x <= r_max_out; x++)
+	{
+		// Get logical coordinates in the 2D map
+		RFLOAT xp = Ainv(0,0) * x;
+		RFLOAT yp = Ainv(1,0) * x;
+
+		const RFLOAT r_ref_2 = xp*xp + yp*yp;
+
+		if (r_ref_2 > r_max_ref_2) continue;
+
+		if (interpolator == TRILINEAR || r_ref_2 < r_min_NN_ref_2)
+		{
+			// Only asymmetric half is stored
+			const bool is_neg_x = xp < 0;
+
+			if (is_neg_x)
+			{
+				// Get complex conjugated hermitian symmetry pair
+				xp = -xp;
+				yp = -yp;
+			}
+
+			// Trilinear interpolation (with physical coords)
+			// Subtract STARTINGY to accelerate access to data (STARTINGX=0)
+			// In that way use DIRECT_A3D_ELEM, rather than A3D_ELEM
+			const int x0 = FLOOR(xp);
+			const RFLOAT fx = xp - x0;
+			const int x1 = x0 + 1;
+
+			int y0 = FLOOR(yp);
+			const RFLOAT fy = yp - y0;
+			y0 -=  STARTINGY(data);
+			const int y1 = y0 + 1;
+
+			// Matrix access can be accelerated through pre-calculation of z0*xydim etc.
+			const Complex d00 = DIRECT_A2D_ELEM(data, y0, x0);
+			const Complex d01 = DIRECT_A2D_ELEM(data, y0, x1);
+			const Complex d10 = DIRECT_A2D_ELEM(data, y1, x0);
+			const Complex d11 = DIRECT_A2D_ELEM(data, y1, x1);
+
+			// Set the interpolated value in the 2D output array
+			const Complex dx0 = LIN_INTERP(fx, d00, d01);
+			const Complex dx1 = LIN_INTERP(fx, d10, d11);
+
+			DIRECT_A1D_ELEM(f1d, x) = LIN_INTERP(fy, dx0, dx1);
+
+			// Take complex conjugated for half with negative x
+			if (is_neg_x)
+			{
 				DIRECT_A1D_ELEM(f1d, x) = conj(DIRECT_A1D_ELEM(f1d, x));
+			}
 
 		} // endif TRILINEAR
 		else if (interpolator == NEAREST_NEIGHBOUR )
 		{
+			const int x0 = ROUND(xp);
+			const int y0 = ROUND(yp);
 
-			x0 = ROUND(xp);
-			y0 = ROUND(yp);
 			if (x0 < 0)
+			{
 				DIRECT_A1D_ELEM(f1d, x) = conj(A2D_ELEM(data, -y0, -x0));
+			}
 			else
+			{
 				DIRECT_A1D_ELEM(f1d, x) = A2D_ELEM(data, y0, x0);
+			}
 
 		} // endif NEAREST_NEIGHBOUR
 		else
+		{
 			REPORT_ERROR("Unrecognized interpolator in Projector::project2Dto1D");
-
+		}
 	} // endif x-loop
-
-
 }
 
-void Projector::rotate2D(MultidimArray<Complex > &f2d, Matrix2D<RFLOAT> &A, bool inv)
+void Projector::rotate2D(MultidimArray<Complex > &f2d, Matrix2D<RFLOAT> &A)
 {
-	RFLOAT fx, fy, xp, yp;
-	int x0, x1, y0, y1, y, y2, r2;
-	bool is_neg_x;
-	Complex d00, d01, d10, d11, dx0, dx1;
-	Matrix2D<RFLOAT> Ainv;
+	// f2d should already be in the right size (ori_size,orihalfdim)
+	// AND the points outside max_r should already be zero...
+	// f2d.initZeros();
 
-    // f2d should already be in the right size (ori_size,orihalfdim)
-    // AND the points outside max_r should already be zero...
-    // f2d.initZeros();
 	// Use the inverse matrix
-    if (inv)
-    	Ainv = A;
-    else
-    	Ainv = A.transpose();
+	Matrix2D<RFLOAT> Ainv = A.inv();
+	Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
 
-    // The f2d image may be smaller than r_max, in that case also make sure not to fill the corners!
-    int my_r_max = XMIPP_MIN(r_max, XSIZE(f2d) - 1);
+	// The f2d image may be smaller than r_max, in that case also make sure not to fill the corners!
+	const int r_max_out = XSIZE(f2d) - 1;
+	const int r_max_out_2 = r_max_out * r_max_out;
 
-    // Go from the 2D slice coordinates to the map coordinates
-    Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
-    int max_r2 = my_r_max * my_r_max;
-    int min_r2_nn = r_min_nn * r_min_nn;
+	const int r_max_ref = r_max * padding_factor;
+	const int r_max_ref_2 = r_max_ref * r_max_ref;
+
+	const int r_min_NN_ref_2 = r_min_nn * r_min_nn * padding_factor * padding_factor;
+
 #ifdef DEBUG
-    std::cerr << " XSIZE(f2d)= "<< XSIZE(f2d) << std::endl;
-    std::cerr << " YSIZE(f2d)= "<< YSIZE(f2d) << std::endl;
-    std::cerr << " XSIZE(data)= "<< XSIZE(data) << std::endl;
-    std::cerr << " YSIZE(data)= "<< YSIZE(data) << std::endl;
-    std::cerr << " STARTINGX(data)= "<< STARTINGX(data) << std::endl;
-    std::cerr << " STARTINGY(data)= "<< STARTINGY(data) << std::endl;
-    std::cerr << " STARTINGZ(data)= "<< STARTINGZ(data) << std::endl;
-    std::cerr << " max_r= "<< r_max << std::endl;
-    std::cerr << " Ainv= " << Ainv << std::endl;
+	std::cerr << " XSIZE(f2d)= "<< XSIZE(f2d) << std::endl;
+	std::cerr << " YSIZE(f2d)= "<< YSIZE(f2d) << std::endl;
+	std::cerr << " XSIZE(data)= "<< XSIZE(data) << std::endl;
+	std::cerr << " YSIZE(data)= "<< YSIZE(data) << std::endl;
+	std::cerr << " STARTINGX(data)= "<< STARTINGX(data) << std::endl;
+	std::cerr << " STARTINGY(data)= "<< STARTINGY(data) << std::endl;
+	std::cerr << " STARTINGZ(data)= "<< STARTINGZ(data) << std::endl;
+	std::cerr << " max_r= "<< r_max << std::endl;
+	std::cerr << " Ainv= " << Ainv << std::endl;
 #endif
+
 	for (int i=0; i < YSIZE(f2d); i++)
 	{
-		// Don't search beyond square with side max_r
-		if (i <= my_r_max)
-		{
-			y = i;
-		}
-		else if (i >= YSIZE(f2d) - my_r_max)
-		{
-			y = i - YSIZE(f2d);
-		}
-		else
-			continue;
-		y2 = y * y;
-		for (int x=0; x <= my_r_max; x++)
-		{
-	    	// Only include points with radius < max_r (exclude points outside circle in square)
-			r2 = x * x + y2;
-			if (r2 > max_r2)
-				continue;
+		const int y = (i <= r_max_out)? i : i - YSIZE(f2d);
+		const int y2 = y * y;
 
-			// Get logical coordinates in the 3D map
-			xp = Ainv(0,0) * x + Ainv(0,1) * y;
-			yp = Ainv(1,0) * x + Ainv(1,1) * y;
-			if (interpolator == TRILINEAR || r2 < min_r2_nn)
+		const int x_max = FLOOR(sqrt(r_max_out_2 - y2));
+
+		for (int x = 0; x <= x_max; x++)
+		{
+			// sqrt(x*x + y*y) guaranteed to be < r_max_out
+
+			RFLOAT xp = Ainv(0,0) * x + Ainv(0,1) * y;
+			RFLOAT yp = Ainv(1,0) * x + Ainv(1,1) * y;
+
+			const int r_ref_2 = xp*xp + yp*yp;
+
+			if (r_ref_2 > r_max_ref_2) continue;
+
+			if (interpolator == TRILINEAR || r_ref_2 < r_min_NN_ref_2)
 			{
+				const bool is_neg_x = xp < 0;
+
 				// Only asymmetric half is stored
-				if (xp < 0)
+				if (is_neg_x)
 				{
 					// Get complex conjugated hermitian symmetry pair
 					xp = -xp;
 					yp = -yp;
-					is_neg_x = true;
-				}
-				else
-				{
-					is_neg_x = false;
 				}
 
 				// Trilinear interpolation (with physical coords)
 				// Subtract STARTINGY to accelerate access to data (STARTINGX=0)
 				// In that way use DIRECT_A3D_ELEM, rather than A3D_ELEM
-    			x0 = FLOOR(xp);
-				fx = xp - x0;
-				x1 = x0 + 1;
+    			const int x0 = FLOOR(xp);
+				const RFLOAT fx = xp - x0;
+				const int x1 = x0 + 1;
 
-				y0 = FLOOR(yp);
-				fy = yp - y0;
+				int y0 = FLOOR(yp);
+				const RFLOAT fy = yp - y0;
 				y0 -=  STARTINGY(data);
-				y1 = y0 + 1;
+				const int y1 = y0 + 1;
 
 				// Matrix access can be accelerated through pre-calculation of z0*xydim etc.
-				d00 = DIRECT_A2D_ELEM(data, y0, x0);
-				d01 = DIRECT_A2D_ELEM(data, y0, x1);
-				d10 = DIRECT_A2D_ELEM(data, y1, x0);
-				d11 = DIRECT_A2D_ELEM(data, y1, x1);
+				const Complex d00 = DIRECT_A2D_ELEM(data, y0, x0);
+				const Complex d01 = DIRECT_A2D_ELEM(data, y0, x1);
+				const Complex d10 = DIRECT_A2D_ELEM(data, y1, x0);
+				const Complex d11 = DIRECT_A2D_ELEM(data, y1, x1);
 
 				// Set the interpolated value in the 2D output array
-				dx0 = LIN_INTERP(fx, d00, d01);
-				dx1 = LIN_INTERP(fx, d10, d11);
+				const Complex dx0 = LIN_INTERP(fx, d00, d01);
+				const Complex dx1 = LIN_INTERP(fx, d10, d11);
+
 				DIRECT_A2D_ELEM(f2d, i, x) = LIN_INTERP(fy, dx0, dx1);
+
 				// Take complex conjugated for half with negative x
 				if (is_neg_x)
+				{
 					DIRECT_A2D_ELEM(f2d, i, x) = conj(DIRECT_A2D_ELEM(f2d, i, x));
+				}
 			} // endif TRILINEAR
-			else if (interpolator == NEAREST_NEIGHBOUR )
+			else if (interpolator == NEAREST_NEIGHBOUR ) // never used
 			{
-				x0 = ROUND(xp);
-				y0 = ROUND(yp);
+				const int x0 = ROUND(xp);
+				const int y0 = ROUND(yp);
+
 				if (x0 < 0)
+				{
 					DIRECT_A2D_ELEM(f2d, i, x) = conj(A2D_ELEM(data, -y0, -x0));
+				}
 				else
+				{
 					DIRECT_A2D_ELEM(f2d, i, x) = A2D_ELEM(data, y0, x0);
+				}
 			} // endif NEAREST_NEIGHBOUR
 			else
+			{
 				REPORT_ERROR("Unrecognized interpolator in Projector::project");
+			}
 		} // endif x-loop
 	} // endif y-loop
 }
 
 
-void Projector::rotate3D(MultidimArray<Complex > &f3d, Matrix2D<RFLOAT> &A, bool inv)
+void Projector::rotate3D(MultidimArray<Complex > &f3d, Matrix2D<RFLOAT> &A)
 {
-	RFLOAT fx, fy, fz, xp, yp, zp;
-	int x0, x1, y0, y1, z0, z1, y, z, y2, z2, r2;
-	bool is_neg_x;
-	Complex d000, d010, d100, d110, d001, d011, d101, d111, dx00, dx10, dxy0, dx01, dx11, dxy1;
-	Matrix2D<RFLOAT> Ainv;
+	// f3d should already be in the right size (ori_size,orihalfdim)
+	// AND the points outside max_r should already be zero
+	// f3d.initZeros();
 
-    // f3d should already be in the right size (ori_size,orihalfdim)
-    // AND the points outside max_r should already be zero...
-    // f3d.initZeros();
 	// Use the inverse matrix
-    if (inv)
-    	Ainv = A;
-    else
-    	Ainv = A.transpose();
+	Matrix2D<RFLOAT> Ainv = A.inv();
+	Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
 
-    // The f3d image may be smaller than r_max, in that case also make sure not to fill the corners!
-    int my_r_max = XMIPP_MIN(r_max, XSIZE(f3d) - 1);
+	const int r_max_out = XSIZE(f3d) - 1;
+	const int r_max_out_2 = r_max_out * r_max_out;
 
-    // Go from the 3D rotated coordinates to the original map coordinates
-    Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
-    int max_r2 = my_r_max * my_r_max;
-    int min_r2_nn = r_min_nn * r_min_nn;
+	const int r_max_ref = r_max * padding_factor;
+	const int r_max_ref_2 = r_max_ref * r_max_ref;
+
+	const int r_min_NN_ref_2 = r_min_nn * r_min_nn * padding_factor * padding_factor;
+
 #ifdef DEBUG
-    std::cerr << " XSIZE(f3d)= "<< XSIZE(f3d) << std::endl;
-    std::cerr << " YSIZE(f3d)= "<< YSIZE(f3d) << std::endl;
-    std::cerr << " XSIZE(data)= "<< XSIZE(data) << std::endl;
-    std::cerr << " YSIZE(data)= "<< YSIZE(data) << std::endl;
-    std::cerr << " STARTINGX(data)= "<< STARTINGX(data) << std::endl;
-    std::cerr << " STARTINGY(data)= "<< STARTINGY(data) << std::endl;
-    std::cerr << " STARTINGZ(data)= "<< STARTINGZ(data) << std::endl;
-    std::cerr << " max_r= "<< r_max << std::endl;
-    std::cerr << " Ainv= " << Ainv << std::endl;
+	std::cerr << " XSIZE(f3d)= "<< XSIZE(f3d) << std::endl;
+	std::cerr << " YSIZE(f3d)= "<< YSIZE(f3d) << std::endl;
+	std::cerr << " XSIZE(data)= "<< XSIZE(data) << std::endl;
+	std::cerr << " YSIZE(data)= "<< YSIZE(data) << std::endl;
+	std::cerr << " STARTINGX(data)= "<< STARTINGX(data) << std::endl;
+	std::cerr << " STARTINGY(data)= "<< STARTINGY(data) << std::endl;
+	std::cerr << " STARTINGZ(data)= "<< STARTINGZ(data) << std::endl;
+	std::cerr << " max_r= "<< r_max << std::endl;
+	std::cerr << " Ainv= " << Ainv << std::endl;
 #endif
-	for (int k=0; k < ZSIZE(f3d); k++)
+
+	for (int k = 0; k < ZSIZE(f3d); k++)
 	{
-		// Don't search beyond square with side max_r
-		if (k <= my_r_max)
-		{
-			z = k;
-		}
-		else if (k >= ZSIZE(f3d) - my_r_max)
-		{
-			z = k - ZSIZE(f3d);
-		}
-		else
-			continue;
-		z2 = z * z;
+		const int z = (k <= r_max_out)? k : k - ZSIZE(f3d);
+		const int z2 = z * z;
 
-		for (int i=0; i < YSIZE(f3d); i++)
+		for (int i = 0; i < YSIZE(f3d); i++)
 		{
-			// Don't search beyond square with side max_r
-			if (i <= my_r_max)
-			{
-				y = i;
-			}
-			else if (i >= YSIZE(f3d) - my_r_max)
-			{
-				y = i - YSIZE(f3d);
-			}
-			else
-				continue;
-			y2 = y * y;
+			const int y = (i <= r_max_out)? i : i - YSIZE(f3d);
+			const int y2 = y * y;
 
-			for (int x=0; x <= my_r_max; x++)
-			{
-				// Only include points with radius < max_r (exclude points outside circle in square)
-				r2 = x * x + y2 + z2;
-				if (r2 > max_r2)
-					continue;
+			const RFLOAT yz2 = y2 + z2;
 
+			// avoid negative square root
+			if (yz2 > r_max_out_2) continue;
+
+			const int x_max = FLOOR(sqrt(r_max_out_2 - yz2));
+
+			for (int x = 0; x <= x_max; x++)
+			{
 				// Get logical coordinates in the 3D map
-				xp = Ainv(0,0) * x + Ainv(0,1) * y + Ainv(0,2) * z;
-				yp = Ainv(1,0) * x + Ainv(1,1) * y + Ainv(1,2) * z;
-				zp = Ainv(2,0) * x + Ainv(2,1) * y + Ainv(2,2) * z;
+				RFLOAT xp = Ainv(0,0) * x + Ainv(0,1) * y + Ainv(0,2) * z;
+				RFLOAT yp = Ainv(1,0) * x + Ainv(1,1) * y + Ainv(1,2) * z;
+				RFLOAT zp = Ainv(2,0) * x + Ainv(2,1) * y + Ainv(2,2) * z;
 
-				if (interpolator == TRILINEAR || r2 < min_r2_nn)
+				const int r_ref_2 = xp*xp + yp*yp + zp*zp;
+
+				if (r_ref_2 > r_max_ref_2) continue;
+
+				if (interpolator == TRILINEAR || r_ref_2 < r_min_NN_ref_2)
 				{
 					// Only asymmetric half is stored
-					if (xp < 0)
+					const bool is_neg_x = (xp < 0);
+
+					if (is_neg_x)
 					{
 						// Get complex conjugated hermitian symmetry pair
 						xp = -xp;
 						yp = -yp;
 						zp = -zp;
-						is_neg_x = true;
-					}
-					else
-					{
-						is_neg_x = false;
 					}
 
 					// Trilinear interpolation (with physical coords)
 					// Subtract STARTINGY to accelerate access to data (STARTINGX=0)
 					// In that way use DIRECT_A3D_ELEM, rather than A3D_ELEM
-					x0 = FLOOR(xp);
-					fx = xp - x0;
-					x1 = x0 + 1;
+					const int x0 = FLOOR(xp);
+					const RFLOAT fx = xp - x0;
+					const int x1 = x0 + 1;
 
-					y0 = FLOOR(yp);
-					fy = yp - y0;
+					int y0 = FLOOR(yp);
+					const RFLOAT fy = yp - y0;
 					y0 -=  STARTINGY(data);
-					y1 = y0 + 1;
+					const int y1 = y0 + 1;
 
-					z0 = FLOOR(zp);
-					fz = zp - z0;
+					int z0 = FLOOR(zp);
+					const RFLOAT fz = zp - z0;
 					z0 -=  STARTINGZ(data);
-					z1 = z0 + 1;
+					const int z1 = z0 + 1;
 
 					// Matrix access can be accelerated through pre-calculation of z0*xydim etc.
-					d000 = DIRECT_A3D_ELEM(data, z0, y0, x0);
-					d001 = DIRECT_A3D_ELEM(data, z0, y0, x1);
-					d010 = DIRECT_A3D_ELEM(data, z0, y1, x0);
-					d011 = DIRECT_A3D_ELEM(data, z0, y1, x1);
-					d100 = DIRECT_A3D_ELEM(data, z1, y0, x0);
-					d101 = DIRECT_A3D_ELEM(data, z1, y0, x1);
-					d110 = DIRECT_A3D_ELEM(data, z1, y1, x0);
-					d111 = DIRECT_A3D_ELEM(data, z1, y1, x1);
+					const Complex d000 = DIRECT_A3D_ELEM(data, z0, y0, x0);
+					const Complex d001 = DIRECT_A3D_ELEM(data, z0, y0, x1);
+					const Complex d010 = DIRECT_A3D_ELEM(data, z0, y1, x0);
+					const Complex d011 = DIRECT_A3D_ELEM(data, z0, y1, x1);
+					const Complex d100 = DIRECT_A3D_ELEM(data, z1, y0, x0);
+					const Complex d101 = DIRECT_A3D_ELEM(data, z1, y0, x1);
+					const Complex d110 = DIRECT_A3D_ELEM(data, z1, y1, x0);
+					const Complex d111 = DIRECT_A3D_ELEM(data, z1, y1, x1);
 
 					// Set the interpolated value in the 2D output array
 					// interpolate in x
-					dx00 = LIN_INTERP(fx, d000, d001);
-					dx01 = LIN_INTERP(fx, d100, d101);
-					dx10 = LIN_INTERP(fx, d010, d011);
-					dx11 = LIN_INTERP(fx, d110, d111);
+					const Complex dx00 = LIN_INTERP(fx, d000, d001);
+					const Complex dx01 = LIN_INTERP(fx, d100, d101);
+					const Complex dx10 = LIN_INTERP(fx, d010, d011);
+					const Complex dx11 = LIN_INTERP(fx, d110, d111);
 					// interpolate in y
-					dxy0 = LIN_INTERP(fy, dx00, dx10);
-					dxy1 = LIN_INTERP(fy, dx01, dx11);
+					const Complex dxy0 = LIN_INTERP(fy, dx00, dx10);
+					const Complex dxy1 = LIN_INTERP(fy, dx01, dx11);
 					//interpolate in z
 					DIRECT_A3D_ELEM(f3d, k, i, x) = LIN_INTERP(fz, dxy0, dxy1);
 
 					// Take complex conjugated for half with negative x
 					if (is_neg_x)
+					{
 						DIRECT_A3D_ELEM(f3d, k, i, x) = conj(DIRECT_A3D_ELEM(f3d, k, i, x));
+					}
 
 				} // endif TRILINEAR
 				else if (interpolator == NEAREST_NEIGHBOUR )
 				{
-					x0 = ROUND(xp);
-					y0 = ROUND(yp);
-					z0 = ROUND(zp);
+					const int x0 = ROUND(xp);
+					const int y0 = ROUND(yp);
+					const int z0 = ROUND(zp);
 
 					if (x0 < 0)
+					{
 						DIRECT_A3D_ELEM(f3d, k, i, x) = conj(A3D_ELEM(data, -z0, -y0, -x0));
+					}
 					else
+					{
 						DIRECT_A3D_ELEM(f3d, k, i, x) = A3D_ELEM(data, z0, y0, x0);
+					}
 
 				} // endif NEAREST_NEIGHBOUR
 				else
+				{
 					REPORT_ERROR("Unrecognized interpolator in Projector::project");
+				}
 			} // endif x-loop
 		} // endif y-loop
 	} // endif z-loop
 }
-
-
-
-
-
 

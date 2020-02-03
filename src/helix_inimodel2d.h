@@ -96,7 +96,7 @@ public:
 	int random_seed;
 
 	// Diameter of circular mask within to extract images
-	float mask_diameter;
+	float mask_diameter, mask_radius_pix;
 
 	// Maximum resolution to be taken into account (approximate, as adjusted to accommodate exact crossover_distance
 	float maxres;
@@ -115,6 +115,7 @@ public:
 
 	// How many pixels to search up and down?
 	int max_shift;
+	RFLOAT max_shift_A;
 
 	// How many degrees to rotate?
 	RFLOAT max_rotate;
@@ -138,9 +139,14 @@ public:
 	// Filename of initial 2D reconstruction for model
 	FileName fn_inimodel;
 
+	// Only make 3d
+	bool do_only_make_3d;
+
 	// Symmetry order (Cn)
 	int symmetry;
 
+	// Number of openMP threads
+	int nr_threads;
 
 private:
 
@@ -164,6 +170,10 @@ private:
 
 	// Pre-read (rotated versions of) all Xrect of the (downscaled) images into RAM
 	std::vector<std::vector<MultidimArray<RFLOAT> > > Xrects;
+
+	// Foroptimal orientation control
+	std::vector<RFLOAT> psis, ori_psis, ori_yoffs;
+	MetaDataTable MD;
 
 
 public:

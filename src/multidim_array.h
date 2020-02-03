@@ -428,15 +428,15 @@ class MultidimArray;
 
 template<typename T>
 void coreArrayByScalar(const MultidimArray<T>& op1, const T& op2,
-                       MultidimArray<T>& result, char operation);
+                       MultidimArray<T>& result, const char operation);
 
 template<typename T>
 void coreScalarByArray(const T& op1, const MultidimArray<T>& op2,
-                       MultidimArray<T>& result, char operation);
+                       MultidimArray<T>& result, const char operation);
 
 template<typename T>
 void coreArrayByArray(const MultidimArray<T>& op1, const MultidimArray<T>& op2,
-                      MultidimArray<T>& result, char operation);
+                      MultidimArray<T>& result, const char operation);
 
 /** Template class for Xmipp arrays.
   * This class provides physical and logical access.
@@ -1528,15 +1528,17 @@ public:
      * than the argument
      */
     template <typename T1>
-    inline bool sameShape(const MultidimArray<T1>& op) const
+    inline bool sameShape(const MultidimArray<T1>& op, bool ignore_origin=false) const
     {
-        return (NSIZE(*this) == NSIZE(op) &&
-                XSIZE(*this) == XSIZE(op) &&
-                YSIZE(*this) == YSIZE(op) &&
-                ZSIZE(*this) == ZSIZE(op) &&
-                STARTINGX(*this) == STARTINGX(op) &&
-                STARTINGY(*this) == STARTINGY(op) &&
-                STARTINGZ(*this) == STARTINGZ(op));
+	bool size_ok = (NSIZE(*this) == NSIZE(op) &&
+                        XSIZE(*this) == XSIZE(op) &&
+                        YSIZE(*this) == YSIZE(op) &&
+                        ZSIZE(*this) == ZSIZE(op));
+        bool origin_ok = ignore_origin || (STARTINGX(*this) == STARTINGX(op) &&
+                                           STARTINGY(*this) == STARTINGY(op) &&
+                                           STARTINGZ(*this) == STARTINGZ(op));
+
+        return size_ok && origin_ok;
     }
 
 
@@ -2864,7 +2866,7 @@ public:
      */
     inline friend void coreArrayByArray(const MultidimArray<T>& op1,
                                         const MultidimArray<T>& op2, MultidimArray<T>& result,
-                                        char operation)
+                                        const char operation)
     {
         T* ptrResult=NULL;
         T* ptrOp1=NULL;
@@ -3000,7 +3002,7 @@ public:
     inline friend void coreArrayByScalar(const MultidimArray<T>& op1,
                                          const T& op2,
                                          MultidimArray<T>& result,
-                                         char operation)
+                                         const char operation)
     {
         T* ptrResult=NULL;
         T* ptrOp1=NULL;
@@ -3139,7 +3141,7 @@ public:
     inline friend void coreScalarByArray(const T& op1,
                                          const MultidimArray<T>& op2,
                                          MultidimArray<T>& result,
-                                         char operation)
+                                         const char operation)
     {
         T* ptrResult=NULL;
         T* ptrOp2=NULL;

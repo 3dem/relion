@@ -27,21 +27,18 @@ void Reconstructor::read(int argc, char **argv)
 	fn_sel = parser.getOption("--i", "Input STAR file with the projection images and their orientations", "");
 	fn_out = parser.getOption("--o", "Name for output reconstruction","relion.mrc");
 	fn_sym = parser.getOption("--sym", "Symmetry group", "c1");
-	angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "1"));
 	maxres = textToFloat(parser.getOption("--maxres", "Maximum resolution (in Angstrom) to consider in Fourier space (default Nyquist)", "-1"));
 	padding_factor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
 	image_path = parser.getOption("--img", "Optional: image path prefix", "");
 	subset = textToInteger(parser.getOption("--subset", "Subset of images to consider (1: only reconstruct half1; 2: only half2; other: reconstruct all)", "-1"));
+	chosen_class = textToInteger(parser.getOption("--class", "Consider only this class (-1: use all classes)", "-1"));
+	angpix  = textToFloat(parser.getOption("--angpix", "Pixel size in the reconstruction (take from first optics group by default)", "-1"));
 
 	int ctf_section = parser.addSection("CTF options");
 	do_ctf = parser.checkOption("--ctf", "Apply CTF correction");
 	intact_ctf_first_peak = parser.checkOption("--ctf_intact_first_peak", "Leave CTFs intact until first peak");
 	ctf_phase_flipped = parser.checkOption("--ctf_phase_flipped", "Images have been phase flipped");
 	only_flip_phases = parser.checkOption("--only_flip_phases", "Do not correct CTF-amplitudes, only flip phases");
-	ctf_premultiplied = parser.checkOption("--ctf_multiplied", "Have the data been premultiplied with their CTF?");
-	beamtilt_x = textToFloat(parser.getOption("--beamtilt_x", "Beamtilt in the X-direction (in mrad)", "0."));
-	beamtilt_y = textToFloat(parser.getOption("--beamtilt_y", "Beamtilt in the Y-direction (in mrad)", "0."));
-	cl_beamtilt = (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.);
 
 	int ewald_section = parser.addSection("Ewald-sphere correction options");
 	do_ewald = parser.checkOption("--ewald", "Correct for Ewald-sphere curvature (developmental)");
@@ -73,7 +70,7 @@ void Reconstructor::read(int argc, char **argv)
 	iter = textToInteger(parser.getOption("--iter", "Number of gridding-correction iterations", "10"));
 	ref_dim = textToInteger(parser.getOption("--refdim", "Dimension of the reconstruction (2D or 3D)", "3"));
 	angular_error = textToFloat(parser.getOption("--angular_error", "Apply random deviations with this standard deviation (in degrees) to each of the 3 Euler angles", "0."));
-	shift_error = textToFloat(parser.getOption("--shift_error", "Apply random deviations with this standard deviation (in pixels) to each of the 2 translations", "0."));
+	shift_error = textToFloat(parser.getOption("--shift_error", "Apply random deviations with this standard deviation (in Angstrom) to each of the 2 translations", "0."));
 	do_fom_weighting = parser.checkOption("--fom_weighting", "Weight particles according to their figure-of-merit (_rlnParticleFigureOfMerit)");
 	fn_fsc = parser.getOption("--fsc", "FSC-curve for regularized reconstruction", "");
 	do_3d_rot = parser.checkOption("--3d_rot", "Perform 3D rotations instead of backprojections from 2D images");
@@ -86,6 +83,7 @@ void Reconstructor::read(int argc, char **argv)
 	fn_noise = parser.getOption("--reconstruct_noise","Reconstruct noise using sigma2 values in this model STAR file", "");
 	read_weights = parser.checkOption("--read_weights", "Developmental: read freq. weight files");
 	do_debug = parser.checkOption("--write_debug_output", "Write out arrays with data and weight terms prior to reconstruct");
+	do_external_reconstruct = parser.checkOption("--external_reconstruct", "Write out BP denominator and numerator for external_reconstruct program");
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
 
 	// Hidden
@@ -105,24 +103,39 @@ void Reconstructor::initialise()
 {
 	do_reconstruct_ctf = (ctf_dim > 0);
 	if (do_reconstruct_ctf)
+	{
 		do_ctf = false;
+		padding_factor = 1.;
+	}
 
+	do_ignore_optics = false;
 	// Read MetaData file, which should have the image names and their angles!
 	if (fn_debug == "")
-		DF.read(fn_sel);
+	{
+		ObservationModel::loadSafely(fn_sel, obsModel, DF, "particles", 0, false);
+		if (obsModel.opticsMdt.numberOfObjects() == 0)
+		{
+			do_ignore_optics = true;
+			DF.read(fn_sel);
+		}
+	}
 
 	if (verb > 0 && (subset == 1 || subset == 2) && !DF.containsLabel(EMDL_PARTICLE_RANDOM_SUBSET))
 	{
 		REPORT_ERROR("The rlnRandomSubset column is missing in the input STAR file.");
 	}
 
+	if (verb > 0 && (chosen_class >= 0) && !DF.containsLabel(EMDL_PARTICLE_CLASS))
+	{
+		REPORT_ERROR("The rlnClassNumber column is missing in the input STAR file.");
+	}
+
 	randomize_random_generator();
 
-	if (cl_beamtilt || do_ewald)
-		do_ctf = true;
+	if (do_ewald) do_ctf = true;
 
 	// Is this 2D or 3D data?
-	data_dim = (do_3d_rot) ? 3 : 2;
+	data_dim = 2; // Initial default value
 
 	if (fn_noise != "")
 		model.read(fn_noise);
@@ -148,17 +161,47 @@ void Reconstructor::initialise()
 		// When doing Ewald-curvature correction: allow reconstructing smaller box than the input images (which should have large boxes!!)
 		if (do_ewald && newbox > 0)
 			mysize = newbox;
+
+		if (do_3d_rot)
+			data_dim = 3;
+		else // If not specifically provided, we autodetect it
+		{
+            if (do_ignore_optics)
+			{
+				data_dim = img0().getDim();
+				std::cout << " + Taking data dimensions from the first image: " << data_dim << std::endl;
+			}
+			else
+            {
+                obsModel.opticsMdt.getValue(EMDL_IMAGE_DIMENSIONALITY, data_dim, 0);
+                std::cout << " + Taking data dimensions from the first optics group: " << data_dim << std::endl;
+            }
+        }
 	}
 
-
-	if (DF.containsLabel(EMDL_CTF_MAGNIFICATION) && DF.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+	if (angpix < 0.)
 	{
-		RFLOAT mag, dstep;
-		DF.getValue(EMDL_CTF_MAGNIFICATION, mag);
-		DF.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
-		angpix = 10000. * dstep / mag;
-		if (verb > 0)
-			std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << angpix << std::endl;
+		if (do_ignore_optics)
+		{
+	        if (DF.containsLabel(EMDL_CTF_MAGNIFICATION) && DF.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+	        {
+	                RFLOAT mag, dstep;
+	                DF.getValue(EMDL_CTF_MAGNIFICATION, mag);
+	                DF.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+	                angpix = 10000. * dstep / mag;
+	                if (verb > 0)
+	                        std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << angpix << std::endl;
+	        }
+	        else
+	        {
+	        	REPORT_ERROR("ERROR: cannot find pixel size in input STAR file, provide it using --angpix");
+	        }
+		}
+		else
+		{
+			angpix = obsModel.getPixelSize(0);
+			std::cout << " + Taking angpix from the first optics group: " << angpix << std::endl;
+		}
 	}
 
 	if (maxres < 0.)
@@ -166,25 +209,6 @@ void Reconstructor::initialise()
 	else
 		r_max = CEIL(mysize * angpix / maxres);
 
-	// Check for beam-tilt parameters in the input star file
-	if (cl_beamtilt)
-	{
-		if (verb > 0)
-			std::cout << " + Using the beamtilt parameters from the command line" << std::endl;
-		do_beamtilt = true;
-	}
-	else if ( DF.containsLabel(EMDL_IMAGE_BEAMTILT_X) || DF.containsLabel(EMDL_IMAGE_BEAMTILT_Y) )
-	{
-		if (verb > 0)
-			std::cout << " + Using the beamtilt parameters in the input STAR file" << std::endl;
-		do_beamtilt = true;
-	}
-	else
-	{
-		if (verb > 0)
-			std::cout << " + Assuming zero beamtilt" << std::endl;
-		do_beamtilt = false;
-	}
 }
 
 void Reconstructor::run()
@@ -206,7 +230,11 @@ void Reconstructor::readDebugArrays()
 {
 	if (verb > 0)
 		std::cout << " + Reading in the debug arrays ... " << std::endl;
-	data_dim = (do_3d_rot) ? 3 : 2;
+
+	// We first read the image to set the data_dim automatically from backprojector data
+	Image<RFLOAT> It;
+	It.read(fn_debug+"_data_real.mrc");
+	data_dim = It().getDim();
 
 	backprojector = BackProjector(debug_ori_size, 3, fn_sym, interpolator, padding_factor, r_min_nn, blob_order, blob_radius, blob_alpha, data_dim, skip_gridding);
 
@@ -218,8 +246,7 @@ void Reconstructor::readDebugArrays()
 		std::cout << " Size of weight array: " ;
 		backprojector.weight.printShape();
 	}
-	Image<RFLOAT> It;
-	It.read(fn_debug+"_data_real.mrc");
+
 	It().setXmippOrigin();
 	It().xinit=0;
 
@@ -295,10 +322,14 @@ void Reconstructor::backprojectOneParticle(long int p)
 	Matrix1D<RFLOAT> trans(2);
 	FourierTransformer transformer;
 
-	int randSubset = 0;
+	int randSubset = 0, classid = 0;
 	DF.getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
+	DF.getValue(EMDL_PARTICLE_CLASS, classid, p);
 
 	if (subset >= 1 && subset <= 2 && randSubset != subset)
+		return;
+
+	if (chosen_class >= 0 && chosen_class != classid)
 		return;
 
 	// Rotations
@@ -325,10 +356,27 @@ void Reconstructor::backprojectOneParticle(long int p)
 
 	Euler_angles2matrix(rot, tilt, psi, A3D);
 
+	// If we are considering Ewald sphere curvature, the mag. matrix
+	// has to be provided to the backprojector explicitly
+	// (to avoid creating an Ewald ellipsoid)
+	int opticsGroup;
+	bool ctf_premultiplied = false;
+	if (!do_ignore_optics)
+	{
+		opticsGroup = obsModel.getOpticsGroup(DF, p);
+		ctf_premultiplied = obsModel.getCtfPremultiplied(opticsGroup);
+		Matrix2D<RFLOAT> magMat;
+		if (!do_ewald)
+		{
+			A3D = obsModel.applyAnisoMag(A3D, opticsGroup);
+		}
+		A3D = obsModel.applyScaleDifference(A3D, opticsGroup, mysize, angpix);
+	}
+
 	// Translations (either through phase-shifts or in real space
 	trans.initZeros();
-	DF.getValue( EMDL_ORIENT_ORIGIN_X, XX(trans), p);
-	DF.getValue( EMDL_ORIENT_ORIGIN_Y, YY(trans), p);
+	DF.getValue( EMDL_ORIENT_ORIGIN_X_ANGSTROM, XX(trans), p);
+	DF.getValue( EMDL_ORIENT_ORIGIN_Y_ANGSTROM, YY(trans), p);
 
 	if (shift_error > 0.)
 	{
@@ -336,16 +384,19 @@ void Reconstructor::backprojectOneParticle(long int p)
 		YY(trans) += rnd_gaus(0., shift_error);
 	}
 
-	if (do_3d_rot)
+	if (data_dim == 3)
 	{
 		trans.resize(3);
-		DF.getValue( EMDL_ORIENT_ORIGIN_Z, ZZ(trans), p);
+		DF.getValue( EMDL_ORIENT_ORIGIN_Z_ANGSTROM, ZZ(trans), p);
 
 		if (shift_error > 0.)
 		{
 			ZZ(trans) += rnd_gaus(0., shift_error);
 		}
 	}
+
+	// As of v3.1, shifts are in Angstroms in the STAR files, convert back to pixels here
+	trans/= angpix;
 
 	if (do_fom_weighting)
 	{
@@ -367,21 +418,10 @@ void Reconstructor::backprojectOneParticle(long int p)
 		CenterFFT(img(), true);
 		transformer.FourierTransform(img(), F2D);
 
-		if (do_3d_rot)
+		if (ABS(XX(trans)) > 0. || ABS(YY(trans)) > 0. || ABS(ZZ(trans)) > 0. ) // ZZ(trans) is 0 in case data_dim=2
 		{
-			if (ABS(XX(trans)) > 0. || ABS(YY(trans)) > 0. || ABS(ZZ(trans)) > 0. )
-			{
-				shiftImageInFourierTransform(F2D, F2D,
-				                             XSIZE(img()), XX(trans), YY(trans), ZZ(trans));
-			}
-		}
-		else
-		{
-			if (ABS(XX(trans)) > 0. || ABS(YY(trans)) > 0.)
-			{
-				shiftImageInFourierTransform(F2D, F2D,
-				                             XSIZE(img()), XX(trans), YY(trans));
-			}
+			shiftImageInFourierTransform(F2D, F2D,
+										 XSIZE(img()), XX(trans), YY(trans), ZZ(trans));
 		}
 	}
 	else
@@ -467,30 +507,19 @@ void Reconstructor::backprojectOneParticle(long int p)
 		else
 		{
 			CTF ctf;
-			ctf.read(DF, DF, p);
+			if (do_ignore_optics)
+				ctf.read(DF, DF, p);
+			else
+				ctf.readByGroup(DF, &obsModel, p);
 
 			ctf.getFftwImage(Fctf, mysize, mysize, angpix,
-				 ctf_phase_flipped, only_flip_phases,
-				 intact_ctf_first_peak, true);
+			                 ctf_phase_flipped, only_flip_phases,
+			                 intact_ctf_first_peak, true);
 
-			if (do_beamtilt)
+			if (!do_ignore_optics)
 			{
-				if (!cl_beamtilt)
-				{
-					if (DF.containsLabel(EMDL_IMAGE_BEAMTILT_X))
-					{
-						DF.getValue(EMDL_IMAGE_BEAMTILT_X, beamtilt_x, p);
-					}
-
-					if (DF.containsLabel(EMDL_IMAGE_BEAMTILT_Y))
-					{
-						DF.getValue(EMDL_IMAGE_BEAMTILT_Y, beamtilt_y, p);
-					}
-				}
-
-				selfApplyBeamTilt(
-					F2D, beamtilt_x, beamtilt_y,
-					ctf.lambda, ctf.Cs, angpix, mysize);
+				obsModel.demodulatePhase(DF, p, F2D);
+				obsModel.divideByMtf(DF, p, F2D);
 			}
 
 			// Ewald-sphere curvature correction
@@ -501,7 +530,7 @@ void Reconstructor::backprojectOneParticle(long int p)
 				if (!skip_weighting)
 				{
 					// Also calculate W, store again in Fctf
-					ctf.applyWeightEwaldSphereCurvature(Fctf, mysize, mysize, angpix, mask_diameter);
+					ctf.applyWeightEwaldSphereCurvature_noAniso(Fctf, mysize, mysize, angpix, mask_diameter);
 				}
 
 				// Also calculate the radius of the Ewald sphere (in pixels)
@@ -514,7 +543,7 @@ void Reconstructor::backprojectOneParticle(long int p)
 	if (fn_sub != "")
 	{
 		Fsub.resize(F2D);
-		projector.get2DFourierTransform(Fsub, A3D, IS_NOT_INV);
+		projector.get2DFourierTransform(Fsub, A3D);
 
 		// Apply CTF if necessary
 		if (do_ctf)
@@ -530,7 +559,7 @@ void Reconstructor::backprojectOneParticle(long int p)
 			DIRECT_MULTIDIM_ELEM(F2D, n) -= DIRECT_MULTIDIM_ELEM(Fsub, n);
 		}
 		// Back-project difference image
-		backprojector.set2DFourierTransform(F2D, A3D, IS_NOT_INV);
+		backprojector.set2DFourierTransform(F2D, A3D);
 	}
 	else
 	{
@@ -608,8 +637,7 @@ void Reconstructor::backprojectOneParticle(long int p)
 			for (long int y = 0; y < Fctf.ydim; y++)
 			for (long int x = 0; x < Fctf.xdim; x++)
 			{
-				DIRECT_NZYX_ELEM(Fctf, n, z, y, x)
-						*= DIRECT_NZYX_ELEM(wgh(), n, z, y, x);
+				DIRECT_NZYX_ELEM(Fctf, n, z, y, x) *= DIRECT_NZYX_ELEM(wgh(), n, z, y, x);
 			}
 		}
 
@@ -617,12 +645,24 @@ void Reconstructor::backprojectOneParticle(long int p)
 
 		if (do_ewald)
 		{
-			backprojector.set2DFourierTransform(F2DP, A3D, IS_NOT_INV, &Fctf, r_ewald_sphere, true);
-			backprojector.set2DFourierTransform(F2DQ, A3D, IS_NOT_INV, &Fctf, r_ewald_sphere, false);
+			Matrix2D<RFLOAT> magMat;
+
+			if (!do_ignore_optics && obsModel.hasMagMatrices)
+			{
+				magMat = obsModel.getMagMatrix(opticsGroup);
+			}
+			else
+			{
+				magMat = Matrix2D<RFLOAT>(2,2);
+				magMat.initIdentity();
+			}
+
+			backprojector.set2DFourierTransform(F2DP, A3D, &Fctf, r_ewald_sphere, true, &magMat);
+			backprojector.set2DFourierTransform(F2DQ, A3D, &Fctf, r_ewald_sphere, false, &magMat);
 		}
 		else
 		{
-			backprojector.set2DFourierTransform(F2D, A3D, IS_NOT_INV, &Fctf);
+			backprojector.set2DFourierTransform(F2D, A3D, &Fctf);
 		}
 	}
 
@@ -649,76 +689,86 @@ void Reconstructor::reconstruct()
 			RFLOAT val;
 			MDfsc.getValue(EMDL_SPECTRAL_IDX, idx);
 			MDfsc.getValue(EMDL_MLMODEL_FSC_HALVES_REF, val);
-			fsc(idx) =	val;
+			fsc(idx) = val;
 		}
 	}
 
 	if (verb > 0)
 		std::cout << " + Starting the reconstruction ..." << std::endl;
+
 	backprojector.symmetrise(nr_helical_asu, helical_twist, helical_rise/angpix);
-
-
-	if (do_debug)
-	{
-		Image<RFLOAT> It;
-		FileName fn_tmp = fn_out.withoutExtension();
-		It().resize(backprojector.data);
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(It())
-		{
-			DIRECT_MULTIDIM_ELEM(It(), n) = (DIRECT_MULTIDIM_ELEM(backprojector.data, n)).real;
-		}
-		It.write(fn_tmp+"_data_real.mrc");
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(It())
-		{
-			DIRECT_MULTIDIM_ELEM(It(), n) = (DIRECT_MULTIDIM_ELEM(backprojector.data, n)).imag;
-		}
-		It.write(fn_tmp+"_data_imag.mrc");
-		It()=backprojector.weight;
-		It.write(fn_tmp+"_weight.mrc");
-	}
-
-	backprojector.reconstruct(vol(), iter, do_map, 1., dummy, dummy, dummy, dummy,
-							  fsc, 1., do_use_fsc, true, 1, -1, false);
-
 
 	if (do_reconstruct_ctf)
 	{
-		MultidimArray<Complex> F2D;
-		FourierTransformer transformer;
 
-		F2D.clear();
-		transformer.FourierTransform(vol(), F2D);
-
-		// CenterOriginFFT: Set the center of the FFT in the FFTW origin
-		Matrix1D<RFLOAT> shift(3);
-		XX(shift)=-(RFLOAT)(int)(ctf_dim / 2);
-		YY(shift)=-(RFLOAT)(int)(ctf_dim / 2);
-		ZZ(shift)=-(RFLOAT)(int)(ctf_dim / 2);
-		shiftImageInFourierTransform(F2D, F2D, (RFLOAT)ctf_dim, XX(shift), YY(shift), ZZ(shift));
+		vol().initZeros(ctf_dim, ctf_dim, ctf_dim);
 		vol().setXmippOrigin();
-		vol().initZeros();
-		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(F2D)
-		{
-			// Take care of kp==dim/2, as XmippOrigin lies just right off center of image...
-			if ( kp > FINISHINGZ(vol()) || ip > FINISHINGY(vol()) || jp > FINISHINGX(vol()))
-				continue;
-			A3D_ELEM(vol(), kp, ip, jp)    = FFTW_ELEM(F2D, kp, ip, jp).real;
-			A3D_ELEM(vol(), -kp, -ip, -jp) = FFTW_ELEM(F2D, kp, ip, jp).real;
-		}
-		vol() *= (RFLOAT)ctf_dim;
 
-		// Take sqrt(CTF^2)
-		if (do_reconstruct_ctf2)
+		FOR_ALL_ELEMENTS_IN_ARRAY3D(vol())
 		{
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(vol())
+			int jp = j;
+			int ip = i;
+			int kp = k;
+
+			// for negative j's: use inverse
+			if (j < 0)
 			{
-				if (DIRECT_MULTIDIM_ELEM(vol(), n) > 0.)
-					DIRECT_MULTIDIM_ELEM(vol(), n) = sqrt(DIRECT_MULTIDIM_ELEM(vol(), n));
-				else
-					DIRECT_MULTIDIM_ELEM(vol(), n) = 0.;
+				jp = -j;
+				ip = -i;
+				kp = -k;
+			}
+
+			if (jp >= STARTINGX(backprojector.data) && jp <= FINISHINGX(backprojector.data) &&
+					ip >= STARTINGY(backprojector.data) && ip <= FINISHINGY(backprojector.data) &&
+					kp >= STARTINGZ(backprojector.data) && kp <= FINISHINGZ(backprojector.data))
+			{
+				if (A3D_ELEM(backprojector.weight, kp, ip, jp) > 0.)
+				{
+					A3D_ELEM(vol(), k, i, j) = A3D_ELEM(backprojector.data, kp, ip, jp) / A3D_ELEM(backprojector.weight, kp, ip, jp);
+					if (do_reconstruct_ctf2)
+						A3D_ELEM(vol(), k, i, j) = sqrt(A3D_ELEM(vol(), k, i, j));
+				}
 			}
 		}
 	}
+	else
+	{
+
+		if (do_debug)
+		{
+			Image<RFLOAT> It;
+			FileName fn_tmp = fn_out.withoutExtension();
+			It().resize(backprojector.data);
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(It())
+			{
+				DIRECT_MULTIDIM_ELEM(It(), n) = (DIRECT_MULTIDIM_ELEM(backprojector.data, n)).real;
+			}
+			It.write(fn_tmp+"_data_real.mrc");
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(It())
+			{
+				DIRECT_MULTIDIM_ELEM(It(), n) = (DIRECT_MULTIDIM_ELEM(backprojector.data, n)).imag;
+			}
+			It.write(fn_tmp+"_data_imag.mrc");
+			It()=backprojector.weight;
+			It.write(fn_tmp+"_weight.mrc");
+		}
+
+		MultidimArray<RFLOAT> tau2;
+		if (do_use_fsc) backprojector.updateSSNRarrays(1., tau2, dummy, dummy, dummy, fsc, do_use_fsc, true);
+
+		if (do_external_reconstruct)
+		{
+			FileName fn_root = fn_out.withoutExtension();
+			backprojector.externalReconstruct(vol(),
+					fn_root,
+					tau2, dummy, dummy, dummy, false, 1., 1);
+		}
+		else
+		{
+			backprojector.reconstruct(vol(), iter, do_map, tau2);
+		}
+	}
+
 
 	vol.setSamplingRateInHeader(angpix);
 	vol.write(fn_out);

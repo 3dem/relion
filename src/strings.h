@@ -63,12 +63,14 @@
 
 /** Removes all occurrences of 'character' from the string no matter
 where they are */
-std::string removeChar( const std::string& str, char character );
+std::string removeChar(const std::string &str, char character);
 
 /** Removes escaped symbols ESC+n, t, v, b, r, f, and a
  * Note that tabs are replaced by spaces.
  * */
-std::string unescape( const std::string& str );
+std::string unescape(const std::string &str);
+
+void escapeStringForSTAR(std::string &value);
 
 /** Best precision for a float number.
  *
@@ -105,6 +107,8 @@ std::string unescape( const std::string& str );
  * @endcode
  */
 int bestPrecision(float F, int _width);
+
+bool isNumber(std::string);
 
 /** String (char*) to double conversion.
  *
@@ -408,6 +412,8 @@ inline char* nextToken()
  * When there are no more tokens. It returns "".
  */
 std::string nextToken(const std::string& str, int& i);
+
+bool nextTokenInSTAR(const std::string& str, int& i, std::string &token);
 
 /** Get non empty string (char*).
  *

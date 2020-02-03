@@ -21,6 +21,7 @@ However, it does also contain pieces of code from the following packages:
 - Numerical diagonalization of 3x3 matrices by Joachim Kopp: https://www.mpi-hd.mpg.de/personalhomes/globes/3x3/index.html
 - Gravis by Graphics and Vision Research Group at University of Basel: https://gravis.dmi.unibas.ch/index.html
 - CPlot2D by Attila Michael Zsaki: http://www.amzsaki.com/?page_id=2073
+- cmake-modules by Ryan A. Pavlik: https://github.com/rpavlik/cmake-modules
 
 Original disclaimers in the code of these external packages have been maintained as much as possible.
 Please contact Sjors Scheres (scheres@mrc-lmb.cam.ac.uk) if you feel this has not been done correctly.

@@ -20,8 +20,8 @@
 
 #include "motion_helper.h"
 
-#include <src/jaz/filter_helper.h>
-#include <src/jaz/image_op.h>
+#include <src/jaz/img_proc/filter_helper.h>
+#include <src/jaz/img_proc/image_op.h>
 #include <src/jaz/image_log.h>
 #include <src/jaz/interpolation.h>
 #include <src/jaz/optimization/nelder_mead.h>
@@ -318,10 +318,11 @@ std::vector<d2Vector> MotionHelper::getGlobalOffsets(
         }
 
         d2Vector out_p = Interpolation::quadraticMaxWrapXY(pSum, eps, wMax, hMax);
+		
         if (out_p.x >= sh) out_p.x -= s;
         if (out_p.y >= sh) out_p.y -= s;
 
-        out[p] = out_p/cc_pad;
+		out[p] = out_p/cc_pad;
     }
 
     return out;
@@ -370,11 +371,11 @@ void MotionHelper::noiseNormalize(
 }
 
 void MotionHelper::writeTracks(
-    const std::vector<std::vector<d2Vector>>& tracks,
-    std::string fn)
+    const std::vector<std::vector<d2Vector>>& tracksInPix,
+    std::string fn, double angpix)
 {
-    const int pc = tracks.size();
-    const int fc = tracks[0].size();
+    const int pc = tracksInPix.size();
+    const int fc = tracksInPix[0].size();
 
     std::string path = fn.substr(0, fn.find_last_of('/'));
     mktree(path);
@@ -399,8 +400,9 @@ void MotionHelper::writeTracks(
         for (int f = 0; f < fc; f++)
         {
             mdt.addObject();
-            mdt.setValue(EMDL_ORIENT_ORIGIN_X, tracks[p][f].x);
-            mdt.setValue(EMDL_ORIENT_ORIGIN_Y, tracks[p][f].y);
+			
+            mdt.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, angpix * tracksInPix[p][f].x);
+            mdt.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, angpix * tracksInPix[p][f].y);
         }
 
         mdt.write(ofs);
@@ -408,7 +410,7 @@ void MotionHelper::writeTracks(
     }
 }
 
-std::vector<std::vector<d2Vector>> MotionHelper::readTracks(std::string fn)
+std::vector<std::vector<d2Vector>> MotionHelper::readTracksInPix(std::string fn, double angpix)
 {
     std::ifstream ifs(fn);
 
@@ -450,8 +452,10 @@ std::vector<std::vector<d2Vector>> MotionHelper::readTracks(std::string fn)
 
         for (int f = 0; f < fc; f++)
         {
-            mdt.getValue(EMDL_ORIENT_ORIGIN_X, out[p][f].x, f);
-            mdt.getValue(EMDL_ORIENT_ORIGIN_Y, out[p][f].y, f);
+            mdt.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, out[p][f].x, f);
+            mdt.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, out[p][f].y, f);
+			
+			out[p][f] /= angpix;
         }
     }
 

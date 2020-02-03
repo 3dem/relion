@@ -17,7 +17,7 @@ long int makeJobsForDiff2Fine(
 		ProjectionParams &FineProjectionData,
 		std::vector< long unsigned > &iover_transes,
 		std::vector< long unsigned > &ihiddens,
-		long int nr_over_orient, long int nr_over_trans, int ipart,
+		long int nr_over_orient, long int nr_over_trans, int img_id,
 		IndexedDataArray &FPW, // FPW=FinePassWeights
 		IndexedDataArrayMask &dataMask,
 		int chunk);
@@ -27,8 +27,8 @@ long int makeJobsForDiff2Fine(
  * orientations into 'jobs' which are fed into the collect-kenrel, which reduces all translations
  * with computed differences into a reduced object to be back-projected.
  */
-long int  makeJobsForCollect(IndexedDataArray &FPW, 
-        IndexedDataArrayMask &dataMask, 
+long int  makeJobsForCollect(IndexedDataArray &FPW,
+        IndexedDataArrayMask &dataMask,
         unsigned long NewJobNum); // FPW=FinePassWeights
 
 /*
@@ -46,11 +46,12 @@ void mapWeights(
 		long unsigned *trans_idx,
 		unsigned long current_oversampling);
 
-void buildCorrImage(MlOptimiser *baseMLO, 
-		OptimisationParamters &op, 
-		AccPtr<XFLOAT> &corr_img, 
-		long int ipart, 
-		long int group_id);
+void buildCorrImage(MlOptimiser *baseMLO,
+		OptimisationParamters &op,
+		AccPtr<XFLOAT> &corr_img,
+		int img_id,
+		long int group_id,
+		bool ctf_premultiplied);
 
 void generateEulerMatrices(
 		ProjectionParams &ProjectionData,
@@ -83,11 +84,12 @@ void runWavgKernel(
 		long unsigned orientation_num,
 		long unsigned translation_num,
 		unsigned long image_size,
-		long int ipart,
+		int img_id,
 		int group_id,
 		int exp_iclass,
 		XFLOAT part_scale,
 		bool refs_are_ctf_corrected,
+		bool ctf_premultiplied,
 		bool data_is_3D,
 		cudaStream_t stream);
 
@@ -112,6 +114,7 @@ void runBackProjectKernel(
 		unsigned long imageCount,
 		bool data_is_3D,
 		bool do_sgd,
+		bool ctf_premultiplied,
 		cudaStream_t optStream);
 
 template< typename T>
@@ -186,7 +189,7 @@ size_t findThresholdIdxInCumulativeSum(AccPtr<T> &data, T threshold)
 				~data,
 				threshold,
 				data.getSize()-1,
-				~idx, 
+				~idx,
 				FIND_IN_CUMULATIVE_BLOCK_SIZE);
 		idx.cpToHost();
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(data.getStream()));
@@ -202,7 +205,7 @@ size_t findThresholdIdxInCumulativeSum(AccPtr<T> &data, T threshold)
 #endif
 	}
 }
-	
+
 void runDiff2KernelCoarse(
 		AccProjectorKernel &projector,
 		XFLOAT *trans_x,
@@ -242,7 +245,7 @@ void runDiff2KernelFine(
 		long unsigned translation_num,
 		long unsigned significant_num,
 		unsigned long image_size,
-		int ipart,
+		int img_id,
 		int exp_iclass,
 		cudaStream_t stream,
 		long unsigned job_num_count,
@@ -594,7 +597,7 @@ void lowPassFilterMapGPU(
 	XFLOAT edge_high = XMIPP_MIN(Xdim, (ires_filter + filter_edge_halfwidth) / (RFLOAT)ori_size); // in 1/pix
 	XFLOAT edge_width = edge_high - edge_low;
 
-	int blocks = ceilf( (float)((size_t)Xdim*(size_t)Ydim*(size_t)Zdim) / 
+	int blocks = ceilf( (float)((size_t)Xdim*(size_t)Ydim*(size_t)Zdim) /
 		(float)(CFTT_BLOCK_SIZE) );
 	if (do_highpass)
 	{

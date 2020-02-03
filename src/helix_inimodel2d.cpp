@@ -84,18 +84,21 @@ void HelixAligner::parseInitial(int argc, char **argv)
 
     fn_out = parser.getOption("--o", "Output rootname","");
 	fn_imgs = parser.getOption("--i", " STAR file with the input images and orientation parameters","");
-    fn_mics = parser.getOption("--mic", "OR: STAR file with the input micrographs","");
+    // deactivate fn_mics approach: never really worked...
+	fn_mics = "";
+	/*
+	fn_mics = parser.getOption("--mic", "OR: STAR file with the input micrographs","");
 	fn_coord_suffix = parser.getOption("--coord_suffix", "The suffix for the start-end coordinate files, e.g. \"_picked.star\" or \".box\"","");
 	fn_coord_dir = parser.getOption("--coord_dir", "The directory where the coordinate files are (default is same as micrographs)", "ASINPUT");
 	extract_width = textToInteger(parser.getOption("--extract_width", "Width (in pixels) of the images for the helices to be extracted ", "100"));
-
+	*/
     int param_section = parser.addSection("Parameters");
     crossover_distance = textToFloat(parser.getOption("--crossover_distance", "Distance in Angstroms between 2 cross-overs",""));
     nr_iter = textToInteger(parser.getOption("--iter", "Maximum number of iterations to perform", "10"));
     nr_classes = textToInteger(parser.getOption("--K", "Number of classes", "1"));
     angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms (default take from STAR file)", "-1"));
     maxres = textToFloat(parser.getOption("--maxres", "Limit calculations to approximately this resolution in Angstroms", "-1"));
-    max_shift = textToInteger(parser.getOption("--search_shift", "How many pixels to search translations perpendicular to helical axis?", "0"));
+    max_shift_A = textToFloat(parser.getOption("--search_shift", "How many Angstroms to search translations perpendicular to helical axis?", "0"));
     max_rotate = textToFloat(parser.getOption("--search_angle", "How many degrees to search in-plane rotations?", "0"));
     step_rotate = textToFloat(parser.getOption("--step_angle", "The step size (in degrees) of the rotational searches", "1"));
     fn_inimodel = parser.getOption("--iniref", "An initial model to starting optimisation path", "");
@@ -103,6 +106,10 @@ void HelixAligner::parseInitial(int argc, char **argv)
     max_smear = textToInteger(parser.getOption("--smear", "Smear out each image along X to ensure continuity", "0"));
     random_seed = textToInteger(parser.getOption("--random_seed", "Random seed (default is with clock)", "-1"));
     search_size = textToInteger(parser.getOption("--search_size", "Search this many pixels up/down of the target downscaled size to fit best crossover distance", "5"));
+    mask_diameter = textToFloat(parser.getOption("--mask_diameter", "The diameter (A) of a mask to be aplpied to the 2D reconstruction", "-1"));
+    nr_threads = textToInteger(parser.getOption("--j", "Number of (openMP) threads", "1"));
+    do_only_make_3d = parser.checkOption("--only_make_3d", "Take the iniref image, and create a 3D model from that without any alignment of the input images");
+
     verb = 1;
 
     if (parser.checkForErrors(verb))
@@ -121,7 +128,7 @@ void HelixAligner::initialise()
     // Also randomize random-number-generator for perturbations on the angles
     init_random_generator(random_seed);
 
-	if (fn_mics== "")
+	if (fn_imgs!= "")
 	{
 		// Get the image size
 		MetaDataTable MD;
@@ -154,7 +161,7 @@ void HelixAligner::initialise()
 		}
 
 	}
-	else
+	else if (fn_mics != "")
 	{
 		// Read in the micrographs STAR file
 		MDmics.read(fn_mics);
@@ -189,6 +196,43 @@ void HelixAligner::initialise()
 		}
 
 		ori_size = extract_width;
+	}
+	else if (do_only_make_3d && fn_inimodel != "")
+	{
+		Image<RFLOAT> img;
+		img.read(fn_inimodel);
+		img().setXmippOrigin();
+		if (angpix < 0.)
+		{
+			img.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, angpix);
+			std::cout << " Using pixel size from the input file header: " << angpix << std::endl;
+		}
+		ori_size = XSIZE(img());
+
+		// The 3D reconstruction
+		float deg_per_pixel = 180. * angpix / (crossover_distance);
+		Image<RFLOAT> vol;
+		vol().resize(ori_size, ori_size, ori_size);
+		for (int k = 0; k < ZSIZE(vol()); k++)
+		{
+			float ang = deg_per_pixel * k;
+			Matrix2D<RFLOAT> Arot;
+			rotation2DMatrix(ang, Arot);
+
+			MultidimArray<RFLOAT> Mrot;
+			Mrot.initZeros(img());
+			applyGeometry(img(), Mrot, Arot, true, false);
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(Mrot)
+				DIRECT_A3D_ELEM(vol(), k, i, j) = DIRECT_A2D_ELEM(Mrot, i, j);
+		}
+		vol.setSamplingRateInHeader(angpix);
+		vol.write(fn_out + ".mrc");
+		std::cout << " * Written " << fn_out << ".mrc" << std::endl;
+		exit(RELION_EXIT_SUCCESS);
+	}
+	else
+	{
+		REPORT_ERROR("ERROR: provide --i, -mic, or --only_make_3d and --iniref");
 	}
 
 	if (angpix < 0.)
@@ -238,8 +282,11 @@ void HelixAligner::initialise()
 	yrect -= yrect%2;
 	xrect  = ROUND((2. * crossover_distance)/down_angpix);
 	model.initialise(nr_classes, yrect, xrect);
+	max_shift = CEIL(max_shift_A / down_angpix);
+	mask_radius_pix = (mask_diameter > 0) ? CEIL(mask_diameter / (2. * down_angpix)) : yrect/2 - 2;
 	std::cout << " maxres= " << maxres << " angpix= " << angpix << " down_size= " << down_size << std::endl;
 	std::cout << " xrect= " << xrect << " yrect= " << yrect << " down_angpix= " << down_angpix << std::endl;
+	std::cout << " max_shift= " << max_shift << " mask_radius_pix= "<< mask_radius_pix<< std::endl;
 
 	// Now read in all images
 	if (fn_mics == "")
@@ -255,7 +302,6 @@ void HelixAligner::initialise()
 void HelixAligner::readImages()
 {
 
-	MetaDataTable MD;
 	MD.read(fn_imgs);
 
 	if (verb > 0)
@@ -282,41 +328,39 @@ void HelixAligner::readImages()
 		img.read(fn_img);
 		img().setXmippOrigin();
 		// Rethink this when expanding program to 3D!
-		RFLOAT xoff = 0.;
 		RFLOAT yoff = 0.;
 		RFLOAT psi = 0.;
-		if (MD.containsLabel(EMDL_ORIENT_ORIGIN_X))
-			MD.getValue(EMDL_ORIENT_ORIGIN_X, xoff);
-		if (MD.containsLabel(EMDL_ORIENT_ORIGIN_Y))
-			MD.getValue(EMDL_ORIENT_ORIGIN_Y, yoff);
+		if (MD.containsLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM))
+			MD.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff);
 		if (MD.containsLabel(EMDL_ORIENT_PSI))
 			MD.getValue(EMDL_ORIENT_PSI, psi);
+		ori_psis.push_back(psi);
+		ori_yoffs.push_back(yoff);
 		// Apply the actual transformation
 		Matrix2D<RFLOAT> A;
 		rotation2DMatrix(psi, A);
-		MAT_ELEM(A,0, 2) = xoff;
-		MAT_ELEM(A,1, 2) = yoff;
-		selfApplyGeometry(img(), A, IS_NOT_INV, DONT_WRAP);
+		MAT_ELEM(A,1, 2) = -yoff / angpix;
+		selfApplyGeometry(img(), A, IS_INV, DONT_WRAP);
 
 
 		Xrects.push_back(dummy);
 
 		// Calculate all rotated versions
+		if (ipart==0) psis.clear();
 		for (int iflip =0; iflip < 2; iflip++)
 		{
 			for (RFLOAT ang = 0; ang <= max_rotate; ang += step_rotate)
 			{
 				Matrix2D<RFLOAT> Arot;
 				MultidimArray<RFLOAT> Irot;
+				RFLOAT myang = (iflip == 1) ? ang + 180. : ang;
 				Irot.initZeros(img());
-				if (iflip == 1)
-					rotation2DMatrix(ang+180., Arot);
-				else
-					rotation2DMatrix(ang, Arot);
+				rotation2DMatrix(myang, Arot);
 				applyGeometry(img(), Irot, Arot, true, false);
 				resizeMap(Irot, down_size);
 				Irot.setXmippOrigin();
 				Xrects[Xrects.size()-1].push_back(Irot);
+				if (ipart==0) psis.push_back(myang);
 				if (ang > 0.)
 				{
 					// Also rotate in the opposite direction
@@ -325,6 +369,7 @@ void HelixAligner::readImages()
 					resizeMap(Irot, down_size);
 					Irot.setXmippOrigin();
 					Xrects[Xrects.size()-1].push_back(Irot);
+					if (ipart==0) psis.push_back(-myang);
 				}
 			}
 		}
@@ -654,7 +699,7 @@ void HelixAligner::initialiseClasses()
 
 			RFLOAT rot = (RFLOAT)j*360./(XSIZE(model.Aref[0]));
 	    	rotation2DMatrix(rot, A2D);
-	    	PP.get2DFourierTransform(myFline, A2D, IS_NOT_INV);
+	    	PP.get2DFourierTransform(myFline, A2D);
 	    	transformer.inverseFourierTransform(myFline,myline);
 	    	// Shift the image back to the center...
 	    	myline.setXmippOrigin();
@@ -753,42 +798,51 @@ void HelixAligner::expectationOneParticleNoFFT(long int ipart)
 					double ccf_xa = 0;
 					double ccf_x2 = 0;
 					double ccf_a2 = 0;
-					FOR_ALL_ELEMENTS_IN_ARRAY2D(Xrects[ipart][k_rot])
-					{
-						int jp = j + j_offset;
-						while (jp < STARTINGX(model.Aref[iclass]))
-							jp += xrect;
-						while (jp > FINISHINGX(model.Aref[iclass]))
-							jp -= xrect;
+				    for (long int i=STARTINGY(Xrects[ipart][k_rot]); i<=FINISHINGY(Xrects[ipart][k_rot]); i++) \
+				    {
 
 						int ip = i + i_offset;
+						if (ip < -mask_radius_pix || ip > mask_radius_pix)
+							continue;
+
+						/*
 						while (ip < STARTINGY(model.Aref[iclass]))
 							ip += yrect;
 						while (ip > FINISHINGY(model.Aref[iclass]))
 							ip -= yrect;
+						*/
 
-						// This places the Y-flipped image at half a cross-over distance from the first one
-						int ipp = -ip;
-						// Don't let the image run out of the height of the box
-						if (ipp >= STARTINGY(Xrects[ipart][k_rot]) && ipp <= FINISHINGY(Xrects[ipart][k_rot]))
-						{
-							int jpp = jp + xrect/2;
-							while (jpp < STARTINGX(model.Aref[iclass]))
-								jpp += xrect;
-							while (jpp > FINISHINGX(model.Aref[iclass]))
-								jpp -= xrect;
+						for (long int j=STARTINGX(Xrects[ipart][k_rot]); j<=FINISHINGX(Xrects[ipart][k_rot]); j++)
+				    	{
+							int jp = j + j_offset;
+							while (jp < STARTINGX(model.Aref[iclass]))
+								jp += xrect;
+							while (jp > FINISHINGX(model.Aref[iclass]))
+								jp -= xrect;
 
-							// this places the original image in the offset-translated center of the rectangle
-							ccf_xa += A2D_ELEM(model.Aref[iclass], ip, jp) * A2D_ELEM(Xrects[ipart][k_rot], i, j);
-							ccf_a2 += A2D_ELEM(model.Aref[iclass], ip, jp) * A2D_ELEM(model.Aref[iclass], ip, jp);
+							// This places the Y-flipped image at half a cross-over distance from the first one
+							int ipp = -ip;
+							// Don't let the image run out of the height of the box
+							if (ipp >= STARTINGY(Xrects[ipart][k_rot]) && ipp <= FINISHINGY(Xrects[ipart][k_rot]))
+							{
+								int jpp = jp + xrect/2;
+								while (jpp < STARTINGX(model.Aref[iclass]))
+									jpp += xrect;
+								while (jpp > FINISHINGX(model.Aref[iclass]))
+									jpp -= xrect;
 
-							ccf_xa += A2D_ELEM(model.Aref[iclass], ipp, jpp) * A2D_ELEM(Xrects[ipart][k_rot], i, j);
-							ccf_a2 += A2D_ELEM(model.Aref[iclass], ipp, jpp) * A2D_ELEM(model.Aref[iclass], ipp, jpp);
+								// this places the original image in the offset-translated center of the rectangle
+								ccf_xa += A2D_ELEM(model.Aref[iclass], ip, jp) * A2D_ELEM(Xrects[ipart][k_rot], i, j);
+								ccf_a2 += A2D_ELEM(model.Aref[iclass], ip, jp) * A2D_ELEM(model.Aref[iclass], ip, jp);
 
-							ccf_x2 += 2. * A2D_ELEM(Xrects[ipart][k_rot], i, j) * A2D_ELEM(Xrects[ipart][k_rot], i, j);
+								ccf_xa += A2D_ELEM(model.Aref[iclass], ipp, jpp) * A2D_ELEM(Xrects[ipart][k_rot], i, j);
+								ccf_a2 += A2D_ELEM(model.Aref[iclass], ipp, jpp) * A2D_ELEM(model.Aref[iclass], ipp, jpp);
 
-						}
-					} // end loop over all pixels
+								ccf_x2 += 2. * A2D_ELEM(Xrects[ipart][k_rot], i, j) * A2D_ELEM(Xrects[ipart][k_rot], i, j);
+
+							}
+						} // end loop j
+				    } // end loop i
 
 					double ccf = (ccf_x2 > 0. && ccf_a2 > 0.) ? ccf_xa/(sqrt(ccf_x2) * sqrt(ccf_a2)) : 0.;
 
@@ -801,56 +855,63 @@ void HelixAligner::expectationOneParticleNoFFT(long int ipart)
 						best_i_offset = i_offset;
 						best_j_offset = j_offset;
 					}
-					//std::cerr << " i_offset= " << i_offset<< " j_offset= " << j_offset << " ccf= " << ccf<< " maxccf= "<< maxccf <<std::endl;
 				} // end for j_offset
 			} // end for i_offset
 		} // end for k_rot
 	}
 
+
 	if (maxccf < -1.)
 		REPORT_ERROR("BUG: not found maxccf!");
 
-	std::cerr << " best_class= " << best_class  << " best_k_rot= " << best_k_rot<< " best_i_offset= " << best_i_offset << " best_j_offset= " << best_j_offset<< std::endl;
+	// Now set the optimal Y-translations and rotations in the output STAR file
+	RFLOAT yoff, psi;
+	psi = ori_psis[ipart] + psis[best_k_rot];
+	yoff = ori_yoffs[ipart] + best_i_offset * down_angpix;
+
+	MD.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, ipart);
+	MD.setValue(EMDL_ORIENT_PSI, psi, ipart);
 
 	// Now add the image to that class reference
 	// To ensure continuity in the reference: smear out every image along X
-	for (int j_smear = -max_smear; j_smear <= max_smear; j_smear++)
+	#pragma omp critical
 	{
-
-		double smearw = (max_smear< XMIPP_EQUAL_ACCURACY) ? 1 : gaussian1D((double)j_smear, (double)max_smear/3);
-		FOR_ALL_ELEMENTS_IN_ARRAY2D(Xrects[ipart][best_k_rot])
+		for (int j_smear = -max_smear; j_smear <= max_smear; j_smear++)
 		{
-
-			int jp = j + best_j_offset + j_smear;
-			while (jp < STARTINGX(model.Aref[best_class]))
-				jp += xrect;
-			while (jp > FINISHINGX(model.Aref[best_class]))
-				jp -= xrect;
-
-			int ip = i + best_i_offset;
-			while (ip < STARTINGY(model.Aref[best_class]))
-				ip += yrect;
-			while (ip > FINISHINGY(model.Aref[best_class]))
-				ip -= yrect;
-
-			// this places the original image in the offset-translated center of the rectangle
-			A2D_ELEM(model.Asum[best_class], ip, jp) += smearw * A2D_ELEM(Xrects[ipart][best_k_rot], i, j);
-			A2D_ELEM(model.Asumw[best_class], ip, jp) += smearw;
-
-			// This places the Y-flipped image at half a cross-over distance from the first one
-			int ipp = -ip;
-			if (ipp >= STARTINGY(Xrects[ipart][best_k_rot]) && ipp <= FINISHINGY(Xrects[ipart][best_k_rot]))
+			double smearw = (max_smear< XMIPP_EQUAL_ACCURACY) ? 1 : gaussian1D((double)j_smear, (double)max_smear/3);
+			FOR_ALL_ELEMENTS_IN_ARRAY2D(Xrects[ipart][best_k_rot])
 			{
-				int jpp = jp + xrect/2;
-				while (jpp > FINISHINGX(model.Aref[best_class]))
-					jpp -= xrect;
-				A2D_ELEM(model.Asum[best_class], ipp, jpp) += smearw * A2D_ELEM(Xrects[ipart][best_k_rot], i, j);
-				A2D_ELEM(model.Asumw[best_class], ipp, jpp) += smearw;
+
+				int jp = j + best_j_offset + j_smear;
+				while (jp < STARTINGX(model.Aref[best_class]))
+					jp += xrect;
+				while (jp > FINISHINGX(model.Aref[best_class]))
+					jp -= xrect;
+
+				int ip = i + best_i_offset;
+				while (ip < STARTINGY(model.Aref[best_class]))
+					ip += yrect;
+				while (ip > FINISHINGY(model.Aref[best_class]))
+					ip -= yrect;
+
+				// this places the original image in the offset-translated center of the rectangle
+				A2D_ELEM(model.Asum[best_class], ip, jp) += smearw * A2D_ELEM(Xrects[ipart][best_k_rot], i, j);
+				A2D_ELEM(model.Asumw[best_class], ip, jp) += smearw;
+
+				// This places the Y-flipped image at half a cross-over distance from the first one
+				int ipp = -ip;
+				if (ipp >= STARTINGY(Xrects[ipart][best_k_rot]) && ipp <= FINISHINGY(Xrects[ipart][best_k_rot]))
+				{
+					int jpp = jp + xrect/2;
+					while (jpp > FINISHINGX(model.Aref[best_class]))
+						jpp -= xrect;
+					A2D_ELEM(model.Asum[best_class], ipp, jpp) += smearw * A2D_ELEM(Xrects[ipart][best_k_rot], i, j);
+					A2D_ELEM(model.Asumw[best_class], ipp, jpp) += smearw;
+				}
 			}
 		}
+		model.pdf[best_class] += 1.;
 	}
-	model.pdf[best_class] += 1.;
-
 
 }
 
@@ -866,12 +927,13 @@ void HelixAligner::expectation()
 		init_progress_bar(Xrects.size());
 	}
 
+	#pragma omp parallel for num_threads(nr_threads)
 	for (long int ipart = 0; ipart < Xrects.size(); ipart++)
 	{
 
 		expectationOneParticleNoFFT(ipart);
 
-		if (ipart%1==0)
+		if (ipart%nr_threads==0)
 			progress_bar(ipart);
 	}
 
@@ -901,6 +963,9 @@ void HelixAligner::maximisation()
 					DIRECT_A2D_ELEM(model.Aref[iclass], i, j) =  DIRECT_A2D_ELEM(model.Asum[iclass], i, j) / DIRECT_A2D_ELEM(model.Asumw[iclass], i, j);
 				else
 					DIRECT_A2D_ELEM(model.Aref[iclass], i, j) = 0.;
+
+				// Also store  sum of classes in Asum for writeOut
+				DIRECT_A2D_ELEM(model.Asum[iclass], i, j)  = DIRECT_A2D_ELEM(model.Aref[iclass], i, j);
 			}
 		}
 		allsum += model.pdf[iclass];
@@ -948,11 +1013,11 @@ void HelixAligner::reconstruct2D(int iclass)
     	Matrix2D<RFLOAT> A2D;
     	RFLOAT rot = (RFLOAT)j*360./(XSIZE(model.Aref[iclass]));
     	rotation2DMatrix(rot, A2D);
-    	BP.set2DFourierTransform(myFlines[j], A2D, IS_NOT_INV);
+    	BP.set2DFourierTransform(myFlines[j], A2D);
     }
     MultidimArray<RFLOAT> dummy;
     model.Arec[iclass].initZeros();
-    BP.reconstruct(model.Arec[iclass], 10, false, 1., dummy, dummy, dummy, dummy, dummy, 1., false, true, 1, -1);
+    BP.reconstruct(model.Arec[iclass], 10, false, dummy);
 
     if (symmetry > 1)
     {
@@ -976,6 +1041,13 @@ void HelixAligner::reconstruct2D(int iclass)
 		model.Arec[iclass] = Asum / (RFLOAT)symmetry;
     }
 
+    if (mask_diameter > 0.)
+    {
+    	RFLOAT pixel_radius = mask_diameter/(2.*down_angpix);
+    	softMaskOutsideMap(model.Arec[iclass], pixel_radius, 0.);
+    }
+
+
 #ifdef DEBUGREC2D
 	It()=model.Arec[iclass];
 	resizeMap(It(), ori_size);
@@ -997,7 +1069,7 @@ void HelixAligner::reconstruct2D(int iclass)
 		RFLOAT rot = (RFLOAT)j*360./(XSIZE(model.Aref[iclass]));
     	rotation2DMatrix(rot, A2D);
     	myFlines[j].initZeros();
-    	PP.get2DFourierTransform(myFlines[j], A2D, IS_NOT_INV);
+    	PP.get2DFourierTransform(myFlines[j], A2D);
     	transformer.inverseFourierTransform(myFlines[j],myline);
     	// Shift the image back to the center...
     	CenterFFT(myline, false);
@@ -1019,7 +1091,7 @@ void HelixAligner::reconstruct2D(int iclass)
 void HelixAligner::writeOut(int iter)
 {
 
-	std::cout << " **** Model for iteration " << iter << std::endl;
+	//std::cout << " **** Model for iteration " << iter << std::endl;
 
 #ifdef DEBUG
 	for (int iclass = 0; iclass < nr_classes; iclass++)
@@ -1036,7 +1108,9 @@ void HelixAligner::writeOut(int iter)
 	}
 #else
 	FileName fn_iter = fn_out + "_it" + integerToString(iter, 3);
+	MD.write(fn_iter+".star");
 	Image<RFLOAT> Aimg(xrect, yrect, 1, nr_classes);
+
 	for (int iclass = 0; iclass < nr_classes; iclass++)
 	{
 		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(model.Aref[iclass])
@@ -1044,7 +1118,17 @@ void HelixAligner::writeOut(int iter)
 			DIRECT_NZYX_ELEM(Aimg(), iclass, 0, i, j) = DIRECT_A2D_ELEM(model.Aref[iclass], i, j);
 		}
     }
-	Aimg.write(fn_iter + "_classes.mrcs");
+	Aimg.write(fn_iter + "_reprojections.mrcs");
+
+	for (int iclass = 0; iclass < nr_classes; iclass++)
+	{
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(model.Asum[iclass])
+		{
+			DIRECT_NZYX_ELEM(Aimg(), iclass, 0, i, j) = DIRECT_A2D_ELEM(model.Asum[iclass], i, j);
+		}
+    }
+	Aimg.write(fn_iter + "_summed_classes.mrcs");
+
 	Image<RFLOAT> Aimg2(yrect, yrect, 1, nr_classes);
 	for (int iclass = 0; iclass < nr_classes; iclass++)
 	{
@@ -1053,12 +1137,15 @@ void HelixAligner::writeOut(int iter)
 			DIRECT_NZYX_ELEM(Aimg2(), iclass, 0, i, j) = DIRECT_A2D_ELEM(model.Arec[iclass], i, j);
 		}
 	}
-	Aimg2.write(fn_iter + "_classes_reconstructed.mrcs");
+	Aimg2.write(fn_iter + "_reconstructed.mrcs");
 #endif
 
-	for (int iclass = 0; iclass < nr_classes; iclass++)
+	if (nr_classes > 1)
 	{
-		std:: cout << " * Fraction class " << iclass+1 << " = " << model.pdf[iclass] << std::endl;
+		for (int iclass = 0; iclass < nr_classes; iclass++)
+		{
+			std:: cout << " * Fraction class " << iclass+1 << " = " << model.pdf[iclass] << std::endl;
+		}
 	}
 
 }
@@ -1126,6 +1213,8 @@ void HelixAligner::run()
 		expectation();
 
 		maximisation();
+
+		writeOut(iter);
 
 		if (max_smear > 0)
 			max_smear -= decrease_smear;
