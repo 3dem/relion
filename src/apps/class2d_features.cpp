@@ -61,6 +61,7 @@
 #include <src/exp_model.h>
 #include <src/ctf.h>
 #include <stdio.h>
+#include <src/metadata_label.h>
 
 
 // This contains 3 moments for an image
@@ -81,9 +82,9 @@ public:
     long class_index;
     int is_selected, resol_limit;
     RFLOAT class_distribution, accuracy_rotation, accuracy_translation, estimated_resolution, particle_nr;
-    RFLOAT class_score, edge_signal, scattered_signal, weighted_resolution;
+    RFLOAT class_score, edge_signal, scattered_signal, weighted_resolution, relative_resolution;
     RFLOAT lowpass_filtered_img_avg, lowpass_filtered_img_stddev, lowpass_filtered_img_minval, lowpass_filtered_img_maxval;
-    std::vector<RFLOAT> resolutions, lbp, lbp_p, lbp_s, haralick_p, haralick_s, zernike_moments;
+    std::vector<RFLOAT> resolutions, lbp, lbp_p, lbp_s, haralick_p, haralick_s, zernike_moments, granulo;
     moments circular_mask_moments, ring_moments, inner_circle_moments, fft_moments, protein_moments, solvent_moments;
     double total_entropy, protein_entropy, solvent_entropy;
 
@@ -100,6 +101,7 @@ public:
 			accuracy_translation(0),
 			estimated_resolution(999.0),
 			weighted_resolution(999.0),
+			relative_resolution(999.0),
 			PixelSize(0),
 			OriginalImageSize(0),
 			SigmaOffSets(0),
@@ -438,6 +440,9 @@ class HaralickExtractor
         	MultidimArray<double> avg;
         	avg.initZeros(13);
 
+        	// Check there are non-zero elements in the mask
+        	if (mask != NULL && (*mask).sum() == 0) return ans;
+
         	// Convert greyscale image to integer image with much fewer (32) grey-scale values
         	MultidimArray<int> imgint;
         	imgint.resize(img);
@@ -671,6 +676,12 @@ public:
 	void meanMomentsCalculator (MultidimArray<RFLOAT> &img, RFLOAT inner_radius, RFLOAT outer_radius, moments &mmts, MultidimArray<int> *mask = NULL){
 		int pix_num = 0;
 		RFLOAT inner_radius_square, outer_radius_square;
+
+		if (mask != NULL  && (*mask).sum() == 0)
+		{
+			mmts.mean = mmts.stddev = mmts.skew = mmts.kurt = 0.;
+			return;
+		}
 
 		inner_radius_square = pow((inner_radius), 2);
 		outer_radius_square = pow((outer_radius), 2);
@@ -1263,6 +1274,83 @@ public:
 		}
 	}
 
+	void extractGranulo(const MultidimArray<double> &I, class_features &cf)
+	{
+		Image<double> G;
+	    G().resize(I);
+	    double m, M;
+	    I.computeDoubleMinMax(m, M);
+
+	    if (XSIZE(I) < 15 || YSIZE(I) < 15)
+	    {
+	        std::cerr << "ERROR: Input image must be at least 15x15px"
+	                  << "to extract granulo features!\n";
+	        exit(1);
+	    }
+
+	    for (int N = 1; N < 7; N++)
+	    {
+	        // creating circular structuring element
+	        int size = N*2 + 1;
+	        bool struct_elem[size][size];
+	        for (int y = 0; y < size; y++)
+	        {
+	            for (int x = 0; x < size; x++)
+	                struct_elem[x][y] = ((x-N)*(x-N) + (y-N)*(y-N)) <= N*N;
+	        }
+
+	        // morphological erosion
+	        double sum = 0.0;
+	        for (int y = 0; y < YSIZE(I); y++)
+	        {
+	            for (int x = 0; x < XSIZE(I); x++)
+	            {
+	                double struct_min = M;
+
+	                for (int yy = y-N; yy <= y+N; yy++)
+	                {
+	                    if (yy < 0 || yy >= YSIZE(I)) continue;
+
+	                    for (int xx = x-N; xx <= x+N; xx++)
+	                    {
+	                        if (xx < 0 || xx >= XSIZE(I)) continue;
+
+	                        if (struct_elem[xx+N-x][yy+N-y] &&
+	                            DIRECT_A2D_ELEM(I, yy, xx) < struct_min)
+	                            struct_min = DIRECT_A2D_ELEM(I, yy, xx);
+	                    }
+	                }
+	                DIRECT_A2D_ELEM(G(), y, x) = struct_min;
+	            }
+	        }
+
+	        // morphological dilation (dilation after erosion = opening)
+	        for (int y = 0; y < YSIZE(I); y++)
+	        {
+	            for (int x = 0; x < XSIZE(I); x++)
+	            {
+	                double struct_max = m;
+
+	                for (int yy = y-N; yy <= y+N; yy++)
+	                {
+	                    if (yy < 0 || yy >= YSIZE(I)) continue;
+
+	                    for (int xx = x-N; xx <= x+N; xx++)
+	                    {
+	                        if (xx < 0 || xx >= XSIZE(I)) continue;
+
+	                        if (struct_elem[xx+N-x][yy+N-y] &&
+	                            DIRECT_A2D_ELEM(G(), yy, xx) > struct_max)
+	                            struct_max = DIRECT_A2D_ELEM(G(), yy, xx);
+	                    }
+	                }
+	                sum += struct_max;
+	            }
+	        }
+	        cf.granulo.push_back(sum);
+	    }
+	}
+
 /** ===========================================================Correct CTF until first peak ====================================================== */
 	void correctCtfUntilFirstPeak(MultidimArray<RFLOAT> &in, CTF ctf)
 	{
@@ -1281,11 +1369,13 @@ public:
 
 			// ctf should become part of the pvs_features class, perhaps call it avgctf
 			RFLOAT ctf_val = ctf.getCTF(x, y, false, false, false, false, 0., true);
-			if (ctf_val > 0.)
-	    		DIRECT_A2D_ELEM(Faux, i, j) /= ctf_val;
+			// Don't use any value smaller than 7%. Some people accidentally use 0% amplitude contrast, which would be bad!
+			if (ctf_val < 0.07) ctf_val = 0.07;
+			DIRECT_A2D_ELEM(Faux, i, j) /= ctf_val;
 	    }
 	    transformer.inverseFourierTransform(Faux, in);
 	}
+
 
 	/** ======================================================== Collecting All Features ========================================================= */
 
@@ -1358,6 +1448,9 @@ public:
 
 				// Calculate particle number-weighted resolution
 				features_this_class.weighted_resolution = (1. / (features_this_class.estimated_resolution*features_this_class.estimated_resolution)) / log(features_this_class.particle_nr);
+
+				// Calculate image size weighted resolution
+				features_this_class.relative_resolution = features_this_class.estimated_resolution / (myopt.mymodel.ori_size *myopt.mymodel.pixel_size);
 
 				// Calculate moments for class average image
 				// Find job-wise best resolution among selected (red) classes in preparation for class score calculation called in the write_output function
@@ -1450,6 +1543,8 @@ public:
 				features_this_class.zernike_moments = zernike_extractor.zernike(features_this_class.img(), 7, circular_mask_radius, debug>0);
 				if (debug> 0 ) std::cerr << " done with Zernike moments" << std::endl;
 
+				// Calculate granulo feature
+				extractGranulo(features_this_class.img(), features_this_class);
 				features_all_classes.push_back(features_this_class);
 				ith_nonzero_class++;
 
@@ -1553,6 +1648,9 @@ public:
             // Zernike moments
             MD_class_features.getValue(EMDL_CLASS_FEAT_ZERNIKE_MOMENTS, this_class_feature.zernike_moments);
 
+            // Granulo
+            MD_class_features.getValue(EMDL_CLASS_FEAT_GRANULO, this_class_feature.granulo);
+
 
             preread_features_all_classes.push_back(this_class_feature);
 			i++;
@@ -1581,6 +1679,7 @@ public:
 			MD_class_features.setValue(EMDL_MLMODEL_ACCURACY_TRANS, features_all_classes[i].accuracy_translation);
 			MD_class_features.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, features_all_classes[i].estimated_resolution);
 			MD_class_features.setValue(EMDL_CLASS_FEAT_WEIGHTED_RESOLUTION, features_all_classes[i].weighted_resolution);
+			MD_class_features.setValue(EMDL_CLASS_FEAT_RELATIVE_RESOLUTION, features_all_classes[i].relative_resolution);
 			MD_class_features.setValue(EMDL_CLASS_FEAT_PARTICLE_NR, features_all_classes[i].particle_nr);
 
 
@@ -1642,7 +1741,7 @@ public:
 
             // Zernike moments
             MD_class_features.setValue(EMDL_CLASS_FEAT_ZERNIKE_MOMENTS, features_all_classes[i].zernike_moments);
-
+            MD_class_features.setValue(EMDL_CLASS_FEAT_GRANULO, features_all_classes[i].granulo);
 		}
 		MD_class_features.write(fn_out);
 	}

@@ -112,6 +112,7 @@ enum EMDLabel
 	EMDL_CLASS_FEAT_SCATTERED_SIGNAL,
 	EMDL_CLASS_FEAT_EDGE_SIGNAL,
 	EMDL_CLASS_FEAT_WEIGHTED_RESOLUTION,
+	EMDL_CLASS_FEAT_RELATIVE_RESOLUTION,
 	EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MAX,
 	EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MIN,
 	EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MEAN,
@@ -125,6 +126,7 @@ enum EMDLabel
 	EMDL_CLASS_FEAT_PROTEIN_HARALICK,
 	EMDL_CLASS_FEAT_SOLVENT_HARALICK,
 	EMDL_CLASS_FEAT_ZERNIKE_MOMENTS,
+	EMDL_CLASS_FEAT_GRANULO,
 
 	EMDL_CTF_ASTIGMATISM,
 	EMDL_CTF_BFACTOR, ///< B-factor
@@ -686,6 +688,7 @@ private:
         EMDL::addLabel(EMDL_CLASS_FEAT_SCATTERED_SIGNAL, EMDL_DOUBLE, "rlnScatteredSignal", "Ratio of excluded white pixels when making the protein mask.");
         EMDL::addLabel(EMDL_CLASS_FEAT_EDGE_SIGNAL, EMDL_DOUBLE, "rlnEdgeSignal", "Ratio of white pixels on the edge in the protein mask.");
         EMDL::addLabel(EMDL_CLASS_FEAT_WEIGHTED_RESOLUTION, EMDL_DOUBLE, "rlnWeightedResolution", "Estimated resolution weighted by the number of particles in the class.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_RELATIVE_RESOLUTION, EMDL_DOUBLE, "rlnRelativeResolution", "Estimated resolution weighted by the image dimension.");
         EMDL::addLabel(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MAX, EMDL_DOUBLE, "rlnLowpassFilteredImageMax", "Maximum pixel value of the lowpass filtered image.");
         EMDL::addLabel(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MIN, EMDL_DOUBLE, "rlnLowpassFilteredImageMin", "Minimum pixel value of the lowpass filtered image.");
         EMDL::addLabel(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MEAN, EMDL_DOUBLE, "rlnLowpassFilteredImageMean", "Mean pixel value of the lowpass filtered image.");
@@ -699,6 +702,7 @@ private:
         EMDL::addLabel(EMDL_CLASS_FEAT_PROTEIN_HARALICK, EMDL_DOUBLE_VECTOR, "rlnProteinHaralick", "Haralick features of the protein area.");
         EMDL::addLabel(EMDL_CLASS_FEAT_SOLVENT_HARALICK, EMDL_DOUBLE_VECTOR, "rlnSolventHaralick", "Haralick features of the solvent area.");
         EMDL::addLabel(EMDL_CLASS_FEAT_ZERNIKE_MOMENTS, EMDL_DOUBLE_VECTOR, "rlnZernikeMoments", "Zernike moments of the image.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_GRANULO, EMDL_DOUBLE_VECTOR, "rlnGranulo", "Granulo features of the image.");
 
 		EMDL::addLabel(EMDL_CTF_ASTIGMATISM, EMDL_DOUBLE, "rlnCtfAstigmatism", "Absolute value of the difference between defocus in U- and V-direction (in A)");
 		EMDL::addLabel(EMDL_CTF_BFACTOR, EMDL_DOUBLE, "rlnCtfBfactor", "B-factor (in A^2) that describes CTF power spectrum fall-off");
