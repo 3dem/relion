@@ -70,8 +70,8 @@ class star_handler_parameters
 
 		int subset_section = parser.addSection("Select options");
 		select_label = parser.getOption("--select", "Metadata label (number) to base output selection on (e.g. rlnCtfFigureOfMerit)", "");
-		select_minval = textToFloat(parser.getOption("--minval", "Minimum acceptable value for this label", "-99999999."));
-		select_maxval = textToFloat(parser.getOption("--maxval", "Maximum acceptable value for this label", "99999999."));
+		select_minval = textToFloat(parser.getOption("--minval", "Minimum acceptable value for this label (inclusive)", "-99999999."));
+		select_maxval = textToFloat(parser.getOption("--maxval", "Maximum acceptable value for this label (inclusive)", "99999999."));
 		select_str_label = parser.getOption("--select_by_str", "Metadata label (string) to base output selection on (e.g. rlnMicrographname)", "");
 		select_include_str = parser.getOption("--select_include", "select rows that contains this string in --select_by_str ", "");
 		select_exclude_str = parser.getOption("--select_exclude", "exclude rows that contains this string in --select_by_str ", "");
@@ -440,11 +440,14 @@ class star_handler_parameters
 				FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsin[MDs_id])
 				{
 					MDsin[MDs_id].setValue(EMDL_IMAGE_OPTICS_GROUP, new_optics_groups[current_object]);
+
 					// Also rename the rlnGroupName to not have groups overlapping from different optics groups
 					std::string name;
-					MDsin[MDs_id].getValue(EMDL_MLMODEL_GROUP_NAME, name);
-					name = "optics"+integerToString(new_optics_groups[current_object])+"_"+name;
-					MDsin[MDs_id].setValue(EMDL_MLMODEL_GROUP_NAME, name);
+					if (MDsin[MDs_id].getValue(EMDL_MLMODEL_GROUP_NAME, name))
+					{
+						name = "optics"+integerToString(new_optics_groups[current_object])+"_"+name;
+						MDsin[MDs_id].setValue(EMDL_MLMODEL_GROUP_NAME, name);
+					}
 				}
 			}
 
@@ -452,7 +455,7 @@ class star_handler_parameters
 			MDoptics.push_back(obsModel.opticsMdt);
 			for (int i = 1; i < fns_in.size(); i++)
 			{
-				MDoptics.push_back(obsModels[i-1].opticsMdt);
+				MDoptics.push_back(obsModels[i - 1].opticsMdt);
 			}
 
 			// Check if anisotropic magnification and/or beam_tilt are present in some optics groups, but not in others.
@@ -461,6 +464,7 @@ class star_handler_parameters
 			bool has_anisomag = false, has_not_anisomag = false;
 			bool has_odd_zernike = false, has_not_odd_zernike = false;
 			bool has_even_zernike = false, has_not_even_zernike = false;
+			bool has_ctf_premultiplied = false, has_not_ctf_premultiplied = false;
 			for (int i = 0; i < fns_in.size(); i++)
 			{
 				if (MDoptics[i].containsLabel(EMDL_IMAGE_BEAMTILT_X) ||
@@ -499,7 +503,18 @@ class star_handler_parameters
 				{
 					has_not_even_zernike = true;
 				}
+				if (MDoptics[i].containsLabel(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED))
+				{
+					has_ctf_premultiplied = true;
+				}
+				else
+				{
+					has_not_ctf_premultiplied = true;
+				}
 			}
+#ifdef DEBUG
+			printf("has_beamtilt = %d, has_not_beamtilt = %d, has_anisomag = %d, has_not_anisomag = %d, has_odd_zernike = %d, has_not_odd_zernike = %d, has_even_zernike = %d, has_not_even_zernike = %d, has_ctf_premultiplied = %d, has_not_ctf_premultiplied = %d\n", has_beamtilt, has_not_beamtilt, has_anisomag, has_not_anisomag, has_odd_zernike, has_not_odd_zernike, has_even_zernike, has_not_even_zernike, has_ctf_premultiplied, has_not_ctf_premultiplied);
+#endif
 
 			for (int i = 0; i < fns_in.size(); i++)
 			{
@@ -540,26 +555,38 @@ class star_handler_parameters
 
 				if (has_odd_zernike && has_not_odd_zernike)
 				{
+					std::vector<RFLOAT> six_zeros(6, 0);
 					if (!MDoptics[i].containsLabel(EMDL_IMAGE_ODD_ZERNIKE_COEFFS))
 					{
 						FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDoptics[i])
 						{
-							MDoptics[i].setValue(EMDL_IMAGE_ODD_ZERNIKE_COEFFS, "[0,0,0,0,0,0]");
+							MDoptics[i].setValue(EMDL_IMAGE_ODD_ZERNIKE_COEFFS, six_zeros);
 						}
 					}
 				}
 
 				if (has_even_zernike && has_not_even_zernike)
 				{
+					std::vector<RFLOAT> nine_zeros(9, 0);
 					if (!MDoptics[i].containsLabel(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS))
 					{
 						FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDoptics[i])
 						{
-							MDoptics[i].setValue(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS, "[0,0,0,0,0,0,0,0,0]");
+							MDoptics[i].setValue(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS, nine_zeros);
 						}
 					}
 				}
 
+				if (has_ctf_premultiplied && has_not_ctf_premultiplied)
+				{
+					if (!MDoptics[i].containsLabel(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED))
+					{
+						FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDoptics[i])
+						{
+							MDoptics[i].setValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, false);
+						}
+					}
+				}
 			}
 
 			// Now combine all optics tables into one
@@ -673,11 +700,11 @@ class star_handler_parameters
 			int type;
 			if (MD.getName() == "micrographs")
 			{
-				type == NODE_MICS;
+				type = NODE_MICS;
 			}
 			else if (MD.getName() == "movies")
 			{
-				type == NODE_MOVIES;
+				type = NODE_MOVIES;
 			}
 			else
 			{
@@ -1011,7 +1038,6 @@ class star_handler_parameters
 		std::cout << " Written: " << fn_out << std::endl;
 	}
 };
-
 
 int main(int argc, char *argv[])
 {

@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
 
-#
 #if(POLICY CMP0048)
 #  cmake_policy(SET CMP0048 NEW)
 #endif()
@@ -17,6 +16,11 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 add_definitions(-DINSTALL_LIBRARY_DIR=${CMAKE_INSTALL_PREFIX}/lib/)
 add_definitions(-DSOURCE_DIR=${CMAKE_SOURCE_DIR}/src/)
+
+if(MDT_TYPE_CHECK)
+    message(" DEVELOPER MODE: MetaDataTable type check is enabled.")
+    add_definitions(-DMETADATA_TABLE_TYPE_CHECK)
+endif()
 
 # message(STATUS "INSTALL_LIBRARY_DIR set to ${CMAKE_INSTALL_PREFIX}/lib/")
 # message(STATUS "SOURCE_DIR set to ${CMAKE_SOURCE_DIR}/src/")
@@ -95,12 +99,12 @@ option(DoublePrec_CPU "DoublePrec_CPU" ON)
 option(DoublePrec_ACC "Accelerated Code use double-precision" OFF)
 option(MKLFFT "Use MKL rather than FFTW for FFT" OFF)
 option(CudaTexture "CudaTexture" ON)
-option(ALLOW_CTF_IN_SGD "Allow CTF-modulation in SGD, as specified in Claim 1 of patent US10,282,513B2" ON)
+option(ALLOW_CTF_IN_SAGD "Allow CTF-modulation in SAGD, as specified in Claim 1 of patent US10,282,513B2" ON)
 
-if(ALLOW_CTF_IN_SGD)
-#    message(STATUS "ALLOW_CTF_IN_SGD enabled - This build of RELION allows modulation of particle images by a contrast transfer function inside stochastic gradient descent, as specified in Claim 1 of patent US10,282,513B2")
+if(ALLOW_CTF_IN_SAGD)
+    message(STATUS "ALLOW_CTF_IN_SAGD enabled - This build of RELION allows modulation of particle images by a contrast transfer function inside stochastic average gradient descent, as specified in Claim 1 of patent US10,282,513B2")
 else()
-    message(STATUS "ALLOW_CTF_IN_SGD disabled - This build of RELION does not allow modulation of particle images by a contrast transfer function inside stochastic gradient descent, as specified in Claim 1 of patent US10,282,513B2")
+    message(STATUS "ALLOW_CTF_IN_SAGD disabled - This build of RELION does not allow modulation of particle images by a contrast transfer function inside stochastic average gradient descent, as specified in Claim 1 of patent US10,282,513B2")
 endif()
 
 if(ALTCPU)
@@ -268,7 +272,7 @@ if(ALTCPU)
     add_definitions(-DALTCPU)
 endif()
 
-if(ALLOW_CTF_IN_SGD)
+if(ALLOW_CTF_IN_SAGD)
     add_definitions(-DALLOW_CTF_IN_SGD)
 endif()
 
@@ -397,7 +401,7 @@ ADD_SUBDIRECTORY(src/apps)
 
 #message(STATUS "CUDA option = ${CUDA}")
 #message(STATUS "ALTCPU option = ${ALTCPU}")
-#message(STATUS "ALLOW_CTF_IN_SGD option = ${ALLOW_CTF_IN_SGD}")
+#message(STATUS "ALLOW_CTF_IN_SAGD option = ${ALLOW_CTF_IN_SAGD}")
 #message(STATUS "DoublePrec_CPU option = ${DoublePrec_CPU}")
 #message(STATUS "DoublePrec_ACC option = ${DoublePrec_ACC}")
 #message(STATUS "MKLFFT option = ${MKLFFT}")

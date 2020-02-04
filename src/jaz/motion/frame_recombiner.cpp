@@ -231,7 +231,7 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 	const RFLOAT ref_angpix = reference->angpix;
 	const RFLOAT coords_angpix = micrographHandler->coords_angpix;
 
-	std::cout << "ref_angpix = " << ref_angpix << " coords_angpix = " << coords_angpix << std::endl;
+//	std::cout << "ref_angpix = " << ref_angpix << " coords_angpix = " << coords_angpix << std::endl;
 	if (verb > 0)
 	{
 		std::cout << " + Combining frames for all micrographs ... " << std::endl;
@@ -310,8 +310,8 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 
 			xoff -= XX(my_projected_center);
 			yoff -= YY(my_projected_center);
-			xoff /= coords_angpix; // Now in (possibly binned) micrograph's pixel
-			yoff /= coords_angpix;
+			xoff = xoff * ref_angpix / coords_angpix; // Now in (possibly binned) micrograph's pixel
+			yoff = yoff * ref_angpix / coords_angpix;
 
 			mdtOut.getValue(EMDL_IMAGE_COORD_X, xcoord, p);
 			mdtOut.getValue(EMDL_IMAGE_COORD_Y, ycoord, p);

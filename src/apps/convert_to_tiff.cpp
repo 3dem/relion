@@ -1,6 +1,6 @@
 /***************************************************************************
  *
- * Author: "Sjors H.W. Scheres"
+ * Author: "Takanori Nakane"
  * MRC Laboratory of Molecular Biology
  *
  * This program is free software; you can redistribute it and/or modify
@@ -10,7 +10,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * This complete copyright notice must be included in any revised version of the
@@ -18,30 +18,17 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#include <src/args.h>
-#include "../particle_subtractor.h"
+#include <src/tiff_converter.h>
 
 int main(int argc, char *argv[])
 {
-	ParticleSubtractor prm;
+	TIFFConverter app;
 
 	try
 	{
-		prm.read(argc, argv);
-
-		prm.initialise();
-
-		if (prm.fn_revert != "")
-		{
-			prm.revert();
-		}
-		else
-		{
-			prm.run();
-			prm.setLinesInStarFile();
-			prm.saveStarFile();
-		}
-
+		app.read(argc, argv);
+		app.initialise();
+		app.run();
 	}
 	catch (RelionError XE)
 	{

@@ -20,7 +20,6 @@
 
 #include "flex_analyser.h"
 
-
 void FlexAnalyser::read(int argc, char **argv)
 {
 	parser.setCommandLine(argc, argv);
@@ -53,7 +52,6 @@ void FlexAnalyser::read(int argc, char **argv)
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())
 		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
-
 }
 
 void FlexAnalyser::initialise()
@@ -100,7 +98,6 @@ void FlexAnalyser::initialise()
 
 	if (do_PCA_orient)
 	{
-
 		if (model.nr_bodies * 6 > data.numberOfParticles())
 			REPORT_ERROR("ERROR: there are not enough particles to perform PCA!");
 
@@ -173,7 +170,6 @@ void FlexAnalyser::initialise()
 
 void FlexAnalyser::run(int rank, int size)
 {
-
 	if (do_3dmodels) setup3DModels();
 
 	// Loop through all particles
@@ -182,7 +178,6 @@ void FlexAnalyser::run(int rank, int size)
 	if (size > 1) {
 		MPI_Barrier(MPI_COMM_WORLD);
 	}
-
 }
 
 void FlexAnalyser::setup3DModels()
@@ -205,7 +200,6 @@ void FlexAnalyser::setup3DModels()
 			model.Iref[ibody].setXmippOrigin();
 			model.masks_bodies[ibody].setXmippOrigin();
 		}
-
 	}
 }
 
@@ -341,12 +335,10 @@ void FlexAnalyser::loopThroughParticles(int rank, int size)
 			outputSelectedParticles(projected_data);
 		}
 	}
-
 }
 
 void FlexAnalyser::make3DModelOneParticle(long int part_id, long int imgno, std::vector<double> &datarow, int rank, int size)
 {
-
 	// Get the consensus class, orientational parameters and norm (if present)
 	Matrix2D<RFLOAT> Aori;
 	RFLOAT rot, tilt, psi, xoff, yoff, zoff;
@@ -452,9 +444,8 @@ void FlexAnalyser::make3DModelOneParticle(long int part_id, long int imgno, std:
 }
 
 void FlexAnalyser::makePCAhistograms(std::vector< std::vector<double> > &projected_input,
-			std::vector<double> &eigenvalues, std::vector<double> &means)
+                                     std::vector<double> &eigenvalues, std::vector<double> &means)
 {
-
 	std::vector<FileName> all_fn_eps;
 	FileName fn_eps = fn_out + "_eigenvalues.eps";
 	all_fn_eps.push_back(fn_eps);
@@ -517,7 +508,6 @@ void FlexAnalyser::makePCAhistograms(std::vector< std::vector<double> > &project
 		// Sort the vector to calculate average of nr_maps_per_component equi-populated bins
 		std::sort (project.begin(), project.end());
 
-		// TODO: write histogram to file!!!
 		// Write the movement plot as well
 		FileName fn_eps = fn_out + "_component" + integerToString(k+1, 3) + "_histogram.eps";
 		all_fn_eps.push_back(fn_eps);
@@ -556,13 +546,11 @@ void FlexAnalyser::makePCAhistograms(std::vector< std::vector<double> > &project
 	}
 
 	joinMultipleEPSIntoSinglePDF(fn_out + "_logfile.pdf", all_fn_eps);
-
 }
 
 void FlexAnalyser::make3DModelsAlongPrincipalComponents(std::vector< std::vector<double> > &projected_input,
-		std::vector< std::vector<double> > &eigenvectors, std::vector<double> &means)
+                                                        std::vector< std::vector<double> > &eigenvectors, std::vector<double> &means)
 {
-
 	// Loop over the principal components
 	for (int k = 0; k < nr_components; k++)
 	{
@@ -660,7 +648,6 @@ void FlexAnalyser::make3DModelsAlongPrincipalComponents(std::vector< std::vector
 		} // end loop ibin
 
 	} // end loop components
-
 }
 
 void FlexAnalyser::writeAllPCAProjections(std::vector< std::vector<double> > &projected_input)
@@ -695,8 +682,8 @@ void FlexAnalyser::outputSelectedParticles(std::vector< std::vector<double> > &p
 	MetaDataTable MDo;
 	for (long int ipart = 0; ipart < projected_input.size(); ipart++)
 	{
-		if (projected_input[ipart][select_eigenvalue-1] > select_eigenvalue_min
-				&& projected_input[ipart][select_eigenvalue-1] < select_eigenvalue_max)
+		if (projected_input[ipart][select_eigenvalue-1] > select_eigenvalue_min &&
+		    projected_input[ipart][select_eigenvalue-1] < select_eigenvalue_max)
 			MDo.addObject(data.MDimg.getObject(ipart));
 	}
 
@@ -708,17 +695,15 @@ void FlexAnalyser::outputSelectedParticles(std::vector< std::vector<double> > &p
 	if (max < 99998)
 		fnt += "_max"+integerToString(max);
 	fnt += ".star";
-	MDo.write(fnt);
+	data.obsModel.save(MDo, fnt, "particles");
 	std::cout << " Written out " << MDo.numberOfObjects() << " selected particles in " << fnt << std::endl;
-
 }
 
 void principalComponentsAnalysis(const std::vector< std::vector<double> > &input,
-		std::vector< std::vector<double> > &eigenvec,
-		std::vector<double> &eigenval, std::vector<double> &means,
-		std::vector< std::vector<double> > &projected_input)
+                                 std::vector< std::vector<double> > &eigenvec,
+                                 std::vector<double> &eigenval, std::vector<double> &means,
+                                 std::vector< std::vector<double> > &projected_input)
 {
-
 	std:: cout << "Calculating PCA ..." << std::endl;
 
 	std::vector<std::vector<double> > a;
@@ -786,7 +771,6 @@ void principalComponentsAnalysis(const std::vector< std::vector<double> > &input
 	// Jacobi method (it=iteration number)
 	for (int it = 1; it <= 50; it++)
 	{
-
 		double threshold;
 		double sm = 0.0;
 		for (int ip = 0; ip < n - 1; ip++)
@@ -907,5 +891,3 @@ void principalComponentsAnalysis(const std::vector< std::vector<double> > &input
 
 	REPORT_ERROR("ERROR: too many Jacobi iterations in PCA calculation...");
 }
-
-

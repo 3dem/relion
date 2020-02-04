@@ -869,18 +869,6 @@ void JobWindow::initialiseExtractWindow()
 	group1->end();
 	guientries["do_reextract"].cb_menu_i();
 
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group2->end();
-	place("do_set_angpix", TOGGLE_DEACTIVATE, group2);
-
-	group2->begin();
-	place("angpix", TOGGLE_DEACTIVATE); //(current_y, "Pixel size (A)", 1, 0.3, 5, 0.1, "Provide the pixel size in Angstroms in the micrograph (so before any re-scaling).  If you provide input CTF parameters, then leave this value to the default of -1.");
-	group2->end();
-	guientries["do_set_angpix"].cb_menu_i();
-
 	tab1->end();
 
 	tab2->begin();
@@ -1943,15 +1931,8 @@ void JobWindow::initialisePostprocessWindow()
 
 	current_y += STEPY/2;
 
-	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group4->end();
-	place("do_mtf", TOGGLE_LEAVE_ACTIVE, group4);
-
-	group4->begin();
 	place("fn_mtf");
 	place("mtf_angpix");
-	group4->end();
-	guientries["do_mtf"].cb_menu_i();
 
 	tab2->end();
 	tab3->begin();

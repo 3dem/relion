@@ -316,10 +316,8 @@ size_t MetaDataTable::size() const
 	return objects.size();
 }
 
-
 bool MetaDataTable::setUnknownValue(int labelPosition, const std::string &value)
 {
-
 	long offset = unknownLabelPosition2Offset[labelPosition];
 	if (offset < 0) REPORT_ERROR("MetaDataTable::setValueFromString BUG: offset should not be negative here....");
 
@@ -332,8 +330,6 @@ bool MetaDataTable::setUnknownValue(int labelPosition, const std::string &value)
 	{
 		return false;
 	}
-
-
 }
 
 bool MetaDataTable::setValueFromString(
@@ -395,82 +391,82 @@ bool MetaDataTable::setValueFromString(
 	return false;
 }
 
-	// comparators used for sorting
+// comparators used for sorting
 
-	struct MdDoubleComparator
+struct MdDoubleComparator
+{
+	MdDoubleComparator(long index) : index(index) {}
+
+	bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
 	{
-		MdDoubleComparator(long index) : index(index) {}
+		return lh->doubles[index] < rh->doubles[index];
+	}
 
-		bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
-		{
-			return lh->doubles[index] < rh->doubles[index];
-		}
+	long index;
+};
 
-		long index;
-	};
+struct MdIntComparator
+{
+	MdIntComparator(long index) : index(index) {}
 
-	struct MdIntComparator
+	bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
 	{
-		MdIntComparator(long index) : index(index) {}
+		return lh->ints[index] < rh->ints[index];
+	}
 
-		bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
-		{
-			return lh->ints[index] < rh->ints[index];
-		}
+	long index;
+};
 
-		long index;
-	};
+struct MdStringComparator
+{
+	MdStringComparator(long index) : index(index) {}
 
-	struct MdStringComparator
+	bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
 	{
-		MdStringComparator(long index) : index(index) {}
+		return lh->strings[index] < rh->strings[index];
+	}
 
-		bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
-		{
-			return lh->strings[index] < rh->strings[index];
-		}
+	long index;
+};
 
-		long index;
-	};
+struct MdStringAfterAtComparator
+{
+	MdStringAfterAtComparator(long index) : index(index) {}
 
-	struct MdStringAfterAtComparator
+	bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
 	{
-		MdStringAfterAtComparator(long index) : index(index) {}
+		std::string slh = lh->strings[index];
+		std::string srh = rh->strings[index];
+		slh = slh.substr(slh.find("@")+1);
+		srh = srh.substr(srh.find("@")+1);
+		return slh < srh;
+	}
 
-		bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
-		{
-			std::string slh = lh->strings[index];
-			std::string srh = rh->strings[index];
-			slh = slh.substr(slh.find("@")+1);
-			srh = srh.substr(srh.find("@")+1);
-			return slh < srh;
-		}
+	long index;
+};
 
-		long index;
-	};
+struct MdStringBeforeAtComparator
+{
+	MdStringBeforeAtComparator(long index) : index(index) {}
 
-	struct MdStringBeforeAtComparator
+	bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
 	{
-		MdStringBeforeAtComparator(long index) : index(index) {}
+		std::string slh = lh->strings[index];
+		std::string srh = rh->strings[index];
+		slh = slh.substr(0, slh.find("@"));
+		srh = srh.substr(0, srh.find("@"));
+		std::stringstream stslh, stsrh;
+		stslh << slh;
+		stsrh << srh;
+		long ilh, irh;
+		stslh >> ilh;
+		stsrh >> irh;
 
-		bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
-		{
-			std::string slh = lh->strings[index];
-			std::string srh = rh->strings[index];
-			slh = slh.substr(0, slh.find("@"));
-			srh = srh.substr(0, srh.find("@"));
-			std::stringstream stslh, stsrh;
-			stslh << slh;
-			stsrh << srh;
-			long ilh, irh;
-			stslh >> ilh;
-			stsrh >> irh;
+		return ilh < irh;
+	}
 
-			return ilh < irh;
-		}
-
-		long index;
-	};
+	long index;
+};
 
 void MetaDataTable::sort(EMDLabel name, bool do_reverse, bool only_set_index, bool do_random)
 {
@@ -1058,10 +1054,10 @@ long int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std
 	// The loop statement may be necessary for data blocks that have a list AND a table inside them
 	while (getline(in, line, '\n'))
 	{
+		trim(line);
 		if (line.find("# version ") != std::string::npos)
 		{
-			token = line.substr(line.find("# version ")
-								+ std::string("# version ").length());
+			token = line.substr(line.find("# version ") + std::string("# version ").length());
 
 			std::istringstream sts(token);
 			sts >> version;
@@ -1080,7 +1076,6 @@ long int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std
 				int current_pos = in.tellg();
 				while (getline(in, line, '\n'))
 				{
-					trim(line);
 					if (line.find("loop_") != std::string::npos)
 					{
 						return readStarLoop(in, desiredLabels, grep_pattern, do_only_count);
@@ -1696,7 +1691,6 @@ MetaDataTable combineMetaDataTables(std::vector<MetaDataTable> &MDin)
 	}
 	else
 	{
-		bool some_labels_missing = false;
 		// Find which labels occur in all input tables
 		std::vector<EMDLabel> labelsc;
 		std::vector<EMDLabel> labels1 = MDin[0].getActiveLabels();
@@ -1714,7 +1708,6 @@ MetaDataTable combineMetaDataTables(std::vector<MetaDataTable> &MDin)
 				if (!is_present)
 				{
 					std::cerr << " + WARNING: ignoring label " << EMDL::label2Str(labels1[i]) << " in " << j+1 << "th STAR file" << std::endl;
-					some_labels_missing = true;
 					break;
 				}
 			}
@@ -1787,13 +1780,13 @@ MetaDataTable subsetMetaDataTable(MetaDataTable &MDin, EMDLabel label, RFLOAT mi
 		{
 			long val;
 			MDin.getValue(label, val);
-			do_include = ((RFLOAT)val < max_value && (RFLOAT)val > min_value);
+			do_include = ((RFLOAT)val <= max_value && (RFLOAT)val >= min_value);
 		}
 		else
 		{
 			RFLOAT val;
 			MDin.getValue(label, val);
-			do_include = ((RFLOAT)val < max_value && (RFLOAT)val > min_value);
+			do_include = ((RFLOAT)val <= max_value && (RFLOAT)val >= min_value);
 		}
 
 		if (do_include)
