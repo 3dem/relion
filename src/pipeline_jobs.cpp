@@ -363,10 +363,12 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 		MetaDataTable MDvals;
 
 		FileName fn_star = myfilename;
-		if (fn_star.back() == '/')
-			fn_star += "job.star";
-		if (!exists(fn_star))
-			return false;
+		if (fn_star.getExtension() != "star" || !exists(fn_star)) // full name was given
+		{
+			fn_star += "job.star"; // "Refine3D/job123" OR ".gui_auto3d"
+			if (!exists(fn_star))
+				return false;
+		}
 
 		MDhead.read(fn_star, "job");
 		MDhead.getValue(EMDL_JOB_TYPE, type);
@@ -1047,7 +1049,7 @@ void RelionJob::initialiseImportJob()
 	hidden_name = ".gui_import";
 
 	joboptions["do_raw"] = JobOption("Import raw movies/micrographs?", true, "Set this to Yes if you plan to import raw movies or micrographs");
-	joboptions["fn_in_raw"] = JobOption("Raw input files:", (std::string)"Micrographs/*.mrcs", "Provide a Linux wildcard that selects all raw movies or micrographs to be imported.");
+	joboptions["fn_in_raw"] = JobOption("Raw input files:", "Micrographs/*.tif", (std::string)"Movie or Image (*.{mrc,mrcs,tif,tiff})", ".", "Provide a Linux wildcard that selects all raw movies or micrographs to be imported.");
 	joboptions["is_multiframe"] = JobOption("Are these multi-frame movies?", true, "Set to Yes for multi-frame movies, set to No for single-frame micrographs.");
 
 	joboptions["optics_group_name"] = JobOption("Optics group name:", (std::string)"opticsGroup1", "Name of this optics group. Each group of movies/micrographs with different optics characteristics for CTF refinement should have a unique name.");
@@ -1971,8 +1973,6 @@ void RelionJob::initialiseExtractJob()
 	joboptions["recenter_x"] = JobOption("Re-center on X-coordinate (in pix): ", std::string("0"), "Re-extract particles centered on this X-coordinate (in pixels in the reference)");
 	joboptions["recenter_y"] = JobOption("Re-center on Y-coordinate (in pix): ", std::string("0"), "Re-extract particles centered on this Y-coordinate (in pixels in the reference)");
 	joboptions["recenter_z"] = JobOption("Re-center on Z-coordinate (in pix): ", std::string("0"), "Re-extract particles centered on this Z-coordinate (in pixels in the reference)");
-	joboptions["do_set_angpix"] = JobOption("Manually set pixel size? ", false, "If set to Yes, the rlnMagnification and rlnDetectorPixelSize will be set in the resulting STAR file. Only use this option if CTF information is NOT coming from the input coordinate STAR file(s). For example, because you decided not to estimate the CTF for your micrographs. You must NOT use this option if you intend to use Bayesian Polishing afterwards.");
-	joboptions["angpix"] = JobOption("Pixel size (A)", 1, 0.3, 5, 0.1, "Provide the pixel size in Angstroms in the micrograph (so before any re-scaling).  If you provide input CTF parameters, then leave this value to the default of -1.");
 	joboptions["extract_size"] = JobOption("Particle box size (pix):", 128, 64, 512, 8, "Size of the extracted particles (in pixels). This should be an even number!");
 	joboptions["do_invert"] = JobOption("Invert contrast?", true, "If set to Yes, the contrast in the particles will be inverted.");
 
@@ -2101,11 +2101,6 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 	}
 	if (joboptions["do_invert"].getBoolean())
 		command += " --invert_contrast ";
-
-	if (joboptions["do_set_angpix"].getBoolean())
-	{
-		command += " --set_angpix " + joboptions["angpix"].getString();
-	}
 
 	// Helix
 	if (joboptions["do_extract_helix"].getBoolean())

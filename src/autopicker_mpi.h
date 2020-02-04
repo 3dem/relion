@@ -19,32 +19,31 @@ private:
 
 public:
 	/** Destructor, calls MPI_Finalize */
-    ~AutoPickerMpi()
-    {
-        delete node;
-    }
+	~AutoPickerMpi()
+	{
+		delete node;
+	}
 
-    /** Read
-     * This could take care of mpi-parallelisation-dependent variables
-     */
-    void read(int argc, char **argv);
+	/** Read
+	 * This could take care of mpi-parallelisation-dependent variables
+	 */
+	void read(int argc, char **argv);
 
 	// Set device-affinity
 	int deviceInitialise();
 
-    // Parallelized run function
-    void run();
+	// Parallelized run function
+	void run();
 
-    int getRank()
-    {
-    	return(node->rank);
-    }
+	int getRank()
+	{
+		return(node->rank);
+	}
 
-    MpiNode * getNode()
-    {
-    	return(node);
-    }
-
+	MpiNode * getNode()
+	{
+		return(node);
+	}
 };
 
 #endif /* AUTOPICKER_MPI_H_ */

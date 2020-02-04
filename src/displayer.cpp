@@ -1322,7 +1322,7 @@ void multiViewerCanvas::saveSelectedParticles(int save_selected)
 	if (nparts > 0)
 	{
 		obsModel->save(MDpart, fn_selected_parts, "particles");
-		std::cout << "Saved "<< fn_selected_parts << " with " << nparts << " selected particles." << std::endl;
+		std::cout << "Saved " << fn_selected_parts << " with " << nparts << " selected particles." << std::endl;
 	}
 	else
 		std::cout <<" No classes selected. Please select one or more classes..." << std::endl;
@@ -1330,12 +1330,43 @@ void multiViewerCanvas::saveSelectedParticles(int save_selected)
 
 void regroupSelectedParticles(MetaDataTable &MDdata, MetaDataTable &MDgroups, int nr_regroups)
 {
+	// This function modify MDgroups, which will not be written anyway.
 
 	if (nr_regroups <= 0)
 		return;
 
-	if (nr_regroups > 999)
-		REPORT_ERROR("regroupSelectedParticles: cannot regroup in more than 999 groups. Usually around 20-50 groups are useful.");
+	int max_optics_group_id = -1;
+
+	// Find out which optics group each scale group belongs to
+	// Also initialise rlnGroupNrParticles for this selection
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDgroups)
+	{
+		MDgroups.setValue(EMDL_IMAGE_OPTICS_GROUP, -1);
+		MDgroups.setValue(EMDL_MLMODEL_GROUP_NR_PARTICLES, 0);
+	}
+
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDdata)
+	{
+		long group_id, part_optics_id, group_optics_id;
+		int nr_parts;
+		MDdata.getValue(EMDL_MLMODEL_GROUP_NO, group_id); // 1-indexed
+		MDdata.getValue(EMDL_IMAGE_OPTICS_GROUP, part_optics_id);
+
+		MDgroups.getValue(EMDL_IMAGE_OPTICS_GROUP, group_optics_id, group_id - 1); // 0-indexed
+		if (group_optics_id == -1)
+		{
+			MDgroups.setValue(EMDL_IMAGE_OPTICS_GROUP, part_optics_id, group_id - 1);
+			if (max_optics_group_id < part_optics_id)
+				max_optics_group_id = part_optics_id;
+		}
+		else if (group_optics_id != part_optics_id)
+		{
+			std::cerr << "WARNING: group_no " << group_id << " contains particles from multiple optics groups." << std::endl;
+		}
+
+		MDgroups.getValue(EMDL_MLMODEL_GROUP_NR_PARTICLES, nr_parts, group_id - 1);
+		MDgroups.setValue(EMDL_MLMODEL_GROUP_NR_PARTICLES, nr_parts + 1, group_id - 1);
+	}
 
 	// First sort the MDgroups based on refined intensity scale factor
 	MDgroups.sort(EMDL_MLMODEL_GROUP_SCALE_CORRECTION);
@@ -1347,50 +1378,67 @@ void regroupSelectedParticles(MetaDataTable &MDdata, MetaDataTable &MDgroups, in
 
 	// Average group size
 	long average_group_size = nr_parts / nr_regroups;
-	int fillgroupschar = 1;
-	if (nr_regroups > 100)
-		fillgroupschar = 3;
-	else if (nr_regroups > 10)
-		fillgroupschar = 2;
+	if (average_group_size < 10)
+		REPORT_ERROR("Each group should have at least 10 particles");
+	int fillgroupschar = (int)(floor(log(average_group_size) / log(10))) + 1;
+
+	std::map<long, std::string> new_group_names;
+	std::map<long, std::string>::iterator it;
 
 	// Loop through all existing, sorted groups
-	long old_nr_groups = MDgroups.numberOfObjects();
-	long curr_group_id, my_old_group_id, new_group_id = 1;
-	long nr_parts_in_new_group = 0;
-	MetaDataTable MDout;
-	for (long ig = 0; ig < old_nr_groups; ig++)
+	long new_group_id = 1;
+
+	// Worst case: O(old_nr_groups ^ 2) = O(mic ^ 2)
+	// We can reduce this by using one more hash but this should be enough.
+	for (long optics_group_id = 1; optics_group_id <= max_optics_group_id; optics_group_id++)
 	{
-		// Now search for curr_group_id in the input MetaDataTable
-		MDgroups.getValue(EMDL_MLMODEL_GROUP_NO, curr_group_id, ig);
+		long nr_parts_in_new_group = 0;
+		MetaDataTable MDout;
 
-		if (nr_parts_in_new_group > average_group_size)
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDgroups)
 		{
-			// This group is now full: start a new one
-			new_group_id++;
-			nr_parts_in_new_group = 0;
-		}
+			long group_id, group_optics_id;
+			int nr_parts;
 
-		std::string new_group_name = "group_" + integerToString(new_group_id, fillgroupschar);
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDdata)
-		{
-			MDdata.getValue(EMDL_MLMODEL_GROUP_NO, my_old_group_id);
-			if (my_old_group_id == curr_group_id)
+			MDgroups.getValue(EMDL_IMAGE_OPTICS_GROUP, group_optics_id);
+			if (group_optics_id != optics_group_id)
+				continue;
+
+			MDgroups.getValue(EMDL_MLMODEL_GROUP_NO, group_id);
+			MDgroups.getValue(EMDL_MLMODEL_GROUP_NR_PARTICLES, nr_parts);
+			nr_parts_in_new_group += nr_parts;
+
+			if (nr_parts_in_new_group > average_group_size)
 			{
-				nr_parts_in_new_group++;
-				MDout.addObject(MDdata.getObject());
-				MDout.setValue(EMDL_MLMODEL_GROUP_NO, new_group_id);
-				MDout.setValue(EMDL_MLMODEL_GROUP_NAME, new_group_name);
+				// This group is now full: start a new one
+				new_group_id++;
+				nr_parts_in_new_group = 0;
 			}
+		
+			new_group_names[group_id] = "group_" + integerToString(new_group_id, fillgroupschar);
 		}
 	}
 
-	// Maintain the original image ordering
-	if (MDout.containsLabel(EMDL_SORTED_IDX))
-		MDout.sort(EMDL_SORTED_IDX);
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDdata)
+	{
+		long group_id;
+		MDdata.getValue(EMDL_MLMODEL_GROUP_NO, group_id);
+
+		it = new_group_names.find(group_id);
+		if (it != new_group_names.end())
+		{
+			MDdata.setValue(EMDL_MLMODEL_GROUP_NAME, new_group_names[group_id]);
+		}
+		else
+		{
+			std::cerr << "Logic error: cannot find group_id " << group_id << " during remapping." << std::endl;
+			REPORT_ERROR("Failed in regrouping");
+		}
+	}
+
+	MDdata.deactivateLabel(EMDL_MLMODEL_GROUP_NO); // no longer valid
 
 	std::cout <<" Regrouped particles into " << new_group_id << " groups" << std::endl;
-	MDdata = MDout;
-
 }
 
 void multiViewerCanvas::showSelectedParticles(int save_selected)
@@ -1405,7 +1453,6 @@ void multiViewerCanvas::showSelectedParticles(int save_selected)
 	}
 	else
 		std::cout <<" No classes selected. First select one or more classes..." << std::endl;
-
 }
 
 void multiViewerCanvas::saveTrainingSet()
@@ -1481,7 +1528,6 @@ void multiViewerCanvas::saveTrainingSet()
 	//	REPORT_ERROR("ERROR in executing: " + command);
 
 	std::cout << "Saved selection to Sjors' training directory. Thanks for helping out!" << std::endl;
-
 }
 
 void multiViewerCanvas::saveSelected(int save_selected)
@@ -1502,7 +1548,6 @@ void multiViewerCanvas::saveSelected(int save_selected)
 	}
 	if (nsel > 0)
 	{
-
 		// Maintain the original image ordering
 		if (MDout.containsLabel(EMDL_SORTED_IDX))
 			MDout.sort(EMDL_SORTED_IDX);
@@ -1842,7 +1887,6 @@ int pickerViewerCanvas::handle(int ev)
 			}
 			RFLOAT aux = -999., zero = 0.;
 			int iaux = current_selection_type;
-			std::cout << "picked with type = " << iaux << std::endl;
 
 			// Else store new coordinate
 			if (!MDcoords.isEmpty())

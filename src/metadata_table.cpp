@@ -1054,10 +1054,10 @@ long int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std
 	// The loop statement may be necessary for data blocks that have a list AND a table inside them
 	while (getline(in, line, '\n'))
 	{
+		trim(line);
 		if (line.find("# version ") != std::string::npos)
 		{
-			token = line.substr(line.find("# version ")
-								+ std::string("# version ").length());
+			token = line.substr(line.find("# version ") + std::string("# version ").length());
 
 			std::istringstream sts(token);
 			sts >> version;
@@ -1076,7 +1076,6 @@ long int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std
 				int current_pos = in.tellg();
 				while (getline(in, line, '\n'))
 				{
-					trim(line);
 					if (line.find("loop_") != std::string::npos)
 					{
 						return readStarLoop(in, desiredLabels, grep_pattern, do_only_count);

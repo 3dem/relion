@@ -437,14 +437,14 @@ class star_handler_parameters
 
 				obsModels[obs_id].opticsMdt = unique_opticsMdt;
 
-				if (MDsin[MDs_id].containsLabel(EMDL_MLMODEL_GROUP_NAME))
+				FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsin[MDs_id])
 				{
-					FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsin[MDs_id])
+					MDsin[MDs_id].setValue(EMDL_IMAGE_OPTICS_GROUP, new_optics_groups[current_object]);
+
+					// Also rename the rlnGroupName to not have groups overlapping from different optics groups
+					std::string name;
+					if (MDsin[MDs_id].getValue(EMDL_MLMODEL_GROUP_NAME, name))
 					{
-						MDsin[MDs_id].setValue(EMDL_IMAGE_OPTICS_GROUP, new_optics_groups[current_object]);
-						// Also rename the rlnGroupName to not have groups overlapping from different optics groups
-						std::string name;
-						MDsin[MDs_id].getValue(EMDL_MLMODEL_GROUP_NAME, name);
 						name = "optics"+integerToString(new_optics_groups[current_object])+"_"+name;
 						MDsin[MDs_id].setValue(EMDL_MLMODEL_GROUP_NAME, name);
 					}
@@ -457,7 +457,6 @@ class star_handler_parameters
 			{
 				MDoptics.push_back(obsModels[i - 1].opticsMdt);
 			}
-
 
 			// Check if anisotropic magnification and/or beam_tilt are present in some optics groups, but not in others.
 			// If so, initialise the others correctly

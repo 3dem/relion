@@ -339,6 +339,7 @@ enum EMDLabel
 	EMDL_OPTIMISER_EXTERNAL_RECONS_DATA_IMAG,
 	EMDL_OPTIMISER_EXTERNAL_RECONS_WEIGHT,
 	EMDL_OPTIMISER_EXTERNAL_RECONS_RESULT,
+	EMDL_OPTIMISER_EXTERNAL_RECONS_NEWSTAR,
 	EMDL_OPTIMISER_FAST_SUBSETS,
 	EMDL_OPTIMISER_SGD_INI_ITER,
 	EMDL_OPTIMISER_SGD_FIN_ITER,
@@ -915,6 +916,7 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_EXTERNAL_RECONS_DATA_IMAG, EMDL_STRING, "rlnExtReconsDataImag", "Name of the map with the imaginary components of the input data array for the external reconstruction program");
 		EMDL::addLabel(EMDL_OPTIMISER_EXTERNAL_RECONS_WEIGHT, EMDL_STRING, "rlnExtReconsWeight", "Name of the map with the input weight array for the external reconstruction program");
 		EMDL::addLabel(EMDL_OPTIMISER_EXTERNAL_RECONS_RESULT, EMDL_STRING, "rlnExtReconsResult", "Name of the output reconstruction from the external reconstruction program");
+		EMDL::addLabel(EMDL_OPTIMISER_EXTERNAL_RECONS_NEWSTAR, EMDL_STRING, "rlnExtReconsResultStarfile", "Name of the output STAR file with updated FSC or tau curves");
 		EMDL::addLabel(EMDL_OPTIMISER_FAST_SUBSETS, EMDL_BOOL, "rlnDoFastSubsetOptimisation", "Use subsets of the data in the earlier iterations to speed up convergence");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_INI_ITER, EMDL_INT, "rlnSgdInitialIterations", "Number of initial SGD iterations (at rlnSgdInitialResolution and with rlnSgdInitialSubsetSize)");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_FIN_ITER, EMDL_INT, "rlnSgdFinalIterations", "Number of final SGD iterations (at rlnSgdFinalResolution and with rlnSgdFinalSubsetSize)");

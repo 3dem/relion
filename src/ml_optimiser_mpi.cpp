@@ -2048,18 +2048,6 @@ void MlOptimiserMpi::maximization()
 								do_split_random_halves,
 								(do_join_random_halves || do_always_join_random_halves));
 
-#ifdef TIMING
-						(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons],
-								gridding_nr_iter,
-								do_map,
-								mymodel.tau2_class[ith_recons],
-								mymodel.tau2_fudge_factor,
-								wsum_model.pdf_class[iclass],
-								minres_map,
-								false,
-								&timer);
-#else
-
 						if (do_external_reconstruct)
 						{
 							FileName fn_ext_root;
@@ -2072,6 +2060,9 @@ void MlOptimiserMpi::maximization()
 									fn_ext_root,
 									mymodel.fsc_halves_class[ith_recons],
 									mymodel.tau2_class[ith_recons],
+									mymodel.sigma2_class[ith_recons],
+									mymodel.data_vs_prior_class[ith_recons],
+									(do_join_random_halves || do_always_join_random_halves),
 									mymodel.tau2_fudge_factor,
 									node->rank==1); // only first slaves is verbose
 						}
@@ -2084,14 +2075,17 @@ void MlOptimiserMpi::maximization()
 								mymodel.tau2_fudge_factor,
 								wsum_model.pdf_class[iclass],
 								minres_map,
-								false);
-						}
+								false
+#ifdef TIMING
+							        ,&timer
 #endif
-						if(do_sgd)
+							        );
+						}
+						if (do_sgd)
 						{
 
 							// Use stochastic expectation maximisation, instead of SGD.
-							if(do_avoid_sgd)
+							if (do_avoid_sgd)
 							{
 								if (iter < sgd_ini_iter)
 								{
@@ -2221,6 +2215,9 @@ void MlOptimiserMpi::maximization()
 										fn_ext_root,
 										mymodel.fsc_halves_class[ith_recons],
 										mymodel.tau2_class[ith_recons],
+										mymodel.sigma2_class[ith_recons],
+										mymodel.data_vs_prior_class[ith_recons],
+										(do_join_random_halves || do_always_join_random_halves),
 										mymodel.tau2_fudge_factor);
 							}
 							else
