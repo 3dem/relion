@@ -43,6 +43,7 @@ public:
 
 	// Class-wise features
     FileName name;
+    long class_index;
     int is_selected;
     RFLOAT class_distribution, accuracy_rotation, accuracy_translation, estimated_resolution, particle_nr;
     RFLOAT class_score, edge_signal, scattered_signal, weighted_resolution, relative_resolution;
@@ -54,7 +55,8 @@ public:
     double total_entropy, protein_entropy, solvent_entropy;
 
     classFeatures(): name(""),
-			is_selected(0),
+			class_index(0),
+    		is_selected(0),
 			particle_nr(0),
     		class_distribution(0),
 			accuracy_rotation(0),

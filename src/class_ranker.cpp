@@ -812,7 +812,7 @@ RFLOAT ClassRanker::findResolution(classFeatures &cf)
 
 	RFLOAT result;
 
-	std::string class_name = "model_class_" + integerToString(getClassIndex(cf.name));
+	std::string class_name = "model_class_" + integerToString(cf.class_index);
 	MetaDataTable MD_model_this_class;
 	MD_model_this_class.read(fn_model, class_name);
 	bool isGood = true;
@@ -1271,11 +1271,10 @@ void ClassRanker::saveMasks(MultidimArray<RFLOAT> &lpf, MultidimArray<int> &p_ma
 		DIRECT_MULTIDIM_ELEM(s_out(), n) = (double)DIRECT_MULTIDIM_ELEM(s_mask, n);
 	}
 
-	FileName fp_out, fs_out, flpf_out, f_original;
-	long int idx = getClassIndex(cf.name);
-	flpf_out = fn_out+filtered_mask_folder+"/class"+integerToString(idx)+"_lowpassfiltered.mrc";
-	fp_out = fn_out+filtered_mask_folder+"/class"+integerToString(idx)+"_p_mask.mrc";
-	fs_out = fn_out+filtered_mask_folder+"/class"+integerToString(idx)+"_s_mask.mrc";
+	FileName fp_out, fs_out, flpf_out;
+	flpf_out = fn_out+filtered_mask_folder+"/class"+integerToString(cf.class_index)+"_lowpassfiltered.mrc";
+	fp_out = fn_out+filtered_mask_folder+"/class"+integerToString(cf.class_index)+"_p_mask.mrc";
+	fs_out = fn_out+filtered_mask_folder+"/class"+integerToString(cf.class_index)+"_s_mask.mrc";
 
 	lpf_out.write(flpf_out);
 	p_out.write(fp_out);
@@ -1338,6 +1337,7 @@ void ClassRanker::getFeatures()
 		{
 
 			features_this_class.name = myopt.mymodel.ref_names[iclass];
+			features_this_class.class_index = getClassIndex(features_this_class.name);
 			Image<RFLOAT> img;
 			img() = myopt.mymodel.Iref[iclass];
 
@@ -1512,6 +1512,7 @@ void ClassRanker::readFeatures()
 		MD_class_features.getValue(EMDL_MLMODEL_REF_IMAGE, this_class_feature.name);
 		MD_class_features.getValue(EMDL_CLASS_FEAT_CLASS_SCORE, this_class_feature.class_score);
 		MD_class_features.getValue(EMDL_CLASS_FEAT_IS_SELECTED,this_class_feature.is_selected);
+		MD_class_features.getValue(EMDL_CLASS_FEAT_CLASS_INDEX, this_class_feature.class_index);
 		MD_class_features.getValue(EMDL_MLMODEL_PDF_CLASS, this_class_feature.class_distribution);
 		MD_class_features.getValue(EMDL_MLMODEL_ACCURACY_ROT, this_class_feature.accuracy_rotation);
 		MD_class_features.getValue(EMDL_MLMODEL_ACCURACY_TRANS, this_class_feature.accuracy_translation);
@@ -1588,6 +1589,7 @@ void ClassRanker::writeFeatures()
 		MD_class_features.setValue(EMDL_MLMODEL_REF_IMAGE, features_all_classes[i].name);
 		MD_class_features.setValue(EMDL_CLASS_FEAT_CLASS_SCORE, features_all_classes[i].class_score);
 		MD_class_features.setValue(EMDL_CLASS_FEAT_IS_SELECTED,features_all_classes[i].is_selected);
+		MD_class_features.setValue(EMDL_CLASS_FEAT_CLASS_INDEX, features_all_classes[i].class_index);
 		MD_class_features.setValue(EMDL_MLMODEL_PDF_CLASS, features_all_classes[i].class_distribution);
 		MD_class_features.setValue(EMDL_MLMODEL_ACCURACY_ROT, features_all_classes[i].accuracy_rotation);
 		MD_class_features.setValue(EMDL_MLMODEL_ACCURACY_TRANS, features_all_classes[i].accuracy_translation);
@@ -1677,8 +1679,6 @@ void ClassRanker::performRanking()
 	long int nr_sel_classavgs = 0;
 	for (int i = 0; i < features_all_classes.size(); i++)
 	{
-		long int myclass = getClassIndex(features_all_classes[i].name);
-
 		/// Here execute the neural network! (for now just use class_score to test code...)
 		RFLOAT myscore = features_all_classes[i].class_score;
 
@@ -1690,7 +1690,7 @@ void ClassRanker::performRanking()
 			FOR_ALL_OBJECTS_IN_METADATA_TABLE(myopt.mydata.MDimg)
 			{
 				myopt.mydata.MDimg.getValue(EMDL_PARTICLE_CLASS, classnr);
-				if (classnr == myclass)
+				if (classnr == features_all_classes[i].class_index)
 				{
 					MDselected_particles.addObject(myopt.mydata.MDimg.getObject());
 					nr_sel_parts++;
@@ -1706,7 +1706,7 @@ void ClassRanker::performRanking()
 		}
 
 		// Set myscore in the vector that now runs over ALL classes (including empty ones)
-		long int iclass = myclass - 1; // class counting in STAR files starts at 1!
+		long int iclass = features_all_classes[i].class_index - 1; // class counting in STAR files starts at 1!
 		if (iclass < 0 || iclass >= myopt.mymodel.nr_classes)
 		{
 			std::cerr << " iclass= " << iclass << " myopt.mymodel.nr_classes= " << myopt.mymodel.nr_classes << std::endl;
