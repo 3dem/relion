@@ -366,7 +366,8 @@ void MlModel::read(FileName fn_in)
 
 }
 
-void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bild, bool only_write_images)
+void MlModel::write(FileName fn_out, HealpixSampling &sampling,
+		bool do_write_bild, bool only_write_images, const std::vector<RFLOAT> *predicted_scores)
 {
 
 	MetaDataTable MDclass, MDgroup, MDlog, MDsigma, MDbodies;
@@ -376,6 +377,18 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 
 	// Treat classes or bodies (for multi-body refinement) in the same way...
 	int nr_classes_bodies = (nr_bodies > 1) ? nr_bodies : nr_classes;
+
+
+	if (predicted_scores != NULL)
+	{
+		if ((*predicted_scores).size() != nr_classes_bodies)
+		{
+			std::cerr << " nr_classes_bodies= " << nr_classes_bodies << " (*predicted_scores).size()= " << (*predicted_scores).size() << std::endl;
+			REPORT_ERROR("ERROR: predicted scores vector is of incorrect size!");
+		}
+	}
+
+
 	// A. Write images
 	if (ref_dim == 2)
 	{
@@ -563,6 +576,11 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 
 		// For multiple bodies: only star PDF_CLASS in the first one!
 		int myclass = (nr_bodies > 1) ? 0 : iclass; // for multi-body: just set iclass=0
+
+		if (predicted_scores != NULL)
+		{
+			MDclass.setValue(EMDL_CLASS_FEAT_CLASS_SCORE, (*predicted_scores)[iclass]);
+		}
 		MDclass.setValue(EMDL_MLMODEL_PDF_CLASS, pdf_class[myclass]);
 		MDclass.setValue(EMDL_MLMODEL_ACCURACY_ROT, acc_rot[iclass]);
 		MDclass.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, acc_trans[iclass]);

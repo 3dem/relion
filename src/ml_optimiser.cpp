@@ -998,7 +998,8 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 }
 
 
-void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_write_optimiser, bool do_write_model, int random_subset)
+void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_write_optimiser, bool do_write_model,
+		int random_subset, const std::vector<RFLOAT> *predicted_scores)
 {
 	if (subset_size > 0 && (iter % write_every_sgd_iter) != 0 && iter != nr_iter)
 		return;
@@ -1145,7 +1146,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		if (do_split_random_halves && !do_join_random_halves)
 			mymodel.write(fn_root2 + "_half" + integerToString(random_subset), sampling, do_write_bild);
 		else
-			mymodel.write(fn_root2, sampling, do_write_bild);
+			mymodel.write(fn_root2, sampling, do_write_bild, false, predicted_scores);
 	}
 
 	// And write the mydata to file

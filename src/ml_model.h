@@ -393,7 +393,8 @@ public:
 	void read(FileName fn_in);
 
 	// Write a model to disc
-	void write(FileName fn_out, HealpixSampling &sampling, bool do_write_bild = true, bool do_only_write_images = false);
+	void write(FileName fn_out, HealpixSampling &sampling,
+			bool do_write_bild = true, bool do_only_write_images = false, const std::vector<RFLOAT> *predicted_scores = NULL);
 
 	//Read a tau-spectrum from a STAR file
 	void readTauSpectrum(FileName fn_tau, int verb);
