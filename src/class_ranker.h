@@ -84,6 +84,7 @@ public:
     classFeatures(classFeatures const& copy)
 	{
     	name = copy.name;
+    	class_index = copy.class_index;
     	is_selected = copy.is_selected;
     	class_distribution = copy.class_distribution;
     	accuracy_rotation = copy.accuracy_rotation;
@@ -121,6 +122,7 @@ public:
     classFeatures& operator=(classFeatures const& copy)
 	{
     	name = copy.name;
+    	class_index = copy.class_index;
     	is_selected = copy.is_selected;
     	class_distribution = copy.class_distribution;
     	accuracy_rotation = copy.accuracy_rotation;
