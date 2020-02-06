@@ -211,7 +211,7 @@ public:
 
 	RFLOAT minRes, job_score;
 	RFLOAT radius_ratio, radius;
-	RFLOAT circular_mask_radius, uniform_angpix = 4.0;
+	RFLOAT particle_diameter, circular_mask_radius, uniform_angpix = 4.0;
 	RFLOAT binary_threshold, lowpass;
     int debug, verb, start_class, end_class;
 
@@ -226,9 +226,11 @@ public:
 
     // Save some time by limiting calculations
 	int only_use_this_class;
-	bool do_skip_angular_errors, do_granularity_features;
+	bool do_skip_angular_errors, do_granularity_features, do_save_masks;
 
-	MlOptimiser myopt;
+	bool do_ctf_correction, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak;
+	MlModel mymodel;
+	Experiment mydata;
 	MetaDataTable MD_optimiser, MD_select;
 	std::vector<classFeatures> features_all_classes, preread_features_all_classes;
 

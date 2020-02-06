@@ -400,6 +400,7 @@ void ClassRanker::read(int argc, char **argv, int rank)
 	only_use_this_class = textToInteger(parser.getOption("--only_class_nr", "Class number of the class of interest", "-1"));
 	do_skip_angular_errors = parser.checkOption("--skip_angular_errors", "Skip angular error calculation");
 	do_granularity_features  = parser.checkOption("--do_granularity_features", "Calculate granularity features");
+	do_save_masks = parser.checkOption("--save_masks", "Save the automatically generated 2D solvent masks for all references");
 
 	int expert_section = parser.addSection("Expert options");
 	radius_ratio = textToFloat(parser.getOption("--radius_ratio", "Ratio of inner radius of the interested ring area in proportion to the current circular mask radius", "0.95"));
@@ -433,6 +434,8 @@ void ClassRanker::usage()
 void ClassRanker::initialise()
 {
 
+	if (verb > 0) std::cout << " Initialising... " << std::endl;
+
 	// Make sure output rootname ends with a "/" and make directory
 	if (fn_out[fn_out.length()-1] != '/') fn_out += "/";
 	if (!exists(fn_out))
@@ -448,54 +451,67 @@ void ClassRanker::initialise()
 	// Read in the MD_optimiser table from the STAR file, get model.star and data.star
 	if (fn_optimiser != "")
 	{
-		// A bit ugly, but we need fn_model...
-		MetaDataTable MDopt;
-		MDopt.read(fn_optimiser, "optimiser_general");
-		MDopt.getValue(EMDL_OPTIMISER_MODEL_STARFILE, fn_model);
 
-		bool do_ctf;
-		MDopt.getValue(EMDL_OPTIMISER_DO_CORRECT_CTF, do_ctf);
-		if (!do_ctf)
+		FileName fn_data;
+		MD_optimiser.read(fn_optimiser, "optimiser_general");
+		MD_optimiser.getValue(EMDL_OPTIMISER_MODEL_STARFILE, fn_model);
+		MD_optimiser.getValue(EMDL_OPTIMISER_DATA_STARFILE, fn_data);
+
+
+		MD_optimiser.getValue(EMDL_OPTIMISER_DO_CORRECT_CTF, do_ctf_correction);
+		MD_optimiser.getValue(EMDL_OPTIMISER_IGNORE_CTF_UNTIL_FIRST_PEAK, intact_ctf_first_peak);
+		MD_optimiser.getValue(EMDL_OPTIMISER_DATA_ARE_CTF_PHASE_FLIPPED, ctf_phase_flipped);
+		MD_optimiser.getValue(EMDL_OPTIMISER_DO_ONLY_FLIP_CTF_PHASES, only_flip_phases);
+		MD_optimiser.getValue(EMDL_OPTIMISER_PARTICLE_DIAMETER, particle_diameter);
+
+		if (!do_ctf_correction)
 		{
-			std::cerr << " Skipping this job because it hasn't done CTF correction ..." << std::endl;
+			std::cerr << " Skipping this job because it hasn't been done with CTF correction ..." << std::endl;
 			exit(1);
 		}
 
-		myopt.read(fn_optimiser); // true means skip_groups_and_pdf_direction from mlmodel; only read 1000 particles...
-		if (debug>0) std::cerr << "Done with reading optimiser ..." << std::endl;
+		//Sjors 06022020: go back to just reading MD_optimiser for speed
+		mymodel.read(fn_model, true); // true means: read only one group!
+		if (debug>0) std::cerr << "Done with reading model.star ..." << std::endl;
+
+		mydata.read(fn_data, true, true); // true true means: ignore particle_name and group name!
+		if (debug>0) std::cerr << "Done with reading data.star ..." << std::endl;
+
+		//myopt.read(fn_optimiser); // true means skip_groups_and_pdf_direction from mlmodel; only read 1000 particles...
+		//if (debug>0) std::cerr << "Done with reading optimiser ..." << std::endl;
 
 		// Collect features for all specified classes
 		start_class = 0;
-		end_class = myopt.mymodel.nr_classes;
+		end_class = mymodel.nr_classes;
 		if (only_use_this_class > 0)
 		{
 			start_class = only_use_this_class-1;
 			end_class = only_use_this_class;
 		}
 
-		if (myopt.intact_ctf_first_peak)
+		if (intact_ctf_first_peak)
 		{
 			if (verb > 0) std::cout << " Doing first peak CTF correction ..." << std::endl;
 
 			// Calculate avg. defocus
 			RFLOAT def_avg = 0, def_u, def_v;
-			for (long int part_id = 0; part_id < myopt.mydata.MDimg.numberOfObjects(); part_id++)
+			for (long int part_id = 0; part_id < mydata.MDimg.numberOfObjects(); part_id++)
 			{
-				myopt.mydata.MDimg.getValue(EMDL_CTF_DEFOCUSU, def_u, part_id);
-				myopt.mydata.MDimg.getValue(EMDL_CTF_DEFOCUSV, def_v, part_id);
+				mydata.MDimg.getValue(EMDL_CTF_DEFOCUSU, def_u, part_id);
+				mydata.MDimg.getValue(EMDL_CTF_DEFOCUSV, def_v, part_id);
 				def_avg += def_u + def_v;
 			}
-			def_avg /= (2. * myopt.mydata.MDimg.numberOfObjects());
+			def_avg /= (2. * mydata.MDimg.numberOfObjects());
 
 			// some people may have used a too small , or even zero amplitude contrast, lets forbid that...
 			//q0 = XMIPP_MAX(q0, 0.07);
 			CTF avgctf;
-			avgctf.setValuesByGroup(&myopt.mydata.obsModel, 0, def_u, def_v, 0.);
+			avgctf.setValuesByGroup(&mydata.obsModel, 0, def_u, def_v, 0.);
 
 			// Loop over all classes in myopt.mymodel.Iref
-			for (long iref =0; iref < myopt.mymodel.Iref.size(); iref++)
+			for (long iref =0; iref < mymodel.Iref.size(); iref++)
 			{
-				correctCtfUntilFirstPeak(myopt.mymodel.Iref[iref], avgctf);
+				correctCtfUntilFirstPeak(mymodel.Iref[iref], avgctf);
 			}
 		}
 
@@ -507,17 +523,17 @@ void ClassRanker::initialise()
 			for (int iclass = start_class; iclass < end_class; iclass++)
 			{
 				// Only consider features with non-zero class distributions
-				if (myopt.mymodel.pdf_class[iclass] > 0)
+				if (mymodel.pdf_class[iclass] > 0)
 				{
 
-					if (myopt.mymodel.acc_rot[iclass] > 99. || myopt.mymodel.acc_rot[iclass] > 99.)
+					if (mymodel.acc_rot[iclass] > 99. || mymodel.acc_rot[iclass] > 99.)
 					{
 						haveAllAccuracies = false;
 						break;
 					}
 				}
 			}
-			if (!haveAllAccuracies) myopt.mymodel.setFourierTransformMaps(false);
+			if (!haveAllAccuracies) mymodel.setFourierTransformMaps(false);
 		}
 	}
 
@@ -831,7 +847,7 @@ RFLOAT ClassRanker::findResolution(classFeatures &cf)
 	}
 	if (isGood)
 	{
-		result = myopt.mymodel.pixel_size*2;
+		result = mymodel.pixel_size*2;
 	}
 
 	return result;
@@ -842,7 +858,7 @@ RFLOAT ClassRanker::findResolution(classFeatures &cf)
 void ClassRanker::calculateExpectedAngularErrors(int iclass, classFeatures &cf)
 {
 	// Set current_image_size to the coarse_size to calculate expected angular errors
-	int current_image_size = myopt.mymodel.current_size;
+	int current_image_size = mymodel.current_size;
 
 	// Separate angular error estimate for each of the classes
 	RFLOAT acc_rot = 999., acc_trans = 999.;
@@ -870,27 +886,28 @@ void ClassRanker::calculateExpectedAngularErrors(int iclass, classFeatures &cf)
 		int n_trials = 100;
 		for (long int part_id = 0; part_id <= n_trials; part_id++)
 		{
-			int group_id = myopt.mydata.getGroupId(part_id, 0);
-			RFLOAT my_pixel_size = myopt.mydata.getImagePixelSize(part_id, 0);
-			const int optics_group = myopt.mydata.getOpticsGroup(part_id, 0);
-			int my_image_size = (myopt.mydata.obsModel.hasBoxSizes) ? myopt.mydata.getOpticsImageSize(optics_group) : myopt.mymodel.ori_size;
-			bool ctf_premultiplied = myopt.mydata.obsModel.getCtfPremultiplied(optics_group);
+			// SHWS 6Feb2020: just work with noise spectrum from group 0 to save time!
+			int group_id = 0; // mydata.getGroupId(part_id, 0);
+			RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, 0);
+			const int optics_group = mydata.getOpticsGroup(part_id, 0);
+			int my_image_size = (mydata.obsModel.hasBoxSizes) ? mydata.getOpticsImageSize(optics_group) : mymodel.ori_size;
+			bool ctf_premultiplied = mydata.obsModel.getCtfPremultiplied(optics_group);
 
 			MultidimArray<RFLOAT> Fctf;
-			// Get CTF for this particle
-			if (myopt.do_ctf_correction)
+			// Get CTF for this particle (do_ctf_correction is always true for this program)!
+			if (do_ctf_correction)
 			{
 				Fctf.resize(current_image_size, current_image_size/ 2 + 1);
 
 				// Get parameters that change per-particle from the exp_metadata
 				CTF ctf;
 				RFLOAT def_u, def_v, def_angle, voltage, cs, q0;
-				myopt.mydata.MDimg.getValue(EMDL_CTF_DEFOCUSU, def_u, part_id);                 //??
-				myopt.mydata.MDimg.getValue(EMDL_CTF_DEFOCUSV, def_v, part_id);
-				myopt.mydata.MDimg.getValue(EMDL_CTF_DEFOCUS_ANGLE, def_angle, part_id);
-				ctf.setValuesByGroup(&myopt.mydata.obsModel, optics_group, def_u, def_v, def_angle);
-				ctf.getFftwImage(Fctf, my_image_size, my_image_size, myopt.mymodel.pixel_size,
-						myopt.ctf_phase_flipped, myopt.only_flip_phases, myopt.intact_ctf_first_peak, true, myopt.do_ctf_padding);
+				mydata.MDimg.getValue(EMDL_CTF_DEFOCUSU, def_u, part_id);                 //??
+				mydata.MDimg.getValue(EMDL_CTF_DEFOCUSV, def_v, part_id);
+				mydata.MDimg.getValue(EMDL_CTF_DEFOCUS_ANGLE, def_angle, part_id);
+				ctf.setValuesByGroup(&mydata.obsModel, optics_group, def_u, def_v, def_angle);
+				ctf.getFftwImage(Fctf, my_image_size, my_image_size, mymodel.pixel_size,
+						ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true, false);
 			}
 			// Search 2 times: ang and off
 			for (int imode = 0; imode < 2; imode++)
@@ -949,21 +966,21 @@ void ClassRanker::calculateExpectedAngularErrors(int iclass, classFeatures &cf)
 					RFLOAT xoff1 = 0.;
 					RFLOAT yoff1 = 0.;
 					RFLOAT zoff1 = 0.;
-					myopt.mydata.MDimg.getValue(EMDL_ORIENT_ROT, rot1, part_id);
-					myopt.mydata.MDimg.getValue(EMDL_ORIENT_TILT, tilt1, part_id);
-					myopt.mydata.MDimg.getValue(EMDL_ORIENT_PSI, psi1, part_id);
+					mydata.MDimg.getValue(EMDL_ORIENT_ROT, rot1, part_id);
+					mydata.MDimg.getValue(EMDL_ORIENT_TILT, tilt1, part_id);
+					mydata.MDimg.getValue(EMDL_ORIENT_PSI, psi1, part_id);
 
 					F1.initZeros(current_image_size, current_image_size/ 2 + 1);
 
 					// Get the FT of the first image
 					Euler_angles2matrix(rot1, tilt1, psi1, A1, false);
 					// Older versions of RELION dont have the metadata to do this, so disable then
-					if (myopt.mydata.obsModel.hasBoxSizes)
+					if (mydata.obsModel.hasBoxSizes)
 					{
-						A1 = myopt.mydata.obsModel.applyAnisoMag(A1, optics_group);
-						A1 = myopt.mydata.obsModel.applyScaleDifference(A1, optics_group, myopt.mymodel.ori_size, myopt.mymodel.pixel_size);
+						A1 = mydata.obsModel.applyAnisoMag(A1, optics_group);
+						A1 = mydata.obsModel.applyScaleDifference(A1, optics_group, mymodel.ori_size, mymodel.pixel_size);
 					}
-					(myopt.mymodel.PPref[iclass]).get2DFourierTransform(F1, A1);    //?
+					(mymodel.PPref[iclass]).get2DFourierTransform(F1, A1);    //?
 					// Apply the angular or shift error
 					RFLOAT rot2 = rot1;
 					RFLOAT tilt2 = tilt1;
@@ -975,7 +992,7 @@ void ClassRanker::calculateExpectedAngularErrors(int iclass, classFeatures &cf)
 					// Perturb psi or xoff , depending on the mode
 					if (imode == 0)
 					{
-						if (myopt.mymodel.ref_dim == 3)
+						if (mymodel.ref_dim == 3)
 						{
 							// Randomly change rot, tilt or psi
 							RFLOAT ran = rnd_unif();
@@ -995,7 +1012,7 @@ void ClassRanker::calculateExpectedAngularErrors(int iclass, classFeatures &cf)
 					{
 						// Randomly change xoff or yoff
 						RFLOAT ran = rnd_unif();
-						if (myopt.mymodel.data_dim == 3)
+						if (mymodel.data_dim == 3)
 						{
 							if (ran < 0.3333)
 							  xshift = xoff1 + sh_error;
@@ -1014,7 +1031,7 @@ void ClassRanker::calculateExpectedAngularErrors(int iclass, classFeatures &cf)
 					}
 
 					// Get the FT of the second image
-					if (myopt.mymodel.data_dim == 2)
+					if (mymodel.data_dim == 2)
 					  F2.initZeros(current_image_size, current_image_size/ 2 + 1);
 					else
 					  F2.initZeros(current_image_size, current_image_size, current_image_size/ 2 + 1);
@@ -1024,21 +1041,21 @@ void ClassRanker::calculateExpectedAngularErrors(int iclass, classFeatures &cf)
 						// Get new rotated version of reference
 						Euler_angles2matrix(rot2, tilt2, psi2, A2, false);
 						// Older versions of RELION dont have the metadata to do this, so disable then
-						if (myopt.mydata.obsModel.hasBoxSizes)
+						if (mydata.obsModel.hasBoxSizes)
 						{
-							A2 = myopt.mydata.obsModel.applyAnisoMag(A2, optics_group);
-							A2 = myopt.mydata.obsModel.applyScaleDifference(A2, optics_group, myopt.mymodel.ori_size, myopt.mymodel.pixel_size);
+							A2 = mydata.obsModel.applyAnisoMag(A2, optics_group);
+							A2 = mydata.obsModel.applyScaleDifference(A2, optics_group, mymodel.ori_size, mymodel.pixel_size);
 						}
-						(myopt.mymodel.PPref[iclass]).get2DFourierTransform(F2, A2);    //??
+						(mymodel.PPref[iclass]).get2DFourierTransform(F2, A2);    //??
 					}
 					else
 					{
 						// Get shifted version
-						shiftImageInFourierTransform(F1, F2, (RFLOAT) myopt.mymodel.ori_size, -xshift, -yshift, -zshift);
+						shiftImageInFourierTransform(F1, F2, (RFLOAT) mymodel.ori_size, -xshift, -yshift, -zshift);
 					}
 
 					// Apply CTF to F1 and F2 if necessary
-					if (myopt.do_ctf_correction)
+					if (do_ctf_correction)
 					{
 						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F1)
 						{
@@ -1046,7 +1063,7 @@ void ClassRanker::calculateExpectedAngularErrors(int iclass, classFeatures &cf)
 							DIRECT_MULTIDIM_ELEM(F2, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 						}
 
-						if (myopt.mydata.hasCtfPremultiplied())
+						if (mydata.hasCtfPremultiplied())
 						{
 							FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F1)
 								{
@@ -1060,9 +1077,9 @@ void ClassRanker::calculateExpectedAngularErrors(int iclass, classFeatures &cf)
 					FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(F1)
 					{
 						int ires = ROUND(sqrt((RFLOAT)(ip*ip + jp*jp)));
-						if (ires < myopt.mymodel.ori_size / 2 + 1 && !(jp==0 && ip < 0))
+						if (ires < mymodel.ori_size / 2 + 1 && !(jp==0 && ip < 0))
 						{
-							my_snr += norm(DIRECT_A2D_ELEM(F1, i ,j) - DIRECT_A2D_ELEM(F2, i, j)) / (2 * myopt.mymodel.sigma2_noise[group_id](ires) );
+							my_snr += norm(DIRECT_A2D_ELEM(F1, i ,j) - DIRECT_A2D_ELEM(F2, i, j)) / (2 * mymodel.sigma2_noise[group_id](ires) );
 						}
 					}
 
@@ -1288,8 +1305,8 @@ void ClassRanker::correctCtfUntilFirstPeak(MultidimArray<RFLOAT> &in, CTF ctf)
 	FourierTransformer transformer;
 	MultidimArray<Complex > Faux;
 
-	RFLOAT xs = (RFLOAT)XSIZE(in) * myopt.mymodel.pixel_size;
-	RFLOAT ys = (RFLOAT)YSIZE(in) * myopt.mymodel.pixel_size;
+	RFLOAT xs = (RFLOAT)XSIZE(in) * mymodel.pixel_size;
+	RFLOAT ys = (RFLOAT)YSIZE(in) * mymodel.pixel_size;
     transformer.FourierTransform(in, Faux, false);
 
     FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(Faux)
@@ -1314,7 +1331,7 @@ void ClassRanker::getFeatures()
 
 	minRes = 999.0;
 	features_all_classes.clear();
-	features_all_classes.reserve(myopt.mymodel.nr_classes);
+	features_all_classes.reserve(mymodel.nr_classes);
 
 	if (verb > 0)
 	{
@@ -1330,19 +1347,19 @@ void ClassRanker::getFeatures()
 		classFeatures features_this_class;
 
 		// Get class distribution and excluding empty classes
-		features_this_class.class_distribution = myopt.mymodel.pdf_class[iclass];
+		features_this_class.class_distribution = mymodel.pdf_class[iclass];
 
 		// Only consider features with non-zero class distributions
 		if (features_this_class.class_distribution > 0)
 		{
 
-			features_this_class.name = myopt.mymodel.ref_names[iclass];
+			features_this_class.name = mymodel.ref_names[iclass];
 			features_this_class.class_index = getClassIndex(features_this_class.name);
 			Image<RFLOAT> img;
-			img() = myopt.mymodel.Iref[iclass];
+			img() = mymodel.Iref[iclass];
 
 			// Get number of particles in the class from data.star file
-			features_this_class.particle_nr = features_this_class.class_distribution * myopt.mydata.numberOfParticles(0);
+			features_this_class.particle_nr = features_this_class.class_distribution * mydata.numberOfParticles(0);
 
 			// Get selection label (if training data)
 			if (MD_select.numberOfObjects() > 0)
@@ -1355,9 +1372,9 @@ void ClassRanker::getFeatures()
 			}
 
 			// Get estimated resolution (regardless of whether it is already in model_classes table or not)
-			if (myopt.mymodel.estimated_resolution[iclass] > 0.)
+			if (mymodel.estimated_resolution[iclass] > 0.)
 			{
-				features_this_class.estimated_resolution = myopt.mymodel.estimated_resolution[iclass];
+				features_this_class.estimated_resolution = mymodel.estimated_resolution[iclass];
 			}
 			else
 			{
@@ -1369,7 +1386,7 @@ void ClassRanker::getFeatures()
 			features_this_class.weighted_resolution = (1. / (features_this_class.estimated_resolution*features_this_class.estimated_resolution)) / log(features_this_class.particle_nr);
 
 			// Calculate image size weighted resolution
-			features_this_class.relative_resolution = features_this_class.estimated_resolution / (myopt.mymodel.ori_size *myopt.mymodel.pixel_size);
+			features_this_class.relative_resolution = features_this_class.estimated_resolution / (mymodel.ori_size * mymodel.pixel_size);
 
 			// Calculate moments for class average image
 			// Find job-wise best resolution among selected (red) classes in preparation for class score calculation called in the write_output function
@@ -1386,9 +1403,9 @@ void ClassRanker::getFeatures()
 			else
 			{
 				// Get class accuracy rotation and translation from model.star if present
-				features_this_class.accuracy_rotation = myopt.mymodel.acc_rot[iclass];
-				features_this_class.accuracy_translation = myopt.mymodel.acc_trans[iclass];
-				if (debug>0) std::cerr << " myopt.mymodel.acc_rot[iclass]= " << myopt.mymodel.acc_rot[iclass] << " myopt.mymodel.acc_trans[iclass]= " << myopt.mymodel.acc_trans[iclass] << std::endl;
+				features_this_class.accuracy_rotation = mymodel.acc_rot[iclass];
+				features_this_class.accuracy_translation = mymodel.acc_trans[iclass];
+				if (debug>0) std::cerr << " mymodel.acc_rot[iclass]= " << mymodel.acc_rot[iclass] << " mymodel.acc_trans[iclass]= " << mymodel.acc_trans[iclass] << std::endl;
 				if (features_this_class.accuracy_rotation > 99. || features_this_class.accuracy_translation > 99.)
 				{
 					calculateExpectedAngularErrors(iclass, features_this_class);
@@ -1398,13 +1415,13 @@ void ClassRanker::getFeatures()
 
 			// Now that we are going to calculate image-based features,
 			// re-scale the image to have uniform pixel size of 4 angstrom
-			int newsize = ROUND(XSIZE(img()) * (myopt.mymodel.pixel_size / uniform_angpix));
+			int newsize = ROUND(XSIZE(img()) * (mymodel.pixel_size / uniform_angpix));
 			newsize -= newsize%2; //make even in case it is not already
 			resizeMap(img(), newsize);
 			img().setXmippOrigin();
 
 			// Determining radius to use
-			circular_mask_radius = myopt.particle_diameter / (uniform_angpix * 2.);
+			circular_mask_radius = particle_diameter / (uniform_angpix * 2.);
 			circular_mask_radius = std::min( (XSIZE(img())/2.) , circular_mask_radius);
 			if (radius_ratio > 0 && radius <= 0) radius = radius_ratio * circular_mask_radius;
 			if (radius > 0)
@@ -1658,17 +1675,19 @@ void ClassRanker::performRanking()
 	std::cout << " TODO: implement execution of neural network ranking here, and fill result into features_all_classes[i].class_score!" << std::endl;
 	std::cout << " TODO: implement execution of neural network ranking here, and fill result into features_all_classes[i].class_score!" << std::endl;
 
+	std::cout << " TODO: ALSO ONLY LOOP ONCE OVER PARTICLES IN DATA.STAR AND DEAL WITH OBSMODEL!!!" << std::endl;
+
 	// Initialise all scores to -999 (including empty classes!
-	std::vector<RFLOAT> predicted_scores(myopt.mymodel.nr_classes, -999.);
+	std::vector<RFLOAT> predicted_scores(mymodel.nr_classes, -999.);
 
 	// to preserve original particle order in the data.star file
 	if (do_select)
 	{
 		// Store original image order
-		long int nr_parts = myopt.mydata.MDimg.numberOfObjects();
+		long int nr_parts = mydata.MDimg.numberOfObjects();
 		for (long int j = 0; j < nr_parts; j++)
 		{
-			myopt.mydata.MDimg.setValue(EMDL_SORTED_IDX, j, j);
+			mydata.MDimg.setValue(EMDL_SORTED_IDX, j, j);
 		}
 	}
 
@@ -1687,12 +1706,12 @@ void ClassRanker::performRanking()
 			nr_sel_classavgs++;
 			int classnr;
 			// Get all particles from the original STAR file that have this class number
-			FOR_ALL_OBJECTS_IN_METADATA_TABLE(myopt.mydata.MDimg)
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(mydata.MDimg)
 			{
-				myopt.mydata.MDimg.getValue(EMDL_PARTICLE_CLASS, classnr);
+				mydata.MDimg.getValue(EMDL_PARTICLE_CLASS, classnr);
 				if (classnr == features_all_classes[i].class_index)
 				{
-					MDselected_particles.addObject(myopt.mydata.MDimg.getObject());
+					MDselected_particles.addObject(mydata.MDimg.getObject());
 					nr_sel_parts++;
 				}
 			}
@@ -1707,18 +1726,35 @@ void ClassRanker::performRanking()
 
 		// Set myscore in the vector that now runs over ALL classes (including empty ones)
 		long int iclass = features_all_classes[i].class_index - 1; // class counting in STAR files starts at 1!
-		if (iclass < 0 || iclass >= myopt.mymodel.nr_classes)
-		{
-			std::cerr << " iclass= " << iclass << " myopt.mymodel.nr_classes= " << myopt.mymodel.nr_classes << std::endl;
-			REPORT_ERROR("BIG: incorrect iclass from class features!");
-		}
-		predicted_scores[iclass] = myscore;
+		predicted_scores.at(iclass) = myscore;
 
 	}
 
 	// Write optimiser.star and model.star in the output directory.
-	myopt.fn_out = fn_out + myopt.fn_out.afterLastOf("/");
-	myopt.write(true, true, true, true, 0, &predicted_scores);
+	FileName fn_opt_out, fn_model_out;
+	fn_opt_out = fn_out + fn_optimiser.afterLastOf("/");
+	fn_model_out = fn_out + fn_model.afterLastOf("/");
+	MD_optimiser.setValue(EMDL_OPTIMISER_MODEL_STARFILE, fn_model_out);
+	MD_optimiser.write(fn_opt_out);
+
+	MetaDataTable MDclass;
+	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+	{
+		MDclass.addObject();
+		MDclass.setValue(EMDL_MLMODEL_REF_IMAGE, mymodel.ref_names[iclass]);
+		MDclass.setValue(EMDL_CLASS_FEAT_CLASS_SCORE, predicted_scores[iclass]);
+		MDclass.setValue(EMDL_MLMODEL_PDF_CLASS, mymodel.pdf_class[iclass]);
+		MDclass.setValue(EMDL_MLMODEL_ACCURACY_ROT, mymodel.acc_rot[iclass]);
+		MDclass.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, mymodel.acc_trans[iclass]);
+		MDclass.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, mymodel.estimated_resolution[iclass]);
+		MDclass.setValue(EMDL_MLMODEL_FOURIER_COVERAGE_TOTAL_REF, mymodel.total_fourier_coverage[iclass]);
+		if (mymodel.ref_dim==2)
+		{
+			MDclass.setValue(EMDL_MLMODEL_PRIOR_OFFX_CLASS, XX(mymodel.prior_offset_class[iclass]));
+			MDclass.setValue(EMDL_MLMODEL_PRIOR_OFFY_CLASS, YY(mymodel.prior_offset_class[iclass]));
+		}
+	}
+	MDclass.write(fn_model_out);
 
 	if (do_select)
 	{

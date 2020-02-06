@@ -94,7 +94,7 @@ void MlModel::initialise(bool _do_sgd)
 }
 
 // Reading from a file
-void MlModel::read(FileName fn_in)
+void MlModel::read(FileName fn_in, bool read_only_one_group)
 {
 
 	// Clear current model
@@ -296,7 +296,8 @@ void MlModel::read(FileName fn_in)
 	}
 
 	// Read sigma models for each group
-	for (int igroup = 0; igroup < nr_groups; igroup++)
+	long read_this_many_groups = (read_only_one_group) ? 1 : nr_groups;
+	for (int igroup = 0; igroup < read_this_many_groups; igroup++)
 	{
 		// Allow sigma2_noise with different sizes!
 		sigma2_noise[igroup].resize(ori_size/2 + 1);
@@ -366,8 +367,7 @@ void MlModel::read(FileName fn_in)
 
 }
 
-void MlModel::write(FileName fn_out, HealpixSampling &sampling,
-		bool do_write_bild, bool only_write_images, const std::vector<RFLOAT> *predicted_scores)
+void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bild, bool only_write_images)
 {
 
 	MetaDataTable MDclass, MDgroup, MDlog, MDsigma, MDbodies;
@@ -377,17 +377,6 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling,
 
 	// Treat classes or bodies (for multi-body refinement) in the same way...
 	int nr_classes_bodies = (nr_bodies > 1) ? nr_bodies : nr_classes;
-
-
-	if (predicted_scores != NULL)
-	{
-		if ((*predicted_scores).size() != nr_classes_bodies)
-		{
-			std::cerr << " nr_classes_bodies= " << nr_classes_bodies << " (*predicted_scores).size()= " << (*predicted_scores).size() << std::endl;
-			REPORT_ERROR("ERROR: predicted scores vector is of incorrect size!");
-		}
-	}
-
 
 	// A. Write images
 	if (ref_dim == 2)
@@ -577,10 +566,6 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling,
 		// For multiple bodies: only star PDF_CLASS in the first one!
 		int myclass = (nr_bodies > 1) ? 0 : iclass; // for multi-body: just set iclass=0
 
-		if (predicted_scores != NULL)
-		{
-			MDclass.setValue(EMDL_CLASS_FEAT_CLASS_SCORE, (*predicted_scores)[iclass]);
-		}
 		MDclass.setValue(EMDL_MLMODEL_PDF_CLASS, pdf_class[myclass]);
 		MDclass.setValue(EMDL_MLMODEL_ACCURACY_ROT, acc_rot[iclass]);
 		MDclass.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, acc_trans[iclass]);

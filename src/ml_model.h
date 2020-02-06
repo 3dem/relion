@@ -390,11 +390,11 @@ public:
 	void initialise(bool _do_sgd = false);
 
 	//Read a model from a file
-	void read(FileName fn_in);
+	void read(FileName fn_in, bool read_only_one_group = false);
 
 	// Write a model to disc
 	void write(FileName fn_out, HealpixSampling &sampling,
-			bool do_write_bild = true, bool do_only_write_images = false, const std::vector<RFLOAT> *predicted_scores = NULL);
+			bool do_write_bild = true, bool do_only_write_images = false);
 
 	//Read a tau-spectrum from a STAR file
 	void readTauSpectrum(FileName fn_tau, int verb);
