@@ -1150,7 +1150,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 
 	// And write the mydata to file
 	if (do_write_data)
-		mydata.write(fn_root);
+		mydata.write(fn_root + "_data.star");
 
 	// And write the sampling object
 	if (do_write_sampling)

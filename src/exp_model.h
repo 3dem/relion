@@ -395,7 +395,7 @@ public:
 		bool need_tiltpsipriors_for_helical_refine = false, int verb = 0);
 
 	// Write
-	void write(FileName fn_root);
+	void write(FileName fn_out);
 };
 
 #endif /* METADATA_MODEL_H_ */
