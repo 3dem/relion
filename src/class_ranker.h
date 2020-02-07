@@ -43,7 +43,7 @@ public:
 
 	// Class-wise features
     FileName name;
-    long class_index;
+    int class_index;
     int is_selected;
     RFLOAT class_distribution, accuracy_rotation, accuracy_translation, estimated_resolution, particle_nr;
     RFLOAT class_score, edge_signal, scattered_signal, weighted_resolution, relative_resolution;
@@ -206,7 +206,7 @@ class ClassRanker
 public:
 
 	IOParser parser;
-	FileName fn_out, fn_ext, fn_optimiser, fn_model, fn_select, fn_job_score, fn_cf;
+	FileName fn_out, fn_ext, fn_optimiser, fn_model, fn_data, fn_select, fn_job_score, fn_cf;
 	FileName fn_features, fn_sel_parts, fn_sel_classavgs;
 
 	RFLOAT minRes, job_score;
@@ -233,8 +233,6 @@ public:
 	Experiment mydata;
 	MetaDataTable MD_optimiser, MD_select;
 	std::vector<classFeatures> features_all_classes, preread_features_all_classes;
-
-	bool do_save_masks, save_masks_only;
 
 public:
 
@@ -264,7 +262,7 @@ public:
 
 private:
 
-	long int getClassIndex(FileName &name);
+	int getClassIndex(FileName &name);
 
 	moments calculateMoments(MultidimArray<RFLOAT> &img,
 			RFLOAT inner_radius, RFLOAT outer_radius, MultidimArray<int> *mask = NULL);

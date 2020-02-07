@@ -452,11 +452,9 @@ void ClassRanker::initialise()
 	if (fn_optimiser != "")
 	{
 
-		FileName fn_data;
 		MD_optimiser.read(fn_optimiser, "optimiser_general");
 		MD_optimiser.getValue(EMDL_OPTIMISER_MODEL_STARFILE, fn_model);
 		MD_optimiser.getValue(EMDL_OPTIMISER_DATA_STARFILE, fn_data);
-
 
 		MD_optimiser.getValue(EMDL_OPTIMISER_DO_CORRECT_CTF, do_ctf_correction);
 		MD_optimiser.getValue(EMDL_OPTIMISER_IGNORE_CTF_UNTIL_FIRST_PEAK, intact_ctf_first_peak);
@@ -474,9 +472,6 @@ void ClassRanker::initialise()
 		mymodel.read(fn_model, true); // true means: read only one group!
 		if (debug>0) std::cerr << "Done with reading model.star ..." << std::endl;
 
-		mydata.read(fn_data, true, true); // true true means: ignore particle_name and group name!
-		if (debug>0) std::cerr << "Done with reading data.star ..." << std::endl;
-
 		//myopt.read(fn_optimiser); // true means skip_groups_and_pdf_direction from mlmodel; only read 1000 particles...
 		//if (debug>0) std::cerr << "Done with reading optimiser ..." << std::endl;
 
@@ -492,6 +487,10 @@ void ClassRanker::initialise()
 		if (intact_ctf_first_peak)
 		{
 			if (verb > 0) std::cout << " Doing first peak CTF correction ..." << std::endl;
+
+			// Read in particles (otherwise wait until haveAllAccuracies or performRanking, as Liyi sometimes doesn't need mydata)
+			mydata.read(fn_data, true, true); // true true means: ignore particle_name and group name!
+			if (debug>0) std::cerr << "Done with reading data.star ..." << std::endl;
 
 			// Calculate avg. defocus
 			RFLOAT def_avg = 0, def_u, def_v;
@@ -509,7 +508,7 @@ void ClassRanker::initialise()
 			avgctf.setValuesByGroup(&mydata.obsModel, 0, def_u, def_v, 0.);
 
 			// Loop over all classes in myopt.mymodel.Iref
-			for (long iref =0; iref < mymodel.Iref.size(); iref++)
+			for (int iref =0; iref < mymodel.Iref.size(); iref++)
 			{
 				correctCtfUntilFirstPeak(mymodel.Iref[iref], avgctf);
 			}
@@ -533,7 +532,19 @@ void ClassRanker::initialise()
 					}
 				}
 			}
-			if (!haveAllAccuracies) mymodel.setFourierTransformMaps(false);
+			if (!haveAllAccuracies)
+			{
+				// Set FTs of the references
+				mymodel.setFourierTransformMaps(false);
+
+				if (mydata.numberOfParticles() == 0)
+				{
+					// Read in particles (otherwise wait until performRanking, as Liyi sometimes doesn't need mydata)
+					mydata.read(fn_data, true, true); // true true means: ignore particle_name and group name!
+					if (debug>0) std::cerr << "Done with reading data.star ..." << std::endl;
+				}
+
+			}
 		}
 	}
 
@@ -588,7 +599,7 @@ void ClassRanker::run()
 	return;
 }
 
-long int ClassRanker::getClassIndex(FileName &name)
+int ClassRanker::getClassIndex(FileName &name)
 {
 	// Get class indexes from reference image name
 	long int result;
@@ -1675,7 +1686,12 @@ void ClassRanker::performRanking()
 	std::cout << " TODO: implement execution of neural network ranking here, and fill result into features_all_classes[i].class_score!" << std::endl;
 	std::cout << " TODO: implement execution of neural network ranking here, and fill result into features_all_classes[i].class_score!" << std::endl;
 
-	std::cout << " TODO: ALSO ONLY LOOP ONCE OVER PARTICLES IN DATA.STAR AND DEAL WITH OBSMODEL!!!" << std::endl;
+	if (mydata.numberOfParticles() == 0)
+	{
+		// Read in particles if we haven't done this already
+		mydata.read(fn_data, true, true); // true true means: ignore particle_name and group name!
+		if (debug>0) std::cerr << "Done with reading data.star ..." << std::endl;
+	}
 
 	// Initialise all scores to -999 (including empty classes!
 	std::vector<RFLOAT> predicted_scores(mymodel.nr_classes, -999.);
@@ -1696,6 +1712,7 @@ void ClassRanker::performRanking()
 
 	long int nr_sel_parts = 0;
 	long int nr_sel_classavgs = 0;
+	std::vector<int> selected_classes;
 	for (int i = 0; i < features_all_classes.size(); i++)
 	{
 		/// Here execute the neural network! (for now just use class_score to test code...)
@@ -1704,17 +1721,8 @@ void ClassRanker::performRanking()
 		if (do_select && myscore >= select_min_score && myscore <= select_max_score)
 		{
 			nr_sel_classavgs++;
-			int classnr;
-			// Get all particles from the original STAR file that have this class number
-			FOR_ALL_OBJECTS_IN_METADATA_TABLE(mydata.MDimg)
-			{
-				mydata.MDimg.getValue(EMDL_PARTICLE_CLASS, classnr);
-				if (classnr == features_all_classes[i].class_index)
-				{
-					MDselected_particles.addObject(mydata.MDimg.getObject());
-					nr_sel_parts++;
-				}
-			}
+			selected_classes.push_back(features_all_classes[i].class_index);
+
 			MDselected_classavgs.addObject();
 			MDselected_classavgs.setValue(EMDL_MLMODEL_REF_IMAGE, features_all_classes[i].name);
 			MDselected_classavgs.setValue(EMDL_CLASS_FEAT_CLASS_SCORE, myscore);
@@ -1725,7 +1733,7 @@ void ClassRanker::performRanking()
 		}
 
 		// Set myscore in the vector that now runs over ALL classes (including empty ones)
-		long int iclass = features_all_classes[i].class_index - 1; // class counting in STAR files starts at 1!
+		int iclass = features_all_classes[i].class_index - 1; // class counting in STAR files starts at 1!
 		predicted_scores.at(iclass) = myscore;
 
 	}
@@ -1759,10 +1767,23 @@ void ClassRanker::performRanking()
 	if (do_select)
 	{
 
-
-		// Maintain the original image ordering
+		// Select all particles in the data.star that have classes inside the selected_classes vector
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(mydata.MDimg)
+		{
+			int classnr;
+			mydata.MDimg.getValue(EMDL_PARTICLE_CLASS, classnr);
+			if (std::find(selected_classes.begin(), selected_classes.end(), classnr) != selected_classes.end())
+			{
+				MDselected_particles.addObject(mydata.MDimg.getObject());
+				nr_sel_parts++;
+			}
+		}
+		// Maintain the original image ordering and obsModel in mydata too
 		MDselected_particles.sort(EMDL_SORTED_IDX);
-		MDselected_particles.write(fn_out+fn_sel_parts);
+		mydata.MDimg = MDselected_particles;
+		mydata.write(fn_out+fn_sel_parts);
+
+		// Also write out class_averages.star with the selected classes
 		MDselected_classavgs.write(fn_out+fn_sel_classavgs);
 
 		if (verb > 0)
@@ -1770,6 +1791,7 @@ void ClassRanker::performRanking()
 			std::cout << " Written " << nr_sel_parts << " selected particles to: " << fn_out << fn_sel_parts << std::endl;
 			std::cout << " Written " << nr_sel_classavgs << " selected classes to: " << fn_out << fn_sel_classavgs << std::endl;
 		}
+
 	}
 
 
