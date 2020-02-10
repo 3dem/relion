@@ -323,33 +323,32 @@ void ParticleSubtractor::run()
 
 void ParticleSubtractor::setLinesInStarFile(int myrank)
 {
-	long int my_first, my_last;
-	divideLabour(myrank, size, my_first, my_last);
-
-	long int imgno = 0;
-	for (long int part_id = my_first; part_id <= my_last; part_id++)
+	long int counter = 0;
+	for (long int part_id = my_first_part_id; part_id <= my_last_part_id; part_id++, counter++)
 	{
+		long int ori_img_id = opt.mydata.particles[part_id].images[0].id;
+
+
 		if (do_center || opt.fn_body_masks != "None")
 		{
-			opt.mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, DIRECT_A2D_ELEM(orients, imgno, 0), part_id);
-			opt.mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, DIRECT_A2D_ELEM(orients, imgno, 1), part_id);
-			if (opt.mymodel.data_dim == 3) opt.mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, DIRECT_A2D_ELEM(orients, imgno, 2), part_id);
+			opt.mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, DIRECT_A2D_ELEM(orients, counter, 0), ori_img_id);
+			opt.mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, DIRECT_A2D_ELEM(orients, counter, 1), ori_img_id);
+			if (opt.mymodel.data_dim == 3) opt.mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, DIRECT_A2D_ELEM(orients, counter, 2), ori_img_id);
 		}
 		if (opt.fn_body_masks != "None")
 		{
-			opt.mydata.MDimg.setValue(EMDL_ORIENT_ROT, DIRECT_A2D_ELEM(orients, imgno, 3), part_id);
-			opt.mydata.MDimg.setValue(EMDL_ORIENT_TILT, DIRECT_A2D_ELEM(orients, imgno, 4), part_id);
-			opt.mydata.MDimg.setValue(EMDL_ORIENT_PSI, DIRECT_A2D_ELEM(orients, imgno, 5), part_id);
+			opt.mydata.MDimg.setValue(EMDL_ORIENT_ROT, DIRECT_A2D_ELEM(orients, counter, 3), ori_img_id);
+			opt.mydata.MDimg.setValue(EMDL_ORIENT_TILT, DIRECT_A2D_ELEM(orients, counter, 4), ori_img_id);
+			opt.mydata.MDimg.setValue(EMDL_ORIENT_PSI, DIRECT_A2D_ELEM(orients, counter, 5), ori_img_id);
 		}
 
 		// Store the original particle name, and also set the subtracted name
 		FileName fn_img;
-		opt.mydata.MDimg.getValue(EMDL_IMAGE_NAME, fn_img, part_id);
-		opt.mydata.MDimg.setValue(EMDL_IMAGE_ORI_NAME, fn_img, part_id);
-		fn_img = getParticleName(imgno, myrank);
-		opt.mydata.MDimg.setValue(EMDL_IMAGE_NAME, fn_img, part_id);
+		opt.mydata.MDimg.getValue(EMDL_IMAGE_NAME, fn_img, ori_img_id);
+		opt.mydata.MDimg.setValue(EMDL_IMAGE_ORI_NAME, fn_img, ori_img_id);
+		fn_img = getParticleName(counter, myrank);
+		opt.mydata.MDimg.setValue(EMDL_IMAGE_NAME, fn_img, ori_img_id);
 
-		imgno++;
 	}
 
 	// Remove origin prior columns if present, as we have re-centered.
@@ -645,9 +644,9 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 		Euler_matrix2angles(Abody, rot, tilt, psi);
 
 		// Store the optimal orientations in the orients array
-		DIRECT_A2D_ELEM(orients, imgno, 3) = rot;
-		DIRECT_A2D_ELEM(orients, imgno, 4) = tilt;
-		DIRECT_A2D_ELEM(orients, imgno, 5) = psi;
+		DIRECT_A2D_ELEM(orients, counter, 3) = rot;
+		DIRECT_A2D_ELEM(orients, counter, 4) = tilt;
+		DIRECT_A2D_ELEM(orients, counter, 5) = psi;
 
 		// Also get refined offset for this body
 		opt.mydata.MDbodies[subtract_body].getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, XX(my_refined_ibody_offset), ori_img_id);
@@ -716,9 +715,9 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 		selfTranslate(img(), centering_offset, WRAP);
 
 		// Set the non-integer difference between the rounded centering offset and the actual offsets in the STAR file
-		DIRECT_A2D_ELEM(orients, imgno, 0) = my_pixel_size * XX(my_residual_offset);
-		DIRECT_A2D_ELEM(orients, imgno, 1) = my_pixel_size * YY(my_residual_offset);
-		if (opt.mymodel.data_dim == 3) DIRECT_A2D_ELEM(orients, imgno, 2) = my_pixel_size * ZZ(my_residual_offset);
+		DIRECT_A2D_ELEM(orients, counter, 0) = my_pixel_size * XX(my_residual_offset);
+		DIRECT_A2D_ELEM(orients, counter, 1) = my_pixel_size * YY(my_residual_offset);
+		if (opt.mymodel.data_dim == 3) DIRECT_A2D_ELEM(orients, counter, 2) = my_pixel_size * ZZ(my_residual_offset);
 	}
 
 	// Rebox the image
