@@ -81,7 +81,7 @@ public:
 	FileName getParticleName(long int imgno, int myrank, int optics_group=-1);
 
 	// subtract one particle
-	void subtractOneParticle(long int part_id, long int imgno, MultidimArray<RFLOAT> &orients);
+	void subtractOneParticle(long int part_id, long int imgno, long int counter, MultidimArray<RFLOAT> &orients);
 
 private:
 	// Pre-calculated rotation matrix for (0,90,0) rotation, and its transpose, for multi-body orientations
