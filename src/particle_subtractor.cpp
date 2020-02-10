@@ -470,8 +470,8 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 	int optics_group = opt.mydata.getOpticsGroup(part_id, 0);
 
 	// Read in the image
+	// SHWS 10feb2020: just leave this for a while. Not necessary, but better check nasty bug has been indeed repaired
 	opt.mydata.MDimg.getValue(EMDL_IMAGE_NAME, fn_img, ori_img_id);
-
 	if (opt.mydata.particles[part_id].images[0].name != fn_img)
 	{
 		std::cerr << " fn_img= " << fn_img << " opt.mydata.particles[part_id].images[0].name= " << opt.mydata.particles[part_id].images[0].name << std::endl;
@@ -565,7 +565,7 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 		else
 		{
 			CTF ctf;
-			ctf.readByGroup(opt.mydata.MDimg, &opt.mydata.obsModel, part_id);
+			ctf.readByGroup(opt.mydata.MDimg, &opt.mydata.obsModel, ori_img_id);
 			ctf.getFftwImage(Fctf, opt.mymodel.ori_size, opt.mymodel.ori_size, opt.mymodel.pixel_size,
 					opt.ctf_phase_flipped, false, opt.intact_ctf_first_peak, true);
 		}
