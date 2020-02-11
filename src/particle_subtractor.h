@@ -40,14 +40,14 @@ public:
 	// FileName for the optimiser.star file, a possibly more restricted particle subset, mask and output files
 	FileName fn_opt, fn_sel, fn_msk, fn_out, fn_revert;
 
+	//Output metadatatable for each rank
+	MetaDataTable MDimg_out;
+
 	// For conventional 3D classifications/ refinements: center the subtracted particles?
 	bool do_center;
 
 	// verbosity
 	int verb;
-
-	// Array with new orientations
-	MultidimArray<RFLOAT> orients;
 
 public:
 	// Read command line arguments
@@ -68,20 +68,17 @@ public:
 	// Revert particle subtraction
 	void revert();
 
-	//Set the metatdata into the final STAR file
-	void setLinesInStarFile(int myrank=0);
-
 	// Write out a STAR file for this rank
 	void saveStarFile(int myrank=0);
 
 	// Write out the final STAR file
-	void combineStarFile();
+	void combineStarFile(int myrank=0);
 
 	// Get name of a single subtracted particle
 	FileName getParticleName(long int imgno, int myrank, int optics_group=-1);
 
 	// subtract one particle
-	void subtractOneParticle(long int part_id, long int imgno, long int counter, MultidimArray<RFLOAT> &orients);
+	void subtractOneParticle(long int part_id, long int imgno, long int counter);
 
 private:
 	// Pre-calculated rotation matrix for (0,90,0) rotation, and its transpose, for multi-body orientations

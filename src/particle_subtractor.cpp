@@ -282,7 +282,6 @@ void ParticleSubtractor::revert()
 
 void ParticleSubtractor::run()
 {
-	int my_halfset = 0;
 
 	long int nr_parts = my_last_part_id - my_first_part_id + 1;
 	long int barstep = XMIPP_MAX(1, nr_parts/120);
@@ -293,17 +292,7 @@ void ParticleSubtractor::run()
 		init_progress_bar(nr_parts);
 	}
 
-	long int cc = 0;
-	// For multibody: store, xoff, yoff, zoff, rot, tilt and psi; for normal, only store xoff, yoff, zoff
-	if (opt.fn_body_masks != "None")
-	{
-		orients.resize(nr_parts, 6);
-	}
-	else if (do_center)
-	{
-		orients.resize(nr_parts, 3);
-	}
-
+	MDimg_out.clear();
 	for (long int part_id = my_first_part_id, cc = 0; part_id <= my_last_part_id; part_id++, cc++)
 	{
 
@@ -313,56 +302,12 @@ void ParticleSubtractor::run()
 				exit(RELION_EXIT_ABORTED);
 		}
 
-		subtractOneParticle(part_id, 0, cc, orients);
+		subtractOneParticle(part_id, 0, cc);
 
 		if (cc % barstep == 0 && verb > 0) progress_bar(cc);
 	}
 
 	if (verb > 0) progress_bar(nr_parts);
-}
-
-void ParticleSubtractor::setLinesInStarFile(int myrank)
-{
-	long int counter = 0;
-	for (long int part_id = my_first_part_id; part_id <= my_last_part_id; part_id++, counter++)
-	{
-		long int ori_img_id = opt.mydata.particles[part_id].images[0].id;
-
-
-		if (do_center || opt.fn_body_masks != "None")
-		{
-			opt.mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, DIRECT_A2D_ELEM(orients, counter, 0), ori_img_id);
-			opt.mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, DIRECT_A2D_ELEM(orients, counter, 1), ori_img_id);
-			if (opt.mymodel.data_dim == 3) opt.mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, DIRECT_A2D_ELEM(orients, counter, 2), ori_img_id);
-		}
-		if (opt.fn_body_masks != "None")
-		{
-			opt.mydata.MDimg.setValue(EMDL_ORIENT_ROT, DIRECT_A2D_ELEM(orients, counter, 3), ori_img_id);
-			opt.mydata.MDimg.setValue(EMDL_ORIENT_TILT, DIRECT_A2D_ELEM(orients, counter, 4), ori_img_id);
-			opt.mydata.MDimg.setValue(EMDL_ORIENT_PSI, DIRECT_A2D_ELEM(orients, counter, 5), ori_img_id);
-		}
-
-		// Store the original particle name, and also set the subtracted name
-		FileName fn_img;
-		opt.mydata.MDimg.getValue(EMDL_IMAGE_NAME, fn_img, ori_img_id);
-		opt.mydata.MDimg.setValue(EMDL_IMAGE_ORI_NAME, fn_img, ori_img_id);
-		fn_img = getParticleName(counter, myrank);
-		opt.mydata.MDimg.setValue(EMDL_IMAGE_NAME, fn_img, ori_img_id);
-
-	}
-
-	// Remove origin prior columns if present, as we have re-centered.
-	if (do_center || opt.fn_body_masks != "None")
-	{
-		if (opt.mydata.MDimg.containsLabel(EMDL_ORIENT_ORIGIN_X_PRIOR_ANGSTROM))
-		{
-			opt.mydata.MDimg.deactivateLabel(EMDL_ORIENT_ORIGIN_X_PRIOR_ANGSTROM);
-		}
-		if (opt.mydata.MDimg.containsLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR_ANGSTROM))
-		{
-			opt.mydata.MDimg.deactivateLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR_ANGSTROM);
-		}
-	}
 }
 
 void ParticleSubtractor::saveStarFile(int myrank)
@@ -376,52 +321,56 @@ void ParticleSubtractor::saveStarFile(int myrank)
 		}
 	}
 
-	// Write only processed particles
-	MetaDataTable MD;
-	long int my_first, my_last;
-	divideLabour(myrank, size, my_first, my_last);
-	for (long int part_id = my_first; part_id <= my_last; part_id++)
+	// Remove origin prior columns if present, as we have re-centered.
+	if (do_center || opt.fn_body_masks != "None")
 	{
-		MD.addObject();
-		MD.setObject(opt.mydata.MDimg.getObject(part_id));
+		if (MDimg_out.containsLabel(EMDL_ORIENT_ORIGIN_X_PRIOR_ANGSTROM))
+		{
+			MDimg_out.deactivateLabel(EMDL_ORIENT_ORIGIN_X_PRIOR_ANGSTROM);
+		}
+		if (MDimg_out.containsLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR_ANGSTROM))
+		{
+			MDimg_out.deactivateLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR_ANGSTROM);
+		}
 	}
 
 	FileName fn_star;
 	if (size == 0)
+	{
 		fn_star = fn_out + "particles_subtracted.star";
+		MDimg_out.deactivateLabel(EMDL_IMAGE_ID);
+	}
 	else
-		fn_star.compose(fn_out + "Particles/subtracted_", myrank + 1, "star");
-	opt.mydata.obsModel.save(MD, fn_star);
+	{
+		fn_star = fn_out + "Particles/subtracted_rank" + integerToString(myrank) + "star";
+	}
+	opt.mydata.obsModel.save(MDimg_out, fn_star);
 
 #ifdef DEBUG
 	std::cout << "myrank = " << myrank << " size = " << size << " my_first = " << my_first << " my_last = " << my_last << " num_items = " << MD.numberOfObjects() << " writing to " << fn_star << std::endl;
 #endif
 }
 
-void ParticleSubtractor::combineStarFile()
+void ParticleSubtractor::combineStarFile(int myrank)
 {
-	ObservationModel obsModel, obsModel2;
-	MetaDataTable MD, MD2;
 
-	for (int i = 0; i < size; i++)
+	if (myrank != 0) REPORT_ERROR("BUG: this function should only be called by master!");
+
+	MetaDataTable MD;
+	for (int i = 1; i < size; i++)
 	{
-		FileName fn_star;
-		fn_star.compose(fn_out + "Particles/subtracted_", i + 1, "star");
-
-		if (i == 0)
-		{
-			ObservationModel::loadSafely(fn_star, obsModel, MD);
-		}
-		else
-		{
-			ObservationModel::loadSafely(fn_star, obsModel2, MD2);
-			MD.append(MD2);
-		}
+		FileName fn_star = fn_out + "Particles/subtracted_rank" + integerToString(i) + "star";
+		MD.read(fn_star, "particles");
+		MDimg_out.append(MD);
 	}
 
-	obsModel.save(MD, fn_out + "particles_subtracted.star");
-	std::cout << " + Saved STAR file with " << MD.numberOfObjects()
-	          << " subtracted particles in " << fn_out <<"particles_subtracted.star" << std::endl;
+	MDimg_out.sort(EMDL_IMAGE_ID);
+	MDimg_out.deactivateLabel(EMDL_IMAGE_ID);
+	opt.mydata.obsModel.save(MDimg_out, fn_out + "particles_subtracted.star");
+
+	std::cout << " + Saved STAR file with " << MDimg_out.numberOfObjects()
+	          << " subtracted particles in " << fn_out << "particles_subtracted.star" << std::endl;
+
 }
 
 FileName ParticleSubtractor::getParticleName(long int imgno, int myrank, int optics_group)
@@ -441,7 +390,7 @@ FileName ParticleSubtractor::getParticleName(long int imgno, int myrank, int opt
 	FileName fn_img;
 	FileName fn_stack = fn_out + "Particles/subtracted";
 	if (size > 1)
-		fn_stack += "_" + integerToString(myrank + 1);
+		fn_stack += "_rank" + integerToString(myrank + 1);
 
 	if (opt.mymodel.data_dim == 3)
 	{
@@ -460,24 +409,13 @@ FileName ParticleSubtractor::getParticleName(long int imgno, int myrank, int opt
 	return fn_img;
 }
 
-void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, long int counter, MultidimArray<RFLOAT> &orients)
+void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, long int counter)
 {
 	// Read the particle image
 	Image<RFLOAT> img;
-	FileName fn_img;
 	long int ori_img_id = opt.mydata.particles[part_id].images[imgno].id;
 	int optics_group = opt.mydata.getOpticsGroup(part_id, 0);
-
-	// Read in the image
-	// SHWS 10feb2020: just leave this for a while. Not necessary, but better check nasty bug has been indeed repaired
-	opt.mydata.MDimg.getValue(EMDL_IMAGE_NAME, fn_img, ori_img_id);
-	if (opt.mydata.particles[part_id].images[0].name != fn_img)
-	{
-		std::cerr << " fn_img= " << fn_img << " opt.mydata.particles[part_id].images[0].name= " << opt.mydata.particles[part_id].images[0].name << std::endl;
-		REPORT_ERROR("BUG! incorrect filename!");
-	}
-
-	img.read(fn_img);
+	img.read(opt.mydata.particles[part_id].images[0].name);
 	img().setXmippOrigin();
 
 	// Get the consensus class, orientational parameters and norm (if present)
@@ -643,10 +581,10 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 		Abody = Aori * (opt.mymodel.orient_bodies[subtract_body]).transpose() * A_rot90 * Aresi_subtract * opt.mymodel.orient_bodies[subtract_body];
 		Euler_matrix2angles(Abody, rot, tilt, psi);
 
-		// Store the optimal orientations in the orients array
-		DIRECT_A2D_ELEM(orients, counter, 3) = rot;
-		DIRECT_A2D_ELEM(orients, counter, 4) = tilt;
-		DIRECT_A2D_ELEM(orients, counter, 5) = psi;
+		// Store the optimal orientations in the MDimg table
+		opt.mydata.MDimg.setValue(EMDL_ORIENT_ROT, rot, ori_img_id);
+		opt.mydata.MDimg.setValue(EMDL_ORIENT_TILT, tilt, ori_img_id);
+		opt.mydata.MDimg.setValue(EMDL_ORIENT_PSI, psi, ori_img_id);
 
 		// Also get refined offset for this body
 		opt.mydata.MDbodies[subtract_body].getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, XX(my_refined_ibody_offset), ori_img_id);
@@ -715,9 +653,12 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 		selfTranslate(img(), centering_offset, WRAP);
 
 		// Set the non-integer difference between the rounded centering offset and the actual offsets in the STAR file
-		DIRECT_A2D_ELEM(orients, counter, 0) = my_pixel_size * XX(my_residual_offset);
-		DIRECT_A2D_ELEM(orients, counter, 1) = my_pixel_size * YY(my_residual_offset);
-		if (opt.mymodel.data_dim == 3) DIRECT_A2D_ELEM(orients, counter, 2) = my_pixel_size * ZZ(my_residual_offset);
+		opt.mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, my_pixel_size * XX(my_residual_offset), ori_img_id);
+		opt.mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, my_pixel_size * YY(my_residual_offset), ori_img_id);
+		if (opt.mymodel.data_dim == 3)
+		{
+			opt.mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, my_pixel_size * ZZ(my_residual_offset), ori_img_id);
+		}
 	}
 
 	// Rebox the image
@@ -735,9 +676,15 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 		}
 	}
 
-	// Now write out the image
-	FileName fn_orig = fn_img;
-	fn_img = getParticleName(counter, rank, optics_group);
+	// Now write out the image & set filenames in output metadatatable
+	FileName fn_img = getParticleName(counter, rank, optics_group);
+	opt.mydata.MDimg.setValue(EMDL_IMAGE_NAME, fn_img, ori_img_id);
+	opt.mydata.MDimg.setValue(EMDL_IMAGE_ORI_NAME, opt.mydata.particles[part_id].images[0].name, ori_img_id);
+	//Also set the original order in the input STAR file for later combination
+	opt.mydata.MDimg.setValue(EMDL_IMAGE_ID, ori_img_id, ori_img_id);
+	MDimg_out.addObject();
+	MDimg_out.setObject(opt.mydata.MDimg.getObject(ori_img_id));
+
 	//printf("Writing: fn_orig = %s counter = %ld rank = %d optics_group = %d fn_img = %s SIZE = %d nr_particles_in_optics_group[optics_group] = %d\n", fn_orig.c_str(), counter, rank, optics_group+1, fn_img.c_str(), XSIZE(img()), nr_particles_in_optics_group[optics_group]);
 	img.setSamplingRateInHeader(my_pixel_size);
 	if (opt.mymodel.data_dim == 3)
