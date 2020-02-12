@@ -2209,16 +2209,17 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 	for (int img_id = 0; img_id < sp.nr_images; img_id++)
 	{
-		// Allocate space for all classes, so that we can pre-calculate data for all classes, copy in one operation, call kenrels on all classes, and copy back in one operation
-		AccPtr<XFLOAT>          oo_otrans_x = ptrFactory.make<XFLOAT>((size_t)nr_fake_classes*nr_transes); // old_offset_oversampled_trans_x
-		AccPtr<XFLOAT>          oo_otrans_y = ptrFactory.make<XFLOAT>((size_t)nr_fake_classes*nr_transes);
-		AccPtr<XFLOAT>          oo_otrans_z = ptrFactory.make<XFLOAT>((size_t)nr_fake_classes*nr_transes);
-		AccPtr<XFLOAT> myp_oo_otrans_x2y2z2 = ptrFactory.make<XFLOAT>((size_t)nr_fake_classes*nr_transes); // my_prior_old_offs....x^2*y^2*z^2
+		// here we introduce offsets for the oo_transes in an array as it is more efficient to
+		// copy one big array to/from GPU rather than four small arrays
+		size_t otrans_x      = 0*(size_t)nr_fake_classes*nr_transes;
+		size_t otrans_y      = 1*(size_t)nr_fake_classes*nr_transes;
+		size_t otrans_z      = 2*(size_t)nr_fake_classes*nr_transes;
+		size_t otrans_x2y2z2 = 3*(size_t)nr_fake_classes*nr_transes;
 
-		oo_otrans_x.allAlloc();
-		oo_otrans_y.allAlloc();
-		oo_otrans_z.allAlloc();
-		myp_oo_otrans_x2y2z2.allAlloc();
+		// Allocate space for all classes, so that we can pre-calculate data for all classes, copy in one operation, call kenrels on all classes, and copy back in one operation
+		AccPtr<XFLOAT>          oo_otrans = ptrFactory.make<XFLOAT>((size_t)nr_fake_classes*nr_transes*4);
+
+		oo_otrans.allAlloc();
 
 		int sumBlockNum =0;
 		int my_metadata_offset = op.metadata_offset + img_id;
@@ -2276,10 +2277,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						(baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry));
 				for (long int iover_trans = 0; iover_trans < sp.nr_oversampled_trans; iover_trans++, iitrans++)
 				{
-					oo_otrans_x[fake_class*nr_transes+iitrans] = old_offset_x + oversampled_translations_x[iover_trans];
-					oo_otrans_y[fake_class*nr_transes+iitrans] = old_offset_y + oversampled_translations_y[iover_trans];
+					oo_otrans[otrans_x+fake_class*nr_transes+iitrans] = old_offset_x + oversampled_translations_x[iover_trans];
+					oo_otrans[otrans_y+fake_class*nr_transes+iitrans] = old_offset_y + oversampled_translations_y[iover_trans];
 					if (accMLO->dataIs3D)
-						oo_otrans_z[fake_class*nr_transes+iitrans] = old_offset_z + oversampled_translations_z[iover_trans];
+						oo_otrans[otrans_z+fake_class*nr_transes+iitrans] = old_offset_z + oversampled_translations_z[iover_trans];
 
 					// Calculate the vector length of myprior
 					RFLOAT mypriors_len2 = myprior_x * myprior_x + myprior_y * myprior_y;
@@ -2296,24 +2297,21 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					}
 
 					if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) )
-						RFLOAT diffx = myprior_x - oo_otrans_x[fake_class*nr_transes+iitrans];
-					RFLOAT diffx = myprior_x - oo_otrans_x[fake_class*nr_transes+iitrans];
-					RFLOAT diffy = myprior_y - oo_otrans_y[fake_class*nr_transes+iitrans];
+						RFLOAT diffx = myprior_x - oo_otrans[otrans_x+fake_class*nr_transes+iitrans];
+					RFLOAT diffx = myprior_x - oo_otrans[otrans_x+fake_class*nr_transes+iitrans];
+					RFLOAT diffy = myprior_y - oo_otrans[otrans_y+fake_class*nr_transes+iitrans];
 					RFLOAT diffz = 0;
 					if (accMLO->dataIs3D)
 						diffz = myprior_z - (old_offset_z + oversampled_translations_z[iover_trans]);
 
-					myp_oo_otrans_x2y2z2[fake_class*nr_transes+iitrans] = diffx*diffx + diffy*diffy + diffz*diffz;
+					oo_otrans[otrans_x2y2z2+fake_class*nr_transes+iitrans] = diffx*diffx + diffy*diffy + diffz*diffz;
 				}
 			}
 		}
 
 		bundleSWS[img_id].cpToDevice();
-		oo_otrans_x.cpToDevice();
-		oo_otrans_y.cpToDevice();
-		oo_otrans_z.cpToDevice();
+		oo_otrans.cpToDevice();
 
-		myp_oo_otrans_x2y2z2.cpToDevice();
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 		AccPtr<XFLOAT>                      p_weights = ptrFactory.make<XFLOAT>((size_t)sumBlockNum);
@@ -2348,10 +2346,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			int block_num = block_nums[nr_fake_classes*img_id + fake_class];
 
 			runCollect2jobs(block_num,
-						&(~oo_otrans_x)[cpos],          // otrans-size -> make const
-						&(~oo_otrans_y)[cpos],          // otrans-size -> make const
-						&(~oo_otrans_z)[cpos],          // otrans-size -> make const
-						&(~myp_oo_otrans_x2y2z2)[cpos], // otrans-size -> make const
+						&(~oo_otrans)[otrans_x+cpos],          // otrans-size -> make const
+						&(~oo_otrans)[otrans_y+cpos],          // otrans-size -> make const
+						&(~oo_otrans)[otrans_z+cpos],          // otrans-size -> make const
+						&(~oo_otrans)[otrans_x2y2z2+cpos], // otrans-size -> make const
 						~thisClassFinePassWeights.weights,
 						(XFLOAT)op.significant_weight[img_id],
 						(XFLOAT)op.sum_weight[img_id],
