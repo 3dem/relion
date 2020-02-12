@@ -105,7 +105,12 @@ void Reconstructor::initialise()
 	if (do_reconstruct_ctf)
 	{
 		do_ctf = false;
+		do_ctf2 = false;
 		padding_factor = 1.;
+	}
+	else
+	{
+		do_ctf2 = do_reconstruct_ctf2;
 	}
 
 	do_ignore_optics = false;
@@ -585,14 +590,17 @@ void Reconstructor::backprojectOneParticle(long int p)
 		{
 			if (!ctf_premultiplied)
 			{
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
+                FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
 				{
 					DIRECT_MULTIDIM_ELEM(F2D, n)  *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 				}
 			}
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+			if (!do_ctf2)
 			{
-				DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+				{
+					DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+				}
 			}
 		}
 
