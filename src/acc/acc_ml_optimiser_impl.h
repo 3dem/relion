@@ -2314,22 +2314,18 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
+		// here we introduce offsets for the clases in an array as it is more efficient to
+		// copy one big array to/from GPU rather than four small arrays
+		size_t offsetx_class = 0*(size_t)sumBlockNum;
+		size_t offsety_class = 1*(size_t)sumBlockNum;
+		size_t offsetz_class = 2*(size_t)sumBlockNum;
+		size_t sigma2_offset = 3*(size_t)sumBlockNum;
+
 		AccPtr<XFLOAT>                      p_weights = ptrFactory.make<XFLOAT>((size_t)sumBlockNum);
-		AccPtr<XFLOAT> p_thr_wsum_prior_offsetx_class = ptrFactory.make<XFLOAT>((size_t)sumBlockNum);
-		AccPtr<XFLOAT> p_thr_wsum_prior_offsety_class = ptrFactory.make<XFLOAT>((size_t)sumBlockNum);
-		AccPtr<XFLOAT> p_thr_wsum_prior_offsetz_class = ptrFactory.make<XFLOAT>((size_t)sumBlockNum);
-		AccPtr<XFLOAT>       p_thr_wsum_sigma2_offset = ptrFactory.make<XFLOAT>((size_t)sumBlockNum);
+		AccPtr<XFLOAT> p_thr_wsum_prior_offsetxyz_class = ptrFactory.make<XFLOAT>((size_t)sumBlockNum*4);
 
 		p_weights.allAlloc();
-		p_thr_wsum_prior_offsetx_class.allAlloc();
-		p_thr_wsum_prior_offsety_class.allAlloc();
-
-		if (accMLO->dataIs3D)
-			p_thr_wsum_prior_offsetz_class.allAlloc();
-		else
-			p_thr_wsum_prior_offsetz_class.setAccPtr(p_thr_wsum_prior_offsety_class.getAccPtr());
-
-		p_thr_wsum_sigma2_offset.allAlloc();
+		p_thr_wsum_prior_offsetxyz_class.allAlloc();
 		CTOC(accMLO->timer,"collect_data_2_pre_kernel");
 		int partial_pos=0;
 
@@ -2359,10 +2355,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						oversamples,
 						(baseMLO->do_skip_align || baseMLO->do_skip_rotate ),
 						&(~p_weights)[partial_pos],
-						&(~p_thr_wsum_prior_offsetx_class)[partial_pos],
-						&(~p_thr_wsum_prior_offsety_class)[partial_pos],
-						&(~p_thr_wsum_prior_offsetz_class)[partial_pos],
-						&(~p_thr_wsum_sigma2_offset)[partial_pos],
+						&(~p_thr_wsum_prior_offsetxyz_class)[offsetx_class+partial_pos],
+						&(~p_thr_wsum_prior_offsetxyz_class)[offsety_class+partial_pos],
+						&(~p_thr_wsum_prior_offsetxyz_class)[offsetz_class+partial_pos],
+						&(~p_thr_wsum_prior_offsetxyz_class)[sigma2_offset+partial_pos],
 						~thisClassFinePassWeights.rot_idx,
 						~thisClassFinePassWeights.trans_idx,
 						~FPCMasks[img_id][exp_iclass].jobOrigin,
@@ -2375,11 +2371,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		CTIC(accMLO->timer,"collect_data_2_post_kernel");
 		p_weights.cpToHost();
-		p_thr_wsum_sigma2_offset.cpToHost();
-		p_thr_wsum_prior_offsetx_class.cpToHost();
-		p_thr_wsum_prior_offsety_class.cpToHost();
-		if (accMLO->dataIs3D)
-			p_thr_wsum_prior_offsetz_class.cpToHost();
+		p_thr_wsum_prior_offsetxyz_class.cpToHost();
 
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 		int iorient = 0;
@@ -2406,12 +2398,13 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[ithr_wsum_pdf_direction], mydir) += p_weights[n];
 				thr_sumw_group[img_id]                                                       += p_weights[n];
 				thr_wsum_pdf_class[iclass]                                                   += p_weights[n];
-				thr_wsum_sigma2_offset                                                       += my_pixel_size * my_pixel_size * p_thr_wsum_sigma2_offset[n];
+
+				thr_wsum_sigma2_offset                                                       += my_pixel_size * my_pixel_size * p_thr_wsum_prior_offsetxyz_class[sigma2_offset+n];
 
 				if (baseMLO->mymodel.ref_dim == 2)
 				{
-					thr_wsum_prior_offsetx_class[iclass] += my_pixel_size * p_thr_wsum_prior_offsetx_class[n];
-					thr_wsum_prior_offsety_class[iclass] += my_pixel_size * p_thr_wsum_prior_offsety_class[n];
+					thr_wsum_prior_offsetx_class[iclass] += my_pixel_size * p_thr_wsum_prior_offsetxyz_class[offsetx_class+n];
+					thr_wsum_prior_offsety_class[iclass] += my_pixel_size * p_thr_wsum_prior_offsetxyz_class[offsety_class+n];
 				}
 			}
 			partial_pos+=block_num;
