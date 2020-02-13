@@ -2514,13 +2514,13 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
 
-		AccPtr<XFLOAT> trans_x = ptrFactory.make<XFLOAT>((size_t)translation_num);
-		AccPtr<XFLOAT> trans_y = ptrFactory.make<XFLOAT>((size_t)translation_num);
-		AccPtr<XFLOAT> trans_z = ptrFactory.make<XFLOAT>((size_t)translation_num);
+		size_t trans_x_offset = 0*(size_t)translation_num;
+		size_t trans_y_offset = 1*(size_t)translation_num;
+		size_t trans_z_offset = 2*(size_t)translation_num;
 
-		trans_x.allAlloc();
-		trans_y.allAlloc();
-		trans_z.allAlloc();
+		AccPtr<XFLOAT> trans_xyz = ptrFactory.make<XFLOAT>((size_t)translation_num*3);
+
+		trans_xyz.allAlloc();
 
 		int j = 0;
 		for (long int itrans = 0; itrans < (sp.itrans_max - sp.itrans_min + 1); itrans++)
@@ -2547,16 +2547,14 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					transformCartesianAndHelicalCoords(xshift, yshift, zshift, xshift, yshift, zshift, rot_deg, tilt_deg, psi_deg, (accMLO->dataIs3D) ? (3) : (2), HELICAL_TO_CART_COORDS);
 				}
 
-				trans_x[j] = -2 * PI * xshift / (double)baseMLO->image_full_size[optics_group];
-				trans_y[j] = -2 * PI * yshift / (double)baseMLO->image_full_size[optics_group];
-				trans_z[j] = -2 * PI * zshift / (double)baseMLO->image_full_size[optics_group];
+				trans_xyz[trans_x_offset+j] = -2 * PI * xshift / (double)baseMLO->image_full_size[optics_group];
+				trans_xyz[trans_y_offset+j] = -2 * PI * yshift / (double)baseMLO->image_full_size[optics_group];
+				trans_xyz[trans_z_offset+j] = -2 * PI * zshift / (double)baseMLO->image_full_size[optics_group];
 				j ++;
 			}
 		}
 
-		trans_x.cpToDevice();
-		trans_y.cpToDevice();
-		trans_z.cpToDevice();
+		trans_xyz.cpToDevice();
 
 
 		/*======================================================
@@ -2572,28 +2570,24 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		windowFourierTransform(op.Fimg_nomask[img_id], Fimg_nonmask, baseMLO->image_current_size[optics_group]);
 		unsigned long image_size = Fimg.nzyxdim;
 
-		AccPtr<XFLOAT> Fimgs_real = ptrFactory.make<XFLOAT>((size_t)image_size);
-		AccPtr<XFLOAT> Fimgs_imag = ptrFactory.make<XFLOAT>((size_t)image_size);
-		AccPtr<XFLOAT> Fimgs_nomask_real = ptrFactory.make<XFLOAT>((size_t)image_size);
-		AccPtr<XFLOAT> Fimgs_nomask_imag = ptrFactory.make<XFLOAT>((size_t)image_size);
+		size_t re_offset = 0*(size_t)image_size;
+		size_t im_offset = 1*(size_t)image_size;
+		size_t re_nomask_offset = 2*(size_t)image_size;
+		size_t im_nomask_offset = 3*(size_t)image_size;
 
-		Fimgs_real.allAlloc();
-		Fimgs_imag.allAlloc();
-		Fimgs_nomask_real.allAlloc();
-		Fimgs_nomask_imag.allAlloc();
+		AccPtr<XFLOAT> Fimgs = ptrFactory.make<XFLOAT>(4*(size_t)image_size);
+
+		Fimgs.allAlloc();
 
 		for (unsigned long i = 0; i < image_size; i ++)
 		{
-			Fimgs_real[i] = Fimg.data[i].real;
-			Fimgs_imag[i] = Fimg.data[i].imag;
-			Fimgs_nomask_real[i] = Fimg_nonmask.data[i].real;
-			Fimgs_nomask_imag[i] = Fimg_nonmask.data[i].imag;
+			Fimgs[re_offset+i] = Fimg.data[i].real;
+			Fimgs[im_offset+i] = Fimg.data[i].imag;
+			Fimgs[re_nomask_offset+i] = Fimg_nonmask.data[i].real;
+			Fimgs[im_nomask_offset+i] = Fimg_nonmask.data[i].imag;
 		}
 
-		Fimgs_real.cpToDevice();
-		Fimgs_imag.cpToDevice();
-		Fimgs_nomask_real.cpToDevice();
-		Fimgs_nomask_imag.cpToDevice();
+		Fimgs.cpToDevice();
 
 		CTOC(accMLO->timer,"translation_3");
 
@@ -2660,17 +2654,15 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		CUSTOM_ALLOCATOR_REGION_NAME("wdiff2s");
 
-		AccPtr<XFLOAT> wdiff2s_AA  = ptrFactory.make<XFLOAT>((size_t)(baseMLO->mymodel.nr_classes*image_size));
-		AccPtr<XFLOAT> wdiff2s_XA  = ptrFactory.make<XFLOAT>((size_t)(baseMLO->mymodel.nr_classes*image_size));
-		AccPtr<XFLOAT> wdiff2s_sum = ptrFactory.make<XFLOAT>((size_t)image_size);
+		size_t wdiff2s_buf = (size_t)(baseMLO->mymodel.nr_classes*image_size)*2+(size_t)image_size;
+		size_t AA_offset =  0*(size_t)(baseMLO->mymodel.nr_classes*image_size);
+		size_t XA_offset =  1*(size_t)(baseMLO->mymodel.nr_classes*image_size);
+		size_t sum_offset = 2*(size_t)(baseMLO->mymodel.nr_classes*image_size);
 
-		wdiff2s_AA.allAlloc();
-		wdiff2s_XA.allAlloc();
-		wdiff2s_sum.allAlloc();
+		AccPtr<XFLOAT> wdiff2s    = ptrFactory.make<XFLOAT>(wdiff2s_buf);
 
-		wdiff2s_AA.accInit(0);
-		wdiff2s_XA.accInit(0);
-		wdiff2s_sum.accInit(0);
+		wdiff2s.allAlloc();
+		wdiff2s.accInit(0);
 
 		unsigned long AAXA_pos=0;
 
@@ -2802,16 +2794,16 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			runWavgKernel(
 					projKernel,
 					~eulers[iclass],
-					~Fimgs_real,
-					~Fimgs_imag,
-					~trans_x,
-					~trans_y,
-					~trans_z,
+					&(~Fimgs)[re_offset], //~Fimgs_real,
+					&(~Fimgs)[im_offset], //~Fimgs_imag,
+					&(~trans_xyz)[trans_x_offset], //~trans_x,
+					&(~trans_xyz)[trans_y_offset], //~trans_y,
+					&(~trans_xyz)[trans_z_offset], //~trans_z,
 					&(~sorted_weights)[classPos],
 					~ctfs,
-					~wdiff2s_sum,
-					&(~wdiff2s_AA)[AAXA_pos],
-					&(~wdiff2s_XA)[AAXA_pos],
+					&(~wdiff2s)[sum_offset],
+					&(~wdiff2s)[AA_offset+AAXA_pos],
+					&(~wdiff2s)[XA_offset+AAXA_pos],
 					op,
 					orientation_num,
 					translation_num,
@@ -2838,11 +2830,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			runBackProjectKernel(
 				accMLO->bundle->backprojectors[iproj],
 				projKernel,
-				~Fimgs_nomask_real,
-				~Fimgs_nomask_imag,
-				~trans_x,
-				~trans_y,
-				~trans_z,
+				&(~Fimgs)[re_nomask_offset], //~Fimgs_nomask_real,
+				&(~Fimgs)[im_nomask_offset], //~Fimgs_nomask_imag,
+				&(~trans_xyz)[trans_x_offset], //~trans_x,
+				&(~trans_xyz)[trans_y_offset], //~trans_y,
+				&(~trans_xyz)[trans_z_offset], //~trans_z,
 				&(~sorted_weights)[classPos],
 				~Minvsigma2s,
 				~ctfs,
@@ -2880,9 +2872,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
-		wdiff2s_AA.cpToHost();
-		wdiff2s_XA.cpToHost();
-		wdiff2s_sum.cpToHost();
+		wdiff2s.cpToHost();
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 		AAXA_pos=0;
@@ -2897,8 +2887,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				if (ires > -1 && baseMLO->do_scale_correction &&
 						DIRECT_A1D_ELEM(baseMLO->mymodel.data_vs_prior_class[exp_iclass], ires) > 3.)
 				{
-					exp_wsum_scale_correction_AA[img_id] += wdiff2s_AA[AAXA_pos+j];
-					exp_wsum_scale_correction_XA[img_id] += wdiff2s_XA[AAXA_pos+j];
+					exp_wsum_scale_correction_AA[img_id] += wdiff2s[AA_offset+AAXA_pos+j];
+					exp_wsum_scale_correction_XA[img_id] += wdiff2s[XA_offset+AAXA_pos+j];
 				}
 			}
 			AAXA_pos += image_size;
@@ -2909,8 +2899,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine[optics_group], j);
 			if (ires > -1)
 			{
-				thr_wsum_sigma2_noise[img_id].data[ires] += (RFLOAT) wdiff2s_sum[j];
-				exp_wsum_norm_correction[img_id] += (RFLOAT) wdiff2s_sum[j]; //TODO could be gpu-reduced
+				thr_wsum_sigma2_noise[img_id].data[ires] += (RFLOAT) wdiff2s[sum_offset+j];
+				exp_wsum_norm_correction[img_id] += (RFLOAT) wdiff2s[sum_offset+j]; //TODO could be gpu-reduced
 			}
 		}
 	} // end loop img_id
