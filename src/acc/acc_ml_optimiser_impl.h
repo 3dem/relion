@@ -1030,18 +1030,19 @@ void getAllSquaredDifferencesCoarse(
 		CTIC(accMLO->timer,"translation_1");
 
 		long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
+		// here we introduce offsets for the trans_ and img_ in an array as it is more efficient to
+		// copy one big array to/from GPU rather than four small arrays
+		size_t trans_x_offset = 0*(size_t)translation_num;
+		size_t trans_y_offset = 1*(size_t)translation_num;
+		size_t trans_z_offset = 2*(size_t)translation_num;
+		size_t img_re_offset = 0*(size_t)image_size;
+		size_t img_im_offset = 1*(size_t)image_size;
 
-		AccPtr<XFLOAT> Fimg_real = ptrFactory.make<XFLOAT>((size_t)image_size);
-		AccPtr<XFLOAT> Fimg_imag = ptrFactory.make<XFLOAT>((size_t)image_size);
-		AccPtr<XFLOAT> trans_x = ptrFactory.make<XFLOAT>((size_t)translation_num);
-		AccPtr<XFLOAT> trans_y = ptrFactory.make<XFLOAT>((size_t)translation_num);
-		AccPtr<XFLOAT> trans_z = ptrFactory.make<XFLOAT>((size_t)translation_num);
+		AccPtr<XFLOAT> Fimg_ = ptrFactory.make<XFLOAT>((size_t)image_size*2);
+		AccPtr<XFLOAT> trans_xyz = ptrFactory.make<XFLOAT>((size_t)translation_num*3);
 
-		Fimg_real.allAlloc();
-		Fimg_imag.allAlloc();
-		trans_x.allAlloc();
-		trans_y.allAlloc();
-		trans_z.allAlloc();
+		Fimg_.allAlloc();
+		trans_xyz.allAlloc();
 
 		std::vector<RFLOAT> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
 
@@ -1066,9 +1067,9 @@ void getAllSquaredDifferencesCoarse(
 				transformCartesianAndHelicalCoords(xshift, yshift, zshift, xshift, yshift, zshift, rot_deg, tilt_deg, psi_deg, (accMLO->dataIs3D) ? (3) : (2), HELICAL_TO_CART_COORDS);
 			}
 
-			trans_x[itrans] = -2 * PI * xshift / (double)baseMLO->image_full_size[optics_group];
-			trans_y[itrans] = -2 * PI * yshift / (double)baseMLO->image_full_size[optics_group];
-			trans_z[itrans] = -2 * PI * zshift / (double)baseMLO->image_full_size[optics_group];
+			trans_xyz[trans_x_offset+itrans] = -2 * PI * xshift / (double)baseMLO->image_full_size[optics_group];
+			trans_xyz[trans_y_offset+itrans] = -2 * PI * yshift / (double)baseMLO->image_full_size[optics_group];
+			trans_xyz[trans_z_offset+itrans] = -2 * PI * zshift / (double)baseMLO->image_full_size[optics_group];
 		}
 
 		XFLOAT scale_correction = baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1;
@@ -1097,16 +1098,13 @@ void getAllSquaredDifferencesCoarse(
 					pixel_correction /= op.local_Fctf[img_id].data[i];
 				}
 			}
-			Fimg_real[i] = Fimg.data[i].real * pixel_correction;
-			Fimg_imag[i] = Fimg.data[i].imag * pixel_correction;
+			Fimg_[img_re_offset+i] = Fimg.data[i].real * pixel_correction;
+			Fimg_[img_im_offset+i] = Fimg.data[i].imag * pixel_correction;
 		}
 
-		trans_x.cpToDevice();
-		trans_y.cpToDevice();
-		trans_z.cpToDevice();
+		trans_xyz.cpToDevice();
 
-		Fimg_real.cpToDevice();
-		Fimg_imag.cpToDevice();
+		Fimg_.cpToDevice();
 
 		CTOC(accMLO->timer,"translation_1");
 
@@ -1143,12 +1141,12 @@ void getAllSquaredDifferencesCoarse(
 
 				runDiff2KernelCoarse(
 						projKernel,
-						~trans_x,
-						~trans_y,
-						~trans_z,
+						&(~trans_xyz)[trans_x_offset], //~trans_x,
+						&(~trans_xyz)[trans_y_offset], //~trans_y,
+						&(~trans_xyz)[trans_z_offset], //~trans_z,
 						~corr_img,
-						~Fimg_real,
-						~Fimg_imag,
+						&(~Fimg_)[img_re_offset], //~Fimg_real,
+						&(~Fimg_)[img_im_offset], //~Fimg_imag,
 						~projectorPlans[iclass].eulers,
 						&(~allWeights)[allWeights_pos],
 						(XFLOAT) op.local_sqrtXi2[img_id],
@@ -1251,18 +1249,19 @@ void getAllSquaredDifferencesFine(
 		CTIC(accMLO->timer,"translation_2");
 
 		long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
+		// here we introduce offsets for the trans_ and img_ in an array as it is more efficient to
+		// copy one big array to/from GPU rather than four small arrays
+		size_t trans_x_offset = 0*(size_t)translation_num;
+		size_t trans_y_offset = 1*(size_t)translation_num;
+		size_t trans_z_offset = 2*(size_t)translation_num;
+		size_t img_re_offset = 0*(size_t)image_size;
+		size_t img_im_offset = 1*(size_t)image_size;
 
-		AccPtr<XFLOAT> Fimg_real = ptrFactory.make<XFLOAT>((size_t)image_size);
-		AccPtr<XFLOAT> Fimg_imag = ptrFactory.make<XFLOAT>((size_t)image_size);
-		AccPtr<XFLOAT> trans_x = ptrFactory.make<XFLOAT>((size_t)translation_num);
-		AccPtr<XFLOAT> trans_y = ptrFactory.make<XFLOAT>((size_t)translation_num);
-		AccPtr<XFLOAT> trans_z = ptrFactory.make<XFLOAT>((size_t)translation_num);
+		AccPtr<XFLOAT> Fimg_     = ptrFactory.make<XFLOAT>((size_t)image_size*2);
+		AccPtr<XFLOAT> trans_xyz = ptrFactory.make<XFLOAT>((size_t)translation_num*3);
 
-		Fimg_real.allAlloc();
-		Fimg_imag.allAlloc();
-		trans_x.allAlloc();
-		trans_y.allAlloc();
-		trans_z.allAlloc();
+		Fimg_.allAlloc();
+		trans_xyz.allAlloc();
 
 		std::vector<RFLOAT> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
 
@@ -1290,9 +1289,9 @@ void getAllSquaredDifferencesFine(
 					transformCartesianAndHelicalCoords(xshift, yshift, zshift, xshift, yshift, zshift, rot_deg, tilt_deg, psi_deg, (accMLO->dataIs3D) ? (3) : (2), HELICAL_TO_CART_COORDS);
 				}
 
-				trans_x[j] = -2 * PI * xshift / (double)baseMLO->image_full_size[optics_group];
-				trans_y[j] = -2 * PI * yshift / (double)baseMLO->image_full_size[optics_group];
-				trans_z[j] = -2 * PI * zshift / (double)baseMLO->image_full_size[optics_group];
+				trans_xyz[trans_x_offset+j] = -2 * PI * xshift / (double)baseMLO->image_full_size[optics_group];
+				trans_xyz[trans_y_offset+j] = -2 * PI * yshift / (double)baseMLO->image_full_size[optics_group];
+				trans_xyz[trans_z_offset+j] = -2 * PI * zshift / (double)baseMLO->image_full_size[optics_group];
 				j ++;
 			}
 		}
@@ -1323,8 +1322,8 @@ void getAllSquaredDifferencesFine(
 				}
 			}
 
-			Fimg_real[i] = Fimg.data[i].real * pixel_correction;
-			Fimg_imag[i] = Fimg.data[i].imag * pixel_correction;
+			Fimg_[img_re_offset+i] = Fimg.data[i].real * pixel_correction;
+			Fimg_[img_im_offset+i] = Fimg.data[i].imag * pixel_correction;
 		}
 
 		CTOC(accMLO->timer,"translation_2");
@@ -1337,13 +1336,10 @@ void getAllSquaredDifferencesFine(
 		corr_img.allAlloc();
 		buildCorrImage(baseMLO,op,corr_img,img_id,group_id, ctf_premultiplied);
 
-		trans_x.cpToDevice();
-		trans_y.cpToDevice();
-		trans_z.cpToDevice();
+		trans_xyz.cpToDevice();
 
 
-		Fimg_real.cpToDevice();
-		Fimg_imag.cpToDevice();
+		Fimg_.cpToDevice();
 		corr_img.cpToDevice();
 
 		CTOC(accMLO->timer,"kernel_init_1");
@@ -1508,11 +1504,11 @@ void getAllSquaredDifferencesFine(
 				runDiff2KernelFine(
 						projKernel,
 						~corr_img,
-						~Fimg_real,
-						~Fimg_imag,
-						~trans_x,
-						~trans_y,
-						~trans_z,
+						&(~Fimg_)[img_re_offset], //~Fimg_real,
+						&(~Fimg_)[img_im_offset], //~Fimg_imag,
+						&(~trans_xyz)[trans_x_offset], //~trans_x,
+						&(~trans_xyz)[trans_y_offset], //~trans_y,
+						&(~trans_xyz)[trans_z_offset], //~trans_z,
 						~eulers[iclass-sp.iclass_min],
 						~thisClassFinePassWeights.rot_id,
 						~thisClassFinePassWeights.rot_idx,
