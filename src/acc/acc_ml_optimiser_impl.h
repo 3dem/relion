@@ -36,9 +36,16 @@ void getFourierTransformsAndCtfs(long int part_id,
 
 		// Which group do I belong?
 		int group_id =baseMLO->mydata.getGroupId(part_id, img_id);
+		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(part_id, img_id);
 		// What is my optics group?
 		int optics_group = baseMLO->mydata.getOpticsGroup(part_id, img_id);
-		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(part_id, img_id);
+		bool ctf_premultiplied = baseMLO->mydata.obsModel.getCtfPremultiplied(optics_group);
+
+		// SHWS 13feb2020: new ctf_premultiplied replaces ctf arrays by ctf^2 arrays, then one can no longer not apply CTF to references...
+		if (ctf_premultiplied && !baseMLO->refs_are_ctf_corrected)
+		{
+			REPORT_ERROR("ERROR: one can no longer use ctf_premultiplied and !refs_are_ctf_corrected together...");
+		}
 
 		// metadata offset for this image in the particle
 		int my_metadata_offset = op.metadata_offset + img_id;
@@ -731,6 +738,15 @@ void getFourierTransformsAndCtfs(long int part_id,
 					REPORT_ERROR("3D CTF volume must be either cubical or adhere to FFTW format!");
 				}
 
+				// SHWS 13feb2020: when using CTF-premultiplied, replace ctf by ctf^2, but make sure they are all positive!!
+				if (ctf_premultiplied)
+				{
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+					{
+						DIRECT_MULTIDIM_ELEM(Fctf, n) = fabs(DIRECT_MULTIDIM_ELEM(Fctf, n));
+					}
+				}
+
 				CTIC(accMLO->timer,"CTFSet3D_array");
 			}
 			else
@@ -748,6 +764,16 @@ void getFourierTransformsAndCtfs(long int part_id,
 
 				ctf.getFftwImage(Fctf, baseMLO->image_full_size[optics_group], baseMLO->image_full_size[optics_group], my_pixel_size,
 						baseMLO->ctf_phase_flipped, baseMLO->only_flip_phases, baseMLO->intact_ctf_first_peak, true, baseMLO->do_ctf_padding);
+
+				// SHWS 13feb2020: when using CTF-premultiplied, from now on use the normal kernels, but replace ctf by ctf^2
+				if (ctf_premultiplied)
+				{
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+					{
+						DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+					}
+				}
+
 				CTIC(accMLO->timer,"CTFRead2D");
 			}
 		}
@@ -1021,7 +1047,6 @@ void getAllSquaredDifferencesCoarse(
 		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
 		int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
 		unsigned long image_size = op.local_Minvsigma2[img_id].nzyxdim;
-		bool ctf_premultiplied = baseMLO->mydata.obsModel.getCtfPremultiplied(optics_group);
 
 		/*====================================
 				Generate Translations
@@ -1092,10 +1117,6 @@ void getAllSquaredDifferencesCoarse(
 				{
 					pixel_correction /= op.local_Fctf[img_id].data[i];
 				}
-				if (ctf_premultiplied)
-				{
-					pixel_correction /= op.local_Fctf[img_id].data[i];
-				}
 			}
 			Fimg_real[i] = Fimg.data[i].real * pixel_correction;
 			Fimg_imag[i] = Fimg.data[i].imag * pixel_correction;
@@ -1116,7 +1137,7 @@ void getAllSquaredDifferencesCoarse(
 
 		corr_img.allAlloc();
 
-		buildCorrImage(baseMLO,op,corr_img,img_id,group_id, ctf_premultiplied);
+		buildCorrImage(baseMLO,op,corr_img,img_id,group_id);
 		corr_img.cpToDevice();
 
 		deviceInitValue<XFLOAT>(allWeights, (XFLOAT) (op.highres_Xi2_img[img_id] / 2.));
@@ -1239,7 +1260,6 @@ void getAllSquaredDifferencesFine(
 		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
 		int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
 		unsigned long image_size = op.local_Minvsigma2[img_id].nzyxdim;
-		bool ctf_premultiplied = baseMLO->mydata.obsModel.getCtfPremultiplied(optics_group);
 
 		MultidimArray<Complex > Fref;
 		Fref.resize(op.local_Minvsigma2[img_id]);
@@ -1317,10 +1337,6 @@ void getAllSquaredDifferencesFine(
 				{
 					pixel_correction /= op.local_Fctf[img_id].data[i];
 				}
-				if (ctf_premultiplied)
-				{
-					pixel_correction /= op.local_Fctf[img_id].data[i];
-				}
 			}
 
 			Fimg_real[i] = Fimg.data[i].real * pixel_correction;
@@ -1335,7 +1351,7 @@ void getAllSquaredDifferencesFine(
 		AccPtr<XFLOAT> corr_img = ptrFactory.make<XFLOAT>((size_t)image_size);
 
 		corr_img.allAlloc();
-		buildCorrImage(baseMLO,op,corr_img,img_id,group_id, ctf_premultiplied);
+		buildCorrImage(baseMLO,op,corr_img,img_id,group_id);
 
 		trans_x.cpToDevice();
 		trans_y.cpToDevice();
@@ -2642,8 +2658,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				ctfs[i] = (XFLOAT) op.local_Fctf[img_id].data[i] * part_scale;
 		}
 		else //TODO should be handled by memset
+		{
 			for (unsigned long i = 0; i < image_size; i++)
 				ctfs[i] = part_scale;
+		}
 
 		ctfs.cpToDevice();
 
