@@ -1593,8 +1593,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	AccPtr<XFLOAT>  pdf_offset            = ptrFactory.make<XFLOAT>((size_t)((sp.iclass_max-sp.iclass_min+1)*sp.nr_trans));
 	AccPtr<bool>    pdf_offset_zeros      = ptrFactory.make<bool>(pdf_offset.getSize());
 
-	pdf_orientation.allAlloc();
-	pdf_orientation_zeros.allAlloc();
+	pdf_orientation.accAlloc();
+	pdf_orientation_zeros.accAlloc();
 	pdf_offset.allAlloc();
 	pdf_offset_zeros.allAlloc();
 
@@ -1602,6 +1602,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 	// pdf_orientation is img_id-independent, so we keep it above img_id scope
 	CTIC(accMLO->timer,"get_orient_priors");
+	AccPtr<RFLOAT> pdfs				= ptrFactory.make<RFLOAT>((size_t)((sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi));
+	pdfs.allAlloc();
+
 	for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		for (unsigned long idir = sp.idir_min, iorientclass = (exp_iclass-sp.iclass_min) * sp.nr_dir * sp.nr_psi; idir <=sp.idir_max; idir++)
 			for (unsigned long ipsi = sp.ipsi_min; ipsi <= sp.ipsi_max; ipsi++, iorientclass++)
@@ -1615,20 +1618,11 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				else
 					pdf = op.directions_prior[idir] * op.psi_prior[ipsi];
 
-				if (pdf == 0)
-				{
-					pdf_orientation[iorientclass] = 0.f;
-					pdf_orientation_zeros[iorientclass] = true;
-				}
-				else
-				{
-					pdf_orientation[iorientclass] = log(pdf);
-					pdf_orientation_zeros[iorientclass] = false;
-				}
+				pdfs[iorientclass] = pdf;
 			}
 
-	pdf_orientation_zeros.cpToDevice();
-	pdf_orientation.cpToDevice();
+	pdfs.cpToDevice();
+	AccUtilities::initOrientations(pdfs, pdf_orientation, pdf_orientation_zeros);
 	CTOC(accMLO->timer,"get_orient_priors");
 
 	if(exp_ipass==0 || baseMLO->adaptive_oversampling!=0)
