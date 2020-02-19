@@ -385,7 +385,7 @@ void Micrograph::read(FileName fn_in, bool read_hotpixels)
 	// Open input file
 	std::ifstream in(fn_in.data(), std::ios_base::in);
 	if (in.fail()) {
-		REPORT_ERROR( (std::string) "MicrographModel::read: File " + fn_in + " cannot be read." );
+		REPORT_ERROR("MicrographModel::read: File " + fn_in + " cannot be read.");
 	}
 
 	MetaDataTable MDglobal, MDhot;
@@ -397,7 +397,7 @@ void Micrograph::read(FileName fn_in, bool read_hotpixels)
 	    !MDglobal.getValue(EMDL_IMAGE_SIZE_Y, height) ||
 	    !MDglobal.getValue(EMDL_IMAGE_SIZE_Z, n_frames) ||
 	    !MDglobal.getValue(EMDL_MICROGRAPH_MOVIE_NAME, fnMovie)) {
-		REPORT_ERROR("MicrographModel::read: insufficient general information");
+		REPORT_ERROR("MicrographModel::read: insufficient general information in " + fn_in);
 	}
 
 	globalShiftX.resize(n_frames, NOT_OBSERVED);
@@ -457,7 +457,7 @@ void Micrograph::read(FileName fn_in, bool read_hotpixels)
 		if (!MDglobal.getValue(EMDL_MICROGRAPH_FRAME_NUMBER, frame) ||
 		    !MDglobal.getValue(EMDL_MICROGRAPH_SHIFT_X, shiftX) ||
 		    !MDglobal.getValue(EMDL_MICROGRAPH_SHIFT_Y, shiftY)) {
-			REPORT_ERROR("MicrographModel::read: incorrect global_shift table");
+			REPORT_ERROR("MicrographModel::read: incorrect global_shift table in " + fn_in);
 		}
 
 		// frame is 1-indexed!
@@ -473,7 +473,7 @@ void Micrograph::read(FileName fn_in, bool read_hotpixels)
 		{
 			if (!MDhot.getValue(EMDL_IMAGE_COORD_X, x) ||
 			    !MDhot.getValue(EMDL_IMAGE_COORD_Y, y))
-				REPORT_ERROR("MicrographModel::read: incorrect hot_pixels table");
+				REPORT_ERROR("MicrographModel::read: incorrect hot_pixels table in " + fn_in);
 
 			hotpixelX.push_back((int)x);
 			hotpixelY.push_back((int)y);

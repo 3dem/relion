@@ -92,6 +92,9 @@ public:
 		SL.read_sym_file(fn_sym);
 
 		// Padding factor for the map
+		if (_padding_factor_3d < 1.0)
+			REPORT_ERROR("Padding factor cannot be less than 1.");
+
 		padding_factor = _padding_factor_3d;
 
 		// Interpolation scheme
