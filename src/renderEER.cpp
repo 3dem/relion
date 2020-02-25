@@ -292,28 +292,40 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 
 			while (true)
 			{
-				// Fetch 32 bits and unpack relevant 7 + 4 bits.
+				// Fetch 32 bits and unpack up to 2 chunks of 7 + 4 bits.
 				// This is faster than unpack 7 and 4 bits sequentially.
-				// If necessary, we can unroll this loop to unpack two chunks simultaneously.
+				// Since the size of buf is larger than the actual size by the TIFF header size,
+				// it is always safe to read ahead.
+
 				long long first_byte = pos + (bit_pos >> 3);
 				const unsigned int bit_offset_in_first_byte = bit_pos & 7; // 7 = 00000111 (same as % 8)
 				const unsigned int chunk = (*(unsigned int*)(buf + first_byte)) >> bit_offset_in_first_byte;
 
 				p = (unsigned char)(chunk & 127); // 127 = 01111111
+				bit_pos += 7; // TODO: we can remove this for further speed.
+				n_pix += p;
+				if (n_pix == EER_IMAGE_PIXELS) break;
+				if (p == 127) continue; // this should be rare.
+				
+				s = (unsigned char)((chunk >> 7) & 15) ^ 0x0A; // 15 = 00001111; See below for 0x0A
+				bit_pos += 4;
+				positions[n_electron] = n_pix;
+				symbols[n_electron] = s;
+				n_electron++;
+				n_pix++;
 
+				p = (unsigned char)((chunk >> 11) & 127); // 127 = 01111111
 				bit_pos += 7;
 				n_pix += p;
 				if (n_pix == EER_IMAGE_PIXELS) break;
-
-				if (p != 127)
-				{
-					s = (unsigned char)((chunk >> 7) & 15) ^ 0x0A; // 15 = 00001111; See below for 0x0A
-					bit_pos += 4;
-					positions[n_electron] = n_pix;
-					symbols[n_electron] = s;
-					n_electron++;
-					n_pix++;
-				}
+				if (p == 127) continue;
+				
+				s = (unsigned char)((chunk >> 18) & 15) ^ 0x0A; // 15 = 00001111; See below for 0x0A
+				bit_pos += 4;
+				positions[n_electron] = n_pix;
+				symbols[n_electron] = s;
+				n_electron++;
+				n_pix++;
 			}
 		}
 		else
