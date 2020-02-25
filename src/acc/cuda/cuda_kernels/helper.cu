@@ -1058,3 +1058,16 @@ __global__ void cuda_kernel_allweights_to_mweights(
 				d_allweights[idx/translation_num * translation_num + idx%translation_num];
                 // TODO - isn't this just d_allweights[idx + idx%translation_num]?   Really?
 }
+
+__global__ void cuda_kernel_initOrientations(RFLOAT *pdfs, XFLOAT *pdf_orientation, bool *pdf_orientation_zeros, size_t sz)
+{
+	int idx = blockIdx.x*blockDim.x + threadIdx.x;
+	if(idx < sz){
+		pdf_orientation_zeros[idx] = (pdfs[idx] == 0);
+		if (pdfs[idx] == 0)
+			pdf_orientation[idx] = 0.f;
+		else
+			pdf_orientation[idx] = log(pdfs[idx]);
+	}
+}
+
