@@ -71,6 +71,9 @@ public:
     /** Flag whether the translations are 3D (for volume refinement) */
     bool is_3d_trans;
 
+    /** Flag whether relax symmetry */
+    bool isRelax;
+
     /** Name of the Symmetry group */
     FileName fn_sym;
     FileName fn_sym_relax;

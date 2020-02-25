@@ -25,6 +25,7 @@
 void HealpixSampling::clear()
 {
 	is_3D = false;
+	isRelax = false;
 	fn_sym = "C1";
 	fn_sym_relax = "C1";
 	limit_tilt = psi_step = offset_range = offset_step = 0.;
@@ -63,6 +64,9 @@ void HealpixSampling::initialise(
 	// Set the prior mode (belongs to mlmodel, but very useful inside this object)
 	orientational_prior_mode = prior_mode;
 
+	// Set the symmetry relaxation flag
+	isRelax = fn_sym_relax == "" ? false : true;
+
 	if (ref_dim != -1)
 		is_3D = (ref_dim == 3);
 
@@ -90,7 +94,7 @@ void HealpixSampling::initialise(
 		L_repository.clear();
 		initialiseSymMats(fn_sym, pgGroup, pgOrder, R_repository, L_repository);
 
-		// Set up symmetry matrices for relaxing symmetry
+		// Set up symmetry matrices for symmetry relax
 		if (fn_sym_relax != "")
 		{
 			R_repository_relax.clear();
@@ -485,9 +489,8 @@ void HealpixSampling::setOrientations(int _order, RFLOAT _psi_step)
 #ifdef  DEBUG_SAMPLING
 		writeAllOrientationsToBild("orients_all.bild", "1 0 0 ", 0.020);
 #endif
-		// Now remove symmetry-related pixels
+		// Now remove symmetry-related pixels if not relaxing symmetry
 		// TODO check size of healpix_base.max_pixrad
-		bool isRelax = fn_sym_relax == "" ? false : true;
 		if (!isRelax)
 			removeSymmetryEquivalentPoints(0.5 * RAD2DEG(healpix_base.max_pixrad()));
 
@@ -651,7 +654,6 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 	directions_prior.clear();
 	// Do not check the mates again
 	std::vector<bool> idir_flag(rot_angles.size(), false);
-	bool isRelax = fn_sym_relax == "" ? false : true;
 
 	if (is_3D)
 	{
@@ -672,7 +674,7 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 
 		for (long int idir = 0; idir < rot_angles.size(); idir++)
 		{
-			// Check if it is met before as symmetry mate
+			// Check if this direction was met before as symmetry mate
 			if (idir_flag[idir] == true)
 					continue;
 
@@ -689,7 +691,7 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 				Euler_angles2direction(rot_angles[idir], tilt_angles[idir], my_direction);
 				best_direction = my_direction;
 
-				// Loop over all symmetry operators to find the operator that brings this direction nearest to the prior if no relax
+				// Loop over all symmetry operators to find the operator that brings this direction nearest to the prior if no symmetry relaxation
 				if (!isRelax)
 				{
 					RFLOAT best_dotProduct = dotProduct(prior_direction, my_direction);
@@ -1049,7 +1051,7 @@ void HealpixSampling::findSymmetryMate(long int idir_, RFLOAT prior_,
 		pointing prior_direction_pointing(beta, alpha); // Object required by healpix function
      	healpix_base.query_disc(prior_direction_pointing, angular_sampling, listpix); // Search healpix for closest indices
      	best_direction_index = listpix[0];
-     	// If there are more than one neighbors then check for the best
+     	// If there are more than one neighbors then select the best
 		if (listpix.size() > 1)
      	{
 			Matrix1D<RFLOAT> current_direction;
