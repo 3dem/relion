@@ -292,15 +292,14 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 
 			while (true)
 			{
+				// Fetch 32 bits and unpack relevant 7 + 4 bits.
+				// This is faster than unpack 7 and 4 bits sequentially.
+				// If necessary, we can unroll this loop to unpack two chunks simultaneously.
 				long long first_byte = pos + (bit_pos >> 3);
-				unsigned char bit_offset_in_first_byte = bit_pos & 7; // 7 = 00000111
-				p = (buf[first_byte] >> bit_offset_in_first_byte) & 127; // 127 = 01111111
-				if (bit_offset_in_first_byte > 1)
-				{
-					unsigned char bits_in_second_byte = bit_offset_in_first_byte - 1;
-					p |= (buf[first_byte + 1] & ((1 << bits_in_second_byte) - 1)) << (8 - bit_offset_in_first_byte);
-				}
-//				printf("frame = %d n_pix = %d n_electron = %d bitpos=%d first_byte=%lld val(HL)=%x %x p=%d\n", iframe, n_pix, n_electron, bit_pos, first_byte, (int)buf[first_byte + 1], (int)buf[first_byte], (int)p);
+				const unsigned int bit_offset_in_first_byte = bit_pos & 7; // 7 = 00000111 (same as % 8)
+				const unsigned int chunk = (*(unsigned int*)(buf + first_byte)) >> bit_offset_in_first_byte;
+
+				p = (unsigned char)(chunk & 127); // 127 = 01111111
 
 				bit_pos += 7;
 				n_pix += p;
@@ -308,19 +307,10 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 
 				if (p != 127)
 				{
-					first_byte = pos + (bit_pos >> 3);
-					bit_offset_in_first_byte = bit_pos & 7;
-					s = (buf[first_byte] >> bit_offset_in_first_byte) & 15; // 15 = 00001111
-					if (bit_offset_in_first_byte > 4)
-					{
-						unsigned char bits_in_second_byte = bit_offset_in_first_byte - 4;
-						s |= (buf[first_byte + 1] & ((1 << bits_in_second_byte) - 1)) << (8 - bit_offset_in_first_byte);
-					}
-//					printf("s=%d\n", (int)s);
-
+					s = (unsigned char)((chunk >> 7) & 15) ^ 0x0A; // 15 = 00001111; See below for 0x0A
 					bit_pos += 4;
 					positions[n_electron] = n_pix;
-					symbols[n_electron] = s ^ 0x0A; // See below
+					symbols[n_electron] = s;
 					n_electron++;
 					n_pix++;
 				}
