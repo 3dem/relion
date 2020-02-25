@@ -30,7 +30,7 @@ class EERtoTIFF {
 		fn_movie = parser.getOption("--i", "Input EER file");
 		fn_out = parser.getOption("--o", "Output file name");
 		n_threads = textToInteger(parser.getOption("--j", "Number of threads", "1"));
-		max_frames = textToInteger(parser.getOption("--max_frames", "Target number of frames to average (rounded to movies; -1 means use all)", "-1"));
+		max_frames = textToInteger(parser.getOption("--max_frames", "Target number of (internal) frames to process (-1 means use all)", "-1"));
 		EER_grouping = textToInteger(parser.getOption("--eer_grouping", "EER grouping", "40"));
 		EER_upsample = textToInteger(parser.getOption("--eer_upsampling", "EER upsampling (1 or 2)", "2"));
 		if (EER_upsample != 1 && EER_upsample != 2)
@@ -68,7 +68,9 @@ class EERtoTIFF {
                 	REPORT_ERROR("Failed to open the output TIFF file.");
 
 		MultidimArray<T> buf;
-		for (int frame = 1; ; frame += EER_grouping)
+		if (max_frames < 0)
+			max_frames = nframes;
+		for (int frame = 1; frame < max_frames; frame += EER_grouping)
 		{
 			const int frame_end = frame + EER_grouping - 1;
 			if (frame_end > nframes)

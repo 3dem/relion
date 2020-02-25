@@ -25,6 +25,7 @@ class EERRenderer {
 
 	bool ready;
 	bool is_legacy;
+	bool is_7bit;
 	bool read_data;
 
 	std::vector<long long> frame_starts, frame_sizes;
@@ -34,7 +35,7 @@ class EERRenderer {
 	static const char EER_FOOTER_ERR[];
 	static const int EER_IMAGE_WIDTH, EER_IMAGE_HEIGHT, EER_IMAGE_PIXELS;
 	static const unsigned int EER_LEN_FOOTER;
-	static const uint16_t TIFF_COMPRESSION_EER;
+	static const uint16_t TIFF_COMPRESSION_EER8bit, TIFF_COMPRESSION_EER7bit;
 
 	int nframes;
 	long long file_size;

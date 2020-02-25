@@ -36,7 +36,8 @@ const int EERRenderer::EER_IMAGE_WIDTH = 4096;
 const int EERRenderer::EER_IMAGE_HEIGHT = 4096;
 const int EERRenderer::EER_IMAGE_PIXELS = EERRenderer::EER_IMAGE_WIDTH * EERRenderer::EER_IMAGE_HEIGHT;
 const unsigned int EERRenderer::EER_LEN_FOOTER = 24;
-const uint16_t EERRenderer::TIFF_COMPRESSION_EER = 65000;
+const uint16_t EERRenderer::TIFF_COMPRESSION_EER8bit = 65000;
+const uint16_t EERRenderer::TIFF_COMPRESSION_EER7bit = 65001;
 
 template <typename T>
 void EERRenderer::render8K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons)
@@ -92,6 +93,7 @@ void EERRenderer::read(FileName _fn_movie)
 	if (ftiff == NULL)
 	{
 		is_legacy = true;
+		is_7bit = false;
 		readLegacy(fh);
 	}
 	else
@@ -100,11 +102,23 @@ void EERRenderer::read(FileName _fn_movie)
 
 		// Check width & size
 		int width, height;
+		uint16_t compression = 0;
 		TIFFGetField(ftiff, TIFFTAG_IMAGEWIDTH, &width);
 		TIFFGetField(ftiff, TIFFTAG_IMAGELENGTH, &height);
+		TIFFGetField(ftiff, TIFFTAG_COMPRESSION, &compression);
+
 #ifdef DEBUG_EER
-		printf("EER in TIFF: %s size = %ld, width = %d, height = %d\n", fn_movie.c_str(), file_size, width, height);
+		printf("EER in TIFF: %s size = %ld, width = %d, height = %d, compression = %d\n", fn_movie.c_str(), file_size, width, height, compression);
 #endif
+
+		// TODO: How can we suppress "TIFFReadDirectory: Warning, Unknown field with tag 65001 (0xfde9) encountered"?
+		if (compression == EERRenderer::TIFF_COMPRESSION_EER8bit)
+			is_7bit = false;
+		else if (compression == EERRenderer::TIFF_COMPRESSION_EER7bit)
+			is_7bit = true;
+		else
+			REPORT_ERROR("Unknown compression scheme for EER");
+
 		if (width != EER_IMAGE_WIDTH || height != EER_IMAGE_HEIGHT)
 			REPORT_ERROR("Currently we support only 4096x4096 pixel EER movies.");
 
@@ -263,54 +277,98 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 	{
 		RCTIC(TIMING_UNPACK_RLE);
 		long long pos = frame_starts[iframe];
-		long long n_pix = 0, n_electron = 0;
-		const int max_electrons = (frame_sizes[iframe] * 8 + 11) / 12;
+		unsigned int n_pix = 0, n_electron = 0;
+		const int max_electrons = frame_sizes[iframe] * 2; // at 4 bits per electron (very permissive bound!)
 		if (positions.size() < max_electrons)
 		{
 			positions.resize(max_electrons);
 			symbols.resize(max_electrons);
 		}
 
-		// unpack every two symbols = 12 bit * 2 = 24 bit = 3 byte
-		//  |bbbbBBBB|BBBBaaaa|AAAAAAAA|
-		// With SIMD intrinsics at the SSSE3 level, we can unpack 10 symbols (120 bits) simultaneously.
-		unsigned char p1, p2, s1, s2;
-
-		// Because there is a footer, it is safe to go beyond the limit by two bytes.
-		long long pos_limit = frame_starts[iframe] + frame_sizes[iframe];
-		while (pos < pos_limit)
+		if (is_7bit)
 		{
-			// symbol is bit tricky. 0000YyXx; Y and X must be flipped.
-			p1 = buf[pos];
-			s1 = (buf[pos + 1] & 0x0F) ^ 0x0A; // 0x0F = 00001111, 0x0A = 00001010
+			unsigned int bit_pos = 0; // 4 K * 4 K * 11 bit << 2 ** 32
+			unsigned char p, s;
 
-			p2 = (buf[pos + 1] >> 4) | (buf[pos + 2] << 4);
-			s2 = (buf[pos + 2] >> 4) ^ 0x0A;
-
-			// Note the order. Add p before checking the size and placing a new electron.
-			n_pix += p1;
-			if (n_pix == EER_IMAGE_PIXELS) break;
-			if (p1 < 255)
+			while (true)
 			{
-				positions[n_electron] = n_pix;
-				symbols[n_electron] = s1;
-				n_electron++;
-				n_pix++;
-			}
+				long long first_byte = pos + (bit_pos >> 3);
+				unsigned char bit_offset_in_first_byte = bit_pos & 7; // 7 = 00000111
+				p = (buf[first_byte] >> bit_offset_in_first_byte) & 127; // 127 = 01111111
+				if (bit_offset_in_first_byte > 1)
+				{
+					unsigned char bits_in_second_byte = bit_offset_in_first_byte - 1;
+					p |= (buf[first_byte + 1] & ((1 << bits_in_second_byte) - 1)) << (8 - bit_offset_in_first_byte);
+				}
+//				printf("frame = %d n_pix = %d n_electron = %d bitpos=%d first_byte=%lld val(HL)=%x %x p=%d\n", iframe, n_pix, n_electron, bit_pos, first_byte, (int)buf[first_byte + 1], (int)buf[first_byte], (int)p);
 
-			n_pix += p2;
-			if (n_pix == EER_IMAGE_PIXELS) break;
-			if (p2 < 255)
-			{
-				positions[n_electron] = n_pix;
-				symbols[n_electron] = s2;
-				n_electron++;
-				n_pix++;
+				bit_pos += 7;
+				n_pix += p;
+				if (n_pix == EER_IMAGE_PIXELS) break;
+
+				if (p != 127)
+				{
+					first_byte = pos + (bit_pos >> 3);
+					bit_offset_in_first_byte = bit_pos & 7;
+					s = (buf[first_byte] >> bit_offset_in_first_byte) & 15; // 15 = 00001111
+					if (bit_offset_in_first_byte > 4)
+					{
+						unsigned char bits_in_second_byte = bit_offset_in_first_byte - 4;
+						s |= (buf[first_byte + 1] & ((1 << bits_in_second_byte) - 1)) << (8 - bit_offset_in_first_byte);
+					}
+//					printf("s=%d\n", (int)s);
+
+					bit_pos += 4;
+					positions[n_electron] = n_pix;
+					symbols[n_electron] = s ^ 0x0A; // See below
+					n_electron++;
+					n_pix++;
+				}
 			}
+		}
+		else
+		{
+			// unpack every two symbols = 12 bit * 2 = 24 bit = 3 byte
+			// high <- |bbbbBBBB|BBBBaaaa|AAAAAAAA| -> low
+			// With SIMD intrinsics at the SSSE3 level, we can unpack 10 symbols (120 bits) simultaneously.
+			unsigned char p1, p2, s1, s2;
+
+			const long long pos_limit = frame_starts[iframe] + frame_sizes[iframe];
+			// Because there is a footer, it is safe to go beyond the limit by two bytes.
+			while (pos < pos_limit)
+			{
+				// symbol is bit tricky. 0000YyXx; Y and X must be flipped.
+				p1 = buf[pos];
+				s1 = (buf[pos + 1] & 0x0F) ^ 0x0A; // 0x0F = 00001111, 0x0A = 00001010
+
+				p2 = (buf[pos + 1] >> 4) | (buf[pos + 2] << 4);
+				s2 = (buf[pos + 2] >> 4) ^ 0x0A;
+
+				// Note the order. Add p before checking the size and placing a new electron.
+				n_pix += p1;
+				if (n_pix == EER_IMAGE_PIXELS) break;
+				if (p1 < 255)
+				{
+					positions[n_electron] = n_pix;
+					symbols[n_electron] = s1;
+					n_electron++;
+					n_pix++;
+				}
+
+				n_pix += p2;
+				if (n_pix == EER_IMAGE_PIXELS) break;
+				if (p2 < 255)
+				{
+					positions[n_electron] = n_pix;
+					symbols[n_electron] = s2;
+					n_electron++;
+					n_pix++;
+				}
 #ifdef DEBUG_EER_DETAIL
-			printf("%d: %u %u, %u %u %d\n", pos, p1, s1, p2, s2, n_pix);
+				printf("%d: %u %u, %u %u %d\n", pos, p1, s1, p2, s2, n_pix);
 #endif
-			pos += 3;
+				pos += 3;
+			}
 		}
 
 		if (n_pix != EER_IMAGE_PIXELS)
