@@ -77,7 +77,6 @@ public:
 class Micrograph
 {
 public:
-
 	bool ready;
 	static const RFLOAT NOT_OBSERVED;
 	RFLOAT angpix, voltage, dose_per_frame, pre_exposure;
@@ -85,6 +84,8 @@ public:
 
 	int first_frame; // First frame for local motion model. 1-indexed.
 	MotionModel *model;
+
+	int eer_upsampling, eer_grouping;
 
 	// Local trajectories (not read from STAR files)
 	std::vector<RFLOAT> localShiftX, localShiftY, localFitX, localFitY, patchX, patchY, patchZ, patchW, patchH;
@@ -135,7 +136,6 @@ public:
 	void fillDefectAndHotpixels(MultidimArray<bool> &mask) const;
 
 private:
-
 	int width, height, n_frames;
 	RFLOAT binning;
 	FileName fnGain;

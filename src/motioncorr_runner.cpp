@@ -89,10 +89,8 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	first_frame_sum =  textToInteger(parser.getOption("--first_frame_sum", "First movie frame used in output sum (start at 1)", "1"));
 	if (first_frame_sum < 1) first_frame_sum = 1;
 	last_frame_sum =  textToInteger(parser.getOption("--last_frame_sum", "Last movie frame used in output sum (0 or negative: use all)", "-1"));
-	int my_eer_grouping = textToInteger(parser.getOption("--eer_grouping", "EER grouping", "-1"));
-	if (my_eer_grouping > 0)
-		EER_grouping = my_eer_grouping;
-	EER_upsample = textToInteger(parser.getOption("--eer_upsampling", "EER upsampling (1 or 2)", "2"));
+	eer_grouping = textToInteger(parser.getOption("--eer_grouping", "EER grouping", "-1"));
+	eer_upsampling = textToInteger(parser.getOption("--eer_upsampling", "EER upsampling (1 = 4K or 2 = 8K)", "2"));
 
 	int motioncor2_section = parser.addSection("MOTIONCOR2 options");
 	do_motioncor2 = parser.checkOption("--use_motioncor2", "Use Shawn Zheng's MOTIONCOR2.");
@@ -992,9 +990,11 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	}
 	else
 	{
-		renderer.read(fn_mic);
+		renderer.read(fn_mic, eer_upsampling);
 		nx = renderer.getWidth(); ny = renderer.getHeight();
-		nn = renderer.getNFrames() / EER_grouping; // remaining frames are truncated
+		nn = renderer.getNFrames() / eer_grouping; // remaining frames are truncated
+		mic.eer_upsampling = eer_upsampling;
+		mic.eer_grouping = eer_grouping;
 	}
 
 	// Which frame to use?
@@ -1075,7 +1075,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 		if (!isEER)
 			Iframes[iframe].read(fn_mic, true, frames[iframe], false, true); // mmap false, is_2D true
 		else
-			renderer.renderFrames(frames[iframe] * EER_grouping + 1, (frames[iframe] + 1) * EER_grouping, Iframes[iframe]());
+			renderer.renderFrames(frames[iframe] * eer_grouping + 1, (frames[iframe] + 1) * eer_grouping, Iframes[iframe]());
 	}
 	RCTOC(TIMING_READ_MOVIE);
 

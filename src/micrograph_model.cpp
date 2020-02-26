@@ -205,6 +205,12 @@ void Micrograph::write(FileName filename)
 		MD.setValue(EMDL_CTF_VOLTAGE, voltage);
         }
 	MD.setValue(EMDL_MICROGRAPH_START_FRAME, first_frame); // 1-indexed
+	if (eer_upsampling > 0) {
+		MD.setValue(EMDL_MICROGRAPH_EER_UPSAMPLING, eer_upsampling);
+	}
+	if (eer_grouping > 0) {
+		MD.setValue(EMDL_MICROGRAPH_EER_GROUPING, eer_grouping);
+	}
 
 	if (model != NULL) {
 		MD.setValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model->getModelVersion());
@@ -427,6 +433,13 @@ void Micrograph::read(FileName fn_in, bool read_hotpixels)
 	if (!MDglobal.getValue(EMDL_MICROGRAPH_START_FRAME, first_frame)) {
 		first_frame = 1; // 1-indexed
 	}
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_EER_UPSAMPLING, eer_upsampling)) {
+		eer_upsampling = -1;
+	}
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_EER_GROUPING, eer_grouping)) {
+		eer_grouping = -1;
+	}
+	
 
 	int model_version;
 	model = NULL;
@@ -489,7 +502,7 @@ void Micrograph::setMovie(FileName fnMovie, FileName fnGain, RFLOAT binning)
 		renderer.read(fnMovie);
 		width = renderer.getWidth();
 		height = renderer.getHeight();
-		n_frames = renderer.getNFrames() / EER_grouping;
+		n_frames = renderer.getNFrames() / eer_grouping;
 	}
 	else
 	{

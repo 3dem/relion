@@ -34,7 +34,9 @@ MicrographHandler::MicrographHandler()
 	  saveMem(false),
 	  ready(false),
 	  last_gainFn(""),
-	  corrMicFn("")
+	  corrMicFn(""),
+	  eer_upsampling(-1),
+	  eer_grouping(-1)
 {}
 
 void MicrographHandler::init(
@@ -490,11 +492,16 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 		}
 		else
 		{
+			if (eer_upsampling < 0)
+				eer_upsampling = micrograph.eer_upsampling;
+			if (eer_grouping < 0)
+				eer_grouping = eer_grouping;
+
 			EERRenderer renderer;
-			renderer.read(mgFn);
+			renderer.read(mgFn, eer_upsampling);
 
 			// lastFrame and firstFrame is 0 indexed
-			int my_lastFrame = (lastFrame < 0) ? (renderer.getNFrames() / EER_grouping - 1) : lastFrame;
+			int my_lastFrame = (lastFrame < 0) ? (renderer.getNFrames() / eer_grouping - 1) : lastFrame;
 			int n_frames = my_lastFrame - firstFrame + 1;
 
 			std::vector<MultidimArray<float> > Iframes(n_frames);
@@ -503,8 +510,8 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 			for (int iframe = 0; iframe < n_frames; iframe++)
 			{
 				// this takes 1-indexed frame numbers
-//				std::cout << "EER: iframe = " << iframe << " start = " << ((firstFrame + iframe) * EER_grouping + 1) << " end = " << ((firstFrame + iframe + 1) * EER_grouping) << std::endl;
-				renderer.renderFrames((firstFrame + iframe) * EER_grouping + 1, (firstFrame + iframe + 1) * EER_grouping, Iframes[iframe]);
+//				std::cout << "EER: iframe = " << iframe << " start = " << ((firstFrame + iframe) * eer_grouping + 1) << " end = " << ((firstFrame + iframe + 1) * eer_grouping) << std::endl;
+				renderer.renderFrames((firstFrame + iframe) * eer_grouping + 1, (firstFrame + iframe + 1) * eer_grouping, Iframes[iframe]);
 
 				if (mgHasGain)
 				{
@@ -516,7 +523,7 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 
 			}
 
-			if (hasDefect) // TODO: TAKANORI: code duplication from RelionCor
+			if (hasDefect) // TODO: TAKANORI: Refactor!! Code duplication from RelionCor
 			{
 				if (XSIZE(defectMask) != XSIZE(Iframes[0]) || YSIZE(defectMask) != YSIZE(Iframes[0]))
 				{
@@ -722,6 +729,7 @@ std::string MicrographHandler::getMetaName(std::string micName, bool die_on_erro
 	}
 }
 
+// TODO: TAKANORI: This needs to handle changes in EER grouping
 int MicrographHandler::determineFrameCount(const MetaDataTable &mdt)
 {
 	int fc = 0;

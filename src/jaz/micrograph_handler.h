@@ -38,6 +38,7 @@ class MicrographHandler
 
 	int nr_omp_threads, firstFrame, lastFrame;
 	double movie_angpix, coords_angpix, hotCutoff;
+	int eer_upsampling, eer_grouping;
 
 	bool debug, saveMem, ready;
 

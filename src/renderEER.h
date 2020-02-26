@@ -37,6 +37,7 @@ class EERRenderer {
 	static const unsigned int EER_LEN_FOOTER;
 	static const uint16_t TIFF_COMPRESSION_EER8bit, TIFF_COMPRESSION_EER7bit;
 
+	int eer_upsampling;
 	int nframes;
 	long long file_size;
 	void readLegacy(FILE *fh);
@@ -64,7 +65,7 @@ class EERRenderer {
 		REPORT_ERROR("Copy assignment operator for EERRenderer not implemented yet.");
 	}
 
-	void read(FileName _fn_movie);
+	void read(FileName _fn_movie, int eer_upsampling=2);
 
 	int getNFrames();
 	int getWidth();
@@ -77,13 +78,15 @@ class EERRenderer {
 	template <typename T>
 	long long renderFrames(int frame_start, int frame_end, MultidimArray<T> &image);
 
+	// The gain reference for EER is not multiplicative! So the inverse is taken here.
+	// 0 means defect.
 	template <typename T>
-	static void upsampleEERGain(MultidimArray<T> &gain)
+	static void upsampleEERGain(MultidimArray<T> &gain, int eer_upsampling=2)
 	{
-		const long long size = EER_IMAGE_WIDTH * EER_upsample;
+		const long long size = EER_IMAGE_WIDTH * eer_upsampling;
 		RFLOAT sum = 0;
 
-		if (EER_upsample == 2 && XSIZE(gain) == EER_IMAGE_WIDTH && YSIZE(gain) == EER_IMAGE_HEIGHT) // gain = 4K and grid = 8K
+		if (eer_upsampling == 2 && XSIZE(gain) == EER_IMAGE_WIDTH && YSIZE(gain) == EER_IMAGE_HEIGHT) // gain = 4K and grid = 8K
 		{
 			MultidimArray<T> original = gain;
 
@@ -94,15 +97,14 @@ class EERRenderer {
 				sum += DIRECT_A2D_ELEM(gain, i, j);
 			}
 		}
-		else if ((EER_upsample == 1 && XSIZE(gain) == EER_IMAGE_WIDTH && YSIZE(gain) == EER_IMAGE_HEIGHT) || // gain = 4K and grid = 4K
-		         (EER_upsample == 2 && XSIZE(gain) == EER_IMAGE_WIDTH * 2 && YSIZE(gain) == EER_IMAGE_HEIGHT * 2)) // gain = 8K and grid = 8K
+		else if ((eer_upsampling == 1 && XSIZE(gain) == EER_IMAGE_WIDTH && YSIZE(gain) == EER_IMAGE_HEIGHT) || // gain = 4K and grid = 4K
+		         (eer_upsampling == 2 && XSIZE(gain) == EER_IMAGE_WIDTH * 2 && YSIZE(gain) == EER_IMAGE_HEIGHT * 2)) // gain = 8K and grid = 8K
 		{
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(gain)
 			{
 				sum += DIRECT_MULTIDIM_ELEM(gain, n);
 			}
-		}	
-	
+		}
 		else
 		{
 			std::cerr << "Size of input gain: X = " << XSIZE(gain) << " Y = " << YSIZE(gain) << " Expected: X = " << (EER_IMAGE_WIDTH * 2) << " Y = " << (EER_IMAGE_HEIGHT * 2) << std::endl;

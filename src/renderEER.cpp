@@ -27,9 +27,6 @@
 	#define RCTOC(label)
 #endif
 
-int EER_grouping = 40;
-int EER_upsample = 2;
-
 const char EERRenderer::EER_FOOTER_OK[]  = "ThermoFisherECComprOK000";
 const char EERRenderer::EER_FOOTER_ERR[] = "ThermoFisherECComprERR00";
 const int EERRenderer::EER_IMAGE_WIDTH = 4096;
@@ -66,12 +63,18 @@ EERRenderer::EERRenderer()
 	ready = false;
 	read_data = false;
 	buf = NULL;
+	eer_upsampling = 2;
 }
 
-void EERRenderer::read(FileName _fn_movie)
+void EERRenderer::read(FileName _fn_movie, int eer_upsampling)
 {
 	if (ready)
 		REPORT_ERROR("Logic error: you cannot recycle EERRenderer for multiple files (now)");
+
+	if (eer_upsampling == 1 || eer_upsampling == 2)
+		this->eer_upsampling = eer_upsampling;
+	else
+		REPORT_ERROR("EERRenderer::read: eer_upsampling must be 1 or 2");
 
 #ifndef HAVE_TIFF
 	REPORT_ERROR("To use EER, you have to re-compile RELION with libtiff.");
@@ -237,7 +240,7 @@ int EERRenderer::getWidth()
 	if (!ready)
 		REPORT_ERROR("EERRenderer::getNFrames called before ready.");
 
-	return EER_IMAGE_WIDTH * EER_upsample;
+	return EER_IMAGE_WIDTH * eer_upsampling;
 }
 
 int EERRenderer::getHeight()
@@ -245,7 +248,7 @@ int EERRenderer::getHeight()
 	if (!ready)
 		REPORT_ERROR("EERRenderer::getNFrames called before ready.");
 
-	return EER_IMAGE_HEIGHT * EER_upsample;
+	return EER_IMAGE_HEIGHT * eer_upsampling;
 }
 
 template <typename T>
@@ -379,9 +382,9 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 		RCTOC(TIMING_UNPACK_RLE);
 
 		RCTIC(TIMING_RENDER_ELECTRONS);
-		if (EER_upsample == 2)
+		if (eer_upsampling == 2)
 			render8K(image, positions, symbols, n_electron);
-		else if (EER_upsample == 1)
+		else if (eer_upsampling == 1)
 			render4K(image, positions, symbols, n_electron);
 		else
 			REPORT_ERROR("Invalid EER upsamle");
