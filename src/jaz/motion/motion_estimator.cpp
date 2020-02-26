@@ -431,15 +431,15 @@ void MotionEstimator::prepMicrograph(
 		else
 		{
 			std::vector<std::vector<gravis::d2Vector>> initialTracks(pc, globTrack);
-			globOffsets = MotionHelper::getGlobalOffsets(
-					movieCC, initialTracks, cc_pad, 0.25*s[ogmg], globOffMax, globOffMax, nr_omp_threads);
+			globOffsets = MotionHelper::getGlobalOffsets(movieCC, initialTracks, cc_pad, 0.25 * s[ogmg],
+			                                             globOffMax, globOffMax, nr_omp_threads);
 		}
 
 		if (diag)
-        {
-            ImageLog::write(ccSum,
-                MotionRefiner::getOutputFileNameRoot(outPath, mdt) + "_CCsum", CenterXY);
-        }
+		{
+        		ImageLog::write(ccSum,
+			                MotionRefiner::getOutputFileNameRoot(outPath, mdt) + "_CCsum", CenterXY);
+		}
 
 		myInitialTracks.resize(pc);
 

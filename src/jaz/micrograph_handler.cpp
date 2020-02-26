@@ -520,7 +520,6 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 						DIRECT_MULTIDIM_ELEM(Iframes[iframe], n) *= DIRECT_MULTIDIM_ELEM(lastGainRef(), n);
 					}
 				}
-
 			}
 
 			if (hasDefect) // TODO: TAKANORI: Refactor!! Code duplication from RelionCor

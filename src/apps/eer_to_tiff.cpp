@@ -58,7 +58,7 @@ class EERtoTIFF {
 		REPORT_ERROR("To use this program, you have to re-compile RELION with libtiff.");
 #else
 		EERRenderer renderer;
-		renderer.read(fn_movie);
+		renderer.read(fn_movie, eer_upsampling);
 
 		int nframes = renderer.getNFrames();
 		std::cout << "Found " << nframes << " frames" << std::endl;
