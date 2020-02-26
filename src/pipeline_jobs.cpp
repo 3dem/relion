@@ -3541,9 +3541,9 @@ Note that this will only be the value for the first few iteration(s): the sampli
 	joboptions["auto_local_sampling"] = JobOption("Local searches from auto-sampling:", job_sampling_options, 4, "In the automated procedure to \
 increase the angular samplings, local angular searches of -6/+6 times the sampling rate will be used from this angular sampling rate onwards. For most \
 lower-symmetric particles a value of 1.8 degrees will be sufficient. Perhaps icosahedral symmetries may benefit from a smaller value such as 0.9 degrees.");
-	joboptions["auto_faster"] = JobOption("Converge faster?", false, "If set to Yes, then let auto-refinement converge faster. Two command-line options will be added to the refine program: \n \
---auto_ignore_angles lets angular sampling go down despite changes still happening in the angles \n \
---auto_resol_angles lets angular sampling go down if the current resolution already requires that sampling at the edge of the particle. \n \
+	joboptions["auto_faster"] = JobOption("Use finer angular sampling faster?", false, "If set to Yes, then let auto-refinement proceed faster with finer angular samplings. Two additional command-line options will be passed to the refine program: \n \n \
+--auto_ignore_angles lets angular sampling go down despite changes still happening in the angles \n \n \
+--auto_resol_angles lets angular sampling go down if the current resolution already requires that sampling at the edge of the particle.  \n\n \
 This option will make the computation faster, but hasn't been tested for many cases for potential loss in reconstruction quality upon convergence.");
 
 	joboptions["do_helix"] = JobOption("Do helical reconstruction?", false, "If set to Yes, then perform 3D helical reconstruction.");
