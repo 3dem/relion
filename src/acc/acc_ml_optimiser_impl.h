@@ -619,7 +619,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 															 current_size_y,
 															 current_size_z);
 		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
-		CTIC(cudaMLO->timer,"normalizeAndTransform");
+		CTOC(cudaMLO->timer,"normalizeAndTransform");
 
 		// ------------------------------------------------------------------------------------------
 
@@ -731,7 +731,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 					REPORT_ERROR("3D CTF volume must be either cubical or adhere to FFTW format!");
 				}
 
-				CTIC(accMLO->timer,"CTFSet3D_array");
+				CTOC(accMLO->timer,"CTFSet3D_array");
 			}
 			else
 			{
@@ -748,7 +748,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 
 				ctf.getFftwImage(Fctf, baseMLO->image_full_size[optics_group], baseMLO->image_full_size[optics_group], my_pixel_size,
 						baseMLO->ctf_phase_flipped, baseMLO->only_flip_phases, baseMLO->intact_ctf_first_peak, true, baseMLO->do_ctf_padding);
-				CTIC(accMLO->timer,"CTFRead2D");
+				CTOC(accMLO->timer,"CTFRead2D");
 			}
 		}
 		else
