@@ -1563,10 +1563,11 @@ void JobWindow::initialiseAutorefineWindow()
 	place("offset_range", TOGGLE_DEACTIVATE);
 	place("offset_step", TOGGLE_DEACTIVATE);
 
-	// Add a little spacer
 	current_y += STEPY/2;
-
 	place("auto_local_sampling", TOGGLE_DEACTIVATE);
+
+	current_y += STEPY/2;
+	place("auto_faster");
 
 	tab5->end();
 	tab6->begin();

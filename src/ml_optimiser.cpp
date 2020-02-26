@@ -183,6 +183,9 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	if (fnt != "OLD")
 		mymodel.tau2_fudge_factor = textToFloat(fnt);
 
+	auto_ignore_angle_changes = parser.checkOption("--auto_ignore_angles", "In auto-refinement, update angular sampling regardless of changes in orientations for convergence. This makes convergence faster.");
+	auto_resolution_based_angles= parser.checkOption("--auto_resol_angles", "In auto-refinement, update angular sampling based on resolution-based required sampling. This makes convergence faster.");
+
 	// Solvent flattening
 	if (parser.checkOption("--flatten_solvent", "Switch on masking on the references?", "OLD"))
 		do_solvent = true;
@@ -711,6 +714,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	failsafe_threshold = textToInteger(parser.getOption("--failsafe_threshold", "Maximum number of particles permitted to be handled by fail-safe mode, due to zero sum of weights, before exiting with an error (GPU only).", "40"));
 	do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
 	nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
+	auto_ignore_angle_changes = parser.checkOption("--auto_ignore_angles", "In auto-refinement, update angular sampling regardless of changes in orientations for convergence. This makes convergence faster.");
+	auto_resolution_based_angles= parser.checkOption("--auto_resol_angles", "In auto-refinement, update angular sampling based on resolution-based required sampling. This makes convergence faster.");
 	///////////////// Special stuff for first iteration (only accessible via CL, not through readSTAR ////////////////////
 
 	// When reading from the CL: always start at iteration 1 and subset 1
@@ -8639,14 +8644,21 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 		// AND the hidden variables have not changed during the last 2 iterations
 		RFLOAT old_rottilt_step = sampling.getAngularSampling(adaptive_oversampling);
 
-		// Takanori: TODO: Turbo mode
-		// If the angular accuracy and the necessary angular step for the current resolution is finer
-		// than the curent angular step, make it finer.
+		// If the angular accuracy and the necessary angular step for the current resolution is finer than the current angular step, make it finer.
 		// But don't go to local search until it stabilises or look at change in angles?
+		int nr_ang_steps = CEIL(PI * particle_diameter * mymodel.current_resolution);
+		RFLOAT myresol_angstep = 360. / nr_ang_steps;
+		// But don't go down to local searches too early, i.e. at last exhaustive sampling first stabilise resolution
+		bool do_proceed_resolution = (auto_resolution_based_angles &&
+									  myresol_angstep < old_rottilt_step &&
+						 		      sampling.healpix_order + 1 != autosampling_hporder_local_searches);
+		do_proceed_resolution = (do_proceed_resolution || (nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN));
+
+		const bool do_proceed_hidden_variables = (auto_ignore_angle_changes || (nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES));
 
 		// Only use a finer angular sampling if the angular accuracy is still above 75% of the estimated accuracy
 		// If it is already below, nothing will change and eventually nr_iter_wo_resol_gain or nr_iter_wo_large_hidden_variable_changes will go above MAX_NR_ITER_WO_RESOL_GAIN
-		if (nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN && nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES)
+		if (do_proceed_resolution && do_proceed_hidden_variables )
 		{
 
 			bool all_bodies_are_done = false;
@@ -8870,7 +8882,9 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 void MlOptimiser::checkConvergence(bool myverb)
 {
 
-	if ( has_fine_enough_angular_sampling && nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN && nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES )
+	if ( has_fine_enough_angular_sampling &&
+		 nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN &&
+		 (auto_ignore_angle_changes || nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES) )
 	{
 		has_converged = true;
 		do_join_random_halves = true;

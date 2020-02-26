@@ -3541,6 +3541,10 @@ Note that this will only be the value for the first few iteration(s): the sampli
 	joboptions["auto_local_sampling"] = JobOption("Local searches from auto-sampling:", job_sampling_options, 4, "In the automated procedure to \
 increase the angular samplings, local angular searches of -6/+6 times the sampling rate will be used from this angular sampling rate onwards. For most \
 lower-symmetric particles a value of 1.8 degrees will be sufficient. Perhaps icosahedral symmetries may benefit from a smaller value such as 0.9 degrees.");
+	joboptions["auto_faster"] = JobOption("Converge faster?", false, "If set to Yes, then let auto-refinement converge faster. Two command-line options will be added to the refine program: \n \
+--auto_ignore_angles lets angular sampling go down despite changes still happening in the angles \n \
+--auto_resol_angles lets angular sampling go down if the current resolution already requires that sampling at the edge of the particle. \n \
+This option will make the computation faster, but hasn't been tested for many cases for potential loss in reconstruction quality upon convergence.");
 
 	joboptions["do_helix"] = JobOption("Do helical reconstruction?", false, "If set to Yes, then perform 3D helical reconstruction.");
 	joboptions["helical_tube_inner_diameter"] = JobOption("Tube diameter - inner (A):", std::string("-1"),"Inner and outer diameter (in Angstroms) of the reconstructed helix spanning across Z axis. \
@@ -3711,6 +3715,10 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 		command += " --pad 2 ";
 	if (joboptions["skip_gridding"].getBoolean())
 		command += " --skip_gridding ";
+	if (joboptions["auto_faster"].getBoolean())
+	{
+		command += " --auto_ignore_angles --auto_resol_angles";
+	}
 
 	// CTF stuff
 	if (!is_continue)
