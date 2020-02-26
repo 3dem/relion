@@ -1461,8 +1461,6 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 
 		// Prevent divisions by zero: set Fweight to at least 1/1000th of the radially averaged weight at that resolution
 		// beyond r_max, set Fweight to at least 1/1000th of the radially averaged weight at r_max;
-//		std::cerr << " max_r2 = " << max_r2 << " r_max = " << r_max << " padding_factor = " << padding_factor
-//	                  << " ROUND(sqrt(max_r2)) = " << ROUND(sqrt(max_r2)) << " ROUND(r_max * padding_factor) = " << ROUND(r_max * padding_factor) << std::endl;
 		MultidimArray<RFLOAT> radavg_weight(r_max), counter(r_max);
 		const int round_max_r2 = ROUND(r_max * padding_factor * r_max * padding_factor);
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fweight)
@@ -1488,7 +1486,6 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 		// Calculate 1/1000th of radial averaged weight
 		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(radavg_weight)
 		{
-//			std::cerr << " i = " << i << " radavg_weight = " << DIRECT_A1D_ELEM(radavg_weight, i) << " counter =" << DIRECT_A1D_ELEM(counter, i) << std::endl;
 			if (DIRECT_A1D_ELEM(counter, i) > 0. || DIRECT_A1D_ELEM(radavg_weight, i) > 0.)
 			{
 				DIRECT_A1D_ELEM(radavg_weight, i) /= 1000.* DIRECT_A1D_ELEM(counter, i);
