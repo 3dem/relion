@@ -1863,6 +1863,7 @@ int pickerViewerCanvas::handle(int ev)
 	const bool with_shift = (Fl::event_shift() != 0);
 	const bool with_control = (Fl::event_ctrl() != 0);
 	const bool with_s = (Fl::get_key(115) != 0);
+	const bool with_q = (Fl::get_key(113) != 0);
 	if (ev==FL_PUSH || (ev==FL_DRAG && (button == FL_MIDDLE_MOUSE || (button == FL_LEFT_MOUSE && with_shift))))
 	{
 		RFLOAT scale = boxes[0]->scale;
@@ -1950,7 +1951,7 @@ int pickerViewerCanvas::handle(int ev)
 				{ "Clear coordinates" },
 				{ "Set selection type" },
 				{ "Help" },
-				{ "Quit" },
+				{ "Quit (CTRL-q)" },
 				{ 0 }
 			};
 			const Fl_Menu_Item *m = rclick_menu->popup(Fl::event_x(), Fl::event_y(), 0, 0, 0);
@@ -1970,7 +1971,7 @@ int pickerViewerCanvas::handle(int ev)
 				setSelectionType();
 			else if ( strcmp(m->label(), "Help") == 0 )
 				printHelp();
-			else if ( strcmp(m->label(), "Quit") == 0 )
+			else if ( strcmp(m->label(), "Quit (CTRL-q)") == 0 )
 				exit(0);
 			redraw();
 			return 1; // (tells caller we handled this event)
@@ -1988,6 +1989,13 @@ int pickerViewerCanvas::handle(int ev)
 	{
 		saveCoordinates(false);
 		sleep(1); // to prevent multiple saves... dirtybut don't know how to do this otherwise...
+		return 1; // (tells caller we handled this event)
+	}
+	// CTRL-s will save the coordinates in a picker window
+	else if (with_control && with_q)
+	{
+		sleep(1);
+		exit(0);
 		return 1; // (tells caller we handled this event)
 	}
 	return 0;
