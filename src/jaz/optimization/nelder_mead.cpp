@@ -119,6 +119,9 @@ std::vector<double> NelderMead::optimize(
         }
         if (allInside)
         {
+            if (verbose) std::cout << "Exiting because allInside" << std::endl;
+
+            opt.deallocateTempStorage(tempStorage);
             return simplex[0];
         }
 
@@ -189,6 +192,7 @@ std::vector<double> NelderMead::optimize(
         }
     }
 
+    if (verbose) std::cout << "Exiting after reaching maxIter" << std::endl;
     opt.deallocateTempStorage(tempStorage);
 
     std::vector<int> order = IndexSort<double>::sortIndices(values);
