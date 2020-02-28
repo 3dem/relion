@@ -2243,8 +2243,6 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			Mavg += img();
 
 			// Calculate the power spectrum of this particle
-			CenterFFT(img(), true);
-
 			MultidimArray<RFLOAT> ind_spectrum, count;
 			int spectral_size = (mymodel.ori_size / 2) + 1;
 			ind_spectrum.initZeros(spectral_size);
@@ -2301,6 +2299,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				//A = mydata.obsModel.applyScaleDifference(A, optics_group, mymodel.ori_size, mymodel.pixel_size);
 				// Construct initial references from random subsets
 				windowFourierTransform(Faux, Fimg, wsum_model.current_size);
+				CenterFFTbySign(Fimg);
 				Fctf.resize(Fimg);
 				Fctf.initConstant(1.);
 
@@ -5317,9 +5316,9 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		// Always store FT of image without mask (to be used for the reconstruction)
 		MultidimArray<RFLOAT> img_aux;
 		img_aux = (has_converged && do_use_reconstruct_images) ? rec_img() : img();
-		CenterFFT(img_aux, true);
 		transformer.FourierTransform(img_aux, Faux);
 		windowFourierTransform(Faux, Fimg, image_current_size[optics_group]);
+		CenterFFTbySign(Fimg);
 
 		// Here apply the aberration corrections if necessary
 		mydata.obsModel.demodulatePhase(optics_group, Fimg);
@@ -5402,9 +5401,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 //		exit(0);
 #endif
 
-		// Inside Projector and Backprojector the origin of the Fourier Transform is centered!
-		CenterFFT(img(), true);
-
 		// Store the Fourier Transform of the image Fimg
 		transformer.FourierTransform(img(), Faux);
 
@@ -5441,6 +5437,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		// We never need any resolutions higher than current_size
 		// So resize the Fourier transforms
 		windowFourierTransform(Faux, Fimg, image_current_size[optics_group]);
+		// Inside Projector and Backprojector the origin of the Fourier Transform is centered!
+		CenterFFTbySign(Fimg);
 
 		// Also perform aberration correction on the masked image (which will be used for alignment)
 		mydata.obsModel.demodulatePhase(optics_group, Fimg);
@@ -5688,9 +5686,9 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 			}
 
 			// For the masked one, have to mask outside the circular mask to prevent negative values outside the mask in the subtracted image!
+			CenterFFTbySign(Fsum_obody);
 			windowFourierTransform(Fsum_obody, Faux, image_full_size[optics_group]);
 			transformer.inverseFourierTransform(Faux, img());
-			CenterFFT(img(), false);
 
 #ifdef DEBUG_BODIES
 			if (part_id == ROUND(debug1))
@@ -5713,9 +5711,9 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 			}
 #endif
 			// And back to Fourier space now
-			CenterFFT(img(), true);
 			transformer.FourierTransform(img(), Faux);
 			windowFourierTransform(Faux, Fsum_obody, image_current_size[optics_group]);
+			CenterFFTbySign(Fsum_obody);
 
 			// Subtract the other-body FT from the masked exp_Fimgs
 			exp_Fimg[img_id] -= Fsum_obody;

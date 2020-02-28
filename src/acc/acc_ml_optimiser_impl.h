@@ -861,16 +861,16 @@ void getFourierTransformsAndCtfs(long int part_id,
 				op.Fimg_nomask.at(img_id) -= Fsum_obody;
 
 			// For the masked one, have to mask outside the circular mask to prevent negative values outside the mask in the subtracted image!
+			CenterFFTbySign(Fsum_obody);
 			windowFourierTransform(Fsum_obody, Faux, baseMLO->image_full_size[optics_group]);
 			accMLO->transformer.inverseFourierTransform(Faux, img());
-			CenterFFT(img(), false);
 
 			softMaskOutsideMap(img(), my_mask_radius, (RFLOAT)baseMLO->width_mask_edge);
 
 			// And back to Fourier space now
-			CenterFFT(img(), true);
 			accMLO->transformer.FourierTransform(img(), Faux);
 			windowFourierTransform(Faux, Fsum_obody, baseMLO->image_current_size[optics_group]);
+			CenterFFTbySign(Fsum_obody);
 
 			// Subtract the other-body FT from the masked exp_Fimgs
 			op.Fimg.at(img_id) -= Fsum_obody;
