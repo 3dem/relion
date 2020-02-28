@@ -313,7 +313,7 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 	bool have_read = false;
 
 	// For backwards compatibility
-	if (exists(myfilename + "run.job"))
+	if (!exists(myfilename + "job.star") && exists(myfilename + "run.job"))
 	{
 		std::ifstream fh;
 		fh.open((myfilename+"run.job").c_str(), std::ios_base::in);
@@ -2549,6 +2549,7 @@ If auto-sampling is used, this will be the value for the first iteration(s) only
 Translational sampling is also done using the adaptive approach. \
 Therefore, if adaptive=1, the translations will first be evaluated on a 2x coarser grid.\n\n \
 If auto-sampling is used, this will be the value for the first iteration(s) only, and the sampling rate will be increased automatically after that.");
+	joboptions["allow_coarser"] = JobOption("Allow coarser sampling?", false, "If set to Yes, the program will use coarser angular and translational samplings if the estimated accuracies of the assignments is still low in the earlier iterations. This may speed up the calculations.");
 
 	joboptions["do_helix"] = JobOption("Classify 2D helical segments?", false, "Set to Yes if you want to classify 2D helical segments. Note that the helical segments should come with priors of psi angles");
 	joboptions["helical_tube_outer_diameter"] = JobOption("Tube diameter (A): ", 200, 100, 1000, 10, "Outer diameter (in Angstroms) of helical tubes. \
@@ -2706,6 +2707,11 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 		// The sampling given in the GUI will be the oversampled one!
 		command += " --offset_step " + floatToString(joboptions["offset_step"].getNumber(error_message) * pow(2., iover));
 		if (error_message != "") return false;
+
+		if (joboptions["allow_coarser"].getBoolean())
+		{
+			command += " --allow_coarser_sampling";
+		}
 
 	}
 
@@ -3101,6 +3107,7 @@ with a stddev of 1/3 of the range given below will be enforced.");
 within +/- the given amount (in degrees) from the optimal orientation in the previous iteration. \
 A Gaussian prior (also see previous option) will be applied, so that orientations closer to the optimal orientation \
 in the previous iteration will get higher weights than those further away.");
+	joboptions["allow_coarser"] = JobOption("Allow coarser sampling?", false, "If set to Yes, the program will use coarser angular and translational samplings if the estimated accuracies of the assignments is still low in the earlier iterations. This may speed up the calculations.");
 
 	joboptions["do_helix"] = JobOption("Do helical reconstruction?", false, "If set to Yes, then perform 3D helical reconstruction.");
 	joboptions["helical_tube_inner_diameter"] = JobOption("Tube diameter - inner (A):", std::string("-1"),"Inner and outer diameter (in Angstroms) of the reconstructed helix spanning across Z axis. \
@@ -3350,6 +3357,11 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 		// The sampling given in the GUI will be the oversampled one!
 		command += " --offset_step " +  floatToString(joboptions["offset_step"].getNumber(error_message) * pow(2., iover));
 		if (error_message != "") return false;
+
+		if (joboptions["allow_coarser"].getBoolean())
+		{
+			command += " --allow_coarser_sampling";
+		}
 
 	}
 

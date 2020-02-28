@@ -878,8 +878,10 @@ void MlOptimiserMpi::expectation()
 		timer.tic(TIMING_EXP_3);
 #endif
 	// D. Update the angular sampling (all nodes except master)
-	if (!node->isMaster() && (do_auto_refine || do_sgd) && iter > 1)
+	if (!node->isMaster() && ( (do_auto_refine || do_sgd) && iter > 1) || (mymodel.nr_classes > 1 && allow_coarser_samplings) )
+	{
 		updateAngularSampling(node->rank == 1);
+	}
 
 	// The master needs to know about the updated parameters from updateAngularSampling
 	node->relion_MPI_Bcast(&has_fine_enough_angular_sampling, 1, MPI_INT, first_slave, MPI_COMM_WORLD);
@@ -2076,10 +2078,7 @@ void MlOptimiserMpi::maximization()
 								wsum_model.pdf_class[iclass],
 								minres_map,
 								false
-#ifdef TIMING
-							        ,&timer
-#endif
-							        );
+							);
 						}
 						if (do_sgd)
 						{

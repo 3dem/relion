@@ -877,9 +877,9 @@ void *BasisOptimisation::allocateTempStorage() const
 	return new Image<RFLOAT>(w,h);
 }
 
-void BasisOptimisation::deallocateTempStorage(void *ts)
-{
-	delete (Image<RFLOAT>*)ts;
+void BasisOptimisation::deallocateTempStorage(void *ts) const
+{	
+	delete static_cast<Image<RFLOAT>*>(ts);
 }
 
 AnisoBasisOptimisation::AnisoBasisOptimisation(
@@ -933,7 +933,7 @@ void* AnisoBasisOptimisation::allocateTempStorage() const
 	return new Image<RFLOAT>(w,h);
 }
 
-void AnisoBasisOptimisation::deallocateTempStorage(void *ts)
+void AnisoBasisOptimisation::deallocateTempStorage(void *ts) const
 {
-	delete (Image<RFLOAT>*)ts;
+	delete static_cast<Image<RFLOAT>*>(ts);
 }

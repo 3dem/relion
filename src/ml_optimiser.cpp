@@ -185,6 +185,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 
 	auto_ignore_angle_changes = parser.checkOption("--auto_ignore_angles", "In auto-refinement, update angular sampling regardless of changes in orientations for convergence. This makes convergence faster.");
 	auto_resolution_based_angles= parser.checkOption("--auto_resol_angles", "In auto-refinement, update angular sampling based on resolution-based required sampling. This makes convergence faster.");
+	allow_coarser_samplings = parser.checkOption("--allow_coarser_sampling", "In 2D/3D classification, allow coarser angular and translational samplings if accuracies are bad (typically in earlier iterations.");
 
 	// Solvent flattening
 	if (parser.checkOption("--flatten_solvent", "Switch on masking on the references?", "OLD"))
@@ -716,6 +717,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
 	auto_ignore_angle_changes = parser.checkOption("--auto_ignore_angles", "In auto-refinement, update angular sampling regardless of changes in orientations for convergence. This makes convergence faster.");
 	auto_resolution_based_angles= parser.checkOption("--auto_resol_angles", "In auto-refinement, update angular sampling based on resolution-based required sampling. This makes convergence faster.");
+	allow_coarser_samplings = parser.checkOption("--allow_coarser_sampling", "In 2D/3D classification, allow coarser angular and translational samplings if accuracies are bad (typically in earlier iterations.");
 	///////////////// Special stuff for first iteration (only accessible via CL, not through readSTAR ////////////////////
 
 	// When reading from the CL: always start at iteration 1 and subset 1
@@ -2241,8 +2243,6 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			Mavg += img();
 
 			// Calculate the power spectrum of this particle
-			CenterFFT(img(), true);
-
 			MultidimArray<RFLOAT> ind_spectrum, count;
 			int spectral_size = (mymodel.ori_size / 2) + 1;
 			ind_spectrum.initZeros(spectral_size);
@@ -2299,6 +2299,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				//A = mydata.obsModel.applyScaleDifference(A, optics_group, mymodel.ori_size, mymodel.pixel_size);
 				// Construct initial references from random subsets
 				windowFourierTransform(Faux, Fimg, wsum_model.current_size);
+				CenterFFTbySign(Fimg);
 				Fctf.resize(Fimg);
 				Fctf.initConstant(1.);
 
@@ -2755,8 +2756,11 @@ void MlOptimiser::expectation()
 	}
 
 	// D. Update the angular sampling (all nodes except master)
-	if ( (do_auto_refine || do_sgd) && iter > 1 )
+	if ( ( (do_auto_refine || do_sgd) && iter > 1) ||
+		 ( mymodel.nr_classes > 1 && allow_coarser_samplings) )
+	{
 		updateAngularSampling();
+	}
 
 	// E. Check whether everything fits into memory
 	expectationSetupCheckMemory(verb);
@@ -5312,9 +5316,9 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		// Always store FT of image without mask (to be used for the reconstruction)
 		MultidimArray<RFLOAT> img_aux;
 		img_aux = (has_converged && do_use_reconstruct_images) ? rec_img() : img();
-		CenterFFT(img_aux, true);
 		transformer.FourierTransform(img_aux, Faux);
 		windowFourierTransform(Faux, Fimg, image_current_size[optics_group]);
+		CenterFFTbySign(Fimg);
 
 		// Here apply the aberration corrections if necessary
 		mydata.obsModel.demodulatePhase(optics_group, Fimg);
@@ -5397,9 +5401,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 //		exit(0);
 #endif
 
-		// Inside Projector and Backprojector the origin of the Fourier Transform is centered!
-		CenterFFT(img(), true);
-
 		// Store the Fourier Transform of the image Fimg
 		transformer.FourierTransform(img(), Faux);
 
@@ -5436,6 +5437,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		// We never need any resolutions higher than current_size
 		// So resize the Fourier transforms
 		windowFourierTransform(Faux, Fimg, image_current_size[optics_group]);
+		// Inside Projector and Backprojector the origin of the Fourier Transform is centered!
+		CenterFFTbySign(Fimg);
 
 		// Also perform aberration correction on the masked image (which will be used for alignment)
 		mydata.obsModel.demodulatePhase(optics_group, Fimg);
@@ -5683,9 +5686,9 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 			}
 
 			// For the masked one, have to mask outside the circular mask to prevent negative values outside the mask in the subtracted image!
+			CenterFFTbySign(Fsum_obody);
 			windowFourierTransform(Fsum_obody, Faux, image_full_size[optics_group]);
 			transformer.inverseFourierTransform(Faux, img());
-			CenterFFT(img(), false);
 
 #ifdef DEBUG_BODIES
 			if (part_id == ROUND(debug1))
@@ -5708,9 +5711,9 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 			}
 #endif
 			// And back to Fourier space now
-			CenterFFT(img(), true);
 			transformer.FourierTransform(img(), Faux);
 			windowFourierTransform(Faux, Fsum_obody, image_current_size[optics_group]);
+			CenterFFTbySign(Fsum_obody);
 
 			// Subtract the other-body FT from the masked exp_Fimgs
 			exp_Fimg[img_id] -= Fsum_obody;
@@ -8631,6 +8634,80 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 			}
 		}
 	}
+	// For 2D/3D classification: use coarser angular and translational samplings when estimated accuracies are low...
+	else if ( mymodel.nr_classes > 1 && allow_coarser_samplings)
+	{
+
+		// A. Coarser rotational sampling
+		// Stay a bit on the safe side: 80% of estimated accuracy
+		if (mymodel.ref_dim == 3)
+		{
+
+			// If doing CC first iteration, there will not be a acc_rot yet: use minimum sampling based on resolution instead
+			RFLOAT my_min_sampling = (iter == 1 && do_firstiter_cc) ? 360. / CEIL(PI * particle_diameter * mymodel.current_resolution) : acc_rot;
+
+			// 3D classification
+			int previous_healpix_order = sampling.healpix_order;
+			// Always go down from original healpix order
+			sampling.healpix_order = sampling.healpix_order_ori;
+			bool is_decreased = false;
+			while (sampling.getAngularSampling(adaptive_oversampling) < 0.8 * my_min_sampling)
+			{
+				sampling.healpix_order--;
+				is_decreased = true;
+			}
+			// Now have healpix_order that gives coarser sampling than min_sampling, go one up to have finer sampling than min_sampling
+			// Only do this is (is_decreased), as we don't want to go finer than the original one...
+			if (is_decreased) sampling.healpix_order++;
+
+			// Don't go beyond original sampling
+			sampling.healpix_order = XMIPP_MIN(sampling.healpix_order, sampling.healpix_order_ori);
+			if (sampling.healpix_order != previous_healpix_order)
+			{
+				sampling.setOrientations(sampling.healpix_order, sampling.getAngularSampling());
+
+				// Resize the pdf_direction arrays to the correct size and fill with an even distribution
+				mymodel.initialisePdfDirection(sampling.NrDirections());
+
+				// Also reset the nr_directions in wsum_model
+				wsum_model.nr_directions = mymodel.nr_directions;
+
+				// Also resize and initialise wsum_model.pdf_direction for each class!
+				for (int iclass=0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
+					wsum_model.pdf_direction[iclass].initZeros(mymodel.nr_directions);
+
+			}
+		}
+		else
+		{
+			// 2D classification
+			RFLOAT new_psi_step = 0.8 * acc_rot * std::pow(2., adaptive_oversampling);
+			new_psi_step = XMIPP_MAX(new_psi_step, sampling.psi_step_ori);
+			if (fabs(new_psi_step - sampling.psi_step) > 0.001 )
+			{
+				sampling.setOrientations(-1, new_psi_step);
+			}
+		}
+
+		// B. Coarser translational sampling
+		// Stay a bit on the safe side: 80% of estimated accuracy
+		RFLOAT new_offset_step = 0.8 * acc_trans * std::pow(2., adaptive_oversampling);
+		// Don't go coarser than the 95% of the offset_range (so at least 5 samplings are done)
+		new_offset_step = XMIPP_MIN(new_offset_step, 0.95*sampling.offset_range);
+		// Don't go finer than the original offset_step!
+		new_offset_step = XMIPP_MAX(new_offset_step, sampling.offset_step_ori);
+		sampling.setTranslations(new_offset_step, sampling.offset_range, false,
+				(do_helical_refine) && (!ignore_helical_symmetry), sampling.helical_offset_step, helical_rise_initial, helical_twist_initial);
+
+		// Print to screen
+		if (myverb)
+		{
+			std::cout << " Coarser-sampling: Angular step= " << sampling.getAngularSampling(adaptive_oversampling) << " degrees." << std::endl;
+			std::cout << " Coarser-sampling: Offset search range= " << sampling.offset_range << " Angstroms; offset step= " << sampling.getTranslationalSampling(adaptive_oversampling) << " Angstroms" << std::endl;
+		}
+
+
+	}
 	else
 	{
 
@@ -8820,7 +8897,7 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 				else
 					std:: cout << "false" << std::endl;
 			}
-			std::cout << " Auto-refine: Offset search range= " << sampling.offset_range << " pixels; offset step= " << sampling.getTranslationalSampling(adaptive_oversampling) << " Anstroms";
+			std::cout << " Auto-refine: Offset search range= " << sampling.offset_range << " Angstroms; offset step= " << sampling.getTranslationalSampling(adaptive_oversampling) << " Angstroms";
 			if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 				std::cout << "; offset step along helical axis= " << sampling.getHelicalTranslationalSampling(adaptive_oversampling) << " pixels";
 			std::cout << std::endl;

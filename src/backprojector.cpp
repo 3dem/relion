@@ -1685,14 +1685,13 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 		}
 	}
 	RCTOC(ReconTimer,ReconS_11);
+	RCTIC(ReconTimer,ReconS_13);
+	CenterFFTbySign(Ftmp);
+	RCTOC(ReconTimer,ReconS_13);
 	RCTIC(ReconTimer,ReconS_12);
 	// inverse FFT leaves result in vol_out
 	transformer2.inverseFourierTransform();
 	RCTOC(ReconTimer,ReconS_12);
-	RCTIC(ReconTimer,ReconS_13);
-	// Shift the map back to its origin
-	CenterFFT(vol_out, false);
-	RCTOC(ReconTimer,ReconS_13);
 	RCTIC(ReconTimer,ReconS_14);
 	// Un-normalize FFTW (because original FFTs were done with the size of 2D FFTs)
 	if (ref_dim==3)
@@ -2285,6 +2284,11 @@ void BackProjector::windowToOridimRealSpace(FourierTransformer &transformer, Mul
 	tt.write("windoworidim_Fresized.spi");
 #endif
 
+	// Shift the map back to its origin
+	RCTIC(OriDimTimer,OriDim6);
+	CenterFFTbySign(Fin);
+	RCTOC(OriDimTimer,OriDim6);
+
 	// Do the inverse FFT
 	RCTIC(OriDimTimer,OriDim4);
 	transformer.setReal(Mout);
@@ -2301,11 +2305,6 @@ void BackProjector::windowToOridimRealSpace(FourierTransformer &transformer, Mul
 	transformer.fReal = NULL; // Make sure to re-calculate fftw plan
 	Mout.setXmippOrigin();
 
-	// Shift the map back to its origin
-
-	RCTIC(OriDimTimer,OriDim6);
-	CenterFFT(Mout,true);
-	RCTOC(OriDimTimer,OriDim6);
 #ifdef DEBUG_WINDOWORIDIMREALSPACE
 	tt()=Mout;
 	tt.write("windoworidim_Munwindowed.spi");
