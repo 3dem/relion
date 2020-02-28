@@ -26,7 +26,7 @@ void HealpixSampling::clear()
 {
 	is_3D = false;
 	fn_sym = "C1";
-	limit_tilt = psi_step = offset_range = offset_step = 0.;
+	limit_tilt = psi_step = offset_range = offset_step = helical_offset_step = psi_step_ori = offset_range_ori = offset_step_ori = 0.;
 	random_perturbation = perturbation_factor = 0.;
 	// Jun19,2015 - Shaoda, Helical refinement
 	helical_offset_step = -1.;
@@ -131,6 +131,13 @@ void HealpixSampling::initialise(
 	// Random perturbation and filling of the directions, psi_angles and translations vectors
 	resetRandomlyPerturbedSampling();
 
+	// SHWS 27feb2020: Set original sampling rates to allow 2D/3D classifications using coarser ones in earlier iterations
+	healpix_order_ori = healpix_order;
+	psi_step_ori = psi_step;
+	offset_range_ori = offset_range;
+	offset_step_ori = offset_step;
+
+
 }
 
 void HealpixSampling::resetRandomlyPerturbedSampling()
@@ -167,6 +174,12 @@ void HealpixSampling::read(FileName fn_in)
     // Jun19,2015 - Shaoda, Helical translational searches, backward compatibility
     if (!MD.getValue(EMDL_SAMPLING_HELICAL_OFFSET_STEP, helical_offset_step))
     	helical_offset_step = -1.;
+
+    // SHWS 27Feb2020: backwards compatibility: older star files will not yet have original sampling parameters, just use current ones
+    if (!MD.getValue(EMDL_SAMPLING_OFFSET_STEP_ORI, offset_step_ori)) offset_step_ori = offset_step;
+    if (!MD.getValue(EMDL_SAMPLING_OFFSET_RANGE_ORI, offset_range_ori)) offset_range_ori = offset_range;
+    if (!MD.getValue(EMDL_SAMPLING_PSI_STEP_ORI, psi_step_ori)) psi_step_ori = psi_step;
+
 	if (is_3D)
 	{
 		if (!MD.getValue(EMDL_SAMPLING_HEALPIX_ORDER, healpix_order) ||
@@ -178,6 +191,10 @@ void HealpixSampling::read(FileName fn_in)
 		// By default it will then be set to the healpix sampling
 		// Only if the --psi_step option is given on the command line it will be set to something different!
 		psi_step = -1.;
+
+	    // SHWS 27Feb2020: backwards compatibility: older star files will not yet have original sampling parameters, just use current ones
+	    if (!MD.getValue(EMDL_SAMPLING_HEALPIX_ORDER_ORI, healpix_order_ori)) healpix_order_ori = healpix_order;
+
 	}
 	else
 	{
@@ -217,6 +234,13 @@ void HealpixSampling::write(FileName fn_out)
 	MD.setValue(EMDL_SAMPLING_HELICAL_OFFSET_STEP, helical_offset_step);
 	MD.setValue(EMDL_SAMPLING_PERTURB, random_perturbation);
 	MD.setValue(EMDL_SAMPLING_PERTURBATION_FACTOR, perturbation_factor);
+
+	//27Feb2020 SHWS: write original sampling rates to allow 2D/3D classifications to use coarser ones in initial iterations
+    MD.setValue(EMDL_SAMPLING_HEALPIX_ORDER_ORI, healpix_order_ori);
+    MD.setValue(EMDL_SAMPLING_PSI_STEP_ORI, psi_step_ori);
+    MD.setValue(EMDL_SAMPLING_OFFSET_RANGE_ORI, offset_range_ori);
+    MD.setValue(EMDL_SAMPLING_OFFSET_STEP_ORI, offset_step_ori);
+
 	MD.write(fh);
 
 	// In the 3D case, also write a table with the sampled rot, tilt angles

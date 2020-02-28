@@ -233,6 +233,9 @@ public:
 	// Flag whether to proceed faster with resolution-based angular sampling updates in auto-refine
 	bool auto_resolution_based_angles;
 
+	// Flag whether to accelerate early iterations of 2D/3D classification with coarser samplings
+	bool allow_coarser_samplings;
+
 	// Force auto-refinement to converge
 	bool do_force_converge;
 
