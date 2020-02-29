@@ -29,7 +29,8 @@
 const RFLOAT Micrograph::NOT_OBSERVED = -9999;
 const int ThirdOrderPolynomialModel::NUM_COEFFS_PER_DIM = 18;
 
-int ThirdOrderPolynomialModel::getShiftAt(RFLOAT z, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const {
+int ThirdOrderPolynomialModel::getShiftAt(RFLOAT z, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const
+{
 	const RFLOAT x2 = x * x, y2 = y * y, xy = x * y, z2 = z * z;
 	const RFLOAT z3 = z2 * z;
 
@@ -54,14 +55,16 @@ MotionModel* ThirdOrderPolynomialModel::clone() const
 	return (MotionModel*) new ThirdOrderPolynomialModel(*this);
 }
 
-void ThirdOrderPolynomialModel::write(std::ostream &fh, std::string block_name) {
+void ThirdOrderPolynomialModel::write(std::ostream &fh, std::string block_name)
+{
 	MetaDataTable MD;
 	MD.setName(block_name);
 
 	int coeff_idx = 0;
 
 	// Write coeffX
-	for (int i = 0; i < NUM_COEFFS_PER_DIM; i++) {
+	for (int i = 0; i < NUM_COEFFS_PER_DIM; i++)
+	{
 		MD.addObject();
                 MD.setValue(EMDL_MICROGRAPH_MOTION_COEFFS_IDX, coeff_idx);
                 MD.setValue(EMDL_MICROGRAPH_MOTION_COEFF, coeffX(i));
@@ -69,7 +72,8 @@ void ThirdOrderPolynomialModel::write(std::ostream &fh, std::string block_name) 
 	}
 
 	// Write coeffY	
-	for (int i = 0; i < NUM_COEFFS_PER_DIM; i++) {
+	for (int i = 0; i < NUM_COEFFS_PER_DIM; i++)
+	{
 		MD.addObject();
                 MD.setValue(EMDL_MICROGRAPH_MOTION_COEFFS_IDX, coeff_idx);
                 MD.setValue(EMDL_MICROGRAPH_MOTION_COEFF, coeffY(i));
@@ -79,7 +83,8 @@ void ThirdOrderPolynomialModel::write(std::ostream &fh, std::string block_name) 
 	MD.write(fh);
 }
 
-void ThirdOrderPolynomialModel::read(std::ifstream &fh, std::string block_name) {
+void ThirdOrderPolynomialModel::read(std::ifstream &fh, std::string block_name)
+{
 	MetaDataTable MD;
 	MD.readStar(fh, block_name);
 
@@ -99,19 +104,24 @@ void ThirdOrderPolynomialModel::read(std::ifstream &fh, std::string block_name) 
 	        {
 				REPORT_ERROR("ThirdOrderPolynomialModel coefficients table: missing index or coefficients");
 	        }
-
-		if (idx >= 0 && idx < NUM_COEFFS_PER_DIM) {
+		if (idx >= 0 && idx < NUM_COEFFS_PER_DIM)
+		{
 			coeffX(idx) = val;
-		} else if (idx >= NUM_COEFFS_PER_DIM && idx < NUM_COEFFS) {
+		}
+		else if (idx >= NUM_COEFFS_PER_DIM && idx < NUM_COEFFS)
+		{
 			coeffY(idx - NUM_COEFFS_PER_DIM) = val;
-		} else {
+		}
+		else
+		{
 			REPORT_ERROR("ThirdOrderPolynomialModel coefficients table: wrong index");
 		}
 
 		num_read++;
 	}
 	
-	if (num_read != NUM_COEFFS) {
+	if (num_read != NUM_COEFFS)
+	{
 		REPORT_ERROR("ThirdOrderPolynomialModel coefficients table: incomplete values");
 	}
 }
@@ -130,7 +140,7 @@ Micrograph::Micrograph(const Micrograph& m)
 	copyFieldsFrom(m);
 }
 
-Micrograph::Micrograph(FileName filename, FileName fnGain, RFLOAT binning)
+Micrograph::Micrograph(FileName filename, FileName fnGain, RFLOAT binning, int eer_upsampling, int eer_grouping)
 :   ready(false),
     model(NULL)
 {
@@ -138,10 +148,15 @@ Micrograph::Micrograph(FileName filename, FileName fnGain, RFLOAT binning)
 
 	if (filename.getExtension() == "star" && fnGain == "")
 	{
+		if (eer_upsampling > 0 || eer_grouping > 0)
+			REPORT_ERROR("Micrograph::Micrograph: When reading STAR file, you shouldn't specify eer_upsampling and eer_grouping. They are read from the STAR file.");
+
 		read(filename);
 	}
 	else
 	{
+		this->eer_upsampling = eer_upsampling;
+		this->eer_grouping = eer_grouping;
 		setMovie(filename, fnGain, binning);
 	}
 
@@ -173,7 +188,8 @@ void Micrograph::write(FileName filename)
 	MetaDataTable MD;
 
 	fh.open(filename.c_str());
-	if (!fh) {
+	if (!fh)
+	{
 		REPORT_ERROR((std::string)"Micrograph::write: Cannot write file: " + filename);
 	}
 
@@ -185,43 +201,48 @@ void Micrograph::write(FileName filename)
         MD.setValue(EMDL_IMAGE_SIZE_Z, n_frames);
         MD.setValue(EMDL_MICROGRAPH_MOVIE_NAME, fnMovie);
 
-	if (fnGain != "") {
+	if (fnGain != "")
 		MD.setValue(EMDL_MICROGRAPH_GAIN_NAME, fnGain);
-	}
-	if (fnDefect != "") {
+
+	if (fnDefect != "")
 		MD.setValue(EMDL_MICROGRAPH_DEFECT_FILE, fnDefect);
-	}
+
 	MD.setValue(EMDL_MICROGRAPH_BINNING, binning);
-	if (angpix != -1) {
+
+	if (angpix != -1)
 		MD.setValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix);
-        }
-	if (dose_per_frame != -1) {
+
+	if (dose_per_frame != -1)
 		MD.setValue(EMDL_MICROGRAPH_DOSE_RATE, dose_per_frame);
-        }
-	if (pre_exposure != -1) {
+
+	if (pre_exposure != -1)
 		MD.setValue(EMDL_MICROGRAPH_PRE_EXPOSURE, pre_exposure);
-        }
-	if (voltage != -1) {
+
+	if (voltage != -1)
 		MD.setValue(EMDL_CTF_VOLTAGE, voltage);
-        }
+
 	MD.setValue(EMDL_MICROGRAPH_START_FRAME, first_frame); // 1-indexed
-	if (eer_upsampling > 0) {
-		MD.setValue(EMDL_MICROGRAPH_EER_UPSAMPLING, eer_upsampling);
-	}
-	if (eer_grouping > 0) {
-		MD.setValue(EMDL_MICROGRAPH_EER_GROUPING, eer_grouping);
+
+	if (EERRenderer::isEER(fnMovie))
+	{
+		if (eer_upsampling > 0)
+			MD.setValue(EMDL_MICROGRAPH_EER_UPSAMPLING, this->eer_upsampling);
+
+		if (eer_grouping > 0)
+			MD.setValue(EMDL_MICROGRAPH_EER_GROUPING, this->eer_grouping);
 	}
 
-	if (model != NULL) {
+	if (model != NULL)
 		MD.setValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model->getModelVersion());
-	} else {
+	else
 		MD.setValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, (int)MOTION_MODEL_NULL);
-	}
+
 	MD.write(fh);
 
 	MD.clear();
 	MD.setName("global_shift");
-	for (int frame = 0; frame < n_frames; frame++) {
+	for (int frame = 0; frame < n_frames; frame++)
+	{
 		MD.addObject();
 		MD.setValue(EMDL_MICROGRAPH_FRAME_NUMBER, frame + 1); // make 1-indexed
 		MD.setValue(EMDL_MICROGRAPH_SHIFT_X, globalShiftX[frame]);
@@ -229,7 +250,8 @@ void Micrograph::write(FileName filename)
 	}
 	MD.write(fh);
 
-	if (model != NULL) {
+	if (model != NULL)
+	{
 		std::string block_name = "local_motion_model";
 		model->write(fh, block_name);
 	}
@@ -270,28 +292,44 @@ void Micrograph::write(FileName filename)
 	fh.close();
 }
 
-FileName Micrograph::getGainFilename() const {
+FileName Micrograph::getGainFilename() const
+{
 	return fnGain;
 }
 
-RFLOAT Micrograph::getBinningFactor() const {
+RFLOAT Micrograph::getBinningFactor() const
+{
 	return binning;
 }
 
-FileName Micrograph::getMovieFilename() const {
+FileName Micrograph::getMovieFilename() const
+{
 	return fnMovie;
 }
 
-int Micrograph::getWidth() const {
+int Micrograph::getWidth() const
+{
 	return width;
 }
 
-int Micrograph::getHeight() const {
+int Micrograph::getHeight() const
+{
 	return height;
 }
 
-int Micrograph::getNframes() const {
+int Micrograph::getNframes() const
+{
 	return n_frames;
+}
+
+int Micrograph::getEERUpsampling() const
+{
+	return eer_upsampling;
+}
+
+int Micrograph::getEERGrouping() const
+{
+	return eer_grouping;
 }
 
 void Micrograph::fillDefectAndHotpixels(MultidimArray<bool> &mask) const
@@ -329,7 +367,8 @@ int Micrograph::getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFL
 		y = y / height - 0.5;
 	}
 
-	if (globalShiftX[frame - 1] == NOT_OBSERVED || globalShiftX[frame - 1] == NOT_OBSERVED) {
+	if (globalShiftX[frame - 1] == NOT_OBSERVED || globalShiftX[frame - 1] == NOT_OBSERVED)
+	{
 		// Find the shift of the closest observed frame.
 		// If the given 'frame' is unobserved due to initial frame truncation (--first_frame),
 		// the output becomes zero. This is OK because the shift of the first observed frame
@@ -348,10 +387,13 @@ int Micrograph::getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFL
 		return -1;
 	}
 
-	if (model != NULL && use_local) {
+	if (model != NULL && use_local)
+	{
 		// both frame and first_frame is 1 indexed
 		model->getShiftAt(frame - first_frame, x, y, shiftx, shifty);
-	} else {
+	}
+	else
+	{
 		shiftx = 0;
 		shifty = 0;
 	}
@@ -367,7 +409,8 @@ void Micrograph::setGlobalShift(int frame, RFLOAT shiftx, RFLOAT shifty)
 {
 	checkReadyFlag("setGlobalShift");
 
-	if (frame <= 0 || frame > n_frames) {
+	if (frame <= 0 || frame > n_frames)
+	{
 		std::cout << "Frame: " << frame << " n_frames: " << n_frames << std::endl;
 		REPORT_ERROR("Micrograph::setGlobalShift() frame out of range");
 	}
@@ -390,7 +433,8 @@ void Micrograph::read(FileName fn_in, bool read_hotpixels)
 
 	// Open input file
 	std::ifstream in(fn_in.data(), std::ios_base::in);
-	if (in.fail()) {
+	if (in.fail())
+	{
 		REPORT_ERROR("MicrographModel::read: File " + fn_in + " cannot be read.");
 	}
 
@@ -402,60 +446,71 @@ void Micrograph::read(FileName fn_in, bool read_hotpixels)
 	if (!MDglobal.getValue(EMDL_IMAGE_SIZE_X, width) ||
 	    !MDglobal.getValue(EMDL_IMAGE_SIZE_Y, height) ||
 	    !MDglobal.getValue(EMDL_IMAGE_SIZE_Z, n_frames) ||
-	    !MDglobal.getValue(EMDL_MICROGRAPH_MOVIE_NAME, fnMovie)) {
+	    !MDglobal.getValue(EMDL_MICROGRAPH_MOVIE_NAME, fnMovie))
+	{
 		REPORT_ERROR("MicrographModel::read: insufficient general information in " + fn_in);
 	}
 
 	globalShiftX.resize(n_frames, NOT_OBSERVED);
 	globalShiftY.resize(n_frames, NOT_OBSERVED);
 
-	if (!MDglobal.getValue(EMDL_MICROGRAPH_GAIN_NAME, fnGain)) {
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_GAIN_NAME, fnGain))
 		fnGain = "";
-	}
-	if (!MDglobal.getValue(EMDL_MICROGRAPH_DEFECT_FILE, fnDefect)) {
+
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_DEFECT_FILE, fnDefect))
 		fnDefect = "";
-	}
-	if (!MDglobal.getValue(EMDL_MICROGRAPH_BINNING, binning)) {
+
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_BINNING, binning))
 		binning = 1.0;
-	}
-	if (!MDglobal.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix)) {
+
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix))
 		angpix = -1;
-	}
-	if (!MDglobal.getValue(EMDL_MICROGRAPH_PRE_EXPOSURE, pre_exposure)) {
+
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_PRE_EXPOSURE, pre_exposure))
 		pre_exposure = -1;
-	}
-	if (!MDglobal.getValue(EMDL_MICROGRAPH_DOSE_RATE, dose_per_frame)) {
+
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_DOSE_RATE, dose_per_frame))
 		dose_per_frame = -1;
-	}
-	if (!MDglobal.getValue(EMDL_CTF_VOLTAGE, voltage)) {
+
+	if (!MDglobal.getValue(EMDL_CTF_VOLTAGE, voltage))
 		voltage = -1;
-	}
-	if (!MDglobal.getValue(EMDL_MICROGRAPH_START_FRAME, first_frame)) {
+
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_START_FRAME, first_frame))
 		first_frame = 1; // 1-indexed
+
+	if (EERRenderer::isEER(fnMovie))
+	{
+		if (!MDglobal.getValue(EMDL_MICROGRAPH_EER_UPSAMPLING, eer_upsampling))
+			eer_upsampling = -1;
+
+		if (!MDglobal.getValue(EMDL_MICROGRAPH_EER_GROUPING, eer_grouping))
+			eer_grouping = -1;
 	}
-	if (!MDglobal.getValue(EMDL_MICROGRAPH_EER_UPSAMPLING, eer_upsampling)) {
-		eer_upsampling = -1;
-	}
-	if (!MDglobal.getValue(EMDL_MICROGRAPH_EER_GROUPING, eer_grouping)) {
-		eer_grouping = -1;
-	}
-	
 
 	int model_version;
 	model = NULL;
-	if (MDglobal.getValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model_version)) {
-		if (model_version == MOTION_MODEL_THIRD_ORDER_POLYNOMIAL) {
+	if (MDglobal.getValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model_version))
+	{
+		if (model_version == MOTION_MODEL_THIRD_ORDER_POLYNOMIAL)
+		{
 			model = new ThirdOrderPolynomialModel();
-		} else if (model_version == (int)MOTION_MODEL_NULL) {
+		}
+		else if (model_version == (int)MOTION_MODEL_NULL)
+		{
 			model = NULL;
-		} else {
+		}
+		else
+		{
 			std::cerr << "Warning: Ignoring unknown motion model " << model_version << std::endl;
 		}
-	} else {
-        std::cerr << "Warning: local motion model is absent in the micrograph star file." << std::endl;
+	}
+	else
+	{
+        	std::cerr << "Warning: local motion model is absent in the micrograph star file." << std::endl;
 	}
 
-	if (model != NULL) {
+	if (model != NULL)
+	{
 		model->read(in, "local_motion_model");
 	}
 
@@ -469,7 +524,8 @@ void Micrograph::read(FileName fn_in, bool read_hotpixels)
 	{
 		if (!MDglobal.getValue(EMDL_MICROGRAPH_FRAME_NUMBER, frame) ||
 		    !MDglobal.getValue(EMDL_MICROGRAPH_SHIFT_X, shiftX) ||
-		    !MDglobal.getValue(EMDL_MICROGRAPH_SHIFT_Y, shiftY)) {
+		    !MDglobal.getValue(EMDL_MICROGRAPH_SHIFT_Y, shiftY))
+		{
 			REPORT_ERROR("MicrographModel::read: incorrect global_shift table in " + fn_in);
 		}
 
@@ -499,7 +555,7 @@ void Micrograph::setMovie(FileName fnMovie, FileName fnGain, RFLOAT binning)
 	if (EERRenderer::isEER(fnMovie))
 	{
 		EERRenderer renderer;
-		renderer.read(fnMovie);
+		renderer.read(fnMovie, eer_upsampling);
 		width = renderer.getWidth();
 		height = renderer.getHeight();
 		n_frames = renderer.getNFrames() / eer_grouping;
@@ -536,6 +592,9 @@ void Micrograph::clearFields()
 	dose_per_frame = -1;
 	pre_exposure = -1;
 
+	eer_upsampling = -1;
+	eer_grouping = -1;
+
 	fnMovie = "";
 	fnGain = "";
 	fnDefect = "";
@@ -569,6 +628,9 @@ void Micrograph::copyFieldsFrom(const Micrograph& m)
 	voltage = m.voltage;
 	dose_per_frame = m.dose_per_frame;
 	pre_exposure = m.pre_exposure;
+
+	eer_upsampling = m.eer_upsampling;
+	eer_grouping = m.eer_grouping;
 
 	fnMovie = m.fnMovie;
 	fnGain = m.fnGain;

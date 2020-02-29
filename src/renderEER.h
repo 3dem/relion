@@ -107,7 +107,7 @@ class EERRenderer {
 		}
 		else
 		{
-			std::cerr << "Size of input gain: X = " << XSIZE(gain) << " Y = " << YSIZE(gain) << " Expected: X = " << (EER_IMAGE_WIDTH * 2) << " Y = " << (EER_IMAGE_HEIGHT * 2) << std::endl;
+			std::cerr << "Size of input gain: X = " << XSIZE(gain) << " Y = " << YSIZE(gain) << " Expected: X = " << size << " Y = " << size << std::endl;
 			REPORT_ERROR("Invalid gain size in EERRenderer::upsampleEERGain()");
 		}
 

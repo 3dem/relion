@@ -89,7 +89,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	first_frame_sum =  textToInteger(parser.getOption("--first_frame_sum", "First movie frame used in output sum (start at 1)", "1"));
 	if (first_frame_sum < 1) first_frame_sum = 1;
 	last_frame_sum =  textToInteger(parser.getOption("--last_frame_sum", "Last movie frame used in output sum (0 or negative: use all)", "-1"));
-	eer_grouping = textToInteger(parser.getOption("--eer_grouping", "EER grouping", "-1"));
+	eer_grouping = textToInteger(parser.getOption("--eer_grouping", "EER grouping", "40"));
 	eer_upsampling = textToInteger(parser.getOption("--eer_upsampling", "EER upsampling (1 = 4K or 2 = 8K)", "2"));
 
 	int motioncor2_section = parser.addSection("MOTIONCOR2 options");
@@ -452,7 +452,7 @@ void MotioncorrRunner::run()
 		if (pipeline_control_check_abort_job())
 			exit(RELION_EXIT_ABORTED);
 
-		Micrograph mic(fn_micrographs[imic], fn_gain_reference, bin_factor);
+		Micrograph mic(fn_micrographs[imic], fn_gain_reference, bin_factor, eer_upsampling, eer_grouping);
 
 		// Get angpix and voltage from the optics groups:
 		obsModel.opticsMdt.getValue(EMDL_CTF_VOLTAGE, voltage, optics_group_micrographs[imic]-1);
@@ -993,8 +993,6 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 		renderer.read(fn_mic, eer_upsampling);
 		nx = renderer.getWidth(); ny = renderer.getHeight();
 		nn = renderer.getNFrames() / eer_grouping; // remaining frames are truncated
-		mic.eer_upsampling = eer_upsampling;
-		mic.eer_grouping = eer_grouping;
 	}
 
 	// Which frame to use?

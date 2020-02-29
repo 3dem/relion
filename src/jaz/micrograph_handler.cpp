@@ -446,7 +446,11 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 			{
 				lastGainRef.read(gainFn);
 				if (isEER) // TODO: Takanori: Remove this once we updated RelionCor
-					EERRenderer::upsampleEERGain(lastGainRef());
+				{
+					if (eer_upsampling < 0)
+						eer_upsampling = micrograph.getEERUpsampling();
+					EERRenderer::upsampleEERGain(lastGainRef(), eer_upsampling);
+				}
 
 				last_gainFn = gainFn;
 			}
@@ -493,9 +497,9 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 		else
 		{
 			if (eer_upsampling < 0)
-				eer_upsampling = micrograph.eer_upsampling;
+				eer_upsampling = micrograph.getEERUpsampling();
 			if (eer_grouping < 0)
-				eer_grouping = eer_grouping;
+				eer_grouping = micrograph.getEERGrouping();
 
 			EERRenderer renderer;
 			renderer.read(mgFn, eer_upsampling);
@@ -742,7 +746,7 @@ int MicrographHandler::determineFrameCount(const MetaDataTable &mdt)
 	if (hasCorrMic)
 	{
 		std::string metaFn = getMetaName(fn_post);
-		micrograph = Micrograph(metaFn);
+		micrograph = Micrograph(metaFn); // TODO: TAKANORI: shouldn't read hot pixels
 
 		if (!exists(micrograph.getMovieFilename()))
 		{

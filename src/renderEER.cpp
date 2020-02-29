@@ -74,7 +74,10 @@ void EERRenderer::read(FileName _fn_movie, int eer_upsampling)
 	if (eer_upsampling == 1 || eer_upsampling == 2)
 		this->eer_upsampling = eer_upsampling;
 	else
-		REPORT_ERROR("EERRenderer::read: eer_upsampling must be 1 or 2");
+	{
+		std::cerr << "EERRenderer::read: eer_upsampling = " << eer_upsampling << std::endl;
+		REPORT_ERROR("EERRenderer::read: eer_upsampling must be 1 or 2.");
+	}
 
 #ifndef HAVE_TIFF
 	REPORT_ERROR("To use EER, you have to re-compile RELION with libtiff.");
