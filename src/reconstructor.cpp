@@ -88,6 +88,7 @@ void Reconstructor::read(int argc, char **argv)
 
 	// Hidden
 	r_min_nn = textToInteger(getParameter(argc, argv, "--r_min_nn", "10"));
+	ctf3d_squared = !checkParameter(argc, argv, "--ctf3d_not_squared");
 
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())
@@ -105,12 +106,7 @@ void Reconstructor::initialise()
 	if (do_reconstruct_ctf)
 	{
 		do_ctf = false;
-		do_ctf2 = false;
 		padding_factor = 1.;
-	}
-	else
-	{
-		do_ctf2 = do_reconstruct_ctf2;
 	}
 
 	do_ignore_optics = false;
@@ -215,6 +211,9 @@ void Reconstructor::initialise()
 		r_max = -1;
 	else
 		r_max = CEIL(output_boxsize * angpix / maxres);
+
+	// JOTON 3Mar2020: 3D data must be CTF-premultiplied. Fctf will now contain ctf^2 by default but may be off
+	ctf_squared = (data_dim == 3 && ctf3d_squared);
 }
 
 void Reconstructor::run()
@@ -513,6 +512,14 @@ void Reconstructor::backprojectOneParticle(long int p)
 			{
 				REPORT_ERROR("3D CTF volume must be either cubical or adhere to FFTW format!");
 			}
+			// SHWS 13feb2020: when using CTF-premultiplied on 3D data, Fctf will now contain ctf^2, but make sure they are all positive!!
+			if (ctf_premultiplied && ctf_squared)
+			{
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+				{
+					DIRECT_MULTIDIM_ELEM(Fctf, n) = fabs(DIRECT_MULTIDIM_ELEM(Fctf, n));
+				}
+			}
 		}
 		else
 		{
@@ -604,7 +611,7 @@ void Reconstructor::backprojectOneParticle(long int p)
 					DIRECT_MULTIDIM_ELEM(F2D, n)  *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 				}
 			}
-			if (!do_ctf2)
+			if (!ctf_squared)
 			{
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
 				{
