@@ -45,36 +45,11 @@ int main(int argc, char *argv[])
 			REPORT_ERROR("You cannot use MPI for reverting subtraction.");
 
 		prm.run();
-		for (int myrank = 0; myrank < size; myrank++)
-		{
-			if (myrank > 0)
-			{
-				if (rank == myrank)
-				{
-					// First send how large orients is to the master
-					long int my_ysize = YSIZE(prm.orients);
-					MPI_Send(&my_ysize, 1, MPI_LONG, 0, MPITAG_INT, MPI_COMM_WORLD);
-					MPI_Send(MULTIDIM_ARRAY(prm.orients), my_ysize*XSIZE(prm.orients), MY_MPI_DOUBLE, 0, MPITAG_METADATA, MPI_COMM_WORLD);
-				}
-				else if (rank == 0)
-				{
-					long int my_ysize;
-					MPI_Recv(&my_ysize, 1, MPI_LONG, myrank, MPITAG_INT, MPI_COMM_WORLD, &status);
-					prm.orients.resize(my_ysize, XSIZE(prm.orients));
-					MPI_Recv(MULTIDIM_ARRAY(prm.orients), my_ysize*XSIZE(prm.orients), MY_MPI_DOUBLE, myrank, MPITAG_METADATA, MPI_COMM_WORLD, &status);
-				}
-			}
-			MPI_Barrier(MPI_COMM_WORLD);
-		}
-
-		MPI_Barrier(MPI_COMM_WORLD);
-
-		prm.setLinesInStarFile(rank);
 		prm.saveStarFile(rank);
 
 		MPI_Barrier(MPI_COMM_WORLD);
 
-		if (rank == 0) prm.combineStarFile();
+		if (rank == 0) prm.combineStarFile(rank);
 
 		MPI_Barrier(MPI_COMM_WORLD);
 	}
@@ -85,7 +60,7 @@ int main(int argc, char *argv[])
 	}
 
         MPI_Barrier(MPI_COMM_WORLD);
-	
+
 	MPI_Finalize();
 
 	return RELION_EXIT_SUCCESS;

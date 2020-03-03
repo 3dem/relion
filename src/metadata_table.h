@@ -153,6 +153,7 @@ public:
 
 
 	// getValue: returns true if the label exists
+	// objectID is 0-indexed.
 	template<class T>
 	bool getValue(EMDLabel label, T& value, long objectID = -1) const;
 
@@ -160,6 +161,7 @@ public:
 
 	// Set the value of label for a specified object.
 	// If no objectID is given, the internal iterator 'current_objectID' is used
+	// objectID is 0-indexed.
 	template<class T>
 	bool setValue(EMDLabel name, const T &value, long int objectID = -1);
 

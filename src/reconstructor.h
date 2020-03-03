@@ -45,7 +45,7 @@ public:
 	int r_max, r_min_nn, blob_order, ref_dim, interpolator, iter,
 	    debug_ori_size, debug_size,
 	    ctf_dim, nr_helical_asu, newbox, width_mask_edge, nr_sectors, subset, chosen_class,
-	    data_dim, mysize, verb;
+	    data_dim, output_boxsize, verb;
 
 	RFLOAT blob_radius, blob_alpha, angular_error, shift_error, angpix, maxres,
 	       helical_rise, helical_twist;

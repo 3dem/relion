@@ -459,6 +459,8 @@ void InitValue(AccPtr<T> &data, T value, size_t Size)
 #endif
 }
 
+void initOrientations(AccPtr<RFLOAT> &pdfs, AccPtr<XFLOAT> &pdf_orientation, AccPtr<XFLOAT> &pdf_orientation_zeros);
+
 void centerFFT_2D(int grid_size, int batch_size, int block_size,
 				cudaStream_t stream,
 				XFLOAT *img_in,
