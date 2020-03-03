@@ -34,7 +34,7 @@
 class ext_recons_parameters
 {
 	public:
-   	FileName fn_star, fn_recons, fn_data_real, fn_data_imag, fn_weight;
+   	FileName fn_star, fn_recons, fn_data_real, fn_data_imag, fn_weight, fn_out;
    	MultidimArray<RFLOAT> tau2;
    	RFLOAT tau2_fudge;
    	float padding_factor;
@@ -56,6 +56,7 @@ class ext_recons_parameters
 		}
 		skip_gridding  = checkParameter(argc, argv, "--skip_gridding");
 		do_map = !checkParameter(argc, argv, "--no_map");
+		fn_out =  (checkParameter(argc, argv, "--o")) ? getParameter(argc, argv, "--o") : "";
 
 		MetaDataTable MDlist, MDtau;
 		MDlist.read(fn_star, "external_reconstruct_general");
@@ -69,6 +70,7 @@ class ext_recons_parameters
 		MDlist.getValue(EMDL_MLMODEL_ORIGINAL_SIZE, ori_size);
 		MDlist.getValue(EMDL_MLMODEL_CURRENT_SIZE, current_size);
 
+		if (fn_out != "") fn_recons = fn_out;
 
 		MDtau.read(fn_star, "external_reconstruct_tau2");
 		tau2.resize(MDtau.numberOfObjects());
