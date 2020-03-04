@@ -315,10 +315,11 @@ void ParticleSubtractor::run()
 	}
 
 	MDimg_out.clear();
-	for (long int part_id_sorted = my_first_part_id, cc = 0; part_id_sorted <= my_last_part_id; part_id_sorted++, cc++)
+	//for (long int part_id_sorted = my_first_part_id, cc = 0; part_id_sorted <= my_last_part_id; part_id_sorted++, cc++)
+	for (long int part_id = my_first_part_id, cc = 0; part_id <= my_last_part_id; part_id++, cc++)
 	{
 
-		long int part_id = opt.mydata.sorted_idx[part_id_sorted];
+		//long int part_id = opt.mydata.sorted_idx[part_id_sorted];
 		if (cc % barstep == 0)
 		{
 			if (pipeline_control_check_abort_job())
