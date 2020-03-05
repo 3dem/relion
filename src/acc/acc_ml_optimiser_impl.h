@@ -741,9 +741,19 @@ void getFourierTransformsAndCtfs(long int part_id,
 				// SHWS 13feb2020: when using CTF-premultiplied, replace ctf by ctf^2, but make sure they are all positive!!
 				if (ctf_premultiplied)
 				{
-					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+					if (baseMLO->ctf3d_squared)
 					{
-						DIRECT_MULTIDIM_ELEM(Fctf, n) = fabs(DIRECT_MULTIDIM_ELEM(Fctf, n));
+						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+						{
+							DIRECT_MULTIDIM_ELEM(Fctf, n) = fabs(DIRECT_MULTIDIM_ELEM(Fctf, n));
+						}
+					}
+					else
+					{
+						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+						{
+							DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+						}
 					}
 				}
 

@@ -103,6 +103,9 @@ void MlOptimiserMpi::initialise()
 	int devCount, deviceAffinity;
 	bool is_split(false);
 
+//	std::cout << "Press any key to continue ..." << std::endl;
+//	getchar();
+
 	if (do_gpu)
 	{
 		MPI_Status status;

@@ -532,6 +532,12 @@ public:
 	FileName fn_fourier_mask;
 	MultidimArray<RFLOAT> helical_fourier_mask;
 
+	///////// Special stuff for subtomogram avg //////////
+
+	// Flag whether CTF3D files contain CTF^2 or not
+	bool ctf3d_squared;
+
+
 	///////// Hidden stuff, does not work with read/write: only via command-line ////////////////
 
 	// Skip gridding in reconstruction
