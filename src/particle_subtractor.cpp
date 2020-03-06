@@ -316,7 +316,7 @@ void ParticleSubtractor::run()
 
 	MDimg_out.clear();
 	//for (long int part_id_sorted = my_first_part_id, cc = 0; part_id_sorted <= my_last_part_id; part_id_sorted++, cc++)
-	for (long int part_id = my_first_part_id, cc = 0; part_id <= my_last_part_id; part_id++, cc++)
+	for (long int part_id_sorted = my_first_part_id, cc = 0; part_id_sorted <= my_last_part_id; part_id_sorted++, cc++)
 	{
 
 		//long int part_id = opt.mydata.sorted_idx[part_id_sorted];
@@ -326,6 +326,7 @@ void ParticleSubtractor::run()
 				exit(RELION_EXIT_ABORTED);
 		}
 
+		long int part_id = opt.mydata.sorted_idx[part_id_sorted];
 		subtractOneParticle(part_id, 0, cc);
 
 		if (cc % barstep == 0 && verb > 0) progress_bar(cc);

@@ -52,7 +52,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 		if (!baseMLO->mydata.getImageNameOnScratch(part_id, img_id, fn_img))
 		{
 			std::istringstream split(baseMLO->exp_fn_img);
-			for (int i = 0; i <= istop; i++)
+			for (int i = 0; i <= my_metadata_offset; i++)
 				getline(split, fn_img);
 		}
 		sp.current_img = fn_img;
@@ -234,7 +234,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 				else
 				{
 					CTIC(accMLO->timer,"ParaRead2DImages");
-					img() = baseMLO->exp_imgs[istop];
+					img() = baseMLO->exp_imgs[my_metadata_offset];
 					CTOC(accMLO->timer,"ParaRead2DImages");
 				}
 			}
@@ -243,7 +243,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 				FileName fn_recimg;
 				std::istringstream split2(baseMLO->exp_fn_recimg);
 				// Get the right line in the exp_fn_img string
-				for (int i = 0; i <= istop; i++)
+				for (int i = 0; i <= my_metadata_offset; i++)
 					getline(split2, fn_recimg);
 				rec_img.read(fn_recimg);
 				rec_img().setXmippOrigin();
@@ -690,7 +690,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 					{
 						std::istringstream split(baseMLO->exp_fn_ctf);
 						// Get the right line in the exp_fn_img string
-						for (int i = 0; i <= istop; i++)
+						for (int i = 0; i <= my_metadata_offset; i++)
 							getline(split, fn_ctf);
 					}
 					Ictf.read(fn_ctf);
@@ -3047,7 +3047,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 // -------------------- accDoExpectationOneParticle ---------------------------
 // ----------------------------------------------------------------------------
 template <class MlClass>
-void accDoExpectationOneParticle(MlClass *myInstance, unsigned long part_id, int thread_id, AccPtrFactory ptrFactory)
+void accDoExpectationOneParticle(MlClass *myInstance, unsigned long part_id_sorted, int thread_id, AccPtrFactory ptrFactory)
 {
 	SamplingParameters sp;
 	MlOptimiser *baseMLO = myInstance->baseMLO;
@@ -3059,6 +3059,7 @@ void accDoExpectationOneParticle(MlClass *myInstance, unsigned long part_id, int
 		baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_A);
 #endif
 
+	long int part_id = baseMLO->mydata.sorted_idx[part_id_sorted];
 	sp.nr_images = baseMLO->mydata.numberOfImagesInParticle(part_id);
 
 	OptimisationParamters op(sp.nr_images, part_id);
@@ -3088,7 +3089,7 @@ void accDoExpectationOneParticle(MlClass *myInstance, unsigned long part_id, int
 			// exp_part_id is already in randomized order (controlled by -seed)
 			// WARNING: USING SAME iclass_min AND iclass_max FOR SomeParticles!!
 			// Make sure random division is always the same with the same seed
-			long int idx = part_id - baseMLO->exp_my_first_part_id;
+			long int idx = part_id_sorted - baseMLO->exp_my_first_part_id;
 			if (idx >= baseMLO->exp_random_class_some_particles.size())
 				REPORT_ERROR("BUG: expectationOneParticle idx>random_class_some_particles.size()");
 			sp.iclass_min = sp.iclass_max = baseMLO->exp_random_class_some_particles[idx];
@@ -3109,7 +3110,7 @@ void accDoExpectationOneParticle(MlClass *myInstance, unsigned long part_id, int
 		// Global exp_metadata array has metadata of all particles. Where does part_id start?
 		for (long int iori = baseMLO->exp_my_first_part_id; iori <= baseMLO->exp_my_last_part_id; iori++)
 		{
-			if (iori == part_id) break;
+			if (iori == part_id_sorted) break;
 			op.metadata_offset += baseMLO->mydata.numberOfImagesInParticle(iori);
 		}
 #ifdef TIMING
@@ -3125,24 +3126,30 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_A);
 		if (baseMLO->do_skip_align)
 		{
 			sp.itrans_min = sp.itrans_max = sp.idir_min = sp.idir_max = sp.ipsi_min = sp.ipsi_max =
-					part_id - baseMLO->exp_my_first_part_id;
+					part_id_sorted - baseMLO->exp_my_first_part_id;
 		}
 		else
 		{
 			sp.itrans_min = 0;
 			sp.itrans_max = baseMLO->sampling.NrTranslationalSamplings() - 1;
+		}
+		if (baseMLO->do_skip_align || baseMLO->do_skip_rotate)
+		{
+			sp.idir_min = sp.idir_max = sp.ipsi_min = sp.ipsi_max =
+					part_id_sorted - baseMLO->exp_my_first_part_id;
+		}
+		else if (baseMLO->do_only_sample_tilt)
+		{
+			sp.idir_min = 0;
+			sp.idir_max = baseMLO->sampling.NrDirections(0, &op.pointer_dir_nonzeroprior) - 1;
+			sp.ipsi_min = sp.ipsi_max = part_id_sorted - baseMLO->exp_my_first_part_id;
 
-			if (baseMLO->do_skip_rotate)
-			{
-				sp.idir_min = sp.idir_max = sp.ipsi_min = sp.ipsi_max =
-						part_id - baseMLO->exp_my_first_part_id;
-			}
-			else
-			{
-				sp.idir_min = sp.ipsi_min = 0;
-				sp.idir_max = baseMLO->sampling.NrDirections(0, &op.pointer_dir_nonzeroprior) - 1;
-				sp.ipsi_max = baseMLO->sampling.NrPsiSamplings(0, &op.pointer_psi_nonzeroprior ) - 1;
-			}
+		}
+		else
+		{
+			sp.idir_min = sp.ipsi_min = 0;
+			sp.idir_max = baseMLO->sampling.NrDirections(0, &op.pointer_dir_nonzeroprior) - 1;
+			sp.ipsi_max = baseMLO->sampling.NrPsiSamplings(0, &op.pointer_psi_nonzeroprior ) - 1;
 		}
 
 		// Initialise significant weight to minus one, so that all coarse sampling points will be handled in the first pass
