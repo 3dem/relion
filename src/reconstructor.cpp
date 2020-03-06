@@ -58,6 +58,11 @@ void Reconstructor::read(int argc, char **argv)
 	helical_rise = textToFloat(parser.getOption("--helical_rise", "Helical rise (in Angstroms)", "0."));
 	helical_twist = textToFloat(parser.getOption("--helical_twist", "Helical twist (in degrees, + for right-handedness)", "0."));
 
+	int subtomogram_section = parser.addSection("Subtomogram averaging");
+	normalised_subtomo = parser.checkOption("--normalised_subtomo", "Have subtomograms been multiplicity normalised? (Default=False)");
+	skip_subtomo_correction = parser.checkOption("--skip_subtomo_multi", "Skip subtomo multiplicity correction");
+	ctf3d_squared = !parser.checkOption("--ctf3d_not_squared", "CTF3D files contain sqrt(CTF^2) patterns");
+
 	int expert_section = parser.addSection("Expert options");
 	fn_sub = parser.getOption("--subtract","Subtract projections of this map from the images used for reconstruction", "");
 	if (parser.checkOption("--NN", "Use nearest-neighbour instead of linear interpolation before gridding correction"))
@@ -318,9 +323,11 @@ void Reconstructor::backprojectOneParticle(long int p)
 {
 	RFLOAT rot, tilt, psi, fom, r_ewald_sphere;
 	Matrix2D<RFLOAT> A3D;
-	MultidimArray<RFLOAT> Fctf;
+	MultidimArray<RFLOAT> Fctf, FstMulti;
 	Matrix1D<RFLOAT> trans(2);
 	FourierTransformer transformer;
+
+	bool do_subtomo_correction = false;
 
 	int randSubset = 0, classid = 0;
 	DF.getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
@@ -496,7 +503,34 @@ void Reconstructor::backprojectOneParticle(long int p)
 			// otherwise, just window the CTF to the current resolution
 			else if (XSIZE(Ictf()) == YSIZE(Ictf()) / 2 + 1)
 			{
-				windowFourierTransform(Ictf(), Fctf, YSIZE(Fctf));
+				// If subtomos are not normalised MULTI is included and we don't need to read it
+				if (ZSIZE(Ictf()) == YSIZE(Ictf()) || !normalised_subtomo || skip_subtomo_correction)
+				{
+					windowFourierTransform(Ictf(), Fctf, YSIZE(Fctf));
+				}
+				else if (ZSIZE(Ictf()) == YSIZE(Ictf())*2) // Subtomo multiplicity weights included in the CTF file
+				{
+					FstMulti.resize(F2D);
+					do_subtomo_correction = true;
+					MultidimArray<RFLOAT> &Mctf = Ictf();
+					long int max_r2 = (XSIZE(Mctf) -1) * (XSIZE(Mctf) - 1);
+					FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+					{
+						// Make sure windowed FT has nothing in the corners, otherwise we end up with an asymmetric FT!
+						if (kp*kp + ip*ip + jp*jp <= max_r2)
+						{
+							FFTW_ELEM(Fctf, kp, ip, jp) = DIRECT_A3D_ELEM(Mctf, ((kp < 0) ? (kp + YSIZE(Mctf)) : (kp)), \
+								((ip < 0) ? (ip + YSIZE(Mctf)) : (ip)), jp);
+							FFTW_ELEM(FstMulti, kp, ip, jp) = DIRECT_A3D_ELEM(Mctf, ((kp < 0) ? (kp + ZSIZE(Mctf)) : (kp + YSIZE(Mctf))), \
+								((ip < 0) ? (ip + YSIZE(Mctf)) : (ip)), jp);
+						}
+						else
+						{
+							FFTW_ELEM(Fctf, kp, ip, jp) = 0.;
+							FFTW_ELEM(FstMulti, kp, ip, jp) = 0.;
+						}
+					}
+				}
 			}
 			// if dimensions are neither cubical nor FFTW, stop
 			else
@@ -504,13 +538,13 @@ void Reconstructor::backprojectOneParticle(long int p)
 				REPORT_ERROR("3D CTF volume must be either cubical or adhere to FFTW format!");
 			}
 		}
-		else
-		{
-			CTF ctf;
-			if (do_ignore_optics)
-				ctf.read(DF, DF, p);
-			else
-				ctf.readByGroup(DF, &obsModel, p);
+        else
+        {
+            CTF ctf;
+            if (do_ignore_optics)
+                ctf.read(DF, DF, p);
+            else
+                ctf.readByGroup(DF, &obsModel, p);
 
 			ctf.getFftwImage(Fctf, mysize, mysize, angpix,
 			                 ctf_phase_flipped, only_flip_phases,
@@ -590,9 +624,33 @@ void Reconstructor::backprojectOneParticle(long int p)
 					DIRECT_MULTIDIM_ELEM(F2D, n)  *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 				}
 			}
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+			if (do_subtomo_correction && normalised_subtomo) // Subtomos have always to be reconstructed ctf_premultiplied
 			{
-				DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+				if (ctf3d_squared)
+				{
+					Image<RFLOAT> tt;
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
+					{
+						DIRECT_MULTIDIM_ELEM(F2D, n)  *= DIRECT_MULTIDIM_ELEM(FstMulti, n);
+						DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(FstMulti, n);
+					}
+				}
+				else
+				{
+					Image<RFLOAT> tt;
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
+					{
+						DIRECT_MULTIDIM_ELEM(F2D, n)  *= DIRECT_MULTIDIM_ELEM(FstMulti, n);
+						DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n) * DIRECT_MULTIDIM_ELEM(FstMulti, n);
+					}
+				}
+			}
+			else if (data_dim == 2 || !ctf3d_squared)
+			{
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+				{
+					DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+				}
 			}
 		}
 
