@@ -389,7 +389,7 @@ void CenterFFTbySign(MultidimArray <T> &v)
 
     FOR_ALL_ELEMENTS_IN_ARRAY3D(v)
     {
-        if ((k + i + j) & 1 != 0) // if ODD
+        if ((k ^ i ^ j) & 1 != 0) // if ODD
             DIRECT_A3D_ELEM(v, k, i, j) *= -1;
     }
 }
