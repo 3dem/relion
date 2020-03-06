@@ -370,6 +370,8 @@ void Reconstructor::backprojectOneParticle(long int p)
 		myBoxSize = obsModel.getBoxSize(opticsGroup);
 		myPixelSize = obsModel.getPixelSize(opticsGroup);
 		ctf_premultiplied = obsModel.getCtfPremultiplied(opticsGroup);
+		if (do_ewald && ctf_premultiplied)
+			REPORT_ERROR("We cannot perform Ewald sphere correction on CTF premultiplied particles.");
 		Matrix2D<RFLOAT> magMat;
 		if (!do_ewald)
 		{
