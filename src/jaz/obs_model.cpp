@@ -126,7 +126,7 @@ void ObservationModel::loadSafely(std::string filename, ObservationModel& obsMod
 		obsModel.sortOpticsGroups(particlesMdt);
 	}
 
-	if (tablename != "particles" && obsModel.opticsMdt.containsLabel(EMDL_IMAGE_PIXEL_SIZE))
+	if (mytablename != "particles" && obsModel.opticsMdt.containsLabel(EMDL_IMAGE_PIXEL_SIZE))
 	{
 		std::cerr << "WARNING: This is not a particle STAR file but contains rlnImagePixelSize column." << std::endl;
 		if (!obsModel.opticsMdt.containsLabel(EMDL_MICROGRAPH_PIXEL_SIZE))
