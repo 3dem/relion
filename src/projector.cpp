@@ -328,10 +328,6 @@ void Projector::computeFourierTransformMap(
 											  ~dfourier_mask, fmXsz, fmYsz, fmZsz, do_fourier_mask);
 		ddata.setHostPtr(MULTIDIM_ARRAY(data));
 		ddata.cpToHost();
-		dcounter.setHostPtr(MULTIDIM_ARRAY(counter));
-		dcounter.cpToHost();
-		dpower_spectrum.setHostPtr(MULTIDIM_ARRAY(power_spectrum));
-		dpower_spectrum.cpToHost();
 		dfourier_mask.freeIfSet();
 #endif
 	}
@@ -356,6 +352,7 @@ void Projector::computeFourierTransformMap(
 	// Calculate radial average of power spectrum
 	if(do_heavy)
 	{
+#ifndef CUDA
 		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(power_spectrum)
 		{
 			if (DIRECT_A1D_ELEM(counter, i) < 1.)
@@ -363,6 +360,11 @@ void Projector::computeFourierTransformMap(
 			else
 				DIRECT_A1D_ELEM(power_spectrum, i) /= DIRECT_A1D_ELEM(counter, i);
 		}
+#else
+		run_updatePowerSpectrum(~dcounter, dcounter.getSize(), ~dpower_spectrum);
+		dpower_spectrum.setHostPtr(MULTIDIM_ARRAY(power_spectrum));
+		dpower_spectrum.cpToHost();
+#endif
 	}
 	TIMING_TOC(TIMING_POW);
 

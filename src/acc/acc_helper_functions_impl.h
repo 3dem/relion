@@ -1886,6 +1886,14 @@ void run_calcPowerSpectrum(Complex *dFaux, int padoridim, Complex *ddata, int da
 #endif
 }
 
+void run_updatePowerSpectrum(RFLOAT *dcounter, int sz, RFLOAT *dpower_spectrum)
+{
+#ifdef CUDA
+	cuda_kernel_updatePowerSpectrum<<<ceil(sz/(float)256),256>>>(dcounter, dpower_spectrum, sz);
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
+#endif
+}
+
 
 void selfApplyBeamTilt2(MultidimArray<Complex > &Fimg, RFLOAT beamtilt_x, RFLOAT beamtilt_y,
 		RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size)

@@ -1002,3 +1002,14 @@ __global__ void cuda_kernel_griddingCorrect(RFLOAT *vol, int interpolator, RFLOA
 	}
 }
 
+__global__ void cuda_kernel_updatePowerSpectrum(RFLOAT *dcounter, RFLOAT *dpower_spectrum, int sz)
+{
+	int idx = blockIdx.x*blockDim.x + threadIdx.x;
+	if(idx<sz)
+	{
+		if (dcounter[idx] < 1.)
+			dpower_spectrum[idx] = 0.;
+		else
+			dpower_spectrum[idx] /= dcounter[idx];
+	}
+}

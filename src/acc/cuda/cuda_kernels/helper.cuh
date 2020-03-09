@@ -997,4 +997,5 @@ template __global__ void cuda_kernel_calcPowerSpectrum(double2*, int, double2*, 
 template __global__ void cuda_kernel_calcPowerSpectrum(float2*, int, float2*, int , RFLOAT*, RFLOAT*, int, int, RFLOAT, RFLOAT, RFLOAT,
 											  RFLOAT*, int, int, int, bool);
 
+__global__ void cuda_kernel_updatePowerSpectrum(RFLOAT *dcounter, RFLOAT *dpower_spectrum, int sz);
 #endif /* CUDA_HELPER_KERNELS_CUH_ */
