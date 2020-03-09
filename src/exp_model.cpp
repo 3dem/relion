@@ -124,7 +124,8 @@ long int Experiment::addParticle(std::string part_name, int random_subset)
 	particle.name = part_name;
 	particle.random_subset = random_subset;
 
-	// Push back this particle in the particles vector
+	// Push back this particle in the particles vector and its sorted index in sorted_idx
+	sorted_idx.push_back(particles.size());
 	particles.push_back(particle);
 
 	// Return the current part_id in the particles vector
@@ -342,19 +343,8 @@ void Experiment::divideParticlesInRandomHalves(int seed, bool do_helical_refine)
 	if (nr_particles_subset2 == 0 || nr_particles_subset1 == 0)
 		REPORT_ERROR("ERROR: one of your half sets has no segments. Is rlnRandomSubset set to 1 or 2 in your particles STAR file? Or in case you're doing helical, half-sets are always per-filament, so provide at least 2 filaments.");
 
-	std::stable_sort(particles.begin(), particles.end(), compareRandomSubsetParticles);
-}
+	std::stable_sort(sorted_idx.begin(), sorted_idx.end(), compareRandomSubsetParticles(particles));
 
-// for sorting particles, based on the optics group of their first image
-bool compareOpticsGroupsParticles(const ExpParticle &a, const ExpParticle &b)
-{
-	return (a.images[0].optics_group < b.images[0].optics_group);
-}
-
-// for sorting particles, based on the random subset
-bool compareRandomSubsetParticles(const ExpParticle &a, const ExpParticle &b)
-{
-	return (a.random_subset < b.random_subset);
 }
 
 void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, bool do_subsets)
@@ -367,7 +357,7 @@ void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, 
 
 		if (do_split_random_halves)
 		{
-			std::stable_sort(particles.begin(), particles.end(), compareRandomSubsetParticles);
+			std::stable_sort(sorted_idx.begin(), sorted_idx.end(), compareRandomSubsetParticles(particles));
 
 			// sanity check
 			long int nr_half1 = 0, nr_half2 = 0;
@@ -388,22 +378,23 @@ void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, 
 				REPORT_ERROR("ERROR Experiment::randomiseParticlesOrder: invalid half2 size:" + integerToString(nr_half2) + " != " + integerToString(nr_particles_subset2));
 
 			// Randomise the two particle lists
-			std::random_shuffle(particles.begin(), particles.begin() + nr_half1);
-			std::random_shuffle(particles.begin() + nr_half1, particles.end());
+			std::random_shuffle(sorted_idx.begin(), sorted_idx.begin() + nr_half1);
+			std::random_shuffle(sorted_idx.begin() + nr_half1, sorted_idx.end());
 
 			// Make sure the particles are sorted on their optics_group.
 			// Otherwise CudaFFT re-calculation of plans every time image size changes slows down things a lot!
-			std::stable_sort(particles.begin(), particles.begin() + nr_half1, compareOpticsGroupsParticles);
-			std::stable_sort(particles.begin() + nr_half1, particles.end(), compareOpticsGroupsParticles);
+			std::stable_sort(sorted_idx.begin(), sorted_idx.begin() + nr_half1, compareOpticsGroupsParticles(particles));
+			std::stable_sort(sorted_idx.begin() + nr_half1, sorted_idx.end(), compareOpticsGroupsParticles(particles));
+
 		}
 		else
 		{
 			// Just randomise the entire vector
-			std::random_shuffle(particles.begin(), particles.end());
+			std::random_shuffle(sorted_idx.begin(), sorted_idx.end());
 
 			// Make sure the particles are sorted on their optics_group.
 			// Otherwise CudaFFT re-calculation of plans every time image size changes slows down things a lot!
- 			std::stable_sort(particles.begin(), particles.end(), compareOpticsGroupsParticles);
+ 			std::stable_sort(sorted_idx.begin(), sorted_idx.end(), compareOpticsGroupsParticles(particles));
 		}
 
 		randomised = true;
