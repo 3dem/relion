@@ -855,7 +855,7 @@ public:
 	void doThreadExpectationSomeParticles(int thread_id);
 
 	/* Perform the expectation integration over all k, phi and series elements for a given particle */
-	void expectationOneParticle(long int part_id, int thread_id);
+	void expectationOneParticle(long int part_id_sorted, int thread_id);
 
 	/* Function to call symmetrise of BackProjector helical objects for each class or body
 	 * Do rise and twist for all asymmetrical units in Fourier space

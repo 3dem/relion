@@ -67,12 +67,12 @@ void ParticleSubtractor::divideLabour(int _rank, int _size, long int &my_first, 
     		my_first += opt.mydata.numberOfParticles(1);
     		my_last += opt.mydata.numberOfParticles(1);
 		}
+		//std::cerr << " rank= " << rank << " my_first= " << my_first << " my_last= " << my_last << " mysize= " <<mysize << "my_halfset= " <<my_halfset<< std::endl;
 	}
 	else
 	{
 		divide_equally(opt.mydata.numberOfParticles(), _size, _rank, my_first, my_last);
 	}
-	// std::cerr << "_size= " <<_size << " _rank= " << _rank << " my_first= " << my_first << " my_last= " << my_last << std::endl;
 }
 
 // Initialise some stuff after reading
@@ -104,29 +104,7 @@ void ParticleSubtractor::initialise(int _rank, int _size)
 		opt.mydata.read(fn_sel, false, false, false, is_helical_segment);
 	}
 
-	if (opt.do_split_random_halves)
-	{
-		if (size < 2) REPORT_ERROR("ERROR: for subtraction with half-sets you need at least 2 MPI processes!");
-
-		int nr_slaves_halfset1 = (size / 2) + size%2;
-		int nr_slaves_halfset2 = (size / 2);
-		int my_subset = (rank % 2) + 1;
-
-		if (my_subset == 1)
-		{
-			divide_equally(opt.mydata.numberOfParticles(1), nr_slaves_halfset1, rank / 2, my_first_part_id, my_last_part_id);
-		}
-		else
-		{
-			divide_equally(opt.mydata.numberOfParticles(2), nr_slaves_halfset2, (rank - 1) / 2, my_first_part_id, my_last_part_id);
-			my_first_part_id += opt.mydata.numberOfParticles(1);
-			my_last_part_id += opt.mydata.numberOfParticles(1);
-		}
-	}
-	else
-	{
-		divideLabour(rank, size, my_first_part_id, my_last_part_id);
-	}
+	divideLabour(rank, size, my_first_part_id, my_last_part_id);
 
 	if (verb > 0) std::cout << " + Reading in mask ... " << std::endl;
 	// Mask stuff
@@ -316,7 +294,7 @@ void ParticleSubtractor::run()
 
 	MDimg_out.clear();
 	//for (long int part_id_sorted = my_first_part_id, cc = 0; part_id_sorted <= my_last_part_id; part_id_sorted++, cc++)
-	for (long int part_id = my_first_part_id, cc = 0; part_id <= my_last_part_id; part_id++, cc++)
+	for (long int part_id_sorted = my_first_part_id, cc = 0; part_id_sorted <= my_last_part_id; part_id_sorted++, cc++)
 	{
 
 		//long int part_id = opt.mydata.sorted_idx[part_id_sorted];
@@ -326,6 +304,7 @@ void ParticleSubtractor::run()
 				exit(RELION_EXIT_ABORTED);
 		}
 
+		long int part_id = opt.mydata.sorted_idx[part_id_sorted];
 		subtractOneParticle(part_id, 0, cc);
 
 		if (cc % barstep == 0 && verb > 0) progress_bar(cc);
@@ -444,7 +423,7 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 
 
 	// Make sure gold-standard is adhered to!
-	int my_subset = (rank % 2) + 1;
+	int my_subset = (rank % 2 == 1) ? 1 : 2;
 	if (opt.do_split_random_halves && my_subset != opt.mydata.getRandomSubset(part_id))
 	{
 		std::cerr << " rank= " << rank << " part_id= " << part_id << " opt.mydata.getRandomSubset(part_id)= " << opt.mydata.getRandomSubset(part_id) << std::endl;
