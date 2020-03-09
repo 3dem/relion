@@ -214,6 +214,7 @@ void Projector::computeFourierTransformMap(
 		dMpad.setHostPtr(MULTIDIM_ARRAY(Mpad));
 		dMpad.cpToHost();
 		dMpad.freeIfSet();
+		dvol.freeDevice();
 #else
 		FOR_ALL_ELEMENTS_IN_ARRAY3D(vol_in) // This will also work for 2D
 			A3D_ELEM(Mpad, k, i, j) = A3D_ELEM(vol_in, k, i, j);
@@ -236,7 +237,6 @@ void Projector::computeFourierTransformMap(
 		dFaux.accAlloc();
 		dFaux.cpToDevice();
 		run_CenterFFTbySign(~dFaux, XSIZE(Faux), YSIZE(Faux), ZSIZE(Faux));
-		dFaux.cpToHost();
 	}
 #else
 		CenterFFTbySign(Faux);
@@ -245,6 +245,9 @@ void Projector::computeFourierTransformMap(
 
 	TIMING_TIC(TIMING_INIT2);
 	// Free memory: Mpad no longer needed
+#ifdef CUDA
+	dMpad.freeIfSet();
+#endif
 	Mpad.clear();
 
 	// Resize data array to the right size and initialise to zero
@@ -253,6 +256,33 @@ void Projector::computeFourierTransformMap(
 	// Fill data only for those points with distance to origin less than max_r
 	// (other points will be zero because of initZeros() call above
 	// Also calculate radial power spectrum
+#ifdef CUDA
+	int fourier_mask_sz = (do_fourier_mask)?MULTIDIM_SIZE(*fourier_mask):16;
+	int fmXsz, fmYsz, fmZsz;
+	AccPtr<Complex> ddata = ptrFactory.make<Complex>(MULTIDIM_SIZE(data));
+	AccPtr<RFLOAT> dfourier_mask = ptrFactory.make<RFLOAT>(fourier_mask_sz);
+	AccPtr<RFLOAT> dpower_spectrum = ptrFactory.make<RFLOAT>(ori_size / 2 + 1);
+	AccPtr<RFLOAT> dcounter = ptrFactory.make<RFLOAT>(ori_size / 2 + 1);
+
+	if(do_heavy){
+		ddata.accAlloc();
+		dpower_spectrum.accAlloc();
+		dcounter.accAlloc();
+		ddata.deviceInit(0);
+		dpower_spectrum.deviceInit(0);
+		dcounter.deviceInit(0);
+		dfourier_mask.accAlloc();
+		fmXsz = fmYsz = fmZsz = 0;
+		if(do_fourier_mask)
+		{
+			dfourier_mask.setHostPtr(MULTIDIM_ARRAY(*fourier_mask));
+			dfourier_mask.cpToDevice();
+			fmXsz = XSIZE(*fourier_mask);
+			fmYsz = YSIZE(*fourier_mask);
+			fmZsz = ZSIZE(*fourier_mask);
+		}
+	}
+#endif
 	power_spectrum.initZeros(ori_size / 2 + 1);
 	MultidimArray<RFLOAT> counter(power_spectrum);
 	counter.initZeros();
@@ -269,6 +299,7 @@ void Projector::computeFourierTransformMap(
 	if(do_heavy)
 	{
 		RFLOAT weight = 1.;
+#ifndef CUDA
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux) // This will also work for 2D
 		{
 			int r2 = kp*kp + ip*ip + jp*jp;
@@ -291,6 +322,18 @@ void Projector::computeFourierTransformMap(
 					A3D_ELEM(data, kp, ip, jp) = 0;
 			}
 		}
+#else
+		run_calcPowerSpectrum(~dFaux, padoridim, ~ddata, ZSIZE(data), ~dpower_spectrum, ~dcounter,
+											  max_r2, min_r2, normfft, padding_factor, weight,
+											  ~dfourier_mask, fmXsz, fmYsz, fmZsz, do_fourier_mask);
+		ddata.setHostPtr(MULTIDIM_ARRAY(data));
+		ddata.cpToHost();
+		dcounter.setHostPtr(MULTIDIM_ARRAY(counter));
+		dcounter.cpToHost();
+		dpower_spectrum.setHostPtr(MULTIDIM_ARRAY(power_spectrum));
+		dpower_spectrum.cpToHost();
+		dfourier_mask.freeIfSet();
+#endif
 	}
 	TIMING_TOC(TIMING_FAUX);
 
@@ -325,6 +368,9 @@ void Projector::computeFourierTransformMap(
 
 	TIMING_TOC(TIMING_TOP);
 #ifdef CUDA
+	ddata.freeIfSet();
+	dpower_spectrum.freeIfSet();
+	dcounter.freeIfSet();
 	dvol.freeIfSet();
 	dMpad.freeIfSet();
 	dFaux.freeIfSet();

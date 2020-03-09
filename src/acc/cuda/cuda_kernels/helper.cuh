@@ -940,4 +940,61 @@ __global__ void cuda_kernel_centerFFTbySign(T *img_in,
 template __global__ void cuda_kernel_centerFFTbySign<double2>(double2*, int, int, int);
 template __global__ void cuda_kernel_centerFFTbySign<float2>(float2*, int, int, int);
 
+template <typename T>
+__global__ void cuda_kernel_calcPowerSpectrum(T *dFaux, int padoridim, T *ddata, int data_sz, RFLOAT *dpower_spectrum, RFLOAT *dcounter,
+											  int max_r2, int min_r2, RFLOAT normfft, RFLOAT padding_factor, RFLOAT weight,
+											  RFLOAT *dfourier_mask, int fx, int fy, int fz, bool do_fourier_mask)
+{
+	int idx = blockIdx.x*blockDim.x + threadIdx.x;
+	int idy = blockIdx.y*blockDim.y + threadIdx.y;
+	int idz = blockIdx.z*blockDim.z + threadIdx.z;
+	int XSIZE = padoridim/2+1;
+	if(idx<XSIZE && idy<padoridim && idz<padoridim)
+	{
+		int jp = idx;
+		int ip = (idy<XSIZE)? idy:idy-padoridim;
+		int kp = (idz<XSIZE)? idz:idz-padoridim;
+		int r2 = kp*kp + ip*ip + jp*jp;
+		// The Fourier Transforms are all "normalised" for 2D transforms of size = ori_size x ori_size
+		if (r2 <= max_r2)
+		{
+			//if (do_fourier_mask) weight = FFTW_ELEM(*fourier_mask, ROUND(kp/padding_factor), ROUND(ip/padding_factor), ROUND(jp/padding_factor));
+			if (do_fourier_mask)
+			{
+				int lkp = ROUND(kp/padding_factor);
+				int lip = ROUND(ip/padding_factor);
+				int ljp = ROUND(jp/padding_factor);
+				lkp = (lkp < 0) ? (lkp + fz) : (lkp);
+				lip = (lip < 0) ? (lip + fy) : (lip);
+				weight = dfourier_mask[lkp*fy*fx + lip*fx + ljp];
+			}
+			// Set data array
+			RFLOAT norm;
+			T val;
+			val = dFaux[idz*XSIZE*padoridim + idy*XSIZE + idx];
+			val.x *= normfft; val.y *= normfft;
+			val.x *= weight;  val.y *= weight;
+			//A3D_ELEM(data, kp, ip, jp) = weight*DIRECT_A3D_ELEM(Faux, k, i, j) * normfft;
+			ddata[(kp+data_sz/2)*(data_sz/2+1)*data_sz + (ip+data_sz/2)*(data_sz/2+1)+ (jp)] = val;
+
+			// Calculate power spectrum
+			int ires = ROUND( sqrt((RFLOAT)r2) / padding_factor );
+			// Factor two because of two-dimensionality of the complex plane
+			norm = val.x*val.x + val.y*val.y;
+			norm /= 2.;
+			atomicAdd(dpower_spectrum+ires, norm);   //DIRECT_A1D_ELEM(power_spectrum, ires) += norm(A3D_ELEM(data, kp, ip, jp)) / 2.;
+			atomicAdd(dcounter+ires,weight);  //DIRECT_A1D_ELEM(counter, ires) += weight;
+			// Apply high pass filter of the reference only after calculating the power spectrum
+			val.x = val.y = 0.;
+			if (r2 <= min_r2)
+				ddata[(kp+data_sz/2)*(data_sz/2+1)*data_sz + (ip+data_sz/2)*(data_sz/2+1)+ (jp)] = val; //A3D_ELEM(data, kp, ip, jp) = 0;
+		}
+	}
+}
+
+template __global__ void cuda_kernel_calcPowerSpectrum(double2*, int, double2*, int , RFLOAT*, RFLOAT*, int, int, RFLOAT, RFLOAT, RFLOAT,
+											  RFLOAT*, int, int, int, bool);
+template __global__ void cuda_kernel_calcPowerSpectrum(float2*, int, float2*, int , RFLOAT*, RFLOAT*, int, int, RFLOAT, RFLOAT, RFLOAT,
+											  RFLOAT*, int, int, int, bool);
+
 #endif /* CUDA_HELPER_KERNELS_CUH_ */
