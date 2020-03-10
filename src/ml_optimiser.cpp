@@ -920,6 +920,11 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 		REPORT_ERROR("MlOptimiser::readStar: splitting data into two random halves, but rlnModelStarFile2 is empty. Probably you specified an optimiser STAR file generated with --force_converge. You cannot perform continuation or subtraction from this file. Please use one from the previous iteration.");
 	if (!MD.getValue(EMDL_OPTIMISER_LOWRES_LIMIT_EXP, strict_lowres_exp))
 		strict_lowres_exp = -1.;
+	// backward compatibility with relion-3.1
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_DO_MOM1, do_mom1))
+		do_mom1 = false;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_DO_MOM1, do_mom2))
+		do_mom2 = false;
 
 	// Initialise some stuff for first-iteration only (not relevant here...)
 	do_calculate_initial_sigma_noise = false;
@@ -1083,6 +1088,8 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_SGD_SUBSET_SIZE, subset_size);
 		MD.setValue(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, write_every_vmgd_iter);
 		MD.setValue(EMDL_OPTIMISER_SGD_STEPSIZE, vmgd_stepsize);
+		MD.setValue(EMDL_OPTIMISER_SGD_DO_MOM1, do_mom1);
+		MD.setValue(EMDL_OPTIMISER_SGD_DO_MOM2, do_mom2);
 		MD.setValue(EMDL_OPTIMISER_DO_AUTO_REFINE, do_auto_refine);
 		MD.setValue(EMDL_OPTIMISER_AUTO_LOCAL_HP_ORDER, autosampling_hporder_local_searches);
 		MD.setValue(EMDL_OPTIMISER_NR_ITER_WO_RESOL_GAIN, nr_iter_wo_resol_gain);
