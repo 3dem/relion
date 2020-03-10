@@ -428,6 +428,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 				{
 					DIRECT_NZYX_ELEM(img(), iclass, 0, i, j) = DIRECT_A2D_ELEM(Igrad2[iclass], i, j);
 				}
+
 			}
 			img.write(fn_out + "_2moment.mrcs");
 		}
@@ -830,7 +831,8 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 				{
 					MultidimArray<RFLOAT> zeros;
 					int pad_size = 2 * (ROUND(padding_factor * XSIZE(Iref[0])) + 1) + 1;
-					zeros.initZeros(pad_size, pad_size, pad_size/2 + 1);
+					if (_is_3d_model) zeros.initZeros(pad_size, pad_size, pad_size/2 + 1);
+					else zeros.initZeros(pad_size, pad_size/2 + 1);
 					zeros.setXmippOrigin();
 					zeros.xinit = 0;
 					Igrad2.push_back(zeros);
@@ -888,7 +890,8 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 					{
 						MultidimArray<RFLOAT> zeros;
 						int pad_size = 2 * (ROUND(padding_factor * XSIZE(Iref[0])) + 1) + 1;
-						zeros.initZeros(pad_size, pad_size, pad_size/2 + 1);
+						if (_is_3d_model) zeros.initZeros(pad_size, pad_size, pad_size/2 + 1);
+						else zeros.initZeros(pad_size, pad_size/2 + 1);
 						zeros.setXmippOrigin();
 						zeros.xinit = 0;
 						Igrad2.push_back(zeros);
@@ -1017,7 +1020,8 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 			{
 				MultidimArray<RFLOAT> zeros;
 				int pad_size = 2 * (ROUND(padding_factor * XSIZE(Iref[0])) + 1) + 1;
-				zeros.initZeros(pad_size, pad_size, pad_size/2 + 1);
+				if (_is_3d_model) zeros.initZeros(pad_size, pad_size, pad_size/2 + 1);
+				else zeros.initZeros(pad_size, pad_size/2 + 1);
 				zeros.setXmippOrigin();
 				zeros.xinit = 0;
 				Igrad2.push_back(zeros);
