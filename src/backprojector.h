@@ -92,6 +92,9 @@ public:
 		SL.read_sym_file(fn_sym);
 
 		// Padding factor for the map
+		if (_padding_factor_3d < 1.0)
+			REPORT_ERROR("Padding factor cannot be less than 1.");
+
 		padding_factor = _padding_factor_3d;
 
 		// Interpolation scheme
@@ -288,8 +291,11 @@ public:
 	*/
 	void externalReconstruct(MultidimArray<RFLOAT> &vol_out,
 	                         FileName &fn_out,
-	                         const MultidimArray<RFLOAT> &fsc_halves,
-	                         const MultidimArray<RFLOAT> &tau2,
+	                         MultidimArray<RFLOAT> &fsc_halves_io,
+	                         MultidimArray<RFLOAT> &tau2_io,
+							 MultidimArray<RFLOAT> &sigma2_ref,
+							 MultidimArray<RFLOAT> &data_vs_prior,
+							 bool is_whole_instead_of_half = false,
 	                         RFLOAT tau2_fudge = 1.,
 	                         int verb = 0);
 

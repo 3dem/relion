@@ -499,9 +499,7 @@ __global__ void cuda_kernel_centerFFT_2D(XFLOAT *img_in,
 										 int yshift)
 {
 
-	__shared__ XFLOAT buffer[CFTT_BLOCK_SIZE];
-	int tid = threadIdx.x;
-	int pixel = threadIdx.x + blockIdx.x*CFTT_BLOCK_SIZE;
+	int pixel = threadIdx.x + blockIdx.x*blockDim.x;
 	long int image_offset = image_size*blockIdx.y;
 //	int pixel_pass_num = ceilfracf(image_size, CFTT_BLOCK_SIZE);
 
@@ -512,23 +510,13 @@ __global__ void cuda_kernel_centerFFT_2D(XFLOAT *img_in,
 			int y = floorf((XFLOAT)pixel/(XFLOAT)xdim);
 			int x = pixel % xdim;				// also = pixel - y*xdim, but this depends on y having been calculated, i.e. serial evaluation
 
-			int yp = y + yshift;
-			if (yp < 0)
-				yp += ydim;
-			else if (yp >= ydim)
-				yp -= ydim;
-
-			int xp = x + xshift;
-			if (xp < 0)
-				xp += xdim;
-			else if (xp >= xdim)
-				xp -= xdim;
-
+			int yp = (y + yshift + ydim)%ydim;
+			int xp = (x + xshift + xdim)%xdim;
 			int n_pixel = yp*xdim + xp;
 
-			buffer[tid]                    = img_in[image_offset + n_pixel];
+			XFLOAT buffer                  = img_in[image_offset + n_pixel];
 			img_in[image_offset + n_pixel] = img_in[image_offset + pixel];
-			img_in[image_offset + pixel]   = buffer[tid];
+			img_in[image_offset + pixel]   = buffer;
 		}
 //	}
 }
@@ -543,9 +531,7 @@ __global__ void cuda_kernel_centerFFT_3D(XFLOAT *img_in,
 									 	 int zshift)
 {
 
-	__shared__ XFLOAT buffer[CFTT_BLOCK_SIZE];
-	int tid = threadIdx.x;
-	int pixel = threadIdx.x + blockIdx.x*CFTT_BLOCK_SIZE;
+	int pixel = threadIdx.x + blockIdx.x*blockDim.x;
 	long int image_offset = image_size*blockIdx.y;
 
 		int xydim = xdim*ydim;
@@ -556,29 +542,15 @@ __global__ void cuda_kernel_centerFFT_3D(XFLOAT *img_in,
 			int y = floorf((XFLOAT)xy/(XFLOAT)xdim);
 			int x = xy % xdim;
 
-			int xp = x + xshift;
-			if (xp < 0)
-				xp += xdim;
-			else if (xp >= xdim)
-				xp -= xdim;
-
-			int yp = y + yshift;
-			if (yp < 0)
-				yp += ydim;
-			else if (yp >= ydim)
-				yp -= ydim;
-
-			int zp = z + zshift;
-			if (zp < 0)
-				zp += zdim;
-			else if (zp >= zdim)
-				zp -= zdim;
+			int xp = (x + xshift + xdim)%xdim;
+			int yp = (y + yshift + ydim)%ydim;
+			int zp = (z + zshift + zdim)%zdim;
 
 			int n_pixel = zp*xydim + yp*xdim + xp;
 
-			buffer[tid]                    = img_in[image_offset + n_pixel];
+			XFLOAT buffer                  = img_in[image_offset + n_pixel];
 			img_in[image_offset + n_pixel] = img_in[image_offset + pixel];
-			img_in[image_offset + pixel]   = buffer[tid];
+			img_in[image_offset + pixel]   = buffer;
 		}
 }
 
@@ -655,7 +627,7 @@ __global__ void cuda_kernel_rotateOnly(   ACCCOMPLEX *d_Faux,
 {
 	int proj = blockIdx.y;
 	int image_size=projector.imgX*projector.imgY;
-	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	int pixel = threadIdx.x + blockIdx.x*blockDim.x;
 	if(pixel<image_size)
 	{
 		int y = floorfracf(pixel,projector.imgX);
@@ -696,7 +668,7 @@ __global__ void cuda_kernel_rotateAndCtf( ACCCOMPLEX *d_Faux,
 {
 	int proj = blockIdx.y;
 	int image_size=projector.imgX*projector.imgY;
-	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	int pixel = threadIdx.x + blockIdx.x*blockDim.x;
 	if(pixel<image_size)
 	{
 		int y = floorfracf(pixel,projector.imgX);
@@ -734,7 +706,7 @@ __global__ void cuda_kernel_convol_A( ACCCOMPLEX *d_A,
 									 ACCCOMPLEX *d_B,
 									 int image_size)
 {
-	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	int pixel = threadIdx.x + blockIdx.x*blockDim.x;
 	if(pixel<image_size)
 	{
 		XFLOAT tr =   d_A[pixel].x;
@@ -749,7 +721,7 @@ __global__ void cuda_kernel_convol_A( ACCCOMPLEX *d_A,
 									 ACCCOMPLEX *d_C,
 									 int image_size)
 {
-	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	int pixel = threadIdx.x + blockIdx.x*blockDim.x;
 	if(pixel<image_size)
 	{
 		XFLOAT tr =   d_A[pixel].x;
@@ -763,7 +735,7 @@ __global__ void cuda_kernel_batch_convol_A( ACCCOMPLEX *d_A,
 									 	 	ACCCOMPLEX *d_B,
 									 	 	int image_size)
 {
-	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	int pixel = threadIdx.x + blockIdx.x*blockDim.x;
 	int A_off = blockIdx.y*image_size;
 	if(pixel<image_size)
 	{
@@ -779,7 +751,7 @@ __global__ void cuda_kernel_batch_convol_A( ACCCOMPLEX *d_A,
 									 	 	ACCCOMPLEX *d_C,
 									 	 	int image_size)
 {
-	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	int pixel = threadIdx.x + blockIdx.x*blockDim.x;
 	int A_off = blockIdx.y*image_size;
 	if(pixel<image_size)
 	{
@@ -794,7 +766,7 @@ __global__ void cuda_kernel_convol_B(	 ACCCOMPLEX *d_A,
 									 	 ACCCOMPLEX *d_B,
 									 	 int image_size)
 {
-	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	int pixel = threadIdx.x + blockIdx.x*blockDim.x;
 	if(pixel<image_size)
 	{
 		XFLOAT tr = d_A[pixel].x;
@@ -809,7 +781,7 @@ __global__ void cuda_kernel_convol_B(	 ACCCOMPLEX *d_A,
 									 	 ACCCOMPLEX *d_C,
 									 	 int image_size)
 {
-	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	int pixel = threadIdx.x + blockIdx.x*blockDim.x;
 	if(pixel<image_size)
 	{
 		XFLOAT tr = d_A[pixel].x;
@@ -823,7 +795,7 @@ __global__ void cuda_kernel_batch_convol_B(	 ACCCOMPLEX *d_A,
 									 	 	 ACCCOMPLEX *d_B,
 									 	 	 int image_size)
 {
-	long int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	long int pixel = threadIdx.x + blockIdx.x*blockDim.x;
 	int A_off = blockIdx.y*image_size;
 	if(pixel<image_size)
 	{
@@ -840,7 +812,7 @@ __global__ void cuda_kernel_batch_multi( XFLOAT *A,
 								   XFLOAT S,
 		  	  	  	  	  	  	   int image_size)
 {
-	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	int pixel = threadIdx.x + blockIdx.x*blockDim.x;
 	if(pixel<image_size)
 		OUT[pixel + blockIdx.y*image_size] = A[pixel + blockIdx.y*image_size]*B[pixel + blockIdx.y*image_size]*S;
 }
@@ -850,7 +822,7 @@ __global__ void cuda_kernel_finalizeMstddev( XFLOAT *Mstddev,
 											 XFLOAT S,
 											 int image_size)
 {
-	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	int pixel = threadIdx.x + blockIdx.x*blockDim.x;
 	if(pixel<image_size)
 	{
 		XFLOAT temp = Mstddev[pixel] + S * aux[pixel];
@@ -865,7 +837,7 @@ __global__ void cuda_kernel_square(
 		XFLOAT *A,
 		int image_size)
 {
-	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	int pixel = threadIdx.x + blockIdx.x*blockDim.x;
 	if(pixel<image_size)
 		A[pixel] = A[pixel]*A[pixel];
 }
@@ -876,7 +848,7 @@ __global__ void cuda_kernel_make_eulers_2D(
 		XFLOAT *eulers,
 		unsigned orientation_num)
 {
-	unsigned oid = blockIdx.x * BLOCK_SIZE + threadIdx.x; //Orientation id
+	unsigned oid = blockIdx.x * blockDim.x + threadIdx.x; //Orientation id
 
 	if (oid >= orientation_num)
 		return;
@@ -929,7 +901,7 @@ __global__ void cuda_kernel_make_eulers_3D(
 	XFLOAT a(0.f),b(0.f),g(0.f), A[9],B[9];
 	XFLOAT ca, sa, cb, sb, cg, sg, cc, cs, sc, ss;
 
-	unsigned oid = blockIdx.x * BLOCK_SIZE + threadIdx.x; //Orientation id
+	unsigned oid = blockIdx.x * blockDim.x + threadIdx.x; //Orientation id
 
 	if (oid >= orientation_num)
 		return;
@@ -1058,3 +1030,16 @@ __global__ void cuda_kernel_allweights_to_mweights(
 				d_allweights[idx/translation_num * translation_num + idx%translation_num];
                 // TODO - isn't this just d_allweights[idx + idx%translation_num]?   Really?
 }
+
+__global__ void cuda_kernel_initOrientations(RFLOAT *pdfs, XFLOAT *pdf_orientation, bool *pdf_orientation_zeros, size_t sz)
+{
+	int idx = blockIdx.x*blockDim.x + threadIdx.x;
+	if(idx < sz){
+		pdf_orientation_zeros[idx] = (pdfs[idx] == 0);
+		if (pdfs[idx] == 0)
+			pdf_orientation[idx] = 0.f;
+		else
+			pdf_orientation[idx] = log(pdfs[idx]);
+	}
+}
+

@@ -459,6 +459,8 @@ void InitValue(AccPtr<T> &data, T value, size_t Size)
 #endif
 }
 
+void initOrientations(AccPtr<RFLOAT> &pdfs, AccPtr<XFLOAT> &pdf_orientation, AccPtr<XFLOAT> &pdf_orientation_zeros);
+
 void centerFFT_2D(int grid_size, int batch_size, int block_size,
 				cudaStream_t stream,
 				XFLOAT *img_in,
@@ -531,7 +533,7 @@ void frequencyPass(int grid_size, int block_size,
 #endif
 }
 
-template<bool CTFPREMULTIPLIED, bool REFCTF, bool REF3D, bool DATA3D, int block_sz>
+template<bool REFCTF, bool REF3D, bool DATA3D, int block_sz>
 void kernel_wavg(
 		XFLOAT *g_eulers,
 		AccProjectorKernel &projector,
@@ -558,7 +560,7 @@ void kernel_wavg(
 	//within the same block (this is done to reduce memory loads in the kernel).
 	dim3 block_dim = orientation_num;//ceil((float)orientation_num/(float)REF_GROUP_SIZE);
 
-	cuda_kernel_wavg<CTFPREMULTIPLIED, REFCTF,REF3D,DATA3D,block_sz><<<block_dim,block_sz,(3*block_sz+9)*sizeof(XFLOAT),stream>>>(
+	cuda_kernel_wavg<REFCTF,REF3D,DATA3D,block_sz><<<block_dim,block_sz,(3*block_sz+9)*sizeof(XFLOAT),stream>>>(
 		g_eulers,
 		projector,
 		image_size,

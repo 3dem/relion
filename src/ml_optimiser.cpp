@@ -183,6 +183,10 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	if (fnt != "OLD")
 		mymodel.tau2_fudge_factor = textToFloat(fnt);
 
+	auto_ignore_angle_changes = parser.checkOption("--auto_ignore_angles", "In auto-refinement, update angular sampling regardless of changes in orientations for convergence. This makes convergence faster.");
+	auto_resolution_based_angles= parser.checkOption("--auto_resol_angles", "In auto-refinement, update angular sampling based on resolution-based required sampling. This makes convergence faster.");
+	allow_coarser_samplings = parser.checkOption("--allow_coarser_sampling", "In 2D/3D classification, allow coarser angular and translational samplings if accuracies are bad (typically in earlier iterations.");
+
 	// Solvent flattening
 	if (parser.checkOption("--flatten_solvent", "Switch on masking on the references?", "OLD"))
 		do_solvent = true;
@@ -387,6 +391,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	normalised_subtomos = parser.checkOption("--normalised_subtomo", "Have subtomograms been multiplicity normalised? (Default=False)");
 	do_skip_subtomo_correction = parser.checkOption("--skip_subtomo_multi", "Skip subtomo multiplicity correction");
 	do_sigma2_3d = parser.checkOption("--do_sigma2_3d", "Expand sigma2 from 1d to 3d considering the CTF");
+	ctf3d_squared = !parser.checkOption("--ctf3d_not_squared", "CTF3D files contain sqrt(CTF^2) patterns");
 
 	int computation_section = parser.addSection("Computation");
 
@@ -658,6 +663,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	normalised_subtomos = parser.checkOption("--normalised_subtomo", "Have subtomograms been multiplicity normalised? (Default=False)");
 	do_skip_subtomo_correction = parser.checkOption("--skip_subtomo_multi", "Skip subtomo multiplicity correction");
 	do_sigma2_3d = parser.checkOption("--do_sigma2_3d", "Expand sigma2 from 1d to 3d considering the CTF");
+	ctf3d_squared = !parser.checkOption("--ctf3d_not_squared", "CTF3D files contain sqrt(CTF^2) patterns");
 
 	// Computation stuff
 	// The number of threads is always read from the command line
@@ -722,6 +728,9 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	failsafe_threshold = textToInteger(parser.getOption("--failsafe_threshold", "Maximum number of particles permitted to be handled by fail-safe mode, due to zero sum of weights, before exiting with an error (GPU only).", "40"));
 	do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
 	nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
+	auto_ignore_angle_changes = parser.checkOption("--auto_ignore_angles", "In auto-refinement, update angular sampling regardless of changes in orientations for convergence. This makes convergence faster.");
+	auto_resolution_based_angles= parser.checkOption("--auto_resol_angles", "In auto-refinement, update angular sampling based on resolution-based required sampling. This makes convergence faster.");
+	allow_coarser_samplings = parser.checkOption("--allow_coarser_sampling", "In 2D/3D classification, allow coarser angular and translational samplings if accuracies are bad (typically in earlier iterations.");
 	///////////////// Special stuff for first iteration (only accessible via CL, not through readSTAR ////////////////////
 
 	// When reading from the CL: always start at iteration 1 and subset 1
@@ -2254,8 +2263,6 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			Mavg += img();
 
 			// Calculate the power spectrum of this particle
-			CenterFFT(img(), true);
-
 			MultidimArray<RFLOAT> ind_spectrum, count;
 			int spectral_size = (mymodel.ori_size / 2) + 1;
 			ind_spectrum.initZeros(spectral_size);
@@ -2312,6 +2319,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				//A = mydata.obsModel.applyScaleDifference(A, optics_group, mymodel.ori_size, mymodel.pixel_size);
 				// Construct initial references from random subsets
 				windowFourierTransform(Faux, Fimg, wsum_model.current_size);
+				CenterFFTbySign(Fimg);
 				Fctf.resize(Fimg);
 				Fctf.initConstant(1.);
 
@@ -2768,8 +2776,11 @@ void MlOptimiser::expectation()
 	}
 
 	// D. Update the angular sampling (all nodes except master)
-	if ( (do_auto_refine || do_sgd) && iter > 1 )
+	if ( ( (do_auto_refine || do_sgd) && iter > 1) ||
+		 ( mymodel.nr_classes > 1 && allow_coarser_samplings) )
+	{
 		updateAngularSampling();
+	}
 
 	// E. Check whether everything fits into memory
 	expectationSetupCheckMemory(verb);
@@ -4111,6 +4122,9 @@ void MlOptimiser::maximization()
 							fn_ext_root,
 							mymodel.fsc_halves_class[iclass],
 							mymodel.tau2_class[iclass],
+							mymodel.sigma2_class[iclass],
+							mymodel.data_vs_prior_class[iclass],
+							(do_join_random_halves || do_always_join_random_halves),
 							mymodel.tau2_fudge_factor,
 							1); // verbose
 				}
@@ -4893,8 +4907,15 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		int group_id = mydata.getGroupId(part_id, img_id);
 		// What is my optics group?
 		int optics_group = mydata.getOpticsGroup(part_id, img_id);
+		bool ctf_premultiplied = mydata.obsModel.getCtfPremultiplied(optics_group);
 		RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
 		int my_image_size = mydata.getOpticsImageSize(optics_group);
+
+		// SHWS 13feb2020: new ctf_premultiplied replaces ctf arrays by ctf^2 arrays, then one can no longer not apply CTF to references...
+		if (ctf_premultiplied && !refs_are_ctf_corrected && mymodel.data_dim == 3)
+		{
+			REPORT_ERROR("ERROR: one can no longer use ctf_premultiplied and !refs_are_ctf_corrected for 3D data together...");
+		}
 
 		// metadata offset for this image in the particle
 		int my_metadata_offset = metadata_offset + img_id;
@@ -5334,9 +5355,9 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		// Always store FT of image without mask (to be used for the reconstruction)
 		MultidimArray<RFLOAT> img_aux;
 		img_aux = (has_converged && do_use_reconstruct_images) ? rec_img() : img();
-		CenterFFT(img_aux, true);
 		transformer.FourierTransform(img_aux, Faux);
 		windowFourierTransform(Faux, Fimg, image_current_size[optics_group]);
+		CenterFFTbySign(Fimg);
 
 		// Here apply the aberration corrections if necessary
 		mydata.obsModel.demodulatePhase(optics_group, Fimg);
@@ -5419,9 +5440,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 //		exit(0);
 #endif
 
-		// Inside Projector and Backprojector the origin of the Fourier Transform is centered!
-		CenterFFT(img(), true);
-
 		// Store the Fourier Transform of the image Fimg
 		transformer.FourierTransform(img(), Faux);
 
@@ -5458,6 +5476,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		// We never need any resolutions higher than current_size
 		// So resize the Fourier transforms
 		windowFourierTransform(Faux, Fimg, image_current_size[optics_group]);
+		// Inside Projector and Backprojector the origin of the Fourier Transform is centered!
+		CenterFFTbySign(Fimg);
 
 		// Also perform aberration correction on the masked image (which will be used for alignment)
 		mydata.obsModel.demodulatePhase(optics_group, Fimg);
@@ -5570,6 +5590,25 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 				{
 					REPORT_ERROR("3D CTF volume must be either cubical or adhere to FFTW format!");
 				}
+
+				if (ctf_premultiplied)
+				{
+					// SHWS 13feb2020: when using CTF-premultiplied on 3D data, Fctf will now contain ctf^2, but make sure they are all positive!!
+					if (ctf3d_squared)
+					{
+						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+						{
+							DIRECT_MULTIDIM_ELEM(Fctf, n) = fabs(DIRECT_MULTIDIM_ELEM(Fctf, n));
+						}
+					}
+					else
+					{
+						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+						{
+							DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+						}
+					}
+				}
 			}
 			else
 			{
@@ -5587,6 +5626,14 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 
 				ctf.getFftwImage(Fctf, image_full_size[optics_group], image_full_size[optics_group], my_pixel_size,
 						ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true, do_ctf_padding);
+
+				if (ctf_premultiplied)
+				{
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+					{
+						DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+					}
+				}
 
 			}
 
@@ -5834,9 +5881,9 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 			}
 
 			// For the masked one, have to mask outside the circular mask to prevent negative values outside the mask in the subtracted image!
+			CenterFFTbySign(Fsum_obody);
 			windowFourierTransform(Fsum_obody, Faux, image_full_size[optics_group]);
 			transformer.inverseFourierTransform(Faux, img());
-			CenterFFT(img(), false);
 
 #ifdef DEBUG_BODIES
 			if (part_id == ROUND(debug1))
@@ -5859,9 +5906,9 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 			}
 #endif
 			// And back to Fourier space now
-			CenterFFT(img(), true);
 			transformer.FourierTransform(img(), Faux);
 			windowFourierTransform(Faux, Fsum_obody, image_current_size[optics_group]);
+			CenterFFTbySign(Fsum_obody);
 
 			// Subtract the other-body FT from the masked exp_Fimgs
 			exp_Fimg[img_id] -= Fsum_obody;
@@ -6452,20 +6499,11 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 								// Apply CTF to reference projection
 								if (do_ctf_correction && refs_are_ctf_corrected)
 								{
-									if (ctf_premultiplied)
+									// JO 5Mar2020: For both 2D and 3D data, CTF^2 will be provided if ctf_premultiplied!
+									// TODO: ignore CTF until first peak of premultiplied CTF?
+									FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fref)
 									{
-										// TODO: ignore CTF until first peak of premultiplied CTF?
-										FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fref)
-										{
-											DIRECT_MULTIDIM_ELEM(Frefctf, n) = DIRECT_MULTIDIM_ELEM(Fref, n) * DIRECT_MULTIDIM_ELEM(exp_local_Fctf[img_id], n) * DIRECT_MULTIDIM_ELEM(exp_local_Fctf[img_id], n);
-										}
-									}
-									else
-									{
-										FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fref)
-										{
-											DIRECT_MULTIDIM_ELEM(Frefctf, n) = DIRECT_MULTIDIM_ELEM(Fref, n) * DIRECT_MULTIDIM_ELEM(exp_local_Fctf[img_id], n);
-										}
+										DIRECT_MULTIDIM_ELEM(Frefctf, n) = DIRECT_MULTIDIM_ELEM(Fref, n) * DIRECT_MULTIDIM_ELEM(exp_local_Fctf[img_id], n);
 									}
 								}
 								else
@@ -7648,19 +7686,10 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 									Mctf = exp_local_Fctf[img_id];
 									if (refs_are_ctf_corrected)
 									{
-										if (ctf_premultiplied)
+										// JO 5Mar2020: For both 2D and 3D data, CTF^2 will be provided if ctf_premultiplied!
+										FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fref)
 										{
-											FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fref)
-											{
-												DIRECT_MULTIDIM_ELEM(Frefctf, n) = DIRECT_MULTIDIM_ELEM(Fref, n) * DIRECT_MULTIDIM_ELEM(Mctf, n) * DIRECT_MULTIDIM_ELEM(Mctf, n);
-											}
-										}
-										else
-										{
-											FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fref)
-											{
-												DIRECT_MULTIDIM_ELEM(Frefctf, n) = DIRECT_MULTIDIM_ELEM(Fref, n) * DIRECT_MULTIDIM_ELEM(Mctf, n);
-											}
+											DIRECT_MULTIDIM_ELEM(Frefctf, n) = DIRECT_MULTIDIM_ELEM(Fref, n) * DIRECT_MULTIDIM_ELEM(Mctf, n);
 										}
 									}
 									else
@@ -7958,6 +7987,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 											// Use the FT of the unmasked image to back-project in order to prevent reconstruction artefacts! SS 25oct11
 											if (ctf_premultiplied)
 											{
+												// JO 5Mar2020: For both 2D and 3D data, CTF^2 will be provided if ctf_premultiplied!
 												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fimg)
 												{
 													RFLOAT myctf = DIRECT_MULTIDIM_ELEM(Mctf, n);
@@ -7966,7 +7996,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 													(DIRECT_MULTIDIM_ELEM(Fimg, n)).real += (*(Fimg_store + n)).real * weightxinvsigma2;
 													(DIRECT_MULTIDIM_ELEM(Fimg, n)).imag += (*(Fimg_store + n)).imag * weightxinvsigma2;
 													// now Fweight stores sum of all w and multiply by CTF^2
-													DIRECT_MULTIDIM_ELEM(Fweight, n) += weightxinvsigma2 * myctf * myctf;
+													DIRECT_MULTIDIM_ELEM(Fweight, n) += weightxinvsigma2 * myctf;
 												}
 											}
 											else
@@ -8563,6 +8593,24 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 						{
 							REPORT_ERROR("3D CTF volume must be either cubical or adhere to FFTW format!");
 						}
+						if (ctf_premultiplied)
+						{
+							// JO 5Mar2020: For both 2D and 3D data, CTF^2 will be provided if ctf_premultiplied!
+							if (ctf3d_squared)
+							{
+								FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+								{
+									DIRECT_MULTIDIM_ELEM(Fctf, n) = fabs(DIRECT_MULTIDIM_ELEM(Fctf, n));
+								}
+							}
+							else
+							{
+								FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+								{
+									DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+								}
+							}
+						}
 					}
 					else
 					{
@@ -8581,6 +8629,15 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 
 						ctf.getFftwImage(Fctf, image_full_size[optics_group], image_full_size[optics_group], my_pixel_size,
 								ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true, do_ctf_padding);
+
+						// JO 5Mar2020: For both 2D and 3D data, CTF^2 will be provided if ctf_premultiplied!
+						if (ctf_premultiplied)
+						{
+							FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+							{
+								DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+							}
+						}
 					}
 				}
 
@@ -8737,18 +8794,11 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 								REPORT_ERROR("ERROR: Fctf has a different shape from F1 and F2");
 							}
 #endif
+							// JO 5Mar2020: For both 2D and 3D data, CTF^2 will be provided if ctf_premultiplied!
 							FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F1)
 							{
 								DIRECT_MULTIDIM_ELEM(F1, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 								DIRECT_MULTIDIM_ELEM(F2, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
-							}
-							if (ctf_premultiplied)
-							{
-								FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F1)
-								{
-									DIRECT_MULTIDIM_ELEM(F1, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
-									DIRECT_MULTIDIM_ELEM(F2, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
-								}
 							}
 						}
 
@@ -8858,6 +8908,80 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 			}
 		}
 	}
+	// For 2D/3D classification: use coarser angular and translational samplings when estimated accuracies are low...
+	else if ( mymodel.nr_classes > 1 && allow_coarser_samplings)
+	{
+
+		// A. Coarser rotational sampling
+		// Stay a bit on the safe side: 80% of estimated accuracy
+		if (mymodel.ref_dim == 3)
+		{
+
+			// If doing CC first iteration, there will not be a acc_rot yet: use minimum sampling based on resolution instead
+			RFLOAT my_min_sampling = (iter == 1 && do_firstiter_cc) ? 360. / CEIL(PI * particle_diameter * mymodel.current_resolution) : acc_rot;
+
+			// 3D classification
+			int previous_healpix_order = sampling.healpix_order;
+			// Always go down from original healpix order
+			sampling.healpix_order = sampling.healpix_order_ori;
+			bool is_decreased = false;
+			while (sampling.getAngularSampling(adaptive_oversampling) < 0.8 * my_min_sampling)
+			{
+				sampling.healpix_order--;
+				is_decreased = true;
+			}
+			// Now have healpix_order that gives coarser sampling than min_sampling, go one up to have finer sampling than min_sampling
+			// Only do this is (is_decreased), as we don't want to go finer than the original one...
+			if (is_decreased) sampling.healpix_order++;
+
+			// Don't go beyond original sampling
+			sampling.healpix_order = XMIPP_MIN(sampling.healpix_order, sampling.healpix_order_ori);
+			if (sampling.healpix_order != previous_healpix_order)
+			{
+				sampling.setOrientations(sampling.healpix_order, sampling.getAngularSampling());
+
+				// Resize the pdf_direction arrays to the correct size and fill with an even distribution
+				mymodel.initialisePdfDirection(sampling.NrDirections());
+
+				// Also reset the nr_directions in wsum_model
+				wsum_model.nr_directions = mymodel.nr_directions;
+
+				// Also resize and initialise wsum_model.pdf_direction for each class!
+				for (int iclass=0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
+					wsum_model.pdf_direction[iclass].initZeros(mymodel.nr_directions);
+
+			}
+		}
+		else
+		{
+			// 2D classification
+			RFLOAT new_psi_step = 0.8 * acc_rot * std::pow(2., adaptive_oversampling);
+			new_psi_step = XMIPP_MAX(new_psi_step, sampling.psi_step_ori);
+			if (fabs(new_psi_step - sampling.psi_step) > 0.001 )
+			{
+				sampling.setOrientations(-1, new_psi_step);
+			}
+		}
+
+		// B. Coarser translational sampling
+		// Stay a bit on the safe side: 80% of estimated accuracy
+		RFLOAT new_offset_step = 0.8 * acc_trans * std::pow(2., adaptive_oversampling);
+		// Don't go coarser than the 95% of the offset_range (so at least 5 samplings are done)
+		new_offset_step = XMIPP_MIN(new_offset_step, 0.95*sampling.offset_range);
+		// Don't go finer than the original offset_step!
+		new_offset_step = XMIPP_MAX(new_offset_step, sampling.offset_step_ori);
+		sampling.setTranslations(new_offset_step, sampling.offset_range, false,
+				(do_helical_refine) && (!ignore_helical_symmetry), sampling.helical_offset_step, helical_rise_initial, helical_twist_initial);
+
+		// Print to screen
+		if (myverb)
+		{
+			std::cout << " Coarser-sampling: Angular step= " << sampling.getAngularSampling(adaptive_oversampling) << " degrees." << std::endl;
+			std::cout << " Coarser-sampling: Offset search range= " << sampling.offset_range << " Angstroms; offset step= " << sampling.getTranslationalSampling(adaptive_oversampling) << " Angstroms" << std::endl;
+		}
+
+
+	}
 	else
 	{
 
@@ -8871,14 +8995,21 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 		// AND the hidden variables have not changed during the last 2 iterations
 		RFLOAT old_rottilt_step = sampling.getAngularSampling(adaptive_oversampling);
 
-		// Takanori: TODO: Turbo mode
-		// If the angular accuracy and the necessary angular step for the current resolution is finer
-		// than the curent angular step, make it finer.
+		// If the angular accuracy and the necessary angular step for the current resolution is finer than the current angular step, make it finer.
 		// But don't go to local search until it stabilises or look at change in angles?
+		int nr_ang_steps = CEIL(PI * particle_diameter * mymodel.current_resolution);
+		RFLOAT myresol_angstep = 360. / nr_ang_steps;
+		// But don't go down to local searches too early, i.e. at last exhaustive sampling first stabilise resolution
+		bool do_proceed_resolution = (auto_resolution_based_angles &&
+									  myresol_angstep < old_rottilt_step &&
+						 		      sampling.healpix_order + 1 != autosampling_hporder_local_searches);
+		do_proceed_resolution = (do_proceed_resolution || (nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN));
+
+		const bool do_proceed_hidden_variables = (auto_ignore_angle_changes || (nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES));
 
 		// Only use a finer angular sampling if the angular accuracy is still above 75% of the estimated accuracy
 		// If it is already below, nothing will change and eventually nr_iter_wo_resol_gain or nr_iter_wo_large_hidden_variable_changes will go above MAX_NR_ITER_WO_RESOL_GAIN
-		if (nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN && nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES)
+		if (do_proceed_resolution && do_proceed_hidden_variables )
 		{
 
 			bool all_bodies_are_done = false;
@@ -9040,7 +9171,7 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 				else
 					std:: cout << "false" << std::endl;
 			}
-			std::cout << " Auto-refine: Offset search range= " << sampling.offset_range << " pixels; offset step= " << sampling.getTranslationalSampling(adaptive_oversampling) << " Anstroms";
+			std::cout << " Auto-refine: Offset search range= " << sampling.offset_range << " Angstroms; offset step= " << sampling.getTranslationalSampling(adaptive_oversampling) << " Angstroms";
 			if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 				std::cout << "; offset step along helical axis= " << sampling.getHelicalTranslationalSampling(adaptive_oversampling) << " pixels";
 			std::cout << std::endl;
@@ -9102,7 +9233,9 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 void MlOptimiser::checkConvergence(bool myverb)
 {
 
-	if ( has_fine_enough_angular_sampling && nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN && nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES )
+	if ( has_fine_enough_angular_sampling &&
+		 nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN &&
+		 (auto_ignore_angle_changes || nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES) )
 	{
 		has_converged = true;
 		do_join_random_halves = true;

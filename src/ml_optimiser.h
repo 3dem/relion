@@ -227,6 +227,15 @@ public:
 	// Flag whether to use the auto-refine procedure
 	bool do_auto_refine;
 
+	// Flag whether to ignore changes in hidden variables in auto-refine (which makes it faster)
+	bool auto_ignore_angle_changes;
+
+	// Flag whether to proceed faster with resolution-based angular sampling updates in auto-refine
+	bool auto_resolution_based_angles;
+
+	// Flag whether to accelerate early iterations of 2D/3D classification with coarser samplings
+	bool allow_coarser_samplings;
+
 	// Force auto-refinement to converge
 	bool do_force_converge;
 
@@ -522,6 +531,12 @@ public:
 	std::string helical_fourier_mask_resols;
 	FileName fn_fourier_mask;
 	MultidimArray<RFLOAT> helical_fourier_mask;
+
+	///////// Special stuff for subtomogram avg //////////
+
+	// Flag whether CTF3D files contain CTF^2 or not
+	bool ctf3d_squared;
+
 
 	///////// Hidden stuff, does not work with read/write: only via command-line ////////////////
 

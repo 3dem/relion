@@ -90,7 +90,6 @@ bool ccfPeak::refresh()
 
 void AutoPicker::read(int argc, char **argv)
 {
-
 	parser.setCommandLine(argc, argv);
 
 	int gen_section = parser.addSection("General options");
@@ -188,7 +187,6 @@ void AutoPicker::usage()
 
 void AutoPicker::initialise()
 {
-
 #ifdef TIMING
 	TIMING_A0  =           timer.setNew("Initialise()");
 	TIMING_A1  =           timer.setNew("--Init");
@@ -215,7 +213,6 @@ void AutoPicker::initialise()
 		timer.tic(TIMING_A0);
 		timer.tic(TIMING_A1);
 #endif
-
 	if (random_seed == -1) random_seed = time(NULL);
 
 	if (fn_in.isStarFile())
@@ -229,7 +226,9 @@ void AutoPicker::initialise()
 			fn_micrographs.push_back(fn_mic);
 		}
 
-        	// Check all optics groups have the same pixel size (check for same micrograph size is performed while running through all of them)
+		// Check all optics groups have the same pixel size (check for same micrograph size is performed while running through all of them)
+		if (!obsModel.opticsMdt.containsLabel(EMDL_MICROGRAPH_PIXEL_SIZE))
+			REPORT_ERROR("The input does not contain the rlnMicrographPixelSize column.");
 		obsModel.opticsMdt.getValue(EMDL_MICROGRAPH_PIXEL_SIZE, angpix, 0);
 		for (int optics_group = 1; optics_group < obsModel.numberOfOpticsGroups(); optics_group++)
 		{
@@ -243,7 +242,6 @@ void AutoPicker::initialise()
 	}
 	else
 	{
-
 		if (do_ctf)
 			REPORT_ERROR("AutoPicker::initialise ERROR: use an input STAR file with the CTF information when using --ctf");
 
@@ -393,14 +391,13 @@ void AutoPicker::initialise()
 			Iref().setXmippOrigin();
 			Mrefs.push_back(Iref());
 
-			if (Mrefs.size() == 1 && verb > 0)
+			if (Mrefs.size() == 1) // Check only the first reference
 			{
-
 				// Check pixel size in the header is consistent with angpix_ref. Otherwise, raise a warning
 				RFLOAT angpix_header = Iref.samplingRateX();
 				if (angpix_ref < 0)
 				{
-					if (fabs(angpix_header - angpix) > 1e-3)
+					if (verb > 0 && fabs(angpix_header - angpix) > 1e-3)
 					{
 						std::cout << " + Using pixel size in reference image header= " << angpix_header << std::endl;
 					}
@@ -408,21 +405,16 @@ void AutoPicker::initialise()
 				}
 				else
 				{
-					if (fabs(angpix_header - angpix_ref) > 1e-3)
+					if (verb > 0 && fabs(angpix_header - angpix_ref) > 1e-3)
 					{
 						std::cerr << " WARNING!!! Pixel size in reference image header= " << angpix_header << " but you have provided --angpix_ref " << angpix_ref << std::endl;
 					}
 				}
-
 			}
-
 		}
 	}
 	else
 	{
-
-
-
 		Image<RFLOAT> Istk, Iref;
 		Istk.read(fn_ref);
 
@@ -872,7 +864,6 @@ void AutoPicker::initialise()
 #ifdef DEBUG
 	std::cerr << "Finishing initialise" << std::endl;
 #endif
-
 }
 
 #ifdef CUDA

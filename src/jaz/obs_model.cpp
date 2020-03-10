@@ -125,6 +125,22 @@ void ObservationModel::loadSafely(std::string filename, ObservationModel& obsMod
 
 		obsModel.sortOpticsGroups(particlesMdt);
 	}
+
+	if (tablename != "particles" && obsModel.opticsMdt.containsLabel(EMDL_IMAGE_PIXEL_SIZE))
+	{
+		std::cerr << "WARNING: This is not a particle STAR file but contains rlnImagePixelSize column." << std::endl;
+		if (!obsModel.opticsMdt.containsLabel(EMDL_MICROGRAPH_PIXEL_SIZE))
+		{
+			std::cerr << "Pixel size in rlnImagePixelSize will be copied to rlnMicrographPixelSize column. Please make sure this is correct!" << std::endl;
+
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
+			{
+				RFLOAT image_angpix;
+				obsModel.opticsMdt.getValue(EMDL_IMAGE_PIXEL_SIZE, image_angpix);
+				obsModel.opticsMdt.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, image_angpix);
+			}
+		}
+	}
 }
 
 void ObservationModel::saveNew(
@@ -287,9 +303,9 @@ ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt, bool do_die_
 
 		// See if there is more than one MTF, for more rapid divideByMtf
 		hasMultipleMtfs = false;
-		for (int i = 1; i < fnMtfs.size(); i++)
+		for (int j = 1; j < fnMtfs.size(); j++)
 		{
-			if (fnMtfs[i] != fnMtfs[0])
+			if (fnMtfs[j] != fnMtfs[0])
 			{
 				hasMultipleMtfs = true;
 				break;
