@@ -223,7 +223,7 @@ public:
 	 */
 	void computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, MultidimArray<RFLOAT> &power_spectrum,
                                         int current_size = -1, int nr_threads = 1, bool do_gridding = true, bool do_heavy = true,
-	                                int min_ires = -1, const MultidimArray<RFLOAT> *fourier_mask = NULL);
+	                                int min_ires = -1, const MultidimArray<RFLOAT> *fourier_mask = NULL, bool do_gpu = false);
 
 	/* Because we interpolate in Fourier space to make projections and/or reconstructions, we have to correct
 	 * the real-space maps by dividing them by the Fourier Transform of the interpolator

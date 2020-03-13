@@ -1372,12 +1372,12 @@ void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads, 
 
 		if (update_tau2_spectra && iclass < nr_classes * nr_bodies)
 		{
-			PPref[iclass].computeFourierTransformMap(Irefp, tau2_class[iclass], current_size, nr_threads, true, do_heavy, min_ires, fourier_mask);
+			PPref[iclass].computeFourierTransformMap(Irefp, tau2_class[iclass], current_size, nr_threads, true, do_heavy, min_ires, fourier_mask, do_gpu);
 		}
 		else
 		{
 			MultidimArray<RFLOAT> dummy;
-			PPref[iclass].computeFourierTransformMap(Irefp, dummy, current_size, nr_threads, true, do_heavy, min_ires, fourier_mask);
+			PPref[iclass].computeFourierTransformMap(Irefp, dummy, current_size, nr_threads, true, do_heavy, min_ires, fourier_mask, do_gpu);
 		}
 	}
 

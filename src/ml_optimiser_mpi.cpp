@@ -454,6 +454,7 @@ will still yield good performance and possibly a more stable execution. \n" << s
 				}
 			}
 		}
+		mymodel.do_gpu = do_gpu;
 	}
 	/************************************************************************/
 #endif // CUDA
