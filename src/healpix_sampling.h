@@ -47,12 +47,12 @@ public:
     /** Amount of random perturbation */
     RFLOAT perturbation_factor;
 
-    /** In-plane (psi-angle) sampling rate
+    /** In-plane (psi-angle) sampling rate (and original one)
      */
-    RFLOAT psi_step;
+    RFLOAT psi_step, psi_step_ori;
 
-    /** Healpix order */
-    int healpix_order;
+    /** Healpix order (and original one) */
+    int healpix_order, healpix_order_ori;
 
     /** Mode for orientational prior distribution
      * Note this option is not written to the STAR file, as it really belongs to mlmodel.
@@ -60,10 +60,10 @@ public:
      */
     int orientational_prior_mode;
 
-    /* Translational search range and sampling rate (as of v3.1 in Angstroms!)
+    /* Translational search range and sampling rate (as of v3.1 in Angstroms!) (and original one)
      */
     // Jun19,2015 - Shaoda, Helical refinement (all in Angstroms!)
-    RFLOAT offset_range, offset_step, helical_offset_step;
+    RFLOAT offset_range, offset_step, helical_offset_step, offset_range_ori, offset_step_ori;
 
     /** Flag whether this is a real 3D sampling */
     bool is_3D;

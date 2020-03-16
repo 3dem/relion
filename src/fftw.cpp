@@ -1644,8 +1644,8 @@ void amplitudeOrPhaseMap(const MultidimArray<RFLOAT > &v, MultidimArray<RFLOAT >
 	XYdim = XSIZE(out);
 
 	// Fourier Transform
-	CenterFFT(out, true);
 	transformer.FourierTransform(out, Faux, false); // TODO: false???
+	CenterFFTbySign(Faux);
 
 	// Write to output files
 	out.setXmippOrigin();
@@ -1693,8 +1693,8 @@ void helicalLayerLineProfile(const MultidimArray<RFLOAT > &v, std::string title,
 	XYdim = XSIZE(out);
 
 	// Fourier Transform
-	CenterFFT(out, true);
 	transformer.FourierTransform(out, Faux, false); // TODO: false???
+	CenterFFTbySign(Faux);
 
 	// Statistics
 	out.setXmippOrigin();

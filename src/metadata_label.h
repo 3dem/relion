@@ -456,14 +456,18 @@ enum EMDLabel
 	EMDL_SAMPLING_IS_3D,
 	EMDL_SAMPLING_IS_3D_TRANS,
 	EMDL_SAMPLING_HEALPIX_ORDER,
+	EMDL_SAMPLING_HEALPIX_ORDER_ORI,
 	EMDL_SAMPLING_LIMIT_TILT,
 	EMDL_SAMPLING_OFFSET_RANGE,
 	EMDL_SAMPLING_OFFSET_STEP,
+	EMDL_SAMPLING_OFFSET_RANGE_ORI,
+	EMDL_SAMPLING_OFFSET_STEP_ORI,
 	EMDL_SAMPLING_HELICAL_OFFSET_STEP,
 	EMDL_SAMPLING_PERTURB,
 	EMDL_SAMPLING_PERTURBATION_FACTOR,
 	EMDL_SAMPLING_PRIOR_MODE,
 	EMDL_SAMPLING_PSI_STEP,
+	EMDL_SAMPLING_PSI_STEP_ORI,
 	EMDL_SAMPLING_SIGMA_ROT,
 	EMDL_SAMPLING_SIGMA_TILT,
 	EMDL_SAMPLING_SIGMA_PSI,
@@ -992,13 +996,17 @@ private:
 		EMDL::addLabel(EMDL_SAMPLING_IS_3D, EMDL_BOOL, "rlnIs3DSampling", "Flag to indicate this concerns a 3D sampling ");
 		EMDL::addLabel(EMDL_SAMPLING_IS_3D_TRANS, EMDL_BOOL, "rlnIs3DTranslationalSampling", "Flag to indicate this concerns a x,y,z-translational sampling ");
 		EMDL::addLabel(EMDL_SAMPLING_HEALPIX_ORDER, EMDL_INT, "rlnHealpixOrder", "Healpix order for the sampling of the first two Euler angles (rot, tilt) on the 3D sphere");
+		EMDL::addLabel(EMDL_SAMPLING_HEALPIX_ORDER_ORI, EMDL_INT, "rlnHealpixOrderOriginal", "Original healpix order for the sampling of the first two Euler angles (rot, tilt) on the 3D sphere");
 		EMDL::addLabel(EMDL_SAMPLING_LIMIT_TILT, EMDL_DOUBLE, "rlnTiltAngleLimit", "Values to which to limit the tilt angles (positive for keeping side views, negative for keeping top views)");
 		EMDL::addLabel(EMDL_SAMPLING_OFFSET_RANGE, EMDL_DOUBLE, "rlnOffsetRange", "Search range for the origin offsets (in Angstroms)");
 		EMDL::addLabel(EMDL_SAMPLING_OFFSET_STEP, EMDL_DOUBLE, "rlnOffsetStep", "Step size for the searches in the origin offsets (in Angstroms)");
+		EMDL::addLabel(EMDL_SAMPLING_OFFSET_RANGE_ORI, EMDL_DOUBLE, "rlnOffsetRangeOriginal", "Original search range for the origin offsets (in Angstroms)");
+		EMDL::addLabel(EMDL_SAMPLING_OFFSET_STEP_ORI, EMDL_DOUBLE, "rlnOffsetStepOriginal", "Original step size for the searches in the origin offsets (in Angstroms)");
 		EMDL::addLabel(EMDL_SAMPLING_HELICAL_OFFSET_STEP, EMDL_DOUBLE, "rlnHelicalOffsetStep", "Step size for the searches of offsets along helical axis (in Angstroms)");
 		EMDL::addLabel(EMDL_SAMPLING_PERTURB, EMDL_DOUBLE, "rlnSamplingPerturbInstance", "Random instance of the random perturbation on the orientational sampling");
 		EMDL::addLabel(EMDL_SAMPLING_PERTURBATION_FACTOR, EMDL_DOUBLE, "rlnSamplingPerturbFactor", "Factor for random perturbation on the orientational sampling (between 0 no perturbation and 1 very strong perturbation)");
 		EMDL::addLabel(EMDL_SAMPLING_PSI_STEP, EMDL_DOUBLE, "rlnPsiStep", "Step size (in degrees) for the sampling of the in-plane rotation angle (psi)");
+		EMDL::addLabel(EMDL_SAMPLING_PSI_STEP_ORI, EMDL_DOUBLE, "rlnPsiStepOriginal", "Original step size (in degrees) for the sampling of the in-plane rotation angle (psi)");
 		EMDL::addLabel(EMDL_SAMPLING_SYMMETRY, EMDL_STRING, "rlnSymmetryGroup", "Symmetry group (e.g., C1, D7, I2, I5, etc.)");
 
 		EMDL::addLabel(EMDL_SCHEDULE_EDGE_NUMBER, EMDL_INT, "rlnScheduleEdgeNumber", "Numbered index of an edge inside a Schedule");

@@ -52,7 +52,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 		if (!baseMLO->mydata.getImageNameOnScratch(part_id, img_id, fn_img))
 		{
 			std::istringstream split(baseMLO->exp_fn_img);
-			for (int i = 0; i <= istop; i++)
+			for (int i = 0; i <= my_metadata_offset; i++)
 				getline(split, fn_img);
 		}
 		sp.current_img = fn_img;
@@ -234,7 +234,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 				else
 				{
 					CTIC(accMLO->timer,"ParaRead2DImages");
-					img() = baseMLO->exp_imgs[istop];
+					img() = baseMLO->exp_imgs[my_metadata_offset];
 					CTOC(accMLO->timer,"ParaRead2DImages");
 				}
 			}
@@ -243,7 +243,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 				FileName fn_recimg;
 				std::istringstream split2(baseMLO->exp_fn_recimg);
 				// Get the right line in the exp_fn_img string
-				for (int i = 0; i <= istop; i++)
+				for (int i = 0; i <= my_metadata_offset; i++)
 					getline(split2, fn_recimg);
 				rec_img.read(fn_recimg);
 				rec_img().setXmippOrigin();
@@ -619,7 +619,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 															 current_size_y,
 															 current_size_z);
 		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
-		CTIC(cudaMLO->timer,"normalizeAndTransform");
+		CTOC(cudaMLO->timer,"normalizeAndTransform");
 
 		// ------------------------------------------------------------------------------------------
 
@@ -690,7 +690,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 					{
 						std::istringstream split(baseMLO->exp_fn_ctf);
 						// Get the right line in the exp_fn_img string
-						for (int i = 0; i <= istop; i++)
+						for (int i = 0; i <= my_metadata_offset; i++)
 							getline(split, fn_ctf);
 					}
 					Ictf.read(fn_ctf);
@@ -731,7 +731,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 					REPORT_ERROR("3D CTF volume must be either cubical or adhere to FFTW format!");
 				}
 
-				CTIC(accMLO->timer,"CTFSet3D_array");
+				CTOC(accMLO->timer,"CTFSet3D_array");
 			}
 			else
 			{
@@ -748,7 +748,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 
 				ctf.getFftwImage(Fctf, baseMLO->image_full_size[optics_group], baseMLO->image_full_size[optics_group], my_pixel_size,
 						baseMLO->ctf_phase_flipped, baseMLO->only_flip_phases, baseMLO->intact_ctf_first_peak, true, baseMLO->do_ctf_padding);
-				CTIC(accMLO->timer,"CTFRead2D");
+				CTOC(accMLO->timer,"CTFRead2D");
 			}
 		}
 		else
@@ -861,16 +861,16 @@ void getFourierTransformsAndCtfs(long int part_id,
 				op.Fimg_nomask.at(img_id) -= Fsum_obody;
 
 			// For the masked one, have to mask outside the circular mask to prevent negative values outside the mask in the subtracted image!
+			CenterFFTbySign(Fsum_obody);
 			windowFourierTransform(Fsum_obody, Faux, baseMLO->image_full_size[optics_group]);
 			accMLO->transformer.inverseFourierTransform(Faux, img());
-			CenterFFT(img(), false);
 
 			softMaskOutsideMap(img(), my_mask_radius, (RFLOAT)baseMLO->width_mask_edge);
 
 			// And back to Fourier space now
-			CenterFFT(img(), true);
 			accMLO->transformer.FourierTransform(img(), Faux);
 			windowFourierTransform(Faux, Fsum_obody, baseMLO->image_current_size[optics_group]);
+			CenterFFTbySign(Fsum_obody);
 
 			// Subtract the other-body FT from the masked exp_Fimgs
 			op.Fimg.at(img_id) -= Fsum_obody;
@@ -1589,8 +1589,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	AccPtr<XFLOAT>  pdf_offset            = ptrFactory.make<XFLOAT>((size_t)((sp.iclass_max-sp.iclass_min+1)*sp.nr_trans));
 	AccPtr<bool>    pdf_offset_zeros      = ptrFactory.make<bool>(pdf_offset.getSize());
 
-	pdf_orientation.allAlloc();
-	pdf_orientation_zeros.allAlloc();
+	pdf_orientation.accAlloc();
+	pdf_orientation_zeros.accAlloc();
 	pdf_offset.allAlloc();
 	pdf_offset_zeros.allAlloc();
 
@@ -1598,6 +1598,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 	// pdf_orientation is img_id-independent, so we keep it above img_id scope
 	CTIC(accMLO->timer,"get_orient_priors");
+	AccPtr<RFLOAT> pdfs				= ptrFactory.make<RFLOAT>((size_t)((sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi));
+	pdfs.allAlloc();
+
 	for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		for (unsigned long idir = sp.idir_min, iorientclass = (exp_iclass-sp.iclass_min) * sp.nr_dir * sp.nr_psi; idir <=sp.idir_max; idir++)
 			for (unsigned long ipsi = sp.ipsi_min; ipsi <= sp.ipsi_max; ipsi++, iorientclass++)
@@ -1611,20 +1614,11 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				else
 					pdf = op.directions_prior[idir] * op.psi_prior[ipsi];
 
-				if (pdf == 0)
-				{
-					pdf_orientation[iorientclass] = 0.f;
-					pdf_orientation_zeros[iorientclass] = true;
-				}
-				else
-				{
-					pdf_orientation[iorientclass] = log(pdf);
-					pdf_orientation_zeros[iorientclass] = false;
-				}
+				pdfs[iorientclass] = pdf;
 			}
 
-	pdf_orientation_zeros.cpToDevice();
-	pdf_orientation.cpToDevice();
+	pdfs.cpToDevice();
+	AccUtilities::initOrientations(pdfs, pdf_orientation, pdf_orientation_zeros);
 	CTOC(accMLO->timer,"get_orient_priors");
 
 	if(exp_ipass==0 || baseMLO->adaptive_oversampling!=0)
@@ -3053,7 +3047,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 // -------------------- accDoExpectationOneParticle ---------------------------
 // ----------------------------------------------------------------------------
 template <class MlClass>
-void accDoExpectationOneParticle(MlClass *myInstance, unsigned long part_id, int thread_id, AccPtrFactory ptrFactory)
+void accDoExpectationOneParticle(MlClass *myInstance, unsigned long part_id_sorted, int thread_id, AccPtrFactory ptrFactory)
 {
 	SamplingParameters sp;
 	MlOptimiser *baseMLO = myInstance->baseMLO;
@@ -3065,6 +3059,7 @@ void accDoExpectationOneParticle(MlClass *myInstance, unsigned long part_id, int
 		baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_A);
 #endif
 
+	long int part_id = baseMLO->mydata.sorted_idx[part_id_sorted];
 	sp.nr_images = baseMLO->mydata.numberOfImagesInParticle(part_id);
 
 	OptimisationParamters op(sp.nr_images, part_id);
@@ -3094,7 +3089,7 @@ void accDoExpectationOneParticle(MlClass *myInstance, unsigned long part_id, int
 			// exp_part_id is already in randomized order (controlled by -seed)
 			// WARNING: USING SAME iclass_min AND iclass_max FOR SomeParticles!!
 			// Make sure random division is always the same with the same seed
-			long int idx = part_id - baseMLO->exp_my_first_part_id;
+			long int idx = part_id_sorted - baseMLO->exp_my_first_part_id;
 			if (idx >= baseMLO->exp_random_class_some_particles.size())
 				REPORT_ERROR("BUG: expectationOneParticle idx>random_class_some_particles.size()");
 			sp.iclass_min = sp.iclass_max = baseMLO->exp_random_class_some_particles[idx];
@@ -3115,7 +3110,7 @@ void accDoExpectationOneParticle(MlClass *myInstance, unsigned long part_id, int
 		// Global exp_metadata array has metadata of all particles. Where does part_id start?
 		for (long int iori = baseMLO->exp_my_first_part_id; iori <= baseMLO->exp_my_last_part_id; iori++)
 		{
-			if (iori == part_id) break;
+			if (iori == part_id_sorted) break;
 			op.metadata_offset += baseMLO->mydata.numberOfImagesInParticle(iori);
 		}
 #ifdef TIMING
@@ -3131,24 +3126,30 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_A);
 		if (baseMLO->do_skip_align)
 		{
 			sp.itrans_min = sp.itrans_max = sp.idir_min = sp.idir_max = sp.ipsi_min = sp.ipsi_max =
-					part_id - baseMLO->exp_my_first_part_id;
+					part_id_sorted - baseMLO->exp_my_first_part_id;
 		}
 		else
 		{
 			sp.itrans_min = 0;
 			sp.itrans_max = baseMLO->sampling.NrTranslationalSamplings() - 1;
+		}
+		if (baseMLO->do_skip_align || baseMLO->do_skip_rotate)
+		{
+			sp.idir_min = sp.idir_max = sp.ipsi_min = sp.ipsi_max =
+					part_id_sorted - baseMLO->exp_my_first_part_id;
+		}
+		else if (baseMLO->do_only_sample_tilt)
+		{
+			sp.idir_min = 0;
+			sp.idir_max = baseMLO->sampling.NrDirections(0, &op.pointer_dir_nonzeroprior) - 1;
+			sp.ipsi_min = sp.ipsi_max = part_id_sorted - baseMLO->exp_my_first_part_id;
 
-			if (baseMLO->do_skip_rotate)
-			{
-				sp.idir_min = sp.idir_max = sp.ipsi_min = sp.ipsi_max =
-						part_id - baseMLO->exp_my_first_part_id;
-			}
-			else
-			{
-				sp.idir_min = sp.ipsi_min = 0;
-				sp.idir_max = baseMLO->sampling.NrDirections(0, &op.pointer_dir_nonzeroprior) - 1;
-				sp.ipsi_max = baseMLO->sampling.NrPsiSamplings(0, &op.pointer_psi_nonzeroprior ) - 1;
-			}
+		}
+		else
+		{
+			sp.idir_min = sp.ipsi_min = 0;
+			sp.idir_max = baseMLO->sampling.NrDirections(0, &op.pointer_dir_nonzeroprior) - 1;
+			sp.ipsi_max = baseMLO->sampling.NrPsiSamplings(0, &op.pointer_psi_nonzeroprior ) - 1;
 		}
 
 		// Initialise significant weight to minus one, so that all coarse sampling points will be handled in the first pass
