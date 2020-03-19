@@ -11,10 +11,6 @@
 #include <tiffio.h>
 #endif
 
-extern int EER_grouping; // TODO: avoid global variable!
-extern int EER_upsample; //       design better way; MicrographModel also needs to change
-                         //       allow non-uniform slicing?
-
 class EERRenderer {
 	private:
 
