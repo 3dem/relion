@@ -290,7 +290,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 		const MetaDataTable* mdt,
 		Image<RFLOAT>* gainRef, MultidimArray<bool>* defectMask, std::string movieFn,
 		double outPs, double coordsPs, double moviePs,
-		int squareSize, int threads,
+		int squareSize, int threads, // squareSize is the output box size in pixels after downsampling to outPs
 		bool loadData, int firstFrame, int lastFrame,
 		RFLOAT hot, bool verbose, bool saveMemory,
 		const std::vector<std::vector<gravis::d2Vector>>* offsets_in,
