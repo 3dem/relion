@@ -4526,6 +4526,9 @@ bool RelionJob::getCommandsSubtractJob(std::string &outputname, std::vector<std:
 
 	}
 
+	// Other arguments
+	command += " " + joboptions["other_args"].getString();
+
 	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
