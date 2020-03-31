@@ -1820,7 +1820,7 @@ void BackProjector::reweightGrad(
 				Complex m = lambda1 * A3D_ELEM(PPmom1.data, k, i, j) +
 						(1-lambda1) * g;
 				A3D_ELEM(PPmom1.data, k, i, j) = m;
-				A3D_ELEM(data, k, i, j) = m / (1-lambda1); // Debiasing
+				A3D_ELEM(data, k, i, j) = m;
 			}
 			else
 				A3D_ELEM(data, k, i, j) = g;
@@ -1841,27 +1841,24 @@ void BackProjector::reweightGrad(
 		windowToOridimRealSpace(transformer, mom1, false);
 		RCTOC(ReconTimer,ReconS_17);
 	}
-
+    
+    RFLOAT eps = 1e-12;
+    
 	// Mom2 shell-wise normalisation
 	if (lambda2 > 0.)
 	{
-	    MultidimArray<RFLOAT> norm(ori_size / 2 + 1);
-	    MultidimArray<RFLOAT> count(ori_size / 2 + 1);
+	    MultidimArray<RFLOAT> a(ori_size / 2 + 1);
+	    MultidimArray<RFLOAT> b(ori_size / 2 + 1);
+	    
         FOR_ALL_ELEMENTS_IN_ARRAY3D(mom2)
 		{
 			const int r2 = k * k + i * i + j * j;
 			if (r2 < max_r2)
 			{
 				int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
-				 //mom2 is always positive, hence its L1-norm is simply its sums
-				DIRECT_A1D_ELEM(norm, ires) += A3D_ELEM(mom2, k, i, j) / (1-lambda2); // Debiasing
-				DIRECT_A1D_ELEM(count, ires) += 1;
+				DIRECT_A1D_ELEM(a, ires) += A3D_ELEM(data, k, i, j);
 			}
 		}
-
-		for (long int i=0; i<norm.xdim; i++)
-			if (DIRECT_A1D_ELEM(count, i) > 0.)
-				DIRECT_A1D_ELEM(norm, i) /= DIRECT_A1D_ELEM(count, i);
 
 #ifdef DEBUG_MOM2
 		std::ofstream myfile ("mom2_norm.txt");
@@ -1872,15 +1869,23 @@ void BackProjector::reweightGrad(
 
         FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
         {
-            const int r2 = k * k + i * i + j * j;
-            if (0 < r2 && r2 < max_r2) // Skip origin due to sample count=1
-            {
-                int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
-                RFLOAT corr = 1.;
-                if (DIRECT_A1D_ELEM(norm, ires) > 0. && A3D_ELEM(mom2, k, i, j) > 0.)
-                    corr = A3D_ELEM(mom2, k, i, j) / ( DIRECT_A1D_ELEM(norm, ires) * (1-lambda2)); // Debiasing
-                A3D_ELEM(data, k, i, j) /= corr;
-            }
+			const int r2 = k * k + i * i + j * j;
+			if (r2 < max_r2)
+			{
+				int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
+				A3D_ELEM(data, k, i, j) /= A3D_ELEM(mom2, k, i, j) + eps;
+				DIRECT_A1D_ELEM(b, ires) += A3D_ELEM(data, k, i, j);
+			}
+        }   
+        
+        FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
+        {
+			const int r2 = k * k + i * i + j * j;
+			if (r2 < max_r2)
+			{
+				int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
+				A3D_ELEM(data, k, i, j) *= DIRECT_A1D_ELEM(a, ires) / (DIRECT_A1D_ELEM(b, ires) + eps);
+			}
         }
 	}
 }
