@@ -171,7 +171,7 @@ void EERRenderer::readLegacy(FILE *fh)
 		}
 		else // if (strncmp(EER_FOOTER_ERR, (char*)buf + pos, EER_LEN_FOOTER) == 0)
 		{
-			REPORT_ERROR("Broken frame");
+			REPORT_ERROR("Broken frame in file " + fn_movie);
 		}
 	}
 	std::reverse(frame_starts.begin(), frame_starts.end());
