@@ -1057,10 +1057,10 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 
 		// TODO: recycle! (should be done in the same way as rotation)
 		if (isEER)
-			EERRenderer::upsampleEERGain(Igain());
+			EERRenderer::upsampleEERGain(Igain(), eer_upsampling);
 
 		if (XSIZE(Igain()) != nx || YSIZE(Igain()) != ny) {
-			std::cerr << "fn_mic: " << fn_mic << std::endl;
+			std::cerr << "fn_mic: " << fn_mic << " nx = " << nx << " ny = " << ny << " gain nx = " << XSIZE(Igain()) << " gain ny = " << YSIZE(Igain()) <<  std::endl;
 			REPORT_ERROR("The size of the image and the size of the gain reference do not match. Make sure the gain reference has been rotated if necessary.");
 		}
 	}
