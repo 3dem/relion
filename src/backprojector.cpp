@@ -1999,7 +1999,10 @@ void BackProjector::reconstructGrad(
 	}
 
     //---------------------- Make gradient update ----------------------//
-
+	
+	if (!use_fsc) //Aleady incorporated fudge factor if FCS is estimated
+		tau2_fudge = 1.;
+	
 	FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
 	{
 		const int r2 = k * k + i * i + j * j;
@@ -2008,19 +2011,14 @@ void BackProjector::reconstructGrad(
 			int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
 
 #ifdef WRITE_DIFF
-			invtau2 = 1. / (oversampling_correction * tau2_fudge * DIRECT_A1D_ELEM(tau2, ires));
 			if (A3D_ELEM(weight, k, i, j) > 1e-20)
-			{
 				A3D_ELEM(Fdiff_cen, k, i, j) = (A3D_ELEM(data, k, i, j) ) / (A3D_ELEM(weight, k, i, j) );
-			}
 			else
-			{
 				A3D_ELEM(Fdiff_cen, k, i, j) = 0.;
-			}
 #endif
 
 			RFLOAT fsc = DIRECT_A1D_ELEM(fsc_spectrum, ires);
-			Complex Fgrad = fsc * A3D_ELEM(data, k, i, j) - (1. - fsc) * A3D_ELEM(PPref.data, k, i, j);
+			Complex Fgrad = fsc * A3D_ELEM(data, k, i, j) - (1. - fsc) / tau2_fudge * A3D_ELEM(PPref.data, k, i, j);
 			A3D_ELEM(PPref.data, k, i, j) += grad_stepsize * Fgrad;
 		}
 	}
