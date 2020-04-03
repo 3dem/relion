@@ -1856,7 +1856,7 @@ void BackProjector::reweightGrad(
 			if (r2 < max_r2)
 			{
 				int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
-				DIRECT_A1D_ELEM(a, ires) += A3D_ELEM(data, k, i, j);
+				DIRECT_A1D_ELEM(a, ires) += norm(A3D_ELEM(data, k, i, j));
 			}
 		}
 
@@ -1874,7 +1874,7 @@ void BackProjector::reweightGrad(
 			{
 				int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
 				A3D_ELEM(data, k, i, j) /= A3D_ELEM(mom2, k, i, j) + eps;
-				DIRECT_A1D_ELEM(b, ires) += A3D_ELEM(data, k, i, j);
+				DIRECT_A1D_ELEM(b, ires) += norm(A3D_ELEM(data, k, i, j));
 			}
         }   
         
@@ -1884,7 +1884,7 @@ void BackProjector::reweightGrad(
 			if (r2 < max_r2)
 			{
 				int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
-				A3D_ELEM(data, k, i, j) *= DIRECT_A1D_ELEM(a, ires) / (DIRECT_A1D_ELEM(b, ires) + eps);
+				A3D_ELEM(data, k, i, j) *= sqrt(DIRECT_A1D_ELEM(a, ires) / (DIRECT_A1D_ELEM(b, ires) + eps));
 			}
         }
 	}
