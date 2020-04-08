@@ -830,8 +830,8 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 				if (_do_mom2)
 				{
 					MultidimArray<RFLOAT> zeros;
-					int pad_size = 2 * (ROUND(padding_factor * XSIZE(Iref[0])) + 1) + 1;
-					if (_is_3d_model) zeros.initZeros(pad_size, pad_size, pad_size/2 + 1);
+					int pad_size = 2 * (ROUND(padding_factor * XSIZE(img())) + 1) + 1;
+					if (ZSIZE(img()) > 1) zeros.initZeros(pad_size, pad_size, pad_size/2 + 1);
 					else zeros.initZeros(pad_size, pad_size/2 + 1);
 					zeros.setXmippOrigin();
 					zeros.xinit = 0;
@@ -889,8 +889,8 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 					if (_do_mom2)
 					{
 						MultidimArray<RFLOAT> zeros;
-						int pad_size = 2 * (ROUND(padding_factor * XSIZE(Iref[0])) + 1) + 1;
-						if (_is_3d_model) zeros.initZeros(pad_size, pad_size, pad_size/2 + 1);
+						int pad_size = 2 * (ROUND(padding_factor * XSIZE(img())) + 1) + 1;
+						if (ZSIZE(img()) > 1) zeros.initZeros(pad_size, pad_size, pad_size/2 + 1);
 						else zeros.initZeros(pad_size, pad_size/2 + 1);
 						zeros.setXmippOrigin();
 						zeros.xinit = 0;
@@ -1019,8 +1019,8 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 			if (_do_mom2)
 			{
 				MultidimArray<RFLOAT> zeros;
-				int pad_size = 2 * (ROUND(padding_factor * XSIZE(Iref[0])) + 1) + 1;
-				if (_is_3d_model) zeros.initZeros(pad_size, pad_size, pad_size/2 + 1);
+				int pad_size = 2 * (ROUND(padding_factor * XSIZE(img())) + 1) + 1;
+				if (ZSIZE(img()) > 1) zeros.initZeros(pad_size, pad_size, pad_size/2 + 1);
 				else zeros.initZeros(pad_size, pad_size/2 + 1);
 				zeros.setXmippOrigin();
 				zeros.xinit = 0;
