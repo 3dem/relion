@@ -67,12 +67,12 @@ void ParticleSubtractor::divideLabour(int _rank, int _size, long int &my_first, 
     		my_first += opt.mydata.numberOfParticles(1);
     		my_last += opt.mydata.numberOfParticles(1);
 		}
+		//std::cerr << " rank= " << rank << " my_first= " << my_first << " my_last= " << my_last << " mysize= " <<mysize << "my_halfset= " <<my_halfset<< std::endl;
 	}
 	else
 	{
 		divide_equally(opt.mydata.numberOfParticles(), _size, _rank, my_first, my_last);
 	}
-	// std::cerr << "_size= " <<_size << " _rank= " << _rank << " my_first= " << my_first << " my_last= " << my_last << std::endl;
 }
 
 // Initialise some stuff after reading
@@ -293,15 +293,18 @@ void ParticleSubtractor::run()
 	}
 
 	MDimg_out.clear();
-	for (long int part_id = my_first_part_id, cc = 0; part_id <= my_last_part_id; part_id++, cc++)
+	//for (long int part_id_sorted = my_first_part_id, cc = 0; part_id_sorted <= my_last_part_id; part_id_sorted++, cc++)
+	for (long int part_id_sorted = my_first_part_id, cc = 0; part_id_sorted <= my_last_part_id; part_id_sorted++, cc++)
 	{
 
+		//long int part_id = opt.mydata.sorted_idx[part_id_sorted];
 		if (cc % barstep == 0)
 		{
 			if (pipeline_control_check_abort_job())
 				exit(RELION_EXIT_ABORTED);
 		}
 
+		long int part_id = opt.mydata.sorted_idx[part_id_sorted];
 		subtractOneParticle(part_id, 0, cc);
 
 		if (cc % barstep == 0 && verb > 0) progress_bar(cc);
@@ -418,6 +421,15 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 	img.read(opt.mydata.particles[part_id].images[0].name);
 	img().setXmippOrigin();
 
+
+	// Make sure gold-standard is adhered to!
+	int my_subset = (rank % 2 == 1) ? 1 : 2;
+	if (opt.do_split_random_halves && my_subset != opt.mydata.getRandomSubset(part_id))
+	{
+		std::cerr << " rank= " << rank << " part_id= " << part_id << " opt.mydata.getRandomSubset(part_id)= " << opt.mydata.getRandomSubset(part_id) << std::endl;
+		REPORT_ERROR("BUG:: gold-standard separation of halves is broken!");
+	}
+
 	// Get the consensus class, orientational parameters and norm (if present)
 	RFLOAT my_pixel_size = opt.mydata.getImagePixelSize(part_id, 0);
 	Matrix1D<RFLOAT> my_old_offset(3), my_residual_offset(3), centering_offset(3);
@@ -465,8 +477,8 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 	MultidimArray<Complex> Faux, Fimg;
 	MultidimArray<RFLOAT> Fctf;
 	FourierTransformer transformer;
-	CenterFFT(img(), true);
 	transformer.FourierTransform(img(), Fimg);
+	CenterFFTbySign(Fimg);
 	Fctf.resize(Fimg);
 
 	if (opt.do_ctf_correction)
@@ -641,8 +653,8 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 	Fimg -= Fsubtract;
 
 	// And go finally back to real-space
+	CenterFFTbySign(Fimg);
 	transformer.inverseFourierTransform(Fimg, img());
-	CenterFFT(img(), false);
 
 	if (do_center || opt.fn_body_masks != "None")
 	{
