@@ -1,7 +1,6 @@
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 #include "src/ml_optimiser_mpi.h"
-#include "acc_ml_optimiser.h"
 
 // ----------------------------------------------------------------------------
 // -------------------- getFourierTransformsAndCtfs ---------------------------

@@ -521,9 +521,13 @@ void Reconstructor::backprojectOneParticle(long int p)
 		{
 			CTF ctf;
 			if (do_ignore_optics)
+			{
 				ctf.read(DF, DF, p);
+			}
 			else
+			{
 				ctf.readByGroup(DF, &obsModel, p);
+			}
 
 			ctf.getFftwImage(Fctf, myBoxSize, myBoxSize, myPixelSize,
 			                 ctf_phase_flipped, only_flip_phases,
