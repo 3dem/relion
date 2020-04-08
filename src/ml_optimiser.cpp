@@ -5488,10 +5488,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		// Also store its CTF
 		Fctf.resize(Fimg);
 
-		bool apply_subtomo_weights = false;
-		if (mydata.is_3D)
-			FstMulti.resize(Fimg);
-
 		// Now calculate the actual CTF
 		if (do_ctf_correction)
 		{
@@ -5521,98 +5517,10 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 					}
 				}
 
-				// If there is a redundant half, get rid of it
-				if (XSIZE(Ictf()) == YSIZE(Ictf()))
-				{
-					// Set the CTF-image in Fctf
-					Ictf().setXmippOrigin();
-					FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
-					{
-						// Use negative kp,ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
-						DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf(), -kp, -ip, -jp);
-					}
-				}
-				// otherwise, just window the CTF to the current resolution
-				else if (XSIZE(Ictf()) == YSIZE(Ictf()) / 2 + 1)
-				{
-					if (ZSIZE(Ictf()) == YSIZE(Ictf()))
-					{
-						windowFourierTransform(Ictf(), Fctf, YSIZE(Fctf));
-					}
-					else if (ZSIZE(Ictf()) == YSIZE(Ictf())*2) // Subtomo weights included in the CTF file
-					{
-						MultidimArray<RFLOAT> &Mctf = Ictf();
-						long int max_r2 = (XSIZE(Mctf) -1) * (XSIZE(Mctf) - 1);
-						// We just read the CTF from the file in case we don't apply subtomo correction
-						if (do_skip_subtomo_correction && normalised_subtomos)
-						{
-							FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
-							{
-								// Make sure windowed FT has nothing in the corners, otherwise we end up with an asymmetric FT!
-								if (kp*kp + ip*ip + jp*jp <= max_r2)
-								{
-									FFTW_ELEM(Fctf, kp, ip, jp) = DIRECT_A3D_ELEM(Mctf, ((kp < 0) ? (kp + YSIZE(Mctf)) : (kp)), \
-								((ip < 0) ? (ip + YSIZE(Mctf)) : (ip)), jp);
-								}
-							}
-						}
-						else
-						{
-							apply_subtomo_weights = true;
-
-							FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
-							{
-								// Make sure windowed FT has nothing in the corners, otherwise we end up with an asymmetric FT!
-								if (kp*kp + ip*ip + jp*jp <= max_r2)
-								{
-									FFTW_ELEM(Fctf, kp, ip, jp) = DIRECT_A3D_ELEM(Mctf, ((kp < 0) ? (kp + YSIZE(Mctf)) : (kp)), \
-								((ip < 0) ? (ip + YSIZE(Mctf)) : (ip)), jp);
-
-									RFLOAT mySTMulti = DIRECT_A3D_ELEM(Mctf, ((kp < 0) ? (kp + ZSIZE(Mctf)) : (kp + YSIZE(Mctf))), \
-								((ip < 0) ? (ip + YSIZE(Mctf)) : (ip)), jp);
-
-									// We store the sqrt(Multi) as this is the factor applied to speed up calculations
-									if (mySTMulti < 0)
-										REPORT_ERROR("MULTIPLICITY volume cannot contain negative values!");
-									FFTW_ELEM(FstMulti, kp, ip, jp) = sqrt(mySTMulti);
-								}
-							}
-						}
-					}
-					// if Z dimension is neither containing CTF or CTF+MULTI, stop
-					else
-					{
-						REPORT_ERROR("3D CTF volume in FFTW format must cointain CTF or CTF and MULTI concatenated along Z !");
-					}
-				}
-				// if dimensions are neither cubical nor FFTW, stop
-				else
-				{
-					REPORT_ERROR("3D CTF volume must be either cubical or adhere to FFTW format!");
-				}
-
-				if (ctf_premultiplied)
-				{
-					// SHWS 13feb2020: when using CTF-premultiplied on 3D data, Fctf will now contain ctf^2, but make sure they are all positive!!
-					if (ctf3d_squared)
-					{
-						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
-						{
-							DIRECT_MULTIDIM_ELEM(Fctf, n) = fabs(DIRECT_MULTIDIM_ELEM(Fctf, n));
-						}
-					}
-					else
-					{
-						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
-						{
-							DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
-						}
-					}
-				}
+				get3DCTFAndMulti(Ictf(), Fctf, FstMulti, ctf_premultiplied);
 			}
 			else
 			{
-
 				// Get parameters that change per-particle from the exp_metadata
 				CTF ctf;
 				ctf.setValuesByGroup(
@@ -5634,7 +5542,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 						DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 					}
 				}
-
 			}
 
 //#define DEBUG_CTF_FFTW_IMAGE
@@ -5665,61 +5572,14 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 			Fctf.initConstant(1.);
 		}
 
+		// Correct images and CTFs by Multiplicity, if required, and store it
+		if ( NZYXSIZE(FstMulti) > 0 )
+		{
+			applySubtomoCorrection(exp_Fimg[img_id], exp_Fimg_nomask[img_id], Fctf, FstMulti);
+			exp_STMulti[img_id] = FstMulti;
+		}
 		// Store Fctf
 		exp_Fctf[img_id] = Fctf;
-		// Correct images and CTFs by Multiplicity, if required, and store it
-		if (apply_subtomo_weights)
-		{
-			exp_STMulti[img_id] = FstMulti;
-			MultidimArray<Complex > &myFimg = exp_Fimg[img_id];
-			MultidimArray<Complex > &myFimg_nomask = exp_Fimg_nomask[img_id];
-
-			if (normalised_subtomos)
-			{
-				FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(myFimg)
-				{
-					RFLOAT mySTMulti = FFTW_ELEM(FstMulti, kp, ip, jp);
-					FFTW_ELEM(myFimg, kp, ip, jp) *= mySTMulti;
-					FFTW_ELEM(myFimg_nomask, kp, ip, jp) *= mySTMulti;
-				}
-			}
-			else if (!do_skip_subtomo_correction)
-			{
-				FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(myFimg)
-				{
-					RFLOAT mySTMulti = FFTW_ELEM(FstMulti, kp, ip, jp);
-					if (mySTMulti == 0)
-					{
-						FFTW_ELEM(myFimg, kp, ip, jp) = 0;
-						FFTW_ELEM(myFimg_nomask, kp, ip, jp) = 0;
-					}
-					else
-					{
-						FFTW_ELEM(myFimg, kp, ip, jp) /= mySTMulti;
-						FFTW_ELEM(myFimg_nomask, kp, ip, jp) /= mySTMulti;
-					}
-				}
-			}
-			else // We apply the multiplicity normalisation to process in the old way, without the corrected algorithm
-			{
-				FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(myFimg)
-				{
-					RFLOAT mySTMulti = FFTW_ELEM(FstMulti, kp, ip, jp);
-					if (mySTMulti == 0)
-					{
-						FFTW_ELEM(myFimg, kp, ip, jp) = 0;
-						FFTW_ELEM(myFimg_nomask, kp, ip, jp) = 0;
-					}
-					else
-					{
-						FFTW_ELEM(myFimg, kp, ip, jp) /= (mySTMulti * mySTMulti);
-						FFTW_ELEM(myFimg_nomask, kp, ip, jp) /= (mySTMulti * mySTMulti);
-					}
-				}
-				// We don't store the multiplicity to prevent applying the corrected algorithm
-				exp_STMulti[img_id].clear();
-			}
-		}
 		//We calculate the 1D avg for 3DCTF only active if data_dim == 3
 		if (do_sigma2_3d)
 		{
@@ -5992,7 +5852,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 	exp_local_Fctf.resize(exp_nr_images);
 	exp_local_sqrtXi2.resize(exp_nr_images);
 
-	bool do_subtomo_correction = do_also_unmasked &&  NZYXSIZE(exp_STMulti[0]) > 0;
+	bool do_subtomo_correction = is_for_store_wsums &&  NZYXSIZE(exp_STMulti[0]) > 0;
 
 	MultidimArray<Complex > Fimg, Fimg_nomask;
 	for (int img_id = 0, my_trans_image = 0; img_id < exp_nr_images; img_id++)
@@ -6042,7 +5902,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 		// Map from model_size sigma2_noise array to my_image_size
 		RFLOAT remap_image_sizes = (mymodel.ori_size * mymodel.pixel_size) / (my_image_size * my_pixel_size);
 		int *myMresol = (YSIZE(Fimg) == image_coarse_size[optics_group]) ? Mresol_coarse[optics_group].data : Mresol_fine[optics_group].data;
-		if (do_ctf_invsig)
+ 		if (do_ctf_invsig)
 		{
 			// Also precalculate the sqrt of the sum of all Xi2
 			// Could exp_current_image_size ever be different from mymodel.current_size?
@@ -6108,7 +5968,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 					{
 						myctf4 = XMIPP_MAX(pow(DIRECT_MULTIDIM_ELEM(Mctf, n), 4),1e-8);
 						DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2[img_id], n) *= DIRECT_MULTIDIM_ELEM(MstMulti, n) *
-																				DIRECT_A1D_ELEM(exp_local_Fctfs1D, ires) / myctf4;
+								DIRECT_A1D_ELEM(exp_local_Fctfs1D, ires) / myctf4;
 					}
 				}
 			}
@@ -8570,44 +8430,34 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 								getline(split, fn_ctf);
 						}
 						Ictf.read(fn_ctf);
+						Fctf.resize(current_image_size, current_image_size, current_image_size / 2 + 1);
 
-						// If there is a redundant half, get rid of it
-						if (XSIZE(Ictf()) == YSIZE(Ictf()))
+						MultidimArray<RFLOAT> FstMulti;
+						get3DCTFAndMulti(Ictf(), Fctf, FstMulti, ctf_premultiplied);
+
+						if ( NZYXSIZE(FstMulti) > 0 )
 						{
-							// Set the CTF-image in Fctf
-							Ictf().setXmippOrigin();
-							Fctf.resize(current_image_size, current_image_size, current_image_size / 2 + 1);
-							FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+							if (normalised_subtomos)
 							{
-								// Use negative kp, ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
-								DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf(), -kp, -ip, -jp);
+								FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+									DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(FstMulti, n);
 							}
-						}
-						// otherwise, just window the CTF to the current resolution
-						else if (XSIZE(Ictf()) == YSIZE(Ictf()) / 2 + 1)
-						{
-							windowFourierTransform(Ictf(), Fctf, YSIZE(Fctf));
-						}
-						// if dimensions are neither cubical nor FFTW, stop
-						else
-						{
-							REPORT_ERROR("3D CTF volume must be either cubical or adhere to FFTW format!");
-						}
-						if (ctf_premultiplied)
-						{
-							// JO 5Mar2020: For both 2D and 3D data, CTF^2 will be provided if ctf_premultiplied!
-							if (ctf3d_squared)
+							else if (!do_skip_subtomo_correction)
 							{
 								FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
 								{
-									DIRECT_MULTIDIM_ELEM(Fctf, n) = fabs(DIRECT_MULTIDIM_ELEM(Fctf, n));
+									RFLOAT mySTMulti = DIRECT_MULTIDIM_ELEM(FstMulti, n);
+									if (mySTMulti > 0)
+										DIRECT_MULTIDIM_ELEM(Fctf, n) /= mySTMulti;
 								}
 							}
 							else
 							{
 								FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
 								{
-									DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+									RFLOAT mySTMulti = DIRECT_MULTIDIM_ELEM(FstMulti, n);
+									if (mySTMulti > 0)
+										DIRECT_MULTIDIM_ELEM(Fctf, n) /= (mySTMulti * mySTMulti);
 								}
 							}
 						}
@@ -9674,3 +9524,152 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 
 }
 
+void MlOptimiser::get3DCTFAndMulti(MultidimArray<RFLOAT> &Ictf, MultidimArray<RFLOAT> &Fctf, MultidimArray<RFLOAT> &FstMulti,
+							bool ctf_premultiplied)
+{
+	// If there is a redundant half, get rid of it
+	if (XSIZE(Ictf) == YSIZE(Ictf))
+	{
+		// Set the CTF-image in Fctf
+		Ictf.setXmippOrigin();
+		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+		{
+			// Use negative kp,ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
+			DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf, -kp, -ip, -jp);
+		}
+	}
+	// In case we store a half it may be just CTF or CTF+Multiplicity
+	else if (XSIZE(Ictf) == YSIZE(Ictf) / 2 + 1)
+	{
+		// CTF only. Just window the CTF to the current resolution
+		if (ZSIZE(Ictf) == YSIZE(Ictf))
+		{
+			windowFourierTransform(Ictf, Fctf, YSIZE(Fctf));
+		}
+		// Subtomo Multiplicity weights included. Read both or solo CTF according to parameters
+		else if (ZSIZE(Ictf) == YSIZE(Ictf)*2)
+		{
+			MultidimArray<RFLOAT> &Mctf = Ictf;
+			long int max_r2 = (XSIZE(Mctf) -1) * (XSIZE(Mctf) - 1);
+			// We just read the CTF from the file in case we don't apply subtomo correction
+			if (do_skip_subtomo_correction && normalised_subtomos)
+			{
+				FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+				{
+					// Make sure windowed FT has nothing in the corners, otherwise we end up with an asymmetric FT!
+					if (kp*kp + ip*ip + jp*jp <= max_r2)
+					{
+						FFTW_ELEM(Fctf, kp, ip, jp) = DIRECT_A3D_ELEM(Mctf, ((kp < 0) ? (kp + YSIZE(Mctf)) : (kp)), \
+						((ip < 0) ? (ip + YSIZE(Mctf)) : (ip)), jp);
+					}
+				}
+			}
+			else
+			{
+				FstMulti.resize(Fctf);
+
+				FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+				{
+					// Make sure windowed FT has nothing in the corners, otherwise we end up with an asymmetric FT!
+					if (kp*kp + ip*ip + jp*jp <= max_r2)
+					{
+						FFTW_ELEM(Fctf, kp, ip, jp) = DIRECT_A3D_ELEM(Mctf, ((kp < 0) ? (kp + YSIZE(Mctf)) : (kp)), \
+						((ip < 0) ? (ip + YSIZE(Mctf)) : (ip)), jp);
+
+						RFLOAT mySTMulti = DIRECT_A3D_ELEM(Mctf, ((kp < 0) ? (kp + ZSIZE(Mctf)) : (kp + YSIZE(Mctf))), \
+						((ip < 0) ? (ip + YSIZE(Mctf)) : (ip)), jp);
+
+						// We store the sqrt(Multi) to speed up calculations
+						if (mySTMulti < 0)
+							REPORT_ERROR("MULTIPLICITY volume cannot contain negative values!");
+						FFTW_ELEM(FstMulti, kp, ip, jp) = sqrt(mySTMulti);
+					}
+				}
+			}
+		}
+			// if Z dimension is neither containing CTF or CTF+MULTI, stop
+		else
+		{
+			REPORT_ERROR("3D CTF volume in FFTW format must cointain CTF or CTF and MULTI concatenated along Z !");
+		}
+	}
+		// if dimensions are neither cubical nor FFTW, stop
+	else
+	{
+		REPORT_ERROR("3D CTF volume must be either cubical or adhere to FFTW format!");
+	}
+
+	if (ctf_premultiplied)
+	{
+		// SHWS 13feb2020: when using CTF-premultiplied on 3D data, Fctf will now contain ctf^2, but make sure they are all positive!!
+		if (ctf3d_squared)
+		{
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+			{
+				DIRECT_MULTIDIM_ELEM(Fctf, n) = fabs(DIRECT_MULTIDIM_ELEM(Fctf, n));
+			}
+		}
+		else
+		{
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+			{
+				DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+			}
+		}
+	}
+}
+
+void MlOptimiser::applySubtomoCorrection(MultidimArray<Complex > &Fimg, MultidimArray<Complex > &Fimg_nomask,
+										 MultidimArray<RFLOAT> &Fctf, MultidimArray<RFLOAT> &FstMulti)
+{
+	if (normalised_subtomos)
+	{
+		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fimg)
+		{
+			RFLOAT mySTMulti = FFTW_ELEM(FstMulti, kp, ip, jp);
+			FFTW_ELEM(Fimg, kp, ip, jp) *= mySTMulti;
+			FFTW_ELEM(Fimg_nomask, kp, ip, jp) *= mySTMulti;
+			FFTW_ELEM(Fctf, kp, ip, jp) *= mySTMulti;
+		}
+	}
+	else if (!do_skip_subtomo_correction)
+	{
+		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fimg)
+		{
+			RFLOAT mySTMulti = FFTW_ELEM(FstMulti, kp, ip, jp);
+			if (mySTMulti == 0)
+			{
+				FFTW_ELEM(Fimg, kp, ip, jp) = 0;
+				FFTW_ELEM(Fimg_nomask, kp, ip, jp) = 0;
+				FFTW_ELEM(Fctf, kp, ip, jp) = 0;
+			}
+			else
+			{
+				FFTW_ELEM(Fimg, kp, ip, jp) /= mySTMulti;
+				FFTW_ELEM(Fimg_nomask, kp, ip, jp) /= mySTMulti;
+				FFTW_ELEM(Fctf, kp, ip, jp) /= mySTMulti;
+			}
+		}
+	}
+	else // We apply the multiplicity normalisation to process in the old way, without the corrected algorithm
+	{
+		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fimg)
+		{
+			RFLOAT mySTMulti = FFTW_ELEM(FstMulti, kp, ip, jp);
+			if (mySTMulti == 0)
+			{
+				FFTW_ELEM(Fimg, kp, ip, jp) = 0;
+				FFTW_ELEM(Fimg_nomask, kp, ip, jp) = 0;
+				FFTW_ELEM(Fctf, kp, ip, jp) = 0;
+			}
+			else
+			{
+				FFTW_ELEM(Fimg, kp, ip, jp) /= (mySTMulti * mySTMulti);
+				FFTW_ELEM(Fimg_nomask, kp, ip, jp) /= (mySTMulti * mySTMulti);
+				FFTW_ELEM(Fctf, kp, ip, jp)  /= (mySTMulti * mySTMulti);
+			}
+		}
+		// We don't store the multiplicity to prevent applying the corrected algorithm during reconstruction/averaging
+		FstMulti.clear();
+	}
+}

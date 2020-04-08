@@ -1037,6 +1037,14 @@ public:
 	// Get metadata array of a subset of particles from the experimental model
 	void getMetaAndImageDataSubset(long int my_first_part_id, long int my_last_part_id, bool do_also_imagedata = true);
 
+	// Get the CTF (and Multiplicity weights where available) volumes from the stored files and correct them
+	void get3DCTFAndMulti(MultidimArray<RFLOAT> &Ictf, MultidimArray<RFLOAT> &Fctf, MultidimArray<RFLOAT> &FstMulti,
+			bool ctf_premultiplied);
+
+	// Apply the Multiplicity weights to correct for Images and CTFs to properly estimate squared differences and averages
+	void applySubtomoCorrection(MultidimArray<Complex > &Fimg, MultidimArray<Complex > &Fimg_nomask ,
+								MultidimArray<RFLOAT> &Fctf, MultidimArray<RFLOAT> &FstMulti);
+
 };
 
 // Global call to threaded core of doThreadExpectationSomeParticles
