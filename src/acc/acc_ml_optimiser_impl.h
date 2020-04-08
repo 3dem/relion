@@ -3061,6 +3061,8 @@ void accDoExpectationOneParticle(MlClass *myInstance, unsigned long part_id, int
 	sp.nr_images = baseMLO->mydata.numberOfImagesInParticle(part_id);
 
 	OptimisationParamters op(sp.nr_images, part_id);
+	if (baseMLO->mydata.is_3D)
+		op.FstMulti.resize(sp.nr_images);
 
 	// In the first iteration, multiple seeds will be generated
 	// A single random class is selected for each pool of images, and one does not marginalise over the orientations
