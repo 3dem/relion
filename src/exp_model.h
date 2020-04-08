@@ -213,12 +213,6 @@ public:
 	}
 };
 
-// for sorting particles based on the optics_group of their first image;
-bool compareOpticsGroupsParticles(const ExpParticle &a, const ExpParticle &b);
-
-// for sorting particles based on the random subset
-bool compareRandomSubsetParticles(const ExpParticle &a, const ExpParticle &b);
-
 class Experiment
 {
 public:
@@ -230,6 +224,9 @@ public:
 
 	// All particles in the experiment
 	std::vector<ExpParticle> particles;
+
+	// Indices of the sorted particles
+	std::vector<long int> sorted_idx;
 
 	// Number of particles in random subsets 1 and 2;
 	long int nr_particles_subset1, nr_particles_subset2;
@@ -282,6 +279,7 @@ public:
 		micrographs.clear();
 		micrographs.reserve(MAX_NR_MICROGRAPHS);
 		particles.clear(); // reserve upon reading
+		sorted_idx.clear();
 		nr_particles_subset1 = nr_particles_subset2 = 0;
 		nr_bodies = 1;
 		fn_scratch = "";
@@ -399,6 +397,26 @@ public:
 
 	// Write
 	void write(FileName fn_root);
+
+
+private:
+
+	struct compareOpticsGroupsParticles
+	{
+	    const std::vector<ExpParticle>& particles;
+	    compareOpticsGroupsParticles(const std::vector<ExpParticle>& particles) : particles(particles) { }
+	    bool operator()(const long int i, const long int j) { return particles[i].images[0].optics_group < particles[j].images[0].optics_group;}
+	};
+
+	struct compareRandomSubsetParticles
+	{
+	    const std::vector<ExpParticle>& particles;
+	    compareRandomSubsetParticles(const std::vector<ExpParticle>& particles) : particles(particles) { }
+	    bool operator()(const long int i, const long int j) { return particles[i].random_subset < particles[j].random_subset;}
+	};
+
+
+
 };
 
 #endif /* METADATA_MODEL_H_ */

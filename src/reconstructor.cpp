@@ -374,6 +374,8 @@ void Reconstructor::backprojectOneParticle(long int p)
 		myBoxSize = obsModel.getBoxSize(opticsGroup);
 		myPixelSize = obsModel.getPixelSize(opticsGroup);
 		ctf_premultiplied = obsModel.getCtfPremultiplied(opticsGroup);
+		if (do_ewald && ctf_premultiplied)
+			REPORT_ERROR("We cannot perform Ewald sphere correction on CTF premultiplied particles.");
 		Matrix2D<RFLOAT> magMat;
 		if (!do_ewald)
 		{
@@ -424,8 +426,8 @@ void Reconstructor::backprojectOneParticle(long int p)
 		DF.getValue(EMDL_IMAGE_NAME, fn_img, p);
 		img.read(fn_img);
 		img().setXmippOrigin();
-		CenterFFT(img(), true);
 		transformer.FourierTransform(img(), F2D);
+		CenterFFTbySign(F2D);
 
 		if (ABS(XX(trans)) > 0. || ABS(YY(trans)) > 0. || ABS(ZZ(trans)) > 0. ) // ZZ(trans) is 0 in case data_dim=2
 		{
@@ -826,8 +828,8 @@ void Reconstructor::applyCTFPandCTFQ(MultidimArray<Complex> &Fin, CTF &ctf, Four
 			if (!skip_mask)
 			{
 				// inverse transform and mask out the particle....
+				CenterFFTbySign(Fapp);
 				transformer.inverseFourierTransform(Fapp, Iapp);
-				CenterFFT(Iapp, false);
 
 				softMaskOutsideMap(Iapp, ROUND(mask_diameter/(angpix*2.)), (RFLOAT)width_mask_edge);
 
@@ -840,8 +842,8 @@ void Reconstructor::applyCTFPandCTFQ(MultidimArray<Complex> &Fin, CTF &ctf, Four
 
 				}
 				// Back into Fourier-space
-				CenterFFT(Iapp, true);
 				transformer.FourierTransform(Iapp, Fapp, false); // false means: leave Fapp in the transformer
+				CenterFFTbySign(Fapp);
 			}
 
 			// First time round: resize the output arrays

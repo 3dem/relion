@@ -2117,9 +2117,10 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 		wsum_model.current_size  = mymodel.getPixelFromResolution(1./ini_high);
 	wsum_model.initZeros();
 
-	for (long int part_id = my_first_particle_id; part_id <= my_last_particle_id; part_id++, nr_particles_done++)
+	for (long int part_id_sorted = my_first_particle_id; part_id_sorted <= my_last_particle_id; part_id_sorted++, nr_particles_done++)
 	{
 
+		long int part_id = mydata.sorted_idx[part_id_sorted];
 		for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++)
 		{
 			long int group_id = mydata.getGroupId(part_id, img_id);
@@ -3366,9 +3367,9 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
 	{
     	// calculate the random class for these SomeParticles
     	exp_random_class_some_particles.clear();
-    	for (long int part_id = my_first_part_id; part_id <= my_last_part_id; part_id++)
+    	for (long int part_id_sorted = my_first_part_id; part_id_sorted <= my_last_part_id; part_id_sorted++)
     	{
-        	init_random_generator(random_seed + part_id);
+                init_random_generator(random_seed + part_id_sorted);
     		int random_class = rand() % mymodel.nr_classes;
     		exp_random_class_some_particles.push_back(random_class);
     	}
@@ -3380,15 +3381,17 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
 	FileName fn_img, fn_stack, fn_open_stack="";
 
 	// Store total number of particle images in this bunch of SomeParticles, and set translations and orientations for skip_align/rotate
-	long int istop = 0;
+	long int my_metadata_offset = 0;
 	exp_imgs.clear();
     int metadata_offset = 0;
-    for (long int part_id = my_first_part_id; part_id <= my_last_part_id; part_id++)
+    for (long int part_id_sorted = my_first_part_id; part_id_sorted <= my_last_part_id; part_id_sorted++)
 	{
+
+    	long int part_id = mydata.sorted_idx[part_id_sorted];
 
     	// If skipping alignment or rotations, then store the old translation and orientation for each particle
 		// If we do local angular searches, get the previously assigned angles to center the prior
-    	bool do_clear = (part_id == my_first_part_id);
+    	bool do_clear = (part_id_sorted == my_first_part_id);
 		if (do_skip_align || do_skip_rotate)
 		{
 			// Also set the rotations
@@ -3447,14 +3450,14 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
 		{
 			// Read in the actual image from disc, only open/close common stacks once
 			// Read in all images, only open/close common stacks once
-			for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++, istop++)
+			for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++, my_metadata_offset++)
 			{
 
 				// Get the filename
 				if (!mydata.getImageNameOnScratch(part_id, img_id, fn_img))
 				{
 					std::istringstream split(exp_fn_img);
-					for (int i = 0; i <= istop; i++)
+					for (int i = 0; i <= my_metadata_offset; i++)
 					{
 						getline(split, fn_img);
 					}
@@ -3584,12 +3587,14 @@ void MlOptimiser::doThreadExpectationSomeParticles(int thread_id)
 }
 
 
-void MlOptimiser::expectationOneParticle(long int part_id, int thread_id)
+void MlOptimiser::expectationOneParticle(long int part_id_sorted, int thread_id)
 {
 #ifdef TIMING
-	if (part_id == exp_my_first_part_id)
+	if (part_id_sorted == exp_my_first_part_id)
 		timer.tic(TIMING_ESP_INI);
 #endif
+
+	long int part_id = mydata.sorted_idx[part_id_sorted];
 
 	// In the first iteration, multiple seeds will be generated
 	// A single random class is selected for each pool of images, and one does not marginalise over the orientations
@@ -3611,9 +3616,9 @@ void MlOptimiser::expectationOneParticle(long int part_id, int thread_id)
 		{
 			// In second CC iter, or first iter without CC: generate the seeds
 			// Now select a single random class
-			// exp_part_id is already in randomized order (controlled by -seed)
+			// exp_part_id_sorted is already in randomized order (controlled by -seed)
 			// WARNING: USING SAME iclass_min AND iclass_max FOR SomeParticles!!
-			long int idx = part_id - exp_my_first_part_id;
+			long int idx = part_id_sorted - exp_my_first_part_id;
 			if (idx >= exp_random_class_some_particles.size())
 				REPORT_ERROR("BUG: expectationOneParticle idx>random_class_some_particles.size()");
 			exp_iclass_min = exp_iclass_max = exp_random_class_some_particles[idx];
@@ -3667,9 +3672,9 @@ void MlOptimiser::expectationOneParticle(long int part_id, int thread_id)
 		int metadata_offset = 0;
 		for (long int iori = exp_my_first_part_id; iori <= exp_my_last_part_id; iori++)
 		{
-			if (iori == part_id)
+			if (iori == part_id_sorted)
 				break;
-			metadata_offset += mydata.numberOfImagesInParticle(iori);
+			metadata_offset += mydata.numberOfImagesInParticle(mydata.sorted_idx[iori]);
 		}
 
 		// Resize vectors for all particles
@@ -3683,7 +3688,7 @@ void MlOptimiser::expectationOneParticle(long int part_id, int thread_id)
 
 		// Then calculate all Fourier Transform of masked and unmasked image and the CTF
 #ifdef TIMING
-		if (part_id == exp_my_first_part_id)
+		if (part_id_sorted == exp_my_first_part_id)
 		{
 			timer.toc(TIMING_ESP_INI);
 			timer.tic(TIMING_ESP_FT);
@@ -3694,7 +3699,7 @@ void MlOptimiser::expectationOneParticle(long int part_id, int thread_id)
 				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior);
 
 #ifdef TIMING
-		if (part_id == exp_my_first_part_id)
+		if (part_id_sorted == exp_my_first_part_id)
 			timer.toc(TIMING_ESP_FT);
 #endif
 
@@ -3713,7 +3718,7 @@ void MlOptimiser::expectationOneParticle(long int part_id, int thread_id)
 		int exp_itrans_min, exp_itrans_max, exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max;
 		if (do_skip_align)
 		{
-			exp_itrans_min = exp_itrans_max = part_id - exp_my_first_part_id;
+			exp_itrans_min = exp_itrans_max = part_id_sorted - exp_my_first_part_id;
 		}
 		else
 		{
@@ -3723,13 +3728,13 @@ void MlOptimiser::expectationOneParticle(long int part_id, int thread_id)
 		if (do_skip_align || do_skip_rotate)
 		{
 			exp_idir_min = exp_idir_max = exp_ipsi_min = exp_ipsi_max =
-					part_id - exp_my_first_part_id;
+					part_id_sorted - exp_my_first_part_id;
 		}
 		else if (do_only_sample_tilt)
 		{
 			exp_idir_min = 0;
 			exp_idir_max = sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior) - 1;
-			exp_ipsi_min = exp_ipsi_max = part_id - exp_my_first_part_id;
+			exp_ipsi_min = exp_ipsi_max = part_id_sorted - exp_my_first_part_id;
 		}
 		else
 		{
@@ -3923,7 +3928,7 @@ void MlOptimiser::expectationOneParticle(long int part_id, int thread_id)
     } // end for ibody
 
 #ifdef DEBUG_BODIES
-	if (part_id == ROUND(debug1))
+	if (part_id_sorted == ROUND(debug1))
 		exit(1);
 #endif
 
@@ -4877,12 +4882,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		Matrix2D<RFLOAT> Aori;
 		Matrix1D<RFLOAT> my_projected_com(mymodel.data_dim), my_refined_ibody_offset(mymodel.data_dim);
 
-		// Get the right line in the exp_fn_img strings (also exp_fn_recimg and exp_fn_ctfs)
-		int istop = 0;
-		for (long int ii = exp_my_first_part_id; ii < part_id; ii++)
-			istop += mydata.numberOfImagesInParticle(part_id);
-		istop += img_id;
-
 		// To which group do I belong?
 		int group_id = mydata.getGroupId(part_id, img_id);
 		// What is my optics group?
@@ -4912,7 +4911,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 				std::cerr << "BUG!!! halfset= " << halfset << " my_halfset= " << my_halfset << " part_id= " << part_id << std::endl;
 				REPORT_ERROR("BUG! Mixing gold-standard separation!!!!");
 			}
-
 		}
 
 		// Get the old offsets and the priors on the offsets
@@ -5067,6 +5065,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 			if (do_preread_images)
 			{
 				img().reshape(mydata.particles[part_id].images[img_id].img);
+
+
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mydata.particles[part_id].images[img_id].img)
 				{
 					DIRECT_MULTIDIM_ELEM(img(), n) = (RFLOAT)DIRECT_MULTIDIM_ELEM(mydata.particles[part_id].images[img_id].img, n);
@@ -5080,7 +5080,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 				// Read from disc
 				FileName fn_img;
 				std::istringstream split(exp_fn_img);
-				for (int i = 0; i <= istop; i++)
+				for (int i = 0; i <= my_metadata_offset; i++)
 					getline(split, fn_img);
 
 				img.read(fn_img);
@@ -5088,12 +5088,12 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 
 				// Check that this is the same as the image in exp_imgs vector
 				Image<RFLOAT> diff;
-				if (istop >= exp_imgs.size())
+				if (my_metadata_offset >= exp_imgs.size())
 				{
-					std::cerr << " istop= " <<istop << " exp_imgs.size()= "<<exp_imgs.size()<<std::endl;
-					REPORT_ERROR("BUG: istop runs out of bounds!");
+					std::cerr << " my_metadata_offset= " <<my_metadata_offset << " exp_imgs.size()= "<<exp_imgs.size()<<std::endl;
+					REPORT_ERROR("BUG: my_metadata_offset runs out of bounds!");
 				}
-				diff() = img() - exp_imgs[istop];
+				diff() = img() - exp_imgs[my_metadata_offset];
 				if (diff().computeMax() > 1e-6)
 				{
 					std::cerr << "metadata_offset= " <<metadata_offset<<" fn_img=" << fn_img << " diff avg=" << diff().computeAvg()<<std::endl;
@@ -5112,7 +5112,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 					if (!mydata.getImageNameOnScratch(part_id, img_id, fn_img))
 					{
 						std::istringstream split(exp_fn_img);
-						for (int i = 0; i <= istop; i++)
+						for (int i = 0; i <= my_metadata_offset; i++)
 							getline(split, fn_img);
 					}
 					img.read(fn_img);
@@ -5120,7 +5120,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 				}
 				else
 				{
-					img() = exp_imgs[istop];
+					img() = exp_imgs[my_metadata_offset];
 				}
 #endif
 			}
@@ -5130,7 +5130,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 				FileName fn_recimg;
 				std::istringstream split2(exp_fn_recimg);
 				// Get the right line in the exp_fn_img string
-				for (int i = 0; i <= istop; i++)
+				for (int i = 0; i <= my_metadata_offset; i++)
 					getline(split2, fn_recimg);
 				rec_img.read(fn_recimg);
 				rec_img().setXmippOrigin();
@@ -5482,7 +5482,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 					{
 						std::istringstream split(exp_fn_ctf);
 						// Get the right line in the exp_fn_img string
-						for (int i = 0; i <= istop; i++)
+						for (int i = 0; i <= my_metadata_offset; i++)
 							getline(split, fn_ctf);
 					}
 					Ictf.read(fn_ctf);
@@ -5819,7 +5819,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 {
 
 #ifdef TIMING
-	if (part_id == exp_my_first_part_id)
+	if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 	{
 		if (do_also_unmasked)
 			timer.tic(TIMING_ESP_PRECW);
@@ -6056,7 +6056,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 		}
 	}
 #ifdef TIMING
-	if (part_id == exp_my_first_part_id)
+	if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 	{
 		if (do_also_unmasked)
 			timer.toc(TIMING_ESP_PRECW);
@@ -6112,7 +6112,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 {
 
 #ifdef TIMING
-	if (part_id == exp_my_first_part_id)
+	if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 	{
 		if (exp_ipass == 0) timer.tic(TIMING_ESP_DIFF1);
 		else timer.tic(TIMING_ESP_DIFF2);
@@ -6244,7 +6244,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 								// Project the reference map (into Fref)
 #ifdef TIMING
 								// Only time one thread, as I also only time one MPI process
-								if (part_id == exp_my_first_part_id)
+								if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 									timer.tic(TIMING_DIFF_PROJ);
 #endif
 
@@ -6267,7 +6267,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 
 #ifdef TIMING
 								// Only time one thread, as I also only time one MPI process
-								if (part_id == exp_my_first_part_id)
+								if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 									timer.toc(TIMING_DIFF_PROJ);
 #endif
 
@@ -6318,7 +6318,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 										{
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
-											if (part_id == exp_my_first_part_id)
+											if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 												timer.tic(TIMING_DIFF2_GETSHIFT);
 #endif
 											/// Now get the shifted image
@@ -6403,13 +6403,13 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 											}
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
-											if (part_id == exp_my_first_part_id)
+											if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 												timer.toc(TIMING_DIFF2_GETSHIFT);
 #endif
 
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
-											if (part_id == exp_my_first_part_id)
+											if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 												timer.tic(TIMING_DIFF_DIFF2);
 #endif
 											RFLOAT diff2;
@@ -6444,7 +6444,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 											}
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
-											if (part_id == exp_my_first_part_id)
+											if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 												timer.toc(TIMING_DIFF_DIFF2);
 #endif
 
@@ -6668,7 +6668,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 	} // end loop iclass
 
 #ifdef TIMING
-	if (part_id == exp_my_first_part_id)
+	if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 	{
 		if (exp_ipass == 0) timer.toc(TIMING_ESP_DIFF1);
 		else timer.toc(TIMING_ESP_DIFF2);
@@ -6689,7 +6689,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
 {
 
 #ifdef TIMING
-	if (part_id == exp_my_first_part_id)
+	if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 	{
 		if (exp_ipass == 0) timer.tic(TIMING_ESP_WEIGHT1);
 		else timer.tic(TIMING_ESP_WEIGHT2);
@@ -6935,7 +6935,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
 
 #ifdef TIMING
 							// Only time one thread, as I also only time one MPI process
-							if (part_id == exp_my_first_part_id)
+							if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 								timer.tic(TIMING_WEIGHT_EXP);
 #endif
 							// Now first loop over iover_rot, because that is the order in exp_Mweight as well
@@ -6997,7 +6997,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
 							}// end loop iover_rot
 #ifdef TIMING
 							// Only time one thread, as I also only time one MPI process
-							if (part_id == exp_my_first_part_id)
+							if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 								timer.toc(TIMING_WEIGHT_EXP);
 #endif
 						} // end loop itrans
@@ -7082,7 +7082,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
 
 		int my_metadata_offset = metadata_offset + img_id;
 #ifdef TIMING
-		if (part_id == exp_my_first_part_id)
+		if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 			timer.tic(TIMING_WEIGHT_SORT);
 #endif
 		MultidimArray<RFLOAT> sorted_weight;
@@ -7105,7 +7105,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
 		sorted_weight.sort();
 
 #ifdef TIMING
-		if (part_id == exp_my_first_part_id)
+		if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 			timer.toc(TIMING_WEIGHT_SORT);
 #endif
 		RFLOAT frac_weight = 0.;
@@ -7198,7 +7198,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
 	} // end loop img_id
 
 #ifdef TIMING
-	if (part_id == exp_my_first_part_id)
+	if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 	{
 		if (exp_ipass == 0) timer.toc(TIMING_ESP_WEIGHT1);
 		else timer.toc(TIMING_ESP_WEIGHT2);
@@ -7233,7 +7233,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 		std::vector<RFLOAT> &exp_local_sqrtXi2)
 {
 #ifdef TIMING
-	if (part_id == exp_my_first_part_id)
+	if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 		timer.tic(TIMING_ESP_WSUM);
 #endif
 
@@ -7404,7 +7404,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 
 #ifdef TIMING
 							// Only time one thread, as I also only time one MPI process
-							if (part_id == exp_my_first_part_id)
+							if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 								timer.tic(TIMING_WSUM_PROJ);
 #endif
 							// Project the reference map (into Fref)
@@ -7421,7 +7421,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 							}
 #ifdef TIMING
 							// Only time one thread, as I also only time one MPI process
-							if (part_id == exp_my_first_part_id)
+							if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 								timer.toc(TIMING_WSUM_PROJ);
 #endif
 							// Inside the loop over all translations and all part_id sum all shift Fimg's and their weights
@@ -7528,7 +7528,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
-											if (part_id == exp_my_first_part_id)
+											if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 												timer.tic(TIMING_WSUM_GETSHIFT);
 #endif
 
@@ -7607,7 +7607,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 											}
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
-											if (part_id == exp_my_first_part_id)
+											if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 											{
 												timer.toc(TIMING_WSUM_GETSHIFT);
 												timer.tic(TIMING_WSUM_DIFF2);
@@ -7643,7 +7643,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 											}
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
-											if (part_id == exp_my_first_part_id)
+											if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 											{
 												timer.toc(TIMING_WSUM_DIFF2);
 												timer.tic(TIMING_WSUM_LOCALSUMS);
@@ -7710,7 +7710,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
-											if (part_id == exp_my_first_part_id)
+											if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 											{
 												timer.toc(TIMING_WSUM_LOCALSUMS);
 												timer.tic(TIMING_WSUM_SUMSHIFT);
@@ -7793,7 +7793,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
-											if (part_id == exp_my_first_part_id)
+											if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 												timer.toc(TIMING_WSUM_SUMSHIFT);
 #endif
 										} // end if !do_skip_maximization
@@ -7929,7 +7929,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 							{
 #ifdef TIMING
 								// Only time one thread, as I also only time one MPI process
-								if (part_id == exp_my_first_part_id)
+								if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 									timer.tic(TIMING_WSUM_BACKPROJ);
 #endif
 								// Perform the actual back-projection.
@@ -7944,7 +7944,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 								pthread_mutex_unlock(&global_mutex2[my_mutex]);
 	#ifdef TIMING
 								// Only time one thread, as I also only time one MPI process
-								if (part_id == exp_my_first_part_id)
+								if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 									timer.toc(TIMING_WSUM_BACKPROJ);
 	#endif
 							} // end if !do_skip_maximization
@@ -8109,7 +8109,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 	} // end if !do_skip_maximization
 
 #ifdef TIMING
-	if (part_id == exp_my_first_part_id)
+	if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 		timer.toc(TIMING_ESP_WSUM);
 #endif
 }
@@ -8118,9 +8118,10 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 void MlOptimiser::monitorHiddenVariableChanges(long int my_first_part_id, long int my_last_part_id)
 {
 
-	for (long int part_id = my_first_part_id, metadata_offset = 0; part_id <= my_last_part_id; part_id++)
+	for (long int part_id_sorted = my_first_part_id, metadata_offset = 0; part_id_sorted <= my_last_part_id; part_id_sorted++)
 	{
 
+		long int part_id = mydata.sorted_idx[part_id_sorted];
 		for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++, metadata_offset++)
 		{
 
@@ -8304,9 +8305,10 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 		RFLOAT acc_rot_class = 0.;
 		RFLOAT acc_trans_class = 0.;
 		// Particles are already in random order, so just move from 0 to n_trials
-		for (long int part_id = my_first_part_id, metadata_offset = 0; part_id <= my_last_part_id; part_id++)
+		for (long int part_id_sorted = my_first_part_id, metadata_offset = 0; part_id_sorted <= my_last_part_id; part_id_sorted++)
 	    {
 
+			long int part_id = mydata.sorted_idx[part_id_sorted];
 			for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++, metadata_offset++)
 			{
 
@@ -9053,9 +9055,10 @@ void MlOptimiser::checkConvergence(bool myverb)
 void MlOptimiser::setMetaDataSubset(long int first_part_id, long int last_part_id)
 {
 
-	for (long int part_id = first_part_id, metadata_offset = 0; part_id <= last_part_id; part_id++)
+	for (long int part_id_sorted = first_part_id, metadata_offset = 0; part_id_sorted <= last_part_id; part_id_sorted++)
     {
 
+		long int part_id = mydata.sorted_idx[part_id_sorted];
 		for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++, metadata_offset++)
 		{
 
@@ -9151,8 +9154,9 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 	}
 
 	int nr_images = 0;
-	for (long int part_id = first_part_id; part_id <= last_part_id; part_id++)
+	for (long int part_id_sorted = first_part_id; part_id_sorted <= last_part_id; part_id_sorted++)
 	{
+		long int part_id = mydata.sorted_idx[part_id_sorted];
 		nr_images += mydata.numberOfImagesInParticle(part_id);
 	}
 	exp_metadata.initZeros(nr_images, METADATA_LINE_LENGTH_BEFORE_BODIES + (mymodel.nr_bodies) * METADATA_NR_BODY_PARAMS);
@@ -9192,9 +9196,10 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 		}
 	}
 
-	for (long int part_id = first_part_id, metadata_offset = 0; part_id <= last_part_id; part_id++)
+	for (long int part_id_sorted = first_part_id, metadata_offset = 0; part_id_sorted <= last_part_id; part_id_sorted++)
     {
 
+		long int part_id = mydata.sorted_idx[part_id_sorted];
 		for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++, metadata_offset++)
 		{
 
@@ -9205,7 +9210,8 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 			// Get the image names from the MDimg table
 			FileName fn_img="", fn_rec_img="", fn_ctf="";
 			if (!mydata.getImageNameOnScratch(part_id, img_id, fn_img))
-				mydata.MDimg.getValue(EMDL_IMAGE_NAME, fn_img, ori_img_id);
+                            mydata.MDimg.getValue(EMDL_IMAGE_NAME, fn_img, ori_img_id);
+
 			if (mymodel.data_dim == 3 && do_ctf_correction)
 			{
 				// Also read the CTF image from disc
