@@ -29,6 +29,8 @@ void ParticleSubtractor::read(int argc, char **argv)
 	fn_msk = parser.getOption("--mask", "Name of the 3D mask with all density that should be kept, i.e. not subtracted", "");
 	fn_sel = parser.getOption("--data", "Name of particle STAR file, in case not all particles from optimiser are to be used", "");
 	fn_revert = parser.getOption("--revert", "Name of particle STAR file to revert. When this is provided, all other options are ignored.", "");
+	fn_model = parser.getOption("--model", "Use this model rather than what is referenced by the optimiser file.", "");
+	do_pairs = parser.checkOption("--pairs", "Output two complementary stacks with model projections and particle images.", "false");
 
 	int center_section = parser.addSection("Centering options");
 	do_recenter_on_mask = parser.checkOption("--recenter_on_mask", "Use this flag to center the subtracted particles on projections of the centre-of-mass of the input mask");
@@ -109,7 +111,14 @@ void ParticleSubtractor::initialise(int _rank, int _size)
 	if (verb > 0) std::cout << " + Reading in mask ... " << std::endl;
 	// Mask stuff
 	Image<RFLOAT> Imask;
-	Imask.read(fn_msk);
+	if (fn_msk == "") {
+		//If no mask provided initialize mask to include everything
+		Imask().initZeros(opt.mymodel.Iref[0]);
+		Imask() += 1;
+	}
+	else
+	    Imask.read(fn_msk);
+
 	Imask().setXmippOrigin();
 
 	RFLOAT minval, maxval;
@@ -207,9 +216,24 @@ void ParticleSubtractor::initialise(int _rank, int _size)
 		}
 	}
 
+	// Overwrite the projectors with model file if provided
+	if (fn_model != "")
+	{
+		Image<RFLOAT> model;
+		model.read(fn_model);
+		model().setXmippOrigin();
+
+		for (int iclass = 0; iclass < opt.mymodel.nr_classes; iclass++)
+			opt.mymodel.Iref[iclass] = model();
+	}
+
 	if (verb > 0)
 	{
 		std::cout << " + Calculating Fourier transforms of the maps ..." << std::endl;
+        if (opt.do_norm_correction)
+            std::cout << " + Doing norm correction" << std::endl;
+        else
+            std::cout << " + Not doing norm correction" << std::endl;
 	}
 
 	// Now set up the Projectors inside the model
@@ -287,7 +311,10 @@ void ParticleSubtractor::run()
 	long int barstep = XMIPP_MAX(1, nr_parts/120);
 	if (verb > 0)
 	{
-		std::cout << " + Subtracting all particles ..." << std::endl;
+	    if (do_pairs)
+            std::cout << " + Generating pairs of noise-free and noisy images..." << std::endl;
+	    else
+		    std::cout << " + Subtracting all particles..." << std::endl;
 		time_config();
 		init_progress_bar(nr_parts);
 	}
@@ -415,12 +442,14 @@ FileName ParticleSubtractor::getParticleName(long int imgno, int myrank, int opt
 void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, long int counter)
 {
 	// Read the particle image
-	Image<RFLOAT> img;
+	Image<RFLOAT> img, img_pair;
 	long int ori_img_id = opt.mydata.particles[part_id].images[imgno].id;
 	int optics_group = opt.mydata.getOpticsGroup(part_id, 0);
 	img.read(opt.mydata.particles[part_id].images[0].name);
 	img().setXmippOrigin();
 
+	if (do_pairs)
+		img_pair() = img();
 
 	// Make sure gold-standard is adhered to!
 	int my_subset = (rank % 2 == 1) ? 1 : 2;
@@ -650,11 +679,18 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 	}
 
 	// Do the actual subtraction
-	Fimg -= Fsubtract;
+	if (!do_pairs)
+	    Fimg -= Fsubtract;
 
 	// And go finally back to real-space
 	CenterFFTbySign(Fimg);
 	transformer.inverseFourierTransform(Fimg, img());
+
+    if (do_pairs)
+    {
+        CenterFFTbySign(Fsubtract);
+        transformer.inverseFourierTransform(Fsubtract, img_pair());
+    }
 
 	if (do_center || opt.fn_body_masks != "None")
 	{
@@ -664,13 +700,14 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 		my_residual_offset -= centering_offset;
 		selfTranslate(img(), centering_offset, WRAP);
 
+        if (do_pairs)
+            selfTranslate(img_pair(), centering_offset, WRAP);
+
 		// Set the non-integer difference between the rounded centering offset and the actual offsets in the STAR file
 		opt.mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, my_pixel_size * XX(my_residual_offset), ori_img_id);
 		opt.mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, my_pixel_size * YY(my_residual_offset), ori_img_id);
 		if (opt.mymodel.data_dim == 3)
-		{
 			opt.mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, my_pixel_size * ZZ(my_residual_offset), ori_img_id);
-		}
 	}
 
 	// Rebox the image
@@ -680,16 +717,32 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 		{
 			img().window(FIRST_XMIPP_INDEX(boxsize), FIRST_XMIPP_INDEX(boxsize),
 					   LAST_XMIPP_INDEX(boxsize),  LAST_XMIPP_INDEX(boxsize));
+
+            if (do_pairs)
+                img_pair().window(FIRST_XMIPP_INDEX(boxsize), FIRST_XMIPP_INDEX(boxsize),
+                             LAST_XMIPP_INDEX(boxsize),  LAST_XMIPP_INDEX(boxsize));
 		}
 		else if (img().getDim() == 3)
 		{
 			img().window(FIRST_XMIPP_INDEX(boxsize), FIRST_XMIPP_INDEX(boxsize), FIRST_XMIPP_INDEX(boxsize),
 					   LAST_XMIPP_INDEX(boxsize),  LAST_XMIPP_INDEX(boxsize),  LAST_XMIPP_INDEX(boxsize));
+
+            if (do_pairs)
+                img_pair().window(FIRST_XMIPP_INDEX(boxsize), FIRST_XMIPP_INDEX(boxsize), FIRST_XMIPP_INDEX(boxsize),
+                                   LAST_XMIPP_INDEX(boxsize),  LAST_XMIPP_INDEX(boxsize),  LAST_XMIPP_INDEX(boxsize));
 		}
 	}
 
 	// Now write out the image & set filenames in output metadatatable
-	FileName fn_img = getParticleName(counter, rank, optics_group);
+	FileName fn_img, fn_pair;
+
+	if (do_pairs) {
+		fn_img = fn_out + "/pairs_data.mrcs";
+		fn_pair = fn_out + "/pairs_model.mrcs";
+	}
+	else
+		fn_img = getParticleName(counter, rank, optics_group);
+
 	opt.mydata.MDimg.setValue(EMDL_IMAGE_NAME, fn_img, ori_img_id);
 	opt.mydata.MDimg.setValue(EMDL_IMAGE_ORI_NAME, opt.mydata.particles[part_id].images[0].name, ori_img_id);
 	//Also set the original order in the input STAR file for later combination
@@ -705,9 +758,22 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 	}
 	else
 	{
-		if (nr_particles_in_optics_group[optics_group] == 0)
-			img.write(fn_img, -1, false, WRITE_OVERWRITE);
-		else
-			img.write(fn_img, -1, false, WRITE_APPEND);
+		if (do_pairs) {
+			if (pairs_stack_count == 0) {
+				img.write(fn_img, -1, false, WRITE_OVERWRITE);
+				img_pair.write(fn_pair, -1, false, WRITE_OVERWRITE);
+			}
+			else {
+				img.write(fn_img, -1, false, WRITE_APPEND);
+				img_pair.write(fn_pair, -1, false, WRITE_APPEND);
+			}
+			pairs_stack_count ++;
+		}
+		else {
+			if (nr_particles_in_optics_group[optics_group] == 0)
+				img.write(fn_img, -1, false, WRITE_OVERWRITE);
+			else
+				img.write(fn_img, -1, false, WRITE_APPEND);
+		}
 	}
 }

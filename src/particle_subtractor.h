@@ -46,6 +46,15 @@ public:
 	// For conventional 3D classifications/ refinements: center the subtracted particles?
 	bool do_center;
 
+    // FileName to use instead of the model referensed by the optimiser file
+    FileName fn_model;
+
+    // Rather than a stack of subtracted particle images, output both images and model projections in two stacks
+    bool do_pairs;
+
+    // Number of particles in the pair stacks
+    unsigned pairs_stack_count;
+
 	// verbosity
 	int verb;
 
