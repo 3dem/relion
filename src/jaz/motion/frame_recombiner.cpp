@@ -390,6 +390,7 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 			}
 		}
 
+		stack.setSamplingRateInHeader(angpix_out[ogmg]);
 		stack.write(fn_root+"_shiny" + suffix + ".mrcs");
 
 		if (debug)

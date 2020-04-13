@@ -1475,9 +1475,9 @@ void multiViewerCanvas::saveTrainingSet()
 	{
 		MDout.addObject(boxes[ipos]->MDimg.getObject());
 		if (boxes[ipos]->selected)
-			MDout.setValue(EMDL_SELECTED, true);
+			MDout.setValue(EMDL_SELECTED, 1);
 		else
-			MDout.setValue(EMDL_SELECTED, false);
+			MDout.setValue(EMDL_SELECTED, 0);
 	}
 
 	// Maintain the original image ordering
