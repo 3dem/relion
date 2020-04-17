@@ -37,7 +37,7 @@ public:
 	// I/O Parser
 	IOParser parser;
 
-	FileName fn_out, fn_sym, fn_sel, fn_gain, traj_path, movie_path;
+	FileName fn_out, fn_sym, fn_sel, fn_gain, traj_path, movie_path, fn_corrmic;
 
 	MetaDataTable DF;
 	ObservationModel obsModel;
@@ -61,6 +61,7 @@ public:
 	// All backprojectors needed for parallel reconstruction
 	BackProjector backprojector;
 
+	std::map<std::string, std::string> mic2meta;
 public:
 	MovieReconstructor() { }
 
@@ -122,8 +123,9 @@ void MovieReconstructor::read(int argc, char **argv)
 	fn_sym = parser.getOption("--sym", "Symmetry group", "c1");
 	maxres = textToFloat(parser.getOption("--maxres", "Maximum resolution (in Angstrom) to consider in Fourier space (default Nyquist)", "-1"));
 	padding_factor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
+	fn_corrmic = parser.getOption("--corr_mic", "Motion correction STAR file", "");
 	traj_path = parser.getOption("--traj_path", "Trajectory path prefix", "");
-	movie_path = parser.getOption("--movie_path", "Movie path prefix", "");
+	// movie_path = parser.getOption("--movie_path", "Movie path prefix", "");
 	fn_gain = parser.getOption("--gain", "Gain reference (in the right direction)", "");
 	subset = textToInteger(parser.getOption("--subset", "Subset of images to consider (1: only reconstruct half1; 2: only half2; other: reconstruct all)", "-1"));
 	movie_angpix = textToFloat(parser.getOption("--movie_angpix", "Pixel size in the movie", "-1"));
@@ -132,7 +134,7 @@ void MovieReconstructor::read(int argc, char **argv)
 	coord_angpix = textToFloat(parser.getOption("--coord_angpix", "Pixel size of particle coordinates", "-1"));
 	if (coord_angpix < 0)
 		REPORT_ERROR("For this program, you have to explicitly specify the coordinate pixel size (--coord_angpix).");
-	frame = textToInteger(parser.getOption("--frame", "Movie frame to reconstruct", "1"));
+	frame = textToInteger(parser.getOption("--frame", "Movie frame to reconstruct (1-indexed)", "1"));
 	movie_boxsize = textToInteger(parser.getOption("--window", "Box size to extract from raw movies", "-1"));
 	if (movie_boxsize < 0 || movie_boxsize % 2 != 0)
 		REPORT_ERROR("You have to specify the extraction box size (--window) as an even number.");
@@ -189,6 +191,23 @@ void MovieReconstructor::initialise()
 	std::cout << "Movie box size = " << movie_boxsize << " px at " << movie_angpix << " A/px" << std::endl;
 	std::cout << "Reconstruction box size = " << output_boxsize << " px at " << angpix << " A/px" << std::endl;
 	std::cout << "Coordinate pixel size = " << coord_angpix << " A/px" << std::endl;
+
+	// Load motion correction STAR file. TODO: code duplication from MicrographHandler
+	MetaDataTable corrMic;
+	// Don't die even if conversion failed. Polishing does not use obsModel from a motion correction STAR file
+	ObservationModel::loadSafely(fn_corrmic, obsModel, corrMic, "micrographs", verb, false);
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(corrMic)
+	{
+		std::string micName, metaName;
+		corrMic.getValueToString(EMDL_MICROGRAPH_NAME, micName);
+		corrMic.getValueToString(EMDL_MICROGRAPH_METADATA_NAME, metaName);
+		// remove the pipeline job prefix
+		FileName fn_pre, fn_jobnr, fn_post;
+		decomposePipelineFileName(micName, fn_pre, fn_jobnr, fn_post);
+
+//		std::cout << fn_post << " => " << metaName << std::endl;
+		mic2meta[fn_post] = metaName;
+	}
 
 	// Read MetaData file, which should have the image names and their angles!
 	ObservationModel::loadSafely(fn_sel, obsModel, DF, "particles", 0, false);
@@ -248,10 +267,19 @@ void MovieReconstructor::backproject(int rank, int size)
 	for (int imov = 0; imov < nr_movies; imov++)
 	{	
 		mdts[imov].getValue(EMDL_MICROGRAPH_NAME, fn_mic, 0);
-		// TODO: Actually we should look at MotionCorr STAR file to find the right movie and gain filename
-		//       For the time being, let's assume this is sorted out by Python script.
-		fn_traj = traj_path + "/" + fn_mic.withoutExtension().getBaseName() + "_tracks.star";
-		fn_movie = movie_path + "/" + fn_mic.withoutExtension().getBaseName() + ".tiff"; 
+		// TODO: Actually we should look at MotionCorr STAR file to find the righ gain filename
+		//       For the time being, let's assume this is given in the command line
+		MetaDataTable MDmovie;
+		FileName fn_pre, fn_jobnr, fn_post;
+		decomposePipelineFileName(fn_mic, fn_pre, fn_jobnr, fn_post);
+//		std::cout << "fn_post = " << fn_post << std::endl;
+		if (mic2meta[fn_post] == "")
+			REPORT_ERROR("Cannot get metadata STAR file for " + fn_mic);
+		MDmovie.read(mic2meta[fn_post], "general");
+		if (!MDmovie.getValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_movie))
+			REPORT_ERROR("Cannot get movie name for "+ fn_mic);
+		fn_traj = traj_path + "/" + fn_post.withoutExtension() + "_tracks.star";
+//#define DEBUG
 #ifdef DEBUG
 		std::cout << "fn_mic = " << fn_mic << "\n\tfn_traj = " << fn_traj << "\n\tfn_movie = " << fn_movie << std::endl;
 #endif
@@ -374,7 +402,7 @@ void MovieReconstructor::backproject(int rank, int size)
 
 			Iparticle().setXmippOrigin();
 			transformer.FourierTransform(Iparticle(), Fparticle());
-			if (output_boxsize != movie_boxsize) // TODO: FIXME: Something wrong. Output FSC is worse.
+			if (output_boxsize != movie_boxsize) 
 				Fparticle = FilterHelper::cropCorner2D(Fparticle, output_boxsize / 2 + 1, output_boxsize);
 			shiftImageInFourierTransform(Fparticle(), Fparticle(), output_boxsize, dxR / angpix, dyR / angpix);
 			CenterFFTbySign(Fparticle());
