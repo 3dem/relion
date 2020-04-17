@@ -19,13 +19,11 @@
  ***************************************************************************/
 
 #include <src/backprojector.h>
-#include <src/funcs.h>
 #include <src/ctf.h>
 #include <src/args.h>
-#include <src/error.h>
 #include <src/euler.h>
-#include <src/time.h>
-#include <src/ml_model.h>
+#include <src/micrograph_model.h>
+#include <src/renderEER.h>
 #include <src/jaz/obs_model.h>
 #include <src/jaz/stack_helper.h>
 #include <src/jaz/motion/motion_helper.h>
@@ -37,7 +35,7 @@ public:
 	// I/O Parser
 	IOParser parser;
 
-	FileName fn_out, fn_sym, fn_sel, fn_gain, traj_path, movie_path, fn_corrmic;
+	FileName fn_out, fn_sym, fn_sel, traj_path, movie_path, fn_corrmic;
 
 	MetaDataTable DF;
 	ObservationModel obsModel;
@@ -126,7 +124,6 @@ void MovieReconstructor::read(int argc, char **argv)
 	fn_corrmic = parser.getOption("--corr_mic", "Motion correction STAR file", "");
 	traj_path = parser.getOption("--traj_path", "Trajectory path prefix", "");
 	// movie_path = parser.getOption("--movie_path", "Movie path prefix", "");
-	fn_gain = parser.getOption("--gain", "Gain reference (in the right direction)", "");
 	subset = textToInteger(parser.getOption("--subset", "Subset of images to consider (1: only reconstruct half1; 2: only half2; other: reconstruct all)", "-1"));
 	movie_angpix = textToFloat(parser.getOption("--movie_angpix", "Pixel size in the movie", "-1"));
 	if (movie_angpix < 0)
@@ -253,44 +250,64 @@ void MovieReconstructor::backproject(int rank, int size)
 
 	}
 
-	FileName fn_img, fn_mic, fn_stack, fn_traj, fn_movie;
+	FileName fn_img, fn_mic, fn_stack, fn_traj, fn_movie, prev_gain;
 	long int stack_id;
 	MetaDataTable trajectories;
 	FourierTransformer transformer;
 	Image<float> Iframe, Igain;
 	Image<RFLOAT> Iparticle;
 	Image<Complex> Fparticle;
-	if (fn_gain != "")
-		Igain.read(fn_gain);
 
 	int frame_no = frame; // 1-indexed
 	for (int imov = 0; imov < nr_movies; imov++)
 	{	
 		mdts[imov].getValue(EMDL_MICROGRAPH_NAME, fn_mic, 0);
-		// TODO: Actually we should look at MotionCorr STAR file to find the righ gain filename
-		//       For the time being, let's assume this is given in the command line
-		MetaDataTable MDmovie;
 		FileName fn_pre, fn_jobnr, fn_post;
 		decomposePipelineFileName(fn_mic, fn_pre, fn_jobnr, fn_post);
 //		std::cout << "fn_post = " << fn_post << std::endl;
 		if (mic2meta[fn_post] == "")
 			REPORT_ERROR("Cannot get metadata STAR file for " + fn_mic);
-		MDmovie.read(mic2meta[fn_post], "general");
-		if (!MDmovie.getValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_movie))
-			REPORT_ERROR("Cannot get movie name for "+ fn_mic);
+		Micrograph mic(mic2meta[fn_post]);
+		fn_movie = mic.getMovieFilename();
 		fn_traj = traj_path + "/" + fn_post.withoutExtension() + "_tracks.star";
 //#define DEBUG
 #ifdef DEBUG
 		std::cout << "fn_mic = " << fn_mic << "\n\tfn_traj = " << fn_traj << "\n\tfn_movie = " << fn_movie << std::endl;
 #endif
+		const bool isEER = EERRenderer::isEER(fn_movie);
+		int eer_upsampling, eer_grouping;
+		// TODO: better to use micrograph model
+		if (isEER)
+		{
+			eer_upsampling = mic.getEERUpsampling();
+			eer_grouping = mic.getEERGrouping();
+		}
+
+		FileName fn_gain = mic.getGainFilename();
+		if (fn_gain != prev_gain)
+		{
+			Igain.read(fn_gain);
+			prev_gain = fn_gain;
+
+			if (isEER)
+				EERRenderer::upsampleEERGain(Igain(), eer_upsampling);
+		}
+
 		// Read trajectories. Both particle ID and frame ID are 0-indexed in this array.
 		std::vector<std::vector<gravis::d2Vector>> trajectories = MotionHelper::readTracksInPix(fn_traj, movie_angpix);
 
 		// TODO: loop over relevant frames
 		// TODO: support EER
-		FileName fn_frame;
-		fn_frame.compose(frame_no, fn_movie);
-		Iframe.read(fn_frame);
+		if (isEER)
+		{
+			REPORT_ERROR("Not implemented yet.");
+		}
+		else
+		{
+			FileName fn_frame;
+			fn_frame.compose(frame_no, fn_movie);
+			Iframe.read(fn_frame);
+		}
 		const int w0 = XSIZE(Iframe());
 		const int h0 = YSIZE(Iframe());
 
@@ -309,11 +326,11 @@ void MovieReconstructor::backproject(int rank, int size)
 			progress_bar(imov);
 #endif
 
-			int random_subset = 0;
-			mdts[imov].getValue(EMDL_PARTICLE_RANDOM_SUBSET, random_subset);
+			int this_subset = 0;
+			mdts[imov].getValue(EMDL_PARTICLE_RANDOM_SUBSET, this_subset);
 
 			// TODO: Use two threads for half sets to avoid reading movies twice??
-			if (subset >= 1 && subset <= 2 && random_subset != subset)
+			if (subset >= 1 && subset <= 2 && this_subset != subset)
 				continue;
 
 			const int opticsGroup = obsModel.getOpticsGroup(mdts[imov]); // 0-indexed
@@ -340,32 +357,22 @@ void MovieReconstructor::backproject(int rank, int size)
 			// Below might look overly complicated but is necessary to have the same rounding behaviour as Extract & Polish.
 			Iparticle().initZeros(movie_boxsize, movie_boxsize);
 
-			// ORIGINAL CODE (does not work when angpix changes)
-			// pixel coordinate of the top left corner of the extractio box after down-sampling
-			double xpO = (int)(coord_x * coord_angpix / angpix) - output_boxsize / 2;
-			double ypO = (int)(coord_y * coord_angpix / angpix) - output_boxsize / 2;
-			// pixel coordinate in the movie
-			int x0 = (int)round(xpO * angpix / movie_angpix);
-			int y0 = (int)round(ypO * angpix / movie_angpix);
-
 			// Revised code: use data_angpix
-			double xpOD = (int)(coord_x * coord_angpix / data_angpix);
-			double ypOD = (int)(coord_y * coord_angpix / data_angpix);
-			int x0D = (int)round(xpOD * data_angpix / movie_angpix) - movie_boxsize / 2;
-			int y0D = (int)round(ypOD * data_angpix / movie_angpix) - movie_boxsize / 2;
+			// pixel coordinate of the top left corner of the extractio box after down-sampling
+			double xpO = (int)(coord_x * coord_angpix / data_angpix);
+			double ypO = (int)(coord_y * coord_angpix / data_angpix);
+			// pixel coordinate in the movie
+			int x0 = (int)round(xpO * data_angpix / movie_angpix) - movie_boxsize / 2;
+			int y0 = (int)round(ypO * data_angpix / movie_angpix) - movie_boxsize / 2;
 
 			// pixel coordinate in the movie: cleaner but not compatible with existing files...
-			int x0N = (int)round(coord_x * coord_angpix / movie_angpix) - movie_boxsize / 2;
-			int y0N = (int)round(coord_y * coord_angpix / movie_angpix) - movie_boxsize / 2;
+			// int x0N = (int)round(coord_x * coord_angpix / movie_angpix) - movie_boxsize / 2;
+			// int y0N = (int)round(coord_y * coord_angpix / movie_angpix) - movie_boxsize / 2;
 #ifdef DEBUG
-			std::cout << "DEBUG: xpOD = " << xpO << " ypOD = " << ypO << std::endl;
 			std::cout << "DEBUG: xpO  = " << xpO << " ypO  = " << ypO << std::endl;
 			std::cout << "DEBUG: x0 = " << x0 << " y0 = " << y0 << " data_angpix = " << data_angpix << " angpix = " << angpix << std::endl;
-			std::cout << "DEBUG: x0D = " << x0D << " y0D = " << y0D << " data_angpix = " << data_angpix << " angpix = " << angpix << std::endl;
-			std::cout << "DEBUG: x0N = " << x0N << " y0N = " << y0N << std::endl;
+			// std::cout << "DEBUG: x0N = " << x0N << " y0N = " << y0N << std::endl;
 #endif
-			// Use revised code
-			x0 = x0D; y0 = y0D;
 
 			double dxM = trajectories[stack_id - 1][frame_no - 1].x;
 			double dyM = trajectories[stack_id - 1][frame_no - 1].y;
@@ -436,7 +443,6 @@ void MovieReconstructor::backprojectOneParticle(MetaDataTable &mdt, long int p, 
 	const int opticsGroup = obsModel.getOpticsGroup(mdt, p);
 	if (obsModel.getPixelSize(opticsGroup) != angpix)
 	{
-		std::cout << "before: " << obsModel.getPixelSize(opticsGroup) << " after " << angpix << std::endl;
 		obsModel.setPixelSize(opticsGroup, angpix);
 	}
 	if (obsModel.getBoxSize(opticsGroup) != output_boxsize)
