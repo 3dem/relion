@@ -36,6 +36,19 @@ const unsigned int EERRenderer::EER_LEN_FOOTER = 24;
 const uint16_t EERRenderer::TIFF_COMPRESSION_EER8bit = 65000;
 const uint16_t EERRenderer::TIFF_COMPRESSION_EER7bit = 65001;
 
+#ifdef HAVE_TIFF
+TIFFErrorHandler RELION_prevTIFFWarningHandler = NULL;
+
+void RELION_TIFFWarningHandler(const char* module, const char* fmt, va_list ap)
+{
+	// Silence warnings for private tags
+	if (strcmp("Unknown field with tag %d (0x%x) encountered", fmt) == 0)
+		return;
+
+	RELION_prevTIFFWarningHandler(module, fmt, ap);
+}
+#endif
+
 template <typename T>
 void EERRenderer::render8K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons)
 {
@@ -94,6 +107,9 @@ void EERRenderer::read(FileName _fn_movie, int eer_upsampling)
 	fseek(fh, 0, SEEK_END);
 	file_size = ftell(fh);
 	fseek(fh, 0, SEEK_SET);
+
+	if (RELION_prevTIFFWarningHandler == NULL)
+		RELION_prevTIFFWarningHandler = TIFFSetWarningHandler(RELION_TIFFWarningHandler);
 
 	// Try reading as TIFF; this handle is kept open
 	ftiff = TIFFOpen(fn_movie.c_str(), "r");
