@@ -35,6 +35,7 @@ class EERRenderer {
 
 	int eer_upsampling;
 	int nframes;
+	int preread_start, preread_end;
 	long long file_size;
 	void readLegacy(FILE *fh);
 	void lazyReadFrames();
@@ -59,6 +60,18 @@ class EERRenderer {
 	EERRenderer& operator=(const EERRenderer&)
 	{
 		REPORT_ERROR("Copy assignment operator for EERRenderer not implemented yet.");
+	}
+
+	// 1-indexed
+	void setFramesOfInterest(int start, int end)
+	{
+		if (is_legacy)
+			return;
+
+		if (read_data)
+			REPORT_ERROR("Logic error in EERRenderer::setFramesOfInterest(). This must be set before rendering.");
+		preread_start = start - 1;
+		preread_end = end - 1;
 	}
 
 	void read(FileName _fn_movie, int eer_upsampling=2);

@@ -63,6 +63,8 @@ EERRenderer::EERRenderer()
 	ready = false;
 	read_data = false;
 	buf = NULL;
+	preread_start = -1;
+	preread_end = -1;
 	eer_upsampling = 2;
 }
 
@@ -198,6 +200,10 @@ void EERRenderer::lazyReadFrames()
 			// Read everything
 			for (int frame = 0; frame < nframes; frame++)
 			{
+				if ((preread_start > 0 && frame < preread_start) ||
+				    (preread_end > 0 && frame > preread_end))
+					continue;
+
 				TIFFSetDirectory(ftiff, frame);
 				const int nstrips = TIFFNumberOfStrips(ftiff);
 				frame_starts[frame] = pos;
@@ -282,6 +288,13 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 	for (int iframe = frame_start; iframe <= frame_end; iframe++)
 	{
 		RCTIC(TIMING_UNPACK_RLE);
+		if ((preread_start > 0 && iframe < preread_start) ||
+	  	    (preread_end > 0 && iframe > preread_end))
+		{
+			std::cerr << "EERRenderer::renderFrames(frame_start = " << frame_start + 1 << ", frame_end = " << frame_end + 1<< "),  NFrames = " << getNFrames() << " preread_start = " << preread_start + 1 << " prered_end = " << preread_end + 1<< std::endl;
+			REPORT_ERROR("Tried to render frames outside pre-read region");
+		}		
+
 		long long pos = frame_starts[iframe];
 		unsigned int n_pix = 0, n_electron = 0;
 		const int max_electrons = frame_sizes[iframe] * 2; // at 4 bits per electron (very permissive bound!)

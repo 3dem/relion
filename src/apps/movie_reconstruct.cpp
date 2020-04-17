@@ -35,14 +35,14 @@ public:
 	// I/O Parser
 	IOParser parser;
 
-	FileName fn_out, fn_sym, fn_sel, traj_path, movie_path, fn_corrmic;
+	FileName fn_out, fn_sym, fn_sel, traj_path, fn_corrmic;
 
 	MetaDataTable DF;
 	ObservationModel obsModel;
 
 	int r_max, r_min_nn, blob_order, ref_dim, interpolator, iter,
-	    debug_ori_size, debug_size,
-	    ctf_dim, nr_helical_asu, width_mask_edge, nr_sectors, subset, chosen_class,
+	    debug_ori_size, debug_size, nr_threads,
+	    ctf_dim, nr_helical_asu, width_mask_edge, nr_sectors, chosen_class,
 	    data_dim, output_boxsize, movie_boxsize, verb, frame;
 
 	RFLOAT blob_radius, blob_alpha, angular_error, shift_error, angpix, maxres,
@@ -57,7 +57,7 @@ public:
 	float padding_factor, mask_diameter;
 
 	// All backprojectors needed for parallel reconstruction
-	BackProjector backprojector;
+	BackProjector backprojector[2];
 
 	std::map<std::string, std::string> mic2meta;
 public:
@@ -76,7 +76,7 @@ public:
 	void backproject(int rank = 0, int size = 1);
 
 	// For parallelisation purposes
-	void backprojectOneParticle(MetaDataTable &mdt, long int ipart, MultidimArray<Complex> &F2D);
+	void backprojectOneParticle(MetaDataTable &mdt, long int ipart, MultidimArray<Complex> &F2D, int subset);
 
 	// perform the gridding reconstruction
 	void reconstruct();
@@ -123,8 +123,6 @@ void MovieReconstructor::read(int argc, char **argv)
 	padding_factor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
 	fn_corrmic = parser.getOption("--corr_mic", "Motion correction STAR file", "");
 	traj_path = parser.getOption("--traj_path", "Trajectory path prefix", "");
-	// movie_path = parser.getOption("--movie_path", "Movie path prefix", "");
-	subset = textToInteger(parser.getOption("--subset", "Subset of images to consider (1: only reconstruct half1; 2: only half2; other: reconstruct all)", "-1"));
 	movie_angpix = textToFloat(parser.getOption("--movie_angpix", "Pixel size in the movie", "-1"));
 	if (movie_angpix < 0)
 		REPORT_ERROR("For this program, you have to explicitly specify the movie pixel size (--movie_angpix).");
@@ -138,6 +136,9 @@ void MovieReconstructor::read(int argc, char **argv)
 	output_boxsize = textToInteger(parser.getOption("--scale", "Box size after down-sampling", "-1"));
 	if (output_boxsize < 0 || output_boxsize % 2 != 0)
 		REPORT_ERROR("You have to specify the reconstruction box size (--scale) as an even number.");
+	nr_threads = textToInteger(parser.getOption("--j", "Number of threads (1 or 2)", "2"));
+	if (nr_threads < 0 || nr_threads > 2)
+		REPORT_ERROR("Number of threads (--j) must be 1 or 2");
 
 	int ctf_section = parser.addSection("CTF options");
 	do_ctf = parser.checkOption("--ctf", "Apply CTF correction");
@@ -211,7 +212,7 @@ void MovieReconstructor::initialise()
 	std::cout << "Read " << DF.numberOfObjects() << " particles." << std::endl;
 	data_angpixes = obsModel.getPixelSizes();
 
-	if (verb > 0 && (subset == 1 || subset == 2) && !DF.containsLabel(EMDL_PARTICLE_RANDOM_SUBSET))
+	if (verb > 0 && !DF.containsLabel(EMDL_PARTICLE_RANDOM_SUBSET))
 	{
 		REPORT_ERROR("The rlnRandomSubset column is missing in the input STAR file.");
 	}
@@ -220,8 +221,6 @@ void MovieReconstructor::initialise()
 	{
 		REPORT_ERROR("The rlnClassNumber column is missing in the input STAR file.");
 	}
-
-	randomize_random_generator();
 
 	if (do_ewald) do_ctf = true;
 	data_dim = 2;
@@ -234,10 +233,13 @@ void MovieReconstructor::initialise()
 
 void MovieReconstructor::backproject(int rank, int size)
 {
-	backprojector = BackProjector(output_boxsize, ref_dim, fn_sym, interpolator,
-					padding_factor, r_min_nn, blob_order,
-					blob_radius, blob_alpha, data_dim, skip_gridding);
-	backprojector.initZeros(2 * r_max);
+	for (int i = 0; i < 2; i++)
+	{
+		backprojector[i] = BackProjector(output_boxsize, ref_dim, fn_sym, interpolator,
+		                                 padding_factor, r_min_nn, blob_order,
+		                                 blob_radius, blob_alpha, data_dim, skip_gridding);
+		backprojector[i].initZeros(2 * r_max);
+	}
 
 	std::vector<MetaDataTable> mdts = StackHelper::splitByMicrographName(DF);
 	
@@ -250,13 +252,9 @@ void MovieReconstructor::backproject(int rank, int size)
 
 	}
 
-	FileName fn_img, fn_mic, fn_stack, fn_traj, fn_movie, prev_gain;
-	long int stack_id;
-	MetaDataTable trajectories;
-	FourierTransformer transformer;
+	FileName fn_mic, fn_traj, fn_movie, prev_gain;
+	FourierTransformer transformer[2];
 	Image<float> Iframe, Igain;
-	Image<RFLOAT> Iparticle;
-	Image<Complex> Fparticle;
 
 	int frame_no = frame; // 1-indexed
 	for (int imov = 0; imov < nr_movies; imov++)
@@ -276,7 +274,6 @@ void MovieReconstructor::backproject(int rank, int size)
 #endif
 		const bool isEER = EERRenderer::isEER(fn_movie);
 		int eer_upsampling, eer_grouping;
-		// TODO: better to use micrograph model
 		if (isEER)
 		{
 			eer_upsampling = mic.getEERUpsampling();
@@ -297,10 +294,14 @@ void MovieReconstructor::backproject(int rank, int size)
 		std::vector<std::vector<gravis::d2Vector>> trajectories = MotionHelper::readTracksInPix(fn_traj, movie_angpix);
 
 		// TODO: loop over relevant frames
-		// TODO: support EER
 		if (isEER)
 		{
-			REPORT_ERROR("Not implemented yet.");
+			EERRenderer renderer;
+			renderer.read(fn_movie, eer_upsampling);
+			const int frame_start = (frame_no - 1) * eer_grouping + 1;
+			const int frame_end = frame_start + eer_grouping - 1;
+			renderer.setFramesOfInterest(frame_start, frame_end);
+			renderer.renderFrames(frame_start, frame_end, Iframe());
 		}
 		else
 		{
@@ -320,109 +321,121 @@ void MovieReconstructor::backproject(int rank, int size)
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iframe())
 				DIRECT_MULTIDIM_ELEM(Iframe(), n) *= -DIRECT_MULTIDIM_ELEM(Igain(), n);
 
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(mdts[imov])
+		#pragma omp parallel for num_threads(nr_threads)
+		for (int subset = 1; subset <= 2; subset++)
 		{
-#ifndef DEBUG
-			progress_bar(imov);
-#endif
-
-			int this_subset = 0;
-			mdts[imov].getValue(EMDL_PARTICLE_RANDOM_SUBSET, this_subset);
-
-			// TODO: Use two threads for half sets to avoid reading movies twice??
-			if (subset >= 1 && subset <= 2 && this_subset != subset)
-				continue;
-
-			const int opticsGroup = obsModel.getOpticsGroup(mdts[imov]); // 0-indexed
-			const RFLOAT data_angpix = data_angpixes[opticsGroup];
-			mdts[imov].getValue(EMDL_IMAGE_NAME, fn_img);
-			fn_img.decompose(stack_id, fn_stack);
-#ifdef DEBUG
-			std::cout << "\tstack_id = " << stack_id << " fn_stack = " << fn_stack << std::endl;
-#endif
-			if (stack_id > trajectories.size())
-				REPORT_ERROR("Missing trajectory!");
-
-			RFLOAT coord_x, coord_y, origin_x, origin_y, traj_x, traj_y;
-			mdts[imov].getValue(EMDL_IMAGE_COORD_X, coord_x); // in micrograph pixel
-			mdts[imov].getValue(EMDL_IMAGE_COORD_Y, coord_y);
-			mdts[imov].getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, origin_x); // in Angstrom
-			mdts[imov].getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, origin_y);
-#ifdef DEBUG
-			std::cout << "\t\tcoord_mic_px = (" << coord_x << ", " << coord_y << ")";
-			std::cout << " origin_angst = (" << origin_x << ", " << origin_y << ")";
-			std::cout << " traj_movie_px = (" << trajectories[stack_id - 1][frame_no - 1].x <<  ", " << trajectories[stack_id - 1][frame_no - 1].y << ")" << std::endl;
-#endif
-
-			// Below might look overly complicated but is necessary to have the same rounding behaviour as Extract & Polish.
-			Iparticle().initZeros(movie_boxsize, movie_boxsize);
-
-			// Revised code: use data_angpix
-			// pixel coordinate of the top left corner of the extractio box after down-sampling
-			double xpO = (int)(coord_x * coord_angpix / data_angpix);
-			double ypO = (int)(coord_y * coord_angpix / data_angpix);
-			// pixel coordinate in the movie
-			int x0 = (int)round(xpO * data_angpix / movie_angpix) - movie_boxsize / 2;
-			int y0 = (int)round(ypO * data_angpix / movie_angpix) - movie_boxsize / 2;
-
-			// pixel coordinate in the movie: cleaner but not compatible with existing files...
-			// int x0N = (int)round(coord_x * coord_angpix / movie_angpix) - movie_boxsize / 2;
-			// int y0N = (int)round(coord_y * coord_angpix / movie_angpix) - movie_boxsize / 2;
-#ifdef DEBUG
-			std::cout << "DEBUG: xpO  = " << xpO << " ypO  = " << ypO << std::endl;
-			std::cout << "DEBUG: x0 = " << x0 << " y0 = " << y0 << " data_angpix = " << data_angpix << " angpix = " << angpix << std::endl;
-			// std::cout << "DEBUG: x0N = " << x0N << " y0N = " << y0N << std::endl;
-#endif
-
-			double dxM = trajectories[stack_id - 1][frame_no - 1].x;
-			double dyM = trajectories[stack_id - 1][frame_no - 1].y;
-
-			int dxI = (int)round(dxM);
-			int dyI = (int)round(dyM);
-
-			x0 += dxI;
-			y0 += dyI;
-
-			for (long int y = 0; y < movie_boxsize; y++)
-			for (long int x = 0; x < movie_boxsize; x++)
+			long int stack_id;
+			FileName fn_img, fn_stack;
+			Image<RFLOAT> Iparticle;
+			Image<Complex> Fparticle;
+			int n_processed = 0;
+			
+			// FOR_ALL_OBJECTS_IN_METADATA_TABLE(mdts[imov])
+			// You cannot do this within omp parallel (because current_object changes)
+			for (long int ipart = 0; ipart < mdts[imov].numberOfObjects(); ipart++)
 			{
-				int xx = x0 + x;
-				int yy = y0 + y;
+	#ifndef DEBUG
+				progress_bar(imov);
+	#endif
 
-				if (xx < 0) xx = 0;
-				else if (xx >= w0) xx = w0 - 1;
+				int this_subset = 0;
+				mdts[imov].getValue(EMDL_PARTICLE_RANDOM_SUBSET, this_subset, ipart);
 
-				if (yy < 0) yy = 0;
-				else if (yy >= h0) yy = h0 - 1;
+				if (subset >= 1 && subset <= 2 && this_subset != subset)
+					continue;
+				n_processed++;
 
-				DIRECT_NZYX_ELEM(Iparticle(), 0, 0, y, x) = DIRECT_NZYX_ELEM(Iframe(), 0, 0, yy, xx);
-			}
+				const int opticsGroup = obsModel.getOpticsGroup(mdts[imov], ipart); // 0-indexed
+				const RFLOAT data_angpix = data_angpixes[opticsGroup];
+				mdts[imov].getValue(EMDL_IMAGE_NAME, fn_img, ipart);
+				fn_img.decompose(stack_id, fn_stack);
+	#ifdef DEBUG
+				std::cout << "\tstack_id = " << stack_id << " fn_stack = " << fn_stack << std::endl;
+	#endif
+				if (stack_id > trajectories.size())
+					REPORT_ERROR("Missing trajectory!");
 
-			// Residual shifts in Angstrom. They don't contain OriginX/Y. Note the NEGATIVE sign.
-			double dxR = - (dxM - dxI) * movie_angpix;
-			double dyR = - (dyM - dyI) * movie_angpix;
+				RFLOAT coord_x, coord_y, origin_x, origin_y, traj_x, traj_y;
+				mdts[imov].getValue(EMDL_IMAGE_COORD_X, coord_x, ipart); // in micrograph pixel
+				mdts[imov].getValue(EMDL_IMAGE_COORD_Y, coord_y, ipart);
+				mdts[imov].getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, origin_x, ipart); // in Angstrom
+				mdts[imov].getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, origin_y, ipart);
+	#ifdef DEBUG
+				std::cout << "\t\tcoord_mic_px = (" << coord_x << ", " << coord_y << ")";
+				std::cout << " origin_angst = (" << origin_x << ", " << origin_y << ")";
+				std::cout << " traj_movie_px = (" << trajectories[stack_id - 1][frame_no - 1].x <<  ", " << trajectories[stack_id - 1][frame_no - 1].y << ")" << std::endl;
+	#endif
 
-			// Further shifts by OriginX/Y. Note that OriginX/Y are applied as they are 
-			// (defined as "how much shift" we have to move particles).
-			dxR += origin_x;
-			dyR += origin_y;
+				// Below might look overly complicated but is necessary to have the same rounding behaviour as Extract & Polish.
+				Iparticle().initZeros(movie_boxsize, movie_boxsize);
 
-			Iparticle().setXmippOrigin();
-			transformer.FourierTransform(Iparticle(), Fparticle());
-			if (output_boxsize != movie_boxsize) 
-				Fparticle = FilterHelper::cropCorner2D(Fparticle, output_boxsize / 2 + 1, output_boxsize);
-			shiftImageInFourierTransform(Fparticle(), Fparticle(), output_boxsize, dxR / angpix, dyR / angpix);
-			CenterFFTbySign(Fparticle());
+				// Revised code: use data_angpix
+				// pixel coordinate of the top left corner of the extractio box after down-sampling
+				double xpO = (int)(coord_x * coord_angpix / data_angpix);
+				double ypO = (int)(coord_y * coord_angpix / data_angpix);
+				// pixel coordinate in the movie
+				int x0 = (int)round(xpO * data_angpix / movie_angpix) - movie_boxsize / 2;
+				int y0 = (int)round(ypO * data_angpix / movie_angpix) - movie_boxsize / 2;
 
-			backprojectOneParticle(mdts[imov], current_object, Fparticle());
-		}
-	}
+				// pixel coordinate in the movie: cleaner but not compatible with existing files...
+				// int x0N = (int)round(coord_x * coord_angpix / movie_angpix) - movie_boxsize / 2;
+				// int y0N = (int)round(coord_y * coord_angpix / movie_angpix) - movie_boxsize / 2;
+	#ifdef DEBUG
+				std::cout << "DEBUG: xpO  = " << xpO << " ypO  = " << ypO << std::endl;
+				std::cout << "DEBUG: x0 = " << x0 << " y0 = " << y0 << " data_angpix = " << data_angpix << " angpix = " << angpix << std::endl;
+				// std::cout << "DEBUG: x0N = " << x0N << " y0N = " << y0N << std::endl;
+	#endif
+
+				double dxM = trajectories[stack_id - 1][frame_no - 1].x;
+				double dyM = trajectories[stack_id - 1][frame_no - 1].y;
+
+				int dxI = (int)round(dxM);
+				int dyI = (int)round(dyM);
+
+				x0 += dxI;
+				y0 += dyI;
+
+				for (long int y = 0; y < movie_boxsize; y++)
+				for (long int x = 0; x < movie_boxsize; x++)
+				{
+					int xx = x0 + x;
+					int yy = y0 + y;
+
+					if (xx < 0) xx = 0;
+					else if (xx >= w0) xx = w0 - 1;
+
+					if (yy < 0) yy = 0;
+					else if (yy >= h0) yy = h0 - 1;
+
+					DIRECT_NZYX_ELEM(Iparticle(), 0, 0, y, x) = DIRECT_NZYX_ELEM(Iframe(), 0, 0, yy, xx);
+				}
+
+				// Residual shifts in Angstrom. They don't contain OriginX/Y. Note the NEGATIVE sign.
+				double dxR = - (dxM - dxI) * movie_angpix;
+				double dyR = - (dyM - dyI) * movie_angpix;
+
+				// Further shifts by OriginX/Y. Note that OriginX/Y are applied as they are 
+				// (defined as "how much shift" we have to move particles).
+				dxR += origin_x;
+				dyR += origin_y;
+
+				Iparticle().setXmippOrigin();
+				transformer[this_subset - 1].FourierTransform(Iparticle(), Fparticle());
+				if (output_boxsize != movie_boxsize) 
+					Fparticle = FilterHelper::cropCorner2D(Fparticle, output_boxsize / 2 + 1, output_boxsize);
+				shiftImageInFourierTransform(Fparticle(), Fparticle(), output_boxsize, dxR / angpix, dyR / angpix);
+				CenterFFTbySign(Fparticle());
+
+				backprojectOneParticle(mdts[imov], ipart, Fparticle(), this_subset);
+			} // particle
+		} // subset
+	} // movie
 
 	if (verb > 0)
 		progress_bar(nr_movies);
 }
 
-void MovieReconstructor::backprojectOneParticle(MetaDataTable &mdt, long int p, MultidimArray<Complex> &F2D)
+void MovieReconstructor::backprojectOneParticle(MetaDataTable &mdt, long int p, MultidimArray<Complex> &F2D, int this_subset)
 {
 	RFLOAT rot, tilt, psi, fom, r_ewald_sphere;
 	Matrix2D<RFLOAT> A3D;
@@ -441,12 +454,13 @@ void MovieReconstructor::backprojectOneParticle(MetaDataTable &mdt, long int p, 
 	// (to avoid creating an Ewald ellipsoid)
 	const bool ctf_premultiplied = false;
 	const int opticsGroup = obsModel.getOpticsGroup(mdt, p);
-	if (obsModel.getPixelSize(opticsGroup) != angpix)
+	#pragma omp critical
 	{
-		obsModel.setPixelSize(opticsGroup, angpix);
-	}
-	if (obsModel.getBoxSize(opticsGroup) != output_boxsize)
-		obsModel.setBoxSize(opticsGroup, output_boxsize);
+		if (obsModel.getPixelSize(opticsGroup) != angpix)
+			obsModel.setPixelSize(opticsGroup, angpix);
+		if (obsModel.getBoxSize(opticsGroup) != output_boxsize)
+			obsModel.setBoxSize(opticsGroup, output_boxsize);
+	}	
 	//ctf_premultiplied = obsModel.getCtfPremultiplied(opticsGroup);
 	
 	if (do_ewald && ctf_premultiplied)
@@ -542,12 +556,12 @@ void MovieReconstructor::backprojectOneParticle(MetaDataTable &mdt, long int p, 
 				magMat.initIdentity();
 			}
 
-			backprojector.set2DFourierTransform(F2DP, A3D, &Fctf, r_ewald_sphere, true, &magMat);
-			backprojector.set2DFourierTransform(F2DQ, A3D, &Fctf, r_ewald_sphere, false, &magMat);
+			backprojector[this_subset - 1].set2DFourierTransform(F2DP, A3D, &Fctf, r_ewald_sphere, true, &magMat);
+			backprojector[this_subset - 1].set2DFourierTransform(F2DQ, A3D, &Fctf, r_ewald_sphere, false, &magMat);
 		}
 		else
 		{
-			backprojector.set2DFourierTransform(F2D, A3D, &Fctf);
+			backprojector[this_subset - 1].set2DFourierTransform(F2D, A3D, &Fctf);
 		}
 	}
 }
@@ -556,25 +570,28 @@ void MovieReconstructor::reconstruct()
 {
 	bool do_map = false;
 	bool do_use_fsc = false;
-	MultidimArray<RFLOAT> fsc, dummy;
-	Image<RFLOAT> vol;
-	fsc.resize(output_boxsize/2+1);
-
 	if (verb > 0)
 		std::cout << " + Starting the reconstruction ..." << std::endl;
 
-	backprojector.symmetrise(nr_helical_asu, helical_twist, helical_rise/angpix);
+	#pragma omp parallel for num_threads(nr_threads)
+	for (int i = 0; i < 2; i++)
+	{
+		MultidimArray<RFLOAT> fsc, dummy;
+		Image<RFLOAT> vol;
+		fsc.resize(output_boxsize/2+1);
 
-	MultidimArray<RFLOAT> tau2;
-	backprojector.reconstruct(vol(), iter, do_map, tau2);
+		backprojector[i].symmetrise(nr_helical_asu, helical_twist, helical_rise / angpix);
 
-	vol.setSamplingRateInHeader(angpix);
-	vol.write(fn_out);
-	if (verb > 0)
-		std::cout << " + Done! Written output map in: "<<fn_out<<std::endl;
+		MultidimArray<RFLOAT> tau2;
+		backprojector[i].reconstruct(vol(), iter, do_map, tau2);
+
+		vol.setSamplingRateInHeader(angpix);
+		FileName fn_half = fn_out.withoutExtension() + "_half" + integerToString(i + 1) + ".mrc";
+		vol.write(fn_half);
+		if (verb > 0)
+			std::cout << " + Done! Written output map in: " << fn_half << std::endl;
+	}
 }
-
-
 
 void MovieReconstructor::applyCTFPandCTFQ(MultidimArray<Complex> &Fin, CTF &ctf, FourierTransformer &transformer,
                                           MultidimArray<Complex> &outP, MultidimArray<Complex> &outQ, bool skip_mask)
