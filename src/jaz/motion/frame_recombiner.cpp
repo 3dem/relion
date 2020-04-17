@@ -440,6 +440,7 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
 
 	// Compute B/k-factors from all available FCCs (allMdts),
 	// even if only a subset of micrographs (chosenMdts) is being recombined.
+	// TODO: BUG: og_name is not used.
 	for (long g = 0; g < allMdts.size(); g++)
 	{
 		FileName fn_root = MotionRefiner::getOutputFileNameRoot(outPath, allMdts[g]);

@@ -469,6 +469,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 			mdt->getValue(EMDL_IMAGE_COORD_X, xpC, p);
 			mdt->getValue(EMDL_IMAGE_COORD_Y, ypC, p);
 
+			// TAKANORI: TODO: BUG? Probably this causes 1 px error when outPS changes
 			const double xpO = (int)(coordsPs * xpC / outPs) - squareSize/2;
 			const double ypO = (int)(coordsPs * ypC / outPs) - squareSize/2;
 
