@@ -189,8 +189,9 @@ void MovieReconstructor::initialise()
 	std::cout << "Movie box size = " << movie_boxsize << " px at " << movie_angpix << " A/px" << std::endl;
 	std::cout << "Reconstruction box size = " << output_boxsize << " px at " << angpix << " A/px" << std::endl;
 	std::cout << "Coordinate pixel size = " << coord_angpix << " A/px" << std::endl;
+	// TODO: movie angpix and coordinate angpix can be read from metadata STAR files
 
-	// Load motion correction STAR file. TODO: code duplication from MicrographHandler
+	// Load motion correction STAR file. FIXME: code duplication from MicrographHandler
 	MetaDataTable corrMic;
 	// Don't die even if conversion failed. Polishing does not use obsModel from a motion correction STAR file
 	ObservationModel::loadSafely(fn_corrmic, obsModel, corrMic, "micrographs", verb, false);
@@ -294,12 +295,14 @@ void MovieReconstructor::backproject(int rank, int size)
 		std::vector<std::vector<gravis::d2Vector>> trajectories = MotionHelper::readTracksInPix(fn_traj, movie_angpix);
 
 		// TODO: loop over relevant frames
+		// TODO: interpolate trajectory
 		if (isEER)
 		{
 			EERRenderer renderer;
 			renderer.read(fn_movie, eer_upsampling);
 			const int frame_start = (frame_no - 1) * eer_grouping + 1;
 			const int frame_end = frame_start + eer_grouping - 1;
+			// std::cout << "EER range " << frame_start << " - " << frame_end << std::endl;
 			renderer.setFramesOfInterest(frame_start, frame_end);
 			renderer.renderFrames(frame_start, frame_end, Iframe());
 		}
