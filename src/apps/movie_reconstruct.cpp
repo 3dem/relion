@@ -41,7 +41,7 @@ public:
 	ObservationModel obsModel;
 
 	int r_max, r_min_nn, blob_order, ref_dim, interpolator, iter,
-	    debug_ori_size, debug_size, nr_threads,
+	    debug_ori_size, debug_size, nr_threads, requested_eer_grouping,
 	    ctf_dim, nr_helical_asu, width_mask_edge, nr_sectors, chosen_class,
 	    data_dim, output_boxsize, movie_boxsize, verb, frame;
 
@@ -130,6 +130,7 @@ void MovieReconstructor::read(int argc, char **argv)
 	if (coord_angpix < 0)
 		REPORT_ERROR("For this program, you have to explicitly specify the coordinate pixel size (--coord_angpix).");
 	frame = textToInteger(parser.getOption("--frame", "Movie frame to reconstruct (1-indexed)", "1"));
+	requested_eer_grouping = textToInteger(parser.getOption("--eer_grouping", "Override EER grouping (--frame is in this new grouping)", "-1"));
 	movie_boxsize = textToInteger(parser.getOption("--window", "Box size to extract from raw movies", "-1"));
 	if (movie_boxsize < 0 || movie_boxsize % 2 != 0)
 		REPORT_ERROR("You have to specify the extraction box size (--window) as an even number.");
@@ -274,11 +275,15 @@ void MovieReconstructor::backproject(int rank, int size)
 		std::cout << "fn_mic = " << fn_mic << "\n\tfn_traj = " << fn_traj << "\n\tfn_movie = " << fn_movie << std::endl;
 #endif
 		const bool isEER = EERRenderer::isEER(fn_movie);
-		int eer_upsampling, eer_grouping;
+		int eer_upsampling, orig_eer_grouping, eer_grouping;
 		if (isEER)
 		{
 			eer_upsampling = mic.getEERUpsampling();
-			eer_grouping = mic.getEERGrouping();
+			orig_eer_grouping = mic.getEERGrouping();
+			if (requested_eer_grouping <= 0)
+				eer_grouping = orig_eer_grouping;
+			else
+				eer_grouping = requested_eer_grouping;
 		}
 
 		FileName fn_gain = mic.getGainFilename();
@@ -294,15 +299,14 @@ void MovieReconstructor::backproject(int rank, int size)
 		// Read trajectories. Both particle ID and frame ID are 0-indexed in this array.
 		std::vector<std::vector<gravis::d2Vector>> trajectories = MotionHelper::readTracksInPix(fn_traj, movie_angpix);
 
-		// TODO: loop over relevant frames
-		// TODO: interpolate trajectory
+		// TODO: loop over relevant frames with per-frame shifts with per-frame shifts with per-frame shifts with per-frame shifts
 		if (isEER)
 		{
 			EERRenderer renderer;
 			renderer.read(fn_movie, eer_upsampling);
 			const int frame_start = (frame_no - 1) * eer_grouping + 1;
 			const int frame_end = frame_start + eer_grouping - 1;
-			// std::cout << "EER range " << frame_start << " - " << frame_end << std::endl;
+//			std::cout << "EER orig grouping = " <<  orig_eer_grouping << " new grouping = " << eer_grouping << " range " << frame_start << " - " << frame_end << std::endl;
 			renderer.setFramesOfInterest(frame_start, frame_end);
 			renderer.renderFrames(frame_start, frame_end, Iframe());
 		}
@@ -337,9 +341,9 @@ void MovieReconstructor::backproject(int rank, int size)
 			// You cannot do this within omp parallel (because current_object changes)
 			for (long int ipart = 0; ipart < mdts[imov].numberOfObjects(); ipart++)
 			{
-	#ifndef DEBUG
+#ifndef DEBUG
 				progress_bar(imov);
-	#endif
+#endif
 
 				int this_subset = 0;
 				mdts[imov].getValue(EMDL_PARTICLE_RANDOM_SUBSET, this_subset, ipart);
@@ -352,9 +356,9 @@ void MovieReconstructor::backproject(int rank, int size)
 				const RFLOAT data_angpix = data_angpixes[opticsGroup];
 				mdts[imov].getValue(EMDL_IMAGE_NAME, fn_img, ipart);
 				fn_img.decompose(stack_id, fn_stack);
-	#ifdef DEBUG
+#ifdef DEBUG
 				std::cout << "\tstack_id = " << stack_id << " fn_stack = " << fn_stack << std::endl;
-	#endif
+#endif
 				if (stack_id > trajectories.size())
 					REPORT_ERROR("Missing trajectory!");
 
@@ -363,11 +367,11 @@ void MovieReconstructor::backproject(int rank, int size)
 				mdts[imov].getValue(EMDL_IMAGE_COORD_Y, coord_y, ipart);
 				mdts[imov].getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, origin_x, ipart); // in Angstrom
 				mdts[imov].getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, origin_y, ipart);
-	#ifdef DEBUG
+#ifdef DEBUG
 				std::cout << "\t\tcoord_mic_px = (" << coord_x << ", " << coord_y << ")";
 				std::cout << " origin_angst = (" << origin_x << ", " << origin_y << ")";
 				std::cout << " traj_movie_px = (" << trajectories[stack_id - 1][frame_no - 1].x <<  ", " << trajectories[stack_id - 1][frame_no - 1].y << ")" << std::endl;
-	#endif
+#endif
 
 				// Below might look overly complicated but is necessary to have the same rounding behaviour as Extract & Polish.
 				Iparticle().initZeros(movie_boxsize, movie_boxsize);
@@ -383,14 +387,38 @@ void MovieReconstructor::backproject(int rank, int size)
 				// pixel coordinate in the movie: cleaner but not compatible with existing files...
 				// int x0N = (int)round(coord_x * coord_angpix / movie_angpix) - movie_boxsize / 2;
 				// int y0N = (int)round(coord_y * coord_angpix / movie_angpix) - movie_boxsize / 2;
-	#ifdef DEBUG
+#ifdef DEBUG
 				std::cout << "DEBUG: xpO  = " << xpO << " ypO  = " << ypO << std::endl;
 				std::cout << "DEBUG: x0 = " << x0 << " y0 = " << y0 << " data_angpix = " << data_angpix << " angpix = " << angpix << std::endl;
 				// std::cout << "DEBUG: x0N = " << x0N << " y0N = " << y0N << std::endl;
-	#endif
+#endif
 
-				double dxM = trajectories[stack_id - 1][frame_no - 1].x;
-				double dyM = trajectories[stack_id - 1][frame_no - 1].y;
+				double dxM, dyM;
+				if (isEER)
+				{
+					const int eer_frame = (frame_no - 1) * eer_grouping; // 0 indexed
+					const double eer_frame_in_old_grouping = (double)eer_frame / orig_eer_grouping;
+					const int src1 = int(floor(eer_frame_in_old_grouping));
+					const int src2 = src1 + 1;
+					const double frac = eer_frame_in_old_grouping - src1;
+
+					if (src2 == trajectories[0].size()) // beyond end
+					{
+						dxM = trajectories[stack_id - 1][src1].x;
+						dyM = trajectories[stack_id - 1][src1].y;
+					}
+					else
+					{
+						dxM = trajectories[stack_id - 1][src1].x * (1 - frac) + trajectories[stack_id - 1][src2].x * frac;
+						dyM = trajectories[stack_id - 1][src1].y * (1 - frac) + trajectories[stack_id - 1][src2].y * frac;
+					}
+//					std::cout << "eer_frame_in_old_grouping = " << eer_frame_in_old_grouping << " src1 = " << src1 << " " << trajectories[stack_id - 1][src1] << " src2 = " << src2 << " " << trajectories[stack_id - 1][src2] << " interp = " << dxM << " " << dyM << std::endl;
+				}
+				else
+				{
+					dxM = trajectories[stack_id - 1][frame_no - 1].x;
+					dyM = trajectories[stack_id - 1][frame_no - 1].y;
+				}
 
 				int dxI = (int)round(dxM);
 				int dyI = (int)round(dyM);
