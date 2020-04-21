@@ -1846,7 +1846,8 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 	// Initialise the sampling object (sets prior mode and fills translations and rotations inside sampling object)
 	// May06,2015 - Shaoda & Sjors, initialise for helical translations
-	bool do_local_searches = ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches));
+	bool do_local_searches_helical = ((do_auto_refine) && (do_helical_refine) &&
+			(sampling.healpix_order >= autosampling_hporder_local_searches));
 
 	if (iter == 0)
 	{
@@ -1857,7 +1858,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		sampling.offset_step *= mymodel.pixel_size;
 	}
 	sampling.initialise(mymodel.ref_dim, (mymodel.data_dim == 3), do_gpu, (verb>0),
-			do_local_searches, (do_helical_refine) && (!ignore_helical_symmetry),
+			do_local_searches_helical, (do_helical_refine) && (!ignore_helical_symmetry),
 			helical_rise_initial, helical_twist_initial);
 
 	// Now that sampling is initialised, also modify sigma2_rot for the helical refinement
@@ -8847,7 +8848,8 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 					REPORT_ERROR("MlOptimiser::autoAdjustAngularSampling BUG: ref_dim should be two or three");
 
 				// Jun08,2015 Shaoda & Sjors, Helical refinement
-				bool do_local_searches = ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches));
+				bool do_local_searches_helical = ((do_auto_refine) && (do_helical_refine) &&
+						(sampling.healpix_order >= autosampling_hporder_local_searches));
 
 				// Don't go to coarse angular samplings. Then just keep doing as it was
 				if (new_step > sampling.offset_step)
@@ -8856,7 +8858,7 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 					new_range = sampling.offset_range;
 				}
 
-				sampling.setTranslations(new_step, new_range, do_local_searches, (do_helical_refine) && (!ignore_helical_symmetry), new_helical_offset_step, helical_rise_initial, helical_twist_initial);
+				sampling.setTranslations(new_step, new_range, do_local_searches_helical, (do_helical_refine) && (!ignore_helical_symmetry), new_helical_offset_step, helical_rise_initial, helical_twist_initial);
 
 				// Reset iteration counters
 				nr_iter_wo_resol_gain = 0;

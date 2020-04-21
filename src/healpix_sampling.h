@@ -152,7 +152,7 @@ public:
 			bool do_3d_trans = false,
 			bool do_changepsi = false,
 			bool do_warnpsi = false,
-			bool do_local_searches = false,
+			bool do_local_searches_helical = false,
 			bool do_helical_refine = false,
 			RFLOAT rise_Angst  = 0.,
 			RFLOAT twist_deg = 0.);
@@ -181,7 +181,7 @@ public:
     void setTranslations(
 			RFLOAT new_offset_step = -1.,
     		RFLOAT new_offset_range = -1.,
-    		bool do_local_searches = false,
+    		bool do_local_searches_helical = false,
     		bool do_helical_refine = false,
 			RFLOAT new_helical_offset_step = -1.,
     		RFLOAT helical_rise_Angst = 0.,

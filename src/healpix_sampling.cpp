@@ -48,7 +48,7 @@ void HealpixSampling::initialise(
 		bool do_3d_trans,
 		bool do_changepsi,
 		bool do_warnpsi,
-		bool do_local_searches,
+		bool do_local_searches_helical,
 		bool do_helical_refine,
 		RFLOAT rise_Angst,
 		RFLOAT twist_deg)
@@ -118,7 +118,7 @@ void HealpixSampling::initialise(
 	// Store the not-oversampled translations, and make sure oversampled sampling is 1 pixel
 	//setTranslations();
 	// May06,2015 - Shaoda & Sjors, Helical translational searches
-	setTranslations(-1, -1, do_local_searches, do_helical_refine, -1, rise_Angst, twist_deg);
+	setTranslations(-1, -1, do_local_searches_helical, do_helical_refine, -1, rise_Angst, twist_deg);
 
 	// Store the non-oversampled projection directions
 	setOrientations(-1, -1.);
@@ -262,7 +262,7 @@ void HealpixSampling::write(FileName fn_out)
 void HealpixSampling::setTranslations(
 		RFLOAT new_offset_step,
 		RFLOAT new_offset_range,
-		bool do_local_searches,
+		bool do_local_searches_helical,
 		bool do_helical_refine,
 		RFLOAT new_helical_offset_step,
 		RFLOAT helical_rise_Angst,
@@ -335,7 +335,7 @@ void HealpixSampling::setTranslations(
 		}
 
 		maxh = CEIL(h_range / new_helical_offset_step); // Out of range samplings will be excluded next
-		if (do_local_searches) // Local searches along helical axis
+		if (do_local_searches_helical) // Local searches along helical axis
 		{
 			// Local searches (2*2+1=5 samplings)
 			if (maxh > 2)
