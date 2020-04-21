@@ -30,7 +30,6 @@ void HealpixSampling::clear()
 	random_perturbation = perturbation_factor = 0.;
 	// Jun19,2015 - Shaoda, Helical refinement
 	helical_offset_step = -1.;
-	orientational_prior_mode = NOPRIOR;
 	directions_ipix.clear();
 	rot_angles.clear();
 	tilt_angles.clear();
@@ -45,7 +44,6 @@ void HealpixSampling::clear()
 }
 
 void HealpixSampling::initialise(
-		int prior_mode,
 		int ref_dim,
 		bool do_3d_trans,
 		bool do_changepsi,
@@ -55,9 +53,6 @@ void HealpixSampling::initialise(
 		RFLOAT rise_Angst,
 		RFLOAT twist_deg)
 {
-
-	// Set the prior mode (belongs to mlmodel, but very useful inside this object)
-	orientational_prior_mode = prior_mode;
 
 	if (ref_dim != -1)
 		is_3D = (ref_dim == 3);
@@ -919,7 +914,7 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 				// TMP DEBUGGING
 				if (prior == 0.)
 				{
-					std::cerr << " psi_angles[ipsi]= " << psi_angles[ipsi] << " prior_psi= " << prior_psi << " orientational_prior_mode= " << orientational_prior_mode << std::endl;
+					std::cerr << " psi_angles[ipsi]= " << psi_angles[ipsi] << " prior_psi= " << prior_psi << std::endl;
 					std::cerr << " diffpsi= " << diffpsi << " sigma_cutoff= " << sigma_cutoff << " sigma_psi= " << sigma_psi << std::endl;
 					REPORT_ERROR("prior on psi is zero!");
 				}
@@ -1336,7 +1331,7 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalR
 				// TMP DEBUGGING
 				if (prior == 0.)
 				{
-					std::cerr << " psi_angles[ipsi]= " << psi_angles[ipsi] << " prior_psi= " << prior_psi << " orientational_prior_mode= " << orientational_prior_mode << std::endl;
+					std::cerr << " psi_angles[ipsi]= " << psi_angles[ipsi] << " prior_psi= " << prior_psi << std::endl;
 					std::cerr << " diffpsi= " << diffpsi << " sigma_cutoff= " << sigma_cutoff << " sigma_psi= " << sigma_psi << std::endl;
 					REPORT_ERROR("prior on psi is zero!");
 				}
@@ -1706,27 +1701,17 @@ void HealpixSampling::getOrientations(long int idir, long int ipsi, int oversamp
 	my_tilt.clear();
 	my_psi.clear();
 	long int my_idir, my_ipsi;
-	if (orientational_prior_mode == NOPRIOR)
+	if (pointer_dir_nonzeroprior.size() > idir && pointer_psi_nonzeroprior.size() > ipsi)
 	{
-		my_idir = idir;
-		my_ipsi = ipsi;
+		// nonzeroprior vectors have been initialised, so use priors!
+		my_idir = pointer_dir_nonzeroprior[idir];
+		my_ipsi = pointer_psi_nonzeroprior[ipsi];
 	}
 	else
 	{
-#ifdef DEBUG_CHECKSIZES
-	if (idir >= pointer_dir_nonzeroprior.size())
-	{
-		std::cerr<< "idir= "<<idir<<" pointer_dir_nonzeroprior.size()= "<< pointer_dir_nonzeroprior.size() <<std::endl;
-		REPORT_ERROR("idir >= pointer_dir_nonzeroprior.size()");
-	}
-	if (ipsi >= pointer_psi_nonzeroprior.size())
-	{
-		std::cerr<< "ipsi= "<<ipsi<<" pointer_psi_nonzeroprior.size()= "<< pointer_psi_nonzeroprior.size() <<std::endl;
-		REPORT_ERROR("ipsi >= pointer_psi_nonzeroprior.size()");
-	}
-#endif
-		my_idir = pointer_dir_nonzeroprior[idir];
-		my_ipsi = pointer_psi_nonzeroprior[ipsi];
+		// no priors
+		my_idir = idir;
+		my_ipsi = ipsi;
 	}
 
 #ifdef DEBUG_CHECKSIZES
