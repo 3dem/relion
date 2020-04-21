@@ -472,36 +472,29 @@ void updatePriorsForOneHelicalTube(
 		RFLOAT sigma_segment_dist,
 		std::vector<RFLOAT> helical_rise,
 		std::vector<RFLOAT> helical_twist,
-		bool is_3D,
+		bool is_3D_data,
 		bool do_auto_refine,
-		bool do_local_angular_searches,
-		bool do_exclude_out_of_range_trans,
-		bool psi_prior_flip,     // KThurber
 		RFLOAT sigma2_rot,       // KThurber
 		RFLOAT sigma2_tilt,
 		RFLOAT sigma2_psi,
 		RFLOAT sigma2_offset,
-		RFLOAT sigma_cutoff);
+		RFLOAT sigma_cutoff = 3.);
 
 void updatePriorsForHelicalReconstruction(
 		MetaDataTable& MD,
-		int& total_opposite_polarity,
-		int& total_opposite_rot,	// KThurber
 		RFLOAT sigma_segment_dist,
 		std::vector<RFLOAT> helical_rise,
 		std::vector<RFLOAT> helical_twist,
 		bool is_3D,
 		bool do_auto_refine,
-		bool do_local_angular_searches,
 		RFLOAT sigma2_rot,
 		RFLOAT sigma2_tilt,
 		RFLOAT sigma2_psi,
 		RFLOAT sigma2_offset,
-		bool keep_tilt_prior_fixed = false,
-		RFLOAT sigma_cutoff = 3.);
-// TESTING...
+		bool keep_tilt_prior_fixed,
+		int verb);
 
-void updateAngularPriorsForHelicalReconstruction(
+void updateAngularPriorsForHelicalReconstructionFromLastIter(
 		MetaDataTable& MD,
 		bool keep_tilt_prior_fixed);
 

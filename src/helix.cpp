@@ -2309,7 +2309,7 @@ void convertHelicalSegmentCoordsToMetaDataTable(
 		FileName& fn_in,
 		MetaDataTable& MD_out,
 		int& total_segments,
-		bool is_3D,
+		bool is_3D_data,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT Zdim,
@@ -2319,7 +2319,7 @@ void convertHelicalSegmentCoordsToMetaDataTable(
 	MetaDataTable MD_in;
 	if (fn_in.getExtension() != "star")
 		REPORT_ERROR("helix.cpp::convertHelicalSegmentCoordsToMetaDataTable(): Input file should have .star extension!!");
-	if ( (box_size_pix < 2) || (Xdim < box_size_pix) || (Ydim < box_size_pix) || ((is_3D) && (Zdim < box_size_pix)) )
+	if ( (box_size_pix < 2) || (Xdim < box_size_pix) || (Ydim < box_size_pix) || ((is_3D_data) && (Zdim < box_size_pix)) )
 		REPORT_ERROR("helix.cpp::convertHelicalSegmentCoordsToMetaDataTable(): Wrong dimensions or box size!");
 
 	RFLOAT x = 0., y = 0., z = 0.;
@@ -2340,7 +2340,7 @@ void convertHelicalSegmentCoordsToMetaDataTable(
 
 	if ( (!MD_in.containsLabel(EMDL_IMAGE_COORD_X))
 			|| (!MD_in.containsLabel(EMDL_IMAGE_COORD_Y))
-			|| ( (is_3D) && (!MD_in.containsLabel(EMDL_IMAGE_COORD_Z)) )
+			|| ( (is_3D_data) && (!MD_in.containsLabel(EMDL_IMAGE_COORD_Z)) )
 			|| (!MD_in.containsLabel(EMDL_PARTICLE_HELICAL_TUBE_ID))
 			|| (!MD_in.containsLabel(EMDL_ORIENT_TILT_PRIOR))
 			|| (!MD_in.containsLabel(EMDL_ORIENT_PSI_PRIOR))
@@ -2354,13 +2354,13 @@ void convertHelicalSegmentCoordsToMetaDataTable(
 	{
 		MD_in.getValue(EMDL_IMAGE_COORD_X, x);
 		MD_in.getValue(EMDL_IMAGE_COORD_Y, y);
-		if (is_3D)
+		if (is_3D_data)
 			MD_in.getValue(EMDL_IMAGE_COORD_Z, z);
 #ifdef EXCLUDE_SEGMENTS_ON_THE_EDGES
 		// Avoid segments lying on the edges of the micrographs
 		if ( (x < half_box_size_pix) || (x > (Xdim - half_box_size_pix))
 				|| (y < half_box_size_pix) || (y > (Ydim - half_box_size_pix))
-				|| ( (is_3D) && ((z < half_box_size_pix) || (z > (Zdim - half_box_size_pix))) ) )
+				|| ( (is_3D_data) && ((z < half_box_size_pix) || (z > (Zdim - half_box_size_pix))) ) )
 		{
 			std::cerr << " WARNING: Particle at (" << x << ", " << y << ", " << z << std::flush;
 			std::cerr << ") in coordinate file " << fn_in << " is NOT extracted because it is too close to the edge." << std::flush;
@@ -3531,7 +3531,7 @@ void mergeStarFiles(FileName& fn_in)
 void sortHelicalTubeID(MetaDataTable& MD)
 {
 	std::string str_particle_fullname, str_particle_name, str_comment, str_particle_id;
-	int int_tube_id, total_opposite_polarity, total_opposite_rot, nr_tubes;
+	int int_tube_id, nr_tubes;
 	std::vector<HelicalSegmentPriorInfoEntry> list;
 	std::set<std::string> tubes;
 	long int MDobjectID;
@@ -3576,19 +3576,11 @@ void sortHelicalTubeID(MetaDataTable& MD)
 		MD.setValue(EMDL_IMAGE_NAME, str_comment);
 	}
 
-	// KThurber added total_opposite_rot input below
 	std::vector<RFLOAT> dummy;
 	updatePriorsForHelicalReconstruction(
-			MD, total_opposite_polarity, total_opposite_rot, 1.,dummy, dummy,
-			false, false, false,
-			0., 0., 0., 1.);
-
-	RFLOAT ratio = 100. * ((RFLOAT)(total_opposite_polarity)) / ((RFLOAT)(MD.numberOfObjects()));
-	std::cout << " Total number of segments / tubes = " << MD.numberOfObjects() << " / " << nr_tubes
-			<< " = " << ((RFLOAT)(MD.numberOfObjects())) / ((RFLOAT)(nr_tubes)) << ", % of segments with wrong polarity = "
-			<< ratio << "%" << std::endl;
-	if (fabs(ratio) < (1e-5))
-		std::cout << " WARNING: YOU MIGHT HAVE NOT PROVIDED A RANGE FACTOR FOR LOCAL AVERAGING FOR THIS RECONSTRUCTION! OR YOU MIGHT BE USING A DATA STAR FILE GENERATED IN A LOCAL ANGULAR SEARCH ITERATION. POLARITY CHECK IS ONLY USEFUL FOR ITERATIONS WHERE GLOBAL SEARCHES HAVE BEEN PERFORMED!" << std::endl;
+			MD, 1.,dummy, dummy,
+			false, false,
+			0., 0., 0., 1., false, 1);
 
 	list.clear();
 
@@ -4154,10 +4146,8 @@ void updatePriorsForOneHelicalTube(
 		RFLOAT sigma_segment_dist,
 		std::vector<RFLOAT> helical_rise,
 		std::vector<RFLOAT> helical_twist,
-		bool is_3D,
+		bool is_3D_data,
 		bool do_auto_refine,
-		bool do_local_angular_searches,
-		bool do_exclude_out_of_range_trans,
         RFLOAT sigma2_rot,       // KThurber
 		RFLOAT sigma2_tilt,
 		RFLOAT sigma2_psi,
@@ -4176,9 +4166,9 @@ void updatePriorsForOneHelicalTube(
 		REPORT_ERROR("helix.cpp::updatePriorsForOneHelicalTube(): Subscripts are invalid!");
 
 	// Init
-	data_dim = (is_3D) ? (3) : (2);
+	data_dim = (is_3D_data) ? (3) : (2);
 	// TODO: test: Do not do local averaging if data_dim == 3
-	do_avg = (!is_3D) && (sigma_segment_dist > 0.01) && (list.size() > 1); // Do local average of orientations and translations or just flip tilt and psi angles?
+	do_avg = (!is_3D_data) && (sigma_segment_dist > 0.01) && (list.size() > 1); // Do local average of orientations and translations or just flip tilt and psi angles?
 	sigma2_rot = (sigma2_rot > 0.) ? (sigma2_rot) : (0.);  // KThurber
 	sigma2_tilt = (sigma2_tilt > 0.) ? (sigma2_tilt) : (0.);
 	sigma2_psi = (sigma2_psi > 0.) ? (sigma2_psi) : (0.);
@@ -4251,14 +4241,12 @@ void updatePriorsForOneHelicalTube(
 	// Calculate new angular priors
 	for (int id = sid; id <= eid; id++)
 	{
-		bool do_avg_ang, do_avg_trans;
 		RFLOAT this_rot, this_psi, this_tilt, center_psi, center_tilt, center_pos, this_pos, sum_w, this_w, offset2;
 		RFLOAT center_rot, length_rot_vec, center_x_helix, this_x_helix;  // KThurber
 		Matrix1D<RFLOAT> this_ang_vec, sum_ang_vec, this_trans_vec, center_trans_vec, sum_trans_vec;
 		Matrix1D<RFLOAT> this_rot_vec, sum_rot_vec;  // KThurber
 
 		// Init
-		do_avg_ang = do_avg_trans = false;
 		this_rot = this_psi = this_tilt = center_psi = center_tilt = center_pos = this_pos = sum_w = this_w = offset2 = 0.;
 		center_rot = 0.;  		// KThurber
 		this_ang_vec.initZeros(3);
@@ -4291,21 +4279,18 @@ void updatePriorsForOneHelicalTube(
 		// end new KThurber
 
 		// Analyze translations
-		if (do_exclude_out_of_range_trans)
-		{
-			XX(this_trans_vec) = list[id].dx_prior_A = list[id].dx_A; // REFRESH XOFF PRIOR
-			YY(this_trans_vec) = list[id].dy_prior_A = list[id].dy_A; // REFRESH YOFF PRIOR
-			if (is_3D)
-				ZZ(this_trans_vec) = list[id].dz_prior_A = list[id].dz_A; // REFRESH ZOFF PRIOR
+		XX(this_trans_vec) = list[id].dx_prior_A = list[id].dx_A; // REFRESH XOFF PRIOR
+		YY(this_trans_vec) = list[id].dy_prior_A = list[id].dy_A; // REFRESH YOFF PRIOR
+		if (is_3D_data)
+			ZZ(this_trans_vec) = list[id].dz_prior_A = list[id].dz_A; // REFRESH ZOFF PRIOR
 
-			transformCartesianAndHelicalCoords(this_trans_vec, this_trans_vec, (is_3D) ? (this_rot) : (0.), (is_3D) ? (this_tilt) : (0.), this_psi, CART_TO_HELICAL_COORDS);
-			center_trans_vec = this_trans_vec; // Record helical coordinates of the central segment
-			if (!is_3D)
-				XX(this_trans_vec) = 0.; // Do not accumulate translation along helical axis
-			else
-				ZZ(this_trans_vec) = 0.;
-			sum_trans_vec = this_trans_vec * this_w;
-		}
+		transformCartesianAndHelicalCoords(this_trans_vec, this_trans_vec, (is_3D_data) ? (this_rot) : (0.), (is_3D_data) ? (this_tilt) : (0.), this_psi, CART_TO_HELICAL_COORDS);
+		center_trans_vec = this_trans_vec; // Record helical coordinates of the central segment
+		if (!is_3D_data)
+			XX(this_trans_vec) = 0.; // Do not accumulate translation along helical axis
+		else
+			ZZ(this_trans_vec) = 0.;
+		sum_trans_vec = this_trans_vec * this_w;
 
 		// Local averaging
 		if (do_avg)
@@ -4354,20 +4339,17 @@ void updatePriorsForOneHelicalTube(
 				sum_ang_vec += this_ang_vec * this_w;
 
 				// Analyze translations
-				if (do_exclude_out_of_range_trans)
-				{
-					XX(this_trans_vec) = list[idd].dx_A;
-					YY(this_trans_vec) = list[idd].dy_A;
-					if (is_3D)
-						ZZ(this_trans_vec) = list[idd].dz_A;
+				XX(this_trans_vec) = list[idd].dx_A;
+				YY(this_trans_vec) = list[idd].dy_A;
+				if (is_3D_data)
+					ZZ(this_trans_vec) = list[idd].dz_A;
 
-					transformCartesianAndHelicalCoords(this_trans_vec, this_trans_vec, (is_3D) ? (this_rot) : (0.), (is_3D) ? (this_tilt) : (0.), this_psi, CART_TO_HELICAL_COORDS);
-					if (!is_3D)
-						XX(this_trans_vec) = 0.; // Do not accumulate translation along helical axis
-					else
-						ZZ(this_trans_vec) = 0.;
-					sum_trans_vec += this_trans_vec * this_w;
-				}
+				transformCartesianAndHelicalCoords(this_trans_vec, this_trans_vec, (is_3D_data) ? (this_rot) : (0.), (is_3D_data) ? (this_tilt) : (0.), this_psi, CART_TO_HELICAL_COORDS);
+				if (!is_3D_data)
+					XX(this_trans_vec) = 0.; // Do not accumulate translation along helical axis
+				else
+					ZZ(this_trans_vec) = 0.;
+				sum_trans_vec += this_trans_vec * this_w;
 			}
 
 			sum_ang_vec /= sum_w;
@@ -4388,38 +4370,27 @@ void updatePriorsForOneHelicalTube(
 				this_rot = list[id].rot_prior_deg;  // don't change prior if average fails
 			// KThurber end new section
 
-			//if ( (!do_local_angular_searches) || (fabs(this_psi - center_psi) > range_psi) || (fabs(this_tilt - center_tilt) > range_tilt) )
-			do_avg_ang = true;
+			list[id].rot_prior_deg = this_rot;  // KThurber
+			list[id].psi_prior_deg = this_psi; // REFRESH PSI PRIOR
+			list[id].tilt_prior_deg = this_tilt; // REFRESH TILT PRIOR
 
-			if (do_exclude_out_of_range_trans)
+			sum_trans_vec /= sum_w;
+			offset2 = (YY(sum_trans_vec) - YY(center_trans_vec)) * (YY(sum_trans_vec) - YY(center_trans_vec));
+			if (is_3D_data)
+				offset2 += (XX(sum_trans_vec) - XX(center_trans_vec)) * (XX(sum_trans_vec) - XX(center_trans_vec));
+			if (offset2 > range2_offset) // only now average translations
 			{
-				sum_trans_vec /= sum_w;
-				offset2 = (YY(sum_trans_vec) - YY(center_trans_vec)) * (YY(sum_trans_vec) - YY(center_trans_vec));
-				if (is_3D)
-					offset2 += (XX(sum_trans_vec) - XX(center_trans_vec)) * (XX(sum_trans_vec) - XX(center_trans_vec));
-				if (offset2 > range2_offset)
-					do_avg_ang = do_avg_trans = true;
-			}
-
-			if (do_avg_ang)
-			{
-				list[id].rot_prior_deg = this_rot;  // KThurber
-				list[id].psi_prior_deg = this_psi; // REFRESH PSI PRIOR
-				list[id].tilt_prior_deg = this_tilt; // REFRESH TILT PRIOR
-			}
-			if (do_avg_trans)
-			{
-				if (!is_3D)
+				if (!is_3D_data)
 					XX(sum_trans_vec) = XX(center_trans_vec);
 				else
 				{
 					this_rot = list[id].rot_deg;
 					ZZ(sum_trans_vec) = ZZ(center_trans_vec);
 				}
-				transformCartesianAndHelicalCoords(sum_trans_vec, sum_trans_vec, (is_3D) ? (this_rot) : (0.), (is_3D) ? (this_tilt) : (0.), this_psi, HELICAL_TO_CART_COORDS); // Averaged translations - use respective averaged tilt and psi
+				transformCartesianAndHelicalCoords(sum_trans_vec, sum_trans_vec, (is_3D_data) ? (this_rot) : (0.), (is_3D_data) ? (this_tilt) : (0.), this_psi, HELICAL_TO_CART_COORDS); // Averaged translations - use respective averaged tilt and psi
 				list[id].dx_prior_A = XX(sum_trans_vec); // REFRESH XOFF PRIOR
 				list[id].dy_prior_A = YY(sum_trans_vec); // REFRESH YOFF PRIOR
-				if (is_3D)
+				if (is_3D_data)
 					list[id].dz_prior_A = ZZ(sum_trans_vec); // REFRESH ZOFF PRIOR
 			}
 		}
@@ -4447,49 +4418,38 @@ void updatePriorsForOneHelicalTube(
 
 void updatePriorsForHelicalReconstruction(
 		MetaDataTable& MD,
-		int& total_opposite_polarity,
-		int& total_opposite_rot, 	// KThurber
 		RFLOAT sigma_segment_dist,
 		std::vector<RFLOAT> helical_rise,
 		std::vector<RFLOAT> helical_twist,
-		bool is_3D,
+		bool is_3D_data,
 		bool do_auto_refine,
-		bool do_local_angular_searches,
 		RFLOAT sigma2_rot,
 		RFLOAT sigma2_tilt,
 		RFLOAT sigma2_psi,
 		RFLOAT sigma2_offset,
 		bool keep_tilt_prior_fixed,
-		RFLOAT sigma_cutoff)
+		int verb)
 {
-	std::vector<HelicalSegmentPriorInfoEntry> list;
-	bool do_exclude_out_of_range_trans = true;
-	bool have_dx_prior, have_dy_prior, have_dz_prior, have_classID;
-	long int MDobjectID;
 
+	// If we're not averaging angles from neighbouring segments in the helix,
+	// then just set the priors to the angles from the previous iteration
 	if (sigma_segment_dist < 0.)
 	{
-		updateAngularPriorsForHelicalReconstruction(MD, keep_tilt_prior_fixed);
+		updateAngularPriorsForHelicalReconstructionFromLastIter(MD, keep_tilt_prior_fixed);
 		return;
 	}
 
 	// Check labels
-	if ( (!(sigma_cutoff > 0.)) )
-		REPORT_ERROR("helix.cpp::updatePriorsForHelicalReconstruction: Sigma-cutoff is smaller than 0!");
-	if ( (do_local_angular_searches) && ( (!(sigma2_rot > 0.)) || (!(sigma2_tilt > 0.)) || (!(sigma2_psi > 0.)) ) )
-		REPORT_ERROR("helix.cpp::updatePriorsForHelicalReconstruction: Sigma tilt and psi should be larger than 0 if local angular searches are performed!");
-	if ( (do_exclude_out_of_range_trans) && (!(sigma2_offset > 0.)) )
-		REPORT_ERROR("helix.cpp::updatePriorsForHelicalReconstruction: Sigma offsets should be larger than 0 if local translational searches are performed!");
 	if (MD.numberOfObjects() < 1)
 		REPORT_ERROR("helix.cpp::updatePriorsForHelicalReconstruction: MetaDataTable is empty!");
 	if (!MD.containsLabel(EMDL_IMAGE_NAME))
 		REPORT_ERROR("helix.cpp::updatePriorsForHelicalReconstruction: rlnImageName is missing!");
-	if ( ( (is_3D) && (!MD.containsLabel(EMDL_ORIENT_ROT)) )
+	if ( ( (is_3D_data) && (!MD.containsLabel(EMDL_ORIENT_ROT)) )
 			|| (!MD.containsLabel(EMDL_ORIENT_TILT))
 			|| (!MD.containsLabel(EMDL_ORIENT_PSI))
 			|| (!MD.containsLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM))
 			|| (!MD.containsLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM))
-			|| ( (is_3D) && (!MD.containsLabel(EMDL_ORIENT_ORIGIN_Z_ANGSTROM)) )
+			|| ( (is_3D_data) && (!MD.containsLabel(EMDL_ORIENT_ORIGIN_Z_ANGSTROM)) )
 			|| (!MD.containsLabel(EMDL_ORIENT_TILT_PRIOR))
 			|| (!MD.containsLabel(EMDL_ORIENT_PSI_PRIOR))
 			|| (!MD.containsLabel(EMDL_PARTICLE_HELICAL_TUBE_ID))
@@ -4497,7 +4457,9 @@ void updatePriorsForHelicalReconstruction(
 			|| (!MD.containsLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO))
 			|| ( (do_auto_refine) && (!MD.containsLabel(EMDL_PARTICLE_RANDOM_SUBSET)) ) )
 		REPORT_ERROR("helix.cpp::updatePriorsForHelicalReconstruction: Labels of helical prior information are missing!");
-	have_classID = MD.containsLabel(EMDL_PARTICLE_CLASS);
+
+	std::vector<HelicalSegmentPriorInfoEntry> list;
+	long int MDobjectID;
 
 	// Read _data.star file
 	list.clear();
@@ -4528,20 +4490,17 @@ void updatePriorsForHelicalReconstruction(
 		if (MD.containsLabel(EMDL_ORIENT_PSI_PRIOR_FLIP))			// KThurber2
 			MD.getValue(EMDL_ORIENT_PSI_PRIOR_FLIP, segment.psi_prior_flip);
 		else segment.psi_prior_flip = false;
-		if (have_classID)
+		if (MD.containsLabel(EMDL_PARTICLE_CLASS))
 			MD.getValue(EMDL_PARTICLE_CLASS, segment.classID);
 		else
 			segment.classID = 1;
 		if (do_auto_refine)
 			MD.getValue(EMDL_PARTICLE_RANDOM_SUBSET, segment.subset); // Do I really need this?
 
-		if (do_exclude_out_of_range_trans)
-		{
-			MD.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, segment.dx_A);
-			MD.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, segment.dy_A);
-			if (is_3D)
-				MD.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, segment.dz_A);
-		}
+		MD.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, segment.dx_A);
+		MD.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, segment.dy_A);
+		if (is_3D_data)
+			MD.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, segment.dz_A);
 
 		segment.checkPolarity();
 
@@ -4554,8 +4513,8 @@ void updatePriorsForHelicalReconstruction(
 	std::stable_sort(list.begin(), list.end());
 
 	// Loop over every helical tube
-	total_opposite_polarity = 0;
-	total_opposite_rot = 0;		// KThurber
+	long total_opposite_polarity = 0;
+	long total_opposite_rot = 0;		// KThurber
 	for (int sid = 0; sid < list.size(); )
 	{
 		// A helical tube [id_s, id_e]
@@ -4574,8 +4533,7 @@ void updatePriorsForHelicalReconstruction(
 
 		// Real work...
 		updatePriorsForOneHelicalTube(list, sid, eid, nr_opposite_polarity, nr_opposite_rot, sigma_segment_dist, helical_rise, helical_twist,
-				is_3D, do_auto_refine, do_local_angular_searches, do_exclude_out_of_range_trans,
-				sigma2_rot, sigma2_tilt, sigma2_psi, sigma2_offset, sigma_cutoff);
+				is_3D_data, do_auto_refine, sigma2_rot, sigma2_tilt, sigma2_psi, sigma2_offset);
 		total_opposite_polarity += nr_opposite_polarity;
 		total_opposite_rot += nr_opposite_rot;		// KThurber
 
@@ -4589,14 +4547,10 @@ void updatePriorsForHelicalReconstruction(
 			MD.setValue(EMDL_ORIENT_ROT_PRIOR_FLIP_RATIO, list[id].rot_flip_ratio, list[id].MDobjectID);	// KThurber
 			MD.setValue(EMDL_ORIENT_ROT_PRIOR, list[id].rot_prior_deg, list[id].MDobjectID); // KThurber
 			MD.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP, list[id].psi_prior_flip, list[id].MDobjectID);  // KThurber
-
-			if (do_exclude_out_of_range_trans)
-			{
-				MD.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, list[id].dx_prior_A, list[id].MDobjectID);
-				MD.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, list[id].dy_prior_A, list[id].MDobjectID);
-				if (is_3D)
-					MD.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, list[id].dz_prior_A, list[id].MDobjectID);
-			}
+			MD.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, list[id].dx_prior_A, list[id].MDobjectID);
+			MD.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, list[id].dy_prior_A, list[id].MDobjectID);
+			if (is_3D_data)
+				MD.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, list[id].dz_prior_A, list[id].MDobjectID);
 		}
 
 		// Next helical tube
@@ -4604,9 +4558,22 @@ void updatePriorsForHelicalReconstruction(
 	}
 
 	list.clear();
+
+	if ( (verb > 0) )
+	{
+
+		long total_same_polarity = MD.numberOfObjects() - total_opposite_polarity;
+		long total_same_rot = MD.numberOfObjects() - total_opposite_rot;  // KThurber
+		RFLOAT opposite_percentage = (100.) * ((RFLOAT)(total_opposite_polarity)) / ((RFLOAT)(MD.numberOfObjects()));
+		RFLOAT rot_opposite_percent = (100.) * ((RFLOAT)(total_opposite_rot)) / ((RFLOAT)(MD.numberOfObjects())); // KThurber
+
+		std::cout << " Number of helical segments with psi angles similar/opposite to their priors: " << total_same_polarity << " / " << total_opposite_polarity << " (" << opposite_percentage << "%)" << std::endl;
+		std::cout << " Number of helical segments with rot angles similar/opposite to their priors: " << total_same_rot << " / " << total_opposite_rot << " (" << rot_opposite_percent << "%)" << std::endl;  // KThurber
+	}
+
 }
 
-void updateAngularPriorsForHelicalReconstruction(
+void updateAngularPriorsForHelicalReconstructionFromLastIter(
 		MetaDataTable& MD,
 		bool keep_tilt_prior_fixed)
 {
@@ -4617,7 +4584,6 @@ void updateAngularPriorsForHelicalReconstruction(
 	bool have_psi = MD.containsLabel(EMDL_ORIENT_PSI);
 	bool have_tilt_prior = MD.containsLabel(EMDL_ORIENT_TILT_PRIOR);
 	bool have_psi_prior = MD.containsLabel(EMDL_ORIENT_PSI_PRIOR);
-
 	bool have_rot = MD.containsLabel(EMDL_ORIENT_ROT);		// KThurber
 	bool have_rot_prior = MD.containsLabel(EMDL_ORIENT_ROT_PRIOR);	// KThurber
 
@@ -4826,7 +4792,7 @@ void normaliseHelicalSegments(
 		RFLOAT helical_outer_diameter_A,
 		RFLOAT pixel_size_A)
 {
-	bool is_3D = false, is_mrcs = false, have_tilt_prior = false, have_psi_prior = false, read_angpix_from_star = false;
+	bool is_3D_data = false, is_mrcs = false, have_tilt_prior = false, have_psi_prior = false, read_angpix_from_star = false;
 	RFLOAT rot_deg = 0., tilt_deg = 0., psi_deg = 0., avg = 0., stddev = 0., val = 0., det_pixel_size = 0., mag = 0.;
 	Image<RFLOAT> img0;
 	MetaDataTable MD;
@@ -4879,10 +4845,10 @@ void normaliseHelicalSegments(
 		// Read image
 		img0.clear();
 		img0.read(img_name);
-		is_3D = (ZSIZE(img0()) > 1) || (NSIZE(img0()) > 1);
+		is_3D_data = (ZSIZE(img0()) > 1) || (NSIZE(img0()) > 1);
 		if ( (XSIZE(img0()) < (helical_outer_diameter_A / pixel_size_A)) || (YSIZE(img0()) < (helical_outer_diameter_A / pixel_size_A)) )
 			REPORT_ERROR("helix.cpp::normaliseHelicalSegments(): Diameter of the tubular mask is larger than the box XY dimensions!");
-		if (!is_3D)
+		if (!is_3D_data)
 			rot_deg = tilt_deg = 0.;
 
 		// Calculate avg and stddev
@@ -4913,21 +4879,21 @@ void normaliseHelicalSegments(
 		// Rename
 		img_name = img_name.withoutExtension() + fn_out_root + "." + file_ext;
 
-		if (is_3D)
+		if (is_3D_data)
 		{
 			img0.setSamplingRateInHeader(pixel_size_A, pixel_size_A, pixel_size_A);
 			img0.setStatisticsInHeader();
 		}
 
 		// Write
-		if (is_3D)
+		if (is_3D_data)
 			img0.write(img_name);
 		else
 			img0.write(img_name, -1, true, WRITE_APPEND);
 		img0.clear();
 	}
 
-	if (!is_3D)
+	if (!is_3D_data)
 	{
 		// Read the header of .mrcs stack
 		img_name = img_name.substr(img_name.find("@") + 1);
