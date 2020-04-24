@@ -4228,7 +4228,10 @@ void updatePriorsForOneHelicalTube(
 
 		if ((fabs(list[id].psi_flip_ratio - UNIMODAL_PSI_PRIOR_FLIP_RATIO) > 0.01) || (fabs(list[id].rot_flip_ratio - UNIMODAL_PSI_PRIOR_FLIP_RATIO) > 0.01))
 			unimodal_angular_priors = false;
+		//std::cerr << id << " has_wrong_rot= " << list[id].has_wrong_rot << " has_wrong_polarity= " << list[id].has_wrong_polarity << " unimodal_angular_priors= " << unimodal_angular_priors << std::endl;
 	}
+
+
 	psi_flip_ratio = ((RFLOAT)(nr_opposite_polarity)) / (((RFLOAT)(nr_opposite_polarity)) + ((RFLOAT)(nr_same_polarity)));
 	rot_flip_ratio = ((RFLOAT)(nr_opposite_rot)) / (((RFLOAT)(nr_opposite_rot)) + ((RFLOAT)(nr_same_rot))); // KThurber
 	if ( (unimodal_angular_priors) && (nr_opposite_polarity <= 1) )
@@ -4324,7 +4327,9 @@ void updatePriorsForOneHelicalTube(
 					RFLOAT pitch = helical_rise[list[idd].classID - 1] * 180. / helical_twist[list[idd].classID - 1];
 					if (list[idd].psi_prior_flip) pitch *= -1.;
 					this_x_helix = list[idd].dx_A * cos(DEG2RAD(list[idd].psi_deg)) - list[idd].dy_A * sin(DEG2RAD(list[idd].psi_deg));
-					this_rot = list[idd].rot_deg + (180./pitch)*(this_pos - center_pos - this_x_helix + center_x_helix);
+					// SHWS 24042020: at least for Picks filaments, the sign needs to be reversed here!!
+					//this_rot = list[idd].rot_deg + (180./pitch)*(this_pos - center_pos - this_x_helix + center_x_helix);
+					this_rot = list[idd].rot_deg - (180./pitch)*(this_pos - center_pos - this_x_helix + center_x_helix);
 				}
 				else
 					this_rot = list[idd].rot_deg;
@@ -4358,6 +4363,7 @@ void updatePriorsForOneHelicalTube(
 			// KThurber added
 			sum_rot_vec /= sum_w;
 			length_rot_vec = sqrt(pow(sum_rot_vec(0),2) + pow(sum_rot_vec(1),2));
+			//std::cerr << " length_rot_vec= " << length_rot_vec << std::endl;
 			if (length_rot_vec!=0)
 			{
 				sum_rot_vec(0) = sum_rot_vec(0) / length_rot_vec;
@@ -4370,6 +4376,8 @@ void updatePriorsForOneHelicalTube(
 				this_rot = list[id].rot_prior_deg;  // don't change prior if average fails
 			// KThurber end new section
 
+			//std::cerr << id << " " << list[id].track_pos_A << " old_rot_prior= " << list[id].rot_prior_deg << " new= " << this_rot << std::endl;
+			//std::cerr << id << " " << list[id].track_pos_A << " old_psi_prior= " << list[id].psi_prior_deg << " new= " << this_psi << std::endl;
 			list[id].rot_prior_deg = this_rot;  // KThurber
 			list[id].psi_prior_deg = this_psi; // REFRESH PSI PRIOR
 			list[id].tilt_prior_deg = this_tilt; // REFRESH TILT PRIOR
@@ -4520,7 +4528,7 @@ void updatePriorsForHelicalReconstruction(
 		// A helical tube [id_s, id_e]
 		int nr_opposite_polarity = -1;
 		int nr_opposite_rot = -1;	// KThurber
-		int eid = sid;
+		int eid = sid; // start id (sid) and end id (eid)
 		while (1)
 		{
 			eid++;
