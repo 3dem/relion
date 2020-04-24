@@ -4575,8 +4575,8 @@ void updatePriorsForHelicalReconstruction(
 		RFLOAT opposite_percentage = (100.) * ((RFLOAT)(total_opposite_polarity)) / ((RFLOAT)(MD.numberOfObjects()));
 		RFLOAT rot_opposite_percent = (100.) * ((RFLOAT)(total_opposite_rot)) / ((RFLOAT)(MD.numberOfObjects())); // KThurber
 
-		std::cout << " Number of helical segments with psi angles similar/opposite to their priors: " << total_same_polarity << " / " << total_opposite_polarity << " (" << opposite_percentage << "%)" << std::endl;
-		std::cout << " Number of helical segments with rot angles similar/opposite to their priors: " << total_same_rot << " / " << total_opposite_rot << " (" << rot_opposite_percent << "%)" << std::endl;  // KThurber
+		if (sigma2_psi > 0.) std::cout << " Number of helical segments with psi angles similar/opposite to their priors: " << total_same_polarity << " / " << total_opposite_polarity << " (" << opposite_percentage << "%)" << std::endl;
+		if (sigma2_rot > 0.) std::cout << " Number of helical segments with rot angles similar/opposite to their priors: " << total_same_rot << " / " << total_opposite_rot << " (" << rot_opposite_percent << "%)" << std::endl;  // KThurber
 	}
 
 }
