@@ -50,7 +50,7 @@ public:
 	std::vector<double> data_angpixes;
 
 	bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak,
-	     do_ewald, skip_weighting, skip_mask;
+	     do_ewald, skip_weighting, skip_mask, no_barcode;
 
 	bool skip_gridding, is_reverse, read_weights, do_external_reconstruct;
 
@@ -174,6 +174,7 @@ void MovieReconstructor::read(int argc, char **argv)
 	iter = textToInteger(parser.getOption("--iter", "Number of gridding-correction iterations", "10"));
 	ref_dim = 3;
 	skip_gridding = parser.checkOption("--skip_gridding", "Skip gridding part of the reconstruction");
+	no_barcode = parser.checkOption("--no_barcode", "Don't apply barcode-like extension when extracting outside a micrograph");
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
 
 	// Hidden
@@ -432,11 +433,19 @@ void MovieReconstructor::backproject(int rank, int size)
 					int xx = x0 + x;
 					int yy = y0 + y;
 
-					if (xx < 0) xx = 0;
-					else if (xx >= w0) xx = w0 - 1;
+					if (!no_barcode)
+					{
+						if (xx < 0) xx = 0;
+						else if (xx >= w0) xx = w0 - 1;
 
-					if (yy < 0) yy = 0;
-					else if (yy >= h0) yy = h0 - 1;
+						if (yy < 0) yy = 0;
+						else if (yy >= h0) yy = h0 - 1;
+					}
+					else
+					{
+						// No barcode
+						if (xx < 0 || xx >= w0 || yy < 0 || yy >= h0) continue;
+					}
 
 					DIRECT_NZYX_ELEM(Iparticle(), 0, 0, y, x) = DIRECT_NZYX_ELEM(Iframe(), 0, 0, yy, xx);
 				}
