@@ -3578,7 +3578,7 @@ void sortHelicalTubeID(MetaDataTable& MD)
 
 	std::vector<RFLOAT> dummy;
 	updatePriorsForHelicalReconstruction(
-			MD, 1.,dummy, dummy,
+			MD, 1.,dummy, dummy, 1,
 			false, false,
 			0., 0., 0., 1., false, 1);
 
@@ -4429,6 +4429,7 @@ void updatePriorsForHelicalReconstruction(
 		RFLOAT sigma_segment_dist,
 		std::vector<RFLOAT> helical_rise,
 		std::vector<RFLOAT> helical_twist,
+		int helical_nstart,
 		bool is_3D_data,
 		bool do_auto_refine,
 		RFLOAT sigma2_rot,
@@ -4468,6 +4469,26 @@ void updatePriorsForHelicalReconstruction(
 
 	std::vector<HelicalSegmentPriorInfoEntry> list;
 	long int MDobjectID;
+
+
+	// For N-start helices, revert back to the N>1 twist and rise, otherwise errors in twist and rise may be hugely amplified
+	if (helical_nstart > 1)
+	{
+		// Assume same N-start for all classes
+		// Shaoda's formula (which need to be inverted)
+		// rise_1-start = rise / N
+		// twist_1-start = (twist+360)/N if twist>0
+		// twist_1-start = (twist-360)/N if twist<0
+
+		for (int iclass=0; iclass < helical_rise.size(); iclass++)
+		{
+			helical_rise[iclass] *= helical_nstart;
+			RFLOAT aux = helical_twist[iclass] * helical_nstart;
+			helical_twist[iclass] = (aux > 360.) ? aux - 360. : aux + 360.;
+			if (verb > 0) std::cout << " + for rotational priors go back to " << helical_nstart
+					<< "-start helical twist= " << helical_twist[iclass] << " and rise= " << helical_rise[iclass] << std::endl;
+		}
+	}
 
 	// Read _data.star file
 	list.clear();

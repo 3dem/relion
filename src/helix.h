@@ -485,6 +485,7 @@ void updatePriorsForHelicalReconstruction(
 		RFLOAT sigma_segment_dist,
 		std::vector<RFLOAT> helical_rise,
 		std::vector<RFLOAT> helical_twist,
+		int helical_nstart,
 		bool is_3D,
 		bool do_auto_refine,
 		RFLOAT sigma2_rot,

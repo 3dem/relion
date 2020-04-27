@@ -3251,6 +3251,7 @@ void MlOptimiserMpi::iterate()
 							helical_sigma_distance * ((RFLOAT)(mymodel.ori_size)),
 							mymodel.helical_rise,
 							mymodel.helical_twist,
+							helical_nstart,
 							(mymodel.data_dim == 3),
 							do_auto_refine,
 							mymodel.sigma2_rot,
