@@ -2532,6 +2532,7 @@ void convertXimdispHelicalTubeCoordsToMetaDataTable(
 	y.resize(4);
 	half_box_size_pix = box_size_pix / 2.;
     psi_prior_flip_ratio = UNIMODAL_PSI_PRIOR_FLIP_RATIO;
+    rot_prior_flip_ratio = UNIMODAL_PSI_PRIOR_FLIP_RATIO;
     if (bimodal_angular_priors)
     {
 		psi_prior_flip_ratio = BIMODAL_PSI_PRIOR_FLIP_RATIO;
@@ -4524,6 +4525,9 @@ void updatePriorsForHelicalReconstruction(
 		MD.getValue(EMDL_ORIENT_PSI, segment.psi_deg);
 		MD.getValue(EMDL_ORIENT_PSI_PRIOR, segment.psi_prior_deg);
 		MD.getValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, segment.psi_flip_ratio);
+		if (MD.containsLabel(EMDL_ORIENT_PSI_PRIOR_FLIP))			// KThurber2
+			MD.getValue(EMDL_ORIENT_PSI_PRIOR_FLIP, segment.psi_prior_flip);
+		else segment.psi_prior_flip = false;
 		if (have_classID)
 			MD.getValue(EMDL_PARTICLE_CLASS, segment.classID);
 		else
