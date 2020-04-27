@@ -515,7 +515,7 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 		{
 			CTF ctf;
 			ctf.readByGroup(opt.mydata.MDimg, &opt.mydata.obsModel, ori_img_id);
-			ctf.getFftwImage(Fctf, opt.mymodel.ori_size, opt.mymodel.ori_size, opt.mymodel.pixel_size,
+			ctf.getFftwImage(Fctf, XSIZE(img()), YSIZE(img()), my_pixel_size,
 					opt.ctf_phase_flipped, false, opt.intact_ctf_first_peak, true);
 		}
 	}
@@ -579,7 +579,7 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 			// Subtract the projected COM already applied to this image for ibody
 			other_projected_com -= my_projected_com;
 
-			shiftImageInFourierTransform(FTo, Faux, (RFLOAT)opt.mymodel.ori_size,
+			shiftImageInFourierTransform(FTo, Faux, (RFLOAT)XSIZE(img()),
 					XX(other_projected_com), YY(other_projected_com), ZZ(other_projected_com));
 
 			// Sum the Fourier transforms of all the obodies
@@ -625,7 +625,7 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 		opt.mymodel.PPref[myclass].get2DFourierTransform(Fsubtract, A3D);
 
 		// Shift in opposite direction as offsets in the STAR file
-		shiftImageInFourierTransform(Fsubtract, Fsubtract, (RFLOAT)opt.mymodel.ori_size,
+		shiftImageInFourierTransform(Fsubtract, Fsubtract, (RFLOAT)XSIZE(img()),
 				-XX(my_old_offset), -YY(my_old_offset), -ZZ(my_old_offset));
 
 		if (do_center)
