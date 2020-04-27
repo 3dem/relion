@@ -413,13 +413,14 @@ public:
 	RFLOAT rot_deg, psi_deg, tilt_deg;
 	RFLOAT dx_A, dy_A, dz_A;
 	RFLOAT track_pos_A;
-	bool has_wrong_polarity, has_wrong_rot;	// KThurber
+	bool has_wrong_polarity;
 	int subset, classID;
 
-	RFLOAT rot_prior_deg, psi_prior_deg, tilt_prior_deg;  // KThurber
+	RFLOAT rot_prior_deg, psi_prior_deg, tilt_prior_deg;
+	RFLOAT rot_prior_deg_ori, psi_prior_deg_ori, tilt_prior_deg_ori;
 	RFLOAT dx_prior_A, dy_prior_A, dz_prior_A;
-	RFLOAT psi_flip_ratio, rot_flip_ratio;	// KThurber
-	bool psi_prior_flip;	// KThurber
+	RFLOAT psi_flip_ratio;
+	bool psi_prior_flip;
 
 	void clear();
 
@@ -427,48 +428,24 @@ public:
 
 	~HelicalSegmentPriorInfoEntry() { clear(); };
 
-	void checkPolarity();
+	void checkPsiPolarity();
 
 	bool operator<(const HelicalSegmentPriorInfoEntry &rhs) const;
 };
 
+// KThurber add this function
 void flipPsiTiltForHelicalSegment(
 		RFLOAT old_psi,
 		RFLOAT old_tilt,
 		RFLOAT& new_psi,
 		RFLOAT& new_tilt);
 
-// KThurber add this function
-void flipRotPsiTiltForHelicalSegment(
-		RFLOAT old_rot,
-		RFLOAT old_psi,
-		RFLOAT old_tilt,
-		RFLOAT& new_rot,
-		RFLOAT& new_psi,
-		RFLOAT& new_tilt);
-
-// KThurber add this function
-void flipRotPsiTiltPriorsForHelicalSegment(
-		RFLOAT old_rot,
-		RFLOAT old_psi,
-		RFLOAT old_tilt,
-		bool old_psi_prior_flip,
-		RFLOAT& new_rot,
-		RFLOAT& new_psi,
-		RFLOAT& new_tilt,
-		bool& new_psi_prior_flip);
-
-// KThurber add this function
-void flipRotForHelicalSegment(
-		RFLOAT old_rot,
-		RFLOAT& new_rot);
-
 void updatePriorsForOneHelicalTube(
 		std::vector<HelicalSegmentPriorInfoEntry>& list,
 		int sid,
 		int eid,
 		int& nr_wrong_polarity,
-		int& nr_wrong_rot,	// KThurber
+		bool &reverse_direction,
 		RFLOAT sigma_segment_dist,
 		std::vector<RFLOAT> helical_rise,
 		std::vector<RFLOAT> helical_twist,
@@ -502,8 +479,6 @@ void updateAngularPriorsForHelicalReconstructionFromLastIter(
 void testDataFileTransformXY(MetaDataTable& MD);
 
 void setPsiFlipRatioInStarFile(MetaDataTable& MD, RFLOAT ratio = 0.);
-
-void setRotFlipRatioInStarFile(MetaDataTable& MD, RFLOAT ratio = 0.);	// KThurber
 
 void plotLatticePoints(MetaDataTable& MD,
 		int x1, int y1, int x2, int y2);
