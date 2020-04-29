@@ -308,6 +308,14 @@ public:
 	                 bool printTimes= false,
 	                 Image<RFLOAT>* weight_out = 0);
 
+    /*
+     * Calculate the first or second moment of the gradient in real space
+     */
+    void reweightGradRealSpace(
+            MultidimArray<RFLOAT> &mom1, RFLOAT lambda1,
+            MultidimArray<RFLOAT> &mom2, RFLOAT lambda2,
+            bool init_mom);
+
 	/*
 	 * Calculate the first or second moment of the gradient
 	 */

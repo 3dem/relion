@@ -643,6 +643,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	vmgd_fin_subset_size = textToInteger(parser.getOption("--vmgd_fin_subset", "Mini-batch size during the final SGD iterations", "500"));
 	mu = textToFloat(parser.getOption("--mu", "Momentum parameter for SGD updates", "0.9"));
 	vmgd_stepsize = textToFloat(parser.getOption("--vmgd_stepsize", "Step size parameter for SGD updates", "0.5"));
+    do_vmgd_realspace = parser.checkOption("--vmgd_realspace", "Claculate and apply gradient in real space.");
 	do_vmgd_skip_anneal = !parser.checkOption("--vmgd_anneal", "Keep multiple references similar during the initial iterations.");
 	write_every_vmgd_iter = textToInteger(parser.getOption("--vmgd_write_iter", "Write out model every so many iterations in SGD (default is writing out all iters)", "1"));
 
@@ -4062,12 +4063,20 @@ void MlOptimiser::maximization()
 				{
 					if(do_vmgd)
 					{
-						(wsum_model.BPref[iclass]).reweightGrad(
-								mymodel.Igrad1[iclass],
-								do_mom1 ? 0.9 : 0.,
-								mymodel.Igrad2[iclass],
-								do_mom2 ? 0.999 : 0.,
-								iter==1);
+					    if (do_vmgd_realspace)
+                            (wsum_model.BPref[iclass]).reweightGradRealSpace(
+                                    mymodel.Igrad1[iclass],
+                                    do_mom1 ? 0.9 : 0.,
+                                    mymodel.Igrad2[iclass],
+                                    do_mom2 ? 0.999 : 0.,
+                                    iter==1);
+                        else
+                            (wsum_model.BPref[iclass]).reweightGrad(
+                                    mymodel.Igrad1[iclass],
+                                    do_mom1 ? 0.9 : 0.,
+                                    mymodel.Igrad2[iclass],
+                                    do_mom2 ? 0.999 : 0.,
+                                    iter==1);
 
 						(wsum_model.BPref[iclass]).reconstructGrad(
 								mymodel.Iref[iclass],

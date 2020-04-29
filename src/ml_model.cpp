@@ -829,13 +829,15 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 					Igrad1.push_back(img()*0.);
 				if (_do_mom2)
 				{
-					MultidimArray<RFLOAT> zeros;
-					int pad_size = 2 * (ROUND(padding_factor * XSIZE(img())) + 1) + 1;
-					if (ZSIZE(img()) > 1) zeros.initZeros(pad_size, pad_size, pad_size/2 + 1);
-					else zeros.initZeros(pad_size, pad_size/2 + 1);
-					zeros.setXmippOrigin();
-					zeros.xinit = 0;
-					Igrad2.push_back(zeros);
+//					MultidimArray<RFLOAT> zeros;
+//					int pad_size = 2 * (ROUND(padding_factor * XSIZE(img())) + 1) + 1;
+//					if (ZSIZE(img()) > 1) zeros.initZeros(pad_size, pad_size, pad_size/2 + 1);
+//					else zeros.initZeros(pad_size, pad_size/2 + 1);
+//					zeros.setXmippOrigin();
+//					zeros.xinit = 0;
+//					Igrad2.push_back(zeros);
+
+                    Igrad2.push_back(img()*0.);
 				}
 				nr_classes++;
 			}
@@ -888,13 +890,14 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 						Igrad1.push_back(img()*0.);
 					if (_do_mom2)
 					{
-						MultidimArray<RFLOAT> zeros;
-						int pad_size = 2 * (ROUND(padding_factor * XSIZE(img())) + 1) + 1;
-						if (ZSIZE(img()) > 1) zeros.initZeros(pad_size, pad_size, pad_size/2 + 1);
-						else zeros.initZeros(pad_size, pad_size/2 + 1);
-						zeros.setXmippOrigin();
-						zeros.xinit = 0;
-						Igrad2.push_back(zeros);
+//						MultidimArray<RFLOAT> zeros;
+//						int pad_size = 2 * (ROUND(padding_factor * XSIZE(img())) + 1) + 1;
+//						if (ZSIZE(img()) > 1) zeros.initZeros(pad_size, pad_size, pad_size/2 + 1);
+//						else zeros.initZeros(pad_size, pad_size/2 + 1);
+//						zeros.setXmippOrigin();
+//						zeros.xinit = 0;
+//						Igrad2.push_back(zeros);
+                        Igrad2.push_back(img()*0.);
 					}
 				}
 			}
@@ -1018,13 +1021,14 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 				Igrad1.push_back(img()*0.);
 			if (_do_mom2)
 			{
-				MultidimArray<RFLOAT> zeros;
-				int pad_size = 2 * (ROUND(padding_factor * XSIZE(img())) + 1) + 1;
-				if (ZSIZE(img()) > 1) zeros.initZeros(pad_size, pad_size, pad_size/2 + 1);
-				else zeros.initZeros(pad_size, pad_size/2 + 1);
-				zeros.setXmippOrigin();
-				zeros.xinit = 0;
-				Igrad2.push_back(zeros);
+//				MultidimArray<RFLOAT> zeros;
+//				int pad_size = 2 * (ROUND(padding_factor * XSIZE(img())) + 1) + 1;
+//				if (ZSIZE(img()) > 1) zeros.initZeros(pad_size, pad_size, pad_size/2 + 1);
+//				else zeros.initZeros(pad_size, pad_size/2 + 1);
+//				zeros.setXmippOrigin();
+//				zeros.xinit = 0;
+//				Igrad2.push_back(zeros);
+                Igrad2.push_back(img()*0.);
 			}
 		}
 	}

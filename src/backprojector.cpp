@@ -1774,6 +1774,87 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	}
 }
 
+void BackProjector::reweightGradRealSpace(
+        MultidimArray<RFLOAT> &mom1, RFLOAT lambda1,
+        MultidimArray<RFLOAT> &mom2, RFLOAT lambda2,
+        bool init_mom)
+{
+    const int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
+
+
+    MultidimArray<RFLOAT> grad;
+    if (ref_dim == 2)
+        grad.setDimensions(pad_size, pad_size, 1, 1);
+    else
+        grad.setDimensions(pad_size, pad_size, pad_size, 1);
+
+    FourierTransformer transformer;
+    transformer.setReal(grad);
+    MultidimArray<Complex>& Fconv = transformer.getFourierReference();
+    Fconv.initZeros();
+    Fconv.setXmippOrigin();
+    Fconv.xinit = 0;
+    MultidimArray<Complex> Fgrad(Fconv);
+
+    FOR_ALL_ELEMENTS_IN_ARRAY3D(data) // This will also work for 2D
+    {
+        if (k*k + i*i + j*j <= max_r2) {
+            if (A3D_ELEM(weight, k, i, j) > 0.)
+                A3D_ELEM(Fgrad, k, i, j) = A3D_ELEM(data, k, i, j) / A3D_ELEM(weight, k, i, j);
+            else
+                A3D_ELEM(Fgrad, k, i, j) = 0;
+        }
+    }
+
+    Projector::decenter(Fgrad, Fconv, max_r2);
+    windowToOridimRealSpace(transformer, grad, false);
+
+    if (init_mom)
+    {
+        if (lambda1 > 0)
+            FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mom1)
+            {
+                DIRECT_MULTIDIM_ELEM(mom1, n) = 0;
+            }
+
+        if (lambda2 > 0)
+            FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mom2)
+            {
+                DIRECT_MULTIDIM_ELEM(mom2, n) = 1;
+            }
+    }
+
+    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(grad)
+    {
+        RFLOAT g = DIRECT_MULTIDIM_ELEM(grad, n);
+        RFLOAT gm = g;
+
+        if (lambda1 > 0) {
+            RFLOAT m1 = lambda1 * DIRECT_MULTIDIM_ELEM(mom1, n) + (1 - lambda1) * g;
+            DIRECT_MULTIDIM_ELEM(mom1, n) = m1;
+            gm = m1;
+        }
+
+        if (lambda2 > 0) {
+            RFLOAT m2 = lambda2 * DIRECT_MULTIDIM_ELEM(mom2, n) + (1 - lambda2) * ABS(g);
+            DIRECT_MULTIDIM_ELEM(mom2, n) = m2;
+            gm /= (m2 + 1e-12);
+        }
+
+        DIRECT_MULTIDIM_ELEM(grad, n) = gm;
+    }
+
+    MultidimArray<RFLOAT> dummy;
+    Projector PPgrad(ori_size, interpolator, padding_factor, r_min_nn, data_dim);
+    PPgrad.computeFourierTransformMap(grad, dummy, r_max*2, 1, false);
+
+    FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
+    {
+        if (k * k + i * i + j * j < max_r2)
+            A3D_ELEM(data, k, i, j) = A3D_ELEM(PPgrad.data, k, i, j);
+    }
+}
+
 void BackProjector::reweightGrad(
 		MultidimArray<RFLOAT> &mom1, RFLOAT lambda1,
 		MultidimArray<RFLOAT> &mom2, RFLOAT lambda2,
@@ -1783,9 +1864,13 @@ void BackProjector::reweightGrad(
 
 	MultidimArray<RFLOAT> dummy;
 	Projector PPmom1(ori_size, interpolator, padding_factor, r_min_nn, data_dim);
+    Projector PPmom2(ori_size, interpolator, padding_factor, r_min_nn, data_dim);
 
 	if (lambda1 > 0.)
 		PPmom1.computeFourierTransformMap(mom1, dummy, r_max*2, 1, false);
+
+    if (lambda2 > 0.)
+        PPmom2.computeFourierTransformMap(mom2, dummy, r_max*2, 1, false);
 
     FOR_ALL_ELEMENTS_IN_ARRAY3D(data) // This will also work for 2D
 	{
@@ -1801,7 +1886,8 @@ void BackProjector::reweightGrad(
 				}
 				if (lambda2 > 0.)
 				{
-					A3D_ELEM(mom2, k, i, j) = 1e-12; //Some small value
+					A3D_ELEM(PPmom2.data, k, i, j).real = 1e-12; //Some small value
+                    A3D_ELEM(PPmom2.data, k, i, j).imag = 0;
 				}
 			}
 
@@ -1826,7 +1912,7 @@ void BackProjector::reweightGrad(
 				A3D_ELEM(data, k, i, j) = g;
 
 			if (lambda2 > 0.)
-				A3D_ELEM(mom2, k, i, j) = lambda2 * A3D_ELEM(mom2, k, i, j) +
+				A3D_ELEM(PPmom2.data, k, i, j).real = lambda2 * A3D_ELEM(PPmom2.data, k, i, j).real +
 						(1-lambda2) * sqrt(g.real*g.real + g.imag*g.imag);
 		}
 	}
@@ -1837,9 +1923,7 @@ void BackProjector::reweightGrad(
 		transformer.setReal(mom1);
 		MultidimArray<Complex>& Fconv = transformer.getFourierReference();
 		Projector::decenter(PPmom1.data, Fconv, max_r2);
-		RCTIC(ReconTimer,ReconS_17);
 		windowToOridimRealSpace(transformer, mom1, false);
-		RCTOC(ReconTimer,ReconS_17);
 	}
     
     RFLOAT eps = 1e-12;
@@ -1847,10 +1931,16 @@ void BackProjector::reweightGrad(
 	// Mom2 shell-wise normalisation
 	if (lambda2 > 0.)
 	{
+        FourierTransformer transformer;
+        transformer.setReal(mom2);
+        MultidimArray<Complex>& Fconv = transformer.getFourierReference();
+        Projector::decenter(PPmom2.data, Fconv, max_r2);
+        windowToOridimRealSpace(transformer, mom2, false);
+
 	    MultidimArray<RFLOAT> a(ori_size / 2 + 1);
 	    MultidimArray<RFLOAT> b(ori_size / 2 + 1);
 	    
-        FOR_ALL_ELEMENTS_IN_ARRAY3D(mom2)
+        FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
 		{
 			const int r2 = k * k + i * i + j * j;
 			if (r2 < max_r2)
@@ -1860,23 +1950,16 @@ void BackProjector::reweightGrad(
 			}
 		}
 
-#ifdef DEBUG_MOM2
-		std::ofstream myfile ("mom2_norm.txt");
-		if (myfile.is_open())
-			for(int i = 0; i < norm.nzyxdim; i ++)
-				myfile << DIRECT_A1D_ELEM(norm, i) << std::endl;
-#endif
-
         FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
         {
 			const int r2 = k * k + i * i + j * j;
 			if (r2 < max_r2)
 			{
 				int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
-				A3D_ELEM(data, k, i, j) /= A3D_ELEM(mom2, k, i, j) + eps;
+				A3D_ELEM(data, k, i, j) /= A3D_ELEM(PPmom2.data, k, i, j).real + eps;
 				DIRECT_A1D_ELEM(b, ires) += norm(A3D_ELEM(data, k, i, j));
 			}
-        }   
+        }
         
         FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
         {
@@ -1906,9 +1989,6 @@ void BackProjector::reconstructGrad(
 	MultidimArray<RFLOAT> dummy;
 	Projector PPref(ori_size, interpolator, padding_factor, r_min_nn, data_dim);
 	PPref.computeFourierTransformMap(vol_out, dummy, r_max*2, 1, false); // false means no gridding correction
-
-	Projector PPmom1(ori_size, interpolator, padding_factor, r_min_nn, data_dim);
-	Projector PPmom2(ori_size, interpolator, padding_factor, r_min_nn, data_dim);
 
 	// Set Fconv to the right size
 	if (ref_dim == 2)

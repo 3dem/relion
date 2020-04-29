@@ -357,6 +357,9 @@ public:
 	// (by default refs are kept the same during vmgd_nr_iter_initial and then slowly annealed during vmgd_nr_iter_inbetween)
 	bool do_vmgd_skip_anneal;
 
+	// Calculate and apply gradient in real space
+	bool do_vmgd_realspace;
+
 	// Momentum update parameter
 	RFLOAT mu;
 
