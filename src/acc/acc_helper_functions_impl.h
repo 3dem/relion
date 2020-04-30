@@ -737,7 +737,7 @@ void runBackProjectKernel(
 #ifdef CUDA
 				if(BP.mdlZ==1)
 					if(ctf_premultiplied)
-						cuda_kernel_backproject2D_SGD<false, true><<<imageCount, BP_REF3D_BLOCK_SIZE, 0, optStream>>>(
+						cuda_kernel_backproject2D_SGD<false, true><<<imageCount, BP_2D_BLOCK_SIZE, 0, optStream>>>(
 								projector, d_img_real, d_img_imag,
 								trans_x, trans_y,
 								d_weights, d_Minvsigma2s, d_ctfs,
@@ -747,7 +747,7 @@ void runBackProjectKernel(
 								imgX, imgY,
 								BP.mdlX, BP.mdlY, BP.mdlInitY);
 					else
-						cuda_kernel_backproject2D_SGD<false, false><<<imageCount, BP_REF3D_BLOCK_SIZE, 0, optStream>>>(
+						cuda_kernel_backproject2D_SGD<false, false><<<imageCount, BP_2D_BLOCK_SIZE, 0, optStream>>>(
 								projector, d_img_real, d_img_imag,
 								trans_x, trans_y,
 								d_weights, d_Minvsigma2s, d_ctfs,

@@ -681,69 +681,65 @@ __global__ void cuda_kernel_backproject2D_SGD(
         unsigned mdl_y,
         int mdl_inity)
 {
-    unsigned tid = threadIdx.x;
-    unsigned img = blockIdx.x;
+	unsigned tid = threadIdx.x;
+	unsigned img = blockIdx.x;
 
-    int img_y_half = img_y / 2;
+	int img_y_half = img_y / 2;
+	int max_r2_out = max_r2 * padding_factor * padding_factor;
 
-    int max_r2_vol = max_r2 * padding_factor * padding_factor;
+	__shared__ XFLOAT s_eulers[4];
 
-    __shared__ XFLOAT s_eulers[4];
-    XFLOAT minvsigma2, ctf, img_real, img_imag, Fweight, real, imag, weight;
+	XFLOAT minvsigma2, ctf, img_real, img_imag, Fweight, real, imag, weight;
 
-    if (tid == 0)
-        s_eulers[0] = g_eulers[img*9+0] * padding_factor;
-    else if (tid == 1)
-        s_eulers[1] = g_eulers[img*9+1] * padding_factor;
-    else if (tid == 2)
-        s_eulers[2] = g_eulers[img*9+3] * padding_factor;
-    else if (tid == 3)
-        s_eulers[3] = g_eulers[img*9+4] * padding_factor;
+	if (tid == 0)
+		s_eulers[0] = g_eulers[img*9+0] * padding_factor;
+	else if (tid == 1)
+		s_eulers[1] = g_eulers[img*9+1] * padding_factor;
+	else if (tid == 2)
+		s_eulers[2] = g_eulers[img*9+3] * padding_factor;
+	else if (tid == 3)
+		s_eulers[3] = g_eulers[img*9+4] * padding_factor;
 
-    __syncthreads();
+	__syncthreads();
 
-    int pixel_pass_num(0);
-    pixel_pass_num = (ceilf((float)(img_x*img_y)/(float)BP_REF3D_BLOCK_SIZE));
+	int pixel_pass_num(ceilf((float)(img_x*img_y)/(float)BP_2D_BLOCK_SIZE));
 
-    for (unsigned pass = 0; pass < pixel_pass_num; pass++)
-    {
-        unsigned pixel(0);
-        pixel = (pass * BP_REF3D_BLOCK_SIZE) + tid;
+	for (unsigned pass = 0; pass < pixel_pass_num; pass++)
+	{
+		unsigned pixel = (pass * BP_2D_BLOCK_SIZE) + tid;
 
-        if (pixel >= img_x*img_y)
-            continue;
+		if (pixel >= img_x*img_y)
+			continue;
 
-        int x,y,z,xy;
+		int x = pixel % img_x;
+		int y = (int)floorf( (float)pixel / (float)img_x);
 
-        x =             pixel % img_x;
-        y = floorfracf( pixel , img_x);
+		if (y > img_y_half)
+		{
+			y -= img_y;
+		}
 
-        if (y > img_y_half)
-        {
-            y = y - img_y;
-        }
+		//WAVG
+		minvsigma2 = __ldg(&g_Minvsigma2s[pixel]);
+		ctf = __ldg(&g_ctfs[pixel]);
+		img_real = __ldg(&g_img_real[pixel]);
+		img_imag = __ldg(&g_img_imag[pixel]);
+		Fweight = (XFLOAT) 0.0;
+		real = (XFLOAT) 0.0;
+		imag = (XFLOAT) 0.0;
 
-        XFLOAT ref_real = (XFLOAT) 0.0;
-        XFLOAT ref_imag = (XFLOAT) 0.0;
+		XFLOAT temp_real, temp_imag;
+
+		XFLOAT ref_real = (XFLOAT) 0.0;
+		XFLOAT ref_imag = (XFLOAT) 0.0;
 
         projector.project2Dmodel(
                 x,y,
                 s_eulers[0], s_eulers[1],
-                s_eulers[3], s_eulers[4],
+                s_eulers[2], s_eulers[3],
                 ref_real, ref_imag);
-
-        //WAVG
-        minvsigma2 = __ldg(&g_Minvsigma2s[pixel]);
-        ctf = __ldg(&g_ctfs[pixel]);
-        img_real = __ldg(&g_img_real[pixel]);
-        img_imag = __ldg(&g_img_imag[pixel]);
-        Fweight = (XFLOAT) 0.0;
-        real = (XFLOAT) 0.0;
-        imag = (XFLOAT) 0.0;
         ref_real *= ctf;
         ref_imag *= ctf;
-
-        XFLOAT temp_real, temp_imag;
 
         for (unsigned long itrans = 0; itrans < translation_num; itrans++)
         {
@@ -761,7 +757,10 @@ __global__ void cuda_kernel_backproject2D_SGD(
                     weight = (weight / weight_norm) * ctf * minvsigma2;
                     Fweight += weight * ctf;
                 }
-                translatePixel(x, y,    g_trans_x[itrans], g_trans_y[itrans], img_real, img_imag, temp_real, temp_imag);
+                translatePixel(x, y,
+                		g_trans_x[itrans], g_trans_y[itrans],
+                		img_real, img_imag,
+                		temp_real, temp_imag);
 
                 real += (temp_real-ref_real) * weight;
                 imag += (temp_imag-ref_imag) * weight;
@@ -769,59 +768,54 @@ __global__ void cuda_kernel_backproject2D_SGD(
         }
 
         //BP
-        if (Fweight > (XFLOAT) 0.0)
-        {
-            // Get logical coordinates in the 2D map
+	    if (Fweight > (XFLOAT) 0.0)
+	    {
+		    // Get logical coordinates in the 3D map
+		    XFLOAT xp = (s_eulers[0] * x + s_eulers[1] * y );
+		    XFLOAT yp = (s_eulers[2] * x + s_eulers[3] * y );
 
-            XFLOAT xp, yp, dd;
+		    // Only asymmetric half is stored
+		    if (xp < 0)
+		    {
+			    // Get complex conjugated hermitian symmetry pair
+			    xp = -xp;
+			    yp = -yp;
+			    imag = -imag;
+		    }
 
-            xp = (s_eulers[0] * x + s_eulers[1] * y ) * padding_factor;
-            yp = (s_eulers[3] * x + s_eulers[4] * y ) * padding_factor;
+		    int x0 = floorf(xp);
+		    XFLOAT fx = xp - x0;
+		    int x1 = x0 + 1;
 
-            if ( ( xp * xp + yp * yp ) > max_r2_vol)
-                continue;
+		    int y0 = floorf(yp);
+		    XFLOAT fy = yp - y0;
+		    y0 -= mdl_inity;
+		    int y1 = y0 + 1;
 
-            // Only asymmetric half is stored
-            if (xp < (XFLOAT) 0.0)
-            {
-                // Get complex conjugated hermitian symmetry pair
-                xp = -xp;
-                yp = -yp;
-                imag = -imag;
-            }
+		    XFLOAT mfx = (XFLOAT) 1.0 - fx;
+		    XFLOAT mfy = (XFLOAT) 1.0 - fy;
 
-            int x0 = floorf(xp);
-            XFLOAT fx = xp - x0;
-            int x1 = x0 + 1;
+		    XFLOAT dd00 = mfy * mfx;
+		    XFLOAT dd01 = mfy *  fx;
+		    XFLOAT dd10 =  fy * mfx;
+		    XFLOAT dd11 =  fy *  fx;
 
-            int y0 = floorf(yp);
-            XFLOAT fy = yp - y0;
-            y0 -= mdl_inity;
-            int y1 = y0 + 1;
+		    cuda_atomic_add(&g_model_real  [y0 * mdl_x + x0], dd00 * real);
+		    cuda_atomic_add(&g_model_imag  [y0 * mdl_x + x0], dd00 * imag);
+		    cuda_atomic_add(&g_model_weight[y0 * mdl_x + x0], dd00 * Fweight);
 
-            XFLOAT mfx = (XFLOAT)1.0 - fx;
-            XFLOAT mfy = (XFLOAT)1.0 - fy;
+		    cuda_atomic_add(&g_model_real  [y0 * mdl_x + x1], dd01 * real);
+		    cuda_atomic_add(&g_model_imag  [y0 * mdl_x + x1], dd01 * imag);
+		    cuda_atomic_add(&g_model_weight[y0 * mdl_x + x1], dd01 * Fweight);
 
-            dd = mfy * mfx;
-            cuda_atomic_add(&g_model_real  [y0 * mdl_x + x0], dd * real);
-            cuda_atomic_add(&g_model_imag  [y0 * mdl_x + x0], dd * imag);
-            cuda_atomic_add(&g_model_weight[y0 * mdl_x + x0], dd * Fweight);
+		    cuda_atomic_add(&g_model_real  [y1 * mdl_x + x0], dd10 * real);
+		    cuda_atomic_add(&g_model_imag  [y1 * mdl_x + x0], dd10 * imag);
+		    cuda_atomic_add(&g_model_weight[y1 * mdl_x + x0], dd10 * Fweight);
 
-            dd = mfy *  fx;
-            cuda_atomic_add(&g_model_real  [y0 * mdl_x + x1], dd * real);
-            cuda_atomic_add(&g_model_imag  [y0 * mdl_x + x1], dd * imag);
-            cuda_atomic_add(&g_model_weight[y0 * mdl_x + x1], dd * Fweight);
-
-            dd =  fy * mfx;
-            cuda_atomic_add(&g_model_real  [y1 * mdl_x + x0], dd * real);
-            cuda_atomic_add(&g_model_imag  [y1 * mdl_x + x0], dd * imag);
-            cuda_atomic_add(&g_model_weight[y1 * mdl_x + x0], dd * Fweight);
-
-            dd =  fy *  fx;
-            cuda_atomic_add(&g_model_real  [y1 * mdl_x + x1], dd * real);
-            cuda_atomic_add(&g_model_imag  [y1 * mdl_x + x1], dd * imag);
-            cuda_atomic_add(&g_model_weight[y1 * mdl_x + x1], dd * Fweight);
-        }
+		    cuda_atomic_add(&g_model_real  [y1 * mdl_x + x1], dd11 * real);
+		    cuda_atomic_add(&g_model_imag  [y1 * mdl_x + x1], dd11 * imag);
+		    cuda_atomic_add(&g_model_weight[y1 * mdl_x + x1], dd11 * Fweight);
+	    }
     }
 }
 
