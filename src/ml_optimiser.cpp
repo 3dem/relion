@@ -644,7 +644,6 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	mu = textToFloat(parser.getOption("--mu", "Momentum parameter for SGD updates", "0.9"));
 	vmgd_stepsize = textToFloat(parser.getOption("--vmgd_stepsize", "Step size parameter for SGD updates", "0.5"));
     do_vmgd_realspace = parser.checkOption("--vmgd_realspace", "Claculate and apply gradient in real space.");
-	do_vmgd_skip_anneal = !parser.checkOption("--vmgd_anneal", "Keep multiple references similar during the initial iterations.");
 	write_every_vmgd_iter = textToInteger(parser.getOption("--vmgd_write_iter", "Write out model every so many iterations in SGD (default is writing out all iters)", "1"));
 
 	// Computation stuff
@@ -4142,28 +4141,6 @@ void MlOptimiser::maximizationOtherParameters()
 	// in that case we need to leave all parameters as they were
 	if (sum_weight < XMIPP_EQUAL_ACCURACY)
 		return;
-
-
-	// Annealing of multiple-references in SGD
-	if (do_vmgd && !do_vmgd_skip_anneal && mymodel.nr_classes > 1 && iter < vmgd_ini_iter + vmgd_inbetween_iter)
-	{
-		MultidimArray<RFLOAT> Iavg;
-		Iavg.initZeros(mymodel.Iref[0]);
-		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
-			Iavg += mymodel.Iref[iclass];
-		Iavg /= (RFLOAT)mymodel.nr_classes;
-
-		int diffiter = XMIPP_MAX(0, iter - vmgd_ini_iter);
-		RFLOAT frac = RFLOAT(diffiter)/RFLOAT(vmgd_inbetween_iter);
-		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
-		{
-			 FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iavg)
-			 {
-					 DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n) *= frac;
-					 DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n) += (1.-frac)*DIRECT_MULTIDIM_ELEM(Iavg, n);
-			 }
-		}
-	}
 
 	// Update average norm_correction, don't update norm corrections anymore for multi-body refinements!
 	if (do_norm_correction  && mymodel.nr_bodies == 1)

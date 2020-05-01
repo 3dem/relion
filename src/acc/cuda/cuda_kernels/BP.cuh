@@ -655,7 +655,7 @@ __global__ void cuda_kernel_backproject3D_SGD(
 }
 
 
-template < bool DATA3D, bool CTF_PREMULTIPLIED >
+template < bool CTF_PREMULTIPLIED >
 __global__ void cuda_kernel_backproject2D_SGD(
         AccProjectorKernel projector,
         XFLOAT *g_img_real,
@@ -677,8 +677,8 @@ __global__ void cuda_kernel_backproject2D_SGD(
         XFLOAT padding_factor,
         unsigned img_x,
         unsigned img_y,
+        unsigned img_xy,
         unsigned mdl_x,
-        unsigned mdl_y,
         int mdl_inity)
 {
 	unsigned tid = threadIdx.x;
@@ -702,13 +702,13 @@ __global__ void cuda_kernel_backproject2D_SGD(
 
 	__syncthreads();
 
-	int pixel_pass_num(ceilf((float)(img_x*img_y)/(float)BP_2D_BLOCK_SIZE));
+	int pixel_pass_num(ceilf((float)img_xy/(float)BP_2D_BLOCK_SIZE));
 
 	for (unsigned pass = 0; pass < pixel_pass_num; pass++)
 	{
 		unsigned pixel = (pass * BP_2D_BLOCK_SIZE) + tid;
 
-		if (pixel >= img_x*img_y)
+		if (pixel >= img_xy)
 			continue;
 
 		int x = pixel % img_x;
@@ -733,34 +733,32 @@ __global__ void cuda_kernel_backproject2D_SGD(
 		XFLOAT ref_real = (XFLOAT) 0.0;
 		XFLOAT ref_imag = (XFLOAT) 0.0;
 
-        projector.project2Dmodel(
-                x,y,
-                s_eulers[0], s_eulers[1],
-                s_eulers[2], s_eulers[3],
-                ref_real, ref_imag);
-        ref_real *= ctf;
-        ref_imag *= ctf;
+		projector.project2Dmodel(
+			x,y,
+			s_eulers[0], s_eulers[1],
+			s_eulers[2], s_eulers[3],
+			ref_real, ref_imag);
+		ref_real *= ctf;
+		ref_imag *= ctf;
 
-        for (unsigned long itrans = 0; itrans < translation_num; itrans++)
-        {
-            weight = g_weights[img * translation_num + itrans];
+		for (unsigned long itrans = 0; itrans < translation_num; itrans++)
+		{
+			weight = g_weights[img * translation_num + itrans];
 
-            if (weight >= significant_weight)
-            {
-                if(CTF_PREMULTIPLIED)
-                {
-                    weight = (weight / weight_norm) * minvsigma2;
-                    Fweight += weight * ctf * ctf;
-                }
-                else
-                {
-                    weight = (weight / weight_norm) * ctf * minvsigma2;
-                    Fweight += weight * ctf;
-                }
-                translatePixel(x, y,
-                		g_trans_x[itrans], g_trans_y[itrans],
-                		img_real, img_imag,
-                		temp_real, temp_imag);
+			if (weight >= significant_weight)
+			{
+				if(CTF_PREMULTIPLIED)
+				{
+					weight = (weight / weight_norm) * minvsigma2;
+					Fweight += weight * ctf * ctf;
+				}
+				else
+				{
+					weight = (weight / weight_norm) * ctf * minvsigma2;
+					Fweight += weight * ctf;
+				}
+
+				translatePixel(x, y, g_trans_x[itrans], g_trans_y[itrans], img_real, img_imag, temp_real, temp_imag);
 
                 real += (temp_real-ref_real) * weight;
                 imag += (temp_imag-ref_imag) * weight;
@@ -773,6 +771,9 @@ __global__ void cuda_kernel_backproject2D_SGD(
 		    // Get logical coordinates in the 3D map
 		    XFLOAT xp = (s_eulers[0] * x + s_eulers[1] * y );
 		    XFLOAT yp = (s_eulers[2] * x + s_eulers[3] * y );
+
+		    if ( ( xp * xp + yp * yp ) > max_r2_out)
+			    continue;
 
 		    // Only asymmetric half is stored
 		    if (xp < 0)

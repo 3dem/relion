@@ -640,26 +640,50 @@ void runBackProjectKernel(
 	if(BP.mdlZ==1)
 	{
 #ifdef CUDA
-		if(ctf_premultiplied)
-			cuda_kernel_backproject2D<true><<<imageCount,BP_2D_BLOCK_SIZE,0,optStream>>>(
-				d_img_real, d_img_imag,
-				trans_x, trans_y,
-				d_weights, d_Minvsigma2s, d_ctfs,
-				translation_num, significant_weight, weight_norm, d_eulers,
-				BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
-				BP.maxR, BP.maxR2, BP.padding_factor,
-				imgX, imgY, imgX*imgY,
-				BP.mdlX, BP.mdlInitY);
+		if(do_sgd)
+			if(ctf_premultiplied)
+				cuda_kernel_backproject2D_SGD<true><<<imageCount, BP_2D_BLOCK_SIZE, 0, optStream>>>(
+						projector,
+						d_img_real, d_img_imag,
+						trans_x, trans_y,
+						d_weights, d_Minvsigma2s, d_ctfs,
+						translation_num, significant_weight, weight_norm, d_eulers,
+						BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+						BP.maxR, BP.maxR2, BP.padding_factor,
+						imgX, imgY, imgX*imgY,
+						BP.mdlX, BP.mdlInitY);
+			else
+				cuda_kernel_backproject2D_SGD<false><<<imageCount, BP_2D_BLOCK_SIZE, 0, optStream>>>(
+						projector,
+						d_img_real, d_img_imag,
+						trans_x, trans_y,
+						d_weights, d_Minvsigma2s, d_ctfs,
+						translation_num, significant_weight, weight_norm, d_eulers,
+						BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+						BP.maxR, BP.maxR2, BP.padding_factor,
+						imgX, imgY, imgX*imgY,
+						BP.mdlX, BP.mdlInitY);
 		else
-			cuda_kernel_backproject2D<false><<<imageCount,BP_2D_BLOCK_SIZE,0,optStream>>>(
-				d_img_real, d_img_imag,
-				trans_x, trans_y,
-				d_weights, d_Minvsigma2s, d_ctfs,
-				translation_num, significant_weight, weight_norm, d_eulers,
-				BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
-				BP.maxR, BP.maxR2, BP.padding_factor,
-				imgX, imgY, imgX*imgY,
-				BP.mdlX, BP.mdlInitY);
+			if(ctf_premultiplied)
+				cuda_kernel_backproject2D<true><<<imageCount,BP_2D_BLOCK_SIZE,0,optStream>>>(
+					d_img_real, d_img_imag,
+					trans_x, trans_y,
+					d_weights, d_Minvsigma2s, d_ctfs,
+					translation_num, significant_weight, weight_norm, d_eulers,
+					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+					BP.maxR, BP.maxR2, BP.padding_factor,
+					imgX, imgY, imgX*imgY,
+					BP.mdlX, BP.mdlInitY);
+			else
+				cuda_kernel_backproject2D<false><<<imageCount,BP_2D_BLOCK_SIZE,0,optStream>>>(
+					d_img_real, d_img_imag,
+					trans_x, trans_y,
+					d_weights, d_Minvsigma2s, d_ctfs,
+					translation_num, significant_weight, weight_norm, d_eulers,
+					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+					BP.maxR, BP.maxR2, BP.padding_factor,
+					imgX, imgY, imgX*imgY,
+					BP.mdlX, BP.mdlInitY);
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 #else
 	if(ctf_premultiplied)
@@ -735,48 +759,26 @@ void runBackProjectKernel(
 #endif
 			else
 #ifdef CUDA
-				if(BP.mdlZ==1)
-					if(ctf_premultiplied)
-						cuda_kernel_backproject2D_SGD<false, true><<<imageCount, BP_2D_BLOCK_SIZE, 0, optStream>>>(
-								projector, d_img_real, d_img_imag,
-								trans_x, trans_y,
-								d_weights, d_Minvsigma2s, d_ctfs,
-								translation_num, significant_weight, weight_norm, d_eulers,
-								BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
-								BP.maxR, BP.maxR2, BP.padding_factor,
-								imgX, imgY,
-								BP.mdlX, BP.mdlY, BP.mdlInitY);
-					else
-						cuda_kernel_backproject2D_SGD<false, false><<<imageCount, BP_2D_BLOCK_SIZE, 0, optStream>>>(
-								projector, d_img_real, d_img_imag,
-								trans_x, trans_y,
-								d_weights, d_Minvsigma2s, d_ctfs,
-								translation_num, significant_weight, weight_norm, d_eulers,
-								BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
-								BP.maxR, BP.maxR2, BP.padding_factor,
-								imgX, imgY,
-								BP.mdlX, BP.mdlY, BP.mdlInitY);
-				else
-			        if(ctf_premultiplied)
-						cuda_kernel_backproject3D_SGD<false, true><<<imageCount, BP_REF3D_BLOCK_SIZE, 0, optStream>>>(
-				                projector, d_img_real, d_img_imag,
-				                trans_x, trans_y, trans_z,
-				                d_weights, d_Minvsigma2s, d_ctfs,
-				                translation_num, significant_weight, weight_norm, d_eulers,
-				                BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
-				                BP.maxR, BP.maxR2, BP.padding_factor,
-				                imgX, imgY, imgZ, imgX * imgY * imgZ,
-				                BP.mdlX, BP.mdlY, BP.mdlInitY, BP.mdlInitZ);
-				    else
-				        cuda_kernel_backproject3D_SGD<false, false><<<imageCount, BP_REF3D_BLOCK_SIZE, 0, optStream>>>(
-				                projector, d_img_real, d_img_imag,
-				                trans_x, trans_y, trans_z,
-				                d_weights, d_Minvsigma2s, d_ctfs,
-				                translation_num, significant_weight, weight_norm, d_eulers,
-				                BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
-				                BP.maxR, BP.maxR2, BP.padding_factor,
-				                imgX, imgY, imgZ, imgX * imgY * imgZ,
-				                BP.mdlX, BP.mdlY, BP.mdlInitY, BP.mdlInitZ);
+		        if(ctf_premultiplied)
+					cuda_kernel_backproject3D_SGD<false, true><<<imageCount, BP_REF3D_BLOCK_SIZE, 0, optStream>>>(
+			                projector, d_img_real, d_img_imag,
+			                trans_x, trans_y, trans_z,
+			                d_weights, d_Minvsigma2s, d_ctfs,
+			                translation_num, significant_weight, weight_norm, d_eulers,
+			                BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+			                BP.maxR, BP.maxR2, BP.padding_factor,
+			                imgX, imgY, imgZ, imgX * imgY * imgZ,
+			                BP.mdlX, BP.mdlY, BP.mdlInitY, BP.mdlInitZ);
+			    else
+			        cuda_kernel_backproject3D_SGD<false, false><<<imageCount, BP_REF3D_BLOCK_SIZE, 0, optStream>>>(
+			                projector, d_img_real, d_img_imag,
+			                trans_x, trans_y, trans_z,
+			                d_weights, d_Minvsigma2s, d_ctfs,
+			                translation_num, significant_weight, weight_norm, d_eulers,
+			                BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+			                BP.maxR, BP.maxR2, BP.padding_factor,
+			                imgX, imgY, imgZ, imgX * imgY * imgZ,
+			                BP.mdlX, BP.mdlY, BP.mdlInitY, BP.mdlInitZ);
 
 #else
 				if(ctf_premultiplied)
