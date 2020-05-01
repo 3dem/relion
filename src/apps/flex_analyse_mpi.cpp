@@ -41,7 +41,6 @@ int main(int argc, char *argv[])
 
 		prm.initialise();
 		prm.run(rank, size);
-
 	}
 
 	catch (RelionError XE)

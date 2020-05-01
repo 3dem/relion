@@ -2919,7 +2919,7 @@ void MlOptimiser::expectation()
 
 	long int my_nr_particles = (subset_size > 0) ? subset_size : mydata.numberOfParticles();
 	int barstep = XMIPP_MAX(1, my_nr_particles / 60);
-    long int prev_barstep = 0;
+	long int prev_barstep = 0;
 	long int my_first_part_id = 0.;
 	long int my_last_part_id = my_nr_particles - 1;
 	long int nr_particles_done = 0;
@@ -9059,7 +9059,6 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 	}
 	else if (do_sgd)
 	{
-
 		// Do sgd_ini_iter iterations with completely identical K references, sigd_ini_subset_size, enforce non-negativity and sgd_ini_resol resolution limit
 		if (iter < sgd_ini_iter)
 		{
@@ -9073,13 +9072,12 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 		{
 			subset_size = sgd_fin_subset_size;
 		}
-
-
+		if (subset_size > mydata.numberOfParticles())
+			subset_size = -1;
 	}
 
 	if (myverb && subset_size != old_subset_size)
 		std::cout << " Setting subset size to " << subset_size << " particles" << std::endl;
-
 }
 
 void MlOptimiser::checkConvergence(bool myverb)

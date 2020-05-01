@@ -452,12 +452,10 @@ void flipRotPsiTiltPriorsForHelicalSegment(
 		RFLOAT old_rot,
 		RFLOAT old_psi,
 		RFLOAT old_tilt,
-		RFLOAT old_pitch,
 		bool old_psi_prior_flip,
 		RFLOAT& new_rot,
 		RFLOAT& new_psi,
 		RFLOAT& new_tilt,
-		RFLOAT& new_pitch,
 		bool& new_psi_prior_flip);
 
 // KThurber add this function
