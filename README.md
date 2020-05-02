@@ -55,7 +55,8 @@ do this (not officially supported).
 
 Another useful tool is `relion_eer_to_tiff`, which renders an EER movie into a compressed integer TIFF.
 Due to the different meanings of the gain reference for EER and TIFF, you have to take the inverse
-of the EER gain reference yourself before processing the resulting TIFF files.
+of the EER gain reference yourself before processing the resulting TIFF files. This functionality
+might be merged into `relion_convert_to_tiff` in future.
 
 ## Installation
 
