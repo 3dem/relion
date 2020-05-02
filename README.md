@@ -16,6 +16,8 @@ The more comprehensive documentation of RELION is stored on the [Wiki](http://ww
 This is a special branch for processing movies in the EER format.
 Once the development is complete, this will be merged into the main branch.
 
+**EER format is in development. The following information is subject to change.**
+
 To process EER dataset, proceed as follows.
 
 1. Decide how many (internal) frames to group into a fraction.
