@@ -365,6 +365,9 @@ public:
 
 	// Step size of the gradient updates
 	RFLOAT vmgd_stepsize;
+	RFLOAT vmgd_ini_stepsize;
+	RFLOAT vmgd_fin_stepsize;
+
 
 	// Size of the random subsets
 	long int subset_size;

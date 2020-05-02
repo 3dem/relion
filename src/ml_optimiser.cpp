@@ -642,9 +642,14 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	vmgd_ini_subset_size = textToInteger(parser.getOption("--vmgd_ini_subset", "Mini-batch size during the initial SGD iterations", "100"));
 	vmgd_fin_subset_size = textToInteger(parser.getOption("--vmgd_fin_subset", "Mini-batch size during the final SGD iterations", "500"));
 	mu = textToFloat(parser.getOption("--mu", "Momentum parameter for SGD updates", "0.9"));
-	vmgd_stepsize = textToFloat(parser.getOption("--vmgd_stepsize", "Step size parameter for SGD updates", "0.5"));
+	vmgd_ini_stepsize = textToFloat(parser.getOption("--vmgd_ini_stepsize", "Step size parameter for initial gradient updates.", "0.5"));
+	vmgd_fin_stepsize = textToFloat(parser.getOption("--vmgd_fin_stepsize", "Step size parameter for final gradient updates.", "0.05"));
     do_vmgd_realspace = parser.checkOption("--vmgd_realspace", "Claculate and apply gradient in real space.");
 	write_every_vmgd_iter = textToInteger(parser.getOption("--vmgd_write_iter", "Write out model every so many iterations in SGD (default is writing out all iters)", "1"));
+	do_som = textToInteger(parser.getOption("--som", "Calculate self-organizing map instead of classification.", "1"));
+
+	if (do_som)
+		som
 
 	// Computation stuff
 	// The number of threads is always read from the command line
@@ -892,8 +897,6 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 		do_vmgd_skip_anneal = false;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_SUBSET_SIZE, subset_size))
 		subset_size = -1;
-	if (!MD.getValue(EMDL_OPTIMISER_SGD_STEPSIZE, vmgd_stepsize))
-		vmgd_stepsize = 0.5;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, write_every_vmgd_iter))
 		write_every_vmgd_iter = 1;
 	if (!MD.getValue(EMDL_BODY_STAR_FILE, fn_body_masks))
@@ -2883,7 +2886,9 @@ void MlOptimiser::expectation()
 		{
 			std::cout << " Variable-metric Gradient Descent iteration " << iter << " of " << nr_iter;
 			if (my_nr_particles < mydata.numberOfParticles())
-				std::cout << " (with " << my_nr_particles << " particles)";
+				std::cout << " with " << my_nr_particles << " particles";
+			if (do_vmgd)
+				std::cout << " and stepsize " << vmgd_stepsize;
 		}
 		else
 		{
@@ -8713,21 +8718,21 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 		if (iter < vmgd_ini_iter)
 		{
 			subset_size = vmgd_ini_subset_size;
+			vmgd_stepsize = vmgd_ini_stepsize;
 		}
 		else if (iter < vmgd_ini_iter + vmgd_inbetween_iter)
 		{
 			subset_size = vmgd_ini_subset_size + ROUND((RFLOAT(iter - vmgd_ini_iter)/RFLOAT(vmgd_inbetween_iter))*(vmgd_fin_subset_size-vmgd_ini_subset_size));
+			vmgd_stepsize = vmgd_ini_stepsize + (RFLOAT(iter - vmgd_ini_iter)/RFLOAT(vmgd_inbetween_iter)*(vmgd_fin_stepsize-vmgd_ini_stepsize));
 		}
 		else
 		{
 			subset_size = vmgd_fin_subset_size;
+			vmgd_stepsize = vmgd_fin_stepsize;
 		}
 
 
 	}
-
-	if (myverb && subset_size != old_subset_size)
-		std::cout << " Setting subset size to " << subset_size << " particles" << std::endl;
 
 }
 
