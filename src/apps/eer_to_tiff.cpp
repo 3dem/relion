@@ -33,8 +33,9 @@ class EERtoTIFF {
 		max_frames = textToInteger(parser.getOption("--max_frames", "Target number of (internal) frames to process (-1 means use all)", "-1"));
 		eer_grouping = textToInteger(parser.getOption("--eer_grouping", "EER grouping", "40"));
 		eer_upsampling = textToInteger(parser.getOption("--eer_upsampling", "EER upsampling (1 = 4K or 2 = 8K)", "2"));
-		if (eer_upsampling != 1 && eer_upsampling != 2)
-			REPORT_ERROR("eer_upsampling must be 1 or 2");
+		// --eer_upsampling 3 is only for debugging. Hidden.
+		if (eer_upsampling != 1 && eer_upsampling != 2 && eer_upsampling != 3)
+			REPORT_ERROR("eer_upsampling must be 1, 2 or 3");
 		FileName fn_compression = parser.getOption("--compression", "compresion (none, lzw, deflate=zip)", "lzw");
 		use_short = parser.checkOption("--short", "use unsigned short instead of signed byte");
 

@@ -50,11 +50,23 @@ void RELION_TIFFWarningHandler(const char* module, const char* fmt, va_list ap)
 #endif
 
 template <typename T>
+void EERRenderer::render16K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons)
+{
+	for (int i = 0; i < n_electrons; i++)
+	{
+		int x = ((positions[i] & 4095) << 2) | (symbols[i] & 3); // 4095 = 111111111111b, 3 = 00000011b
+		int y = ((positions[i] >> 12) << 2) | (symbols[i] & 12); //  4096 = 2^12, 12 = 00001100b
+			DIRECT_A2D_ELEM(image, y, x)++;
+	}
+}
+
+
+template <typename T>
 void EERRenderer::render8K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons)
 {
 	for (int i = 0; i < n_electrons; i++)
 	{
-		int x = ((positions[i] & 4095) << 1) | ((symbols[i] & 2) >> 1); // 4095 = 111111111111b, 3 = 00000010b
+		int x = ((positions[i] & 4095) << 1) | ((symbols[i] & 2) >> 1); // 4095 = 111111111111b, 2 = 00000010b
 		int y = ((positions[i] >> 12) << 1) | ((symbols[i] & 8) >> 3); //  4096 = 2^12, 8 = 00001000b
 			DIRECT_A2D_ELEM(image, y, x)++;
 	}
@@ -86,12 +98,12 @@ void EERRenderer::read(FileName _fn_movie, int eer_upsampling)
 	if (ready)
 		REPORT_ERROR("Logic error: you cannot recycle EERRenderer for multiple files (now)");
 
-	if (eer_upsampling == 1 || eer_upsampling == 2)
+	if (eer_upsampling == 1 || eer_upsampling == 2 || eer_upsampling == 3)
 		this->eer_upsampling = eer_upsampling;
 	else
 	{
 		std::cerr << "EERRenderer::read: eer_upsampling = " << eer_upsampling << std::endl;
-		REPORT_ERROR("EERRenderer::read: eer_upsampling must be 1 or 2.");
+		REPORT_ERROR("EERRenderer::read: eer_upsampling must be 1, 2 or 3.");
 	}
 
 #ifndef HAVE_TIFF
@@ -135,13 +147,14 @@ void EERRenderer::read(FileName _fn_movie, int eer_upsampling)
 		printf("EER in TIFF: %s size = %ld, width = %d, height = %d, compression = %d\n", fn_movie.c_str(), file_size, width, height, compression);
 #endif
 
-		// TODO: How can we suppress "TIFFReadDirectory: Warning, Unknown field with tag 65001 (0xfde9) encountered"?
+		// TIA can write an EER file whose first page is a sum and compressoin == 1.
+		// This is not supported (yet). EPU never writes such movies.
 		if (compression == EERRenderer::TIFF_COMPRESSION_EER8bit)
 			is_7bit = false;
 		else if (compression == EERRenderer::TIFF_COMPRESSION_EER7bit)
 			is_7bit = true;
 		else
-			REPORT_ERROR("Unknown compression scheme for EER");
+			REPORT_ERROR("Unknown compression scheme for EER " + integerToString(compression));
 
 		if (width != EER_IMAGE_WIDTH || height != EER_IMAGE_HEIGHT)
 			REPORT_ERROR("Currently we support only 4096x4096 pixel EER movies.");
@@ -414,7 +427,9 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 		RCTOC(TIMING_UNPACK_RLE);
 
 		RCTIC(TIMING_RENDER_ELECTRONS);
-		if (eer_upsampling == 2)
+		if (eer_upsampling == 3)
+			render16K(image, positions, symbols, n_electron);
+		else if (eer_upsampling == 2)
 			render8K(image, positions, symbols, n_electron);
 		else if (eer_upsampling == 1)
 			render4K(image, positions, symbols, n_electron);

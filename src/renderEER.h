@@ -41,6 +41,9 @@ class EERRenderer {
 	void lazyReadFrames();
 
 	template <typename T>
+	void render16K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons);
+
+	template <typename T>
 	void render8K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons);
 
 	template <typename T>
