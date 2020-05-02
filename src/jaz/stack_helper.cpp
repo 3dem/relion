@@ -289,7 +289,7 @@ std::vector<std::vector<Image<RFLOAT> > > StackHelper::loadMovieStack(const Meta
 std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 		const MetaDataTable* mdt,
 		Image<RFLOAT>* gainRef, MultidimArray<bool>* defectMask, std::string movieFn,
-		double outPs, double coordsPs, double moviePs,
+		double outPs, double coordsPs, double moviePs, double dataPs,
 		int squareSize, int threads, // squareSize is the output box size in pixels after downsampling to outPs
 		bool loadData, int firstFrame, int lastFrame,
 		RFLOAT hot, bool verbose, bool saveMemory,
@@ -305,10 +305,10 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 	if (verbose)
 	{
 		std::cout << "size: "
-				  << mgStack().xdim << "x"
-				  << mgStack().ydim << "x"
-				  << mgStack().zdim << "x"
-				  << mgStack().ndim << "\n";
+			  << mgStack().xdim << "x"
+			  << mgStack().ydim << "x"
+			  << mgStack().zdim << "x"
+			  << mgStack().ndim << "\n";
 	}
 
 	const bool dataInZ = mgStack.data.zdim > 1;
@@ -318,6 +318,8 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 	const int fcM = dataInZ? mgStack.data.zdim : mgStack.data.ndim;
 	// lastFrame and firstFrame is 0 indexed, while fcM is 1-indexed
 	const int fc = lastFrame > 0? lastFrame - firstFrame + 1 : fcM - firstFrame;
+
+	if (dataPs < 0) dataPs = outPs;
 
 	if (fcM <= lastFrame)
 	{
@@ -355,6 +357,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 	if (!loadData) return out;
 
 	const int sqMg = 2*(int)(0.5 * squareSize * outPs / moviePs + 0.5);
+	// This should be equal to s_mov in frame_recombiner
 
 	if (verbose)
 	{
@@ -469,12 +472,11 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 			mdt->getValue(EMDL_IMAGE_COORD_X, xpC, p);
 			mdt->getValue(EMDL_IMAGE_COORD_Y, ypC, p);
 
-			// TAKANORI: TODO: BUG? Probably this causes 1 px error when outPS changes
-			const double xpO = (int)(coordsPs * xpC / outPs) - squareSize/2;
-			const double ypO = (int)(coordsPs * ypC / outPs) - squareSize/2;
+			const double xpO = (int)(coordsPs * xpC / dataPs);
+			const double ypO = (int)(coordsPs * ypC / dataPs);
 
-			int x0 = (int)round(xpO * outPs / moviePs);
-			int y0 = (int)round(ypO * outPs / moviePs);
+			int x0 = (int)round(xpO * dataPs / moviePs) - sqMg / 2;
+			int y0 = (int)round(ypO * dataPs / moviePs) - sqMg / 2;
 
 			if (offsets_in != 0 && offsets_out != 0)
 			{
@@ -528,7 +530,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 // TAKANORI: TODO: Code duplication with above will be sorted out later!
 std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 		const MetaDataTable* mdt, std::vector<MultidimArray<float> > &Iframes,
-		double outPs, double coordsPs, double moviePs,
+		double outPs, double coordsPs, double moviePs, double dataPs,
 		int squareSize, int threads,
 		bool loadData,
 		bool verbose,
@@ -543,6 +545,8 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 		REPORT_ERROR("Empty Iframes passed to StackHelper::extractMovieStackFS");
 	const int w0 = Iframes[0].xdim;
 	const int h0 = Iframes[0].ydim;
+
+	if (dataPs < 0) dataPs = outPs;
 
 	if (verbose)
 	{
@@ -597,11 +601,11 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 			mdt->getValue(EMDL_IMAGE_COORD_X, xpC, p);
 			mdt->getValue(EMDL_IMAGE_COORD_Y, ypC, p);
 
-			const double xpO = (int)(coordsPs * xpC / outPs) - squareSize/2;
-			const double ypO = (int)(coordsPs * ypC / outPs) - squareSize/2;
+			const double xpO = (int)(coordsPs * xpC / dataPs);
+			const double ypO = (int)(coordsPs * ypC / dataPs);
 
-			int x0 = (int)round(xpO * outPs / moviePs);
-			int y0 = (int)round(ypO * outPs / moviePs);
+			int x0 = (int)round(xpO * dataPs / moviePs) - sqMg / 2;
+			int y0 = (int)round(ypO * dataPs / moviePs) - sqMg / 2;
 
 			if (offsets_in != 0 && offsets_out != 0)
 			{

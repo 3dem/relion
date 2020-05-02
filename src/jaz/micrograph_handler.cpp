@@ -396,13 +396,13 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 		const MetaDataTable &mdt, int s,
 		double angpix, std::vector<ParFourierTransformer>& fts,
 		const std::vector<std::vector<gravis::d2Vector>>* offsets_in,
-		std::vector<std::vector<gravis::d2Vector>>* offsets_out)
+		std::vector<std::vector<gravis::d2Vector>>* offsets_out,
+		double data_angpix)
 {
 	if (!ready)
 	{
 		REPORT_ERROR("ERROR: MicrographHandler::loadMovie - MicrographHandler not initialized.");
 	}
-
 	std::vector<std::vector<Image<Complex>>> movie;
 
 	const int nr_omp_threads = fts.size();
@@ -463,7 +463,7 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 #define OLD_CODE
 #ifdef OLD_CODE
 			movie = StackHelper::extractMovieStackFS(&mdt, mgHasGain? &lastGainRef : 0, hasDefect ? &defectMask : 0,
-			                                         mgFn, angpix, coords_angpix, movie_angpix, s,
+			                                         mgFn, angpix, coords_angpix, movie_angpix, data_angpix, s,
 			                                         nr_omp_threads, true, firstFrame, lastFrame,
 			                                         hotCutoff, debug, saveMem, offsets_in, offsets_out);
 #else
@@ -489,7 +489,7 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 				Iframes[iframe] = img();
 			}
 
-			movie = StackHelper::extractMovieStackFS(&mdt, Iframes, angpix, coords_angpix, movie_angpix, s,
+			movie = StackHelper::extractMovieStackFS(&mdt, Iframes, angpix, coords_angpix, movie_angpix, data_angpix, s,
 			                                         nr_omp_threads, true,
 			                                         debug, offsets_in, offsets_out);
 #endif
@@ -619,7 +619,7 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 #endif
 			}
 
-			movie = StackHelper::extractMovieStackFS(&mdt, Iframes, angpix, coords_angpix, movie_angpix, s,
+			movie = StackHelper::extractMovieStackFS(&mdt, Iframes, angpix, coords_angpix, movie_angpix, data_angpix, s,
 			                                         nr_omp_threads, true,
 			                                         debug, offsets_in, offsets_out);
 		}
@@ -647,10 +647,11 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 		std::vector<std::vector<d2Vector>>& tracks,
 		bool unregGlob, std::vector<d2Vector>& globComp,
 		const std::vector<std::vector<gravis::d2Vector>>* offsets_in,
-		std::vector<std::vector<gravis::d2Vector>>* offsets_out)
+		std::vector<std::vector<gravis::d2Vector>>* offsets_out,
+		double data_angpix)
 {
 	std::vector<std::vector<Image<Complex>>> out = loadMovie(
-				mdt, s, angpix, fts, offsets_in, offsets_out);
+				mdt, s, angpix, fts, offsets_in, offsets_out, data_angpix);
 
 	if (!hasCorrMic)
 	{
