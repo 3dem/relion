@@ -368,9 +368,12 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 				CTF ctf;
 				ctf.readByGroup(mdtOut, obsModel, p);
 				int og = obsModel->getOpticsGroup(mdtOut, p);
-	 			if (obsModel->getBoxSize(og) != s_out[og])
+				#pragma omp critical(FrameRecombiner_process)
 				{
-					obsModel->setBoxSize(og, s_out[og]);
+	 				if (obsModel->getBoxSize(og) != s_out[og])
+						obsModel->setBoxSize(og, s_out[og]);
+					if (obsModel->getPixelSize(og) != angpix_out[og])
+						obsModel->setPixelSize(og, angpix_out[og]);
 				}
 
 				MultidimArray<RFLOAT> Fctf;

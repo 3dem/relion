@@ -378,7 +378,7 @@ void MovieReconstructor::backproject(int rank, int size)
 				Iparticle().initZeros(movie_boxsize, movie_boxsize);
 
 				// Revised code: use data_angpix
-				// pixel coordinate of the top left corner of the extractio box after down-sampling
+				// pixel coordinate of the top left corner of the extraction box after down-sampling
 				double xpO = (int)(coord_x * coord_angpix / data_angpix);
 				double ypO = (int)(coord_y * coord_angpix / data_angpix);
 				// pixel coordinate in the movie
@@ -494,7 +494,7 @@ void MovieReconstructor::backprojectOneParticle(MetaDataTable &mdt, long int p, 
 	// (to avoid creating an Ewald ellipsoid)
 	const bool ctf_premultiplied = false;
 	const int opticsGroup = obsModel.getOpticsGroup(mdt, p);
-	#pragma omp critical
+	#pragma omp critical(MovieReconstructor_backprojectOneParticle)
 	{
 		if (obsModel.getPixelSize(opticsGroup) != angpix)
 			obsModel.setPixelSize(opticsGroup, angpix);

@@ -403,15 +403,21 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 				                 << "supported for square images.\n");
 			}
 
-			const Image<RFLOAT>& gammaOffset = obsModel->getGammaOffset(opticsGroup, oriydim);
-
-			if (   gammaOffset.data.xdim < result.xdim
-				|| gammaOffset.data.ydim < result.ydim)
+			if (obsModel->getBoxSize(opticsGroup) != orixdim)
 			{
-				REPORT_ERROR_STR("CTF::getFftwImage: requested output image is larger than the original: "
-				                 << gammaOffset.data.xdim << "x" << gammaOffset.data.ydim << " available, "
-				                 << result.xdim << "x" << result.ydim << " requested\n");
+				REPORT_ERROR_STR("CTF::getFftwImage: requested output image size "
+				                 << orixdim << " is not consistent with that in the optics group table "
+				                 << obsModel->getBoxSize(opticsGroup) << "\n");
 			}
+
+			if (fabs(obsModel->getPixelSize(opticsGroup) - angpix) > 1e-4)
+			{
+				REPORT_ERROR_STR("CTF::getFftwImage: requested pixel size "
+				                 << angpix << " is not consistent with that in the optics group table "
+				                 << obsModel->getPixelSize(opticsGroup) << "\n");
+			}
+
+			const Image<RFLOAT>& gammaOffset = obsModel->getGammaOffset(opticsGroup, oriydim);
 
 			for (int y1 = 0; y1 < result.ydim; y1++)
 			for (int x1 = 0; x1 < result.xdim; x1++)
