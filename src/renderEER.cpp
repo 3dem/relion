@@ -278,7 +278,7 @@ int EERRenderer::getWidth()
 	if (!ready)
 		REPORT_ERROR("EERRenderer::getNFrames called before ready.");
 
-	return EER_IMAGE_WIDTH * eer_upsampling;
+	return EER_IMAGE_WIDTH << (eer_upsampling - 1);
 }
 
 int EERRenderer::getHeight()
@@ -286,7 +286,7 @@ int EERRenderer::getHeight()
 	if (!ready)
 		REPORT_ERROR("EERRenderer::getNFrames called before ready.");
 
-	return EER_IMAGE_HEIGHT * eer_upsampling;
+	return EER_IMAGE_HEIGHT << (eer_upsampling - 1);
 }
 
 template <typename T>
