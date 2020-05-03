@@ -8,11 +8,11 @@
 #include <src/fftw.h>
 #include <src/complex.h>
 #include <src/metadata_table.h>
-#include <src/jaz/slice_helper.h>
-#include <src/jaz/img_proc/filter_helper.h>
-#include <src/jaz/volume_converter.h>
+#include <src/jaz/legacy/slice_helper.h>
+#include <src/jaz/legacy/img_proc/filter_helper.h>
+#include <src/jaz/legacy/volume_converter.h>
 
-#include <src/jaz/gravis/t4Matrix.h>
+#include <src/jaz/legacy/gravis/t4Matrix.h>
 using namespace gravis;
 
 int main(int argc, char *argv[])

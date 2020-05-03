@@ -20,7 +20,7 @@
 
 #include <src/args.h>
 #include <src/ml_optimiser.h>
-#include <src/jaz/obs_model.h>
+#include <src/jaz/legacy/obs_model.h>
 #include <stdlib.h>
 
 class particle_reposition_parameters

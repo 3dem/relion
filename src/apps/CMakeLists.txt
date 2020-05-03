@@ -36,26 +36,26 @@ foreach(GUI_SRC_FILE ${REL_GUI_SRC})
 	list(REMOVE_ITEM REL_SRC "${GUI_SRC_FILE}")
 endforeach()
 
-file(GLOB REL_JAZ_SRC "${CMAKE_SOURCE_DIR}/src/jaz/*.cpp")
-file(GLOB REL_JAZ_H "${CMAKE_SOURCE_DIR}/src/jaz/*.h")
-file(GLOB REL_JAZ_OPT_SRC "${CMAKE_SOURCE_DIR}/src/jaz/optimization/*.cpp")
-file(GLOB REL_JAZ_OPT_H "${CMAKE_SOURCE_DIR}/src/jaz/optimization/*.h")
-file(GLOB REL_JAZ_CTF_SRC "${CMAKE_SOURCE_DIR}/src/jaz/ctf/*.cpp")
-file(GLOB REL_JAZ_CTF_H "${CMAKE_SOURCE_DIR}/src/jaz/ctf/*.h")
-file(GLOB REL_JAZ_MOTION_SRC "${CMAKE_SOURCE_DIR}/src/jaz/motion/*.cpp")
-file(GLOB REL_JAZ_MOTION_H "${CMAKE_SOURCE_DIR}/src/jaz/motion/*.h")
-file(GLOB REL_JAZ_MATH_SRC "${CMAKE_SOURCE_DIR}/src/jaz/math/*.cpp")
-file(GLOB REL_JAZ_MATH_H "${CMAKE_SOURCE_DIR}/src/jaz/math/*.h")
-file(GLOB REL_JAZ_IMG_PROC_SRC "${CMAKE_SOURCE_DIR}/src/jaz/img_proc/*.cpp")
-file(GLOB REL_JAZ_IMG_PROC_H "${CMAKE_SOURCE_DIR}/src/jaz/img_proc/*.h")
-file(GLOB REL_JAZ_TOMO_SRC "${CMAKE_SOURCE_DIR}/src/jaz/tomo/*.cpp")
-file(GLOB REL_JAZ_TOMO_H "${CMAKE_SOURCE_DIR}/src/jaz/tomo/*.h")
-file(GLOB REL_JAZ_IO_SRC "${CMAKE_SOURCE_DIR}/src/jaz/io/*.cpp")
-file(GLOB REL_JAZ_IO_H "${CMAKE_SOURCE_DIR}/src/jaz/io/*.h")
-file(GLOB REL_D3x3_SRC "${CMAKE_SOURCE_DIR}/src/jaz/d3x3/*.c")
-file(GLOB REL_D3x3_H "${CMAKE_SOURCE_DIR}/src/jaz/d3x3/*.h")
-file(GLOB REL_LBFGS_SRC "${CMAKE_SOURCE_DIR}/src/jaz/lbfgs/*.c")
-file(GLOB REL_LBFGS_H "${CMAKE_SOURCE_DIR}/src/jaz/lbfgs/*.h")
+file(GLOB REL_JAZ_LEGACY_SRC "${CMAKE_SOURCE_DIR}/src/jaz/legacy/*.cpp")
+file(GLOB REL_JAZ_LEGACY_H "${CMAKE_SOURCE_DIR}/src/jaz/legacy/*.h")
+file(GLOB REL_JAZ_LEGACY_OPT_SRC "${CMAKE_SOURCE_DIR}/src/jaz/legacy/optimization/*.cpp")
+file(GLOB REL_JAZ_LEGACY_OPT_H "${CMAKE_SOURCE_DIR}/src/jaz/legacy/optimization/*.h")
+file(GLOB REL_JAZ_LEGACY_CTF_SRC "${CMAKE_SOURCE_DIR}/src/jaz/legacy/ctf/*.cpp")
+file(GLOB REL_JAZ_LEGACY_CTF_H "${CMAKE_SOURCE_DIR}/src/jaz/legacy/ctf/*.h")
+file(GLOB REL_JAZ_LEGACY_MOTION_SRC "${CMAKE_SOURCE_DIR}/src/jaz/legacy/motion/*.cpp")
+file(GLOB REL_JAZ_LEGACY_MOTION_H "${CMAKE_SOURCE_DIR}/src/jaz/legacy/motion/*.h")
+file(GLOB REL_JAZ_LEGACY_MATH_SRC "${CMAKE_SOURCE_DIR}/src/jaz/legacy/math/*.cpp")
+file(GLOB REL_JAZ_LEGACY_MATH_H "${CMAKE_SOURCE_DIR}/src/jaz/legacy/math/*.h")
+file(GLOB REL_JAZ_LEGACY_IMG_PROC_SRC "${CMAKE_SOURCE_DIR}/src/jaz/legacy/img_proc/*.cpp")
+file(GLOB REL_JAZ_LEGACY_IMG_PROC_H "${CMAKE_SOURCE_DIR}/src/jaz/legacy/img_proc/*.h")
+file(GLOB REL_JAZ_LEGACY_TOMO_SRC "${CMAKE_SOURCE_DIR}/src/jaz/legacy/tomo/*.cpp")
+file(GLOB REL_JAZ_LEGACY_TOMO_H "${CMAKE_SOURCE_DIR}/src/jaz/legacy/tomo/*.h")
+file(GLOB REL_JAZ_LEGACY_IO_SRC "${CMAKE_SOURCE_DIR}/src/jaz/legacy/io/*.cpp")
+file(GLOB REL_JAZ_LEGACY_IO_H "${CMAKE_SOURCE_DIR}/src/jaz/legacy/io/*.h")
+file(GLOB REL_D3x3_SRC "${CMAKE_SOURCE_DIR}/src/jaz/legacy/d3x3/*.c")
+file(GLOB REL_D3x3_H "${CMAKE_SOURCE_DIR}/src/jaz/legacy/d3x3/*.h")
+file(GLOB REL_LBFGS_SRC "${CMAKE_SOURCE_DIR}/src/jaz/legacy/lbfgs/*.c")
+file(GLOB REL_LBFGS_H "${CMAKE_SOURCE_DIR}/src/jaz/legacy/lbfgs/*.h")
 
 file(GLOB REL_HP "${CMAKE_SOURCE_DIR}/src/Healpix_2.15a/*.cc")
 file(GLOB RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/*.cpp")
@@ -84,14 +84,14 @@ endif(NOT RELION_TEST)
 if(BUILD_SHARED_LIBS)
 	add_library(relion_lib SHARED
 	            ${REL_SRC} ${REL_SRC_H} ${REL_HP}
-	            ${REL_JAZ_SRC} ${REL_JAZ_H}
-	            ${REL_JAZ_OPT_SRC} ${REL_JAZ_OPT_H}
-	            ${REL_JAZ_CTF_SRC} ${REL_JAZ_CTF_H}
-	            ${REL_JAZ_MOTION_SRC} ${REL_JAZ_MOTION_H}
-	            ${REL_JAZ_MATH_SRC} ${REL_JAZ_MATH_H}
-	            ${REL_JAZ_IMG_PROC_SRC} ${REL_JAZ_IMG_PROC_H}
-	            ${REL_JAZ_TOMO_SRC} ${REL_JAZ_TOMO_H}
-	            ${REL_JAZ_IO_SRC} ${REL_JAZ_IO_H}
+	            ${REL_JAZ_LEGACY_SRC} ${REL_JAZ_LEGACY_H}
+	            ${REL_JAZ_LEGACY_OPT_SRC} ${REL_JAZ_LEGACY_OPT_H}
+	            ${REL_JAZ_LEGACY_CTF_SRC} ${REL_JAZ_LEGACY_CTF_H}
+	            ${REL_JAZ_LEGACY_MOTION_SRC} ${REL_JAZ_LEGACY_MOTION_H}
+	            ${REL_JAZ_LEGACY_MATH_SRC} ${REL_JAZ_LEGACY_MATH_H}
+	            ${REL_JAZ_LEGACY_IMG_PROC_SRC} ${REL_JAZ_LEGACY_IMG_PROC_H}
+	            ${REL_JAZ_LEGACY_TOMO_SRC} ${REL_JAZ_LEGACY_TOMO_H}
+	            ${REL_JAZ_LEGACY_IO_SRC} ${REL_JAZ_LEGACY_IO_H}
 	            ${REL_D3x3_SRC} ${REL_D3x3_H}
 	            ${REL_LBFGS_SRC} ${REL_LBFGS_H})
 
@@ -103,14 +103,14 @@ if(BUILD_SHARED_LIBS)
 else()
 	add_library(relion_lib STATIC
 		${REL_SRC} ${REL_SRC_H} ${REL_HP}
-		${REL_JAZ_SRC} ${REL_JAZ_H}
-		${REL_JAZ_OPT_SRC} ${REL_JAZ_OPT_H}
-		${REL_JAZ_CTF_SRC} ${REL_JAZ_CTF_H}
-		${REL_JAZ_MOTION_SRC} ${REL_JAZ_MOTION_H}
-		${REL_JAZ_MATH_SRC} ${REL_JAZ_MATH_H}
-		${REL_JAZ_IMG_PROC_SRC} ${REL_JAZ_IMG_PROC_H}
-		${REL_JAZ_TOMO_SRC} ${REL_JAZ_TOMO_H}
-		${REL_JAZ_IO_SRC} ${REL_JAZ_IO_H}
+		${REL_JAZ_LEGACY_SRC} ${REL_JAZ_LEGACY_H}
+		${REL_JAZ_LEGACY_OPT_SRC} ${REL_JAZ_LEGACY_OPT_H}
+		${REL_JAZ_LEGACY_CTF_SRC} ${REL_JAZ_LEGACY_CTF_H}
+		${REL_JAZ_LEGACY_MOTION_SRC} ${REL_JAZ_LEGACY_MOTION_H}
+		${REL_JAZ_LEGACY_MATH_SRC} ${REL_JAZ_LEGACY_MATH_H}
+		${REL_JAZ_LEGACY_IMG_PROC_SRC} ${REL_JAZ_LEGACY_IMG_PROC_H}
+		${REL_JAZ_LEGACY_TOMO_SRC} ${REL_JAZ_LEGACY_TOMO_H}
+		${REL_JAZ_LEGACY_IO_SRC} ${REL_JAZ_LEGACY_IO_H}
 		${REL_D3x3_SRC} ${REL_D3x3_H}
 		${REL_LBFGS_SRC} ${REL_LBFGS_H})
 

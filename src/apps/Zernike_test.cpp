@@ -1,5 +1,5 @@
-#include <src/jaz/vtk_helper.h>
-#include <src/jaz/math/Zernike.h>
+#include <src/jaz/legacy/vtk_helper.h>
+#include <src/jaz/legacy/math/Zernike.h>
 
 int main(int argc, char *argv[])
 {

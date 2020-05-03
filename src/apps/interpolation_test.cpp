@@ -1,4 +1,4 @@
-#include <src/jaz/interpolation.h>
+#include <src/jaz/legacy/interpolation.h>
 
 int main(int argc, char *argv[])
 {

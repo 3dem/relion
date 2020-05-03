@@ -7,18 +7,18 @@
 #include <src/image.h>
 #include <src/metadata_table.h>
 #include <src/ctf.h>
-#include <src/jaz/img_proc/filter_helper.h>
-#include <src/jaz/stack_helper.h>
-#include <src/jaz/obs_model.h>
-#include <src/jaz/image_log.h>
-#include <src/jaz/new_ft.h>
-#include <src/jaz/noise_helper.h>
-#include <src/jaz/fftw_helper.h>
-#include <src/jaz/ctf/delocalisation_helper.h>
-#include <src/jaz/img_proc/color_helper.h>
+#include <src/jaz/legacy/img_proc/filter_helper.h>
+#include <src/jaz/legacy/stack_helper.h>
+#include <src/jaz/legacy/obs_model.h>
+#include <src/jaz/legacy/image_log.h>
+#include <src/jaz/legacy/new_ft.h>
+#include <src/jaz/legacy/noise_helper.h>
+#include <src/jaz/legacy/fftw_helper.h>
+#include <src/jaz/legacy/ctf/delocalisation_helper.h>
+#include <src/jaz/legacy/img_proc/color_helper.h>
 
 #ifdef HAVE_PNG
-#include <src/jaz/gravis/tImage.h>
+#include <src/jaz/legacy/gravis/tImage.h>
 #endif
 
 #include <omp.h>

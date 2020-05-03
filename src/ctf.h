@@ -47,7 +47,7 @@
 
 #include "src/multidim_array.h"
 #include "src/metadata_table.h"
-#include "src/jaz/obs_model.h"
+#include "src/jaz/legacy/obs_model.h"
 #include <map>
 
 

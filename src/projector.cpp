@@ -18,7 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/projector.h"
-#include "src/jaz/gravis/t3Vector.h"
+#include <src/jaz/legacy/gravis/t3Vector.h>
 #include <src/time.h>
 //#define DEBUG
 

@@ -24,8 +24,8 @@
 #include "src/multidim_array.h"
 #include "src/image.h"
 
-#include "src/jaz/volume.h"
-#include "src/jaz/gravis/t2Vector.h"
+#include <src/jaz/legacy/volume.h>
+#include <src/jaz/legacy/gravis/t2Vector.h>
 
 
 #define NEAREST_NEIGHBOUR 0

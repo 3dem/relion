@@ -1,8 +1,8 @@
 
-#include <src/jaz/tomo/tomo_stack.h>
-#include <src/jaz/tomo/backprojection_helper.h>
-#include <src/jaz/vtk_helper.h>
-#include <src/jaz/volume_converter.h>
+#include <src/jaz/legacy/tomo/tomo_stack.h>
+#include <src/jaz/legacy/tomo/backprojection_helper.h>
+#include <src/jaz/legacy/vtk_helper.h>
+#include <src/jaz/legacy/volume_converter.h>
 
 using namespace gravis;
 

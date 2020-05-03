@@ -31,8 +31,8 @@
 #include "src/metadata_table.h"
 #include "src/image.h"
 #include "src/micrograph_model.h"
-#include "src/jaz/new_ft.h"
-#include "src/jaz/obs_model.h"
+#include <src/jaz/legacy/new_ft.h>
+#include <src/jaz/legacy/obs_model.h>
 
 class MotioncorrRunner
 {

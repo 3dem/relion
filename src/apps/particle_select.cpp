@@ -1,5 +1,5 @@
-#include <src/jaz/stack_helper.h>
-#include <src/jaz/gravis/t2Vector.h>
+#include <src/jaz/legacy/stack_helper.h>
+#include <src/jaz/legacy/gravis/t2Vector.h>
 #include <src/metadata_table.h>
 
 using namespace gravis;

@@ -46,8 +46,8 @@
 #include "src/args.h"
 #include "src/fftw.h"
 #include "src/metadata_table.h"
-#include <src/jaz/obs_model.h>
-#include <src/jaz/gravis/t2Matrix.h>
+#include <src/jaz/legacy/obs_model.h>
+#include <src/jaz/legacy/gravis/t2Matrix.h>
 
 using namespace gravis;
 

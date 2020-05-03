@@ -27,14 +27,14 @@
 #include <src/time.h>
 #include <omp.h>
 
-#include <src/jaz/image_log.h>
-#include <src/jaz/complex_io.h>
-#include <src/jaz/stack_helper.h>
-#include <src/jaz/img_proc/image_op.h>
-#include <src/jaz/obs_model.h>
-#include <src/jaz/new_ft.h>
-#include <src/jaz/img_proc/filter_helper.h>
-#include <src/jaz/ctf/delocalisation_helper.h>
+#include <src/jaz/legacy/image_log.h>
+#include <src/jaz/legacy/complex_io.h>
+#include <src/jaz/legacy/stack_helper.h>
+#include <src/jaz/legacy/img_proc/image_op.h>
+#include <src/jaz/legacy/obs_model.h>
+#include <src/jaz/legacy/new_ft.h>
+#include <src/jaz/legacy/img_proc/filter_helper.h>
+#include <src/jaz/legacy/ctf/delocalisation_helper.h>
 
 class reconstruct_parameters
 {

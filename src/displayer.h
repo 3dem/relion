@@ -40,7 +40,7 @@
 #include "src/image.h"
 #include "src/metadata_label.h"
 #include "src/metadata_table.h"
-#include "src/jaz/obs_model.h"
+#include <src/jaz/legacy/obs_model.h>
 #include <src/matrix2d.h>
 #include <src/fftw.h>
 #include <src/time.h>

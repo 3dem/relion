@@ -23,7 +23,7 @@
 
 #include "src/time.h"
 #include "src/pipeliner.h"
-#include "src/jaz/obs_model.h"
+#include <src/jaz/legacy/obs_model.h>
 #define SCHEDULE_HAS_CHANGED ".schedule_has_changed";
 
 class SchedulerFloatVariable
