@@ -55,7 +55,7 @@ void EERRenderer::render16K(MultidimArray<T> &image, std::vector<unsigned int> &
 	for (int i = 0; i < n_electrons; i++)
 	{
 		int x = ((positions[i] & 4095) << 2) | (symbols[i] & 3); // 4095 = 111111111111b, 3 = 00000011b
-		int y = ((positions[i] >> 12) << 2) | (symbols[i] & 12); //  4096 = 2^12, 12 = 00001100b
+		int y = ((positions[i] >> 12) << 2) | ((symbols[i] & 12) >> 2); //  4096 = 2^12, 12 = 00001100b
 			DIRECT_A2D_ELEM(image, y, x)++;
 	}
 }
