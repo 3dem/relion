@@ -32,7 +32,7 @@
 #include <src/ml_model.h>
 #include <src/exp_model.h>
 #include <src/healpix_sampling.h>
-#include <src/jaz/legacy/obs_model.h>
+#include <src/jaz/single_particle/obs_model.h>
 class project_parameters
 {
 public:

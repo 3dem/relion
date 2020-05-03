@@ -21,7 +21,7 @@
 #define COMPLEX_H_
 
 #include <src/macros.h>
-#include <src/jaz/legacy/t_complex.h>
+#include <src/jaz/single_particle/t_complex.h>
 
 typedef tComplex<RFLOAT> Complex;
 

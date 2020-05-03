@@ -7,18 +7,18 @@
 #include <src/image.h>
 #include <src/metadata_table.h>
 #include <src/ctf.h>
-#include <src/jaz/legacy/img_proc/filter_helper.h>
-#include <src/jaz/legacy/stack_helper.h>
-#include <src/jaz/legacy/obs_model.h>
-#include <src/jaz/legacy/image_log.h>
-#include <src/jaz/legacy/new_ft.h>
-#include <src/jaz/legacy/noise_helper.h>
-#include <src/jaz/legacy/fftw_helper.h>
-#include <src/jaz/legacy/ctf/delocalisation_helper.h>
-#include <src/jaz/legacy/img_proc/color_helper.h>
+#include <src/jaz/single_particle/img_proc/filter_helper.h>
+#include <src/jaz/single_particle/stack_helper.h>
+#include <src/jaz/single_particle/obs_model.h>
+#include <src/jaz/single_particle/image_log.h>
+#include <src/jaz/single_particle/new_ft.h>
+#include <src/jaz/single_particle/noise_helper.h>
+#include <src/jaz/single_particle/fftw_helper.h>
+#include <src/jaz/single_particle/ctf/delocalisation_helper.h>
+#include <src/jaz/single_particle/img_proc/color_helper.h>
 
 #ifdef HAVE_PNG
-#include <src/jaz/legacy/gravis/tImage.h>
+#include <src/jaz/single_particle/gravis/tImage.h>
 #endif
 
 #include <omp.h>

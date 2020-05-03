@@ -21,7 +21,7 @@
 #include <src/args.h>
 #include <src/metadata_table.h>
 #include <src/micrograph_model.h>
-#include <src/jaz/legacy/io/star_converter.h>
+#include <src/jaz/single_particle/io/star_converter.h>
 
 class star_converter
 {

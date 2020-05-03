@@ -18,7 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#include <src/jaz/legacy/motion/motion_refiner_mpi.h>
+#include <src/jaz/single_particle/motion/motion_refiner_mpi.h>
 
 
 int main(int argc, char *argv[])

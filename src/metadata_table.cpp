@@ -980,6 +980,8 @@ bool MetaDataTable::readStarList(std::ifstream& in, std::vector<EMDLabel> *desir
 
 	// Read data and fill structures accordingly
 	int labelPosition = 0;
+	int lastGoodPos = in.tellg();
+	
 	while (getline(in, line, '\n'))
 	{
 		int pos = 0;
@@ -1013,6 +1015,8 @@ bool MetaDataTable::readStarList(std::ifstream& in, std::vector<EMDLabel> *desir
 				setValueFromString(label, value, objectID);
 			}
 			labelPosition++;
+			
+			lastGoodPos = in.tellg();
 		}
 		// Check whether there is a comment or an empty line
 		else if (firstword[0] == '#' || firstword[0] == ';')
@@ -1029,7 +1033,10 @@ bool MetaDataTable::readStarList(std::ifstream& in, std::vector<EMDLabel> *desir
 		// Check whether this data blocks ends (because a next one is there)
 		else if (firstword.find("data_") == 0)
 		{
-			// Should I reverse the pointer one line?
+			// Should I reverse the pointer one line? 
+			// - Yes, please!!   -- JZ
+			
+			in.seekg(lastGoodPos);
 			return also_has_loop;
 		}
 	}
@@ -1037,7 +1044,12 @@ bool MetaDataTable::readStarList(std::ifstream& in, std::vector<EMDLabel> *desir
 	return also_has_loop;
 }
 
-long int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std::vector<EMDLabel> *desiredLabels, std::string grep_pattern, bool do_only_count)
+long int MetaDataTable::readStar(
+		std::ifstream& in, 
+		const std::string &name, 
+		std::vector<EMDLabel> *desiredLabels, 
+		std::string grep_pattern, 
+		bool do_only_count)
 {
 	std::string line, token, value;
 	clear();
@@ -1098,6 +1110,72 @@ long int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std
 	return 0;
 }
 
+std::vector<MetaDataTable> MetaDataTable::readAll(
+		std::ifstream &in, 
+		int expectedNumber, 
+		std::vector<EMDLabel> *desiredLabels, 
+		std::string grep_pattern, 
+		bool do_only_count)
+{
+	std::vector<MetaDataTable> out(0);
+	out.reserve(expectedNumber);
+	
+	std::string line;
+
+	// Start reading the ifstream at the top
+	in.seekg(0);
+
+	// Set the version to 30000 by default, in case there is no version tag
+	// (version tags were introduced in version 31000)
+	int version = 30000;
+
+	// Proceed until the next data_ or _loop statement
+	// The loop statement may be necessary for data blocks that have a list AND a table inside them
+	while (getline(in, line, '\n'))
+	{
+		trim(line);
+		
+		if (line.find("# version ") != std::string::npos)
+		{
+			std::string versionStr = line.substr(line.find("# version ") + std::string("# version ").length());
+
+			std::istringstream sts(versionStr);
+			sts >> version;
+		}
+
+		// Find data_ lines
+		if (line.find("data_") != std::string::npos)
+		{
+			std::string nameStr = line.substr(line.find("data_") + 5);
+			
+			out.push_back(MetaDataTable());
+			MetaDataTable& mdt = out[out.size()-1];
+			
+			mdt.setName(nameStr);
+							
+			int current_pos = in.tellg();
+				
+			while (getline(in, line, '\n'))
+			{
+				if (line.find("loop_") != std::string::npos)
+				{
+					mdt.readStarLoop(in, desiredLabels, grep_pattern, do_only_count);
+					break;
+				}
+				else if (line[0] == '_')
+				{
+					// go back one line in the ifstream
+					in.seekg(current_pos);
+					bool also_has_loop = mdt.readStarList(in, desiredLabels);
+					break;
+				}
+			}
+		}
+	}
+
+	return out;	
+}
+
 long int MetaDataTable::read(const FileName &filename, const std::string &name, std::vector<EMDLabel> *desiredLabels, std::string grep_pattern, bool do_only_count)
 {
 
@@ -1122,7 +1200,7 @@ long int MetaDataTable::read(const FileName &filename, const std::string &name, 
 	firstObject();
 }
 
-void MetaDataTable::write(std::ostream& out)
+void MetaDataTable::write(std::ostream& out) const
 {
 	// Only write tables that have something in them
 	if (isEmpty())
@@ -1156,7 +1234,7 @@ void MetaDataTable::write(std::ostream& out)
 
 			if (l == EMDL_UNKNOWN_LABEL)
 			{
-				const long offset = unknownLabelPosition2Offset[i];
+				const long offset = unknownLabelPosition2Offset.find(i)->second;
 				out << "_" << unknownLabelNames[offset]<< " #" << (i + 1) << " \n";
 			}
 			else if (l != EMDL_COMMENT && l != EMDL_SORTED_IDX) // EMDL_SORTED_IDX is only for internal use, never write it out!
@@ -1178,7 +1256,7 @@ void MetaDataTable::write(std::ostream& out)
 				{
 					out.width(10);
 					std::string token, val;
-					long offset = unknownLabelPosition2Offset[i];
+					long offset = unknownLabelPosition2Offset.find(i)->second;
 					val = objects[idx]->unknowns[offset];
 					escapeStringForSTAR(val);
 					out << val << " ";
@@ -1222,7 +1300,7 @@ void MetaDataTable::write(std::ostream& out)
 			}
 			else if (l == EMDL_UNKNOWN_LABEL)
 			{
-				long offset = unknownLabelPosition2Offset[i];
+				long offset = unknownLabelPosition2Offset.find(i)->second;
 				int w = unknownLabelNames[offset].length();
 				if (w > maxWidth) maxWidth = w;
 			}
@@ -1238,7 +1316,7 @@ void MetaDataTable::write(std::ostream& out)
 
 			if (l == EMDL_UNKNOWN_LABEL)
 			{
-				long offset = unknownLabelPosition2Offset[i];
+				long offset = unknownLabelPosition2Offset.find(i)->second;
 				int w = unknownLabelNames[offset].length();
 				out << "_" << unknownLabelNames[offset] << std::setw(12 + maxWidth - w) << " " << objects[0]->unknowns[offset] << "\n";
 			}
@@ -1262,7 +1340,7 @@ void MetaDataTable::write(std::ostream& out)
 	}
 }
 
-void MetaDataTable::write(const FileName &fn_out)
+void MetaDataTable::write(const FileName &fn_out) const
 {
 	std::ofstream  fh;
 	FileName fn_tmp = fn_out + ".tmp";
@@ -1838,7 +1916,7 @@ MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label,
 	if (!MDin.containsLabel(mic_label))
 		REPORT_ERROR("STAR file does not contain " + EMDL::label2Str(mic_label));
 
-    std::vector<bool> valid(MDin.numberOfObjects(), true);
+	std::vector<bool> valid(MDin.numberOfObjects(), true);
 	std::vector<RFLOAT> xs(MDin.numberOfObjects(), 0.0);
 	std::vector<RFLOAT> ys(MDin.numberOfObjects(), 0.0);
     std::vector<RFLOAT> zs;

@@ -1,0 +1,98 @@
+#include <src/args.h>
+#include <src/jaz/dynamo/catalogue.h>
+#include <src/jaz/tomo/projection/projection.h>
+#include <src/jaz/tomo/projection/Fourier_backprojection.h>
+#include <src/jaz/tomo/reconstruction.h>
+#include <src/jaz/tomo/tomogram_set.h>
+#include <src/jaz/image/centering.h>
+#include <src/jaz/image/padding.h>
+#include <src/jaz/tomo/tomo_ctf_helper.h>
+#include <src/jaz/image/power_spectrum.h>
+#include <src/jaz/image/symmetry.h>
+#include <src/jaz/tomo/tomolist.h>
+#include <src/jaz/tomo/data_set.h>
+#include <src/jaz/tomo/tomo_ctf_helper.h>
+#include <src/jaz/optics/damage.h>
+#include <src/jaz/util/zio.h>
+#include <iostream>
+
+
+using namespace gravis;
+
+int main(int argc, char *argv[])
+{
+	IOParser parser;
+	
+	std::string catFn, tomoSetFn, outFn;
+	int particlesToOutput;
+	
+	try
+	{
+		parser.setCommandLine(argc, argv);
+		int gen_section = parser.addSection("General options");
+		
+		catFn = parser.getOption("--i", "Input particle set");
+		tomoSetFn = parser.getOption("--t", "Tomogram set", "tomograms.star");
+		particlesToOutput = textToInteger(parser.getOption("--n", "Number of particles to output", "10"));
+		outFn = parser.getOption("--o", "Output filename pattern");
+		
+		parser.checkForErrors();
+	}
+	catch (RelionError XE)
+	{
+		parser.writeUsage(std::cout);
+		std::cerr << XE;
+		exit(1);
+	}
+	
+	DataSet* dataSet = DataSet::load(catFn, "");	
+	std::vector<std::vector<int>> particles = dataSet->splitByTomogram();
+		
+	const int tc = particles.size();
+	
+	TomogramSet tomogramSet(tomoSetFn);
+		
+	std::ofstream output(outFn);
+	
+	int tpc = 0;
+	
+	for (int t = 0; t < tc; t++)
+	{
+		const int pc = particles[t].size();
+		
+		if (pc == 0) continue;
+						
+		Tomogram tomogram = tomogramSet.loadTomogram(t, false);
+		output << "ts_" << t << ": \n";
+		
+		std::vector<d4Matrix> projTomo = tomogram.proj;	
+		const int fc = projTomo.size();
+			
+		for (int p = 0; p < pc; p++)
+		{
+			output << "\n\tparticle " << p << ": \n\n";
+			
+			const int part_id = particles[t][p];						
+			
+			const d3Vector pos = dataSet->getPosition(part_id);						
+			
+			const gravis::d4Vector pw(pos.x, pos.y, pos.z, 1.0);
+			
+			for (int f = 0; f < fc; f++)
+			{
+				const d4Vector q = projTomo[f] * pw;
+				d2Vector r = gravis::d2Vector(q.x, q.y);
+				
+				output << "\t\t" << f << ": \t" 
+					   << std::setw(8) << r.x << " \t" 
+					   << std::setw(8) << r.y << '\n';
+			}
+			
+			tpc++;
+			
+			if (tpc >= particlesToOutput) return 0;
+		}
+	}
+	
+	return 0;
+}

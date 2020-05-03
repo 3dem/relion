@@ -1,11 +1,11 @@
-#include <src/jaz/legacy/obs_model.h>
-#include <src/jaz/legacy/fftw_helper.h>
-#include <src/jaz/legacy/image_log.h>
-#include <src/jaz/legacy/stack_helper.h>
-#include <src/jaz/legacy/reference_map.h>
-#include <src/jaz/legacy/img_proc/filter_helper.h>
-#include <src/jaz/legacy/interpolation.h>
-#include <src/jaz/legacy/new_ft.h>
+#include <src/jaz/single_particle/obs_model.h>
+#include <src/jaz/single_particle/fftw_helper.h>
+#include <src/jaz/single_particle/image_log.h>
+#include <src/jaz/single_particle/stack_helper.h>
+#include <src/jaz/single_particle/reference_map.h>
+#include <src/jaz/single_particle/img_proc/filter_helper.h>
+#include <src/jaz/single_particle/interpolation.h>
+#include <src/jaz/single_particle/new_ft.h>
 #include <src/ctf.h>
 #include <src/metadata_table.h>
 #include <omp.h>
@@ -15,7 +15,7 @@ using namespace gravis;
 
 int main(int argc, char *argv[])
 {
-	ReferenceMap reference;
+	LegacyReferenceMap reference;
 	
 	IOParser parser;
 	
@@ -83,7 +83,7 @@ int main(int argc, char *argv[])
 		const int pc = allMdts[m].numberOfObjects();
 		
 		std::vector<Image<Complex>> pred = reference.predictAll(
-					allMdts[m], obsModel, ReferenceMap::Own, nr_omp_threads,
+					allMdts[m], obsModel, LegacyReferenceMap::Own, nr_omp_threads,
 					true, true, false);
 		
 		std::vector<Image<Complex>> obs = StackHelper::loadStackFS(

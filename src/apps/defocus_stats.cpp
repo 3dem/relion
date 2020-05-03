@@ -1,7 +1,7 @@
 
 #include <src/args.h>
 #include <src/metadata_table.h>
-#include <src/jaz/legacy/stack_helper.h>
+#include <src/jaz/single_particle/stack_helper.h>
 
 using namespace gravis;
 

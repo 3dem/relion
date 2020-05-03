@@ -25,7 +25,7 @@
 #include <src/error.h>
 #include <src/euler.h>
 #include <src/time.h>
-#include <src/jaz/legacy/obs_model.h>
+#include <src/jaz/single_particle/obs_model.h>
 
 // TODO: set pixel sizes in the outputs
 

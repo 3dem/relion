@@ -45,9 +45,11 @@
 #ifndef _CTF_HH
 #define _CTF_HH
 
-#include "src/multidim_array.h"
-#include "src/metadata_table.h"
-#include "src/jaz/legacy/obs_model.h"
+#include <src/multidim_array.h>
+#include <src/metadata_table.h>
+#include <src/jaz/single_particle/obs_model.h>
+#include <src/jaz/image/buffered_image.h>
+#include <src/jaz/gravis/t2Vector.h>
 #include <map>
 
 
@@ -358,5 +360,79 @@ public:
 	double getAxx();
 	double getAxy();
 	double getAyy();
+	
+	
+	
+	// Methods using the new data types from 2019/2020 in src/jaz/
+	
+	template <typename T>
+	void draw(int w0, int h0, double angpix, T* dest) const
+	{
+		const int wh = w0 / 2 + 1;
+		
+		double xs = w0 * angpix;
+		double ys = h0 * angpix;
+		
+		for (int y = 0; y < h0; y++)
+		for (int x = 0; x < wh; x++)
+		{
+			double xx = x / xs;
+			double yy = (y < h0/2? y : y - h0) / ys;
+	
+			dest[y*wh + x] = getCTF(xx,yy);
+		}
+	}
+	
+	template <typename T>
+	void draw_fast(int w0, int h0, double angpix, T* dest) const
+	{
+		const int wh = w0 / 2 + 1;
+		
+		const double xs = w0 * angpix;
+		const double ys = h0 * angpix;
+		
+		const double r2_max = wh * wh / (xs * xs);
+		
+		for (int y = 0; y < h0; y++)
+		for (int x = 0; x < wh; x++)
+		{
+			const double xx = x / xs;
+			const double yy = (y < h0/2? y : y - h0) / ys;
+			
+			const double u2 = xx * xx + yy * yy;
+			
+			if (u2 < r2_max)
+			{
+				double u4 = u2 * u2;
+		
+				const double gamma = K1 * (Axx*xx*xx + 2.0*Axy*xx*yy + Ayy*yy*yy) + K2 * u4 - K5 - K3;
+				
+				dest[y*wh + x] = -sin(gamma);
+			}
+		}
+	}
+	
+	template <typename T>
+	void drawGamma(int w0, int h0, double angpix, T* dest) const
+	{
+		const int wh = w0 / 2 + 1;
+		
+		double xs = w0 * angpix;
+		double ys = h0 * angpix;
+		
+		for (int y = 0; y < h0; y++)
+		for (int x = 0; x < wh; x++)
+		{
+			double xx = x / xs;
+			double yy = (y < h0/2? y : y - h0) / ys;
+	
+			dest[y*wh + x] = getGamma(xx,yy);
+		}
+	}
+	
+	BufferedImage<float> getFftwImage_float(int w0, int h0, double angpix) const;
+	
+	double setDefocusMatrix(double axx, double axy, double ayy);
+			
 };
 #endif

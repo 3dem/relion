@@ -27,10 +27,10 @@
 #include  <stdlib.h>
 #include  <unistd.h>
 #include  <stdio.h>
-#include "src/metadata_table.h"
-#include "src/image.h"
+#include <src/metadata_table.h>
+#include <src/image.h>
 #include <src/time.h>
-#include "src/jaz/legacy/obs_model.h"
+#include <src/jaz/single_particle/obs_model.h>
 
 class CtffindRunner
 {

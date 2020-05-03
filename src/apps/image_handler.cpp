@@ -24,7 +24,7 @@
 #include <src/fftw.h>
 #include <src/time.h>
 #include <src/symmetries.h>
-#include <src/jaz/legacy/obs_model.h>
+#include <src/jaz/single_particle/obs_model.h>
 
 #include <map>
 

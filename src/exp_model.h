@@ -26,7 +26,7 @@
 #include "src/metadata_table.h"
 #include "src/time.h"
 #include "src/ctf.h"
-#include <src/jaz/legacy/obs_model.h>
+#include <src/jaz/single_particle/obs_model.h>
 
 /// Reserve large vectors with some reasonable estimate
 // Larger numbers will still be OK, but memory management might suffer

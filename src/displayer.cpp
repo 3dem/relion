@@ -22,7 +22,7 @@
 //#define DEBUG
 //
 #ifdef HAVE_PNG
-#include <src/jaz/legacy/gravis/tImage.h>
+#include <src/jaz/single_particle/gravis/tImage.h>
 #endif
 
 const Fl_Menu_Item color_choices[] =

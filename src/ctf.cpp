@@ -46,8 +46,8 @@
 #include "src/args.h"
 #include "src/fftw.h"
 #include "src/metadata_table.h"
-#include <src/jaz/legacy/obs_model.h>
-#include <src/jaz/legacy/gravis/t2Matrix.h>
+#include <src/jaz/single_particle/obs_model.h>
+#include <src/jaz/single_particle/gravis/t2Matrix.h>
 
 using namespace gravis;
 
@@ -614,6 +614,13 @@ void CTF::applyWeightEwaldSphereCurvature_noAniso(MultidimArray <RFLOAT> &result
 	}
 }
 
+BufferedImage<float> CTF::getFftwImage_float(int w0, int h0, double angpix) const
+{
+	BufferedImage<float> out(w0/2 + 1, h0, 1);
+	draw(w0, h0, angpix, &out(0,0,0));
+	return out;
+}
+
 std::vector<double> CTF::getK()
 {
 	// offset by one to maintain indices (K[1] = K1)
@@ -633,4 +640,11 @@ double CTF::getAxy()
 double CTF::getAyy()
 {
 	return Ayy;
+}
+
+double CTF::setDefocusMatrix(double axx, double axy, double ayy)
+{
+	Axx = axx;
+	Axy = axy;
+	Ayy = ayy;
 }
