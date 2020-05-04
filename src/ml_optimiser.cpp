@@ -646,10 +646,14 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	vmgd_fin_stepsize = textToFloat(parser.getOption("--vmgd_fin_stepsize", "Step size parameter for final gradient updates.", "0.05"));
     do_vmgd_realspace = parser.checkOption("--vmgd_realspace", "Claculate and apply gradient in real space.");
 	write_every_vmgd_iter = textToInteger(parser.getOption("--vmgd_write_iter", "Write out model every so many iterations in SGD (default is writing out all iters)", "1"));
-	do_som = textToInteger(parser.getOption("--som", "Calculate self-organizing map instead of classification.", "1"));
+	do_som = parser.checkOption("--som", "Calculate self-organizing map instead of classification.");
 
-	if (do_som)
-		som
+	if (do_som && !do_vmgd)
+		REPORT_ERROR("SOM can only be calculated with a gradient optimization.");
+
+
+	if (do_som && mymodel.nr_classes < 3)
+		REPORT_ERROR("Too low maximum class limit for SOM calculations.");
 
 	// Computation stuff
 	// The number of threads is always read from the command line
@@ -1326,6 +1330,24 @@ void MlOptimiser::initialise()
 	// Initialise the data_versus_prior ratio to get the initial current_size right
 	if (iter == 0 && !do_initialise_bodies)
 		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
+
+	if (do_som)
+	{
+		// Add the initial two nodes to the graph and connect them with an edge
+		unsigned n1 = som.add_node();
+		unsigned n2 = som.add_node();
+		som.add_edge(n1, n2);
+
+		for (unsigned i = 0; i < mymodel.nr_classes; i ++) {
+			if (i == n1 || i == n2)
+				continue;
+
+			mymodel.pdf_class[i] = 0;
+			mymodel.Iref[i] *= 0.;
+			mymodel.Igrad1[i] *= 0.;
+			mymodel.Igrad2[i] *= 0.;
+		}
+	}
 
 	// Check minimum group size of 10 particles
 	if (verb > 0)
@@ -2693,6 +2715,50 @@ void MlOptimiser::iterate()
 			timer.printTimes(false);
 #endif
 
+
+		if(do_som)
+		{
+			// Remove old edges and orphan nodes
+			som.purge_old_edges(1000);
+			std::vector<unsigned> purged_nodes = som.purge_orphans();
+
+			for (unsigned i = 0; i < purged_nodes.size(); i++) {
+				mymodel.pdf_class[purged_nodes[i]] = 0;
+				mymodel.Iref[purged_nodes[i]] *= 0.;
+				mymodel.Igrad1[purged_nodes[i]] *= 0.;
+				mymodel.Igrad2[purged_nodes[i]] *= 0.;
+			}
+
+			// Add new nodes
+			if (iter > 0 && iter % 10 == 0 && som.get_node_count() < mymodel.nr_classes) { //TODO as a parameter
+				unsigned wpu = som.find_wpu();
+				std::vector<unsigned> neighbours = som.get_neighbours(wpu);
+
+				unsigned swpu = -1;
+				XFLOAT max_e = 0;
+				for (unsigned i = 0; i < neighbours.size(); i++) {
+					float e = som.get_node_error(neighbours[i]);
+					if (max_e < e) {
+						swpu = neighbours[i];
+						max_e = e;
+					}
+				}
+				som.reset_errors();
+
+				// Insert the node between the WPU and SWPU
+				som.remove_edge(wpu, swpu);
+				unsigned idx = som.add_node();
+
+				som.add_edge(idx, wpu);
+				som.add_edge(idx, swpu);
+
+				mymodel.pdf_class[idx] = 1;
+
+				mymodel.Iref[idx] = (mymodel.Iref[wpu] + mymodel.Iref[swpu]) / 2;
+				mymodel.Igrad1[idx] = (mymodel.Igrad1[wpu] + mymodel.Igrad1[swpu]) / 2;
+				mymodel.Igrad2[idx] = (mymodel.Igrad2[wpu] + mymodel.Igrad2[swpu]) / 2;
+			}
+		}
 
 	} // end loop iters
 

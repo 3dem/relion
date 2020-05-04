@@ -23,6 +23,7 @@ __global__ void cuda_kernel_wavg(
 		XFLOAT *g_trans_z,
 		XFLOAT* g_weights,
 		XFLOAT* g_ctfs,
+		XFLOAT *g_error,
 		XFLOAT *g_wdiff2s_parts,
 		XFLOAT *g_wdiff2s_AA,
 		XFLOAT *g_wdiff2s_XA,
@@ -152,6 +153,7 @@ __global__ void cuda_kernel_wavg(
 				}
 			}
 
+			cuda_atomic_add(&g_error[pixel], s_wdiff2s_parts[tid]);
 			cuda_atomic_add(&g_wdiff2s_XA[pixel], s_sumXA[tid]);
 			cuda_atomic_add(&g_wdiff2s_AA[pixel], s_sumA2[tid]);
 			cuda_atomic_add(&g_wdiff2s_parts[pixel], s_wdiff2s_parts[tid]);

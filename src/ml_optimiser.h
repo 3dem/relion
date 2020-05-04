@@ -43,6 +43,7 @@
 #include "src/helix.h"
 #include "src/local_symmetry.h"
 #include "src/acc/settings.h"
+#include "src/som.h"
 
 #define ML_SIGNIFICANT_WEIGHT 1.e-8
 #define METADATA_LINE_LENGTH METADATA_LINE_LENGTH_ALL
@@ -367,6 +368,10 @@ public:
 	RFLOAT vmgd_stepsize;
 	RFLOAT vmgd_ini_stepsize;
 	RFLOAT vmgd_fin_stepsize;
+
+	//Self-organizing map
+	bool do_som;
+	SomGraph som;
 
 
 	// Size of the random subsets

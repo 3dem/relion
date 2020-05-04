@@ -2035,6 +2035,20 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
+				if(baseMLO->do_som) {
+					op.sum_weight_class[img_id].resize(baseMLO->mymodel.nr_classes, 0);
+
+					for (unsigned long exp_iclass = sp.iclass_min;
+					     exp_iclass <= sp.iclass_max; exp_iclass++) // TODO could use classStreams
+					{
+						if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) &&
+						    (FPCMasks[img_id][exp_iclass].weightNum > 0)) {
+							IndexedDataArray thisClassPassWeights(PassWeights[img_id], FPCMasks[img_id][exp_iclass]);
+							op.sum_weight_class[img_id][exp_iclass] = AccUtilities::getSumOnDevice(thisClassPassWeights.weights);
+						}
+					}
+				}
+
 				PassWeights[img_id].weights.cpToHost(); // note that the host-pointer is shared: we're copying to Mweight.
 
 
@@ -2786,18 +2800,25 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
+		/*======================================================
+							 KERNEL CALL
+		======================================================*/
+
+		std::vector<XFLOAT> errors(baseMLO->mymodel.nr_classes, -1);
+
 		classPos = 0;
-		for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
-		{
+		for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++) {
 			int iproj;
 			if (baseMLO->mymodel.nr_bodies > 1) iproj = ibody;
-			else                                iproj = iclass;
+			else iproj = iclass;
 
-			if((baseMLO->mymodel.pdf_class[iclass] == 0.) || (ProjectionData[img_id].class_entries[iclass] == 0))
+			if ((baseMLO->mymodel.pdf_class[iclass] == 0.) || (ProjectionData[img_id].class_entries[iclass] == 0))
 				continue;
-			/*======================================================
-								 KERNEL CALL
-			======================================================*/
+
+
+			AccPtr<XFLOAT> error = ptrFactory.make<XFLOAT>((size_t) image_size);
+			error.allAlloc();
+			error.accInit(0);
 
 			long unsigned orientation_num(ProjectionData[img_id].orientation_num[iclass]);
 
@@ -2806,7 +2827,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					op.local_Minvsigma2[img_id].xdim,
 					op.local_Minvsigma2[img_id].ydim,
 					op.local_Minvsigma2[img_id].zdim,
-					op.local_Minvsigma2[img_id].xdim-1);
+					op.local_Minvsigma2[img_id].xdim - 1);
 
 			runWavgKernel(
 					projKernel,
@@ -2818,6 +2839,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					~trans_z,
 					&(~sorted_weights)[classPos],
 					~ctfs,
+					~error,
 					~wdiff2s_sum,
 					&(~wdiff2s_AA)[AAXA_pos],
 					&(~wdiff2s_XA)[AAXA_pos],
@@ -2834,9 +2856,96 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					accMLO->dataIs3D,
 					accMLO->classStreams[iclass]);
 
-			/*======================================================
-								BACKPROJECTION
-			======================================================*/
+			AAXA_pos += image_size;
+			classPos += orientation_num*translation_num;
+
+			if (baseMLO->do_som) {
+				errors[iclass] = AccUtilities::getSumOnDevice(error);
+				XFLOAT error_sum = errors[iclass] + baseMLO->som.get_node_error(iclass);
+				baseMLO->som.set_node_error(iclass, error_sum);
+			}
+		}
+
+		/*======================================================
+							      SOM
+		======================================================*/
+
+		int nr_classes = baseMLO->mymodel.nr_classes;
+		std::vector<RFLOAT> class_sum_weight(nr_classes, baseMLO->do_som ? 0 : op.sum_weight[img_id]);
+
+		if (baseMLO->do_som)
+		{
+
+			// Get best preforming unit
+			int bpu = -1;
+			XFLOAT min_e = 0;
+			for (int i = sp.iclass_min; i <= sp.iclass_max; i++)
+			{
+				XFLOAT e = errors[i];
+				if ((0 <= e && e < min_e) || bpu == -1)
+				{
+					bpu = i;
+					min_e = e;
+				}
+			}
+
+			// Get second best preforming unit
+			int sbpu = -1;
+			min_e = 0;
+			for (int i = sp.iclass_min; i <= sp.iclass_max; i++)
+			{
+				if (i == bpu)
+					continue;
+
+				XFLOAT e = errors[i];
+				if ((0 <= e && e < min_e) || sbpu == -1)
+				{
+					sbpu = i;
+					min_e = e;
+				}
+			}
+
+			// Modify graph
+			baseMLO->som.add_edge(bpu, sbpu);
+			baseMLO->som.increment_age();
+			baseMLO->som.set_edge_age(bpu, sbpu, 0);
+
+			// Set total weight of BPU
+			class_sum_weight[bpu] = op.sum_weight_class[img_id][bpu];
+
+			// Set total weights for neighbours
+			std::vector<unsigned> in = baseMLO->som.get_neighbours(bpu);
+			for (int i = 0; i < in.size(); i ++)
+				class_sum_weight[in[i]] = op.sum_weight_class[img_id][in[i]] * 3; //TODO as a parameter
+
+		}
+
+		/*======================================================
+							BACKPROJECTION
+		======================================================*/
+
+		classPos = 0;
+		for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
+		{
+
+			int iproj;
+			if (baseMLO->mymodel.nr_bodies > 1) iproj = ibody;
+			else                                iproj = iclass;
+
+			if((baseMLO->mymodel.pdf_class[iclass] == 0.) || (ProjectionData[img_id].class_entries[iclass] == 0))
+				continue;
+
+			if (baseMLO->do_som && class_sum_weight[iclass] == 0)
+				continue;
+
+			long unsigned orientation_num(ProjectionData[img_id].orientation_num[iclass]);
+
+			AccProjectorKernel projKernel = AccProjectorKernel::makeKernel(
+					accMLO->bundle->projectors[iproj],
+					op.local_Minvsigma2[img_id].xdim,
+					op.local_Minvsigma2[img_id].ydim,
+					op.local_Minvsigma2[img_id].zdim,
+					op.local_Minvsigma2[img_id].xdim - 1);
 
 #ifdef TIMING
 			if (op.part_id == baseMLO->exp_my_first_part_id)
@@ -2876,7 +2985,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 #endif
 
 			//Update indices
-			AAXA_pos += image_size;
 			classPos += orientation_num*translation_num;
 
 		} // end loop iclass
