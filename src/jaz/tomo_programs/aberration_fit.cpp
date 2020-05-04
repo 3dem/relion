@@ -1,10 +1,10 @@
 #include "aberration_fit.h"
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h> 
-#include <src/jaz/tomo/data_set.h>
-#include <src/jaz/tomo/extraction.h>
-#include <src/jaz/tomo/prediction.h>
-#include <src/jaz/tomo/tomo_ctf_helper.h>
+#include <src/jaz/tomography/data_set.h>
+#include <src/jaz/tomography/extraction.h>
+#include <src/jaz/tomography/prediction.h>
+#include <src/jaz/tomography/tomo_ctf_helper.h>
 #include <src/jaz/math/Zernike_helper.h>
 #include <src/jaz/gravis/t2Matrix.h>
 #include <src/jaz/image/centering.h>
@@ -166,7 +166,7 @@ void AberrationFit::run()
 void AberrationFit :: considerParticle(
 		int part_id,
 		const Tomogram& tomogram, 
-		const ReferenceMap& referenceMap, 
+		const TomoReferenceMap& referenceMap, 
 		const DataSet* dataSet, 
 		bool flip_value,
 		const BufferedImage<float>& frqWeight,

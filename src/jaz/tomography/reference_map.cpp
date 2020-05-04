@@ -8,9 +8,9 @@
 using namespace gravis;
 
 
-ReferenceMap::ReferenceMap(){}
+TomoReferenceMap::TomoReferenceMap(){}
 
-ReferenceMap::ReferenceMap(
+TomoReferenceMap::TomoReferenceMap(
 		std::string ref1Fn, std::string ref2Fn, int boxSize, 
 		std::string maskFn, std::string fscFn,
 		bool rcThresh, double threshWidth)
@@ -150,7 +150,7 @@ ReferenceMap::ReferenceMap(
 	}	
 }
 
-int ReferenceMap::getBoxSize() const
+int TomoReferenceMap::getBoxSize() const
 {
 	return image_real[0].xdim;
 }

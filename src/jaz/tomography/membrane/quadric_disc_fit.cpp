@@ -1,6 +1,6 @@
 #include "quadric_disc_fit.h"
-#include <src/jaz/tomo/projection/projection.h>
-#include <src/jaz/tomo/reconstruction.h>
+#include <src/jaz/tomography/projection/projection.h>
+#include <src/jaz/tomography/reconstruction.h>
 #include <src/jaz/image/normalization.h>
 #include <src/jaz/image/filter.h>
 

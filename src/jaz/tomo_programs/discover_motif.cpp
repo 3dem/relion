@@ -4,10 +4,10 @@
 #include <src/jaz/image/normalization.h>
 #include <src/jaz/image/structure_tensor.h>
 #include <src/jaz/image/local_extrema.h>
-#include <src/jaz/tomo/projection/projection.h>
-#include <src/jaz/tomo/lattice/point_cloud.h>
-#include <src/jaz/tomo/lattice/motif.h>
-#include <src/jaz/tomo/lattice/motif_refinement.h>
+#include <src/jaz/tomography/projection/projection.h>
+#include <src/jaz/tomography/lattice/point_cloud.h>
+#include <src/jaz/tomography/lattice/motif.h>
+#include <src/jaz/tomography/lattice/motif_refinement.h>
 #include <src/jaz/single_particle/vtk_helper.h>
 #include <src/jaz/mesh/mesh.h>
 #include <src/jaz/mesh/mesh_builder.h>

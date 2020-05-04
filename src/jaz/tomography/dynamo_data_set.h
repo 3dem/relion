@@ -2,7 +2,7 @@
 #define DYNAMO_DATA_SET_H
 
 #include "data_set.h"
-#include <src/jaz/dynamo/dynamo_particle.h>
+#include <src/jaz/tomography/dynamo/dynamo_particle.h>
 
 
 class DynamoDataSet : public DataSet

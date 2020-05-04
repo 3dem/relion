@@ -1,7 +1,7 @@
 #include "motion_fit.h"
-#include <src/jaz/tomo/data_set.h>
-#include <src/jaz/tomo/extraction.h>
-#include <src/jaz/tomo/prediction.h>
+#include <src/jaz/tomography/data_set.h>
+#include <src/jaz/tomography/extraction.h>
+#include <src/jaz/tomography/prediction.h>
 #include <src/ctf.h>
 #include <src/jaz/image/centering.h>
 #include <src/jaz/math/Tait_Bryan_angles.h>

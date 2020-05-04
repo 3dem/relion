@@ -1,7 +1,7 @@
 #include <src/args.h>
-#include <src/jaz/tomo/tomogram.h>
-#include <src/jaz/tomo/projection/real_backprojection.h>
-#include <src/jaz/tomo/tomogram_set.h>
+#include <src/jaz/tomography/tomogram.h>
+#include <src/jaz/tomography/projection/real_backprojection.h>
+#include <src/jaz/tomography/tomogram_set.h>
 #include <src/jaz/image/resampling.h>
 
 using namespace gravis;

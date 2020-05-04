@@ -5,8 +5,8 @@
 #include "normalization.h"
 #include "local_extrema.h"
 #include <src/jaz/gravis/t3Vector.h>
-#include <src/jaz/tomo/tomo_stack.h>
-#include <src/jaz/tomo/projection/projection.h>
+#include <src/jaz/tomography/tomo_stack.h>
+#include <src/jaz/tomography/projection/projection.h>
 
 class Detection
 {

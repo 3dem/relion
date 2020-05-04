@@ -1,10 +1,10 @@
 #include "fcc.h"
-#include <src/jaz/tomo/data_set.h>
-#include <src/jaz/tomo/projection/fwd_projection.h>
-#include <src/jaz/tomo/prediction.h>
-#include <src/jaz/tomo/reconstruction.h>
-#include <src/jaz/tomo/tomo_ctf_helper.h>
-#include <src/jaz/tomo/tomogram.h>
+#include <src/jaz/tomography/data_set.h>
+#include <src/jaz/tomography/projection/fwd_projection.h>
+#include <src/jaz/tomography/prediction.h>
+#include <src/jaz/tomography/reconstruction.h>
+#include <src/jaz/tomography/tomo_ctf_helper.h>
+#include <src/jaz/tomography/tomogram.h>
 
 #include <src/jaz/image/centering.h>
 #include <src/jaz/image/power_spectrum.h>

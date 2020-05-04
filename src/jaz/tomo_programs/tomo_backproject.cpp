@@ -1,9 +1,9 @@
 #include "tomo_backproject.h"
-#include <src/jaz/tomo/projection/projection.h>
-#include <src/jaz/tomo/extraction.h>
-#include <src/jaz/tomo/reconstruction.h>
-#include <src/jaz/tomo/tomogram.h>
-#include <src/jaz/tomo/tomogram_set.h>
+#include <src/jaz/tomography/projection/projection.h>
+#include <src/jaz/tomography/extraction.h>
+#include <src/jaz/tomography/reconstruction.h>
+#include <src/jaz/tomography/tomogram.h>
+#include <src/jaz/tomography/tomogram_set.h>
 #include <src/jaz/image/normalization.h>
 #include <src/jaz/image/centering.h>
 #include <src/args.h>

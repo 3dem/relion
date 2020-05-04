@@ -10,11 +10,11 @@
 #include <src/jaz/math/fft.h>
 #include <src/jaz/math/spline.h>
 #include <src/jaz/util/zio.h>
-#include <src/jaz/tomo/filament/filament.h>
-#include <src/jaz/tomo/filament/filament_fit.h>
-#include <src/jaz/tomo/filament/filament_model.h>
-#include <src/jaz/tomo/filament/circular_Fourier_filament_model.h>
-#include <src/jaz/tomo/projection_IO.h>
+#include <src/jaz/tomography/filament/filament.h>
+#include <src/jaz/tomography/filament/filament_fit.h>
+#include <src/jaz/tomography/filament/filament_model.h>
+#include <src/jaz/tomography/filament/circular_Fourier_filament_model.h>
+#include <src/jaz/tomography/projection_IO.h>
 #include <src/jaz/optimization/nelder_mead.h>
 #include <src/jaz/optimization/gradient_descent.h>
 #include <src/jaz/optimization/lbfgs.h>

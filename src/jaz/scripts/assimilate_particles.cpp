@@ -1,5 +1,5 @@
 #include <src/jaz/gravis/t3Vector.h>
-#include <src/jaz/dynamo/catalogue.h>
+#include <src/jaz/tomography/dynamo/catalogue.h>
 #include <src/jaz/util/zio.h>
 #include <src/args.h>
 #include <set>

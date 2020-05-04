@@ -1,7 +1,7 @@
 #include <src/args.h>
-#include <src/jaz/tomo/imod_import.h>
-#include <src/jaz/tomo/tomo_ctf_helper.h>
-#include <src/jaz/tomo/tomogram_set.h>
+#include <src/jaz/tomography/imod_import.h>
+#include <src/jaz/tomography/tomo_ctf_helper.h>
+#include <src/jaz/tomography/tomogram_set.h>
 #include <src/jaz/image/buffered_image.h>
 #include <src/jaz/util/log.h>
 #include <src/jaz/util/zio.h>

@@ -4,7 +4,7 @@
 #include <time.h>
 #include <src/jaz/math/svd_helper.h>
 #include <src/jaz/math/Gaussian_process.h>
-#include <src/jaz/tomo/data_set.h>
+#include <src/jaz/tomography/data_set.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
 

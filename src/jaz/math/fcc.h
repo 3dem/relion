@@ -2,8 +2,8 @@
 #define DYN_FCC_H
 
 #include <src/jaz/image/buffered_image.h>
-#include <src/jaz/tomo/tomogram.h>
-#include <src/jaz/tomo/data_set.h>
+#include <src/jaz/tomography/tomogram.h>
+#include <src/jaz/tomography/data_set.h>
 
 
 class FCC

@@ -24,7 +24,7 @@
 #include "raw_image.h"
 #include "gradient.h"
 #include "filter.h"
-#include <src/jaz/tomo/projection/projection.h>
+#include <src/jaz/tomography/projection/projection.h>
 #include <src/jaz/math/tensor3x3.h>
 #include <src/jaz/math/tensor2x2.h>
 #include <src/jaz/util/new_vtk_helper.h>

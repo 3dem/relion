@@ -1,6 +1,6 @@
 #include "imod_import.h"
-#include <src/jaz/tomo/projection/projection.h>
-#include <src/jaz/tomo/extraction.h>
+#include <src/jaz/tomography/projection/projection.h>
+#include <src/jaz/tomography/extraction.h>
 #include <src/jaz/util/image_file_helper.h>
 #include <src/jaz/util/log.h>
 #include <src/jaz/util/zio.h>

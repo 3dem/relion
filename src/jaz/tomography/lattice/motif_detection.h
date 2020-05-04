@@ -2,7 +2,7 @@
 #define MOTIF_DETECTION_H
 
 #include <src/jaz/gravis/t4Matrix.h>
-#include <src/jaz/dynamo/catalogue.h>
+#include <src/jaz/tomography/dynamo/catalogue.h>
 
 class MotifDetection
 {

@@ -62,7 +62,7 @@ class Prediction
 				const DataSet* dataSet,
 				const std::vector<int>& partIndices,
 				const Tomogram& tomogram,
-				const ReferenceMap& referenceMap,
+				const TomoReferenceMap& referenceMap,
 				const BufferedImage<float>& frqWghts,
 				const std::vector<int>& sequence,
 				int maxRange,				

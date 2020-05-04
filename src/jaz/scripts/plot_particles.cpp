@@ -1,10 +1,10 @@
 #include <src/args.h>
-#include <src/jaz/tomo/data_set.h>
-#include <src/jaz/tomo/tomolist.h>
-#include <src/jaz/tomo/tomogram.h>
+#include <src/jaz/tomography/data_set.h>
+#include <src/jaz/tomography/tomolist.h>
+#include <src/jaz/tomography/tomogram.h>
 #include <src/jaz/mesh/mesh_builder.h>
 #include <src/jaz/util/zio.h>
-#include <src/jaz/tomo/tomogram_set.h>
+#include <src/jaz/tomography/tomogram_set.h>
 
 using namespace gravis;
 

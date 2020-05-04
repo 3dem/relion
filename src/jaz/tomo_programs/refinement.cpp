@@ -1,17 +1,17 @@
 #include "refinement.h"
-#include <src/jaz/dynamo/catalogue.h>
-#include <src/jaz/tomo/projection/projection.h>
-#include <src/jaz/tomo/projection/Fourier_backprojection.h>
-#include <src/jaz/tomo/reconstruction.h>
+#include <src/jaz/tomography/dynamo/catalogue.h>
+#include <src/jaz/tomography/projection/projection.h>
+#include <src/jaz/tomography/projection/Fourier_backprojection.h>
+#include <src/jaz/tomography/reconstruction.h>
 #include <src/jaz/image/centering.h>
 #include <src/jaz/image/padding.h>
 #include <src/jaz/optics/ctf_helper.h>
 #include <src/jaz/image/power_spectrum.h>
-#include <src/jaz/tomo/tomogram.h>
-#include <src/jaz/tomo/tomolist.h>
-#include <src/jaz/tomo/data_set.h>
-#include <src/jaz/tomo/tomo_ctf_helper.h>
-#include <src/jaz/tomo/projection/projection.h>
+#include <src/jaz/tomography/tomogram.h>
+#include <src/jaz/tomography/tomolist.h>
+#include <src/jaz/tomography/data_set.h>
+#include <src/jaz/tomography/tomo_ctf_helper.h>
+#include <src/jaz/tomography/projection/projection.h>
 #include <src/jaz/optics/damage.h>
 #include <src/jaz/util/zio.h>
 #include <iostream>
@@ -78,7 +78,7 @@ void RefinementProgram::init()
 	dataSet = DataSet::load(catFn, motFn);	
 	particles = dataSet->splitByTomogram();
 		
-	referenceMap = ReferenceMap(ref1Fn, ref2Fn, boxSize, maskFn, fscFn, useFscThresh, fscThreshWidth);
+	referenceMap = TomoReferenceMap(ref1Fn, ref2Fn, boxSize, maskFn, fscFn, useFscThresh, fscThreshWidth);
 	
 	tomogramSet = TomogramSet(tomoSetFn);
 }

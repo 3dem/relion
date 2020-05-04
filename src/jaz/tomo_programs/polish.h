@@ -5,7 +5,7 @@
 #include <src/jaz/math/t_complex.h>
 #include <src/jaz/image/buffered_image.h>
 #include <src/jaz/gravis/t4Matrix.h>
-#include <src/jaz/tomo/motion/motion_fit.h>
+#include <src/jaz/tomography/motion/motion_fit.h>
 #include <vector>
 
 #include "refinement.h"

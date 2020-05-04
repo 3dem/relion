@@ -28,8 +28,8 @@
 #include <src/jaz/image/raw_image.h>
 #include <src/jaz/image/interpolation.h>
 #include <iostream>
-#include <src/jaz/tomo/extraction.h>
-#include <src/jaz/tomo/tomo_stack.h>
+#include <src/jaz/tomography/extraction.h>
+#include <src/jaz/tomography/tomo_stack.h>
 #include <src/jaz/image/tapering.h>
 
 

@@ -5,13 +5,13 @@
 #include <vector>
 
 
-class ReferenceMap
+class TomoReferenceMap
 {
 	public:
 		
-		ReferenceMap();
+		TomoReferenceMap();
 		
-		ReferenceMap(
+		TomoReferenceMap(
 			std::string ref1Fn, std::string ref2Fn, int boxSize, 
 			std::string maskFn, std::string fscFn,
 			bool rcThresh, double threshWidth);

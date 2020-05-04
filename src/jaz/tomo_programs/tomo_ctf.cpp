@@ -1,12 +1,12 @@
 #include "tomo_ctf.h"
 
-#include <src/jaz/tomo/projection/projection.h>
-#include <src/jaz/tomo/extraction.h>
+#include <src/jaz/tomography/projection/projection.h>
+#include <src/jaz/tomography/extraction.h>
 #include <src/jaz/image/normalization.h>
 #include <src/jaz/image/centering.h>
 #include <src/args.h>
 #include <src/jaz/gravis/t4Matrix.h>
-#include <src/jaz/tomo/tomo_ctf_find.h>
+#include <src/jaz/tomography/tomo_ctf_find.h>
 
 #include <omp.h>
 

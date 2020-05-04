@@ -6,10 +6,10 @@
 #include <src/jaz/image/buffered_image.h>
 #include <src/jaz/gravis/t4Matrix.h>
 #include <vector>
-#include <src/jaz/tomo/tomogram.h>
-#include <src/jaz/tomo/tomogram_set.h>
-#include <src/jaz/tomo/tomogram.h>
-#include <src/jaz/tomo/reference_map.h>
+#include <src/jaz/tomography/tomogram.h>
+#include <src/jaz/tomography/tomogram_set.h>
+#include <src/jaz/tomography/tomogram.h>
+#include <src/jaz/tomography/reference_map.h>
 #include <src/jaz/optics/optics_data.h>
 
 
@@ -40,7 +40,7 @@ class RefinementProgram
 			std::vector<std::vector<int>> particles;
 			TomogramSet tomogramSet;
 			
-			ReferenceMap referenceMap;
+			TomoReferenceMap referenceMap;
 			
 			
 		void _readParams(IOParser& parser);

@@ -1,9 +1,9 @@
-#include <src/jaz/dynamo/catalogue.h>
-#include <src/jaz/tomo/projection/projection.h>
-#include <src/jaz/tomo/reconstruction.h>
-#include <src/jaz/tomo/tomolist.h>
+#include <src/jaz/tomography/dynamo/catalogue.h>
+#include <src/jaz/tomography/projection/projection.h>
+#include <src/jaz/tomography/reconstruction.h>
+#include <src/jaz/tomography/tomolist.h>
 #include <src/jaz/image/centering.h>
-#include <src/jaz/tomo/tomo_ctf_helper.h>
+#include <src/jaz/tomography/tomo_ctf_helper.h>
 #include <src/jaz/image/power_spectrum.h>
 #include <iostream>
 

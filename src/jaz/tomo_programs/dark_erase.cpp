@@ -1,7 +1,7 @@
 #include "dark_erase.h"
-#include <src/jaz/tomo/tomo_stack.h>
-#include <src/jaz/tomo/projection/projection.h>
-#include <src/jaz/tomo/extraction.h>
+#include <src/jaz/tomography/tomo_stack.h>
+#include <src/jaz/tomography/projection/projection.h>
+#include <src/jaz/tomography/extraction.h>
 #include <src/jaz/optimization/nelder_mead.h>
 #include <src/jaz/optimization/lbfgs.h>
 #include <src/jaz/optimization/gradient_descent.h>

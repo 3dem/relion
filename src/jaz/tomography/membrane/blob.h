@@ -2,7 +2,7 @@
 #define BLOB_H
 
 #include <src/jaz/gravis/t3Vector.h>
-#include <src/jaz/tomo/tomo_stack.h>
+#include <src/jaz/tomography/tomo_stack.h>
 
 namespace au { namespace edu { namespace anu { namespace qm { namespace ro 
 {	class SphericalHarmonics;	}}}}}

@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 #include <src/metadata_table.h>
-#include <src/jaz/tomo/tomogram.h>
+#include <src/jaz/tomography/tomogram.h>
 #include <src/jaz/gravis/t4Matrix.h>
 #include <src/ctf.h>
 
