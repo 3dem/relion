@@ -56,6 +56,8 @@
  }
  @endcode
 
+ This is not thread-safe because current_objectID is updated!
+
  @TODO: remove "&& current_object >= 0"
 		and make "nextObject()" return "current_object++"
 		after "enum errors" has been removed (see below)

@@ -169,6 +169,7 @@ void FrameRecombiner::init(
 	s_out.resize(nog);
 	sh_out.resize(nog);
 	angpix_out.resize(nog);
+	data_angpix.resize(nog);
 	freqWeights.resize(nog);
 
 	const double angpix_mov = micrographHandler->movie_angpix; // TODO: TAKANORI: make sure the movie_angpix is the same for all micrographs
@@ -192,6 +193,7 @@ void FrameRecombiner::init(
 		}
 
 		sh_out[og] = s_out[og]/2 + 1;
+		data_angpix[og] = obsModel->getPixelSize(og);
 
 		if (debug)
 		{
@@ -199,6 +201,7 @@ void FrameRecombiner::init(
 			std::cout << "s_out: " << s_out[og] << "\n";
 			std::cout << "s_mov: " << s_mov[og] << "\n";
 			std::cout << "angpix_out: " << angpix_out[og] << "\n";
+			std::cout << "data_angpix: " << data_angpix[og] << "\n";
 		}
 
 		if (s_out[og] > s_mov[og])
@@ -330,7 +333,7 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 
 		// loadMovie() will extract squares around the value of shift0 rounded in movie coords,
 		// and return the remainder in shift (in output coordinates)
-		movie = micrographHandler->loadMovie(mdtOut, s_out[ogmg], angpix_out[ogmg], fts, &shift0, &shift);
+		movie = micrographHandler->loadMovie(mdtOut, s_out[ogmg], angpix_out[ogmg], fts, &shift0, &shift, data_angpix[ogmg]);
 
 		const int out_size = crop_arg > 0 ? crop_arg : s_out[ogmg];
 		Image<RFLOAT> stack(out_size, out_size, 1, pc);
@@ -365,9 +368,12 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 				CTF ctf;
 				ctf.readByGroup(mdtOut, obsModel, p);
 				int og = obsModel->getOpticsGroup(mdtOut, p);
-	 			if (obsModel->getBoxSize(og) != s_out[og])
+				#pragma omp critical(FrameRecombiner_process)
 				{
-					obsModel->setBoxSize(og, s_out[og]);
+	 				if (obsModel->getBoxSize(og) != s_out[og])
+						obsModel->setBoxSize(og, s_out[og]);
+					if (obsModel->getPixelSize(og) != angpix_out[og])
+						obsModel->setPixelSize(og, angpix_out[og]);
 				}
 
 				MultidimArray<RFLOAT> Fctf;
@@ -440,6 +446,7 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
 
 	// Compute B/k-factors from all available FCCs (allMdts),
 	// even if only a subset of micrographs (chosenMdts) is being recombined.
+	// TODO: BUG: og_name is not used.
 	for (long g = 0; g < allMdts.size(); g++)
 	{
 		FileName fn_root = MotionRefiner::getOutputFileNameRoot(outPath, allMdts[g]);

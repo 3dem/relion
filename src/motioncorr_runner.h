@@ -136,6 +136,9 @@ public:
 	// Process at most this number of (unprocessed) micrographs
 	long do_at_most;
 
+	// EER parameters
+	int eer_upsampling, eer_grouping;
+
 	// Output STAR file
 	MetaDataTable MDavg, MDmov;
 
@@ -144,7 +147,6 @@ public:
 	std::string gpu_ids;
 	std::vector < std::vector < std::string > > allThreadIDs;
 
-public:
 	// Read command line arguments
 	void read(int argc, char **argv, int rank = 0);
 

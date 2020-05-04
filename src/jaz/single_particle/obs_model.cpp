@@ -650,6 +650,23 @@ double ObservationModel::pixToAng(double p, int s, int opticsGroup) const
 	return s * angpix[opticsGroup] / p;
 }
 
+void ObservationModel::setPixelSize(int opticsGroup, RFLOAT newPixelSize)
+{
+	if (opticsGroup < 0 || opticsGroup >= boxSizes.size())
+	{
+		REPORT_ERROR("ObservationModel::setPixelSize: wrong opticsGroup");
+	}
+
+	angpix[opticsGroup] = newPixelSize;
+
+	phaseCorr[opticsGroup].clear();
+	gammaOffset[opticsGroup].clear();
+
+	// mtfImage can be empty
+	if (mtfImage.size() > 0)
+		mtfImage[opticsGroup].clear();
+}
+
 double ObservationModel::getPixelSize(int opticsGroup) const
 {
 	return angpix[opticsGroup];

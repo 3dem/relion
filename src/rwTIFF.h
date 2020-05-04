@@ -60,7 +60,7 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
 
 	// Find the number of frames
 	while (TIFFSetDirectory(ftiff, _nDim) != 0) _nDim++;
-	//	and back to the start
+	// and go back to the start
 	TIFFSetDirectory(ftiff, 0);
 
 #ifdef DEBUG_TIFF
