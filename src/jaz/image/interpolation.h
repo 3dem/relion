@@ -826,7 +826,7 @@ gravis::d2Vector Interpolation::quadraticMaxXY(const RawImage<T>& img, double ep
 		}
 	}
 
-	if (xmax > 0 && xmax < w-1)
+	if (ymax > 0 && ymax < h-1)
 	{
 		const T vp = img(xmax, ymax + 1);
 		const T vn = img(xmax, ymax - 1);
