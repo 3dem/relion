@@ -392,6 +392,12 @@ void MotionEstimator::prepMicrograph(
 		mdt.getValue(EMDL_IMAGE_COORD_X, positions[p].x, p);
 		mdt.getValue(EMDL_IMAGE_COORD_Y, positions[p].y, p);
 	}
+	
+	// @TODO: never load the whole movie.
+	// Instead, load it frame-by-frame two or three times:
+	// 1. measure power spectra (can be avoided by reading SIGMA^2 from run_model.star)
+	// 2. compute cropped CCs
+	// 3. update FCCs after alignment
 
 	movie = micrographHandler->loadMovie(
 				mdt, s[ogmg], angpix[ogmg], fts,
@@ -399,7 +405,7 @@ void MotionEstimator::prepMicrograph(
 
 	std::vector<Image<Complex>> preds = reference->predictAll(
 				mdt, *obsModel, ReferenceMap::Own, nr_omp_threads);
-//	std::cout << "motion estimator preds size = " << XSIZE(preds[0]()) << "x" << YSIZE(preds[0]()) << std::endl;
+
 	if (!no_whitening)
 	{
 		std::vector<double> sigma2 = StackHelper::powerSpectrum(movie);

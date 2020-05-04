@@ -358,9 +358,9 @@ int writeMRC(long int img_select, bool isStack=false, int mode=WRITE_OVERWRITE)
 	RFLOAT aux,aux2;
 
 	// TODO: fix this!
-	header->a = (float)0.; // ua;
-	header->b = (float)0.; // ub;
-	header->c = (float)0.; // uc;
+	header->a = header->nx; // ua;
+	header->b = header->ny; // ub;
+	header->c = header->nz; // uc;
 	header->alpha = (float)90.;
 	header->beta = (float)90.;
 	header->gamma = (float)90.;

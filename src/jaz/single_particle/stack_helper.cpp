@@ -316,7 +316,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 	const int w0 = mgStack.data.xdim;
 	const int h0 = mgStack.data.ydim;
 	const int fcM = dataInZ? mgStack.data.zdim : mgStack.data.ndim;
-	// lastFrame and firstFrame is 0 indexed, while fcM is 1-indexed
+
 	const int fc = lastFrame > 0? lastFrame - firstFrame + 1 : fcM - firstFrame;
 
 	if (dataPs < 0) dataPs = outPs;
