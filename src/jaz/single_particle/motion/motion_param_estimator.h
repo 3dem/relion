@@ -40,7 +40,7 @@
 #endif
 
 class MotionEstimator;
-class LegacyReferenceMap;
+class ReferenceMap;
 class ObservationModel;
 class ParFourierTransformer;
 
@@ -57,7 +57,7 @@ class MotionParamEstimator
                   std::string outPath, int fc,
                   const std::vector<MetaDataTable>& allMdts,
                   MotionEstimator* motionEstimator,
-                  LegacyReferenceMap* reference,
+                  ReferenceMap* reference,
                   ObservationModel* obsModel);
 
         void run();
@@ -90,7 +90,7 @@ class MotionParamEstimator
 
             MotionEstimator* motionEstimator;
             ObservationModel* obsModel;
-            LegacyReferenceMap* reference;
+            ReferenceMap* reference;
 
             int fc, k_out, verb, nr_omp_threads, s_ref, s, sh;
 			bool allGroups;

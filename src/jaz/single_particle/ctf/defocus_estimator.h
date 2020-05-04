@@ -24,7 +24,7 @@
 #include <src/image.h>
 
 class IOParser;
-class LegacyReferenceMap;
+class ReferenceMap;
 class ObservationModel;
 
 class DefocusEstimator
@@ -40,7 +40,7 @@ class DefocusEstimator
 				int verb, int nr_omp_threads,
 				bool debug, bool diag,
 				std::string outPath,
-				LegacyReferenceMap* reference,
+				ReferenceMap* reference,
 				ObservationModel* obsModel);
 		
 		
@@ -75,7 +75,7 @@ class DefocusEstimator
 		std::vector<double> angpix;		
 		std::vector<Image<RFLOAT> > freqWeights;
 		
-		LegacyReferenceMap* reference;
+		ReferenceMap* reference;
 		ObservationModel* obsModel;
 		
 		bool ready;

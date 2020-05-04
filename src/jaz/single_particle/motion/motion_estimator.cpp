@@ -87,7 +87,7 @@ void MotionEstimator::read(IOParser& parser, int argc, char *argv[])
 void MotionEstimator::init(
 		int verb, int fc, int nr_omp_threads,
 		bool debug, std::string outPath,
-		LegacyReferenceMap* reference,
+		ReferenceMap* reference,
 		ObservationModel* obsModel,
 		MicrographHandler* micrographHandler)
 {
@@ -398,7 +398,7 @@ void MotionEstimator::prepMicrograph(
 				positions, myInitialTracks, unregGlob, myGlobComp); // throws exceptions
 
 	std::vector<Image<Complex>> preds = reference->predictAll(
-				mdt, *obsModel, LegacyReferenceMap::Own, nr_omp_threads);
+				mdt, *obsModel, ReferenceMap::Own, nr_omp_threads);
 
 	if (!no_whitening)
 	{
@@ -606,7 +606,7 @@ void MotionEstimator::updateFCC(
 		}
 
 		Image<Complex> pred = reference->predict(
-				mdt, p, *obsModel, LegacyReferenceMap::Opposite);
+				mdt, p, *obsModel, ReferenceMap::Opposite);
 
 		const double scale = (s_ref * angpix_ref)/(s[og] * angpix[og]);
 

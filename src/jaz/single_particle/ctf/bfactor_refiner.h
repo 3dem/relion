@@ -5,7 +5,7 @@
 #include <src/jaz/single_particle/gravis/t2Vector.h>
 
 class IOParser;
-class LegacyReferenceMap;
+class ReferenceMap;
 class ObservationModel;
 
 class BFactorRefiner
@@ -21,7 +21,7 @@ class BFactorRefiner
 				int verb, int nr_omp_threads,
 				bool debug, bool diag,
 				std::string outPath,
-				LegacyReferenceMap* reference,
+				ReferenceMap* reference,
 				ObservationModel* obsModel);
 
 
@@ -70,7 +70,7 @@ class BFactorRefiner
 		std::vector<double> angpix;
 		std::vector<Image<RFLOAT> > freqWeights;
 
-		LegacyReferenceMap* reference;
+		ReferenceMap* reference;
 		ObservationModel* obsModel;
 
 		bool ready;

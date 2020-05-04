@@ -30,13 +30,13 @@
 class ObservationModel;
 class LegacyObservationModel;
 
-class LegacyReferenceMap
+class ReferenceMap
 {
 	public:
 
 		typedef enum {Own, Opposite} HalfSet;
 
-		LegacyReferenceMap();
+		ReferenceMap();
 
 		// input parameters:
 		std::string reconFn0, reconFn1, maskFn, fscFn;

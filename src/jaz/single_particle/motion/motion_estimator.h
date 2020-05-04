@@ -27,7 +27,7 @@
 
 class IOParser;
 class ParFourierTransformer;
-class LegacyReferenceMap;
+class ReferenceMap;
 class ObservationModel;
 class MicrographHandler;
 
@@ -42,7 +42,7 @@ class MotionEstimator
 
         void init(int verb, int fc, int nr_omp_threads,
                   bool debug, std::string outPath,
-                  LegacyReferenceMap* reference,
+                  ReferenceMap* reference,
                   ObservationModel* obsModel,
                   MicrographHandler* micrographHandler);
 
@@ -129,7 +129,7 @@ class MotionEstimator
 
             std::string outPath;
 
-            LegacyReferenceMap* reference;
+            ReferenceMap* reference;
             ObservationModel* obsModel;
             MicrographHandler* micrographHandler;
 

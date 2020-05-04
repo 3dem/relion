@@ -4,7 +4,7 @@
 #include <src/image.h>
 
 class IOParser;
-class LegacyReferenceMap;
+class ReferenceMap;
 class ObservationModel;
 
 class AberrationEstimator
@@ -19,7 +19,7 @@ class AberrationEstimator
 		void init(
 				int verb, int nr_omp_threads,
 				bool debug, bool diag, std::string outPath,
-				LegacyReferenceMap* reference, ObservationModel* obsModel);
+				ReferenceMap* reference, ObservationModel* obsModel);
 
 		// Compute per-pixel information for one micrograph
 		void processMicrograph(
@@ -52,7 +52,7 @@ class AberrationEstimator
 		std::vector<int> s, sh;
 		std::vector<double> angpix;
 
-		LegacyReferenceMap* reference;
+		ReferenceMap* reference;
 		ObservationModel* obsModel;
 
 };

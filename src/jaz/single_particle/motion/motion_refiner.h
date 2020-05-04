@@ -75,7 +75,7 @@ class MotionRefiner
 		
 		// required components
 		ObservationModel obsModel;
-		LegacyReferenceMap reference;
+		ReferenceMap reference;
 		MicrographHandler micrographHandler;
 		
 		// s: full image size, sh: half-size + 1, fc: frame count

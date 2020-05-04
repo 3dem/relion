@@ -15,7 +15,7 @@ using namespace gravis;
 
 int main(int argc, char *argv[])
 {
-	LegacyReferenceMap reference;
+	ReferenceMap reference;
 	
 	IOParser parser;
 	
@@ -83,7 +83,7 @@ int main(int argc, char *argv[])
 		const int pc = allMdts[m].numberOfObjects();
 		
 		std::vector<Image<Complex>> pred = reference.predictAll(
-					allMdts[m], obsModel, LegacyReferenceMap::Own, nr_omp_threads,
+					allMdts[m], obsModel, ReferenceMap::Own, nr_omp_threads,
 					true, true, false);
 		
 		std::vector<Image<Complex>> obs = StackHelper::loadStackFS(

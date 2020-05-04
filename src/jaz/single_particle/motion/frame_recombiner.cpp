@@ -98,7 +98,7 @@ void FrameRecombiner::init(
 	const std::vector<MetaDataTable>& allMdts,
 	int verb, int s_ref, int fc, double maxFreq, double angpix_ref,
 	int nr_omp_threads, std::string outPath, bool debug,
-	LegacyReferenceMap* reference,
+	ReferenceMap* reference,
 	ObservationModel* obsModel,
 	MicrographHandler* micrographHandler)
 {

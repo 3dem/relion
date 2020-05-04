@@ -288,7 +288,7 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 		if (do_defocus_fit || do_bfac_fit)
 		{
 			predSameT = reference.predictAll(
-				unfinishedMdts[g], obsModel, LegacyReferenceMap::Own, nr_omp_threads,
+				unfinishedMdts[g], obsModel, ReferenceMap::Own, nr_omp_threads,
 				false, true, false, true, do_ctf_padding);
 		}
 
@@ -296,14 +296,14 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 		if (do_tilt_fit)
 		{
 			predOppNT = reference.predictAll(
-				unfinishedMdts[g], obsModel, LegacyReferenceMap::Opposite, nr_omp_threads,
+				unfinishedMdts[g], obsModel, ReferenceMap::Opposite, nr_omp_threads,
 				false, false, false, true, do_ctf_padding);
 		}
 
 		if (do_aberr_fit || do_mag_fit)
 		{
 			predOppT = reference.predictAll(
-				unfinishedMdts[g], obsModel, LegacyReferenceMap::Opposite, nr_omp_threads,
+				unfinishedMdts[g], obsModel, ReferenceMap::Opposite, nr_omp_threads,
 				false, true, false, true, do_ctf_padding);
 		}
 
@@ -333,7 +333,7 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 		{
 			std::vector<Volume<t2Vector<Complex>>> predGradient =
 				reference.predictAllComplexGradients(
-					unfinishedMdts[g], obsModel, LegacyReferenceMap::Opposite, nr_omp_threads,
+					unfinishedMdts[g], obsModel, ReferenceMap::Opposite, nr_omp_threads,
 					false, true, false, true, do_ctf_padding);
 
 			magnificationEstimator.processMicrograph(g, unfinishedMdts[g], obs, predOppT, predGradient, do_ctf_padding);

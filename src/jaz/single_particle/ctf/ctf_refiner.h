@@ -53,7 +53,7 @@ class CtfRefiner
 	protected:
 
 		ObservationModel obsModel;
-		LegacyReferenceMap reference;
+		ReferenceMap reference;
 
 		TiltEstimator tiltEstimator;
 		DefocusEstimator defocusEstimator;

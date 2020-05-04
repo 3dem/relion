@@ -32,7 +32,7 @@
 
 using namespace gravis;
 
-LegacyReferenceMap::LegacyReferenceMap()
+ReferenceMap::ReferenceMap()
 :	reconFn0(""),
 	reconFn1(""),
 	maskFn(""),
@@ -42,7 +42,7 @@ LegacyReferenceMap::LegacyReferenceMap()
 {
 }
 
-void LegacyReferenceMap::read(IOParser& parser, int argc, char* argv[])
+void ReferenceMap::read(IOParser& parser, int argc, char* argv[])
 {
 	reconFn0 = parser.getOption("--m1", "Reference map, half 1", "");
 	reconFn1 = parser.getOption("--m2", "Reference map, half 2", "");
@@ -52,7 +52,7 @@ void LegacyReferenceMap::read(IOParser& parser, int argc, char* argv[])
 	paddingFactor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
 }
 
-void LegacyReferenceMap::load(int verb, bool debug)
+void ReferenceMap::load(int verb, bool debug)
 {
 	if (reconFn0 == "" || reconFn1 == "")
 	{
@@ -183,7 +183,7 @@ void LegacyReferenceMap::load(int verb, bool debug)
 	}
 }
 
-Image<RFLOAT> LegacyReferenceMap::getHollowWeight(
+Image<RFLOAT> ReferenceMap::getHollowWeight(
 		double kmin_ang, int s_out, double angpix_out)
 {
 	const int sh_out = s_out/2 + 1;
@@ -223,7 +223,7 @@ Image<RFLOAT> LegacyReferenceMap::getHollowWeight(
 	return out;
 }
 
-std::vector<Image<Complex>> LegacyReferenceMap::predictAll(
+std::vector<Image<Complex>> ReferenceMap::predictAll(
 		const MetaDataTable& mdt,
 		ObservationModel& obs,
 		HalfSet hs, int threads,
@@ -243,7 +243,7 @@ std::vector<Image<Complex>> LegacyReferenceMap::predictAll(
 	return out;
 }
 
-Image<Complex> LegacyReferenceMap::predict(
+Image<Complex> ReferenceMap::predict(
 		const MetaDataTable& mdt, int p,
 		ObservationModel& obs,
 		HalfSet hs,
@@ -262,10 +262,10 @@ Image<Complex> LegacyReferenceMap::predict(
 	return pred;
 }
 
-std::vector<Volume<gravis::t2Vector<Complex>>> LegacyReferenceMap::predictAllComplexGradients(
+std::vector<Volume<gravis::t2Vector<Complex>>> ReferenceMap::predictAllComplexGradients(
 		const MetaDataTable &mdt,
 		ObservationModel &obs,
-		LegacyReferenceMap::HalfSet hs,
+		ReferenceMap::HalfSet hs,
 		int threads,
 		bool applyCtf, bool applyTilt, bool applyShift, bool applyMtf, bool applyCtfPadding)
 {
@@ -283,10 +283,10 @@ std::vector<Volume<gravis::t2Vector<Complex>>> LegacyReferenceMap::predictAllCom
 	return out;
 }
 
-Volume<t2Vector<Complex>> LegacyReferenceMap::predictComplexGradient(
+Volume<t2Vector<Complex>> ReferenceMap::predictComplexGradient(
 		const MetaDataTable &mdt,
 		int p, ObservationModel &obs,
-		LegacyReferenceMap::HalfSet hs,
+		ReferenceMap::HalfSet hs,
 		bool applyCtf, bool applyTilt, bool applyShift, bool applyMtf, bool applyCtfPadding)
 {
 	Volume<t2Vector<Complex>> pred;
@@ -302,7 +302,7 @@ Volume<t2Vector<Complex>> LegacyReferenceMap::predictComplexGradient(
 	return pred;
 }
 
-std::vector<Image<Complex>> LegacyReferenceMap::predictAll(
+std::vector<Image<Complex>> ReferenceMap::predictAll(
 		const MetaDataTable& mdt,
 		const LegacyObservationModel& obs,
 		HalfSet hs, int threads,
@@ -322,7 +322,7 @@ std::vector<Image<Complex>> LegacyReferenceMap::predictAll(
 	return out;
 }
 
-Image<Complex> LegacyReferenceMap::predict(
+Image<Complex> ReferenceMap::predict(
 		const MetaDataTable& mdt, int p,
 		const LegacyObservationModel& obs,
 		HalfSet hs,
@@ -341,12 +341,12 @@ Image<Complex> LegacyReferenceMap::predict(
 	return pred;
 }
 
-double LegacyReferenceMap::angToPix(double a) const
+double ReferenceMap::angToPix(double a) const
 {
 	return s * angpix / a;
 }
 
-double LegacyReferenceMap::pixToAng(double p) const
+double ReferenceMap::pixToAng(double p) const
 {
 	return s * angpix / p;
 }

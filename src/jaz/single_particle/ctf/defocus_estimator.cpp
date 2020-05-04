@@ -74,7 +74,7 @@ void DefocusEstimator::read(IOParser &parser, int argc, char *argv[])
 void DefocusEstimator::init(
 		int verb, int nr_omp_threads,
 		bool debug, bool diag, std::string outPath,
-		LegacyReferenceMap *reference, ObservationModel *obsModel)
+		ReferenceMap *reference, ObservationModel *obsModel)
 {
 	this->verb = verb;
 	this->nr_omp_threads = nr_omp_threads;

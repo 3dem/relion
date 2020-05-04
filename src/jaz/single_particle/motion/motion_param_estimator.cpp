@@ -69,7 +69,7 @@ void MotionParamEstimator::init(
     std::string outPath, int fc,
     const std::vector<MetaDataTable>& allMdts,
     MotionEstimator* motionEstimator,
-    LegacyReferenceMap* reference,
+    ReferenceMap* reference,
     ObservationModel* obsModel)
 {
     if (!paramsRead)
@@ -556,7 +556,7 @@ void MotionParamEstimator::prepAlignment()
                 alignmentSet.copyCC(g, p, f, movieCC[p][f]);
 
                 Image<Complex> pred = reference->predict(
-                    mdts[g], p, *obsModel, LegacyReferenceMap::Opposite);
+                    mdts[g], p, *obsModel, ReferenceMap::Opposite);
 
                 alignmentSet.accelerate(movie[p][f], alignmentSet.obs[g][p][f]);
                 alignmentSet.accelerate(pred, alignmentSet.pred[g][p]);

@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
 	bool oppositeHalf, predictCTF;
 	int minMG, maxMG, threads;
 	
-	LegacyReferenceMap reference;
+	ReferenceMap reference;
 
     IOParser parser;
 
@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
 		
 		pred = reference.predictAll(
 			allMdts[m], obsModel, 
-			oppositeHalf? LegacyReferenceMap::Opposite : LegacyReferenceMap::Own, 
+			oppositeHalf? ReferenceMap::Opposite : ReferenceMap::Own, 
 			threads, predictCTF, true, false);
 		
 		const int pc = obs.size();
