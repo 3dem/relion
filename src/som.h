@@ -59,6 +59,9 @@ private:
 
 	pthread_mutex_t mutex;
 
+	/*
+	 * Non-thread-safe remove node.
+	 */
 	void _remove_node(unsigned node) {
 		if (_nodes.find(node) == _nodes.end())
 			throw std::runtime_error("node missing");
@@ -70,7 +73,29 @@ private:
 		_nodes.erase(node);
 	}
 
+	/*
+	 * Non-thread-safe get neighbours of node.
+	 */
+	std::vector<unsigned> _get_neighbours(unsigned node) {
+		std::vector<unsigned> neighbours;
+		for (unsigned i = 0; i < _edges.size(); i++) {
+			if (_edges[i].n1 == node)
+				neighbours.push_back(_edges[i].n2);
+			if (_edges[i].n2 == node)
+				neighbours.push_back(_edges[i].n1);
+		}
+		return neighbours;
+	}
+
 public:
+
+	SomGraph()
+	{
+		int mutex_error = pthread_mutex_init(&mutex, NULL);
+
+		if (mutex_error != 0)
+			throw std::runtime_error("failed to initialize mutex");
+	}
 
 	/**
 	 * Add an edge-less node to the graph.
@@ -86,17 +111,19 @@ public:
 	}
 
 	/**
-	 * Add a connection between node1 and node2.
+	 * Add a edge between node1 and node2.
+	 * Do nothing if edge already exists.
 	 */
 	void add_edge(unsigned node1, unsigned node2) {
 		if (node1 == node2)
-			throw std::runtime_error("cannot add edge to same node");
+			throw std::runtime_error("cannot add edge to the node itself");
 
 		if (_nodes.find(node1) == _nodes.end() || _nodes.find(node2) == _nodes.end())
 			throw std::runtime_error("node missing");
 
 		Lock ml(&mutex);
 
+		// Does edge already exist
 		for (unsigned i = 0; i < _edges.size(); i++) {
 			if (_edges[i].n1 == node1 && _edges[i].n2 == node2 ||
 			    _edges[i].n1 == node2 && _edges[i].n2 == node1)
@@ -134,25 +161,37 @@ public:
 	 */
 	std::vector<unsigned> get_neighbours(unsigned node) {
 		Lock ml(&mutex);
-		std::vector<unsigned> neighbours;
-		for (unsigned i = 0; i < _edges.size(); i++) {
-			if (_edges[i].n1 == node)
-				neighbours.push_back(_edges[i].n2);
-			if (_edges[i].n2 == node)
-				neighbours.push_back(_edges[i].n1);
-		}
-		return neighbours;
+		return _get_neighbours(node);
 	}
 
 	/**
-	 * Remove all edges older than max_age
+	 * Remove all edges older than min_age
 	 */
-	void purge_old_edges(float max_age) {
+	void purge_old_edges(float min_age) {
 		Lock ml(&mutex);
 		for (unsigned i = 0; i < _edges.size(); i++) {
-			if (_edges[i].age > max_age)
+			if (_edges[i].age > min_age)
 				_edges.erase(_edges.begin()+i);
 		}
+	}
+
+	/**
+	 * Remove only the oldest edge, if older than min_age.
+	 */
+	void purge_oldest_edges(float min_age=0) {
+		Lock ml(&mutex);
+		unsigned idx = 0;
+		XFLOAT idx_age = 0;
+		for (unsigned i = 0; i < _edges.size(); i++) {
+			float a = _edges[i].age;
+			if (a >= idx_age)
+			{
+				idx = i;
+				idx_age = a;
+			}
+		}
+		if (idx_age > min_age)
+			_edges.erase(_edges.begin()+idx);
 	}
 
 	/**
@@ -228,25 +267,90 @@ public:
 		return _edges.size();
 	}
 
+	std::vector<unsigned> get_all_nodes() {
+		Lock ml(&mutex);
+		std::vector<unsigned> nodes;
+		for(std::unordered_map<unsigned, Node>::iterator n = _nodes.begin(); n != _nodes.end(); ++n)
+			nodes.push_back(n->first);
+		return nodes;
+	}
+
 	void reset_errors() {
 		Lock ml(&mutex);
 		for(std::unordered_map<unsigned, Node>::iterator n = _nodes.begin(); n != _nodes.end(); ++n)
 			n->second.error = 0.;
 	}
 
+	/**
+	 * Return the worst performing unit.
+	 */
 	unsigned find_wpu() {
 		Lock ml(&mutex);
-		int wpu = -1;
-		XFLOAT min_e = 0;
+
+		bool set = false;
+		unsigned wpu;
+		XFLOAT wpu_error = 0;
 		for(std::unordered_map<unsigned, Node>::iterator n = _nodes.begin(); n != _nodes.end(); ++n) {
 			float e = n->second.error;
-			if ((0 <= e && e < min_e) || wpu == -1)
-			{
+			if (e >= wpu_error) {
 				wpu = n->first;
-				min_e = e;
+				wpu_error = e;
+				set = true;
 			}
 		}
+
+		if (!set)
+			throw std::runtime_error("no wpu found");
+
 		return wpu;
+	}
+
+	/**
+	 * Return the worst performing neighbour of given node.
+	 */
+	unsigned find_wpu(unsigned node) {
+		Lock ml(&mutex);
+		std::vector<unsigned> neighbours = _get_neighbours(node);
+
+		bool set = false;
+		unsigned wpu;
+		XFLOAT max_e = 0;
+		for (unsigned i = 0; i < neighbours.size(); i++) {
+			float e = _nodes[neighbours[i]].error;
+			if (e >= max_e) {
+				wpu = neighbours[i];
+				max_e = e;
+				set = true;
+			}
+		}
+
+		if (!set)
+			throw std::runtime_error("no neighbour wpu found");
+
+		return wpu;
+	}
+
+	/**
+	 * Return unique nodes connected to edge.
+	 * Exclude node1 and node2.
+	 */
+	std::vector<unsigned> get_neighbourhood_of_edge(unsigned node1, unsigned node2)
+	{
+		std::vector<unsigned> n1 = _get_neighbours(node1);
+		std::vector<unsigned> n2 = _get_neighbours(node2);
+		std::vector<unsigned> n;
+
+		for (unsigned i = 0; i < n1.size(); i++)
+			if (n1[i] != node1 && n1[i] != node2 &&
+			    std::find(n.begin(), n.end(), n1[i]) == n.end() )
+				n.push_back(n1[i]);
+
+		for (unsigned i = 0; i < n2.size(); i++)
+			if (n2[i] != node1 && n2[i] != node2 &&
+			    std::find(n.begin(), n.end(), n2[i]) == n.end() )
+				n.push_back(n2[i]);
+
+		return n;
 	}
 };
 

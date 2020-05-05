@@ -1342,7 +1342,6 @@ void MlOptimiser::initialise()
 			if (i == n1 || i == n2)
 				continue;
 
-			mymodel.pdf_class[i] = 0;
 			mymodel.Iref[i] *= 0.;
 			mymodel.Igrad1[i] *= 0.;
 			mymodel.Igrad2[i] *= 0.;
@@ -2557,6 +2556,16 @@ void MlOptimiser::iterate()
 		timer.tic(TIMING_EXP);
 #endif
 
+		if(do_som) {
+			for (unsigned i = 0; i < mymodel.nr_classes; i ++)
+				mymodel.pdf_class[i] = 0;
+
+			std::vector<unsigned> nodes = som.get_all_nodes();
+			for (unsigned i = 0; i < nodes.size(); i ++)
+				mymodel.pdf_class[nodes[i]] = 1./nodes.size();
+
+		}
+
 		// Update subset_size
 		updateSubsetSize();
 
@@ -2719,11 +2728,10 @@ void MlOptimiser::iterate()
 		if(do_som)
 		{
 			// Remove old edges and orphan nodes
-			som.purge_old_edges(1000);
+			som.purge_oldest_edges(1000); //TODO as a parameter
 			std::vector<unsigned> purged_nodes = som.purge_orphans();
 
 			for (unsigned i = 0; i < purged_nodes.size(); i++) {
-				mymodel.pdf_class[purged_nodes[i]] = 0;
 				mymodel.Iref[purged_nodes[i]] *= 0.;
 				mymodel.Igrad1[purged_nodes[i]] *= 0.;
 				mymodel.Igrad2[purged_nodes[i]] *= 0.;
@@ -2731,19 +2739,11 @@ void MlOptimiser::iterate()
 
 			// Add new nodes
 			if (iter > 0 && iter % 10 == 0 && som.get_node_count() < mymodel.nr_classes) { //TODO as a parameter
-				unsigned wpu = som.find_wpu();
-				std::vector<unsigned> neighbours = som.get_neighbours(wpu);
-
-				unsigned swpu = -1;
-				XFLOAT max_e = 0;
-				for (unsigned i = 0; i < neighbours.size(); i++) {
-					float e = som.get_node_error(neighbours[i]);
-					if (max_e < e) {
-						swpu = neighbours[i];
-						max_e = e;
-					}
-				}
+				unsigned wpu = som.find_wpu(); // Worse performing unit (WPU)
+				unsigned swpu = som.find_wpu(wpu); // Second worse performing unit (SWPU)
 				som.reset_errors();
+
+				std::vector<unsigned> neighbourhood = som.get_neighbourhood_of_edge(wpu, swpu);
 
 				// Insert the node between the WPU and SWPU
 				som.remove_edge(wpu, swpu);
@@ -2752,11 +2752,15 @@ void MlOptimiser::iterate()
 				som.add_edge(idx, wpu);
 				som.add_edge(idx, swpu);
 
-				mymodel.pdf_class[idx] = 1;
+				mymodel.Iref[idx] = (mymodel.Iref[wpu] + mymodel.Iref[swpu]) / 3;
+				mymodel.Igrad1[idx] = (mymodel.Igrad1[wpu] + mymodel.Igrad1[swpu]) / 3;
+				mymodel.Igrad2[idx] = (mymodel.Igrad2[wpu] + mymodel.Igrad2[swpu]) / 3;
 
-				mymodel.Iref[idx] = (mymodel.Iref[wpu] + mymodel.Iref[swpu]) / 2;
-				mymodel.Igrad1[idx] = (mymodel.Igrad1[wpu] + mymodel.Igrad1[swpu]) / 2;
-				mymodel.Igrad2[idx] = (mymodel.Igrad2[wpu] + mymodel.Igrad2[swpu]) / 2;
+				for (unsigned i = 0; i < neighbourhood.size(); i++) {
+					mymodel.Iref[idx] += mymodel.Iref[i] / (3 * neighbourhood.size());
+					mymodel.Igrad1[idx] += mymodel.Igrad1[i] / (3 * neighbourhood.size());
+					mymodel.Igrad2[idx] += mymodel.Igrad2[i] / (3 * neighbourhood.size());
+				}
 			}
 		}
 
@@ -4278,19 +4282,13 @@ void MlOptimiser::maximizationOtherParameters()
 	// Update model.pdf_class vector (for each k)
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 	{
-
-		// Update pdf_class (for SGD: update with taking mu into account! For non-SGD: mu equals zero)
-		mymodel.pdf_class[iclass] *= mu;
-		mymodel.pdf_class[iclass] += (1. - mu) * wsum_model.pdf_class[iclass] / sum_weight;
+		mymodel.pdf_class[iclass] =  wsum_model.pdf_class[iclass] / sum_weight;
 
 		// for 2D also update priors of translations for each class!
 		if (mymodel.ref_dim == 2)
 		{
 			if (wsum_model.pdf_class[iclass] > 0.)
-			{
-				mymodel.prior_offset_class[iclass] *= mu;
-				mymodel.prior_offset_class[iclass] += (1. - mu) * wsum_model.prior_offset_class[iclass] / sum_weight;
-			}
+				mymodel.prior_offset_class[iclass] = wsum_model.prior_offset_class[iclass] / sum_weight;
 			else
 				mymodel.prior_offset_class[iclass].initZeros();
 		}

@@ -2420,9 +2420,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				// store partials according to indices of the relevant dimension
 				unsigned ithr_wsum_pdf_direction = baseMLO->mymodel.nr_bodies > 1 ? ibody : iclass;
 				DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[ithr_wsum_pdf_direction], mydir) += p_weights[n];
-				thr_sumw_group[img_id]                                                       += p_weights[n];
-				thr_wsum_pdf_class[iclass]                                                   += p_weights[n];
-				thr_wsum_sigma2_offset                                                       += my_pixel_size * my_pixel_size * p_thr_wsum_sigma2_offset[n];
+				thr_sumw_group[img_id] += p_weights[n];
+				thr_wsum_sigma2_offset += my_pixel_size * my_pixel_size * p_thr_wsum_sigma2_offset[n];
+
+				if (!baseMLO->do_som)
+					thr_wsum_pdf_class[iclass] += p_weights[n];
 
 				if (baseMLO->mymodel.ref_dim == 2)
 				{
@@ -2876,32 +2878,32 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		if (baseMLO->do_som)
 		{
 
-			// Get best preforming unit
+			// Get best preforming unit (BPU)
 			int bpu = -1;
-			XFLOAT min_e = 0;
+			XFLOAT bpu_error = 0;
 			for (int i = sp.iclass_min; i <= sp.iclass_max; i++)
 			{
 				XFLOAT e = errors[i];
-				if ((0 <= e && e < min_e) || bpu == -1)
+				if ((0 <= e && e < bpu_error) || bpu == -1)
 				{
 					bpu = i;
-					min_e = e;
+					bpu_error = e;
 				}
 			}
 
-			// Get second best preforming unit
+			// Get second best preforming unit (SBPU)
 			int sbpu = -1;
-			min_e = 0;
+			XFLOAT sbpu_error = 0;
 			for (int i = sp.iclass_min; i <= sp.iclass_max; i++)
 			{
 				if (i == bpu)
 					continue;
 
 				XFLOAT e = errors[i];
-				if ((0 <= e && e < min_e) || sbpu == -1)
+				if ((0 <= e && e < sbpu_error) || sbpu == -1)
 				{
 					sbpu = i;
-					min_e = e;
+					sbpu_error = e;
 				}
 			}
 
@@ -2912,11 +2914,14 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			// Set total weight of BPU
 			class_sum_weight[bpu] = op.sum_weight_class[img_id][bpu];
+			thr_wsum_pdf_class[bpu] += op.sum_weight_class[img_id][bpu] / op.sum_weight[img_id];
 
 			// Set total weights for neighbours
 			std::vector<unsigned> in = baseMLO->som.get_neighbours(bpu);
-			for (int i = 0; i < in.size(); i ++)
+			for (int i = 0; i < in.size(); i ++) {
 				class_sum_weight[in[i]] = op.sum_weight_class[img_id][in[i]] * 3; //TODO as a parameter
+				thr_wsum_pdf_class[in[i]] += op.sum_weight_class[img_id][in[i]] / (op.sum_weight[img_id] * 3);
+			}
 
 		}
 
