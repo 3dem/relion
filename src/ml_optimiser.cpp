@@ -590,6 +590,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	mymodel.helical_rise_min = textToFloat(parser.getOption("--helical_rise_min", "Minimum helical rise (in Angstroms)", "0."));
 	mymodel.helical_rise_max = textToFloat(parser.getOption("--helical_rise_max", "Maximum helical rise (in Angstroms)", "0."));
 	mymodel.helical_rise_inistep = textToFloat(parser.getOption("--helical_rise_inistep", "Initial step of helical rise search (in Angstroms)", "0."));
+	helical_nstart = textToInteger(parser.getOption("--helical_nstart", "N-number for the N-start helix (only useful for rotational priors)", "1"));
 	helical_z_percentage = textToFloat(parser.getOption("--helical_z_percentage", "This box length along the center of Z axis contains good information of the helix. Important in imposing and refining symmetry", "0.3"));
 	helical_tube_inner_diameter = textToFloat(parser.getOption("--helical_inner_diameter", "Inner diameter of helical tubes in Angstroms (for masks of helical references and particles)", "-1."));
 	helical_tube_outer_diameter = textToFloat(parser.getOption("--helical_outer_diameter", "Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)", "-1."));
@@ -868,6 +869,8 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
     		helical_rise_initial = 0.;
 	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE, helical_z_percentage))
 		helical_z_percentage = 0.3;
+	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_NSTART, helical_nstart))
+		helical_nstart = 1;
 	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER, helical_tube_inner_diameter))
 		helical_tube_inner_diameter = -1.;
 	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER, helical_tube_outer_diameter))
@@ -1123,6 +1126,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_HELICAL_TWIST_INITIAL, helical_twist_initial);
 		MD.setValue(EMDL_OPTIMISER_HELICAL_RISE_INITIAL, helical_rise_initial);
 		MD.setValue(EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE, helical_z_percentage);
+		MD.setValue(EMDL_OPTIMISER_HELICAL_NSTART, helical_nstart);
 		MD.setValue(EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER, helical_tube_inner_diameter);
 		MD.setValue(EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER, helical_tube_outer_diameter);
 		MD.setValue(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT, do_helical_symmetry_local_refinement);
@@ -1824,7 +1828,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 		if (iter == 0 && sampling.healpix_order >= autosampling_hporder_local_searches)
 		{
 			mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
-			sampling.orientational_prior_mode = PRIOR_ROTTILT_PSI;
 			sampling.is_3D = (mymodel.ref_dim == 3);
 			RFLOAT rottilt_step = sampling.getAngularSampling(adaptive_oversampling);
 			mymodel.sigma2_rot = mymodel.sigma2_tilt = mymodel.sigma2_psi = 2. * 2. * rottilt_step * rottilt_step;
@@ -1847,7 +1850,8 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 	// Initialise the sampling object (sets prior mode and fills translations and rotations inside sampling object)
 	// May06,2015 - Shaoda & Sjors, initialise for helical translations
-	bool do_local_searches = ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches));
+	bool do_local_searches_helical = ((do_auto_refine) && (do_helical_refine) &&
+			(sampling.healpix_order >= autosampling_hporder_local_searches));
 
 	if (iter == 0)
 	{
@@ -1857,8 +1861,8 @@ void MlOptimiser::initialiseGeneral(int rank)
 		sampling.offset_range *= mymodel.pixel_size;
 		sampling.offset_step *= mymodel.pixel_size;
 	}
-	sampling.initialise(mymodel.orientational_prior_mode, mymodel.ref_dim, (mymodel.data_dim == 3), do_gpu, (verb>0),
-			do_local_searches, (do_helical_refine) && (!ignore_helical_symmetry),
+	sampling.initialise(mymodel.ref_dim, (mymodel.data_dim == 3), do_gpu, (verb>0),
+			do_local_searches_helical, (do_helical_refine) && (!ignore_helical_symmetry),
 			helical_rise_initial, helical_twist_initial);
 
 	// Now that sampling is initialised, also modify sigma2_rot for the helical refinement
@@ -1886,7 +1890,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 	if (do_skip_align || do_skip_rotate)
 	{
 		mymodel.orientational_prior_mode = NOPRIOR;
-		sampling.orientational_prior_mode = NOPRIOR;
 		adaptive_oversampling = 0;
 		sampling.perturbation_factor = 0.;
 		sampling.random_perturbation = 0.;
@@ -1898,7 +1901,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 		std::cout << " Only sampling tilt, keep rot and psi fixed." << std::endl;
 
 		mymodel.orientational_prior_mode = NOPRIOR;
-		sampling.orientational_prior_mode = NOPRIOR;
 		adaptive_oversampling = 0;
 		sampling.perturbation_factor = 0.;
 		sampling.random_perturbation = 0.;
@@ -2637,54 +2639,32 @@ void MlOptimiser::iterate()
 		if (do_helical_refine && mymodel.ref_dim == 3)
 		{
 			if (!ignore_helical_symmetry)
+			{
 				makeGoodHelixForEachRef();
+			}
+
 			if ( (!do_skip_align) && (!do_skip_rotate) )
 			{
-				int nr_same_polarity = 0, nr_opposite_polarity = 0;
-				int nr_same_rot = 0, nr_opposite_rot = 0;	// KThurber
-				RFLOAT opposite_percentage = 0.;
-				RFLOAT rot_opposite_percent = 0.;		// KThurber
-				bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
-				bool do_classification_local_searches = (!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
-						&& (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.);
-				bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
-				std::cerr << " do_auto_refine_local_searches= " << do_auto_refine_local_searches << " do_classification_local_searches= " << do_classification_local_searches << " do_local_angular_searches= " << do_local_angular_searches << std::endl;
-				if (helical_sigma_distance < 0.)
-					updateAngularPriorsForHelicalReconstruction(mydata.MDimg, helical_keep_tilt_prior_fixed);
-				else
-				{
-					updatePriorsForHelicalReconstruction(
-							mydata.MDimg,
-							nr_opposite_polarity,
-							nr_opposite_rot,	// KThurber
-							helical_sigma_distance * ((RFLOAT)(mymodel.ori_size)),
-							mymodel.helical_rise,
-							mymodel.helical_twist,
-							(mymodel.data_dim == 3),
-							do_auto_refine,
-							do_local_angular_searches,
-							mymodel.sigma2_rot,
-							mymodel.sigma2_tilt,
-							mymodel.sigma2_psi,
-							mymodel.sigma2_offset,
-							helical_keep_tilt_prior_fixed);
-
-					nr_same_polarity = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_polarity;
-					nr_same_rot = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_rot;  // KThurber
-					opposite_percentage = (100.) * ((RFLOAT)(nr_opposite_polarity)) / ((RFLOAT)(mydata.MDimg.numberOfObjects()));
-					rot_opposite_percent = (100.) * ((RFLOAT)(nr_opposite_rot)) / ((RFLOAT)(mydata.MDimg.numberOfObjects()));  // KThurber
-					if ( (verb > 0) && (!do_local_angular_searches) )
-					{
-						std::cout << " Number of helical segments with psi angles similar/opposite to their priors: " << nr_same_polarity << " / " << nr_opposite_polarity << " (" << opposite_percentage << "%)" << std::endl;
-						std::cout << " Number of helical segments with rot angles similar/opposite to their priors: " << nr_same_rot << " / " << nr_opposite_rot << " (" << rot_opposite_percent << "%)" << std::endl;  // KThurber
-					}
-				}
+				updatePriorsForHelicalReconstruction(
+						mydata.MDimg,
+						helical_sigma_distance * ((RFLOAT)(mymodel.ori_size)),
+						mymodel.helical_rise,
+						mymodel.helical_twist,
+						helical_nstart,
+						(mymodel.data_dim == 3),
+						do_auto_refine,
+						mymodel.sigma2_rot,
+						mymodel.sigma2_tilt,
+						mymodel.sigma2_psi,
+						mymodel.sigma2_offset,
+						helical_keep_tilt_prior_fixed,
+						verb);
 			}
 		}
 
-                // Directly use fn_out, without "_it" specifier, so unmasked refs will be overwritten at every iteration
-                if (do_write_unmasked_refs)
-                    mymodel.write(fn_out+"_unmasked", sampling, false, true);
+		// Directly use fn_out, without "_it" specifier, so unmasked refs will be overwritten at every iteration
+		if (do_write_unmasked_refs)
+			mymodel.write(fn_out+"_unmasked", sampling, false, true);
 
 #ifdef TIMING
 		timer.toc(TIMING_ITER_HELICALREFINE);
@@ -8850,7 +8830,8 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 					REPORT_ERROR("MlOptimiser::autoAdjustAngularSampling BUG: ref_dim should be two or three");
 
 				// Jun08,2015 Shaoda & Sjors, Helical refinement
-				bool do_local_searches = ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches));
+				bool do_local_searches_helical = ((do_auto_refine) && (do_helical_refine) &&
+						(sampling.healpix_order >= autosampling_hporder_local_searches));
 
 				// Don't go to coarse angular samplings. Then just keep doing as it was
 				if (new_step > sampling.offset_step)
@@ -8859,7 +8840,7 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 					new_range = sampling.offset_range;
 				}
 
-				sampling.setTranslations(new_step, new_range, do_local_searches, (do_helical_refine) && (!ignore_helical_symmetry), new_helical_offset_step, helical_rise_initial, helical_twist_initial);
+				sampling.setTranslations(new_step, new_range, do_local_searches_helical, (do_helical_refine) && (!ignore_helical_symmetry), new_helical_offset_step, helical_rise_initial, helical_twist_initial);
 
 				// Reset iteration counters
 				nr_iter_wo_resol_gain = 0;
@@ -8875,7 +8856,6 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 				{
 					// Switch ON local angular searches
 					mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
-					sampling.orientational_prior_mode = PRIOR_ROTTILT_PSI;
 					mymodel.sigma2_rot = mymodel.sigma2_psi = 2. * 2. * new_rottilt_step * new_rottilt_step;
 					if (!(do_helical_refine && helical_keep_tilt_prior_fixed))
 						mymodel.sigma2_tilt = mymodel.sigma2_rot;
@@ -8891,7 +8871,7 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 		if (myverb)
 		{
 			std::cout << " Auto-refine: Angular step= " << sampling.getAngularSampling(adaptive_oversampling) << " degrees; local searches= ";
-			if (sampling.orientational_prior_mode == NOPRIOR)
+			if (mymodel.orientational_prior_mode == NOPRIOR)
 				std:: cout << "false" << std::endl;
 			else
 				std:: cout << "true" << std::endl;
