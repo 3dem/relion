@@ -371,6 +371,7 @@ public:
 
 	//Self-organizing map
 	bool do_som;
+	bool is_som_iter;
 	SomGraph som;
 
 

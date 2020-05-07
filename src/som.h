@@ -30,6 +30,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include "src/parallel.h"
+#include "src/filename.h"
 
 class SomGraph {
 
@@ -39,6 +40,7 @@ private:
 	 * Class for graph nodes
 	 */
 	struct Node {
+		float age = 0;
 		float error = 0.;
 	};
 
@@ -178,7 +180,7 @@ public:
 	/**
 	 * Remove only the oldest edge, if older than min_age.
 	 */
-	void purge_oldest_edges(float min_age=0) {
+	void purge_oldest_edge(float min_age=0) {
 		Lock ml(&mutex);
 		unsigned idx = 0;
 		XFLOAT idx_age = 0;
@@ -232,7 +234,7 @@ public:
 		throw std::runtime_error("edge not found");
 	}
 
-	void set_edge_age(unsigned node1, unsigned node2, float age) {
+	void set_edge_age(unsigned node1, unsigned node2, float age=0.) {
 		Lock ml(&mutex);
 		for (unsigned i = 0; i < _edges.size(); i++)
 			if (_edges[i].n1 == node1 && _edges[i].n2 == node2 ||
@@ -248,22 +250,46 @@ public:
 		return _nodes[node].error;
 	}
 
-	void set_node_error(unsigned node, float error) {
+	void set_node_error(unsigned node, float error=0.) {
 		Lock ml(&mutex);
 		_nodes[node].error = error;
 	}
 
-	void increment_age() {
+	void increment_node_error(unsigned node, float error) {
 		Lock ml(&mutex);
-		for (unsigned i = 0; i < _edges.size(); i++)
-			_edges[i].age ++;
+		_nodes[node].error += error;
 	}
 
-	unsigned get_node_count() const {
+	void increment_neighbour_edge_ages(unsigned node) {
+		Lock ml(&mutex);
+		for (unsigned i = 0; i < _edges.size(); i++) {
+			if (_edges[i].n1 == node || _edges[i].n2 == node)
+				_edges[i].age ++;
+		}
+	}
+
+	void increment_node_age(unsigned node, float amount=1) {
+		Lock ml(&mutex);
+		_nodes[node].age += amount;
+	}
+
+	float get_node_age(unsigned node) {
+		Lock ml(&mutex);
+		return _nodes[node].age;
+	}
+
+	void set_node_age(unsigned node, float age=0.) {
+		Lock ml(&mutex);
+		_nodes[node].age = age;
+	}
+
+	unsigned get_node_count() {
+		Lock ml(&mutex);
 		return _nodes.size();
 	}
 
-	unsigned get_edge_count() const {
+	unsigned get_edge_count() {
+		Lock ml(&mutex);
 		return _edges.size();
 	}
 
@@ -279,6 +305,30 @@ public:
 		Lock ml(&mutex);
 		for(std::unordered_map<unsigned, Node>::iterator n = _nodes.begin(); n != _nodes.end(); ++n)
 			n->second.error = 0.;
+	}
+
+	/**
+	 * Return the oldest node.
+	 */
+	unsigned find_oldest_node() {
+		Lock ml(&mutex);
+
+		bool set = false;
+		unsigned wpu;
+		XFLOAT wpu_error = 0;
+		for(std::unordered_map<unsigned, Node>::iterator n = _nodes.begin(); n != _nodes.end(); ++n) {
+			float e = n->second.age;
+			if (e >= wpu_error) {
+				wpu = n->first;
+				wpu_error = e;
+				set = true;
+			}
+		}
+
+		if (!set)
+			throw std::runtime_error("no node found");
+
+		return wpu;
 	}
 
 	/**
@@ -351,6 +401,24 @@ public:
 				n.push_back(n2[i]);
 
 		return n;
+	}
+
+	void print_to_file(FileName &fn) {
+		std::ofstream out;
+		out.open(fn);
+
+		out << "_nodes [index error age]" << std::endl;
+
+		for(std::unordered_map<unsigned, Node>::iterator n = _nodes.begin(); n != _nodes.end(); ++n)
+			out << n->first << " " << n->second.error << " " << n->second.age << std::endl;
+
+		out << std::endl;
+		out << "_edges [node1 node2 age]" << std::endl;
+
+		for(unsigned i = 0; i < _edges.size(); i++)
+			out << _edges[i].n1 << " " << _edges[i].n2 << " " << _edges[i].age << std::endl;
+
+		out.close();
 	}
 };
 

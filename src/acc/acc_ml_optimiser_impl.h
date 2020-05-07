@@ -2035,7 +2035,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
-				if(baseMLO->do_som) {
+				if(baseMLO->is_som_iter) {
 					op.sum_weight_class[img_id].resize(baseMLO->mymodel.nr_classes, 0);
 
 					for (unsigned long exp_iclass = sp.iclass_min;
@@ -2423,7 +2423,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				thr_sumw_group[img_id] += p_weights[n];
 				thr_wsum_sigma2_offset += my_pixel_size * my_pixel_size * p_thr_wsum_sigma2_offset[n];
 
-				if (!baseMLO->do_som)
+				if (!baseMLO->is_som_iter)
 					thr_wsum_pdf_class[iclass] += p_weights[n];
 
 				if (baseMLO->mymodel.ref_dim == 2)
@@ -2806,7 +2806,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 							 KERNEL CALL
 		======================================================*/
 
-		std::vector<XFLOAT> errors(baseMLO->mymodel.nr_classes, -1);
+		std::vector<XFLOAT> errors(baseMLO->mymodel.nr_classes, 0);
 
 		classPos = 0;
 		for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++) {
@@ -2818,8 +2818,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				continue;
 
 
-			AccPtr<XFLOAT> error = ptrFactory.make<XFLOAT>((size_t) image_size);
-			error.allAlloc();
+			AccPtr<XFLOAT> error = ptrFactory.make<XFLOAT>((size_t) image_size, accMLO->classStreams[iclass]);
+			error.accAlloc();
 			error.accInit(0);
 
 			long unsigned orientation_num(ProjectionData[img_id].orientation_num[iclass]);
@@ -2861,11 +2861,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			AAXA_pos += image_size;
 			classPos += orientation_num*translation_num;
 
-			if (baseMLO->do_som) {
+			if (baseMLO->is_som_iter)
 				errors[iclass] = AccUtilities::getSumOnDevice(error);
-				XFLOAT error_sum = errors[iclass] + baseMLO->som.get_node_error(iclass);
-				baseMLO->som.set_node_error(iclass, error_sum);
-			}
 		}
 
 		/*======================================================
@@ -2873,9 +2870,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		======================================================*/
 
 		int nr_classes = baseMLO->mymodel.nr_classes;
-		std::vector<RFLOAT> class_sum_weight(nr_classes, baseMLO->do_som ? 0 : op.sum_weight[img_id]);
+		std::vector<RFLOAT> class_sum_weight(nr_classes, baseMLO->is_som_iter ? 0 : op.sum_weight[img_id]);
 
-		if (baseMLO->do_som)
+		if (baseMLO->is_som_iter)
 		{
 
 			// Get best preforming unit (BPU)
@@ -2883,6 +2880,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			XFLOAT bpu_error = 0;
 			for (int i = sp.iclass_min; i <= sp.iclass_max; i++)
 			{
+				if (baseMLO->mymodel.pdf_class[i] == 0.)
+					continue;
+
 				XFLOAT e = errors[i];
 				if ((0 <= e && e < bpu_error) || bpu == -1)
 				{
@@ -2896,7 +2896,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			XFLOAT sbpu_error = 0;
 			for (int i = sp.iclass_min; i <= sp.iclass_max; i++)
 			{
-				if (i == bpu)
+				if (i == bpu || baseMLO->mymodel.pdf_class[i] == 0.)
 					continue;
 
 				XFLOAT e = errors[i];
@@ -2909,18 +2909,23 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			// Modify graph
 			baseMLO->som.add_edge(bpu, sbpu);
-			baseMLO->som.increment_age();
+			baseMLO->som.increment_neighbour_edge_ages(bpu);
 			baseMLO->som.set_edge_age(bpu, sbpu, 0);
 
 			// Set total weight of BPU
 			class_sum_weight[bpu] = op.sum_weight_class[img_id][bpu];
 			thr_wsum_pdf_class[bpu] += op.sum_weight_class[img_id][bpu] / op.sum_weight[img_id];
 
+			baseMLO->som.increment_node_error(bpu, errors[bpu]);
+			baseMLO->som.increment_node_age(bpu, 1.);
+
+			XFLOAT lambda = .8;
 			// Set total weights for neighbours
 			std::vector<unsigned> in = baseMLO->som.get_neighbours(bpu);
 			for (int i = 0; i < in.size(); i ++) {
-				class_sum_weight[in[i]] = op.sum_weight_class[img_id][in[i]] * 3; //TODO as a parameter
-				thr_wsum_pdf_class[in[i]] += op.sum_weight_class[img_id][in[i]] / (op.sum_weight[img_id] * 3);
+				class_sum_weight[in[i]] = op.sum_weight_class[img_id][in[i]] /lambda; //TODO as a parameter
+				thr_wsum_pdf_class[in[i]] += op.sum_weight_class[img_id][in[i]] / (op.sum_weight[img_id] /lambda);
+				baseMLO->som.increment_node_age(in[i], lambda);
 			}
 
 		}
@@ -2940,7 +2945,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			if((baseMLO->mymodel.pdf_class[iclass] == 0.) || (ProjectionData[img_id].class_entries[iclass] == 0))
 				continue;
 
-			if (baseMLO->do_som && class_sum_weight[iclass] == 0)
+			if ( baseMLO->is_som_iter && class_sum_weight[iclass] == 0)
 				continue;
 
 			long unsigned orientation_num(ProjectionData[img_id].orientation_num[iclass]);

@@ -1333,18 +1333,29 @@ void MlOptimiser::initialise()
 
 	if (do_som)
 	{
-		// Add the initial two nodes to the graph and connect them with an edge
-		unsigned n1 = som.add_node();
-		unsigned n2 = som.add_node();
-		som.add_edge(n1, n2);
+		// Add the initial nodes to the graph and connect them with an edge
+		for (unsigned i = 0; i < XMIPP_MIN(10, mymodel.nr_classes); i++)
+			som.add_node();
 
+		std::vector<unsigned> nodes = som.get_all_nodes();
+
+		// Connect all to all
+		for (unsigned i = 0; i < nodes.size(); i++)
+			for (unsigned j = i + 1; j < nodes.size(); j++)
+				som.add_edge(nodes[i], nodes[j]);
+
+		// Clear all non-node
 		for (unsigned i = 0; i < mymodel.nr_classes; i ++) {
-			if (i == n1 || i == n2)
-				continue;
+			bool clear = true;
+			for (unsigned j = 0; j < nodes.size(); j++)
+				if (i == nodes[j])
+					clear = false;
 
-			mymodel.Iref[i] *= 0.;
-			mymodel.Igrad1[i] *= 0.;
-			mymodel.Igrad2[i] *= 0.;
+			if (clear) {
+				mymodel.Iref[i] *= 0.;
+				mymodel.Igrad1[i] *= 0.;
+				mymodel.Igrad2[i] *= 0.;
+			}
 		}
 	}
 
@@ -2557,6 +2568,12 @@ void MlOptimiser::iterate()
 #endif
 
 		if(do_som) {
+
+			if (do_generate_seeds && !do_firstiter_cc && iter == 1)
+				is_som_iter = false;
+			else
+				is_som_iter = true;
+
 			for (unsigned i = 0; i < mymodel.nr_classes; i ++)
 				mymodel.pdf_class[i] = 0;
 
@@ -2728,7 +2745,7 @@ void MlOptimiser::iterate()
 		if(do_som)
 		{
 			// Remove old edges and orphan nodes
-			som.purge_oldest_edges(1000); //TODO as a parameter
+			som.purge_old_edges(500); //TODO as a parameter
 			std::vector<unsigned> purged_nodes = som.purge_orphans();
 
 			for (unsigned i = 0; i < purged_nodes.size(); i++) {
@@ -2738,29 +2755,29 @@ void MlOptimiser::iterate()
 			}
 
 			// Add new nodes
-			if (iter > 0 && iter % 10 == 0 && som.get_node_count() < mymodel.nr_classes) { //TODO as a parameter
+			unsigned som_add_interval = 10;
+			if (0 < iter && iter % som_add_interval == 0 && som.get_node_count() < mymodel.nr_classes) { //TODO as a parameter
 				unsigned wpu = som.find_wpu(); // Worse performing unit (WPU)
 				unsigned swpu = som.find_wpu(wpu); // Second worse performing unit (SWPU)
-				som.reset_errors();
 
-				std::vector<unsigned> neighbourhood = som.get_neighbourhood_of_edge(wpu, swpu);
+				float wpu_error = som.get_node_error(wpu);
+				float swpu_error = som.get_node_error(swpu);
 
 				// Insert the node between the WPU and SWPU
 				som.remove_edge(wpu, swpu);
 				unsigned idx = som.add_node();
 
+				som.add_edge(swpu, idx);
 				som.add_edge(idx, wpu);
-				som.add_edge(idx, swpu);
 
-				mymodel.Iref[idx] = (mymodel.Iref[wpu] + mymodel.Iref[swpu]) / 3;
-				mymodel.Igrad1[idx] = (mymodel.Igrad1[wpu] + mymodel.Igrad1[swpu]) / 3;
-				mymodel.Igrad2[idx] = (mymodel.Igrad2[wpu] + mymodel.Igrad2[swpu]) / 3;
+				mymodel.Iref[idx] = 0.8 * mymodel.Iref[wpu] + 0.2 * mymodel.Iref[swpu];
+				mymodel.Igrad1[idx] = 0.8 * mymodel.Igrad1[wpu] + 0.2 * mymodel.Igrad1[swpu];
+				mymodel.Igrad2[idx] = 0.8 * mymodel.Igrad2[wpu] + 0.2 * mymodel.Igrad2[swpu];
 
-				for (unsigned i = 0; i < neighbourhood.size(); i++) {
-					mymodel.Iref[idx] += mymodel.Iref[i] / (3 * neighbourhood.size());
-					mymodel.Igrad1[idx] += mymodel.Igrad1[i] / (3 * neighbourhood.size());
-					mymodel.Igrad2[idx] += mymodel.Igrad2[i] / (3 * neighbourhood.size());
-				}
+				som.set_node_error(idx);
+				som.set_node_error(wpu);
+
+				som.set_node_age(idx, som.get_node_age(wpu) * 0.1f);
 			}
 		}
 
@@ -3395,11 +3412,19 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
 	{
     	// calculate the random class for these SomeParticles
     	exp_random_class_some_particles.clear();
-    	for (long int part_id = my_first_part_id; part_id <= my_last_part_id; part_id++)
-    	{
-        	init_random_generator(random_seed + part_id);
-    		int random_class = rand() % mymodel.nr_classes;
-    		exp_random_class_some_particles.push_back(random_class);
+		init_random_generator(random_seed);
+    	if (!do_som) {
+		    for (long int part_id = my_first_part_id; part_id <= my_last_part_id; part_id++) {
+			    int random_class = rand() % mymodel.nr_classes;
+			    exp_random_class_some_particles.push_back(random_class);
+		    }
+	    } else {
+
+		    std::vector<unsigned> nodes = som.get_all_nodes();
+		    for (long int part_id = my_first_part_id; part_id <= my_last_part_id; part_id++) {
+			    int random_node = rand() % nodes.size();
+			    exp_random_class_some_particles.push_back(nodes[random_node]);
+		    }
     	}
 	}
 
@@ -4137,24 +4162,35 @@ void MlOptimiser::maximization()
 				{
 					if(do_vmgd)
 					{
-					    if (do_vmgd_realspace)
-                            (wsum_model.BPref[iclass]).reweightGradRealSpace(
-                                    mymodel.Igrad1[iclass],
-                                    do_mom1 ? 0.9 : 0.,
-                                    mymodel.Igrad2[iclass],
-                                    do_mom2 ? 0.999 : 0.,
-                                    iter==1);
-                        else
-                            (wsum_model.BPref[iclass]).reweightGrad(
-                                    mymodel.Igrad1[iclass],
-                                    do_mom1 ? 0.9 : 0.,
-                                    mymodel.Igrad2[iclass],
-                                    do_mom2 ? 0.999 : 0.,
-                                    iter==1);
+						float stepsize = vmgd_stepsize;
+
+//						if (do_som) {
+//							// Use exponential step size decay as a function of node age
+//							float node_age = som.get_node_age(iclass);
+//							float a = 0.8;
+//							float b = 100/2.3; // At age=5000 step size becomes 1/10 of a (ln(10)=2.3)
+//							stepsize = XMIPP_MAX(a*exp(-iter/b), 0.01);
+//						}
+
+						if (do_vmgd_realspace)
+							(wsum_model.BPref[iclass]).reweightGradRealSpace(
+									mymodel.Igrad1[iclass],
+									do_mom1 ? 0.9 : 0.,
+									mymodel.Igrad2[iclass],
+									do_mom2 ? 0.999 : 0.,
+									iter == 1);
+						else
+							(wsum_model.BPref[iclass]).reweightGrad(
+									mymodel.Igrad1[iclass],
+									do_mom1 ? 0.9 : 0.,
+									mymodel.Igrad2[iclass],
+									do_mom2 ? 0.999 : 0.,
+									iter == 1);
+
 
 						(wsum_model.BPref[iclass]).reconstructGrad(
 								mymodel.Iref[iclass],
-								vmgd_stepsize,
+								stepsize,
 								mymodel.tau2_fudge_factor,
 								mymodel.fsc_halves_class[iclass],
 								do_split_random_halves,
