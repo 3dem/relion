@@ -337,7 +337,7 @@ BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(
 		
 		BufferedImage<fComplex> observation(sh,s);
 		
-		Extraction::extractFrameAt3D_Fourier(
+		TomoExtraction::extractFrameAt3D_Fourier(
 				tomogram.stack, f, s, 1.0, tomogram.proj[f], traj[f],
 				observation, projCut, 1, false, true);
 		

@@ -79,15 +79,15 @@ class MicrographHandler
 	// load a movie and extract all particles
 	// returns a per-particle vector of per-frame images of size (s/2+1) x s
 	std::vector<std::vector<Image<Complex>>> loadMovie(
-		const MetaDataTable& mdt, int s,
-		double angpix, std::vector<ParFourierTransformer>& fts,
+		const MetaDataTable& mdt, int s, double angpix, 
+		std::vector<ParFourierTransformer>& fts,
 		const std::vector<std::vector<gravis::d2Vector>>* offsets_in = 0,
 		std::vector<std::vector<gravis::d2Vector>>* offsets_out = 0,
 		double data_angpix = -1);
 
 	/* Load a movie as above and also write tracks of particles at 'pos' into 'tracks'.
 	   If 'unregGlob' is set, also write the global component of motion into 'globComp'.*/
-	std::vector<std::vector<Image<Complex>>> loadMovie(
+	std::vector<std::vector<Image<Complex>>> loadMovieAndTracks(
 		const MetaDataTable& mdt, int s, double angpix,
 		std::vector<ParFourierTransformer>& fts,
 		const std::vector<gravis::d2Vector>& pos,

@@ -138,7 +138,7 @@ void BackprojectProgram::run()
 			std::vector<d4Matrix> projCut(fc), projPart(fc);
 			
 			
-			Extraction::extractAt3D_Fourier(
+			TomoExtraction::extractAt3D_Fourier(
 					tomogram.stack, s02D, binning, tomogram.proj, traj,
 					particleStack[th], projCut, inner_threads, no_subpix_off, true);
 			

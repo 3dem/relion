@@ -24,6 +24,10 @@ class RawImage
 		
 		RawImage(size_t xdim, size_t ydim, size_t zdim, T* data);
 		
+		RawImage(const Image<T>& img);
+		
+		RawImage(const MultidimArray<T>& mda);
+		
 			
 			long int xdim, ydim, zdim;
 			T* data;
@@ -70,6 +74,7 @@ class RawImage
 		void copyTo(Image<T>& img) const;
 		void copyTo(RawImage<T>& img) const;
 		
+		void copyFrom(const Image<T>& img);
 		void copyFrom(const RawImage<T>& img);
 		
 		bool hasSize(long int w, long int h, long int d);
@@ -193,6 +198,20 @@ template <class T>
 RawImage<T>::RawImage(size_t xdim, size_t ydim, size_t zdim, T* data)
 	:   xdim(xdim), ydim(ydim), zdim(zdim), data(data)
 {
+}
+
+template<typename T>
+RawImage<T>::RawImage(const Image<T> &img)
+	:   xdim(img.data.xdim), ydim(img.data.ydim), zdim(img.data.zdim), 
+		data(&img(0,0,0))
+{	
+}
+
+template<typename T>
+RawImage<T>::RawImage(const MultidimArray<T> &mda)
+	:   xdim(mda.xdim), ydim(mda.ydim), zdim(mda.zdim), 
+		data(&mda(0))
+{	
 }
 
 template<typename T>
@@ -323,7 +342,7 @@ void RawImage<T>::write(std::string fn) const
 	
 	if (dot == std::string::npos)
 	{
-		REPORT_ERROR_STR("Image<T>::write: filename has no ending (" << fn << ").");
+		REPORT_ERROR_STR("RawImage<T>::write: filename has no ending (" << fn << ").");
 	}
 	
 	std::string end = fn.substr(dot+1);
@@ -347,7 +366,7 @@ void RawImage<T>::writePng(std::string fn) const
 {
 	if (zdim > 1) 
 	{
-		REPORT_ERROR("Image<T>::write: cannot write 3D image into PNG.");
+		REPORT_ERROR("RawImage<T>::write: cannot write 3D image into PNG.");
 	}
 	
 	gravis::tImage<T> img;
@@ -400,6 +419,25 @@ inline void RawImage<T>::copyTo(RawImage<T>& img) const
 	for (size_t x = 0; x < xdim; x++)
 	{
 		img(x,y,z) = data[(z*ydim + y)*xdim + x];
+	}
+}
+
+template <class T>
+inline void RawImage<T>::copyFrom(const Image<T>& img)
+{
+	if (xdim < img.data.xdim || ydim < img.data.ydim || zdim < img.data.zdim)
+	{
+		REPORT_ERROR_STR("RawImage<T>::copyFrom: input image too small: "
+			<< img.data.xdim << "x" << img.data.ydim << "x" << img.data.zdim 
+			<< " (should be at least: " 
+			<< xdim << "x" << ydim << "x" << zdim << ")");
+	}
+	
+	for (size_t z = 0; z < zdim; z++)
+	for (size_t y = 0; y < ydim; y++)
+	for (size_t x = 0; x < xdim; x++)
+	{
+		data[(z*ydim + y)*xdim + x] = img(x,y,z);
 	}
 }
 

@@ -286,7 +286,7 @@ std::vector<std::vector<Image<RFLOAT> > > StackHelper::loadMovieStack(const Meta
 	return out;
 }
 
-std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
+std::vector<std::vector<Image<Complex>>> StackHelper::read_and_extract_MovieStackFS(
 		const MetaDataTable* mdt,
 		Image<RFLOAT>* gainRef, MultidimArray<bool>* defectMask, std::string movieFn,
 		double outPs, double coordsPs, double moviePs, double dataPs,
@@ -299,6 +299,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 	std::vector<std::vector<Image<Complex>>> out(mdt->numberOfObjects());
 	const long pc = mdt->numberOfObjects();
 
+	
 	Image<float> mgStack;
 	mgStack.read(movieFn, false);
 
@@ -317,6 +318,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 	const int h0 = mgStack.data.ydim;
 	const int fcM = dataInZ? mgStack.data.zdim : mgStack.data.ndim;
 
+	
 	const int fc = lastFrame > 0? lastFrame - firstFrame + 1 : fcM - firstFrame;
 
 	if (dataPs < 0) dataPs = outPs;
@@ -656,6 +658,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 
 	return out;
 }
+
 std::vector<Image<Complex> > StackHelper::FourierTransform(std::vector<Image<RFLOAT> >& stack)
 {
 	std::vector<Image<Complex> > out(stack.size());

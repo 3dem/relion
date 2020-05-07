@@ -132,7 +132,7 @@ void SubtomoProgram::run()
 			BufferedImage<fComplex> particleStack = BufferedImage<fComplex>(sh2D,s2D,fc);			
 			BufferedImage<float> weightStack(sh2D,s2D,fc);
 			
-			Extraction::extractAt3D_Fourier(
+			TomoExtraction::extractAt3D_Fourier(
 					tomogram.stack, s02D, binning, tomogram.proj, traj,
 					particleStack, projCut, inner_thread_num, false, true);
 			
@@ -183,8 +183,8 @@ void SubtomoProgram::run()
 				particlesRS = Padding::unpadCenter2D_full(particlesRS, boundary);
 				weightsRS = Padding::unpadCenter2D_full(weightsRS, boundary);
 				
-				Extraction::cropCircle(particlesRS, 5, num_threads);
-				Extraction::cropCircle(weightsRS, 5, num_threads);
+				TomoExtraction::cropCircle(particlesRS, 5, num_threads);
+				TomoExtraction::cropCircle(weightsRS, 5, num_threads);
 				
 				particleStack = StackHelper::FourierTransformStack(particlesRS);
 				weightStack = FFT::toReal(StackHelper::FourierTransformStack(weightsRS));

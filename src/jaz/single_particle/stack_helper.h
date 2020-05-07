@@ -59,7 +59,7 @@ class StackHelper
 				const MetaDataTable* mdt, std::string moviePath);
 	
 		// For movies in file
-		static std::vector<std::vector<Image<Complex>>> extractMovieStackFS(
+		static std::vector<std::vector<Image<Complex>>> read_and_extract_MovieStackFS(
 				const MetaDataTable* mdt,
 				Image<RFLOAT>* gainRef, MultidimArray<bool>* defectMask, std::string movieFn,
 				double outPs, double coordsPs, double moviePs, double dataPs,

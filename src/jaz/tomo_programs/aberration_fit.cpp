@@ -192,7 +192,7 @@ void AberrationFit :: considerParticle(
 	
 	for (int f = f0; f <= f1; f++)
 	{
-		Extraction::extractFrameAt3D_Fourier(
+		TomoExtraction::extractFrameAt3D_Fourier(
 				tomogram.stack, f, s, 1.0, tomogram.proj[f], traj[f],
 				observation, projCut, 1, false, true);
 					

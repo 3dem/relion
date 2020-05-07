@@ -20,7 +20,9 @@
 
 #include "micrograph_handler.h"
 #include <src/jaz/single_particle/stack_helper.h>
-#include <src/renderEER.h>
+#include <src/jaz/single_particle/movie_loader.h>
+#include <src/jaz/single_particle/spa_extraction.h>
+
 
 using namespace gravis;
 
@@ -55,8 +57,9 @@ void MicrographHandler::init(
 
 	if (corrMicFn != "")
 	{
-		MetaDataTable corrMic;
+		MetaDataTable corrMic;		
 		ObservationModel obsModel;
+		
 		// Don't die even if conversion failed. Polishing does not use obsModel from a motion correction STAR file
 		ObservationModel::loadSafely(corrMicFn, obsModel, corrMic, "micrographs", verb, false);
 		mic2meta.clear();
@@ -76,11 +79,11 @@ void MicrographHandler::init(
 		{
 			corrMic.getValueToString(EMDL_MICROGRAPH_NAME, micName, i);
 			corrMic.getValueToString(EMDL_MICROGRAPH_METADATA_NAME, metaName, i);
+			
 			// remove the pipeline job prefix
 			FileName fn_pre, fn_jobnr, fn_post;
 			decomposePipelineFileName(micName, fn_pre, fn_jobnr, fn_post);
 
-//			std::cout << fn_post << " => " << metaName << std::endl;
 			mic2meta[fn_post] = metaName;
 		}
 
@@ -421,8 +424,11 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 		MultidimArray<bool> defectMask;
 
 		bool hasDefect = (micrograph.fnDefect != "" || micrograph.hotpixelX.size() != 0);
+		
 		if (hasDefect)
+		{
 			micrograph.fillDefectAndHotpixels(defectMask);
+		}
 
 		if (debug)
 		{
@@ -444,10 +450,14 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 			if (gainFn != last_gainFn)
 			{
 				lastGainRef.read(gainFn);
+				
 				if (isEER) // TODO: Takanori: Remove this once we updated RelionCor
 				{
 					if (eer_upsampling < 0)
+					{
 						eer_upsampling = micrograph.getEERUpsampling();
+					}
+					
 					EERRenderer::upsampleEERGain(lastGainRef(), eer_upsampling);
 				}
 
@@ -456,172 +466,48 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 
 			mgHasGain = true;
 		}
+		
+		BufferedImage<float> muGraph;
+		
+		RawImage<RFLOAT> gainRef_new(lastGainRef);
+		RawImage<bool> defectMask_new(defectMask);
+		
+		RawImage<RFLOAT>* gainRefToUse = mgHasGain? &gainRef_new : 0;
+		RawImage<bool>* defectMaskToUse = hasDefect? &defectMask_new : 0;
 
-		if (!isEER)
+		if (isEER)			
 		{
-#define OLD_CODE
-#ifdef OLD_CODE
-			movie = StackHelper::extractMovieStackFS(&mdt, mgHasGain? &lastGainRef : 0, hasDefect ? &defectMask : 0,
-			                                         mgFn, angpix, coords_angpix, movie_angpix, data_angpix, s,
-			                                         nr_omp_threads, true, firstFrame, lastFrame,
-			                                         hotCutoff, debug, saveMem, offsets_in, offsets_out);
-#else
-			// TODO: Implement gain and defect correction, and remove the old code path
-			std::cout << "New code path" << std::endl;
-
-			Image<float> mgStack;
-			mgStack.read(mgFn, false);
-
-			// lastFrame and firstFrame is 0 indexed
-			const int my_lastFrame = ((mgStack.data.zdim > 1)? mgStack.data.zdim : mgStack.data.ndim) - 1;
-			const int n_frames = my_lastFrame - firstFrame + 1;
-
-			std::cout << "first = " << firstFrame << " last = " << my_lastFrame << " n_frames = " << n_frames << std::endl;
-
-			std::vector<MultidimArray<float> > Iframes(n_frames);
-
-			#pragma omp parallel for num_threads(nr_omp_threads)
-			for (int iframe = 0; iframe < n_frames; iframe++)
+			if (eer_upsampling < 0)
 			{
-				Image<float> img;
-				img.read(mgFn, true, iframe, false, true); 
-				Iframes[iframe] = img();
+				eer_upsampling = micrograph.getEERUpsampling();
 			}
+			
+			if (eer_grouping < 0)
+			{
+				eer_grouping = micrograph.getEERGrouping();
+			}
+			
+			muGraph = MovieLoader::readEER<float>(
+				mgFn, gainRefToUse, defectMaskToUse,
+				firstFrame, lastFrame - firstFrame + 1,
+				eer_upsampling, eer_grouping,
+				nr_omp_threads);
 
-			movie = StackHelper::extractMovieStackFS(&mdt, Iframes, angpix, coords_angpix, movie_angpix, data_angpix, s,
-			                                         nr_omp_threads, true,
-			                                         debug, offsets_in, offsets_out);
-#endif
 		}
 		else
 		{
-			if (eer_upsampling < 0)
-				eer_upsampling = micrograph.getEERUpsampling();
-			if (eer_grouping < 0)
-				eer_grouping = micrograph.getEERGrouping();
-
-			EERRenderer renderer;
-			renderer.read(mgFn, eer_upsampling);
-
-			// lastFrame and firstFrame is 0 indexed
-			int my_lastFrame = (lastFrame < 0) ? (renderer.getNFrames() / eer_grouping - 1) : lastFrame;
-			int n_frames = my_lastFrame - firstFrame + 1;
-
-			std::vector<MultidimArray<float> > Iframes(n_frames);
-
-			#pragma omp parallel for num_threads(nr_omp_threads)
-			for (int iframe = 0; iframe < n_frames; iframe++)
-			{
-				// this takes 1-indexed frame numbers
-//				std::cout << "EER: iframe = " << iframe << " start = " << ((firstFrame + iframe) * eer_grouping + 1) << " end = " << ((firstFrame + iframe + 1) * eer_grouping) << std::endl;
-				renderer.renderFrames((firstFrame + iframe) * eer_grouping + 1, (firstFrame + iframe + 1) * eer_grouping, Iframes[iframe]);
-
-				if (mgHasGain)
-				{
-					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(lastGainRef())
-					{
-						DIRECT_MULTIDIM_ELEM(Iframes[iframe], n) *= DIRECT_MULTIDIM_ELEM(lastGainRef(), n);
-					}
-				}
-			}
-
-			if (hasDefect) // TODO: TAKANORI: Refactor!! Code duplication from RelionCor
-			{
-				if (XSIZE(defectMask) != XSIZE(Iframes[0]) || YSIZE(defectMask) != YSIZE(Iframes[0]))
-				{
-					std::cerr << "X/YSIZE of defectMask = " << XSIZE(defectMask) << " x " << YSIZE(defectMask) << std::endl;
-					std::cerr << "X/YSIZE of Iframe[0] = " << XSIZE(Iframes[0]) << " x " << YSIZE(Iframes[0]) << std::endl;
-					REPORT_ERROR("Invalid defect mask size for " + mgFn0);
-				}
-
-				MultidimArray<float> Isum;
-				Isum.initZeros(Iframes[0]);
-				for (int iframe = 0; iframe < n_frames; iframe++)
-				{
-					#pragma omp parallel for num_threads(nr_omp_threads)
-					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum)
-					{
-						DIRECT_MULTIDIM_ELEM(Isum, n) += DIRECT_MULTIDIM_ELEM(Iframes[iframe], n);
-					}
-				}
-#ifdef DEBUG
-				Image<float> tmp;
-				tmp() = Isum;
-				tmp.write("Isum.mrc");
-#endif
-
-				RFLOAT mean = 0, std = 0;
-				#pragma omp parallel for reduction(+:mean) num_threads(nr_omp_threads)
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum) {
-					mean += DIRECT_MULTIDIM_ELEM(Isum, n);
-				}
-				mean /= YXSIZE(Isum);
-				#pragma omp parallel for reduction(+:std) num_threads(nr_omp_threads)
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum) {
-					RFLOAT d = (DIRECT_MULTIDIM_ELEM(Isum, n) - mean);
-					std += d * d;
-				}
-				std = std::sqrt(std / YXSIZE(Isum));
-
-				mean /= n_frames;
-				std /= n_frames;
-				Isum.clear();
-
-//				std::cout << "DEBUG: defect correction: mean = " << mean << " std = " << std << std::endl;
-
-				// 25 neighbours; should be enough even for super-resolution images.
-		                const int NUM_MIN_OK = 6;
-		                const int D_MAX = 2;
-		                FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(defectMask)
-        		        {
-		                        if (!DIRECT_A2D_ELEM(defectMask, i, j)) continue;
-
-		                        #pragma omp parallel for num_threads(nr_omp_threads)
-					for (int iframe = 0; iframe < n_frames; iframe++)
-					{
-		 				int n_ok = 0;
-						RFLOAT val = 0;
-						for (int dy= -D_MAX; dy <= D_MAX; dy++)
-						{
-							int y = i + dy;
-							if (y < 0 || y >= YSIZE(defectMask)) continue;
-							for (int dx = -D_MAX; dx <= D_MAX; dx++)
-							{
-								int x = j + dx;
-								if (x < 0 || x >= XSIZE(defectMask)) continue;
-								if (DIRECT_A2D_ELEM(defectMask, y, x)) continue;
-
-								n_ok++;
-								val += DIRECT_A2D_ELEM(Iframes[iframe], y, x);
-							}
-						}
-//						std::cout << "n_ok = " << n_ok << " val = " << val << std::endl;
-						if (n_ok > NUM_MIN_OK) DIRECT_A2D_ELEM(Iframes[iframe], i, j) = val / n_ok;
-						else DIRECT_A2D_ELEM(Iframes[iframe], i, j) = rnd_gaus(mean, std);
-					}
-				}
-
-#ifdef DEBUG
-				Isum.initZeros(Iframes[0]);
-				for (int iframe = 0; iframe < n_frames; iframe++)
-				{
-					#pragma omp parallel for num_threads(nr_omp_threads)
-					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum)
-					{
-						DIRECT_MULTIDIM_ELEM(Isum, n) += DIRECT_MULTIDIM_ELEM(Iframes[iframe], n);
-					}
-				}
-
-				tmp() = Isum;
-				tmp.write("Isum-fix-defect.mrc");
-				exit(0);
-#endif
-			}
-
-			movie = StackHelper::extractMovieStackFS(&mdt, Iframes, angpix, coords_angpix, movie_angpix, data_angpix, s,
-			                                         nr_omp_threads, true,
-			                                         debug, offsets_in, offsets_out);
+			muGraph = MovieLoader::readDense<float>(
+				mgFn, gainRefToUse, defectMaskToUse,
+				firstFrame, lastFrame - firstFrame + 1,
+				hotCutoff,
+				nr_omp_threads);
 		}
+		
+		movie = SpaExtraction::extractMovieStackFS(
+				mdt, muGraph, s,
+				angpix, coords_angpix, movie_angpix, data_angpix,
+				offsets_in, offsets_out, 
+				nr_omp_threads);
 	}
 	else
 	{
@@ -639,7 +525,7 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 	return movie;
 }
 
-std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
+std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovieAndTracks(
 		const MetaDataTable &mdt, int s, double angpix,
 		std::vector<ParFourierTransformer>& fts,
 		const std::vector<d2Vector>& pos,

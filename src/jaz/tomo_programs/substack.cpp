@@ -74,7 +74,7 @@ void SubstackProgram::run()
 			
 			BufferedImage<float> particleStackReal(s,s,fc);
 			
-			Extraction::extractAt3D_real(
+			TomoExtraction::extractAt3D_real(
                 stack, s0, binning, projTomo, pos,
 				particleStackReal, projCut, num_threads, true);
 			

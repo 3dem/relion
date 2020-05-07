@@ -180,7 +180,7 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 		{
 			const int f = sequence[ft];
 			
-			Extraction::extractFrameAt3D_Fourier(
+			TomoExtraction::extractFrameAt3D_Fourier(
 					tomogram.stack, f, s, 1.0, tomogram.proj[f], traj[f],
 					observation, projCut, 1, false, true);
 						

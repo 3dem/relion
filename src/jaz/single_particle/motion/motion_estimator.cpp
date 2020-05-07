@@ -407,7 +407,7 @@ void MotionEstimator::prepMicrograph(
 	// 2. compute cropped CCs
 	// 3. update FCCs after alignment
 
-	movie = micrographHandler->loadMovie(
+	movie = micrographHandler->loadMovieAndTracks(
 				mdt, s[ogmg], angpix[ogmg], fts,
 				positions, myInitialTracks, unregGlob, myGlobComp); // throws exceptions
 
