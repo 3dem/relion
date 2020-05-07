@@ -102,11 +102,9 @@ class MicrographHandler
 	protected:
 
 	
-		Micrograph micrograph;
 		Image<RFLOAT> lastGainRef;
 		std::string last_gainFn;
 	
-		bool hasCorrMic;
 		std::map<std::string, std::string> mic2meta;
 		
 
@@ -115,16 +113,24 @@ class MicrographHandler
 			int& fc, double& dosePerFrame, std::string& metaFn);
 		
 	std::string getMetaName(
-			std::string micName, bool die_on_error=true);
+			std::string micName, bool die_on_error = true);
+	
+	std::string getMicrographMetadataFilename(
+			const MetaDataTable& mdt, 
+			bool die_on_error);
+	
+	Micrograph loadMicrographMetadata(
+			const MetaDataTable& mdt, 
+			bool die_on_error);
 	
 	int determineFrameCount(
 			const MetaDataTable& mdt);
 	
 	bool isMoviePresent(
-			const MetaDataTable& mdt, bool die_on_error=true);
+			const MetaDataTable& mdt, bool die_on_error = true);
 	
 	std::string getMovieFilename(
-			const MetaDataTable& mdt, bool die_on_error=true);
+			const MetaDataTable& mdt, bool die_on_error = true);
 };
 
 #endif
