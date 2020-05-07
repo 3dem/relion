@@ -237,7 +237,7 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 //	std::cout << "ref_angpix = " << ref_angpix << " coords_angpix = " << coords_angpix << std::endl;
 	if (verb > 0)
 	{
-		std::cout << " + Combining frames for all micrographs ... " << std::endl;
+		std::cout << " + Combining frames for micrographs ... " << std::endl;
 		init_progress_bar(my_nr_micrographs);
 		barstep = XMIPP_MAX(1, my_nr_micrographs/ 60);
 	}
@@ -333,7 +333,9 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 
 		// loadMovie() will extract squares around the value of shift0 rounded in movie coords,
 		// and return the remainder in shift (in output coordinates)
-		movie = micrographHandler->loadMovie(mdtOut, s_out[ogmg], angpix_out[ogmg], fts, &shift0, &shift, data_angpix[ogmg]);
+		movie = micrographHandler->loadMovie(
+					mdtOut, s_out[ogmg], angpix_out[ogmg], fts, 
+					&shift0, &shift, data_angpix[ogmg]);
 
 		const int out_size = crop_arg > 0 ? crop_arg : s_out[ogmg];
 		Image<RFLOAT> stack(out_size, out_size, 1, pc);
@@ -733,6 +735,16 @@ int FrameRecombiner::getOutputBoxSize(int opticsGroup)
 bool FrameRecombiner::isCtfMultiplied(int opticsGroup)
 {
 	return do_ctf_multiply;
+}
+
+int FrameRecombiner::getVerbosity()
+{
+	return verb;
+}
+
+void FrameRecombiner::setVerbosity(int v)
+{
+	verb = v;
 }
 
 std::string FrameRecombiner::getOutputSuffix()

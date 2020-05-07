@@ -36,6 +36,7 @@ class FrameRecombiner
 
 		FrameRecombiner();
 
+		
 		void read(IOParser& parser, int argc, char *argv[]);
 
 		void init(const std::vector<MetaDataTable>& allMdts,
@@ -61,7 +62,11 @@ class FrameRecombiner
 		int getOutputBoxSize(int opticsGroup);
 		std::string getOutputSuffix();
 		bool isCtfMultiplied(int opticsGroup);
+		
+		int getVerbosity();
+		void setVerbosity(int v);
 
+		
 	protected:
 
 		// read from cmd. line:

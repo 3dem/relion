@@ -29,9 +29,14 @@ int main(int argc, char *argv[])
 	{
 		prm.read(argc, argv);
 		prm.init();
-
+		
 		MPI_Barrier(MPI_COMM_WORLD);
-		prm.run();
+		
+		prm.runWithFccUpdate();
+		
+		MPI_Barrier(MPI_COMM_WORLD);
+		
+		prm.runWithRecombination();
 	}
 
 	catch (RelionError XE)

@@ -183,7 +183,8 @@ void MotionEstimator::init(
 	ready = true;
 }
 
-void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_start, long g_end)
+void MotionEstimator::process(
+		const std::vector<MetaDataTable>& mdts, long g_start, long g_end, bool do_update_FCC)
 {
 	if (!ready)
 	{
@@ -206,9 +207,12 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
 			weights0(nr_omp_threads),
 			weights1(nr_omp_threads);
 
-	for (int i = 0; i < nr_omp_threads; i++)
+	if (do_update_FCC)
 	{
-		FscHelper::initFscTable(sh_ref, fc, tables[i], weights0[i], weights1[i]);
+		for (int i = 0; i < nr_omp_threads; i++)
+		{
+			FscHelper::initFscTable(sh_ref, fc, tables[i], weights0[i], weights1[i]);
+		}
 	}
 
 	int pctot = 0;
@@ -346,16 +350,20 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
 			          << "! Please inspect this movie." << std::endl;
 		}
 
-		updateFCC(movie, tracks, mdts[g], tables, weights0, weights1);
-
-		writeOutput(tracks, angpix[ogmg], tables, weights0, weights1, positions, fn_root, 30.0);
-
-		for (int i = 0; i < nr_omp_threads; i++)
+		if (do_update_FCC)
 		{
-			tables[i].data.initZeros();
-			weights0[i].data.initZeros();
-			weights1[i].data.initZeros();
+			updateFCC(movie, tracks, mdts[g], tables, weights0, weights1);	
+			writeFCC(tables, weights0, weights1, fn_root);
+	
+			for (int i = 0; i < nr_omp_threads; i++)
+			{
+				tables[i].data.initZeros();
+				weights0[i].data.initZeros();
+				weights1[i].data.initZeros();
+			}
 		}
+		
+		writeTracks(tracks, angpix[ogmg], positions, fn_root, 30.0);
 
 		nr_done++;
 
@@ -623,23 +631,13 @@ void MotionEstimator::updateFCC(
 	}
 }
 
-void MotionEstimator::writeOutput(
-		const std::vector<std::vector<d2Vector>>& tracks,
-		double angpix_mg,
+void MotionEstimator::writeFCC(
 		const std::vector<Image<RFLOAT>>& fccData,
 		const std::vector<Image<RFLOAT>>& fccWeight0,
 		const std::vector<Image<RFLOAT>>& fccWeight1,
-		const std::vector<d2Vector>& positions,
-		std::string fn_root, double visScale)
+		std::string fn_root)
 {
-	const int pc = tracks.size();
-
-	if (pc == 0) return;
-
-	const int fc = tracks[0].size();
-
-	MotionHelper::writeTracks(tracks, fn_root + "_tracks.star", angpix_mg);
-
+	
 	Image<RFLOAT> fccDataSum(sh_ref,fc), fccWeight0Sum(sh_ref,fc), fccWeight1Sum(sh_ref,fc);
 	fccDataSum.data.initZeros();
 	fccWeight0Sum.data.initZeros();
@@ -659,6 +657,21 @@ void MotionEstimator::writeOutput(
 	fccDataSum.write(fn_root + "_FCC_cc.mrc");
 	fccWeight0Sum.write(fn_root + "_FCC_w0.mrc");
 	fccWeight1Sum.write(fn_root + "_FCC_w1.mrc");
+}
+
+void MotionEstimator::writeTracks(
+		const std::vector<std::vector<d2Vector>>& tracks,
+		double angpix_mg,
+		const std::vector<d2Vector>& positions,
+		std::string fn_root, double visScale)
+{
+	const int pc = tracks.size();
+
+	if (pc == 0) return;
+
+	const int fc = tracks[0].size();
+
+	MotionHelper::writeTracks(tracks, fn_root + "_tracks.star", angpix_mg);
 
 	// plot EPS graph with all observed and fitted tracks
 	std::vector<std::vector<gravis::d2Vector>> visTracks(pc);
@@ -886,6 +899,16 @@ double MotionEstimator::normalizeSigDiv(double sig_div, double angpix)
 double MotionEstimator::normalizeSigAcc(double sig_acc, double angpix)
 {
 	return params_scaled_by_dose? dosePerFrame * sig_acc / angpix : sig_acc / angpix;
+}
+
+int MotionEstimator::getVerbosity()
+{
+	return verb;
+}
+
+void MotionEstimator::setVerbosity(int v)
+{
+	verb = v;
 }
 
 bool MotionEstimator::isJobFinished(std::string filenameRoot)

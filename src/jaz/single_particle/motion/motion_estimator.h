@@ -46,7 +46,7 @@ class MotionEstimator
                   ObservationModel* obsModel,
                   MicrographHandler* micrographHandler);
 
-        void process(const std::vector<MetaDataTable> &mdts, long g_start, long g_end);
+        void process(const std::vector<MetaDataTable> &mdts, long g_start, long g_end, bool do_update_FCC);
 
 
         // load micrograph from mdt and compute all data required for the optimization;
@@ -97,6 +97,9 @@ class MotionEstimator
         double normalizeSigVel(double sig_vel, double angpix);
         double normalizeSigDiv(double sig_div, double angpix);
         double normalizeSigAcc(double sig_acc, double angpix);
+		
+		int getVerbosity();
+		void setVerbosity(int v);
 
 
     protected:
@@ -141,13 +144,16 @@ class MotionEstimator
             std::vector<Image<RFLOAT>>& tables,
             std::vector<Image<RFLOAT>>& weights0,
             std::vector<Image<RFLOAT>>& weights1);
+		
+		void writeFCC(
+			const std::vector<Image<RFLOAT>>& fccData,
+			const std::vector<Image<RFLOAT>>& fccWeight0,
+			const std::vector<Image<RFLOAT>>& fccWeight1,
+			std::string fn_root);
 
-        void writeOutput(
+		void writeTracks(
             const std::vector<std::vector<gravis::d2Vector>>& tracks,
 			double angpix_mg,
-            const std::vector<Image<RFLOAT>>& fccData,
-            const std::vector<Image<RFLOAT>>& fccWeight0,
-            const std::vector<Image<RFLOAT>>& fccWeight1,
             const std::vector<gravis::d2Vector>& positions,
             std::string fn_root, double visScale);
 

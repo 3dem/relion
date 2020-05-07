@@ -42,7 +42,9 @@
 class MotionRefiner
 {
 	public:
+		
 		MotionRefiner();
+		
 		
 		// Read command line arguments
 		void read(int argc, char **argv);
@@ -50,57 +52,59 @@ class MotionRefiner
 		// Initialise some general stuff after reading
 		void init();
 		
-		// General Running (Admiral Swimming!)
 		void run();
 		
 		int getVerbosityLevel();
 		
-		// For original particle-polishing-like Bfactors (not used)
-		//void calculateSingleFrameReconstruction(int iframe);
-		
 		// Get output STAR file name for this micrograph
 		static FileName getOutputFileNameRoot(std::string outPath, const MetaDataTable& mdt);
 		
+		
 	protected:
-		// components that do the actual work
-		MotionParamEstimator motionParamEstimator;
-		MotionEstimator motionEstimator;
-		FrameRecombiner frameRecombiner;
 		
-		// required components
-		ObservationModel obsModel;
-		ReferenceMap reference;
-		MicrographHandler micrographHandler;
 		
-		// s: full image size, sh: half-size + 1, fc: frame count
-		int s_ref, sh_ref, fc;
-		
-		// Verbosity
-		int verb;
-		
-		bool debug, findShortestMovie;
-		
-		int nr_omp_threads;
-		std::string outPath;
-		
-		std::string starFn, movie_toReplace, movie_replaceBy;
-		
-		// Allow continuation of crashed jobs
-		bool only_do_unfinished;
-		
-		bool estimateParams,
-		     estimateMotion,
-		     recombineFrames,
-		     generateStar;
-		
-		long maxMG, minMG;
-		
-		MetaDataTable mdt0;
-		
-		std::vector<MetaDataTable>
-			allMdts, // all micrographs (used for B-factor computation)
-			chosenMdts, // micrographs between minMG and maxMG
-			motionMdts, recombMdts; // unfinished micrographs
+			// components that do the actual work
+			MotionParamEstimator motionParamEstimator;
+			MotionEstimator motionEstimator;
+			FrameRecombiner frameRecombiner;
+			
+			// required components
+			ObservationModel obsModel;
+			ReferenceMap reference;
+			MicrographHandler micrographHandler;
+			
+			// s: full image size, sh: half-size + 1, fc: frame count
+			int s_ref, sh_ref, fc;
+			
+			// Verbosity
+			int verb;
+			
+			bool debug, findShortestMovie;
+			
+			int nr_omp_threads;
+			std::string outPath;
+			
+			std::string starFn, movie_toReplace, movie_replaceBy;
+			
+			// Allow continuation of crashed jobs
+			bool only_do_unfinished;
+			
+			bool estimateParams,
+				 estimateMotion,
+				 recombineFrames,
+				 generateStar;
+			
+			int particlesForFcc;
+			
+			long maxMG, minMG;
+			
+			MetaDataTable mdt0;
+			
+			std::vector<MetaDataTable>
+				allMdts, // all micrographs (used for B-factor computation)
+				chosenMdts, // micrographs between minMG and maxMG
+				motionMdts, recombMdts; // unfinished micrographs
+			
 		
 		// combine all EPS files into one logfile.pdf
 		void combineEPSAndSTARfiles();
@@ -108,6 +112,8 @@ class MotionRefiner
 		// apply changes to micrograph-filenames implied by
 		// movie_path, movie_ending and movie_toReplace/replaceBy
 		void adaptMovieNames();
+		
+		int lastMicrographForFCC();
 };
 
 #endif

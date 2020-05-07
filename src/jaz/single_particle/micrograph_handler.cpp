@@ -101,7 +101,7 @@ std::vector<MetaDataTable> MicrographHandler::cullMissingMovies(
 {
 	if (!ready)
 	{
-//		REPORT_ERROR("ERROR: MicrographHandler::cullMissingMovies - MicrographHandler not initialized.");
+		REPORT_ERROR("ERROR: MicrographHandler::cullMissingMovies - MicrographHandler not initialized.");
 	}
 
 	std::vector<MetaDataTable> good(0);
@@ -366,9 +366,7 @@ void MicrographHandler::loadInitial(
 
 void MicrographHandler::validatePixelSize(RFLOAT angpix) const
 {
-//	std::cout << "angpix = " << angpix << " coords_angpix = " << coords_angpix << " movie_angpix = " << movie_angpix << std::endl;
-
-	if (angpix < coords_angpix - 1e-9)
+  	if (angpix < coords_angpix - 1e-9)
 	{
 		std::cerr << "WARNING: pixel size (--angpix) is smaller than the AutoPick pixel size (--coords_angpix)\n";
 
@@ -403,6 +401,7 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 	{
 		REPORT_ERROR("ERROR: MicrographHandler::loadMovie - MicrographHandler not initialized.");
 	}
+	
 	std::vector<std::vector<Image<Complex>>> movie;
 
 	const int nr_omp_threads = fts.size();
@@ -532,7 +531,7 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 				{
 					std::cerr << "X/YSIZE of defectMask = " << XSIZE(defectMask) << " x " << YSIZE(defectMask) << std::endl;
 					std::cerr << "X/YSIZE of Iframe[0] = " << XSIZE(Iframes[0]) << " x " << YSIZE(Iframes[0]) << std::endl;
-					REPORT_ERROR("Invalid dfefect mask size for " + mgFn0);
+					REPORT_ERROR("Invalid defect mask size for " + mgFn0);
 				}
 
 				MultidimArray<float> Isum;
