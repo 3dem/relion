@@ -86,18 +86,16 @@ class MicrographHandler
 		double data_angpix = -1,
 		int single_frame_relative_index = -1); // if this isn't negative, return a single frame for all particles
 
-	/* Load a movie as above and also write tracks of particles at 'pos' into 'tracks'.
-	   If 'unregGlob' is set, also write the global component of motion into 'globComp'.*/
-	std::vector<std::vector<Image<Complex>>> loadMovieAndTracks(
-		const MetaDataTable& mdt, int s, double angpix,
-		std::vector<ParFourierTransformer>& fts,
+	/* Write the initial tracks of particles at 'pos' into 'tracks_out' 
+	   (by interpolating  the polynomial motionCor2 model).
+	   If 'unregGlob' is set, also write the global component of motion into 'globalComponent_out'.*/
+	void loadInitialTracks(
+		const MetaDataTable& mdt, 
+		double angpix, 
 		const std::vector<gravis::d2Vector>& pos,
-		std::vector<std::vector<gravis::d2Vector>>& tracks,
-		bool unregGlob, std::vector<gravis::d2Vector>& globComp,
-		const std::vector<std::vector<gravis::d2Vector>>* offsets_in = 0,
-		std::vector<std::vector<gravis::d2Vector>>* offsets_out = 0,
-		double data_angpix = -1);
-
+		std::vector<std::vector<gravis::d2Vector>>& tracks_out,
+		bool unregGlob, 
+		std::vector<gravis::d2Vector>& globalComponent_out);
 	
 	
 	protected:

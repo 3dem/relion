@@ -407,10 +407,19 @@ void MotionEstimator::prepMicrograph(
 	// 2. compute cropped CCs
 	// 3. update FCCs after alignment
 
-	movie = micrographHandler->loadMovieAndTracks(
+	/*movie = micrographHandler->loadMovieAndTracks(
 				mdt, s[ogmg], angpix[ogmg], fts,
-				positions, myInitialTracks, unregGlob, myGlobComp); // throws exceptions
+				positions, myInitialTracks, unregGlob, myGlobComp, 0, 0, -1); // throws exceptions*/
+	
+	movie = micrographHandler->loadMovie(mdt, s[ogmg], angpix[ogmg], fts);
+	micrographHandler->loadInitialTracks(mdt, angpix[ogmg], positions, myInitialTracks, unregGlob, myGlobComp);
 
+	/*const MetaDataTable &mdt, double angpix,
+				const std::vector<d2Vector>& pos,
+				std::vector<std::vector<d2Vector>>& tracks_out,
+				bool unregGlob, 
+				std::vector<d2Vector>& globalComponent_out*/
+			
 	std::vector<Image<Complex>> preds = reference->predictAll(
 				mdt, *obsModel, ReferenceMap::Own, nr_omp_threads);
 

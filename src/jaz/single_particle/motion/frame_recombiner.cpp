@@ -230,6 +230,7 @@ void FrameRecombiner::init(
 	}
 }
 
+/*
 void FrameRecombiner::process_old(const std::vector<MetaDataTable>& mdts, long g_start, long g_end)
 {
 	int barstep;
@@ -440,19 +441,14 @@ void FrameRecombiner::process_old(const std::vector<MetaDataTable>& mdts, long g
 void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_start, long g_end)
 {
 	process_old(mdts, g_start, g_end);
-}
+}*/
 
-void FrameRecombiner::process_new(const std::vector<MetaDataTable>& mdts, long g_start, long g_end)
+void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_start, long g_end)
 {
 	int barstep;
 	int my_nr_micrographs = g_end - g_start + 1;
 	const RFLOAT ref_angpix = reference->angpix;
 	const RFLOAT coords_angpix = micrographHandler->coords_angpix;
-	
-	// This is required to keep the output of the new version equal to previous ones.
-	// The variance normalisation used to erroneously multiply the image by this much.
-	// JZ, May 8th 2020
-	const RFLOAT legacyScalingFactor = sqrt(fc);
 
 	if (verb > 0)
 	{

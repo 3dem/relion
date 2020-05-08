@@ -504,19 +504,13 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 	return movie;
 }
 
-std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovieAndTracks(
-		const MetaDataTable &mdt, int s, double angpix,
-		std::vector<ParFourierTransformer>& fts,
+void MicrographHandler::loadInitialTracks(
+		const MetaDataTable &mdt, double angpix,
 		const std::vector<d2Vector>& pos,
-		std::vector<std::vector<d2Vector>>& tracks,
-		bool unregGlob, std::vector<d2Vector>& globComp,
-		const std::vector<std::vector<gravis::d2Vector>>* offsets_in,
-		std::vector<std::vector<gravis::d2Vector>>* offsets_out,
-		double data_angpix)
-{
-	std::vector<std::vector<Image<Complex>>> out = loadMovie(
-				mdt, s, angpix, fts, offsets_in, offsets_out, data_angpix);
-	
+		std::vector<std::vector<d2Vector>>& tracks_out,
+		bool unregGlob, 
+		std::vector<d2Vector>& globalComponent_out)
+{	
 	Micrograph micrograph = loadMicrographMetadata(mdt, true);
 	
 	const int fc0 = micrograph.getNframes();
@@ -539,7 +533,7 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovieAndTracks(
 
 	const double outputScale = movie_angpix / angpix;
 
-	globComp = std::vector<d2Vector>(fc, d2Vector(0,0));
+	globalComponent_out = std::vector<d2Vector>(fc, d2Vector(0,0));
 
 	if (unregGlob)
 	{
@@ -548,15 +542,15 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovieAndTracks(
 			RFLOAT sx, sy;
 			micrograph.getShiftAt(firstFrame + f + 1, 0, 0, sx, sy, false);
 
-			globComp[f] = -outputScale * d2Vector(sx, sy);
+			globalComponent_out[f] = -outputScale * d2Vector(sx, sy);
 		}
 	}
 
-	tracks.resize(pc);
+	tracks_out.resize(pc);
 
 	for (int p = 0; p < pc; p++)
 	{
-		tracks[p] = std::vector<d2Vector>(fc);
+		tracks_out[p] = std::vector<d2Vector>(fc);
 
 		for (int f = 0; f < fc; f++)
 		{
@@ -566,11 +560,9 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovieAndTracks(
 			RFLOAT sx, sy;
 			micrograph.getShiftAt(firstFrame + f + 1, in.x, in.y, sx, sy, true);
 
-			tracks[p][f] = -outputScale * d2Vector(sx,sy) - globComp[f];
+			tracks_out[p][f] = -outputScale * d2Vector(sx,sy) - globalComponent_out[f];
 		}
 	}
-
-	return out;
 }
 
 std::string MicrographHandler::getMetaName(std::string micName, bool die_on_error)
