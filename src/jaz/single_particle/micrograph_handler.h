@@ -83,7 +83,8 @@ class MicrographHandler
 		std::vector<ParFourierTransformer>& fts,
 		const std::vector<std::vector<gravis::d2Vector>>* offsets_in = 0,
 		std::vector<std::vector<gravis::d2Vector>>* offsets_out = 0,
-		double data_angpix = -1);
+		double data_angpix = -1,
+		int single_frame_relative_index = -1); // if this isn't negative, return a single frame for all particles
 
 	/* Load a movie as above and also write tracks of particles at 'pos' into 'tracks'.
 	   If 'unregGlob' is set, also write the global component of motion into 'globComp'.*/
@@ -103,7 +104,8 @@ class MicrographHandler
 
 	
 		Image<RFLOAT> lastGainRef;
-		std::string last_gainFn;
+		MultidimArray<bool> lastDefectMask;
+		std::string last_gainFn, last_movieFn;
 	
 		std::map<std::string, std::string> mic2meta;
 		

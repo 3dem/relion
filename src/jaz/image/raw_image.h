@@ -68,7 +68,9 @@ class RawImage
 		
 		void write(std::string fn) const;
 		void writePng(std::string fn) const;
-		void writeVtk(std::string fn, gravis::d3Vector origin, gravis::d3Vector step) const;
+		void writeVtk(std::string fn, 
+					  gravis::d3Vector origin = gravis::d3Vector(0,0,0), 
+					  gravis::d3Vector step = gravis::d3Vector(0,0,0)) const;
 		
 		void copyTo(gravis::tImage<T>& img, int z = 0) const;
 		void copyTo(Image<T>& img) const;

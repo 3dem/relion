@@ -35,6 +35,7 @@ MicrographHandler::MicrographHandler()
 	  saveMem(false),
 	  ready(false),
 	  last_gainFn(""),
+	  last_movieFn(""),
 	  corrMicFn(""),
 	  eer_upsampling(-1),
 	  eer_grouping(-1)
@@ -358,43 +359,52 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 		double angpix, std::vector<ParFourierTransformer>& fts,
 		const std::vector<std::vector<gravis::d2Vector>>* offsets_in,
 		std::vector<std::vector<gravis::d2Vector>>* offsets_out,
-		double data_angpix)
+		double data_angpix,
+		int single_frame_relative_index)
 {
 	if (!ready)
 	{
 		REPORT_ERROR("ERROR: MicrographHandler::loadMovie - MicrographHandler not initialized.");
 	}
 	
-	std::vector<std::vector<Image<Complex>>> movie;
 
 	const int nr_omp_threads = fts.size();
 
 	std::string metaFn = getMicrographMetadataFilename(mdt, true);
 	Micrograph micrograph = Micrograph(metaFn);
 
-	FileName mgFn = micrograph.getMovieFilename();
+	FileName movieFn = micrograph.getMovieFilename();
 	std::string gainFn = micrograph.getGainFilename();
 	MultidimArray<bool> defectMask;
+	last_movieFn = movieFn;
 
 	bool hasDefect = (micrograph.fnDefect != "" || micrograph.hotpixelX.size() != 0);
 	
 	if (hasDefect)
 	{
-		micrograph.fillDefectAndHotpixels(defectMask);
+		if (movieFn == last_movieFn)
+		{
+			defectMask = lastDefectMask;
+		}
+		else
+		{
+			micrograph.fillDefectAndHotpixels(defectMask);
+			lastDefectMask = defectMask;
+		}
 	}
 
 	if (debug)
 	{
 		std::cout << "loading: " << "\n";
 		std::cout << "-> meta: " << metaFn << "\n";
-		std::cout << "-> data: " << mgFn << "\n";
+		std::cout << "-> data: " << movieFn << "\n";
 		std::cout << "-> gain: " << gainFn << "\n";
 		std::cout << "-> mask: " << micrograph.fnDefect << "\n";
 		std::cout << "-> nhot: " << micrograph.hotpixelX.size() << "\n";
 		std::cout << "-> hasdefect: " << (hasDefect ? 1 : 0) << std::endl;
 	}
 
-	const bool isEER = EERRenderer::isEER(mgFn);
+	const bool isEER = EERRenderer::isEER(movieFn);
 
 	bool mgHasGain = false;
 
@@ -427,7 +437,18 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 	
 	RawImage<RFLOAT>* gainRefToUse = mgHasGain? &gainRef_new : 0;
 	RawImage<bool>* defectMaskToUse = hasDefect? &defectMask_new : 0;
+	
+	const bool returnSingleFrame = single_frame_relative_index >= 0;
+	
+	if (returnSingleFrame && offsets_in != 0 && (*offsets_in)[0].size() != 1)
+	{
+		REPORT_ERROR_STR("MicrographHandler::loadMovie: attempting to read one single frame "
+						 << "while the initial trajectories contain more than one position");
+	}
 
+	const int frame0 = returnSingleFrame? single_frame_relative_index : firstFrame;
+	const int fc = returnSingleFrame? 1 : lastFrame - firstFrame + 1;
+				
 	if (isEER)			
 	{
 		if (eer_upsampling < 0)
@@ -441,8 +462,8 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 		}
 		
 		muGraph = MovieLoader::readEER<float>(
-			mgFn, gainRefToUse, defectMaskToUse,
-			firstFrame, lastFrame - firstFrame + 1,
+			movieFn, gainRefToUse, defectMaskToUse,
+			frame0, fc,
 			eer_upsampling, eer_grouping,
 			nr_omp_threads);
 
@@ -450,25 +471,34 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 	else
 	{
 		muGraph = MovieLoader::readDense<float>(
-			mgFn, gainRefToUse, defectMaskToUse,
-			firstFrame, lastFrame - firstFrame + 1,
+			movieFn, gainRefToUse, defectMaskToUse,
+			frame0, fc,
 			hotCutoff,
 			nr_omp_threads);
 	}
 	
-	movie = SpaExtraction::extractMovieStackFS(
+	std::vector<std::vector<Image<Complex>>> movie = SpaExtraction::extractMovieStackFS(
 			mdt, muGraph, s,
 			angpix, coords_angpix, movie_angpix, data_angpix,
 			offsets_in, offsets_out, 
 			nr_omp_threads);
-
-
+	
 	const int pc = movie.size();
 
-	#pragma omp parallel for num_threads(nr_omp_threads)
-	for (int p = 0; p < pc; p++)
+	if (!returnSingleFrame)
 	{
-		StackHelper::varianceNormalize(movie[p], false);
+		#pragma omp parallel for num_threads(nr_omp_threads)
+		for (int p = 0; p < pc; p++)
+		{
+			RFLOAT scale2 = StackHelper::computePower(movie[p], false);
+			
+			for (int f = 0; f < fc; f++)
+			{
+				// NOTE: sqrt(fc) is a legacy scaling factor.
+				// It probably shouldn't be there.
+				RawImage<Complex>(movie[p][f]) /= s * sqrt(scale2 / fc); 
+			}
+		}
 	}
 
 	return movie;

@@ -47,8 +47,10 @@ class FrameRecombiner
 		          ReferenceMap* reference,
 		          ObservationModel* obsModel,
 		          MicrographHandler* micrographHandler);
-
+		
+		void process_old(const std::vector<MetaDataTable>& mdts, long g_start, long g_end);
 		void process(const std::vector<MetaDataTable>& mdts, long g_start, long g_end);
+		void process_new(const std::vector<MetaDataTable>& mdts, long g_start, long g_end);
 
 		bool doingRecombination();
 		
@@ -69,26 +71,28 @@ class FrameRecombiner
 		
 	protected:
 
-		// read from cmd. line:
-		bool doCombineFrames, bfac_diag, do_ctf_multiply, do_recenter;
-		int k0, k1, box_arg, scale_arg, crop_arg;
-		double k0a, k1a, recenter_x, recenter_y, recenter_z;
-		std::string bfacFn, suffix;
+		
+			// read from cmd. line:
+			bool doCombineFrames, bfac_diag, do_ctf_multiply, do_recenter;
+			int k0, k1, box_arg, scale_arg, crop_arg;
+			double k0a, k1a, recenter_x, recenter_y, recenter_z;
+			std::string bfacFn, suffix;
+	
+			// set at init:
+			int s_ref, sh_ref, fc;
+			std::vector<int> s_mov, s_out, sh_out;
+			std::vector<RFLOAT> data_angpix;
+			int verb, nr_omp_threads;
+			std::string outPath;
+			bool debug;
+			double angpix_ref, maxFreq;
+			std::vector<double> angpix_out;
+	
+			ReferenceMap* reference;
+			ObservationModel* obsModel;
+			MicrographHandler* micrographHandler;
 
-		// set at init:
-		int s_ref, sh_ref, fc;
-		std::vector<int> s_mov, s_out, sh_out;
-		std::vector<RFLOAT> data_angpix;
-		int verb, nr_omp_threads;
-		std::string outPath;
-		bool debug;
-		double angpix_ref, maxFreq;
-		std::vector<double> angpix_out;
-
-		ReferenceMap* reference;
-		ObservationModel* obsModel;
-		MicrographHandler* micrographHandler;
-
+			
 		// computed by weightsFromFCC or weightsFromBfacs:
 		std::vector<std::vector<Image<RFLOAT>>> freqWeights;
 
@@ -99,6 +103,11 @@ class FrameRecombiner
 		                                            int s, double angpix);
 
 		bool isJobFinished(std::string filenameRoot);
+		
+		void recenterParticles(
+				MetaDataTable& mdtOut,
+				RFLOAT ref_angpix,
+				RFLOAT coords_angpix);
 };
 
 #endif

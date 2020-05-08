@@ -750,18 +750,89 @@ void StackHelper::varianceNormalize(std::vector<Image<Complex>>& movie, bool cir
 		}
 	}
 
-	const double scale = sqrt(wt*h*var/(cnt*fc));
-
-	//std::cout << "scale: " << scale << "\n";
+	const double scale = sqrt( wt * h * var / (cnt * fc) );
 
 	for (int f = 0; f < fc; f++)
 	{
 		for (int y = 0; y < h; y++)
-			for (int x = 0; x < w; x++)
-			{
-				movie[f](y,x) /= scale;
-			}
+		for (int x = 0; x < w; x++)
+		{
+			movie[f](y,x) /= scale;
+		}
 	}
+}
+
+
+RFLOAT StackHelper::computePower(const RawImage<Complex>& movie, bool circleCropped)
+{
+	const int w = movie.xdim;
+	const int h = movie.ydim;
+	const int fc = movie.zdim;
+
+	double var = 0.0;
+	double cnt = 0.0;
+
+	const double rr = (w-2)*(w-2);
+
+	for (int f = 0; f < fc; f++)
+	{
+		for (int y = 0; y < h; y++)
+		for (int x = 0; x < w; x++)
+		{
+			if (x == 0 && y == 0) continue;
+
+			if (circleCropped)
+			{
+				const double yy = y < w? y : y - h;
+				const double xx = x;
+
+				if (xx*xx + yy*yy > rr) continue;
+			}
+
+			double scale = x > 0? 2.0 : 1.0;
+
+			var += scale * movie(x,y,f).norm();
+			cnt += scale;
+		}
+	}
+
+	return var / cnt;
+}
+
+RFLOAT StackHelper::computePower(std::vector<Image<Complex>>& movie, bool circleCropped)
+{
+	const int fc = movie.size();
+	const int w = movie[0].data.xdim;
+	const int h = movie[0].data.ydim;
+
+	double var = 0.0;
+	double cnt = 0.0;
+
+	const double rr = (w-2)*(w-2);
+
+	for (int f = 0; f < fc; f++)
+	{
+		for (int y = 0; y < h; y++)
+		for (int x = 0; x < w; x++)
+		{
+			if (x == 0 && y == 0) continue;
+
+			if (circleCropped)
+			{
+				const double yy = y < w? y : y - h;
+				const double xx = x;
+
+				if (xx*xx + yy*yy > rr) continue;
+			}
+
+			double scale = x > 0? 2.0 : 1.0;
+
+			var += scale * movie[f](y,x).norm();
+			cnt += scale;
+		}
+	}
+
+	return var / cnt;
 }
 
 std::vector<double> StackHelper::powerSpectrum(const std::vector<std::vector<Image<Complex>>> &stack)

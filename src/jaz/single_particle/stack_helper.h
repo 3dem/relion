@@ -87,6 +87,14 @@ class StackHelper
 		
 		static void varianceNormalize(
 					std::vector<Image<Complex>>& movie, 
+					bool circleCropped);
+		
+		static RFLOAT computePower(
+					const RawImage<Complex>& movie, 
+					bool circleCropped);
+		
+		static RFLOAT computePower(
+					std::vector<Image<Complex>>& movie, 
 					bool circleCropped = false);
 		
 		static std::vector<double> powerSpectrum(
