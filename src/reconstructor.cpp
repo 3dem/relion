@@ -143,7 +143,7 @@ void Reconstructor::initialise()
 	// Get dimension of the images
 	if (do_reconstruct_ctf)
 	{
-		mysize = ctf_dim;
+		output_boxsize = ctf_dim;
 	}
 	else
 	{
@@ -157,45 +157,47 @@ void Reconstructor::initialise()
 
 		Image<RFLOAT> img0;
 		img0.read(fn_img, false);
-		mysize=(int)XSIZE(img0());
-		// When doing Ewald-curvature correction: allow reconstructing smaller box than the input images (which should have large boxes!!)
-		if (do_ewald && newbox > 0)
-			mysize = newbox;
+		output_boxsize=(int)XSIZE(img0());
+		// When doing Ewald-curvature correction or when having optics groups: allow reconstructing smaller box than the input images (which should have large boxes!!)
+		if ((do_ewald || !do_ignore_optics) && newbox > 0)
+		{
+			output_boxsize = newbox;
+		}
 
 		if (do_3d_rot)
 			data_dim = 3;
 		else // If not specifically provided, we autodetect it
 		{
-            if (do_ignore_optics)
+			if (do_ignore_optics)
 			{
 				data_dim = img0().getDim();
 				std::cout << " + Taking data dimensions from the first image: " << data_dim << std::endl;
 			}
 			else
-            {
-                obsModel.opticsMdt.getValue(EMDL_IMAGE_DIMENSIONALITY, data_dim, 0);
-                std::cout << " + Taking data dimensions from the first optics group: " << data_dim << std::endl;
-            }
-        }
+			{
+				obsModel.opticsMdt.getValue(EMDL_IMAGE_DIMENSIONALITY, data_dim, 0);
+				std::cout << " + Taking data dimensions from the first optics group: " << data_dim << std::endl;
+			}
+		}
 	}
 
 	if (angpix < 0.)
 	{
 		if (do_ignore_optics)
 		{
-	        if (DF.containsLabel(EMDL_CTF_MAGNIFICATION) && DF.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
-	        {
-	                RFLOAT mag, dstep;
-	                DF.getValue(EMDL_CTF_MAGNIFICATION, mag);
-	                DF.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
-	                angpix = 10000. * dstep / mag;
-	                if (verb > 0)
-	                        std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << angpix << std::endl;
-	        }
-	        else
-	        {
-	        	REPORT_ERROR("ERROR: cannot find pixel size in input STAR file, provide it using --angpix");
-	        }
+			if (DF.containsLabel(EMDL_CTF_MAGNIFICATION) && DF.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+			{
+				RFLOAT mag, dstep;
+				DF.getValue(EMDL_CTF_MAGNIFICATION, mag);
+				DF.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+				angpix = 10000. * dstep / mag;
+				if (verb > 0)
+					std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << angpix << std::endl;
+			}
+			else
+			{
+				REPORT_ERROR("ERROR: cannot find pixel size in input STAR file, provide it using --angpix");
+			}
 		}
 		else
 		{
@@ -207,8 +209,7 @@ void Reconstructor::initialise()
 	if (maxres < 0.)
 		r_max = -1;
 	else
-		r_max = CEIL(mysize * angpix / maxres);
-
+		r_max = CEIL(output_boxsize * angpix / maxres);
 }
 
 void Reconstructor::run()
@@ -273,21 +274,21 @@ void Reconstructor::readDebugArrays()
 	{
 		A3D_ELEM(backprojector.weight, k, i, j) = A3D_ELEM(It(), k, i, j);
 	}
-	mysize = debug_ori_size;
+	output_boxsize = debug_ori_size;
 }
 
 void Reconstructor::backproject(int rank, int size)
 {
 	if (fn_sub != "")
 	{
-		projector = Projector(mysize, interpolator, padding_factor, r_min_nn);
+		projector = Projector(output_boxsize, interpolator, padding_factor, r_min_nn);
 		Image<RFLOAT> sub;
 		sub.read(fn_sub);
 		MultidimArray<RFLOAT> dummy;
 		projector.computeFourierTransformMap(sub(), dummy, 2 * r_max);
 	}
 
-	backprojector = BackProjector(mysize, ref_dim, fn_sym, interpolator,
+	backprojector = BackProjector(output_boxsize, ref_dim, fn_sym, interpolator,
 					padding_factor, r_min_nn, blob_order,
 					blob_radius, blob_alpha, data_dim, skip_gridding);
 	backprojector.initZeros(2 * r_max);
@@ -359,18 +360,24 @@ void Reconstructor::backprojectOneParticle(long int p)
 	// If we are considering Ewald sphere curvature, the mag. matrix
 	// has to be provided to the backprojector explicitly
 	// (to avoid creating an Ewald ellipsoid)
-	int opticsGroup;
+	int opticsGroup=-1;
+	int myBoxSize = output_boxsize; // Without optics groups, the output box size is always the same as the one from the input images
+	RFLOAT myPixelSize = angpix; // Without optics groups, the pixel size is always the same as the one from the input images
 	bool ctf_premultiplied = false;
 	if (!do_ignore_optics)
 	{
 		opticsGroup = obsModel.getOpticsGroup(DF, p);
+		myBoxSize = obsModel.getBoxSize(opticsGroup);
+		myPixelSize = obsModel.getPixelSize(opticsGroup);
 		ctf_premultiplied = obsModel.getCtfPremultiplied(opticsGroup);
+		if (do_ewald && ctf_premultiplied)
+			REPORT_ERROR("We cannot perform Ewald sphere correction on CTF premultiplied particles.");
 		Matrix2D<RFLOAT> magMat;
 		if (!do_ewald)
 		{
 			A3D = obsModel.applyAnisoMag(A3D, opticsGroup);
 		}
-		A3D = obsModel.applyScaleDifference(A3D, opticsGroup, mysize, angpix);
+		A3D = obsModel.applyScaleDifference(A3D, opticsGroup, output_boxsize, angpix);
 	}
 
 	// Translations (either through phase-shifts or in real space
@@ -396,7 +403,7 @@ void Reconstructor::backprojectOneParticle(long int p)
 	}
 
 	// As of v3.1, shifts are in Angstroms in the STAR files, convert back to pixels here
-	trans/= angpix;
+	trans/= myPixelSize;
 
 	if (do_fom_weighting)
 	{
@@ -415,18 +422,18 @@ void Reconstructor::backprojectOneParticle(long int p)
 		DF.getValue(EMDL_IMAGE_NAME, fn_img, p);
 		img.read(fn_img);
 		img().setXmippOrigin();
-		CenterFFT(img(), true);
 		transformer.FourierTransform(img(), F2D);
+		CenterFFTbySign(F2D);
 
 		if (ABS(XX(trans)) > 0. || ABS(YY(trans)) > 0. || ABS(ZZ(trans)) > 0. ) // ZZ(trans) is 0 in case data_dim=2
 		{
-			shiftImageInFourierTransform(F2D, F2D,
-										 XSIZE(img()), XX(trans), YY(trans), ZZ(trans));
+			shiftImageInFourierTransform(F2D, F2D, XSIZE(img()), XX(trans), YY(trans), ZZ(trans));
 		}
 	}
 	else
 	{
-		F2D.resize(mysize, mysize / 2 + 1);
+		if (data_dim == 3) F2D.resize(myBoxSize, myBoxSize, myBoxSize / 2 + 1);
+		else F2D.resize(myBoxSize, myBoxSize / 2 + 1);
 	}
 
 	if (fn_noise != "")
@@ -459,7 +466,7 @@ void Reconstructor::backprojectOneParticle(long int p)
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(F2D)
 		{
 			int ires = ROUND(sqrt((RFLOAT)(kp*kp + ip*ip + jp*jp)));
-			ires = XMIPP_MIN(ires, model.ori_size/2); // at freqs higher than Nyquist: use last sigma2 value
+			ires = XMIPP_MIN(ires, myBoxSize/2); // at freqs higher than Nyquist: use last sigma2 value
 
 			RFLOAT sigma = sqrt(DIRECT_A1D_ELEM(model.sigma2_noise[my_mic_id], ires));
 			DIRECT_A3D_ELEM(F2D, k, i, j).real += rnd_gaus(0., sigma);
@@ -508,11 +515,15 @@ void Reconstructor::backprojectOneParticle(long int p)
 		{
 			CTF ctf;
 			if (do_ignore_optics)
+			{
 				ctf.read(DF, DF, p);
+			}
 			else
+			{
 				ctf.readByGroup(DF, &obsModel, p);
+			}
 
-			ctf.getFftwImage(Fctf, mysize, mysize, angpix,
+			ctf.getFftwImage(Fctf, myBoxSize, myBoxSize, myPixelSize,
 			                 ctf_phase_flipped, only_flip_phases,
 			                 intact_ctf_first_peak, true);
 
@@ -530,11 +541,11 @@ void Reconstructor::backprojectOneParticle(long int p)
 				if (!skip_weighting)
 				{
 					// Also calculate W, store again in Fctf
-					ctf.applyWeightEwaldSphereCurvature_noAniso(Fctf, mysize, mysize, angpix, mask_diameter);
+					ctf.applyWeightEwaldSphereCurvature_noAniso(Fctf, myBoxSize, myBoxSize, myPixelSize, mask_diameter);
 				}
 
 				// Also calculate the radius of the Ewald sphere (in pixels)
-				r_ewald_sphere = mysize * angpix / ctf.lambda;
+				r_ewald_sphere = myBoxSize * myPixelSize / ctf.lambda;
 			}
 		}
 	}
@@ -675,7 +686,7 @@ void Reconstructor::reconstruct()
 	bool do_use_fsc = false;
 	MultidimArray<RFLOAT> fsc, dummy;
 	Image<RFLOAT> vol;
-	fsc.resize(mysize/2+1);
+	fsc.resize(output_boxsize/2+1);
 
 	if (fn_fsc != "")
 	{
@@ -761,7 +772,7 @@ void Reconstructor::reconstruct()
 			FileName fn_root = fn_out.withoutExtension();
 			backprojector.externalReconstruct(vol(),
 					fn_root,
-					tau2, 1., 1);
+					tau2, dummy, dummy, dummy, false, 1., 1);
 		}
 		else
 		{
@@ -802,8 +813,8 @@ void Reconstructor::applyCTFPandCTFQ(MultidimArray<Complex> &Fin, CTF &ctf, Four
 			if (!skip_mask)
 			{
 				// inverse transform and mask out the particle....
+				CenterFFTbySign(Fapp);
 				transformer.inverseFourierTransform(Fapp, Iapp);
-				CenterFFT(Iapp, false);
 
 				softMaskOutsideMap(Iapp, ROUND(mask_diameter/(angpix*2.)), (RFLOAT)width_mask_edge);
 
@@ -816,8 +827,8 @@ void Reconstructor::applyCTFPandCTFQ(MultidimArray<Complex> &Fin, CTF &ctf, Four
 
 				}
 				// Back into Fourier-space
-				CenterFFT(Iapp, true);
 				transformer.FourierTransform(Iapp, Fapp, false); // false means: leave Fapp in the transformer
+				CenterFFTbySign(Fapp);
 			}
 
 			// First time round: resize the output arrays

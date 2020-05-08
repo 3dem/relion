@@ -22,28 +22,26 @@
 
 void AutoPickerMpi::read(int argc, char **argv)
 {
-    // Define a new MpiNode
-    node = new MpiNode(argc, argv);
+	// Define a new MpiNode
+	node = new MpiNode(argc, argv);
 
-    if (node->isMaster())
-    	PRINT_VERSION_INFO();
+	if (node->isMaster())
+		PRINT_VERSION_INFO();
 
-    // First read in non-parallelisation-dependent variables
-    AutoPicker::read(argc, argv);
+	// First read in non-parallelisation-dependent variables
+	AutoPicker::read(argc, argv);
 
-    // Don't put any output to screen for mpi slaves
-    if (!node->isMaster())
-    	verb = 0;
+	// Don't put any output to screen for mpi slaves
+	if (!node->isMaster())
+		verb = 0;
 
-    if (do_write_fom_maps && node->isMaster())
-    	std::cerr << "WARNING : --write_fom_maps is very heavy on disc I/O and is not advised in parallel execution. If possible, using --shrink 0 and lowpass makes I/O less significant." << std::endl;
+	if (do_write_fom_maps && node->isMaster())
+		std::cerr << "WARNING : --write_fom_maps is very heavy on disc I/O and is not advised in parallel execution. If possible, using --shrink 0 and lowpass makes I/O less significant." << std::endl;
 
-    // Possibly also read parallelisation-dependent variables here
+	// Possibly also read parallelisation-dependent variables here
 
-    // Print out MPI info
+	// Print out MPI info
 	printMpiNodesMachineNames(*node);
-
-
 }
 
 #ifdef CUDA
@@ -62,18 +60,17 @@ int AutoPickerMpi::deviceInitialise()
 	else
 		dev_id = textToInteger((allThreadIDs[node->rank][0]).c_str());
 
-    for (int slave = 0; slave < node->size; slave++)
-    {
-    	if (slave == node->rank)
-    	{
-    		std::cout << " + Using GPU device: " << dev_id << " on MPI node: " << node->rank << std::endl;
-    		std::cout.flush();
-    	}
-    	node->barrierWait();
-    }
+	for (int slave = 0; slave < node->size; slave++)
+	{
+		if (slave == node->rank)
+		{
+			std::cout << " + Using GPU device: " << dev_id << " on MPI node: " << node->rank << std::endl;
+			std::cout.flush();
+		}
+		node->barrierWait();
+	}
 
 	return(dev_id);
-
 }
 #endif
 
@@ -94,8 +91,7 @@ void AutoPickerMpi::run()
 
 	FileName fn_olddir="";
 	for (long int imic = my_first_micrograph; imic <= my_last_micrograph; imic++)
-    {
-
+	{
 		// Abort through the pipeline_control system
 		if (pipeline_control_check_abort_job())
 			MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
@@ -118,8 +114,7 @@ void AutoPickerMpi::run()
 		else
 			autoPickOneMicrograph(fn_micrographs[imic], imic);
 	}
+
 	if (verb > 0)
 		progress_bar(my_nr_micrographs);
-
-
 }

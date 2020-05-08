@@ -499,9 +499,15 @@ will still yield good performance and possibly a more stable execution. \n" << s
 		{
 			if (verb > 0) std::cout<< " WARNING: provided sigma2_noise-spectrum has fewer entries ("<<idx+1<<") than needed ("<<XSIZE(mymodel.sigma2_noise[0])<<"). Set rest to zero..."<<std::endl;
 		}
-		// Use the same spectrum for all classes
-		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
-			mymodel.sigma2_noise[igroup] =  mymodel.sigma2_noise[0];
+
+        mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
+        for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
+        {
+            // Use the same spectrum for all classes
+            mymodel.sigma2_noise[igroup] =  mymodel.sigma2_noise[0];
+            // We set wsum_model.sumw_group as in calculateSumOfPowerSpectraAndAverageImage
+            wsum_model.sumw_group[igroup] = mymodel.nr_particles_per_group[igroup];
+        }
 	}
 	else if (do_calculate_initial_sigma_noise || do_average_unaligned)
 	{
@@ -878,8 +884,10 @@ void MlOptimiserMpi::expectation()
 		timer.tic(TIMING_EXP_3);
 #endif
 	// D. Update the angular sampling (all nodes except master)
-	if (!node->isMaster() && (do_auto_refine || do_sgd) && iter > 1)
+	if (!node->isMaster() && ( (do_auto_refine || do_sgd) && iter > 1) || (mymodel.nr_classes > 1 && allow_coarser_samplings) )
+	{
 		updateAngularSampling(node->rank == 1);
+	}
 
 	// The master needs to know about the updated parameters from updateAngularSampling
 	node->relion_MPI_Bcast(&has_fine_enough_angular_sampling, 1, MPI_INT, first_slave, MPI_COMM_WORLD);
@@ -2048,18 +2056,6 @@ void MlOptimiserMpi::maximization()
 								do_split_random_halves,
 								(do_join_random_halves || do_always_join_random_halves));
 
-#ifdef TIMING
-						(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons],
-								gridding_nr_iter,
-								do_map,
-								mymodel.tau2_class[ith_recons],
-								mymodel.tau2_fudge_factor,
-								wsum_model.pdf_class[iclass],
-								minres_map,
-								false,
-								&timer);
-#else
-
 						if (do_external_reconstruct)
 						{
 							FileName fn_ext_root;
@@ -2072,6 +2068,9 @@ void MlOptimiserMpi::maximization()
 									fn_ext_root,
 									mymodel.fsc_halves_class[ith_recons],
 									mymodel.tau2_class[ith_recons],
+									mymodel.sigma2_class[ith_recons],
+									mymodel.data_vs_prior_class[ith_recons],
+									(do_join_random_halves || do_always_join_random_halves),
 									mymodel.tau2_fudge_factor,
 									node->rank==1); // only first slaves is verbose
 						}
@@ -2084,14 +2083,14 @@ void MlOptimiserMpi::maximization()
 								mymodel.tau2_fudge_factor,
 								wsum_model.pdf_class[iclass],
 								minres_map,
-								false);
+								false
+							);
 						}
-#endif
-						if(do_sgd)
+						if (do_sgd)
 						{
 
 							// Use stochastic expectation maximisation, instead of SGD.
-							if(do_avoid_sgd)
+							if (do_avoid_sgd)
 							{
 								if (iter < sgd_ini_iter)
 								{
@@ -2221,6 +2220,9 @@ void MlOptimiserMpi::maximization()
 										fn_ext_root,
 										mymodel.fsc_halves_class[ith_recons],
 										mymodel.tau2_class[ith_recons],
+										mymodel.sigma2_class[ith_recons],
+										mymodel.data_vs_prior_class[ith_recons],
+										(do_join_random_halves || do_always_join_random_halves),
 										mymodel.tau2_fudge_factor);
 							}
 							else

@@ -82,7 +82,7 @@ public:
 			std::cout << "- binning factor: " << mic.getBinningFactor() << std::endl;
 			const RFLOAT angpix = mic.angpix * mic.getBinningFactor();
 			std::cout << "- binned pixel size: " << angpix << std::endl;
-			optOut.setValue(EMDL_IMAGE_PIXEL_SIZE, angpix);
+			optOut.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, angpix);
 
 			std::cout << "\nThe other microscope parameters must be specified in the command line." << std::endl;
 			if (Cs < 0)

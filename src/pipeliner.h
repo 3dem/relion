@@ -161,7 +161,7 @@ public:
 	int addScheduledJob(int job_type, std::string fn_options);
 
 	// Add this RelionJob as scheduled to the pipeline
-	int addScheduledJob(RelionJob &job);
+	int addScheduledJob(RelionJob &job, std::string fn_options="");
 
 	void waitForJobToFinish(int current_job, bool &is_failure, bool &is_abort);
 

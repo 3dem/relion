@@ -316,10 +316,8 @@ size_t MetaDataTable::size() const
 	return objects.size();
 }
 
-
 bool MetaDataTable::setUnknownValue(int labelPosition, const std::string &value)
 {
-
 	long offset = unknownLabelPosition2Offset[labelPosition];
 	if (offset < 0) REPORT_ERROR("MetaDataTable::setValueFromString BUG: offset should not be negative here....");
 
@@ -332,8 +330,6 @@ bool MetaDataTable::setUnknownValue(int labelPosition, const std::string &value)
 	{
 		return false;
 	}
-
-
 }
 
 bool MetaDataTable::setValueFromString(
@@ -395,82 +391,82 @@ bool MetaDataTable::setValueFromString(
 	return false;
 }
 
-	// comparators used for sorting
+// comparators used for sorting
 
-	struct MdDoubleComparator
+struct MdDoubleComparator
+{
+	MdDoubleComparator(long index) : index(index) {}
+
+	bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
 	{
-		MdDoubleComparator(long index) : index(index) {}
+		return lh->doubles[index] < rh->doubles[index];
+	}
 
-		bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
-		{
-			return lh->doubles[index] < rh->doubles[index];
-		}
+	long index;
+};
 
-		long index;
-	};
+struct MdIntComparator
+{
+	MdIntComparator(long index) : index(index) {}
 
-	struct MdIntComparator
+	bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
 	{
-		MdIntComparator(long index) : index(index) {}
+		return lh->ints[index] < rh->ints[index];
+	}
 
-		bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
-		{
-			return lh->ints[index] < rh->ints[index];
-		}
+	long index;
+};
 
-		long index;
-	};
+struct MdStringComparator
+{
+	MdStringComparator(long index) : index(index) {}
 
-	struct MdStringComparator
+	bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
 	{
-		MdStringComparator(long index) : index(index) {}
+		return lh->strings[index] < rh->strings[index];
+	}
 
-		bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
-		{
-			return lh->strings[index] < rh->strings[index];
-		}
+	long index;
+};
 
-		long index;
-	};
+struct MdStringAfterAtComparator
+{
+	MdStringAfterAtComparator(long index) : index(index) {}
 
-	struct MdStringAfterAtComparator
+	bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
 	{
-		MdStringAfterAtComparator(long index) : index(index) {}
+		std::string slh = lh->strings[index];
+		std::string srh = rh->strings[index];
+		slh = slh.substr(slh.find("@")+1);
+		srh = srh.substr(srh.find("@")+1);
+		return slh < srh;
+	}
 
-		bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
-		{
-			std::string slh = lh->strings[index];
-			std::string srh = rh->strings[index];
-			slh = slh.substr(slh.find("@")+1);
-			srh = srh.substr(srh.find("@")+1);
-			return slh < srh;
-		}
+	long index;
+};
 
-		long index;
-	};
+struct MdStringBeforeAtComparator
+{
+	MdStringBeforeAtComparator(long index) : index(index) {}
 
-	struct MdStringBeforeAtComparator
+	bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
 	{
-		MdStringBeforeAtComparator(long index) : index(index) {}
+		std::string slh = lh->strings[index];
+		std::string srh = rh->strings[index];
+		slh = slh.substr(0, slh.find("@"));
+		srh = srh.substr(0, srh.find("@"));
+		std::stringstream stslh, stsrh;
+		stslh << slh;
+		stsrh << srh;
+		long ilh, irh;
+		stslh >> ilh;
+		stsrh >> irh;
 
-		bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
-		{
-			std::string slh = lh->strings[index];
-			std::string srh = rh->strings[index];
-			slh = slh.substr(0, slh.find("@"));
-			srh = srh.substr(0, srh.find("@"));
-			std::stringstream stslh, stsrh;
-			stslh << slh;
-			stsrh << srh;
-			long ilh, irh;
-			stslh >> ilh;
-			stsrh >> irh;
+		return ilh < irh;
+	}
 
-			return ilh < irh;
-		}
-
-		long index;
-	};
+	long index;
+};
 
 void MetaDataTable::sort(EMDLabel name, bool do_reverse, bool only_set_index, bool do_random)
 {
@@ -1058,10 +1054,10 @@ long int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std
 	// The loop statement may be necessary for data blocks that have a list AND a table inside them
 	while (getline(in, line, '\n'))
 	{
+		trim(line);
 		if (line.find("# version ") != std::string::npos)
 		{
-			token = line.substr(line.find("# version ")
-								+ std::string("# version ").length());
+			token = line.substr(line.find("# version ") + std::string("# version ").length());
 
 			std::istringstream sts(token);
 			sts >> version;
@@ -1080,7 +1076,6 @@ long int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std
 				int current_pos = in.tellg();
 				while (getline(in, line, '\n'))
 				{
-					trim(line);
 					if (line.find("loop_") != std::string::npos)
 					{
 						return readStarLoop(in, desiredLabels, grep_pattern, do_only_count);
@@ -1843,11 +1838,21 @@ MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label,
 	if (!MDin.containsLabel(mic_label))
 		REPORT_ERROR("STAR file does not contain " + EMDL::label2Str(mic_label));
 
-	std::vector<bool> valid(MDin.numberOfObjects(), true);
+    std::vector<bool> valid(MDin.numberOfObjects(), true);
 	std::vector<RFLOAT> xs(MDin.numberOfObjects(), 0.0);
 	std::vector<RFLOAT> ys(MDin.numberOfObjects(), 0.0);
+    std::vector<RFLOAT> zs;
 
-	RFLOAT threshold_sq = threshold * threshold;
+    bool dataIs3D = false;
+    if (MDin.containsLabel(EMDL_IMAGE_COORD_Z))
+    {
+        if (!MDin.containsLabel(EMDL_ORIENT_ORIGIN_Z_ANGSTROM))
+            REPORT_ERROR("You need rlnOriginZAngst to remove duplicated 3D particles");
+        dataIs3D = true;
+         zs.resize(MDin.numberOfObjects(), 0.0);
+    }
+
+    RFLOAT threshold_sq = threshold * threshold;
 
 	// group by micrograph
 	std::map<std::string, std::vector<long> > grouped;
@@ -1863,6 +1868,13 @@ MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label,
 		MDin.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, val1);
 		MDin.getValue(EMDL_IMAGE_COORD_Y, val2);
 		ys[current_object] = -val1 * origin_scale + val2;
+
+		if (dataIs3D)
+        {
+            MDin.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, val1);
+            MDin.getValue(EMDL_IMAGE_COORD_Z, val2);
+            zs[current_object] = -val1 * origin_scale + val2;
+        }
 
 		grouped[mic_name].push_back(current_object);
 	}
@@ -1880,6 +1892,8 @@ MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label,
 			{
 				long part_id2 = it->second[j];
 				RFLOAT dist_sq = (xs[part_id1] - xs[part_id2]) * (xs[part_id1] - xs[part_id2]) + (ys[part_id1] - ys[part_id2]) * (ys[part_id1] - ys[part_id2]);
+				if (dataIs3D)
+                    dist_sq += (zs[part_id1] - zs[part_id2]) * (zs[part_id1] - zs[part_id2]);
 
 				if (dist_sq <= threshold_sq)
 				{
