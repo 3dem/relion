@@ -19,7 +19,16 @@
  ***************************************************************************/
 #include "spa_backproject.h"
 #include <src/jaz/util/zio.h>
+#include <src/jaz/util/log.h>
+#include <src/jaz/tomography/projection/Fourier_backprojection.h>
+#include <src/jaz/tomography/reconstruction.h>
+#include <src/jaz/image/centering.h>
+#include <src/jaz/image/padding.h>
+#include <src/jaz/image/symmetry.h>
 #include <omp.h>
+
+using namespace gravis;
+
 
 void SpaBackproject::read(int argc, char **argv)
 {
@@ -98,11 +107,14 @@ void SpaBackproject::read(int argc, char **argv)
 	
 	num_threads_in = textToInteger(parser.getOption("--j_in", "Number of inner threads", "1"));
 	num_threads_out = textToInteger(parser.getOption("--j_out", "Number of outer threads", "1"));
+	num_threads_total = num_threads_in * num_threads_out;
 	
-	use_fwd_mapping = true; //parser.checkOption("--fwd_mapping", "Use the legacy forward-mapping algorithm");
+	use_fwd_mapping = parser.checkOption("--fwd_mapping", "Use the legacy forward-mapping algorithm");
 
 	// Hidden
 	r_min_nn = textToInteger(getParameter(argc, argv, "--r_min_nn", "10"));
+		
+	Log::readParams(parser);
 
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())
@@ -188,7 +200,7 @@ void SpaBackproject::initialise()
 	if (angpix < 0.)
 	{
 		angpix = obsModel.getPixelSize(0);
-		std::cout << " + Taking angpix from the first optics group: " << angpix << std::endl;
+		Log::print("Reconstructing at the pixel size from the first optics group: " + ZIO::itoa(angpix) + " Å");
 	}
 
 	if (maxres < 0.)
@@ -205,7 +217,15 @@ void SpaBackproject::run()
 {
 	initialise();
 	backprojectAllParticles();
-	reconstruct();
+	
+	if (use_fwd_mapping)
+	{
+		reconstructForward();
+	}
+	else
+	{
+		reconstructBackward();
+	}
 }
 
 void SpaBackproject::backprojectAllParticles()
@@ -233,15 +253,36 @@ void SpaBackproject::backprojectAllParticles()
 			backprojectors[i].initZeros(2 * r_max);
 		}
 	}
+	else
+	{
+		padded_box_size = (int)(padding_factor * output_boxsize);
+		
+		const int s = padded_box_size;
+		const int sh = s/2 + 1;
+		
+		accumulation_volumes = std::vector<AccumulationVolume>(2 * num_threads_out);
+		
+		for (int i = 0; i < accumulation_volumes.size(); i++)
+		{
+			accumulation_volumes[i].data = BufferedImage<Complex>(sh,s,s);
+			accumulation_volumes[i].weight = BufferedImage<RFLOAT>(sh,s,s);
+			accumulation_volumes[i].multiplicity = BufferedImage<RFLOAT>(sh,s,s);
+			accumulation_volumes[i].spreading_function = BufferedImage<RFLOAT>(sh,s,s);
+			
+			accumulation_volumes[i].data.fill(Complex(0.0, 0.0));
+			accumulation_volumes[i].weight.fill(0.0);
+			accumulation_volumes[i].multiplicity.fill(0.0);
+			accumulation_volumes[i].spreading_function.fill(0.0);
+		}
+	}
 
 	long int nr_parts = DF.numberOfObjects();
 	long int barstep = XMIPP_MAX(1, nr_parts/(120 * num_threads_out));
 	
 	if (verb > 0)
 	{
-		std::cout << " + Back-projecting all images ..." << std::endl;
 		time_config();
-		init_progress_bar(nr_parts / num_threads_out);
+		Log::beginProgress("Back-projecting all images", nr_parts / num_threads_out);
 	}
 	
 	#pragma omp parallel for num_threads(num_threads_out)
@@ -253,13 +294,13 @@ void SpaBackproject::backprojectAllParticles()
 
 		if (th == 0 && p % barstep == 0 && verb > 0)
 		{
-			progress_bar(p);
+			Log::updateProgress(p);
 		}
 	}
 
 	if (verb > 0)
 	{
-		progress_bar(nr_parts);
+		Log::endProgress();
 	}
 }
 
@@ -275,10 +316,15 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 	const int data_id = 2*thread_id + subset;
 	
 	BackProjector* backprojector;
+	AccumulationVolume* accumulationVolume;
 	
 	if (use_fwd_mapping)
 	{
 		backprojector = &backprojectors[data_id];
+	}
+	else
+	{
+		accumulationVolume = &accumulation_volumes[data_id];
 	}
 	
 	Matrix2D<RFLOAT> A3D;
@@ -579,11 +625,32 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 			{
 				backprojector->set2DFourierTransform(F2D, A3D, &Fctf);
 			}
+			else
+			{
+				d4Matrix proj(
+						A3D(0,0), A3D(0,1), A3D(0,2), 0,
+						A3D(1,0), A3D(1,1), A3D(1,2), 0,
+						A3D(2,0), A3D(2,1), A3D(2,2), 0,
+						       0,        0,        0, 1 );
+				
+				FourierBackprojection::backprojectSlice_noSF(
+					dataImage, ctfImage, proj,
+					accumulationVolume->data,
+					accumulationVolume->weight,
+					accumulationVolume->multiplicity,
+					padding_factor,
+					num_threads_in);
+						
+				FourierBackprojection::backprojectSpreadingFunction(
+					proj,
+					accumulationVolume->spreading_function,
+					padding_factor);
+			}
 		}
 	}
 }
 
-void SpaBackproject::reconstruct()
+void SpaBackproject::reconstructForward()
 {
 	const bool do_use_fsc = fn_fsc != "";
 	bool do_MAP = do_use_fsc;
@@ -592,12 +659,7 @@ void SpaBackproject::reconstruct()
 		
 	if (verb > 0)
 	{
-		std::cout << " + Starting the reconstruction ..." << std::endl;
-	}
-	
-	if (verb > 0)
-	{
-		std::cout << " -  merging volumes ..." << std::endl;
+		Log::print("Merging volumes");
 	}
 	
 	for (int subset = 0; subset < 2; subset++)	
@@ -612,17 +674,19 @@ void SpaBackproject::reconstruct()
 	{
 		if (verb > 0)
 		{
-			std::cout << " -  subset " << subset+1 << " ..." << std::endl;
+			Log::beginSection("Subset " + ZIO::itoa(subset+1));
 		}
 		
 		BackProjector& backprojector = backprojectors[subset];
 		
 		if (verb > 0)
 		{
-			std::cout << " -    symmetrising ..." << std::endl;
+			Log::print("Applying symmetries");
 		}
 		
-		backprojector.symmetrise(nr_helical_asu, helical_twist, helical_rise/angpix, 6);
+		backprojector.symmetrise(
+					nr_helical_asu, helical_twist, helical_rise/angpix, 
+					num_threads_total);
 	
 		const long int s = ctf_dim;
 		
@@ -630,7 +694,7 @@ void SpaBackproject::reconstruct()
 		{
 			if (verb > 0)
 			{
-				std::cout << " -    dividing ctf volume ..." << std::endl;
+				Log::print("Dividing CTF volume");
 			}
 			
 			vol_xmipp().initZeros(s, s, s);
@@ -692,27 +756,27 @@ void SpaBackproject::reconstruct()
 			{
 				if (verb > 0)
 				{
-					std::cout << " -    writing debugging data ..." << std::endl;
+					Log::print("Writing debugging data");
 				}
 				
 				Image<RFLOAT> It;
 				FileName fn_tmp = fn_out.withoutExtension() + "_half_" + ZIO::itoa(subset+1);
 				It().resize(backprojector.data);
 				
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(It())
+				for (long int n = 0; n < It().nzyxdim; n++)
 				{
-					DIRECT_MULTIDIM_ELEM(It(), n) = (DIRECT_MULTIDIM_ELEM(backprojector.data, n)).real;
+					It().data[n] = backprojector.data.data[n].real;
 				}
 				
 				It.write(fn_tmp+"_data_real.mrc");
 				
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(It())
+				for (long int n = 0; n < It().nzyxdim; n++)
 				{
-					DIRECT_MULTIDIM_ELEM(It(), n) = (DIRECT_MULTIDIM_ELEM(backprojector.data, n)).imag;
+					It().data[n] = backprojector.data.data[n].imag;
 				}
 				
 				It.write(fn_tmp+"_data_imag.mrc");
-				It()=backprojector.weight;
+				It() = backprojector.weight;
 				It.write(fn_tmp+"_weight.mrc");
 			}
 	
@@ -722,7 +786,7 @@ void SpaBackproject::reconstruct()
 			{
 				if (verb > 0)
 				{
-					std::cout << " -    reading FSC ..." << std::endl;
+					Log::print("Reading FSC");
 				}
 				
 				do_MAP = true;
@@ -749,7 +813,7 @@ void SpaBackproject::reconstruct()
 			{
 				if (verb > 0)
 				{
-					std::cout << " -    preparing for external reconstruction ..." << std::endl;
+					Log::print("Preparing for external reconstruction");
 				}
 				
 				FileName fn_root = fn_out.withoutExtension() + "_half_" + ZIO::itoa(subset+1);			
@@ -763,16 +827,11 @@ void SpaBackproject::reconstruct()
 			{
 				if (verb > 0)
 				{
-					std::cout << " -    reconstructing ..." << std::endl;
+					Log::print("Reconstructing");
 				}
 				
 				backprojector.reconstruct(vol_xmipp(), iter, do_MAP, tau2);
 			}
-		}
-		
-		if (verb > 0)
-		{
-			std::cout << " -    writing file ..." << std::endl;
 		}
 		
 		std::string my_fn_out = fn_out + "_half_" + ZIO::itoa(subset+1) + ".mrc";
@@ -782,9 +841,107 @@ void SpaBackproject::reconstruct()
 		
 		if (verb > 0)
 		{
-			std::cout << " -    Done! Written output map in: " << my_fn_out << std::endl;
+			Log::print("Done! Written output map in: " + my_fn_out);
+		}
+		
+		Log::endSection();
+	}
+}
+
+void SpaBackproject::reconstructBackward()
+{
+	const int outCount = accumulation_volumes.size();
+			
+	if (outCount > 2)
+	{		
+		Log::print("Merging volumes");
+	
+		for (int i = 2; i < outCount; i++)
+		{
+			accumulation_volumes[i%2].data += accumulation_volumes[i].data;
+			accumulation_volumes[i%2].weight += accumulation_volumes[i].weight;
+			accumulation_volumes[i%2].multiplicity += accumulation_volumes[i].multiplicity;
+			accumulation_volumes[i%2].spreading_function += accumulation_volumes[i].spreading_function;
 		}
 	}
+	
+	std::vector<BufferedImage<Complex>> dataImgFS = {
+		accumulation_volumes[0].data, 
+		accumulation_volumes[1].data};
+	
+	std::vector<BufferedImage<RFLOAT>> psfImgFS = {
+		accumulation_volumes[0].spreading_function, 
+		accumulation_volumes[1].spreading_function};
+	
+	std::vector<BufferedImage<RFLOAT>> ctfImgFS = {
+		accumulation_volumes[0].weight, 
+		accumulation_volumes[1].weight};
+	
+	if (fn_sym != "C1")
+	{		
+		Log::print("Applying symmetries");
+		
+		for (int half = 0; half < 2; half++)
+		{
+			dataImgFS[half] = Symmetry::symmetrise_FS_complex(
+				dataImgFS[half], fn_sym, num_threads_total);
+			
+			psfImgFS[half] = Symmetry::symmetrise_FS_real(
+				psfImgFS[half], fn_sym, num_threads_total);
+			
+			ctfImgFS[half] = Symmetry::symmetrise_FS_real(
+				ctfImgFS[half], fn_sym, num_threads_total);
+		}
+	}
+	
+	const int s = dataImgFS[0].ydim;	
+	
+	std::vector<BufferedImage<double>> dataImgRS(2), dataImgDivRS(2);
+	
+	BufferedImage<dComplex> dataImgFS_both = dataImgFS[0] + dataImgFS[1];
+	BufferedImage<double> psfImgFS_both = psfImgFS[0] + psfImgFS[1];
+	BufferedImage<double> ctfImgFS_both = ctfImgFS[0] + ctfImgFS[1];
+	
+	Log::beginSection("Reconstructing");
+	
+	const double WienerFract = 0.01;
+	
+	for (int half = 0; half < 2; half++)
+	{		
+		Log::print("Half " + ZIO::itoa(half));
+		
+		dataImgRS[half] = BufferedImage<double>(s,s,s);
+		dataImgDivRS[half] = BufferedImage<double>(s,s,s);
+		
+		Reconstruction::griddingCorrect3D(
+					dataImgFS[half], psfImgFS[half], dataImgRS[half],
+					true, num_threads_total);
+		
+		Reconstruction::ctfCorrect3D(
+					dataImgRS[half], ctfImgFS[half], dataImgDivRS[half],
+					1.0 / WienerFract, num_threads_total);
+		
+		dataImgDivRS[half].write(fn_out+"_half"+ZIO::itoa(half+1)+".mrc");
+		
+		dataImgRS[half].write(fn_out+"_data_half"+ZIO::itoa(half+1)+".mrc");
+		
+		Centering::fftwHalfToHumanFull(ctfImgFS[half]).write(
+					fn_out+"_weight_half"+ZIO::itoa(half+1)+".mrc");
+	}
+	
+	Log::endSection();
+	
+	Reconstruction::griddingCorrect3D(
+		dataImgFS_both, psfImgFS_both, dataImgRS[0], true, num_threads_total);
+	
+	Reconstruction::ctfCorrect3D(
+		dataImgRS[0], ctfImgFS_both, dataImgDivRS[0], 1.0 / WienerFract, num_threads_total);
+	
+	dataImgDivRS[0].write(fn_out+"_merged.mrc");
+	
+	dataImgRS[0].write(fn_out+"_data_merged.mrc");
+	
+	Centering::fftwHalfToHumanFull(ctfImgFS[0]).write(fn_out+"_weight_merged.mrc");
 }
 
 void SpaBackproject::applyCTFPandCTFQ(

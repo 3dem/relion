@@ -33,51 +33,66 @@
 #include <src/time.h>
 #include <src/ml_model.h>
 #include <src/jaz/single_particle/obs_model.h>
+#include <src/jaz/image/buffered_image.h>
+
 
 class SpaBackproject
 {
 		
 	public:
-			
+		
 		IOParser parser;
-	
+		
 		FileName fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_fsc, fn_noise, image_path;
-	
+		
 		MetaDataTable DF;
 		ObservationModel obsModel;
 		MlModel model;
-	
-			int 
-				r_max, r_min_nn, blob_order, ref_dim, interpolator, iter,
-				ctf_dim, nr_helical_asu, newbox, width_mask_edge, nr_sectors, subset, chosen_class,
-				output_boxsize, verb, 
-				num_threads_in, num_threads_out;
-
-			RFLOAT 
-				blob_radius, blob_alpha, angular_error, shift_error, angpix, maxres,
-				helical_rise, helical_twist;
 		
-			bool 
-				do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak,				 
-				do_fom_weighting, do_reconstruct_ctf, do_ewald, 
-				skip_weighting, skip_mask, do_debug,
-				skip_gridding, do_reconstruct_ctf2, do_reconstruct_meas, 
-				is_reverse, read_weights, do_external_reconstruct,
-				use_fwd_mapping;
+		int 
+			r_max, r_min_nn, blob_order, ref_dim, interpolator, iter,
+			ctf_dim, nr_helical_asu, newbox, width_mask_edge, nr_sectors, subset, chosen_class,
+			output_boxsize, verb, 
+			num_threads_in, num_threads_out, num_threads_total;
 		
-			float 
-				padding_factor, mask_diameter;
-	
-			
+		RFLOAT 
+			blob_radius, blob_alpha, angular_error, shift_error, angpix, maxres,
+			helical_rise, helical_twist;
+		
+		bool 
+			do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak,				 
+			do_fom_weighting, do_reconstruct_ctf, do_ewald, 
+			skip_weighting, skip_mask, do_debug,
+			skip_gridding, do_reconstruct_ctf2, do_reconstruct_meas, 
+			is_reverse, read_weights, do_external_reconstruct,
+			use_fwd_mapping;
+		
+		float 
+			padding_factor, mask_diameter;
+		
+		
+		
 		std::vector<BackProjector> backprojectors;
 		
 		Projector projector;
-	
+		
+		
+		
+		struct AccumulationVolume
+		{
+			BufferedImage<Complex> data;
+			BufferedImage<RFLOAT> weight, multiplicity, spreading_function;
+		};
+		
+		std::vector<AccumulationVolume> accumulation_volumes;
+		
+		int padded_box_size;
+		
 		
 	public:
-	
+		
 		SpaBackproject() { }
-	
+		
 		
 		void read(int argc, char **argv);
 		void usage();
@@ -86,8 +101,9 @@ class SpaBackproject
 		void readDebugArrays();
 		void backprojectAllParticles();
 		void backprojectOneParticle(long int p, int thread_id);
-		void reconstruct();
-	
+		void reconstructForward();
+		void reconstructBackward();
+		
 		void applyCTFPandCTFQ(
 				MultidimArray<Complex> &Fin, 
 				CTF &ctf, 

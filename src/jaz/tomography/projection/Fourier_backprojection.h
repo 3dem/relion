@@ -86,9 +86,7 @@ class FourierBackprojection
 		static void backprojectSpreadingFunction(
 			const gravis::d4Matrix& proj,
 			RawImage<DestType>& destPSF,
-			double paddingFactor, 
-			int w0_half, 
-			int h0);
+			double paddingFactor);
 };
 
 
@@ -119,9 +117,7 @@ void FourierBackprojection::backproject_bwd(
 		backprojectSpreadingFunction(
 			proj[f],
 			destPSF,
-			paddingFactor,
-			stackFS.xdim/2 + 1, 
-			stackFS.ydim);
+			paddingFactor);
 	}
 }
 
@@ -154,9 +150,7 @@ void FourierBackprojection::backproject_bwd(
 		backprojectSpreadingFunction(
 			proj[f],
 			destPSF,
-			paddingFactor,
-			stackFS.xdim/2 + 1, 
-			stackFS.ydim);
+			paddingFactor);
 	}
 }
 
@@ -354,14 +348,8 @@ template <typename DestType>
 void FourierBackprojection::backprojectSpreadingFunction(
 	const gravis::d4Matrix& proj,
 	RawImage<DestType>& destPSF,
-	double paddingFactor, 
-	int w0_half, 
-	int h0)
+	double paddingFactor)
 {	
-	const int wh2 = w0_half;
-	const int h2 = h0;
-	
-	const int wh3 = destPSF.xdim;
 	const int h3 = destPSF.ydim;
 	const int d3 = destPSF.zdim;
 	
