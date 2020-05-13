@@ -1,5 +1,5 @@
 #include <src/args.h>
-#include <src/jaz/tomo_programs/defocus_refinement.h>
+#include <src/jaz/tomography/programs/defocus_refinement.h>
 
 
 int main(int argc, char *argv[])

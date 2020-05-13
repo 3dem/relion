@@ -1,5 +1,5 @@
 #include <src/args.h>
-#include <src/jaz/tomo_programs/backproject.h>
+#include <src/jaz/tomography/programs/backproject.h>
 #include <src/jaz/util/log.h>
 
 

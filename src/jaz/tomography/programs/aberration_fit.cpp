@@ -13,7 +13,7 @@
 using namespace gravis;
 
 
-AberrationFit::AberrationFit(int argc, char *argv[])
+AberrationFitProgram::AberrationFitProgram(int argc, char *argv[])
 :	RefinementProgram(argc, argv)
 {
 	IOParser parser;
@@ -21,7 +21,7 @@ AberrationFit::AberrationFit(int argc, char *argv[])
 	readParams(parser);
 }
 
-void AberrationFit::readParams(IOParser &parser)
+void AberrationFitProgram::readParams(IOParser &parser)
 {
 	try
 	{
@@ -51,7 +51,7 @@ void AberrationFit::readParams(IOParser &parser)
 	}
 }
 
-void AberrationFit::run()
+void AberrationFitProgram::run()
 {
 	Log::beginSection("Initialising");
 	
@@ -163,7 +163,7 @@ void AberrationFit::run()
 	}
 }
 
-void AberrationFit :: considerParticle(
+void AberrationFitProgram :: considerParticle(
 		int part_id,
 		const Tomogram& tomogram, 
 		const TomoReferenceMap& referenceMap, 
@@ -259,7 +259,7 @@ void AberrationFit :: considerParticle(
 	}
 }
 
-std::vector<double> AberrationFit::solveEven(
+std::vector<double> AberrationFitProgram::solveEven(
 		const BufferedImage<EvenData>& data,
 		int n_bands,
 		double pixelSize, 
@@ -347,7 +347,7 @@ std::vector<double> AberrationFit::solveEven(
 	return coeffs;
 }
 
-std::vector<double> AberrationFit::solveOdd(
+std::vector<double> AberrationFitProgram::solveOdd(
 		const BufferedImage<OddData>& data,
 		int n_bands,
 		double pixelSize, 
@@ -421,7 +421,7 @@ std::vector<double> AberrationFit::solveOdd(
 	return coeffs;
 }
 
-AberrationFit::EvenData &AberrationFit::EvenData::operator+=(const EvenData& d)
+AberrationFitProgram::EvenData &AberrationFitProgram::EvenData::operator+=(const EvenData& d)
 {
 	Axx += d.Axx;
 	Axy += d.Axy;
@@ -430,7 +430,7 @@ AberrationFit::EvenData &AberrationFit::EvenData::operator+=(const EvenData& d)
 	by += d.by;
 }
 
-AberrationFit::OddData &AberrationFit::OddData::operator+=(const OddData& d)
+AberrationFitProgram::OddData &AberrationFitProgram::OddData::operator+=(const OddData& d)
 {
 	a += d.a;
 	b += d.b;

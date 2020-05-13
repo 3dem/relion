@@ -1,5 +1,5 @@
 #include <src/jaz/single_particle/vtk_helper.h>
-#include <src/jaz/single_particle/math/Zernike.h>
+#include <src/jaz/math/Zernike.h>
 
 int main(int argc, char *argv[])
 {

@@ -1,5 +1,5 @@
 #include <src/args.h>
-#include <src/jaz/tomo_programs/powspec.h>
+#include <src/jaz/tomography/programs/powspec.h>
 
 
 int main(int argc, char *argv[])

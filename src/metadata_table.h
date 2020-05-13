@@ -164,6 +164,14 @@ public:
 	void getValueSafely(EMDLabel label, T& value, long objectID = -1) const;
 
 	bool getValueToString(EMDLabel label, std::string &value, long int objectID = -1, bool escape=false) const;
+	
+	// more syntactic sugar to avoid having to declare output variables separately:	
+	int getInt(EMDLabel label, long objectID = -1);
+	int getIntMinusOne(EMDLabel label, long objectID = -1);
+	RFLOAT getRfloat(EMDLabel label, long objectID = -1);
+	bool getBool(EMDLabel label, long objectID = -1);
+	std::string getString(EMDLabel label, long objectID = -1);
+	std::vector<double> getDoubleVector(EMDLabel label, long objectID = -1);
 
 	// Set the value of label for a specified object.
 	// If no objectID is given, the internal iterator 'current_objectID' is used
@@ -409,7 +417,9 @@ bool MetaDataTable::getValue(EMDLabel label, T& value, long objectID) const
 			objectID = current_objectID;
 		}
 		else
+		{
 			checkObjectID(objectID,  "MetaDataTable::getValue");
+		}
 
 		objects[objectID]->getValue(off, value);
 		return true;

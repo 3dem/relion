@@ -1,5 +1,5 @@
 #include <src/args.h>
-#include <src/jaz/tomo_programs/tomo_backproject.h>
+#include <src/jaz/tomography/programs/tomo_backproject.h>
 
 
 int main(int argc, char *argv[])

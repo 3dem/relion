@@ -1,5 +1,5 @@
 #include <src/args.h>
-#include <src/jaz/tomo_programs/convert_projections.h>
+#include <src/jaz/tomography/programs/convert_projections.h>
 
 int main(int argc, char *argv[])
 {

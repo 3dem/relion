@@ -1,5 +1,5 @@
 #include <src/args.h>
-#include <src/jaz/tomo_programs/frame_alignment_program.h>
+#include <src/jaz/tomography/programs/frame_alignment_program.h>
 
 
 int main(int argc, char *argv[])

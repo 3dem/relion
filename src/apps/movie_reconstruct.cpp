@@ -24,10 +24,10 @@
 #include <src/euler.h>
 #include <src/micrograph_model.h>
 #include <src/renderEER.h>
-#include <src/jaz/obs_model.h>
-#include <src/jaz/stack_helper.h>
-#include <src/jaz/motion/motion_helper.h>
-#include <src/jaz/img_proc/filter_helper.h>
+#include <src/jaz/single_particle/obs_model.h>
+#include <src/jaz/single_particle/stack_helper.h>
+#include <src/jaz/single_particle/motion/motion_helper.h>
+#include <src/jaz/single_particle/img_proc/filter_helper.h>
 
 class MovieReconstructor
 {

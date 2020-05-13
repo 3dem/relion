@@ -11,7 +11,7 @@
 #include <stddef.h>
 
 
-template <typename T>
+template <class T>
 class RawImage
 {
 	public:
@@ -24,9 +24,9 @@ class RawImage
 		
 		RawImage(size_t xdim, size_t ydim, size_t zdim, T* data);
 		
-		RawImage(const Image<T>& img);
+		RawImage(Image<T>& img);
 		
-		RawImage(const MultidimArray<T>& mda);
+		RawImage(MultidimArray<T>& mda);
 		
 			
 			long int xdim, ydim, zdim;
@@ -35,7 +35,7 @@ class RawImage
 		
 		/* operator (x,y,z): returns a reference to the indicated voxel.
 		   The correct version (const or non-const) will be chosen by the compiler,
-		   depending on whether the instance is declared as const or not.*/
+		   depending on whether the instance is declared const.*/
 		
 		inline const T& operator() (size_t, size_t, size_t) const;
 		inline T& operator() (size_t, size_t, size_t);
@@ -59,10 +59,9 @@ class RawImage
 		RawImage<T> getSliceRef(size_t z);
 		const RawImage<T> getConstSliceRef(size_t z) const;
 		RawImage<T> getSlabRef(size_t z, size_t thickness);
-		//void copySliceFrom(size_t z, const RawImage<T>& src, size_t z_src = 0);
 		
-		template <typename SourceType>
-		void copySliceFrom(size_t z, const RawImage<SourceType>& src, size_t z_src = 0);
+		template <class T2>
+		void copySliceFrom(size_t z, const RawImage<T2>& src, size_t z_src = 0);
 		
 		void swapWith(RawImage<T>& img);
 		
@@ -76,15 +75,18 @@ class RawImage
 		void copyTo(Image<T>& img) const;
 		void copyTo(RawImage<T>& img) const;
 		
-		void copyFrom(const Image<T>& img);
-		void copyFrom(const RawImage<T>& img);
+		template <class T2>
+		void copyFrom(const Image<T2>& img);
+		
+		template <class T2>		
+		void copyFrom(const RawImage<T2>& img);
 		
 		bool hasSize(long int w, long int h, long int d);
 		bool hasEqualSize(const RawImage<T>& img);
 		
 		std::string sizeString();
 		
-		template<typename T2> inline
+		template<class T2> inline
 		RawImage& operator += (const RawImage<T2>& v)
 		{
 			const long int s = xdim * ydim * zdim;
@@ -97,7 +99,7 @@ class RawImage
 			return *this;
 		}
 		
-		template<typename T2> inline
+		template<class T2> inline
 		RawImage& operator -= (const RawImage<T2>& v)
 		{
 			const long int s = xdim * ydim * zdim;
@@ -134,7 +136,7 @@ class RawImage
 			return *this;
 		}
 		
-		template<typename T2> inline
+		template<class T2> inline
 		RawImage& operator *= (const RawImage<T2>& v)
 		{
 			const long int s = xdim * ydim * zdim;
@@ -159,7 +161,7 @@ class RawImage
 			return *this;
 		}
 		
-		template<typename T2> inline
+		template<class T2> inline
 		RawImage& operator /= (const RawImage<T2>& v)
 		{
 			const long int s = xdim * ydim * zdim;
@@ -202,46 +204,46 @@ RawImage<T>::RawImage(size_t xdim, size_t ydim, size_t zdim, T* data)
 {
 }
 
-template<typename T>
-RawImage<T>::RawImage(const Image<T> &img)
+template<class T>
+RawImage<T>::RawImage(Image<T> &img)
 	:   xdim(img.data.xdim), ydim(img.data.ydim), zdim(img.data.zdim), 
-		data(&img(0,0,0))
+		data(img.data.data)
 {	
 }
 
-template<typename T>
-RawImage<T>::RawImage(const MultidimArray<T> &mda)
+template<class T>
+RawImage<T>::RawImage(MultidimArray<T> &mda)
 	:   xdim(mda.xdim), ydim(mda.ydim), zdim(mda.zdim), 
-		data(&mda(0))
+		data(mda.data)
 {	
 }
 
-template<typename T>
+template<class T>
 RawImage<T> RawImage<T>::getFullRef()
 {
 	return RawImage<T>(xdim, ydim, zdim, data);
 }
 
-template<typename T>
+template<class T>
 RawImage<T> RawImage<T>::getSliceRef(size_t z)
 {
 	return RawImage<T>(xdim, ydim, 1, data + xdim * ydim * z);
 }
 
-template<typename T>
+template<class T>
 const RawImage<T> RawImage<T>::getConstSliceRef(size_t z) const
 {
 	return RawImage<T>(xdim, ydim, 1, data + xdim * ydim * z);
 }
 
-template<typename T>
+template<class T>
 RawImage<T> RawImage<T>::getSlabRef(size_t z, size_t thickness)
 {
 	return RawImage<T>(xdim, ydim, thickness, data + xdim * ydim * z);
 }
 
-template<typename T> template<typename SourceType>
-void RawImage<T>::copySliceFrom(size_t z_dest, const RawImage<SourceType>& src, size_t z_src)
+template<class T> template<class T2>
+void RawImage<T>::copySliceFrom(size_t z_dest, const RawImage<T2>& src, size_t z_src)
 {
 	for (int y = 0; y < ydim; y++)
 	for (int x = 0; x < xdim; x++)
@@ -250,7 +252,7 @@ void RawImage<T>::copySliceFrom(size_t z_dest, const RawImage<SourceType>& src, 
 	}
 }
 
-template<typename T>
+template<class T>
 void RawImage<T>::swapWith(RawImage<T>& img)
 {
 	T* sw = img.data;
@@ -424,8 +426,8 @@ inline void RawImage<T>::copyTo(RawImage<T>& img) const
 	}
 }
 
-template <class T>
-inline void RawImage<T>::copyFrom(const Image<T>& img)
+template <class T> template <class T2>
+inline void RawImage<T>::copyFrom(const Image<T2>& img)
 {
 	if (xdim < img.data.xdim || ydim < img.data.ydim || zdim < img.data.zdim)
 	{
@@ -439,12 +441,12 @@ inline void RawImage<T>::copyFrom(const Image<T>& img)
 	for (size_t y = 0; y < ydim; y++)
 	for (size_t x = 0; x < xdim; x++)
 	{
-		data[(z*ydim + y)*xdim + x] = img(x,y,z);
+		data[(z*ydim + y)*xdim + x] = T(img(x,y,z));
 	}
 }
 
-template <class T>
-inline void RawImage<T>::copyFrom(const RawImage<T>& img)
+template <class T> template <class T2>
+inline void RawImage<T>::copyFrom(const RawImage<T2>& img)
 {
 	if (xdim < img.xdim || ydim < img.ydim || zdim < img.zdim)
 	{
@@ -458,7 +460,7 @@ inline void RawImage<T>::copyFrom(const RawImage<T>& img)
 	for (size_t y = 0; y < ydim; y++)
 	for (size_t x = 0; x < xdim; x++)
 	{
-		data[(z*ydim + y)*xdim + x] = img(x,y,z);
+		data[(z*ydim + y)*xdim + x] = T(img(x,y,z));
 	}
 }
 
