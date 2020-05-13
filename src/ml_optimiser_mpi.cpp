@@ -3264,6 +3264,9 @@ void MlOptimiserMpi::iterate()
 		}
 		MPI_Barrier(MPI_COMM_WORLD);
 
+
+		if (do_center_classes) centerClasses();
+
 		// Directly use fn_out, without "_it" specifier, so unmasked refs will be overwritten at every iteration
 		if (do_write_unmasked_refs && node->rank == 1)
 			mymodel.write(fn_out+"_unmasked", sampling, false, true);

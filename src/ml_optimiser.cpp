@@ -367,6 +367,12 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	else
 		do_bimodal_psi = false;
 
+	fnt = parser.getOption("--center_classes", "Re-center classes based on their center-of-mass?", "OLD");
+	if (fnt != "OLD")
+	{
+		do_center_classes = true;
+	}
+
 	do_skip_maximization = parser.checkOption("--skip_maximize", "Skip maximization step (only write out data.star file)?");
 
 	int corrections_section = parser.addSection("Corrections");
@@ -507,6 +513,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	fn_local_symmetry = parser.getOption("--local_symmetry", "Local symmetry description file containing list of masks and their operators", "None");
 	do_split_random_halves = parser.checkOption("--split_random_halves", "Refine two random halves of the data completely separately");
 	low_resol_join_halves = textToFloat(parser.getOption("--low_resol_join_halves", "Resolution (in Angstrom) up to which the two random half-reconstructions will not be independent to prevent diverging orientations","-1"));
+	do_center_classes = parser.checkOption("--center_classes", "Re-center classes based on their center-of-mass?");
 
 	// Initialisation
 	int init_section = parser.addSection("Initialisation");
@@ -938,6 +945,8 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 		REPORT_ERROR("MlOptimiser::readStar: splitting data into two random halves, but rlnModelStarFile2 is empty. Probably you specified an optimiser STAR file generated with --force_converge. You cannot perform continuation or subtraction from this file. Please use one from the previous iteration.");
 	if (!MD.getValue(EMDL_OPTIMISER_LOWRES_LIMIT_EXP, strict_lowres_exp))
 		strict_lowres_exp = -1.;
+	if (!MD.getValue(EMDL_OPTIMISER_DO_CENTER_CLASSES, do_center_classes))
+		do_center_classes = false;
 
 	// Initialise some stuff for first-iteration only (not relevant here...)
 	do_calculate_initial_sigma_noise = false;
@@ -1138,6 +1147,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_DO_CORRECT_NORM, do_norm_correction);
 		MD.setValue(EMDL_OPTIMISER_DO_CORRECT_SCALE, do_scale_correction);
 		MD.setValue(EMDL_OPTIMISER_DO_CORRECT_CTF, do_ctf_correction);
+		MD.setValue(EMDL_OPTIMISER_DO_CENTER_CLASSES, do_center_classes);
 		MD.setValue(EMDL_OPTIMISER_IGNORE_CTF_UNTIL_FIRST_PEAK, intact_ctf_first_peak);
 		MD.setValue(EMDL_OPTIMISER_DATA_ARE_CTF_PHASE_FLIPPED, ctf_phase_flipped);
 		MD.setValue(EMDL_OPTIMISER_DO_ONLY_FLIP_CTF_PHASES, only_flip_phases);
@@ -2662,6 +2672,9 @@ void MlOptimiser::iterate()
 			}
 		}
 
+		if (do_center_classes)
+			centerClasses();
+
 		// Directly use fn_out, without "_it" specifier, so unmasked refs will be overwritten at every iteration
 		if (do_write_unmasked_refs)
 			mymodel.write(fn_out+"_unmasked", sampling, false, true);
@@ -4165,6 +4178,31 @@ void MlOptimiser::maximization()
 	RCTOC(timer,RCT_4);
 	if (verb > 0)
 		progress_bar(mymodel.nr_classes);
+
+}
+
+void MlOptimiser::centerClasses()
+{
+	// Don't do this for auto_refinement or multibody refinement
+	if (mymodel.nr_bodies > 1 || do_split_random_halves)
+		return;
+
+	RFLOAT offset_range_pix = sampling.offset_range / mymodel.pixel_size;
+
+	// Shift all classes to their center-of-mass, and store all center-of-mass in coms vector
+	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+	{
+		Matrix1D< RFLOAT > my_com;
+		mymodel.Iref[iclass].centerOfMass(my_com);
+		// Maximum number of pixels to shift center-of-mass is the current search range of translations
+		if (my_com.module() > offset_range_pix)
+		{
+			my_com *= offset_range_pix/my_com.module();
+		}
+		my_com *= -1;
+		MultidimArray<RFLOAT> aux = mymodel.Iref[iclass];
+		translate(aux, mymodel.Iref[iclass], my_com, DONT_WRAP, (RFLOAT)0.);
+	}
 
 }
 
