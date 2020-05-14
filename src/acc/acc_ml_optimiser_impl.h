@@ -30,15 +30,22 @@ void getFourierTransformsAndCtfs(long int part_id,
 		Image<RFLOAT> img, rec_img;
 		MultidimArray<Complex > Fimg;
 		MultidimArray<Complex > Faux;
-		MultidimArray<RFLOAT> Fctf;
+		MultidimArray<RFLOAT> Fctf, FstMulti;
 		Matrix2D<RFLOAT> Aori;
 		Matrix1D<RFLOAT> my_projected_com(baseMLO->mymodel.data_dim), my_refined_ibody_offset(baseMLO->mymodel.data_dim);
 
 		// Which group do I belong?
 		int group_id =baseMLO->mydata.getGroupId(part_id, img_id);
+		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(part_id, img_id);
 		// What is my optics group?
 		int optics_group = baseMLO->mydata.getOpticsGroup(part_id, img_id);
-		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(part_id, img_id);
+		bool ctf_premultiplied = baseMLO->mydata.obsModel.getCtfPremultiplied(optics_group);
+
+		// SHWS 13feb2020: new ctf_premultiplied replaces ctf arrays by ctf^2 arrays, then one can no longer not apply CTF to references...
+		if (ctf_premultiplied && !baseMLO->refs_are_ctf_corrected)
+		{
+			REPORT_ERROR("ERROR: one can no longer use ctf_premultiplied and !refs_are_ctf_corrected together...");
+		}
 
 		// metadata offset for this image in the particle
 		int my_metadata_offset = op.metadata_offset + img_id;
@@ -709,28 +716,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 				}
 				// Set the CTF-image in Fctf
 				CTIC(accMLO->timer,"CTFSet3D_array");
-
-				// If there is a redundant half, get rid of it
-				if (XSIZE(Ictf()) == YSIZE(Ictf()))
-				{
-					Ictf().setXmippOrigin();
-					FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
-					{
-						// Use negative kp,ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
-						DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf(), -kp, -ip, -jp);
-					}
-				}
-				// otherwise, just window the CTF to the current resolution
-				else if (XSIZE(Ictf()) == YSIZE(Ictf()) / 2 + 1)
-				{
-					windowFourierTransform(Ictf(), Fctf, YSIZE(Fctf));
-				}
-				// if dimensions are neither cubical nor FFTW, stop
-				else
-				{
-					REPORT_ERROR("3D CTF volume must be either cubical or adhere to FFTW format!");
-				}
-
+				baseMLO->get3DCTFAndMulti(Ictf(), Fctf, FstMulti, ctf_premultiplied);
 				CTOC(accMLO->timer,"CTFSet3D_array");
 			}
 			else
@@ -748,6 +734,16 @@ void getFourierTransformsAndCtfs(long int part_id,
 
 				ctf.getFftwImage(Fctf, baseMLO->image_full_size[optics_group], baseMLO->image_full_size[optics_group], my_pixel_size,
 						baseMLO->ctf_phase_flipped, baseMLO->only_flip_phases, baseMLO->intact_ctf_first_peak, true, baseMLO->do_ctf_padding);
+
+				// SHWS 13feb2020: when using CTF-premultiplied, from now on use the normal kernels, but replace ctf by ctf^2
+				if (ctf_premultiplied)
+				{
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+					{
+						DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+					}
+				}
+
 				CTOC(accMLO->timer,"CTFRead2D");
 			}
 		}
@@ -765,6 +761,13 @@ void getFourierTransformsAndCtfs(long int part_id,
 		// Store Fimg and Fctf
 		op.Fimg.at(img_id) = Fimg;
 		op.Fctf.at(img_id) = Fctf;
+
+		// Correct images and CTFs by Multiplicity, if required, and store it
+		if ( NZYXSIZE(FstMulti) > 0 )
+		{
+			baseMLO->applySubtomoCorrection(op.Fimg.at(img_id), op.Fimg_nomask.at(img_id), op.Fctf.at(img_id), FstMulti);
+			op.FstMulti.at(img_id) = FstMulti;
+		}
 
 		// If we're doing multibody refinement, now subtract projections of the other bodies from both the masked and the unmasked particle
 		if (baseMLO->mymodel.nr_bodies > 1)
@@ -922,9 +925,10 @@ void getAllSquaredDifferencesCoarse(
 
 	std::vector<MultidimArray<Complex > > dummy;
 	std::vector<std::vector<MultidimArray<Complex > > > dummy2;
+	std::vector<MultidimArray<RFLOAT> > dummyRF;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, false, op.part_id, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimg, dummy, op.Fctf, dummy2, dummy2,
-			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2);
+			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2, op.FstMulti, dummyRF);
 
 	CTOC(accMLO->timer,"diff_pre_gpu");
 
@@ -1021,7 +1025,6 @@ void getAllSquaredDifferencesCoarse(
 		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
 		int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
 		unsigned long image_size = op.local_Minvsigma2[img_id].nzyxdim;
-		bool ctf_premultiplied = baseMLO->mydata.obsModel.getCtfPremultiplied(optics_group);
 
 		/*====================================
 				Generate Translations
@@ -1093,10 +1096,6 @@ void getAllSquaredDifferencesCoarse(
 				{
 					pixel_correction /= op.local_Fctf[img_id].data[i];
 				}
-				if (ctf_premultiplied)
-				{
-					pixel_correction /= op.local_Fctf[img_id].data[i];
-				}
 			}
 			Fimg_[img_re_offset+i] = Fimg.data[i].real * pixel_correction;
 			Fimg_[img_im_offset+i] = Fimg.data[i].imag * pixel_correction;
@@ -1114,7 +1113,7 @@ void getAllSquaredDifferencesCoarse(
 
 		corr_img.allAlloc();
 
-		buildCorrImage(baseMLO,op,corr_img,img_id,group_id, ctf_premultiplied);
+		buildCorrImage(baseMLO,op,corr_img,img_id,group_id);
 		corr_img.cpToDevice();
 
 		deviceInitValue<XFLOAT>(allWeights, (XFLOAT) (op.highres_Xi2_img[img_id] / 2.));
@@ -1216,9 +1215,10 @@ void getAllSquaredDifferencesFine(
 	CTIC(accMLO->timer,"precalculateShiftedImagesCtfsAndInvSigma2s");
 	std::vector<MultidimArray<Complex > > dummy;
 	std::vector<std::vector<MultidimArray<Complex > > > dummy2;
+	std::vector<MultidimArray<RFLOAT> > dummyRF;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, false, op.part_id, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimg, dummy, op.Fctf, dummy2, dummy2,
-			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2);
+			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2, op.FstMulti, dummyRF);
 	CTOC(accMLO->timer,"precalculateShiftedImagesCtfsAndInvSigma2s");
 
 
@@ -1237,7 +1237,6 @@ void getAllSquaredDifferencesFine(
 		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
 		int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
 		unsigned long image_size = op.local_Minvsigma2[img_id].nzyxdim;
-		bool ctf_premultiplied = baseMLO->mydata.obsModel.getCtfPremultiplied(optics_group);
 
 		MultidimArray<Complex > Fref;
 		Fref.resize(op.local_Minvsigma2[img_id]);
@@ -1316,10 +1315,6 @@ void getAllSquaredDifferencesFine(
 				{
 					pixel_correction /= op.local_Fctf[img_id].data[i];
 				}
-				if (ctf_premultiplied)
-				{
-					pixel_correction /= op.local_Fctf[img_id].data[i];
-				}
 			}
 
 			Fimg_[img_re_offset+i] = Fimg.data[i].real * pixel_correction;
@@ -1334,7 +1329,7 @@ void getAllSquaredDifferencesFine(
 		AccPtr<XFLOAT> corr_img = ptrFactory.make<XFLOAT>((size_t)image_size);
 
 		corr_img.allAlloc();
-		buildCorrImage(baseMLO,op,corr_img,img_id,group_id, ctf_premultiplied);
+		buildCorrImage(baseMLO,op,corr_img,img_id,group_id);
 
 		trans_xyz.cpToDevice();
 
@@ -2117,9 +2112,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	// Re-do below because now also want unmasked images AND if (stricht_highres_exp >0.) then may need to resize
 	std::vector<MultidimArray<Complex > > dummy;
 	std::vector<std::vector<MultidimArray<Complex > > > dummy2;
+	std::vector<MultidimArray<RFLOAT> > dummyRF;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, true, op.part_id, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimg, op.Fimg_nomask, op.Fctf, dummy2, dummy2,
-			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2);
+			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2, op.FstMulti, dummyRF);
 
 	// In doThreadPrecalculateShiftedImagesCtfsAndInvSigma2s() the origin of the op.local_Minvsigma2s was omitted.
 	// Set those back here
@@ -2617,8 +2613,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				ctfs[i] = (XFLOAT) op.local_Fctf[img_id].data[i] * part_scale;
 		}
 		else //TODO should be handled by memset
+		{
 			for (unsigned long i = 0; i < image_size; i++)
 				ctfs[i] = part_scale;
+		}
 
 		ctfs.cpToDevice();
 
@@ -3063,6 +3061,8 @@ void accDoExpectationOneParticle(MlClass *myInstance, unsigned long part_id_sort
 	sp.nr_images = baseMLO->mydata.numberOfImagesInParticle(part_id);
 
 	OptimisationParamters op(sp.nr_images, part_id);
+	if (baseMLO->mydata.is_3D)
+		op.FstMulti.resize(sp.nr_images);
 
 	// In the first iteration, multiple seeds will be generated
 	// A single random class is selected for each pool of images, and one does not marginalise over the orientations
@@ -3101,6 +3101,8 @@ void accDoExpectationOneParticle(MlClass *myInstance, unsigned long part_id_sort
     {
 
     	OptimisationParamters op(sp.nr_images, part_id);
+		if (baseMLO->mydata.is_3D)
+			op.FstMulti.resize(sp.nr_images);
 
 		// Skip this body if keep_fixed_bodies[ibody] or if it's angular accuracy is worse than 1.5x the sampling rate
     	if ( baseMLO->mymodel.nr_bodies > 1 && baseMLO->mymodel.keep_fixed_bodies[ibody] > 0)

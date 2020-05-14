@@ -10,7 +10,7 @@
 #include "src/acc/cuda/cuda_settings.h"
 #include "src/acc/cuda/cuda_kernels/cuda_device_utils.cuh"
 
-template<bool CTFPREMULTIPLIED, bool REFCTF, bool REF3D, bool DATA3D, int block_sz>
+template<bool REFCTF, bool REF3D, bool DATA3D, int block_sz>
 __global__ void cuda_kernel_wavg(
 		XFLOAT *g_eulers,
 		AccProjectorKernel projector,
@@ -109,16 +109,8 @@ __global__ void cuda_kernel_wavg(
 
 			if (REFCTF)
 			{
-				if(CTFPREMULTIPLIED)
-				{
-					ref_real *= __ldg(&g_ctfs[pixel]) * __ldg(&g_ctfs[pixel]);
-					ref_imag *= __ldg(&g_ctfs[pixel]) * __ldg(&g_ctfs[pixel]);
-				}
-				else
-				{
-					ref_real *= __ldg(&g_ctfs[pixel]);
-					ref_imag *= __ldg(&g_ctfs[pixel]);
-				}
+				ref_real *= __ldg(&g_ctfs[pixel]);
+				ref_imag *= __ldg(&g_ctfs[pixel]);
 			}
 			else
 			{
