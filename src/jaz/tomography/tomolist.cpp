@@ -28,11 +28,10 @@ TomoList::TomoList(std::string filename)
 	{
 		std::istringstream iss(line);
 				
-		int ind;
+		int ind;		
+        iss >> ind;
 		
-		bool good = (iss >> ind);
-		
-		if (!good) continue;
+        if (iss.fail()) continue;
 		
 		if (ind > maxInd) maxInd = ind;
 				
