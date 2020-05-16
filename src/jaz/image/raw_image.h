@@ -66,6 +66,7 @@ class RawImage
 		void swapWith(RawImage<T>& img);
 		
 		void write(std::string fn) const;
+		void write(std::string fn, double pixelSize) const;
 		void writePng(std::string fn) const;
 		void writeVtk(std::string fn, 
 					  gravis::d3Vector origin = gravis::d3Vector(0,0,0), 
@@ -364,6 +365,34 @@ void RawImage<T>::write(std::string fn) const
 		img.write(fn);
 	}
 }
+
+template <class T>
+void RawImage<T>::write(std::string fn, double pixelSize) const
+{
+	std::string::size_type dot = fn.find_last_of('.');
+	
+	if (dot == std::string::npos)
+	{
+		REPORT_ERROR_STR("RawImage<T>::write: filename has no ending (" << fn << ").");
+	}
+	
+	std::string end = fn.substr(dot+1);
+	
+	if (end == "vtk")
+	{
+		Image<T> img;
+		copyTo(img);
+		VtkHelper::writeVTK(img, fn, 0, 0, 0, pixelSize, pixelSize, pixelSize);
+	}
+	else
+	{
+		Image<T> img;
+		copyTo(img);
+		img.setSamplingRateInHeader(pixelSize);
+		img.write(fn);
+	}
+}
+
 
 template <class T>
 void RawImage<T>::writePng(std::string fn) const

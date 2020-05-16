@@ -200,7 +200,7 @@ void SpaBackproject::initialise()
 	if (angpix < 0.)
 	{
 		angpix = obsModel.getPixelSize(0);
-		Log::print("Reconstructing at the pixel size from the first optics group: " + ZIO::itoa(angpix) + " Å");
+		Log::print("Reconstructing at the pixel size of the first optics group: " + ZIO::itoa(angpix) + " Å");
 	}
 
 	if (maxres < 0.)
@@ -277,7 +277,6 @@ void SpaBackproject::backprojectAllParticles()
 	}
 
 	long int nr_parts = DF.numberOfObjects();
-	long int barstep = XMIPP_MAX(1, nr_parts/(120 * num_threads_out));
 	
 	if (verb > 0)
 	{
@@ -292,7 +291,7 @@ void SpaBackproject::backprojectAllParticles()
 		
 		backprojectOneParticle(p, th);
 
-		if (th == 0 && p % barstep == 0 && verb > 0)
+		if (th == 0 && verb > 0)
 		{
 			Log::updateProgress(p);
 		}
@@ -921,12 +920,11 @@ void SpaBackproject::reconstructBackward()
 					dataImgRS[half], ctfImgFS[half], dataImgDivRS[half],
 					1.0 / WienerFract, num_threads_total);
 		
-		dataImgDivRS[half].write(fn_out+"_half"+ZIO::itoa(half+1)+".mrc");
-		
-		dataImgRS[half].write(fn_out+"_data_half"+ZIO::itoa(half+1)+".mrc");
+		dataImgDivRS[half].write(fn_out+"_half"+ZIO::itoa(half+1)+".mrc", angpix);		
+		dataImgRS[half].write(fn_out+"_data_half"+ZIO::itoa(half+1)+".mrc", angpix);
 		
 		Centering::fftwHalfToHumanFull(ctfImgFS[half]).write(
-					fn_out+"_weight_half"+ZIO::itoa(half+1)+".mrc");
+					fn_out+"_weight_half"+ZIO::itoa(half+1)+".mrc", angpix);
 	}
 	
 	Log::endSection();
@@ -937,11 +935,10 @@ void SpaBackproject::reconstructBackward()
 	Reconstruction::ctfCorrect3D(
 		dataImgRS[0], ctfImgFS_both, dataImgDivRS[0], 1.0 / WienerFract, num_threads_total);
 	
-	dataImgDivRS[0].write(fn_out+"_merged.mrc");
+	dataImgDivRS[0].write(fn_out+"_merged.mrc", angpix);	
+	dataImgRS[0].write(fn_out+"_data_merged.mrc", angpix);
 	
-	dataImgRS[0].write(fn_out+"_data_merged.mrc");
-	
-	Centering::fftwHalfToHumanFull(ctfImgFS[0]).write(fn_out+"_weight_merged.mrc");
+	Centering::fftwHalfToHumanFull(ctfImgFS[0]).write(fn_out+"_weight_merged.mrc", angpix);
 }
 
 void SpaBackproject::applyCTFPandCTFQ(
