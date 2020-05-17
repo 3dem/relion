@@ -90,8 +90,7 @@ BufferedImage<float> Prediction::predictRS(
 	BufferedImage<fComplex> prediction(sh,s), psf(sh,s);
 							
 	ForwardProjection::forwardProject(
-			referenceFS[hs], {projPart}, 
-			prediction, psf, 1.0, 1);
+			referenceFS[hs], {projPart}, prediction, psf, 1);
 	
 	BufferedImage<float> predictionReal(s,s);			
 	

@@ -210,13 +210,13 @@ void SubtomoProgram::run()
 				
 				FourierBackprojection::backproject_bwd(
 						particleStack, weightStack, projPart, dataImgFS,
-						psfImgFS, ctfImgFS, multiImageFS, 1.0, inner_thread_num);
+						psfImgFS, ctfImgFS, multiImageFS, inner_thread_num);
 			}
 			else
 			{
 				FourierBackprojection::backproject_bwd(
 						particleStack, weightStack, projPart, dataImgFS,
-						psfImgFS, ctfImgFS, 1.0, inner_thread_num);
+						psfImgFS, ctfImgFS, inner_thread_num);
 			}
 			
 			Reconstruction::griddingCorrect3D(

@@ -174,7 +174,8 @@ void BackprojectProgram::run()
 				particleStack[th], weightStack[th], projPart, 
 				dataImgFS[2*th + halfSet], 
 				psfImgFS[2*th + halfSet], 
-				ctfImgFS[2*th + halfSet], 1.0, inner_threads);
+				ctfImgFS[2*th + halfSet],
+				inner_threads);
 			
 			tpc++;
 		}

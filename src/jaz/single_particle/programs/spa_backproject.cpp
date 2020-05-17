@@ -25,6 +25,7 @@
 #include <src/jaz/image/centering.h>
 #include <src/jaz/image/padding.h>
 #include <src/jaz/image/symmetry.h>
+#include <src/jaz/image/padding.h>
 #include <omp.h>
 
 using namespace gravis;
@@ -626,7 +627,7 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 			}
 			else
 			{
-				d4Matrix proj(
+				const d4Matrix proj = (double)padding_factor * d4Matrix(
 						A3D(0,0), A3D(0,1), A3D(0,2), 0,
 						A3D(1,0), A3D(1,1), A3D(1,2), 0,
 						A3D(2,0), A3D(2,1), A3D(2,2), 0,
@@ -637,13 +638,11 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 					accumulationVolume->data,
 					accumulationVolume->weight,
 					accumulationVolume->multiplicity,
-					padding_factor,
 					num_threads_in);
 						
 				FourierBackprojection::backprojectSpreadingFunction(
 					proj,
-					accumulationVolume->spreading_function,
-					padding_factor);
+					accumulationVolume->spreading_function);
 			}
 		}
 	}
@@ -904,6 +903,10 @@ void SpaBackproject::reconstructBackward()
 	Log::beginSection("Reconstructing");
 	
 	const double WienerFract = 0.01;
+	const int cropSize = s / padding_factor;
+	const int margin = (s - cropSize) / 2;
+	const bool needs_cropping = margin > 0;
+
 	
 	for (int half = 0; half < 2; half++)
 	{		
@@ -925,6 +928,12 @@ void SpaBackproject::reconstructBackward()
 		
 		Centering::fftwHalfToHumanFull(ctfImgFS[half]).write(
 					fn_out+"_weight_half"+ZIO::itoa(half+1)+".mrc", angpix);
+
+		if (needs_cropping)
+		{
+			Padding::unpadCenter3D_full(dataImgDivRS[half], margin).
+					write(fn_out+"_half"+ZIO::itoa(half+1)+"_cropped.mrc", angpix);
+		}
 	}
 	
 	Log::endSection();
@@ -939,6 +948,12 @@ void SpaBackproject::reconstructBackward()
 	dataImgRS[0].write(fn_out+"_data_merged.mrc", angpix);
 	
 	Centering::fftwHalfToHumanFull(ctfImgFS[0]).write(fn_out+"_weight_merged.mrc", angpix);
+
+	if (needs_cropping)
+	{
+		Padding::unpadCenter3D_full(dataImgDivRS[0], margin).
+				write(fn_out+"_cropped.mrc", angpix);
+	}
 }
 
 void SpaBackproject::applyCTFPandCTFQ(
