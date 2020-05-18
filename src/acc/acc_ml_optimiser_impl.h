@@ -2877,57 +2877,54 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			// Get best preforming unit (BPU)
 			int bpu = -1;
-			XFLOAT bpu_error = 0;
+			XFLOAT bpu_weight = 0;
 			for (int i = sp.iclass_min; i <= sp.iclass_max; i++)
 			{
 				if (baseMLO->mymodel.pdf_class[i] == 0.)
 					continue;
 
-				XFLOAT e = errors[i];
-				if ((0 <= e && e < bpu_error) || bpu == -1)
+				XFLOAT w = op.sum_weight_class[img_id][i];
+				if (bpu_weight <= w)
 				{
 					bpu = i;
-					bpu_error = e;
+					bpu_weight = w;
 				}
 			}
 
 			// Get second best preforming unit (SBPU)
 			int sbpu = -1;
-			XFLOAT sbpu_error = 0;
+			XFLOAT sbpu_weight = 0;
 			for (int i = sp.iclass_min; i <= sp.iclass_max; i++)
 			{
 				if (i == bpu || baseMLO->mymodel.pdf_class[i] == 0.)
 					continue;
 
-				XFLOAT e = errors[i];
-				if ((0 <= e && e < sbpu_error) || sbpu == -1)
+				XFLOAT w = op.sum_weight_class[img_id][i];
+				if (sbpu_weight <= w)
 				{
 					sbpu = i;
-					sbpu_error = e;
+					sbpu_weight = w;
 				}
 			}
 
 			// Modify graph
 			baseMLO->som.add_edge(bpu, sbpu);
-			baseMLO->som.increment_neighbour_edge_ages(bpu);
-			baseMLO->som.set_edge_age(bpu, sbpu, 0);
+			baseMLO->som.increment_all_edge_ages(1);
+			baseMLO->som.set_edge_age(bpu, sbpu, baseMLO->som.get_edge_age(bpu, sbpu)*0.1);
 
 			// Set total weight of BPU
 			class_sum_weight[bpu] = op.sum_weight_class[img_id][bpu];
 			thr_wsum_pdf_class[bpu] += op.sum_weight_class[img_id][bpu] / op.sum_weight[img_id];
 
-			baseMLO->som.increment_node_error(bpu, errors[bpu]);
-			baseMLO->som.increment_node_age(bpu, 1.);
-
 			XFLOAT lambda = .8;
 			// Set total weights for neighbours
 			std::vector<unsigned> in = baseMLO->som.get_neighbours(bpu);
+			lambda /= in.size();
 			for (int i = 0; i < in.size(); i ++) {
 				class_sum_weight[in[i]] = op.sum_weight_class[img_id][in[i]] /lambda; //TODO as a parameter
 				thr_wsum_pdf_class[in[i]] += op.sum_weight_class[img_id][in[i]] / (op.sum_weight[img_id] /lambda);
 				baseMLO->som.increment_node_age(in[i], lambda);
 			}
-
 		}
 
 		/*======================================================

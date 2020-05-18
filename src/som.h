@@ -31,6 +31,8 @@
 #include <unordered_set>
 #include "src/parallel.h"
 #include "src/filename.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 class SomGraph {
 
@@ -260,11 +262,17 @@ public:
 		_nodes[node].error += error;
 	}
 
-	void increment_neighbour_edge_ages(unsigned node) {
+	void increment_all_edge_ages(float age=1.) {
+		Lock ml(&mutex);
+		for (unsigned i = 0; i < _edges.size(); i++)
+			_edges[i].age += age;
+	}
+
+	void increment_neighbour_edge_ages(unsigned node, float age=1.) {
 		Lock ml(&mutex);
 		for (unsigned i = 0; i < _edges.size(); i++) {
 			if (_edges[i].n1 == node || _edges[i].n2 == node)
-				_edges[i].age ++;
+				_edges[i].age += age;
 		}
 	}
 
@@ -404,21 +412,20 @@ public:
 	}
 
 	void print_to_file(FileName &fn) {
-		std::ofstream out;
-		out.open(fn);
+		FILE * fp;
+		fp = fopen (fn.c_str(), "w+");
 
-		out << "_nodes [index error age]" << std::endl;
+		fprintf(fp, "_nodes [index error age]\n");
 
 		for(std::unordered_map<unsigned, Node>::iterator n = _nodes.begin(); n != _nodes.end(); ++n)
-			out << n->first << " " << n->second.error << " " << n->second.age << std::endl;
+			fprintf(fp, "%3d %5.1f %5.1f\n", n->first, n->second.error, n->second.age);
 
-		out << std::endl;
-		out << "_edges [node1 node2 age]" << std::endl;
+		fprintf(fp, "\n_edges [node1 node2 age]\n");
 
 		for(unsigned i = 0; i < _edges.size(); i++)
-			out << _edges[i].n1 << " " << _edges[i].n2 << " " << _edges[i].age << std::endl;
+			fprintf(fp, "%3d %3d %5.1f\n", _edges[i].n1, _edges[i].n2, _edges[i].age);
 
-		out.close();
+		fclose(fp);
 	}
 };
 

@@ -1158,6 +1158,11 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 	// And write the sampling object
 	if (do_write_sampling)
 		sampling.write(fn_root);
+
+	if (do_som) {
+		FileName som_fn = fn_root + "_som.txt";
+		som.print_to_file(som_fn);
+	}
 }
 
 /** ========================== Initialisation  =========================== */
@@ -1334,7 +1339,7 @@ void MlOptimiser::initialise()
 	if (do_som)
 	{
 		// Add the initial nodes to the graph and connect them with an edge
-		for (unsigned i = 0; i < XMIPP_MIN(10, mymodel.nr_classes); i++)
+		for (unsigned i = 0; i < XMIPP_MIN(2, mymodel.nr_classes); i++)
 			som.add_node();
 
 		std::vector<unsigned> nodes = som.get_all_nodes();
@@ -1353,8 +1358,10 @@ void MlOptimiser::initialise()
 
 			if (clear) {
 				mymodel.Iref[i] *= 0.;
-				mymodel.Igrad1[i] *= 0.;
-				mymodel.Igrad2[i] *= 0.;
+				if (do_mom1)
+					mymodel.Igrad1[i] *= 0.;
+				if (do_mom2)
+					mymodel.Igrad2[i] *= 0.;
 			}
 		}
 	}
@@ -2521,6 +2528,142 @@ void MlOptimiser::iterateWrapUp()
 #endif
 }
 
+struct FitImagesParams {
+	float rot = 0, xtrans = 0, ytrans = 0;
+};
+
+FitImagesParams fitImages(MultidimArray<RFLOAT> &map1, MultidimArray<RFLOAT> &map2) {
+	float ang_step = 4.;
+	int ang_count = 360. / ang_step;
+	int side = map1.xdim;
+	FitImagesParams out;
+
+	int max_trans = 2;
+	int trans_count = (2 * max_trans + 1) * (2 * max_trans + 1);
+	std::vector<int> xtrans(trans_count), ytrans(trans_count);
+
+	int i = 0;
+	for (int x = -max_trans; x <= max_trans; x++)
+		for (int y = -max_trans; y <= max_trans; y++) {
+			xtrans[i] = x;
+			ytrans[i] = y;
+			i++;
+		}
+
+	float current_ang = 0, d;
+	Matrix2D<RFLOAT> A;
+	float min_diff = -1;
+	float min_ang;
+	int min_itans;
+
+	for (int iang = 0; iang < ang_count; iang++) {
+		Euler_angles2matrix(0, 0, current_ang, A, false);
+		for (int itrans = 0; itrans < trans_count; itrans++) {
+			float xt = xtrans[itrans];
+			float yt = ytrans[itrans];
+			float diff = 0;
+			int diff_count = 0;
+
+			for (int x = 0; x < side; x++) {
+				for (int y = 0; y < side; y++) {
+					float xp = x - side / 2;
+					float yp = y - side / 2;
+					if (xp * xp + yp * yp < side * side) {
+						float v = map2.data[y * side + x];
+						float xpp = A(0, 0) * xp + A(0, 1) * yp + xt;
+						float ypp = A(1, 0) * xp + A(1, 1) * yp + yt;
+
+						xpp += side / 2;
+						ypp += side / 2;
+
+						if (xpp < 0 || xpp >= side - 1 ||
+						    ypp < 0 || ypp >= side - 1)
+							continue;
+
+						int x0 = floor(xpp);
+						float fx = xpp - x0;
+						int x1 = x0 + 1;
+
+						int y0 = floor(ypp);
+						float fy = ypp - y0;
+						int y1 = y0 + 1;
+
+						float mfx = 1.f - fx;
+						float mfy = 1.f - fy;
+
+						d = map1.data[y0 * side + x0] - v;
+						diff += d * d * mfy * mfx;
+						d = map1.data[y0 * side + x1] - v;
+						diff += d * d * mfy * fx;
+						d = map1.data[y1 * side + x0] - v;
+						diff += d * d * fy * mfx;
+						d = map1.data[y1 * side + x1] - v;
+						diff += d * d * fy * fx;
+						diff_count++;
+					}
+				}
+			}
+
+			diff /= diff_count;
+			if (diff < min_diff || min_diff < 0) {
+				min_diff = diff;
+				out.rot = current_ang;
+				out.xtrans = xtrans[itrans];
+				out.ytrans = ytrans[itrans];
+			}
+		}
+		current_ang += ang_step;
+	}
+
+	return out;
+}
+
+void combineImages(const MultidimArray<RFLOAT> &map1, const MultidimArray<RFLOAT> &map2,
+		MultidimArray<RFLOAT> &out, const FitImagesParams &params)
+{
+	out.initZeros(map1);
+	int side = map1.xdim;
+	Matrix2D<RFLOAT> A;
+	Euler_angles2matrix(0, 0, params.rot, A, false);
+
+	for (int x = 0; x < side; x++) {
+		for (int y = 0; y < side; y++) {
+			float xp = x - side / 2;
+			float yp = y - side / 2;
+			if (xp * xp + yp * yp < side * side) {
+				float v = map2.data[y * side + x];
+				float xpp = A(0,0) * xp + A(0,1) * yp + params.xtrans;
+				float ypp = A(1,0) * xp + A(1,1) * yp + params.ytrans;
+
+				xpp += side / 2;
+				ypp += side / 2;
+
+				if (xpp < 0 || xpp >= side - 1 ||
+				    ypp < 0 || ypp >= side - 1)
+					continue;
+
+				int x0 = floor(xpp);
+				float fx = xpp - x0;
+				int x1 = x0 + 1;
+
+				int y0 = floor(ypp);
+				float fy = ypp - y0;
+				int y1 = y0 + 1;
+
+				float mfx = 1.f - fx;
+				float mfy = 1.f - fy;
+
+				out.data[y0 * side + x0] += v * mfy * mfx;
+				out.data[y0 * side + x1] += v * mfy *  fx;
+				out.data[y1 * side + x0] += v * fy * mfx;
+				out.data[y1 * side + x1] += v * fy *  fx;
+			}
+		}
+	}
+	out += map1;
+	out /= 2.;
+}
+
 void MlOptimiser::iterate()
 {
 
@@ -2755,8 +2898,9 @@ void MlOptimiser::iterate()
 			}
 
 			// Add new nodes
-			unsigned som_add_interval = 10;
-			if (0 < iter && iter % som_add_interval == 0 && som.get_node_count() < mymodel.nr_classes) { //TODO as a parameter
+			unsigned som_add_interval = 4;
+			if (0 < iter && iter % som_add_interval == 0 && som.get_node_count() < mymodel.nr_classes) //TODO as a parameter
+			{
 				unsigned wpu = som.find_wpu(); // Worse performing unit (WPU)
 				unsigned swpu = som.find_wpu(wpu); // Second worse performing unit (SWPU)
 
@@ -2770,14 +2914,16 @@ void MlOptimiser::iterate()
 				som.add_edge(swpu, idx);
 				som.add_edge(idx, wpu);
 
-				mymodel.Iref[idx] = 0.8 * mymodel.Iref[wpu] + 0.2 * mymodel.Iref[swpu];
-				mymodel.Igrad1[idx] = 0.8 * mymodel.Igrad1[wpu] + 0.2 * mymodel.Igrad1[swpu];
-				mymodel.Igrad2[idx] = 0.8 * mymodel.Igrad2[wpu] + 0.2 * mymodel.Igrad2[swpu];
+				FitImagesParams params = fitImages(mymodel.Iref[wpu], mymodel.Iref[swpu]);
+				combineImages(mymodel.Iref[wpu], mymodel.Iref[swpu], mymodel.Iref[idx], params);
+				if (do_mom1)
+					combineImages(mymodel.Igrad1[wpu], mymodel.Igrad1[swpu], mymodel.Igrad1[idx], params);
+				if (do_mom2)
+					combineImages(mymodel.Igrad2[wpu], mymodel.Igrad2[swpu], mymodel.Igrad2[idx], params);
 
-				som.set_node_error(idx);
-				som.set_node_error(wpu);
+				som.set_node_error(idx, som.get_node_error(wpu)*0.25);
+				som.set_node_error(wpu, som.get_node_error(wpu)*0.25);
 
-				som.set_node_age(idx, som.get_node_age(wpu) * 0.1f);
 			}
 		}
 
@@ -4187,6 +4333,16 @@ void MlOptimiser::maximization()
 									do_mom2 ? 0.999 : 0.,
 									iter == 1);
 
+						if (do_som)
+						{
+							RFLOAT avg(0);
+
+							for (unsigned i = 0; i < wsum_model.BPref[iclass].data.nzyxdim; i++)
+								avg += norm(wsum_model.BPref[iclass].data.data[i]);
+
+							avg /= (RFLOAT) wsum_model.BPref[iclass].data.nzyxdim;
+							som.increment_node_error(iclass, avg);
+						}
 
 						(wsum_model.BPref[iclass]).reconstructGrad(
 								mymodel.Iref[iclass],
