@@ -53,6 +53,7 @@ void SpaBackproject::read(int argc, char **argv)
 	intact_ctf_first_peak = parser.checkOption("--ctf_intact_first_peak", "Leave CTFs intact until first peak");
 	ctf_phase_flipped = parser.checkOption("--ctf_phase_flipped", "Images have been phase flipped");
 	only_flip_phases = parser.checkOption("--only_flip_phases", "Do not correct CTF-amplitudes, only flip phases");
+	SNR = textToDouble(parser.getOption("--SNR", "Assumed signal-to-noise ratio (exaggerated)", "2000"));
 
 	int ewald_section = parser.addSection("Ewald-sphere correction options");
 	
@@ -165,7 +166,26 @@ void SpaBackproject::initialise()
 		model.read(fn_noise);
 	}
 
-	// Get dimension of the images
+	determineOutputBoxSize();
+
+	if (angpix < 0.)
+	{
+		angpix = obsModel.getPixelSize(0);
+		Log::print("Reconstructing at the pixel size of the first optics group: " + ZIO::itoa(angpix) + " Å");
+	}
+
+	if (maxres < 0.)
+	{
+		r_max = -1;
+	}
+	else
+	{
+		r_max = CEIL(output_boxsize * angpix / maxres);
+	}
+}
+
+void SpaBackproject::determineOutputBoxSize()
+{
 	if (do_reconstruct_ctf)
 	{
 		output_boxsize = ctf_dim;
@@ -183,7 +203,7 @@ void SpaBackproject::initialise()
 		Image<RFLOAT> img0;
 		img0.read(fn_img, false);
 		output_boxsize = (int)XSIZE(img0());
-		
+
 		// Allow reconstructing smaller box than the input images (which should have large boxes!)
 		if (newbox > 0)
 		{
@@ -191,26 +211,11 @@ void SpaBackproject::initialise()
 		}
 
 		const int data_dim = obsModel.opticsMdt.getInt(EMDL_IMAGE_DIMENSIONALITY, 0);
-		
+
 		if (data_dim != 2)
 		{
 			REPORT_ERROR("Only 2D images are supported.");
 		}
-	}
-
-	if (angpix < 0.)
-	{
-		angpix = obsModel.getPixelSize(0);
-		Log::print("Reconstructing at the pixel size of the first optics group: " + ZIO::itoa(angpix) + " Å");
-	}
-
-	if (maxres < 0.)
-	{
-		r_max = -1;
-	}
-	else
-	{
-		r_max = CEIL(output_boxsize * angpix / maxres);
 	}
 }
 
@@ -818,8 +823,7 @@ void SpaBackproject::reconstructForward()
 				MultidimArray<RFLOAT> dummy;
 				
 				backprojector.externalReconstruct(vol_xmipp(),
-						fn_root,
-						tau2, dummy, dummy, dummy, false, 1., 1);
+					fn_root, tau2, dummy, dummy, dummy, false, 1., 1);
 			}
 			else
 			{
@@ -893,6 +897,12 @@ void SpaBackproject::reconstructBackward()
 	}
 	
 	const int s = dataImgFS[0].ydim;	
+
+	// Scale image values to match Relion's original output:
+	for (int half = 0; half < 2; half++)
+	{
+		dataImgFS[half] *= s / 2.0;
+	}
 	
 	std::vector<BufferedImage<double>> dataImgRS(2), dataImgDivRS(2);
 	
@@ -901,11 +911,11 @@ void SpaBackproject::reconstructBackward()
 	BufferedImage<double> ctfImgFS_both = ctfImgFS[0] + ctfImgFS[1];
 	
 	Log::beginSection("Reconstructing");
-	
-	const double WienerFract = 0.01;
+
 	const int cropSize = s / padding_factor;
 	const int margin = (s - cropSize) / 2;
 	const bool needs_cropping = margin > 0;
+	const double WienerOffset = 1.0 / SNR;
 
 	
 	for (int half = 0; half < 2; half++)
@@ -916,12 +926,14 @@ void SpaBackproject::reconstructBackward()
 		dataImgDivRS[half] = BufferedImage<double>(s,s,s);
 		
 		Reconstruction::griddingCorrect3D(
-					dataImgFS[half], psfImgFS[half], dataImgRS[half],
+					dataImgFS[half], psfImgFS[half],  // in
+					dataImgRS[half],                  // out
 					true, num_threads_total);
 		
 		Reconstruction::ctfCorrect3D(
-					dataImgRS[half], ctfImgFS[half], dataImgDivRS[half],
-					1.0 / WienerFract, num_threads_total);
+					dataImgRS[half], ctfImgFS[half],  // in
+					dataImgDivRS[half],               // out
+					WienerOffset, num_threads_total);
 		
 		dataImgDivRS[half].write(fn_out+"_half"+ZIO::itoa(half+1)+".mrc", angpix);		
 		dataImgRS[half].write(fn_out+"_data_half"+ZIO::itoa(half+1)+".mrc", angpix);
@@ -942,7 +954,7 @@ void SpaBackproject::reconstructBackward()
 		dataImgFS_both, psfImgFS_both, dataImgRS[0], true, num_threads_total);
 	
 	Reconstruction::ctfCorrect3D(
-		dataImgRS[0], ctfImgFS_both, dataImgDivRS[0], 1.0 / WienerFract, num_threads_total);
+		dataImgRS[0], ctfImgFS_both, dataImgDivRS[0], WienerOffset, num_threads_total);
 	
 	dataImgDivRS[0].write(fn_out+"_merged.mrc", angpix);	
 	dataImgRS[0].write(fn_out+"_data_merged.mrc", angpix);

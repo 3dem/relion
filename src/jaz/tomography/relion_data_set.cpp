@@ -252,6 +252,11 @@ int RelionDataSet::getOpticsGroup(long particle_id) const
 	return out - 1;
 }
 
+int RelionDataSet::numberOfOpticsGroups() const
+{
+	return optTable.numberOfObjects();
+}
+
 double RelionDataSet::getBinnedPixelSize(int opticsGroup) const
 {
 	if (!optTable.labelExists(EMDL_IMAGE_PIXEL_SIZE))

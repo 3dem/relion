@@ -330,6 +330,11 @@ RFLOAT MetaDataTable::getRfloat(EMDLabel label, long objectID)
 	return out;
 }
 
+RFLOAT MetaDataTable::getDouble(EMDLabel label, long objectID)
+{
+	return (double) getRfloat(label, objectID);
+}
+
 bool MetaDataTable::getBool(EMDLabel label, long objectID)
 {
 	bool out = false;

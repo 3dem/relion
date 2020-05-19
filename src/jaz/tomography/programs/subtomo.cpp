@@ -42,12 +42,11 @@ void SubtomoProgram::run()
 	const long int s02D = (int)(binning * s2D + 0.5);
 	
 	TomogramSet tomogramSet(tomoSetFn);
-	
-	// @TODO: write binning level
-	
+
 	if (dataSet->type == DataSet::Relion)
 	{
-		RelionDataSet* rds = (RelionDataSet*) dataSet;	
+		RelionDataSet* rds0 = (RelionDataSet*) dataSet;
+		RelionDataSet rds = *rds0;
 		
 		for (int t = 0; t < tc; t++)
 		{
@@ -59,28 +58,38 @@ void SubtomoProgram::run()
 			{
 				const int part_id = particles[t][p];
 				
-				const int opticsGroup = rds->getOpticsGroup(part_id);
-				const double pixelSize = rds->getBinnedPixelSize(opticsGroup);
-				
+				const int opticsGroup = rds.getOpticsGroup(part_id);
+				const double pixelSize = rds.getBinnedPixelSize(opticsGroup);
 				
 				std::string outData = outTag + "/" + dataSet->getName(part_id) + "_data.mrc";
 				std::string outWeight = outTag + "/" + dataSet->getName(part_id) + "_weights.mrc";
 				
-				rds->setImageFileNames(outData, outWeight, part_id);
+				rds.setImageFileNames(outData, outWeight, part_id);
 				
 				d3Vector off, coord;
 				
-				rds->getParticleOffset(part_id, off.x, off.y, off.z);
-				rds->getParticleCoord(part_id, coord.x, coord.y, coord.z);
+				rds.getParticleOffset(part_id, off.x, off.y, off.z);
+				rds.getParticleCoord(part_id, coord.x, coord.y, coord.z);
 				
 				coord -= off / pixelSize;
 				
-				rds->setParticleOffset(part_id, 0,0,0);
-				rds->setParticleCoord(part_id, coord.x, coord.y, coord.z);
+				rds.setParticleOffset(part_id, 0,0,0);
+				rds.setParticleCoord(part_id, coord.x, coord.y, coord.z);
 			}
 		}
-		
-		rds->write(outTag + "_particles.star");
+
+		for (int og = 0; og < rds.numberOfOpticsGroups(); og++)
+		{
+			const double ps_img = rds.optTable.getDouble(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, og);
+			const double ps_out = binning * ps_img;
+
+			rds.optTable.setValue(EMDL_MICROGRAPH_BINNING, binning, og);
+			rds.optTable.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, ps_out, og);
+			rds.optTable.setValue(EMDL_IMAGE_PIXEL_SIZE, ps_out, og);
+			rds.optTable.setValue(EMDL_IMAGE_SIZE, cropSize, og);
+		}
+
+		rds.write(outTag + "_particles.star");
 	}
 		
 	

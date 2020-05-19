@@ -169,6 +169,7 @@ public:
 	int getInt(EMDLabel label, long objectID = -1);
 	int getIntMinusOne(EMDLabel label, long objectID = -1);
 	RFLOAT getRfloat(EMDLabel label, long objectID = -1);
+	RFLOAT getDouble(EMDLabel label, long objectID = -1);
 	bool getBool(EMDLabel label, long objectID = -1);
 	std::string getString(EMDLabel label, long objectID = -1);
 	std::vector<double> getDoubleVector(EMDLabel label, long objectID = -1);
