@@ -18,7 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#include <src/jaz/single_particle/aberration_fit.h>
+#include <src/jaz/optics/aberration_fit.h>
 #include <src/jaz/single_particle/image_log.h>
 
 

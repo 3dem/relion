@@ -22,7 +22,7 @@ class SubtomoProgram
 				num_threads;
 			
 			double 
-				WienerFract, 
+				SNR,
 				binning, 
 				taper, 
 				env_sigma,

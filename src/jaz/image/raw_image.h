@@ -11,7 +11,7 @@
 #include <stddef.h>
 
 
-template <typename T>
+template <class T>
 class RawImage
 {
 	public:
@@ -24,6 +24,10 @@ class RawImage
 		
 		RawImage(size_t xdim, size_t ydim, size_t zdim, T* data);
 		
+		RawImage(Image<T>& img);
+		
+		RawImage(MultidimArray<T>& mda);
+		
 			
 			long int xdim, ydim, zdim;
 			T* data;
@@ -31,7 +35,7 @@ class RawImage
 		
 		/* operator (x,y,z): returns a reference to the indicated voxel.
 		   The correct version (const or non-const) will be chosen by the compiler,
-		   depending on whether the instance is declared as const or not.*/
+		   depending on whether the instance is declared const.*/
 		
 		inline const T& operator() (size_t, size_t, size_t) const;
 		inline T& operator() (size_t, size_t, size_t);
@@ -55,29 +59,35 @@ class RawImage
 		RawImage<T> getSliceRef(size_t z);
 		const RawImage<T> getConstSliceRef(size_t z) const;
 		RawImage<T> getSlabRef(size_t z, size_t thickness);
-		//void copySliceFrom(size_t z, const RawImage<T>& src, size_t z_src = 0);
 		
-		template <typename SourceType>
-		void copySliceFrom(size_t z, const RawImage<SourceType>& src, size_t z_src = 0);
+		template <class T2>
+		void copySliceFrom(size_t z, const RawImage<T2>& src, size_t z_src = 0);
 		
 		void swapWith(RawImage<T>& img);
 		
 		void write(std::string fn) const;
+		void write(std::string fn, double pixelSize) const;
 		void writePng(std::string fn) const;
-		void writeVtk(std::string fn, gravis::d3Vector origin, gravis::d3Vector step) const;
+		void writeVtk(std::string fn, 
+					  gravis::d3Vector origin = gravis::d3Vector(0,0,0), 
+					  gravis::d3Vector step = gravis::d3Vector(0,0,0)) const;
 		
 		void copyTo(gravis::tImage<T>& img, int z = 0) const;
 		void copyTo(Image<T>& img) const;
 		void copyTo(RawImage<T>& img) const;
 		
-		void copyFrom(const RawImage<T>& img);
+		template <class T2>
+		void copyFrom(const Image<T2>& img);
+		
+		template <class T2>		
+		void copyFrom(const RawImage<T2>& img);
 		
 		bool hasSize(long int w, long int h, long int d);
 		bool hasEqualSize(const RawImage<T>& img);
 		
 		std::string sizeString();
 		
-		template<typename T2> inline
+		template<class T2> inline
 		RawImage& operator += (const RawImage<T2>& v)
 		{
 			const long int s = xdim * ydim * zdim;
@@ -90,7 +100,7 @@ class RawImage
 			return *this;
 		}
 		
-		template<typename T2> inline
+		template<class T2> inline
 		RawImage& operator -= (const RawImage<T2>& v)
 		{
 			const long int s = xdim * ydim * zdim;
@@ -127,7 +137,7 @@ class RawImage
 			return *this;
 		}
 		
-		template<typename T2> inline
+		template<class T2> inline
 		RawImage& operator *= (const RawImage<T2>& v)
 		{
 			const long int s = xdim * ydim * zdim;
@@ -152,7 +162,7 @@ class RawImage
 			return *this;
 		}
 		
-		template<typename T2> inline
+		template<class T2> inline
 		RawImage& operator /= (const RawImage<T2>& v)
 		{
 			const long int s = xdim * ydim * zdim;
@@ -195,32 +205,46 @@ RawImage<T>::RawImage(size_t xdim, size_t ydim, size_t zdim, T* data)
 {
 }
 
-template<typename T>
+template<class T>
+RawImage<T>::RawImage(Image<T> &img)
+	:   xdim(img.data.xdim), ydim(img.data.ydim), zdim(img.data.zdim), 
+		data(img.data.data)
+{	
+}
+
+template<class T>
+RawImage<T>::RawImage(MultidimArray<T> &mda)
+	:   xdim(mda.xdim), ydim(mda.ydim), zdim(mda.zdim), 
+		data(mda.data)
+{	
+}
+
+template<class T>
 RawImage<T> RawImage<T>::getFullRef()
 {
 	return RawImage<T>(xdim, ydim, zdim, data);
 }
 
-template<typename T>
+template<class T>
 RawImage<T> RawImage<T>::getSliceRef(size_t z)
 {
 	return RawImage<T>(xdim, ydim, 1, data + xdim * ydim * z);
 }
 
-template<typename T>
+template<class T>
 const RawImage<T> RawImage<T>::getConstSliceRef(size_t z) const
 {
 	return RawImage<T>(xdim, ydim, 1, data + xdim * ydim * z);
 }
 
-template<typename T>
+template<class T>
 RawImage<T> RawImage<T>::getSlabRef(size_t z, size_t thickness)
 {
 	return RawImage<T>(xdim, ydim, thickness, data + xdim * ydim * z);
 }
 
-template<typename T> template<typename SourceType>
-void RawImage<T>::copySliceFrom(size_t z_dest, const RawImage<SourceType>& src, size_t z_src)
+template<class T> template<class T2>
+void RawImage<T>::copySliceFrom(size_t z_dest, const RawImage<T2>& src, size_t z_src)
 {
 	for (int y = 0; y < ydim; y++)
 	for (int x = 0; x < xdim; x++)
@@ -229,7 +253,7 @@ void RawImage<T>::copySliceFrom(size_t z_dest, const RawImage<SourceType>& src, 
 	}
 }
 
-template<typename T>
+template<class T>
 void RawImage<T>::swapWith(RawImage<T>& img)
 {
 	T* sw = img.data;
@@ -323,7 +347,7 @@ void RawImage<T>::write(std::string fn) const
 	
 	if (dot == std::string::npos)
 	{
-		REPORT_ERROR_STR("Image<T>::write: filename has no ending (" << fn << ").");
+		REPORT_ERROR_STR("RawImage<T>::write: filename has no ending (" << fn << ").");
 	}
 	
 	std::string end = fn.substr(dot+1);
@@ -343,11 +367,39 @@ void RawImage<T>::write(std::string fn) const
 }
 
 template <class T>
+void RawImage<T>::write(std::string fn, double pixelSize) const
+{
+	std::string::size_type dot = fn.find_last_of('.');
+	
+	if (dot == std::string::npos)
+	{
+		REPORT_ERROR_STR("RawImage<T>::write: filename has no ending (" << fn << ").");
+	}
+	
+	std::string end = fn.substr(dot+1);
+	
+	if (end == "vtk")
+	{
+		Image<T> img;
+		copyTo(img);
+		VtkHelper::writeVTK(img, fn, 0, 0, 0, pixelSize, pixelSize, pixelSize);
+	}
+	else
+	{
+		Image<T> img;
+		copyTo(img);
+		img.setSamplingRateInHeader(pixelSize);
+		img.write(fn);
+	}
+}
+
+
+template <class T>
 void RawImage<T>::writePng(std::string fn) const
 {
 	if (zdim > 1) 
 	{
-		REPORT_ERROR("Image<T>::write: cannot write 3D image into PNG.");
+		REPORT_ERROR("RawImage<T>::write: cannot write 3D image into PNG.");
 	}
 	
 	gravis::tImage<T> img;
@@ -403,8 +455,27 @@ inline void RawImage<T>::copyTo(RawImage<T>& img) const
 	}
 }
 
-template <class T>
-inline void RawImage<T>::copyFrom(const RawImage<T>& img)
+template <class T> template <class T2>
+inline void RawImage<T>::copyFrom(const Image<T2>& img)
+{
+	if (xdim < img.data.xdim || ydim < img.data.ydim || zdim < img.data.zdim)
+	{
+		REPORT_ERROR_STR("RawImage<T>::copyFrom: input image too small: "
+			<< img.data.xdim << "x" << img.data.ydim << "x" << img.data.zdim 
+			<< " (should be at least: " 
+			<< xdim << "x" << ydim << "x" << zdim << ")");
+	}
+	
+	for (size_t z = 0; z < zdim; z++)
+	for (size_t y = 0; y < ydim; y++)
+	for (size_t x = 0; x < xdim; x++)
+	{
+		data[(z*ydim + y)*xdim + x] = T(img(x,y,z));
+	}
+}
+
+template <class T> template <class T2>
+inline void RawImage<T>::copyFrom(const RawImage<T2>& img)
 {
 	if (xdim < img.xdim || ydim < img.ydim || zdim < img.zdim)
 	{
@@ -418,7 +489,7 @@ inline void RawImage<T>::copyFrom(const RawImage<T>& img)
 	for (size_t y = 0; y < ydim; y++)
 	for (size_t x = 0; x < xdim; x++)
 	{
-		data[(z*ydim + y)*xdim + x] = img(x,y,z);
+		data[(z*ydim + y)*xdim + x] = T(img(x,y,z));
 	}
 }
 

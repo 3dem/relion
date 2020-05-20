@@ -2,6 +2,7 @@
 #define TRAJECTORY_SET_H
 
 #include <src/jaz/gravis/t3Vector.h>
+#include <vector>
 
 
 class TrajectorySet

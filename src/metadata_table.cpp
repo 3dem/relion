@@ -311,6 +311,51 @@ bool MetaDataTable::getValueToString(EMDLabel label, std::string &value, long ob
 	}
 }
 
+int MetaDataTable::getInt(EMDLabel label, long objectID)
+{
+	int out = 0;
+	getValue(label, out, objectID);
+	return out;
+}
+
+int MetaDataTable::getIntMinusOne(EMDLabel label, long objectID)
+{
+	return getInt(label, objectID) - 1;
+}
+
+RFLOAT MetaDataTable::getRfloat(EMDLabel label, long objectID)
+{
+	RFLOAT out = 0.f;
+	getValue(label, out, objectID);
+	return out;
+}
+
+RFLOAT MetaDataTable::getDouble(EMDLabel label, long objectID)
+{
+	return (double) getRfloat(label, objectID);
+}
+
+bool MetaDataTable::getBool(EMDLabel label, long objectID)
+{
+	bool out = false;
+	getValue(label, out, objectID);
+	return out;
+}
+
+std::string MetaDataTable::getString(EMDLabel label, long objectID)
+{
+	std::string out = "";
+	getValue(label, out, objectID);
+	return out;
+}
+
+std::vector<double> MetaDataTable::getDoubleVector(EMDLabel label, long objectID)
+{
+	std::vector<double> out(0);
+	getValue(label, out, objectID);
+	return out;
+}
+
 size_t MetaDataTable::size() const
 {
 	return objects.size();

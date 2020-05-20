@@ -43,9 +43,13 @@ public:
      */
     void read(int argc, char **argv);
 
-	// Parallelized run function
-    void run();
-
+	// For the first fraction, align movies and update the FCC
+	void runWithFccUpdate();
+	
+	// For the second, estimate the B factors from the FCC and 
+	// then align and immediately recombine the following micrographs
+	void runWithRecombination();
+	
 };
 
 

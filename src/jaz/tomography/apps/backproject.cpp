@@ -1,5 +1,5 @@
 #include <src/args.h>
-#include <src/jaz/tomo_programs/backproject.h>
+#include <src/jaz/tomography/programs/backproject.h>
 #include <src/jaz/util/log.h>
 
 
@@ -20,7 +20,7 @@ int main(int argc, char *argv[])
 		bp.cropSize = textToInteger(parser.getOption("--crop", "Size of (additionally output) cropped image", "-1"));
 		bp.binning = textToDouble(parser.getOption("--bin", "Binning factor", "1"));
 		bp.taper = textToDouble(parser.getOption("--taper", "Taper against the sphere by this number of pixels (only if cropping)", "10"));
-		bp.WienerFract = textToDouble(parser.getOption("--SNR", "SNR assumed by the Wiener filter", "0.1"));
+		bp.SNR = textToDouble(parser.getOption("--SNR", "Assumed signal-to-noise ratio (negative means use a heuristic)", "-1"));
 		bp.symmName = parser.getOption("--sym", "Symmetry group", "C1");
 				
 		bp.max_mem_GB = textToInteger(parser.getOption("--mem", "Max. amount of memory to use for accumulation (--j_out will be reduced)", "-1"));

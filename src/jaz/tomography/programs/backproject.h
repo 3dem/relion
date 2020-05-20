@@ -13,7 +13,7 @@ class BackprojectProgram
 			
 			bool diag, no_subpix_off, no_reconstruction;
 			int boxSize, cropSize, num_threads, outer_threads, inner_threads, max_mem_GB;
-			double WienerFract, taper, binning;
+			double SNR, taper, binning;
 			
 		void run();
 };

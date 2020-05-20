@@ -72,6 +72,7 @@ void MotionRefiner::read(int argc, char **argv)
 	parser.addSection("Computational options");
 	
 	nr_omp_threads = textToInteger(parser.getOption("--j", "Number of (OMP) threads", "1"));
+	particlesForFcc = textToInteger(parser.getOption("--B_parts", "Number of particles used for B-factor estimation (negative means all)", "-1"));
 	minMG = textToInteger(parser.getOption("--min_MG", "First micrograph index", "0"));
 	maxMG = textToInteger(parser.getOption("--max_MG", "Last micrograph index (default is to process all)", "-1"));
 	
@@ -192,7 +193,7 @@ void MotionRefiner::init()
 	{
 		std::string metaFn = ""; // the first meta-star filename
 		double fractDose = 0.0; // the dose in the first meta-star (@TODO: support variable dose)
-		// => we don't need variable dose support as long as different motioncorr jobs are processed separatedly
+		// => we don't need variable dose support as long as different motioncorr jobs are processed separately
 		int fc0; // the frame count in the first movie
 		
 		// initialise corrected/uncorrected micrograph dictionary, then load the header
@@ -344,18 +345,15 @@ void MotionRefiner::run()
 		// @TODO: apply the optimized parameters, then continue with motion estimation
 	}
 	
-	// The subsets will be used in openMPI parallelisation: instead of over g0->gc,
-	// they will be over smaller subsets
+	const int lastMgForFCC = lastMicrographForFCC();
+	const int firstMgWithoutFCC = lastMgForFCC + 1;
+	const bool anyWithoutFCC = firstMgWithoutFCC < motionMdts.size();
 	
-	// TODO: TAKANORI: first, estimate FCC on only a subset of movies here
 	if (estimateMotion)
 	{
-		motionEstimator.process(motionMdts, 0, motionMdts.size()-1);
+		motionEstimator.process(motionMdts, 0, lastMgForFCC, true);
 	}
 	
-	// TODO: TAKANORI: then process all movies, simultaneously estimating tracks and recombining.
-	//                 micrograph handler can cache movie frames to avoid reading movies twice.
-	//                 (if --sbs, don't cache to save memory)
 	if (recombineFrames)
 	{
 		double k_out_A = reference.pixToAng(reference.k_out);
@@ -365,7 +363,47 @@ void MotionRefiner::run()
 			nr_omp_threads, outPath, debug,
 			&reference, &obsModel, &micrographHandler);
 		
-		frameRecombiner.process(recombMdts, 0, recombMdts.size()-1);
+		frameRecombiner.process(recombMdts, 0, lastMgForFCC);
+		
+		if (anyWithoutFCC)
+		{
+			motionEstimator.setVerbosity(0);
+			frameRecombiner.setVerbosity(0);
+			
+			const int left = motionMdts.size() - lastMgForFCC - 1;
+			const int barstep = XMIPP_MAX(1, left/ 60);
+			
+			if (verb > 0)
+			{
+				std::cout << " + Aligning and combining frames for micrographs ... " << std::endl;
+				init_progress_bar(left);
+			}
+			
+			for (int m = firstMgWithoutFCC; m < motionMdts.size(); m++)
+			{
+				// TODO: TAKANORI: micrograph handler can cache movie frames to avoid reading movies twice.
+				//                 (if --sbs, don't cache to save memory)
+				
+				motionEstimator.process(motionMdts, m, m, false);
+				frameRecombiner.process(recombMdts, m, m);
+				
+				const int nr_done = m - firstMgWithoutFCC + 1;
+				
+				if (verb > 0 && nr_done % barstep == 0)
+				{
+					progress_bar(nr_done);
+				}
+			}
+			
+			if (verb > 0)
+			{
+				progress_bar(left);
+			}
+		}
+	}
+	else if (anyWithoutFCC)
+	{
+		motionEstimator.process(motionMdts, firstMgWithoutFCC, motionMdts.size()-1, true);
 	}
 	
 	if (generateStar)
@@ -542,5 +580,27 @@ void MotionRefiner::adaptMovieNames()
 			
 			mdt0.setValue(EMDL_MICROGRAPH_NAME, name, i);
 		}
+	}
+}
+
+int MotionRefiner::lastMicrographForFCC()
+{
+	if (particlesForFcc > 0)
+	{
+		int partSoFar = 0;
+		
+		for (int m = 0; m < motionMdts.size(); m++)
+		{
+			partSoFar += motionMdts[m].numberOfObjects();
+			
+			if (partSoFar > particlesForFcc)
+			{
+				return m;
+			}
+		}
+	}
+	else
+	{
+		return motionMdts.size()-1;
 	}
 }

@@ -42,7 +42,6 @@ class ForwardProjection
 				const std::vector<gravis::d4Matrix>& proj,
 				RawImage<tComplex<T>>& destData,
 				RawImage<tComplex<T>>& destPsf,
-				double paddingFactor,
 				int num_threads = 1);
 };
 						
@@ -53,7 +52,6 @@ void ForwardProjection::forwardProject(
 		const std::vector<gravis::d4Matrix>& proj,
 		RawImage<tComplex<T>>& destData,
 		RawImage<tComplex<T>>& destPsf,
-		double paddingFactor,
 		int num_threads)
 {
 	const int wh2 = destData.xdim;
@@ -68,7 +66,7 @@ void ForwardProjection::forwardProject(
 						   proj[f](0,1), proj[f](1,1), proj[f](2,1), 
 						   proj[f](0,2), proj[f](1,2), proj[f](2,2) );
 				
-		projTransp[f] = (1.0 / paddingFactor) * A;
+		projTransp[f] = A;
 	}
 	
 	#pragma omp parallel for num_threads(num_threads)	
@@ -78,7 +76,7 @@ void ForwardProjection::forwardProject(
 		for (long int xi = 0; xi < wh2; xi++)
 		{
 			const double xd = xi;
-			const double yd = yi > h2/2? yi - h2 : yi;
+			const double yd = yi >= h2/2? yi - h2 : yi;
 					
 			const gravis::d3Vector pi(xd, yd, 0.0);
 			gravis::d3Vector pw = projTransp[f] * pi;

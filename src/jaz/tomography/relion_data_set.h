@@ -35,8 +35,9 @@ class RelionDataSet : public DataSet
 		
 		void getParticleCoord(long int particle_id, double& x, double& y, double& z) const;
 		void setParticleCoord(long int particle_id, double x, double y, double z);
-		
+
 		int getOpticsGroup(long int particle_id) const;
+		int numberOfOpticsGroups() const;
 		
 		double getBinnedPixelSize(int opticsGroup) const;
 		double getOriginalPixelSize(int opticsGroup) const;

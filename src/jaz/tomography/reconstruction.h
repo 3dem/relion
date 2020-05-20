@@ -27,6 +27,7 @@
 
 #include <src/jaz/image/raw_image.h>
 #include <src/jaz/image/interpolation.h>
+#include <src/jaz/image/radial_avg.h>
 #include "extraction.h"
 #include "tomo_stack.h"
 
@@ -42,14 +43,22 @@ class Reconstruction
 				BufferedImage<T>& out,
 				bool center, 
 				int num_threads);
-		
+
 		template <typename T>
-		static void ctfCorrect3D(
+		static void ctfCorrect3D_Wiener(
 				BufferedImage<T>& img,
 				BufferedImage<T>& ctfImgFS,
 				BufferedImage<T>& out,
 				double WienerOffset,
-				int num_threads);
+				int num_threads = 1);
+
+		template <typename T>
+		static void ctfCorrect3D_heuristic(
+				BufferedImage<T>& img,
+				BufferedImage<T>& ctfImgFS,
+				BufferedImage<T>& out,
+				double weightFraction = 0.001,
+				int num_threads = 1);
 		
 		template <typename T>
 		static void taper(
@@ -164,9 +173,9 @@ void Reconstruction :: griddingCorrect3D(
 		}
 	}
 }
-	
+
 template <typename T>
-void Reconstruction :: ctfCorrect3D(
+void Reconstruction :: ctfCorrect3D_Wiener(
 		BufferedImage<T>& img,
 		BufferedImage<T>& ctfImgFS,
 		BufferedImage<T>& out,
@@ -177,12 +186,10 @@ void Reconstruction :: ctfCorrect3D(
 	const long int wh = w/2 + 1;
 	const long int h = img.ydim;
 	const long int d = img.zdim;
-	
-	// CTF correction	
 
-	BufferedImage<tComplex<T>> dataImgCorrFS(wh,h,d);	
+	BufferedImage<tComplex<T>> dataImgCorrFS(wh,h,d);
 	FFT::FourierTransform(img, dataImgCorrFS, FFT::Both);
-	
+
 	#pragma omp parallel for num_threads(num_threads)
 	for (long int z = 0; z < d;  z++)
 	for (long int y = 0; y < h;  y++)
@@ -190,7 +197,78 @@ void Reconstruction :: ctfCorrect3D(
 	{
 		dataImgCorrFS(x,y,z) /= ctfImgFS(x,y,z) + WienerOffset;
 	}
-	
+
+	FFT::inverseFourierTransform(dataImgCorrFS, out, FFT::Both);
+}
+
+template <typename T>
+void Reconstruction :: ctfCorrect3D_heuristic(
+		BufferedImage<T>& img,
+		BufferedImage<T>& ctfImgFS,
+		BufferedImage<T>& out,
+		double weightFraction,
+		int num_threads)
+{
+	const long int w = img.xdim;
+	const long int wh = w/2 + 1;
+	const long int h = img.ydim;
+	const long int d = img.zdim;
+
+	BufferedImage<tComplex<T>> dataImgCorrFS(wh,h,d);
+	FFT::FourierTransform(img, dataImgCorrFS, FFT::Both);
+
+	std::vector<T> rad_avg = RadialAvg::fftwHalf_3D_lin(ctfImgFS);
+
+	#pragma omp parallel for num_threads(num_threads)
+	for (long int z = 0; z < d;  z++)
+	for (long int y = 0; y < h;  y++)
+	for (long int x = 0; x < wh; x++)
+	{
+		/*const T avgWeight = RadialAvg::interpolate_FftwHalf_3D_lin(
+					x, y, z, w, h, d, rad_avg);*/
+
+		const int s = rad_avg.size();
+
+		const double xx = x;
+		const double yy = (y >= h/2)? y - h: y;
+		const double zz = (z >= d/2)? z - d: z;
+
+		const double r = sqrt(xx * xx + yy * yy + zz * zz);
+
+		const int r0 = (int) r;
+		const int r1 = r0 + 1;
+
+		if (r1 >= s)
+		{
+			dataImgCorrFS(x,y,z) = T(0);
+		}
+		else
+		{
+			const T v1 = rad_avg[r1];
+			const T v0 = rad_avg[r0];
+
+			const double f = r - r0;
+
+			const T avgWeight = f * v1 + (1.0 - f) * v0;
+
+			const T threshold = avgWeight * weightFraction;
+
+			T wg = ctfImgFS(x,y,z);
+
+			if (wg < threshold)
+			{
+				wg = threshold;
+			}
+
+			if (wg > 0.0)
+			{
+				dataImgCorrFS(x,y,z) /= wg;
+			}
+		}
+
+
+	}
+
 	FFT::inverseFourierTransform(dataImgCorrFS, out, FFT::Both);
 }
 

@@ -15,7 +15,7 @@
 #include <src/jaz/single_particle/noise_helper.h>
 #include <src/jaz/single_particle/fftw_helper.h>
 #include <src/jaz/single_particle/ctf/delocalisation_helper.h>
-#include <src/jaz/single_particle/img_proc/color_helper.h>
+#include <src/jaz/image/color_helper.h>
 
 #ifdef HAVE_PNG
 #include <src/jaz/single_particle/gravis/tImage.h>

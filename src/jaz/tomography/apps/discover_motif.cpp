@@ -1,5 +1,5 @@
 #include <src/args.h>
-#include <src/jaz/tomo_programs/discover_motif.h>
+#include <src/jaz/tomography/programs/discover_motif.h>
 
 
 int main(int argc, char *argv[])

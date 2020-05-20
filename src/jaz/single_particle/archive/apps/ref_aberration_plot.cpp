@@ -22,7 +22,7 @@
 #include <src/jaz/single_particle/img_proc/image_op.h>
 #include <src/jaz/single_particle/refinement_program.h>
 #include <src/jaz/single_particle/parallel_ft.h>
-#include <src/jaz/single_particle/aberration_fit.h>
+#include <src/jaz/optics/aberration_fit.h>
 
 #include <omp.h>
 

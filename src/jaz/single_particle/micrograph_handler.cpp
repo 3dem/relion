@@ -20,13 +20,14 @@
 
 #include "micrograph_handler.h"
 #include <src/jaz/single_particle/stack_helper.h>
-#include <src/renderEER.h>
+#include <src/jaz/single_particle/movie_loader.h>
+#include <src/jaz/single_particle/spa_extraction.h>
+
 
 using namespace gravis;
 
 MicrographHandler::MicrographHandler()
-	: hasCorrMic(false),
-	  nr_omp_threads(1),
+	: nr_omp_threads(1),
 	  firstFrame(0),
 	  lastFrame(-1),
 	  hotCutoff(-1),
@@ -34,6 +35,7 @@ MicrographHandler::MicrographHandler()
 	  saveMem(false),
 	  ready(false),
 	  last_gainFn(""),
+	  last_movieFn(""),
 	  corrMicFn(""),
 	  eer_upsampling(-1),
 	  eer_grouping(-1)
@@ -53,42 +55,35 @@ void MicrographHandler::init(
 	this->firstFrame = firstFrame;
 	this->lastFrame = lastFrame;
 
-	if (corrMicFn != "")
+	
+	MetaDataTable corrMic;		
+	ObservationModel obsModel;
+	
+	// Don't die even if conversion failed. Polishing does not use obsModel from a motion correction STAR file
+	ObservationModel::loadSafely(corrMicFn, obsModel, corrMic, "micrographs", verb, false);
+	mic2meta.clear();
+
+	std::string micName, metaName;
+
+	if (!corrMic.containsLabel(EMDL_MICROGRAPH_NAME))
 	{
-		MetaDataTable corrMic;
-		ObservationModel obsModel;
-		// Don't die even if conversion failed. Polishing does not use obsModel from a motion correction STAR file
-		ObservationModel::loadSafely(corrMicFn, obsModel, corrMic, "micrographs", verb, false);
-		mic2meta.clear();
-
-		std::string micName, metaName;
-
-		if (!corrMic.containsLabel(EMDL_MICROGRAPH_NAME))
-		{
-			REPORT_ERROR(" The corrected_micrographs STAR file does not contain rlnMicrographName label.");
-		}
-		if (!corrMic.containsLabel(EMDL_MICROGRAPH_METADATA_NAME))
-		{
-			REPORT_ERROR(" The corrected_micrographs STAR file does not contain rlnMicrographMetadata label. Did you not run motion correction from the RELION-3.0 GUI?");
-		}
-
-		for (int i = 0; i < corrMic.numberOfObjects(); i++)
-		{
-			corrMic.getValueToString(EMDL_MICROGRAPH_NAME, micName, i);
-			corrMic.getValueToString(EMDL_MICROGRAPH_METADATA_NAME, metaName, i);
-			// remove the pipeline job prefix
-			FileName fn_pre, fn_jobnr, fn_post;
-			decomposePipelineFileName(micName, fn_pre, fn_jobnr, fn_post);
-
-//			std::cout << fn_post << " => " << metaName << std::endl;
-			mic2meta[fn_post] = metaName;
-		}
-
-		hasCorrMic = true;
+		REPORT_ERROR(" The corrected_micrographs STAR file does not contain rlnMicrographName label.");
 	}
-	else
+	if (!corrMic.containsLabel(EMDL_MICROGRAPH_METADATA_NAME))
 	{
-		hasCorrMic = false;
+		REPORT_ERROR(" The corrected_micrographs STAR file does not contain rlnMicrographMetadata label. Did you not run motion correction from the RELION-3.0 GUI?");
+	}
+
+	for (int i = 0; i < corrMic.numberOfObjects(); i++)
+	{
+		corrMic.getValueToString(EMDL_MICROGRAPH_NAME, micName, i);
+		corrMic.getValueToString(EMDL_MICROGRAPH_METADATA_NAME, metaName, i);
+		
+		// remove the pipeline job prefix
+		FileName fn_pre, fn_jobnr, fn_post;
+		decomposePipelineFileName(micName, fn_pre, fn_jobnr, fn_post);
+
+		mic2meta[fn_post] = metaName;
 	}
 
 	loadInitial(mdts, verb, fc, dosePerFrame, metaFn);
@@ -101,7 +96,7 @@ std::vector<MetaDataTable> MicrographHandler::cullMissingMovies(
 {
 	if (!ready)
 	{
-//		REPORT_ERROR("ERROR: MicrographHandler::cullMissingMovies - MicrographHandler not initialized.");
+		REPORT_ERROR("ERROR: MicrographHandler::cullMissingMovies - MicrographHandler not initialized.");
 	}
 
 	std::vector<MetaDataTable> good(0);
@@ -244,131 +239,98 @@ void MicrographHandler::loadInitial(
 		const std::vector<MetaDataTable>& mdts, bool verb,
 		int& fc, double& dosePerFrame, std::string& metaFn)
 {
-	if (hasCorrMic)
+	std::string mgFn;
+	FileName fn_pre, fn_jobnr, fn_post;
+	
+	const int mc = mdts.size();
+
+	for (int m = 0; m < mc; m++)
 	{
-		std::string mgFn;
-		FileName fn_pre, fn_jobnr, fn_post;
+		mdts[m].getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
 
-		for (int i = 0, ilim = mdts.size(); i < ilim; i++)
+		// remove the pipeline job prefix
+		decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);
+
+		metaFn = getMetaName(fn_post, false);
+		if (metaFn != "") break;
+	}
+
+	if (metaFn == "")
+	{
+		REPORT_ERROR("There is no movie metadata STAR file for any micrographs!");
+	}
+
+	if (debug)
+	{
+		std::cout << "first movie: " << fn_post << "\n";
+		std::cout << "maps to: " << metaFn << "\n";
+	}
+
+	Micrograph micrograph = Micrograph(metaFn);
+
+	if (movie_angpix <= 0)
+	{
+		movie_angpix = micrograph.angpix;
+
+		if (verb > 0)
 		{
-			mdts[i].getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
-
-			// remove the pipeline job prefix
-			decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);
-
-			metaFn = getMetaName(fn_post, false);
-			if (metaFn != "") break;
-		}
-
-		if (metaFn == "")
-			REPORT_ERROR("There is no movie metadata STAR file for any micrographs!");
-
-		if (debug)
-		{
-			std::cout << "first movie: " << fn_post << "\n";
-			std::cout << "maps to: " << metaFn << "\n";
-		}
-
-		micrograph = Micrograph(metaFn);
-
-		if (movie_angpix <= 0)
-		{
-			movie_angpix = micrograph.angpix;
-
-			if (verb > 0)
-			{
-				std::cout << " + Using movie pixel size from " << metaFn << ": "
-						  << movie_angpix << " A\n";
-			}
-		}
-		else
-		{
-			if (verb > 0)
-			{
-				std::cout << " + Using movie pixel size from command line: "
-						  << movie_angpix << " A\n";
-			}
-		}
-
-		if (coords_angpix <= 0)
-		{
-			coords_angpix = micrograph.angpix * micrograph.getBinningFactor();
-
-			if (verb > 0)
-			{
-				std::cout << " + Using coord. pixel size from " << metaFn << ": "
-						  << coords_angpix << " A\n";
-			}
-		}
-		else
-		{
-			if (verb > 0)
-			{
-				std::cout << " + Using coord. pixel size from command line: "
-						  << coords_angpix << " A\n";
-			}
-		}
-
-		dosePerFrame = micrograph.dose_per_frame;
-
-		micrograph_size.x = micrograph.getWidth();
-		micrograph_size.y = micrograph.getHeight();
-
-		if (lastFrame >= micrograph.getNframes())
-		{
-			REPORT_ERROR_STR("ERROR: There are only " << micrograph.getNframes()
-							 << " frames in " << metaFn << " - " << lastFrame
-							 << " have been requested using the --lastFrame option.");
-		}
-
-		if (lastFrame < 0)
-		{
-			fc = micrograph.getNframes() - firstFrame;
-		}
-		else
-		{
-			fc = lastFrame - firstFrame + 1;
+			std::cout << " + Using movie pixel size from " << metaFn << ": "
+					  << movie_angpix << " A\n";
 		}
 	}
 	else
 	{
-		std::string mgFn0;
-		mdts[0].getValueToString(EMDL_MICROGRAPH_NAME, mgFn0, 0);
-		FileName fn_pre, fn_jobnr, fn_post;
-		decomposePipelineFileName(mgFn0, fn_pre, fn_jobnr, fn_post);
-
-		Image<RFLOAT> dum;
-		dum.read(fn_post, false);
-		micrograph_size.x = XSIZE(dum());
-		micrograph_size.y = YSIZE(dum());
-
-		const int fc0 = dum().zdim > 1? dum().zdim : dum().ndim;
-
-		if (lastFrame < 0)
+		if (verb > 0)
 		{
-			fc = fc0 - firstFrame;
+			std::cout << " + Using movie pixel size from command line: "
+					  << movie_angpix << " A\n";
 		}
-		else
+	}
+
+	if (coords_angpix <= 0)
+	{
+		coords_angpix = micrograph.angpix * micrograph.getBinningFactor();
+
+		if (verb > 0)
 		{
-			if (lastFrame >= fc0)
-			{
-				REPORT_ERROR_STR("ERROR: There are only " << micrograph.getNframes()
-								 << " frames in " << metaFn << " - " << (lastFrame+1)
-								 << " have been requested using the --lastFrame option.");
-			}
-			else
-			{
-				fc = lastFrame - firstFrame + 1;
-			}
+			std::cout << " + Using coord. pixel size from " << metaFn << ": "
+					  << coords_angpix << " A\n";
 		}
+	}
+	else
+	{
+		if (verb > 0)
+		{
+			std::cout << " + Using coord. pixel size from command line: "
+					  << coords_angpix << " A\n";
+		}
+	}
+
+	dosePerFrame = micrograph.dose_per_frame;
+
+	micrograph_size.x = micrograph.getWidth();
+	micrograph_size.y = micrograph.getHeight();
+
+	if (lastFrame >= micrograph.getNframes())
+	{
+		REPORT_ERROR_STR("ERROR: There are only " << micrograph.getNframes()
+						 << " frames in " << metaFn << " - " << lastFrame
+						 << " have been requested using the --lastFrame option.");
+	}
+
+	if (lastFrame < 0)
+	{
+		fc = micrograph.getNframes() - firstFrame;
+	}
+	else
+	{
+		fc = lastFrame - firstFrame + 1;
 	}
 }
 
 void MicrographHandler::validatePixelSize(RFLOAT angpix) const
 {
-//	std::cout << "angpix = " << angpix << " coords_angpix = " << coords_angpix << " movie_angpix = " << movie_angpix << std::endl;
-
-	if (angpix < coords_angpix - 1e-9)
+  	if (angpix < coords_angpix - 1e-9)
 	{
 		std::cerr << "WARNING: pixel size (--angpix) is smaller than the AutoPick pixel size (--coords_angpix)\n";
 
@@ -397,335 +359,227 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 		double angpix, std::vector<ParFourierTransformer>& fts,
 		const std::vector<std::vector<gravis::d2Vector>>* offsets_in,
 		std::vector<std::vector<gravis::d2Vector>>* offsets_out,
-		double data_angpix)
+		double data_angpix,
+		int single_frame_relative_index)
 {
 	if (!ready)
 	{
 		REPORT_ERROR("ERROR: MicrographHandler::loadMovie - MicrographHandler not initialized.");
 	}
-	std::vector<std::vector<Image<Complex>>> movie;
+	
 
 	const int nr_omp_threads = fts.size();
 
-	std::string mgFn0;
-	mdt.getValueToString(EMDL_MICROGRAPH_NAME, mgFn0, 0);
-	FileName fn_pre, fn_jobnr, fn_post;
-	decomposePipelineFileName(mgFn0, fn_pre, fn_jobnr, fn_post);
+	std::string metaFn = getMicrographMetadataFilename(mdt, true);
+	Micrograph micrograph = Micrograph(metaFn);
 
-	if (hasCorrMic)
+	FileName movieFn = micrograph.getMovieFilename();
+	std::string gainFn = micrograph.getGainFilename();
+	MultidimArray<bool> defectMask;
+	last_movieFn = movieFn;
+
+	bool hasDefect = (micrograph.fnDefect != "" || micrograph.hotpixelX.size() != 0);
+	
+	if (hasDefect)
 	{
-		std::string metaFn = getMetaName(fn_post);
-		micrograph = Micrograph(metaFn);
-
-		FileName mgFn = micrograph.getMovieFilename();
-		std::string gainFn = micrograph.getGainFilename();
-		MultidimArray<bool> defectMask;
-
-		bool hasDefect = (micrograph.fnDefect != "" || micrograph.hotpixelX.size() != 0);
-		if (hasDefect)
-			micrograph.fillDefectAndHotpixels(defectMask);
-
-		if (debug)
+		if (movieFn == last_movieFn)
 		{
-			std::cout << "loading: " << fn_post << "\n";
-			std::cout << "-> meta: " << metaFn << "\n";
-			std::cout << "-> data: " << mgFn << "\n";
-			std::cout << "-> gain: " << gainFn << "\n";
-			std::cout << "-> mask: " << micrograph.fnDefect << "\n";
-			std::cout << "-> nhot: " << micrograph.hotpixelX.size() << "\n";
-			std::cout << "-> hasdefect: " << (hasDefect ? 1 : 0) << std::endl;
-		}
-
-		const bool isEER = EERRenderer::isEER(mgFn);
-
-		bool mgHasGain = false;
-
-		if (gainFn != "")
-		{
-			if (gainFn != last_gainFn)
-			{
-				lastGainRef.read(gainFn);
-				if (isEER) // TODO: Takanori: Remove this once we updated RelionCor
-				{
-					if (eer_upsampling < 0)
-						eer_upsampling = micrograph.getEERUpsampling();
-					EERRenderer::upsampleEERGain(lastGainRef(), eer_upsampling);
-				}
-
-				last_gainFn = gainFn;
-			}
-
-			mgHasGain = true;
-		}
-
-		if (!isEER)
-		{
-#define OLD_CODE
-#ifdef OLD_CODE
-			movie = StackHelper::extractMovieStackFS(&mdt, mgHasGain? &lastGainRef : 0, hasDefect ? &defectMask : 0,
-			                                         mgFn, angpix, coords_angpix, movie_angpix, data_angpix, s,
-			                                         nr_omp_threads, true, firstFrame, lastFrame,
-			                                         hotCutoff, debug, saveMem, offsets_in, offsets_out);
-#else
-			// TODO: Implement gain and defect correction, and remove the old code path
-			std::cout << "New code path" << std::endl;
-
-			Image<float> mgStack;
-			mgStack.read(mgFn, false);
-
-			// lastFrame and firstFrame is 0 indexed
-			const int my_lastFrame = ((mgStack.data.zdim > 1)? mgStack.data.zdim : mgStack.data.ndim) - 1;
-			const int n_frames = my_lastFrame - firstFrame + 1;
-
-			std::cout << "first = " << firstFrame << " last = " << my_lastFrame << " n_frames = " << n_frames << std::endl;
-
-			std::vector<MultidimArray<float> > Iframes(n_frames);
-
-			#pragma omp parallel for num_threads(nr_omp_threads)
-			for (int iframe = 0; iframe < n_frames; iframe++)
-			{
-				Image<float> img;
-				img.read(mgFn, true, iframe, false, true); 
-				Iframes[iframe] = img();
-			}
-
-			movie = StackHelper::extractMovieStackFS(&mdt, Iframes, angpix, coords_angpix, movie_angpix, data_angpix, s,
-			                                         nr_omp_threads, true,
-			                                         debug, offsets_in, offsets_out);
-#endif
+			defectMask = lastDefectMask;
 		}
 		else
 		{
-			if (eer_upsampling < 0)
-				eer_upsampling = micrograph.getEERUpsampling();
-			if (eer_grouping < 0)
-				eer_grouping = micrograph.getEERGrouping();
-
-			EERRenderer renderer;
-			renderer.read(mgFn, eer_upsampling);
-
-			// lastFrame and firstFrame is 0 indexed
-			int my_lastFrame = (lastFrame < 0) ? (renderer.getNFrames() / eer_grouping - 1) : lastFrame;
-			int n_frames = my_lastFrame - firstFrame + 1;
-
-			std::vector<MultidimArray<float> > Iframes(n_frames);
-
-			#pragma omp parallel for num_threads(nr_omp_threads)
-			for (int iframe = 0; iframe < n_frames; iframe++)
-			{
-				// this takes 1-indexed frame numbers
-//				std::cout << "EER: iframe = " << iframe << " start = " << ((firstFrame + iframe) * eer_grouping + 1) << " end = " << ((firstFrame + iframe + 1) * eer_grouping) << std::endl;
-				renderer.renderFrames((firstFrame + iframe) * eer_grouping + 1, (firstFrame + iframe + 1) * eer_grouping, Iframes[iframe]);
-
-				if (mgHasGain)
-				{
-					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(lastGainRef())
-					{
-						DIRECT_MULTIDIM_ELEM(Iframes[iframe], n) *= DIRECT_MULTIDIM_ELEM(lastGainRef(), n);
-					}
-				}
-			}
-
-			if (hasDefect) // TODO: TAKANORI: Refactor!! Code duplication from RelionCor
-			{
-				if (XSIZE(defectMask) != XSIZE(Iframes[0]) || YSIZE(defectMask) != YSIZE(Iframes[0]))
-				{
-					std::cerr << "X/YSIZE of defectMask = " << XSIZE(defectMask) << " x " << YSIZE(defectMask) << std::endl;
-					std::cerr << "X/YSIZE of Iframe[0] = " << XSIZE(Iframes[0]) << " x " << YSIZE(Iframes[0]) << std::endl;
-					REPORT_ERROR("Invalid dfefect mask size for " + mgFn0);
-				}
-
-				MultidimArray<float> Isum;
-				Isum.initZeros(Iframes[0]);
-				for (int iframe = 0; iframe < n_frames; iframe++)
-				{
-					#pragma omp parallel for num_threads(nr_omp_threads)
-					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum)
-					{
-						DIRECT_MULTIDIM_ELEM(Isum, n) += DIRECT_MULTIDIM_ELEM(Iframes[iframe], n);
-					}
-				}
-#ifdef DEBUG
-				Image<float> tmp;
-				tmp() = Isum;
-				tmp.write("Isum.mrc");
-#endif
-
-				RFLOAT mean = 0, std = 0;
-				#pragma omp parallel for reduction(+:mean) num_threads(nr_omp_threads)
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum) {
-					mean += DIRECT_MULTIDIM_ELEM(Isum, n);
-				}
-				mean /= YXSIZE(Isum);
-				#pragma omp parallel for reduction(+:std) num_threads(nr_omp_threads)
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum) {
-					RFLOAT d = (DIRECT_MULTIDIM_ELEM(Isum, n) - mean);
-					std += d * d;
-				}
-				std = std::sqrt(std / YXSIZE(Isum));
-
-				mean /= n_frames;
-				std /= n_frames;
-				Isum.clear();
-
-//				std::cout << "DEBUG: defect correction: mean = " << mean << " std = " << std << std::endl;
-
-				// 25 neighbours; should be enough even for super-resolution images.
-		                const int NUM_MIN_OK = 6;
-		                const int D_MAX = 2;
-		                FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(defectMask)
-        		        {
-		                        if (!DIRECT_A2D_ELEM(defectMask, i, j)) continue;
-
-		                        #pragma omp parallel for num_threads(nr_omp_threads)
-					for (int iframe = 0; iframe < n_frames; iframe++)
-					{
-		 				int n_ok = 0;
-						RFLOAT val = 0;
-						for (int dy= -D_MAX; dy <= D_MAX; dy++)
-						{
-							int y = i + dy;
-							if (y < 0 || y >= YSIZE(defectMask)) continue;
-							for (int dx = -D_MAX; dx <= D_MAX; dx++)
-							{
-								int x = j + dx;
-								if (x < 0 || x >= XSIZE(defectMask)) continue;
-								if (DIRECT_A2D_ELEM(defectMask, y, x)) continue;
-
-								n_ok++;
-								val += DIRECT_A2D_ELEM(Iframes[iframe], y, x);
-							}
-						}
-//						std::cout << "n_ok = " << n_ok << " val = " << val << std::endl;
-						if (n_ok > NUM_MIN_OK) DIRECT_A2D_ELEM(Iframes[iframe], i, j) = val / n_ok;
-						else DIRECT_A2D_ELEM(Iframes[iframe], i, j) = rnd_gaus(mean, std);
-					}
-				}
-
-#ifdef DEBUG
-				Isum.initZeros(Iframes[0]);
-				for (int iframe = 0; iframe < n_frames; iframe++)
-				{
-					#pragma omp parallel for num_threads(nr_omp_threads)
-					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum)
-					{
-						DIRECT_MULTIDIM_ELEM(Isum, n) += DIRECT_MULTIDIM_ELEM(Iframes[iframe], n);
-					}
-				}
-
-				tmp() = Isum;
-				tmp.write("Isum-fix-defect.mrc");
-				exit(0);
-#endif
-			}
-
-			movie = StackHelper::extractMovieStackFS(&mdt, Iframes, angpix, coords_angpix, movie_angpix, data_angpix, s,
-			                                         nr_omp_threads, true,
-			                                         debug, offsets_in, offsets_out);
+			micrograph.fillDefectAndHotpixels(defectMask);
+			lastDefectMask = defectMask;
 		}
+	}
+
+	if (debug)
+	{
+		std::cout << "loading: " << "\n";
+		std::cout << "-> meta: " << metaFn << "\n";
+		std::cout << "-> data: " << movieFn << "\n";
+		std::cout << "-> gain: " << gainFn << "\n";
+		std::cout << "-> mask: " << micrograph.fnDefect << "\n";
+		std::cout << "-> nhot: " << micrograph.hotpixelX.size() << "\n";
+		std::cout << "-> hasdefect: " << (hasDefect ? 1 : 0) << std::endl;
+	}
+
+	const bool isEER = EERRenderer::isEER(movieFn);
+
+	bool mgHasGain = false;
+
+	if (gainFn != "")
+	{
+		if (gainFn != last_gainFn)
+		{
+			lastGainRef.read(gainFn);
+			
+			if (isEER) // TODO: Takanori: Remove this once we updated RelionCor
+			{
+				if (eer_upsampling < 0)
+				{
+					eer_upsampling = micrograph.getEERUpsampling();
+				}
+				
+				EERRenderer::upsampleEERGain(lastGainRef(), eer_upsampling);
+			}
+
+			last_gainFn = gainFn;
+		}
+
+		mgHasGain = true;
+	}
+	
+	BufferedImage<float> muGraph;
+	
+	RawImage<RFLOAT> gainRef_new(lastGainRef);
+	RawImage<bool> defectMask_new(defectMask);
+	
+	RawImage<RFLOAT>* gainRefToUse = mgHasGain? &gainRef_new : 0;
+	RawImage<bool>* defectMaskToUse = hasDefect? &defectMask_new : 0;
+	
+	const bool returnSingleFrame = single_frame_relative_index >= 0;
+	
+	if (returnSingleFrame && offsets_in != 0 && (*offsets_in)[0].size() != 1)
+	{
+		REPORT_ERROR_STR("MicrographHandler::loadMovie: attempting to read one single frame "
+						 << "while the initial trajectories contain more than one position");
+	}
+
+	const int frame0 = returnSingleFrame? single_frame_relative_index : firstFrame;
+	const int fc = returnSingleFrame? 1 : lastFrame - firstFrame + 1;
+				
+	if (isEER)			
+	{
+		if (eer_upsampling < 0)
+		{
+			eer_upsampling = micrograph.getEERUpsampling();
+		}
+		
+		if (eer_grouping < 0)
+		{
+			eer_grouping = micrograph.getEERGrouping();
+		}
+		
+		muGraph = MovieLoader::readEER<float>(
+			movieFn, gainRefToUse, defectMaskToUse,
+			frame0, fc,
+			eer_upsampling, eer_grouping,
+			nr_omp_threads);
+
 	}
 	else
 	{
-		REPORT_ERROR("You can no longer use this program without micrograph metadata STAR files.");
+		muGraph = MovieLoader::readDense<float>(
+			movieFn, gainRefToUse, defectMaskToUse,
+			frame0, fc,
+			hotCutoff,
+			nr_omp_threads);
 	}
-
+	
+	std::vector<std::vector<Image<Complex>>> movie = SpaExtraction::extractMovieStackFS(
+			mdt, muGraph, s,
+			angpix, coords_angpix, movie_angpix, data_angpix,
+			offsets_in, offsets_out, 
+			nr_omp_threads);
+	
 	const int pc = movie.size();
 
-	#pragma omp parallel for num_threads(nr_omp_threads)
-	for (int p = 0; p < pc; p++)
+	if (!returnSingleFrame)
 	{
-		StackHelper::varianceNormalize(movie[p], false);
+		#pragma omp parallel for num_threads(nr_omp_threads)
+		for (int p = 0; p < pc; p++)
+		{
+			RFLOAT scale2 = StackHelper::computePower(movie[p], false);
+			
+			for (int f = 0; f < fc; f++)
+			{
+				// NOTE: sqrt(fc) is a legacy scaling factor.
+				// It probably shouldn't be there.
+				RawImage<Complex>(movie[p][f]) /= s * sqrt(scale2 / fc); 
+			}
+		}
 	}
 
 	return movie;
 }
 
-std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
-		const MetaDataTable &mdt, int s, double angpix,
-		std::vector<ParFourierTransformer>& fts,
+void MicrographHandler::loadInitialTracks(
+		const MetaDataTable &mdt, double angpix,
 		const std::vector<d2Vector>& pos,
-		std::vector<std::vector<d2Vector>>& tracks,
-		bool unregGlob, std::vector<d2Vector>& globComp,
-		const std::vector<std::vector<gravis::d2Vector>>* offsets_in,
-		std::vector<std::vector<gravis::d2Vector>>* offsets_out,
-		double data_angpix)
-{
-	std::vector<std::vector<Image<Complex>>> out = loadMovie(
-				mdt, s, angpix, fts, offsets_in, offsets_out, data_angpix);
+		std::vector<std::vector<d2Vector>>& tracks_out,
+		bool unregGlob, 
+		std::vector<d2Vector>& globalComponent_out)
+{	
+	Micrograph micrograph = loadMicrographMetadata(mdt, true);
+	
+	const int fc0 = micrograph.getNframes();
+	int fc;
 
-	if (!hasCorrMic)
+	if (lastFrame >= 0)
 	{
-		tracks.resize(0);
+		fc = lastFrame - firstFrame + 1;
 	}
 	else
 	{
-		const int fc0 = micrograph.getNframes();
-		int fc;
+		fc = fc0 - firstFrame;
+	}
 
-		if (lastFrame >= 0)
+	const int pc = pos.size();
+
+	const d2Vector inputScale(
+				coords_angpix / (movie_angpix * micrograph.getWidth()),
+				coords_angpix / (movie_angpix * micrograph.getHeight()));
+
+	const double outputScale = movie_angpix / angpix;
+
+	globalComponent_out = std::vector<d2Vector>(fc, d2Vector(0,0));
+
+	if (unregGlob)
+	{
+		for (int f = 0; f < fc; f++)
 		{
-			fc = lastFrame - firstFrame + 1;
-		}
-		else
-		{
-			fc = fc0 - firstFrame;
-		}
+			RFLOAT sx, sy;
+			micrograph.getShiftAt(firstFrame + f + 1, 0, 0, sx, sy, false);
 
-		const int pc = pos.size();
-
-		const d2Vector inputScale(
-					coords_angpix / (movie_angpix * micrograph.getWidth()),
-					coords_angpix / (movie_angpix * micrograph.getHeight()));
-
-		const double outputScale = movie_angpix / angpix;
-
-		globComp = std::vector<d2Vector>(fc, d2Vector(0,0));
-
-		if (unregGlob)
-		{
-			for (int f = 0; f < fc; f++)
-			{
-				RFLOAT sx, sy;
-				micrograph.getShiftAt(firstFrame + f + 1, 0, 0, sx, sy, false);
-
-				globComp[f] = -outputScale * d2Vector(sx, sy);
-			}
-		}
-
-		tracks.resize(pc);
-
-		for (int p = 0; p < pc; p++)
-		{
-			tracks[p] = std::vector<d2Vector>(fc);
-
-			for (int f = 0; f < fc; f++)
-			{
-				d2Vector in(inputScale.x * pos[p].x - 0.5,
-				            inputScale.y * pos[p].y - 0.5);
-
-				RFLOAT sx, sy;
-				micrograph.getShiftAt(firstFrame + f + 1, in.x, in.y, sx, sy, true);
-
-				tracks[p][f] = -outputScale * d2Vector(sx,sy) - globComp[f];
-			}
+			globalComponent_out[f] = -outputScale * d2Vector(sx, sy);
 		}
 	}
 
-	return out;
+	tracks_out.resize(pc);
+
+	for (int p = 0; p < pc; p++)
+	{
+		tracks_out[p] = std::vector<d2Vector>(fc);
+
+		for (int f = 0; f < fc; f++)
+		{
+			d2Vector in(inputScale.x * pos[p].x - 0.5,
+						inputScale.y * pos[p].y - 0.5);
+
+			RFLOAT sx, sy;
+			micrograph.getShiftAt(firstFrame + f + 1, in.x, in.y, sx, sy, true);
+
+			tracks_out[p][f] = -outputScale * d2Vector(sx,sy) - globalComponent_out[f];
+		}
+	}
 }
 
 std::string MicrographHandler::getMetaName(std::string micName, bool die_on_error)
 {
-//	std::cout << "MicrographHandler::getMetaName " << micName << std::endl;
 	std::map<std::string, std::string>::iterator it = mic2meta.find(micName);
 
 	if (it == mic2meta.end())
 	{
 		if (die_on_error)
+		{
 			REPORT_ERROR("ERROR: MicrographHandler::getMetaName: no metadata star-file for "
 			              +micName+" found in "+corrMicFn+".");
+		}
 		else
+		{
 			return "";
+		}
 	}
 	else
 	{
@@ -733,97 +587,70 @@ std::string MicrographHandler::getMetaName(std::string micName, bool die_on_erro
 	}
 }
 
+std::string MicrographHandler::getMicrographMetadataFilename(
+		const MetaDataTable &mdt, 
+		bool die_on_error)
+{
+	std::string mgFn;
+	// all entries in the MetaDataTable mdt (particles) have the same micrograph name
+	mdt.getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
+	
+	FileName fn_pre, fn_jobnr, fn_post;
+	decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);	
+	
+	return getMetaName(fn_post, die_on_error);
+}
+
+Micrograph MicrographHandler::loadMicrographMetadata(
+		const MetaDataTable &mdt,
+		bool die_on_error)
+{
+	return Micrograph(getMicrographMetadataFilename(mdt, die_on_error));
+}
+
 // TODO: TAKANORI: This needs to handle changes in EER grouping
 int MicrographHandler::determineFrameCount(const MetaDataTable &mdt)
 {
-	int fc = 0;
+	Micrograph micrograph = loadMicrographMetadata(mdt, true); // TODO: TAKANORI: shouldn't read hot pixels
 
-	std::string mgFn;
-	mdt.getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
-
-	FileName fn_pre, fn_jobnr, fn_post;
-	decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);
-
-	if (hasCorrMic)
+	if (!exists(micrograph.getMovieFilename()))
 	{
-		std::string metaFn = getMetaName(fn_post);
-		micrograph = Micrograph(metaFn); // TODO: TAKANORI: shouldn't read hot pixels
-
-		if (!exists(micrograph.getMovieFilename()))
-		{
-			return -1;
-		}
-
-		fc = micrograph.getNframes();
+		return -1;
 	}
 	else
 	{
-		if (!exists(fn_post))
-		{
-			return -1;
-		}
-
-		Image<RFLOAT> dum;
-		dum.read(fn_post, false);
-
-		fc = dum().zdim > 1? dum().zdim : dum().ndim;
+		return micrograph.getNframes();
 	}
-
-	return fc;
 }
 
 bool MicrographHandler::isMoviePresent(const MetaDataTable &mdt, bool die_on_error)
-{
-	std::string mgFn;
-	FileName fn_pre, fn_jobnr, fn_post;
-	mdt.getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
-	decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);
-
-	if (hasCorrMic)
+{	
+	std::string metaFn = getMicrographMetadataFilename(mdt, die_on_error);
+	
+	if (exists(metaFn))
 	{
-		std::string metaFn = getMetaName(fn_post, die_on_error);
-		if (exists(metaFn))
-		{
-			micrograph = Micrograph(metaFn);
-
-			return exists(micrograph.getMovieFilename());
-		}
-		else
-		{
-			return false;
-		}
+		Micrograph micrograph = Micrograph(metaFn);
+		
+		return exists(micrograph.getMovieFilename());
 	}
 	else
 	{
-		return exists(fn_post);
+		return false;
 	}
 }
 
 std::string MicrographHandler::getMovieFilename(const MetaDataTable& mdt, bool die_on_error)
 {
-	std::string mgFn;
-	mdt.getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
+	std::string metaFn = getMicrographMetadataFilename(mdt, die_on_error);
 
-	FileName fn_pre, fn_jobnr, fn_post;
-	decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);
-
-	if (hasCorrMic)
+	if (exists(metaFn))
 	{
-		std::string metaFn = getMetaName(fn_post, die_on_error);
+		Micrograph micrograph = Micrograph(metaFn);
 
-		if (exists(metaFn))
-		{
-			micrograph = Micrograph(metaFn);
-
-			return micrograph.getMovieFilename();
-		}
-		else
-		{
-			return metaFn;
-		}
+		return micrograph.getMovieFilename();
 	}
 	else
 	{
-		return fn_post;
+		return metaFn;
 	}
 }

@@ -1,5 +1,5 @@
-#ifndef EXTRACTION_HELPER_H
-#define EXTRACTION_HELPER_H
+#ifndef TOMO_EXTRACTION_HELPER_H
+#define TOMO_EXTRACTION_HELPER_H
 
 #include <src/jaz/gravis/t3Vector.h>
 #include <src/jaz/gravis/t4Matrix.h>
@@ -14,7 +14,7 @@
 
 #define EDGE_FALLOFF 5
 
-class Extraction
+class TomoExtraction
 {
 	public:
 		
@@ -103,7 +103,7 @@ class Extraction
 };
 
 template <typename T>
-void Extraction::extractFrameAt3D_Fourier(
+void TomoExtraction::extractFrameAt3D_Fourier(
 		const RawImage<T>& stack, int f, int s, double bin,
 		const gravis::d4Matrix& projIn,
 		gravis::d3Vector center,
@@ -123,7 +123,7 @@ void Extraction::extractFrameAt3D_Fourier(
 }
 
 template <typename T>
-void Extraction::extractAt3D_Fourier(
+void TomoExtraction::extractAt3D_Fourier(
         const RawImage<T>& stack, int s, double bin,
 		const std::vector<gravis::d4Matrix>& projIn,
 		const std::vector<gravis::d3Vector>& trajectory,
@@ -147,7 +147,7 @@ void Extraction::extractAt3D_Fourier(
 }
 
 template <typename T>
-void Extraction::extractAt2D_Fourier(
+void TomoExtraction::extractAt2D_Fourier(
         const RawImage<T>& stack, int s, double bin,
 		const std::vector<gravis::d4Matrix>& projIn,
 		const std::vector<gravis::d2Vector>& centers,
@@ -232,7 +232,7 @@ void Extraction::extractAt2D_Fourier(
 }
 
 template <typename T>
-void Extraction::extractAt3D_real(
+void TomoExtraction::extractAt3D_real(
         const RawImage<T>& stack, int s, double bin,
 		const std::vector<gravis::d4Matrix>& projIn,
 		gravis::d3Vector center,
@@ -258,7 +258,7 @@ void Extraction::extractAt3D_real(
 }
 
 template <typename T>
-void Extraction::extractAt2D_real(
+void TomoExtraction::extractAt2D_real(
         const RawImage<T>& stack, int s, double bin,
 		const std::vector<gravis::d4Matrix>& projIn,
 		const std::vector<gravis::d2Vector>& centers,
@@ -345,7 +345,7 @@ void Extraction::extractAt2D_real(
 }
 
 template <typename T>
-void Extraction::extractSquares(
+void TomoExtraction::extractSquares(
 		const RawImage<T>& stack, 
 		int w, int h, 
 		const std::vector<gravis::d2Vector>& origins,
@@ -378,7 +378,7 @@ void Extraction::extractSquares(
 }
 
 template <typename T>
-void Extraction::cropCircle(
+void TomoExtraction::cropCircle(
 		RawImage<T>& stack, 
 		float falloff,
 		int num_threads)

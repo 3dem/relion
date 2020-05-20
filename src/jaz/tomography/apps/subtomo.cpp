@@ -1,5 +1,5 @@
 #include <src/args.h>
-#include <src/jaz/tomo_programs/subtomo.h>
+#include <src/jaz/tomography/programs/subtomo.h>
 #include <src/jaz/util/log.h>
 
 
@@ -20,8 +20,8 @@ int main(int argc, char *argv[])
 		sp.cropSize = textToInteger(parser.getOption("--crop", "Output box size", "-1"));
         sp.binning = textToDouble(parser.getOption("--bin", "Binning factor", "1"));
 		sp.write_multiplicity = parser.checkOption("--multi", "Write out multiplicity volumes");		
-        sp.do_rotate = parser.checkOption("--rot", "Rotate the particles according to current angles");
-        sp.WienerFract = textToDouble(parser.getOption("--SNR", "SNR assumed by the Wiener filter (exaggerated for subtomograms!)", "1.0"));
+		sp.do_rotate = parser.checkOption("--rot", "Rotate the particles according to current angles");
+		sp.SNR = textToDouble(parser.getOption("--SNR", "Assumed signal-to-noise ratio (negative means use a heuristic)", "-1"));
 		
 		sp.do_cone_weight = parser.checkOption("--cone_weight", "Weight down a double cone along Z");		
 		const double alpha = 0.5 * textToDouble(parser.getOption("--cone_angle", "Opening angle of the cone in degrees", "10"));

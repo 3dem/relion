@@ -63,8 +63,8 @@ file(GLOB REL_JAZ_OPTICS_SRC "${CMAKE_SOURCE_DIR}/src/jaz/optics/*.cpp")
 file(GLOB REL_JAZ_OPTICS_H "${CMAKE_SOURCE_DIR}/src/jaz/optics/*.h")
 file(GLOB REL_JAZ_SEGMENTATION_SRC "${CMAKE_SOURCE_DIR}/src/jaz/segmentation/*.cpp")
 file(GLOB REL_JAZ_SEGMENTATION_H "${CMAKE_SOURCE_DIR}/src/jaz/segmentation/*.h")
-file(GLOB REL_JAZ_PROGRAMS_SRC "${CMAKE_SOURCE_DIR}/src/jaz/tomo_programs/*.cpp")
-file(GLOB REL_JAZ_PROGRAMS_H "${CMAKE_SOURCE_DIR}/src/jaz/tomo_programs/*.h")
+file(GLOB REL_JAZ_PROGRAMS_SRC "${CMAKE_SOURCE_DIR}/src/jaz/tomography/programs/*.cpp")
+file(GLOB REL_JAZ_PROGRAMS_H "${CMAKE_SOURCE_DIR}/src/jaz/tomography/programs/*.h")
 file(GLOB REL_JAZ_DYNAMO_SRC "${CMAKE_SOURCE_DIR}/src/jaz/tomography/dynamo/*.cpp")
 file(GLOB REL_JAZ_DYNAMO_H "${CMAKE_SOURCE_DIR}/src/jaz/tomography/dynamo/*.h")
 
@@ -84,6 +84,8 @@ file(GLOB REL_JAZ_SPA_TOMO_SRC "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/tomo
 file(GLOB REL_JAZ_SPA_TOMO_H "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/tomo/*.h")
 file(GLOB REL_JAZ_SPA_IO_SRC "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/io/*.cpp")
 file(GLOB REL_JAZ_SPA_IO_H "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/io/*.h")
+file(GLOB REL_JAZ_SPA_PROGRAMS_SRC "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/programs/*.cpp")
+file(GLOB REL_JAZ_SPA_PROGRAMS_H "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/programs/*.h")
 
 file(GLOB REL_SPHERICAL_HARMONICS_SRC "${CMAKE_SOURCE_DIR}/src/spherical-harmonics/*.cc")
 file(GLOB REL_SPHERICAL_HARMONICS_H "${CMAKE_SOURCE_DIR}/src/spherical-harmonics/*.h")
@@ -94,8 +96,9 @@ file(GLOB REL_LBFGS_H "${CMAKE_SOURCE_DIR}/src/lbfgs/*.h")
 
 file(GLOB REL_HP "${CMAKE_SOURCE_DIR}/src/Healpix_2.15a/*.cc")
 file(GLOB RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/*.cpp")
-file(GLOB RELION_TOMO_TARGETS "${CMAKE_SOURCE_DIR}/src/jaz/tomo_apps/*.cpp")
-file(GLOB RELION_TOMO_SCRIPT_TARGETS "${CMAKE_SOURCE_DIR}/src/jaz/scripts/*.cpp")
+file(GLOB RELION_JAZ_SPA_TARGETS "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/apps/*.cpp")
+file(GLOB RELION_JAZ_TOMO_TARGETS "${CMAKE_SOURCE_DIR}/src/jaz/tomography/apps/*.cpp")
+file(GLOB RELION_JAZ_EXPERIMENTAL_TARGETS "${CMAKE_SOURCE_DIR}/src/jaz/scripts/*.cpp")
 
 set(GUI_TARGETS display maingui manualpick pipeliner)
 
@@ -107,7 +110,7 @@ if(NOT GUI)
 endif(NOT GUI)
 
 #--Remove apps for testing--
-#SET(RELION_TEST TRUE)
+SET(RELION_TEST TRUE)
 set(TEST_TARGETS movie_reconstruct double_reconstruct_openmp cs_fit ctf_nyquist_test free_aberration_plot split_stack defocus_stats double_bfac_fit interpolation_test motion_diff paper_data_synth Zernike_test vis_delocalisation vis_Ewald_weight)
 if(NOT RELION_TEST)
 	foreach(TARGET ${TEST_TARGETS})
@@ -143,7 +146,8 @@ if(BUILD_SHARED_LIBS)
 	            ${REL_JAZ_SPA_MATH_SRC} ${REL_JAZ_SPA_MATH_H}
 	            ${REL_JAZ_SPA_IMG_PROC_SRC} ${REL_JAZ_SPA_IMG_PROC_H}
 	            ${REL_JAZ_SPA_TOMO_SRC} ${REL_JAZ_SPA_TOMO_H}
-	            ${REL_JAZ_SPA_IO_SRC} ${REL_JAZ_SPA_IO_H}
+				${REL_JAZ_SPA_IO_SRC} ${REL_JAZ_SPA_IO_H}
+				${REL_JAZ_SPA_PROGRAMS_SRC} ${REL_JAZ_SPA_PROGRAMS_H}				
 	            ${REL_D3x3_SRC} ${REL_D3x3_H}
 	            ${REL_LBFGS_SRC} ${REL_LBFGS_H} 
 				${REL_SPHERICAL_HARMONICS_SRC} ${REL_SPHERICAL_HARMONICS_H})
@@ -179,6 +183,7 @@ else()
 		${REL_JAZ_SPA_IMG_PROC_SRC} ${REL_JAZ_SPA_IMG_PROC_H}
 		${REL_JAZ_SPA_TOMO_SRC} ${REL_JAZ_SPA_TOMO_H}
 		${REL_JAZ_SPA_IO_SRC} ${REL_JAZ_SPA_IO_H}
+		${REL_JAZ_SPA_PROGRAMS_SRC} ${REL_JAZ_SPA_PROGRAMS_H}
 		${REL_D3x3_SRC} ${REL_D3x3_H}
 		${REL_LBFGS_SRC} ${REL_LBFGS_H} 
 		${REL_SPHERICAL_HARMONICS_SRC} ${REL_SPHERICAL_HARMONICS_H})
@@ -322,12 +327,30 @@ endforeach()
 
 
 
+foreach (_target ${RELION_JAZ_SPA_TARGETS})
+
+	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)	
+	add_executable(${_target} ${CMAKE_SOURCE_DIR}/src/jaz/single_particle/apps/${_target}.cpp)
+	set(LIB relion_lib)	
+ 	add_dependencies(${_target} relion_lib)	
+	set_target_properties(${_target} PROPERTIES PREFIX "relion_")
+	target_link_libraries(${_target} ${LIB} ${FFTW_LIBRARIES} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
+	set_target_properties(${_target} PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF	)
+	
+	if(TIFF_FOUND)
+		target_link_libraries(${_target} ${TIFF_LIBRARIES})
+	endif()
+	
+	install (TARGETS ${_target} RUNTIME DESTINATION bin/spa)
+	
+endforeach()
+
 # former Dynamite programs:
 
-foreach (_target ${RELION_TOMO_TARGETS})
+foreach (_target ${RELION_JAZ_TOMO_TARGETS})
 
 	GET_FILENAME_COMPONENT(_target "relion_tomo_${_target}" NAME_WE)	
-	add_executable(${_target} ${CMAKE_SOURCE_DIR}/src/jaz/tomo_apps/${_target}.cpp)
+	add_executable(${_target} ${CMAKE_SOURCE_DIR}/src/jaz/tomography/apps/${_target}.cpp)
 	set(LIB relion_lib)	
  	add_dependencies(${_target} relion_lib)	
 	set_target_properties(${_target} PROPERTIES PREFIX "relion_tomo_")
@@ -342,13 +365,13 @@ foreach (_target ${RELION_TOMO_TARGETS})
 	
 endforeach()
 
-foreach (_target ${RELION_TOMO_SCRIPT_TARGETS})
+foreach (_target ${RELION_JAZ_EXPERIMENTAL_TARGETS})
 
-	GET_FILENAME_COMPONENT(_target "relion_tomo_${_target}" NAME_WE)	
+	GET_FILENAME_COMPONENT(_target "relion_exp_${_target}" NAME_WE)	
 	add_executable(${_target} ${CMAKE_SOURCE_DIR}/src/jaz/scripts/${_target}.cpp)		
 	set(LIB relion_lib)	
  	add_dependencies(${_target} relion_lib)	
-	set_target_properties(${_target} PROPERTIES PREFIX "relion_tomo_")
+	set_target_properties(${_target} PROPERTIES PREFIX "relion_exp_")
 	target_link_libraries(${_target} ${LIB} ${FFTW_LIBRARIES} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
 	set_target_properties(${_target} PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF	)
 	

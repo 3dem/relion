@@ -184,24 +184,24 @@ void DefocusRefinementProgram::run()
 				const int sh = s/2 + 1;
 				const int pc = particles[t].size();
 				
-				std::vector<BufferedImage<AberrationFit::EvenData>> evenData_thread(num_threads);
-				std::vector<BufferedImage<AberrationFit::OddData>> oddData_thread(num_threads);
+				std::vector<BufferedImage<AberrationFitProgram::EvenData>> evenData_thread(num_threads);
+				std::vector<BufferedImage<AberrationFitProgram::OddData>> oddData_thread(num_threads);
 				
-				const AberrationFit::EvenData evenZero({0.0, 0.0, 0.0, 0.0, 0.0});
-				const AberrationFit::OddData oddZero({0.0, dComplex(0.0, 0.0)});
+				const AberrationFitProgram::EvenData evenZero({0.0, 0.0, 0.0, 0.0, 0.0});
+				const AberrationFitProgram::OddData oddZero({0.0, dComplex(0.0, 0.0)});
 				
-				BufferedImage<AberrationFit::EvenData> evenData(sh,s);
+				BufferedImage<AberrationFitProgram::EvenData> evenData(sh,s);
 				evenData.fill(evenZero);
 				
-				BufferedImage<AberrationFit::OddData> oddData(sh,s);
+				BufferedImage<AberrationFitProgram::OddData> oddData(sh,s);
 				oddData.fill(oddZero);
 				
 				for (int th = 0; th < num_threads; th++)
 				{
-					evenData_thread[th] = BufferedImage<AberrationFit::EvenData>(sh,s);
+					evenData_thread[th] = BufferedImage<AberrationFitProgram::EvenData>(sh,s);
 					evenData_thread[th].fill(evenZero);
 					
-					oddData_thread[th] = BufferedImage<AberrationFit::OddData>(sh,s);
+					oddData_thread[th] = BufferedImage<AberrationFitProgram::OddData>(sh,s);
 					oddData_thread[th].fill(oddZero);
 				}
 				
@@ -217,7 +217,7 @@ void DefocusRefinementProgram::run()
 						Log::updateProgress(p);
 					}
 					
-					AberrationFit::considerParticle(
+					AberrationFitProgram::considerParticle(
 						particles[t][p], tomogram, referenceMap, dataSet, flip_value, freqWeights,
 						f, f, 
 						evenData_thread[th], oddData_thread[th]);
@@ -232,7 +232,7 @@ void DefocusRefinementProgram::run()
 				}
 						
 				{
-					std::vector<double> coeffs = AberrationFit::solveEven(
+					std::vector<double> coeffs = AberrationFitProgram::solveEven(
 							evenData, 2, tomogram.optics.pixelSize, 
 							outDir+"diag_"+ZIO::itoa(t)+","+ZIO::itoa(f)+"_", diag);
 					
@@ -337,7 +337,7 @@ BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(
 		
 		BufferedImage<fComplex> observation(sh,s);
 		
-		Extraction::extractFrameAt3D_Fourier(
+		TomoExtraction::extractFrameAt3D_Fourier(
 				tomogram.stack, f, s, 1.0, tomogram.proj[f], traj[f],
 				observation, projCut, 1, false, true);
 		

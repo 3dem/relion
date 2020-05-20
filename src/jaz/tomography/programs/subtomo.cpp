@@ -42,12 +42,11 @@ void SubtomoProgram::run()
 	const long int s02D = (int)(binning * s2D + 0.5);
 	
 	TomogramSet tomogramSet(tomoSetFn);
-	
-	// @TODO: write binning level
-	
+
 	if (dataSet->type == DataSet::Relion)
 	{
-		RelionDataSet* rds = (RelionDataSet*) dataSet;	
+		RelionDataSet* rds0 = (RelionDataSet*) dataSet;
+		RelionDataSet rds = *rds0;
 		
 		for (int t = 0; t < tc; t++)
 		{
@@ -59,28 +58,38 @@ void SubtomoProgram::run()
 			{
 				const int part_id = particles[t][p];
 				
-				const int opticsGroup = rds->getOpticsGroup(part_id);
-				const double pixelSize = rds->getBinnedPixelSize(opticsGroup);
-				
+				const int opticsGroup = rds.getOpticsGroup(part_id);
+				const double pixelSize = rds.getBinnedPixelSize(opticsGroup);
 				
 				std::string outData = outTag + "/" + dataSet->getName(part_id) + "_data.mrc";
 				std::string outWeight = outTag + "/" + dataSet->getName(part_id) + "_weights.mrc";
 				
-				rds->setImageFileNames(outData, outWeight, part_id);
+				rds.setImageFileNames(outData, outWeight, part_id);
 				
 				d3Vector off, coord;
 				
-				rds->getParticleOffset(part_id, off.x, off.y, off.z);
-				rds->getParticleCoord(part_id, coord.x, coord.y, coord.z);
+				rds.getParticleOffset(part_id, off.x, off.y, off.z);
+				rds.getParticleCoord(part_id, coord.x, coord.y, coord.z);
 				
 				coord -= off / pixelSize;
 				
-				rds->setParticleOffset(part_id, 0,0,0);
-				rds->setParticleCoord(part_id, coord.x, coord.y, coord.z);
+				rds.setParticleOffset(part_id, 0,0,0);
+				rds.setParticleCoord(part_id, coord.x, coord.y, coord.z);
 			}
 		}
-		
-		rds->write(outTag + "_particles.star");
+
+		for (int og = 0; og < rds.numberOfOpticsGroups(); og++)
+		{
+			const double ps_img = rds.optTable.getDouble(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, og);
+			const double ps_out = binning * ps_img;
+
+			rds.optTable.setValue(EMDL_MICROGRAPH_BINNING, binning, og);
+			rds.optTable.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, ps_out, og);
+			rds.optTable.setValue(EMDL_IMAGE_PIXEL_SIZE, ps_out, og);
+			rds.optTable.setValue(EMDL_IMAGE_SIZE, cropSize, og);
+		}
+
+		rds.write(outTag + "_particles.star");
 	}
 		
 	
@@ -132,7 +141,7 @@ void SubtomoProgram::run()
 			BufferedImage<fComplex> particleStack = BufferedImage<fComplex>(sh2D,s2D,fc);			
 			BufferedImage<float> weightStack(sh2D,s2D,fc);
 			
-			Extraction::extractAt3D_Fourier(
+			TomoExtraction::extractAt3D_Fourier(
 					tomogram.stack, s02D, binning, tomogram.proj, traj,
 					particleStack, projCut, inner_thread_num, false, true);
 			
@@ -183,8 +192,8 @@ void SubtomoProgram::run()
 				particlesRS = Padding::unpadCenter2D_full(particlesRS, boundary);
 				weightsRS = Padding::unpadCenter2D_full(weightsRS, boundary);
 				
-				Extraction::cropCircle(particlesRS, 5, num_threads);
-				Extraction::cropCircle(weightsRS, 5, num_threads);
+				TomoExtraction::cropCircle(particlesRS, 5, num_threads);
+				TomoExtraction::cropCircle(weightsRS, 5, num_threads);
 				
 				particleStack = StackHelper::FourierTransformStack(particlesRS);
 				weightStack = FFT::toReal(StackHelper::FourierTransformStack(weightsRS));
@@ -210,13 +219,13 @@ void SubtomoProgram::run()
 				
 				FourierBackprojection::backproject_bwd(
 						particleStack, weightStack, projPart, dataImgFS,
-						psfImgFS, ctfImgFS, multiImageFS, 1.0, inner_thread_num);
+						psfImgFS, ctfImgFS, multiImageFS, inner_thread_num);
 			}
 			else
 			{
 				FourierBackprojection::backproject_bwd(
 						particleStack, weightStack, projPart, dataImgFS,
-						psfImgFS, ctfImgFS, 1.0, inner_thread_num);
+						psfImgFS, ctfImgFS, inner_thread_num);
 			}
 			
 			Reconstruction::griddingCorrect3D(
@@ -313,9 +322,18 @@ void SubtomoProgram::run()
 			
 			if (write_divided)
 			{
-				Reconstruction::ctfCorrect3D(
+				if (SNR > 0.0)
+				{
+					Reconstruction::ctfCorrect3D_Wiener(
 						dataImgRS, ctfImgFS, dataImgDivRS,
-						1.0 / WienerFract, inner_thread_num);				
+						1.0 / SNR, inner_thread_num);
+				}
+				else
+				{
+					Reconstruction::ctfCorrect3D_heuristic(
+						dataImgRS, ctfImgFS, dataImgDivRS,
+						0.001, inner_thread_num);
+				}
 				
 				Reconstruction::taper(dataImgDivRS, taper, do_center, inner_thread_num);				
 				dataImgDivRS.write(outDiv);

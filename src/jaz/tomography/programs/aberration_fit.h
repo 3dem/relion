@@ -1,11 +1,11 @@
-#ifndef ABERRATION_FIT_H
-#define ABERRATION_FIT_H
+#ifndef ABERRATION_FIT_PROGRAM_H
+#define ABERRATION_FIT_PROGRAM_H
 
 #include "refinement.h"
 #include <src/jaz/math/tensor2x2.h>
 
 
-class AberrationFit : public RefinementProgram
+class AberrationFitProgram : public RefinementProgram
 {
 	public:
 		
@@ -34,7 +34,7 @@ class AberrationFit : public RefinementProgram
 		};
 			 
 		
-		AberrationFit(int argc, char *argv[]);
+		AberrationFitProgram(int argc, char *argv[]);
 		
 		
 			Granularity granularity;

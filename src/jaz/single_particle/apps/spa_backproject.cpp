@@ -1,6 +1,6 @@
 /***************************************************************************
  *
- * Authors: "Jasenko Zivanov & Sjors H.W. Scheres"
+ * Author: "Jasenko Zivanov"
  * MRC Laboratory of Molecular Biology
  *
  * This program is free software; you can redistribute it and/or modify
@@ -18,39 +18,23 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#include <src/jaz/single_particle/motion/motion_refiner_mpi.h>
-
+#include <src/jaz/single_particle/programs/spa_backproject.h>
 
 int main(int argc, char *argv[])
 {
-	MotionRefinerMpi prm;
+	SpaBackproject sb;
 
 	try
 	{
-		prm.read(argc, argv);
-		prm.init();
-		
-		MPI_Barrier(MPI_COMM_WORLD);
-		
-		prm.runWithFccUpdate();
-		
-		MPI_Barrier(MPI_COMM_WORLD);
-		
-		prm.runWithRecombination();
-	}
+		sb.read(argc, argv);
+		sb.run();
 
+	}
 	catch (RelionError XE)
 	{
 		std::cerr << XE;
-
-		MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_FAILURE);
+		return RELION_EXIT_FAILURE;
 	}
-
-        MPI_Barrier(MPI_COMM_WORLD);
+	
 	return RELION_EXIT_SUCCESS;
 }
-
-
-
-
-

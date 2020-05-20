@@ -29,6 +29,9 @@
 #include <src/jaz/single_particle/damage_helper.h>
 #include <src/jaz/single_particle/image_log.h>
 #include <src/jaz/single_particle/img_proc/filter_helper.h>
+#include <src/jaz/image/translation.h>
+#include <src/jaz/math/fft.h>
+#include <src/jaz/util/zio.h>
 #include <src/filename.h>
 
 using namespace gravis;
@@ -227,7 +230,8 @@ void FrameRecombiner::init(
 	}
 }
 
-void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_start, long g_end)
+/*
+void FrameRecombiner::process_old(const std::vector<MetaDataTable>& mdts, long g_start, long g_end)
 {
 	int barstep;
 	int my_nr_micrographs = g_end - g_start + 1;
@@ -237,7 +241,7 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 //	std::cout << "ref_angpix = " << ref_angpix << " coords_angpix = " << coords_angpix << std::endl;
 	if (verb > 0)
 	{
-		std::cout << " + Combining frames for all micrographs ... " << std::endl;
+		std::cout << " + Combining frames for micrographs ... " << std::endl;
 		init_progress_bar(my_nr_micrographs);
 		barstep = XMIPP_MAX(1, my_nr_micrographs/ 60);
 	}
@@ -333,7 +337,9 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 
 		// loadMovie() will extract squares around the value of shift0 rounded in movie coords,
 		// and return the remainder in shift (in output coordinates)
-		movie = micrographHandler->loadMovie(mdtOut, s_out[ogmg], angpix_out[ogmg], fts, &shift0, &shift, data_angpix[ogmg]);
+		movie = micrographHandler->loadMovie(
+					mdtOut, s_out[ogmg], angpix_out[ogmg], fts, 
+					&shift0, &shift, data_angpix[ogmg]);
 
 		const int out_size = crop_arg > 0 ? crop_arg : s_out[ogmg];
 		Image<RFLOAT> stack(out_size, out_size, 1, pc);
@@ -352,7 +358,7 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 			{
 				shiftImageInFourierTransform(movie[p][f](), obs(), s_out[ogmg],
 				                             -shift[p][f].x, -shift[p][f].y);
-
+				
 				for (int y = 0; y < s_out[ogmg]; y++)
 				for (int x = 0; x < sh_out[ogmg]; x++)
 				{
@@ -368,6 +374,7 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 				CTF ctf;
 				ctf.readByGroup(mdtOut, obsModel, p);
 				int og = obsModel->getOpticsGroup(mdtOut, p);
+				
 				#pragma omp critical(FrameRecombiner_process)
 				{
 	 				if (obsModel->getBoxSize(og) != s_out[og])
@@ -379,6 +386,7 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 				MultidimArray<RFLOAT> Fctf;
 				Fctf.resize(YSIZE(sum()), XSIZE(sum()));
 				ctf.getFftwImage(Fctf, s_out[og], s_out[og], angpix_out[og], false, false, false, true, false);
+				
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sum())
 				{
 					 DIRECT_MULTIDIM_ELEM(sum(), n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
@@ -386,7 +394,7 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 			}
 
 			fts[threadnum].inverseFourierTransform(sum(), real());
-			real().setXmippOrigin();
+			real.data.setXmippOrigin();
 
 			const int half_out = out_size / 2;
 			for (int y = 0; y < out_size; y++)
@@ -427,6 +435,243 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 	if (verb > 0)
 	{
 		progress_bar(my_nr_micrographs);
+	}
+}
+
+void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_start, long g_end)
+{
+	process_old(mdts, g_start, g_end);
+}*/
+
+void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_start, long g_end)
+{
+	int barstep;
+	int my_nr_micrographs = g_end - g_start + 1;
+	const RFLOAT ref_angpix = reference->angpix;
+	const RFLOAT coords_angpix = micrographHandler->coords_angpix;
+
+	if (verb > 0)
+	{
+		std::cout << " + Combining frames for micrographs ... " << std::endl;
+		init_progress_bar(my_nr_micrographs);
+		barstep = XMIPP_MAX(1, my_nr_micrographs/ 60);
+	}
+
+	std::vector<ParFourierTransformer> fts(nr_omp_threads);
+
+	int pctot = 0;
+	long nr_done = 0;
+
+	for (long g = g_start; g <= g_end; g++)
+	{
+		// Abort through the pipeline_control system, TODO: check how this goes with MPI....
+		if (pipeline_control_check_abort_job())
+		{
+			exit(RELION_EXIT_ABORTED);
+		}
+
+		const int pc = mdts[g].numberOfObjects();
+		if (pc == 0) continue;
+
+		pctot += pc;
+
+		MetaDataTable mdtOut = mdts[g];
+
+		// optics group representative of this micrograph
+		// (only the pixel and box sizes have to be identical)
+		int ogmg = obsModel->getOpticsGroup(mdtOut, 0);
+
+		if (!obsModel->allPixelAndBoxSizesIdentical(mdtOut))
+		{
+			std::cerr << "WARNING: varying pixel or box sizes detected in "
+			          << MotionRefiner::getOutputFileNameRoot(outPath, mdtOut)
+			          << " - skipping micrograph." << std::endl;
+
+			continue;
+		}
+
+
+		FileName fn_root = MotionRefiner::getOutputFileNameRoot(outPath, mdtOut);
+		std::vector<std::vector<d2Vector>> priorShift;
+		priorShift = MotionHelper::readTracksInPix(fn_root + "_tracks.star", angpix_out[ogmg]);
+
+		std::vector<std::vector<d2Vector>> shift(pc);
+			
+		for (int p = 0; p < pc; p++)
+		{
+			int og = obsModel->getOpticsGroup(mdtOut, p);
+			
+			if (obsModel->getBoxSize(og) != s_out[og])
+			{
+				obsModel->setBoxSize(og, s_out[og]);
+			}
+			
+			if (obsModel->getPixelSize(og) != angpix_out[og])
+			{
+				obsModel->setPixelSize(og, angpix_out[og]);
+			}
+			
+			shift[p] = {d2Vector(0)};
+		}
+		
+		if (do_recenter)
+		{
+			recenterParticles(mdtOut, ref_angpix, coords_angpix);
+		}
+		
+		const int out_size = crop_arg > 0 ? crop_arg : s_out[ogmg];
+		
+		
+		BufferedImage<Complex> sumStack(sh_out[ogmg], s_out[ogmg], pc);
+		sumStack.fill(Complex(0,0));
+		
+		
+		for (int f = 0; f < fc; f++)
+		{
+			std::vector<std::vector<gravis::d2Vector>> priorShift_f(pc);
+			
+			for (int p = 0; p < pc; p++)
+			{
+				priorShift_f[p] = {priorShift[p][f]};
+			}
+			
+			std::vector<std::vector<Image<Complex>>> fullFrame = micrographHandler->loadMovie(
+						mdtOut, s_out[ogmg], angpix_out[ogmg], fts, 
+						&priorShift_f, &shift, data_angpix[ogmg], f);
+			
+			#pragma omp parallel for num_threads(nr_omp_threads)
+			for (int p = 0; p < pc; p++)
+			{
+				RawImage<Complex> obs(fullFrame[p][0]);
+				
+				Translation::shiftInFourierSpace2D(obs, -shift[p][0].x, -shift[p][0].y);
+				
+				for (int y = 0; y < s_out[ogmg]; y++)
+				for (int x = 0; x < sh_out[ogmg]; x++)
+				{
+					sumStack(x,y,p) += freqWeights[ogmg][f](y,x) * obs(x,y);
+				}
+			}
+		}
+		
+		Image<RFLOAT> outStack_xmipp(out_size, out_size, 1, pc);	
+		RawImage<RFLOAT> outStack(outStack_xmipp);
+
+		#pragma omp parallel for num_threads(nr_omp_threads)
+		for (int p = 0; p < pc; p++)
+		{
+			BufferedImage<Complex> sumCopy = sumStack.getSliceRef(p);
+			
+			if (do_ctf_multiply)
+			{
+				CTF ctf;
+				ctf.readByGroup(mdtOut, obsModel, p);
+				int og = obsModel->getOpticsGroup(mdtOut, p);
+				
+				MultidimArray<RFLOAT> ctfImg_xmipp;
+				ctfImg_xmipp.resize(s_out[og], sh_out[og]);
+				ctf.getFftwImage(ctfImg_xmipp, s_out[og], s_out[og], angpix_out[og], 
+								 false,  // do_abs
+								 false,  // do_only_flip_phases
+								 false,  // do_intact_until_first_peak
+								 true,   // do_damping
+								 false );// do_ctf_padding								
+				
+				RawImage<RFLOAT> ctfImg(ctfImg_xmipp);
+				
+				sumCopy *= ctfImg;
+			}
+			
+			RFLOAT scale2 = StackHelper::computePower(sumCopy, false);			
+			sumCopy /= out_size * sqrt(scale2);
+			
+			BufferedImage<RFLOAT> real(s_out[ogmg], s_out[ogmg]);			
+			FFT::inverseFourierTransform(sumCopy, real);
+			
+			outStack.getSliceRef(p).copyFrom(real);
+		}
+		
+		std::string stackFn = fn_root + "_shiny" + suffix + ".mrcs";
+		
+		outStack_xmipp.setSamplingRateInHeader(angpix_out[ogmg]);
+		outStack_xmipp.write(stackFn);
+
+		for (int p = 0; p < pc; p++)
+		{
+			mdtOut.setValue(EMDL_IMAGE_NAME, ZIO::itoa(p+1) + "@" + stackFn, p);
+		}
+
+		mdtOut.write(fn_root + "_shiny" + suffix + ".star");
+
+		nr_done++;
+
+		if (verb > 0 && nr_done % barstep == 0)
+		{
+			progress_bar(nr_done);
+		}
+	}
+
+	if (verb > 0)
+	{
+		progress_bar(my_nr_micrographs);
+	}
+}
+
+void FrameRecombiner::recenterParticles(
+		MetaDataTable& mdtOut,
+		RFLOAT ref_angpix,
+		RFLOAT coords_angpix)
+{
+	const int pc = mdtOut.numberOfObjects();
+	
+	for (int p = 0; p < pc; p++)
+	{
+		// FIXME: code duplication from preprocess.cpp
+		RFLOAT xoff, yoff, xcoord, ycoord;
+		Matrix1D<RFLOAT> my_projected_center(3);
+		my_projected_center.initZeros();
+
+		mdtOut.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, p); // in A
+		mdtOut.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, p);
+
+		xoff /= ref_angpix; // Now in reference pixels
+		yoff /= ref_angpix;
+
+		if (fabs(recenter_x) > 0. || fabs(recenter_y) > 0. || fabs(recenter_z) > 0.)
+		{
+			RFLOAT rot, tilt, psi;
+			mdtOut.getValue(EMDL_ORIENT_ROT, rot, p);
+			mdtOut.getValue(EMDL_ORIENT_TILT, tilt, p);
+			mdtOut.getValue(EMDL_ORIENT_PSI, psi, p);
+
+			// Project the center-coordinates
+			Matrix1D<RFLOAT> my_center(3);
+			Matrix2D<RFLOAT> A3D;
+			XX(my_center) = recenter_x; // in reference pixels
+			YY(my_center) = recenter_y;
+			ZZ(my_center) = recenter_z;
+			Euler_angles2matrix(rot, tilt, psi, A3D, false);
+			my_projected_center = A3D * my_center;
+		}
+
+		xoff -= XX(my_projected_center);
+		yoff -= YY(my_projected_center);
+		xoff = xoff * ref_angpix / coords_angpix; // Now in (possibly binned) micrograph's pixel
+		yoff = yoff * ref_angpix / coords_angpix;
+
+		mdtOut.getValue(EMDL_IMAGE_COORD_X, xcoord, p);
+		mdtOut.getValue(EMDL_IMAGE_COORD_Y, ycoord, p);
+
+		xcoord -= ROUND(xoff);
+		ycoord -= ROUND(yoff);
+		xoff -= ROUND(xoff);
+		yoff -= ROUND(yoff);
+		
+		mdtOut.setValue(EMDL_IMAGE_COORD_X, xcoord, p);
+		mdtOut.setValue(EMDL_IMAGE_COORD_Y, ycoord, p);
+
+		mdtOut.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, coords_angpix * xoff, p);
+		mdtOut.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, coords_angpix * yoff, p);
 	}
 }
 
@@ -733,6 +978,16 @@ int FrameRecombiner::getOutputBoxSize(int opticsGroup)
 bool FrameRecombiner::isCtfMultiplied(int opticsGroup)
 {
 	return do_ctf_multiply;
+}
+
+int FrameRecombiner::getVerbosity()
+{
+	return verb;
+}
+
+void FrameRecombiner::setVerbosity(int v)
+{
+	verb = v;
 }
 
 std::string FrameRecombiner::getOutputSuffix()

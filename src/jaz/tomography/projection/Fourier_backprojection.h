@@ -44,7 +44,6 @@ class FourierBackprojection
 			RawImage<tComplex<DestType>>& destFS,
 			RawImage<DestType>& destPSF,
 			RawImage<DestType>& destCTF,
-			double paddingFactor,
 			int num_threads = 1);
 		
 		template <typename SrcType, typename DestType>
@@ -56,7 +55,6 @@ class FourierBackprojection
 			RawImage<DestType>& destPSF,
 			RawImage<DestType>& destCTF,
 			RawImage<DestType>& destMP,
-			double paddingFactor,
 			int num_threads = 1);
 		
 		
@@ -67,7 +65,6 @@ class FourierBackprojection
 			const gravis::d4Matrix& proj,
 			RawImage<tComplex<DestType>>& destFS,
 			RawImage<DestType>& destCTF,
-			double paddingFactor,
 			int num_threads);	
 		
 		template <typename SrcType, typename DestType>
@@ -78,17 +75,13 @@ class FourierBackprojection
 			RawImage<tComplex<DestType>>& destFS,
 			RawImage<DestType>& destCTF,
 			RawImage<DestType>& destMP,
-			double paddingFactor,
 			int num_threads);		
 		
 		
 		template <typename DestType>
 		static void backprojectSpreadingFunction(
 			const gravis::d4Matrix& proj,
-			RawImage<DestType>& destPSF,
-			double paddingFactor, 
-			int w0_half, 
-			int h0);
+			RawImage<DestType>& destPSF);
 };
 
 
@@ -100,7 +93,6 @@ void FourierBackprojection::backproject_bwd(
 		RawImage<tComplex<DestType>>& destFS,
 		RawImage<DestType>& destPSF,
 		RawImage<DestType>& destCTF,
-		double paddingFactor,
 		int num_threads)
 {
 	const int fc = stackFS.zdim;
@@ -113,15 +105,11 @@ void FourierBackprojection::backproject_bwd(
 			proj[f],
 			destFS,
 			destCTF,
-			paddingFactor,
 			num_threads);
 				
 		backprojectSpreadingFunction(
 			proj[f],
-			destPSF,
-			paddingFactor,
-			stackFS.xdim/2 + 1, 
-			stackFS.ydim);
+			destPSF);
 	}
 }
 
@@ -134,7 +122,6 @@ void FourierBackprojection::backproject_bwd(
 		RawImage<DestType>& destPSF,
 		RawImage<DestType>& destCTF,
 		RawImage<DestType>& destMP,
-		double paddingFactor,
 		int num_threads)
 {
 	const int fc = stackFS.zdim;
@@ -148,15 +135,9 @@ void FourierBackprojection::backproject_bwd(
 			destFS,
 			destCTF,
 			destMP,
-			paddingFactor,
 			num_threads);
 				
-		backprojectSpreadingFunction(
-			proj[f],
-			destPSF,
-			paddingFactor,
-			stackFS.xdim/2 + 1, 
-			stackFS.ydim);
+		backprojectSpreadingFunction(proj[f], destPSF);
 	}
 }
 
@@ -167,7 +148,6 @@ void FourierBackprojection::backprojectSlice_noSF(
 				const gravis::d4Matrix& proj,
 				RawImage<tComplex<DestType>>& destFS,
 				RawImage<DestType>& destCTF,
-				double paddingFactor,
 				int num_threads)
 {
 	const int wh2 = dataFS.xdim;
@@ -187,7 +167,7 @@ void FourierBackprojection::backprojectSlice_noSF(
 					   proj(1,0), proj(1,1), proj(1,2), 
 					   proj(2,0), proj(2,1), proj(2,2) );
 			
-	gravis::d3Matrix projInvTransp = paddingFactor * A.invert().transpose();
+	gravis::d3Matrix projInvTransp = A.invert().transpose();
 	gravis::d3Vector normal(projInvTransp(2,0), projInvTransp(2,1), projInvTransp(2,2));
 	
 	#pragma omp parallel for num_threads(num_threads)	
@@ -262,7 +242,6 @@ void FourierBackprojection::backprojectSlice_noSF(
 				RawImage<tComplex<DestType>>& destFS,
 				RawImage<DestType>& destCTF,
 				RawImage<DestType>& destMP,
-				double paddingFactor,
 				int num_threads)
 {
 	const int wh2 = dataFS.xdim;
@@ -282,7 +261,7 @@ void FourierBackprojection::backprojectSlice_noSF(
 					   proj(1,0), proj(1,1), proj(1,2), 
 					   proj(2,0), proj(2,1), proj(2,2) );
 			
-	gravis::d3Matrix projInvTransp = paddingFactor * A.invert().transpose();
+	gravis::d3Matrix projInvTransp = A.invert().transpose();
 	gravis::d3Vector normal(projInvTransp(2,0), projInvTransp(2,1), projInvTransp(2,2));
 	
 	#pragma omp parallel for num_threads(num_threads)	
@@ -353,15 +332,8 @@ void FourierBackprojection::backprojectSlice_noSF(
 template <typename DestType>
 void FourierBackprojection::backprojectSpreadingFunction(
 	const gravis::d4Matrix& proj,
-	RawImage<DestType>& destPSF,
-	double paddingFactor, 
-	int w0_half, 
-	int h0)
+	RawImage<DestType>& destPSF)
 {	
-	const int wh2 = w0_half;
-	const int h2 = h0;
-	
-	const int wh3 = destPSF.xdim;
 	const int h3 = destPSF.ydim;
 	const int d3 = destPSF.zdim;
 	
@@ -369,7 +341,7 @@ void FourierBackprojection::backprojectSpreadingFunction(
 					   proj(1,0), proj(1,1), proj(1,2), 
 					   proj(2,0), proj(2,1), proj(2,2) );
 			
-	gravis::d3Matrix projInvTransp = paddingFactor * A.invert().transpose();
+	gravis::d3Matrix projInvTransp = A.invert().transpose();
 	
 	const double rng = std::floor( (1.0 / sqrt(std::abs(projInvTransp.det())) ) + 1e-4);
 	

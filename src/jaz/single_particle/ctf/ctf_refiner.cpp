@@ -260,7 +260,9 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 	{
 		// Abort through the pipeline_control system, TODO: check how this goes with MPI....
 		if (pipeline_control_check_abort_job())
+		{
 			exit(RELION_EXIT_ABORTED);
+		}
 
 		std::vector<Image<Complex> > obs;
 

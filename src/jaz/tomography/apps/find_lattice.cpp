@@ -1,5 +1,5 @@
 #include <src/args.h>
-#include <src/jaz/tomo_programs/find_lattice.h>
+#include <src/jaz/tomography/programs/find_lattice.h>
 
 
 int main(int argc, char *argv[])
