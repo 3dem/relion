@@ -322,9 +322,18 @@ void SubtomoProgram::run()
 			
 			if (write_divided)
 			{
-				Reconstruction::ctfCorrect3D(
+				if (SNR > 0.0)
+				{
+					Reconstruction::ctfCorrect3D_Wiener(
 						dataImgRS, ctfImgFS, dataImgDivRS,
-						1.0 / WienerFract, inner_thread_num);				
+						1.0 / SNR, inner_thread_num);
+				}
+				else
+				{
+					Reconstruction::ctfCorrect3D_heuristic(
+						dataImgRS, ctfImgFS, dataImgDivRS,
+						0.001, inner_thread_num);
+				}
 				
 				Reconstruction::taper(dataImgDivRS, taper, do_center, inner_thread_num);				
 				dataImgDivRS.write(outDiv);

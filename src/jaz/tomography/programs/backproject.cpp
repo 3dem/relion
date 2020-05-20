@@ -234,9 +234,18 @@ void BackprojectProgram::run()
 					dataImgFS[half], psfImgFS[half], dataImgRS[half],
 					true, num_threads);
 		
-		Reconstruction::ctfCorrect3D(
-					dataImgRS[half], ctfImgFS[half], dataImgDivRS[half],
-					1.0 / WienerFract, num_threads);
+		if (SNR > 0.0)
+		{
+			Reconstruction::ctfCorrect3D_Wiener(
+				dataImgRS[half], ctfImgFS[half], dataImgDivRS[half],
+				1.0 / SNR, num_threads);
+		}
+		else
+		{
+			Reconstruction::ctfCorrect3D_heuristic(
+				dataImgRS[half], ctfImgFS[half], dataImgDivRS[half],
+				0.001, num_threads);
+		}
 		
 		dataImgDivRS[half].write(outTag+"_half"+ZIO::itoa(half+1)+".mrc");
 		
@@ -261,8 +270,18 @@ void BackprojectProgram::run()
 	Reconstruction::griddingCorrect3D(
 		dataImgFS_both, psfImgFS_both, dataImgRS[0], true, num_threads);
 	
-	Reconstruction::ctfCorrect3D(
-		dataImgRS[0], ctfImgFS_both, dataImgDivRS[0], 1.0 / WienerFract, num_threads);
+	if (SNR > 0.0)
+	{
+		Reconstruction::ctfCorrect3D_Wiener(
+			dataImgRS[0], ctfImgFS_both, dataImgDivRS[0],
+			1.0 / SNR, num_threads);
+	}
+	else
+	{
+		Reconstruction::ctfCorrect3D_heuristic(
+			dataImgRS[0], ctfImgFS_both, dataImgDivRS[0],
+			0.001, num_threads);
+	}
 	
 	dataImgDivRS[0].write(outTag+"_merged.mrc");
 	

@@ -53,7 +53,7 @@ void SpaBackproject::read(int argc, char **argv)
 	intact_ctf_first_peak = parser.checkOption("--ctf_intact_first_peak", "Leave CTFs intact until first peak");
 	ctf_phase_flipped = parser.checkOption("--ctf_phase_flipped", "Images have been phase flipped");
 	only_flip_phases = parser.checkOption("--only_flip_phases", "Do not correct CTF-amplitudes, only flip phases");
-	SNR = textToDouble(parser.getOption("--SNR", "Assumed signal-to-noise ratio (exaggerated)", "2000"));
+	SNR = textToDouble(parser.getOption("--SNR", "Assumed signal-to-noise ratio (negative means use a heuristic)", "-1"));
 
 	int ewald_section = parser.addSection("Ewald-sphere correction options");
 	
@@ -898,10 +898,10 @@ void SpaBackproject::reconstructBackward()
 	
 	const int s = dataImgFS[0].ydim;	
 
-	// Scale image values to match Relion's original output:
+	// Scale image values to approximate Relion's original output:
 	for (int half = 0; half < 2; half++)
 	{
-		dataImgFS[half] *= s / 2.0;
+		dataImgFS[half] *= s / (6.0 * padding_factor);
 	}
 	
 	std::vector<BufferedImage<double>> dataImgRS(2), dataImgDivRS(2);
@@ -915,7 +915,6 @@ void SpaBackproject::reconstructBackward()
 	const int cropSize = s / padding_factor;
 	const int margin = (s - cropSize) / 2;
 	const bool needs_cropping = margin > 0;
-	const double WienerOffset = 1.0 / SNR;
 
 	
 	for (int half = 0; half < 2; half++)
@@ -930,10 +929,20 @@ void SpaBackproject::reconstructBackward()
 					dataImgRS[half],                  // out
 					true, num_threads_total);
 		
-		Reconstruction::ctfCorrect3D(
+		if (SNR > 0.0)
+		{
+			Reconstruction::ctfCorrect3D_Wiener(
 					dataImgRS[half], ctfImgFS[half],  // in
 					dataImgDivRS[half],               // out
-					WienerOffset, num_threads_total);
+					1.0 / SNR, num_threads_total);
+		}
+		else
+		{
+			Reconstruction::ctfCorrect3D_heuristic(
+					dataImgRS[half], ctfImgFS[half],  // in
+					dataImgDivRS[half],               // out
+					0.001, num_threads_total);
+		}
 		
 		dataImgDivRS[half].write(fn_out+"_half"+ZIO::itoa(half+1)+".mrc", angpix);		
 		dataImgRS[half].write(fn_out+"_data_half"+ZIO::itoa(half+1)+".mrc", angpix);
@@ -953,8 +962,18 @@ void SpaBackproject::reconstructBackward()
 	Reconstruction::griddingCorrect3D(
 		dataImgFS_both, psfImgFS_both, dataImgRS[0], true, num_threads_total);
 	
-	Reconstruction::ctfCorrect3D(
-		dataImgRS[0], ctfImgFS_both, dataImgDivRS[0], WienerOffset, num_threads_total);
+	if (SNR > 0.0)
+	{
+		Reconstruction::ctfCorrect3D_Wiener(
+			dataImgRS[0], ctfImgFS_both, dataImgDivRS[0],
+			1.0 / SNR, num_threads_total);
+	}
+	else
+	{
+		Reconstruction::ctfCorrect3D_heuristic(
+			dataImgRS[0], ctfImgFS_both, dataImgDivRS[0],
+			0.001, num_threads_total);
+	}
 	
 	dataImgDivRS[0].write(fn_out+"_merged.mrc", angpix);	
 	dataImgRS[0].write(fn_out+"_data_merged.mrc", angpix);
