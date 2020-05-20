@@ -1,5 +1,10 @@
 build
+build-debug
+build-release
+cmake-build-debug
+cmake-build-release
 external
+.idea
 #Eclipse files
 .cproject
 .project
