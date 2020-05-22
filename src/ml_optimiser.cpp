@@ -9586,7 +9586,9 @@ void MlOptimiser::get3DCTFAndMulti(MultidimArray<RFLOAT> &Ictf, MultidimArray<RF
 						// We store the sqrt(Multi) to speed up calculations
 						if (mySTMulti < 0)
 							REPORT_ERROR("MULTIPLICITY volume cannot contain negative values!");
-						FFTW_ELEM(FstMulti, kp, ip, jp) = sqrt(mySTMulti);
+						// threshold to avoid dividing by small values
+						if (mySTMulti > 0.001)
+							FFTW_ELEM(FstMulti, kp, ip, jp) = sqrt(mySTMulti);
 					}
 				}
 			}
