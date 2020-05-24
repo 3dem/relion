@@ -755,6 +755,7 @@ public:
 		asymmetric_padding(false),
 		maximum_significants(-1),
 		threadException(NULL),
+		som(),
 #ifdef ALTCPU
 		tbbSchedulerInit(tbb::task_scheduler_init::deferred ),
 		mdlClassComplex(NULL),

@@ -42,6 +42,7 @@ private:
 	 * Class for graph nodes
 	 */
 	struct Node {
+		bool active = false;
 		float age = 0;
 		float error = 0.;
 	};
@@ -58,7 +59,7 @@ private:
 		{};
 	};
 
-	std::unordered_map<unsigned, Node> _nodes;
+	std::vector<Node> _nodes;
 	std::vector<Edge> _edges;
 
 	pthread_mutex_t mutex;
@@ -67,14 +68,15 @@ private:
 	 * Non-thread-safe remove node.
 	 */
 	void _remove_node(unsigned node) {
-		if (_nodes.find(node) == _nodes.end())
+		if (!_nodes[node].active)
 			throw std::runtime_error("node missing");
+
+		_nodes[node].active = false;
 
 		for (unsigned i = 0; i < _edges.size(); i++)
 			if (_edges[i].n1 == node || _edges[i].n2 == node)
 				_edges.erase(_edges.begin()+i);
 
-		_nodes.erase(node);
 	}
 
 	/*
@@ -102,13 +104,22 @@ public:
 	}
 
 	/**
+	 * Max number of nodes
+	 */
+	void set_max_node_count(unsigned count) {
+		_nodes.resize(count);
+	}
+
+	/**
 	 * Add an edge-less node to the graph.
 	 */
 	unsigned add_node() {
 		Lock ml(&mutex);
 		for (unsigned i = 0; i < _nodes.size() + 1; i++)
-			if (_nodes.find(i) == _nodes.end()) { // If index not found
-				_nodes.emplace(i, Node{});
+			if (!_nodes[i].active) { // If index not found
+				_nodes[i].active = true;
+				_nodes[i].age = 0;
+				_nodes[i].error = 0;
 				return i;
 			}
 		throw std::runtime_error("failed to add node");
@@ -120,10 +131,10 @@ public:
 	 */
 	void add_edge(unsigned node1, unsigned node2) {
 		if (node1 == node2)
-			throw std::runtime_error("cannot add edge to the node itself");
+			throw std::runtime_error("cannot add edge to the same node itself");
 
-		if (_nodes.find(node1) == _nodes.end() || _nodes.find(node2) == _nodes.end())
-			throw std::runtime_error("node missing");
+		if (!_nodes[node1].active || !_nodes[node2].active)
+			throw std::runtime_error("node(s) missing");
 
 		Lock ml(&mutex);
 
@@ -169,6 +180,47 @@ public:
 	}
 
 	/**
+	 * Get average edge age.
+	 */
+	float get_avg_age() {
+		Lock ml(&mutex);
+		float avg = 0;
+		for (unsigned i = 0; i < _edges.size(); i++)
+			avg += _edges[i].age;
+		return avg / (float) _edges.size();
+	}
+
+	/**
+	 * Get average node error.
+	 */
+	float get_avg_error() {
+		Lock ml(&mutex);
+		float avg = 0;
+		int count = 0;
+		for (unsigned i = 0; i < _nodes.size(); i++)
+			if (_nodes[i].active) {
+				avg += _nodes[i].error;
+				count ++;
+			}
+		return avg / count;
+	}
+
+	/**
+	 * Get neighbours of given node and their corresponding age.
+	 */
+	std::vector<std::pair<unsigned, float>> get_neighbours_age(unsigned node) {
+		Lock ml(&mutex);
+		std::vector<std::pair<unsigned, float>> out;
+		for (unsigned i = 0; i < _edges.size(); i++) {
+			if (_edges[i].n1 == node)
+				out.emplace_back(_edges[i].n2, _edges[i].age);
+			if (_edges[i].n2 == node)
+				out.emplace_back(_edges[i].n1, _edges[i].age);
+		}
+		return out;
+	}
+
+	/**
 	 * Remove all edges older than min_age
 	 */
 	void purge_old_edges(float min_age) {
@@ -205,15 +257,17 @@ public:
 	std::vector<unsigned> purge_orphans() {
 		Lock ml(&mutex);
 		std::vector<unsigned> orphans;
-		for(std::unordered_map<unsigned, Node>::iterator n = _nodes.begin(); n != _nodes.end(); ++n) {
-			bool is_orphan = true;
-			for (unsigned i = 0; i < _edges.size(); i++)
-				if (_edges[i].n1 == n->first || _edges[i].n2 == n->first) {
-					is_orphan = false;
-					break;
-				}
-			if (is_orphan)
-				orphans.push_back(n->first);
+		for (unsigned ni = 0; ni < _nodes.size(); ni++) {
+			if (_nodes[ni].active) {
+				bool is_orphan = true;
+				for (unsigned ei = 0; ei < _edges.size(); ei++)
+					if (_edges[ei].n1 == ni || _edges[ei].n2 == ni) {
+						is_orphan = false;
+						break;
+					}
+				if (is_orphan)
+					orphans.push_back(ni);
+			}
 		}
 
 		for (unsigned i = 0; i < orphans.size(); i++)
@@ -293,7 +347,11 @@ public:
 
 	unsigned get_node_count() {
 		Lock ml(&mutex);
-		return _nodes.size();
+		unsigned count = 0;
+		for (unsigned i = 0; i < _nodes.size(); i++)
+			if (_nodes[i].active)
+				count ++;
+		return count;
 	}
 
 	unsigned get_edge_count() {
@@ -304,15 +362,16 @@ public:
 	std::vector<unsigned> get_all_nodes() {
 		Lock ml(&mutex);
 		std::vector<unsigned> nodes;
-		for(std::unordered_map<unsigned, Node>::iterator n = _nodes.begin(); n != _nodes.end(); ++n)
-			nodes.push_back(n->first);
+		for (unsigned i = 0; i < _nodes.size(); i++)
+			if (_nodes[i].active)
+				nodes.push_back(i);
 		return nodes;
 	}
 
 	void reset_errors() {
 		Lock ml(&mutex);
-		for(std::unordered_map<unsigned, Node>::iterator n = _nodes.begin(); n != _nodes.end(); ++n)
-			n->second.error = 0.;
+		for (unsigned i = 0; i < _nodes.size(); i++)
+			_nodes[i].error = 0.;
 	}
 
 	/**
@@ -324,12 +383,14 @@ public:
 		bool set = false;
 		unsigned wpu;
 		XFLOAT wpu_error = 0;
-		for(std::unordered_map<unsigned, Node>::iterator n = _nodes.begin(); n != _nodes.end(); ++n) {
-			float e = n->second.age;
-			if (e >= wpu_error) {
-				wpu = n->first;
-				wpu_error = e;
-				set = true;
+		for (unsigned i = 0; i < _nodes.size(); i++) {
+			if (_nodes[i].active) {
+				float e = _nodes[i].age;
+				if (e >= wpu_error) {
+					wpu = i;
+					wpu_error = e;
+					set = true;
+				}
 			}
 		}
 
@@ -348,12 +409,14 @@ public:
 		bool set = false;
 		unsigned wpu;
 		XFLOAT wpu_error = 0;
-		for(std::unordered_map<unsigned, Node>::iterator n = _nodes.begin(); n != _nodes.end(); ++n) {
-			float e = n->second.error;
-			if (e >= wpu_error) {
-				wpu = n->first;
-				wpu_error = e;
-				set = true;
+		for (unsigned i = 0; i < _nodes.size(); i++) {
+			if (_nodes[i].active) {
+				float e = _nodes[i].error;
+				if (e >= wpu_error) {
+					wpu = i;
+					wpu_error = e;
+					set = true;
+				}
 			}
 		}
 
@@ -417,8 +480,9 @@ public:
 
 		fprintf(fp, "_nodes [index error age]\n");
 
-		for(std::unordered_map<unsigned, Node>::iterator n = _nodes.begin(); n != _nodes.end(); ++n)
-			fprintf(fp, "%3d %5.1f %5.1f\n", n->first, n->second.error, n->second.age);
+		for (unsigned i = 0; i < _nodes.size(); i++)
+			if (_nodes[i].active)
+				fprintf(fp, "%3d %5.1f %5.1f\n", i, _nodes[i].error, _nodes[i].age);
 
 		fprintf(fp, "\n_edges [node1 node2 age]\n");
 

@@ -2419,9 +2419,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 				// store partials according to indices of the relevant dimension
 				unsigned ithr_wsum_pdf_direction = baseMLO->mymodel.nr_bodies > 1 ? ibody : iclass;
-				DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[ithr_wsum_pdf_direction], mydir) += p_weights[n];
 				thr_sumw_group[img_id] += p_weights[n];
 				thr_wsum_sigma2_offset += my_pixel_size * my_pixel_size * p_thr_wsum_sigma2_offset[n];
+
+				DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[ithr_wsum_pdf_direction], mydir) += p_weights[n];
 
 				if (!baseMLO->is_som_iter)
 					thr_wsum_pdf_class[iclass] += p_weights[n];
@@ -2908,23 +2909,35 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			}
 
 			// Modify graph
-			baseMLO->som.add_edge(bpu, sbpu);
 			baseMLO->som.increment_all_edge_ages(1);
+			baseMLO->som.add_edge(bpu, sbpu);
 			baseMLO->som.set_edge_age(bpu, sbpu, baseMLO->som.get_edge_age(bpu, sbpu)*0.1);
+			baseMLO->som.purge_old_edges(5000); //TODO as a parameter
 
 			// Set total weight of BPU
-			class_sum_weight[bpu] = op.sum_weight_class[img_id][bpu];
-			thr_wsum_pdf_class[bpu] += op.sum_weight_class[img_id][bpu] / op.sum_weight[img_id];
+			XFLOAT total_neighbour_weight = .4; //TODO as a parameter
+			float w = 1 - total_neighbour_weight;
 
-			XFLOAT lambda = .8;
+			class_sum_weight[bpu] = op.sum_weight_class[img_id][bpu] * w;
+			thr_wsum_pdf_class[bpu] += w;
+			baseMLO->som.set_node_age(bpu, baseMLO->som.get_node_age(bpu) + w);
+
 			// Set total weights for neighbours
-			std::vector<unsigned> in = baseMLO->som.get_neighbours(bpu);
-			lambda /= in.size();
+			std::vector<std::pair<unsigned, float>> in = baseMLO->som.get_neighbours_age(bpu);
+			float weights_sum = 0;
+			std::vector<float> weights(in.size());
 			for (int i = 0; i < in.size(); i ++) {
-				class_sum_weight[in[i]] = op.sum_weight_class[img_id][in[i]] /lambda; //TODO as a parameter
-				thr_wsum_pdf_class[in[i]] += op.sum_weight_class[img_id][in[i]] / (op.sum_weight[img_id] /lambda);
-				baseMLO->som.increment_node_age(in[i], lambda);
+				weights[i] = exp(-in[i].second / 10);
+				weights_sum += weights[i];
 			}
+
+			if (weights_sum > 0.)
+				for (int i = 0; i < in.size(); i ++) {
+					w = total_neighbour_weight * weights[i] / weights_sum;
+					class_sum_weight[in[i].first] = op.sum_weight_class[img_id][in[i].first] / w;
+					thr_wsum_pdf_class[in[i].first] += w;
+					baseMLO->som.set_node_age(in[i].first, baseMLO->som.get_node_age(in[i].first) + w);
+				}
 		}
 
 		/*======================================================
@@ -2973,7 +2986,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				~ctfs,
 				translation_num,
 				(XFLOAT) op.significant_weight[img_id],
-				(XFLOAT) op.sum_weight[img_id],
+				(XFLOAT) (baseMLO->is_som_iter ? class_sum_weight[iclass] : op.sum_weight[img_id]),
 				~eulers[iclass],
 				op.local_Minvsigma2[img_id].xdim,
 				op.local_Minvsigma2[img_id].ydim,

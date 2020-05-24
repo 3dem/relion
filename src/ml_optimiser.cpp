@@ -1338,6 +1338,7 @@ void MlOptimiser::initialise()
 
 	if (do_som)
 	{
+		som.set_max_node_count(mymodel.nr_classes);
 		// Add the initial nodes to the graph and connect them with an edge
 		for (unsigned i = 0; i < XMIPP_MIN(2, mymodel.nr_classes); i++)
 			som.add_node();
@@ -2533,9 +2534,11 @@ struct FitImagesParams {
 };
 
 FitImagesParams fitImages(MultidimArray<RFLOAT> &map1, MultidimArray<RFLOAT> &map2) {
-	float ang_step = 4.;
+	float ang_step = 2.;
+	float image_portion = .9;  // Size of the central portion of the image to consider
 	int ang_count = 360. / ang_step;
 	int side = map1.xdim;
+	int max_r2 = side/2 * image_portion;
 	FitImagesParams out;
 
 	int max_trans = 2;
@@ -2556,6 +2559,9 @@ FitImagesParams fitImages(MultidimArray<RFLOAT> &map1, MultidimArray<RFLOAT> &ma
 	float min_ang;
 	int min_itans;
 
+	int start_xy = (side - side * image_portion)/2;
+	int end_xy = side - start_xy;
+
 	for (int iang = 0; iang < ang_count; iang++) {
 		Euler_angles2matrix(0, 0, current_ang, A, false);
 		for (int itrans = 0; itrans < trans_count; itrans++) {
@@ -2564,21 +2570,17 @@ FitImagesParams fitImages(MultidimArray<RFLOAT> &map1, MultidimArray<RFLOAT> &ma
 			float diff = 0;
 			int diff_count = 0;
 
-			for (int x = 0; x < side; x++) {
-				for (int y = 0; y < side; y++) {
+			for (int x = start_xy; x < end_xy; x++) {
+				for (int y = start_xy; y < end_xy; y++) {
 					float xp = x - side / 2;
 					float yp = y - side / 2;
-					if (xp * xp + yp * yp < side * side) {
+					if (xp * xp + yp * yp < max_r2) {
 						float v = map2.data[y * side + x];
 						float xpp = A(0, 0) * xp + A(0, 1) * yp + xt;
 						float ypp = A(1, 0) * xp + A(1, 1) * yp + yt;
 
 						xpp += side / 2;
 						ypp += side / 2;
-
-						if (xpp < 0 || xpp >= side - 1 ||
-						    ypp < 0 || ypp >= side - 1)
-							continue;
 
 						int x0 = floor(xpp);
 						float fx = xpp - x0;
@@ -2618,11 +2620,10 @@ FitImagesParams fitImages(MultidimArray<RFLOAT> &map1, MultidimArray<RFLOAT> &ma
 	return out;
 }
 
-void combineImages(const MultidimArray<RFLOAT> &map1, const MultidimArray<RFLOAT> &map2,
-		MultidimArray<RFLOAT> &out, const FitImagesParams &params)
+void transform_map(const MultidimArray<RFLOAT> &map, MultidimArray<RFLOAT> &out, const FitImagesParams &params)
 {
-	out.initZeros(map1);
-	int side = map1.xdim;
+	out.initZeros(map);
+	int side = map.xdim;
 	Matrix2D<RFLOAT> A;
 	Euler_angles2matrix(0, 0, params.rot, A, false);
 
@@ -2631,7 +2632,7 @@ void combineImages(const MultidimArray<RFLOAT> &map1, const MultidimArray<RFLOAT
 			float xp = x - side / 2;
 			float yp = y - side / 2;
 			if (xp * xp + yp * yp < side * side) {
-				float v = map2.data[y * side + x];
+				float v = map.data[y * side + x];
 				float xpp = A(0,0) * xp + A(0,1) * yp + params.xtrans;
 				float ypp = A(1,0) * xp + A(1,1) * yp + params.ytrans;
 
@@ -2660,8 +2661,6 @@ void combineImages(const MultidimArray<RFLOAT> &map1, const MultidimArray<RFLOAT
 			}
 		}
 	}
-	out += map1;
-	out /= 2.;
 }
 
 void MlOptimiser::iterate()
@@ -2888,7 +2887,6 @@ void MlOptimiser::iterate()
 		if(do_som)
 		{
 			// Remove old edges and orphan nodes
-			som.purge_old_edges(500); //TODO as a parameter
 			std::vector<unsigned> purged_nodes = som.purge_orphans();
 
 			for (unsigned i = 0; i < purged_nodes.size(); i++) {
@@ -2898,14 +2896,15 @@ void MlOptimiser::iterate()
 			}
 
 			// Add new nodes
-			unsigned som_add_interval = 4;
-			if (0 < iter && iter % som_add_interval == 0 && som.get_node_count() < mymodel.nr_classes) //TODO as a parameter
-			{
-				unsigned wpu = som.find_wpu(); // Worse performing unit (WPU)
-				unsigned swpu = som.find_wpu(wpu); // Second worse performing unit (SWPU)
+			bool do_add_node = false;
+			unsigned wpu = som.find_wpu(); // Worse performing unit (WPU)
+			float wpu_error = som.get_node_error(wpu);
+			do_add_node = iter == 10 || iter == 15 || iter == 20;
+			if (24 <= iter)
+				do_add_node = iter < vmgd_ini_iter + vmgd_inbetween_iter && iter % 2 == 0;
 
-				float wpu_error = som.get_node_error(wpu);
-				float swpu_error = som.get_node_error(swpu);
+			if (do_add_node && som.get_node_count() < mymodel.nr_classes) {
+				unsigned swpu = som.find_wpu(wpu); // Second worse performing unit (SWPU)
 
 				// Insert the node between the WPU and SWPU
 				som.remove_edge(wpu, swpu);
@@ -2915,15 +2914,21 @@ void MlOptimiser::iterate()
 				som.add_edge(idx, wpu);
 
 				FitImagesParams params = fitImages(mymodel.Iref[wpu], mymodel.Iref[swpu]);
-				combineImages(mymodel.Iref[wpu], mymodel.Iref[swpu], mymodel.Iref[idx], params);
-				if (do_mom1)
-					combineImages(mymodel.Igrad1[wpu], mymodel.Igrad1[swpu], mymodel.Igrad1[idx], params);
+
+				transform_map(mymodel.Iref[swpu], mymodel.Iref[idx], params);
+				mymodel.Iref[idx] *= 0.2;
+				mymodel.Iref[idx] += mymodel.Iref[wpu] * 0.8;
+
+				if (do_mom1) {
+					transform_map(mymodel.Igrad1[swpu], mymodel.Igrad1[idx], params);
+					mymodel.Igrad1[idx] *= 0.2;
+					mymodel.Igrad1[idx] += mymodel.Igrad1[wpu] * 0.8;
+				}
 				if (do_mom2)
-					combineImages(mymodel.Igrad2[wpu], mymodel.Igrad2[swpu], mymodel.Igrad2[idx], params);
+					mymodel.Igrad2[idx] = mymodel.Igrad2[wpu] * 0.8; // Igrad2 is in Fourier space
 
-				som.set_node_error(idx, som.get_node_error(wpu)*0.25);
-				som.set_node_error(wpu, som.get_node_error(wpu)*0.25);
-
+				som.set_node_error(wpu);
+				som.set_node_error(idx);
 			}
 		}
 
@@ -4271,6 +4276,22 @@ void MlOptimiser::maximization()
 		init_progress_bar(mymodel.nr_classes);
 	}
 
+	if (do_som)
+	{
+		float age_sum = 0.;
+		float count = 0.;
+		for (int i = 0; i < mymodel.nr_classes * mymodel.nr_bodies; i ++)
+			if (mymodel.pdf_class[i] > 0.) {
+				age_sum += sqrt(som.get_node_age(i));
+				count ++;
+			}
+		age_sum /= count;
+
+		for (int i = 0; i < mymodel.nr_classes * mymodel.nr_bodies; i ++)
+			if (mymodel.pdf_class[i] > 0.)
+				som.set_node_age(i, sqrt(som.get_node_age(i)) / age_sum);
+	}
+
 	// First reconstruct the images for each class
 	// multi-body refinement will never get here, as it is only 3D auto-refine and that requires MPI!
 	for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
@@ -4333,20 +4354,26 @@ void MlOptimiser::maximization()
 									do_mom2 ? 0.999 : 0.,
 									iter == 1);
 
+						float _stepsize = stepsize;
 						if (do_som)
 						{
+							_stepsize *= som.get_node_age(iclass);
+							som.set_node_age(iclass); // Reset age
+
 							RFLOAT avg(0);
 
 							for (unsigned i = 0; i < wsum_model.BPref[iclass].data.nzyxdim; i++)
 								avg += norm(wsum_model.BPref[iclass].data.data[i]);
 
 							avg /= (RFLOAT) wsum_model.BPref[iclass].data.nzyxdim;
-							som.increment_node_error(iclass, avg);
+							som.set_node_error(iclass, som.get_node_error(iclass) * 0.99 + avg * _stepsize * 0.01);
+
+							_stepsize = XMIPP_MAX(_stepsize, 0.05);
 						}
 
 						(wsum_model.BPref[iclass]).reconstructGrad(
 								mymodel.Iref[iclass],
-								stepsize,
+								_stepsize,
 								mymodel.tau2_fudge_factor,
 								mymodel.fsc_halves_class[iclass],
 								do_split_random_halves,
@@ -4474,13 +4501,19 @@ void MlOptimiser::maximizationOtherParameters()
 	// Update model.pdf_class vector (for each k)
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 	{
-		mymodel.pdf_class[iclass] =  wsum_model.pdf_class[iclass] / sum_weight;
+
+		// Update pdf_class (for SGD: update with taking mu into account! For non-SGD: mu equals zero)
+		mymodel.pdf_class[iclass] *= mu;
+		mymodel.pdf_class[iclass] += (1. - mu) * wsum_model.pdf_class[iclass] / sum_weight;
 
 		// for 2D also update priors of translations for each class!
 		if (mymodel.ref_dim == 2)
 		{
 			if (wsum_model.pdf_class[iclass] > 0.)
-				mymodel.prior_offset_class[iclass] = wsum_model.prior_offset_class[iclass] / sum_weight;
+			{
+				mymodel.prior_offset_class[iclass] *= mu;
+				mymodel.prior_offset_class[iclass] += (1. - mu) * wsum_model.prior_offset_class[iclass] / sum_weight;
+			}
 			else
 				mymodel.prior_offset_class[iclass].initZeros();
 		}
@@ -4489,12 +4522,17 @@ void MlOptimiser::maximizationOtherParameters()
 	for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
 	{
 		// Use sampling.NrDirections() to include all directions (also those with zero prior probability for any given image)
-		if (!(do_skip_align || do_skip_rotate || do_vmgd))
+		if (!(do_skip_align || do_skip_rotate))
 		{
 			for (int idir = 0; idir < sampling.NrDirections(); idir++)
 			{
-				mymodel.pdf_direction[iclass](idir) *= mu;
-				mymodel.pdf_direction[iclass](idir) += (1. - mu) * wsum_model.pdf_direction[iclass](idir) / sum_weight;
+				if (do_som)
+					mymodel.pdf_direction[iclass](idir) = 1;
+				else {
+					mymodel.pdf_direction[iclass](idir) *= mu;
+					mymodel.pdf_direction[iclass](idir) +=
+							(1. - mu) * wsum_model.pdf_direction[iclass](idir) / sum_weight;
+				}
 			}
 		}
 	}
@@ -4537,7 +4575,7 @@ void MlOptimiser::maximizationOtherParameters()
 					DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) *= mu;
 					DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) +=
 							(1. - mu) * DIRECT_MULTIDIM_ELEM(wsum_model.sigma2_noise[igroup], n ) /
-								(2. * wsum_model.sumw_group[igroup] * DIRECT_MULTIDIM_ELEM(Npix_per_shell, n));
+							(2. * wsum_model.sumw_group[igroup] * DIRECT_MULTIDIM_ELEM(Npix_per_shell, n));
 					// Watch out for all-zero sigma2 in case of CTF-premultiplication!
 					if (mydata.hasCtfPremultiplied())
 						DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) = XMIPP_MAX(DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n), 1e-15);
@@ -4555,11 +4593,11 @@ void MlOptimiser::maximizationOtherParameters()
 	RCTOC(timer,RCT_7);
 	RCTIC(timer,RCT_8);
 	// After the first iteration the references are always CTF-corrected
-    if (do_ctf_correction)
-    	refs_are_ctf_corrected = true;
+	if (do_ctf_correction)
+		refs_are_ctf_corrected = true;
 
 	// Some statistics to output
-    mymodel.LL = 	wsum_model.LL;
+	mymodel.LL = 	wsum_model.LL;
 	if ((iter==1 && do_firstiter_cc) || do_always_cc)
 		mymodel.LL /= sum_weight; // this now stores the average ccf
 	mymodel.ave_Pmax = wsum_model.ave_Pmax / sum_weight;
@@ -8987,7 +9025,8 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 			vmgd_stepsize = vmgd_fin_stepsize;
 		}
 
-
+		if (iter == nr_iter)
+			subset_size = mydata.numberOfParticles();
 	}
 
 }
