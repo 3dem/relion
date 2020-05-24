@@ -98,7 +98,7 @@ __global__ void cuda_kernel_backproject2D(
 				if(CTF_PREMULTIPLIED)
 				{
 					weight = (weight / weight_norm) * minvsigma2;
-					Fweight += weight * ctf * ctf;
+					Fweight += weight * ctf; // SHWS 13feb2020: from now on when ctf_premultiplied, the ctf array actually contains ctf^2!
 				}
 				else
 				{
@@ -280,7 +280,7 @@ __global__ void cuda_kernel_backproject3D(
 				if(CTF_PREMULTIPLIED)
 				{
 					weight = (weight / weight_norm) * minvsigma2;
-					Fweight += weight * ctf * ctf;
+					Fweight += weight * ctf; // SHWS 13feb2020: from now on when ctf_premultiplied, the ctf array actually contains ctf^2!
 				}
 				else
 				{
@@ -533,7 +533,7 @@ __global__ void cuda_kernel_backprojectSGD(
 				if(CTF_PREMULTIPLIED)
 				{
 					weight = (weight / weight_norm) * minvsigma2;
-					Fweight += weight * ctf * ctf;
+					Fweight += weight * ctf; // SHWS 13feb2020: from now on when ctf_premultiplied, the ctf array actually contains ctf^2!
 				}
 				else
 				{

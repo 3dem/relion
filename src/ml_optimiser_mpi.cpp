@@ -500,14 +500,14 @@ will still yield good performance and possibly a more stable execution. \n" << s
 			if (verb > 0) std::cout<< " WARNING: provided sigma2_noise-spectrum has fewer entries ("<<idx+1<<") than needed ("<<XSIZE(mymodel.sigma2_noise[0])<<"). Set rest to zero..."<<std::endl;
 		}
 
-        mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
-        for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
-        {
-            // Use the same spectrum for all classes
-            mymodel.sigma2_noise[igroup] =  mymodel.sigma2_noise[0];
-            // We set wsum_model.sumw_group as in calculateSumOfPowerSpectraAndAverageImage
-            wsum_model.sumw_group[igroup] = mymodel.nr_particles_per_group[igroup];
-        }
+		mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
+		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
+		{
+			// Use the same spectrum for all classes
+			mymodel.sigma2_noise[igroup] =  mymodel.sigma2_noise[0];
+			// We set wsum_model.sumw_group as in calculateSumOfPowerSpectraAndAverageImage
+			wsum_model.sumw_group[igroup] = mymodel.nr_particles_per_group[igroup];
+		}
 	}
 	else if (do_calculate_initial_sigma_noise || do_average_unaligned)
 	{
@@ -2083,8 +2083,7 @@ void MlOptimiserMpi::maximization()
 								mymodel.tau2_fudge_factor,
 								wsum_model.pdf_class[iclass],
 								minres_map,
-								false
-							);
+								false);
 						}
 						if (do_sgd)
 						{
