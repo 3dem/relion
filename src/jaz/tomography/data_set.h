@@ -31,9 +31,9 @@ class DataSet
 		virtual void moveParticleTo(long int particle_id, gravis::d3Vector pos) = 0;
 		virtual void shiftParticleBy(long int particle_id, gravis::d3Vector shift) = 0;
 		virtual void write(std::string fn) const = 0;
-			
-		std::vector<gravis::d3Vector> getTrajectoryInPix(long int particle_id, int fc, double pixelSize) const;
-		void checkTrajectoryLengths(int p0, int np, int fc, std::string caller) const;
+
+			std::vector<gravis::d3Vector> getTrajectoryInPix(long int particle_id, int fc, double pixelSize) const;
+			void checkTrajectoryLengths(int p0, int np, int fc, std::string caller) const;
 };
 
 #endif

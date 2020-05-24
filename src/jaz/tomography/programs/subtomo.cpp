@@ -12,6 +12,7 @@
 #include <src/jaz/tomography/relion_data_set.h>
 #include <src/jaz/tomography/tomo_ctf_helper.h>
 #include <src/jaz/tomography/tomogram.h>
+#include <src/jaz/tomography/particle_set.h>
 #include <src/jaz/optics/damage.h>
 #include <src/time.h>
 #include <src/jaz/util/zio.h>
@@ -23,8 +24,10 @@ using namespace gravis;
 
 void SubtomoProgram::run()
 {
-	DataSet* dataSet = DataSet::load(catFn, motFn);
-	std::vector<std::vector<int> > particles = dataSet->splitByTomogram();
+	TomogramSet tomogramSet(tomoSetFn);
+
+	ParticleSet* dataSet = ParticleSet::load(catFn, motFn);
+	std::vector<std::vector<int> > particles = dataSet->splitByTomogram(tomogramSet);
 	
 	if (cropSize < 0) cropSize = boxSize;
 	
@@ -40,57 +43,52 @@ void SubtomoProgram::run()
 	const long int sh3D = s3D / 2 + 1;
 	
 	const long int s02D = (int)(binning * s2D + 0.5);
-	
-	TomogramSet tomogramSet(tomoSetFn);
 
-	if (dataSet->type == DataSet::Relion)
+
+	ParticleSet copy = *dataSet;
+
+	for (int t = 0; t < tc; t++)
 	{
-		RelionDataSet* rds0 = (RelionDataSet*) dataSet;
-		RelionDataSet rds = *rds0;
-		
-		for (int t = 0; t < tc; t++)
+		const int pc = particles[t].size();
+
+		if (pc == 0) continue;
+
+		for (int p = 0; p < pc; p++)
 		{
-			const int pc = particles[t].size();
-			
-			if (pc == 0) continue;
-			
-			for (int p = 0; p < pc; p++)
-			{
-				const int part_id = particles[t][p];
-				
-				const int opticsGroup = rds.getOpticsGroup(part_id);
-				const double pixelSize = rds.getBinnedPixelSize(opticsGroup);
-				
-				std::string outData = outTag + "/" + dataSet->getName(part_id) + "_data.mrc";
-				std::string outWeight = outTag + "/" + dataSet->getName(part_id) + "_weights.mrc";
-				
-				rds.setImageFileNames(outData, outWeight, part_id);
-				
-				d3Vector off, coord;
-				
-				rds.getParticleOffset(part_id, off.x, off.y, off.z);
-				rds.getParticleCoord(part_id, coord.x, coord.y, coord.z);
-				
-				coord -= off / pixelSize;
-				
-				rds.setParticleOffset(part_id, 0,0,0);
-				rds.setParticleCoord(part_id, coord.x, coord.y, coord.z);
-			}
+			const int part_id = particles[t][p];
+
+			const int opticsGroup = copy.getOpticsGroup(part_id);
+			const double pixelSize = copy.getBinnedPixelSize(opticsGroup);
+
+			std::string outData = outTag + "/" + dataSet->getName(part_id) + "_data.mrc";
+			std::string outWeight = outTag + "/" + dataSet->getName(part_id) + "_weights.mrc";
+
+			copy.setImageFileNames(outData, outWeight, part_id);
+
+			d3Vector off, coord;
+
+			copy.getParticleOffset(part_id, off.x, off.y, off.z);
+			copy.getParticleCoord(part_id, coord.x, coord.y, coord.z);
+
+			coord -= off / pixelSize;
+
+			copy.setParticleOffset(part_id, 0,0,0);
+			copy.setParticleCoord(part_id, coord.x, coord.y, coord.z);
 		}
-
-		for (int og = 0; og < rds.numberOfOpticsGroups(); og++)
-		{
-			const double ps_img = rds.optTable.getDouble(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, og);
-			const double ps_out = binning * ps_img;
-
-			rds.optTable.setValue(EMDL_MICROGRAPH_BINNING, binning, og);
-			rds.optTable.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, ps_out, og);
-			rds.optTable.setValue(EMDL_IMAGE_PIXEL_SIZE, ps_out, og);
-			rds.optTable.setValue(EMDL_IMAGE_SIZE, cropSize, og);
-		}
-
-		rds.write(outTag + "_particles.star");
 	}
+
+	for (int og = 0; og < copy.numberOfOpticsGroups(); og++)
+	{
+		const double ps_img = copy.optTable.getDouble(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, og);
+		const double ps_out = binning * ps_img;
+
+		copy.optTable.setValue(EMDL_MICROGRAPH_BINNING, binning, og);
+		copy.optTable.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, ps_out, og);
+		copy.optTable.setValue(EMDL_IMAGE_PIXEL_SIZE, ps_out, og);
+		copy.optTable.setValue(EMDL_IMAGE_SIZE, cropSize, og);
+	}
+
+	copy.write(outTag + "_particles.star");
 		
 	
 	int dummy = std::system(("mkdir -p " + outTag).c_str());

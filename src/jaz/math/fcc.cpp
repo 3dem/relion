@@ -1,5 +1,5 @@
 #include "fcc.h"
-#include <src/jaz/tomography/data_set.h>
+#include <src/jaz/tomography/particle_set.h>
 #include <src/jaz/tomography/projection/fwd_projection.h>
 #include <src/jaz/tomography/prediction.h>
 #include <src/jaz/tomography/reconstruction.h>
@@ -18,7 +18,7 @@ using namespace gravis;
 
 
 BufferedImage<double> FCC::compute(
-	DataSet* dataSet, 
+	ParticleSet* dataSet,
 	const std::vector<int>& partIndices, 
 	const Tomogram& tomogram,
 	const std::vector<BufferedImage<fComplex>>& referenceFS, 
@@ -32,7 +32,7 @@ BufferedImage<double> FCC::compute(
 }
 
 BufferedImage<double> FCC::compute3(
-    DataSet* dataSet, 
+	ParticleSet* dataSet,
     const std::vector<int>& partIndices, 
     const Tomogram& tomogram,
     const std::vector<BufferedImage<fComplex>>& referenceFS, 

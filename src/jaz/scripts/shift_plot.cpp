@@ -6,6 +6,7 @@
 #include <src/jaz/tomography/data_set.h>
 #include <src/jaz/tomography/prediction.h>
 #include <src/jaz/tomography/extraction.h>
+#include <src/jaz/tomography/particle_set.h>
 #include <src/jaz/image/interpolation.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/optimization/nelder_mead.h>
@@ -56,11 +57,14 @@ int main(int argc, char *argv[])
 	int res = system(("mkdir -p "+outDir).c_str());
 	
 	
-	DataSet* dataSet0 = DataSet::load(partFn0, "");
-	DataSet* dataSet1 = DataSet::load(partFn1, "");
-	
-	std::vector<std::vector<int>> particles0 = dataSet0->splitByTomogram();	
-	std::vector<std::vector<int>> particles1 = dataSet1->splitByTomogram();
+	ParticleSet* dataSet0 = ParticleSet::load(partFn0, "");
+	ParticleSet* dataSet1 = ParticleSet::load(partFn1, "");
+
+	TomogramSet tomogramSet0(tomoSetFn0);
+	TomogramSet tomogramSet1(tomoSetFn1);
+
+	std::vector<std::vector<int>> particles0 = dataSet0->splitByTomogram(tomogramSet0);
+	std::vector<std::vector<int>> particles1 = dataSet1->splitByTomogram(tomogramSet1);
 	
 	const int tc0 = particles0.size();
 	const int tc1 = particles1.size();

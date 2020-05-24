@@ -9,7 +9,7 @@
 
 #include "refinement.h"
 
-class DataSet;
+class ParticleSet;
 class CTF;
 
 class DefocusRefinementProgram : public RefinementProgram
@@ -40,7 +40,7 @@ class DefocusRefinementProgram : public RefinementProgram
 				double minDelta, 
 				double maxDelta,
 				int steps, int group_count, double sigma_input,
-				const DataSet* dataSet, 
+				const ParticleSet* dataSet,
 				std::vector<int>& particles, int max_particles,
 				const Tomogram& tomogram,
 				std::vector<BufferedImage<fComplex>>& referenceFS,
@@ -51,7 +51,7 @@ class DefocusRefinementProgram : public RefinementProgram
 		static BufferedImage<double> computeOffsetCost(
 				int f,
 				double z0, double z1, int steps, 
-				const DataSet* dataSet, 
+				const ParticleSet* dataSet,
 				std::vector<int>& particles, int max_particles,
 				const Tomogram& tomogram,
 				std::vector<BufferedImage<fComplex>>& referenceFS,

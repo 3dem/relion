@@ -4,6 +4,7 @@
 #include <src/jaz/tomography/projection/Fourier_backprojection.h>
 #include <src/jaz/tomography/reconstruction.h>
 #include <src/jaz/tomography/tomogram_set.h>
+#include <src/jaz/tomography/particle_set.h>
 #include <src/jaz/image/centering.h>
 #include <src/jaz/image/padding.h>
 #include <src/jaz/tomography/tomo_ctf_helper.h>
@@ -44,13 +45,13 @@ int main(int argc, char *argv[])
 		std::cerr << XE;
 		exit(1);
 	}
+
+	TomogramSet tomogramSet(tomoSetFn);
 	
-	DataSet* dataSet = DataSet::load(catFn, "");	
-	std::vector<std::vector<int>> particles = dataSet->splitByTomogram();
+	ParticleSet* dataSet = ParticleSet::load(catFn, "");
+	std::vector<std::vector<int>> particles = dataSet->splitByTomogram(tomogramSet);
 		
 	const int tc = particles.size();
-	
-	TomogramSet tomogramSet(tomoSetFn);
 		
 	std::ofstream output(outFn);
 	

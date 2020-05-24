@@ -4,7 +4,7 @@
 #include <src/jaz/optimization/optimization.h>
 #include <src/jaz/image/buffered_image.h>
 
-class DataSet;
+class ParticleSet;
 class CTF;
 
 class ProtoAlignment : public DifferentiableOptimization
@@ -14,7 +14,7 @@ class ProtoAlignment : public DifferentiableOptimization
 		ProtoAlignment(
 				const std::vector<BufferedImage<double>>& CCs,
 				const std::vector<gravis::d4Matrix>& frameProj, 
-				DataSet* dataSet, 
+				ParticleSet* dataSet,
 				const std::vector<int>& partIndices,
 				const std::vector<BufferedImage<fComplex>>& referenceFS,
 				bool constParticles,
@@ -27,7 +27,7 @@ class ProtoAlignment : public DifferentiableOptimization
 		
 		
 			std::vector<gravis::d4Matrix> frameProj; // make a reference again
-			DataSet* dataSet;
+			ParticleSet* dataSet;
 			const std::vector<int>& partIndices;
 			const std::vector<BufferedImage<fComplex>>& referenceFS;
 			
@@ -52,7 +52,7 @@ class ProtoAlignment : public DifferentiableOptimization
 		void shiftParticles(
 				const std::vector<double>& x,
 				const std::vector<int>& partIndices,
-				DataSet* target) const;
+				ParticleSet* target) const;
 		
 		int getParamCount();
 		

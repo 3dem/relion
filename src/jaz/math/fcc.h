@@ -1,9 +1,9 @@
-#ifndef DYN_FCC_H
-#define DYN_FCC_H
+#ifndef RELION_TOMO_FCC_H
+#define RELION_TOMO_FCC_H
 
 #include <src/jaz/image/buffered_image.h>
 #include <src/jaz/tomography/tomogram.h>
-#include <src/jaz/tomography/data_set.h>
+#include <src/jaz/tomography/particle_set.h>
 
 
 class FCC
@@ -11,7 +11,7 @@ class FCC
 	public:
 		
 		static BufferedImage<double> compute(
-				DataSet* dataSet,
+				ParticleSet* dataSet,
 				const std::vector<int>& partIndices,
 				const Tomogram& tomogram,
 				const std::vector<BufferedImage<fComplex>>& referenceFS,
@@ -19,7 +19,7 @@ class FCC
 				int num_threads);
 		
 		static BufferedImage<double> compute3(
-				DataSet* dataSet,
+				ParticleSet* dataSet,
 				const std::vector<int>& partIndices,
 				const Tomogram& tomogram,
 				const std::vector<BufferedImage<fComplex>>& referenceFS,

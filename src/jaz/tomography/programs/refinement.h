@@ -8,12 +8,13 @@
 #include <vector>
 #include <src/jaz/tomography/tomogram.h>
 #include <src/jaz/tomography/tomogram_set.h>
+#include <src/jaz/tomography/particle_set.h>
 #include <src/jaz/tomography/tomogram.h>
 #include <src/jaz/tomography/reference_map.h>
 #include <src/jaz/optics/optics_data.h>
 
 
-class DataSet;
+class ParticleSet;
 class CTF;
 
 
@@ -36,7 +37,7 @@ class RefinementProgram
 			double fscThreshWidth;
 			
 			
-			DataSet* dataSet;
+			ParticleSet* dataSet;
 			std::vector<std::vector<int>> particles;
 			TomogramSet tomogramSet;
 			

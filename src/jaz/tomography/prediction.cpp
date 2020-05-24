@@ -1,5 +1,5 @@
 #include "prediction.h"
-#include "data_set.h"
+#include "particle_set.h"
 #include "projection/fwd_projection.h"
 #include "reconstruction.h"
 #include "tomo_ctf_helper.h"
@@ -23,7 +23,7 @@ using namespace gravis;
 
 
 BufferedImage<fComplex> Prediction::predictFS(
-		int particle_id, const DataSet* dataSet, d4Matrix proj, int s, 
+		int particle_id, const ParticleSet* dataSet, d4Matrix proj, int s,
 		const CTF& centreCtf, d3Vector tomo_centre,
 		double handedness, double pixelSize,
 		const std::vector<BufferedImage<fComplex>>& referenceFS,
@@ -60,7 +60,7 @@ BufferedImage<fComplex> Prediction::predictFS(
 }
 
 BufferedImage<fComplex> Prediction::predictFS(
-		int particle_id, const DataSet* dataSet, d4Matrix proj, int s, 
+		int particle_id, const ParticleSet* dataSet, d4Matrix proj, int s,
 		const std::vector<BufferedImage<fComplex>>& referenceFS,
 		HalfSet halfSet)
 {
@@ -75,7 +75,7 @@ BufferedImage<fComplex> Prediction::predictFS(
 }
 
 BufferedImage<float> Prediction::predictRS(
-		int particle_id, const DataSet* dataSet, d4Matrix proj, int s, 
+		int particle_id, const ParticleSet* dataSet, d4Matrix proj, int s,
 		const std::vector<BufferedImage<fComplex>>& referenceFS,
 		HalfSet halfSet)
 {
@@ -100,7 +100,7 @@ BufferedImage<float> Prediction::predictRS(
 }
 
 std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
-		const DataSet* dataSet,
+		const ParticleSet* dataSet,
 		const std::vector<int>& partIndices,
 		const Tomogram& tomogram,
 		const TomoReferenceMap& referenceMap,

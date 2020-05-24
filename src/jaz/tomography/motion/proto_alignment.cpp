@@ -1,5 +1,5 @@
 #include "proto_alignment.h"
-#include <src/jaz/tomography/data_set.h>
+#include <src/jaz/tomography/particle_set.h>
 #include <src/jaz/tomography/extraction.h>
 #include <src/jaz/tomography/prediction.h>
 #include <src/ctf.h>
@@ -14,7 +14,7 @@ using namespace gravis;
 ProtoAlignment::ProtoAlignment(
 	const std::vector<BufferedImage<double>>& CCs,
 	const std::vector<gravis::d4Matrix>& frameProj, 
-	DataSet* dataSet, 
+	ParticleSet* dataSet,
 	const std::vector<int>& partIndices,
 	const std::vector<BufferedImage<fComplex>>& referenceFS,
 	bool constParticles,
@@ -245,7 +245,7 @@ std::vector<d4Matrix> ProtoAlignment::getProjections(const std::vector<double> &
 void ProtoAlignment::shiftParticles(
 		const std::vector<double> &x,
 		const std::vector<int>& partIndices, 
-		DataSet *target) const
+		ParticleSet *target) const
 {
 	if (constParticles) return;
 	

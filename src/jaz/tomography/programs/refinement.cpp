@@ -74,13 +74,13 @@ void RefinementProgram::init()
 		
 		ofs << '\n';
 	}
+
+	tomogramSet = TomogramSet(tomoSetFn);
 	
-	dataSet = DataSet::load(catFn, motFn);	
-	particles = dataSet->splitByTomogram();
+	dataSet = ParticleSet::load(catFn, motFn);
+	particles = dataSet->splitByTomogram(tomogramSet);
 		
 	referenceMap = TomoReferenceMap(ref1Fn, ref2Fn, boxSize, maskFn, fscFn, useFscThresh, fscThreshWidth);
-	
-	tomogramSet = TomogramSet(tomoSetFn);
 }
 
 BufferedImage<float> RefinementProgram::computeFrequencyWeights(

@@ -1,5 +1,5 @@
 #include "motion_fit.h"
-#include <src/jaz/tomography/data_set.h>
+#include <src/jaz/tomography/particle_set.h>
 #include <src/jaz/tomography/extraction.h>
 #include <src/jaz/tomography/prediction.h>
 #include <src/ctf.h>
@@ -15,7 +15,7 @@ using namespace gravis;
 MotionFit::MotionFit(
 	const std::vector<BufferedImage<double>>& CCs,
 	const std::vector<gravis::d4Matrix>& frameProj, 
-	DataSet* dataSet, 
+	ParticleSet* dataSet,
 	const std::vector<int>& partIndices,
 	const std::vector<BufferedImage<fComplex>>& referenceFS,
 	MotionParameters motionParameters,
@@ -393,7 +393,7 @@ std::vector<d4Matrix> MotionFit::getProjections(const std::vector<double> &x,
 
 void MotionFit::shiftParticles(
 		const std::vector<double> &x,
-		DataSet *target) const
+		ParticleSet *target) const
 {
 	if (settings.constParticles) return;
 	
@@ -436,7 +436,7 @@ Trajectory MotionFit::getTrajectory(const std::vector<double> &x, int p,
 
 void MotionFit::exportTrajectories(
 		const std::vector<double>& x, 
-		DataSet* dataSet,
+		ParticleSet* dataSet,
 		const std::vector<int>& frameSequence) const
 {
 	for (int p = 0; p < pc; p++)

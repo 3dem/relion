@@ -166,13 +166,13 @@ public:
 	bool getValueToString(EMDLabel label, std::string &value, long int objectID = -1, bool escape=false) const;
 	
 	// more syntactic sugar to avoid having to declare output variables separately:	
-	int getInt(EMDLabel label, long objectID = -1);
-	int getIntMinusOne(EMDLabel label, long objectID = -1);
-	RFLOAT getRfloat(EMDLabel label, long objectID = -1);
-	RFLOAT getDouble(EMDLabel label, long objectID = -1);
-	bool getBool(EMDLabel label, long objectID = -1);
-	std::string getString(EMDLabel label, long objectID = -1);
-	std::vector<double> getDoubleVector(EMDLabel label, long objectID = -1);
+	int getInt(EMDLabel label, long objectID = -1) const;
+	int getIntMinusOne(EMDLabel label, long objectID = -1) const;
+	RFLOAT getRfloat(EMDLabel label, long objectID = -1) const;
+	RFLOAT getDouble(EMDLabel label, long objectID = -1) const;
+	bool getBool(EMDLabel label, long objectID = -1) const;
+	std::string getString(EMDLabel label, long objectID = -1) const;
+	std::vector<double> getDoubleVector(EMDLabel label, long objectID = -1) const;
 
 	// Set the value of label for a specified object.
 	// If no objectID is given, the internal iterator 'current_objectID' is used

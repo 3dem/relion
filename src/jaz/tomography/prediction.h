@@ -6,7 +6,7 @@
 
 #include "reference_map.h"
 
-class DataSet;
+class ParticleSet;
 class CTF;
 class TomoList;
 class Tomogram;
@@ -32,7 +32,7 @@ class Prediction
 		
 		static BufferedImage<fComplex> predictFS(
 				int particle_id, 
-				const DataSet* dataSet, 
+				const ParticleSet* dataSet,
 				gravis::d4Matrix proj,
 				int s, const CTF& centreCtf,
 				gravis::d3Vector tomo_centre,
@@ -44,7 +44,7 @@ class Prediction
 		
 		static BufferedImage<fComplex> predictFS(
 				int particle_id, 
-				const DataSet* dataSet, 
+				const ParticleSet* dataSet,
 				gravis::d4Matrix proj,
 				int s, 
 				const std::vector<BufferedImage<fComplex>>& referenceFS,
@@ -52,14 +52,14 @@ class Prediction
 		
 		static BufferedImage<float> predictRS(
 				int particle_id, 
-				const DataSet* dataSet, 
+				const ParticleSet* dataSet,
 				gravis::d4Matrix proj,
 				int s, 
 				const std::vector<BufferedImage<fComplex>>& referenceFS,
 				HalfSet halfSet = OwnHalf);
 		
 		static std::vector<BufferedImage<double>> computeCroppedCCs(
-				const DataSet* dataSet,
+				const ParticleSet* dataSet,
 				const std::vector<int>& partIndices,
 				const Tomogram& tomogram,
 				const TomoReferenceMap& referenceMap,

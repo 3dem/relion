@@ -1,10 +1,10 @@
 #include <src/args.h>
-#include <src/jaz/tomography/data_set.h>
 #include <src/jaz/tomography/tomolist.h>
 #include <src/jaz/tomography/tomogram.h>
 #include <src/jaz/mesh/mesh_builder.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/tomography/tomogram_set.h>
+#include <src/jaz/tomography/particle_set.h>
 
 using namespace gravis;
 
@@ -73,14 +73,14 @@ int main(int argc, char *argv[])
 	
 	TomogramSet tomogramSet(tomoSetFn);
 	
-	DataSet* dataSet = DataSet::load(inFn, motFn);
-	std::vector<std::vector<int>> particles = dataSet->splitByTomogram();
+	ParticleSet* dataSet = ParticleSet::load(inFn, motFn);
+	std::vector<std::vector<int>> particles = dataSet->splitByTomogram(tomogramSet);
 	
-	DataSet* refDataSet = 0;
+	ParticleSet* refDataSet = 0;
 	
 	if (refFn != "")
 	{
-		refDataSet = DataSet::load(refFn, "");
+		refDataSet = ParticleSet::load(refFn, "");
 	}
 	
 	const int tc = particles.size();

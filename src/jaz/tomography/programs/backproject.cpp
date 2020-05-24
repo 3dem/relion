@@ -12,6 +12,7 @@
 #include <src/jaz/tomography/tomo_ctf_helper.h>
 #include <src/jaz/tomography/tomogram.h>
 #include <src/jaz/tomography/tomogram_set.h>
+#include <src/jaz/tomography/particle_set.h>
 #include <src/jaz/optics/damage.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
@@ -25,9 +26,11 @@ using namespace gravis;
 void BackprojectProgram::run()
 {
 	Log::beginSection("Initialising");
-	
-	DataSet* dataSet = DataSet::load(catFn, motFn);	
-	std::vector<std::vector<int>> particles = dataSet->splitByTomogram();
+
+	TomogramSet tomoSet(tomoSetFn);
+	ParticleSet* dataSet = ParticleSet::load(catFn, motFn);
+
+	std::vector<std::vector<int>> particles = dataSet->splitByTomogram(tomoSet);
 	
 	const int tc = particles.size();
 	const int s = boxSize;
@@ -37,9 +40,7 @@ void BackprojectProgram::run()
 	
 	const bool flip_value = true;
 	const bool do_ctf = true;
-	
-	
-	TomogramSet tomoSet(tomoSetFn);
+
 	
 	const long int voxelNum = (long int) sh * (long int) s * (long int) s;
 	

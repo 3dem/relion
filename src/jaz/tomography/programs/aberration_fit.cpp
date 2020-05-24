@@ -1,7 +1,7 @@
 #include "aberration_fit.h"
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h> 
-#include <src/jaz/tomography/data_set.h>
+#include <src/jaz/tomography/particle_set.h>
 #include <src/jaz/tomography/extraction.h>
 #include <src/jaz/tomography/prediction.h>
 #include <src/jaz/tomography/tomo_ctf_helper.h>
@@ -167,7 +167,7 @@ void AberrationFitProgram :: considerParticle(
 		int part_id,
 		const Tomogram& tomogram, 
 		const TomoReferenceMap& referenceMap, 
-		const DataSet* dataSet, 
+		const ParticleSet* dataSet,
 		bool flip_value,
 		const BufferedImage<float>& frqWeight,
 		int f0, int f1,

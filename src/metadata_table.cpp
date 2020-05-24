@@ -311,45 +311,45 @@ bool MetaDataTable::getValueToString(EMDLabel label, std::string &value, long ob
 	}
 }
 
-int MetaDataTable::getInt(EMDLabel label, long objectID)
+int MetaDataTable::getInt(EMDLabel label, long objectID) const
 {
 	int out = 0;
 	getValue(label, out, objectID);
 	return out;
 }
 
-int MetaDataTable::getIntMinusOne(EMDLabel label, long objectID)
+int MetaDataTable::getIntMinusOne(EMDLabel label, long objectID) const
 {
 	return getInt(label, objectID) - 1;
 }
 
-RFLOAT MetaDataTable::getRfloat(EMDLabel label, long objectID)
+RFLOAT MetaDataTable::getRfloat(EMDLabel label, long objectID) const
 {
 	RFLOAT out = 0.f;
 	getValue(label, out, objectID);
 	return out;
 }
 
-RFLOAT MetaDataTable::getDouble(EMDLabel label, long objectID)
+RFLOAT MetaDataTable::getDouble(EMDLabel label, long objectID) const
 {
 	return (double) getRfloat(label, objectID);
 }
 
-bool MetaDataTable::getBool(EMDLabel label, long objectID)
+bool MetaDataTable::getBool(EMDLabel label, long objectID) const
 {
 	bool out = false;
 	getValue(label, out, objectID);
 	return out;
 }
 
-std::string MetaDataTable::getString(EMDLabel label, long objectID)
+std::string MetaDataTable::getString(EMDLabel label, long objectID) const
 {
 	std::string out = "";
 	getValue(label, out, objectID);
 	return out;
 }
 
-std::vector<double> MetaDataTable::getDoubleVector(EMDLabel label, long objectID)
+std::vector<double> MetaDataTable::getDoubleVector(EMDLabel label, long objectID) const
 {
 	std::vector<double> out(0);
 	getValue(label, out, objectID);

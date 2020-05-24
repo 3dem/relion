@@ -1,6 +1,5 @@
 #include "defocus_refinement.h"
 #include "aberration_fit.h"
-#include <src/jaz/tomography/dynamo/catalogue.h>
 #include <src/jaz/tomography/projection/projection.h>
 #include <src/jaz/tomography/projection/Fourier_backprojection.h>
 #include <src/jaz/tomography/reconstruction.h>
@@ -9,7 +8,7 @@
 #include <src/jaz/tomography/tomo_ctf_helper.h>
 #include <src/jaz/image/power_spectrum.h>
 #include <src/jaz/tomography/tomolist.h>
-#include <src/jaz/tomography/data_set.h>
+#include <src/jaz/tomography/particle_set.h>
 #include <src/jaz/tomography/tomo_ctf_helper.h>
 #include <src/jaz/tomography/prediction.h>
 #include <src/jaz/tomography/projection/projection.h>
@@ -276,7 +275,7 @@ void DefocusRefinementProgram::run()
 BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(
 		int f, 
 		double z0, double z1, int steps, 
-		const DataSet* dataSet, 
+		const ParticleSet* dataSet,
 		std::vector<int>& particles, int max_particles,
 		const Tomogram& tomogram,
 		std::vector<BufferedImage<fComplex>>& referenceFS,
@@ -445,7 +444,7 @@ DefocusRefinementProgram::DefocusFit DefocusRefinementProgram::findDefocus(
 		double minDelta, 
 		double maxDelta,
 		int steps, int group_count, double sigma_input,
-		const DataSet* dataSet, 
+		const ParticleSet* dataSet,
 		std::vector<int>& particles, int max_particles,
 		const Tomogram& tomogram,
 		std::vector<BufferedImage<fComplex>>& referenceFS,
