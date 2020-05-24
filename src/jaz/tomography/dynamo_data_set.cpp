@@ -5,11 +5,9 @@ using namespace gravis;
 
 
 DynamoDataSet::DynamoDataSet()
-: DataSet(Dynamo)
 {}
 
 DynamoDataSet::DynamoDataSet(std::string filename)
-: DataSet(Dynamo)
 {
 	std::ifstream ifs(filename);
 	

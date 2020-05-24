@@ -4,7 +4,6 @@
 #include <src/jaz/tomography/motion/motion_fit.h>
 #include <src/jaz/tomography/motion/trajectory_set.h>
 #include <src/jaz/tomography/projection_IO.h>
-#include <src/jaz/tomography/data_set.h>
 #include <src/jaz/tomography/prediction.h>
 #include <src/jaz/tomography/extraction.h>
 #include <src/jaz/image/interpolation.h>

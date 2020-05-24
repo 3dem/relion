@@ -1,8 +1,6 @@
 #include <src/args.h>
-#include <src/jaz/tomography/data_set.h>
 #include <src/jaz/tomography/tomolist.h>
 #include <src/jaz/tomography/tomogram.h>
-#include <src/jaz/tomography/relion_data_set.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/tomography/tomogram_set.h>
 
@@ -20,7 +18,7 @@ int main(int argc, char *argv[])
 		int gen_section = parser.addSection("General options");
 
 		inputFn = parser.getOption("--i", "Input particle set");
-		tableFn = parser.getOption("--m", "Two-column table mapping micrograph names to tomogram names");
+		tableFn = parser.getOption("--m", "Table mapping micrograph names (first column) to tomogram names (second column)");
 		outputFn = parser.getOption("--o", "Output particle set");
 
 		parser.checkForErrors();

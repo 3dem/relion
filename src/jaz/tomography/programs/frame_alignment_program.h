@@ -9,7 +9,6 @@
 
 #include "refinement.h"
 
-class DataSet;
 class CTF;
 
 class FrameAlignmentProgram : public RefinementProgram

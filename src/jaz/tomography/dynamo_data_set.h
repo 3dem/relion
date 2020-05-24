@@ -1,11 +1,10 @@
 #ifndef DYNAMO_DATA_SET_H
 #define DYNAMO_DATA_SET_H
 
-#include "data_set.h"
 #include <src/jaz/tomography/dynamo/dynamo_particle.h>
 
 
-class DynamoDataSet : public DataSet
+class DynamoDataSet
 {
 	public:
 		

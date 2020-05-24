@@ -5,7 +5,6 @@
 #include <src/jaz/tomography/tomogram.h>
 #include <src/jaz/tomography/motion/proto_alignment.h>
 #include <src/jaz/tomography/projection_IO.h>
-#include <src/jaz/tomography/data_set.h>
 #include <src/jaz/tomography/prediction.h>
 #include <src/jaz/tomography/extraction.h>
 #include <src/jaz/image/interpolation.h>

@@ -10,7 +10,6 @@
 
 #include "refinement.h"
 
-class DataSet;
 class CTF;
 
 class PolishProgram : public RefinementProgram

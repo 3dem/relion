@@ -9,7 +9,6 @@
 #include <src/jaz/image/power_spectrum.h>
 #include <src/jaz/tomography/tomogram.h>
 #include <src/jaz/tomography/tomolist.h>
-#include <src/jaz/tomography/data_set.h>
 #include <src/jaz/tomography/tomo_ctf_helper.h>
 #include <src/jaz/tomography/projection/projection.h>
 #include <src/jaz/optics/damage.h>

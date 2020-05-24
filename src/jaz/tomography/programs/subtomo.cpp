@@ -8,8 +8,6 @@
 #include <src/jaz/image/padding.h>
 #include <src/jaz/tomography/tomo_ctf_helper.h>
 #include <src/jaz/image/power_spectrum.h>
-#include <src/jaz/tomography/data_set.h>
-#include <src/jaz/tomography/relion_data_set.h>
 #include <src/jaz/tomography/tomo_ctf_helper.h>
 #include <src/jaz/tomography/tomogram.h>
 #include <src/jaz/tomography/particle_set.h>
