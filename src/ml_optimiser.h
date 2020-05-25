@@ -945,7 +945,8 @@ public:
 			std::vector<RFLOAT> &exp_local_sqrtXi2,
 			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2,
 			std::vector<MultidimArray<RFLOAT> > &exp_STweight,
-			std::vector<MultidimArray<RFLOAT> > &exp_Fctfs1D);
+			std::vector<MultidimArray<RFLOAT> > &exp_Fctfs1D,
+			std::vector<MultidimArray<RFLOAT> > &exp_local_STMulti);
 
 	// Given exp_Mcoarse_significant, check for iorient whether any of the particles has any significant (coarsely sampled) translation
 	bool isSignificantAnyImageAnyTranslation(long int iorient,

@@ -928,7 +928,7 @@ void getAllSquaredDifferencesCoarse(
 	std::vector<MultidimArray<RFLOAT> > dummyRF;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, false, op.part_id, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimg, dummy, op.Fctf, dummy2, dummy2,
-			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2, op.FstMulti, dummyRF);
+			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2, op.FstMulti, dummyRF, dummyRF);
 
 	CTOC(accMLO->timer,"diff_pre_gpu");
 
@@ -1218,7 +1218,7 @@ void getAllSquaredDifferencesFine(
 	std::vector<MultidimArray<RFLOAT> > dummyRF;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, false, op.part_id, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimg, dummy, op.Fctf, dummy2, dummy2,
-			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2, op.FstMulti, dummyRF);
+			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2, op.FstMulti, dummyRF, dummyRF);
 	CTOC(accMLO->timer,"precalculateShiftedImagesCtfsAndInvSigma2s");
 
 
@@ -2113,9 +2113,15 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	std::vector<MultidimArray<Complex > > dummy;
 	std::vector<std::vector<MultidimArray<Complex > > > dummy2;
 	std::vector<MultidimArray<RFLOAT> > dummyRF;
+
+	std::vector<MultidimArray<RFLOAT> > exp_local_STMulti;
+	exp_local_STMulti.resize(sp.nr_images);
+
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, true, op.part_id, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimg, op.Fimg_nomask, op.Fctf, dummy2, dummy2,
-			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2, op.FstMulti, dummyRF);
+			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2, op.FstMulti, dummyRF, exp_local_STMulti);
+
+	bool do_subtomo_correction = NZYXSIZE(op.FstMulti[0]) > 0;
 
 	// In doThreadPrecalculateShiftedImagesCtfsAndInvSigma2s() the origin of the op.local_Minvsigma2s was omitted.
 	// Set those back here
@@ -2889,6 +2895,29 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			{
 				thr_wsum_sigma2_noise[img_id].data[ires] += (RFLOAT) wdiff2s[sum_offset+j];
 				exp_wsum_norm_correction[img_id] += (RFLOAT) wdiff2s[sum_offset+j]; //TODO could be gpu-reduced
+			}
+		}
+
+		if (do_subtomo_correction)
+		{	MultidimArray<RFLOAT> &MySTMulti = exp_local_STMulti[img_id];
+			MultidimArray<RFLOAT> thr_wsum_stMulti;
+			thr_wsum_stMulti.initZeros(baseMLO->image_full_size[optics_group]/2 + 1);
+
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(baseMLO->Mresol_fine[optics_group])
+			{
+				int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine[optics_group], n);
+				if (ires > -1)
+					DIRECT_MULTIDIM_ELEM(thr_wsum_stMulti, ires) += DIRECT_MULTIDIM_ELEM(MySTMulti, n);
+			}
+
+			int my_image_size = baseMLO->mydata.getOpticsImageSize(optics_group);
+			RFLOAT my_optics_pixel_size = baseMLO->mydata.getOpticsPixelSize(optics_group);
+			RFLOAT remap_image_sizes = (baseMLO->mymodel.ori_size * baseMLO->mymodel.pixel_size) / (my_image_size * my_optics_pixel_size);
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(thr_wsum_sigma2_noise[img_id])
+			{
+				int i_resam = ROUND(i * remap_image_sizes);
+				if (i_resam < XSIZE(baseMLO->Npix_per_shell))
+					DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[img_id], i) *= DIRECT_A1D_ELEM(baseMLO->Npix_per_shell, i_resam) / DIRECT_MULTIDIM_ELEM(thr_wsum_stMulti, i);
 			}
 		}
 	} // end loop img_id
