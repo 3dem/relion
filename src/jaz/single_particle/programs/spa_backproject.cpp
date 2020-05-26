@@ -65,6 +65,7 @@ void SpaBackproject::read(int argc, char **argv)
 	nr_sectors = textToInteger(parser.getOption("--sectors", "Number of sectors for Ewald sphere correction", "2"));
 	skip_mask = parser.checkOption("--skip_mask", "Do not apply real space mask during Ewald sphere correction");
 	skip_weighting = parser.checkOption("--skip_weighting", "Do not apply weighting during Ewald sphere correction");
+	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
 
 	if (verb > 0 && do_ewald && mask_diameter < 0 && !(skip_mask && skip_weighting))
 	{
@@ -105,7 +106,6 @@ void SpaBackproject::read(int argc, char **argv)
 	read_weights = parser.checkOption("--read_weights", "Developmental: read freq. weight files");
 	do_debug = parser.checkOption("--write_debug_output", "Write out arrays with data and weight terms prior to reconstruct");
 	do_external_reconstruct = parser.checkOption("--external_reconstruct", "Write out BP denominator and numerator for external_reconstruct program");
-	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
 	
 	num_threads_in = textToInteger(parser.getOption("--j_in", "Number of inner threads", "1"));
 	num_threads_out = textToInteger(parser.getOption("--j_out", "Number of outer threads", "1"));
@@ -240,7 +240,14 @@ void SpaBackproject::run()
 	}
 	else
 	{
-		reconstructBackward();
+		if (do_dual_contrast)
+		{
+			reconstructDualContrast();
+		}
+		else
+		{
+			reconstructBackward();
+		}
 	}
 }
 
@@ -1004,6 +1011,12 @@ void SpaBackproject::reconstructBackward()
 
 			ctfImgFS[half] = Symmetry::symmetrise_FS_real(
 				ctfImgFS[half], fn_sym, num_threads_total);
+
+			if (compute_multiplicity)
+			{
+				multiplicities[half] = Symmetry::symmetrise_FS_real(
+					multiplicities[half], fn_sym, num_threads_total);
+			}
 		}
 	}
 
@@ -1098,7 +1111,7 @@ void SpaBackproject::reconstructBackward()
 	}
 }
 
-void SpaBackproject::reconstructBackward_dualContrast()
+void SpaBackproject::reconstructDualContrast()
 {
 	const int ic = dual_contrast_accumulation_volumes.size();
 
@@ -1120,123 +1133,88 @@ void SpaBackproject::reconstructBackward_dualContrast()
 		}
 	}
 
-	std::vector<BufferedImage<Complex>> dataImgFS = {
-		accumulation_volumes[0].data,
-		accumulation_volumes[1].data};
-
-	std::vector<BufferedImage<RFLOAT>> psfImgFS = {
-		spreading_functions[0],
-		spreading_functions[1]};
-
-	std::vector<BufferedImage<RFLOAT>> ctfImgFS = {
-		accumulation_volumes[0].weight,
-		accumulation_volumes[1].weight};
-
 	if (fn_sym != "C1")
 	{
 		Log::print("Applying symmetries");
 
 		for (int half = 0; half < 2; half++)
 		{
-			dataImgFS[half] = Symmetry::symmetrise_FS_complex(
-				dataImgFS[half], fn_sym, num_threads_total);
+			dual_contrast_accumulation_volumes[half] =
+				Symmetry::symmetrise_dualContrast(
+					dual_contrast_accumulation_volumes[half],
+					fn_sym, num_threads_total);
 
-			psfImgFS[half] = Symmetry::symmetrise_FS_real(
-				psfImgFS[half], fn_sym, num_threads_total);
-
-			ctfImgFS[half] = Symmetry::symmetrise_FS_real(
-				ctfImgFS[half], fn_sym, num_threads_total);
+			spreading_functions[half] = Symmetry::symmetrise_FS_real(
+				spreading_functions[half], fn_sym, num_threads_total);
 		}
 	}
 
-	const int s = dataImgFS[0].ydim;
+	BufferedImage<DualContrastVoxel<RFLOAT>> accumulation_volume_both =
+			dual_contrast_accumulation_volumes[0] + dual_contrast_accumulation_volumes[1];
 
-	// Scale image values to approximate Relion's original output:
-	for (int half = 0; half < 2; half++)
-	{
-		dataImgFS[half] *= s / (6.0 * padding_factor);
-	}
+	BufferedImage<double> psfImgFS_both = spreading_functions[0] + spreading_functions[1];
 
-	std::vector<BufferedImage<double>> dataImgRS(2), dataImgDivRS(2);
 
-	BufferedImage<dComplex> dataImgFS_both = dataImgFS[0] + dataImgFS[1];
-	BufferedImage<double> psfImgFS_both = psfImgFS[0] + psfImgFS[1];
-	BufferedImage<double> ctfImgFS_both = ctfImgFS[0] + ctfImgFS[1];
+	Log::beginSection("Reconstructing");	
 
-	Log::beginSection("Reconstructing");
-
+	const int s = dual_contrast_accumulation_volumes[0].ydim;
 	const int cropSize = s / padding_factor;
 	const int margin = (s - cropSize) / 2;
 	const bool needs_cropping = margin > 0;
+
 
 
 	for (int half = 0; half < 2; half++)
 	{
 		Log::print("Half " + ZIO::itoa(half));
 
-		dataImgRS[half] = BufferedImage<double>(s,s,s);
-		dataImgDivRS[half] = BufferedImage<double>(s,s,s);
+		Reconstruction::griddingCorrect_dualContrast(
+				dual_contrast_accumulation_volumes[half], // in
+				spreading_functions[half],                // in
+				dual_contrast_accumulation_volumes[half], // out
+				true, num_threads_total);
 
-		Reconstruction::griddingCorrect3D(
-					dataImgFS[half], psfImgFS[half],  // in
-					dataImgRS[half],                  // out
-					true, num_threads_total);
+		std::pair<BufferedImage<RFLOAT>,BufferedImage<RFLOAT>> dualContrastMaps =
+			Reconstruction::solveDualContrast(
+				dual_contrast_accumulation_volumes[half],
+				SNR, num_threads_total);
 
-		if (SNR > 0.0)
-		{
-			Reconstruction::ctfCorrect3D_Wiener(
-					dataImgRS[half], ctfImgFS[half],  // in
-					dataImgDivRS[half],               // out
-					1.0 / SNR, num_threads_total);
-		}
-		else
-		{
-			Reconstruction::ctfCorrect3D_heuristic(
-					dataImgRS[half], ctfImgFS[half],  // in
-					dataImgDivRS[half],               // out
-					0.001, num_threads_total);
-		}
-
-		dataImgDivRS[half].write(fn_out+"_half"+ZIO::itoa(half+1)+".mrc", angpix);
-		dataImgRS[half].write(fn_out+"_data_half"+ZIO::itoa(half+1)+".mrc", angpix);
-
-		Centering::fftwHalfToHumanFull(ctfImgFS[half]).write(
-					fn_out+"_weight_half"+ZIO::itoa(half+1)+".mrc", angpix);
+		dualContrastMaps.first.write(fn_out+"_half"+ZIO::itoa(half+1)+"_phase.mrc", angpix);
+		dualContrastMaps.second.write(fn_out+"_half"+ZIO::itoa(half+1)+"_amplitude.mrc", angpix);
 
 		if (needs_cropping)
 		{
-			Padding::unpadCenter3D_full(dataImgDivRS[half], margin).
-					write(fn_out+"_half"+ZIO::itoa(half+1)+"_cropped.mrc", angpix);
+			Padding::unpadCenter3D_full(dualContrastMaps.first, margin).
+					write(fn_out+"_half"+ZIO::itoa(half+1)+"_phase_cropped.mrc", angpix);
+
+			Padding::unpadCenter3D_full(dualContrastMaps.second, margin).
+					write(fn_out+"_half"+ZIO::itoa(half+1)+"_amplitude_cropped.mrc", angpix);
 		}
 	}
 
 	Log::endSection();
 
-	Reconstruction::griddingCorrect3D(
-		dataImgFS_both, psfImgFS_both, dataImgRS[0], true, num_threads_total);
+	Reconstruction::griddingCorrect_dualContrast(
+			accumulation_volume_both,
+			psfImgFS_both,
+			accumulation_volume_both,
+			true, num_threads_total);
 
-	if (SNR > 0.0)
-	{
-		Reconstruction::ctfCorrect3D_Wiener(
-			dataImgRS[0], ctfImgFS_both, dataImgDivRS[0],
-			1.0 / SNR, num_threads_total);
-	}
-	else
-	{
-		Reconstruction::ctfCorrect3D_heuristic(
-			dataImgRS[0], ctfImgFS_both, dataImgDivRS[0],
-			0.001, num_threads_total);
-	}
+	std::pair<BufferedImage<RFLOAT>,BufferedImage<RFLOAT>> dualContrastMaps =
+		Reconstruction::solveDualContrast(
+			accumulation_volume_both,
+			SNR, num_threads_total);
 
-	dataImgDivRS[0].write(fn_out+"_merged.mrc", angpix);
-	dataImgRS[0].write(fn_out+"_data_merged.mrc", angpix);
-
-	Centering::fftwHalfToHumanFull(ctfImgFS[0]).write(fn_out+"_weight_merged.mrc", angpix);
+	dualContrastMaps.first.write(fn_out+"_phase.mrc", angpix);
+	dualContrastMaps.second.write(fn_out+"_amplitude.mrc", angpix);
 
 	if (needs_cropping)
 	{
-		Padding::unpadCenter3D_full(dataImgDivRS[0], margin).
-				write(fn_out+"_cropped.mrc", angpix);
+		Padding::unpadCenter3D_full(dualContrastMaps.first, margin).
+				write(fn_out+"_phase_cropped.mrc", angpix);
+
+		Padding::unpadCenter3D_full(dualContrastMaps.second, margin).
+				write(fn_out+"_amplitude_cropped.mrc", angpix);
 	}
 }
 

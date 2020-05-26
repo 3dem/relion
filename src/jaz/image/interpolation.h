@@ -68,10 +68,15 @@ class Interpolation
 		static tComplex<T> linearXY_complex_FftwHalf(
 				const RawImage<tComplex<T>>& img, 
 				double xSgn, double ySgn, int z = 0);
-		
+
 		template<typename T> inline
 		static tComplex<T> linearXYZ_FftwHalf_complex(
-				const RawImage<tComplex<T>>& img, 
+				const RawImage<tComplex<T>>& img,
+				double xSgn, double ySgn, double zSgn);
+
+		template<typename T> inline
+		static T linearXYZ_FftwHalf_generic(
+				const RawImage<T>& img,
 				double xSgn, double ySgn, double zSgn);
 		
 		template<typename T> inline
@@ -674,6 +679,69 @@ tComplex<T> Interpolation::linearXYZ_FftwHalf_complex(
 	return conj? vxyz.conj() : vxyz;
 }
 
+
+template<typename Conjugable> inline
+Conjugable Interpolation::linearXYZ_FftwHalf_generic(
+		const RawImage<Conjugable>& img,
+		double xSgn, double ySgn, double zSgn)
+{
+	double xd, yd, zd;
+	bool conj;
+
+	if (xSgn > 0.0)
+	{
+		xd = xSgn;
+		yd = ySgn;
+		zd = zSgn;
+		conj = false;
+	}
+	else
+	{
+		xd = -xSgn;
+		yd = -ySgn;
+		zd = -zSgn;
+		conj = true;
+	}
+
+	if (yd < 0.0) yd += img.ydim;
+	if (zd < 0.0) zd += img.zdim;
+
+	int x0 = (int) xd;
+	int y0 = (int) yd;
+	int z0 = (int) zd;
+
+	const double xf = xd - x0;
+	const double yf = yd - y0;
+	const double zf = zd - z0;
+
+	if (x0 >= img.xdim) x0 = img.xdim-1;
+
+	int x1 = x0 + 1;
+	if (x1 >= img.xdim) x1 = img.xdim-2;
+
+
+	if (y0 < 0) y0 = 0;
+	else if (y0 >= img.ydim) y0 = img.ydim-1;
+
+	int y1 = (y0 + 1) % img.ydim;
+
+	if (z0 < 0) z0 = 0;
+	else if (z0 >= img.zdim) z0 = img.zdim-1;
+
+	int z1 = (z0 + 1) % img.zdim;
+
+	const Conjugable vx00 = (1 - xf) * img(x0,y0,z0) + xf * img(x1,y0,z0);
+	const Conjugable vx10 = (1 - xf) * img(x0,y1,z0) + xf * img(x1,y1,z0);
+	const Conjugable vx01 = (1 - xf) * img(x0,y0,z1) + xf * img(x1,y0,z1);
+	const Conjugable vx11 = (1 - xf) * img(x0,y1,z1) + xf * img(x1,y1,z1);
+
+	const Conjugable vxy0 = (1 - yf) * vx00 + yf * vx10;
+	const Conjugable vxy1 = (1 - yf) * vx01 + yf * vx11;
+
+	const Conjugable vxyz = (1 - zf) * vxy0 + zf * vxy1;
+
+	return conj? vxyz.conj() : vxyz;
+}
 
 template<typename T> inline
 T Interpolation::linearXYZ_FftwHalf_real(

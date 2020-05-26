@@ -110,7 +110,7 @@ class SpaBackproject
 		void backprojectOneParticle(long int p, int thread_id);
 		void reconstructForward();
 		void reconstructBackward();
-		void reconstructBackward_dualContrast();
+		void reconstructDualContrast();
 		
 		void applyCTFPandCTFQ(
 				MultidimArray<Complex> &Fin, 

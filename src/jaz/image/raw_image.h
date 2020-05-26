@@ -10,6 +10,7 @@
 #include <src/jaz/single_particle/vtk_helper.h>
 #include <stddef.h>
 
+#define RAW_IMAGE_BOUNDS_CHECKING 0
 
 template <class T>
 class RawImage
@@ -266,36 +267,109 @@ void RawImage<T>::swapWith(RawImage<T>& img)
 template <class T> 
 inline const T& RawImage<T>::operator() (size_t x, size_t y, size_t z) const
 {
+	#if RAW_IMAGE_BOUNDS_CHECKING
+
+	const int i = (z*ydim + y)*xdim + x;
+
+	if (i < 0 || i >= xdim*ydim*zdim)
+	{
+		REPORT_ERROR_STR("RawImage<T>::operator(): indices "
+			<< x << ", " << y << ", " << z
+			<< " (" << i << ") not in [0, " << (xdim*ydim*zdim) << "]");
+	}
+
+	#endif
+
 	return data[(z*ydim + y)*xdim + x];
 }
 
 template <class T>
 inline T& RawImage<T>::operator() (size_t x, size_t y, size_t z)
 {
+	#if RAW_IMAGE_BOUNDS_CHECKING
+
+	const int i = (z*ydim + y)*xdim + x;
+
+	if (i < 0 || i >= xdim*ydim*zdim)
+	{
+		REPORT_ERROR_STR("RawImage<T>::operator(): indices "
+			<< x << ", " << y << ", " << z
+			<< " (" << i << ") not in [0, " << (xdim*ydim*zdim) << "]");
+	}
+
+	#endif
+
 	return data[(z*ydim + y)*xdim + x];
 }
 
 template <class T>
 inline const T& RawImage<T>::operator() (size_t x, size_t y) const
 {
+	#if RAW_IMAGE_BOUNDS_CHECKING
+
+	const int i = y*xdim + x;
+
+	if (i < 0 || i >= xdim*ydim*zdim)
+	{
+		REPORT_ERROR_STR("RawImage<T>::operator(): indices "
+			<< x << ", " << y
+			<< " (" << i << ") not in [0, " << (xdim*ydim*zdim) << "]");
+	}
+
+	#endif
+
 	return data[y*xdim + x];
 }
 
 template <class T>
 inline T& RawImage<T>::operator() (size_t x, size_t y)
 {
+	#if RAW_IMAGE_BOUNDS_CHECKING
+
+	const int i = y*xdim + x;
+
+	if (i < 0 || i >= xdim*ydim*zdim)
+	{
+		REPORT_ERROR_STR("RawImage<T>::operator(): indices "
+			<< x << ", " << y
+			<< " (" << i << ") not in [0, " << (xdim*ydim*zdim) << "]");
+	}
+
+	#endif
+
+
 	return data[y*xdim + x];
 }
 
 template <class T>
 inline const T& RawImage<T>::operator[] (size_t i) const
 {
+	#if RAW_IMAGE_BOUNDS_CHECKING
+
+	if (i < 0 || i >= xdim*ydim*zdim)
+	{
+		REPORT_ERROR_STR("RawImage<T>::operator(): index "
+			<< i << " not in [0, " << (xdim*ydim*zdim) << "]");
+	}
+
+	#endif
+
 	return data[i];
 }
 
 template <class T>
 inline T& RawImage<T>::operator[] (size_t i)
 {
+	#if RAW_IMAGE_BOUNDS_CHECKING
+
+	if (i < 0 || i >= xdim*ydim*zdim)
+	{
+		REPORT_ERROR_STR("RawImage<T>::operator(): index "
+			<< i << " not in [0, " << (xdim*ydim*zdim) << "]");
+	}
+
+	#endif
+
 	return data[i];
 }
 

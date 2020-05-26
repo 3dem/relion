@@ -28,6 +28,7 @@
 #include <src/jaz/image/raw_image.h>
 #include <src/jaz/image/interpolation.h>
 #include <src/jaz/image/radial_avg.h>
+#include <src/jaz/optics/dual_contrast/dual_contrast_voxel.h>
 #include "extraction.h"
 #include "tomo_stack.h"
 
@@ -35,13 +36,21 @@
 class Reconstruction
 {
     public:
-		
+
 		template <typename T>
 		static void griddingCorrect3D(
 				BufferedImage<tComplex<T>>& dataImgFS,
 				BufferedImage<T>& psfImgFS,
 				BufferedImage<T>& out,
-				bool center, 
+				bool center,
+				int num_threads);
+
+		template <typename T>
+		static void griddingCorrect_dualContrast(
+				BufferedImage<DualContrastVoxel<T>>& image,
+				BufferedImage<T>& psfImgFS,
+				BufferedImage<DualContrastVoxel<T>>& out,
+				bool center,
 				int num_threads);
 
 		template <typename T>
@@ -58,6 +67,12 @@ class Reconstruction
 				BufferedImage<T>& ctfImgFS,
 				BufferedImage<T>& out,
 				double weightFraction = 0.001,
+				int num_threads = 1);
+
+		template <typename T>
+		static std::pair<BufferedImage<T>,BufferedImage<T>> solveDualContrast(
+				BufferedImage<DualContrastVoxel<T>>& image,
+				double SNR = 1,
 				int num_threads = 1);
 		
 		template <typename T>
@@ -175,6 +190,97 @@ void Reconstruction :: griddingCorrect3D(
 }
 
 template <typename T>
+void Reconstruction :: griddingCorrect_dualContrast(
+		BufferedImage<DualContrastVoxel<T>>& image,
+		BufferedImage<T>& psfImgFS,
+		BufferedImage<DualContrastVoxel<T>>& out,
+		bool center,
+		int num_threads)
+{
+	const long int wh = image.xdim;
+	const long int w = 2 * (wh - 1);
+	const long int h = image.ydim;
+	const long int d = image.zdim;
+
+	if (!out.hasEqualSize(image))
+	{
+		REPORT_ERROR_STR("Reconstruction :: griddingCorrect_dualContrast: unequal input and output image sizes");
+	}
+
+	if (center)
+	{
+		#pragma omp parallel for num_threads(num_threads)
+		for (long int z = 0; z < d;  z++)
+		for (long int y = 0; y < h;  y++)
+		for (long int x = 0; x < wh; x++)
+		{
+			image(x,y,z).data_sin *= (1 - 2*(x%2)) * (1 - 2*(y%2)) * (1 - 2*(z%2));
+			image(x,y,z).data_cos *= (1 - 2*(x%2)) * (1 - 2*(y%2)) * (1 - 2*(z%2));
+		}
+	}
+
+	BufferedImage<tComplex<T>> sinImgFS(wh,h,d), cosImgFS(wh,h,d);
+
+	for (long int z = 0; z < d;  z++)
+	for (long int y = 0; y < h;  y++)
+	for (long int x = 0; x < wh; x++)
+	{
+		sinImgFS(x,y,z) = image(x,y,z).data_sin;
+		cosImgFS(x,y,z) = image(x,y,z).data_cos;
+	}
+
+	BufferedImage<T> sinImgRS(w,h,d), cosImgRS(w,h,d);
+
+	FFT::inverseFourierTransform(sinImgFS, sinImgRS, FFT::Both);
+	FFT::inverseFourierTransform(cosImgFS, cosImgRS, FFT::Both);
+
+	BufferedImage<tComplex<T>> psfImgFS_complex(wh,h,d);
+
+	#pragma omp parallel for num_threads(num_threads)
+	for (long int z = 0; z < d; z++)
+	for (long int y = 0; y < h; y++)
+	for (long int x = 0; x < wh; x++)
+	{
+		psfImgFS_complex(x,y,z) = psfImgFS(x,y,z);
+
+		if (center)
+		{
+			psfImgFS_complex(x,y,z) *= (1 - 2*(x%2)) * (1 - 2*(y%2)) * (1 - 2*(z%2));
+		}
+	}
+
+	BufferedImage<T> dataEnv(w,h,d);
+	FFT::inverseFourierTransform(psfImgFS_complex, dataEnv, FFT::Both);
+
+	const double eps = 1e-10;
+
+	#pragma omp parallel for num_threads(num_threads)
+	for (long int z = 0; z < d; z++)
+	for (long int y = 0; y < h; y++)
+	for (long int x = 0; x < w; x++)
+	{
+		if (dataEnv(x,y,z) > eps)
+		{
+			sinImgRS(x,y,z) /= dataEnv(x,y,z);
+			cosImgRS(x,y,z) /= dataEnv(x,y,z);
+		}
+	}
+
+	FFT::FourierTransform(sinImgRS, sinImgFS, FFT::Both);
+	FFT::FourierTransform(cosImgRS, cosImgFS, FFT::Both);
+
+	#pragma omp parallel for num_threads(num_threads)
+	for (long int z = 0; z < d; z++)
+	for (long int y = 0; y < h; y++)
+	for (long int x = 0; x < wh; x++)
+	{
+		out(x,y,z) = image(x,y,z);
+		out(x,y,z).data_sin = sinImgFS(x,y,z);
+		out(x,y,z).data_cos = cosImgFS(x,y,z);
+	}
+}
+
+template <typename T>
 void Reconstruction :: ctfCorrect3D_Wiener(
 		BufferedImage<T>& img,
 		BufferedImage<T>& ctfImgFS,
@@ -265,11 +371,42 @@ void Reconstruction :: ctfCorrect3D_heuristic(
 				dataImgCorrFS(x,y,z) /= wg;
 			}
 		}
-
-
 	}
 
 	FFT::inverseFourierTransform(dataImgCorrFS, out, FFT::Both);
+}
+
+template<typename T>
+std::pair<BufferedImage<T>, BufferedImage<T>>
+	Reconstruction::solveDualContrast(
+		BufferedImage<DualContrastVoxel<T>>& image, double SNR, int num_threads)
+{
+	const long int wh = image.xdim;
+	const long int w = 2 * (wh - 1);
+	const long int h = image.ydim;
+	const long int d = image.zdim;
+
+	const double WienerOffset = SNR > 0.0? 1.0 / SNR : 0.0;
+
+	BufferedImage<tComplex<T>> phaseOutFS(wh,h,d), ampOutFS(wh,h,d);
+
+	#pragma omp parallel for num_threads(num_threads)
+	for (long int z = 0; z < d;  z++)
+	for (long int y = 0; y < h;  y++)
+	for (long int x = 0; x < wh; x++)
+	{
+		std::pair<tComplex<T>,tComplex<T>> mu = image(x,y,z).solve(WienerOffset);
+
+		phaseOutFS(x,y,z) = mu.first;
+		ampOutFS(x,y,z)   = mu.second;
+	}
+
+	BufferedImage<T> phaseOutRS(w,h,d), ampOutRS(w,h,d);
+
+	FFT::inverseFourierTransform(phaseOutFS, phaseOutRS, FFT::Both);
+	FFT::inverseFourierTransform(ampOutFS, ampOutRS, FFT::Both);
+
+	return std::make_pair(phaseOutRS, ampOutRS);
 }
 
 template <typename T>
