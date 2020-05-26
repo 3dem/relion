@@ -33,10 +33,10 @@ class RadialAvg
 		static std::vector<T> fftwHalf_2D_NN(const RawImage<T>& img, int boundary = 0);
 
 		template<typename T>
-		static void toFftwHalf_2D_lin(const std::vector<T>& vec, int wh, int h, RawImage<T>& dest);
+		static void toFftwHalf_2D_lin(const std::vector<T>& vec, int wh, int h, RawImage<T>& dest, double scale = 1.0);
 
 		template<typename T>
-		static BufferedImage<T> toFftwHalf_2D_lin(const std::vector<T>& vec, int wh, int h);
+		static BufferedImage<T> toFftwHalf_2D_lin(const std::vector<T>& vec, int wh, int h, double scale = 1.0);
 
 		template<typename T>
 		static std::vector<std::pair<T,T>> radialAverageAndStdDevFFTW_2D(const Image<T>& map);
@@ -271,7 +271,7 @@ std::vector<T> RadialAvg::fftwHalf_2D_NN(const RawImage<T>& img, int boundary)
 
 
 template<typename T>
-void RadialAvg::toFftwHalf_2D_lin(const std::vector<T>& vec, int wh, int h, RawImage<T>& dest)
+void RadialAvg::toFftwHalf_2D_lin(const std::vector<T>& vec, int wh, int h, RawImage<T>& dest, double scale)
 {
 	const int b = vec.size();
 
@@ -280,7 +280,7 @@ void RadialAvg::toFftwHalf_2D_lin(const std::vector<T>& vec, int wh, int h, RawI
 	{
 		const double x = xx;
 		const double y = yy < h/2.0? yy : yy - h;
-		const double rd = sqrt(x*x + y*y);
+		const double rd = scale * sqrt(x*x + y*y);
 
 		const int r0 = (int)(rd);
 		const int r1 = r0 + 1;
@@ -299,12 +299,12 @@ void RadialAvg::toFftwHalf_2D_lin(const std::vector<T>& vec, int wh, int h, RawI
 }
 
 template<typename T>
-BufferedImage<T> RadialAvg::toFftwHalf_2D_lin(const std::vector<T>& vec, int wh, int h)
+BufferedImage<T> RadialAvg::toFftwHalf_2D_lin(const std::vector<T>& vec, int wh, int h, double scale)
 {
 	BufferedImage<T> out(wh,h);
 	out.fill(T(0));
 
-	toFftwHalf_2D_lin(vec, wh, h, out);
+	toFftwHalf_2D_lin(vec, wh, h, out, scale);
 
 	return out;
 }

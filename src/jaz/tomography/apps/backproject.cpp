@@ -18,6 +18,9 @@ int main(int argc, char *argv[])
 		bp.tomoSetFn = parser.getOption("--t", "Tomogram set", "tomograms.star");
 		bp.boxSize = textToInteger(parser.getOption("--b", "Box size", "100"));
 		bp.cropSize = textToInteger(parser.getOption("--crop", "Size of (additionally output) cropped image", "-1"));
+
+		bp.do_whiten = parser.checkOption("--whiten", "Whiten the noise by flattening the power spectrum");
+
 		bp.binning = textToDouble(parser.getOption("--bin", "Binning factor", "1"));
 		bp.taper = textToDouble(parser.getOption("--taper", "Taper against the sphere by this number of pixels (only if cropping)", "10"));
 		bp.SNR = textToDouble(parser.getOption("--SNR", "Assumed signal-to-noise ratio (negative means use a heuristic)", "-1"));

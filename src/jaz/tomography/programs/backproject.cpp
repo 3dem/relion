@@ -103,6 +103,13 @@ void BackprojectProgram::run()
 		dataSet->checkTrajectoryLengths(particles[t][0], pc, fc, "backproject");
 		
 		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s, binning);
+		BufferedImage<float> noiseWeights;
+
+		if (do_whiten)
+		{
+			noiseWeights = tomogram.computeNoiseWeight(s, binning);
+		}
+
 		
 		// @TODO: define input and output pixel sizes!		
 		const double binnedPixelSize = tomogram.optics.pixelSize * binning;
@@ -168,8 +175,14 @@ void BackprojectProgram::run()
 						weightStack[th](x,y,f) = c * c;
 					}
 				}
+			}			
+
+			if (do_whiten)
+			{
+				particleStack[th] *= noiseWeights;
+				weightStack[th] *= noiseWeights;
 			}
-			
+
 			FourierBackprojection::backproject_bwd(
 				particleStack[th], weightStack[th], projPart, 
 				dataImgFS[2*th + halfSet], 

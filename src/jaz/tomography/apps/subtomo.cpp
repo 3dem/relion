@@ -31,6 +31,7 @@ int main(int argc, char *argv[])
         sp.taper = textToDouble(parser.getOption("--taper", "Taper against the sphere by this number of pixels", "5"));
 		sp.env_sigma = textToDouble(parser.getOption("--env", "Sigma of a Gaussian envelope applied before cropping", "-1"));
 		
+		sp.do_whiten = parser.checkOption("--whiten", "Whiten the noise by flattening the power spectrum");
         sp.do_center = !parser.checkOption("--no_center", "Do not subtract the mean from the voxel values");
 		
 		sp.flip_value = !parser.checkOption("--no_ic", "Do not invert contrast (keep particles dark)");

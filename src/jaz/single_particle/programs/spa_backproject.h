@@ -34,6 +34,7 @@
 #include <src/ml_model.h>
 #include <src/jaz/single_particle/obs_model.h>
 #include <src/jaz/image/buffered_image.h>
+#include <src/jaz/optics/dual_contrast/dual_contrast_voxel.h>
 
 
 class SpaBackproject
@@ -73,7 +74,7 @@ class SpaBackproject
 			padding_factor, mask_diameter;
 		
 		
-		
+
 		std::vector<BackProjector> backprojectors;
 		
 		Projector projector;
@@ -83,11 +84,14 @@ class SpaBackproject
 		struct AccumulationVolume
 		{
 			BufferedImage<Complex> data;
-			BufferedImage<RFLOAT> weight, multiplicity, spreading_function;
+			BufferedImage<RFLOAT> weight;
 		};
-		
+
 		std::vector<AccumulationVolume> accumulation_volumes;
+		std::vector<BufferedImage<RFLOAT>> multiplicities, spreading_functions;
+		std::vector<BufferedImage<DualContrastVoxel<RFLOAT>>> dual_contrast_accumulation_volumes;
 		
+		bool compute_multiplicity, do_dual_contrast;
 		int padded_box_size;
 		
 		
@@ -106,6 +110,7 @@ class SpaBackproject
 		void backprojectOneParticle(long int p, int thread_id);
 		void reconstructForward();
 		void reconstructBackward();
+		void reconstructBackward_dualContrast();
 		
 		void applyCTFPandCTFQ(
 				MultidimArray<Complex> &Fin, 

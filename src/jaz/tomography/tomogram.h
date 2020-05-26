@@ -40,8 +40,9 @@ class Tomogram
 		// gravis::d2Vector project(gravis::d3Vector pos, int frame);
 		// Image<float> drawCtf(gravis::d3Vector pos, int size);
 		// Image<float> drawDoseWeights(int size);
-		
+
 		BufferedImage<float> computeDoseWeight(int boxSize, double binning) const;
+		BufferedImage<float> computeNoiseWeight(int boxSize, double binning, double overlap = 2.0) const;
 		
 		
 };

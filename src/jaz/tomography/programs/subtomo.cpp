@@ -106,7 +106,13 @@ void SubtomoProgram::run()
 		dataSet->checkTrajectoryLengths(particles[t][0], pc, fc, "subtomo");
 		
 		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s2D, binning);
-		
+		BufferedImage<float> noiseWeights;
+
+		if (do_whiten)
+		{
+			noiseWeights = tomogram.computeNoiseWeight(s2D, binning);
+		}
+
 		const int inner_thread_num = 1;
 		const int outer_thread_num = num_threads / inner_thread_num;
 		
@@ -174,8 +180,13 @@ void SubtomoProgram::run()
 					}
 				}
 			}
-			
-			
+
+			if (do_whiten)
+			{
+				particleStack *= noiseWeights;
+				weightStack *= noiseWeights;
+			}
+						
 			const int boundary = (boxSize - cropSize) / 2;
 					
 			if (boundary > 0)

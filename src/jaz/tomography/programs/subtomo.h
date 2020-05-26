@@ -32,6 +32,7 @@ class SubtomoProgram
 			bool 
 				flip_value, 
 				diag, 
+				do_whiten,
 				do_center, 
 				do_rotate, 
 				do_cone_weight,
