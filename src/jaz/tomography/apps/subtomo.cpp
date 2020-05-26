@@ -27,6 +27,8 @@ int main(int argc, char *argv[])
 		const double alpha = 0.5 * textToDouble(parser.getOption("--cone_angle", "Opening angle of the cone in degrees", "10"));
 		sp.cone_slope = sin(DEG2RAD(alpha));
 		sp.cone_sig0 = textToDouble(parser.getOption("--cone_sig0", "Cone width at Z = 0", "2"));	
+
+		sp.do_gridding_correction = parser.checkOption("--grid_corr", "Perform individual gridding-correction on each subtomogram");
 				
         sp.taper = textToDouble(parser.getOption("--taper", "Taper against the sphere by this number of pixels", "5"));
 		sp.env_sigma = textToDouble(parser.getOption("--env", "Sigma of a Gaussian envelope applied before cropping", "-1"));

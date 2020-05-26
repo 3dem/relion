@@ -36,6 +36,7 @@ class SubtomoProgram
 				do_center, 
 				do_rotate, 
 				do_cone_weight,
+				do_gridding_correction,
 				write_combined,
 				write_ctf,
 				write_multiplicity, 

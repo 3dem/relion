@@ -235,9 +235,17 @@ void SubtomoProgram::run()
 						psfImgFS, ctfImgFS, inner_thread_num);
 			}
 			
-			Reconstruction::griddingCorrect3D(
-					dataImgFS, psfImgFS, dataImgRS,
-					true, inner_thread_num);
+			if (do_gridding_correction)
+			{
+				Reconstruction::griddingCorrect3D(
+						dataImgFS, psfImgFS, dataImgRS,
+						true, inner_thread_num);
+			}
+			else
+			{
+				Centering::shiftInSitu(dataImgFS);
+				FFT::inverseFourierTransform(dataImgFS, dataImgRS, FFT::Both);
+			}
 			
 			
 			if (do_cone_weight)
