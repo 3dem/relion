@@ -557,6 +557,16 @@ void basisViewerCanvas::fill(MetaDataTable &MDin, ObservationModel *obsModel, EM
 						selfApplyGeometry(img(), A, IS_NOT_INV, DONT_WRAP);
 					}
 				}
+				else if(_do_apply_orient && MDin.containsLabel(EMDL_MLMODEL_IS_HELIX) && img().getDim()==3)
+				{
+					RFLOAT psi,rot,tilt;
+					Matrix2D<RFLOAT> A;
+					Euler_rotation3DMatrix(0,90,0, A);
+					MAT_ELEM(A, 0, 3) = MAT_ELEM(A, 0, 0)  + MAT_ELEM(A, 0, 1)  + MAT_ELEM(A, 0, 2) ;
+					MAT_ELEM(A, 1, 3) = MAT_ELEM(A, 1, 0)  + MAT_ELEM(A, 1, 1)  + MAT_ELEM(A, 1, 2) ;
+					MAT_ELEM(A, 2, 3) = MAT_ELEM(A, 2, 0)  + MAT_ELEM(A, 2, 1)  + MAT_ELEM(A, 2, 2) ;
+					selfApplyGeometry(img(), A, IS_NOT_INV, DONT_WRAP);
+				}
 				if (_do_recenter)
 				{
 					selfTranslateCenterOfMassToCenter(img());
@@ -2802,6 +2812,10 @@ void Displayer::run()
 		if (fn_in.contains("_model.star"))
 		{
 			MDin.read(fn_in, "model_classes");
+			MetaDataTable MD2;
+			MD2.read(fn_in, "model_general");
+			if(MD2.containsLabel(EMDL_MLMODEL_IS_HELIX))
+				MDin.addLabel(EMDL_MLMODEL_IS_HELIX);
 		}
 		else
 		{
