@@ -1018,7 +1018,6 @@ void helicalLayerLineProfile(const MultidimArray<RFLOAT> &v, std::string title, 
 
 void generateBinaryHelicalFourierMask(MultidimArray<RFLOAT> &mask, std::vector<RFLOAT> exclude_begin, std::vector<RFLOAT> exclude_end, RFLOAT angpix);
 
-
 template <class T>
 void cropInFourierSpace(MultidimArray<T> &Fref, MultidimArray<T> &Fbinned) {
 	const int nfx = XSIZE(Fref), nfy = YSIZE(Fref);
@@ -1038,6 +1037,5 @@ void cropInFourierSpace(MultidimArray<T> &Fref, MultidimArray<T> &Fbinned) {
 		}
 	}
 }
-
 
 #endif // __RELIONFFTW_H

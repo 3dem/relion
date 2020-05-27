@@ -176,7 +176,6 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 		img_data = new unsigned char [3 * xsize_data * ysize_data];
 	}
 	RFLOAT range = maxval - minval;
-	RFLOAT middle = range/2.;
 	RFLOAT step = range / 255; // 8-bit scaling range from 0 to 255
 	RFLOAT* old_ptr=NULL;
 	long int n;
@@ -196,10 +195,8 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 		int line_d = XSIZE(img);
 		int dx, dy, sy, xerr, yerr;
 
-		// scale the image using a nearest-neighbor algorithm...
 		if (colour_scheme == GREYSCALE)
 		{
-			// scale the image using a nearest-neighbor algorithm...
 			for (dy = ysize_data, sy = 0, yerr = ysize_data, n = 0; dy > 0; dy --)
 			{
 				for (dx = xsize_data, xerr = xsize_data, old_ptr = img.data + sy * line_d; dx > 0; dx --, n++)
@@ -225,13 +222,12 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 		}
 		else
 		{
-			// scale the image using a nearest-neighbor algorithm...
 			for (dy = ysize_data, sy = 0, yerr = ysize_data, n = 0; dy > 0; dy --)
 			{
 				for (dx = xsize_data, xerr = xsize_data, old_ptr = img.data + sy * line_d; dx > 0; dx --, n++)
 				{
 					unsigned char val = FLOOR((*old_ptr - minval) / step);
-					greyToRGB(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
+					greyToRGB(colour_scheme, val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
 					old_ptr += xstep;
 					xerr    -= xmod;
 					if (xerr <= 0)
@@ -265,7 +261,7 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(img, n, old_ptr)
 			{
 				unsigned char val = FLOOR((*old_ptr - minval) / step);
-				greyToRGB(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
+				greyToRGB(colour_scheme, val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
 			}
 		}
 	}
@@ -640,42 +636,11 @@ void basisViewerCanvas::fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOA
 	boxes.push_back(my_box);
 }
 
-void basisViewerCanvas::getImageContrast(MultidimArray<RFLOAT> &image, RFLOAT &minval, RFLOAT &maxval, RFLOAT &sigma_contrast)
-{
-	// First check whether to apply sigma-contrast, i.e. set minval and maxval to the mean +/- sigma_contrast times the stddev
-	bool redo_minmax = (sigma_contrast > 0. || minval != maxval);
-
-	if (sigma_contrast > 0. || minval == maxval)
-	{
-		RFLOAT avg, stddev;
-		image.computeStats(avg, stddev, minval, maxval);
-		if (sigma_contrast > 0.)
-		{
-			minval = avg - sigma_contrast * stddev;
-			maxval = avg + sigma_contrast * stddev;
-			redo_minmax = true;
-		}
-	}
-
-	if (redo_minmax)
-	{
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(image)
-		{
-			RFLOAT val = DIRECT_MULTIDIM_ELEM(image, n);
-			if (val > maxval)
-				DIRECT_MULTIDIM_ELEM(image, n) = maxval;
-			else if (val < minval)
-				DIRECT_MULTIDIM_ELEM(image, n) = minval;
-		}
-	}
-}
-
 void basisViewerCanvas::draw()
 {
 	for (int ipos = 0 ; ipos < boxes.size(); ipos++)
 		boxes[ipos]->redraw();
 }
-
 
 int multiViewerCanvas::handle(int ev)
 {
@@ -2803,21 +2768,6 @@ int Displayer::runGui()
 
 void Displayer::run()
 {
-
-//#define DEBUG_COLOURS
-#ifdef DEBUG_COLOURS
-	if (colour_scheme > GREYSCALE)
-	{
-		for (int val = 0; val < 256; val++)
-		{
-			unsigned char grey,red,green,blue;
-			greyToRGB(val,red,green,blue);
-			grey = rgbToGrey(red,green,blue);
-			std::cout << val << "  " << (int)grey << "  " << (int)red << "  " << (int)green << "  " << (int)blue << std::endl;
-		}
-	}
-#endif
-
 	if (do_gui)
 	{
 	}

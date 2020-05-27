@@ -396,3 +396,32 @@ void rewindow(Image<RFLOAT> &I, int mysize)
 	}
 }
 
+void getImageContrast(MultidimArray<RFLOAT> &image, RFLOAT &minval, RFLOAT &maxval, RFLOAT &sigma_contrast)
+{
+	// First check whether to apply sigma-contrast, i.e. set minval and maxval to the mean +/- sigma_contrast times the stddev
+	bool redo_minmax = (sigma_contrast > 0. || minval != maxval);
+
+	if (sigma_contrast > 0. || minval == maxval)
+	{
+		RFLOAT avg, stddev;
+		image.computeStats(avg, stddev, minval, maxval);
+		if (sigma_contrast > 0.)
+		{
+			minval = avg - sigma_contrast * stddev;
+			maxval = avg + sigma_contrast * stddev;
+			redo_minmax = true;
+		}
+	}
+
+	if (redo_minmax)
+	{
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(image)
+		{
+			RFLOAT val = DIRECT_MULTIDIM_ELEM(image, n);
+			if (val > maxval)
+				DIRECT_MULTIDIM_ELEM(image, n) = maxval;
+			else if (val < minval)
+				DIRECT_MULTIDIM_ELEM(image, n) = minval;
+		}
+	}
+}

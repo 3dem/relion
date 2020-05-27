@@ -25,6 +25,9 @@
 #include <src/time.h>
 #include <src/symmetries.h>
 #include <src/jaz/obs_model.h>
+#ifdef HAVE_PNG
+#include <src/jaz/gravis/tImage.h>
+#endif
 
 #include <map>
 
@@ -35,6 +38,10 @@ class image_handler_parameters
 	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box, minr_ampl_corr, my_new_box_size;
 	bool do_add_edge, do_invert_hand, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_calc_com, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan, do_average_all_frames, do_power, do_ignore_optics;
 	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, new_angpix, lowpass, highpass, logfilter, bfactor, shift_x, shift_y, shift_z, replace_nan, randomize_at;
+	// PNG options
+	RFLOAT minval, maxval, sigma_contrast;
+	int color_scheme; // There is a global variable called colour_scheme in displayer.h!
+
 	std::string directional;
    	int verb;
 	// I/O Parser
@@ -132,6 +139,17 @@ class image_handler_parameters
 		avg_last = textToInteger(parser.getOption("--avg_last", "Last frame to include in averaging", "-1"));
 		do_average_all_frames = parser.checkOption("--average_all_movie_frames", "Average all movie frames of all movies in the input STAR file.");
 
+		int png_section = parser.addSection("PNG options");
+		minval = textToFloat(parser.getOption("--black", "Pixel value for black (default is auto-contrast)", "0"));
+		maxval = textToFloat(parser.getOption("--white", "Pixel value for white (default is auto-contrast)", "0"));
+		sigma_contrast  = textToFloat(parser.getOption("--sigma_contrast", "Set white and black pixel values this many times the image stddev from the mean", "0"));
+		if (parser.checkOption("--colour_fire", "Show images in black-grey-white-red colour scheme (highlight high signal)?")) color_scheme = BLACKGREYREDSCALE;
+		else if (parser.checkOption("--colour_ice", "Show images in blue-black-grey-white colour scheme (highlight low signal)?")) color_scheme = BLUEGREYWHITESCALE;
+		else if (parser.checkOption("--colour_fire-n-ice", "Show images in blue-grey-red colour scheme (highlight high&low signal)?")) color_scheme = BLUEGREYREDSCALE;
+		else if (parser.checkOption("--colour_rainbow", "Show images in cyan-blue-black-red-yellow colour scheme?")) color_scheme = RAINBOWSCALE;
+		else if (parser.checkOption("--colour_difference", "Show images in cyan-blue-black-red-yellow colour scheme (for difference images)?")) color_scheme = CYANBLACKYELLOWSCALE;
+		else color_scheme = GREYSCALE;
+
 		// Hidden
 		fn_cosDPhi = getParameter(argc, argv, "--cos_dphi", "");
 		// Check for errors in the command-line option
@@ -148,6 +166,10 @@ class image_handler_parameters
 	{
 		Image<RFLOAT> Iout;
 		Iout().resize(Iin());
+
+		bool isPNG = FileName(my_fn_out.getExtension()).toLowercase() == "png";
+		if (isPNG && (ZSIZE(Iout()) > 1 || NSIZE(Iout()) > 1))
+			REPORT_ERROR("You can only write a 2D image to a PNG file.");
 
 		if (angpix < 0 && (new_angpix > 0 || fn_fsc != "" || randomize_at > 0 ||
 		                   do_power || fn_cosDPhi != "" || fn_correct_ampl != "" ||
@@ -373,10 +395,10 @@ class image_handler_parameters
 			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
 			{
 				int jpp = ROUND(jp * A(0, 0) + ip * A(0, 1));
-	            int ipp = ROUND(jp * A(1, 0) + ip * A(1, 1));
-	            int kpp = kp;
-	            RFLOAT fil;
-	            if (jpp >= STARTINGX(Iop()) && jpp <= FINISHINGX(Iop()) && ipp >= STARTINGY(Iop()) && ipp <= FINISHINGY(Iop()))
+				int ipp = ROUND(jp * A(1, 0) + ip * A(1, 1));
+				int kpp = kp;
+				RFLOAT fil;
+				if (jpp >= STARTINGX(Iop()) && jpp <= FINISHINGX(Iop()) && ipp >= STARTINGY(Iop()) && ipp <= FINISHINGY(Iop()))
 					fil = A3D_ELEM(Iop(), kpp, ipp, jpp);
 				else
 					fil = 0.;
@@ -477,6 +499,10 @@ class image_handler_parameters
 
 			int newsize = ROUND(oldsize * (angpix / new_angpix));
 			newsize -= newsize%2; //make even in case it is not already
+
+			// BUG: Due to this rounding, we might end up in a pixel size that is different from requested.
+			// Still, the requested (but not correct) pixel size is written to the header!! 
+
 			resizeMap(Iout(), newsize);
 			my_new_box_size = newsize;
 
@@ -539,17 +565,43 @@ class image_handler_parameters
 		FileName fn_tmp;
 		my_fn_out.decompose(n, fn_tmp);
 		n--;
-		if (n >= 0) // This is a stack...
+		if (!isPNG)
 		{
+			if (n >= 0) // This is a stack...
+			{
 
-			// The following assumes the images in the stack come ordered...
-			if (n == 0)
-				Iout.write(fn_tmp, n, true, WRITE_OVERWRITE); // make a new stack
+				// The following assumes the images in the stack come ordered...
+				if (n == 0)
+					Iout.write(fn_tmp, n, true, WRITE_OVERWRITE); // make a new stack
+				else
+					Iout.write(fn_tmp, n, true, WRITE_APPEND);
+			}
 			else
-				Iout.write(fn_tmp, n, true, WRITE_APPEND);
+				Iout.write(my_fn_out);
 		}
 		else
-			Iout.write(my_fn_out);
+		{
+#ifdef HAVE_PNG
+			RFLOAT this_minval = minval, this_maxval = maxval; // User setting
+			getImageContrast(Iout(), this_minval, this_maxval, sigma_contrast); // Update if neecssary
+			const RFLOAT range = this_maxval - this_minval;
+			const RFLOAT step = range / 255;
+
+			gravis::tImage<gravis::bRGB> pngOut(XSIZE(Iout()), YSIZE(Iout()));
+			pngOut.fill(gravis::bRGB(0));
+
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iout())
+			{
+				const unsigned char val = FLOOR((DIRECT_MULTIDIM_ELEM(Iout(), n) - this_minval) / step);
+				unsigned char r, g, b;
+				greyToRGB(color_scheme, val, r, g, b);
+				pngOut[n] = gravis::bRGB(r, g, b);
+			}
+			pngOut.writePNG(my_fn_out);
+#else
+			REPORT_ERROR("You cannot write PNG images because libPNG was not linked during compilation.");
+#endif
+		}
 	}
 
 	void run()
