@@ -98,8 +98,8 @@ std::pair<tComplex<T>, tComplex<T>> DualContrastVoxel<T> :: solve(double WienerO
 		const gravis::t2Vector<T> out_imag = A_inv * data_imag;
 
 		return std::make_pair(
-			tComplex<T>(out_real[0], out_imag[0]),
-			tComplex<T>(out_real[1], out_imag[1]));
+			tComplex<T>(-out_real[0], -out_imag[0]),
+			tComplex<T>(-out_real[1], -out_imag[1]));
 	}
 	else
 	{

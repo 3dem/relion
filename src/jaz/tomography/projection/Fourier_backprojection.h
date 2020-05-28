@@ -170,7 +170,7 @@ void FourierBackprojection::backprojectSlice_noSF(
 	if (!destCTF.hasSize(wh3, h3, d3))
 	{
 		REPORT_ERROR_STR("FourierBackprojection::backprojectSlice_noSF: destCTF has wrong size ("
-						 << destCTF.sizeString() << " instead of " << destCTF.sizeString() << ")");
+						 << destCTF.getSizeString() << " instead of " << destCTF.getSizeString() << ")");
 	}
 	
 	gravis::d3Matrix A(proj(0,0), proj(0,1), proj(0,2), 
@@ -264,7 +264,7 @@ void FourierBackprojection::backprojectSlice_noSF(
 	if (!destCTF.hasSize(wh3, h3, d3))
 	{
 		REPORT_ERROR_STR("FourierBackprojection::backprojectSlice_noSF: destCTF has wrong size ("
-						 << destCTF.sizeString() << " instead of " << destCTF.sizeString() << ")");
+						 << destCTF.getSizeString() << " instead of " << destCTF.getSizeString() << ")");
 	}
 	
 	gravis::d3Matrix A(proj(0,0), proj(0,1), proj(0,2), 

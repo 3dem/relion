@@ -18,10 +18,18 @@ class ImageFilter
 		template<class T>
 		static BufferedImage<T> highpass2D(
 				const RawImage<T>& img, int z, double freqPx, double widthPx, bool pad);
+
+		template<class T>
+		static BufferedImage<tComplex<T>> highpass3D(
+				const RawImage<tComplex<T>>& img, double freqPx, double widthPx);
 		
 		template<class T>
 		static BufferedImage<T> lowpass2D(
 				const RawImage<T>& img, int z, double freqPx, double widthPx, bool pad);
+
+		template<class T>
+		static BufferedImage<tComplex<T>> lowpass3D(
+				const RawImage<tComplex<T>>& img, double freqPx, double widthPx);
 		
 		template<class T>
 		static BufferedImage<T> Gauss2D(
@@ -186,6 +194,46 @@ BufferedImage<T> ImageFilter::highpass2D(const RawImage<T>& img, int z, double f
 }
 
 template<class T>
+BufferedImage<tComplex<T>> ImageFilter::highpass3D(
+	const RawImage<tComplex<T>>& img, double freqPx, double widthPx)
+{
+	const int wh = img.xdim;
+	const int w = (wh - 1) * 2;
+	const int h = img.ydim;
+	const int d = img.zdim;
+
+	BufferedImage<tComplex<T>> out(wh, h, d);
+
+	for (int z = 0; z < d;  z++)
+	for (int y = 0; y < h;  y++)
+	for (int x = 0; x < wh; x++)
+	{
+		const double xx = x;
+		const double yy = (((y + h/2) % h) - h/2);
+		const double zz = (((z + d/2) % d) - d/2);
+
+		const double f = sqrt(xx * xx + yy * yy + zz * zz);
+
+		const double df = (f - freqPx) / widthPx + 0.5;
+
+		if (df < 0.0)
+		{
+			out(x,y,z) = tComplex<T>(0.0, 0.0);
+		}
+		else if (df < 1.0)
+		{
+			out(x,y,z) = (T) (1.0 - 0.5 * (cos(PI * df) + 1.0)) * img(x,y,z);
+		}
+		else
+		{
+			out(x,y,z) = img(x,y,z);
+		}
+	}
+
+	return out;
+}
+
+template<class T>
 BufferedImage<T> ImageFilter::lowpass2D(const RawImage<T>& img, int z, double freqPx, double widthPx, bool pad)
 {
 	const int w = img.xdim;
@@ -249,6 +297,47 @@ BufferedImage<T> ImageFilter::lowpass2D(const RawImage<T>& img, int z, double fr
 	}
 	
 	return outCropped;
+}
+
+template<class T>
+BufferedImage<tComplex<T>> ImageFilter::lowpass3D(
+	const RawImage<tComplex<T>>& img, double freqPx, double widthPx)
+{
+	const int wh = img.xdim;
+	const int w = (wh - 1) * 2;
+	const int h = img.ydim;
+	const int d = img.zdim;
+
+	BufferedImage<tComplex<T>> out(wh, h, d);
+
+	for (int z = 0; z < d;  z++)
+	for (int y = 0; y < h;  y++)
+	for (int x = 0; x < wh; x++)
+	{
+		const double xx = x;
+		const double yy = (((y + h/2) % h) - h/2);
+		const double zz = (((z + d/2) % d) - d/2);
+
+		const double f = sqrt(xx * xx + yy * yy + zz * zz);
+
+		const double df = (f - freqPx) / widthPx + 0.5;
+
+		if (df < 0.0)
+		{
+			out(x,y,z) = img(x,y,z);
+		}
+		else if (df < 1.0)
+		{
+			out(x,y,z) *= (T) (0.5 * (cos(PI * df) + 1.0));
+		}
+		else
+		{
+			out(x,y,z) = tComplex<T>(0.0, 0.0);
+		}
+
+	}
+
+	return out;
 }
 
 template<class T>

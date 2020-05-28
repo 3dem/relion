@@ -53,6 +53,8 @@ class RawImage
 		inline size_t getSize() const;
 		
 		std::string getSizeString() const;
+
+		std::vector<long int> getSizeVector() const;
 		
 		void fill(T t);
 		
@@ -85,8 +87,7 @@ class RawImage
 		
 		bool hasSize(long int w, long int h, long int d);
 		bool hasEqualSize(const RawImage<T>& img);
-		
-		std::string sizeString();
+
 		
 		template<class T2> inline
 		RawImage& operator += (const RawImage<T2>& v)
@@ -402,6 +403,12 @@ inline std::string RawImage<T>::getSizeString() const
 }
 
 template <class T>
+std::vector<long int> RawImage<T>::getSizeVector() const
+{
+	return std::vector<long int>{xdim, ydim, zdim};
+}
+
+template <class T>
 inline void RawImage<T>::fill(T t)
 {
 	const long int s = xdim * ydim * zdim;
@@ -577,15 +584,6 @@ template <class T>
 bool RawImage<T>::hasEqualSize(const RawImage<T>& img)
 {
 	return xdim == img.xdim && ydim == img.ydim && zdim == img.zdim;
-}
-
-template <class T>
-std::string RawImage<T>::sizeString()
-{
-	std::stringstream sts;
-	sts << xdim << "x" << ydim << "x" << zdim;
-	
-	return sts.str();
 }
 
 template <class T1, class T2>
