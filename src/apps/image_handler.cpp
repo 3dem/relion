@@ -37,7 +37,7 @@ class image_handler_parameters
    	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_fsc, fn_adjust_power, fn_correct_ampl, fn_fourfilter, fn_cosDPhi;
 	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box, minr_ampl_corr, my_new_box_size;
 	bool do_add_edge, do_invert_hand, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_calc_com, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan, do_average_all_frames, do_power, do_ignore_optics;
-	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, new_angpix, lowpass, highpass, logfilter, bfactor, shift_x, shift_y, shift_z, replace_nan, randomize_at;
+	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, requested_angpix, real_angpix, force_header_angpix, lowpass, highpass, logfilter, bfactor, shift_x, shift_y, shift_z, replace_nan, randomize_at;
 	// PNG options
 	RFLOAT minval, maxval, sigma_contrast;
 	int color_scheme; // There is a global variable called colour_scheme in displayer.h!
@@ -100,7 +100,9 @@ class image_handler_parameters
 		directional = parser.getOption("--directional", "Directionality of low-pass filter frequency ('X', 'Y' or 'Z', default non-directional)", "");
 		logfilter = textToFloat(parser.getOption("--LoG", "Diameter for optimal response of Laplacian of Gaussian filter (in A)", "-1."));
 		angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in A)", "-1"));
-		new_angpix = textToFloat(parser.getOption("--rescale_angpix", "Scale input image(s) to this new pixel size (in A)", "-1."));
+		requested_angpix = textToFloat(parser.getOption("--rescale_angpix", "Scale input image(s) to this new pixel size (in A)", "-1."));
+		real_angpix = -1;
+		force_header_angpix = textToFloat(parser.getOption("--force_header_angpix", "Change the pixel size in the header (in A). Without --rescale_angpix, the image is not scaled.", "-1."));
 		new_box = textToInteger(parser.getOption("--new_box", "Resize the image(s) to this new box size (in pixel) ", "-1"));
 		filter_edge_width = textToInteger(parser.getOption("--filter_edge_width", "Width of the raised cosine on the low/high-pass filter edge (in resolution shells)", "2"));
 		do_flipX = parser.checkOption("--flipX", "Flip (mirror) a 2D image or 3D map in the X-direction?");
@@ -171,7 +173,7 @@ class image_handler_parameters
 		if (isPNG && (ZSIZE(Iout()) > 1 || NSIZE(Iout()) > 1))
 			REPORT_ERROR("You can only write a 2D image to a PNG file.");
 
-		if (angpix < 0 && (new_angpix > 0 || fn_fsc != "" || randomize_at > 0 ||
+		if (angpix < 0 && (requested_angpix > 0 || fn_fsc != "" || randomize_at > 0 ||
 		                   do_power || fn_cosDPhi != "" || fn_correct_ampl != "" ||
 		                   fabs(bfactor) > 0 || logfilter > 0 || lowpass > 0 || highpass > 0))
 		{
@@ -483,42 +485,42 @@ class image_handler_parameters
 		}
 
 		// Re-scale
-		if (new_angpix > 0.)
+		if (requested_angpix > 0.)
 		{
-
 			int oldxsize = XSIZE(Iout());
 			int oldysize = YSIZE(Iout());
 			int oldsize = oldxsize;
-			if ( oldxsize != oldysize && Iout().getDim() == 2)
+			if (oldxsize != oldysize && Iout().getDim() == 2)
 			{
 				oldsize = XMIPP_MAX( oldxsize, oldysize );
 				Iout().setXmippOrigin();
 				Iout().window(FIRST_XMIPP_INDEX(oldsize), FIRST_XMIPP_INDEX(oldsize),
-						      LAST_XMIPP_INDEX(oldsize),  LAST_XMIPP_INDEX(oldsize));
+			 	              LAST_XMIPP_INDEX(oldsize),  LAST_XMIPP_INDEX(oldsize));
 			}
 
-			int newsize = ROUND(oldsize * (angpix / new_angpix));
-			newsize -= newsize%2; //make even in case it is not already
+			int newsize = ROUND(oldsize * (angpix / requested_angpix));
+			newsize -= newsize % 2; //make even in case it is not already
 
-			// BUG: Due to this rounding, we might end up in a pixel size that is different from requested.
-			// Still, the requested (but not correct) pixel size is written to the header!! 
+			real_angpix = oldsize * angpix / newsize;
+			if (fabs(real_angpix - requested_angpix) / requested_angpix > 0.001)
+				std::cerr << "WARNING: Although the requested pixel size (--rescale_angpix) is " << requested_angpix << " A/px, the actual pixel size will be " << real_angpix << " A/px due to rounding of the box size to an even number. The latter value is set to the image header. You can overwrite the header pixel size by --force_header_angpix." << std::endl;
 
 			resizeMap(Iout(), newsize);
 			my_new_box_size = newsize;
 
-			if ( oldxsize != oldysize && Iout().getDim() == 2)
+			if (oldxsize != oldysize && Iout().getDim() == 2)
 			{
-				int newxsize = ROUND(oldxsize * (angpix / new_angpix));
-				int newysize = ROUND(oldysize * (angpix / new_angpix));;
+				int newxsize = ROUND(oldxsize * (angpix / real_angpix));
+				int newysize = ROUND(oldysize * (angpix / real_angpix));;
 				newxsize -= newxsize%2; //make even in case it is not already
 				newysize -= newysize%2; //make even in case it is not already
 				Iout().setXmippOrigin();
 				Iout().window(FIRST_XMIPP_INDEX(newysize), FIRST_XMIPP_INDEX(newxsize),
-						      LAST_XMIPP_INDEX(newysize),  LAST_XMIPP_INDEX(newxsize));
+				              LAST_XMIPP_INDEX(newysize),  LAST_XMIPP_INDEX(newxsize));
 			}
 
 			// Also reset the sampling rate in the header
-			Iout.setSamplingRateInHeader(new_angpix);
+			Iout.setSamplingRateInHeader(real_angpix);
 		}
 
 		// Re-window
@@ -557,6 +559,12 @@ class image_handler_parameters
 				if (DIRECT_A3D_ELEM(Iout(), k, i, j) < threshold_below)
 					DIRECT_A3D_ELEM(Iout(), k, i, j) = threshold_below;
 			}
+		}
+
+		if (force_header_angpix > 0)
+		{
+			Iout.setSamplingRateInHeader(force_header_angpix);
+			std::cout << "As requested by --force_header_angpix, the pixel size in the image header is set to " << force_header_angpix << " A/px." << std::endl;
 		}
 
 		// Write out the result
@@ -758,9 +766,10 @@ class image_handler_parameters
 			if (do_stats) // only write statistics to screen
 			{
 				Iin.read(fn_img);
-				RFLOAT avg, stddev, minval, maxval;
+				RFLOAT avg, stddev, minval, maxval, header_angpix;
 				Iin().computeStats(avg, stddev, minval, maxval);
-				std::cout << fn_img << " : (x,y,z,n)= " << XSIZE(Iin()) << " x "<< YSIZE(Iin()) << " x "<< ZSIZE(Iin()) << " x "<< NSIZE(Iin()) << " ; avg= " << avg << " stddev= " << stddev << " minval= " <<minval << " maxval= " << maxval << std::endl;
+				header_angpix = Iin.samplingRateX();
+				std::cout << fn_img << " : (x,y,z,n)= " << XSIZE(Iin()) << " x "<< YSIZE(Iin()) << " x "<< ZSIZE(Iin()) << " x "<< NSIZE(Iin()) << " ; avg= " << avg << " stddev= " << stddev << " minval= " <<minval << " maxval= " << maxval << "; angpix = " << header_angpix << std::endl;
 			}
 			else if (do_calc_com)
 			{
@@ -938,11 +947,11 @@ class image_handler_parameters
 						obsModel.opticsMdt.setValue(EMDL_IMAGE_SIZE, my_new_box_size);
 					}
 				}
-				if (new_angpix > 0)
+				if (real_angpix > 0)
 				{
 					FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
 					{
-						obsModel.opticsMdt.setValue(EMDL_IMAGE_PIXEL_SIZE, new_angpix);
+						obsModel.opticsMdt.setValue(EMDL_IMAGE_PIXEL_SIZE, real_angpix);
 					}
 				}
 				obsModel.save(MD, fn_md_out);
