@@ -2861,9 +2861,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			AAXA_pos += image_size;
 			classPos += orientation_num*translation_num;
-
-			if (baseMLO->is_som_iter)
-				errors[iclass] = AccUtilities::getSumOnDevice(error);
 		}
 
 		/*======================================================
@@ -2875,69 +2872,27 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		if (baseMLO->is_som_iter)
 		{
+			std::vector<unsigned> s = SomGraph::arg_sort(op.sum_weight_class[img_id], false);
+			unsigned bpu = s[0];
+			unsigned sbpu = s[1];
 
-			// Get best preforming unit (BPU)
-			int bpu = -1;
-			XFLOAT bpu_weight = 0;
-			for (int i = sp.iclass_min; i <= sp.iclass_max; i++)
-			{
-				if (baseMLO->mymodel.pdf_class[i] == 0.)
-					continue;
+			baseMLO->wsum_model.som.add_edge_activity(bpu, sbpu);
 
-				XFLOAT w = op.sum_weight_class[img_id][i];
-				if (bpu_weight <= w)
-				{
-					bpu = i;
-					bpu_weight = w;
-				}
+			class_sum_weight[bpu] = op.sum_weight_class[img_id][bpu];
+			thr_wsum_pdf_class[bpu] += 1;
+			baseMLO->wsum_model.som.add_node_activity(bpu);
+			baseMLO->mymodel.som.add_node_age(bpu);
+
+			std::vector< std::pair<unsigned, float> > weights = baseMLO->mymodel.som.get_neighbours(bpu);
+
+			for (int i = 0; i < weights.size(); i ++) {
+				unsigned idx = weights[i].first;
+				float w = weights[i].second * .2; //TODO Should be a parameter
+				class_sum_weight[idx] = op.sum_weight_class[img_id][idx] / w;
+				thr_wsum_pdf_class[idx] += w;
+				baseMLO->wsum_model.som.add_node_activity(idx, w);
+				baseMLO->mymodel.som.add_node_age(idx, w);
 			}
-
-			// Get second best preforming unit (SBPU)
-			int sbpu = -1;
-			XFLOAT sbpu_weight = 0;
-			for (int i = sp.iclass_min; i <= sp.iclass_max; i++)
-			{
-				if (i == bpu || baseMLO->mymodel.pdf_class[i] == 0.)
-					continue;
-
-				XFLOAT w = op.sum_weight_class[img_id][i];
-				if (sbpu_weight <= w)
-				{
-					sbpu = i;
-					sbpu_weight = w;
-				}
-			}
-
-			// Modify graph
-			baseMLO->som.increment_all_edge_ages(1);
-			baseMLO->som.add_edge(bpu, sbpu);
-			baseMLO->som.set_edge_age(bpu, sbpu, baseMLO->som.get_edge_age(bpu, sbpu)*0.1);
-			baseMLO->som.purge_old_edges(5000); //TODO as a parameter
-
-			// Set total weight of BPU
-			XFLOAT total_neighbour_weight = .4; //TODO as a parameter
-			float w = 1 - total_neighbour_weight;
-
-			class_sum_weight[bpu] = op.sum_weight_class[img_id][bpu] * w;
-			thr_wsum_pdf_class[bpu] += w;
-			baseMLO->som.set_node_age(bpu, baseMLO->som.get_node_age(bpu) + w);
-
-			// Set total weights for neighbours
-			std::vector<std::pair<unsigned, float>> in = baseMLO->som.get_neighbours_age(bpu);
-			float weights_sum = 0;
-			std::vector<float> weights(in.size());
-			for (int i = 0; i < in.size(); i ++) {
-				weights[i] = exp(-in[i].second / 10);
-				weights_sum += weights[i];
-			}
-
-			if (weights_sum > 0.)
-				for (int i = 0; i < in.size(); i ++) {
-					w = total_neighbour_weight * weights[i] / weights_sum;
-					class_sum_weight[in[i].first] = op.sum_weight_class[img_id][in[i].first] / w;
-					thr_wsum_pdf_class[in[i].first] += w;
-					baseMLO->som.set_node_age(in[i].first, baseMLO->som.get_node_age(in[i].first) + w);
-				}
 		}
 
 		/*======================================================

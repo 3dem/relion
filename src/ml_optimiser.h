@@ -43,7 +43,6 @@
 #include "src/helix.h"
 #include "src/local_symmetry.h"
 #include "src/acc/settings.h"
-#include "src/som.h"
 
 #define ML_SIGNIFICANT_WEIGHT 1.e-8
 #define METADATA_LINE_LENGTH METADATA_LINE_LENGTH_ALL
@@ -372,8 +371,6 @@ public:
 	//Self-organizing map
 	bool do_som;
 	bool is_som_iter;
-	SomGraph som;
-
 
 	// Size of the random subsets
 	long int subset_size;
@@ -755,7 +752,6 @@ public:
 		asymmetric_padding(false),
 		maximum_significants(-1),
 		threadException(NULL),
-		som(),
 #ifdef ALTCPU
 		tbbSchedulerInit(tbb::task_scheduler_init::deferred ),
 		mdlClassComplex(NULL),

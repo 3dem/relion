@@ -1161,7 +1161,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 
 	if (do_som) {
 		FileName som_fn = fn_root + "_som.txt";
-		som.print_to_file(som_fn);
+		mymodel.som.print_to_file(som_fn);
 	}
 }
 
@@ -1338,17 +1338,17 @@ void MlOptimiser::initialise()
 
 	if (do_som)
 	{
-		som.set_max_node_count(mymodel.nr_classes);
+		mymodel.som.set_max_node_count(mymodel.nr_classes);
 		// Add the initial nodes to the graph and connect them with an edge
 		for (unsigned i = 0; i < XMIPP_MIN(2, mymodel.nr_classes); i++)
-			som.add_node();
+			mymodel.som.add_node();
 
-		std::vector<unsigned> nodes = som.get_all_nodes();
+		std::vector<unsigned> nodes = mymodel.som.get_all_nodes();
 
 		// Connect all to all
 		for (unsigned i = 0; i < nodes.size(); i++)
 			for (unsigned j = i + 1; j < nodes.size(); j++)
-				som.add_edge(nodes[i], nodes[j]);
+				mymodel.som.set_edge_activity(nodes[i], nodes[j]);
 
 		// Clear all non-node
 		for (unsigned i = 0; i < mymodel.nr_classes; i ++) {
@@ -2719,10 +2719,14 @@ void MlOptimiser::iterate()
 			for (unsigned i = 0; i < mymodel.nr_classes; i ++)
 				mymodel.pdf_class[i] = 0;
 
-			std::vector<unsigned> nodes = som.get_all_nodes();
+			std::vector<unsigned> nodes = mymodel.som.get_all_nodes();
 			for (unsigned i = 0; i < nodes.size(); i ++)
 				mymodel.pdf_class[nodes[i]] = 1./nodes.size();
 
+			mymodel.som.set_connectivity(5);  //TODO Should be set by user
+
+			wsum_model.som.clone_nodes(mymodel.som);
+			wsum_model.som.reset_activities();
 		}
 
 		// Update subset_size
@@ -2737,6 +2741,8 @@ void MlOptimiser::iterate()
 		{
 			std::cerr << " WARNING: skipping randomisation of particle order because random_seed equals zero..." << std::endl;
 		}
+		else if (do_vmgd)
+			REPORT_ERROR("ERROR: Random seed must be set for gradient optimisation.");
 
 		if (do_auto_refine)
 		{
@@ -2882,55 +2888,6 @@ void MlOptimiser::iterate()
 		if (verb > 0)
 			timer.printTimes(false);
 #endif
-
-
-		if(do_som)
-		{
-			// Remove old edges and orphan nodes
-			std::vector<unsigned> purged_nodes = som.purge_orphans();
-
-			for (unsigned i = 0; i < purged_nodes.size(); i++) {
-				mymodel.Iref[purged_nodes[i]] *= 0.;
-				mymodel.Igrad1[purged_nodes[i]] *= 0.;
-				mymodel.Igrad2[purged_nodes[i]] *= 0.;
-			}
-
-			// Add new nodes
-			bool do_add_node = false;
-			unsigned wpu = som.find_wpu(); // Worse performing unit (WPU)
-			float wpu_error = som.get_node_error(wpu);
-			do_add_node = iter == 10 || iter == 15 || iter == 20;
-			if (24 <= iter)
-				do_add_node = iter < vmgd_ini_iter + vmgd_inbetween_iter && iter % 2 == 0;
-
-			if (do_add_node && som.get_node_count() < mymodel.nr_classes) {
-				unsigned swpu = som.find_wpu(wpu); // Second worse performing unit (SWPU)
-
-				// Insert the node between the WPU and SWPU
-				som.remove_edge(wpu, swpu);
-				unsigned idx = som.add_node();
-
-				som.add_edge(swpu, idx);
-				som.add_edge(idx, wpu);
-
-				FitImagesParams params = fitImages(mymodel.Iref[wpu], mymodel.Iref[swpu]);
-
-				transform_map(mymodel.Iref[swpu], mymodel.Iref[idx], params);
-				mymodel.Iref[idx] *= 0.2;
-				mymodel.Iref[idx] += mymodel.Iref[wpu] * 0.8;
-
-				if (do_mom1) {
-					transform_map(mymodel.Igrad1[swpu], mymodel.Igrad1[idx], params);
-					mymodel.Igrad1[idx] *= 0.2;
-					mymodel.Igrad1[idx] += mymodel.Igrad1[wpu] * 0.8;
-				}
-				if (do_mom2)
-					mymodel.Igrad2[idx] = mymodel.Igrad2[wpu] * 0.8; // Igrad2 is in Fourier space
-
-				som.set_node_error(wpu);
-				som.set_node_error(idx);
-			}
-		}
 
 	} // end loop iters
 
@@ -3571,7 +3528,7 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
 		    }
 	    } else {
 
-		    std::vector<unsigned> nodes = som.get_all_nodes();
+		    std::vector<unsigned> nodes = mymodel.som.get_all_nodes();
 		    for (long int part_id = my_first_part_id; part_id <= my_last_part_id; part_id++) {
 			    int random_node = rand() % nodes.size();
 			    exp_random_class_some_particles.push_back(nodes[random_node]);
@@ -4276,20 +4233,82 @@ void MlOptimiser::maximization()
 		init_progress_bar(mymodel.nr_classes);
 	}
 
-	if (do_som)
-	{
-		float age_sum = 0.;
-		float count = 0.;
-		for (int i = 0; i < mymodel.nr_classes * mymodel.nr_bodies; i ++)
-			if (mymodel.pdf_class[i] > 0.) {
-				age_sum += sqrt(som.get_node_age(i));
-				count ++;
-			}
-		age_sum /= count;
+	if (do_som) {
+		wsum_model.som.normalize_activity();
+		mymodel.som.update_edge_activities(wsum_model.som, mu);
+		mymodel.som.update_node_activities(wsum_model.som, mu);
+	}
 
-		for (int i = 0; i < mymodel.nr_classes * mymodel.nr_bodies; i ++)
-			if (mymodel.pdf_class[i] > 0.)
-				som.set_node_age(i, sqrt(som.get_node_age(i)) / age_sum);
+	if(do_vmgd) {
+
+		std::vector<float> error_avgs(mymodel.nr_classes * mymodel.nr_bodies, 0);
+		for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++) {
+			if (mymodel.pdf_class[iclass] > 0. || mymodel.nr_bodies > 1) {
+				if (do_som)
+				{
+					unsigned node_count = mymodel.som.get_node_count();
+					if (node_count > 2 && mymodel.som.get_node_activity(iclass) < 0.01/node_count) {  //TODO should be a parameter
+						mymodel.som.remove_node(iclass);
+						mymodel.Iref[iclass] *= 0;
+						mymodel.Igrad1[iclass] *= 0;
+						mymodel.Igrad2[iclass] *= 0;
+						mymodel.pdf_class[iclass] = 0;
+						std::cerr << "SOM -" << iclass << std::endl;
+						continue;
+					}
+				}
+
+				if ((wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY) {
+
+					if (do_vmgd_realspace)
+						(wsum_model.BPref[iclass]).reweightGradRealSpace(
+								mymodel.Igrad1[iclass],
+								do_mom1 ? 0.9 : 0.,
+								mymodel.Igrad2[iclass],
+								do_mom2 ? 0.999 : 0.,
+								iter == 1);
+					else
+						(wsum_model.BPref[iclass]).reweightGrad(
+								mymodel.Igrad1[iclass],
+								do_mom1 ? 0.9 : 0.,
+								mymodel.Igrad2[iclass],
+								do_mom2 ? 0.999 : 0.,
+								iter == 1);
+
+					if (do_som)
+					{
+						RFLOAT avg(0);
+
+						for (unsigned i = 0; i < wsum_model.BPref[iclass].data.nzyxdim; i++)
+							avg += norm(wsum_model.BPref[iclass].data.data[i]);
+
+						avg /= (RFLOAT) wsum_model.BPref[iclass].data.nzyxdim;
+						error_avgs[iclass] = avg * wsum_model.som.get_node_activity(iclass);
+					}
+				}
+			}
+		}
+
+		if (do_som && mymodel.som.get_node_count() < mymodel.nr_classes &&
+				iter - mymodel.last_som_add_iter > 3) {
+			std::vector<unsigned> s = SomGraph::arg_sort(error_avgs, false);
+			int wpu = -1;
+			for (int i = 0; i < s.size()/2; i++)  // Only consider top half
+				if (mymodel.som.get_node_age(s[i]) > 1000) { //TODO Should be a parameter
+					wpu = s[i];
+					break;
+				}
+
+			if (wpu != -1) {
+				unsigned nn = mymodel.som.add_node(wpu, 0.2); //TODO Should be a parameter
+				std::cerr << "SOM +" << nn << std::endl;
+
+				mymodel.Iref[nn] = mymodel.Iref[wpu];
+				mymodel.Igrad1[nn] = mymodel.Igrad1[wpu];
+				mymodel.Igrad2[nn] = mymodel.Igrad2[wpu];
+				mymodel.last_som_add_iter = iter;
+			}
+		}
 	}
 
 	// First reconstruct the images for each class
@@ -4327,48 +4346,13 @@ void MlOptimiser::maximization()
 				}
 				else
 				{
-					if(do_vmgd)
-					{
-						float stepsize = vmgd_stepsize;
-
-//						if (do_som) {
-//							// Use exponential step size decay as a function of node age
-//							float node_age = som.get_node_age(iclass);
-//							float a = 0.8;
-//							float b = 100/2.3; // At age=5000 step size becomes 1/10 of a (ln(10)=2.3)
-//							stepsize = XMIPP_MAX(a*exp(-iter/b), 0.01);
-//						}
-
-						if (do_vmgd_realspace)
-							(wsum_model.BPref[iclass]).reweightGradRealSpace(
-									mymodel.Igrad1[iclass],
-									do_mom1 ? 0.9 : 0.,
-									mymodel.Igrad2[iclass],
-									do_mom2 ? 0.999 : 0.,
-									iter == 1);
-						else
-							(wsum_model.BPref[iclass]).reweightGrad(
-									mymodel.Igrad1[iclass],
-									do_mom1 ? 0.9 : 0.,
-									mymodel.Igrad2[iclass],
-									do_mom2 ? 0.999 : 0.,
-									iter == 1);
-
-						float _stepsize = stepsize;
+					if(do_vmgd) {
+						float _stepsize = vmgd_stepsize;
 						if (do_som)
 						{
-							_stepsize *= som.get_node_age(iclass);
-							som.set_node_age(iclass); // Reset age
-
-							RFLOAT avg(0);
-
-							for (unsigned i = 0; i < wsum_model.BPref[iclass].data.nzyxdim; i++)
-								avg += norm(wsum_model.BPref[iclass].data.data[i]);
-
-							avg /= (RFLOAT) wsum_model.BPref[iclass].data.nzyxdim;
-							som.set_node_error(iclass, som.get_node_error(iclass) * 0.99 + avg * _stepsize * 0.01);
-
-							_stepsize = XMIPP_MAX(_stepsize, 0.05);
+							_stepsize = wsum_model.som.get_node_activity(iclass);
+							float age = mymodel.som.get_node_age(iclass);
+							_stepsize *= exp(-age/4000.);  //TODO Should be a parameter
 						}
 
 						(wsum_model.BPref[iclass]).reconstructGrad(
@@ -4377,10 +4361,9 @@ void MlOptimiser::maximization()
 								mymodel.tau2_fudge_factor,
 								mymodel.fsc_halves_class[iclass],
 								do_split_random_halves,
-								(iclass==0));
+								(iclass == 0));
 					}
 					else
-					{
 						(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass],
 								gridding_nr_iter,
 								do_map,
@@ -4389,7 +4372,6 @@ void MlOptimiser::maximization()
 								wsum_model.pdf_class[iclass],
 								minres_map,
 								(iclass==0));
-					}
 				}
 			}
 		}
@@ -4652,6 +4634,7 @@ void MlOptimiser::maximizationOtherParameters()
 		}
 
 	}
+
 	RCTOC(timer,RCT_8);
 #ifdef DEBUG
 	std::cerr << "Leaving maximizationOtherParameters" << std::endl;

@@ -25,6 +25,7 @@
 #include "src/metadata_table.h"
 #include "src/exp_model.h"
 #include "src/healpix_sampling.h"
+#include "src/som.h"
 
 #define ML_BLOB_ORDER 0
 #define ML_BLOB_RADIUS 1.9
@@ -213,6 +214,10 @@ public:
 	// Helical rise (in Angstroms)
 	std::vector<RFLOAT> helical_rise;
 
+	// Self-organizing map
+	SomGraph som;
+	int last_som_add_iter;
+
 	// Search range of helical twist (in degrees)
 	RFLOAT helical_twist_min,  helical_twist_max, helical_twist_inistep;
 
@@ -256,7 +261,9 @@ public:
 		helical_rise_min(0),
 		helical_rise_max(0),
 		helical_rise_inistep(0),
-		norm_body_mask_overlap(false)
+		norm_body_mask_overlap(false),
+		som(),
+		last_som_add_iter(0)
 	{
 		clear();
 	}

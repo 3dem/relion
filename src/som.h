@@ -43,26 +43,53 @@ private:
 	 */
 	struct Node {
 		bool active = false;
-		float age = 0;
-		float error = 0.;
-	};
-
-	/**
-	 * Class for graph edges
-	 */
-	class Edge {
-	public:
+		float activity = 0;
 		float age = 0.;
-		unsigned n1, n2;
-		Edge (unsigned node1, unsigned node2):
-				n1(node1), n2(node2)
-		{};
 	};
 
 	std::vector<Node> _nodes;
-	std::vector<Edge> _edges;
-
+	std::vector<float> _edges_activity;
+	float neighbour_threshold;
 	pthread_mutex_t mutex;
+
+	/*
+	 * Non-thread-safe add node.
+	 */
+	unsigned _add_node() {
+		for (unsigned i = 0; i < _nodes.size(); i++)
+			if (!_nodes[i].active) { // If index not found
+				_nodes[i].active = true;
+				_nodes[i].activity = 0;
+				_nodes[i].age = 0;
+				return i;
+			}
+		throw std::runtime_error("failed to add node");
+	}
+
+	void _normalize_node_activity() {
+		float activity_sum = 0;
+		for (unsigned i = 0; i < _nodes.size(); i++)
+			if (_nodes[i].active)
+				activity_sum += _nodes[i].activity;
+
+		if (activity_sum > 0)
+			for (unsigned i = 0; i < _nodes.size(); i++)
+				if (_nodes[i].active)
+					_nodes[i].activity /= activity_sum;
+	}
+
+	void _normalize_edge_activity() {
+		float activity_sum = 0;
+		for (unsigned i = 0; i < _nodes.size(); i++)
+			if (_nodes[i].active)
+				for (unsigned j = i+1; j < _nodes.size(); j++)
+					if (_nodes[j].active)
+						activity_sum += _edges_activity[i * _nodes.size() + j];
+
+		if (activity_sum > 0)
+			for (unsigned i = 0; i < _edges_activity.size(); i++)
+				_edges_activity[i] /= activity_sum;
+	}
 
 	/*
 	 * Non-thread-safe remove node.
@@ -72,80 +99,89 @@ private:
 			throw std::runtime_error("node missing");
 
 		_nodes[node].active = false;
+		_nodes[node].activity = 0.;
+		_nodes[node].age = 0.;
 
-		for (unsigned i = 0; i < _edges.size(); i++)
-			if (_edges[i].n1 == node || _edges[i].n2 == node)
-				_edges.erase(_edges.begin()+i);
-
-	}
-
-	/*
-	 * Non-thread-safe get neighbours of node.
-	 */
-	std::vector<unsigned> _get_neighbours(unsigned node) {
-		std::vector<unsigned> neighbours;
-		for (unsigned i = 0; i < _edges.size(); i++) {
-			if (_edges[i].n1 == node)
-				neighbours.push_back(_edges[i].n2);
-			if (_edges[i].n2 == node)
-				neighbours.push_back(_edges[i].n1);
+		for (unsigned i = 0; i < _nodes.size(); i++)
+		{
+			_edges_activity[node * _nodes.size() + i] = 0.;
+			_edges_activity[i * _nodes.size() + node] = 0.;
 		}
-		return neighbours;
+
+		_normalize_node_activity();
+		_normalize_edge_activity();
 	}
 
-public:
+	unsigned _get_node_count() {
+		unsigned count = 0;
+		for (unsigned i = 0; i < _nodes.size(); i++)
+			if (_nodes[i].active)
+				count ++;
+		return count;
+	}
 
-	SomGraph()
-	{
+	void _init_mutex() {
 		int mutex_error = pthread_mutex_init(&mutex, NULL);
 
 		if (mutex_error != 0)
 			throw std::runtime_error("failed to initialize mutex");
 	}
+public:
 
-	/**
-	 * Max number of nodes
-	 */
-	void set_max_node_count(unsigned count) {
-		_nodes.resize(count);
+	SomGraph() {
+		_init_mutex();
+		neighbour_threshold = 0;
 	}
 
 	/**
-	 * Add an edge-less node to the graph.
+	 * Set max number of nodes
+	 */
+	void set_max_node_count(unsigned count) {
+		Node n;
+		n.active = false;
+		n.activity = 0;
+		n.age = 0.;
+
+		_nodes.resize(count, n);
+		_edges_activity.resize(count * count, 0);
+	}
+
+	/**
+	 * Clone nodes settings
+	 */
+	void clone_nodes(const SomGraph &som) {
+		_nodes = som._nodes;
+		_edges_activity.resize(som._edges_activity.size(), 0);
+	}
+
+	void reset_activities() {
+		for (unsigned i = 0; i < _nodes.size() + 1; i++)
+			_nodes[i].activity = 0.;
+		for (unsigned i = 0; i < _edges_activity.size() + 1; i++)
+			_edges_activity[i] = 0.;
+	}
+
+	/**
+	 * Add an unconnected node to the graph.
 	 */
 	unsigned add_node() {
 		Lock ml(&mutex);
-		for (unsigned i = 0; i < _nodes.size() + 1; i++)
-			if (!_nodes[i].active) { // If index not found
-				_nodes[i].active = true;
-				_nodes[i].age = 0;
-				_nodes[i].error = 0;
-				return i;
-			}
-		throw std::runtime_error("failed to add node");
+		return _add_node();
 	}
 
 	/**
-	 * Add a edge between node1 and node2.
-	 * Do nothing if edge already exists.
+	 * Add a node to the graph close to given node.
 	 */
-	void add_edge(unsigned node1, unsigned node2) {
-		if (node1 == node2)
-			throw std::runtime_error("cannot add edge to the same node itself");
-
-		if (!_nodes[node1].active || !_nodes[node2].active)
-			throw std::runtime_error("node(s) missing");
-
+	unsigned add_node(unsigned node, float age_factor=0.1) {
 		Lock ml(&mutex);
-
-		// Does edge already exist
-		for (unsigned i = 0; i < _edges.size(); i++) {
-			if (_edges[i].n1 == node1 && _edges[i].n2 == node2 ||
-			    _edges[i].n1 == node2 && _edges[i].n2 == node1)
-				return;
-		}
-
-		_edges.emplace_back(node1, node2);
+		unsigned n = _add_node();
+		_edges_activity[node * _nodes.size() + n] = neighbour_threshold;
+		_edges_activity[n * _nodes.size() + node] = neighbour_threshold;
+		_nodes[n].activity = _nodes[node].activity;
+		_nodes[n].age = _nodes[node].age * age_factor;
+		_normalize_node_activity();
+		_normalize_edge_activity();
+		return n;
 	}
 
 	/**
@@ -157,182 +193,30 @@ public:
 	}
 
 	/**
-	 * Remove edge.
-	 */
-	void remove_edge(unsigned node1, unsigned node2) {
-		Lock ml(&mutex);
-		for (unsigned i = 0; i < _edges.size(); i++) {
-			if (_edges[i].n1 == node1 && _edges[i].n2 == node2 ||
-			    _edges[i].n1 == node2 && _edges[i].n2 == node1) {
-				_edges.erase(_edges.begin()+i);
-				return;
-			}
-		}
-		throw std::runtime_error("edge not found");
-	}
-
-	/**
-	 * Get neighbours of given node.
-	 */
-	std::vector<unsigned> get_neighbours(unsigned node) {
-		Lock ml(&mutex);
-		return _get_neighbours(node);
-	}
-
-	/**
-	 * Get average edge age.
-	 */
-	float get_avg_age() {
-		Lock ml(&mutex);
-		float avg = 0;
-		for (unsigned i = 0; i < _edges.size(); i++)
-			avg += _edges[i].age;
-		return avg / (float) _edges.size();
-	}
-
-	/**
-	 * Get average node error.
-	 */
-	float get_avg_error() {
-		Lock ml(&mutex);
-		float avg = 0;
-		int count = 0;
-		for (unsigned i = 0; i < _nodes.size(); i++)
-			if (_nodes[i].active) {
-				avg += _nodes[i].error;
-				count ++;
-			}
-		return avg / count;
-	}
-
-	/**
-	 * Get neighbours of given node and their corresponding age.
-	 */
-	std::vector<std::pair<unsigned, float>> get_neighbours_age(unsigned node) {
-		Lock ml(&mutex);
-		std::vector<std::pair<unsigned, float>> out;
-		for (unsigned i = 0; i < _edges.size(); i++) {
-			if (_edges[i].n1 == node)
-				out.emplace_back(_edges[i].n2, _edges[i].age);
-			if (_edges[i].n2 == node)
-				out.emplace_back(_edges[i].n1, _edges[i].age);
-		}
-		return out;
-	}
-
-	/**
-	 * Remove all edges older than min_age
-	 */
-	void purge_old_edges(float min_age) {
-		Lock ml(&mutex);
-		for (unsigned i = 0; i < _edges.size(); i++) {
-			if (_edges[i].age > min_age)
-				_edges.erase(_edges.begin()+i);
-		}
-	}
-
-	/**
-	 * Remove only the oldest edge, if older than min_age.
-	 */
-	void purge_oldest_edge(float min_age=0) {
-		Lock ml(&mutex);
-		unsigned idx = 0;
-		XFLOAT idx_age = 0;
-		for (unsigned i = 0; i < _edges.size(); i++) {
-			float a = _edges[i].age;
-			if (a >= idx_age)
-			{
-				idx = i;
-				idx_age = a;
-			}
-		}
-		if (idx_age > min_age)
-			_edges.erase(_edges.begin()+idx);
-	}
-
-	/**
-	 * Remove all edge-less nodes.
-	 * Return them as a list.
-	 */
-	std::vector<unsigned> purge_orphans() {
-		Lock ml(&mutex);
-		std::vector<unsigned> orphans;
-		for (unsigned ni = 0; ni < _nodes.size(); ni++) {
-			if (_nodes[ni].active) {
-				bool is_orphan = true;
-				for (unsigned ei = 0; ei < _edges.size(); ei++)
-					if (_edges[ei].n1 == ni || _edges[ei].n2 == ni) {
-						is_orphan = false;
-						break;
-					}
-				if (is_orphan)
-					orphans.push_back(ni);
-			}
-		}
-
-		for (unsigned i = 0; i < orphans.size(); i++)
-			_remove_node(orphans[i]);
-
-		return orphans;
-	}
-
-	/**
 	 * Getters and setters.
 	 */
 
-	float get_edge_age(unsigned node1, unsigned node2) {
+	float get_edge_activity(unsigned node1, unsigned node2) {
+		if (node1 == node2)
+			throw std::runtime_error("edge to node itself");
 		Lock ml(&mutex);
-		for (unsigned i = 0; i < _edges.size(); i++) {
-			if (_edges[i].n1 == node1 && _edges[i].n2 == node2 ||
-			    _edges[i].n1 == node2 && _edges[i].n2 == node1)
-				return _edges[i].age;
-		}
-		throw std::runtime_error("edge not found");
+		return _edges_activity[node1 * _nodes.size() + node2];
 	}
 
-	void set_edge_age(unsigned node1, unsigned node2, float age=0.) {
+	void set_edge_activity(unsigned node1, unsigned node2, float activity=1.) {
+		if (node1 == node2)
+			throw std::runtime_error("edge to node itself");
 		Lock ml(&mutex);
-		for (unsigned i = 0; i < _edges.size(); i++)
-			if (_edges[i].n1 == node1 && _edges[i].n2 == node2 ||
-			    _edges[i].n1 == node2 && _edges[i].n2 == node1) {
-				_edges[i].age = age;
-				return;
-			}
-		throw std::runtime_error("edge not found");
+		_edges_activity[node1 * _nodes.size() + node2] = activity;
+		_edges_activity[node2 * _nodes.size() + node1] = activity;
 	}
 
-	float get_node_error(unsigned node) {
+	void add_edge_activity(unsigned node1, unsigned node2, float activity=1.) {
+		if (node1 == node2)
+			throw std::runtime_error("edge to node itself");
 		Lock ml(&mutex);
-		return _nodes[node].error;
-	}
-
-	void set_node_error(unsigned node, float error=0.) {
-		Lock ml(&mutex);
-		_nodes[node].error = error;
-	}
-
-	void increment_node_error(unsigned node, float error) {
-		Lock ml(&mutex);
-		_nodes[node].error += error;
-	}
-
-	void increment_all_edge_ages(float age=1.) {
-		Lock ml(&mutex);
-		for (unsigned i = 0; i < _edges.size(); i++)
-			_edges[i].age += age;
-	}
-
-	void increment_neighbour_edge_ages(unsigned node, float age=1.) {
-		Lock ml(&mutex);
-		for (unsigned i = 0; i < _edges.size(); i++) {
-			if (_edges[i].n1 == node || _edges[i].n2 == node)
-				_edges[i].age += age;
-		}
-	}
-
-	void increment_node_age(unsigned node, float amount=1) {
-		Lock ml(&mutex);
-		_nodes[node].age += amount;
+		_edges_activity[node1 * _nodes.size() + node2] += activity;
+		_edges_activity[node2 * _nodes.size() + node1] += activity;
 	}
 
 	float get_node_age(unsigned node) {
@@ -345,18 +229,34 @@ public:
 		_nodes[node].age = age;
 	}
 
-	unsigned get_node_count() {
+	void add_node_age(unsigned node, float age=1.) {
 		Lock ml(&mutex);
-		unsigned count = 0;
-		for (unsigned i = 0; i < _nodes.size(); i++)
-			if (_nodes[i].active)
-				count ++;
-		return count;
+		_nodes[node].age += age;
 	}
 
-	unsigned get_edge_count() {
+	float get_node_activity(unsigned node) {
 		Lock ml(&mutex);
-		return _edges.size();
+		return _nodes[node].activity;
+	}
+
+	void set_node_activity(unsigned node, float activity=0.) {
+		Lock ml(&mutex);
+		_nodes[node].activity = activity;
+	}
+
+	void add_node_activity(unsigned node, float activity=0.) {
+		Lock ml(&mutex);
+		_nodes[node].activity += activity;
+	}
+
+	unsigned get_node_count() {
+		Lock ml(&mutex);
+		return _get_node_count();
+	}
+
+	void normalize_activity() {
+		_normalize_node_activity();
+		_normalize_edge_activity();
 	}
 
 	std::vector<unsigned> get_all_nodes() {
@@ -368,128 +268,123 @@ public:
 		return nodes;
 	}
 
-	void reset_errors() {
+	void update_node_activities(SomGraph update, float mu) {
 		Lock ml(&mutex);
 		for (unsigned i = 0; i < _nodes.size(); i++)
-			_nodes[i].error = 0.;
+			_nodes[i].activity = _nodes[i].activity * mu + update._nodes[i].activity * (1-mu);
+		_normalize_node_activity();
 	}
 
-	/**
-	 * Return the oldest node.
-	 */
-	unsigned find_oldest_node() {
+	void update_edge_activities(SomGraph update, float mu) {
 		Lock ml(&mutex);
+		for (unsigned i = 0; i < _edges_activity.size(); i++)
+			_edges_activity[i] = _edges_activity[i] * mu + update._edges_activity[i] * (1-mu);
+		_normalize_edge_activity();
+	}
 
-		bool set = false;
-		unsigned wpu;
-		XFLOAT wpu_error = 0;
+	std::vector< std::pair<unsigned, float> > get_neighbours(unsigned node) {
+		Lock ml(&mutex);
+		std::vector< std::pair<unsigned, float> > out;
+		float weight_sum = 0;
 		for (unsigned i = 0; i < _nodes.size(); i++) {
-			if (_nodes[i].active) {
-				float e = _nodes[i].age;
-				if (e >= wpu_error) {
-					wpu = i;
-					wpu_error = e;
-					set = true;
-				}
+			if (i == node)
+				continue;
+			float w = _edges_activity[_nodes.size() * node + i];
+			if (w > neighbour_threshold) {
+				w = 1;
+				out.emplace_back(std::pair<unsigned, float>(i, w));
+				weight_sum += w;
 			}
 		}
 
-		if (!set)
-			throw std::runtime_error("no node found");
+		for (unsigned i = 0; i < out.size(); i++)
+			out[i].second /= weight_sum;
 
-		return wpu;
+		return out;
 	}
 
-	/**
-	 * Return the worst performing unit.
+	/*
+	 * Set the averactivity number of neighbours per node.
 	 */
-	unsigned find_wpu() {
+	void set_connectivity(float connectivity) {
+		if (connectivity < 0)
+			throw std::runtime_error("bad connectivity value");
+
 		Lock ml(&mutex);
+		_normalize_edge_activity();
 
-		bool set = false;
-		unsigned wpu;
-		XFLOAT wpu_error = 0;
-		for (unsigned i = 0; i < _nodes.size(); i++) {
-			if (_nodes[i].active) {
-				float e = _nodes[i].error;
-				if (e >= wpu_error) {
-					wpu = i;
-					wpu_error = e;
-					set = true;
-				}
-			}
-		}
+		unsigned N = _get_node_count();
+		std::vector<float> edges(( N * (N-1) ) / 2, 0);
 
-		if (!set)
-			throw std::runtime_error("no wpu found");
-
-		return wpu;
-	}
-
-	/**
-	 * Return the worst performing neighbour of given node.
-	 */
-	unsigned find_wpu(unsigned node) {
-		Lock ml(&mutex);
-		std::vector<unsigned> neighbours = _get_neighbours(node);
-
-		bool set = false;
-		unsigned wpu;
-		XFLOAT max_e = 0;
-		for (unsigned i = 0; i < neighbours.size(); i++) {
-			float e = _nodes[neighbours[i]].error;
-			if (e >= max_e) {
-				wpu = neighbours[i];
-				max_e = e;
-				set = true;
-			}
-		}
-
-		if (!set)
-			throw std::runtime_error("no neighbour wpu found");
-
-		return wpu;
-	}
-
-	/**
-	 * Return unique nodes connected to edge.
-	 * Exclude node1 and node2.
-	 */
-	std::vector<unsigned> get_neighbourhood_of_edge(unsigned node1, unsigned node2)
-	{
-		std::vector<unsigned> n1 = _get_neighbours(node1);
-		std::vector<unsigned> n2 = _get_neighbours(node2);
-		std::vector<unsigned> n;
-
-		for (unsigned i = 0; i < n1.size(); i++)
-			if (n1[i] != node1 && n1[i] != node2 &&
-			    std::find(n.begin(), n.end(), n1[i]) == n.end() )
-				n.push_back(n1[i]);
-
-		for (unsigned i = 0; i < n2.size(); i++)
-			if (n2[i] != node1 && n2[i] != node2 &&
-			    std::find(n.begin(), n.end(), n2[i]) == n.end() )
-				n.push_back(n2[i]);
-
-		return n;
+		int n = 0;
+		for (unsigned i = 0; i < _nodes.size(); i++)
+			if (_nodes[i].active)
+				for (unsigned j = i+1; j < _nodes.size(); j++)
+					if (_nodes[j].active) {
+						edges[n] = _edges_activity[i * _nodes.size() + j];
+						n ++;
+					}
+		std::sort (edges.begin(), edges.end());
+		int nr_edges = N * connectivity / 2;  // Divide by 2, each edge is two connections
+		if (nr_edges >= edges.size())
+			neighbour_threshold = 0;
+		else
+			neighbour_threshold = edges[edges.size() - nr_edges];
 	}
 
 	void print_to_file(FileName &fn) {
+		Lock ml(&mutex);
 		FILE * fp;
 		fp = fopen (fn.c_str(), "w+");
 
-		fprintf(fp, "_nodes [index error age]\n");
+		fprintf(fp, "\n_edge_activity_threshold %4.4f\n", neighbour_threshold);
 
+		fprintf(fp, "\n_nodes [index age activity]\n");
+
+		std::vector<int> active_nodes;
 		for (unsigned i = 0; i < _nodes.size(); i++)
-			if (_nodes[i].active)
-				fprintf(fp, "%3d %5.1f %5.1f\n", i, _nodes[i].error, _nodes[i].age);
+			if (_nodes[i].active) {
+				fprintf(fp, "%3d %4.4f %4.4f\n", i, _nodes[i].age, _nodes[i].activity);
+				active_nodes.push_back(i);
+			}
 
-		fprintf(fp, "\n_edges [node1 node2 age]\n");
+		fprintf(fp, "\n_edge_activities\n");
 
-		for(unsigned i = 0; i < _edges.size(); i++)
-			fprintf(fp, "%3d %3d %5.1f\n", _edges[i].n1, _edges[i].n2, _edges[i].age);
+		for(unsigned i = 0; i < active_nodes.size(); i++) {
+			for (unsigned j = 0; j < active_nodes.size(); j++)
+				fprintf(fp, "%4.4f ", _edges_activity[active_nodes[i] * _nodes.size() + active_nodes[j]]);
+			fprintf(fp, "\n");
+		}
 
 		fclose(fp);
+	}
+
+	template<typename T>
+	static bool _pair_sort_ascend_fn (std::pair<unsigned, T> i, std::pair<unsigned, T> j)
+	{ return (i.second < j.second); }
+
+	template<typename T>
+	static bool _pair_sort_descend_fn (std::pair<unsigned, T> i, std::pair<unsigned, T> j)
+	{ return (i.second > j.second); }
+
+	template<typename T>
+	static std::vector<unsigned> arg_sort(std::vector<T> values, bool ascend=true) {
+		std::vector< std::pair<unsigned, T> > pair_list(values.size());
+		for (unsigned i = 0; i < values.size(); i ++) {
+			pair_list[i].first = i;
+			pair_list[i].second = values[i];
+		}
+		if (ascend)
+			std::sort (pair_list.begin(), pair_list.end(), _pair_sort_ascend_fn<T>);
+		else
+			std::sort (pair_list.begin(), pair_list.end(), _pair_sort_descend_fn<T>);
+
+		std::vector<unsigned> list(values.size());
+		for (unsigned i = 0; i < values.size(); i ++) {
+			list[i] = pair_list[i].first;
+		}
+		return list;
+
 	}
 };
 
