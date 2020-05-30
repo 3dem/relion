@@ -7754,8 +7754,8 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 													int i_resam = ROUND(i * remap_image_sizes);
 													if (i_resam < XSIZE(Npix_per_shell))
 													{
-														DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[img_id], i) *= DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[img_id], i)*
-																DIRECT_A1D_ELEM(Npix_per_shell, i_resam) / DIRECT_A1D_ELEM(thr_wsum_stMulti[img_id], i);
+														DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[img_id], i) *= DIRECT_A1D_ELEM(Npix_per_shell, i_resam) /
+																DIRECT_A1D_ELEM(thr_wsum_stMulti[img_id], i);
 													}
 												}
 											}
