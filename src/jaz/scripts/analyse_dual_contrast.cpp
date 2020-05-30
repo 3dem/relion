@@ -79,6 +79,7 @@ int main(int argc, char *argv[])
 		FFT::FourierTransform(mapsRS[m], mapsFS[m]);
 	}
 
+
 	const int s = mapsRS[0].xdim;
 	const int sh = mapsFS[0].xdim;
 
@@ -240,6 +241,11 @@ int main(int argc, char *argv[])
 	scaled_phase.write(out_path + "filtered_phase.mrc", pixel_size);
 	scaled_amplitude.write(out_path + "filtered_amplitude.mrc", pixel_size);
 
+
+	std::cout << mapsFS[amplitude_id].getSizeString() << std::endl;
+
+	BufferedImage<double> correlation(sh,s,s), rot_correlation(sh,s,s);
+
 	for (int z = 0; z < s;  z++)
 	for (int y = 0; y < s;  y++)
 	for (int x = 0; x < sh; x++)
@@ -247,8 +253,12 @@ int main(int argc, char *argv[])
 		dComplex za = mapsFS[amplitude_id](x,y,z);
 		dComplex zp = mapsFS[phase_id](x,y,z);
 
-
+		correlation(x,y,z) = za.real * zp.real + za.imag * zp.imag;
+		rot_correlation(x,y,z) = za.real * zp.imag - za.imag * zp.real;
 	}
+
+	correlation.write(out_path + "correlation.mrc", pixel_size);
+	rot_correlation.write(out_path + "rot_correlation.mrc", pixel_size);
 
 	std::cout << std::endl;
 
