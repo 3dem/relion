@@ -405,7 +405,11 @@ inline std::string RawImage<T>::getSizeString() const
 template <class T>
 std::vector<long int> RawImage<T>::getSizeVector() const
 {
-	return std::vector<long int>{xdim, ydim, zdim};
+	std::vector<long int> out(3);
+	out[0] = xdim;
+	out[1] = ydim;
+	out[2] = zdim;
+	return out;
 }
 
 template <class T>
