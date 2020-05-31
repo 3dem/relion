@@ -18,8 +18,8 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#ifndef REFERENCE_MAP_H
-#define REFERENCE_MAP_H
+#ifndef NEW_SPA_REFERENCE_MAP_H
+#define NEW_SPA_REFERENCE_MAP_H
 
 #include <src/image.h>
 #include <src/projector.h>
@@ -32,30 +32,28 @@
 class ObservationModel;
 class LegacyObservationModel;
 
-class ReferenceMap
+class NewReferenceMap
 {
 	public:
 
 		typedef enum {Own, Opposite} HalfSet;
 
-		ReferenceMap();
+		NewReferenceMap();
 
 			// input parameters:
 			std::string
-				reconFn0, reconFn1, amplitudeFn0, amplitudeFn1,
+				phase_file_names[2], amplitude_file_names[2],
 				maskFn, fscFn;
 
 			double paddingFactor;
 
 			// data:
-			Image<RFLOAT> freqWeight, mask;
+			BufferedImage<Complex> phaseMap[2], amplitudeMap[2];
+			BufferedImage<RFLOAT> freqWeight, mask;
 			std::vector<double> freqWeight1D;
-			Projector projectors[2];
 			int k_out, s, sh;
 			bool dualContrast, hasMask;
 			double angpix;
-
-			//std::vector<BufferedImage> phaseMaps, amplitudeMaps;
 
 
 		void read(IOParser& parser, int argc, char *argv[]);
@@ -83,7 +81,7 @@ class ReferenceMap
 				bool applyMtf = true,
 				bool applyCtfPadding = false);
 
-		std::vector<Volume<gravis::t2Vector<Complex> > > predictAllComplexGradients(
+		std::vector<Volume<gravis::t2Vector<Complex>>> predictAllComplexGradients(
 				const MetaDataTable& mdt,
 				ObservationModel& obs,
 				HalfSet hs, int threads,
@@ -103,24 +101,18 @@ class ReferenceMap
 				bool applyMtf = true,
 				bool applyCtfPadding = false);
 
-		std::vector<Image<Complex>> predictAll(
-				const MetaDataTable& mdt,
-				const LegacyObservationModel& obs,
-				HalfSet hs, int threads,
-				bool applyCtf = true,
-				bool applyTilt = true,
-				bool applyShift = true);
-
-		Image<Complex> predict(
-				const MetaDataTable& mdt, int p,
-				const LegacyObservationModel& obs,
-				HalfSet hs,
-				bool applyCtf = true,
-				bool applyTilt = true,
-				bool applyShift = true);
-
 		double angToPix(double a) const;
 		double pixToAng(double p) const;
+
+		void drawFSC(
+				std::string fsc_filename,
+				std::vector<double>& dest1D,
+				RawImage<RFLOAT>& dest2D,
+				double thresh = 0.143) const;
+
+	protected:
+
+		void presharpen(BufferedImage<RFLOAT>& map);
 };
 
 #endif

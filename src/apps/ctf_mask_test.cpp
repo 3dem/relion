@@ -158,6 +158,6 @@ int main(int argc, char *argv[])
 	
 	ImageLog::write(maskedCTF, outPath+"_maskedCTF");
 	ImageLog::write(mask, outPath+"_mask");
-	ImageLog::write(psf, outPath+"_psf", CenterXY);
-	ImageLog::write(slopeHistRad, outPath+"_slopeHist", CenterXY);
+	ImageLog::write(psf, outPath+"_psf", ImageLog::CenterXY);
+	ImageLog::write(slopeHistRad, outPath+"_slopeHist", ImageLog::CenterXY);
 }

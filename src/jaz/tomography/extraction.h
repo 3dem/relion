@@ -206,12 +206,12 @@ void TomoExtraction::extractAt2D_Fourier(
 	
 	if (no_subpixel_shift && bin == 1.0)
 	{
-		StackHelper::FourierTransformStack(smallStack, smallStackFS, true, num_threads);
+		NewStackHelper::FourierTransformStack(smallStack, smallStackFS, true, num_threads);
 		out.copyFrom(smallStackFS);
 	}
 	else
 	{	
-		StackHelper::FourierTransformStack(smallStack, smallStackFS, true, num_threads);
+		NewStackHelper::FourierTransformStack(smallStack, smallStackFS, true, num_threads);
 	
 		if (bin != 1.0)
 		{
@@ -221,12 +221,12 @@ void TomoExtraction::extractAt2D_Fourier(
 
 		if (no_subpixel_shift)
 		{
-			//StackHelper::inverseFourierTransformStack(smallStackFS, smallStack, true, num_threads);
+			//NewStackHelper::inverseFourierTransformStack(smallStackFS, smallStack, true, num_threads);
 			out.copyFrom(smallStackFS);
 		}
 		else
 		{
-			StackHelper::shiftStack(smallStackFS, posInNewImg, out, true, num_threads);
+			NewStackHelper::shiftStack(smallStackFS, posInNewImg, out, true, num_threads);
 		}
 	}
 }
@@ -320,7 +320,7 @@ void TomoExtraction::extractAt2D_real(
 	else
 	{	
 		BufferedImage<tComplex<T>> smallStackFS(sh,s,fc);
-		StackHelper::FourierTransformStack(smallStack, smallStackFS, true, num_threads);
+		NewStackHelper::FourierTransformStack(smallStack, smallStackFS, true, num_threads);
 	
 		if (bin != 1.0)
 		{
@@ -332,13 +332,13 @@ void TomoExtraction::extractAt2D_real(
 
 		if (no_subpixel_shift)
 		{
-			StackHelper::inverseFourierTransformStack(smallStackFS, smallStack, true, num_threads);
+			NewStackHelper::inverseFourierTransformStack(smallStackFS, smallStack, true, num_threads);
 			out.copyFrom(smallStack);
 		}
 		else
 		{
-			StackHelper::shiftStack(smallStackFS, posInNewImg, smallStackFS, true, num_threads);
-			StackHelper::inverseFourierTransformStack(smallStackFS, smallStack, true, num_threads);
+			NewStackHelper::shiftStack(smallStackFS, posInNewImg, smallStackFS, true, num_threads);
+			NewStackHelper::inverseFourierTransformStack(smallStackFS, smallStack, true, num_threads);
 			out.copyFrom(smallStack);
 		}
 	}

@@ -102,7 +102,7 @@ ModularCtfOptimisation::ModularCtfOptimisation(
 		
 		for (int ogpi = 0; ogpi < ogPres.size(); ogpi++)
 		{
-			const int og = ogPres[ogpi];			
+			const int og = ogPres[ogpi];
 			aberrationByGroup[og] = obsModel->getGammaOffset(og, obsModel->getBoxSize(og));
 		}
 	}
@@ -154,7 +154,7 @@ double ModularCtfOptimisation::f(const std::vector<double> &x) const
 			const double u2 = xu * xu + yu * yu;
 			const double u4 = u2 * u2;
 			
-			const double gammaOffset = obsModel->hasEvenZernike? aberrationByGroup[og](yi,xi) : 0.0;
+			const double gammaOffset = obsModel->hasEvenZernike? aberrationByGroup[og](xi,yi) : 0.0;
 			const double freqWgh = frqWghByGroup[og](yi,xi);
 	
 			const double gamma = ph 
@@ -228,7 +228,7 @@ double ModularCtfOptimisation::f(const std::vector<double> &x, void *tempStorage
 			const double u2 = xu * xu + yu * yu;
 			const double u4 = u2 * u2;
 			
-			const double gammaOffset = obsModel->hasEvenZernike? aberrationByGroup[og](yi,xi) : 0.0;
+			const double gammaOffset = obsModel->hasEvenZernike? aberrationByGroup[og](xi,yi) : 0.0;
 			const double freqWgh = frqWghByGroup[og](yi,xi);
 	
 			const double gamma = ph 
@@ -302,7 +302,7 @@ void ModularCtfOptimisation::grad(
 			const double u2 = xu * xu + yu * yu;
 			const double u4 = u2 * u2;
 			
-			const double gammaOffset = obsModel->hasEvenZernike? aberrationByGroup[og](yi,xi) : 0.0;
+			const double gammaOffset = obsModel->hasEvenZernike? aberrationByGroup[og](xi,yi) : 0.0;
 			const double freqWgh = frqWghByGroup[og](yi,xi);
 	
 			const double gamma = ph 
@@ -433,7 +433,7 @@ void ModularCtfOptimisation::grad(
 			const double u2 = xu * xu + yu * yu;
 			const double u4 = u2 * u2;
 			
-			const double gammaOffset = obsModel->hasEvenZernike? aberrationByGroup[og](yi,xi) : 0.0;
+			const double gammaOffset = obsModel->hasEvenZernike? aberrationByGroup[og](xi,yi) : 0.0;
 			const double freqWgh = frqWghByGroup[og](yi,xi);
 	
 			const double gamma = ph 

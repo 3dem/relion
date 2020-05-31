@@ -90,7 +90,7 @@ BufferedImage<T> Normalization::byNormalDistByFrame(const RawImage<T>& img)
 	
 	for (int f = 0; f < fc; f++)
 	{
-		BufferedImage<T> slice = StackHelper::extractSliceZ(img,f);
+		BufferedImage<T> slice = NewStackHelper::extractSliceZ(img,f);
 		
 		T mean = computeMean(slice);
 		T var = computeVariance(slice, mean);

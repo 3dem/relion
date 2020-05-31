@@ -183,7 +183,7 @@ BufferedImage<T> Resampling::upsampleCubic_Stack_full(
 	for (int f = 0; f < stack.zdim; f++)
 	{		
 		BufferedImage<T> sliceBig = upsampleCubic_2D_full(stack, f, factor, wout, hout);		
-		StackHelper::insertSliceZ(sliceBig, out, f);
+		NewStackHelper::insertSliceZ(sliceBig, out, f);
 	}
 	
 	return out;
@@ -250,7 +250,7 @@ BufferedImage<T> Resampling::downsampleFiltStack_2D_full(
 	for (int f = 0; f < img.zdim; f++)
 	{
 		BufferedImage<T> sliceFilt = ImageFilter::lowpass2D(img, f, freqPx, widthPx, true);				
-		StackHelper::insertSliceZ(subsample_2D_full(sliceFilt, wout, hout, factor), out, f);
+		NewStackHelper::insertSliceZ(subsample_2D_full(sliceFilt, wout, hout, factor), out, f);
 	}
 			
 	return out;
@@ -417,7 +417,7 @@ BufferedImage<T> Resampling::FourierCrop_fullStack(
 	
 	BufferedImage<tComplex<T>> imgFS(wh_in, h_in, fc);
 	
-	StackHelper::FourierTransformStack(imgCp, imgFS, true, num_threads);
+	NewStackHelper::FourierTransformStack(imgCp, imgFS, true, num_threads);
 	
 	BufferedImage<tComplex<T>> imgFS_cropped(wh_out, h_out, fc);	
 	
@@ -433,7 +433,7 @@ BufferedImage<T> Resampling::FourierCrop_fullStack(
 	}
 	
 	BufferedImage<float> imgOut(w_out, h_out, fc);
-	StackHelper::inverseFourierTransformStack(imgFS_cropped, imgOut, true, num_threads);
+	NewStackHelper::inverseFourierTransformStack(imgFS_cropped, imgOut, true, num_threads);
 	
 	return imgOut;
 }

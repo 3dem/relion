@@ -46,6 +46,8 @@ void ReferenceMap::read(IOParser& parser, int argc, char* argv[])
 {
 	reconFn0 = parser.getOption("--m1", "Reference map, half 1", "");
 	reconFn1 = parser.getOption("--m2", "Reference map, half 2", "");
+	amplitudeFn0 = parser.getOption("--a1", "Amplitude reference map, half 1", "");
+	amplitudeFn1 = parser.getOption("--a2", "Amplitude reference map, half 2", "");
 	angpix = textToDouble(parser.getOption("--angpix_ref", "Pixel size of the reference map", "-1"));
 	maskFn = parser.getOption("--mask", "Reference mask", "");
 	fscFn = parser.getOption("--f", "Input STAR file with the FSC of the reference (usually from PostProcess)");

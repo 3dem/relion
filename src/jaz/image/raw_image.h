@@ -71,9 +71,10 @@ class RawImage
 		void write(std::string fn) const;
 		void write(std::string fn, double pixelSize) const;
 		void writePng(std::string fn) const;
-		void writeVtk(std::string fn, 
-					  gravis::d3Vector origin = gravis::d3Vector(0,0,0), 
-					  gravis::d3Vector step = gravis::d3Vector(1,1,1)) const;
+		void writeVtk(
+				std::string fn,
+				gravis::d3Vector origin = gravis::d3Vector(0,0,0),
+				gravis::d3Vector step = gravis::d3Vector(1,1,1)) const;
 		
 		void copyTo(gravis::tImage<T>& img, int z = 0) const;
 		void copyTo(Image<T>& img) const;
@@ -87,6 +88,8 @@ class RawImage
 		
 		bool hasSize(long int w, long int h, long int d);
 		bool hasEqualSize(const RawImage<T>& img);
+		bool isSquare();
+		bool isCubical();
 
 		
 		template<class T2> inline
@@ -510,10 +513,10 @@ inline void RawImage<T>::copyTo(gravis::tImage<T>& img, int z) const
 	img = gravis::tImage<T>(xdim, ydim);
 	
 	for (size_t y = 0; y < ydim; y++)
-		for (size_t x = 0; x < xdim; x++)
-		{
-			img(x,y) = data[(z*ydim + y)*xdim + x];
-		}
+	for (size_t x = 0; x < xdim; x++)
+	{
+		img(x,y) = data[(z*ydim + y)*xdim + x];
+	}
 }
 
 template <class T>
@@ -555,7 +558,7 @@ inline void RawImage<T>::copyFrom(const Image<T2>& img)
 	for (size_t y = 0; y < ydim; y++)
 	for (size_t x = 0; x < xdim; x++)
 	{
-		data[(z*ydim + y)*xdim + x] = T(img(x,y,z));
+		data[(z*ydim + y)*xdim + x] = T(img.data(z,y,x));
 	}
 }
 
@@ -588,6 +591,18 @@ template <class T>
 bool RawImage<T>::hasEqualSize(const RawImage<T>& img)
 {
 	return xdim == img.xdim && ydim == img.ydim && zdim == img.zdim;
+}
+
+template<class T>
+bool RawImage<T>::isSquare()
+{
+	return xdim == ydim;
+}
+
+template<class T>
+bool RawImage<T>::isCubical()
+{
+	return xdim == ydim && ydim == zdim;
 }
 
 template <class T1, class T2>

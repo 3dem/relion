@@ -461,10 +461,10 @@ void TomoCtfFind::findAstigmatism()
 			
 			BufferedImage<double> fit = afGlob.computeExpansion(f, alpha, beta, accum, 0);	
 			
-			StackHelper::insertSliceZ(
+			NewStackHelper::insertSliceZ(
 				Centering::fftwHalfToHumanFull(fit), astigFits, f);
 			
-			StackHelper::insertSliceZ(
+			NewStackHelper::insertSliceZ(
 				Centering::fftwHalfToHumanFull(avgTiles[f]), astigData, f);
 			
 			
@@ -472,7 +472,7 @@ void TomoCtfFind::findAstigmatism()
 			
 			BufferedImage<double> nullFit = afGlob.computeExpansion(f, 0.0, 0.0, accum, 0);
 			
-			StackHelper::insertSliceZ(
+			NewStackHelper::insertSliceZ(
 				Centering::fftwHalfToHumanFull(nullFit), astigNullFit, f);
 		}
 	}
@@ -527,7 +527,7 @@ void TomoCtfFind::extractTiles()
 		BufferedImage<float> tempReal(s,s), tempRealBig(w,h);
 		BufferedImage<tComplex<float>> tempComplex(sh,s), tempComplexBig(wh, h);
 		
-		tempRealBig = StackHelper::extractSliceZ(tiltSeries, f);
+		tempRealBig = NewStackHelper::extractSliceZ(tiltSeries, f);
 		FFT::FourierTransform(tempRealBig, tempComplexBig, FFT::Both);
 		
 		for (int y = 0; y < h; y++)

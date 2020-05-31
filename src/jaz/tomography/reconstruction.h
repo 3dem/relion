@@ -569,8 +569,8 @@ void Reconstruction :: correctStack(
 	
 	BufferedImage<T> data(w,h,fc), psf(w,h,fc);
 	
-	StackHelper::inverseFourierTransformStack(dataImgFS, data, center);	
-	StackHelper::inverseFourierTransformStack(psfImgFS, psf, center);
+	NewStackHelper::inverseFourierTransformStack(dataImgFS, data, center);
+	NewStackHelper::inverseFourierTransformStack(psfImgFS, psf, center);
 		
 	#pragma omp parallel for num_threads(num_threads)			
 	for (long int f = 0; f < fc; f++)
@@ -598,7 +598,7 @@ void Reconstruction :: correctStackFS(
 	
 	correctStack(dataImgFS, psfImgFS, temp, center, num_threads);
 	
-	out = StackHelper::FourierTransformStack(temp, center, num_threads);
+	out = NewStackHelper::FourierTransformStack(temp, center, num_threads);
 }
 
 

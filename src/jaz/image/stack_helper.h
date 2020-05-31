@@ -1,5 +1,5 @@
-#ifndef STACK_HELPER_H
-#define STACK_HELPER_H
+#ifndef NEW_STACK_HELPER_H
+#define NEW_STACK_HELPER_H
 
 #include "buffered_image.h"
 #include <src/jaz/math/t_complex.h>
@@ -8,7 +8,7 @@
 #include <omp.h>
 
 
-class StackHelper
+class NewStackHelper
 {
 	public:
 		
@@ -61,7 +61,7 @@ class StackHelper
 };
 
 template<typename T>
-BufferedImage<T> StackHelper::extractSliceZ(const RawImage<T>& img, int z)
+BufferedImage<T> NewStackHelper::extractSliceZ(const RawImage<T>& img, int z)
 {
 	const int w = img.xdim;
 	const int h = img.ydim;
@@ -69,7 +69,7 @@ BufferedImage<T> StackHelper::extractSliceZ(const RawImage<T>& img, int z)
 	
 	if (z < 0 || z >= d)
 	{
-		REPORT_ERROR_STR("StackHelper::extractSliceZ: unable to extract slice index " << z 
+		REPORT_ERROR_STR("NewStackHelper::extractSliceZ: unable to extract slice index " << z
 						 << " from " << d << " slices.\n");
 	}
 	
@@ -85,7 +85,7 @@ BufferedImage<T> StackHelper::extractSliceZ(const RawImage<T>& img, int z)
 }
 
 template<typename SrcType, typename DestType>
-void StackHelper::insertSliceZ(const RawImage<SrcType> &slice, RawImage<DestType> &dest, int z)
+void NewStackHelper::insertSliceZ(const RawImage<SrcType> &slice, RawImage<DestType> &dest, int z)
 {
 	const int w = dest.xdim;
 	const int h = dest.ydim;
@@ -93,13 +93,13 @@ void StackHelper::insertSliceZ(const RawImage<SrcType> &slice, RawImage<DestType
 	
 	if (z < 0 || z >= d)
 	{
-		REPORT_ERROR_STR("StackHelper::insertSliceZ: unable to insert slice index " << z 
+		REPORT_ERROR_STR("NewStackHelper::insertSliceZ: unable to insert slice index " << z
 						 << " into " << d << " slices.\n");
 	}
 	
 	if (slice.xdim != w || slice.ydim != h)
 	{
-		REPORT_ERROR_STR("StackHelper::insertSliceZ: image size mismatch - slice: " 
+		REPORT_ERROR_STR("NewStackHelper::insertSliceZ: image size mismatch - slice: "
 						 << slice.xdim << "x" << slice.ydim << ", dest: " 
 						 << w << "x" << h << "x" << d << ".\n");
 	}
@@ -112,13 +112,13 @@ void StackHelper::insertSliceZ(const RawImage<SrcType> &slice, RawImage<DestType
 }
 
 template<typename T>
-void StackHelper::writeAsStack(const std::vector<RawImage<T>>& vec, std::string fn)
+void NewStackHelper::writeAsStack(const std::vector<RawImage<T>>& vec, std::string fn)
 {
 	const int fc = vec.size();
 	
 	if (fc < 1) 
 	{
-		REPORT_ERROR_STR("StackHelper::writeAsStack: unable to write " << fn << " - empty stack.");
+		REPORT_ERROR_STR("NewStackHelper::writeAsStack: unable to write " << fn << " - empty stack.");
 	}
 	
 	const size_t w = vec[0].xdim;
@@ -135,13 +135,13 @@ void StackHelper::writeAsStack(const std::vector<RawImage<T>>& vec, std::string 
 }
 
 template<typename T>
-void StackHelper::writeAsStack(const std::vector<BufferedImage<T>>& vec, std::string fn)
+void NewStackHelper::writeAsStack(const std::vector<BufferedImage<T>>& vec, std::string fn)
 {
 	const int fc = vec.size();
 	
 	if (fc < 1) 
 	{
-		REPORT_ERROR_STR("StackHelper::writeAsStack: unable to write " << fn << " - empty stack.");
+		REPORT_ERROR_STR("NewStackHelper::writeAsStack: unable to write " << fn << " - empty stack.");
 	}
 	
 	const size_t w = vec[0].xdim;
@@ -158,7 +158,7 @@ void StackHelper::writeAsStack(const std::vector<BufferedImage<T>>& vec, std::st
 }
 
 template <typename T>
-void StackHelper::FourierTransformStack(
+void NewStackHelper::FourierTransformStack(
 		const RawImage<T>& stack, 
 		RawImage<tComplex<T>>& stackOut, 
 		bool center,
@@ -202,7 +202,7 @@ void StackHelper::FourierTransformStack(
 }
 
 template <typename T>
-BufferedImage<tComplex<T>> StackHelper::FourierTransformStack(
+BufferedImage<tComplex<T>> NewStackHelper::FourierTransformStack(
 		const RawImage<T>& stack, 
 		bool center,
 		int num_threads)
@@ -213,7 +213,7 @@ BufferedImage<tComplex<T>> StackHelper::FourierTransformStack(
 }
 
 template <typename T>
-void StackHelper::inverseFourierTransformStack(
+void NewStackHelper::inverseFourierTransformStack(
 		const RawImage<tComplex<T>>& stack, 
 		RawImage<T>& stackOut, 
 		bool decenter,
@@ -265,7 +265,7 @@ void StackHelper::inverseFourierTransformStack(
 }
 
 template <typename T>
-BufferedImage<T> StackHelper::inverseFourierTransformStack(
+BufferedImage<T> NewStackHelper::inverseFourierTransformStack(
 		const RawImage<tComplex<T>>& stack, 
 		bool center,
 		int num_threads)
@@ -276,7 +276,7 @@ BufferedImage<T> StackHelper::inverseFourierTransformStack(
 }
 
 template <typename T>
-void StackHelper::shiftStack(
+void NewStackHelper::shiftStack(
 		const RawImage<tComplex<T>>& stack,
 		const std::vector<gravis::d2Vector> &pos,
 		RawImage<tComplex<T>>& stackOut,

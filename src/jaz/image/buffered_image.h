@@ -12,10 +12,12 @@ class BufferedImage : public RawImage<T>
 		template <typename T2>
 		static BufferedImage<T> convert(const BufferedImage<T2>& img);
 		
-		BufferedImage();		
+		BufferedImage();
 		BufferedImage(size_t xdim, size_t ydim = 1, size_t zdim = 1);
 		BufferedImage(const BufferedImage& vi);
 		BufferedImage(const RawImage<T>& vi);
+		BufferedImage(const Image<T>& vi);
+		BufferedImage(std::string filename);
 		
 		
 			std::vector<T> dataVec;
@@ -90,15 +92,41 @@ BufferedImage<T>::BufferedImage(const RawImage<T>& vi)
 	:   RawImage<T>(vi)
 {
 	const long int s = this->xdim * this->ydim * this->zdim;
-	
+
 	dataVec.resize(s);
-	
+
 	for (int i = 0; i < s; i++)
 	{
 		dataVec[i] = vi[i];
 	}
-	
+
 	RawImage<T>::data = &(dataVec[0]);
+}
+
+template <class T>
+BufferedImage<T>::BufferedImage(const Image<T>& vi)
+	:   RawImage<T>(
+			vi.data.xdim,
+			vi.data.ydim,
+			vi.data.zdim * vi.data.ndim,
+			 0)
+{
+	const long int s = this->xdim * this->ydim * this->zdim;
+
+	dataVec.resize(s);
+
+	for (int i = 0; i < s; i++)
+	{
+		dataVec[i] = vi.data.data[i];
+	}
+
+	RawImage<T>::data = &(dataVec[0]);
+}
+
+template<typename T>
+BufferedImage<T>::BufferedImage(std::string filename)
+{
+	read(filename);
 }
 
 template <class T>

@@ -79,12 +79,12 @@ int main(int argc, char *argv[])
 		
 		const int fc = ts.zdim;
 		
-		BufferedImage<float> slice = StackHelper::extractSliceZ(ts, fc/2);
+		BufferedImage<float> slice = NewStackHelper::extractSliceZ(ts, fc/2);
 		
 		BufferedImage<float> sliceBinned = Resampling::downsampleFilt_2D_full(
 				slice, wb, hb);
 		
-		StackHelper::insertSliceZ(sliceBinned, cat, t);
+		NewStackHelper::insertSliceZ(sliceBinned, cat, t);
 	}
 	
 	cat.write(outTag+"_catalogue.mrc");

@@ -88,11 +88,11 @@ BufferedImage<float> Prediction::predictRS(
 	const int hs = (halfSet == OppositeHalf)? 1 - hs0: hs0;
 	
 	BufferedImage<fComplex> prediction(sh,s), psf(sh,s);
-							
+
 	ForwardProjection::forwardProject(
 			referenceFS[hs], {projPart}, prediction, psf, 1);
 	
-	BufferedImage<float> predictionReal(s,s);			
+	BufferedImage<float> predictionReal(s,s);
 	
 	Reconstruction::correctStack(prediction, psf, predictionReal, false, 1);
 	

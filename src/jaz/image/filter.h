@@ -442,7 +442,7 @@ BufferedImage<T> ImageFilter::highpassStack(
 	for (int f = 0; f < fc; f++)
 	{		
 		BufferedImage<T> sliceFilt = highpass2D(stack, f, freqPx, widthPx, pad);		
-		StackHelper::insertSliceZ(sliceFilt, out, f);
+		NewStackHelper::insertSliceZ(sliceFilt, out, f);
 	}
 	
 	return out;
@@ -464,7 +464,7 @@ BufferedImage<T> ImageFilter::highpassStackGaussPadded(
 	
 	for (int f = 0; f < fc; f++)
 	{	
-		BufferedImage<T> slice0 = StackHelper::extractSliceZ(stack, f);		
+		BufferedImage<T> slice0 = NewStackHelper::extractSliceZ(stack, f);
 		BufferedImage<T> slice = Padding::padCenter2D_full(slice0, 2*sigmaRS);
 		
 		slice = Gauss2D(slice, 0, sigmaRS, false);
@@ -472,7 +472,7 @@ BufferedImage<T> ImageFilter::highpassStackGaussPadded(
 		slice /= mask;		
 		slice = slice0 - slice;
 		
-		StackHelper::insertSliceZ(slice, out, f);
+		NewStackHelper::insertSliceZ(slice, out, f);
 	}
 	
 	return out;
@@ -490,7 +490,7 @@ BufferedImage<T> ImageFilter::lowpassStack(
 	for (int f = 0; f < fc; f++)
 	{		
 		BufferedImage<T> sliceFilt = lowpass2D(stack, f, freqPx, widthPx, pad);		
-		StackHelper::insertSliceZ(sliceFilt, out, f);
+		NewStackHelper::insertSliceZ(sliceFilt, out, f);
 	}
 	
 	return out;
@@ -507,7 +507,7 @@ BufferedImage<T> ImageFilter::GaussStack(
 	for (int f = 0; f < fc; f++)
 	{		
 		BufferedImage<T> sliceFilt = Gauss2D(stack, f, sigmaRS, pad);		
-		StackHelper::insertSliceZ(sliceFilt, out, f);
+		NewStackHelper::insertSliceZ(sliceFilt, out, f);
 	}
 	
 	return out;

@@ -417,7 +417,7 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 				                 << obsModel->getPixelSize(opticsGroup) << "\n");
 			}
 
-			const Image<RFLOAT>& gammaOffset = obsModel->getGammaOffset(opticsGroup, oriydim);
+			const BufferedImage<RFLOAT>& gammaOffset = obsModel->getGammaOffset(opticsGroup, oriydim);
 
 			for (int y1 = 0; y1 < result.ydim; y1++)
 			for (int x1 = 0; x1 < result.xdim; x1++)
@@ -426,10 +426,12 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 				RFLOAT y = y1 <= result.ydim/2? y1 / ys : (y1 - result.ydim) / ys;
 
 				const int x0 = x1;
-				const int y0 = y1 <= result.ydim/2? y1 : gammaOffset.data.ydim + y1 - result.ydim;
+				const int y0 = y1 <= result.ydim/2? y1 : gammaOffset.ydim + y1 - result.ydim;
 
-				DIRECT_A2D_ELEM(result, y1, x1) = getCTF(x, y, do_abs, do_only_flip_phases,
-				                                         do_intact_until_first_peak, do_damping, gammaOffset(y0,x0), do_intact_after_first_peak);
+				DIRECT_A2D_ELEM(result, y1, x1) = getCTF(
+					x, y, do_abs, do_only_flip_phases,
+					do_intact_until_first_peak, do_damping,
+					gammaOffset(x0,y0), do_intact_after_first_peak);
 			}
 		}
 		else

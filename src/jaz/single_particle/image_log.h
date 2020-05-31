@@ -25,11 +25,13 @@
 #include <src/jaz/single_particle/jaz_config.h>
 #include <src/jaz/single_particle/vtk_helper.h>
 
-enum Centering {NoCenter, CenterXY, CenterXYZ};
 
 class ImageLog
 {
     public:
+
+		enum Centering {NoCenter, CenterXY, CenterXYZ};
+
 
         template <typename T>
         static void write(

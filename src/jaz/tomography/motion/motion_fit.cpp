@@ -509,9 +509,9 @@ std::vector<BufferedImage<double>> MotionFit::drawShiftedCCs(const std::vector<d
 			}
 		}
 			
-		StackHelper::FourierTransformStack(CCs[p], CCsFS, true, num_threads);
-		StackHelper::shiftStack(CCsFS, posInNewImg, CCsFS, true, num_threads);
-		StackHelper::inverseFourierTransformStack(CCsFS, out[p], false, num_threads);
+		NewStackHelper::FourierTransformStack(CCs[p], CCsFS, true, num_threads);
+		NewStackHelper::shiftStack(CCsFS, posInNewImg, CCsFS, true, num_threads);
+		NewStackHelper::inverseFourierTransformStack(CCsFS, out[p], false, num_threads);
 	}
 	
 	return out;

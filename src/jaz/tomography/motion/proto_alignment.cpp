@@ -363,9 +363,9 @@ std::vector<BufferedImage<double>> ProtoAlignment::drawShiftedCCs(const std::vec
 						dp.y * paddingFactor);
 		}
 			
-		StackHelper::FourierTransformStack(CCs[p], CCsFS, true, num_threads);
-		StackHelper::shiftStack(CCsFS, posInNewImg, CCsFS, true, num_threads);
-		StackHelper::inverseFourierTransformStack(CCsFS, out[p], false, num_threads);
+		NewStackHelper::FourierTransformStack(CCs[p], CCsFS, true, num_threads);
+		NewStackHelper::shiftStack(CCsFS, posInNewImg, CCsFS, true, num_threads);
+		NewStackHelper::inverseFourierTransformStack(CCsFS, out[p], false, num_threads);
 	}
 	
 	return out;
