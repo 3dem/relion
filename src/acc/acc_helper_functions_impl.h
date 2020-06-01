@@ -1869,6 +1869,30 @@ void windowFourierTransform2(
 	}
 }
 
+void run_calcPowerSpectrum(Complex *dFaux, int padoridim, Complex *ddata, int data_sz, RFLOAT *dpower_spectrum, RFLOAT *dcounter,
+											  int max_r2, int min_r2, RFLOAT normfft, RFLOAT padding_factor, RFLOAT weight,
+											  RFLOAT *dfourier_mask, int fx, int fy, int fz, bool do_fourier_mask)
+{
+#ifdef CUDA
+	dim3 bs(32,4,2);
+	dim3 gs(ceil((padoridim/2+1)/(float)bs.x), ceil(padoridim/(float)bs.y), ceil(padoridim/(float)bs.z));
+	if(sizeof(RFLOAT) == sizeof(double))
+		cuda_kernel_calcPowerSpectrum<<<gs,bs>>>((double2*)dFaux,padoridim,(double2*)ddata,data_sz,dpower_spectrum,dcounter,
+												  max_r2,min_r2,normfft,padding_factor,weight,dfourier_mask,fx,fy,fz,do_fourier_mask);
+	else
+		cuda_kernel_calcPowerSpectrum<<<gs,bs>>>((float2*)dFaux,padoridim,(float2*)ddata,data_sz,dpower_spectrum,dcounter,
+												  max_r2,min_r2,normfft,padding_factor,weight,dfourier_mask,fx,fy,fz,do_fourier_mask);
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
+#endif
+}
+
+void run_updatePowerSpectrum(RFLOAT *dcounter, int sz, RFLOAT *dpower_spectrum)
+{
+#ifdef CUDA
+	cuda_kernel_updatePowerSpectrum<<<ceil(sz/(float)256),256>>>(dcounter, dpower_spectrum, sz);
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
+#endif
+}
 
 
 void selfApplyBeamTilt2(MultidimArray<Complex > &Fimg, RFLOAT beamtilt_x, RFLOAT beamtilt_y,
