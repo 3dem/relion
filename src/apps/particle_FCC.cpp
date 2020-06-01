@@ -22,20 +22,20 @@ using namespace gravis;
 
 int main(int argc, char *argv[])
 {
-    std::string starFn, outPath;
+	std::string starFn, outPath;
 	double minFreqPx;
 	bool oppositeHalf, predictCTF;
 	int minMG, maxMG, threads;
 	
 	NewReferenceMap reference;
 
-    IOParser parser;
+	IOParser parser;
 
-    try
-    {
-        parser.setCommandLine(argc, argv);
+	try
+	{
+		parser.setCommandLine(argc, argv);
 
-        parser.addSection("General options");
+		parser.addSection("General options");
 		
 		starFn = parser.getOption("--i", "Input particle *.star file");
 		reference.read(parser, argc, argv);
@@ -51,14 +51,14 @@ int main(int argc, char *argv[])
 		threads = textToInteger(parser.getOption("--j", "Number of threads", "1"));
 		outPath = parser.getOption("--o", "Output path");
 
-        parser.checkForErrors();
-    }
-    catch (RelionError XE)
-    {
-        parser.writeUsage(std::cout);
-        std::cerr << XE;
-        return RELION_EXIT_FAILURE;
-    }
+		parser.checkForErrors();
+	}
+	catch (RelionError XE)
+	{
+		parser.writeUsage(std::cout);
+		std::cerr << XE;
+		return RELION_EXIT_FAILURE;
+	}
 
 	ObservationModel obsModel;	
 	MetaDataTable mdt0;
@@ -134,7 +134,7 @@ int main(int argc, char *argv[])
 			os_fcc << r << " " << fcc << "\n";
 			os_l2 << r << " " << l2 << "\n";
 		}
-	}		
+	}
 
 	return RELION_EXIT_SUCCESS;
 }

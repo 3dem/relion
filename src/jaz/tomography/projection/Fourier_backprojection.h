@@ -362,6 +362,15 @@ void FourierBackprojection::backprojectSlice_noSF_dualContrast(
 	gravis::d3Matrix projInvTransp = A.invert().transpose();
 	gravis::d3Vector normal(projInvTransp(2,0), projInvTransp(2,1), projInvTransp(2,2));
 
+	BufferedImage<tComplex<SrcType>> sinImg(wh2,h2), cosImg(wh2,h2);
+
+	for (long int y = 0; y < h2; y++)
+	for (long int x = 0; x < wh2; x++)
+	{
+		sinImg(x,y) = sin_gamma(x,y) * dataFS(x,y);
+		cosImg(x,y) = cos_gamma(x,y) * dataFS(x,y);
+	}
+
 	#pragma omp parallel for num_threads(num_threads)
 	for (long int z = 0; z < d3; z++)
 	for (long int y = 0; y < h3; y++)
@@ -416,14 +425,17 @@ void FourierBackprojection::backprojectSlice_noSF_dualContrast(
 			{
 				const double c = 1.0 - std::abs(pi.z);
 
-				const tComplex<SrcType> z0 = Interpolation::linearXY_complex_FftwHalf(dataFS, pi.x, pi.y, 0);
-				const tComplex<DestType> z1(z0.real, z0.imag);
+				const tComplex<SrcType> zs0 = Interpolation::linearXY_complex_FftwHalf(sinImg, pi.x, pi.y, 0);
+				const tComplex<DestType> zs1(zs0.real, zs0.imag);
+
+				const tComplex<SrcType> zc0 = Interpolation::linearXY_complex_FftwHalf(cosImg, pi.x, pi.y, 0);
+				const tComplex<DestType> zc1(zc0.real, zc0.imag);
 
 				const DestType sin_g = Interpolation::linearXY_symmetric_FftwHalf(sin_gamma, pi.x, pi.y, 0);
 				const DestType cos_g = Interpolation::linearXY_symmetric_FftwHalf(cos_gamma, pi.x, pi.y, 0);
 
-				dest(x,y,z).data_sin += c * sin_g * z1;
-				dest(x,y,z).data_cos += c * cos_g * z1;
+				dest(x,y,z).data_sin += c * zs1;
+				dest(x,y,z).data_cos += c * zc1;
 
 				dest(x,y,z).weight_sin2    += c * sin_g * sin_g;
 				dest(x,y,z).weight_sin_cos += c * sin_g * cos_g;

@@ -602,7 +602,7 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 	// Subtract reference projection
 	if (fn_sub != "")
 	{
-		MultidimArray<Complex> Fsub;		
+		MultidimArray<Complex> Fsub;
 		Fsub.resize(F2D);
 		projector.get2DFourierTransform(Fsub, A3D);
 		
