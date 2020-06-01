@@ -80,9 +80,11 @@ class FourierBackprojection
 
 		template <typename SrcType, typename DestType>
 		static void backprojectSlice_noSF_dualContrast(
-			const RawImage<tComplex<SrcType>>& dataFS,
-			const RawImage<SrcType>& sin_gamma,
-			const RawImage<SrcType>& cos_gamma,
+			const RawImage<tComplex<SrcType>>& sin_gamma_data,
+			const RawImage<tComplex<SrcType>>& cos_gamma_data,
+			const RawImage<SrcType>& sin2_weight,
+			const RawImage<SrcType>& sin_cos_weight,
+			const RawImage<SrcType>& cos2_weight,
 			const gravis::d4Matrix& proj,
 			RawImage<DualContrastVoxel<DestType>>& dest,
 			int num_threads);
@@ -341,15 +343,17 @@ void FourierBackprojection::backprojectSlice_noSF(
 
 template <typename SrcType, typename DestType>
 void FourierBackprojection::backprojectSlice_noSF_dualContrast(
-	const RawImage<tComplex<SrcType>>& dataFS,
-	const RawImage<SrcType>& sin_gamma,
-	const RawImage<SrcType>& cos_gamma,
+	const RawImage<tComplex<SrcType>>& sin_gamma_data,
+	const RawImage<tComplex<SrcType>>& cos_gamma_data,
+	const RawImage<SrcType>& sin2_weight,
+	const RawImage<SrcType>& sin_cos_weight,
+	const RawImage<SrcType>& cos2_weight,
 	const gravis::d4Matrix& proj,
 	RawImage<DualContrastVoxel<DestType>>& dest,
 	int num_threads)
 {
-	const int wh2 = dataFS.xdim;
-	const int h2 = dataFS.ydim;
+	const int wh2 = sin_gamma_data.xdim;
+	const int h2 = sin_gamma_data.ydim;
 
 	const int wh3 = dest.xdim;
 	const int h3 = dest.ydim;
@@ -362,14 +366,6 @@ void FourierBackprojection::backprojectSlice_noSF_dualContrast(
 	gravis::d3Matrix projInvTransp = A.invert().transpose();
 	gravis::d3Vector normal(projInvTransp(2,0), projInvTransp(2,1), projInvTransp(2,2));
 
-	BufferedImage<tComplex<SrcType>> sinImg(wh2,h2), cosImg(wh2,h2);
-
-	for (long int y = 0; y < h2; y++)
-	for (long int x = 0; x < wh2; x++)
-	{
-		sinImg(x,y) = sin_gamma(x,y) * dataFS(x,y);
-		cosImg(x,y) = cos_gamma(x,y) * dataFS(x,y);
-	}
 
 	#pragma omp parallel for num_threads(num_threads)
 	for (long int z = 0; z < d3; z++)
@@ -425,21 +421,31 @@ void FourierBackprojection::backprojectSlice_noSF_dualContrast(
 			{
 				const double c = 1.0 - std::abs(pi.z);
 
-				const tComplex<SrcType> zs0 = Interpolation::linearXY_complex_FftwHalf(sinImg, pi.x, pi.y, 0);
+				const tComplex<SrcType> zs0 = Interpolation::linearXY_complex_FftwHalf(
+							sin_gamma_data, pi.x, pi.y, 0);
+
 				const tComplex<DestType> zs1(zs0.real, zs0.imag);
 
-				const tComplex<SrcType> zc0 = Interpolation::linearXY_complex_FftwHalf(cosImg, pi.x, pi.y, 0);
+				const tComplex<SrcType> zc0 = Interpolation::linearXY_complex_FftwHalf(
+							cos_gamma_data, pi.x, pi.y, 0);
+
 				const tComplex<DestType> zc1(zc0.real, zc0.imag);
 
-				const DestType sin_g = Interpolation::linearXY_symmetric_FftwHalf(sin_gamma, pi.x, pi.y, 0);
-				const DestType cos_g = Interpolation::linearXY_symmetric_FftwHalf(cos_gamma, pi.x, pi.y, 0);
+				const DestType sin2_g = Interpolation::linearXY_symmetric_FftwHalf(
+							sin2_weight, pi.x, pi.y, 0);
+
+				const DestType sin_cos_g = Interpolation::linearXY_symmetric_FftwHalf(
+							sin_cos_weight, pi.x, pi.y, 0);
+
+				const DestType cos2_g = Interpolation::linearXY_symmetric_FftwHalf(
+							cos2_weight, pi.x, pi.y, 0);
 
 				dest(x,y,z).data_sin += c * zs1;
 				dest(x,y,z).data_cos += c * zc1;
 
-				dest(x,y,z).weight_sin2    += c * sin_g * sin_g;
-				dest(x,y,z).weight_sin_cos += c * sin_g * cos_g;
-				dest(x,y,z).weight_cos2    += c * cos_g * cos_g;
+				dest(x,y,z).weight_sin2    += c * sin2_g;
+				dest(x,y,z).weight_sin_cos += c * sin_cos_g;
+				dest(x,y,z).weight_cos2    += c * cos2_g;
 			}
 		}
 	}

@@ -517,7 +517,8 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 	const int sh = dataImage.xdim;
 	const int s = dataImage.ydim;
 
-	BufferedImage<RFLOAT> sin_gamma, cos_gamma;
+	BufferedImage<Complex> sin_gamma_data, cos_gamma_data;
+	BufferedImage<RFLOAT> sin2_weight, sin_cos_weight, cos2_weight;
 
 		
 	RFLOAT r_ewald_sphere = std::numeric_limits<RFLOAT>::max();
@@ -525,13 +526,19 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 	// Apply CTF if necessary
 	if (do_ctf || do_reconstruct_ctf)
 	{
+		obsModel.demodulatePhase(DF, p, F2D);
+		obsModel.divideByMtf(DF, p, F2D);
+
 		CTF ctf;
 		ctf.readByGroup(DF, &obsModel, p);
 
 		if (do_dual_contrast)
 		{
-			sin_gamma = BufferedImage<RFLOAT>(sh,s);
-			cos_gamma = BufferedImage<RFLOAT>(sh,s);
+			sin_gamma_data = BufferedImage<Complex>(sh,s);
+			cos_gamma_data = BufferedImage<Complex>(sh,s);
+			sin2_weight = BufferedImage<RFLOAT>(sh,s);
+			sin_cos_weight = BufferedImage<RFLOAT>(sh,s);
+			cos2_weight = BufferedImage<RFLOAT>(sh,s);
 
 			BufferedImage<RFLOAT> gamma_img(sh,s);
 			ctf.drawGamma(s, s, angpix, &gamma_img[0]);
@@ -539,8 +546,17 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 			for (int y = 0; y < s; y++)
 			for (int x = 0; x < sh; x++)
 			{
-				sin_gamma(x,y) = sin(gamma_img(x,y));
-				cos_gamma(x,y) = cos(gamma_img(x,y));
+				const double gamma = gamma_img(x,y);
+				const double cos_gamma = cos(gamma);
+				const double sin_gamma = sin(gamma);
+				const Complex data = dataImage(x,y);
+
+				sin_gamma_data(x,y) = sin_gamma * data;
+				cos_gamma_data(x,y) = cos_gamma * data;
+
+				sin2_weight(x,y) = sin_gamma * sin_gamma;
+				sin_cos_weight(x,y) = sin_gamma * cos_gamma;
+				cos2_weight(x,y) = cos_gamma * cos_gamma;
 			}
 		}
 		else
@@ -549,24 +565,21 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 					Fctf, myBoxSize, myBoxSize, myPixelSize,
 					ctf_phase_flipped, only_flip_phases,
 					intact_ctf_first_peak, true);
-		}
 
-		obsModel.demodulatePhase(DF, p, F2D);
-		obsModel.divideByMtf(DF, p, F2D);
-
-		// Ewald-sphere curvature correction
-		if (do_ewald)
-		{
-			applyCTFPandCTFQ(F2D, ctf, transformer, F2DP, F2DQ, skip_mask);
-
-			if (!skip_weighting)
+			// Ewald-sphere curvature correction
+			if (do_ewald)
 			{
-				// Also calculate W, store again in Fctf
-				ctf.applyWeightEwaldSphereCurvature_noAniso(Fctf, myBoxSize, myBoxSize, myPixelSize, mask_diameter);
-			}
+				applyCTFPandCTFQ(F2D, ctf, transformer, F2DP, F2DQ, skip_mask);
 
-			// Also calculate the radius of the Ewald sphere (in pixels)
-			r_ewald_sphere = myBoxSize * myPixelSize / ctf.lambda;
+				if (!skip_weighting)
+				{
+					// Also calculate W, store again in Fctf
+					ctf.applyWeightEwaldSphereCurvature_noAniso(Fctf, myBoxSize, myBoxSize, myPixelSize, mask_diameter);
+				}
+
+				// Also calculate the radius of the Ewald sphere (in pixels)
+				r_ewald_sphere = myBoxSize * myPixelSize / ctf.lambda;
+			}
 		}
 	}
 
@@ -731,7 +744,9 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 				if (do_dual_contrast)
 				{
 					FourierBackprojection::backprojectSlice_noSF_dualContrast(
-						dataImage, sin_gamma, cos_gamma, proj,
+						sin_gamma_data, cos_gamma_data,
+						sin2_weight, sin_cos_weight, cos2_weight,
+						proj,
 						*dual_contrast_accumulation_volume,
 						num_threads_in);
 				}
