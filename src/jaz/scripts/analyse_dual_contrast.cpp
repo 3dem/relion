@@ -93,7 +93,7 @@ int main(int argc, char *argv[])
 
 		std::ofstream ofs(out_path + "power_" + names[m] + ".dat");
 
-		for (int i = 0; i < power1D.size(); i++)
+		for (int i = 0; i < power1D[m].size(); i++)
 		{
 			ofs << i << ' ' << power1D[m][i] << '\n';
 		}
@@ -104,7 +104,7 @@ int main(int argc, char *argv[])
 	std::vector<double> power_ratio(sc);
 
 	{
-		std::ofstream power_ratio_file(out_path + "scale.dat");
+		std::ofstream power_ratio_file(out_path + "power_ratio.dat");
 		std::ofstream scale_file(out_path + "scale.dat");
 
 		for (int i = 0; i < sc; i++)
@@ -184,67 +184,11 @@ int main(int argc, char *argv[])
 	DualContrastWriter::writeAxialSlices(
 		filtered_phase_RS, filtered_rescaled_amplitude_RS, out_path + "filtered_rescaled_dual_slice_", output_scale);
 
-
-	d2Vector b(0.0, 0.0);
-	d2Matrix A(0.0, 0.0, 0.0, 0.0);
-
-	for (int z = 0; z < s;  z++)
-	for (int y = 0; y < s;  y++)
-	for (int x = 0; x < s; x++)
-	{
-		const double ap = filtered_phase_RS(x,y,z);
-		const double aa = filtered_rescaled_amplitude_RS(x,y,z);
-		const double ab = filtered_blended_RS(x,y,z);
-
-		// minimise |x_p * ap + x_a * aa - ab|²
-
-		A(0,0) += ap * ap;
-		A(0,1) += ap * aa;
-		A(1,0) += aa * ap;
-		A(1,1) += aa * aa;
-
-		b[0] += ap * ab;
-		b[1] += aa * ab;
-	}
-
-	d2Matrix Ainv = A;
-	Ainv.invert();
-
-	d2Vector optimum = Ainv * b;
-
-	std::cout << "scales: " << optimum[0] << ", " << optimum[1]
-			  << " (" << (100.0 * optimum[1] /
-				 (std::abs(optimum[0]) + std::abs(optimum[1])))
-			  << "%)" << std::endl;
-
-	BufferedImage<double> recombined(s,s,s);
-	BufferedImage<double> scaled_phase(s,s,s);
-	BufferedImage<double> scaled_amplitude(s,s,s);
-
-	for (int z = 0; z < s; z++)
-	for (int y = 0; y < s; y++)
-	for (int x = 0; x < s; x++)
-	{
-		recombined(x,y,z) =
-			  optimum[0] * filtered_phase_RS(x,y,z)
-			+ optimum[1] * filtered_rescaled_amplitude_RS(x,y,z);
-
-		scaled_phase(x,y,z) =
-			  optimum[0] * filtered_phase_RS(x,y,z);
-
-		scaled_amplitude(x,y,z) =
-			  optimum[1] * filtered_rescaled_amplitude_RS(x,y,z);
-	}
-
-	recombined.write(out_path + "recombined.mrc", pixel_size);
-	filtered_blended_RS.write(out_path + "filtered_blended.mrc", pixel_size);
-	scaled_phase.write(out_path + "filtered_phase.mrc", pixel_size);
-	scaled_amplitude.write(out_path + "filtered_amplitude.mrc", pixel_size);
-
-
 	std::cout << mapsFS[amplitude_id].getSizeString() << std::endl;
 
 	BufferedImage<double> correlation(sh,s,s), rot_correlation(sh,s,s);
+
+
 
 	for (int z = 0; z < s;  z++)
 	for (int y = 0; y < s;  y++)

@@ -58,7 +58,7 @@ void DualContrastWriter :: writeAxialSlices(
 		for (int x = 0; x < s; x++)
 		{
 			double p = phase_scale * (slice_phase(x,y) - mean_phase);
-			double a = -amplitude_scale * (slice_amp(x,y) - mean_amplitude);
+			double a = amplitude_scale * (slice_amp(x,y) - mean_amplitude);
 
 			pngOut(x,y) = output_scale * gravis::dRGB(p,0.5*(p+a),a) + 0.5 * gravis::dRGB(1,1,1);
 			pngOut(x,y).clamp();

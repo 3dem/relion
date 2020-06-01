@@ -529,9 +529,6 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 		obsModel.demodulatePhase(DF, p, F2D);
 		obsModel.divideByMtf(DF, p, F2D);
 
-		CTF ctf;
-		ctf.readByGroup(DF, &obsModel, p);
-
 		if (do_dual_contrast)
 		{
 			sin_gamma_data = BufferedImage<Complex>(sh,s);
@@ -540,7 +537,13 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 			sin_cos_weight = BufferedImage<RFLOAT>(sh,s);
 			cos2_weight = BufferedImage<RFLOAT>(sh,s);
 
+			CTF ctf;
+			ctf.readByGroup(DF, &obsModel, p);
+			ctf.Q0 = 0.0;
+			ctf.initialise();
+
 			BufferedImage<RFLOAT> gamma_img(sh,s);
+
 			ctf.drawGamma(s, s, angpix, &gamma_img[0]);
 
 			for (int y = 0; y < s; y++)
@@ -561,6 +564,8 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 		}
 		else
 		{
+			CTF ctf;
+			ctf.readByGroup(DF, &obsModel, p);
 			ctf.getFftwImage(
 					Fctf, myBoxSize, myBoxSize, myPixelSize,
 					ctf_phase_flipped, only_flip_phases,

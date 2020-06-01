@@ -310,6 +310,8 @@ void ObservationModel::predictObservation(
 
 			CTF ctf;
 			ctf.readByGroup(particle_table, this, particle_index);
+			ctf.Q0 = 0.0;
+			ctf.initialise();
 
 			BufferedImage<RFLOAT> gamma_img(sh_out, s_out);
 			ctf.drawGamma(s_out, s_out, ps, &gamma_img[0]);
