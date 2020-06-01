@@ -515,6 +515,8 @@ enum EMDLabel
 	EMDL_RESOLUTION_INVPIXEL,
 	EMDL_SPECTRAL_IDX,
 
+	EMDL_TOMO_PARTICLE_ID,
+	EMDL_TOMO_PICK_PARTICLE_ID,
 	EMDL_UNKNOWN_LABEL,
 
 	EMDL_LAST_LABEL // **** NOTE ****: Do keep this label always at the end
@@ -1049,6 +1051,9 @@ private:
 		EMDL::addLabel(EMDL_RESOLUTION_ANGSTROM, EMDL_DOUBLE, "rlnAngstromResolution", "Resolution (in Angstroms)");
 		EMDL::addLabel(EMDL_RESOLUTION_INVPIXEL, EMDL_DOUBLE, "rlnResolutionInversePixel", "Resolution (in 1/pixel, Nyquist = 0.5)");
 		EMDL::addLabel(EMDL_SPECTRAL_IDX, EMDL_INT, "rlnSpectralIndex", "Spectral index (i.e. distance in pixels to the origin in Fourier space) ");
+
+		EMDL::addLabel(EMDL_TOMO_PARTICLE_ID, EMDL_INT, "rlnTomoParticleId", "Index particle. Temporal purposes");
+		EMDL::addLabel(EMDL_TOMO_PICK_PARTICLE_ID, EMDL_INT, "rlnTomoPickParticleId", "Viruses Index particle. Temporal purposes");
 
 		EMDL::addLabel(EMDL_UNKNOWN_LABEL, EMDL_UNKNOWN, "rlnUnknownLabel", "NON-RELION label: values will be ignored, yet maintained in the STAR file.");
 	 }
