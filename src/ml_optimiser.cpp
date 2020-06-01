@@ -392,6 +392,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	do_skip_subtomo_correction = parser.checkOption("--skip_subtomo_multi", "Skip subtomo multiplicity correction");
 	do_sigma2_3d = parser.checkOption("--do_sigma2_3d", "Expand sigma2 from 1d to 3d considering the CTF");
 	ctf3d_squared = !parser.checkOption("--ctf3d_not_squared", "CTF3D files contain sqrt(CTF^2) patterns");
+	subtomo_multi_thr = textToFloat(parser.getOption("--subtomo_multi_thr", "Threshold to remove marginal voxels during expectation", "0.01"));
 
 	int computation_section = parser.addSection("Computation");
 
@@ -665,6 +666,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_skip_subtomo_correction = parser.checkOption("--skip_subtomo_multi", "Skip subtomo multiplicity correction");
 	do_sigma2_3d = parser.checkOption("--do_sigma2_3d", "Expand sigma2 from 1d to 3d considering the CTF");
 	ctf3d_squared = !parser.checkOption("--ctf3d_not_squared", "CTF3D files contain sqrt(CTF^2) patterns");
+	subtomo_multi_thr = textToFloat(parser.getOption("--subtomo_multi_thr", "Threshold to remove marginal voxels during expectation", "0.01"));
 
 	// Computation stuff
 	// The number of threads is always read from the command line
@@ -9548,6 +9550,10 @@ void MlOptimiser::get3DCTFAndMulti(MultidimArray<RFLOAT> &Ictf, MultidimArray<RF
 					}
 				}
 			}
+			else if (!ctf_premultiplied)
+			{
+				REPORT_ERROR("ERROR: subtomo multiplicity correction only applies to ctf_premultiplied data");
+			}
 			else
 			{
 				FstMulti.resize(Fctf);
@@ -9567,7 +9573,7 @@ void MlOptimiser::get3DCTFAndMulti(MultidimArray<RFLOAT> &Ictf, MultidimArray<RF
 						if (mySTMulti < 0)
 							REPORT_ERROR("MULTIPLICITY volume cannot contain negative values!");
 						// threshold to avoid dividing by small values
-						if (mySTMulti > 0.001)
+						if (mySTMulti > subtomo_multi_thr)
 							FFTW_ELEM(FstMulti, kp, ip, jp) = sqrt(mySTMulti);
 					}
 				}

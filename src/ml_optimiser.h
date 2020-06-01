@@ -589,6 +589,7 @@ public:
 	bool do_skip_subtomo_correction;
 	bool do_sigma2_3d;
 	bool normalised_subtomos;
+	RFLOAT subtomo_multi_thr;
 
 	/////////// Some internal stuff ////////////////////////
 
