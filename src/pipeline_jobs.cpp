@@ -4855,6 +4855,12 @@ bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<
 		return false;
 	}
 
+	if (joboptions["do_param_optim"].getBoolean() && joboptions["do_polish"].getBoolean())
+	{
+		error_message = "ERROR: Choose either parameter training or polishing, not both.";
+		return false;
+	}
+
 	if (!joboptions["do_param_optim"].getBoolean() && !joboptions["do_polish"].getBoolean())
 	{
 		error_message = "ERROR: nothing to do, choose either parameter training or polishing.";

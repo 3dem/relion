@@ -392,6 +392,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	do_skip_subtomo_correction = parser.checkOption("--skip_subtomo_multi", "Skip subtomo multiplicity correction");
 	do_sigma2_3d = parser.checkOption("--do_sigma2_3d", "Expand sigma2 from 1d to 3d considering the CTF");
 	ctf3d_squared = !parser.checkOption("--ctf3d_not_squared", "CTF3D files contain sqrt(CTF^2) patterns");
+	subtomo_multi_thr = textToFloat(parser.getOption("--subtomo_multi_thr", "Threshold to remove marginal voxels during expectation", "0.01"));
 
 	int computation_section = parser.addSection("Computation");
 
@@ -596,6 +597,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	mymodel.helical_rise_min = textToFloat(parser.getOption("--helical_rise_min", "Minimum helical rise (in Angstroms)", "0."));
 	mymodel.helical_rise_max = textToFloat(parser.getOption("--helical_rise_max", "Maximum helical rise (in Angstroms)", "0."));
 	mymodel.helical_rise_inistep = textToFloat(parser.getOption("--helical_rise_inistep", "Initial step of helical rise search (in Angstroms)", "0."));
+	helical_nstart = textToInteger(parser.getOption("--helical_nstart", "N-number for the N-start helix (only useful for rotational priors)", "1"));
 	helical_z_percentage = textToFloat(parser.getOption("--helical_z_percentage", "This box length along the center of Z axis contains good information of the helix. Important in imposing and refining symmetry", "0.3"));
 	helical_tube_inner_diameter = textToFloat(parser.getOption("--helical_inner_diameter", "Inner diameter of helical tubes in Angstroms (for masks of helical references and particles)", "-1."));
 	helical_tube_outer_diameter = textToFloat(parser.getOption("--helical_outer_diameter", "Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)", "-1."));
@@ -664,6 +666,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_skip_subtomo_correction = parser.checkOption("--skip_subtomo_multi", "Skip subtomo multiplicity correction");
 	do_sigma2_3d = parser.checkOption("--do_sigma2_3d", "Expand sigma2 from 1d to 3d considering the CTF");
 	ctf3d_squared = !parser.checkOption("--ctf3d_not_squared", "CTF3D files contain sqrt(CTF^2) patterns");
+	subtomo_multi_thr = textToFloat(parser.getOption("--subtomo_multi_thr", "Threshold to remove marginal voxels during expectation", "0.01"));
 
 	// Computation stuff
 	// The number of threads is always read from the command line
@@ -881,6 +884,8 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
     		helical_rise_initial = 0.;
 	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE, helical_z_percentage))
 		helical_z_percentage = 0.3;
+	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_NSTART, helical_nstart))
+		helical_nstart = 1;
 	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER, helical_tube_inner_diameter))
 		helical_tube_inner_diameter = -1.;
 	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER, helical_tube_outer_diameter))
@@ -1136,6 +1141,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_HELICAL_TWIST_INITIAL, helical_twist_initial);
 		MD.setValue(EMDL_OPTIMISER_HELICAL_RISE_INITIAL, helical_rise_initial);
 		MD.setValue(EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE, helical_z_percentage);
+		MD.setValue(EMDL_OPTIMISER_HELICAL_NSTART, helical_nstart);
 		MD.setValue(EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER, helical_tube_inner_diameter);
 		MD.setValue(EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER, helical_tube_outer_diameter);
 		MD.setValue(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT, do_helical_symmetry_local_refinement);
@@ -1837,7 +1843,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 		if (iter == 0 && sampling.healpix_order >= autosampling_hporder_local_searches)
 		{
 			mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
-			sampling.orientational_prior_mode = PRIOR_ROTTILT_PSI;
 			sampling.is_3D = (mymodel.ref_dim == 3);
 			RFLOAT rottilt_step = sampling.getAngularSampling(adaptive_oversampling);
 			mymodel.sigma2_rot = mymodel.sigma2_tilt = mymodel.sigma2_psi = 2. * 2. * rottilt_step * rottilt_step;
@@ -1860,7 +1865,8 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 	// Initialise the sampling object (sets prior mode and fills translations and rotations inside sampling object)
 	// May06,2015 - Shaoda & Sjors, initialise for helical translations
-	bool do_local_searches = ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches));
+	bool do_local_searches_helical = ((do_auto_refine) && (do_helical_refine) &&
+			(sampling.healpix_order >= autosampling_hporder_local_searches));
 
 	if (iter == 0)
 	{
@@ -1870,8 +1876,8 @@ void MlOptimiser::initialiseGeneral(int rank)
 		sampling.offset_range *= mymodel.pixel_size;
 		sampling.offset_step *= mymodel.pixel_size;
 	}
-	sampling.initialise(mymodel.orientational_prior_mode, mymodel.ref_dim, (mymodel.data_dim == 3), do_gpu, (verb>0),
-			do_local_searches, (do_helical_refine) && (!ignore_helical_symmetry),
+	sampling.initialise(mymodel.ref_dim, (mymodel.data_dim == 3), do_gpu, (verb>0),
+			do_local_searches_helical, (do_helical_refine) && (!ignore_helical_symmetry),
 			helical_rise_initial, helical_twist_initial);
 
 	// Now that sampling is initialised, also modify sigma2_rot for the helical refinement
@@ -1899,7 +1905,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 	if (do_skip_align || do_skip_rotate)
 	{
 		mymodel.orientational_prior_mode = NOPRIOR;
-		sampling.orientational_prior_mode = NOPRIOR;
 		adaptive_oversampling = 0;
 		sampling.perturbation_factor = 0.;
 		sampling.random_perturbation = 0.;
@@ -1911,7 +1916,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 		std::cout << " Only sampling tilt, keep rot and psi fixed." << std::endl;
 
 		mymodel.orientational_prior_mode = NOPRIOR;
-		sampling.orientational_prior_mode = NOPRIOR;
 		adaptive_oversampling = 0;
 		sampling.perturbation_factor = 0.;
 		sampling.random_perturbation = 0.;
@@ -2652,54 +2656,32 @@ void MlOptimiser::iterate()
 		if (do_helical_refine && mymodel.ref_dim == 3)
 		{
 			if (!ignore_helical_symmetry)
+			{
 				makeGoodHelixForEachRef();
+			}
+
 			if ( (!do_skip_align) && (!do_skip_rotate) )
 			{
-				int nr_same_polarity = 0, nr_opposite_polarity = 0;
-				int nr_same_rot = 0, nr_opposite_rot = 0;	// KThurber
-				RFLOAT opposite_percentage = 0.;
-				RFLOAT rot_opposite_percent = 0.;		// KThurber
-				bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
-				bool do_classification_local_searches = (!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
-						&& (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.);
-				bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
-				std::cerr << " do_auto_refine_local_searches= " << do_auto_refine_local_searches << " do_classification_local_searches= " << do_classification_local_searches << " do_local_angular_searches= " << do_local_angular_searches << std::endl;
-				if (helical_sigma_distance < 0.)
-					updateAngularPriorsForHelicalReconstruction(mydata.MDimg, helical_keep_tilt_prior_fixed);
-				else
-				{
-					updatePriorsForHelicalReconstruction(
-							mydata.MDimg,
-							nr_opposite_polarity,
-							nr_opposite_rot,	// KThurber
-							helical_sigma_distance * ((RFLOAT)(mymodel.ori_size)),
-							mymodel.helical_rise,
-							mymodel.helical_twist,
-							(mymodel.data_dim == 3),
-							do_auto_refine,
-							do_local_angular_searches,
-							mymodel.sigma2_rot,
-							mymodel.sigma2_tilt,
-							mymodel.sigma2_psi,
-							mymodel.sigma2_offset,
-							helical_keep_tilt_prior_fixed);
-
-					nr_same_polarity = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_polarity;
-					nr_same_rot = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_rot;  // KThurber
-					opposite_percentage = (100.) * ((RFLOAT)(nr_opposite_polarity)) / ((RFLOAT)(mydata.MDimg.numberOfObjects()));
-					rot_opposite_percent = (100.) * ((RFLOAT)(nr_opposite_rot)) / ((RFLOAT)(mydata.MDimg.numberOfObjects()));  // KThurber
-					if ( (verb > 0) && (!do_local_angular_searches) )
-					{
-						std::cout << " Number of helical segments with psi angles similar/opposite to their priors: " << nr_same_polarity << " / " << nr_opposite_polarity << " (" << opposite_percentage << "%)" << std::endl;
-						std::cout << " Number of helical segments with rot angles similar/opposite to their priors: " << nr_same_rot << " / " << nr_opposite_rot << " (" << rot_opposite_percent << "%)" << std::endl;  // KThurber
-					}
-				}
+				updatePriorsForHelicalReconstruction(
+						mydata.MDimg,
+						helical_sigma_distance * ((RFLOAT)(mymodel.ori_size)),
+						mymodel.helical_rise,
+						mymodel.helical_twist,
+						helical_nstart,
+						(mymodel.data_dim == 3),
+						do_auto_refine,
+						mymodel.sigma2_rot,
+						mymodel.sigma2_tilt,
+						mymodel.sigma2_psi,
+						mymodel.sigma2_offset,
+						helical_keep_tilt_prior_fixed,
+						verb);
 			}
 		}
 
-                // Directly use fn_out, without "_it" specifier, so unmasked refs will be overwritten at every iteration
-                if (do_write_unmasked_refs)
-                    mymodel.write(fn_out+"_unmasked", sampling, false, true);
+		// Directly use fn_out, without "_it" specifier, so unmasked refs will be overwritten at every iteration
+		if (do_write_unmasked_refs)
+			mymodel.write(fn_out+"_unmasked", sampling, false, true);
 
 #ifdef TIMING
 		timer.toc(TIMING_ITER_HELICALREFINE);
@@ -3697,7 +3679,7 @@ void MlOptimiser::expectationOneParticle(long int part_id_sorted, int thread_id)
 		if (mydata.is_3D)
 		{
             exp_STMulti.resize(my_nr_images);
-			if (do_sigma2_3d)
+            if (do_sigma2_3d)
 			exp_Fctfs1D.resize(my_nr_images);
 		}
 
@@ -5825,8 +5807,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 		std::vector<RFLOAT> &exp_local_sqrtXi2,
 		std::vector<MultidimArray<RFLOAT> >&exp_local_Minvsigma2,
 		std::vector<MultidimArray<RFLOAT> > &exp_STMulti,
-		std::vector<MultidimArray<RFLOAT> > &exp_Fctfs1D,
-		std::vector<MultidimArray<RFLOAT> > &exp_local_STMulti)
+		std::vector<MultidimArray<RFLOAT> > &exp_Fctfs1D)
 {
 
 #ifdef TIMING
@@ -5945,10 +5926,10 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 		if (do_subtomo_correction)
 		{
 			// We store the downsized subtomogram Fourier Multiplicity weights
-			//MultidimArray<RFLOAT> MstMulti;
-			windowFourierTransform(exp_STMulti[img_id], exp_local_STMulti[img_id], exp_current_image_size);
+			MultidimArray<RFLOAT> MstMulti;
+			windowFourierTransform(exp_STMulti[img_id], MstMulti, exp_current_image_size);
 
-/*			if (do_sigma2_3d)
+			if (do_sigma2_3d)
 			{
 				// We also store the downsized 1D profile of the CTF
 				MultidimArray<RFLOAT> exp_local_Fctfs1D;
@@ -5973,7 +5954,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 					}
 				}
 			}
-			else*/
+			else
 			{
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Minvsigma2[img_id])
 				{
@@ -5982,11 +5963,11 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 					// Exclude origin (ires==0) from the Probability-calculation
 					// This way we are invariant to additive factors
 					if (ires > 0 && ires_remapped < XSIZE(mymodel.sigma2_noise[group_id]))
-						DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2[img_id], n) *= sqrt(DIRECT_MULTIDIM_ELEM(exp_local_STMulti[img_id], n));
+						DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2[img_id], n) *= DIRECT_MULTIDIM_ELEM(MstMulti, n);
 				}
 			}
 		}
-/*		else if (do_sigma2_3d)
+		else if (do_sigma2_3d)
 		{
 			// We also store the downsized 1D profile of the CTF
 			MultidimArray<RFLOAT> exp_local_Fctfs1D;
@@ -6009,7 +5990,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 							DIRECT_A1D_ELEM(exp_local_Fctfs1D, ires) / myctf4;
 				}
 			}
-		}*/
+		}
 
 		//Shifts are done on the fly on the gpu, if do_gpu || do_cpu, do_shifts_onthefly is always false!
 		if (do_shifts_onthefly)
@@ -6231,11 +6212,10 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 
 	std::vector<MultidimArray<Complex > > dummy;
 	std::vector<std::vector<MultidimArray<Complex > > > dummy2;
-	std::vector<MultidimArray<RFLOAT> > dymmyR;
 
 	precalculateShiftedImagesCtfsAndInvSigma2s(false, false, part_id, exp_current_oversampling, metadata_offset,
 			exp_itrans_min, exp_itrans_max, exp_Fimg, dummy, exp_Fctf, exp_local_Fimgs_shifted, dummy2,
-			exp_local_Fctf, exp_local_sqrtXi2, exp_local_Minvsigma2, exp_STMulti, exp_Fctfs1D, dymmyR);
+			exp_local_Fctf, exp_local_sqrtXi2, exp_local_Minvsigma2, exp_STMulti, exp_Fctfs1D);
 
 	// Loop only from exp_iclass_min to exp_iclass_max to deal with seed generation in first iteration
 	for (int exp_iclass = exp_iclass_min; exp_iclass <= exp_iclass_max; exp_iclass++)
@@ -7331,15 +7311,10 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 	long int exp_nr_oversampled_rot = sampling.oversamplingFactorOrientations(exp_current_oversampling);
 	long int exp_nr_oversampled_trans = sampling.oversamplingFactorTranslations(exp_current_oversampling);
 
-	std::vector<MultidimArray<RFLOAT> > exp_local_STMulti;
-	bool do_subtomo_correction = NZYXSIZE(exp_STMulti[0]) > 0;
-	if (do_subtomo_correction)
-		exp_local_STMulti.resize(exp_nr_images);
-
 	// Re-do below because now also want unmasked images AND if (stricht_highres_exp >0.) then may need to resize
 	precalculateShiftedImagesCtfsAndInvSigma2s(true, true, part_id, exp_current_oversampling, metadata_offset,
 			exp_itrans_min, exp_itrans_max, exp_Fimg, exp_Fimg_nomask, exp_Fctf, exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask,
-			exp_local_Fctf, exp_local_sqrtXi2, exp_local_Minvsigma2, exp_STMulti, exp_Fctfs1D, exp_local_STMulti);
+			exp_local_Fctf, exp_local_sqrtXi2, exp_local_Minvsigma2, exp_STMulti, exp_Fctfs1D);
 
 	// In doThreadPrecalculateShiftedImagesCtfsAndInvSigma2s() the origin of the exp_local_Minvsigma2s was omitted.
 	// Set those back here
@@ -7370,10 +7345,8 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 
 	//Sigma2_noise estimation
 	std::vector<MultidimArray<RFLOAT> > thr_wsum_sigma2_noise;
-	std::vector<MultidimArray<RFLOAT> >  thr_wsum_stMulti;
 	// Wsum_sigma_noise2 is a 1D-spectrum for each img_id
 	thr_wsum_sigma2_noise.resize(exp_nr_images);
-	thr_wsum_stMulti.resize(exp_nr_images);
 
 	for (int img_id = 0; img_id < exp_nr_images; img_id++)
 	{
@@ -7731,31 +7704,6 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 														sumA2 = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real * (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real;
 														sumA2 += (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag * (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag;
 														exp_wsum_scale_correction_AA[img_id] += weight * sumA2;
-													}
-												}
-											}
-											if (do_subtomo_correction)
-											{
-												thr_wsum_stMulti[img_id].initZeros(image_full_size[optics_group]/2 + 1);
-												MultidimArray<RFLOAT> &MySTMulti = exp_local_STMulti[img_id];
-												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mresol_fine[optics_group])
-												{
-													int ires = DIRECT_MULTIDIM_ELEM(Mresol_fine[optics_group], n);
-													if (ires > -1)
-														DIRECT_MULTIDIM_ELEM(thr_wsum_stMulti[img_id], ires) += DIRECT_MULTIDIM_ELEM(MySTMulti, n);
-												}
-
-												long int igroup = mydata.getGroupId(part_id, img_id);
-												int my_image_size = mydata.getOpticsImageSize(optics_group);
-												RFLOAT my_optics_pixel_size = mydata.getOpticsPixelSize(optics_group);
-												RFLOAT remap_image_sizes = (mymodel.ori_size * mymodel.pixel_size) / (my_image_size * my_optics_pixel_size);
-												FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(thr_wsum_sigma2_noise[img_id])
-												{
-													int i_resam = ROUND(i * remap_image_sizes);
-													if (i_resam < XSIZE(Npix_per_shell))
-													{
-														DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[img_id], i) *= DIRECT_A1D_ELEM(Npix_per_shell, i_resam) /
-																DIRECT_A1D_ELEM(thr_wsum_stMulti[img_id], i);
 													}
 												}
 											}
@@ -9003,7 +8951,8 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 					REPORT_ERROR("MlOptimiser::autoAdjustAngularSampling BUG: ref_dim should be two or three");
 
 				// Jun08,2015 Shaoda & Sjors, Helical refinement
-				bool do_local_searches = ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches));
+				bool do_local_searches_helical = ((do_auto_refine) && (do_helical_refine) &&
+						(sampling.healpix_order >= autosampling_hporder_local_searches));
 
 				// Don't go to coarse angular samplings. Then just keep doing as it was
 				if (new_step > sampling.offset_step)
@@ -9012,7 +8961,7 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 					new_range = sampling.offset_range;
 				}
 
-				sampling.setTranslations(new_step, new_range, do_local_searches, (do_helical_refine) && (!ignore_helical_symmetry), new_helical_offset_step, helical_rise_initial, helical_twist_initial);
+				sampling.setTranslations(new_step, new_range, do_local_searches_helical, (do_helical_refine) && (!ignore_helical_symmetry), new_helical_offset_step, helical_rise_initial, helical_twist_initial);
 
 				// Reset iteration counters
 				nr_iter_wo_resol_gain = 0;
@@ -9028,7 +8977,6 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 				{
 					// Switch ON local angular searches
 					mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
-					sampling.orientational_prior_mode = PRIOR_ROTTILT_PSI;
 					mymodel.sigma2_rot = mymodel.sigma2_psi = 2. * 2. * new_rottilt_step * new_rottilt_step;
 					if (!(do_helical_refine && helical_keep_tilt_prior_fixed))
 						mymodel.sigma2_tilt = mymodel.sigma2_rot;
@@ -9044,7 +8992,7 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 		if (myverb)
 		{
 			std::cout << " Auto-refine: Angular step= " << sampling.getAngularSampling(adaptive_oversampling) << " degrees; local searches= ";
-			if (sampling.orientational_prior_mode == NOPRIOR)
+			if (mymodel.orientational_prior_mode == NOPRIOR)
 				std:: cout << "false" << std::endl;
 			else
 				std:: cout << "true" << std::endl;
@@ -9602,6 +9550,10 @@ void MlOptimiser::get3DCTFAndMulti(MultidimArray<RFLOAT> &Ictf, MultidimArray<RF
 					}
 				}
 			}
+			else if (!ctf_premultiplied)
+			{
+				REPORT_ERROR("ERROR: subtomo multiplicity correction only applies to ctf_premultiplied data");
+			}
 			else
 			{
 				FstMulti.resize(Fctf);
@@ -9621,8 +9573,8 @@ void MlOptimiser::get3DCTFAndMulti(MultidimArray<RFLOAT> &Ictf, MultidimArray<RF
 						if (mySTMulti < 0)
 							REPORT_ERROR("MULTIPLICITY volume cannot contain negative values!");
 						// threshold to avoid dividing by small values
-						if (mySTMulti > 0.01)
-							FFTW_ELEM(FstMulti, kp, ip, jp) = mySTMulti;
+						if (mySTMulti > subtomo_multi_thr)
+							FFTW_ELEM(FstMulti, kp, ip, jp) = sqrt(mySTMulti);
 					}
 				}
 			}
@@ -9666,7 +9618,7 @@ void MlOptimiser::applySubtomoCorrection(MultidimArray<Complex > &Fimg, Multidim
 	{
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fimg)
 		{
-			RFLOAT mySTMulti = sqrt(FFTW_ELEM(FstMulti, kp, ip, jp));
+			RFLOAT mySTMulti = FFTW_ELEM(FstMulti, kp, ip, jp);
 			FFTW_ELEM(Fimg, kp, ip, jp) *= mySTMulti;
 			FFTW_ELEM(Fimg_nomask, kp, ip, jp) *= mySTMulti;
 			FFTW_ELEM(Fctf, kp, ip, jp) *= mySTMulti;
@@ -9676,7 +9628,7 @@ void MlOptimiser::applySubtomoCorrection(MultidimArray<Complex > &Fimg, Multidim
 	{
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fimg)
 		{
-			RFLOAT mySTMulti = sqrt(FFTW_ELEM(FstMulti, kp, ip, jp));
+			RFLOAT mySTMulti = FFTW_ELEM(FstMulti, kp, ip, jp);
 			if (mySTMulti == 0)
 			{
 				FFTW_ELEM(Fimg, kp, ip, jp) = 0;
@@ -9704,9 +9656,9 @@ void MlOptimiser::applySubtomoCorrection(MultidimArray<Complex > &Fimg, Multidim
 			}
 			else
 			{
-				FFTW_ELEM(Fimg, kp, ip, jp) /= mySTMulti;
-				FFTW_ELEM(Fimg_nomask, kp, ip, jp) /= mySTMulti;
-				FFTW_ELEM(Fctf, kp, ip, jp)  /= mySTMulti;
+				FFTW_ELEM(Fimg, kp, ip, jp) /= (mySTMulti * mySTMulti);
+				FFTW_ELEM(Fimg_nomask, kp, ip, jp) /= (mySTMulti * mySTMulti);
+				FFTW_ELEM(Fctf, kp, ip, jp)  /= (mySTMulti * mySTMulti);
 			}
 		}
 		// We don't store the multiplicity to prevent applying the corrected algorithm during reconstruction/averaging

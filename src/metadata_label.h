@@ -328,6 +328,7 @@ enum EMDLabel
 	EMDL_OPTIMISER_HELICAL_TWIST_INITIAL,
 	EMDL_OPTIMISER_HELICAL_RISE_INITIAL,
 	EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE,
+	EMDL_OPTIMISER_HELICAL_NSTART,
 	EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER,
 	EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER,
 	EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT,
@@ -515,6 +516,8 @@ enum EMDLabel
 	EMDL_RESOLUTION_INVPIXEL,
 	EMDL_SPECTRAL_IDX,
 
+	EMDL_TOMO_PARTICLE_ID,
+	EMDL_TOMO_PICK_PARTICLE_ID,
 	EMDL_UNKNOWN_LABEL,
 
 	EMDL_LAST_LABEL // **** NOTE ****: Do keep this label always at the end
@@ -865,6 +868,7 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_TWIST_INITIAL, EMDL_DOUBLE, "rlnHelicalTwistInitial", "The intial helical twist (rotation per subunit) in degrees before refinement");
 		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_RISE_INITIAL, EMDL_DOUBLE, "rlnHelicalRiseInitial", "The initial helical rise (translation per subunit) in Angstroms before refinement");
 		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE, EMDL_DOUBLE, "rlnHelicalCentralProportion", "Only expand this central fraction of the Z axis when imposing real-space helical symmetry");
+		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_NSTART, EMDL_INT, "rlnNrHelicalNStart", "The N-number for an N-start helix");
 		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER, EMDL_DOUBLE, "rlnHelicalMaskTubeInnerDiameter", "Inner diameter of helical tubes in Angstroms (for masks of helical references and particles)");
 		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER, EMDL_DOUBLE, "rlnHelicalMaskTubeOuterDiameter", "Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)");
 		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT, EMDL_BOOL, "rlnHelicalSymmetryLocalRefinement", "Flag to indicate that local refinement of helical parameters should be performed");
@@ -1049,6 +1053,9 @@ private:
 		EMDL::addLabel(EMDL_RESOLUTION_ANGSTROM, EMDL_DOUBLE, "rlnAngstromResolution", "Resolution (in Angstroms)");
 		EMDL::addLabel(EMDL_RESOLUTION_INVPIXEL, EMDL_DOUBLE, "rlnResolutionInversePixel", "Resolution (in 1/pixel, Nyquist = 0.5)");
 		EMDL::addLabel(EMDL_SPECTRAL_IDX, EMDL_INT, "rlnSpectralIndex", "Spectral index (i.e. distance in pixels to the origin in Fourier space) ");
+
+		EMDL::addLabel(EMDL_TOMO_PARTICLE_ID, EMDL_INT, "rlnTomoParticleId", "Index particle. Temporal purposes");
+		EMDL::addLabel(EMDL_TOMO_PICK_PARTICLE_ID, EMDL_INT, "rlnTomoPickParticleId", "Viruses Index particle. Temporal purposes");
 
 		EMDL::addLabel(EMDL_UNKNOWN_LABEL, EMDL_UNKNOWN, "rlnUnknownLabel", "NON-RELION label: values will be ignored, yet maintained in the STAR file.");
 	 }
