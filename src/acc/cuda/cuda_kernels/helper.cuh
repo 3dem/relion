@@ -940,6 +940,21 @@ __global__ void cuda_kernel_centerFFTbySign(T *img_in,
 template __global__ void cuda_kernel_centerFFTbySign<double2>(double2*, int, int, int);
 template __global__ void cuda_kernel_centerFFTbySign<float2>(float2*, int, int, int);
 
+#if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ >= 600
+#else
+__device__ double atomicAdd(double* address, double val)
+{
+    unsigned long long int* address_as_ull = (unsigned long long int*)address;
+    unsigned long long int old = *address_as_ull, assumed;
+    do {
+        assumed = old;
+        old = atomicCAS(address_as_ull, assumed,
+                __double_as_longlong(val + __longlong_as_double(assumed)));
+    } while (assumed != old);
+    return __longlong_as_double(old);
+}
+#endif
+
 template <typename T>
 __global__ void cuda_kernel_calcPowerSpectrum(T *dFaux, int padoridim, T *ddata, int data_sz, RFLOAT *dpower_spectrum, RFLOAT *dcounter,
 											  int max_r2, int min_r2, RFLOAT normfft, RFLOAT padding_factor, RFLOAT weight,
