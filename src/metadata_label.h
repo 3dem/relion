@@ -529,6 +529,8 @@ enum EMDLabel
 	EMDL_TOMO_PROJECTION_W,
 	EMDL_TOMO_HANDEDNESS,
 
+	EMDL_TOMO_PARTICLE_ID,
+	EMDL_TOMO_PICK_PARTICLE_ID,
 	EMDL_UNKNOWN_LABEL,
 
 	EMDL_LAST_LABEL // **** NOTE ****: Do keep this label always at the end
@@ -1080,6 +1082,9 @@ private:
 		
 		EMDL::addLabel(EMDL_TOMO_HANDEDNESS, EMDL_DOUBLE, "rlnTomoHand", "Handedness of a tomogram (i.e. slope of defocus over the image-space z coordinate)");
 				
+		EMDL::addLabel(EMDL_TOMO_PARTICLE_ID, EMDL_INT, "rlnTomoParticleId", "Index particle. Temporal purposes");
+		EMDL::addLabel(EMDL_TOMO_PICK_PARTICLE_ID, EMDL_INT, "rlnTomoPickParticleId", "Viruses Index particle. Temporal purposes");
+
 		EMDL::addLabel(EMDL_UNKNOWN_LABEL, EMDL_UNKNOWN, "rlnUnknownLabel", "NON-RELION label: values will be ignored, yet maintained in the STAR file.");
 	 }
 
