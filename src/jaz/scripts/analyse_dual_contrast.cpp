@@ -27,10 +27,10 @@ int main(int argc, char *argv[])
 
 		in_phase = parser.getOption("--phase", "Phase map");
 		in_amplitude = parser.getOption("--amp", "Amplitude map");
-		in_blended = parser.getOption("--blend", "Consensus map");
+		//in_blended = parser.getOption("--blend", "Consensus map");
 		do_flip_phase = parser.checkOption("--flip_phase", "Flip the sign of the phase map");
 		filter_freq = textToDouble(parser.getOption("--res", "Resolution [A]", "3.0"));
-		output_scale = textToDouble(parser.getOption("--scale", "Scale of the output pixel colours", "0.03"));
+		output_scale = textToDouble(parser.getOption("--scale", "Scale of the output pixel colours", "0.02"));
 		out_path = parser.getOption("--o", "Output path");
 
 		parser.checkForErrors();
@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
 	std::vector<BufferedImage<double>> mapsRS(3);
 	std::vector<BufferedImage<dComplex>> mapsFS(3);
 
-	mapsRS[blended_id].read(in_blended);
+	//mapsRS[blended_id].read(in_blended);
 	mapsRS[phase_id].read(in_phase);
 	mapsRS[amplitude_id].read(in_amplitude);
 
@@ -74,18 +74,19 @@ int main(int argc, char *argv[])
 		mapsRS[phase_id] *= -1.0;
 	}
 
-	for (int m = 0; m < 3; m++)
+	for (int m = 1; m < 3; m++)
 	{
 		FFT::FourierTransform(mapsRS[m], mapsFS[m]);
 	}
 
 
-	const int s = mapsRS[0].xdim;
-	const int sh = mapsFS[0].xdim;
+	const int s = mapsRS[1].xdim;
+	const int sh = mapsFS[1].xdim;
 
 	std::vector<std::vector<double>> power1D(3);
 
-	for (int m = 0; m < 3; m++)
+
+	for (int m = 1; m < 3; m++)
 	{
 		BufferedImage<double> power3D = PowerSpectrum::halfComplex(mapsFS[m]);
 
@@ -99,7 +100,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	const int sc = power1D[0].size();
+	const int sc = power1D[1].size();
 
 	std::vector<double> power_ratio(sc);
 
@@ -156,20 +157,15 @@ int main(int argc, char *argv[])
 	BufferedImage<dComplex> filtered_rescaled_amplitude_FS = ImageFilter::lowpass3D(
 				rescaled_amplitude_FS, resolution_pixels, 10);
 
-	BufferedImage<dComplex> filtered_blended_FS = ImageFilter::lowpass3D(
-				mapsFS[blended_id], resolution_pixels, 10);
-
 
 	BufferedImage<double>
 			filtered_phase_RS,
 			filtered_amplitude_RS,
-			filtered_rescaled_amplitude_RS,
-			filtered_blended_RS;
+			filtered_rescaled_amplitude_RS;
 
 	FFT::inverseFourierTransform(filtered_phase_FS, filtered_phase_RS);
 	FFT::inverseFourierTransform(filtered_amplitude_FS, filtered_amplitude_RS);
 	FFT::inverseFourierTransform(filtered_rescaled_amplitude_FS, filtered_rescaled_amplitude_RS);
-	FFT::inverseFourierTransform(filtered_blended_FS, filtered_blended_RS);
 
 
 	DualContrastWriter::writeAxialSlices(
@@ -184,11 +180,31 @@ int main(int argc, char *argv[])
 	DualContrastWriter::writeAxialSlices(
 		filtered_phase_RS, filtered_rescaled_amplitude_RS, out_path + "filtered_rescaled_dual_slice_", output_scale);
 
-	std::cout << mapsFS[amplitude_id].getSizeString() << std::endl;
+	filtered_phase_RS.write(out_path + "filtered_phase.mrc");
+	filtered_amplitude_RS.write(out_path + "filtered_amplitude.mrc");
+
+
+	const double high_pass_sigma = 20;
+
+	BufferedImage<dComplex> high_pass_phase_FS = ImageFilter::highpassGauss3D(
+				filtered_phase_FS, high_pass_sigma);
+
+	BufferedImage<dComplex> high_pass_amplitude_FS = ImageFilter::highpassGauss3D(
+				filtered_amplitude_FS, high_pass_sigma);
+
+
+	FFT::inverseFourierTransform(high_pass_phase_FS, filtered_phase_RS);
+	FFT::inverseFourierTransform(high_pass_amplitude_FS, filtered_amplitude_RS);
+
+	filtered_phase_RS.write(out_path + "high_pass_phase.mrc");
+	filtered_amplitude_RS.write(out_path + "high_pass_amplitude.mrc");
+
+	DualContrastWriter::writeAxialSlices(
+		filtered_phase_RS, filtered_amplitude_RS, out_path + "high_pass_dual_slice_", output_scale);
+
+
 
 	BufferedImage<double> correlation(sh,s,s), rot_correlation(sh,s,s);
-
-
 
 	for (int z = 0; z < s;  z++)
 	for (int y = 0; y < s;  y++)
@@ -204,7 +220,6 @@ int main(int argc, char *argv[])
 	correlation.write(out_path + "correlation.mrc", pixel_size);
 	rot_correlation.write(out_path + "rot_correlation.mrc", pixel_size);
 
-	std::cout << std::endl;
 
 	return 0;
 }
