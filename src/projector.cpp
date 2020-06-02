@@ -153,11 +153,15 @@ void Projector::computeFourierTransformMap(
 	}
 #ifdef CUDA
 	size_t mem_req;
+	int Faux_sz = padoridim*(padoridim/2+1);
+	
+	if(ref_dim == 3)
+		Faux_sz *= padoridim;
 
 	mem_req =  (size_t)1024;
 	if(do_heavy && do_gpu)
 		mem_req = (size_t)sizeof(RFLOAT)*MULTIDIM_SIZE(vol_in) +                   // dvol
-				  (size_t)sizeof(Complex)*(padoridim*padoridim*(padoridim/2+1)) +  // dFaux
+				  (size_t)sizeof(Complex)*Faux_sz +                                // dFaux
 				  (size_t)sizeof(RFLOAT)*MULTIDIM_SIZE(Mpad);                      // dMpad
 
 	CudaCustomAllocator *allocator = NULL;
@@ -166,7 +170,7 @@ void Projector::computeFourierTransformMap(
 
 	AccPtrFactory ptrFactory(allocator);
 	AccPtr<RFLOAT> dMpad = ptrFactory.make<RFLOAT>(MULTIDIM_SIZE(Mpad));
-	AccPtr<Complex> dFaux = ptrFactory.make<Complex>(padoridim*padoridim*(padoridim/2+1));
+	AccPtr<Complex> dFaux = ptrFactory.make<Complex>(Faux_sz);
 	AccPtr<RFLOAT> dvol = ptrFactory.make<RFLOAT>(MULTIDIM_SIZE(vol_in));
 	if(do_heavy && do_gpu)
 	{
