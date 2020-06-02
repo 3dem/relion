@@ -160,7 +160,9 @@ void Projector::computeFourierTransformMap(
 				  (size_t)sizeof(Complex)*(padoridim*padoridim*(padoridim/2+1)) +  // dFaux
 				  (size_t)sizeof(RFLOAT)*MULTIDIM_SIZE(Mpad);                      // dMpad
 
-	CudaCustomAllocator *allocator = new CudaCustomAllocator(mem_req, (size_t)16);
+	CudaCustomAllocator *allocator = NULL;
+	if(do_gpu) 
+		allocator = new CudaCustomAllocator(mem_req, (size_t)16);
 
 	AccPtrFactory ptrFactory(allocator);
 	AccPtr<RFLOAT> dMpad = ptrFactory.make<RFLOAT>(MULTIDIM_SIZE(Mpad));
