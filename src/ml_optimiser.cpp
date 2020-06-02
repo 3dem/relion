@@ -5807,7 +5807,8 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 		std::vector<RFLOAT> &exp_local_sqrtXi2,
 		std::vector<MultidimArray<RFLOAT> >&exp_local_Minvsigma2,
 		std::vector<MultidimArray<RFLOAT> > &exp_STMulti,
-		std::vector<MultidimArray<RFLOAT> > &exp_Fctfs1D)
+		std::vector<MultidimArray<RFLOAT> > &exp_Fctfs1D,
+		std::vector<MultidimArray<RFLOAT> > &exp_local_STMulti)
 {
 
 #ifdef TIMING
@@ -5926,10 +5927,10 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 		if (do_subtomo_correction)
 		{
 			// We store the downsized subtomogram Fourier Multiplicity weights
-			MultidimArray<RFLOAT> MstMulti;
-			windowFourierTransform(exp_STMulti[img_id], MstMulti, exp_current_image_size);
+			//MultidimArray<RFLOAT> MstMulti;
+			windowFourierTransform(exp_STMulti[img_id], exp_local_STMulti[img_id], exp_current_image_size);
 
-			if (do_sigma2_3d)
+/*			if (do_sigma2_3d)
 			{
 				// We also store the downsized 1D profile of the CTF
 				MultidimArray<RFLOAT> exp_local_Fctfs1D;
@@ -5954,7 +5955,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 					}
 				}
 			}
-			else
+			else*/
 			{
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Minvsigma2[img_id])
 				{
@@ -5963,11 +5964,11 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 					// Exclude origin (ires==0) from the Probability-calculation
 					// This way we are invariant to additive factors
 					if (ires > 0 && ires_remapped < XSIZE(mymodel.sigma2_noise[group_id]))
-						DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2[img_id], n) *= DIRECT_MULTIDIM_ELEM(MstMulti, n);
+						DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2[img_id], n) *= sqrt(DIRECT_MULTIDIM_ELEM(exp_local_STMulti[img_id], n));
 				}
 			}
 		}
-		else if (do_sigma2_3d)
+/*		else if (do_sigma2_3d)
 		{
 			// We also store the downsized 1D profile of the CTF
 			MultidimArray<RFLOAT> exp_local_Fctfs1D;
@@ -5990,7 +5991,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 							DIRECT_A1D_ELEM(exp_local_Fctfs1D, ires) / myctf4;
 				}
 			}
-		}
+		}*/
 
 		//Shifts are done on the fly on the gpu, if do_gpu || do_cpu, do_shifts_onthefly is always false!
 		if (do_shifts_onthefly)
@@ -6212,10 +6213,11 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 
 	std::vector<MultidimArray<Complex > > dummy;
 	std::vector<std::vector<MultidimArray<Complex > > > dummy2;
+	std::vector<MultidimArray<RFLOAT> > dymmyR;
 
 	precalculateShiftedImagesCtfsAndInvSigma2s(false, false, part_id, exp_current_oversampling, metadata_offset,
 			exp_itrans_min, exp_itrans_max, exp_Fimg, dummy, exp_Fctf, exp_local_Fimgs_shifted, dummy2,
-			exp_local_Fctf, exp_local_sqrtXi2, exp_local_Minvsigma2, exp_STMulti, exp_Fctfs1D);
+			exp_local_Fctf, exp_local_sqrtXi2, exp_local_Minvsigma2, exp_STMulti, exp_Fctfs1D, dymmyR);
 
 	// Loop only from exp_iclass_min to exp_iclass_max to deal with seed generation in first iteration
 	for (int exp_iclass = exp_iclass_min; exp_iclass <= exp_iclass_max; exp_iclass++)
@@ -7311,10 +7313,15 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 	long int exp_nr_oversampled_rot = sampling.oversamplingFactorOrientations(exp_current_oversampling);
 	long int exp_nr_oversampled_trans = sampling.oversamplingFactorTranslations(exp_current_oversampling);
 
+	std::vector<MultidimArray<RFLOAT> > exp_local_STMulti;
+	bool do_subtomo_correction = NZYXSIZE(exp_STMulti[0]) > 0;
+	if (do_subtomo_correction)
+		exp_local_STMulti.resize(exp_nr_images);
+
 	// Re-do below because now also want unmasked images AND if (stricht_highres_exp >0.) then may need to resize
 	precalculateShiftedImagesCtfsAndInvSigma2s(true, true, part_id, exp_current_oversampling, metadata_offset,
 			exp_itrans_min, exp_itrans_max, exp_Fimg, exp_Fimg_nomask, exp_Fctf, exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask,
-			exp_local_Fctf, exp_local_sqrtXi2, exp_local_Minvsigma2, exp_STMulti, exp_Fctfs1D);
+			exp_local_Fctf, exp_local_sqrtXi2, exp_local_Minvsigma2, exp_STMulti, exp_Fctfs1D, exp_local_STMulti);
 
 	// In doThreadPrecalculateShiftedImagesCtfsAndInvSigma2s() the origin of the exp_local_Minvsigma2s was omitted.
 	// Set those back here
@@ -7345,8 +7352,10 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 
 	//Sigma2_noise estimation
 	std::vector<MultidimArray<RFLOAT> > thr_wsum_sigma2_noise;
+	std::vector<MultidimArray<RFLOAT> >  thr_wsum_stMulti;
 	// Wsum_sigma_noise2 is a 1D-spectrum for each img_id
 	thr_wsum_sigma2_noise.resize(exp_nr_images);
+	thr_wsum_stMulti.resize(exp_nr_images);
 
 	for (int img_id = 0; img_id < exp_nr_images; img_id++)
 	{
@@ -7704,6 +7713,31 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 														sumA2 = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real * (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real;
 														sumA2 += (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag * (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag;
 														exp_wsum_scale_correction_AA[img_id] += weight * sumA2;
+													}
+												}
+											}
+											if (do_subtomo_correction)
+											{
+												thr_wsum_stMulti[img_id].initZeros(image_full_size[optics_group]/2 + 1);
+												MultidimArray<RFLOAT> &MySTMulti = exp_local_STMulti[img_id];
+												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mresol_fine[optics_group])
+												{
+													int ires = DIRECT_MULTIDIM_ELEM(Mresol_fine[optics_group], n);
+													if (ires > -1)
+														DIRECT_MULTIDIM_ELEM(thr_wsum_stMulti[img_id], ires) += DIRECT_MULTIDIM_ELEM(MySTMulti, n);
+												}
+
+												long int igroup = mydata.getGroupId(part_id, img_id);
+												int my_image_size = mydata.getOpticsImageSize(optics_group);
+												RFLOAT my_optics_pixel_size = mydata.getOpticsPixelSize(optics_group);
+												RFLOAT remap_image_sizes = (mymodel.ori_size * mymodel.pixel_size) / (my_image_size * my_optics_pixel_size);
+												FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(thr_wsum_sigma2_noise[img_id])
+												{
+													int i_resam = ROUND(i * remap_image_sizes);
+													if (i_resam < XSIZE(Npix_per_shell))
+													{
+														DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[img_id], i) *= DIRECT_A1D_ELEM(Npix_per_shell, i_resam) /
+																DIRECT_A1D_ELEM(thr_wsum_stMulti[img_id], i);
 													}
 												}
 											}
@@ -9574,7 +9608,7 @@ void MlOptimiser::get3DCTFAndMulti(MultidimArray<RFLOAT> &Ictf, MultidimArray<RF
 							REPORT_ERROR("MULTIPLICITY volume cannot contain negative values!");
 						// threshold to avoid dividing by small values
 						if (mySTMulti > subtomo_multi_thr)
-							FFTW_ELEM(FstMulti, kp, ip, jp) = sqrt(mySTMulti);
+							FFTW_ELEM(FstMulti, kp, ip, jp) = mySTMulti;
 					}
 				}
 			}
@@ -9618,7 +9652,7 @@ void MlOptimiser::applySubtomoCorrection(MultidimArray<Complex > &Fimg, Multidim
 	{
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fimg)
 		{
-			RFLOAT mySTMulti = FFTW_ELEM(FstMulti, kp, ip, jp);
+			RFLOAT mySTMulti = sqrt(FFTW_ELEM(FstMulti, kp, ip, jp));
 			FFTW_ELEM(Fimg, kp, ip, jp) *= mySTMulti;
 			FFTW_ELEM(Fimg_nomask, kp, ip, jp) *= mySTMulti;
 			FFTW_ELEM(Fctf, kp, ip, jp) *= mySTMulti;
@@ -9628,7 +9662,7 @@ void MlOptimiser::applySubtomoCorrection(MultidimArray<Complex > &Fimg, Multidim
 	{
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fimg)
 		{
-			RFLOAT mySTMulti = FFTW_ELEM(FstMulti, kp, ip, jp);
+			RFLOAT mySTMulti = sqrt(FFTW_ELEM(FstMulti, kp, ip, jp));
 			if (mySTMulti == 0)
 			{
 				FFTW_ELEM(Fimg, kp, ip, jp) = 0;
@@ -9656,9 +9690,9 @@ void MlOptimiser::applySubtomoCorrection(MultidimArray<Complex > &Fimg, Multidim
 			}
 			else
 			{
-				FFTW_ELEM(Fimg, kp, ip, jp) /= (mySTMulti * mySTMulti);
-				FFTW_ELEM(Fimg_nomask, kp, ip, jp) /= (mySTMulti * mySTMulti);
-				FFTW_ELEM(Fctf, kp, ip, jp)  /= (mySTMulti * mySTMulti);
+				FFTW_ELEM(Fimg, kp, ip, jp) /= mySTMulti;
+				FFTW_ELEM(Fimg_nomask, kp, ip, jp) /= mySTMulti;
+				FFTW_ELEM(Fctf, kp, ip, jp)  /= mySTMulti;
 			}
 		}
 		// We don't store the multiplicity to prevent applying the corrected algorithm during reconstruction/averaging
