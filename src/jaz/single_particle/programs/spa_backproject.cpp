@@ -54,6 +54,7 @@ void SpaBackproject::read(int argc, char **argv)
 	ctf_phase_flipped = parser.checkOption("--ctf_phase_flipped", "Images have been phase flipped");
 	only_flip_phases = parser.checkOption("--only_flip_phases", "Do not correct CTF-amplitudes, only flip phases");
 	SNR = textToDouble(parser.getOption("--SNR", "Assumed signal-to-noise ratio (negative means use a heuristic)", "-1"));
+	dual_contrast_lambda = textToDouble(parser.getOption("--DC_lambda", "Regularisation constant keeping the phase and amplitude maps similar", "0"));
 
 	int ewald_section = parser.addSection("Ewald-sphere correction options");
 	
@@ -1197,7 +1198,7 @@ void SpaBackproject::reconstructDualContrast()
 		std::pair<BufferedImage<RFLOAT>,BufferedImage<RFLOAT>> dualContrastMaps =
 			Reconstruction::solveDualContrast(
 				dual_contrast_accumulation_volumes[half],
-				SNR, num_threads_total);
+				SNR, dual_contrast_lambda, num_threads_total);
 
 		dualContrastMaps.first.write(fn_out+"_half"+ZIO::itoa(half+1)+"_phase.mrc", angpix);
 		dualContrastMaps.second.write(fn_out+"_half"+ZIO::itoa(half+1)+"_amplitude.mrc", angpix);
@@ -1223,7 +1224,7 @@ void SpaBackproject::reconstructDualContrast()
 	std::pair<BufferedImage<RFLOAT>,BufferedImage<RFLOAT>> dualContrastMaps =
 		Reconstruction::solveDualContrast(
 			accumulation_volume_both,
-			SNR, num_threads_total);
+			SNR, dual_contrast_lambda, num_threads_total);
 
 	dualContrastMaps.first.write(fn_out+"_phase.mrc", angpix);
 	dualContrastMaps.second.write(fn_out+"_amplitude.mrc", angpix);

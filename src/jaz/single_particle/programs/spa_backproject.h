@@ -60,7 +60,7 @@ class SpaBackproject
 			blob_radius, blob_alpha, angular_error, shift_error, angpix, maxres,
 			helical_rise, helical_twist,
 
-			SNR;
+			SNR, dual_contrast_lambda;
 		
 		bool 
 			do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak,				 

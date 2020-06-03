@@ -73,6 +73,7 @@ class Reconstruction
 		static std::pair<BufferedImage<T>,BufferedImage<T>> solveDualContrast(
 				BufferedImage<DualContrastVoxel<T>>& image,
 				double SNR = 1,
+				double lambda = 0,
 				int num_threads = 1);
 		
 		template <typename T>
@@ -379,7 +380,10 @@ void Reconstruction :: ctfCorrect3D_heuristic(
 template<typename T>
 std::pair<BufferedImage<T>, BufferedImage<T>>
 	Reconstruction::solveDualContrast(
-		BufferedImage<DualContrastVoxel<T>>& image, double SNR, int num_threads)
+		BufferedImage<DualContrastVoxel<T>>& image,
+		double SNR,
+		double lambda,
+		int num_threads)
 {
 	const long int wh = image.xdim;
 	const long int w = 2 * (wh - 1);
@@ -395,7 +399,8 @@ std::pair<BufferedImage<T>, BufferedImage<T>>
 	for (long int y = 0; y < h;  y++)
 	for (long int x = 0; x < wh; x++)
 	{
-		std::pair<tComplex<T>,tComplex<T>> mu = image(x,y,z).solve(WienerOffset);
+		std::pair<tComplex<T>,tComplex<T>> mu = image(x,y,z).solve(
+					WienerOffset, lambda);
 
 		phaseOutFS(x,y,z) = mu.first;
 		ampOutFS(x,y,z)   = mu.second;

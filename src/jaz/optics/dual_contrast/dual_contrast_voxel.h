@@ -14,7 +14,7 @@ class DualContrastVoxel
 			tComplex<T> data_sin, data_cos;
 			T weight_sin2, weight_sin_cos, weight_cos2;
 
-		std::pair<tComplex<T>, tComplex<T>> solve(double WienerOffset);
+		std::pair<tComplex<T>, tComplex<T>> solve(double WienerOffset, double lambda);
 
 		inline DualContrastVoxel<T>& operator += (const DualContrastVoxel<T>& rhs)
 		{
@@ -74,21 +74,37 @@ DualContrastVoxel<T> :: DualContrastVoxel()
 }
 
 template <typename T>
-std::pair<tComplex<T>, tComplex<T>> DualContrastVoxel<T> :: solve(double WienerOffset)
+std::pair<tComplex<T>, tComplex<T>> DualContrastVoxel<T> :: solve(
+		double WienerOffset, double lambda)
 {
-	const gravis::t2Matrix<T> A(
+	const double Q0 = 0.07;
+
+	const gravis::t2Matrix<T> A0(
 		weight_sin2, weight_sin_cos,
 		weight_sin_cos, weight_cos2 );
 
-	gravis::t2Matrix<T> A_inv = A;
+	gravis::t2Matrix<T> A = A0;
 
-	A_inv(0,0) += WienerOffset;
-	A_inv(1,1) += WienerOffset;
+	A(0,0) += WienerOffset;
+	A(1,1) += WienerOffset / (Q0 * Q0);
 
-	const double det = A_inv(0,0) * A_inv(1,1) - A_inv(0,1) * A_inv(1,0);
+	/*
+	  Encourage phase (P) and amplitude (M) structure factors to assume a ratio of  M = Q0 * P.
+	  Penalise  lambda * |Q0 * P - M|^2
+	  by adding  lambda * [Q0, -1]^T [Q0, -1]  to A.
+	*/
+
+	A(0,0) += lambda * Q0 * Q0;
+	A(1,0) += lambda * Q0;
+	A(0,1) += lambda * Q0;
+	A(1,1) += lambda;
+
+
+	const double det = A(0,0) * A(1,1) - A(0,1) * A(1,0);
 
 	if (std::abs(det) > 1e-16)
 	{
+		gravis::t2Matrix<T> A_inv = A;
 		A_inv.invert();
 
 		const gravis::t2Vector<T> data_real(data_sin.real, data_cos.real);
@@ -99,7 +115,7 @@ std::pair<tComplex<T>, tComplex<T>> DualContrastVoxel<T> :: solve(double WienerO
 
 		return std::make_pair(
 			tComplex<T>(-out_real[0], -out_imag[0]),
-			tComplex<T>(-out_real[1], -out_imag[1]));
+			tComplex<T>(out_real[1], out_imag[1]));
 	}
 	else
 	{
