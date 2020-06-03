@@ -74,6 +74,7 @@ class Reconstruction
 				BufferedImage<DualContrastVoxel<T>>& image,
 				double SNR = 1,
 				double lambda = 0,
+				bool isotropicWiener = true,
 				int num_threads = 1);
 		
 		template <typename T>
@@ -383,6 +384,7 @@ std::pair<BufferedImage<T>, BufferedImage<T>>
 		BufferedImage<DualContrastVoxel<T>>& image,
 		double SNR,
 		double lambda,
+		bool isotropicWiener,
 		int num_threads)
 {
 	const long int wh = image.xdim;
@@ -400,7 +402,7 @@ std::pair<BufferedImage<T>, BufferedImage<T>>
 	for (long int x = 0; x < wh; x++)
 	{
 		std::pair<tComplex<T>,tComplex<T>> mu = image(x,y,z).solve(
-					WienerOffset, lambda);
+					WienerOffset, lambda, isotropicWiener);
 
 		phaseOutFS(x,y,z) = mu.first;
 		ampOutFS(x,y,z)   = mu.second;

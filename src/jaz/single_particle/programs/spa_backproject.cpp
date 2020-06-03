@@ -114,6 +114,7 @@ void SpaBackproject::read(int argc, char **argv)
 
 	use_fwd_mapping = parser.checkOption("--fwd_mapping", "Use the legacy forward-mapping algorithm");
 	do_dual_contrast = parser.checkOption("--dual_contrast", "Perform a dual-contrast reconstruction (backward-mapping only)");
+	do_isotropic_Wiener = !parser.checkOption("--aniso_Wiener", "Use scale-appropriate Wiener constants for phase and amplitude maps (dual contrast only)");
 	compute_multiplicity = parser.checkOption("--mult", "Compute multiplicity map (backward-mapping only)");
 
 	// Hidden
@@ -1198,7 +1199,7 @@ void SpaBackproject::reconstructDualContrast()
 		std::pair<BufferedImage<RFLOAT>,BufferedImage<RFLOAT>> dualContrastMaps =
 			Reconstruction::solveDualContrast(
 				dual_contrast_accumulation_volumes[half],
-				SNR, dual_contrast_lambda, num_threads_total);
+				SNR, dual_contrast_lambda, do_isotropic_Wiener, num_threads_total);
 
 		dualContrastMaps.first.write(fn_out+"_half"+ZIO::itoa(half+1)+"_phase.mrc", angpix);
 		dualContrastMaps.second.write(fn_out+"_half"+ZIO::itoa(half+1)+"_amplitude.mrc", angpix);
@@ -1224,7 +1225,7 @@ void SpaBackproject::reconstructDualContrast()
 	std::pair<BufferedImage<RFLOAT>,BufferedImage<RFLOAT>> dualContrastMaps =
 		Reconstruction::solveDualContrast(
 			accumulation_volume_both,
-			SNR, dual_contrast_lambda, num_threads_total);
+			SNR, dual_contrast_lambda, do_isotropic_Wiener, num_threads_total);
 
 	dualContrastMaps.first.write(fn_out+"_phase.mrc", angpix);
 	dualContrastMaps.second.write(fn_out+"_amplitude.mrc", angpix);

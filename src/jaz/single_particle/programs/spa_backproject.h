@@ -91,7 +91,7 @@ class SpaBackproject
 		std::vector<BufferedImage<RFLOAT>> multiplicities, spreading_functions;
 		std::vector<BufferedImage<DualContrastVoxel<RFLOAT>>> dual_contrast_accumulation_volumes;
 		
-		bool compute_multiplicity, do_dual_contrast;
+		bool compute_multiplicity, do_dual_contrast, do_isotropic_Wiener;
 		int padded_box_size;
 		
 		

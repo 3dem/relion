@@ -144,6 +144,10 @@ int main(int argc, char *argv[])
 	rescaled_amplitude_RS.write(out_path + "rescaled_amplitude.mrc", pixel_size);
 
 
+	BufferedImage<double> difference_map = rescaled_phase_RS - mapsRS[amplitude_id];
+	difference_map.write(out_path + "difference_map.mrc", pixel_size);
+
+
 	const double resolution_Angstrom = filter_freq;
 	const double resolution_pixels = (s * pixel_size) / resolution_Angstrom;
 

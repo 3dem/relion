@@ -14,7 +14,10 @@ class DualContrastVoxel
 			tComplex<T> data_sin, data_cos;
 			T weight_sin2, weight_sin_cos, weight_cos2;
 
-		std::pair<tComplex<T>, tComplex<T>> solve(double WienerOffset, double lambda);
+		std::pair<tComplex<T>, tComplex<T>> solve(
+				double WienerOffset,
+				double lambda,
+				bool isotropicWiener = true);
 
 		inline DualContrastVoxel<T>& operator += (const DualContrastVoxel<T>& rhs)
 		{
@@ -75,7 +78,7 @@ DualContrastVoxel<T> :: DualContrastVoxel()
 
 template <typename T>
 std::pair<tComplex<T>, tComplex<T>> DualContrastVoxel<T> :: solve(
-		double WienerOffset, double lambda)
+		double WienerOffset, double lambda, bool isotropicWiener)
 {
 	const double Q0 = 0.07;
 
@@ -86,7 +89,15 @@ std::pair<tComplex<T>, tComplex<T>> DualContrastVoxel<T> :: solve(
 	gravis::t2Matrix<T> A = A0;
 
 	A(0,0) += WienerOffset;
-	A(1,1) += WienerOffset / (Q0 * Q0);
+
+	if (isotropicWiener)
+	{
+		A(1,1) += WienerOffset;
+	}
+	else
+	{
+		A(1,1) += WienerOffset / (Q0 * Q0);
+	}
 
 	/*
 	  Encourage phase (P) and amplitude (M) structure factors to assume a ratio of  M = Q0 * P.
