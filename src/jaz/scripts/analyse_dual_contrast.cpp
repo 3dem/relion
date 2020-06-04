@@ -121,6 +121,45 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	std::vector<double> optimal_scale(sc);
+
+	{
+		std::vector<double> num(sc, 0.0), denom(sc, 0.0);
+
+		for (int z = 0; z < s;  z++)
+		for (int y = 0; y < s;  y++)
+		for (int x = 0; x < sh; x++)
+		{
+			const double r = RadialAvg::get1DIndex(x,y,z,s,s,s);
+			const int ri = (int)(r+0.5);
+
+			if (ri < sc)
+			{
+				const Complex za = mapsFS[amplitude_id](x,y,z);
+				const Complex zp = mapsFS[phase_id](x,y,z);
+
+				num[ri]   += za.real * zp.real + za.imag * zp.imag;
+				denom[ri] += zp.real * zp.real + zp.imag * zp.imag;
+			}
+		}
+
+		std::ofstream optimal_scale_file(out_path + "optimal_scale.dat");
+
+		for (int i = 0; i < sc; i++)
+		{
+			if (denom[i] > 0.0)
+			{
+				optimal_scale[i] = num[i] / denom[i];
+			}
+			else
+			{
+				optimal_scale[i] = 0.0;
+			}
+
+			optimal_scale_file << i << ' ' << optimal_scale[i] << '\n';
+		}
+	}
+
 	BufferedImage<dComplex> rescaled_amplitude_FS(sh,s,s);
 	BufferedImage<dComplex> rescaled_phase_FS(sh,s,s);
 
@@ -128,12 +167,11 @@ int main(int argc, char *argv[])
 	for (int y = 0; y < s;  y++)
 	for (int x = 0; x < sh; x++)
 	{
-		double scale = sqrt(
-					RadialAvg::interpolate_FftwHalf_3D_lin(
-						x,y,z, s,s,s, power_ratio));
+		double scale = RadialAvg::interpolate_FftwHalf_3D_lin(
+						x,y,z, s,s,s, optimal_scale);
 
-		rescaled_amplitude_FS(x,y,z) = scale * mapsFS[amplitude_id](x,y,z);
-		rescaled_phase_FS(x,y,z) = mapsFS[phase_id](x,y,z) / scale;
+		rescaled_amplitude_FS(x,y,z) = mapsFS[amplitude_id](x,y,z) / scale;
+		rescaled_phase_FS(x,y,z) = scale * mapsFS[phase_id](x,y,z);
 	}
 
 	BufferedImage<double> rescaled_phase_RS, rescaled_amplitude_RS;
@@ -158,6 +196,9 @@ int main(int argc, char *argv[])
 	BufferedImage<dComplex> filtered_amplitude_FS = ImageFilter::lowpass3D(
 				mapsFS[amplitude_id], resolution_pixels, 10);
 
+	BufferedImage<dComplex> filtered_rescaled_phase_FS = ImageFilter::lowpass3D(
+				rescaled_phase_FS, resolution_pixels, 10);
+
 	BufferedImage<dComplex> filtered_rescaled_amplitude_FS = ImageFilter::lowpass3D(
 				rescaled_amplitude_FS, resolution_pixels, 10);
 
@@ -165,14 +206,16 @@ int main(int argc, char *argv[])
 	BufferedImage<double>
 			filtered_phase_RS,
 			filtered_amplitude_RS,
+			filtered_rescaled_phase_RS,
 			filtered_rescaled_amplitude_RS;
 
 	FFT::inverseFourierTransform(filtered_phase_FS, filtered_phase_RS);
 	FFT::inverseFourierTransform(filtered_amplitude_FS, filtered_amplitude_RS);
-	FFT::inverseFourierTransform(filtered_rescaled_amplitude_FS, filtered_rescaled_amplitude_RS);
+	//FFT::inverseFourierTransform(filtered_rescaled_phase_FS, filtered_rescaled_phase_RS);
+	//FFT::inverseFourierTransform(filtered_rescaled_amplitude_FS, filtered_rescaled_amplitude_RS);
 
 
-	DualContrastWriter::writeAxialSlices(
+	/*DualContrastWriter::writeAxialSlices(
 		mapsRS[phase_id], mapsRS[amplitude_id], out_path + "dual_slice_", output_scale);
 
 	DualContrastWriter::writeAxialSlices(
@@ -182,10 +225,10 @@ int main(int argc, char *argv[])
 		filtered_phase_RS, filtered_amplitude_RS, out_path + "filtered_dual_slice_", output_scale);
 
 	DualContrastWriter::writeAxialSlices(
-		filtered_phase_RS, filtered_rescaled_amplitude_RS, out_path + "filtered_rescaled_dual_slice_", output_scale);
+		filtered_phase_RS, filtered_rescaled_amplitude_RS, out_path + "filtered_rescaled_dual_slice_", output_scale);*/
 
-	filtered_phase_RS.write(out_path + "filtered_phase.mrc");
-	filtered_amplitude_RS.write(out_path + "filtered_amplitude.mrc");
+	filtered_phase_RS.write(out_path + "filtered_phase.mrc", pixel_size);
+	filtered_amplitude_RS.write(out_path + "filtered_amplitude.mrc", pixel_size);
 
 
 	const double high_pass_sigma = 20;
@@ -196,15 +239,23 @@ int main(int argc, char *argv[])
 	BufferedImage<dComplex> high_pass_amplitude_FS = ImageFilter::highpassGauss3D(
 				filtered_amplitude_FS, high_pass_sigma);
 
+	BufferedImage<dComplex> high_pass_rescaled_phase_FS = ImageFilter::highpassGauss3D(
+				filtered_rescaled_phase_FS, high_pass_sigma);
+
 
 	FFT::inverseFourierTransform(high_pass_phase_FS, filtered_phase_RS);
 	FFT::inverseFourierTransform(high_pass_amplitude_FS, filtered_amplitude_RS);
+	FFT::inverseFourierTransform(high_pass_rescaled_phase_FS, filtered_rescaled_phase_RS);
 
-	filtered_phase_RS.write(out_path + "high_pass_phase.mrc");
-	filtered_amplitude_RS.write(out_path + "high_pass_amplitude.mrc");
+	filtered_phase_RS.write(out_path + "high_pass_phase.mrc", pixel_size);
+	filtered_amplitude_RS.write(out_path + "high_pass_amplitude.mrc", pixel_size);
+	filtered_rescaled_phase_RS.write(out_path + "high_pass_rescaled_phase.mrc", pixel_size);
 
-	DualContrastWriter::writeAxialSlices(
-		filtered_phase_RS, filtered_amplitude_RS, out_path + "high_pass_dual_slice_", output_scale);
+	(filtered_amplitude_RS - filtered_rescaled_phase_RS).write(
+				out_path + "filtered_discrepancy.mrc", pixel_size);
+
+	/*DualContrastWriter::writeAxialSlices(
+		filtered_phase_RS, filtered_amplitude_RS, out_path + "high_pass_dual_slice_", output_scale);*/
 
 
 

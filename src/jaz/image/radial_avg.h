@@ -21,6 +21,10 @@ class RadialAvg
 				int w, int h, int d,
 				const std::vector<T>& avg);
 
+		static double get1DIndex(
+				double x, double y, double z,
+				int w, int h, int d);
+
 
 
 		template<typename T>
