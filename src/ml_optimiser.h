@@ -371,6 +371,7 @@ public:
 	//Self-organizing map
 	bool do_som;
 	bool is_som_iter;
+	int som_starting_nodes;
 
 	// Size of the random subsets
 	long int subset_size;

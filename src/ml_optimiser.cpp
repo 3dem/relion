@@ -647,13 +647,16 @@ void MlOptimiser::parseInitial(int argc, char **argv)
     do_vmgd_realspace = parser.checkOption("--vmgd_realspace", "Claculate and apply gradient in real space.");
 	write_every_vmgd_iter = textToInteger(parser.getOption("--vmgd_write_iter", "Write out model every so many iterations in SGD (default is writing out all iters)", "1"));
 	do_som = parser.checkOption("--som", "Calculate self-organizing map instead of classification.");
+	som_starting_nodes = textToInteger(parser.getOption("--som_ini_nodes", "Number of initial SOM nodes.", "2"));
 
 	if (do_som && !do_vmgd)
 		REPORT_ERROR("SOM can only be calculated with a gradient optimization.");
 
-
 	if (do_som && mymodel.nr_classes < 3)
 		REPORT_ERROR("Too low maximum class limit for SOM calculations.");
+
+	if (do_som && som_starting_nodes > mymodel.nr_classes)
+		REPORT_ERROR("Cannot initiate more nodes than maximum number of nodes.");
 
 	// Computation stuff
 	// The number of threads is always read from the command line
@@ -1340,15 +1343,12 @@ void MlOptimiser::initialise()
 	{
 		mymodel.som.set_max_node_count(mymodel.nr_classes);
 		// Add the initial nodes to the graph and connect them with an edge
-		for (unsigned i = 0; i < XMIPP_MIN(2, mymodel.nr_classes); i++)
+		for (unsigned i = 0; i < som_starting_nodes; i++)
 			mymodel.som.add_node();
 
 		std::vector<unsigned> nodes = mymodel.som.get_all_nodes();
-
-		// Connect all to all
-		for (unsigned i = 0; i < nodes.size(); i++)
-			for (unsigned j = i + 1; j < nodes.size(); j++)
-				mymodel.som.set_edge_activity(nodes[i], nodes[j]);
+		for (unsigned i = 0; i < nodes.size(); i ++)
+			mymodel.som.set_node_activity(nodes[i], 1);
 
 		// Clear all non-node
 		for (unsigned i = 0; i < mymodel.nr_classes; i ++) {
@@ -4300,11 +4300,11 @@ void MlOptimiser::maximization()
 				}
 
 			if (wpu != -1) {
-				unsigned nn = mymodel.som.add_node(wpu, 0.2); //TODO Should be a parameter
+				unsigned nn = mymodel.som.add_node(wpu, 0); //TODO Should be a parameter
 				std::cerr << "SOM +" << nn << std::endl;
 
 				mymodel.Iref[nn] = mymodel.Iref[wpu];
-				mymodel.Igrad1[nn] = mymodel.Igrad1[wpu];
+				mymodel.Igrad1[nn] = mymodel.Igrad1[wpu] * 0.9; // Dampen momentum
 				mymodel.Igrad2[nn] = mymodel.Igrad2[wpu];
 				mymodel.last_som_add_iter = iter;
 			}
@@ -4350,9 +4350,10 @@ void MlOptimiser::maximization()
 						float _stepsize = vmgd_stepsize;
 						if (do_som)
 						{
-							_stepsize = wsum_model.som.get_node_activity(iclass);
-							float age = mymodel.som.get_node_age(iclass);
-							_stepsize *= exp(-age/4000.);  //TODO Should be a parameter
+							_stepsize *= wsum_model.som.get_node_activity(iclass);
+//							_stepsize *= mymodel.som.get_node_count();
+//							float age = mymodel.som.get_node_age(iclass);
+//							_stepsize *= vmgd_stepsize * pow(10,-age/1000.) + 0.01;  //TODO Should be a parameter
 						}
 
 						(wsum_model.BPref[iclass]).reconstructGrad(
