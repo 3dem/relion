@@ -27,8 +27,6 @@
 #include <string>
 #include <vector>
 #include <stack>
-#include <unordered_map>
-#include <unordered_set>
 #include "src/parallel.h"
 #include "src/filename.h"
 #include <stdio.h>
@@ -42,9 +40,9 @@ private:
 	 * Class for graph nodes
 	 */
 	struct Node {
-		bool active = false;
-		float activity = 0;
-		float age = 0.;
+		bool active;
+		float activity;
+		float age;
 	};
 
 	std::vector<Node> _nodes;
@@ -292,7 +290,7 @@ public:
 			float w = _edges_activity[_nodes.size() * node + i];
 			if (w > neighbour_threshold) {
 				w = 1;
-				out.emplace_back(std::pair<unsigned, float>(i, w));
+				out.push_back(std::pair<unsigned, float>(i, w));
 				weight_sum += w;
 			}
 		}
