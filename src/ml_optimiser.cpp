@@ -650,6 +650,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	som_starting_nodes = textToInteger(parser.getOption("--som_ini_nodes", "Number of initial SOM nodes.", "2"));
 	som_connectivity = textToFloat(parser.getOption("--som_connectivity", "Number of average active neighbour connections.", "5.0"));
 	som_inactivity_threshold = textToFloat(parser.getOption("--som_inactivity_threshold", "Threshold for inactivity before node is dropped.", "0.01"));
+	som_neighbour_pull = textToFloat(parser.getOption("--som_neighbour_pull", "Portion of gradient applied to connected nodes.", "0.2"));
 
 	if (do_som && !do_vmgd)
 		REPORT_ERROR("SOM can only be calculated with a gradient optimization.");
@@ -659,6 +660,9 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 
 	if (do_som && som_starting_nodes > mymodel.nr_classes)
 		REPORT_ERROR("Cannot initiate more nodes than maximum number of nodes.");
+
+	if (som_neighbour_pull < 0 || 1 <= som_neighbour_pull)
+		REPORT_ERROR("--som_neighbour_pull should be more then or equal to zero and less than one.");
 
 	// Computation stuff
 	// The number of threads is always read from the command line
@@ -4353,7 +4357,7 @@ void MlOptimiser::maximization()
 						if (do_som)
 						{
 							_stepsize *= wsum_model.som.get_node_activity(iclass);
-//							_stepsize *= mymodel.som.get_node_count();
+							_stepsize *= mymodel.som.get_node_count();
 //							float age = mymodel.som.get_node_age(iclass);
 //							_stepsize *= vmgd_stepsize * pow(10,-age/1000.) + 0.01;  //TODO Should be a parameter
 						}

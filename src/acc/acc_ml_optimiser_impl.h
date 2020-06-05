@@ -2887,7 +2887,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			for (int i = 0; i < weights.size(); i ++) {
 				unsigned idx = weights[i].first;
-				float w = weights[i].second * .2; //TODO Should be a parameter
+				float w = weights[i].second * baseMLO->som_neighbour_pull;
 				class_sum_weight[idx] = op.sum_weight_class[img_id][idx] / w;
 				thr_wsum_pdf_class[idx] += w;
 				baseMLO->wsum_model.som.add_node_activity(idx, w);
