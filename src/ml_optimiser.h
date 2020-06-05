@@ -372,6 +372,8 @@ public:
 	bool do_som;
 	bool is_som_iter;
 	int som_starting_nodes;
+	float som_connectivity;
+	float som_inactivity_threshold;
 
 	// Size of the random subsets
 	long int subset_size;
@@ -756,6 +758,8 @@ public:
 		do_som(false),
 		is_som_iter(false),
 		som_starting_nodes(0),
+		som_connectivity(0),
+		som_inactivity_threshold(0),
 #ifdef ALTCPU
 		tbbSchedulerInit(tbb::task_scheduler_init::deferred ),
 		mdlClassComplex(NULL),

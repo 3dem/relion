@@ -648,6 +648,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	write_every_vmgd_iter = textToInteger(parser.getOption("--vmgd_write_iter", "Write out model every so many iterations in SGD (default is writing out all iters)", "1"));
 	do_som = parser.checkOption("--som", "Calculate self-organizing map instead of classification.");
 	som_starting_nodes = textToInteger(parser.getOption("--som_ini_nodes", "Number of initial SOM nodes.", "2"));
+	som_connectivity = textToFloat(parser.getOption("--som_connectivity", "Number of average active neighbour connections.", "5.0"));
+	som_inactivity_threshold = textToFloat(parser.getOption("--som_inactivity_threshold", "Threshold for inactivity before node is dropped.", "0.01"));
 
 	if (do_som && !do_vmgd)
 		REPORT_ERROR("SOM can only be calculated with a gradient optimization.");
@@ -2723,7 +2725,7 @@ void MlOptimiser::iterate()
 			for (unsigned i = 0; i < nodes.size(); i ++)
 				mymodel.pdf_class[nodes[i]] = 1./nodes.size();
 
-			mymodel.som.set_connectivity(5);  //TODO Should be set by user
+			mymodel.som.set_connectivity(som_connectivity);
 
 			wsum_model.som.clone_nodes(mymodel.som);
 			wsum_model.som.reset_activities();
@@ -4247,7 +4249,7 @@ void MlOptimiser::maximization()
 				if (do_som)
 				{
 					unsigned node_count = mymodel.som.get_node_count();
-					if (node_count > 2 && mymodel.som.get_node_activity(iclass) < 0.01/node_count) {  //TODO should be a parameter
+					if (node_count > 2 && mymodel.som.get_node_activity(iclass) < som_inactivity_threshold/node_count) {
 						mymodel.som.remove_node(iclass);
 						mymodel.Iref[iclass] *= 0;
 						mymodel.Igrad1[iclass] *= 0;
