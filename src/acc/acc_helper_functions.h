@@ -148,7 +148,7 @@ void mapAllWeightsToMweights(
 template< typename T>
 void arrayOverThreshold(AccPtr<T> &data, AccPtr<bool> &passed, T threshold)
 {
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	int grid_size = ceil((float)data.getSize()/(float)OVER_THRESHOLD_BLOCK_SIZE);
 	cuda_kernel_array_over_threshold<T><<< grid_size, OVER_THRESHOLD_BLOCK_SIZE, 0, data.getStream() >>>(
 			~data,
@@ -180,7 +180,7 @@ size_t findThresholdIdxInCumulativeSum(AccPtr<T> &data, T threshold)
 	}
 	else
 	{
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 		AccPtr<size_t >  idx(1, data.getStream(), data.getAllocator());
 		idx[0] = 0;
 
@@ -350,7 +350,7 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 
 		int dim=ceilf((float)(v.nzyxdim/(float)(2*CFTT_BLOCK_SIZE)));
 		AccUtilities::centerFFT_2D(dim, 0, CFTT_BLOCK_SIZE,
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 				~img_in,
 #else
 				&img_in[0],

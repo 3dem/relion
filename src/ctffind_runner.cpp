@@ -20,7 +20,7 @@
 #include "src/ctffind_runner.h"
 #include <cmath>
 
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 #include "src/acc/cuda/cuda_mem_utils.h"
 #endif
 
@@ -323,7 +323,7 @@ void CtffindRunner::initialise()
 		untangleDeviceIDs(gpu_ids, allThreadIDs);
 		if (allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
 		{
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 			if (verb>0)
 				std::cout << "gpu-ids were not specified, so threads will automatically be mapped to devices (incrementally)."<< std::endl;
 			HANDLE_ERROR(cudaGetDeviceCount(&devCount));

@@ -192,6 +192,10 @@ if(BUILD_OWN_TBB)
 	add_dependencies(relion_lib OWN_TBB)
 endif()
 
+if(BUILD_OWN_Torch)
+	add_dependencies(relion_lib OWN_Torch)
+endif()
+
 foreach (_target ${RELION_TARGETS})
 	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)  #specify target name WE=WithoutExtension
 	
@@ -215,6 +219,11 @@ foreach (_target ${RELION_TARGETS})
 	if (ALTCPU)
 		target_link_libraries(${_target} ${TBB_LIBRARIES})
 	endif(ALTCPU)
+
+	if(TORCH)
+		target_link_libraries(${_target} ${Torch_LIBRARIES})
+		set_property(TARGET ${_target} PROPERTY CXX_STANDARD 14)
+	endif(TORCH)
 
 	set_target_properties(${_target} PROPERTIES
 	                      XX_STANDARD 11
@@ -255,7 +264,12 @@ if(OPENMP_FOUND)
 endif()
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+
+if(TORCH)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
+else(TORCH)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+endif(TORCH)
 
 # Set this flag to activate bounds checking in stl-vectors (incl. strings)
 # It is useful to do this periodically, as it catches 

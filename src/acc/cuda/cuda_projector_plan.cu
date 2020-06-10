@@ -2,7 +2,7 @@
 #include "src/time.h"
 #include <cuda_runtime.h>
 
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 //#include <cuda_runtime.h>
 #ifdef CUDA_FORCESTL
 #include "src/acc/cuda/cuda_utils_stl.cuh"
