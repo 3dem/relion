@@ -221,7 +221,7 @@ foreach (_target ${RELION_TARGETS})
 	endif(ALTCPU)
 
 	if(TORCH)
-		target_link_libraries(${_target} ${Torch_LIBRARIES})
+		target_link_libraries(${_target} ${TORCH_LIBRARIES})
 		set_property(TARGET ${_target} PROPERTY CXX_STANDARD 14)
 	endif(TORCH)
 
