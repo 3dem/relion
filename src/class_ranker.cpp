@@ -1716,7 +1716,8 @@ void ClassRanker::performRanking()
 	for (int i = 0; i < features_all_classes.size(); i++)
 	{
 		/// Here execute the neural network! (for now just use class_score to test code...)
-		RFLOAT myscore = features_all_classes[i].class_score;
+	        /// DARI to insert function
+	        //RFLOAT myscore = executePyTorchModel(features_all_classes[i]);
 
 		if (do_select && myscore >= select_min_score && myscore <= select_max_score)
 		{
