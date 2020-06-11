@@ -236,6 +236,8 @@ __global__ void cuda_kernel_cosineFilter(	XFLOAT *vol,
 											XFLOAT cosine_width,
 											XFLOAT sum_bg_total);
 
+__global__ void cuda_kernel_initOrientations(RFLOAT *pdfs, XFLOAT *pdf_orientation, bool *pdf_orientation_zeros, size_t sz);
+
 //----------------------------------------------------------------------------
 namespace CudaKernels
 {

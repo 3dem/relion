@@ -26,11 +26,10 @@ void HealpixSampling::clear()
 {
 	is_3D = false;
 	fn_sym = "C1";
-	limit_tilt = psi_step = offset_range = offset_step = 0.;
+	limit_tilt = psi_step = offset_range = offset_step = helical_offset_step = psi_step_ori = offset_range_ori = offset_step_ori = 0.;
 	random_perturbation = perturbation_factor = 0.;
 	// Jun19,2015 - Shaoda, Helical refinement
 	helical_offset_step = -1.;
-	orientational_prior_mode = NOPRIOR;
 	directions_ipix.clear();
 	rot_angles.clear();
 	tilt_angles.clear();
@@ -45,19 +44,15 @@ void HealpixSampling::clear()
 }
 
 void HealpixSampling::initialise(
-		int prior_mode,
 		int ref_dim,
 		bool do_3d_trans,
 		bool do_changepsi,
 		bool do_warnpsi,
-		bool do_local_searches,
+		bool do_local_searches_helical,
 		bool do_helical_refine,
 		RFLOAT rise_Angst,
 		RFLOAT twist_deg)
 {
-
-	// Set the prior mode (belongs to mlmodel, but very useful inside this object)
-	orientational_prior_mode = prior_mode;
 
 	if (ref_dim != -1)
 		is_3D = (ref_dim == 3);
@@ -123,13 +118,20 @@ void HealpixSampling::initialise(
 	// Store the not-oversampled translations, and make sure oversampled sampling is 1 pixel
 	//setTranslations();
 	// May06,2015 - Shaoda & Sjors, Helical translational searches
-	setTranslations(-1, -1, do_local_searches, do_helical_refine, -1, rise_Angst, twist_deg);
+	setTranslations(-1, -1, do_local_searches_helical, do_helical_refine, -1, rise_Angst, twist_deg);
 
 	// Store the non-oversampled projection directions
 	setOrientations(-1, -1.);
 
 	// Random perturbation and filling of the directions, psi_angles and translations vectors
 	resetRandomlyPerturbedSampling();
+
+	// SHWS 27feb2020: Set original sampling rates to allow 2D/3D classifications using coarser ones in earlier iterations
+	healpix_order_ori = healpix_order;
+	psi_step_ori = psi_step;
+	offset_range_ori = offset_range;
+	offset_step_ori = offset_step;
+
 
 }
 
@@ -167,6 +169,12 @@ void HealpixSampling::read(FileName fn_in)
     // Jun19,2015 - Shaoda, Helical translational searches, backward compatibility
     if (!MD.getValue(EMDL_SAMPLING_HELICAL_OFFSET_STEP, helical_offset_step))
     	helical_offset_step = -1.;
+
+    // SHWS 27Feb2020: backwards compatibility: older star files will not yet have original sampling parameters, just use current ones
+    if (!MD.getValue(EMDL_SAMPLING_OFFSET_STEP_ORI, offset_step_ori)) offset_step_ori = offset_step;
+    if (!MD.getValue(EMDL_SAMPLING_OFFSET_RANGE_ORI, offset_range_ori)) offset_range_ori = offset_range;
+    if (!MD.getValue(EMDL_SAMPLING_PSI_STEP_ORI, psi_step_ori)) psi_step_ori = psi_step;
+
 	if (is_3D)
 	{
 		if (!MD.getValue(EMDL_SAMPLING_HEALPIX_ORDER, healpix_order) ||
@@ -178,6 +186,10 @@ void HealpixSampling::read(FileName fn_in)
 		// By default it will then be set to the healpix sampling
 		// Only if the --psi_step option is given on the command line it will be set to something different!
 		psi_step = -1.;
+
+	    // SHWS 27Feb2020: backwards compatibility: older star files will not yet have original sampling parameters, just use current ones
+	    if (!MD.getValue(EMDL_SAMPLING_HEALPIX_ORDER_ORI, healpix_order_ori)) healpix_order_ori = healpix_order;
+
 	}
 	else
 	{
@@ -217,6 +229,13 @@ void HealpixSampling::write(FileName fn_out)
 	MD.setValue(EMDL_SAMPLING_HELICAL_OFFSET_STEP, helical_offset_step);
 	MD.setValue(EMDL_SAMPLING_PERTURB, random_perturbation);
 	MD.setValue(EMDL_SAMPLING_PERTURBATION_FACTOR, perturbation_factor);
+
+	//27Feb2020 SHWS: write original sampling rates to allow 2D/3D classifications to use coarser ones in initial iterations
+    MD.setValue(EMDL_SAMPLING_HEALPIX_ORDER_ORI, healpix_order_ori);
+    MD.setValue(EMDL_SAMPLING_PSI_STEP_ORI, psi_step_ori);
+    MD.setValue(EMDL_SAMPLING_OFFSET_RANGE_ORI, offset_range_ori);
+    MD.setValue(EMDL_SAMPLING_OFFSET_STEP_ORI, offset_step_ori);
+
 	MD.write(fh);
 
 	// In the 3D case, also write a table with the sampled rot, tilt angles
@@ -243,7 +262,7 @@ void HealpixSampling::write(FileName fn_out)
 void HealpixSampling::setTranslations(
 		RFLOAT new_offset_step,
 		RFLOAT new_offset_range,
-		bool do_local_searches,
+		bool do_local_searches_helical,
 		bool do_helical_refine,
 		RFLOAT new_helical_offset_step,
 		RFLOAT helical_rise_Angst,
@@ -316,7 +335,7 @@ void HealpixSampling::setTranslations(
 		}
 
 		maxh = CEIL(h_range / new_helical_offset_step); // Out of range samplings will be excluded next
-		if (do_local_searches) // Local searches along helical axis
+		if (do_local_searches_helical) // Local searches along helical axis
 		{
 			// Local searches (2*2+1=5 samplings)
 			if (maxh > 2)
@@ -895,7 +914,7 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 				// TMP DEBUGGING
 				if (prior == 0.)
 				{
-					std::cerr << " psi_angles[ipsi]= " << psi_angles[ipsi] << " prior_psi= " << prior_psi << " orientational_prior_mode= " << orientational_prior_mode << std::endl;
+					std::cerr << " psi_angles[ipsi]= " << psi_angles[ipsi] << " prior_psi= " << prior_psi << std::endl;
 					std::cerr << " diffpsi= " << diffpsi << " sigma_cutoff= " << sigma_cutoff << " sigma_psi= " << sigma_psi << std::endl;
 					REPORT_ERROR("prior on psi is zero!");
 				}
@@ -1312,7 +1331,7 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalR
 				// TMP DEBUGGING
 				if (prior == 0.)
 				{
-					std::cerr << " psi_angles[ipsi]= " << psi_angles[ipsi] << " prior_psi= " << prior_psi << " orientational_prior_mode= " << orientational_prior_mode << std::endl;
+					std::cerr << " psi_angles[ipsi]= " << psi_angles[ipsi] << " prior_psi= " << prior_psi << std::endl;
 					std::cerr << " diffpsi= " << diffpsi << " sigma_cutoff= " << sigma_cutoff << " sigma_psi= " << sigma_psi << std::endl;
 					REPORT_ERROR("prior on psi is zero!");
 				}
@@ -1682,27 +1701,17 @@ void HealpixSampling::getOrientations(long int idir, long int ipsi, int oversamp
 	my_tilt.clear();
 	my_psi.clear();
 	long int my_idir, my_ipsi;
-	if (orientational_prior_mode == NOPRIOR)
+	if (pointer_dir_nonzeroprior.size() > idir && pointer_psi_nonzeroprior.size() > ipsi)
 	{
-		my_idir = idir;
-		my_ipsi = ipsi;
+		// nonzeroprior vectors have been initialised, so use priors!
+		my_idir = pointer_dir_nonzeroprior[idir];
+		my_ipsi = pointer_psi_nonzeroprior[ipsi];
 	}
 	else
 	{
-#ifdef DEBUG_CHECKSIZES
-	if (idir >= pointer_dir_nonzeroprior.size())
-	{
-		std::cerr<< "idir= "<<idir<<" pointer_dir_nonzeroprior.size()= "<< pointer_dir_nonzeroprior.size() <<std::endl;
-		REPORT_ERROR("idir >= pointer_dir_nonzeroprior.size()");
-	}
-	if (ipsi >= pointer_psi_nonzeroprior.size())
-	{
-		std::cerr<< "ipsi= "<<ipsi<<" pointer_psi_nonzeroprior.size()= "<< pointer_psi_nonzeroprior.size() <<std::endl;
-		REPORT_ERROR("ipsi >= pointer_psi_nonzeroprior.size()");
-	}
-#endif
-		my_idir = pointer_dir_nonzeroprior[idir];
-		my_ipsi = pointer_psi_nonzeroprior[ipsi];
+		// no priors
+		my_idir = idir;
+		my_ipsi = ipsi;
 	}
 
 #ifdef DEBUG_CHECKSIZES

@@ -486,6 +486,31 @@ static void cosineFilter(
 #endif
 }
 
+void initOrientations(AccPtr<RFLOAT> &pdfs, AccPtr<XFLOAT> &pdf_orientation, AccPtr<bool> &pdf_orientation_zeros)
+{
+#ifdef CUDA
+	int bs = 512;
+	int gs = ceil(pdfs.getSize()/(float)(bs));
+	cuda_kernel_initOrientations<<<gs, bs, 0, pdfs.getStream()>>>(~pdfs, ~pdf_orientation, ~pdf_orientation_zeros, pdfs.getSize());
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
+#else
+	for(int iorientclass=0; iorientclass< pdfs.getSize(); iorientclass++)
+	{
+		if (pdfs[iorientclass] == 0)
+		{
+			pdf_orientation[iorientclass] = 0.f;
+			pdf_orientation_zeros[iorientclass] = true;
+		}
+		else
+		{
+			pdf_orientation[iorientclass] = log(pdfs[iorientclass]);
+			pdf_orientation_zeros[iorientclass] = false;
+		}
+	}
+
+#endif
+}
+
 void centerFFT_2D(int grid_size, int batch_size, int block_size,
 				cudaStream_t stream,
 				XFLOAT *img_in,

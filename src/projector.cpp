@@ -178,17 +178,17 @@ void Projector::computeFourierTransformMap(
 
 	TIMING_TOC(TIMING_PAD);
 
-	TIMING_TIC(TIMING_CENTER);
-	// Translate padded map to put origin of FT in the center
-	if(do_heavy)
-		CenterFFT(Mpad, true);
-	TIMING_TOC(TIMING_CENTER);
-
 	TIMING_TIC(TIMING_TRANS);
 	// Calculate the oversampled Fourier transform
 	if(do_heavy)
 		transformer.FourierTransform(Mpad, Faux, false);
 	TIMING_TOC(TIMING_TRANS);
+
+	TIMING_TIC(TIMING_CENTER);
+	// Translate padded map to put origin of FT in the center
+	if(do_heavy)
+		CenterFFTbySign(Faux);
+	TIMING_TOC(TIMING_CENTER);
 
 	TIMING_TIC(TIMING_INIT2);
 	// Free memory: Mpad no longer needed
@@ -246,9 +246,9 @@ void Projector::computeFourierTransformMap(
 	MultidimArray<Complex> Faux2(padding_factor * ori_size, (padding_factor * ori_size)/2+1);
 	Image<RFLOAT> tt2(padding_factor * ori_size, padding_factor * ori_size);
 	decenter(data, Faux2, max_r2);
+	CenterFFTbySign(Faux2);
 	windowFourierTransform(Faux2, padding_factor * ori_size);
 	ft2.inverseFourierTransform(Faux2, tt2());
-	CenterFFT(tt2(), true);
 	tt2().setXmippOrigin();
 	tt2().window(FIRST_XMIPP_INDEX(ori_size), FIRST_XMIPP_INDEX(ori_size), LAST_XMIPP_INDEX(ori_size), LAST_XMIPP_INDEX(ori_size));
 	tt2.write("Fdata_proj.spi");

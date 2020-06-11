@@ -66,7 +66,7 @@ class BasisOptimisation : public Optimization
         double f(const std::vector<double>& x, void* tempStorage) const;
 
 		void* allocateTempStorage() const;
-		void deallocateTempStorage(void* ts);
+		void deallocateTempStorage(void* ts) const;
 
     private:
 
@@ -93,7 +93,7 @@ class AnisoBasisOptimisation : public Optimization
         double f(const std::vector<double>& x, void* tempStorage) const;
 
 		void* allocateTempStorage() const;
-		void deallocateTempStorage(void* ts);
+		void deallocateTempStorage(void* ts) const;
 
     private:
 

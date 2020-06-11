@@ -30,8 +30,8 @@ if(NOT TBB_FOUND)
     
     include(ExternalProject)
 
-    set(TBB_URL https://github.com/01org/tbb/archive/2018_U3.tar.gz)   # TBB 2018 U3
-    set(TBB_URL_MD5 cd2e136598ffa5c136f077ee85a35b4c)
+    set(TBB_URL https://github.com/oneapi-src/oneTBB/archive/2018_U3.tar.gz)   # TBB 2018 U3
+    set(TBB_URL_MD5 6a5b327fc86e2cd259f43af9322fdf42)
     set(TBB_TAR_NAME tbb-2018_U3.tar.gz)
    
     ExternalProject_Add(OWN_TBB

@@ -1120,6 +1120,10 @@ void JobWindow::initialiseClass2DWindow()
 	place("psi_sampling");
 	place("offset_range");
 	place("offset_step");
+
+	current_y += STEPY/2;
+	place("allow_coarser");
+
 	group3->end();
 
 	guientries["dont_skip_align"].cb_menu_i(); // to make default effective
@@ -1422,6 +1426,9 @@ void JobWindow::initialiseClass3DWindow()
 	group4->end();
 	guientries["do_local_ang_searches"].cb_menu_i(); // to make default effective
 
+	current_y += STEPY/2;
+	place("allow_coarser");
+
 	group3->end();
 	guientries["dont_skip_align"].cb_menu_i(); // to make default effective
 
@@ -1563,10 +1570,11 @@ void JobWindow::initialiseAutorefineWindow()
 	place("offset_range", TOGGLE_DEACTIVATE);
 	place("offset_step", TOGGLE_DEACTIVATE);
 
-	// Add a little spacer
 	current_y += STEPY/2;
-
 	place("auto_local_sampling", TOGGLE_DEACTIVATE);
+
+	current_y += STEPY/2;
+	place("auto_faster");
 
 	tab5->end();
 	tab6->begin();
