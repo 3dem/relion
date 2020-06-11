@@ -179,6 +179,9 @@ public:
 
         // All the Molecules in this Assembly
         std::vector<Molecule> molecules;
+		
+		// Additional atoms (denoted by HETATM in the PDB file)
+		std::vector<Atom> looseAtoms;
 
         // Empty Constructor
         Assembly()

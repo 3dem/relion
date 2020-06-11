@@ -191,6 +191,8 @@ class RawImage
 			
 			return *this;
 		}
+		
+		void addMultiple(T scale, const RawImage<T>& image);
 };
 
 template <class T>
@@ -611,6 +613,17 @@ RawImage<T1> operator * (const RawImage<T1>& t1, const RawImage<T2>& t2)
 	RawImage<T1> out = t1;
 	out += t2;
 	return out;
+}
+
+template <class T>
+void RawImage<T>::addMultiple(T scale, const RawImage<T>& image)
+{
+	for (size_t z = 0; z < zdim; z++)
+	for (size_t y = 0; y < ydim; y++)
+	for (size_t x = 0; x < xdim; x++)
+	{
+		data[(z*ydim + y)*xdim + x] += T(scale * image(x,y,z));
+	}
 }
 
 #endif
