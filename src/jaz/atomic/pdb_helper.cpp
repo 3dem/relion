@@ -3,8 +3,9 @@
 using namespace gravis;
 
 
-std::map<std::string,std::vector<d3Vector>> PdbHelper::splitAtomsByElement(
-		const std::string& pdbFile)
+std::map<std::string,std::vector<d3Vector>> PdbHelper::splitAtoms(
+		const std::string& pdbFile,
+		bool byElement)
 {
 	std::map<std::string,std::vector<d3Vector>> out;
 	
@@ -24,7 +25,8 @@ std::map<std::string,std::vector<d3Vector>> PdbHelper::splitAtomsByElement(
 		for (int a = 0; a < ac; a++)
 		{
 			Atom& atom = residue.atoms[a];
-			out[getElement(atom.name)].push_back(getPosition(atom));
+			const std::string key = byElement? getElement(atom.name) : atom.name;
+			out[key].push_back(getPosition(atom));
 		}
 	}
 	

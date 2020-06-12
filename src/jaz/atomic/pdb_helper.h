@@ -13,8 +13,9 @@ class PdbHelper
 	public:
 		
 		static std::map<std::string,std::vector<gravis::d3Vector>>
-			splitAtomsByElement(
-				const std::string& pdbFile);
+			splitAtoms(
+				const std::string& pdbFile,
+				bool byElement);
 		
 		static std::string getElement(const std::string& atomName);
 		static gravis::d3Vector getPosition(const Atom& atom);

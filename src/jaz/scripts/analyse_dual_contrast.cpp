@@ -113,28 +113,54 @@ int main(int argc, char *argv[])
 	
 	const double coord_offset = (boxOut/2)*pixel_size - (boxModel/2)*psModel;
 	
-	std::map<std::string,std::vector<d3Vector>> atoms = PdbHelper::splitAtomsByElement(in_model);
+	const bool merge_by_element = false;
 	
-	for (std::map<std::string,std::vector<d3Vector>>::iterator it = atoms.begin();
-		 it != atoms.end(); it++)
-	{
-		const std::string element = it->first;
-		const std::vector<d3Vector>& positions = it->second;
+	std::map<std::string,std::vector<d3Vector>> atoms = PdbHelper::splitAtoms(
+				in_model, merge_by_element);
+	
+	{	
+		std::ofstream averages(out_path + "element_averages.txt");
 		
-		std::ofstream scatterplot(out_path + "amp_over_phase_" + element + ".dat");
-				
-		const int pc = positions.size();
+		averages << "element \tphase \tamplitude \topt. ratio\n";
 		
-		for (int p = 0; p < pc; p++)
+		for (std::map<std::string,std::vector<d3Vector>>::iterator it = atoms.begin();
+			 it != atoms.end(); it++)
 		{
-			const d3Vector pos = (positions[p] + coord_offset * d3Vector(1,1,1)) / pixel_size;
+			const std::string element = it->first;
+			const std::vector<d3Vector>& positions = it->second;
 			
-			const double vp = Interpolation::linearXYZ_clip(phase_map_RS, pos.x, pos.y, pos.z);
-			const double va = Interpolation::linearXYZ_clip(amp_map_RS, pos.x, pos.y, pos.z);
+			std::ofstream scatterplot(out_path + "amp_over_phase_" + element + ".dat");
+					
+			const int pc = positions.size();
 			
-			scatterplot << vp << ' ' << va << '\n';
+			double num = 0.0;
+			double denom = 0.0;
+			double phase_sum = 0.0;
+			double amp_sum = 0.0;
+			
+			for (int p = 0; p < pc; p++)
+			{
+				const d3Vector pos = (positions[p] + coord_offset * d3Vector(1,1,1)) / pixel_size;
+				
+				const double vp = Interpolation::linearXYZ_clip(phase_map_RS, pos.x, pos.y, pos.z);
+				const double va = Interpolation::linearXYZ_clip(amp_map_RS, pos.x, pos.y, pos.z);
+				
+				scatterplot << vp << ' ' << va << '\n';
+				
+				num += vp * va;
+				denom += vp * vp;
+				phase_sum += vp;
+				amp_sum += va;
+			}
+			
+			averages << element << " \t" 
+					 << phase_sum / pc << " \t" 
+					 << amp_sum / pc << " \t" 
+					 << num / denom << '\n'; 
 		}
 	}
+	
+	return 0;
 	
 	{
 		BufferedImage<double> filtered_difference = amp_map_RS - phase_map_RS;
@@ -308,6 +334,43 @@ int main(int argc, char *argv[])
 				}
 				
 				scaled_phase.write(out_path + "scaled_phase.mrc", pixel_size);
+			}
+			
+			const double coord_offset = (boxOut/2)*pixel_size - (boxModel/2)*psModel;
+			
+			std::map<std::string,std::vector<d3Vector>> atoms = PdbHelper::splitAtoms(
+						in_model, merge_by_element);
+			
+			{	
+				std::ofstream averages(out_path + "element_averages_regional.txt");
+				
+				averages << "element \topt. ratio\n";
+				
+				for (std::map<std::string,std::vector<d3Vector>>::iterator it = atoms.begin();
+					 it != atoms.end(); it++)
+				{
+					const std::string element = it->first;
+					const std::vector<d3Vector>& positions = it->second;
+					
+					const int pc = positions.size();
+					
+					double num = 0.0;
+					double denom = 0.0;
+					
+					for (int p = 0; p < pc; p++)
+					{
+						const d3Vector pos = (positions[p] + coord_offset * d3Vector(1,1,1)) / pixel_size;
+						
+						const double vn = Interpolation::linearXYZ_clip(amp_phase_smooth, pos.x, pos.y, pos.z);
+						const double vd = Interpolation::linearXYZ_clip(phase_2_smooth, pos.x, pos.y, pos.z);
+						
+						num += vn;
+						denom += vd;
+					}
+					
+					averages << element << " \t" 
+							 << num / denom << '\n'; 
+				}
 			}
 			
 		}
