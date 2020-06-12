@@ -113,50 +113,68 @@ int main(int argc, char *argv[])
 	
 	const double coord_offset = (boxOut/2)*pixel_size - (boxModel/2)*psModel;
 	
-	const bool merge_by_element = false;
 	
-	std::map<std::string,std::vector<d3Vector>> atoms = PdbHelper::splitAtoms(
-				in_model, merge_by_element);
+	Assembly assembly;
+	assembly.readPDB(in_model);
+	
+	std::map<std::string,std::map<std::string,std::vector<d3Vector>>> atoms_by_residue = 
+			PdbHelper::groupAtomsByResidue(assembly);
 	
 	{	
-		std::ofstream averages(out_path + "element_averages.txt");
+		std::ofstream averages(out_path + "atom_averages.txt");
 		
-		averages << "element \tphase \tamplitude \topt. ratio\n";
 		
-		for (std::map<std::string,std::vector<d3Vector>>::iterator it = atoms.begin();
-			 it != atoms.end(); it++)
+		for (std::map<std::string,std::map<std::string,std::vector<d3Vector>>>::const_iterator itt = 
+			 atoms_by_residue.begin(); itt != atoms_by_residue.end(); itt++)
 		{
-			const std::string element = it->first;
-			const std::vector<d3Vector>& positions = it->second;
+			const std::string residue_name = itt->first;
+			const std::map<std::string,std::vector<d3Vector>>& atoms = itt->second;
 			
-			std::ofstream scatterplot(out_path + "amp_over_phase_" + element + ".dat");
-					
-			const int pc = positions.size();
+			averages << residue_name << ":\n\n";
+			averages << "atom   phase   ampl.   ratio\n\n";
 			
-			double num = 0.0;
-			double denom = 0.0;
-			double phase_sum = 0.0;
-			double amp_sum = 0.0;
+			std::ofstream scatterplot(out_path + "amp_over_phase_" + residue_name + ".dat");
+			std::ofstream scatterplot_legend(out_path + "amp_over_phase_" + residue_name + "_legend.txt");
 			
-			for (int p = 0; p < pc; p++)
+			for (std::map<std::string,std::vector<d3Vector>>::const_iterator it = 
+				 atoms.begin(); it != atoms.end(); it++)
 			{
-				const d3Vector pos = (positions[p] + coord_offset * d3Vector(1,1,1)) / pixel_size;
+				const std::string atom_name = it->first;
+				const std::vector<d3Vector>& positions = it->second;
 				
-				const double vp = Interpolation::linearXYZ_clip(phase_map_RS, pos.x, pos.y, pos.z);
-				const double va = Interpolation::linearXYZ_clip(amp_map_RS, pos.x, pos.y, pos.z);
+				const int pc = positions.size();
 				
-				scatterplot << vp << ' ' << va << '\n';
+				double num = 0.0;
+				double denom = 0.0;
+				double phase_sum = 0.0;
+				double amp_sum = 0.0;
 				
-				num += vp * va;
-				denom += vp * vp;
-				phase_sum += vp;
-				amp_sum += va;
+				for (int p = 0; p < pc; p++)
+				{
+					const d3Vector pos = (positions[p] + coord_offset * d3Vector(1,1,1)) / pixel_size;
+					
+					const double vp = Interpolation::linearXYZ_clip(phase_map_RS, pos.x, pos.y, pos.z);
+					const double va = Interpolation::linearXYZ_clip(amp_map_RS, pos.x, pos.y, pos.z);
+					
+					scatterplot << vp << ' ' << va << '\n';
+					
+					num += vp * va;
+					denom += vp * vp;
+					phase_sum += vp;
+					amp_sum += va;
+				}
+				
+				scatterplot_legend << atom_name << '\n';
+				scatterplot << '\n';
+				
+				averages.setf( std::ios::fixed, std::ios::floatfield);
+				averages << std::setw(3) << atom_name.substr(1) << "    " 
+						 << std::setprecision(2) << std::setw(4) << phase_sum / (pc*1e-8) << "    " 
+						 << std::setprecision(2) << std::setw(4) << amp_sum / (pc*1e-8) << "    " 
+						 << std::setprecision(2) << std::setw(4) << num / denom << '\n'; 
 			}
 			
-			averages << element << " \t" 
-					 << phase_sum / pc << " \t" 
-					 << amp_sum / pc << " \t" 
-					 << num / denom << '\n'; 
+			averages << "\n\n";
 		}
 	}
 	
@@ -297,7 +315,7 @@ int main(int argc, char *argv[])
 				
 				local_scale.write(out_path + "local_scale.mrc", pixel_size);
 				
-				for (std::map<std::string,std::vector<d3Vector>>::iterator it = atoms.begin();
+				/*for (std::map<std::string,std::vector<d3Vector>>::iterator it = atoms.begin();
 					 it != atoms.end(); it++)
 				{
 					const std::string element = it->first;
@@ -315,7 +333,7 @@ int main(int argc, char *argv[])
 						
 						local_scale_file << vsp << " 0\n";
 					}
-				}		
+				}*/		
 			}
 			
 			{
@@ -336,7 +354,7 @@ int main(int argc, char *argv[])
 				scaled_phase.write(out_path + "scaled_phase.mrc", pixel_size);
 			}
 			
-			const double coord_offset = (boxOut/2)*pixel_size - (boxModel/2)*psModel;
+			/*const double coord_offset = (boxOut/2)*pixel_size - (boxModel/2)*psModel;
 			
 			std::map<std::string,std::vector<d3Vector>> atoms = PdbHelper::splitAtoms(
 						in_model, merge_by_element);
@@ -371,7 +389,7 @@ int main(int argc, char *argv[])
 					averages << element << " \t" 
 							 << num / denom << '\n'; 
 				}
-			}
+			}*/
 			
 		}
 	}

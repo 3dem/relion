@@ -3,30 +3,32 @@
 using namespace gravis;
 
 
-std::map<std::string,std::vector<d3Vector>> PdbHelper::splitAtoms(
-		const std::string& pdbFile,
+std::map<std::string,std::vector<d3Vector>> PdbHelper::groupAtoms(
+		const Assembly& assembly,
 		bool byElement)
 {
 	std::map<std::string,std::vector<d3Vector>> out;
 	
-	Assembly assembly;
-	assembly.readPDB(pdbFile);
+	const int mc = assembly.molecules.size();
 	
-	Molecule& molecule = assembly.molecules[0];
-	
-	const int rc = molecule.residues.size();
-	
-	for (int r = 0; r < rc; r++)
+	for (int m = 0; m < mc; m++)
 	{
-		Residue& residue = molecule.residues[r];
+		const Molecule& molecule = assembly.molecules[m];
 		
-		const int ac = residue.atoms.size();
+		const int rc = molecule.residues.size();
 		
-		for (int a = 0; a < ac; a++)
+		for (int r = 0; r < rc; r++)
 		{
-			Atom& atom = residue.atoms[a];
-			const std::string key = byElement? getElement(atom.name) : atom.name;
-			out[key].push_back(getPosition(atom));
+			const Residue& residue = molecule.residues[r];
+			
+			const int ac = residue.atoms.size();
+			
+			for (int a = 0; a < ac; a++)
+			{
+				const Atom& atom = residue.atoms[a];
+				const std::string key = byElement? getElement(atom.name) : atom.name;
+				out[key].push_back(getPosition(atom));
+			}
 		}
 	}
 	
@@ -34,8 +36,38 @@ std::map<std::string,std::vector<d3Vector>> PdbHelper::splitAtoms(
 	
 	for (int la = 0; la < lac; la++)
 	{
-		Atom& atom = assembly.looseAtoms[la];
+		const Atom& atom = assembly.looseAtoms[la];
 		out[getElement(atom.name)].push_back(getPosition(atom));
+	}
+	
+	return out;
+}
+
+std::map<std::string, std::map<std::string, std::vector<d3Vector>>> 
+	PdbHelper::groupAtomsByResidue(const Assembly &assembly)
+{
+	std::map<std::string, std::map<std::string, std::vector<d3Vector>>> out;
+	
+	const int mc = assembly.molecules.size();
+	
+	for (int m = 0; m < mc; m++)
+	{
+		const Molecule& molecule = assembly.molecules[m];
+		
+		const int rc = molecule.residues.size();
+		
+		for (int r = 0; r < rc; r++)
+		{
+			const Residue& residue = molecule.residues[r];
+			
+			const int ac = residue.atoms.size();
+			
+			for (int a = 0; a < ac; a++)
+			{
+				const Atom& atom = residue.atoms[a];
+				out[residue.name][atom.name].push_back(getPosition(atom));
+			}
+		}
 	}
 	
 	return out;
@@ -49,7 +81,7 @@ std::string PdbHelper::getElement(const std::string& atomName)
 
 d3Vector PdbHelper::getPosition(const Atom &atom)
 {
-	const Matrix1D<RFLOAT> c = atom.coords;
+	const Matrix1D<RFLOAT>& c = atom.coords;
 	
 	return d3Vector(c(0), c(1), c(2));
 }
