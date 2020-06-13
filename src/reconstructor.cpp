@@ -895,5 +895,3 @@ void Reconstructor::applyCTFPandCTFQ(MultidimArray<Complex> &Fin, CTF &ctf, Four
 		}
 	}
 }
-
-
