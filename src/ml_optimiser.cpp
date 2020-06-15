@@ -256,6 +256,12 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	if (fnt != "OLD")
 		write_every_sgd_iter = textToInteger(fnt);
 
+	fnt = parser.getOption("--relax_sym", "The symmetry to be relaxed", "OLD");
+	if (fnt != "OLD")
+	{
+		sampling.fn_sym_relax = fnt;
+	}
+
 	do_join_random_halves = parser.checkOption("--join_random_halves", "Join previously split random halves again (typically to perform a final reconstruction).");
 
 	// ORIENTATIONS
@@ -540,6 +546,10 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	else
 		sampling.fn_sym = sym_;
 
+	//Check for relax_symmetry option
+	std::string sym_relax_ =  parser.getOption("--relax_sym", "Symmetry to be relaxed", "");
+	sampling.fn_sym_relax = sym_relax_;
+
 	sampling.offset_range = textToFloat(parser.getOption("--offset_range", "Search range for origin offsets (in pixels)", "6"));
 	sampling.offset_step = textToFloat(parser.getOption("--offset_step", "Sampling rate (before oversampling) for origin offsets (in pixels)", "2"));
 	// Jun19,2015 - Shaoda, Helical refinement
@@ -552,6 +562,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	RFLOAT _sigma_rot = textToFloat(parser.getOption("--sigma_rot", "Stddev on the first Euler angle for local angular searches (of +/- 3 stddev)", "-1"));
 	RFLOAT _sigma_tilt = textToFloat(parser.getOption("--sigma_tilt", "Stddev on the second Euler angle for local angular searches (of +/- 3 stddev)", "-1"));
 	RFLOAT _sigma_psi = textToFloat(parser.getOption("--sigma_psi", "Stddev on the in-plane angle for local angular searches (of +/- 3 stddev)", "-1"));
+
 	if (_sigma_ang > 0.)
 	{
 		mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
@@ -569,8 +580,18 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	else
 	{
 		//default
-		mymodel.orientational_prior_mode = NOPRIOR;
-		mymodel.sigma2_rot = mymodel.sigma2_tilt = mymodel.sigma2_psi = 0.;
+		// Very small to force the algorithm to take the current orientation
+		if (sym_relax_ != "")
+		{
+			mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
+			_sigma_ang = 0.0033;
+			mymodel.sigma2_rot = mymodel.sigma2_tilt = mymodel.sigma2_psi = _sigma_ang * _sigma_ang;
+		}
+		else
+		{
+			mymodel.orientational_prior_mode = NOPRIOR;
+			mymodel.sigma2_rot = mymodel.sigma2_tilt = mymodel.sigma2_psi = 0.;
+		}
 	}
 	do_skip_align = parser.checkOption("--skip_align", "Skip orientational assignment (only classify)?");
 	do_skip_rotate = parser.checkOption("--skip_rotate", "Skip rotational assignment (only translate and classify)?");
@@ -3180,6 +3201,8 @@ void MlOptimiser::expectationSetupCheckMemory(int myverb)
 		for (int oversampling = 0; oversampling <= adaptive_oversampling; oversampling++)
 		{
 			std::cout << " Oversampling= " << oversampling << " NrHiddenVariableSamplingPoints= " << mymodel.nr_classes * sampling.NrSamplingPoints(oversampling, &pointer_dir_nonzeroprior, &pointer_psi_nonzeroprior) << std::endl;
+			if (sampling.fn_sym_relax != "")
+				std::cout<<"Relaxing symmetry to "<<sampling.fn_sym_relax<<std::endl;
 			int nr_orient = (do_only_sample_tilt) ? sampling.NrDirections(oversampling, &pointer_dir_nonzeroprior) : sampling.NrDirections(oversampling, &pointer_dir_nonzeroprior) * sampling.NrPsiSamplings(oversampling, &pointer_psi_nonzeroprior);
 			if (do_skip_rotate || do_skip_align)
 				nr_orient = 1;
