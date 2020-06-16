@@ -22,6 +22,8 @@ However, it does also contain pieces of code from the following packages:
 - Gravis by Graphics and Vision Research Group at University of Basel: https://gravis.dmi.unibas.ch/index.html
 - CPlot2D by Attila Michael Zsaki: http://www.amzsaki.com/?page_id=2073
 - cmake-modules by Ryan A. Pavlik: https://github.com/rpavlik/cmake-modules
+- Many contributions (especially RelionIt GUI) from Colin Palmer
+- Symmetry relaxation patch by Vahid Abrishami 
 
 Original disclaimers in the code of these external packages have been maintained as much as possible.
 Please contact Sjors Scheres (scheres@mrc-lmb.cam.ac.uk) if you feel this has not been done correctly.
