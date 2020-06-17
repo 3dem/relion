@@ -854,7 +854,7 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 		// SHWS 17june2020: go back to rescaling references to smallest pixel size, as not doing so leads to reported user mistakes...
 
 		// The reference should be at the highest resolution, i.e. smallest pixel size, of the input optics groups
-		if (pixel_size - smallest_pixel_size > 0.001)
+		if (fabs(pixel_size - smallest_pixel_size) > 0.001)
 		{
 
 			int input_size = XSIZE(Iref[0]);
