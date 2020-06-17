@@ -698,7 +698,7 @@ void  MlModel::readTauSpectrum(FileName fn_tau, int verb)
 // Reading images from disc
 void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experiment &_mydata,
 			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected,
-			RFLOAT _ref_angpix, bool _do_sgd, bool verb)
+			RFLOAT _ref_angpix, bool _do_sgd, bool _do_trust_ref_size, bool verb)
 {
 
 
@@ -711,24 +711,6 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 	else
 	{
 		_mydata.obsModel.opticsMdt.getValue(EMDL_IMAGE_DIMENSIONALITY, data_dim, 0);
-	}
-
-	// Make sure that the model has a bigger box (in Angstroms) than the optics_group with largest images in mydata
-	// Also make sure it has the smallest pixel size
-	RFLOAT largest_box = -1.;
-	RFLOAT smallest_pixel_size = 99e99;
-	for (int optics_group = 0; optics_group < _mydata.numberOfOpticsGroups(); optics_group++)
-	{
-		RFLOAT my_pixel_size = _mydata.getOpticsPixelSize(optics_group);
-		int my_image_size = _mydata.getOpticsImageSize(optics_group);
-		if (my_image_size * my_pixel_size > largest_box)
-		{
-			largest_box = my_image_size * my_pixel_size;
-		}
-		if (my_pixel_size < smallest_pixel_size)
-		{
-			smallest_pixel_size = my_pixel_size;
-		}
 	}
 
 	// Read references into memory
@@ -849,94 +831,40 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 
 	}
 
+	// Make sure that the model has the same box and pixel size as (the first optics group of) the data
+	RFLOAT pixel_size_first_optics_group = _mydata.getOpticsPixelSize(0);
+	int box_size_first_optics_group = _mydata.getOpticsImageSize(0);
+
 	if (fn_ref != "None")
 	{
-		// SHWS 17june2020: go back to rescaling references to smallest pixel size, as not doing so leads to reported user mistakes...
 
-		// The reference should be at the highest resolution, i.e. smallest pixel size, of the input optics groups
-		if (fabs(pixel_size - smallest_pixel_size) > 0.001)
+		if (fabs(pixel_size - pixel_size_first_optics_group) > 0.001 ||
+				ori_size != box_size_first_optics_group)
 		{
 
-			int input_size = XSIZE(Iref[0]);
-			int rescale_size = ROUND(input_size * (pixel_size / smallest_pixel_size));
-			rescale_size += rescale_size%2; //make even in case it is not already
-			pixel_size *= (RFLOAT)(input_size)/(RFLOAT)(rescale_size);
-			ori_size = rescale_size;
-
-			if (verb > 0)
+			std::string mesg = "";
+			if (fabs(pixel_size - pixel_size_first_optics_group) > 0.001)
 			{
-				std::cerr << " WARNING: re-scaling input reference to a pixel size of " << pixel_size<< " Angstroms, in a box of " << rescale_size << " pixels..." << std::endl;
+				mesg = " The reference pixel size is " + floatToString(pixel_size)
+				     + " A, but the pixel size of the first optics group of the data is "
+					 + floatToString(pixel_size_first_optics_group) + " A! \n";
+			}
+			if (ori_size != box_size_first_optics_group)
+			{
+				mesg += " The reference box size is " + integerToString(ori_size)
+				     + " A, but the box size of the first optics group of the data is "
+					 + integerToString(box_size_first_optics_group) + " A!\n";
 			}
 
-			for (int iclass = 0; iclass < nr_classes*nr_bodies; iclass++)
-			{
-				resizeMap(Iref[iclass], rescale_size);
-				if (_do_sgd) resizeMap(Igrad[iclass], rescale_size);
-			}
-
+			if (_do_trust_ref_size) std::cerr << " WARNING " << mesg;
+			else REPORT_ERROR("ERROR " + mesg);
 		}
-
-		// SHWS 20mar19: the rescaling and rewindowing is no longer necessary with the debugged code,
-		// but do warn the user the reference isn't as high-resolution/large box as some of the optics groups
-		//if (pixel_size > 0.001 + smallest_pixel_size)
-		//{
-		//	std::cerr << " WARNING: The reference pixel size is " << pixel_size
-		//			<< " A, but the smallest pixel size in the data is " << smallest_pixel_size << " A!" << std::endl;
-		//}
-		if (XSIZE(Iref[0])*pixel_size + 0.001 < largest_box)
-		{
-			std::cerr << " WARNING: The reference box size is " << XSIZE(Iref[0])*pixel_size
-					<< " A, but the largest box size in the data is " << largest_box << " A!" << std::endl;
-		}
-
-		/*
-		// The reference should also be in the biggest box of the input images
-		int new_size = ROUND(largest_box / pixel_size);
-		new_size += new_size%2; //make even in case it is not already
-		if (XSIZE(Iref[0]) < new_size)
-		{
-			ori_size = new_size;
-
-			if (verb > 0)
-			{
-				std::cerr << " WARNING: rewindowing input reference to a box size of " << new_size<< " pixels..." << std::endl;
-			}
-
-			for (int iclass = 0; iclass < nr_classes*nr_bodies; iclass++)
-			{
-				Iref[iclass].setXmippOrigin();
-				if (ref_dim == 3)
-				{
-					Iref[iclass].window(FIRST_XMIPP_INDEX(new_size), FIRST_XMIPP_INDEX(new_size), FIRST_XMIPP_INDEX(new_size),
-					                    LAST_XMIPP_INDEX(new_size), LAST_XMIPP_INDEX(new_size),  LAST_XMIPP_INDEX(new_size));
-					if (_do_sgd)
-					{
-						Igrad[iclass].window(FIRST_XMIPP_INDEX(new_size), FIRST_XMIPP_INDEX(new_size), FIRST_XMIPP_INDEX(new_size),
-						                     LAST_XMIPP_INDEX(new_size), LAST_XMIPP_INDEX(new_size),  LAST_XMIPP_INDEX(new_size));
-					}
-				}
-				else
-				{
-					Iref[iclass].window(FIRST_XMIPP_INDEX(new_size), FIRST_XMIPP_INDEX(new_size),
-					                    LAST_XMIPP_INDEX(new_size), LAST_XMIPP_INDEX(new_size));
-					if (_do_sgd)
-					{
-						Igrad[iclass].window(FIRST_XMIPP_INDEX(new_size), FIRST_XMIPP_INDEX(new_size),
-						                     LAST_XMIPP_INDEX(new_size), LAST_XMIPP_INDEX(new_size));
-					}
-				}
-			}
-
-		}
-		*/
 
 	}
 	else
 	{
-		pixel_size = smallest_pixel_size;
-		ori_size = ROUND(largest_box / smallest_pixel_size);
-		// Make sure ori_size is even
-		ori_size += ori_size%2;
+		pixel_size = pixel_size_first_optics_group;
+		ori_size = box_size_first_optics_group;
 
 		// Calculate average of all unaligned images later on.
 		do_average_unaligned = true;
