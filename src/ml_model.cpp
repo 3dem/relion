@@ -851,22 +851,10 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 
 	if (fn_ref != "None")
 	{
-		// SHWS 20mar19: the rescaling and rewindowing is no longer necessary with the debugged code,
-		// but do warn the user the reference isn't as high-resolution/large box as some of the optics groups
-		if (pixel_size > 0.001 + smallest_pixel_size)
-		{
-			std::cerr << " WARNING: The reference pixel size is " << pixel_size
-					<< " A, but the smallest pixel size in the data is " << smallest_pixel_size << " A!" << std::endl;
-		}
-		if (XSIZE(Iref[0])*pixel_size + 0.001 < largest_box)
-		{
-			std::cerr << " WARNING: The reference box size is " << XSIZE(Iref[0])*pixel_size
-					<< " A, but the largest box size in the data is " << largest_box << " A!" << std::endl;
-		}
+		// SHWS 17june2020: go back to rescaling references to smallest pixel size, as not doing so leads to reported user mistakes...
 
-		/*
-		// The reference should be at the highest resolution of the input images
-		if (fabs(pixel_size - smallest_pixel_size) > 0.001)
+		// The reference should be at the highest resolution, i.e. smallest pixel size, of the input optics groups
+		if (pixel_size - smallest_pixel_size > 0.001)
 		{
 
 			int input_size = XSIZE(Iref[0]);
@@ -877,7 +865,7 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 
 			if (verb > 0)
 			{
-				std::cerr << " WARNING: rescaling input reference to a pixel size of " << pixel_size<< " Angstroms, in a box of " << rescale_size << " pixels..." << std::endl;
+				std::cerr << " WARNING: re-scaling input reference to a pixel size of " << pixel_size<< " Angstroms, in a box of " << rescale_size << " pixels..." << std::endl;
 			}
 
 			for (int iclass = 0; iclass < nr_classes*nr_bodies; iclass++)
@@ -888,6 +876,20 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 
 		}
 
+		// SHWS 20mar19: the rescaling and rewindowing is no longer necessary with the debugged code,
+		// but do warn the user the reference isn't as high-resolution/large box as some of the optics groups
+		//if (pixel_size > 0.001 + smallest_pixel_size)
+		//{
+		//	std::cerr << " WARNING: The reference pixel size is " << pixel_size
+		//			<< " A, but the smallest pixel size in the data is " << smallest_pixel_size << " A!" << std::endl;
+		//}
+		if (XSIZE(Iref[0])*pixel_size + 0.001 < largest_box)
+		{
+			std::cerr << " WARNING: The reference box size is " << XSIZE(Iref[0])*pixel_size
+					<< " A, but the largest box size in the data is " << largest_box << " A!" << std::endl;
+		}
+
+		/*
 		// The reference should also be in the biggest box of the input images
 		int new_size = ROUND(largest_box / pixel_size);
 		new_size += new_size%2; //make even in case it is not already
