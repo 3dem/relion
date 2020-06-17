@@ -189,6 +189,25 @@ void JobOption::setString(std::string set_to)
 	value = set_to;
 }
 
+int JobOption::getHealPixOrder(std::string s)
+{
+	for (int i = 0; i < 9; i++)
+	{
+		if (s == job_sampling_options[i])
+			return i + 1;
+	}
+
+	return -1;
+}
+
+std::string JobOption::getCtfFitString(std::string s)
+{
+	if (s == job_ctffit_options[0]) return "f";
+	else if (s == job_ctffit_options[1]) return "m";
+	else if (s == job_ctffit_options[2]) return "p";
+	else return "";
+}
+
 // Get a numbered value
 float JobOption::getNumber(std::string &errmsg)
 {
@@ -1161,12 +1180,7 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 			outputNodes.push_back(node);
 			command += " --do_coordinates ";
 		}
-		else if (node_type == "Particles STAR file (.star)" ||
-				 node_type == "2D references (.star or .mrcs)" ||
-				 node_type == "3D reference (.mrc)" ||
-				 node_type == "3D mask (.mrc)" ||
-				 node_type == "Micrographs STAR file (.star)" ||
-				 node_type == "Unfiltered half-map (unfil.mrc)")
+		else
 		{
 			fn_out = "/" + fn_in;
 			fn_out = fn_out.afterLastOf("/");
@@ -1185,7 +1199,10 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 			else if (node_type == "Unfiltered half-map (unfil.mrc)")
 				mynodetype = NODE_HALFMAP;
 			else
-				REPORT_ERROR("ImportJobWindow::getCommands ERROR: Unrecognized menu option for node_type= " + node_type);
+			{			
+				error_message = "Unrecognized menu option for node_type = " + node_type;
+				return false;
+			}
 
 			Node node(outputname + fn_out, mynodetype);
 			outputNodes.push_back(node);
@@ -1847,15 +1864,14 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 			command += " --sym " + joboptions["ref3d_symmetry"].getString();
 
 			// Sampling
-			for (int i = 0; i < 10; i++)
+			int ref3d_sampling = JobOption::getHealPixOrder(joboptions["ref3d_sampling"].getString());
+			if (ref3d_sampling <= 0)
 			{
-				if (strcmp((joboptions["ref3d_sampling"].getString()).c_str(), job_sampling_options[i].c_str()) == 0)
-				{
-					// The sampling given in the GUI will be the oversampled one!
-					command += " --healpix_order " + floatToString((float)i + 1);
-					break;
-				}
+				error_message = "Wrong choice for ref3d_sampling";
+				return false;
 			}
+
+			command += " --healpix_order " + integerToString(ref3d_sampling);
 		}
 		else
 		{
@@ -2962,15 +2978,16 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 	// Sampling
 	int iover = 1;
 	command += " --oversampling " + floatToString((float)iover);
-	for (int i = 0; i < 10; i++)
+
+	int sampling = JobOption::getHealPixOrder(joboptions["sampling"].getString());
+	if (sampling <= 0)
 	{
-		if (strcmp((joboptions["sampling"].getString()).c_str(), job_sampling_options[i].c_str()) == 0)
-		{
-			// The sampling given in the GUI will be the oversampled one!
-			command += " --healpix_order " + floatToString((float)i + 1 - iover);
-			break;
-		}
+		error_message = "Wrong choice for sampling";
+		return false;
 	}
+	// The sampling given in the GUI will be the oversampled one!
+	command += " --healpix_order " + floatToString(sampling - iover);
+
 	// Offset range
 	command += " --offset_range " + joboptions["offset_range"].getString();
 	// The sampling given in the GUI will be the oversampled one!
@@ -3336,15 +3353,15 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 	{
 		int iover = 1;
 		command += " --oversampling " + floatToString((float)iover);
-		for (int i = 0; i < 10; i++)
+		int sampling = JobOption::getHealPixOrder(joboptions["sampling"].getString());
+		if (sampling <= 0)
 		{
-			if (strcmp((joboptions["sampling"].getString()).c_str(), job_sampling_options[i].c_str()) == 0)
-			{
-				// The sampling given in the GUI will be the oversampled one!
-				command += " --healpix_order " + floatToString((float)i + 1 - iover);
-				break;
-			}
+			error_message = "Wrong choice for sampling";
+			return false;
 		}
+		// The sampling given in the GUI will be the oversampled one!
+		command += " --healpix_order " + integerToString(sampling - iover);
+
 		// Manually input local angular searches
 		if (joboptions["do_local_ang_searches"].getBoolean())
 		{
@@ -3770,24 +3787,25 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 		// Sampling
 		int iover = 1;
 		command += " --oversampling " + floatToString((float)iover);
-		for (int i = 0; i < 10; i++)
+
+		int sampling = JobOption::getHealPixOrder(joboptions["sampling"].getString());
+		if (sampling <= 0)
 		{
-			if (strcmp((joboptions["sampling"].getString()).c_str(), job_sampling_options[i].c_str()) == 0)
-			{
-				// The sampling given in the GUI will be the oversampled one!
-				command += " --healpix_order " + floatToString((float)i + 1 - iover);
-				break;
-			}
+			error_message = "Wrong choice for sampling";
+			return false;
 		}
+		// The sampling given in the GUI will be the oversampled one!
+		command += " --healpix_order " + integerToString(sampling - iover);
+
 		// Minimum sampling rate to perform local searches (may be changed upon continuation
-		for (int i = 0; i < 10; i++)
+		int auto_local_sampling = JobOption::getHealPixOrder(joboptions["auto_local_sampling"].getString());
+		if (auto_local_sampling <= 0)
 		{
-			if (strcmp((joboptions["auto_local_sampling"].getString()).c_str(), job_sampling_options[i].c_str()) == 0)
-			{
-				command += " --auto_local_healpix_order " + floatToString((float)i + 1 - iover);
-				break;
-			}
+			error_message = "Wrong choice for auto_local_sampling";
+			return false;
 		}
+		// The sampling given in the GUI will be the oversampled one!
+		command += " --auto_local_healpix_order " + integerToString(auto_local_sampling - iover);
 
 		// Offset range
 		command += " --offset_range " + joboptions["offset_range"].getString();
@@ -4034,17 +4052,16 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 			// Sampling
 			int iover = 1;
 			command += " --oversampling " + floatToString((float)iover);
-			for (int i = 0; i < 10; i++)
+			int sampling = JobOption::getHealPixOrder(joboptions["sampling"].getString());
+			if (sampling <= 0)
 			{
-				if (strcmp((joboptions["sampling"].getString()).c_str(), job_sampling_options[i].c_str()) == 0)
-				{
-					// The sampling given in the GUI will be the oversampled one!
-					command += " --healpix_order " + floatToString((float)i + 1 - iover);
-					// Always perform local searches!
-					command += " --auto_local_healpix_order " + floatToString((float)i + 1 - iover);
-					break;
-				}
+				error_message = "Wrong choice for sampling";
+				return false;
 			}
+			// The sampling given in the GUI will be the oversampled one!
+			command += " --healpix_order " + integerToString(sampling - iover);
+			// Always perform local searches!
+			command += " --auto_local_healpix_order " + integerToString(sampling - iover);
 
 			// Offset range
 			command += " --offset_range " + joboptions["offset_range"].getString();
@@ -5088,11 +5105,17 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 			command += " --fit_defocus --kmin_defocus " + joboptions["minres"].getString();
 			std::string fit_options = "";
 
-			fit_options += getStringFitOption(joboptions["do_phase"].getString());
-			fit_options += getStringFitOption(joboptions["do_defocus"].getString());
-			fit_options += getStringFitOption(joboptions["do_astig"].getString());
+			fit_options += JobOption::getCtfFitString(joboptions["do_phase"].getString());
+			fit_options += JobOption::getCtfFitString(joboptions["do_defocus"].getString());
+			fit_options += JobOption::getCtfFitString(joboptions["do_astig"].getString());
 			fit_options += "f"; // always have Cs refinement switched off
-			fit_options += getStringFitOption(joboptions["do_bfactor"].getString());
+			fit_options += JobOption::getCtfFitString(joboptions["do_bfactor"].getString());
+
+			if (fit_options.size() != 5)
+			{
+				error_message = "Wrong CTF fitting options";
+				return false;
+			}
 
 			command += " --fit_mode " + fit_options;
 		}
