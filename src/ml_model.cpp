@@ -839,7 +839,7 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 	{
 
 		if (fabs(pixel_size - pixel_size_first_optics_group) > 0.001 ||
-				ori_size != box_size_first_optics_group)
+		    ori_size != box_size_first_optics_group)
 		{
 
 			std::string mesg = "";
@@ -856,8 +856,10 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 					 + integerToString(box_size_first_optics_group) + " A!\n";
 			}
 
-			if (_do_trust_ref_size) std::cerr << " WARNING " << mesg;
-			else REPORT_ERROR("ERROR " + mesg);
+			if (!_do_trust_ref_size)
+				REPORT_ERROR("ERROR " + mesg + "\nIf you want to re-scale and/or re-box input particles into the pixel size and the box size of the reference, re-run the program with the --trust_ref_size option.");
+			else if (verb)
+				std::cerr << " WARNING " << mesg;
 		}
 
 	}
