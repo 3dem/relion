@@ -914,7 +914,8 @@ void CPlot2D::DrawLegendPostScript()
 
         double r,g,b;
         m_dataSets[i].GetDatasetColor(&r,&g,&b);
-
+		
+		if (m_dataSets[i].GetDatasetTitle() == "") continue;
 
         if (m_dataSets[i].GetDrawLine()) {
             // draw the line

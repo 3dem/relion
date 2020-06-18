@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
 	
 	const double coordOffset = (boxOut/2)*psOut - (boxModel/2)*psModel;
 	
-	std::map<std::string,std::vector<d3Vector>> atoms = PdbHelper::groupAtoms(inFn, true);
+	std::map<std::string,std::vector<d3Vector>> atoms = PdbHelper::groupAtomsByElement(inFn);
 	
 	for (std::map<std::string,std::vector<d3Vector>>::iterator it = atoms.begin();
 		 it != atoms.end(); it++)
