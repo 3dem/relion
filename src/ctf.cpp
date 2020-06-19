@@ -467,22 +467,57 @@ void CTF::getCTFPImage(MultidimArray<Complex> &result, int orixdim, int oriydim,
 	RFLOAT xs = (RFLOAT)orixdim * angpix;
 	RFLOAT ys = (RFLOAT)oriydim * angpix;
 
-	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(result)
+	if (obsModel != 0 && obsModel->hasEvenZernike)
 	{
-		RFLOAT x = (RFLOAT)jp / xs;
-		RFLOAT y = (RFLOAT)ip / ys;
-		RFLOAT myangle = (x * x + y * y > 0) ? acos(y / sqrt(x * x + y * y)) : 0; // dot-product with Y-axis: (0,1)
-
-		if (myangle >= anglerad)
+		if (orixdim != oriydim)
 		{
-			DIRECT_A2D_ELEM(result, i, j) = getCTFP(x, y, is_positive);
+			REPORT_ERROR_STR("CTF::getFftwImage: symmetric aberrations are currently only "
+					 << "supported for square images.\n");
 		}
-		else
+
+		const Image<RFLOAT>& gammaOffset = obsModel->getGammaOffset(opticsGroup, oriydim);
+
+		if (   gammaOffset.data.xdim < result.xdim
+			|| gammaOffset.data.ydim < result.ydim)
 		{
-			DIRECT_A2D_ELEM(result, i, j) = getCTFP(x, y, !is_positive);
+			REPORT_ERROR_STR("CTF::getFftwImage: requested output image is larger than the original: "
+					 << gammaOffset.data.xdim << "x" << gammaOffset.data.ydim << " available, "
+					 << result.xdim << "x" << result.ydim << " requested\n");
+		}
+
+		for (int y1 = 0; y1 < result.ydim; y1++)
+		for (int x1 = 0; x1 < result.xdim; x1++)
+		{
+			RFLOAT x = x1 / xs;
+			RFLOAT y = y1 <= result.ydim/2? y1 / ys : (y1 - result.ydim) / ys;
+			RFLOAT myangle = (x * x + y * y > 0) ? acos(y / sqrt(x * x + y * y)) : 0; // dot-product with Y-axis: (0,1)
+			const int x0 = x1;
+			const int y0 = y1 <= result.ydim/2? y1 : gammaOffset.data.ydim + y1 - result.ydim;
+
+			if (myangle >= anglerad)
+				DIRECT_A2D_ELEM(result, y1, x1) = getCTFP(x, y, is_positive, gammaOffset(y0, x0));
+			else
+				DIRECT_A2D_ELEM(result, y1, x1) = getCTFP(x, y, !is_positive, gammaOffset(y0, x0));
 		}
 	}
+	else
+	{
+		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(result)
+		{
+			RFLOAT x = (RFLOAT)jp / xs;
+			RFLOAT y = (RFLOAT)ip / ys;
+			RFLOAT myangle = (x * x + y * y > 0) ? acos(y / sqrt(x * x + y * y)) : 0; // dot-product with Y-axis: (0,1)
 
+			if (myangle >= anglerad)
+			{
+				DIRECT_A2D_ELEM(result, i, j) = getCTFP(x, y, is_positive);
+			}
+			else
+			{
+				DIRECT_A2D_ELEM(result, i, j) = getCTFP(x, y, !is_positive);
+			}
+		}
+	}
 	// Special line along the vertical Y-axis, where FFTW stores both Friedel mates and Friedel symmetry needs to remain
 	if (angle == 0.)
 	{
@@ -491,7 +526,7 @@ void CTF::getCTFPImage(MultidimArray<Complex> &result, int orixdim, int oriydim,
 
 		for (int i = hdim + 1; i < dim; i++)
 		{
-			DIRECT_A2D_ELEM(result, i, 0) = conj(DIRECT_A2D_ELEM(result, dim-i, 0));
+			DIRECT_A2D_ELEM(result, i, 0) = conj(DIRECT_A2D_ELEM(result, dim - i, 0));
 		}
 	}
 }
