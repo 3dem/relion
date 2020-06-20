@@ -2,19 +2,25 @@
 #define PDB_HELPER_H
 
 #include <src/jaz/gravis/t3Vector.h>
+#include <src/assembly.h>
 #include <vector>
 #include <map>
 #include <string>
-#include <src/assembly.h>
+#include <set>
 
 
 class PdbHelper
 {
 	public:
-		
+
 		static std::map<std::string,std::vector<gravis::d3Vector>>
 			groupAtomsByName(
 				const Assembly& assembly);
+
+		static std::map<std::string,std::vector<gravis::d3Vector>>
+			groupAtomsByName(
+				const Assembly& assembly,
+				const std::set<std::string>& includeExternal);
 		
 		static std::map<std::string,std::vector<gravis::d3Vector>>
 			groupAtomsByElement(

@@ -7,21 +7,21 @@ std::map<std::string,std::vector<d3Vector>> PdbHelper::groupAtomsByName(
 		const Assembly& assembly)
 {
 	std::map<std::string,std::vector<d3Vector>> out;
-	
+
 	const int mc = assembly.molecules.size();
-	
+
 	for (int m = 0; m < mc; m++)
 	{
 		const Molecule& molecule = assembly.molecules[m];
-		
+
 		const int rc = molecule.residues.size();
-		
+
 		for (int r = 0; r < rc; r++)
 		{
 			const Residue& residue = molecule.residues[r];
-			
+
 			const int ac = residue.atoms.size();
-			
+
 			for (int a = 0; a < ac; a++)
 			{
 				const Atom& atom = residue.atoms[a];
@@ -30,15 +30,60 @@ std::map<std::string,std::vector<d3Vector>> PdbHelper::groupAtomsByName(
 			}
 		}
 	}
-	
+
 	const int lac = assembly.looseAtoms.size();
-	
+
 	for (int la = 0; la < lac; la++)
 	{
 		const Atom& atom = assembly.looseAtoms[la];
 		out[getElement(atom.name)].push_back(getPosition(atom));
 	}
-	
+
+	return out;
+}
+
+std::map<std::string,std::vector<d3Vector>> PdbHelper::groupAtomsByName(
+		const Assembly& assembly,
+		const std::set<std::string>& includeExternal)
+{
+	std::map<std::string,std::vector<d3Vector>> out;
+
+	const int mc = assembly.molecules.size();
+
+	for (int m = 0; m < mc; m++)
+	{
+		const Molecule& molecule = assembly.molecules[m];
+
+		const int rc = molecule.residues.size();
+
+		for (int r = 0; r < rc; r++)
+		{
+			const Residue& residue = molecule.residues[r];
+
+			const int ac = residue.atoms.size();
+
+			for (int a = 0; a < ac; a++)
+			{
+				const Atom& atom = residue.atoms[a];
+				const std::string key = atom.name;
+				out[key].push_back(getPosition(atom));
+			}
+		}
+	}
+
+	const int lac = assembly.looseAtoms.size();
+
+	for (int la = 0; la < lac; la++)
+	{
+		const Atom& atom = assembly.looseAtoms[la];
+		const std::string element = getElement(atom.name);
+
+		if (includeExternal.find(element) != includeExternal.end())
+		{
+			out[element].push_back(getPosition(atom));
+		}
+	}
+
 	return out;
 }
 

@@ -46,8 +46,15 @@ int main(int argc, char *argv[])
 	outDir = ZIO::makeOutputDir(outDir);
 	
 	const double coordOffset = (boxOut/2)*psOut - (boxModel/2)*psModel;
-	
-	std::map<std::string,std::vector<d3Vector>> atoms = PdbHelper::groupAtomsByElement(inFn);
+
+	Assembly assembly;
+	assembly.readPDB(inFn);
+
+	std::map<std::string,std::vector<d3Vector>> atoms = PdbHelper::groupAtomsByElement(assembly);
+
+	std::cout << atoms.size() << " elements found" << std::endl;
+	std::cout << "    " << assembly.molecules.size() << " molecules" << std::endl;
+	std::cout << "    " << assembly.looseAtoms.size() << " lose atoms" << std::endl;
 	
 	for (std::map<std::string,std::vector<d3Vector>>::iterator it = atoms.begin();
 		 it != atoms.end(); it++)
@@ -56,6 +63,8 @@ int main(int argc, char *argv[])
 		
 		const std::string element = it->first;
 		const std::vector<d3Vector>& positions = it->second;
+
+		std::cout << element << " (" << positions.size() << ")" << std::endl;
 		
 		const int pc = positions.size();
 		

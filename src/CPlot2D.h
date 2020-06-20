@@ -892,6 +892,8 @@ void joinMultipleEPSIntoSinglePDF(FileName fn_pdf, std::vector<FileName> fn_eps)
      void AddDataSet(std::vector<RFLOAT> xValues, std::vector<RFLOAT> yValues);
      void AddDataSet(std::vector<RFLOAT> yValues);
 
+	 void SetViewArea(double origin_x, double origin_y, double width, double height);
+
 
  protected:
 
@@ -1016,7 +1018,7 @@ void joinMultipleEPSIntoSinglePDF(FileName fn_pdf, std::vector<FileName> fn_eps)
      double m_dMinXStartPoint; /*!< Minimum starting point along x axis over all data sets. */
      double m_dMinYStartPoint; /*!< Minimum starting point along y axis over all data sets. */
      double m_dMaxXEndPoint; /*!< Maximum end point along x axis over all data sets. */
-     double m_dMaxYEndPoint; /*!< Maximum end point along y axis over all data sets. */
+	 double m_dMaxYEndPoint; /*!< Maximum end point along y axis over all data sets. */
 
      // line widths
      double m_dFrameLineWidth; /*!< Width (thickness) of line used for the frame. */
@@ -1058,6 +1060,13 @@ void joinMultipleEPSIntoSinglePDF(FileName fn_pdf, std::vector<FileName> fn_eps)
 
      // data storage
      std::vector<CDataSet> m_dataSets; /*!< Storage for the datasets, implemented as a vector. */
+
+	 // JZ, 6-2020: allow the user to control the view area manually
+	 bool m_bSizeSetExternally;
+	 double m_dMinXStartPointOverride;
+	 double m_dMinYStartPointOverride;
+	 double m_dMaxXEndPointOverride;
+	 double m_dMaxYEndPointOverride;
  };
 
  inline void CPlot2D::SetTitle(std::string title)
