@@ -148,6 +148,7 @@ public:
 
 	// One value for each class
 	std::vector<RFLOAT > pdf_class;
+	std::vector<RFLOAT > class_age;
 
 	// One array for each class
 	std::vector<MultidimArray<RFLOAT> > pdf_direction;
@@ -336,6 +337,7 @@ public:
 			data_vs_prior_class = MD.data_vs_prior_class;
 			fourier_coverage_class = MD.fourier_coverage_class;
 			pdf_class = MD.pdf_class;
+			class_age = MD.class_age;
 			pdf_direction = MD.pdf_direction;
 			prior_offset_class = MD.prior_offset_class;
 			nr_particles_per_group = MD.nr_particles_per_group;
@@ -377,6 +379,7 @@ public:
 		fourier_coverage_class.clear();
 		prior_offset_class.clear();
 		pdf_class.clear();
+		class_age.clear();
 		pdf_direction.clear();
 		nr_particles_per_group.clear();
 		ref_dim = data_dim = ori_size = nr_classes = nr_bodies = nr_groups = nr_directions = interpolator = r_min_nn;
@@ -450,6 +453,8 @@ public:
 	void initialiseHelicalParametersLists(RFLOAT _helical_twist, RFLOAT _helical_rise);
 
 	void calculateTotalFourierCoverage();
+
+	void reset_class(int class_idx, int to_class_idx = -1);
 };
 
 class MlWsumModel: public MlModel

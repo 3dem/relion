@@ -2035,7 +2035,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
-				if(baseMLO->is_som_iter) {
+				if(baseMLO->do_vmgd) {
 					op.sum_weight_class[img_id].resize(baseMLO->mymodel.nr_classes, 0);
 
 					for (unsigned long exp_iclass = sp.iclass_min;
@@ -2883,9 +2883,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			baseMLO->wsum_model.som.add_node_activity(bpu);
 			baseMLO->mymodel.som.add_node_age(bpu);
 
-			std::vector< std::pair<unsigned, float> > weights = baseMLO->mymodel.som.get_neighbours(bpu);
+			std::vector<std::pair<unsigned, float> > weights = baseMLO->mymodel.som.get_neighbours(bpu);
 
-			for (int i = 0; i < weights.size(); i ++) {
+			for (int i = 0; i < weights.size(); i++) {
 				unsigned idx = weights[i].first;
 				float w = weights[i].second * baseMLO->som_neighbour_pull;
 				class_sum_weight[idx] = op.sum_weight_class[img_id][idx] / w;
@@ -2894,6 +2894,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				baseMLO->mymodel.som.add_node_age(idx, w);
 			}
 		}
+
+		for (unsigned i = 0; i < nr_classes; i++)
+			baseMLO->mymodel.class_age[i] += op.sum_weight_class[img_id][i] / op.sum_weight[img_id];
 
 		/*======================================================
 							BACKPROJECTION

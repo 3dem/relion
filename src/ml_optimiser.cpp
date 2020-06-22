@@ -646,11 +646,13 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	vmgd_fin_stepsize = textToFloat(parser.getOption("--vmgd_fin_stepsize", "Step size parameter for final gradient updates.", "0.05"));
     do_vmgd_realspace = parser.checkOption("--vmgd_realspace", "Claculate and apply gradient in real space.");
 	write_every_vmgd_iter = textToInteger(parser.getOption("--vmgd_write_iter", "Write out model every so many iterations in SGD (default is writing out all iters)", "1"));
+	do_init_blobs = parser.checkOption("--init_blobs", "Initialize models with random Gaussians.");
 	do_som = parser.checkOption("--som", "Calculate self-organizing map instead of classification.");
 	som_starting_nodes = textToInteger(parser.getOption("--som_ini_nodes", "Number of initial SOM nodes.", "2"));
 	som_connectivity = textToFloat(parser.getOption("--som_connectivity", "Number of average active neighbour connections.", "5.0"));
 	som_inactivity_threshold = textToFloat(parser.getOption("--som_inactivity_threshold", "Threshold for inactivity before node is dropped.", "0.01"));
 	som_neighbour_pull = textToFloat(parser.getOption("--som_neighbour_pull", "Portion of gradient applied to connected nodes.", "0.2"));
+	class_inactivity_threshold = textToFloat(parser.getOption("--class_inactivity_threshold", "Replace classes with little activity during gradient based classification.", "-1"));
 
 	if (do_som && !do_vmgd)
 		REPORT_ERROR("SOM can only be calculated with a gradient optimization.");
@@ -1353,8 +1355,10 @@ void MlOptimiser::initialise()
 			mymodel.som.add_node();
 
 		std::vector<unsigned> nodes = mymodel.som.get_all_nodes();
-		for (unsigned i = 0; i < nodes.size(); i ++)
+		for (unsigned i = 0; i < nodes.size(); i ++) {
+			mymodel.pdf_class[nodes[i]] = 1./nodes.size();
 			mymodel.som.set_node_activity(nodes[i], 1);
+		}
 
 		// Clear all non-node
 		for (unsigned i = 0; i < mymodel.nr_classes; i ++) {
@@ -1364,11 +1368,23 @@ void MlOptimiser::initialise()
 					clear = false;
 
 			if (clear) {
+				mymodel.pdf_class[i] = 0.;
 				mymodel.Iref[i] *= 0.;
 				if (do_mom1)
 					mymodel.Igrad1[i] *= 0.;
 				if (do_mom2)
 					mymodel.Igrad2[i] *= 0.;
+			}
+		}
+	}
+
+	if (do_init_blobs) {
+		for (unsigned i = 0; i < mymodel.nr_classes; i ++) {
+			if (mymodel.pdf_class[i] > 0.) {
+				MultidimArray<RFLOAT> blobs_pos(mymodel.Iref[i]), blobs_neg(mymodel.Iref[i]);
+				SomGraph::make_blobs_2d(blobs_pos, mymodel.Iref[i], 40, particle_diameter/mymodel.pixel_size);
+				SomGraph::make_blobs_2d(blobs_neg, mymodel.Iref[i], 40, particle_diameter/mymodel.pixel_size);
+				mymodel.Iref[i] = blobs_pos/40 - blobs_neg/80;
 			}
 		}
 	}
@@ -2349,6 +2365,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			}
 
 		} // end loop img_id
+
 
 		if (myverb > 0 && nr_particles_done % barstep == 0)
 		{
@@ -4245,25 +4262,21 @@ void MlOptimiser::maximization()
 		mymodel.som.update_node_activities(wsum_model.som, mu);
 	}
 
-	if(do_vmgd) {
+	int skip_class = -1;
+	unsigned nr_active_classes = 0;
+	float wsum_mode_pdf_class_sum = 0;
+	for (int i = 0; i < mymodel.nr_classes; i ++) {
+		wsum_mode_pdf_class_sum += sqrt(wsum_model.pdf_class[i]);
+		if (mymodel.pdf_class[i] > 0.)
+			nr_active_classes ++;
+	}
 
-		std::vector<float> error_avgs(mymodel.nr_classes * mymodel.nr_bodies, 0);
+	if(do_vmgd) {
+		maximizationOtherParameters();
+
+		std::vector<float> avg_class_errors(mymodel.nr_classes * mymodel.nr_bodies, 0);
 		for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++) {
 			if (mymodel.pdf_class[iclass] > 0. || mymodel.nr_bodies > 1) {
-				if (do_som)
-				{
-					unsigned node_count = mymodel.som.get_node_count();
-					if (node_count > 2 && mymodel.som.get_node_activity(iclass) < som_inactivity_threshold/node_count) {
-						mymodel.som.remove_node(iclass);
-						mymodel.Iref[iclass] *= 0;
-						mymodel.Igrad1[iclass] *= 0;
-						mymodel.Igrad2[iclass] *= 0;
-						mymodel.pdf_class[iclass] = 0;
-						std::cerr << "SOM -" << iclass << std::endl;
-						continue;
-					}
-				}
-
 				if ((wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY) {
 
 					if (do_vmgd_realspace)
@@ -4281,46 +4294,64 @@ void MlOptimiser::maximization()
 								do_mom2 ? 0.999 : 0.,
 								iter == 1);
 
-					if (do_som)
-					{
-						RFLOAT avg(0);
+					RFLOAT avg_grad(0);
+					for (unsigned i = 0; i < wsum_model.BPref[iclass].data.nzyxdim; i++)
+						avg_grad += norm(wsum_model.BPref[iclass].data.data[i]);
+					avg_grad /= (RFLOAT) wsum_model.BPref[iclass].data.nzyxdim;
 
-						for (unsigned i = 0; i < wsum_model.BPref[iclass].data.nzyxdim; i++)
-							avg += norm(wsum_model.BPref[iclass].data.data[i]);
-
-						avg /= (RFLOAT) wsum_model.BPref[iclass].data.nzyxdim;
-						error_avgs[iclass] = avg * wsum_model.som.get_node_activity(iclass);
-					}
+					avg_class_errors[iclass] = avg_grad * mymodel.pdf_class[iclass];
 				}
 			}
 		}
 
-		if (do_som && mymodel.som.get_node_count() < mymodel.nr_classes &&
-				iter - mymodel.last_som_add_iter > 3) {
-			std::vector<unsigned> s = SomGraph::arg_sort(error_avgs, false);
-			int wpu = -1;
-			for (int i = 0; i < s.size()/2; i++)  // Only consider top half
-				if (mymodel.som.get_node_age(s[i]) > 1000) { //TODO Should be a parameter
-					wpu = s[i];
-					break;
-				}
+		if (iter < vmgd_ini_iter + vmgd_inbetween_iter) {
+			int drop_class_idx = -1, expand_class_idx = -1;
 
-			if (wpu != -1) {
-				unsigned nn = mymodel.som.add_node(wpu, 0); //TODO Should be a parameter
-				std::cerr << "SOM +" << nn << std::endl;
+			// Determine the class with the largest average error to expand
+			std::vector<unsigned> s = SomGraph::arg_sort(avg_class_errors, false);
+			expand_class_idx = s[0];
 
-				mymodel.Iref[nn] = mymodel.Iref[wpu];
-				mymodel.Igrad1[nn] = mymodel.Igrad1[wpu] * 0.9; // Dampen momentum
-				mymodel.Igrad2[nn] = mymodel.Igrad2[wpu];
+			// Determine if a class should be dropped
+			if (class_inactivity_threshold > 0) {
+				std::vector<unsigned> idx = SomGraph::arg_sort(mymodel.pdf_class);
+				int most_inactive = idx[0];
+				if (mymodel.pdf_class[most_inactive] < class_inactivity_threshold/nr_active_classes)
+					drop_class_idx = most_inactive;
+			}
+
+			// If both drop and expand are set, replace drop with expand
+			if (drop_class_idx != -1 && expand_class_idx != -1) {
+				mymodel.reset_class(drop_class_idx, expand_class_idx);
+				mymodel.Igrad1[drop_class_idx] *= 0.9; // Dampen momentum
+				mymodel.class_age[drop_class_idx] = mymodel.class_age[expand_class_idx] * 0.9;
+				skip_class = drop_class_idx;
+				std::cerr << "Dropping class " << drop_class_idx << " replacing with " << expand_class_idx << std::endl;
+			}
+
+			// If SOM, sometimes expand without a drop
+			if (do_som && expand_class_idx != -1 &&
+			    mymodel.som.get_node_count() < mymodel.nr_classes &&
+			    iter - mymodel.last_som_add_iter > 3) {
+				unsigned nn = mymodel.som.add_node(expand_class_idx, 0); //TODO Should be a parameter
+				mymodel.reset_class(nn, expand_class_idx);
+				mymodel.Igrad1[nn] *= 0.9; // Dampen momentum
+				mymodel.class_age[nn] = mymodel.class_age[expand_class_idx] * 0.5;
+				skip_class = nn;
 				mymodel.last_som_add_iter = iter;
+				std::cerr << "Expanding class " << expand_class_idx << std::endl;
 			}
 		}
 	}
+
+	RFLOAT avg_stepsize = 0, avg_stepsize_count = 0;
+
 
 	// First reconstruct the images for each class
 	// multi-body refinement will never get here, as it is only 3D auto-refine and that requires MPI!
 	for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
 	{
+		if (iclass == skip_class)
+			continue;
 		RCTIC(timer,RCT_1);
 		if (mymodel.pdf_class[iclass] > 0. || mymodel.nr_bodies > 1 )
 		{
@@ -4354,13 +4385,16 @@ void MlOptimiser::maximization()
 				{
 					if(do_vmgd) {
 						float _stepsize = vmgd_stepsize;
-						if (do_som)
-						{
-							_stepsize *= wsum_model.som.get_node_activity(iclass);
-							_stepsize *= mymodel.som.get_node_count();
-//							float age = mymodel.som.get_node_age(iclass);
-//							_stepsize *= vmgd_stepsize * pow(10,-age/1000.) + 0.01;  //TODO Should be a parameter
-						}
+
+						float a = 200.;
+
+						_stepsize = vmgd_ini_stepsize - vmgd_fin_stepsize;
+						_stepsize *= 1 / (pow(10, (mymodel.class_age[iclass]-a/2.)/(a/5.)) + 1.);
+						_stepsize += vmgd_fin_stepsize;
+						avg_stepsize += _stepsize;
+						avg_stepsize_count ++;
+						_stepsize *= sqrt(wsum_model.pdf_class[iclass]/wsum_mode_pdf_class_sum) * nr_active_classes/10;
+
 
 						(wsum_model.BPref[iclass]).reconstructGrad(
 								mymodel.Iref[iclass],
@@ -4396,7 +4430,8 @@ void MlOptimiser::maximization()
 
 	RCTIC(timer,RCT_3);
 	// Then perform the update of all other model parameters
-	maximizationOtherParameters();
+	if (!do_vmgd)
+		maximizationOtherParameters();
 	RCTOC(timer,RCT_3);
 	RCTIC(timer,RCT_4);
 	// Keep track of changes in hidden variables
@@ -4404,6 +4439,8 @@ void MlOptimiser::maximization()
 	RCTOC(timer,RCT_4);
 	if (verb > 0)
 		progress_bar(mymodel.nr_classes);
+
+	std::cerr << "Average class stepsize " << avg_stepsize / avg_stepsize_count << std::endl;
 
 }
 
@@ -4490,6 +4527,7 @@ void MlOptimiser::maximizationOtherParameters()
 	// Update model.pdf_class vector (for each k)
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 	{
+		mymodel.class_age[iclass] += wsum_model.pdf_class[iclass];
 
 		// Update pdf_class (for SGD: update with taking mu into account! For non-SGD: mu equals zero)
 		mymodel.pdf_class[iclass] *= mu;
@@ -9007,7 +9045,8 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 		else if (iter < vmgd_ini_iter + vmgd_inbetween_iter)
 		{
 			subset_size = vmgd_ini_subset_size + ROUND((RFLOAT(iter - vmgd_ini_iter)/RFLOAT(vmgd_inbetween_iter))*(vmgd_fin_subset_size-vmgd_ini_subset_size));
-			vmgd_stepsize = vmgd_ini_stepsize + (RFLOAT(iter - vmgd_ini_iter)/RFLOAT(vmgd_inbetween_iter)*(vmgd_fin_stepsize-vmgd_ini_stepsize));
+			//vmgd_stepsize = vmgd_ini_stepsize + (RFLOAT(iter - vmgd_ini_iter)/RFLOAT(vmgd_inbetween_iter)*(vmgd_fin_stepsize-vmgd_ini_stepsize));
+			vmgd_stepsize = (vmgd_ini_stepsize - vmgd_fin_stepsize) * pow(10,-RFLOAT(iter - vmgd_ini_iter)*0.1) + vmgd_fin_stepsize;
 		}
 		else
 		{

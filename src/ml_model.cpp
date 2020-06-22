@@ -49,6 +49,7 @@ void MlModel::initialise(bool _do_mom1, bool _do_mom2)
 	pointer_body_overlap.resize(nr_bodies, nr_bodies);
 	max_radius_mask_bodies.resize(nr_bodies, -1);
 	pdf_class.resize(nr_classes, 1./(RFLOAT)nr_classes);
+	class_age.resize(nr_classes, 0);
 	pdf_direction.resize(nr_classes * nr_bodies);
 	group_names.resize(nr_groups, "");
 	sigma2_noise.resize(nr_groups);
@@ -1597,6 +1598,30 @@ void MlModel::calculateTotalFourierCoverage()
 }
 
 
+void MlModel::reset_class(int class_idx, int to_class_idx) {
+	if (to_class_idx == -1) {
+		Iref[class_idx] *= 0;
+		Igrad1[class_idx] *= 0;
+		Igrad2[class_idx] *= 0;
+		pdf_class[class_idx] = 0;
+		tau2_class[class_idx] *= 0.;
+		data_vs_prior_class[class_idx] *= 0.;
+		pdf_class[class_idx] *= 0;
+		pdf_direction[class_idx] *= 0.;
+	} else {
+		Iref[class_idx] = Iref[to_class_idx];
+		Igrad1[class_idx] = Igrad1[to_class_idx];
+		Igrad2[class_idx] = Igrad2[to_class_idx];
+		pdf_class[class_idx] = pdf_class[to_class_idx];
+		tau2_class[class_idx] = tau2_class[to_class_idx];
+		data_vs_prior_class[class_idx] = data_vs_prior_class[to_class_idx];
+		pdf_class[class_idx] = pdf_class[to_class_idx];
+		pdf_direction[class_idx] = pdf_direction[to_class_idx];
+
+	}
+}
+
+
 /////////// MlWsumModel
 void MlWsumModel::initialise(MlModel &_model, FileName fn_sym, bool asymmetric_padding, bool _skip_gridding)
 {
@@ -1609,6 +1634,7 @@ void MlWsumModel::initialise(MlModel &_model, FileName fn_sym, bool asymmetric_p
 	data_dim = _model.data_dim;
 	ori_size = _model.ori_size;
 	pdf_class = _model.pdf_class;
+	class_age = _model.class_age;
 	if (ref_dim == 2)
 		prior_offset_class = _model.prior_offset_class;
 	pdf_direction = _model.pdf_direction;
@@ -1693,6 +1719,7 @@ void MlWsumModel::initZeros()
 	for (int iclass = 0; iclass < nr_classes; iclass++)
 	{
 		pdf_class[iclass] = 0.;
+		class_age[iclass] = 0.;
 		if (ref_dim == 2)
 			prior_offset_class[iclass].initZeros();
 	}

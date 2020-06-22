@@ -289,7 +289,6 @@ public:
 				continue;
 			float w = _edges_activity[_nodes.size() * node + i];
 			if (w > neighbour_threshold) {
-				w = 1;
 				out.push_back(std::pair<unsigned, float>(i, w));
 				weight_sum += w;
 			}
@@ -384,6 +383,47 @@ public:
 		return list;
 
 	}
+
+	template<typename T>
+	static void make_blobs_2d(MultidimArray<T> &box, MultidimArray<T> &amp_box, unsigned nr_blobs, T diameter)
+	{
+		std::vector<T> blobs_x(nr_blobs), blobs_y(nr_blobs), blobs_amp(nr_blobs);
+		box.resize(amp_box);
+		box.initZeros();
+
+		T v1, v2;
+		for (int i = 0; i < nr_blobs; i ++) {
+			// Generate normal distributed random value
+			v1 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
+			v2 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
+			blobs_x[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter/7. + box.xdim/2.;
+			v1 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
+			v2 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
+			blobs_y[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter/7. + box.ydim/2.;
+		}
+
+		for (int i = 0; i < nr_blobs; i ++) {
+			T avg = 0;
+			int count = 0;
+			for (int y = XMIPP_MAX(0, blobs_y[i]-2); y < XMIPP_MIN(box.ydim, blobs_y[i]+2); y ++)
+				for (int x = XMIPP_MAX(0, blobs_x[i]-2); x < XMIPP_MIN(box.xdim, blobs_x[i]+2); x ++) {
+					avg += abs(amp_box.data[y * amp_box.xdim + x]);
+					count ++;
+				}
+			if (count > 0)
+				blobs_amp[i] = XMIPP_MAX(avg / count, 0.5);
+		}
+
+		T sigma_inv = 10./diameter;
+		for (int y = 0; y < box.ydim; y ++)
+			for (int x = 0; x < box.xdim; x ++)
+				for (int i = 0; i < nr_blobs; i ++) {
+					T xp = (x-blobs_x[i]) * sigma_inv;
+					T yp = (y-blobs_y[i]) * sigma_inv;
+					box.data[y * box.xdim + x] += exp(-xp*xp -yp*yp) * blobs_amp[i];
+				}
+	}
+
 };
 
 #endif
