@@ -67,7 +67,9 @@ class ctf_toolbox_parameters
 		Q0 = textToFloat(parser.getOption("--Q0", "Amplitude contrast", "0.1"));
 		Cs = textToFloat(parser.getOption("--Cs", "Spherical aberration (mm)", "2.7"));
 		defU = textToFloat(parser.getOption("--defU", "Defocus in U-direction (A)", "20000"));
-		defV = textToFloat(parser.getOption("--defU", "Defocus in V-direction (A, default = defU)", "-1."));
+		defV = textToFloat(parser.getOption("--defV", "Defocus in V-direction (A, default = defU)", "-1."));
+		if (defV < 0)
+			defV = defU;
 		defAng = textToFloat(parser.getOption("--defAng", "Defocus angle (deg)", "0."));
 		phase_shift  = textToFloat(parser.getOption("--phase_shift", "Phase shift (deg)", "0."));
 
