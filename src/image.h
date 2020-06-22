@@ -1315,6 +1315,7 @@ public:
 	{
 		int err = 0;
 
+#ifdef HAVE_TIFF
 		TiffInMemory handle;
 		handle.buf = (unsigned char*)buf;
 		handle.size = size;
@@ -1329,7 +1330,6 @@ public:
 		MDMainHeader.clear();
 		MDMainHeader.addObject();
 
-#ifdef HAVE_TIFF
 		TIFF* ftiff = TIFFClientOpen("in-memory-tiff", "r", (thandle_t)&handle,
 		                             TiffInMemoryReadProc, TiffInMemoryWriteProc, TiffInMemorySeekProc,
 		                             TiffInMemoryCloseProc, TiffInMemorySizeProc, TiffInMemoryMapFileProc,

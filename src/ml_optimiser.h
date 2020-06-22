@@ -509,6 +509,9 @@ public:
 	// Initial helical rise in Angstroms
 	RFLOAT helical_rise_initial;
 
+	// N-number of an N-start helix (only for rotational priors, a la KThurber)
+	int helical_nstart;
+
 	// Only expand this amount of Z axis proportion to full when imposing real space helical symmetry
 	RFLOAT helical_z_percentage;
 

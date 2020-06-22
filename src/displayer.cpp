@@ -1380,7 +1380,7 @@ void regroupSelectedParticles(MetaDataTable &MDdata, MetaDataTable &MDgroups, in
 	long average_group_size = nr_parts / nr_regroups;
 	if (average_group_size < 10)
 		REPORT_ERROR("Each group should have at least 10 particles");
-	int fillgroupschar = (int)(floor(log(average_group_size) / log(10))) + 1;
+	int fillgroupschar = (int)(floor(log(nr_regroups) / log(10))) + 1;
 
 	std::map<long, std::string> new_group_names;
 	std::map<long, std::string>::iterator it;
