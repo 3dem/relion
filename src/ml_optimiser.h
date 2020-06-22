@@ -637,6 +637,9 @@ public:
 	//Maximum number of particles permitted to be drop, due to zero sum of weights, before exiting with an error (GPU only).
 	int failsafe_threshold;
 
+	// Trust box size and angpix for the input reference
+	bool do_trust_ref_size;
+
 #ifdef TIMING
 	Timer timer;
 	int TIMING_DIFF_PROJ, TIMING_DIFF_SHIFT, TIMING_DIFF_DIFF2;
@@ -769,7 +772,8 @@ public:
 		tbbSchedulerInit(tbb::task_scheduler_init::deferred ),
 		mdlClassComplex(NULL),
 #endif
-		failsafe_threshold(40)
+		failsafe_threshold(40),
+		do_trust_ref_size(0)
 	{
 #ifdef ALTCPU
 		tbbCpuOptimiser = CpuOptimiserType((void*)NULL);
