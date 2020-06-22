@@ -42,7 +42,7 @@
 #include "src/macros.h"
 #include "src/error.h"
 #include "src/ml_optimiser.h"
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 #include "src/acc/cuda/cuda_ml_optimiser.h"
 #include <nvToolsExt.h>
 #include <cuda_profiler_api.h>
@@ -70,7 +70,7 @@ void globalThreadExpectationSomeParticles(ThreadArgument &thArg)
 
 	try
 	{
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 		if (MLO->do_gpu)
 			((MlOptimiserCuda*) MLO->cudaOptimisers[thArg.thread_id])->doThreadExpectationSomeParticles(thArg.thread_id);
 		else
@@ -410,8 +410,8 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
-#ifndef CUDA
-	if(do_gpu)
+#ifndef _CUDA_ENABLED
+if(do_gpu)
 	{
 		std::cerr << "+ WARNING : Relion was compiled without CUDA of at least version 7.0 - you do NOT have support for GPUs" << std::endl;
 		do_gpu = false;
@@ -677,8 +677,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
-#ifndef CUDA
-	if(do_gpu)
+#ifndef _CUDA_ENABLED
+if(do_gpu)
 	{
 		std::cerr << "+ WARNING : Relion was compiled without CUDA of at least version 7.0 - you do NOT have support for GPUs" << std::endl;
 		do_gpu = false;
@@ -1181,7 +1181,7 @@ void MlOptimiser::initialise()
 
 	if (do_gpu)
 	{
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 		int devCount;
 		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 
@@ -2764,7 +2764,7 @@ void MlOptimiser::expectation()
 	std::cerr << "Expectation: done setupCheckMemory" << std::endl;
 #endif
 
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	/************************************************************************/
 	//GPU memory setup
 
@@ -2965,7 +2965,7 @@ void MlOptimiser::expectation()
 	if (verb > 0)
 		progress_bar(my_nr_particles);
 
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	if (do_gpu)
 	{
 		for (int i = 0; i < accDataBundles.size(); i ++)

@@ -1672,7 +1672,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 			//Set all device-located weights to zero, and only the smallest one to 1.
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 			DEBUG_HANDLE_ERROR(cudaMemsetAsync(~(PassWeights[img_id].weights), 0.f, PassWeights[img_id].weights.getSize()*sizeof(XFLOAT),0));
 
 			XFLOAT unity=1;

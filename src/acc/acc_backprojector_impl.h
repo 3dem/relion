@@ -32,7 +32,7 @@ size_t AccBackprojector::setMdlDim(
 		padding_factor = paddingFactor;
 
 		//Allocate space for model
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 		HANDLE_ERROR(cudaMalloc( (void**) &d_mdlReal,   mdlXYZ * sizeof(XFLOAT)));
 		HANDLE_ERROR(cudaMalloc( (void**) &d_mdlImag,   mdlXYZ * sizeof(XFLOAT)));
 		HANDLE_ERROR(cudaMalloc( (void**) &d_mdlWeight, mdlXYZ * sizeof(XFLOAT)));
@@ -67,7 +67,7 @@ void AccBackprojector::initMdl()
 #endif
 
 	//Initiate model with zeros
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	DEBUG_HANDLE_ERROR(cudaMemset( d_mdlReal,   0, mdlXYZ * sizeof(XFLOAT)));
 	DEBUG_HANDLE_ERROR(cudaMemset( d_mdlImag,   0, mdlXYZ * sizeof(XFLOAT)));
 	DEBUG_HANDLE_ERROR(cudaMemset( d_mdlWeight, 0, mdlXYZ * sizeof(XFLOAT)));
@@ -83,7 +83,7 @@ void AccBackprojector::initMdl()
 
 void AccBackprojector::getMdlData(XFLOAT *r, XFLOAT *i, XFLOAT * w)
 {
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(stream)); //Make sure to wait for remaining kernel executions
 
 	DEBUG_HANDLE_ERROR(cudaMemcpyAsync( r, d_mdlReal,   mdlXYZ * sizeof(XFLOAT), cudaMemcpyDeviceToHost, stream));
@@ -100,7 +100,7 @@ void AccBackprojector::getMdlData(XFLOAT *r, XFLOAT *i, XFLOAT * w)
 
 void AccBackprojector::getMdlDataPtrs(XFLOAT *& r, XFLOAT *& i, XFLOAT *& w)
 {
-#ifndef CUDA
+#ifndef _CUDA_ENABLED
 	r = d_mdlReal;
 	i = d_mdlImag;
 	w = d_mdlWeight;
@@ -122,7 +122,7 @@ void AccBackprojector::clear()
 
 	if (d_mdlReal != NULL)
 	{
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 		DEBUG_HANDLE_ERROR(cudaFree(d_mdlReal));
 		DEBUG_HANDLE_ERROR(cudaFree(d_mdlImag));
 		DEBUG_HANDLE_ERROR(cudaFree(d_mdlWeight));

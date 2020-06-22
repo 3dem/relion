@@ -5,20 +5,20 @@
 
 #ifdef ACC_DOUBLE_PRECISION
 	#define XFLOAT double
-	#ifndef CUDA
-		typedef struct{ XFLOAT x; XFLOAT y;} double2;
+	#ifndef _CUDA_ENABLED
+typedef struct{ XFLOAT x; XFLOAT y;} double2;
 	#endif
 	#define ACCCOMPLEX double2
 #else
 	#define XFLOAT float
-	#ifndef CUDA
+	#ifndef _CUDA_ENABLED
 		typedef struct{ XFLOAT x; XFLOAT y;} float2;
 	#endif
 	#define ACCCOMPLEX float2
 #endif
 #ifdef ALTCPU
-	#ifndef CUDA
-		typedef float cudaStream_t;
+	#ifndef _CUDA_ENABLED
+typedef float cudaStream_t;
 		typedef double CudaCustomAllocator;
 		#define cudaStreamPerThread 0
 	#endif

@@ -639,7 +639,7 @@ void runBackProjectKernel(
 
 	if(BP.mdlZ==1)
 	{
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 		if(ctf_premultiplied)
 			cuda_kernel_backproject2D<true><<<imageCount,BP_2D_BLOCK_SIZE,0,optStream>>>(
 				d_img_real, d_img_imag,
@@ -689,7 +689,7 @@ void runBackProjectKernel(
 		if(do_sgd)
 		{
 			if(data_is_3D)
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 				if(ctf_premultiplied)
 					cuda_kernel_backprojectSGD<true, true><<<imageCount,BP_DATA3D_BLOCK_SIZE,0,optStream>>>(
 						projector, d_img_real, d_img_imag,
@@ -734,7 +734,7 @@ void runBackProjectKernel(
 
 #endif
 			else
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 				if(ctf_premultiplied)
 					cuda_kernel_backprojectSGD<false, true><<<imageCount,BP_REF3D_BLOCK_SIZE,0,optStream>>>(
 						projector, d_img_real, d_img_imag,
@@ -782,7 +782,7 @@ void runBackProjectKernel(
 		else
 		{
 			if(data_is_3D)
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 				if(ctf_premultiplied)
 					cuda_kernel_backproject3D<true, true><<<imageCount,BP_DATA3D_BLOCK_SIZE,0,optStream>>>(
 						d_img_real, d_img_imag,
@@ -828,7 +828,7 @@ void runBackProjectKernel(
 
 #endif
 			else
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 			    if(ctf_premultiplied)
 					cuda_kernel_backproject3D<false, true><<<imageCount,BP_REF3D_BLOCK_SIZE,0,optStream>>>(
 						d_img_real, d_img_imag,
@@ -914,7 +914,7 @@ void mapAllWeightsToMweights(
 {
 	size_t combinations = orientation_num*translation_num;
 	int grid_size = ceil((float)(combinations)/(float)WEIGHT_MAP_BLOCK_SIZE);
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	cuda_kernel_allweights_to_mweights<<< grid_size, WEIGHT_MAP_BLOCK_SIZE, 0, stream >>>(
 			d_iorient,
 			d_allweights,
@@ -1630,7 +1630,7 @@ void runCollect2jobs(	int grid_dim,
 						)
 {
 	if (data_is_3D) {
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	dim3 numblocks(grid_dim);
 	size_t shared_buffer = sizeof(XFLOAT)*SUMW_BLOCK_SIZE*5; // x+y+z+myp+weights
 	cuda_kernel_collect2jobs<true><<<numblocks,SUMW_BLOCK_SIZE,shared_buffer>>>(
@@ -1682,7 +1682,7 @@ void runCollect2jobs(	int grid_dim,
 	}
 	else
 	{
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	dim3 numblocks(grid_dim);
 	size_t shared_buffer = sizeof(XFLOAT)*SUMW_BLOCK_SIZE*4; // x+y+myp+weights
 	cuda_kernel_collect2jobs<false><<<numblocks,SUMW_BLOCK_SIZE,shared_buffer>>>(
@@ -1804,7 +1804,7 @@ void windowFourierTransform2(
 	if(oX==iX)
 	{
 		HANDLE_ERROR(cudaStreamSynchronize(d_in.getStream()));
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 		cudaCpyDeviceToDevice(&d_in(pos), ~d_out, oX*oY*oZ*Npsi, d_out.getStream() );
 #else
 		memcpy(&d_out[0], &d_in[0], oX*oY*oZ*Npsi*sizeof(ACCCOMPLEX));
@@ -1816,7 +1816,7 @@ void windowFourierTransform2(
 	{
 		long int max_r2 = (iX - 1) * (iX - 1);
 
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 		dim3 grid_dim(ceil((float)(iX*iY*iZ) / (float) WINDOW_FT_BLOCK_SIZE),Npsi);
 		cuda_kernel_window_fourier_transform<true><<< grid_dim, WINDOW_FT_BLOCK_SIZE, 0, d_out.getStream() >>>(
 				&d_in(pos),
@@ -1843,7 +1843,7 @@ void windowFourierTransform2(
 	}
 	else
 	{
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 		dim3 grid_dim(ceil((float)(oX*oY*oZ) / (float) WINDOW_FT_BLOCK_SIZE),Npsi);
 		cuda_kernel_window_fourier_transform<false><<< grid_dim, WINDOW_FT_BLOCK_SIZE, 0, d_out.getStream() >>>(
 				&d_in(pos),

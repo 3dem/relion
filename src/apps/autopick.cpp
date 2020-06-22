@@ -18,7 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include <src/autopicker.h>
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 #include <src/acc/cuda/cuda_autopicker.h>
 #endif
 
@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
 
 		prm.initialise();
 
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 		if (prm.do_gpu)
 		{
 			std::stringstream didSs;
