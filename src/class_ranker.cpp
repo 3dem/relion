@@ -412,6 +412,8 @@ void ClassRanker::read(int argc, char **argv, int rank)
 	fn_sel_parts = parser.getOption("--fn_sel_parts", "Filename for output star file with selected particles", "particles.star");
 	fn_sel_classavgs = parser.getOption("--fn_sel_classavgs", "Filename for output star file with selected class averages", "class_averages.star");
 
+	fn_torch_model = parser.getOption("--fn_torch_model", "Filename for the serialized Torch model.", ""); // Default should be compile-time defined
+
 	// Check for errors in the command-line option
 	if (radius > 0 && radius < 1)
 		REPORT_ERROR("Incorrect value(s) for inner_radius / outer_radius. Try inner_radius_ratio / outer_radius_ratio.");
@@ -1679,6 +1681,33 @@ void ClassRanker::writeFeatures()
 
 }
 
+float ClassRanker::deployTorchModel(FileName &model_path, std::vector<float> &features) {
+
+#ifdef _TORCH_ENABLED
+	torch::jit::script::Module module;
+
+	// Deserialize model
+	try {
+		module = torch::jit::load(model_path);
+	}
+	catch (const c10::Error& e) {
+		REPORT_ERROR("Error loading Torch model.");
+	}
+
+	// Create an inputs with batch size=1.
+	std::vector<torch::jit::IValue> inputs;
+	inputs.push_back(features);
+
+	// Execute the model and turn its output into a tensor.
+	at::Tensor output = module.forward(inputs).toTensor();
+
+	// Extract score value from tensor and return
+	return output[0][0].item<float>();
+
+#else //_TORCH_ENABLED
+	REPORT_ERROR("RELION was not compiled with Torch support.\nConfigure with -DTORCH=ON and re-compile.");
+#endif //_TORCH_ENABLED
+}
 
 void ClassRanker::performRanking()
 {
@@ -1715,9 +1744,8 @@ void ClassRanker::performRanking()
 	std::vector<int> selected_classes;
 	for (int i = 0; i < features_all_classes.size(); i++)
 	{
-		/// Here execute the neural network! (for now just use class_score to test code...)
-	        /// DARI to insert function
-	        //RFLOAT myscore = executePyTorchModel(features_all_classes[i]);
+		std::vector<float> feature_vector = features_all_classes[i].toVector();
+		RFLOAT myscore = (RFLOAT) deployTorchModel(fn_torch_model, feature_vector);
 
 		if (do_select && myscore >= select_min_score && myscore <= select_max_score)
 		{
@@ -1794,10 +1822,4 @@ void ClassRanker::performRanking()
 		}
 
 	}
-
-
-	return;
 }
-
-
-

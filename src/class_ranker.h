@@ -24,6 +24,10 @@
 #include <stack>
 #include "src/ml_optimiser.h"
 
+#ifdef _TORCH_ENABLED
+#include <torch/script.h> // One-stop header.
+#endif //_TORCH_ENABLED
+
 // This contains 4 moments for an image
 class moments
 {
@@ -157,6 +161,47 @@ public:
 		return *this;
 	}
 
+	std::vector<float> toVector() {
+		std::vector<float> out(28);
+
+		// Order matters
+		out[0] =  class_distribution;
+		out[1] =  accuracy_rotation;
+		out[2] =  accuracy_translation;
+		out[3] =  estimated_resolution;
+		out[4] =  edge_signal;
+		out[5] =  scattered_signal;
+		out[6] =  weighted_resolution;
+		out[7] =  relative_resolution;
+
+		out[8] =  lowpass_filtered_img_avg;
+		out[9] =  lowpass_filtered_img_stddev;
+		out[10] = lowpass_filtered_img_minval;
+		out[11] = lowpass_filtered_img_maxval;
+
+		out[12] = circular_mask_moments.mean;
+		out[13] = circular_mask_moments.stddev;
+		out[14] = circular_mask_moments.skew;
+		out[15] = circular_mask_moments.kurt;
+
+		out[16] = ring_moments.mean;
+		out[17] = ring_moments.stddev;
+		out[18] = ring_moments.skew;
+		out[19] = ring_moments.kurt;
+
+		out[20] = protein_moments.mean;
+		out[21] = protein_moments.stddev;
+		out[22] = protein_moments.skew;
+		out[23] = protein_moments.kurt;
+
+		out[24] = solvent_moments.mean;
+		out[25] = solvent_moments.stddev;
+		out[26] = solvent_moments.skew;
+		out[27] = solvent_moments.kurt;
+
+		return out;
+    }
+
 };
 
 class ZernikeMomentsExtractor
@@ -234,6 +279,8 @@ public:
 	MetaDataTable MD_optimiser, MD_select;
 	std::vector<classFeatures> features_all_classes, preread_features_all_classes;
 
+	FileName fn_torch_model;
+
 public:
 
 	ClassRanker(){}
@@ -291,7 +338,8 @@ private:
 
 	void writeFeatures();
 
-	void performRanking();
+	float deployTorchModel(FileName &model_path, std::vector<float> &features);
 
+	void performRanking();
 };
 #endif /* CLASS_RANKER_H_ */

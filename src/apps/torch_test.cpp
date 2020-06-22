@@ -28,7 +28,7 @@ int main(int argc, const char* argv[]) {
 
 	// Execute the model and turn its output into a tensor.
 	at::Tensor output = module.forward(inputs).toTensor();
-	std::cout << output.slice(/*dim=*/1, /*start=*/0, /*end=*/1) << '\n';
+	std::cout << output[0][0].item<float>() << '\n';
 
 	std::cout << "ok\n";
 #endif //_TORCH_ENABLED
