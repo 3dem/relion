@@ -695,7 +695,10 @@ class image_handler_parameters
 	{
 		my_new_box_size = -1;
 
-		bool input_is_stack = (fn_in.getExtension() == "mrcs" || fn_in.getExtension() == "tif" || fn_in.getExtension() == "tiff") && !fn_in.contains("@");
+		long int slice_id;
+		std::string fn_stem;
+		fn_in.decompose(slice_id, fn_stem);
+		bool input_is_stack = (fn_in.getExtension() == "mrcs" || fn_in.getExtension() == "tif" || fn_in.getExtension() == "tiff") && (slice_id == -1);
 		bool input_is_star = (fn_in.getExtension() == "star");
 		// By default: write single output images
 
