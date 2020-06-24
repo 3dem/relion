@@ -1196,20 +1196,20 @@ void SpaBackproject::reconstructDualContrast()
 				dual_contrast_accumulation_volumes[half], // out
 				true, num_threads_total);
 
-		std::pair<BufferedImage<RFLOAT>,BufferedImage<RFLOAT>> dualContrastMaps =
+		DualContrastSolution<RFLOAT> dualContrastSolution =
 			Reconstruction::solveDualContrast(
 				dual_contrast_accumulation_volumes[half],
 				SNR, dual_contrast_lambda, do_isotropic_Wiener, num_threads_total);
 
-		dualContrastMaps.first.write(fn_out+"_half"+ZIO::itoa(half+1)+"_phase.mrc", angpix);
-		dualContrastMaps.second.write(fn_out+"_half"+ZIO::itoa(half+1)+"_amplitude.mrc", angpix);
+		dualContrastSolution.phase.write(fn_out+"_half"+ZIO::itoa(half+1)+"_phase.mrc", angpix);
+		dualContrastSolution.amplitude.write(fn_out+"_half"+ZIO::itoa(half+1)+"_amplitude.mrc", angpix);
 
 		if (needs_cropping)
 		{
-			Padding::unpadCenter3D_full(dualContrastMaps.first, margin).
+			Padding::unpadCenter3D_full(dualContrastSolution.phase, margin).
 					write(fn_out+"_half"+ZIO::itoa(half+1)+"_phase_cropped.mrc", angpix);
 
-			Padding::unpadCenter3D_full(dualContrastMaps.second, margin).
+			Padding::unpadCenter3D_full(dualContrastSolution.amplitude, margin).
 					write(fn_out+"_half"+ZIO::itoa(half+1)+"_amplitude_cropped.mrc", angpix);
 		}
 	}
@@ -1222,21 +1222,73 @@ void SpaBackproject::reconstructDualContrast()
 			accumulation_volume_both,
 			true, num_threads_total);
 
-	std::pair<BufferedImage<RFLOAT>,BufferedImage<RFLOAT>> dualContrastMaps =
+	DualContrastSolution<RFLOAT> dualContrastSolution =
 		Reconstruction::solveDualContrast(
 			accumulation_volume_both,
 			SNR, dual_contrast_lambda, do_isotropic_Wiener, num_threads_total);
 
-	dualContrastMaps.first.write(fn_out+"_phase.mrc", angpix);
-	dualContrastMaps.second.write(fn_out+"_amplitude.mrc", angpix);
+	dualContrastSolution.phase.write(fn_out+"_phase.mrc", angpix);
+	dualContrastSolution.amplitude.write(fn_out+"_amplitude.mrc", angpix);
 
 	if (needs_cropping)
 	{
-		Padding::unpadCenter3D_full(dualContrastMaps.first, margin).
+		Padding::unpadCenter3D_full(dualContrastSolution.phase, margin).
 				write(fn_out+"_phase_cropped.mrc", angpix);
 
-		Padding::unpadCenter3D_full(dualContrastMaps.second, margin).
+		Padding::unpadCenter3D_full(dualContrastSolution.amplitude, margin).
 				write(fn_out+"_amplitude_cropped.mrc", angpix);
+	}
+
+	{
+		std::ofstream conditionFile(fn_out+"_condition.dat");
+
+		const int n = dualContrastSolution.conditionPerShell.size();
+
+		for (int i = 0; i < n; i++)
+		{
+			conditionFile << i << ' '
+				<< dualContrastSolution.conditionPerShell[i].minimum
+				<< '\n';
+		}
+
+		conditionFile << '\n';
+
+		for (int i = 0; i < n; i++)
+		{
+			conditionFile << i << ' '
+				<< (  dualContrastSolution.conditionPerShell[i].mean
+					- dualContrastSolution.conditionPerShell[i].std_deviation)
+				<< '\n';
+		}
+
+		conditionFile << '\n';
+
+		for (int i = 0; i < n; i++)
+		{
+			conditionFile << i << ' '
+				<< dualContrastSolution.conditionPerShell[i].mean
+				<< '\n';
+		}
+
+		conditionFile << '\n';
+
+		for (int i = 0; i < n; i++)
+		{
+			conditionFile << i << ' '
+				<< (  dualContrastSolution.conditionPerShell[i].mean
+					+ dualContrastSolution.conditionPerShell[i].std_deviation)
+				<< '\n';
+		}
+
+		conditionFile << '\n';
+
+		for (int i = 0; i < n; i++)
+		{
+			conditionFile << i << ' '
+				<< dualContrastSolution.conditionPerShell[i].maximum << '\n';
+		}
+
+		conditionFile << '\n';
 	}
 }
 

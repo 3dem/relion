@@ -9,12 +9,19 @@ class DualContrastVoxel
 {
 	public:
 
+		struct Solution
+		{
+			tComplex<T> phase, amplitude;
+			T conditionNumber;
+		};
+
+
 		DualContrastVoxel();
 
 			tComplex<T> data_sin, data_cos;
 			T weight_sin2, weight_sin_cos, weight_cos2;
 
-		std::pair<tComplex<T>, tComplex<T>> solve(
+		Solution solve(
 				double WienerOffset,
 				double lambda,
 				bool isotropicWiener = true);
@@ -77,7 +84,8 @@ DualContrastVoxel<T> :: DualContrastVoxel()
 }
 
 template <typename T>
-std::pair<tComplex<T>, tComplex<T>> DualContrastVoxel<T> :: solve(
+typename DualContrastVoxel<T>::Solution
+	DualContrastVoxel<T>::solve(
 		double WienerOffset, double lambda, bool isotropicWiener)
 {
 	const double Q0 = 0.07;
@@ -110,6 +118,38 @@ std::pair<tComplex<T>, tComplex<T>> DualContrastVoxel<T> :: solve(
 	A(0,1) += lambda * Q0;
 	A(1,1) += lambda;
 
+	Solution out;
+
+	/*
+	  Find eigenvalues of A:
+
+	  det(A-tI) = 0
+	  = (a00-t)*(a11-t) - a01*a10
+	  = t² - (a00+a11)*t + a00*a11 - a01*a10
+	   <=>
+	  t = [a00+a11 +- sqrt((a00+a11)² - 4(a00*a11 - a01*a10))] / 2
+	*/
+
+	{
+		const double a00 = A(0,0);
+		const double a01 = A(0,1);
+		const double a10 = A(1,0);
+		const double a11 = A(1,1);
+
+		const double discr = (a00+a11) * (a00+a11) - 4.0 * (a00*a11 - a01*a10);
+
+		if (discr >= 0)
+		{
+			const double eig0 = (a00+a11 - sqrt(discr)) / 2.0;
+			const double eig1 = (a00+a11 + sqrt(discr)) / 2.0;
+
+			out.conditionNumber = eig0 / eig1;
+		}
+		else
+		{
+			out.conditionNumber = 0.0;
+		}
+	}
 
 	const double det = A(0,0) * A(1,1) - A(0,1) * A(1,0);
 
@@ -124,16 +164,17 @@ std::pair<tComplex<T>, tComplex<T>> DualContrastVoxel<T> :: solve(
 		const gravis::t2Vector<T> out_real = A_inv * data_real;
 		const gravis::t2Vector<T> out_imag = A_inv * data_imag;
 
-		return std::make_pair(
-			tComplex<T>(-out_real[0], -out_imag[0]),
-			tComplex<T>(out_real[1], out_imag[1]));
+		out.phase = tComplex<T>(-out_real[0], -out_imag[0]);
+		out.amplitude = tComplex<T>(out_real[1], out_imag[1]);
 	}
 	else
 	{
-		return std::make_pair(
-			tComplex<T>(0,0),
-			tComplex<T>(0,0));
+
+		out.phase = tComplex<T>(0,0);
+		out.amplitude = tComplex<T>(0,0);
 	}
+
+	return out;
 }
 
 

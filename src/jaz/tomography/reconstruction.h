@@ -29,6 +29,7 @@
 #include <src/jaz/image/interpolation.h>
 #include <src/jaz/image/radial_avg.h>
 #include <src/jaz/optics/dual_contrast/dual_contrast_voxel.h>
+#include <src/jaz/optics/dual_contrast/dual_contrast_solution.h>
 #include "extraction.h"
 #include "tomo_stack.h"
 
@@ -70,7 +71,7 @@ class Reconstruction
 				int num_threads = 1);
 
 		template <typename T>
-		static std::pair<BufferedImage<T>,BufferedImage<T>> solveDualContrast(
+		static DualContrastSolution<T> solveDualContrast(
 				BufferedImage<DualContrastVoxel<T>>& image,
 				double SNR = 1,
 				double lambda = 0,
@@ -379,7 +380,7 @@ void Reconstruction :: ctfCorrect3D_heuristic(
 }
 
 template<typename T>
-std::pair<BufferedImage<T>, BufferedImage<T>>
+DualContrastSolution<T>
 	Reconstruction::solveDualContrast(
 		BufferedImage<DualContrastVoxel<T>>& image,
 		double SNR,
@@ -395,25 +396,91 @@ std::pair<BufferedImage<T>, BufferedImage<T>>
 	const double WienerOffset = SNR > 0.0? 1.0 / SNR : 0.0;
 
 	BufferedImage<tComplex<T>> phaseOutFS(wh,h,d), ampOutFS(wh,h,d);
+	BufferedImage<T> conditionNumber(wh,h,d);
+
 
 	#pragma omp parallel for num_threads(num_threads)
 	for (long int z = 0; z < d;  z++)
 	for (long int y = 0; y < h;  y++)
 	for (long int x = 0; x < wh; x++)
 	{
-		std::pair<tComplex<T>,tComplex<T>> mu = image(x,y,z).solve(
+		typename DualContrastVoxel<T>::Solution X = image(x,y,z).solve(
 					WienerOffset, lambda, isotropicWiener);
 
-		phaseOutFS(x,y,z) = mu.first;
-		ampOutFS(x,y,z)   = mu.second;
+		phaseOutFS(x,y,z) = X.phase;
+		ampOutFS(x,y,z)   = X.amplitude;
+
+		conditionNumber(x,y,z) = X.conditionNumber;
 	}
 
-	BufferedImage<T> phaseOutRS(w,h,d), ampOutRS(w,h,d);
+	DualContrastSolution<T> out(w,h,d);
 
-	FFT::inverseFourierTransform(phaseOutFS, phaseOutRS, FFT::Both);
-	FFT::inverseFourierTransform(ampOutFS, ampOutRS, FFT::Both);
+	FFT::inverseFourierTransform(phaseOutFS, out.phase, FFT::Both);
+	FFT::inverseFourierTransform(ampOutFS, out.amplitude, FFT::Both);
 
-	return std::make_pair(phaseOutRS, ampOutRS);
+
+	std::vector<int> shellVolume(wh, 0.0);
+
+	for (long int z = 0; z < d;  z++)
+	for (long int y = 0; y < h;  y++)
+	for (long int x = 0; x < wh; x++)
+	{
+		const double r = RadialAvg::get1DIndex(x,y,z, w,h,d);
+		const int ri = (int)(r + 0.5);
+
+		if (ri >= wh) continue;
+
+		const double c = conditionNumber(x,y,z);
+
+		if (out.conditionPerShell[ri].maximum < c)
+		{
+			out.conditionPerShell[ri].maximum = c;
+		}
+
+		if (out.conditionPerShell[ri].minimum > c)
+		{
+			out.conditionPerShell[ri].minimum = c;
+		}
+
+		out.conditionPerShell[ri].mean += c;
+
+		shellVolume[ri]++;
+	}
+
+	for (int r = 0; r < wh; r++)
+	{
+		if (shellVolume[r] > 0)
+		{
+			out.conditionPerShell[r].mean /= shellVolume[r];
+		}
+	}
+
+	std::vector<double> shellVariance(wh, 0.0);
+
+	for (long int z = 0; z < d;  z++)
+	for (long int y = 0; y < h;  y++)
+	for (long int x = 0; x < wh; x++)
+	{
+		const double r = RadialAvg::get1DIndex(x,y,z, w,h,d);
+		const int ri = (int)(r + 0.5);
+
+		if (ri >= wh) continue;
+
+		const double d = conditionNumber(x,y,z) - out.conditionPerShell[ri].mean;
+
+		shellVariance[ri] += d * d;
+	}
+
+	for (int r = 0; r < wh; r++)
+	{
+		if (shellVolume[r] > 1)
+		{
+			shellVariance[r] /= (shellVolume[r] - 1);
+			out.conditionPerShell[r].std_deviation = sqrt(shellVariance[r]);
+		}
+	}
+
+	return out;
 }
 
 template <typename T>

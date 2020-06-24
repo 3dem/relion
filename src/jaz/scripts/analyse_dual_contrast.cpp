@@ -237,6 +237,18 @@ void plotEllipse(
 	centre.AddDataPoint(CDataPoint(ellipse.mean.x, ellipse.mean.y));
 
 	plot2D.AddDataSet(centre);
+
+
+	CDataSet centre_outline;
+
+	centre_outline.SetDrawMarker(true);
+	centre_outline.SetDrawLine(false);
+	centre_outline.SetMarkerSize(marker_size + 1);
+	centre_outline.SetDatasetColor(0, 0, 0);
+	centre_outline.SetDrawMarkerFilled(false);
+	centre_outline.AddDataPoint(CDataPoint(ellipse.mean.x, ellipse.mean.y));
+
+	plot2D.AddDataSet(centre_outline);
 }
 
 std::map<std::string, std::vector<d2Vector>> mergeElementClouds(
@@ -306,11 +318,106 @@ double fitSlope(const std::vector<d2Vector>& cloud)
 	return num / denom;
 }
 
+void plotAllAtoms(
+	std::map<std::string, std::set<std::string>> element_to_names,
+	std::map<std::string,std::vector<d2Vector>> coords_by_name,
+	std::map<std::string, dRGB> element_colours,
+	double ellipse_line_width,
+	bool plot_window_set,
+	d2Vector plot_start,
+	d2Vector plot_end,
+	const std::string& out_path,
+	const std::string& tag)
+{
+	std::ofstream element_angles_file(out_path+"element_angles_" + tag + ".txt");
+	element_angles_file << "element  slope  angle [degrees]\n";
+
+	CPlot2D all_atoms_plot("");
+
+	std::map<std::string, std::vector<d2Vector>> all_element_coords;
+
+	for (std::map<std::string, std::set<std::string>>::iterator it =
+		 element_to_names.begin(); it != element_to_names.end(); it++)
+	{
+		std::string element = it->first;
+		std::set<std::string>& names = it->second;
+
+		std::vector<d2Vector>& all_coords = all_element_coords[element];
+
+		for (std::set<std::string>::iterator it2 = names.begin();
+			 it2 != names.end(); it2++)
+		{
+			const std::string atom_name = *it2;
+			const std::vector<d2Vector>& coords = coords_by_name[atom_name];
+			all_coords.insert(all_coords.end(), coords.begin(), coords.end());
+		}
+
+		dRGB full_colour = element_colours[element];
+		const double fade = 0.67;
+		dRGB faded_colour = (1 - fade) * full_colour + fade * dRGB(1,1,1);
+
+		plotCloud(all_atoms_plot, all_coords, 1, faded_colour, true);
+
+		const double slope = fitSlope(all_coords);
+		const double angle_deg = RAD2DEG(atan(slope));
+
+		element_angles_file << element << ": " << slope << ' ' << angle_deg << '\n';
+	}
+
+	for (std::map<std::string, std::vector<d2Vector>>::iterator it =
+		 all_element_coords.begin(); it != all_element_coords.end(); it++)
+	{
+		std::string element = it->first;
+		std::vector<d2Vector>& all_coords = it->second;
+
+		Ellipse ellipse = fitEllipse(all_coords);
+
+		dRGB colour = element_colours[element];
+
+		CDataSet line;
+
+		const double m = fitSlope(all_coords);
+		const d2Vector optimal_ratio_spot = ellipse.mean.length() * d2Vector(1,m) / sqrt(1 + m*m);
+
+
+		line.SetDrawMarker(false);
+		line.SetDrawLine(true);
+		line.SetDatasetColor(colour.r, colour.g, colour.b);
+		line.AddDataPoint(CDataPoint(0, 0));
+		line.AddDataPoint(CDataPoint(optimal_ratio_spot.x, optimal_ratio_spot.y));
+		line.SetLineWidth(1.5);
+
+		all_atoms_plot.AddDataSet(line);
+	}
+
+	for (std::map<std::string, std::vector<d2Vector>>::iterator it =
+		 all_element_coords.begin(); it != all_element_coords.end(); it++)
+	{
+		std::string element = it->first;
+		std::vector<d2Vector>& all_coords = it->second;
+
+		plotEllipse(
+			all_atoms_plot, fitEllipse(all_coords), 100,
+			ellipse_line_width, 12, element_colours[element], true);
+	}
+
+	all_atoms_plot.SetTitle(tag);
+	all_atoms_plot.SetXAxisTitle("phase");
+	all_atoms_plot.SetYAxisTitle("amplitude");
+
+	if (plot_window_set)
+	{
+		all_atoms_plot.SetViewArea(plot_start.x, plot_start.y, plot_end.x, plot_end.y);
+	}
+
+	all_atoms_plot.OutputPostScriptPlot(out_path+"all_atoms_" + tag + ".eps");
+}
+
 int main(int argc, char *argv[])
 {
 	IOParser parser;
 
-	std::string in_phase, in_amplitude, in_model, out_path;
+	std::string in_phase, in_amplitude, in_model, out_path, tag;
 	double filter_freq, high_pass_frequency, sigma_scale, psModel;
 	d2Vector plot_start, plot_end;
 	bool plot_window_set;
@@ -362,6 +469,7 @@ int main(int argc, char *argv[])
 		}
 		
 		out_path = parser.getOption("--o", "Output path");
+		tag = parser.getOption("--tag", "Output tag", "");
 
 		parser.checkForErrors();
 	}
@@ -426,9 +534,9 @@ int main(int argc, char *argv[])
 	{
 		BufferedImage<double> filtered_difference = amp_map_RS - phase_map_RS;
 
-		phase_map_RS.write(out_path + "phase.mrc", pixel_size);
-		amp_map_RS.write(out_path + "amplitude.mrc", pixel_size);
-		filtered_difference.write(out_path + "difference.mrc", pixel_size);
+		phase_map_RS.write(out_path + "phase_" + tag + ".mrc", pixel_size);
+		amp_map_RS.write(out_path + "amplitude_" + tag + ".mrc", pixel_size);
+		filtered_difference.write(out_path + "difference_" + tag + ".mrc", pixel_size);
 	}
 
 
@@ -456,7 +564,7 @@ int main(int argc, char *argv[])
 			}
 		}
 		
-		histogram.write(out_path + "joint_histogram.mrc");
+		histogram.write(out_path + "joint_histogram_" + tag + ".mrc");
 		
 		BufferedImage<double> normalised_histogram(bins, bins);
 
@@ -478,7 +586,7 @@ int main(int argc, char *argv[])
 			}
 		}
 		
-		normalised_histogram.write(out_path + "joint_histogram_normalised.mrc");
+		normalised_histogram.write(out_path + "joint_histogram_normalised_" + tag + ".mrc");
 
 		BufferedImage<double> cumulative_histogram(bins, bins);
 
@@ -501,7 +609,7 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		cumulative_histogram.write(out_path + "cumulative_joint_histogram.mrc");
+		cumulative_histogram.write(out_path + "cumulative_joint_histogram_" + tag + ".mrc");
 	}
 
 	const double coord_offset_pixels =
@@ -512,6 +620,8 @@ int main(int argc, char *argv[])
 	assembly.readPDB(in_model);
 
 	std::set<std::string> heavy_external;
+	heavy_external.insert("P");
+	heavy_external.insert("CL");
 	heavy_external.insert("FE");
 	heavy_external.insert("ZN");
 
@@ -548,7 +658,9 @@ int main(int argc, char *argv[])
 	element_colours["C"] = dRGB(0.1,0.1,0.1);
 	element_colours["N"] = dRGB(48,80,248)/255.0;
 	element_colours["O"] = dRGB(1.0,0.0,0.0);
+	element_colours["P"] = dRGB(0.5,0.125,1);
 	element_colours["S"] = dRGB(0.9,0.9,0.1);
+	element_colours["CL"] = dRGB(0.1,0.9,0.1);
 	element_colours["FE"] = dRGB(255,165,0)/255.0;
 	element_colours["ZN"] = dRGB(165,42,42)/255.0;
 
@@ -556,6 +668,9 @@ int main(int argc, char *argv[])
 	const double ellipse_line_width = 0.5;
 
 	{
+		std::ofstream element_angles_file(out_path+"main_chain_element_angles_" + tag + ".txt");
+		element_angles_file << "element  angle [degrees]\n";
+
 		std::vector<d2Vector> C_coords  = coords_by_name[" C  "];
 		std::vector<d2Vector> CA_coords = coords_by_name[" CA "];
 		std::vector<d2Vector> O_coords  = coords_by_name[" O  "];
@@ -566,6 +681,12 @@ int main(int argc, char *argv[])
 
 		std::vector<d2Vector> all_C_coords = C_coords;
 		all_C_coords.insert(all_C_coords.end(), CA_coords.begin(), CA_coords.end());
+
+
+		element_angles_file << "C: " << RAD2DEG(atan(fitSlope(all_C_coords))) << '\n';
+		element_angles_file << "N: " << RAD2DEG(atan(fitSlope(N_coords))) << '\n';
+		element_angles_file << "O: " << RAD2DEG(atan(fitSlope(O_coords))) << '\n';
+
 
 		plotCloud(main_chain_plot, all_C_coords, 1, element_colours["C"], true);
 		plotCloud(main_chain_plot, O_coords, 1, element_colours["O"], true);
@@ -595,501 +716,17 @@ int main(int argc, char *argv[])
 			main_chain_plot.SetViewArea(plot_start.x, plot_start.y, plot_end.x, plot_end.y);
 		}
 
-		main_chain_plot.OutputPostScriptPlot(out_path+"main_chain_atoms.eps");
+		main_chain_plot.OutputPostScriptPlot(out_path+"main_chain_atoms_" + tag + ".eps");
 	}
 
-	{
-		std::ofstream element_angles_file(out_path+"element_angles.txt");
-		element_angles_file << "element  slope  angle [degrees]\n";
 
-		CPlot2D all_atoms_plot("");
-
-		for (std::map<std::string, std::set<std::string>>::iterator it =
-			 element_to_names.begin(); it != element_to_names.end(); it++)
-		{
-			std::string element = it->first;
-			std::set<std::string>& names = it->second;
-
-			std::vector<d2Vector> all_coords;
-
-			for (std::set<std::string>::iterator it2 = names.begin();
-				 it2 != names.end(); it2++)
-			{
-				const std::string atom_name = *it2;
-				const std::vector<d2Vector>& coords = coords_by_name[atom_name];
-				all_coords.insert(all_coords.end(), coords.begin(), coords.end());
-			}
-
-			plotCloud(all_atoms_plot, all_coords, 1, element_colours[element], true);
-
-			plotEllipse(all_atoms_plot, fitEllipse(all_coords), 100,
-						ellipse_line_width, 12, element_colours[element], true);
-
-			const double slope = fitSlope(all_coords);
-			const double angle_deg = RAD2DEG(atan(slope));
-
-			element_angles_file << element << ": " << slope << ' ' << angle_deg << '\n';
-		}
-
-		all_atoms_plot.SetXAxisTitle("phase");
-		all_atoms_plot.SetYAxisTitle("amplitude");
-
-		if (plot_window_set)
-		{
-			all_atoms_plot.SetViewArea(plot_start.x, plot_start.y, plot_end.x, plot_end.y);
-		}
-
-		all_atoms_plot.OutputPostScriptPlot(out_path+"all_atoms.eps");
-	}
-
+	plotAllAtoms(
+		element_to_names, coords_by_name, element_colours,
+		ellipse_line_width, plot_window_set, plot_start, plot_end,
+		out_path, tag);
 
 
 	//plot2D.SetTitle("amplitude over phase");
 	//plot2D.SetDrawLegend(true);
 
-
-
-
-
-
-
-
-
-	return 0;
-
-	compareAtomsByResidue(
-		PdbHelper::groupAtomsByNameByResidue(assembly),
-		coord_offset_pixels, 
-		pixel_size,
-		phase_map_RS, amp_map_RS,
-		out_path, "_sharp",
-		false);
-		
-	compareResidues(
-		PdbHelper::groupAtomsByResidue(assembly),
-		coord_offset_pixels, 
-		pixel_size,
-		phase_map_RS, amp_map_RS,
-		out_path + "residue_averages.txt",
-		false);
-		
-	compareResidues(
-		PdbHelper::groupAtomsByResidue(assembly, "C"),
-		coord_offset_pixels, 
-		pixel_size,
-		phase_map_RS, amp_map_RS,
-		out_path + "residue_averages_C.txt",
-		false);
-	
-	return 0;
-	
-	
-	{
-		BufferedImage<double> amp_phase_RS(s,s,s), phase_2_RS(s,s,s);
-		
-		for (int z = 0; z < s; z++)
-		for (int y = 0; y < s; y++)
-		for (int x = 0; x < s; x++)
-		{
-			amp_phase_RS(x,y,z) = amp_map_RS(x,y,z) * phase_map_RS(x,y,z);
-			phase_2_RS(x,y,z) = phase_map_RS(x,y,z) * phase_map_RS(x,y,z);
-		}
-		
-		const bool estimate_intercept = false;
-		
-		if (estimate_intercept)
-		{
-			BufferedImage<double> amp_smooth = ImageFilter::Gauss3D(amp_map_RS, sigma_scale);
-			BufferedImage<double> phase_smooth = ImageFilter::Gauss3D(amp_map_RS, sigma_scale);
-			BufferedImage<double> amp_phase_smooth = ImageFilter::Gauss3D(amp_phase_RS, sigma_scale);
-			BufferedImage<double> phase_2_smooth = ImageFilter::Gauss3D(phase_2_RS, sigma_scale);
-			
-			BufferedImage<double> local_scale(s,s,s), local_intercept(s,s,s);
-					
-			for (int z = 0; z < s; z++)
-			for (int y = 0; y < s; y++)
-			for (int x = 0; x < s; x++)
-			{
-				const double a = amp_smooth(x,y,z);
-				const double p = phase_smooth(x,y,z);
-				const double ap = amp_phase_smooth(x,y,z);
-				const double p2 = phase_2_smooth(x,y,z);
-				
-				d2Matrix A(p2,p,p,1);
-				const d2Vector b(ap,a);
-				
-				A.invert();
-				
-				const d2Vector opt = A * b;
-				
-				local_scale(x,y,z) = opt[0];
-				local_intercept(x,y,z) = opt[1];
-			}
-			
-			local_scale.write(out_path + "local_scale.mrc", pixel_size);
-			local_intercept.write(out_path + "local_intercept.mrc", pixel_size);
-			
-			BufferedImage<double> local_difference(s,s,s);
-			
-			for (int z = 0; z < s; z++)
-			for (int y = 0; y < s; y++)
-			for (int x = 0; x < s; x++)
-			{
-				const double a = amp_map_RS(x,y,z);
-				const double p = phase_map_RS(x,y,z);
-				const double m = local_scale(x,y,z);
-				const double q = local_intercept(x,y,z);
-				
-				local_difference(x,y,z) = a - (m*p + q);
-			}
-			
-			local_difference.write(out_path + "local_difference.mrc", pixel_size);
-		}
-		else
-		{
-			BufferedImage<double> amp_phase_smooth = ImageFilter::Gauss3D(amp_phase_RS, sigma_scale);
-			BufferedImage<double> phase_2_smooth = ImageFilter::Gauss3D(phase_2_RS, sigma_scale);
-			
-			if (write_ratios) phase_2_smooth.write(out_path + "phase_2_smooth.mrc", pixel_size);	
-			
-			const double offset = 1e-16;
-			
-			if (write_ratios)		
-			{
-				BufferedImage<double> local_difference(s,s,s);
-				
-				for (int z = 0; z < s; z++)
-				for (int y = 0; y < s; y++)
-				for (int x = 0; x < s; x++)
-				{
-					const double a = amp_map_RS(x,y,z);
-					const double p = phase_map_RS(x,y,z);
-					const double ap = amp_phase_smooth(x,y,z);
-					const double p2 = phase_2_smooth(x,y,z) + offset;
-					const double scale = p2 > 0.0? ap / p2 : 0.0;
-					
-					local_difference(x,y,z) = a - scale * p;
-				}
-				
-				local_difference.write(out_path + "local_difference.mrc", pixel_size);			
-			}
-			
-			if (write_ratios)
-			{
-				BufferedImage<double> local_scale(s,s,s);
-				
-				for (int z = 0; z < s; z++)
-				for (int y = 0; y < s; y++)
-				for (int x = 0; x < s; x++)
-				{
-					const double ap = amp_phase_smooth(x,y,z);
-					const double p2 = phase_2_smooth(x,y,z) + offset;
-					const double scale = p2 > 0.0? ap / p2 : 0.0;
-					
-					local_scale(x,y,z) = scale;
-				}
-				
-				local_scale.write(out_path + "local_scale.mrc", pixel_size);	
-			}
-			
-			if (write_ratios)
-			{
-				BufferedImage<double> scaled_phase(s,s,s);
-				
-				for (int z = 0; z < s; z++)
-				for (int y = 0; y < s; y++)
-				for (int x = 0; x < s; x++)
-				{
-					const double p = phase_map_RS(x,y,z);
-					const double ap = amp_phase_smooth(x,y,z);
-					const double p2 = phase_2_smooth(x,y,z) + offset;
-					const double scale = p2 > 0.0? ap / p2 : 0.0;
-					
-					scaled_phase(x,y,z) = scale * p;
-				}
-				
-				scaled_phase.write(out_path + "scaled_phase.mrc", pixel_size);
-			}
-			
-			const std::string tag = "_sigma_" + ZIO::itoa(sigma_scale);
-			
-			compareAtomsByResidue(
-				PdbHelper::groupAtomsByNameByResidue(assembly),
-				coord_offset_pixels, 
-			    pixel_size,
-				phase_2_smooth, amp_phase_smooth,
-				out_path, tag,
-				true);
-				
-			compareResidues(
-				PdbHelper::groupAtomsByResidue(assembly),
-				coord_offset_pixels, 
-				pixel_size,
-				phase_2_smooth, amp_phase_smooth,
-				out_path + "residue_averages"+tag+".txt",
-				true);
-				
-			compareResidues(
-				PdbHelper::groupAtomsByResidue(assembly, "C"),
-				coord_offset_pixels, 
-				pixel_size,
-				phase_2_smooth, amp_phase_smooth,
-				out_path + "residue_averages_C"+tag+".txt",
-				true);
-			
-		}
-	}
-		
-	return 0;
 }
-
-void compareAtomsByResidue(
-		const std::map<std::string,std::map<std::string,std::vector<d3Vector>>>& atoms_by_name_by_residue,
-		double coord_offset_pixels,
-		double pixel_size,
-		const RawImage<double>& phase_map_RS,
-		const RawImage<double>& amp_map_RS,
-		std::string out_path,
-		std::string tag,
-		bool images_are_premultiplied)
-{	
-	std::ofstream averages(out_path + "atom_averages_by_residue"+tag+".txt");
-	
-	std::map<std::string, std::vector<d2Vector>> all_atoms;
-	
-	for (std::map<std::string,std::map<std::string,std::vector<d3Vector>>>::const_iterator itt = 
-		 atoms_by_name_by_residue.begin(); itt != atoms_by_name_by_residue.end(); itt++)
-	{
-		const std::string residue_name = itt->first;
-		const std::map<std::string,std::vector<d3Vector>>& atoms = itt->second;
-		
-		averages << residue_name << ":\n\n";
-		averages << "atom   phase   ampl.   ratio   diff.\n\n";
-		
-		std::ofstream scatterplot, scatterplot_legend;
-		
-		if (!images_are_premultiplied)
-		{
-			scatterplot.open(out_path + "amp_over_phase" + tag + "_" + residue_name + ".dat");
-			scatterplot_legend.open(out_path + "amp_over_phase" + tag + "_" + residue_name + "_legend.txt");
-		}
-		
-		for (std::map<std::string,std::vector<d3Vector>>::const_iterator it = 
-			 atoms.begin(); it != atoms.end(); it++)
-		{
-			const std::string atom_name = it->first;
-			const std::vector<d3Vector>& positions = it->second;
-			
-			const int pc = positions.size();
-			
-			double num = 0.0;
-			double denom = 0.0;
-			double phase_sum = 0.0;
-			double amp_sum = 0.0;
-			
-			for (int p = 0; p < pc; p++)
-			{
-				const d3Vector pos = positions[p] / pixel_size + coord_offset_pixels * d3Vector(1,1,1);
-				
-				const double vp = Interpolation::linearXYZ_clip(phase_map_RS, pos.x, pos.y, pos.z);
-				const double va = Interpolation::linearXYZ_clip(amp_map_RS, pos.x, pos.y, pos.z);
-				
-				scatterplot << vp << ' ' << va << '\n';
-				
-				if (!images_are_premultiplied)
-				{
-					num += vp * va;
-					denom += vp * vp;
-					phase_sum += vp;
-					amp_sum += va;
-					
-					scatterplot_legend << atom_name << '\n';
-					scatterplot << '\n';
-					
-					all_atoms[atom_name].push_back(d2Vector(vp, va));
-				}
-				else
-				{
-					num += va;
-					denom += vp;
-				}
-			}
-			
-			averages.setf( std::ios::fixed, std::ios::floatfield);
-			
-			if (!images_are_premultiplied)
-			{
-				averages 
-					<< std::setw(3) << atom_name << "    " 
-					<< std::setprecision(2) << std::setw(4) << phase_sum / (pc*1e-8) << "    " 
-					<< std::setprecision(2) << std::setw(4) << amp_sum / (pc*1e-8) << "    " 
-					<< std::setprecision(2) << std::setw(4) << num / denom << "    "  
-					<< std::setprecision(2) << std::setw(4) << (amp_sum - phase_sum) / (pc*1e-8) << '\n'; 
-			}
-			else
-			{
-				averages 
-					<< std::setw(3) << atom_name << " " 
-					<< std::setprecision(2) << std::setw(4) << num / denom << '\n'; 
-			} 
-		}
-		
-		averages << "\n\n";
-	}
-	
-	if (!images_are_premultiplied)
-	{
-		std::ofstream scatterplot_all(out_path + "amp_over_phase" + tag + "_all.dat");
-		std::ofstream scatterplot_all_legend(out_path + "amp_over_phase" + tag + "_all_legend.txt");
-		
-		for (std::map<std::string,std::vector<d2Vector>>::iterator it = all_atoms.begin(); 
-		     it != all_atoms.end(); it++)
-		{
-			const std::string atom_name = it->first;
-			const std::vector<d2Vector>& coordinates = it->second;
-			const int ac = coordinates.size();	
-			
-			scatterplot_all_legend << atom_name << " (" << ac << ")\n";
-			
-			d2Vector average(0,0);
-			
-			const bool rotate_coords = false;
-			
-			for (int a = 0; a < ac; a++)
-			{
-				const d2Vector c0 = coordinates[a];
-				const d2Vector c = rotate_coords? d2Vector(c0.x+c0.y, c0.y-c0.x) : c0;
-				        
-				scatterplot_all << c.x << ' ' << c.y << '\n';
-				
-				average += c;
-			}
-			
-			scatterplot_all << '\n';
-			
-			average /= ac;
-			
-			scatterplot_all << average.x << ' ' << average.y << "\n";
-			scatterplot_all << "0 0\n\n";
-						
-			Tensor2x2<double> cov(0,0,0);
-			
-			for (int a = 0; a < ac; a++)
-			{
-				const d2Vector c00 = coordinates[a];
-				const d2Vector c0 = rotate_coords? d2Vector(c00.x+c00.y, c00.y-c00.x) : c00;
-				const d2Vector c = c0 - average;
-				
-				cov.xx += c[0] * c[0];
-				cov.xy += c[0] * c[1];
-				cov.yy += c[1] * c[1];
-			}
-			
-			cov /= ac;
-			
-			d2Vector eigenvalues;
-			d2Vector eigenvector0, eigenvector1;
-			
-						
-			cov.diagonalize(eigenvalues, eigenvector0, eigenvector1);
-			
-			const d2Vector a0 = sqrt(eigenvalues[0]) * eigenvector0;
-			const d2Vector a1 = sqrt(eigenvalues[1]) * eigenvector1;
-				
-			
-			const int ellipse_samples = 99;
-			
-			for (int i = 0; i < ellipse_samples+1; i++)
-			{
-				const double phi = 2.0 * PI * i / (double) ellipse_samples;
-				
-				const d2Vector d0 = average + cos(phi) * a0 + sin(phi) * a1;
-				
-				scatterplot_all << d0.x << ' ' << d0.y << '\n';
-			}
-			
-			scatterplot_all << '\n';
-			
-			for (int i = 0; i < ellipse_samples+1; i++)
-			{
-				const double phi = 2.0 * PI * i / (double) ellipse_samples;
-				
-				const d2Vector d0 = average + 2.0 * (cos(phi) * a0 + sin(phi) * a1);
-				
-				scatterplot_all << d0.x << ' ' << d0.y << '\n';
-			}
-			
-			scatterplot_all << '\n';
-		}
-	}
-}
-
-void compareResidues(
-		const std::map<std::string,std::vector<d3Vector>>& atoms_by_residue, 
-		double coord_offset_pixels,
-		double pixel_size,
-		const RawImage<double>& phase_map_RS,
-		const RawImage<double>& amp_map_RS,
-		std::string filename_out,
-		bool images_are_premultiplied)
-{	
-	std::ofstream averages(filename_out);
-	
-	averages << "res.   phase   ampl.   ratio   diff.\n\n";
-	
-	for (std::map<std::string,std::vector<d3Vector>>::const_iterator it = 
-		 atoms_by_residue.begin(); it != atoms_by_residue.end(); it++)
-	{
-		const std::string residue_name = it->first;
-		const std::vector<d3Vector>& positions = it->second;
-					
-		const int pc = positions.size();
-		
-		double num = 0.0;
-		double denom = 0.0;
-		double phase_sum = 0.0;
-		double amp_sum = 0.0;
-		
-		for (int p = 0; p < pc; p++)
-		{
-			const d3Vector pos = positions[p] / pixel_size + coord_offset_pixels * d3Vector(1,1,1);
-			
-			const double vp = Interpolation::linearXYZ_clip(phase_map_RS, pos.x, pos.y, pos.z);
-			const double va = Interpolation::linearXYZ_clip(amp_map_RS, pos.x, pos.y, pos.z);
-			
-			if (!images_are_premultiplied)
-			{
-				num += vp * va;
-				denom += vp * vp;
-				phase_sum += vp;
-				amp_sum += va;
-			}
-			else
-			{
-				num += va;
-				denom += vp;
-			}
-		}
-		
-		averages.setf( std::ios::fixed, std::ios::floatfield);
-		
-		if (!images_are_premultiplied)
-		{
-			averages 
-				<< std::setw(3) << residue_name << "    " 
-				<< std::setprecision(2) << std::setw(4) << phase_sum / (pc*1e-8) << "    " 
-				<< std::setprecision(2) << std::setw(4) << amp_sum / (pc*1e-8) << "    " 
-				<< std::setprecision(2) << std::setw(4) << num / denom << "    "  
-				<< std::setprecision(2) << std::setw(4) << (amp_sum - phase_sum) / (pc*1e-8) << '\n'; 
-		}
-		else
-		{
-			averages 
-				<< std::setw(3) << residue_name << " " 
-				<< std::setprecision(2) << std::setw(4) << num / denom << '\n'; 
-		}
-	}
-	
-	averages << "\n";
-}
-	
