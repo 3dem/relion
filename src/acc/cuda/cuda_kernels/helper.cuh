@@ -964,6 +964,10 @@ __global__ void cuda_kernel_calcPowerSpectrum(T *dFaux, int padoridim, T *ddata,
 	int idy = blockIdx.y*blockDim.y + threadIdx.y;
 	int idz = blockIdx.z*blockDim.z + threadIdx.z;
 	int XSIZE = padoridim/2+1;
+	int dx, dxy;
+	dx = (data_sz/2+1);
+	dxy = (blockDim.z != 1)? data_sz*dx:0;
+
 	if(idx<XSIZE && idy<padoridim && idz<padoridim)
 	{
 		int jp = idx;
@@ -990,7 +994,7 @@ __global__ void cuda_kernel_calcPowerSpectrum(T *dFaux, int padoridim, T *ddata,
 			val.x *= normfft; val.y *= normfft;
 			val.x *= weight;  val.y *= weight;
 			//A3D_ELEM(data, kp, ip, jp) = weight*DIRECT_A3D_ELEM(Faux, k, i, j) * normfft;
-			ddata[(kp+data_sz/2)*(data_sz/2+1)*data_sz + (ip+data_sz/2)*(data_sz/2+1)+ (jp)] = val;
+			ddata[(kp+data_sz/2)*dxy + (ip+data_sz/2)*dx+ (jp)] = val; 
 
 			// Calculate power spectrum
 			int ires = ROUND( sqrt((RFLOAT)r2) / padding_factor );
@@ -1002,7 +1006,7 @@ __global__ void cuda_kernel_calcPowerSpectrum(T *dFaux, int padoridim, T *ddata,
 			// Apply high pass filter of the reference only after calculating the power spectrum
 			val.x = val.y = 0.;
 			if (r2 <= min_r2)
-				ddata[(kp+data_sz/2)*(data_sz/2+1)*data_sz + (ip+data_sz/2)*(data_sz/2+1)+ (jp)] = val; //A3D_ELEM(data, kp, ip, jp) = 0;
+				ddata[(kp+data_sz/2)*dxy + (ip+data_sz/2)*dx + (jp)] = val;  //A3D_ELEM(data, kp, ip, jp) = 0;
 		}
 	}
 }

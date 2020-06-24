@@ -1871,11 +1871,16 @@ void windowFourierTransform2(
 
 void run_calcPowerSpectrum(Complex *dFaux, int padoridim, Complex *ddata, int data_sz, RFLOAT *dpower_spectrum, RFLOAT *dcounter,
 											  int max_r2, int min_r2, RFLOAT normfft, RFLOAT padding_factor, RFLOAT weight,
-											  RFLOAT *dfourier_mask, int fx, int fy, int fz, bool do_fourier_mask)
+											  RFLOAT *dfourier_mask, int fx, int fy, int fz, bool do_fourier_mask, bool if3D)
 {
 #ifdef CUDA
-	dim3 bs(32,4,2);
-	dim3 gs(ceil((padoridim/2+1)/(float)bs.x), ceil(padoridim/(float)bs.y), ceil(padoridim/(float)bs.z));
+	dim3 bs(32,4);
+	dim3 gs(ceil((padoridim/2+1)/(float)bs.x), ceil(padoridim/(float)bs.y));
+	if(if3D)
+	{
+		bs.z = 2;
+		gs.z = ceil(padoridim/(float)bs.z); 
+	}
 	if(sizeof(RFLOAT) == sizeof(double))
 		cuda_kernel_calcPowerSpectrum<<<gs,bs>>>((double2*)dFaux,padoridim,(double2*)ddata,data_sz,dpower_spectrum,dcounter,
 												  max_r2,min_r2,normfft,padding_factor,weight,dfourier_mask,fx,fy,fz,do_fourier_mask);

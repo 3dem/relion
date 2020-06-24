@@ -313,9 +313,9 @@ void Projector::computeFourierTransformMap(
 #ifdef CUDA
 		if(do_gpu)
 		{
-			run_calcPowerSpectrum(~dFaux, padoridim, ~ddata, ZSIZE(data), ~dpower_spectrum, ~dcounter,
+			run_calcPowerSpectrum(~dFaux, padoridim, ~ddata, YSIZE(data), ~dpower_spectrum, ~dcounter,
 								  max_r2, min_r2, normfft, padding_factor, weight,
-								  ~dfourier_mask, fmXsz, fmYsz, fmZsz, do_fourier_mask);
+								  ~dfourier_mask, fmXsz, fmYsz, fmZsz, do_fourier_mask, ref_dim == 3);
 			ddata.setHostPtr(MULTIDIM_ARRAY(data));
 			ddata.cpToHost();
 			dfourier_mask.freeIfSet();
