@@ -311,7 +311,7 @@ void diff2_coarse_3D(
 			}  // for y direction
 		}	
 
-		XFLOAT *pData = g_diff2s + (size_t)block * (size_t)ulers_per_block * (size_t)trans_num;
+		XFLOAT *pData = g_diff2s + (size_t)block * (size_t)eulers_per_block * (size_t)trans_num;
 		for(int i=0; i<eulers_per_block; i++) {
 			for(unsigned long j=0; j<trans_num; j++) {
 				 *pData += diff2s[j][i];
@@ -352,15 +352,40 @@ void diff2_coarse(
 		for (int i = 0; i < eulers_per_block * 9; i++)
 			s_eulers[i] = g_eulers[(size_t)block * (size_t)eulers_per_block * (size_t)9 + i];
 
+		// pre-compute sin and cos for x and y component
+		int xSize = projector.imgX;
+		int ySize = projector.imgY;
+		int zSize = projector.imgZ;
+		XFLOAT sin_x[translation_num][xSize], cos_x[translation_num][xSize];
+		XFLOAT sin_y[translation_num][ySize], cos_y[translation_num][ySize];
+		XFLOAT sin_z[translation_num][zSize], cos_z[translation_num][zSize];	
+
+		if (DATA3D)  {
+			computeSincosLookupTable3D(translation_num, trans_x, trans_y, trans_z,
+									xSize, ySize, zSize,                               
+									&sin_x[0][0], &cos_x[0][0], 
+									&sin_y[0][0], &cos_y[0][0],
+									&sin_z[0][0], &cos_z[0][0]);
+		} else {
+			computeSincosLookupTable2D(translation_num, trans_x, trans_y, 
+									xSize, ySize,
+									&sin_x[0][0], &cos_x[0][0], 
+									&sin_y[0][0], &cos_y[0][0]);
+		}
+		
 		//Setup variables
 		XFLOAT s_ref_real[eulers_per_block][block_sz];
 		XFLOAT s_ref_imag[eulers_per_block][block_sz];
 
 		XFLOAT s_real[block_sz];
 		XFLOAT s_imag[block_sz];
-		XFLOAT s_corr[block_sz]; 
+		XFLOAT s_corr[block_sz];
 
 		int    x[block_sz], y[block_sz], z[block_sz];
+		
+		XFLOAT trans_cos_x[block_sz], trans_sin_x[block_sz];
+		XFLOAT trans_cos_y[block_sz], trans_sin_y[block_sz];
+		XFLOAT trans_cos_z[block_sz], trans_sin_z[block_sz];
 
 		XFLOAT diff2s[translation_num][eulers_per_block];
 		memset(&diff2s[0][0], 0, sizeof(XFLOAT) * translation_num * eulers_per_block);
@@ -369,13 +394,13 @@ void diff2_coarse(
 		unsigned pass_num(ceilfracf(image_size,block_sz));
 		for (unsigned pass = 0; pass < pass_num; pass++) { // finish an entire ref image each block
 			unsigned long start = pass * block_sz;
+			unsigned long elements = block_sz;
+			if (start + block_sz >= image_size)
+				elements = image_size - start;
 
 			// Rotate the reference image per block_sz, saved in cache
-			#pragma omp simd
-			for (int tid=0; tid<block_sz; tid++){
+			for (int tid=0; tid<elements; tid++){
 				unsigned long pixel = (unsigned long)start + (unsigned long)tid;
-				if(pixel >= image_size)
-					continue;
 
 				if(DATA3D)
 				{
@@ -393,8 +418,18 @@ void diff2_coarse(
 				}
 				if (y[tid] > projector.maxR)
 					y[tid] -= projector.imgY;
+			}
+						
+			for (int tid=0; tid<elements; tid++){
+				unsigned long pixel = (unsigned long)start + (unsigned long)tid;
+			
+				s_real[tid] = g_real[pixel];
+				s_imag[tid] = g_imag[pixel];
+				s_corr[tid] = g_corr[pixel] * (XFLOAT)0.5;
+			}
 
-				for (int i = 0; i < eulers_per_block; i ++) {
+			for (int i = 0; i < eulers_per_block; i ++) {
+				for (int tid=0; tid<elements; tid++){
 					if(DATA3D) // if DATA3D, then REF3D as well.
 						projector.project3Dmodel(
 								x[tid], y[tid], z[tid],
@@ -429,30 +464,74 @@ void diff2_coarse(
 								s_eulers[i*9+4],
 								s_ref_real[i][tid],
 								s_ref_imag[i][tid]);
-				}
-
-				s_real[tid] = g_real[pixel];
-				s_imag[tid] = g_imag[pixel];
-				s_corr[tid] = g_corr[pixel] * (XFLOAT)0.5;
-			}
+				} // tid
+			}  // eulers per block
 
 			for(unsigned long i=0; i<translation_num; i++) {
-				XFLOAT tx = trans_x[i];
-				XFLOAT ty = trans_y[i];
-				XFLOAT tz = trans_z[i];                 
+
+				for (int tid=0; tid<elements; tid++) {
+					unsigned long pixel = (unsigned long)start + (unsigned long)tid;
+
+					int xidx = x[tid];
+					int yidx = y[tid];
+					int zidx;
+					
+					if(DATA3D) {
+						zidx = z[tid];
+						if ( zidx < 0) {
+							trans_cos_z[tid] =  cos_z[i][-zidx];
+							trans_sin_z[tid] = -sin_z[i][-zidx];            
+						}
+						else {
+							trans_cos_z[tid] = cos_z[i][zidx];
+							trans_sin_z[tid] = sin_z[i][zidx];
+						}
+					}
+
+					if ( yidx < 0) {
+						trans_cos_y[tid] =  cos_y[i][-yidx];
+						trans_sin_y[tid] = -sin_y[i][-yidx];            
+					}
+					else {
+						trans_cos_y[tid] = cos_y[i][yidx];
+						trans_sin_y[tid] = sin_y[i][yidx];
+					}
+					
+					if ( xidx < 0) {
+						trans_cos_x[tid] =  cos_x[i][-xidx];
+						trans_sin_x[tid] = -sin_x[i][-xidx];            
+					}
+					else {
+						trans_cos_x[tid] = cos_x[i][xidx];
+						trans_sin_x[tid] = sin_x[i][xidx];
+					}					
+				}  // tid              
 
 				#pragma omp simd
-				for (int tid=0; tid<block_sz; tid++) {
-					unsigned long pixel = (unsigned long)start + (unsigned long)tid;
-					if(pixel >= image_size)
-						continue;                
-
+				for (int tid=0; tid<elements; tid++) {
+//					unsigned long pixel = (unsigned long)start + (unsigned long)tid;              
+					
 					XFLOAT real, imag;
-					if(DATA3D)
-						translatePixel(x[tid], y[tid], z[tid], tx, ty, tz, s_real[tid], s_imag[tid], real, imag);
-					else
-						translatePixel(x[tid], y[tid],         tx, ty,     s_real[tid], s_imag[tid], real, imag);
+					if(DATA3D) {
+//						translatePixel(x[tid], y[tid], z[tid], tx, ty, tz, s_real[tid], s_imag[tid], real, imag);
+						XFLOAT s  = trans_sin_x[tid] * trans_cos_y[tid] + trans_cos_x[tid] * trans_sin_y[tid];
+						XFLOAT c  = trans_cos_x[tid] * trans_cos_y[tid] - trans_sin_x[tid] * trans_sin_y[tid];
 
+						XFLOAT ss = s * trans_cos_z[tid] + c * trans_sin_z[tid];
+						XFLOAT cc = c * trans_cos_z[tid] - s * trans_sin_z[tid];				
+
+						real = cc * s_real[tid] - ss * s_imag[tid];
+						imag = cc * s_imag[tid] + ss * s_real[tid];
+					}
+					else  { // 2D data
+//						translatePixel(x[tid], y[tid],         tx, ty,     s_real[tid], s_imag[tid], real, imag);
+						XFLOAT ss = trans_sin_x[tid] * trans_cos_y[tid] + trans_cos_x[tid] * trans_sin_y[tid];
+						XFLOAT cc = trans_cos_x[tid] * trans_cos_y[tid] - trans_sin_x[tid] * trans_sin_y[tid];
+
+						real = cc * s_real[tid] - ss * s_imag[tid];
+						imag = cc * s_imag[tid] + ss * s_real[tid];
+					}
+					
 					for (int j = 0; j < eulers_per_block; j ++) {
 						XFLOAT diff_real =  s_ref_real[j][tid] - real;
 						XFLOAT diff_imag =  s_ref_imag[j][tid] - imag;
