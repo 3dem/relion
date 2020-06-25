@@ -85,7 +85,36 @@ void wavg_ref3D(
 
 			XFLOAT ref_real[xSize], ref_imag[xSize];
 			XFLOAT img_real[xSize], img_imag[xSize];
+			XFLOAT ctfs[xSize];
+			XFLOAT wdiff2s_parts[xSize];
+			XFLOAT wdiff2s_XA   [xSize];
+			XFLOAT wdiff2s_AA   [xSize];
+			
+			for(int x = xstart; x < xend; x++) {
+				img_real[x] = g_img_real[pixel + x];
+			}
 
+			for(int x = xstart; x < xend; x++) {
+				img_imag[x] = g_img_imag[pixel + x];
+			}
+
+			if (REFCTF)     {
+				for(int x = xstart; x < xend; x++)
+						ctfs[x] = g_ctfs[pixel + x];
+			}
+
+			for(int x = xstart; x < xend; x++) {
+				wdiff2s_parts[x] = g_wdiff2s_parts[pixel + x];
+			}
+
+			for(int x = xstart; x < xend; x++) {
+				wdiff2s_XA[x] = g_wdiff2s_XA[pixel + x];
+			}
+
+			for(int x = xstart; x < xend; x++) {
+				wdiff2s_AA[x] = g_wdiff2s_AA[pixel + x];
+			}
+			
 			#pragma omp simd
 			for(int x = xstart; x < xend; x++) {
 				if(REF3D)
@@ -98,22 +127,19 @@ void wavg_ref3D(
 				{
 					if(CTFPREMULTIPLIED)
 					{
-						ref_real[x] *= g_ctfs[pixel + x] * g_ctfs[pixel + x];
-						ref_imag[x] *= g_ctfs[pixel + x] * g_ctfs[pixel + x];
+						ref_real[x] *= ctfs[x] * ctfs[x];
+						ref_imag[x] *= ctfs[x] * ctfs[x];
 					}
 					else
 					{
-						ref_real[x] *= g_ctfs[pixel + x];
-						ref_imag[x] *= g_ctfs[pixel + x];
+						ref_real[x] *= ctfs[x];
+						ref_imag[x] *= ctfs[x];
 					}
 				}
 				else {
 					ref_real[x] *= part_scale;
 					ref_imag[x] *= part_scale;
 				}
-
-				img_real[x] = g_img_real[pixel + x];
-				img_imag[x] = g_img_imag[pixel + x];
 			}
 
 			for (unsigned long itrans = 0; itrans < trans_num; itrans++) {
@@ -135,6 +161,7 @@ void wavg_ref3D(
 				XFLOAT *trans_cos_x = &cos_x[itrans][0];
 				XFLOAT *trans_sin_x = &sin_x[itrans][0];
 
+#pragma omp simd
 				for(int x = xstart; x < xend; x++) {
 
 					XFLOAT ss = trans_sin_x[x] * trans_cos_y + trans_cos_x[x] * trans_sin_y;
@@ -142,20 +169,40 @@ void wavg_ref3D(
 
 					XFLOAT trans_real = cc * img_real[x] - ss * img_imag[x];
 					XFLOAT trans_imag = cc * img_imag[x] + ss * img_real[x];
+					
 					/*
 					XFLOAT trans_real, trans_imag;
 					translatePixel(x, y,  g_trans_x[itrans], g_trans_y[itrans],
 								   img_real[x], img_imag[x], trans_real, trans_imag);
+
+					where translatePixel is:
+							int x, int y, XFLOAT tx, XFLOAT ty, 
+							XFLOAT &real, XFLOAT &imag, XFLOAT &tReal, XFLOAT &tImag
+						sincosf( x * tx + y * ty , &s, &c );
+						tReal = c * real - s * imag;
+						tImag = c * imag + s * real;
 					*/
+					
 					XFLOAT diff_real = ref_real[x] - trans_real;
 					XFLOAT diff_imag = ref_imag[x] - trans_imag;
 
-					g_wdiff2s_parts[pixel + x] += weight * (diff_real    * diff_real   + diff_imag    * diff_imag);
-					g_wdiff2s_XA   [pixel + x] += weight * (ref_real[x]  * trans_real  + ref_imag[x]  * trans_imag);
-					g_wdiff2s_AA   [pixel + x] += weight * (ref_real[x]  * ref_real[x] + ref_imag[x]  * ref_imag[x] );
+					wdiff2s_parts[x] += weight * (diff_real    * diff_real   + diff_imag    * diff_imag);
+					wdiff2s_XA   [x] += weight * (ref_real[x]  * trans_real  + ref_imag[x]  * trans_imag);
+					wdiff2s_AA   [x] += weight * (ref_real[x]  * ref_real[x] + ref_imag[x]  * ref_imag[x] );
 				}
 			}  // for itrans
 
+			// Update the globals once
+			for(int x = xstart; x < xend; x++) {
+				g_wdiff2s_parts[pixel + x] = wdiff2s_parts[x];
+			}
+			for(int x = xstart; x < xend; x++) {
+				g_wdiff2s_XA   [pixel + x] = wdiff2s_XA[x];
+			}
+			for(int x = xstart; x < xend; x++) {
+				g_wdiff2s_AA   [pixel + x] = wdiff2s_AA[x];
+			}
+			
 			pixel += (unsigned long)xSize;
 		} // y direction
 	} // bid
