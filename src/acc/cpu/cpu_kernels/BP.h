@@ -8,41 +8,6 @@
 
 namespace CpuKernels
 {
-
-// 2019Mar28: Takanori defined CPU_BP_INITIALIZE here to avoid template instantiation
-// problems with CTF_PREMULTIPLIED.
-// The result looks OK; I don't know why this is here in the first place.
-#define CPU_BP_INITIALIZE
-
-#ifndef CPU_BP_INITIALIZE //TODO Clean this up
-template < bool CTF_PREMULTIPLIED >
-	void backproject2D(
-		unsigned long imageCount,
-		int     block_size,
-		XFLOAT *g_img_real,
-		XFLOAT *g_img_imag,
-		XFLOAT *g_trans_x,
-		XFLOAT *g_trans_y,
-		XFLOAT* g_weights,
-		XFLOAT* g_Minvsigma2s,
-		XFLOAT* g_ctfs,
-		unsigned long translation_num,
-		XFLOAT significant_weight,
-		XFLOAT weight_norm,
-		XFLOAT *g_eulers,
-		XFLOAT *g_model_real,
-		XFLOAT *g_model_imag,
-		XFLOAT *g_model_weight,
-		int max_r,
-		int max_r2,
-		XFLOAT padding_factor,
-		unsigned img_x,
-		unsigned img_y,
-		unsigned img_xy,
-		unsigned mdl_x,
-		int mdl_inity,
-		tbb::spin_mutex *mutexes);
-#else
 template < bool CTF_PREMULTIPLIED >
 void backproject2D(
 		unsigned long imageCount,
@@ -206,7 +171,6 @@ void backproject2D(
 		}  // for tid
 	} // img
 }
-#endif // CPU_BP_INITIALIZE
 
 template < bool DATA3D, bool CTF_PREMULTIPLIED >
 void backproject3D(
@@ -486,37 +450,6 @@ void backproject3D(
 // translation index. Since sin(a+B) = sin(A) * cos(B) + cos(A) * sin(B), and
 // cos(A+B) = cos(A) * cos(B) - sin(A) * sin(B), we can use lookup table to
 // compute sin(x*tx + y*ty) and cos(x*tx + y*ty).
-#ifndef CPU_BP_INITIALIZE //TODO Clean this up
-template < bool CTF_PREMULTIPLIED >
-void backprojectRef3D(
-		unsigned long imageCount,
-		XFLOAT *g_img_real,
-		XFLOAT *g_img_imag,
-		XFLOAT *g_trans_x,
-		XFLOAT *g_trans_y,
-		XFLOAT* g_weights,
-		XFLOAT* g_Minvsigma2s,
-		XFLOAT* g_ctfs,
-		unsigned long trans_num,
-		XFLOAT significant_weight,
-		XFLOAT weight_norm,
-		XFLOAT *g_eulers,
-		XFLOAT *g_model_real,
-		XFLOAT *g_model_imag,
-		XFLOAT *g_model_weight,
-		int     max_r,
-		int     max_r2,
-		XFLOAT   padding_factor,
-		unsigned img_x,
-		unsigned img_y,
-		unsigned img_z,
-		size_t   img_xyz,
-		unsigned mdl_x,
-		unsigned mdl_y,
-		int      mdl_inity,
-		int      mdl_initz,
-		tbb::spin_mutex *mutexes);
-#else
 template < bool CTF_PREMULTIPLIED >
 void backprojectRef3D(
 		unsigned long imageCount,
@@ -765,7 +698,6 @@ void backprojectRef3D(
 		} // for y direction
 	} // for img
 }
-#endif
 
 template < bool DATA3D, bool CTF_PREMULTIPLIED >
 void backprojectSGD(
