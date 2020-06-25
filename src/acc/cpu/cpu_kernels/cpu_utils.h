@@ -137,6 +137,9 @@ XFLOAT no_tex2D(XFLOAT* mdl, XFLOAT xp, XFLOAT yp, int mdlX, int mdlInitY)
 
 // 2D linear interpolation for complex data that interleaves real and
 // imaginary data, rather than storing them in a separate array
+#ifdef __INTEL_COMPILER
+__attribute__((vector(uniform(mdlX,mdlInitY))))
+#endif
 static inline
 void complex2D(std::complex<XFLOAT> *mdlComplex, XFLOAT &real, XFLOAT &imag,
                XFLOAT xp, XFLOAT yp, int mdlX, int mdlInitY)

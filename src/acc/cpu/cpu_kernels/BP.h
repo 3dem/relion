@@ -580,7 +580,7 @@ void backprojectRef3D(
 			}
 
 			int y2 = y * y;
-			int xmax = sqrt((XFLOAT)(img_y_half_2 - y2));
+			int xmax = sqrt((XFLOAT)(img_y_half_2 - y2));  // minimize locking if possible
 
 			memset(Fweight,0,sizeof(XFLOAT)*img_x);
 			memset(real,   0,sizeof(XFLOAT)*img_x);
@@ -643,7 +643,7 @@ void backprojectRef3D(
 			}
 
 			#pragma omp simd
-			for(int x=0; x<img_x; x++) {
+			for(int x=0; x<xmax; x++) {
 				// Get logical coordinates in the 3D map
 				xp[x] = (s_eulers[0] * x + s_eulers[1] * y ) * padding_factor;
 				yp[x] = (s_eulers[3] * x + s_eulers[4] * y ) * padding_factor;
@@ -667,7 +667,7 @@ void backprojectRef3D(
 				}
 			}  // for x direction
 
-			for(int x=0; x<img_x; x++){
+			for(int x=0; x<xmax; x++){
 				if (Fweight[x] <= (XFLOAT) 0.0)
 					continue;
 
