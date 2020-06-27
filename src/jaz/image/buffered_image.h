@@ -376,4 +376,5 @@ BufferedImage<T> operator / (const RawImage<T>& i0, T t)
 	return out;
 }
 
+
 #endif
