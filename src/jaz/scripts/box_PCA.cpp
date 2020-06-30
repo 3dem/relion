@@ -52,6 +52,7 @@ int main(int argc, char *argv[])
 	
 	for (int i = 0; i < ic; i++)
 	{
+		std::cout << i << ": " << input_filenames[i] << std::endl;
 		images[i].read(input_filenames[i]);
 	}
 	
@@ -104,11 +105,11 @@ int main(int argc, char *argv[])
 
 	for (int i = 0; i < N; i++)
 	{
-		BufferedImage<float> out = ((float)svd.matrixV()(i,0)) * images[0];
+		BufferedImage<float> out = ((float)svd.matrixV()(0,i)) * images[0];
 		
 		for (int j = 1; j < ic; j++)
 		{
-			out += ((float)svd.matrixV()(i,j)) * images[j];
+			out += ((float)svd.matrixV()(j,i)) * images[j];
 		}
 		
 		out.write(output_directory+ZIO::itoa(i)+".mrc");

@@ -78,15 +78,15 @@ std::vector<std::string> ZIO::split(const std::string &s, const std::string &del
 	std::vector<std::string> out;
 	
 	char* cstr = const_cast<char*>(s.c_str());
-    char* current = strtok(cstr, delimiter.c_str());
+	char* current = strtok(cstr, delimiter.c_str());
 	
-    while (current != NULL)
+	while (current != NULL)
 	{
-        out.push_back(current);
-        current = strtok(cstr, delimiter.c_str());
-    }
+		out.push_back(current);
+		current = strtok(0, delimiter.c_str());
+	}
 	
-    return out;
+	return out;
 }
 
 std::string ZIO::itoa(double num)
