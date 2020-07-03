@@ -2081,7 +2081,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 	if (fn_mask2 != "None") checkMask(fn_mask2, 2, rank);
 
 	// Write out unmasked 2D class averages
-	do_write_unmasked_refs = (mymodel.ref_dim == 2);
+	do_write_unmasked_refs = (mymodel.ref_dim == 2 && !do_vmgd);
 
 #ifdef DEBUG
 	std::cerr << "Leaving initialiseGeneral" << std::endl;
@@ -4157,14 +4157,12 @@ void MlOptimiser::maximization()
 	unsigned nr_active_classes = 0;
 	float wsum_mode_pdf_class_sum = 0;
 	for (int i = 0; i < mymodel.nr_classes; i ++) {
-		wsum_mode_pdf_class_sum += sqrt(wsum_model.pdf_class[i]);
+		wsum_mode_pdf_class_sum += wsum_model.pdf_class[i];
 		if (mymodel.pdf_class[i] > 0.)
 			nr_active_classes ++;
 	}
 
 	if(do_vmgd) {
-		maximizationOtherParameters();
-
 		std::vector<float> avg_class_errors(mymodel.nr_classes * mymodel.nr_bodies, 0);
 		for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++) {
 			mymodel.class_age[iclass] += wsum_model.pdf_class[iclass]/wsum_mode_pdf_class_sum;
@@ -4324,8 +4322,7 @@ void MlOptimiser::maximization()
 
 	RCTIC(timer,RCT_3);
 	// Then perform the update of all other model parameters
-	if (!do_vmgd)
-		maximizationOtherParameters();
+	maximizationOtherParameters();
 	RCTOC(timer,RCT_3);
 	RCTIC(timer,RCT_4);
 	// Keep track of changes in hidden variables
@@ -9024,8 +9021,12 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 		{
 			subset_size = vmgd_fin_subset_size;
 		}
+
+		if (iter == nr_iter)
+			subset_size = mydata.numberOfParticles();
+
 		if (subset_size > mydata.numberOfParticles())
-			subset_size = -1;
+			subset_size = mydata.numberOfParticles();
 	}
 
 	if (myverb && subset_size != old_subset_size)
