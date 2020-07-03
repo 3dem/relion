@@ -2186,6 +2186,12 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 		for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++)
 		{
 			long int group_id = mydata.getGroupId(part_id, img_id);
+
+			if (do_vmgd && wsum_model.sumw_group[group_id] > vmgd_ini_subset_size) {
+				mymodel.nr_particles_per_group[group_id] ++;
+				continue;
+			}
+
 			int optics_group = mydata.getOpticsGroup(part_id, img_id);
 			RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
 			int my_image_size = mydata.getOpticsImageSize(optics_group);
@@ -2433,7 +2439,8 @@ void MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(MultidimArray<RFLOAT>
 	RFLOAT total_sum = 0.;
 	for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
 	{
-		mymodel.nr_particles_per_group[igroup] = ROUND(wsum_model.sumw_group[igroup]);
+		if (! do_vmgd)
+			mymodel.nr_particles_per_group[igroup] = ROUND(wsum_model.sumw_group[igroup]);
 		total_sum += wsum_model.sumw_group[igroup];
 	}
 	Mavg /= total_sum;
