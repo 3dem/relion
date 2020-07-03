@@ -707,7 +707,13 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 
 			ctfImage *= weightImage;
 		}
-
+		
+		const d4Matrix proj = (double)padding_factor * d4Matrix(
+				A3D(0,0), A3D(0,1), A3D(0,2), 0,
+				A3D(1,0), A3D(1,1), A3D(1,2), 0,
+				A3D(2,0), A3D(2,1), A3D(2,2), 0,
+				       0,        0,        0, 1 );
+		
 		dataImage(0,0) = 0.0;
 
 		if (do_ewald)
@@ -731,7 +737,20 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 			}
 			else
 			{
-				REPORT_ERROR("Ewald's sphere curvature is currently only supported with forward mapping.");
+				RawImage<Complex> dataImageP(F2DP);
+				RawImage<Complex> dataImageQ(F2DQ);
+				
+				FourierBackprojection::backprojectSlice_noSF_curved(
+					dataImageP, ctfImage, proj, +r_ewald_sphere,
+					accumulation_volume->data,
+					accumulation_volume->weight,
+					num_threads_in);
+				
+				FourierBackprojection::backprojectSlice_noSF_curved(
+					dataImageQ, ctfImage, proj, -r_ewald_sphere,
+					accumulation_volume->data,
+					accumulation_volume->weight,
+					num_threads_in);
 			}
 		}
 		else
@@ -742,12 +761,6 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 			}
 			else
 			{
-				const d4Matrix proj = (double)padding_factor * d4Matrix(
-						A3D(0,0), A3D(0,1), A3D(0,2), 0,
-						A3D(1,0), A3D(1,1), A3D(1,2), 0,
-						A3D(2,0), A3D(2,1), A3D(2,2), 0,
-						       0,        0,        0, 1 );
-
 				if (do_dual_contrast)
 				{
 					FourierBackprojection::backprojectSlice_noSF_dualContrast(
@@ -1348,17 +1361,18 @@ void SpaBackproject::applyCTFPandCTFQ(
 			float anglemax = angle + 90. + (0.5*angle_step);
 
 			// angles larger than 180
-			bool is_reverse = false;
+			bool is_sector_reverse = false;
+			
 			if (anglemin >= 180.)
 			{
 				anglemin -= 180.;
 				anglemax -= 180.;
-				is_reverse = true;
+				is_sector_reverse = true;
 			}
 			
 			MultidimArray<Complex> *myCTFPorQ, *myCTFPorQb;
 			
-			if (is_reverse)
+			if (is_sector_reverse)
 			{
 				myCTFPorQ  = (ipass == 0) ? &outQ : &outP;
 				myCTFPorQb = (ipass == 0) ? &outP : &outQ;

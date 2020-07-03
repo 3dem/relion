@@ -69,6 +69,31 @@ class FourierBackprojection
 			int num_threads);
 		
 		template <typename SrcType, typename DestType>
+		static inline void rasteriseLine(
+			const RawImage<tComplex<SrcType>>& dataFS,
+			const RawImage<SrcType>& weight,
+			int x0, 
+			int x1,
+			const int y, 
+			const int z,
+			const double D,
+			const gravis::d3Matrix& A,
+			const double yy, 
+			const double zz,
+			RawImage<tComplex<DestType>>& destFS,
+			RawImage<DestType>& destCTF);
+		
+		template <typename SrcType, typename DestType>
+		static void backprojectSlice_noSF_curved(
+			const RawImage<tComplex<SrcType>>& dataFS,
+			const RawImage<SrcType>& weight,
+			const gravis::d4Matrix& proj,
+			const double radius,
+			RawImage<tComplex<DestType>>& destFS,
+			RawImage<DestType>& destCTF,
+			int num_threads);
+		
+		template <typename SrcType, typename DestType>
 		static void backprojectSlice_noSF(
 			const RawImage<tComplex<SrcType>>& dataFS,
 			const RawImage<SrcType>& weight,
@@ -355,6 +380,218 @@ void FourierBackprojection::backprojectSlice_noSF(
 				destCTF(x,y,z) += c * wgh;
 				destMP(x,y,z) += c;
 			}
+		}
+	}
+}
+
+template <typename SrcType, typename DestType>
+inline void FourierBackprojection::rasteriseLine(
+        const RawImage<tComplex<SrcType>>& dataFS,
+		const RawImage<SrcType>& weight,
+        int x0, 
+        int x1,
+        const int y, 
+        const int z,
+        const double D,
+        const gravis::d3Matrix& A,
+        const double yy, 
+        const double zz,
+        RawImage<tComplex<DestType>>& destFS,
+		RawImage<DestType>& destCTF)
+{
+	const int wh2 = dataFS.xdim;
+	const int h2 = dataFS.ydim;
+	const int wh3 = destFS.ydim;
+	
+	if (x0 < 0) x0 = 0;
+	if (x1 >= wh3) x1 = wh3 - 1;
+	
+	for (long int x = x0; x <= x1; x++)
+	{
+		const gravis::d3Vector pw(x,yy,zz);		
+		const gravis::d3Vector pi0 = A * pw;
+		const gravis::d3Vector pi(pi0.x, pi0.y, pi0.z + D * (pi.x * pi.x + pi.y * pi.y));
+		
+		if (pi.z > -1.0 && pi.z < 1.0 &&
+			std::abs(pi.x) < wh2 && std::abs(pi.y) < h2/2 + 1 )
+		{
+			const double c = 1.0 - std::abs(pi.z);
+			
+			tComplex<SrcType> z0 = Interpolation::linearXY_complex_FftwHalf_clip(dataFS, pi.x, pi.y, 0);
+			const DestType wgh = Interpolation::linearXY_symmetric_FftwHalf_clip(weight, pi.x, pi.y, 0);
+							
+			destFS(x,y,z) += tComplex<DestType>(c * z0.real, c * z0.imag);
+			destCTF(x,y,z) += c * wgh;
+		}
+	}
+}
+
+template <typename SrcType, typename DestType>
+void FourierBackprojection::backprojectSlice_noSF_curved(
+				const RawImage<tComplex<SrcType>>& dataFS,
+				const RawImage<SrcType>& weight,
+				const gravis::d4Matrix& proj,
+				const double radius,
+				RawImage<tComplex<DestType>>& destFS,
+				RawImage<DestType>& destCTF,
+				int num_threads)
+{
+	const int wh2 = dataFS.xdim;
+	const int h2 = dataFS.ydim;
+	
+	const int wh3 = destFS.xdim;
+	const int h3 = destFS.ydim;
+	const int d3 = destFS.zdim;
+	
+	if (!destCTF.hasSize(wh3, h3, d3))
+	{
+		REPORT_ERROR_STR("FourierBackprojection::backprojectSlice_noSF: destCTF has wrong size ("
+						 << destCTF.getSizeString() << " instead of " << destCTF.getSizeString() << ")");
+	}
+	
+	gravis::d3Matrix P(proj(0,0), proj(1,0), proj(2,0), 
+					   proj(0,1), proj(1,1), proj(2,1), 
+					   proj(0,2), proj(1,2), proj(2,2) );
+			
+	gravis::d3Matrix A = P.invert();
+	
+	gravis::d3Vector ax(A(0,0), A(0,1), A(0,2));
+	gravis::d3Vector ay(A(1,0), A(1,1), A(1,2));
+	gravis::d3Vector az(A(2,0), A(2,1), A(2,2));
+	
+	const double D = 1.0 / (2.0 * radius);
+		
+	
+	#pragma omp parallel for num_threads(num_threads)	
+	for (long int z = 0; z < d3; z++)
+	for (long int y = 0; y < h3; y++)
+	{
+		const double yy = y >= h3/2? y - h3 : y;
+		const double zz = z >= d3/2? z - d3 : z;
+		
+		/*
+			forward model:
+			
+				3x3 Matrix P = [Pu, Pv, Pw]
+			
+				(u,v) -> (x,y,z) = u * Pu + v * Pv + D * (u² + v²) * Ph
+			
+			
+			extend:
+			
+				(u,v,h) -> (x,y,z)   
+				    = u * Pu + v * Pv + [D * (u² + v²) + h] * Ph
+					
+				(u,v,h) -> (x,y,z)_0 
+				    = P * (u,v,w) 
+				    = u * Pu + v * Pv + h * Ph
+				
+				(x,y,z) = (x,y,z)_0 + D * (u² + v²) * Ph
+				
+
+			invert:
+			
+				Matrix A = P^(-1) = [Ax, Ay, Az] = [Au, Av, Ah]^T
+			
+				(u,v,h) = A * (x,y,z)_0
+				        = A * [(x,y,z) - D * (u² + v²) * Ph]
+				        = A * (x,y,z) - D * (u² + v²) * eh
+				
+				        = [ Au * (x,y,z) ]
+				          [ Av * (x,y,z) ]
+				          [ Ah * (x,y,z) - D * (u² + v²)]
+ 
+				
+				        = [ Au * (x,y,z) ]
+				          [ Av * (x,y,z) ]
+				          [ Ah * (x,y,z) - D * ((Au * (x,y,z))² + (Av * (x,y,z))²)]
+
+			given y and z, find the range of x for which -1 < h < 1:
+			
+				Ah * (x,y,z) - D * ((Au * (x,y,z))² + (Av * (x,y,z))²)  in [-1,1]
+				
+				= Ahx * x + Ahy * y + Ahz * z
+				  - D * ((Aux * x + Auy * y + Auz * z)² + (Avx * x + Avy * y + Avz * z)²)
+				  
+				= Axz * x + Ayz * y + Azz * z
+				  - D * ((Axx * x + Ayx * y + Azx * z)² + (Axy * x + Ayy * y + Azy * z)²)
+				  
+				= Axz * x + Ayz * y + Azz * z				
+				  - D * (
+				           Axx² x² + 2 Axx Ayx x y + 2 Axx Azx x z 
+				         + Ayx² y² + 2 Ayx Azx y z
+				         + Azx² z² 
+				
+				         + Axy² x² + 2 Axy Ayy x y + 2 Axy Azy x z 
+				         + Ayy² y² + 2 Ayy Azy y z
+				         + Azy² z² )
+				
+
+				= -D [Axx² + Axy²] * x²
+				
+				  + [-D {2(Axx Ayx + Axy Ayy) y + 2(Axx Azx + Axy Azy) z} + Axz] * x
+				  
+				  + -D {(Ayx²+Ayy²) y² + 2(Ayx Azx + Ayy Azy) y z + (Azx² + Azy²) z²} + Ayz * y + Azz * z
+				  
+			
+				=: f(x) =: alpha x² + beta x + gamma
+						  
+		*/
+		
+		
+		const double alpha = -D * (ax.x * ax.x + ax.y  * ax.y);
+		
+		const double beta  =
+		        -D * (
+						 2 * (ax.x * ay.x + ax.y * ay.y) * yy
+					   + 2 * (ax.x * az.x + ax.y * az.y) * zz
+					   + ax.z
+					 );
+		
+		const double gamma_0 = 
+		        -D * (      
+							 (ay.x * ay.x + ay.y * ay.y) * yy * yy 
+					   + 2 * (ay.x * az.x + ay.y * az.y) * yy * zz
+					   +     (az.x * az.x + az.y * az.y) * zz * zz 
+					 ) 
+					 + ay.z * yy + az.z * zz;
+		
+		const double gamma_up   = alpha > 0.0? gamma_0 + 1 :  gamma_0 - 1;
+		const double gamma_down = alpha > 0.0? gamma_0 - 1 :  gamma_0 + 1;
+		
+		const double discr_out  = beta * beta - 4 * alpha * gamma_down;
+		const double discr_in   = beta * beta - 4 * alpha * gamma_up;
+		        
+		if (discr_out < 0.0) continue;
+		
+		const double mid = -0.5 * beta / alpha;
+		const double outer_step = 0.5 * sqrt(discr_out) / std::abs(alpha);
+		
+		if (discr_in < 0.0)
+		{
+			const int x0 = std::ceil(mid - outer_step);
+			const int x1 = std::floor(mid + outer_step);
+			
+			rasteriseLine(
+				dataFS, weight, x0, x1, y, z, D, A,
+				yy, zz, destFS, destCTF);
+		}
+		else
+		{
+			const double inner_step = 0.5 * sqrt(discr_in) / std::abs(alpha);
+			
+			const int x0_0 = std::ceil(mid - outer_step);
+			const int x1_0 = std::floor(mid - inner_step);
+			const int x0_1 = std::ceil(mid + inner_step);
+			const int x1_1 = std::floor(mid + outer_step);
+			
+			rasteriseLine(
+				dataFS, weight, x0_0, x1_0, y, z, D, A,
+				yy, zz, destFS, destCTF);
+			
+			rasteriseLine(
+				dataFS, weight, x0_1, x1_1, y, z, D, A,
+				yy, zz, destFS, destCTF);
 		}
 	}
 }
