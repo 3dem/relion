@@ -2187,9 +2187,10 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 		{
 			long int group_id = mydata.getGroupId(part_id, img_id);
 
-			if (do_vmgd && wsum_model.sumw_group[group_id] > vmgd_ini_subset_size) {
+			if (do_vmgd) {
 				mymodel.nr_particles_per_group[group_id] ++;
-				continue;
+				if (do_vmgd && mymodel.nr_particles_per_group[group_id] > vmgd_ini_subset_size)
+					continue;
 			}
 
 			int optics_group = mydata.getOpticsGroup(part_id, img_id);
