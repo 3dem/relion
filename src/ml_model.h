@@ -412,8 +412,8 @@ public:
 	// Read images from disc and initialise
 	// Also set do_average_unaligned and do_generate_seeds flags
 	void initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experiment &_mydata,
-			bool &do_average_unaligned, bool &do_generate_seeds,
-			bool &refs_are_ctf_corrected, RFLOAT ref_angpix = -1.,
+			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected,
+			RFLOAT ref_angpix = -1., bool _do_sgd = false, bool do_trust_ref = false, 
 			bool _do_mom1 = false, bool _do_mom2 = false, bool verb = false);
 
 	RFLOAT getResolution(int ipix)	{ return (RFLOAT)ipix/(pixel_size * ori_size); }
@@ -442,9 +442,6 @@ public:
 
 	// current_size will determine the size of the transform (in number of Fourier shells) to be held in the projector ( thisClass == -1  => do all classes this call)
 	void setFourierTransformMaps(bool update_tau2_spectra, std::vector<bool> ListCheapSetup, int nr_threads = 1, RFLOAT strict_lowres_exp = -1);
-
-    //Calculate average power of noise of the entire dataset
-	MultidimArray<RFLOAT> getAverageSigma2Noise();
 
 	/* Initialises the radial average of the data-versus-prior ratio
 	 */

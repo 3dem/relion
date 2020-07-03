@@ -869,18 +869,6 @@ void JobWindow::initialiseExtractWindow()
 	group1->end();
 	guientries["do_reextract"].cb_menu_i();
 
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group2->end();
-	place("do_set_angpix", TOGGLE_DEACTIVATE, group2);
-
-	group2->begin();
-	place("angpix", TOGGLE_DEACTIVATE); //(current_y, "Pixel size (A)", 1, 0.3, 5, 0.1, "Provide the pixel size in Angstroms in the micrograph (so before any re-scaling).  If you provide input CTF parameters, then leave this value to the default of -1.");
-	group2->end();
-	guientries["do_set_angpix"].cb_menu_i();
-
 	tab1->end();
 
 	tab2->begin();
@@ -1132,6 +1120,10 @@ void JobWindow::initialiseClass2DWindow()
 	place("psi_sampling");
 	place("offset_range");
 	place("offset_step");
+
+	current_y += STEPY/2;
+	place("allow_coarser");
+
 	group3->end();
 
 	guientries["dont_skip_align"].cb_menu_i(); // to make default effective
@@ -1404,6 +1396,9 @@ void JobWindow::initialiseClass3DWindow()
 	group4->end();
 	guientries["do_local_ang_searches"].cb_menu_i(); // to make default effective
 
+	current_y += STEPY/2;
+	place("allow_coarser");
+
 	group3->end();
 	guientries["dont_skip_align"].cb_menu_i(); // to make default effective
 
@@ -1545,10 +1540,11 @@ void JobWindow::initialiseAutorefineWindow()
 	place("offset_range", TOGGLE_DEACTIVATE);
 	place("offset_step", TOGGLE_DEACTIVATE);
 
-	// Add a little spacer
 	current_y += STEPY/2;
-
 	place("auto_local_sampling", TOGGLE_DEACTIVATE);
+
+	current_y += STEPY/2;
+	place("auto_faster");
 
 	tab5->end();
 	tab6->begin();

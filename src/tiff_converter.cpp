@@ -194,7 +194,7 @@ void TIFFConverter::unnormalise(FileName fn_movie, FileName fn_tiff)
 			const float expected = gain_here * ival;
 			if (fabs(expected - val) > 0.0001)
 			{
-				snprintf(msg, 255, " mismatch: %s frame %2d pos %4d %4d status %5d obs % 8.4f expected % 8.4f gain %.4f\n",
+				snprintf(msg, 255, " mismatch: %s frame %2d pos %4ld %4ld obs % 8.4f status %d expected % 8.4f gain %.4f\n",
 					 fn_movie.c_str(), iframe, n / nx, n % ny, (double)val, DIRECT_MULTIDIM_ELEM(defects(), n),
 					 (double)expected, (double)gain_here);
 				std::cerr << msg << std::endl;
@@ -213,7 +213,7 @@ void TIFFConverter::unnormalise(FileName fn_movie, FileName fn_tiff)
 					ival = underflow;
 					error++;
 					
-					printf(" underflow: %s frame %2d pos %4d %4d obs % 8.4f expected % 8.4f gain %.4f\n",
+					printf(" underflow: %s frame %2d pos %4ld %4ld obs % 8.4f expected % 8.4f gain %.4f\n",
 					       fn_movie.c_str(), iframe, n / nx, n % ny, (double)val,
 					       (double)expected, (double)gain_here);
 				}
@@ -222,7 +222,7 @@ void TIFFConverter::unnormalise(FileName fn_movie, FileName fn_tiff)
 					ival = overflow;
 					error++;
 
-					printf(" overflow: %s frame %2d pos %4d %4d obs % 8.4f expected % 8.4f gain %.4f\n",
+					printf(" overflow: %s frame %2d pos %4ld %4ld obs % 8.4f expected % 8.4f gain %.4f\n",
 					       fn_movie.c_str(), iframe, n / nx, n % ny, (double)val,
 					       (double)expected, (double)gain_here);
 				}
@@ -283,7 +283,7 @@ void TIFFConverter::initialise(int _rank, int _total_ranks)
 	if (do_estimate && total_ranks != 1)
 		REPORT_ERROR("MPI parallelisation is not avaialble for --estimate_gain");
 
-	if (fn_out.back() != '/')
+	if (fn_out[fn_out.size() - 1] != '/')
 		fn_out += "/";
 
 	FileName fn_first;
@@ -291,7 +291,7 @@ void TIFFConverter::initialise(int _rank, int _total_ranks)
 
 	if (fn_in_ext == "star")
 	{
-		MD.read(fn_in, "movie");
+		MD.read(fn_in, "movies");
 
 		// Support non-optics group STAR files
 		if (MD.numberOfObjects() == 0)

@@ -28,6 +28,7 @@ class Optimization
 {
     public:
 
+    // Don't forget const when overriding these functions!
     virtual double f(const std::vector<double>& x, void* tempStorage) const = 0;
     virtual void* allocateTempStorage() const {return 0;}
     virtual void deallocateTempStorage(void* ts) const {}

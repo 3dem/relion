@@ -38,7 +38,7 @@ class star_handler_parameters
 	std::string remove_col_label, add_col_label, add_col_value, add_col_from, hist_col_label, select_include_str, select_exclude_str;
 	RFLOAT eps, select_minval, select_maxval, multiply_by, add_to, center_X, center_Y, center_Z, hist_min, hist_max;
 	bool do_ignore_optics, do_combine, do_split, do_center, do_random_order, show_frac, show_cumulative, do_discard;
-	long int nr_split, size_split, nr_bin;
+	long int nr_split, size_split, nr_bin, random_seed;
 	RFLOAT discard_sigma, duplicate_threshold, extract_angpix, cl_angpix;
 	ObservationModel obsModel;
 	// I/O Parser
@@ -88,6 +88,7 @@ class star_handler_parameters
 		int split_section = parser.addSection("Split options");
 		do_split = parser.checkOption("--split", "Split the input STAR file into one or more smaller output STAR files");
 		do_random_order = parser.checkOption("--random_order", "Perform splits on randomised order of the input STAR file");
+		random_seed = textToInteger(parser.getOption("--random_seed", "Random seed for randomisation.", "-1"));
 		nr_split = textToInteger(parser.getOption("--nr_split", "Split into this many equal-sized STAR files", "-1"));
 		size_split = textToLongLong(parser.getOption("--size_split", "AND/OR split into subsets of this many lines", "-1"));
 
@@ -437,14 +438,14 @@ class star_handler_parameters
 
 				obsModels[obs_id].opticsMdt = unique_opticsMdt;
 
-				if (MDsin[MDs_id].containsLabel(EMDL_MLMODEL_GROUP_NAME))
+				FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsin[MDs_id])
 				{
-					FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsin[MDs_id])
+					MDsin[MDs_id].setValue(EMDL_IMAGE_OPTICS_GROUP, new_optics_groups[current_object]);
+
+					// Also rename the rlnGroupName to not have groups overlapping from different optics groups
+					std::string name;
+					if (MDsin[MDs_id].getValue(EMDL_MLMODEL_GROUP_NAME, name))
 					{
-						MDsin[MDs_id].setValue(EMDL_IMAGE_OPTICS_GROUP, new_optics_groups[current_object]);
-						// Also rename the rlnGroupName to not have groups overlapping from different optics groups
-						std::string name;
-						MDsin[MDs_id].getValue(EMDL_MLMODEL_GROUP_NAME, name);
 						name = "optics"+integerToString(new_optics_groups[current_object])+"_"+name;
 						MDsin[MDs_id].setValue(EMDL_MLMODEL_GROUP_NAME, name);
 					}
@@ -457,7 +458,6 @@ class star_handler_parameters
 			{
 				MDoptics.push_back(obsModels[i - 1].opticsMdt);
 			}
-
 
 			// Check if anisotropic magnification and/or beam_tilt are present in some optics groups, but not in others.
 			// If so, initialise the others correctly
@@ -645,6 +645,11 @@ class star_handler_parameters
 		// Randomise if neccesary
 		if (do_random_order)
 		{
+			if (random_seed < 0)
+				randomize_random_generator();
+			else
+				init_random_generator(random_seed);
+
 			MD.randomiseOrder();
 		}
 

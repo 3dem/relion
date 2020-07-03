@@ -499,9 +499,15 @@ will still yield good performance and possibly a more stable execution. \n" << s
 		{
 			if (verb > 0) std::cout<< " WARNING: provided sigma2_noise-spectrum has fewer entries ("<<idx+1<<") than needed ("<<XSIZE(mymodel.sigma2_noise[0])<<"). Set rest to zero..."<<std::endl;
 		}
-		// Use the same spectrum for all classes
-		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
-			mymodel.sigma2_noise[igroup] =  mymodel.sigma2_noise[0];
+
+        mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
+        for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
+        {
+            // Use the same spectrum for all classes
+            mymodel.sigma2_noise[igroup] =  mymodel.sigma2_noise[0];
+            // We set wsum_model.sumw_group as in calculateSumOfPowerSpectraAndAverageImage
+            wsum_model.sumw_group[igroup] = mymodel.nr_particles_per_group[igroup];
+        }
 	}
 	else if (do_calculate_initial_sigma_noise || do_average_unaligned)
 	{
@@ -878,7 +884,7 @@ void MlOptimiserMpi::expectation()
 		timer.tic(TIMING_EXP_3);
 #endif
 	// D. Update the angular sampling (all nodes except master)
-	if (!node->isMaster() && (do_auto_refine) && iter > 1)
+	if (!node->isMaster() && ( do_auto_refine && iter > 1 || (mymodel.nr_classes > 1 && allow_coarser_samplings) ))
 		updateAngularSampling(node->rank == 1);
 
 	// The master needs to know about the updated parameters from updateAngularSampling
@@ -2035,6 +2041,8 @@ void MlOptimiserMpi::maximization()
 					if ((wsum_model.BPref[ith_recons].weight).sum() > XMIPP_EQUAL_ACCURACY)
 					{
 
+						MultidimArray<RFLOAT> Iref_old;
+
 						(wsum_model.BPref[ith_recons]).updateSSNRarrays(mymodel.tau2_fudge_factor,
 								mymodel.tau2_class[ith_recons],
 								mymodel.sigma2_class[ith_recons],
@@ -2043,18 +2051,6 @@ void MlOptimiserMpi::maximization()
 								mymodel.fsc_halves_class[ibody],
 								do_split_random_halves,
 								(do_join_random_halves || do_always_join_random_halves));
-
-#ifdef TIMING
-						(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons],
-								gridding_nr_iter,
-								do_map,
-								mymodel.tau2_class[ith_recons],
-								mymodel.tau2_fudge_factor,
-								wsum_model.pdf_class[iclass],
-								minres_map,
-								false,
-								&timer);
-#else
 
 						if (do_external_reconstruct)
 						{
@@ -2068,6 +2064,9 @@ void MlOptimiserMpi::maximization()
 									fn_ext_root,
 									mymodel.fsc_halves_class[ith_recons],
 									mymodel.tau2_class[ith_recons],
+									mymodel.sigma2_class[ith_recons],
+									mymodel.data_vs_prior_class[ith_recons],
+									(do_join_random_halves || do_always_join_random_halves),
 									mymodel.tau2_fudge_factor,
 									node->rank==1); // only first slaves is verbose
 						}
@@ -2096,7 +2095,6 @@ void MlOptimiserMpi::maximization()
 										false);
 							}
 						}
-#endif
 					}
 
 					// Apply the body mask
@@ -2199,6 +2197,9 @@ void MlOptimiserMpi::maximization()
 										fn_ext_root,
 										mymodel.fsc_halves_class[ith_recons],
 										mymodel.tau2_class[ith_recons],
+										mymodel.sigma2_class[ith_recons],
+										mymodel.data_vs_prior_class[ith_recons],
+										(do_join_random_halves || do_always_join_random_halves),
 										mymodel.tau2_fudge_factor);
 							}
 							else
@@ -3119,15 +3120,6 @@ void MlOptimiserMpi::iterate()
 #endif
 			writeTemporaryDataAndWeightArrays();
 
-		if (do_vmgd)
-			for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
-			{
-				(wsum_model.BPref[iclass]).reweightGrad(
-						mymodel.Igrad1[iclass], do_mom1 ? 0.9 : 0.,
-						mymodel.Igrad2[iclass], do_mom2 ? 0.999 : 0.,
-						iter==1);
-			}
-
 		// Inside iterative refinement: do FSC-calculation BEFORE the solvent flattening, otherwise over-estimation of resolution
 		// anyway, now that this is done inside BPref, there would be no other way...
 		if (do_split_random_halves)
@@ -3231,45 +3223,20 @@ void MlOptimiserMpi::iterate()
 		{
 			if ( (do_helical_refine) && (!do_skip_align) && (!do_skip_rotate) && mymodel.ref_dim == 3)
 			{
-				int nr_same_polarity = 0, nr_opposite_polarity = 0;
-				int nr_same_rot = 0, nr_opposite_rot = 0;	// KThurber
-				RFLOAT opposite_percentage = 0.;
-				RFLOAT rot_opposite_percent = 0.;	// KThurber
-				bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
-				bool do_classification_local_searches = (!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
-						&& (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.);
-				bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
-
-				if (helical_sigma_distance < 0.)
-					updateAngularPriorsForHelicalReconstruction(mydata.MDimg, helical_keep_tilt_prior_fixed);
-				else
-				{
 					updatePriorsForHelicalReconstruction(
 							mydata.MDimg,
-							nr_opposite_polarity,
-							nr_opposite_rot,	// KThurber
 							helical_sigma_distance * ((RFLOAT)(mymodel.ori_size)),
 							mymodel.helical_rise,
 							mymodel.helical_twist,
+							helical_nstart,
 							(mymodel.data_dim == 3),
 							do_auto_refine,
-							do_local_angular_searches,
 							mymodel.sigma2_rot,
 							mymodel.sigma2_tilt,
 							mymodel.sigma2_psi,
 							mymodel.sigma2_offset,
-							helical_keep_tilt_prior_fixed);
-
-					nr_same_polarity = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_polarity;
-					opposite_percentage = (100.) * ((RFLOAT)(nr_opposite_polarity)) / ((RFLOAT)(mydata.MDimg.numberOfObjects()));
-					nr_same_rot = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_rot; // KThurber
-					rot_opposite_percent = (100.) * ((RFLOAT)(nr_opposite_rot)) / ((RFLOAT)(mydata.MDimg.numberOfObjects())); // KThurber
-					if ( (verb > 0) && (!do_local_angular_searches) )
-					{
-						std::cout << " Number of helical segments with psi angles similar/opposite to their priors: " << nr_same_polarity << " / " << nr_opposite_polarity << " (" << opposite_percentage << "%)" << std::endl;
-						std::cout << " Number of helical segments with rot angles similar/opposite to their priors: " << nr_same_rot << " / " << nr_opposite_rot << " (" << rot_opposite_percent << "%)" << std::endl; // KThurber
-					}
-				}
+							helical_keep_tilt_prior_fixed,
+							verb);
 			}
 		}
 		MPI_Barrier(MPI_COMM_WORLD);

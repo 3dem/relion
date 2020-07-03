@@ -1783,17 +1783,17 @@ void GuiMainWindow::cb_display_io_node_i()
 
 				std::string error_message = "";
 				float mylowpass = manualpickjob.joboptions["lowpass"].getNumber(error_message);
-				if (error_message != "") {fl_message("%s", error_message.c_str()); return;}
+				if (error_message != "") {fl_message("joboption['lowpass'] %s", error_message.c_str()); return;}
 				if (mylowpass > 0.)
 					command += " --lowpass " + manualpickjob.joboptions["lowpass"].getString();
 
 				float myhighpass = manualpickjob.joboptions["highpass"].getNumber(error_message);
-				if (error_message != "") {fl_message("%s", error_message.c_str()); return;}
+				if (error_message != "") {fl_message("joboption['highpass'] %s", error_message.c_str()); return;}
 				if (myhighpass > 0.)
 					command += " --highpass " + manualpickjob.joboptions["highpass"].getString();
 
 				float myangpix = manualpickjob.joboptions["angpix"].getNumber(error_message);
-				if (error_message != "") {fl_message("%s", error_message.c_str()); return;}
+				if (error_message != "") {fl_message("joboption['angpix'] %s", error_message.c_str()); return;}
 				if (myangpix > 0.)
 					command += " --angpix " + manualpickjob.joboptions["angpix"].getString();
 

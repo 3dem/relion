@@ -61,7 +61,7 @@ public:
 	bool do_phase_flip;
 	bool do_premultiply_ctf;
 	bool do_ctf_intact_first_peak;
-	RFLOAT angpix, output_angpix;
+	RFLOAT angpix, output_angpix, ref_angpix;
 
 	////////////////// Extract particles from the micrographs
 	// Perform particle extraction?
@@ -169,9 +169,6 @@ public:
 
 	// Name of output stack (only when fn_operate in is given)
 	FileName fn_operate_out;
-
-	// Manually set pixel size (rlnMagnification and rlnDetectorPixelSize) in the output STAR file
-	RFLOAT set_angpix;
 
 public:
 	// Read command line arguments

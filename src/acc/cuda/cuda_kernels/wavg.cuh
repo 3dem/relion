@@ -23,7 +23,6 @@ __global__ void cuda_kernel_wavg(
 		XFLOAT *g_trans_z,
 		XFLOAT* g_weights,
 		XFLOAT* g_ctfs,
-		XFLOAT *g_error,
 		XFLOAT *g_wdiff2s_parts,
 		XFLOAT *g_wdiff2s_AA,
 		XFLOAT *g_wdiff2s_XA,
@@ -48,8 +47,6 @@ __global__ void cuda_kernel_wavg(
 	if (tid < 9)
 		s_eulers[tid] = g_eulers[bid*9+tid];
 	__syncthreads();
-
-	XFLOAT error = 0.f;
 
 	for (unsigned pass = 0; pass < pass_num; pass++) // finish a reference proj in each block
 	{
@@ -148,8 +145,6 @@ __global__ void cuda_kernel_wavg(
 					XFLOAT diff_real = ref_real - trans_real;
 					XFLOAT diff_imag = ref_imag - trans_imag;
 
-					error += weight * (diff_real*diff_real + diff_imag*diff_imag);
-
 					s_wdiff2s_parts[tid] += weight * (diff_real*diff_real + diff_imag*diff_imag);
 
 					s_sumXA[tid] +=  weight * ( ref_real * trans_real + ref_imag * trans_imag);
@@ -157,7 +152,6 @@ __global__ void cuda_kernel_wavg(
 				}
 			}
 
-			cuda_atomic_add(&g_error[pixel], error);
 			cuda_atomic_add(&g_wdiff2s_XA[pixel], s_sumXA[tid]);
 			cuda_atomic_add(&g_wdiff2s_AA[pixel], s_sumA2[tid]);
 			cuda_atomic_add(&g_wdiff2s_parts[pixel], s_wdiff2s_parts[tid]);

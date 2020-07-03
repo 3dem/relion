@@ -732,16 +732,16 @@ void TiltHelper::drawPhaseShift(
         const Matrix2D<RFLOAT>& mag,
         Image<RFLOAT> *tgt)
 {
-    for (long yi = 0; yi < h; yi++)
+	for (long yi = 0; yi < h; yi++)
     for (long xi = 0; xi < w; xi++)
     {
         const double x0 = xi;
         const double y0 = yi < w? yi : yi-h;
 
-		const double x = mag(0,0) * x0 + mag(0,1) * y0;
-		const double y = mag(1,0) * x0 + mag(1,1) * y0;
+		const double x = (mag(0,0) * x0 + mag(0,1) * y0) / as;
+		const double y = (mag(1,0) * x0 + mag(1,1) * y0) / as;
 
-        const double q = x*x + y*y;
+		const double q = x*x + y*y;
 
         DIRECT_A2D_ELEM(tgt->data, yi, xi) = x * shift_x + y * shift_y + q * x * tilt_x + q * y * tilt_y;
     }
@@ -761,8 +761,8 @@ void TiltHelper::drawPhaseShift(
 		const double x0 = xi;
         const double y0 = yi < w? yi : yi-h;
 
-		const double x = mag(0,0) * x0 + mag(0,1) * y0;
-		const double y = mag(1,0) * x0 + mag(1,1) * y0;
+        const double x = (mag(0,0) * x0 + mag(0,1) * y0) / as;
+		const double y = (mag(1,0) * x0 + mag(1,1) * y0) / as;
 
         const double q = tilt_xx * x * x + 2.0 * tilt_xy * x * y + tilt_yy * y * y;
 
@@ -877,9 +877,9 @@ void *BasisOptimisation::allocateTempStorage() const
 	return new Image<RFLOAT>(w,h);
 }
 
-void BasisOptimisation::deallocateTempStorage(void *ts)
-{
-	delete (Image<RFLOAT>*)ts;
+void BasisOptimisation::deallocateTempStorage(void *ts) const
+{	
+	delete static_cast<Image<RFLOAT>*>(ts);
 }
 
 AnisoBasisOptimisation::AnisoBasisOptimisation(
@@ -933,7 +933,7 @@ void* AnisoBasisOptimisation::allocateTempStorage() const
 	return new Image<RFLOAT>(w,h);
 }
 
-void AnisoBasisOptimisation::deallocateTempStorage(void *ts)
+void AnisoBasisOptimisation::deallocateTempStorage(void *ts) const
 {
-	delete (Image<RFLOAT>*)ts;
+	delete static_cast<Image<RFLOAT>*>(ts);
 }
