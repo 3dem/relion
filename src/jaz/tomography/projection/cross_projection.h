@@ -99,7 +99,7 @@ void CrossProjection::crossproject_bwd(
 			if (p_src.z > -1.0 && p_src.z < 1.0 &&
 			    std::abs(p_src.x) < wh && std::abs(p_src.y) < hh)
 			{
-				tComplex<SrcType> z0 = Interpolation::linearXY_complex_FftwHalf(stackFS, p_src.x, p_src.y, f_src);
+				tComplex<SrcType> z0 = Interpolation::linearXY_complex_FftwHalf_clip(stackFS, p_src.x, p_src.y, f_src);
 				
 				const double cx = 1.0 - std::abs(p_src.x);
 				const double cy = 1.0 - std::abs(p_src.y);

@@ -76,9 +76,14 @@ class RawImage
 				gravis::d3Vector origin = gravis::d3Vector(0,0,0),
 				gravis::d3Vector step = gravis::d3Vector(1,1,1)) const;
 		
-		void copyTo(gravis::tImage<T>& img, int z = 0) const;
-		void copyTo(Image<T>& img) const;
-		void copyTo(RawImage<T>& img) const;
+		template <class T2>
+		void copyTo(gravis::tImage<T2>& img, int z = 0) const;
+		
+		template <class T2>		
+		void copyTo(Image<T2>& img) const;
+		
+		template <class T2>
+		void copyTo(RawImage<T2>& img) const;
 		
 		template <class T2>
 		void copyFrom(const Image<T2>& img);
@@ -509,39 +514,39 @@ void RawImage<T>::writeVtk(std::string fn, gravis::d3Vector origin, gravis::d3Ve
 				step.x, step.y, step.z);
 }
 
-template <class T>
-inline void RawImage<T>::copyTo(gravis::tImage<T>& img, int z) const
+template <class T> template <class T2>
+inline void RawImage<T>::copyTo(gravis::tImage<T2>& img, int z) const
 {
-	img = gravis::tImage<T>(xdim, ydim);
+	img = gravis::tImage<T2>(xdim, ydim);
 	
 	for (size_t y = 0; y < ydim; y++)
 	for (size_t x = 0; x < xdim; x++)
 	{
-		img(x,y) = data[(z*ydim + y)*xdim + x];
+		img(x,y) = (T2) data[(z*ydim + y)*xdim + x];
 	}
 }
 
-template <class T>
-inline void RawImage<T>::copyTo(Image<T>& img) const
+template <class T> template <class T2>
+inline void RawImage<T>::copyTo(Image<T2>& img) const
 {
-	img = Image<T>(xdim, ydim, zdim);
+	img = Image<T2>(xdim, ydim, zdim);
 	
 	for (size_t z = 0; z < zdim; z++)
 	for (size_t y = 0; y < ydim; y++)
 	for (size_t x = 0; x < xdim; x++)
 	{
-		img(z,y,x) = data[(z*ydim + y)*xdim + x];
+		DIRECT_A3D_ELEM(img(), z, y, x) = (T2) data[(z*ydim + y)*xdim + x];
 	}
 }
 
-template <class T>
-inline void RawImage<T>::copyTo(RawImage<T>& img) const
+template <class T> template <class T2>
+inline void RawImage<T>::copyTo(RawImage<T2>& img) const
 {
 	for (size_t z = 0; z < zdim; z++)
 	for (size_t y = 0; y < ydim; y++)
 	for (size_t x = 0; x < xdim; x++)
 	{
-		img(x,y,z) = data[(z*ydim + y)*xdim + x];
+		img(x,y,z) = (T2) data[(z*ydim + y)*xdim + x];
 	}
 }
 
@@ -560,7 +565,8 @@ inline void RawImage<T>::copyFrom(const Image<T2>& img)
 	for (size_t y = 0; y < ydim; y++)
 	for (size_t x = 0; x < xdim; x++)
 	{
-		data[(z*ydim + y)*xdim + x] = T(img.data(z,y,x));
+		T val = (T) DIRECT_A3D_ELEM(img(), z, y, x);
+		data[(z*ydim + y)*xdim + x] = val;
 	}
 }
 

@@ -53,6 +53,13 @@ class Reconstruction
 				BufferedImage<DualContrastVoxel<T>>& out,
 				bool center,
 				int num_threads);
+		
+		template <typename T>
+		static void griddingCorrect3D_sinc2(
+				BufferedImage<tComplex<T>>& dataImgFS,
+				BufferedImage<T>& out,
+				bool center,
+				int num_threads);
 
 		template <typename T>
 		static void ctfCorrect3D_Wiener(
@@ -280,6 +287,69 @@ void Reconstruction :: griddingCorrect_dualContrast(
 		out(x,y,z) = image(x,y,z);
 		out(x,y,z).data_sin = sinImgFS(x,y,z);
 		out(x,y,z).data_cos = cosImgFS(x,y,z);
+	}
+}
+
+
+template <typename T>
+void Reconstruction :: griddingCorrect3D_sinc2(
+		BufferedImage<tComplex<T>>& dataImgFS,
+		BufferedImage<T>& out,
+		bool center, 
+		int num_threads)
+{
+	const long int wh = dataImgFS.xdim;
+	const long int w = 2 * (wh - 1);
+	const long int h = dataImgFS.ydim;
+	const long int d = dataImgFS.zdim;
+	
+	if (center)
+	{
+		#pragma omp parallel for num_threads(num_threads)
+		for (long int z = 0; z < d;  z++)
+		for (long int y = 0; y < h;  y++)
+		for (long int x = 0; x < wh; x++)
+		{
+			dataImgFS(x,y,z) *= (1 - 2*(x%2)) * (1 - 2*(y%2)) * (1 - 2*(z%2));
+		}
+	}
+	
+	// gridding correction
+	
+	BufferedImage<T> dataImg(w,h,d);	
+	FFT::inverseFourierTransform(dataImgFS, dataImg, FFT::Both);
+	
+	const double eps = 1e-2;
+	
+	#pragma omp parallel for num_threads(num_threads)
+	for (long int z = 0; z < d; z++)
+	for (long int y = 0; y < h; y++)
+	for (long int x = 0; x < w; x++)
+	{
+		const double xx = x - w/2;
+		const double yy = y - h/2;
+		const double zz = z - d/2;
+		
+		if (xx == 0 && yy == 0 && zz == 0)
+		{
+			out(x,y,z) = dataImg(x,y,z);
+		}
+		else
+		{		
+			const double r = sqrt(xx*xx + yy*yy + zz*zz);
+			const double d = r / w;
+			const double sinc = sin(PI * d) / (PI * d);
+			const double sinc2 = sinc * sinc;
+			
+			if (sinc2 > eps)
+			{
+				out(x,y,z) = dataImg(x,y,z) / sinc2;
+			}
+			else
+			{
+				out(x,y,z) = dataImg(x,y,z) / eps;
+			}			
+		}
 	}
 }
 

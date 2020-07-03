@@ -28,8 +28,11 @@ class BufferedImage : public RawImage<T>
 		
 		void read(std::string fn, int slice = -1);
 		
-		void copyFrom(const gravis::tImage<T>& img);
-		void copyFrom(const Image<T>& img);
+		template <typename T2>
+		void copyDataAndSizeFrom(const gravis::tImage<T2>& img);
+		
+		template <typename T2>
+		void copyDataAndSizeFrom(const Image<T2>& img);
 		
 		RawImage<T> getRef();
 		
@@ -167,19 +170,20 @@ void BufferedImage<T>::read(std::string fn, int slice)
 	{
 		gravis::tImage<T> img;
 		img.read(fn);
-		copyFrom(img);		
+		copyDataAndSizeFrom(img);		
 	}
 	else
 	{
 		Image<T> img;
 		img.read(fn, true, slice);
-		copyFrom(img);
+		copyDataAndSizeFrom(img);
 	}	
 }
 
 
 template <class T>
-inline void BufferedImage<T>::copyFrom(const gravis::tImage<T>& img)
+template <typename T2>
+inline void BufferedImage<T>::copyDataAndSizeFrom(const gravis::tImage<T2>& img)
 {
 	this->xdim = img.cols();
 	this->ydim = img.rows();
@@ -189,14 +193,15 @@ inline void BufferedImage<T>::copyFrom(const gravis::tImage<T>& img)
 	RawImage<T>::data = &(dataVec[0]);
 	
 	for (size_t y = 0; y < this->ydim; y++)
-		for (size_t x = 0; x < this->xdim; x++)
-		{
-			RawImage<T>::data[y * this->xdim + x] = img(x,y);
-		}
+	for (size_t x = 0; x < this->xdim; x++)
+	{
+		RawImage<T>::data[y * this->xdim + x] = (T)img(x,y);
+	}
 }
 
 template <class T>
-inline void BufferedImage<T>::copyFrom(const Image<T>& img)
+template <typename T2>
+inline void BufferedImage<T>::copyDataAndSizeFrom(const Image<T2>& img)
 {
 	this->xdim = img.data.xdim;
 	this->ydim = img.data.ydim;
@@ -209,7 +214,8 @@ inline void BufferedImage<T>::copyFrom(const Image<T>& img)
 	for (size_t y = 0; y < this->ydim; y++)
 	for (size_t x = 0; x < this->xdim; x++)
 	{
-		RawImage<T>::data[(z * this->ydim + y) * this->xdim + x] = img(z,y,x);
+		T value = (T)(DIRECT_A3D_ELEM(img(), z, y, x));
+		RawImage<T>::data[(z * this->ydim + y) * this->xdim + x] = value;
 	}
 }
 
