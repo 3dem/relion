@@ -457,7 +457,7 @@ void AutoPicker::initialise()
 			sampling.offset_step = 1;
 			sampling.limit_tilt = -91.;
 			sampling.is_3D = true;
-			sampling.initialise(NOPRIOR);
+			sampling.initialise();
 
 			if (verb > 0)
 			{

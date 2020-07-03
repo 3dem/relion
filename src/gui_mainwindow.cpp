@@ -3446,63 +3446,72 @@ void GuiMainWindow::cb_about(Fl_Widget* o, void* v)
 
 void GuiMainWindow::cb_about_i()
 {
-#define HELPTEXT ("RELION " RELION_SHORT_VERSION "\n \n \
-RELION is is developed in the groups of\n\n \
-Sjors H.W. Scheres at the MRC Laboratory of Molecular Biology\n \n \
-- Sjors H.W. Scheres\n \
-- Shaoda He\n \
-- Takanori Nakane\n \
-- Jasenko Zivanov\n \
-- Liyi Dong\n \
-\n \n \
-and Erik Lindahl at Stockholm University\n \n \
-- Erik Lindahl\n \
-- Björn O. Forsberg\n \
-- Dari Kimanius\n \
+#define HELPTEXT ("RELION " RELION_SHORT_VERSION " \n\n\
+RELION is developed in the groups of:\n\n\
+Sjors H.W. Scheres at the MRC Laboratory of Molecular Biology\n\
+ - Sjors H.W. Scheres\n\
+ - Shaoda He\n\
+ - Takanori Nakane\n\
+ - Jasenko Zivanov\n\
+ - Liyi Dong\n\
+ - Dari Kimanius\n\
+\n\
+and Erik Lindahl at Stockholm University\n\
+ - Erik Lindahl\n\
+ - Björn O. Forsber\n\
 \n\
 Note that RELION is completely free, open-source software. You can redistribute it and/or modify it for your own purposes, but please do make sure \
 the contribution of the developers are acknowledged appropriately. In order to maintain an overview of existing versions, a notification regarding  \
-any redistribution of (modified versions of) the code is appreciated (contact Sjors directly). \n \n \n \
+any redistribution of (modified versions of) the code is appreciated (contact Sjors directly).\n\n\
 If RELION is useful in your work, please cite us. Relevant papers are:\n \n \
- * General Bayesian approach (and first mention of RELION): \n \
-     Scheres (2012) J. Mol. Biol. (PMID: 22100448)	 \n \n\
- * RELION implementation details and the 3D auto-refine procedure: \n \
-     Scheres (2012) J. Struct. Biol. (PMID: 23000701)	 \n \n\
- * Gold-standard FSC and the relevance of the 0.143 criterion: \n \
-     Scheres & Chen (2012) Nat. Meth. (PMID: 22842542)	 \n \n\
- * Movie-processing procedure: \n \
-     Bai et al. (2013) eLife (PMID: 23427024 )	 \n \n\
- * Correction of mask effects on the FSC curve by randomised phases: \n \
-     Chen et al. (2013) Ultramicroscopy (PMID: 23872039)	 \n \n\
- * Auto-picking : \n \
-     Scheres (2014) J. Struct. Biol. (PMID: 25486611) \n \n \
- * Sub-tomogram averaging : \n \
-     Bharat et al. (2015) Structure (PMID: 26256537) \n \n \
- * v.2.0 GPU capability and autopicking acceleration : \n \
-     Kimanius et al. (2016) eLife (PMID: 27845625) \n \n \
- * Helical reconstruction : \n \
-     He & Scheres (2017) J, Struct. Biol. (PMID: 28193500) \n \n \
-Please also cite the following EXTERNAL programs: \n \n \
-* MOTIONCOR2 for beam-induced motion correction: \n \
-    Zheng et al (2017) Nat. Meth. (PMID: 28250466) \n \n\
-* UNBLUR for beam-induced motion correction: \n \
-    Grabnt & Grigorieff eLife (PMID: 26023829) \n \n\
-* CTFFIND4 for CTF-estimation: \n \
-    Rohou & Grigorieff (2015) J. Struct. Biol. (PMID: 26278980) \n \n\
-* Gctf for CTF-estimation: \n \
-    Zhang (2016) J. Struct. Biol. (PMID: 26592709) \n \n\
-* Stochastic Gradient Descent initial model generation:  \n\
-    Punjani et al. (2017) Nat. Meth. (PMID: 28165473) \n \n\
-* ResMap for local-resolution estimation:  \n\
-    Kucukelbir et al. (2014) Nat. Meth. (PMID: 24213166) \n \n\
-* Postscript plots are made using CPlot2D from  www.amzsaki.com\n\n\
+ * General Bayesian approach (and first mention of RELION):\n\
+     Scheres (2012) J. Mol. Biol. (PMID: 22100448)\n\n\
+ * RELION implementation details and the 3D auto-refine procedure:\n\
+     Scheres (2012) J. Struct. Biol. (PMID: 23000701)\n\n\
+ * Gold-standard FSC and the relevance of the 0.143 criterion:\n\
+     Scheres & Chen (2012) Nat. Meth. (PMID: 22842542)\n\n\
+ * Correction of mask effects on the FSC curve by randomised phases:\n\
+     Chen et al. (2013) Ultramicroscopy (PMID: 23872039)\n\n\
+ * Auto-picking :\n\
+     Scheres (2014) J. Struct. Biol. (PMID: 25486611)\n\n\
+ * Sub-tomogram averaging :\n\
+     Bharat et al. (2015) Structure (PMID: 26256537)\n\n\
+ * RELION 2.0 GPU capability and autopicking acceleration:\n\
+     Kimanius et al. (2016) eLife (PMID: 27845625)\n\n\
+ * Helical reconstruction:\n\
+     He & Scheres (2017) J, Struct. Biol. (PMID: 28193500)\n\n\
+ * RELION 3.0 CTFRefine, RelionIt, CPU acceleration, Ewald sphere correction:\n\
+     Zivanov et al. (2018) eLife (PMID: 30412051)\n\n\
+ * Multibody refinement:\n\
+     Nakane et al. (2018) eLife (PMID: 29856314)\n\n\
+ * Bayesian Polishing:\n\
+     Zivanov et al. (2019) IUCrJ (PMID: 30713699)\n\n\
+ * Higher-order aberration correction, magnification anisotropy correction\n\
+     Zivanov et al. (2020) IUCrJ (PMID: 32148853)\n\n\
+ * Amyloid structure determination:\n\
+     Scheres (2020) Acta Crystallor. D (PMID: 32038040)\n\n\
+\
+Please also cite relevant papers when you used external programs or their algorithms re-implemented in RELION: \n \n \
+* MOTIONCOR2 algorithm for beam-induced motion correction:\n\
+    Zheng et al (2017) Nat. Meth. (PMID: 28250466)\n\n\
+* CTFFIND4 for CTF-estimation:\n\
+    Rohou & Grigorieff (2015) J. Struct. Biol. (PMID: 26278980)\n\n\
+* GCTF for CTF-estimation:\n\
+    Zhang (2016) J. Struct. Biol. (PMID: 26592709)\n\n\
+* Stochastic Gradient Descent for initial model generation:\n\
+    Punjani et al. (2017) Nat. Meth. (PMID: 28165473)\n\n\
+* ResMap for local-resolution estimation:\n\
+    Kucukelbir et al. (2014) Nat. Meth. (PMID: 24213166)\n\n\
+* Symmetry relaxation:\n\
+    Abrishami et al. (2020) Prog. Biophys. Mol. Biol. (PMID: 32470354) \n\n\
+* Postscript plots are made using CPlot2D from http://www.amzsaki.com\n\n\
 \
 About the start up screen:\n\n\
 The map shown is the cryo-EM map of mouse heavy-chain apoferritin\n\
 at 1.54 A (EMDB-9865). This is the highest resolution single particle\n\
 reconstruction map deposited to EMDB as of August 2019. The raw dataset\n\
 is also available at EMPIAR-10248.\
- ")
+")
 
 	ShowHelpText *help = new ShowHelpText(HELPTEXT);
 }

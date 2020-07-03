@@ -389,7 +389,9 @@ void CenterFFTbySign(MultidimArray <T> &v)
 
     FOR_ALL_ELEMENTS_IN_ARRAY3D(v)
     {
-        if ((k ^ i ^ j) & 1 != 0) // if ODD
+	// NOTE: != has higher precedence than & in C as pointed out in GitHub issue #637.
+	// So (k ^ i ^ j) & 1 != 0 is not good (fortunately in this case the behaviour happened to be the same)
+        if (((k ^ i ^ j) & 1) != 0) // if ODD
             DIRECT_A3D_ELEM(v, k, i, j) *= -1;
     }
 }
