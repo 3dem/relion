@@ -4283,9 +4283,9 @@ void MlOptimiser::maximization()
 						float scale = 1 / (pow(10, (x-b-a/2.)/(a/4.)) + 1.);
 
 						float _stepsize = (vmgd_ini_stepsize - vmgd_fin_stepsize) * scale + vmgd_fin_stepsize;
+						_stepsize *= sqrt(wsum_model.pdf_class[iclass]/wsum_mode_pdf_class_sum * nr_active_classes);
 						avg_stepsize += _stepsize;
 						avg_stepsize_count ++;
-						_stepsize *= sqrt(wsum_model.pdf_class[iclass]/wsum_mode_pdf_class_sum) * nr_active_classes/10;
 
 
 						(wsum_model.BPref[iclass]).reconstructGrad(
