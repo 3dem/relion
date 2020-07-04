@@ -1024,7 +1024,7 @@ void SpaBackproject::reconstructLegacy()
 					Log::print("Reconstructing");
 				}
 				
-				{				
+				/*{				
 					std::cout << padded_box_size << std::endl; 
 					       
 					const int s = padded_box_size;
@@ -1054,7 +1054,7 @@ void SpaBackproject::reconstructLegacy()
 					data_centered.writeVtk("data_legacy.vtk");
 					
 					std::exit(0);
-				}
+				}*/
 				
 				backprojector.reconstruct(vol_xmipp(), iter, do_MAP, tau2);
 			}
@@ -1168,10 +1168,10 @@ void SpaBackproject::reconstructNew()
 	const int margin = (s - cropSize) / 2;
 	const bool needs_cropping = margin > 0;
 
-	{
+	/*{
 		dataImgFS[0].writeVtk("data_fwd_new.vtk");
 		std::exit(0);
-	}
+	}*/
 	
 	for (int half = 0; half < 2; half++)
 	{
