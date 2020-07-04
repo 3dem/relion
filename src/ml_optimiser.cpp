@@ -1416,8 +1416,18 @@ void MlOptimiser::initialise()
 		for (unsigned i = 0; i < mymodel.nr_classes; i ++) {
 			if (mymodel.pdf_class[i] > 0.) {
 				MultidimArray<RFLOAT> blobs_pos(mymodel.Iref[i]), blobs_neg(mymodel.Iref[i]);
-				SomGraph::make_blobs_2d(blobs_pos, mymodel.Iref[i], 40, particle_diameter/mymodel.pixel_size);
-				SomGraph::make_blobs_2d(blobs_neg, mymodel.Iref[i], 40, particle_diameter/mymodel.pixel_size);
+				if (mymodel.ref_dim == 2) {
+					SomGraph::make_blobs_2d(
+							blobs_pos, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
+					SomGraph::make_blobs_2d(
+							blobs_neg, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
+				}
+				else {
+					SomGraph::make_blobs_3d(
+							blobs_pos, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
+					SomGraph::make_blobs_3d(
+							blobs_neg, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
+				}
 				mymodel.Iref[i] = blobs_pos/40 - blobs_neg/80;
 			}
 		}

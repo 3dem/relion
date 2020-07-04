@@ -424,6 +424,56 @@ public:
 				}
 	}
 
+	template<typename T>
+	static void make_blobs_3d(MultidimArray<T> &box, MultidimArray<T> &amp_box, unsigned nr_blobs, T diameter)
+	{
+		std::vector<T> blobs_x(nr_blobs), blobs_y(nr_blobs), blobs_z(nr_blobs), blobs_amp(nr_blobs);
+		box.resize(amp_box);
+		box.initZeros();
+
+		T v1, v2;
+		for (int i = 0; i < nr_blobs; i ++) {
+			// Generate normal distributed random value
+			v1 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
+			v2 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
+			blobs_x[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter/7. + box.xdim/2.;
+			v1 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
+			v2 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
+			blobs_y[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter/7. + box.ydim/2.;
+			v1 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
+			v2 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
+			blobs_z[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter/7. + box.zdim/2.;
+		}
+
+		for (int i = 0; i < nr_blobs; i ++) {
+			T avg = 0;
+			int count = 0;
+			for (int z = XMIPP_MAX(0, blobs_z[i]-2); z < XMIPP_MIN(box.zdim, blobs_z[i]+2); z ++)
+				for (int y = XMIPP_MAX(0, blobs_y[i]-2); y < XMIPP_MIN(box.ydim, blobs_y[i]+2); y ++)
+					for (int x = XMIPP_MAX(0, blobs_x[i]-2); x < XMIPP_MIN(box.xdim, blobs_x[i]+2); x ++) {
+						avg += abs(amp_box.data[z * amp_box.yxdim + y * amp_box.xdim + x]);
+						count ++;
+					}
+			if (count > 0)
+				blobs_amp[i] = XMIPP_MAX(avg / count, 0.5);
+		}
+
+		T span = diameter/3.;
+		T sigma_inv = 10./diameter;
+		for (int i = 0; i < nr_blobs; i ++)
+			for (int z = XMIPP_MAX(0, blobs_z[i]-span);
+				z < XMIPP_MIN(box.zdim, blobs_z[i]+span); z ++)
+				for (int y = XMIPP_MAX(0, blobs_y[i]-span);
+					y < XMIPP_MIN(box.ydim, blobs_y[i]+span); y ++)
+					for (int x = XMIPP_MAX(0, blobs_x[i]-span);
+						x < XMIPP_MIN(box.xdim, blobs_x[i]+span); x ++) {
+						T xp = (x-blobs_x[i]) * sigma_inv;
+						T yp = (y-blobs_y[i]) * sigma_inv;
+						T zp = (z-blobs_z[i]) * sigma_inv;
+						box.data[z * amp_box.yxdim + y * box.xdim + x] += exp(-xp*xp -yp*yp -zp*zp) * blobs_amp[i];
+					}
+	}
+
 };
 
 #endif
