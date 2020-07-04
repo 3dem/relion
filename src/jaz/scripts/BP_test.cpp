@@ -2,6 +2,7 @@
 #include <src/jaz/image/buffered_image.h>
 #include <src/jaz/image/normalization.h>
 #include <src/jaz/tomography/projection/Fourier_backprojection.h>
+#include <src/jaz/tomography/projection/point_insertion.h>
 #include <src/jaz/tomography/reconstruction.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
@@ -126,14 +127,16 @@ int main(int argc, char *argv[])
 			{
 				if (wrap_voxels)
 				{
-					FourierBackprojection::backprojectSlice_noSF_fwd_wrap(
+					FourierBackprojection::backprojectSlice_fwd_wrap(
 						observation_FS, ctf, proj,
 						data, weight);
 				}
 				else
 				{
-					FourierBackprojection::backprojectSlice_noSF_fwd_clip(
-						observation_FS, ctf, proj,
+					ClippedPointInsertion<INPUT_PRECISION,OUTPUT_PRECISION> clippedInsertion;
+					
+					FourierBackprojection::backprojectSlice_fwd(
+						clippedInsertion, observation_FS, ctf, proj,
 						data, weight);
 				}
 			}

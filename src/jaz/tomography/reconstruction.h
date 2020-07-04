@@ -45,11 +45,18 @@ class Reconstruction
 				BufferedImage<T>& out,
 				bool center,
 				int num_threads);
-
+		
 		template <typename T>
 		static void griddingCorrect_dualContrast(
 				BufferedImage<DualContrastVoxel<T>>& image,
 				BufferedImage<T>& psfImgFS,
+				BufferedImage<DualContrastVoxel<T>>& out,
+				bool center,
+				int num_threads);
+		
+		template <typename T>
+		static void griddingCorrectSinc2_dualContrast(
+				BufferedImage<DualContrastVoxel<T>>& image,
 				BufferedImage<DualContrastVoxel<T>>& out,
 				bool center,
 				int num_threads);
@@ -273,6 +280,100 @@ void Reconstruction :: griddingCorrect_dualContrast(
 		{
 			sinImgRS(x,y,z) /= dataEnv(x,y,z);
 			cosImgRS(x,y,z) /= dataEnv(x,y,z);
+		}
+	}
+
+	FFT::FourierTransform(sinImgRS, sinImgFS, FFT::Both);
+	FFT::FourierTransform(cosImgRS, cosImgFS, FFT::Both);
+
+	#pragma omp parallel for num_threads(num_threads)
+	for (long int z = 0; z < d; z++)
+	for (long int y = 0; y < h; y++)
+	for (long int x = 0; x < wh; x++)
+	{
+		out(x,y,z) = image(x,y,z);
+		out(x,y,z).data_sin = sinImgFS(x,y,z);
+		out(x,y,z).data_cos = cosImgFS(x,y,z);
+	}
+}
+
+template <typename T>
+void Reconstruction :: griddingCorrectSinc2_dualContrast(
+		BufferedImage<DualContrastVoxel<T>>& image,
+		BufferedImage<DualContrastVoxel<T>>& out,
+		bool center,
+		int num_threads)
+{
+	const long int wh = image.xdim;
+	const long int w = 2 * (wh - 1);
+	const long int h = image.ydim;
+	const long int d = image.zdim;
+
+	if (!out.hasEqualSize(image))
+	{
+		REPORT_ERROR_STR("Reconstruction :: griddingCorrectSinc2_dualContrast: unequal input and output image sizes");
+	}
+
+	if (center)
+	{
+		#pragma omp parallel for num_threads(num_threads)
+		for (long int z = 0; z < d;  z++)
+		for (long int y = 0; y < h;  y++)
+		for (long int x = 0; x < wh; x++)
+		{
+			image(x,y,z).data_sin *= (1 - 2*(x%2)) * (1 - 2*(y%2)) * (1 - 2*(z%2));
+			image(x,y,z).data_cos *= (1 - 2*(x%2)) * (1 - 2*(y%2)) * (1 - 2*(z%2));
+		}
+	}
+
+	BufferedImage<tComplex<T>> sinImgFS(wh,h,d), cosImgFS(wh,h,d);
+
+	for (long int z = 0; z < d;  z++)
+	for (long int y = 0; y < h;  y++)
+	for (long int x = 0; x < wh; x++)
+	{
+		sinImgFS(x,y,z) = image(x,y,z).data_sin;
+		cosImgFS(x,y,z) = image(x,y,z).data_cos;
+	}
+
+	BufferedImage<T> sinImgRS(w,h,d), cosImgRS(w,h,d);
+
+	FFT::inverseFourierTransform(sinImgFS, sinImgRS, FFT::Both);
+	FFT::inverseFourierTransform(cosImgFS, cosImgRS, FFT::Both);
+
+
+	const double eps = 1e-10;
+
+	#pragma omp parallel for num_threads(num_threads)
+	for (long int z = 0; z < d; z++)
+	for (long int y = 0; y < h; y++)
+	for (long int x = 0; x < w; x++)
+	{
+		const double xx = x - w/2;
+		const double yy = y - h/2;
+		const double zz = z - d/2;
+		
+		if (xx == 0 && yy == 0 && zz == 0)
+		{
+			// sinc at 0 is 1
+		}
+		else
+		{		
+			const double r = sqrt(xx*xx + yy*yy + zz*zz);
+			const double d = r / w;
+			const double sinc = sin(PI * d) / (PI * d);
+			const double sinc2 = sinc * sinc;
+			
+			if (sinc2 > eps)
+			{
+				sinImgRS(x,y,z) /= sinc2;
+				cosImgRS(x,y,z) /= sinc2;
+			}
+			else
+			{
+				sinImgRS(x,y,z) /= eps;
+				cosImgRS(x,y,z) /= eps;
+			}			
 		}
 	}
 

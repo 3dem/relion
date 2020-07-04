@@ -68,7 +68,8 @@ class SpaBackproject
 			skip_weighting, skip_mask, do_debug,
 			skip_gridding, do_reconstruct_ctf2, do_reconstruct_meas, 
 			is_reverse, read_weights, do_external_reconstruct,
-			use_fwd_mapping;
+			use_legacy_fwd_mapping, use_new_fwd_mapping,
+			explicit_spreading_function;
 		
 		float 
 			padding_factor, mask_diameter;
@@ -108,8 +109,8 @@ class SpaBackproject
 		void readDebugArrays();
 		void backprojectAllParticles();
 		void backprojectOneParticle(long int p, int thread_id);
-		void reconstructForward();
-		void reconstructBackward();
+		void reconstructLegacy();
+		void reconstructNew();
 		void reconstructDualContrast();
 		
 		void applyCTFPandCTFQ(

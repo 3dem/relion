@@ -21,6 +21,7 @@
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
 #include <src/jaz/tomography/projection/Fourier_backprojection.h>
+#include <src/jaz/tomography/projection/point_insertion.h>
 #include <src/jaz/tomography/reconstruction.h>
 #include <src/jaz/image/centering.h>
 #include <src/jaz/image/padding.h>
@@ -58,7 +59,7 @@ void SpaBackproject::read(int argc, char **argv)
 
 	int ewald_section = parser.addSection("Ewald-sphere correction options");
 	
-	do_ewald = parser.checkOption("--ewald", "Correct for Ewald-sphere curvature (developmental)");
+	do_ewald = parser.checkOption("--ewald", "Correct for Ewald-sphere curvature");
 	mask_diameter  = textToFloat(parser.getOption("--mask_diameter", "Diameter (in A) of mask for Ewald-sphere curvature correction", "-1."));
 	width_mask_edge = textToInteger(parser.getOption("--width_mask_edge", "Width (in pixels) of the soft edge on the mask", "3"));
 	is_reverse = parser.checkOption("--reverse_curvature", "Try curvature the other way around");
@@ -108,15 +109,19 @@ void SpaBackproject::read(int argc, char **argv)
 	do_debug = parser.checkOption("--write_debug_output", "Write out arrays with data and weight terms prior to reconstruct");
 	do_external_reconstruct = parser.checkOption("--external_reconstruct", "Write out BP denominator and numerator for external_reconstruct program");
 	
+	
 	num_threads_in = textToInteger(parser.getOption("--j_in", "Number of inner threads", "1"));
 	num_threads_out = textToInteger(parser.getOption("--j_out", "Number of outer threads", "1"));
 	num_threads_total = num_threads_in * num_threads_out;
-
-	use_fwd_mapping = parser.checkOption("--fwd_mapping", "Use the legacy forward-mapping algorithm");
+	
+	use_legacy_fwd_mapping = parser.checkOption("--fwd_old", "Use the legacy forward-mapping algorithm");
+	use_new_fwd_mapping = parser.checkOption("--fwd_new", "Use the new forward-mapping algorithm");
 	do_dual_contrast = parser.checkOption("--dual_contrast", "Perform a dual-contrast reconstruction (backward-mapping only)");
 	do_isotropic_Wiener = !parser.checkOption("--aniso_Wiener", "Use scale-appropriate Wiener constants for phase and amplitude maps (dual contrast only)");
 	compute_multiplicity = parser.checkOption("--mult", "Compute multiplicity map (backward-mapping only)");
-
+	
+	explicit_spreading_function = parser.checkOption("--xsf", "Compute an explicit spreading function to deconvolve by");
+	        
 	// Hidden
 	r_min_nn = textToInteger(getParameter(argc, argv, "--r_min_nn", "10"));
 		
@@ -155,17 +160,17 @@ void SpaBackproject::initialise()
 	{
 		if ((subset == 1 || subset == 2) && !DF.containsLabel(EMDL_PARTICLE_RANDOM_SUBSET))
 		{
-			REPORT_ERROR("The rlnRandomSubset column is missing in the input STAR file.");
+			REPORT_ERROR("The rlnRandomSubset column is missing from the input STAR file.");
 		}
 
 		if ((chosen_class >= 0) && !DF.containsLabel(EMDL_PARTICLE_CLASS))
 		{
-			REPORT_ERROR("The rlnClassNumber column is missing in the input STAR file.");
+			REPORT_ERROR("The rlnClassNumber column is missing from the input STAR file.");
 		}
 
-		if (skip_gridding && !use_fwd_mapping)
+		if (skip_gridding && !use_legacy_fwd_mapping)
 		{
-			Log::warn("The option --skip_gridding has no effect unless --use_fwd_mapping is also on.");
+			Log::warn("The option --skip_gridding has no effect unless --fwd_old is also on.");
 		}
 	}
 
@@ -236,9 +241,9 @@ void SpaBackproject::run()
 	initialise();
 	backprojectAllParticles();
 	
-	if (use_fwd_mapping)
+	if (use_legacy_fwd_mapping)
 	{
-		reconstructForward();
+		reconstructLegacy();
 	}
 	else
 	{
@@ -248,7 +253,7 @@ void SpaBackproject::run()
 		}
 		else
 		{
-			reconstructBackward();
+			reconstructNew();
 		}
 	}
 }
@@ -263,8 +268,10 @@ void SpaBackproject::backprojectAllParticles()
 		MultidimArray<RFLOAT> dummy;
 		projector.computeFourierTransformMap(sub(), dummy, 2 * r_max);
 	}
+	
+	padded_box_size = (int)(padding_factor * output_boxsize);
 
-	if (use_fwd_mapping)
+	if (use_legacy_fwd_mapping)
 	{
 		backprojectors = std::vector<BackProjector>(
 					2 * num_threads_out, 
@@ -280,8 +287,6 @@ void SpaBackproject::backprojectAllParticles()
 	}
 	else
 	{
-		padded_box_size = (int)(padding_factor * output_boxsize);
-		
 		const int s = padded_box_size;
 		const int sh = s/2 + 1;
 		const int ic = 2 * num_threads_out;
@@ -320,8 +325,11 @@ void SpaBackproject::backprojectAllParticles()
 
 		for (int i = 0; i < ic; i++)
 		{
-			spreading_functions[i] = BufferedImage<RFLOAT>(sh,s,s);
-			spreading_functions[i].fill(0.0);
+			if (explicit_spreading_function)
+			{
+				spreading_functions[i] = BufferedImage<RFLOAT>(sh,s,s);
+				spreading_functions[i].fill(0.0);
+			}
 		}
 
 		if (compute_multiplicity)
@@ -599,7 +607,7 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 	BufferedImage<RFLOAT>* multiplicity;
 	BufferedImage<RFLOAT>* spreading_function;
 
-	if (use_fwd_mapping)
+	if (use_legacy_fwd_mapping)
 	{
 		backprojector = &backprojectors[data_id];
 	}
@@ -616,7 +624,11 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 		}
 
 		multiplicity = &multiplicities[data_id];
-		spreading_function = &spreading_functions[data_id];
+		
+		if (explicit_spreading_function)
+		{
+			spreading_function = &spreading_functions[data_id];
+		}
 	}
 
 	// Subtract reference projection
@@ -635,7 +647,7 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 
 		dataImage -= clutterImage;
 		
-		if (use_fwd_mapping)
+		if (use_legacy_fwd_mapping)
 		{
 			backprojector->set2DFourierTransform(F2D, A3D);
 		}
@@ -730,34 +742,66 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 				magMat.initIdentity();
 			}
 
-			if (use_fwd_mapping)
+			if (use_legacy_fwd_mapping)
 			{
 				backprojector->set2DFourierTransform(F2DP, A3D, &Fctf, r_ewald_sphere, true, &magMat);
 				backprojector->set2DFourierTransform(F2DQ, A3D, &Fctf, r_ewald_sphere, false, &magMat);
 			}
-			else
+			else if (use_new_fwd_mapping)
 			{
 				RawImage<Complex> dataImageP(F2DP);
 				RawImage<Complex> dataImageQ(F2DQ);
 				
-				FourierBackprojection::backprojectSlice_noSF_curved(
-					dataImageP, ctfImage, proj, +r_ewald_sphere,
-					accumulation_volume->data,
-					accumulation_volume->weight,
-					num_threads_in);
+				ClippedPointInsertion<RFLOAT,RFLOAT> clippedInsertion;
 				
-				FourierBackprojection::backprojectSlice_noSF_curved(
-					dataImageQ, ctfImage, proj, -r_ewald_sphere,
-					accumulation_volume->data,
-					accumulation_volume->weight,
-					num_threads_in);
+				if (do_dual_contrast)
+				{
+					FourierBackprojection::backprojectSlice_dualContrast_fwd_curved(
+							clippedInsertion,
+							sin_gamma_data, cos_gamma_data,
+							sin2_weight, sin_cos_weight, cos2_weight, 
+							proj, r_ewald_sphere, !is_reverse,
+							*dual_contrast_accumulation_volume);
+					
+					FourierBackprojection::backprojectSlice_dualContrast_fwd_curved(
+							clippedInsertion,
+							sin_gamma_data, cos_gamma_data,
+							sin2_weight, sin_cos_weight, cos2_weight, 
+							proj, -r_ewald_sphere, is_reverse,
+							*dual_contrast_accumulation_volume);
+				}
+				else
+				{
+					FourierBackprojection::backprojectSlice_fwd_curved(
+							clippedInsertion,
+							dataImageP, ctfImage, proj, r_ewald_sphere,
+							accumulation_volume->data, accumulation_volume->weight);
+					
+					FourierBackprojection::backprojectSlice_fwd_curved(
+							clippedInsertion,
+							dataImageQ, ctfImage, proj, -r_ewald_sphere,
+							accumulation_volume->data, accumulation_volume->weight);
+				}
+			}
+			else
+			{
+				REPORT_ERROR("Ewald sphere curvature does not work with backward mapping.");
 			}
 		}
 		else
 		{
-			if (use_fwd_mapping)
+			if (use_legacy_fwd_mapping)
 			{
 				backprojector->set2DFourierTransform(F2D, A3D, &Fctf);
+			}
+			else if (use_new_fwd_mapping)
+			{
+				ClippedPointInsertion<RFLOAT,RFLOAT> clippedInsertion;
+				
+				FourierBackprojection::backprojectSlice_fwd
+					(clippedInsertion, dataImage, ctfImage, proj,
+					 accumulation_volume->data, 
+				     accumulation_volume->weight);
 			}
 			else
 			{
@@ -791,14 +835,17 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 					}
 				}
 						
-				FourierBackprojection::backprojectSpreadingFunction(
-					proj, *spreading_function);
+				if (explicit_spreading_function)
+				{
+					FourierBackprojection::backprojectSpreadingFunction(
+						proj, *spreading_function);
+				}
 			}
 		}
 	}
 }
 
-void SpaBackproject::reconstructForward()
+void SpaBackproject::reconstructLegacy()
 {
 	const bool do_use_fsc = fn_fsc != "";
 	bool do_MAP = do_use_fsc;
@@ -977,6 +1024,38 @@ void SpaBackproject::reconstructForward()
 					Log::print("Reconstructing");
 				}
 				
+				{				
+					std::cout << padded_box_size << std::endl; 
+					       
+					const int s = padded_box_size;
+					const int sh = s/2 + 1;
+					
+					MultidimArray<Complex> data_centered_xmipp(s,s,sh);
+					
+					std::cout 
+						<< data_centered_xmipp.xdim << "x" 
+						<< data_centered_xmipp.ydim << "x" 
+						<< data_centered_xmipp.zdim << std::endl; 
+					
+					backprojector.decenter(backprojector.data, data_centered_xmipp, s*s/4);
+					
+					std::cout 
+						<< data_centered_xmipp.xdim << "x" 
+						<< data_centered_xmipp.ydim << "x" 
+						<< data_centered_xmipp.zdim << std::endl; 
+					
+					RawImage<Complex> data_centered(data_centered_xmipp);
+					
+					std::cout 
+						<< data_centered.xdim << "x" 
+						<< data_centered.ydim << "x" 
+						<< data_centered.zdim << std::endl;
+					
+					data_centered.writeVtk("data_legacy.vtk");
+					
+					std::exit(0);
+				}
+				
 				backprojector.reconstruct(vol_xmipp(), iter, do_MAP, tau2);
 			}
 		}
@@ -995,7 +1074,7 @@ void SpaBackproject::reconstructForward()
 	}
 }
 
-void SpaBackproject::reconstructBackward()
+void SpaBackproject::reconstructNew()
 {
 	const int ic = accumulation_volumes.size();
 
@@ -1024,9 +1103,14 @@ void SpaBackproject::reconstructBackward()
 		accumulation_volumes[0].data,
 		accumulation_volumes[1].data};
 
-	std::vector<BufferedImage<RFLOAT>> psfImgFS = {
-		spreading_functions[0],
-		spreading_functions[1]};
+	std::vector<BufferedImage<RFLOAT>> psfImgFS;
+	
+	if (explicit_spreading_function)
+	{
+		psfImgFS = {
+			spreading_functions[0],
+			spreading_functions[1]};
+	}
 
 	std::vector<BufferedImage<RFLOAT>> ctfImgFS = {
 		accumulation_volumes[0].weight,
@@ -1041,8 +1125,11 @@ void SpaBackproject::reconstructBackward()
 			dataImgFS[half] = Symmetry::symmetrise_FS_complex(
 				dataImgFS[half], fn_sym, num_threads_total);
 
-			psfImgFS[half] = Symmetry::symmetrise_FS_real(
-				psfImgFS[half], fn_sym, num_threads_total);
+			if (explicit_spreading_function)
+			{
+				psfImgFS[half] = Symmetry::symmetrise_FS_real(
+					psfImgFS[half], fn_sym, num_threads_total);
+			}
 
 			ctfImgFS[half] = Symmetry::symmetrise_FS_real(
 				ctfImgFS[half], fn_sym, num_threads_total);
@@ -1066,7 +1153,13 @@ void SpaBackproject::reconstructBackward()
 	std::vector<BufferedImage<double>> dataImgRS(2), dataImgDivRS(2);
 
 	BufferedImage<dComplex> dataImgFS_both = dataImgFS[0] + dataImgFS[1];
-	BufferedImage<double> psfImgFS_both = psfImgFS[0] + psfImgFS[1];
+	BufferedImage<double> psfImgFS_both;
+	
+	if (explicit_spreading_function)
+	{
+		psfImgFS_both = psfImgFS[0] + psfImgFS[1];
+	}
+	
 	BufferedImage<double> ctfImgFS_both = ctfImgFS[0] + ctfImgFS[1];
 
 	Log::beginSection("Reconstructing");
@@ -1075,7 +1168,11 @@ void SpaBackproject::reconstructBackward()
 	const int margin = (s - cropSize) / 2;
 	const bool needs_cropping = margin > 0;
 
-
+	{
+		dataImgFS[0].writeVtk("data_fwd_new.vtk");
+		std::exit(0);
+	}
+	
 	for (int half = 0; half < 2; half++)
 	{
 		Log::print("Half " + ZIO::itoa(half));
@@ -1083,10 +1180,22 @@ void SpaBackproject::reconstructBackward()
 		dataImgRS[half] = BufferedImage<double>(s,s,s);
 		dataImgDivRS[half] = BufferedImage<double>(s,s,s);
 
-		Reconstruction::griddingCorrect3D(
+		
+		
+		if (explicit_spreading_function)
+		{
+			Reconstruction::griddingCorrect3D(
 					dataImgFS[half], psfImgFS[half],  // in
 					dataImgRS[half],                  // out
 					true, num_threads_total);
+		}
+		else
+		{
+			Reconstruction::griddingCorrect3D_sinc2(
+				dataImgFS[half],                      // in
+				dataImgRS[half],                      // out
+				true, num_threads_total);
+		}
 
 		if (SNR > 0.0)
 		{
@@ -1118,8 +1227,17 @@ void SpaBackproject::reconstructBackward()
 
 	Log::endSection();
 
-	Reconstruction::griddingCorrect3D(
-		dataImgFS_both, psfImgFS_both, dataImgRS[0], true, num_threads_total);
+	if (explicit_spreading_function)
+	{
+		Reconstruction::griddingCorrect3D(
+			dataImgFS_both, psfImgFS_both, dataImgRS[0], true, num_threads_total);
+	}
+	else
+	{
+		Reconstruction::griddingCorrect3D_sinc2(
+			dataImgFS_both, dataImgRS[0], 
+			true, num_threads_total);
+	}
 
 	if (SNR > 0.0)
 	{
@@ -1159,7 +1277,10 @@ void SpaBackproject::reconstructDualContrast()
 			dual_contrast_accumulation_volumes[i%2] +=
 				dual_contrast_accumulation_volumes[i];
 
-			spreading_functions[i%2] += spreading_functions[i];
+			if (explicit_spreading_function)
+			{
+				spreading_functions[i%2] += spreading_functions[i];
+			}
 
 			if (compute_multiplicity)
 			{
@@ -1179,15 +1300,23 @@ void SpaBackproject::reconstructDualContrast()
 					dual_contrast_accumulation_volumes[half],
 					fn_sym, num_threads_total);
 
-			spreading_functions[half] = Symmetry::symmetrise_FS_real(
-				spreading_functions[half], fn_sym, num_threads_total);
+			if (explicit_spreading_function)
+			{
+				spreading_functions[half] = Symmetry::symmetrise_FS_real(
+					spreading_functions[half], fn_sym, num_threads_total);
+			}
 		}
 	}
 
 	BufferedImage<DualContrastVoxel<RFLOAT>> accumulation_volume_both =
 			dual_contrast_accumulation_volumes[0] + dual_contrast_accumulation_volumes[1];
 
-	BufferedImage<double> psfImgFS_both = spreading_functions[0] + spreading_functions[1];
+	BufferedImage<double> psfImgFS_both;
+	
+	if (explicit_spreading_function)
+	{
+		psfImgFS_both = spreading_functions[0] + spreading_functions[1];
+	}
 
 
 	Log::beginSection("Reconstructing");	
@@ -1203,11 +1332,21 @@ void SpaBackproject::reconstructDualContrast()
 	{
 		Log::print("Half " + ZIO::itoa(half));
 
-		Reconstruction::griddingCorrect_dualContrast(
+		if (explicit_spreading_function)
+		{
+			Reconstruction::griddingCorrect_dualContrast(
 				dual_contrast_accumulation_volumes[half], // in
 				spreading_functions[half],                // in
 				dual_contrast_accumulation_volumes[half], // out
 				true, num_threads_total);
+		}
+		else
+		{
+			Reconstruction::griddingCorrectSinc2_dualContrast(
+				dual_contrast_accumulation_volumes[half], // in
+				dual_contrast_accumulation_volumes[half], // out
+				true, num_threads_total);
+		}
 
 		DualContrastSolution<RFLOAT> dualContrastSolution =
 			Reconstruction::solveDualContrast(
