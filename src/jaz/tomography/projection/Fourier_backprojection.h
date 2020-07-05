@@ -513,7 +513,7 @@ void FourierBackprojection::backprojectSphere_backward(
 	const double D = 1.0 / (2.0 * radius);
 		
 	
-	//#pragma omp parallel for num_threads(num_threads)	
+	#pragma omp parallel for num_threads(num_threads)	
 	for (long int z = 0; z < d3; z++)
 	for (long int y = 0; y < h3; y++)
 	{
