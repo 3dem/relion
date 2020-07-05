@@ -183,7 +183,7 @@ void BackprojectProgram::run()
 				weightStack[th] *= noiseWeights;
 			}
 
-			FourierBackprojection::backproject_bwd(
+			FourierBackprojection::backprojectStack_backward(
 				particleStack[th], weightStack[th], projPart, 
 				dataImgFS[2*th + halfSet], 
 				psfImgFS[2*th + halfSet], 

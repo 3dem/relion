@@ -38,7 +38,7 @@ class FourierBackprojection
 	public:
 		
 		template <typename SrcType, typename DestType>
-		static void backproject_bwd(
+		static void backprojectStack_backward(
 			RawImage<tComplex<SrcType>>& stackFS,
 			RawImage<SrcType>& weightStack,
 			const std::vector<gravis::d4Matrix>& proj,
@@ -48,7 +48,7 @@ class FourierBackprojection
 			int num_threads = 1);
 		
 		template <typename SrcType, typename DestType>
-		static void backproject_bwd(
+		static void backprojectStack_backward(
 			RawImage<tComplex<SrcType>>& stackFS,
 			RawImage<SrcType>& weightStack,
 			const std::vector<gravis::d4Matrix>& proj,
@@ -60,7 +60,7 @@ class FourierBackprojection
 		
 		
 		template <typename SrcType, typename DestType>
-		static void backprojectSlice_noSF(
+		static void backprojectSlice_backward(
 			const RawImage<tComplex<SrcType>>& dataFS,
 			const RawImage<SrcType>& weight,
 			const gravis::d4Matrix& proj,
@@ -69,24 +69,8 @@ class FourierBackprojection
 			int num_threads);
 		
 		template <typename SrcType, typename DestType>
-		static inline void rasteriseLine(
-			const RawImage<tComplex<SrcType>>& dataFS,
-			const RawImage<SrcType>& weight,
-			int x0, 
-			int x1,
-			const int y, 
-			const int z,
-			const double D,
-			const gravis::d3Matrix& A,
-			const double yy, 
-			const double zz,
-			RawImage<tComplex<DestType>>& destFS,
-			RawImage<DestType>& destCTF);
-		
-		template <typename SrcType, typename DestType>
-		static inline void rasteriseLine_crossed(
-			const RawImage<tComplex<SrcType>>& dataP,
-			const RawImage<tComplex<SrcType>>& dataQ,
+		static inline void rasteriseLine_Ewald(
+			const RawImage<tComplex<SrcType>>& dataPQ,
 			const RawImage<SrcType>& weight,
 			int x0, 
 			int x1,
@@ -101,8 +85,8 @@ class FourierBackprojection
 		
 		
 		template <typename SrcType, typename DestType>
-		static void backprojectSlice_noSF_curved(
-			const RawImage<tComplex<SrcType>>& dataFS,
+		static void backprojectSphere_backward(
+			const RawImage<tComplex<SrcType>>& dataPQ,
 			const RawImage<SrcType>& weight,
 			const gravis::d4Matrix& proj,
 			const double radius,
@@ -111,8 +95,8 @@ class FourierBackprojection
 			int num_threads);
 		
 		template <typename SrcType, typename DestType>
-		static void backprojectSlice_noSF_curved_slow(
-			const RawImage<tComplex<SrcType>>& dataFS,
+		static void backprojectSphere_backward_slow(
+			const RawImage<tComplex<SrcType>>& dataPQ,
 			const RawImage<SrcType>& weight,
 			const gravis::d4Matrix& proj,
 			const double radius,
@@ -120,20 +104,19 @@ class FourierBackprojection
 			RawImage<DestType>& destCTF,
 			int num_threads);
 		
-		template <typename SrcType, typename DestType>
-		static void backprojectSlice_noSF_curved_slow_crossed(
-			const RawImage<tComplex<SrcType>>& dataP,
-			const RawImage<tComplex<SrcType>>& dataQ,
+		/*template <typename SrcType, typename DestType>
+		static void backprojectSlice_dualContrast_backward_curved_slow(
+			const RawImage<tComplex<SrcType>>& dataPQ,
 			const RawImage<SrcType>& weight,
 			const gravis::d4Matrix& proj,
 			const double radius,
 			RawImage<tComplex<DestType>>& destFS,
 			RawImage<DestType>& destCTF,
-			int num_threads);
+			int num_threads);*/
 		
 		
 		template <typename SrcType, typename DestType>
-		static void backprojectSlice_noSF(
+		static void backprojectSlice_backward(
 			const RawImage<tComplex<SrcType>>& dataFS,
 			const RawImage<SrcType>& weight,
 			const gravis::d4Matrix& proj,
@@ -143,7 +126,7 @@ class FourierBackprojection
 			int num_threads);		
 
 		template <typename SrcType, typename DestType>
-		static void backprojectSlice_noSF_dualContrast(
+		static void backprojectSlice_dualContrast_backward(
 			const RawImage<tComplex<SrcType>>& sin_gamma_data,
 			const RawImage<tComplex<SrcType>>& cos_gamma_data,
 			const RawImage<SrcType>& sin2_weight,
@@ -155,7 +138,7 @@ class FourierBackprojection
 		
 		
 		template <typename SrcType, typename DestType, class PointInsertion>
-		static void backprojectSlice_fwd(
+		static void backprojectSlice_forward(
 			const PointInsertion& pointInsertion,
 			const RawImage<tComplex<SrcType>>& dataFS,
 			const RawImage<SrcType>& weight,
@@ -164,7 +147,7 @@ class FourierBackprojection
 			RawImage<DestType>& destCTF);
 		
 		template <typename SrcType, typename DestType, class PointInsertion>
-		static void backprojectSlice_fwd_curved(
+		static void backprojectSphere_forward(
 			const PointInsertion& pointInsertion,
 			const RawImage<tComplex<SrcType>>& dataFS,
 			const RawImage<SrcType>& weight,
@@ -174,7 +157,7 @@ class FourierBackprojection
 			RawImage<DestType>& destCTF);
 		
 		template <typename SrcType, typename DestType, class PointInsertion>
-		static void backprojectSlice_dualContrast_fwd_curved(
+		static void backprojectSphere_dualContrast_forward(
 			const PointInsertion& pointInsertion,
 			const RawImage<tComplex<SrcType>>& sin_gamma_data,
 			const RawImage<tComplex<SrcType>>& cos_gamma_data,
@@ -187,7 +170,7 @@ class FourierBackprojection
 			RawImage<DualContrastVoxel<DestType>>& dest);
 		
 		template <typename SrcType, typename DestType>
-		static void backprojectSlice_fwd_wrap(
+		static void backprojectSlice_forward_wrap(
 			const RawImage<tComplex<SrcType>>& dataFS,
 			const RawImage<SrcType>& weight,
 			const gravis::d4Matrix& proj,
@@ -202,7 +185,7 @@ class FourierBackprojection
 
 
 template <typename SrcType, typename DestType>
-void FourierBackprojection::backproject_bwd(
+void FourierBackprojection::backprojectStack_backward(
 		RawImage<tComplex<SrcType>>& stackFS,
 		RawImage<SrcType>& weightStack,
 		const std::vector<gravis::d4Matrix>& proj,
@@ -215,7 +198,7 @@ void FourierBackprojection::backproject_bwd(
 	
 	for (int f = 0; f < fc; f++)
 	{	
-		backprojectSlice_noSF(
+		backprojectSlice_backward(
 			stackFS.getSliceRef(f),
 			weightStack.getSliceRef(f),
 			proj[f],
@@ -230,7 +213,7 @@ void FourierBackprojection::backproject_bwd(
 }
 
 template <typename SrcType, typename DestType>
-void FourierBackprojection::backproject_bwd(
+void FourierBackprojection::backprojectStack_backward(
 		RawImage<tComplex<SrcType>>& stackFS,
 		RawImage<SrcType>& weightStack,
 		const std::vector<gravis::d4Matrix>& proj,
@@ -244,7 +227,7 @@ void FourierBackprojection::backproject_bwd(
 	
 	for (int f = 0; f < fc; f++)
 	{	
-		backprojectSlice_noSF(
+		backprojectSlice_backward(
 			stackFS.getSliceRef(f),
 			weightStack.getSliceRef(f),
 			proj[f],
@@ -258,7 +241,7 @@ void FourierBackprojection::backproject_bwd(
 }
 
 template <typename SrcType, typename DestType>
-void FourierBackprojection::backprojectSlice_noSF(
+void FourierBackprojection::backprojectSlice_backward(
 				const RawImage<tComplex<SrcType>>& dataFS,
 				const RawImage<SrcType>& weight,
 				const gravis::d4Matrix& proj,
@@ -275,7 +258,7 @@ void FourierBackprojection::backprojectSlice_noSF(
 	
 	if (!destCTF.hasSize(wh3, h3, d3))
 	{
-		REPORT_ERROR_STR("FourierBackprojection::backprojectSlice_noSF: destCTF has wrong size ("
+		REPORT_ERROR_STR("FourierBackprojection::backprojectSlice_backward: destCTF has wrong size ("
 						 << destCTF.getSizeString() << " instead of " << destCTF.getSizeString() << ")");
 	}
 	
@@ -351,7 +334,7 @@ void FourierBackprojection::backprojectSlice_noSF(
 }
 
 template <typename SrcType, typename DestType>
-void FourierBackprojection::backprojectSlice_noSF(
+void FourierBackprojection::backprojectSlice_backward(
 				const RawImage<tComplex<SrcType>>& dataFS,
 				const RawImage<SrcType>& weight,
 				const gravis::d4Matrix& proj,
@@ -369,7 +352,7 @@ void FourierBackprojection::backprojectSlice_noSF(
 	
 	if (!destCTF.hasSize(wh3, h3, d3))
 	{
-		REPORT_ERROR_STR("FourierBackprojection::backprojectSlice_noSF: destCTF has wrong size ("
+		REPORT_ERROR_STR("FourierBackprojection::backprojectSlice_backward: destCTF has wrong size ("
 						 << destCTF.getSizeString() << " instead of " << destCTF.getSizeString() << ")");
 	}
 	
@@ -447,9 +430,10 @@ void FourierBackprojection::backprojectSlice_noSF(
 	}
 }
 
+
 template <typename SrcType, typename DestType>
-inline void FourierBackprojection::rasteriseLine(
-        const RawImage<tComplex<SrcType>>& dataFS,
+inline void FourierBackprojection::rasteriseLine_Ewald(
+        const RawImage<tComplex<SrcType>>& dataPQ,
 		const RawImage<SrcType>& weight,
         int x0, 
         int x1,
@@ -462,27 +446,34 @@ inline void FourierBackprojection::rasteriseLine(
         RawImage<tComplex<DestType>>& destFS,
 		RawImage<DestType>& destCTF)
 {
-	const int wh2 = dataFS.xdim;
-	const int h2 = dataFS.ydim;
-	const int wh3 = destFS.ydim;
+	const int w2 = dataPQ.xdim;
+	const int h2 = dataPQ.ydim;
+	const int m = w2 / 2;	
+	
+	const int wh3 = destFS.xdim;	
 	
 	if (x0 < 0) x0 = 0;
-	if (x1 >= wh3) x1 = wh3 - 1;
+	if (x1 >= wh3) x1 = wh3 - 1;	
 	
 	for (long int x = x0; x <= x1; x++)
 	{
 		const gravis::d3Vector pw(x,yy,zz);		
 		const gravis::d3Vector pi0 = A * pw;
-		const gravis::d3Vector pi(pi0.x, pi0.y, pi0.z + D * (pi0.x * pi0.x + pi0.y * pi0.y));
+		const gravis::d3Vector pi(pi0.x, pi0.y, pi0.z - D * (pi0.x * pi0.x + pi0.y * pi0.y));
 		
+		const double u = m + pi.x;
+		const double v = m + pi.y;
+		
+		        
 		if (pi.z > -1.0 && pi.z < 1.0 &&
-			std::abs(pi.x) < wh2 && std::abs(pi.y) < h2/2 + 1 )
+			u >= 0 && u <= w2-1 && 
+			v >= 0 && v <= h2-1 )
 		{
 			const double c = 1.0 - std::abs(pi.z);
 			
-			tComplex<SrcType> z0 = Interpolation::linearXY_complex_FftwHalf_clip(dataFS, pi.x, pi.y, 0);
+			tComplex<SrcType> z0 = Interpolation::linearXY_clip(dataPQ, u, v, 0);
 			const DestType wgh = Interpolation::linearXY_symmetric_FftwHalf_clip(weight, pi.x, pi.y, 0);
-							
+
 			destFS(x,y,z) += tComplex<DestType>(c * z0.real, c * z0.imag);
 			destCTF(x,y,z) += c * wgh;
 		}
@@ -490,83 +481,8 @@ inline void FourierBackprojection::rasteriseLine(
 }
 
 template <typename SrcType, typename DestType>
-inline void FourierBackprojection::rasteriseLine_crossed(
-        const RawImage<tComplex<SrcType>>& dataP,
-        const RawImage<tComplex<SrcType>>& dataQ,
-		const RawImage<SrcType>& weight,
-        int x0, 
-        int x1,
-        const int y, 
-        const int z,
-        const double D,
-        const gravis::d3Matrix& A,
-        const double yy, 
-        const double zz,
-        RawImage<tComplex<DestType>>& destFS,
-		RawImage<DestType>& destCTF)
-{
-	const int wh2 = dataP.xdim;
-	const int h2 = dataP.ydim;
-	const int wh3 = destFS.ydim;
-	
-	if (x0 < 0) x0 = 0;
-	if (x1 >= wh3) x1 = wh3 - 1;
-	
-	for (long int x = x0; x <= x1; x++)
-	{
-		const gravis::d3Vector pw(x,yy,zz);		
-		const gravis::d3Vector pi0 = A * pw;
-		const gravis::d3Vector pi(pi0.x, pi0.y, pi0.z + D * (pi0.x * pi0.x + pi0.y * pi0.y));
-		
-		if (pi.z > -1.0 && pi.z < 1.0 &&
-			std::abs(pi.x) < wh2 && std::abs(pi.y) < h2/2 + 1 )
-		{
-			const double c = 1.0 - std::abs(pi.z);
-			
-			tComplex<SrcType> z0;
-			
-			if (pi.x < -1)
-			{
-				z0 = Interpolation::linearXY_complex_FftwHalf_clip(dataQ, -pi.x, -pi.y, 0);
-			}
-			else if (pi.x < 0)
-			{
-				tComplex<SrcType> zq = Interpolation::linearXY_complex_FftwHalf_clip(dataQ, 1, -pi.y, 0);
-				
-				tComplex<SrcType> zp = 
-				        0.5 * (
-				          Interpolation::linearXY_complex_FftwHalf_clip(dataP, 0, pi.y, 0)
-				        + Interpolation::linearXY_complex_FftwHalf_clip(dataQ, 0, -pi.y, 0) );
-				
-				z0 = (1+pi.x) * zp - pi.x * zq; 
-			}
-			else if (pi.x < 1)
-			{
-				tComplex<SrcType> zq = 
-				        0.5 * (
-				          Interpolation::linearXY_complex_FftwHalf_clip(dataP, 0, pi.y, 0)
-				        + Interpolation::linearXY_complex_FftwHalf_clip(dataQ, 0, -pi.y, 0) );
-				
-				tComplex<SrcType> zp = Interpolation::linearXY_complex_FftwHalf_clip(dataP, 1, pi.y, 0);
-				
-				z0 = (1-pi.x) * zq - pi.x * zp; 
-			}
-			else
-			{
-				z0 = Interpolation::linearXY_complex_FftwHalf_clip(dataP, pi.x, pi.y, 0);
-			}
-			
-			const DestType wgh = Interpolation::linearXY_symmetric_FftwHalf_clip(weight, pi.x, pi.y, 0);
-							
-			destFS(x,y,z) += tComplex<DestType>(c * z0.real, c * z0.imag);
-			destCTF(x,y,z) += c * wgh;
-		}
-	}
-}
-
-template <typename SrcType, typename DestType>
-void FourierBackprojection::backprojectSlice_noSF_curved(
-				const RawImage<tComplex<SrcType>>& dataFS,
+void FourierBackprojection::backprojectSphere_backward(
+				const RawImage<tComplex<SrcType>>& dataPQ,
 				const RawImage<SrcType>& weight,
 				const gravis::d4Matrix& proj,
 				const double radius,
@@ -574,33 +490,30 @@ void FourierBackprojection::backprojectSlice_noSF_curved(
 				RawImage<DestType>& destCTF,
 				int num_threads)
 {
-	const int wh2 = dataFS.xdim;
-	const int h2 = dataFS.ydim;
-	
 	const int wh3 = destFS.xdim;
-	const int h3 = destFS.ydim;
-	const int d3 = destFS.zdim;
+	const int h3  = destFS.ydim;
+	const int d3  = destFS.zdim;
 	
 	if (!destCTF.hasSize(wh3, h3, d3))
 	{
-		REPORT_ERROR_STR("FourierBackprojection::backprojectSlice_noSF: destCTF has wrong size ("
+		REPORT_ERROR_STR("FourierBackprojection::backprojectSphere_backward: destCTF has wrong size ("
 						 << destCTF.getSizeString() << " instead of " << destCTF.getSizeString() << ")");
 	}
 	
-	gravis::d3Matrix P(proj(0,0), proj(1,0), proj(2,0), 
+	gravis::d3Matrix Pt(proj(0,0), proj(1,0), proj(2,0), 
 					   proj(0,1), proj(1,1), proj(2,1), 
 					   proj(0,2), proj(1,2), proj(2,2) );
 			
-	gravis::d3Matrix A = P.invert();
+	gravis::d3Matrix A = Pt.invert();
 	
 	gravis::d3Vector ax(A(0,0), A(0,1), A(0,2));
 	gravis::d3Vector ay(A(1,0), A(1,1), A(1,2));
 	gravis::d3Vector az(A(2,0), A(2,1), A(2,2));
 	
-	const double D = -1.0 / (2.0 * radius);
+	const double D = 1.0 / (2.0 * radius);
 		
 	
-	#pragma omp parallel for num_threads(num_threads)	
+	//#pragma omp parallel for num_threads(num_threads)	
 	for (long int z = 0; z < d3; z++)
 	for (long int y = 0; y < h3; y++)
 	{
@@ -618,19 +531,17 @@ void FourierBackprojection::backprojectSlice_noSF_curved(
 			extend:
 			
 				(u,v,h) -> (x,y,z)   
-				    = u * Pu + v * Pv + [D * (u² + v²) + h] * Ph
-					
-				(u,v,h) -> (x,y,z)_0 
-				    = P * (u,v,w) 
-				    = u * Pu + v * Pv + h * Ph
 				
-				(x,y,z) = (x,y,z)_0 + D * (u² + v²) * Ph
-				
+				(x,y,z) = u * Pu + v * Pv + [D * (u² + v²) + h] * Ph
+						= P (u,v,h)  + D * (u² + v²) * Ph
+						=: (x,y,z)_0 + D * (u² + v²) * Ph				
 
 			invert:
 			
-				Matrix A = P^(-1) = [Ax, Ay, Az] = [Au, Av, Ah]^T
-			
+				Matrix A := P^(-1) = [Ax, Ay, Az] = [Au, Av, Ah]^T
+				
+				(x,y,z)_0 -> (u,v,h) 
+				
 				(u,v,h) = A * (x,y,z)_0
 				        = A * [(x,y,z) - D * (u² + v²) * Ph]
 				        = A * (x,y,z) - D * (u² + v²) * eh
@@ -677,7 +588,7 @@ void FourierBackprojection::backprojectSlice_noSF_curved(
 		*/
 		
 		
-		const double alpha = -D * (ax.x * ax.x + ax.y  * ax.y);
+		const double alpha = -D * (ax.x * ax.x + ax.y * ax.y);
 		
 		const double beta  =
 		        -D * (
@@ -705,39 +616,40 @@ void FourierBackprojection::backprojectSlice_noSF_curved(
 		const double mid = -0.5 * beta / alpha;
 		const double outer_step = 0.5 * sqrt(discr_out) / std::abs(alpha);
 		
+		
 		if (discr_in < 0.0)
 		{
 			const int x0 = std::ceil(mid - outer_step);
 			const int x1 = std::floor(mid + outer_step);
 			
-			rasteriseLine(
-				dataFS, weight, x0, x1, y, z, D, A,
+			rasteriseLine_Ewald(
+				dataPQ, weight, x0, x1, y, z, D, A,
 				yy, zz, destFS, destCTF);
 		}
 		else
 		{
 			const double inner_step = 0.5 * sqrt(discr_in) / std::abs(alpha);
 			
-			const int x0_0 = std::ceil(mid - outer_step);
+			const int x0_0 = std::ceil( mid - outer_step);
 			const int x1_0 = std::floor(mid - inner_step);
-			const int x0_1 = std::ceil(mid + inner_step);
-			const int x1_1 = std::floor(mid + outer_step);
 			
-			rasteriseLine(
-				dataFS, weight, x0_0, x1_0, y, z, D, A,
+			const int x0_1 = std::ceil( mid + inner_step);
+			const int x1_1 = std::floor(mid + outer_step);
+						
+			rasteriseLine_Ewald(
+				dataPQ, weight, x0_0, x1_0, y, z, D, A,
 				yy, zz, destFS, destCTF);
 			
-			rasteriseLine(
-				dataFS, weight, x0_1, x1_1, y, z, D, A,
+			rasteriseLine_Ewald(
+				dataPQ, weight, x0_1, x1_1, y, z, D, A,
 				yy, zz, destFS, destCTF);
 		}
 	}
 }
 
-
 template <typename SrcType, typename DestType>
-void FourierBackprojection::backprojectSlice_noSF_curved_slow(
-				const RawImage<tComplex<SrcType>>& dataFS,
+void FourierBackprojection::backprojectSphere_backward_slow(
+				const RawImage<tComplex<SrcType>>& dataPQ,
 				const RawImage<SrcType>& weight,
 				const gravis::d4Matrix& proj,
 				const double radius,
@@ -745,26 +657,23 @@ void FourierBackprojection::backprojectSlice_noSF_curved_slow(
 				RawImage<DestType>& destCTF,
 				int num_threads)
 {
-	const int wh2 = dataFS.xdim;
-	const int h2 = dataFS.ydim;
-	
 	const int wh3 = destFS.xdim;
-	const int h3 = destFS.ydim;
-	const int d3 = destFS.zdim;
+	const int h3  = destFS.ydim;
+	const int d3  = destFS.zdim;
 	
 	if (!destCTF.hasSize(wh3, h3, d3))
 	{
-		REPORT_ERROR_STR("FourierBackprojection::backprojectSlice_noSF: destCTF has wrong size ("
+		REPORT_ERROR_STR("FourierBackprojection::backprojectSphere_backward_slow: destCTF has wrong size ("
 						 << destCTF.getSizeString() << " instead of " << destCTF.getSizeString() << ")");
 	}
 	
-	gravis::d3Matrix P(proj(0,0), proj(1,0), proj(2,0), 
-					   proj(0,1), proj(1,1), proj(2,1), 
-					   proj(0,2), proj(1,2), proj(2,2) );
+	gravis::d3Matrix Pt(proj(0,0), proj(1,0), proj(2,0), 
+	                    proj(0,1), proj(1,1), proj(2,1), 
+	                    proj(0,2), proj(1,2), proj(2,2) );
 			
-	gravis::d3Matrix A = P.invert();
+	gravis::d3Matrix A = Pt.invert();
 	
-	const double D = -1.0 / (2.0 * radius);
+	const double D = 1.0 / (2.0 * radius);
 		
 	
 	#pragma omp parallel for num_threads(num_threads)	
@@ -774,61 +683,15 @@ void FourierBackprojection::backprojectSlice_noSF_curved_slow(
 		const double yy = y >= h3/2? y - h3 : y;
 		const double zz = z >= d3/2? z - d3 : z;
 		
-		rasteriseLine(
-			dataFS, weight, 0, wh3-1, y, z, D, A,
-			yy, zz, destFS, destCTF);
-	}
-}
-
-template <typename SrcType, typename DestType>
-void FourierBackprojection::backprojectSlice_noSF_curved_slow_crossed(
-				const RawImage<tComplex<SrcType>>& dataP,
-				const RawImage<tComplex<SrcType>>& dataQ,
-				const RawImage<SrcType>& weight,
-				const gravis::d4Matrix& proj,
-				const double radius,
-				RawImage<tComplex<DestType>>& destFS,
-				RawImage<DestType>& destCTF,
-				int num_threads)
-{
-	const int wh2 = dataP.xdim;
-	const int h2 = dataP.ydim;
-	
-	const int wh3 = destFS.xdim;
-	const int h3 = destFS.ydim;
-	const int d3 = destFS.zdim;
-	
-	if (!destCTF.hasSize(wh3, h3, d3))
-	{
-		REPORT_ERROR_STR("FourierBackprojection::backprojectSlice_noSF: destCTF has wrong size ("
-						 << destCTF.getSizeString() << " instead of " << destCTF.getSizeString() << ")");
-	}
-	
-	gravis::d3Matrix P(proj(0,0), proj(1,0), proj(2,0), 
-					   proj(0,1), proj(1,1), proj(2,1), 
-					   proj(0,2), proj(1,2), proj(2,2) );
-			
-	gravis::d3Matrix A = P.invert();
-	
-	const double D = -1.0 / (2.0 * radius);
-		
-	
-	#pragma omp parallel for num_threads(num_threads)	
-	for (long int z = 0; z < d3; z++)
-	for (long int y = 0; y < h3; y++)
-	{
-		const double yy = y >= h3/2? y - h3 : y;
-		const double zz = z >= d3/2? z - d3 : z;
-		
-		rasteriseLine_crossed(
-			dataP, dataQ, weight, 0, wh3-1, y, z, D, A,
+		rasteriseLine_Ewald(
+			dataPQ, weight, 0, wh3-1, y, z, D, A,
 			yy, zz, destFS, destCTF);
 	}
 }
 
 
 template <typename SrcType, typename DestType>
-void FourierBackprojection::backprojectSlice_noSF_dualContrast(
+void FourierBackprojection::backprojectSlice_dualContrast_backward(
 	const RawImage<tComplex<SrcType>>& sin_gamma_data,
 	const RawImage<tComplex<SrcType>>& cos_gamma_data,
 	const RawImage<SrcType>& sin2_weight,
@@ -976,7 +839,7 @@ void FourierBackprojection::backprojectSpreadingFunction(
 }
 
 template <typename SrcType, typename DestType, class PointInsertion>
-void FourierBackprojection::backprojectSlice_fwd(
+void FourierBackprojection::backprojectSlice_forward(
 				const PointInsertion& pointInsertion,
 				const RawImage<tComplex<SrcType>>& dataFS,
 				const RawImage<SrcType>& weight,
@@ -993,7 +856,7 @@ void FourierBackprojection::backprojectSlice_fwd(
 	
 	if (!destCTF.hasSize(wh3, h3, d3))
 	{
-		REPORT_ERROR_STR("FourierBackprojection::backprojectSlice_noSF_fwd: destCTF has wrong size ("
+		REPORT_ERROR_STR("FourierBackprojection::backprojectSlice_forward: destCTF has wrong size ("
 						 << destCTF.getSizeString() << " instead of " << destCTF.getSizeString() << ")");
 	}
 	
@@ -1025,7 +888,7 @@ void FourierBackprojection::backprojectSlice_fwd(
 
 
 template <typename SrcType, typename DestType, class PointInsertion>
-void FourierBackprojection::backprojectSlice_fwd_curved(
+void FourierBackprojection::backprojectSphere_forward(
 				const PointInsertion& pointInsertion,
 				const RawImage<tComplex<SrcType>>& dataFS,
 				const RawImage<SrcType>& weight,
@@ -1043,7 +906,7 @@ void FourierBackprojection::backprojectSlice_fwd_curved(
 	
 	if (!destCTF.hasSize(wh3, h3, d3))
 	{
-		REPORT_ERROR_STR("FourierBackprojection::backprojectSlice_noSF_fwd: destCTF has wrong size ("
+		REPORT_ERROR_STR("FourierBackprojection::backprojectSphere_forward: destCTF has wrong size ("
 						 << destCTF.getSizeString() << " instead of " << destCTF.getSizeString() << ")");
 	}
 	
@@ -1077,7 +940,7 @@ void FourierBackprojection::backprojectSlice_fwd_curved(
 }
 
 template <typename SrcType, typename DestType, class PointInsertion>
-void FourierBackprojection::backprojectSlice_dualContrast_fwd_curved(
+void FourierBackprojection::backprojectSphere_dualContrast_forward(
         const PointInsertion& pointInsertion,
         const RawImage<tComplex<SrcType>>& sin_gamma_data,
 		const RawImage<tComplex<SrcType>>& cos_gamma_data,
@@ -1130,7 +993,7 @@ void FourierBackprojection::backprojectSlice_dualContrast_fwd_curved(
 
 
 template <typename SrcType, typename DestType>
-void FourierBackprojection::backprojectSlice_fwd_wrap(
+void FourierBackprojection::backprojectSlice_forward_wrap(
 				const RawImage<tComplex<SrcType>>& dataFS,
 				const RawImage<SrcType>& weight,
 				const gravis::d4Matrix& proj,
@@ -1146,7 +1009,7 @@ void FourierBackprojection::backprojectSlice_fwd_wrap(
 	
 	if (!destCTF.hasSize(wh3, h3, d3))
 	{
-		REPORT_ERROR_STR("FourierBackprojection::backprojectSlice_noSF_fwd: destCTF has wrong size ("
+		REPORT_ERROR_STR("FourierBackprojection::backprojectSlice_forward_wrap: destCTF has wrong size ("
 						 << destCTF.getSizeString() << " instead of " << destCTF.getSizeString() << ")");
 	}
 	

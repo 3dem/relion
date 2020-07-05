@@ -224,13 +224,13 @@ void SubtomoProgram::run()
 				multiImageFS = BufferedImage<float>(sh3D,s3D,s3D);
 				multiImageFS.fill(0.0);
 				
-				FourierBackprojection::backproject_bwd(
+				FourierBackprojection::backprojectStack_backward(
 						particleStack, weightStack, projPart, dataImgFS,
 						psfImgFS, ctfImgFS, multiImageFS, inner_thread_num);
 			}
 			else
 			{
-				FourierBackprojection::backproject_bwd(
+				FourierBackprojection::backprojectStack_backward(
 						particleStack, weightStack, projPart, dataImgFS,
 						psfImgFS, ctfImgFS, inner_thread_num);
 			}

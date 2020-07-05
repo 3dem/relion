@@ -27,6 +27,7 @@
 #include <src/jaz/image/padding.h>
 #include <src/jaz/image/symmetry.h>
 #include <src/jaz/image/padding.h>
+#include <src/jaz/optics/ctf_helper.h>
 #include <omp.h>
 
 using namespace gravis;
@@ -756,14 +757,14 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 				
 				if (do_dual_contrast)
 				{
-					FourierBackprojection::backprojectSlice_dualContrast_fwd_curved(
+					FourierBackprojection::backprojectSphere_dualContrast_forward(
 							clippedInsertion,
 							sin_gamma_data, cos_gamma_data,
 							sin2_weight, sin_cos_weight, cos2_weight, 
 							proj, r_ewald_sphere, !is_reverse,
 							*dual_contrast_accumulation_volume);
 					
-					FourierBackprojection::backprojectSlice_dualContrast_fwd_curved(
+					FourierBackprojection::backprojectSphere_dualContrast_forward(
 							clippedInsertion,
 							sin_gamma_data, cos_gamma_data,
 							sin2_weight, sin_cos_weight, cos2_weight, 
@@ -772,12 +773,12 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 				}
 				else
 				{
-					FourierBackprojection::backprojectSlice_fwd_curved(
+					FourierBackprojection::backprojectSphere_forward(
 							clippedInsertion,
 							dataImageP, ctfImage, proj, r_ewald_sphere,
 							accumulation_volume->data, accumulation_volume->weight);
 					
-					FourierBackprojection::backprojectSlice_fwd_curved(
+					FourierBackprojection::backprojectSphere_forward(
 							clippedInsertion,
 							dataImageQ, ctfImage, proj, -r_ewald_sphere,
 							accumulation_volume->data, accumulation_volume->weight);
@@ -785,7 +786,28 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 			}
 			else
 			{
-				REPORT_ERROR("Ewald sphere curvature does not work with backward mapping.");
+				if (do_dual_contrast)
+				{
+					REPORT_ERROR("Dual contrast is currently not supported with backward mapping");
+				}
+				else
+				{
+					RawImage<Complex> dataImageP(F2DP);
+					RawImage<Complex> dataImageQ(F2DQ);
+					
+					CtfHelper::CTFP_CTFQ_Pair<RFLOAT> dataImagePQ = 
+					        CtfHelper::stitchHalves(dataImageP, dataImageQ);
+					
+					FourierBackprojection::backprojectSphere_backward(
+						dataImagePQ.pq, ctfImage, proj, r_ewald_sphere,
+						accumulation_volume->data, accumulation_volume->weight,
+						num_threads_in);
+					
+					FourierBackprojection::backprojectSphere_backward(
+						dataImagePQ.qp, ctfImage, proj, -r_ewald_sphere,
+						accumulation_volume->data, accumulation_volume->weight,
+						num_threads_in);
+				}
 			}
 		}
 		else
@@ -798,7 +820,7 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 			{
 				ClippedPointInsertion<RFLOAT,RFLOAT> clippedInsertion;
 				
-				FourierBackprojection::backprojectSlice_fwd
+				FourierBackprojection::backprojectSlice_forward
 					(clippedInsertion, dataImage, ctfImage, proj,
 					 accumulation_volume->data, 
 				     accumulation_volume->weight);
@@ -807,7 +829,7 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 			{
 				if (do_dual_contrast)
 				{
-					FourierBackprojection::backprojectSlice_noSF_dualContrast(
+					FourierBackprojection::backprojectSlice_dualContrast_backward(
 						sin_gamma_data, cos_gamma_data,
 						sin2_weight, sin_cos_weight, cos2_weight,
 						proj,
@@ -818,7 +840,7 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 				{
 					if (compute_multiplicity)
 					{
-						FourierBackprojection::backprojectSlice_noSF(
+						FourierBackprojection::backprojectSlice_backward(
 							dataImage, ctfImage, proj,
 							accumulation_volume->data,
 							accumulation_volume->weight,
@@ -827,7 +849,7 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 					}
 					else
 					{
-						FourierBackprojection::backprojectSlice_noSF(
+						FourierBackprojection::backprojectSlice_backward(
 							dataImage, ctfImage, proj,
 							accumulation_volume->data,
 							accumulation_volume->weight,

@@ -33,19 +33,19 @@ class Interpolation
     public:
 		
 		template<typename T> inline
-		static double linearXY_clip(const RawImage<T>& img, double x, double y, int z = 0);
+		static T linearXY_clip(const RawImage<T>& img, double x, double y, int z = 0);
 
         template<typename T> inline
-        static double linearXYZ_clip(const RawImage<T>& img, double x, double y, double z);
+        static T linearXYZ_clip(const RawImage<T>& img, double x, double y, double z);
 		
 		template<typename T> inline
-		static double cubicXY_clip(const RawImage<T>& img, double x, double y, int z = 0);	
+		static T cubicXY_clip(const RawImage<T>& img, double x, double y, int z = 0);	
 		
 		template<typename T> inline
 		static gravis::t2Vector<T> cubicXYGrad_clip(const RawImage<T>& img, double x, double y, int z = 0);		
 		
 		template<typename T> inline
-		static double cubicXY_wrap(const RawImage<T>& img, double x, double y, int z = 0);
+		static T cubicXY_wrap(const RawImage<T>& img, double x, double y, int z = 0);
 		
 		template<typename T> inline
 		static gravis::t2Vector<T> cubicXYGrad_wrap(const RawImage<T>& img, double x, double y, int z = 0);		
@@ -145,7 +145,7 @@ class Interpolation
 };
 
 template<typename T> inline
-double Interpolation::linearXY_clip(const RawImage<T>& img, double x, double y, int z)
+T Interpolation::linearXY_clip(const RawImage<T>& img, double x, double y, int z)
 {
 	int x0 = FLOOR(x);
 	int y0 = FLOOR(y);
@@ -172,7 +172,7 @@ double Interpolation::linearXY_clip(const RawImage<T>& img, double x, double y, 
 }
 
 template<typename T> inline
-double Interpolation::linearXYZ_clip(const RawImage<T>& img, double x, double y, double z)
+T Interpolation::linearXYZ_clip(const RawImage<T>& img, double x, double y, double z)
 {
     int x0 = FLOOR(x);
     int y0 = FLOOR(y);
@@ -222,7 +222,7 @@ double Interpolation::linearXYZ_clip(const RawImage<T>& img, double x, double y,
 }
 
 template<typename T> inline
-double Interpolation::cubicXY_clip(const RawImage<T>& img, double x, double y, int z)
+T Interpolation::cubicXY_clip(const RawImage<T>& img, double x, double y, int z)
 {
 	int xi    = (int)std::floor(x);
 	int yi    = (int)std::floor(y);
@@ -358,7 +358,7 @@ gravis::t2Vector<T> Interpolation::cubicXYGrad_clip(const RawImage<T>& img, doub
 }
 
 template<typename T> inline
-double Interpolation::cubicXY_wrap(const RawImage<T>& img, double x, double y, int z)
+T Interpolation::cubicXY_wrap(const RawImage<T>& img, double x, double y, int z)
 {
 	const int w = img.xdim;
 	const int h = img.ydim;

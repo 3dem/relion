@@ -4,6 +4,7 @@
 #include <src/jaz/tomography/projection/Fourier_backprojection.h>
 #include <src/jaz/tomography/projection/point_insertion.h>
 #include <src/jaz/tomography/reconstruction.h>
+#include <src/jaz/optics/ctf_helper.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
 #include <src/jaz/math/Euler_angles.h>
@@ -17,38 +18,59 @@ using namespace gravis;
 
 int main(int argc, char *argv[])
 {
+	
 	const int s = 180;
 	const int sh = s/2 + 1;
-	const int num_observations = 1;
-	const int num_shells = 5;
-	const int num_spheres = 2 * num_shells - 1;
-	const int num_threads = 6;
-	const double outer_radius = s / 2;
-	
-	const std::string tag = "Ewald_"+ZIO::itoa(num_observations)+"_new_fwd";
-	
+	const int num_observations = 1;		
 	const double SNR = 1.0;
-	const double Ewald_radius = 5 * s;
-	const bool forward = true;
-	const bool slow = true;
-	const bool explicit_gridding = false;
-	const bool legacy_backprojector = false;
-	const bool crossed = false;
+	const double Ewald_radius = 2 * s;
 	
-	std::vector<double> sphere_radius(num_spheres);
-	std::vector<double> sphere_scale(num_spheres);
+	bool forward, slow, explicit_gridding, legacy_backprojector, crossed;	
+	int num_threads;
 	
-	for (int i = 0; i < num_spheres; i++)
+	
+	IOParser parser;
+	
+	try
 	{
-		const double r = (i + 1.0) * outer_radius / num_spheres;
-		sphere_radius[i] = r;
-		sphere_scale[i] = 1 - 2 * (i % 2);
+		parser.setCommandLine(argc, argv);
+		int gen_section = parser.addSection("General options");
+		
+		forward = parser.checkOption("--forward", "Use forward mapping");
+		slow = parser.checkOption("--slow", "Use slow backward mapping");
+		explicit_gridding = parser.checkOption("--xg", "Use explicit gridding");
+		legacy_backprojector = parser.checkOption("--old", "Use legacy backprojector");
+		
+		num_threads = textToInteger(parser.getOption("--j", "Number of threads", "6"));
+		
+		parser.checkForErrors();
+	}
+	catch (RelionError XE)
+	{
+		parser.writeUsage(std::cout);
+		std::cerr << XE;
+		exit(1);
 	}
 	
+	
+	const std::string tag 
+		= "Ewald_" + (
+	            legacy_backprojector? 
+				"legacy" 
+	              :
+				(   
+					std::string("new_")
+				  + (forward? "forward" : "backward") 
+				  + (slow? "_slow" : "")
+				  + (crossed? "_crossed" : "")
+				));
+	
+	std::cout << "tag: " << tag << std::endl;
+		
 	BufferedImage<INPUT_PRECISION> observation_P_RS(s,s);
 	BufferedImage<INPUT_PRECISION> observation_Q_RS(s,s);
 	
-	const double falloff_sigma2 = s*s/16.0;
+	const double falloff_sigma2 = s*s/64.0;
 	        
 	for (int y = 0; y < s; y++)
 	for (int x = 0; x < s; x++)
@@ -109,8 +131,8 @@ int main(int argc, char *argv[])
 		
 		if (i == 0)
 		{
-			phi = DEG2RAD(60);
-			psi = DEG2RAD(0);
+			phi  = DEG2RAD(60);
+			psi  = DEG2RAD(0);
 			tilt = DEG2RAD(0);
 		}
 		
@@ -138,56 +160,47 @@ int main(int argc, char *argv[])
 			{
 				ClippedPointInsertion<INPUT_PRECISION,OUTPUT_PRECISION> clippedInsertion;
 				
-				FourierBackprojection::backprojectSlice_fwd_curved(
+				FourierBackprojection::backprojectSphere_forward(
 					clippedInsertion,
 					observation_P, ctf, proj, Ewald_radius,
 					data, weight);
 				
-				FourierBackprojection::backprojectSlice_fwd_curved(
+				FourierBackprojection::backprojectSphere_forward(
 					clippedInsertion,
 					observation_Q, ctf, proj, -Ewald_radius,
 					data, weight);
 			}
 			else
 			{
+				CtfHelper::CTFP_CTFQ_Pair<INPUT_PRECISION> ctfPQ 
+				        = CtfHelper::stitchHalves(observation_P, observation_Q);
+				
+				ctfPQ.pq.writeVtk("observation_PQ_"+tag+".vtk");
+				
 				if (!slow)
 				{
-					FourierBackprojection::backprojectSlice_noSF_curved(
-						observation_P, ctf, proj, Ewald_radius,
+					FourierBackprojection::backprojectSphere_backward(
+						ctfPQ.pq, ctf, proj, Ewald_radius,
 						data, weight,
 						num_threads);
 					
-					FourierBackprojection::backprojectSlice_noSF_curved(
-						observation_Q, ctf, proj, -Ewald_radius,
+					FourierBackprojection::backprojectSphere_backward(
+						ctfPQ.qp, ctf, proj, -Ewald_radius,
 						data, weight,
 						num_threads);
 				}
 				else
 				{
-					if (crossed)
-					{
-						FourierBackprojection::backprojectSlice_noSF_curved_slow_crossed(
-							observation_P, observation_Q, ctf, proj, Ewald_radius,
-							data, weight,
-							num_threads);
 						
-						FourierBackprojection::backprojectSlice_noSF_curved_slow_crossed(
-							observation_Q, observation_P, ctf, proj, -Ewald_radius,
-							data, weight,
-							num_threads);
-					}
-					else
-					{
-						FourierBackprojection::backprojectSlice_noSF_curved_slow(
-							observation_P, ctf, proj, Ewald_radius,
-							data, weight,
-							num_threads);
-						
-						FourierBackprojection::backprojectSlice_noSF_curved_slow(
-							observation_Q, ctf, proj, -Ewald_radius,
-							data, weight,
-							num_threads);
-					}
+					FourierBackprojection::backprojectSphere_backward_slow(
+						ctfPQ.pq, ctf, proj, Ewald_radius,
+						data, weight,
+						num_threads);
+					
+					FourierBackprojection::backprojectSphere_backward_slow(
+						ctfPQ.qp, ctf, proj, -Ewald_radius,
+						data, weight,
+						num_threads);
 				}
 				
 				
@@ -226,7 +239,7 @@ int main(int argc, char *argv[])
 	}
 	else
 	{
-		data.writeVtk("data_"+tag+".vtk");
+		data.writeVtk("dataDebug_"+tag+".vtk");
 		        
 		BufferedImage<OUTPUT_PRECISION> data_RS(s,s,s);
 		

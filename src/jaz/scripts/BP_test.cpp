@@ -127,7 +127,7 @@ int main(int argc, char *argv[])
 			{
 				if (wrap_voxels)
 				{
-					FourierBackprojection::backprojectSlice_fwd_wrap(
+					FourierBackprojection::backprojectSlice_forward_wrap(
 						observation_FS, ctf, proj,
 						data, weight);
 				}
@@ -135,14 +135,14 @@ int main(int argc, char *argv[])
 				{
 					ClippedPointInsertion<INPUT_PRECISION,OUTPUT_PRECISION> clippedInsertion;
 					
-					FourierBackprojection::backprojectSlice_fwd(
+					FourierBackprojection::backprojectSlice_forward(
 						clippedInsertion, observation_FS, ctf, proj,
 						data, weight);
 				}
 			}
 			else
 			{
-				FourierBackprojection::backprojectSlice_noSF(
+				FourierBackprojection::backprojectSlice_backward(
 					observation_FS, ctf, proj,
 					data, weight, num_threads);
 				
