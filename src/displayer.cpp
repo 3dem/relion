@@ -1361,14 +1361,14 @@ void regroupSelectedParticles(MetaDataTable &MDdata, MetaDataTable &MDgroups, in
 	std::map<long, std::string>::iterator it;
 
 	// Loop through all existing, sorted groups
-	long new_group_id = 1;
+	long new_group_id = 0;
 
 	// Worst case: O(old_nr_groups ^ 2) = O(mic ^ 2)
 	// We can reduce this by using one more hash but this should be enough.
 	for (long optics_group_id = 1; optics_group_id <= max_optics_group_id; optics_group_id++)
 	{
 		long nr_parts_in_new_group = 0;
-		MetaDataTable MDout;
+		new_group_id++;
 
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDgroups)
 		{
