@@ -34,10 +34,10 @@
 class image_handler_parameters
 {
 	public:
-   	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_fsc, fn_adjust_power, fn_correct_ampl, fn_fourfilter, fn_cosDPhi;
+   	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_mask, fn_fsc, fn_adjust_power, fn_correct_ampl, fn_fourfilter, fn_cosDPhi;
 	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box, minr_ampl_corr, my_new_box_size;
-	bool do_add_edge, do_invert_hand, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_calc_com, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan, do_average_all_frames, do_power, do_ignore_optics;
-	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, requested_angpix, real_angpix, force_header_angpix, lowpass, highpass, logfilter, bfactor, shift_x, shift_y, shift_z, replace_nan, randomize_at;
+	bool do_add_edge, do_invert_hand, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_calc_com, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan, do_average_all_frames, do_power, do_ignore_optics, do_optimise_scale_subtract;
+	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, requested_angpix, real_angpix, force_header_angpix, lowpass, highpass, logfilter, bfactor, shift_x, shift_y, shift_z, replace_nan, randomize_at, optimise_bfactor_subtract;
 	// PNG options
 	RFLOAT minval, maxval, sigma_contrast;
 	int color_scheme; // There is a global variable called colour_scheme in displayer.h!
@@ -50,6 +50,7 @@ class image_handler_parameters
 
 	Image<RFLOAT> Iout;
 	Image<RFLOAT> Iop;
+	Image<RFLOAT> Imask;
 	MultidimArray<RFLOAT> avg_ampl;
 	MetaDataTable MD;
 	FourierTransformer transformer;
@@ -90,6 +91,11 @@ class image_handler_parameters
 		do_power = parser.checkOption("--power", "Calculate power spectrum (|F|^2) of the input image");
 		fn_adjust_power = parser.getOption("--adjust_power", "Adjust the power spectrum of the input image to be the same as this image ", "");
 		fn_fourfilter = parser.getOption("--fourier_filter", "Multiply the Fourier transform of the input image(s) with this one image ", "");
+
+		int subtract_section = parser.addSection("additional subtract options");
+		do_optimise_scale_subtract = parser.checkOption("--optimise_scale_subtract", "Optimise scale between maps before subtraction?");
+		optimise_bfactor_subtract = textToFloat(parser.getOption("--optimise_bfactor_subtract", "Search range for relative B-factor for subtraction (in A^2)", "0."));
+		fn_mask = parser.getOption("--mask_optimise_subtract", "Use only voxels in this mask to optimise scale for subtraction", "");
 
 		int four_section = parser.addSection("per-image operations");
 		do_stats = parser.checkOption("--stats", "Calculate per-image statistics?");
@@ -175,7 +181,7 @@ class image_handler_parameters
 
 		if (angpix < 0 && (requested_angpix > 0 || fn_fsc != "" || randomize_at > 0 ||
 		                   do_power || fn_cosDPhi != "" || fn_correct_ampl != "" ||
-		                   fabs(bfactor) > 0 || logfilter > 0 || lowpass > 0 || highpass > 0))
+		                   fabs(bfactor) > 0 || logfilter > 0 || lowpass > 0 || highpass > 0 || fabs(optimise_bfactor_subtract) > 0))
 		{
 			angpix = Iin.samplingRateX();
 			std::cerr << "WARNING: You did not specify --angpix. The pixel size in the image header, " << angpix << " A/px, is used." << std::endl;
@@ -303,9 +309,82 @@ class image_handler_parameters
 		}
 		else if (fn_subtract != "")
 		{
+			RFLOAT my_scale = 1., best_diff2 ;
+			if (do_optimise_scale_subtract)
+			{
+				if (fn_mask == "")
+				{
+					Imask(). resize(Iop());
+					Imask().initConstant(1.);
+				}
+
+				if (optimise_bfactor_subtract > 0.)
+				{
+					MultidimArray< Complex > FTop, FTop_bfac;
+					FourierTransformer transformer;
+					MultidimArray<RFLOAT> Isharp(Iop());
+					transformer.FourierTransform(Iop(), FTop);
+
+					RFLOAT my_bfac, smallest_diff2=99.e99;
+					for (RFLOAT bfac = -optimise_bfactor_subtract; bfac <= optimise_bfactor_subtract; bfac+= 10.)
+					{
+						FTop_bfac = FTop;
+						applyBFactorToMap(FTop_bfac, XSIZE(Iop()), bfac, angpix);
+						transformer.inverseFourierTransform(FTop_bfac, Isharp);
+						RFLOAT scale, diff2;
+
+						RFLOAT sum_aa = 0., sum_xa = 0., sum_xx = 0.;
+						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iin())
+						{
+							RFLOAT w = DIRECT_MULTIDIM_ELEM(Imask(), n) * DIRECT_MULTIDIM_ELEM(Imask(), n);
+							RFLOAT x = DIRECT_MULTIDIM_ELEM(Iin(), n);
+							RFLOAT a = DIRECT_MULTIDIM_ELEM(Isharp, n);
+							sum_aa += w*a*a;
+							sum_xa += w*x*a;
+							sum_xx += w*x*x;
+						}
+						scale = sum_xa/sum_aa;
+
+						diff2 = 0.;
+						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iin())
+						{
+							RFLOAT w = DIRECT_MULTIDIM_ELEM(Imask(), n);
+							RFLOAT x = DIRECT_MULTIDIM_ELEM(Iin(), n);
+							RFLOAT a = DIRECT_MULTIDIM_ELEM(Isharp, n);
+							diff2 += w * w * (x - scale * a) * (x - scale * a);
+						}
+						if (diff2 < smallest_diff2)
+						{
+							smallest_diff2 = diff2;
+							my_bfac = bfac;
+							my_scale = scale;
+						}
+					}
+					std::cout << " Optimised bfactor = " << my_bfac << "; optimised scale = " << my_scale << std::endl;
+					applyBFactorToMap(FTop, XSIZE(Iop()), my_bfac, angpix);
+					transformer.inverseFourierTransform(FTop, Iop());
+
+				}
+				else
+				{
+					RFLOAT sum_aa = 0., sum_xa = 0.;
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iin())
+					{
+						RFLOAT w = DIRECT_MULTIDIM_ELEM(Imask(), n);
+						RFLOAT x = DIRECT_MULTIDIM_ELEM(Iin(), n);
+						RFLOAT a = DIRECT_MULTIDIM_ELEM(Iop(), n);
+						sum_aa += w*w*a*a;
+						sum_xa += w*w*x*a;
+					}
+					my_scale = sum_xa/sum_aa;
+					std::cout << " Optimised scale = " << my_scale << std::endl;
+
+				}
+			}
+
 			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Iin())
 			{
-				DIRECT_A3D_ELEM(Iout(), k, i, j) -= DIRECT_A3D_ELEM(Iop(), k, i, j);
+				DIRECT_A3D_ELEM(Iout(), k, i, j) -= my_scale * DIRECT_A3D_ELEM(Iop(), k, i, j);
 			}
 		}
 		else if (fn_fsc != "")
@@ -616,7 +695,10 @@ class image_handler_parameters
 	{
 		my_new_box_size = -1;
 
-		bool input_is_stack = (fn_in.getExtension() == "mrcs" || fn_in.getExtension() == "tif" || fn_in.getExtension() == "tiff") && !fn_in.contains("@");
+		long int slice_id;
+		std::string fn_stem;
+		fn_in.decompose(slice_id, fn_stem);
+		bool input_is_stack = (fn_in.getExtension() == "mrcs" || fn_in.getExtension() == "tif" || fn_in.getExtension() == "tiff") && (slice_id == -1);
 		bool input_is_star = (fn_in.getExtension() == "star");
 		// By default: write single output images
 
@@ -707,7 +789,10 @@ class image_handler_parameters
 				else if (fn_add != "")
 					Iop.read(fn_add);
 				else if (fn_subtract != "")
+				{
 					Iop.read(fn_subtract);
+					if (do_optimise_scale_subtract && fn_mask != "") Imask.read(fn_mask);
+				}
 				else if (fn_fsc != "")
 					Iop.read(fn_fsc);
 				else if (fn_cosDPhi != "")
