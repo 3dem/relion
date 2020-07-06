@@ -535,12 +535,6 @@ public:
 	FileName fn_fourier_mask;
 	MultidimArray<RFLOAT> helical_fourier_mask;
 
-	///////// Special stuff for subtomogram avg //////////
-
-	// Flag whether CTF3D files contain CTF^2 or not
-	bool ctf3d_squared;
-
-
 	///////// Hidden stuff, does not work with read/write: only via command-line ////////////////
 
 	// Skip gridding in reconstruction
@@ -586,9 +580,15 @@ public:
 	// Just count how often the optimal changes are summed
 	RFLOAT sum_changes_count;
 
+	///////// Special stuff for subtomogram avg //////////
+
+	// Do CTF3D files contain CTF^2 or not?
+	bool ctf3d_squared;
+	// Apply regular Probability and Noise estimation
 	bool do_skip_subtomo_correction;
-	bool do_sigma2_3d;
+	// Have subtomogram files been multiplicity normalised during reconstruction?
 	bool normalised_subtomos;
+	// Threshold applied to multiplicity volume to mask edge voxels
 	RFLOAT subtomo_multi_thr;
 
 	/////////// Some internal stuff ////////////////////////
@@ -673,104 +673,107 @@ public:
 public:
 
 	MlOptimiser():
-			do_zero_mask(0),
-			do_write_unmasked_refs(0),
-			do_generate_seeds(0),
-			sum_changes_count(0),
-			current_changes_optimal_orientations(0),
-			do_average_unaligned(0),
-			sigma2_fudge(0),
-			do_always_cc(0),
-			best_resol_thus_far(0),
-			debug1(0),
-			incr_size(0),
-			has_large_incr_size_iter_ago(0),
-			nr_iter_wo_resol_gain(0),
-			nr_pool(0),
-			refs_are_ctf_corrected(0),
-			has_high_fsc_at_limit(0),
-			do_acc_currentsize_despite_highres_exp(0),
-			low_resol_join_halves(0),
-			do_auto_refine(0),
-			has_converged(0),
-			only_flip_phases(0),
-			gridding_nr_iter(0),
-			do_use_reconstruct_images(0),
-			fix_sigma_noise(0),
-			current_changes_optimal_offsets(0),
-			smallest_changes_optimal_classes(0),
-			do_print_metadata_labels(0),
-			adaptive_fraction(0),
-			do_print_symmetry_ops(0),
-			do_bfactor(0),
-			do_use_all_data(0),
-			minres_map(0),
-			debug2(0),
-			do_always_join_random_halves(0),
-			my_first_particle_id(0),
-			x_pool(1),
-			nr_threads(0),
-			do_shifts_onthefly(0),
-			exp_ipart_ThreadTaskDistributor(0),
-			do_parallel_disc_io(0),
-			sum_changes_optimal_orientations(0),
-			do_solvent(0),
-			strict_highres_exp(0),
-			sum_changes_optimal_classes(0),
-			acc_trans(0),
-			width_mask_edge(0),
-			has_fine_enough_angular_sampling(0),
-			sum_changes_optimal_offsets(0),
-			do_scale_correction(0),
-			ctf_phase_flipped(0),
-			nr_iter_wo_large_hidden_variable_changes(0),
-			adaptive_oversampling(0),
-			nr_iter(0),
-			intact_ctf_first_peak(0),
-			do_join_random_halves(0),
-			do_skip_align(0),
-			do_calculate_initial_sigma_noise(0),
-			fix_sigma_offset(0),
-			do_firstiter_cc(0),
-			exp_my_last_part_id(0),
-			particle_diameter(0),
-			smallest_changes_optimal_orientations(0),
-			verb(0),
-			do_norm_correction(0),
-			fix_tau(0),
-			directions_have_changed(0),
-			acc_rot(0),
-			do_sequential_halves_recons(0),
-			do_skip_rotate(0),
-			current_changes_optimal_classes(0),
-			do_skip_maximization(0),
-			dont_raise_norm_error(0),
-			do_map(0),
-			combine_weights_thru_disc(0),
-			smallest_changes_optimal_offsets(0),
-			exp_my_first_part_id(0),
-			iter(0),
-			my_last_particle_id(0),
-			ini_high(0),
-			do_ctf_correction(0),
-			max_coarse_size(0),
-			autosampling_hporder_local_searches(0),
-			do_split_random_halves(0),
-			debug_split_random_half(0),
-			random_seed(0),
-			do_gpu(0),
-			anticipate_oom(0),
-			do_helical_refine(0),
-			ignore_helical_symmetry(0),
-			helical_twist_initial(0),
-			helical_rise_initial(0),
-			helical_z_percentage(0),
-			helical_tube_inner_diameter(0),
-			helical_tube_outer_diameter(0),
-			do_helical_symmetry_local_refinement(0),
-			helical_sigma_distance(0),
-			helical_keep_tilt_prior_fixed(0),
-			do_skip_subtomo_correction(0),
+		do_zero_mask(0),
+		do_write_unmasked_refs(0),
+		do_generate_seeds(0),
+		sum_changes_count(0),
+		current_changes_optimal_orientations(0),
+		do_average_unaligned(0),
+		sigma2_fudge(0),
+		do_always_cc(0),
+		best_resol_thus_far(0),
+		debug1(0),
+		incr_size(0),
+		has_large_incr_size_iter_ago(0),
+		nr_iter_wo_resol_gain(0),
+		nr_pool(0),
+		refs_are_ctf_corrected(0),
+		has_high_fsc_at_limit(0),
+		do_acc_currentsize_despite_highres_exp(0),
+		low_resol_join_halves(0),
+		do_auto_refine(0),
+		has_converged(0),
+		only_flip_phases(0),
+		gridding_nr_iter(0),
+		do_use_reconstruct_images(0),
+		fix_sigma_noise(0),
+		current_changes_optimal_offsets(0),
+		smallest_changes_optimal_classes(0),
+		do_print_metadata_labels(0),
+		adaptive_fraction(0),
+		do_print_symmetry_ops(0),
+		do_bfactor(0),
+		do_use_all_data(0),
+		minres_map(0),
+		debug2(0),
+		do_always_join_random_halves(0),
+		my_first_particle_id(0),
+		x_pool(1),
+		nr_threads(0),
+		do_shifts_onthefly(0),
+		exp_ipart_ThreadTaskDistributor(0),
+		do_parallel_disc_io(0),
+		sum_changes_optimal_orientations(0),
+		do_solvent(0),
+		strict_highres_exp(0),
+		sum_changes_optimal_classes(0),
+		acc_trans(0),
+		width_mask_edge(0),
+		has_fine_enough_angular_sampling(0),
+		sum_changes_optimal_offsets(0),
+		do_scale_correction(0),
+		ctf_phase_flipped(0),
+		nr_iter_wo_large_hidden_variable_changes(0),
+		adaptive_oversampling(0),
+		nr_iter(0),
+		intact_ctf_first_peak(0),
+		do_join_random_halves(0),
+		do_skip_align(0),
+		do_calculate_initial_sigma_noise(0),
+		fix_sigma_offset(0),
+		do_firstiter_cc(0),
+		exp_my_last_part_id(0),
+		particle_diameter(0),
+		smallest_changes_optimal_orientations(0),
+		verb(0),
+		do_norm_correction(0),
+		fix_tau(0),
+		directions_have_changed(0),
+		acc_rot(0),
+		do_sequential_halves_recons(0),
+		do_skip_rotate(0),
+		current_changes_optimal_classes(0),
+		do_skip_maximization(0),
+		dont_raise_norm_error(0),
+		do_map(0),
+		combine_weights_thru_disc(0),
+		smallest_changes_optimal_offsets(0),
+		exp_my_first_part_id(0),
+		iter(0),
+		my_last_particle_id(0),
+		ini_high(0),
+		do_ctf_correction(0),
+		max_coarse_size(0),
+		autosampling_hporder_local_searches(0),
+		do_split_random_halves(0),
+		debug_split_random_half(0),
+		random_seed(0),
+		do_gpu(0),
+		anticipate_oom(0),
+		do_helical_refine(0),
+		ignore_helical_symmetry(0),
+		helical_twist_initial(0),
+		helical_rise_initial(0),
+		helical_z_percentage(0),
+		helical_tube_inner_diameter(0),
+		helical_tube_outer_diameter(0),
+		do_helical_symmetry_local_refinement(0),
+		helical_sigma_distance(0),
+		helical_keep_tilt_prior_fixed(0),
+		ctf3d_squared(0),
+		do_skip_subtomo_correction(0),
+		normalised_subtomos(0),
+		subtomo_multi_thr(0),
 		//directional_lowpass(0),
 		asymmetric_padding(false),
 		maximum_significants(-1),
@@ -935,8 +938,7 @@ public:
 			std::vector<int> &exp_pointer_psi_nonzeroprior,
 			std::vector<RFLOAT> &exp_directions_prior,
 			std::vector<RFLOAT> &exp_psi_prior,
-			std::vector<MultidimArray<RFLOAT> > &exp_STweight,
-			std::vector<MultidimArray<RFLOAT> > &exp_Fctfs1D);
+			std::vector<MultidimArray<RFLOAT> > &exp_STweight);
 
 	/* Store all shifted FourierTransforms in a vector
 	 * also store precalculated 2D matrices with 1/sigma2_noise
@@ -952,8 +954,7 @@ public:
 			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
 			std::vector<RFLOAT> &exp_local_sqrtXi2,
 			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2,
-			std::vector<MultidimArray<RFLOAT> > &exp_STweight,
-			std::vector<MultidimArray<RFLOAT> > &exp_Fctfs1D);
+			std::vector<MultidimArray<RFLOAT> > &exp_STweight);
 
 	// Given exp_Mcoarse_significant, check for iorient whether any of the particles has any significant (coarsely sampled) translation
 	bool isSignificantAnyImageAnyTranslation(long int iorient,
@@ -976,8 +977,7 @@ public:
 			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2,
 			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
 			std::vector<RFLOAT> &exp_local_sqrtXi,
-			std::vector<MultidimArray<RFLOAT> > &exp_STweight,
-			std::vector<MultidimArray<RFLOAT> > &exp_Fctfs1D);
+			std::vector<MultidimArray<RFLOAT> > &exp_STweight);
 
 	// Convert all squared difference terms to weights.
 	// Also calculates exp_sum_weight and, for adaptive approach, also exp_significant_weight
@@ -1016,8 +1016,7 @@ public:
 			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2,
 			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
 			std::vector<RFLOAT> &exp_local_sqrtXi2,
-			std::vector<MultidimArray<RFLOAT> > &exp_STweight,
-			std::vector<MultidimArray<RFLOAT> > &exp_Fctfs1D);
+			std::vector<MultidimArray<RFLOAT> > &exp_STweight);
 
 	/** Monitor the changes in the optimal translations, orientations and class assignments for some particles */
 	void monitorHiddenVariableChanges(long int my_first_part_id, long int my_last_part_id);
