@@ -1574,7 +1574,7 @@ skip_fitting:
 
 		// Apply binning
 		RCTIC(TIMING_BINNING);
-		if (!early_binning & bin_factor != 1) {
+		if (!early_binning && bin_factor != 1) {
 			binNonSquareImage(Iref, bin_factor);
 		}
 		RCTOC(TIMING_BINNING);
