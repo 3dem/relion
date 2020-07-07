@@ -1390,11 +1390,21 @@ void SpaBackproject::reconstructDualContrast()
 
 	Log::endSection();
 
-	Reconstruction::griddingCorrect_dualContrast(
+	if (explicit_spreading_function)
+	{
+		Reconstruction::griddingCorrect_dualContrast(
 			accumulation_volume_both,
 			psfImgFS_both,
 			accumulation_volume_both,
 			true, num_threads_total);
+	}
+	else
+	{
+		Reconstruction::griddingCorrectSinc2_dualContrast(
+			accumulation_volume_both,
+			accumulation_volume_both,
+			true, num_threads_total);
+	}
 
 	DualContrastSolution<RFLOAT> dualContrastSolution =
 		Reconstruction::solveDualContrast(

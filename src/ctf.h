@@ -264,7 +264,7 @@ public:
 		RFLOAT u2 = X * X + Y * Y;
 		RFLOAT u4 = u2 * u2;
 
-		RFLOAT gamma = K1 * (Axx*X*X + 2.0*Axy*X*Y + Ayy*Y*Y) + K2 * u4 - K5 - K3 + PI/2.;
+		RFLOAT gamma = K1 * (Axx*X*X + 2.0*Axy*X*Y + Ayy*Y*Y) + K2 * u4 - K5 - K3;
 
 		RFLOAT sinx, cosx;
 #ifdef RELION_SINGLE_PRECISION
@@ -273,8 +273,8 @@ public:
 		SINCOS( gamma, &sinx, &cosx );
 #endif
 		Complex retval;
-		retval.real = cosx;
-		retval.imag = (is_positive) ? sinx : -sinx;
+		retval.real = -sinx;
+		retval.imag = (is_positive) ? cosx : -cosx;
 
 		return retval;
 	}
@@ -356,6 +356,9 @@ public:
 	// Calculate weight W for Ewald-sphere curvature correction: apply this to the result from getFftwImage
 	void applyWeightEwaldSphereCurvature_noAniso(MultidimArray < RFLOAT > &result, int orixdim, int oriydim, RFLOAT angpix, RFLOAT particle_diameter);
 
+	void applyEwaldMask(RawImage<RFLOAT>& result, int orixdim, int oriydim, RFLOAT angpix, RFLOAT particle_diameter);
+
+	
 	std::vector<double> getK();
 	double getAxx();
 	double getAxy();

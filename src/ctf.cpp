@@ -622,6 +622,31 @@ void CTF::applyWeightEwaldSphereCurvature_noAniso(MultidimArray <RFLOAT> &result
 	}
 }
 
+void CTF::applyEwaldMask(RawImage<RFLOAT>& weight, int orixdim, int oriydim, double angpix, double particle_diameter)
+{
+	const double xs = orixdim * angpix;
+	const double ys = oriydim * angpix;
+	
+	const int w = orixdim;
+	const int h = oriydim;
+	const int wh = w / 2  + 1;
+	const int my = oriydim / 2;
+	
+	for (int yi = 0; yi < h;  yi++)
+	for (int xi = 0; xi < wh; xi++)
+	{
+		const double x = xi / xs;
+		const double y = (yi < my? yi : yi - h) / ys;
+		                  
+		const double deltaf = std::abs(getDeltaF(x, y));
+		const double inv_d = sqrt(x * x + y * y);
+		const double aux = (2. * deltaf * lambda * inv_d) / (particle_diameter);
+		const double A = (aux > 1.) ? 0. : (2. / PI) * (acos(aux) - aux * sin(acos(aux)));
+		
+		weight(xi,yi) = 0.5 * (1 + A * (2 * std::abs(weight(xi,yi)) - 1));
+	}	
+}
+
 BufferedImage<float> CTF::getFftwImage_float(int w0, int h0, double angpix) const
 {
 	BufferedImage<float> out(w0/2 + 1, h0, 1);

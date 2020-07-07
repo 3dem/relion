@@ -82,6 +82,9 @@ class RawImage
 		template <class T2>		
 		void copyTo(Image<T2>& img) const;
 		
+		template <class T2>		
+		void copyTo(MultidimArray<T2>& img) const;
+		
 		template <class T2>
 		void copyTo(RawImage<T2>& img) const;
 		
@@ -536,6 +539,19 @@ inline void RawImage<T>::copyTo(Image<T2>& img) const
 	for (size_t x = 0; x < xdim; x++)
 	{
 		DIRECT_A3D_ELEM(img(), z, y, x) = (T2) data[(z*ydim + y)*xdim + x];
+	}
+}
+
+template <class T> template <class T2>
+inline void RawImage<T>::copyTo(MultidimArray<T2>& img) const
+{
+	img = MultidimArray<T2>(zdim, ydim, xdim);
+	
+	for (size_t z = 0; z < zdim; z++)
+	for (size_t y = 0; y < ydim; y++)
+	for (size_t x = 0; x < xdim; x++)
+	{
+		DIRECT_A3D_ELEM(img, z, y, x) = (T2) data[(z*ydim + y)*xdim + x];
 	}
 }
 
