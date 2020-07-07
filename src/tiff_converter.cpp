@@ -282,7 +282,7 @@ void TIFFConverter::only_compress(FileName fn_movie, FileName fn_tiff)
 		EERRenderer renderer;
 		renderer.read(fn_movie, eer_upsampling);
 
-		int nframes = renderer.getNFrames();
+		const int nframes = renderer.getNFrames();
 		std::cout << " Found " << nframes << " raw frames" << std::endl;
 
 		MultidimArray<T> buf;
@@ -365,13 +365,28 @@ void TIFFConverter::initialise(int _rank, int _total_ranks)
 	if (fn_first.getExtension() != "mrc" && fn_first.getExtension() != "mrcs" && !EERRenderer::isEER(fn_first))
 		REPORT_ERROR(fn_first + ": the input must be MRC, MRCS or EER files");
 
+	if (fn_out.contains("/"))
+		system(("mkdir -p " + fn_out.beforeLastOf("/")).c_str());
+
 	if (EERRenderer::isEER(fn_first))
 	{
 		mrc_mode = -99;
 
-		if (fn_gain != "")
+		if (rank == 0)
 		{
-			// TODO: convert EER gain
+			if (fn_gain != "" && rank == 0)
+			{
+				gain.read(fn_gain);
+				std::cout << "Read an EER gain file " << fn_gain << " NX = " << XSIZE(gain()) << " NY = " << YSIZE(gain()) << std::endl;
+				std::cout << "Taking inverse and re-scaling (when necessary)." << std::endl;
+				EERRenderer::upsampleEERGain(gain(), eer_upsampling);
+				gain.write(fn_out + "gain-reference.mrc");
+				std::cout << "Written " + fn_out + "gain-reference.mrc. Please use this file as a gain reference when processing the converted movies.\n" << std::endl; 	
+			}
+			else
+			{
+				std::cerr << "WARNING: Note that an EER gain reference is the inverse of those expected for TIFF movies. You can convert your gain reference file with --gain option." << std::endl;
+			}
 		}
 
 		if (do_estimate)
@@ -442,10 +457,6 @@ void TIFFConverter::initialise(int _rank, int _total_ranks)
 			}
 		}
 	}
-
-	if (fn_out.contains("/"))
-		system(("mkdir -p " + fn_out.beforeLastOf("/")).c_str());
-
 }
 
 void TIFFConverter::processOneMovie(FileName fn_movie, FileName fn_tiff)

@@ -96,13 +96,13 @@ class EERRenderer {
 	static void upsampleEERGain(MultidimArray<T> &gain, int eer_upsampling=2)
 	{
 		const long long size = EER_IMAGE_WIDTH * eer_upsampling;
-		RFLOAT sum = 0;
+		double sum = 0;
 
 		if (eer_upsampling == 2 && XSIZE(gain) == EER_IMAGE_WIDTH && YSIZE(gain) == EER_IMAGE_HEIGHT) // gain = 4K and grid = 8K
 		{
 			MultidimArray<T> original = gain;
 
-			gain.resize(size, size);
+			gain.initZeros(size, size);
 			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(gain)
 			{
 				DIRECT_A2D_ELEM(gain, i, j) = DIRECT_A2D_ELEM(original, i / 2, j / 2);
@@ -115,6 +115,17 @@ class EERRenderer {
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(gain)
 			{
 				sum += DIRECT_MULTIDIM_ELEM(gain, n);
+			}
+		}
+		else if (eer_upsampling == 1 && XSIZE(gain) == EER_IMAGE_WIDTH * 2 && YSIZE(gain) == EER_IMAGE_HEIGHT * 2) // gain = 8K and grid = 4K
+		{
+			MultidimArray<T> original = gain;
+
+			gain.initZeros(size, size);
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(original)
+			{
+				DIRECT_A2D_ELEM(gain, i / 2, j / 2) += DIRECT_A2D_ELEM(original, i, j);
+				sum += DIRECT_A2D_ELEM(original, i, j);
 			}
 		}
 		else
