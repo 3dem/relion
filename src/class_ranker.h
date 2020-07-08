@@ -30,8 +30,8 @@ class moments
 
 public:
 
-	RFLOAT mean, stddev, skew, kurt;
-    moments(): mean(0), stddev(0), skew(0), kurt(0){}
+	RFLOAT sum, mean, stddev, skew, kurt;
+    moments(): sum(0), mean(0), stddev(0), skew(0), kurt(0){}
 
 };
 
@@ -45,9 +45,12 @@ public:
     FileName name;
     int class_index;
     int is_selected;
+
+    int protein_area, solvent_area;
     RFLOAT class_distribution, accuracy_rotation, accuracy_translation, estimated_resolution, particle_nr;
-    RFLOAT class_score, edge_signal, scattered_signal, weighted_resolution, relative_resolution;
+    RFLOAT class_score, relative_signal_intensity, edge_signal, scattered_signal, weighted_resolution, relative_resolution;
     RFLOAT lowpass_filtered_img_avg, lowpass_filtered_img_stddev, lowpass_filtered_img_minval, lowpass_filtered_img_maxval;
+    RFLOAT CAR; // protein mask's circumference
     moments circular_mask_moments, ring_moments, inner_circle_moments, protein_moments, solvent_moments;
 
     // Granularity features only for historical development reasons
@@ -57,23 +60,27 @@ public:
     classFeatures(): name(""),
 			class_index(0),
     		is_selected(0),
-			particle_nr(0),
-    		class_distribution(0),
-			accuracy_rotation(0),
-			accuracy_translation(0),
+			particle_nr(0.),
+    		class_distribution(0.),
+			accuracy_rotation(0.),
+			accuracy_translation(0.),
 			estimated_resolution(999.0),
 			weighted_resolution(999.0),
 			relative_resolution(999.0),
 			class_score(-1),
+			relative_signal_intensity(0.),
 			edge_signal(-1.),
 			scattered_signal(-1.),
-			lowpass_filtered_img_avg(0),
-			lowpass_filtered_img_stddev(0),
-			lowpass_filtered_img_minval(0),
-			lowpass_filtered_img_maxval(0),
+			lowpass_filtered_img_avg(0.),
+			lowpass_filtered_img_stddev(0.),
+			lowpass_filtered_img_minval(0.),
+			lowpass_filtered_img_maxval(0.),
 			total_entropy(0.),
 			protein_entropy(0.),
-			solvent_entropy(0.)
+			solvent_entropy(0.),
+			protein_area(0),
+			solvent_area(0),
+			CAR(0.)
     {
     }
 
@@ -92,6 +99,7 @@ public:
     	estimated_resolution= copy.estimated_resolution;
     	particle_nr = copy.particle_nr;
     	class_score = copy.class_score;
+    	relative_signal_intensity = copy.relative_signal_intensity;
     	edge_signal = copy.edge_signal;
     	scattered_signal = copy.scattered_signal;
     	weighted_resolution = copy.weighted_resolution;
@@ -103,6 +111,8 @@ public:
     	circular_mask_moments = copy.circular_mask_moments;
     	ring_moments = copy.ring_moments;
     	inner_circle_moments = copy.inner_circle_moments;
+    	protein_area = copy.protein_area;
+    	solvent_area = copy.solvent_area;
     	protein_moments = copy.protein_moments;
     	solvent_moments = copy.solvent_moments;
     	lbp = copy.lbp;
@@ -115,6 +125,7 @@ public:
 	    total_entropy = copy.total_entropy;
 	    protein_entropy = copy.protein_entropy;
 	    solvent_entropy = copy.solvent_entropy;
+	    CAR = copy.CAR;
 
 	}
 
@@ -130,6 +141,7 @@ public:
     	estimated_resolution= copy.estimated_resolution;
     	particle_nr = copy.particle_nr;
     	class_score = copy.class_score;
+    	relative_signal_intensity = copy.relative_signal_intensity;
     	edge_signal = copy.edge_signal;
     	scattered_signal = copy.scattered_signal;
     	weighted_resolution = copy.weighted_resolution;
@@ -141,6 +153,8 @@ public:
     	circular_mask_moments = copy.circular_mask_moments;
     	ring_moments = copy.ring_moments;
     	inner_circle_moments = copy.inner_circle_moments;
+    	protein_area = copy.protein_area;
+    	solvent_area = copy.solvent_area;
     	protein_moments = copy.protein_moments;
     	solvent_moments = copy.solvent_moments;
     	lbp = copy.lbp;
@@ -206,7 +220,7 @@ class ClassRanker
 public:
 
 	IOParser parser;
-	FileName fn_out, fn_ext, fn_optimiser, fn_model, fn_data, fn_select, fn_job_score, fn_cf;
+	FileName fn_out, fn_ext, fn_optimiser, fn_model, fn_data, fn_select, fn_job_score, fn_cf, fn_mask_dir;
 	FileName fn_features, fn_sel_parts, fn_sel_classavgs;
 
 	RFLOAT minRes, job_score;
@@ -214,6 +228,9 @@ public:
 	RFLOAT particle_diameter, circular_mask_radius, uniform_angpix = 4.0;
 	RFLOAT binary_threshold, lowpass;
     int debug, verb, start_class, end_class;
+
+	// Total number of particles in one jobs (always needed)
+	long int total_nr_particles = 0;
 
     HaralickExtractor haralick_extractor;
 	ZernikeMomentsExtractor zernike_extractor;
@@ -226,7 +243,7 @@ public:
 
     // Save some time by limiting calculations
 	int only_use_this_class;
-	bool do_skip_angular_errors, do_granularity_features, do_save_masks;
+	bool do_skip_angular_errors, do_granularity_features, do_save_masks, do_save_mask_c;
 
 	bool do_ctf_correction, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak;
 	MlModel mymodel;
@@ -277,11 +294,13 @@ private:
 
 	RFLOAT getClassScoreFromJobScore(classFeatures &cf, RFLOAT minRes);
 
-	void makeSolventMasks(MultidimArray<RFLOAT> img, MultidimArray<RFLOAT> &lpf, MultidimArray<int> &p_mask, MultidimArray<int> &s_mask,
+	void makeSolventMasks(classFeatures cf, MultidimArray<RFLOAT> img, MultidimArray<RFLOAT> &lpf, MultidimArray<int> &p_mask, MultidimArray<int> &s_mask,
 				RFLOAT &scattered_signal, long &protein_area, long &solvent_area);
 
-	void saveMasks(MultidimArray<RFLOAT> &lpf, MultidimArray<int> &p_mask,
+	void saveMasks(Image<RFLOAT> &img, MultidimArray<RFLOAT> &lpf, MultidimArray<int> &p_mask,
 			MultidimArray<int> &s_mask, classFeatures &cf);
+
+	void maskCircumference(MultidimArray<int> p_mask, RFLOAT &protein_C, classFeatures cf, bool do_save_mask_c);
 
 	void correctCtfUntilFirstPeak(MultidimArray<RFLOAT> &in, CTF ctf);
 

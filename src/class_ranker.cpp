@@ -120,7 +120,7 @@ std::vector<double> ZernikeMomentsExtractor::getZernikeMoments(MultidimArray<dou
 	}
 	else
 	{
-		long   z_num_features = (long)( ((z_order + 4) *
+		long z_num_features = (long)( ((z_order + 4) *
 					   (z_order + 1) - 2 *
 					   (long)(((long)z_order + 1) / (long)2) ) / 4 ) ;
 		zfeatures.resize(z_num_features, 0.);
@@ -394,17 +394,20 @@ void ClassRanker::read(int argc, char **argv, int rank)
 
 	int part_section = parser.addSection("Network training options (only used in development!)");
 	do_ranking  = !parser.checkOption("--train", "Only write output files for training purposes (don't rank classes)");
-	fn_select = parser.getOption("--select", "Input class_averages.star from the Selection job or backup_selection.star", "");
-	fn_job_score = parser.getOption("--fn_score", "Input job score file", "");
+	fn_select = parser.getOption("--select", "Input class_averages.star from the Selection job or backup_selection.star", "backup_selection.star");
+	fn_job_score = parser.getOption("--fn_score", "Input job score file", "job_score.txt");
 	fn_cf = parser.getOption("--cf_file", "Input class feature star file", "");
 	only_use_this_class = textToInteger(parser.getOption("--only_class_nr", "Class number of the class of interest", "-1"));
 	do_skip_angular_errors = parser.checkOption("--skip_angular_errors", "Skip angular error calculation");
 	do_granularity_features  = parser.checkOption("--do_granularity_features", "Calculate granularity features");
 	do_save_masks = parser.checkOption("--save_masks", "Save the automatically generated 2D solvent masks for all references");
+	do_save_mask_c = parser.checkOption("--save_mask_c", "Write out images of protein mask circumferences.");
+	fn_mask_dir = parser.getOption("--mask_folder_name", "Folder name for saving all masks.", "protein_solvent_masks");
 
 	int expert_section = parser.addSection("Expert options");
 	radius_ratio = textToFloat(parser.getOption("--radius_ratio", "Ratio of inner radius of the interested ring area in proportion to the current circular mask radius", "0.95"));
-	radius = textToFloat(parser.getOption("--radius", "Inner radius of the interested ring area to the current circular mask radius", "0"));
+	radius = textToFloat(parser.getOption("--radius", "Inner radius of the interested ring area to the current circular mask radius", "-1"));
+	lowpass = textToFloat(parser.getOption("--lowpass", "Image lowpass filter threshold for generating binary masks.", "25"));
 	binary_threshold = textToFloat(parser.getOption("--binary_threshold", "Threshold for generating binary masks.", "0."));
     debug = textToInteger(parser.getOption("--debug", "Debug level", "0"));
 	verb = textToInteger(parser.getOption("--verb", "Verbosity level", "1"));
@@ -484,13 +487,49 @@ void ClassRanker::initialise()
 			end_class = only_use_this_class;
 		}
 
+		// Check if any angular accuracies are missing
+		bool haveAllAccuracies = true;
+
+		// Pre-calculate Fourier Transforms of all classes, but only if angular accuracies need to be computed
+		if (!do_skip_angular_errors)
+		{
+			for (int iclass = start_class; iclass < end_class; iclass++)
+			{
+				// Only consider features with non-zero class distributions
+				if (mymodel.pdf_class[iclass] > 0)
+				{
+
+					if (mymodel.acc_rot[iclass] > 99. || mymodel.acc_rot[iclass] > 99.)
+					{
+						haveAllAccuracies = false;
+						break;
+					}
+				}
+			}
+			if (!haveAllAccuracies)
+			{
+				// Set FTs of the references
+				mymodel.setFourierTransformMaps(false);
+			}
+		}
+
+		if (intact_ctf_first_peak || do_ranking || (!do_skip_angular_errors && !haveAllAccuracies))
+		{
+			// Read in particles (otherwise wait until haveAllAccuracies or performRanking, as Liyi sometimes doesn't need mydata)
+			mydata.read(fn_data, true, true); // true true means: ignore particle_name and group name!
+			total_nr_particles = mydata.numberOfParticles(0);
+			if (debug>0) std::cerr << "Done with reading data.star ..." << std::endl;
+
+		}
+		else
+		{
+			MetaDataTable MDtmp;
+			total_nr_particles = MDtmp.read(fn_data, "", NULL, "", true); // true means do_only_count
+		}
+
 		if (intact_ctf_first_peak)
 		{
 			if (verb > 0) std::cout << " Doing first peak CTF correction ..." << std::endl;
-
-			// Read in particles (otherwise wait until haveAllAccuracies or performRanking, as Liyi sometimes doesn't need mydata)
-			mydata.read(fn_data, true, true); // true true means: ignore particle_name and group name!
-			if (debug>0) std::cerr << "Done with reading data.star ..." << std::endl;
 
 			// Calculate avg. defocus
 			RFLOAT def_avg = 0, def_u, def_v;
@@ -514,38 +553,6 @@ void ClassRanker::initialise()
 			}
 		}
 
-		// Pre-calculate Fourier Transforms of all classes, but only if angular accuracies need to be computed
-		if (!do_skip_angular_errors)
-		{
-			// Check if any angular accuracies are missing
-			bool haveAllAccuracies = true;
-			for (int iclass = start_class; iclass < end_class; iclass++)
-			{
-				// Only consider features with non-zero class distributions
-				if (mymodel.pdf_class[iclass] > 0)
-				{
-
-					if (mymodel.acc_rot[iclass] > 99. || mymodel.acc_rot[iclass] > 99.)
-					{
-						haveAllAccuracies = false;
-						break;
-					}
-				}
-			}
-			if (!haveAllAccuracies)
-			{
-				// Set FTs of the references
-				mymodel.setFourierTransformMaps(false);
-
-				if (mydata.numberOfParticles() == 0)
-				{
-					// Read in particles (otherwise wait until performRanking, as Liyi sometimes doesn't need mydata)
-					mydata.read(fn_data, true, true); // true true means: ignore particle_name and group name!
-					if (debug>0) std::cerr << "Done with reading data.star ..." << std::endl;
-				}
-
-			}
-		}
 	}
 
 	// Open selected_class table
@@ -610,8 +617,7 @@ int ClassRanker::getClassIndex(FileName &name)
 }
 
 // Calculate moments for one class
-moments ClassRanker::calculateMoments(MultidimArray<RFLOAT> &img,
-		RFLOAT inner_radius, RFLOAT outer_radius, MultidimArray<int> *mask)
+moments ClassRanker::calculateMoments(MultidimArray<RFLOAT> &img, RFLOAT inner_radius, RFLOAT outer_radius, MultidimArray<int> *mask)
 {
 	moments result;
 
@@ -620,7 +626,7 @@ moments ClassRanker::calculateMoments(MultidimArray<RFLOAT> &img,
 
 	if (mask != NULL  && (*mask).sum() == 0)
 	{
-		result.mean = result.stddev = result.skew = result.kurt = 0.;
+		result.sum = result.mean = result.stddev = result.skew = result.kurt = 0.;
 		return result;
 	}
 
@@ -640,9 +646,10 @@ moments ClassRanker::calculateMoments(MultidimArray<RFLOAT> &img,
 			}
 		}
 	}
+	result.sum = sum;
 	result.mean = sum / pix_num;
 
-	// Calculating image moments
+	// Calculating other image moments
 	RFLOAT square_sum = 0, cube_sum = 0, quad_sum = 0;
 	for (long int i= STARTINGY(img) ; i <= FINISHINGY(img); i++)
 	{
@@ -1133,14 +1140,14 @@ RFLOAT ClassRanker::getClassScoreFromJobScore(classFeatures &cf, RFLOAT minRes)
 			break;
 		case 4:
 			result = (0+weight*0.25)*job_score;
-			if (verb > 0) std::cout << "Class " << cf.name << "is labelled cyan!" << std::endl;
+			if (verb > 0) std::cout << "Class " << cf.name << " is labelled cyan!" << std::endl;
 			break;
 		case 5:
 			result = (0.5+weight*0.25)*job_score;
 			break;
 		case 6:
 			result = 0.0;
-			if (verb > 0) std::cout << "Class " << cf.name << "is labelled yellow!" << std::endl;
+//			if (verb > 0) std::cout << "Class " << cf.name << " is labelled yellow!" << std::endl;
 			break;
 		case 0:
 			result = 0.0;
@@ -1160,9 +1167,8 @@ RFLOAT ClassRanker::getClassScoreFromJobScore(classFeatures &cf, RFLOAT minRes)
 }
 
 
-void ClassRanker::makeSolventMasks(MultidimArray<RFLOAT> img, MultidimArray<RFLOAT> &lpf,
-		MultidimArray<int> &p_mask, MultidimArray<int> &s_mask,
-		RFLOAT &scattered_signal, long &protein_area, long &solvent_area)
+void ClassRanker::makeSolventMasks(classFeatures cf, MultidimArray<RFLOAT> img, MultidimArray<RFLOAT> &lpf, MultidimArray<int> &p_mask, MultidimArray<int> &s_mask,
+									RFLOAT &scattered_signal, long &protein_area, long &solvent_area)
 {
 	MultidimArray<bool> visited;
 	std::stack<std::pair<long int, long int>> white_stack;
@@ -1180,13 +1186,13 @@ void ClassRanker::makeSolventMasks(MultidimArray<RFLOAT> img, MultidimArray<RFLO
 	s_mask.initZeros(lpf);
 	p_mask.setXmippOrigin();
 	s_mask.setXmippOrigin();
+
 	protein_area = 0;
 	long circular_area = 0;
 
-	// A hyper-parameter to adjust: definition of central area: 0.7 of radius (~ half of the area)
-	//		RFLOAT sq_ctr_r = 0.49*circular_mask_radius*circular_mask_radius;
-	//		RFLOAT central_area = 3.14*0.49*circular_mask_radius*circular_mask_radius;
+	binary_threshold = 0.05*cf.lowpass_filtered_img_stddev;
 
+	// A hyper-parameter to adjust: definition of central area: 0.7 of radius (~ half of the area)
 	lowPassFilterMap(lpf, lowpass, uniform_angpix);
 
 	for (long int i= STARTINGY(lpf) ; i <= FINISHINGY(lpf); i++)
@@ -1199,8 +1205,9 @@ void ClassRanker::makeSolventMasks(MultidimArray<RFLOAT> img, MultidimArray<RFLO
 				{
 					// Mark
 					A2D_ELEM(visited, i, j) = true;
+											   // Find a new white pixel that was never visited before and use it to identify a new island
 					if (A2D_ELEM(lpf, i, j) > binary_threshold)
-					{                  // Find an initial white pixel and identify a new islands
+					{
 						std::vector<std::pair<long int, long int>> island;
 						long int inside = 1;
 						white_stack.push(std::make_pair(i, j));
@@ -1232,8 +1239,12 @@ void ClassRanker::makeSolventMasks(MultidimArray<RFLOAT> img, MultidimArray<RFLO
 									}
 								}
 							} // end of for loop for looking at 8 neighbours
-						}
-						if (inside > 0.2*3.14*0.49*circular_mask_radius*circular_mask_radius)
+						} // finish finding all pixels for the new island
+
+						//  Debug
+						std::cerr << "Class " << cf.class_index << " inside: " << inside << std::endl;
+
+						if (inside > 0.4*3.14*0.49*circular_mask_radius*circular_mask_radius)
 						{
 							all_islands.push_back(island);
 							protein_area += island.size();
@@ -1247,10 +1258,11 @@ void ClassRanker::makeSolventMasks(MultidimArray<RFLOAT> img, MultidimArray<RFLO
 			}
 		}
 	}
+
 	// Calculate two member variables: scattered_signal and solvent_area
-	scattered_signal = RFLOAT(scattered_signal_nr)/ RFLOAT((scattered_signal_nr + protein_area));
+	scattered_signal = (RFLOAT(scattered_signal_nr))/ (RFLOAT(scattered_signal_nr + protein_area + 1));
 	// Make the masks
-	for (long int i= STARTINGY(lpf) ; i <= FINISHINGY(lpf); i++)
+	for (long int i= STARTINGY(lpf); i <= FINISHINGY(lpf); i++)
 	{
 		for (long int j= STARTINGX(lpf) ; j <= FINISHINGX(lpf); j++)
 		{
@@ -1275,13 +1287,13 @@ void ClassRanker::makeSolventMasks(MultidimArray<RFLOAT> img, MultidimArray<RFLO
 }
 
 
-void ClassRanker::saveMasks(MultidimArray<RFLOAT> &lpf, MultidimArray<int> &p_mask,
-		MultidimArray<int> &s_mask, classFeatures &cf)
+void ClassRanker::saveMasks(Image<RFLOAT> &img, MultidimArray<RFLOAT> &lpf, MultidimArray<int> &p_mask, MultidimArray<int> &s_mask,
+							classFeatures &cf)
 {
 
 	// Create folders to save protein and solvent region masks
 	char foldername[256];
-	snprintf(foldername, 255, "pvs_masks_lp%.0fth%.3f", lowpass, binary_threshold);
+	snprintf(foldername, 255, "%s", fn_mask_dir.c_str());
 	FileName filtered_mask_folder = foldername;
 	if (!exists(filtered_mask_folder))
 	{
@@ -1299,15 +1311,59 @@ void ClassRanker::saveMasks(MultidimArray<RFLOAT> &lpf, MultidimArray<int> &p_ma
 		DIRECT_MULTIDIM_ELEM(s_out(), n) = (double)DIRECT_MULTIDIM_ELEM(s_mask, n);
 	}
 
-	FileName fp_out, fs_out, flpf_out;
+	FileName fp_out, fs_out, flpf_out, fimg_out;
+	fimg_out = fn_out+filtered_mask_folder+"/class"+integerToString(cf.class_index)+"_original.mrc";
 	flpf_out = fn_out+filtered_mask_folder+"/class"+integerToString(cf.class_index)+"_lowpassfiltered.mrc";
 	fp_out = fn_out+filtered_mask_folder+"/class"+integerToString(cf.class_index)+"_p_mask.mrc";
 	fs_out = fn_out+filtered_mask_folder+"/class"+integerToString(cf.class_index)+"_s_mask.mrc";
 
+	img.write(fimg_out);
 	lpf_out.write(flpf_out);
 	p_out.write(fp_out);
 	s_out.write(fs_out);
 
+}
+
+void ClassRanker::maskCircumference(MultidimArray<int> p_mask, RFLOAT &protein_C, classFeatures cf, bool do_save_mask_c)
+{
+	// Sanity check
+	Image<RFLOAT> c_out;
+	c_out().initZeros(p_mask);
+	c_out().setXmippOrigin();
+
+	// Neighbours' relative coordinate. Notice that
+	int dx[8] = {-1, -1, 0, 1, 1, 1, 0, -1};
+	int dy[8] = {0, 1, 1, 1, 0, -1, -1, -1};
+
+	for (long int i= STARTINGY(p_mask) ; i <= FINISHINGY(p_mask); i++)
+	{
+		for (long int j= STARTINGX(p_mask) ; j <= FINISHINGX(p_mask); j++)
+		{								// inside the protein area
+			if (A2D_ELEM(p_mask, i, j) > 0.5)
+			{
+				for (int a=0; a<8; a++)
+				{                               // Neighbours
+					long y = i + dy[a];
+					long x = j + dx[a];
+					if (A2D_ELEM(p_mask, y, x)<0.5)     // If any neighbour is black
+					{
+						A2D_ELEM(c_out(), i, j) = 1;
+						protein_C++;
+						break;
+					}
+				}
+			}
+		}
+	}
+	if (do_save_mask_c)
+	{
+		std::string mask_c_fn_command = "mkdir -p mask_C";
+		system(mask_c_fn_command.c_str());
+
+		FileName fc_out;
+		fc_out = "./mask_C/class_"+integerToString(cf.class_index)+"_mask_c.mrc";
+		c_out.write(fc_out);
+	}
 }
 
 void ClassRanker::correctCtfUntilFirstPeak(MultidimArray<RFLOAT> &in, CTF ctf)
@@ -1350,27 +1406,22 @@ void ClassRanker::getFeatures()
 		init_progress_bar(end_class-start_class);
 	}
 
-
 	int ith_nonzero_class = 0;
 	for (int iclass = start_class; iclass < end_class; iclass++)
 	{
 		if (debug > 0) std::cerr << " dealing with class: " << iclass+1 << std::endl;
 		classFeatures features_this_class;
 
-		// Get class distribution and excluding empty classes
+		// Get class distribution and particle number in the class and exclude classes with less than 10 particles (so that particle-number
+// weighted resolution is sensible)
 		features_this_class.class_distribution = mymodel.pdf_class[iclass];
-
-		// Only consider features with non-zero class distributions
-		if (features_this_class.class_distribution > 0)
+		features_this_class.particle_nr = features_this_class.class_distribution * total_nr_particles;
+		if (features_this_class.particle_nr > 10)
 		{
-
 			features_this_class.name = mymodel.ref_names[iclass];
 			features_this_class.class_index = getClassIndex(features_this_class.name);
 			Image<RFLOAT> img;
 			img() = mymodel.Iref[iclass];
-
-			// Get number of particles in the class from data.star file
-			features_this_class.particle_nr = features_this_class.class_distribution * mydata.numberOfParticles(0);
 
 			// Get selection label (if training data)
 			if (MD_select.numberOfObjects() > 0)
@@ -1399,7 +1450,6 @@ void ClassRanker::getFeatures()
 			// Calculate image size weighted resolution
 			features_this_class.relative_resolution = features_this_class.estimated_resolution / (mymodel.ori_size * mymodel.pixel_size);
 
-			// Calculate moments for class average image
 			// Find job-wise best resolution among selected (red) classes in preparation for class score calculation called in the write_output function
 			if (features_this_class.is_selected == 1 && features_this_class.estimated_resolution < minRes)
 			{
@@ -1438,35 +1488,55 @@ void ClassRanker::getFeatures()
 			if (radius > 0)
 			{
 				features_this_class.ring_moments = calculateMoments(img(), radius, circular_mask_radius);
-				features_this_class.inner_circle_moments = calculateMoments(img(), 0, radius);
+//				features_this_class.inner_circle_moments = calculateMoments(img(), 0, radius); // no longer written out
 			}
 			if (debug > 0) std::cerr << " done with ring moments" << std::endl;
 
-			// Make filtered masks
+			// Store the mean, stddev, minval and maxval of the lowpassed image as features
 			MultidimArray<RFLOAT> lpf;
-			MultidimArray<int> p_mask, s_mask;
-			long protein_area, solvent_area;
-			makeSolventMasks(img(), lpf, p_mask, s_mask, features_this_class.scattered_signal, protein_area, solvent_area);
-			if (do_save_masks) saveMasks(lpf, p_mask, s_mask, features_this_class);
+			lpf = img();
+			lowPassFilterMap(lpf, lowpass, uniform_angpix);
+			lpf.computeStats(features_this_class.lowpass_filtered_img_avg, features_this_class.lowpass_filtered_img_stddev,
+					features_this_class.lowpass_filtered_img_minval, features_this_class.lowpass_filtered_img_maxval);
 
+			// Make filtered masks
+//			MultidimArray<RFLOAT> lpf;
+			MultidimArray<int> p_mask, s_mask;
+			long protein_area=0, solvent_area=0;
+			makeSolventMasks(features_this_class, img(), lpf, p_mask, s_mask, features_this_class.scattered_signal, protein_area, solvent_area);
+			// Protein and solvent area
+			if (protein_area > 1) features_this_class.protein_area = 1;
+			if (solvent_area > 0.08*3.14*circular_mask_radius*circular_mask_radius) features_this_class.solvent_area = 1;
+			// Debug
+//			std::cerr << "class " << features_this_class.class_index << " protein area: " << protein_area << std::endl;
+			if (do_save_masks) saveMasks(img, lpf, p_mask, s_mask, features_this_class);
+
+			// Circumference to area ratio
+			RFLOAT protein_C = 0.;
+			if (features_this_class.protein_area > 0.5)
+			{
+				maskCircumference(p_mask, protein_C, features_this_class, do_save_mask_c);
+				features_this_class.CAR = protein_C / (2*sqrt(3.14*protein_area));
+				// Debug
+//				std::cerr << "Class " << features_this_class.class_index << ": protein area: " << protein_area << " mask circumference: " << protein_C << std::endl;
+			}
 			// Store entropy features on overall, protein and solvent region
 			features_this_class.solvent_entropy = img().entropy(&s_mask);
 			features_this_class.protein_entropy = img().entropy(&p_mask);
 			features_this_class.total_entropy = img().entropy();
 
-			// Store the mean, stddev, minval and maxval of the lowpassed image as features
-			lpf.computeStats(features_this_class.lowpass_filtered_img_avg, features_this_class.lowpass_filtered_img_stddev,
-					features_this_class.lowpass_filtered_img_minval, features_this_class.lowpass_filtered_img_maxval);
-
 			// Moments for the protein and solvent area
 			features_this_class.protein_moments = calculateMoments(img(), 0., circular_mask_radius, &p_mask);
 			features_this_class.solvent_moments = calculateMoments(img(), 0., circular_mask_radius, &s_mask);
 
-			// Fraction of white pixels of the protein mask against the circular_mask_radius
+			// Relative intensity of signal in the protein area
+			features_this_class.relative_signal_intensity = features_this_class.protein_moments.sum - features_this_class.solvent_moments.mean*protein_area;
+
+			// Fraction of white pixels in the protein mask on the edge
 			long int edge_pix = 0, edge_white = 0;
 			FOR_ALL_ELEMENTS_IN_ARRAY2D(p_mask)
 			{
-				if (round(sqrt((RFLOAT)(i * i + j * j))) == round(circular_mask_radius))
+				if (round(sqrt(RFLOAT(i * i + j * j))) == round(circular_mask_radius))
 				{
 					edge_pix++;
 					if (A2D_ELEM(p_mask, i, j) == 1) edge_white++;
@@ -1474,14 +1544,6 @@ void ClassRanker::getFeatures()
 			}
 			features_this_class.edge_signal = RFLOAT(edge_white) / RFLOAT(edge_pix);
 			if (debug > 0) std::cerr << " done with edge signal" << std::endl;
-
-	        //if (!do_ranking)
-	        {
-	        	// for training: get a target clasd score from the jobscore and the resolution
-	    		// First calculate class score based on best resolution among red classes of the job, job score, estimated resolution, and selection label
-	        	// for ranking, this will later be overwritten
-				features_this_class.class_score = getClassScoreFromJobScore(features_this_class, minRes);
-	        }
 
 			if (do_granularity_features)
 			{
@@ -1503,6 +1565,8 @@ void ClassRanker::getFeatures()
 				// Calculate granulo feature
 				features_this_class.granulo = calculateGranulo(img());
 			}
+//			std::cout << "protein_area: " << features_this_class.protein_area << std::endl;
+//			std::cout << "solvent_area: " << features_this_class.solvent_area << std::endl;
 
 			// Push back the features of this class in the vector for all classes
 			features_all_classes.push_back(features_this_class);
@@ -1514,6 +1578,17 @@ void ClassRanker::getFeatures()
 		} // end if non-zero class
 
 	} // end iterating all classes
+
+	if (!do_ranking)
+	{
+		for (int iclass = start_class; iclass < end_class; iclass++)
+		{
+			if (features_all_classes[iclass].particle_nr > 10)
+			{
+				features_all_classes[iclass].class_score = getClassScoreFromJobScore(features_all_classes[iclass], minRes);
+			}
+		}
+	}
 
 	if (verb > 0)
 		progress_bar(end_class-start_class);
@@ -1549,7 +1624,7 @@ void ClassRanker::readFeatures()
 		MD_class_features.getValue(EMDL_CLASS_FEAT_RELATIVE_RESOLUTION, this_class_feature.relative_resolution);
 
 
-		// Moments for the ring, inner circle, and outer circle
+		// Moments for the ring
 		if (radius > 0)
 		{
 			MD_class_features.getValue(EMDL_CLASS_FEAT_RING_MEAN, this_class_feature.ring_moments.mean);
@@ -1559,16 +1634,22 @@ void ClassRanker::readFeatures()
 		}
 
 		// Protein and solvent region moments
+		MD_class_features.getValue(EMDL_CLASS_FEAT_PROTEIN_AREA, this_class_feature.protein_area);
+		MD_class_features.getValue(EMDL_CLASS_FEAT_PROTEIN_SUM, this_class_feature.protein_moments.sum);
 		MD_class_features.getValue(EMDL_CLASS_FEAT_PROTEIN_MEAN, this_class_feature.protein_moments.mean);
 		MD_class_features.getValue(EMDL_CLASS_FEAT_PROTEIN_STDDEV, this_class_feature.protein_moments.stddev);
 		MD_class_features.getValue(EMDL_CLASS_FEAT_PROTEIN_SKEW, this_class_feature.protein_moments.skew);
 		MD_class_features.getValue(EMDL_CLASS_FEAT_PROTEIN_KURT, this_class_feature.protein_moments.kurt);
+		MD_class_features.getValue(EMDL_CLASS_FEAT_SOLVENT_AREA, this_class_feature.solvent_area);
+		MD_class_features.getValue(EMDL_CLASS_FEAT_SOLVENT_SUM, this_class_feature.solvent_moments.sum);
 		MD_class_features.getValue(EMDL_CLASS_FEAT_SOLVENT_MEAN, this_class_feature.solvent_moments.mean);
 		MD_class_features.getValue(EMDL_CLASS_FEAT_SOLVENT_STDDEV, this_class_feature.solvent_moments.stddev);
 		MD_class_features.getValue(EMDL_CLASS_FEAT_SOLVENT_SKEW, this_class_feature.solvent_moments.skew);
 		MD_class_features.getValue(EMDL_CLASS_FEAT_SOLVENT_KURT, this_class_feature.solvent_moments.kurt);
+		MD_class_features.getValue(EMDL_CLASS_FEAT_RELATIVE_SIGNAL_INT, this_class_feature.relative_signal_intensity);
 		MD_class_features.getValue(EMDL_CLASS_FEAT_SCATTERED_SIGNAL, this_class_feature.scattered_signal);
 		MD_class_features.getValue(EMDL_CLASS_FEAT_EDGE_SIGNAL, this_class_feature.edge_signal);
+		MD_class_features.getValue(EMDL_CLASS_FEAT_CAR, this_class_feature.CAR);
 
         // Lowpass filtered image features
         MD_class_features.getValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MEAN, this_class_feature.lowpass_filtered_img_avg);
@@ -1608,12 +1689,20 @@ void ClassRanker::readFeatures()
 // Generate star file: write feature value of each of the features for all classes in the job out in the format of a star file
 void ClassRanker::writeFeatures()
 {
-
 	MetaDataTable MD_class_features;
 	MD_class_features.setName("class_features");
 	for (int i=0; i<features_all_classes.size();i++)
 	{
-		MD_class_features.addObject();
+        // First calculate class scores if this is for training purpose (as the calculation depends on minRes, which can only be obtained at the end of the loop of getFeatures())
+//		if (!do_ranking)
+        {
+        	// for training: get a target clasd score from the jobscore and the resolution
+    		// First calculate class score based on best resolution among red classes of the job, job score, estimated resolution, and selection label
+        	// for ranking, this will later be overwritten
+        	features_all_classes[i].class_score = getClassScoreFromJobScore(features_all_classes[i], minRes);
+        }
+
+        MD_class_features.addObject();
 		MD_class_features.setValue(EMDL_MLMODEL_REF_IMAGE, features_all_classes[i].name);
 		MD_class_features.setValue(EMDL_CLASS_FEAT_CLASS_SCORE, features_all_classes[i].class_score);
 		MD_class_features.setValue(EMDL_CLASS_FEAT_IS_SELECTED,features_all_classes[i].is_selected);
@@ -1621,12 +1710,13 @@ void ClassRanker::writeFeatures()
 		MD_class_features.setValue(EMDL_MLMODEL_PDF_CLASS, features_all_classes[i].class_distribution);
 		MD_class_features.setValue(EMDL_MLMODEL_ACCURACY_ROT, features_all_classes[i].accuracy_rotation);
 		MD_class_features.setValue(EMDL_MLMODEL_ACCURACY_TRANS, features_all_classes[i].accuracy_translation);
+
 		MD_class_features.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, features_all_classes[i].estimated_resolution);
 		MD_class_features.setValue(EMDL_CLASS_FEAT_WEIGHTED_RESOLUTION, features_all_classes[i].weighted_resolution);
 		MD_class_features.setValue(EMDL_CLASS_FEAT_RELATIVE_RESOLUTION, features_all_classes[i].relative_resolution);
 		MD_class_features.setValue(EMDL_CLASS_FEAT_PARTICLE_NR, features_all_classes[i].particle_nr);
 
-		// Moments for the ring, inner circle, and outer circle
+		// Moments for the ring
 		if (radius > 0)
 		{
 			MD_class_features.setValue(EMDL_CLASS_FEAT_RING_MEAN, features_all_classes[i].ring_moments.mean);
@@ -1636,22 +1726,28 @@ void ClassRanker::writeFeatures()
 		}
 
 		// Protein and solvent region moments
+		MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_AREA, features_all_classes[i].protein_area);
+		MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_SUM, features_all_classes[i].protein_moments.sum);
 		MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_MEAN, features_all_classes[i].protein_moments.mean);
 		MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_STDDEV, features_all_classes[i].protein_moments.stddev);
 		MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_SKEW, features_all_classes[i].protein_moments.skew);
 		MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_KURT, features_all_classes[i].protein_moments.kurt);
+		MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_AREA, features_all_classes[i].solvent_area);
+		MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_SUM, features_all_classes[i].solvent_moments.sum);
 		MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_MEAN, features_all_classes[i].solvent_moments.mean);
 		MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_STDDEV, features_all_classes[i].solvent_moments.stddev);
 		MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_SKEW, features_all_classes[i].solvent_moments.skew);
 		MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_KURT, features_all_classes[i].solvent_moments.kurt);
+		MD_class_features.setValue(EMDL_CLASS_FEAT_RELATIVE_SIGNAL_INT, features_all_classes[i].relative_signal_intensity);
 		MD_class_features.setValue(EMDL_CLASS_FEAT_SCATTERED_SIGNAL, features_all_classes[i].scattered_signal);
 		MD_class_features.setValue(EMDL_CLASS_FEAT_EDGE_SIGNAL, features_all_classes[i].edge_signal);
+		MD_class_features.setValue(EMDL_CLASS_FEAT_CAR, features_all_classes[i].CAR);
 
         // Lowpass filtered image features
-        MD_class_features.setValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MEAN, features_all_classes[i].lowpass_filtered_img_avg);
-        MD_class_features.setValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_STDDEV, features_all_classes[i].lowpass_filtered_img_stddev);
-        MD_class_features.setValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MIN, features_all_classes[i].lowpass_filtered_img_minval);
-        MD_class_features.setValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MAX, features_all_classes[i].lowpass_filtered_img_maxval);
+		MD_class_features.setValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MEAN, features_all_classes[i].lowpass_filtered_img_avg);
+		MD_class_features.setValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_STDDEV, features_all_classes[i].lowpass_filtered_img_stddev);
+		MD_class_features.setValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MIN, features_all_classes[i].lowpass_filtered_img_minval);
+		MD_class_features.setValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MAX, features_all_classes[i].lowpass_filtered_img_maxval);
 
 		if (do_granularity_features)
 		{
@@ -1685,13 +1781,6 @@ void ClassRanker::performRanking()
 	std::cout << " TODO: implement execution of neural network ranking here, and fill result into features_all_classes[i].class_score!" << std::endl;
 	std::cout << " TODO: implement execution of neural network ranking here, and fill result into features_all_classes[i].class_score!" << std::endl;
 	std::cout << " TODO: implement execution of neural network ranking here, and fill result into features_all_classes[i].class_score!" << std::endl;
-
-	if (mydata.numberOfParticles() == 0)
-	{
-		// Read in particles if we haven't done this already
-		mydata.read(fn_data, true, true); // true true means: ignore particle_name and group name!
-		if (debug>0) std::cerr << "Done with reading data.star ..." << std::endl;
-	}
 
 	// Initialise all scores to -999 (including empty classes!
 	std::vector<RFLOAT> predicted_scores(mymodel.nr_classes, -999.);
