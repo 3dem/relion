@@ -156,7 +156,7 @@ if(CUDA_FOUND)
     endif()
     
     if(CUDA)
-        add_definitions(-DCUDA)
+        add_definitions(-D_CUDA_ENABLED)
     endif()
 else(CUDA_FOUND)
     message(STATUS "Using non-cuda compilation....")
@@ -247,8 +247,6 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
     if(MKLFFT)
         SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fopenmp -mkl -limf ")
     	add_definitions(-DMKLFFT)
-    else(MKLFFT)
-        SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -limf ")
     endif(MKLFFT)
     if(ALTCPU)
         add_definitions(-DFAST_CENTERFFT)
@@ -259,8 +257,11 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
     SET(MPI_C_COMPILER ${SAVE_CMAKE_C_COMPILER})
     SET(MPI_CXX_COMPILER ${SAVE_CMAKE_CXX_COMPILER})
 else()
-    SET(MKLFFT OFF)
-    SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ")
+    if(MKLFFT)
+        # For the time being, let's use the sequential version (as with FFTW)
+        SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lmkl_intel_ilp64 -lmkl_core -lmkl_sequential ")
+        add_definitions(-DMKLFFT)
+    endif(MKLFFT)
 endif()
 
 message(STATUS "CMAKE_C_COMPILER : ${CMAKE_C_COMPILER}")
@@ -354,6 +355,16 @@ find_package(PNG)
 if(PNG_FOUND)
 	add_definitions(-DHAVE_PNG)
 endif()
+
+
+# -----------------------------------------------------------------------------Torch--
+
+option(TORCH "Enable support for Torch" OFF)
+if(TORCH)
+    message(STATUS "Torch support requested by user.")
+    include(${CMAKE_SOURCE_DIR}/cmake/BuildTorch.cmake)
+    add_definitions(-D_TORCH_ENABLED)
+endif(TORCH)
 
 # ----------------------------------------------------------------------COPY SCRIPTS--
 

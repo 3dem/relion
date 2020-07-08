@@ -19,7 +19,7 @@
  ***************************************************************************/
 #include "src/ml_optimiser_mpi.h"
 #include "src/ml_optimiser.h"
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 #include "src/acc/cuda/cuda_ml_optimiser.h"
 #endif
 #ifdef ALTCPU
@@ -97,7 +97,7 @@ void MlOptimiserMpi::initialise()
 
 	// Print information about MPI nodes:
 	printMpiNodesMachineNames(*node, nr_threads);
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
     /************************************************************************/
 	//Setup GPU related resources
 	int devCount, deviceAffinity;
@@ -499,9 +499,15 @@ will still yield good performance and possibly a more stable execution. \n" << s
 		{
 			if (verb > 0) std::cout<< " WARNING: provided sigma2_noise-spectrum has fewer entries ("<<idx+1<<") than needed ("<<XSIZE(mymodel.sigma2_noise[0])<<"). Set rest to zero..."<<std::endl;
 		}
-		// Use the same spectrum for all classes
-		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
-			mymodel.sigma2_noise[igroup] =  mymodel.sigma2_noise[0];
+
+        mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
+        for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
+        {
+            // Use the same spectrum for all classes
+            mymodel.sigma2_noise[igroup] =  mymodel.sigma2_noise[0];
+            // We set wsum_model.sumw_group as in calculateSumOfPowerSpectraAndAverageImage
+            wsum_model.sumw_group[igroup] = mymodel.nr_particles_per_group[igroup];
+        }
 	}
 	else if (do_calculate_initial_sigma_noise || do_average_unaligned)
 	{
@@ -878,8 +884,10 @@ void MlOptimiserMpi::expectation()
 		timer.tic(TIMING_EXP_3);
 #endif
 	// D. Update the angular sampling (all nodes except master)
-	if (!node->isMaster() && (do_auto_refine || do_sgd) && iter > 1)
+	if (!node->isMaster() && ( (do_auto_refine || do_sgd) && iter > 1) || (mymodel.nr_classes > 1 && allow_coarser_samplings) )
+	{
 		updateAngularSampling(node->rank == 1);
+	}
 
 	// The master needs to know about the updated parameters from updateAngularSampling
 	node->relion_MPI_Bcast(&has_fine_enough_angular_sampling, 1, MPI_INT, first_slave, MPI_COMM_WORLD);
@@ -949,7 +957,7 @@ void MlOptimiserMpi::expectation()
 #define JOB_LEN_FN_RECIMG  (first_last_nr_images(5))
 #define JOB_NPAR  (JOB_LAST - JOB_FIRST + 1)
 
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	/************************************************************************/
 	//GPU memory setup
 
@@ -1432,7 +1440,7 @@ void MlOptimiserMpi::expectation()
 			}
 //		TODO: define MPI_COMM_SLAVES!!!!	MPI_Barrier(node->MPI_COMM_SLAVES);
 
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 			if (do_gpu)
 			{
 				for (int i = 0; i < accDataBundles.size(); i ++)
@@ -2076,10 +2084,7 @@ void MlOptimiserMpi::maximization()
 								wsum_model.pdf_class[iclass],
 								minres_map,
 								false
-#ifdef TIMING
-							        ,&timer
-#endif
-							        );
+							);
 						}
 						if (do_sgd)
 						{
@@ -3241,48 +3246,26 @@ void MlOptimiserMpi::iterate()
 		{
 			if ( (do_helical_refine) && (!do_skip_align) && (!do_skip_rotate) && mymodel.ref_dim == 3)
 			{
-				int nr_same_polarity = 0, nr_opposite_polarity = 0;
-				int nr_same_rot = 0, nr_opposite_rot = 0;	// KThurber
-				RFLOAT opposite_percentage = 0.;
-				RFLOAT rot_opposite_percent = 0.;	// KThurber
-				bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
-				bool do_classification_local_searches = (!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
-						&& (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.);
-				bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
-
-				if (helical_sigma_distance < 0.)
-					updateAngularPriorsForHelicalReconstruction(mydata.MDimg, helical_keep_tilt_prior_fixed);
-				else
-				{
 					updatePriorsForHelicalReconstruction(
 							mydata.MDimg,
-							nr_opposite_polarity,
-							nr_opposite_rot,	// KThurber
 							helical_sigma_distance * ((RFLOAT)(mymodel.ori_size)),
 							mymodel.helical_rise,
 							mymodel.helical_twist,
+							helical_nstart,
 							(mymodel.data_dim == 3),
 							do_auto_refine,
-							do_local_angular_searches,
 							mymodel.sigma2_rot,
 							mymodel.sigma2_tilt,
 							mymodel.sigma2_psi,
 							mymodel.sigma2_offset,
-							helical_keep_tilt_prior_fixed);
-
-					nr_same_polarity = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_polarity;
-					opposite_percentage = (100.) * ((RFLOAT)(nr_opposite_polarity)) / ((RFLOAT)(mydata.MDimg.numberOfObjects()));
-					nr_same_rot = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_rot; // KThurber
-					rot_opposite_percent = (100.) * ((RFLOAT)(nr_opposite_rot)) / ((RFLOAT)(mydata.MDimg.numberOfObjects())); // KThurber
-					if ( (verb > 0) && (!do_local_angular_searches) )
-					{
-						std::cout << " Number of helical segments with psi angles similar/opposite to their priors: " << nr_same_polarity << " / " << nr_opposite_polarity << " (" << opposite_percentage << "%)" << std::endl;
-						std::cout << " Number of helical segments with rot angles similar/opposite to their priors: " << nr_same_rot << " / " << nr_opposite_rot << " (" << rot_opposite_percent << "%)" << std::endl; // KThurber
-					}
-				}
+							helical_keep_tilt_prior_fixed,
+							verb);
 			}
 		}
 		MPI_Barrier(MPI_COMM_WORLD);
+
+
+		if (do_center_classes) centerClasses();
 
 		// Directly use fn_out, without "_it" specifier, so unmasked refs will be overwritten at every iteration
 		if (do_write_unmasked_refs && node->rank == 1)

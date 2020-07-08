@@ -227,6 +227,15 @@ public:
 	// Flag whether to use the auto-refine procedure
 	bool do_auto_refine;
 
+	// Flag whether to ignore changes in hidden variables in auto-refine (which makes it faster)
+	bool auto_ignore_angle_changes;
+
+	// Flag whether to proceed faster with resolution-based angular sampling updates in auto-refine
+	bool auto_resolution_based_angles;
+
+	// Flag whether to accelerate early iterations of 2D/3D classification with coarser samplings
+	bool allow_coarser_samplings;
+
 	// Force auto-refinement to converge
 	bool do_force_converge;
 
@@ -463,6 +472,9 @@ public:
 	/* Flag to use bimodal prior distributions on psi (2D classification of helical segments) */
 	bool do_bimodal_psi;
 
+	/* Flag to center classes */
+	bool do_center_classes;
+
 	//////// Special stuff for the first iterations /////////////////
 
 	// Skip marginalisation in first iteration and use signal cross-product instead of Gaussian
@@ -499,6 +511,9 @@ public:
 
 	// Initial helical rise in Angstroms
 	RFLOAT helical_rise_initial;
+
+	// N-number of an N-start helix (only for rotational priors, a la KThurber)
+	int helical_nstart;
 
 	// Only expand this amount of Z axis proportion to full when imposing real space helical symmetry
 	RFLOAT helical_z_percentage;
@@ -622,6 +637,9 @@ public:
 	//Maximum number of particles permitted to be drop, due to zero sum of weights, before exiting with an error (GPU only).
 	int failsafe_threshold;
 
+	// Trust box size and angpix for the input reference
+	bool do_trust_ref_size;
+
 #ifdef TIMING
 	Timer timer;
 	int TIMING_DIFF_PROJ, TIMING_DIFF_SHIFT, TIMING_DIFF_DIFF2;
@@ -706,6 +724,8 @@ public:
 		do_calculate_initial_sigma_noise(0),
 		fix_sigma_offset(0),
 		do_firstiter_cc(0),
+		do_bimodal_psi(0),
+		do_center_classes(0),
 		exp_my_last_part_id(0),
 		particle_diameter(0),
 		smallest_changes_optimal_orientations(0),
@@ -753,7 +773,8 @@ public:
 		tbbSchedulerInit(tbb::task_scheduler_init::deferred ),
 		mdlClassComplex(NULL),
 #endif
-		failsafe_threshold(40)
+		failsafe_threshold(40),
+		do_trust_ref_size(0)
 	{
 #ifdef ALTCPU
 		tbbCpuOptimiser = CpuOptimiserType((void*)NULL);
@@ -848,7 +869,7 @@ public:
 	void doThreadExpectationSomeParticles(int thread_id);
 
 	/* Perform the expectation integration over all k, phi and series elements for a given particle */
-	void expectationOneParticle(long int part_id, int thread_id);
+	void expectationOneParticle(long int part_id_sorted, int thread_id);
 
 	/* Function to call symmetrise of BackProjector helical objects for each class or body
 	 * Do rise and twist for all asymmetrical units in Fourier space
@@ -884,6 +905,11 @@ public:
 	/* Apply a solvent flattening to a map
 	 */
 	void solventFlatten();
+
+	/* Center classes based on their center-of-mass
+	 * and also update the origin offsets in the _data.star file correspondingly
+	 */
+	void centerClasses();
 
 	/* Updates the current resolution (from data_vs_prior array) and keeps track of best resolution thus far
 	 *  and precalculates a 2D Fourier-space array with pointers to the resolution of each point in a FFTW-centered array

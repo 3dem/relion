@@ -107,8 +107,8 @@ void AutoPicker::read(int argc, char **argv)
 	do_only_unfinished = parser.checkOption("--only_do_unfinished", "Only autopick those micrographs for which the coordinate file does not yet exist");
 	do_gpu = parser.checkOption("--gpu", "Use GPU acceleration when availiable");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
-#ifndef CUDA
-	if(do_gpu)
+#ifndef _CUDA_ENABLED
+if(do_gpu)
 	{
 		std::cerr << "+ WARNING : Relion was compiled without CUDA of at least version 7.0 - you do NOT have support for GPUs" << std::endl;
 		do_gpu = false;
@@ -488,9 +488,9 @@ void AutoPicker::initialise()
 				Euler_angles2matrix(rot, tilt, 0., A, false);
 				Fref.initZeros();
 				projector.get2DFourierTransform(Fref, A);
-				transformer.inverseFourierTransform();
 				// Shift the image back to the center...
-				CenterFFT(Mref, false);
+				CenterFFTbySign(Fref);
+				transformer.inverseFourierTransform();
 				Mref.setXmippOrigin();
 				Mrefs.push_back(Mref);
 
@@ -775,8 +775,8 @@ void AutoPicker::initialise()
 			{
 				A2D_ELEM(Maux, i, j ) = A2D_ELEM(Mcirc_mask, i, j);
 			}
-			CenterFFT(Maux, true);
 			transformer.FourierTransform(Maux, Favgmsk);
+			CenterFFTbySign(Favgmsk);
 
 		}
 
@@ -799,8 +799,8 @@ void AutoPicker::initialise()
 		{
 			A2D_ELEM(Maux, i, j ) = A2D_ELEM(Mcirc_mask, i, j);
 		}
-		CenterFFT(Maux, true);
 		transformer.FourierTransform(Maux, Finvmsk);
+		CenterFFTbySign(Finvmsk);
 
 		// Also get the particle-area mask
 		nr_pixels_circular_mask = 0;
@@ -866,7 +866,7 @@ void AutoPicker::initialise()
 #endif
 }
 
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 int AutoPicker::deviceInitialise()
 {
 	int devCount;
@@ -2625,7 +2625,7 @@ void AutoPicker::autoPickLoGOneMicrograph(FileName &fn_mic, long int imic)
 		}
 
 		Image<RFLOAT> Maux(workSize, workSize);
-		
+
 //		transformer.inverseFourierTransform(Fmic, Maux());
 //		Maux.write("LoG-ctf-filtered.mrc");
 //		REPORT_ERROR("stop");
@@ -2993,7 +2993,6 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 		 */
 
         // Fourier Transform (and downscale) Imic()
-		CenterFFT(Imic(), true);
 		transformer.FourierTransform(Imic(), Fmic);
 
 		if (highpass > 0.)
@@ -3001,6 +3000,9 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 			lowPassFilterMap(Fmic, micrograph_size, highpass, angpix, 2, true); // true means highpass instead of lowpass!
 			transformer.inverseFourierTransform(Fmic, Imic()); // also calculate inverse transform again for squared calculation below
 		}
+
+		CenterFFTbySign(Fmic);
+
 
 		// Also calculate the FFT of the squared micrograph
 		Maux.resize(micrograph_size,micrograph_size);
@@ -3010,6 +3012,7 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 		}
 		MultidimArray<Complex> Fmic2;
 		transformer.FourierTransform(Maux, Fmic2);
+		CenterFFTbySign(Fmic2);
 
 		Maux.resize(workSize,workSize);
 
@@ -3017,8 +3020,8 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 		std::cerr << " nr_pixels_circular_invmask= " << nr_pixels_circular_invmask << std::endl;
 		std::cerr << " nr_pixels_circular_mask= " << nr_pixels_circular_mask << std::endl;
 		windowFourierTransform(Finvmsk, Faux2, micrograph_size);
+		CenterFFTbySign(Faux2);
 		transformer.inverseFourierTransform(Faux2, tt());
-		CenterFFT(tt(), false);
 		tt.write("Minvmask.spi");
 #endif
 
@@ -3138,14 +3141,14 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 #ifdef DEBUG
 				std::cerr << " psi= " << psi << std::endl;
 				windowFourierTransform(Faux, Faux2, micrograph_size);
+				CenterFFTbySign(Faux2);
 				tt().resize(micrograph_size, micrograph_size);
 				transformer.inverseFourierTransform(Faux2, tt());
-				CenterFFT(tt(), false);
 				tt.write("Mref_rot.spi");
 
 				windowFourierTransform(Fmic, Faux2, micrograph_size);
+				CenterFFTbySign(Faux2);
 				transformer.inverseFourierTransform(Faux2, tt());
-				CenterFFT(tt(), false);
 				tt.write("Mmic.spi");
 
 #endif
@@ -3165,8 +3168,8 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 #ifdef DEBUG
 				MultidimArray<RFLOAT> ttt(micrograph_size, micrograph_size);
 				windowFourierTransform(Faux, Faux2, micrograph_size);
+				CenterFFTbySign(Faux2);
 				transformer.inverseFourierTransform(Faux2, ttt);
-				CenterFFT(ttt, false);
 				ttt.setXmippOrigin();
 				tt().resize(particle_size, particle_size);
 				tt().setXmippOrigin();
@@ -3188,9 +3191,9 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 					// Do this also if we're not recalculating the fom maps...
 					// This calculation needs to be done on an "non-shrinked" micrograph, in order to get the correct I^2 statistics
 					windowFourierTransform(Faux, Faux2, micrograph_size);
+					CenterFFTbySign(Faux2);
 					Maux.resize(micrograph_size, micrograph_size);
 					transformer.inverseFourierTransform(Faux2, Maux);
-					CenterFFT(Maux, false);
 					Maux.setXmippOrigin();
 #ifdef DEBUG
 					Image<RFLOAT> ttt;
@@ -3249,8 +3252,8 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 
 				// If we're not doing shrink, then Faux is bigger than Faux2!
 				windowFourierTransform(Faux, Faux2, workSize);
+				CenterFFTbySign(Faux2);
 				transformer.inverseFourierTransform(Faux2, Maux);
-				CenterFFT(Maux, false);
 #ifdef DEBUG
 				tt()=Maux*normfft;
 				tt.write("Mcc.spi");
@@ -3494,14 +3497,13 @@ void AutoPicker::calculateStddevAndMeanUnderMask(const MultidimArray<Complex > &
 		DIRECT_MULTIDIM_ELEM(Faux, n) = DIRECT_MULTIDIM_ELEM(_Fmic, n) * conj(DIRECT_MULTIDIM_ELEM(_Fmsk, n));
 	}
 	windowFourierTransform(Faux, Faux2, workSize);
+	CenterFFTbySign(Faux2);
 	transformer.inverseFourierTransform(Faux2, Maux);
 	Maux *= normfft;
 	_Mmean = Maux;
-	CenterFFT(_Mmean, false);
 
 #ifdef DEBUG
 	tt()=Maux;
-	CenterFFT(tt(), false);
 	tt.write("Mavg_mic.spi");
 #endif
 
@@ -3517,6 +3519,7 @@ void AutoPicker::calculateStddevAndMeanUnderMask(const MultidimArray<Complex > &
 		DIRECT_MULTIDIM_ELEM(Faux, n) = DIRECT_MULTIDIM_ELEM(_Fmic2, n) * conj(DIRECT_MULTIDIM_ELEM(_Fmsk, n));
 	}
 	windowFourierTransform(Faux, Faux2, workSize);
+	CenterFFTbySign(Faux2);
 	transformer.inverseFourierTransform(Faux2, Maux);
 
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(_Mstddev)
@@ -3528,8 +3531,6 @@ void AutoPicker::calculateStddevAndMeanUnderMask(const MultidimArray<Complex > &
 		else
 			DIRECT_MULTIDIM_ELEM(_Mstddev, n) = 1.;
 	}
-
-	CenterFFT(_Mstddev, false);
 
 #ifdef DEBUG
 	tt()=_Mstddev;

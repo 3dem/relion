@@ -173,23 +173,27 @@ if (CUDA_FOUND)
 endif(CUDA_FOUND)
 
 if(TIFF_FOUND)
-	message("TIFF FOUND")
+	#message("TIFF FOUND")
 	include_directories(${TIFF_INCLUDE_DIRS})
 	target_link_libraries(relion_lib ${TIFF_LIBRARIES})
 else()
-	message("TIFF NOT FOUND")
+	#message("TIFF NOT FOUND")
 endif()
 
 if(PNG_FOUND)
-	message("PNG FOUND")
+	#message("PNG FOUND")
 	include_directories(${PNG_INCLUDE_DIRS})
 	target_link_libraries(relion_lib ${PNG_LIBRARY})
 else()
-	message("PNG NOT FOUND")
+	#message("PNG NOT FOUND")
 endif()
 
 if(BUILD_OWN_TBB)
 	add_dependencies(relion_lib OWN_TBB)
+endif()
+
+if(BUILD_OWN_Torch)
+	add_dependencies(relion_lib OWN_Torch)
 endif()
 
 foreach (_target ${RELION_TARGETS})
@@ -215,6 +219,11 @@ foreach (_target ${RELION_TARGETS})
 	if (ALTCPU)
 		target_link_libraries(${_target} ${TBB_LIBRARIES})
 	endif(ALTCPU)
+
+	if(TORCH)
+		target_link_libraries(${_target} ${TORCH_LIBRARIES})
+		set_property(TARGET ${_target} PROPERTY CXX_STANDARD 14)
+	endif(TORCH)
 
 	set_target_properties(${_target} PROPERTIES
 	                      XX_STANDARD 11
@@ -247,7 +256,7 @@ endif(GUI)
 
 FIND_PACKAGE( OpenMP REQUIRED)
 if(OPENMP_FOUND)
-	message("OPENMP FOUND")
+	#message("OPENMP FOUND")
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
@@ -255,7 +264,12 @@ if(OPENMP_FOUND)
 endif()
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+
+if(TORCH)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
+else(TORCH)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+endif(TORCH)
 
 # Set this flag to activate bounds checking in stl-vectors (incl. strings)
 # It is useful to do this periodically, as it catches 

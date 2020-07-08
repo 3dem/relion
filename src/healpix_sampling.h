@@ -47,23 +47,17 @@ public:
     /** Amount of random perturbation */
     RFLOAT perturbation_factor;
 
-    /** In-plane (psi-angle) sampling rate
+    /** In-plane (psi-angle) sampling rate (and original one)
      */
-    RFLOAT psi_step;
+    RFLOAT psi_step, psi_step_ori;
 
-    /** Healpix order */
-    int healpix_order;
+    /** Healpix order (and original one) */
+    int healpix_order, healpix_order_ori;
 
-    /** Mode for orientational prior distribution
-     * Note this option is not written to the STAR file, as it really belongs to mlmodel.
-     * It is included here for convenience, and always needs to be set in initialise
-     */
-    int orientational_prior_mode;
-
-    /* Translational search range and sampling rate (as of v3.1 in Angstroms!)
+    /* Translational search range and sampling rate (as of v3.1 in Angstroms!) (and original one)
      */
     // Jun19,2015 - Shaoda, Helical refinement (all in Angstroms!)
-    RFLOAT offset_range, offset_step, helical_offset_step;
+    RFLOAT offset_range, offset_step, helical_offset_step, offset_range_ori, offset_step_ori;
 
     /** Flag whether this is a real 3D sampling */
     bool is_3D;
@@ -108,7 +102,6 @@ public:
 		perturbation_factor(0),
 		is_3D(false),
 		random_perturbation(0),
-		orientational_prior_mode(0),
 		psi_step(0),
 		limit_tilt(0),
 		healpix_order(0),
@@ -153,15 +146,13 @@ public:
      * etc...
      *
      * */
-    //void initialise(int prior_mode, int ref_dim = -1, bool do_3d_trans = false);
     // May 6, 2015 - Shaoda & Sjors - initialise for helical translations
     void initialise(
-    		int prior_mode,
 			int ref_dim = -1,
 			bool do_3d_trans = false,
 			bool do_changepsi = false,
 			bool do_warnpsi = false,
-			bool do_local_searches = false,
+			bool do_local_searches_helical = false,
 			bool do_helical_refine = false,
 			RFLOAT rise_Angst  = 0.,
 			RFLOAT twist_deg = 0.);
@@ -190,7 +181,7 @@ public:
     void setTranslations(
 			RFLOAT new_offset_step = -1.,
     		RFLOAT new_offset_range = -1.,
-    		bool do_local_searches = false,
+    		bool do_local_searches_helical = false,
     		bool do_helical_refine = false,
 			RFLOAT new_helical_offset_step = -1.,
     		RFLOAT helical_rise_Angst = 0.,

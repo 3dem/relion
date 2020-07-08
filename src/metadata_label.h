@@ -364,6 +364,7 @@ enum EMDLabel
 	EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET,
 	EMDL_OPTIMISER_SGD_MAX_SUBSETS,
 	EMDL_OPTIMISER_SGD_STEPSIZE,
+	EMDL_OPTIMISER_DO_CENTER_CLASSES,
 	EMDL_OPTIMISER_DO_SOLVENT_FLATTEN,
 	EMDL_OPTIMISER_DO_SOLVENT_FSC,
 	EMDL_OPTIMISER_DO_SKIP_ALIGN,
@@ -382,6 +383,7 @@ enum EMDLabel
 	EMDL_OPTIMISER_HELICAL_TWIST_INITIAL,
 	EMDL_OPTIMISER_HELICAL_RISE_INITIAL,
 	EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE,
+	EMDL_OPTIMISER_HELICAL_NSTART,
 	EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER,
 	EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER,
 	EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT,
@@ -510,14 +512,18 @@ enum EMDLabel
 	EMDL_SAMPLING_IS_3D,
 	EMDL_SAMPLING_IS_3D_TRANS,
 	EMDL_SAMPLING_HEALPIX_ORDER,
+	EMDL_SAMPLING_HEALPIX_ORDER_ORI,
 	EMDL_SAMPLING_LIMIT_TILT,
 	EMDL_SAMPLING_OFFSET_RANGE,
 	EMDL_SAMPLING_OFFSET_STEP,
+	EMDL_SAMPLING_OFFSET_RANGE_ORI,
+	EMDL_SAMPLING_OFFSET_STEP_ORI,
 	EMDL_SAMPLING_HELICAL_OFFSET_STEP,
 	EMDL_SAMPLING_PERTURB,
 	EMDL_SAMPLING_PERTURBATION_FACTOR,
 	EMDL_SAMPLING_PRIOR_MODE,
 	EMDL_SAMPLING_PSI_STEP,
+	EMDL_SAMPLING_PSI_STEP_ORI,
 	EMDL_SAMPLING_SIGMA_ROT,
 	EMDL_SAMPLING_SIGMA_TILT,
 	EMDL_SAMPLING_SIGMA_PSI,
@@ -951,6 +957,7 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_STEPSIZE, EMDL_DOUBLE, "rlnSgdStepsize", "Stepsize in SGD updates)");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_AUTO_REFINE, EMDL_BOOL, "rlnDoAutoRefine", "Flag to indicate that 3D auto-refine procedure is being used");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_ONLY_FLIP_CTF_PHASES, EMDL_BOOL, "rlnDoOnlyFlipCtfPhases", "Flag to indicate that CTF-correction should only comprise phase-flipping");
+		EMDL::addLabel(EMDL_OPTIMISER_DO_CENTER_CLASSES, EMDL_BOOL, "rlnDoCenterClasses", "Flag to indicate that the class averages or reconstructions should be centered based on their center-of-mass during every iteration.");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_SOLVENT_FLATTEN, EMDL_BOOL, "rlnDoSolventFlattening", "Flag to indicate that the references should be masked to set their solvent areas to a constant density");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_SOLVENT_FSC, EMDL_BOOL, "rlnDoSolventFscCorrection", "Flag to indicate that the FSCs should be solvent-corrected during refinement");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_SKIP_ALIGN, EMDL_BOOL, "rlnDoSkipAlign", "Flag to indicate that orientational (i.e. rotational and translational) searches will be omitted from the refinement, only marginalisation over classes will take place");
@@ -969,6 +976,7 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_TWIST_INITIAL, EMDL_DOUBLE, "rlnHelicalTwistInitial", "The intial helical twist (rotation per subunit) in degrees before refinement");
 		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_RISE_INITIAL, EMDL_DOUBLE, "rlnHelicalRiseInitial", "The initial helical rise (translation per subunit) in Angstroms before refinement");
 		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE, EMDL_DOUBLE, "rlnHelicalCentralProportion", "Only expand this central fraction of the Z axis when imposing real-space helical symmetry");
+		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_NSTART, EMDL_INT, "rlnNrHelicalNStart", "The N-number for an N-start helix");
 		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER, EMDL_DOUBLE, "rlnHelicalMaskTubeInnerDiameter", "Inner diameter of helical tubes in Angstroms (for masks of helical references and particles)");
 		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER, EMDL_DOUBLE, "rlnHelicalMaskTubeOuterDiameter", "Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)");
 		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT, EMDL_BOOL, "rlnHelicalSymmetryLocalRefinement", "Flag to indicate that local refinement of helical parameters should be performed");
@@ -1100,13 +1108,17 @@ private:
 		EMDL::addLabel(EMDL_SAMPLING_IS_3D, EMDL_BOOL, "rlnIs3DSampling", "Flag to indicate this concerns a 3D sampling ");
 		EMDL::addLabel(EMDL_SAMPLING_IS_3D_TRANS, EMDL_BOOL, "rlnIs3DTranslationalSampling", "Flag to indicate this concerns a x,y,z-translational sampling ");
 		EMDL::addLabel(EMDL_SAMPLING_HEALPIX_ORDER, EMDL_INT, "rlnHealpixOrder", "Healpix order for the sampling of the first two Euler angles (rot, tilt) on the 3D sphere");
+		EMDL::addLabel(EMDL_SAMPLING_HEALPIX_ORDER_ORI, EMDL_INT, "rlnHealpixOrderOriginal", "Original healpix order for the sampling of the first two Euler angles (rot, tilt) on the 3D sphere");
 		EMDL::addLabel(EMDL_SAMPLING_LIMIT_TILT, EMDL_DOUBLE, "rlnTiltAngleLimit", "Values to which to limit the tilt angles (positive for keeping side views, negative for keeping top views)");
 		EMDL::addLabel(EMDL_SAMPLING_OFFSET_RANGE, EMDL_DOUBLE, "rlnOffsetRange", "Search range for the origin offsets (in Angstroms)");
 		EMDL::addLabel(EMDL_SAMPLING_OFFSET_STEP, EMDL_DOUBLE, "rlnOffsetStep", "Step size for the searches in the origin offsets (in Angstroms)");
+		EMDL::addLabel(EMDL_SAMPLING_OFFSET_RANGE_ORI, EMDL_DOUBLE, "rlnOffsetRangeOriginal", "Original search range for the origin offsets (in Angstroms)");
+		EMDL::addLabel(EMDL_SAMPLING_OFFSET_STEP_ORI, EMDL_DOUBLE, "rlnOffsetStepOriginal", "Original step size for the searches in the origin offsets (in Angstroms)");
 		EMDL::addLabel(EMDL_SAMPLING_HELICAL_OFFSET_STEP, EMDL_DOUBLE, "rlnHelicalOffsetStep", "Step size for the searches of offsets along helical axis (in Angstroms)");
 		EMDL::addLabel(EMDL_SAMPLING_PERTURB, EMDL_DOUBLE, "rlnSamplingPerturbInstance", "Random instance of the random perturbation on the orientational sampling");
 		EMDL::addLabel(EMDL_SAMPLING_PERTURBATION_FACTOR, EMDL_DOUBLE, "rlnSamplingPerturbFactor", "Factor for random perturbation on the orientational sampling (between 0 no perturbation and 1 very strong perturbation)");
 		EMDL::addLabel(EMDL_SAMPLING_PSI_STEP, EMDL_DOUBLE, "rlnPsiStep", "Step size (in degrees) for the sampling of the in-plane rotation angle (psi)");
+		EMDL::addLabel(EMDL_SAMPLING_PSI_STEP_ORI, EMDL_DOUBLE, "rlnPsiStepOriginal", "Original step size (in degrees) for the sampling of the in-plane rotation angle (psi)");
 		EMDL::addLabel(EMDL_SAMPLING_SYMMETRY, EMDL_STRING, "rlnSymmetryGroup", "Symmetry group (e.g., C1, D7, I2, I5, etc.)");
 
 		EMDL::addLabel(EMDL_SCHEDULE_EDGE_NUMBER, EMDL_INT, "rlnScheduleEdgeNumber", "Numbered index of an edge inside a Schedule");

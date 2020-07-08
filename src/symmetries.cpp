@@ -773,7 +773,7 @@ void SymList::writeDefinition(std::ostream &outstream, FileName fn_sym)
 	outstream << " ++++ Using symmetry group " << fn_sym << ", with the following " << SymsNo()+1 << " transformation matrices:"<< std::endl;
     R.initIdentity();
     outstream << " R(1)= " << R;
-	for (int isym = 0; isym < SymsNo(); isym++)
+    for (int isym = 0; isym < SymsNo(); isym++)
     {
         get_matrices(isym, L, R);
         R.resize(3, 3);
@@ -781,6 +781,9 @@ void SymList::writeDefinition(std::ostream &outstream, FileName fn_sym)
         if (!L.isIdentity())
         	outstream << " L("<< isym+2<<")= "<<L;
         outstream << " R("<< isym+2<<")= "<<R;
+        RFLOAT alpha, beta, gamma;
+        Euler_matrix2angles(R, alpha, beta, gamma);
+        outstream << "     Euler angles: " << alpha << " " << beta << " " << gamma << std::endl;
     }
 
 }

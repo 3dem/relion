@@ -1150,18 +1150,18 @@ void MetaDataTable::write(std::ostream& out)
 	{
 		// Write loop header structure
 		out << "loop_ \n";
-		for (long i = 0; i < activeLabels.size(); i++)
+
+		for (long i = 0, n_printed = 1; i < activeLabels.size(); i++)
 		{
 			EMDLabel l = activeLabels[i];
-
 			if (l == EMDL_UNKNOWN_LABEL)
 			{
 				const long offset = unknownLabelPosition2Offset[i];
-				out << "_" << unknownLabelNames[offset]<< " #" << (i + 1) << " \n";
+				out << "_" << unknownLabelNames[offset]<< " #" << (n_printed++) << " \n";
 			}
 			else if (l != EMDL_COMMENT && l != EMDL_SORTED_IDX) // EMDL_SORTED_IDX is only for internal use, never write it out!
 			{
-				out << "_" << EMDL::label2Str(l) << " #" << (i + 1) << " \n";
+				out << "_" << EMDL::label2Str(l) << " #" << (n_printed++) << " \n";
 			}
 		}
 
@@ -1838,11 +1838,21 @@ MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label,
 	if (!MDin.containsLabel(mic_label))
 		REPORT_ERROR("STAR file does not contain " + EMDL::label2Str(mic_label));
 
-	std::vector<bool> valid(MDin.numberOfObjects(), true);
+    std::vector<bool> valid(MDin.numberOfObjects(), true);
 	std::vector<RFLOAT> xs(MDin.numberOfObjects(), 0.0);
 	std::vector<RFLOAT> ys(MDin.numberOfObjects(), 0.0);
+    std::vector<RFLOAT> zs;
 
-	RFLOAT threshold_sq = threshold * threshold;
+    bool dataIs3D = false;
+    if (MDin.containsLabel(EMDL_IMAGE_COORD_Z))
+    {
+        if (!MDin.containsLabel(EMDL_ORIENT_ORIGIN_Z_ANGSTROM))
+            REPORT_ERROR("You need rlnOriginZAngst to remove duplicated 3D particles");
+        dataIs3D = true;
+         zs.resize(MDin.numberOfObjects(), 0.0);
+    }
+
+    RFLOAT threshold_sq = threshold * threshold;
 
 	// group by micrograph
 	std::map<std::string, std::vector<long> > grouped;
@@ -1858,6 +1868,13 @@ MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label,
 		MDin.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, val1);
 		MDin.getValue(EMDL_IMAGE_COORD_Y, val2);
 		ys[current_object] = -val1 * origin_scale + val2;
+
+		if (dataIs3D)
+        {
+            MDin.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, val1);
+            MDin.getValue(EMDL_IMAGE_COORD_Z, val2);
+            zs[current_object] = -val1 * origin_scale + val2;
+        }
 
 		grouped[mic_name].push_back(current_object);
 	}
@@ -1875,6 +1892,8 @@ MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label,
 			{
 				long part_id2 = it->second[j];
 				RFLOAT dist_sq = (xs[part_id1] - xs[part_id2]) * (xs[part_id1] - xs[part_id2]) + (ys[part_id1] - ys[part_id2]) * (ys[part_id1] - ys[part_id2]);
+				if (dataIs3D)
+                    dist_sq += (zs[part_id1] - zs[part_id2]) * (zs[part_id1] - zs[part_id2]);
 
 				if (dist_sq <= threshold_sq)
 				{

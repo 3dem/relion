@@ -33,7 +33,7 @@ void ReconstructorMpi::read(int argc, char **argv)
 	// Possibly also read parallelisation-dependent variables here
 
 	if (node->size < 2)
-		REPORT_ERROR("ParticlePolisherMpi::read ERROR: this program needs to be run with at least two MPI processes!");
+		REPORT_ERROR("ReconstductMpi::read ERROR: this program needs to be run with at least two MPI processes!");
 
 	// Print out MPI info
 	printMpiNodesMachineNames(*node);

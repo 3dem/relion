@@ -380,6 +380,20 @@ void randomizePhasesBeyond(MultidimArray<RFLOAT> &I, int index);
 // // Randomize phases beyond the given F-space shell (index) of F-space input image
 // void randomizePhasesBeyond(MultidimArray<Complex> &v, int index);
 
+template <typename T>
+void CenterFFTbySign(MultidimArray <T> &v)
+{
+    // This technique does not work when the sizes of dimensions of iFFT(v) are odd.
+    // Unfortunately, this cannot be checked within this function...
+    // Forward and backward shifts are equivalent.
+
+    FOR_ALL_ELEMENTS_IN_ARRAY3D(v)
+    {
+        if ((k ^ i ^ j) & 1 != 0) // if ODD
+            DIRECT_A3D_ELEM(v, k, i, j) *= -1;
+    }
+}
+
 
 /** Center an array, to have its origin at the origin of the FFTW
  *
@@ -1004,7 +1018,6 @@ void helicalLayerLineProfile(const MultidimArray<RFLOAT> &v, std::string title, 
 
 void generateBinaryHelicalFourierMask(MultidimArray<RFLOAT> &mask, std::vector<RFLOAT> exclude_begin, std::vector<RFLOAT> exclude_end, RFLOAT angpix);
 
-
 template <class T>
 void cropInFourierSpace(MultidimArray<T> &Fref, MultidimArray<T> &Fbinned) {
 	const int nfx = XSIZE(Fref), nfy = YSIZE(Fref);
@@ -1024,6 +1037,5 @@ void cropInFourierSpace(MultidimArray<T> &Fref, MultidimArray<T> &Fbinned) {
 		}
 	}
 }
-
 
 #endif // __RELIONFFTW_H

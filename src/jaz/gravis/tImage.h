@@ -120,7 +120,7 @@ namespace gravis
       void write(const std::string&) const;
       void writePNM (const std::string&) const;
       void writePNG (const std::string&) const;
-      void writeJPG (const std::string&, int quality=100) const;
+      //void writeJPG (const std::string&, int quality=100) const;
 
       /**
        * Interpolated access to the image
@@ -292,7 +292,7 @@ namespace gravis
 #include "private/tImageConverter.hxx"
 #include "private/tImageIO_PNM.hxx"
 #include "private/tImageIO_PNG.hxx"
-#include "private/tImageIO_JPG.hxx"
+//#include "private/tImageIO_JPG.hxx"
 
 namespace gravis
 {
@@ -683,12 +683,14 @@ namespace gravis
   inline
   void tImage<T>::read (const std::string& filename)
   {
-    if (priv::JPGImageReader<T>::canHandle(filename))
+
+/*    if (priv::JPGImageReader<T>::canHandle(filename))
     {
       priv::JPGImageReader<T> reader;
       reader.read(*this,  filename);
       return;
     }
+*/
 
     char header[512];
 
@@ -722,9 +724,9 @@ namespace gravis
   inline
   void tImage<T>::write(const std::string& filename) const
   {
-    if (has_ending(filename, "jpg") || has_ending(filename, "jpeg"))
+    if /* (has_ending(filename, "jpg") || has_ending(filename, "jpeg"))
       writeJPG(filename);
-    else if (has_ending(filename, "png"))
+    else if*/ (has_ending(filename, "png"))
       writePNG(filename);
     else if (has_ending(filename, "pnm"))
       writePNM(filename);
@@ -749,6 +751,7 @@ namespace gravis
   }
 
 
+/*
   template <class T>
   inline
   void tImage<T>::writeJPG (const std::string& filename, int quality) const
@@ -756,7 +759,7 @@ namespace gravis
     priv::JPGImageWriter<T> writer;
     writer.write(*this, filename.c_str(), quality);
   }
-
+*/
 
 } /* Close namespace "gravis" */
 

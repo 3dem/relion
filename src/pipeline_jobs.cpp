@@ -189,6 +189,25 @@ void JobOption::setString(std::string set_to)
 	value = set_to;
 }
 
+int JobOption::getHealPixOrder(std::string s)
+{
+	for (int i = 0; i < 9; i++)
+	{
+		if (s == job_sampling_options[i])
+			return i + 1;
+	}
+
+	return -1;
+}
+
+std::string JobOption::getCtfFitString(std::string s)
+{
+	if (s == job_ctffit_options[0]) return "f";
+	else if (s == job_ctffit_options[1]) return "m";
+	else if (s == job_ctffit_options[2]) return "p";
+	else return "";
+}
+
 // Get a numbered value
 float JobOption::getNumber(std::string &errmsg)
 {
@@ -313,7 +332,7 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 	bool have_read = false;
 
 	// For backwards compatibility
-	if (exists(myfilename + "run.job"))
+	if (!exists(myfilename + "job.star") && exists(myfilename + "run.job"))
 	{
 		std::ifstream fh;
 		fh.open((myfilename+"run.job").c_str(), std::ios_base::in);
@@ -1161,12 +1180,7 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 			outputNodes.push_back(node);
 			command += " --do_coordinates ";
 		}
-		else if (node_type == "Particles STAR file (.star)" ||
-				 node_type == "2D references (.star or .mrcs)" ||
-				 node_type == "3D reference (.mrc)" ||
-				 node_type == "3D mask (.mrc)" ||
-				 node_type == "Micrographs STAR file (.star)" ||
-				 node_type == "Unfiltered half-map (unfil.mrc)")
+		else
 		{
 			fn_out = "/" + fn_in;
 			fn_out = fn_out.afterLastOf("/");
@@ -1185,7 +1199,10 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 			else if (node_type == "Unfiltered half-map (unfil.mrc)")
 				mynodetype = NODE_HALFMAP;
 			else
-				REPORT_ERROR("ImportJobWindow::getCommands ERROR: Unrecognized menu option for node_type= " + node_type);
+			{			
+				error_message = "Unrecognized menu option for node_type = " + node_type;
+				return false;
+			}
 
 			Node node(outputname + fn_out, mynodetype);
 			outputNodes.push_back(node);
@@ -1847,15 +1864,14 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 			command += " --sym " + joboptions["ref3d_symmetry"].getString();
 
 			// Sampling
-			for (int i = 0; i < 10; i++)
+			int ref3d_sampling = JobOption::getHealPixOrder(joboptions["ref3d_sampling"].getString());
+			if (ref3d_sampling <= 0)
 			{
-				if (strcmp((joboptions["ref3d_sampling"].getString()).c_str(), job_sampling_options[i].c_str()) == 0)
-				{
-					// The sampling given in the GUI will be the oversampled one!
-					command += " --healpix_order " + floatToString((float)i + 1);
-					break;
-				}
+				error_message = "Wrong choice for ref3d_sampling";
+				return false;
 			}
+
+			command += " --healpix_order " + integerToString(ref3d_sampling);
 		}
 		else
 		{
@@ -2549,6 +2565,7 @@ If auto-sampling is used, this will be the value for the first iteration(s) only
 Translational sampling is also done using the adaptive approach. \
 Therefore, if adaptive=1, the translations will first be evaluated on a 2x coarser grid.\n\n \
 If auto-sampling is used, this will be the value for the first iteration(s) only, and the sampling rate will be increased automatically after that.");
+	joboptions["allow_coarser"] = JobOption("Allow coarser sampling?", false, "If set to Yes, the program will use coarser angular and translational samplings if the estimated accuracies of the assignments is still low in the earlier iterations. This may speed up the calculations.");
 
 	joboptions["do_helix"] = JobOption("Classify 2D helical segments?", false, "Set to Yes if you want to classify 2D helical segments. Note that the helical segments should come with priors of psi angles");
 	joboptions["helical_tube_outer_diameter"] = JobOption("Tube diameter (A): ", 200, 100, 1000, 10, "Outer diameter (in Angstroms) of helical tubes. \
@@ -2707,6 +2724,11 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 		command += " --offset_step " + floatToString(joboptions["offset_step"].getNumber(error_message) * pow(2., iover));
 		if (error_message != "") return false;
 
+		if (joboptions["allow_coarser"].getBoolean())
+		{
+			command += " --allow_coarser_sampling";
+		}
+
 	}
 
 	// Helix
@@ -2827,7 +2849,7 @@ Otherwise, only the master will read images and send them through the network to
 All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
 This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
 	joboptions["do_pad1"] = JobOption("Skip padding?", false, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
-	joboptions["skip_gridding"] = JobOption("Skip gridding?", false, "If set to Yes, the calculations will skip gridding in the M step to save time. This usually gives nearly as good results as using gridding, but some artifacts may appear.");
+	joboptions["skip_gridding"] = JobOption("Skip gridding?", true, "If set to Yes, the calculations will skip gridding in the M step to save time, typically with just as good results.");
 	joboptions["do_preread_images"] = JobOption("Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in float-precision, it will take ( N * box_size * box_size * 4 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 15Gb, or 60 Gb for the same number of 400x400 particles. \
 Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the master reads all particles into RAM and sends those particles through the network to the MPI slaves during the refinement iterations.");
@@ -2956,15 +2978,16 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 	// Sampling
 	int iover = 1;
 	command += " --oversampling " + floatToString((float)iover);
-	for (int i = 0; i < 10; i++)
+
+	int sampling = JobOption::getHealPixOrder(joboptions["sampling"].getString());
+	if (sampling <= 0)
 	{
-		if (strcmp((joboptions["sampling"].getString()).c_str(), job_sampling_options[i].c_str()) == 0)
-		{
-			// The sampling given in the GUI will be the oversampled one!
-			command += " --healpix_order " + floatToString((float)i + 1 - iover);
-			break;
-		}
+		error_message = "Wrong choice for sampling";
+		return false;
 	}
+	// The sampling given in the GUI will be the oversampled one!
+	command += " --healpix_order " + floatToString(sampling - iover);
+
 	// Offset range
 	command += " --offset_range " + joboptions["offset_range"].getString();
 	// The sampling given in the GUI will be the oversampled one!
@@ -3101,6 +3124,7 @@ with a stddev of 1/3 of the range given below will be enforced.");
 within +/- the given amount (in degrees) from the optimal orientation in the previous iteration. \
 A Gaussian prior (also see previous option) will be applied, so that orientations closer to the optimal orientation \
 in the previous iteration will get higher weights than those further away.");
+	joboptions["allow_coarser"] = JobOption("Allow coarser sampling?", false, "If set to Yes, the program will use coarser angular and translational samplings if the estimated accuracies of the assignments is still low in the earlier iterations. This may speed up the calculations.");
 
 	joboptions["do_helix"] = JobOption("Do helical reconstruction?", false, "If set to Yes, then perform 3D helical reconstruction.");
 	joboptions["helical_tube_inner_diameter"] = JobOption("Tube diameter - inner (A):", std::string("-1"),"Inner and outer diameter (in Angstroms) of the reconstructed helix spanning across Z axis. \
@@ -3171,7 +3195,7 @@ Otherwise, only the master will read images and send them through the network to
 All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
 This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
 	joboptions["do_pad1"] = JobOption("Skip padding?", false, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
-	joboptions["skip_gridding"] = JobOption("Skip gridding?", false, "If set to Yes, the calculations will skip gridding in the M step to save time. This usually gives nearly as good results as using gridding, but some artifacts may appear.");
+	joboptions["skip_gridding"] = JobOption("Skip gridding?", true, "If set to Yes, the calculations will skip gridding in the M step to save time, typically with just as good results.");
 	joboptions["do_preread_images"] = JobOption("Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in float-precision, it will take ( N * box_size * box_size * 4 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 15Gb, or 60 Gb for the same number of 400x400 particles. \
 Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the master reads all particles into RAM and sends those particles through the network to the MPI slaves during the refinement iterations.");
@@ -3329,15 +3353,15 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 	{
 		int iover = 1;
 		command += " --oversampling " + floatToString((float)iover);
-		for (int i = 0; i < 10; i++)
+		int sampling = JobOption::getHealPixOrder(joboptions["sampling"].getString());
+		if (sampling <= 0)
 		{
-			if (strcmp((joboptions["sampling"].getString()).c_str(), job_sampling_options[i].c_str()) == 0)
-			{
-				// The sampling given in the GUI will be the oversampled one!
-				command += " --healpix_order " + floatToString((float)i + 1 - iover);
-				break;
-			}
+			error_message = "Wrong choice for sampling";
+			return false;
 		}
+		// The sampling given in the GUI will be the oversampled one!
+		command += " --healpix_order " + integerToString(sampling - iover);
+
 		// Manually input local angular searches
 		if (joboptions["do_local_ang_searches"].getBoolean())
 		{
@@ -3350,6 +3374,11 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 		// The sampling given in the GUI will be the oversampled one!
 		command += " --offset_step " +  floatToString(joboptions["offset_step"].getNumber(error_message) * pow(2., iover));
 		if (error_message != "") return false;
+
+		if (joboptions["allow_coarser"].getBoolean())
+		{
+			command += " --allow_coarser_sampling";
+		}
 
 	}
 
@@ -3541,6 +3570,10 @@ Note that this will only be the value for the first few iteration(s): the sampli
 	joboptions["auto_local_sampling"] = JobOption("Local searches from auto-sampling:", job_sampling_options, 4, "In the automated procedure to \
 increase the angular samplings, local angular searches of -6/+6 times the sampling rate will be used from this angular sampling rate onwards. For most \
 lower-symmetric particles a value of 1.8 degrees will be sufficient. Perhaps icosahedral symmetries may benefit from a smaller value such as 0.9 degrees.");
+	joboptions["auto_faster"] = JobOption("Use finer angular sampling faster?", false, "If set to Yes, then let auto-refinement proceed faster with finer angular samplings. Two additional command-line options will be passed to the refine program: \n \n \
+--auto_ignore_angles lets angular sampling go down despite changes still happening in the angles \n \n \
+--auto_resol_angles lets angular sampling go down if the current resolution already requires that sampling at the edge of the particle.  \n\n \
+This option will make the computation faster, but hasn't been tested for many cases for potential loss in reconstruction quality upon convergence.");
 
 	joboptions["do_helix"] = JobOption("Do helical reconstruction?", false, "If set to Yes, then perform 3D helical reconstruction.");
 	joboptions["helical_tube_inner_diameter"] = JobOption("Tube diameter - inner (A):", std::string("-1"),"Inner and outer diameter (in Angstroms) of the reconstructed helix spanning across Z axis. \
@@ -3611,7 +3644,7 @@ Otherwise, only the master will read images and send them through the network to
 All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
 This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
 	joboptions["do_pad1"] = JobOption("Skip padding?", false, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
-	joboptions["skip_gridding"] = JobOption("Skip gridding?", false, "If set to Yes, the calculations will skip gridding in the M step to save time. This usually gives nearly as good results as using gridding, but some artifacts may appear.");
+	joboptions["skip_gridding"] = JobOption("Skip gridding?", true, "If set to Yes, the calculations will skip gridding in the M step to save time, typically with just as good results.");
 	joboptions["do_preread_images"] = JobOption("Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in float-precision, it will take ( N * box_size * box_size * 8 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 15Gb, or 60 Gb for the same number of 400x400 particles. \
 Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the master reads all particles into RAM and sends those particles through the network to the MPI slaves during the refinement iterations.");
@@ -3711,6 +3744,10 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 		command += " --pad 2 ";
 	if (joboptions["skip_gridding"].getBoolean())
 		command += " --skip_gridding ";
+	if (joboptions["auto_faster"].getBoolean())
+	{
+		command += " --auto_ignore_angles --auto_resol_angles";
+	}
 
 	// CTF stuff
 	if (!is_continue)
@@ -3750,24 +3787,25 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 		// Sampling
 		int iover = 1;
 		command += " --oversampling " + floatToString((float)iover);
-		for (int i = 0; i < 10; i++)
+
+		int sampling = JobOption::getHealPixOrder(joboptions["sampling"].getString());
+		if (sampling <= 0)
 		{
-			if (strcmp((joboptions["sampling"].getString()).c_str(), job_sampling_options[i].c_str()) == 0)
-			{
-				// The sampling given in the GUI will be the oversampled one!
-				command += " --healpix_order " + floatToString((float)i + 1 - iover);
-				break;
-			}
+			error_message = "Wrong choice for sampling";
+			return false;
 		}
+		// The sampling given in the GUI will be the oversampled one!
+		command += " --healpix_order " + integerToString(sampling - iover);
+
 		// Minimum sampling rate to perform local searches (may be changed upon continuation
-		for (int i = 0; i < 10; i++)
+		int auto_local_sampling = JobOption::getHealPixOrder(joboptions["auto_local_sampling"].getString());
+		if (auto_local_sampling <= 0)
 		{
-			if (strcmp((joboptions["auto_local_sampling"].getString()).c_str(), job_sampling_options[i].c_str()) == 0)
-			{
-				command += " --auto_local_healpix_order " + floatToString((float)i + 1 - iover);
-				break;
-			}
+			error_message = "Wrong choice for auto_local_sampling";
+			return false;
 		}
+		// The sampling given in the GUI will be the oversampled one!
+		command += " --auto_local_healpix_order " + integerToString(auto_local_sampling - iover);
 
 		// Offset range
 		command += " --offset_range " + joboptions["offset_range"].getString();
@@ -3887,17 +3925,17 @@ with X being the iteration from which one continues the previous run.");
 
 	joboptions["fn_bodies"] = JobOption("Body STAR file:", std::string(""), "STAR Files (*.{star})", ".", " Provide the STAR file with all information about the bodies to be used in multi-body refinement. \
 An example for a three-body refinement would look like this: \n\
- \n \
-data_ \n \
-loop_ \n \
-_rlnBodyMaskName \n \
-_rlnBodyRotateRelativeTo \n \
-_rlnBodySigmaAngles \n \
-_rlnBodySigmaOffset \n \
-large_body_mask.mrc 2 10 2 \n \
-small_body_mask.mrc 1 10 2 \n \
-head_body_mask.mrc 2 10 2 \n \
- \n \
+\n\
+data_\n\
+loop_\n\
+_rlnBodyMaskName\n\
+_rlnBodyRotateRelativeTo\n\
+_rlnBodySigmaAngles\n\
+_rlnBodySigmaOffset\n\
+large_body_mask.mrc 2 10 2\n\
+small_body_mask.mrc 1 10 2\n\
+head_body_mask.mrc 2 10 2\n\
+\n\
 Where each data line represents a different body, and: \n \
  - rlnBodyMaskName contains the name of a soft-edged mask with values in [0,1] that define the body; \n\
  - rlnBodyRotateRelativeTo defines relative to which other body this body rotates (first body is number 1); \n\
@@ -3936,7 +3974,7 @@ Otherwise, only the master will read images and send them through the network to
 All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
 This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
 	joboptions["do_pad1"] = JobOption("Skip padding?", false, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
-	joboptions["skip_gridding"] = JobOption("Skip gridding?", false, "If set to Yes, the calculations will skip gridding in the M step to save time. This usually gives nearly as good results as using gridding, but some artifacts may appear.");
+	joboptions["skip_gridding"] = JobOption("Skip gridding?", true, "If set to Yes, the calculations will skip gridding in the M step to save time, typically with just as good results.");
 	joboptions["do_preread_images"] = JobOption("Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in float-precision, it will take ( N * box_size * box_size * 8 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 15Gb, or 60 Gb for the same number of 400x400 particles. \
 Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the master reads all particles into RAM and sends those particles through the network to the MPI slaves during the refinement iterations.");
@@ -4014,17 +4052,16 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 			// Sampling
 			int iover = 1;
 			command += " --oversampling " + floatToString((float)iover);
-			for (int i = 0; i < 10; i++)
+			int sampling = JobOption::getHealPixOrder(joboptions["sampling"].getString());
+			if (sampling <= 0)
 			{
-				if (strcmp((joboptions["sampling"].getString()).c_str(), job_sampling_options[i].c_str()) == 0)
-				{
-					// The sampling given in the GUI will be the oversampled one!
-					command += " --healpix_order " + floatToString((float)i + 1 - iover);
-					// Always perform local searches!
-					command += " --auto_local_healpix_order " + floatToString((float)i + 1 - iover);
-					break;
-				}
+				error_message = "Wrong choice for sampling";
+				return false;
 			}
+			// The sampling given in the GUI will be the oversampled one!
+			command += " --healpix_order " + integerToString(sampling - iover);
+			// Always perform local searches!
+			command += " --auto_local_healpix_order " + integerToString(sampling - iover);
 
 			// Offset range
 			command += " --offset_range " + joboptions["offset_range"].getString();
@@ -4506,6 +4543,9 @@ bool RelionJob::getCommandsSubtractJob(std::string &outputname, std::vector<std:
 
 	}
 
+	// Other arguments
+	command += " " + joboptions["other_args"].getString();
+
 	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
@@ -4832,6 +4872,12 @@ bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<
 		return false;
 	}
 
+	if (joboptions["do_param_optim"].getBoolean() && joboptions["do_polish"].getBoolean())
+	{
+		error_message = "ERROR: Choose either parameter training or polishing, not both.";
+		return false;
+	}
+
 	if (!joboptions["do_param_optim"].getBoolean() && !joboptions["do_polish"].getBoolean())
 	{
 		error_message = "ERROR: nothing to do, choose either parameter training or polishing.";
@@ -5059,11 +5105,17 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 			command += " --fit_defocus --kmin_defocus " + joboptions["minres"].getString();
 			std::string fit_options = "";
 
-			fit_options += getStringFitOption(joboptions["do_phase"].getString());
-			fit_options += getStringFitOption(joboptions["do_defocus"].getString());
-			fit_options += getStringFitOption(joboptions["do_astig"].getString());
+			fit_options += JobOption::getCtfFitString(joboptions["do_phase"].getString());
+			fit_options += JobOption::getCtfFitString(joboptions["do_defocus"].getString());
+			fit_options += JobOption::getCtfFitString(joboptions["do_astig"].getString());
 			fit_options += "f"; // always have Cs refinement switched off
-			fit_options += getStringFitOption(joboptions["do_bfactor"].getString());
+			fit_options += JobOption::getCtfFitString(joboptions["do_bfactor"].getString());
+
+			if (fit_options.size() != 5)
+			{
+				error_message = "Wrong CTF fitting options";
+				return false;
+			}
 
 			command += " --fit_mode " + fit_options;
 		}

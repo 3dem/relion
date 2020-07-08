@@ -279,6 +279,13 @@ void Preprocessing::joinAllStarFiles()
 			{
 				MetaDataTable MDonestack;
 				MDonestack.read(fn_star);
+
+				if (!compareLabels(MDout, MDonestack))
+				{
+					std::cout << "The STAR file " << fn_star << " contains a column not present in others. Missing values will be filled by default values (0 or empty string)" << std::endl;
+					MDout.addMissingLabels(&MDonestack);
+					MDonestack.addMissingLabels(&MDout);
+				}
 				MDout.append(MDonestack);
 			}
 		}
@@ -591,14 +598,14 @@ void Preprocessing::readHelicalCoordinates(FileName fn_mic, FileName fn_coord, M
 		if (do_extract_helical_tubes)
 			convertEmanHelicalTubeCoordsToMetaDataTable(fn_coord, MD, total_segments, total_tubes, helical_nr_asu, helical_rise, angpix, xdim, ydim, extract_size, helical_bimodal_angular_priors, helical_cut_into_segments);
 		else
-			convertEmanHelicalSegmentCoordsToMetaDataTable(fn_coord, MD, total_segments, total_tubes, xdim, ydim, extract_size, helical_bimodal_angular_priors);
+			convertEmanHelicalSegmentCoordsToMetaDataTable(fn_coord, MD, total_segments, total_tubes, angpix, xdim, ydim, extract_size, helical_bimodal_angular_priors);
 	}
 	else if (is_coords)
 	{
 		if (do_extract_helical_tubes)
 			convertXimdispHelicalTubeCoordsToMetaDataTable(fn_coord, MD, total_segments, total_tubes, helical_nr_asu, helical_rise, angpix, xdim, ydim, extract_size, helical_bimodal_angular_priors, helical_cut_into_segments);
 		else
-			convertXimdispHelicalSegmentCoordsToMetaDataTable(fn_coord, MD, total_segments, total_tubes, xdim, ydim, extract_size, helical_bimodal_angular_priors);
+			convertXimdispHelicalSegmentCoordsToMetaDataTable(fn_coord, MD, total_segments, total_tubes, angpix, xdim, ydim, extract_size, helical_bimodal_angular_priors);
 	}
 	else
 		REPORT_ERROR("Preprocessing::readCoordinates ERROR: Extraction of helical segments - Unknown file extension (RELION *.star, EMAN2 *.box and XIMDISP *.coords are supported).");
