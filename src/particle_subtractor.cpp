@@ -439,6 +439,11 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 	if (opt.mydata.MDimg.containsLabel(EMDL_PARTICLE_CLASS))
 	{
 		opt.mydata.MDimg.getValue(EMDL_PARTICLE_CLASS, myclass, ori_img_id);
+		if (myclass > opt.mymodel.nr_classes)
+		{
+			std::cerr << "A particle belongs to class " << myclass << " while the number of classes in the optimiser.star is only " << opt.mymodel.nr_classes << "." << std::endl;
+			REPORT_ERROR("Tried to subtract a non-existing class from a particle.");
+		}
 		myclass--; // start counting at zero instead of one
 	}
 	opt.mydata.MDimg.getValue(EMDL_ORIENT_ROT, rot, ori_img_id);
