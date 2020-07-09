@@ -49,19 +49,20 @@ void diff2_coarse_2D(
 	//Prefetch euler matrices
 	XFLOAT s_eulers[eulers_per_block * 9];
  
+ 
+	int xSize = projector.imgX;
+	int ySize = projector.imgY;
+	XFLOAT sin_x[trans_num][xSize], cos_x[trans_num][xSize];
+	XFLOAT sin_y[trans_num][ySize], cos_y[trans_num][ySize];
+
+	// pre-compute sin and cos for x and y component
+	computeSincosLookupTable2D(trans_num, g_trans_x, g_trans_y, xSize, ySize,
+			&sin_x[0][0], &cos_x[0][0], 
+			&sin_y[0][0], &cos_y[0][0]);
+ 
 	for (unsigned long block = 0; block < grid_size; block++) {
 		for (int i = 0; i < eulers_per_block * 9; i++)
 			s_eulers[i] = g_eulers[(size_t)block * (size_t)eulers_per_block * (size_t)9 + i];		
-
-		int xSize = projector.imgX;
-		int ySize = projector.imgY;
-		XFLOAT sin_x[trans_num][xSize], cos_x[trans_num][xSize];
-		XFLOAT sin_y[trans_num][ySize], cos_y[trans_num][ySize];
-
-		// pre-compute sin and cos for x and y component
-		computeSincosLookupTable2D(trans_num, g_trans_x, g_trans_y, xSize, ySize,
-				&sin_x[0][0], &cos_x[0][0], 
-				&sin_y[0][0], &cos_y[0][0]);
 
 		//Setup variables
 		XFLOAT s_ref_real[eulers_per_block][xSize];
@@ -183,23 +184,25 @@ void diff2_coarse_3D(
 	//Prefetch euler matrices
 	XFLOAT s_eulers[eulers_per_block * 9];
 	
+ 
+	// pre-compute sin and cos for x and y component
+	int xSize = projector.imgX;
+	int ySize = projector.imgY;
+	int zSize = projector.imgZ;
+	XFLOAT sin_x[trans_num][xSize], cos_x[trans_num][xSize];
+	XFLOAT sin_y[trans_num][ySize], cos_y[trans_num][ySize];
+	XFLOAT sin_z[trans_num][zSize], cos_z[trans_num][zSize];	
+
+	computeSincosLookupTable3D(trans_num, g_trans_x, g_trans_y, g_trans_z,
+							   xSize, ySize, zSize,                               
+							  &sin_x[0][0], &cos_x[0][0], 
+							  &sin_y[0][0], &cos_y[0][0],
+							  &sin_z[0][0], &cos_z[0][0]);
+ 
 	for (unsigned long block = 0; block < grid_size; block++) {
 		for (int i = 0; i < eulers_per_block * 9; i++)
 			s_eulers[i] = g_eulers[(size_t)block * (size_t)eulers_per_block * (size_t)9 + i];		
 
-		// pre-compute sin and cos for x and y component
-		int xSize = projector.imgX;
-		int ySize = projector.imgY;
-		int zSize = projector.imgZ;
-		XFLOAT sin_x[trans_num][xSize], cos_x[trans_num][xSize];
-		XFLOAT sin_y[trans_num][ySize], cos_y[trans_num][ySize];
-		XFLOAT sin_z[trans_num][zSize], cos_z[trans_num][zSize];	
-
-		computeSincosLookupTable3D(trans_num, g_trans_x, g_trans_y, g_trans_z,
-								   xSize, ySize, zSize,                               
-								  &sin_x[0][0], &cos_x[0][0], 
-								  &sin_y[0][0], &cos_y[0][0],
-								  &sin_z[0][0], &cos_z[0][0]);
 		//Setup variables
 		XFLOAT s_ref_real[eulers_per_block][xSize];
 		XFLOAT s_ref_imag[eulers_per_block][xSize];
@@ -345,49 +348,50 @@ void diff2_coarse(
 	checkedArray<XFLOAT> g_real;
 	g_real.initCheckedArray(_g_real);
 #endif
-	//Prefetch euler matrices
 	XFLOAT s_eulers[eulers_per_block * 9];
 
+	// pre-compute sin and cos for x and y component
+	int xSize = projector.imgX;
+	int ySize = projector.imgY;
+	int zSize = projector.imgZ;
+	XFLOAT sin_x[translation_num][xSize], cos_x[translation_num][xSize];
+	XFLOAT sin_y[translation_num][ySize], cos_y[translation_num][ySize];
+	XFLOAT sin_z[translation_num][zSize], cos_z[translation_num][zSize];	
+
+	if (DATA3D)  {
+		computeSincosLookupTable3D(translation_num, trans_x, trans_y, trans_z,
+								xSize, ySize, zSize,                               
+								&sin_x[0][0], &cos_x[0][0], 
+								&sin_y[0][0], &cos_y[0][0],
+								&sin_z[0][0], &cos_z[0][0]);
+	} else {
+		computeSincosLookupTable2D(translation_num, trans_x, trans_y, 
+								xSize, ySize,
+								&sin_x[0][0], &cos_x[0][0], 
+								&sin_y[0][0], &cos_y[0][0]);
+	}
+			
+	//Set up variables
+	XFLOAT s_ref_real[eulers_per_block][block_sz];
+	XFLOAT s_ref_imag[eulers_per_block][block_sz];
+
+	XFLOAT s_real[block_sz];
+	XFLOAT s_imag[block_sz];
+	XFLOAT s_corr[block_sz];
+
+	int    x[block_sz], y[block_sz], z[block_sz];
+
+	XFLOAT trans_cos_x[block_sz], trans_sin_x[block_sz];
+	XFLOAT trans_cos_y[block_sz], trans_sin_y[block_sz];
+	XFLOAT trans_cos_z[block_sz], trans_sin_z[block_sz];
+
+	XFLOAT diff2s[translation_num][eulers_per_block];
+		
 	for (unsigned long block = 0; block < grid_size; block++) {
+		//Prefetch euler matrices
 		for (int i = 0; i < eulers_per_block * 9; i++)
 			s_eulers[i] = g_eulers[(size_t)block * (size_t)eulers_per_block * (size_t)9 + i];
 
-		// pre-compute sin and cos for x and y component
-		int xSize = projector.imgX;
-		int ySize = projector.imgY;
-		int zSize = projector.imgZ;
-		XFLOAT sin_x[translation_num][xSize], cos_x[translation_num][xSize];
-		XFLOAT sin_y[translation_num][ySize], cos_y[translation_num][ySize];
-		XFLOAT sin_z[translation_num][zSize], cos_z[translation_num][zSize];	
-
-		if (DATA3D)  {
-			computeSincosLookupTable3D(translation_num, trans_x, trans_y, trans_z,
-									xSize, ySize, zSize,                               
-									&sin_x[0][0], &cos_x[0][0], 
-									&sin_y[0][0], &cos_y[0][0],
-									&sin_z[0][0], &cos_z[0][0]);
-		} else {
-			computeSincosLookupTable2D(translation_num, trans_x, trans_y, 
-									xSize, ySize,
-									&sin_x[0][0], &cos_x[0][0], 
-									&sin_y[0][0], &cos_y[0][0]);
-		}
-		
-		//Setup variables
-		XFLOAT s_ref_real[eulers_per_block][block_sz];
-		XFLOAT s_ref_imag[eulers_per_block][block_sz];
-
-		XFLOAT s_real[block_sz];
-		XFLOAT s_imag[block_sz];
-		XFLOAT s_corr[block_sz];
-
-		int    x[block_sz], y[block_sz], z[block_sz];
-		
-		XFLOAT trans_cos_x[block_sz], trans_sin_x[block_sz];
-		XFLOAT trans_cos_y[block_sz], trans_sin_y[block_sz];
-		XFLOAT trans_cos_z[block_sz], trans_sin_z[block_sz];
-
-		XFLOAT diff2s[translation_num][eulers_per_block];
 		memset(&diff2s[0][0], 0, sizeof(XFLOAT) * translation_num * eulers_per_block);
 
 		//Step through data
@@ -404,20 +408,20 @@ void diff2_coarse(
 
 				if(DATA3D)
 				{
-					z[tid] =  floorfracf(pixel, projector.imgX*projector.imgY);
-					int xy = pixel % (projector.imgX*projector.imgY);
-					x[tid] =             xy  % projector.imgX;
-					y[tid] = floorfracf( xy,   projector.imgX);
+					z[tid] =  floorfracf(pixel, xSize*ySize);
+					int xy = pixel % (xSize*ySize);
+					x[tid] =             xy  % xSize;
+					y[tid] = floorfracf( xy,   xSize);
 					if (z[tid] > projector.maxR)
-						z[tid] -= projector.imgZ;
+						z[tid] -= zSize;
 				}
 				else
 				{
-					x[tid] =            pixel % projector.imgX;
-					y[tid] = floorfracf(pixel, projector.imgX);
+					x[tid] =            pixel % xSize;
+					y[tid] = floorfracf(pixel, xSize);
 				}
 				if (y[tid] > projector.maxR)
-					y[tid] -= projector.imgY;
+					y[tid] -= ySize;
 			}
 						
 			for (int tid=0; tid<elements; tid++){
@@ -570,6 +574,9 @@ void diff2_fine_2D(
 		XFLOAT *g_diff2s,
 		unsigned long image_size,
 		XFLOAT sum_init,
+		unsigned long orientation_num,
+		unsigned long translation_num,
+		unsigned long num_jobs,
 		unsigned long *d_rot_idx,
 		unsigned long *d_trans_idx,
 		unsigned long *d_job_idx,
@@ -580,6 +587,20 @@ void diff2_fine_2D(
 	checkedArray<XFLOAT> g_imgs_real;
 	g_imgs_real.initCheckedArray(_g_imgs_real);
 #endif
+    // Set up arrays to hold largest possible values
+	int xSize = projector.imgX;
+	int ySize = projector.imgY;
+	XFLOAT sin_x[translation_num][xSize], cos_x[translation_num][xSize];
+	XFLOAT sin_y[translation_num][ySize], cos_y[translation_num][ySize];
+
+	XFLOAT trans_x[translation_num], trans_y[translation_num];
+	
+	XFLOAT ref_real[xSize],  ref_imag[xSize];
+	XFLOAT imgs_real[xSize], imgs_imag[xSize];
+	
+	XFLOAT s[translation_num];   
+	
+	// Now do calculations
 	for (unsigned long bid = 0; bid < grid_size; bid++) {
 		unsigned long trans_num        = (unsigned long)d_job_num[bid];     
 		unsigned long int iy_part = d_trans_idx[d_job_idx[bid]];  
@@ -589,22 +610,17 @@ void diff2_fine_2D(
 		XFLOAT e3 = g_eulers[offset+3], e4 = g_eulers[offset+4];
 		XFLOAT e5 = g_eulers[offset+6], e6 = g_eulers[offset+7];        
 
-		int xSize = projector.imgX;
-		int ySize = projector.imgY;
-		XFLOAT sin_x[trans_num][xSize], cos_x[trans_num][xSize];
-		XFLOAT sin_y[trans_num][ySize], cos_y[trans_num][ySize];
-
-		XFLOAT trans_x[trans_num], trans_y[trans_num];
+		// build lookup table for sin and cos
 		for(unsigned long i=0; i<trans_num; i++) {
 			int itrans = d_trans_idx[d_job_idx[bid]] + i;
 			trans_x[i] = g_trans_x[itrans];
 			trans_y[i] = g_trans_y[itrans];	       
-		}		
+		}	
 		computeSincosLookupTable2D(trans_num, trans_x, trans_y,
 				xSize, ySize,
 				&sin_x[0][0], &cos_x[0][0], 
 				&sin_y[0][0], &cos_y[0][0]);		
-		XFLOAT s[trans_num];    
+ 
 		memset(s, 0, sizeof(XFLOAT) * trans_num);
 
 		unsigned long pixel = 0;
@@ -620,9 +636,6 @@ void diff2_fine_2D(
 					xend   = xstart + 1;
 				}
 			}
-
-			XFLOAT ref_real[xSize],  ref_imag[xSize];
-			XFLOAT imgs_real[xSize], imgs_imag[xSize];
 
 			#pragma omp simd
 			for(int x = xstart; x < xend; x++) {
@@ -708,6 +721,9 @@ void diff2_fine_3D(
 		XFLOAT *g_diff2s,
 		unsigned long image_size,
 		XFLOAT sum_init,
+		unsigned long orientation_num,
+		unsigned long translation_num,
+		unsigned long num_jobs,
 		unsigned long *d_rot_idx,
 		unsigned long *d_trans_idx,
 		unsigned long *d_job_idx,
@@ -718,6 +734,23 @@ void diff2_fine_3D(
 	checkedArray<XFLOAT> g_imgs_real;
 	g_imgs_real.initCheckedArray(_g_imgs_real);
 #endif
+	
+    // Set up arrays to hold largest possible values
+	int xSize = projector.imgX;
+	int ySize = projector.imgY;
+	int zSize = projector.imgZ;
+	XFLOAT sin_x[translation_num][xSize], cos_x[translation_num][xSize];
+	XFLOAT sin_y[translation_num][ySize], cos_y[translation_num][ySize];
+	XFLOAT sin_z[translation_num][zSize], cos_z[translation_num][zSize];	
+
+	XFLOAT trans_x[translation_num], trans_y[translation_num], trans_z[translation_num];
+	
+	XFLOAT ref_real[xSize],  ref_imag[xSize];
+	XFLOAT imgs_real[xSize], imgs_imag[xSize];
+	
+	XFLOAT s[translation_num];   
+	
+	// Now do calculations
 	for (unsigned long bid = 0; bid < grid_size; bid++) {
 		unsigned long trans_num        = (unsigned long)d_job_num[bid];     
 		unsigned long int iy_part = d_trans_idx[d_job_idx[bid]];  
@@ -730,14 +763,6 @@ void diff2_fine_3D(
 		XFLOAT e9 = g_eulers[offset+8];
 
 		// pre-compute sin and cos for x and y component
-		int xSize = projector.imgX;
-		int ySize = projector.imgY;
-		int zSize = projector.imgZ;
-		XFLOAT sin_x[trans_num][xSize], cos_x[trans_num][xSize];
-		XFLOAT sin_y[trans_num][ySize], cos_y[trans_num][ySize];
-		XFLOAT sin_z[trans_num][zSize], cos_z[trans_num][zSize];	
-
-		XFLOAT trans_x[trans_num], trans_y[trans_num], trans_z[trans_num];
 		for(unsigned long i=0; i<trans_num; i++) {
 			int itrans = d_trans_idx[d_job_idx[bid]] + i;
 			trans_x[i] = g_trans_x[itrans];
@@ -750,7 +775,6 @@ void diff2_fine_3D(
 								  &sin_y[0][0], &cos_y[0][0],
 								  &sin_z[0][0], &cos_z[0][0]);
 
-		XFLOAT s[trans_num];    
 		memset(s, 0, sizeof(XFLOAT) * trans_num);
 
 		// index of comparison
@@ -778,9 +802,6 @@ void diff2_fine_3D(
 						xend_y   = xstart_y + 1;
 					}
 				}
-
-				XFLOAT ref_real[xSize],  ref_imag[xSize];
-				XFLOAT imgs_real[xSize], imgs_imag[xSize];
 
 				#pragma omp simd
 				for(int x = xstart_y; x < xend_y; x++) {
@@ -886,6 +907,24 @@ template<bool REF3D>
 	checkedArray<XFLOAT> g_imgs_real;
 	g_imgs_real.initCheckedArray(_g_imgs_real);
 #endif
+
+	// pre-compute sin and cos for x and y direction
+	int xSize = projector.imgX;
+	int ySize = projector.imgY;
+	XFLOAT sin_x[trans_num][xSize], cos_x[trans_num][xSize];
+	XFLOAT sin_y[trans_num][ySize], cos_y[trans_num][ySize];
+
+	computeSincosLookupTable2D(trans_num, g_trans_x, g_trans_y, xSize, ySize,
+			&sin_x[0][0], &cos_x[0][0], 
+			&sin_y[0][0], &cos_y[0][0]);
+	
+	// Set up other arrays
+	XFLOAT s_weight[trans_num][xSize];	
+	XFLOAT s_norm[trans_num][xSize];
+
+	XFLOAT ref_real[xSize], ref_imag[xSize];
+	XFLOAT img_real[xSize], img_imag[xSize], corr_imag[xSize];
+			
 	for (unsigned long iorient = 0; iorient < grid_size; iorient++) {
 	
 		XFLOAT e0,e1,e3,e4,e6,e7;
@@ -896,19 +935,7 @@ template<bool REF3D>
 		e6 = g_eulers[iorient*9+6];
 		e7 = g_eulers[iorient*9+7];
 
-		// pre-compute sin and cos for x and y direction
-		int xSize = projector.imgX;
-		int ySize = projector.imgY;
-		XFLOAT sin_x[trans_num][xSize], cos_x[trans_num][xSize];
-		XFLOAT sin_y[trans_num][ySize], cos_y[trans_num][ySize];
-
-		computeSincosLookupTable2D(trans_num, g_trans_x, g_trans_y, xSize, ySize,
-				&sin_x[0][0], &cos_x[0][0], 
-				&sin_y[0][0], &cos_y[0][0]);
-
-		XFLOAT s_weight[trans_num][xSize];
 		memset(s_weight, 0, sizeof(XFLOAT) * xSize * trans_num);
-		XFLOAT s_norm[trans_num][xSize];
 		memset(s_norm, 0, sizeof(XFLOAT) *   xSize * trans_num);
 
 		unsigned long pixel = 0;
@@ -924,9 +951,6 @@ template<bool REF3D>
 					xend   = xstart + 1;
 				}
 			}
-
-			XFLOAT ref_real[xSize], ref_imag[xSize];
-			XFLOAT img_real[xSize], img_imag[xSize], corr_imag[xSize];
 
 			#pragma omp simd
 			for(int x = xstart; x < xend; x++) {
@@ -1022,6 +1046,28 @@ void diff2_CC_coarse_3D(
 	checkedArray<XFLOAT> g_imgs_real;
 	g_imgs_real.initCheckedArray(_g_imgs_real);
 #endif
+
+	// pre-compute sin and cos for x, y, and z direction
+	int xSize = projector.imgX;
+	int ySize = projector.imgY;
+	int zSize = projector.imgZ;
+	XFLOAT sin_x[trans_num][xSize], cos_x[trans_num][xSize];
+	XFLOAT sin_y[trans_num][ySize], cos_y[trans_num][ySize];
+	XFLOAT sin_z[trans_num][zSize], cos_z[trans_num][zSize];	
+
+	computeSincosLookupTable3D(trans_num, g_trans_x, g_trans_y, g_trans_z,
+							   xSize, ySize, zSize,                               
+							  &sin_x[0][0], &cos_x[0][0], 
+							  &sin_y[0][0], &cos_y[0][0],
+							  &sin_z[0][0], &cos_z[0][0]);
+		
+	// Set up some arrays
+	XFLOAT s_weight[trans_num][xSize];
+	XFLOAT s_norm[trans_num][xSize];
+
+	XFLOAT ref_real[xSize], ref_imag[xSize];
+	XFLOAT img_real[xSize], img_imag[xSize], corr_imag[xSize];
+	
 	for (unsigned long iorient = 0; iorient < grid_size; iorient++) {
 		XFLOAT e0, e1, e2, e3, e4, e5, e6, e7, e8;
 		e0 = g_eulers[iorient*9  ];
@@ -1034,23 +1080,7 @@ void diff2_CC_coarse_3D(
 		e7 = g_eulers[iorient*9+7];
 		e8 = g_eulers[iorient*9+8];
 
-		// pre-compute sin and cos for x, y, and z direction
-		int xSize = projector.imgX;
-		int ySize = projector.imgY;
-		int zSize = projector.imgZ;
-		XFLOAT sin_x[trans_num][xSize], cos_x[trans_num][xSize];
-		XFLOAT sin_y[trans_num][ySize], cos_y[trans_num][ySize];
-		XFLOAT sin_z[trans_num][zSize], cos_z[trans_num][zSize];	
-
-		computeSincosLookupTable3D(trans_num, g_trans_x, g_trans_y, g_trans_z,
-								   xSize, ySize, zSize,                               
-								  &sin_x[0][0], &cos_x[0][0], 
-								  &sin_y[0][0], &cos_y[0][0],
-								  &sin_z[0][0], &cos_z[0][0]);
-
-		XFLOAT s_weight[trans_num][xSize];
 		memset(s_weight, 0, sizeof(XFLOAT) * xSize * trans_num);
-		XFLOAT s_norm[trans_num][xSize];
 		memset(s_norm,   0, sizeof(XFLOAT) *   xSize * trans_num);
 
 		unsigned long pixel = 0;
@@ -1077,9 +1107,6 @@ void diff2_CC_coarse_3D(
 						xend_y   = xstart_y + 1;
 					}
 				}
-
-				XFLOAT ref_real[xSize], ref_imag[xSize];
-				XFLOAT img_real[xSize], img_imag[xSize], corr_imag[xSize];
 
 				#pragma omp simd
 				for(int x = xstart_y; x < xend_y; x++) {
@@ -1176,6 +1203,9 @@ void diff2_CC_fine_2D(
 		unsigned long image_size,
 		XFLOAT sum_init,
 		XFLOAT exp_local_sqrtXi2,
+		unsigned long orientation_num,
+		unsigned long translation_num,
+		unsigned long num_jobs,
 		unsigned long *d_rot_idx,
 		unsigned long *d_trans_idx,
 		unsigned long *d_job_idx,
@@ -1186,17 +1216,26 @@ void diff2_CC_fine_2D(
 	checkedArray<XFLOAT> g_imgs_real;
 	g_imgs_real.initCheckedArray(_g_imgs_real);
 #endif
+    // Set up arrays to hold largest possible values
+	int xSize = projector.imgX;
+	int ySize = projector.imgY;
+	XFLOAT sin_x[translation_num][xSize], cos_x[translation_num][xSize];
+	XFLOAT sin_y[translation_num][ySize], cos_y[translation_num][ySize];
+
+	XFLOAT trans_x[translation_num], trans_y[translation_num];
+
+	XFLOAT  s   [translation_num][xSize]; 
+	XFLOAT  s_cc[translation_num][xSize];
+	
+	XFLOAT ref_real[xSize], ref_imag[xSize];
+	XFLOAT img_real[xSize], img_imag[xSize], corr_imag[xSize];
+	
+	// Now do calculations
 	for (unsigned long bid = 0; bid < grid_size; bid++) {
 
 		unsigned long trans_num   = d_job_num[bid]; //how many transes we have for this rot
 
 		// pre-compute sin and cos for x and y direction
-		int xSize = projector.imgX;
-		int ySize = projector.imgY;
-		XFLOAT sin_x[trans_num][xSize], cos_x[trans_num][xSize];
-		XFLOAT sin_y[trans_num][ySize], cos_y[trans_num][ySize];
-
-		XFLOAT trans_x[trans_num], trans_y[trans_num];
 		for(unsigned long i=0; i<trans_num; i++) {
 			unsigned long itrans = d_trans_idx[d_job_idx[bid]] + i;
 			trans_x[i] = g_trans_x[itrans];
@@ -1215,8 +1254,6 @@ void diff2_CC_fine_2D(
 		e6 = g_eulers[iorient*9+6];
 		e7 = g_eulers[iorient*9+7];
 
-		XFLOAT  s   [trans_num][xSize]; 
-		XFLOAT  s_cc[trans_num][xSize];
 		memset(&s[0][0],    0, sizeof(XFLOAT) * xSize * trans_num);
 		memset(&s_cc[0][0], 0, sizeof(XFLOAT) * xSize * trans_num);
 
@@ -1233,9 +1270,6 @@ void diff2_CC_fine_2D(
 					xend   = xstart + 1;
 				}
 			}
-
-			XFLOAT ref_real[xSize], ref_imag[xSize];
-			XFLOAT img_real[xSize], img_imag[xSize], corr_imag[xSize];
 
 			#pragma omp simd
 			for(int x = xstart; x < xend; x++) {
@@ -1322,6 +1356,9 @@ void diff2_CC_fine_3D(
 		unsigned long image_size,
 		XFLOAT sum_init,
 		XFLOAT exp_local_sqrtXi2,
+		unsigned long orientation_num,
+		unsigned long translation_num,
+		unsigned long num_jobs,
 		unsigned long *d_rot_idx,
 		unsigned long *d_trans_idx,
 		unsigned long *d_job_idx,
@@ -1332,20 +1369,28 @@ void diff2_CC_fine_3D(
 	checkedArray<XFLOAT> g_imgs_real;
 	g_imgs_real.initCheckedArray(_g_imgs_real);
 #endif
+    // Set up arrays to hold largest possible values
+	int xSize = projector.imgX;
+	int ySize = projector.imgY;
+	int zSize = projector.imgZ;
+	XFLOAT sin_x[translation_num][xSize], cos_x[translation_num][xSize];
+	XFLOAT sin_y[translation_num][ySize], cos_y[translation_num][ySize];
+	XFLOAT sin_z[translation_num][zSize], cos_z[translation_num][zSize];	
 
+	XFLOAT trans_x[translation_num], trans_y[translation_num], trans_z[translation_num];
+
+	XFLOAT  s   [translation_num][xSize]; 
+	XFLOAT  s_cc[translation_num][xSize];
+
+	XFLOAT ref_real[xSize], ref_imag[xSize];
+	XFLOAT img_real[xSize], img_imag[xSize], corr_imag[xSize];
+	
+	// Now do calculations
 	for (unsigned long bid = 0; bid < grid_size; bid++) {
 
 		unsigned long trans_num   = d_job_num[bid]; //how many transes we have for this rot
 
 		// pre-compute sin and cos for x and y direction
-		int xSize = projector.imgX;
-		int ySize = projector.imgY;
-		int zSize = projector.imgZ;
-		XFLOAT sin_x[trans_num][xSize], cos_x[trans_num][xSize];
-		XFLOAT sin_y[trans_num][ySize], cos_y[trans_num][ySize];
-		XFLOAT sin_z[trans_num][zSize], cos_z[trans_num][zSize];	
-
-		XFLOAT trans_x[trans_num], trans_y[trans_num], trans_z[trans_num];
 		for(unsigned long i=0; i<trans_num; i++) {
 			unsigned long itrans = d_trans_idx[d_job_idx[bid]] + i;
 			trans_x[i] = g_trans_x[itrans];
@@ -1358,8 +1403,6 @@ void diff2_CC_fine_3D(
 								  &sin_y[0][0], &cos_y[0][0],
 								  &sin_z[0][0], &cos_z[0][0]);
 
-		XFLOAT  s   [trans_num][xSize]; 
-		XFLOAT  s_cc[trans_num][xSize];
 		memset(&s[0][0],    0, sizeof(XFLOAT) * xSize * trans_num);
 		memset(&s_cc[0][0], 0, sizeof(XFLOAT) * xSize * trans_num);
 
@@ -1400,9 +1443,6 @@ void diff2_CC_fine_3D(
 						xend_y   = xstart_y + 1;
 					}
 				}
-
-				XFLOAT ref_real[xSize], ref_imag[xSize];
-				XFLOAT img_real[xSize], img_imag[xSize], corr_imag[xSize];
 
 				#pragma omp simd
 				for(int x = xstart_y; x < xend_y; x++) {
