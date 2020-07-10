@@ -550,13 +550,13 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 
 			CTF ctf;
 			ctf.readByGroup(DF, &obsModel, p);
-			ctf.Q0 = 0.0;
 			
-			// @TODO: change the aberrations coefficients so that gamma(0) = 0
-			//        make sure the cache is invalidated
+			const BufferedImage<RFLOAT>& aberration = obsModel.getGammaOffset(opticsGroup, s);
+			ctf.Q0 = 0.0;
+			ctf.phase_shift = RAD2DEG(aberration(0,0));
 			
 			ctf.initialise();
-
+			
 			BufferedImage<RFLOAT> gamma_img(sh,s);
 
 			ctf.drawGamma(s, s, angpix, &gamma_img[0]);

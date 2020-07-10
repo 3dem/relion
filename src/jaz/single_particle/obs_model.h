@@ -62,7 +62,7 @@ class ObservationModel
 		std::vector<std::string> fnMtfs, groupNames;
 
 		// cached aberration effects for a set of given image sizes
-		// e.g.: phaseCorr[opt. group][img. height](y,x)
+		// e.g.: phaseCorr[opt. group][img. height](x,y)
 		std::vector<std::map<int,BufferedImage<Complex> > > phaseCorr;
 		std::vector<std::map<int,BufferedImage<RFLOAT> > > gammaOffset, mtfImage;
 		std::map<int,BufferedImage<RFLOAT> > avgMtfImage;

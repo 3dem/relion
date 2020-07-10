@@ -399,13 +399,29 @@ public:
 		double xs = w0 * angpix;
 		double ys = h0 * angpix;
 		
-		for (int y = 0; y < h0; y++)
-		for (int x = 0; x < wh; x++)
+		if (obsModel == 0 || !obsModel->hasEvenZernike)
 		{
-			double xx = x / xs;
-			double yy = (y < h0/2? y : y - h0) / ys;
-	
-			dest[y*wh + x] = getGamma(xx,yy);
+			for (int y = 0; y < h0; y++)
+			for (int x = 0; x < wh; x++)
+			{
+				double xx = x / xs;
+				double yy = (y < h0/2? y : y - h0) / ys;
+		
+				dest[y*wh + x] = getGamma(xx,yy);
+			}
+		}
+		else
+		{
+			const BufferedImage<RFLOAT>& gammaOffset = obsModel->getGammaOffset(opticsGroup, h0);
+			
+			for (int y = 0; y < h0; y++)
+			for (int x = 0; x < wh; x++)
+			{
+				double xx = x / xs;
+				double yy = (y < h0/2? y : y - h0) / ys;
+		
+				dest[y*wh + x] = getGamma(xx,yy) + gammaOffset(x,y);
+			}
 		}
 	}
 	
