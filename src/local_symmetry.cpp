@@ -1506,7 +1506,6 @@ void getLocalSearchOperatorSamplings(
 		// Initialise healpix sampling
 		sampling.clear();
 		sampling.healpix_order = healpix_order;
-		sampling.orientational_prior_mode = prior_mode;
 		sampling.is_3D = sampling.is_3d_trans = true;
 		sampling.limit_tilt = -91.; // Don't limit tilts
 		sampling.psi_step = 360. / (6. * ROUND(std::pow(2., healpix_order)));
@@ -1514,7 +1513,7 @@ void getLocalSearchOperatorSamplings(
 		sampling.random_perturbation = sampling.perturbation_factor = 0.;
 
 		// Get all orientations
-		sampling.initialise(prior_mode, 3, true, false, false, (prior_mode == NOPRIOR) ? (false) : (true));
+		sampling.initialise(3, true, false, false, (prior_mode == NOPRIOR) ? (false) : (true));
 		sampling.setOrientations();
 
 		// Select orientations

@@ -1581,4 +1581,73 @@ void rewindow(Image<RFLOAT> &I, int mysize);
 /// @ingroup Images
 // Functions belonging to this topic are commented in rw*.h
 //@}
+
+#define GREYSCALE 0
+#define BLACKGREYREDSCALE 1
+#define BLUEGREYWHITESCALE 2
+#define BLUEGREYREDSCALE 3
+#define RAINBOWSCALE 4
+#define CYANBLACKYELLOWSCALE 5
+
+void getImageContrast(MultidimArray<RFLOAT> &image, RFLOAT &minval, RFLOAT &maxval, RFLOAT &sigma_contrast);
+
+inline void greyToRGB(const int color_scheme, const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue)
+{
+	switch (color_scheme)
+	{
+	case GREYSCALE:
+		red = green = blue = grey;
+		break;
+	case BLACKGREYREDSCALE:
+		if (grey >= 128) { red = 255; blue = green = FLOOR((RFLOAT)(255 - grey)*2); }
+		else { red = green = blue = FLOOR((RFLOAT)(grey*2.)); }
+		break;
+	case BLUEGREYWHITESCALE:
+		if (grey >= 128) { red = green = blue = FLOOR((RFLOAT)((grey - 128) * 2)); }
+		else { red = 0; blue = green = FLOOR((RFLOAT)(255 - 2 * grey)); }
+		break;
+	case BLUEGREYREDSCALE:
+	{
+		const RFLOAT a = grey / 85.0; // group
+		const int X = FLOOR(a);	//this is the integer part
+		const unsigned char Y = FLOOR(255 * (a - X)); //fractional part from 0 to 255
+		switch(X)
+		{
+		    case 0: red = 0; green = 255-Y; blue = 255 - Y; break;
+		    case 1: red = Y; green = Y; blue = Y; break;
+		    case 2: red = 255; green = 255-Y; blue = 255 - Y; break;
+		    case 3: red = 255; green = 0; blue = 0; break;
+		}
+
+		break;
+	}
+	case RAINBOWSCALE:
+	{
+		const RFLOAT a = (255 - grey) / 64.; //invert and group
+		const int X = FLOOR(a);
+		const unsigned char Y = FLOOR(255 * (a - X)); //fractional part from 0 to 255
+		switch(X)
+		{
+		    case 0: red = 255; green = Y; blue = 0; break;
+		    case 1: red = 255 - Y; green = 255; blue = 0; break;
+		    case 2: red = 0; green = 255; blue = Y; break;
+		    case 3: red = 0; green = 255-Y; blue = 255; break;
+		    case 4: red = 0; green = 0; blue = 255; break;
+		}
+
+		break;
+	}
+	case CYANBLACKYELLOWSCALE:
+	{
+		const RFLOAT d_rb = 3 * (grey - 128);
+		const RFLOAT d_g = 3 * (std::abs(grey - 128) - 42);
+		red   = (unsigned char)(FLOOR(XMIPP_MIN(255., XMIPP_MAX(0.0,  d_rb))));
+		green = (unsigned char)(FLOOR(XMIPP_MIN(255., XMIPP_MAX(0.0,  d_g))));
+		blue  = (unsigned char)(FLOOR(XMIPP_MIN(255., XMIPP_MAX(0.0, -d_rb))));
+
+		break;
+	}
+	}
+	return;
+}
 #endif

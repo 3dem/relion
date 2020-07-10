@@ -71,7 +71,3 @@ std::ostream& operator<<(std::ostream& ostrm,
 
     return ostrm;
 }
-
-
-
-

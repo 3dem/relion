@@ -1183,6 +1183,7 @@ const BufferedImage<Complex>& ObservationModel::getPhaseCorrection(int optGroup,
 			}
 
 			const int sh = s/2 + 1;
+
 			phaseCorr[optGroup][s] = BufferedImage<Complex>(sh,s);
 
 			BufferedImage<Complex>& img = phaseCorr[optGroup][s];

@@ -551,6 +551,10 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 			CTF ctf;
 			ctf.readByGroup(DF, &obsModel, p);
 			ctf.Q0 = 0.0;
+			
+			// @TODO: change the aberrations coefficients so that gamma(0) = 0
+			//        make sure the cache is invalidated
+			
 			ctf.initialise();
 
 			BufferedImage<RFLOAT> gamma_img(sh,s);
@@ -731,6 +735,11 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 
 		if (do_ewald)
 		{
+			if (do_dual_contrast)
+			{
+				REPORT_ERROR("Dual contrast does not work with Ewald sphere curvature");
+			}
+			
 			Matrix2D<RFLOAT> magMat;
 
 			if (obsModel.hasMagMatrices)
@@ -755,59 +764,33 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 				
 				ClippedPointInsertion<RFLOAT,RFLOAT> clippedInsertion;
 				
-				if (do_dual_contrast)
-				{
-					FourierBackprojection::backprojectSphere_dualContrast_forward(
-							clippedInsertion,
-							sin_gamma_data, cos_gamma_data,
-							sin2_weight, sin_cos_weight, cos2_weight, 
-							proj, r_ewald_sphere, !is_reverse,
-							*dual_contrast_accumulation_volume);
+				FourierBackprojection::backprojectSphere_forward(
+						clippedInsertion,
+						dataImageP, ctfImage, proj, r_ewald_sphere,
+						accumulation_volume->data, accumulation_volume->weight);
 					
-					FourierBackprojection::backprojectSphere_dualContrast_forward(
-							clippedInsertion,
-							sin_gamma_data, cos_gamma_data,
-							sin2_weight, sin_cos_weight, cos2_weight, 
-							proj, -r_ewald_sphere, is_reverse,
-							*dual_contrast_accumulation_volume);
-				}
-				else
-				{
-					FourierBackprojection::backprojectSphere_forward(
-							clippedInsertion,
-							dataImageP, ctfImage, proj, r_ewald_sphere,
-							accumulation_volume->data, accumulation_volume->weight);
-					
-					FourierBackprojection::backprojectSphere_forward(
-							clippedInsertion,
-							dataImageQ, ctfImage, proj, -r_ewald_sphere,
-							accumulation_volume->data, accumulation_volume->weight);
-				}
+				FourierBackprojection::backprojectSphere_forward(
+						clippedInsertion,
+						dataImageQ, ctfImage, proj, -r_ewald_sphere,
+						accumulation_volume->data, accumulation_volume->weight);
 			}
 			else
 			{
-				if (do_dual_contrast)
-				{
-					REPORT_ERROR("Dual contrast is currently not supported with backward mapping");
-				}
-				else
-				{
-					RawImage<Complex> dataImageP(F2DP);
-					RawImage<Complex> dataImageQ(F2DQ);
-					
-					CtfHelper::CTFP_CTFQ_Pair<RFLOAT> dataImagePQ = 
-					        CtfHelper::stitchHalves(dataImageP, dataImageQ);
-					
-					FourierBackprojection::backprojectSphere_backward(
-						dataImagePQ.pq, ctfImage, proj, r_ewald_sphere,
-						accumulation_volume->data, accumulation_volume->weight,
-						num_threads_in);
-					
-					FourierBackprojection::backprojectSphere_backward(
-						dataImagePQ.qp, ctfImage, proj, -r_ewald_sphere,
-						accumulation_volume->data, accumulation_volume->weight,
-						num_threads_in);
-				}
+				RawImage<Complex> dataImageP(F2DP);
+				RawImage<Complex> dataImageQ(F2DQ);
+				
+				CtfHelper::CTFP_CTFQ_Pair<RFLOAT> dataImagePQ = 
+						CtfHelper::stitchHalves(dataImageP, dataImageQ);
+				
+				FourierBackprojection::backprojectSphere_backward(
+					dataImagePQ.pq, ctfImage, proj, r_ewald_sphere,
+					accumulation_volume->data, accumulation_volume->weight,
+					num_threads_in);
+				
+				FourierBackprojection::backprojectSphere_backward(
+					dataImagePQ.qp, ctfImage, proj, -r_ewald_sphere,
+					accumulation_volume->data, accumulation_volume->weight,
+					num_threads_in);
 			}
 		}
 		else
