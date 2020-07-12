@@ -2180,6 +2180,9 @@ void MotioncorrRunner::binNonSquareImage(Image<float> &Iwork, RFLOAT bin_factor)
 bool MotioncorrRunner::detectSerialEMDefectText(FileName fn_defect)
 {
 	std::ifstream f_defect(fn_defect);
+	if (!f_defect.is_open())
+		REPORT_ERROR("Failed to open a defect file: " + fn_defect);
+
 	std::string line;
 	bool ret = false;
 
@@ -2208,6 +2211,8 @@ void MotioncorrRunner::fillDefectMask(MultidimArray<bool> &bBad, FileName fn_def
 	{
 		// UCSF MotionCor2 style defect file (x y w h)
 		std::ifstream f_defect(fn_defect);
+		if (!f_defect.is_open())
+			REPORT_ERROR("Failed to open a defect file: " + fn_defect);
 
 		// TODO: error handling !!
 		while (!f_defect.eof()) {
