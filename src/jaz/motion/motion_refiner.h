@@ -39,13 +39,10 @@
 
 #include <omp.h>
 
-
 class MotionRefiner
 {
 	public:
-		
 		MotionRefiner();
-		
 		
 		// Read command line arguments
 		void read(int argc, char **argv);
@@ -58,16 +55,13 @@ class MotionRefiner
 		
 		int getVerbosityLevel();
 		
-		
 		// For original particle-polishing-like Bfactors (not used)
 		//void calculateSingleFrameReconstruction(int iframe);
 		
 		// Get output STAR file name for this micrograph
 		static FileName getOutputFileNameRoot(std::string outPath, const MetaDataTable& mdt);
 		
-		
 	protected:
-		
 		// components that do the actual work
 		MotionParamEstimator motionParamEstimator;
 		MotionEstimator motionEstimator;
@@ -108,7 +102,6 @@ class MotionRefiner
 			chosenMdts, // micrographs between minMG and maxMG
 			motionMdts, recombMdts; // unfinished micrographs
 		
-		
 		// combine all EPS files into one logfile.pdf
 		void combineEPSAndSTARfiles();
 		
@@ -116,7 +109,5 @@ class MotionRefiner
 		// movie_path, movie_ending and movie_toReplace/replaceBy
 		void adaptMovieNames();
 };
-
-
 
 #endif

@@ -79,6 +79,7 @@ class MotionHelper
                 const std::vector<std::vector<gravis::d2Vector>>& tracksInPix,
                 std::string fn, double angpix);
 
+	// both stack number and frame number are 0-indexed in the array and STAR file
         static std::vector<std::vector<gravis::d2Vector>> readTracksInPix(
                 std::string fn, double angpix);
 
