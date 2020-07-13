@@ -439,6 +439,11 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 	if (opt.mydata.MDimg.containsLabel(EMDL_PARTICLE_CLASS))
 	{
 		opt.mydata.MDimg.getValue(EMDL_PARTICLE_CLASS, myclass, ori_img_id);
+		if (myclass > opt.mymodel.nr_classes)
+		{
+			std::cerr << "A particle belongs to class " << myclass << " while the number of classes in the optimiser.star is only " << opt.mymodel.nr_classes << "." << std::endl;
+			REPORT_ERROR("Tried to subtract a non-existing class from a particle.");
+		}
 		myclass--; // start counting at zero instead of one
 	}
 	opt.mydata.MDimg.getValue(EMDL_ORIENT_ROT, rot, ori_img_id);
@@ -610,17 +615,16 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 
 		// re-center to new_center
 		my_residual_offset += my_refined_ibody_offset;
-		my_residual_offset += Abody * (opt.mymodel.com_bodies[subtract_body] - new_center);
-
+		my_residual_offset += Abody * (opt.mymodel.com_bodies[subtract_body] - new_center * opt.mymodel.pixel_size / my_pixel_size);
 	}
 	else
 	{
 		// Normal 3D classification/refinement: get the projection in rot,tilt,psi for the corresponding class
-		Matrix2D<RFLOAT> A3D;
-		Euler_angles2matrix(rot, tilt, psi, A3D);
+		Matrix2D<RFLOAT> A3D_pure_rot, A3D;
+		Euler_angles2matrix(rot, tilt, psi, A3D_pure_rot);
 
 		// Apply anisotropic mag and scaling
-		A3D = opt.mydata.obsModel.applyAnisoMag(A3D, optics_group);
+		A3D = opt.mydata.obsModel.applyAnisoMag(A3D_pure_rot, optics_group);
 		A3D = opt.mydata.obsModel.applyScaleDifference(A3D, optics_group, opt.mymodel.ori_size, opt.mymodel.pixel_size);
 		opt.mymodel.PPref[myclass].get2DFourierTransform(Fsubtract, A3D);
 
@@ -631,7 +635,7 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 		if (do_center)
 		{
 			// Re-center the output particle to a new centre...
-			my_residual_offset = my_old_offset - A3D * (new_center);
+			my_residual_offset = my_old_offset - A3D_pure_rot * (new_center * opt.mymodel.pixel_size / my_pixel_size);
 		}
 	}
 
@@ -639,10 +643,12 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 	// Apply the CTF to the to-be-subtracted projection
 	if (opt.do_ctf_correction)
 	{
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fsubtract)
-		{
-			DIRECT_MULTIDIM_ELEM(Fsubtract, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
-		}
+		if (opt.mydata.obsModel.getCtfPremultiplied(optics_group))
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fsubtract)
+				DIRECT_MULTIDIM_ELEM(Fsubtract, n) *= (DIRECT_MULTIDIM_ELEM(Fctf, n) * DIRECT_MULTIDIM_ELEM(Fctf, n));
+		else
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fsubtract)
+				DIRECT_MULTIDIM_ELEM(Fsubtract, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 
 		// Also do phase modulation, for beam tilt correction and other asymmetric aberrations
 		opt.mydata.obsModel.demodulatePhase(optics_group, Fsubtract, true); // true means do_modulate_instead

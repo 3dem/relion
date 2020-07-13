@@ -256,6 +256,12 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	if (fnt != "OLD")
 		write_every_sgd_iter = textToInteger(fnt);
 
+	fnt = parser.getOption("--relax_sym", "The symmetry to be relaxed", "OLD");
+	if (fnt != "OLD")
+	{
+		sampling.fn_sym_relax = fnt;
+	}
+
 	do_join_random_halves = parser.checkOption("--join_random_halves", "Join previously split random halves again (typically to perform a final reconstruction).");
 
 	// ORIENTATIONS
@@ -437,6 +443,8 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	if (fnt != "OLD")
 		strict_highres_exp = textToFloat(fnt);
 
+	do_trust_ref_size = parser.checkOption("--trust_ref_size", "Trust the pixel and box size of the input reference; by default the program will die if these are different from the first optics group of the data");
+
 	// Debugging/analysis/hidden stuff
 	do_map = !checkParameter(argc, argv, "--no_map");
 	minres_map = textToInteger(getParameter(argc, argv, "--minres_map", "5"));
@@ -540,6 +548,10 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	else
 		sampling.fn_sym = sym_;
 
+	//Check for relax_symmetry option
+	std::string sym_relax_ =  parser.getOption("--relax_sym", "Symmetry to be relaxed", "");
+	sampling.fn_sym_relax = sym_relax_;
+
 	sampling.offset_range = textToFloat(parser.getOption("--offset_range", "Search range for origin offsets (in pixels)", "6"));
 	sampling.offset_step = textToFloat(parser.getOption("--offset_step", "Sampling rate (before oversampling) for origin offsets (in pixels)", "2"));
 	// Jun19,2015 - Shaoda, Helical refinement
@@ -552,6 +564,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	RFLOAT _sigma_rot = textToFloat(parser.getOption("--sigma_rot", "Stddev on the first Euler angle for local angular searches (of +/- 3 stddev)", "-1"));
 	RFLOAT _sigma_tilt = textToFloat(parser.getOption("--sigma_tilt", "Stddev on the second Euler angle for local angular searches (of +/- 3 stddev)", "-1"));
 	RFLOAT _sigma_psi = textToFloat(parser.getOption("--sigma_psi", "Stddev on the in-plane angle for local angular searches (of +/- 3 stddev)", "-1"));
+
 	if (_sigma_ang > 0.)
 	{
 		mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
@@ -569,8 +582,18 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	else
 	{
 		//default
-		mymodel.orientational_prior_mode = NOPRIOR;
-		mymodel.sigma2_rot = mymodel.sigma2_tilt = mymodel.sigma2_psi = 0.;
+		// Very small to force the algorithm to take the current orientation
+		if (sym_relax_ != "")
+		{
+			mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
+			_sigma_ang = 0.0033;
+			mymodel.sigma2_rot = mymodel.sigma2_tilt = mymodel.sigma2_psi = _sigma_ang * _sigma_ang;
+		}
+		else
+		{
+			mymodel.orientational_prior_mode = NOPRIOR;
+			mymodel.sigma2_rot = mymodel.sigma2_tilt = mymodel.sigma2_psi = 0.;
+		}
 	}
 	do_skip_align = parser.checkOption("--skip_align", "Skip orientational assignment (only classify)?");
 	do_skip_rotate = parser.checkOption("--skip_rotate", "Skip rotational assignment (only translate and classify)?");
@@ -719,6 +742,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	auto_ignore_angle_changes = parser.checkOption("--auto_ignore_angles", "In auto-refinement, update angular sampling regardless of changes in orientations for convergence. This makes convergence faster.");
 	auto_resolution_based_angles= parser.checkOption("--auto_resol_angles", "In auto-refinement, update angular sampling based on resolution-based required sampling. This makes convergence faster.");
 	allow_coarser_samplings = parser.checkOption("--allow_coarser_sampling", "In 2D/3D classification, allow coarser angular and translational samplings if accuracies are bad (typically in earlier iterations.");
+	do_trust_ref_size = parser.checkOption("--trust_ref_size", "Trust the pixel and box size of the input reference; by default the program will die if these are different from the first optics group of the data");
 	///////////////// Special stuff for first iteration (only accessible via CL, not through readSTAR ////////////////////
 
 	// When reading from the CL: always start at iteration 1 and subset 1
@@ -1614,7 +1638,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		// Read in the reference(s) and initialise mymodel
 		int refdim = (fn_ref == "denovo") ? 3 : 2;
 		mymodel.initialiseFromImages(fn_ref, is_3d_model, mydata,
-				do_average_unaligned, do_generate_seeds, refs_are_ctf_corrected, ref_angpix, do_sgd, (rank==0));
+				do_average_unaligned, do_generate_seeds, refs_are_ctf_corrected, ref_angpix, do_sgd, do_trust_ref_size, (rank==0));
 
 	}
 
@@ -3181,6 +3205,8 @@ void MlOptimiser::expectationSetupCheckMemory(int myverb)
 		for (int oversampling = 0; oversampling <= adaptive_oversampling; oversampling++)
 		{
 			std::cout << " Oversampling= " << oversampling << " NrHiddenVariableSamplingPoints= " << mymodel.nr_classes * sampling.NrSamplingPoints(oversampling, &pointer_dir_nonzeroprior, &pointer_psi_nonzeroprior) << std::endl;
+			if (sampling.fn_sym_relax != "")
+				std::cout<<"Relaxing symmetry to "<<sampling.fn_sym_relax<<std::endl;
 			int nr_orient = (do_only_sample_tilt) ? sampling.NrDirections(oversampling, &pointer_dir_nonzeroprior) : sampling.NrDirections(oversampling, &pointer_dir_nonzeroprior) * sampling.NrPsiSamplings(oversampling, &pointer_psi_nonzeroprior);
 			if (do_skip_rotate || do_skip_align)
 				nr_orient = 1;
@@ -5653,10 +5679,13 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 			// Apply the CTF to this reference projection
 			if (do_ctf_correction)
 			{
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fsum_obody)
-				{
-					DIRECT_MULTIDIM_ELEM(Fsum_obody, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
-				}
+
+				if (mydata.obsModel.getCtfPremultiplied(optics_group))
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fsum_obody)
+						DIRECT_MULTIDIM_ELEM(Fsum_obody, n) *= (DIRECT_MULTIDIM_ELEM(Fctf, n) * DIRECT_MULTIDIM_ELEM(Fctf, n));
+				else
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fsum_obody)
+						DIRECT_MULTIDIM_ELEM(Fsum_obody, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 
 				// Also do phase modulation, for beam tilt correction and other asymmetric aberrations
 				mydata.obsModel.demodulatePhase(optics_group, Fsum_obody, true); // true means do_modulate_instead
