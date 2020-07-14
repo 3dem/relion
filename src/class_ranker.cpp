@@ -1,4 +1,4 @@
-/***************************************************************************
+ /***************************************************************************
  *
  * Author: "Liyi Dong and Sjors H.W. Scheres"
  * MRC Laboratory of Molecular Biology
@@ -391,6 +391,7 @@ void ClassRanker::read(int argc, char **argv, int rank)
 	do_select = parser.checkOption("--auto_select", "Perform auto-selection of particles based on below thresholds for the score");
 	select_min_score = textToFloat(parser.getOption("--min_score", "Minimum selected score to be included in class selection", "0.5"));
 	select_max_score = textToFloat(parser.getOption("--max_score", "Maximum selected score to be included in class selection", "999."));
+	relative_select_threshold = textToFloat(parser.getOption("--relative_select_threshold", "Class selection threshold relative to the highest score obtained within the dataset.", "0.6"));
 
 	int part_section = parser.addSection("Network training options (only used in development!)");
 	do_ranking  = !parser.checkOption("--train", "Only write output files for training purposes (don't rank classes)");
@@ -1392,6 +1393,37 @@ void ClassRanker::correctCtfUntilFirstPeak(MultidimArray<RFLOAT> &in, CTF ctf)
     transformer.inverseFourierTransform(Faux, in);
 }
 
+// Data local normalisation (wrote into a separate function as not sure if this can be done in a nicer way...)
+void ClassRanker::localNormalisation(std::vector<classFeatures> &cf_all)
+{
+	// protein_sum
+	RFLOAT ps_sum = 0.0, ps_mean = 0.0, ps_stddev = 0.0;
+	for (int i = 0; i < cf_all.size(); i++) ps_sum += cf_all[i].selected_features.protein_sum;
+	ps_mean = ps_sum / cf_all.size();
+	for (int i = 0; i < cf_all.size(); i++) ps_stddev += pow((cf_all[i].selected_features.protein_sum - ps_mean), 2);
+	ps_stddev = sqrt(ps_stddev / cf_all.size());
+	for (int i = 0; i < cf_all.size(); i++) cf_all[i].selected_features.protein_sum = (cf_all[i].selected_features.protein_sum - ps_mean) / ps_stddev;
+
+	// solvent_sum
+	RFLOAT ss_sum = 0.0, ss_mean = 0.0, ss_stddev = 0.0;
+	for (int i = 0; i < cf_all.size(); i++) ss_sum += cf_all[i].selected_features.solvent_sum;
+	ss_mean = ss_sum / cf_all.size();
+	for (int i = 0; i < cf_all.size(); i++) ss_stddev += pow((cf_all[i].selected_features.solvent_sum - ss_mean), 2);
+	ss_stddev = sqrt(ss_stddev / cf_all.size());
+	for (int i = 0; i < cf_all.size(); i++) cf_all[i].selected_features.solvent_sum = (cf_all[i].selected_features.solvent_sum - ss_mean) / ss_stddev;
+
+	// relative_signal_intensity
+	RFLOAT sum = 0.0, mean = 0.0, stddev = 0.0;
+	for (int i = 0; i < cf_all.size(); i++) sum += cf_all[i].selected_features.relative_signal_intensity;
+	mean = sum / cf_all.size();
+	for (int i = 0; i < cf_all.size(); i++) stddev += pow((cf_all[i].selected_features.relative_signal_intensity - mean), 2);
+	stddev = sqrt(stddev / cf_all.size());
+	for (int i = 0; i < cf_all.size(); i++) cf_all[i].selected_features.relative_signal_intensity = (cf_all[i].selected_features.relative_signal_intensity - mean) / stddev;
+
+
+
+}
+
 /** ======================================================== Collecting All Features ========================================================= */
 
 // Get features for non-empty classes
@@ -1465,7 +1497,7 @@ void ClassRanker::getFeatures()
 			}
 			else
 			{
-				// Get class accuracy rotation and translation from model.star if present
+				// Calculate globally normalised class accuracy rotation and translation from model.star if present
 				features_this_class.accuracy_rotation = mymodel.acc_rot[iclass];
 				features_this_class.accuracy_translation = mymodel.acc_trans[iclass];
 				if (debug>0) std::cerr << " mymodel.acc_rot[iclass]= " << mymodel.acc_rot[iclass] << " mymodel.acc_trans[iclass]= " << mymodel.acc_trans[iclass] << std::endl;
@@ -1487,6 +1519,7 @@ void ClassRanker::getFeatures()
 			circular_mask_radius = particle_diameter / (uniform_angpix * 2.);
 			circular_mask_radius = std::min( (XSIZE(img())/2.) , circular_mask_radius);
 			if (radius_ratio > 0 && radius <= 0) radius = radius_ratio * circular_mask_radius;
+			// Calculate moments in ring area
 			if (radius > 0)
 			{
 				features_this_class.ring_moments = calculateMoments(img(), radius, circular_mask_radius);
@@ -1501,7 +1534,7 @@ void ClassRanker::getFeatures()
 			lpf.computeStats(features_this_class.lowpass_filtered_img_avg, features_this_class.lowpass_filtered_img_stddev,
 					features_this_class.lowpass_filtered_img_minval, features_this_class.lowpass_filtered_img_maxval);
 
-			// Make filtered masks
+		 	// Make filtered masks
 //			MultidimArray<RFLOAT> lpf;
 			MultidimArray<int> p_mask, s_mask;
 			long protein_area=0, solvent_area=0;
@@ -1509,8 +1542,6 @@ void ClassRanker::getFeatures()
 			// Protein and solvent area
 			if (protein_area > 1) features_this_class.protein_area = 1;
 			if (solvent_area > 0.08*3.14*circular_mask_radius*circular_mask_radius) features_this_class.solvent_area = 1;
-			// Debug
-//			std::cerr << "class " << features_this_class.class_index << " protein area: " << protein_area << std::endl;
 			if (do_save_masks) saveMasks(img, lpf, p_mask, s_mask, features_this_class);
 
 			// Circumference to area ratio
@@ -1570,8 +1601,36 @@ void ClassRanker::getFeatures()
 //			std::cout << "protein_area: " << features_this_class.protein_area << std::endl;
 //			std::cout << "solvent_area: " << features_this_class.solvent_area << std::endl;
 
+			// Collect selected features and apply global normalisation to part of them
+			features_this_class.selected_features.accuracy_rotation = (features_this_class.accuracy_rotation - global_mean[0]) / global_stddev[0];
+			features_this_class.selected_features.accuracy_translation = (features_this_class.accuracy_translation - global_mean[1]) / global_stddev[1];
+			features_this_class.selected_features.weighted_resolution = (features_this_class.weighted_resolution - global_mean[2]) / global_stddev[2];
+			features_this_class.selected_features.relative_resolution = (features_this_class.relative_resolution - global_mean[3]) / global_stddev[3];
+			features_this_class.selected_features.ring_mean = (features_this_class.ring_moments.mean - global_mean[4]) / global_stddev[4];
+			features_this_class.selected_features.ring_stddev = (features_this_class.ring_moments.stddev - global_mean[5]) / global_stddev[5];
+			features_this_class.selected_features.protein_stddev = (features_this_class.protein_moments.stddev - global_mean[6]) / global_stddev[6];
+			features_this_class.selected_features.solvent_mean = (features_this_class.solvent_moments.mean - global_mean[7]) / global_stddev[7];
+			features_this_class.selected_features.solvent_stddev = (features_this_class.solvent_moments.stddev - global_mean[8]) / global_stddev[8];
+			features_this_class.selected_features.scattered_signal = (features_this_class.scattered_signal - global_mean[9]) / global_stddev[9];
+			features_this_class.selected_features.edge_signal = (features_this_class.edge_signal - global_mean[10]) / global_stddev[10];
+			features_this_class.selected_features.lowpass_filtered_img_avg = (features_this_class.lowpass_filtered_img_avg - global_mean[11]) / global_stddev[11];
+			features_this_class.selected_features.lowpass_filtered_img_stddev = (features_this_class.lowpass_filtered_img_stddev - global_mean[12]) / global_stddev[12];
+			features_this_class.selected_features.lowpass_filtered_img_minval = (features_this_class.lowpass_filtered_img_minval - global_mean[13]) / global_stddev[13];
+			features_this_class.selected_features.lowpass_filtered_img_maxval = (features_this_class.lowpass_filtered_img_maxval - global_mean[14]) / global_stddev[14];
+			features_this_class.selected_features.granulo0 = (features_this_class.granulo[0] - global_mean[15]) / global_stddev[15];
+			features_this_class.selected_features.granulo1 = (features_this_class.granulo[1] - global_mean[16]) / global_stddev[16];
+			features_this_class.selected_features.granulo2 = (features_this_class.granulo[2] - global_mean[17]) / global_stddev[17];
+			features_this_class.selected_features.granulo3 = (features_this_class.granulo[3] - global_mean[18]) / global_stddev[18];
+			features_this_class.selected_features.granulo4 = (features_this_class.granulo[4] - global_mean[19]) / global_stddev[19];
+			features_this_class.selected_features.granulo5 = (features_this_class.granulo[5] - global_mean[20]) / global_stddev[20];
+			features_this_class.selected_features.protein_sum = features_this_class.protein_moments.sum;
+			features_this_class.selected_features.solvent_sum = features_this_class.solvent_moments.sum;
+			features_this_class.selected_features.relative_signal_intensity = features_this_class.relative_signal_intensity;
+
+
 			// Push back the features of this class in the vector for all classes
 			features_all_classes.push_back(features_this_class);
+
 			ith_nonzero_class++;
 
 			if (verb > 0)
@@ -1580,6 +1639,9 @@ void ClassRanker::getFeatures()
 		} // end if non-zero class
 
 	} // end iterating all classes
+
+	// Apply local normalisation for the last three features
+	ClassRanker::localNormalisation(features_all_classes);
 
 	if (!do_ranking)
 	{
@@ -1688,6 +1750,154 @@ void ClassRanker::readFeatures()
 }
 
 
+float ClassRanker::deployTorchModel(FileName &model_path, std::vector<float> &features) {
+
+#ifdef _TORCH_ENABLED
+	torch::jit::script::Module module;
+
+	// Deserialize model
+	try {
+		module = torch::jit::load(model_path);
+	}
+	catch (const c10::Error& e) {
+		REPORT_ERROR("Error loading Torch model.");
+	}
+
+	// Create an inputs with batch size=1.
+	std::vector<torch::jit::IValue> inputs;
+	inputs.push_back(features);
+
+	// Execute the model and turn its output into a tensor.
+	at::Tensor output = module.forward(inputs).toTensor();
+
+	// Extract score value from tensor and return
+	return output[0][0].item<float>();
+
+#else //_TORCH_ENABLED
+	REPORT_ERROR("RELION was not compiled with Torch support.\nConfigure with -DTORCH=ON and re-compile.");
+#endif //_TORCH_ENABLED
+}
+
+void ClassRanker::performRanking()
+{
+//	std::cout << " TODO: implement execution of neural network ranking here, and fill result into features_all_classes[i].class_score!" << std::endl;
+//	std::cout << " TODO: implement execution of neural network ranking here, and fill result into features_all_classes[i].class_score!" << std::endl;
+//	std::cout << " TODO: implement execution of neural network ranking here, and fill result into features_all_classes[i].class_score!" << std::endl;
+
+
+
+
+	// Initialise all scores to -999 (including empty classes!
+	std::vector<RFLOAT> predicted_scores(mymodel.nr_classes, -999.);
+
+	// to preserve original particle order in the data.star file
+	if (do_select)
+	{
+		// Store original image order
+		long int nr_parts = mydata.MDimg.numberOfObjects();
+		for (long int j = 0; j < nr_parts; j++)
+		{
+			mydata.MDimg.setValue(EMDL_SORTED_IDX, j, j);
+		}
+	}
+
+
+	MetaDataTable MDselected_particles, MDselected_classavgs;
+
+	long int nr_sel_parts = 0;
+	long int nr_sel_classavgs = 0;
+	RFLOAT highscore = 0.0;
+	std::vector<int> selected_classes;
+	for (int i = 0; i < features_all_classes.size(); i++)
+	{
+		std::vector<float> feature_vector = features_all_classes[i].toVector();
+		RFLOAT myscore = (RFLOAT) deployTorchModel(fn_torch_model, feature_vector);
+		if (highscore < myscore) highscore = myscore;
+
+		// Set myscore in the vector that now runs over ALL classes (including empty ones)
+		int iclass = features_all_classes[i].class_index - 1; // class counting in STAR files starts at 1!
+		predicted_scores.at(iclass) = myscore;
+
+	}
+
+	for (int i = 0; i < features_all_classes.size(); i++)
+	{
+		if (do_select && predicted_scores[i] >= select_min_score && predicted_scores[i] <= select_max_score && predicted_scores[i] >= relative_select_threshold*highscore)
+		{
+			nr_sel_classavgs++;
+			selected_classes.push_back(features_all_classes[i].class_index);
+
+			MDselected_classavgs.addObject();
+			MDselected_classavgs.setValue(EMDL_MLMODEL_REF_IMAGE, features_all_classes[i].name);
+			MDselected_classavgs.setValue(EMDL_CLASS_FEAT_CLASS_SCORE, predicted_scores[i]);
+			MDselected_classavgs.setValue(EMDL_MLMODEL_PDF_CLASS, features_all_classes[i].class_distribution);
+			MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_ROT, features_all_classes[i].accuracy_rotation);
+			MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, features_all_classes[i].accuracy_translation);
+			MDselected_classavgs.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, features_all_classes[i].estimated_resolution);
+		}
+
+	}
+
+
+
+	// Write optimiser.star and model.star in the output directory.
+	FileName fn_opt_out, fn_model_out;
+	fn_opt_out = fn_out + fn_optimiser.afterLastOf("/");
+	fn_model_out = fn_out + fn_model.afterLastOf("/");
+	MD_optimiser.setValue(EMDL_OPTIMISER_MODEL_STARFILE, fn_model_out);
+	MD_optimiser.write(fn_opt_out);
+
+	MetaDataTable MDclass;
+	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+	{
+		MDclass.addObject();
+		MDclass.setValue(EMDL_MLMODEL_REF_IMAGE, mymodel.ref_names[iclass]);
+		MDclass.setValue(EMDL_CLASS_FEAT_CLASS_SCORE, predicted_scores[iclass]);
+		MDclass.setValue(EMDL_MLMODEL_PDF_CLASS, mymodel.pdf_class[iclass]);
+		MDclass.setValue(EMDL_MLMODEL_ACCURACY_ROT, mymodel.acc_rot[iclass]);
+		MDclass.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, mymodel.acc_trans[iclass]);
+		MDclass.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, mymodel.estimated_resolution[iclass]);
+		MDclass.setValue(EMDL_MLMODEL_FOURIER_COVERAGE_TOTAL_REF, mymodel.total_fourier_coverage[iclass]);
+		if (mymodel.ref_dim==2)
+		{
+			MDclass.setValue(EMDL_MLMODEL_PRIOR_OFFX_CLASS, XX(mymodel.prior_offset_class[iclass]));
+			MDclass.setValue(EMDL_MLMODEL_PRIOR_OFFY_CLASS, YY(mymodel.prior_offset_class[iclass]));
+		}
+	}
+	MDclass.write(fn_model_out);
+
+	if (do_select)
+	{
+
+		// Select all particles in the data.star that have classes inside the selected_classes vector
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(mydata.MDimg)
+		{
+			int classnr;
+			mydata.MDimg.getValue(EMDL_PARTICLE_CLASS, classnr);
+			if (std::find(selected_classes.begin(), selected_classes.end(), classnr) != selected_classes.end())
+			{
+				MDselected_particles.addObject(mydata.MDimg.getObject());
+				nr_sel_parts++;
+			}
+		}
+		// Maintain the original image ordering and obsModel in mydata too
+		MDselected_particles.sort(EMDL_SORTED_IDX);
+		mydata.MDimg = MDselected_particles;
+		mydata.write(fn_out+fn_sel_parts);
+
+		// Also write out class_averages.star with the selected classes
+		MDselected_classavgs.write(fn_out+fn_sel_classavgs);
+
+		if (verb > 0)
+		{
+			std::cout << " Written " << nr_sel_parts << " selected particles to: " << fn_out << fn_sel_parts << std::endl;
+			std::cout << " Written " << nr_sel_classavgs << " selected classes to: " << fn_out << fn_sel_classavgs << std::endl;
+		}
+
+	}
+}
+
+
 // Generate star file: write feature value of each of the features for all classes in the job out in the format of a star file
 void ClassRanker::writeFeatures()
 {
@@ -1696,17 +1906,19 @@ void ClassRanker::writeFeatures()
 	for (int i=0; i<features_all_classes.size();i++)
 	{
         // First calculate class scores if this is for training purpose (as the calculation depends on minRes, which can only be obtained at the end of the loop of getFeatures())
-//		if (!do_ranking)
+		if (!do_ranking)
         {
-        	// for training: get a target clasd score from the jobscore and the resolution
-    		// First calculate class score based on best resolution among red classes of the job, job score, estimated resolution, and selection label
-        	// for ranking, this will later be overwritten
+        	// for training: get a target class score from the jobscore and the resolution
+    		// First calculate class score based on best resolution among red classes of the job, job score, estimated resolution, and the selection label
         	features_all_classes[i].class_score = getClassScoreFromJobScore(features_all_classes[i], minRes);
         }
 
         MD_class_features.addObject();
 		MD_class_features.setValue(EMDL_MLMODEL_REF_IMAGE, features_all_classes[i].name);
-		MD_class_features.setValue(EMDL_CLASS_FEAT_CLASS_SCORE, features_all_classes[i].class_score);
+		if (!do_ranking)
+		{
+			MD_class_features.setValue(EMDL_CLASS_FEAT_CLASS_SCORE, features_all_classes[i].class_score);
+		}
 		MD_class_features.setValue(EMDL_CLASS_FEAT_IS_SELECTED,features_all_classes[i].is_selected);
 		MD_class_features.setValue(EMDL_CLASS_FEAT_CLASS_INDEX, features_all_classes[i].class_index);
 		MD_class_features.setValue(EMDL_MLMODEL_PDF_CLASS, features_all_classes[i].class_distribution);
@@ -1775,140 +1987,4 @@ void ClassRanker::writeFeatures()
 	MD_class_features.write(fn_out+fn_features);
 	if (verb > 0) std::cout << " Written features to star file: " << fn_out << fn_features << std::endl;
 
-}
-
-float ClassRanker::deployTorchModel(FileName &model_path, std::vector<float> &features) {
-
-#ifdef _TORCH_ENABLED
-	torch::jit::script::Module module;
-
-	// Deserialize model
-	try {
-		module = torch::jit::load(model_path);
-	}
-	catch (const c10::Error& e) {
-		REPORT_ERROR("Error loading Torch model.");
-	}
-
-	// Create an inputs with batch size=1.
-	std::vector<torch::jit::IValue> inputs;
-	inputs.push_back(features);
-
-	// Execute the model and turn its output into a tensor.
-	at::Tensor output = module.forward(inputs).toTensor();
-
-	// Extract score value from tensor and return
-	return output[0][0].item<float>();
-
-#else //_TORCH_ENABLED
-	REPORT_ERROR("RELION was not compiled with Torch support.\nConfigure with -DTORCH=ON and re-compile.");
-#endif //_TORCH_ENABLED
-}
-
-void ClassRanker::performRanking()
-{
-	std::cout << " TODO: implement execution of neural network ranking here, and fill result into features_all_classes[i].class_score!" << std::endl;
-	std::cout << " TODO: implement execution of neural network ranking here, and fill result into features_all_classes[i].class_score!" << std::endl;
-	std::cout << " TODO: implement execution of neural network ranking here, and fill result into features_all_classes[i].class_score!" << std::endl;
-
-	// Initialise all scores to -999 (including empty classes!
-	std::vector<RFLOAT> predicted_scores(mymodel.nr_classes, -999.);
-
-	// to preserve original particle order in the data.star file
-	if (do_select)
-	{
-		// Store original image order
-		long int nr_parts = mydata.MDimg.numberOfObjects();
-		for (long int j = 0; j < nr_parts; j++)
-		{
-			mydata.MDimg.setValue(EMDL_SORTED_IDX, j, j);
-		}
-	}
-
-
-	MetaDataTable MDselected_particles, MDselected_classavgs;
-
-	long int nr_sel_parts = 0;
-	long int nr_sel_classavgs = 0;
-	std::vector<int> selected_classes;
-	for (int i = 0; i < features_all_classes.size(); i++)
-	{
-		std::vector<float> feature_vector = features_all_classes[i].toVector();
-		RFLOAT myscore = (RFLOAT) deployTorchModel(fn_torch_model, feature_vector);
-
-		if (do_select && myscore >= select_min_score && myscore <= select_max_score)
-		{
-			nr_sel_classavgs++;
-			selected_classes.push_back(features_all_classes[i].class_index);
-
-			MDselected_classavgs.addObject();
-			MDselected_classavgs.setValue(EMDL_MLMODEL_REF_IMAGE, features_all_classes[i].name);
-			MDselected_classavgs.setValue(EMDL_CLASS_FEAT_CLASS_SCORE, myscore);
-			MDselected_classavgs.setValue(EMDL_MLMODEL_PDF_CLASS, features_all_classes[i].class_distribution);
-			MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_ROT, features_all_classes[i].accuracy_rotation);
-			MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, features_all_classes[i].accuracy_translation);
-			MDselected_classavgs.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, features_all_classes[i].estimated_resolution);
-		}
-
-		// Set myscore in the vector that now runs over ALL classes (including empty ones)
-		int iclass = features_all_classes[i].class_index - 1; // class counting in STAR files starts at 1!
-		predicted_scores.at(iclass) = myscore;
-
-	}
-
-	// Write optimiser.star and model.star in the output directory.
-	FileName fn_opt_out, fn_model_out;
-	fn_opt_out = fn_out + fn_optimiser.afterLastOf("/");
-	fn_model_out = fn_out + fn_model.afterLastOf("/");
-	MD_optimiser.setValue(EMDL_OPTIMISER_MODEL_STARFILE, fn_model_out);
-	MD_optimiser.write(fn_opt_out);
-
-	MetaDataTable MDclass;
-	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
-	{
-		MDclass.addObject();
-		MDclass.setValue(EMDL_MLMODEL_REF_IMAGE, mymodel.ref_names[iclass]);
-		MDclass.setValue(EMDL_CLASS_FEAT_CLASS_SCORE, predicted_scores[iclass]);
-		MDclass.setValue(EMDL_MLMODEL_PDF_CLASS, mymodel.pdf_class[iclass]);
-		MDclass.setValue(EMDL_MLMODEL_ACCURACY_ROT, mymodel.acc_rot[iclass]);
-		MDclass.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, mymodel.acc_trans[iclass]);
-		MDclass.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, mymodel.estimated_resolution[iclass]);
-		MDclass.setValue(EMDL_MLMODEL_FOURIER_COVERAGE_TOTAL_REF, mymodel.total_fourier_coverage[iclass]);
-		if (mymodel.ref_dim==2)
-		{
-			MDclass.setValue(EMDL_MLMODEL_PRIOR_OFFX_CLASS, XX(mymodel.prior_offset_class[iclass]));
-			MDclass.setValue(EMDL_MLMODEL_PRIOR_OFFY_CLASS, YY(mymodel.prior_offset_class[iclass]));
-		}
-	}
-	MDclass.write(fn_model_out);
-
-	if (do_select)
-	{
-
-		// Select all particles in the data.star that have classes inside the selected_classes vector
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(mydata.MDimg)
-		{
-			int classnr;
-			mydata.MDimg.getValue(EMDL_PARTICLE_CLASS, classnr);
-			if (std::find(selected_classes.begin(), selected_classes.end(), classnr) != selected_classes.end())
-			{
-				MDselected_particles.addObject(mydata.MDimg.getObject());
-				nr_sel_parts++;
-			}
-		}
-		// Maintain the original image ordering and obsModel in mydata too
-		MDselected_particles.sort(EMDL_SORTED_IDX);
-		mydata.MDimg = MDselected_particles;
-		mydata.write(fn_out+fn_sel_parts);
-
-		// Also write out class_averages.star with the selected classes
-		MDselected_classavgs.write(fn_out+fn_sel_classavgs);
-
-		if (verb > 0)
-		{
-			std::cout << " Written " << nr_sel_parts << " selected particles to: " << fn_out << fn_sel_parts << std::endl;
-			std::cout << " Written " << nr_sel_classavgs << " selected classes to: " << fn_out << fn_sel_classavgs << std::endl;
-		}
-
-	}
 }
