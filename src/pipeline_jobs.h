@@ -149,11 +149,11 @@ static bool do_allow_change_minimum_dedicated;
 #define NODE_REFS       	5 // A STAR file with one or multiple references, e.g. autopick_references.star
 #define NODE_3DREF       	6 // A single 3D-reference, e.g. map.mrc
 #define NODE_MASK			7 // 3D mask, e.g. mask.mrc or masks.star
-// SHWS 28nov2019: NODE_MODEL should disappear now, only here for backwards compatbility
+// SHWS 28nov2019: NODE_MODEL should disappear now, only here for backwards compatibility
 #define NODE_MODEL		    8 // A model STAR-file for class selection
 #define NODE_OPTIMISER		9 // An optimiser STAR-file for job continuation
 #define NODE_HALFMAP		10// Unfiltered half-maps from 3D auto-refine, e.g. run1_half?_class001_unfil.mrc
-// SHWS 28nov2019: NODE_FINALMAP should disappear now, only here for backwards compatbility
+// SHWS 28nov2019: NODE_FINALMAP should disappear now, only here for backwards compatibility
 #define NODE_FINALMAP		11// Sharpened final map from post-processing (cannot be used as input)
 #define NODE_RESMAP			12// Resmap with local resolution (cannot be used as input)
 #define NODE_PDF_LOGFILE    13// PDF logfile
