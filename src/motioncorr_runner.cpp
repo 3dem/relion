@@ -1053,11 +1053,10 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	// Read gain reference
 	RCTIC(TIMING_READ_GAIN);
 	if (fn_gain_reference != "") {
-		Igain.read(fn_gain_reference);
-
-		// TODO: recycle! (should be done in the same way as rotation)
 		if (isEER)
-			EERRenderer::upsampleEERGain(Igain(), eer_upsampling);
+			 EERRenderer::loadEERGain(fn_gain_reference, Igain(), eer_upsampling);
+		else
+			Igain.read(fn_gain_reference);
 
 		if (XSIZE(Igain()) != nx || YSIZE(Igain()) != ny) {
 			std::cerr << "fn_mic: " << fn_mic << " nx = " << nx << " ny = " << ny << " gain nx = " << XSIZE(Igain()) << " gain ny = " << YSIZE(Igain()) <<  std::endl;
@@ -1136,11 +1135,16 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 		// TODO: This should be done earlier and merged with badmap
 		if (isEER && fn_gain_reference != "")
 		{
+			int n_bad_eer = 0;
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Igain())
 			{
 				if (DIRECT_MULTIDIM_ELEM(Igain(), n) == 0) // || DIRECT_MULTIDIM_ELEM(Igain(), n) > 2.0)
+				{
+//					n_bad_eer++;
 					DIRECT_MULTIDIM_ELEM(bBad, n) = true;
+				}
 			}
+//			std::cout << "n_bad_eer = " << n_bad_eer << std::endl;
 		}
 
 		int n_bad = 0;
@@ -1186,15 +1190,17 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 						val += DIRECT_A2D_ELEM(Iframes[iframe](), y, x);
 					}
 				}
-//				std::cout << "n_ok = " << n_ok << " val = " << val << std::endl;
+//				std::cout << "n_ok = " << n_ok << " val = " << val;
 				if (n_ok > NUM_MIN_OK) DIRECT_A2D_ELEM(Iframes[iframe](), i, j) = val / n_ok;
 				else DIRECT_A2D_ELEM(Iframes[iframe](), i, j) = rnd_gaus(frame_mean, frame_std);
+//				std::cout << " set = " << DIRECT_A2D_ELEM(Iframes[iframe](), i, j) << std::endl;
 			}
 		}
 		RCTOC(TIMING_FIX_DEFECT);
 		logfile << "Fixed hot pixels." << std::endl;
 	} // !skip_defect
 
+//#define WRITE_FRAMES
 #ifdef WRITE_FRAMES
 	// Debug output
 	for (int iframe = 0; iframe < n_frames; iframe++)

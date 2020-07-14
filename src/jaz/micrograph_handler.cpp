@@ -444,15 +444,17 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 		{
 			if (gainFn != last_gainFn)
 			{
-				lastGainRef.read(gainFn);
+				last_gainFn = gainFn;
+
 				if (isEER) // TODO: Takanori: Remove this once we updated RelionCor
 				{
 					if (eer_upsampling < 0)
 						eer_upsampling = micrograph.getEERUpsampling();
-					EERRenderer::upsampleEERGain(lastGainRef(), eer_upsampling);
+					EERRenderer::loadEERGain(gainFn, lastGainRef(), eer_upsampling);
 				}
+				else
+					lastGainRef.read(gainFn);
 
-				last_gainFn = gainFn;
 			}
 
 			mgHasGain = true;

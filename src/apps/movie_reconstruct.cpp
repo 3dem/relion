@@ -290,11 +290,11 @@ void MovieReconstructor::backproject(int rank, int size)
 		FileName fn_gain = mic.getGainFilename();
 		if (fn_gain != prev_gain)
 		{
-			Igain.read(fn_gain);
-			prev_gain = fn_gain;
-
 			if (isEER)
-				EERRenderer::upsampleEERGain(Igain(), eer_upsampling);
+				EERRenderer::loadEERGain(fn_gain, Igain(), eer_upsampling);
+			else
+				Igain.read(fn_gain);
+			prev_gain = fn_gain;
 		}
 
 		// Read trajectories. Both particle ID and frame ID are 0-indexed in this array.

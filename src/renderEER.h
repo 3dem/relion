@@ -93,53 +93,70 @@ class EERRenderer {
 	// The gain reference for EER is not multiplicative! So the inverse is taken here.
 	// 0 means defect.
 	template <typename T>
-	static void upsampleEERGain(MultidimArray<T> &gain, int eer_upsampling=2)
+	static void loadEERGain(FileName fn_gain, MultidimArray<T> &gain, int eer_upsampling)
 	{
-		const long long size = EER_IMAGE_WIDTH * eer_upsampling;
-		double sum = 0;
+		const bool is_multiplicative = (fn_gain.getExtension() == "gain");
+		if (is_multiplicative)
+			fn_gain += ":tif";
 
-		if (eer_upsampling == 2 && XSIZE(gain) == EER_IMAGE_WIDTH && YSIZE(gain) == EER_IMAGE_HEIGHT) // gain = 4K and grid = 8K
+		Image<T> original;
+		original.read(fn_gain, true, 0, false, true); // explicitly use the first page
+		const int nx_in = XSIZE(original());
+		const int ny_in = YSIZE(original());
+		const long long size_out = EER_IMAGE_WIDTH * eer_upsampling;
+
+		// Revert Y flip in TIFF reader
+		if (is_multiplicative)
 		{
-			MultidimArray<T> original = gain;
+			const int ylim = ny_in / 2;
+			for (int y1 = 0; y1 < ylim; y1++)
+			{
+				const int y2 = ny_in - 1 - y1;
+				for (int x = 0; x < nx_in; x++)
+				{
+					const T tmp = DIRECT_A2D_ELEM(original(), y1, x);
+					DIRECT_A2D_ELEM(original(), y1, x) = DIRECT_A2D_ELEM(original(), y2, x);
+					DIRECT_A2D_ELEM(original(), y2, x) = tmp;
+				}
+			}
+		} 
 
-			gain.initZeros(size, size);
+		if (eer_upsampling == 2 && nx_in == EER_IMAGE_WIDTH && ny_in == EER_IMAGE_HEIGHT) // gain = 4K and grid = 8K
+		{
+			gain.initZeros(size_out, size_out);
 			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(gain)
-			{
-				DIRECT_A2D_ELEM(gain, i, j) = DIRECT_A2D_ELEM(original, i / 2, j / 2);
-				sum += DIRECT_A2D_ELEM(gain, i, j);
-			}
+				DIRECT_A2D_ELEM(gain, i, j) = DIRECT_A2D_ELEM(original(), i / 2, j / 2);
 		}
-		else if ((eer_upsampling == 1 && XSIZE(gain) == EER_IMAGE_WIDTH && YSIZE(gain) == EER_IMAGE_HEIGHT) || // gain = 4K and grid = 4K
-		         (eer_upsampling == 2 && XSIZE(gain) == EER_IMAGE_WIDTH * 2 && YSIZE(gain) == EER_IMAGE_HEIGHT * 2)) // gain = 8K and grid = 8K
+		else if ((eer_upsampling == 1 && nx_in == EER_IMAGE_WIDTH && ny_in == EER_IMAGE_HEIGHT) || // gain = 4K and grid = 4K
+		         (eer_upsampling == 2 && nx_in == EER_IMAGE_WIDTH * 2 && ny_in == EER_IMAGE_HEIGHT * 2)) // gain = 8K and grid = 8K
 		{
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(gain)
-			{
-				sum += DIRECT_MULTIDIM_ELEM(gain, n);
-			}
+			gain = original();
 		}
-		else if (eer_upsampling == 1 && XSIZE(gain) == EER_IMAGE_WIDTH * 2 && YSIZE(gain) == EER_IMAGE_HEIGHT * 2) // gain = 8K and grid = 4K
+		else if (eer_upsampling == 1 && nx_in == EER_IMAGE_WIDTH * 2 && ny_in == EER_IMAGE_HEIGHT * 2) // gain = 8K and grid = 4K
 		{
-			MultidimArray<T> original = gain;
-
-			gain.initZeros(size, size);
-			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(original)
-			{
-				DIRECT_A2D_ELEM(gain, i / 2, j / 2) += DIRECT_A2D_ELEM(original, i, j);
-				sum += DIRECT_A2D_ELEM(original, i, j);
-			}
+			gain.initZeros(size_out, size_out);
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(original())
+				DIRECT_A2D_ELEM(gain, i / 2, j / 2) += DIRECT_A2D_ELEM(original(), i, j);
 		}
 		else
 		{
-			std::cerr << "Size of input gain: X = " << XSIZE(gain) << " Y = " << YSIZE(gain) << " Expected: X = " << size << " Y = " << size << std::endl;
+			std::cerr << "Size of input gain: X = " << nx_in << " Y = " << ny_in << " Expected: X = " << size_out << " Y = " << size_out << std::endl;
 			REPORT_ERROR("Invalid gain size in EERRenderer::upsampleEERGain()");
 		}
-
-		sum /= size * size;
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(gain)
+		
+		if (is_multiplicative)
 		{
-			if (DIRECT_MULTIDIM_ELEM(gain, n) != 0)
+			double sum = 0;
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(gain)
+				sum += DIRECT_MULTIDIM_ELEM(gain, n);
+			sum /= size_out * size_out;
+
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(gain)
 			{
-				DIRECT_MULTIDIM_ELEM(gain, n) = sum / DIRECT_MULTIDIM_ELEM(gain, n);
+				if (DIRECT_MULTIDIM_ELEM(gain, n) != 0)
+				{
+					DIRECT_MULTIDIM_ELEM(gain, n) = sum / DIRECT_MULTIDIM_ELEM(gain, n);
+				}
 			}
 		}
 	}
