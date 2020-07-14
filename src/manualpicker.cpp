@@ -31,7 +31,7 @@ std::vector<Fl_Text_Display*> text_displays;
 std::vector<Fl_Text_Display*> count_displays;
 std::vector<Fl_Text_Display*> defocus_displays;
 std::vector<Fl_Check_Button*> check_buttons;
-int last_pick_viewed;
+int first_pick_viewed, last_pick_viewed;
 int last_ctf_viewed;
 
 bool   global_has_ctf;
@@ -50,6 +50,7 @@ RFLOAT global_ctfsigma;
 RFLOAT global_blue_value;
 RFLOAT global_red_value;
 int    global_total_count;
+int global_nr_simultaneous;
 FileName global_fn_odir;
 FileName global_pickname;
 FileName global_fn_color;
@@ -62,66 +63,80 @@ void cb_viewmic(Fl_Widget* w, void* data)
 	int *iptr = (int*)data;
 	int imic = *iptr;
 
+	const bool with_control = (Fl::event_ctrl() != 0);
+	int nr_simultaneous = (with_control) ? global_nr_simultaneous : 1;
+
 	// Update the count of the last one we picked...
-	if (last_pick_viewed >= 0 && last_pick_viewed < count_displays.size())
+	for (int mymic = first_pick_viewed; mymic <= last_pick_viewed; mymic++)
 	{
-		MetaDataTable MDcoord;
+		if (mymic >= 0 && mymic < count_displays.size())
+		{
+			MetaDataTable MDcoord;
 
+			FileName fn_pre, fn_jobnr, fn_post;
+			decomposePipelineSymlinkName(global_fn_mics[mymic], fn_pre, fn_jobnr, fn_post);
+			FileName fn_coord = global_fn_odir + fn_post.withoutExtension() + "_" + global_pickname + ".star";
+			int my_nr_picked;
+			if (exists(fn_coord))
+			{
+				MDcoord.read(fn_coord);
+				my_nr_picked = MDcoord.numberOfObjects();
+			}
+			else
+			{
+				my_nr_picked = 0;
+			}
+			Fl_Text_Buffer *textbuff2 = new Fl_Text_Buffer();
+			textbuff2->text(floatToString(my_nr_picked).c_str());
+			count_displays[mymic]->buffer(textbuff2);
+			count_displays[mymic]->redraw();
+			// Also reset the color of the button to light
+			viewmic_buttons[mymic]->color(GUI_BUTTON_COLOR, GUI_BUTTON_COLOR);
+			viewmic_buttons[mymic]->redraw();
+		}
+	}
+
+	// Launch the picking window
+	first_pick_viewed = imic;
+	last_pick_viewed = XMIPP_MIN(global_fn_mics.size() - 1, imic + nr_simultaneous - 1);
+	for (int mymic = first_pick_viewed; mymic <= last_pick_viewed; mymic++)
+	{
 		FileName fn_pre, fn_jobnr, fn_post;
-		decomposePipelineSymlinkName(global_fn_mics[last_pick_viewed], fn_pre, fn_jobnr, fn_post);
+		decomposePipelineSymlinkName(global_fn_mics[mymic], fn_pre, fn_jobnr, fn_post);
 		FileName fn_coord = global_fn_odir + fn_post.withoutExtension() + "_" + global_pickname + ".star";
-		int my_nr_picked;
-		if (exists(fn_coord))
+
+		int rad = ROUND(global_particle_diameter/(2. * global_angpix));
+		std::string command;
+		command =  "relion_display --pick  --i " + global_fn_mics[mymic];
+		command += "  --coords " + fn_coord;
+		command += " --scale " + floatToString(global_micscale);
+		command += " --coord_scale " + floatToString(global_coord_scale);
+		command += " --black "  + floatToString(global_black_val);
+		command += " --white "  + floatToString(global_white_val);
+		command += " --sigma_contrast "  + floatToString(global_sigma_contrast);
+		command += " --particle_radius " + floatToString(rad);
+		command += " --lowpass " + floatToString(global_lowpass);
+		command += " --highpass " + floatToString(global_highpass);
+		command += " --angpix " + floatToString(global_angpix);
+		if (global_pick_startend)
+			command += " --pick_start_end ";
+
+		if (global_color_label != "")
 		{
-			MDcoord.read(fn_coord);
-			my_nr_picked = MDcoord.numberOfObjects();
+			command += " --color_label " + global_color_label;
+			command += " --blue " + floatToString(global_blue_value);
+			command += " --red " + floatToString(global_red_value);
+			if (global_fn_color != "")
+				command += " --color_star " + global_fn_color;
 		}
-		else
-		{
-			my_nr_picked = 0;
-		}
-		Fl_Text_Buffer *textbuff2 = new Fl_Text_Buffer();
-		textbuff2->text(floatToString(my_nr_picked).c_str());
-		count_displays[last_pick_viewed]->buffer(textbuff2);
-		count_displays[last_pick_viewed]->redraw();
+
+		command += " &";
+		int res = system(command.c_str());
 	}
 
-	FileName fn_pre, fn_jobnr, fn_post;
-	decomposePipelineSymlinkName(global_fn_mics[imic], fn_pre, fn_jobnr, fn_post);
-	FileName fn_coord = global_fn_odir + fn_post.withoutExtension() + "_" + global_pickname + ".star";
-
-	int rad = ROUND(global_particle_diameter/(2. * global_angpix));
-	std::string command;
-	command =  "relion_display --pick  --i " + global_fn_mics[imic];
-	command += "  --coords " + fn_coord;
-	command += " --scale " + floatToString(global_micscale);
-	command += " --coord_scale " + floatToString(global_coord_scale);
-	command += " --black "  + floatToString(global_black_val);
-	command += " --white "  + floatToString(global_white_val);
-	command += " --sigma_contrast "  + floatToString(global_sigma_contrast);
-	command += " --particle_radius " + floatToString(rad);
-	command += " --lowpass " + floatToString(global_lowpass);
-	command += " --highpass " + floatToString(global_highpass);
-	command += " --angpix " + floatToString(global_angpix);
-	if (global_pick_startend)
-		command += " --pick_start_end ";
-
-	if (global_color_label != "")
-	{
-		command += " --color_label " + global_color_label;
-		command += " --blue " + floatToString(global_blue_value);
-		command += " --red " + floatToString(global_red_value);
-		if (global_fn_color != "")
-			command += " --color_star " + global_fn_color;
-	}
-
-	command += " &";
-	int res = system(command.c_str());
-
-	last_pick_viewed = imic;
 	for (int i = 0; i < viewmic_buttons.size(); i++)
 	{
-		if (i == last_pick_viewed)
+		if (i >= first_pick_viewed && i <= last_pick_viewed)
 		{
 			viewmic_buttons[i]->color(GUI_BUTTON_DARK_COLOR, GUI_BUTTON_DARK_COLOR);
 		}
@@ -129,6 +144,8 @@ void cb_viewmic(Fl_Widget* w, void* data)
 		{
 			viewmic_buttons[i]->color(GUI_BUTTON_COLOR, GUI_BUTTON_COLOR);
 		}
+		viewmic_buttons[i]->redraw();
+
 	}
 }
 
@@ -539,6 +556,7 @@ void ManualPicker::read(int argc, char **argv)
 	global_pick_startend = parser.checkOption("--pick_start_end", "Pick start-end coordinates of helices");
 	do_allow_save = parser.checkOption("--allow_save", "Allow saving of the selected micrographs");
 	do_fast_save = parser.checkOption("--fast_save", "Save a default selection of all micrographs immediately");
+	global_nr_simultaneous = textToInteger(parser.getOption("--open_simultaneous", "Open this many of the next micrographs simultaneously when pressing CTRL and a Pick button", "10"));
 
 	int mic_section = parser.addSection("Displaying options");
 	global_micscale = textToFloat(parser.getOption("--scale", "Relative scale for the micrograph display", "1"));

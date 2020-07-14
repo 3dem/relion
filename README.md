@@ -1,5 +1,5 @@
-RELION 3.1 beta
-===============
+RELION 3.1.0
+=============
 
 RELION (for REgularised LIkelihood OptimisatioN) is a stand-alone computer
 program for Maximum A Posteriori refinement of (multiple) 3D reconstructions
@@ -25,7 +25,7 @@ sudo apt install cmake git build-essential mpi-default-bin mpi-default-dev libff
 On other systems it is typically just as easy, you simply have to modify "apt" to
 the appropriate package manager (e.g. yum).
 
-Once git and cmake are installed, relion can be easily installed through
+Once git and cmake are installed, relion can be easily installed through:
 
 ```
 git clone https://github.com/3dem/relion.git
@@ -33,20 +33,22 @@ cd relion
 git checkout ver3.1
 mkdir build
 cd build
-cmake -DCMAKE_INSTALL_PREFIX=/where/to/install/ ..
-make -j4
-make install
+cmake ..
+make
 ```
 
-Instead of running "make install" to copy binaries into somewhere else, you may 
-directly use programs compiled in "build/bin". In any case, you have to make sure
-your PATH environmental variable points to the directory containing relion binaries.
-Launching RELION as "/path/to/relion" is NOT a right way; this starts the right
-GUI, but the GUI might invoke other versions of RELION in the PATH.
+The binaries will be produced in the `build/bin` directory. If you want to copy binaries
+into somewhere else, run `cmake` with `-DCMAKE_INSTALL_PREFIX=/where/to/install/` and
+perform `make install` as the final step. Do not specify the build directory itself
+as `CMAKE_INSTALL_PREFIX`! This will not work.
 
-These steps will download the source-code, create a build-directory,
-then configure and build relion, and lastly install it to be generally
-available on the system.
+Also note that the MPI library used for compilation must be the one you intend to use RELION with.
+Compiling RELION with one version of MPI and running the resulting binary with mpirun from another
+version can cause crash. See our wiki below for details.
+
+In any case, you have to make sure your PATH environmental variable points to the directory
+containing relion binaries. Launching RELION as `/path/to/relion` is NOT a right way; this
+starts the right GUI, but the GUI might invoke other versions of RELION in the PATH.
 
 If FLTK related errors are reported, please add `-DFORCE_OWN_FLTK=ON` to
 `cmake`. For FFTW related errors, try `-DFORCE_OWN_FFTW=ON`.
@@ -57,7 +59,7 @@ to read BigTIFF files. If you installed libtiff in a non-standard location, spec
 `-DTIFF_INCLUDE_DIR=/path/to/include -DTIFF_LIBRARY=/path/to/libtiff.so.5`.
 
 See [our wiki](http://www2.mrc-lmb.cam.ac.uk/relion/index.php/Download_%26_install) for more
-options and useful environmental variables (especially in HPC clusters).
+options, troubleshooting and useful environmental variables (especially in HPC clusters).
 
 ## Updating
 
@@ -68,8 +70,8 @@ To update an existing installation, simply use the following commands
 cd relion
 git pull
 cd build
-make -j4
-make install    # (or "sudo make install")
+make
+make install # Only when you have specified CMAKE_INSTALL_PREFIX in the cmake step
 ```
 
 If something went wrong, remove the `build` directory and try again from `cmake`.

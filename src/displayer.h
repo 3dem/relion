@@ -73,91 +73,14 @@ static int preshift_ipos;
 
 static int current_selection_type;
 static int colour_scheme;
-#define GREYSCALE 0
-#define BLACKGREYREDSCALE 1
-#define BLUEGREYWHITESCALE 2
-#define BLUEGREYREDSCALE 3
-#define RAINBOWSCALE 4
-#define CYANBLACKYELLOWSCALE 5
-
-
-inline void greyToRGB(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue)
-{
-
-	switch (colour_scheme)
-	{
-	case (BLACKGREYREDSCALE):
-	{
-		if (grey >= 128) { red = 255; blue = green = FLOOR((RFLOAT)(255.-grey)*2.); }
-		else { red = green = blue = FLOOR((RFLOAT)(grey*2.)); }
-		break;
-	}
-	case (BLUEGREYWHITESCALE):
-	{
-		if (grey >= 128) { red = green = blue = FLOOR((RFLOAT)((grey-128.)*2.)); }
-		else { red = 0; blue = green = FLOOR((RFLOAT)(255.-2.*grey)); }
-		break;
-	}
-	case (BLUEGREYREDSCALE):
-	{
-
-		RFLOAT a=(grey)/85.;	//group
-		int X=FLOOR(a);	//this is the integer part
-		unsigned char Y = FLOOR(255*(a-X)); //fractional part from 0 to 255
-		switch(X)
-		{
-		    case 0: red=0;green=255-Y;blue=255-Y;break;
-		    case 1: red=Y;green=Y;blue=Y;break;
-		    case 2: red=255;green=255-Y;blue=255-Y;break;
-		    case 3: red=255;green=0;blue=0;break;
-		}
-
-		break;
-	}
-	case (RAINBOWSCALE):
-	{
-
-		RFLOAT a=(255-grey)/64.;	//invert and group
-		int X=FLOOR(a);	//this is the integer part
-		unsigned char Y = FLOOR(255*(a-X)); //fractional part from 0 to 255
-		switch(X)
-		{
-		    case 0: red=255;green=Y;blue=0;break;
-		    case 1: red=255-Y;green=255;blue=0;break;
-		    case 2: red=0;green=255;blue=Y;break;
-		    case 3: red=0;green=255-Y;blue=255;break;
-		    case 4: red=0;green=0;blue=255;break;
-		}
-
-		break;
-	}
-	case (CYANBLACKYELLOWSCALE):
-	{
-
-		const RFLOAT d_rb = 3. * (grey - 128);
-		const RFLOAT d_g = 3. * (std::abs(grey - 128) - 42);
-		red   = (unsigned char)(FLOOR(XMIPP_MIN(255., XMIPP_MAX(0.0,  d_rb))));
-		green = (unsigned char)(FLOOR(XMIPP_MIN(255., XMIPP_MAX(0.0,  d_g))));
-		blue  = (unsigned char)(FLOOR(XMIPP_MIN(255., XMIPP_MAX(0.0, -d_rb))));
-
-		break;
-	}
-	}
-
-	return;
-
-}
-
 
 class DisplayBox : public Fl_Box
 {
 protected:
-
 	// Draw the actual box on the screen (this function is used by redraw())
 	void draw();
 
 public:
-
 	int xsize_data;
 	int ysize_data;
 	int xoff;
@@ -173,7 +96,7 @@ public:
 	MetaDataTable MDimg;
 
 	// The actual image data array
-	unsigned char * img_data;
+	unsigned char *img_data;
 	std::string img_label;
 
 	// For getting back close the original image values from the uchar ones...
@@ -186,7 +109,6 @@ public:
 
 	void setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, int ipos, RFLOAT minval, RFLOAT maxval,
 	             RFLOAT _scale, bool do_relion_scale = false);
-
 
 	// Destructor
 	~DisplayBox()
@@ -204,18 +126,17 @@ public:
 	int select();
 	// unSelect, redraw and return new selected status
 	int unSelect();
-
 };
-
 
 // This class only puts scrollbars around the resizable canvas
 class basisViewerWindow : public Fl_Window
 {
-
 public:
-
 	// Constructor with w x h size of the window and a title
-	basisViewerWindow(int W, int H, const char* title=0): Fl_Window(W, H, title){}
+	basisViewerWindow(int W, int H, const char* title=0): Fl_Window(W, H, title)
+	{
+		current_selection_type = 1;
+	}
 
 	int fillCanvas(int viewer_type, MetaDataTable &MDin, ObservationModel *obsModel, EMDLabel display_label, EMDLabel text_label, bool _do_read_whole_stacks, bool _do_apply_orient,
 	               RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast,
@@ -227,8 +148,6 @@ public:
 	int fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale, RFLOAT _coord_scale,
 	                           int _particle_radius, bool do_startend = false, FileName _fn_coords = "",
 	                           FileName _fn_color = "", FileName _fn_mic= "", FileName _color_label = "", RFLOAT _color_blue_value = 0., RFLOAT _color_red_value = 1.);
-
-
 };
 
 class basisViewerCanvas : public Fl_Widget
@@ -265,10 +184,7 @@ public:
 	          RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol, bool do_recenter = false, long int max_images = -1,
 	          RFLOAT lowpass = -1.0, RFLOAT highpass = -1.0);
 	void fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale = 1.);
-
-private:
-	void getImageContrast(MultidimArray<RFLOAT> &image, RFLOAT &minval, RFLOAT &maxval, RFLOAT &sigma_contrast);
-
+	void setSelectionType();
 };
 
 class multiViewerCanvas : public basisViewerCanvas
@@ -336,7 +252,6 @@ public:
 	// Constructor with w x h size of the window and a title
 	multiViewerCanvas(int X,int Y, int W, int H, const char* title=0): basisViewerCanvas(X,Y,W, H, title)
 	{
-		current_selection_type= 1;
 	}
 
 private:
@@ -358,11 +273,9 @@ private:
 	void saveTrainingSet();
 	void saveSelected(int save_selected);
 	void saveBackupSelection();
-	void setSelectionType();
 	// Allow re-loading of existing backup selection
 public:
 	void loadBackupSelection(bool do_ask = true);
-
 };
 
 // Generally accessible function
@@ -386,8 +299,8 @@ public:
 	}
 	inline void cb_set_i()
 	{
-		// Careful with setting the right value! Look at handle function of multiviewerCanvas
-		current_selection_type =  choice->value() + 1;
+		// void* to (small) int
+		current_selection_type = static_cast<int>(reinterpret_cast<intptr_t>(choice->mvalue()->user_data()));
 	}
 
 	static void cb_close(Fl_Widget* o, void* v)
@@ -416,8 +329,6 @@ private:
 
 	// explain functionality of clicks
 	void printHelp();
-
-
 };
 
 /*
@@ -456,10 +367,8 @@ public:
 };
 */
 
-
 class pickerViewerCanvas : public basisViewerCanvas
 {
-
 protected:
 	int handle(int ev);
 	void draw();

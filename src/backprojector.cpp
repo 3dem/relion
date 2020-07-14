@@ -1198,14 +1198,20 @@ void BackProjector::updateSSNRarrays(RFLOAT tau2_fudge,
 
 void BackProjector::externalReconstruct(MultidimArray<RFLOAT> &vol_out,
                                         FileName &fn_out,
-                                        const MultidimArray<RFLOAT> &fsc_halves,
-                                        const MultidimArray<RFLOAT> &tau2,
+                                        MultidimArray<RFLOAT> &fsc_halves_io,
+                                        MultidimArray<RFLOAT> &tau2_io,
+										MultidimArray<RFLOAT> &sigma2_ref,
+										MultidimArray<RFLOAT> &data_vs_prior,
+										bool is_whole_instead_of_half,
                                         RFLOAT tau2_fudge,
                                         int verb)
 {
 
 	FileName fn_recons = fn_out+"_external_reconstruct.mrc";
 	FileName fn_star = fn_out+"_external_reconstruct.star";
+	FileName fn_out_star = fn_out+"_external_reconstruct_out.star";
+	MultidimArray<RFLOAT> fsc_halves = fsc_halves_io;
+	MultidimArray<RFLOAT> tau2 = tau2_io;
 
 	const int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
 	int padoridim = ROUND(padding_factor * ori_size);
@@ -1238,6 +1244,7 @@ void BackProjector::externalReconstruct(MultidimArray<RFLOAT> &vol_out,
 	MDlist.setValue(EMDL_OPTIMISER_EXTERNAL_RECONS_DATA_IMAG, fn_out+"_external_reconstruct_data_imag.mrc");
 	MDlist.setValue(EMDL_OPTIMISER_EXTERNAL_RECONS_WEIGHT, fn_out+"_external_reconstruct_weight.mrc");
 	MDlist.setValue(EMDL_OPTIMISER_EXTERNAL_RECONS_RESULT, fn_recons);
+	MDlist.setValue(EMDL_OPTIMISER_EXTERNAL_RECONS_NEWSTAR, fn_out_star);
 	MDlist.setValue(EMDL_MLMODEL_TAU2_FUDGE_FACTOR, tau2_fudge);
 	MDlist.setValue(EMDL_MLMODEL_PADDING_FACTOR, padding_factor);
 	MDlist.setValue(EMDL_MLMODEL_DIMENSIONALITY, ref_dim);
@@ -1280,6 +1287,50 @@ void BackProjector::externalReconstruct(MultidimArray<RFLOAT> &vol_out,
 	Iweight.read(fn_recons);
 	vol_out = Iweight();
 	vol_out.setXmippOrigin();
+
+	if (exists(fn_out_star))
+	{
+		MetaDataTable MDnewtau;
+		MDnewtau.read(fn_out_star);
+		if (!MDnewtau.containsLabel(EMDL_SPECTRAL_IDX))
+			REPORT_ERROR("ERROR: external reconstruct output STAR file does not contain spectral idx!");
+
+		// Directly update tau2 spectrum
+		int idx;
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDnewtau)
+		{
+			MDnewtau.getValue(EMDL_SPECTRAL_IDX, idx);
+			if (idx >= XSIZE(tau2_io)) continue;
+			if (MDnewtau.containsLabel(EMDL_MLMODEL_TAU2_REF))
+			{
+				MDnewtau.getValue(EMDL_MLMODEL_TAU2_REF, tau2_io(idx));
+				data_vs_prior(idx) = tau2_io(idx) / sigma2_ref(idx);
+			}
+			else if (MDnewtau.containsLabel(EMDL_POSTPROCESS_FSC_GENERAL))
+			{
+				MDnewtau.getValue(EMDL_SPECTRAL_IDX, idx);
+				MDnewtau.getValue(EMDL_POSTPROCESS_FSC_GENERAL, fsc_halves_io(idx));
+
+				RFLOAT myfsc = XMIPP_MAX(0.001, fsc_halves_io(idx));
+				if (is_whole_instead_of_half)
+				{
+					// Factor two because of twice as many particles
+					// Sqrt-term to get 60-degree phase errors....
+					myfsc = sqrt(2. * myfsc / (myfsc + 1.));
+				}
+				myfsc = XMIPP_MIN(0.999, myfsc);
+				RFLOAT myssnr = myfsc / (1. - myfsc);
+				myssnr *= tau2_fudge;
+				tau2_io(idx) = myssnr * sigma2_ref(idx);
+				data_vs_prior(idx) = myssnr;
+			}
+			else
+			{
+				REPORT_ERROR("ERROR: output STAR file from external reconstruct does not contain tau2 or FSC array");
+			}
+		}
+		if (verb > 0) std::cout << " + External reconstruction successfully updated external tau2 array ... " << std::endl;
+	}
 
 }
 
@@ -1410,8 +1461,6 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 
 		// Prevent divisions by zero: set Fweight to at least 1/1000th of the radially averaged weight at that resolution
 		// beyond r_max, set Fweight to at least 1/1000th of the radially averaged weight at r_max;
-//		std::cerr << " max_r2 = " << max_r2 << " r_max = " << r_max << " padding_factor = " << padding_factor 
-//	                  << " ROUND(sqrt(max_r2)) = " << ROUND(sqrt(max_r2)) << " ROUND(r_max * padding_factor) = " << ROUND(r_max * padding_factor) << std::endl;
 		MultidimArray<RFLOAT> radavg_weight(r_max), counter(r_max);
 		const int round_max_r2 = ROUND(r_max * padding_factor * r_max * padding_factor);
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fweight)
@@ -1437,7 +1486,6 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 		// Calculate 1/1000th of radial averaged weight
 		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(radavg_weight)
 		{
-//			std::cerr << " i = " << i << " radavg_weight = " << DIRECT_A1D_ELEM(radavg_weight, i) << " counter =" << DIRECT_A1D_ELEM(counter, i) << std::endl;
 			if (DIRECT_A1D_ELEM(counter, i) > 0. || DIRECT_A1D_ELEM(radavg_weight, i) > 0.)
 			{
 				DIRECT_A1D_ELEM(radavg_weight, i) /= 1000.* DIRECT_A1D_ELEM(counter, i);
@@ -1462,7 +1510,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 				if (!have_warned)
 				{
 					std::cerr << " WARNING: ignoring divide by zero in skip_gridding: ires = " << ires << " kp = " << kp << " ip = " << ip << " jp = " << jp << std::endl;
-					std::cerr << " max_r2 = " << max_r2 << " r_max = " << r_max << " padding_factor = " << padding_factor 
+					std::cerr << " max_r2 = " << max_r2 << " r_max = " << r_max << " padding_factor = " << padding_factor
 					           << " ROUND(sqrt(max_r2)) = " << ROUND(sqrt(max_r2)) << " ROUND(r_max * padding_factor) = " << ROUND(r_max * padding_factor) << std::endl;
 					have_warned = true;
 				}
@@ -1637,14 +1685,13 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 		}
 	}
 	RCTOC(ReconTimer,ReconS_11);
+	RCTIC(ReconTimer,ReconS_13);
+	CenterFFTbySign(Ftmp);
+	RCTOC(ReconTimer,ReconS_13);
 	RCTIC(ReconTimer,ReconS_12);
 	// inverse FFT leaves result in vol_out
 	transformer2.inverseFourierTransform();
 	RCTOC(ReconTimer,ReconS_12);
-	RCTIC(ReconTimer,ReconS_13);
-	// Shift the map back to its origin
-	CenterFFT(vol_out, false);
-	RCTOC(ReconTimer,ReconS_13);
 	RCTIC(ReconTimer,ReconS_14);
 	// Un-normalize FFTW (because original FFTs were done with the size of 2D FFTs)
 	if (ref_dim==3)
@@ -2237,6 +2284,11 @@ void BackProjector::windowToOridimRealSpace(FourierTransformer &transformer, Mul
 	tt.write("windoworidim_Fresized.spi");
 #endif
 
+	// Shift the map back to its origin
+	RCTIC(OriDimTimer,OriDim6);
+	CenterFFTbySign(Fin);
+	RCTOC(OriDimTimer,OriDim6);
+
 	// Do the inverse FFT
 	RCTIC(OriDimTimer,OriDim4);
 	transformer.setReal(Mout);
@@ -2253,11 +2305,6 @@ void BackProjector::windowToOridimRealSpace(FourierTransformer &transformer, Mul
 	transformer.fReal = NULL; // Make sure to re-calculate fftw plan
 	Mout.setXmippOrigin();
 
-	// Shift the map back to its origin
-
-	RCTIC(OriDimTimer,OriDim6);
-	CenterFFT(Mout,true);
-	RCTOC(OriDimTimer,OriDim6);
 #ifdef DEBUG_WINDOWORIDIMREALSPACE
 	tt()=Mout;
 	tt.write("windoworidim_Munwindowed.spi");

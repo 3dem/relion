@@ -484,13 +484,11 @@ long int PipeLine::addJob(RelionJob &thisjob, int as_status, bool do_overwrite, 
 	// Writing of the overall pipeline is done in the function calling addToPipeLine
 
 	return myProcess;
-
 }
 
 bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, bool is_main_continue,
                       bool is_scheduled, bool do_overwrite_current, std::string &error_message)
 {
-
 	std::vector<std::string> commands;
 	std::string final_command;
 
@@ -703,8 +701,16 @@ int PipeLine::addScheduledJob(int job_type, std::string fn_options)
 }
 
 // Adds a scheduled job to the pipeline from the command line
-int PipeLine::addScheduledJob(RelionJob &job)
+int PipeLine::addScheduledJob(RelionJob &job, std::string fn_options)
 {
+	if (fn_options != "")
+	{
+		std::vector<std::string> options;
+		splitString(fn_options, ";", options);
+		for (long int iopt = 0; iopt < options.size(); iopt++)
+			job.setOption(options[iopt]);
+	}
+
 	std::string error_message;
 	int current_job = processList.size();
 	if (!runJob(job, current_job, true, job.is_continue, false, false, error_message)) // true is only_schedule, false means !is_scheduled, 2nd false means dont overwrite current
@@ -715,34 +721,30 @@ int PipeLine::addScheduledJob(RelionJob &job)
 
 void PipeLine::waitForJobToFinish(int current_job, bool &is_failure, bool &is_aborted)
 {
-
 	while (true)
-    {
-        sleep(10);
-        checkProcessCompletion();
-        if (processList[current_job].status == PROC_FINISHED_SUCCESS ||
-            processList[current_job].status == PROC_FINISHED_ABORTED ||
-            processList[current_job].status == PROC_FINISHED_FAILURE)
-        {
-            // Prepare a string for a more informative .lock file
-            std::string lock_message = " pipeliner noticed that " + processList[current_job].name + " finished and is trying to update the pipeline";
+	{
+		sleep(10);
+		checkProcessCompletion();
+		if (processList[current_job].status == PROC_FINISHED_SUCCESS ||
+		    processList[current_job].status == PROC_FINISHED_ABORTED ||
+		    processList[current_job].status == PROC_FINISHED_FAILURE)
+		{
+			// Prepare a string for a more informative .lock file
+			std::string lock_message = " pipeliner noticed that " + processList[current_job].name + " finished and is trying to update the pipeline";
 
-            // Read in existing pipeline, in case some other window had changed something else
-            read(DO_LOCK, lock_message);
+			// Read in existing pipeline, in case some other window had changed something else
+			read(DO_LOCK, lock_message);
 
-            if (processList[current_job].status == PROC_FINISHED_FAILURE)
-                is_failure = true;
-            else if (processList[current_job].status == PROC_FINISHED_ABORTED)
-                is_aborted = true;
+			if (processList[current_job].status == PROC_FINISHED_FAILURE)
+			    is_failure = true;
+			else if (processList[current_job].status == PROC_FINISHED_ABORTED)
+			    is_aborted = true;
 
-            // Write out the modified pipeline with the new status of current_job
-            write(DO_LOCK);
-            break;
-
-        } // endif something has happened
-    } // while true, waiting for job to finish
-
-
+			// Write out the modified pipeline with the new status of current_job
+			write(DO_LOCK);
+			break;
+		} // endif something has happened
+	} // while true, waiting for job to finish
 }
 
 void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat,

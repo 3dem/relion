@@ -171,10 +171,11 @@ void FourierTransformer::setReal(MultidimArray<RFLOAT> &input, bool force_new_pl
 {
 	bool recomputePlan = false;
 
-	if (   fReal == NULL
-	    || dataPtr != MULTIDIM_ARRAY(input)
-	    || !fReal->sameShape(input)
-	    || complexDataPtr != MULTIDIM_ARRAY(fFourier))
+	if (   (fReal == NULL)
+	    || (dataPtr != MULTIDIM_ARRAY(input))
+	    || (!fReal->sameShape(input))
+		|| (XSIZE(fFourier) != XSIZE(input)/2+1)
+	    || (complexDataPtr != MULTIDIM_ARRAY(fFourier)) )
 	{
 		recomputePlan = true;
 	}
@@ -317,6 +318,13 @@ void FourierTransformer::setReal(MultidimArray<Complex > &input, bool force_new_
 void FourierTransformer::setFourier(const MultidimArray<Complex> &inputFourier)
 {
 	RCTIC(TIMING_FFTW_COPY);
+
+	if (!fFourier.sameShape(inputFourier))
+	{
+		std::cerr << " fFourier= "; fFourier.printShape(std::cerr);
+		std::cerr << " inputFourier= "; inputFourier.printShape(std::cerr);
+		REPORT_ERROR("BUG: incompatible shaped in setFourier part of FFTW transformer");
+	}
 	memcpy(MULTIDIM_ARRAY(fFourier),MULTIDIM_ARRAY(inputFourier),
 		   MULTIDIM_SIZE(inputFourier)*2*sizeof(RFLOAT));
 	RCTOC(TIMING_FFTW_COPY);
@@ -1636,8 +1644,8 @@ void amplitudeOrPhaseMap(const MultidimArray<RFLOAT > &v, MultidimArray<RFLOAT >
 	XYdim = XSIZE(out);
 
 	// Fourier Transform
-	CenterFFT(out, true);
 	transformer.FourierTransform(out, Faux, false); // TODO: false???
+	CenterFFTbySign(Faux);
 
 	// Write to output files
 	out.setXmippOrigin();
@@ -1685,8 +1693,8 @@ void helicalLayerLineProfile(const MultidimArray<RFLOAT > &v, std::string title,
 	XYdim = XSIZE(out);
 
 	// Fourier Transform
-	CenterFFT(out, true);
 	transformer.FourierTransform(out, Faux, false); // TODO: false???
+	CenterFFTbySign(Faux);
 
 	// Statistics
 	out.setXmippOrigin();

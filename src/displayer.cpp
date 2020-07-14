@@ -25,6 +25,19 @@
 #include <src/jaz/gravis/tImage.h>
 #endif
 
+const Fl_Menu_Item color_choices[] =
+{
+	// text, shortcut, callback, user_data, flags, type, font, size, color
+	{"Red (1)",     0, (Fl_Callback*)0, (void*)1, 0, 0, 0, 0, FL_RED},
+	{"Green (2)",   0, (Fl_Callback*)0, (void*)2, 0, 0, 0, 0, FL_GREEN},
+	{"Blue (3)",    0, (Fl_Callback*)0, (void*)3, 0, 0, 0, 0, FL_BLUE},
+	{"Cyan (4)",    0, (Fl_Callback*)0, (void*)4, 0, 0, 0, 0, FL_CYAN},
+	{"Magenta (5)", 0, (Fl_Callback*)0, (void*)5, 0, 0, 0, 0, FL_MAGENTA},
+	{"Yellow (6)",  0, (Fl_Callback*)0, (void*)6, 0, 0, 0, 0, FL_YELLOW},
+	{0} // sentinel
+};
+const int NUM_COLORS = 6;
+
 /************************************************************************/
 void DisplayBox::draw()
 {
@@ -45,18 +58,8 @@ void DisplayBox::draw()
 		fl_draw(img_label.c_str(), xpos, ypos + fl_height());
 	}
 	/* Draw a red rectangle around the particle if it is selected */
-	if (selected == 1)
-		fl_color(FL_RED);
-	else if (selected == 2)
-		fl_color(FL_GREEN);
-	else if (selected == 3)
-		fl_color(FL_BLUE);
-	else if (selected == 4)
-		fl_color(FL_CYAN);
-	else if (selected == 5)
-		fl_color(FL_MAGENTA);
-	else if (selected == 6)
-		fl_color(FL_YELLOW);
+	if (selected >= 1 && selected <= 6)
+		fl_color(color_choices[selected - 1].labelcolor_);
 	else
 		fl_color(FL_BLACK);
 
@@ -72,13 +75,13 @@ void DisplayBox::draw()
 
 	//fl_pop_clip();
 }
+
 unsigned char rgbToGrey(const unsigned char red, const unsigned char green, const unsigned char blue)
 {
 	switch (colour_scheme)
 	{
 	case (BLACKGREYREDSCALE):
 	{
-
 		if (red == 255) return FLOOR((RFLOAT)(255. - blue/2.));
 		else return FLOOR((RFLOAT)(red/2.));
 		break;
@@ -91,7 +94,6 @@ unsigned char rgbToGrey(const unsigned char red, const unsigned char green, cons
 	}
 	case (BLUEGREYREDSCALE):
 	{
-
 		unsigned char Y;
 		int X;
 		if (red == 0) { Y = 255-blue; X = 0; }
@@ -102,7 +104,6 @@ unsigned char rgbToGrey(const unsigned char red, const unsigned char green, cons
 	}
 	case (RAINBOWSCALE):
 	{
-
 		unsigned char Y;
 		int X;
 		if (red > 0)
@@ -122,7 +123,6 @@ unsigned char rgbToGrey(const unsigned char red, const unsigned char green, cons
 	}
 	case (CYANBLACKYELLOWSCALE):
 	{
-
 		if (red >0)
 		{
 			if (red < 255) return (unsigned char)FLOOR((RFLOAT)red / 3. + 128);
@@ -141,11 +141,9 @@ unsigned char rgbToGrey(const unsigned char red, const unsigned char green, cons
 	return 0;
 }
 
-
 void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, int _ipos,
                          RFLOAT _minval, RFLOAT _maxval, RFLOAT _scale, bool do_relion_scale)
 {
-
 	scale = _scale;
 	minval = _minval;
 	maxval = _maxval;
@@ -178,7 +176,6 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 		img_data = new unsigned char [3 * xsize_data * ysize_data];
 	}
 	RFLOAT range = maxval - minval;
-	RFLOAT middle = range/2.;
 	RFLOAT step = range / 255; // 8-bit scaling range from 0 to 255
 	RFLOAT* old_ptr=NULL;
 	long int n;
@@ -198,10 +195,8 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 		int line_d = XSIZE(img);
 		int dx, dy, sy, xerr, yerr;
 
-		// scale the image using a nearest-neighbor algorithm...
 		if (colour_scheme == GREYSCALE)
 		{
-			// scale the image using a nearest-neighbor algorithm...
 			for (dy = ysize_data, sy = 0, yerr = ysize_data, n = 0; dy > 0; dy --)
 			{
 				for (dx = xsize_data, xerr = xsize_data, old_ptr = img.data + sy * line_d; dx > 0; dx --, n++)
@@ -227,14 +222,12 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 		}
 		else
 		{
-
-			// scale the image using a nearest-neighbor algorithm...
 			for (dy = ysize_data, sy = 0, yerr = ysize_data, n = 0; dy > 0; dy --)
 			{
 				for (dx = xsize_data, xerr = xsize_data, old_ptr = img.data + sy * line_d; dx > 0; dx --, n++)
 				{
 					unsigned char val = FLOOR((*old_ptr - minval) / step);
-					greyToRGB(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
+					greyToRGB(colour_scheme, val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
 					old_ptr += xstep;
 					xerr    -= xmod;
 					if (xerr <= 0)
@@ -252,13 +245,10 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 					sy ++;
 				}
 			}
-
-
 		}
 	}
 	else
 	{
-
 		if (colour_scheme == GREYSCALE)
 		{
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(img, n, old_ptr)
@@ -271,18 +261,14 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(img, n, old_ptr)
 			{
 				unsigned char val = FLOOR((*old_ptr - minval) / step);
-				greyToRGB(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
+				greyToRGB(colour_scheme, val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
 			}
 		}
-
 	}
 }
 
-
-
 int DisplayBox::toggleSelect(int set_selected)
 {
-
 	if (selected > 0)
 		selected = 0;
 	else if (selected == 0)
@@ -293,7 +279,6 @@ int DisplayBox::toggleSelect(int set_selected)
 
 void DisplayBox::setSelect(int value)
 {
-
 	selected = value;
 	redraw();
 }
@@ -308,7 +293,6 @@ int DisplayBox::select()
 
 int DisplayBox::unSelect()
 {
-
 	selected = NOTSELECTED;
 	redraw();
 	return selected;
@@ -405,6 +389,8 @@ int basisViewerWindow::fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOA
                                               RFLOAT _scale, RFLOAT _coord_scale, int _particle_radius, bool _do_startend, FileName _fn_coords,
                                               FileName _fn_color, FileName _fn_mic, FileName _color_label, RFLOAT _color_blue_value, RFLOAT _color_red_value)
 {
+	current_selection_type = 2; // Green
+
 	// Scroll bars
 	Fl_Scroll scroll(0, 0, w(), h());
 	int xsize_canvas = CEIL(XSIZE(image)*_scale);
@@ -448,13 +434,11 @@ int basisViewerWindow::fillSingleViewerCanvas(MultidimArray<RFLOAT> image, RFLOA
 	resizable(*this);
 	show();
 	return Fl::run();
-
 }
 
 void basisViewerCanvas::fill(MetaDataTable &MDin, ObservationModel *obsModel, EMDLabel display_label, EMDLabel text_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
                             RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol, bool _do_recenter, long int max_images, RFLOAT lowpass, RFLOAT highpass)
 {
-
 	ncol = _ncol;
 	int nr_imgs = MDin.numberOfObjects();
 	if (nr_imgs > 1)
@@ -573,6 +557,16 @@ void basisViewerCanvas::fill(MetaDataTable &MDin, ObservationModel *obsModel, EM
 						selfApplyGeometry(img(), A, IS_NOT_INV, DONT_WRAP);
 					}
 				}
+				else if(_do_apply_orient && MDin.containsLabel(EMDL_MLMODEL_IS_HELIX) && img().getDim()==3)
+				{
+					RFLOAT psi,rot,tilt;
+					Matrix2D<RFLOAT> A;
+					Euler_rotation3DMatrix(0,90,0, A);
+					MAT_ELEM(A, 0, 3) = MAT_ELEM(A, 0, 0)  + MAT_ELEM(A, 0, 1)  + MAT_ELEM(A, 0, 2) ;
+					MAT_ELEM(A, 1, 3) = MAT_ELEM(A, 1, 0)  + MAT_ELEM(A, 1, 1)  + MAT_ELEM(A, 1, 2) ;
+					MAT_ELEM(A, 2, 3) = MAT_ELEM(A, 2, 0)  + MAT_ELEM(A, 2, 1)  + MAT_ELEM(A, 2, 2) ;
+					selfApplyGeometry(img(), A, IS_NOT_INV, DONT_WRAP);
+				}
 				if (_do_recenter)
 				{
 					selfTranslateCenterOfMassToCenter(img());
@@ -617,7 +611,6 @@ void basisViewerCanvas::fill(MetaDataTable &MDin, ObservationModel *obsModel, EM
 				boxes[my_sorted_ipos] = my_box;//boxes.push_back(my_box);
 			}
 
-
 			// 2. Reset numbers_in_stack and my_stack_first_ipos for next stack
 			numbers_in_stack.clear();
 			my_stack_first_ipos = ipos + 1;
@@ -634,8 +627,8 @@ void basisViewerCanvas::fill(MetaDataTable &MDin, ObservationModel *obsModel, EM
 
 	if (nr_imgs > 1)
 		progress_bar(nr_imgs);
-
 }
+
 void basisViewerCanvas::fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale)
 {
 	xoff = yoff = 0;
@@ -651,37 +644,6 @@ void basisViewerCanvas::fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOA
 	my_box->setData(image, MDtmp.getObject(), 0, _minval, _maxval, _scale, true);
 	my_box->redraw();
 	boxes.push_back(my_box);
-
-}
-
-void basisViewerCanvas::getImageContrast(MultidimArray<RFLOAT> &image, RFLOAT &minval, RFLOAT &maxval, RFLOAT &sigma_contrast)
-{
-	// First check whether to apply sigma-contrast, i.e. set minval and maxval to the mean +/- sigma_contrast times the stddev
-	bool redo_minmax = (sigma_contrast > 0. || minval != maxval);
-
-	if (sigma_contrast > 0. || minval == maxval)
-	{
-		RFLOAT avg, stddev;
-		image.computeStats(avg, stddev, minval, maxval);
-		if (sigma_contrast > 0.)
-		{
-			minval = avg - sigma_contrast * stddev;
-			maxval = avg + sigma_contrast * stddev;
-			redo_minmax = true;
-		}
-	}
-
-	if (redo_minmax)
-	{
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(image)
-		{
-			RFLOAT val = DIRECT_MULTIDIM_ELEM(image, n);
-			if (val > maxval)
-				DIRECT_MULTIDIM_ELEM(image, n) = maxval;
-			else if (val < minval)
-				DIRECT_MULTIDIM_ELEM(image, n) = minval;
-		}
-	}
 }
 
 void basisViewerCanvas::draw()
@@ -689,7 +651,6 @@ void basisViewerCanvas::draw()
 	for (int ipos = 0 ; ipos < boxes.size(); ipos++)
 		boxes[ipos]->redraw();
 }
-
 
 int multiViewerCanvas::handle(int ev)
 {
@@ -982,7 +943,6 @@ void multiViewerCanvas::loadBackupSelection(bool do_ask)
 
 		boxes[ipos]->setSelect(selected[my_sorted_ipos]);
 	}
-
 }
 
 void multiViewerCanvas::clearSelection()
@@ -1337,7 +1297,7 @@ void multiViewerCanvas::saveSelectedParticles(int save_selected)
 	if (nparts > 0)
 	{
 		obsModel->save(MDpart, fn_selected_parts, "particles");
-		std::cout << "Saved "<< fn_selected_parts << " with " << nparts << " selected particles." << std::endl;
+		std::cout << "Saved " << fn_selected_parts << " with " << nparts << " selected particles." << std::endl;
 	}
 	else
 		std::cout <<" No classes selected. Please select one or more classes..." << std::endl;
@@ -1345,12 +1305,43 @@ void multiViewerCanvas::saveSelectedParticles(int save_selected)
 
 void regroupSelectedParticles(MetaDataTable &MDdata, MetaDataTable &MDgroups, int nr_regroups)
 {
+	// This function modify MDgroups, which will not be written anyway.
 
 	if (nr_regroups <= 0)
 		return;
 
-	if (nr_regroups > 999)
-		REPORT_ERROR("regroupSelectedParticles: cannot regroup in more than 999 groups. Usually around 20-50 groups are useful.");
+	int max_optics_group_id = -1;
+
+	// Find out which optics group each scale group belongs to
+	// Also initialise rlnGroupNrParticles for this selection
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDgroups)
+	{
+		MDgroups.setValue(EMDL_IMAGE_OPTICS_GROUP, -1);
+		MDgroups.setValue(EMDL_MLMODEL_GROUP_NR_PARTICLES, 0);
+	}
+
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDdata)
+	{
+		long group_id, part_optics_id, group_optics_id;
+		int nr_parts;
+		MDdata.getValue(EMDL_MLMODEL_GROUP_NO, group_id); // 1-indexed
+		MDdata.getValue(EMDL_IMAGE_OPTICS_GROUP, part_optics_id);
+
+		MDgroups.getValue(EMDL_IMAGE_OPTICS_GROUP, group_optics_id, group_id - 1); // 0-indexed
+		if (group_optics_id == -1)
+		{
+			MDgroups.setValue(EMDL_IMAGE_OPTICS_GROUP, part_optics_id, group_id - 1);
+			if (max_optics_group_id < part_optics_id)
+				max_optics_group_id = part_optics_id;
+		}
+		else if (group_optics_id != part_optics_id)
+		{
+			std::cerr << "WARNING: group_no " << group_id << " contains particles from multiple optics groups." << std::endl;
+		}
+
+		MDgroups.getValue(EMDL_MLMODEL_GROUP_NR_PARTICLES, nr_parts, group_id - 1);
+		MDgroups.setValue(EMDL_MLMODEL_GROUP_NR_PARTICLES, nr_parts + 1, group_id - 1);
+	}
 
 	// First sort the MDgroups based on refined intensity scale factor
 	MDgroups.sort(EMDL_MLMODEL_GROUP_SCALE_CORRECTION);
@@ -1362,50 +1353,67 @@ void regroupSelectedParticles(MetaDataTable &MDdata, MetaDataTable &MDgroups, in
 
 	// Average group size
 	long average_group_size = nr_parts / nr_regroups;
-	int fillgroupschar = 1;
-	if (nr_regroups > 100)
-		fillgroupschar = 3;
-	else if (nr_regroups > 10)
-		fillgroupschar = 2;
+	if (average_group_size < 10)
+		REPORT_ERROR("Each group should have at least 10 particles");
+	int fillgroupschar = (int)(floor(log(nr_regroups) / log(10))) + 1;
+
+	std::map<long, std::string> new_group_names;
+	std::map<long, std::string>::iterator it;
 
 	// Loop through all existing, sorted groups
-	long old_nr_groups = MDgroups.numberOfObjects();
-	long curr_group_id, my_old_group_id, new_group_id = 1;
-	long nr_parts_in_new_group = 0;
-	MetaDataTable MDout;
-	for (long ig = 0; ig < old_nr_groups; ig++)
+	long new_group_id = 0;
+
+	// Worst case: O(old_nr_groups ^ 2) = O(mic ^ 2)
+	// We can reduce this by using one more hash but this should be enough.
+	for (long optics_group_id = 1; optics_group_id <= max_optics_group_id; optics_group_id++)
 	{
-		// Now search for curr_group_id in the input MetaDataTable
-		MDgroups.getValue(EMDL_MLMODEL_GROUP_NO, curr_group_id, ig);
+		long nr_parts_in_new_group = 0;
+		new_group_id++;
 
-		if (nr_parts_in_new_group > average_group_size)
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDgroups)
 		{
-			// This group is now full: start a new one
-			new_group_id++;
-			nr_parts_in_new_group = 0;
-		}
+			long group_id, group_optics_id;
+			int nr_parts;
 
-		std::string new_group_name = "group_" + integerToString(new_group_id, fillgroupschar);
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDdata)
-		{
-			MDdata.getValue(EMDL_MLMODEL_GROUP_NO, my_old_group_id);
-			if (my_old_group_id == curr_group_id)
+			MDgroups.getValue(EMDL_IMAGE_OPTICS_GROUP, group_optics_id);
+			if (group_optics_id != optics_group_id)
+				continue;
+
+			MDgroups.getValue(EMDL_MLMODEL_GROUP_NO, group_id);
+			MDgroups.getValue(EMDL_MLMODEL_GROUP_NR_PARTICLES, nr_parts);
+			nr_parts_in_new_group += nr_parts;
+
+			if (nr_parts_in_new_group > average_group_size)
 			{
-				nr_parts_in_new_group++;
-				MDout.addObject(MDdata.getObject());
-				MDout.setValue(EMDL_MLMODEL_GROUP_NO, new_group_id);
-				MDout.setValue(EMDL_MLMODEL_GROUP_NAME, new_group_name);
+				// This group is now full: start a new one
+				new_group_id++;
+				nr_parts_in_new_group = 0;
 			}
+
+			new_group_names[group_id] = "group_" + integerToString(new_group_id, fillgroupschar);
 		}
 	}
 
-	// Maintain the original image ordering
-	if (MDout.containsLabel(EMDL_SORTED_IDX))
-		MDout.sort(EMDL_SORTED_IDX);
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDdata)
+	{
+		long group_id;
+		MDdata.getValue(EMDL_MLMODEL_GROUP_NO, group_id);
+
+		it = new_group_names.find(group_id);
+		if (it != new_group_names.end())
+		{
+			MDdata.setValue(EMDL_MLMODEL_GROUP_NAME, new_group_names[group_id]);
+		}
+		else
+		{
+			std::cerr << "Logic error: cannot find group_id " << group_id << " during remapping." << std::endl;
+			REPORT_ERROR("Failed in regrouping");
+		}
+	}
+
+	MDdata.deactivateLabel(EMDL_MLMODEL_GROUP_NO); // no longer valid
 
 	std::cout <<" Regrouped particles into " << new_group_id << " groups" << std::endl;
-	MDdata = MDout;
-
 }
 
 void multiViewerCanvas::showSelectedParticles(int save_selected)
@@ -1420,7 +1428,6 @@ void multiViewerCanvas::showSelectedParticles(int save_selected)
 	}
 	else
 		std::cout <<" No classes selected. First select one or more classes..." << std::endl;
-
 }
 
 void multiViewerCanvas::saveTrainingSet()
@@ -1443,9 +1450,9 @@ void multiViewerCanvas::saveTrainingSet()
 	{
 		MDout.addObject(boxes[ipos]->MDimg.getObject());
 		if (boxes[ipos]->selected)
-			MDout.setValue(EMDL_SELECTED, true);
+			MDout.setValue(EMDL_SELECTED, 1);
 		else
-			MDout.setValue(EMDL_SELECTED, false);
+			MDout.setValue(EMDL_SELECTED, 0);
 	}
 
 	// Maintain the original image ordering
@@ -1496,7 +1503,6 @@ void multiViewerCanvas::saveTrainingSet()
 	//	REPORT_ERROR("ERROR in executing: " + command);
 
 	std::cout << "Saved selection to Sjors' training directory. Thanks for helping out!" << std::endl;
-
 }
 
 void multiViewerCanvas::saveSelected(int save_selected)
@@ -1517,7 +1523,6 @@ void multiViewerCanvas::saveSelected(int save_selected)
 	}
 	if (nsel > 0)
 	{
-
 		// Maintain the original image ordering
 		if (MDout.containsLabel(EMDL_SORTED_IDX))
 			MDout.sort(EMDL_SORTED_IDX);
@@ -1577,7 +1582,7 @@ void multiViewerCanvas::saveSelected(int save_selected)
 		std::cout <<" No images to save...." << std::endl;
 }
 
-void multiViewerCanvas::setSelectionType()
+void basisViewerCanvas::setSelectionType()
 {
 	popupSelectionTypeWindow win(250, 50, "Set selection type");
 	win.fill();
@@ -1588,21 +1593,16 @@ int popupSelectionTypeWindow::fill()
 	color(GUI_BACKGROUND_COLOR);
 	choice = new Fl_Choice(50, 10, 130, 30, "type: ") ;
 
-	choice->add("Red (1)", 0, 0,0, FL_MENU_VALUE);
-	choice->add("Green (2)", 0, 0,0, FL_MENU_VALUE);
-	choice->add("Blue (3)", 0, 0,0, FL_MENU_VALUE);
-	choice->add("Cyan (4)", 0, 0,0, FL_MENU_VALUE);
-	choice->add("Magenta (5)", 0, 0,0, FL_MENU_VALUE);
-	choice->add("Yellow (6)", 0, 0,0, FL_MENU_VALUE);
+	choice->menu(color_choices);
 	choice->color(GUI_INPUT_COLOR);
 
-	choice->value(current_selection_type-1);
+	choice->value(current_selection_type - 1);
 
 	choice->callback(cb_set, this);
 
 	Fl_Button * closebutton = new Fl_Button(190, 10, 50, 30, "Close");
 	closebutton->color(GUI_RUNBUTTON_COLOR);
-	closebutton->callback( cb_close, this);
+	closebutton->callback(cb_close, this);
 
 	show();
 
@@ -1748,7 +1748,6 @@ int popupSetContrastWindow::fill()
 }
 */
 
-
 void pickerViewerCanvas::draw()
 {
 	RFLOAT scale = boxes[0]->scale;
@@ -1769,40 +1768,50 @@ void pickerViewerCanvas::draw()
 			if (EMDL::isInt(color_label))
 			{
 				int ival;
-				MDcoords.getValue(color_label, ival);
+				if (!MDcoords.getValue(color_label, ival))
+				{
+					ival = 2; // populate as green if absent
+					MDcoords.setValue(color_label, ival);
+				}
 				colval = (RFLOAT)ival;
+				if (ival >= 1 && ival <= NUM_COLORS)
+					fl_color(color_choices[ival - 1].labelcolor_);
+				else
+					fl_color(FL_GREEN);
 			}
 			else
 			{
 				MDcoords.getValue(color_label, colval);
-			}
-			// Assume undefined values are set to -999....
-			if ((colval + 999.) < XMIPP_EQUAL_ACCURACY)
-			{
-				fl_color(FL_GREEN);
-			}
-			else
-			{
-				colval = XMIPP_MAX(colval, smallest_color_value);
-				colval = XMIPP_MIN(colval, biggest_color_value);
-				unsigned char red, blue;
-				if (do_blue_to_red)
+
+				// Assume undefined values are set to -999....
+				if ((colval + 999.) < XMIPP_EQUAL_ACCURACY)
 				{
-					red  = ROUND(255. * (colval - smallest_color_value) / (biggest_color_value - smallest_color_value));
-					blue = ROUND(255. * (biggest_color_value - colval)  / (biggest_color_value - smallest_color_value));
+					fl_color(FL_GREEN);
 				}
 				else
 				{
-					blue = ROUND(255. * (colval - smallest_color_value) / (biggest_color_value - smallest_color_value));
-					red  = ROUND(255. * (biggest_color_value - colval)  / (biggest_color_value - smallest_color_value));
+					colval = XMIPP_MAX(colval, smallest_color_value);
+					colval = XMIPP_MIN(colval, biggest_color_value);
+					unsigned char red, blue;
+					if (do_blue_to_red)
+					{
+						red  = ROUND(255. * (colval - smallest_color_value) / (biggest_color_value - smallest_color_value));
+						blue = ROUND(255. * (biggest_color_value - colval)  / (biggest_color_value - smallest_color_value));
+					}
+					else
+					{
+						blue = ROUND(255. * (colval - smallest_color_value) / (biggest_color_value - smallest_color_value));
+						red  = ROUND(255. * (biggest_color_value - colval)  / (biggest_color_value - smallest_color_value));
+					}
+					fl_color(red, 0, blue);
 				}
-				fl_color(red,0,blue);
 			}
 		}
 		else
 		{
 			fl_color(FL_GREEN);
 		}
+
 		int xcoori, ycoori;
 		xcoori = ROUND(xcoor * coord_scale * scale) + scroll->x() - scroll->hscrollbar.value();
 		ycoori = ROUND(ycoor * coord_scale * scale) + scroll->y() - scroll->scrollbar.value();
@@ -1810,7 +1819,7 @@ void pickerViewerCanvas::draw()
 
 		if (do_startend)
 		{
-			if (icoord%2==1)
+			if (icoord % 2 == 1)
 			{
 				xcoori_start = xcoori;
 				ycoori_start = ycoori;
@@ -1828,6 +1837,7 @@ int pickerViewerCanvas::handle(int ev)
 	const int button = Fl::event_button() ;
 	const bool with_shift = (Fl::event_shift() != 0);
 	const bool with_control = (Fl::event_ctrl() != 0);
+	const int key = Fl::event_key();
 	if (ev==FL_PUSH || (ev==FL_DRAG && (button == FL_MIDDLE_MOUSE || (button == FL_LEFT_MOUSE && with_shift))))
 	{
 		RFLOAT scale = boxes[0]->scale;
@@ -1835,7 +1845,7 @@ int pickerViewerCanvas::handle(int ev)
 		int yc = (int)Fl::event_y() - scroll->y() + scroll->scrollbar.value();
 		RFLOAT xcoor = (RFLOAT)ROUND(xc / (coord_scale * scale));
 		RFLOAT ycoor = (RFLOAT)ROUND(yc / (coord_scale * scale));
-		RFLOAT rad2 = particle_radius * particle_radius / (scale * scale);
+		RFLOAT rad2 = particle_radius * particle_radius / (coord_scale * coord_scale * scale * scale);
 		if (button == FL_LEFT_MOUSE && !with_shift && !with_control)
 		{
 			// Left mouse for picking
@@ -1852,7 +1862,8 @@ int pickerViewerCanvas::handle(int ev)
 					return 0;
 			}
 			RFLOAT aux = -999., zero = 0.;
-			int iaux = -999;
+			int iaux = current_selection_type;
+
 			// Else store new coordinate
 			if (!MDcoords.isEmpty())
 			{
@@ -1907,19 +1918,20 @@ int pickerViewerCanvas::handle(int ev)
 		{
 			redraw();
 			Fl_Menu_Item rclick_menu[] = {
-				{ "Save STAR with coordinates" },
+				{ "Save STAR with coordinates (CTRL-s)" },
 //				{ "Save_as STAR with coordinates" },
 				{ "Load coordinates" },
 				{ "Reload coordinates" },
 				{ "Clear coordinates" },
+				{ "Set selection type" },
 				{ "Help" },
-				{ "Quit" },
+				{ "Quit (CTRL-q)" },
 				{ 0 }
 			};
 			const Fl_Menu_Item *m = rclick_menu->popup(Fl::event_x(), Fl::event_y(), 0, 0, 0);
 			if ( !m )
 				return 0;
-			else if ( strcmp(m->label(), "Save STAR with coordinates") == 0 )
+			else if ( strcmp(m->label(), "Save STAR with coordinates (CTRL-s)") == 0 )
 				saveCoordinates(false);
 //			else if ( strcmp(m->label(), "Save_as STAR with coordinates") == 0 )
 //				saveCoordinates(true);
@@ -1929,12 +1941,14 @@ int pickerViewerCanvas::handle(int ev)
 				loadCoordinates(false);
 			else if ( strcmp(m->label(), "Clear coordinates") == 0 )
 				clearCoordinates();
+			else if ( strcmp(m->label(), "Set selection type") == 0)
+				setSelectionType();
 			else if ( strcmp(m->label(), "Help") == 0 )
 				printHelp();
-			else if ( strcmp(m->label(), "Quit") == 0 )
+			else if ( strcmp(m->label(), "Quit (CTRL-q)") == 0 )
 				exit(0);
 			redraw();
-			return(1);          // (tells caller we handled this event)
+			return 1; // (tells caller we handled this event)
 		}
 		return 0;
 	}
@@ -1944,19 +1958,33 @@ int pickerViewerCanvas::handle(int ev)
 		redraw();
 		return 1;
 	}
+	// CTRL-s will save the coordinates in a picker window
+	else if (with_control)
+	{
+		if (key == 's')
+		{
+			saveCoordinates(false);
+			sleep(1); // to prevent multiple saves... dirty but don't know how to do this otherwise...
+			return 1; // (tells caller we handled this event)
+		}
+		else if (key == 'q')
+		{
+			sleep(1);
+			exit(0);
+			return 1; // (tells caller we handled this event)
+		}
+		else if (key >= '1' && key <= '6')
+		{
+			std::cout << "debug key = " << key << std::endl;
+			current_selection_type = key - '0';
+			return 1;
+		}
+	}
 	return 0;
-
 }
+
 void pickerViewerCanvas::saveCoordinates(bool ask_filename)
 {
-
-	// Allow saving empty coordinate files, in case user decides to delete all particles!
-	//if (MDcoords.numberOfObjects() < 1)
-	//{
-	//	std::cout <<" No coordinates to save. Use left-mouse clicks to pick coordinates first..." << std::endl;
-	//	return;
-	//}
-
 	FileName fn_out;
 	if (ask_filename)
 	{
@@ -1990,8 +2018,6 @@ void pickerViewerCanvas::saveCoordinates(bool ask_filename)
 		MDcoords.write(fn_out);
 	}
 	std::cout << "Saved "<<fn_out << " with " << MDcoords.numberOfObjects() << " selected coordinates." << std::endl;
-	return;
-
 }
 
 void pickerViewerCanvas::loadCoordinates(bool ask_filename)
@@ -2017,12 +2043,10 @@ void pickerViewerCanvas::loadCoordinates(bool ask_filename)
 	{
 		findColorColumnForCoordinates();
 	}
-
 }
 
 void pickerViewerCanvas::findColorColumnForCoordinates()
 {
-
 	MetaDataTable MDcolor, MDcolormic;
 	MDcolor.read(fn_color);
 
@@ -2061,7 +2085,6 @@ void pickerViewerCanvas::findColorColumnForCoordinates()
 			iimg--; // counting starts at 1 in STAR file!
 
 			// Check that this entry in the coord file has the same xpos and ypos
-			// TODO: coord_scale
 			RFLOAT my_xpos, my_ypos;
 			MDcoords.getValue(EMDL_IMAGE_COORD_X, my_xpos, iimg);
 			MDcoords.getValue(EMDL_IMAGE_COORD_Y, my_ypos, iimg);
@@ -2094,7 +2117,6 @@ void pickerViewerCanvas::findColorColumnForCoordinates()
 			}
 		}
 	}
-
 }
 
 void pickerViewerCanvas::clearCoordinates()
@@ -2330,9 +2352,8 @@ void displayerGuiWindow::readLastSettings()
 	}
 
 	in.close();
-
-
 }
+
 void displayerGuiWindow::writeLastSettings()
 {
 	std::ofstream  fh;
@@ -2373,7 +2394,6 @@ void displayerGuiWindow::cb_display(Fl_Widget* o, void* v) {
 
 void displayerGuiWindow::cb_display_i()
 {
-
 	// Save last settings, so we don't need to change settings every time...
 	writeLastSettings();
 
@@ -2481,9 +2501,7 @@ void displayerGuiWindow::cb_display_i()
 	cl += " &";
 	//std::cout << "Executing: " << cl << std::endl;
 	int res = system(cl.c_str());
-
 }
-
 
 void Displayer::read(int argc, char **argv)
 {
@@ -2558,7 +2576,6 @@ void Displayer::usage()
 
 void Displayer::initialise()
 {
-
 	if (!do_gui && fn_in=="")
 		REPORT_ERROR("Displayer::initialise ERROR: either provide --i or --gui");
 	Fl::visual(FL_RGB);
@@ -2781,21 +2798,6 @@ int Displayer::runGui()
 
 void Displayer::run()
 {
-
-//#define DEBUG_COLOURS
-#ifdef DEBUG_COLOURS
-	if (colour_scheme > GREYSCALE)
-	{
-		for (int val = 0; val < 256; val++)
-		{
-			unsigned char grey,red,green,blue;
-			greyToRGB(val,red,green,blue);
-			grey = rgbToGrey(red,green,blue);
-			std::cout << val << "  " << (int)grey << "  " << (int)red << "  " << (int)green << "  " << (int)blue << std::endl;
-		}
-	}
-#endif
-
 	if (do_gui)
 	{
 	}
@@ -2839,6 +2841,10 @@ void Displayer::run()
 		else if (fn_in.contains("_model.star"))
 		{
 			MDin.read(fn_in, "model_classes");
+			MetaDataTable MD2;
+			MD2.read(fn_in, "model_general");
+			if(MD2.containsLabel(EMDL_MLMODEL_IS_HELIX))
+				MDin.addLabel(EMDL_MLMODEL_IS_HELIX);
 		}
 		else
 		{

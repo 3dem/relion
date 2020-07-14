@@ -95,6 +95,7 @@ static const std::vector<std::string> job_sampling_options{
 	"0.2 degrees",
 	"0.1 degrees"
 };
+// Modify the loop in JobOption::getHealPixOrder when you add more choices!
 
 static const std::vector<std::string> job_nodetype_options{
 	"Particle coordinates (*.box, *_pick.star)",
@@ -125,14 +126,6 @@ static const std::vector<std::string> job_ctffit_options{
 	"Per-micrograph",
 	"Per-particle"
 };
-
-static std::string getStringFitOption(std::string option)
-{
-	if (option == job_ctffit_options[0]) return "f";
-	if (option == job_ctffit_options[1]) return "m";
-	if (option == job_ctffit_options[2]) return "p";
-	REPORT_ERROR("ERROR: unrecognised fit_mode for ctf_refine");
-}
 
 // To have a line on the GUI to change the minimum number of dedicated in a job
 static bool do_allow_change_minimum_dedicated;
@@ -371,6 +364,13 @@ std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, 
 class JobOption
 {
 public:
+	// Get HealPix order from string. Returns -1 when failed.
+	static int getHealPixOrder(std::string s);
+
+	// Get a f/p/m character for CTF fitting. Returns "" when failed.
+	static std::string getCtfFitString(std::string option);
+
+public:
 
 	std::string label;
 	std::string label_gui;
@@ -500,6 +500,7 @@ public:
 	void setOption(std::string setOptionLine);
 
 	// write/read settings to disc
+	// fn is a directory name (e.g. Refine3D/job123/) or a STAR file
 	bool read(std::string fn, bool &_is_continue, bool do_initialise = false); // return false if unsuccessful
 	void write(std::string fn);
 

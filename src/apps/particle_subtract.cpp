@@ -38,7 +38,6 @@ int main(int argc, char *argv[])
 		else
 		{
 			prm.run();
-			prm.setLinesInStarFile();
 			prm.saveStarFile();
 		}
 

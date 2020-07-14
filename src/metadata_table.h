@@ -153,6 +153,7 @@ public:
 
 
 	// getValue: returns true if the label exists
+	// objectID is 0-indexed.
 	template<class T>
 	bool getValue(EMDLabel label, T& value, long objectID = -1) const;
 
@@ -160,6 +161,7 @@ public:
 
 	// Set the value of label for a specified object.
 	// If no objectID is given, the internal iterator 'current_objectID' is used
+	// objectID is 0-indexed.
 	template<class T>
 	bool setValue(EMDLabel name, const T &value, long int objectID = -1);
 
@@ -305,6 +307,9 @@ public:
 		NO_OBJECT_FOUND = -3
 	};
 
+	template<class T>
+	bool isTypeCompatible(EMDLabel label, T& value) const;
+
 private:
 
 	// Check if 'id' corresponds to an actual object.
@@ -337,14 +342,34 @@ MetaDataTable subsetMetaDataTable(MetaDataTable &MDin, EMDLabel label, std::stri
 // OriginX/Y are multiplied by origin_scale before added to CoordinateX/Y to compensate for down-sampling
 MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label, RFLOAT threshold, RFLOAT origin_scale=1.0, FileName fn_removed="", bool verb=true);
 
-#ifdef MD_TYPE_CHECK
+#ifdef METADATA_TABLE_TYPE_CHECK
+//#pragma message("typecheck enabled")
 template<class T>
 bool MetaDataTable::isTypeCompatible(EMDLabel label, T& value) const
 {
-	// TODO: implement type check using
-	// std::is_same<std::make_signed<std::remove_cv<T> >, U >::value;
-	// types are EMDL_INT, EMDL_BOOL, EMDL_DOUBLE, EMDL_FLOAT, EMDL_STRING, EMDL_DOUBLE_VECTOR, EMDL_UNKNOWN
-	return true;
+	// remove const appended by setValue()
+	typedef typename std::remove_const<T>::type U;
+
+	// In C++11, this repeat can be avoided by using "if constexpr(...) else static_assert"
+	static_assert(std::is_same<bool, U>::value ||
+	              std::is_same<FileName, U>::value || std::is_same<std::string, U>::value ||
+	              std::is_same<double, U>::value || std::is_same<float, U>::value ||
+	              std::is_same<int, U>::value || std::is_same<long, U>::value ||
+	              std::is_same<std::vector<double>, U>::value || std::is_same<std::vector<float>, U>::value,
+	              "Compile error: wrong type given to MetaDataTable::getValur or setValue");
+
+	if (std::is_same<bool, U>::value)
+		return EMDL::isBool(label);
+	else if (std::is_same<FileName, U>::value || std::is_same<std::string, U>::value)
+		return EMDL::isString(label);
+	else if (std::is_same<double, U>::value || std::is_same<float, U>::value)
+		return EMDL::isDouble(label);
+	else if (std::is_same<int, U>::value || std::is_same<long, U>::value)
+		return EMDL::isInt(label);
+	else if (std::is_same<std::vector<double>, U>::value || std::is_same<std::vector<float>, U>::value)
+		return EMDL::isVector(label);
+	else
+		return false;
 }
 #endif
 
@@ -353,8 +378,9 @@ bool MetaDataTable::getValue(EMDLabel label, T& value, long objectID) const
 {
 	if (label < 0 || label >= EMDL_LAST_LABEL) return false;
 
-#ifdef MD_TYPE_CHECK
-	isTypeCompatible(label, value);
+#ifdef METADATA_TABLE_TYPE_CHECK
+	if (!isTypeCompatible(label, value))
+		REPORT_ERROR("Runtime error: wrong type given to MetaDataTable::getValue for label " + EMDL::label2Str(label));
 #endif
 
 	const long off = label2offset[label];
@@ -377,20 +403,21 @@ bool MetaDataTable::getValue(EMDLabel label, T& value, long objectID) const
 }
 
 template<class T>
-bool MetaDataTable::setValue(EMDLabel name, const T &value, long int objectID)
+bool MetaDataTable::setValue(EMDLabel label, const T &value, long int objectID)
 {
-	if (name < 0 || name >= EMDL_LAST_LABEL) return false;
+	if (label < 0 || label >= EMDL_LAST_LABEL) return false;
 
-#ifdef MD_TYPE_CHECK
-	isTypeCompatible(label, value);
+#ifdef METADATA_TABLE_TYPE_CHECK
+	if (!isTypeCompatible(label, value))
+		REPORT_ERROR("Runtime error: wrong type given to MetaDataTable::setValue for label " + EMDL::label2Str(label));
 #endif
 
-	long off = label2offset[name];
+	long off = label2offset[label];
 
 	if (off < 0)
 	{
-		addLabel(name);
-		off = label2offset[name];
+		addLabel(label);
+		off = label2offset[label];
 	}
 
 	if (objectID < 0)

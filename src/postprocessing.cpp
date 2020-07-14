@@ -30,6 +30,7 @@ void Postprocessing::read(int argc, char **argv)
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "-1"));
 	write_halfmaps = parser.checkOption("--half_maps", "Write post-processed half maps for validation");
 	mtf_angpix  = textToFloat(parser.getOption("--mtf_angpix", "Pixel size in the original micrographs/movies (in Angstroms)", "-1."));
+	molweight = textToFloat(parser.getOption("--molweight", "Molecular weight (in kDa) of ordered protein mass", "-1"));
 
 	int mask_section = parser.addSection("Masking options");
 	do_auto_mask = parser.checkOption("--auto_mask", "Perform automated masking, based on a density threshold");
@@ -140,6 +141,19 @@ void Postprocessing::initialise()
 		mtf_angpix = angpix;
 	}
 
+	// Calculate what fraction of voxels in the box is protein according to the expected ordered molecular weight
+	// Protein density is 1.35 g/cm^3, Nav=6.022 E+23, so protein volume = (MW /0.81 Da) A^3
+	// 47.6% is volume of sphere relative to box
+	if (molweight > 0.)
+	{
+		frac_molweight = 0.476 * std::pow(XSIZE(I1())*angpix, 3) * 0.81 / ( molweight*1000) ;
+		if (verb > 0)
+		{
+			std::cout.width(35); std::cout << std::left   << "  + ordered molecular weight (kDa): "; std::cout  << molweight <<std::endl;
+			std::cout.width(35); std::cout << std::left   << "  + fraction f (molweight based): "; std::cout  << frac_molweight <<std::endl;
+		}
+	}
+
 	if (!I1().sameShape(I2()))
 	{
 		std::cerr << " Size of half1 map: "; I1().printShape(std::cerr); std::cerr << std::endl;
@@ -184,6 +198,23 @@ bool Postprocessing::getMask()
 		// Check values are between 0 and 1
 		RFLOAT avg, stddev, minval, maxval;
 		Im().computeStats(avg, stddev, minval, maxval);
+
+		long summask = 0;
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Im())
+		{
+			if (DIRECT_MULTIDIM_ELEM(Im(), n) > 0.5) summask++;
+		}
+		avg = (RFLOAT)summask / (RFLOAT)NZYXSIZE(Im());
+		frac_solvent_mask = 0.476 /avg;
+		molweight_frommask = avg * std::pow(XSIZE(Im()) * angpix, 3) * 0.81;
+
+		if (verb > 0)
+		{
+			std::cout.width(35); std::cout << std::left   << "  + fraction f (solvent mask based): "; std::cout  << frac_solvent_mask <<std::endl;
+			std::cout.width(35); std::cout << std::left   << "  + molecular weight inside protein mask: "; std::cout  << molweight_frommask <<std::endl;
+
+		}
+
 		if (minval < -1e-6 || maxval - 1. > 1.e-6)
 		{
 			std::cerr << " minval= " << minval << " maxval= " << maxval << std::endl;
@@ -204,6 +235,7 @@ bool Postprocessing::getMask()
 		if (verb > 0)
 		{
 			std::cout << "== Not performing any masking ... " << std::endl;
+			frac_solvent_mask = 0.;
 		}
 		return false;
 	}
@@ -522,6 +554,26 @@ void Postprocessing::calculateFSCtrue(MultidimArray<RFLOAT> &fsc_true, MultidimA
 	}
 }
 
+void Postprocessing::calculateFSCpart(const MultidimArray<RFLOAT> fsc_unmasked, RFLOAT fraction, MultidimArray<RFLOAT> &fsc_part)
+{
+	// Now that we have fsc_masked and fsc_random_masked, calculate fsc_true according to Richard's formula
+	// FSC_true = FSC_t - FSC_n / ( )
+
+	// Sometimes FSc at origin becomes -1!
+	if (DIRECT_A1D_ELEM(fsc_masked, 0) <= 0.)
+		DIRECT_A1D_ELEM(fsc_masked, 0) = 1.;
+	if (DIRECT_A1D_ELEM(fsc_random_masked, 0) <= 0.)
+		DIRECT_A1D_ELEM(fsc_random_masked, 0) = 1.;
+
+
+	fsc_part.resize(fsc_unmasked);
+	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_part)
+	{
+		DIRECT_A1D_ELEM(fsc_part, i) = fraction * DIRECT_A1D_ELEM(fsc_unmasked, i) / (1. + (fraction-1) * DIRECT_A1D_ELEM(fsc_unmasked, i));
+	}
+
+}
+
 void Postprocessing::applyFscWeighting(MultidimArray<Complex > &FT, MultidimArray<RFLOAT> my_fsc)
 {
 	// Find resolution where fsc_true drops below zero for the first time
@@ -640,8 +692,14 @@ void Postprocessing::writeOutput()
 	MDlist.setValue(EMDL_POSTPROCESS_UNFIL_HALFMAP1, fn_I1);
 	MDlist.setValue(EMDL_POSTPROCESS_UNFIL_HALFMAP2, fn_I2);
 	MDlist.setValue(EMDL_POSTPROCESSED_MAP, fn_out + ".mrc");
+	if (molweight > 0.)
+	{
+		MDlist.setValue(EMDL_POSTPROCESS_MOLWEIGHT, molweight);
+		MDlist.setValue(EMDL_POSTPROCESS_FRACTION_MOLWEIGHT, frac_molweight);
+	}
 	if (do_mask)
 	{
+		MDlist.setValue(EMDL_POSTPROCESS_FRACTION_SOLVENT_MASK, frac_solvent_mask);
 		RFLOAT randomize_at_Ang = XSIZE(I1())* angpix / randomize_at;
 		MDlist.setValue(EMDL_MASK_NAME, fn_mask);
 		MDlist.setValue(EMDL_POSTPROCESS_RANDOMISE_FROM, randomize_at_Ang);
@@ -666,6 +724,9 @@ void Postprocessing::writeOutput()
 		if (do_mask)
 		{
 			MDfsc.setValue(EMDL_POSTPROCESS_FSC_TRUE, DIRECT_A1D_ELEM(fsc_true, i) );
+			MDfsc.setValue(EMDL_POSTPROCESS_FSC_PART_FRACMASK, DIRECT_A1D_ELEM(fsc_part_fracmask, i) );
+			if (molweight > 0.)
+				MDfsc.setValue(EMDL_POSTPROCESS_FSC_PART_MOLWEIGHT, DIRECT_A1D_ELEM(fsc_part_molweight, i) );
 			MDfsc.setValue(EMDL_POSTPROCESS_FSC_UNMASKED, DIRECT_A1D_ELEM(fsc_unmasked, i) );
 			MDfsc.setValue(EMDL_POSTPROCESS_FSC_MASKED, DIRECT_A1D_ELEM(fsc_masked, i) );
 			MDfsc.setValue(EMDL_POSTPROCESS_FSC_RANDOM_MASKED, DIRECT_A1D_ELEM(fsc_random_masked, i) );
@@ -680,6 +741,8 @@ void Postprocessing::writeOutput()
 		else
 		{
 			MDfsc.setValue(EMDL_POSTPROCESS_FSC_UNMASKED, DIRECT_A1D_ELEM(fsc_true, i) );
+			if (molweight > 0.)
+				MDfsc.setValue(EMDL_POSTPROCESS_FSC_PART_MOLWEIGHT, DIRECT_A1D_ELEM(fsc_part_molweight, i) );
 			if (do_ampl_corr)
 			{
 				MDfsc.setValue(EMDL_POSTPROCESS_AMPLCORR_UNMASKED, DIRECT_A1D_ELEM(acorr_unmasked, i) );
@@ -702,6 +765,23 @@ void Postprocessing::writeOutput()
 	plot2D->SetYAxisTitle("Fourier Shell Correlation");
 	plot2D->OutputPostScriptPlot(fn_out + "_fsc.eps");
 	delete plot2D;
+
+//#define CISTEMFSC
+#ifdef CISTEMFSC
+	// Write a plot with the FSC curves
+	std::string title2= "RELION/cisTEM FSC comparison; MW_mask = " +  floatToString(molweight_frommask/1000., 8,2) + " kDa";
+	CPlot2D *plot2Db = new CPlot2D(title2);
+	plot2Db->SetXAxisSize(600);
+	plot2Db->SetYAxisSize(400);
+	MDfsc.addToCPlot2D(plot2Db, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_TRUE, 0., 0., 0., 2.);
+	MDfsc.addToCPlot2D(plot2Db, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_PART_FRACMASK, 1., 0.66, 0., 1.);
+	if (molweight > 0.)
+		MDfsc.addToCPlot2D(plot2Db, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_PART_MOLWEIGHT, 0., 1., 1., 2.);
+	plot2Db->SetXAxisTitle("resolution (1/A)");
+	plot2Db->SetYAxisTitle("Fourier Shell Correlation");
+	plot2Db->OutputPostScriptPlot(fn_out + "_fsc_part.eps");
+	delete plot2Db;
+#endif
 
 	// Also write XML file with FSC_true curve for EMDB submission
 	writeFscXml(MDfsc);
@@ -741,30 +821,31 @@ void Postprocessing::writeOutput()
 	MDguinier.write(fh);
 	fh.close();
 
-	CPlot2D *plot2Db = new CPlot2D("Guinier plots");
-	plot2Db->SetXAxisSize(600);
-	plot2Db->SetYAxisSize(400);
-	MDguinier.addToCPlot2D(plot2Db, EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_POSTPROCESS_GUINIER_VALUE_IN, 0., 0., 0.);
+	CPlot2D *plot2Dc = new CPlot2D("Guinier plots");
+	plot2Dc->SetXAxisSize(600);
+	plot2Dc->SetYAxisSize(400);
+	MDguinier.addToCPlot2D(plot2Dc, EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_POSTPROCESS_GUINIER_VALUE_IN, 0., 0., 0.);
 	if (fn_mtf != "")
-		MDguinier.addToCPlot2D(plot2Db, EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_POSTPROCESS_GUINIER_VALUE_INVMTF, 0., 1., 0.);
+		MDguinier.addToCPlot2D(plot2Dc, EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_POSTPROCESS_GUINIER_VALUE_INVMTF, 0., 1., 0.);
 	if (do_fsc_weighting)
 	{
-		MDextra1.addToCPlot2D(plot2Db, EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_POSTPROCESS_GUINIER_VALUE_WEIGHTED, 0., 0., 1.);
+		MDextra1.addToCPlot2D(plot2Dc, EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_POSTPROCESS_GUINIER_VALUE_WEIGHTED, 0., 0., 1.);
 	}
 	if (do_auto_bfac || ABS(adhoc_bfac) > 0.)
 	{
-		MDextra2.addToCPlot2D(plot2Db, EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_POSTPROCESS_GUINIER_VALUE_SHARPENED, 1., 0., 0.);
+		MDextra2.addToCPlot2D(plot2Dc, EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_POSTPROCESS_GUINIER_VALUE_SHARPENED, 1., 0., 0.);
 	}
-	plot2Db->SetXAxisTitle("resolution^2 (1/A^2)");
-	plot2Db->SetYAxisTitle("ln(amplitudes)");
-	plot2Db->OutputPostScriptPlot(fn_out + "_guinier.eps");
-	delete plot2Db;
+	plot2Dc->SetXAxisTitle("resolution^2 (1/A^2)");
+	plot2Dc->SetYAxisTitle("ln(amplitudes)");
+	plot2Dc->OutputPostScriptPlot(fn_out + "_guinier.eps");
+	delete plot2Dc;
 
 	FileName fn_log = fn_out.beforeLastOf("/") + "/logfile.pdf";
 	if (!exists(fn_log))
 	{
 		std::vector<FileName> fn_eps;
 		fn_eps.push_back(fn_out + "_fsc.eps");
+		fn_eps.push_back(fn_out + "_fsc_part.eps");
 		fn_eps.push_back(fn_out + "_guinier.eps");
 		joinMultipleEPSIntoSinglePDF(fn_log, fn_eps);
 	}
@@ -1155,6 +1236,11 @@ void Postprocessing::run()
 		// Now that we have fsc_masked and fsc_random_masked, calculate fsc_true according to Richard's formula
 		// FSC_true = FSC_t - FSC_n / ( )
 		calculateFSCtrue(fsc_true, fsc_unmasked, fsc_masked, fsc_random_masked, randomize_at);
+
+		// Also calculate cisTEM-like corrected part_FSC based on expected ordered molecular weight
+		calculateFSCpart(fsc_unmasked, frac_molweight, fsc_part_molweight);
+		// and based on fraction of white voxels in the solvent mask used for RELION-correction
+		calculateFSCpart(fsc_unmasked, frac_solvent_mask, fsc_part_fracmask);
 
 		// Now re-read the original maps yet again into memory
 		I1.read(fn_I1);

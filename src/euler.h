@@ -74,9 +74,7 @@ void Euler_angles2matrix(RFLOAT a, RFLOAT b, RFLOAT g, Matrix2D< RFLOAT >& A,
  * This function returns  a vector parallel to the  projection direction.
  * Resizes v if needed
  */
-void Euler_angles2direction(RFLOAT alpha,
-						 RFLOAT beta,
-						 Matrix1D< RFLOAT >& v);
+void Euler_angles2direction(RFLOAT alpha, RFLOAT beta, Matrix1D< RFLOAT >& v);
 
 /** Euler direction2angles
  *

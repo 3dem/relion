@@ -25,16 +25,23 @@
 #include <src/time.h>
 #include <src/symmetries.h>
 #include <src/jaz/obs_model.h>
+#ifdef HAVE_PNG
+#include <src/jaz/gravis/tImage.h>
+#endif
 
 #include <map>
 
 class image_handler_parameters
 {
 	public:
-   	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_fsc, fn_adjust_power, fn_correct_ampl, fn_fourfilter, fn_cosDPhi;
+   	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_mask, fn_fsc, fn_adjust_power, fn_correct_ampl, fn_fourfilter, fn_cosDPhi;
 	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box, minr_ampl_corr, my_new_box_size;
-	bool do_add_edge, do_invert_hand, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_calc_com, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan, do_average_all_frames, do_power, do_ignore_optics;
-	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, new_angpix, lowpass, highpass, logfilter, bfactor, shift_x, shift_y, shift_z, replace_nan, randomize_at;
+	bool do_add_edge, do_invert_hand, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_calc_com, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan, do_average_all_frames, do_power, do_ignore_optics, do_optimise_scale_subtract;
+	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, requested_angpix, real_angpix, force_header_angpix, lowpass, highpass, logfilter, bfactor, shift_x, shift_y, shift_z, replace_nan, randomize_at, optimise_bfactor_subtract;
+	// PNG options
+	RFLOAT minval, maxval, sigma_contrast;
+	int color_scheme; // There is a global variable called colour_scheme in displayer.h!
+
 	std::string directional;
    	int verb;
 	// I/O Parser
@@ -43,6 +50,7 @@ class image_handler_parameters
 
 	Image<RFLOAT> Iout;
 	Image<RFLOAT> Iop;
+	Image<RFLOAT> Imask;
 	MultidimArray<RFLOAT> avg_ampl;
 	MetaDataTable MD;
 	FourierTransformer transformer;
@@ -84,6 +92,11 @@ class image_handler_parameters
 		fn_adjust_power = parser.getOption("--adjust_power", "Adjust the power spectrum of the input image to be the same as this image ", "");
 		fn_fourfilter = parser.getOption("--fourier_filter", "Multiply the Fourier transform of the input image(s) with this one image ", "");
 
+		int subtract_section = parser.addSection("additional subtract options");
+		do_optimise_scale_subtract = parser.checkOption("--optimise_scale_subtract", "Optimise scale between maps before subtraction?");
+		optimise_bfactor_subtract = textToFloat(parser.getOption("--optimise_bfactor_subtract", "Search range for relative B-factor for subtraction (in A^2)", "0."));
+		fn_mask = parser.getOption("--mask_optimise_subtract", "Use only voxels in this mask to optimise scale for subtraction", "");
+
 		int four_section = parser.addSection("per-image operations");
 		do_stats = parser.checkOption("--stats", "Calculate per-image statistics?");
 		do_calc_com = parser.checkOption("--com", "Calculate center of mass?");
@@ -93,7 +106,9 @@ class image_handler_parameters
 		directional = parser.getOption("--directional", "Directionality of low-pass filter frequency ('X', 'Y' or 'Z', default non-directional)", "");
 		logfilter = textToFloat(parser.getOption("--LoG", "Diameter for optimal response of Laplacian of Gaussian filter (in A)", "-1."));
 		angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in A)", "-1"));
-		new_angpix = textToFloat(parser.getOption("--rescale_angpix", "Scale input image(s) to this new pixel size (in A)", "-1."));
+		requested_angpix = textToFloat(parser.getOption("--rescale_angpix", "Scale input image(s) to this new pixel size (in A)", "-1."));
+		real_angpix = -1;
+		force_header_angpix = textToFloat(parser.getOption("--force_header_angpix", "Change the pixel size in the header (in A). Without --rescale_angpix, the image is not scaled.", "-1."));
 		new_box = textToInteger(parser.getOption("--new_box", "Resize the image(s) to this new box size (in pixel) ", "-1"));
 		filter_edge_width = textToInteger(parser.getOption("--filter_edge_width", "Width of the raised cosine on the low/high-pass filter edge (in resolution shells)", "2"));
 		do_flipX = parser.checkOption("--flipX", "Flip (mirror) a 2D image or 3D map in the X-direction?");
@@ -132,6 +147,17 @@ class image_handler_parameters
 		avg_last = textToInteger(parser.getOption("--avg_last", "Last frame to include in averaging", "-1"));
 		do_average_all_frames = parser.checkOption("--average_all_movie_frames", "Average all movie frames of all movies in the input STAR file.");
 
+		int png_section = parser.addSection("PNG options");
+		minval = textToFloat(parser.getOption("--black", "Pixel value for black (default is auto-contrast)", "0"));
+		maxval = textToFloat(parser.getOption("--white", "Pixel value for white (default is auto-contrast)", "0"));
+		sigma_contrast  = textToFloat(parser.getOption("--sigma_contrast", "Set white and black pixel values this many times the image stddev from the mean", "0"));
+		if (parser.checkOption("--colour_fire", "Show images in black-grey-white-red colour scheme (highlight high signal)?")) color_scheme = BLACKGREYREDSCALE;
+		else if (parser.checkOption("--colour_ice", "Show images in blue-black-grey-white colour scheme (highlight low signal)?")) color_scheme = BLUEGREYWHITESCALE;
+		else if (parser.checkOption("--colour_fire-n-ice", "Show images in blue-grey-red colour scheme (highlight high&low signal)?")) color_scheme = BLUEGREYREDSCALE;
+		else if (parser.checkOption("--colour_rainbow", "Show images in cyan-blue-black-red-yellow colour scheme?")) color_scheme = RAINBOWSCALE;
+		else if (parser.checkOption("--colour_difference", "Show images in cyan-blue-black-red-yellow colour scheme (for difference images)?")) color_scheme = CYANBLACKYELLOWSCALE;
+		else color_scheme = GREYSCALE;
+
 		// Hidden
 		fn_cosDPhi = getParameter(argc, argv, "--cos_dphi", "");
 		// Check for errors in the command-line option
@@ -149,9 +175,13 @@ class image_handler_parameters
 		Image<RFLOAT> Iout;
 		Iout().resize(Iin());
 
-		if (angpix < 0 && (new_angpix > 0 || fn_fsc != "" || randomize_at > 0 ||
+		bool isPNG = FileName(my_fn_out.getExtension()).toLowercase() == "png";
+		if (isPNG && (ZSIZE(Iout()) > 1 || NSIZE(Iout()) > 1))
+			REPORT_ERROR("You can only write a 2D image to a PNG file.");
+
+		if (angpix < 0 && (requested_angpix > 0 || fn_fsc != "" || randomize_at > 0 ||
 		                   do_power || fn_cosDPhi != "" || fn_correct_ampl != "" ||
-		                   fabs(bfactor) > 0 || logfilter > 0 || lowpass > 0 || highpass > 0))
+		                   fabs(bfactor) > 0 || logfilter > 0 || lowpass > 0 || highpass > 0 || fabs(optimise_bfactor_subtract) > 0))
 		{
 			angpix = Iin.samplingRateX();
 			std::cerr << "WARNING: You did not specify --angpix. The pixel size in the image header, " << angpix << " A/px, is used." << std::endl;
@@ -279,9 +309,82 @@ class image_handler_parameters
 		}
 		else if (fn_subtract != "")
 		{
+			RFLOAT my_scale = 1., best_diff2 ;
+			if (do_optimise_scale_subtract)
+			{
+				if (fn_mask == "")
+				{
+					Imask(). resize(Iop());
+					Imask().initConstant(1.);
+				}
+
+				if (optimise_bfactor_subtract > 0.)
+				{
+					MultidimArray< Complex > FTop, FTop_bfac;
+					FourierTransformer transformer;
+					MultidimArray<RFLOAT> Isharp(Iop());
+					transformer.FourierTransform(Iop(), FTop);
+
+					RFLOAT my_bfac, smallest_diff2=99.e99;
+					for (RFLOAT bfac = -optimise_bfactor_subtract; bfac <= optimise_bfactor_subtract; bfac+= 10.)
+					{
+						FTop_bfac = FTop;
+						applyBFactorToMap(FTop_bfac, XSIZE(Iop()), bfac, angpix);
+						transformer.inverseFourierTransform(FTop_bfac, Isharp);
+						RFLOAT scale, diff2;
+
+						RFLOAT sum_aa = 0., sum_xa = 0., sum_xx = 0.;
+						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iin())
+						{
+							RFLOAT w = DIRECT_MULTIDIM_ELEM(Imask(), n) * DIRECT_MULTIDIM_ELEM(Imask(), n);
+							RFLOAT x = DIRECT_MULTIDIM_ELEM(Iin(), n);
+							RFLOAT a = DIRECT_MULTIDIM_ELEM(Isharp, n);
+							sum_aa += w*a*a;
+							sum_xa += w*x*a;
+							sum_xx += w*x*x;
+						}
+						scale = sum_xa/sum_aa;
+
+						diff2 = 0.;
+						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iin())
+						{
+							RFLOAT w = DIRECT_MULTIDIM_ELEM(Imask(), n);
+							RFLOAT x = DIRECT_MULTIDIM_ELEM(Iin(), n);
+							RFLOAT a = DIRECT_MULTIDIM_ELEM(Isharp, n);
+							diff2 += w * w * (x - scale * a) * (x - scale * a);
+						}
+						if (diff2 < smallest_diff2)
+						{
+							smallest_diff2 = diff2;
+							my_bfac = bfac;
+							my_scale = scale;
+						}
+					}
+					std::cout << " Optimised bfactor = " << my_bfac << "; optimised scale = " << my_scale << std::endl;
+					applyBFactorToMap(FTop, XSIZE(Iop()), my_bfac, angpix);
+					transformer.inverseFourierTransform(FTop, Iop());
+
+				}
+				else
+				{
+					RFLOAT sum_aa = 0., sum_xa = 0.;
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iin())
+					{
+						RFLOAT w = DIRECT_MULTIDIM_ELEM(Imask(), n);
+						RFLOAT x = DIRECT_MULTIDIM_ELEM(Iin(), n);
+						RFLOAT a = DIRECT_MULTIDIM_ELEM(Iop(), n);
+						sum_aa += w*w*a*a;
+						sum_xa += w*w*x*a;
+					}
+					my_scale = sum_xa/sum_aa;
+					std::cout << " Optimised scale = " << my_scale << std::endl;
+
+				}
+			}
+
 			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Iin())
 			{
-				DIRECT_A3D_ELEM(Iout(), k, i, j) -= DIRECT_A3D_ELEM(Iop(), k, i, j);
+				DIRECT_A3D_ELEM(Iout(), k, i, j) -= my_scale * DIRECT_A3D_ELEM(Iop(), k, i, j);
 			}
 		}
 		else if (fn_fsc != "")
@@ -373,10 +476,10 @@ class image_handler_parameters
 			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
 			{
 				int jpp = ROUND(jp * A(0, 0) + ip * A(0, 1));
-	            int ipp = ROUND(jp * A(1, 0) + ip * A(1, 1));
-	            int kpp = kp;
-	            RFLOAT fil;
-	            if (jpp >= STARTINGX(Iop()) && jpp <= FINISHINGX(Iop()) && ipp >= STARTINGY(Iop()) && ipp <= FINISHINGY(Iop()))
+				int ipp = ROUND(jp * A(1, 0) + ip * A(1, 1));
+				int kpp = kp;
+				RFLOAT fil;
+				if (jpp >= STARTINGX(Iop()) && jpp <= FINISHINGX(Iop()) && ipp >= STARTINGY(Iop()) && ipp <= FINISHINGY(Iop()))
 					fil = A3D_ELEM(Iop(), kpp, ipp, jpp);
 				else
 					fil = 0.;
@@ -461,38 +564,42 @@ class image_handler_parameters
 		}
 
 		// Re-scale
-		if (new_angpix > 0.)
+		if (requested_angpix > 0.)
 		{
-
 			int oldxsize = XSIZE(Iout());
 			int oldysize = YSIZE(Iout());
 			int oldsize = oldxsize;
-			if ( oldxsize != oldysize && Iout().getDim() == 2)
+			if (oldxsize != oldysize && Iout().getDim() == 2)
 			{
 				oldsize = XMIPP_MAX( oldxsize, oldysize );
 				Iout().setXmippOrigin();
 				Iout().window(FIRST_XMIPP_INDEX(oldsize), FIRST_XMIPP_INDEX(oldsize),
-						      LAST_XMIPP_INDEX(oldsize),  LAST_XMIPP_INDEX(oldsize));
+			 	              LAST_XMIPP_INDEX(oldsize),  LAST_XMIPP_INDEX(oldsize));
 			}
 
-			int newsize = ROUND(oldsize * (angpix / new_angpix));
-			newsize -= newsize%2; //make even in case it is not already
+			int newsize = ROUND(oldsize * (angpix / requested_angpix));
+			newsize -= newsize % 2; //make even in case it is not already
+
+			real_angpix = oldsize * angpix / newsize;
+			if (fabs(real_angpix - requested_angpix) / requested_angpix > 0.001)
+				std::cerr << "WARNING: Although the requested pixel size (--rescale_angpix) is " << requested_angpix << " A/px, the actual pixel size will be " << real_angpix << " A/px due to rounding of the box size to an even number. The latter value is set to the image header. You can overwrite the header pixel size by --force_header_angpix." << std::endl;
+
 			resizeMap(Iout(), newsize);
 			my_new_box_size = newsize;
 
-			if ( oldxsize != oldysize && Iout().getDim() == 2)
+			if (oldxsize != oldysize && Iout().getDim() == 2)
 			{
-				int newxsize = ROUND(oldxsize * (angpix / new_angpix));
-				int newysize = ROUND(oldysize * (angpix / new_angpix));;
+				int newxsize = ROUND(oldxsize * (angpix / real_angpix));
+				int newysize = ROUND(oldysize * (angpix / real_angpix));;
 				newxsize -= newxsize%2; //make even in case it is not already
 				newysize -= newysize%2; //make even in case it is not already
 				Iout().setXmippOrigin();
 				Iout().window(FIRST_XMIPP_INDEX(newysize), FIRST_XMIPP_INDEX(newxsize),
-						      LAST_XMIPP_INDEX(newysize),  LAST_XMIPP_INDEX(newxsize));
+				              LAST_XMIPP_INDEX(newysize),  LAST_XMIPP_INDEX(newxsize));
 			}
 
 			// Also reset the sampling rate in the header
-			Iout.setSamplingRateInHeader(new_angpix);
+			Iout.setSamplingRateInHeader(real_angpix);
 		}
 
 		// Re-window
@@ -533,30 +640,65 @@ class image_handler_parameters
 			}
 		}
 
+		if (force_header_angpix > 0)
+		{
+			Iout.setSamplingRateInHeader(force_header_angpix);
+			std::cout << "As requested by --force_header_angpix, the pixel size in the image header is set to " << force_header_angpix << " A/px." << std::endl;
+		}
+
 		// Write out the result
 		// Check whether fn_out has an "@": if so REPLACE the corresponding frame in the output stack!
 		long int n;
 		FileName fn_tmp;
 		my_fn_out.decompose(n, fn_tmp);
 		n--;
-		if (n >= 0) // This is a stack...
+		if (!isPNG)
 		{
+			if (n >= 0) // This is a stack...
+			{
 
-			// The following assumes the images in the stack come ordered...
-			if (n == 0)
-				Iout.write(fn_tmp, n, true, WRITE_OVERWRITE); // make a new stack
+				// The following assumes the images in the stack come ordered...
+				if (n == 0)
+					Iout.write(fn_tmp, n, true, WRITE_OVERWRITE); // make a new stack
+				else
+					Iout.write(fn_tmp, n, true, WRITE_APPEND);
+			}
 			else
-				Iout.write(fn_tmp, n, true, WRITE_APPEND);
+				Iout.write(my_fn_out);
 		}
 		else
-			Iout.write(my_fn_out);
+		{
+#ifdef HAVE_PNG
+			RFLOAT this_minval = minval, this_maxval = maxval; // User setting
+			getImageContrast(Iout(), this_minval, this_maxval, sigma_contrast); // Update if neecssary
+			const RFLOAT range = this_maxval - this_minval;
+			const RFLOAT step = range / 255;
+
+			gravis::tImage<gravis::bRGB> pngOut(XSIZE(Iout()), YSIZE(Iout()));
+			pngOut.fill(gravis::bRGB(0));
+
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iout())
+			{
+				const unsigned char val = FLOOR((DIRECT_MULTIDIM_ELEM(Iout(), n) - this_minval) / step);
+				unsigned char r, g, b;
+				greyToRGB(color_scheme, val, r, g, b);
+				pngOut[n] = gravis::bRGB(r, g, b);
+			}
+			pngOut.writePNG(my_fn_out);
+#else
+			REPORT_ERROR("You cannot write PNG images because libPNG was not linked during compilation.");
+#endif
+		}
 	}
 
 	void run()
 	{
 		my_new_box_size = -1;
 
-		bool input_is_stack = (fn_in.getExtension() == "mrcs" || fn_in.getExtension() == "tif" || fn_in.getExtension() == "tiff") && !fn_in.contains("@");
+		long int slice_id;
+		std::string fn_stem;
+		fn_in.decompose(slice_id, fn_stem);
+		bool input_is_stack = (fn_in.getExtension() == "mrcs" || fn_in.getExtension() == "tif" || fn_in.getExtension() == "tiff") && (slice_id == -1);
 		bool input_is_star = (fn_in.getExtension() == "star");
 		// By default: write single output images
 
@@ -647,7 +789,10 @@ class image_handler_parameters
 				else if (fn_add != "")
 					Iop.read(fn_add);
 				else if (fn_subtract != "")
+				{
 					Iop.read(fn_subtract);
+					if (do_optimise_scale_subtract && fn_mask != "") Imask.read(fn_mask);
+				}
 				else if (fn_fsc != "")
 					Iop.read(fn_fsc);
 				else if (fn_cosDPhi != "")
@@ -706,9 +851,10 @@ class image_handler_parameters
 			if (do_stats) // only write statistics to screen
 			{
 				Iin.read(fn_img);
-				RFLOAT avg, stddev, minval, maxval;
+				RFLOAT avg, stddev, minval, maxval, header_angpix;
 				Iin().computeStats(avg, stddev, minval, maxval);
-				std::cout << fn_img << " : (x,y,z,n)= " << XSIZE(Iin()) << " x "<< YSIZE(Iin()) << " x "<< ZSIZE(Iin()) << " x "<< NSIZE(Iin()) << " ; avg= " << avg << " stddev= " << stddev << " minval= " <<minval << " maxval= " << maxval << std::endl;
+				header_angpix = Iin.samplingRateX();
+				std::cout << fn_img << " : (x,y,z,n)= " << XSIZE(Iin()) << " x "<< YSIZE(Iin()) << " x "<< ZSIZE(Iin()) << " x "<< NSIZE(Iin()) << " ; avg= " << avg << " stddev= " << stddev << " minval= " <<minval << " maxval= " << maxval << "; angpix = " << header_angpix << std::endl;
 			}
 			else if (do_calc_com)
 			{
@@ -886,11 +1032,11 @@ class image_handler_parameters
 						obsModel.opticsMdt.setValue(EMDL_IMAGE_SIZE, my_new_box_size);
 					}
 				}
-				if (new_angpix > 0)
+				if (real_angpix > 0)
 				{
 					FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
 					{
-						obsModel.opticsMdt.setValue(EMDL_IMAGE_PIXEL_SIZE, new_angpix);
+						obsModel.opticsMdt.setValue(EMDL_IMAGE_PIXEL_SIZE, real_angpix);
 					}
 				}
 				obsModel.save(MD, fn_md_out);

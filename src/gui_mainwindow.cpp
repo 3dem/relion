@@ -1783,17 +1783,17 @@ void GuiMainWindow::cb_display_io_node_i()
 
 				std::string error_message = "";
 				float mylowpass = manualpickjob.joboptions["lowpass"].getNumber(error_message);
-				if (error_message != "") {fl_message("%s", error_message.c_str()); return;}
+				if (error_message != "") {fl_message("joboption['lowpass'] %s", error_message.c_str()); return;}
 				if (mylowpass > 0.)
 					command += " --lowpass " + manualpickjob.joboptions["lowpass"].getString();
 
 				float myhighpass = manualpickjob.joboptions["highpass"].getNumber(error_message);
-				if (error_message != "") {fl_message("%s", error_message.c_str()); return;}
+				if (error_message != "") {fl_message("joboption['highpass'] %s", error_message.c_str()); return;}
 				if (myhighpass > 0.)
 					command += " --highpass " + manualpickjob.joboptions["highpass"].getString();
 
 				float myangpix = manualpickjob.joboptions["angpix"].getNumber(error_message);
-				if (error_message != "") {fl_message("%s", error_message.c_str()); return;}
+				if (error_message != "") {fl_message("joboption['angpix'] %s", error_message.c_str()); return;}
 				if (myangpix > 0.)
 					command += " --angpix " + manualpickjob.joboptions["angpix"].getString();
 
@@ -1915,7 +1915,10 @@ void GuiMainWindow::cb_delete_scheduler_edge_i()
 {
 	int idx = scheduler_edge_browser->value();
 	if (idx <= 0)
+	{
+		fl_message("Please select a job.");
 		return;
+	}
 
 	std::string ask = "Are you sure you want to delete this edge?";
 	int proceed =  fl_choice("%s", "Cancel", "Delete!", NULL, ask.c_str());
@@ -2660,7 +2663,7 @@ void GuiMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 {
 	if (current_job < 0)
 	{
-		std::cout << " You can only delete existing jobs ... " << std::endl;
+		fl_message("Please select a job.");
 		return;
 	}
 
@@ -2732,9 +2735,9 @@ e.g. by using \"touch Polish/job045/NO_HARSH_CLEAN\". Below is a list of current
 		for (int myjob = 0; myjob < pipeline.processList.size(); myjob++)
 		{
 			if (pipeline.processList[myjob].status == PROC_FINISHED_SUCCESS &&
-					(pipeline.processList[myjob].type == PROC_MOTIONCORR ||
-					pipeline.processList[myjob].type == PROC_EXTRACT ||
-					pipeline.processList[myjob].type == PROC_SUBTRACT) )
+			    (pipeline.processList[myjob].type == PROC_MOTIONCORR ||
+			     pipeline.processList[myjob].type == PROC_EXTRACT ||
+			     pipeline.processList[myjob].type == PROC_SUBTRACT))
 			{
 				if (exists(pipeline.processList[myjob].name + "NO_HARSH_CLEAN"))
 					ask += pipeline.processList[myjob].name + " \n";
@@ -2777,7 +2780,14 @@ void GuiMainWindow::cb_cleanup_i(int myjob, bool do_verb, bool do_harsh)
 {
 	// Allow cleaning the currently selected job from the GUI
 	if (myjob < 0)
+	{
+		if (current_job < 0)
+		{
+			fl_message("Please select a job.");
+			return;
+		}
 		myjob = current_job;
+	}
 
 	int proceed = 1;
 	if (do_verb)
@@ -2804,6 +2814,12 @@ void GuiMainWindow::cb_set_alias(Fl_Widget* o, void* v)
 
 void GuiMainWindow::cb_set_alias_i(std::string alias)
 {
+	if (current_job < 0)
+	{
+		fl_message("Please select a job.");
+		return;
+	}
+
 	FileName fn_pre, fn_jobnr, fn_post, fn_dummy, default_ask;
 	if (!decomposePipelineFileName(pipeline.processList[current_job].name, fn_pre, fn_jobnr, fn_post))
 		REPORT_ERROR("GuiMainWindow::cb_set_alias_i ERROR: invalid pipeline process name: " + pipeline.processList[current_job].name);
@@ -2854,6 +2870,12 @@ void GuiMainWindow::cb_abort(Fl_Widget* o, void* v)
 
 void GuiMainWindow::cb_abort_i(std::string alias)
 {
+	if (current_job < 0)
+	{
+		fl_message("Please select a job.");
+		return;
+	}
+
 	if (pipeline.processList[current_job].status != PROC_RUNNING)
 	{
 		std::string error_message = "You can only abort running jobs ... ";
@@ -2909,6 +2931,12 @@ void GuiMainWindow::cb_make_flowchart(Fl_Widget* o, void* v)
 
 void GuiMainWindow::cb_make_flowchart_i()
 {
+	if (current_job < 0)
+	{
+		fl_message("Please select a job.");
+		return;
+	}
+
 	std::string error_message;
 	if (!pipeline.makeFlowChart(current_job, true, error_message))
 		fl_message("%s",error_message.c_str());
@@ -3013,7 +3041,7 @@ void GuiMainWindow::cb_undelete_job_i()
 		return;
 
 	char relname[FL_PATH_MAX];
-    fl_filename_relative(relname,sizeof(relname),chooser.value());
+	fl_filename_relative(relname,sizeof(relname),chooser.value());
 	FileName fn_pipe(relname);
 
 	pipeline.undeleteJob(fn_pipe);
@@ -3418,63 +3446,72 @@ void GuiMainWindow::cb_about(Fl_Widget* o, void* v)
 
 void GuiMainWindow::cb_about_i()
 {
-#define HELPTEXT ("RELION " RELION_SHORT_VERSION "\n \n \
-RELION is is developed in the groups of\n\n \
-Sjors H.W. Scheres at the MRC Laboratory of Molecular Biology\n \n \
-- Sjors H.W. Scheres\n \
-- Shaoda He\n \
-- Takanori Nakane\n \
-- Jasenko Zivanov\n \
-- Liyi Dong\n \
-\n \n \
-and Erik Lindahl at Stockholm University\n \n \
-- Erik Lindahl\n \
-- Björn O. Forsberg\n \
-- Dari Kimanius\n \
+#define HELPTEXT ("RELION " RELION_SHORT_VERSION " \n\n\
+RELION is developed in the groups of:\n\n\
+Sjors H.W. Scheres at the MRC Laboratory of Molecular Biology\n\
+ - Sjors H.W. Scheres\n\
+ - Shaoda He\n\
+ - Takanori Nakane\n\
+ - Jasenko Zivanov\n\
+ - Liyi Dong\n\
+ - Dari Kimanius\n\
+\n\
+and Erik Lindahl at Stockholm University\n\
+ - Erik Lindahl\n\
+ - Björn O. Forsber\n\
 \n\
 Note that RELION is completely free, open-source software. You can redistribute it and/or modify it for your own purposes, but please do make sure \
 the contribution of the developers are acknowledged appropriately. In order to maintain an overview of existing versions, a notification regarding  \
-any redistribution of (modified versions of) the code is appreciated (contact Sjors directly). \n \n \n \
+any redistribution of (modified versions of) the code is appreciated (contact Sjors directly).\n\n\
 If RELION is useful in your work, please cite us. Relevant papers are:\n \n \
- * General Bayesian approach (and first mention of RELION): \n \
-     Scheres (2012) J. Mol. Biol. (PMID: 22100448)	 \n \n\
- * RELION implementation details and the 3D auto-refine procedure: \n \
-     Scheres (2012) J. Struct. Biol. (PMID: 23000701)	 \n \n\
- * Gold-standard FSC and the relevance of the 0.143 criterion: \n \
-     Scheres & Chen (2012) Nat. Meth. (PMID: 22842542)	 \n \n\
- * Movie-processing procedure: \n \
-     Bai et al. (2013) eLife (PMID: 23427024 )	 \n \n\
- * Correction of mask effects on the FSC curve by randomised phases: \n \
-     Chen et al. (2013) Ultramicroscopy (PMID: 23872039)	 \n \n\
- * Auto-picking : \n \
-     Scheres (2014) J. Struct. Biol. (PMID: 25486611) \n \n \
- * Sub-tomogram averaging : \n \
-     Bharat et al. (2015) Structure (PMID: 26256537) \n \n \
- * v.2.0 GPU capability and autopicking acceleration : \n \
-     Kimanius et al. (2016) eLife (PMID: 27845625) \n \n \
- * Helical reconstruction : \n \
-     He & Scheres (2017) J, Struct. Biol. (PMID: 28193500) \n \n \
-Please also cite the following EXTERNAL programs: \n \n \
-* MOTIONCOR2 for beam-induced motion correction: \n \
-    Zheng et al (2017) Nat. Meth. (PMID: 28250466) \n \n\
-* UNBLUR for beam-induced motion correction: \n \
-    Grabnt & Grigorieff eLife (PMID: 26023829) \n \n\
-* CTFFIND4 for CTF-estimation: \n \
-    Rohou & Grigorieff (2015) J. Struct. Biol. (PMID: 26278980) \n \n\
-* Gctf for CTF-estimation: \n \
-    Zhang (2016) J. Struct. Biol. (PMID: 26592709) \n \n\
-* Stochastic Gradient Descent initial model generation:  \n\
-    Punjani et al. (2017) Nat. Meth. (PMID: 28165473) \n \n\
-* ResMap for local-resolution estimation:  \n\
-    Kucukelbir et al. (2014) Nat. Meth. (PMID: 24213166) \n \n\
-* Postscript plots are made using CPlot2D from  www.amzsaki.com\n\n\
+ * General Bayesian approach (and first mention of RELION):\n\
+     Scheres (2012) J. Mol. Biol. (PMID: 22100448)\n\n\
+ * RELION implementation details and the 3D auto-refine procedure:\n\
+     Scheres (2012) J. Struct. Biol. (PMID: 23000701)\n\n\
+ * Gold-standard FSC and the relevance of the 0.143 criterion:\n\
+     Scheres & Chen (2012) Nat. Meth. (PMID: 22842542)\n\n\
+ * Correction of mask effects on the FSC curve by randomised phases:\n\
+     Chen et al. (2013) Ultramicroscopy (PMID: 23872039)\n\n\
+ * Auto-picking :\n\
+     Scheres (2014) J. Struct. Biol. (PMID: 25486611)\n\n\
+ * Sub-tomogram averaging :\n\
+     Bharat et al. (2015) Structure (PMID: 26256537)\n\n\
+ * RELION 2.0 GPU capability and autopicking acceleration:\n\
+     Kimanius et al. (2016) eLife (PMID: 27845625)\n\n\
+ * Helical reconstruction:\n\
+     He & Scheres (2017) J, Struct. Biol. (PMID: 28193500)\n\n\
+ * RELION 3.0 CTFRefine, RelionIt, CPU acceleration, Ewald sphere correction:\n\
+     Zivanov et al. (2018) eLife (PMID: 30412051)\n\n\
+ * Multibody refinement:\n\
+     Nakane et al. (2018) eLife (PMID: 29856314)\n\n\
+ * Bayesian Polishing:\n\
+     Zivanov et al. (2019) IUCrJ (PMID: 30713699)\n\n\
+ * Higher-order aberration correction, magnification anisotropy correction\n\
+     Zivanov et al. (2020) IUCrJ (PMID: 32148853)\n\n\
+ * Amyloid structure determination:\n\
+     Scheres (2020) Acta Crystallor. D (PMID: 32038040)\n\n\
+\
+Please also cite relevant papers when you used external programs or their algorithms re-implemented in RELION: \n \n \
+* MOTIONCOR2 algorithm for beam-induced motion correction:\n\
+    Zheng et al (2017) Nat. Meth. (PMID: 28250466)\n\n\
+* CTFFIND4 for CTF-estimation:\n\
+    Rohou & Grigorieff (2015) J. Struct. Biol. (PMID: 26278980)\n\n\
+* GCTF for CTF-estimation:\n\
+    Zhang (2016) J. Struct. Biol. (PMID: 26592709)\n\n\
+* Stochastic Gradient Descent for initial model generation:\n\
+    Punjani et al. (2017) Nat. Meth. (PMID: 28165473)\n\n\
+* ResMap for local-resolution estimation:\n\
+    Kucukelbir et al. (2014) Nat. Meth. (PMID: 24213166)\n\n\
+* Symmetry relaxation:\n\
+    Abrishami et al. (2020) Prog. Biophys. Mol. Biol. (PMID: 32470354) \n\n\
+* Postscript plots are made using CPlot2D from http://www.amzsaki.com\n\n\
 \
 About the start up screen:\n\n\
 The map shown is the cryo-EM map of mouse heavy-chain apoferritin\n\
 at 1.54 A (EMDB-9865). This is the highest resolution single particle\n\
 reconstruction map deposited to EMDB as of August 2019. The raw dataset\n\
 is also available at EMPIAR-10248.\
- ")
+")
 
 	ShowHelpText *help = new ShowHelpText(HELPTEXT);
 }
