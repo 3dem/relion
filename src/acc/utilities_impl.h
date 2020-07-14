@@ -682,7 +682,7 @@ void run_padTranslatedMap(
    
 	if(iszX == oszX && iszY == oszY && iszZ == oszZ)
 	{
-		cudaCpyDeviceToDevice(d_in, d_out, iszX*iszY*iszZ*sizeof(RFLOAT), stream);
+		cudaCpyDeviceToDevice(d_in, d_out, iszX*iszY*iszZ, stream);
 	}
 	else
 	{
@@ -703,7 +703,6 @@ void run_CenterFFTbySign(Complex *img_in, int xSize, int ySize, int zSize, cudaS
 #ifdef CUDA
 	dim3 bs(32,4,2);
 	dim3 gs(ceil(xSize/(float)bs.x), ceil(ySize/(float)bs.y), ceil(zSize/(float)bs.z));
-
 	if(sizeof(RFLOAT) == sizeof(double))
 		cuda_kernel_centerFFTbySign<<<gs,bs, 0, stream>>>(
 				(double2*)img_in,
