@@ -638,12 +638,10 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 	// Apply the CTF to the to-be-subtracted projection
 	if (opt.do_ctf_correction)
 	{
-		if (opt.mydata.obsModel.getCtfPremultiplied(optics_group))
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fsubtract)
-				DIRECT_MULTIDIM_ELEM(Fsubtract, n) *= (DIRECT_MULTIDIM_ELEM(Fctf, n) * DIRECT_MULTIDIM_ELEM(Fctf, n));
-		else
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fsubtract)
-				DIRECT_MULTIDIM_ELEM(Fsubtract, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fsubtract)
+		{
+			DIRECT_MULTIDIM_ELEM(Fsubtract, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+		}
 
 		// Also do phase modulation, for beam tilt correction and other asymmetric aberrations
 		opt.mydata.obsModel.demodulatePhase(optics_group, Fsubtract, true); // true means do_modulate_instead
