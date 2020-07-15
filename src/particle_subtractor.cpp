@@ -480,6 +480,7 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 	transformer.FourierTransform(img(), Fimg);
 	CenterFFTbySign(Fimg);
 	Fctf.resize(Fimg);
+	bool ctf_premultiplied = opt.mydata.obsModel.getCtfPremultiplied(optics_group);
 
 	if (opt.do_ctf_correction)
 	{
@@ -517,6 +518,10 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 			ctf.readByGroup(opt.mydata.MDimg, &opt.mydata.obsModel, ori_img_id);
 			ctf.getFftwImage(Fctf, XSIZE(img()), YSIZE(img()), my_pixel_size,
 					opt.ctf_phase_flipped, false, opt.intact_ctf_first_peak, true);
+
+			if (ctf_premultiplied)
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+					(DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n));
 		}
 	}
 	else
