@@ -199,7 +199,7 @@ enum EMDLabel
 
 	EMDL_JOB_IS_CONTINUE,
 	EMDL_JOB_TYPE,
-	EMDL_JOB_TYPE_NAME,
+	EMDL_JOB_TYPE_LABEL,
 
 	EMDL_JOBOPTION_TYPE,
 	EMDL_JOBOPTION_VARIABLE,
@@ -227,6 +227,7 @@ enum EMDLabel
 	EMDL_MICROGRAPH_ACCUM_MOTION_TOTAL,
 	EMDL_MICROGRAPH_ACCUM_MOTION_EARLY,
 	EMDL_MICROGRAPH_ACCUM_MOTION_LATE,
+	EMDL_MICROGRAPH_COORDINATES,
 	EMDL_MICROGRAPH_ID,
 	EMDL_MICROGRAPH_NAME,
 	EMDL_MICROGRAPH_GAIN_NAME,
@@ -465,10 +466,13 @@ enum EMDLabel
 	EMDL_PIPELINE_JOB_COUNTER,
 	EMDL_PIPELINE_NODE_NAME,
 	EMDL_PIPELINE_NODE_TYPE,
+	EMDL_PIPELINE_NODE_TYPE_LABEL,
 	EMDL_PIPELINE_PROCESS_ALIAS,
 	EMDL_PIPELINE_PROCESS_NAME,
 	EMDL_PIPELINE_PROCESS_TYPE,
+	EMDL_PIPELINE_PROCESS_TYPE_LABEL,
 	EMDL_PIPELINE_PROCESS_STATUS,
+	EMDL_PIPELINE_PROCESS_STATUS_LABEL,
 	EMDL_PIPELINE_EDGE_FROM,
 	EMDL_PIPELINE_EDGE_TO,
 	EMDL_PIPELINE_EDGE_PROCESS,
@@ -502,6 +506,9 @@ enum EMDLabel
 	EMDL_POSTPROCESS_RANDOMISE_FROM,
 	EMDL_POSTPROCESS_UNFIL_HALFMAP1,
 	EMDL_POSTPROCESS_UNFIL_HALFMAP2,
+	EMDL_POSTPROCESSED_MAP,
+	EMDL_POSTPROCESSED_MAP_MASKED,
+
 
 	EMDL_SAMPLING_IS_3D,
 	EMDL_SAMPLING_IS_3D_TRANS,
@@ -788,7 +795,7 @@ private:
 
 		EMDL::addLabel(EMDL_JOB_IS_CONTINUE, EMDL_BOOL, "rlnJobIsContinue", "Is tthis a continuation job?");
 		EMDL::addLabel(EMDL_JOB_TYPE, EMDL_INT, "rlnJobType", "Which type of job is this?");
-		EMDL::addLabel(EMDL_JOB_TYPE_NAME, EMDL_STRING, "rlnJobTypeName", "The name for this type of job (also name of main directory for output jobs)");
+		EMDL::addLabel(EMDL_JOB_TYPE_LABEL, EMDL_STRING, "rlnJobTypeLabel", "The name for this type of job (also name of main directory for output jobs)");
 
 		EMDL::addLabel(EMDL_JOBOPTION_TYPE, EMDL_INT, "rlnJoboptionType", "Which type of joboption is this?");
 		EMDL::addLabel(EMDL_JOBOPTION_VARIABLE, EMDL_STRING, "rlnJobOptionVariable", "Name of the joboption variable");
@@ -816,6 +823,7 @@ private:
 		EMDL::addLabel(EMDL_MICROGRAPH_ACCUM_MOTION_TOTAL, EMDL_DOUBLE, "rlnAccumMotionTotal","Accumulated global motion during the entire movie (in A)");
 		EMDL::addLabel(EMDL_MICROGRAPH_ACCUM_MOTION_EARLY, EMDL_DOUBLE, "rlnAccumMotionEarly","Accumulated global motion during the first frames of the movie (in A)");
 		EMDL::addLabel(EMDL_MICROGRAPH_ACCUM_MOTION_LATE, EMDL_DOUBLE, "rlnAccumMotionLate","Accumulated global motion during the last frames of the movie (in A)");
+		EMDL::addLabel(EMDL_MICROGRAPH_COORDINATES, EMDL_STRING, "rlnMicrographCoordinates", "Filename of a file (in .star, .box or .txt format) with X,Y (Z) coordinates of picked particles in micrographs/tomograms");
 		EMDL::addLabel(EMDL_MICROGRAPH_ID, EMDL_INT, "rlnMicrographId", "ID (i.e. a unique number) of a micrograph");
 		EMDL::addLabel(EMDL_MICROGRAPH_NAME, EMDL_STRING, "rlnMicrographName", "Name of a micrograph");
 		EMDL::addLabel(EMDL_MICROGRAPH_GAIN_NAME, EMDL_STRING, "rlnMicrographGainName", "Name of a gain reference");
@@ -1055,10 +1063,13 @@ private:
 		EMDL::addLabel(EMDL_PIPELINE_JOB_COUNTER, EMDL_INT, "rlnPipeLineJobCounter", "Number of the last job in the pipeline");
 		EMDL::addLabel(EMDL_PIPELINE_NODE_NAME, EMDL_STRING , "rlnPipeLineNodeName", "Name of a Node in the pipeline");
 		EMDL::addLabel(EMDL_PIPELINE_NODE_TYPE, EMDL_INT, "rlnPipeLineNodeType", "Type of a Node in the pipeline");
+		EMDL::addLabel(EMDL_PIPELINE_NODE_TYPE_LABEL, EMDL_STRING, "rlnPipeLineNodeTypeLabel", "Name for the Node Type in the pipeline");
 		EMDL::addLabel(EMDL_PIPELINE_PROCESS_ALIAS, EMDL_STRING , "rlnPipeLineProcessAlias", "Alias of a Process in the pipeline");
 		EMDL::addLabel(EMDL_PIPELINE_PROCESS_NAME, EMDL_STRING , "rlnPipeLineProcessName", "Name of a Process in the pipeline");
 		EMDL::addLabel(EMDL_PIPELINE_PROCESS_TYPE, EMDL_INT, "rlnPipeLineProcessType", "Type of a Process in the pipeline");
-		EMDL::addLabel(EMDL_PIPELINE_PROCESS_STATUS, EMDL_INT, "rlnPipeLineProcessStatus", "Status of a Process in the pipeline (running, scheduled, finished or cancelled)");
+		EMDL::addLabel(EMDL_PIPELINE_PROCESS_TYPE_LABEL, EMDL_STRING, "rlnPipeLineProcessTypeLabel", "Name for the Process type in the pipeline");
+		EMDL::addLabel(EMDL_PIPELINE_PROCESS_STATUS, EMDL_INT, "rlnPipeLineProcessStatus", "Status of a Process in the pipeline (integer for running, scheduled, finished or cancelled)");
+		EMDL::addLabel(EMDL_PIPELINE_PROCESS_STATUS_LABEL, EMDL_STRING, "rlnPipeLineProcessStatusLabel", "Name for the status of a Process in the pipeline (running, scheduled, finished or cancelled)");
 		EMDL::addLabel(EMDL_PIPELINE_EDGE_FROM, EMDL_STRING , "rlnPipeLineEdgeFromNode", "Name of the origin of an edge");
 		EMDL::addLabel(EMDL_PIPELINE_EDGE_TO, EMDL_STRING ,"rlnPipeLineEdgeToNode", "Name of the to-Node in an edge");
 		EMDL::addLabel(EMDL_PIPELINE_EDGE_PROCESS, EMDL_STRING ,"rlnPipeLineEdgeProcess", "Name of the destination of an edge");
@@ -1092,6 +1103,8 @@ private:
 		EMDL::addLabel(EMDL_POSTPROCESS_RANDOMISE_FROM, EMDL_DOUBLE, "rlnRandomiseFrom", "Resolution (in A) from which the phases are randomised in the postprocessing step");
 		EMDL::addLabel(EMDL_POSTPROCESS_UNFIL_HALFMAP1, EMDL_STRING, "rlnUnfilteredMapHalf1", "Name of the unfiltered map from halfset 1");
 		EMDL::addLabel(EMDL_POSTPROCESS_UNFIL_HALFMAP2, EMDL_STRING, "rlnUnfilteredMapHalf2", "Name of the unfiltered map from halfset 2");
+		EMDL::addLabel(EMDL_POSTPROCESSED_MAP, EMDL_STRING, "rlnPostprocessedMap", "Name of the postprocssed map");
+		EMDL::addLabel(EMDL_POSTPROCESSED_MAP_MASKED, EMDL_STRING, "rlnPostprocessedMapMasked", "Name of the masked postprocssed map");
 
 		EMDL::addLabel(EMDL_SAMPLING_IS_3D, EMDL_BOOL, "rlnIs3DSampling", "Flag to indicate this concerns a 3D sampling ");
 		EMDL::addLabel(EMDL_SAMPLING_IS_3D_TRANS, EMDL_BOOL, "rlnIs3DTranslationalSampling", "Flag to indicate this concerns a x,y,z-translational sampling ");

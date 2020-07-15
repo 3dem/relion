@@ -61,7 +61,7 @@ public:
 	bool do_phase_flip;
 	bool do_premultiply_ctf;
 	bool do_ctf_intact_first_peak;
-	RFLOAT angpix, output_angpix;
+	RFLOAT angpix, output_angpix, ref_angpix;
 
 	////////////////// Extract particles from the micrographs
 	// Perform particle extraction?
@@ -74,7 +74,13 @@ public:
 	bool do_skip_ctf_logfiles;
 
 	// STAR file with all (selected) micrographs, the suffix of the coordinates files, and the directory where the coordinate files are
-	FileName fn_star_in, fn_coord_suffix, fn_coord_dir ;
+	FileName fn_star_in, fn_coord_suffix, fn_coord_dir;
+
+	// Map to go from micrograph name to coordinate file name
+	std::map<FileName, FileName> micname2coordname;
+
+	// Alternative to fn_coord_suffix: a list of all coordinate files
+	FileName fn_coord_list;
 
 	// STAR file with refined particle coordinates (to re-extract particles, for example with different binning)
 	FileName fn_data;
@@ -223,8 +229,7 @@ public:
 			RFLOAT &all_maxval);
 
 
-	// Get the coordinate filename and the output filename for the particle stack from the micrograph filename
-	FileName getCoordinateFileName(FileName fn_mic);
+	// Get the coordinate metadatatable from fn_data
 	MetaDataTable getCoordinateMetaDataTable(FileName fn_mic);
 	FileName getOutputFileNameRoot(FileName fn_mic);
 

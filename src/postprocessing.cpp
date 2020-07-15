@@ -691,6 +691,7 @@ void Postprocessing::writeOutput()
 	MDlist.setValue(EMDL_POSTPROCESS_BFACTOR, global_bfactor );
 	MDlist.setValue(EMDL_POSTPROCESS_UNFIL_HALFMAP1, fn_I1);
 	MDlist.setValue(EMDL_POSTPROCESS_UNFIL_HALFMAP2, fn_I2);
+	MDlist.setValue(EMDL_POSTPROCESSED_MAP, fn_out + ".mrc");
 	if (molweight > 0.)
 	{
 		MDlist.setValue(EMDL_POSTPROCESS_MOLWEIGHT, molweight);
@@ -702,6 +703,7 @@ void Postprocessing::writeOutput()
 		RFLOAT randomize_at_Ang = XSIZE(I1())* angpix / randomize_at;
 		MDlist.setValue(EMDL_MASK_NAME, fn_mask);
 		MDlist.setValue(EMDL_POSTPROCESS_RANDOMISE_FROM, randomize_at_Ang);
+		MDlist.setValue(EMDL_POSTPROCESSED_MAP_MASKED, fn_out + "_masked.mrc");
 	}
 	if (do_auto_bfac)
 	{

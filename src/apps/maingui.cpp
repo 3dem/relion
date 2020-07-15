@@ -71,8 +71,8 @@ int main(int argc, char *argv[])
 		// Fill the window
 		if (checkParameter(argc, argv, "--help"))
 		{
-			std::cerr << " [--refresh=2]  : refresh rate in seconds" << std::endl;
-			std::cerr << " [--idle=3600]  : quit GUI after this many second" << std::endl;
+			std::cerr << " [--refresh 2]  : refresh rate in seconds" << std::endl;
+			std::cerr << " [--idle 3600]  : quit GUI after this many second" << std::endl;
 			std::cerr << " [--readonly]   : limited version of GUI that does not touch any files" << std::endl;
 			std::cerr << " [--version]    : show the version of this program" << std::endl;
 			exit(0);

@@ -1513,7 +1513,7 @@ void getLocalSearchOperatorSamplings(
 		sampling.random_perturbation = sampling.perturbation_factor = 0.;
 
 		// Get all orientations
-		sampling.initialise(prior_mode, 3, true, false, false, (prior_mode == NOPRIOR) ? (false) : (true));
+		sampling.initialise(3, true, false, false, (prior_mode == NOPRIOR) ? (false) : (true));
 		sampling.setOrientations();
 
 		// Select orientations

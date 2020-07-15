@@ -2537,7 +2537,7 @@ void Displayer::read(int argc, char **argv)
 	sort_label = EMDL::str2Label(parser.getOption("--sort", "Metadata label to sort images on", "EMDL_UNDEFINED"));
 	random_sort = parser.checkOption("--random_sort", "Use random order in the sorting");
 	reverse_sort = parser.checkOption("--reverse", "Use reverse order (from high to low) in the sorting");
-	do_class = parser.checkOption("--class", "Use this to analyse classes in input model.star file");
+	do_class = parser.checkOption("--class", "Use this to analyse classes in input optimiser.star or model.star file");
 	nr_regroups = textToInteger(parser.getOption("--regroup", "Number of groups to regroup saved particles from selected classes in (default is no regrouping)", "-1"));
 	do_allow_save = parser.checkOption("--allow_save", "Allow saving of selected particles or class averages");
 
@@ -2587,20 +2587,28 @@ void Displayer::initialise()
 	{
 		display_label = EMDL_MLMODEL_REF_IMAGE;
 		table_name = "model_classes";
-		FileName fn_data;
+		FileName fn_data, fn_model = fn_in;
 		if (fn_in.contains("_half1_model.star"))
 			fn_data = fn_in.without("_half1_model.star") + "_data.star";
 		else if (fn_in.contains("_half2_model.star"))
 			fn_data = fn_in.without("_half2_model.star") + "_data.star";
-		else
+		// SHWS 28nov2019: backwards compatibility
+		else if (fn_in.contains("_model.star"))
 			fn_data = fn_in.without("_model.star") + "_data.star";
+		else if (fn_in.contains("_optimiser.star"))
+		{
+			fn_data = fn_in.without("_optimiser.star") + "_data.star";
+			MetaDataTable MDopt;
+			MDopt.read(fn_in, "optimiser_general");
+			MDopt.getValue(EMDL_OPTIMISER_MODEL_STARFILE, fn_model);
+		}
 
 		if (do_ignore_optics) MDdata.read(fn_data);
 		else ObservationModel::loadSafely(fn_data, obsModel, MDdata);
 
 		// If regrouping, also read the model_groups table into memory
 		if (nr_regroups > 0)
-			MDgroups.read(fn_in, "model_groups");
+			MDgroups.read(fn_model, "model_groups");
 	}
 
 	// Also allow regrouping on data.star
@@ -2725,7 +2733,19 @@ int Displayer::runGui()
 		win.is_star = true;
 		win.is_multi = true;
 		win.is_data = fn_in.contains("_data.star");
-		if (fn_in.contains("_model.star"))
+		if (fn_in.contains("_optimiser.star"))
+		{
+			win.fn_data = fn_in.without("_optimiser.star") + "_data.star";
+			win.is_class = true;
+
+			MetaDataTable MDopt;
+			MDopt.read(fn_in, "optimiser_general");
+			FileName fn_model;
+			MDopt.getValue(EMDL_OPTIMISER_MODEL_STARFILE, fn_model);
+			MD.read(fn_model, "model_classes");
+		}
+		// SHWS 28nov2019: backwards compatibility
+		else if (fn_in.contains("_model.star"))
 		{
 			win.fn_data = fn_in.without("_model.star") + "_data.star";
 			win.is_class = true;
@@ -2809,7 +2829,16 @@ void Displayer::run()
 	}
 	else if (fn_in.isStarFile())
 	{
-		if (fn_in.contains("_model.star"))
+		if (fn_in.contains("_optimiser.star"))
+		{
+			MetaDataTable MDopt;
+			MDopt.read(fn_in, "optimiser_general");
+			FileName fn_model;
+			MDopt.getValue(EMDL_OPTIMISER_MODEL_STARFILE, fn_model);
+			MDin.read(fn_model, "model_classes");
+		}
+		// SHWS 28nov2019: Backwards compatibility
+		else if (fn_in.contains("_model.star"))
 		{
 			MDin.read(fn_in, "model_classes");
 			MetaDataTable MD2;

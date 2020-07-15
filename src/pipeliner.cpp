@@ -673,45 +673,9 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 // Adds a scheduled job to the pipeline from the command line
 int PipeLine::addScheduledJob(std::string typestring, std::string fn_options)
 {
-	int type;
-	if (typestring == PROC_IMPORT_NAME)
-		type = PROC_IMPORT;
-	else if (typestring == PROC_MOTIONCORR_NAME)
-		type = PROC_MOTIONCORR;
-	else if (typestring == PROC_CTFFIND_NAME)
-		type = PROC_CTFFIND;
-	else if (typestring == PROC_MANUALPICK_NAME)
-		type = PROC_MANUALPICK;
-	else if (typestring == PROC_AUTOPICK_NAME)
-		type = PROC_AUTOPICK;
-	else if (typestring == PROC_EXTRACT_NAME)
-		type = PROC_EXTRACT;
-	else if (typestring == PROC_CLASSSELECT_NAME)
-		type = PROC_CLASSSELECT;
-	else if (typestring == PROC_2DCLASS_NAME)
-		type = PROC_2DCLASS;
-	else if (typestring == PROC_3DCLASS_NAME)
-		type = PROC_3DCLASS;
-	else if (typestring == PROC_3DAUTO_NAME)
-		type = PROC_3DAUTO;
-	else if (typestring == PROC_MASKCREATE_NAME)
-		typestring = PROC_MASKCREATE;
-	else if (typestring == PROC_JOINSTAR_NAME)
-		type = PROC_JOINSTAR;
-	else if (typestring == PROC_SUBTRACT_NAME)
-		type = PROC_SUBTRACT;
-	else if (typestring == PROC_POST_NAME)
-		type = PROC_POST;
-	else if (typestring == PROC_RESMAP_NAME)
-		type = PROC_RESMAP;
-	else if (typestring == PROC_INIMODEL_NAME)
-		type = PROC_INIMODEL;
-	else if (typestring == PROC_EXTERNAL_NAME)
-		type = PROC_EXTERNAL;
-	else
-		REPORT_ERROR("ERROR: unrecognised string for job type: " + typestring);
 
-	return addScheduledJob(type, fn_options);
+	return addScheduledJob(proc_label2type.at(typestring), fn_options);
+
 }
 
 // Adds a scheduled job to the pipeline from the command line
@@ -1183,6 +1147,8 @@ bool PipeLine::markAsFinishedJob(int this_job, std::string &error_message, bool 
 		{
 
 			fn_opt = fn_opts[fn_opts.size()-1]; // the last one
+			Node node3(fn_opt, NODE_OPTIMISER);
+			addNewOutputEdge(this_job, node3);
 
 			// Also get data.star
 			FileName fn_data = fn_opt.without("_optimiser.star") + "_data.star";
@@ -1192,11 +1158,6 @@ bool PipeLine::markAsFinishedJob(int this_job, std::string &error_message, bool 
 			FileName fn_root = fn_opt.without("_optimiser.star");
 			if (processList[this_job].type == PROC_3DAUTO)
 				fn_root += "_half1";
-
-			FileName fn_model = fn_root + "_model.star";
-			Node node3(fn_model, NODE_MODEL);
-			addNewOutputEdge(this_job, node3);
-
 
 			FileName fn_map = fn_root + "_class???.mrc";
 			std::vector<FileName> fn_maps;
@@ -1647,13 +1608,6 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 		}
 
 	} // end if subtract
-	else if (processList[this_job].type == PROC_POST)
-	{
-
-		fn_pattern = processList[this_job].name + "*masked.mrc";
-		fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
-
-	} // end if postprocess
 
 
 	// Now actually move all the files
@@ -1968,9 +1922,19 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 	{
 		std::string name;
 		int type;
-		if (!MDnode.getValue(EMDL_PIPELINE_NODE_NAME, name) ||
-			!MDnode.getValue(EMDL_PIPELINE_NODE_TYPE, type)	)
-			REPORT_ERROR("PipeLine::read: cannot find name or type in pipeline_nodes table");
+		if (!MDnode.getValue(EMDL_PIPELINE_NODE_NAME, name) )
+			REPORT_ERROR("PipeLine::read: cannot find name in pipeline_nodes table");
+
+		if (MDnode.containsLabel(EMDL_PIPELINE_NODE_TYPE_LABEL))
+		{
+			std::string label;
+			MDnode.getValue(EMDL_PIPELINE_NODE_TYPE_LABEL, label);
+			type = node_label2type.at(label);
+		}
+		else if (!MDnode.getValue(EMDL_PIPELINE_NODE_TYPE, type))
+		{
+			REPORT_ERROR("PipeLine::read: cannot find type in pipeline_nodes table");
+		}
 
 		Node newNode(name, type);
 		nodeList.push_back(newNode);
@@ -1982,10 +1946,23 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 		std::string name, alias;
 		int type, status;
 		if (!MDproc.getValue(EMDL_PIPELINE_PROCESS_NAME, name) ||
-			!MDproc.getValue(EMDL_PIPELINE_PROCESS_ALIAS, alias) ||
-			!MDproc.getValue(EMDL_PIPELINE_PROCESS_TYPE, type) ||
+			!MDproc.getValue(EMDL_PIPELINE_PROCESS_ALIAS, alias) )
+			REPORT_ERROR("PipeLine::read: cannot find name or alias in pipeline_processes table");
+
+		if (MDproc.containsLabel(EMDL_PIPELINE_PROCESS_TYPE_LABEL) &&
+				MDproc.containsLabel(EMDL_PIPELINE_PROCESS_STATUS_LABEL))
+		{
+			std::string label;
+			MDproc.getValue(EMDL_PIPELINE_PROCESS_TYPE_LABEL, label);
+			type = proc_label2type.at(label);
+			MDproc.getValue(EMDL_PIPELINE_PROCESS_STATUS_LABEL, label);
+			status = procstatus_label2type.at(label);
+		}
+		else if (!MDproc.getValue(EMDL_PIPELINE_PROCESS_TYPE, type) ||
 			!MDproc.getValue(EMDL_PIPELINE_PROCESS_STATUS, status)	)
-			REPORT_ERROR("PipeLine::read: cannot find name or type in pipeline_processes table");
+		{
+			REPORT_ERROR("PipeLine::read: cannot find type or status in pipeline_processes table");
+		}
 
 		Process newProcess(name, type, status, alias);
 		processList.push_back(newProcess);
@@ -2160,16 +2137,20 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 			MDproc.addObject();
 			MDproc.setValue(EMDL_PIPELINE_PROCESS_NAME, processList[i].name);
 			MDproc.setValue(EMDL_PIPELINE_PROCESS_ALIAS, processList[i].alias);
-			MDproc.setValue(EMDL_PIPELINE_PROCESS_TYPE, processList[i].type);
-			MDproc.setValue(EMDL_PIPELINE_PROCESS_STATUS, processList[i].status);
+			//MDproc.setValue(EMDL_PIPELINE_PROCESS_TYPE, processList[i].type);
+			//MDproc.setValue(EMDL_PIPELINE_PROCESS_STATUS, processList[i].status);
+			MDproc.setValue(EMDL_PIPELINE_PROCESS_TYPE_LABEL, proc_type2label.at(processList[i].type));
+			MDproc.setValue(EMDL_PIPELINE_PROCESS_STATUS_LABEL, procstatus_type2label.at(processList[i].status));
 		}
 		else
 		{
 			MDproc_del.addObject();
 			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_NAME, processList[i].name);
 			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_ALIAS, processList[i].alias);
-			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_TYPE, processList[i].type);
-			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_STATUS, processList[i].status);
+			//MDproc_del.setValue(EMDL_PIPELINE_PROCESS_TYPE, processList[i].type);
+			//MDproc_del.setValue(EMDL_PIPELINE_PROCESS_STATUS, processList[i].status);
+			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_TYPE_LABEL, proc_type2label.at(processList[i].type));
+			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_STATUS_LABEL, procstatus_type2label.at(processList[i].status));
 		}
 
 	}
@@ -2188,13 +2169,15 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 		{
 			MDnode.addObject();
 			MDnode.setValue(EMDL_PIPELINE_NODE_NAME, nodeList[i].name);
-			MDnode.setValue(EMDL_PIPELINE_NODE_TYPE, nodeList[i].type);
+			//MDnode.setValue(EMDL_PIPELINE_NODE_TYPE, nodeList[i].type);
+			MDnode.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, node_type2label.at(nodeList[i].type));
 		}
 		else
 		{
 			MDnode_del.addObject();
 			MDnode_del.setValue(EMDL_PIPELINE_NODE_NAME, nodeList[i].name);
-			MDnode_del.setValue(EMDL_PIPELINE_NODE_TYPE, nodeList[i].type);
+			//MDnode_del.setValue(EMDL_PIPELINE_NODE_TYPE, nodeList[i].type);
+			MDnode_del.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, node_type2label.at(nodeList[i].type));
 
 		}
 	}
@@ -2331,14 +2314,14 @@ std::string PipeLineFlowChart::getDownwardsArrowLabel(PipeLine &pipeline, long i
 			mylabel = integerToString(nr_obj) + " particles";
 			break;
 		}
-		case NODE_2DREFS:
+		case NODE_REFS:
 		{
 			mylabel = "2Drefs";
 			break;
 		}
 		case NODE_3DREF:
 		{
-			mylabel = "3D ref";
+			mylabel = "3D map";
 			break;
 		}
 		case NODE_MASK:
@@ -2346,12 +2329,15 @@ std::string PipeLineFlowChart::getDownwardsArrowLabel(PipeLine &pipeline, long i
 			mylabel = "mask";
 			break;
 		}
+/*
+		SHWS 27nov2019: this no longer works, as I replaved NODE_MODEL by NODE_OPTIMISER. Bt then, flowchart generation isn't very much used anyway...
 		case NODE_MODEL:
 		{
 			nr_obj = MD.read(pipeline.nodeList[mynode].name, "model_classes", NULL, "", true); // true means: only count nr entries;
 			mylabel = integerToString(nr_obj) + " classes";
 			break;
 		}
+*/
 		case NODE_OPTIMISER:
 		{
 			mylabel = "continue";
@@ -2360,11 +2346,6 @@ std::string PipeLineFlowChart::getDownwardsArrowLabel(PipeLine &pipeline, long i
 		case NODE_HALFMAP:
 		{
 			mylabel = "half-map";
-			break;
-		}
-		case NODE_FINALMAP:
-		{
-			mylabel = "final map";
 			break;
 		}
 		case NODE_RESMAP:
@@ -2455,7 +2436,7 @@ long int PipeLineFlowChart::addProcessToUpwardsFlowChart(std::ofstream &fh, Pipe
 
 	        if (pipeline.processList[new_process].type == PROC_AUTOPICK)
 	        {
-	        	is_right = (mynodetype == NODE_2DREFS);
+	        	is_right = (mynodetype == NODE_REFS);
 	        	right_label="2D refs";
 	        }
 	        else if (pipeline.processList[new_process].type == PROC_EXTRACT)
