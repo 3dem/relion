@@ -969,6 +969,17 @@ void JobWindow::initialiseSelectWindow()
 	tab2->label("Class options");
 	resetHeight();
 
+	group6 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group6->end();
+	place("do_class_ranker", TOGGLE_DEACTIVATE, group6);
+	group6->begin();
+	place("rank_threshold", TOGGLE_DEACTIVATE);
+	place("do_rank_relative", TOGGLE_DEACTIVATE);
+	group6->end();
+	guientries["do_class_ranker"].cb_menu_i();
+
+	current_y += STEPY/2;
+
 	place("do_recenter", TOGGLE_DEACTIVATE);
 	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group1->end();
