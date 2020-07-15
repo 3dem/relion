@@ -222,9 +222,10 @@ void diff2_coarse_3D(
 			{
 				if (z >= zSize - projector.maxR)
 					z = z - projector.imgZ;
-				else
+				else {
 					xstart_z = projector.maxR;
 					xend_z   = xstart_z + 1;
+                }
 			}	
 
 			for(int iy = 0; iy < ySize; iy++) {
@@ -786,9 +787,10 @@ void diff2_fine_3D(
 			{
 				if (z >= zSize - projector.maxR)
 					z = z - projector.imgZ;
-				else
+				else {
 					xstart_z = projector.maxR;
 					xend_z   = xstart_z + 1;
+				}
 			}
 
 			for(int iy = 0; iy < ySize; iy++) {
@@ -1091,9 +1093,10 @@ void diff2_CC_coarse_3D(
 			{
 				if (z >= zSize - projector.maxR)
 					z = z - projector.imgZ;
-				else
+				else {
 					xstart_z = projector.maxR;
 					xend_z   = xstart_z + 1;
+				}
 			}	
 
 			for(int iy = 0; iy < ySize; iy++) {
@@ -1427,9 +1430,10 @@ void diff2_CC_fine_3D(
 			{
 				if (z >= zSize - projector.maxR)
 					z = z - projector.imgZ;
-				else
+				else {
 					xstart_z = projector.maxR;
 					xend_z   = xstart_z + 1;
+				}
 			}
 
 			for(int iy = 0; iy < ySize; iy++) {
