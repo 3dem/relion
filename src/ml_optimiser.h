@@ -509,6 +509,9 @@ public:
 	// Initial helical rise in Angstroms
 	RFLOAT helical_rise_initial;
 
+	// N-number of an N-start helix (only for rotational priors, a la KThurber)
+	int helical_nstart;
+
 	// Only expand this amount of Z axis proportion to full when imposing real space helical symmetry
 	RFLOAT helical_z_percentage;
 
@@ -531,12 +534,6 @@ public:
 	std::string helical_fourier_mask_resols;
 	FileName fn_fourier_mask;
 	MultidimArray<RFLOAT> helical_fourier_mask;
-
-	///////// Special stuff for subtomogram avg //////////
-
-	// Flag whether CTF3D files contain CTF^2 or not
-	bool ctf3d_squared;
-
 
 	///////// Hidden stuff, does not work with read/write: only via command-line ////////////////
 
@@ -582,6 +579,17 @@ public:
 
 	// Just count how often the optimal changes are summed
 	RFLOAT sum_changes_count;
+
+	///////// Special stuff for subtomogram avg //////////
+
+	// Do CTF3D files contain CTF^2 or not?
+	bool ctf3d_squared;
+	// Apply regular Probability and Noise estimation
+	bool do_skip_subtomo_correction;
+	// Have subtomogram files been multiplicity normalised during reconstruction?
+	bool normalised_subtomos;
+	// Threshold applied to multiplicity volume to mask edge voxels
+	RFLOAT subtomo_multi_thr;
 
 	/////////// Some internal stuff ////////////////////////
 
@@ -636,6 +644,9 @@ public:
 
 	//Maximum number of particles permitted to be drop, due to zero sum of weights, before exiting with an error (GPU only).
 	int failsafe_threshold;
+
+	// Trust box size and angpix for the input reference
+	bool do_trust_ref_size;
 
 #ifdef TIMING
 	Timer timer;
@@ -759,6 +770,10 @@ public:
 		do_helical_symmetry_local_refinement(0),
 		helical_sigma_distance(0),
 		helical_keep_tilt_prior_fixed(0),
+		ctf3d_squared(0),
+		do_skip_subtomo_correction(0),
+		normalised_subtomos(0),
+		subtomo_multi_thr(0),
 		//directional_lowpass(0),
 		asymmetric_padding(false),
 		maximum_significants(-1),
@@ -767,7 +782,8 @@ public:
 		tbbSchedulerInit(tbb::task_scheduler_init::deferred ),
 		mdlClassComplex(NULL),
 #endif
-		failsafe_threshold(40)
+		failsafe_threshold(40),
+		do_trust_ref_size(0)
 	{
 #ifdef ALTCPU
 		tbbCpuOptimiser = CpuOptimiserType((void*)NULL);
@@ -921,7 +937,8 @@ public:
 			std::vector<int> &exp_pointer_dir_nonzeroprior,
 			std::vector<int> &exp_pointer_psi_nonzeroprior,
 			std::vector<RFLOAT> &exp_directions_prior,
-			std::vector<RFLOAT> &exp_psi_prior);
+			std::vector<RFLOAT> &exp_psi_prior,
+			std::vector<MultidimArray<RFLOAT> > &exp_STweight);
 
 	/* Store all shifted FourierTransforms in a vector
 	 * also store precalculated 2D matrices with 1/sigma2_noise
@@ -936,7 +953,8 @@ public:
 			std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted_nomask,
 			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
 			std::vector<RFLOAT> &exp_local_sqrtXi2,
-			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2);
+			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2,
+			std::vector<MultidimArray<RFLOAT> > &exp_STweight);
 
 	// Given exp_Mcoarse_significant, check for iorient whether any of the particles has any significant (coarsely sampled) translation
 	bool isSignificantAnyImageAnyTranslation(long int iorient,
@@ -958,7 +976,8 @@ public:
 			std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted,
 			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2,
 			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
-			std::vector<RFLOAT> &exp_local_sqrtXi);
+			std::vector<RFLOAT> &exp_local_sqrtXi,
+			std::vector<MultidimArray<RFLOAT> > &exp_STweight);
 
 	// Convert all squared difference terms to weights.
 	// Also calculates exp_sum_weight and, for adaptive approach, also exp_significant_weight
@@ -996,7 +1015,8 @@ public:
 			std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted_nomask,
 			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2,
 			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
-			std::vector<RFLOAT> &exp_local_sqrtXi2);
+			std::vector<RFLOAT> &exp_local_sqrtXi2,
+			std::vector<MultidimArray<RFLOAT> > &exp_STweight);
 
 	/** Monitor the changes in the optimal translations, orientations and class assignments for some particles */
 	void monitorHiddenVariableChanges(long int my_first_part_id, long int my_last_part_id);
@@ -1023,6 +1043,14 @@ public:
 
 	// Get metadata array of a subset of particles from the experimental model
 	void getMetaAndImageDataSubset(long int my_first_part_id, long int my_last_part_id, bool do_also_imagedata = true);
+
+	// Get the CTF (and Multiplicity weights where available) volumes from the stored files and correct them
+	void get3DCTFAndMulti(MultidimArray<RFLOAT> &Ictf, MultidimArray<RFLOAT> &Fctf, MultidimArray<RFLOAT> &FstMulti,
+			bool ctf_premultiplied);
+
+	// Apply the Multiplicity weights to correct for Images and CTFs to properly estimate squared differences and averages
+	void applySubtomoCorrection(MultidimArray<Complex > &Fimg, MultidimArray<Complex > &Fimg_nomask ,
+								MultidimArray<RFLOAT> &Fctf, MultidimArray<RFLOAT> &FstMulti);
 
 };
 

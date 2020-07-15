@@ -58,6 +58,7 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	recenter_x = textToFloat(parser.getOption("--recenter_x", "X-coordinate (in pixel inside the reference) to recenter re-extracted data on", "0."));
 	recenter_y = textToFloat(parser.getOption("--recenter_y", "Y-coordinate (in pixel inside the reference) to recenter re-extracted data on", "0."));
 	recenter_z = textToFloat(parser.getOption("--recenter_z", "Z-coordinate (in pixel inside the reference) to recenter re-extracted data on", "0."));
+	ref_angpix = textToFloat(parser.getOption("--ref_angpix", "Pixel size of the reference used for recentering. -1 uses the pixel size of particles.", "-1"));
 
 	int extract_section = parser.addSection("Particle extraction");
 	do_extract = parser.checkOption("--extract", "Extract all particles from the micrographs");
@@ -164,11 +165,26 @@ void Preprocessing::initialise()
 				std::cout << " + Re-extracting particles based on coordinates from input _data.star file " << std::endl;
 				std::cout << " + " << fn_data << std::endl;
 			}
-			if (do_recenter && verb > 0)
-				std::cout << " + And re-centering particles based on refined coordinates in the _data.star file" << std::endl;
-
 			ObservationModel::loadSafely(fn_data, obsModelPart, MDimg, "particles", verb);
 			data_star_has_ctf = MDimg.containsLabel(EMDL_CTF_DEFOCUSU);
+
+			if (do_recenter && ref_angpix <= 0)
+			{
+				if (!obsModelPart.allPixelSizesIdentical())
+					REPORT_ERROR("The pixel sizes in the particle STAR file are not identical. Please specify the pixel size of the reference for re-centering as --ref_angpix.");
+			}
+
+			if (do_recenter && verb > 0)
+			{
+				std::cout << " + And re-centering particles based on refined coordinates in the _data.star file" << std::endl;
+				if (ref_angpix > 0)
+					std::cout << "   using " << ref_angpix << " A/px to convert the recentering coordinate from pixels to Angstrom." << std::endl;
+				else
+				{
+					std::cout << "   assuming the particle pixel size is the same as the reference pixel size.\n   If this is not the case, please specify --ref_angpix." << std::endl;
+				}
+			}
+
 		}
 		else
 		{
@@ -279,6 +295,13 @@ void Preprocessing::joinAllStarFiles()
 			{
 				MetaDataTable MDonestack;
 				MDonestack.read(fn_star);
+
+				if (!compareLabels(MDout, MDonestack))
+				{
+					std::cout << "The STAR file " << fn_star << " contains a column not present in others. Missing values will be filled by default values (0 or empty string)" << std::endl;
+					MDout.addMissingLabels(&MDonestack);
+					MDonestack.addMissingLabels(&MDout);
+				}
 				MDout.append(MDonestack);
 			}
 		}
@@ -1187,6 +1210,8 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 					XX(my_center) = recenter_x; // in run_data's pixels
 					YY(my_center) = recenter_y;
 					ZZ(my_center) = recenter_z;
+					if (ref_angpix > 0)
+						my_center = my_center * (ref_angpix / particle_angpix);
 					Euler_angles2matrix(rot, tilt, psi, A3D, false);
 					my_projected_center = A3D * my_center;
 				}

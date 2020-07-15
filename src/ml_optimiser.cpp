@@ -256,6 +256,12 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	if (fnt != "OLD")
 		write_every_sgd_iter = textToInteger(fnt);
 
+	fnt = parser.getOption("--relax_sym", "The symmetry to be relaxed", "OLD");
+	if (fnt != "OLD")
+	{
+		sampling.fn_sym_relax = fnt;
+	}
+
 	do_join_random_halves = parser.checkOption("--join_random_halves", "Join previously split random halves again (typically to perform a final reconstruction).");
 
 	// ORIENTATIONS
@@ -388,7 +394,10 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 		do_norm_correction = false;
 
 	int subtomogram_section = parser.addSection("Subtomogram averaging");
+	normalised_subtomos = parser.checkOption("--normalised_subtomo", "Have subtomograms been multiplicity normalised? (Default=False)");
+	do_skip_subtomo_correction = parser.checkOption("--skip_subtomo_multi", "Skip subtomo multiplicity correction");
 	ctf3d_squared = !parser.checkOption("--ctf3d_not_squared", "CTF3D files contain sqrt(CTF^2) patterns");
+	subtomo_multi_thr = textToFloat(parser.getOption("--subtomo_multi_thr", "Threshold to remove marginal voxels during expectation", "0.01"));
 
 	int computation_section = parser.addSection("Computation");
 
@@ -439,6 +448,8 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	fnt = parser.getOption("--strict_highres_exp", "Resolution limit (in Angstrom) to restrict probability calculations in the expectation step", "OLD");
 	if (fnt != "OLD")
 		strict_highres_exp = textToFloat(fnt);
+
+	do_trust_ref_size = parser.checkOption("--trust_ref_size", "Trust the pixel and box size of the input reference; by default the program will die if these are different from the first optics group of the data");
 
 	// Debugging/analysis/hidden stuff
 	do_map = !checkParameter(argc, argv, "--no_map");
@@ -543,6 +554,10 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	else
 		sampling.fn_sym = sym_;
 
+	//Check for relax_symmetry option
+	std::string sym_relax_ =  parser.getOption("--relax_sym", "Symmetry to be relaxed", "");
+	sampling.fn_sym_relax = sym_relax_;
+
 	sampling.offset_range = textToFloat(parser.getOption("--offset_range", "Search range for origin offsets (in pixels)", "6"));
 	sampling.offset_step = textToFloat(parser.getOption("--offset_step", "Sampling rate (before oversampling) for origin offsets (in pixels)", "2"));
 	// Jun19,2015 - Shaoda, Helical refinement
@@ -555,6 +570,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	RFLOAT _sigma_rot = textToFloat(parser.getOption("--sigma_rot", "Stddev on the first Euler angle for local angular searches (of +/- 3 stddev)", "-1"));
 	RFLOAT _sigma_tilt = textToFloat(parser.getOption("--sigma_tilt", "Stddev on the second Euler angle for local angular searches (of +/- 3 stddev)", "-1"));
 	RFLOAT _sigma_psi = textToFloat(parser.getOption("--sigma_psi", "Stddev on the in-plane angle for local angular searches (of +/- 3 stddev)", "-1"));
+
 	if (_sigma_ang > 0.)
 	{
 		mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
@@ -572,8 +588,18 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	else
 	{
 		//default
-		mymodel.orientational_prior_mode = NOPRIOR;
-		mymodel.sigma2_rot = mymodel.sigma2_tilt = mymodel.sigma2_psi = 0.;
+		// Very small to force the algorithm to take the current orientation
+		if (sym_relax_ != "")
+		{
+			mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
+			_sigma_ang = 0.0033;
+			mymodel.sigma2_rot = mymodel.sigma2_tilt = mymodel.sigma2_psi = _sigma_ang * _sigma_ang;
+		}
+		else
+		{
+			mymodel.orientational_prior_mode = NOPRIOR;
+			mymodel.sigma2_rot = mymodel.sigma2_tilt = mymodel.sigma2_psi = 0.;
+		}
 	}
 	do_skip_align = parser.checkOption("--skip_align", "Skip orientational assignment (only classify)?");
 	do_skip_rotate = parser.checkOption("--skip_rotate", "Skip rotational assignment (only translate and classify)?");
@@ -593,6 +619,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	mymodel.helical_rise_min = textToFloat(parser.getOption("--helical_rise_min", "Minimum helical rise (in Angstroms)", "0."));
 	mymodel.helical_rise_max = textToFloat(parser.getOption("--helical_rise_max", "Maximum helical rise (in Angstroms)", "0."));
 	mymodel.helical_rise_inistep = textToFloat(parser.getOption("--helical_rise_inistep", "Initial step of helical rise search (in Angstroms)", "0."));
+	helical_nstart = textToInteger(parser.getOption("--helical_nstart", "N-number for the N-start helix (only useful for rotational priors)", "1"));
 	helical_z_percentage = textToFloat(parser.getOption("--helical_z_percentage", "This box length along the center of Z axis contains good information of the helix. Important in imposing and refining symmetry", "0.3"));
 	helical_tube_inner_diameter = textToFloat(parser.getOption("--helical_inner_diameter", "Inner diameter of helical tubes in Angstroms (for masks of helical references and particles)", "-1."));
 	helical_tube_outer_diameter = textToFloat(parser.getOption("--helical_outer_diameter", "Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)", "-1."));
@@ -657,7 +684,10 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 
 	// Subtomo Avg stuff
 	int subtomogram_section = parser.addSection("Subtomogram averaging");
+	normalised_subtomos = parser.checkOption("--normalised_subtomo", "Have subtomograms been multiplicity normalised? (Default=False)");
+	do_skip_subtomo_correction = parser.checkOption("--skip_subtomo_multi", "Skip subtomo multiplicity correction");
 	ctf3d_squared = !parser.checkOption("--ctf3d_not_squared", "CTF3D files contain sqrt(CTF^2) patterns");
+	subtomo_multi_thr = textToFloat(parser.getOption("--subtomo_multi_thr", "Threshold to remove marginal voxels during expectation", "0.01"));
 
 	// Computation stuff
 	// The number of threads is always read from the command line
@@ -725,6 +755,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	auto_ignore_angle_changes = parser.checkOption("--auto_ignore_angles", "In auto-refinement, update angular sampling regardless of changes in orientations for convergence. This makes convergence faster.");
 	auto_resolution_based_angles= parser.checkOption("--auto_resol_angles", "In auto-refinement, update angular sampling based on resolution-based required sampling. This makes convergence faster.");
 	allow_coarser_samplings = parser.checkOption("--allow_coarser_sampling", "In 2D/3D classification, allow coarser angular and translational samplings if accuracies are bad (typically in earlier iterations.");
+	do_trust_ref_size = parser.checkOption("--trust_ref_size", "Trust the pixel and box size of the input reference; by default the program will die if these are different from the first optics group of the data");
 	///////////////// Special stuff for first iteration (only accessible via CL, not through readSTAR ////////////////////
 
 	// When reading from the CL: always start at iteration 1 and subset 1
@@ -875,6 +906,8 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
     		helical_rise_initial = 0.;
 	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE, helical_z_percentage))
 		helical_z_percentage = 0.3;
+	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_NSTART, helical_nstart))
+		helical_nstart = 1;
 	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER, helical_tube_inner_diameter))
 		helical_tube_inner_diameter = -1.;
 	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER, helical_tube_outer_diameter))
@@ -1130,6 +1163,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_HELICAL_TWIST_INITIAL, helical_twist_initial);
 		MD.setValue(EMDL_OPTIMISER_HELICAL_RISE_INITIAL, helical_rise_initial);
 		MD.setValue(EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE, helical_z_percentage);
+		MD.setValue(EMDL_OPTIMISER_HELICAL_NSTART, helical_nstart);
 		MD.setValue(EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER, helical_tube_inner_diameter);
 		MD.setValue(EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER, helical_tube_outer_diameter);
 		MD.setValue(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT, do_helical_symmetry_local_refinement);
@@ -1616,7 +1650,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		// Read in the reference(s) and initialise mymodel
 		int refdim = (fn_ref == "denovo") ? 3 : 2;
 		mymodel.initialiseFromImages(fn_ref, is_3d_model, mydata,
-				do_average_unaligned, do_generate_seeds, refs_are_ctf_corrected, ref_angpix, do_sgd, (rank==0));
+				do_average_unaligned, do_generate_seeds, refs_are_ctf_corrected, ref_angpix, do_sgd, do_trust_ref_size, (rank==0));
 
 	}
 
@@ -1831,7 +1865,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 		if (iter == 0 && sampling.healpix_order >= autosampling_hporder_local_searches)
 		{
 			mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
-			sampling.orientational_prior_mode = PRIOR_ROTTILT_PSI;
 			sampling.is_3D = (mymodel.ref_dim == 3);
 			RFLOAT rottilt_step = sampling.getAngularSampling(adaptive_oversampling);
 			mymodel.sigma2_rot = mymodel.sigma2_tilt = mymodel.sigma2_psi = 2. * 2. * rottilt_step * rottilt_step;
@@ -1854,7 +1887,8 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 	// Initialise the sampling object (sets prior mode and fills translations and rotations inside sampling object)
 	// May06,2015 - Shaoda & Sjors, initialise for helical translations
-	bool do_local_searches = ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches));
+	bool do_local_searches_helical = ((do_auto_refine) && (do_helical_refine) &&
+			(sampling.healpix_order >= autosampling_hporder_local_searches));
 
 	if (iter == 0)
 	{
@@ -1864,8 +1898,8 @@ void MlOptimiser::initialiseGeneral(int rank)
 		sampling.offset_range *= mymodel.pixel_size;
 		sampling.offset_step *= mymodel.pixel_size;
 	}
-	sampling.initialise(mymodel.orientational_prior_mode, mymodel.ref_dim, (mymodel.data_dim == 3), do_gpu, (verb>0),
-			do_local_searches, (do_helical_refine) && (!ignore_helical_symmetry),
+	sampling.initialise(mymodel.ref_dim, (mymodel.data_dim == 3), do_gpu, (verb>0),
+			do_local_searches_helical, (do_helical_refine) && (!ignore_helical_symmetry),
 			helical_rise_initial, helical_twist_initial);
 
 	// Now that sampling is initialised, also modify sigma2_rot for the helical refinement
@@ -1893,7 +1927,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 	if (do_skip_align || do_skip_rotate)
 	{
 		mymodel.orientational_prior_mode = NOPRIOR;
-		sampling.orientational_prior_mode = NOPRIOR;
 		adaptive_oversampling = 0;
 		sampling.perturbation_factor = 0.;
 		sampling.random_perturbation = 0.;
@@ -1905,7 +1938,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 		std::cout << " Only sampling tilt, keep rot and psi fixed." << std::endl;
 
 		mymodel.orientational_prior_mode = NOPRIOR;
-		sampling.orientational_prior_mode = NOPRIOR;
 		adaptive_oversampling = 0;
 		sampling.perturbation_factor = 0.;
 		sampling.random_perturbation = 0.;
@@ -2644,54 +2676,32 @@ void MlOptimiser::iterate()
 		if (do_helical_refine && mymodel.ref_dim == 3)
 		{
 			if (!ignore_helical_symmetry)
+			{
 				makeGoodHelixForEachRef();
+			}
+
 			if ( (!do_skip_align) && (!do_skip_rotate) )
 			{
-				int nr_same_polarity = 0, nr_opposite_polarity = 0;
-				int nr_same_rot = 0, nr_opposite_rot = 0;	// KThurber
-				RFLOAT opposite_percentage = 0.;
-				RFLOAT rot_opposite_percent = 0.;		// KThurber
-				bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
-				bool do_classification_local_searches = (!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
-						&& (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.);
-				bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
-				std::cerr << " do_auto_refine_local_searches= " << do_auto_refine_local_searches << " do_classification_local_searches= " << do_classification_local_searches << " do_local_angular_searches= " << do_local_angular_searches << std::endl;
-				if (helical_sigma_distance < 0.)
-					updateAngularPriorsForHelicalReconstruction(mydata.MDimg, helical_keep_tilt_prior_fixed);
-				else
-				{
-					updatePriorsForHelicalReconstruction(
-							mydata.MDimg,
-							nr_opposite_polarity,
-							nr_opposite_rot,	// KThurber
-							helical_sigma_distance * ((RFLOAT)(mymodel.ori_size)),
-							mymodel.helical_rise,
-							mymodel.helical_twist,
-							(mymodel.data_dim == 3),
-							do_auto_refine,
-							do_local_angular_searches,
-							mymodel.sigma2_rot,
-							mymodel.sigma2_tilt,
-							mymodel.sigma2_psi,
-							mymodel.sigma2_offset,
-							helical_keep_tilt_prior_fixed);
-
-					nr_same_polarity = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_polarity;
-					nr_same_rot = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_rot;  // KThurber
-					opposite_percentage = (100.) * ((RFLOAT)(nr_opposite_polarity)) / ((RFLOAT)(mydata.MDimg.numberOfObjects()));
-					rot_opposite_percent = (100.) * ((RFLOAT)(nr_opposite_rot)) / ((RFLOAT)(mydata.MDimg.numberOfObjects()));  // KThurber
-					if ( (verb > 0) && (!do_local_angular_searches) )
-					{
-						std::cout << " Number of helical segments with psi angles similar/opposite to their priors: " << nr_same_polarity << " / " << nr_opposite_polarity << " (" << opposite_percentage << "%)" << std::endl;
-						std::cout << " Number of helical segments with rot angles similar/opposite to their priors: " << nr_same_rot << " / " << nr_opposite_rot << " (" << rot_opposite_percent << "%)" << std::endl;  // KThurber
-					}
-				}
+				updatePriorsForHelicalReconstruction(
+						mydata.MDimg,
+						helical_sigma_distance * ((RFLOAT)(mymodel.ori_size)),
+						mymodel.helical_rise,
+						mymodel.helical_twist,
+						helical_nstart,
+						(mymodel.data_dim == 3),
+						do_auto_refine,
+						mymodel.sigma2_rot,
+						mymodel.sigma2_tilt,
+						mymodel.sigma2_psi,
+						mymodel.sigma2_offset,
+						helical_keep_tilt_prior_fixed,
+						verb);
 			}
 		}
 
-                // Directly use fn_out, without "_it" specifier, so unmasked refs will be overwritten at every iteration
-                if (do_write_unmasked_refs)
-                    mymodel.write(fn_out+"_unmasked", sampling, false, true);
+		// Directly use fn_out, without "_it" specifier, so unmasked refs will be overwritten at every iteration
+		if (do_write_unmasked_refs)
+			mymodel.write(fn_out+"_unmasked", sampling, false, true);
 
 #ifdef TIMING
 		timer.toc(TIMING_ITER_HELICALREFINE);
@@ -2911,7 +2921,7 @@ void MlOptimiser::expectation()
 
 	long int my_nr_particles = (subset_size > 0) ? subset_size : mydata.numberOfParticles();
 	int barstep = XMIPP_MAX(1, my_nr_particles / 60);
-    long int prev_barstep = 0;
+	long int prev_barstep = 0;
 	long int my_first_part_id = 0.;
 	long int my_last_part_id = my_nr_particles - 1;
 	long int nr_particles_done = 0;
@@ -3207,6 +3217,8 @@ void MlOptimiser::expectationSetupCheckMemory(int myverb)
 		for (int oversampling = 0; oversampling <= adaptive_oversampling; oversampling++)
 		{
 			std::cout << " Oversampling= " << oversampling << " NrHiddenVariableSamplingPoints= " << mymodel.nr_classes * sampling.NrSamplingPoints(oversampling, &pointer_dir_nonzeroprior, &pointer_psi_nonzeroprior) << std::endl;
+			if (sampling.fn_sym_relax != "")
+				std::cout<<"Relaxing symmetry to "<<sampling.fn_sym_relax<<std::endl;
 			int nr_orient = (do_only_sample_tilt) ? sampling.NrDirections(oversampling, &pointer_dir_nonzeroprior) : sampling.NrDirections(oversampling, &pointer_dir_nonzeroprior) * sampling.NrPsiSamplings(oversampling, &pointer_psi_nonzeroprior);
 			if (do_skip_rotate || do_skip_align)
 				nr_orient = 1;
@@ -3654,7 +3666,7 @@ void MlOptimiser::expectationOneParticle(long int part_id_sorted, int thread_id)
 		// Here define all kind of local arrays that will be needed
 		std::vector<MultidimArray<Complex > > exp_Fimg, exp_Fimg_nomask;
 		std::vector<std::vector<MultidimArray<Complex > > > exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask;
-		std::vector<MultidimArray<RFLOAT> > exp_Fctf, exp_local_Fctf, exp_local_Minvsigma2;
+		std::vector<MultidimArray<RFLOAT> > exp_Fctf, exp_local_Fctf, exp_local_Minvsigma2,exp_STMulti;
 		std::vector<int> exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior;
 		std::vector<RFLOAT> exp_directions_prior, exp_psi_prior, exp_local_sqrtXi2;
 		int exp_current_image_size, exp_current_oversampling;
@@ -3686,6 +3698,11 @@ void MlOptimiser::expectationOneParticle(long int part_id_sorted, int thread_id)
 		exp_old_offset.resize(my_nr_images);
 		exp_prior.resize(my_nr_images);
 
+		if (mydata.is_3D)
+		{
+            exp_STMulti.resize(my_nr_images);
+		}
+
 		// Then calculate all Fourier Transform of masked and unmasked image and the CTF
 #ifdef TIMING
 		if (part_id_sorted == exp_my_first_part_id)
@@ -3696,7 +3713,8 @@ void MlOptimiser::expectationOneParticle(long int part_id_sorted, int thread_id)
 #endif
 		getFourierTransformsAndCtfs(part_id, ibody, metadata_offset, exp_Fimg, exp_Fimg_nomask, exp_Fctf,
 				exp_old_offset, exp_prior, exp_power_imgs, exp_highres_Xi2_img,
-				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior);
+				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior,
+				exp_directions_prior, exp_psi_prior, exp_STMulti);
 
 #ifdef TIMING
 		if (part_id_sorted == exp_my_first_part_id)
@@ -3776,7 +3794,7 @@ void MlOptimiser::expectationOneParticle(long int part_id_sorted, int thread_id)
 					exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max, exp_min_diff2, exp_highres_Xi2_img,
 					exp_Fimg, exp_Fctf, exp_Mweight, exp_Mcoarse_significant,
 					exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
-					exp_local_Fimgs_shifted, exp_local_Minvsigma2, exp_local_Fctf, exp_local_sqrtXi2);
+					exp_local_Fimgs_shifted, exp_local_Minvsigma2, exp_local_Fctf, exp_local_sqrtXi2, exp_STMulti);
 
 
 #ifdef DEBUG_ESP_MEM
@@ -3886,7 +3904,8 @@ void MlOptimiser::expectationOneParticle(long int part_id_sorted, int thread_id)
 				exp_power_imgs, exp_old_offset, exp_prior, exp_Mweight, exp_Mcoarse_significant,
 				exp_significant_weight, exp_sum_weight, exp_max_weight,
 				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
-				exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask, exp_local_Minvsigma2, exp_local_Fctf, exp_local_sqrtXi2);
+				exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask, exp_local_Minvsigma2, exp_local_Fctf,
+				exp_local_sqrtXi2, exp_STMulti);
 
 #ifdef RELION_TESTING
 //		std::string mode;
@@ -4870,7 +4889,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		std::vector<int> &exp_pointer_dir_nonzeroprior,
 		std::vector<int> &exp_pointer_psi_nonzeroprior,
 		std::vector<RFLOAT> &exp_directions_prior,
-		std::vector<RFLOAT> &exp_psi_prior)
+		std::vector<RFLOAT> &exp_psi_prior,
+		std::vector<MultidimArray<RFLOAT> > &exp_STMulti)
 {
 
 	FourierTransformer transformer;
@@ -4878,7 +4898,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 	{
 		Image<RFLOAT> img, rec_img;
 		MultidimArray<Complex > Fimg, Faux;
-		MultidimArray<RFLOAT> Fctf;
+		MultidimArray<RFLOAT> Fctf, FstMulti; // SubtomoWeights
 		Matrix2D<RFLOAT> Aori;
 		Matrix1D<RFLOAT> my_projected_com(mymodel.data_dim), my_refined_ibody_offset(mymodel.data_dim);
 
@@ -5497,51 +5517,10 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 					}
 				}
 
-				// If there is a redundant half, get rid of it
-				if (XSIZE(Ictf()) == YSIZE(Ictf()))
-				{
-					// Set the CTF-image in Fctf
-					Ictf().setXmippOrigin();
-					FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
-					{
-						// Use negative kp,ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
-						DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf(), -kp, -ip, -jp);
-					}
-				}
-				// otherwise, just window the CTF to the current resolution
-				else if (XSIZE(Ictf()) == YSIZE(Ictf()) / 2 + 1)
-				{
-					windowFourierTransform(Ictf(), Fctf, YSIZE(Fctf));
-				}
-				// if dimensions are neither cubical nor FFTW, stop
-				else
-				{
-					REPORT_ERROR("3D CTF volume must be either cubical or adhere to FFTW format!");
-				}
-
-				if (ctf_premultiplied)
-				{
-					// SHWS 13feb2020: when using CTF-premultiplied on 3D data, Fctf will now contain ctf^2, but make sure they are all positive!!
-					if (ctf3d_squared)
-					{
-						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
-						{
-							DIRECT_MULTIDIM_ELEM(Fctf, n) = fabs(DIRECT_MULTIDIM_ELEM(Fctf, n));
-						}
-					}
-					else
-					{
-						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
-						{
-							DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
-						}
-					}
-				}
-
+				get3DCTFAndMulti(Ictf(), Fctf, FstMulti, ctf_premultiplied);
 			}
 			else
 			{
-
 				// Get parameters that change per-particle from the exp_metadata
 				CTF ctf;
 				ctf.setValuesByGroup(
@@ -5563,7 +5542,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 						DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 					}
 				}
-
 			}
 
 //#define DEBUG_CTF_FFTW_IMAGE
@@ -5594,6 +5572,12 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 			Fctf.initConstant(1.);
 		}
 
+		// Correct images and CTFs by Multiplicity, if required, and store it
+		if ( NZYXSIZE(FstMulti) > 0 )
+		{
+			applySubtomoCorrection(exp_Fimg[img_id], exp_Fimg_nomask[img_id], Fctf, FstMulti);
+			exp_STMulti[img_id] = FstMulti;
+		}
 		// Store Fctf
 		exp_Fctf[img_id] = Fctf;
 
@@ -5815,7 +5799,8 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 		std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted_nomask,
 		std::vector<MultidimArray<RFLOAT> >&exp_local_Fctf,
 		std::vector<RFLOAT> &exp_local_sqrtXi2,
-		std::vector<MultidimArray<RFLOAT> >&exp_local_Minvsigma2)
+		std::vector<MultidimArray<RFLOAT> >&exp_local_Minvsigma2,
+		std::vector<MultidimArray<RFLOAT> > &exp_STMulti)
 {
 
 #ifdef TIMING
@@ -5841,6 +5826,8 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 	exp_local_Minvsigma2.resize(exp_nr_images);
 	exp_local_Fctf.resize(exp_nr_images);
 	exp_local_sqrtXi2.resize(exp_nr_images);
+
+	bool do_subtomo_correction = is_for_store_wsums &&  NZYXSIZE(exp_STMulti[0]) > 0;
 
 	MultidimArray<Complex > Fimg, Fimg_nomask;
 	for (int img_id = 0, my_trans_image = 0; img_id < exp_nr_images; img_id++)
@@ -5887,7 +5874,10 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 			exp_local_Fimgs_shifted_nomask[img_id].resize(nr_shifts);
 		}
 
-		if (do_ctf_invsig)
+		// Map from model_size sigma2_noise array to my_image_size
+		RFLOAT remap_image_sizes = (mymodel.ori_size * mymodel.pixel_size) / (my_image_size * my_pixel_size);
+		int *myMresol = (YSIZE(Fimg) == image_coarse_size[optics_group]) ? Mresol_coarse[optics_group].data : Mresol_fine[optics_group].data;
+ 		if (do_ctf_invsig)
 		{
 			// Also precalculate the sqrt of the sum of all Xi2
 			// Could exp_current_image_size ever be different from mymodel.current_size?
@@ -5914,9 +5904,6 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 			else
 				exp_local_Minvsigma2[img_id].initZeros(YSIZE(Fimg), XSIZE(Fimg));
 
-			// Map from model_size sigma2_noise array to my_image_size
-			RFLOAT remap_image_sizes = (mymodel.ori_size * mymodel.pixel_size) / (my_image_size * my_pixel_size);
-			int *myMresol = (YSIZE(Fimg) == image_coarse_size[optics_group]) ? Mresol_coarse[optics_group].data : Mresol_fine[optics_group].data;
 			// With group_id and relevant size of Fimg, calculate inverse of sigma^2 for relevant parts of Mresol
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Minvsigma2[img_id])
 			{
@@ -5926,6 +5913,23 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 				// This way we are invariant to additive factors
 				if (ires > 0 && ires_remapped < XSIZE(mymodel.sigma2_noise[group_id]))
 					DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2[img_id], n) = 1. / (sigma2_fudge * DIRECT_A1D_ELEM(mymodel.sigma2_noise[group_id], ires_remapped));
+			}
+		}
+
+		if (do_subtomo_correction)
+		{
+			// We store the downsized subtomogram Fourier Multiplicity weights
+			MultidimArray<RFLOAT> MstMulti;
+			windowFourierTransform(exp_STMulti[img_id], MstMulti, exp_current_image_size);
+
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Minvsigma2[img_id])
+			{
+				int ires = *(myMresol + n);
+				int ires_remapped = ROUND(remap_image_sizes * ires);
+				// Exclude origin (ires==0) from the Probability-calculation
+				// This way we are invariant to additive factors
+				if (ires > 0 && ires_remapped < XSIZE(mymodel.sigma2_noise[group_id]))
+					DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2[img_id], n) *= DIRECT_MULTIDIM_ELEM(MstMulti, n);
 			}
 		}
 
@@ -6108,7 +6112,8 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 		std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted,
 		std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2,
 		std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
-		std::vector<RFLOAT> &exp_local_sqrtXi2)
+		std::vector<RFLOAT> &exp_local_sqrtXi2,
+		std::vector<MultidimArray<RFLOAT> > &exp_STMulti)
 {
 
 #ifdef TIMING
@@ -6150,7 +6155,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 
 	precalculateShiftedImagesCtfsAndInvSigma2s(false, false, part_id, exp_current_oversampling, metadata_offset,
 			exp_itrans_min, exp_itrans_max, exp_Fimg, dummy, exp_Fctf, exp_local_Fimgs_shifted, dummy2,
-			exp_local_Fctf, exp_local_sqrtXi2, exp_local_Minvsigma2);
+			exp_local_Fctf, exp_local_sqrtXi2, exp_local_Minvsigma2, exp_STMulti);
 
 	// Loop only from exp_iclass_min to exp_iclass_max to deal with seed generation in first iteration
 	for (int exp_iclass = exp_iclass_min; exp_iclass <= exp_iclass_max; exp_iclass++)
@@ -7230,7 +7235,8 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 		std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted_nomask,
 		std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2,
 		std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
-		std::vector<RFLOAT> &exp_local_sqrtXi2)
+		std::vector<RFLOAT> &exp_local_sqrtXi2,
+		std::vector<MultidimArray<RFLOAT> > &exp_STMulti)
 {
 #ifdef TIMING
 	if (part_id == mydata.sorted_idx[exp_my_first_part_id])
@@ -7247,7 +7253,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 	// Re-do below because now also want unmasked images AND if (stricht_highres_exp >0.) then may need to resize
 	precalculateShiftedImagesCtfsAndInvSigma2s(true, true, part_id, exp_current_oversampling, metadata_offset,
 			exp_itrans_min, exp_itrans_max, exp_Fimg, exp_Fimg_nomask, exp_Fctf, exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask,
-			exp_local_Fctf, exp_local_sqrtXi2, exp_local_Minvsigma2);
+			exp_local_Fctf, exp_local_sqrtXi2, exp_local_Minvsigma2, exp_STMulti);
 
 	// In doThreadPrecalculateShiftedImagesCtfsAndInvSigma2s() the origin of the exp_local_Minvsigma2s was omitted.
 	// Set those back here
@@ -7613,7 +7619,6 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 												timer.tic(TIMING_WSUM_DIFF2);
 											}
 #endif
-
 											// Store weighted sum of squared differences for sigma2_noise estimation
 											// Suggestion Robert Sinkovitz: merge difference and scale steps to make better use of cache
 											FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mresol_fine[optics_group])
@@ -7895,7 +7900,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 												DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_CLASS) = (RFLOAT)exp_iclass + 1;
 												DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_PMAX) = exp_max_weight[img_id];
 											}
-										}
+										} // end if weight > exp_max_weight[img_id]
 									} // end if weight >= exp_significant_weight
 								} // end loop iover_trans
 							} // end loop itrans
@@ -8348,44 +8353,34 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 								getline(split, fn_ctf);
 						}
 						Ictf.read(fn_ctf);
+						Fctf.resize(current_image_size, current_image_size, current_image_size / 2 + 1);
 
-						// If there is a redundant half, get rid of it
-						if (XSIZE(Ictf()) == YSIZE(Ictf()))
+						MultidimArray<RFLOAT> FstMulti;
+						get3DCTFAndMulti(Ictf(), Fctf, FstMulti, ctf_premultiplied);
+
+						if ( NZYXSIZE(FstMulti) > 0 )
 						{
-							// Set the CTF-image in Fctf
-							Ictf().setXmippOrigin();
-							Fctf.resize(current_image_size, current_image_size, current_image_size / 2 + 1);
-							FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+							if (normalised_subtomos)
 							{
-								// Use negative kp, ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
-								DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf(), -kp, -ip, -jp);
+								FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+									DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(FstMulti, n);
 							}
-						}
-						// otherwise, just window the CTF to the current resolution
-						else if (XSIZE(Ictf()) == YSIZE(Ictf()) / 2 + 1)
-						{
-							windowFourierTransform(Ictf(), Fctf, YSIZE(Fctf));
-						}
-						// if dimensions are neither cubical nor FFTW, stop
-						else
-						{
-							REPORT_ERROR("3D CTF volume must be either cubical or adhere to FFTW format!");
-						}
-						if (ctf_premultiplied)
-						{
-							// JO 5Mar2020: For both 2D and 3D data, CTF^2 will be provided if ctf_premultiplied!
-							if (ctf3d_squared)
+							else if (!do_skip_subtomo_correction)
 							{
 								FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
 								{
-									DIRECT_MULTIDIM_ELEM(Fctf, n) = fabs(DIRECT_MULTIDIM_ELEM(Fctf, n));
+									RFLOAT mySTMulti = DIRECT_MULTIDIM_ELEM(FstMulti, n);
+									if (mySTMulti > 0)
+										DIRECT_MULTIDIM_ELEM(Fctf, n) /= mySTMulti;
 								}
 							}
 							else
 							{
 								FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
 								{
-									DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+									RFLOAT mySTMulti = DIRECT_MULTIDIM_ELEM(FstMulti, n);
+									if (mySTMulti > 0)
+										DIRECT_MULTIDIM_ELEM(Fctf, n) /= (mySTMulti * mySTMulti);
 								}
 							}
 						}
@@ -8895,7 +8890,8 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 					REPORT_ERROR("MlOptimiser::autoAdjustAngularSampling BUG: ref_dim should be two or three");
 
 				// Jun08,2015 Shaoda & Sjors, Helical refinement
-				bool do_local_searches = ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches));
+				bool do_local_searches_helical = ((do_auto_refine) && (do_helical_refine) &&
+						(sampling.healpix_order >= autosampling_hporder_local_searches));
 
 				// Don't go to coarse angular samplings. Then just keep doing as it was
 				if (new_step > sampling.offset_step)
@@ -8904,7 +8900,7 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 					new_range = sampling.offset_range;
 				}
 
-				sampling.setTranslations(new_step, new_range, do_local_searches, (do_helical_refine) && (!ignore_helical_symmetry), new_helical_offset_step, helical_rise_initial, helical_twist_initial);
+				sampling.setTranslations(new_step, new_range, do_local_searches_helical, (do_helical_refine) && (!ignore_helical_symmetry), new_helical_offset_step, helical_rise_initial, helical_twist_initial);
 
 				// Reset iteration counters
 				nr_iter_wo_resol_gain = 0;
@@ -8920,7 +8916,6 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 				{
 					// Switch ON local angular searches
 					mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
-					sampling.orientational_prior_mode = PRIOR_ROTTILT_PSI;
 					mymodel.sigma2_rot = mymodel.sigma2_psi = 2. * 2. * new_rottilt_step * new_rottilt_step;
 					if (!(do_helical_refine && helical_keep_tilt_prior_fixed))
 						mymodel.sigma2_tilt = mymodel.sigma2_rot;
@@ -8936,7 +8931,7 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 		if (myverb)
 		{
 			std::cout << " Auto-refine: Angular step= " << sampling.getAngularSampling(adaptive_oversampling) << " degrees; local searches= ";
-			if (sampling.orientational_prior_mode == NOPRIOR)
+			if (mymodel.orientational_prior_mode == NOPRIOR)
 				std:: cout << "false" << std::endl;
 			else
 				std:: cout << "true" << std::endl;
@@ -8985,7 +8980,6 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 	}
 	else if (do_sgd)
 	{
-
 		// Do sgd_ini_iter iterations with completely identical K references, sigd_ini_subset_size, enforce non-negativity and sgd_ini_resol resolution limit
 		if (iter < sgd_ini_iter)
 		{
@@ -8999,13 +8993,12 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 		{
 			subset_size = sgd_fin_subset_size;
 		}
-
-
+		if (subset_size > mydata.numberOfParticles())
+			subset_size = -1;
 	}
 
 	if (myverb && subset_size != old_subset_size)
 		std::cout << " Setting subset size to " << subset_size << " particles" << std::endl;
-
 }
 
 void MlOptimiser::checkConvergence(bool myverb)
@@ -9456,3 +9449,158 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 
 }
 
+void MlOptimiser::get3DCTFAndMulti(MultidimArray<RFLOAT> &Ictf, MultidimArray<RFLOAT> &Fctf, MultidimArray<RFLOAT> &FstMulti,
+							bool ctf_premultiplied)
+{
+	// If there is a redundant half, get rid of it
+	if (XSIZE(Ictf) == YSIZE(Ictf))
+	{
+		// Set the CTF-image in Fctf
+		Ictf.setXmippOrigin();
+		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+		{
+			// Use negative kp,ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
+			DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf, -kp, -ip, -jp);
+		}
+	}
+	// In case we store a half it may be just CTF or CTF+Multiplicity
+	else if (XSIZE(Ictf) == YSIZE(Ictf) / 2 + 1)
+	{
+		// CTF only. Just window the CTF to the current resolution
+		if (ZSIZE(Ictf) == YSIZE(Ictf))
+		{
+			windowFourierTransform(Ictf, Fctf, YSIZE(Fctf));
+		}
+		// Subtomo Multiplicity weights included. Read both or solo CTF according to parameters
+		else if (ZSIZE(Ictf) == YSIZE(Ictf)*2)
+		{
+			MultidimArray<RFLOAT> &Mctf = Ictf;
+			long int max_r2 = (XSIZE(Mctf) -1) * (XSIZE(Mctf) - 1);
+			// We just read the CTF from the file in case we don't apply subtomo correction
+			if (do_skip_subtomo_correction && normalised_subtomos)
+			{
+				FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+				{
+					// Make sure windowed FT has nothing in the corners, otherwise we end up with an asymmetric FT!
+					if (kp*kp + ip*ip + jp*jp <= max_r2)
+					{
+						FFTW_ELEM(Fctf, kp, ip, jp) = DIRECT_A3D_ELEM(Mctf, ((kp < 0) ? (kp + YSIZE(Mctf)) : (kp)), \
+						((ip < 0) ? (ip + YSIZE(Mctf)) : (ip)), jp);
+					}
+				}
+			}
+			else if (!ctf_premultiplied)
+			{
+				REPORT_ERROR("ERROR: subtomo multiplicity correction only applies to ctf_premultiplied data");
+			}
+			else
+			{
+				FstMulti.resize(Fctf);
+
+				FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+				{
+					// Make sure windowed FT has nothing in the corners, otherwise we end up with an asymmetric FT!
+					if (kp*kp + ip*ip + jp*jp <= max_r2)
+					{
+						FFTW_ELEM(Fctf, kp, ip, jp) = DIRECT_A3D_ELEM(Mctf, ((kp < 0) ? (kp + YSIZE(Mctf)) : (kp)), \
+						((ip < 0) ? (ip + YSIZE(Mctf)) : (ip)), jp);
+
+						RFLOAT mySTMulti = DIRECT_A3D_ELEM(Mctf, ((kp < 0) ? (kp + ZSIZE(Mctf)) : (kp + YSIZE(Mctf))), \
+						((ip < 0) ? (ip + YSIZE(Mctf)) : (ip)), jp);
+
+						// We store the sqrt(Multi) to speed up calculations
+						if (mySTMulti < 0)
+							REPORT_ERROR("MULTIPLICITY volume cannot contain negative values!");
+						// threshold to avoid dividing by small values
+						if (mySTMulti > subtomo_multi_thr)
+							FFTW_ELEM(FstMulti, kp, ip, jp) = sqrt(mySTMulti);
+					}
+				}
+			}
+		}
+			// if Z dimension is neither containing CTF or CTF+MULTI, stop
+		else
+		{
+			REPORT_ERROR("3D CTF volume in FFTW format must cointain CTF or CTF and MULTI concatenated along Z !");
+		}
+	}
+		// if dimensions are neither cubical nor FFTW, stop
+	else
+	{
+		REPORT_ERROR("3D CTF volume must be either cubical or adhere to FFTW format!");
+	}
+
+	if (ctf_premultiplied)
+	{
+		// SHWS 13feb2020: when using CTF-premultiplied on 3D data, Fctf will now contain ctf^2, but make sure they are all positive!!
+		if (ctf3d_squared)
+		{
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+			{
+				DIRECT_MULTIDIM_ELEM(Fctf, n) = fabs(DIRECT_MULTIDIM_ELEM(Fctf, n));
+			}
+		}
+		else
+		{
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+			{
+				DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+			}
+		}
+	}
+}
+
+void MlOptimiser::applySubtomoCorrection(MultidimArray<Complex > &Fimg, MultidimArray<Complex > &Fimg_nomask,
+										 MultidimArray<RFLOAT> &Fctf, MultidimArray<RFLOAT> &FstMulti)
+{
+	if (normalised_subtomos)
+	{
+		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fimg)
+		{
+			RFLOAT mySTMulti = FFTW_ELEM(FstMulti, kp, ip, jp);
+			FFTW_ELEM(Fimg, kp, ip, jp) *= mySTMulti;
+			FFTW_ELEM(Fimg_nomask, kp, ip, jp) *= mySTMulti;
+			FFTW_ELEM(Fctf, kp, ip, jp) *= mySTMulti;
+		}
+	}
+	else if (!do_skip_subtomo_correction)
+	{
+		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fimg)
+		{
+			RFLOAT mySTMulti = FFTW_ELEM(FstMulti, kp, ip, jp);
+			if (mySTMulti == 0)
+			{
+				FFTW_ELEM(Fimg, kp, ip, jp) = 0;
+				FFTW_ELEM(Fimg_nomask, kp, ip, jp) = 0;
+				FFTW_ELEM(Fctf, kp, ip, jp) = 0;
+			}
+			else
+			{
+				FFTW_ELEM(Fimg, kp, ip, jp) /= mySTMulti;
+				FFTW_ELEM(Fimg_nomask, kp, ip, jp) /= mySTMulti;
+				FFTW_ELEM(Fctf, kp, ip, jp) /= mySTMulti;
+			}
+		}
+	}
+	else // We apply the multiplicity normalisation to process in the old way, without the corrected algorithm
+	{
+		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fimg)
+		{
+			RFLOAT mySTMulti = FFTW_ELEM(FstMulti, kp, ip, jp);
+			if (mySTMulti == 0)
+			{
+				FFTW_ELEM(Fimg, kp, ip, jp) = 0;
+				FFTW_ELEM(Fimg_nomask, kp, ip, jp) = 0;
+				FFTW_ELEM(Fctf, kp, ip, jp) = 0;
+			}
+			else
+			{
+				FFTW_ELEM(Fimg, kp, ip, jp) /= (mySTMulti * mySTMulti);
+				FFTW_ELEM(Fimg_nomask, kp, ip, jp) /= (mySTMulti * mySTMulti);
+				FFTW_ELEM(Fctf, kp, ip, jp)  /= (mySTMulti * mySTMulti);
+			}
+		}
+		// We don't store the multiplicity to prevent applying the corrected algorithm during reconstruction/averaging
+		FstMulti.clear();
+	}
+}

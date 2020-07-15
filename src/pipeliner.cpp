@@ -706,6 +706,8 @@ int PipeLine::addScheduledJob(std::string typestring, std::string fn_options)
 		type = PROC_RESMAP;
 	else if (typestring == PROC_INIMODEL_NAME)
 		type = PROC_INIMODEL;
+	else if (typestring == PROC_EXTERNAL_NAME)
+		type = PROC_EXTERNAL;
 	else
 		REPORT_ERROR("ERROR: unrecognised string for job type: " + typestring);
 

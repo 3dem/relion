@@ -30,7 +30,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 		Image<RFLOAT> img, rec_img;
 		MultidimArray<Complex > Fimg;
 		MultidimArray<Complex > Faux;
-		MultidimArray<RFLOAT> Fctf;
+		MultidimArray<RFLOAT> Fctf, FstMulti;
 		Matrix2D<RFLOAT> Aori;
 		Matrix1D<RFLOAT> my_projected_com(baseMLO->mymodel.data_dim), my_refined_ibody_offset(baseMLO->mymodel.data_dim);
 
@@ -716,47 +716,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 				}
 				// Set the CTF-image in Fctf
 				CTIC(accMLO->timer,"CTFSet3D_array");
-
-				// If there is a redundant half, get rid of it
-				if (XSIZE(Ictf()) == YSIZE(Ictf()))
-				{
-					Ictf().setXmippOrigin();
-					FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
-					{
-						// Use negative kp,ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
-						DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf(), -kp, -ip, -jp);
-					}
-				}
-				// otherwise, just window the CTF to the current resolution
-				else if (XSIZE(Ictf()) == YSIZE(Ictf()) / 2 + 1)
-				{
-					windowFourierTransform(Ictf(), Fctf, YSIZE(Fctf));
-				}
-				// if dimensions are neither cubical nor FFTW, stop
-				else
-				{
-					REPORT_ERROR("3D CTF volume must be either cubical or adhere to FFTW format!");
-				}
-
-				// SHWS 13feb2020: when using CTF-premultiplied, replace ctf by ctf^2, but make sure they are all positive!!
-				if (ctf_premultiplied)
-				{
-					if (baseMLO->ctf3d_squared)
-					{
-						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
-						{
-							DIRECT_MULTIDIM_ELEM(Fctf, n) = fabs(DIRECT_MULTIDIM_ELEM(Fctf, n));
-						}
-					}
-					else
-					{
-						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
-						{
-							DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
-						}
-					}
-				}
-
+				baseMLO->get3DCTFAndMulti(Ictf(), Fctf, FstMulti, ctf_premultiplied);
 				CTOC(accMLO->timer,"CTFSet3D_array");
 			}
 			else
@@ -801,6 +761,13 @@ void getFourierTransformsAndCtfs(long int part_id,
 		// Store Fimg and Fctf
 		op.Fimg.at(img_id) = Fimg;
 		op.Fctf.at(img_id) = Fctf;
+
+		// Correct images and CTFs by Multiplicity, if required, and store it
+		if ( NZYXSIZE(FstMulti) > 0 )
+		{
+			baseMLO->applySubtomoCorrection(op.Fimg.at(img_id), op.Fimg_nomask.at(img_id), op.Fctf.at(img_id), FstMulti);
+			op.FstMulti.at(img_id) = FstMulti;
+		}
 
 		// If we're doing multibody refinement, now subtract projections of the other bodies from both the masked and the unmasked particle
 		if (baseMLO->mymodel.nr_bodies > 1)
@@ -960,7 +927,7 @@ void getAllSquaredDifferencesCoarse(
 	std::vector<std::vector<MultidimArray<Complex > > > dummy2;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, false, op.part_id, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimg, dummy, op.Fctf, dummy2, dummy2,
-			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2);
+			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2, op.FstMulti);
 
 	CTOC(accMLO->timer,"diff_pre_gpu");
 
@@ -1249,7 +1216,7 @@ void getAllSquaredDifferencesFine(
 	std::vector<std::vector<MultidimArray<Complex > > > dummy2;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, false, op.part_id, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimg, dummy, op.Fctf, dummy2, dummy2,
-			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2);
+			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2, op.FstMulti);
 	CTOC(accMLO->timer,"precalculateShiftedImagesCtfsAndInvSigma2s");
 
 
@@ -2145,7 +2112,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	std::vector<std::vector<MultidimArray<Complex > > > dummy2;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, true, op.part_id, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimg, op.Fimg_nomask, op.Fctf, dummy2, dummy2,
-			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2);
+			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2, op.FstMulti);
 
 	// In doThreadPrecalculateShiftedImagesCtfsAndInvSigma2s() the origin of the op.local_Minvsigma2s was omitted.
 	// Set those back here
@@ -3091,6 +3058,8 @@ void accDoExpectationOneParticle(MlClass *myInstance, unsigned long part_id_sort
 	sp.nr_images = baseMLO->mydata.numberOfImagesInParticle(part_id);
 
 	OptimisationParamters op(sp.nr_images, part_id);
+	if (baseMLO->mydata.is_3D)
+		op.FstMulti.resize(sp.nr_images);
 
 	// In the first iteration, multiple seeds will be generated
 	// A single random class is selected for each pool of images, and one does not marginalise over the orientations
@@ -3129,6 +3098,8 @@ void accDoExpectationOneParticle(MlClass *myInstance, unsigned long part_id_sort
     {
 
     	OptimisationParamters op(sp.nr_images, part_id);
+		if (baseMLO->mydata.is_3D)
+			op.FstMulti.resize(sp.nr_images);
 
 		// Skip this body if keep_fixed_bodies[ibody] or if it's angular accuracy is worse than 1.5x the sampling rate
     	if ( baseMLO->mymodel.nr_bodies > 1 && baseMLO->mymodel.keep_fixed_bodies[ibody] > 0)

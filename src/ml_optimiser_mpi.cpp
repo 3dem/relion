@@ -103,9 +103,6 @@ void MlOptimiserMpi::initialise()
 	int devCount, deviceAffinity;
 	bool is_split(false);
 
-//	std::cout << "Press any key to continue ..." << std::endl;
-//	getchar();
-
 	if (do_gpu)
 	{
 		MPI_Status status;
@@ -503,14 +500,14 @@ will still yield good performance and possibly a more stable execution. \n" << s
 			if (verb > 0) std::cout<< " WARNING: provided sigma2_noise-spectrum has fewer entries ("<<idx+1<<") than needed ("<<XSIZE(mymodel.sigma2_noise[0])<<"). Set rest to zero..."<<std::endl;
 		}
 
-        mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
-        for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
-        {
-            // Use the same spectrum for all classes
-            mymodel.sigma2_noise[igroup] =  mymodel.sigma2_noise[0];
-            // We set wsum_model.sumw_group as in calculateSumOfPowerSpectraAndAverageImage
-            wsum_model.sumw_group[igroup] = mymodel.nr_particles_per_group[igroup];
-        }
+		mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
+		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
+		{
+			// Use the same spectrum for all classes
+			mymodel.sigma2_noise[igroup] =  mymodel.sigma2_noise[0];
+			// We set wsum_model.sumw_group as in calculateSumOfPowerSpectraAndAverageImage
+			wsum_model.sumw_group[igroup] = mymodel.nr_particles_per_group[igroup];
+		}
 	}
 	else if (do_calculate_initial_sigma_noise || do_average_unaligned)
 	{
@@ -2086,8 +2083,7 @@ void MlOptimiserMpi::maximization()
 								mymodel.tau2_fudge_factor,
 								wsum_model.pdf_class[iclass],
 								minres_map,
-								false
-							);
+								false);
 						}
 						if (do_sgd)
 						{
@@ -3249,45 +3245,20 @@ void MlOptimiserMpi::iterate()
 		{
 			if ( (do_helical_refine) && (!do_skip_align) && (!do_skip_rotate) && mymodel.ref_dim == 3)
 			{
-				int nr_same_polarity = 0, nr_opposite_polarity = 0;
-				int nr_same_rot = 0, nr_opposite_rot = 0;	// KThurber
-				RFLOAT opposite_percentage = 0.;
-				RFLOAT rot_opposite_percent = 0.;	// KThurber
-				bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
-				bool do_classification_local_searches = (!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
-						&& (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.);
-				bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
-
-				if (helical_sigma_distance < 0.)
-					updateAngularPriorsForHelicalReconstruction(mydata.MDimg, helical_keep_tilt_prior_fixed);
-				else
-				{
 					updatePriorsForHelicalReconstruction(
 							mydata.MDimg,
-							nr_opposite_polarity,
-							nr_opposite_rot,	// KThurber
 							helical_sigma_distance * ((RFLOAT)(mymodel.ori_size)),
 							mymodel.helical_rise,
 							mymodel.helical_twist,
+							helical_nstart,
 							(mymodel.data_dim == 3),
 							do_auto_refine,
-							do_local_angular_searches,
 							mymodel.sigma2_rot,
 							mymodel.sigma2_tilt,
 							mymodel.sigma2_psi,
 							mymodel.sigma2_offset,
-							helical_keep_tilt_prior_fixed);
-
-					nr_same_polarity = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_polarity;
-					opposite_percentage = (100.) * ((RFLOAT)(nr_opposite_polarity)) / ((RFLOAT)(mydata.MDimg.numberOfObjects()));
-					nr_same_rot = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_rot; // KThurber
-					rot_opposite_percent = (100.) * ((RFLOAT)(nr_opposite_rot)) / ((RFLOAT)(mydata.MDimg.numberOfObjects())); // KThurber
-					if ( (verb > 0) && (!do_local_angular_searches) )
-					{
-						std::cout << " Number of helical segments with psi angles similar/opposite to their priors: " << nr_same_polarity << " / " << nr_opposite_polarity << " (" << opposite_percentage << "%)" << std::endl;
-						std::cout << " Number of helical segments with rot angles similar/opposite to their priors: " << nr_same_rot << " / " << nr_opposite_rot << " (" << rot_opposite_percent << "%)" << std::endl; // KThurber
-					}
-				}
+							helical_keep_tilt_prior_fixed,
+							verb);
 			}
 		}
 		MPI_Barrier(MPI_COMM_WORLD);

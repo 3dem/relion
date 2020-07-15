@@ -480,11 +480,15 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 	transformer.FourierTransform(img(), Fimg);
 	CenterFFTbySign(Fimg);
 	Fctf.resize(Fimg);
+	bool ctf_premultiplied = opt.mydata.obsModel.getCtfPremultiplied(optics_group);
 
 	if (opt.do_ctf_correction)
 	{
 		if (opt.mymodel.data_dim == 3)
 		{
+			if (!ctf_premultiplied)
+				REPORT_ERROR("3D data must be ctf_premultiplied for CTF correction.");
+
 			Image<RFLOAT> Ictf;
 			FileName fn_ctf;
 			opt.mydata.MDimg.getValue(EMDL_CTF_IMAGE, fn_ctf, ori_img_id);
@@ -500,10 +504,36 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 					DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf(), -kp, -ip, -jp);
 				}
 			}
-			// otherwise, just window the CTF to the current resolution
+			// otherwise, check if the file also contains Multiplicity
 			else if (XSIZE(Ictf()) == YSIZE(Ictf()) / 2 + 1)
 			{
-				windowFourierTransform(Ictf(), Fctf, YSIZE(Fctf));
+				//CTF Only: Just window the CTF to the current resolution
+				if (ZSIZE(Ictf()) == YSIZE(Ictf()))
+				{
+					windowFourierTransform(Ictf(), Fctf, YSIZE(Fctf));
+				}
+				// Subtomo Multiplicity weights included. Read solo CTF
+				else if (ZSIZE(Ictf()) == YSIZE(Ictf())*2)
+				{
+					MultidimArray<RFLOAT> &Mctf = Ictf();
+					long int max_r2 = (XSIZE(Mctf) - 1) * (XSIZE(Mctf) - 1);
+
+					FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+					{
+						// Make sure windowed FT has nothing in the corners, otherwise we end up with an asymmetric FT!
+						if (kp * kp + ip * ip + jp * jp <= max_r2)
+						{
+							FFTW_ELEM(Fctf, kp, ip, jp) = DIRECT_A3D_ELEM(Mctf, ((kp < 0) ? (kp + YSIZE(Mctf))
+																						  : (kp)), \
+								((ip < 0) ? (ip + YSIZE(Mctf)) : (ip)), jp);
+						}
+					}
+				}
+					// if Z dimension is neither containing CTF or CTF+MULTI, stop
+				else
+				{
+					REPORT_ERROR("3D CTF volume in FFTW format must cointain CTF or CTF and MULTI concatenated along Z !");
+				}
 			}
 			// if dimensions are neither cubical nor FFTW, stop
 			else
@@ -515,8 +545,12 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 		{
 			CTF ctf;
 			ctf.readByGroup(opt.mydata.MDimg, &opt.mydata.obsModel, ori_img_id);
-			ctf.getFftwImage(Fctf, opt.mymodel.ori_size, opt.mymodel.ori_size, opt.mymodel.pixel_size,
+			ctf.getFftwImage(Fctf, XSIZE(img()), YSIZE(img()), my_pixel_size,
 					opt.ctf_phase_flipped, false, opt.intact_ctf_first_peak, true);
+
+			if (ctf_premultiplied)
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+					(DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n));
 		}
 	}
 	else
@@ -579,7 +613,7 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 			// Subtract the projected COM already applied to this image for ibody
 			other_projected_com -= my_projected_com;
 
-			shiftImageInFourierTransform(FTo, Faux, (RFLOAT)opt.mymodel.ori_size,
+			shiftImageInFourierTransform(FTo, Faux, (RFLOAT)XSIZE(img()),
 					XX(other_projected_com), YY(other_projected_com), ZZ(other_projected_com));
 
 			// Sum the Fourier transforms of all the obodies
@@ -610,28 +644,27 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 
 		// re-center to new_center
 		my_residual_offset += my_refined_ibody_offset;
-		my_residual_offset += Abody * (opt.mymodel.com_bodies[subtract_body] - new_center);
-
+		my_residual_offset += Abody * (opt.mymodel.com_bodies[subtract_body] - new_center * opt.mymodel.pixel_size / my_pixel_size);
 	}
 	else
 	{
 		// Normal 3D classification/refinement: get the projection in rot,tilt,psi for the corresponding class
-		Matrix2D<RFLOAT> A3D;
-		Euler_angles2matrix(rot, tilt, psi, A3D);
+		Matrix2D<RFLOAT> A3D_pure_rot, A3D;
+		Euler_angles2matrix(rot, tilt, psi, A3D_pure_rot);
 
 		// Apply anisotropic mag and scaling
-		A3D = opt.mydata.obsModel.applyAnisoMag(A3D, optics_group);
+		A3D = opt.mydata.obsModel.applyAnisoMag(A3D_pure_rot, optics_group);
 		A3D = opt.mydata.obsModel.applyScaleDifference(A3D, optics_group, opt.mymodel.ori_size, opt.mymodel.pixel_size);
 		opt.mymodel.PPref[myclass].get2DFourierTransform(Fsubtract, A3D);
 
 		// Shift in opposite direction as offsets in the STAR file
-		shiftImageInFourierTransform(Fsubtract, Fsubtract, (RFLOAT)opt.mymodel.ori_size,
+		shiftImageInFourierTransform(Fsubtract, Fsubtract, (RFLOAT)XSIZE(img()),
 				-XX(my_old_offset), -YY(my_old_offset), -ZZ(my_old_offset));
 
 		if (do_center)
 		{
 			// Re-center the output particle to a new centre...
-			my_residual_offset = my_old_offset - A3D * (new_center);
+			my_residual_offset = my_old_offset - A3D_pure_rot * (new_center * opt.mymodel.pixel_size / my_pixel_size);
 		}
 	}
 

@@ -170,6 +170,9 @@ void FlexAnalyser::initialise()
 
 void FlexAnalyser::run(int rank, int size)
 {
+	if (size > 1 && do_PCA_orient)
+		REPORT_ERROR("PCA analysis (--PCA_orient) must be performed in the non-MPI version.");
+
 	if (do_3dmodels) setup3DModels();
 
 	// Loop through all particles
