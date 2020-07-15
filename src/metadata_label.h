@@ -101,16 +101,22 @@ enum EMDLabel
 	EMDL_CLASS_FEAT_FFT_STDDEV,
 	EMDL_CLASS_FEAT_FFT_SKEW,
 	EMDL_CLASS_FEAT_FFT_KURT,
-	EMDL_CLASS_FEAT_PROTEIN_MEAN,        /// Moments in
+	EMDL_CLASS_FEAT_PROTEIN_AREA,
+	EMDL_CLASS_FEAT_PROTEIN_SUM,
+	EMDL_CLASS_FEAT_PROTEIN_MEAN,        /// stats in the protein area
 	EMDL_CLASS_FEAT_PROTEIN_STDDEV,
 	EMDL_CLASS_FEAT_PROTEIN_SKEW,
 	EMDL_CLASS_FEAT_PROTEIN_KURT,
+	EMDL_CLASS_FEAT_SOLVENT_AREA,
+	EMDL_CLASS_FEAT_SOLVENT_SUM,
 	EMDL_CLASS_FEAT_SOLVENT_MEAN,
 	EMDL_CLASS_FEAT_SOLVENT_STDDEV,
 	EMDL_CLASS_FEAT_SOLVENT_SKEW,
 	EMDL_CLASS_FEAT_SOLVENT_KURT,
+	EMDL_CLASS_FEAT_RELATIVE_SIGNAL_INT,
 	EMDL_CLASS_FEAT_SCATTERED_SIGNAL,
 	EMDL_CLASS_FEAT_EDGE_SIGNAL,
+	EMDL_CLASS_FEAT_CAR, // circumference to area ratio (relative to a perfect circle)
 	EMDL_CLASS_FEAT_WEIGHTED_RESOLUTION,
 	EMDL_CLASS_FEAT_RELATIVE_RESOLUTION,
 	EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MAX,
@@ -696,16 +702,22 @@ private:
         EMDL::addLabel(EMDL_CLASS_FEAT_FFT_STDDEV, EMDL_DOUBLE, "rlnFftStddev", "Standard deviation of Fourier components (amplitude only) up to resolution limit.");
         EMDL::addLabel(EMDL_CLASS_FEAT_FFT_SKEW, EMDL_DOUBLE, "rlnFftSkew", "Skewness of Fourier components (amplitude only) up to resolution limit.");
         EMDL::addLabel(EMDL_CLASS_FEAT_FFT_KURT, EMDL_DOUBLE, "rlnFftKurt", "Kurtosis of Fourier components (amplitude only) up to resolution limit.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_PROTEIN_AREA, EMDL_INT, "rlnProteinArea", "Whether protein area is non-zero.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_PROTEIN_SUM, EMDL_DOUBLE, "rlnProteinSum", "Sum of protein region.");
         EMDL::addLabel(EMDL_CLASS_FEAT_PROTEIN_MEAN, EMDL_DOUBLE, "rlnProteinMean", "Mean of protein region.");
         EMDL::addLabel(EMDL_CLASS_FEAT_PROTEIN_STDDEV, EMDL_DOUBLE, "rlnProteinStddev", "Standard deviation of protein region.");
         EMDL::addLabel(EMDL_CLASS_FEAT_PROTEIN_SKEW, EMDL_DOUBLE, "rlnProteinSkew", "Skewness of protein region.");
         EMDL::addLabel(EMDL_CLASS_FEAT_PROTEIN_KURT, EMDL_DOUBLE, "rlnProteinKurt", "Kurtosis of protein region.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_SOLVENT_AREA, EMDL_INT, "rlnSolventArea", "Whether solvent area is non-zero.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_SOLVENT_SUM, EMDL_DOUBLE, "rlnSolventSum", "Sum of solvent region.");
         EMDL::addLabel(EMDL_CLASS_FEAT_SOLVENT_MEAN, EMDL_DOUBLE, "rlnSolventMean", "Mean of solvent region.");
         EMDL::addLabel(EMDL_CLASS_FEAT_SOLVENT_STDDEV, EMDL_DOUBLE, "rlnSolventStddev", "Standard deviation of solvent region.");
         EMDL::addLabel(EMDL_CLASS_FEAT_SOLVENT_SKEW, EMDL_DOUBLE, "rlnSolventSkew", "Skewness of solvent region.");
         EMDL::addLabel(EMDL_CLASS_FEAT_SOLVENT_KURT, EMDL_DOUBLE, "rlnSolventKurt", "Kurtosis of solvent region.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_RELATIVE_SIGNAL_INT,EMDL_DOUBLE, "rlnRelativeSignalIntensity", "Sum of protein area's individual pixel values subtracting solvent area mean.");
         EMDL::addLabel(EMDL_CLASS_FEAT_SCATTERED_SIGNAL, EMDL_DOUBLE, "rlnScatteredSignal", "Ratio of excluded white pixels when making the protein mask.");
         EMDL::addLabel(EMDL_CLASS_FEAT_EDGE_SIGNAL, EMDL_DOUBLE, "rlnEdgeSignal", "Ratio of white pixels on the edge in the protein mask.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_CAR, EMDL_DOUBLE, "rlnProteinCAR", "Circumference to area ratio of protein area (relative to a perfect circle).");
         EMDL::addLabel(EMDL_CLASS_FEAT_WEIGHTED_RESOLUTION, EMDL_DOUBLE, "rlnWeightedResolution", "Estimated resolution weighted by the number of particles in the class.");
         EMDL::addLabel(EMDL_CLASS_FEAT_RELATIVE_RESOLUTION, EMDL_DOUBLE, "rlnRelativeResolution", "Estimated resolution weighted by the image dimension.");
         EMDL::addLabel(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MAX, EMDL_DOUBLE, "rlnLowpassFilteredImageMax", "Maximum pixel value of the lowpass filtered image.");
