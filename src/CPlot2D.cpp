@@ -145,6 +145,8 @@ CPlot2D::CPlot2D(std::string title)
     m_dYAxisLabelColor[2]=0.0;
 
     m_bDrawLegend=true;
+
+	m_bSizeSetExternally = false;
 }
 
 CPlot2D::~CPlot2D()
@@ -254,21 +256,29 @@ void CPlot2D::PrecomputeDimensions()
     m_dMaxXEndPoint=-DBL_MAX;
     m_dMaxYEndPoint=-DBL_MAX;
 
-    // for all data sets
-    for (int i=0;i<m_dataSets.size();++i) {
-        if (m_dMinXStartPoint>m_dataSets[i].GetXMinValue()) {
-            m_dMinXStartPoint=m_dataSets[i].GetXMinValue();
-        }
-        if (m_dMinYStartPoint>m_dataSets[i].GetYMinValue()) {
-            m_dMinYStartPoint=m_dataSets[i].GetYMinValue();
-        }
-        if (m_dMaxXEndPoint<m_dataSets[i].GetXMaxValue()) {
-            m_dMaxXEndPoint=m_dataSets[i].GetXMaxValue();
-        }
-        if (m_dMaxYEndPoint<m_dataSets[i].GetYMaxValue()) {
-            m_dMaxYEndPoint=m_dataSets[i].GetYMaxValue();
-        }
-    }
+	if (!m_bSizeSetExternally) {
+		// for all data sets
+		for (int i=0;i<m_dataSets.size();++i) {
+			if (m_dMinXStartPoint>m_dataSets[i].GetXMinValue()) {
+				m_dMinXStartPoint=m_dataSets[i].GetXMinValue();
+			}
+			if (m_dMinYStartPoint>m_dataSets[i].GetYMinValue()) {
+				m_dMinYStartPoint=m_dataSets[i].GetYMinValue();
+			}
+			if (m_dMaxXEndPoint<m_dataSets[i].GetXMaxValue()) {
+				m_dMaxXEndPoint=m_dataSets[i].GetXMaxValue();
+			}
+			if (m_dMaxYEndPoint<m_dataSets[i].GetYMaxValue()) {
+				m_dMaxYEndPoint=m_dataSets[i].GetYMaxValue();
+			}
+		}
+	}
+	else {
+		m_dMinXStartPoint = m_dMinXStartPointOverride;
+		m_dMinYStartPoint = m_dMinYStartPointOverride;
+		m_dMaxXEndPoint = m_dMaxXEndPointOverride;
+		m_dMaxYEndPoint = m_dMaxYEndPointOverride;
+	}
 
     // Sjors 20Apr2016: prevent zero width of x,y axes
     if (fabs(m_dMinXStartPoint - m_dMaxXEndPoint) < 1e-10)
@@ -522,7 +532,16 @@ void CPlot2D::AddDataSet(std::vector<RFLOAT> yValues)
     	CDataPoint point=CDataPoint(i+1,yValues[i]);
         dataSet.AddDataPoint(point);
     }
-    m_dataSets.push_back(dataSet);
+	m_dataSets.push_back(dataSet);
+}
+
+void CPlot2D::SetViewArea(double start_x, double start_y, double end_x, double end_y)
+{
+	m_dMinXStartPointOverride = start_x;
+	m_dMaxXEndPointOverride = end_x;
+	m_dMinYStartPointOverride = start_y;
+	m_dMaxYEndPointOverride = end_y;
+	m_bSizeSetExternally = true;
 }
 
 void CPlot2D::DrawMarker(std::string symbol, double size, bool filled, double xLocation, double yLocation, int dataSet)
@@ -914,7 +933,8 @@ void CPlot2D::DrawLegendPostScript()
 
         double r,g,b;
         m_dataSets[i].GetDatasetColor(&r,&g,&b);
-
+		
+		if (m_dataSets[i].GetDatasetTitle() == "") continue;
 
         if (m_dataSets[i].GetDrawLine()) {
             // draw the line

@@ -389,7 +389,9 @@ void CenterFFTbySign(MultidimArray <T> &v)
 
     FOR_ALL_ELEMENTS_IN_ARRAY3D(v)
     {
-        if ((k ^ i ^ j) & 1 != 0) // if ODD
+	// NOTE: != has higher precedence than & in C as pointed out in GitHub issue #637.
+	// So (k ^ i ^ j) & 1 != 0 is not good (fortunately in this case the behaviour happened to be the same)
+        if (((k ^ i ^ j) & 1) != 0) // if ODD
             DIRECT_A3D_ELEM(v, k, i, j) *= -1;
     }
 }
@@ -1018,7 +1020,6 @@ void helicalLayerLineProfile(const MultidimArray<RFLOAT> &v, std::string title, 
 
 void generateBinaryHelicalFourierMask(MultidimArray<RFLOAT> &mask, std::vector<RFLOAT> exclude_begin, std::vector<RFLOAT> exclude_end, RFLOAT angpix);
 
-
 template <class T>
 void cropInFourierSpace(MultidimArray<T> &Fref, MultidimArray<T> &Fbinned) {
 	const int nfx = XSIZE(Fref), nfy = YSIZE(Fref);
@@ -1038,6 +1039,5 @@ void cropInFourierSpace(MultidimArray<T> &Fref, MultidimArray<T> &Fbinned) {
 		}
 	}
 }
-
 
 #endif // __RELIONFFTW_H

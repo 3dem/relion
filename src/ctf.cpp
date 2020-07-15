@@ -457,7 +457,7 @@ void CTF::getCTFPImage(MultidimArray<Complex> &result, int orixdim, int oriydim,
 		REPORT_ERROR("CTF::getCTFPImage: angle should be in [0,360>");
 	}
 
-	// Angles larger than 180, are the inverse of the other half!
+	// Angles larger than 180 are the inverse of the other half!
 	if (angle >= 180.)
 	{
 		angle -= 180.;
@@ -469,22 +469,57 @@ void CTF::getCTFPImage(MultidimArray<Complex> &result, int orixdim, int oriydim,
 	RFLOAT xs = (RFLOAT)orixdim * angpix;
 	RFLOAT ys = (RFLOAT)oriydim * angpix;
 
-	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(result)
+	if (obsModel != 0 && obsModel->hasEvenZernike)
 	{
-		RFLOAT x = (RFLOAT)jp / xs;
-		RFLOAT y = (RFLOAT)ip / ys;
-		RFLOAT myangle = (x * x + y * y > 0) ? acos(y / sqrt(x * x + y * y)) : 0; // dot-product with Y-axis: (0,1)
-
-		if (myangle >= anglerad)
+		if (orixdim != oriydim)
 		{
-			DIRECT_A2D_ELEM(result, i, j) = getCTFP(x, y, is_positive);
+			REPORT_ERROR_STR("CTF::getFftwImage: symmetric aberrations are currently only "
+					 << "supported for square images.\n");
 		}
-		else
+
+		const BufferedImage<RFLOAT>& gammaOffset = obsModel->getGammaOffset(opticsGroup, oriydim);
+
+		if (   gammaOffset.xdim < result.xdim
+			|| gammaOffset.ydim < result.ydim)
 		{
-			DIRECT_A2D_ELEM(result, i, j) = getCTFP(x, y, !is_positive);
+			REPORT_ERROR_STR("CTF::getFftwImage: requested output image is larger than the original: "
+					 << gammaOffset.xdim << "x" << gammaOffset.ydim << " available, "
+					 << result.xdim << "x" << result.ydim << " requested\n");
+		}
+
+		for (int y1 = 0; y1 < result.ydim; y1++)
+		for (int x1 = 0; x1 < result.xdim; x1++)
+		{
+			RFLOAT x = x1 / xs;
+			RFLOAT y = y1 <= result.ydim/2? y1 / ys : (y1 - result.ydim) / ys;
+			RFLOAT myangle = (x * x + y * y > 0) ? acos(y / sqrt(x * x + y * y)) : 0; // dot-product with Y-axis: (0,1)
+			const int x0 = x1;
+			const int y0 = y1 <= result.ydim/2? y1 : gammaOffset.ydim + y1 - result.ydim;
+
+			if (myangle >= anglerad)
+				DIRECT_A2D_ELEM(result, y1, x1) = getCTFP(x, y, is_positive, gammaOffset(x0, y0));
+			else
+				DIRECT_A2D_ELEM(result, y1, x1) = getCTFP(x, y, !is_positive, gammaOffset(x0, y0));
 		}
 	}
+	else
+	{
+		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(result)
+		{
+			RFLOAT x = (RFLOAT)jp / xs;
+			RFLOAT y = (RFLOAT)ip / ys;
+			RFLOAT myangle = (x * x + y * y > 0) ? acos(y / sqrt(x * x + y * y)) : 0; // dot-product with Y-axis: (0,1)
 
+			if (myangle >= anglerad)
+			{
+				DIRECT_A2D_ELEM(result, i, j) = getCTFP(x, y, is_positive);
+			}
+			else
+			{
+				DIRECT_A2D_ELEM(result, i, j) = getCTFP(x, y, !is_positive);
+			}
+		}
+	}
 	// Special line along the vertical Y-axis, where FFTW stores both Friedel mates and Friedel symmetry needs to remain
 	if (angle == 0.)
 	{
@@ -493,7 +528,7 @@ void CTF::getCTFPImage(MultidimArray<Complex> &result, int orixdim, int oriydim,
 
 		for (int i = hdim + 1; i < dim; i++)
 		{
-			DIRECT_A2D_ELEM(result, i, 0) = conj(DIRECT_A2D_ELEM(result, dim-i, 0));
+			DIRECT_A2D_ELEM(result, i, 0) = conj(DIRECT_A2D_ELEM(result, dim - i, 0));
 		}
 	}
 }
@@ -620,6 +655,31 @@ void CTF::applyWeightEwaldSphereCurvature_noAniso(MultidimArray <RFLOAT> &result
 		// Keep everything on the same scale inside RELION, where we use sin(chi), not 2sin(chi)
 		DIRECT_A2D_ELEM(result, i, j) *= 0.5;
 	}
+}
+
+void CTF::applyEwaldMask(RawImage<RFLOAT>& weight, int orixdim, int oriydim, double angpix, double particle_diameter)
+{
+	const double xs = orixdim * angpix;
+	const double ys = oriydim * angpix;
+	
+	const int w = orixdim;
+	const int h = oriydim;
+	const int wh = w / 2  + 1;
+	const int my = oriydim / 2;
+	
+	for (int yi = 0; yi < h;  yi++)
+	for (int xi = 0; xi < wh; xi++)
+	{
+		const double x = xi / xs;
+		const double y = (yi < my? yi : yi - h) / ys;
+		                  
+		const double deltaf = std::abs(getDeltaF(x, y));
+		const double inv_d = sqrt(x * x + y * y);
+		const double aux = (2. * deltaf * lambda * inv_d) / (particle_diameter);
+		const double A = (aux > 1.) ? 0. : (2. / PI) * (acos(aux) - aux * sin(acos(aux)));
+		
+		weight(xi,yi) = 0.5 * (1 + A * (2 * std::abs(weight(xi,yi)) - 1));
+	}	
 }
 
 BufferedImage<float> CTF::getFftwImage_float(int w0, int h0, double angpix) const

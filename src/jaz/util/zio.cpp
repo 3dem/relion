@@ -1,4 +1,7 @@
 #include "zio.h"
+#include <string.h>
+#include <stdio.h>
+
 
 std::vector<double> ZIO::readDoubles(std::string fn)
 {
@@ -65,6 +68,22 @@ std::vector<std::vector<double>> ZIO::readDoublesTable(std::string fn, int cols,
 			
 			out[i][c] = d;
 		}
+	}
+	
+	return out;
+}
+
+std::vector<std::string> ZIO::split(const std::string &s, const std::string &delimiter)
+{
+	std::vector<std::string> out;
+	
+	char* cstr = const_cast<char*>(s.c_str());
+	char* current = strtok(cstr, delimiter.c_str());
+	
+	while (current != NULL)
+	{
+		out.push_back(current);
+		current = strtok(0, delimiter.c_str());
 	}
 	
 	return out;

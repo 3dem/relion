@@ -249,7 +249,7 @@ public:
 
 	gravis::t2Vector<RFLOAT> getGammaGrad(RFLOAT X, RFLOAT Y) const;
 
-	inline Complex getCTFP(RFLOAT X, RFLOAT Y, bool is_positive) const
+	inline Complex getCTFP(RFLOAT X, RFLOAT Y, bool is_positive, double gammaOffset = 0.0) const
 	{
 		if (obsModel != 0 && obsModel->hasMagMatrices)
 		{
@@ -264,7 +264,7 @@ public:
 		RFLOAT u2 = X * X + Y * Y;
 		RFLOAT u4 = u2 * u2;
 
-		RFLOAT gamma = K1 * (Axx*X*X + 2.0*Axy*X*Y + Ayy*Y*Y) + K2 * u4 - K5 - K3 + PI/2.;
+		RFLOAT gamma = K1 * (Axx*X*X + 2.0*Axy*X*Y + Ayy*Y*Y) + K2 * u4 - K5 - K3 + gammaOffset + PI/2.;
 
 		RFLOAT sinx, cosx;
 #ifdef RELION_SINGLE_PRECISION
@@ -273,34 +273,10 @@ public:
 		SINCOS( gamma, &sinx, &cosx );
 #endif
 		Complex retval;
-		retval.real = cosx;
-		retval.imag = (is_positive) ? sinx : -sinx;
+		retval.real = -sinx;
+		retval.imag = (is_positive) ? cosx : -cosx;
 
 		return retval;
-	}
-
-	inline Complex getCTFP_noAniso(RFLOAT X, RFLOAT Y, bool is_positive) const
-	{
-		RFLOAT u2 = X * X + Y * Y;
-		RFLOAT u = sqrt(u2);
-		RFLOAT u4 = u2 * u2;
-		// if (u2>=ua2) return 0;
-		RFLOAT deltaf = getDeltaF(X, Y);
-		RFLOAT argument = K1 * deltaf * u2 + K2 * u4 - K5 - K3;
-		// Add half pi phase shift
-		argument += PI/2.;
-		RFLOAT sinx, cosx;
-#ifdef RELION_SINGLE_PRECISION
-		SINCOSF( argument, &sinx, &cosx );
-#else
-		SINCOS( argument, &sinx, &cosx );
-#endif
-		Complex retval;
-		retval.real = cosx;
-		retval.imag = (is_positive) ? sinx : -sinx;
-
-		return retval;
-
 	}
 
 	/// Compute Deltaf at a given direction (no longer used by getCTF)
@@ -356,6 +332,9 @@ public:
 	// Calculate weight W for Ewald-sphere curvature correction: apply this to the result from getFftwImage
 	void applyWeightEwaldSphereCurvature_noAniso(MultidimArray < RFLOAT > &result, int orixdim, int oriydim, RFLOAT angpix, RFLOAT particle_diameter);
 
+	void applyEwaldMask(RawImage<RFLOAT>& result, int orixdim, int oriydim, RFLOAT angpix, RFLOAT particle_diameter);
+
+	
 	std::vector<double> getK();
 	double getAxx();
 	double getAxy();
@@ -420,13 +399,29 @@ public:
 		double xs = w0 * angpix;
 		double ys = h0 * angpix;
 		
-		for (int y = 0; y < h0; y++)
-		for (int x = 0; x < wh; x++)
+		if (obsModel == 0 || !obsModel->hasEvenZernike)
 		{
-			double xx = x / xs;
-			double yy = (y < h0/2? y : y - h0) / ys;
-	
-			dest[y*wh + x] = getGamma(xx,yy);
+			for (int y = 0; y < h0; y++)
+			for (int x = 0; x < wh; x++)
+			{
+				double xx = x / xs;
+				double yy = (y < h0/2? y : y - h0) / ys;
+		
+				dest[y*wh + x] = getGamma(xx,yy);
+			}
+		}
+		else
+		{
+			const BufferedImage<RFLOAT>& gammaOffset = obsModel->getGammaOffset(opticsGroup, h0);
+			
+			for (int y = 0; y < h0; y++)
+			for (int x = 0; x < wh; x++)
+			{
+				double xx = x / xs;
+				double yy = (y < h0/2? y : y - h0) / ys;
+		
+				dest[y*wh + x] = getGamma(xx,yy) + gammaOffset(x,y);
+			}
 		}
 	}
 	

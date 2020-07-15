@@ -22,6 +22,10 @@ class ImageFilter
 		template<class T>
 		static BufferedImage<tComplex<T>> highpass3D(
 				const RawImage<tComplex<T>>& img, double freqPx, double widthPx);
+
+		template<class T>
+		static BufferedImage<tComplex<T>> highpassGauss3D(
+				const RawImage<tComplex<T>>& img, double sigmaPx);
 		
 		template<class T>
 		static BufferedImage<T> lowpass2D(
@@ -36,7 +40,7 @@ class ImageFilter
 				const RawImage<T>& img, int z, double sigmaRS, bool pad);
 		
 		template<class T>
-        static BufferedImage<T> ramp(const RawImage<T>& img);
+		static BufferedImage<T> ramp(const RawImage<T>& img);
 
 		
 		
@@ -228,6 +232,34 @@ BufferedImage<tComplex<T>> ImageFilter::highpass3D(
 		{
 			out(x,y,z) = img(x,y,z);
 		}
+	}
+
+	return out;
+}
+
+template<class T>
+BufferedImage<tComplex<T>> ImageFilter::highpassGauss3D(
+	const RawImage<tComplex<T>>& img, double sigmaPx)
+{
+	const int wh = img.xdim;
+	const int w = (wh - 1) * 2;
+	const int h = img.ydim;
+	const int d = img.zdim;
+
+	BufferedImage<tComplex<T>> out(wh, h, d);
+
+	for (int z = 0; z < d;  z++)
+	for (int y = 0; y < h;  y++)
+	for (int x = 0; x < wh; x++)
+	{
+		const double xx = x;
+		const double yy = (((y + h/2) % h) - h/2);
+		const double zz = (((z + d/2) % d) - d/2);
+
+		const double f = sqrt(xx * xx + yy * yy + zz * zz);
+		const double q = f / sigmaPx;
+
+		out(x,y,z) = (1 - exp(-0.5 * q * q)) * img(x,y,z);
 	}
 
 	return out;

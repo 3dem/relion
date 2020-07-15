@@ -920,15 +920,15 @@ void Reconstructor::applyCTFPandCTFQ(MultidimArray<Complex> &Fin, CTF &ctf, Four
 			float anglemax = angle + 90. + (0.5*angle_step);
 
 			// angles larger than 180
-			bool is_reverse = false;
+			bool is_angle_reverse = false;
 			if (anglemin >= 180.)
 			{
 				anglemin -= 180.;
 				anglemax -= 180.;
-				is_reverse = true;
+				is_angle_reverse = true;
 			}
 			MultidimArray<Complex> *myCTFPorQ, *myCTFPorQb;
-			if (is_reverse)
+			if (is_angle_reverse)
 			{
 				myCTFPorQ  = (ipass == 0) ? &outQ : &outP;
 				myCTFPorQb = (ipass == 0) ? &outP : &outQ;
@@ -972,5 +972,3 @@ void Reconstructor::applyCTFPandCTFQ(MultidimArray<Complex> &Fin, CTF &ctf, Four
 		}
 	}
 }
-
-

@@ -33,19 +33,19 @@ class Interpolation
     public:
 		
 		template<typename T> inline
-		static double linearXY_clip(const RawImage<T>& img, double x, double y, int z = 0);
+		static T linearXY_clip(const RawImage<T>& img, double x, double y, int z = 0);
 
         template<typename T> inline
-        static double linearXYZ_clip(const RawImage<T>& img, double x, double y, double z);
+        static T linearXYZ_clip(const RawImage<T>& img, double x, double y, double z);
 		
 		template<typename T> inline
-		static double cubicXY_clip(const RawImage<T>& img, double x, double y, int z = 0);	
+		static T cubicXY_clip(const RawImage<T>& img, double x, double y, int z = 0);	
 		
 		template<typename T> inline
 		static gravis::t2Vector<T> cubicXYGrad_clip(const RawImage<T>& img, double x, double y, int z = 0);		
 		
 		template<typename T> inline
-		static double cubicXY_wrap(const RawImage<T>& img, double x, double y, int z = 0);
+		static T cubicXY_wrap(const RawImage<T>& img, double x, double y, int z = 0);
 		
 		template<typename T> inline
 		static gravis::t2Vector<T> cubicXYGrad_wrap(const RawImage<T>& img, double x, double y, int z = 0);		
@@ -59,15 +59,30 @@ class Interpolation
 				const RawImage<tComplex<T>>& img, 
 				double xSgn, double ySgn, int z = 0);*/
 		
+		
+		
 		template<typename T> inline
-		static T linearXY_symmetric_FftwHalf(
+		static T linearXY_symmetric_FftwHalf_clip(
 				const RawImage<T>& img, 
 				double xSgn, double ySgn, int z = 0);
 		
 		template<typename T> inline
-		static tComplex<T> linearXY_complex_FftwHalf(
+		static tComplex<T> linearXY_complex_FftwHalf_clip(
 				const RawImage<tComplex<T>>& img, 
 				double xSgn, double ySgn, int z = 0);
+		
+		
+		template<typename T> inline
+		static T linearXY_symmetric_FftwHalf_wrap(
+				const RawImage<T>& img, 
+				double xSgn, double ySgn, int z = 0);
+		
+		template<typename T> inline
+		static tComplex<T> linearXY_complex_FftwHalf_wrap(
+				const RawImage<tComplex<T>>& img, 
+				double xSgn, double ySgn, int z = 0);
+		
+		
 
 		template<typename T> inline
 		static tComplex<T> linearXYZ_FftwHalf_complex(
@@ -130,7 +145,7 @@ class Interpolation
 };
 
 template<typename T> inline
-double Interpolation::linearXY_clip(const RawImage<T>& img, double x, double y, int z)
+T Interpolation::linearXY_clip(const RawImage<T>& img, double x, double y, int z)
 {
 	int x0 = FLOOR(x);
 	int y0 = FLOOR(y);
@@ -157,7 +172,7 @@ double Interpolation::linearXY_clip(const RawImage<T>& img, double x, double y, 
 }
 
 template<typename T> inline
-double Interpolation::linearXYZ_clip(const RawImage<T>& img, double x, double y, double z)
+T Interpolation::linearXYZ_clip(const RawImage<T>& img, double x, double y, double z)
 {
     int x0 = FLOOR(x);
     int y0 = FLOOR(y);
@@ -207,7 +222,7 @@ double Interpolation::linearXYZ_clip(const RawImage<T>& img, double x, double y,
 }
 
 template<typename T> inline
-double Interpolation::cubicXY_clip(const RawImage<T>& img, double x, double y, int z)
+T Interpolation::cubicXY_clip(const RawImage<T>& img, double x, double y, int z)
 {
 	int xi    = (int)std::floor(x);
 	int yi    = (int)std::floor(y);
@@ -343,7 +358,7 @@ gravis::t2Vector<T> Interpolation::cubicXYGrad_clip(const RawImage<T>& img, doub
 }
 
 template<typename T> inline
-double Interpolation::cubicXY_wrap(const RawImage<T>& img, double x, double y, int z)
+T Interpolation::cubicXY_wrap(const RawImage<T>& img, double x, double y, int z)
 {
 	const int w = img.xdim;
 	const int h = img.ydim;
@@ -529,13 +544,13 @@ inline double Interpolation::cubicXYkernel(double dx, double dy)
 }
 
 template<typename T> inline
-T Interpolation::linearXY_symmetric_FftwHalf(
+T Interpolation::linearXY_symmetric_FftwHalf_clip(
 		const RawImage<T>& img, 
 		double xSgn, double ySgn, int z)
 {
 	double xd, yd;
 	
-	if (xSgn > 0.0)
+	if (xSgn >= 0.0)
 	{
 		xd = xSgn;
 		yd = ySgn;
@@ -570,14 +585,14 @@ T Interpolation::linearXY_symmetric_FftwHalf(
 }
 
 template<typename T> inline
-tComplex<T> Interpolation::linearXY_complex_FftwHalf(
+tComplex<T> Interpolation::linearXY_complex_FftwHalf_clip(
 		const RawImage<tComplex<T>>& img, 
 		double xSgn, double ySgn, int z)
 {
 	double xd, yd;
 	bool conj;
 	
-	if (xSgn > 0.0)
+	if (xSgn >= 0.0)
 	{
 		xd = xSgn;
 		yd = ySgn;
@@ -613,6 +628,147 @@ tComplex<T> Interpolation::linearXY_complex_FftwHalf(
 	const tComplex<T> v = (1 - yf) * vx0 + yf * vx1;
 		
 	return conj? v.conj() : v;
+}
+
+
+
+template<typename T> inline
+T Interpolation::linearXY_symmetric_FftwHalf_wrap(
+		const RawImage<T>& img, 
+		double xSgn, double ySgn, int z)
+{
+	double xd, yd;
+	
+	if (xSgn >= 0.0)
+	{
+		xd = xSgn;
+		yd = ySgn;
+	}
+	else
+	{
+		xd = -xSgn;
+		yd = -ySgn;
+	}
+	
+	if (yd < 0.0) yd += img.ydim;
+	
+	int x0 = (int) std::floor(xd);
+	int y0 = (int) std::floor(yd);
+	
+	const double xf = xd - x0;
+	const double yf = yd - y0;
+	
+	T sum  = 0;
+	
+	const int wh = img.xdim;
+	const int w = 2 * (w - 1);
+	const int h = img.ydim;
+	
+	for (int dy = 0; dy < 2; dy++)
+	for (int dx = 0; dx < 2; dx++)
+	{
+		int xg = x0 + dx;
+		int yg = y0 + dy;
+		
+		xg = xg % w;
+		
+		if (xg >= wh)
+		{
+			xg = 2*wh - xg;
+		}
+		
+		if (yg < 0)
+		{
+			yg += (int)((-1 - yg) / h + 1) * h;
+		}
+		else if (yg >= img.ydim)
+		{
+			yg -= (int)(yg / img.ydim);
+		}
+		
+		const double ax = 1 - std::abs(xf - (double)dx);
+		const double ay = 1 - std::abs(yf - (double)dy);
+		
+		sum += ax * ay * img(xg, yg, z);
+	}
+	
+	return sum;
+}
+
+template<typename T> inline
+tComplex<T> Interpolation::linearXY_complex_FftwHalf_wrap(
+		const RawImage<tComplex<T>>& img, 
+		double xSgn, double ySgn, int z)
+{
+	double xd, yd;
+	const bool conj0 = xSgn < 0.0;
+	
+	if (xSgn >= 0.0)
+	{
+		xd = xSgn;
+		yd = ySgn;
+	}
+	else
+	{
+		xd = -xSgn;
+		yd = -ySgn;
+	}
+	
+	if (yd < 0.0) yd += img.ydim;
+	
+	int x0 = (int) std::floor(xd);
+	int y0 = (int) std::floor(yd);
+	
+	const double xf = xd - x0;
+	const double yf = yd - y0;
+	
+	tComplex<T> sum  = 0;
+	
+	const int wh = img.xdim;
+	const int w = 2 * (w - 1);
+	const int h = img.ydim;
+	
+	for (int dy = 0; dy < 2; dy++)
+	for (int dx = 0; dx < 2; dx++)
+	{
+		int xg = x0 + dx;
+		int yg = y0 + dy;
+		
+		xg = xg % w;
+		
+		bool conj;
+		
+		if (xg >= wh)
+		{
+			xg = 2*wh - xg;
+			
+			conj = !conj0;
+		}
+		else
+		{
+			conj = conj0;
+		}
+		
+		if (yg < 0)
+		{
+			yg += (int)((-1 - yg) / h + 1) * h;
+		}
+		else if (yg >= img.ydim)
+		{
+			yg -= (int)(yg / img.ydim);
+		}
+		
+		const double ax = 1 - std::abs(xf - (double)dx);
+		const double ay = 1 - std::abs(yf - (double)dy);
+		
+		tComplex<T> val = img(xg, yg, z);
+		
+		if (conj) val.imag *= -1;
+		
+		sum += ax * ay * val;
+	}
+	
+	return sum;
 }
 
 

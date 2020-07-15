@@ -56,7 +56,9 @@ class tComplex
         :   real(real),
             imag(imag)
         {}
-
+		
+		template <class T2>
+		tComplex(const tComplex<T2>& z);
 
             T real, imag;
 
@@ -141,6 +143,11 @@ class tComplex
             return atan2(imag,real);
         }
 };
+
+template <class T> template <class T2>
+tComplex<T>::tComplex(const tComplex<T2>& z)
+:	real(z.real), imag(z.imag)
+{}
 
 template <class T> inline
 tComplex<T> conj(const tComplex<T>& op)

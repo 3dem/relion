@@ -51,7 +51,7 @@ void NewReferenceMap::read(IOParser& parser, int argc, char* argv[])
 	amplitude_file_names[1] = parser.getOption("--a2", "Amplitude reference map, half 2", "");
 	angpix = textToDouble(parser.getOption("--angpix_ref", "Pixel size of the reference map", "-1"));
 	maskFn = parser.getOption("--mask", "Reference mask", "");
-	fscFn = parser.getOption("--f", "Input STAR file with the FSC of the reference (usually from PostProcess)");
+	fscFn = parser.getOption("--f", "Input STAR file with the FSC of the reference (usually from PostProcess)", "");
 	paddingFactor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
 
 	dualContrast = amplitude_file_names[0] != "";

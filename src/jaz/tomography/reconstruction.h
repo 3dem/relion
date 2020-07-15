@@ -29,6 +29,7 @@
 #include <src/jaz/image/interpolation.h>
 #include <src/jaz/image/radial_avg.h>
 #include <src/jaz/optics/dual_contrast/dual_contrast_voxel.h>
+#include <src/jaz/optics/dual_contrast/dual_contrast_solution.h>
 #include "extraction.h"
 #include "tomo_stack.h"
 
@@ -44,12 +45,26 @@ class Reconstruction
 				BufferedImage<T>& out,
 				bool center,
 				int num_threads);
-
+		
 		template <typename T>
 		static void griddingCorrect_dualContrast(
 				BufferedImage<DualContrastVoxel<T>>& image,
 				BufferedImage<T>& psfImgFS,
 				BufferedImage<DualContrastVoxel<T>>& out,
+				bool center,
+				int num_threads);
+		
+		template <typename T>
+		static void griddingCorrectSinc2_dualContrast(
+				BufferedImage<DualContrastVoxel<T>>& image,
+				BufferedImage<DualContrastVoxel<T>>& out,
+				bool center,
+				int num_threads);
+		
+		template <typename T>
+		static void griddingCorrect3D_sinc2(
+				BufferedImage<tComplex<T>>& dataImgFS,
+				BufferedImage<T>& out,
 				bool center,
 				int num_threads);
 
@@ -70,9 +85,11 @@ class Reconstruction
 				int num_threads = 1);
 
 		template <typename T>
-		static std::pair<BufferedImage<T>,BufferedImage<T>> solveDualContrast(
+		static DualContrastSolution<T> solveDualContrast(
 				BufferedImage<DualContrastVoxel<T>>& image,
 				double SNR = 1,
+				double lambda = 0,
+				bool isotropicWiener = true,
 				int num_threads = 1);
 		
 		template <typename T>
@@ -281,6 +298,163 @@ void Reconstruction :: griddingCorrect_dualContrast(
 }
 
 template <typename T>
+void Reconstruction :: griddingCorrectSinc2_dualContrast(
+		BufferedImage<DualContrastVoxel<T>>& image,
+		BufferedImage<DualContrastVoxel<T>>& out,
+		bool center,
+		int num_threads)
+{
+	const long int wh = image.xdim;
+	const long int w = 2 * (wh - 1);
+	const long int h = image.ydim;
+	const long int d = image.zdim;
+
+	if (!out.hasEqualSize(image))
+	{
+		REPORT_ERROR_STR("Reconstruction :: griddingCorrectSinc2_dualContrast: unequal input and output image sizes");
+	}
+
+	if (center)
+	{
+		#pragma omp parallel for num_threads(num_threads)
+		for (long int z = 0; z < d;  z++)
+		for (long int y = 0; y < h;  y++)
+		for (long int x = 0; x < wh; x++)
+		{
+			image(x,y,z).data_sin *= (1 - 2*(x%2)) * (1 - 2*(y%2)) * (1 - 2*(z%2));
+			image(x,y,z).data_cos *= (1 - 2*(x%2)) * (1 - 2*(y%2)) * (1 - 2*(z%2));
+		}
+	}
+
+	BufferedImage<tComplex<T>> sinImgFS(wh,h,d), cosImgFS(wh,h,d);
+
+	for (long int z = 0; z < d;  z++)
+	for (long int y = 0; y < h;  y++)
+	for (long int x = 0; x < wh; x++)
+	{
+		sinImgFS(x,y,z) = image(x,y,z).data_sin;
+		cosImgFS(x,y,z) = image(x,y,z).data_cos;
+	}
+
+	BufferedImage<T> sinImgRS(w,h,d), cosImgRS(w,h,d);
+
+	FFT::inverseFourierTransform(sinImgFS, sinImgRS, FFT::Both);
+	FFT::inverseFourierTransform(cosImgFS, cosImgRS, FFT::Both);
+
+
+	const double eps = 1e-10;
+
+	#pragma omp parallel for num_threads(num_threads)
+	for (long int z = 0; z < d; z++)
+	for (long int y = 0; y < h; y++)
+	for (long int x = 0; x < w; x++)
+	{
+		const double xx = x - w/2;
+		const double yy = y - h/2;
+		const double zz = z - d/2;
+		
+		if (xx == 0 && yy == 0 && zz == 0)
+		{
+			// sinc at 0 is 1
+		}
+		else
+		{		
+			const double r = sqrt(xx*xx + yy*yy + zz*zz);
+			const double d = r / w;
+			const double sinc = sin(PI * d) / (PI * d);
+			const double sinc2 = sinc * sinc;
+			
+			if (sinc2 > eps)
+			{
+				sinImgRS(x,y,z) /= sinc2;
+				cosImgRS(x,y,z) /= sinc2;
+			}
+			else
+			{
+				sinImgRS(x,y,z) /= eps;
+				cosImgRS(x,y,z) /= eps;
+			}			
+		}
+	}
+
+	FFT::FourierTransform(sinImgRS, sinImgFS, FFT::Both);
+	FFT::FourierTransform(cosImgRS, cosImgFS, FFT::Both);
+
+	#pragma omp parallel for num_threads(num_threads)
+	for (long int z = 0; z < d; z++)
+	for (long int y = 0; y < h; y++)
+	for (long int x = 0; x < wh; x++)
+	{
+		out(x,y,z) = image(x,y,z);
+		out(x,y,z).data_sin = sinImgFS(x,y,z);
+		out(x,y,z).data_cos = cosImgFS(x,y,z);
+	}
+}
+
+
+template <typename T>
+void Reconstruction :: griddingCorrect3D_sinc2(
+		BufferedImage<tComplex<T>>& dataImgFS,
+		BufferedImage<T>& out,
+		bool center, 
+		int num_threads)
+{
+	const long int wh = dataImgFS.xdim;
+	const long int w = 2 * (wh - 1);
+	const long int h = dataImgFS.ydim;
+	const long int d = dataImgFS.zdim;
+	
+	if (center)
+	{
+		#pragma omp parallel for num_threads(num_threads)
+		for (long int z = 0; z < d;  z++)
+		for (long int y = 0; y < h;  y++)
+		for (long int x = 0; x < wh; x++)
+		{
+			dataImgFS(x,y,z) *= (1 - 2*(x%2)) * (1 - 2*(y%2)) * (1 - 2*(z%2));
+		}
+	}
+	
+	// gridding correction
+	
+	BufferedImage<T> dataImg(w,h,d);	
+	FFT::inverseFourierTransform(dataImgFS, dataImg, FFT::Both);
+	
+	const double eps = 1e-2;
+	
+	#pragma omp parallel for num_threads(num_threads)
+	for (long int z = 0; z < d; z++)
+	for (long int y = 0; y < h; y++)
+	for (long int x = 0; x < w; x++)
+	{
+		const double xx = x - w/2;
+		const double yy = y - h/2;
+		const double zz = z - d/2;
+		
+		if (xx == 0 && yy == 0 && zz == 0)
+		{
+			out(x,y,z) = dataImg(x,y,z);
+		}
+		else
+		{		
+			const double r = sqrt(xx*xx + yy*yy + zz*zz);
+			const double d = r / w;
+			const double sinc = sin(PI * d) / (PI * d);
+			const double sinc2 = sinc * sinc;
+			
+			if (sinc2 > eps)
+			{
+				out(x,y,z) = dataImg(x,y,z) / sinc2;
+			}
+			else
+			{
+				out(x,y,z) = dataImg(x,y,z) / eps;
+			}			
+		}
+	}
+}
+
+template <typename T>
 void Reconstruction :: ctfCorrect3D_Wiener(
 		BufferedImage<T>& img,
 		BufferedImage<T>& ctfImgFS,
@@ -377,9 +551,13 @@ void Reconstruction :: ctfCorrect3D_heuristic(
 }
 
 template<typename T>
-std::pair<BufferedImage<T>, BufferedImage<T>>
+DualContrastSolution<T>
 	Reconstruction::solveDualContrast(
-		BufferedImage<DualContrastVoxel<T>>& image, double SNR, int num_threads)
+		BufferedImage<DualContrastVoxel<T>>& image,
+		double SNR,
+		double lambda,
+		bool isotropicWiener,
+		int num_threads)
 {
 	const long int wh = image.xdim;
 	const long int w = 2 * (wh - 1);
@@ -389,24 +567,91 @@ std::pair<BufferedImage<T>, BufferedImage<T>>
 	const double WienerOffset = SNR > 0.0? 1.0 / SNR : 0.0;
 
 	BufferedImage<tComplex<T>> phaseOutFS(wh,h,d), ampOutFS(wh,h,d);
+	BufferedImage<T> conditionNumber(wh,h,d);
+
 
 	#pragma omp parallel for num_threads(num_threads)
 	for (long int z = 0; z < d;  z++)
 	for (long int y = 0; y < h;  y++)
 	for (long int x = 0; x < wh; x++)
 	{
-		std::pair<tComplex<T>,tComplex<T>> mu = image(x,y,z).solve(WienerOffset);
+		typename DualContrastVoxel<T>::Solution X = image(x,y,z).solve(
+					WienerOffset, lambda, isotropicWiener);
 
-		phaseOutFS(x,y,z) = mu.first;
-		ampOutFS(x,y,z)   = mu.second;
+		phaseOutFS(x,y,z) = X.phase;
+		ampOutFS(x,y,z)   = X.amplitude;
+
+		conditionNumber(x,y,z) = X.conditionNumber;
 	}
 
-	BufferedImage<T> phaseOutRS(w,h,d), ampOutRS(w,h,d);
+	DualContrastSolution<T> out(w,h,d);
 
-	FFT::inverseFourierTransform(phaseOutFS, phaseOutRS, FFT::Both);
-	FFT::inverseFourierTransform(ampOutFS, ampOutRS, FFT::Both);
+	FFT::inverseFourierTransform(phaseOutFS, out.phase, FFT::Both);
+	FFT::inverseFourierTransform(ampOutFS, out.amplitude, FFT::Both);
 
-	return std::make_pair(phaseOutRS, ampOutRS);
+
+	std::vector<int> shellVolume(wh, 0.0);
+
+	for (long int z = 0; z < d;  z++)
+	for (long int y = 0; y < h;  y++)
+	for (long int x = 0; x < wh; x++)
+	{
+		const double r = RadialAvg::get1DIndex(x,y,z, w,h,d);
+		const int ri = (int)(r + 0.5);
+
+		if (ri >= wh) continue;
+
+		const double c = conditionNumber(x,y,z);
+
+		if (out.conditionPerShell[ri].maximum < c)
+		{
+			out.conditionPerShell[ri].maximum = c;
+		}
+
+		if (out.conditionPerShell[ri].minimum > c)
+		{
+			out.conditionPerShell[ri].minimum = c;
+		}
+
+		out.conditionPerShell[ri].mean += c;
+
+		shellVolume[ri]++;
+	}
+
+	for (int r = 0; r < wh; r++)
+	{
+		if (shellVolume[r] > 0)
+		{
+			out.conditionPerShell[r].mean /= shellVolume[r];
+		}
+	}
+
+	std::vector<double> shellVariance(wh, 0.0);
+
+	for (long int z = 0; z < d;  z++)
+	for (long int y = 0; y < h;  y++)
+	for (long int x = 0; x < wh; x++)
+	{
+		const double r = RadialAvg::get1DIndex(x,y,z, w,h,d);
+		const int ri = (int)(r + 0.5);
+
+		if (ri >= wh) continue;
+
+		const double d = conditionNumber(x,y,z) - out.conditionPerShell[ri].mean;
+
+		shellVariance[ri] += d * d;
+	}
+
+	for (int r = 0; r < wh; r++)
+	{
+		if (shellVolume[r] > 1)
+		{
+			shellVariance[r] /= (shellVolume[r] - 1);
+			out.conditionPerShell[r].std_deviation = sqrt(shellVariance[r]);
+		}
+	}
+
+	return out;
 }
 
 template <typename T>

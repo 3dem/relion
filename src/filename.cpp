@@ -95,15 +95,28 @@ bool FileName::isInStack() const
 void FileName::decompose(long int &no, std::string &str) const
 {
 	size_t idx = find('@');
-	if(idx != std::string::npos)
+	if (idx != std::string::npos)
 	{
-		no = textToInteger(substr(0,idx));
-		str = substr(idx+1,length()-idx);
+		bool ok = true;
+		for (int i = 0; i < idx; i++)
+		{
+			if ((*this)[i] < '0' || (*this)[i] > '9')
+			{
+				ok = false;
+				break;
+			}
+		}
+
+		if (ok)
+		{
+			no = textToInteger(substr(0, idx));
+			str = substr(idx + 1,length() - idx);
+			return;
+		}
 	}
-	else{
-	  no=-1;
-	  str = *this;
-	}
+
+	no = -1;
+	str = *this;
 }
 
 // Convert to lower case characters .........................................

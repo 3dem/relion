@@ -202,6 +202,9 @@ public:
 	// Write XML file for EMDB submission
 	void writeFscXml(MetaDataTable &MDfsc);
 
+	// Write DAT file for easier plotting in xmgrace
+	void writeFscDat(MetaDataTable &MDfsc);
+
 	// Local-resolution running
 	void run_locres(int rank = 0, int size = 1);
 

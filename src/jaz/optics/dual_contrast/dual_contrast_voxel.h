@@ -9,12 +9,22 @@ class DualContrastVoxel
 {
 	public:
 
+		struct Solution
+		{
+			tComplex<T> phase, amplitude;
+			T conditionNumber;
+		};
+
+
 		DualContrastVoxel();
 
 			tComplex<T> data_sin, data_cos;
 			T weight_sin2, weight_sin_cos, weight_cos2;
 
-		std::pair<tComplex<T>, tComplex<T>> solve(double WienerOffset);
+		Solution solve(
+				double WienerOffset,
+				double lambda,
+				bool isotropicWiener = true);
 
 		inline DualContrastVoxel<T>& operator += (const DualContrastVoxel<T>& rhs)
 		{
@@ -74,21 +84,78 @@ DualContrastVoxel<T> :: DualContrastVoxel()
 }
 
 template <typename T>
-std::pair<tComplex<T>, tComplex<T>> DualContrastVoxel<T> :: solve(double WienerOffset)
+typename DualContrastVoxel<T>::Solution
+	DualContrastVoxel<T>::solve(
+		double WienerOffset, double lambda, bool isotropicWiener)
 {
-	const gravis::t2Matrix<T> A(
+	const double Q0 = 0.07;
+
+	const gravis::t2Matrix<T> A0(
 		weight_sin2, weight_sin_cos,
 		weight_sin_cos, weight_cos2 );
 
-	gravis::t2Matrix<T> A_inv = A;
+	gravis::t2Matrix<T> A = A0;
 
-	A_inv(0,0) += WienerOffset;
-	A_inv(1,1) += WienerOffset;
+	A(0,0) += WienerOffset;
 
-	const double det = A_inv(0,0) * A_inv(1,1) - A_inv(0,1) * A_inv(1,0);
+	if (isotropicWiener)
+	{
+		A(1,1) += WienerOffset;
+	}
+	else
+	{
+		A(1,1) += WienerOffset / (Q0 * Q0);
+	}
+
+	/*
+	  Encourage phase (P) and amplitude (M) structure factors to assume a ratio of  M = Q0 * P.
+	  Penalise  lambda * |Q0 * P - M|^2
+	  by adding  lambda * [Q0, -1]^T [Q0, -1]  to A.
+	*/
+
+	A(0,0) += lambda * Q0 * Q0;
+	A(1,0) += lambda * Q0;
+	A(0,1) += lambda * Q0;
+	A(1,1) += lambda;
+
+	Solution out;
+
+	/*
+	  Find eigenvalues of A:
+
+	  det(A-tI) = 0
+	  = (a00-t)*(a11-t) - a01*a10
+	  = t² - (a00+a11)*t + a00*a11 - a01*a10
+	   <=>
+	  t = [a00+a11 +- sqrt((a00+a11)² - 4(a00*a11 - a01*a10))] / 2
+	*/
+
+	{
+		const double a00 = A(0,0);
+		const double a01 = A(0,1);
+		const double a10 = A(1,0);
+		const double a11 = A(1,1);
+
+		const double discr = (a00+a11) * (a00+a11) - 4.0 * (a00*a11 - a01*a10);
+
+		if (discr >= 0)
+		{
+			const double eig0 = (a00+a11 - sqrt(discr)) / 2.0;
+			const double eig1 = (a00+a11 + sqrt(discr)) / 2.0;
+
+			out.conditionNumber = eig0 / eig1;
+		}
+		else
+		{
+			out.conditionNumber = 0.0;
+		}
+	}
+
+	const double det = A(0,0) * A(1,1) - A(0,1) * A(1,0);
 
 	if (std::abs(det) > 1e-16)
 	{
+		gravis::t2Matrix<T> A_inv = A;
 		A_inv.invert();
 
 		const gravis::t2Vector<T> data_real(data_sin.real, data_cos.real);
@@ -97,16 +164,17 @@ std::pair<tComplex<T>, tComplex<T>> DualContrastVoxel<T> :: solve(double WienerO
 		const gravis::t2Vector<T> out_real = A_inv * data_real;
 		const gravis::t2Vector<T> out_imag = A_inv * data_imag;
 
-		return std::make_pair(
-			tComplex<T>(-out_real[0], -out_imag[0]),
-			tComplex<T>(-out_real[1], -out_imag[1]));
+		out.phase = tComplex<T>(-out_real[0], -out_imag[0]);
+		out.amplitude = tComplex<T>(out_real[1], out_imag[1]);
 	}
 	else
 	{
-		return std::make_pair(
-			tComplex<T>(0,0),
-			tComplex<T>(0,0));
+
+		out.phase = tComplex<T>(0,0);
+		out.amplitude = tComplex<T>(0,0);
 	}
+
+	return out;
 }
 
 

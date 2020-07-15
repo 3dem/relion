@@ -60,7 +60,7 @@ class SpaBackproject
 			blob_radius, blob_alpha, angular_error, shift_error, angpix, maxres,
 			helical_rise, helical_twist,
 
-			SNR;
+			SNR, dual_contrast_lambda;
 		
 		bool 
 			do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak,				 
@@ -68,7 +68,8 @@ class SpaBackproject
 			skip_weighting, skip_mask, do_debug,
 			skip_gridding, do_reconstruct_ctf2, do_reconstruct_meas, 
 			is_reverse, read_weights, do_external_reconstruct,
-			use_fwd_mapping;
+			use_legacy_fwd_mapping, use_new_fwd_mapping,
+			explicit_spreading_function;
 		
 		float 
 			padding_factor, mask_diameter;
@@ -91,7 +92,7 @@ class SpaBackproject
 		std::vector<BufferedImage<RFLOAT>> multiplicities, spreading_functions;
 		std::vector<BufferedImage<DualContrastVoxel<RFLOAT>>> dual_contrast_accumulation_volumes;
 		
-		bool compute_multiplicity, do_dual_contrast;
+		bool compute_multiplicity, do_dual_contrast, do_isotropic_Wiener;
 		int padded_box_size;
 		
 		
@@ -108,8 +109,8 @@ class SpaBackproject
 		void readDebugArrays();
 		void backprojectAllParticles();
 		void backprojectOneParticle(long int p, int thread_id);
-		void reconstructForward();
-		void reconstructBackward();
+		void reconstructLegacy();
+		void reconstructNew();
 		void reconstructDualContrast();
 		
 		void applyCTFPandCTFQ(

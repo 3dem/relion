@@ -27,6 +27,7 @@
 #include <src/jaz/util/index_sort.h>
 #include <src/jaz/gravis/t2Vector.h>
 #include <src/jaz/gravis/t2Matrix.h>
+#include "ellipse.h"
 
 extern "C"
 {
@@ -51,8 +52,15 @@ class Tensor2x2
 
         static Tensor2x2<T> autoDyadicProduct(const gravis::t2Vector<T>& v);
         static Tensor2x2<T> dyadicProduct(const gravis::t2Vector<T>& v0, const gravis::t2Vector<T>& v1);
+		
+		void diagonalize(gravis::t2Vector<T>& eigenvalues, gravis::t2Matrix<T>& eigenvectors) const;
 
-        void diagonalize(gravis::t2Vector<T>& eigenvalues, gravis::t2Matrix<T>& eigenvectors) const;
+		void diagonalize(gravis::t2Vector<T>& eigenvalues,
+						 gravis::t2Vector<T>& eigenvector0,
+						 gravis::t2Vector<T>& eigenvector1) const;
+
+		Ellipse getEllipse(gravis::d2Vector mean) const;
+		
         gravis::t2Matrix<T> toMatrix() const;
 
         T& operator[] (int idx)
@@ -164,8 +172,42 @@ class Tensor2x2
 		eigenvectors(0,0) = (T)  v0;
 		eigenvectors(0,1) = (T)  v1;		
         eigenvectors(1,0) = (T) -v1;
-        eigenvectors(1,1) = (T)  v0;
-    }
+		eigenvectors(1,1) = (T)  v0;
+	}
+	
+	template<class T>
+	void Tensor2x2<T>::diagonalize(
+		gravis::t2Vector<T> &eigenvalues, 
+		gravis::t2Vector<T> &eigenvector0, 
+		gravis::t2Vector<T> &eigenvector1) const
+	{
+		double l0, l1, v0, v1;
+		
+        dsyev2(xx, xy, yy, &l0, &l1, &v0, &v1);
+		
+		eigenvalues[0] = (T) l0;
+		eigenvalues[1] = (T) l1;
+		
+		eigenvector0.x = (T)  v0;
+		eigenvector0.y = (T)  v1;		
+        eigenvector1.x = (T) -v1;
+		eigenvector1.y = (T)  v0;
+	}
+
+	template<class T>
+	Ellipse Tensor2x2<T>::getEllipse(gravis::d2Vector mean) const
+	{
+		Ellipse out;
+
+		gravis::d2Vector evals, eig0, eig1;
+		diagonalize(evals, eig0, eig1);
+
+		out.axis0 = sqrt(evals[0]) * eig0;
+		out.axis1 = sqrt(evals[1]) * eig1;
+		out.mean = mean;
+
+		return out;
+	}
 
     template <class T>
     gravis::t2Matrix<T> Tensor2x2<T>::toMatrix() const

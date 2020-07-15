@@ -330,6 +330,7 @@ enum EMDLabel
 	EMDL_OPTIMISER_HELICAL_TWIST_INITIAL,
 	EMDL_OPTIMISER_HELICAL_RISE_INITIAL,
 	EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE,
+	EMDL_OPTIMISER_HELICAL_NSTART,
 	EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER,
 	EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER,
 	EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT,
@@ -883,6 +884,7 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_TWIST_INITIAL, EMDL_DOUBLE, "rlnHelicalTwistInitial", "The intial helical twist (rotation per subunit) in degrees before refinement");
 		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_RISE_INITIAL, EMDL_DOUBLE, "rlnHelicalRiseInitial", "The initial helical rise (translation per subunit) in Angstroms before refinement");
 		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE, EMDL_DOUBLE, "rlnHelicalCentralProportion", "Only expand this central fraction of the Z axis when imposing real-space helical symmetry");
+		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_NSTART, EMDL_INT, "rlnNrHelicalNStart", "The N-number for an N-start helix");
 		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER, EMDL_DOUBLE, "rlnHelicalMaskTubeInnerDiameter", "Inner diameter of helical tubes in Angstroms (for masks of helical references and particles)");
 		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER, EMDL_DOUBLE, "rlnHelicalMaskTubeOuterDiameter", "Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)");
 		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT, EMDL_BOOL, "rlnHelicalSymmetryLocalRefinement", "Flag to indicate that local refinement of helical parameters should be performed");

@@ -54,12 +54,6 @@ public:
     /** Healpix order (and original one) */
     int healpix_order, healpix_order_ori;
 
-    /** Mode for orientational prior distribution
-     * Note this option is not written to the STAR file, as it really belongs to mlmodel.
-     * It is included here for convenience, and always needs to be set in initialise
-     */
-    int orientational_prior_mode;
-
     /* Translational search range and sampling rate (as of v3.1 in Angstroms!) (and original one)
      */
     // Jun19,2015 - Shaoda, Helical refinement (all in Angstroms!)
@@ -71,15 +65,22 @@ public:
     /** Flag whether the translations are 3D (for volume refinement) */
     bool is_3d_trans;
 
+    /** Flag whether relax symmetry */
+    bool isRelax;
+
     /** Name of the Symmetry group */
     FileName fn_sym;
+    FileName fn_sym_relax;
 
     /** List of symmetry operators */
     std::vector <Matrix2D<RFLOAT> > R_repository, L_repository;
+    std::vector <Matrix2D<RFLOAT> > R_repository_relax, L_repository_relax;
 
     /** Two numbers that describe the symmetry group */
     int pgGroup;
     int pgOrder;
+    int pgGroupRelaxSym;
+    int pgOrderRelaxSym;
 
     /** Limited tilt angle range */
     RFLOAT limit_tilt;
@@ -105,14 +106,15 @@ public:
 		offset_step(0),
 		is_3d_trans(false),
 		pgGroup(0),
+		pgGroupRelaxSym(0),
 		perturbation_factor(0),
 		is_3D(false),
 		random_perturbation(0),
-		orientational_prior_mode(0),
 		psi_step(0),
 		limit_tilt(0),
 		healpix_order(0),
-		pgOrder(0)
+		pgOrder(0),
+		pgOrderRelaxSym(0)
     {}
 
     // Destructor
@@ -153,18 +155,21 @@ public:
      * etc...
      *
      * */
-    //void initialise(int prior_mode, int ref_dim = -1, bool do_3d_trans = false);
     // May 6, 2015 - Shaoda & Sjors - initialise for helical translations
     void initialise(
-    		int prior_mode,
 			int ref_dim = -1,
 			bool do_3d_trans = false,
 			bool do_changepsi = false,
 			bool do_warnpsi = false,
-			bool do_local_searches = false,
+			bool do_local_searches_helical = false,
 			bool do_helical_refine = false,
 			RFLOAT rise_Angst  = 0.,
 			RFLOAT twist_deg = 0.);
+
+    // Initialize the symmetry matrices
+    void initialiseSymMats(FileName fn_sym_, int & pgGroup_,
+    		int & pgOrder_, std::vector <Matrix2D<RFLOAT> > & R_repository,
+			std::vector <Matrix2D<RFLOAT> > & L_repository);
 
     // Reset the random perturbation
     void resetRandomlyPerturbedSampling();
@@ -190,7 +195,7 @@ public:
     void setTranslations(
 			RFLOAT new_offset_step = -1.,
     		RFLOAT new_offset_range = -1.,
-    		bool do_local_searches = false,
+    		bool do_local_searches_helical = false,
     		bool do_helical_refine = false,
 			RFLOAT new_helical_offset_step = -1.,
     		RFLOAT helical_rise_Angst = 0.,
@@ -245,6 +250,12 @@ public:
     		RFLOAT prior_psi_flip_ratio = 0.5,
 			RFLOAT prior_rot_flip_ratio = 0.5,  // KThurber
     		RFLOAT sigma_cutoff = 3.);
+
+    // Find the symmetry mate by searching the Healpix library
+    void findSymmetryMate(long int idir_, RFLOAT prior_,
+    		std::vector<int> &pointer_dir_nonzeroprior,
+			std::vector<RFLOAT> &directions_prior,
+			std::vector<bool> &idir_flag);
 
     /** Get the symmetry group of this sampling object
      */
