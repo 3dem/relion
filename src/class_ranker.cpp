@@ -386,11 +386,12 @@ void ClassRanker::read(int argc, char **argv, int rank)
 	// TODO: optional input files, eg. job score file
 	int general_section = parser.addSection("General options");
 	fn_optimiser = parser.getOption("--opt", "Input optimiser.star file", "");
-	fn_out = parser.getOption("--odir", "Directory name for output files", "./");
+	fn_out = parser.getOption("--o", "Directory name for output files", "./");
 	fn_ext = parser.getOption("--ext", "Extension for root filenames of output optimiser.star and model.star", "ranked");
 	do_select = parser.checkOption("--auto_select", "Perform auto-selection of particles based on below thresholds for the score");
 	select_min_score = textToFloat(parser.getOption("--min_score", "Minimum selected score to be included in class selection", "0.5"));
 	select_max_score = textToFloat(parser.getOption("--max_score", "Maximum selected score to be included in class selection", "999."));
+	do_relative_threshold = parser.checkOption("--relative_thresholds", "If true, interpret the above min and max_scores as fractions of the maximum score of all predicted classes in the input");
 
 	int part_section = parser.addSection("Network training options (only used in development!)");
 	do_ranking  = !parser.checkOption("--train", "Only write output files for training purposes (don't rank classes)");
@@ -402,6 +403,11 @@ void ClassRanker::read(int argc, char **argv, int rank)
 	do_granularity_features  = parser.checkOption("--do_granularity_features", "Calculate granularity features");
 	do_save_masks = parser.checkOption("--save_masks", "Save the automatically generated 2D solvent masks for all references");
 
+	int subimg_section = parser.addSection("Extract subimage for deep convolutional neural network analysis");
+	do_subimages = parser.checkOption("--extract_subimages", "Extract subimages within protein mask for each class");
+	nr_subimages = textToInteger(parser.getOption("--nr_subimages", "Number of subimage to extract (randonly)", "25"));
+	subimage_boxsize = textToInteger(parser.getOption("--subimage_boxsize", "Boxsize (in pixels) for subimages", "16"));
+
 	int expert_section = parser.addSection("Expert options");
 	radius_ratio = textToFloat(parser.getOption("--radius_ratio", "Ratio of inner radius of the interested ring area in proportion to the current circular mask radius", "0.95"));
 	radius = textToFloat(parser.getOption("--radius", "Inner radius of the interested ring area to the current circular mask radius", "0"));
@@ -411,6 +417,7 @@ void ClassRanker::read(int argc, char **argv, int rank)
 	fn_features = parser.getOption("--fn_features", "Filename for output features star file", "features.star");
 	fn_sel_parts = parser.getOption("--fn_sel_parts", "Filename for output star file with selected particles", "particles.star");
 	fn_sel_classavgs = parser.getOption("--fn_sel_classavgs", "Filename for output star file with selected class averages", "class_averages.star");
+	fn_root = parser.getOption("--fn_root", "rootname for output model.star and optimiser.star files", "run");
 
 	fn_torch_model = parser.getOption("--fn_torch_model", "Filename for the serialized Torch model.", ""); // Default should be compile-time defined
 
@@ -609,6 +616,45 @@ int ClassRanker::getClassIndex(FileName &name)
 	name.decompose(result, root);
 	return result;
 
+}
+
+// SHWS 15072020: extract subimages within protein mask
+MultidimArray<RFLOAT> ClassRanker::getSubimages(MultidimArray<RFLOAT> &img,
+		int boxsize, int nr_images, MultidimArray<int> *mask)
+{
+
+	MultidimArray<RFLOAT> subimages(nr_images, 1, boxsize, boxsize);
+	subimages.setXmippOrigin();
+	int imgsize = XSIZE(img);
+
+	for (int my_image = 0; my_image < nr_images; my_image++)
+	{
+		int xpos, ypos;
+
+		bool got_one = false;
+		while (!got_one)
+		{
+			// uniformly sample x and y and see if it is within the mask
+			xpos = FLOOR(rnd_unif(FIRST_XMIPP_INDEX(imgsize), LAST_XMIPP_INDEX(imgsize)));
+			ypos = FLOOR(rnd_unif(FIRST_XMIPP_INDEX(imgsize), LAST_XMIPP_INDEX(imgsize)));
+			if ((mask == NULL) || (A2D_ELEM(*mask, ypos, xpos) > 0) )
+			{
+				got_one = true;
+			}
+		}
+
+		// Extract subimage here
+		int x0 = xpos + FIRST_XMIPP_INDEX(boxsize);
+		int xF = xpos + LAST_XMIPP_INDEX(boxsize);
+		int y0 = ypos + FIRST_XMIPP_INDEX(boxsize);
+		int yF = ypos + LAST_XMIPP_INDEX(boxsize);
+
+		MultidimArray<RFLOAT> subimg;
+		img.window(subimg, y0, x0, yF, xF, 0.);
+		subimages.setImage(my_image, subimg);
+
+	}
+	return subimages;
 }
 
 // Calculate moments for one class
@@ -1288,7 +1334,7 @@ void ClassRanker::saveMasks(MultidimArray<RFLOAT> &lpf, MultidimArray<int> &p_ma
 	if (!exists(filtered_mask_folder))
 	{
 		std::string filtered_mask_fn_command = "mkdir -p " + fn_out+filtered_mask_folder;
-		system(filtered_mask_fn_command.c_str());
+		int result = system(filtered_mask_fn_command.c_str());
 	}
 
 	Image<RFLOAT> p_out, s_out, lpf_out;
@@ -1506,6 +1552,13 @@ void ClassRanker::getFeatures()
 				features_this_class.granulo = calculateGranulo(img());
 			}
 
+			// SHWS 15072020: new try small subimages with fixed boxsize at uniform_angpix for image-based CNN
+			if (do_subimages)
+			{
+				features_this_class.subimages = getSubimages(img(), subimage_boxsize, nr_subimages, &p_mask);
+				if (debug> 0 ) std::cerr << " done withgetSubimages" << std::endl;
+			}
+
 			// Push back the features of this class in the vector for all classes
 			features_all_classes.push_back(features_this_class);
 			ith_nonzero_class++;
@@ -1679,6 +1732,36 @@ void ClassRanker::writeFeatures()
 	MD_class_features.write(fn_out+fn_features);
 	if (verb > 0) std::cout << " Written features to star file: " << fn_out << fn_features << std::endl;
 
+
+	if (do_subimages)
+	{
+		MetaDataTable MD_subimages;
+		MD_subimages.setName("subimages");
+		long int nr_stack = 0;
+		for (int f=0; f<features_all_classes.size();f++)
+		{
+			int nr_images = NSIZE(features_all_classes[f].subimages);
+			for (long n=0; n < nr_images; n++)
+			{
+
+				FileName fnt;
+				fnt.compose(nr_stack+1, fn_out + "subimages.mrcs");
+				MD_subimages.addObject();
+				MD_subimages.setValue(EMDL_IMAGE_NAME, fnt);
+				MD_subimages.setValue(EMDL_MLMODEL_REF_IMAGE, features_all_classes[f].name);
+				MD_subimages.setValue(EMDL_CLASS_FEAT_CLASS_SCORE, features_all_classes[f].class_score);
+
+				Image<RFLOAT> img;
+				features_all_classes[f].subimages.getImage(n, img());
+				img.write(fn_out + "subimages.mrcs", -1, false, (nr_stack == 0) ? WRITE_OVERWRITE : WRITE_APPEND);
+				nr_stack++;
+			}
+		}
+		MD_subimages.write(fn_out + "subimages.star");
+		if (verb > 0) std::cout << " Written subimages to: " << fn_out + "subimages.star" << std::endl;
+
+	}
+
 }
 
 float ClassRanker::deployTorchModel(FileName &model_path, std::vector<float> &features) {
@@ -1711,10 +1794,6 @@ float ClassRanker::deployTorchModel(FileName &model_path, std::vector<float> &fe
 
 void ClassRanker::performRanking()
 {
-	std::cout << " TODO: implement execution of neural network ranking here, and fill result into features_all_classes[i].class_score!" << std::endl;
-	std::cout << " TODO: implement execution of neural network ranking here, and fill result into features_all_classes[i].class_score!" << std::endl;
-	std::cout << " TODO: implement execution of neural network ranking here, and fill result into features_all_classes[i].class_score!" << std::endl;
-
 	if (mydata.numberOfParticles() == 0)
 	{
 		// Read in particles if we haven't done this already
@@ -1742,19 +1821,33 @@ void ClassRanker::performRanking()
 	long int nr_sel_parts = 0;
 	long int nr_sel_classavgs = 0;
 	std::vector<int> selected_classes;
+	std::vector<float> scores(features_all_classes.size());
+	float max_score = -999.;
 	for (int i = 0; i < features_all_classes.size(); i++)
 	{
 		std::vector<float> feature_vector = features_all_classes[i].toVector();
-		RFLOAT myscore = (RFLOAT) deployTorchModel(fn_torch_model, feature_vector);
+		scores[i] = (RFLOAT) deployTorchModel(fn_torch_model, feature_vector);
+		if (scores[i] > max_score) max_score = scores[i];
+	}
 
-		if (do_select && myscore >= select_min_score && myscore <= select_max_score)
+	RFLOAT my_min = select_min_score;
+	RFLOAT my_max = select_max_score;
+	if (do_relative_threshold)
+	{
+		my_min = select_min_score * max_score;
+		my_max = select_max_score * max_score;
+	}
+
+	for (int i = 0; i < features_all_classes.size(); i++)
+	{
+		if (do_select && scores[i] >= my_min && scores[i] <= my_max)
 		{
 			nr_sel_classavgs++;
 			selected_classes.push_back(features_all_classes[i].class_index);
 
 			MDselected_classavgs.addObject();
 			MDselected_classavgs.setValue(EMDL_MLMODEL_REF_IMAGE, features_all_classes[i].name);
-			MDselected_classavgs.setValue(EMDL_CLASS_FEAT_CLASS_SCORE, myscore);
+			MDselected_classavgs.setValue(EMDL_CLASS_FEAT_CLASS_SCORE, scores[i]);
 			MDselected_classavgs.setValue(EMDL_MLMODEL_PDF_CLASS, features_all_classes[i].class_distribution);
 			MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_ROT, features_all_classes[i].accuracy_rotation);
 			MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, features_all_classes[i].accuracy_translation);
@@ -1763,14 +1856,14 @@ void ClassRanker::performRanking()
 
 		// Set myscore in the vector that now runs over ALL classes (including empty ones)
 		int iclass = features_all_classes[i].class_index - 1; // class counting in STAR files starts at 1!
-		predicted_scores.at(iclass) = myscore;
+		predicted_scores.at(iclass) = scores[i];
 
 	}
 
 	// Write optimiser.star and model.star in the output directory.
 	FileName fn_opt_out, fn_model_out;
-	fn_opt_out = fn_out + fn_optimiser.afterLastOf("/");
-	fn_model_out = fn_out + fn_model.afterLastOf("/");
+	fn_opt_out = fn_out + fn_root + "_optimiser.star";
+	fn_model_out = fn_out + fn_root + "_model.star";
 	MD_optimiser.setValue(EMDL_OPTIMISER_MODEL_STARFILE, fn_model_out);
 	MD_optimiser.write(fn_opt_out);
 
@@ -1792,6 +1885,10 @@ void ClassRanker::performRanking()
 		}
 	}
 	MDclass.write(fn_model_out);
+	if (verb > 0)
+	{
+		std::cout << " Written model with all predicted scores to: " << fn_opt_out << std::endl;
+	}
 
 	if (do_select)
 	{

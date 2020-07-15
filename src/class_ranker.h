@@ -54,6 +54,9 @@ public:
     RFLOAT lowpass_filtered_img_avg, lowpass_filtered_img_stddev, lowpass_filtered_img_minval, lowpass_filtered_img_maxval;
     moments circular_mask_moments, ring_moments, inner_circle_moments, protein_moments, solvent_moments;
 
+    // SHWS 15072020: subimages for CNN
+    MultidimArray<RFLOAT> subimages;
+
     // Granularity features only for historical development reasons
     std::vector<RFLOAT> lbp, lbp_p, lbp_s, haralick_p, haralick_s, zernike_moments, granulo;
     double total_entropy, protein_entropy, solvent_entropy;
@@ -119,6 +122,7 @@ public:
 	    total_entropy = copy.total_entropy;
 	    protein_entropy = copy.protein_entropy;
 	    solvent_entropy = copy.solvent_entropy;
+	    subimages = copy.subimages;
 
 	}
 
@@ -157,6 +161,7 @@ public:
 	    total_entropy = copy.total_entropy;
 	    protein_entropy = copy.protein_entropy;
 	    solvent_entropy = copy.solvent_entropy;
+	    subimages = copy.subimages;
 
 		return *this;
 	}
@@ -252,13 +257,14 @@ public:
 
 	IOParser parser;
 	FileName fn_out, fn_ext, fn_optimiser, fn_model, fn_data, fn_select, fn_job_score, fn_cf;
-	FileName fn_features, fn_sel_parts, fn_sel_classavgs;
+	FileName fn_features, fn_sel_parts, fn_sel_classavgs, fn_root;
 
 	RFLOAT minRes, job_score;
 	RFLOAT radius_ratio, radius;
 	RFLOAT particle_diameter, circular_mask_radius, uniform_angpix = 4.0;
 	RFLOAT binary_threshold, lowpass;
     int debug, verb, start_class, end_class;
+    bool do_relative_threshold;
 
     HaralickExtractor haralick_extractor;
 	ZernikeMomentsExtractor zernike_extractor;
@@ -267,6 +273,11 @@ public:
 	bool do_ranking;
 	// Perform selection of classes based on predicted scores
 	bool do_select;
+
+	// Make subimages out of class averages at standardized pixel size
+	bool do_subimages;
+    int nr_subimages, subimage_boxsize;
+
 	RFLOAT select_min_score, select_max_score;
 
     // Save some time by limiting calculations
@@ -310,6 +321,9 @@ public:
 private:
 
 	int getClassIndex(FileName &name);
+
+	MultidimArray<RFLOAT> getSubimages(MultidimArray<RFLOAT> &img, int boxsize = 16,
+			int nr_images = 25, MultidimArray<int> *mask = NULL);
 
 	moments calculateMoments(MultidimArray<RFLOAT> &img,
 			RFLOAT inner_radius, RFLOAT outer_radius, MultidimArray<int> *mask = NULL);
