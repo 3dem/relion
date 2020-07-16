@@ -653,21 +653,25 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	// SGD stuff
 	int vmgd_section = parser.addSection("Stochastic Gradient Descent");
 	do_vmgd = parser.checkOption("--grad", "Perform gradient based optimisation (instead of default expectation-maximization)");
-	do_mom1 = parser.checkOption("--mom1", "Track the first moment of the gradient");
-	do_mom2 = parser.checkOption("--mom2", "Track the second moment of the gradient");
+//	do_mom1 = parser.checkOption("--mom1", "Track the first moment of the gradient");
+//	do_mom2 = parser.checkOption("--mom2", "Track the second moment of the gradient");
+	if (do_vmgd) {
+		do_mom1 = true;
+		do_mom2 = true;
+	}
 	// Stochastic EM is implemented as a variant of SGD, though it is really a different algorithm!
 	vmgd_ini_iter = textToInteger(parser.getOption("--vmgd_ini_iter", "Number of initial SGD iterations", "50"));
 	vmgd_fin_iter = textToInteger(parser.getOption("--vmgd_fin_iter", "Number of final SGD iterations", "50"));
 	vmgd_inbetween_iter = textToInteger(parser.getOption("--vmgd_inbetween_iter", "Number of SGD iterations between the initial and final ones", "200"));
 	vmgd_ini_resol = textToInteger(parser.getOption("--vmgd_ini_resol", "Resolution cutoff during the initial SGD iterations (A)", "-1"));
 	vmgd_fin_resol = textToInteger(parser.getOption("--vmgd_fin_resol", "Resolution cutoff during the final SGD iterations (A)", "-1"));
-	vmgd_ini_subset_size = textToInteger(parser.getOption("--vmgd_ini_subset", "Mini-batch size during the initial SGD iterations", "100"));
-	vmgd_fin_subset_size = textToInteger(parser.getOption("--vmgd_fin_subset", "Mini-batch size during the final SGD iterations", "500"));
+	vmgd_ini_subset_size = textToInteger(parser.getOption("--vmgd_ini_subset", "Mini-batch size during the initial SGD iterations", "500"));
+	vmgd_fin_subset_size = textToInteger(parser.getOption("--vmgd_fin_subset", "Mini-batch size during the final SGD iterations", "5000"));
 	mu = textToFloat(parser.getOption("--mu", "Momentum parameter for SGD updates", "0.9"));
 	vmgd_ini_stepsize = textToFloat(parser.getOption("--vmgd_ini_stepsize", "Step size parameter for initial gradient updates.", "0.5"));
 	vmgd_fin_stepsize = textToFloat(parser.getOption("--vmgd_fin_stepsize", "Step size parameter for final gradient updates.", "0.05"));
-    do_vmgd_realspace = parser.checkOption("--vmgd_realspace", "Claculate and apply gradient in real space.");
-	write_every_vmgd_iter = textToInteger(parser.getOption("--vmgd_write_iter", "Write out model every so many iterations in SGD (default is writing out all iters)", "1"));
+	do_vmgd_realspace = parser.checkOption("--vmgd_realspace", "Claculate and apply gradient in real space.");
+	write_every_vmgd_iter = textToInteger(parser.getOption("--vmgd_write_iter", "Write out model every so many iterations in SGD (default is writing out all iters)", "10"));
 	do_init_blobs = parser.checkOption("--init_blobs", "Initialize models with random Gaussians.");
 	do_som = parser.checkOption("--som", "Calculate self-organizing map instead of classification.");
 	som_starting_nodes = textToInteger(parser.getOption("--som_ini_nodes", "Number of initial SOM nodes.", "2"));
