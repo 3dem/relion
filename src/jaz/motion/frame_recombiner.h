@@ -73,6 +73,7 @@ class FrameRecombiner
 		// set at init:
 		int s_ref, sh_ref, fc;
 		std::vector<int> s_mov, s_out, sh_out;
+		std::vector<RFLOAT> data_angpix;
 		int verb, nr_omp_threads;
 		std::string outPath;
 		bool debug;

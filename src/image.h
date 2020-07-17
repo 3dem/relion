@@ -497,7 +497,7 @@ public:
 	 * the select slide may come in the image name or in the select_img parameter
 	 * file name takes precedence over select_img
 	 * If -1 is given the whole object is read
-	 *
+	 * The number before @ in the filename is 1-indexed, while select_img is 0-indexed.
 	 */
 	int read(const FileName &name, bool readdata=true, long int select_img=-1, bool mapData = false, bool is_2D = false)
 	{
@@ -1371,7 +1371,6 @@ private:
 #undef DEBUG
 //#define DEBUG
 #ifdef DEBUG
-
 		std::cerr << "READ\n" <<
 		"name="<<name <<std::endl;
 		std::cerr << "ext= "<<ext_name <<std::endl;
@@ -1403,6 +1402,8 @@ private:
 			err = readIMAGIC(select_img);//imagic is always an stack
 		else if (ext_name.contains("dm"))
 			REPORT_ERROR("The Digital Micrograph format (DM3, DM4) is not supported. You can convert it to MRC by other programs, for example, dm2mrc in IMOD.");
+		else if (ext_name.contains("eer") || ext_name.contains("ecc"))
+			REPORT_ERROR("BUG: EER movies should be handled by EERRenderer, not by Image.");
 		else
 			err = readSPIDER(select_img);
 

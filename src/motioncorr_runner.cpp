@@ -17,6 +17,8 @@
  * source code. Additional authorship citations may be added, but existing
  * author citations must be preserved.
  ***************************************************************************/
+#include <omp.h>
+
 #include "src/motioncorr_runner.h"
 #ifdef CUDA
 #include "src/acc/cuda/cuda_mem_utils.h"
@@ -26,7 +28,7 @@
 #include "src/matrix1d.h"
 #include "src/jaz/img_proc/image_op.h"
 #include "src/funcs.h"
-#include <omp.h>
+#include "src/renderEER.h"
 
 //#define TIMING
 #ifdef TIMING
@@ -87,6 +89,8 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	first_frame_sum =  textToInteger(parser.getOption("--first_frame_sum", "First movie frame used in output sum (start at 1)", "1"));
 	if (first_frame_sum < 1) first_frame_sum = 1;
 	last_frame_sum =  textToInteger(parser.getOption("--last_frame_sum", "Last movie frame used in output sum (0 or negative: use all)", "-1"));
+	eer_grouping = textToInteger(parser.getOption("--eer_grouping", "EER grouping", "40"));
+	eer_upsampling = textToInteger(parser.getOption("--eer_upsampling", "EER upsampling (1 = 4K or 2 = 8K)", "2"));
 
 	int motioncor2_section = parser.addSection("MOTIONCOR2 options");
 	do_motioncor2 = parser.checkOption("--use_motioncor2", "Use Shawn Zheng's MOTIONCOR2.");
@@ -448,7 +452,7 @@ void MotioncorrRunner::run()
 		if (pipeline_control_check_abort_job())
 			exit(RELION_EXIT_ABORTED);
 
-		Micrograph mic(fn_micrographs[imic], fn_gain_reference, bin_factor);
+		Micrograph mic(fn_micrographs[imic], fn_gain_reference, bin_factor, eer_upsampling, eer_grouping);
 
 		// Get angpix and voltage from the optics groups:
 		obsModel.opticsMdt.getValue(EMDL_CTF_VOLTAGE, voltage, optics_group_micrographs[imic]-1);
@@ -953,6 +957,11 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	std::ofstream logfile;
 	logfile.open(fn_log);
 
+	// EER related things
+	// TODO: will be refactored
+	EERRenderer renderer;
+	const bool isEER = EERRenderer::isEER(mic.getMovieFilename());
+
 	int n_io_threads = n_threads;
 	logfile << "Working on " << fn_mic << " with " << n_threads << " thread(s)." << std::endl << std::endl;
 	if (max_io_threads > 0 && n_io_threads > max_io_threads)
@@ -964,17 +973,27 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	Image<float> Ihead, Igain, Iref;
 	std::vector<MultidimArray<fComplex> > Fframes;
 	std::vector<Image<float> > Iframes;
-	std::vector<int> frames;
+	std::vector<int> frames; // 0-indexed
 
 	RFLOAT output_angpix = angpix * bin_factor;
 	RFLOAT prescaling = 1;
 
 	const int hotpixel_sigma = 6;
 	const int fit_rmsd_threshold = 10; // px
+	int nx, ny, nn;
 
 	// Check image size
-	Ihead.read(fn_mic, false, -1, false, true); // select_img -1, mmap false, is_2D true
-	int nx = XSIZE(Ihead()), ny = YSIZE(Ihead()), nn = NSIZE(Ihead());
+	if (!isEER)
+	{
+		Ihead.read(fn_mic, false, -1, false, true); // select_img -1, mmap false, is_2D true
+		nx = XSIZE(Ihead()); ny = YSIZE(Ihead()); nn = NSIZE(Ihead());
+	}
+	else
+	{
+		renderer.read(fn_mic, eer_upsampling);
+		nx = renderer.getWidth(); ny = renderer.getHeight();
+		nn = renderer.getNFrames() / eer_grouping; // remaining frames are truncated
+	}
 
 	// Which frame to use?
 	logfile << "Movie size: X = " << nx << " Y = " << ny << " N = " << nn << std::endl;
@@ -1034,9 +1053,13 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	// Read gain reference
 	RCTIC(TIMING_READ_GAIN);
 	if (fn_gain_reference != "") {
-		Igain.read(fn_gain_reference);
+		if (isEER)
+			 EERRenderer::loadEERGain(fn_gain_reference, Igain(), eer_upsampling);
+		else
+			Igain.read(fn_gain_reference);
+
 		if (XSIZE(Igain()) != nx || YSIZE(Igain()) != ny) {
-			std::cerr << "fn_mic: " << fn_mic << std::endl;
+			std::cerr << "fn_mic: " << fn_mic << " nx = " << nx << " ny = " << ny << " gain nx = " << XSIZE(Igain()) << " gain ny = " << YSIZE(Igain()) <<  std::endl;
 			REPORT_ERROR("The size of the image and the size of the gain reference do not match. Make sure the gain reference has been rotated if necessary.");
 		}
 	}
@@ -1046,7 +1069,10 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	RCTIC(TIMING_READ_MOVIE);
 	#pragma omp parallel for num_threads(n_io_threads)
 	for (int iframe = 0; iframe < n_frames; iframe++) {
-		Iframes[iframe].read(fn_mic, true, frames[iframe], false, true); // mmap false, is_2D true
+		if (!isEER)
+			Iframes[iframe].read(fn_mic, true, frames[iframe], false, true); // mmap false, is_2D true
+		else
+			renderer.renderFrames(frames[iframe] * eer_grouping + 1, (frames[iframe] + 1) * eer_grouping, Iframes[iframe]());
 	}
 	RCTOC(TIMING_READ_MOVIE);
 
@@ -1106,6 +1132,21 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 #endif
 		}
 
+		// TODO: This should be done earlier and merged with badmap
+		if (isEER && fn_gain_reference != "")
+		{
+			int n_bad_eer = 0;
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Igain())
+			{
+				if (DIRECT_MULTIDIM_ELEM(Igain(), n) == 0) // || DIRECT_MULTIDIM_ELEM(Igain(), n) > 2.0)
+				{
+//					n_bad_eer++;
+					DIRECT_MULTIDIM_ELEM(bBad, n) = true;
+				}
+			}
+//			std::cout << "n_bad_eer = " << n_bad_eer << std::endl;
+		}
+
 		int n_bad = 0;
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum) {
 			if (DIRECT_MULTIDIM_ELEM(Isum, n) > threshold && !DIRECT_MULTIDIM_ELEM(bBad, n)) {
@@ -1149,14 +1190,25 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 						val += DIRECT_A2D_ELEM(Iframes[iframe](), y, x);
 					}
 				}
-//				std::cout << "n_ok = " << n_ok << " val = " << val << std::endl;
+//				std::cout << "n_ok = " << n_ok << " val = " << val;
 				if (n_ok > NUM_MIN_OK) DIRECT_A2D_ELEM(Iframes[iframe](), i, j) = val / n_ok;
 				else DIRECT_A2D_ELEM(Iframes[iframe](), i, j) = rnd_gaus(frame_mean, frame_std);
+//				std::cout << " set = " << DIRECT_A2D_ELEM(Iframes[iframe](), i, j) << std::endl;
 			}
 		}
 		RCTOC(TIMING_FIX_DEFECT);
 		logfile << "Fixed hot pixels." << std::endl;
 	} // !skip_defect
+
+//#define WRITE_FRAMES
+#ifdef WRITE_FRAMES
+	// Debug output
+	for (int iframe = 0; iframe < n_frames; iframe++)
+	{
+		Iframes[iframe].write(fn_avg.withoutExtension() + "_frames.mrcs", iframe, 
+		                      true, (iframe == 0) ? WRITE_OVERWRITE : WRITE_APPEND);
+	}
+#endif
 
 	if (early_binning) {
 		nx /= bin_factor; ny /= bin_factor;

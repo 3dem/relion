@@ -1,5 +1,5 @@
-RELION 3.1.0
-=============
+RELION 3.1 (+ EER support)
+===========================
 
 RELION (for REgularised LIkelihood OptimisatioN) is a stand-alone computer
 program for Maximum A Posteriori refinement of (multiple) 3D reconstructions
@@ -11,6 +11,13 @@ If RELION is useful in your work, please cite this paper.
 
 The more comprehensive documentation of RELION is stored on the [Wiki](http://www2.mrc-lmb.cam.ac.uk/relion)
 
+## Notes specific to this EER branch: PLEASE READ
+
+This is a special branch for processing movies in the EER format.
+Once the development is complete, this will be merged into the main branch.
+
+Please read instructions in [our wiki](https://www3.mrc-lmb.cam.ac.uk/relion/index.php/Image_compression#Falcon4_EER) carefully before starting processing.
+
 ## Installation
 
 More extensive options and configurations are available [here](http://www2.mrc-lmb.cam.ac.uk/relion/index.php/Download_%26_install),
@@ -19,7 +26,7 @@ but the outlines to clone and install relion for typical use are made easy throu
 On Debian or Ubuntu machines, installing cmake, the compiler, and additional dependencies (mpi, fftw) is as easy as:
 
 ```
-sudo apt install cmake git build-essential mpi-default-bin mpi-default-dev libfftw3-dev
+sudo apt install cmake git build-essential mpi-default-bin mpi-default-dev libfftw3-dev libtiff-dev
 ```
 
 On other systems it is typically just as easy, you simply have to modify "apt" to
@@ -53,9 +60,9 @@ starts the right GUI, but the GUI might invoke other versions of RELION in the P
 If FLTK related errors are reported, please add `-DFORCE_OWN_FLTK=ON` to
 `cmake`. For FFTW related errors, try `-DFORCE_OWN_FFTW=ON`.
 
-RELION requires libtiff to read TIFF movies. Most Linux distributions have packages like
-`libtiff-dev` or `libtiff-devel`. Note that you need a developer package. You need version 4.0.x
-to read BigTIFF files. If you installed libtiff in a non-standard location, specify the location by
+RELION also requires libtiff. Most Linux distributions have packages like `libtiff-dev` or `libtiff-devel`.
+Note that you need a developer package. You need version 4.0.x to read BigTIFF files. If you installed
+libtiff in a non-standard location, specify the location by
 `-DTIFF_INCLUDE_DIR=/path/to/include -DTIFF_LIBRARY=/path/to/libtiff.so.5`.
 
 See [our wiki](http://www2.mrc-lmb.cam.ac.uk/relion/index.php/Download_%26_install) for more
