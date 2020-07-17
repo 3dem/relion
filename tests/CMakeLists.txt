@@ -1,4 +1,3 @@
-
 add_executable(tests
 		tests.cpp
 	)
@@ -8,7 +7,9 @@ target_link_libraries(tests relion_lib)
 target_link_libraries(tests ${FFTW_LIBRARIES})
 target_link_libraries(tests ${TIFF_LIBRARIES})
 
-include_directories(tests PRIVATE ${CMAKE_SOURCE_DIR})
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+
+include_directories(tests PRIVATE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/tests)
 include_directories(tests PRIVATE ${FFTW_INCLUDES})
 
 find_package(OpenMP)
