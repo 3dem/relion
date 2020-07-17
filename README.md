@@ -11,12 +11,7 @@ If RELION is useful in your work, please cite this paper.
 
 The more comprehensive documentation of RELION is stored on the [Wiki](http://www2.mrc-lmb.cam.ac.uk/relion)
 
-## Notes specific to this EER branch: PLEASE READ
-
-This is a special branch for processing movies in the EER format.
-Once the development is complete, this will be merged into the main branch.
-
-Please read instructions in [our wiki](https://www3.mrc-lmb.cam.ac.uk/relion/index.php/Image_compression#Falcon4_EER) carefully before starting processing.
+For EER data processing, please read instructions in [our wiki](https://www3.mrc-lmb.cam.ac.uk/relion/index.php/Image_compression#Falcon4_EER) carefully. 
 
 ## Installation
 

@@ -421,8 +421,14 @@ ADD_SUBDIRECTORY(src/apps)
 # -----------------------------------------------------------------------------TESTS--
 # Include testing flag(s) as precomiler 
 # definitions and include test directives
-enable_testing()
-include(${CMAKE_SOURCE_DIR}/tests/RelionTests.cmake)
+#enable_testing()
+#include(${CMAKE_SOURCE_DIR}/tests/RelionTests.cmake)
+
+option(BUILD_TESTS "Build and configure tests" OFF)
+if(BUILD_TESTS)
+    include(CTest)
+    add_subdirectory(tests)
+endif()
 
 # ----------------------------------------------------------PRINT OUT ALL CMAKE VARS--
 #get_cmake_property(_variableNames VARIABLES)

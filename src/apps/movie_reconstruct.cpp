@@ -124,22 +124,13 @@ void MovieReconstructor::read(int argc, char **argv)
 	fn_corrmic = parser.getOption("--corr_mic", "Motion correction STAR file", "");
 	traj_path = parser.getOption("--traj_path", "Trajectory path prefix", "");
 	movie_angpix = textToFloat(parser.getOption("--movie_angpix", "Pixel size in the movie", "-1"));
-	if (movie_angpix < 0)
-		REPORT_ERROR("For this program, you have to explicitly specify the movie pixel size (--movie_angpix).");
 	coord_angpix = textToFloat(parser.getOption("--coord_angpix", "Pixel size of particle coordinates", "-1"));
-	if (coord_angpix < 0)
-		REPORT_ERROR("For this program, you have to explicitly specify the coordinate pixel size (--coord_angpix).");
+	
 	frame = textToInteger(parser.getOption("--frame", "Movie frame to reconstruct (1-indexed)", "1"));
 	requested_eer_grouping = textToInteger(parser.getOption("--eer_grouping", "Override EER grouping (--frame is in this new grouping)", "-1"));
 	movie_boxsize = textToInteger(parser.getOption("--window", "Box size to extract from raw movies", "-1"));
-	if (movie_boxsize < 0 || movie_boxsize % 2 != 0)
-		REPORT_ERROR("You have to specify the extraction box size (--window) as an even number.");
 	output_boxsize = textToInteger(parser.getOption("--scale", "Box size after down-sampling", "-1"));
-	if (output_boxsize < 0 || output_boxsize % 2 != 0)
-		REPORT_ERROR("You have to specify the reconstruction box size (--scale) as an even number.");
 	nr_threads = textToInteger(parser.getOption("--j", "Number of threads (1 or 2)", "2"));
-	if (nr_threads < 0 || nr_threads > 2)
-		REPORT_ERROR("Number of threads (--j) must be 1 or 2");
 
 	int ctf_section = parser.addSection("CTF options");
 	do_ctf = parser.checkOption("--ctf", "Apply CTF correction");
@@ -155,8 +146,6 @@ void MovieReconstructor::read(int argc, char **argv)
 	nr_sectors = textToInteger(parser.getOption("--sectors", "Number of sectors for Ewald sphere correction", "2"));
 	skip_mask = parser.checkOption("--skip_mask", "Do not apply real space mask during Ewald sphere correction");
 	skip_weighting = parser.checkOption("--skip_weighting", "Do not apply weighting during Ewald sphere correction");
-	if (verb > 0 && do_ewald && mask_diameter < 0 && !(skip_mask && skip_weighting))
-		REPORT_ERROR("To apply Ewald sphere correction (--ewald), you have to specify the mask diameter(--mask_diameter).");
 
 	int helical_section = parser.addSection("Helical options");
 	nr_helical_asu = textToInteger(parser.getOption("--nr_helical_asu", "Number of helical asymmetrical units", "1"));
@@ -183,6 +172,19 @@ void MovieReconstructor::read(int argc, char **argv)
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())
 		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
+
+	if (movie_angpix < 0)
+		REPORT_ERROR("For this program, you have to explicitly specify the movie pixel size (--movie_angpix).");
+	if (coord_angpix < 0)
+		REPORT_ERROR("For this program, you have to explicitly specify the coordinate pixel size (--coord_angpix).");
+	if (movie_boxsize < 0 || movie_boxsize % 2 != 0)
+		REPORT_ERROR("You have to specify the extraction box size (--window) as an even number.");
+	if (output_boxsize < 0 || output_boxsize % 2 != 0)
+		REPORT_ERROR("You have to specify the reconstruction box size (--scale) as an even number.");
+	if (nr_threads < 0 || nr_threads > 2)
+		REPORT_ERROR("Number of threads (--j) must be 1 or 2");
+	if (verb > 0 && do_ewald && mask_diameter < 0 && !(skip_mask && skip_weighting))
+		REPORT_ERROR("To apply Ewald sphere correction (--ewald), you have to specify the mask diameter(--mask_diameter).");
 }
 
 void MovieReconstructor::initialise()
@@ -290,11 +292,11 @@ void MovieReconstructor::backproject(int rank, int size)
 		FileName fn_gain = mic.getGainFilename();
 		if (fn_gain != prev_gain)
 		{
-			Igain.read(fn_gain);
-			prev_gain = fn_gain;
-
 			if (isEER)
-				EERRenderer::upsampleEERGain(Igain(), eer_upsampling);
+				EERRenderer::loadEERGain(fn_gain, Igain(), eer_upsampling);
+			else
+				Igain.read(fn_gain);
+			prev_gain = fn_gain;
 		}
 
 		// Read trajectories. Both particle ID and frame ID are 0-indexed in this array.
