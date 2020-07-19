@@ -189,7 +189,7 @@ int main(int argc, char *argv[])
 		name = "ts_"+ZIO::itoa(my_index);
 	}
 	
-	tomograms.add(
+	tomograms.addTomogram(
 		name, tsFn,
 		mapping.projections, 
 		mapping.w, mapping.h, mapping.d, 

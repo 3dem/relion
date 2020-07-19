@@ -21,7 +21,7 @@ class TomogramSet
 			std::vector<MetaDataTable> tomogramTables;
 			
 			
-		int add(
+		int addTomogram(
 			std::string tomoName, std::string stackFilename,
 			const std::vector<gravis::d4Matrix>& projections,
 			int w, int h, int d,

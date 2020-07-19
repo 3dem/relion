@@ -37,7 +37,7 @@ TomogramSet::TomogramSet(std::string filename)
 	globalTable.setName("global");
 }
 
-int TomogramSet::add(
+int TomogramSet::addTomogram(
 		std::string tomoName, std::string stackFilename,
 		const std::vector<gravis::d4Matrix>& projections, 
 		int w, int h, int d, 
