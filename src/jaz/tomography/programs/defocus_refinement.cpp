@@ -330,14 +330,14 @@ BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(
 		#endif						
 		
 		const d3Vector pos = dataSet->getPosition(part_id);
-		const std::vector<d3Vector> traj = dataSet->getTrajectoryInPix(part_id, fc, pixelSize);
+		const std::vector<d3Vector> traj = dataSet->getTrajectoryInPixels(part_id, fc, pixelSize);
 		
 		d4Matrix projCut;	
 		
 		BufferedImage<fComplex> observation(sh,s);
 		
 		TomoExtraction::extractFrameAt3D_Fourier(
-				tomogram.stack, f, s, 1.0, tomogram.proj[f], traj[f],
+				tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f], traj[f],
 				observation, projCut, 1, false, true);
 		
 		#if TIMING
@@ -356,11 +356,7 @@ BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(
 			if (th==0) timer.toc(time_fwd_proj);
 		#endif
 			
-		
-		CTF ctf_part_0 = TomoCtfHelper::adaptToParticle(
-				tomogram.centralCTFs[f], tomogram.proj[f], pos, tomogram.centre, 
-				handedness, pixelSize);
-		
+		CTF ctf_part_0 = tomogram.getCtf(f, pos);		
 		CTF ctf_part = ctf_part_0;
 		
 		BufferedImage<float> CTFimage(sh,s);

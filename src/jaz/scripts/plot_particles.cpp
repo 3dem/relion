@@ -121,7 +121,7 @@ int main(int argc, char *argv[])
 			}
 			else
 			{
-				const std::vector<d3Vector> traj = dataSet->getTrajectoryInPix(
+				const std::vector<d3Vector> traj = dataSet->getTrajectoryInPixels(
 							part_id, 0, tomogram.optics.pixelSize);
 				
 				if (allFrames)

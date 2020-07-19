@@ -192,11 +192,11 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 	
 	out.cumulativeDose.resize(out.frameCount);
 	out.centralCTFs.resize(out.frameCount);
-	out.proj.resize(out.frameCount);
+	out.projectionMatrices.resize(out.frameCount);
 	
 	for (int f = 0; f < out.frameCount; f++)
 	{
-		d4Matrix& P = out.proj[f];
+		d4Matrix& P = out.projectionMatrices[f];
 		
 		std::vector<EMDLabel> rows({
 			EMDL_TOMO_PROJECTION_X, 

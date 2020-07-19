@@ -377,7 +377,7 @@ double ParticleSet::getOriginalPixelSize(int opticsGroup) const
 	return out;
 }
 
-std::vector<d3Vector> ParticleSet::getTrajectoryInPix(long particle_id, int fc, double pixelSize) const
+std::vector<d3Vector> ParticleSet::getTrajectoryInPixels(long particle_id, int fc, double pixelSize) const
 {
 	const d3Vector p0 = getPosition(particle_id);
 

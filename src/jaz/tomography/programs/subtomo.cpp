@@ -135,7 +135,7 @@ void SubtomoProgram::run()
 			const int part_id = particles[t][p];
 			
 			const d3Vector pos = dataSet->getPosition(part_id);
-			const std::vector<d3Vector> traj = dataSet->getTrajectoryInPix(
+			const std::vector<d3Vector> traj = dataSet->getTrajectoryInPixels(
 						part_id, fc, tomogram.optics.pixelSize);
 			
 			std::vector<d4Matrix> projCut(fc), projPart(fc);			
@@ -144,7 +144,7 @@ void SubtomoProgram::run()
 			BufferedImage<float> weightStack(sh2D,s2D,fc);
 			
 			TomoExtraction::extractAt3D_Fourier(
-					tomogram.stack, s02D, binning, tomogram.proj, traj,
+					tomogram.stack, s02D, binning, tomogram.projectionMatrices, traj,
 					particleStack, projCut, inner_thread_num, false, true);
 			
 			
@@ -164,9 +164,9 @@ void SubtomoProgram::run()
 				
 				if (do_ctf)
 				{
-					BufferedImage<float> ctfImg = TomoCtfHelper::drawCTF(
-						tomogram.centralCTFs[f], tomogram.proj[f], pos, 
-						tomogram.centre, tomogram.handedness, binnedPixelSize, s2D);
+					CTF ctf = tomogram.getCtf(f, pos);
+					BufferedImage<float> ctfImg(sh2D, s2D);
+					ctf.draw(s2D, s2D, binnedPixelSize, &ctfImg(0,0,0));
 					
 					const float scale = flip_value? -1.f : 1.f;
 							

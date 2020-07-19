@@ -23,7 +23,7 @@ class Tomogram
 			double handedness;
 			
 			BufferedImage<float> stack;
-			std::vector<gravis::d4Matrix> proj;
+			std::vector<gravis::d4Matrix> projectionMatrices;
 			
 			std::vector<CTF> centralCTFs;
 			std::vector<double> cumulativeDose;
@@ -44,7 +44,7 @@ class Tomogram
 		BufferedImage<float> computeDoseWeight(int boxSize, double binning) const;
 		BufferedImage<float> computeNoiseWeight(int boxSize, double binning, double overlap = 2.0) const;
 		
-		
+		CTF getCtf(int frame, gravis::d3Vector position, double zOffset = 0.0) const;
 };
 
 

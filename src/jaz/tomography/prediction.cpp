@@ -24,8 +24,7 @@ using namespace gravis;
 
 BufferedImage<fComplex> Prediction::predictFS(
 		int particle_id, const ParticleSet* dataSet, d4Matrix proj, int s,
-		const CTF& centreCtf, d3Vector tomo_centre,
-		double handedness, double pixelSize,
+		const CTF& ctf, double pixelSize,
 		const std::vector<BufferedImage<fComplex>>& referenceFS,
 		HalfSet halfSet,
 		Modulation modulation)
@@ -36,12 +35,6 @@ BufferedImage<fComplex> Prediction::predictFS(
 	if (  modulation == AmplitudeModulated
 	   || modulation == AmplitudeAndPhaseModulated)
 	{
-		d3Vector pos = dataSet->getPosition(particle_id);
-		
-		CTF ctf = TomoCtfHelper::adaptToParticle(
-				centreCtf, proj, pos, tomo_centre, 
-				handedness, pixelSize);
-		
 		const int sh = s / 2 + 1;
 		BufferedImage<float> ctfImg(sh, s);
 		
@@ -169,7 +162,7 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 		
 		const int part_id = partIndices[p];	
 		
-		const std::vector<d3Vector> traj = dataSet->getTrajectoryInPix(part_id, fc, tomogram.optics.pixelSize);
+		const std::vector<d3Vector> traj = dataSet->getTrajectoryInPixels(part_id, fc, tomogram.optics.pixelSize);
 		
 		d4Matrix projCut;	
 		
@@ -180,13 +173,13 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 			const int f = sequence[ft];
 			
 			TomoExtraction::extractFrameAt3D_Fourier(
-					tomogram.stack, f, s, 1.0, tomogram.proj[f], traj[f],
+					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f], traj[f],
 					observation, projCut, 1, false, true);
 						
 			BufferedImage<fComplex> prediction = Prediction::predictFS(
 					part_id, dataSet, projCut, s, 
-					tomogram.centralCTFs[f], tomogram.centre,
-					tomogram.handedness, tomogram.optics.pixelSize,
+					tomogram.getCtf(f, dataSet->getPosition(part_id)),
+					tomogram.optics.pixelSize,
 					referenceMap.image_FS, halfSet);
 					
 			BufferedImage<fComplex> ccFS(sh,s);

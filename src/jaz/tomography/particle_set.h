@@ -52,7 +52,7 @@ class ParticleSet
 		double getOriginalPixelSize(int opticsGroup) const;
 
 
-		std::vector<gravis::d3Vector> getTrajectoryInPix(long int particle_id, int fc, double pixelSize) const;
+		std::vector<gravis::d3Vector> getTrajectoryInPixels(long int particle_id, int fc, double pixelSize) const;
 		void checkTrajectoryLengths(int p0, int np, int fc, std::string caller) const;
 };
 

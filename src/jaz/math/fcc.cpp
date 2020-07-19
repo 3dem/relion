@@ -67,7 +67,7 @@ BufferedImage<double> FCC::compute3(
 		
 		const int part_id = partIndices[p];	
 		
-		const std::vector<d3Vector> traj = dataSet->getTrajectoryInPix(part_id, fc, tomogram.optics.pixelSize);
+		const std::vector<d3Vector> traj = dataSet->getTrajectoryInPixels(part_id, fc, tomogram.optics.pixelSize);
 		d4Matrix projCut;
 				
 		BufferedImage<fComplex> observation(sh,s);
@@ -75,13 +75,13 @@ BufferedImage<double> FCC::compute3(
 		for (int f = 0; f < fc; f++)
 		{
 			TomoExtraction::extractFrameAt3D_Fourier(
-					tomogram.stack, f, s, 1.0, tomogram.proj[f], traj[f],
+					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f], traj[f],
 					observation, projCut, 1, false, true);
 						
 			BufferedImage<fComplex> prediction = Prediction::predictFS(
-					part_id, dataSet, projCut, s, 
-					tomogram.centralCTFs[f], tomogram.centre,
-					tomogram.handedness, tomogram.optics.pixelSize,
+					part_id, dataSet, projCut, s,
+					tomogram.getCtf(f, dataSet->getPosition(part_id)),
+					tomogram.optics.pixelSize,
 					referenceFS, Prediction::OppositeHalf);
 								
 			const float scale = flip_value? -1.f : 1.f;

@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
 				
 		for (int f = 0; f < fc; f++)
 		{
-			projAct[f] = tomogram.proj[f] / binning;
+			projAct[f] = tomogram.projectionMatrices[f] / binning;
 			projAct[f](3,3) = 1.0;
 		}
 		

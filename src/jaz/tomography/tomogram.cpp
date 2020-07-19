@@ -61,3 +61,22 @@ BufferedImage<float> Tomogram::computeNoiseWeight(int boxSize, double binning, d
 
 	return out;
 }
+
+CTF Tomogram::getCtf(int frame, d3Vector position, double zOffset) const
+{
+	const d4Matrix& projFrame = projectionMatrices[frame];
+	d4Vector pos2D = projFrame * d4Vector(position);
+	d4Vector cent2D = projFrame * d4Vector(centre);
+	
+	double dz_pos = pos2D.z - cent2D.z;
+	double dz = handedness * optics.pixelSize * dz_pos + zOffset;
+	
+	CTF ctf = centralCTFs[frame];
+	
+	ctf.DeltafU += dz;
+	ctf.DeltafV += dz;
+	
+	ctf.initialise();
+	
+	return ctf;
+}
