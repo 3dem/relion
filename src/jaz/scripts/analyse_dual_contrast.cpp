@@ -5,6 +5,7 @@
 #include <src/jaz/image/cutting.h>
 #include <src/jaz/image/color_helper.h>
 #include <src/jaz/image/normalization.h>
+#include <src/jaz/tomography/reconstruction.h>
 #include <src/jaz/optics/dual_contrast/dual_contrast_writer.h>
 #include <src/jaz/math/fft.h>
 #include <src/jaz/math/tensor2x2.h>
@@ -496,6 +497,9 @@ int main(int argc, char *argv[])
 
 
 	BufferedImage<double> phase_map_RS(in_phase), amp_map_RS(in_amplitude);
+
+
+
 	BufferedImage<dComplex> phase_map_FS, amp_map_FS;
 
 	FFT::FourierTransform(phase_map_RS, phase_map_FS);
@@ -512,6 +516,15 @@ int main(int argc, char *argv[])
 	
 	phase_map_FS = ImageFilter::highpassGauss3D(phase_map_FS, high_pass_frequency);
 	amp_map_FS = ImageFilter::highpassGauss3D(amp_map_FS, high_pass_frequency);
+
+	FFT::inverseFourierTransform(phase_map_FS, phase_map_RS);
+	FFT::inverseFourierTransform(amp_map_FS, amp_map_RS);
+
+	Reconstruction::taper(phase_map_RS, 5, false, 6);
+	Reconstruction::taper(amp_map_RS, 5, false, 6);
+
+	FFT::FourierTransform(phase_map_RS, phase_map_FS);
+	FFT::FourierTransform(amp_map_RS, amp_map_FS);
 
 	const double optimal_ratio = computeUniformScale(phase_map_FS, amp_map_FS);
 	
@@ -532,7 +545,8 @@ int main(int argc, char *argv[])
 	
 	if (write_filtered_maps)
 	{
-		BufferedImage<double> filtered_difference = amp_map_RS - phase_map_RS;
+		BufferedImage<double> filtered_difference = amp_map_RS;
+		filtered_difference.addMultiple(-optimal_ratio, phase_map_RS);
 
 		phase_map_RS.write(out_path + "phase_" + tag + ".mrc", pixel_size);
 		amp_map_RS.write(out_path + "amplitude_" + tag + ".mrc", pixel_size);
@@ -624,6 +638,8 @@ int main(int argc, char *argv[])
 	heavy_external.insert("CL");
 	heavy_external.insert("FE");
 	heavy_external.insert("ZN");
+	heavy_external.insert("NA");
+	heavy_external.insert("MG");
 
 	std::map<std::string,std::vector<d3Vector>> atoms_by_name =
 			PdbHelper::groupAtomsByName(assembly, heavy_external);
@@ -663,6 +679,8 @@ int main(int argc, char *argv[])
 	element_colours["CL"] = dRGB(0.1,0.9,0.1);
 	element_colours["FE"] = dRGB(255,165,0)/255.0;
 	element_colours["ZN"] = dRGB(165,42,42)/255.0;
+	element_colours["NA"] = dRGB(171,92,242)/255.0;
+	element_colours["MG"] = dRGB(138,255,0)/255.0;
 
 
 	const double ellipse_line_width = 0.5;
