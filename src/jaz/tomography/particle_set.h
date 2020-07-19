@@ -19,7 +19,6 @@ class ParticleSet
 		ParticleSet(std::string filename, std::string motionFilename);
 		
 			MetaDataTable partTable, optTable;
-			std::vector<double> binnedPixelSizes, originalPixelSizes;
 
 			bool hasMotion;
 			std::vector<Trajectory> motionTrajectories;

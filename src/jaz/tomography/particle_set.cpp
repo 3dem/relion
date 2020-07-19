@@ -29,17 +29,6 @@ ParticleSet::ParticleSet(std::string filename, std::string motionFilename)
 					 + EMDL::label2Str(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE)
 					 + " missing from optics MetaDataTable.\n");
 	}
-	
-	const int groupCount = optTable.numberOfObjects();
-	
-	originalPixelSizes.resize(groupCount);
-	binnedPixelSizes.resize(groupCount);
-	
-	for (int i = 0; i < groupCount; i++)
-	{
-		optTable.getValueSafely(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, originalPixelSizes[i], i);
-		optTable.getValueSafely(EMDL_IMAGE_PIXEL_SIZE, binnedPixelSizes[i], i);
-	}
 
 	hasMotion = motionFilename != "";
 
@@ -193,9 +182,13 @@ d3Vector ParticleSet::getPosition(long int particle_id) const
 	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_X_ANGSTROM, off.x, particle_id);
 	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, off.y, particle_id);
 	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, off.z, particle_id);
-		
+	
 	const int og = getOpticsGroup(particle_id);
-	d3Vector out = (binnedPixelSizes[og] * pos - off) / originalPixelSizes[og];
+	
+	const double originalPixelSize = optTable.getDouble(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, og);
+	const double binnedPixelSize = optTable.getDouble(EMDL_IMAGE_PIXEL_SIZE, og);
+	
+	d3Vector out = (binnedPixelSize * pos - off) / originalPixelSize;
 	
 	out.x += 1.0;
 	out.y += 1.0;
