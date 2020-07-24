@@ -8,6 +8,8 @@ class ImageFileHelper
 	public:
 		
 		static gravis::t3Vector<long int> getSize(const std::string& filename);
+
+		static double getSamplingRate(const std::string& filename);
 };
 
 #endif

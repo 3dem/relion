@@ -4,7 +4,7 @@
 
 int main(int argc, char *argv[])
 {
-	IOParser parser;	
+	IOParser parser;
 	
 	TomoBackprojectProgram tbp;
 	
@@ -22,8 +22,8 @@ int main(int argc, char *argv[])
 		tbp.zeroDC = parser.checkOption("--0dc", "Zero the DC component of each frame");
 		
 		tbp.taperRad = textToDouble(parser.getOption("--td", "Tapering distance", "0.0"));
-	
-        tbp.thickness = textToInteger(parser.getOption("--th", "Thickness (read from .tlt file by default)", "-1"));
+
+		tbp.thickness = textToInteger(parser.getOption("--th", "Thickness (read from .tlt file by default)", "-1"));
 		
 		tbp.x0 = textToDouble(parser.getOption("--x0", "X origin", "1.0"));
 		tbp.y0 = textToDouble(parser.getOption("--y0", "Y origin", "1.0"));
@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
 		tbp.n_threads = textToInteger(parser.getOption("--j", "Number of threads", "1"));
 		
 		tbp.outFn = parser.getOption("--o", "Output filename");
-				
+
 		parser.checkForErrors();
 	}
 	catch (RelionError XE)

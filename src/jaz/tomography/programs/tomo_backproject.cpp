@@ -24,11 +24,11 @@ void TomoBackprojectProgram::run()
 	
 	std::cout << w0 << " x " << h0 << std::endl;
 	
-    if (thickness < 0)
-    {
-        thickness = tomogram.d0;
-        std::cout << "Using thickness from '" << tomoSetFn << "': " << thickness << std::endl;
-    }
+	if (thickness < 0)
+	{
+		thickness = tomogram.d0;
+		std::cout << "Using thickness from '" << tomoSetFn << "': " << thickness << std::endl;
+	}
 	
 	if (zeroDC) Normalization::zeroDC_stack(tomogram.stack);
 		
@@ -91,5 +91,7 @@ void TomoBackprojectProgram::run()
 	
 	std::cout << "writing output..." << std::endl;
 	
-	out.write(outFn);
+	const double samplingRate = tomogram.optics.pixelSize * spacing;
+
+	out.write(outFn, samplingRate);
 }
