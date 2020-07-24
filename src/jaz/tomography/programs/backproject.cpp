@@ -22,6 +22,55 @@
 using namespace gravis;
 
 
+void BackprojectProgram::readParameters(int argc, char *argv[])
+{
+	IOParser parser;
+	
+	try
+	{
+		parser.setCommandLine(argc, argv);
+		int gen_section = parser.addSection("General options");
+		
+		catFn = parser.getOption("--i", "Input particle set");
+		tomoSetFn = parser.getOption("--t", "Tomogram set", "tomograms.star");
+		boxSize = textToInteger(parser.getOption("--b", "Box size", "100"));
+		cropSize = textToInteger(parser.getOption("--crop", "Size of (additionally output) cropped image", "-1"));
+
+		do_whiten = parser.checkOption("--whiten", "Whiten the noise by flattening the power spectrum");
+
+		binning = textToDouble(parser.getOption("--bin", "Binning factor", "1"));
+		taper = textToDouble(parser.getOption("--taper", "Taper against the sphere by this number of pixels (only if cropping)", "10"));
+		SNR = textToDouble(parser.getOption("--SNR", "Assumed signal-to-noise ratio (negative means use a heuristic)", "-1"));
+		symmName = parser.getOption("--sym", "Symmetry group", "C1");
+				
+		max_mem_GB = textToInteger(parser.getOption("--mem", "Max. amount of memory to use for accumulation (--j_out will be reduced)", "-1"));
+				
+		explicit_gridding = parser.checkOption("--xg", "Perform gridding correction using a measured spreading function");
+		diag = parser.checkOption("--diag", "Write out diagnostic information");
+		no_subpix_off = parser.checkOption("--nso", "No subpixel offset (debugging)");
+		
+		motFn = parser.getOption("--mot", "Particle trajectories", "");
+		
+		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
+		inner_threads = textToInteger(parser.getOption("--j_in", "Number of inner threads (slower, needs less memory)", "3"));
+		outer_threads = textToInteger(parser.getOption("--j_out", "Number of outer threads (faster, needs more memory)", "2"));
+		
+		no_reconstruction = parser.checkOption("--no_recon", "Do not reconstruct the volume, only backproject (for benchmarking purposes)");
+		
+		outTag = parser.getOption("--o", "Output filename pattern");
+		
+		Log::readParams(parser);
+		
+		parser.checkForErrors();
+	}
+	catch (RelionError XE)
+	{
+		parser.writeUsage(std::cout);
+		std::cerr << XE;
+		exit(1);
+	}
+}
+
 void BackprojectProgram::run()
 {
 	Log::beginSection("Initialising");
@@ -182,13 +231,29 @@ void BackprojectProgram::run()
 				particleStack[th] *= noiseWeights;
 				weightStack[th] *= noiseWeights;
 			}
-
-			FourierBackprojection::backprojectStack_backward(
-				particleStack[th], weightStack[th], projPart, 
-				dataImgFS[2*th + halfSet], 
-				psfImgFS[2*th + halfSet], 
-				ctfImgFS[2*th + halfSet],
-				inner_threads);
+			
+			if (explicit_gridding)
+			{
+				FourierBackprojection::backprojectStack_backward(
+					particleStack[th], weightStack[th], projPart, 
+					dataImgFS[2*th + halfSet], 
+					psfImgFS[2*th + halfSet], 
+					ctfImgFS[2*th + halfSet],
+					inner_threads);
+			}
+			else
+			{
+				for (int f = 0; f < fc; f++)
+				{
+					FourierBackprojection::backprojectSlice_backward(
+						particleStack[th].getSliceRef(f), 
+						weightStack[th].getSliceRef(f), 
+						projPart[f], 
+						dataImgFS[2*th + halfSet],
+						ctfImgFS[2*th + halfSet],
+						inner_threads);
+				}
+			}
 			
 			tpc++;
 		}
@@ -204,8 +269,12 @@ void BackprojectProgram::run()
 		for (int i = 2; i < outCount; i++)
 		{
 			dataImgFS[i%2] += dataImgFS[i];
-			psfImgFS[i%2] += psfImgFS[i];
 			ctfImgFS[i%2] += ctfImgFS[i];
+			
+			if (explicit_gridding)
+			{
+				psfImgFS[i%2] += psfImgFS[i];
+			}
 		}
 	}
 	
@@ -220,19 +289,28 @@ void BackprojectProgram::run()
 			dataImgFS[half] = Symmetry::symmetrise_FS_complex(
 						dataImgFS[half], symmName, num_threads);
 			
-			psfImgFS[half] = Symmetry::symmetrise_FS_real(
-						psfImgFS[half], symmName, num_threads);
-			
 			ctfImgFS[half] = Symmetry::symmetrise_FS_real(
 						ctfImgFS[half], symmName, num_threads);
+			
+			if (explicit_gridding)
+			{
+				psfImgFS[half] = Symmetry::symmetrise_FS_real(
+						psfImgFS[half], symmName, num_threads);
+			}
 		}
 	}
 	
 	std::vector<BufferedImage<double>> dataImgRS(2), dataImgDivRS(2);
 	
 	BufferedImage<dComplex> dataImgFS_both = dataImgFS[0] + dataImgFS[1];
-	BufferedImage<double> psfImgFS_both = psfImgFS[0] + psfImgFS[1];
 	BufferedImage<double> ctfImgFS_both = ctfImgFS[0] + ctfImgFS[1];
+	
+	BufferedImage<double> psfImgFS_both;
+	
+	if (explicit_gridding)
+	{
+		psfImgFS_both = psfImgFS[0] + psfImgFS[1];
+	}
 	
 	Log::beginSection("Reconstructing");
 	
@@ -243,9 +321,18 @@ void BackprojectProgram::run()
 		dataImgRS[half] = BufferedImage<double>(s,s,s);
 		dataImgDivRS[half] = BufferedImage<double>(s,s,s);
 		
-		Reconstruction::griddingCorrect3D(
+		if (explicit_gridding)
+		{
+			Reconstruction::griddingCorrect3D(
 					dataImgFS[half], psfImgFS[half], dataImgRS[half],
 					true, num_threads);
+		}
+		else
+		{
+			Reconstruction::griddingCorrect3D_sinc2(
+					dataImgFS[half], dataImgRS[half],
+					true, num_threads);
+		}
 		
 		if (SNR > 0.0)
 		{
@@ -280,8 +367,16 @@ void BackprojectProgram::run()
 	
 	Log::endSection();
 	
-	Reconstruction::griddingCorrect3D(
-		dataImgFS_both, psfImgFS_both, dataImgRS[0], true, num_threads);
+	if (explicit_gridding)
+	{
+		Reconstruction::griddingCorrect3D(
+			dataImgFS_both, psfImgFS_both, dataImgRS[0], true, num_threads);
+	}
+	else
+	{
+		Reconstruction::griddingCorrect3D_sinc2(
+			dataImgFS_both, dataImgRS[0], true, num_threads);
+	}
 	
 	if (SNR > 0.0)
 	{

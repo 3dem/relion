@@ -20,6 +20,62 @@
 using namespace gravis;
 
 
+void SubtomoProgram::readParameters(int argc, char *argv[])
+{
+	IOParser parser;
+	
+	try
+    {
+        parser.setCommandLine(argc, argv);
+        int gen_section = parser.addSection("General options");
+
+        catFn = parser.getOption("--i", "Catalogue .tbl or .star file");
+        tomoSetFn = parser.getOption("--t", "Tomogram set", "tomograms.star");
+		boxSize = textToInteger(parser.getOption("--b", "Projection box size", "100"));
+		cropSize = textToInteger(parser.getOption("--crop", "Output box size", "-1"));
+        binning = textToDouble(parser.getOption("--bin", "Binning factor", "1"));
+		write_multiplicity = parser.checkOption("--multi", "Write out multiplicity volumes");		
+		do_rotate = parser.checkOption("--rot", "Rotate the particles according to current angles");
+		SNR = textToDouble(parser.getOption("--SNR", "Assumed signal-to-noise ratio (negative means use a heuristic)", "-1"));
+		
+		do_cone_weight = parser.checkOption("--cone_weight", "Weight down a double cone along Z");		
+		const double alpha = 0.5 * textToDouble(parser.getOption("--cone_angle", "Opening angle of the cone in degrees", "10"));
+		cone_slope = sin(DEG2RAD(alpha));
+		cone_sig0 = textToDouble(parser.getOption("--cone_sig0", "Cone width at Z = 0", "2"));	
+
+		do_gridding_correction = parser.checkOption("--grid_corr", "Perform individual gridding-correction on each subtomogram");
+				
+        taper = textToDouble(parser.getOption("--taper", "Taper against the sphere by this number of pixels", "5"));
+		env_sigma = textToDouble(parser.getOption("--env", "Sigma of a Gaussian envelope applied before cropping", "-1"));
+		
+		do_whiten = parser.checkOption("--whiten", "Whiten the noise by flattening the power spectrum");
+        do_center = !parser.checkOption("--no_center", "Do not subtract the mean from the voxel values");
+		
+		flip_value = !parser.checkOption("--no_ic", "Do not invert contrast (keep particles dark)");
+		write_combined = !parser.checkOption("--no_comb", "Do not write the concatenated CTF-multiplicity image");
+		write_ctf = parser.checkOption("--ctf", "Write 3D CTFs");
+		write_divided = parser.checkOption("--div", "Write CTF-corrected subtomograms");
+		write_normalised = parser.checkOption("--nrm", "Write multiplicity-normalised subtomograms");
+		
+		motFn = parser.getOption("--mot", "Particle trajectories", "");
+		
+        diag = parser.checkOption("--diag", "Write out diagnostic information");
+
+        num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
+        outTag = parser.getOption("--o", "Output filename pattern");
+		
+		Log::readParams(parser);
+
+        parser.checkForErrors();
+    }
+    catch (RelionError XE)
+    {
+        parser.writeUsage(std::cout);
+        std::cerr << XE;
+        exit(1);
+    }
+}
+
 void SubtomoProgram::run()
 {
 	TomogramSet tomogramSet(tomoSetFn);
