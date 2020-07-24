@@ -2,6 +2,8 @@
 #define BACKPROJECT_PROGRAM_H
 
 #include <string>
+#include <src/jaz/image/buffered_image.h>
+
 
 class BackprojectProgram
 {
@@ -17,6 +19,23 @@ class BackprojectProgram
 			
 		void readParameters(int argc, char *argv[]);
 		void run();
+
+
+	protected:
+
+		void reconstruct(
+				BufferedImage<double>& dataImgRS,
+				BufferedImage<double>& dataImgDivRS,
+				BufferedImage<double>& ctfImgFS,
+				BufferedImage<double>* psfImgFS,
+				BufferedImage<dComplex>& dataImgFS);
+
+		void writeOutput(
+				const BufferedImage<double>& corrected,
+				const BufferedImage<double>& data,
+				const BufferedImage<double>& weight,
+				const std::string& tag,
+				double pixelSize);
 };
 
 #endif

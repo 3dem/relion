@@ -89,6 +89,9 @@ void BackprojectProgram::run()
 	const bool flip_value = true;
 	const bool do_ctf = true;
 
+	Tomogram tomo0 = tomoSet.loadTomogram(0, false);
+	const double binnedOutPixelSize = tomo0.optics.pixelSize * binning;
+
 	
 	const long int voxelNum = (long int) sh * (long int) s * (long int) s;
 	
@@ -159,8 +162,6 @@ void BackprojectProgram::run()
 			noiseWeights = tomogram.computeNoiseWeight(s, binning);
 		}
 
-		
-		// @TODO: define input and output pixel sizes!		
 		const double binnedPixelSize = tomogram.optics.pixelSize * binning;
 				
 		std::vector<BufferedImage<float>> weightStack(outer_threads, BufferedImage<float>(sh,s,fc));
@@ -205,7 +206,8 @@ void BackprojectProgram::run()
 			
 			for (int f = 0; f < fc; f++)
 			{
-				projPart[f] = projCut[f] * particleToTomo;
+				const double scaleRatio = binnedOutPixelSize / binnedPixelSize;
+				projPart[f] = scaleRatio * projCut[f] * particleToTomo;
 			
 				if (do_ctf)
 				{
@@ -258,7 +260,7 @@ void BackprojectProgram::run()
 			tpc++;
 		}
 		
-		Log::endProgress();			
+		Log::endProgress();
 		Log::endSection();
 	}
 	
@@ -277,9 +279,11 @@ void BackprojectProgram::run()
 			}
 		}
 	}
+
 	
 	if (no_reconstruction) return;
 	
+
 	if (symmName != "C1")
 	{
 		Log::print("Applying symmetry");
@@ -299,6 +303,7 @@ void BackprojectProgram::run()
 			}
 		}
 	}
+
 	
 	std::vector<BufferedImage<double>> dataImgRS(2), dataImgDivRS(2);
 	
@@ -311,6 +316,7 @@ void BackprojectProgram::run()
 	{
 		psfImgFS_both = psfImgFS[0] + psfImgFS[1];
 	}
+
 	
 	Log::beginSection("Reconstructing");
 	
@@ -320,91 +326,87 @@ void BackprojectProgram::run()
 		
 		dataImgRS[half] = BufferedImage<double>(s,s,s);
 		dataImgDivRS[half] = BufferedImage<double>(s,s,s);
+
+		reconstruct(
+			dataImgRS[half], dataImgDivRS[half], ctfImgFS[half],
+			&psfImgFS[half], dataImgFS[half]);
 		
-		if (explicit_gridding)
-		{
-			Reconstruction::griddingCorrect3D(
-					dataImgFS[half], psfImgFS[half], dataImgRS[half],
-					true, num_threads);
-		}
-		else
-		{
-			Reconstruction::griddingCorrect3D_sinc2(
-					dataImgFS[half], dataImgRS[half],
-					true, num_threads);
-		}
-		
-		if (SNR > 0.0)
-		{
-			Reconstruction::ctfCorrect3D_Wiener(
-				dataImgRS[half], ctfImgFS[half], dataImgDivRS[half],
-				1.0 / SNR, num_threads);
-		}
-		else
-		{
-			Reconstruction::ctfCorrect3D_heuristic(
-				dataImgRS[half], ctfImgFS[half], dataImgDivRS[half],
-				0.001, num_threads);
-		}
-		
-		dataImgDivRS[half].write(outTag+"_half"+ZIO::itoa(half+1)+".mrc");
-		
-		dataImgRS[half].write(outTag+"_data_half"+ZIO::itoa(half+1)+".mrc");
-		
-		Centering::fftwHalfToHumanFull(ctfImgFS[half]).write(
-					outTag+"_weight_half"+ZIO::itoa(half+1)+".mrc");
-		
-		if (cropSize > 0 && cropSize < boxSize)
-		{
-			BufferedImage<double> cropped = Padding::unpadCenter3D_full(
-						dataImgDivRS[half], (boxSize - cropSize)/2);
-			
-			Reconstruction::taper(cropped, taper, true, num_threads);
-			
-			cropped.write(outTag+"_half"+ZIO::itoa(half+1)+"_crop_"+ZIO::itoa(cropSize)+".mrc");
-		}
+		writeOutput(
+			dataImgDivRS[half], dataImgRS[half], ctfImgFS[half],
+			"_half"+ZIO::itoa(half+1), binnedOutPixelSize);
 	}
-	
+
+	reconstruct(
+		dataImgRS[0], dataImgDivRS[0], ctfImgFS_both,
+		&psfImgFS_both, dataImgFS_both);
+
+	writeOutput(
+		dataImgDivRS[0], dataImgRS[0], ctfImgFS[0],
+			"_merged", binnedOutPixelSize);
+
 	Log::endSection();
-	
+}
+
+void BackprojectProgram::reconstruct(
+		BufferedImage<double>& dataImgRS,
+		BufferedImage<double>& dataImgDivRS,
+		BufferedImage<double>& ctfImgFS,
+		BufferedImage<double>* psfImgFS,
+		BufferedImage<dComplex>& dataImgFS)
+{
 	if (explicit_gridding)
 	{
 		Reconstruction::griddingCorrect3D(
-			dataImgFS_both, psfImgFS_both, dataImgRS[0], true, num_threads);
+			dataImgFS, *psfImgFS, dataImgRS, true, num_threads);
 	}
 	else
 	{
 		Reconstruction::griddingCorrect3D_sinc2(
-			dataImgFS_both, dataImgRS[0], true, num_threads);
+			dataImgFS, dataImgRS, true, num_threads);
 	}
-	
+
 	if (SNR > 0.0)
 	{
 		Reconstruction::ctfCorrect3D_Wiener(
-			dataImgRS[0], ctfImgFS_both, dataImgDivRS[0],
+			dataImgRS, ctfImgFS, dataImgDivRS,
 			1.0 / SNR, num_threads);
 	}
 	else
 	{
 		Reconstruction::ctfCorrect3D_heuristic(
-			dataImgRS[0], ctfImgFS_both, dataImgDivRS[0],
+			dataImgRS, ctfImgFS, dataImgDivRS,
 			0.001, num_threads);
 	}
-	
-	dataImgDivRS[0].write(outTag+"_merged.mrc");
-	
-	dataImgRS[0].write(outTag+"_data_merged.mrc");
-	
-	Centering::fftwHalfToHumanFull(ctfImgFS[0]).write(
-				outTag+"_weight_merged.mrc");
-	
+}
+
+
+void BackprojectProgram::writeOutput(
+		const BufferedImage<double>& corrected,
+		const BufferedImage<double>& data,
+		const BufferedImage<double>& weight,
+		const std::string& tag,
+		double pixelSize)
+{
+	data.write(outTag+"_data"+tag+".mrc", pixelSize);
+
+	Centering::fftwHalfToHumanFull(weight).write(outTag+"_weight"+tag+".mrc", pixelSize);
+
 	if (cropSize > 0 && cropSize < boxSize)
 	{
+		corrected.write(outTag+tag+"_full.mrc", pixelSize);
+
 		BufferedImage<double> cropped = Padding::unpadCenter3D_full(
-					dataImgDivRS[0], (boxSize - cropSize)/2);
-		
+					corrected, (boxSize - cropSize)/2);
+
 		Reconstruction::taper(cropped, taper, true, num_threads);
-		
-		cropped.write(outTag+"_merged_crop_"+ZIO::itoa(cropSize)+".mrc");
+
+		cropped.write(outTag+tag+".mrc", pixelSize);
+	}
+	else
+	{
+		BufferedImage<double> tapered = corrected;
+		Reconstruction::taper(tapered, taper, true, num_threads);
+
+		tapered.write(outTag+tag+".mrc", pixelSize);
 	}
 }
