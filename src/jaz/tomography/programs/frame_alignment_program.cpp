@@ -86,7 +86,7 @@ void FrameAlignmentProgram::run()
 		Tomogram tomogram = tomogramSet.loadTomogram(t, true);
 		
 		const int fc = tomogram.frameCount;
-		std::vector<d4Matrix> projTomoCorr = tomogram.proj;
+		std::vector<d4Matrix> projTomoCorr = tomogram.projectionMatrices;
 		
 		std::string tag = ZIO::itoa(t);
 		std::string diagPrefix = outDir + "diag_" + tag;
@@ -126,7 +126,7 @@ void FrameAlignmentProgram::run()
 		}
 		
 		ProtoAlignment protoAlignment(
-				CCs, tomogram.proj, dataSet, particles[t], referenceMap.image_FS, 
+				CCs, tomogram.projectionMatrices, dataSet, particles[t], referenceMap.image_FS, 
 				const_particles, const_angles, const_shifts, range,
 				tomogram.centre, num_threads, padding);
 		
@@ -198,7 +198,7 @@ void FrameAlignmentProgram::run()
 		
 		if (diag)
 		{
-			tomogram.proj = projTomoCorr;
+			tomogram.projectionMatrices = projTomoCorr;
 			
 			FCC3 = FCC::compute3(
 				dataSet, particles[t], tomogram, referenceMap.image_FS,

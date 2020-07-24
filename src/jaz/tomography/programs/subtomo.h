@@ -43,6 +43,7 @@ class SubtomoProgram
 				write_divided, 
 				write_normalised;
 		
+		void readParameters(int argc, char *argv[]);
 		void run();	
 		
 		BufferedImage<float> cropAndTaper(

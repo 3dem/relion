@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
 		Tomogram tomogram = tomogramSet.loadTomogram(t, false);
 		output << "ts_" << t << ": \n";
 		
-		std::vector<d4Matrix> projTomo = tomogram.proj;	
+		std::vector<d4Matrix> projTomo = tomogram.projectionMatrices;	
 		const int fc = projTomo.size();
 			
 		for (int p = 0; p < pc; p++)

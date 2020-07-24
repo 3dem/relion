@@ -47,14 +47,14 @@ void TomoBackprojectProgram::run()
 		
 	if (std::abs(spacing - 1.0) < 1e-2)
 	{
-		projAct = tomogram.proj;
+		projAct = tomogram.projectionMatrices;
 		stackAct = tomogram.stack;
 	}
 	else
 	{
 		for (int f = 0; f < fc; f++)
 		{
-			projAct[f] = tomogram.proj[f] / spacing;
+			projAct[f] = tomogram.projectionMatrices[f] / spacing;
 			projAct[f](3,3) = 1.0;
 		}
 		

@@ -182,7 +182,7 @@ void AberrationFitProgram :: considerParticle(
 	if (f1 < 0) f1 = fc - 1;
 	
 	
-	const std::vector<d3Vector> traj = dataSet->getTrajectoryInPix(
+	const std::vector<d3Vector> traj = dataSet->getTrajectoryInPixels(
 				part_id, fc, tomogram.optics.pixelSize);
 	
 	d4Matrix projCut;					
@@ -193,20 +193,18 @@ void AberrationFitProgram :: considerParticle(
 	for (int f = f0; f <= f1; f++)
 	{
 		TomoExtraction::extractFrameAt3D_Fourier(
-				tomogram.stack, f, s, 1.0, tomogram.proj[f], traj[f],
+				tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f], traj[f],
 				observation, projCut, 1, false, true);
-					
+		
+		CTF ctf = tomogram.getCtf(f, dataSet->getPosition(part_id)); 
+		                          
 		BufferedImage<fComplex> prediction = Prediction::predictFS(
 				part_id, dataSet, projCut, s, 
-				tomogram.centralCTFs[f], tomogram.centre,
-				tomogram.handedness, tomogram.optics.pixelSize,
+				ctf,
+				tomogram.optics.pixelSize,
 				referenceMap.image_FS, 
 				Prediction::OppositeHalf,
 				Prediction::Unmodulated);
-		
-		CTF ctf = TomoCtfHelper::adaptToParticle(
-				tomogram.centralCTFs[f], tomogram.proj[f], traj[f], tomogram.centre, 
-				tomogram.handedness, tomogram.optics.pixelSize);
 		
 		const float scale = flip_value? -1.f : 1.f;
 		

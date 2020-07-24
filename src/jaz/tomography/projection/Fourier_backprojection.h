@@ -38,6 +38,47 @@ class FourierBackprojection
 	public:
 		
 		template <typename SrcType, typename DestType>
+		static void backprojectSlice_backward(
+			const RawImage<tComplex<SrcType>>& dataFS,
+			const RawImage<SrcType>& weight,
+			const gravis::d4Matrix& proj,
+			RawImage<tComplex<DestType>>& destFS,
+			RawImage<DestType>& destCTF,
+			int num_threads);
+
+		template <typename SrcType, typename DestType>
+		static void backprojectSlice_backward(
+			const RawImage<tComplex<SrcType>>& dataFS,
+			const RawImage<SrcType>& weight,
+			const gravis::d4Matrix& proj,
+			RawImage<tComplex<DestType>>& destFS,
+			RawImage<DestType>& destCTF,
+			RawImage<DestType>& destMP,
+			int num_threads);		
+
+		template <typename SrcType, typename DestType>
+		static void backprojectSlice_dualContrast_backward(
+			const RawImage<tComplex<SrcType>>& sin_gamma_data,
+			const RawImage<tComplex<SrcType>>& cos_gamma_data,
+			const RawImage<SrcType>& sin2_weight,
+			const RawImage<SrcType>& sin_cos_weight,
+			const RawImage<SrcType>& cos2_weight,
+			const gravis::d4Matrix& proj,
+			RawImage<DualContrastVoxel<DestType>>& dest,
+			int num_threads);
+		
+		template <typename SrcType, typename DestType, class PointInsertion>
+		static void backprojectSlice_forward(
+			const PointInsertion& pointInsertion,
+			const RawImage<tComplex<SrcType>>& dataFS,
+			const RawImage<SrcType>& weight,
+			const gravis::d4Matrix& proj,
+			RawImage<tComplex<DestType>>& destFS,
+			RawImage<DestType>& destCTF);
+		
+		
+		
+		template <typename SrcType, typename DestType>
 		static void backprojectStack_backward(
 			RawImage<tComplex<SrcType>>& stackFS,
 			RawImage<SrcType>& weightStack,
@@ -58,15 +99,7 @@ class FourierBackprojection
 			RawImage<DestType>& destMP,
 			int num_threads = 1);
 		
-		
-		template <typename SrcType, typename DestType>
-		static void backprojectSlice_backward(
-			const RawImage<tComplex<SrcType>>& dataFS,
-			const RawImage<SrcType>& weight,
-			const gravis::d4Matrix& proj,
-			RawImage<tComplex<DestType>>& destFS,
-			RawImage<DestType>& destCTF,
-			int num_threads);
+
 		
 		template <typename SrcType, typename DestType>
 		static inline void rasteriseLine_Ewald(
@@ -115,36 +148,7 @@ class FourierBackprojection
 			int num_threads);*/
 		
 		
-		template <typename SrcType, typename DestType>
-		static void backprojectSlice_backward(
-			const RawImage<tComplex<SrcType>>& dataFS,
-			const RawImage<SrcType>& weight,
-			const gravis::d4Matrix& proj,
-			RawImage<tComplex<DestType>>& destFS,
-			RawImage<DestType>& destCTF,
-			RawImage<DestType>& destMP,
-			int num_threads);		
 
-		template <typename SrcType, typename DestType>
-		static void backprojectSlice_dualContrast_backward(
-			const RawImage<tComplex<SrcType>>& sin_gamma_data,
-			const RawImage<tComplex<SrcType>>& cos_gamma_data,
-			const RawImage<SrcType>& sin2_weight,
-			const RawImage<SrcType>& sin_cos_weight,
-			const RawImage<SrcType>& cos2_weight,
-			const gravis::d4Matrix& proj,
-			RawImage<DualContrastVoxel<DestType>>& dest,
-			int num_threads);
-		
-		
-		template <typename SrcType, typename DestType, class PointInsertion>
-		static void backprojectSlice_forward(
-			const PointInsertion& pointInsertion,
-			const RawImage<tComplex<SrcType>>& dataFS,
-			const RawImage<SrcType>& weight,
-			const gravis::d4Matrix& proj,
-			RawImage<tComplex<DestType>>& destFS,
-			RawImage<DestType>& destCTF);
 		
 		template <typename SrcType, typename DestType, class PointInsertion>
 		static void backprojectSphere_forward(
@@ -176,6 +180,8 @@ class FourierBackprojection
 			const gravis::d4Matrix& proj,
 			RawImage<tComplex<DestType>>& destFS,
 			RawImage<DestType>& destCTF);
+		
+		
 		
 		template <typename DestType>
 		static void backprojectSpreadingFunction(

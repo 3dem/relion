@@ -37,7 +37,7 @@ TomogramSet::TomogramSet(std::string filename)
 	globalTable.setName("global");
 }
 
-int TomogramSet::add(
+int TomogramSet::addTomogram(
 		std::string tomoName, std::string stackFilename,
 		const std::vector<gravis::d4Matrix>& projections, 
 		int w, int h, int d, 
@@ -192,11 +192,11 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 	
 	out.cumulativeDose.resize(out.frameCount);
 	out.centralCTFs.resize(out.frameCount);
-	out.proj.resize(out.frameCount);
+	out.projectionMatrices.resize(out.frameCount);
 	
 	for (int f = 0; f < out.frameCount; f++)
 	{
-		d4Matrix& P = out.proj[f];
+		d4Matrix& P = out.projectionMatrices[f];
 		
 		std::vector<EMDLabel> rows({
 			EMDL_TOMO_PROJECTION_X, 

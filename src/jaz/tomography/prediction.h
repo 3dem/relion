@@ -34,10 +34,7 @@ class Prediction
 				int particle_id, 
 				const ParticleSet* dataSet,
 				gravis::d4Matrix proj,
-				int s, const CTF& centreCtf,
-				gravis::d3Vector tomo_centre,
-				double handedness, 
-				double pixelSize,
+				int s, const CTF& ctf, double pixelSize,
 				const std::vector<BufferedImage<fComplex>>& referenceFS,
 				HalfSet halfSet = OwnHalf,
 				Modulation modulation = AmplitudeAndPhaseModulated);

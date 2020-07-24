@@ -9,25 +9,6 @@ class TomoCtfHelper
 {
 	public:
 		
-		static CTF adaptToParticle(
-				const CTF& ctfFrame,
-				const gravis::d4Matrix& projFrame, 
-				gravis::d3Vector pos, 
-				gravis::d3Vector tomoCentre,
-				double handedness,
-				double pixelSize, 
-				double zOffset = 0);
-		
-		static BufferedImage<float> drawCTF(
-				const CTF& ctfFrame,
-				const gravis::d4Matrix& projFrame, 
-				gravis::d3Vector pos, 
-				gravis::d3Vector tomoCentre,
-				double handedness,
-				double pixelSize,
-				int boxSize, 
-				double zOffset = 0);
-		
 		static std::vector<CTF> loadCtffind4(
 			std::string path, 
 			int imageCount,
