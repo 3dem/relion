@@ -1063,7 +1063,10 @@ void SpaBackproject::reconstructNew()
 			accumulation_volumes[i%2].weight +=
 						accumulation_volumes[i].weight;
 
-			spreading_functions[i%2] += spreading_functions[i];
+			if (explicit_spreading_function)
+			{
+				spreading_functions[i%2] += spreading_functions[i];
+			}
 
 			if (compute_multiplicity)
 			{
