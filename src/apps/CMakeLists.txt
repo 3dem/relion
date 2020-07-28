@@ -192,9 +192,13 @@ if(BUILD_OWN_TBB)
 	add_dependencies(relion_lib OWN_TBB)
 endif()
 
-if(BUILD_OWN_Torch)
-	add_dependencies(relion_lib OWN_Torch)
-endif()
+if(TORCH)
+	target_link_libraries(relion_lib ${TORCH_LIBRARIES})
+	set_property(TARGET relion_lib PROPERTY CXX_STANDARD 14)
+	if(BUILD_OWN_Torch)
+		add_dependencies(relion_lib OWN_Torch)
+	endif()
+endif(TORCH)
 
 foreach (_target ${RELION_TARGETS})
 	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)  #specify target name WE=WithoutExtension
@@ -219,11 +223,6 @@ foreach (_target ${RELION_TARGETS})
 	if (ALTCPU)
 		target_link_libraries(${_target} ${TBB_LIBRARIES})
 	endif(ALTCPU)
-
-	if(TORCH)
-		target_link_libraries(${_target} ${TORCH_LIBRARIES})
-		set_property(TARGET ${_target} PROPERTY CXX_STANDARD 14)
-	endif(TORCH)
 
 	set_target_properties(${_target} PROPERTIES
 	                      XX_STANDARD 11
