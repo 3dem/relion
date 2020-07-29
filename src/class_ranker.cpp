@@ -2051,4 +2051,34 @@ void ClassRanker::writeFeatures()
 	MD_class_features.write(fn_out+fn_features);
 	if (verb > 0) std::cout << " Written features to star file: " << fn_out << fn_features << std::endl;
 
+        if (do_subimages)
+        {
+            MetaDataTable MD_subimages;
+            MD_subimages.setName("subimages");
+            long int nr_stack = 0;
+            for (int f=0; f<features_all_classes.size();f++)
+            {
+                int nr_images = NSIZE(features_all_classes[f].subimages);
+                for (long n=0; n < nr_images; n++)
+                {
+
+                    FileName fnt;
+                    fnt.compose(nr_stack+1, fn_out + "subimages.mrcs");
+                    MD_subimages.addObject();
+                    MD_subimages.setValue(EMDL_IMAGE_NAME, fnt);
+                    MD_subimages.setValue(EMDL_MLMODEL_REF_IMAGE, features_all_classes[f].name);
+                    MD_subimages.setValue(EMDL_CLASS_FEAT_CLASS_SCORE, features_all_classes[f].class_score);
+
+                    Image<RFLOAT> img;
+                    features_all_classes[f].subimages.getImage(n, img());
+                    img.write(fn_out + "subimages.mrcs", -1, false, (nr_stack == 0) ? WRITE_OVERWRITE : WRITE_APPEND);
+                    nr_stack++;
+                }
+            }
+            MD_subimages.write(fn_out + "subimages.star");
+            if (verb > 0) std::cout << " Written subimages to: " << fn_out + "subimages.star" << std::endl;
+
+        }
+
+
 }
