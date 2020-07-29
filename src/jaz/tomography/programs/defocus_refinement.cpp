@@ -37,7 +37,10 @@ DefocusRefinementProgram::DefocusRefinementProgram(int argc, char *argv[])
 		
 		int def_section = parser.addSection("Defocus refinement options");
 				
-		scanDefocus = parser.checkOption("--scan_defocus", "Perform brute-force defocus scan");
+		//scanDefocus = parser.checkOption("--scan_defocus", "Perform brute-force defocus scan");
+		//refineFast = !parser.checkOption("--scan_only", "Perform only a brute-force scan");
+		scanDefocus = true;
+		refineFast = false;
 		max_particles = textToInteger(parser.getOption("--max", "Max. number of particles to consider per tomogram", "-1"));
 		group_count = textToInteger(parser.getOption("--g", "Number of independent groups", "10"));
 		sigma_input = textToDouble(parser.getOption("--sig0", "Std. dev. of initial defoci (negative to turn off regularisation)", "-1"));
@@ -167,8 +170,10 @@ void DefocusRefinementProgram::run()
 				const double s02 = sigma_input * sigma_input;
 				const double sf2 = offsetStdDev[f] * offsetStdDev[f];
 				
-				const double deltaZ = regularise? s02 * defocusOffset[f] / (sf2 + s02)
-												: defocusOffset[f];
+				const double deltaZ = regularise?
+					s02 * defocusOffset[f] / (sf2 + s02) :
+					defocusOffset[f];
+
 				ctf.DeltafU += deltaZ;
 				ctf.DeltafV += deltaZ;
 				
@@ -177,7 +182,8 @@ void DefocusRefinementProgram::run()
 				tomogramSet.setCtf(t,f,ctf);
 			}
 
-			// @TODO: find astigmatism using aberrations fit
+			// @TODO: fix
+			if (refineFast)
 			{
 				const int s = referenceMap.image_real[0].xdim;
 				const int sh = s/2 + 1;
@@ -206,7 +212,7 @@ void DefocusRefinementProgram::run()
 				
 				Log::beginProgress("Accumulating evidence", pc/num_threads);
 				
-				#pragma omp parallel for num_threads(num_threads)		
+				#pragma omp parallel for num_threads(num_threads)
 				for (int p = 0; p < pc; p++)
 				{
 					const int th = omp_get_thread_num();
@@ -229,7 +235,7 @@ void DefocusRefinementProgram::run()
 					evenData += evenData_thread[th];
 					oddData += oddData_thread[th];
 				}
-						
+
 				{
 					std::vector<double> coeffs = AberrationFitProgram::solveEven(
 							evenData, 2, tomogram.optics.pixelSize, 
@@ -350,7 +356,7 @@ BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(
 		#endif
 								
 		BufferedImage<fComplex> prediction = Prediction::predictFS(
-				part_id, dataSet, projCut, s, referenceFS);	
+				part_id, dataSet, projCut, s, referenceFS);
 						
 		#if TIMING
 			if (th==0) timer.toc(time_fwd_proj);

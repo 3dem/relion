@@ -22,7 +22,7 @@
 using namespace gravis;
 
 
-BufferedImage<fComplex> Prediction::predictFS(
+BufferedImage<fComplex> Prediction::predictModulated(
 		int particle_id, const ParticleSet* dataSet, d4Matrix proj, int s,
 		const CTF& ctf, double pixelSize,
 		const std::vector<BufferedImage<fComplex>>& referenceFS,
@@ -176,7 +176,7 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f], traj[f],
 					observation, projCut, 1, false, true);
 						
-			BufferedImage<fComplex> prediction = Prediction::predictFS(
+			BufferedImage<fComplex> prediction = Prediction::predictModulated(
 					part_id, dataSet, projCut, s, 
 					tomogram.getCtf(f, dataSet->getPosition(part_id)),
 					tomogram.optics.pixelSize,

@@ -13,7 +13,7 @@ class ParticleSet
 {
 	public:
 
-		static ParticleSet* load(std::string filename, std::string motionFilename);
+		static ParticleSet* load(std::string filename, std::string motionFilename = "");
 		
 		ParticleSet();
 		ParticleSet(std::string filename, std::string motionFilename);

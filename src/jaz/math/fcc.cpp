@@ -78,7 +78,7 @@ BufferedImage<double> FCC::compute3(
 					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f], traj[f],
 					observation, projCut, 1, false, true);
 						
-			BufferedImage<fComplex> prediction = Prediction::predictFS(
+			BufferedImage<fComplex> prediction = Prediction::predictModulated(
 					part_id, dataSet, projCut, s,
 					tomogram.getCtf(f, dataSet->getPosition(part_id)),
 					tomogram.optics.pixelSize,

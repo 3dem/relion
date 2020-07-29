@@ -20,7 +20,7 @@ class TomoExtraction
 		
 		template <typename T>
 		static void extractFrameAt3D_Fourier(
-                const RawImage<T>& stack, int f, int s, double bin,
+				const RawImage<T>& stack, int f, int s, double bin,
 				const gravis::d4Matrix& projIn,
 				gravis::d3Vector center,
 				RawImage<tComplex<T>>& out,
@@ -31,7 +31,7 @@ class TomoExtraction
 		
 		template <typename T>
 		static void extractAt3D_Fourier(
-                const RawImage<T>& stack, int s, double bin,
+				const RawImage<T>& stack, int s, double bin,
 				const std::vector<gravis::d4Matrix>& projIn,
 				const std::vector<gravis::d3Vector>& trajectory,
 				RawImage<tComplex<T>>& out,
@@ -42,7 +42,7 @@ class TomoExtraction
 		
 		template <typename T>
 		static void extractAt2D_Fourier(
-                const RawImage<T>& stack, int s, double bin,
+				const RawImage<T>& stack, int s, double bin,
 				const std::vector<gravis::d4Matrix>& projIn,
 				const std::vector<gravis::d2Vector>& centers,
 				RawImage<tComplex<T>>& out,
@@ -53,7 +53,7 @@ class TomoExtraction
 		
 		template <typename T>
 		static void extractAt3D_real(
-                const RawImage<T>& stack, int s, double bin,
+				const RawImage<T>& stack, int s, double bin,
 				const std::vector<gravis::d4Matrix>& projIn,
 				gravis::d3Vector center,
 				RawImage<T>& out,
@@ -64,7 +64,7 @@ class TomoExtraction
 		
 		template <typename T>
 		static void extractAt2D_real(
-                const RawImage<T>& stack, int s, double bin,
+				const RawImage<T>& stack, int s, double bin,
 				const std::vector<gravis::d4Matrix>& projIn,
 				const std::vector<gravis::d2Vector>& centers,
 				RawImage<T>& out,

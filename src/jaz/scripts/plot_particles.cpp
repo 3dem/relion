@@ -95,9 +95,9 @@ int main(int argc, char *argv[])
 		const int pc = particles[t].size();
 		
 		if (pc == 0) continue;
-				
+
 		Tomogram tomogram = tomogramSet.loadTomogram(t, false);
-													 
+
 		std::vector<int> frameSeq = IndexSort<double>::sortIndices(tomogram.cumulativeDose);
 		
 		const int fc = tomogram.frameCount;

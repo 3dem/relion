@@ -30,7 +30,7 @@ class Prediction
 			AmplitudeAndPhaseModulated = 3
 		};
 		
-		static BufferedImage<fComplex> predictFS(
+		static BufferedImage<fComplex> predictModulated(
 				int particle_id, 
 				const ParticleSet* dataSet,
 				gravis::d4Matrix proj,

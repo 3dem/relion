@@ -408,6 +408,8 @@ void NewReferenceMap::presharpen(BufferedImage<RFLOAT>& map)
 {
 	const int s = map.xdim;
 
+	const double epsilon = 0.02;
+
 	for (int z = 0; z < s; z++)
 	for (int y = 0; y < s; y++)
 	for (int x = 0; x < s; x++)
@@ -423,7 +425,7 @@ void NewReferenceMap::presharpen(BufferedImage<RFLOAT>& map)
 			const double rval = r / (s * paddingFactor);
 			const double sinc = sin(PI * rval) / (PI * rval);
 
-			map(x,y,z) /= sinc * sinc;
+			map(x,y,z) /= sinc * sinc + epsilon;
 		}
 	}
 }

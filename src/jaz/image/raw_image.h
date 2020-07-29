@@ -569,7 +569,7 @@ inline void RawImage<T>::copyTo(RawImage<T2>& img) const
 template <class T> template <class T2>
 inline void RawImage<T>::copyFrom(const Image<T2>& img)
 {
-	if (xdim < img.data.xdim || ydim < img.data.ydim || zdim < img.data.zdim)
+	if (xdim > img.data.xdim || ydim > img.data.ydim || zdim > img.data.zdim)
 	{
 		REPORT_ERROR_STR("RawImage<T>::copyFrom: input image too small: "
 			<< img.data.xdim << "x" << img.data.ydim << "x" << img.data.zdim 
@@ -589,7 +589,7 @@ inline void RawImage<T>::copyFrom(const Image<T2>& img)
 template <class T> template <class T2>
 inline void RawImage<T>::copyFrom(const RawImage<T2>& img)
 {
-	if (xdim < img.xdim || ydim < img.ydim || zdim < img.zdim)
+	if (xdim > img.xdim || ydim > img.ydim || zdim > img.zdim)
 	{
 		REPORT_ERROR_STR("RawImage<T>::copyFrom: input image too small: "
 			<< img.xdim << "x" << img.ydim << "x" << img.zdim 

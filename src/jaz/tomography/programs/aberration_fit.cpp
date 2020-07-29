@@ -185,7 +185,7 @@ void AberrationFitProgram :: considerParticle(
 	const std::vector<d3Vector> traj = dataSet->getTrajectoryInPixels(
 				part_id, fc, tomogram.optics.pixelSize);
 	
-	d4Matrix projCut;					
+	d4Matrix projCut;
 	
 	
 	BufferedImage<fComplex> observation(sh,s);
@@ -197,8 +197,8 @@ void AberrationFitProgram :: considerParticle(
 				observation, projCut, 1, false, true);
 		
 		CTF ctf = tomogram.getCtf(f, dataSet->getPosition(part_id)); 
-		                          
-		BufferedImage<fComplex> prediction = Prediction::predictFS(
+
+		BufferedImage<fComplex> prediction = Prediction::predictModulated(
 				part_id, dataSet, projCut, s, 
 				ctf,
 				tomogram.optics.pixelSize,
@@ -221,7 +221,7 @@ void AberrationFitProgram :: considerParticle(
 	
 			const double gamma = ctf.getGamma(x_ang, y_ang);
 			const double cg = cos(gamma);
-			const double sg = sin(gamma);					
+			const double sg = sin(gamma);
 			const double c = -sg;
 	
 			fComplex zobs = observation(x,y);
