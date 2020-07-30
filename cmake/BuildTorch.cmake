@@ -13,13 +13,13 @@ set(TORCH_EXTERNAL_PATH "${CMAKE_SOURCE_DIR}/external/libtorch")
 find_package(Torch PATHS ${TORCH_EXTERNAL_PATH})
 option(TORCH_EXTERNAL_VERBOSE "Verbose mode during Torch fetch and configure." OFF)
 if(NOT TORCH_FOUND)
-	set(TORCH_FILE_NAME libtorch-cxx11-abi-shared-with-deps-1.6.0%2Bcpu.zip) # TORCH 1.5 CPU only
-	set(TORCH_FILE_PATH ${TORCH_EXTERNAL_PATH}/${TORCH_FILE_NAME})
-	set(TORCH_URL "https://download.pytorch.org/libtorch/cpu/${TORCH_FILE_NAME}")
-	set(TORCH_HASH 21c5ef08e13aaeb16ec7c2eb1c0e75e9)
-#	set(TORCH_URL "ftp://ftp.mrc-lmb.cam.ac.uk/pub/dari/${TORCH_FILE_NAME}")
-#	set(TORCH_HASH 70ff4499db697db2d032e0c2e82db0aa)
+	set(TORCH_FILE_NAME libtorch-commit-4c7fb8c2-cxx11-abi-glibc2.17-shared.zip)
 
+	set(TORCH_URL "ftp://ftp.mrc-lmb.cam.ac.uk/pub/dari/${TORCH_FILE_NAME}")
+	set(TORCH_HASH 9f6bf405a981b490b3fe5fac1e647127)
+
+        set(TORCH_FILE_PATH ${TORCH_EXTERNAL_PATH}/${TORCH_FILE_NAME})
+	
 	message(STATUS "Downloading Torch...")
 	file(MAKE_DIRECTORY ${TORCH_EXTERNAL_PATH})
 	foreach(ATTEMPT RANGE 2 6)
