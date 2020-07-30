@@ -16,7 +16,7 @@ if(NOT TORCH_FOUND)
 	set(TORCH_FILE_NAME libtorch-commit-4c7fb8c2-cxx11-abi-glibc2.17-shared.zip)
 
 	set(TORCH_URL "ftp://ftp.mrc-lmb.cam.ac.uk/pub/dari/${TORCH_FILE_NAME}")
-	set(TORCH_HASH 9f6bf405a981b490b3fe5fac1e647127)
+	set(TORCH_HASH 4aa641cd867d141e438596a1ba31e13d)
 
         set(TORCH_FILE_PATH ${TORCH_EXTERNAL_PATH}/${TORCH_FILE_NAME})
 	
