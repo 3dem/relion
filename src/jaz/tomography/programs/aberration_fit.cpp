@@ -203,27 +203,26 @@ void AberrationFitProgram :: considerParticle(
 				ctf,
 				tomogram.optics.pixelSize,
 				referenceMap.image_FS, 
-				Prediction::OppositeHalf,
+				Prediction::OwnHalf,
 				Prediction::Unmodulated);
 		
 		const float scale = flip_value? -1.f : 1.f;
 		
 		observation(0,0) = fComplex(0.f, 0.f);
 		prediction(0,0) = fComplex(0.f, 0.f);
-		
-		
+
+
 		for (int y = 0; y < s;  y++)
 		for (int x = 0; x < sh; x++)
 		{
 			const double x_ang = pix2ang * x;
-			const double y_ang = pix2ang * (y < sh? y : y - s);
-			
-	
+			const double y_ang = pix2ang * (y < s/2? y : y - s);
+
 			const double gamma = ctf.getGamma(x_ang, y_ang);
 			const double cg = cos(gamma);
 			const double sg = sin(gamma);
 			const double c = -sg;
-	
+
 			fComplex zobs = observation(x,y);
 			fComplex zprd = scale * prediction(x,y);
 			
@@ -273,7 +272,7 @@ std::vector<double> AberrationFitProgram::solveEven(
 	BufferedImage<double> phaseShift(sh,s);
 	BufferedImage<double> initialWeight(sh,s);
 	BufferedImage<Tensor2x2<double>> weight(sh,s);
-	
+
 	for (int y = 0; y < s;  y++)
 	for (int x = 0; x < sh; x++)
 	{
@@ -284,7 +283,7 @@ std::vector<double> AberrationFitProgram::solveEven(
 		
 		const double det = A(0,0) * A(1,1) - A(0,1) * A(1,0);
 		const double absDet = std::abs(det);
-		
+
 		if (absDet > eps)
 		{
 			d2Matrix Ai = A;
@@ -310,9 +309,9 @@ std::vector<double> AberrationFitProgram::solveEven(
 	{
 		Centering::fftwHalfToHumanFull(phaseShift).write(prefix + "even_phase_per-pixel.mrc");
 	}
-		
+
 	BufferedImage<double> linearFit, nonlinearFit;
-			
+
 	std::vector<double> coeffs0 = ZernikeHelper::fitEvenZernike(
 		phaseShift, 
 		initialWeight, 

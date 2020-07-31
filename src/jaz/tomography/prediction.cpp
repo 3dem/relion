@@ -58,11 +58,13 @@ BufferedImage<fComplex> Prediction::predictFS(
 		HalfSet halfSet)
 {
 	const int sh = s/2 + 1;
-			
+
 	BufferedImage<float> predictionReal = predictRS(particle_id, dataSet, proj, s, referenceFS, halfSet);
 	
 	BufferedImage<fComplex> prediction(sh,s);
 	FFT::FourierTransform(predictionReal, prediction, FFT::Both);
+
+	prediction /= s;
 	
 	return prediction;
 }
@@ -84,7 +86,7 @@ BufferedImage<float> Prediction::predictRS(
 
 	ForwardProjection::forwardProject(
 			referenceFS[hs], {projPart}, prediction, psf, 1);
-	
+
 	BufferedImage<float> predictionReal(s,s);
 	
 	Reconstruction::correctStack(prediction, psf, predictionReal, false, 1);
@@ -99,7 +101,7 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 		const TomoReferenceMap& referenceMap,
 		const BufferedImage<float>& frqWghts,
 		const std::vector<int>& sequence,
-		int maxRange,				
+		int maxRange,
 		bool flip_value,
 		int num_threads,
 		double paddingFactor,

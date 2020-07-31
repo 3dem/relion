@@ -3,7 +3,11 @@
 #include <src/jaz/image/normalization.h>
 #include <src/jaz/tomography/projection/Fourier_backprojection.h>
 #include <src/jaz/tomography/projection/point_insertion.h>
+#include <src/jaz/tomography/projection/fwd_projection.h>
 #include <src/jaz/tomography/reconstruction.h>
+#include <src/jaz/tomography/reference_map.h>
+#include <src/jaz/tomography/prediction.h>
+#include <src/jaz/image/centering.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
 #include <src/jaz/math/Euler_angles.h>
@@ -25,13 +29,13 @@ int main(int argc, char *argv[])
 	const int num_threads = 6;
 	const double outer_radius = s / 2;
 	
-	const std::string tag = "100k_backward_num_sf";
+	const std::string tag = "100k_backward_noxg";
 	
 	const double SNR = 1.0;
 	const bool forward = false;
-	const bool explicit_gridding = true;
+	const bool explicit_gridding = false;
 	const bool legacy_backprojector = false;
-	const bool wrap_voxels = true;
+	const bool wrap_voxels = false;
 	
 	std::vector<double> sphere_radius(num_spheres);
 	std::vector<double> sphere_scale(num_spheres);
@@ -182,6 +186,7 @@ int main(int argc, char *argv[])
 		
 		if (forward || !explicit_gridding)
 		{
+			std::cout << "Reconstruction::griddingCorrect3D_sinc2" << std::endl;
 			Reconstruction::griddingCorrect3D_sinc2(
 				data, data_RS, 
 				true, 1);
@@ -199,10 +204,42 @@ int main(int argc, char *argv[])
 			data_div_RS,               // out
 			1.0 / SNR, num_threads);
 	}
+
+	Reconstruction::taper(data_div_RS, 10, true, num_threads);
 	
 	data_div_RS.write("reconstruction_"+tag+".mrc");
-	
-	
+
+
+	const int num_predictions = 10;
+
+	BufferedImage<float> predictions(s,s,num_predictions);
+
+	for (int i = 0; i < num_predictions; i++)
+	{
+		BufferedImage<tComplex<OUTPUT_PRECISION>> data_div_FS;
+		FFT::FourierTransform(data_div_RS, data_div_FS);
+
+		Centering::shiftInSitu(data_div_FS);
+
+		const double phi = 2.0 * PI * rand() / (double)RAND_MAX;
+		const double psi = 2.0 * PI * rand() / (double)RAND_MAX;
+		const double tilt = (PI/2.0) * sin(PI * rand() / (double)RAND_MAX - PI/2.0);
+
+		d4Matrix proj = Euler::anglesToMatrix4(phi, tilt, psi);
+
+
+		BufferedImage<fComplex> prediction(sh,s), psf(sh,s);
+
+		ForwardProjection::forwardProject(data_div_FS, {proj}, prediction, psf, 1);
+
+		BufferedImage<float> predictionReal(s,s);
+
+		Reconstruction::correctStack(prediction, psf, predictionReal, true, 1);
+
+		predictions.getSliceRef(i).copyFrom(predictionReal);
+	}
+
+	predictions.write("predictions_"+tag+".mrc");
 	
 	std::vector<double> radial_mean(sh, 0.0);
 	std::vector<double> radial_count(sh, 0.0);

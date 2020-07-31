@@ -33,11 +33,11 @@ BufferedImage<double> FCC::compute(
 
 BufferedImage<double> FCC::compute3(
 	ParticleSet* dataSet,
-    const std::vector<int>& partIndices, 
-    const Tomogram& tomogram,
-    const std::vector<BufferedImage<fComplex>>& referenceFS, 
-    bool flip_value, 
-    int num_threads)
+	const std::vector<int>& partIndices,
+	const Tomogram& tomogram,
+	const std::vector<BufferedImage<fComplex>>& referenceFS,
+	bool flip_value,
+	int num_threads)
 {
 	const int s = referenceFS[0].ydim;
 	const int sh = s/2 + 1;
@@ -55,7 +55,7 @@ BufferedImage<double> FCC::compute3(
 	
 	Log::beginProgress("Computing Fourier-cylinder correlations", pc/num_threads);
 		
-	#pragma omp parallel for num_threads(num_threads)		
+	#pragma omp parallel for num_threads(num_threads)
 	for (int p = 0; p < pc; p++)
 	{
 		const int th = omp_get_thread_num();
@@ -65,7 +65,7 @@ BufferedImage<double> FCC::compute3(
 			Log::updateProgress(p);
 		}
 		
-		const int part_id = partIndices[p];	
+		const int part_id = partIndices[p];
 		
 		const std::vector<d3Vector> traj = dataSet->getTrajectoryInPixels(part_id, fc, tomogram.optics.pixelSize);
 		d4Matrix projCut;
@@ -77,13 +77,15 @@ BufferedImage<double> FCC::compute3(
 			TomoExtraction::extractFrameAt3D_Fourier(
 					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f], traj[f],
 					observation, projCut, 1, false, true);
-						
+
 			BufferedImage<fComplex> prediction = Prediction::predictModulated(
 					part_id, dataSet, projCut, s,
 					tomogram.getCtf(f, dataSet->getPosition(part_id)),
 					tomogram.optics.pixelSize,
-					referenceFS, Prediction::OppositeHalf);
-								
+					referenceFS,
+					Prediction::OppositeHalf,
+					Prediction::AmplitudeAndPhaseModulated);
+
 			const float scale = flip_value? -1.f : 1.f;
 			
 			for (int y = 0; y < s;  y++)

@@ -301,7 +301,7 @@ ZernikeHelper::OldCtfBasis ZernikeHelper::convertSymmetrical(
 {
 	OldCtfBasis out;
 	
-    const double local_kV = kV * 1e3;
+	const double local_kV = kV * 1e3;
 	const double lambda = 12.2643247 / sqrt(local_kV * (1. + local_kV * 0.978466e-6));
 	
 	const int cc = coeffs.size();
@@ -355,14 +355,14 @@ ZernikeHelper::OldCtfBasis ZernikeHelper::convertSymmetrical(
 
 std::vector<double> ZernikeHelper::convertSymmetrical(const CTF &ctf)
 {
-    const double local_kV = ctf.kV * 1e3;
-    const double rad_azimuth = DEG2RAD(ctf.azimuthal_angle);
+	const double local_kV = ctf.kV * 1e3;
+	const double rad_azimuth = DEG2RAD(ctf.azimuthal_angle);
 
-    const double lambda = 12.2643247 / sqrt(local_kV * (1. + local_kV * 0.978466e-6));
+	const double lambda = 12.2643247 / sqrt(local_kV * (1. + local_kV * 0.978466e-6));
 
-    const double K1 = (PI / 2) * 2 * lambda;
-    const double K3 = atan(ctf.Q0 / sqrt(1.0 - ctf.Q0 * ctf.Q0));
-    const double K5 = DEG2RAD(ctf.phase_shift);
+	const double K1 = (PI / 2) * 2 * lambda;
+	const double K3 = atan(ctf.Q0 / sqrt(1.0 - ctf.Q0 * ctf.Q0));
+	const double K5 = DEG2RAD(ctf.phase_shift);
 
 	const double sin_az = sin(rad_azimuth);
 	const double cos_az = cos(rad_azimuth);
