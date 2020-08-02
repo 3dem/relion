@@ -89,11 +89,10 @@ class ZernikeHelper
 			double defocusU, defocusV, astigAzimuth_deg, Q0, Cs, phaseShift_deg;
 		};
 		
-		static OldCtfBasis convertSymmetrical(
+		static OldCtfBasis paramsToCtf(
 				const std::vector<double> coeffs, double kV);
 		
-		static std::vector<double> convertSymmetrical(
-				const CTF& ctf);
+		static std::vector<double> ctfToParams(const CTF& ctf);
 		
 		static void testConversion();
 		

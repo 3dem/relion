@@ -296,7 +296,7 @@ std::vector<double> ZernikeHelper::optimiseBasis(
 	return opt;
 }
 
-ZernikeHelper::OldCtfBasis ZernikeHelper::convertSymmetrical(
+ZernikeHelper::OldCtfBasis ZernikeHelper::paramsToCtf(
 		const std::vector<double> coeffs, double kV)
 {
 	OldCtfBasis out;
@@ -313,7 +313,13 @@ ZernikeHelper::OldCtfBasis ZernikeHelper::convertSymmetrical(
 		
 	const double K2_pix = 6.0 * z6;
 	const double K3 = z2 - z0 - z6;
-	
+
+	std::cout << "cc = " << cc << std::endl;
+	std::cout << "z0 = " << z0 << std::endl;
+	std::cout << "z2 = " << z2 << std::endl;
+	std::cout << "z6 = " << z6 << std::endl;
+	std::cout << "K3 = " << K3 << std::endl;
+
 	const double a = 2.0 * z2 - 6.0 * z6;
 	const double b = z3;
 	const double c = z1;
@@ -353,7 +359,7 @@ ZernikeHelper::OldCtfBasis ZernikeHelper::convertSymmetrical(
 	return out;
 }
 
-std::vector<double> ZernikeHelper::convertSymmetrical(const CTF &ctf)
+std::vector<double> ZernikeHelper::ctfToParams(const CTF &ctf)
 {
 	const double local_kV = ctf.kV * 1e3;
 	const double rad_azimuth = DEG2RAD(ctf.azimuthal_angle);
@@ -442,7 +448,7 @@ void ZernikeHelper::testConversion()
 		
 		
 		
-		OldCtfBasis ob = convertSymmetrical(coeffs, kV);
+		OldCtfBasis ob = paramsToCtf(coeffs, kV);
 				
 		CTF ctf;
 		ctf.setValues(ob.defocusU, ob.defocusV, ob.astigAzimuth_deg, kV, ob.Cs, ob.Q0,
@@ -466,7 +472,7 @@ void ZernikeHelper::testConversion()
 		
 		(comb1 - comb0).write("debug/"+ZIO::itoa(it)+"_diff.mrc");
 		
-		std::vector<double> coeffs2 = convertSymmetrical(ctf);
+		std::vector<double> coeffs2 = ctfToParams(ctf);
 		
 		std::cout 
 			<< coeffs2[0] << " \t" 

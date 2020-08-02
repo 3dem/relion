@@ -37,17 +37,19 @@ DefocusRefinementProgram::DefocusRefinementProgram(int argc, char *argv[])
 		
 		int def_section = parser.addSection("Defocus refinement options");
 				
-		scanDefocus = parser.checkOption("--scan_defocus", "Perform brute-force defocus scan");
-		refineFast = !parser.checkOption("--scan_only", "Perform only a brute-force scan");
-		/*scanDefocus = true;
-		refineFast = false;*/
+		scanDefocus = !parser.checkOption("--no_scan", "Skip accelerated defocus scan");
+		slowScan = parser.checkOption("--slow_scan", "Perform a slow, brute-force defocus scan instead");
+		refineFast = !parser.checkOption("--slow_scan_only", "Only perform a brute-force scan");
+		refineAstigmatism = !parser.checkOption("--no_astigmatism", "Do not refine the astigmatism");
+		scanAstigmatism = !parser.checkOption("--no_astigmatism_scan", "Refine astigmatism from initial optimum");
+
 		max_particles = textToInteger(parser.getOption("--max", "Max. number of particles to consider per tomogram", "-1"));
 		group_count = textToInteger(parser.getOption("--g", "Number of independent groups", "10"));
 		sigma_input = textToDouble(parser.getOption("--sig0", "Std. dev. of initial defoci (negative to turn off regularisation)", "-1"));
 		regularise = sigma_input > 0.0;
 		
-		minDelta = textToDouble(parser.getOption("--d0", "Min. defocus offset to test [Å]", "-100"));
-		maxDelta = textToDouble(parser.getOption("--d1", "Max. defocus offset to test [Å]", "100"));
+		minDelta = textToDouble(parser.getOption("--d0", "Min. defocus offset to test [Å]", "-300"));
+		maxDelta = textToDouble(parser.getOption("--d1", "Max. defocus offset to test [Å]", "300"));
 		deltaSteps = textToInteger(parser.getOption("--ds", "Number of defocus steps in-between", "100"));
 		
 		clearAstigmatism = parser.checkOption("--ca", "Clear the current astigmatism estimate");
@@ -64,6 +66,11 @@ DefocusRefinementProgram::DefocusRefinementProgram(int argc, char *argv[])
 		parser.writeUsage(std::cout);
 		std::cerr << XE;
 		exit(1);
+	}
+
+	if (!refineFast)
+	{
+		slowScan = true;
 	}
 }
 
@@ -126,7 +133,7 @@ void DefocusRefinementProgram::run()
 		{
 			Log::beginSection("Frame " + ZIO::itoa(f+1));
 			
-			if (scanDefocus)
+			if (slowScan)
 			{
 				DefocusFit defocus = findDefocus(
 					f, minDelta, maxDelta, deltaSteps,  
@@ -184,7 +191,6 @@ void DefocusRefinementProgram::run()
 				tomogramSet.setCtf(t,f,ctf);
 			}
 
-			// @TODO: fix
 			if (refineFast)
 			{
 				const int s = referenceMap.image_real[0].xdim;
@@ -212,6 +218,7 @@ void DefocusRefinementProgram::run()
 					oddData_thread[th].fill(oddZero);
 				}
 				
+
 				Log::beginProgress("Accumulating evidence", pc/num_threads);
 				
 				#pragma omp parallel for num_threads(num_threads)
@@ -229,9 +236,10 @@ void DefocusRefinementProgram::run()
 						f, f, 
 						evenData_thread[th], oddData_thread[th]);
 				}
-				
+
 				Log::endProgress();
 				
+
 				for (int th = 0; th < num_threads; th++)
 				{
 					evenData += evenData_thread[th];
@@ -239,112 +247,125 @@ void DefocusRefinementProgram::run()
 				}
 
 
+				CTF ctf0 = tomogram.centralCTFs[f];
+				CTF ctf_dz = ctf0;
 
+				if (scanDefocus)
 				{
-					std::vector<double> coeffs = AberrationFitProgram::solveEven(
-							evenData, 2, tomogram.optics.pixelSize, 
-							outDir+"diag_"+ZIO::itoa(t)+","+ZIO::itoa(f)+"_", diag);
-					
-					{
-						/*findDefocus(
-											f, minDelta, maxDelta, deltaSteps,
-											group_count, sigma_input,
-											dataSet, particles[t], usedParticleCount,
-											tomogram, referenceMap.image_FS,
-											freqWeights, flip_value, num_threads);*/
+					const double bestZ = AberrationFitProgram::findDefocus(
+							evenData, tomogram.optics.pixelSize, tomogram.centralCTFs[f],
+							minDelta, maxDelta, deltaSteps);
 
-						const double eps = 1e-30;
-						const double deltaStep = (maxDelta - minDelta) / (double) (deltaSteps - 1);
+					std::cout << "delta Z = " << bestZ << std::endl;
 
-						CTF ctf0 = tomogram.centralCTFs[f];
-						CTF ctf = ctf0;
+					ctf_dz.DeltafU = ctf0.DeltafU + bestZ;
+					ctf_dz.DeltafV = ctf0.DeltafV + bestZ;
 
-						std::ofstream costOut(
-									outDir+"cost_tomo_"+ZIO::itoa(t)+"_frame_"+ZIO::itoa(f)+"_acc.dat");
-
-						for (int di = 0; di < deltaSteps; di++)
-						{
-							const double deltaZ = minDelta + di * deltaStep;
-
-							ctf.DeltafU = ctf0.DeltafU + deltaZ;
-							ctf.DeltafV = ctf0.DeltafV + deltaZ;
-
-							ctf.initialise();
-
-							const double as = s * tomogram.optics.pixelSize;
-
-							double cost = 0.0;
-
-							for (int y = 0; y < s;  y++)
-							for (int x = 0; x < sh; x++)
-							{
-								const double xx = x;
-								const double yy = y < s/2? y : y - s;
-								const double r2 = xx * xx + yy * yy;
-
-								if (r2 < sh)
-								{
-									AberrationFitProgram::EvenData d = evenData(x,y);
-
-									d2Vector b(d.bx, d.by);
-									d2Matrix A(d.Axx, d.Axy, d.Axy, d.Ayy);
-
-									const double det = A(0,0) * A(1,1) - A(0,1) * A(1,0);
-
-									if (std::abs(det) > eps)
-									{
-										d2Matrix Ai = A;
-										Ai.invert();
-
-										const d2Vector opt = Ai * b;
-
-										const double gamma0 = ctf0.getGamma(xx/as, yy/as);
-										const double gamma  = ctf.getGamma(xx/as, yy/as);
-
-										const double delta = gamma - gamma0;
-										const d2Vector dx = d2Vector(cos(delta), sin(delta)) - opt;
-
-										cost += dx.dot(A * dx);
-
-										/*d3Vector dx3(cos(delta), sin(delta), 1);
-										d3Matrix A3(
-											d.Axx, d.Axy, -d.bx,
-											d.Axy, d.Ayy, -d.by,
-											-d.bx, -d.by,  0.0);
-
-										cost += dx3.dot(A3 * dx3);*/
-									}
-								}
-							}
-
-							costOut << deltaZ << ' ' << cost / (s*s) << '\n';
-						}
-					}
-
-					CTF ctf = tomogram.centralCTFs[f];
-					
-					//evenData.fill(evenZero);
-					
-					std::vector<double> coeffs0 = ZernikeHelper::convertSymmetrical(ctf);
-					
-					const int cc = coeffs0.size() < coeffs.size()? coeffs0.size() : coeffs.size();
-					
-					for (int i = 0; i < cc; i++)
-					{
-						coeffs0[i] += coeffs[i];
-					}
-					
-					ZernikeHelper::OldCtfBasis newCtf = ZernikeHelper::convertSymmetrical(
-							coeffs0, tomogram.optics.voltage);
-					
-					ctf.DeltafU = newCtf.defocusU;
-					ctf.DeltafV = newCtf.defocusV;
-					ctf.azimuthal_angle = newCtf.astigAzimuth_deg;
-					
-					// Q0, Cs and phase_shift are currently not being handled per particle.
-					
-					tomogramSet.setCtf(t, f, ctf);
+					std::cout << "in: "
+							  << ctf_dz.DeltafU << ", "
+							  << ctf_dz.DeltafV << ", "
+							  << ctf_dz.azimuthal_angle << ", "
+							  << ctf_dz.Q0 << ", "
+							  << ctf_dz.phase_shift << std::endl;
 				}
+
+				if (scanAstigmatism)
+				{
+					// @TODO
+				}
+
+				CTF ctf1;
+
+				if (refineAstigmatism)
+				{
+					std::vector<double> coeffs_0 = ZernikeHelper::ctfToParams(ctf0);
+					std::vector<double> coeffs_dz = ZernikeHelper::ctfToParams(ctf_dz);
+
+
+					const int cc = coeffs_0.size();
+					std::vector<double> initial_delta(4);
+
+					for (int i = 0; i < 4; i++)
+					{
+						initial_delta[i] = coeffs_dz[i] - coeffs_0[i];
+					}
+
+					/*std::cout << "coeffs_0: \n";
+					for (int i = 0; i < coeffs_0.size(); i++)
+					{
+						std::cout << "   " << i << ' ' << coeffs_0[i] << '\n';
+					}
+
+					std::cout << "coeffs_dz: \n";
+					for (int i = 0; i < coeffs_dz.size(); i++)
+					{
+						std::cout << "   " << i << ' ' << coeffs_dz[i] << '\n';
+					}
+
+					std::cout << "initial_delta: \n";
+					for (int i = 0; i < initial_delta.size(); i++)
+					{
+						std::cout << "   " << i << ' ' << initial_delta[i] << '\n';
+					}*/
+
+					AberrationFitProgram::EvenSolution solution =
+							AberrationFitProgram::solveEven(evenData);
+
+					std::vector<double> final_delta = AberrationFitProgram::fitEven(
+						solution, 2, initial_delta, tomogram.optics.pixelSize,
+						outDir+"diag_"+ZIO::itoa(t)+","+ZIO::itoa(f)+"_", diag);
+
+
+					/*std::cout << "final_delta: \n";
+					for (int i = 0; i < final_delta.size(); i++)
+					{
+						std::cout << "   " << i << ' ' << final_delta[i] << '\n';
+					}*/
+
+					std::vector<double> coeffs_1(cc);
+
+					for (int i = 0; i < 4; i++)
+					{
+						coeffs_1[i] = coeffs_0[i] + final_delta[i];
+					}
+
+					for (int i = 4; i < cc; i++)
+					{
+						coeffs_1[i] = coeffs_0[i];
+					}
+
+
+					/*std::cout << "coeffs_1: \n";
+					for (int i = 0; i < coeffs_1.size(); i++)
+					{
+						std::cout << "   " << i << ' ' << coeffs_1[i] << '\n';
+					}*/
+
+					ZernikeHelper::OldCtfBasis refinedCtfData = ZernikeHelper::paramsToCtf(
+						coeffs_1, tomogram.optics.voltage);
+
+					ctf1.DeltafU = refinedCtfData.defocusU;
+					ctf1.DeltafV = refinedCtfData.defocusV;
+					ctf1.azimuthal_angle = refinedCtfData.astigAzimuth_deg;
+					ctf1.Q0 = refinedCtfData.Q0;
+					ctf1.phase_shift = refinedCtfData.phaseShift_deg;
+				}
+				else
+				{
+					ctf1 = ctf_dz;
+				}
+
+				std::cout << "out: "
+						  << ctf1.DeltafU << ", "
+						  << ctf1.DeltafV << ", "
+						  << ctf1.azimuthal_angle << ", "
+						  << ctf1.Q0 << ", "
+						  << ctf1.phase_shift << std::endl;
+
+				// Cs is currently not being handled per particle.
+
+				tomogramSet.setCtf(t, f, ctf1);
+
 			}
 			
 			Log::endSection();
@@ -409,7 +430,7 @@ BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(
 		
 		if (th == 0) Log::updateProgress(p);
 		
-		const int part_id = particles[p];	
+		const int part_id = particles[p];
 		
 		#if TIMING
 			if (th==0) timer.tic(time_extract);
@@ -418,8 +439,8 @@ BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(
 		const d3Vector pos = dataSet->getPosition(part_id);
 		const std::vector<d3Vector> traj = dataSet->getTrajectoryInPixels(part_id, fc, pixelSize);
 		
-		d4Matrix projCut;	
-		
+		d4Matrix projCut;
+
 		BufferedImage<fComplex> observation(sh,s);
 		
 		TomoExtraction::extractFrameAt3D_Fourier(
@@ -444,7 +465,7 @@ BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(
 
 		CTF ctf_part_0 = tomogram.getCtf(f, pos);
 		CTF ctf_part = ctf_part_0;
-		
+
 		BufferedImage<float> CTFimage(sh,s);
 
 		for (int di = 0; di < steps; di++)

@@ -4,6 +4,7 @@
 #include "refinement.h"
 #include <src/jaz/math/tensor2x2.h>
 
+// @TODO: move to jaz/optics/
 
 class AberrationFitProgram : public RefinementProgram
 {
@@ -20,7 +21,7 @@ class AberrationFitProgram : public RefinementProgram
 				
 				double Axx, Axy, Ayy, bx, by;
 				
-				EvenData& operator+=(const EvenData& d);				
+				EvenData& operator+=(const EvenData& d);
 		};
 		
 		class OddData
@@ -31,6 +32,24 @@ class AberrationFitProgram : public RefinementProgram
 				dComplex b;
 				
 				OddData& operator+=(const OddData& d);
+		};
+
+		class EvenSolution
+		{
+			public:
+
+				BufferedImage<dComplex> optimum;
+				BufferedImage<double> phaseShift;
+				BufferedImage<Tensor2x2<double>> weight;
+		};
+
+		class OddSolution
+		{
+			public:
+
+				BufferedImage<dComplex> optimum;
+				BufferedImage<double> phaseShift;
+				BufferedImage<double> weight;
 		};
 			 
 		
@@ -54,18 +73,52 @@ class AberrationFitProgram : public RefinementProgram
 				int f0, int f1,
 				BufferedImage<EvenData>& even_out, 
 				BufferedImage<OddData>& odd_out);
-		
-		static std::vector<double> solveEven(
-				const BufferedImage<EvenData>& data,
+
+
+		static EvenSolution solveEven(
+				const BufferedImage<EvenData>& data);
+
+		static std::vector<double> fitEven(
+				const EvenSolution& solution,
 				int n_bands,
-				double pixelSize, 
+				const std::vector<double>& initialCoeffs,
+				double pixelSize,
 				std::string prefix,
 				bool writeImages);
+
+		static std::vector<double> solveAndFitEven(
+				const BufferedImage<EvenData>& data,
+				int n_bands,
+				const std::vector<double>& initialCoeffs,
+				double pixelSize,
+				std::string prefix,
+				bool writeImages);
+
+		static double findDefocus(
+				const BufferedImage<EvenData>& evenData,
+				double pixelSize,
+				const CTF& ctf0,
+				double minDefocus,
+				double maxDefocus,
+				int steps);
 		
-		static std::vector<double> solveOdd(
+
+		static OddSolution solveOdd(
+				const BufferedImage<OddData>& data);
+
+		static std::vector<double> fitOdd(
+				const OddSolution& solution,
+				int n_bands,
+				const std::vector<double>& initialCoeffs,
+				double pixelSize,
+				std::string prefix,
+				bool writeImages);
+
+		static std::vector<double> solveAndFitOdd(
 				const BufferedImage<OddData>& data,
 				int n_bands,
-				double pixelSize, 
+				const std::vector<double>& initialCoeffs,
+				double pixelSize,
 				std::string prefix,
 				bool writeImages);
 };
