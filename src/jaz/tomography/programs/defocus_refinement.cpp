@@ -42,6 +42,7 @@ DefocusRefinementProgram::DefocusRefinementProgram(int argc, char *argv[])
 		refineFast = !parser.checkOption("--slow_scan_only", "Only perform a brute-force scan");
 		refineAstigmatism = !parser.checkOption("--no_astigmatism", "Do not refine the astigmatism");
 		scanAstigmatism = !parser.checkOption("--no_astigmatism_scan", "Refine astigmatism from initial optimum");
+		plotAstigmatism = parser.checkOption("--plot_astigmatism", "Plot the astigmatism cost function");
 
 		max_particles = textToInteger(parser.getOption("--max", "Max. number of particles to consider per tomogram", "-1"));
 		group_count = textToInteger(parser.getOption("--g", "Number of independent groups", "10"));
@@ -81,7 +82,7 @@ void DefocusRefinementProgram::run()
 	RefinementProgram::init();
 		
 	const int tc = particles.size();
-	const bool flip_value = true;	
+	const bool flip_value = true;
 	
 	Log::endSection();
 		
@@ -90,7 +91,7 @@ void DefocusRefinementProgram::run()
 		int pc0 = particles[t].size();
 		if (pc0 == 0) continue;
 		
-		Log::beginSection("Tomogram " + ZIO::itoa(t+1) + " / " + ZIO::itoa(tc));		
+		Log::beginSection("Tomogram " + ZIO::itoa(t+1) + " / " + ZIO::itoa(tc));
 		Log::print("Loading");
 		
 		Tomogram tomogram = tomogramSet.loadTomogram(t, true);
@@ -113,6 +114,7 @@ void DefocusRefinementProgram::run()
 				
 				ctf.DeltafU = z0;
 				ctf.DeltafV = z0;
+				ctf.initialise();
 			}
 		}
 				
@@ -246,123 +248,47 @@ void DefocusRefinementProgram::run()
 					oddData += oddData_thread[th];
 				}
 
-
 				CTF ctf0 = tomogram.centralCTFs[f];
 				CTF ctf_dz = ctf0;
 
+				double bestDeltaZ = 0;
+
 				if (scanDefocus)
 				{
-					const double bestZ = AberrationFitProgram::findDefocus(
+					bestDeltaZ = AberrationFitProgram::findDefocus(
 							evenData, tomogram.optics.pixelSize, tomogram.centralCTFs[f],
 							minDelta, maxDelta, deltaSteps);
 
-					std::cout << "delta Z = " << bestZ << std::endl;
-
-					ctf_dz.DeltafU = ctf0.DeltafU + bestZ;
-					ctf_dz.DeltafV = ctf0.DeltafV + bestZ;
-
-					std::cout << "in: "
-							  << ctf_dz.DeltafU << ", "
-							  << ctf_dz.DeltafV << ", "
-							  << ctf_dz.azimuthal_angle << ", "
-							  << ctf_dz.Q0 << ", "
-							  << ctf_dz.phase_shift << std::endl;
+					ctf_dz.DeltafU = ctf0.DeltafU + bestDeltaZ;
+					ctf_dz.DeltafV = ctf0.DeltafV + bestDeltaZ;
 				}
 
-				if (scanAstigmatism)
-				{
-					// @TODO
-				}
-
-				CTF ctf1;
+				CTF ctf1 = ctf_dz;
 
 				if (refineAstigmatism)
 				{
-					std::vector<double> coeffs_0 = ZernikeHelper::ctfToParams(ctf0);
-					std::vector<double> coeffs_dz = ZernikeHelper::ctfToParams(ctf_dz);
-
-
-					const int cc = coeffs_0.size();
-					std::vector<double> initial_delta(4);
-
-					for (int i = 0; i < 4; i++)
-					{
-						initial_delta[i] = coeffs_dz[i] - coeffs_0[i];
-					}
-
-					/*std::cout << "coeffs_0: \n";
-					for (int i = 0; i < coeffs_0.size(); i++)
-					{
-						std::cout << "   " << i << ' ' << coeffs_0[i] << '\n';
-					}
-
-					std::cout << "coeffs_dz: \n";
-					for (int i = 0; i < coeffs_dz.size(); i++)
-					{
-						std::cout << "   " << i << ' ' << coeffs_dz[i] << '\n';
-					}
-
-					std::cout << "initial_delta: \n";
-					for (int i = 0; i < initial_delta.size(); i++)
-					{
-						std::cout << "   " << i << ' ' << initial_delta[i] << '\n';
-					}*/
-
 					AberrationFitProgram::EvenSolution solution =
 							AberrationFitProgram::solveEven(evenData);
 
-					std::vector<double> final_delta = AberrationFitProgram::fitEven(
-						solution, 2, initial_delta, tomogram.optics.pixelSize,
-						outDir+"diag_"+ZIO::itoa(t)+","+ZIO::itoa(f)+"_", diag);
+					const double pixelSize = tomogram.optics.pixelSize;
 
+					d3Vector astig = AberrationFitProgram::findAstigmatism(
+						solution, ctf0, bestDeltaZ, pixelSize, 1.0);
 
-					/*std::cout << "final_delta: \n";
-					for (int i = 0; i < final_delta.size(); i++)
+					if (plotAstigmatism)
 					{
-						std::cout << "   " << i << ' ' << final_delta[i] << '\n';
-					}*/
+						BufferedImage<double> astigPlot =
+								AberrationFitProgram::plotAstigmatism(
+									solution, ctf0, bestDeltaZ, 100.0, pixelSize, 32);
 
-					std::vector<double> coeffs_1(cc);
-
-					for (int i = 0; i < 4; i++)
-					{
-						coeffs_1[i] = coeffs_0[i] + final_delta[i];
+						astigPlot.write(
+							outDir+"astig_cost_"+ZIO::itoa(t)+"_"+ZIO::itoa(f)+".mrc");
 					}
 
-					for (int i = 4; i < cc; i++)
-					{
-						coeffs_1[i] = coeffs_0[i];
-					}
-
-
-					/*std::cout << "coeffs_1: \n";
-					for (int i = 0; i < coeffs_1.size(); i++)
-					{
-						std::cout << "   " << i << ' ' << coeffs_1[i] << '\n';
-					}*/
-
-					ZernikeHelper::OldCtfBasis refinedCtfData = ZernikeHelper::paramsToCtf(
-						coeffs_1, tomogram.optics.voltage);
-
-					ctf1.DeltafU = refinedCtfData.defocusU;
-					ctf1.DeltafV = refinedCtfData.defocusV;
-					ctf1.azimuthal_angle = refinedCtfData.astigAzimuth_deg;
-					ctf1.Q0 = refinedCtfData.Q0;
-					ctf1.phase_shift = refinedCtfData.phaseShift_deg;
+					ctf1.DeltafU = astig[0];
+					ctf1.DeltafV = astig[1];
+					ctf1.azimuthal_angle = astig[2];
 				}
-				else
-				{
-					ctf1 = ctf_dz;
-				}
-
-				std::cout << "out: "
-						  << ctf1.DeltafU << ", "
-						  << ctf1.DeltafV << ", "
-						  << ctf1.azimuthal_angle << ", "
-						  << ctf1.Q0 << ", "
-						  << ctf1.phase_shift << std::endl;
-
-				// Cs is currently not being handled per particle.
 
 				tomogramSet.setCtf(t, f, ctf1);
 

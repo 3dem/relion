@@ -69,7 +69,7 @@ std::vector<double> NelderMead::optimize(
         if (verbose)
         {
 			opt.report(i, values[order[0]], simplex[order[0]]);
-			
+			std::cout << std::endl;
             //std::cout << i << ": " << values[order[0]] << std::endl;
         }
 
@@ -119,6 +119,7 @@ std::vector<double> NelderMead::optimize(
         }
         if (allInside)
         {
+			if (verbose) std::cout << std::endl;
             return simplex[0];
         }
 
@@ -188,6 +189,8 @@ std::vector<double> NelderMead::optimize(
             values[j] = opt.f(simplex[j], tempStorage);
         }
     }
+
+	if (verbose) std::cout << std::endl;
 
     opt.deallocateTempStorage(tempStorage);
 

@@ -335,10 +335,10 @@ public:
 	void applyEwaldMask(RawImage<RFLOAT>& result, int orixdim, int oriydim, RFLOAT angpix, RFLOAT particle_diameter);
 
 	
-	std::vector<double> getK();
-	double getAxx();
-	double getAxy();
-	double getAyy();
+	std::vector<double> getK() const;
+	double getAxx() const;
+	double getAxy() const;
+	double getAyy() const;
 	
 	
 	

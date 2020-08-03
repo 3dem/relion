@@ -83,15 +83,30 @@ class AberrationFitProgram : public RefinementProgram
 				int n_bands,
 				const std::vector<double>& initialCoeffs,
 				double pixelSize,
-				std::string prefix,
+				const std::string& prefix,
 				bool writeImages);
+
+		static gravis::d3Vector findAstigmatism(
+				const EvenSolution& solution,
+				const CTF& referenceCtf,
+				double initialDeltaZ,
+				double pixelSize,
+				double initialStep);
+
+		static BufferedImage<double> plotAstigmatism(
+				const EvenSolution& solution,
+				const CTF& referenceCtf,
+				double initialDeltaZ,
+				double range,
+				double pixelSize,
+				int size);
 
 		static std::vector<double> solveAndFitEven(
 				const BufferedImage<EvenData>& data,
 				int n_bands,
 				const std::vector<double>& initialCoeffs,
 				double pixelSize,
-				std::string prefix,
+				const std::string& prefix,
 				bool writeImages);
 
 		static double findDefocus(
@@ -111,7 +126,7 @@ class AberrationFitProgram : public RefinementProgram
 				int n_bands,
 				const std::vector<double>& initialCoeffs,
 				double pixelSize,
-				std::string prefix,
+				const std::string& prefix,
 				bool writeImages);
 
 		static std::vector<double> solveAndFitOdd(
@@ -119,7 +134,7 @@ class AberrationFitProgram : public RefinementProgram
 				int n_bands,
 				const std::vector<double>& initialCoeffs,
 				double pixelSize,
-				std::string prefix,
+				const std::string& prefix,
 				bool writeImages);
 };
 

@@ -8,6 +8,8 @@
 #include <src/jaz/math/Zernike_helper.h>
 #include <src/jaz/gravis/t2Matrix.h>
 #include <src/jaz/image/centering.h>
+#include <src/jaz/single_particle/ctf/magnification_helper.h>
+#include <src/jaz/optimization/nelder_mead.h>
 #include <omp.h> 
 
 using namespace gravis;
@@ -322,7 +324,7 @@ std::vector<double> AberrationFitProgram::fitEven(
 		int n_bands,
 		const std::vector<double>& initialCoeffs,
 		double pixelSize,
-		std::string prefix,
+		const std::string& prefix,
 		bool writeImages)
 {
 	const d2Matrix mag(1.0, 0.0, 0.0, 1.0);
@@ -367,12 +369,128 @@ std::vector<double> AberrationFitProgram::fitEven(
 	return coeffs;
 }
 
+gravis::d3Vector AberrationFitProgram::findAstigmatism(
+		const AberrationFitProgram::EvenSolution& solution,
+		const CTF& referenceCtf,
+		double initialDeltaZ,
+		double pixelSize,
+		double initialStep)
+{
+	const int s = solution.optimum.ydim;
+	const int sh = solution.optimum.xdim;
+	const double K1 = PI * referenceCtf.lambda;
+
+	BufferedImage<double> astigBasis(sh,s,3);
+
+	const double as = s * pixelSize;
+
+	for (int yi = 0; yi < s;  yi++)
+	for (int xi = 0; xi < sh; xi++)
+	{
+		const double xx = xi/as;
+		const double yy = (yi < s/2)? yi/as : (yi - s)/as;
+
+		astigBasis(xi,yi,0) = xx * xx + yy * yy;
+		astigBasis(xi,yi,1) = xx * xx - yy * yy;
+		astigBasis(xi,yi,2) = 2.0 * xx * yy;
+	}
+
+	ZernikeHelper::AnisoBasisOptimisation problem(
+				solution.optimum, solution.weight, astigBasis, false);
+
+	std::vector<double> nmOpt = NelderMead::optimize(
+		{-initialDeltaZ * K1, 0.0, 0.0},
+		problem, initialStep, 0.000001, 2000, 1.0, 2.0, 0.5, 0.5, false);
+
+	const double dz = nmOpt[0];
+	const double a1 = nmOpt[1];
+	const double a2 = nmOpt[2];
+
+	d2Matrix A_delta((dz+a1)/ K1,      a2 / K1,
+						 a2 / K1,  (dz-a1)/ K1);
+
+	d2Matrix A_ref(referenceCtf.getAxx(), referenceCtf.getAxy(),
+				   referenceCtf.getAxy(), referenceCtf.getAyy());
+
+	d2Matrix A_total = A_ref + A_delta;
+
+	RFLOAT defocusU, defocusV, angleDeg;
+	MagnificationHelper::matrixToPolar(
+			A_total, defocusU, defocusV, angleDeg);
+
+	return d3Vector(-defocusU, -defocusV, angleDeg);
+}
+
+BufferedImage<double> AberrationFitProgram::plotAstigmatism(
+		const AberrationFitProgram::EvenSolution& solution,
+		const CTF& referenceCtf,
+		double initialDeltaZ,
+		double range,
+		double pixelSize,
+		int size)
+{
+	const int s = solution.optimum.ydim;
+	const int sh = solution.optimum.xdim;
+	const double K1 = PI * referenceCtf.lambda;
+
+	BufferedImage<double> astigBasis(sh,s,3);
+
+	const double as = s * pixelSize;
+
+	for (int yi = 0; yi < s;  yi++)
+	for (int xi = 0; xi < sh; xi++)
+	{
+		const double xx = xi/as;
+		const double yy = (yi < s/2)? yi/as : (yi - s)/as;
+
+		astigBasis(xi,yi,0) = xx * xx + yy * yy;
+		astigBasis(xi,yi,1) = xx * xx - yy * yy;
+		astigBasis(xi,yi,2) = xx * yy;
+	}
+
+	ZernikeHelper::AnisoBasisOptimisation problem(
+				solution.optimum, solution.weight, astigBasis, false);
+
+	std::vector<double> globalOpt(3,0.0);
+	double minCost = std::numeric_limits<double>::max();
+
+	void* tempStorage = problem.allocateTempStorage();
+
+	const int steps = size-1;
+	const double mid = steps/2;
+	const double scale = 2.0 * K1 * range;
+
+	BufferedImage<double> out(size, size, 1);
+
+	for (int a1i = 0; a1i < size; a1i++)
+	for (int a2i = 0; a2i < size; a2i++)
+	{
+		const double dz = -initialDeltaZ * K1;
+		const double a1 = scale * (a1i - mid);
+		const double a2 = scale * (a2i - mid);
+
+		std::vector<double> params = {dz, a1, a2};
+
+		const double cost = problem.f(params, tempStorage);
+
+		if (cost < minCost)
+		{
+			minCost = cost;
+			globalOpt = params;
+		}
+
+		out(a1i,a2i) = cost;
+	}
+
+	return out;
+}
+
 std::vector<double> AberrationFitProgram::solveAndFitEven(
 		const BufferedImage<AberrationFitProgram::EvenData> &data,
 		int n_bands,
 		const std::vector<double> &initialCoeffs,
 		double pixelSize,
-		std::string prefix,
+		const std::string& prefix,
 		bool writeImages)
 {
 	EvenSolution solution = solveEven(data);
@@ -494,7 +612,7 @@ std::vector<double> AberrationFitProgram::fitOdd(
 		int n_bands,
 		const std::vector<double>& initialCoeffs,
 		double pixelSize,
-		std::string prefix,
+		const std::string& prefix,
 		bool writeImages)
 {
 	const d2Matrix mag(1.0, 0.0, 0.0, 1.0);
@@ -539,7 +657,7 @@ std::vector<double> AberrationFitProgram::solveAndFitOdd(
 		int n_bands,
 		const std::vector<double> &initialCoeffs,
 		double pixelSize,
-		std::string prefix,
+		const std::string& prefix,
 		bool writeImages)
 {
 

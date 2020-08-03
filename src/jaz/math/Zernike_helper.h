@@ -22,17 +22,17 @@ class ZernikeHelper
 		
 		static std::vector<double> fitEvenZernike(
 				const BufferedImage<double>& phase,
-                const BufferedImage<double>& weight,
+				const BufferedImage<double>& weight,
 				double pixelSize, const gravis::d2Matrix& mag,
 				int n_max, BufferedImage<double>* fit = 0);
 		
 		static std::vector<double> optimiseEvenZernike(
-                const BufferedImage<dComplex>& xy,
+				const BufferedImage<dComplex>& xy,
 				const BufferedImage<Tensor2x2<double>>& A,
-                double pixelSize, const gravis::d2Matrix& mag,
+				double pixelSize, const gravis::d2Matrix& mag,
 				int n_max,
-                const std::vector<double>& coeffs,
-                BufferedImage<double>* fit);
+				const std::vector<double>& coeffs,
+				BufferedImage<double>* fit);
 		
 		
 		
@@ -44,36 +44,36 @@ class ZernikeHelper
 		
 		static std::vector<double> fitOddZernike(
 				const BufferedImage<dComplex>& xy,
-                const BufferedImage<double>& weight,
+				const BufferedImage<double>& weight,
 				double pixelSize, const gravis::d2Matrix& mag,
 				int n_max,
 				BufferedImage<double>* fit = 0);
 		
 		static std::vector<double> optimiseOddZernike(
-                const BufferedImage<dComplex>& xy,
-                const BufferedImage<double>& weight,
-                double pixelSize, const gravis::d2Matrix& mag,
+				const BufferedImage<dComplex>& xy,
+				const BufferedImage<double>& weight,
+				double pixelSize, const gravis::d2Matrix& mag,
 				int n_max,
-                const std::vector<double>& coeffs,
-                BufferedImage<double>* fit);
+				const std::vector<double>& coeffs,
+				BufferedImage<double>* fit);
 		
 		
 		
 		static std::vector<double> fitBasisLin(
 				const BufferedImage<dComplex>& xy,
-                const BufferedImage<double>& weight,
+				const BufferedImage<double>& weight,
 				const BufferedImage<double>& basis);
 
 		static std::vector<double> fitBasisLin(
 				const BufferedImage<double>& phase,
-                const BufferedImage<double>& weight,
+				const BufferedImage<double>& weight,
 				const BufferedImage<double>& basis);
 		
 		
 		
 		static std::vector<double> optimiseBasis(
 				const BufferedImage<dComplex>& xy,
-                const BufferedImage<double>& weight,
+				const BufferedImage<double>& weight,
 				const BufferedImage<double>& basis,
 				const std::vector<double>& initial);
 
