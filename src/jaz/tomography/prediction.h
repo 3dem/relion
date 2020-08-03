@@ -46,15 +46,7 @@ class Prediction
 				int s, 
 				const std::vector<BufferedImage<fComplex>>& referenceFS,
 				HalfSet halfSet = OwnHalf);
-		
-		static BufferedImage<float> predictRS(
-				int particle_id, 
-				const ParticleSet* dataSet,
-				gravis::d4Matrix proj,
-				int s, 
-				const std::vector<BufferedImage<fComplex>>& referenceFS,
-				HalfSet halfSet = OwnHalf);
-		
+
 		static std::vector<BufferedImage<double>> computeCroppedCCs(
 				const ParticleSet* dataSet,
 				const std::vector<int>& partIndices,

@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
 	std::string particleFn, tomoSetFn, outPath;
 	double minFreqPx, lowPass;
 	bool oppositeHalf, predictCTF, writeObs;
-	int threads, tomoIndex, particleIndex;
+	int threads, tomoIndex, particleIndex, boxSize;
 
 	//ReferenceMap reference;
 	TomoReferenceMap referenceMap;
@@ -53,6 +53,7 @@ int main(int argc, char *argv[])
 		tomoSetFn = parser.getOption("--t", "Tomogram set", "tomograms.star");
 		tomoIndex = textToInteger(parser.getOption("--ti", "Tomogram index", "0"));
 		particleIndex = textToInteger(parser.getOption("--pi", "Particle index", "0"));
+		boxSize = textToInteger(parser.getOption("--b", "Box size", "-1"));
 
 		referenceMap.read(parser);
 
@@ -90,7 +91,7 @@ int main(int argc, char *argv[])
 	ParticleSet* dataSet = ParticleSet::load(particleFn);
 	std::vector<std::vector<int>> particles = dataSet->splitByTomogram(tomogramSet);
 
-	referenceMap.load();
+	referenceMap.load(boxSize);
 
 	const int s = referenceMap.getBoxSize();
 	const int sh = s/2 + 1;

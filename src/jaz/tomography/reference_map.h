@@ -25,6 +25,11 @@ class TomoReferenceMap
 		void load(int boxSize = -1);
 			
 		int getBoxSize() const;
+
+
+	protected:
+
+		void presharpen(BufferedImage<float>& map_RS, double padding);
 };
 
 #endif

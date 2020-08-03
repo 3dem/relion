@@ -66,10 +66,13 @@ void TomoReferenceMap::load(int boxSize)
 		}
 	}
 
+
 	image_FS.resize(2);
 
 	for (int i = 0; i < 2; i++)
 	{
+		presharpen(image_real[i], 1.0);
+
 		FFT::FourierTransform(image_real[i], image_FS[i], FFT::Both);
 		Centering::shiftInSitu(image_FS[i]);
 	}
@@ -161,4 +164,36 @@ void TomoReferenceMap::load(int boxSize)
 int TomoReferenceMap::getBoxSize() const
 {
 	return image_real[0].xdim;
+}
+
+void TomoReferenceMap::presharpen(
+		BufferedImage<float>& map_RS,
+		double padding)
+{
+	const int s = image_real[0].xdim;
+
+	const double epsilon = 0.02;
+
+	for (int z = 0; z < s; z++)
+	for (int y = 0; y < s; y++)
+	for (int x = 0; x < s; x++)
+	{
+		const double xx = x - s/2;
+		const double yy = y - s/2;
+		const double zz = z - s/2;
+
+		const double r = sqrt(xx*xx + yy*yy + zz*zz);
+		const double rval = r / (s * padding);
+
+		if (rval > 0.0 && rval < 1.0)
+		{
+			const double sinc = sin(PI * rval) / (PI * rval);
+
+			map_RS(x,y,z) /= sinc * sinc + epsilon;
+		}
+		else
+		{
+			map_RS(x,y,z) = 0.;
+		}
+	}
 }
