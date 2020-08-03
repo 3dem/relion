@@ -480,11 +480,15 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 	transformer.FourierTransform(img(), Fimg);
 	CenterFFTbySign(Fimg);
 	Fctf.resize(Fimg);
+	bool ctf_premultiplied = opt.mydata.obsModel.getCtfPremultiplied(optics_group);
 
 	if (opt.do_ctf_correction)
 	{
 		if (opt.mymodel.data_dim == 3)
 		{
+			if (!ctf_premultiplied)
+				REPORT_ERROR("3D data must be ctf_premultiplied for CTF correction.");
+
 			Image<RFLOAT> Ictf;
 			FileName fn_ctf;
 			opt.mydata.MDimg.getValue(EMDL_CTF_IMAGE, fn_ctf, ori_img_id);
@@ -500,10 +504,36 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 					DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf(), -kp, -ip, -jp);
 				}
 			}
-			// otherwise, just window the CTF to the current resolution
+			// otherwise, check if the file also contains Multiplicity
 			else if (XSIZE(Ictf()) == YSIZE(Ictf()) / 2 + 1)
 			{
-				windowFourierTransform(Ictf(), Fctf, YSIZE(Fctf));
+				//CTF Only: Just window the CTF to the current resolution
+				if (ZSIZE(Ictf()) == YSIZE(Ictf()))
+				{
+					windowFourierTransform(Ictf(), Fctf, YSIZE(Fctf));
+				}
+				// Subtomo Multiplicity weights included. Read solo CTF
+				else if (ZSIZE(Ictf()) == YSIZE(Ictf())*2)
+				{
+					MultidimArray<RFLOAT> &Mctf = Ictf();
+					long int max_r2 = (XSIZE(Mctf) - 1) * (XSIZE(Mctf) - 1);
+
+					FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+					{
+						// Make sure windowed FT has nothing in the corners, otherwise we end up with an asymmetric FT!
+						if (kp * kp + ip * ip + jp * jp <= max_r2)
+						{
+							FFTW_ELEM(Fctf, kp, ip, jp) = DIRECT_A3D_ELEM(Mctf, ((kp < 0) ? (kp + YSIZE(Mctf))
+																						  : (kp)), \
+								((ip < 0) ? (ip + YSIZE(Mctf)) : (ip)), jp);
+						}
+					}
+				}
+					// if Z dimension is neither containing CTF or CTF+MULTI, stop
+				else
+				{
+					REPORT_ERROR("3D CTF volume in FFTW format must cointain CTF or CTF and MULTI concatenated along Z !");
+				}
 			}
 			// if dimensions are neither cubical nor FFTW, stop
 			else
@@ -517,6 +547,10 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 			ctf.readByGroup(opt.mydata.MDimg, &opt.mydata.obsModel, ori_img_id);
 			ctf.getFftwImage(Fctf, XSIZE(img()), YSIZE(img()), my_pixel_size,
 					opt.ctf_phase_flipped, false, opt.intact_ctf_first_peak, true);
+
+			if (ctf_premultiplied)
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+					(DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n));
 		}
 	}
 	else
@@ -638,12 +672,10 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 	// Apply the CTF to the to-be-subtracted projection
 	if (opt.do_ctf_correction)
 	{
-		if (opt.mydata.obsModel.getCtfPremultiplied(optics_group))
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fsubtract)
-				DIRECT_MULTIDIM_ELEM(Fsubtract, n) *= (DIRECT_MULTIDIM_ELEM(Fctf, n) * DIRECT_MULTIDIM_ELEM(Fctf, n));
-		else
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fsubtract)
-				DIRECT_MULTIDIM_ELEM(Fsubtract, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fsubtract)
+		{
+			DIRECT_MULTIDIM_ELEM(Fsubtract, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+		}
 
 		// Also do phase modulation, for beam tilt correction and other asymmetric aberrations
 		opt.mydata.obsModel.demodulatePhase(optics_group, Fsubtract, true); // true means do_modulate_instead
