@@ -22,7 +22,7 @@ void SubstackProgram::run()
 	dummy = std::system(("mkdir -p "+stackOutFn).c_str());
 	dummy = std::system(("mkdir -p "+projOutFn).c_str());
 	
-	Catalogue cat(catFn);	
+	Catalogue cat(particlesFn);	
 	std::vector<std::vector<DynamoParticle>> particles = cat.splitByTomogram();
 		
 	const int tc = particles.size();

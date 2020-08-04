@@ -27,7 +27,7 @@ class RefinementProgram
 			int argc;
 			char** argv;
 			
-			std::string outDir, tomoSetFn, catFn, motFn;
+			std::string outDir, tomoSetFn, particlesFn, motFn;
 			
 			bool diag, timing;
 			

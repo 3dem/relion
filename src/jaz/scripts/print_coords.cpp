@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
 {
 	IOParser parser;
 	
-	std::string catFn, tomoSetFn, outFn;
+	std::string particlesFn, tomoSetFn, outFn;
 	int particlesToOutput;
 	
 	try
@@ -31,7 +31,7 @@ int main(int argc, char *argv[])
 		parser.setCommandLine(argc, argv);
 		int gen_section = parser.addSection("General options");
 		
-		catFn = parser.getOption("--i", "Input particle set");
+		particlesFn = parser.getOption("--i", "Input particle set");
 		tomoSetFn = parser.getOption("--t", "Tomogram set", "tomograms.star");
 		particlesToOutput = textToInteger(parser.getOption("--n", "Number of particles to output", "10"));
 		outFn = parser.getOption("--o", "Output filename pattern");
@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
 
 	TomogramSet tomogramSet(tomoSetFn);
 	
-	ParticleSet* dataSet = ParticleSet::load(catFn, "");
+	ParticleSet* dataSet = ParticleSet::load(particlesFn, "");
 	std::vector<std::vector<int>> particles = dataSet->splitByTomogram(tomogramSet);
 		
 	const int tc = particles.size();

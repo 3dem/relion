@@ -11,7 +11,7 @@ class SubstackProgram
 		SubstackProgram(){}
 		
 		
-			std::string outTag, tomoListFn, catFn;
+			std::string outTag, tomoListFn, particlesFn;
 			
 			int boxSize, num_threads;
 			double binning;

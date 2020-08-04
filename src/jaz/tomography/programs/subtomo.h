@@ -14,7 +14,7 @@ class SubtomoProgram
 		SubtomoProgram(){}
 		
 		
-			std::string outTag, tomoSetFn, catFn, motFn;
+			std::string outTag, tomoSetFn, particlesFn, motFn;
 			
 			int 
 				boxSize, 

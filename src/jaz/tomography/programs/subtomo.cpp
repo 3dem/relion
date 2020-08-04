@@ -29,7 +29,7 @@ void SubtomoProgram::readParameters(int argc, char *argv[])
         parser.setCommandLine(argc, argv);
         int gen_section = parser.addSection("General options");
 
-        catFn = parser.getOption("--i", "Catalogue .tbl or .star file");
+        particlesFn = parser.getOption("--i", "Catalogue .tbl or .star file");
         tomoSetFn = parser.getOption("--t", "Tomogram set", "tomograms.star");
 		boxSize = textToInteger(parser.getOption("--b", "Projection box size", "100"));
 		cropSize = textToInteger(parser.getOption("--crop", "Output box size", "-1"));
@@ -80,7 +80,7 @@ void SubtomoProgram::run()
 {
 	TomogramSet tomogramSet(tomoSetFn);
 
-	ParticleSet* dataSet = ParticleSet::load(catFn, motFn);
+	ParticleSet* dataSet = ParticleSet::load(particlesFn, motFn);
 	std::vector<std::vector<int> > particles = dataSet->splitByTomogram(tomogramSet);
 	
 	if (cropSize < 0) cropSize = boxSize;

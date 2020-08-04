@@ -31,7 +31,7 @@ void BackprojectProgram::readParameters(int argc, char *argv[])
 		parser.setCommandLine(argc, argv);
 		int gen_section = parser.addSection("General options");
 		
-		catFn = parser.getOption("--i", "Input particle set");
+		particlesFn = parser.getOption("--i", "Input particle set");
 		tomoSetFn = parser.getOption("--t", "Tomogram set", "tomograms.star");
 		boxSize = textToInteger(parser.getOption("--b", "Box size", "100"));
 		cropSize = textToInteger(parser.getOption("--crop", "Size of (additionally output) cropped image", "-1"));
@@ -76,7 +76,7 @@ void BackprojectProgram::run()
 	Log::beginSection("Initialising");
 
 	TomogramSet tomoSet(tomoSetFn);
-	ParticleSet* dataSet = ParticleSet::load(catFn, motFn);
+	ParticleSet* dataSet = ParticleSet::load(particlesFn, motFn);
 
 	std::vector<std::vector<int>> particles = dataSet->splitByTomogram(tomoSet);
 	

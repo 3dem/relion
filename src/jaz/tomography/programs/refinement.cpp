@@ -29,7 +29,7 @@ void RefinementProgram::_readParams(IOParser &parser)
 {
 	int gen_section = parser.addSection("General refinement options");
 	
-	catFn = parser.getOption("--i", "Input particle set");
+	particlesFn = parser.getOption("--i", "Input particle set");
 	tomoSetFn = parser.getOption("--t", "Tomogram set", "tomograms.star");
 	boxSize = textToInteger(parser.getOption("--b", "Box size", "384"));
 
@@ -70,7 +70,7 @@ void RefinementProgram::init()
 
 	tomogramSet = TomogramSet(tomoSetFn);
 	
-	dataSet = ParticleSet::load(catFn, motFn);
+	dataSet = ParticleSet::load(particlesFn, motFn);
 	particles = dataSet->splitByTomogram(tomogramSet);
 		
 	referenceMap.load(boxSize);
