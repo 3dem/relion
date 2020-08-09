@@ -5,10 +5,10 @@
 
 int main(int argc, char *argv[])
 {
-    SubtomoProgram sp;
+	SubtomoProgram sp;
 
 	sp.readParameters(argc, argv);
-    sp.run();
+	sp.run();
 
-    return 0;
+	return 0;
 }

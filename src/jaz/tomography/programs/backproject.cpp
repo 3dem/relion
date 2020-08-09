@@ -1,5 +1,4 @@
 #include "backproject.h"
-#include <src/jaz/tomography/dynamo/catalogue.h>
 #include <src/jaz/tomography/projection/projection.h>
 #include <src/jaz/tomography/projection/Fourier_backprojection.h>
 #include <src/jaz/tomography/reconstruction.h>

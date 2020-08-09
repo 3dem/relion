@@ -238,3 +238,35 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 	
 	return out;
 }
+
+int TomogramSet::getTomogramIndex(std::string tomogramName) const
+{
+	const int tc = globalTable.numberOfObjects();
+
+	for (int t = 0; t < tc; t++)
+	{
+		std::string name_t;
+		globalTable.getValueSafely(EMDL_TOMO_NAME, name_t, t);
+
+		if (name_t == tomogramName)
+		{
+			return t;
+		}
+	}
+
+	return -1;
+}
+
+int TomogramSet::getTomogramIndexSafely(std::string tomogramName) const
+{
+	int t = getTomogramIndex(tomogramName);
+
+	if (t < 0)
+	{
+		REPORT_ERROR_STR("No tomogram named '" << tomogramName << "' found in the set");
+	}
+	else
+	{
+		return t;
+	}
+}

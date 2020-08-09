@@ -123,6 +123,11 @@ std::string ZIO::makeOutputDir(const std::string& dir)
 		}
 		
 		int res = system(("mkdir -p "+out).c_str());
+
+		if (res)
+		{
+			REPORT_ERROR_STR("Unable to write to: " << out);
+		}
 	}
 	
 	return out;

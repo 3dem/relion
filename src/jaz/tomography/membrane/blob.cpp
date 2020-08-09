@@ -15,7 +15,8 @@ Blob::Blob(gravis::d3Vector center, int outer_radius)
 	outer_radius(outer_radius), 
 	sphericalHarmonics(0),
 	shCoeffs(0), shBands(0)
-{}
+{
+}
 	
 Blob::Blob(const std::vector<double>& params, int outer_radius,
 		   au::edu::anu::qm::ro::SphericalHarmonics* sphericalHarmonics)
@@ -55,7 +56,6 @@ std::vector<double> Blob::radialAverage(
 	const int x0 = (int) (pi.x + 0.5);
 	const int y0 = (int) (pi.y + 0.5);
 
-
 	for (int y = y0 - radius + 1; y <= y0 + radius - 1; y++)
 	for (int x = x0 - radius + 1; x <= x0 + radius - 1; x++)
 	{
@@ -67,6 +67,7 @@ std::vector<double> Blob::radialAverage(
 		const double r = sqrt(dx*dx + dy*dy) + getOffsetAcc(dx, dy, accSH);
 
 		if (r >= radius - 1 || r < 0) continue;
+
 
 		const double m = mask == 0? 1.0 : (*mask)(x,y);
 

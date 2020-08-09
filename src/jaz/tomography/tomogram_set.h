@@ -38,8 +38,10 @@ class TomogramSet
 		void setProjection(int tomogramIndex, int frame, const gravis::d4Matrix& P);
 		void setCtf(int tomogramIndex, int frame, const CTF& ctf);
 		void setDose(int tomogramIndex, int frame, double dose);
-		
+
 		Tomogram loadTomogram(int index, bool loadImageData) const;
+		int getTomogramIndex(std::string tomogramName) const;
+		int getTomogramIndexSafely(std::string tomogramName) const;
 };
 
 #endif

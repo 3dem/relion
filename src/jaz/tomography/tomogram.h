@@ -33,8 +33,7 @@ class Tomogram
 		
 			
 		double getFrameDose() const;
-		
-		// - Get rid of boxSize ctor parameter -> losing doseWeights
+
 		// - Dissolve OpticsData?
 		
 		// gravis::d2Vector project(gravis::d3Vector pos, int frame);
@@ -45,6 +44,9 @@ class Tomogram
 		BufferedImage<float> computeNoiseWeight(int boxSize, double binning, double overlap = 2.0) const;
 		
 		CTF getCtf(int frame, gravis::d3Vector position, double zOffset = 0.0) const;
+
+		Tomogram extractSubstack(gravis::d3Vector position, int width, int height) const;
+		Tomogram FourierCrop(double factor, int num_threads) const;
 };
 
 

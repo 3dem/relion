@@ -2,12 +2,12 @@
 
 BlobFit::BlobFit(
 		const Tomogram& tomogram,
-		const std::vector<gravis::d3Vector>& positions, 
+		const std::vector<gravis::d4Vector>& positions,
 		int id, double mean_radius,
 		int outer_radius, int sh_bands, bool useMasks, double priorSigma,
 		int num_threads)
 :	tomogram(tomogram),
-	initialPos(positions[id]), 
+	initialPos(positions[id].x, positions[id].y, positions[id].z),
 	outer_radius(outer_radius), 
 	sh_bands(sh_bands),
 	goodViews(tomogram.stack.zdim),
@@ -41,7 +41,7 @@ BlobFit::BlobFit(
 		{
 			if (i == id) continue;
 			
-			gravis::d4Vector piw(positions[i]);
+			gravis::d4Vector piw(positions[id].x, positions[id].y, positions[id].z, 1.0);
 			gravis::d4Vector pii = tomogram.projectionMatrices[f] * piw;
 			
 			for (int y = pii.y - mean_radius; y <= pii.y + mean_radius; y++)
@@ -76,8 +76,6 @@ double BlobFit::f(const std::vector<double>& x, void* tempStorage) const
 	for (int f = 0; f < fc; f++)
 	{
 		const int t = omp_get_thread_num();
-		
-		//std::cout << t << "/" << num_threads << std::endl;
 		
 		if (goodViews[f])
 		{

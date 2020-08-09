@@ -16,7 +16,7 @@ class BlobFit : public DifferentiableOptimization
 	public:
 		
 		BlobFit(const Tomogram& tomogram,
-				const std::vector<gravis::d3Vector>& positions, 
+				const std::vector<gravis::d4Vector>& positions,
 				int id, double mean_radius,
 				int outer_radius, int sh_bands, bool useMasks, double priorSigma,
 				int num_threads);
