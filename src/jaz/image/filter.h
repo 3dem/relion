@@ -472,8 +472,8 @@ BufferedImage<T> ImageFilter::highpassStack(
 	const int fc = stack.zdim;
 	
 	for (int f = 0; f < fc; f++)
-	{		
-		BufferedImage<T> sliceFilt = highpass2D(stack, f, freqPx, widthPx, pad);		
+	{
+		BufferedImage<T> sliceFilt = highpass2D(stack, f, freqPx, widthPx, pad);
 		NewStackHelper::insertSliceZ(sliceFilt, out, f);
 	}
 	

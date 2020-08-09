@@ -101,20 +101,20 @@ int TomogramSet::size() const
 void TomogramSet::write(std::string filename) const
 {
 	const int tc = tomogramTables.size();
-    
+
 	if (filename.find_last_of('/') != std::string::npos)
 	{
 		std::string path = filename.substr(0, filename.find_last_of('/'));
 		mktree(path);
 	}
 
-    std::ofstream ofs(filename);
+	std::ofstream ofs(filename);
 	
-    globalTable.write(ofs);
+	globalTable.write(ofs);
 
-    for (int t = 0; t < tc; t++)
-    {
-        tomogramTables[t].write(ofs);
+	for (int t = 0; t < tc; t++)
+	{
+		tomogramTables[t].write(ofs);
 	}
 }
 
@@ -235,6 +235,7 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 	}
 	
 	out.frameSequence = IndexSort<double>::sortIndices(out.cumulativeDose);
+	out.name = tomoName;
 	
 	return out;
 }

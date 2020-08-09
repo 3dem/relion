@@ -46,7 +46,7 @@ class Resampling
 		
 		template <typename T>
 		static BufferedImage<T> downsampleMax_2D_full(
-				const BufferedImage<T>& img, int wout, int hout);
+				const RawImage<T>& img, int wout, int hout);
 		
 		template <typename T>
 		static BufferedImage<T> lowPassFilter_full(
@@ -54,7 +54,7 @@ class Resampling
 		
 		template <typename T>
 		static BufferedImage<T> subsample_2D_full(
-				const BufferedImage<T>& img, int wout, int hout, double factor = -1.0);
+				const RawImage<T>& img, int wout, int hout, double factor = -1.0);
 		
 		template <typename T>
 		static BufferedImage<T> subsample_3D_full(
@@ -257,7 +257,7 @@ BufferedImage<T> Resampling::downsampleFiltStack_2D_full(
 }
 
 template <typename T>
-BufferedImage<T> Resampling::downsampleMax_2D_full(const BufferedImage<T>& img, int wout, int hout)
+BufferedImage<T> Resampling::downsampleMax_2D_full(const RawImage<T>& img, int wout, int hout)
 {	
 	const long int w = img.xdim;
 	const long int h = img.ydim;
@@ -342,7 +342,7 @@ BufferedImage<T> Resampling::lowPassFilter_full(BufferedImage<T>& img, double ma
 }
 
 template <typename T>
-BufferedImage<T> Resampling::subsample_2D_full(const BufferedImage<T>& img, int wout, int hout, double factor)
+BufferedImage<T> Resampling::subsample_2D_full(const RawImage<T>& img, int wout, int hout, double factor)
 {
 	if (factor < 0.0) factor = img.xdim / (double) wout;
 			

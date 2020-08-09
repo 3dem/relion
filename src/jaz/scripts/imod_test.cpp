@@ -55,7 +55,7 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 	
-	if (false)
+	/*if (false)
 	{
 		std::string stack_fn = "gridStack.mrc";
 		std::string tlt_fn = "test_off2.tlt";
@@ -84,7 +84,7 @@ int main(int argc, char *argv[])
 			2, 2, 1.0);
 	
 		dest.writeVtk("gridStack_dyn_testC_off2.vtk", d3Vector(0.0, d/2, 0.0), d3Vector(1.0));
-	}
+	}*/
 	
 	//if (false)
 	{

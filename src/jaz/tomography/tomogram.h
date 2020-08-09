@@ -30,6 +30,7 @@ class Tomogram
 			gravis::d3Vector centre;
 			int w0, h0, d0;
 			std::vector<int> frameSequence;
+			std::string name;
 		
 			
 		double getFrameDose() const;
@@ -46,7 +47,7 @@ class Tomogram
 		CTF getCtf(int frame, gravis::d3Vector position, double zOffset = 0.0) const;
 
 		Tomogram extractSubstack(gravis::d3Vector position, int width, int height) const;
-		Tomogram FourierCrop(double factor, int num_threads) const;
+		Tomogram FourierCrop(double factor, int num_threads, bool downsampleData = true) const;
 };
 
 

@@ -59,8 +59,11 @@ void BackprojectProgram::readParameters(int argc, char *argv[])
 		outTag = parser.getOption("--o", "Output filename pattern");
 		
 		Log::readParams(parser);
-		
-		parser.checkForErrors();
+
+		if (parser.checkForErrors())
+		{
+			REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
+		}
 	}
 	catch (RelionError XE)
 	{

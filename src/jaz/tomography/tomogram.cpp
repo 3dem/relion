@@ -107,17 +107,26 @@ Tomogram Tomogram::extractSubstack(d3Vector position, int width, int height) con
 	return out;
 }
 
-Tomogram Tomogram::FourierCrop(double factor, int num_threads) const
+Tomogram Tomogram::FourierCrop(double factor, int num_threads, bool downsampleData) const
 {
 	Tomogram out = *this;
 
-	out.stack = Resampling::FourierCrop_fullStack(stack, factor, num_threads, true);
+	if (downsampleData && hasImage)
+	{
+		out.stack = Resampling::FourierCrop_fullStack(stack, factor, num_threads, true);
+	}
+	else
+	{
+		out.stack.resize(0,0,0);
+		out.hasImage = false;
+	}
 
 	for (int f = 0; f < frameCount; f++)
 	{
 		out.projectionMatrices[f] /= factor;
-		out.optics.pixelSize *= factor;
 	}
+
+	out.optics.pixelSize *= factor;
 
 	return out;
 }

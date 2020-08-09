@@ -29,7 +29,7 @@
 #include <src/jaz/image/interpolation.h>
 #include <iostream>
 #include <src/jaz/tomography/extraction.h>
-#include <src/jaz/tomography/tomo_stack.h>
+#include <src/jaz/tomography/tomogram.h>
 #include <src/jaz/image/tapering.h>
 
 
@@ -38,7 +38,7 @@ class RealSpaceBackprojection
 	public:
 		
 		enum InterpolationType {Linear, Cubic};
-		
+
 		template <typename SrcType, typename DestType>
 		static void backproject(
 			const RawImage<SrcType>& stack,
@@ -49,9 +49,31 @@ class RealSpaceBackprojection
 			double spacing = 1.0,
 			InterpolationType interpolation = Linear,
 			double taper = 0.0);
-		
+
+		template <typename SrcType, typename DestType>
+		static void backprojectSmooth(
+			const RawImage<SrcType>& stack,
+			const std::vector<gravis::d4Matrix>& proj,
+			RawImage<DestType>& dest,
+			int num_threads = 1,
+			gravis::d3Vector origin = gravis::d3Vector(0.0, 0.0, 0.0),
+			double spacing = 1.0,
+			InterpolationType interpolation = Linear,
+			double taper = 0.0);
+
 		template <typename SrcType, typename DestType>
 		static void backprojectCoverage(
+			const RawImage<SrcType>& stack,
+			const std::vector<gravis::d4Matrix>& proj,
+			RawImage<DestType>& dest,
+			int num_threads = 1,
+			gravis::d3Vector origin = gravis::d3Vector(0.0, 0.0, 0.0),
+			double spacing = 1.0,
+			InterpolationType interpolation = Linear,
+			double taper = 0.0);
+
+		template <typename SrcType, typename DestType>
+		static void backprojectSmoothCoverage(
 			const RawImage<SrcType>& stack,
 			const std::vector<gravis::d4Matrix>& proj,
 			RawImage<DestType>& dest,
@@ -70,26 +92,24 @@ class RealSpaceBackprojection
 			gravis::d3Vector origin = gravis::d3Vector(0.0, 0.0, 0.0),
 			double spacing = 1.0,
 			InterpolationType interpolation = Linear);
-				
+
 		template <typename T>
 		static void backprojectRaw(
-			const TomoStack<T>& stack,
-			RawImage<T>& dest, 
+			const Tomogram& tomogram,
+			RawImage<T>& dest,
 			RawImage<T>& maskDest,
-			gravis::d3Vector origin, 
-			gravis::d3Vector spacing = 1.0, 
+			gravis::d3Vector origin,
+			gravis::d3Vector spacing = 1.0,
 			int num_threads = 1,
 			InterpolationType interpolation = Linear,
-			double taperX = 20, 
-			double taperY = 20, 
-			double wMin = 3.0, 
-			int frame0 = 0, 
-			int frames = -1);
+			double taperX = 20,
+			double taperY = 20,
+			double wMin = 3.0);
 		
 		template <typename T>
 		static void backprojectRaw(
-			const TomoStack<T>& stack,
-			const std::vector<BufferedImage<T>>& images,
+			const std::vector<gravis::d4Matrix>& projections,
+			const RawImage<T>& imageStack,
 			RawImage<T>& dest, 
 			RawImage<T>& maskDest,
 			gravis::d3Vector origin, 
@@ -98,12 +118,10 @@ class RealSpaceBackprojection
 			InterpolationType interpolation = Linear,
 			double taperX = 20, 
 			double taperY = 20, 
-			double wMin = 3.0, 
-			int frame0 = 0, 
-			int frames = -1);
+			double wMin = 3.0);
 };
-						
-						
+
+
 template <typename SrcType, typename DestType>
 void RealSpaceBackprojection::backproject(
 				const RawImage<SrcType>& stack,
@@ -116,10 +134,10 @@ void RealSpaceBackprojection::backproject(
 				double taper)
 {
 	const int fc = stack.zdim;
-	
+
 	const bool doTaper = taper != 0.0;
-	
-	#pragma omp parallel for num_threads(num_threads)	
+
+	#pragma omp parallel for num_threads(num_threads)
 	for (size_t z = 0; z < dest.zdim; z++)
 	for (size_t y = 0; y < dest.ydim; y++)
 	for (size_t x = 0; x < dest.xdim; x++)
@@ -127,27 +145,27 @@ void RealSpaceBackprojection::backproject(
 		double sum = 0.0;
 		double wgh = 0.0;
 		double taperMax = 0.0;
-	
+
 		gravis::d4Vector pw(
-			origin.x + x * spacing, 
-			origin.y + y * spacing, 
-			origin.z + z * spacing, 
+			origin.x + x * spacing,
+			origin.y + y * spacing,
+			origin.z + z * spacing,
 			1.0);
-	
+
 		for (int f = 0; f < fc; f++)
 		{
 			gravis::d4Vector pi = proj[f] * pw;
-	
+
 			if (pi.x >= 0.0 && pi.x < stack.xdim && pi.y >= 0.0 && pi.y < stack.ydim)
 			{
 				if (doTaper)
 				{
 					const double t = Tapering::getTaperWeight2D(
 								pi.x, pi.y, stack.xdim, stack.ydim, taper);
-					
+
 					if (t > taperMax) taperMax = t;
 				}
-						
+
 				if (interpolation == Linear)
 				{
 					sum += Interpolation::linearXY_clip(stack, pi.x, pi.y, f);
@@ -156,14 +174,70 @@ void RealSpaceBackprojection::backproject(
 				{
 					sum += Interpolation::cubicXY_clip(stack, pi.x, pi.y, f);
 				}
-				
+
 				wgh += 1.0;
 			}
 		}
-		
+
 		if (doTaper) sum *= taperMax;
-	
+
 		if (wgh > 0.0) dest(x,y,z) += sum / wgh;
+	}
+}
+
+template <typename SrcType, typename DestType>
+void RealSpaceBackprojection::backprojectSmooth(
+				const RawImage<SrcType>& stack,
+				const std::vector<gravis::d4Matrix>& proj,
+				RawImage<DestType>& dest,
+				int num_threads,
+				gravis::d3Vector origin,
+				double spacing,
+				InterpolationType interpolation,
+				double taper)
+{
+	const int fc = stack.zdim;
+
+	#pragma omp parallel for num_threads(num_threads)
+	for (size_t z = 0; z < dest.zdim; z++)
+	for (size_t y = 0; y < dest.ydim; y++)
+	for (size_t x = 0; x < dest.xdim; x++)
+	{
+		double sum = 0.0;
+		double wgh = 0.0;
+
+		gravis::d4Vector pw(
+			origin.x + x * spacing,
+			origin.y + y * spacing,
+			origin.z + z * spacing,
+			1.0);
+
+		for (int f = 0; f < fc; f++)
+		{
+			gravis::d4Vector pi = proj[f] * pw;
+
+			if (pi.x >= 0.0 && pi.x < stack.xdim && pi.y >= 0.0 && pi.y < stack.ydim)
+			{
+				const double t = Tapering::getTaperWeight2D(
+						pi.x, pi.y, stack.xdim, stack.ydim, taper);
+
+				if (interpolation == Linear)
+				{
+					sum += t * Interpolation::linearXY_clip(stack, pi.x, pi.y, f);
+				}
+				else
+				{
+					sum += t * Interpolation::cubicXY_clip(stack, pi.x, pi.y, f);
+				}
+
+				wgh += t;
+			}
+		}
+
+		if (wgh > 1e-6)
+		{
+			dest(x,y,z) += sum / wgh;
+		}
 	}
 }
 
@@ -216,11 +290,67 @@ void RealSpaceBackprojection::backprojectCoverage(
 		
 		if (doTaper) 
 		{
-			dest(x,y,z) += wgh;
+			dest(x,y,z) += taperMax * wgh;
 		}
 		else 
 		{
-			dest(x,y,z) += taperMax * wgh;
+			dest(x,y,z) += wgh;
+		}
+	}
+}
+
+template <typename SrcType, typename DestType>
+void RealSpaceBackprojection::backprojectSmoothCoverage(
+				const RawImage<SrcType>& stack,
+				const std::vector<gravis::d4Matrix>& proj,
+				RawImage<DestType>& dest,
+				int num_threads,
+				gravis::d3Vector origin,
+				double spacing,
+				InterpolationType interpolation,
+				double taper)
+{
+	const int fc = stack.zdim;
+
+	#pragma omp parallel for num_threads(num_threads)
+	for (size_t z = 0; z < dest.zdim; z++)
+	for (size_t y = 0; y < dest.ydim; y++)
+	for (size_t x = 0; x < dest.xdim; x++)
+	{
+		double sum = 0.0;
+		double wgh = 0.0;
+
+		gravis::d4Vector pw(
+			origin.x + x * spacing,
+			origin.y + y * spacing,
+			origin.z + z * spacing,
+			1.0);
+
+		for (int f = 0; f < fc; f++)
+		{
+			gravis::d4Vector pi = proj[f] * pw;
+
+			if (pi.x >= 0.0 && pi.x < stack.xdim && pi.y >= 0.0 && pi.y < stack.ydim)
+			{
+				const double t = Tapering::getTaperWeight2D(
+						pi.x, pi.y, stack.xdim, stack.ydim, taper);
+
+				if (interpolation == Linear)
+				{
+					sum += t * Interpolation::linearXY_clip(stack, pi.x, pi.y, f);
+				}
+				else
+				{
+					sum += t * Interpolation::cubicXY_clip(stack, pi.x, pi.y, f);
+				}
+
+				wgh += t;
+			}
+		}
+
+		if (wgh > 1e-6)
+		{
+			dest(x,y,z) += wgh;
 		}
 	}
 }
@@ -276,7 +406,7 @@ void RealSpaceBackprojection::backprojectPsf(
 
 template <typename T>
 void RealSpaceBackprojection::backprojectRaw(
-				const TomoStack<T>& stack,
+				const Tomogram& tomogram,
 				RawImage<T>& dest, 
 				RawImage<T>& maskDest,
 				gravis::d3Vector origin, 
@@ -285,18 +415,18 @@ void RealSpaceBackprojection::backprojectRaw(
 				InterpolationType interpolation,
 				double taperX, 
 				double taperY, 
-				double wMin, 
-				int frame0, 
-				int frames)
+				double wMin)
 {
-	backprojectRaw(stack, stack.images, dest, maskDest, origin, spacing, num_threads,
-				   interpolation, taperX, taperY, wMin, frame0, frames);
+	backprojectRaw(
+		tomogram.projectionMatrices, tomogram.stack, dest, maskDest,
+		origin, spacing, num_threads,
+		interpolation, taperX, taperY, wMin);
 }
 
 template <typename T>
 void RealSpaceBackprojection::backprojectRaw(
-				const TomoStack<T>& stack,
-				const std::vector<BufferedImage<T>>& images,
+				const std::vector<gravis::d4Matrix>& projections,
+				const RawImage<T>& imageStack,
 				RawImage<T>& dest, 
 				RawImage<T>& maskDest,
 				gravis::d3Vector origin, 
@@ -305,79 +435,79 @@ void RealSpaceBackprojection::backprojectRaw(
 				InterpolationType interpolation,
 				double taperX, 
 				double taperY, 
-				double wMin, 
-				int frame0, 
-				int frames)
+				double wMin)
 {
 	gravis::d4Matrix vol2world;
 
-    vol2world(0,0) = spacing.x;
-    vol2world(1,1) = spacing.y;
-    vol2world(2,2) = spacing.z;
-    vol2world(0,3) = origin.x;
-    vol2world(1,3) = origin.y;
-    vol2world(2,3) = origin.z;
-	
-    const int ic = frames > 0? frames + frame0 : images.size();
+	vol2world(0,0) = spacing.x;
+	vol2world(1,1) = spacing.y;
+	vol2world(2,2) = spacing.z;
+	vol2world(0,3) = origin.x;
+	vol2world(1,3) = origin.y;
+	vol2world(2,3) = origin.z;
 
-    std::vector<gravis::d4Matrix> vol2img(ic);
+	const int w = imageStack.xdim;
+	const int h = imageStack.ydim;
+	const int ic = imageStack.zdim;
 
-    for (int im = 0; im < ic; im++)
-    {
-        vol2img[im] = stack.worldToImage[im] * vol2world;
-    }
+	std::vector<gravis::d4Matrix> vol2img(ic);
+
+	for (int im = 0; im < ic; im++)
+	{
+		vol2img[im] = projections[im] * vol2world;
+	}
 	
 	#pragma omp parallel for num_threads(num_threads)	
 	for (size_t z = 0; z < dest.zdim; z++)
 	for (size_t y = 0; y < dest.ydim; y++)
 	for (size_t x = 0; x < dest.xdim; x++)
-    {
-        double sum = 0.0;
-        double wgh = 0.0;
+	{
+		double sum = 0.0;
+		double wgh = 0.0;
 
-        gravis::d4Vector pw(x,y,z,1.0);
+		gravis::d4Vector pw(x,y,z,1.0);
 
-        for (int im = frame0; im < ic; im++)
-        {
-            gravis::d4Vector pi = vol2img[im] * pw;
+		for (int im = 0; im < ic; im++)
+		{
+			gravis::d4Vector pi = vol2img[im] * pw;
 
-			if (pi.x >= 0.0 && pi.x < images[im].xdim-1 
-				&& pi.y >= 0.0 && pi.y < images[im].ydim-1)
-            {
-                double wghi = Tapering::getTaperWeight2D(
-							pi.x, pi.y, images[im].xdim, images[im].ydim, taperX);
+			if (pi.x >= 0.0 && pi.x < w-1
+					&& pi.y >= 0.0 && pi.y < h-1)
+			{
+				double wghi = Tapering::getTaperWeight2D(
+							pi.x, pi.y, w, h, taperX);
 
-                if (interpolation == Linear)
-                {
-                    sum += wghi * Interpolation::linearXY_clip(images[im], pi.x, pi.y, 0);
-                }
-                else
-                {
-                    sum += wghi * Interpolation::cubicXY_clip(images[im], pi.x, pi.y, 0);
-                }
+				if (interpolation == Linear)
+				{
+					sum += wghi * Interpolation::linearXY_clip(imageStack, pi.x, pi.y, im);
+				}
+				else
+				{
+					sum += wghi * Interpolation::cubicXY_clip(imageStack, pi.x, pi.y, im);
+				}
 
-                wgh += wghi;
-            }
-        }
+				wgh += wghi;
+			}
+		}
 
-        if (wgh > 0.0)
-        {
-            sum /= wgh;
-        }
+		if (wgh > 0.0)
+		{
+			sum /= wgh;
+		}
 
-        dest(x,y,z) = sum;
-        maskDest(x,y,z) = wgh;
-    }
+		dest(x,y,z) = sum;
+		maskDest(x,y,z) = wgh;
+	}
 
-    double mean = 0.0, sum = 0.0;
+	double mean = 0.0, sum = 0.0;
 	
 	for (size_t z = 0; z < dest.zdim; z++)
 	for (size_t y = 0; y < dest.ydim; y++)
 	for (size_t x = 0; x < dest.xdim; x++)
-    {
-        mean += maskDest(x,y,z) * dest(x,y,z);
-        sum += maskDest(x,y,z);
-    }
+	{
+		mean += maskDest(x,y,z) * dest(x,y,z);
+		sum += maskDest(x,y,z);
+	}
 
 	if (sum > 0.0)
 	{
@@ -388,14 +518,14 @@ void RealSpaceBackprojection::backprojectRaw(
 	for (size_t z = 0; z < dest.zdim; z++)
 	for (size_t y = 0; y < dest.ydim; y++)
 	for (size_t x = 0; x < dest.xdim; x++)
-    {
-        double t = maskDest(x,y,z) / wMin;
+	{
+		double t = maskDest(x,y,z) / wMin;
 
-        if (t < 1.0)
-        {
-            dest(x,y,z) = t * dest(x,y,z) + (1.0 - t) * mean;
-        }
-    }
+		if (t < 1.0)
+		{
+			dest(x,y,z) = t * dest(x,y,z) + (1.0 - t) * mean;
+		}
+	}
 }
 
 #endif
