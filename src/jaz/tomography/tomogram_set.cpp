@@ -173,7 +173,12 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 		
 	if (loadImageData)
 	{
-		out.stack.read(stackFn);	
+		out.stack.read(stackFn);
+		out.hasImage = true;
+	}
+	else
+	{
+		out.hasImage = false;
 	}
 		
 	globalTable.getValueSafely(EMDL_TOMO_SIZE_X, out.w0, index);

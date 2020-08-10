@@ -4,6 +4,7 @@
 #include <src/jaz/tomography/membrane/blob_fit.h>
 #include <src/jaz/optimization/gradient_descent.h>
 #include <src/jaz/optimization/nelder_mead.h>
+#include <src/jaz/tomography/fiducials.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
 
@@ -23,6 +24,7 @@ void DeleteBlobsProgram::readParameters(int argc, char *argv[])
 		tomoSetFn = parser.getOption("--t", "Tomogram set filename", "tomograms.star");
 		tomoName = parser.getOption("--tn", "Tomogram name");
 		spheresFn = parser.getOption("--sn", "Spheres filename");
+		fiducialsDir = parser.getOption("--fid", "Fiducial markers directory", "");
 		spheres_binning = textToDouble(parser.getOption("--sbin", "Binning factor of the sphere coordinates"));
 
 		diag = parser.checkOption("--diag", "Write out diagnostic information");
@@ -38,7 +40,11 @@ void DeleteBlobsProgram::readParameters(int argc, char *argv[])
 
 		Log::readParams(parser);
 
-		parser.checkForErrors();
+		if (parser.checkForErrors())
+		{
+			parser.writeUsage(std::cout);
+			exit(1);
+		}
 	}
 	catch (RelionError XE)
 	{
@@ -73,7 +79,7 @@ void DeleteBlobsProgram::run()
 	const double outer_radius_0 = outer_margin * sphere_radius;
 	const double inner_radius_0 = inner_margin * sphere_radius;
 
-	const bool use_masks = true;
+	const bool use_masks = false;
 	const double prior_sigma = 2.0;
 	const double initial_step = 1.0;
 	const double binning_factor = 8.0;
@@ -99,6 +105,19 @@ void DeleteBlobsProgram::run()
 		BufferedImage<float> radAvgProj = blob.radialAverageProjection(tomogram, test_frame, radAvg);
 
 		radAvgProj.write(outPath+"blob0_f"+ZIO::itoa(test_frame)+".mrc");
+	}
+
+	std::vector<d3Vector> fiducials;
+	bool has_fiducials = fiducialsDir.length() > 0;
+
+	if (has_fiducials)
+	{
+		if (fiducialsDir[fiducialsDir.length()-1] != '/')
+		{
+			fiducialsDir = fiducialsDir + "/";
+		}
+
+		fiducials = Fiducials::read(tomogram.name, fiducialsDir);
 	}
 
 
@@ -131,7 +150,7 @@ void DeleteBlobsProgram::run()
 		std::vector<double> radAvg0 = blob0.radialAverage(tomogram, test_frame);
 		BufferedImage<float> radAvgProj0 = blob0.radialAverageProjection(tomogram, test_frame, radAvg0);
 
-		radAvgProj0.write("dev/ves-"+ZIO::itoa(vesicle_id)+"_rad_avg_2_L0_f"+ZIO::itoa(test_frame)+".mrc");
+		radAvgProj0.write(outPath+"ves-"+ZIO::itoa(vesicle_id)+"_rad_avg_2_L0_f"+ZIO::itoa(test_frame)+".mrc");
 	}
 
 	for (int current_SH_bands = 1; current_SH_bands <= SH_bands; current_SH_bands++)
@@ -188,7 +207,7 @@ void DeleteBlobsProgram::run()
 			std::stringstream sts;
 			sts << current_SH_bands;
 			radAvgProj2.write(
-				"dev/ves-"+ZIO::itoa(vesicle_id)
+				outPath+"ves-"+ZIO::itoa(vesicle_id)
 				+"_rad_avg_2_L"+ZIO::itoa(current_SH_bands)+"_f"+ZIO::itoa(test_frame)+".mrc");
 		}
 

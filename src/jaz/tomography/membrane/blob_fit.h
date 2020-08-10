@@ -24,7 +24,6 @@ class BlobFit : public DifferentiableOptimization
 			const Tomogram& tomogram;
 			gravis::d3Vector initialPos;
 			int outer_radius, sh_bands;
-			std::vector<bool> goodViews;
 			std::vector<BufferedImage<float>> masks;
 			bool useMasks;
 			int num_threads;

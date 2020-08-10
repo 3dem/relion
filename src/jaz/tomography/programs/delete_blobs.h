@@ -11,7 +11,7 @@ class DeleteBlobsProgram
 		
 		DeleteBlobsProgram(){}
 		
-			std::string outPath, tomoSetFn, tomoName, spheresFn;
+			std::string outPath, tomoSetFn, tomoName, spheresFn, fiducialsDir;
 			
 			bool diag;
 			int SH_bands, num_threads, max_iters;

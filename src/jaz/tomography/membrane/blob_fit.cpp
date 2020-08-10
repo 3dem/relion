@@ -10,7 +10,6 @@ BlobFit::BlobFit(
 	initialPos(positions[id].x, positions[id].y, positions[id].z),
 	outer_radius(outer_radius), 
 	sh_bands(sh_bands),
-	goodViews(tomogram.stack.zdim),
 	useMasks(useMasks),
 	num_threads(num_threads),
 	priorSigma2(priorSigma*priorSigma)
@@ -27,11 +26,6 @@ BlobFit::BlobFit(
 	
 	for (int f = 0; f < fc; f++)
 	{
-		gravis::d4Vector pi = tomogram.projectionMatrices[f] * pw;
-		
-		goodViews[f] = pi.x > outer_radius && pi.x + outer_radius < w
-				&& pi.y > outer_radius && pi.y + outer_radius < h;
-		
 		if (!useMasks) continue;
 		
 		masks[f] = BufferedImage<float>(w, h);
@@ -60,6 +54,8 @@ BlobFit::BlobFit(
 			
 		}
 	}
+
+	std::cout << "initialPos = " << initialPos << std::endl;
 }
 
 double BlobFit::f(const std::vector<double>& x, void* tempStorage) const
@@ -77,14 +73,11 @@ double BlobFit::f(const std::vector<double>& x, void* tempStorage) const
 	{
 		const int t = omp_get_thread_num();
 		
-		if (goodViews[f])
-		{
-			std::vector<double> radAvg = blob.radialAverage(
-					tomogram, f, -1, useMasks? &masks[f] : 0);
+		std::vector<double> radAvg = blob.radialAverage(
+				tomogram, f, -1, useMasks? &masks[f] : 0);
 
-			per_thread[padding*t] += blob.radialAverageError(
-					tomogram, f, radAvg, useMasks? &masks[f] : 0);
-		}
+		per_thread[padding*t] += blob.radialAverageError(
+				tomogram, f, radAvg, useMasks? &masks[f] : 0);
 	}
 	
 	double out = 0.0;
@@ -114,15 +107,12 @@ void BlobFit::grad(const std::vector<double> &x, std::vector<double> &gradDest, 
 	
 	for (int f = 0; f < fc; f++)
 	{
-		if (goodViews[f])
+		std::vector<double> radAvg = blob.radialAverage(tomogram, f);
+		std::vector<double> grad = blob.radialAverageErrorGrad(tomogram, f, radAvg);
+
+		for (int i = 0; i < cc; i++)
 		{
-			std::vector<double> radAvg = blob.radialAverage(tomogram, f);
-			std::vector<double> grad = blob.radialAverageErrorGrad(tomogram, f, radAvg);
-			
-			for (int i = 0; i < cc; i++)
-			{
-				gradDest[i] += grad[i];
-			}
+			gradDest[i] += grad[i];
 		}
 	}
 }
