@@ -38,13 +38,20 @@ class Blob
 				const RawImage<float>& weight,
 				const std::vector<double>& radAvg);
 
+		BufferedImage<float> drawError(
+				const RawImage<float>& frame,
+				const gravis::d4Matrix& proj,
+				const RawImage<float>& weight,
+				const std::vector<double>& radAvg);
+
 		BufferedImage<float> radialAverageProjection(
 				const RawImage<float>& frame,
 				const gravis::d4Matrix& proj,
 				const std::vector<double>& radAvg);
 
-		void subtract(
+		void decompose(
 				RawImage<float>& frame,
+				RawImage<float>& blob,
 				const gravis::d4Matrix& proj,
 				const RawImage<float>& weight,
 				double taper);
@@ -60,6 +67,8 @@ class Blob
 		
 		inline double getOffsetAcc(double dx, double dy, const std::vector<double>& accSH);
 		inline double getBasisAcc(double dx, double dy, int b, const std::vector<double>& accSHbasis);
+
+		inline double smoothOrigin(double r, double radius);
 		
 };
 
@@ -196,6 +205,18 @@ inline double Blob::getBasisAcc(double dx, double dy, int b, const std::vector<d
 	
 	return (1.0 - di) * accSHbasis[i0*cc + b] + di * accSHbasis[i1*cc + b];
 	
+}
+
+inline double Blob::smoothOrigin(double r, double radius)
+{
+	if (r < radius / 2)
+	{
+		return r * r / radius + radius / 4;
+	}
+	else
+	{
+		return r;
+	}
 }
 
 #endif

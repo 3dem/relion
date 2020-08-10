@@ -17,7 +17,10 @@ class DeleteBlobsProgram
 			
 			bool diag;
 			int SH_bands, num_threads, max_iters;
-			double sphere_thickness, spheres_binning, prior_sigma_A, fiducials_radius_A;
+			double sphere_thickness, spheres_binning,
+				prior_sigma_A, fiducials_radius_A,
+				highpass_sigma_real_A,
+				max_binning, min_binning;
 
 			std::vector<gravis::d4Vector> spheres;
 			
@@ -30,8 +33,10 @@ class DeleteBlobsProgram
 
 	private:
 
-		void processBlob(
+		std::vector<double> fitBlob(
 				int blob_id,
+				const std::vector<double>& initial,
+				double binning_factor,
 				Tomogram& tomogram0,
 				const std::vector<gravis::d3Vector>& fiducials);
 
@@ -39,11 +44,15 @@ class DeleteBlobsProgram
 				const std::string& filename,
 				double binning);
 
-		BufferedImage<float> drawTestFrame(
+		BufferedImage<float> drawFit(
 				Blob& blob,
 				const Tomogram& tomogram,
-				int test_frame,
-				BufferedImage<float>& dummyWeight);
+				BufferedImage<float>& realWeight);
+
+		BufferedImage<float> drawTestStack(
+				Blob& blob,
+				const Tomogram& tomogram,
+				BufferedImage<float>& realWeight);
 };
 
 #endif

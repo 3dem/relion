@@ -1,4 +1,5 @@
 #include "blob_fit.h"
+#include <src/jaz/tomography/fiducials.h>
 
 using namespace gravis;
 
@@ -26,17 +27,11 @@ BlobFit::BlobFit(
 	const int w = tomogram.stack.xdim;
 	const int h = tomogram.stack.ydim;
 
-	const double maskedVal = 1e-4;
-	const double fidRad2 = fiducialRadius * fiducialRadius;
-
-
-	std::cout << "fiducialRadius = " << fiducialRadius << std::endl;
+	const double maskedVal = 1e-6;
 
 	weight.resize(w,h,fc);
 	weight.fill(1.f);
 
-
-	const double inner_rad_2 = (radius - thickness / 2)*(radius - thickness / 2);
 	const double outer_rad_2 = (radius + thickness / 2)*(radius + thickness / 2);
 
 	for (int f = 0; f < fc; f++)
@@ -44,33 +39,27 @@ BlobFit::BlobFit(
 		const d4Vector blob_img = tomogram.projectionMatrices[f]
 				* d4Vector(position);
 
+		RawImage<float> weightSlice = weight.getSliceRef(f);
+
+		Fiducials::drawMask(fiducials, tomogram.projectionMatrices[f], fiducialRadius, weightSlice, maskedVal);
+
 		for (int y = 0; y < h; y++)
 		for (int x = 0; x < w; x++)
 		{
 			const double dxb = blob_img.x - x;
 			const double dyb = blob_img.y - y;
-			const double distB2 = dxb * dxb + dyb * dyb;
+			const double distB = sqrt(dxb * dxb + dyb * dyb);
 
-			if (distB2 < inner_rad_2 || distB2 > outer_rad_2)
+			const double d = 2 * std::abs(distB - outer_rad_2) / thickness;
+
+			if (d > 1)
 			{
-				weight(x,y,f) = maskedVal;
+				weight(x,y,f) *= maskedVal;
 			}
 			else
 			{
-				for (int fid = 0; fid < fiducials.size(); fid++)
-				{
-					const d4Vector fid_img = tomogram.projectionMatrices[f]
-							* d4Vector(fiducials[fid]);
-
-					const double dxf = fid_img.x - x;
-					const double dyf = fid_img.y - y;
-					const double distF2 = dxf * dxf + dyf * dyf;
-
-					if (distF2 < fidRad2)
-					{
-						weight(x,y,f) = maskedVal;
-					}
-				}
+				const double a = 1 - d;
+				weight(x,y,f) *= maskedVal + (1 - maskedVal) * a * a;
 			}
 		}
 	}

@@ -22,6 +22,13 @@ class Fiducials
 				double pixelSize,
 				const std::string& tomoName,
 				const std::string &path);
+
+		static void drawMask(
+				const std::vector<gravis::d3Vector>& positions,
+				const gravis::d4Matrix& proj,
+				double radius,
+				RawImage<float>& destination,
+				double value);
 };
 
 

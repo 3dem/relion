@@ -32,6 +32,8 @@ Blob::Blob(const std::vector<double>& params, int outer_radius,
 	{
 		shCoeffs[i] = params[i+3];
 	}
+
+	if (shCoeffs.size() > 0) shCoeffs[0] = 0.0;
 }
 
 std::vector<double> Blob::radialAverage(
@@ -61,10 +63,9 @@ std::vector<double> Blob::radialAverage(
 		const double dx = x - pi.x;
 		const double dy = y - pi.y;
 
-		const double r = sqrt(dx*dx + dy*dy) + getOffsetAcc(dx, dy, accSH);
+		double r = smoothOrigin(sqrt(dx*dx + dy*dy) + getOffsetAcc(dx, dy, accSH), radius);
 
 		if (r >= radius - 1 || r < 0) continue;
-
 
 		const double m = weight(x,y);
 
@@ -119,7 +120,7 @@ double Blob::radialAverageError(
 		const double dx = x - pi.x;
 		const double dy = y - pi.y;
 
-		double r = sqrt(dx*dx + dy*dy) + getOffsetAcc(dx, dy, accSH);
+		double r = smoothOrigin(sqrt(dx*dx + dy*dy) + getOffsetAcc(dx, dy, accSH), radius);
 
 		if (r >= radius - 1 - 1e-6) r = radius - 1 - 1e-6;
 		if (r < 0) r = 0;
@@ -133,6 +134,54 @@ double Blob::radialAverageError(
 		const double err = pred - obs;
 
 		out += m * err * err;
+	}
+
+	return out;
+}
+
+BufferedImage<float> Blob::drawError(
+		const RawImage<float>& frame,
+		const d4Matrix& proj,
+		const RawImage<float>& weight,
+		const std::vector<double>& radAvg)
+{
+	const int radius = radAvg.size();
+
+	const int w = frame.xdim;
+	const int h = frame.ydim;
+
+	BufferedImage<float> out(w,h);
+
+	d4Vector pw(center);
+	d4Vector pi = proj * pw;
+
+	d3Vector dwdx(proj(0,0), proj(0,1), proj(0,2));
+	d3Vector dwdy(proj(1,0), proj(1,1), proj(1,2));
+
+	std::vector<double> accSH = accelerate(dwdx, dwdy, 2.0 * PI * radius);
+
+	for (int y = 0; y < h; y++)
+	for (int x = 0; x < w; x++)
+	{
+		const double obs = frame(x,y);
+		const double m = weight(x,y);
+
+		const double dx = x - pi.x;
+		const double dy = y - pi.y;
+
+		double r = smoothOrigin(sqrt(dx*dx + dy*dy) + getOffsetAcc(dx, dy, accSH), radius);
+
+		if (r >= radius - 1 - 1e-6) r = radius - 1 - 1e-6;
+		if (r < 0) r = 0;
+
+		const int r0 = (int)r;
+		const int r1 = r0 + 1;
+
+		const double dr = r - r0;
+
+		const double pred = (1 - dr) * radAvg[r0] + dr * radAvg[r1];
+
+		out(x,y) = sqrt(m) * (pred - obs);
 	}
 
 	return out;
@@ -165,7 +214,7 @@ BufferedImage<float> Blob::radialAverageProjection(
 		const double dx = x - pi.x;
 		const double dy = y - pi.y;
 
-		double r = sqrt(dx*dx + dy*dy) + getOffsetAcc(dx, dy, accSH);
+		double r = smoothOrigin(sqrt(dx*dx + dy*dy) + getOffsetAcc(dx, dy, accSH), radius);
 
 		if (r >= radius - 1 - 1e-6) r = radius - 1 - 1e-6;
 		if (r < 0) r = 0;
@@ -181,8 +230,9 @@ BufferedImage<float> Blob::radialAverageProjection(
 	return out;
 }
 
-void Blob::subtract(
+void Blob::decompose(
 	RawImage<float>& frame,
+	RawImage<float>& blob,
 	const d4Matrix& proj,
 	const RawImage<float>& weight,
 	double taper)
@@ -216,7 +266,7 @@ void Blob::subtract(
 		const double dy = y - pi.y;
 
 		const double ru = sqrt(dx*dx + dy*dy);
-		const double r = ru + getOffsetAcc(dx, dy, accSH);
+		const double r = smoothOrigin(ru + getOffsetAcc(dx, dy, accSH), radius);
 
 		if (r >= radius - 1 || r < 0)
 		{
@@ -244,7 +294,7 @@ void Blob::subtract(
 		const double dy = y - pi.y;
 
 		const double ru = sqrt(dx*dx + dy*dy);
-		const double r = ru + getOffsetAcc(dx, dy, accSH);
+		const double r = smoothOrigin(ru + getOffsetAcc(dx, dy, accSH), radius);
 
 		if (r >= radius - 1 || r < 0)
 		{
@@ -265,6 +315,7 @@ void Blob::subtract(
 		else wgh = 0.0;
 
 		frame(x,y) -= wgh * pred;
+		blob(x,y)  += wgh * pred;
 	}
 }
 

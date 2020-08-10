@@ -46,3 +46,34 @@ void Fiducials::write(
 
 	metaDataTable.write(path+"fiducials_"+tomoName+".star");
 }
+
+void Fiducials::drawMask(
+		const std::vector<d3Vector> &positions,
+		const d4Matrix &proj,
+		double radius,
+		RawImage<float> &destination,
+		double value)
+{
+	const int w = destination.xdim;
+	const int h = destination.ydim;
+
+	const double fidRad2 = radius * radius;
+
+	for (int y = 0; y < h; y++)
+	for (int x = 0; x < w; x++)
+	{
+		for (int fid = 0; fid < positions.size(); fid++)
+		{
+			const d4Vector fid_img = proj * d4Vector(positions[fid]);
+
+			const double dxf = fid_img.x - x;
+			const double dyf = fid_img.y - y;
+			const double distF2 = dxf * dxf + dyf * dyf;
+
+			if (distF2 < fidRad2)
+			{
+				destination(x,y) = value;
+			}
+		}
+	}
+}

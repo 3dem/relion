@@ -34,10 +34,13 @@ void DeleteBlobsProgram::readParameters(int argc, char *argv[])
 		fiducials_radius_A = textToDouble(parser.getOption("--frad", "Fiducial marker radius [Å]", "100"));
 
 		prior_sigma_A = textToDouble(parser.getOption("--sig", "Uncertainty std. dev. of initial position [Å]", "10"));
+		max_binning = textToDouble(parser.getOption("--bin0", "Initial (maximal) binning factor", "8"));
+		min_binning = textToDouble(parser.getOption("--bin1", "Final (minimal) binning factor", "2"));
 
 		diag = parser.checkOption("--diag", "Write out diagnostic information");
 
 		SH_bands = textToInteger(parser.getOption("--n", "Number of spherical harmonics bands", "2"));
+		highpass_sigma_real_A = textToDouble(parser.getOption("--hp", "High-pass sigma [Å, real space]", "300"));
 		max_iters = textToInteger(parser.getOption("--max_iters", "Maximum number of iterations", "1000"));
 		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 
@@ -70,9 +73,30 @@ void DeleteBlobsProgram::run()
 	const int tomo_index = tomogramSet.getTomogramIndexSafely(tomoName);
 
 	Tomogram tomogram0 = tomogramSet.loadTomogram(tomo_index, true);
+	const int frame_count = tomogram0.frameCount;
+
+	const int w_full = tomogram0.stack.xdim;
+	const int h_full = tomogram0.stack.ydim;
+
+	const double pixel_size = tomogram0.optics.pixelSize;
+
+	const double highpass_sigma_real = highpass_sigma_real_A / pixel_size;
+	const double fiducials_radius = fiducials_radius_A / pixel_size;
+
+
+
+	BufferedImage<float> original_stack = tomogram0.stack;
+
+	tomogram0.stack = ImageFilter::highpassStackGaussPadded(
+						original_stack,
+						highpass_sigma_real,
+						num_threads);
+
 
 	std::vector<d3Vector> fiducials(0);
 	bool has_fiducials = fiducialsDir.length() > 0;
+
+	BufferedImage<float> fiducialsMask(w_full, h_full, frame_count);
 
 	if (has_fiducials)
 	{
@@ -82,13 +106,71 @@ void DeleteBlobsProgram::run()
 		}
 
 		fiducials = Fiducials::read(tomogram0.name, fiducialsDir, tomogram0.optics.pixelSize);
+
+		#pragma omp parallel for num_threads(num_threads)
+		for (int f = 0; f < frame_count; f++)
+		{
+			RawImage<float> maskSlice = fiducialsMask.getSliceRef(f);
+			maskSlice.fill(1.f);
+
+			Fiducials::drawMask(
+					fiducials, tomogram0.projectionMatrices[f],
+					fiducials_radius, maskSlice, 1e-5f);
+		}
 	}
 
-	processBlob(0, tomogram0, fiducials);
+
+	original_stack.write(outPath+"orig.mrc", tomogram0.optics.pixelSize);
+
+	BufferedImage<float> blobs_stack(w_full, h_full, frame_count);
+	blobs_stack.fill(0.f);
+
+
+	for (int blob_id = 0; blob_id < spheres.size(); blob_id++)
+	{
+		const d4Vector s4 = spheres[blob_id];
+
+		std::vector<double> initial = {s4.x, s4.y, s4.z};
+
+		std::vector<double> blob_coeffs = initial;
+
+
+		double current_binning = max_binning;
+
+		while (current_binning > min_binning)
+		{
+			blob_coeffs = fitBlob(blob_id, blob_coeffs, current_binning, tomogram0, fiducials);
+
+			current_binning /= 2;
+		}
+
+
+		SphericalHarmonics sh(SH_bands);
+		Blob blob(blob_coeffs, spheres[blob_id].w + sphere_thickness / 2, &sh);
+
+
+		#pragma omp parallel for num_threads(num_threads)
+		for (int f = 0; f < frame_count; f++)
+		{
+			RawImage<float> stackSlice = original_stack.getSliceRef(f);
+			RawImage<float> blobsSlice = blobs_stack.getSliceRef(f);
+
+			blob.decompose(
+				stackSlice, blobsSlice,
+				tomogram0.projectionMatrices[f],
+				fiducialsMask.getConstSliceRef(f),
+				50.0);
+		}
+
+		original_stack.write(outPath+"blob_"+ZIO::itoa(blob_id)+"_subtracted.mrc", tomogram0.optics.pixelSize);
+		blobs_stack.write(outPath+"blob_"+ZIO::itoa(blob_id)+"_blobs.mrc", tomogram0.optics.pixelSize);
+	}
 }
 
-void DeleteBlobsProgram::processBlob(
+std::vector<double> DeleteBlobsProgram::fitBlob(
 		int blob_id,
+		const std::vector<double>& initial,
+		double binning_factor,
 		Tomogram& tomogram0,
 		const std::vector<d3Vector>& fiducials)
 {
@@ -109,11 +191,6 @@ void DeleteBlobsProgram::processBlob(
 	const double prior_sigma = prior_sigma_A / pixelSize_full;
 	const double initial_step = 1.0;
 
-	const int test_frame = 19;
-
-
-	const double binning_factor = 8.0;
-
 
 
 	const int substack_size = 1024;
@@ -126,8 +203,6 @@ void DeleteBlobsProgram::processBlob(
 	const double sphere_thickness_binned = sphere_thickness / binning_factor;
 
 	std::string outTag = outPath + "blob_" + ZIO::itoa(blob_id);
-	std::string binTag = outPath + "bin_" + ZIO::itoa(binning_factor);
-	std::string testFrameTag = "frame_" + ZIO::itoa(test_frame);
 
 
 	Tomogram tomogram_cropped = tomogram0.extractSubstack(sphere_position, substack_size, substack_size);
@@ -145,60 +220,26 @@ void DeleteBlobsProgram::processBlob(
 	dummyWeight_binned.fill(1.f);
 
 
-	if (diag)
+	const int xc = initial.size();
+	std::vector<double> last_optimum(xc);
+
+	for (int i = 0; i < last_optimum.size(); i++)
 	{
-		Blob blob(sphere_position, outer_radius_binned);
+		last_optimum[i] = initial[i];
 
-		tomogram_binned.stack.getSliceRef(test_frame)
-			.write(outTag+"_000_original_"+testFrameTag+".mrc");
-
-		drawTestFrame(blob, tomogram_binned, test_frame, dummyWeight_binned)
-			.write(outTag+"_001_initial_"+testFrameTag+".mrc");
-	}
-
-
-
-	BlobFit bf0(
-		tomogram_binned, spheres[blob_id].xyz(), 0,
-		sphere_radius_binned,
-		sphere_thickness_binned,
-		spheres,
-		fiducials, fiducials_radius_binned,
-		prior_sigma, num_threads);
-
-	std::vector<double> initial0 = {sphere_position.x, sphere_position.y, sphere_position.z};
-
-	std::vector<double> opt0;
-
-	opt0 = NelderMead::optimize(
-				initial0, bf0, initial_step, 0.05, 100, 1.0, 2.0, 0.5, 0.5, diag);
-
-	if (!diag)
-	{
-		std::cout << "           -> ";
-
-		for (int i = 0; i < 3; i++)
+		if (i > 2)
 		{
-			std::cout << opt0[i] << ", ";
+			last_optimum[i] /= binning_factor;
 		}
-
-		std::cout << std::endl;
-	}
-	else
-	{
-		Blob blob0(opt0, outer_radius_binned, 0);
-
-		drawTestFrame(blob0, tomogram_binned, test_frame, dummyWeight_binned)
-			.write(outTag+"_002_SH0_"+testFrameTag+".mrc");
 	}
 
-	for (int current_SH_bands = 1; current_SH_bands <= SH_bands; current_SH_bands++)
+	int initial_SH_bands = xc < 7? 0 : sqrt(xc - 3) - 1;
+
+	for (int current_SH_bands = initial_SH_bands; current_SH_bands <= SH_bands; current_SH_bands++)
 	{
+		std::cout << current_SH_bands << " SH bands..." << std::endl;
+
 		const int SH_coeffs = (current_SH_bands + 1) * (current_SH_bands + 1);
-
-		/*!!BlobFit bf(
-			tomogram_binned, spheres, blob_id, inner_radius,
-			outer_radius_binned, current_SH_bands, use_masks, prior_sigma, num_threads);*/
 
 		BlobFit bf(
 			tomogram_binned, spheres[blob_id].xyz(), current_SH_bands,
@@ -208,25 +249,35 @@ void DeleteBlobsProgram::processBlob(
 			fiducials, fiducials_radius_binned,
 			prior_sigma, num_threads);
 
-		std::vector<double> initial(SH_coeffs + 3, 0.0);
+		std::vector<double> current_optimum(SH_coeffs + 3, 0.0);
 
-		for (int i = 0; i < opt0.size(); i++)
+		for (int i = 0; i < last_optimum.size(); i++)
 		{
-			initial[i] = opt0[i];
+			current_optimum[i] = last_optimum[i];
 		}
 
-		std::vector<double> opt;
+		std::vector<double> new_optimum;
 
-		opt = NelderMead::optimize(
-				initial, bf, initial_step, 0.05, 200, 1.0, 2.0, 0.5, 0.5, diag);
+		new_optimum = NelderMead::optimize(
+				current_optimum, bf, initial_step, 0.05, 200, 1.0, 2.0, 0.5, 0.5, false);
 
-		if (!diag)
+		if (diag)
+		{
+			SphericalHarmonics sh(current_SH_bands);
+			Blob blob2(new_optimum, outer_radius_binned, &sh);
+
+			std::cout << "E = " << bf.f(new_optimum, &sh) << std::endl;
+
+			drawTestStack(blob2, tomogram_binned, bf.weight)
+				.write(outTag+"_003_SH"+ZIO::itoa(current_SH_bands)+".mrc");
+		}
+		else
 		{
 			std::cout << "           -> ";
 
 			for (int i = 0; i < 3; i++)
 			{
-				std::cout << opt[i] << ", ";
+				std::cout << new_optimum[i] << ", ";
 			}
 
 			std::cout << "   ";
@@ -235,7 +286,7 @@ void DeleteBlobsProgram::processBlob(
 			{
 				for (int i = -j; i <= j; i++)
 				{
-					std::cout << opt[3 + j*j + j + i] << ", ";
+					std::cout << new_optimum[3 + j*j + j + i] << ", ";
 				}
 
 				std::cout << "   ";
@@ -243,101 +294,19 @@ void DeleteBlobsProgram::processBlob(
 
 			std::cout << std::endl;
 		}
-		else
-		{
-			SphericalHarmonics sh(current_SH_bands);
-			Blob blob2(opt, outer_radius_binned, &sh);
 
-			drawTestFrame(blob2, tomogram_binned, test_frame, dummyWeight_binned)
-				.write(
-					outPath+"ves-"+ZIO::itoa(blob_id)
-					+"_rad_avg_2_L"+ZIO::itoa(current_SH_bands)
-					+"_f"+ZIO::itoa(test_frame)+".mrc");
-		}
-
-		opt0 = opt;
+		last_optimum = new_optimum;
 	}
 
 
-	std::vector<double> opt_upscaled = opt0;
+	std::vector<double> upscaled_optimum = last_optimum;
 
-	for (int i = 3; i < opt_upscaled.size(); i++)
+	for (int i = 3; i < upscaled_optimum.size(); i++)
 	{
-		opt_upscaled[i] *= binning_factor;
+		upscaled_optimum[i] *= binning_factor;
 	}
 
-
-
-	{
-		tomogram_cropped.stack.getSliceRef(test_frame).write(outPath+"original_f"+ZIO::itoa(test_frame)+"_bin1.mrc");
-
-
-		SphericalHarmonics sh(SH_bands);
-		Blob blob(opt_upscaled, outer_radius_full, &sh);
-
-		drawTestFrame(blob, tomogram_cropped, test_frame, dummyWeight_cropped)
-			.write(outPath+"blob0_f"+ZIO::itoa(test_frame)+"_bin1.mrc");
-	}
-
-
-	const bool refine_full = false;
-
-	std::vector<double> opt_fin;
-
-	BufferedImage<float> full_weight;
-
-	if (refine_full)
-	{
-		/*!!BlobFit bf(
-			tomogram1, spheres, blob_id, inner_radius_0, outer_radius_full,
-			SH_bands, use_masks, prior_sigma * binning_factor, num_threads);*/
-
-		BlobFit bf(
-			tomogram_cropped, spheres[blob_id].xyz(), SH_bands,
-			sphere_radius_full,
-			sphere_thickness_full,
-			spheres,
-			fiducials, fiducials_radius_full,
-			prior_sigma, num_threads);
-
-		full_weight = bf.weight;
-
-		opt_fin = NelderMead::optimize(
-			opt_upscaled, bf, initial_step, 0.05, 200, 1.0, 2.0, 0.5, 0.5, diag);
-
-
-		{
-			SphericalHarmonics sh(SH_bands);
-			Blob blob(opt_fin, outer_radius_full, &sh);
-
-			drawTestFrame(blob, tomogram_cropped, test_frame, dummyWeight_cropped)
-				.write(outPath+"blob0_f"+ZIO::itoa(test_frame)+"_bin1_final.mrc");
-		}
-	}
-	else
-	{
-		opt_fin = opt_upscaled;
-	}
-
-
-
-
-	SphericalHarmonics sh(SH_bands);
-
-	Blob blobOut(opt_fin, outer_radius_full, &sh);
-
-	for (int f = 0; f < frame_count; f++)
-	{
-		RawImage<float> slice = tomogram0.stack.getSliceRef(f);
-
-		blobOut.subtract(
-			slice,
-			tomogram0.projectionMatrices[f],
-			full_weight.getSliceRef(f),
-			50.0);
-	}
-
-	tomogram0.stack.write(outPath+"blob_"+ZIO::itoa(blob_id)+"_stack.mrc", tomogram0.optics.pixelSize);
+	return upscaled_optimum;
 }
 
 std::vector<d4Vector> DeleteBlobsProgram::readSpheresCMM(
@@ -376,21 +345,63 @@ std::vector<d4Vector> DeleteBlobsProgram::readSpheresCMM(
 	return spheres;
 }
 
-BufferedImage<float> DeleteBlobsProgram::drawTestFrame(
+
+BufferedImage<float> DeleteBlobsProgram::drawFit(
 		Blob& blob,
 		const Tomogram& tomogram,
-		int test_frame,
-		BufferedImage<float>& dummyWeight)
+		BufferedImage<float>& realWeight)
 {
-	std::vector<double> radAvg = blob.radialAverage(
-			tomogram.stack.getConstSliceRef(test_frame),
-			tomogram.projectionMatrices[test_frame],
-			dummyWeight);
+	const int fc = tomogram.frameCount;
+	const int w = tomogram.stack.xdim;
+	const int h = tomogram.stack.ydim;
 
-	BufferedImage<float> radAvgProj = blob.radialAverageProjection(
-			tomogram.stack.getConstSliceRef(test_frame),
-			tomogram.projectionMatrices[test_frame],
+	BufferedImage<float> out(w,h,fc);
+
+	for (int f = 0; f < fc; f++)
+	{
+		std::vector<double> radAvg = blob.radialAverage(
+			tomogram.stack.getConstSliceRef(f),
+			tomogram.projectionMatrices[f],
+			realWeight.getConstSliceRef(f));
+
+		BufferedImage<float> diff = blob.drawError(
+			tomogram.stack.getConstSliceRef(f),
+			tomogram.projectionMatrices[f],
+			realWeight.getConstSliceRef(f),
 			radAvg);
 
-	return radAvgProj;
+		out.copySliceFrom(f, diff);
+	}
+
+	return out;
+}
+
+
+BufferedImage<float> DeleteBlobsProgram::drawTestStack(
+		Blob& blob,
+		const Tomogram& tomogram,
+		BufferedImage<float>& realWeight)
+{
+	const int fc = tomogram.frameCount;
+	const int w = tomogram.stack.xdim;
+	const int h = tomogram.stack.ydim;
+
+	BufferedImage<float> out(w,h,fc);
+
+	for (int f = 0; f < fc; f++)
+	{
+		std::vector<double> radAvg = blob.radialAverage(
+			tomogram.stack.getConstSliceRef(f),
+			tomogram.projectionMatrices[f],
+			realWeight.getConstSliceRef(f));
+
+		BufferedImage<float> radAvgProj = blob.radialAverageProjection(
+			tomogram.stack.getConstSliceRef(f),
+			tomogram.projectionMatrices[f],
+			radAvg);
+
+		out.copySliceFrom(f, radAvgProj);
+	}
+
+	return out;
 }

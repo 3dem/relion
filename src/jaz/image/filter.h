@@ -50,7 +50,7 @@ class ImageFilter
 		
 		template<class T>
 		static BufferedImage<T> highpassStackGaussPadded(
-				const RawImage<T>& stack, double sigmaRS);
+				const RawImage<T>& stack, double sigmaRS, int num_threads = 1);
 		
 		template<class T>
 		static BufferedImage<T> lowpassStack(
@@ -482,29 +482,30 @@ BufferedImage<T> ImageFilter::highpassStack(
 
 template<class T>
 BufferedImage<T> ImageFilter::highpassStackGaussPadded(
-		const RawImage<T>& stack, double sigmaRS)
+		const RawImage<T>& stack, double sigmaRS, int num_threads)
 {
 	BufferedImage<T> out(stack.xdim, stack.ydim, stack.zdim);
 	
 	const int fc = stack.zdim;
 	
 	BufferedImage<T> mask(stack.xdim, stack.ydim, 1);
-	mask.fill(T(1));	
-	mask = Padding::padCenter2D_full(mask, 2*sigmaRS);	
-	mask = Gauss2D(mask, 0, sigmaRS, false);	
+	mask.fill(T(1));
+	mask = Padding::padCenter2D_full(mask, 2*sigmaRS);
+	mask = Gauss2D(mask, 0, sigmaRS, false);
 	mask = Padding::unpadCenter2D_full(mask, 2*sigmaRS);
-	
+
+	#pragma omp parallel for num_threads(num_threads)
 	for (int f = 0; f < fc; f++)
 	{	
 		BufferedImage<T> slice0 = NewStackHelper::extractSliceZ(stack, f);
 		BufferedImage<T> slice = Padding::padCenter2D_full(slice0, 2*sigmaRS);
 		
 		slice = Gauss2D(slice, 0, sigmaRS, false);
-		slice = Padding::unpadCenter2D_full(slice, 2*sigmaRS);		
-		slice /= mask;		
+		slice = Padding::unpadCenter2D_full(slice, 2*sigmaRS);
+		slice /= mask;
 		slice = slice0 - slice;
 		
-		NewStackHelper::insertSliceZ(slice, out, f);
+		out.getSliceRef(f).copyFrom(slice);
 	}
 	
 	return out;
