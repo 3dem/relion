@@ -4,6 +4,8 @@
 #include <string>
 #include <src/jaz/image/buffered_image.h>
 
+class Tomogram;
+class Blob;
 
 class DeleteBlobsProgram
 {
@@ -15,7 +17,7 @@ class DeleteBlobsProgram
 			
 			bool diag;
 			int SH_bands, num_threads, max_iters;
-			double inner_margin, outer_margin, spheres_binning;
+			double sphere_thickness, spheres_binning, prior_sigma_A, fiducials_radius_A;
 
 			std::vector<gravis::d4Vector> spheres;
 			
@@ -28,9 +30,20 @@ class DeleteBlobsProgram
 
 	private:
 
+		void processBlob(
+				int blob_id,
+				Tomogram& tomogram0,
+				const std::vector<gravis::d3Vector>& fiducials);
+
 		std::vector<gravis::d4Vector> readSpheresCMM(
 				const std::string& filename,
 				double binning);
+
+		BufferedImage<float> drawTestFrame(
+				Blob& blob,
+				const Tomogram& tomogram,
+				int test_frame,
+				BufferedImage<float>& dummyWeight);
 };
 
 #endif

@@ -3,6 +3,9 @@
 
 #include <omp.h>
 
+using namespace gravis;
+
+
 Blob::Blob()
 :	center(0.0), 
 	outer_radius(0), 
@@ -10,7 +13,7 @@ Blob::Blob()
 	shCoeffs(0), shBands(0)
 {}
 
-Blob::Blob(gravis::d3Vector center, int outer_radius)
+Blob::Blob(d3Vector center, int outer_radius)
 :	center(center), 
 	outer_radius(outer_radius), 
 	sphericalHarmonics(0),
@@ -33,23 +36,23 @@ Blob::Blob(const std::vector<double>& params, int outer_radius,
 }
 
 std::vector<double> Blob::radialAverage(
-		const Tomogram& tomogram, int f, int radius,
-		const RawImage<float>* mask)
+		const RawImage<float>& frame,
+		const d4Matrix& proj,
+		const RawImage<float>& weight,
+		int radius)
 {
-	if (radius < 0) radius = outer_radius+1;
+	if (radius < 0) radius = outer_radius + 1;
 
 	std::vector<double> radAvg(radius, 0.0), radCnt(radius, 0.0);
 
-	const int w = tomogram.stack.xdim;
-	const int h = tomogram.stack.ydim;
+	const int w = frame.xdim;
+	const int h = frame.ydim;
 
-	const gravis::d4Matrix& proj = tomogram.projectionMatrices[f];
+	d4Vector pw(center);
+	d4Vector pi = proj * pw;
 
-	gravis::d4Vector pw(center);
-	gravis::d4Vector pi = proj * pw;
-
-	gravis::d3Vector dwdx(proj(0,0), proj(0,1), proj(0,2));
-	gravis::d3Vector dwdy(proj(1,0), proj(1,1), proj(1,2));
+	d3Vector dwdx(proj(0,0), proj(0,1), proj(0,2));
+	d3Vector dwdy(proj(1,0), proj(1,1), proj(1,2));
 
 	std::vector<double> accSH = accelerate(dwdx, dwdy, 2.0 * PI * radius);
 
@@ -69,17 +72,17 @@ std::vector<double> Blob::radialAverage(
 		if (r >= radius - 1 || r < 0) continue;
 
 
-		const double m = mask == 0? 1.0 : (*mask)(x,y);
+		const double m = weight(x,y);
 
 		const int r0 = (int)r;
 		const int r1 = r0 + 1;
 
 		const double dr = r - r0;
 
-		radAvg[r0] += m * (1 - dr) * tomogram.stack(x,y,f);
+		radAvg[r0] += m * (1 - dr) * frame(x,y);
 		radCnt[r0] += m * (1 - dr);
 
-		radAvg[r1] += m * dr * tomogram.stack(x,y,f);
+		radAvg[r1] += m * dr * frame(x,y);
 		radCnt[r1] += m * dr;
 	}
 
@@ -92,23 +95,24 @@ std::vector<double> Blob::radialAverage(
 }
 
 double Blob::radialAverageError(
-		const Tomogram& tomogram, int f, const std::vector<double>& radAvg, const RawImage<float>* mask)
+		const RawImage<float>& frame,
+		const d4Matrix& proj,
+		const RawImage<float>& weight,
+		const std::vector<double>& radAvg)
 {
 	double out(0.0), totWgh(0.0);
 
 	const int radius = radAvg.size();
 
-	const int w = tomogram.stack.xdim;
-	const int h = tomogram.stack.ydim;
+	const int w = frame.xdim;
+	const int h = frame.ydim;
 
 
-	const gravis::d4Matrix& proj = tomogram.projectionMatrices[f];
+	d4Vector pw(center);
+	d4Vector pi = proj * pw;
 
-	gravis::d4Vector pw(center);
-	gravis::d4Vector pi = proj * pw;
-
-	gravis::d3Vector dwdx(proj(0,0), proj(0,1), proj(0,2));
-	gravis::d3Vector dwdy(proj(1,0), proj(1,1), proj(1,2));
+	d3Vector dwdx(proj(0,0), proj(0,1), proj(0,2));
+	d3Vector dwdy(proj(1,0), proj(1,1), proj(1,2));
 
 	std::vector<double> accSH = accelerate(dwdx, dwdy, 2.0 * PI * radius);
 
@@ -132,13 +136,13 @@ double Blob::radialAverageError(
 			else if (y >= h) ya = h-1;
 			else ya = y;
 
-			obs = tomogram.stack(xa,ya,f);
+			obs = frame(xa,ya);
 			m = 1e-4;
 		}
 		else
 		{
-			obs = tomogram.stack(x,y,f);
-			if (mask != 0) m = (*mask)(x,y);
+			obs = frame(x,y);
+			m = weight(x,y);
 		}
 
 		const double dx = x - pi.x;
@@ -165,225 +169,24 @@ double Blob::radialAverageError(
 	return out;
 }
 
-std::vector<double> Blob::radialAverageErrorGrad(
-		const Tomogram& tomogram, int f, const std::vector<double>& radAvg)
-{
-/*
-	C = SUM_p (e_p^2)
-	e_p = pred_p - obs_p
-	pred_p = (1 - dr) * radAvg[r0] + dr * radAvg[r1];
-
-	radAvg[r] = (SUM_p m_p * obs_p) / SUM_p m_p
-	m_p = 1 - max(r(p) - r, 1)
-
-	r(p) = |p - c| + SUM_i q_i Y_i
-
-
-	=> dC/dq = SUM_p ( 2 e_p d(e_p)/dq )
-
-	d(e_p)/dq = d(pred_p)/dq
-	 =	d(1 - dr)/dq * radAvg[r0] + (1 - dr) * d(radAvg[r0])/dq
-		+ d(dr)/dq * radAvg[r1] + dr * d(radAvg[r1])/dq
-	 =	- d(dr)/dq * radAvg[r0] + (1 - dr) * d(radAvg[r0])/dq
-		+ d(dr)/dq * radAvg[r1] + dr * d(radAvg[r1])/dq
-	 =	d(dr)/dq * (radAvg[r1] - radAvg[r0])
-		+ (1 - dr) * d(radAvg[r0])/dq
-		dr * d(radAvg[r1])/dq
-
-	d(r)/dc = (c - p)/|c - p| (EXCEPT for c == p!) + SUM_i q_i dY_i/dc
-	d(r)/dq = q
-
-	d(radAvg[r])/dq = ( d(SUM_p m_p * obs_p)/dq * SUM_p m_p - (SUM_p m_p * obs_p) * d(SUM_p m_p)/dq )
-					  / (SUM_p m_p)^2
-
-	d(SUM_p m_p * obs_p)/dq = SUM_p obs_p * d(m_p)/dq
-	d(SUM_p m_p)/dq = SUM_p d(m_p)/dq
-
-				{ 1 for r - 1 <= r(p) < r
-	d(m_p)/dq =	{ -1 for r <= r(p) < r + 1
-				{ 0 else
-
-*/
-	const int radius = radAvg.size();
-
-	const int w = tomogram.stack.xdim;
-	const int h = tomogram.stack.ydim;
-
-	const int qc = shCoeffs.size() + 3;
-
-
-	const gravis::d4Matrix& proj = tomogram.projectionMatrices[f];
-
-	gravis::d4Vector pw(center);
-	gravis::d4Vector pi = proj * pw;
-
-	gravis::d3Vector dwdx(proj(0,0), proj(0,1), proj(0,2));
-	gravis::d3Vector dwdy(proj(1,0), proj(1,1), proj(1,2));
-
-	std::vector<double> accSH = accelerate(dwdx, dwdy, 2.0 * PI * radius);
-	std::vector<double> accSHbasis = accelerateBasis(dwdx, dwdy, 2.0 * PI * radius);
-
-	const int x0 = (int) (pi.x + 0.5);
-	const int y0 = (int) (pi.y + 0.5);
-
-
-	std::vector<double> radAvgGrad(radius*qc, 0.0), radCntGrad(radius*qc, 0.0);
-	std::vector<double> radAvgVal(radius, 0.0), radCntVal(radius, 0.0);
-
-	for (int y = y0 - radius + 1; y <= y0 + radius - 1; y++)
-	for (int x = x0 - radius + 1; x <= x0 + radius - 1; x++)
-	{
-		if (x < 0 || x >= w || y < 0 || y >= h) continue;
-
-		const double dx = x - pi.x;
-		const double dy = y - pi.y;
-
-		double r = sqrt(dx*dx + dy*dy) + getOffsetAcc(dx, dy, accSH);
-
-		if (r < radius - 1 - 1e-6 && r >= 0)
-		{
-			const int r0 = (int)r;
-			const int r1 = r0 + 1;
-
-			const float val = tomogram.stack(x,y,f);
-
-			gravis::d2Vector cp(pi.x - x, pi.y - y);
-
-			if (cp.length() > 1e-20) cp.normalize();
-
-			for (int i = 0; i < 3; i++)
-			{
-				const double drdq = dwdx[i] * cp.x + dwdy[i] * cp.y;
-
-				radAvgGrad[qc*r0 + i] -= drdq * val;
-				radAvgGrad[qc*r1 + i] += drdq * val;
-
-				radCntGrad[qc*r0 + i] -= drdq;
-				radCntGrad[qc*r1 + i] += drdq;
-			}
-
-			for (int q = 4; q < qc; q++)
-			{
-				const double drdq = getBasisAcc(dx, dy, q-3, accSHbasis);
-
-				radAvgGrad[qc*r0 + q] -= drdq * val;
-				radAvgGrad[qc*r1 + q] += drdq * val;
-
-				radCntGrad[qc*r0 + q] -= drdq;
-				radCntGrad[qc*r1 + q] += drdq;
-			}
-
-			const double dr = r - r0;
-
-			radAvgVal[r0] += (1 - dr) * val;
-			radCntVal[r0] += 1 - dr;
-
-			radAvgVal[r1] += dr * val;
-			radCntVal[r1] += dr;
-		}
-	}
-
-	for (int r = 0; r < radius; r++)
-	for (int q = 0; q < qc; q++)
-	{
-		const size_t i = qc*r + q;
-
-		if (radCntVal[r] > 0.0)
-		{
-			radAvgGrad[i] = (radAvgGrad[i] * radCntVal[r] - radAvgVal[r] * radCntGrad[i])
-						/ (radCntVal[r] * radCntVal[r]);
-		}
-		else
-		{
-			radAvgGrad[i] = 0.0;
-		}
-	}
-
-
-	std::vector<double> out(shCoeffs.size() + 3, 0.0);
-
-
-	for (int y = y0 - radius + 1; y <= y0 + radius - 1; y++)
-	for (int x = x0 - radius + 1; x <= x0 + radius - 1; x++)
-	{
-		if (x < 0 || x >= w || y < 0 || y >= h) continue;
-
-		const double dx = x - pi.x;
-		const double dy = y - pi.y;
-
-		double r = sqrt(dx*dx + dy*dy) + getOffsetAcc(dx, dy, accSH);
-
-		if (r < radius - 1 - 1e-6 && r >= 0)
-		{
-			const int r0 = (int)r;
-			const int r1 = r0 + 1;
-
-			const double dr = r - r0;
-
-			const double pred = (1 - dr) * radAvg[r0] + dr * radAvg[r1];
-			const double obs = tomogram.stack(x,y,f);
-			const double err = pred - obs;
-
-			/*
-				d(e_p)/dq = d(pred_p)/dq
-				 =	d(1 - dr)/dq * radAvg[r0] + (1 - dr) * d(radAvg[r0])/dq
-					+ d(dr)/dq * radAvg[r1] + dr * d(radAvg[r1])/dq
-				 =	- d(dr)/dq * radAvg[r0] + (1 - dr) * d(radAvg[r0])/dq
-					+ d(dr)/dq * radAvg[r1] + dr * d(radAvg[r1])/dq
-				 =	d(dr)/dq * (radAvg[r1] - radAvg[r0])
-					+ (1 - dr) * d(radAvg[r0])/dq
-					dr * d(radAvg[r1])/dq
-			*/
-
-			gravis::d2Vector cp(pi.x - x, pi.y - y);
-
-			if (cp.length() > 1e-20) cp.normalize();
-
-			for (int q = 0; q < qc; q++)
-			{
-				double drdq = 0.0;
-
-				if (q < 3)
-				{
-					drdq = dwdx[q] * cp.x + dwdy[q] * cp.y;
-				}
-				else if (q > 3)
-				{
-					drdq = getBasisAcc(dx, dy, q-3, accSHbasis);
-				}
-
-				const double dpred_dq =
-						drdq * (radAvg[r1] - radAvg[r0])
-						+ (1 - dr) * radAvgGrad[qc*r0 + q]
-						+ dr * radAvgGrad[qc*r1 + q];
-
-				//const double dpred_dq = drdq * (radAvg[r1] - radAvg[r0]);
-
-				out[q] += 2.0 * err * dpred_dq;
-			}
-		}
-	}
-
-	return out;
-}
-
 BufferedImage<float> Blob::radialAverageProjection(
-		const Tomogram& tomogram, int f, const std::vector<double>& radAvg)
+		const RawImage<float>& frame,
+		const gravis::d4Matrix& proj,
+		const std::vector<double>& radAvg)
 {
-	BufferedImage<float> out(tomogram.stack.xdim, tomogram.stack.ydim);
+	BufferedImage<float> out(frame.xdim, frame.ydim);
 
 	const int radius = radAvg.size();
 
-	const int w = tomogram.stack.xdim;
-	const int h = tomogram.stack.ydim;
+	const int w = frame.xdim;
+	const int h = frame.ydim;
 
-	const gravis::d4Matrix& proj = tomogram.projectionMatrices[f];
 
-	gravis::d4Vector pw(center);
-	gravis::d4Vector pi = proj * pw;
+	d4Vector pw(center);
+	d4Vector pi = proj * pw;
 
-	gravis::d3Vector dwdx(proj(0,0), proj(0,1), proj(0,2));
-	gravis::d3Vector dwdy(proj(1,0), proj(1,1), proj(1,2));
+	d3Vector dwdx(proj(0,0), proj(0,1), proj(0,2));
+	d3Vector dwdy(proj(1,0), proj(1,1), proj(1,2));
 
 	std::vector<double> accSH = accelerate(dwdx, dwdy, 2.0 * PI * radius);
 
@@ -402,7 +205,7 @@ BufferedImage<float> Blob::radialAverageProjection(
 
 		if (r >= radius - 1 || r < 0)
 		{
-			out(x,y) = tomogram.stack(x,y,f);
+			out(x,y) = frame(x,y);
 			continue;
 		}
 
@@ -418,22 +221,23 @@ BufferedImage<float> Blob::radialAverageProjection(
 }
 
 void Blob::subtract(
-	Tomogram& tomogram, int f, double taper)
+	RawImage<float>& frame,
+	const d4Matrix& proj,
+	const RawImage<float>& weight,
+	double taper)
 {
 	const int radius = outer_radius + taper;
 
-	std::vector<double> radAvg = radialAverage(tomogram, f, radius);
+	std::vector<double> radAvg = radialAverage(frame, proj, weight, radius);
 
-	const int w = tomogram.stack.xdim;
-	const int h = tomogram.stack.ydim;
+	const int w = frame.xdim;
+	const int h = frame.ydim;
 
-	const gravis::d4Matrix& proj = tomogram.projectionMatrices[f];
+	d4Vector pw(center);
+	d4Vector pi = proj * pw;
 
-	gravis::d4Vector pw(center);
-	gravis::d4Vector pi = proj * pw;
-
-	gravis::d3Vector dwdx(proj(0,0), proj(0,1), proj(0,2));
-	gravis::d3Vector dwdy(proj(1,0), proj(1,1), proj(1,2));
+	d3Vector dwdx(proj(0,0), proj(0,1), proj(0,2));
+	d3Vector dwdy(proj(1,0), proj(1,1), proj(1,2));
 
 	std::vector<double> accSH = accelerate(dwdx, dwdy, 2.0 * PI * radius);
 
@@ -464,7 +268,7 @@ void Blob::subtract(
 		else if (ru < outer_radius + taper) wgh = cos(0.5 * PI * (ru - outer_radius) / taper);
 		else wgh = 0.0;
 
-		outside_val += (1 - wgh) * tomogram.stack(x,y,f);
+		outside_val += (1 - wgh) * frame(x,y);
 		outside_wgh += (1 - wgh);
 	}
 
@@ -499,7 +303,7 @@ void Blob::subtract(
 		else if (ru < outer_radius + taper) wgh = cos(0.5 * PI * (ru - outer_radius) / taper);
 		else wgh = 0.0;
 
-		tomogram.stack(x,y,f) -= wgh * pred;
+		frame(x,y) -= wgh * pred;
 	}
 }
 
@@ -521,7 +325,7 @@ std::vector<double> Blob::toVector()
 	return out;
 }
 
-double Blob::getOffset(gravis::d3Vector v)
+double Blob::getOffset(d3Vector v)
 {
 	const int cc = shCoeffs.size();
 	
@@ -540,7 +344,7 @@ double Blob::getOffset(gravis::d3Vector v)
 	return out;
 }
 
-void Blob::getBasis(gravis::d3Vector v, double *dest)
+void Blob::getBasis(d3Vector v, double *dest)
 {
 	const int cc = shCoeffs.size();
 	
@@ -563,7 +367,7 @@ void Blob::getBasis(gravis::d3Vector v, double *dest)
 	}
 }
 
-std::vector<double> Blob::accelerate(gravis::d3Vector ux, gravis::d3Vector uy, int bins)
+std::vector<double> Blob::accelerate(d3Vector ux, d3Vector uy, int bins)
 {
 	std::vector<double> accSH(bins);
 	
@@ -579,7 +383,7 @@ std::vector<double> Blob::accelerate(gravis::d3Vector ux, gravis::d3Vector uy, i
 	return accSH;
 }
 
-std::vector<double> Blob::accelerateBasis(gravis::d3Vector ux, gravis::d3Vector uy, int bins)
+std::vector<double> Blob::accelerateBasis(d3Vector ux, d3Vector uy, int bins)
 {
 	const int cc = shCoeffs.size();	
 	

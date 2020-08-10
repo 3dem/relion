@@ -5,7 +5,8 @@ using namespace gravis;
 
 std::vector<d3Vector> Fiducials::read(
 		const std::string &tomoName,
-		const std::string &path)
+		const std::string &path,
+		double pixelSize)
 {
 	MetaDataTable metaDataTable;
 	metaDataTable.read(path+"fiducials_"+tomoName+".star");
@@ -16,9 +17,9 @@ std::vector<d3Vector> Fiducials::read(
 
 	for (int i = 0; i < n; i++)
 	{
-		out[i].x = metaDataTable.getDouble(EMDL_ORIENT_ORIGIN_X_ANGSTROM, i);
-		out[i].y = metaDataTable.getDouble(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, i);
-		out[i].z = metaDataTable.getDouble(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, i);
+		out[i].x = metaDataTable.getDouble(EMDL_ORIENT_ORIGIN_X_ANGSTROM, i) / pixelSize;
+		out[i].y = metaDataTable.getDouble(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, i) / pixelSize;
+		out[i].z = metaDataTable.getDouble(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, i) / pixelSize;
 	}
 
 	return out;

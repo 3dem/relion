@@ -14,7 +14,8 @@ class Fiducials
 
 		static std::vector<gravis::d3Vector> read(
 				const std::string &tomoName,
-				const std::string &path);
+				const std::string &path,
+				double pixelSize);
 
 		static void write(
 				const std::vector<gravis::d3Vector>& positions,

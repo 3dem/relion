@@ -12,7 +12,7 @@ class Blob
 {
 	public:
 		
-		Blob();		
+		Blob();
 		
 		Blob(gravis::d3Vector center, int outer_radius);
 		
@@ -29,21 +29,27 @@ class Blob
 		
 
 		std::vector<double> radialAverage(
-				const Tomogram& tomogram, int f, int radius = -1,
-				const RawImage<float>* mask = 0);
+				const RawImage<float>& frame,
+				const gravis::d4Matrix& proj,
+				const RawImage<float>& weight,
+				int radius = -1);
 
 		double radialAverageError(
-				const Tomogram& tomogram, int f, const std::vector<double>& radAvg,
-				const RawImage<float>* mask = 0);
-
-		std::vector<double> radialAverageErrorGrad(
-				const Tomogram& tomogram, int f, const std::vector<double>& radAvg);
+				const RawImage<float>& frame,
+				const gravis::d4Matrix& proj,
+				const RawImage<float>& weight,
+				const std::vector<double>& radAvg);
 
 		BufferedImage<float> radialAverageProjection(
-				const Tomogram& tomogram, int f, const std::vector<double>& radAvg);
+				const RawImage<float>& frame,
+				const gravis::d4Matrix& proj,
+				const std::vector<double>& radAvg);
 
-		// change to pure image stack
-		void subtract(Tomogram& tomogram, int f, double taper);
+		void subtract(
+				RawImage<float>& frame,
+				const gravis::d4Matrix& proj,
+				const RawImage<float>& weight,
+				double taper);
 		
 		std::vector<double> toVector();
 		

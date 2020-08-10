@@ -11,24 +11,31 @@
 using namespace au::edu::anu::qm::ro;
 
 
-class BlobFit : public DifferentiableOptimization
+class BlobFit : public Optimization
 {
 	public:
 		
-		BlobFit(const Tomogram& tomogram,
-				const std::vector<gravis::d4Vector>& positions,
-				int id, double mean_radius,
-				int outer_radius, int sh_bands, bool useMasks, double priorSigma,
-				int num_threads);
-		
+		BlobFit(
+			const Tomogram& tomogram,
+			gravis::d3Vector position,
+			int sh_bands,
+			double radius,
+			double thickness,
+			const std::vector<gravis::d4Vector>& allSpheres,
+			const std::vector<gravis::d3Vector>& fiducials,
+			double fiducialRadius,
+			double priorSigma,
+			int num_threads);
+
+
 			const Tomogram& tomogram;
 			gravis::d3Vector initialPos;
 			int outer_radius, sh_bands;
-			std::vector<BufferedImage<float>> masks;
-			bool useMasks;
-			int num_threads;
+			BufferedImage<float> weight;
 			double priorSigma2;
+			int num_threads;
 			
+
 		double f(const std::vector<double>& x, void* tempStorage) const;
 		void grad(const std::vector<double>& x, std::vector<double>& gradDest, void* tempStorage) const;
 		
