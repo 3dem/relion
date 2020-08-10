@@ -28,12 +28,12 @@ class BlobFit : public Optimization
 			int num_threads);
 
 
-			const Tomogram& tomogram;
-			gravis::d3Vector initialPos;
-			int outer_radius, sh_bands;
-			BufferedImage<float> weight;
-			double priorSigma2;
-			int num_threads;
+				const Tomogram& tomogram;
+				gravis::d3Vector initialPos;
+				int outer_radius, sh_bands;
+				BufferedImage<float> weight;
+				double priorSigma2;
+				int num_threads;
 			
 
 		double f(const std::vector<double>& x, void* tempStorage) const;

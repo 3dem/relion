@@ -1,5 +1,4 @@
 #include "blob.h"
-#include <src/spherical-harmonics/SphericalHarmonics.h>
 
 #include <omp.h>
 
@@ -56,14 +55,9 @@ std::vector<double> Blob::radialAverage(
 
 	std::vector<double> accSH = accelerate(dwdx, dwdy, 2.0 * PI * radius);
 
-	const int x0 = (int) (pi.x + 0.5);
-	const int y0 = (int) (pi.y + 0.5);
-
-	for (int y = y0 - radius + 1; y <= y0 + radius - 1; y++)
-	for (int x = x0 - radius + 1; x <= x0 + radius - 1; x++)
+	for (int y = 0; y < h; y++)
+	for (int x = 0; x < w; x++)
 	{
-		if (x < 0 || x >= w || y < 0 || y >= h) continue;
-
 		const double dx = x - pi.x;
 		const double dy = y - pi.y;
 
@@ -100,7 +94,7 @@ double Blob::radialAverageError(
 		const RawImage<float>& weight,
 		const std::vector<double>& radAvg)
 {
-	double out(0.0), totWgh(0.0);
+	double out = 0.0;
 
 	const int radius = radAvg.size();
 
@@ -116,34 +110,11 @@ double Blob::radialAverageError(
 
 	std::vector<double> accSH = accelerate(dwdx, dwdy, 2.0 * PI * radius);
 
-	const int x0 = (int) (pi.x + 0.5);
-	const int y0 = (int) (pi.y + 0.5);
-
-	for (int y = y0 - radius + 1; y <= y0 + radius - 1; y++)
-	for (int x = x0 - radius + 1; x <= x0 + radius - 1; x++)
+	for (int y = 0; y < h; y++)
+	for (int x = 0; x < w; x++)
 	{
-		double obs(0.0), m(1.0);
-
-		if (x < 0 || x >= w || y < 0 || y >= h)
-		{
-			int xa, ya;
-
-			if (x < 0) xa = 0;
-			else if (x >= w) xa = w-1;
-			else xa = x;
-
-			if (y < 0) ya = 0;
-			else if (y >= h) ya = h-1;
-			else ya = y;
-
-			obs = frame(xa,ya);
-			m = 1e-4;
-		}
-		else
-		{
-			obs = frame(x,y);
-			m = weight(x,y);
-		}
+		const double obs = frame(x,y);
+		const double m = weight(x,y);
 
 		const double dx = x - pi.x;
 		const double dy = y - pi.y;
@@ -162,10 +133,8 @@ double Blob::radialAverageError(
 		const double err = pred - obs;
 
 		out += m * err * err;
-		totWgh += m;
 	}
 
-	if (totWgh > 0.0) return out / totWgh;
 	return out;
 }
 
@@ -190,24 +159,16 @@ BufferedImage<float> Blob::radialAverageProjection(
 
 	std::vector<double> accSH = accelerate(dwdx, dwdy, 2.0 * PI * radius);
 
-	const int x0 = (int) (pi.x + 0.5);
-	const int y0 = (int) (pi.y + 0.5);
-
-	for (int y = y0 - radius + 1; y <= y0 + radius - 1; y++)
-	for (int x = x0 - radius + 1; x <= x0 + radius - 1; x++)
+	for (int y = 0; y < h; y++)
+	for (int x = 0; x < w; x++)
 	{
-		if (x < 0 || x >= w || y < 0 || y >= h) continue;
-
 		const double dx = x - pi.x;
 		const double dy = y - pi.y;
 
-		const double r = sqrt(dx*dx + dy*dy) + getOffsetAcc(dx, dy, accSH);
+		double r = sqrt(dx*dx + dy*dy) + getOffsetAcc(dx, dy, accSH);
 
-		if (r >= radius - 1 || r < 0)
-		{
-			out(x,y) = frame(x,y);
-			continue;
-		}
+		if (r >= radius - 1 - 1e-6) r = radius - 1 - 1e-6;
+		if (r < 0) r = 0;
 
 		const int r0 = (int)r;
 		const int r1 = r0 + 1;
@@ -307,137 +268,3 @@ void Blob::subtract(
 	}
 }
 
-
-std::vector<double> Blob::toVector()
-{
-	std::vector<double> out(shCoeffs.size() + 3);
-	
-	for (int i = 0; i < 3; i++)
-	{
-		out[i] = center[i];
-	}
-	
-	for (int i = 0; i < shCoeffs.size(); i++)
-	{
-		out[i+3] = shCoeffs[i];
-	}
-	
-	return out;
-}
-
-double Blob::getOffset(d3Vector v)
-{
-	const int cc = shCoeffs.size();
-	
-	if (cc < 1) return 0.0;
-	
-	std::vector<double> basis(cc);
-	getBasis(v, &basis[0]);
-	
-	double out(0.0);
-	
-	for (int i = 1; i < cc; i++)
-	{
-		out += shCoeffs[i] * basis[i];
-	}
-	
-	return out;
-}
-
-void Blob::getBasis(d3Vector v, double *dest)
-{
-	const int cc = shCoeffs.size();
-	
-	if (cc < 1) return;
-	
-	v.normalize();
-	
-	const double phi = atan2(v.y, v.x);
-	
-	std::vector<double> Y(cc);
-	
-	#pragma omp critical
-	{
-		sphericalHarmonics->computeY(shBands, v.z, phi, &Y[0]);
-	}
-	
-	for (int i = 1; i < cc; i++)
-	{
-		dest[i] = Y[i];
-	}
-}
-
-std::vector<double> Blob::accelerate(d3Vector ux, d3Vector uy, int bins)
-{
-	std::vector<double> accSH(bins);
-	
-	for (int i = 0; i < bins; i++)
-	{
-		const double phi = 2.0 * PI * i / (double)bins;
-		const double dx = cos(phi);
-		const double dy = sin(phi);
-		
-		accSH[i] = getOffset(dx * ux + dy * uy);
-	}
-	
-	return accSH;
-}
-
-std::vector<double> Blob::accelerateBasis(d3Vector ux, d3Vector uy, int bins)
-{
-	const int cc = shCoeffs.size();	
-	
-	if (cc < 1) return std::vector<double>(0);
-	
-	std::vector<double> accSHbasis(bins*cc);
-		
-	for (int i = 0; i < bins; i++)
-	{
-		const double phi = 2.0 * PI * i / (double)bins;
-		const double dx = cos(phi);
-		const double dy = sin(phi);
-		
-		getBasis(dx * ux + dy * uy, &accSHbasis[i*cc]);
-	}
-	
-	return accSHbasis;
-}
-
-double Blob::getOffsetAcc(double dx, double dy, const std::vector<double>& accSH)
-{
-	if (dx == 0.0 && dy == 0.0) return 0.0;
-	
-	const int bins = accSH.size();
-	
-	double phi = atan2(dy,dx);
-	if (phi < 0.0) phi += 2.0 * PI;
-	
-	const double id = bins * phi / (2.0 * PI);
-	
-	const int i0 = (int)id;
-	const int i1 = (i0+1) % bins;
-	const double di = id - i0;
-	
-	return (1.0 - di) * accSH[i0] + di * accSH[i1];
-}
-
-
-double Blob::getBasisAcc(double dx, double dy, int b, const std::vector<double>& accSHbasis)
-{
-	if (dx == 0.0 && dy == 0.0) return 0.0;
-	
-	const int cc = shCoeffs.size();
-	const int bins = accSHbasis.size() / cc;
-	
-	double phi = atan2(dy,dx);
-	if (phi < 0.0) phi += 2.0 * PI;
-	
-	const double id = bins * phi / (2.0 * PI);
-	
-	const int i0 = (int)id;
-	const int i1 = (i0+1) % bins;
-	const double di = id - i0;
-	
-	return (1.0 - di) * accSHbasis[i0*cc + b] + di * accSHbasis[i1*cc + b];
-	
-}
