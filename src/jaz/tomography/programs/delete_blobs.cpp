@@ -24,9 +24,8 @@ void DeleteBlobsProgram::readParameters(int argc, char *argv[])
 		int gen_section = parser.addSection("General options");
 
 		tomoSetFn = parser.getOption("--t", "Tomogram set filename", "tomograms.star");
-		tomoName = parser.getOption("--tn", "Tomogram name");
+		listFn = parser.getOption("--i", "File containing a list of tomogram-name/spheres-file pairs");
 
-		spheresFn = parser.getOption("--sn", "Spheres filename");
 		sphere_thickness_0 = textToDouble(parser.getOption("--th", "Sphere thickness (same units as sphere centres)"));
 		spheres_binning = textToDouble(parser.getOption("--sbin", "Binning factor of the sphere coordinates"));
 
@@ -61,7 +60,6 @@ void DeleteBlobsProgram::readParameters(int argc, char *argv[])
 		exit(1);
 	}
 
-	spheres = readSpheresCMM(spheresFn, spheres_binning);
 	sphere_thickness = sphere_thickness_0 * spheres_binning;
 
 	outPath = ZIO::makeOutputDir(outPath);
@@ -70,6 +68,65 @@ void DeleteBlobsProgram::readParameters(int argc, char *argv[])
 void DeleteBlobsProgram::run()
 {
 	TomogramSet tomogramSet = TomogramSet(tomoSetFn);
+	
+	if (!tomogramSet.globalTable.labelExists(EMDL_TOMO_FIDUCIALS_STARFILE))
+	{
+		Log::warn("No fiducial markers present: you are advised to run relion_tomo_find_fiducials first.");
+	}
+	
+	std::ifstream list(listFn);
+	
+	if (!list)
+	{
+		REPORT_ERROR_STR("Unable to read "+listFn);
+	}
+	
+	std::map<std::string, std::string> tomoToSpheres;
+	
+	std::string line;
+	
+	while (std::getline(list, line))
+	{
+		std::stringstream sts;
+		sts << line;
+	
+		std::string tomoName, spheresFn;		
+		sts >> tomoName;
+		sts >> spheresFn;
+		
+		tomoToSpheres[tomoName] = spheresFn;
+		
+		if (diag)
+		{
+			Log::print(tomoName + " -> " + spheresFn);
+		}
+	}
+		
+	for (std::map<std::string, std::string>::iterator it = tomoToSpheres.begin();
+	     it != tomoToSpheres.end(); it++)
+	{
+		const std::string tomoName = it->first;
+		const std::string spheresFn = it->second;
+		
+		Log::beginSection("Tomogram " + tomoName);
+		
+		processTomogram(tomoName, spheresFn, tomogramSet);
+		
+		Log::endSection();
+	}
+	
+	tomogramSet.write(outPath+"tomograms.star");
+}
+
+void DeleteBlobsProgram::processTomogram(
+        std::string tomoName, 
+        std::string spheresFn,
+        TomogramSet& tomogramSet)
+{
+	Log::print("Loading");
+	
+	spheres = readSpheresCMM(spheresFn, spheres_binning);
+	
 	const int tomo_index = tomogramSet.getTomogramIndexSafely(tomoName);
 
 	Tomogram tomogram0 = tomogramSet.loadTomogram(tomo_index, true);
@@ -83,23 +140,25 @@ void DeleteBlobsProgram::run()
 	const double highpass_sigma_real = highpass_sigma_real_A / pixel_size;
 	const double fiducials_radius = fiducials_radius_A / pixel_size;
 
-
-
+	
+	Log::print("Filtering");
+	
 	BufferedImage<float> original_stack = tomogram0.stack;
 
 	tomogram0.stack = ImageFilter::highpassStackGaussPadded(
 						original_stack,
 						highpass_sigma_real,
 						num_threads);
-
-
+	
 	std::vector<d3Vector> fiducials(0);
-	bool has_fiducials = fiducialsDir.length() > 0;
+	bool has_fiducials = tomogram0.fiducialsFilename.length() > 0;
 
 	BufferedImage<float> fiducialsMask(w_full, h_full, frame_count);
 
 	if (has_fiducials)
 	{
+		Log::print("Loading fiducial markers");
+		
 		if (fiducialsDir[fiducialsDir.length()-1] != '/')
 		{
 			fiducialsDir = fiducialsDir + "/";
@@ -120,14 +179,14 @@ void DeleteBlobsProgram::run()
 	}
 
 
-	original_stack.write(outPath+"orig.mrc", tomogram0.optics.pixelSize);
-
 	BufferedImage<float> blobs_stack(w_full, h_full, frame_count);
 	blobs_stack.fill(0.f);
 
 
 	for (int blob_id = 0; blob_id < spheres.size(); blob_id++)
 	{
+		Log::beginSection("Blob #" + ZIO::itoa(blob_id + 1));
+		
 		const d4Vector s4 = spheres[blob_id];
 
 		std::vector<double> initial = {s4.x, s4.y, s4.z};
@@ -137,7 +196,7 @@ void DeleteBlobsProgram::run()
 
 		double current_binning = max_binning;
 
-		while (current_binning > min_binning)
+		while (current_binning > min_binning - 1e-6)
 		{
 			blob_coeffs = fitBlob(blob_id, blob_coeffs, current_binning, tomogram0, fiducials);
 
@@ -161,9 +220,15 @@ void DeleteBlobsProgram::run()
 				fiducialsMask.getConstSliceRef(f),
 				50.0);
 		}
+		
+		const std::string blobTag = "blob_" + ZIO::itoa(blob_id);
 
-		original_stack.write(outPath+"blob_"+ZIO::itoa(blob_id)+"_subtracted.mrc", tomogram0.optics.pixelSize);
-		blobs_stack.write(outPath+"blob_"+ZIO::itoa(blob_id)+"_blobs.mrc", tomogram0.optics.pixelSize);
+		original_stack.write(outPath + blobTag + "_subtracted.mrc", tomogram0.optics.pixelSize);
+		blobs_stack.write(outPath + blobTag + "_blobs.mrc", tomogram0.optics.pixelSize);
+		
+		tomogramSet.setTiltSeriesFile(tomo_index, outPath + blobTag + "_subtracted.mrc");
+		
+		Log::endSection();
 	}
 }
 
@@ -175,7 +240,6 @@ std::vector<double> DeleteBlobsProgram::fitBlob(
 		const std::vector<d3Vector>& fiducials)
 {
 	const double pixelSize_full = tomogram0.optics.pixelSize;
-	const int frame_count = tomogram0.frameCount;
 
 	// 3D coordinates live in bin-1 pixel coordinates
 	const d4Vector sphere = spheres[blob_id];
@@ -184,8 +248,6 @@ std::vector<double> DeleteBlobsProgram::fitBlob(
 	// 2D radii, thicknesses and distances are binned
 	const double sphere_radius_full = sphere.w;
 	const double outer_radius_full = sphere.w + sphere_thickness / 2;
-	const double sphere_thickness_full = sphere_thickness;
-	const double fiducials_radius_full = fiducials_radius_A / pixelSize_full;
 
 	// The prior is evaluated in 2D
 	const double prior_sigma = prior_sigma_A / pixelSize_full;
@@ -237,9 +299,9 @@ std::vector<double> DeleteBlobsProgram::fitBlob(
 
 	for (int current_SH_bands = initial_SH_bands; current_SH_bands <= SH_bands; current_SH_bands++)
 	{
-		std::cout << current_SH_bands << " SH bands..." << std::endl;
-
 		const int SH_coeffs = (current_SH_bands + 1) * (current_SH_bands + 1);
+		
+		Log::print(ZIO::itoa(current_SH_bands) + " SH bands (" + ZIO::itoa(SH_coeffs + 3) + " parameters)");
 
 		BlobFit bf(
 			tomogram_binned, spheres[blob_id].xyz(), current_SH_bands,
@@ -259,40 +321,20 @@ std::vector<double> DeleteBlobsProgram::fitBlob(
 		std::vector<double> new_optimum;
 
 		new_optimum = NelderMead::optimize(
-				current_optimum, bf, initial_step, 0.05, 200, 1.0, 2.0, 0.5, 0.5, false);
+				current_optimum, bf, initial_step, 0.05, max_iters, 1.0, 2.0, 0.5, 0.5, false);
 
 		if (diag)
 		{
 			SphericalHarmonics sh(current_SH_bands);
 			Blob blob2(new_optimum, outer_radius_binned, &sh);
-
-			std::cout << "E = " << bf.f(new_optimum, &sh) << std::endl;
+			
+			const double E0 = bf.f(current_optimum, &sh);
+			const double E1 = bf.f(new_optimum, &sh);
+			
+			Log::print("E: "+ZIO::itoa(E0)+" -> "+ZIO::itoa(E1));
 
 			drawTestStack(blob2, tomogram_binned, bf.weight)
 				.write(outTag+"_003_SH"+ZIO::itoa(current_SH_bands)+".mrc");
-		}
-		else
-		{
-			std::cout << "           -> ";
-
-			for (int i = 0; i < 3; i++)
-			{
-				std::cout << new_optimum[i] << ", ";
-			}
-
-			std::cout << "   ";
-
-			for (int j = 1; j <= current_SH_bands; j++)
-			{
-				for (int i = -j; i <= j; i++)
-				{
-					std::cout << new_optimum[3 + j*j + j + i] << ", ";
-				}
-
-				std::cout << "   ";
-			}
-
-			std::cout << std::endl;
 		}
 
 		last_optimum = new_optimum;

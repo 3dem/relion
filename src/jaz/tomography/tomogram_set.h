@@ -38,6 +38,7 @@ class TomogramSet
 		void setProjection(int tomogramIndex, int frame, const gravis::d4Matrix& P);
 		void setCtf(int tomogramIndex, int frame, const CTF& ctf);
 		void setDose(int tomogramIndex, int frame, double dose);
+		void setTiltSeriesFile(int tomogramIndex, const std::string& filename);
 		void setFiducialsFile(int tomogramIndex, const std::string& filename);
 
 		Tomogram loadTomogram(int index, bool loadImageData) const;

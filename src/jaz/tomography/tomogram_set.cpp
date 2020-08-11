@@ -161,6 +161,11 @@ void TomogramSet::setDose(int tomogramIndex, int frame, double dose)
 	m.setValue(EMDL_MICROGRAPH_PRE_EXPOSURE, dose, frame);
 }
 
+void TomogramSet::setTiltSeriesFile(int tomogramIndex, const std::string &filename)
+{
+	globalTable.setValue(EMDL_TOMO_TILT_SERIES_NAME, filename, tomogramIndex);
+}
+
 void TomogramSet::setFiducialsFile(int tomogramIndex, const std::string &filename)
 {
 	globalTable.setValue(EMDL_TOMO_FIDUCIALS_STARFILE, filename, tomogramIndex);
@@ -246,6 +251,15 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 	
 	out.frameSequence = IndexSort<double>::sortIndices(out.cumulativeDose);
 	out.name = tomoName;
+	
+	if (globalTable.labelExists(EMDL_TOMO_FIDUCIALS_STARFILE))
+	{
+		 globalTable.getValue(EMDL_TOMO_FIDUCIALS_STARFILE, out.fiducialsFilename, index);
+	}
+	else
+	{
+		out.fiducialsFilename;
+	}
 	
 	return out;
 }

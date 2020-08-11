@@ -30,7 +30,7 @@ class Tomogram
 			gravis::d3Vector centre;
 			int w0, h0, d0;
 			std::vector<int> frameSequence;
-			std::string name;
+			std::string name, fiducialsFilename;
 		
 			
 		double getFrameDose() const;

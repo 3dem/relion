@@ -5,6 +5,7 @@
 #include <src/jaz/image/buffered_image.h>
 
 class Tomogram;
+class TomogramSet;
 class Blob;
 
 class DeleteBlobsProgram
@@ -13,7 +14,7 @@ class DeleteBlobsProgram
 		
 		DeleteBlobsProgram(){}
 		
-			std::string outPath, tomoSetFn, tomoName, spheresFn, fiducialsDir;
+			std::string outPath, tomoSetFn, listFn, fiducialsDir;
 			
 			bool diag;
 			int SH_bands, num_threads, max_iters;
@@ -26,7 +27,11 @@ class DeleteBlobsProgram
 			
 		void readParameters(int argc, char *argv[]);
 		void run();
-
+		
+		void processTomogram(
+		        std::string tomoName, 
+		        std::string spheresFn,
+		        TomogramSet& tomogramSet);
 
 
 
