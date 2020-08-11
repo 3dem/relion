@@ -199,9 +199,12 @@ void DeleteBlobsProgram::processTomogram(
 
 		while (current_binning > min_binning - 1e-6)
 		{
+			Log::beginSection("Refining at bin " + ZIO::itoa((int)current_binning));
+			
 			blob_coeffs = fitBlob(blob_id, blob_coeffs, current_binning, tomogram0, fiducials);
-
 			current_binning /= 2;
+			
+			Log::endSection();
 		}
 
 
