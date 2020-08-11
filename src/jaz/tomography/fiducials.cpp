@@ -43,8 +43,12 @@ std::string Fiducials::write(
 		metaDataTable.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, posAngst.y, i);
 		metaDataTable.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, posAngst.z, i);
 	}
+	
+	std::string filename = path + "fiducials_" + tomoName + ".star";
 
-	metaDataTable.write(path+"fiducials_"+tomoName+".star");
+	metaDataTable.write(filename);
+	
+	return filename;
 }
 
 void Fiducials::drawMask(

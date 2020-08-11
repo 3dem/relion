@@ -199,10 +199,6 @@ std::vector<gravis::d3Vector> Detection::findLocalMaxima(
 	const int h3Db = h3D / binning;
 	const int d3Db = d3D / binning;
 
-	std::cout << w2D << "x" << h2D << ", " << wt2D << "x" << ht2D << std::endl;
-	std::cout << w3D << "x" << h3D << ", " << d3D
-			  << ", " << w3Db << "x" << h3Db << ", " << d3Db << std::endl;
-
 
 	BufferedImage<T> coarseVol(w3Db, h3Db, d3Db), coarseMask(w3Db, h3Db, d3Db);
 			

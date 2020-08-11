@@ -102,7 +102,7 @@ int main(int argc, char *argv[])
 
 		std::vector<gravis::d3Vector> detections = Detection::findLocalMaxima(
 			tomogram, fidCC, origin, spacing, diagonal,
-			(float)thresh, 10000, beadRadius_px, num_threads, binning_in, "debug_");
+			(float)thresh, 10000, beadRadius_px, num_threads, binning_in, "");
 
 		Log::print(ZIO::itoa(detections.size()) + " blobs found.");
 		
