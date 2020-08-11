@@ -11,6 +11,7 @@ class Blob;
 class DeleteBlobsProgram
 {
 	public:
+
 		
 		DeleteBlobsProgram(){}
 		
@@ -26,17 +27,20 @@ class DeleteBlobsProgram
 			std::vector<gravis::d4Vector> spheres;
 			
 		void readParameters(int argc, char *argv[]);
-		void run();
-		
-		void processTomogram(
-		        std::string tomoName, 
-		        std::string spheresFn,
-		        TomogramSet& tomogramSet);
 
+		void run();
 
 
 
 	private:
+
+
+		void processTomogram(
+				std::string tomoName,
+				std::string spheresFn,
+				TomogramSet& initial_tomogram_set,
+				TomogramSet& subtracted_tomogram_set,
+				TomogramSet& blobs_tomogram_set);
 
 		std::vector<double> fitBlob(
 				int blob_id,
@@ -58,6 +62,14 @@ class DeleteBlobsProgram
 				Blob& blob,
 				const Tomogram& tomogram,
 				BufferedImage<float>& realWeight);
+
+		std::vector<double> toBin1(
+				const std::vector<double>& parameters,
+				double binning_factor);
+
+		std::vector<double> fromBin1(
+				const std::vector<double>& parameters,
+				double binning_factor);
 };
 
 #endif
