@@ -13,8 +13,7 @@ class Fiducials
 	public:
 
 		static std::vector<gravis::d3Vector> read(
-				const std::string &tomoName,
-				const std::string &path,
+		        const std::string &filename,
 				double pixelSize);
 
 		static std::string write(

@@ -164,7 +164,7 @@ void DeleteBlobsProgram::processTomogram(
 			fiducialsDir = fiducialsDir + "/";
 		}
 
-		fiducials = Fiducials::read(tomogram0.name, fiducialsDir, tomogram0.optics.pixelSize);
+		fiducials = Fiducials::read(tomogram0.fiducialsFilename, tomogram0.optics.pixelSize);
 
 		#pragma omp parallel for num_threads(num_threads)
 		for (int f = 0; f < frame_count; f++)

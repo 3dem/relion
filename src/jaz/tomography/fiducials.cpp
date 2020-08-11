@@ -4,12 +4,11 @@ using namespace gravis;
 
 
 std::vector<d3Vector> Fiducials::read(
-		const std::string &tomoName,
-		const std::string &path,
+		const std::string &filename,
 		double pixelSize)
 {
 	MetaDataTable metaDataTable;
-	metaDataTable.read(path+"fiducials_"+tomoName+".star");
+	metaDataTable.read(filename);
 
 	const int n = metaDataTable.numberOfObjects();
 
