@@ -40,7 +40,10 @@ class DeleteBlobsProgram
 				std::string spheresFn,
 				TomogramSet& initial_tomogram_set,
 				TomogramSet& subtracted_tomogram_set,
-				TomogramSet& blobs_tomogram_set);
+				TomogramSet& blobs_tomogram_set,
+				BufferedImage<float>& visualisation,
+				int tomo_batch_index,
+				int tomo_batch_size);
 
 		std::vector<double> fitBlob(
 				int blob_id,

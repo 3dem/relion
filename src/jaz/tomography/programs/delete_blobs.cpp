@@ -90,6 +90,8 @@ void DeleteBlobsProgram::run()
 	std::map<std::string, std::string> tomoToSpheres;
 	
 	std::string line;
+
+	BufferedImage<float> visualisation(0,0,0);
 	
 	while (std::getline(list, line))
 	{
@@ -102,6 +104,8 @@ void DeleteBlobsProgram::run()
 		
 		tomoToSpheres[tomoName] = spheresFn;
 	}
+
+	int tomo_index = 0;
 		
 	for (std::map<std::string, std::string>::iterator it = tomoToSpheres.begin();
 	     it != tomoToSpheres.end(); it++)
@@ -115,13 +119,23 @@ void DeleteBlobsProgram::run()
 			tomoName, spheresFn,
 			initial_tomogram_set,
 			subtracted_tomogram_set,
-			blobs_tomogram_set );
+			blobs_tomogram_set,
+			visualisation,
+			tomo_index,
+			tomoToSpheres.size());
 		
 		Log::endSection();
+
+		tomo_index++;
 	}
 
-	subtracted_tomogram_set.write(outPath+"tomograms.star");
-	blobs_tomogram_set.write(outPath+"blob_tomograms.star");
+	subtracted_tomogram_set.write(outPath + "tomograms.star");
+	blobs_tomogram_set.write(outPath + "blob_tomograms.star");
+
+	if (diag)
+	{
+		visualisation.write(outPath + "diagnostic.mrc");
+	}
 }
 
 void DeleteBlobsProgram::processTomogram(
@@ -129,7 +143,10 @@ void DeleteBlobsProgram::processTomogram(
 		std::string spheresFn,
 		TomogramSet& initial_tomogram_set,
 		TomogramSet& subtracted_tomogram_set,
-		TomogramSet& blobs_tomogram_set)
+		TomogramSet& blobs_tomogram_set,
+		BufferedImage<float>& visualisation,
+		int tomo_batch_index,
+		int tomo_batch_size)
 {
 	Log::print("Loading tilt series");
 	
@@ -148,11 +165,6 @@ void DeleteBlobsProgram::processTomogram(
 	const double highpass_sigma_real = highpass_sigma_real_A / pixel_size;
 	const double fiducials_radius = fiducials_radius_A / pixel_size;
 
-	if (diag)
-	{
-		ZIO::makeOutputDir(outPath + "diag/" + tomogram0.name);
-	}
-
 
 	Log::print("Filtering");
 	
@@ -162,7 +174,20 @@ void DeleteBlobsProgram::processTomogram(
 						original_stack,
 						highpass_sigma_real,
 						num_threads);
-	
+	if (diag)
+	{
+		ZIO::makeOutputDir(outPath + "diag/" + tomogram0.name);
+
+		if (visualisation.xdim == 0)
+		{
+			visualisation.resize(w_full, h_full, 3 * tomo_batch_size);
+		}
+
+		visualisation.getSliceRef(3 * tomo_batch_index).copyFrom(
+				original_stack.getConstSliceRef(frame_count / 2));
+	}
+
+
 	std::vector<d3Vector> fiducials(0);
 	bool has_fiducials = tomogram0.fiducialsFilename.length() > 0;
 
@@ -261,6 +286,15 @@ void DeleteBlobsProgram::processTomogram(
 
 	subtracted_tomogram_set.setTiltSeriesFile(tomo_index, tag + "_subtracted.mrc");
 	blobs_tomogram_set.setTiltSeriesFile(tomo_index, tag + "_blobs.mrc");
+
+	if (diag)
+	{
+		visualisation.getSliceRef(3 * tomo_batch_index + 1).copyFrom(
+				original_stack.getConstSliceRef(frame_count / 2));
+
+		visualisation.getSliceRef(3 * tomo_batch_index + 2).copyFrom(
+				blobs_stack.getConstSliceRef(frame_count / 2));
+	}
 }
 
 std::vector<double> DeleteBlobsProgram::fitBlob(
@@ -312,7 +346,7 @@ std::vector<double> DeleteBlobsProgram::fitBlob(
 	{
 		const int SH_coeffs = (current_SH_bands + 1) * (current_SH_bands + 1);
 		
-		Log::print(ZIO::itoa(current_SH_bands) + " SH bands (" + ZIO::itoa(SH_coeffs + 3) + " parameters)");
+		Log::print(ZIO::itoa(current_SH_bands) + " SH bands (" + ZIO::itoa(SH_coeffs + 2) + " parameters)");
 
 		std::string tag = outTag + "_SH_" + ZIO::itoa(current_SH_bands);
 
