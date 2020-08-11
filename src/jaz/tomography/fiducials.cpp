@@ -25,7 +25,7 @@ std::vector<d3Vector> Fiducials::read(
 	return out;
 }
 
-void Fiducials::write(
+std::string Fiducials::write(
 		const std::vector<gravis::d3Vector> &positions,
 		double pixelSize,
 		const std::string &tomoName,

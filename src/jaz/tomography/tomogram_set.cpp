@@ -161,6 +161,11 @@ void TomogramSet::setDose(int tomogramIndex, int frame, double dose)
 	m.setValue(EMDL_MICROGRAPH_PRE_EXPOSURE, dose, frame);
 }
 
+void TomogramSet::setFiducialsFile(int tomogramIndex, const std::string &filename)
+{
+	globalTable.setValue(EMDL_TOMO_FIDUCIALS_STARFILE, filename, tomogramIndex);
+}
+
 Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 {
 	Tomogram out;

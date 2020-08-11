@@ -17,7 +17,7 @@ class Fiducials
 				const std::string &path,
 				double pixelSize);
 
-		static void write(
+		static std::string write(
 				const std::vector<gravis::d3Vector>& positions,
 				double pixelSize,
 				const std::string& tomoName,

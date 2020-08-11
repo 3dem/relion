@@ -9,6 +9,8 @@
 #include <src/jaz/mesh/mesh.h>
 #include <src/jaz/mesh/mesh_builder.h>
 #include <src/jaz/tomography/fiducials.h>
+#include <src/jaz/util/zio.h>
+#include <src/jaz/util/log.h>
 
 using namespace gravis;
 
@@ -18,6 +20,7 @@ int main(int argc, char *argv[])
 	std::string tomoSetFn, outDir;
 	double thresh, binning_out, binning_in, beadRadius_A;
 	int tomoIndex, num_threads;
+	bool diag;
 	
 	IOParser parser;
 
@@ -29,13 +32,15 @@ int main(int argc, char *argv[])
 
 		outDir = parser.getOption("--o", "Output directory");
 		tomoSetFn = parser.getOption("--t", "Tomogram set", "tomograms.star");
-		tomoIndex = textToInteger(parser.getOption("--ti", "Tomogram index"));
 		thresh = textToDouble(parser.getOption("--d", "Detection threshold", "5"));
 		beadRadius_A = textToDouble(parser.getOption("--r", "Bead radius [Å]", "100"));
 		binning_in = textToDouble(parser.getOption("--bin0", "Search binning level", "4"));
 		binning_out = textToDouble(parser.getOption("--bin1", "CC binning level", "4"));
-			
+		diag = parser.checkOption("--diag", "Write out diagnostic information");
+		
 		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
+		
+		Log::readParams(parser);
 
 		if (parser.checkForErrors())
 		{
@@ -50,22 +55,17 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 	
-	TomogramSet tomogramSet(tomoSetFn);
-	
-	const int tc = tomogramSet.size();
-
-	if (tomoIndex >= tc)
-	{
-		REPORT_ERROR_STR("Tomogram index (--ti) must be between 0 and " << tc-1);
-	}
-	
 	outDir = ZIO::makeOutputDir(outDir);
+	
+	TomogramSet tomogramSet(tomoSetFn);	
+	const int tc = tomogramSet.size();
+	
 
-
-
-
+	for (int t = 0; t < tc; t++)
 	{
-		Tomogram tomogram0 = tomogramSet.loadTomogram(tomoIndex, true);
+		Log::beginSection("Tomogram " + ZIO::itoa(t));
+		            
+		Tomogram tomogram0 = tomogramSet.loadTomogram(t, true);
 
 		Tomogram tomogram = tomogram0.FourierCrop(binning_out, num_threads);
 		const int fc = tomogram.frameCount;
@@ -75,11 +75,8 @@ int main(int argc, char *argv[])
 
 		const double beadRadius_px = beadRadius_A / tomogram.optics.pixelSize;
 
-
 		BufferedImage<float> fidKernel = Detection::smallCircleKernel<float>(
 					beadRadius_px, w, h);
-
-		//fidKernel.write(outDir+"debug_fidKernel.mrc");
 
 		BufferedImage<tComplex<float>> fidKernelFS;
 
@@ -98,8 +95,6 @@ int main(int argc, char *argv[])
 			fidCC.getSliceRef(f).copyFrom(CC2D);
 		}
 
-		//fidCC.write(outDir+"debug_fidCC.mrc");
-
 		const d3Vector origin(0.0);
 		const d3Vector spacing(binning_out);
 		const d3Vector diagonal = d3Vector(tomogram.w0, tomogram.h0, tomogram.d0) / binning_out;
@@ -109,8 +104,10 @@ int main(int argc, char *argv[])
 			tomogram, fidCC, origin, spacing, diagonal,
 			(float)thresh, 10000, beadRadius_px, num_threads, binning_in, "debug_");
 
-		std::cout << detections.size() << " blobs found." << std::endl;
+		Log::print(ZIO::itoa(detections.size()) + " blobs found.");
+		
 
+		if (diag)
 		{
 			Mesh mesh;
 
@@ -125,10 +122,16 @@ int main(int argc, char *argv[])
 			mesh.writePly(outDir+"fiducials_"+tomogram0.name+".ply");
 		}
 
-		Fiducials::write(
+		std::string fidFn = Fiducials::write(
 			detections,
 			tomogram0.optics.pixelSize,
 			tomogram0.name,
 			outDir);
+		
+		tomogramSet.setFiducialsFile(t, fidFn);
+		
+		Log::endSection();
 	}
+	
+	tomogramSet.write(outDir+"tomograms.star");
 }

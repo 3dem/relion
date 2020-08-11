@@ -529,6 +529,7 @@ enum EMDLabel
 	EMDL_TOMO_PROJECTION_Z,
 	EMDL_TOMO_PROJECTION_W,
 	EMDL_TOMO_HANDEDNESS,
+	EMDL_TOMO_FIDUCIALS_STARFILE,
 
 	EMDL_UNKNOWN_LABEL,
 
@@ -1081,6 +1082,8 @@ private:
 		EMDL::addLabel(EMDL_TOMO_PROJECTION_W, EMDL_DOUBLE_VECTOR, "rlnTomoProjW", "Fourth row of the projection matrix");
 		
 		EMDL::addLabel(EMDL_TOMO_HANDEDNESS, EMDL_DOUBLE, "rlnTomoHand", "Handedness of a tomogram (i.e. slope of defocus over the image-space z coordinate)");
+				
+		EMDL::addLabel(EMDL_TOMO_FIDUCIALS_STARFILE, EMDL_STRING, "rlnTomoFiducialsStarFile", "STAR file containing the 3D locations of fiducial markers");
 				
 		EMDL::addLabel(EMDL_UNKNOWN_LABEL, EMDL_UNKNOWN, "rlnUnknownLabel", "NON-RELION label: values will be ignored, yet maintained in the STAR file.");
 	 }
