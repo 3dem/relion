@@ -177,8 +177,9 @@ void DeleteBlobsProgram::processTomogram(
 					fiducials_radius, maskSlice, 1e-5f);
 		}
 	}
-
-
+	
+	Log::print("Allocating blobs stack");
+	
 	BufferedImage<float> blobs_stack(w_full, h_full, frame_count);
 	blobs_stack.fill(0.f);
 
@@ -254,17 +255,21 @@ std::vector<double> DeleteBlobsProgram::fitBlob(
 	const double initial_step = 1.0;
 
 
-
-	const int substack_size = 1024;
+	
+	
 	const double pixelSize_binned = tomogram0.optics.pixelSize * binning_factor;
 	const double fiducials_radius_binned = fiducials_radius_A / pixelSize_binned;
 
 	const double sphere_radius_binned = sphere_radius_full / binning_factor;
 	const double outer_radius_binned = outer_radius_full / binning_factor;
-
 	const double sphere_thickness_binned = sphere_thickness / binning_factor;
-
+	
+	const int substack_size_binned = 2 * std::ceil(outer_radius_binned / binning_factor);
+	const int substack_size = (int)(substack_size_binned * binning_factor);
+	
+	
 	std::string outTag = outPath + "blob_" + ZIO::itoa(blob_id);
+	
 
 
 	Tomogram tomogram_cropped = tomogram0.extractSubstack(sphere_position, substack_size, substack_size);
