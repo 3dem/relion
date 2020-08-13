@@ -20,12 +20,14 @@
 #include "src/projector.h"
 #include "src/jaz/gravis/t3Vector.h"
 #include <src/time.h>
+#ifdef CUDA
 #include <cufft.h>
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/sem.h>
 #define SEMKEY 826976737978L /* key value for semget() */
 #define PERMS 0666
+#endif
 //#define DEBUG
 
 //#define PROJ_TIMING
