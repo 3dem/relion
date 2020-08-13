@@ -27,8 +27,9 @@ void TomoBackprojectProgram::readParameters(int argc, char *argv[])
 		tomoIndex = textToInteger(parser.getOption("--ti", "Tomogram index", "0"));
 		
 		weight = parser.checkOption("--wg", "Perform weighting in Fourier space (using a Wiener filter)");
-		WienerFract = textToDouble(parser.getOption("--SNR", "SNR assumed by the Wiener filter", "0.1"));
+		SNR = textToDouble(parser.getOption("--SNR", "SNR assumed by the Wiener filter", "0.1"));
 		
+		applyCtf = !parser.checkOption("--noctf", "Ignore the CTF");
 		zeroDC = parser.checkOption("--0dc", "Zero the DC component of each frame");
 		
 		taperRad = textToDouble(parser.getOption("--td", "Tapering distance", "0.0"));
@@ -81,6 +82,7 @@ void TomoBackprojectProgram::run()
 		
 	BufferedImage<float> stackAct;
 	std::vector<d4Matrix> projAct(fc);
+	double pixelSizeAct = tomogram.optics.pixelSize;
 	
 	
 	const int w1 = w > 0? w : w0 / spacing + 0.5;
@@ -106,7 +108,10 @@ void TomoBackprojectProgram::run()
 		{
 			std::cout << "resampling image stack... " << std::endl;
 			
-			stackAct = Resampling::downsampleFiltStack_2D_full(tomogram.stack, spacing / stack_spacing, n_threads);
+			stackAct = Resampling::downsampleFiltStack_2D_full(
+			            tomogram.stack, spacing / stack_spacing, n_threads);
+			
+			pixelSizeAct *= spacing / stack_spacing;
 		}
 		else
 		{
@@ -114,9 +119,64 @@ void TomoBackprojectProgram::run()
 		}
 	}
 	
+	const int w_stackAct = stackAct.xdim;
+	const int h_stackAct = stackAct.ydim;
+	const int wh_stackAct = w_stackAct/2 + 1;
+	
 	
 	d3Vector orig(x0, y0, z0);
 	BufferedImage<float> out(w1, h1, t1);
+	
+	BufferedImage<float> psfStack;
+	
+	if (applyCtf)
+	{
+		// modulate stackAct with CTF (mind the spacing)
+		
+		psfStack.resize(w_stackAct, h_stackAct, fc);
+		BufferedImage<fComplex> debug(wh_stackAct, h_stackAct, fc);
+		
+		#pragma omp parallel for num_threads(n_threads)
+		for (int f = 0; f < fc; f++)
+		{
+			BufferedImage<float> frame = stackAct.getSliceRef(f);
+			
+			BufferedImage<fComplex> frameFS;
+			FFT::FourierTransform(frame, frameFS);
+			
+			CTF ctf = tomogram.centralCTFs[f];
+			
+			
+			BufferedImage<fComplex> ctf2ImageFS(wh_stackAct, h_stackAct);
+			
+			const double box_size_x = pixelSizeAct * w_stackAct;
+			const double box_size_y = pixelSizeAct * h_stackAct;
+			
+			for (int y = 0; y < h_stackAct;  y++)
+			for (int x = 0; x < wh_stackAct; x++)
+			{
+				const double xA = x / box_size_x;
+				const double yA = (y < h_stackAct/2? y : y - h_stackAct) / box_size_y;
+				
+				const float c = ctf.getCTF(xA, yA);
+				
+				ctf2ImageFS(x,y) = fComplex(c*c,0);
+				frameFS(x,y) *= c;
+			}
+			
+			FFT::inverseFourierTransform(frameFS, frame);			
+			stackAct.getSliceRef(f).copyFrom(frame);
+			
+			FFT::inverseFourierTransform(ctf2ImageFS, frame);			
+			psfStack.getSliceRef(f).copyFrom(frame);
+			
+			debug.getSliceRef(f).copyFrom(ctf2ImageFS);
+		}
+		
+		psfStack.write("DEBUG_psfStack.mrc");
+		debug.writeVtk("DEBUG_CtfStack.vtk");
+	}	
+	
 	
 	std::cout << "backprojecting... " << std::endl;
 	
@@ -124,13 +184,24 @@ void TomoBackprojectProgram::run()
 			stackAct, projAct, out, n_threads, 
 			orig, spacing, RealSpaceBackprojection::Linear, taperRad);
 	
-	if (weight)
+	
+	if (weight || applyCtf)
 	{
 		BufferedImage<float> psf(w1, h1, t1);
 		
-		RealSpaceBackprojection::backprojectPsf(stackAct, projAct, psf, n_threads, orig, spacing);
+		if (applyCtf)
+		{
+			RealSpaceBackprojection::backproject(
+					psfStack, projAct, psf, n_threads, 
+					orig, spacing, RealSpaceBackprojection::Linear, taperRad);
+		}
+		else
+		{
+			RealSpaceBackprojection::backprojectPsf(
+					stackAct, projAct, psf, n_threads, orig, spacing);
+		}
 		
-		Reconstruction::correct3D_RS(out, psf, out, WienerFract, n_threads);
+		Reconstruction::correct3D_RS(out, psf, out, 1.0 / SNR, n_threads);
 	}
 	
 	std::cout << "writing output..." << std::endl;
