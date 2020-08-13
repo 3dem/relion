@@ -19,6 +19,8 @@ class TomoBackprojectProgram
 			bool weight, zeroDC;	
 			double WienerFract;
 			
+			
+		void readParameters(int argc, char *argv[]);		
 		void run();		
 };
 
