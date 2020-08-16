@@ -1899,6 +1899,14 @@ void run_updatePowerSpectrum(RFLOAT *dcounter, int sz, RFLOAT *dpower_spectrum)
 #endif
 }
 
+void scale(RFLOAT *img, size_t sz, RFLOAT val, cudaStream_t stream)
+{
+	int block_size = 256;
+	int MultiBsize = ceil(sz/(float)block_size);
+#ifdef CUDA
+	AccUtilities::multiply(MultiBsize,block_size, stream, img, val, (size_t)sz);
+#endif
+}
 
 void selfApplyBeamTilt2(MultidimArray<Complex > &Fimg, RFLOAT beamtilt_x, RFLOAT beamtilt_y,
 		RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size)
