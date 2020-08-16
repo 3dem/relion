@@ -206,7 +206,6 @@ void Projector::computeFourierTransformMap(
 			allocator = new CudaCustomAllocator(mem_req, (size_t)16);
 		else
 		{
-			std::cerr << " WARNING: There is not enough memory to process the Expectation setup stage on GPU. It will be executed on CPU." << std::endl;
 			do_gpu = false; // change local copy of do_gpu variable
 			if (semop(semid, &op_unlock[0], 1) < 0)
 				REPORT_ERROR("semop unlock error");
