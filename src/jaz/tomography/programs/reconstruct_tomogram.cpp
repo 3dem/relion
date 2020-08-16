@@ -27,7 +27,7 @@ void TomoBackprojectProgram::readParameters(int argc, char *argv[])
 		tomoIndex = textToInteger(parser.getOption("--ti", "Tomogram index", "0"));
 		
 		weight = parser.checkOption("--wg", "Perform weighting in Fourier space (using a Wiener filter)");
-		SNR = textToDouble(parser.getOption("--SNR", "SNR assumed by the Wiener filter", "0.1"));
+		SNR = textToDouble(parser.getOption("--SNR", "SNR assumed by the Wiener filter", "0.001"));
 		
 		applyCtf = !parser.checkOption("--noctf", "Ignore the CTF");
 		zeroDC = parser.checkOption("--0dc", "Zero the DC component of each frame");
