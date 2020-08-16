@@ -224,9 +224,10 @@ void wavg_3D(
 			{
 				if (z >= zSize - projector.maxR)
 					z = z - projector.imgZ;
-				else
+				else {
 					xstart_z = projector.maxR;
 					xend_z   = xstart_z + 1;
+				}
 			}
 
 			for(int iy = 0; iy < ySize; iy++) {
