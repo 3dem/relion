@@ -252,6 +252,24 @@ if (CUDA_FOUND)
 
 	target_link_libraries(relion_lib relion_gpu_util ${CUDA_CUFFT_LIBRARIES})
 	target_link_libraries(relion_lib relion_gpu_util ${CUDA_CUFFT_LIBRARIES} ${CUDA_curand_LIBRARY})
+
+
+
+	file(GLOB REL_JAZ_CUDA_SRC "${CMAKE_SOURCE_DIR}/src/jaz/cuda/*.cu" "${CMAKE_SOURCE_DIR}/src/jaz/cuda/kernels/*.cu" )
+	cuda_add_library(relion_jaz_gpu_util ${REL_JAZ_CUDA_SRC})
+
+	#list(APPEND EXTRA_LIBS "${CUDA_CUFFT_LIBRARIES}")
+	#if(BUILD_SHARED_LIBS)
+	#	install (TARGETS relion_jaz_gpu_util LIBRARY DESTINATION lib)
+	#else()
+	#	target_link_libraries(relion_jaz_gpu_util relion_lib)
+	#	target_link_libraries(relion_jaz_gpu_util ${CUDA_CUFFT_LIBRARIES})
+	#endif()
+
+	target_link_libraries(relion_lib relion_jaz_gpu_util ${CUDA_CUFFT_LIBRARIES})
+	target_link_libraries(relion_lib relion_jaz_gpu_util ${CUDA_CUFFT_LIBRARIES} ${CUDA_curand_LIBRARY})
+
+
 endif(CUDA_FOUND)
 
 if(TIFF_FOUND)
