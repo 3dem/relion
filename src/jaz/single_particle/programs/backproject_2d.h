@@ -16,6 +16,7 @@ class Backproject2D
 
 
 			std::string particlesFn, outDir;
+			double SNR;
 
 
 		void read(int argc, char **argv);

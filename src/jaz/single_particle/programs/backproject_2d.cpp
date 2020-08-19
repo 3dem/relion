@@ -27,6 +27,7 @@ void Backproject2D::read(int argc, char **argv)
 		int general_section = parser.addSection("General options");
 
 		particlesFn = parser.getOption("--i", "Input file (e.g. run_it023_data.star)", "");
+		SNR = textToDouble(parser.getOption("--SNR", "Assumed signal-to-noise ratio", "0.1"));
 		outDir = parser.getOption("--o", "Output directory");
 
 		Log::readParams(parser);
@@ -130,7 +131,7 @@ void Backproject2D::run()
 			}
 		}
 
-		BufferedImage<double> average = reconstruct(data, weight, 1000.0);
+		BufferedImage<double> average = reconstruct(data, weight, 1.0/SNR);
 
 		Tapering::taperCircularly2D(average, 5);
 
