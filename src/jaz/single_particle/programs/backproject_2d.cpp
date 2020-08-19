@@ -199,7 +199,7 @@ void Backproject2D::backrotate_particle(
 	const double box_size_A = box_size_px * pixel_size;
 
 
-	const double psi = DEG2RAD(particles_table.getDouble(EMDL_ORIENT_PSI));
+	const double psi = DEG2RAD(particles_table.getDouble(EMDL_ORIENT_PSI, particle_id));
 
 	const d2Matrix rot(
 			 cos(psi), sin(psi),
