@@ -100,7 +100,7 @@ void BackprojectProgram::run()
 	if (max_mem_GB > 0)
 	{
 		const double GB_per_thread = 
-		   2.0 * voxelNum * 4.0 * sizeof(double)   // two halves  *  box size  *  (data (x2), ctf and psf)
+		   2.0 * voxelNum * 3.0 * sizeof(double)   // two halves  *  box size  *  (data (x2) + ctf)
 		    / (1024.0 * 1024.0 * 1024.0);          // in GB
 		
 		const double maxThreads = max_mem_GB / GB_per_thread;
@@ -118,7 +118,7 @@ void BackprojectProgram::run()
 	const int outCount = 2 * outer_threads;
 		
 	Log::print("Memory required for accumulation: " + ZIO::itoa(
-			(4.0 * sizeof(double) * (long int) outCount * (double)voxelNum) 
+			(3.0 * sizeof(double) * (long int) outCount * (double)voxelNum)
 			  / (1024.0 * 1024.0 * 1024.0)
 			) + " GB");
 	
@@ -182,7 +182,7 @@ void BackprojectProgram::run()
 		#pragma omp parallel for num_threads(outer_threads)
 		for (int p = 0; p < pc; p++)
 		{
-			const int th = omp_get_thread_num();			
+			const int th = omp_get_thread_num();
 			
 			if (th == 0)
 			{
