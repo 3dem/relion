@@ -674,7 +674,8 @@ T Interpolation::linearXY_symmetric_FftwHalf_wrap(
 		
 		if (xg >= wh)
 		{
-			xg = 2*wh - xg;
+			xg = 2*wh - xg - 2;
+			yg = (h - yg) % h;
 		}
 		
 		if (yg < 0)
@@ -740,7 +741,8 @@ tComplex<T> Interpolation::linearXY_complex_FftwHalf_wrap(
 		
 		if (xg >= wh)
 		{
-			xg = 2*wh - xg;
+			xg = 2*wh - xg - 2;
+			yg = (h - yg) % h;
 			
 			conj = !conj0;
 		}
