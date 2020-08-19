@@ -9,6 +9,7 @@
 #include <src/jaz/image/translation.h>
 #include <src/jaz/image/tapering.h>
 #include <src/jaz/math/fft.h>
+#include <omp.h>
 
 
 using namespace gravis;
@@ -28,6 +29,7 @@ void Backproject2D::read(int argc, char **argv)
 
 		particlesFn = parser.getOption("--i", "Input file (e.g. run_it023_data.star)", "");
 		SNR = textToDouble(parser.getOption("--SNR", "Assumed signal-to-noise ratio", "0.1"));
+		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 		outDir = parser.getOption("--o", "Output directory");
 
 		Log::readParams(parser);
@@ -84,52 +86,91 @@ void Backproject2D::run()
 		particle_count[class_id]++;
 	}
 
+
+
+	std::vector<std::vector<int>> particle_by_class(class_count);
+
+	for (long int c = 0; c < class_count; c++)
+	{
+		particle_by_class[c].reserve(particle_count[c]);
+	}
+
+	for (long int p = 0; p < particles_table.numberOfObjects(); p++)
+	{
+		const int class_id = particles_table.getIntMinusOne(
+					EMDL_PARTICLE_CLASS, p);
+
+		particle_by_class[class_id].push_back(p);
+	}
+
+
 	const int box_size = obs_model.getBoxSize(0);
 	const double pixel_size = obs_model.getPixelSize(0);
 
 
 	BufferedImage<double> average_stack(box_size, box_size, class_count);
-	BufferedImage<float> particle_image_RS;
-	BufferedImage<fComplex> particle_image_FS;
 
 	for (int class_id = 0; class_id < class_count; class_id++)
 	{
-		BufferedImage<dComplex> data(box_size / 2 + 1, box_size);
+		BufferedImage<dComplex> data(box_size / 2 + 1, box_size, num_threads);
 		data.fill(dComplex(0.0, 0.0));
 
-		BufferedImage<double> weight(box_size / 2 + 1, box_size);
+		BufferedImage<double> weight(box_size / 2 + 1, box_size, num_threads);
 		weight.fill(0.0);
 
-		for (long int p = 0; p < particles_table.numberOfObjects(); p++)
+		Log::beginSection("Class " + ZIO::itoa(class_id+1));
+		Log::beginProgress("Averaging particles", particle_count[class_id]/num_threads);
+
+
+		#pragma omp parallel for num_threads(num_threads)
+		for (long int pi = 0; pi < particle_count[class_id]; pi++)
 		{
-			const int class_id_p = particles_table.getIntMinusOne(
-						EMDL_PARTICLE_CLASS, p);
+			const int thread_id = omp_get_thread_num();
 
-			if (class_id_p == class_id)
+			if (thread_id == 0)
 			{
-				const double dx_A = particles_table.getDouble(
-							EMDL_ORIENT_ORIGIN_X_ANGSTROM, p);
-
-				const double dy_A = particles_table.getDouble(
-							EMDL_ORIENT_ORIGIN_Y_ANGSTROM, p);
-
-				const d2Vector shift(dx_A / pixel_size, dy_A / pixel_size);
-
-				std::string img_fn = particles_table.getString(EMDL_IMAGE_NAME, p);
-				particle_image_RS.read(img_fn);
-
-				FFT::FourierTransform(particle_image_RS, particle_image_FS, FFT::Both);
-
-				const double m = box_size / 2;
-				Translation::shiftInFourierSpace2D(particle_image_FS, shift.x + m, shift.y + m);
-
-				backrotate_particle(
-					particle_image_FS,
-					p, particles_table,
-					obs_model,
-					data, weight);
+				Log::updateProgress(pi);
 			}
+
+			BufferedImage<float> particle_image_RS;
+			BufferedImage<fComplex> particle_image_FS;
+
+			const long int p = particle_by_class[class_id][pi];
+
+			const double dx_A = particles_table.getDouble(
+						EMDL_ORIENT_ORIGIN_X_ANGSTROM, p);
+
+			const double dy_A = particles_table.getDouble(
+						EMDL_ORIENT_ORIGIN_Y_ANGSTROM, p);
+
+			const d2Vector shift(dx_A / pixel_size, dy_A / pixel_size);
+
+			std::string img_fn = particles_table.getString(EMDL_IMAGE_NAME, p);
+			particle_image_RS.read(img_fn);
+
+			FFT::FourierTransform(particle_image_RS, particle_image_FS, FFT::Both);
+
+			const double m = box_size / 2;
+			Translation::shiftInFourierSpace2D(particle_image_FS, shift.x + m, shift.y + m);
+
+			RawImage<dComplex> data_slice = data.getSliceRef(thread_id);
+			RawImage<double> weight_slice = weight.getSliceRef(thread_id);
+
+			backrotate_particle(
+				particle_image_FS,
+				p, particles_table,
+				obs_model,
+				data_slice,
+				weight_slice);
 		}
+
+		for (long int t = 1; t < num_threads; t++)
+		{
+			data.getSliceRef(0) += data.getSliceRef(t);
+		}
+
+		Log::endProgress();
+		Log::endSection();
 
 		BufferedImage<double> average = reconstruct(data, weight, 1.0/SNR);
 
