@@ -39,7 +39,8 @@ class Tapering
 			double y,
 			int w,
 			int h,
-			double r);
+			double r0,
+			double r1);
 
 		inline static double getTaperWeight2D(
 			double x,
@@ -74,7 +75,7 @@ class Tapering
 		template <typename T>
 		static void taperCircularly2D(
 			RawImage<T>& img,
-			double d,
+			double r0, double r1,
 			int num_threads = 1,
 			bool exactMean = false);
 };
@@ -91,14 +92,15 @@ inline double Tapering::getRadialTaperWeight2D(
 		double y,
 		int w,
 		int h,
-		double r)
+		double r0,
+		double r1)
 {
 	const double dx = x - w/2;
 	const double dy = y - h/2;
 	const double d = sqrt(dx*dx + dy*dy);
 	const double d0 = w/2;
 
-	return getRadialTaperWeight(d, d0 - r, d0);
+	return getRadialTaperWeight(d, r0, r1);
 }
 
 inline double Tapering::getTaperWeight2D(double x, double y, int w, int h, double r)
@@ -257,7 +259,7 @@ void Tapering::taper2D(RawImage<T>& img, double r, int num_threads, bool exactMe
 }
 
 template <typename T>
-void Tapering::taperCircularly2D(RawImage<T>& img, double r, int num_threads, bool exactMean)
+void Tapering::taperCircularly2D(RawImage<T>& img, double r0, double r1, int num_threads, bool exactMean)
 {
 	const int w = img.xdim;
 	const int h = img.ydim;
@@ -270,7 +272,7 @@ void Tapering::taperCircularly2D(RawImage<T>& img, double r, int num_threads, bo
 		for (size_t y = 0; y < h; y++)
 		for (size_t x = 0; x < w; x++)
 		{
-			const double t = getRadialTaperWeight2D(x,y,w,h,r);
+			const double t = getRadialTaperWeight2D(x,y,w,h,r0,r1);
 
 			dSum += t * img(x,y);
 			wgSum += t;
@@ -282,7 +284,7 @@ void Tapering::taperCircularly2D(RawImage<T>& img, double r, int num_threads, bo
 		for (size_t y = 0; y < h; y++)
 		for (size_t x = 0; x < w; x++)
 		{
-			const double t = getRadialTaperWeight2D(x,y,w,h,r);
+			const double t = getRadialTaperWeight2D(x,y,w,h,r0,r1);
 
 			img(x,y) = t * img(x,y) + (1.0 - t) * wgMean;
 		}
@@ -293,7 +295,7 @@ void Tapering::taperCircularly2D(RawImage<T>& img, double r, int num_threads, bo
 		for (size_t y = 0; y < h; y++)
 		for (size_t x = 0; x < w; x++)
 		{
-			img(x,y) *= getRadialTaperWeight2D(x,y,w,h,r);
+			img(x,y) *= getRadialTaperWeight2D(x,y,w,h,r0,r1);
 		}
 	}
 }

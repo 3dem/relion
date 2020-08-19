@@ -29,6 +29,7 @@ void Backproject2D::read(int argc, char **argv)
 
 		particlesFn = parser.getOption("--i", "Input file (e.g. run_it023_data.star)", "");
 		SNR = textToDouble(parser.getOption("--SNR", "Assumed signal-to-noise ratio", "0.1"));
+		margin = textToDouble(parser.getOption("--m", "Margin around the particle [Px]", "20"));
 		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 		outDir = parser.getOption("--o", "Output directory");
 
@@ -174,7 +175,9 @@ void Backproject2D::run()
 
 		BufferedImage<double> average = reconstruct(data, weight, 1.0/SNR);
 
-		Tapering::taperCircularly2D(average, 5);
+		const double radius = box_size/2;
+
+		Tapering::taperCircularly2D(average, radius - margin, radius - margin + 5);
 
 		average_stack.getSliceRef(class_id).copyFrom(average);
 	}

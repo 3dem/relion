@@ -16,7 +16,7 @@ class Backproject2D
 
 
 			std::string particlesFn, outDir;
-			double SNR;
+			double margin, SNR;
 			int num_threads;
 
 
