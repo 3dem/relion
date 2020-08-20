@@ -1,3 +1,4 @@
+#include <iostream>
 
 #ifdef CUDA
 #include <src/jaz/cuda/test00.h>
