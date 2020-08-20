@@ -211,7 +211,7 @@ int main(int argc, char *argv[])
 
 	// align every other class against the biggest one
 
-	for (int ci = 1; ci < 5; ci++)
+	for (int ci = 1; ci < class_count; ci++)
 	{
 		const int class_id = class_by_size[class_count - ci - 1];
 
