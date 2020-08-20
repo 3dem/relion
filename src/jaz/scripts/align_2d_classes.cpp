@@ -7,10 +7,12 @@
 #include <src/ctf.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
+#include <src/jaz/util/index_sort.h>
 #include <src/jaz/single_particle/obs_model.h>
 #include <src/jaz/image/interpolation.h>
 #include <src/jaz/image/translation.h>
 #include <src/jaz/image/tapering.h>
+#include <src/jaz/image/centering.h>
 #include <src/jaz/math/fft.h>
 #include <omp.h>
 
@@ -28,6 +30,7 @@ int main(int argc, char *argv[])
 	std::string particlesFn, class_averages_filename, outDir;
 	double margin;
 	int num_threads;
+	bool flip_orientation, align_horizontally_only;
 	
 	
 	IOParser parser;
@@ -42,7 +45,10 @@ int main(int argc, char *argv[])
 
 		particlesFn = parser.getOption("--i", "Input file (e.g. run_it023_data.star)");
 		class_averages_filename = parser.getOption("--ca", "Class averages stack");
+		flip_orientation = parser.checkOption("--flip", "Rotate the initial alignment by 180°");
+		align_horizontally_only = parser.checkOption("--horizontal_only", "Only align the biggest class horizontally, then exit");
 		margin = textToDouble(parser.getOption("--m", "Margin around the particle [Px]", "20"));
+
 		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 		outDir = parser.getOption("--o", "Output directory");
 
@@ -113,60 +119,146 @@ int main(int argc, char *argv[])
 		particle_by_class[class_id].push_back(p);
 	}
 
+	std::vector<int> class_by_size = IndexSort<int>::sortIndices(particle_count);
+	const int biggest_class = class_by_size[class_count-1];
 
-	const int box_size = obs_model.getBoxSize(0);
-	const double pixel_size = obs_model.getPixelSize(0);
-	
-	
-	int biggest_class = -1;
-	int biggest_class_size = 0;
-	
-	for (long int c = 0; c < class_count; c++)
-	{
-		const int n = particle_count[c];
-		
-		if (n > biggest_class_size)
-		{
-			biggest_class_size = n;
-			biggest_class = c;
-		}
-	}
-	
+
+	const int angle_samples_coarse = 36;
+	const int angle_samples_fine = 100;
+
+
 	BufferedImage<float> class_averages;
 	class_averages.read(class_averages_filename);
-	
-	// align biggest class so as to maximise horizontal symmetry
+
+
+	std::vector<double> angle_by_class(class_count, 0.0);
+
+	BufferedImage<float> template_slice;
+
+
+	// align biggest class to maximise horizontal symmetry
 	{
-		const int angle_samples = 100;
+
 		
-		double best_phi = 0;
-		double best_phi_CC = 0;
+		double best_phi_coarse = 0;
+		double best_phi_CC_coarse = 0;
 		
 		RawImage<float> slice0 = class_averages.getSliceRef(biggest_class);
-		
-		
-		for (int ai = 0; ai < angle_samples; ai++)
+
+
+		for (int ai = 0; ai < angle_samples_coarse; ai++)
 		{
-			const double phi = ai * 2.0 * PI / angle_samples;
-						
+			const double phi = ai * 2.0 * PI / angle_samples_coarse;
+
 			BufferedImage<float> slice = rotate(slice0, phi);
-			BufferedImage<float> flipped_slice = flip_x(slice0);
-			
+			BufferedImage<float> flipped_slice = flip_x(slice);
+
 			const double max_CC = max_correlation(slice, flipped_slice);
-			
-			if (max_CC > best_phi_CC)
+
+			if (max_CC > best_phi_CC_coarse)
 			{
-				best_phi_CC = max_CC;
-				best_phi = phi;
+				best_phi_CC_coarse = max_CC;
+				best_phi_coarse = phi;
 			}
 		}
-		
-		BufferedImage<float> rotated_slice = rotate(slice0, best_phi);
-		
-		slice0.write("debug_class_align__original.mrc");
-		rotated_slice.write("debug_class_align__rotated.mrc");
+
+		double best_phi_fine = best_phi_coarse;
+		double best_phi_CC_fine = best_phi_CC_coarse;
+
+		for (int ai = 0; ai < angle_samples_fine; ai++)
+		{
+			const double range = 2.0 * PI / angle_samples_coarse;
+			const double phi = best_phi_coarse + (2 * ai / (double) angle_samples_fine - 1) * range;
+
+			BufferedImage<float> slice = rotate(slice0, phi);
+			BufferedImage<float> flipped_slice = flip_x(slice);
+
+			const double max_CC = max_correlation(slice, flipped_slice);
+
+			if (max_CC > best_phi_CC_fine)
+			{
+				best_phi_CC_fine = max_CC;
+				best_phi_fine = phi;
+			}
+		}
+
+		if (flip_orientation)
+		{
+			best_phi_fine += PI;
+
+			if (best_phi_fine > 2 * PI)
+			{
+				best_phi_fine -= 2 * PI;
+			}
+		}
+
+		angle_by_class[biggest_class] = best_phi_fine;
+
+		template_slice = rotate(slice0, best_phi_fine);
+
+		slice0.write(outDir + "class_"+ZIO::itoa(biggest_class)+"_original.mrc");
+		template_slice.write(outDir + "class_"+ZIO::itoa(biggest_class)+"_rotated.mrc");
 	}
-	
+
+
+
+	if (align_horizontally_only) return 0;
+
+
+	BufferedImage<float> class_averages_rotated = class_averages;
+	class_averages_rotated.getSliceRef(biggest_class).copyFrom(template_slice);
+
+
+	// align every other class against the biggest one
+
+	for (int ci = 1; ci < 5; ci++)
+	{
+		const int class_id = class_by_size[class_count - ci - 1];
+
+
+		double best_phi_coarse = 0;
+		double best_phi_CC_coarse = 0;
+
+		RawImage<float> slice0 = class_averages.getSliceRef(class_id);
+
+		for (int ai = 0; ai < angle_samples_coarse; ai++)
+		{
+			const double phi = ai * 2.0 * PI / angle_samples_coarse;
+
+			BufferedImage<float> slice = rotate(slice0, phi);
+			const double max_CC = max_correlation(slice, template_slice);
+
+			if (max_CC > best_phi_CC_coarse)
+			{
+				best_phi_CC_coarse = max_CC;
+				best_phi_coarse = phi;
+			}
+		}
+
+		double best_phi_fine = best_phi_coarse;
+		double best_phi_CC_fine = best_phi_CC_coarse;
+
+		for (int ai = 0; ai < angle_samples_fine; ai++)
+		{
+			const double range = 2.0 * PI / angle_samples_coarse;
+			const double phi = best_phi_coarse + (2 * ai / (double) angle_samples_fine - 1) * range;
+
+			BufferedImage<float> slice = rotate(slice0, phi);
+			const double max_CC = max_correlation(slice, template_slice);
+
+			if (max_CC > best_phi_CC_fine)
+			{
+				best_phi_CC_fine = max_CC;
+				best_phi_fine = phi;
+			}
+		}
+
+		BufferedImage<float> slice = rotate(slice0, best_phi_fine);
+		class_averages_rotated.getSliceRef(class_id).copyFrom(slice);
+	}
+
+	class_averages_rotated.write(outDir+"class_averages_rotated.mrc");
+
 	return 0;
 }
 
