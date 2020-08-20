@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
 	std::string particlesFn, class_averages_filename, outDir;
 	double margin;
 	int num_threads;
-	bool flip_orientation, align_horizontally_only;
+	bool flip_orientation, reorder, align_horizontally_only;
 	
 	
 	IOParser parser;
@@ -47,6 +47,7 @@ int main(int argc, char *argv[])
 		class_averages_filename = parser.getOption("--ca", "Class averages stack");
 		flip_orientation = parser.checkOption("--flip", "Rotate the initial alignment by 180°");
 		align_horizontally_only = parser.checkOption("--horizontal_only", "Only align the biggest class horizontally, then exit");
+		reorder = parser.checkOption("--sort", "Sort classes by descending cardinality");
 		margin = textToDouble(parser.getOption("--m", "Margin around the particle [Px]", "20"));
 
 		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
@@ -252,6 +253,8 @@ int main(int argc, char *argv[])
 				best_phi_fine = phi;
 			}
 		}
+		
+		angle_by_class[class_id] = best_phi_fine;
 
 		BufferedImage<float> slice = rotate(slice0, best_phi_fine);
 		class_averages_rotated.getSliceRef(class_id).copyFrom(slice);
@@ -259,6 +262,45 @@ int main(int argc, char *argv[])
 
 	class_averages_rotated.write(outDir+"class_averages_rotated.mrc");
 
+	
+	
+	for (long int p = 0; p < particles_table.numberOfObjects(); p++)
+	{
+		const int class_id = particles_table.getIntMinusOne(EMDL_PARTICLE_CLASS, p);
+		const double phi0 = particles_table.getDouble(EMDL_ORIENT_PSI, p);
+
+		double phi1 = phi0 + RAD2DEG(angle_by_class[class_id]);
+		
+		if (phi1 > 360) phi1 -= 360;
+		
+		particles_table.setValue(EMDL_ORIENT_PSI, phi1, p);
+	}
+	
+	if (reorder)
+	{
+		std::vector<int> new_class_id(class_count);
+		
+		for (int i = 0; i < class_count; i++)
+		{
+			new_class_id[class_by_size[i]] = class_count - i - 1;
+		}
+		
+		for (long int p = 0; p < particles_table.numberOfObjects(); p++)
+		{
+			const int class_id = particles_table.getIntMinusOne(EMDL_PARTICLE_CLASS, p);
+			
+			particles_table.setValue(EMDL_PARTICLE_CLASS, new_class_id[class_id] + 1, p);
+		}
+	}
+	
+	
+	
+	ObservationModel::saveNew(
+		particles_table, 
+		obs_model.opticsMdt, 
+		outDir+"rotated_particles.star");
+	
+	
 	return 0;
 }
 
