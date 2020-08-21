@@ -119,13 +119,15 @@ int main(int argc, char *argv[])
 	const int w_binned = binned_size.x;
 	const int h_binned = binned_size.y;
 	
-	BufferedImage<float> log_image(w_log, h_log, micrograph_count);
+	BufferedImage<float> log_image(w_log, h_log, max_MG + 1);
 	log_image.fill(0.f);
 	
 	
 
 	Log::beginProgress("Finding blobs", (max_MG - min_MG + 1)/num_threads);
 
+	std::vector<std::vector<d2Vector>> blob_coordinates(max_MG + 1);
+	
 	#pragma omp parallel for num_threads(num_threads)
 	for (int m = min_MG; m <= max_MG; m++)
 	{
@@ -249,6 +251,8 @@ int main(int argc, char *argv[])
 			}
 		}
 		
+		blob_coordinates[m] = sparse_detections;
+		
 		BufferedImage<float> micrograph_binned_2 = Resampling::FourierCrop_fullStack(
 		            micrograph_binned, additional_binning, 1, true);
 		
@@ -275,6 +279,32 @@ int main(int argc, char *argv[])
 	Log::endProgress();
 	
 	log_image.write(outDir+"diagnostic.mrc");
+	
+	{
+		const int mc = blob_coordinates.size();
+		
+		std::ofstream ofs(outDir+"blobs.star");
+	    
+	    for (int m = 0; m < mc; m++)
+	    {
+			MetaDataTable mdt;
+	        mdt.setName(ZIO::itoa(m));
+			
+			const int bc = blob_coordinates[m].size();
+	
+	        for (int b = 0; b < bc; b++)
+	        {
+				const d2Vector p = blob_coordinates[m][b];
+				
+	            mdt.addObject();
+				
+	            mdt.setValue(EMDL_IMAGE_COORD_X, p.x);
+				mdt.setValue(EMDL_IMAGE_COORD_Y, p.y);
+	        }
+	
+	        mdt.write(ofs);
+		}
+	}
 	
 	return 0;
 }
