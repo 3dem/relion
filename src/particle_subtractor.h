@@ -46,6 +46,12 @@ public:
 	// For conventional 3D classifications/ refinements: center the subtracted particles?
 	bool do_center;
 
+	// Calculate average spectral SNRs?
+	bool do_ssnr;
+
+	// Running sums of power of signal and noise for SSNR calculation (keep public for MPI access)
+	MultidimArray<RFLOAT> sum_count, sum_S2, sum_N2;
+
 	// verbosity
 	int verb;
 

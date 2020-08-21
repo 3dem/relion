@@ -295,6 +295,7 @@ void MlOptimiserMpi::initialise()
 					cudaDevices.push_back(deviceAffinity);
 					cudaDeviceShares.push_back(1);
 				}
+				HANDLE_ERROR(cudaSetDevice(deviceAffinity));
 				cudaOptimiserDeviceMap.push_back(bundleId);
 			}
 		}
@@ -453,6 +454,7 @@ will still yield good performance and possibly a more stable execution. \n" << s
 				}
 			}
 		}
+		mymodel.do_gpu = do_gpu;
 	}
 	/************************************************************************/
 #endif // CUDA
@@ -841,7 +843,7 @@ void MlOptimiserMpi::expectation()
 	// C. Calculate expected angular errors
 	// Do not do this for maxCC
 	// Only the first (reconstructing) slave (i.e. from half1) calculates expected angular errors
-	if (!(iter==1 && do_firstiter_cc) && !(do_skip_align || do_skip_rotate) && !do_vmgd)
+	if (!(iter==1 && do_firstiter_cc) && !(do_skip_align || do_skip_rotate) && !do_grad)
 	{
 		int my_nr_images, length_fn_ctf;
 		if (node->isMaster())
@@ -928,7 +930,7 @@ void MlOptimiserMpi::expectation()
 
 		// F. Precalculate AB-matrices for on-the-fly shifts
 		// Use tabulated sine and cosine values instead for 2D helical segments / 3D helical sub-tomogram averaging with on-the-fly shifts
-		if ( (do_shifts_onthefly) && (!((do_helical_refine) && (!ignore_helical_symmetry)))  && !(do_vmgd && iter > 1))
+		if ( (do_shifts_onthefly) && (!((do_helical_refine) && (!ignore_helical_symmetry)))  && !(do_grad && iter > 1))
 			precalculateABMatrices();
 	}
 	// Slave 1 sends has_converged to everyone else (in particular the master needs it!)
@@ -1125,7 +1127,7 @@ void MlOptimiserMpi::expectation()
 
 			if (verb > 0)
 			{
-				if (do_vmgd)
+				if (do_grad)
 				{
 					std::cout << " Variable-metric Gradient Descent iteration " << iter << " of " << nr_iter;
 				}
@@ -2072,11 +2074,11 @@ void MlOptimiserMpi::maximization()
 						}
 						else
 						{
-							if(do_vmgd)
+							if(do_grad)
 							{
 								(wsum_model.BPref[ith_recons]).reconstructGrad(
 										mymodel.Iref[ith_recons],
-										vmgd_stepsize,
+										grad_stepsize,
 										mymodel.tau2_fudge_factor,
 										mymodel.fsc_halves_class[ith_recons],
 										do_split_random_halves,
@@ -2204,11 +2206,11 @@ void MlOptimiserMpi::maximization()
 							}
 							else
 							{
-								if(do_vmgd)
+								if(do_grad)
 								{
 									(wsum_model.BPref[ith_recons]).reconstructGrad(
 											mymodel.Iref[ith_recons],
-											vmgd_stepsize,
+											grad_stepsize,
 											mymodel.tau2_fudge_factor,
 											mymodel.fsc_halves_class[ith_recons],
 											do_split_random_halves,
@@ -2294,7 +2296,7 @@ void MlOptimiserMpi::maximization()
 			else
 			{
 				// When not doing SGD, initialise to zero, but when doing SGD just keep the previous reference
-				if (!do_vmgd)
+				if (!do_grad)
 					mymodel.Iref[ith_recons].initZeros();
 			}
 			RCTOC(timer,RCT_1);
@@ -2418,7 +2420,7 @@ void MlOptimiserMpi::maximization()
 
 			// Re-set the origin (this may be lost in some cases??)
 			mymodel.Iref[ith_recons].setXmippOrigin();
-			//if (do_vmgd)
+			//if (do_grad)
 			//	mymodel.Igrad[ith_recons].setXmippOrigin();
 
 			// Aug05,2015 - Shaoda, helical symmetry refinement, broadcast refined helical parameters
@@ -2617,7 +2619,7 @@ void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
 
 void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC()
 {
-	if (do_vmgd || subset_size > 0)
+	if (do_grad || subset_size > 0)
 		REPORT_ERROR("BUG! You cannot do solvent-corrected FSCs and subsets!");
 
 	if (fn_mask == "")

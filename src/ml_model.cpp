@@ -733,7 +733,7 @@ void  MlModel::readTauSpectrum(FileName fn_tau, int verb)
 void MlModel::initialiseFromImages(
 	FileName fn_ref, bool _is_3d_model, Experiment &_mydata,
 	bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected,
-	RFLOAT _ref_angpix, bool _do_sgd, bool _do_trust_ref_size, bool _do_mom1, bool _do_mom2, bool verb)
+	RFLOAT _ref_angpix, bool _do_grad, bool _do_trust_ref_size, bool _do_mom1, bool _do_mom2, bool verb)
 {
 
 
@@ -881,14 +881,14 @@ void MlModel::initialiseFromImages(
 			if (fabs(pixel_size - pixel_size_first_optics_group) > 0.001)
 			{
 				mesg = " The reference pixel size is " + floatToString(pixel_size)
-				     + " A, but the pixel size of the first optics group of the data is "
-					 + floatToString(pixel_size_first_optics_group) + " A! \n";
+				     + " A/px, but the pixel size of the first optics group of the data is "
+					 + floatToString(pixel_size_first_optics_group) + " A/px! \n";
 			}
 			if (ori_size != box_size_first_optics_group)
 			{
 				mesg += " The reference box size is " + integerToString(ori_size)
-				     + " A, but the box size of the first optics group of the data is "
-					 + integerToString(box_size_first_optics_group) + " A!\n";
+				     + " px, but the box size of the first optics group of the data is "
+					 + integerToString(box_size_first_optics_group) + " px!\n";
 			}
 
 			if (!_do_trust_ref_size)
@@ -1342,12 +1342,12 @@ void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads, 
 
 		if (update_tau2_spectra && iclass < nr_classes * nr_bodies)
 		{
-			PPref[iclass].computeFourierTransformMap(Irefp, tau2_class[iclass], current_size, nr_threads, true, do_heavy, min_ires, fourier_mask);
+			PPref[iclass].computeFourierTransformMap(Irefp, tau2_class[iclass], current_size, nr_threads, true, do_heavy, min_ires, fourier_mask, do_gpu);
 		}
 		else
 		{
 			MultidimArray<RFLOAT> dummy;
-			PPref[iclass].computeFourierTransformMap(Irefp, dummy, current_size, nr_threads, true, do_heavy, min_ires, fourier_mask);
+			PPref[iclass].computeFourierTransformMap(Irefp, dummy, current_size, nr_threads, true, do_heavy, min_ires, fourier_mask, do_gpu);
 		}
 	}
 

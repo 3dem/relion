@@ -1226,7 +1226,7 @@ void JobWindow::initialiseInimodelWindow()
 	resetHeight();
 
 	place("nr_classes", TOGGLE_DEACTIVATE);
-	place("vmgd_anneal", TOGGLE_DEACTIVATE);
+	place("grad_anneal", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -1244,20 +1244,20 @@ void JobWindow::initialiseInimodelWindow()
 
 	tab3->end();
 	tab4->begin();
-	tab4->label("VMGD");
+	tab4->label("Gradient Optimization");
 
 	resetHeight();
 
-	place("vmgd_ini_iter");
-	place("vmgd_inbetween_iter");
-	place("vmgd_fin_iter");
-	place("vmgd_write_iter");
+	place("grad_ini_iter");
+	place("grad_inbetween_iter");
+	place("grad_fin_iter");
+	place("grad_write_iter");
 
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	place("vmgd_ini_subset_size");
-	place("vmgd_fin_subset_size");
+	place("grad_ini_subset_size");
+	place("grad_fin_subset_size");
 
 	tab4->end();
 

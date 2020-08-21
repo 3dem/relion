@@ -2790,22 +2790,19 @@ Note that the Output rootname of the continued run and the rootname of the previ
 If they are the same, the program will automatically add a '_ctX' to the output rootname, \
 with X being the iteration from which one continues the previous run.");
 
-	joboptions["vmgd_ini_iter"] = JobOption("Number of initial iterations:", 50, 10, 300, 10, "Number of initial SGD iterations, at which the initial resolution cutoff and the initial subset size will be used, and multiple references are kept the same. 50 seems to work well in many cases. Increase if the correct solution is not found.");
-	joboptions["vmgd_inbetween_iter"] = JobOption("Number of in-between iterations:", 200, 50, 500, 50, "Number of SGD iterations between the initial and final ones. During these in-between iterations, the resolution is linearly increased, \
+	joboptions["grad_ini_iter"] = JobOption("Number of initial iterations:", 50, 10, 300, 10, "Number of initial SGD iterations, at which the initial resolution cutoff and the initial subset size will be used, and multiple references are kept the same. 50 seems to work well in many cases. Increase if the correct solution is not found.");
+	joboptions["grad_inbetween_iter"] = JobOption("Number of in-between iterations:", 200, 50, 500, 50, "Number of SGD iterations between the initial and final ones. During these in-between iterations, the resolution is linearly increased, \
 together with the mini-batch or subset size. In case of a multi-class refinement, the different references are also increasingly left to become dissimilar. 200 seems to work well in many cases. Increase if multiple references have trouble separating, or the correct solution is not found.");
-	joboptions["vmgd_fin_iter"] = JobOption("Number of final iterations:", 50, 10, 300, 10, "Number of final SGD iterations, at which the final resolution cutoff and the final subset size will be used, and multiple references are left dissimilar. 50 seems to work well in many cases. Perhaps increase when multiple reference have trouble separating.");
+	joboptions["grad_fin_iter"] = JobOption("Number of final iterations:", 50, 10, 300, 10, "Number of final SGD iterations, at which the final resolution cutoff and the final subset size will be used, and multiple references are left dissimilar. 50 seems to work well in many cases. Perhaps increase when multiple reference have trouble separating.");
 
-	joboptions["vmgd_ini_resol"] = JobOption("Initial resolution (A):", 35, 10, 60, 5, "This is the resolution cutoff (in A) that will be applied during the initial SGD iterations. 35A seems to work well in many cases.");
-	joboptions["vmgd_fin_resol"] = JobOption("Final resolution (A):", 15, 5, 30, 5, "This is the resolution cutoff (in A) that will be applied during the final SGD iterations. 15A seems to work well in many cases.");
+	joboptions["grad_ini_subset_size"] = JobOption("Initial mini-batch size:", 100, 30, 300, 10, "The number of particles that will be processed during the initial iterations. 100 seems to work well in many cases. Lower values may result in wider searches of the energy landscape, but possibly at reduced resolutions.");
+	joboptions["grad_fin_subset_size"] = JobOption("Final mini-batch size:", 500, 100, 2000, 100, "The number of particles that will be processed during the final iterations. 300-500 seems to work well in many cases. Higher values may result in increased resolutions, but at increased computational costs and possibly reduced searches of the energy landscape, but possibly at reduced resolutions.");
 
-	joboptions["vmgd_ini_subset_size"] = JobOption("Initial mini-batch size:", 100, 30, 300, 10, "The number of particles that will be processed during the initial iterations. 100 seems to work well in many cases. Lower values may result in wider searches of the energy landscape, but possibly at reduced resolutions.");
-	joboptions["vmgd_fin_subset_size"] = JobOption("Final mini-batch size:", 500, 100, 2000, 100, "The number of particles that will be processed during the final iterations. 300-500 seems to work well in many cases. Higher values may result in increased resolutions, but at increased computational costs and possibly reduced searches of the energy landscape, but possibly at reduced resolutions.");
+	joboptions["grad_write_iter"] = JobOption("Write-out frequency (iter):", 10, 1, 50, 1, "Every how many iterations do you want to write the model to disk?");
 
-	joboptions["vmgd_write_iter"] = JobOption("Write-out frequency (iter):", 10, 1, 50, 1, "Every how many iterations do you want to write the model to disk?");
-
-	joboptions["vmgd_sigma2fudge_halflife"] = JobOption("Increased noise variance half-life:", -1, -100, 10000, 100, "When set to a positive value, the initial estimates of the noise variance will internally be multiplied by 8, and then be gradually reduced, \
+//	joboptions["grad_sigma2fudge_halflife"] = JobOption("Increased noise variance half-life:", -1, -100, 10000, 100, "When set to a positive value, the initial estimates of the noise variance will internally be multiplied by 8, and then be gradually reduced, \
 having 50% after this many particles have been processed. By default, this option is switched off by setting this value to a negative number. \
-In some difficult cases, switching this option on helps. In such cases, values around 1000 have been found to be useful. Change the factor of eight with the additional argument --sgd_sigma2fudge_ini");
+In some difficult cases, switching this option on helps. In such cases, values around 1000 have been found to be useful. Change the factor of eight with the additional argument --grad_sigma2fudge_ini");
 
 	joboptions["nr_classes"] = JobOption("Number of classes:", 1, 1, 50, 1, "The number of classes (K) for a multi-reference ab initio SGD refinement. \
 These classes will be made in an unsupervised manner, starting from a single reference in the initial iterations of the SGD, and the references will become increasingly dissimilar during the inbetween iterations.");
@@ -2901,13 +2898,13 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 
 	command += " --o " + outputname + fn_run;
 
-	int total_nr_iter = joboptions["vmgd_ini_iter"].getNumber(error_message);
+	int total_nr_iter = joboptions["grad_ini_iter"].getNumber(error_message);
 	if (error_message != "") return false;
 
-	total_nr_iter += joboptions["vmgd_inbetween_iter"].getNumber(error_message);
+	total_nr_iter += joboptions["grad_inbetween_iter"].getNumber(error_message);
 	if (error_message != "") return false;
 
-	total_nr_iter += joboptions["vmgd_fin_iter"].getNumber(error_message);
+	total_nr_iter += joboptions["grad_fin_iter"].getNumber(error_message);
 	if (error_message != "") return false;
 
 	int nr_classes = joboptions["nr_classes"].getNumber(error_message);
@@ -2915,17 +2912,17 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 
 	outputNodes = getOutputNodesRefine(outputname + fn_run, total_nr_iter, nr_classes, 3, 1);
 
-	command += " --vmgd_ini_iter " + joboptions["vmgd_ini_iter"].getString();
-	command += " --vmgd_inbetween_iter " + joboptions["vmgd_inbetween_iter"].getString();
-	command += " --vmgd_fin_iter " + joboptions["vmgd_fin_iter"].getString();
-	command += " --vmgd_write_iter " + joboptions["vmgd_write_iter"].getString();
-	command += " --vmgd_ini_subset " + joboptions["vmgd_ini_subset_size"].getString();
-	command += " --vmgd_fin_subset " + joboptions["vmgd_fin_subset_size"].getString();
-	if (joboptions["vmgd_anneal"].getBoolean()) command += " --vmgd_anneal";
+	command += " --grad_ini_iter " + joboptions["grad_ini_iter"].getString();
+	command += " --grad_inbetween_iter " + joboptions["grad_inbetween_iter"].getString();
+	command += " --grad_fin_iter " + joboptions["grad_fin_iter"].getString();
+	command += " --grad_write_iter " + joboptions["grad_write_iter"].getString();
+	command += " --grad_ini_subset " + joboptions["grad_ini_subset_size"].getString();
+	command += " --grad_fin_subset " + joboptions["grad_fin_subset_size"].getString();
+	if (joboptions["grad_anneal"].getBoolean()) command += " --grad_anneal";
 
 	if (!is_continue)
 	{
-		command += " --vmgd ";
+		command += " --grad ";
 
 		if (joboptions["fn_img"].getString() == "")
 		{

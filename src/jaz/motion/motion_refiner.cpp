@@ -33,6 +33,7 @@
 #include <src/jaz/fsc_helper.h>
 #include <src/jaz/img_proc/image_op.h>
 #include <src/jaz/parallel_ft.h>
+#include <src/renderEER.h>
 
 #include "gp_motion_fit.h"
 #include "motion_helper.h"
@@ -89,7 +90,19 @@ void MotionRefiner::read(int argc, char **argv)
 	
 	movie_toReplace = parser.getOption("--mov_toReplace", "Replace this string in micrograph names...", "");
 	movie_replaceBy = parser.getOption("--mov_replaceBy", "..by this one", "");
-			
+
+	micrographHandler.eer_upsampling = textToInteger(parser.getOption("--eer_upsampling", "EER upsampling (1 = 4K or 2 = 8K)", "-1"));
+	micrographHandler.eer_grouping = textToInteger(parser.getOption("--eer_grouping", "EER grouping", "-1"));
+
+	if (micrographHandler.eer_upsampling > 0 || micrographHandler.eer_grouping > 0)
+	{
+		// TODO: TAKANORI: Support changing EER upsampling and EER grouping in Polish.
+		// Change in upsampling needs changes in ImageX/Y, Binning, OriginalPixelSize, ShiftX/Y, HotpixelX/Y (but not coeffs)
+		// Change in grouping needs changes in ImageZ, DoseRate and interpolation of ShiftX/Y and scaling of MotionModelCoeffs
+		std::cerr << "At the moment, Polishing does not support changing --eer_upsampling and --eer_grouping from the values used in MotionCorr job.\n";
+		std::cerr << "You need to manually modify trajectory STAR files for it." << std::endl;
+	}
+	
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())
 	{
@@ -188,7 +201,7 @@ void MotionRefiner::init()
 		micrographHandler.init(
 			chosenMdts, verb, nr_omp_threads, // in
 			fc0, fractDose, metaFn); // out
-		
+
 		chosenMdts = micrographHandler.cullMissingMovies(chosenMdts, verb);
 		
 		if (!findShortestMovie)

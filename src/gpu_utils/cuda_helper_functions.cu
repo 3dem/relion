@@ -458,7 +458,7 @@ void runBackProjectKernel(
 		int imgZ,
 		unsigned long imageCount,
 		bool data_is_3D,
-		bool do_sgd,
+		bool do_grad,
 		cudaStream_t optStream)
 {
 
@@ -491,7 +491,7 @@ void runBackProjectKernel(
 	}
 	else
 	{
-		if(do_sgd)
+		if(do_grad)
 		{
 			if(data_is_3D)
 				cuda_kernel_backprojectSGD<true><<<imageCount,BP_DATA3D_BLOCK_SIZE,0,optStream>>>(

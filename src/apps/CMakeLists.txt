@@ -71,7 +71,7 @@ endif(NOT GUI)
 
 #--Remove apps for testing--
 #SET(RELION_TEST TRUE)
-set(TEST_TARGETS double_reconstruct_openmp cs_fit ctf_nyquist_test free_aberration_plot split_stack defocus_stats double_bfac_fit interpolation_test motion_diff paper_data_synth Zernike_test vis_delocalisation vis_Ewald_weight)
+set(TEST_TARGETS movie_reconstruct double_reconstruct_openmp cs_fit ctf_nyquist_test free_aberration_plot split_stack defocus_stats double_bfac_fit interpolation_test motion_diff paper_data_synth Zernike_test vis_delocalisation vis_Ewald_weight)
 if(NOT RELION_TEST)
 	foreach(TARGET ${TEST_TARGETS})
 		list(REMOVE_ITEM RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/${TARGET}.cpp")
@@ -241,7 +241,6 @@ if(GUI)
 	ADD_CUSTOM_COMMAND(TARGET maingui
 	                   POST_BUILD
                            COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/bin/relion_maingui ${PROJECT_BINARY_DIR}/bin/relion
-                           COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/bin/relion_qsub.csh ${PROJECT_BINARY_DIR}/bin/qsub.csh
 	)
 endif(GUI)
 

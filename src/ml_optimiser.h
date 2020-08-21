@@ -330,49 +330,49 @@ public:
 	int nr_pool;
 
 	//////////////// Gradient optimisation
-	bool do_vmgd;
+	bool do_grad;
 	bool do_mom1;
 	bool do_mom2;
 
 	// Number of initial iterations at low resolution, and without annealing of references
-	int vmgd_ini_iter;
+	int grad_ini_iter;
 
 	// Number of final iterations at high resolution, and without annealing of reference
-	int vmgd_fin_iter;
+	int grad_fin_iter;
 
 	// Number of iterations between the initial and the final ones
-	// (during which a linear transform from vmgd_ini_resol->vmgd_fin_resol and vmgd_ini_subset_size->vmgd_fin_subset_size will be done)
-	int vmgd_inbetween_iter;
+	// (during which a linear transform from grad_ini_resol->grad_fin_resol and grad_ini_subset_size->grad_fin_subset_size will be done)
+	int grad_inbetween_iter;
 
 	// Size of the subsets used in the initial iterations
-	int vmgd_ini_subset_size;
+	int grad_ini_subset_size;
 
 	//Size of the subsets used in the final iterations
-	int vmgd_fin_subset_size;
+	int grad_fin_subset_size;
 
 	// Effective size of subsets
 	int effective_setsize;
 
 	// The resolution in the initial iterations
-	RFLOAT vmgd_ini_resol; // in A
+	RFLOAT grad_ini_resol; // in A
 
 	// The resolution in the final iterations
-	RFLOAT vmgd_fin_resol; // in A
+	RFLOAT grad_fin_resol; // in A
 
 	// Skip annealing of multiple reference in SGD
-	// (by default refs are kept the same during vmgd_nr_iter_initial and then slowly annealed during vmgd_nr_iter_inbetween)
-	bool do_vmgd_skip_anneal;
+	// (by default refs are kept the same during grad_nr_iter_initial and then slowly annealed during grad_nr_iter_inbetween)
+	bool do_grad_skip_anneal;
 
 	// Calculate and apply gradient in real space
-	bool do_vmgd_realspace;
+	bool do_grad_realspace;
 
 	// Momentum update parameter
 	RFLOAT mu;
 
 	// Step size of the gradient updates
-	RFLOAT vmgd_stepsize;
-	RFLOAT vmgd_ini_stepsize;
-	RFLOAT vmgd_fin_stepsize;
+	RFLOAT grad_stepsize;
+	RFLOAT grad_ini_stepsize;
+	RFLOAT grad_fin_stepsize;
 
 	//Self-organizing map
 	bool do_init_blobs;
@@ -389,7 +389,7 @@ public:
 	long int subset_size;
 
 	// Every how many iterations should be written to disk when using subsets
-	int write_every_vmgd_iter;
+	int write_every_grad_iter;
 
 	// Use subsets like in cisTEM to speed up 2D/3D classification
 	bool do_fast_subsets;
@@ -1028,7 +1028,7 @@ public:
 	// Adjust angular sampling based on the expected angular accuracies for auto-refine procedure
 	void updateAngularSampling(bool verb = true);
 
-	// Adjust subset size in fast_subsets or VMGD algorithms
+	// Adjust subset size in fast_subsets or GRAD algorithms
 	void updateSubsetSize(bool verb = true);
 
 	// Check convergence for auto-refine procedure

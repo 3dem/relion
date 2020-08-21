@@ -331,7 +331,7 @@ public:
 
 	void reconstructGrad(
 			MultidimArray<RFLOAT> &vol_out,
-			RFLOAT vmgd_stepsize,
+			RFLOAT grad_stepsize,
 			RFLOAT tau2_fudge,
 			const MultidimArray<RFLOAT> &fsc,
 			bool use_fsc,

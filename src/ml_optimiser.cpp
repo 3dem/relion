@@ -216,45 +216,45 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 		particle_diameter = textToFloat(fnt);
 
 	// SGD stuff
-	fnt = parser.getOption("--vmgd_ini_iter", "Number of initial SGD iterations", "OLD");
+	fnt = parser.getOption("--grad_ini_iter", "Number of initial SGD iterations", "OLD");
 	if (fnt != "OLD")
-		vmgd_ini_iter = textToInteger(fnt);
+		grad_ini_iter = textToInteger(fnt);
 
-	fnt = parser.getOption("--vmgd_fin_iter", "Number of final SGD iterations", "OLD");
+	fnt = parser.getOption("--grad_fin_iter", "Number of final SGD iterations", "OLD");
 	if (fnt != "OLD")
-		vmgd_fin_iter = textToInteger(fnt);
+		grad_fin_iter = textToInteger(fnt);
 
-	fnt = parser.getOption("--vmgd_inbetween_iter", "Number of SGD iterations between the initial and final ones", "OLD");
+	fnt = parser.getOption("--grad_inbetween_iter", "Number of SGD iterations between the initial and final ones", "OLD");
 	if (fnt != "OLD")
-		vmgd_inbetween_iter = textToInteger(fnt);
+		grad_inbetween_iter = textToInteger(fnt);
 
-	fnt = parser.getOption("--vmgd_ini_resol", "Resolution cutoff during the initial SGD iterations (A)", "OLD");
+	fnt = parser.getOption("--grad_ini_resol", "Resolution cutoff during the initial SGD iterations (A)", "OLD");
 	if (fnt != "OLD")
-		vmgd_ini_resol = textToFloat(fnt);
+		grad_ini_resol = textToFloat(fnt);
 
-	fnt = parser.getOption("--vmgd_fin_resol", "Resolution cutoff during the final SGD iterations (A)", "OLD");
+	fnt = parser.getOption("--grad_fin_resol", "Resolution cutoff during the final SGD iterations (A)", "OLD");
 	if (fnt != "OLD")
-		vmgd_fin_resol = textToFloat(fnt);
+		grad_fin_resol = textToFloat(fnt);
 
-	fnt = parser.getOption("--vmgd_ini_subset", "Mini-batch size during the initial SGD iterations", "OLD");
+	fnt = parser.getOption("--grad_ini_subset", "Mini-batch size during the initial SGD iterations", "OLD");
 	if (fnt != "OLD")
-		vmgd_ini_subset_size = textToInteger(fnt);
+		grad_ini_subset_size = textToInteger(fnt);
 
-	fnt = parser.getOption("--vmgd_fin_subset", "Mini-batch size during the final SGD iterations", "OLD");
+	fnt = parser.getOption("--grad_fin_subset", "Mini-batch size during the final SGD iterations", "OLD");
 	if (fnt != "OLD")
-		vmgd_fin_subset_size = textToInteger(fnt);
+		grad_fin_subset_size = textToInteger(fnt);
 
-	fnt = parser.getOption("--vmgd_stepsize", "Step size parameter for SGD updates", "OLD");
+	fnt = parser.getOption("--grad_stepsize", "Step size parameter for SGD updates", "OLD");
 	if (fnt != "OLD")
-		vmgd_stepsize = textToInteger(fnt);
+		grad_stepsize = textToInteger(fnt);
 
 	fnt = parser.getOption("--mu", "Momentum parameter for SGD updates", "OLD");
 	if (fnt != "OLD")
 		mu = textToFloat(fnt);
 
-	fnt = parser.getOption("--vmgd_write_iter", "Write out model every so many iterations in SGD", "OLD");
+	fnt = parser.getOption("--grad_write_iter", "Write out model every so many iterations in SGD", "OLD");
 	if (fnt != "OLD")
-		write_every_vmgd_iter = textToInteger(fnt);
+		write_every_grad_iter = textToInteger(fnt);
 
 	do_join_random_halves = parser.checkOption("--join_random_halves", "Join previously split random halves again (typically to perform a final reconstruction).");
 
@@ -651,27 +651,27 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 		do_scale_correction = false;
 
 	// SGD stuff
-	int vmgd_section = parser.addSection("Stochastic Gradient Descent");
-	do_vmgd = parser.checkOption("--grad", "Perform gradient based optimisation (instead of default expectation-maximization)");
+	int grad_section = parser.addSection("Stochastic Gradient Descent");
+	do_grad = parser.checkOption("--grad", "Perform gradient based optimisation (instead of default expectation-maximization)");
 //	do_mom1 = parser.checkOption("--mom1", "Track the first moment of the gradient");
 //	do_mom2 = parser.checkOption("--mom2", "Track the second moment of the gradient");
-	if (do_vmgd) {
+	if (do_grad) {
 		do_mom1 = true;
 		do_mom2 = true;
 	}
 	// Stochastic EM is implemented as a variant of SGD, though it is really a different algorithm!
-	vmgd_ini_iter = textToInteger(parser.getOption("--vmgd_ini_iter", "Number of initial SGD iterations", "50"));
-	vmgd_fin_iter = textToInteger(parser.getOption("--vmgd_fin_iter", "Number of final SGD iterations", "50"));
-	vmgd_inbetween_iter = textToInteger(parser.getOption("--vmgd_inbetween_iter", "Number of SGD iterations between the initial and final ones", "200"));
-	vmgd_ini_resol = textToInteger(parser.getOption("--vmgd_ini_resol", "Resolution cutoff during the initial SGD iterations (A)", "-1"));
-	vmgd_fin_resol = textToInteger(parser.getOption("--vmgd_fin_resol", "Resolution cutoff during the final SGD iterations (A)", "-1"));
-	vmgd_ini_subset_size = textToInteger(parser.getOption("--vmgd_ini_subset", "Mini-batch size during the initial SGD iterations", "500"));
-	vmgd_fin_subset_size = textToInteger(parser.getOption("--vmgd_fin_subset", "Mini-batch size during the final SGD iterations", "5000"));
+	grad_ini_iter = textToInteger(parser.getOption("--grad_ini_iter", "Number of initial SGD iterations", "50"));
+	grad_fin_iter = textToInteger(parser.getOption("--grad_fin_iter", "Number of final SGD iterations", "50"));
+	grad_inbetween_iter = textToInteger(parser.getOption("--grad_inbetween_iter", "Number of SGD iterations between the initial and final ones", "200"));
+	grad_ini_resol = textToInteger(parser.getOption("--grad_ini_resol", "Resolution cutoff during the initial SGD iterations (A)", "-1"));
+	grad_fin_resol = textToInteger(parser.getOption("--grad_fin_resol", "Resolution cutoff during the final SGD iterations (A)", "-1"));
+	grad_ini_subset_size = textToInteger(parser.getOption("--grad_ini_subset", "Mini-batch size during the initial SGD iterations", "500"));
+	grad_fin_subset_size = textToInteger(parser.getOption("--grad_fin_subset", "Mini-batch size during the final SGD iterations", "5000"));
 	mu = textToFloat(parser.getOption("--mu", "Momentum parameter for SGD updates", "0.9"));
-	vmgd_ini_stepsize = textToFloat(parser.getOption("--vmgd_ini_stepsize", "Step size parameter for initial gradient updates.", "0.5"));
-	vmgd_fin_stepsize = textToFloat(parser.getOption("--vmgd_fin_stepsize", "Step size parameter for final gradient updates.", "0.05"));
-	do_vmgd_realspace = parser.checkOption("--vmgd_realspace", "Claculate and apply gradient in real space.");
-	write_every_vmgd_iter = textToInteger(parser.getOption("--vmgd_write_iter", "Write out model every so many iterations in SGD (default is writing out all iters)", "10"));
+	grad_ini_stepsize = textToFloat(parser.getOption("--grad_ini_stepsize", "Step size parameter for initial gradient updates.", "0.5"));
+	grad_fin_stepsize = textToFloat(parser.getOption("--grad_fin_stepsize", "Step size parameter for final gradient updates.", "0.05"));
+	do_grad_realspace = parser.checkOption("--grad_realspace", "Claculate and apply gradient in real space.");
+	write_every_grad_iter = textToInteger(parser.getOption("--grad_write_iter", "Write out model every so many iterations in SGD (default is writing out all iters)", "10"));
 	do_init_blobs = parser.checkOption("--init_blobs", "Initialize models with random Gaussians.");
 	do_som = parser.checkOption("--som", "Calculate self-organizing map instead of classification.");
 	som_starting_nodes = textToInteger(parser.getOption("--som_ini_nodes", "Number of initial SOM nodes.", "2"));
@@ -680,7 +680,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	som_neighbour_pull = textToFloat(parser.getOption("--som_neighbour_pull", "Portion of gradient applied to connected nodes.", "0.2"));
 	class_inactivity_threshold = textToFloat(parser.getOption("--class_inactivity_threshold", "Replace classes with little activity during gradient based classification.", "-1"));
 
-	if (do_som && !do_vmgd)
+	if (do_som && !do_grad)
 		REPORT_ERROR("SOM can only be calculated with a gradient optimization.");
 
 	if (do_som && mymodel.nr_classes < 3)
@@ -733,7 +733,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	// Expert options
 	int expert_section = parser.addSection("Expert options");
 	mymodel.padding_factor = textToFloat(parser.getOption("--pad", "Oversampling factor for the Fourier transforms of the references", "2"));
-	if (do_vmgd)
+	if (do_grad)
 		mymodel.padding_factor = 1;
 	ref_angpix = textToFloat(parser.getOption("--ref_angpix", "Pixel size (in A) for the input reference (default is to read from header)", "-1."));
 	mymodel.interpolator = (parser.checkOption("--NN", "Perform nearest-neighbour instead of linear Fourier-space interpolation?")) ? NEAREST_NEIGHBOUR : TRILINEAR;
@@ -924,30 +924,30 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_KEEP_TILT_PRIOR_FIXED, helical_keep_tilt_prior_fixed))
     		helical_keep_tilt_prior_fixed = false;
 	// New SGD (13Feb2018)
-	if (!MD.getValue(EMDL_OPTIMISER_DO_VMGD, do_vmgd))
-		do_vmgd = false;
-	if (!MD.getValue(EMDL_OPTIMISER_SGD_INI_ITER, vmgd_ini_iter))
-		vmgd_ini_iter = 50;
-	if (!MD.getValue(EMDL_OPTIMISER_SGD_FIN_ITER, vmgd_fin_iter))
-		vmgd_fin_iter = 50;
-	if (!MD.getValue(EMDL_OPTIMISER_SGD_INBETWEEN_ITER, vmgd_inbetween_iter))
-		vmgd_inbetween_iter = 200;
-	if (!MD.getValue(EMDL_OPTIMISER_SGD_INI_RESOL, vmgd_ini_resol))
-		vmgd_ini_resol = 35.;
-	if (!MD.getValue(EMDL_OPTIMISER_SGD_FIN_RESOL, vmgd_fin_resol))
-		vmgd_fin_resol = 15.;
-	if (!MD.getValue(EMDL_OPTIMISER_SGD_INI_SUBSET_SIZE, vmgd_ini_subset_size))
-		vmgd_ini_subset_size = 100;
-	if (!MD.getValue(EMDL_OPTIMISER_SGD_FIN_SUBSET_SIZE, vmgd_fin_subset_size))
-		vmgd_fin_subset_size = 500;
+	if (!MD.getValue(EMDL_OPTIMISER_DO_GRAD, do_grad))
+		do_grad = false;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_INI_ITER, grad_ini_iter))
+		grad_ini_iter = 50;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_FIN_ITER, grad_fin_iter))
+		grad_fin_iter = 50;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_INBETWEEN_ITER, grad_inbetween_iter))
+		grad_inbetween_iter = 200;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_INI_RESOL, grad_ini_resol))
+		grad_ini_resol = 35.;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_FIN_RESOL, grad_fin_resol))
+		grad_fin_resol = 15.;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_INI_SUBSET_SIZE, grad_ini_subset_size))
+		grad_ini_subset_size = 100;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_FIN_SUBSET_SIZE, grad_fin_subset_size))
+		grad_fin_subset_size = 500;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_MU, mu))
 		mu = 0.9;
-	if (!MD.getValue(EMDL_OPTIMISER_SGD_SKIP_ANNNEAL, do_vmgd_skip_anneal))
-		do_vmgd_skip_anneal = false;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_SKIP_ANNNEAL, do_grad_skip_anneal))
+		do_grad_skip_anneal = false;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_SUBSET_SIZE, subset_size))
 		subset_size = -1;
-	if (!MD.getValue(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, write_every_vmgd_iter))
-		write_every_vmgd_iter = 1;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, write_every_grad_iter))
+		write_every_grad_iter = 1;
 	if (!MD.getValue(EMDL_BODY_STAR_FILE, fn_body_masks))
 		fn_body_masks = "None";
 	if (!MD.getValue(EMDL_OPTIMISER_DO_SOLVENT_FSC, do_phase_random_fsc))
@@ -1049,7 +1049,7 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 
 void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_write_optimiser, bool do_write_model, int random_subset)
 {
-	if (subset_size > 0 && (iter % write_every_vmgd_iter) != 0 && iter != nr_iter)
+	if (subset_size > 0 && (iter % write_every_grad_iter) != 0 && iter != nr_iter)
 		return;
 
 	FileName fn_root, fn_tmp, fn_model, fn_model2, fn_data, fn_sampling, fn_root2;
@@ -1060,7 +1060,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		fn_root = fn_out;
 	// fn_root2 is used to write out the model and optimiser, and adds a subset number in SGD
 	fn_root2 = fn_root;
-	bool do_write_bild = !(do_skip_align || do_skip_rotate || do_vmgd);
+	bool do_write_bild = !(do_skip_align || do_skip_rotate || do_grad);
 
 	// First write "main" STAR file with all information from this run
 	// Do this for random_subset==0 and random_subset==1
@@ -1127,19 +1127,19 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_DO_MAP, do_map);
 		MD.setValue(EMDL_OPTIMISER_FAST_SUBSETS, do_fast_subsets);
 		MD.setValue(EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT, do_external_reconstruct);
-		MD.setValue(EMDL_OPTIMISER_DO_VMGD, do_vmgd);
-		MD.setValue(EMDL_OPTIMISER_SGD_INI_ITER, vmgd_ini_iter);
-		MD.setValue(EMDL_OPTIMISER_SGD_FIN_ITER, vmgd_fin_iter);
-		MD.setValue(EMDL_OPTIMISER_SGD_INBETWEEN_ITER, vmgd_inbetween_iter);
-		MD.setValue(EMDL_OPTIMISER_SGD_INI_RESOL, vmgd_ini_resol);
-		MD.setValue(EMDL_OPTIMISER_SGD_FIN_RESOL, vmgd_fin_resol);
-		MD.setValue(EMDL_OPTIMISER_SGD_INI_SUBSET_SIZE, vmgd_ini_subset_size);
-		MD.setValue(EMDL_OPTIMISER_SGD_FIN_SUBSET_SIZE, vmgd_fin_subset_size);
+		MD.setValue(EMDL_OPTIMISER_DO_GRAD, do_grad);
+		MD.setValue(EMDL_OPTIMISER_SGD_INI_ITER, grad_ini_iter);
+		MD.setValue(EMDL_OPTIMISER_SGD_FIN_ITER, grad_fin_iter);
+		MD.setValue(EMDL_OPTIMISER_SGD_INBETWEEN_ITER, grad_inbetween_iter);
+		MD.setValue(EMDL_OPTIMISER_SGD_INI_RESOL, grad_ini_resol);
+		MD.setValue(EMDL_OPTIMISER_SGD_FIN_RESOL, grad_fin_resol);
+		MD.setValue(EMDL_OPTIMISER_SGD_INI_SUBSET_SIZE, grad_ini_subset_size);
+		MD.setValue(EMDL_OPTIMISER_SGD_FIN_SUBSET_SIZE, grad_fin_subset_size);
 		MD.setValue(EMDL_OPTIMISER_SGD_MU, mu);
-		MD.setValue(EMDL_OPTIMISER_SGD_SKIP_ANNNEAL, do_vmgd_skip_anneal);
+		MD.setValue(EMDL_OPTIMISER_SGD_SKIP_ANNNEAL, do_grad_skip_anneal);
 		MD.setValue(EMDL_OPTIMISER_SGD_SUBSET_SIZE, subset_size);
-		MD.setValue(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, write_every_vmgd_iter);
-		MD.setValue(EMDL_OPTIMISER_SGD_STEPSIZE, vmgd_stepsize);
+		MD.setValue(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, write_every_grad_iter);
+		MD.setValue(EMDL_OPTIMISER_SGD_STEPSIZE, grad_stepsize);
 		MD.setValue(EMDL_OPTIMISER_SGD_DO_MOM1, do_mom1);
 		MD.setValue(EMDL_OPTIMISER_SGD_DO_MOM2, do_mom2);
 		MD.setValue(EMDL_OPTIMISER_DO_AUTO_REFINE, do_auto_refine);
@@ -1308,6 +1308,7 @@ void MlOptimiser::initialise()
 
 			cudaOptimiserDeviceMap.push_back(bundleId);
 		}
+		mymodel.do_gpu = do_gpu;
 #else
         REPORT_ERROR("GPU usage requested, but RELION was compiled without CUDA support");
 #endif
@@ -1737,7 +1738,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 		if (mymodel.nr_classes > 1)
 			REPORT_ERROR("ERROR: One cannot use multiple classes with multi-body refinement!");
-		if (do_vmgd)
+		if (do_grad)
 			REPORT_ERROR("ERROR: One cannot use SGD with multi-body refinement!");
 		if (do_helical_refine)
 			REPORT_ERROR("ERROR: One cannot use helical symmetry with multi-body refinement!");
@@ -2073,10 +2074,10 @@ void MlOptimiser::initialiseGeneral(int rank)
 	// For new thread-parallelization: each thread does 1 particle, so nr_pool=nr_threads
 	nr_pool = x_pool*nr_threads;
 
-	if (do_vmgd)
+	if (do_grad)
 	{
 		// for continuation jobs (iter>0): could do some more iterations as specified by nr_iter
-		nr_iter = vmgd_ini_iter + vmgd_fin_iter + vmgd_inbetween_iter;
+		nr_iter = grad_ini_iter + grad_fin_iter + grad_inbetween_iter;
 	}
 	else
 	{
@@ -2097,7 +2098,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 	if (fn_mask2 != "None") checkMask(fn_mask2, 2, rank);
 
 	// Write out unmasked 2D class averages
-	do_write_unmasked_refs = (mymodel.ref_dim == 2 && !do_vmgd);
+	do_write_unmasked_refs = (mymodel.ref_dim == 2 && !do_grad);
 
 #ifdef DEBUG
 	std::cerr << "Leaving initialiseGeneral" << std::endl;
@@ -2203,9 +2204,9 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 		{
 			long int group_id = mydata.getGroupId(part_id, img_id);
 
-			if (do_vmgd) {
+			if (do_grad) {
 				mymodel.nr_particles_per_group[group_id] ++;
-				if (do_vmgd && mymodel.nr_particles_per_group[group_id] > vmgd_ini_subset_size)
+				if (do_grad && mymodel.nr_particles_per_group[group_id] > grad_ini_subset_size)
 					continue;
 			}
 
@@ -2363,8 +2364,8 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			wsum_model.sigma2_noise[group_id] += ind_spectrum;
 			wsum_model.sumw_group[group_id] += 1.;
 
-			// When doing SGD, only take the first vmgd_ini_subset_size*mymodel.nr_classes images to calculate the initial reconstruction
-			if (fn_ref == "None" && !(do_vmgd && part_id > vmgd_ini_subset_size*mymodel.nr_classes) )
+			// When doing SGD, only take the first grad_ini_subset_size*mymodel.nr_classes images to calculate the initial reconstruction
+			if (fn_ref == "None" && !(do_grad && part_id > grad_ini_subset_size*mymodel.nr_classes) )
 			{
 
 				MultidimArray<RFLOAT> Fctf, Fweight;
@@ -2456,7 +2457,7 @@ void MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(MultidimArray<RFLOAT>
 	RFLOAT total_sum = 0.;
 	for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
 	{
-		if (! do_vmgd)
+		if (! do_grad)
 			mymodel.nr_particles_per_group[igroup] = ROUND(wsum_model.sumw_group[igroup]);
 		total_sum += wsum_model.sumw_group[igroup];
 	}
@@ -2685,7 +2686,7 @@ void MlOptimiser::iterate()
 		{
 			std::cerr << " WARNING: skipping randomisation of particle order because random_seed equals zero..." << std::endl;
 		}
-		else if (do_vmgd)
+		else if (do_grad)
 			REPORT_ERROR("ERROR: Random seed must be set for gradient optimisation.");
 
 		if (do_auto_refine)
@@ -2845,7 +2846,7 @@ void MlOptimiser::expectation()
 
 	// C. Calculate expected minimum angular errors (only for 3D refinements)
 	// And possibly update orientational sampling automatically
-	if (!((iter==1 && do_firstiter_cc) || do_always_cc) && !(do_skip_align || do_only_sample_tilt) && !do_vmgd)
+	if (!((iter==1 && do_firstiter_cc) || do_always_cc) && !(do_skip_align || do_only_sample_tilt) && !do_grad)
 	{
 		// Set the exp_metadata (but not the exp_imagedata which is not needed for calculateExpectedAngularErrors)
 		int n_trials_acc = (mymodel.ref_dim==3 && mymodel.data_dim != 3) ? 100 : 10;
@@ -2866,7 +2867,7 @@ void MlOptimiser::expectation()
 
 	// F. Precalculate AB-matrices for on-the-fly shifts
 	// Use tabulated sine and cosine values instead for 2D helical segments / 3D helical sub-tomogram averaging with on-the-fly shifts
-	if ( (do_shifts_onthefly) && (!((do_helical_refine) && (!ignore_helical_symmetry))) && !(do_vmgd && iter > 1))
+	if ( (do_shifts_onthefly) && (!((do_helical_refine) && (!ignore_helical_symmetry))) && !(do_grad && iter > 1))
 		precalculateABMatrices();
 
 
@@ -3003,7 +3004,7 @@ void MlOptimiser::expectation()
 	long int nr_particles_done = 0;
 	if (verb > 0)
 	{
-		if (do_vmgd)
+		if (do_grad)
 		{
 			std::cout << " Variable-metric Gradient Descent iteration " << iter << " of " << nr_iter;
 			if (my_nr_particles < mydata.numberOfParticles())
@@ -4178,7 +4179,7 @@ void MlOptimiser::maximization()
 			nr_active_classes ++;
 	}
 
-	if(do_vmgd) {
+	if(do_grad) {
 		std::vector<float> avg_class_errors(mymodel.nr_classes * mymodel.nr_bodies, 0);
 		for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++) {
 			mymodel.class_age[iclass] += wsum_model.pdf_class[iclass]/wsum_mode_pdf_class_sum;
@@ -4186,7 +4187,7 @@ void MlOptimiser::maximization()
 			if (mymodel.pdf_class[iclass] > 0. || mymodel.nr_bodies > 1) {
 				if ((wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY) {
 
-					if (do_vmgd_realspace)
+					if (do_grad_realspace)
 						(wsum_model.BPref[iclass]).reweightGradRealSpace(
 								mymodel.Igrad1[iclass],
 								do_mom1 ? 0.9 : 0.,
@@ -4211,7 +4212,7 @@ void MlOptimiser::maximization()
 			}
 		}
 
-		if (vmgd_ini_iter < iter && iter < vmgd_ini_iter + vmgd_inbetween_iter) {
+		if (grad_ini_iter < iter && iter < grad_ini_iter + grad_inbetween_iter) {
 			int drop_class_idx = -1, expand_class_idx = -1;
 
 			// Determine the class with the largest average error to expand
@@ -4292,13 +4293,13 @@ void MlOptimiser::maximization()
 				}
 				else
 				{
-					if(do_vmgd) {
-						float a = vmgd_inbetween_iter;
-						float b = vmgd_ini_iter;
+					if(do_grad) {
+						float a = grad_inbetween_iter;
+						float b = grad_ini_iter;
 						float x = mymodel.class_age[iclass] * nr_active_classes;
 						float scale = 1 / (pow(10, (x-b-a/2.)/(a/4.)) + 1.);
 
-						float _stepsize = (vmgd_ini_stepsize - vmgd_fin_stepsize) * scale + vmgd_fin_stepsize;
+						float _stepsize = (grad_ini_stepsize - grad_fin_stepsize) * scale + grad_fin_stepsize;
 						_stepsize *= sqrt(wsum_model.pdf_class[iclass]/wsum_mode_pdf_class_sum * nr_active_classes);
 						avg_stepsize += _stepsize;
 						avg_stepsize_count ++;
@@ -4327,7 +4328,7 @@ void MlOptimiser::maximization()
 		else
 		{
 			// When not doing SGD, initialise to zero, but when doing SGD just keep the previous reference
-			if (!do_vmgd)
+			if (!do_grad)
 				mymodel.Iref[iclass].initZeros();
 
 		}
@@ -7378,7 +7379,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 	std::vector< RFLOAT> oversampled_rot, oversampled_tilt, oversampled_psi;
 	std::vector<RFLOAT> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
 	Matrix2D<RFLOAT> A, Abody, Aori;
-	MultidimArray<Complex > Fimg, Fref, Frefctf, Fimg_otfshift, Fimg_otfshift_nomask, Fimg_store_vmgd;
+	MultidimArray<Complex > Fimg, Fref, Frefctf, Fimg_otfshift, Fimg_otfshift_nomask, Fimg_store_grad;
 	MultidimArray<RFLOAT> Minvsigma2, Mctf, Fweight;
 	RFLOAT rot, tilt, psi;
 	bool have_warned_small_scale = false;
@@ -7398,9 +7399,9 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 		Fimg_otfshift.resize(Frefctf);
 		Fimg_otfshift_nomask.resize(Frefctf);
 	}
-	if (do_vmgd)
+	if (do_grad)
 	{
-		Fimg_store_vmgd.resize(Frefctf);
+		Fimg_store_grad.resize(Frefctf);
 	}
 
 
@@ -7808,14 +7809,14 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 #endif
 
 											Complex *Fimg_store;
-											if (do_vmgd)
+											if (do_grad)
 											{
 												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Frefctf)
 												{
-													(DIRECT_MULTIDIM_ELEM(Fimg_store_vmgd, n)).real = (*(Fimg_shift_nomask + n)).real - (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real;
-													(DIRECT_MULTIDIM_ELEM(Fimg_store_vmgd, n)).imag = (*(Fimg_shift_nomask + n)).imag - (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag;
+													(DIRECT_MULTIDIM_ELEM(Fimg_store_grad, n)).real = (*(Fimg_shift_nomask + n)).real - (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real;
+													(DIRECT_MULTIDIM_ELEM(Fimg_store_grad, n)).imag = (*(Fimg_shift_nomask + n)).imag - (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag;
 												}
-												Fimg_store = Fimg_store_vmgd.data;
+												Fimg_store = Fimg_store_grad.data;
 											}
 											else
 											{
@@ -9022,20 +9023,20 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 		if (subset_size > mydata.numberOfParticles())
 			subset_size = -1;
 	}
-	else if (do_vmgd)
+	else if (do_grad)
 	{
-		// Do sgd_ini_iter iterations with completely identical K references, sigd_ini_subset_size, enforce non-negativity and sgd_ini_resol resolution limit
-		if (iter < vmgd_ini_iter)
+		// Do grad_ini_iter iterations with completely identical K references, sigd_ini_subset_size, enforce non-negativity and grad_ini_resol resolution limit
+		if (iter < grad_ini_iter)
 		{
-			subset_size = vmgd_ini_subset_size;
+			subset_size = grad_ini_subset_size;
 		}
-		else if (iter < vmgd_ini_iter + vmgd_inbetween_iter)
+		else if (iter < grad_ini_iter + grad_inbetween_iter)
 		{
-			subset_size = vmgd_ini_subset_size + ROUND((RFLOAT(iter - vmgd_ini_iter)/RFLOAT(vmgd_inbetween_iter))*(vmgd_fin_subset_size-vmgd_ini_subset_size));
+			subset_size = grad_ini_subset_size + ROUND((RFLOAT(iter - grad_ini_iter)/RFLOAT(grad_inbetween_iter))*(grad_fin_subset_size-grad_ini_subset_size));
 		}
 		else
 		{
-			subset_size = vmgd_fin_subset_size;
+			subset_size = grad_fin_subset_size;
 		}
 
 		if (iter == nr_iter)

@@ -632,7 +632,7 @@ void runBackProjectKernel(
 		int imgZ,
 		unsigned long imageCount,
 		bool data_is_3D,
-		bool do_sgd,
+		bool do_grad,
 		bool ctf_premultiplied,
 		cudaStream_t optStream)
 {
@@ -640,7 +640,7 @@ void runBackProjectKernel(
 	if(BP.mdlZ==1)
 	{
 #ifdef CUDA
-		if(do_sgd)
+		if(do_grad)
 			if(ctf_premultiplied)
 				cuda_kernel_backproject2D_SGD<true><<<imageCount, BP_2D_BLOCK_SIZE, 0, optStream>>>(
 						projector,
@@ -710,7 +710,7 @@ void runBackProjectKernel(
 	}
 	else
 	{
-		if(do_sgd)
+		if(do_grad)
 		{
 			if(data_is_3D)
 #ifdef CUDA
@@ -920,7 +920,7 @@ void runBackProjectKernel(
 						(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, BP.mutexes);
 #endif
 #endif
-		} // do_sgd is false
+		} // do_grad is false
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	}
 }
@@ -1893,6 +1893,35 @@ void windowFourierTransform2(
 	}
 }
 
+void run_calcPowerSpectrum(Complex *dFaux, int padoridim, Complex *ddata, int data_sz, RFLOAT *dpower_spectrum, RFLOAT *dcounter,
+											  int max_r2, int min_r2, RFLOAT normfft, RFLOAT padding_factor, RFLOAT weight,
+											  RFLOAT *dfourier_mask, int fx, int fy, int fz, bool do_fourier_mask, bool if3D)
+{
+#ifdef CUDA
+	dim3 bs(32,4);
+	dim3 gs(ceil((padoridim/2+1)/(float)bs.x), ceil(padoridim/(float)bs.y));
+	if(if3D)
+	{
+		bs.z = 2;
+		gs.z = ceil(padoridim/(float)bs.z); 
+	}
+	if(sizeof(RFLOAT) == sizeof(double))
+		cuda_kernel_calcPowerSpectrum<<<gs,bs>>>((double2*)dFaux,padoridim,(double2*)ddata,data_sz,dpower_spectrum,dcounter,
+												  max_r2,min_r2,normfft,padding_factor,weight,dfourier_mask,fx,fy,fz,do_fourier_mask);
+	else
+		cuda_kernel_calcPowerSpectrum<<<gs,bs>>>((float2*)dFaux,padoridim,(float2*)ddata,data_sz,dpower_spectrum,dcounter,
+												  max_r2,min_r2,normfft,padding_factor,weight,dfourier_mask,fx,fy,fz,do_fourier_mask);
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
+#endif
+}
+
+void run_updatePowerSpectrum(RFLOAT *dcounter, int sz, RFLOAT *dpower_spectrum)
+{
+#ifdef CUDA
+	cuda_kernel_updatePowerSpectrum<<<ceil(sz/(float)256),256>>>(dcounter, dpower_spectrum, sz);
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
+#endif
+}
 
 
 void selfApplyBeamTilt2(MultidimArray<Complex > &Fimg, RFLOAT beamtilt_x, RFLOAT beamtilt_y,

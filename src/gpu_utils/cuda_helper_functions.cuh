@@ -122,7 +122,7 @@ void runBackProjectKernel(
 		int imgZ,
 		unsigned long imageCount,
 		bool data_is_3D,
-		bool do_sgd,
+		bool do_grad,
 		cudaStream_t optStream);
 
 #define INIT_VALUE_BLOCK_SIZE 512
