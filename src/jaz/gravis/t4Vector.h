@@ -339,6 +339,7 @@ namespace gravis
 
   typedef t4Vector<float> f4Vector;
   typedef t4Vector<double> d4Vector;
+  typedef t4Vector<int> i4Vector;
 
 } /* Close Namespace "gravis" */
 
