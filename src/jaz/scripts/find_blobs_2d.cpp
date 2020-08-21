@@ -124,8 +124,9 @@ int main(int argc, char *argv[])
 	
 	
 
-	Log::beginProgress("Averaging particles", (max_MG - min_MG + 1)/num_threads);
+	Log::beginProgress("Finding blobs", (max_MG - min_MG + 1)/num_threads);
 
+	#pragma omp parallel for num_threads(num_threads)
 	for (int m = min_MG; m <= max_MG; m++)
 	{
 		const int thread_id = omp_get_thread_num();
