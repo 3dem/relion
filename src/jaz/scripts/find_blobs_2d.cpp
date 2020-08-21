@@ -123,11 +123,17 @@ int main(int argc, char *argv[])
 	log_image.fill(0.f);
 	
 	
-	
-	#pragma omp parallel for num_threads(num_threads)            
+
+	Log::beginProgress("Averaging particles", (max_MG - min_MG + 1)/num_threads);
+
 	for (int m = min_MG; m <= max_MG; m++)
 	{
-		Log::beginSection("Micrograph "+ZIO::itoa(m+1));
+		const int thread_id = omp_get_thread_num();
+
+		if (thread_id == 0)
+		{
+			Log::updateProgress(m);
+		}
 		
 		MetaDataTable& particles = particles_by_micrograph[m];
 		
@@ -242,9 +248,6 @@ int main(int argc, char *argv[])
 			}
 		}
 		
-		Log::print(ZIO::itoa(sparse_detections.size()) + " blobs found");
-		
-		
 		BufferedImage<float> micrograph_binned_2 = Resampling::FourierCrop_fullStack(
 		            micrograph_binned, additional_binning, 1, true);
 		
@@ -266,9 +269,9 @@ int main(int argc, char *argv[])
 				log_slice(dx,dy) = dot_value;
 			}
 		}
-		
-		Log::endSection();
 	}
+
+	Log::endProgress();
 	
 	log_image.write(outDir+"diagnostic.mrc");
 	
