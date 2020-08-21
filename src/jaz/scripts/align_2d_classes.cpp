@@ -215,6 +215,8 @@ int main(int argc, char *argv[])
 	for (int ci = 1; ci < class_count; ci++)
 	{
 		const int class_id = class_by_size[class_count - ci - 1];
+		
+		Log::print("Aligning class " + ZIO::itoa(class_id)); 
 
 
 		double best_phi_coarse = 0;

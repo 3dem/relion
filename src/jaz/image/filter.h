@@ -378,7 +378,7 @@ BufferedImage<T> ImageFilter::Gauss2D(const RawImage<T>& img, int z, double sigm
 	const int w = img.xdim;
 	const int h = img.ydim;
 	
-	int padding = pad? (int) (2.0 * sigmaRS + 0.5) : 0;
+	int padding = pad? (int) (3.0 * sigmaRS + 0.5) : 0;
 	
 	const double sigmaFSx = 0.5 / (PI * sigmaRS);
 	const double sigmaFSy = 0.5 / (PI * sigmaRS);
@@ -388,6 +388,7 @@ BufferedImage<T> ImageFilter::Gauss2D(const RawImage<T>& img, int z, double sigm
 	const int wph = wp/2 + 1;
 	
 	BufferedImage<T> imgPadded(wp, hp);
+	BufferedImage<T> weightPadded(wp, hp);
 	
 	for (int y = 0; y < hp; y++)
 	for (int x = 0; x < wp; x++)
@@ -395,18 +396,17 @@ BufferedImage<T> ImageFilter::Gauss2D(const RawImage<T>& img, int z, double sigm
 		int xx = x - padding;
 		int yy = y - padding;
 		
-		if (xx < 0) xx = 0;
-		else if (xx >= w) xx = w - 1;
-		
-		if (yy < 0) yy = 0;
-		else if (yy >= h) yy = h - 1;
-		
-		imgPadded(x,y) = img(xx,yy,z);
+		if (xx >= 0 && xx < w && yy >= 0 && yy < h) 
+		{
+			imgPadded(x,y) = img(xx,yy,z);
+			weightPadded(x,y) = 1; 
+		}
 	}
 	
-	BufferedImage<tComplex<T>> imgFS;
+	BufferedImage<tComplex<T>> imgFS, weightFS;
 	
 	FFT::FourierTransform(imgPadded, imgFS, FFT::Both);
+	FFT::FourierTransform(weightPadded, weightFS, FFT::Both);
 		
 	for (int y = 0; y < hp; y++)
 	for (int x = 0; x < wph; x++)
@@ -417,18 +417,20 @@ BufferedImage<T> ImageFilter::Gauss2D(const RawImage<T>& img, int z, double sigm
 		const double d = 
 			  xx * xx / (sigmaFSx * sigmaFSx) 
 			+ yy * yy / (sigmaFSy * sigmaFSy);
-				
+		
 		imgFS(x,y) *= exp(-d / 2.0);
+		weightFS(x,y) *= exp(-d / 2.0);
 	}
 	
-	BufferedImage<T> out, outCropped(w,h);
+	BufferedImage<T> out, weightOut, outCropped(w,h);
 	
 	FFT::inverseFourierTransform(imgFS, out, FFT::Both);
+	FFT::inverseFourierTransform(weightFS, weightOut, FFT::Both);
 	
 	for (int y = 0; y < h; y++)
 	for (int x = 0; x < w; x++)
 	{
-		outCropped(x,y) = out(x + padding, y + padding);
+		outCropped(x,y) = out(x + padding, y + padding) / weightOut(x + padding, y + padding);
 	}
 	
 	return outCropped;
