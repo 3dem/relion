@@ -2011,6 +2011,8 @@ void MlOptimiserMpi::maximization()
 		init_progress_bar(mymodel.nr_classes);
 	}
 
+	int skip_class = maximizationGradientParameters();
+
 	RFLOAT helical_twist_half1, helical_rise_half1, helical_twist_half2, helical_rise_half2;
 	helical_twist_half1 = helical_twist_half2 = helical_twist_initial;
 	helical_rise_half1 = helical_rise_half2 = helical_rise_initial;
@@ -2076,9 +2078,10 @@ void MlOptimiserMpi::maximization()
 						{
 							if(do_grad)
 							{
+								float _stepsize = getGradientStepSize(iclass);
 								(wsum_model.BPref[ith_recons]).reconstructGrad(
 										mymodel.Iref[ith_recons],
-										grad_stepsize,
+										_stepsize,
 										mymodel.tau2_fudge_factor,
 										mymodel.fsc_halves_class[ith_recons],
 										do_split_random_halves,
@@ -2208,9 +2211,10 @@ void MlOptimiserMpi::maximization()
 							{
 								if(do_grad)
 								{
+									float _stepsize = getGradientStepSize(iclass);
 									(wsum_model.BPref[ith_recons]).reconstructGrad(
 											mymodel.Iref[ith_recons],
-											grad_stepsize,
+											_stepsize,
 											mymodel.tau2_fudge_factor,
 											mymodel.fsc_halves_class[ith_recons],
 											do_split_random_halves,

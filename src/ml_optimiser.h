@@ -904,6 +904,14 @@ public:
 	 */
 	void maximizationReconstructClass(int iclass);
 
+	/* Update gradient related parameters, returns class index that should be skipped during SOM
+	 */
+	int maximizationGradientParameters();
+
+	/* Update gradient related parameters
+	 */
+	float getGradientStepSize(int iclass);
+
 	/* Updates all other model parameters (besides the reconstructions)
 	 */
 	void maximizationOtherParameters();

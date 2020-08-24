@@ -4164,95 +4164,9 @@ void MlOptimiser::maximization()
 		init_progress_bar(mymodel.nr_classes);
 	}
 
-	if (do_som) {
-		wsum_model.som.normalize_activity();
-		mymodel.som.update_edge_activities(wsum_model.som, mu);
-		mymodel.som.update_node_activities(wsum_model.som, mu);
-	}
-
-	int skip_class = -1;
-	unsigned nr_active_classes = 0;
-	float wsum_mode_pdf_class_sum = 0;
-	for (int i = 0; i < mymodel.nr_classes; i ++) {
-		wsum_mode_pdf_class_sum += wsum_model.pdf_class[i];
-		if (mymodel.pdf_class[i] > 0.)
-			nr_active_classes ++;
-	}
-
-	if(do_grad) {
-		std::vector<float> avg_class_errors(mymodel.nr_classes * mymodel.nr_bodies, 0);
-		for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++) {
-			mymodel.class_age[iclass] += wsum_model.pdf_class[iclass]/wsum_mode_pdf_class_sum;
-
-			if (mymodel.pdf_class[iclass] > 0. || mymodel.nr_bodies > 1) {
-				if ((wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY) {
-
-					if (do_grad_realspace)
-						(wsum_model.BPref[iclass]).reweightGradRealSpace(
-								mymodel.Igrad1[iclass],
-								do_mom1 ? 0.9 : 0.,
-								mymodel.Igrad2[iclass],
-								do_mom2 ? 0.999 : 0.,
-								iter == 1);
-					else
-						(wsum_model.BPref[iclass]).reweightGrad(
-								mymodel.Igrad1[iclass],
-								do_mom1 ? 0.9 : 0.,
-								mymodel.Igrad2[iclass],
-								do_mom2 ? 0.999 : 0.,
-								iter == 1);
-
-					RFLOAT avg_grad(0);
-					for (unsigned i = 0; i < wsum_model.BPref[iclass].data.nzyxdim; i++)
-						avg_grad += norm(wsum_model.BPref[iclass].data.data[i]);
-					avg_grad /= (RFLOAT) wsum_model.BPref[iclass].data.nzyxdim;
-
-					avg_class_errors[iclass] = avg_grad * mymodel.pdf_class[iclass];
-				}
-			}
-		}
-
-		if (grad_ini_iter < iter && iter < grad_ini_iter + grad_inbetween_iter) {
-			int drop_class_idx = -1, expand_class_idx = -1;
-
-			// Determine the class with the largest average error to expand
-			std::vector<unsigned> s = SomGraph::arg_sort(avg_class_errors, false);
-			expand_class_idx = s[0];
-
-			// Determine if a class should be dropped
-			if (class_inactivity_threshold > 0) {
-				std::vector<unsigned> idx = SomGraph::arg_sort(mymodel.pdf_class);
-				int most_inactive = idx[0];
-				if (mymodel.pdf_class[most_inactive] < class_inactivity_threshold/nr_active_classes)
-					drop_class_idx = most_inactive;
-			}
-
-			// If both drop and expand are set, replace drop with expand
-			if (drop_class_idx != -1 && expand_class_idx != -1) {
-				mymodel.reset_class(drop_class_idx, expand_class_idx);
-				mymodel.Igrad1[drop_class_idx] *= 0.9; // Dampen momentum
-				mymodel.class_age[drop_class_idx] = mymodel.class_age[expand_class_idx] * 0.9;
-				skip_class = drop_class_idx;
-				std::cerr << "Dropping class " << drop_class_idx << " replacing with " << expand_class_idx << std::endl;
-			}
-
-			// If SOM, sometimes expand without a drop
-			if (do_som && expand_class_idx != -1 &&
-			    mymodel.som.get_node_count() < mymodel.nr_classes &&
-			    iter - mymodel.last_som_add_iter > 3) {
-				unsigned nn = mymodel.som.add_node(expand_class_idx, 0); //TODO Should be a parameter
-				mymodel.reset_class(nn, expand_class_idx);
-				mymodel.Igrad1[nn] *= 0.9; // Dampen momentum
-				mymodel.class_age[nn] = mymodel.class_age[expand_class_idx] * 0.5;
-				skip_class = nn;
-				mymodel.last_som_add_iter = iter;
-				std::cerr << "Expanding class " << expand_class_idx << std::endl;
-			}
-		}
-	}
+	int skip_class = maximizationGradientParameters();
 
 	RFLOAT avg_stepsize = 0, avg_stepsize_count = 0;
-
 
 	// First reconstruct the images for each class
 	// multi-body refinement will never get here, as it is only 3D auto-refine and that requires MPI!
@@ -4294,16 +4208,10 @@ void MlOptimiser::maximization()
 				else
 				{
 					if(do_grad) {
-						float a = grad_inbetween_iter;
-						float b = grad_ini_iter;
-						float x = mymodel.class_age[iclass] * nr_active_classes;
-						float scale = 1 / (pow(10, (x-b-a/2.)/(a/4.)) + 1.);
 
-						float _stepsize = (grad_ini_stepsize - grad_fin_stepsize) * scale + grad_fin_stepsize;
-						_stepsize *= sqrt(wsum_model.pdf_class[iclass]/wsum_mode_pdf_class_sum * nr_active_classes);
+						float _stepsize = getGradientStepSize(iclass);
 						avg_stepsize += _stepsize;
 						avg_stepsize_count ++;
-
 
 						(wsum_model.BPref[iclass]).reconstructGrad(
 								mymodel.Iref[iclass],
@@ -4591,6 +4499,116 @@ void MlOptimiser::maximizationOtherParameters()
 #endif
 }
 
+
+int MlOptimiser::maximizationGradientParameters() {
+	if (do_som) {
+		wsum_model.som.normalize_activity();
+		mymodel.som.update_edge_activities(wsum_model.som, mu);
+		mymodel.som.update_node_activities(wsum_model.som, mu);
+	}
+
+	int skip_class = -1;
+	int nr_active_classes = 0;
+	float wsum_mode_pdf_class_sum = 0;
+	for (int i = 0; i < mymodel.nr_classes; i ++) {
+		wsum_mode_pdf_class_sum += wsum_model.pdf_class[i];
+		if (mymodel.pdf_class[i] > 0.)
+			nr_active_classes ++;
+	}
+
+	if(do_grad) {
+		std::vector<float> avg_class_errors(mymodel.nr_classes * mymodel.nr_bodies, 0);
+		for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++) {
+			mymodel.class_age[iclass] += wsum_model.pdf_class[iclass]/wsum_mode_pdf_class_sum;
+
+			if (mymodel.pdf_class[iclass] > 0. || mymodel.nr_bodies > 1) {
+				if ((wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY) {
+
+					if (do_grad_realspace)
+						(wsum_model.BPref[iclass]).reweightGradRealSpace(
+								mymodel.Igrad1[iclass],
+								do_mom1 ? 0.9 : 0.,
+								mymodel.Igrad2[iclass],
+								do_mom2 ? 0.999 : 0.,
+								iter == 1);
+					else
+						(wsum_model.BPref[iclass]).reweightGrad(
+								mymodel.Igrad1[iclass],
+								do_mom1 ? 0.9 : 0.,
+								mymodel.Igrad2[iclass],
+								do_mom2 ? 0.999 : 0.,
+								iter == 1);
+
+					RFLOAT avg_grad(0);
+					for (unsigned i = 0; i < wsum_model.BPref[iclass].data.nzyxdim; i++)
+						avg_grad += norm(wsum_model.BPref[iclass].data.data[i]);
+					avg_grad /= (RFLOAT) wsum_model.BPref[iclass].data.nzyxdim;
+
+					avg_class_errors[iclass] = avg_grad * mymodel.pdf_class[iclass];
+				}
+			}
+		}
+
+		if (grad_ini_iter < iter && iter < grad_ini_iter + grad_inbetween_iter) {
+			int drop_class_idx = -1, expand_class_idx = -1;
+
+			// Determine the class with the largest average error to expand
+			std::vector<unsigned> s = SomGraph::arg_sort(avg_class_errors, false);
+			expand_class_idx = s[0];
+
+			// Determine if a class should be dropped
+			if (class_inactivity_threshold > 0) {
+				std::vector<unsigned> idx = SomGraph::arg_sort(mymodel.pdf_class);
+				int most_inactive = idx[0];
+				if (mymodel.pdf_class[most_inactive] < class_inactivity_threshold/(float) nr_active_classes)
+					drop_class_idx = most_inactive;
+			}
+
+			// If both drop and expand are set, replace drop with expand
+			if (drop_class_idx != -1 && expand_class_idx != -1) {
+				mymodel.reset_class(drop_class_idx, expand_class_idx);
+				mymodel.Igrad1[drop_class_idx] *= 0.9; // Dampen momentum
+				mymodel.class_age[drop_class_idx] = mymodel.class_age[expand_class_idx] * 0.9;
+				skip_class = drop_class_idx;
+				std::cerr << "Dropping class " << drop_class_idx << " replacing with " << expand_class_idx << std::endl;
+			}
+
+			// If SOM, sometimes expand without a drop
+			if (do_som && expand_class_idx != -1 &&
+			    mymodel.som.get_node_count() < mymodel.nr_classes &&
+			    iter - mymodel.last_som_add_iter > 3) {
+				unsigned nn = mymodel.som.add_node(expand_class_idx, 0); //TODO Should be a parameter
+				mymodel.reset_class(nn, expand_class_idx);
+				mymodel.Igrad1[nn] *= 0.9; // Dampen momentum
+				mymodel.class_age[nn] = mymodel.class_age[expand_class_idx] * 0.5;
+				skip_class = nn;
+				mymodel.last_som_add_iter = iter;
+				std::cerr << "Expanding class " << expand_class_idx << std::endl;
+			}
+		}
+	}
+	return skip_class;
+}
+
+float MlOptimiser::getGradientStepSize(int iclass) {
+	int nr_active_classes = 0;
+	float wsum_mode_pdf_class_sum = 0;
+	for (int i = 0; i < mymodel.nr_classes; i ++) {
+		wsum_mode_pdf_class_sum += wsum_model.pdf_class[i];
+		if (mymodel.pdf_class[i] > 0.)
+			nr_active_classes ++;
+	}
+
+	float a = grad_inbetween_iter;
+	float b = grad_ini_iter;
+	float x = mymodel.class_age[iclass] * nr_active_classes;
+	float scale = 1 / (pow(10, (x-b-a/2.)/(a/4.)) + 1.);
+
+	float _stepsize = (grad_ini_stepsize - grad_fin_stepsize) * scale + grad_fin_stepsize;
+	_stepsize *= sqrt(wsum_model.pdf_class[iclass]/wsum_mode_pdf_class_sum * nr_active_classes);
+
+	return _stepsize;
+}
 
 void MlOptimiser::solventFlatten()
 {
