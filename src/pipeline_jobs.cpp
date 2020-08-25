@@ -3125,6 +3125,7 @@ within +/- the given amount (in degrees) from the optimal orientation in the pre
 A Gaussian prior (also see previous option) will be applied, so that orientations closer to the optimal orientation \
 in the previous iteration will get higher weights than those further away.");
 	joboptions["allow_coarser"] = JobOption("Allow coarser sampling?", false, "If set to Yes, the program will use coarser angular and translational samplings if the estimated accuracies of the assignments is still low in the earlier iterations. This may speed up the calculations.");
+	joboptions["relax_sym"] = JobOption("Relax symmetry:", std::string(""), "With this option, poses related to the standard local angular search range by the given point group will also be explored. For example, if you have a pseudo-symmetric dimer A-A', refinement or classification in C1 with symmetry relaxation by C2 might be able to improve distinction between A and A'. Note that the reference must be more-or-less aligned to the convention of (pseudo-)symmetry operators. For details, see Ilca et al 2019 and Abrishami et al 2020 cited in the About dialog.");
 
 	joboptions["do_helix"] = JobOption("Do helical reconstruction?", false, "If set to Yes, then perform 3D helical reconstruction.");
 	joboptions["helical_tube_inner_diameter"] = JobOption("Tube diameter - inner (A):", std::string("-1"),"Inner and outer diameter (in Angstroms) of the reconstructed helix spanning across Z axis. \
@@ -3366,6 +3367,9 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 		if (joboptions["do_local_ang_searches"].getBoolean())
 		{
 			command += " --sigma_ang " + floatToString(joboptions["sigma_angles"].getNumber(error_message) / 3.);
+			if (joboptions["relax_sym"].getString().length() > 0)
+				command += " --relax_sym " + joboptions["relax_sym"].getString();
+
 			if (error_message != "") return false;
 		}
 
@@ -3570,6 +3574,7 @@ Note that this will only be the value for the first few iteration(s): the sampli
 	joboptions["auto_local_sampling"] = JobOption("Local searches from auto-sampling:", job_sampling_options, 4, "In the automated procedure to \
 increase the angular samplings, local angular searches of -6/+6 times the sampling rate will be used from this angular sampling rate onwards. For most \
 lower-symmetric particles a value of 1.8 degrees will be sufficient. Perhaps icosahedral symmetries may benefit from a smaller value such as 0.9 degrees.");
+	joboptions["relax_sym"] = JobOption("Relax symmetry:", std::string(""), "With this option, poses related to the standard local angular search range by the given point group will also be explored. For example, if you have a pseudo-symmetric dimer A-A', refinement or classification in C1 with symmetry relaxation by C2 might be able to improve distinction between A and A'. Note that the reference must be more-or-less aligned to the convention of (pseudo-)symmetry operators. For details, see Ilca et al 2019 and Abrishami et al 2020 cited in the About dialog.");
 	joboptions["auto_faster"] = JobOption("Use finer angular sampling faster?", false, "If set to Yes, then let auto-refinement proceed faster with finer angular samplings. Two additional command-line options will be passed to the refine program: \n \n \
 --auto_ignore_angles lets angular sampling go down despite changes still happening in the angles \n \n \
 --auto_resol_angles lets angular sampling go down if the current resolution already requires that sampling at the edge of the particle.  \n\n \
@@ -3890,6 +3895,9 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 				command += " --helical_keep_tilt_prior_fixed";
 		}
 	}
+
+	if (joboptions["relax_sym"].getString().length() > 0)
+		command += " --relax_sym " + joboptions["relax_sym"].getString();
 
 	// Running stuff
 	command += " --j " + joboptions["nr_threads"].getString();
