@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
 		
 		output_table.setValue(
 			EMDL_MICROGRAPH_NAME, 
-			particles_by_micrograph[0].getString(EMDL_MICROGRAPH_NAME, 0),
+			particles_by_micrograph[m].getString(EMDL_MICROGRAPH_NAME, 0),
 			m);
 	}
 
