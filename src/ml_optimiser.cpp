@@ -4910,12 +4910,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
 		int my_image_size = mydata.getOpticsImageSize(optics_group);
 
-		// SHWS 13feb2020: new ctf_premultiplied replaces ctf arrays by ctf^2 arrays, then one can no longer not apply CTF to references...
-		if (ctf_premultiplied && !refs_are_ctf_corrected && mymodel.data_dim == 3)
-		{
-			REPORT_ERROR("ERROR: one can no longer use ctf_premultiplied and !refs_are_ctf_corrected for 3D data together...");
-		}
-
 		// metadata offset for this image in the particle
 		int my_metadata_offset = metadata_offset + img_id;
 
