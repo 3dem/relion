@@ -1,10 +1,8 @@
-#include "delete_blobs.h"
+#include "delete_blobs_2d.h"
 
-#include <src/jaz/tomography/tomogram_set.h>
-#include <src/jaz/membrane/blob_fit_3d.h>
+#include <src/jaz/membrane/blob_fit_2d.h>
 #include <src/jaz/optimization/gradient_descent.h>
 #include <src/jaz/optimization/nelder_mead.h>
-#include <src/jaz/tomography/fiducials.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
 
@@ -12,7 +10,7 @@
 using namespace gravis;
 
 
-void DeleteBlobsProgram::readParameters(int argc, char *argv[])
+void DeleteBlobs2DProgram::readParameters(int argc, char *argv[])
 {
 	double sphere_thickness_0;
 
@@ -24,7 +22,7 @@ void DeleteBlobsProgram::readParameters(int argc, char *argv[])
 		int gen_section = parser.addSection("General options");
 
 		tomoSetFn = parser.getOption("--t", "Tomogram set filename", "tomograms.star");
-		listFn = parser.getOption("--i", "File containing a list of tomogram-name/spheres-file pairs");
+		blobListFn = parser.getOption("--i", "File containing a list of tomogram-name/spheres-file pairs");
 
 		sphere_thickness_0 = textToDouble(parser.getOption("--th", "Sphere thickness (same units as sphere centres)"));
 		spheres_binning = textToDouble(parser.getOption("--sbin", "Binning factor of the sphere coordinates"));
@@ -69,22 +67,13 @@ void DeleteBlobsProgram::readParameters(int argc, char *argv[])
 	}
 }
 
-void DeleteBlobsProgram::run()
+void DeleteBlobs2DProgram::run()
 {
-	TomogramSet initial_tomogram_set = TomogramSet(tomoSetFn);
-	TomogramSet subtracted_tomogram_set = initial_tomogram_set;
-	TomogramSet blobs_tomogram_set = initial_tomogram_set;
-	
-	if (!initial_tomogram_set.globalTable.labelExists(EMDL_TOMO_FIDUCIALS_STARFILE))
-	{
-		Log::warn("No fiducial markers present: you are advised to run relion_tomo_find_fiducials first.");
-	}
-	
-	std::ifstream list(listFn);
+	std::ifstream list(blobListFn);
 	
 	if (!list)
 	{
-		REPORT_ERROR_STR("Unable to read "+listFn);
+		REPORT_ERROR_STR("Unable to read "+blobListFn);
 	}
 	
 	std::map<std::string, std::string> tomoToSpheres;
@@ -138,7 +127,7 @@ void DeleteBlobsProgram::run()
 	}
 }
 
-void DeleteBlobsProgram::processTomogram(
+void DeleteBlobs2DProgram::processTomogram(
 		std::string tomoName,
 		std::string spheresFn,
 		TomogramSet& initial_tomogram_set,
@@ -297,7 +286,7 @@ void DeleteBlobsProgram::processTomogram(
 	}
 }
 
-std::vector<double> DeleteBlobsProgram::fitBlob(
+std::vector<double> DeleteBlobs2DProgram::fitBlob(
 		int blob_id,
 		const std::vector<double>& initial,
 		double binning_factor,
@@ -393,7 +382,7 @@ std::vector<double> DeleteBlobsProgram::fitBlob(
 	return upscaled_optimum;
 }
 
-std::vector<d4Vector> DeleteBlobsProgram::readSpheresCMM(
+std::vector<d4Vector> DeleteBlobs2DProgram::readSpheresCMM(
 		const std::string& filename,
 		double binning)
 {
@@ -430,7 +419,7 @@ std::vector<d4Vector> DeleteBlobsProgram::readSpheresCMM(
 }
 
 
-BufferedImage<float> DeleteBlobsProgram::drawFit(
+BufferedImage<float> DeleteBlobs2DProgram::drawFit(
 		Blob3D& blob,
 		const Tomogram& tomogram,
 		BufferedImage<float>& realWeight)
@@ -461,7 +450,7 @@ BufferedImage<float> DeleteBlobsProgram::drawFit(
 }
 
 
-BufferedImage<float> DeleteBlobsProgram::drawTestStack(
+BufferedImage<float> DeleteBlobs2DProgram::drawTestStack(
 		Blob3D& blob,
 		const Tomogram& tomogram,
 		BufferedImage<float>& realWeight)
@@ -490,7 +479,7 @@ BufferedImage<float> DeleteBlobsProgram::drawTestStack(
 	return out;
 }
 
-std::vector<double> DeleteBlobsProgram::toBin1(
+std::vector<double> DeleteBlobs2DProgram::toBin1(
 		const std::vector<double> &parameters,
 		double binning_factor)
 {
@@ -504,7 +493,7 @@ std::vector<double> DeleteBlobsProgram::toBin1(
 	return upscaled_optimum;
 }
 
-std::vector<double> DeleteBlobsProgram::fromBin1(
+std::vector<double> DeleteBlobs2DProgram::fromBin1(
 		const std::vector<double> &parameters,
 		double binning_factor)
 {

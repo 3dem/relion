@@ -1,20 +1,20 @@
-#ifndef BLOB_H
-#define BLOB_H
+#ifndef BLOB_2D_H
+#define BLOB_2D_H
 
 #include <src/jaz/gravis/t3Vector.h>
 #include <src/jaz/tomography/tomogram.h>
 #include <src/spherical-harmonics/SphericalHarmonics.h>
 
 
-class Blob
+class Blob3D
 {
 	public:
 		
-		Blob();
+		Blob3D();
 		
-		Blob(gravis::d3Vector center, int outer_radius);
+		Blob3D(gravis::d3Vector center, int outer_radius);
 		
-		Blob(const std::vector<double>& params, int outer_radius, 
+		Blob3D(const std::vector<double>& params, int outer_radius,
 			 au::edu::anu::qm::ro::SphericalHarmonics* sphericalHarmonics);
 		
 		
@@ -73,7 +73,7 @@ class Blob
 };
 
 
-inline std::vector<double> Blob::toVector()
+inline std::vector<double> Blob3D::toVector()
 {
 	std::vector<double> out(shCoeffs.size() + 3);
 	
@@ -90,7 +90,7 @@ inline std::vector<double> Blob::toVector()
 	return out;
 }
 
-inline double Blob::getOffset(gravis::d3Vector v)
+inline double Blob3D::getOffset(gravis::d3Vector v)
 {
 	const int cc = shCoeffs.size();
 	
@@ -109,7 +109,7 @@ inline double Blob::getOffset(gravis::d3Vector v)
 	return out;
 }
 
-inline void Blob::getBasis(gravis::d3Vector v, double *dest)
+inline void Blob3D::getBasis(gravis::d3Vector v, double *dest)
 {
 	const int cc = shCoeffs.size();
 	
@@ -132,7 +132,7 @@ inline void Blob::getBasis(gravis::d3Vector v, double *dest)
 	}
 }
 
-inline std::vector<double> Blob::accelerate(gravis::d3Vector ux, gravis::d3Vector uy, int bins)
+inline std::vector<double> Blob3D::accelerate(gravis::d3Vector ux, gravis::d3Vector uy, int bins)
 {
 	std::vector<double> accSH(bins);
 	
@@ -148,7 +148,7 @@ inline std::vector<double> Blob::accelerate(gravis::d3Vector ux, gravis::d3Vecto
 	return accSH;
 }
 
-inline std::vector<double> Blob::accelerateBasis(gravis::d3Vector ux, gravis::d3Vector uy, int bins)
+inline std::vector<double> Blob3D::accelerateBasis(gravis::d3Vector ux, gravis::d3Vector uy, int bins)
 {
 	const int cc = shCoeffs.size();	
 	
@@ -168,7 +168,7 @@ inline std::vector<double> Blob::accelerateBasis(gravis::d3Vector ux, gravis::d3
 	return accSHbasis;
 }
 
-inline double Blob::getOffsetAcc(double dx, double dy, const std::vector<double>& accSH)
+inline double Blob3D::getOffsetAcc(double dx, double dy, const std::vector<double>& accSH)
 {
 	if (dx == 0.0 && dy == 0.0) return 0.0;
 	
@@ -187,7 +187,7 @@ inline double Blob::getOffsetAcc(double dx, double dy, const std::vector<double>
 }
 
 
-inline double Blob::getBasisAcc(double dx, double dy, int b, const std::vector<double>& accSHbasis)
+inline double Blob3D::getBasisAcc(double dx, double dy, int b, const std::vector<double>& accSHbasis)
 {
 	if (dx == 0.0 && dy == 0.0) return 0.0;
 	
@@ -207,7 +207,7 @@ inline double Blob::getBasisAcc(double dx, double dy, int b, const std::vector<d
 	
 }
 
-inline double Blob::smoothOrigin(double r, double radius)
+inline double Blob3D::smoothOrigin(double r, double radius)
 {
 	if (r < radius / 2)
 	{

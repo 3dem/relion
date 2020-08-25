@@ -2,8 +2,8 @@
 #include <src/jaz/tomography/tomo_stack.h>
 #include <src/jaz/tomography/projection/projection.h>
 #include <src/jaz/tomography/extraction.h>
-#include <src/jaz/tomography/membrane/blob.h>
-#include <src/jaz/tomography/membrane/blob_fit.h>
+#include <src/jaz/membrane/blob_3d.h>
+#include <src/jaz/membrane/blob_fit_3d.h>
 #include <src/jaz/optimization/nelder_mead.h>
 #include <src/jaz/optimization/lbfgs.h>
 #include <src/jaz/optimization/gradient_descent.h>
@@ -16,7 +16,7 @@
 #include <src/jaz/single_particle/volume_converter.h>
 #include <src/spherical-harmonics/SphericalHarmonics.h>
 #include <src/jaz/util/image_file_helper.h>
-#include <src/jaz/tomography/membrane/membrane_fit.h>
+#include <src/jaz/membrane/membrane_fit.h>
 
 #include <omp.h>
 

@@ -1,8 +1,8 @@
-#ifndef BLOB_FIT_H
-#define BLOB_FIT_H
+#ifndef BLOB_FIT_3D_H
+#define BLOB_FIT_3D_H
 
 #include <src/jaz/optimization/optimization.h>
-#include "blob.h"
+#include "blob_3d.h"
 
 #include <omp.h>
 
@@ -11,11 +11,11 @@
 using namespace au::edu::anu::qm::ro;
 
 
-class BlobFit : public Optimization
+class BlobFit3D : public Optimization
 {
 	public:
 		
-		BlobFit(
+		BlobFit3D(
 			const Tomogram& tomogram,
 			gravis::d3Vector position,
 			int sh_bands,

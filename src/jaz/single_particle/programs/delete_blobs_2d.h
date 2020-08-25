@@ -1,21 +1,19 @@
-#ifndef DELETE_BLOBS_PROGRAM_H
-#define DELETE_BLOBS_PROGRAM_H
+#ifndef DELETE_BLOBS_2D_PROGRAM_H
+#define DELETE_BLOBS_2D_PROGRAM_H
 
 #include <string>
 #include <src/jaz/image/buffered_image.h>
 
-class Tomogram;
-class TomogramSet;
-class Blob3D;
+class Blob2D;
 
-class DeleteBlobsProgram
+class DeleteBlobs2DProgram
 {
 	public:
 
 		
-		DeleteBlobsProgram(){}
+		DeleteBlobs2DProgram(){}
 		
-			std::string outPath, tomoSetFn, listFn, fiducialsDir;
+			std::string outPath, tomoSetFn, blobListFn, fiducialsDir;
 			
 			bool diag;
 			int SH_bands, num_threads, max_iters;

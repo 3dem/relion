@@ -10,7 +10,7 @@
 #include <src/jaz/image/normalization.h>
 #include <src/jaz/image/centering.h>
 #include <src/jaz/tomography/dynamo/catalogue.h>
-#include <src/jaz/tomography/membrane/membrane_fit.h>
+#include <src/jaz/membrane/membrane_fit.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/image/structure_tensor.h>
 #include <src/jaz/segmentation/diffusion.h>
@@ -19,8 +19,8 @@
 #include <src/jaz/segmentation/primal_dual_TV.h>
 #include <src/jaz/segmentation/diffusion_tensors.h>
 #include <src/jaz/segmentation/skeletonization.h>
-#include <src/jaz/tomography/membrane/membrane_segmentation.h>
-#include <src/jaz/tomography/membrane/cells.h>
+#include <src/jaz/membrane/membrane_segmentation.h>
+#include <src/jaz/membrane/cells.h>
 #include <src/jaz/tomography/tomolist.h>
 
 #include <omp.h>

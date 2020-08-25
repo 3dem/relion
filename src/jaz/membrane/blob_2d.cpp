@@ -1,44 +1,37 @@
-#include "blob.h"
+#include "blob_2d.h"
 
 #include <omp.h>
 
 using namespace gravis;
 
 
-Blob::Blob()
+Blob2D::Blob2D()
 :	center(0.0), 
 	outer_radius(0), 
-	sphericalHarmonics(0),
-	shCoeffs(0), shBands(0)
+	amplitudes(0)
 {}
 
-Blob::Blob(d3Vector center, int outer_radius)
+Blob2D::Blob2D(d2Vector center, int outer_radius)
 :	center(center), 
 	outer_radius(outer_radius), 
-	sphericalHarmonics(0),
-	shCoeffs(0), shBands(0)
+	amplitudes(0)
 {
 }
 	
-Blob::Blob(const std::vector<double>& params, int outer_radius,
+Blob2D::Blob2D(const std::vector<double>& params, int outer_radius,
 		   au::edu::anu::qm::ro::SphericalHarmonics* sphericalHarmonics)
-:	center(params[0], params[1], params[2]),
-	outer_radius(outer_radius), 
-	sphericalHarmonics(sphericalHarmonics),
-	shCoeffs(params.size() - 3),
-	shBands(sqrt(params.size() - 3) + 0.5 - 1)
+:	center(params[0], params[1]),
+	outer_radius(outer_radius),
+	amplitudes(params.size() - 2)
 {
-	for (int i = 0; i < shCoeffs.size(); i++)
+	for (int i = 0; i < amplitudes.size(); i++)
 	{
-		shCoeffs[i] = params[i+3];
+		amplitudes[i] = params[i+2];
 	}
-
-	if (shCoeffs.size() > 0) shCoeffs[0] = 0.0;
 }
 
-std::vector<double> Blob::radialAverage(
+std::vector<double> Blob2D::radialAverage(
 		const RawImage<float>& frame,
-		const d4Matrix& proj,
 		const RawImage<float>& weight,
 		int radius)
 {
@@ -49,21 +42,14 @@ std::vector<double> Blob::radialAverage(
 	const int w = frame.xdim;
 	const int h = frame.ydim;
 
-	d4Vector pw(center);
-	d4Vector pi = proj * pw;
-
-	d3Vector dwdx(proj(0,0), proj(0,1), proj(0,2));
-	d3Vector dwdy(proj(1,0), proj(1,1), proj(1,2));
-
-	std::vector<double> accSH = accelerate(dwdx, dwdy, 2.0 * PI * radius);
 
 	for (int y = 0; y < h; y++)
 	for (int x = 0; x < w; x++)
 	{
-		const double dx = x - pi.x;
-		const double dy = y - pi.y;
+		const double dx = x - center.x;
+		const double dy = y - center.y;
 
-		double r = smoothOrigin(sqrt(dx*dx + dy*dy) + getOffsetAcc(dx, dy, accSH), radius);
+		double r = smoothOrigin(sqrt(dx*dx + dy*dy) + getOffset(d2Vector(dx, dy)), radius);
 
 		if (r >= radius - 1 || r < 0) continue;
 
@@ -89,9 +75,8 @@ std::vector<double> Blob::radialAverage(
 	return radAvg;
 }
 
-double Blob::radialAverageError(
+double Blob2D::radialAverageError(
 		const RawImage<float>& frame,
-		const d4Matrix& proj,
 		const RawImage<float>& weight,
 		const std::vector<double>& radAvg)
 {
@@ -103,24 +88,16 @@ double Blob::radialAverageError(
 	const int h = frame.ydim;
 
 
-	d4Vector pw(center);
-	d4Vector pi = proj * pw;
-
-	d3Vector dwdx(proj(0,0), proj(0,1), proj(0,2));
-	d3Vector dwdy(proj(1,0), proj(1,1), proj(1,2));
-
-	std::vector<double> accSH = accelerate(dwdx, dwdy, 2.0 * PI * radius);
-
 	for (int y = 0; y < h; y++)
 	for (int x = 0; x < w; x++)
 	{
 		const double obs = frame(x,y);
 		const double m = weight(x,y);
 
-		const double dx = x - pi.x;
-		const double dy = y - pi.y;
+		const double dx = x - center.x;
+		const double dy = y - center.y;
 
-		double r = smoothOrigin(sqrt(dx*dx + dy*dy) + getOffsetAcc(dx, dy, accSH), radius);
+		double r = smoothOrigin(sqrt(dx*dx + dy*dy) + getOffset(d2Vector(dx, dy)), radius);
 
 		if (r >= radius - 1 - 1e-6) r = radius - 1 - 1e-6;
 		if (r < 0) r = 0;
@@ -139,9 +116,8 @@ double Blob::radialAverageError(
 	return out;
 }
 
-BufferedImage<float> Blob::drawError(
+BufferedImage<float> Blob2D::drawError(
 		const RawImage<float>& frame,
-		const d4Matrix& proj,
 		const RawImage<float>& weight,
 		const std::vector<double>& radAvg)
 {
@@ -152,13 +128,6 @@ BufferedImage<float> Blob::drawError(
 
 	BufferedImage<float> out(w,h);
 
-	d4Vector pw(center);
-	d4Vector pi = proj * pw;
-
-	d3Vector dwdx(proj(0,0), proj(0,1), proj(0,2));
-	d3Vector dwdy(proj(1,0), proj(1,1), proj(1,2));
-
-	std::vector<double> accSH = accelerate(dwdx, dwdy, 2.0 * PI * radius);
 
 	for (int y = 0; y < h; y++)
 	for (int x = 0; x < w; x++)
@@ -166,10 +135,10 @@ BufferedImage<float> Blob::drawError(
 		const double obs = frame(x,y);
 		const double m = weight(x,y);
 
-		const double dx = x - pi.x;
-		const double dy = y - pi.y;
+		const double dx = x - center.x;
+		const double dy = y - center.y;
 
-		double r = smoothOrigin(sqrt(dx*dx + dy*dy) + getOffsetAcc(dx, dy, accSH), radius);
+		double r = smoothOrigin(sqrt(dx*dx + dy*dy) + getOffset(d2Vector(dx, dy)), radius);
 
 		if (r >= radius - 1 - 1e-6) r = radius - 1 - 1e-6;
 		if (r < 0) r = 0;
@@ -187,9 +156,8 @@ BufferedImage<float> Blob::drawError(
 	return out;
 }
 
-BufferedImage<float> Blob::radialAverageProjection(
+BufferedImage<float> Blob2D::radialAverageProjection(
 		const RawImage<float>& frame,
-		const gravis::d4Matrix& proj,
 		const std::vector<double>& radAvg)
 {
 	BufferedImage<float> out(frame.xdim, frame.ydim);
@@ -199,22 +167,13 @@ BufferedImage<float> Blob::radialAverageProjection(
 	const int w = frame.xdim;
 	const int h = frame.ydim;
 
-
-	d4Vector pw(center);
-	d4Vector pi = proj * pw;
-
-	d3Vector dwdx(proj(0,0), proj(0,1), proj(0,2));
-	d3Vector dwdy(proj(1,0), proj(1,1), proj(1,2));
-
-	std::vector<double> accSH = accelerate(dwdx, dwdy, 2.0 * PI * radius);
-
 	for (int y = 0; y < h; y++)
 	for (int x = 0; x < w; x++)
 	{
-		const double dx = x - pi.x;
-		const double dy = y - pi.y;
+		const double dx = x - center.x;
+		const double dy = y - center.y;
 
-		double r = smoothOrigin(sqrt(dx*dx + dy*dy) + getOffsetAcc(dx, dy, accSH), radius);
+		double r = smoothOrigin(sqrt(dx*dx + dy*dy) + getOffset(d2Vector(dx, dy)), radius);
 
 		if (r >= radius - 1 - 1e-6) r = radius - 1 - 1e-6;
 		if (r < 0) r = 0;
@@ -230,30 +189,22 @@ BufferedImage<float> Blob::radialAverageProjection(
 	return out;
 }
 
-void Blob::decompose(
+void Blob2D::decompose(
 	RawImage<float>& frame,
 	RawImage<float>& blob,
-	const d4Matrix& proj,
 	const RawImage<float>& weight,
 	double taper)
 {
 	const int radius = outer_radius + taper;
 
-	std::vector<double> radAvg = radialAverage(frame, proj, weight, radius);
+	std::vector<double> radAvg = radialAverage(frame, weight, radius);
 
 	const int w = frame.xdim;
 	const int h = frame.ydim;
 
-	d4Vector pw(center);
-	d4Vector pi = proj * pw;
 
-	d3Vector dwdx(proj(0,0), proj(0,1), proj(0,2));
-	d3Vector dwdy(proj(1,0), proj(1,1), proj(1,2));
-
-	std::vector<double> accSH = accelerate(dwdx, dwdy, 2.0 * PI * radius);
-
-	const int x0 = (int) (pi.x + 0.5);
-	const int y0 = (int) (pi.y + 0.5);
+	const int x0 = (int) (center.x + 0.5);
+	const int y0 = (int) (center.y + 0.5);
 
 	double outside_val(0.0), outside_wgh(0.0);
 
@@ -262,11 +213,11 @@ void Blob::decompose(
 	{
 		if (x < 0 || x >= w || y < 0 || y >= h) continue;
 
-		const double dx = x - pi.x;
-		const double dy = y - pi.y;
+		const double dx = x - center.x;
+		const double dy = y - center.y;
 
 		const double ru = sqrt(dx*dx + dy*dy);
-		const double r = smoothOrigin(ru + getOffsetAcc(dx, dy, accSH), radius);
+		double r = smoothOrigin(ru + getOffset(d2Vector(dx, dy)), radius);
 
 		if (r >= radius - 1 || r < 0)
 		{
@@ -290,11 +241,11 @@ void Blob::decompose(
 	{
 		if (x < 0 || x >= w || y < 0 || y >= h) continue;
 
-		const double dx = x - pi.x;
-		const double dy = y - pi.y;
+		const double dx = x - center.x;
+		const double dy = y - center.y;
 
 		const double ru = sqrt(dx*dx + dy*dy);
-		const double r = smoothOrigin(ru + getOffsetAcc(dx, dy, accSH), radius);
+		double r = smoothOrigin(ru + getOffset(d2Vector(dx, dy)), radius);
 
 		if (r >= radius - 1 || r < 0)
 		{

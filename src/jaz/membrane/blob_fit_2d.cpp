@@ -1,10 +1,10 @@
-#include "blob_fit.h"
+#include "blob_fit_2d.h"
 #include <src/jaz/tomography/fiducials.h>
 
 using namespace gravis;
 
 
-BlobFit::BlobFit(
+BlobFit2D::BlobFit2D(
 	const Tomogram &tomogram,
 	d3Vector position,
 	int sh_bands,
@@ -65,10 +65,10 @@ BlobFit::BlobFit(
 	}
 }
 
-double BlobFit::f(const std::vector<double>& x, void* tempStorage) const
+double BlobFit2D::f(const std::vector<double>& x, void* tempStorage) const
 {
 	SphericalHarmonics* sh = (SphericalHarmonics*) tempStorage;
-	Blob blob(x, outer_radius, sh);
+	Blob3D blob(x, outer_radius, sh);
 
 	const int fc = tomogram.stack.zdim;
 	
