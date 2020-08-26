@@ -221,7 +221,7 @@ public:
 	}
 
 	std::vector<float> toVector() {
-		std::vector<float> out(28);
+		std::vector<float> out(24);
 
 		// Order matters
 		out[0] =  selected_features.accuracy_rotation;

@@ -1817,7 +1817,8 @@ float ClassRanker::deployTorchModel(FileName &model_path, std::vector<float> &fe
 
 	// Create an inputs with batch size=1.
 	std::vector<torch::jit::IValue> inputs;
-	inputs.push_back(features);
+	torch::Tensor t = torch::from_blob(features.data(), {1, (int)features.size()});
+	inputs.push_back(t);
 
 	// Execute the model and turn its output into a tensor.
 	at::Tensor output = module.forward(inputs).toTensor();
