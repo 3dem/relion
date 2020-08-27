@@ -127,14 +127,14 @@ void Backproject2D::run()
 		if (reextract)
 		{
 			const std::string micrograph_filename = particles.getString(EMDL_MICROGRAPH_NAME, 0);
+			micrograph_pixel_size = ImageFileHelper::getSamplingRate(micrograph_filename);
+			extraction_scale = pixel_size / micrograph_pixel_size;
 
 			micrograph.read(micrograph_filename);
+
 			mean_value = Normalization::computeMean(micrograph);
 			std_dev = sqrt(Normalization::computeVariance(micrograph, mean_value));
 
-			micrograph_pixel_size = ImageFileHelper::getSamplingRate(micrograph_filename);
-
-			extraction_scale = pixel_size / micrograph_pixel_size;
 		}
 
 		const i2Vector micrograph_size(micrograph.xdim, micrograph.ydim);
@@ -157,7 +157,7 @@ void Backproject2D::run()
 
 			if (reextract)
 			{
-				const int extraction_box_size = extraction_scale * box_size;
+				const int extraction_box_size = std::round(extraction_scale * box_size);
 
 				const d2Vector local_shift = d2Vector(dx_A, dy_A) / pixel_size;
 
@@ -165,34 +165,33 @@ void Backproject2D::run()
 					particles_table.getDouble(EMDL_IMAGE_COORD_X, p),
 					particles_table.getDouble(EMDL_IMAGE_COORD_Y, p));
 
-				const d2Vector global_position = global_position_0;// - local_shift;
+				const d2Vector global_position = global_position_0 - local_shift;
 
 				i2Vector integral_position(std::round(global_position.x), std::round(global_position.y));
 
 				for (int dim = 0; dim < 2; dim++)
 				{
-					if (integral_position[dim] < extraction_box_size/2)
-					{
-						integral_position[dim] = extraction_box_size/2;
-					}
-					else if (integral_position[dim] > micrograph_size[dim] - extraction_box_size/2)
-					{
-						integral_position[dim] = micrograph_size[dim] - extraction_box_size/2;
-					}
-
-					shift[dim] = local_shift[dim];//micrograph_pixel_size * (integral_position[dim] - global_position[dim]);
+					shift[dim] = (integral_position[dim] - global_position[dim]) / extraction_scale;
 				}
 
 				BufferedImage<float> extraction_buffer(extraction_box_size, extraction_box_size);
 
-				const int x0 = integral_position.x - extraction_box_size / 2;
-				const int y0 = integral_position.y - extraction_box_size / 2;
+				const int x0 = integral_position.x - extraction_box_size / 2 + 1;
+				const int y0 = integral_position.y - extraction_box_size / 2 + 1;
 
 				for (int y = 0; y < extraction_box_size; y++)
 				for (int x = 0; x < extraction_box_size; x++)
 				{
-					//extraction_buffer(x,y) = -(micrograph(x0+x, y0+y) - mean_value) / std_dev;
-					extraction_buffer(x,y) = -micrograph(x0+x, y0+y);
+					int xx = x0 + x;
+					int yy = y0 + y;
+
+					if (xx < 0) xx = 0;
+					else if (xx >= micrograph_size.x) xx = micrograph_size.x - 1;
+
+					if (yy < 0) yy = 0;
+					else if (yy >= micrograph_size.y) yy = micrograph_size.y - 1;
+
+					extraction_buffer(x,y) = -(micrograph(x0+x, y0+y) - mean_value) / std_dev;
 				}
 
 				if (std::abs(micrograph_pixel_size - pixel_size) > 0.001)

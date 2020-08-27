@@ -389,7 +389,7 @@ BufferedImage<T> Resampling::FourierCrop_fullStack(
 	
 	int w_out = (int)(w_in / factor);
 	int h_out = (int)(h_in / factor);
-	
+
 	if (keepSizeEven)
 	{
 		w_out -= w_out % 2;
