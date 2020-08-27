@@ -3,7 +3,6 @@
 
 #include <src/jaz/gravis/t3Vector.h>
 #include <src/jaz/tomography/tomogram.h>
-#include <src/spherical-harmonics/SphericalHarmonics.h>
 
 
 class Blob2D
@@ -14,8 +13,7 @@ class Blob2D
 		
 		Blob2D(gravis::d2Vector center, int outer_radius);
 		
-		Blob2D(const std::vector<double>& params, int outer_radius,
-			 au::edu::anu::qm::ro::SphericalHarmonics* sphericalHarmonics);
+		Blob2D(const std::vector<double>& params, int outer_radius);
 		
 		
 			gravis::d2Vector center;

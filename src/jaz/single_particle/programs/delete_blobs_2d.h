@@ -13,12 +13,12 @@ class DeleteBlobs2DProgram
 		
 		DeleteBlobs2DProgram(){}
 		
-			std::string outPath, tomoSetFn, blobListFn, fiducialsDir;
+			std::string outPath, micrographs_list_filename, blob_list_filename, fiducialsDir;
 			
 			bool diag;
-			int SH_bands, num_threads, max_iters;
-			double sphere_thickness, spheres_binning,
-				prior_sigma_A, fiducials_radius_A,
+			int max_frequencies, num_threads, max_iters, min_MG, max_MG;
+			double blob_radius_A, blob_thickness_A,
+				prior_sigma_A,
 				highpass_sigma_real_A,
 				max_binning, min_binning;
 
@@ -33,36 +33,31 @@ class DeleteBlobs2DProgram
 	private:
 
 
-		void processTomogram(
-				std::string tomoName,
-				std::string spheresFn,
-				TomogramSet& initial_tomogram_set,
-				TomogramSet& subtracted_tomogram_set,
-				TomogramSet& blobs_tomogram_set,
+		void processMicrograph(
+				MetaDataTable& detected_blobs,
+				const std::string& micrograph_name,
 				BufferedImage<float>& visualisation,
-				int tomo_batch_index,
-				int tomo_batch_size);
+				int micrograph_index,
+				int micrograph_count);
 
 		std::vector<double> fitBlob(
 				int blob_id,
 				const std::vector<double>& initial,
+				double outer_radius_full,
+				double pixel_size_full,
 				double binning_factor,
-				Tomogram& tomogram0,
-				const std::vector<gravis::d3Vector>& fiducials);
-
-		std::vector<gravis::d4Vector> readSpheresCMM(
-				const std::string& filename,
-				double binning);
+				RawImage<float>& image_full,
+				int micrograph_index);
 
 		BufferedImage<float> drawFit(
-				Blob3D& blob,
-				const Tomogram& tomogram,
-				BufferedImage<float>& realWeight);
+				Blob2D& blob,
+				const BufferedImage<float>& image,
+				const BufferedImage<float>& realWeight);
 
 		BufferedImage<float> drawTestStack(
-				Blob3D& blob,
-				const Tomogram& tomogram,
-				BufferedImage<float>& realWeight);
+				Blob2D& blob,
+				const BufferedImage<float>& image,
+				const BufferedImage<float>& realWeight);
 
 		std::vector<double> toBin1(
 				const std::vector<double>& parameters,
@@ -71,6 +66,10 @@ class DeleteBlobs2DProgram
 		std::vector<double> fromBin1(
 				const std::vector<double>& parameters,
 				double binning_factor);
+
+		BufferedImage<float> evaluateRotationalSymmetry(
+				const RawImage<float>& image,
+				double radius, double max_radius, double sigma);
 };
 
 #endif

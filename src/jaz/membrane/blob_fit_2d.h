@@ -2,13 +2,10 @@
 #define BLOB_FIT_3D_H
 
 #include <src/jaz/optimization/optimization.h>
-#include "blob_3d.h"
+#include "blob_2d.h"
 
 #include <omp.h>
 
-#include <src/spherical-harmonics/SphericalHarmonics.h>
-
-using namespace au::edu::anu::qm::ro;
 
 
 class BlobFit2D : public Optimization
@@ -16,21 +13,18 @@ class BlobFit2D : public Optimization
 	public:
 		
 		BlobFit2D(
-			const Tomogram& tomogram,
-			gravis::d3Vector position,
-			int sh_bands,
+			const RawImage<float>& image,
+			gravis::d2Vector position,
+			int frequencies,
 			double radius,
 			double thickness,
-			const std::vector<gravis::d4Vector>& allSpheres,
-			const std::vector<gravis::d3Vector>& fiducials,
-			double fiducialRadius,
 			double priorSigma,
 			int num_threads);
 
 
-				const Tomogram& tomogram;
-				gravis::d3Vector initialPos;
-				int outer_radius, sh_bands;
+				const RawImage<float>& image;
+				gravis::d2Vector initialPos;
+				int outer_radius, frequencies;
 				BufferedImage<float> weight;
 				double priorSigma2;
 				int num_threads;
@@ -39,8 +33,8 @@ class BlobFit2D : public Optimization
 		double f(const std::vector<double>& x, void* tempStorage) const;
 		void grad(const std::vector<double>& x, std::vector<double>& gradDest, void* tempStorage) const;
 		
-		void* allocateTempStorage() const {return new SphericalHarmonics(sh_bands);}
-		void deallocateTempStorage(void* ts) const {delete (SphericalHarmonics*) ts;}
+		void* allocateTempStorage() const {return 0;}
+		void deallocateTempStorage(void* ts) const {}
 		
 		void report(int iteration, double cost, const std::vector<double>& x) const 
 		{

@@ -18,8 +18,7 @@ Blob2D::Blob2D(d2Vector center, int outer_radius)
 {
 }
 	
-Blob2D::Blob2D(const std::vector<double>& params, int outer_radius,
-		   au::edu::anu::qm::ro::SphericalHarmonics* sphericalHarmonics)
+Blob2D::Blob2D(const std::vector<double>& params, int outer_radius)
 :	center(params[0], params[1]),
 	outer_radius(outer_radius),
 	amplitudes(params.size() - 2)
