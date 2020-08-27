@@ -18,6 +18,7 @@ class Backproject2D
 			std::string particlesFn, outDir;
 			double margin, SNR;
 			int num_threads;
+			bool reextract;
 
 
 		void read(int argc, char **argv);

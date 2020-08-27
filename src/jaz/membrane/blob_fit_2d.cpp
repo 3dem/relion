@@ -28,7 +28,7 @@ BlobFit2D::BlobFit2D(
 	weight.resize(w,h);
 	weight.fill(1.f);
 
-	const double outer_rad_2 = (radius + thickness / 2)*(radius + thickness / 2);
+	const double outer_rad = radius + thickness / 2;
 
 
 	for (int y = 0; y < h; y++)
@@ -38,7 +38,7 @@ BlobFit2D::BlobFit2D(
 		const double dyb = position.y - y;
 		const double distB = sqrt(dxb * dxb + dyb * dyb);
 
-		const double d = 2 * std::abs(distB - outer_rad_2) / thickness;
+		const double d = 2 * std::abs(distB - outer_rad) / thickness;
 
 		if (d > 1)
 		{
@@ -50,6 +50,8 @@ BlobFit2D::BlobFit2D(
 			weight(x,y) *= maskedVal + (1 - maskedVal) * a * a;
 		}
 	}
+
+	std::cout << "outer_radius = " << outer_radius << std::endl;
 }
 
 double BlobFit2D::f(const std::vector<double>& x, void* tempStorage) const
@@ -60,8 +62,13 @@ double BlobFit2D::f(const std::vector<double>& x, void* tempStorage) const
 
 	std::vector<double> radAvg = blob.radialAverage(image, weight);
 
-	out += blob.radialAverageError(image, weight, radAvg)
-			+ (blob.center - initialPos).norm2() / priorSigma2;
+	out += blob.radialAverageError(image, weight, radAvg);
+
+	if (priorSigma2 > 0.0)
+	{
+
+		out += (blob.center - initialPos).norm2() / priorSigma2;
+	}
 	
 	return out;
 }
