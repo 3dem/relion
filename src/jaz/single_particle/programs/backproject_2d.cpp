@@ -130,6 +130,10 @@ void Backproject2D::run()
 			micrograph_pixel_size = ImageFileHelper::getSamplingRate(micrograph_filename);
 			extraction_scale = pixel_size / micrograph_pixel_size;
 
+			// Round extraction scale to the third decimal to avoid numbers
+			// that are infinitesimally shy of the next integer
+			extraction_scale = std::round(1000 * extraction_scale)/1000.0;
+
 			micrograph.read(micrograph_filename);
 
 			mean_value = Normalization::computeMean(micrograph);
@@ -162,10 +166,10 @@ void Backproject2D::run()
 				const d2Vector local_shift = d2Vector(dx_A, dy_A) / pixel_size;
 
 				const d2Vector global_position_0(
-					particles_table.getDouble(EMDL_IMAGE_COORD_X, p),
-					particles_table.getDouble(EMDL_IMAGE_COORD_Y, p));
+					particles.getDouble(EMDL_IMAGE_COORD_X, p),
+					particles.getDouble(EMDL_IMAGE_COORD_Y, p));
 
-				const d2Vector global_position = global_position_0 - local_shift;
+				const d2Vector global_position = global_position_0 - extraction_scale * local_shift;
 
 				i2Vector integral_position(std::round(global_position.x), std::round(global_position.y));
 
@@ -176,8 +180,10 @@ void Backproject2D::run()
 
 				BufferedImage<float> extraction_buffer(extraction_box_size, extraction_box_size);
 
-				const int x0 = integral_position.x - extraction_box_size / 2 + 1;
-				const int y0 = integral_position.y - extraction_box_size / 2 + 1;
+				const int x0 = integral_position.x - extraction_box_size / 2;
+				const int y0 = integral_position.y - extraction_box_size / 2;
+
+				double sum = 0.0;
 
 				for (int y = 0; y < extraction_box_size; y++)
 				for (int x = 0; x < extraction_box_size; x++)
@@ -191,8 +197,14 @@ void Backproject2D::run()
 					if (yy < 0) yy = 0;
 					else if (yy >= micrograph_size.y) yy = micrograph_size.y - 1;
 
-					extraction_buffer(x,y) = -(micrograph(x0+x, y0+y) - mean_value) / std_dev;
+					extraction_buffer(x,y) = -micrograph(x0+x, y0+y);
+
+					sum += extraction_buffer(x,y);
 				}
+
+				extraction_buffer -= sum / (extraction_box_size * extraction_box_size);
+				extraction_buffer /= std_dev;
+
 
 				if (std::abs(micrograph_pixel_size - pixel_size) > 0.001)
 				{
@@ -208,7 +220,7 @@ void Backproject2D::run()
 			{
 				shift = d2Vector(dx_A, dy_A) / pixel_size;
 
-				std::string img_fn = particles_table.getString(EMDL_IMAGE_NAME, p);
+				std::string img_fn = particles.getString(EMDL_IMAGE_NAME, p);
 				particle_image_RS.read(img_fn);
 			}
 
@@ -224,7 +236,7 @@ void Backproject2D::run()
 
 			backrotate_particle(
 				particle_image_FS,
-				p, particles_table,
+				p, particles,
 				obs_model,
 				data_slice,
 				weight_slice);
