@@ -8398,7 +8398,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 								FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
 									DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(FstMulti, n);
 							}
-							else if (!do_skip_subtomo_correction)
+							else if (do_skip_subtomo_correction)
 							{
 								FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
 								{
@@ -8407,15 +8407,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 										DIRECT_MULTIDIM_ELEM(Fctf, n) /= mySTMulti;
 								}
 							}
-							else
-							{
-								FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
-								{
-									RFLOAT mySTMulti = DIRECT_MULTIDIM_ELEM(FstMulti, n);
-									if (mySTMulti > 0)
-										DIRECT_MULTIDIM_ELEM(Fctf, n) /= (mySTMulti * mySTMulti);
-								}
-							}
+							// If subtomos/CTFs ared non multiplicity normalised then Fctf is already correct
 						}
 					}
 					else
