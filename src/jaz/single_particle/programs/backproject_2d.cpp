@@ -197,7 +197,7 @@ void Backproject2D::run()
 					if (yy < 0) yy = 0;
 					else if (yy >= micrograph_size.y) yy = micrograph_size.y - 1;
 
-					extraction_buffer(x,y) = -micrograph(x0+x, y0+y);
+					extraction_buffer(x,y) = -micrograph(xx, yy);
 
 					sum += extraction_buffer(x,y);
 				}
