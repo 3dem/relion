@@ -7293,7 +7293,8 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 	std::vector<MultidimArray<RFLOAT> >  thr_wsum_stMulti;
 	// Wsum_sigma_noise2 is a 1D-spectrum for each img_id
 	thr_wsum_sigma2_noise.resize(exp_nr_images);
-	thr_wsum_stMulti.resize(exp_nr_images);
+	if (do_subtomo_correction)
+		thr_wsum_stMulti.resize(exp_nr_images);
 
 	for (int img_id = 0; img_id < exp_nr_images; img_id++)
 	{
@@ -7661,8 +7662,8 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mresol_fine[optics_group])
 												{
 													int ires = DIRECT_MULTIDIM_ELEM(Mresol_fine[optics_group], n);
-													if (ires > -1)
-														DIRECT_MULTIDIM_ELEM(thr_wsum_stMulti[img_id], ires) += DIRECT_MULTIDIM_ELEM(MySTMulti, n);
+													if (DIRECT_MULTIDIM_ELEM(MySTMulti, n) > 0 && ires > -1)
+														DIRECT_MULTIDIM_ELEM(thr_wsum_stMulti[img_id], ires) += 1;
 												}
 
 												long int igroup = mydata.getGroupId(part_id, img_id);

@@ -2904,8 +2904,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(baseMLO->Mresol_fine[optics_group])
 			{
 				int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine[optics_group], n);
-				if (ires > -1)
-					DIRECT_MULTIDIM_ELEM(thr_wsum_stMulti, ires) += DIRECT_MULTIDIM_ELEM(MySTMulti, n);
+				if (DIRECT_MULTIDIM_ELEM(MySTMulti, n) > 0 && ires > -1)
+					DIRECT_MULTIDIM_ELEM(thr_wsum_stMulti, ires) += 1;
 			}
 
 			int my_image_size = baseMLO->mydata.getOpticsImageSize(optics_group);
