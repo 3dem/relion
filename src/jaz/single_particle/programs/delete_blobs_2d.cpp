@@ -360,7 +360,7 @@ std::vector<double> DeleteBlobs2DProgram::fitBlob(
 
 
 	for (int current_frequencies = initial_frequencies;
-		 current_frequencies <= max_frequencies; current_frequencies++)
+		 current_frequencies <= max_frequencies; current_frequencies+=2)
 	{
 		Log::print(ZIO::itoa(current_frequencies) + " frequencies ("
 				   + ZIO::itoa(current_frequencies + 2) + " parameters)");

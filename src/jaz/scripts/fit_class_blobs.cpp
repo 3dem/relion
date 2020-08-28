@@ -146,7 +146,7 @@ int main(int argc, char *argv[])
 		std::vector<double> optimal_parameters = NelderMead::optimize(
 				intial_parameters, blob_fit, 2, 0.001, max_iterations, 1.0, 2.0, 0.5, 0.5, false);
 
-		all_optimal_parameters[class_id] = optimal_parameters;
+		all_optimal_parameters[cc] = optimal_parameters;
 
 
 		Blob2D blob(optimal_parameters, radius + 2*box_size);
@@ -154,7 +154,7 @@ int main(int argc, char *argv[])
 		std::vector<double> radial_average = blob.radialAverage(slice, blob_fit.weight);
 		BufferedImage<float> projection = blob.radialAverageProjection(slice, radial_average);
 
-		blob_fits.copySliceFrom(class_id, projection);
+		blob_fits.copySliceFrom(cc, projection);
 
 		// DEBUG:
 		/*{
