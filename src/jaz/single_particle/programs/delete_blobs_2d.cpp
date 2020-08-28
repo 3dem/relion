@@ -6,9 +6,11 @@
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
 #include <src/jaz/util/image_file_helper.h>
+#include <src/jaz/util/drawing.h>
 #include <src/jaz/image/filter.h>
 #include <src/jaz/image/resampling.h>
 #include <src/jaz/image/normalization.h>
+#include <src/jaz/image/local_extrema.h>
 
 
 using namespace gravis;
@@ -140,52 +142,77 @@ void DeleteBlobs2DProgram::processMicrograph(
 	Log::print("Filtering");
 
 
-	micrograph.write("DEBUG_micrograph.mrc");
+	micrograph.write(outPath+"DEBUG_micrograph.mrc");
 
 	BufferedImage<float> micrograph_filtered = ImageFilter::highpassStackGaussPadded(
 				micrograph, highpass_sigma_real, num_threads);
 
 
-	micrograph_filtered.write("DEBUG_micrograph_filtered.mrc");
+	micrograph_filtered.write(outPath+"DEBUG_micrograph_filtered.mrc");
 
 
-	/*{
+	{
 		const double bin = 32;
+		const double radius_bin1 = 350;
+		const double radius_binned = radius_bin1 / bin;
+		const double threshold = 0.1;
 
 		BufferedImage<float> micrograph_binned = Resampling::FourierCrop_fullStack(
 					micrograph_filtered, bin, num_threads, true);
 
-		micrograph_binned.write("DEBUG_micrograph_bin32.mrc");
-		BufferedImage<float> symm = evaluateRotationalSymmetry(micrograph_binned, 17, 23, 5);
+		micrograph_binned.write(outPath+"DEBUG_micrograph_binned.mrc");
+
+		BufferedImage<float> symm = evaluateRotationalSymmetry(
+					micrograph_binned, radius_binned, 1.5*radius_binned, 0.25*radius_binned);
 
 		float mean = Normalization::computeMean(symm);
 
 		symm -= mean;
 
-		symm.write("DEBUG_symmetry_bin32.mrc");
+		symm.write(outPath+"DEBUG_symmetry.mrc");
 
 
-		BufferedImage<float> box_maxima = LocalExtrema::boxMaxima(detections, radius / binning);
+		BufferedImage<float> lowpass0 = ImageFilter::Gauss2D(
+					micrograph_binned, 0, 0.5 * radius_binned, true);
 
+		BufferedImage<float> lowpass1 = ImageFilter::Gauss2D(
+					micrograph_binned, 0, 1.500 * radius_binned, true);
 
+		BufferedImage<float> dog = lowpass1 - lowpass0;
 
-		for (int blob_id = 0; blob_id < blob_count; blob_id++)
-		{
-			const d2Vector pos = d2Vector(
-				detected_blobs.getDouble(EMDL_IMAGE_COORD_X, blob_id),
-				detected_blobs.getDouble(EMDL_IMAGE_COORD_Y, blob_id)) / bin;
+		dog.write(outPath+"DEBUG_dog.mrc");
 
-			int px = (int)(pos.x + 0.5);
-			int py = (int)(pos.y + 0.5);
+		double var_dog = Normalization::computeVariance(dog, 0.f);
+		double var_symm = Normalization::computeVariance(symm, 0.f);
 
-			symm(px,py) = 150;
-		}
+		dog /= sqrt(var_dog);
+		symm /= sqrt(var_symm);
 
-		symm.write("DEBUG_symmetry+dots_bin32.mrc");
+		dog = ImageFilter::thresholdAbove(dog, 0.f);
+		symm = ImageFilter::thresholdAbove(symm, 0.f);
 
+		BufferedImage<float> product = dog * symm;
+
+		product.write(outPath+"DEBUG_product.mrc");
+
+		BufferedImage<float> box_maxima = LocalExtrema::boxMaxima(
+					product, (int)(0.72 * radius_binned));
+
+		box_maxima.write(outPath+"DEBUG_product_maxima.mrc");
+
+		std::vector<d2Vector> peaks = LocalExtrema::discretePoints2D(
+				product, box_maxima, (float)threshold);
+
+		const float mean_mg = Normalization::computeMean(micrograph_binned);
+		const float var_mg = Normalization::computeVariance(micrograph_binned, mean_mg);
+		const float drawing_value = mean_mg + 5 * sqrt(var_mg);
+
+		Drawing::drawCrosses(peaks, drawing_value, 5, micrograph_binned);
+
+		micrograph_binned.write(outPath+"DEBUG_detections.mrc");
 
 		std::exit(0);
-	}*/
+	}
 
 	/*if (diag)
 	{

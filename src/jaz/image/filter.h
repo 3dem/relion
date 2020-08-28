@@ -38,9 +38,12 @@ class ImageFilter
 		template<class T>
 		static BufferedImage<T> Gauss2D(
 				const RawImage<T>& img, int z, double sigmaRS, bool pad);
-		
+
 		template<class T>
 		static BufferedImage<T> ramp(const RawImage<T>& img);
+
+		template<class T>
+		static BufferedImage<T> thresholdAbove(const RawImage<T>& img, T value);
 
 		
 		
@@ -463,6 +466,20 @@ BufferedImage<T> ImageFilter::ramp(const RawImage<T>& img)
 	FFT::inverseFourierTransform(imgFS, imgCp, FFT::Both);
 	
 	return imgCp;
+}
+
+template<class T>
+BufferedImage<T> ImageFilter::thresholdAbove(const RawImage<T>& img, T value)
+{
+	BufferedImage<T> out = img;
+	const size_t s = img.getSize();
+
+	for (size_t i = 0; i < s; i++)
+	{
+		if (out[i] < value) out[i] = value;
+	}
+
+	return out;
 }
 
 template<class T>

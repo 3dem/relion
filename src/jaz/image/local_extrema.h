@@ -16,6 +16,12 @@ class LocalExtrema
 		
 		template <typename T>
 		static BufferedImage<T> boxExtrema(const RawImage<T>& img, int dist, double sign);
+
+		template <typename T>
+		static std::vector<gravis::d2Vector> discretePoints2D(
+					const RawImage<T>& originalImage,
+					const RawImage<T>& boxMaximaImage,
+					T threshold);
 };
 
 template <typename T>
@@ -85,6 +91,34 @@ BufferedImage<T> LocalExtrema::boxExtrema(const RawImage<T>& img, int dist, doub
 	}
 	
 	return img1;
+}
+
+template<typename T>
+std::vector<gravis::d2Vector> LocalExtrema::discretePoints2D(
+		const RawImage<T>& originalImage,
+		const RawImage<T>& boxMaximaImage,
+		T threshold)
+{
+	std::vector<gravis::d2Vector> out;
+
+	const int w = boxMaximaImage.xdim;
+	const int h = boxMaximaImage.ydim;
+
+	out.reserve(w);
+
+	for (int y = 0; y < h; y++)
+	for (int x = 0; x < w; x++)
+	{
+		const T v0 = originalImage(x,y);
+		const T v1 = boxMaximaImage(x,y);
+
+		if (v0 > threshold && v0 == v1)
+		{
+			out.push_back(gravis::d2Vector(x,y));
+		}
+	}
+
+	return out;
 }
 
 #endif
