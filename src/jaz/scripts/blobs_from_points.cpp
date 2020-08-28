@@ -2,7 +2,9 @@
 #include <src/jaz/util/log.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/image_file_helper.h>
+#include <src/jaz/image/local_extrema.h>
 #include <src/jaz/membrane/blob_2d.h>
+#include <src/jaz/membrane/point_blob_fit_2d.h>
 
 using namespace gravis;
 
@@ -11,8 +13,8 @@ int main(int argc, char *argv[])
 	std::string points_file_name = "model_dilute_mg0.txt";
 	std::string image_directory = "MotionCorr/job002/Frames/";
 	const double binning = 32.0;
-	const double radius = 350.0;
-	const double tolerance = 100.0;
+	const double radius_bin1 = 350.0;
+	const double tolerance_bin1 = 100.0;
 	        
 	TopazParticleMap particles_by_image = 
 	        TopazHelper::read(points_file_name);
@@ -25,14 +27,14 @@ int main(int argc, char *argv[])
 	            full_image_size.x / binning,
 	            full_image_size.y / binning);
 	
-	const double binned_radius = radius / binning;
-	const double binned_tolerance = tolerance / binning;
+	const double binned_radius = radius_bin1 / binning;
+	const double binned_tolerance = tolerance_bin1 / binning;
 	
 	
 	for (TopazParticleMap::iterator it = particles_by_image.begin();
 	     it != particles_by_image.end(); it++)
 	{
-		const std::string image_name = it->first;
+		//const std::string image_name = it->first;
 		const std::vector<TopazHelper::Particle> particles = it->second;
 		
 		BufferedImage<float> map(binned_image_size.x, binned_image_size.y);
@@ -62,7 +64,9 @@ int main(int argc, char *argv[])
 		}
 		
 		map.write("DEV_topaz_map.mrc");
-		std::exit(0);
+		
+		BufferedImage<float> box_maxima = LocalExtrema::boxMaxima(map, (int)(0.72 * binned_radius));
+		//LocalExtrema::
 	}
 	
 	
