@@ -227,71 +227,73 @@ int main(int argc, char *argv[])
 
 		const int relevant_particle_count = current_index;
 
-
-		BufferedImage<float> all_particle_images(box_size, box_size, relevant_particle_count);
-		BufferedImage<float> all_blob_images(box_size, box_size, relevant_particle_count);
-
-		#pragma omp parallel for num_threads(num_threads)
-		for (int p = 0; p < particle_count; p++)
+		if (relevant_particle_count > 0)
 		{
-			const int global_class_id = particles.getIntMinusOne(EMDL_PARTICLE_CLASS, p);
-			const int selected_class_id = class_to_subset[global_class_id];
+			BufferedImage<float> all_particle_images(box_size, box_size, relevant_particle_count);
+			BufferedImage<float> all_blob_images(box_size, box_size, relevant_particle_count);
 
-			if (selected_class_id >= 0)
+			#pragma omp parallel for num_threads(num_threads)
+			for (int p = 0; p < particle_count; p++)
 			{
-				const double dx_A = particles.getDouble(EMDL_ORIENT_ORIGIN_X_ANGSTROM, p);
-				const double dy_A = particles.getDouble(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, p);
+				const int global_class_id = particles.getIntMinusOne(EMDL_PARTICLE_CLASS, p);
+				const int selected_class_id = class_to_subset[global_class_id];
 
-				std::vector<double> raw_blob_parameters = all_optimal_parameters[selected_class_id];
-				raw_blob_parameters[0] += dx_A / pixel_size;
-				raw_blob_parameters[1] += dy_A / pixel_size;
+				if (selected_class_id >= 0)
+				{
+					const double dx_A = particles.getDouble(EMDL_ORIENT_ORIGIN_X_ANGSTROM, p);
+					const double dy_A = particles.getDouble(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, p);
 
-				const d2Vector raw_blob_centre(raw_blob_parameters[0], raw_blob_parameters[1]);
-				const d2Vector image_centre((double)(box_size/2), (double)(box_size/2));
-				const double max_dist = (image_centre - raw_blob_centre).length() + box_size / sqrt(2.0) + 1;
+					std::vector<double> raw_blob_parameters = all_optimal_parameters[selected_class_id];
+					raw_blob_parameters[0] += dx_A / pixel_size;
+					raw_blob_parameters[1] += dy_A / pixel_size;
 
-				const double phi = DEG2RAD(particles.getDouble(EMDL_ORIENT_PSI, p));
+					const d2Vector raw_blob_centre(raw_blob_parameters[0], raw_blob_parameters[1]);
+					const d2Vector image_centre((double)(box_size/2), (double)(box_size/2));
+					const double max_dist = (image_centre - raw_blob_centre).length() + box_size / sqrt(2.0) + 1;
 
-				const double centre = box_size / 2;
-				const d2Vector axis(centre,centre);
+					const double phi = DEG2RAD(particles.getDouble(EMDL_ORIENT_PSI, p));
 
-				std::vector<double> rotated_blob_parameters = Blob2D::rotate(raw_blob_parameters, phi, axis);
-				Blob2D blob(rotated_blob_parameters, max_dist);
+					const double centre = box_size / 2;
+					const d2Vector axis(centre,centre);
 
-				BufferedImage<float> weight(box_size,box_size);
-				weight.fill(1.f);
+					std::vector<double> rotated_blob_parameters = Blob2D::rotate(raw_blob_parameters, phi, axis);
+					Blob2D blob(rotated_blob_parameters, max_dist);
+
+					BufferedImage<float> weight(box_size,box_size);
+					weight.fill(1.f);
 
 
-				std::string img_fn = particles.getString(EMDL_IMAGE_NAME, p);
-				BufferedImage<float> particle_image;
-				particle_image.read(img_fn);
+					std::string img_fn = particles.getString(EMDL_IMAGE_NAME, p);
+					BufferedImage<float> particle_image;
+					particle_image.read(img_fn);
 
-				std::vector<double> rad_average = blob.radialAverage(particle_image, weight);
-				BufferedImage<float> projection = blob.radialAverageProjection(particle_image, rad_average);
+					std::vector<double> rad_average = blob.radialAverage(particle_image, weight);
+					BufferedImage<float> projection = blob.radialAverageProjection(particle_image, rad_average);
 
-				particle_image -= projection;
+					particle_image -= projection;
 
-				const int index = compressed_particle_indices[p];
-				all_particle_images.copySliceFrom(index, particle_image);
-				all_blob_images.copySliceFrom(index, projection);
+					const int index = compressed_particle_indices[p];
+					all_particle_images.copySliceFrom(index, particle_image);
+					all_blob_images.copySliceFrom(index, projection);
+				}
 			}
-		}
 
-		std::string img_fn = particles.getString(EMDL_IMAGE_NAME, 0);
-		img_fn = outDir + "Frames/" + img_fn.substr(img_fn.find_last_of('/')+1);
+			std::string img_fn = particles.getString(EMDL_IMAGE_NAME, 0);
+			img_fn = outDir + "Frames/" + img_fn.substr(img_fn.find_last_of('/')+1);
 
-		all_particle_images.write(img_fn);
-		all_blob_images.write(img_fn.substr(0,img_fn.find_last_of('.'))+"_blobs.mrcs");
+			all_particle_images.write(img_fn);
+			all_blob_images.write(img_fn.substr(0,img_fn.find_last_of('.'))+"_blobs.mrcs");
 
-		for (int p = 0; p < particle_count; p++)
-		{
-			const int index = compressed_particle_indices[p];
-
-			if (index >= 0)
+			for (int p = 0; p < particle_count; p++)
 			{
-				output_particles.addObject();
-				output_particles.setObject(particles.getObject(p));
-				output_particles.setValue(EMDL_IMAGE_NAME, ZIO::itoa(index+1) + "@" + img_fn);
+				const int index = compressed_particle_indices[p];
+
+				if (index >= 0)
+				{
+					output_particles.addObject();
+					output_particles.setObject(particles.getObject(p));
+					output_particles.setValue(EMDL_IMAGE_NAME, ZIO::itoa(index+1) + "@" + img_fn);
+				}
 			}
 		}
 	}

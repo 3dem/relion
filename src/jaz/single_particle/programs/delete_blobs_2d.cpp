@@ -206,10 +206,8 @@ void DeleteBlobs2DProgram::processMicrograph(
 
 
 
-	//for (int blob_id = 0; blob_id < blob_count; blob_id++)
+	for (int blob_id = 0; blob_id < blob_count; blob_id++)
 	{
-		int blob_id = 1;
-
 		Log::beginSection("Blob #" + ZIO::itoa(blob_id + 1));
 		
 		const d2Vector initial_blob_position(
@@ -346,7 +344,7 @@ std::vector<double> DeleteBlobs2DProgram::fitBlob(
 	BufferedImage<float> blob_region_binned = Resampling::FourierCrop_fullStack(
 				blob_region_full, binning_factor, num_threads, true);
 
-	blob_region_binned = ImageFilter::Gauss2D(blob_region_binned, 0, 3, true);
+	//blob_region_binned = ImageFilter::Gauss2D(blob_region_binned, 0, 3, true);
 
 	if (diag)
 	{

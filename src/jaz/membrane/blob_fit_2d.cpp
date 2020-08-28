@@ -31,14 +31,14 @@ BlobFit2D::BlobFit2D(
 	const double outer_rad = radius + thickness / 2;
 
 
-	for (int y = 0; y < h; y++)
+	/*for (int y = 0; y < h; y++)
 	for (int x = 0; x < w; x++)
 	{
 		const double dxb = position.x - x;
 		const double dyb = position.y - y;
 		const double distB = sqrt(dxb * dxb + dyb * dyb);
 
-		const double d = 2 * std::abs(distB - outer_rad) / thickness;
+		const double d = 2 * std::abs(distB - radius) / thickness;
 
 		if (d > 1)
 		{
@@ -49,7 +49,7 @@ BlobFit2D::BlobFit2D(
 			const double a = 1 - d;
 			weight(x,y) *= maskedVal + (1 - maskedVal) * a * a;
 		}
-	}
+	}*/
 }
 
 double BlobFit2D::f(const std::vector<double>& x, void* tempStorage) const
