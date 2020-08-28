@@ -107,11 +107,17 @@ int main(int argc, char *argv[])
 
 
 
-	Log::beginProgress("Fitting blobs", relevant_class_count);
+	Log::beginProgress("Fitting blobs", relevant_class_count/num_threads);
 
+	#pragma omp parallel for num_threads(num_threads)
 	for (int cc = 0; cc < relevant_class_count; cc++)
 	{
-		Log::updateProgress(cc);
+		const int thread_id = omp_get_thread_num();
+
+		if (thread_id == 0)
+		{
+			Log::updateProgress(cc);
+		}
 
 		const int class_id = classes_to_consider[cc];
 
