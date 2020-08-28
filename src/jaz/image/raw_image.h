@@ -78,12 +78,18 @@ class RawImage
 		
 		template <class T2>
 		void copyTo(gravis::tImage<T2>& img, int z = 0) const;
-		
-		template <class T2>		
+
+		template <class T2>
 		void copyTo(Image<T2>& img) const;
-		
-		template <class T2>		
+
+		template <class T2>
+		void copyToN(Image<T2>& img) const;
+
+		template <class T2>
 		void copyTo(MultidimArray<T2>& img) const;
+
+		template <class T2>
+		void copyToN(MultidimArray<T2>& img) const;
 		
 		template <class T2>
 		void copyTo(RawImage<T2>& img) const;
@@ -441,27 +447,7 @@ inline void RawImage<T>::fill(T t)
 template <class T>
 void RawImage<T>::write(std::string fn) const
 {
-	std::string::size_type dot = fn.find_last_of('.');
-	
-	if (dot == std::string::npos)
-	{
-		REPORT_ERROR_STR("RawImage<T>::write: filename has no ending (" << fn << ").");
-	}
-	
-	std::string end = fn.substr(dot+1);
-	
-	if (end == "vtk")
-	{
-		Image<T> img;
-		copyTo(img);
-		VtkHelper::writeVTK(img, fn);
-	}
-	else
-	{
-		Image<T> img;
-		copyTo(img);
-		img.write(fn);
-	}
+	write(fn, 1);
 }
 
 template <class T>
@@ -481,6 +467,13 @@ void RawImage<T>::write(std::string fn, double pixelSize) const
 		Image<T> img;
 		copyTo(img);
 		VtkHelper::writeVTK(img, fn, 0, 0, 0, pixelSize, pixelSize, pixelSize);
+	}
+	else if (end == "mrcs")
+	{
+		Image<T> img;
+		copyToN(img);
+		img.setSamplingRateInHeader(pixelSize);
+		img.write(fn);
 	}
 	else
 	{
@@ -532,26 +525,38 @@ inline void RawImage<T>::copyTo(gravis::tImage<T2>& img, int z) const
 template <class T> template <class T2>
 inline void RawImage<T>::copyTo(Image<T2>& img) const
 {
-	img = Image<T2>(xdim, ydim, zdim);
-	
-	for (size_t z = 0; z < zdim; z++)
-	for (size_t y = 0; y < ydim; y++)
-	for (size_t x = 0; x < xdim; x++)
-	{
-		DIRECT_A3D_ELEM(img(), z, y, x) = (T2) data[(z*ydim + y)*xdim + x];
-	}
+	copyTo(img.data);
+}
+
+template <class T> template <class T2>
+inline void RawImage<T>::copyToN(Image<T2>& img) const
+{
+	copyToN(img.data);
 }
 
 template <class T> template <class T2>
 inline void RawImage<T>::copyTo(MultidimArray<T2>& img) const
 {
 	img = MultidimArray<T2>(zdim, ydim, xdim);
-	
+
 	for (size_t z = 0; z < zdim; z++)
 	for (size_t y = 0; y < ydim; y++)
 	for (size_t x = 0; x < xdim; x++)
 	{
 		DIRECT_A3D_ELEM(img, z, y, x) = (T2) data[(z*ydim + y)*xdim + x];
+	}
+}
+
+template <class T> template <class T2>
+inline void RawImage<T>::copyToN(MultidimArray<T2>& img) const
+{
+	img = MultidimArray<T2>(zdim, 1, ydim, xdim);
+
+	for (size_t z = 0; z < zdim; z++)
+	for (size_t y = 0; y < ydim; y++)
+	for (size_t x = 0; x < xdim; x++)
+	{
+		DIRECT_NZYX_ELEM(img, z, 0, y, x) = (T2) data[(z*ydim + y)*xdim + x];
 	}
 }
 

@@ -21,11 +21,12 @@ Blob2D::Blob2D(d2Vector center, int outer_radius)
 Blob2D::Blob2D(const std::vector<double>& params, int outer_radius)
 :	center(params[0], params[1]),
 	outer_radius(outer_radius),
-	amplitudes(params.size() - 2)
+	amplitudes((params.size() - 2)/2)
 {
 	for (int i = 0; i < amplitudes.size(); i++)
 	{
-		amplitudes[i] = params[i+2];
+		amplitudes[i].real = params[2*i+2];
+		amplitudes[i].imag = params[2*i+3];
 	}
 }
 
@@ -267,5 +268,31 @@ void Blob2D::decompose(
 		frame(x,y) -= wgh * pred;
 		blob(x,y)  += wgh * pred;
 	}
+}
+
+std::vector<double> Blob2D::rotate(const std::vector<double> &params, double angle, d2Vector axis)
+{
+	std::vector<double> out = params;
+	const double cos_psi = cos(angle);
+	const double sin_psi = sin(angle);
+
+	out[0] = axis.x + cos_psi * (params[0] - axis.x) + sin_psi * (params[1] - axis.y);
+	out[1] = axis.y - sin_psi * (params[0] - axis.x) + cos_psi * (params[1] - axis.y);
+
+	const int Fourier_params = params.size() - 2;
+
+	for (int i = 0; i < Fourier_params/2; i++)
+	{
+		const int n = i + 1;
+		const double cos_n_psi = cos(n * angle);
+		const double sin_n_psi = sin(n * angle);
+
+		const int j = 2 + 2 * i;
+
+		out[j]   = cos_n_psi * params[j]   + sin_n_psi * params[j+1];
+		out[j+1] = cos_n_psi * params[j+1] - sin_n_psi * params[j];
+	}
+
+	return out;
 }
 

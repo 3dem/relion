@@ -50,8 +50,6 @@ BlobFit2D::BlobFit2D(
 			weight(x,y) *= maskedVal + (1 - maskedVal) * a * a;
 		}
 	}
-
-	std::cout << "outer_radius = " << outer_radius << std::endl;
 }
 
 double BlobFit2D::f(const std::vector<double>& x, void* tempStorage) const

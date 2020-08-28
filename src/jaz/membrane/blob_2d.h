@@ -53,13 +53,19 @@ class Blob2D
 		inline double getOffset(gravis::d2Vector v);
 
 		inline double smoothOrigin(double r, double radius);
+
+
+		static std::vector<double> rotate(
+				const std::vector<double>& params,
+				double angle,
+				gravis::d2Vector axis);
 		
 };
 
 
 inline std::vector<double> Blob2D::toVector()
 {
-	std::vector<double> out(amplitudes.size() + 2);
+	std::vector<double> out(2 * amplitudes.size() + 2);
 	
 	for (int i = 0; i < 2; i++)
 	{
@@ -68,7 +74,8 @@ inline std::vector<double> Blob2D::toVector()
 	
 	for (int i = 0; i < amplitudes.size(); i++)
 	{
-		out[i+2] = amplitudes[i];
+		out[2*i+2] = amplitudes[i].real;
+		out[2*i+3] = amplitudes[i].imag;
 	}
 	
 	return out;
