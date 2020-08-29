@@ -127,9 +127,18 @@ int main(int argc, char *argv[])
 	int res = system(("mkdir -p "+outDir+"Frames").c_str());
 	
 
+	Log::beginProgress("Finding blobs", micrograph_count / num_threads);
+
 	#pragma omp parallel for num_threads(num_threads)	
 	for (int m = 0; m < micrograph_count; m++)
 	{
+		const int th = omp_get_thread_num();
+
+		if (th == 0)
+		{
+			Log::updateProgress(m);
+		}
+
 		const std::string image_name = all_image_names[m];
 		const std::vector<TopazHelper::Particle> particles = all_particles[m];
 		
@@ -138,9 +147,7 @@ int main(int argc, char *argv[])
 		
 		BufferedImage<float> blob_radius(binned_image_size.x, binned_image_size.y);
 		blob_radius.fill(0.f);
-		
-		std::cout << image_name << '\n';
-		
+
 		
 		for (int y = 0; y < binned_image_size.y; y++)
 		for (int x = 0; x < binned_image_size.x; x++)
@@ -155,7 +162,7 @@ int main(int argc, char *argv[])
 				const double t = rr / (double)(radius_steps - 1);
 				const double rad_bin1 = (1 - t) * min_radius_bin1 + t * max_radius_bin1;
 				const double rad = rad_bin1 / binning;
-				        
+
 				double score = 0.0;
 				
 				for (int p = 0; p < particles.size(); p++)
@@ -294,7 +301,7 @@ int main(int argc, char *argv[])
 		
 		
 		std::ofstream blob_file(outDir+"Frames/"+image_name+".blobs");
-		                        
+
 		for (int i = 0; i < sorted_blobs.size(); i++)
 		{
 			if (is_accepted[i])
@@ -316,6 +323,8 @@ int main(int argc, char *argv[])
 		
 		diagnostic.getSliceRef(m).copyFrom(final_plots_sum);
 	}
+
+	Log::endProgress();
 	
 	diagnostic.write(outDir + "diagnostic.mrc");
 	
