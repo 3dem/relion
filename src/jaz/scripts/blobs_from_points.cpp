@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
 
 	const std::string first_image_name = particles_by_image.begin()->first;
 	
-	t3Vector<long int> full_image_size = ImageFileHelper::getSize(image_directory + first_image_name + ".mrcs");
+	t3Vector<long int> full_image_size = ImageFileHelper::getSize(image_directory + first_image_name + ".mrc");
 	
 	const i2Vector binned_image_size(
 	            full_image_size.x / binning,
