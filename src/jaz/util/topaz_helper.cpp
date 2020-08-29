@@ -34,8 +34,6 @@ std::map<std::string, std::vector<TopazHelper::Particle>> TopazHelper::read(std:
 		{
 			if (currentParticles.size() > 0)
 			{
-				std::cout << lastName << ": " << currentParticles.size() << std::endl;
-				
 				out[lastName] = currentParticles;
 				currentParticles.clear();
 			}
@@ -54,8 +52,6 @@ std::map<std::string, std::vector<TopazHelper::Particle>> TopazHelper::read(std:
 	
 	if (currentParticles.size() > 0)
 	{
-		std::cout << lastName << ": " << currentParticles.size() << std::endl;
-		
 		out[lastName] = currentParticles;
 	}
 	
