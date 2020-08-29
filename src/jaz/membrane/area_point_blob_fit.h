@@ -13,18 +13,23 @@ class AreaPointBlobFit : public Optimization
 		
 		AreaPointBlobFit(
 			const RawImage<float>& pointDensity,
+			const RawImage<float>& regionalTerm,
 			gravis::d2Vector origin,
 			double initial_radius, 
 			double tolerance,
 		    double tethering,
-			double aspectCost);
+			double aspectCost,
+		    double contrastCost);
 		
 		
 		
 			gravis::d2Vector origin;
 			int radialSamples;
-			double initial_radius, tolerance, tethering, aspectCost;
-			const RawImage<float>& pointDensity;
+			double initial_radius, tolerance, tethering, aspectCost, contrastCost;
+			const RawImage<float>& pointDensity, regionalTerm;
+			
+			gravis::i2Vector boxOrigin, boxSize;
+			double boxArea;
 			
 		
 		double f(const std::vector<double>& x, void* tempStorage) const;

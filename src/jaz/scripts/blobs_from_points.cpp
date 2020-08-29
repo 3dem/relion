@@ -5,6 +5,8 @@
 #include <src/jaz/util/drawing.h>
 #include <src/jaz/util/index_sort.h>
 #include <src/jaz/image/local_extrema.h>
+#include <src/jaz/image/resampling.h>
+#include <src/jaz/image/normalization.h>
 #include <src/jaz/optimization/nelder_mead.h>
 #include <src/jaz/membrane/blob_2d.h>
 #include <src/jaz/membrane/point_blob_fit_2d.h>
@@ -16,7 +18,7 @@ int main(int argc, char *argv[])
 {
 	std::string points_file_name, image_directory, outDir;
 	double binning, particle_spacing, min_radius_bin1, max_radius_bin1, tolerance_bin1, threshold, tethering, 
-	        aspect_cost, acceptance_threshold;
+	        aspect_cost, contrast_cost, acceptance_threshold;
 	int radius_steps, max_iterations, max_frequencies, num_threads;
 	bool diag;
 		
@@ -47,6 +49,7 @@ int main(int argc, char *argv[])
 		
 		tethering = textToDouble(parser.getOption("--tth", "Blob tethering to its initial position", "0.0"));
 		aspect_cost = textToDouble(parser.getOption("--ac", "Cost of deviating from a circular shape", "0.01"));
+		contrast_cost = textToDouble(parser.getOption("--cc", "Cost of contrast mismatch (dark pixels outside or bright pixels inside)", "0.01"));
 		acceptance_threshold = textToDouble(parser.getOption("--at", "Acceptance threshold for final blobs (fraction of perimeter not covered in particles)", "0.2"));
 		
 		diag = parser.checkOption("--diag", "Write out diagnostic information");
@@ -89,7 +92,7 @@ int main(int argc, char *argv[])
 	            full_image_size.y / binning);
 	
 	const double avg_radius_bin1 = (min_radius_bin1 + max_radius_bin1) / 2.0;
-	const double binned_radius = avg_radius_bin1 / binning;
+	const double binned_avg_radius = avg_radius_bin1 / binning;
 	const double binned_tolerance = tolerance_bin1 / binning;
 	
 	
@@ -129,7 +132,7 @@ int main(int argc, char *argv[])
 
 	Log::beginProgress("Finding blobs", micrograph_count / num_threads);
 
-	#pragma omp parallel for num_threads(num_threads)	
+	//#pragma omp parallel for num_threads(num_threads)	
 	for (int m = 0; m < micrograph_count; m++)
 	{
 		const int th = omp_get_thread_num();
@@ -147,6 +150,25 @@ int main(int argc, char *argv[])
 		
 		BufferedImage<float> blob_radius(binned_image_size.x, binned_image_size.y);
 		blob_radius.fill(0.f);
+		
+		BufferedImage<float> micrograph;
+		micrograph.read(image_directory + image_name + ".mrc");
+		micrograph = Resampling::FourierCrop_fullStack(micrograph, binning, 1, true);		
+		micrograph = Normalization::byNormalDist(micrograph);
+		
+		BufferedImage<float> lowpass0 = ImageFilter::Gauss2D(
+					micrograph, 0, 0.125 * binned_avg_radius, true);
+
+		BufferedImage<float> lowpass1 = ImageFilter::Gauss2D(
+					micrograph, 0, 1.500 * binned_avg_radius, true);
+
+		BufferedImage<float> dog = lowpass1 - lowpass0;
+		
+		/*dog.write(outDir+"DEV_dog.mrc");
+		micrograph.write(outDir+"DEV_micrograph.mrc");
+		lowpass0.write(outDir+"DEV_lowpass0.mrc");
+		lowpass1.write(outDir+"DEV_lowpass1.mrc");*/
+			
 
 		
 		for (int y = 0; y < binned_image_size.y; y++)
@@ -196,7 +218,7 @@ int main(int argc, char *argv[])
 			centre_quality.write(outDir + "centre_quality.mrc");
 		}
 		
-		BufferedImage<float> box_maxima = LocalExtrema::boxMaxima(centre_quality, (int)(0.72 * binned_radius));
+		BufferedImage<float> box_maxima = LocalExtrema::boxMaxima(centre_quality, (int)(0.72 * binned_avg_radius));
 		std::vector<d2Vector> detections = LocalExtrema::discretePoints2D(centre_quality, box_maxima, (float)threshold);
 		
 		
@@ -263,7 +285,7 @@ int main(int argc, char *argv[])
 			const double radius = blob_radius((int)std::round(d.x), (int)std::round(d.y));
 			
 			AreaPointBlobFit point_blob_fit(
-				density_map, d, radius, binned_tolerance, tethering, aspect_cost);
+				density_map, dog, d, radius, binned_tolerance, tethering, aspect_cost, contrast_cost);
 			            
 			/*PointBlobFit2D point_blob_fit(
 				all_particle_positions, d, radius, binned_tolerance, tethering);*/
@@ -310,7 +332,7 @@ int main(int argc, char *argv[])
 				
 				for (int j = 0; j < parameters.size(); j++)
 				{
-					blob_file << parameters[j] << " ";
+					blob_file << binning * parameters[j] << " ";
 				}
 				
 				blob_file << '\n';
