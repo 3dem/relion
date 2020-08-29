@@ -8,10 +8,17 @@
 class Drawing
 {
 	public:
-
+		
 		template <typename T>
 		static void drawCross(
 				gravis::i2Vector location,
+				T value,
+				int size,
+				RawImage<T>& target);
+		
+		template <typename T>
+		static void drawCross(
+				gravis::d2Vector location,
 				T value,
 				int size,
 				RawImage<T>& target);
@@ -56,6 +63,16 @@ void Drawing::drawCross(
 		drawPoint(location + gravis::i2Vector(-i,0), value, target);
 		drawPoint(location + gravis::i2Vector(0,-i), value, target);
 	}
+}
+
+template<typename T>
+void Drawing::drawCross(
+		gravis::d2Vector location, T value, int size, RawImage<T>& target)
+{
+	
+	drawCross(
+		gravis::i2Vector((int)std::round(location.x), (int)std::round(location.y)),
+		value, size, target);
 }
 
 template<typename PixelType, typename CoordType>
