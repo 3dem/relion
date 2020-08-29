@@ -26,7 +26,8 @@ class AreaPointBlobFit : public Optimization
 			gravis::d2Vector origin;
 			int radialSamples;
 			double initial_radius, tolerance, tethering, aspectCost, contrastCost;
-			const RawImage<float>& pointDensity, regionalTerm;
+			const RawImage<float>& pointDensity;
+			BufferedImage<float> regionalTermSquare;
 			
 			gravis::i2Vector boxOrigin, boxSize;
 			double boxArea;

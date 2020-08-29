@@ -3,7 +3,8 @@
 
 using namespace gravis;
 
-std::map<std::string, std::vector<TopazHelper::Particle>> TopazHelper::read(std::string fileName)
+std::map<std::string, std::vector<TopazHelper::Particle>> TopazHelper::read(
+        std::string fileName, double minScore)
 {
 	std::ifstream file(fileName);
 	
@@ -47,7 +48,10 @@ std::map<std::string, std::vector<TopazHelper::Particle>> TopazHelper::read(std:
 		sts >> p.coordinates.y;
 		sts >> p.score;
 		
-		currentParticles.push_back(p);
+		if (p.score >= minScore)
+		{
+			currentParticles.push_back(p);
+		}
 	}
 	
 	if (currentParticles.size() > 0)

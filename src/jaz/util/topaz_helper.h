@@ -16,7 +16,9 @@ class TopazHelper
 			double score;
 		};
 		
-		static std::map<std::string, std::vector<Particle>> read(std::string fileName);
+		static std::map<std::string, std::vector<Particle>> read(
+		        std::string fileName, 
+		        double minScore);
 };
 
 typedef std::map<std::string, std::vector<TopazHelper::Particle>> TopazParticleMap;

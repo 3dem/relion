@@ -64,11 +64,10 @@ int main(int argc, char *argv[])
 	}
 	
 	        
-	TopazParticleMap particles_by_image = TopazHelper::read(points_file_name);
+	TopazParticleMap particles_by_image = TopazHelper::read(points_file_name, -1000);
 
 	const std::string first_image_name = particles_by_image.begin()->first;
 	
-	t3Vector<long int> full_image_size = ImageFileHelper::getSize(image_directory + first_image_name + ".mrc");
 	
 	BufferedImage<float> micrograph;
 	micrograph.read(image_directory + first_image_name + ".mrc");

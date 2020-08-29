@@ -17,7 +17,7 @@ using namespace gravis;
 int main(int argc, char *argv[])
 {
 	std::string points_file_name, image_directory, outDir;
-	double binning, particle_spacing, min_radius_bin1, max_radius_bin1, tolerance_bin1, threshold, tethering, 
+	double binning, score_threshold, particle_spacing, min_radius_bin1, max_radius_bin1, tolerance_bin1, threshold, tethering, 
 	        aspect_cost, contrast_cost, acceptance_threshold;
 	int radius_steps, max_iterations, max_frequencies, num_threads;
 	bool diag;
@@ -35,22 +35,23 @@ int main(int argc, char *argv[])
 
 		points_file_name = parser.getOption("--i", "Topaz membrane detections");
 		image_directory = parser.getOption("--id", "Directory containing the micrographs");
+		score_threshold = textToDouble(parser.getOption("--pt", "Score threshold for input particles", "-4"));
 		particle_spacing = textToDouble(parser.getOption("--sp", "Input particle spacing (bin-1 pixels)", "25"));
 		binning = textToDouble(parser.getOption("--bin", "Binning level", "32"));
 		min_radius_bin1 = textToDouble(parser.getOption("--r0", "Minimal blob radius (bin-1 pixels)", "300"));
 		max_radius_bin1 = textToDouble(parser.getOption("--r1", "Maximal blob radius (bin-1 pixels)", "400"));
-		radius_steps = textToInteger(parser.getOption("--rs", "Radius steps", "10"));
+		radius_steps = textToInteger(parser.getOption("--rs", "Radius steps", "5"));
 		tolerance_bin1 = textToDouble(parser.getOption("--rt", "Radius tolerance (bin-1 pixels)", "50"));
 		threshold = textToDouble(parser.getOption("--dt", "Blob centre detection threshold (#particles)", "15"));
 		
 		max_iterations = textToInteger(parser.getOption("--it", "Max. number of iterations", "1000"));
-		max_frequencies = textToInteger(parser.getOption("--frq", "Max. number of blob frequencies", "5"));
+		max_frequencies = textToInteger(parser.getOption("--frq", "Max. number of blob frequencies", "6"));
 		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 		
 		tethering = textToDouble(parser.getOption("--tth", "Blob tethering to its initial position", "0.0"));
-		aspect_cost = textToDouble(parser.getOption("--ac", "Cost of deviating from a circular shape", "0.01"));
-		contrast_cost = textToDouble(parser.getOption("--cc", "Cost of contrast mismatch (dark pixels outside or bright pixels inside)", "0.01"));
-		acceptance_threshold = textToDouble(parser.getOption("--at", "Acceptance threshold for final blobs (fraction of perimeter not covered in particles)", "0.2"));
+		aspect_cost = textToDouble(parser.getOption("--ac", "Cost of deviating from a circular shape", "0.02"));
+		contrast_cost = textToDouble(parser.getOption("--cc", "Cost of contrast mismatch (dark pixels outside or bright pixels inside)", "2.0"));
+		acceptance_threshold = textToDouble(parser.getOption("--at", "Acceptance threshold for final blobs", "0.5"));
 		
 		diag = parser.checkOption("--diag", "Write out diagnostic information");
 		
@@ -81,7 +82,7 @@ int main(int argc, char *argv[])
 	}
 	
 	        
-	TopazParticleMap particles_by_image = TopazHelper::read(points_file_name);
+	TopazParticleMap particles_by_image = TopazHelper::read(points_file_name, score_threshold);
 
 	const std::string first_image_name = particles_by_image.begin()->first;
 	
@@ -132,7 +133,7 @@ int main(int argc, char *argv[])
 
 	Log::beginProgress("Finding blobs", micrograph_count / num_threads);
 
-	//#pragma omp parallel for num_threads(num_threads)	
+	#pragma omp parallel for num_threads(num_threads)	
 	for (int m = 0; m < micrograph_count; m++)
 	{
 		const int th = omp_get_thread_num();
@@ -300,24 +301,54 @@ int main(int argc, char *argv[])
 			            initial_parameters, point_blob_fit, 0.5, 0.0001, max_iterations, 
 			            1.0, 2.0, 0.5, 0.5, false);
 			
-			
-			BufferedImage<float> final_plot = point_blob_fit.visualise(
-			            optimal_parameters, binned_image_size.x, binned_image_size.y);
-			
 			const double cost = point_blob_fit.f(optimal_parameters,0);
 			
+			
+			BufferedImage<float> final_plot;
+			
+			if (detection_id == 5)
+			{
+				
+				
+			}
+			else
+			{
+				final_plot.resize(binned_image_size.x, binned_image_size.y);
+				final_plot.fill(0.f);
+			}
 			
 			
 			is_accepted[detection_id] = cost < acceptance_threshold;
 			
+			if (!(cost == cost))
+			{
+				std::cout << "nan: " << d << ", " << radius << "\n";
+				std::cout << "optimal_parameters.size() = " << optimal_parameters.size() << "\n";
+				
+				for (int i = 0; i < optimal_parameters.size(); i++)
+				{
+					std::cout << optimal_parameters[i] << " ";
+				}
+				std::cout << "\n";
+			}
+			
 			if (is_accepted[detection_id])
 			{
+				final_plot = point_blob_fit.visualise(
+			            optimal_parameters, binned_image_size.x, binned_image_size.y);
+				
 				final_plots_sum += final_plot;
 			}
 			
 			all_costs[detection_id] = cost;
 			all_optimal_parameters[detection_id] = optimal_parameters;
 		}
+		
+		
+		BufferedImage<float> all_particle_dots(binned_image_size.x, binned_image_size.y);	
+		Drawing::drawCrosses(all_particle_positions, 0.1f, 3, all_particle_dots);
+		final_plots_sum += all_particle_dots;
+		
 		
 		std::vector<int> sorted_blobs = IndexSort<double>::sortIndices(all_costs);
 		
@@ -326,7 +357,7 @@ int main(int argc, char *argv[])
 
 		for (int i = 0; i < sorted_blobs.size(); i++)
 		{
-			if (is_accepted[i])
+			if (is_accepted[sorted_blobs[i]])
 			{
 				const std::vector<double> parameters = all_optimal_parameters[sorted_blobs[i]];
 				
@@ -336,12 +367,12 @@ int main(int argc, char *argv[])
 				}
 				
 				blob_file << '\n';
+				
+				Drawing::drawCross(
+					d2Vector(parameters[1], parameters[2]),
+					(float)all_costs[sorted_blobs[i]], 5, final_plots_sum);
 			}
 		}
-		
-		BufferedImage<float> all_particle_dots(binned_image_size.x, binned_image_size.y);	
-		Drawing::drawCrosses(all_particle_positions, 0.1f, 3, all_particle_dots);
-		final_plots_sum += all_particle_dots;
 		
 		diagnostic.getSliceRef(m).copyFrom(final_plots_sum);
 	}
