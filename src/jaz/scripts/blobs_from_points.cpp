@@ -48,10 +48,21 @@ int main(int argc, char *argv[])
 		max_frequencies = textToInteger(parser.getOption("--frq", "Max. number of blob frequencies", "6"));
 		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 		
-		tethering = textToDouble(parser.getOption("--tth", "Blob tethering to its initial position", "0.0"));
-		aspect_cost = textToDouble(parser.getOption("--ac", "Cost of deviating from a circular shape", "0.02"));
-		contrast_cost = textToDouble(parser.getOption("--cc", "Cost of contrast mismatch (dark pixels outside or bright pixels inside)", "2.0"));
-		acceptance_threshold = textToDouble(parser.getOption("--at", "Acceptance threshold for final blobs", "0.5"));
+		tethering = textToDouble(parser.getOption("--tth", 
+			"Blob tethering to its initial position", 
+		    "0.0"));
+		
+		aspect_cost = textToDouble(parser.getOption("--ac", 
+			"Cost of deviating from a circular shape", 
+		    "0.02"));
+		
+		contrast_cost = textToDouble(parser.getOption("--cc", 
+			"Cost of contrast mismatch (dark pixels outside or bright pixels inside)", 
+		    "2.0"));
+		
+		acceptance_threshold = textToDouble(parser.getOption("--at", 
+			"Acceptance threshold for final blobs", 
+		    "0.5"));
 		
 		diag = parser.checkOption("--diag", "Write out diagnostic information");
 		
