@@ -1,5 +1,5 @@
-#ifndef POINT_BLOB_FIT_H
-#define POINT_BLOB_FIT_H
+#ifndef AREA_POINT_BLOB_FIT_H
+#define AREA_POINT_BLOB_FIT_H
 
 #include <src/jaz/optimization/optimization.h>
 #include "blob_2d.h"
@@ -7,22 +7,24 @@
 #include <omp.h>
 
 
-class PointBlobFit2D : public Optimization
+class AreaPointBlobFit : public Optimization
 {
 	public:
 		
-		PointBlobFit2D(
-			const std::vector<gravis::d2Vector>& allPoints,
+		AreaPointBlobFit(
+			const RawImage<float>& pointDensity,
 			gravis::d2Vector origin,
 			double initial_radius, 
 			double tolerance,
-		    double tethering);
+		    double tethering,
+			double aspectCost);
 		
 		
 		
 			gravis::d2Vector origin;
-			double initial_radius, tolerance, tethering;
-			std::vector<gravis::d2Vector> points;
+			int radialSamples;
+			double initial_radius, tolerance, tethering, aspectCost;
+			const RawImage<float>& pointDensity;
 			
 		
 		double f(const std::vector<double>& x, void* tempStorage) const;

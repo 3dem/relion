@@ -22,10 +22,22 @@ class Drawing
 				PixelType value,
 				int size,
 				RawImage<PixelType>& target);
-
+		
 		template <typename T>
 		static void drawPoint(
 				gravis::i2Vector location,
+				T value,
+				RawImage<T>& target);
+		
+		template <typename T>
+		static void addPoint(
+				gravis::i2Vector location,
+				T value,
+				RawImage<T>& target);
+		
+		template <typename T>
+		static void addPoint(
+				gravis::d2Vector location,
 				T value,
 				RawImage<T>& target);
 };
@@ -51,7 +63,7 @@ void Drawing::drawCrosses(
 		std::vector<gravis::t2Vector<CoordType> > locations,
 		PixelType value,
 		int size,
-		RawImage<PixelType> &target)
+		RawImage<PixelType>& target)
 {
 	for (int i = 0; i < locations.size(); i++)
 	{
@@ -73,6 +85,24 @@ void Drawing::drawPoint(gravis::i2Vector location, T value, RawImage<T>& target)
 	{
 		target(location.x, location.y) = value;
 	}
+}
+
+template<typename T>
+void Drawing::addPoint(gravis::i2Vector location, T value, RawImage<T>& target)
+{
+	if (location.x >= 0 && location.x < target.xdim &&
+		location.y >= 0 && location.y < target.ydim )
+	{
+		target(location.x, location.y) += value;
+	}
+}
+
+template<typename T>
+void Drawing::addPoint(gravis::d2Vector location, T value, RawImage<T>& target)
+{
+	addPoint(
+		gravis::i2Vector((int)std::round(location.x), (int)std::round(location.y)),
+		value, target);
 }
 
 #endif

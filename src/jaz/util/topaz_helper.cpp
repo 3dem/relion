@@ -19,6 +19,9 @@ std::map<std::string, std::vector<TopazHelper::Particle>> TopazHelper::read(std:
 	std::string lastName = "";
 	std::vector<Particle> currentParticles;
 	
+	// skip first line
+	std::getline(file, line);
+	
 	while (std::getline(file, line))
 	{
 		std::stringstream sts;
@@ -31,6 +34,8 @@ std::map<std::string, std::vector<TopazHelper::Particle>> TopazHelper::read(std:
 		{
 			if (currentParticles.size() > 0)
 			{
+				std::cout << lastName << ": " << currentParticles.size() << std::endl;
+				
 				out[lastName] = currentParticles;
 				currentParticles.clear();
 			}
@@ -49,6 +54,8 @@ std::map<std::string, std::vector<TopazHelper::Particle>> TopazHelper::read(std:
 	
 	if (currentParticles.size() > 0)
 	{
+		std::cout << lastName << ": " << currentParticles.size() << std::endl;
+		
 		out[lastName] = currentParticles;
 	}
 	

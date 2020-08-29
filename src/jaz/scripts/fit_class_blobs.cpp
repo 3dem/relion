@@ -145,12 +145,12 @@ int main(int argc, char *argv[])
 		}
 
 
-		std::vector<double> intial_parameters(num_frequencies + 2, 0.0);
-		intial_parameters[0] = initial_centre.x;
-		intial_parameters[1] = initial_centre.y;
+		std::vector<double> initial_parameters(num_frequencies + 2, 0.0);
+		initial_parameters[0] = initial_centre.x;
+		initial_parameters[1] = initial_centre.y;
 
 		std::vector<double> optimal_parameters = NelderMead::optimize(
-				intial_parameters, blob_fit, 2, 0.001, max_iterations, 1.0, 2.0, 0.5, 0.5, false);
+				initial_parameters, blob_fit, 2, 0.001, max_iterations, 1.0, 2.0, 0.5, 0.5, false);
 
 		all_optimal_parameters[cc] = optimal_parameters;
 

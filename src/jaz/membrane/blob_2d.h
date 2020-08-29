@@ -4,6 +4,7 @@
 #include <src/jaz/gravis/t3Vector.h>
 #include <src/jaz/tomography/tomogram.h>
 
+#define FIRST_BLOB_FREQUENCY 2
 
 class Blob2D
 {
@@ -51,9 +52,13 @@ class Blob2D
 		inline std::vector<double> toVector();
 		
 		inline double getOffset(gravis::d2Vector v);
+		inline double getOffset(double phi);
 
 		inline double smoothOrigin(double r, double radius);
 
+		
+		double scanForMinimalRadius(int samples);
+		double scanForMaximalRadius(int samples);
 
 		static std::vector<double> rotate(
 				const std::vector<double>& params,
@@ -89,12 +94,19 @@ inline double Blob2D::getOffset(gravis::d2Vector v)
 	
 	const double phi = atan2(v.y, v.x);
 
+	return getOffset(phi);
+}
+
+inline double Blob2D::getOffset(double phi)
+{
+	const int cc = amplitudes.size();
+	
 	double out = 0.0;
 	
 	for (int i = 0; i < cc; i++)
 	{
-		out += amplitudes[i].real * cos((i+1) * phi);
-		out += amplitudes[i].imag * sin((i+1) * phi);
+		out += amplitudes[i].real * cos((i+FIRST_BLOB_FREQUENCY) * phi);
+		out += amplitudes[i].imag * sin((i+FIRST_BLOB_FREQUENCY) * phi);
 	}
 	
 	return out;

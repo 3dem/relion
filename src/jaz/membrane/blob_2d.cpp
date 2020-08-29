@@ -270,6 +270,38 @@ void Blob2D::decompose(
 	}
 }
 
+double Blob2D::scanForMinimalRadius(int samples)
+{
+	double min = std::numeric_limits<double>::max();
+	
+	for (int i = 0; i < samples; i++)
+	{
+		double phi = 2 * PI * i / (double) samples;
+		
+		double value = getOffset(phi);
+		
+		if (value < min) min = value;
+	}
+	
+	return min;
+}
+
+double Blob2D::scanForMaximalRadius(int samples)
+{
+	double max = -std::numeric_limits<double>::max();
+	
+	for (int i = 0; i < samples; i++)
+	{
+		double phi = 2 * PI * i / (double) samples;
+		
+		double value = getOffset(phi);
+		
+		if (value > max) max = value;
+	}
+	
+	return max;
+}
+
 std::vector<double> Blob2D::rotate(const std::vector<double> &params, double angle, d2Vector axis)
 {
 	std::vector<double> out = params;
@@ -283,7 +315,7 @@ std::vector<double> Blob2D::rotate(const std::vector<double> &params, double ang
 
 	for (int i = 0; i < Fourier_params/2; i++)
 	{
-		const int n = i + 1;
+		const int n = i + FIRST_BLOB_FREQUENCY;
 		const double cos_n_psi = cos(n * angle);
 		const double sin_n_psi = sin(n * angle);
 
