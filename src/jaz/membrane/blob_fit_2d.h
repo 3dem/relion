@@ -16,22 +16,25 @@ class BlobFit2D : public Optimization
 			const RawImage<float>& image,
 			gravis::d2Vector position,
 			int frequencies,
-			double radius,
-			double thickness,
+			double smoothingRadius,
 			double priorSigma,
 			int num_threads);
 
 
 				const RawImage<float>& image;
 				gravis::d2Vector initialPos;
-				int outer_radius, frequencies;
+				int smoothingRadius, frequencies;
 				BufferedImage<float> weight;
 				double priorSigma2;
 				int num_threads;
 			
 
 		double f(const std::vector<double>& x, void* tempStorage) const;
-		void grad(const std::vector<double>& x, std::vector<double>& gradDest, void* tempStorage) const;
+		
+		void computeWeight(
+		        const Blob2D& blob,
+		        double minRadius,
+		        double maxRadius);
 		
 		void* allocateTempStorage() const {return 0;}
 		void deallocateTempStorage(void* ts) const {}

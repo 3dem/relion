@@ -307,4 +307,119 @@ int main(int argc, char *argv[])
 	}
 	
 	return 0;
+	
+	
+	/*
+	  
+	{
+		const double bin = 32;
+		const double radius_bin1 = 350;
+		const double radius_binned = radius_bin1 / bin;
+		const double threshold = 0.1;
+
+		BufferedImage<float> micrograph_binned = Resampling::FourierCrop_fullStack(
+					micrograph_filtered, bin, num_threads, true);
+
+		micrograph_binned.write(outPath+"DEBUG_micrograph_binned.mrc");
+
+		BufferedImage<float> symm = evaluateRotationalSymmetry(
+					micrograph_binned, radius_binned, 1.5*radius_binned, 0.25*radius_binned);
+
+		float mean = Normalization::computeMean(symm);
+
+		symm -= mean;
+
+		symm.write(outPath+"DEBUG_symmetry.mrc");
+
+
+		BufferedImage<float> lowpass0 = ImageFilter::Gauss2D(
+					micrograph_binned, 0, 0.5 * radius_binned, true);
+
+		BufferedImage<float> lowpass1 = ImageFilter::Gauss2D(
+					micrograph_binned, 0, 1.500 * radius_binned, true);
+
+		BufferedImage<float> dog = lowpass1 - lowpass0;
+
+		dog.write(outPath+"DEBUG_dog.mrc");
+
+		double var_dog = Normalization::computeVariance(dog, 0.f);
+		double var_symm = Normalization::computeVariance(symm, 0.f);
+
+		dog /= sqrt(var_dog);
+		symm /= sqrt(var_symm);
+
+		dog = ImageFilter::thresholdAbove(dog, 0.f);
+		symm = ImageFilter::thresholdAbove(symm, 0.f);
+
+		BufferedImage<float> product = dog * symm;
+
+		product.write(outPath+"DEBUG_product.mrc");
+
+		BufferedImage<float> box_maxima = LocalExtrema::boxMaxima(
+					product, (int)(0.72 * radius_binned));
+
+		box_maxima.write(outPath+"DEBUG_product_maxima.mrc");
+
+		std::vector<d2Vector> peaks = LocalExtrema::discretePoints2D(
+				product, box_maxima, (float)threshold);
+
+		const float mean_mg = Normalization::computeMean(micrograph_binned);
+		const float var_mg = Normalization::computeVariance(micrograph_binned, mean_mg);
+		const float drawing_value = mean_mg + 5 * sqrt(var_mg);
+
+		Drawing::drawCrosses(peaks, drawing_value, 5, micrograph_binned);
+
+		micrograph_binned.write(outPath+"DEBUG_detections.mrc");
+
+		std::exit(0);
+	}  
+
+	*/
 }
+
+/*
+BufferedImage<float> DeleteBlobs2DProgram::evaluateRotationalSymmetry(
+		const RawImage<float> &image, double radius, double max_radius, double sigma)
+{
+	const int w = image.xdim;
+	const int h = image.ydim;
+
+	BufferedImage<float> out(w,h);
+
+	BufferedImage<float> weight(w,h);
+	weight.fill(1.f);
+
+	for (int y = 0; y < h; y++)
+	for (int x = 0; x < w; x++)
+	{
+		std::vector<double> params{(double)x, (double)y};
+		Blob2D blob(params, max_radius);
+
+		std::vector<double> radAvg = blob.radialAverage(image, weight);
+
+		double sum = 0, sum_wgh = 0;
+
+		for (int i = 0; i < radAvg.size(); i++)
+		{
+			sum += radAvg[i] * i;
+			sum_wgh += i;
+		}
+
+		const double avg = sum / sum_wgh;
+
+		double power = 0;
+
+		for (int i = 0; i < radAvg.size(); i++)
+		{
+			const double d = radAvg[i] - avg;
+			const double dr = i - radius;
+			const double g = exp(-dr/(2*sigma*sigma));
+
+			power += g * d * d * i;
+		}
+
+		out(x,y) = power;
+	}
+
+	return out;
+}*/

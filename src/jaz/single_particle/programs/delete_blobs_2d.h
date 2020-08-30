@@ -13,11 +13,13 @@ class DeleteBlobs2DProgram
 		
 		DeleteBlobs2DProgram(){}
 		
-			std::string outPath, micrographs_list_filename, blob_list_filename, fiducialsDir;
+			std::string outPath, micrograph_filename, blobs_filename;
 			
 			bool diag;
-			int max_frequencies, num_threads, max_iters, min_MG, max_MG;
-			double blob_radius_A, blob_thickness_A,
+			
+			int max_frequencies, num_threads, max_iters;
+			
+			double 
 				prior_sigma_A,
 				highpass_sigma_real_A,
 				max_binning, min_binning;
@@ -41,13 +43,13 @@ class DeleteBlobs2DProgram
 				int micrograph_count);
 
 		std::vector<double> fitBlob(
-				int blob_id,
-				const std::vector<double>& initial,
-				double outer_radius_full,
+		        int blob_id,
+				const std::vector<double>& initial_parameters,
+		        double radius_full,
 				double pixel_size_full,
 				double binning_factor,
-				RawImage<float>& image_full,
-				int micrograph_index);
+				const RawImage<float>& image_full,
+				const std::string& image_name);
 
 		BufferedImage<float> drawFit(
 				Blob2D& blob,

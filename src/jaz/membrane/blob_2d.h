@@ -10,55 +10,58 @@ class Blob2D
 {
 	public:
 		
-		Blob2D();
-		
-		Blob2D(gravis::d2Vector center, int outer_radius);
-		
-		Blob2D(const std::vector<double>& params, int outer_radius);
+		Blob2D();		
+		Blob2D(gravis::d2Vector center, double smoothingRadius = 0.0);
+		Blob2D(const std::vector<double>& params, double smoothingRadius = 0.0);
 		
 		
-			gravis::d2Vector center;
-			int outer_radius;
-			
+			gravis::d2Vector center;			
 			std::vector<dComplex> amplitudes;
+			double smoothingRadius;
 		
 
 		std::vector<double> radialAverage(
 				const RawImage<float>& frame,
-				const RawImage<float>& weight,
-				int radius = -1);
+				const RawImage<float>& weight) const;
 
 		double radialAverageError(
 				const RawImage<float>& frame,
 				const RawImage<float>& weight,
-				const std::vector<double>& radAvg);
+				const std::vector<double>& radAvg) const;
 
 		BufferedImage<float> drawError(
 				const RawImage<float>& frame,
 				const RawImage<float>& weight,
-				const std::vector<double>& radAvg);
+				const std::vector<double>& radAvg) const;
 
 		BufferedImage<float> radialAverageProjection(
 				const RawImage<float>& frame,
-				const std::vector<double>& radAvg);
+				const std::vector<double>& radAvg) const;
 
 		void decompose(
 				RawImage<float>& frame,
 				RawImage<float>& blob,
 				const RawImage<float>& weight,
-				double taper);
+				double outerRadius, double taper) const;
 		
 		
-		inline std::vector<double> toVector();
+		inline std::vector<double> toVector() const;
 		
-		inline double getOffset(gravis::d2Vector v);
-		inline double getOffset(double phi);
+		inline int findMaxRadius(gravis::i2Vector imageSize) const;
+		
+		inline double getOffset(gravis::d2Vector v) const;
+		inline double getOffset(double phi) const;
 
-		inline double smoothOrigin(double r, double radius);
+		inline double smoothOrigin(double r) const;
+		
+		inline double getDistance(gravis::d2Vector imgPos) const;
 
 		
-		double scanForMinimalRadius(int samples);
-		double scanForMaximalRadius(int samples);
+		double scanForMinimalRadius(int samples) const;
+		double scanForMaximalRadius(int samples) const;
+		
+		std::pair<gravis::d2Vector,gravis::d2Vector> scanForBoundingBox(
+		        double radius, double padding, int samples) const;
 
 		static std::vector<double> rotate(
 				const std::vector<double>& params,
@@ -67,8 +70,23 @@ class Blob2D
 		
 };
 
+class DelineatedBlob2D
+{
+	public: 
+		
+		DelineatedBlob2D(gravis::d2Vector center, double radius, double smoothingRadius = 0.0);
+		DelineatedBlob2D(const std::vector<double>& params);
+		
+			Blob2D blob;
+			double radius;
+		
+		
+		static std::vector<DelineatedBlob2D> read(const std::string& filename);
+		static std::vector<double> stripRadius(const std::vector<double>& params);
+};
 
-inline std::vector<double> Blob2D::toVector()
+
+inline std::vector<double> Blob2D::toVector() const
 {
 	std::vector<double> out(2 * amplitudes.size() + 2);
 	
@@ -86,7 +104,25 @@ inline std::vector<double> Blob2D::toVector()
 	return out;
 }
 
-inline double Blob2D::getOffset(gravis::d2Vector v)
+inline int Blob2D::findMaxRadius(gravis::i2Vector imageSize) const
+{
+	double maxRad = 0;
+	
+	for (int y = 0; y < imageSize.y; y++)
+	for (int x = 0; x < imageSize.x; x++)
+	{
+		const double dx = x + center.x;
+		const double dy = y + center.y;
+
+		const double r = sqrt(dx*dx + dy*dy);
+		
+		if (r > maxRad) maxRad = r;
+	}
+		
+	return (int) std::ceil(maxRad);
+}
+
+inline double Blob2D::getOffset(gravis::d2Vector v) const
 {
 	const int cc = amplitudes.size();
 	
@@ -97,7 +133,7 @@ inline double Blob2D::getOffset(gravis::d2Vector v)
 	return getOffset(phi);
 }
 
-inline double Blob2D::getOffset(double phi)
+inline double Blob2D::getOffset(double phi) const
 {
 	const int cc = amplitudes.size();
 	
@@ -112,16 +148,22 @@ inline double Blob2D::getOffset(double phi)
 	return out;
 }
 
-inline double Blob2D::smoothOrigin(double r, double radius)
+inline double Blob2D::smoothOrigin(double r) const
 {
-	if (r < radius / 2)
+	if (r < smoothingRadius)
 	{
-		return r * r / radius + radius / 4;
+		return 2 * r * r / smoothingRadius + smoothingRadius / 2;
 	}
 	else
 	{
 		return r;
 	}
+}
+
+inline double Blob2D::getDistance(gravis::d2Vector imgPos) const
+{
+	const gravis::d2Vector d = imgPos - center;
+	return d.length() + getOffset(d);
 }
 
 #endif
