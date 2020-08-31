@@ -165,7 +165,7 @@ void DeleteBlobs2DProgram::run()
 void DeleteBlobs2DProgram::processMicrograph(
         int micrograph_index,
         const std::string& micrograph_filename,
-        const std::string& blobs_filename,         
+		const std::string& blobs_filename,
         RawImage<float>& visualisation,
         double visualisation_binning,
         bool verbose)
@@ -220,12 +220,102 @@ void DeleteBlobs2DProgram::processMicrograph(
 			Log::beginSection("Blob " + ZIO::itoa(blob_id + 1)+"/"+ZIO::itoa(blob_count));
 		}
 		
-		const double radius = delineated_blobs[blob_id].radius;		
+		const double radius = delineated_blobs[blob_id].radius;
 		Blob2D initial_blob = delineated_blobs[blob_id].blob;
 		
-		std::vector<double> initial = initial_blob.toVector();
+		std::vector<double> initial_parameters_fullsize = initial_blob.toVector();
 
-		std::vector<double> blob_coeffs = initial;
+		std::vector<double> blob_coeffs = initial_parameters_fullsize;
+
+		i2Vector window_origin_full;
+		BufferedImage<float> blob_region_full;
+
+		{
+			const double blob_padding_full = radius / 2.0;
+			const double smoothing_radius_full = 0.5 * radius;
+
+			// determine bounding box at bin 1
+
+			Blob2D blob_full(initial_parameters_fullsize, smoothing_radius_full);
+
+			std::pair<d2Vector, d2Vector> bounding_box_full = blob_full.scanForBoundingBox(
+						radius, blob_padding_full, (int)(2 * PI * radius));
+
+			window_origin_full = i2Vector(
+					std::floor(bounding_box_full.first.x),
+					std::floor(bounding_box_full.first.y));
+
+			i2Vector window_size_full(
+					std::ceil(bounding_box_full.second.x) - window_origin_full.x,
+					std::ceil(bounding_box_full.second.y) - window_origin_full.y);
+
+			i2Vector window_size_binned_max(
+						std::round(window_size_full.x / max_binning),
+						std::round(window_size_full.y / max_binning));
+
+			if (window_size_binned_max.x < 1 || window_size_binned_max.y < 1)
+			{
+				Log::endSection();
+				continue;
+			}
+
+
+			// ensure an even box size at the greatest binning level
+
+			if (window_size_binned_max.x % 2 == 1) window_size_binned_max.x += 1;
+			if (window_size_binned_max.y % 2 == 1) window_size_binned_max.y += 1;
+
+
+			// ensure an integral ratio between window sizes
+
+			window_size_full.x = max_binning * window_size_binned_max.x;
+			window_size_full.y = max_binning * window_size_binned_max.y;
+
+			if (window_size_full.x > micrograph.xdim) window_size_full.x = micrograph.xdim;
+			if (window_size_full.y > micrograph.ydim) window_size_full.y = micrograph.ydim;
+
+
+			// shift full-size window to lie inside the image
+
+			if (window_origin_full.x + window_size_full.x > micrograph.xdim)
+			{
+				window_origin_full.x = micrograph.xdim - window_size_full.x;
+			}
+			else if (window_origin_full.x < 0)
+			{
+				window_origin_full.x = 0;
+			}
+
+			if (window_origin_full.y + window_size_full.y > micrograph.ydim)
+			{
+				window_origin_full.y = micrograph.ydim - window_size_full.y;
+			}
+			else if (window_origin_full.y < 0)
+			{
+				window_origin_full.y = 0;
+			}
+
+			blob_region_full.resize(window_size_full.x, window_size_full.y);
+
+			// extract full-size image
+
+			for (int y = 0; y < window_size_full.y; y++)
+			for (int x = 0; x < window_size_full.x; x++)
+			{
+				const int x0 = window_origin_full.x;
+				const int y0 = window_origin_full.y;
+
+				blob_region_full(x,y) = micrograph_filtered(x0 + x, y0 + y);
+			}
+		}
+
+
+		std::vector<double> initial_parameters_cropped = initial_parameters_fullsize;
+		initial_parameters_cropped[0] -= window_origin_full.x;
+		initial_parameters_cropped[1] -= window_origin_full.y;
+
+		std::vector<double> blob_parameters_cropped = initial_parameters_cropped;
+
 
 
 		double current_binning = max_binning;
@@ -244,12 +334,12 @@ void DeleteBlobs2DProgram::processMicrograph(
 				}
 			}
 			
-			blob_coeffs = fitBlob(
-						blob_id, blob_coeffs, 
-			            radius, pixel_size, current_binning, 
-			            micrograph_filtered,
-						micrograph_name,
-			            verbose);
+			blob_parameters_cropped = fitBlob(
+				blob_id, blob_parameters_cropped,
+				radius, pixel_size, current_binning,
+				blob_region_full,
+				micrograph_name,
+				verbose);
 
 			current_binning /= 2;
 			
@@ -263,6 +353,10 @@ void DeleteBlobs2DProgram::processMicrograph(
 		{
 			Log::print("Erasing");
 		}
+
+		std::vector<double> final_parameters_fullsize = blob_parameters_cropped;
+		final_parameters_fullsize[0] += window_origin_full.x;
+		final_parameters_fullsize[1] += window_origin_full.y;
 
 		Blob2D final_blob(blob_coeffs, radius/2);
 		final_blob.erase(micrograph, erased_image, blobs_image, dummy_weight, 1.5 * radius, radius);
@@ -301,19 +395,17 @@ void DeleteBlobs2DProgram::processMicrograph(
 
 std::vector<double> DeleteBlobs2DProgram::fitBlob(
 		int blob_id,
-		const std::vector<double>& initial_parameters,
-        double radius_full,
+		const std::vector<double>& initial_blob_params_cropped,
+		double radius_full,
 		double pixel_size_full,
 		double binning_factor,
-		const RawImage<float>& image_full,
+		BufferedImage<float>& blob_region_full,
 		const std::string& image_name,
-        bool verbose)
+		bool verbose)
 {
 	const double radius_binned = radius_full / binning_factor;
 	const double prior_sigma = prior_sigma_A / pixel_size_full;
 	const double initial_step = 2.0;
-	const double blob_padding_full = radius_full / 2.0;
-	const double smoothing_radius_full = 0.5 * radius_full;
 	const double smoothing_radius_binned = 0.5 * radius_full / binning_factor;
 
 	std::string blobTag = "blob_" + ZIO::itoa(blob_id);
@@ -321,81 +413,9 @@ std::vector<double> DeleteBlobs2DProgram::fitBlob(
 
 	std::string outTag = outPath + "diag/" + image_name + "/" + blobTag + "/" + binTag;
 	
-	
-	// determine bounding box at bin 1
-	
-	Blob2D blob_full(initial_parameters, smoothing_radius_full);
-	
-	std::pair<d2Vector, d2Vector> bounding_box_full = blob_full.scanForBoundingBox(
-	            radius_full, blob_padding_full, (int)(4 * PI * radius_binned));
-	
-	i2Vector window_origin_full(
-			std::floor(bounding_box_full.first.x),
-			std::floor(bounding_box_full.first.y));
-	          
-	i2Vector window_size_full(
-			std::ceil(bounding_box_full.second.x) - window_origin_full.x,
-			std::ceil(bounding_box_full.second.y) - window_origin_full.y);	
-	
-	i2Vector window_size_binned_max(
-	            std::round(window_size_full.x / max_binning),
-	            std::round(window_size_full.y / max_binning));
-	
-	
-	// ensure an even box size at greatest binning level
-	
-	if (window_size_binned_max.x % 2 == 1) window_size_binned_max.x += 1;
-	if (window_size_binned_max.y % 2 == 1) window_size_binned_max.y += 1;
-	
-	
-	// ensure an integral ratio between window sizes
-	
-	window_size_full.x = max_binning * window_size_binned_max.x;
-	window_size_full.y = max_binning * window_size_binned_max.y;
-	
-	if (window_size_full.x > image_full.xdim) window_size_full.x = image_full.xdim;
-	if (window_size_full.y > image_full.ydim) window_size_full.y = image_full.ydim;
-	
-	       
-	// shift full-size window to lie inside the image
-	
-	if (window_origin_full.x + window_size_full.x > image_full.xdim)
-	{
-		window_origin_full.x = image_full.xdim - window_size_full.x;
-	}
-	else if (window_origin_full.x < 0)
-	{
-		window_origin_full.x = 0;
-	}
-	
-	if (window_origin_full.y + window_size_full.y > image_full.ydim)
-	{
-		window_origin_full.y = image_full.ydim - window_size_full.y;
-	}
-	else if (window_origin_full.y < 0)
-	{
-		window_origin_full.y = 0;
-	}
-	
-	// extract full-size image
-	
-	BufferedImage<float> blob_region_full(window_size_full.x, window_size_full.y);
+		
 
-	for (int y = 0; y < window_size_full.y; y++)
-	for (int x = 0; x < window_size_full.x; x++)
-	{
-		const int x0 = window_origin_full.x;
-		const int y0 = window_origin_full.y;
-
-		blob_region_full(x,y) = image_full(x0 + x, y0 + y);
-	}
-
-	std::vector<double> initial_cropped = initial_parameters;
-	initial_cropped[0] -= window_origin_full.x;
-	initial_cropped[1] -= window_origin_full.y;
-	
-
-	const d2Vector initial_position_cropped = d2Vector(initial_cropped[0], initial_cropped[1]);
+	const d2Vector initial_position_cropped = d2Vector(initial_blob_params_cropped[0], initial_blob_params_cropped[1]);
 
 	BufferedImage<float> blob_region_binned = Resampling::FourierCrop_fullStack(
 				blob_region_full, binning_factor, 1, true);
@@ -409,8 +429,8 @@ std::vector<double> DeleteBlobs2DProgram::fitBlob(
 	}
 
 
-	std::vector<double> last_optimum = fromBin1(initial_cropped, binning_factor);
-	int initial_frequencies = initial_cropped.size() < 2? 0 : (initial_cropped.size() - 2) / 2;
+	std::vector<double> last_optimum = fromBin1(initial_blob_params_cropped, binning_factor);
+	int initial_frequencies = initial_blob_params_cropped.size() < 2? 0 : (initial_blob_params_cropped.size() - 2) / 2;
 
 
 	for (int current_frequencies = initial_frequencies;
@@ -474,13 +494,7 @@ std::vector<double> DeleteBlobs2DProgram::fitBlob(
 		last_optimum = new_optimum;
 	}
 
-
-	std::vector<double> upscaled_optimum = toBin1(last_optimum, binning_factor);
-
-	upscaled_optimum[0] += window_origin_full.x;
-	upscaled_optimum[1] += window_origin_full.y;
-
-	return upscaled_optimum;
+	return toBin1(last_optimum, binning_factor);
 }
 
 

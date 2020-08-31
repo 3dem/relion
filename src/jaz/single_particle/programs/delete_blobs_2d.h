@@ -51,7 +51,7 @@ class DeleteBlobs2DProgram
 		        double radius_full,
 				double pixel_size_full,
 				double binning_factor,
-				const RawImage<float>& image_full,
+				BufferedImage<float>& blob_region_full,
 				const std::string& image_name,
 		        bool verbose);
 
