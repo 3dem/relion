@@ -28,6 +28,9 @@ class ZIO
 		static std::vector<std::vector<double>> readDoublesTable(std::string fn, int cols, char delim = ' ');
 		static std::vector<std::string> split(const std::string& s, const std::string &delimiter);
 		
+		template <typename T>
+		static bool writeToFile(const std::vector<T>& items, std::string filename);
+		
 		static std::string itoa(double num);
 		
 		static bool beginsWith(const std::string& string, const std::string& prefix);
@@ -85,5 +88,19 @@ std::vector<T> ZIO::readDat(std::string fn)
 	return out;
 }
 
+template <typename T>
+bool ZIO::writeToFile(const std::vector<T>& items, std::string filename)
+{
+	std::ofstream file(filename);
+	
+	if (!file) return false;
+	
+	for (int i = 0; i < items.size(); i++)
+	{
+		file << items[i] << '\n';
+	}
+	
+	return true;
+}
 
 #endif

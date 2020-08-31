@@ -113,6 +113,8 @@ void DeleteBlobs2DProgram::run()
 	            visualisation_size.y, 
 	            3 * micrograph_count);
 	
+	std::vector<std::string> failed_micrographs;
+	
 	
 	#pragma omp parallel for num_threads(num_threads)
 	for (int m = 0; m < micrograph_count; m++)
@@ -128,13 +130,23 @@ void DeleteBlobs2DProgram::run()
 			    +ZIO::itoa(micrograph_count)+")");
 		}
 		
-		processMicrograph(
-			m,
-			micrographs_dir + all_micrograph_names[m] + ".mrc",
-			blobs_dir + all_micrograph_names[m] + ".blobs",
-			visualisation,
-			visualisation_binning,
-			verbose);
+		try 
+		{
+			processMicrograph(
+				m,
+				micrographs_dir + all_micrograph_names[m] + ".mrc",
+				blobs_dir + all_micrograph_names[m] + ".blobs",
+				visualisation,
+				visualisation_binning,
+				verbose);
+		}
+		catch (Exception e)
+		{
+			#pragma omp critical
+			{
+				failed_micrographs.push_back(all_micrograph_names[m]);
+			}
+		}
 		
 		if (verbose)
 		{
@@ -143,6 +155,11 @@ void DeleteBlobs2DProgram::run()
 	}
 	
 	visualisation.write(outPath + "diagnostic.mrc");
+	
+	if (failed_micrographs.size() > 0)
+	{
+		ZIO::writeToFile(failed_micrographs, outPath + "failed_micrographs.txt");
+	}
 }
 
 void DeleteBlobs2DProgram::processMicrograph(
