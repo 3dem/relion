@@ -140,7 +140,7 @@ void DeleteBlobs2DProgram::run()
 				visualisation_binning,
 				verbose);
 		}
-		catch (Exception e)
+		catch (...)
 		{
 			#pragma omp critical
 			{
