@@ -11,6 +11,7 @@
 #include <src/jaz/image/resampling.h>
 #include <src/jaz/image/normalization.h>
 #include <src/jaz/image/local_extrema.h>
+#include <src/jaz/single_particle/stack_helper.h>
 
 
 using namespace gravis;
@@ -28,6 +29,7 @@ void DeleteBlobs2DProgram::readParameters(int argc, char *argv[])
 		micrographs_list_filename = parser.getOption("--i", "Micrograph lists filename");
 		micrographs_dir = parser.getOption("--md", "Micrographs directory");
 		blobs_dir = parser.getOption("--bd", "Initial blobs directory");
+		particles_file = parser.getOption("--ptc", "Optional particles file for phase flipping", "");
 
 		prior_sigma_A = textToDouble(parser.getOption("--sig", "Weight of initial position", "0"));
 		max_binning = textToDouble(parser.getOption("--bin0", "Initial (maximal) binning factor", "8"));
@@ -115,6 +117,39 @@ void DeleteBlobs2DProgram::run()
 	
 	std::vector<std::string> failed_micrographs;
 	
+	const bool do_phase_flipping = particles_file != "";
+	
+	
+	std::map<std::string, CTF> micrograph_to_ctf;
+	
+	if (do_phase_flipping)
+	{
+		Log::print("Will flip the phases of all micrographs according to: "+particles_file);
+		
+		ObservationModel obs_model;
+		MetaDataTable particles_table;
+		ObservationModel::loadSafely(particles_file, obs_model, particles_table);
+		
+		
+		std::vector<MetaDataTable> all_tables = StackHelper::splitByMicrographName(particles_table);
+		
+		for (int i = 0; i < all_tables.size(); i++)
+		{
+			CTF ctf;
+			ctf.readByGroup(all_tables[i], &obs_model, 0);
+			
+			const std::string micrograph_filename = all_tables[i].getString(EMDL_MICROGRAPH_NAME, 0);
+			
+			std::string micrograph_name = micrograph_filename.substr(
+			            micrograph_filename.find_last_of('/')+1);
+			
+			micrograph_name = micrograph_name.substr(
+			            0, micrograph_name.find_last_of('.'));
+			
+			micrograph_to_ctf[micrograph_name] = ctf;
+		}
+	}
+	
 	
 	#pragma omp parallel for num_threads(num_threads)
 	for (int m = 0; m < micrograph_count; m++)
@@ -132,13 +167,32 @@ void DeleteBlobs2DProgram::run()
 		
 		try 
 		{
+			const std::string micrograph_name = all_micrograph_names[m];
+			
+			CTF* ctf = 0;
+			
+			if (do_phase_flipping)
+			{
+				std::map<std::string, CTF>::iterator it = micrograph_to_ctf.find(micrograph_name);
+				
+				if (it == micrograph_to_ctf.end())
+				{
+					Log::warn("Unable to find a CTF for "+micrograph_name+" in "+particles_file);
+				}
+				else
+				{
+					ctf = &it->second;
+				}
+			}
+			
 			processMicrograph(
 				m,
-				micrographs_dir + all_micrograph_names[m] + ".mrc",
-				blobs_dir + all_micrograph_names[m] + ".blobs",
+				micrographs_dir + micrograph_name + ".mrc",
+				blobs_dir + micrograph_name + ".blobs",
 				visualisation,
 				visualisation_binning,
-				verbose);
+				verbose,
+				ctf);
 		}
 		catch (...)
 		{
@@ -168,7 +222,8 @@ void DeleteBlobs2DProgram::processMicrograph(
 		const std::string& blobs_filename,
         RawImage<float>& visualisation,
         double visualisation_binning,
-        bool verbose)
+        bool verbose,
+        CTF* ctf)
 {	        
 	if (verbose)
 	{
@@ -194,9 +249,21 @@ void DeleteBlobs2DProgram::processMicrograph(
 	{
 		Log::print("Filtering");
 	}
-
-	BufferedImage<float> micrograph_filtered = ImageFilter::highpassStackGaussPadded(
+	
+	BufferedImage<float> micrograph_filtered;
+	
+	if (ctf != 0)
+	{
+		micrograph_filtered = ImageFilter::phaseFlip(micrograph, *ctf, pixel_size);
+		
+		micrograph_filtered = ImageFilter::highpassStackGaussPadded(
+				micrograph_filtered, highpass_sigma_real, 1);
+	}
+	else
+	{
+		micrograph_filtered = ImageFilter::highpassStackGaussPadded(
 				micrograph, highpass_sigma_real, 1);
+	}
 	
 	BufferedImage<float> blobs_image(w_full, h_full, 1);
 	blobs_image.fill(0.f);

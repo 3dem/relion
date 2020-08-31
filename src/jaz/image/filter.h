@@ -5,6 +5,7 @@
 #include "stack_helper.h"
 #include "padding.h"
 #include <src/jaz/math/fft.h>
+#include <src/ctf.h>
 
 class ImageFilter
 {
@@ -70,6 +71,11 @@ class ImageFilter
 		template<class T>
 		static BufferedImage<T> separableGauss3D(
 				const RawImage<T>& img, double sigma);
+		
+		
+		template<class T>
+		static BufferedImage<T> phaseFlip(
+				const RawImage<T>& image, CTF& ctf, double pixelSize);
 		
 };
 
@@ -722,6 +728,42 @@ BufferedImage<T> ImageFilter::separableGauss3D(const RawImage<T>& img, double si
     }
 	
 	return out;
+}
+
+
+template<class T>
+BufferedImage<T> ImageFilter::phaseFlip(
+		const RawImage<T>& image, CTF& ctf, double pixelSize)
+{
+	const int w = image.xdim;
+	const int h = image.ydim;
+	const int wh = w/2 + 1;
+	
+	BufferedImage<T> imageCopy = image;
+	BufferedImage<tComplex<T>> imageFS;
+	
+	FFT::FourierTransform(imageCopy, imageFS);
+	
+	const double bw = w * pixelSize;
+	const double bh = h * pixelSize;
+	
+	for (int y = 0; y < h; y++)
+	for (int x = 0; x < wh; x++)
+	{
+		const double xx = x;
+		const double yy = y < h/2? y : y - h;
+		
+		const double c = ctf.getCTF(xx/bw, yy/bh);
+		
+		if (c < 0.0)
+		{
+			imageFS(x,y).imag *= -1;
+		}
+	}
+	
+	FFT::inverseFourierTransform(imageFS, imageCopy);
+	
+	return imageCopy;
 }
 
 #endif

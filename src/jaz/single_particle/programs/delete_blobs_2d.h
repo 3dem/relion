@@ -5,6 +5,7 @@
 #include <src/jaz/image/buffered_image.h>
 
 class Blob2D;
+class CTF;
 
 class DeleteBlobs2DProgram
 {
@@ -13,7 +14,7 @@ class DeleteBlobs2DProgram
 		
 		DeleteBlobs2DProgram(){}
 		
-			std::string outPath, micrographs_list_filename, micrographs_dir, blobs_dir;
+			std::string outPath, micrographs_list_filename, micrographs_dir, blobs_dir, particles_file;
 			
 			bool diag;
 			
@@ -43,7 +44,8 @@ class DeleteBlobs2DProgram
 		        const std::string& blobs_filename,        
 		        RawImage<float>& visualisation,
 		        double visualisation_binning,
-		        bool verbose);
+		        bool verbose,
+		        CTF* ctf);
 
 		std::vector<double> fitBlob(
 		        int blob_id,
