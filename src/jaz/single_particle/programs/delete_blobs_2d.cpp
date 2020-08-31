@@ -225,8 +225,6 @@ void DeleteBlobs2DProgram::processMicrograph(
 		
 		std::vector<double> initial_parameters_fullsize = initial_blob.toVector();
 
-		std::vector<double> blob_coeffs = initial_parameters_fullsize;
-
 		i2Vector window_origin_full;
 		BufferedImage<float> blob_region_full;
 
@@ -356,7 +354,7 @@ void DeleteBlobs2DProgram::processMicrograph(
 		final_parameters_fullsize[0] += window_origin_full.x;
 		final_parameters_fullsize[1] += window_origin_full.y;
 
-		Blob2D final_blob(blob_coeffs, radius/2);
+		Blob2D final_blob(final_parameters_fullsize, radius/2);
 		final_blob.erase(micrograph, erased_image, blobs_image, dummy_weight, 1.5 * radius, radius);
 		
 		if (verbose)
@@ -411,9 +409,10 @@ std::vector<double> DeleteBlobs2DProgram::fitBlob(
 
 	std::string outTag = outPath + "diag/" + image_name + "/" + blobTag + "/" + binTag;
 	
-		
 
-	const d2Vector initial_position_cropped = d2Vector(initial_blob_params_cropped[0], initial_blob_params_cropped[1]);
+	const d2Vector initial_position_cropped = d2Vector(
+	            initial_blob_params_cropped[0], 
+				initial_blob_params_cropped[1]);
 
 	BufferedImage<float> blob_region_binned = Resampling::FourierCrop_fullStack(
 				blob_region_full, binning_factor, 1, true);

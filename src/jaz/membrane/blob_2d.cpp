@@ -369,7 +369,9 @@ void Blob2D::erase(
 		const int r0 = (int)r;
 		const int r1 = r0 + 1;
 		
-		if (radWgh[r0] == 0 || radWgh[r1] == 0)
+		const double eps = 1e-6;
+		
+		if (radWgh[r0] < eps || radWgh[r1] < eps)
 		{
 			continue;
 		}
