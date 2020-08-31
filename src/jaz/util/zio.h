@@ -34,6 +34,7 @@ class ZIO
 		static bool endsWith(const std::string& string, const std::string& suffix);
 		
 		static std::string makeOutputDir(const std::string& dir);
+		static std::string ensureEndingSlash(const std::string& dir);
 };
 
 template <typename T>

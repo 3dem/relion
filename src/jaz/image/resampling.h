@@ -64,6 +64,9 @@ class Resampling
 		static BufferedImage<T> FourierCrop_fullStack(
 				const BufferedImage<T>& img, double factor, int num_threads, bool keepSizeEven);
 		
+		static gravis::i2Vector getFourierCroppedSize2D(
+		        int w, int h, double factor, bool keepSizeEven);
+		
 		template <typename T>
 		static BufferedImage<T> FourierCrop_fftwHalfStack(
 				const BufferedImage<T>& img, double factor, int num_threads);
@@ -71,6 +74,7 @@ class Resampling
 		template <typename T>
 		static BufferedImage<T> FourierCrop_3D(
 				const BufferedImage<T>& img, int w, int h, int d, int num_threads);
+		
 		
 		
 		

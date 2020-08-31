@@ -18,11 +18,19 @@ class Blob2D
 			gravis::d2Vector center;			
 			std::vector<dComplex> amplitudes;
 			double smoothingRadius;
-		
-
+			
+			std::vector<dComplex> sin_cos_table;
+			
+			
 		std::vector<double> radialAverage(
 				const RawImage<float>& frame,
-				const RawImage<float>& weight) const;
+				const RawImage<float>& weight,
+				double relevantRadius = -1.0) const;
+		
+		std::pair<std::vector<double>,std::vector<double>> radialAverageAndWeight(
+				const RawImage<float>& frame,
+				const RawImage<float>& weight,
+				double relevantRadius = -1.0) const;
 
 		double radialAverageError(
 				const RawImage<float>& frame,
@@ -38,11 +46,12 @@ class Blob2D
 				const RawImage<float>& frame,
 				const std::vector<double>& radAvg) const;
 
-		void decompose(
-				RawImage<float>& frame,
-				RawImage<float>& blob,
+		void erase(
+		        const RawImage<float>& micrographs,
+				RawImage<float>& erased_out,
+				RawImage<float>& blob_out,
 				const RawImage<float>& weight,
-				double outerRadius, double taper) const;
+				double radius, double taper) const;
 		
 		
 		inline std::vector<double> toVector() const;
@@ -152,7 +161,10 @@ inline double Blob2D::smoothOrigin(double r) const
 {
 	if (r < smoothingRadius)
 	{
-		return 2 * r * r / smoothingRadius + smoothingRadius / 2;
+		/* f(x)  = x²/2R + R/2   =>  f(R) = R,  f(0) = R/2		   
+		   f'(x) = x/R           =>  f'(R) = 1             */
+		
+		return 0.5 * r * r / smoothingRadius + smoothingRadius / 2;
 	}
 	else
 	{

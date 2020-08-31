@@ -139,7 +139,7 @@ std::string ZIO::makeOutputDir(const std::string& dir)
 	
 	if (len > 0)
 	{
-		if (out[out.length()-1] != '/')
+		if (out[len-1] != '/')
 		{
 			out = out + "/";
 		}
@@ -153,4 +153,21 @@ std::string ZIO::makeOutputDir(const std::string& dir)
 	}
 	
 	return out;
+}
+
+std::string ZIO::ensureEndingSlash(const std::string &dir)
+{
+	std::string out = dir;
+	
+	const int len = out.length();
+	
+	if (len > 0)
+	{
+		if (out[len-1] != '/')
+		{
+			out = out + "/";
+		}
+	}
+	
+	return out;	
 }

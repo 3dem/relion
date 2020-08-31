@@ -13,7 +13,7 @@ class DeleteBlobs2DProgram
 		
 		DeleteBlobs2DProgram(){}
 		
-			std::string outPath, micrograph_filename, blobs_filename;
+			std::string outPath, micrographs_list_filename, micrographs_dir, blobs_dir;
 			
 			bool diag;
 			
@@ -22,12 +22,14 @@ class DeleteBlobs2DProgram
 			double 
 				prior_sigma_A,
 				highpass_sigma_real_A,
-				max_binning, min_binning;
+				max_binning, min_binning, 
+				blob_thickness,
+				convergence_threshold;
 
 			std::vector<gravis::d4Vector> spheres;
 			
+				
 		void readParameters(int argc, char *argv[]);
-
 		void run();
 
 
@@ -36,11 +38,12 @@ class DeleteBlobs2DProgram
 
 
 		void processMicrograph(
-				MetaDataTable& detected_blobs,
-				const std::string& micrograph_name,
-				BufferedImage<float>& visualisation,
-				int micrograph_index,
-				int micrograph_count);
+		        int micrograph_index,
+		        const std::string& micrograph_filename,
+		        const std::string& blobs_filename,        
+		        RawImage<float>& visualisation,
+		        double visualisation_binning,
+		        bool verbose);
 
 		std::vector<double> fitBlob(
 		        int blob_id,
@@ -49,7 +52,8 @@ class DeleteBlobs2DProgram
 				double pixel_size_full,
 				double binning_factor,
 				const RawImage<float>& image_full,
-				const std::string& image_name);
+				const std::string& image_name,
+		        bool verbose);
 
 		BufferedImage<float> drawFit(
 				Blob2D& blob,

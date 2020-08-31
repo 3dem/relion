@@ -8,7 +8,8 @@ using namespace gravis;
 Blob2D::Blob2D()
 :	center(0.0), 
 	amplitudes(0)
-{}
+{
+}
 
 Blob2D::Blob2D(d2Vector center, double smoothingRadius)
 :	center(center), 
@@ -31,9 +32,12 @@ Blob2D::Blob2D(const std::vector<double>& params, double smoothingRadius)
 
 std::vector<double> Blob2D::radialAverage(
 		const RawImage<float>& frame,
-		const RawImage<float>& weight) const
+		const RawImage<float>& weight,
+        double relevantRadius) const
 {
 	int maxRadius = findMaxRadius(i2Vector(frame.xdim, frame.ydim));
+	
+	if (relevantRadius > 0 && maxRadius > relevantRadius) maxRadius = relevantRadius;
 
 	std::vector<double> radAvg(maxRadius, 0.0), radCnt(maxRadius, 0.0);
 
@@ -44,6 +48,10 @@ std::vector<double> Blob2D::radialAverage(
 	for (int y = 0; y < h; y++)
 	for (int x = 0; x < w; x++)
 	{
+		const double m = weight(x,y);
+		
+		if (m == 0.f) continue;
+		
 		const double dx = x - center.x;
 		const double dy = y - center.y;
 
@@ -51,7 +59,6 @@ std::vector<double> Blob2D::radialAverage(
 
 		if (r >= maxRadius - 1 || r < 0) continue;
 
-		const double m = weight(x,y);
 
 		const int r0 = (int)r;
 		const int r1 = r0 + 1;
@@ -73,6 +80,57 @@ std::vector<double> Blob2D::radialAverage(
 	return radAvg;
 }
 
+
+std::pair<std::vector<double>,std::vector<double>> Blob2D::radialAverageAndWeight(
+		const RawImage<float>& frame,
+		const RawImage<float>& weight,
+        double relevantRadius) const
+{
+	int maxRadius = findMaxRadius(i2Vector(frame.xdim, frame.ydim));
+	
+	if (relevantRadius > 0 && maxRadius > relevantRadius) maxRadius = relevantRadius;
+
+	std::vector<double> radAvg(maxRadius, 0.0), radCnt(maxRadius, 0.0);
+
+	const int w = frame.xdim;
+	const int h = frame.ydim;
+
+
+	for (int y = 0; y < h; y++)
+	for (int x = 0; x < w; x++)
+	{
+		const double m = weight(x,y);
+		
+		if (m == 0.f) continue;
+		
+		const double dx = x - center.x;
+		const double dy = y - center.y;
+
+		double r = smoothOrigin(sqrt(dx*dx + dy*dy) + getOffset(d2Vector(dx, dy)));
+
+		if (r >= maxRadius - 1 || r < 0) continue;
+
+
+		const int r0 = (int)r;
+		const int r1 = r0 + 1;
+
+		const double dr = r - r0;
+
+		radAvg[r0] += m * (1 - dr) * frame(x,y);
+		radCnt[r0] += m * (1 - dr);
+
+		radAvg[r1] += m * dr * frame(x,y);
+		radCnt[r1] += m * dr;
+	}
+
+	for (int i = 0; i < maxRadius; i++)
+	{
+		if (radCnt[i] > 0.0) radAvg[i] /= radCnt[i];
+	}
+
+	return std::make_pair(radAvg, radCnt);
+}
+
 double Blob2D::radialAverageError(
 		const RawImage<float>& frame,
 		const RawImage<float>& weight,
@@ -89,8 +147,12 @@ double Blob2D::radialAverageError(
 	for (int y = 0; y < h; y++)
 	for (int x = 0; x < w; x++)
 	{
-		const double obs = frame(x,y);
 		const double m = weight(x,y);
+		
+		if (m == 0.f) continue;
+		
+		const double obs = frame(x,y);
+		
 
 		const double dx = x - center.x;
 		const double dy = y - center.y;
@@ -125,13 +187,17 @@ BufferedImage<float> Blob2D::drawError(
 	const int h = frame.ydim;
 
 	BufferedImage<float> out(w,h);
+	out.fill(0.f);
 
 
 	for (int y = 0; y < h; y++)
 	for (int x = 0; x < w; x++)
 	{
-		const double obs = frame(x,y);
 		const double m = weight(x,y);
+		
+		if (m == 0.f) continue;
+		
+		const double obs = frame(x,y);
 
 		const double dx = x - center.x;
 		const double dy = y - center.y;
@@ -187,27 +253,76 @@ BufferedImage<float> Blob2D::radialAverageProjection(
 	return out;
 }
 
-void Blob2D::decompose(
-	RawImage<float>& frame,
-	RawImage<float>& blob,
+void Blob2D::erase(
+	const RawImage<float>& micrographs,
+	RawImage<float>& erased_out,
+	RawImage<float>& blob_out,
 	const RawImage<float>& weight,
-	double outerRadius, double taper) const
+	double radius, 
+    double taper) const
 {
+	std::pair<std::vector<double>,std::vector<double>> radAvgAndWgh = radialAverageAndWeight(
+	            micrographs, weight, radius + taper);
+	
+	const double cappingRadius = 1.5 * smoothingRadius;
+	
+	std::vector<double> radAvg = radAvgAndWgh.first;
+	std::vector<double> radWgh = radAvgAndWgh.second;
+	
+	int first_r = (int) cappingRadius;
+	
+	for (int r = 0; r < cappingRadius; r++)
+	{
+		if (radWgh[r] > 0)
+		{
+			first_r = r;
+			break;
+		}
+	}
+	
+	const double cappingRange = cappingRadius - first_r;
 
-	std::vector<double> radAvg = radialAverage(frame, weight);
-	const int radius = radAvg.size();
+	double tipAvg = 0.0;
+	double tipWgh = 0.0;
+	
+	for (int r = first_r; r < cappingRadius; r++)
+	{
+		const int rr = r - first_r;
+		const double t = radWgh[r] * (cos(PI * rr / cappingRange) + 1.0) / 2;
+		
+		tipAvg += t * radAvg[r];
+		tipWgh += t;
+	}
+	
+	tipAvg /= tipWgh;
+	
+	for (int r = first_r; r < cappingRadius; r++)
+	{
+		const int rr = r - first_r;
+		const double t = (cos(PI * rr / cappingRange) + 1.0) / 2;
+		
+		radAvg[r] = (1 - t) * radAvg[r] + t * tipAvg;
+	}
 
-	const int w = frame.xdim;
-	const int h = frame.ydim;
-
-
-	const int x0 = (int) (center.x + 0.5);
-	const int y0 = (int) (center.y + 0.5);
+	
+	const int w = micrographs.xdim;
+	const int h = micrographs.ydim;
 
 	double outside_val(0.0), outside_wgh(0.0);
+	
+	std::pair<gravis::d2Vector,gravis::d2Vector> boundingBox = scanForBoundingBox(
+	        radius + taper, 2, 2 * PI * (radius+taper));
+	
+	const d2Vector minPos = boundingBox.first;
+	const d2Vector maxPos = boundingBox.second;
+	
+	const int x0 = minPos.x < 0?       0 : std::ceil(minPos.x);
+	const int x1 = maxPos.x >= w-1?  w-1 : std::floor(maxPos.x);
+	const int y0 = minPos.y < 0?       0 : std::ceil(minPos.y);
+	const int y1 = maxPos.y >= h-1?  h-1 : std::floor(maxPos.y);
 
-	for (int y = 0; y < h; y++)
-	for (int x = 0; x < w; x++)
+	for (int y = y0; y <= y1; y++)
+	for (int x = x0; x <= x1; x++)
 	{
 		const double dx = x - center.x;
 		const double dy = y - center.y;
@@ -215,25 +330,28 @@ void Blob2D::decompose(
 		const double ru = sqrt(dx*dx + dy*dy);
 		double r = smoothOrigin(ru + getOffset(d2Vector(dx, dy)));
 
-		if (r >= radius - 1 || r < 0)
+		if (r >= radius + taper || r < 0)
 		{
 			continue;
 		}
 
 		double wgh;
 
-		if (ru < outerRadius) wgh = 1.0;
-		else if (ru < outerRadius + taper) wgh = cos(0.5 * PI * (ru - outerRadius) / taper);
+		if (ru < radius) wgh = 1.0;
+		else if (ru < radius + taper) wgh = (cos(PI * (ru - radius) / taper) + 1) / 2;
 		else wgh = 0.0;
 
-		outside_val += (1 - wgh) * frame(x,y);
-		outside_wgh += (1 - wgh);
+		if (wgh > 0.0)
+		{
+			outside_val += (1 - wgh) * micrographs(x,y);
+			outside_wgh += (1 - wgh);
+		}
 	}
 
 	if (outside_wgh > 0.0) outside_val /= outside_wgh;
-
-	for (int y = y0 - radius + 1; y <= y0 + radius - 1; y++)
-	for (int x = x0 - radius + 1; x <= x0 + radius - 1; x++)
+	
+	for (int y = y0; y <= y1; y++)
+	for (int x = x0; x <= x1; x++)
 	{
 		if (x < 0 || x >= w || y < 0 || y >= h) continue;
 
@@ -243,7 +361,7 @@ void Blob2D::decompose(
 		const double ru = sqrt(dx*dx + dy*dy);
 		double r = smoothOrigin(ru + getOffset(d2Vector(dx, dy)));
 
-		if (r >= radius - 1 || r < 0)
+		if (r >= radius + taper - 1 || r < 0)
 		{
 			continue;
 		}
@@ -257,12 +375,14 @@ void Blob2D::decompose(
 
 		double wgh;
 
-		if (ru < outerRadius) wgh = 1.0;
-		else if (ru < outerRadius + taper) wgh = cos(0.5 * PI * (ru - outerRadius) / taper);
+		if (ru < radius) wgh = 1.0;
+		else if (ru < radius + taper) wgh = (cos(PI * (ru - radius) / taper) + 1) / 2;
 		else wgh = 0.0;
+		
+		const double blob_value = wgh * pred;
 
-		frame(x,y) -= wgh * pred;
-		blob(x,y)  += wgh * pred;
+		erased_out(x,y) -= blob_value;
+		blob_out(x,y)   += blob_value;
 	}
 }
 

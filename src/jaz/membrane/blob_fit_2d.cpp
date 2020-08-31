@@ -59,7 +59,7 @@ void BlobFit2D::computeWeight(const Blob2D& blob, double minRadius, double maxRa
 		
 		if (r > maxRadius || r < minRadius)
 		{
-			weight(x,y) = eps;
+			weight(x,y) = 0.f;
 		}
 		else
 		{

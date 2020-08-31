@@ -25,18 +25,21 @@ void DeleteBlobs2DProgram::readParameters(int argc, char *argv[])
 		parser.setCommandLine(argc, argv);
 		int gen_section = parser.addSection("General options");
 
-		blobs_filename = parser.getOption("--i", "Initial blob locations");
-		micrograph_filename = parser.getOption("--m", "Micrograph file name");
+		micrographs_list_filename = parser.getOption("--i", "Micrograph lists filename");
+		micrographs_dir = parser.getOption("--md", "Micrographs directory");
+		blobs_dir = parser.getOption("--bd", "Initial blobs directory");
 
 		prior_sigma_A = textToDouble(parser.getOption("--sig", "Weight of initial position", "0"));
 		max_binning = textToDouble(parser.getOption("--bin0", "Initial (maximal) binning factor", "8"));
-		min_binning = textToDouble(parser.getOption("--bin1", "Final (minimal) binning factor", "2"));
+		min_binning = textToDouble(parser.getOption("--bin1", "Final (minimal) binning factor", "4"));
 
 		diag = parser.checkOption("--diag", "Write out diagnostic information");
 
-		max_frequencies = textToInteger(parser.getOption("--n", "Number of frequencies", "50"));
+		max_frequencies = textToInteger(parser.getOption("--n", "Number of frequencies", "12"));
+		blob_thickness = textToDouble(parser.getOption("--th", "Blob thickness [fraction of radius]", "0.5"));
 		highpass_sigma_real_A = textToDouble(parser.getOption("--hp", "High-pass sigma [Å, real space]", "300"));
 		max_iters = textToInteger(parser.getOption("--max_iters", "Maximum number of iterations", "1000"));
+		convergence_threshold = textToDouble(parser.getOption("--cth", "Convergence threshold", "0.02"));
 		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 
 		outPath = parser.getOption("--o", "Output filename pattern");
@@ -57,16 +60,103 @@ void DeleteBlobs2DProgram::readParameters(int argc, char *argv[])
 	}
 
 	outPath = ZIO::makeOutputDir(outPath);
+	
+	ZIO::makeOutputDir(outPath + "Frames");
+	ZIO::makeOutputDir(outPath + "Blobs");
 
 	if (diag)
 	{
 		ZIO::makeOutputDir(outPath + "diag");
 	}
+	
+	micrographs_dir = ZIO::ensureEndingSlash(micrographs_dir);
+	blobs_dir = ZIO::ensureEndingSlash(blobs_dir);
 }
 
 void DeleteBlobs2DProgram::run()
 {
-	Log::print("Loading");
+	std::vector<std::string> all_micrograph_names;
+	all_micrograph_names.reserve(1000);
+	
+	std::ifstream file(micrographs_list_filename);
+	
+	if (!file)
+	{
+		REPORT_ERROR("DelineatedBlob2D::run: unable to read " + micrographs_list_filename);
+	}
+	
+	std::string line;
+	
+	while (std::getline(file, line))
+	{
+		std::stringstream sts;
+		sts << line;
+		
+		std::string name;
+		sts >> name;
+		
+		all_micrograph_names.push_back(name);
+	}
+	
+	const int micrograph_count = all_micrograph_names.size();
+	
+	t3Vector<long int> micrograph_size = ImageFileHelper::getSize(
+	            micrographs_dir + all_micrograph_names[0] + ".mrc");
+	
+	const double visualisation_binning = 32.0;
+	
+	i2Vector visualisation_size = Resampling::getFourierCroppedSize2D(
+	            micrograph_size.x, micrograph_size.y, visualisation_binning, true);
+	
+	BufferedImage<float> visualisation(
+	            visualisation_size.x, 
+	            visualisation_size.y, 
+	            3 * micrograph_count);
+	
+	
+	#pragma omp parallel for num_threads(num_threads)
+	for (int m = 0; m < micrograph_count; m++)
+	{
+		const int thread_id = omp_get_thread_num();
+		const bool verbose = thread_id == 0;
+		
+		if (verbose)
+		{
+			Log::beginSection(
+				"Micrograph "+ZIO::itoa(m+1)+"/"
+			    +ZIO::itoa((int)std::ceil(micrograph_count / (double)num_threads))+" (out of "
+			    +ZIO::itoa(micrograph_count)+")");
+		}
+		
+		processMicrograph(
+			m,
+			micrographs_dir + all_micrograph_names[m] + ".mrc",
+			blobs_dir + all_micrograph_names[m] + ".blobs",
+			visualisation,
+			visualisation_binning,
+			verbose);
+		
+		if (verbose)
+		{
+			Log::endSection();
+		}
+	}
+	
+	visualisation.write(outPath + "diagnostic.mrc");
+}
+
+void DeleteBlobs2DProgram::processMicrograph(
+        int micrograph_index,
+        const std::string& micrograph_filename,
+        const std::string& blobs_filename,         
+        RawImage<float>& visualisation,
+        double visualisation_binning,
+        bool verbose)
+{	        
+	if (verbose)
+	{
+		Log::print("Loading");
+	}
 
 	BufferedImage<float> micrograph;
 	micrograph.read(micrograph_filename);
@@ -81,22 +171,23 @@ void DeleteBlobs2DProgram::run()
 	std::vector<DelineatedBlob2D> delineated_blobs = DelineatedBlob2D::read(blobs_filename);
 	
 	
-	
 	const int blob_count = delineated_blobs.size();
 
-	Log::print("Filtering");
-
-
-	micrograph.write(outPath+"DEBUG_micrograph.mrc");
+	if (verbose)
+	{
+		Log::print("Filtering");
+	}
 
 	BufferedImage<float> micrograph_filtered = ImageFilter::highpassStackGaussPadded(
-				micrograph, highpass_sigma_real, num_threads);
-
-	micrograph_filtered.write(outPath+"DEBUG_micrograph_filtered.mrc");
+				micrograph, highpass_sigma_real, 1);
 	
 	BufferedImage<float> blobs_image(w_full, h_full, 1);
 	blobs_image.fill(0.f);
 	
+	BufferedImage<float> erased_image = micrograph;
+	
+	BufferedImage<float> dummy_weight(w_full, h_full, 1);
+	dummy_weight.fill(1.f);
 	
 	std::string micrograph_name = micrograph_filename.substr(
 	            micrograph_filename.find_last_of('/')+1);
@@ -107,12 +198,15 @@ void DeleteBlobs2DProgram::run()
 
 	for (int blob_id = 0; blob_id < blob_count; blob_id++)
 	{
-		Log::beginSection("Blob #" + ZIO::itoa(blob_id + 1));
+		if (verbose)
+		{
+			Log::beginSection("Blob " + ZIO::itoa(blob_id + 1)+"/"+ZIO::itoa(blob_count));
+		}
 		
-		Blob2D blob = delineated_blobs[blob_id].blob;
-		const double radius = delineated_blobs[blob_id].radius;
+		const double radius = delineated_blobs[blob_id].radius;		
+		Blob2D initial_blob = delineated_blobs[blob_id].blob;
 		
-		std::vector<double> initial = blob.toVector();
+		std::vector<double> initial = initial_blob.toVector();
 
 		std::vector<double> blob_coeffs = initial;
 
@@ -121,58 +215,71 @@ void DeleteBlobs2DProgram::run()
 
 		while (current_binning > min_binning - 1e-6)
 		{
-			if (current_binning == max_binning)
+			if (verbose)
 			{
-				Log::beginSection("Fitting at bin " + ZIO::itoa((int)current_binning));
-			}
-			else
-			{
-				Log::beginSection("Refining at bin " + ZIO::itoa((int)current_binning));
+				if (current_binning == max_binning)
+				{
+					Log::beginSection("Fitting at bin " + ZIO::itoa((int)current_binning));
+				}
+				else
+				{
+					Log::beginSection("Refining at bin " + ZIO::itoa((int)current_binning));
+				}
 			}
 			
 			blob_coeffs = fitBlob(
 						blob_id, blob_coeffs, 
 			            radius, pixel_size, current_binning, 
 			            micrograph_filtered,
-						micrograph_name);
+						micrograph_name,
+			            verbose);
 
 			current_binning /= 2;
 			
-			Log::endSection();
+			if (verbose)
+			{
+				Log::endSection();
+			}
+		}
+		
+		if (verbose)
+		{
+			Log::print("Erasing");
 		}
 
-		//Blob2D blob(blob_coeffs, outer_radius_full);
-
-
-			/*RawImage<float> stackSlice = original_stack.getSliceRef(f);
-			RawImage<float> blobsSlice = blobs_stack.getSliceRef(f);
-
-			blob.decompose(
-				stackSlice, blobsSlice,
-				tomogram0.projectionMatrices[f],
-				fiducialsMask.getConstSliceRef(f),
-				50.0);*/
-
+		Blob2D final_blob(blob_coeffs, radius/2);
+		final_blob.erase(micrograph, erased_image, blobs_image, dummy_weight, 1.5 * radius, radius);
 		
-		Log::endSection();
+		if (verbose)
+		{
+			Log::endSection();
+		}
+	}	  
+	
+	if (verbose)
+	{
+		Log::print("Writing output");
 	}
 
-	/*const std::string tag = outPath + tomogram0.name;
-
-	original_stack.write(tag + "_subtracted.mrc", tomogram0.optics.pixelSize);
-	blobs_stack.write(tag + "_blobs.mrc", tomogram0.optics.pixelSize);
-
-	subtracted_tomogram_set.setTiltSeriesFile(tomo_index, tag + "_subtracted.mrc");
-	blobs_tomogram_set.setTiltSeriesFile(tomo_index, tag + "_blobs.mrc");
-
-	if (diag)
-	{
-		visualisation.getSliceRef(3 * tomo_batch_index + 1).copyFrom(
-				original_stack.getConstSliceRef(frame_count / 2));
-
-		visualisation.getSliceRef(3 * tomo_batch_index + 2).copyFrom(
-				blobs_stack.getConstSliceRef(frame_count / 2));
-	}*/
+	erased_image.write(outPath + "Frames/" + micrograph_name + ".mrc", pixel_size);
+	blobs_image.write(outPath + "Blobs/" + micrograph_name + ".mrc", pixel_size);
+	
+	BufferedImage<float> cropped_original = Resampling::FourierCrop_fullStack(
+	            micrograph, visualisation_binning, 1, true);
+	
+	BufferedImage<float> cropped_erased = Resampling::FourierCrop_fullStack(
+	            erased_image, visualisation_binning, 1, true);
+	
+	BufferedImage<float> cropped_blobs = Resampling::FourierCrop_fullStack(
+	            blobs_image, visualisation_binning, 1, true);
+	
+	const float mu = Normalization::computeMean(cropped_original);
+	cropped_original -= mu;
+	cropped_erased -= mu;
+	
+	visualisation.copySliceFrom(3 * micrograph_index,     cropped_original);
+	visualisation.copySliceFrom(3 * micrograph_index + 1, cropped_erased);
+	visualisation.copySliceFrom(3 * micrograph_index + 2, cropped_blobs);
 }
 
 std::vector<double> DeleteBlobs2DProgram::fitBlob(
@@ -182,7 +289,8 @@ std::vector<double> DeleteBlobs2DProgram::fitBlob(
 		double pixel_size_full,
 		double binning_factor,
 		const RawImage<float>& image_full,
-		const std::string& image_name)
+		const std::string& image_name,
+        bool verbose)
 {
 	const double radius_binned = radius_full / binning_factor;
 	const double prior_sigma = prior_sigma_A / pixel_size_full;
@@ -273,10 +381,7 @@ std::vector<double> DeleteBlobs2DProgram::fitBlob(
 	const d2Vector initial_position_cropped = d2Vector(initial_cropped[0], initial_cropped[1]);
 
 	BufferedImage<float> blob_region_binned = Resampling::FourierCrop_fullStack(
-				blob_region_full, binning_factor, num_threads, true);
-	
-	blob_region_full.write(outPath + "blob_region_full.mrc");
-	blob_region_binned.write(outPath + "blob_region_binned.mrc");
+				blob_region_full, binning_factor, 1, true);
 	
 	//blob_region_binned = ImageFilter::Gauss2D(blob_region_binned, 0, 3, true);
 
@@ -294,8 +399,11 @@ std::vector<double> DeleteBlobs2DProgram::fitBlob(
 	for (int current_frequencies = initial_frequencies;
 		 current_frequencies <= max_frequencies; current_frequencies++)
 	{
-		Log::print(ZIO::itoa(current_frequencies) + " frequencies ("
+		if (verbose)
+		{
+			Log::print(ZIO::itoa(current_frequencies) + " frequencies ("
 				   + ZIO::itoa(2*current_frequencies + 2) + " parameters)");
+		}
 
 		std::string tag = outTag + "_N_" + ZIO::itoa(current_frequencies);
 
@@ -304,11 +412,16 @@ std::vector<double> DeleteBlobs2DProgram::fitBlob(
 
 		BlobFit2D blob_fit(
 			blob_region_binned, initial_position_cropped_binned, current_frequencies,
-			smoothing_radius_binned, prior_sigma, num_threads);
+			smoothing_radius_binned, prior_sigma, 1);
 		
 		Blob2D blob0(last_optimum, smoothing_radius_binned);
 		
-		blob_fit.computeWeight(blob0, 0.5 * radius_binned, 1.5 * radius_binned);
+		{
+			const double r0 = radius_binned - blob_thickness * radius_binned / 2;
+			const double r1 = radius_binned + blob_thickness * radius_binned / 2;
+			
+			blob_fit.computeWeight(blob0, r0, r1);
+		}
 		
 		std::vector<double> current_optimum(2*current_frequencies + 2, 0.0);
 
@@ -320,7 +433,9 @@ std::vector<double> DeleteBlobs2DProgram::fitBlob(
 		std::vector<double> new_optimum;
 
 		new_optimum = NelderMead::optimize(
-				current_optimum, blob_fit, initial_step, 0.001, max_iters, 1.0, 2.0, 0.5, 0.5, false);
+						current_optimum, blob_fit, 
+						initial_step, convergence_threshold, max_iters, 
+						1.0, 2.0, 0.5, 0.5, false);
 
 		if (diag)
 		{
@@ -329,7 +444,10 @@ std::vector<double> DeleteBlobs2DProgram::fitBlob(
 			const double E0 = blob_fit.f(current_optimum, 0);
 			const double E1 = blob_fit.f(new_optimum, 0);
 
-			Log::print("  E: "+ZIO::itoa(E0)+" -> "+ZIO::itoa(E1));
+			if (verbose)
+			{
+				Log::print("  E: "+ZIO::itoa(E0)+" -> "+ZIO::itoa(E1));
+			}
 
 			drawTestStack(blob2, blob_region_binned, blob_fit.weight).write(tag+"_fit.mrc");
 			drawFit(blob2, blob_region_binned, blob_fit.weight).write(tag+"_residual.mrc");
