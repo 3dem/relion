@@ -259,7 +259,6 @@ void DeleteBlobs2DProgram::processMicrograph(
 				continue;
 			}
 
-
 			// ensure an even box size at the greatest binning level
 
 			if (window_size_binned_max.x % 2 == 1) window_size_binned_max.x += 1;
@@ -315,7 +314,6 @@ void DeleteBlobs2DProgram::processMicrograph(
 		initial_parameters_cropped[1] -= window_origin_full.y;
 
 		std::vector<double> blob_parameters_cropped = initial_parameters_cropped;
-
 
 
 		double current_binning = max_binning;
@@ -431,7 +429,23 @@ std::vector<double> DeleteBlobs2DProgram::fitBlob(
 
 	std::vector<double> last_optimum = fromBin1(initial_blob_params_cropped, binning_factor);
 	int initial_frequencies = initial_blob_params_cropped.size() < 2? 0 : (initial_blob_params_cropped.size() - 2) / 2;
+	
+	
+	
+	const d2Vector initial_position_cropped_binned = initial_position_cropped / binning_factor;
 
+	BlobFit2D blob_fit(
+		blob_region_binned, initial_position_cropped_binned, 
+		smoothing_radius_binned, prior_sigma, 1);
+	
+	{
+		Blob2D blob0(last_optimum, smoothing_radius_binned);
+		
+		const double r0 = radius_binned - blob_thickness * radius_binned / 2;
+		const double r1 = radius_binned + blob_thickness * radius_binned / 2;
+		
+		blob_fit.computeWeight(blob0, r0, r1);
+	}
 
 	for (int current_frequencies = initial_frequencies;
 		 current_frequencies <= max_frequencies; current_frequencies++)
@@ -443,23 +457,7 @@ std::vector<double> DeleteBlobs2DProgram::fitBlob(
 		}
 
 		std::string tag = outTag + "_N_" + ZIO::itoa(current_frequencies);
-
-		
-		const d2Vector initial_position_cropped_binned = initial_position_cropped / binning_factor;
-
-		BlobFit2D blob_fit(
-			blob_region_binned, initial_position_cropped_binned, current_frequencies,
-			smoothing_radius_binned, prior_sigma, 1);
-		
-		Blob2D blob0(last_optimum, smoothing_radius_binned);
-		
-		{
-			const double r0 = radius_binned - blob_thickness * radius_binned / 2;
-			const double r1 = radius_binned + blob_thickness * radius_binned / 2;
-			
-			blob_fit.computeWeight(blob0, r0, r1);
-		}
-		
+				
 		std::vector<double> current_optimum(2*current_frequencies + 2, 0.0);
 
 		for (int i = 0; i < last_optimum.size(); i++)

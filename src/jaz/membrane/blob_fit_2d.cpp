@@ -7,7 +7,6 @@ using namespace gravis;
 BlobFit2D::BlobFit2D(
 	const RawImage<float>& image,
 	d2Vector position,
-	int frequencies,
 	double smoothingRadius,
 	double priorSigma,
 	int num_threads)
@@ -15,7 +14,6 @@ BlobFit2D::BlobFit2D(
 		image(image),
 		initialPos(position),
 		smoothingRadius(smoothingRadius),
-		frequencies(frequencies),
 		num_threads(num_threads),
 		priorSigma2(priorSigma*priorSigma)
 {
@@ -49,8 +47,6 @@ void BlobFit2D::computeWeight(const Blob2D& blob, double minRadius, double maxRa
 {
 	const int w = weight.xdim;
 	const int h = weight.ydim;
-	
-	const float eps = 1e-6;
 	
 	for (int y = 0; y < h; y++)
 	for (int x = 0; x < w; x++)

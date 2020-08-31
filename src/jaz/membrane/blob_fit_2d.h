@@ -15,7 +15,6 @@ class BlobFit2D : public Optimization
 		BlobFit2D(
 			const RawImage<float>& image,
 			gravis::d2Vector position,
-			int frequencies,
 			double smoothingRadius,
 			double priorSigma,
 			int num_threads);
@@ -23,7 +22,7 @@ class BlobFit2D : public Optimization
 
 				const RawImage<float>& image;
 				gravis::d2Vector initialPos;
-				int smoothingRadius, frequencies;
+				int smoothingRadius;
 				BufferedImage<float> weight;
 				double priorSigma2;
 				int num_threads;
