@@ -31,6 +31,9 @@ class ZIO
 		template <typename T>
 		static bool writeToFile(const std::vector<T>& items, std::string filename);
 		
+		template <typename T>
+		static bool writeToFile(const std::vector<std::vector<T>>& items, std::string filename);
+		
 		static std::string itoa(double num);
 		
 		static bool beginsWith(const std::string& string, const std::string& prefix);
@@ -98,6 +101,26 @@ bool ZIO::writeToFile(const std::vector<T>& items, std::string filename)
 	for (int i = 0; i < items.size(); i++)
 	{
 		file << items[i] << '\n';
+	}
+	
+	return true;
+}
+
+template <typename T>
+bool ZIO::writeToFile(const std::vector<std::vector<T>>& items, std::string filename)
+{
+	std::ofstream file(filename);
+	
+	if (!file) return false;
+	
+	for (int i = 0; i < items.size(); i++)
+	{
+		for (int j = 0; j < items[i].size(); j++)
+		{
+			file << items[i][j] << ' ';
+		}
+		
+		file << '\n';
 	}
 	
 	return true;

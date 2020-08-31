@@ -206,11 +206,15 @@ void DeleteBlobs2DProgram::processMicrograph(
 	BufferedImage<float> dummy_weight(w_full, h_full, 1);
 	dummy_weight.fill(1.f);
 	
+	
 	std::string micrograph_name = micrograph_filename.substr(
 	            micrograph_filename.find_last_of('/')+1);
 	
 	micrograph_name = micrograph_name.substr(
-	            0, micrograph_filename.find_last_of('.'));
+	            0, micrograph_name.find_last_of('.'));
+	
+	
+	std::vector<std::vector<double>> all_blob_parameters;
 
 
 	for (int blob_id = 0; blob_id < blob_count; blob_id++)
@@ -357,6 +361,8 @@ void DeleteBlobs2DProgram::processMicrograph(
 		Blob2D final_blob(final_parameters_fullsize, radius/2);
 		final_blob.erase(micrograph, erased_image, blobs_image, dummy_weight, 1.5 * radius, radius);
 		
+		all_blob_parameters.push_back(final_parameters_fullsize);
+		        
 		if (verbose)
 		{
 			Log::endSection();
@@ -370,6 +376,8 @@ void DeleteBlobs2DProgram::processMicrograph(
 
 	erased_image.write(outPath + "Frames/" + micrograph_name + ".mrc", pixel_size);
 	blobs_image.write(outPath + "Blobs/" + micrograph_name + ".mrc", pixel_size);
+	
+	ZIO::writeToFile(all_blob_parameters, outPath + "Blobs/" + micrograph_name + ".blobs");
 	
 	BufferedImage<float> cropped_original = Resampling::FourierCrop_fullStack(
 	            micrograph, visualisation_binning, 1, true);
