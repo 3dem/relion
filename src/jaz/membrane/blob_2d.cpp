@@ -131,6 +131,64 @@ std::pair<std::vector<double>,std::vector<double>> Blob2D::radialAverageAndWeigh
 	return std::make_pair(radAvg, radCnt);
 }
 
+
+
+std::pair<std::vector<double>,std::vector<double>> Blob2D::radialAverageAndWeightInSectors(
+		const RawImage<float>& frame,
+		const RawImage<float>& weight,
+        int sectors,
+        double relevantRadius) const
+{
+	int maxRadius = findMaxRadius(i2Vector(frame.xdim, frame.ydim));
+	
+	if (relevantRadius > 0 && maxRadius > relevantRadius) maxRadius = relevantRadius;
+
+	std::vector<double> radAvg(sectors*maxRadius, 0.0), radCnt(sectors*maxRadius, 0.0);
+
+	const int w = frame.xdim;
+	const int h = frame.ydim;
+
+
+	for (int y = 0; y < h; y++)
+	for (int x = 0; x < w; x++)
+	{
+		const double m = weight(x,y);
+		
+		if (m == 0.f) continue;
+		
+		const double dx = x - center.x;
+		const double dy = y - center.y;
+		
+		const double phi = atan2(dx, dy);
+		
+		const double tau = sectors * (phi + PI) / (2*PI);
+		const int sector = ((int)std::round(tau)) % sectors;
+
+		double r = smoothOrigin(sqrt(dx*dx + dy*dy) + getOffset(phi));
+
+		if (r >= maxRadius - 1 || r < 0) continue;
+
+
+		const int r0 = (int)r;
+		const int r1 = r0 + 1;
+
+		const double dr = r - r0;
+
+		radAvg[sector * maxRadius + r0] += m * (1 - dr) * frame(x,y);
+		radCnt[sector * maxRadius + r0] += m * (1 - dr);
+
+		radAvg[sector * maxRadius + r1] += m * dr * frame(x,y);
+		radCnt[sector * maxRadius + r1] += m * dr;
+	}
+
+	for (int i = 0; i < sectors * maxRadius; i++)
+	{
+		if (radCnt[i] > 0.0) radAvg[i] /= radCnt[i];
+	}
+
+	return std::make_pair(radAvg, radCnt);
+}
+
 double Blob2D::radialAverageError(
 		const RawImage<float>& frame,
 		const RawImage<float>& weight,
@@ -353,8 +411,6 @@ void Blob2D::erase(
 	for (int y = y0; y <= y1; y++)
 	for (int x = x0; x <= x1; x++)
 	{
-		if (x < 0 || x >= w || y < 0 || y >= h) continue;
-
 		const double dx = x - center.x;
 		const double dy = y - center.y;
 
@@ -387,6 +443,166 @@ void Blob2D::erase(
 		else wgh = 0.0;
 		
 		const double blob_value = wgh * pred;
+
+		erased_out(x,y) -= blob_value;
+		blob_out(x,y)   += blob_value;
+	}
+}
+
+
+void Blob2D::eraseInSectors(
+	const RawImage<float>& micrographs,
+	RawImage<float>& erased_out,
+	RawImage<float>& blob_out,
+	const RawImage<float>& weight,
+	double radius, 
+    double taper,
+	int sectors) const
+{
+	std::pair<std::vector<double>,std::vector<double>> radAvgAndWgh = radialAverageAndWeightInSectors(
+	            micrographs, weight, sectors, radius + taper);
+	
+	std::vector<double> radAvg = radAvgAndWgh.first;
+	std::vector<double> radWgh = radAvgAndWgh.second;
+	
+	const int max_rad = radAvg.size() / sectors;
+	        
+	const double cappingRadius = 1.5 * smoothingRadius;
+	int first_r = (int) cappingRadius;
+	
+	for (int sec = 0; sec < sectors; sec++)
+	for (int r = 0; r < first_r; r++)
+	{
+		if (radWgh[sec * max_rad + r] > 0)
+		{
+			first_r = r;
+		}
+	}
+	
+	const double cappingRange = cappingRadius - first_r;
+
+	double tipAvg = 0.0;
+	double tipWgh = 0.0;
+	
+	for (int sec = 0; sec < sectors; sec++)
+	for (int r = first_r; r < cappingRadius; r++)
+	{
+		const int rr = r - first_r;
+		const double t = radWgh[sec * max_rad + r] * (cos(PI * rr / cappingRange) + 1.0) / 2;
+		
+		tipAvg += t * radAvg[sec * max_rad + r];
+		tipWgh += t;
+	}
+	
+	tipAvg /= tipWgh;
+	
+	for (int sec = 0; sec < sectors; sec++)
+	for (int r = first_r; r < cappingRadius; r++)
+	{
+		const int rr = r - first_r;
+		const double t = (cos(PI * rr / cappingRange) + 1.0) / 2;
+		
+		radAvg[sec * max_rad + r] = (1 - t) * radAvg[sec * max_rad + r] + t * tipAvg;
+	}
+
+	
+	const int w = micrographs.xdim;
+	const int h = micrographs.ydim;
+
+	double outside_val(0.0), outside_wgh(0.0);
+	
+	std::pair<gravis::d2Vector,gravis::d2Vector> boundingBox = scanForBoundingBox(
+	        radius + taper, 2, 2 * PI * (radius+taper));
+	
+	const d2Vector minPos = boundingBox.first;
+	const d2Vector maxPos = boundingBox.second;
+	
+	const int x0 = minPos.x < 0?       0 : std::ceil(minPos.x);
+	const int x1 = maxPos.x >= w-1?  w-1 : std::floor(maxPos.x);
+	const int y0 = minPos.y < 0?       0 : std::ceil(minPos.y);
+	const int y1 = maxPos.y >= h-1?  h-1 : std::floor(maxPos.y);
+
+	for (int y = y0; y <= y1; y++)
+	for (int x = x0; x <= x1; x++)
+	{
+		const double dx = x - center.x;
+		const double dy = y - center.y;
+		
+		const double ru = sqrt(dx*dx + dy*dy);
+		double r = smoothOrigin(ru + getOffset(d2Vector(dx, dy)));
+
+		if (r >= radius + taper || r < 0)
+		{
+			continue;
+		}
+
+		double wgh;
+
+		if (ru < radius) wgh = 1.0;
+		else if (ru < radius + taper) wgh = (cos(PI * (ru - radius) / taper) + 1) / 2;
+		else wgh = 0.0;
+
+		if (wgh > 0.0)
+		{
+			outside_val += (1 - wgh) * micrographs(x,y);
+			outside_wgh += (1 - wgh);
+		}
+	}
+
+	if (outside_wgh > 0.0) outside_val /= outside_wgh;
+	
+	for (int y = y0; y <= y1; y++)
+	for (int x = x0; x <= x1; x++)
+	{
+		const double dx = x - center.x;
+		const double dy = y - center.y;
+
+		const double phi = atan2(dx, dy);
+				
+		const double tau = sectors * (phi + PI) / (2*PI);
+		const int sector_0 = ((int)tau) % sectors;
+		const int sector_1 = (sector_0 + 1) % sectors;
+
+		const double ru = sqrt(dx*dx + dy*dy);
+		double r = smoothOrigin(ru + getOffset(d2Vector(phi)));
+
+		if (r >= radius + taper - 1 || r < 0)
+		{
+			continue;
+		}
+
+		const int r0 = (int)r;
+		const int r1 = r0 + 1;
+		
+		const double eps = 1e-6;
+		
+		if (radWgh[sector_0 * max_rad + r0] < eps || 
+		    radWgh[sector_0 * max_rad + r1] < eps || 
+		    radWgh[sector_1 * max_rad + r0] < eps || 
+		    radWgh[sector_1 * max_rad + r1] < eps)
+		{
+			continue;
+		}
+
+		const double dr = r - r0;
+		
+		const double pred_0 = 
+		        (1 - dr) * radAvg[sector_0 * max_rad + r0] 
+		            + dr * radAvg[sector_0 * max_rad + r1] - outside_val;
+		
+		const double pred_1 = 
+		        (1 - dr) * radAvg[sector_1 * max_rad + r0] 
+		            + dr * radAvg[sector_1 * max_rad + r1] - outside_val;
+		
+		const double t_phi = (cos(PI * (tau - sector_0)) + 1) / 2;
+
+		double wgh;
+
+		if (ru < radius) wgh = 1.0;
+		else if (ru < radius + taper) wgh = (cos(PI * (ru - radius) / taper) + 1) / 2;
+		else wgh = 0.0;
+		
+		const double blob_value = wgh * (t_phi * pred_0 + (1 - t_phi) * pred_1);
 
 		erased_out(x,y) -= blob_value;
 		blob_out(x,y)   += blob_value;

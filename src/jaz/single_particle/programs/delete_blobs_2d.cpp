@@ -427,6 +427,7 @@ void DeleteBlobs2DProgram::processMicrograph(
 
 		Blob2D final_blob(final_parameters_fullsize, radius/2);
 		final_blob.erase(micrograph, erased_image, blobs_image, dummy_weight, 1.5 * radius, radius);
+		//final_blob.eraseInSectors(micrograph, erased_image, blobs_image, dummy_weight, 1.5 * radius, radius, 12);
 		
 		all_blob_parameters.push_back(final_parameters_fullsize);
 		        

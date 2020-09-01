@@ -31,6 +31,12 @@ class Blob2D
 				const RawImage<float>& frame,
 				const RawImage<float>& weight,
 				double relevantRadius = -1.0) const;
+		
+		std::pair<std::vector<double>,std::vector<double>> radialAverageAndWeightInSectors(
+				const RawImage<float>& frame,
+				const RawImage<float>& weight,
+		        int sectors,
+				double relevantRadius = -1.0) const;
 
 		double radialAverageError(
 				const RawImage<float>& frame,
@@ -45,13 +51,21 @@ class Blob2D
 		BufferedImage<float> radialAverageProjection(
 				const RawImage<float>& frame,
 				const std::vector<double>& radAvg) const;
-
+		
 		void erase(
 		        const RawImage<float>& micrographs,
 				RawImage<float>& erased_out,
 				RawImage<float>& blob_out,
 				const RawImage<float>& weight,
 				double radius, double taper) const;
+		
+		void eraseInSectors(
+		        const RawImage<float>& micrographs,
+				RawImage<float>& erased_out,
+				RawImage<float>& blob_out,
+				const RawImage<float>& weight,
+				double radius, double taper,
+		        int sectors) const;
 		
 		
 		inline std::vector<double> toVector() const;
