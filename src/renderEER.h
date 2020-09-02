@@ -144,7 +144,7 @@ class EERRenderer {
 			REPORT_ERROR("Invalid gain size in EERRenderer::upsampleEERGain()");
 		}
 		
-		if (is_multiplicative)
+		if (!is_multiplicative)
 		{
 			double sum = 0;
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(gain)
