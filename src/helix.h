@@ -31,7 +31,7 @@
 #include "src/transformations.h"
 #include "src/euler.h"
 #include "src/assembly.h"
-#include "src/jaz/obs_model.h"
+#include <src/jaz/single_particle/obs_model.h>
 #include "src/time.h"
 #include <set>
 

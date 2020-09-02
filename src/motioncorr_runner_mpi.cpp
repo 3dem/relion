@@ -67,7 +67,7 @@ void MotioncorrRunnerMpi::run()
 		if (pipeline_control_check_abort_job())
 			MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
 
-		Micrograph mic(fn_micrographs[imic], fn_gain_reference, bin_factor);
+		Micrograph mic(fn_micrographs[imic], fn_gain_reference, bin_factor, eer_upsampling, eer_grouping);
 
 		// Get angpix and voltage from the optics groups:
 		obsModel.opticsMdt.getValue(EMDL_CTF_VOLTAGE, voltage, optics_group_micrographs[imic]-1);

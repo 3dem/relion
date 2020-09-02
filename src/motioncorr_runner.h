@@ -31,8 +31,8 @@
 #include "src/metadata_table.h"
 #include "src/image.h"
 #include "src/micrograph_model.h"
-#include "src/jaz/new_ft.h"
-#include "src/jaz/obs_model.h"
+#include <src/jaz/single_particle/new_ft.h>
+#include <src/jaz/single_particle/obs_model.h>
 
 class MotioncorrRunner
 {
@@ -136,6 +136,9 @@ public:
 	// Process at most this number of (unprocessed) micrographs
 	long do_at_most;
 
+	// EER parameters
+	int eer_upsampling, eer_grouping;
+
 	// Output STAR file
 	MetaDataTable MDavg, MDmov;
 
@@ -144,7 +147,6 @@ public:
 	std::string gpu_ids;
 	std::vector < std::vector < std::string > > allThreadIDs;
 
-public:
 	// Read command line arguments
 	void read(int argc, char **argv, int rank = 0);
 

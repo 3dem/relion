@@ -1,6 +1,6 @@
 #include <src/metadata_table.h>
-#include <src/jaz/io/star_converter.h>
-#include <src/jaz/obs_model.h>
+#include <src/jaz/single_particle/io/star_converter.h>
+#include <src/jaz/single_particle/obs_model.h>
 
 int main(int argc, char *argv[])
 {

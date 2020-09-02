@@ -107,7 +107,7 @@ namespace gravis
         JPGImageWriter () {};
         ~JPGImageWriter () {};
 
-        void write (const tImage<T>& image, const std::string& filename, int quality);
+        void write (const tImage<T>& image, const std::string& filename, int quality=100);
     };
 
 

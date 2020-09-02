@@ -36,29 +36,73 @@ foreach(GUI_SRC_FILE ${REL_GUI_SRC})
 	list(REMOVE_ITEM REL_SRC "${GUI_SRC_FILE}")
 endforeach()
 
-file(GLOB REL_JAZ_SRC "${CMAKE_SOURCE_DIR}/src/jaz/*.cpp")
-file(GLOB REL_JAZ_H "${CMAKE_SOURCE_DIR}/src/jaz/*.h")
-file(GLOB REL_JAZ_OPT_SRC "${CMAKE_SOURCE_DIR}/src/jaz/optimization/*.cpp")
-file(GLOB REL_JAZ_OPT_H "${CMAKE_SOURCE_DIR}/src/jaz/optimization/*.h")
-file(GLOB REL_JAZ_CTF_SRC "${CMAKE_SOURCE_DIR}/src/jaz/ctf/*.cpp")
-file(GLOB REL_JAZ_CTF_H "${CMAKE_SOURCE_DIR}/src/jaz/ctf/*.h")
-file(GLOB REL_JAZ_MOTION_SRC "${CMAKE_SOURCE_DIR}/src/jaz/motion/*.cpp")
-file(GLOB REL_JAZ_MOTION_H "${CMAKE_SOURCE_DIR}/src/jaz/motion/*.h")
+
 file(GLOB REL_JAZ_MATH_SRC "${CMAKE_SOURCE_DIR}/src/jaz/math/*.cpp")
 file(GLOB REL_JAZ_MATH_H "${CMAKE_SOURCE_DIR}/src/jaz/math/*.h")
-file(GLOB REL_JAZ_IMG_PROC_SRC "${CMAKE_SOURCE_DIR}/src/jaz/img_proc/*.cpp")
-file(GLOB REL_JAZ_IMG_PROC_H "${CMAKE_SOURCE_DIR}/src/jaz/img_proc/*.h")
-file(GLOB REL_JAZ_TOMO_SRC "${CMAKE_SOURCE_DIR}/src/jaz/tomo/*.cpp")
-file(GLOB REL_JAZ_TOMO_H "${CMAKE_SOURCE_DIR}/src/jaz/tomo/*.h")
-file(GLOB REL_JAZ_IO_SRC "${CMAKE_SOURCE_DIR}/src/jaz/io/*.cpp")
-file(GLOB REL_JAZ_IO_H "${CMAKE_SOURCE_DIR}/src/jaz/io/*.h")
+file(GLOB REL_JAZ_IMG_PROC_SRC "${CMAKE_SOURCE_DIR}/src/jaz/image/*.cpp")
+file(GLOB REL_JAZ_IMG_PROC_H "${CMAKE_SOURCE_DIR}/src/jaz/image/*.h")
+file(GLOB REL_JAZ_MESH_PROC_SRC "${CMAKE_SOURCE_DIR}/src/jaz/mesh/*.cpp")
+file(GLOB REL_JAZ_MESH_PROC_H "${CMAKE_SOURCE_DIR}/src/jaz/mesh/*.h")
+file(GLOB REL_JAZ_UTIL_SRC "${CMAKE_SOURCE_DIR}/src/jaz/util/*.cpp")
+file(GLOB REL_JAZ_UTIL_H "${CMAKE_SOURCE_DIR}/src/jaz/util/*.h")
+file(GLOB REL_JAZ_TOMO_SRC "${CMAKE_SOURCE_DIR}/src/jaz/tomography/*.cpp")
+file(GLOB REL_JAZ_TOMO_H "${CMAKE_SOURCE_DIR}/src/jaz/tomography/*.h")
+file(GLOB REL_JAZ_TOMO_PROJ_SRC "${CMAKE_SOURCE_DIR}/src/jaz/tomography/projection/*.cpp")
+file(GLOB REL_JAZ_TOMO_PROJ_H "${CMAKE_SOURCE_DIR}/src/jaz/tomography/projection/*.h")
+file(GLOB REL_JAZ_TOMO_LATTICE_SRC "${CMAKE_SOURCE_DIR}/src/jaz/tomography/lattice/*.cpp")
+file(GLOB REL_JAZ_TOMO_LATTICE_H "${CMAKE_SOURCE_DIR}/src/jaz/tomography/lattice/*.h")
+file(GLOB REL_JAZ_TOMO_MEMBRANE_SRC "${CMAKE_SOURCE_DIR}/src/jaz/tomography/membrane/*.cpp")
+file(GLOB REL_JAZ_TOMO_MEMBRANE_H "${CMAKE_SOURCE_DIR}/src/jaz/tomography/membrane/*.h")
+file(GLOB REL_JAZ_TOMO_FILAMENT_SRC "${CMAKE_SOURCE_DIR}/src/jaz/tomography/filament/*.cpp")
+file(GLOB REL_JAZ_TOMO_FILAMENT_H "${CMAKE_SOURCE_DIR}/src/jaz/tomography/filament/*.h")
+file(GLOB REL_JAZ_TOMO_MOTION_SRC "${CMAKE_SOURCE_DIR}/src/jaz/tomography/motion/*.cpp")
+file(GLOB REL_JAZ_TOMO_MOTION_H "${CMAKE_SOURCE_DIR}/src/jaz/tomography/motion/*.h")
+file(GLOB REL_JAZ_OPTIM_SRC "${CMAKE_SOURCE_DIR}/src/jaz/optimization/*.cpp")
+file(GLOB REL_JAZ_OPTIM_H "${CMAKE_SOURCE_DIR}/src/jaz/optimization/*.h")
+file(GLOB REL_JAZ_OPTICS_SRC "${CMAKE_SOURCE_DIR}/src/jaz/optics/*.cpp")
+file(GLOB REL_JAZ_OPTICS_H "${CMAKE_SOURCE_DIR}/src/jaz/optics/*.h")
+file(GLOB REL_JAZ_OPTICS_DUAL_CONTRAST_SRC "${CMAKE_SOURCE_DIR}/src/jaz/optics/dual_contrast/*.cpp")
+file(GLOB REL_JAZ_OPTICS_DUAL_CONTRAST_H "${CMAKE_SOURCE_DIR}/src/jaz/optics/dual_contrast/*.h")
+file(GLOB REL_JAZ_SEGMENTATION_SRC "${CMAKE_SOURCE_DIR}/src/jaz/segmentation/*.cpp")
+file(GLOB REL_JAZ_SEGMENTATION_H "${CMAKE_SOURCE_DIR}/src/jaz/segmentation/*.h")
+file(GLOB REL_JAZ_ATOMIC_SRC "${CMAKE_SOURCE_DIR}/src/jaz/atomic/*.cpp")
+file(GLOB REL_JAZ_ATOMIC_H "${CMAKE_SOURCE_DIR}/src/jaz/atomic/*.h")
+file(GLOB REL_JAZ_PROGRAMS_SRC "${CMAKE_SOURCE_DIR}/src/jaz/tomography/programs/*.cpp")
+file(GLOB REL_JAZ_PROGRAMS_H "${CMAKE_SOURCE_DIR}/src/jaz/tomography/programs/*.h")
+file(GLOB REL_JAZ_DYNAMO_SRC "${CMAKE_SOURCE_DIR}/src/jaz/tomography/dynamo/*.cpp")
+file(GLOB REL_JAZ_DYNAMO_H "${CMAKE_SOURCE_DIR}/src/jaz/tomography/dynamo/*.h")
+
+file(GLOB REL_JAZ_SPA_SRC "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/*.cpp")
+file(GLOB REL_JAZ_SPA_H "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/*.h")
+file(GLOB REL_JAZ_SPA_OPT_SRC "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/optimization/*.cpp")
+file(GLOB REL_JAZ_SPA_OPT_H "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/optimization/*.h")
+file(GLOB REL_JAZ_SPA_CTF_SRC "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/ctf/*.cpp")
+file(GLOB REL_JAZ_SPA_CTF_H "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/ctf/*.h")
+file(GLOB REL_JAZ_SPA_MOTION_SRC "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/motion/*.cpp")
+file(GLOB REL_JAZ_SPA_MOTION_H "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/motion/*.h")
+file(GLOB REL_JAZ_SPA_MATH_SRC "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/math/*.cpp")
+file(GLOB REL_JAZ_SPA_MATH_H "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/math/*.h")
+file(GLOB REL_JAZ_SPA_IMG_PROC_SRC "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/img_proc/*.cpp")
+file(GLOB REL_JAZ_SPA_IMG_PROC_H "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/img_proc/*.h")
+file(GLOB REL_JAZ_SPA_TOMO_SRC "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/tomo/*.cpp")
+file(GLOB REL_JAZ_SPA_TOMO_H "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/tomo/*.h")
+file(GLOB REL_JAZ_SPA_IO_SRC "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/io/*.cpp")
+file(GLOB REL_JAZ_SPA_IO_H "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/io/*.h")
+file(GLOB REL_JAZ_SPA_PROGRAMS_SRC "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/programs/*.cpp")
+file(GLOB REL_JAZ_SPA_PROGRAMS_H "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/programs/*.h")
+
+file(GLOB REL_SPHERICAL_HARMONICS_SRC "${CMAKE_SOURCE_DIR}/src/spherical-harmonics/*.cc")
+file(GLOB REL_SPHERICAL_HARMONICS_H "${CMAKE_SOURCE_DIR}/src/spherical-harmonics/*.h")
 file(GLOB REL_D3x3_SRC "${CMAKE_SOURCE_DIR}/src/jaz/d3x3/*.c")
 file(GLOB REL_D3x3_H "${CMAKE_SOURCE_DIR}/src/jaz/d3x3/*.h")
-file(GLOB REL_LBFGS_SRC "${CMAKE_SOURCE_DIR}/src/jaz/lbfgs/*.c")
-file(GLOB REL_LBFGS_H "${CMAKE_SOURCE_DIR}/src/jaz/lbfgs/*.h")
+file(GLOB REL_LBFGS_SRC "${CMAKE_SOURCE_DIR}/src/lbfgs/*.c")
+file(GLOB REL_LBFGS_H "${CMAKE_SOURCE_DIR}/src/lbfgs/*.h")
 
 file(GLOB REL_HP "${CMAKE_SOURCE_DIR}/src/Healpix_2.15a/*.cc")
 file(GLOB RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/*.cpp")
+file(GLOB RELION_JAZ_SPA_TARGETS "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/apps/*.cpp")
+file(GLOB RELION_JAZ_TOMO_TARGETS "${CMAKE_SOURCE_DIR}/src/jaz/tomography/apps/*.cpp")
+file(GLOB RELION_JAZ_EXPERIMENTAL_TARGETS "${CMAKE_SOURCE_DIR}/src/jaz/scripts/*.cpp")
 
 set(GUI_TARGETS display maingui manualpick pipeliner)
 
@@ -70,8 +114,8 @@ if(NOT GUI)
 endif(NOT GUI)
 
 #--Remove apps for testing--
-#SET(RELION_TEST TRUE)
-set(TEST_TARGETS double_reconstruct_openmp cs_fit ctf_nyquist_test free_aberration_plot split_stack defocus_stats double_bfac_fit interpolation_test motion_diff paper_data_synth Zernike_test vis_delocalisation vis_Ewald_weight)
+SET(RELION_TEST TRUE)
+set(TEST_TARGETS movie_reconstruct double_reconstruct_openmp cs_fit ctf_nyquist_test free_aberration_plot split_stack defocus_stats double_bfac_fit interpolation_test motion_diff paper_data_synth Zernike_test vis_delocalisation vis_Ewald_weight)
 if(NOT RELION_TEST)
 	foreach(TARGET ${TEST_TARGETS})
 		list(REMOVE_ITEM RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/${TARGET}.cpp")
@@ -83,17 +127,36 @@ endif(NOT RELION_TEST)
 # relion_gui_lib is where the X11 code is placed
 if(BUILD_SHARED_LIBS)
 	add_library(relion_lib SHARED
-	            ${REL_SRC} ${REL_SRC_H} ${REL_HP}
-	            ${REL_JAZ_SRC} ${REL_JAZ_H}
-	            ${REL_JAZ_OPT_SRC} ${REL_JAZ_OPT_H}
-	            ${REL_JAZ_CTF_SRC} ${REL_JAZ_CTF_H}
-	            ${REL_JAZ_MOTION_SRC} ${REL_JAZ_MOTION_H}
-	            ${REL_JAZ_MATH_SRC} ${REL_JAZ_MATH_H}
-	            ${REL_JAZ_IMG_PROC_SRC} ${REL_JAZ_IMG_PROC_H}
-	            ${REL_JAZ_TOMO_SRC} ${REL_JAZ_TOMO_H}
-	            ${REL_JAZ_IO_SRC} ${REL_JAZ_IO_H}
-	            ${REL_D3x3_SRC} ${REL_D3x3_H}
-	            ${REL_LBFGS_SRC} ${REL_LBFGS_H})
+	    ${REL_SRC} ${REL_SRC_H} ${REL_HP}
+	    ${REL_JAZ_MATH_SRC} ${REL_JAZ_MATH_H}
+	    ${REL_JAZ_IMG_PROC_SRC} ${REL_JAZ_IMG_PROC_H}
+	    ${REL_JAZ_MESH_PROC_SRC} ${REL_JAZ_MESH_PROC_H}
+	    ${REL_JAZ_UTIL_SRC} ${REL_JAZ_UTIL_H}
+	    ${REL_JAZ_TOMO_SRC} ${REL_JAZ_TOMO_H}
+	    ${REL_JAZ_TOMO_PROJ_SRC} ${REL_JAZ_TOMO_PROJ_H}
+	    ${REL_JAZ_TOMO_MEMBRANE_SRC} ${REL_JAZ_TOMO_MEMBRANE_H}
+	    ${REL_JAZ_TOMO_FILAMENT_SRC} ${REL_JAZ_TOMO_FILAMENT_H}
+	    ${REL_JAZ_TOMO_MOTION_SRC} ${REL_JAZ_TOMO_MOTION_H}
+	    ${REL_JAZ_TOMO_LATTICE_SRC} ${REL_JAZ_TOMO_LATTICE_H}
+	    ${REL_JAZ_OPTIM_SRC} ${REL_JAZ_OPTIM_H}
+	    ${REL_JAZ_OPTICS_SRC} ${REL_JAZ_OPTICS_H}
+	    ${REL_JAZ_OPTICS_DUAL_CONTRAST_SRC} ${REL_JAZ_OPTICS_DUAL_CONTRAST_H}
+	    ${REL_JAZ_SEGMENTATION_SRC} ${REL_JAZ_SEGMENTATION_H}
+		${REL_JAZ_ATOMIC_SRC} ${REL_JAZ_ATOMIC_H} 		
+	    ${REL_JAZ_PROGRAMS_SRC} ${REL_JAZ_PROGRAMS_H}
+	    ${REL_JAZ_DYNAMO_SRC} ${REL_JAZ_DYNAMO_H}
+	    ${REL_JAZ_SPA_SRC} ${REL_JAZ_SPA_H}
+	    ${REL_JAZ_SPA_OPT_SRC} ${REL_JAZ_SPA_OPT_H}
+	    ${REL_JAZ_SPA_CTF_SRC} ${REL_JAZ_SPA_CTF_H}
+	    ${REL_JAZ_SPA_MOTION_SRC} ${REL_JAZ_SPA_MOTION_H}
+	    ${REL_JAZ_SPA_MATH_SRC} ${REL_JAZ_SPA_MATH_H}
+	    ${REL_JAZ_SPA_IMG_PROC_SRC} ${REL_JAZ_SPA_IMG_PROC_H}
+	    ${REL_JAZ_SPA_TOMO_SRC} ${REL_JAZ_SPA_TOMO_H}
+	    ${REL_JAZ_SPA_IO_SRC} ${REL_JAZ_SPA_IO_H}
+	    ${REL_JAZ_SPA_PROGRAMS_SRC} ${REL_JAZ_SPA_PROGRAMS_H}
+	    ${REL_D3x3_SRC} ${REL_D3x3_H}
+	    ${REL_LBFGS_SRC} ${REL_LBFGS_H}
+	    ${REL_SPHERICAL_HARMONICS_SRC} ${REL_SPHERICAL_HARMONICS_H})
 
 	install(TARGETS relion_lib LIBRARY DESTINATION lib)
 	if(GUI)
@@ -103,16 +166,35 @@ if(BUILD_SHARED_LIBS)
 else()
 	add_library(relion_lib STATIC
 		${REL_SRC} ${REL_SRC_H} ${REL_HP}
-		${REL_JAZ_SRC} ${REL_JAZ_H}
-		${REL_JAZ_OPT_SRC} ${REL_JAZ_OPT_H}
-		${REL_JAZ_CTF_SRC} ${REL_JAZ_CTF_H}
-		${REL_JAZ_MOTION_SRC} ${REL_JAZ_MOTION_H}
 		${REL_JAZ_MATH_SRC} ${REL_JAZ_MATH_H}
 		${REL_JAZ_IMG_PROC_SRC} ${REL_JAZ_IMG_PROC_H}
+		${REL_JAZ_MESH_PROC_SRC} ${REL_JAZ_MESH_PROC_H}
+		${REL_JAZ_UTIL_SRC} ${REL_JAZ_UTIL_H}
 		${REL_JAZ_TOMO_SRC} ${REL_JAZ_TOMO_H}
-		${REL_JAZ_IO_SRC} ${REL_JAZ_IO_H}
+		${REL_JAZ_TOMO_PROJ_SRC} ${REL_JAZ_TOMO_PROJ_H}    
+		${REL_JAZ_TOMO_MEMBRANE_SRC} ${REL_JAZ_TOMO_MEMBRANE_H}
+		${REL_JAZ_TOMO_FILAMENT_SRC} ${REL_JAZ_TOMO_FILAMENT_H}
+		${REL_JAZ_TOMO_MOTION_SRC} ${REL_JAZ_TOMO_MOTION_H}
+		${REL_JAZ_TOMO_LATTICE_SRC} ${REL_JAZ_TOMO_LATTICE_H}    
+		${REL_JAZ_OPTIM_SRC} ${REL_JAZ_OPTIM_H}
+		${REL_JAZ_OPTICS_SRC} ${REL_JAZ_OPTICS_H}
+		${REL_JAZ_OPTICS_DUAL_CONTRAST_SRC} ${REL_JAZ_OPTICS_DUAL_CONTRAST_H}
+		${REL_JAZ_SEGMENTATION_SRC} ${REL_JAZ_SEGMENTATION_H} 
+		${REL_JAZ_ATOMIC_SRC} ${REL_JAZ_ATOMIC_H} 
+		${REL_JAZ_PROGRAMS_SRC} ${REL_JAZ_PROGRAMS_H} 
+		${REL_JAZ_DYNAMO_SRC} ${REL_JAZ_DYNAMO_H} 
+		${REL_JAZ_SPA_SRC} ${REL_JAZ_SPA_H}
+		${REL_JAZ_SPA_OPT_SRC} ${REL_JAZ_SPA_OPT_H}
+		${REL_JAZ_SPA_CTF_SRC} ${REL_JAZ_SPA_CTF_H}
+		${REL_JAZ_SPA_MOTION_SRC} ${REL_JAZ_SPA_MOTION_H}
+		${REL_JAZ_SPA_MATH_SRC} ${REL_JAZ_SPA_MATH_H}
+		${REL_JAZ_SPA_IMG_PROC_SRC} ${REL_JAZ_SPA_IMG_PROC_H}
+		${REL_JAZ_SPA_TOMO_SRC} ${REL_JAZ_SPA_TOMO_H}
+		${REL_JAZ_SPA_IO_SRC} ${REL_JAZ_SPA_IO_H}
+		${REL_JAZ_SPA_PROGRAMS_SRC} ${REL_JAZ_SPA_PROGRAMS_H}
 		${REL_D3x3_SRC} ${REL_D3x3_H}
-		${REL_LBFGS_SRC} ${REL_LBFGS_H})
+		${REL_LBFGS_SRC} ${REL_LBFGS_H} 
+		${REL_SPHERICAL_HARMONICS_SRC} ${REL_SPHERICAL_HARMONICS_H})
 
 	if(GUI)
 		add_library(relion_gui_lib STATIC ${REL_GUI_SRC} ${REL_SRC_H} ${REL_HP})
@@ -180,12 +262,26 @@ else()
 	#message("TIFF NOT FOUND")
 endif()
 
+find_package(ZLIB)
+
+find_package(PNG)
 if(PNG_FOUND)
-	#message("PNG FOUND")
+	add_definitions(-DHAVE_PNG)
+	message("PNG FOUND")
 	include_directories(${PNG_INCLUDE_DIRS})
 	target_link_libraries(relion_lib ${PNG_LIBRARY})
 else()
-	#message("PNG NOT FOUND")
+	message("PNG NOT FOUND")
+endif()
+
+find_package(JPEG)
+if(JPEG_FOUND)
+	add_definitions(-DHAVE_JPEG)
+	message("JPEG FOUND")
+	include_directories(${JPEG_INCLUDE_DIRS})
+	target_link_libraries(relion_lib ${JPEG_LIBRARY})
+else()
+	message("JPEG NOT FOUND")
 endif()
 
 if(BUILD_OWN_TBB)
@@ -236,6 +332,67 @@ foreach (_target ${RELION_TARGETS})
 	
 	install (TARGETS ${_target} RUNTIME DESTINATION bin)
 endforeach()
+
+
+
+foreach (_target ${RELION_JAZ_SPA_TARGETS})
+
+	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)	
+	add_executable(${_target} ${CMAKE_SOURCE_DIR}/src/jaz/single_particle/apps/${_target}.cpp)
+	set(LIB relion_lib)	
+ 	add_dependencies(${_target} relion_lib)	
+	set_target_properties(${_target} PROPERTIES PREFIX "relion_")
+	target_link_libraries(${_target} ${LIB} ${FFTW_LIBRARIES} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
+	set_target_properties(${_target} PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF	)
+	
+	if(TIFF_FOUND)
+		target_link_libraries(${_target} ${TIFF_LIBRARIES})
+	endif()
+	
+	install (TARGETS ${_target} RUNTIME DESTINATION bin/spa)
+	
+endforeach()
+
+# former Dynamite programs:
+
+foreach (_target ${RELION_JAZ_TOMO_TARGETS})
+
+	GET_FILENAME_COMPONENT(_target "relion_tomo_${_target}" NAME_WE)	
+	add_executable(${_target} ${CMAKE_SOURCE_DIR}/src/jaz/tomography/apps/${_target}.cpp)
+	set(LIB relion_lib)	
+ 	add_dependencies(${_target} relion_lib)	
+	set_target_properties(${_target} PROPERTIES PREFIX "relion_tomo_")
+	target_link_libraries(${_target} ${LIB} ${FFTW_LIBRARIES} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
+	set_target_properties(${_target} PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF	)
+	
+	if(TIFF_FOUND)
+		target_link_libraries(${_target} ${TIFF_LIBRARIES})
+	endif()
+	
+	install (TARGETS ${_target} RUNTIME DESTINATION bin/tomo)
+	
+endforeach()
+
+foreach (_target ${RELION_JAZ_EXPERIMENTAL_TARGETS})
+
+	GET_FILENAME_COMPONENT(_target "relion_exp_${_target}" NAME_WE)	
+	add_executable(${_target} ${CMAKE_SOURCE_DIR}/src/jaz/scripts/${_target}.cpp)		
+	set(LIB relion_lib)	
+ 	add_dependencies(${_target} relion_lib)	
+	set_target_properties(${_target} PROPERTIES PREFIX "relion_exp_")
+	target_link_libraries(${_target} ${LIB} ${FFTW_LIBRARIES} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
+	set_target_properties(${_target} PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF	)
+	
+	if(TIFF_FOUND)
+		target_link_libraries(${_target} ${TIFF_LIBRARIES})
+	endif()
+	
+	install (TARGETS ${_target} RUNTIME DESTINATION bin/scripts)
+	
+endforeach()
+
+
+
 
 if(GUI)
 	ADD_CUSTOM_COMMAND(TARGET maingui

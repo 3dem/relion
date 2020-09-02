@@ -1,3 +1,4 @@
+
 RELION 3.1.0
 =============
 
@@ -10,6 +11,55 @@ The underlying theory of MAP refinement is given in a [scientific publication](h
 If RELION is useful in your work, please cite this paper.
 
 The more comprehensive documentation of RELION is stored on the [Wiki](http://www2.mrc-lmb.cam.ac.uk/relion)
+
+## Notes specific to this EER branch: PLEASE READ
+
+This is a special branch for processing movies in the EER format.
+Once the development is complete, this will be merged into the main branch.
+
+**EER format is in development. The following information is subject to change.**
+
+To process EER dataset, proceed as follows.
+
+1. Decide how many (internal) frames to group into a fraction.
+
+   For example, if you have 1000 internal frames and group them by 30,
+   you will get 33 fractions. The remaining 10 (= 1000 - 30 * 33) frames will be ignored.
+2. Calculate how many e/A2 each fraction has.
+3. Import EER files as usual.
+
+   The pixel size should be **half of the physical size**, because RELION renders
+   electrons in a 8K x 8K super resolution grid by default.
+4. Run motion correction.
+   - Specify the dose rate calculated in step 2.
+   - Specify the gain reference.
+   - **Grouping in the GUI must be 1** regardless of what you choose in step 1.
+   - **Binning should be 2** to bring a 8K super resolution grid into a 4K physical grid by Fourier cropping.
+   - Add `--eer_grouping 30` as additional arguments to specify the value decided in step 1.
+
+If you specify `--eer_upsampling 1`, RELION renders electrons in a 4K x 4K grid from the beginning,
+thus saving memory and increasing the processing speed. In this case, you should specify the physical
+pixel size in step 3 and the binning should be 1 in step 4. This might reduce the data quality due with
+noise beyond physical Nyquist aliasing back, but in our tests, the difference was tiny (only one
+or two shells) if any.
+
+The gain reference for EER is different from multiplicative gain references for K2/K3. When the
+movie is in EER format, RELION will *divide* raw pixel values with the provided gain. When the gain
+is zero, the pixel is considered as defective. With `--eer_upsamling 2` (default), the gain reference
+can be 8K x 8K or 4K x 4K. In the latter case, the gain is upsampled. With `--eer_upsamling 1`, the
+gain reference must be 4K x 4K.
+
+If memory usage is a concern, consider building RELION in CPU single precision (`cmake -DDoublePrec_CPU=OFF`).
+
+In future, we will make it possible to change `eer_upsampling` and `eer_grouping` during Polish.
+This way, you can start processing at 4K and coarse slicing and then switch to 8K and finer slicing
+in Polish to save processing time. Currently you have to manually modify trajectory STAR files to
+do this (not officially supported).
+
+Another useful tool is `relion_eer_to_tiff`, which renders an EER movie into a compressed integer TIFF.
+Due to the different meanings of the gain reference for EER and TIFF, you have to take the inverse
+of the EER gain reference yourself before processing the resulting TIFF files. This functionality
+might be merged into `relion_convert_to_tiff` in future.
 
 ## Installation
 
@@ -53,7 +103,7 @@ starts the right GUI, but the GUI might invoke other versions of RELION in the P
 If FLTK related errors are reported, please add `-DFORCE_OWN_FLTK=ON` to
 `cmake`. For FFTW related errors, try `-DFORCE_OWN_FFTW=ON`.
 
-RELION requires libtiff to read TIFF movies. Most Linux distributions have packages like
+RELION requires libtiff to read movies in TIFF and EER. Most Linux distributions have packages like
 `libtiff-dev` or `libtiff-devel`. Note that you need a developer package. You need version 4.0.x
 to read BigTIFF files. If you installed libtiff in a non-standard location, specify the location by
 `-DTIFF_INCLUDE_DIR=/path/to/include -DTIFF_LIBRARY=/path/to/libtiff.so.5`.

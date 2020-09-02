@@ -85,7 +85,7 @@ int Zernike::numberOfOddCoeffs(int n_max)
 
 double Zernike::factorial(int k)
 {
-	// @TODO: replace by tgamma(k+1) once C++11 becomes available
+	// @TODO_C++11: replace by tgamma(k+1) once C++11 becomes available
 	
 	double out = 1.0;
 	

@@ -117,8 +117,10 @@ namespace gravis
       t4Matrix& rmul(const t4Matrix& m);
 
       T trace() const;
-      T det() const;
+	  T det() const;
+	  T FrobeniusNorm() const;
 
+	  t4Matrix adjugate() const;
       t4Matrix& transpose();
       t4Matrix& invert();
       t4Matrix& loadIdentity();
@@ -387,7 +389,7 @@ namespace gravis
   {
     return ( m[0] + m[5] + m[10] + m[15] );
   }
-
+  
   /*! \brief Return the determinant of this matrix. */
   template <class T> inline
   T t4Matrix<T>::det() const
@@ -396,6 +398,48 @@ namespace gravis
                   m[ 1], m[ 5], m[ 9], m[13],
                   m[ 2], m[ 6], m[10], m[14],
                   m[ 3], m[ 7], m[11], m[15]);
+  }
+  
+  template <class T> inline
+  T t4Matrix<T>::FrobeniusNorm() const
+  {
+    double sum(0.0);
+	
+    for (int i = 0; i < 16; i++)
+    {
+      sum += m[i] * m[i];
+    }
+	
+    return sum;
+  }
+  
+  template <class T> inline
+  t4Matrix<T> t4Matrix<T>::adjugate() const
+  {
+    const t4Matrix<T>& A = *this;
+	t4Matrix<T> B;
+
+    B(0,0) =  det3x3(A(1,1), A(2,1), A(3,1), A(1,2), A(2,2), A(3,2), A(1,3), A(2,3), A(3,3));
+    B(1,0) = -det3x3(A(1,0), A(2,0), A(3,0), A(1,2), A(2,2), A(3,2), A(1,3), A(2,3), A(3,3));
+    B(2,0) =  det3x3(A(1,0), A(2,0), A(3,0), A(1,1), A(2,1), A(3,1), A(1,3), A(2,3), A(3,3));
+    B(3,0) = -det3x3(A(1,0), A(2,0), A(3,0), A(1,1), A(2,1), A(3,1), A(1,2), A(2,2), A(3,2));
+
+    B(0,1) = -det3x3(A(0,1), A(2,1), A(3,1), A(0,2), A(2,2), A(3,2), A(0,3), A(2,3), A(3,3));
+    B(1,1) =  det3x3(A(0,0), A(2,0), A(3,0), A(0,2), A(2,2), A(3,2), A(0,3), A(2,3), A(3,3));
+    B(2,1) = -det3x3(A(0,0), A(2,0), A(3,0), A(0,1), A(2,1), A(3,1), A(0,3), A(2,3), A(3,3));
+    B(3,1) =  det3x3(A(0,0), A(2,0), A(3,0), A(0,1), A(2,1), A(3,1), A(0,2), A(2,2), A(3,2));
+
+    B(0,2) =  det3x3(A(0,1), A(1,1), A(3,1), A(0,2), A(1,2), A(3,2), A(0,3), A(1,3), A(3,3));
+    B(1,2) = -det3x3(A(0,0), A(1,0), A(3,0), A(0,2), A(1,2), A(3,2), A(0,3), A(1,3), A(3,3));
+    B(2,2) =  det3x3(A(0,0), A(1,0), A(3,0), A(0,1), A(1,1), A(3,1), A(0,3), A(1,3), A(3,3));
+    B(3,2) = -det3x3(A(0,0), A(1,0), A(3,0), A(0,1), A(1,1), A(3,1), A(0,2), A(1,2), A(3,2));
+
+    B(0,3) = -det3x3(A(0,1), A(1,1), A(2,1), A(0,2), A(1,2), A(2,2), A(0,3), A(1,3), A(2,3));
+    B(1,3) =  det3x3(A(0,0), A(1,0), A(2,0), A(0,2), A(1,2), A(2,2), A(0,3), A(1,3), A(2,3));
+    B(2,3) = -det3x3(A(0,0), A(1,0), A(2,0), A(0,1), A(1,1), A(2,1), A(0,3), A(1,3), A(2,3));
+    B(3,3) =  det3x3(A(0,0), A(1,0), A(2,0), A(0,1), A(1,1), A(2,1), A(0,2), A(1,2), A(2,2));
+
+    return B;
   }
 
   /*! \brief Transpose this matrix.
@@ -414,7 +458,7 @@ namespace gravis
   }
 
   /*! \brief Invert this matrix.
-   * Attention: Although innocent looking this is an inplace operation
+   * Attention: Although innocent looking, this is an inplace operation
    **/
   template <class T> inline
   t4Matrix<T>& t4Matrix<T>::invert()

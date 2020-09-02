@@ -34,38 +34,40 @@ class MetaDataTable;
 class MetaDataContainer
 {
     public:
+		
+		MetaDataContainer();
+		MetaDataContainer(MetaDataTable* table, long doubleCount, long intCount,
+						  long boolCount, long stringCount, long doubleVectorCount, long unknownCount);
+		MetaDataContainer(MetaDataTable* table, MetaDataContainer* mdc);
 
-        MetaDataTable* table;
+		
+			MetaDataTable* table;
+	
+			std::vector<double> doubles;
+			std::vector<long> ints;
+			std::vector<bool> bools;
+			std::vector<std::string> strings;
+			std::vector<std::vector<double> > doubleVectors;
+			std::vector<std::string> unknowns;
 
-        std::vector<double> doubles;
-        std::vector<long> ints;
-        std::vector<bool> bools;
-	std::vector<std::string> strings;
-	std::vector<std::vector<double> > doubleVectors;
-	std::vector<std::string> unknowns;
-
-        MetaDataContainer();
-        MetaDataContainer(MetaDataTable* table, long doubleCount, long intCount,
-                          long boolCount, long stringCount, long doubleVectorCount, long unknownCount);
-        MetaDataContainer(MetaDataTable* table, MetaDataContainer* mdc);
-
-        void getValue(long offset, double& dest) const;
-        void getValue(long offset, float& dest) const;
-        void getValue(long offset, int& dest) const;
-        void getValue(long offset, long& dest) const;
-        void getValue(long offset, bool& dest) const;
-	void getValue(long offset, std::string& dest) const;
-	void getValue(long offset, std::vector<double>& dest) const;
-	void getValue(long offset, std::vector<float>& dest) const;
-
-        void setValue(long offset, const double& src);
-        void setValue(long offset, const float& src);
-        void setValue(long offset, const int& src);
-        void setValue(long offset, const long& src);
-        void setValue(long offset, const bool& src);
-	void setValue(long offset, const std::string& src);
-	void setValue(long offset, const std::vector<double>& src);
-	void setValue(long offset, const std::vector<float>& src);
+			
+		void getValue(long offset, double& dest) const;
+		void getValue(long offset, float& dest) const;
+		void getValue(long offset, int& dest) const;
+		void getValue(long offset, long& dest) const;
+		void getValue(long offset, bool& dest) const;
+		void getValue(long offset, std::string& dest) const;
+		void getValue(long offset, std::vector<double>& dest) const;
+		void getValue(long offset, std::vector<float>& dest) const;
+		
+		void setValue(long offset, const double& src);
+		void setValue(long offset, const float& src);
+		void setValue(long offset, const int& src);
+		void setValue(long offset, const long& src);
+		void setValue(long offset, const bool& src);
+		void setValue(long offset, const std::string& src);
+		void setValue(long offset, const std::vector<double>& src);
+		void setValue(long offset, const std::vector<float>& src);
 };
 
 #endif

@@ -202,6 +202,8 @@ enum EMDLabel
 	EMDL_MICROGRAPH_SHIFT_Y,
 	EMDL_MICROGRAPH_MOTION_COEFFS_IDX,
 	EMDL_MICROGRAPH_MOTION_COEFF,
+	EMDL_MICROGRAPH_EER_UPSAMPLING,
+	EMDL_MICROGRAPH_EER_GROUPING,
 
 	EMDL_MASK_NAME,
 
@@ -517,8 +519,20 @@ enum EMDLabel
 	EMDL_SPECTRAL_IDX,
 
 	EMDL_TOMO_NAME,
+	EMDL_TOMO_TILT_SERIES_NAME,
+	EMDL_TOMO_FRAME_COUNT,
+	EMDL_TOMO_SIZE_X,
+	EMDL_TOMO_SIZE_Y,
+	EMDL_TOMO_SIZE_Z,
+	EMDL_TOMO_PROJECTION_X,
+	EMDL_TOMO_PROJECTION_Y,
+	EMDL_TOMO_PROJECTION_Z,
+	EMDL_TOMO_PROJECTION_W,
+	EMDL_TOMO_HANDEDNESS,
+
 	EMDL_TOMO_PARTICLE_ID,
 	EMDL_TOMO_PICK_PARTICLE_ID,
+
 	EMDL_UNKNOWN_LABEL,
 
 	EMDL_LAST_LABEL // **** NOTE ****: Do keep this label always at the end
@@ -745,6 +759,8 @@ private:
 		EMDL::addLabel(EMDL_MICROGRAPH_SHIFT_Y, EMDL_DOUBLE, "rlnMicrographShiftY", "Y shift of a (patch of) micrograph");
 		EMDL::addLabel(EMDL_MICROGRAPH_MOTION_COEFFS_IDX, EMDL_INT, "rlnMotionModelCoeffsIdx", "Index of a coefficient of a motion model");
 		EMDL::addLabel(EMDL_MICROGRAPH_MOTION_COEFF, EMDL_DOUBLE, "rlnMotionModelCoeff", "A coefficient of a motion model");
+		EMDL::addLabel(EMDL_MICROGRAPH_EER_UPSAMPLING, EMDL_INT, "rlnEERUpsampling", "EER upsampling ratio (1 = 4K, 2 = 8K)");
+		EMDL::addLabel(EMDL_MICROGRAPH_EER_GROUPING, EMDL_INT, "rlnEERGrouping", "The number of hardware frames to group");
 
 		EMDL::addLabel(EMDL_MLMODEL_ACCURACY_ROT, EMDL_DOUBLE, "rlnAccuracyRotations", "Estimated accuracy (in degrees) with which rotations can be assigned");
 		EMDL::addLabel(EMDL_MLMODEL_ACCURACY_TRANS, EMDL_DOUBLE, "rlnAccuracyTranslations", "Estimated accuracy (in pixels) with which translations can be assigned");
@@ -1056,6 +1072,19 @@ private:
 		EMDL::addLabel(EMDL_SPECTRAL_IDX, EMDL_INT, "rlnSpectralIndex", "Spectral index (i.e. distance in pixels to the origin in Fourier space) ");
 
 		EMDL::addLabel(EMDL_TOMO_NAME, EMDL_STRING, "rlnTomoName", "Arbitrary name for a tomogram");
+		EMDL::addLabel(EMDL_TOMO_TILT_SERIES_NAME, EMDL_STRING, "rlnTomoTiltSeriesName", "Tilt series file name");
+		EMDL::addLabel(EMDL_TOMO_FRAME_COUNT, EMDL_INT, "rlnTomoFrameCount", "Number of tilts in a tilt series");
+		EMDL::addLabel(EMDL_TOMO_SIZE_X, EMDL_INT, "rlnTomoSizeX", "Width of a bin-1 tomogram in pixels");
+		EMDL::addLabel(EMDL_TOMO_SIZE_Y, EMDL_INT, "rlnTomoSizeY", "Height of a bin-1 tomogram in pixels");
+		EMDL::addLabel(EMDL_TOMO_SIZE_Z, EMDL_INT, "rlnTomoSizeZ", "Depth of a bin-1 tomogram in pixels");
+		
+		EMDL::addLabel(EMDL_TOMO_PROJECTION_X, EMDL_DOUBLE_VECTOR, "rlnTomoProjX", "First row of the projection matrix");
+		EMDL::addLabel(EMDL_TOMO_PROJECTION_Y, EMDL_DOUBLE_VECTOR, "rlnTomoProjY", "Second row of the projection matrix");
+		EMDL::addLabel(EMDL_TOMO_PROJECTION_Z, EMDL_DOUBLE_VECTOR, "rlnTomoProjZ", "Third row of the projection matrix");
+		EMDL::addLabel(EMDL_TOMO_PROJECTION_W, EMDL_DOUBLE_VECTOR, "rlnTomoProjW", "Fourth row of the projection matrix");
+		
+		EMDL::addLabel(EMDL_TOMO_HANDEDNESS, EMDL_DOUBLE, "rlnTomoHand", "Handedness of a tomogram (i.e. slope of defocus over the image-space z coordinate)");
+				
 		EMDL::addLabel(EMDL_TOMO_PARTICLE_ID, EMDL_INT, "rlnTomoParticleId", "Particle index");
 		EMDL::addLabel(EMDL_TOMO_PICK_PARTICLE_ID, EMDL_INT, "rlnTomoPickParticleId", "Virus Particle index");
 

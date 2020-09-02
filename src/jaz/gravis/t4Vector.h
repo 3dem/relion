@@ -31,7 +31,8 @@ namespace gravis
       explicit t4Vector (T _v) : x(_v), y(_v), z(_v), w(_v) { }
       t4Vector (T _x, T _y, T _z, T _w=T(1)) : x(_x), y(_y), z(_z), w(_w) { }
       /*! \brief Construct a 4D vector with w = 1. */
-      explicit t4Vector (const t3Vector<T>& vec) : x(vec.x), y(vec.y), z(vec.z), w(1.0) { }
+	  explicit t4Vector (const t3Vector<T>& vec) : x(vec.x), y(vec.y), z(vec.z), w(1.0) { }
+	  explicit t4Vector (const t3Vector<T>& vec, T ww) : x(vec.x), y(vec.y), z(vec.z), w(ww) { }
 
       template <class T1>
       explicit t4Vector (const t4Vector<T1>& vec) : x(vec.x), y(vec.y), z(vec.z), w(vec.w) {}
@@ -307,12 +308,19 @@ namespace gravis
   {
     return t4Vector<T>(f * v.x, f * v.y, f * v.z, f * v.w);
   }
-
+  
   template <class T>
   inline
   t4Vector<T> operator * (const t4Vector<T>& v, T f)
   {
     return t4Vector<T>(f * v.x, f * v.y, f * v.z, f * v.w);
+  }
+  
+  template <class T>
+  inline
+  t4Vector<T> operator / (const t4Vector<T>& v, T f)
+  {
+    return t4Vector<T>(v.x / f, v.y / f, v.z / f, v.w / f);
   }
 
 

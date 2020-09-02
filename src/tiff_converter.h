@@ -66,6 +66,11 @@ public:
 			TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, 8);
 			TIFFSetField(tif, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_UINT);
 		}
+		else if (std::is_same<T, signed char>::value)
+		{
+			TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, 8);
+			TIFFSetField(tif, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_INT);
+		}
 		else
 		{
 			REPORT_ERROR("write_tiff_one_page: unknown data type");

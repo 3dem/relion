@@ -1,6 +1,6 @@
-#include <src/jaz/vtk_helper.h>
-#include <src/jaz/obs_model.h>
-#include <src/jaz/stack_helper.h>
+#include <src/jaz/single_particle/vtk_helper.h>
+#include <src/jaz/single_particle/obs_model.h>
+#include <src/jaz/single_particle/stack_helper.h>
 #include <src/metadata_table.h>
 #include <src/args.h>
 

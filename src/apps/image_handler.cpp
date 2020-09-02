@@ -24,7 +24,7 @@
 #include <src/fftw.h>
 #include <src/time.h>
 #include <src/symmetries.h>
-#include <src/jaz/obs_model.h>
+#include <src/jaz/single_particle/obs_model.h>
 #ifdef HAVE_PNG
 #include <src/jaz/gravis/tImage.h>
 #endif

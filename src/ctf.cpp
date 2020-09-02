@@ -46,8 +46,8 @@
 #include "src/args.h"
 #include "src/fftw.h"
 #include "src/metadata_table.h"
-#include <src/jaz/obs_model.h>
-#include <src/jaz/gravis/t2Matrix.h>
+#include <src/jaz/single_particle/obs_model.h>
+#include <src/jaz/single_particle/gravis/t2Matrix.h>
 
 using namespace gravis;
 
@@ -403,15 +403,21 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 				                 << "supported for square images.\n");
 			}
 
-			const Image<RFLOAT>& gammaOffset = obsModel->getGammaOffset(opticsGroup, oriydim);
-
-			if (   gammaOffset.data.xdim < result.xdim
-				|| gammaOffset.data.ydim < result.ydim)
+			if (obsModel->getBoxSize(opticsGroup) != orixdim)
 			{
-				REPORT_ERROR_STR("CTF::getFftwImage: requested output image is larger than the original: "
-				                 << gammaOffset.data.xdim << "x" << gammaOffset.data.ydim << " available, "
-				                 << result.xdim << "x" << result.ydim << " requested\n");
+				REPORT_ERROR_STR("CTF::getFftwImage: requested output image size "
+				                 << orixdim << " is not consistent with that in the optics group table "
+				                 << obsModel->getBoxSize(opticsGroup) << "\n");
 			}
+
+			if (fabs(obsModel->getPixelSize(opticsGroup) - angpix) > 1e-4)
+			{
+				REPORT_ERROR_STR("CTF::getFftwImage: requested pixel size "
+				                 << angpix << " is not consistent with that in the optics group table "
+				                 << obsModel->getPixelSize(opticsGroup) << "\n");
+			}
+
+			const BufferedImage<RFLOAT>& gammaOffset = obsModel->getGammaOffset(opticsGroup, oriydim);
 
 			for (int y1 = 0; y1 < result.ydim; y1++)
 			for (int x1 = 0; x1 < result.xdim; x1++)
@@ -420,10 +426,12 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 				RFLOAT y = y1 <= result.ydim/2? y1 / ys : (y1 - result.ydim) / ys;
 
 				const int x0 = x1;
-				const int y0 = y1 <= result.ydim/2? y1 : gammaOffset.data.ydim + y1 - result.ydim;
+				const int y0 = y1 <= result.ydim/2? y1 : gammaOffset.ydim + y1 - result.ydim;
 
-				DIRECT_A2D_ELEM(result, y1, x1) = getCTF(x, y, do_abs, do_only_flip_phases,
-				                                         do_intact_until_first_peak, do_damping, gammaOffset(y0,x0), do_intact_after_first_peak);
+				DIRECT_A2D_ELEM(result, y1, x1) = getCTF(
+					x, y, do_abs, do_only_flip_phases,
+					do_intact_until_first_peak, do_damping,
+					gammaOffset(x0,y0), do_intact_after_first_peak);
 			}
 		}
 		else
@@ -449,7 +457,7 @@ void CTF::getCTFPImage(MultidimArray<Complex> &result, int orixdim, int oriydim,
 		REPORT_ERROR("CTF::getCTFPImage: angle should be in [0,360>");
 	}
 
-	// Angles larger than 180, are the inverse of the other half!
+	// Angles larger than 180 are the inverse of the other half!
 	if (angle >= 180.)
 	{
 		angle -= 180.;
@@ -469,13 +477,13 @@ void CTF::getCTFPImage(MultidimArray<Complex> &result, int orixdim, int oriydim,
 					 << "supported for square images.\n");
 		}
 
-		const Image<RFLOAT>& gammaOffset = obsModel->getGammaOffset(opticsGroup, oriydim);
+		const BufferedImage<RFLOAT>& gammaOffset = obsModel->getGammaOffset(opticsGroup, oriydim);
 
-		if (   gammaOffset.data.xdim < result.xdim
-			|| gammaOffset.data.ydim < result.ydim)
+		if (   gammaOffset.xdim < result.xdim
+			|| gammaOffset.ydim < result.ydim)
 		{
 			REPORT_ERROR_STR("CTF::getFftwImage: requested output image is larger than the original: "
-					 << gammaOffset.data.xdim << "x" << gammaOffset.data.ydim << " available, "
+					 << gammaOffset.xdim << "x" << gammaOffset.ydim << " available, "
 					 << result.xdim << "x" << result.ydim << " requested\n");
 		}
 
@@ -486,12 +494,12 @@ void CTF::getCTFPImage(MultidimArray<Complex> &result, int orixdim, int oriydim,
 			RFLOAT y = y1 <= result.ydim/2? y1 / ys : (y1 - result.ydim) / ys;
 			RFLOAT myangle = (x * x + y * y > 0) ? acos(y / sqrt(x * x + y * y)) : 0; // dot-product with Y-axis: (0,1)
 			const int x0 = x1;
-			const int y0 = y1 <= result.ydim/2? y1 : gammaOffset.data.ydim + y1 - result.ydim;
+			const int y0 = y1 <= result.ydim/2? y1 : gammaOffset.ydim + y1 - result.ydim;
 
 			if (myangle >= anglerad)
-				DIRECT_A2D_ELEM(result, y1, x1) = getCTFP(x, y, is_positive, gammaOffset(y0, x0));
+				DIRECT_A2D_ELEM(result, y1, x1) = getCTFP(x, y, is_positive, gammaOffset(x0, y0));
 			else
-				DIRECT_A2D_ELEM(result, y1, x1) = getCTFP(x, y, !is_positive, gammaOffset(y0, x0));
+				DIRECT_A2D_ELEM(result, y1, x1) = getCTFP(x, y, !is_positive, gammaOffset(x0, y0));
 		}
 	}
 	else
@@ -649,6 +657,38 @@ void CTF::applyWeightEwaldSphereCurvature_noAniso(MultidimArray <RFLOAT> &result
 	}
 }
 
+void CTF::applyEwaldMask(RawImage<RFLOAT>& weight, int orixdim, int oriydim, double angpix, double particle_diameter)
+{
+	const double xs = orixdim * angpix;
+	const double ys = oriydim * angpix;
+	
+	const int w = orixdim;
+	const int h = oriydim;
+	const int wh = w / 2  + 1;
+	const int my = oriydim / 2;
+	
+	for (int yi = 0; yi < h;  yi++)
+	for (int xi = 0; xi < wh; xi++)
+	{
+		const double x = xi / xs;
+		const double y = (yi < my? yi : yi - h) / ys;
+		                  
+		const double deltaf = std::abs(getDeltaF(x, y));
+		const double inv_d = sqrt(x * x + y * y);
+		const double aux = (2. * deltaf * lambda * inv_d) / (particle_diameter);
+		const double A = (aux > 1.) ? 0. : (2. / PI) * (acos(aux) - aux * sin(acos(aux)));
+		
+		weight(xi,yi) = 0.5 * (1 + A * (2 * std::abs(weight(xi,yi)) - 1));
+	}	
+}
+
+BufferedImage<float> CTF::getFftwImage_float(int w0, int h0, double angpix) const
+{
+	BufferedImage<float> out(w0/2 + 1, h0, 1);
+	draw(w0, h0, angpix, &out(0,0,0));
+	return out;
+}
+
 std::vector<double> CTF::getK()
 {
 	// offset by one to maintain indices (K[1] = K1)
@@ -668,4 +708,11 @@ double CTF::getAxy()
 double CTF::getAyy()
 {
 	return Ayy;
+}
+
+double CTF::setDefocusMatrix(double axx, double axy, double ayy)
+{
+	Axx = axx;
+	Axy = axy;
+	Ayy = ayy;
 }

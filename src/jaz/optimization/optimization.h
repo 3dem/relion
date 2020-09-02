@@ -22,34 +22,62 @@
 #define JAZ_OPTIMIZATION_H
 
 #include <vector>
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+
 
 // abstract class for optimization problems
 class Optimization
 {
-    public:
-
-    // Don't forget const when overriding these functions!
-    virtual double f(const std::vector<double>& x, void* tempStorage) const = 0;
-    virtual void* allocateTempStorage() const {return 0;}
-    virtual void deallocateTempStorage(void* ts) const {}
-    virtual void report(int iteration, double cost, const std::vector<double>& x) const {}
+	public:
+		
+		virtual double f(const std::vector<double>& x, void* tempStorage) const = 0;
+		
+		virtual void* allocateTempStorage() const 
+		{
+			return 0;
+		}
+		
+		virtual void deallocateTempStorage(void* ts) const 
+		{}
+		
+		virtual void report(int iteration, double cost, const std::vector<double>& x) const 
+		{
+			if (iteration == 0) 
+			{
+				return;
+			}
+			else if (iteration == 1) 
+			{
+				std::cout << "iteration    cost\n";
+				std::cout << ' ' << std::setw(6) << iteration << "       " << cost;
+			}
+			else
+			{ 
+				std::cout << "\r                                                                         ";	
+				std::cout << '\r' << ' ' << std::setw(6) << iteration << "       " << cost;
+			}
+			
+			std::cout.flush();
+		}
 };
 
 class DifferentiableOptimization : public Optimization
 {
-    public:
-
-    virtual void grad(const std::vector<double>& x, std::vector<double>& gradDest, void* tempStorage) const = 0;
+	public:
 		
-	void testGradient(const std::vector<double>& x, double eps = 1e-9);
+		virtual void grad(const std::vector<double>& x, std::vector<double>& gradDest, void* tempStorage) const = 0;
+		
+		void testGradient(const std::vector<double>& x, double eps);
 };
 
 class RosenbrockBanana : public DifferentiableOptimization
 {
-    public:
-
-    double f(const std::vector<double>& x, void* tempStorage) const;
-    void grad(const std::vector<double>& x, std::vector<double>& gradDest, void* tempStorage) const;
+	public:
+		
+		double f(const std::vector<double>& x, void* tempStorage) const;
+		void grad(const std::vector<double>& x, std::vector<double>& gradDest, void* tempStorage) const;
 };
 
 #endif

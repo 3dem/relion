@@ -34,7 +34,7 @@
 #include "src/mask.h"
 #include "src/tabfuncs.h"
 #include "src/symmetries.h"
-#include "src/jaz/complex_io.h"
+#include <src/jaz/single_particle/complex_io.h>
 
 class BackProjector: public Projector
 {
