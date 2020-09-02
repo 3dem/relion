@@ -44,6 +44,8 @@ void run_calcPowerSpectrum(Complex *dFaux, int padoridim, Complex *ddata, int da
 											  RFLOAT *dfourier_mask, int fx, int fy, int fz, bool do_fourier_mask, bool if3D);
 
 void run_updatePowerSpectrum(RFLOAT *dcounter, int sz, RFLOAT *dpower_spectrum);
+
+extern void scale(RFLOAT *img, size_t sz, RFLOAT val, cudaStream_t stream = 0);
 #endif
 
 
