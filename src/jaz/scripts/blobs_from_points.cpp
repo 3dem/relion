@@ -138,8 +138,9 @@ int main(int argc, char *argv[])
 	
 	BufferedImage<float> diagnostic(binned_image_size.x, binned_image_size.y, micrograph_count);
 	
-	
-	int res = system(("mkdir -p "+outDir+"Frames").c_str());
+	int res;
+	res = system(("mkdir -p "+outDir+"Frames").c_str());
+	res = system(("mkdir -p "+outDir+"diag").c_str());
 	
 
 	Log::beginProgress("Finding blobs", micrograph_count / num_threads);
@@ -176,11 +177,11 @@ int main(int argc, char *argv[])
 
 		BufferedImage<float> dog = lowpass1 - lowpass0;
 		
-		/*dog.write(outDir+"DEV_dog.mrc");
-		micrograph.write(outDir+"DEV_micrograph.mrc");
-		lowpass0.write(outDir+"DEV_lowpass0.mrc");
-		lowpass1.write(outDir+"DEV_lowpass1.mrc");*/
-			
+		if (diag)
+		{
+			dog.write(outDir+"diag/"+image_name+"_DoG.mrc");
+			micrograph.write(outDir+"diag/"+image_name+"_micrograph.mrc");
+		}
 
 		
 		for (int y = 0; y < binned_image_size.y; y++)
@@ -286,6 +287,14 @@ int main(int argc, char *argv[])
 		BufferedImage<float> final_plots_sum(binned_image_size.x, binned_image_size.y);		
 		final_plots_sum.fill(0.f);
 		
+		BufferedImage<float> initial_plots_sum;	
+		
+		if (diag)
+		{
+			initial_plots_sum.resize(binned_image_size.x, binned_image_size.y);
+			initial_plots_sum.fill(0.f);
+		}
+		
 		std::vector<double> all_costs(detections.size());
 		std::vector<std::vector<double>> all_optimal_parameters(detections.size());
 		std::vector<bool> is_accepted(detections.size());
@@ -307,26 +316,20 @@ int main(int argc, char *argv[])
 			initial_parameters[1] = d.x;
 			initial_parameters[2] = d.y;
 			
+			if (diag)
+			{
+				BufferedImage<float> final_plot = point_blob_fit.visualise(
+			            initial_parameters, binned_image_size.x, binned_image_size.y);
+				
+				initial_plots_sum += final_plot;
+			}
+			
 						
 			std::vector<double> optimal_parameters = NelderMead::optimize(
 			            initial_parameters, point_blob_fit, 0.5, 0.0001, max_iterations, 
 			            1.0, 2.0, 0.5, 0.5, false);
 			
 			const double cost = point_blob_fit.f(optimal_parameters,0);
-			
-			
-			BufferedImage<float> final_plot;
-			
-			if (detection_id == 5)
-			{
-				
-				
-			}
-			else
-			{
-				final_plot.resize(binned_image_size.x, binned_image_size.y);
-				final_plot.fill(0.f);
-			}
 			
 			
 			is_accepted[detection_id] = cost < acceptance_threshold;
@@ -345,7 +348,7 @@ int main(int argc, char *argv[])
 			
 			if (is_accepted[detection_id])
 			{
-				final_plot = point_blob_fit.visualise(
+				BufferedImage<float> final_plot = point_blob_fit.visualise(
 			            optimal_parameters, binned_image_size.x, binned_image_size.y);
 				
 				final_plots_sum += final_plot;
@@ -386,6 +389,12 @@ int main(int argc, char *argv[])
 		}
 		
 		diagnostic.getSliceRef(m).copyFrom(final_plots_sum);
+		
+		if (diag)
+		{
+			initial_plots_sum.write(outDir+"diag/"+image_name+"_initial.mrc");
+			final_plots_sum.write(outDir+"diag/"+image_name+"_final.mrc");
+		}
 	}
 
 	Log::endProgress();
