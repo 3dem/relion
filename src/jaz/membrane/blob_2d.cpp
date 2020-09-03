@@ -322,6 +322,8 @@ void Blob2D::erase(
 	std::pair<std::vector<double>,std::vector<double>> radAvgAndWgh = radialAverageAndWeight(
 	            micrographs, weight, radius + taper);
 	
+	const int max_radius = radAvgAndWgh.first.size();
+	
 	const double cappingRadius = 1.5 * smoothingRadius;
 	
 	std::vector<double> radAvg = radAvgAndWgh.first;
@@ -388,7 +390,7 @@ void Blob2D::erase(
 		const double ru = sqrt(dx*dx + dy*dy);
 		double r = smoothOrigin(ru + getOffset(d2Vector(dx, dy)));
 
-		if (r >= radius + taper || r < 0)
+		if (r >= radius + taper || r >= max_radius - 1 || r < 0)
 		{
 			continue;
 		}
@@ -417,7 +419,7 @@ void Blob2D::erase(
 		const double ru = sqrt(dx*dx + dy*dy);
 		double r = smoothOrigin(ru + getOffset(d2Vector(dx, dy)));
 
-		if (r >= radius + taper - 1 || r < 0)
+		if (r >= radius + taper - 1 || r >= max_radius - 1 || r < 0)
 		{
 			continue;
 		}
@@ -461,6 +463,8 @@ void Blob2D::eraseInSectors(
 {
 	std::pair<std::vector<double>,std::vector<double>> radAvgAndWgh = radialAverageAndWeightInSectors(
 	            micrographs, weight, sectors, radius + taper);
+	
+	const int max_radius = radAvgAndWgh.first.size();
 	
 	std::vector<double> radAvg = radAvgAndWgh.first;
 	std::vector<double> radWgh = radAvgAndWgh.second;
@@ -531,7 +535,7 @@ void Blob2D::eraseInSectors(
 		const double ru = sqrt(dx*dx + dy*dy);
 		double r = smoothOrigin(ru + getOffset(d2Vector(dx, dy)));
 
-		if (r >= radius + taper || r < 0)
+		if (r >= radius + taper || r >= max_radius - 1  || r < 0)
 		{
 			continue;
 		}
@@ -566,7 +570,7 @@ void Blob2D::eraseInSectors(
 		const double ru = sqrt(dx*dx + dy*dy);
 		double r = smoothOrigin(ru + getOffset(d2Vector(phi)));
 
-		if (r >= radius + taper - 1 || r < 0)
+		if (r >= radius + taper - 1 || r >= max_radius - 1 || r < 0)
 		{
 			continue;
 		}
