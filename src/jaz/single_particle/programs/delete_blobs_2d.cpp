@@ -31,6 +31,7 @@ void DeleteBlobs2DProgram::readParameters(int argc, char *argv[])
 		blobs_dir = parser.getOption("--bd", "Initial blobs directory");
 		particles_file = parser.getOption("--ptc", "Optional particles file for phase flipping", "");
 
+		roundedness = textToDouble(parser.getOption("--rnd", "Roundedness prior", "0"));
 		prior_sigma_A = textToDouble(parser.getOption("--sig", "Weight of initial position", "0"));
 		max_binning = textToDouble(parser.getOption("--bin0", "Initial (maximal) binning factor", "8"));
 		min_binning = textToDouble(parser.getOption("--bin1", "Final (minimal) binning factor", "4"));
@@ -161,8 +162,8 @@ void DeleteBlobs2DProgram::run()
 		{
 			Log::beginSection(
 				"Micrograph "+ZIO::itoa(m+1)+"/"
-			    +ZIO::itoa((int)std::ceil(micrograph_count / (double)num_threads))+" (out of "
-			    +ZIO::itoa(micrograph_count)+")");
+			    +ZIO::itoa((int)std::ceil(micrograph_count / (double)num_threads))+" on this thread (out of "
+			    +ZIO::itoa(micrograph_count)+" on all threads)");
 		}
 		
 		try 
@@ -511,7 +512,7 @@ std::vector<double> DeleteBlobs2DProgram::fitBlob(
 
 	BlobFit2D blob_fit(
 		blob_region_binned, initial_position_cropped_binned, 
-		smoothing_radius_binned, prior_sigma, 1);
+		smoothing_radius_binned, prior_sigma, roundedness, 1);
 	
 	{
 		Blob2D blob0(last_optimum, smoothing_radius_binned);

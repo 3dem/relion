@@ -17,6 +17,7 @@ class BlobFit2D : public Optimization
 			gravis::d2Vector position,
 			double smoothingRadius,
 			double priorSigma,
+			double roundedness,
 			int num_threads);
 
 
@@ -24,7 +25,7 @@ class BlobFit2D : public Optimization
 				gravis::d2Vector initialPos;
 				int smoothingRadius;
 				BufferedImage<float> weight;
-				double priorSigma2;
+				double priorSigma2, roundedness;
 				int num_threads;
 			
 

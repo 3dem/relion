@@ -25,7 +25,8 @@ class DeleteBlobs2DProgram
 				highpass_sigma_real_A,
 				max_binning, min_binning, 
 				blob_thickness,
-				convergence_threshold;
+				convergence_threshold,
+				roundedness;
 
 			std::vector<gravis::d4Vector> spheres;
 			

@@ -9,13 +9,15 @@ BlobFit2D::BlobFit2D(
 	d2Vector position,
 	double smoothingRadius,
 	double priorSigma,
+	double roundedness,
 	int num_threads)
 :
 		image(image),
 		initialPos(position),
 		smoothingRadius(smoothingRadius),
 		num_threads(num_threads),
-		priorSigma2(priorSigma*priorSigma)
+		priorSigma2(priorSigma*priorSigma),
+        roundedness(roundedness)
 {
 	const int w = image.xdim;
 	const int h = image.ydim;
@@ -32,12 +34,21 @@ double BlobFit2D::f(const std::vector<double>& x, void* tempStorage) const
 
 	std::vector<double> radAvg = blob.radialAverage(image, weight);
 
-	out += blob.radialAverageError(image, weight, radAvg);
+	out += blob.radialAverageError(image, weight, radAvg) / (image.xdim * (double)image.ydim);
 
 	if (priorSigma2 > 0.0)
 	{
 
 		out += (blob.center - initialPos).norm2() / priorSigma2;
+	}
+	
+	if (roundedness > 0.0)
+	{
+		for (int i = 2; i < x.size(); i++)
+		{
+			const double f = (i - 2) / 2;
+			out += roundedness * x[i] * x[i] * f * f;
+		}
 	}
 	
 	return out;

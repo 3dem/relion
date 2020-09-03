@@ -125,7 +125,7 @@ int main(int argc, char *argv[])
 		const d2Vector initial_centre(box_size/2, box_size/2 - radius);
 
 		BlobFit2D blob_fit(
-			slice, initial_centre, radius/2, 0, num_threads);
+			slice, initial_centre, radius/2, 0, 0, num_threads);
 
 		for (int y = 0; y < blob_fit.weight.ydim; y++)
 		for (int x = 0; x < blob_fit.weight.xdim; x++)
