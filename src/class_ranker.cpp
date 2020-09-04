@@ -1667,13 +1667,12 @@ void ClassRanker::getFeatures()
 			features_this_class.normalized_features.lowpass_filtered_img_stddev = (features_this_class.lowpass_filtered_img_stddev - global_mean[12]) / global_stddev[12];
 			features_this_class.normalized_features.lowpass_filtered_img_minval = (features_this_class.lowpass_filtered_img_minval - global_mean[13]) / global_stddev[13];
 			features_this_class.normalized_features.lowpass_filtered_img_maxval = (features_this_class.lowpass_filtered_img_maxval - global_mean[14]) / global_stddev[14];
-			features_this_class.normalized_features.granulo0 = (features_this_class.granulo[0] - global_mean[15]) / global_stddev[15];
-			features_this_class.normalized_features.granulo1 = (features_this_class.granulo[1] - global_mean[16]) / global_stddev[16];
-			features_this_class.normalized_features.granulo2 = (features_this_class.granulo[2] - global_mean[17]) / global_stddev[17];
-			features_this_class.normalized_features.granulo3 = (features_this_class.granulo[3] - global_mean[18]) / global_stddev[18];
-			features_this_class.normalized_features.granulo4 = (features_this_class.granulo[4] - global_mean[19]) / global_stddev[19];
-			features_this_class.normalized_features.granulo5 = (features_this_class.granulo[5] - global_mean[20]) / global_stddev[20];
-
+			features_this_class.normalized_features.granulo0 = (features_this_class.granulo[0] - global_granulo_mean[0]) / global_granulo_stddev[0];
+			features_this_class.normalized_features.granulo1 = (features_this_class.granulo[1] - global_granulo_mean[1]) / global_granulo_stddev[1];
+			features_this_class.normalized_features.granulo2 = (features_this_class.granulo[2] - global_granulo_mean[2]) / global_granulo_stddev[2];
+			features_this_class.normalized_features.granulo3 = (features_this_class.granulo[3] - global_granulo_mean[3]) / global_granulo_stddev[3];
+			features_this_class.normalized_features.granulo4 = (features_this_class.granulo[4] - global_granulo_mean[4]) / global_granulo_stddev[4];
+			features_this_class.normalized_features.granulo5 = (features_this_class.granulo[5] - global_granulo_mean[5]) / global_granulo_stddev[5];
 
 			// SHWS 15072020: new try small subimages with fixed boxsize at uniform_angpix for image-based CNN
 			if (do_subimages && protein_area>0)
