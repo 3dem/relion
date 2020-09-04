@@ -225,7 +225,7 @@ void diff2_coarse_3D(
 				else {
 					xstart_z = projector.maxR;
 					xend_z   = xstart_z + 1;
-                }
+				}
 			}	
 
 			for(int iy = 0; iy < ySize; iy++) {
@@ -325,8 +325,9 @@ void diff2_coarse_3D(
 	} // for block
 }
 */
+
 template<bool REF3D, bool DATA3D, int block_sz, int eulers_per_block, int prefetch_fraction>
-void diff2_coarse(                    
+void diff2_coarse(
 		unsigned long     grid_size,
 		XFLOAT *g_eulers,
 		XFLOAT *trans_x,
@@ -344,219 +345,160 @@ void diff2_coarse(
 		unsigned long translation_num,
 		unsigned long image_size
 		)
-{ 
+{
 #ifdef DEBUG_CUDA
 	checkedArray<XFLOAT> g_real;
 	g_real.initCheckedArray(_g_real);
 #endif
-	XFLOAT s_eulers[eulers_per_block * 9];
+	const int xSize = projector.imgX;
+	const int ySize = projector.imgY;
+	const int zSize = projector.imgZ;
+	const int maxR = projector.maxR;
+	const unsigned pass_num(ceilfracf(image_size,block_sz));
 
-	// pre-compute sin and cos for x and y component
-	int xSize = projector.imgX;
-	int ySize = projector.imgY;
-	int zSize = projector.imgZ;
-	XFLOAT sin_x[translation_num][xSize], cos_x[translation_num][xSize];
-	XFLOAT sin_y[translation_num][ySize], cos_y[translation_num][ySize];
-	XFLOAT sin_z[translation_num][zSize], cos_z[translation_num][zSize];	
+	int x[pass_num][block_sz], y[pass_num][block_sz], z[pass_num][block_sz];
+	XFLOAT s_real[pass_num][block_sz];
+	XFLOAT s_imag[pass_num][block_sz];
+	XFLOAT s_corr[pass_num][block_sz];
 
-	if (DATA3D)  {
-		computeSincosLookupTable3D(translation_num, trans_x, trans_y, trans_z,
-								xSize, ySize, zSize,                               
-								&sin_x[0][0], &cos_x[0][0], 
-								&sin_y[0][0], &cos_y[0][0],
-								&sin_z[0][0], &cos_z[0][0]);
-	} else {
-		computeSincosLookupTable2D(translation_num, trans_x, trans_y, 
-								xSize, ySize,
-								&sin_x[0][0], &cos_x[0][0], 
-								&sin_y[0][0], &cos_y[0][0]);
+	// Pre-calculate x/y/z
+	for (unsigned pass = 0; pass < pass_num; pass++) { // finish an entire ref image each block
+   		unsigned long start = pass * block_sz;
+		unsigned long elements = block_sz;
+		if (start + block_sz >= image_size)
+			elements = image_size - start;
+
+		// Rotate the reference image per block_sz, saved in cache
+		#pragma omp simd
+		for (int tid=0; tid<elements; tid++){
+			unsigned long pixel = (unsigned long)start + (unsigned long)tid;
+
+			if(DATA3D)
+			{
+				z[pass][tid] = floorfracf(pixel, xSize*ySize);
+				int xy = pixel % (xSize*ySize);
+				x[pass][tid] =             xy  % xSize;
+				y[pass][tid] = floorfracf( xy,   xSize);
+				if (z[pass][tid] > maxR)
+					z[pass][tid] -= zSize;
+			}
+			else
+			{
+				x[pass][tid] =            pixel % xSize;
+				y[pass][tid] = floorfracf(pixel, xSize);
+			}
+			if (y[pass][tid] > maxR)
+				y[pass][tid] -= ySize;
+
+			s_real[pass][tid] = g_real[pixel];
+			s_imag[pass][tid] = g_imag[pixel];
+			s_corr[pass][tid] = g_corr[pixel] * (XFLOAT)0.5;
+		}
 	}
-			
-	//Set up variables
-	XFLOAT s_ref_real[eulers_per_block][block_sz];
-	XFLOAT s_ref_imag[eulers_per_block][block_sz];
-
-	XFLOAT s_real[block_sz];
-	XFLOAT s_imag[block_sz];
-	XFLOAT s_corr[block_sz];
-
-	int    x[block_sz], y[block_sz], z[block_sz];
-
-	XFLOAT trans_cos_x[block_sz], trans_sin_x[block_sz];
-	XFLOAT trans_cos_y[block_sz], trans_sin_y[block_sz];
-	XFLOAT trans_cos_z[block_sz], trans_sin_z[block_sz];
 
 	XFLOAT diff2s[translation_num][eulers_per_block];
-		
+
 	for (unsigned long block = 0; block < grid_size; block++) {
-		//Prefetch euler matrices
-		for (int i = 0; i < eulers_per_block * 9; i++)
-			s_eulers[i] = g_eulers[(size_t)block * (size_t)eulers_per_block * (size_t)9 + i];
+		//Prefetch euler matrices with cacheline friendly index
+		XFLOAT s_eulers[eulers_per_block * 16];
+		for (int e = 0; e < eulers_per_block; e++)
+			for (int i = 0; i < 9; i++)
+				s_eulers[e*16+i] = g_eulers[(size_t)block * (size_t)eulers_per_block * (size_t)9 + e*9+i];
+
+		//Setup variables
+		XFLOAT s_ref_real[eulers_per_block][block_sz];
+		XFLOAT s_ref_imag[eulers_per_block][block_sz];
 
 		memset(&diff2s[0][0], 0, sizeof(XFLOAT) * translation_num * eulers_per_block);
 
 		//Step through data
-		unsigned pass_num(ceilfracf(image_size,block_sz));
 		for (unsigned pass = 0; pass < pass_num; pass++) { // finish an entire ref image each block
 			unsigned long start = pass * block_sz;
 			unsigned long elements = block_sz;
 			if (start + block_sz >= image_size)
 				elements = image_size - start;
 
-			// Rotate the reference image per block_sz, saved in cache
-			for (int tid=0; tid<elements; tid++){
-				unsigned long pixel = (unsigned long)start + (unsigned long)tid;
-
-				if(DATA3D)
-				{
-					z[tid] =  floorfracf(pixel, xSize*ySize);
-					int xy = pixel % (xSize*ySize);
-					x[tid] =             xy  % xSize;
-					y[tid] = floorfracf( xy,   xSize);
-					if (z[tid] > projector.maxR)
-						z[tid] -= zSize;
-				}
-				else
-				{
-					x[tid] =            pixel % xSize;
-					y[tid] = floorfracf(pixel, xSize);
-				}
-				if (y[tid] > projector.maxR)
-					y[tid] -= ySize;
-			}
-						
-			for (int tid=0; tid<elements; tid++){
-				unsigned long pixel = (unsigned long)start + (unsigned long)tid;
-			
-				s_real[tid] = g_real[pixel];
-				s_imag[tid] = g_imag[pixel];
-				s_corr[tid] = g_corr[pixel] * (XFLOAT)0.5;
-			}
-
 			for (int i = 0; i < eulers_per_block; i ++) {
+				#pragma omp simd
 				for (int tid=0; tid<elements; tid++){
+
 					if(DATA3D) // if DATA3D, then REF3D as well.
 						projector.project3Dmodel(
-								x[tid], y[tid], z[tid],
-								s_eulers[i*9  ],
-								s_eulers[i*9+1],
-								s_eulers[i*9+2],
-								s_eulers[i*9+3],
-								s_eulers[i*9+4],
-								s_eulers[i*9+5],
-								s_eulers[i*9+6],
-								s_eulers[i*9+7],
-								s_eulers[i*9+8],
+								x[pass][tid], y[pass][tid], z[pass][tid],
+								s_eulers[i*16  ],
+								s_eulers[i*16+1],
+								s_eulers[i*16+2],
+								s_eulers[i*16+3],
+								s_eulers[i*16+4],
+								s_eulers[i*16+5],
+								s_eulers[i*16+6],
+								s_eulers[i*16+7],
+								s_eulers[i*16+8],
 								s_ref_real[i][tid],
 								s_ref_imag[i][tid]);
 					else if(REF3D)
 						projector.project3Dmodel(
-								x[tid], y[tid], 
-								s_eulers[i*9  ],
-								s_eulers[i*9+1],
-								s_eulers[i*9+3],
-								s_eulers[i*9+4],
-								s_eulers[i*9+6],
-								s_eulers[i*9+7],
+								x[pass][tid], y[pass][tid], 
+								s_eulers[i*16  ],
+								s_eulers[i*16+1],
+								s_eulers[i*16+3],
+								s_eulers[i*16+4],
+								s_eulers[i*16+6],
+								s_eulers[i*16+7],
 								s_ref_real[i][tid],
 								s_ref_imag[i][tid]);                    
 					else
 						projector.project2Dmodel(
-								x[tid], y[tid], 
-								s_eulers[i*9  ],
-								s_eulers[i*9+1],
-								s_eulers[i*9+3],
-								s_eulers[i*9+4],
+								x[pass][tid], y[pass][tid], 
+								s_eulers[i*16  ],
+								s_eulers[i*16+1],
+								s_eulers[i*16+3],
+								s_eulers[i*16+4],
 								s_ref_real[i][tid],
 								s_ref_imag[i][tid]);
-				} // tid
-			}  // eulers per block
+				}
+			}
 
 			for(unsigned long i=0; i<translation_num; i++) {
-
-				for (int tid=0; tid<elements; tid++) {
-					unsigned long pixel = (unsigned long)start + (unsigned long)tid;
-
-					int xidx = x[tid];
-					int yidx = y[tid];
-					int zidx;
-					
-					if(DATA3D) {
-						zidx = z[tid];
-						if ( zidx < 0) {
-							trans_cos_z[tid] =  cos_z[i][-zidx];
-							trans_sin_z[tid] = -sin_z[i][-zidx];            
-						}
-						else {
-							trans_cos_z[tid] = cos_z[i][zidx];
-							trans_sin_z[tid] = sin_z[i][zidx];
-						}
-					}
-
-					if ( yidx < 0) {
-						trans_cos_y[tid] =  cos_y[i][-yidx];
-						trans_sin_y[tid] = -sin_y[i][-yidx];            
-					}
-					else {
-						trans_cos_y[tid] = cos_y[i][yidx];
-						trans_sin_y[tid] = sin_y[i][yidx];
-					}
-					
-					if ( xidx < 0) {
-						trans_cos_x[tid] =  cos_x[i][-xidx];
-						trans_sin_x[tid] = -sin_x[i][-xidx];            
-					}
-					else {
-						trans_cos_x[tid] = cos_x[i][xidx];
-						trans_sin_x[tid] = sin_x[i][xidx];
-					}					
-				}  // tid              
+				XFLOAT tx = trans_x[i];
+				XFLOAT ty = trans_y[i];
+				XFLOAT tz = trans_z[i];                 
 
 				#pragma omp simd
-				for (int tid=0; tid<elements; tid++) {
-//					unsigned long pixel = (unsigned long)start + (unsigned long)tid;              
-					
+				for (int tid=0; tid<block_sz; tid++) {
+// This will generate masked SVML routines for Intel compiler
+					unsigned long pixel = (unsigned long)start + (unsigned long)tid;
+					if(pixel >= image_size)
+						continue;                
+
 					XFLOAT real, imag;
-					if(DATA3D) {
-//						translatePixel(x[tid], y[tid], z[tid], tx, ty, tz, s_real[tid], s_imag[tid], real, imag);
-						XFLOAT s  = trans_sin_x[tid] * trans_cos_y[tid] + trans_cos_x[tid] * trans_sin_y[tid];
-						XFLOAT c  = trans_cos_x[tid] * trans_cos_y[tid] - trans_sin_x[tid] * trans_sin_y[tid];
+					if(DATA3D)
+						translatePixel(x[pass][tid], y[pass][tid], z[pass][tid], tx, ty, tz,
+										s_real[pass][tid], s_imag[pass][tid], real, imag);
+					else
+						translatePixel(x[pass][tid], y[pass][tid], tx, ty,
+										s_real[pass][tid], s_imag[pass][tid], real, imag);
 
-						XFLOAT ss = s * trans_cos_z[tid] + c * trans_sin_z[tid];
-						XFLOAT cc = c * trans_cos_z[tid] - s * trans_sin_z[tid];				
-
-						real = cc * s_real[tid] - ss * s_imag[tid];
-						imag = cc * s_imag[tid] + ss * s_real[tid];
-					}
-					else  { // 2D data
-//						translatePixel(x[tid], y[tid],         tx, ty,     s_real[tid], s_imag[tid], real, imag);
-						XFLOAT ss = trans_sin_x[tid] * trans_cos_y[tid] + trans_cos_x[tid] * trans_sin_y[tid];
-						XFLOAT cc = trans_cos_x[tid] * trans_cos_y[tid] - trans_sin_x[tid] * trans_sin_y[tid];
-
-						real = cc * s_real[tid] - ss * s_imag[tid];
-						imag = cc * s_imag[tid] + ss * s_real[tid];
-					}
-					
+#ifdef __INTEL_COMPILER
+					#pragma unroll(eulers_per_block)
+#endif
 					for (int j = 0; j < eulers_per_block; j ++) {
 						XFLOAT diff_real =  s_ref_real[j][tid] - real;
 						XFLOAT diff_imag =  s_ref_imag[j][tid] - imag;
 
-						diff2s[i][j] += (diff_real * diff_real + diff_imag * diff_imag) * s_corr[tid];
-					}             
-				} // for tid       
+						diff2s[i][j] += (diff_real * diff_real + diff_imag * diff_imag) * s_corr[pass][tid];
+					}
+				} // for tid
 			}  // for each translation
 		}  // for each pass
 
 		XFLOAT *pData = g_diff2s + (size_t)block * (size_t)eulers_per_block * (size_t)translation_num;
-		for(int i=0; i<eulers_per_block; i++) {
-			for(unsigned long j=0; j<translation_num; j++) {
-				 *pData += diff2s[j][i];
-				 pData ++;
-			}
-		}
+		for(int i=0; i<eulers_per_block; i++)
+			for(unsigned long j=0; j<translation_num; j++)
+				pData[i*translation_num + j] += diff2s[j][i];
 	} // block
 }
-	
+
 template<bool REF3D>
 void diff2_fine_2D(
 		unsigned long     grid_size,
@@ -583,7 +525,7 @@ void diff2_fine_2D(
 		unsigned long *d_job_idx,
 		unsigned long *d_job_num
 		)
-{   
+{
 #ifdef DEBUG_CUDA
 	checkedArray<XFLOAT> g_imgs_real;
 	g_imgs_real.initCheckedArray(_g_imgs_real);
@@ -730,7 +672,7 @@ void diff2_fine_3D(
 		unsigned long *d_job_idx,
 		unsigned long *d_job_num
 		)
-{ 
+{
 #ifdef DEBUG_CUDA
 	checkedArray<XFLOAT> g_imgs_real;
 	g_imgs_real.initCheckedArray(_g_imgs_real);
@@ -904,7 +846,7 @@ template<bool REF3D>
 		unsigned long image_size,
 		XFLOAT   exp_local_sqrtXi2
 		)
-{  
+{
 #ifdef DEBUG_CUDA
 	checkedArray<XFLOAT> g_imgs_real;
 	g_imgs_real.initCheckedArray(_g_imgs_real);
@@ -1043,7 +985,7 @@ void diff2_CC_coarse_3D(
 		unsigned long image_size,
 		XFLOAT   exp_local_sqrtXi2
 		)
-{ 
+{
 #ifdef DEBUG_CUDA
 	checkedArray<XFLOAT> g_imgs_real;
 	g_imgs_real.initCheckedArray(_g_imgs_real);
@@ -1214,7 +1156,7 @@ void diff2_CC_fine_2D(
 		unsigned long *d_job_idx,
 		unsigned long *d_job_num
 		)
-{ 
+{
 #ifdef DEBUG_CUDA
 	checkedArray<XFLOAT> g_imgs_real;
 	g_imgs_real.initCheckedArray(_g_imgs_real);
@@ -1367,7 +1309,7 @@ void diff2_CC_fine_3D(
 		unsigned long *d_job_idx,
 		unsigned long *d_job_num
 		)
-{  
+{
 #ifdef DEBUG_CUDA
 	checkedArray<XFLOAT> g_imgs_real;
 	g_imgs_real.initCheckedArray(_g_imgs_real);
