@@ -72,6 +72,8 @@ public:
 
 #ifdef CUDA
 	__device__ __forceinline__
+#else
+	inline
 #endif
 	void project3Dmodel(
 			int x,
@@ -89,16 +91,11 @@ public:
 			XFLOAT &real,
 			XFLOAT &imag)
 	{
-		int r2;
-
-        real=(XFLOAT)0;
-		imag=(XFLOAT)0;
-
 		XFLOAT xp = (e0 * x + e1 * y + e2 * z) * padding_factor;
 		XFLOAT yp = (e3 * x + e4 * y + e5 * z) * padding_factor;
 		XFLOAT zp = (e6 * x + e7 * y + e8 * z) * padding_factor;
 
-		r2 = xp*xp + yp*yp + zp*zp;
+		int r2 = xp*xp + yp*yp + zp*zp;
 
 		if (r2 <= maxR2_padded)
 		{
@@ -156,6 +153,8 @@ public:
 
 #ifdef CUDA
 	__device__ __forceinline__
+#else
+	inline
 #endif
 	void project3Dmodel(
 			int x,
@@ -169,16 +168,11 @@ public:
 			XFLOAT &real,
 			XFLOAT &imag)
 	{
-		int r2;
-
-        real=(XFLOAT)0;
-		imag=(XFLOAT)0;
-
 		XFLOAT xp = (e0 * x + e1 * y ) * padding_factor;
 		XFLOAT yp = (e3 * x + e4 * y ) * padding_factor;
 		XFLOAT zp = (e6 * x + e7 * y ) * padding_factor;
 
-		r2 = xp*xp + yp*yp + zp*zp;
+		int r2 = xp*xp + yp*yp + zp*zp;
 
 		if (r2 <= maxR2_padded)
 		{
@@ -196,7 +190,7 @@ public:
 			real = no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 			imag = no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 	#else
-				CpuKernels::complex3D(mdlComplex, real, imag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
+			CpuKernels::complex3D(mdlComplex, real, imag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 	#endif
 
 			if(invers)
@@ -234,6 +228,8 @@ public:
 
 #ifdef CUDA
 	__device__ __forceinline__
+#else
+	inline
 #endif
 	void project2Dmodel(
 				int x,
@@ -245,15 +241,10 @@ public:
 				XFLOAT &real,
 				XFLOAT &imag)
 	{
-		int r2;
-
-        real=(XFLOAT)0;
-		imag=(XFLOAT)0;
-
 		XFLOAT xp = (e0 * x + e1 * y ) * padding_factor;
 		XFLOAT yp = (e3 * x + e4 * y ) * padding_factor;
 
-		r2 = xp*xp + yp*yp;
+		int r2 = xp*xp + yp*yp;
 
 		if (r2 <= maxR2_padded)
 		{
