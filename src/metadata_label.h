@@ -133,6 +133,7 @@ enum EMDLabel
 	EMDL_CLASS_FEAT_SOLVENT_HARALICK,
 	EMDL_CLASS_FEAT_ZERNIKE_MOMENTS,
 	EMDL_CLASS_FEAT_GRANULO,
+	EMDL_CLASS_PREDICTED_SCORE,
 
 	EMDL_CTF_ASTIGMATISM,
 	EMDL_CTF_BFACTOR, ///< B-factor
@@ -734,6 +735,7 @@ private:
         EMDL::addLabel(EMDL_CLASS_FEAT_SOLVENT_HARALICK, EMDL_DOUBLE_VECTOR, "rlnSolventHaralick", "Haralick features of the solvent area.");
         EMDL::addLabel(EMDL_CLASS_FEAT_ZERNIKE_MOMENTS, EMDL_DOUBLE_VECTOR, "rlnZernikeMoments", "Zernike moments of the image.");
         EMDL::addLabel(EMDL_CLASS_FEAT_GRANULO, EMDL_DOUBLE_VECTOR, "rlnGranulo", "Granulo features of the image.");
+        EMDL::addLabel(EMDL_CLASS_PREDICTED_SCORE, EMDL_DOUBLE, "rlnPredictedClassScore", "2D class merit scores predicted by RELION model.");
 
 		EMDL::addLabel(EMDL_CTF_ASTIGMATISM, EMDL_DOUBLE, "rlnCtfAstigmatism", "Absolute value of the difference between defocus in U- and V-direction (in A)");
 		EMDL::addLabel(EMDL_CTF_BFACTOR, EMDL_DOUBLE, "rlnCtfBfactor", "B-factor (in A^2) that describes CTF power spectrum fall-off");

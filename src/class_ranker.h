@@ -39,14 +39,14 @@ public:
 
 };
 
-class SelectedFeatures
+class NormalizedFeatures
 {
 public:
 	RFLOAT accuracy_rotation, accuracy_translation, weighted_resolution, relative_resolution, ring_mean, ring_stddev, protein_stddev,
 			solvent_mean, solvent_stddev, scattered_signal, edge_signal, relative_signal_intensity, lowpass_filtered_img_avg, lowpass_filtered_img_stddev,
 			lowpass_filtered_img_minval, lowpass_filtered_img_maxval, granulo0, granulo1, granulo2, granulo3, granulo4, granulo5,
 			protein_sum, solvent_sum;
-	SelectedFeatures(): accuracy_rotation(999.),
+	NormalizedFeatures(): accuracy_rotation(999.),
 			accuracy_translation(999.),
 			weighted_resolution(999.),
 			relative_resolution(999.),
@@ -99,7 +99,7 @@ public:
     std::vector<RFLOAT> lbp, lbp_p, lbp_s, haralick_p, haralick_s, zernike_moments, granulo;
     double total_entropy, protein_entropy, solvent_entropy;
 
-    SelectedFeatures selected_features;
+    NormalizedFeatures normalized_features;
 
     classFeatures(): name(""),
 			class_index(0),
@@ -171,7 +171,7 @@ public:
 	    solvent_entropy = copy.solvent_entropy;
 	    subimages = copy.subimages;
 	    CAR = copy.CAR;
-	    selected_features = copy.selected_features;
+	    normalized_features = copy.normalized_features;
 
 	}
 
@@ -215,7 +215,7 @@ public:
 	    solvent_entropy = copy.solvent_entropy;
 	    subimages = copy.subimages;
 	    CAR = copy.CAR;
-	    selected_features = copy.selected_features;
+	    normalized_features = copy.normalized_features;
 
 		return *this;
 	}
@@ -224,35 +224,35 @@ public:
 		std::vector<float> out(24);
 
 		// Order matters
-		out[0] =  selected_features.accuracy_rotation;
-		out[1] =  selected_features.accuracy_translation;
-		out[2] =  selected_features.weighted_resolution;
-		out[3] =  selected_features.relative_resolution;
+		out[0] =  normalized_features.accuracy_rotation;
+		out[1] =  normalized_features.accuracy_translation;
+		out[2] =  normalized_features.weighted_resolution;
+		out[3] =  normalized_features.relative_resolution;
 
-		out[4] =  selected_features.ring_mean;
-		out[5] =  selected_features.ring_stddev;
-		out[6] =  selected_features.protein_stddev;
-		out[7] =  selected_features.solvent_mean;
-		out[8] =  selected_features.solvent_stddev;
-		out[9] = selected_features.scattered_signal;
-		out[10] = selected_features.edge_signal;
+		out[4] =  normalized_features.ring_mean;
+		out[5] =  normalized_features.ring_stddev;
+		out[6] =  normalized_features.protein_stddev;
+		out[7] =  normalized_features.solvent_mean;
+		out[8] =  normalized_features.solvent_stddev;
+		out[9] = normalized_features.scattered_signal;
+		out[10] = normalized_features.edge_signal;
 
-		out[11] = selected_features.lowpass_filtered_img_avg;
-		out[12] = selected_features.lowpass_filtered_img_stddev;
-		out[13] = selected_features.lowpass_filtered_img_minval;
-		out[14] = selected_features.lowpass_filtered_img_maxval;
+		out[11] = normalized_features.lowpass_filtered_img_avg;
+		out[12] = normalized_features.lowpass_filtered_img_stddev;
+		out[13] = normalized_features.lowpass_filtered_img_minval;
+		out[14] = normalized_features.lowpass_filtered_img_maxval;
 
-		out[15] = selected_features.granulo0;
-		out[16] = selected_features.granulo1;
-		out[17] = selected_features.granulo2;
+		out[15] = normalized_features.granulo0;
+		out[16] = normalized_features.granulo1;
+		out[17] = normalized_features.granulo2;
 
-		out[18] = selected_features.granulo3;
-		out[19] = selected_features.granulo4;
-		out[20] = selected_features.granulo5;
+		out[18] = normalized_features.granulo3;
+		out[19] = normalized_features.granulo4;
+		out[20] = normalized_features.granulo5;
 
-		out[21] = selected_features.protein_sum;
-		out[22] = selected_features.solvent_sum;
-		out[23] = selected_features.relative_signal_intensity;
+		out[21] = normalized_features.protein_sum;
+		out[22] = normalized_features.solvent_sum;
+		out[23] = normalized_features.relative_signal_intensity;
 
 		return out;
     }
@@ -306,7 +306,7 @@ class ClassRanker
 public:
 
 	IOParser parser;
-	FileName fn_out, fn_ext, fn_optimiser, fn_model, fn_data, fn_select, fn_job_score, fn_cf, fn_mask_dir;
+	FileName fn_out, fn_ext, fn_optimiser, fn_model, fn_data, fn_select, fn_job_score, fn_cf, fn_mask_dir, fn_subimages, fn_subimage_star;
 	FileName fn_features, fn_sel_parts, fn_sel_classavgs, fn_root;
 
 	RFLOAT minRes, job_score;
