@@ -1151,7 +1151,7 @@ void MetaDataTable::write(std::ostream& out)
 		// Write loop header structure
 		out << "loop_ \n";
 
-		for (long i = 0, n_printed = 0; i < activeLabels.size(); i++)
+		for (long i = 0, n_printed = 1; i < activeLabels.size(); i++)
 		{
 			EMDLabel l = activeLabels[i];
 			if (l == EMDL_UNKNOWN_LABEL)

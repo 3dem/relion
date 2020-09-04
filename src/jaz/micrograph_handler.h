@@ -37,7 +37,8 @@ class MicrographHandler
 	MicrographHandler();
 
 	int nr_omp_threads, firstFrame, lastFrame;
-	double movie_angpix, coords_angpix, hotCutoff;
+	double movie_angpix, coords_angpix, data_angpix, hotCutoff;
+	int eer_upsampling, eer_grouping;
 
 	bool debug, saveMem, ready;
 
@@ -79,7 +80,8 @@ class MicrographHandler
 	std::vector<std::vector<Image<Complex>>> loadMovie(const MetaDataTable& mdt, int s,
 		double angpix, std::vector<ParFourierTransformer>& fts,
 		const std::vector<std::vector<gravis::d2Vector>>* offsets_in = 0,
-		std::vector<std::vector<gravis::d2Vector>>* offsets_out = 0);
+		std::vector<std::vector<gravis::d2Vector>>* offsets_out = 0,
+		double data_angpix = -1);
 
 	/* Load a movie as above and also write tracks of particles at 'pos' into 'tracks'.
 	   If 'unregGlob' is set, also write the global component of motion into 'globComp'.*/
@@ -90,7 +92,8 @@ class MicrographHandler
 		std::vector<std::vector<gravis::d2Vector>>& tracks,
 		bool unregGlob, std::vector<gravis::d2Vector>& globComp,
 		const std::vector<std::vector<gravis::d2Vector>>* offsets_in = 0,
-		std::vector<std::vector<gravis::d2Vector>>* offsets_out = 0);
+		std::vector<std::vector<gravis::d2Vector>>* offsets_out = 0,
+		double data_angpix = -1);
 
 	protected:
 

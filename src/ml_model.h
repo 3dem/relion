@@ -220,6 +220,9 @@ public:
 	// Normalize overlapping regions in multibody masks
 	bool norm_body_mask_overlap;
 
+	// Process data on GPU
+	bool do_gpu;
+
 public:
 
 	// Constructor
@@ -254,7 +257,8 @@ public:
 		helical_rise_min(0),
 		helical_rise_max(0),
 		helical_rise_inistep(0),
-		norm_body_mask_overlap(false)
+		norm_body_mask_overlap(false),
+		do_gpu(false)
 	{
 		clear();
 	}
@@ -335,6 +339,7 @@ public:
 			orientability_contrib = MD.orientability_contrib;
 			helical_twist = MD.helical_twist;
 			helical_rise = MD.helical_rise;
+			do_gpu = MD.do_gpu;
 	        }
         	return *this;
 	}
@@ -396,7 +401,8 @@ public:
 	// Read images from disc and initialise
 	// Also set do_average_unaligned and do_generate_seeds flags
 	void initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experiment &_mydata,
-			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected, RFLOAT ref_angpix = -1., bool _do_sgd = false, bool verb = false);
+			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected,
+			RFLOAT ref_angpix = -1., bool _do_sgd = false, bool do_trust_ref = false, bool verb = false);
 
 	RFLOAT getResolution(int ipix)	{ return (RFLOAT)ipix/(pixel_size * ori_size); }
 
