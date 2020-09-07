@@ -25,7 +25,8 @@ class ZIO
 
 		static std::vector<double> readDoubles(std::string fn);
 		static std::vector<int> readInts(std::string fn);
-		static std::vector<std::vector<double>> readDoublesTable(std::string fn, int cols, char delim = ' ');
+		static std::vector<std::vector<double>> readFixedDoublesTable(std::string fn, int cols, char delim = ' ');
+		static std::vector<std::vector<double>> readDoublesTable(std::string fn, char delim = ' ');
 		static std::vector<std::string> split(const std::string& s, const std::string &delimiter);
 		
 		template <typename T>

@@ -94,10 +94,28 @@ std::pair<std::vector<double>,std::vector<double>> Blob2D::radialAverageAndWeigh
 
 	const int w = frame.xdim;
 	const int h = frame.ydim;
-
-
-	for (int y = 0; y < h; y++)
-	for (int x = 0; x < w; x++)
+	
+	
+	double maxAmp = 0.0;
+	
+	for (int i = 0; i < amplitudes.size(); i++)
+	{
+		maxAmp += amplitudes[i].abs();
+	}
+	
+	int x0 = std::ceil( center.x - maxRadius - maxAmp);
+	int x1 = std::floor(center.x + maxRadius + maxAmp)+1;
+	int y0 = std::ceil( center.y - maxRadius - maxAmp);
+	int y1 = std::floor(center.y + maxRadius + maxAmp)+1;
+	
+	if (x0 < 0) x0 = 0;
+	if (x1 > w) x1 = w;
+	
+	if (y0 < 0) y0 = 0;
+	if (y1 > h) y1 = h;
+	
+	for (int y = y0; y < y1; y++)
+	for (int x = x0; x < x1; x++)
 	{
 		const double m = weight(x,y);
 		
@@ -312,7 +330,7 @@ BufferedImage<float> Blob2D::radialAverageProjection(
 }
 
 void Blob2D::erase(
-	const RawImage<float>& micrographs,
+	const RawImage<float>& micrograph,
 	RawImage<float>& erased_out,
 	RawImage<float>& blob_out,
 	const RawImage<float>& weight,
@@ -320,7 +338,7 @@ void Blob2D::erase(
     double taper) const
 {
 	std::pair<std::vector<double>,std::vector<double>> radAvgAndWgh = radialAverageAndWeight(
-	            micrographs, weight, radius + taper);
+	            micrograph, weight, radius + taper);
 	
 	const int max_radius = radAvgAndWgh.first.size();
 	
@@ -365,8 +383,8 @@ void Blob2D::erase(
 	}
 
 	
-	const int w = micrographs.xdim;
-	const int h = micrographs.ydim;
+	const int w = micrograph.xdim;
+	const int h = micrograph.ydim;
 
 	double outside_val(0.0), outside_wgh(0.0);
 	
@@ -403,7 +421,7 @@ void Blob2D::erase(
 
 		if (wgh > 0.0)
 		{
-			outside_val += (1 - wgh) * micrographs(x,y);
+			outside_val += (1 - wgh) * micrograph(x,y);
 			outside_wgh += (1 - wgh);
 		}
 	}
@@ -453,7 +471,7 @@ void Blob2D::erase(
 
 
 void Blob2D::eraseInSectors(
-	const RawImage<float>& micrographs,
+	const RawImage<float>& micrograph,
 	RawImage<float>& erased_out,
 	RawImage<float>& blob_out,
 	const RawImage<float>& weight,
@@ -462,7 +480,7 @@ void Blob2D::eraseInSectors(
 	int sectors) const
 {
 	std::pair<std::vector<double>,std::vector<double>> radAvgAndWgh = radialAverageAndWeightInSectors(
-	            micrographs, weight, sectors, radius + taper);
+	            micrograph, weight, sectors, radius + taper);
 	
 	const int max_radius = radAvgAndWgh.first.size();
 	
@@ -510,8 +528,8 @@ void Blob2D::eraseInSectors(
 	}
 
 	
-	const int w = micrographs.xdim;
-	const int h = micrographs.ydim;
+	const int w = micrograph.xdim;
+	const int h = micrograph.ydim;
 
 	double outside_val(0.0), outside_wgh(0.0);
 	
@@ -548,7 +566,7 @@ void Blob2D::eraseInSectors(
 
 		if (wgh > 0.0)
 		{
-			outside_val += (1 - wgh) * micrographs(x,y);
+			outside_val += (1 - wgh) * micrograph(x,y);
 			outside_wgh += (1 - wgh);
 		}
 	}
@@ -653,7 +671,7 @@ std::pair<d2Vector, d2Vector> Blob2D::scanForBoundingBox(double radius, double p
 	for (int i = 0; i < samples; i++)
 	{
 		const double phi = 2 * PI * i / (double) samples;		
-		const double rad = radius + getOffset(phi);
+		const double rad = radius - getOffset(phi);
 		const d2Vector r = center + rad * d2Vector(cos(phi), sin(phi));
 		
 		if (p0.x > r.x) p0.x = r.x;
@@ -700,17 +718,76 @@ std::vector<double> Blob2D::rotate(const std::vector<double> &params, double ang
 }
 
 
-DelineatedBlob2D::DelineatedBlob2D(d2Vector center, double radius, double smoothing_radius)
-:	blob(center, smoothing_radius),
+DelineatedBlob2D::DelineatedBlob2D()
+{	
+}
+
+DelineatedBlob2D::DelineatedBlob2D(const Blob2D& blob, double radius)
+:	Blob2D(blob),
 	radius(radius)	
 {
-	
+}
+
+DelineatedBlob2D::DelineatedBlob2D(d2Vector center, double radius, double smoothing_radius)
+:	Blob2D(center, smoothing_radius),
+	radius(radius)	
+{
 }
 
 DelineatedBlob2D::DelineatedBlob2D(const std::vector<double>& params)
-:	radius(params[0]),
-	blob(stripRadius(params), 2 * params[0])
+:	Blob2D(stripRadius(params), 2 * params[0]),
+	radius(params[0])	
 {
+}
+
+double DelineatedBlob2D::getRadius(double phi) const
+{
+	return radius - getOffset(phi);
+}
+
+double DelineatedBlob2D::getSignedDistance(d2Vector imgPos) const
+{
+	return getDistance(imgPos) - radius;
+}
+
+double DelineatedBlob2D::getRelativeSignedDistance(d2Vector imgPos) const
+{
+	return (getDistance(imgPos) - radius) / radius;
+}
+
+d2Vector DelineatedBlob2D::getOutlinePoint(double phi) const
+{
+	const double r = getRadius(phi);
+	return center + r * d2Vector(cos(phi), sin(phi));
+}
+
+double DelineatedBlob2D::perimeter() const
+{
+	const int samples = std::round(2 * PI * radius);
+	
+	double sum = 0.0;
+	        
+	for (int i = 0; i < samples; i++)
+	{
+		const double phi0 = 2 * PI * (i  ) / (double) samples;
+		const double phi1 = 2 * PI * (i+1) / (double) samples;
+		
+		const double rad0 = radius - Blob2D::getOffset(phi0);
+		const double rad1 = radius - Blob2D::getOffset(phi1);
+		
+		const d2Vector r0 = Blob2D::center + rad0 * d2Vector(cos(phi0), sin(phi0));
+		const d2Vector r1 = Blob2D::center + rad1 * d2Vector(cos(phi1), sin(phi1));
+		
+		sum += (r1 - r0).length();
+	}
+	
+	return sum;
+}
+
+Blob2D DelineatedBlob2D::getBlob2D() const
+{
+	Blob2D out = *this;
+	return out; 
 }
 
 std::vector<DelineatedBlob2D> DelineatedBlob2D::read(const std::string &filename)
@@ -753,6 +830,20 @@ std::vector<double> DelineatedBlob2D::stripRadius(const std::vector<double> &par
 	for (int i = 0; i < params.size()-1; i++)
 	{
 		blob_params[i] = params[i+1];
+	}
+	
+	return blob_params;
+}
+
+std::vector<double> DelineatedBlob2D::addRadius(double radius, const std::vector<double> &params)
+{
+	std::vector<double> blob_params(params.size()+1);
+	
+	blob_params[0] = radius;
+	
+	for (int i = 0; i < params.size(); i++)
+	{
+		blob_params[i+1] = params[i];
 	}
 	
 	return blob_params;

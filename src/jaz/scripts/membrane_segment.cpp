@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
 	std::string tomoTag = "214";
 			
 	std::string pointsFn = "coords_"+tomoTag+"_bin1.txt";//"coords_145_bin8.txt";
-	std::vector<std::vector<double>> coords = ZIO::readDoublesTable(pointsFn, 6);
+	std::vector<std::vector<double>> coords = ZIO::readFixedDoublesTable(pointsFn, 6);
 	
 	const double binning = 16.0;
 	const int pc = coords.size();

@@ -93,19 +93,28 @@ class Blob2D
 		
 };
 
-class DelineatedBlob2D
+class DelineatedBlob2D : public Blob2D
 {
 	public: 
 		
+		DelineatedBlob2D();
+		DelineatedBlob2D(const Blob2D& blob, double radius);
 		DelineatedBlob2D(gravis::d2Vector center, double radius, double smoothingRadius = 0.0);
 		DelineatedBlob2D(const std::vector<double>& params);
 		
-			Blob2D blob;
 			double radius;
-		
+			
+			
+		double getRadius(double phi) const;
+		double getSignedDistance(gravis::d2Vector imgPos) const;
+		double getRelativeSignedDistance(gravis::d2Vector imgPos) const;
+		gravis::d2Vector getOutlinePoint(double phi) const;
+		double perimeter() const;
+		Blob2D getBlob2D() const;
 		
 		static std::vector<DelineatedBlob2D> read(const std::string& filename);
 		static std::vector<double> stripRadius(const std::vector<double>& params);
+		static std::vector<double> addRadius(double radius, const std::vector<double>& params);
 };
 
 

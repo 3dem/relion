@@ -85,7 +85,7 @@ void DeleteBlobs2DProgram::run()
 	
 	if (!file)
 	{
-		REPORT_ERROR("DelineatedBlob2D::run: unable to read " + micrographs_list_filename);
+		REPORT_ERROR("DeleteBlobs2DProgram::run: unable to read " + micrographs_list_filename);
 	}
 	
 	std::string line;
@@ -293,7 +293,7 @@ void DeleteBlobs2DProgram::processMicrograph(
 		}
 		
 		const double radius = delineated_blobs[blob_id].radius;
-		Blob2D initial_blob = delineated_blobs[blob_id].blob;
+		Blob2D initial_blob = delineated_blobs[blob_id].getBlob2D();
 		
 		std::vector<double> initial_parameters_fullsize = initial_blob.toVector();
 

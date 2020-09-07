@@ -141,7 +141,7 @@ int main(int argc, char *argv[])
 	
 	Log::print("Deducing frame sequence from "+orderFn+" and "+tltFn);
 		
-	std::vector<std::vector<double>> order = ZIO::readDoublesTable(orderFn, 2, ',');
+	std::vector<std::vector<double>> order = ZIO::readFixedDoublesTable(orderFn, 2, ',');
 	std::vector<double> tilts = ZIO::readDoubles(tltFn);
 	
 	int fc = tilts.size();
