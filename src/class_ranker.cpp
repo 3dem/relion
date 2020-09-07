@@ -564,35 +564,40 @@ void ClassRanker::initialise()
 
 	}
 
-	// Open selected_class table
-	if (fn_select != "")
+	if (!do_select)
 	{
-		if (verb > 0) std::cout << " Reading in selection file: " << fn_select << std::endl;
-		MD_select.read(fn_select);
-	}
+		// These options are for generating training data
 
-	// Read in class features from a previous run if fn_cf is provided
-	if (fn_cf != "")
-	{
+		// Open selected_class table
+		if (fn_select != "")
+		{
+			if (verb > 0) std::cout << " Reading in selection file: " << fn_select << std::endl;
+			MD_select.read(fn_select);
+		}
 
-		if (verb > 0) std::cout << " Reading in previously calculated feature star file: " << fn_cf << std::endl;
-		readFeatures();
-	}
+		// Read in class features from a previous run if fn_cf is provided
+		if (fn_cf != "")
+		{
 
-	// Get job score
-	if (fn_job_score != "")
-	{
-		std::ifstream in(fn_job_score, std::ios_base::in);
-		if (in.fail()) REPORT_ERROR( (std::string) "ERROR: File " + fn_job_score + " does not exists" );
-		std::string line;
-		getline(in, line, '\n');
-		job_score = textToFloat(line);
-		in.close();
-		if (verb > 0) std::cout << " Read in job_score of: " << job_score << std::endl;
-	}
-	else
-	{
-		job_score = -1.;
+			if (verb > 0) std::cout << " Reading in previously calculated feature star file: " << fn_cf << std::endl;
+			readFeatures();
+		}
+
+		// Get job score
+		if (fn_job_score != "")
+		{
+			std::ifstream in(fn_job_score, std::ios_base::in);
+			if (in.fail()) REPORT_ERROR( (std::string) "ERROR: File " + fn_job_score + " does not exists" );
+			std::string line;
+			getline(in, line, '\n');
+			job_score = textToFloat(line);
+			in.close();
+			if (verb > 0) std::cout << " Read in job_score of: " << job_score << std::endl;
+		}
+		else
+		{
+			job_score = -1.;
+		}
 	}
 
 	if (radius_ratio > 0 && radius > 0)
@@ -1290,7 +1295,7 @@ void ClassRanker::makeSolventMasks(classFeatures cf, MultidimArray<RFLOAT> img, 
 						} // finish finding all pixels for the new island
 
 						//  Debug
-						std::cerr << "Class " << cf.class_index << " inside: " << inside << std::endl;
+						//std::cerr << "Class " << cf.class_index << " inside: " << inside << std::endl;
 
 						if (inside > 0.4*3.14*0.49*circular_mask_radius*circular_mask_radius)
 						{
@@ -1842,7 +1847,7 @@ void ClassRanker::performRanking()
 		if (debug>0) std::cerr << "Done with reading data.star ..." << std::endl;
 	}
 
-	// Initialise all scores to -999 (including empty classes!
+	// Initialise all scores to -999 (including empty classes!)
 	std::vector<RFLOAT> predicted_scores(mymodel.nr_classes, -999.);
 
 	// to preserve original particle order in the data.star file
