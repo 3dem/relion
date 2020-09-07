@@ -54,9 +54,9 @@ int main(int argc, char *argv[])
 	
 	outPath = ZIO::makeOutputDir(outPath);
 	
-	const std::string perimeter_dir = "perimeter/";
-	const std::string full_dir = "full/";
-	const std::string outer_half_dir = "outer_half/";
+	const std::string perimeter_dir = "perimeter/Frames/";
+	const std::string full_dir = "full/Frames/";
+	const std::string outer_half_dir = "outer_half/Frames/";
 	
 	ZIO::makeOutputDir(outPath + perimeter_dir);
 	ZIO::makeOutputDir(outPath + full_dir);
@@ -132,9 +132,17 @@ int main(int argc, char *argv[])
 			
 			std::vector<DelineatedBlob2D> blobs(blob_count);
 			
+			if (verbose)
+			{
+				Log::beginProgress("Processing Blobs", blob_count);
+			}
+				            
 			for (int b = 0; b < blob_count; b++)
 			{
-				Log::print("Blob "+ZIO::itoa(b));
+				if (verbose)
+				{
+					Log::updateProgress(b);
+				}
 				
 				Blob2D blob(blob_shapes[b]);
 				
@@ -195,6 +203,11 @@ int main(int argc, char *argv[])
 				blobs[b] = delineated_blob;
 			}
 			
+			if (verbose)
+			{
+				Log::endProgress();
+			}
+			
 			const int EDGE = 0;
 			const int OUTER_HALF = 1;
 			const int FULL_BLOB = 2;
@@ -206,19 +219,6 @@ int main(int argc, char *argv[])
 			{
 				DelineatedBlob2D blob = blobs[b];
 				
-				const double l = blob.perimeter();
-				const int samples = std::floor(l / min_distance);
-				
-				
-				for (int i = 0; i < samples; i++)
-				{
-					const double phi = 2 * PI * i / (double) samples;
-					const d2Vector p = blob.getOutlinePoint(phi);
-					
-					picks[EDGE].push_back(p);
-					
-					if (diag) Drawing::drawCross(p, 100.f, 10, plot);
-				}
 				
 				const double d = min_distance;
 				const double margin = d;
@@ -249,6 +249,24 @@ int main(int argc, char *argv[])
 						}
 					}
 				}
+				
+				const double l = blob.perimeter();
+				const int samples = std::floor(l / min_distance);
+				
+				
+				for (int i = 0; i < samples; i++)
+				{
+					const double phi = 2 * PI * i / (double) samples;
+					const d2Vector p = blob.getOutlinePoint(phi);
+					
+					if (p.x > margin && p.x < w - margin   
+					 && p.y > margin && p.y < h - margin)
+					{
+						picks[EDGE].push_back(p);
+						
+						if (diag) Drawing::drawCross(p, 100.f, 10, plot);
+					}
+				}
 			}
 			
 			if (diag) plot.write(outPath + "diag_"+ZIO::itoa(m)+".mrc", pixel_size);
@@ -259,6 +277,8 @@ int main(int argc, char *argv[])
 			{
 				const int pc = picks[i].size();
 				MetaDataTable& table = tables[i];
+				
+				table.setName("images");
 				
 				table.addLabel(EMDL_IMAGE_COORD_X);
 				table.addLabel(EMDL_IMAGE_COORD_Y);
@@ -278,9 +298,9 @@ int main(int argc, char *argv[])
 				}
 			}
 			
-			tables[EDGE].write(outPath + perimeter_dir + micrograph_name + "_blob_pick.txt");
-			tables[FULL_BLOB].write(outPath + full_dir + micrograph_name + "_blob_pick.txt");
-			tables[OUTER_HALF].write(outPath + outer_half_dir + micrograph_name + "_blob_pick.txt");
+			tables[EDGE].write(outPath + perimeter_dir + micrograph_name + "_blob_pick.star");
+			tables[FULL_BLOB].write(outPath + full_dir + micrograph_name + "_blob_pick.star");
+			tables[OUTER_HALF].write(outPath + outer_half_dir + micrograph_name + "_blob_pick.star");
 		}
 		catch (...)
 		{
