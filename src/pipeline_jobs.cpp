@@ -1213,7 +1213,7 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 			else if (node_type == "Unfiltered half-map (unfil.mrc)")
 				mynodetype = NODE_HALFMAP;
 			else
-			{			
+			{
 				error_message = "Unrecognized menu option for node_type = " + node_type;
 				return false;
 			}
@@ -2398,6 +2398,7 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 			outputNodes.push_back(node4);
 
 			// perform the actual prediction and selection
+			command += " --do_granularity_features --fn_torch_model /lmb/home/ldong/app/relion-3.1/traced_model.pt ";
 			command += " --auto_select ";
 			command += " --min_score " + joboptions["rank_threshold"].getString();
 			if (joboptions["do_rank_relative"].getBoolean())

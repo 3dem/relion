@@ -420,7 +420,7 @@ void ClassRanker::read(int argc, char **argv, int rank)
 	fn_features = parser.getOption("--fn_features", "Filename for output features star file", "features.star");
 	fn_sel_parts = parser.getOption("--fn_sel_parts", "Filename for output star file with selected particles", "particles.star");
 	fn_sel_classavgs = parser.getOption("--fn_sel_classavgs", "Filename for output star file with selected class averages", "class_averages.star");
-	fn_root = parser.getOption("--fn_root", "rootname for output model.star and optimiser.star files", "run");
+	fn_root = parser.getOption("--fn_root", "rootname for output model.star and optimiser.star files", "rank");
 	fn_subimages = parser.getOption("--output_subimages", "Name of the mrcs file for saving output subimages.", "subimages.mrcs");
 	fn_subimage_star = parser.getOption("--output_subimage_star", "Name of the subimage star file.", "subimages.star");
 
@@ -1874,6 +1874,14 @@ void ClassRanker::performRanking()
 		my_max = select_max_score * max_score;
 	}
 
+
+	MetaDataTable MDbackup;
+	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+	{
+		MDbackup.addObject();
+		MDbackup.setValue(EMDL_SELECTED, 0);
+	}
+
 	for (int i = 0; i < features_all_classes.size(); i++)
 	{
 		if (do_select && scores[i] >= my_min && scores[i] <= my_max)
@@ -1888,6 +1896,9 @@ void ClassRanker::performRanking()
 			MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_ROT, features_all_classes[i].accuracy_rotation);
 			MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, features_all_classes[i].accuracy_translation);
 			MDselected_classavgs.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, features_all_classes[i].estimated_resolution);
+
+			std::cerr << " features_all_classes[i].class_index= " << features_all_classes[i].class_index << std::endl;
+			MDbackup.setValue(EMDL_SELECTED, 1, features_all_classes[i].class_index - 1 );
 		}
 
 		// Set myscore in the vector that now runs over ALL classes (including empty ones)
@@ -1896,11 +1907,15 @@ void ClassRanker::performRanking()
 	}
 
 	// Write optimiser.star and model.star in the output directory.
-	FileName fn_opt_out, fn_model_out;
+	FileName fn_opt_out, fn_model_out, fn_data_out;
 	fn_opt_out = fn_out + fn_root + "_optimiser.star";
 	fn_model_out = fn_out + fn_root + "_model.star";
+	fn_data_out = fn_out + fn_root + "_data.star";
 	MD_optimiser.setValue(EMDL_OPTIMISER_MODEL_STARFILE, fn_model_out);
+	MD_optimiser.setValue(EMDL_OPTIMISER_DATA_STARFILE, fn_data_out);
 	MD_optimiser.write(fn_opt_out);
+	mydata.write(fn_data_out);
+	MDbackup.write(fn_out + "backup_selection.star");
 
 	MetaDataTable MDclass;
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
@@ -1919,6 +1934,7 @@ void ClassRanker::performRanking()
 			MDclass.setValue(EMDL_MLMODEL_PRIOR_OFFY_CLASS, YY(mymodel.prior_offset_class[iclass]));
 		}
 	}
+	MDclass.setName("model_classes");
 	MDclass.write(fn_model_out);
 	if (verb > 0)
 	{
