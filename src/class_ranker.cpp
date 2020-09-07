@@ -1897,7 +1897,6 @@ void ClassRanker::performRanking()
 			MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, features_all_classes[i].accuracy_translation);
 			MDselected_classavgs.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, features_all_classes[i].estimated_resolution);
 
-			std::cerr << " features_all_classes[i].class_index= " << features_all_classes[i].class_index << std::endl;
 			MDbackup.setValue(EMDL_SELECTED, 1, features_all_classes[i].class_index - 1 );
 		}
 
