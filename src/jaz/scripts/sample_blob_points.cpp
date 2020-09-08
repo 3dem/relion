@@ -224,7 +224,7 @@ int main(int argc, char *argv[])
 				const double margin = d;
 				const double dd = 0.5 * sqrt(3.0) * d;
 				const int rc = (h - 2*margin) / dd + 1;
-				const std::vector<int> cc = {(int)((w - 2*margin) / dd), (int)((w - 2*margin - d/2) / dd)};
+				const std::vector<int> cc = {(int)((w - 2*margin) / d), (int)((w - 2*margin - d/2) / d)};
 				
 				for (int r = 0; r < rc; r++)
 				for (int c = 0; c < cc[r%2]; c++)
