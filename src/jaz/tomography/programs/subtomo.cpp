@@ -230,10 +230,11 @@ void SubtomoProgram::run()
 					for (int y = 0; y < s2D;  y++)
 					for (int x = 0; x < sh2D; x++)
 					{
-						const float c = scale * ctfImg(x,y) * doseWeights(x,y,f);
+						particleStack(x,y,f) *= scale * ctfImg(x,y) * doseWeights(x,y,f);
 						
-						particleStack(x,y,f) *= c;
-						weightStack(x,y,f) = c * c;
+						// Apply only the square root of the dose weight
+						// because we are going to square the weight after cropping:
+						weightStack(x,y,f) = scale * ctfImg(x,y) * sqrt(doseWeights(x,y,f));
 					}
 				}
 			}
@@ -262,6 +263,9 @@ void SubtomoProgram::run()
 				particleStack = NewStackHelper::FourierTransformStack(particlesRS);
 				weightStack = FFT::toReal(NewStackHelper::FourierTransformStack(weightsRS));
 			}
+			
+			// squaring the CTF here:
+			weightStack *= weightStack;
 			
 			BufferedImage<fComplex> dataImgFS(sh3D,s3D,s3D);
 			dataImgFS.fill(fComplex(0.0, 0.0));
