@@ -1570,7 +1570,6 @@ void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 	long int myint1, myint2;
 	double myd1, myd2, mydy1 = 0., mydy2 = 0., mydz1 = 0., mydz2 = 0.;
 
-
 	// loop over MD1
 	std::vector<long int> to_remove_from_only2;
 	for (long int current_object1 = MD1.firstObject();
@@ -1598,7 +1597,6 @@ void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 					  current_object2 != MetaDataTable::NO_MORE_OBJECTS && current_object2 != MetaDataTable::NO_OBJECTS_STORED;
 					  current_object2 = MD2.nextObject())
 		{
-
 			if (EMDL::isString(label1))
 			{
 				MD2.getValue(label1, mystr2);
@@ -1651,8 +1649,6 @@ void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 		}
 	}
 
-
-
 	for (long int current_object2 = MD2.firstObject();
 				current_object2 != MetaDataTable::NO_MORE_OBJECTS && current_object2 != MetaDataTable::NO_OBJECTS_STORED;
 				current_object2 = MD2.nextObject())
@@ -1673,8 +1669,6 @@ void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 			MDonly2.addObject(MD2.getObject(current_object2));
 		}
 	}
-
-
 }
 
 MetaDataTable combineMetaDataTables(std::vector<MetaDataTable> &MDin)

@@ -1423,6 +1423,7 @@ void JobWindow::initialiseClass3DWindow()
 
 	group4->begin();
 	place("sigma_angles");
+	place("relax_sym");
 	group4->end();
 	guientries["do_local_ang_searches"].cb_menu_i(); // to make default effective
 
@@ -1572,7 +1573,7 @@ void JobWindow::initialiseAutorefineWindow()
 
 	current_y += STEPY/2;
 	place("auto_local_sampling", TOGGLE_DEACTIVATE);
-
+	place("relax_sym");
 	current_y += STEPY/2;
 	place("auto_faster");
 

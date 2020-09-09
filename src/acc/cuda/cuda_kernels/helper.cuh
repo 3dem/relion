@@ -443,7 +443,7 @@ __global__ void cuda_kernel_multi( T *A,
 								   T S,
 		  	  	  	  	  	  	   int image_size)
 {
-	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	int pixel = threadIdx.x + blockIdx.x*blockDim.x;
 	if(pixel<image_size)
 		OUT[pixel] = A[pixel]*S;
 }
@@ -461,7 +461,7 @@ __global__ void cuda_kernel_multi(
 		T S,
 		int image_size)
 {
-	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	int pixel = threadIdx.x + blockIdx.x*blockDim.x;
 	if(pixel<image_size)
 		A[pixel] = A[pixel]*S;
 }
@@ -480,7 +480,7 @@ __global__ void cuda_kernel_multi( T *A,
 								   T S,
 		  	  	  	  	  	  	   int image_size)
 {
-	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	int pixel = threadIdx.x + blockIdx.x*blockDim.x;
 	if(pixel<image_size)
 		OUT[pixel] = A[pixel]*B[pixel]*S;
 }

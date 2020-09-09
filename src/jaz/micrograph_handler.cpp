@@ -572,9 +572,9 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 
 //				std::cout << "DEBUG: defect correction: mean = " << mean << " std = " << std << std::endl;
 
-				// 25 neighbours; should be enough even for super-resolution images.
 		                const int NUM_MIN_OK = 6;
-		                const int D_MAX = 2;
+		                const int D_MAX = isEER ? 4: 2;
+				const int PBUF_SIZE = 100;
 		                FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(defectMask)
         		        {
 		                        if (!DIRECT_A2D_ELEM(defectMask, i, j)) continue;
@@ -583,7 +583,7 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 					for (int iframe = 0; iframe < n_frames; iframe++)
 					{
 		 				int n_ok = 0;
-						RFLOAT val = 0;
+						RFLOAT pbuf[PBUF_SIZE];
 						for (int dy= -D_MAX; dy <= D_MAX; dy++)
 						{
 							int y = i + dy;
@@ -594,13 +594,15 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 								if (x < 0 || x >= XSIZE(defectMask)) continue;
 								if (DIRECT_A2D_ELEM(defectMask, y, x)) continue;
 
+								pbuf[n_ok] = DIRECT_A2D_ELEM(Iframes[iframe], y, x);
 								n_ok++;
-								val += DIRECT_A2D_ELEM(Iframes[iframe], y, x);
 							}
 						}
-//						std::cout << "n_ok = " << n_ok << " val = " << val << std::endl;
-						if (n_ok > NUM_MIN_OK) DIRECT_A2D_ELEM(Iframes[iframe], i, j) = val / n_ok;
-						else DIRECT_A2D_ELEM(Iframes[iframe], i, j) = rnd_gaus(mean, std);
+//						std::cout << "n_ok = " << n_ok << std::endl;
+						if (n_ok > NUM_MIN_OK)
+							DIRECT_A2D_ELEM(Iframes[iframe], i, j) = pbuf[rand() % n_ok];
+						else
+							DIRECT_A2D_ELEM(Iframes[iframe], i, j) = rnd_gaus(mean, std);
 					}
 				}
 
