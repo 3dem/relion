@@ -429,14 +429,15 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 
 			// 25 neighbours; should be enough even for super-resolution images.
 			const int NUM_MIN_OK = 6;
-			const int D_MAX = 2;
+			const int D_MAX = 2; // EER code path does not use this function
+			const int PBUF_SIZE = 100;	
 			#pragma omp parallel for num_threads(threads_p)
 			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(muGraph.data)
 			{
 				if (!DIRECT_A2D_ELEM(*defectMask, i, j)) continue;
 
 				int n_ok = 0;
-				RFLOAT val = 0;
+				RFLOAT pbuf[PBUF_SIZE];
 				for (int dy= -D_MAX; dy <= D_MAX; dy++)
 				{
 					int y = i + dy;
@@ -447,11 +448,11 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 						if (x < 0 || x >= w0) continue;
 						if (DIRECT_A2D_ELEM(*defectMask, y, x)) continue;
 
+						pbuf[n_ok] = DIRECT_A2D_ELEM(muGraph.data, y, x);
 						n_ok++;
-						val += DIRECT_A2D_ELEM(muGraph.data, y, x);
 					}
 				}
-				if (n_ok > NUM_MIN_OK) DIRECT_A2D_ELEM(muGraph.data, i, j) = val / n_ok;
+				if (n_ok > NUM_MIN_OK) DIRECT_A2D_ELEM(muGraph.data, i, j) = pbuf[rand() % n_ok];
 				else DIRECT_A2D_ELEM(muGraph.data, i, j) = rnd_gaus(frame_mean, frame_std);
 			}
 		}
