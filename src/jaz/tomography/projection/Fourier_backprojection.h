@@ -76,6 +76,15 @@ class FourierBackprojection
 			RawImage<tComplex<DestType>>& destFS,
 			RawImage<DestType>& destCTF);
 		
+		template <typename SrcType, typename DestType>
+		static void backprojectSlice_forward_with_multiplicity(
+			const RawImage<tComplex<SrcType>>& dataFS,
+			const RawImage<SrcType>& weight,
+			const gravis::d4Matrix& proj,
+			RawImage<tComplex<DestType>>& destFS,
+			RawImage<DestType>& destCTF,
+			RawImage<DestType>& destMult);
+		
 		
 		
 		template <typename SrcType, typename DestType>
@@ -889,6 +898,98 @@ void FourierBackprojection::backprojectSlice_forward(
 		const tComplex<SrcType> wgh = weight(x,y);
 		
 		pointInsertion.insert(value, wgh, pos3, destFS, destCTF);
+	}
+}
+
+
+
+template <typename SrcType, typename DestType>
+void FourierBackprojection::backprojectSlice_forward_with_multiplicity(
+				const RawImage<tComplex<SrcType>>& dataFS,
+				const RawImage<SrcType>& weight,
+				const gravis::d4Matrix& proj,
+				RawImage<tComplex<DestType>>& destFS,
+				RawImage<DestType>& destCTF,
+				RawImage<DestType>& destMult)
+{
+	const int wh2 = dataFS.xdim;
+	const int h2 = dataFS.ydim;
+	
+	const int wh3 = destFS.xdim;
+	const int h3 = destFS.ydim;
+	const int d3 = destFS.zdim;
+	
+	if (!destCTF.hasSize(wh3, h3, d3))
+	{
+		REPORT_ERROR_STR("FourierBackprojection::backprojectSlice_forward_with_multiplicity: destCTF has wrong size ("
+						 << destCTF.getSizeString() << " instead of " << destCTF.getSizeString() << ")");
+	}
+	
+	const gravis::d3Vector u(proj(0,0), proj(0,1), proj(0,2));
+	const gravis::d3Vector v(proj(1,0), proj(1,1), proj(1,2));
+	
+	for (long int y = 0; y < h2;  y++)
+	for (long int x = (y > 0 && y < h2/2? 0 : 1); x < wh2; x++)
+	{
+		const double xx = x;
+		const double yy = y < h2/2? y : y - h2;
+		
+		gravis::d3Vector pos3 = xx * u + yy * v;		
+		
+		bool conj = false;
+		
+		if (pos3.x < 0)
+		{
+			pos3 = -pos3;
+			conj = true;
+		}		
+		
+		const tComplex<SrcType> value = conj? dataFS(x,y).conj() : dataFS(x,y);
+		const tComplex<SrcType> wgh = weight(x,y);
+		
+		{
+			const int x0 = std::floor(pos3.x);
+			const int y0 = std::floor(pos3.y);
+			const int z0 = std::floor(pos3.z);
+			
+			for (int dz = 0; dz < 2; dz++)
+			for (int dy = 0; dy < 2; dy++)
+			for (int dx = 0; dx < 2; dx++)
+			{
+				const int xg = x0 + dx;			
+				const int yg = y0 + dy;
+				const int zg = z0 + dz;
+				
+				if ( xg < wh3
+				  && yg >= -h3/2 && yg < h3/2
+				  && zg >= -d3/2 && zg < d3/2)
+				{
+					const int xi = xg;			
+					const int yi = yg >= 0? yg : yg + h3;
+					const int zi = zg >= 0? zg : zg + d3;
+					
+					const double fx = 1.0 - std::abs(pos3.x - xg);
+					const double fy = 1.0 - std::abs(pos3.y - yg);
+					const double fz = 1.0 - std::abs(pos3.z - zg);
+					
+					const double m = fx * fy * fz;
+					
+					destFS(  xi,yi,zi) += m * value;
+					destCTF( xi,yi,zi) += m * wgh;
+					destMult(xi,yi,zi) += m;
+					
+					if (xi == 0)
+					{
+						const int yim = (h3 - yi) % h3;
+						const int zim = (d3 - zi) % d3;
+						
+						destFS(  0,yim,zim) += m * value.conj();
+						destCTF( 0,yim,zim) += m * wgh;
+						destMult(0,yim,zim) += m;
+					}
+				}
+			}
+		}
 	}
 }
 

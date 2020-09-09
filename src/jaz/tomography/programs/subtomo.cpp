@@ -4,9 +4,10 @@
 #include <src/jaz/tomography/projection/Fourier_backprojection.h>
 #include <src/jaz/tomography/reconstruction.h>
 #include <src/jaz/tomography/tomogram_set.h>
+#include <src/jaz/tomography/tomo_ctf_helper.h>
+#include <src/jaz/tomography/projection/point_insertion.h>
 #include <src/jaz/image/centering.h>
 #include <src/jaz/image/padding.h>
-#include <src/jaz/tomography/tomo_ctf_helper.h>
 #include <src/jaz/image/power_spectrum.h>
 #include <src/jaz/tomography/tomo_ctf_helper.h>
 #include <src/jaz/tomography/tomogram.h>
@@ -43,7 +44,8 @@ void SubtomoProgram::readParameters(int argc, char *argv[])
 		cone_slope = sin(DEG2RAD(alpha));
 		cone_sig0 = textToDouble(parser.getOption("--cone_sig0", "Cone width at Z = 0", "2"));	
 
-		do_gridding_correction = parser.checkOption("--grid_corr", "Perform individual gridding-correction on each subtomogram");
+		//do_gridding_correction = parser.checkOption("--grid_corr", "Perform individual gridding-correction on each subtomogram");
+		do_gridding_correction = false;
 
 		taper = textToDouble(parser.getOption("--taper", "Taper against the sphere by this number of pixels", "5"));
 		env_sigma = textToDouble(parser.getOption("--env", "Sigma of a Gaussian envelope applied before cropping", "-1"));
@@ -75,6 +77,11 @@ void SubtomoProgram::readParameters(int argc, char *argv[])
 		std::cerr << XE;
 		exit(1);
 	}
+	
+	if (do_gridding_correction)
+	{
+		REPORT_ERROR("Gridding correction is currently disabled.");
+	}
 }
 
 void SubtomoProgram::run()
@@ -86,8 +93,6 @@ void SubtomoProgram::run()
 	
 	if (cropSize < 0) cropSize = boxSize;
 	
-	const bool computeMultiplicity = write_multiplicity || write_normalised || write_combined;
-	
 	bool do_ctf = true;
 	
 	const long int tc = particles.size();
@@ -98,6 +103,8 @@ void SubtomoProgram::run()
 	const long int sh3D = s3D / 2 + 1;
 	
 	const long int s02D = (int)(binning * s2D + 0.5);
+	
+	const double relative_box_scale = cropSize / (double) boxSize;
 
 
 	ParticleSet copy = *dataSet;
@@ -200,9 +207,12 @@ void SubtomoProgram::run()
 			BufferedImage<fComplex> particleStack = BufferedImage<fComplex>(sh2D,s2D,fc);			
 			BufferedImage<float> weightStack(sh2D,s2D,fc);
 			
+			const bool noSubpixelShift = false;
+			const bool circleCrop = false;
+			
 			TomoExtraction::extractAt3D_Fourier(
 					tomogram.stack, s02D, binning, tomogram.projectionMatrices, traj,
-					particleStack, projCut, inner_thread_num, false, true);
+					particleStack, projCut, inner_thread_num, noSubpixelShift, circleCrop);
 			
 			
 			if (!do_ctf) weightStack.fill(1.f);
@@ -225,16 +235,15 @@ void SubtomoProgram::run()
 					BufferedImage<float> ctfImg(sh2D, s2D);
 					ctf.draw(s2D, s2D, binnedPixelSize, &ctfImg(0,0,0));
 					
-					const float scale = flip_value? -1.f : 1.f;
+					const float scale = (flip_value? -1.f : 1.f) * relative_box_scale * relative_box_scale;
 							
 					for (int y = 0; y < s2D;  y++)
 					for (int x = 0; x < sh2D; x++)
 					{
-						particleStack(x,y,f) *= scale * ctfImg(x,y) * doseWeights(x,y,f);
+						const double c = scale * ctfImg(x,y) * doseWeights(x,y,f);
 						
-						// Apply only the square root of the dose weight
-						// because we are going to square the weight after cropping:
-						weightStack(x,y,f) = scale * ctfImg(x,y) * sqrt(doseWeights(x,y,f));
+						particleStack(x,y,f) *= c;
+						weightStack(x,y,f) = c * c;
 					}
 				}
 			}
@@ -249,51 +258,36 @@ void SubtomoProgram::run()
 					
 			if (boundary > 0)
 			{
-				BufferedImage<float> particlesRS, weightsRS;
+				BufferedImage<float> particlesRS;
 				
 				particlesRS = NewStackHelper::inverseFourierTransformStack(particleStack);
-				weightsRS = NewStackHelper::inverseFourierTransformStack(FFT::toComplex(weightStack));
 				
-				particlesRS = Padding::unpadCenter2D_full(particlesRS, boundary);
-				weightsRS = Padding::unpadCenter2D_full(weightsRS, boundary);
-				
-				TomoExtraction::cropCircle(particlesRS, 5, num_threads);
-				TomoExtraction::cropCircle(weightsRS, 5, num_threads);
+				TomoExtraction::cropCircle(particlesRS, boundary, 5, num_threads);
 				
 				particleStack = NewStackHelper::FourierTransformStack(particlesRS);
-				weightStack = FFT::toReal(NewStackHelper::FourierTransformStack(weightsRS));
 			}
-			
-			// squaring the CTF here:
-			weightStack *= weightStack;
 			
 			BufferedImage<fComplex> dataImgFS(sh3D,s3D,s3D);
 			dataImgFS.fill(fComplex(0.0, 0.0));
 			
 			BufferedImage<float> ctfImgFS(sh3D,s3D,s3D), psfImgFS(sh3D,s3D,s3D), 
 					dataImgRS(s3D,s3D,s3D), dataImgDivRS(s3D,s3D,s3D),
-					multiImageFS;
+					multiImageFS(sh3D,s3D,s3D);
 			
 			ctfImgFS.fill(0.0);
 			psfImgFS.fill(0.0);
 			dataImgRS.fill(0.0);			
 			dataImgDivRS.fill(0.0);
 			
-			
-			if (computeMultiplicity)
+			for (int f = 0; f < fc; f++)
 			{
-				multiImageFS = BufferedImage<float>(sh3D,s3D,s3D);
-				multiImageFS.fill(0.0);
-				
-				FourierBackprojection::backprojectStack_backward(
-						particleStack, weightStack, projPart, dataImgFS,
-						psfImgFS, ctfImgFS, multiImageFS, inner_thread_num);
-			}
-			else
-			{
-				FourierBackprojection::backprojectStack_backward(
-						particleStack, weightStack, projPart, dataImgFS,
-						psfImgFS, ctfImgFS, inner_thread_num);
+				FourierBackprojection::backprojectSlice_forward_with_multiplicity(
+					particleStack.getSliceRef(f),
+					weightStack.getSliceRef(f),
+					projPart[f] * relative_box_scale,
+					dataImgFS,
+					ctfImgFS,
+					multiImageFS);
 			}
 			
 			if (do_gridding_correction)
@@ -333,11 +327,7 @@ void SubtomoProgram::run()
 					
 					dataImgFS(x,y,z) *= m;					
 					psfImgFS(x,y,z) *= m;
-					
-					if (computeMultiplicity)
-					{
-						multiImageFS(x,y,z) *= m;
-					}
+					multiImageFS(x,y,z) *= m;
 				}
 				
 				FFT::inverseFourierTransform(dataImgFS, dataImgRS);
