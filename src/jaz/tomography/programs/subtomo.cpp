@@ -235,15 +235,16 @@ void SubtomoProgram::run()
 					BufferedImage<float> ctfImg(sh2D, s2D);
 					ctf.draw(s2D, s2D, binnedPixelSize, &ctfImg(0,0,0));
 					
-					const float scale = (flip_value? -1.f : 1.f) * relative_box_scale * relative_box_scale;
+					const float sign = flip_value? -1.f : 1.f;
+					const float scale = relative_box_scale * relative_box_scale;
 							
 					for (int y = 0; y < s2D;  y++)
 					for (int x = 0; x < sh2D; x++)
 					{
-						const double c = scale * ctfImg(x,y) * doseWeights(x,y,f);
+						const double c = ctfImg(x,y) * doseWeights(x,y,f);
 						
-						particleStack(x,y,f) *= c;
-						weightStack(x,y,f) = c * c;
+						particleStack(x,y,f) *= sign * scale * c;
+						weightStack(x,y,f) = scale * c * c;
 					}
 				}
 			}
