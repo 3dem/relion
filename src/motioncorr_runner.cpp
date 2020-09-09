@@ -125,7 +125,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	interpolate_shifts = parser.checkOption("--interpolate_shifts", "(EXPERIMENTAL) Interpolate shifts");
 	ccf_downsample = textToFloat(parser.getOption("--ccf_downsample", "(EXPERT) Downsampling rate of CC map. default = 0 = automatic based on B factor", "0"));
 	if (parser.checkOption("--early_binning", "Do binning before alignment to reduce memory usage. This might dampen signal near Nyquist. (ON by default)"))
-		std::cerr << "Since RELION 3.1, --early_binning is on by default. Use --early_binning to disable it." << std::endl;
+		std::cerr << "Since RELION 3.1, --early_binning is on by default. Use --no_early_binning to disable it." << std::endl;
 
 	early_binning = !parser.checkOption("--no_early_binning", "Disable --early_binning");
 	if (fabs(bin_factor - 1) < 0.01)
