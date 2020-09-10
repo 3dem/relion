@@ -308,32 +308,40 @@ void ParticleSet::setImageFileNames(std::string data, std::string weight, long i
 	partTable.setValue(EMDL_CTF_IMAGE, weight, particle_id);
 }
 
-void ParticleSet::getParticleOffset(long particle_id, double& x, double& y, double& z) const
+d3Vector ParticleSet::getParticleOffset(long particle_id) const
 {
-	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_X_ANGSTROM, x, particle_id);
-	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, y, particle_id);
-	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, z, particle_id);
+	d3Vector out;
+	
+	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_X_ANGSTROM, out.x, particle_id);
+	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, out.y, particle_id);
+	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, out.z, particle_id);
+	
+	return out;
 }
 
-void ParticleSet::setParticleOffset(long particle_id, double x, double y, double z)
+void ParticleSet::setParticleOffset(long particle_id, const d3Vector& v)
 {
-	partTable.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, x, particle_id);
-	partTable.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, y, particle_id);
-	partTable.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, z, particle_id);
+	partTable.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, v.x, particle_id);
+	partTable.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, v.y, particle_id);
+	partTable.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, v.z, particle_id);
 }
 
-void ParticleSet::getParticleCoord(long particle_id, double& x, double& y, double& z) const
+d3Vector ParticleSet::getParticleCoord(long particle_id) const
 {
-	partTable.getValueSafely(EMDL_IMAGE_COORD_X, x, particle_id);
-	partTable.getValueSafely(EMDL_IMAGE_COORD_Y, y, particle_id);
-	partTable.getValueSafely(EMDL_IMAGE_COORD_Z, z, particle_id);
+	d3Vector out;
+	
+	partTable.getValueSafely(EMDL_IMAGE_COORD_X, out.x, particle_id);
+	partTable.getValueSafely(EMDL_IMAGE_COORD_Y, out.y, particle_id);
+	partTable.getValueSafely(EMDL_IMAGE_COORD_Z, out.z, particle_id);
+	
+	return out;
 }
 
-void ParticleSet::setParticleCoord(long particle_id, double x, double y, double z)
+void ParticleSet::setParticleCoord(long particle_id, const d3Vector& v)
 {
-	partTable.setValue(EMDL_IMAGE_COORD_X, x, particle_id);
-	partTable.setValue(EMDL_IMAGE_COORD_Y, y, particle_id);
-	partTable.setValue(EMDL_IMAGE_COORD_Z, z, particle_id);
+	partTable.setValue(EMDL_IMAGE_COORD_X, v.x, particle_id);
+	partTable.setValue(EMDL_IMAGE_COORD_Y, v.y, particle_id);
+	partTable.setValue(EMDL_IMAGE_COORD_Z, v.z, particle_id);
 }
 
 int ParticleSet::getOpticsGroup(long particle_id) const

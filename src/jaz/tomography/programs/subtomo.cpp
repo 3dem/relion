@@ -126,16 +126,14 @@ void SubtomoProgram::run()
 			std::string outWeight = outTag + "/" + dataSet->getName(part_id) + "_weights.mrc";
 
 			copy.setImageFileNames(outData, outWeight, part_id);
-
-			d3Vector off, coord;
-
-			copy.getParticleOffset(part_id, off.x, off.y, off.z);
-			copy.getParticleCoord(part_id, coord.x, coord.y, coord.z);
-
-			coord -= off / pixelSize;
-
-			copy.setParticleOffset(part_id, 0,0,0);
-			copy.setParticleCoord(part_id, coord.x, coord.y, coord.z);
+			
+			const d3Vector offset = copy.getParticleOffset(part_id);
+			const d3Vector coord_0 = copy.getParticleCoord(part_id);
+			
+			const d3Vector coord_1 = (coord_0 - offset / pixelSize) / binning;
+			
+			copy.setParticleOffset(part_id, d3Vector(0,0,0));
+			copy.setParticleCoord(part_id, coord_1);
 		}
 	}
 

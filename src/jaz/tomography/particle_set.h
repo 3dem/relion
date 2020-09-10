@@ -39,11 +39,11 @@ class ParticleSet
 		
 		void setImageFileNames(std::string data, std::string weight, long int particle_id);
 		
-		void getParticleOffset(long int particle_id, double& x, double& y, double& z) const;
-		void setParticleOffset(long int particle_id, double x, double y, double z);
+		gravis::d3Vector getParticleOffset(long int particle_id) const;
+		void setParticleOffset(long int particle_id, const gravis::d3Vector& v);
 		
-		void getParticleCoord(long int particle_id, double& x, double& y, double& z) const;
-		void setParticleCoord(long int particle_id, double x, double y, double z);
+		gravis::d3Vector getParticleCoord(long int particle_id) const;
+		void setParticleCoord(long int particle_id, const gravis::d3Vector& v);
 
 		int getOpticsGroup(long int particle_id) const;
 		int numberOfOpticsGroups() const;
