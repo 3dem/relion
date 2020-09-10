@@ -927,6 +927,7 @@ void FourierBackprojection::backprojectSlice_forward_with_multiplicity(
 	
 	const gravis::d3Vector u(proj(0,0), proj(0,1), proj(0,2));
 	const gravis::d3Vector v(proj(1,0), proj(1,1), proj(1,2));
+	const double scale = u.length() * v.length();
 	
 	for (long int y = 0; y < h2;  y++)
 	for (long int x = (y > 0 && y < h2/2? 0 : 1); x < wh2; x++)
@@ -972,7 +973,7 @@ void FourierBackprojection::backprojectSlice_forward_with_multiplicity(
 					const double fy = 1.0 - std::abs(pos3.y - yg);
 					const double fz = 1.0 - std::abs(pos3.z - zg);
 					
-					const double m = fx * fy * fz;
+					const double m = scale * fx * fy * fz;
 					
 					destFS(  xi,yi,zi) += m * value;
 					destCTF( xi,yi,zi) += m * wgh;

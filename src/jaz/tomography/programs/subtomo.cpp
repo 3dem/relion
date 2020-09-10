@@ -236,15 +236,14 @@ void SubtomoProgram::run()
 					ctf.draw(s2D, s2D, binnedPixelSize, &ctfImg(0,0,0));
 					
 					const float sign = flip_value? -1.f : 1.f;
-					const float scale = relative_box_scale * relative_box_scale;
 							
 					for (int y = 0; y < s2D;  y++)
 					for (int x = 0; x < sh2D; x++)
 					{
 						const double c = ctfImg(x,y) * doseWeights(x,y,f);
 						
-						particleStack(x,y,f) *= sign * scale * c;
-						weightStack(x,y,f) = scale * c * c;
+						particleStack(x,y,f) *= sign * c;
+						weightStack(x,y,f) = c * c;
 					}
 				}
 			}
@@ -346,7 +345,7 @@ void SubtomoProgram::run()
 			
 			
 			
-			dataImgRS.write(outData);
+			dataImgRS.write(outData, binnedPixelSize);
 			
 			if (write_combined)
 			{
@@ -354,17 +353,17 @@ void SubtomoProgram::run()
 				ctfAndMultiplicity.getSlabRef(0,s3D).copyFrom(ctfImgFS);
 				ctfAndMultiplicity.getSlabRef(s3D,s3D).copyFrom(multiImageFS);
 				
-				ctfAndMultiplicity.write(outWeight);
+				ctfAndMultiplicity.write(outWeight, 1.0 / binnedPixelSize);
 			}
 			
 			if (write_ctf)
 			{
-				Centering::fftwHalfToHumanFull(ctfImgFS).write(outCTF);
+				Centering::fftwHalfToHumanFull(ctfImgFS).write(outCTF, 1.0 / binnedPixelSize);
 			}
 			
 			if (write_multiplicity)
 			{
-				Centering::fftwHalfToHumanFull(multiImageFS).write(outMulti);
+				Centering::fftwHalfToHumanFull(multiImageFS).write(outMulti, 1.0 / binnedPixelSize);
 			}
 			
 			if (write_normalised)
@@ -383,8 +382,8 @@ void SubtomoProgram::run()
 				
 				FFT::inverseFourierTransform(dataImgCorrFS, dataImgDivRS, FFT::Both);
 				
-				dataImgDivRS.write(outNrm);
-				Centering::fftwHalfToHumanFull(ctfImgFSnrm).write(outWeightNrm);
+				dataImgDivRS.write(outNrm, binnedPixelSize);
+				Centering::fftwHalfToHumanFull(ctfImgFSnrm).write(outWeightNrm, 1.0 / binnedPixelSize);
 			}
 			
 			if (write_divided)
@@ -403,7 +402,7 @@ void SubtomoProgram::run()
 				}
 				
 				Reconstruction::taper(dataImgDivRS, taper, do_center, inner_thread_num);				
-				dataImgDivRS.write(outDiv);
+				dataImgDivRS.write(outDiv, binnedPixelSize);
 			}
 		}
 		
