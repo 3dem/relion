@@ -2178,7 +2178,7 @@ void RelionJob::initialiseSelectJob()
 	joboptions["fn_data"] = JobOption("OR select from particles.star:", NODE_PART_DATA, "", "STAR files (*.star)", "A particles.star file to select individual particles from.");
 	joboptions["fn_coords"] = JobOption("OR select from picked coords:", NODE_MIC_COORDS, "", "STAR files (coords_suffix*.star)", "A coordinate suffix .star file to select micrographs while inspecting coordinates (and/or CTFs).");
 
-	joboptions["do_class_ranker"] = JobOption("Automatically select 2D classes?", true, "If set to True, the class_ranker program will be used to make an automated class selection, based on the parameters below. This option only works when selecting classes from a relion_refine job (input optimiser.star on the I.O tab)");
+	joboptions["do_class_ranker"] = JobOption("Automatically select 2D classes?", false, "If set to True, the class_ranker program will be used to make an automated class selection, based on the parameters below. This option only works when selecting classes from a relion_refine job (input optimiser.star on the I.O tab)");
 	joboptions["rank_threshold"] = JobOption("Minimum threshold for auto-selection: ", 0.5, 0, 1, 0.05, "Only classes with a predicted threshold above this value will be selected.");
 	joboptions["do_rank_relative"] = JobOption("Use relative threshold for auto-selection? ", true, "If set to true, only classes with the value above times the maximum predicted score of the classes in the run will be selected.");
 
@@ -2390,10 +2390,10 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 			outputNodes.push_back(node3);
 
 			// Also save optimiser.star, which could be used for next manual selection (but ordered for examples on the new scores)
-			command += " --fn_root run";
+			command += " --fn_root rank";
 
 			// Only save the 2D class averages for 2D jobs
-			FileName fn_opt = outputname+"run_optimiser.star";
+			FileName fn_opt = outputname+"rank_optimiser.star";
 			Node node4(fn_opt, NODE_OPTIMISER);
 			outputNodes.push_back(node4);
 

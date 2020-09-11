@@ -330,7 +330,7 @@ class star_handler_parameters
 		std::vector<FileName> fns_in;
 		std::vector<std::string> words;
 		tokenize(fn_in, words);
-		for (int iword = 0; iword < words.size(); iword++)
+                for (int iword = 0; iword < words.size(); iword++)
 		{
 			FileName fnt = words[iword];
 			fnt.globFiles(fns_in, false);
@@ -340,7 +340,7 @@ class star_handler_parameters
 		std::vector<MetaDataTable> MDsin, MDoptics;
 		std::vector<ObservationModel> obsModels;
 		// Read the first table into the global obsModel
-		read_check_ignore_optics(MDin, fns_in[0]);
+		read_check_ignore_optics(MDin, fns_in[0], tablename_in);
 		MDsin.push_back(MDin);
 		// Read all the rest of the tables into local obsModels
 		for (int i = 1; i < fns_in.size(); i++)
