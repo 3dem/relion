@@ -104,6 +104,12 @@ class RawImage
 		bool hasEqualSize(const RawImage<T>& img);
 		bool isSquare();
 		bool isCubical();
+		
+		template<class T2>
+		bool containsPoint(gravis::t2Vector<T2> point) const;
+		
+		template<class T2>
+		bool containsPoint(gravis::t3Vector<T2> point) const;
 
 		
 		template<class T2> inline
@@ -632,6 +638,23 @@ template<class T>
 bool RawImage<T>::isCubical()
 {
 	return xdim == ydim && ydim == zdim;
+}
+
+template<class T> template<class T2>
+bool RawImage<T>::containsPoint(gravis::t2Vector<T2> point) const
+{
+	return 
+	        point.x > 0 && point.x < xdim && 
+	        point.y > 0 && point.y < ydim;
+}
+
+template<class T> template<class T2>
+bool RawImage<T>::containsPoint(gravis::t3Vector<T2> point) const
+{
+	return 
+	        point.x > 0 && point.x < xdim && 
+	        point.y > 0 && point.y < ydim && 
+	        point.z > 0 && point.z < zdim;
 }
 
 template <class T1, class T2>

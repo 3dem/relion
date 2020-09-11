@@ -1,4 +1,6 @@
 #include "blob_2d.h"
+#include <src/jaz/image/interpolation.h>
+#include <src/jaz/math/fft.h>
 
 #include <omp.h>
 
@@ -470,63 +472,69 @@ void Blob2D::erase(
 }
 
 
-void Blob2D::eraseInSectors(
+void Blob2D::eraseLocally(
 	const RawImage<float>& micrograph,
 	RawImage<float>& erased_out,
 	RawImage<float>& blob_out,
 	const RawImage<float>& weight,
 	double radius, 
     double taper,
-	int sectors) const
+	double smoothness) const
 {
-	std::pair<std::vector<double>,std::vector<double>> radAvgAndWgh = radialAverageAndWeightInSectors(
-	            micrograph, weight, sectors, radius + taper);
+	std::pair<BufferedImage<float>, BufferedImage<float>> 
+		polarAndMask =	transformToPolar(micrograph, weight, radius + taper);
+		
+	BufferedImage<float> polarImage = polarAndMask.first;
+	BufferedImage<float> polarWeight = polarAndMask.second;
+		
+	const int phi_samples = polarImage.xdim;
+	const int max_radius = polarImage.ydim;
 	
-	const int max_radius = radAvgAndWgh.first.size();
 	
-	std::vector<double> radAvg = radAvgAndWgh.first;
-	std::vector<double> radWgh = radAvgAndWgh.second;
+	BufferedImage<fComplex> polarImageFS, polarWeightFS;
 	
-	const int max_rad = radAvg.size() / sectors;
+	FFT::FourierTransform(polarImage, polarImageFS);
+	FFT::FourierTransform(polarWeight, polarWeightFS);
+	
+	const double sigma = PI * phi_samples / smoothness;
+	const double sig22 = 2.0 * sigma * sigma;
 	        
-	const double cappingRadius = 1.5 * smoothingRadius;
-	int first_r = (int) cappingRadius;
-	
-	for (int sec = 0; sec < sectors; sec++)
-	for (int r = 0; r < first_r; r++)
+	for (int y = 0; y < max_radius; y++)
+	for (int x = 0; x < phi_samples/2 + 1; x++)
 	{
-		if (radWgh[sec * max_rad + r] > 0)
-		{
-			first_r = r;
-		}
+		polarImageFS(x,y)  *= exp(-x*x/sig22);
+		polarWeightFS(x,y) *= exp(-x*x/sig22);
 	}
 	
-	const double cappingRange = cappingRadius - first_r;
-
+	FFT::inverseFourierTransform(polarImageFS, polarImage);
+	FFT::inverseFourierTransform(polarWeightFS, polarWeight);
+	
+	
+	polarImage /= polarWeight;
+	
+	const double cappingRadius = 1.75 * smoothingRadius;
+	
 	double tipAvg = 0.0;
 	double tipWgh = 0.0;
 	
-	for (int sec = 0; sec < sectors; sec++)
-	for (int r = first_r; r < cappingRadius; r++)
+	for (int p = 0; p < phi_samples; p++)
+	for (int r = 0; r < cappingRadius && r < max_radius; r++)
 	{
-		const int rr = r - first_r;
-		const double t = radWgh[sec * max_rad + r] * (cos(PI * rr / cappingRange) + 1.0) / 2;
+		const double t = polarWeight(p,r) * (cos(PI * r / cappingRadius) + 1.0) / 2;
 		
-		tipAvg += t * radAvg[sec * max_rad + r];
+		tipAvg += t * polarImage(p,r);
 		tipWgh += t;
 	}
 	
 	tipAvg /= tipWgh;
 	
-	for (int sec = 0; sec < sectors; sec++)
-	for (int r = first_r; r < cappingRadius; r++)
+	for (int p = 0; p < phi_samples; p++)
+	for (int r = 0; r < cappingRadius && r < max_radius; r++)
 	{
-		const int rr = r - first_r;
-		const double t = (cos(PI * rr / cappingRange) + 1.0) / 2;
+		const double t = (cos(PI * r / cappingRadius) + 1.0) / 2;
 		
-		radAvg[sec * max_rad + r] = (1 - t) * radAvg[sec * max_rad + r] + t * tipAvg;
+		polarImage(p,r) = t * tipAvg + (1-t) * polarImage(p,r);
 	}
-
 	
 	const int w = micrograph.xdim;
 	const int h = micrograph.ydim;
@@ -543,6 +551,8 @@ void Blob2D::eraseInSectors(
 	const int x1 = maxPos.x >= w-1?  w-1 : std::floor(maxPos.x);
 	const int y0 = minPos.y < 0?       0 : std::ceil(minPos.y);
 	const int y1 = maxPos.y >= h-1?  h-1 : std::floor(maxPos.y);
+	
+	const double eps = 0.001;
 
 	for (int y = y0; y <= y1; y++)
 	for (int x = x0; x <= x1; x++)
@@ -551,18 +561,26 @@ void Blob2D::eraseInSectors(
 		const double dy = y - center.y;
 		
 		const double ru = sqrt(dx*dx + dy*dy);
-		double r = smoothOrigin(ru + getOffset(d2Vector(dx, dy)));
+		const double phi = atan2(dy, dx);
+		double r = smoothOrigin(ru + getOffset(phi));
 
 		if (r >= radius + taper || r >= max_radius - 1  || r < 0)
 		{
 			continue;
 		}
-
-		double wgh;
-
-		if (ru < radius) wgh = 1.0;
-		else if (ru < radius + taper) wgh = (cos(PI * (ru - radius) / taper) + 1) / 2;
-		else wgh = 0.0;
+		
+		double wgh = weight(x,y) * Interpolation::cubicXY_wrap(
+		            polarWeight, 
+		            phi_samples * phi / (2 * PI), 
+		            r);
+		
+		if (wgh < eps) continue;
+		
+		if (ru > radius)
+		{
+			if (ru < radius + taper) wgh *= (cos(PI * (ru - radius) / taper) + 1) / 2;
+			else wgh = 0.0;
+		}
 
 		if (wgh > 0.0)
 		{
@@ -579,56 +597,78 @@ void Blob2D::eraseInSectors(
 		const double dx = x - center.x;
 		const double dy = y - center.y;
 
-		const double phi = atan2(dx, dy);
-				
-		const double tau = sectors * (phi + PI) / (2*PI);
-		const int sector_0 = ((int)tau) % sectors;
-		const int sector_1 = (sector_0 + 1) % sectors;
-
+		double phi = atan2(dy, dx) + 2 * PI;
+		if (phi >= 2*PI) phi -= 2*PI;
+		
 		const double ru = sqrt(dx*dx + dy*dy);
-		double r = smoothOrigin(ru + getOffset(d2Vector(phi)));
+		double r = smoothOrigin(ru + getOffset(phi));
 
 		if (r >= radius + taper - 1 || r >= max_radius - 1 || r < 0)
 		{
 			continue;
 		}
-
-		const int r0 = (int)r;
-		const int r1 = r0 + 1;
 		
-		const double eps = 1e-6;
+		const double pred = Interpolation::cubicXY_wrap(
+		            polarImage, 
+		            phi_samples * phi / (2 * PI), 
+		            r);
 		
-		if (radWgh[sector_0 * max_rad + r0] < eps || 
-		    radWgh[sector_0 * max_rad + r1] < eps || 
-		    radWgh[sector_1 * max_rad + r0] < eps || 
-		    radWgh[sector_1 * max_rad + r1] < eps)
+		double wgh = weight(x,y) * Interpolation::cubicXY_wrap(
+		            polarWeight, 
+		            phi_samples * phi / (2 * PI), 
+		            r);
+		
+		if (wgh < eps) continue;
+		
+		if (ru > radius)
 		{
-			continue;
+			if (ru < radius + taper) wgh *= (cos(PI * (ru - radius) / taper) + 1) / 2;
+			else wgh = 0.0;
 		}
-
-		const double dr = r - r0;
 		
-		const double pred_0 = 
-		        (1 - dr) * radAvg[sector_0 * max_rad + r0] 
-		            + dr * radAvg[sector_0 * max_rad + r1] - outside_val;
-		
-		const double pred_1 = 
-		        (1 - dr) * radAvg[sector_1 * max_rad + r0] 
-		            + dr * radAvg[sector_1 * max_rad + r1] - outside_val;
-		
-		const double t_phi = (cos(PI * (tau - sector_0)) + 1) / 2;
-
-		double wgh;
-
-		if (ru < radius) wgh = 1.0;
-		else if (ru < radius + taper) wgh = (cos(PI * (ru - radius) / taper) + 1) / 2;
-		else wgh = 0.0;
-		
-		const double blob_value = wgh * (t_phi * pred_0 + (1 - t_phi) * pred_1);
+		const double blob_value = wgh * (pred - outside_val);
 
 		erased_out(x,y) -= blob_value;
 		blob_out(x,y)   += blob_value;
 	}
+}
+
+std::pair<BufferedImage<float>, BufferedImage<float>> 
+Blob2D::transformToPolar(
+        const RawImage<float> &frame,
+        const RawImage<float> &mask, 
+        double maxRadius) const
+{
+	const double l = 2 * PI * maxRadius;
+	        
+	const int h_out = (int) maxRadius;
+	const int w_out = (int) l;
+	
+	BufferedImage<float> out_data(w_out, h_out);
+	BufferedImage<float> out_weight(w_out, h_out);
+	
+	for (int y = 0; y < h_out; y++)
+	for (int x = 0; x < w_out; x++)
+	{
+		const double phi = 2 * PI * x / (double) w_out;
+		const double r = y - getOffset(phi);		
+		
+		const d2Vector pos = center + r * d2Vector(cos(phi), sin(phi));
+		
+		if (frame.containsPoint(pos))
+		{
+			const float wgh = Interpolation::cubicXY_clip(mask, pos.x, pos.y);
+			out_data(x,y) = wgh * Interpolation::cubicXY_clip(frame, pos.x, pos.y);
+			out_weight(x,y) = wgh;
+		}
+		else
+		{
+			out_data(x,y) = 0;
+			out_weight(x,y) = 0;
+		}
+	}
+	
+	return std::make_pair(out_data, out_weight);
 }
 
 double Blob2D::scanForMinimalRadius(int samples) const

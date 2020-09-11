@@ -32,10 +32,13 @@ void DeleteBlobs2DProgram::readParameters(int argc, char *argv[])
 		particles_file = parser.getOption("--ptc", "Optional particles file for phase flipping", "");
 
 		roundedness = textToDouble(parser.getOption("--rnd", "Roundedness prior", "0"));
+		smoothness = textToDouble(parser.getOption("--smt", "Outline average smoothness (negative means full average)", "-1"));
 		prior_sigma_A = textToDouble(parser.getOption("--sig", "Weight of initial position", "0"));
 		max_binning = textToDouble(parser.getOption("--bin0", "Initial (maximal) binning factor", "8"));
 		min_binning = textToDouble(parser.getOption("--bin1", "Final (minimal) binning factor", "4"));
-
+		mask_other_blobs = !parser.checkOption("--nomask", "Do not mask out neighbouring blobs");
+		mask_smooth_sigma = textToDouble(parser.getOption("--sig", "Mask smoothing sigma [bin-1 pixels]", "100"));
+		        
 		diag = parser.checkOption("--diag", "Write out diagnostic information");
 
 		max_frequencies = textToInteger(parser.getOption("--n", "Number of frequencies", "12"));
@@ -241,10 +244,12 @@ void DeleteBlobs2DProgram::processMicrograph(
 
 	const double highpass_sigma_real = highpass_sigma_real_A / pixel_size;
 	
-	std::vector<DelineatedBlob2D> delineated_blobs = DelineatedBlob2D::read(blobs_filename);
-	
-	
+	std::vector<DelineatedBlob2D> delineated_blobs = DelineatedBlob2D::read(blobs_filename);	
 	const int blob_count = delineated_blobs.size();
+	
+	
+	BufferedImage<int> closest_blob = findClosestBlob(delineated_blobs, w_full, h_full);
+	        
 
 	if (verbose)
 	{
@@ -271,9 +276,6 @@ void DeleteBlobs2DProgram::processMicrograph(
 	
 	BufferedImage<float> erased_image = micrograph;
 	
-	BufferedImage<float> dummy_weight(w_full, h_full, 1);
-	dummy_weight.fill(1.f);
-	
 	
 	std::string micrograph_name = micrograph_filename.substr(
 	            micrograph_filename.find_last_of('/')+1);
@@ -299,6 +301,7 @@ void DeleteBlobs2DProgram::processMicrograph(
 
 		i2Vector window_origin_full;
 		BufferedImage<float> blob_region_full;
+		BufferedImage<float> blob_mask_full;
 
 		{
 			const double blob_padding_full = radius / 2.0;
@@ -365,6 +368,7 @@ void DeleteBlobs2DProgram::processMicrograph(
 			}
 
 			blob_region_full.resize(window_size_full.x, window_size_full.y);
+			blob_mask_full.resize(window_size_full.x, window_size_full.y);
 
 			// extract full-size image
 
@@ -375,6 +379,22 @@ void DeleteBlobs2DProgram::processMicrograph(
 				const int y0 = window_origin_full.y;
 
 				blob_region_full(x,y) = micrograph_filtered(x0 + x, y0 + y);
+			}
+			
+			if (mask_other_blobs)
+			{
+				for (int y = 0; y < window_size_full.y; y++)
+				for (int x = 0; x < window_size_full.x; x++)
+				{
+					const int x0 = window_origin_full.x;
+					const int y0 = window_origin_full.y;
+	
+					blob_mask_full(x,y) = closest_blob(x0 + x, y0 + y) == blob_id;
+				}
+			}
+			else
+			{
+				blob_mask_full.fill(1.f);
 			}
 		}
 
@@ -387,7 +407,7 @@ void DeleteBlobs2DProgram::processMicrograph(
 
 
 		double current_binning = max_binning;
-
+		
 		while (current_binning > min_binning - 1e-6)
 		{
 			if (verbose)
@@ -406,6 +426,7 @@ void DeleteBlobs2DProgram::processMicrograph(
 				blob_id, blob_parameters_cropped,
 				radius, pixel_size, current_binning,
 				blob_region_full,
+				blob_mask_full,
 				micrograph_name,
 				verbose);
 
@@ -421,14 +442,39 @@ void DeleteBlobs2DProgram::processMicrograph(
 		{
 			Log::print("Erasing");
 		}
-
+		
+		
 		std::vector<double> final_parameters_fullsize = blob_parameters_cropped;
 		final_parameters_fullsize[0] += window_origin_full.x;
 		final_parameters_fullsize[1] += window_origin_full.y;
-
+		
+		BufferedImage<float> blob_weight(w_full, h_full, 1);
+		
+		for (int y = 0; y < h_full; y++)
+		for (int x = 0; x < w_full; x++)
+		{
+			if (closest_blob(x,y) == blob_id)
+			{
+				blob_weight(x,y) = 1.f;
+			}
+			else
+			{
+				blob_weight(x,y) = 0.f;
+			}
+		}
+		
+		blob_weight = ImageFilter::Gauss2D(blob_weight, 0, mask_smooth_sigma, true);
+		
 		Blob2D final_blob(final_parameters_fullsize, radius/2);
-		final_blob.erase(micrograph, erased_image, blobs_image, dummy_weight, 1.5 * radius, radius);
-		//final_blob.eraseInSectors(micrograph, erased_image, blobs_image, dummy_weight, 1.5 * radius, radius, 12);
+		
+		if (smoothness < 0)
+		{
+			final_blob.erase(micrograph, erased_image, blobs_image, blob_weight, 1.5 * radius, radius);
+		}
+		else
+		{
+			final_blob.eraseLocally(micrograph, erased_image, blobs_image, blob_weight, 1.5 * radius, radius, smoothness);
+		}
 		
 		all_blob_parameters.push_back(final_parameters_fullsize);
 		        
@@ -472,7 +518,8 @@ std::vector<double> DeleteBlobs2DProgram::fitBlob(
 		double radius_full,
 		double pixel_size_full,
 		double binning_factor,
-		BufferedImage<float>& blob_region_full,
+        BufferedImage<float>& blob_region_full,
+        BufferedImage<float>& blob_mask_full,
 		const std::string& image_name,
 		bool verbose)
 {
@@ -493,6 +540,17 @@ std::vector<double> DeleteBlobs2DProgram::fitBlob(
 
 	BufferedImage<float> blob_region_binned = Resampling::FourierCrop_fullStack(
 				blob_region_full, binning_factor, 1, true);
+	
+	BufferedImage<float> blob_mask_binned(blob_region_binned.xdim, blob_region_binned.ydim);
+	
+	for (int y = 0; y < blob_region_binned.ydim; y++)
+	for (int x = 0; x < blob_region_binned.xdim; x++)
+	{
+		blob_mask_binned(x,y) = blob_mask_full(
+		            (int)(x*binning_factor), 
+		            (int)(y*binning_factor));
+	}
+	
 	
 	//blob_region_binned = ImageFilter::Gauss2D(blob_region_binned, 0, 3, true);
 
@@ -520,7 +578,7 @@ std::vector<double> DeleteBlobs2DProgram::fitBlob(
 		const double r0 = radius_binned - blob_thickness * radius_binned / 2;
 		const double r1 = radius_binned + blob_thickness * radius_binned / 2;
 		
-		blob_fit.computeWeight(blob0, r0, r1);
+		blob_fit.computeWeight(blob0, r0, r1, blob_mask_binned);
 	}
 
 	for (int current_frequencies = initial_frequencies;
@@ -622,5 +680,48 @@ std::vector<double> DeleteBlobs2DProgram::fromBin1(
 	}
 
 	return downscaled_optimum;
+}
+
+BufferedImage<int> DeleteBlobs2DProgram::findClosestBlob(const std::vector<DelineatedBlob2D> &blobs, int w, int h)
+{
+	double max_rad = 0;
+	
+	for (int b = 0; b < blobs.size(); b++)
+	{
+		const DelineatedBlob2D& blob = blobs[b];
+		
+		if (blob.radius > max_rad) max_rad = blob.radius;
+	}
+	
+	BufferedImage<int> out(w,h);
+	
+	for (int y = 0; y < h; y++)
+	for (int x = 0; x < w; x++)
+	{
+		const d2Vector pos(x,y);
+		
+		double min_dist = sqrt(w*w + h*h);
+		int best_blob = -1;
+		
+		for (int b = 0; b < blobs.size(); b++)
+		{
+			const DelineatedBlob2D& blob = blobs[b];
+			
+			if ((blob.center - pos).length() < 2.0 * max_rad)
+			{
+				const double dist = blob.getSignedDistance(pos);
+				
+				if (dist < min_dist)
+				{
+					min_dist = dist;
+					best_blob = b;
+				}
+			}
+		}
+		
+		out(x,y) = best_blob;
+	}
+	
+	return out;
 }
 

@@ -54,7 +54,8 @@ double BlobFit2D::f(const std::vector<double>& x, void* tempStorage) const
 	return out;
 }
 
-void BlobFit2D::computeWeight(const Blob2D& blob, double minRadius, double maxRadius)
+void BlobFit2D::computeWeight(const Blob2D& blob, double minRadius, double maxRadius,
+                              const RawImage<float>& mask)
 {
 	const int w = weight.xdim;
 	const int h = weight.ydim;
@@ -64,13 +65,17 @@ void BlobFit2D::computeWeight(const Blob2D& blob, double minRadius, double maxRa
 	{
 		const double r = blob.getDistance(d2Vector(x,y));
 		
-		if (r > maxRadius || r < minRadius)
+		if (r > maxRadius)
 		{
 			weight(x,y) = 0.f;
 		}
+		else if (r < minRadius)
+		{
+			weight(x,y) = r * mask(x,y) / minRadius;
+		}
 		else
 		{
-			weight(x,y) = 1.f;
+			weight(x,y) = mask(x,y);
 		}
 	}
 }

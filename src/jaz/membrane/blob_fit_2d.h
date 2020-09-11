@@ -34,7 +34,8 @@ class BlobFit2D : public Optimization
 		void computeWeight(
 		        const Blob2D& blob,
 		        double minRadius,
-		        double maxRadius);
+		        double maxRadius,
+		        const RawImage<float>& mask);
 		
 		void* allocateTempStorage() const {return 0;}
 		void deallocateTempStorage(void* ts) const {}

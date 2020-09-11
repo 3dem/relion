@@ -59,13 +59,20 @@ class Blob2D
 				const RawImage<float>& weight,
 				double radius, double taper) const;
 		
-		void eraseInSectors(
+		void eraseLocally(
 		        const RawImage<float>& micrographs,
 				RawImage<float>& erased_out,
 				RawImage<float>& blob_out,
 				const RawImage<float>& weight,
-				double radius, double taper,
-		        int sectors) const;
+				double radius, 
+		        double taper,
+		        double smoothness) const;
+		
+		std::pair<BufferedImage<float>, BufferedImage<float>> 
+			transformToPolar(
+		        const RawImage<float>& frame,
+		        const RawImage<float>& mask,
+				double maxRadius) const;
 		
 		
 		inline std::vector<double> toVector() const;

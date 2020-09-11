@@ -3,6 +3,7 @@
 
 #include <string>
 #include <src/jaz/image/buffered_image.h>
+#include <src/jaz/membrane/blob_fit_2d.h>
 
 class Blob2D;
 class CTF;
@@ -16,7 +17,7 @@ class DeleteBlobs2DProgram
 		
 			std::string outPath, micrographs_list_filename, micrographs_dir, blobs_dir, particles_file;
 			
-			bool diag;
+			bool diag, mask_other_blobs;
 			
 			int max_frequencies, num_threads, max_iters;
 			
@@ -26,7 +27,9 @@ class DeleteBlobs2DProgram
 				max_binning, min_binning, 
 				blob_thickness,
 				convergence_threshold,
-				roundedness;
+				roundedness,
+				smoothness,
+				mask_smooth_sigma;
 
 			std::vector<gravis::d4Vector> spheres;
 			
@@ -55,6 +58,7 @@ class DeleteBlobs2DProgram
 				double pixel_size_full,
 				double binning_factor,
 				BufferedImage<float>& blob_region_full,
+		        BufferedImage<float>& blob_mask_full,
 				const std::string& image_name,
 		        bool verbose);
 
@@ -79,6 +83,10 @@ class DeleteBlobs2DProgram
 		BufferedImage<float> evaluateRotationalSymmetry(
 				const RawImage<float>& image,
 				double radius, double max_radius, double sigma);
+		
+		BufferedImage<int> findClosestBlob(
+		        const std::vector<DelineatedBlob2D>& blobs,
+		        int w, int h);
 };
 
 #endif
