@@ -28,6 +28,63 @@
 #include <torch/script.h> // One-stop header.
 #endif //_TORCH_ENABLED
 
+
+static float feature_normalization_local_ps_mean=0., feature_normalization_local_ps_stddev=0.;
+static float feature_normalization_local_ss_mean=0., feature_normalization_local_ss_stddev=0.;
+static float feature_normalization_local_rsi_mean=0., feature_normalization_local_rsi_stddev=0.;
+
+
+static std::vector<RFLOAT> feature_normalization_global_mean{
+								4.352,
+								3.871,
+								0.001,
+								0.061,
+								-0.199,
+								0.424,
+								0.744,
+								-0.380,
+								0.292,
+								0.024,
+								0.047,
+								0.116,
+								0.638,
+								-1.112,
+								2.990
+							},
+			    feature_normalization_global_stddev{
+								4.759,
+								3.019,
+								0.002,
+								0.088,
+								0.283,
+								0.629,
+								0.585,
+								0.378,
+								0.485,
+								0.075,
+								0.075,
+								0.182,
+								0.429,
+								1.087,
+								1.758
+							},
+			    feature_normalization_global_granulo_mean{
+								837.576,
+								726.097,
+								602.175,
+								483.469,
+								328.014,
+								196.059
+							},
+			     feature_normalization_global_granulo_stddev{
+								1958.823,
+								2845.330,
+								3605.858,
+								4001.972,
+								4399.578,
+								4709.751
+							};
+
 // This contains 4 moments for an image
 class moments
 {
@@ -36,41 +93,6 @@ public:
 
 	RFLOAT sum, mean, stddev, skew, kurt;
     moments(): sum(0), mean(0), stddev(0), skew(0), kurt(0){}
-
-};
-
-class NormalizedFeatures
-{
-public:
-	RFLOAT accuracy_rotation, accuracy_translation, weighted_resolution, relative_resolution, ring_mean, ring_stddev, protein_stddev,
-			solvent_mean, solvent_stddev, scattered_signal, edge_signal, relative_signal_intensity, lowpass_filtered_img_avg, lowpass_filtered_img_stddev,
-			lowpass_filtered_img_minval, lowpass_filtered_img_maxval, granulo0, granulo1, granulo2, granulo3, granulo4, granulo5,
-			protein_sum, solvent_sum;
-	NormalizedFeatures(): accuracy_rotation(999.),
-			accuracy_translation(999.),
-			weighted_resolution(999.),
-			relative_resolution(999.),
-			ring_mean(0.),
-			ring_stddev(0.),
-			protein_stddev(0.),
-			solvent_mean(0.),
-			solvent_stddev(0.),
-			scattered_signal(0.),
-			edge_signal(0.),
-			relative_signal_intensity(0.),
-			lowpass_filtered_img_avg(0.),
-			lowpass_filtered_img_stddev(0.),
-			lowpass_filtered_img_minval(0.),
-			lowpass_filtered_img_maxval(0.),
-			protein_sum(0.),
-			solvent_sum(0.),
-			granulo0(0.),
-			granulo1(0.),
-			granulo2(0.),
-			granulo3(0.),
-			granulo4(0.),
-			granulo5(0.)
-			{}
 
 };
 
@@ -99,8 +121,6 @@ public:
     std::vector<RFLOAT> lbp, lbp_p, lbp_s, haralick_p, haralick_s, zernike_moments, granulo;
     double total_entropy, protein_entropy, solvent_entropy;
 
-    NormalizedFeatures normalized_features;
-
     classFeatures(): name(""),
 			class_index(0),
     		is_selected(0),
@@ -124,7 +144,7 @@ public:
 			solvent_entropy(0.),
 			protein_area(0),
 			solvent_area(0),
-			CAR(0.)
+                        CAR(0.)
     {
     }
 
@@ -171,8 +191,6 @@ public:
 	    solvent_entropy = copy.solvent_entropy;
 	    subimages = copy.subimages;
 	    CAR = copy.CAR;
-	    normalized_features = copy.normalized_features;
-
 	}
 
 	// Define assignment operator in terms of the copy constructor
@@ -215,46 +233,50 @@ public:
 	    solvent_entropy = copy.solvent_entropy;
 	    subimages = copy.subimages;
 	    CAR = copy.CAR;
-	    normalized_features = copy.normalized_features;
-
 		return *this;
 	}
 
-	std::vector<float> toVector() {
+    std::vector<float> toNormalizedVector()
+    {
+
 		std::vector<float> out(24);
 
 		// Order matters
-		out[0] =  normalized_features.accuracy_rotation;
-		out[1] =  normalized_features.accuracy_translation;
-		out[2] =  normalized_features.weighted_resolution;
-		out[3] =  normalized_features.relative_resolution;
+		out[0] = (accuracy_rotation - feature_normalization_global_mean[0]) / feature_normalization_global_stddev[0];
+		out[1] = (accuracy_translation - feature_normalization_global_mean[1]) / feature_normalization_global_stddev[1];
+		out[2] = (weighted_resolution - feature_normalization_global_mean[2]) / feature_normalization_global_stddev[2];
+		out[3] = (relative_resolution - feature_normalization_global_mean[3]) / feature_normalization_global_stddev[3];
 
-		out[4] =  normalized_features.ring_mean;
-		out[5] =  normalized_features.ring_stddev;
-		out[6] =  normalized_features.protein_stddev;
-		out[7] =  normalized_features.solvent_mean;
-		out[8] =  normalized_features.solvent_stddev;
-		out[9] = normalized_features.scattered_signal;
-		out[10] = normalized_features.edge_signal;
+		out[4] = (ring_moments.mean - feature_normalization_global_mean[4]) / feature_normalization_global_stddev[4];
+		out[5] = (ring_moments.stddev - feature_normalization_global_mean[5]) / feature_normalization_global_stddev[5];
+		out[6] = (protein_moments.stddev - feature_normalization_global_mean[6]) / feature_normalization_global_stddev[6];
+		out[7] = (solvent_moments.mean - feature_normalization_global_mean[7]) / feature_normalization_global_stddev[7];
+		out[8] = (solvent_moments.stddev - feature_normalization_global_mean[8]) / feature_normalization_global_stddev[8];
+		out[9] = (scattered_signal - feature_normalization_global_mean[9]) / feature_normalization_global_stddev[9];
+		out[10] = (edge_signal - feature_normalization_global_mean[10]) / feature_normalization_global_stddev[10];
 
-		out[11] = normalized_features.lowpass_filtered_img_avg;
-		out[12] = normalized_features.lowpass_filtered_img_stddev;
-		out[13] = normalized_features.lowpass_filtered_img_minval;
-		out[14] = normalized_features.lowpass_filtered_img_maxval;
+		out[11] = (lowpass_filtered_img_avg - feature_normalization_global_mean[11]) / feature_normalization_global_stddev[11];   
+		out[12] = (lowpass_filtered_img_stddev - feature_normalization_global_mean[12]) / feature_normalization_global_stddev[12];
+		out[13] = (lowpass_filtered_img_minval - feature_normalization_global_mean[13]) / feature_normalization_global_stddev[13];
+		out[14] = (lowpass_filtered_img_maxval - feature_normalization_global_mean[14]) / feature_normalization_global_stddev[14];
 
-		out[15] = normalized_features.granulo0;
-		out[16] = normalized_features.granulo1;
-		out[17] = normalized_features.granulo2;
+		out[15] = (granulo[0] - feature_normalization_global_granulo_mean[0]) / feature_normalization_global_granulo_stddev[0];
+		out[16] = (granulo[1] - feature_normalization_global_granulo_mean[1]) / feature_normalization_global_granulo_stddev[1];
+		out[17] = (granulo[2] - feature_normalization_global_granulo_mean[2]) / feature_normalization_global_granulo_stddev[2];
+		out[18] = (granulo[3] - feature_normalization_global_granulo_mean[3]) / feature_normalization_global_granulo_stddev[3];
+		out[19] = (granulo[4] - feature_normalization_global_granulo_mean[4]) / feature_normalization_global_granulo_stddev[4];
+		out[20] = (granulo[5] - feature_normalization_global_granulo_mean[5]) / feature_normalization_global_granulo_stddev[5];
 
-		out[18] = normalized_features.granulo3;
-		out[19] = normalized_features.granulo4;
-		out[20] = normalized_features.granulo5;
-
-		out[21] = normalized_features.protein_sum;
-		out[22] = normalized_features.solvent_sum;
-		out[23] = normalized_features.relative_signal_intensity;
+                if (feature_normalization_local_ps_stddev < 1e-10 || feature_normalization_local_ss_stddev < 1e-10 || feature_normalization_local_rsi_stddev < 1e-10)
+                {
+                    REPORT_ERROR("BUG: local normalisation stddev values are zero. Call localNormalization before toNormalizedVector!");
+                }
+		out[21] = (protein_moments.sum - feature_normalization_local_ps_mean) / feature_normalization_local_ps_stddev;
+                out[22] = (solvent_moments.sum - feature_normalization_local_ss_mean) / feature_normalization_local_ss_stddev;
+		out[23] = (relative_signal_intensity - feature_normalization_local_rsi_mean) / feature_normalization_local_rsi_stddev;
 
 		return out;
+
     }
 
 };
@@ -306,7 +328,7 @@ class ClassRanker
 public:
 
 	IOParser parser;
-	FileName fn_out, fn_ext, fn_optimiser, fn_model, fn_data, fn_select, fn_job_score, fn_cf, fn_mask_dir, fn_subimages, fn_subimage_star;
+	FileName fn_out, fn_ext, fn_optimiser, fn_model, fn_data, fn_select, fn_job_score, fn_cf, fn_mask_dir;
 	FileName fn_features, fn_sel_parts, fn_sel_classavgs, fn_root;
 
 	RFLOAT minRes, job_score;
@@ -326,6 +348,8 @@ public:
 	bool do_ranking;
 	// Perform selection of classes based on predicted scores
 	bool do_select;
+        // Also write out normalized feature vector
+        bool do_write_normalized_features;
 
 	// Make subimages out of class averages at standardized pixel size
 	bool do_subimages;
@@ -342,59 +366,7 @@ public:
 	Experiment mydata;
 	MetaDataTable MD_optimiser, MD_select;
 	std::vector<classFeatures> features_all_classes, preread_features_all_classes;
-	std::vector<RFLOAT> global_mean{
-								4.352,
-								3.871,
-								0.001,
-								0.061,
-								-0.199,
-								0.424,
-								0.744,
-								-0.380,
-								0.292,
-								0.024,
-								0.047,
-								0.116,
-								0.638,
-								-1.112,
-								2.990
-							},
-						global_stddev{
-								4.759,
-								3.019,
-								0.002,
-								0.088,
-								0.283,
-								0.629,
-								0.585,
-								0.378,
-								0.485,
-								0.075,
-								0.075,
-								0.182,
-								0.429,
-								1.087,
-								1.758
-							},
-						global_granulo_mean{
-								837.576,
-								726.097,
-								602.175,
-								483.469,
-								328.014,
-								196.059
-							},
-						global_granulo_stddev{
-								1958.823,
-								2845.330,
-								3605.858,
-								4001.972,
-								4399.578,
-								4709.751
-							};
-//	std::vector<std::string> features_to_global_normalize{},
-//							features_to_local_normalize{};
-//
+
 	FileName fn_torch_model;
 
 public:

@@ -20,7 +20,6 @@
 
 #include "src/class_ranker.h"
 
-
 //
 // Calculates n! (uses double arithmetic to avoid overflow)
 //
@@ -392,6 +391,10 @@ void ClassRanker::read(int argc, char **argv, int rank)
 	select_min_score = textToFloat(parser.getOption("--min_score", "Minimum selected score to be included in class selection", "0.5"));
 	select_max_score = textToFloat(parser.getOption("--max_score", "Maximum selected score to be included in class selection", "999."));
 	do_relative_threshold = parser.checkOption("--relative_thresholds", "If true, interpret the above min and max_scores as fractions of the maximum score of all predicted classes in the input");
+	fn_sel_parts = parser.getOption("--fn_sel_parts", "Filename for output star file with selected particles", "particles.star");
+	fn_sel_classavgs = parser.getOption("--fn_sel_classavgs", "Filename for output star file with selected class averages", "class_averages.star");
+	fn_root = parser.getOption("--fn_root", "rootname for output model.star and optimiser.star files", "rank");
+	fn_torch_model = parser.getOption("--fn_torch_model", "Filename for the serialized Torch model.", ""); // Default should be compile-time defined
 
 	int part_section = parser.addSection("Network training options (only used in development!)");
 	do_ranking  = !parser.checkOption("--train", "Only write output files for training purposes (don't rank classes)");
@@ -418,13 +421,7 @@ void ClassRanker::read(int argc, char **argv, int rank)
     debug = textToInteger(parser.getOption("--debug", "Debug level", "0"));
 	verb = textToInteger(parser.getOption("--verb", "Verbosity level", "1"));
 	fn_features = parser.getOption("--fn_features", "Filename for output features star file", "features.star");
-	fn_sel_parts = parser.getOption("--fn_sel_parts", "Filename for output star file with selected particles", "particles.star");
-	fn_sel_classavgs = parser.getOption("--fn_sel_classavgs", "Filename for output star file with selected class averages", "class_averages.star");
-	fn_root = parser.getOption("--fn_root", "rootname for output model.star and optimiser.star files", "rank");
-	fn_subimages = parser.getOption("--output_subimages", "Name of the mrcs file for saving output subimages.", "subimages.mrcs");
-	fn_subimage_star = parser.getOption("--output_subimage_star", "Name of the subimage star file.", "subimages.star");
-
-	fn_torch_model = parser.getOption("--fn_torch_model", "Filename for the serialized Torch model.", ""); // Default should be compile-time defined
+        do_write_normalized_features = parser.checkOption("--write_normalized_features", "Also write out normalized feature vectors");
 
 	// Check for errors in the command-line option
 	if (radius > 0 && radius < 1)
@@ -1455,28 +1452,26 @@ void ClassRanker::correctCtfUntilFirstPeak(MultidimArray<RFLOAT> &in, CTF ctf)
 void ClassRanker::localNormalisation(std::vector<classFeatures> &cf_all)
 {
 	// protein_sum
-	RFLOAT ps_sum = 0.0, ps_mean = 0.0, ps_stddev = 0.0;
+        RFLOAT ps_sum = 0.0, ps_stddev = 0.0;
 	for (int i = 0; i < cf_all.size(); i++) ps_sum += cf_all[i].protein_moments.sum;
-	ps_mean = ps_sum / cf_all.size();
-	for (int i = 0; i < cf_all.size(); i++) ps_stddev += pow((cf_all[i].protein_moments.sum - ps_mean), 2);
-	ps_stddev = sqrt(ps_stddev / cf_all.size());
-	for (int i = 0; i < cf_all.size(); i++) cf_all[i].normalized_features.protein_sum = (cf_all[i].protein_moments.sum - ps_mean) / ps_stddev;
+	feature_normalization_local_ps_mean = ps_sum / cf_all.size();
+	for (int i = 0; i < cf_all.size(); i++) ps_stddev += pow((cf_all[i].protein_moments.sum - feature_normalization_local_ps_mean), 2);
+	feature_normalization_local_ps_stddev = sqrt(ps_stddev / cf_all.size());
 
 	// solvent_sum
-	RFLOAT ss_sum = 0.0, ss_mean = 0.0, ss_stddev = 0.0;
+	RFLOAT ss_sum = 0.0, ss_stddev = 0.0;
 	for (int i = 0; i < cf_all.size(); i++) ss_sum += cf_all[i].solvent_moments.sum;
-	ss_mean = ss_sum / cf_all.size();
-	for (int i = 0; i < cf_all.size(); i++) ss_stddev += pow((cf_all[i].solvent_moments.sum - ss_mean), 2);
-	ss_stddev = sqrt(ss_stddev / cf_all.size());
-	for (int i = 0; i < cf_all.size(); i++) cf_all[i].normalized_features.solvent_sum = (cf_all[i].solvent_moments.sum - ss_mean) / ss_stddev;
+	feature_normalization_local_ss_mean = ss_sum / cf_all.size();
+	for (int i = 0; i < cf_all.size(); i++) ss_stddev += pow((cf_all[i].solvent_moments.sum - feature_normalization_local_ss_mean), 2);
+	feature_normalization_local_ss_stddev = sqrt(ss_stddev / cf_all.size());
 
 	// relative_signal_intensity
-	RFLOAT sum = 0.0, mean = 0.0, stddev = 0.0;
-	for (int i = 0; i < cf_all.size(); i++) sum += cf_all[i].relative_signal_intensity;
-	mean = sum / cf_all.size();
-	for (int i = 0; i < cf_all.size(); i++) stddev += pow((cf_all[i].relative_signal_intensity - mean), 2);
-	stddev = sqrt(stddev / cf_all.size());
-	for (int i = 0; i < cf_all.size(); i++) cf_all[i].normalized_features.relative_signal_intensity = (cf_all[i].relative_signal_intensity - mean) / stddev;
+	RFLOAT rsi_sum = 0.0, rsi_stddev = 0.0;
+	for (int i = 0; i < cf_all.size(); i++) rsi_sum += cf_all[i].relative_signal_intensity;
+	feature_normalization_local_rsi_mean = rsi_sum / cf_all.size();
+	for (int i = 0; i < cf_all.size(); i++) rsi_stddev += pow((cf_all[i].relative_signal_intensity - feature_normalization_local_rsi_mean), 2);
+	feature_normalization_local_rsi_stddev = sqrt(rsi_stddev / cf_all.size());
+
 }
 
 /** ======================================================== Collecting All Features ========================================================= */
@@ -1655,29 +1650,6 @@ void ClassRanker::getFeatures()
 			}
 //			std::cout << "protein_area: " << features_this_class.protein_area << std::endl;
 //			std::cout << "solvent_area: " << features_this_class.solvent_area << std::endl;
-
-			// Collect selected features and apply global normalisation to part of them
-			features_this_class.normalized_features.accuracy_rotation = (features_this_class.accuracy_rotation - global_mean[0]) / global_stddev[0];
-			features_this_class.normalized_features.accuracy_translation = (features_this_class.accuracy_translation - global_mean[1]) / global_stddev[1];
-			features_this_class.normalized_features.weighted_resolution = (features_this_class.weighted_resolution - global_mean[2]) / global_stddev[2];
-			features_this_class.normalized_features.relative_resolution = (features_this_class.relative_resolution - global_mean[3]) / global_stddev[3];
-			features_this_class.normalized_features.ring_mean = (features_this_class.ring_moments.mean - global_mean[4]) / global_stddev[4];
-			features_this_class.normalized_features.ring_stddev = (features_this_class.ring_moments.stddev - global_mean[5]) / global_stddev[5];
-			features_this_class.normalized_features.protein_stddev = (features_this_class.protein_moments.stddev - global_mean[6]) / global_stddev[6];
-			features_this_class.normalized_features.solvent_mean = (features_this_class.solvent_moments.mean - global_mean[7]) / global_stddev[7];
-			features_this_class.normalized_features.solvent_stddev = (features_this_class.solvent_moments.stddev - global_mean[8]) / global_stddev[8];
-			features_this_class.normalized_features.scattered_signal = (features_this_class.scattered_signal - global_mean[9]) / global_stddev[9];
-			features_this_class.normalized_features.edge_signal = (features_this_class.edge_signal - global_mean[10]) / global_stddev[10];
-			features_this_class.normalized_features.lowpass_filtered_img_avg = (features_this_class.lowpass_filtered_img_avg - global_mean[11]) / global_stddev[11];
-			features_this_class.normalized_features.lowpass_filtered_img_stddev = (features_this_class.lowpass_filtered_img_stddev - global_mean[12]) / global_stddev[12];
-			features_this_class.normalized_features.lowpass_filtered_img_minval = (features_this_class.lowpass_filtered_img_minval - global_mean[13]) / global_stddev[13];
-			features_this_class.normalized_features.lowpass_filtered_img_maxval = (features_this_class.lowpass_filtered_img_maxval - global_mean[14]) / global_stddev[14];
-			features_this_class.normalized_features.granulo0 = (features_this_class.granulo[0] - global_granulo_mean[0]) / global_granulo_stddev[0];
-			features_this_class.normalized_features.granulo1 = (features_this_class.granulo[1] - global_granulo_mean[1]) / global_granulo_stddev[1];
-			features_this_class.normalized_features.granulo2 = (features_this_class.granulo[2] - global_granulo_mean[2]) / global_granulo_stddev[2];
-			features_this_class.normalized_features.granulo3 = (features_this_class.granulo[3] - global_granulo_mean[3]) / global_granulo_stddev[3];
-			features_this_class.normalized_features.granulo4 = (features_this_class.granulo[4] - global_granulo_mean[4]) / global_granulo_stddev[4];
-			features_this_class.normalized_features.granulo5 = (features_this_class.granulo[5] - global_granulo_mean[5]) / global_granulo_stddev[5];
 
 			// SHWS 15072020: new try small subimages with fixed boxsize at uniform_angpix for image-based CNN
 			if (do_subimages && protein_area>0)
@@ -1861,7 +1833,7 @@ void ClassRanker::performRanking()
 	float max_score = -999.;
 	for (int i = 0; i < features_all_classes.size(); i++)
 	{
-		std::vector<float> feature_vector = features_all_classes[i].toVector();
+		std::vector<float> feature_vector = features_all_classes[i].toNormalizedVector();
 		scores[i] = (RFLOAT) deployTorchModel(fn_torch_model, feature_vector);
 		if (scores[i] > max_score) max_score = scores[i];
 	}
@@ -1978,126 +1950,138 @@ void ClassRanker::writeFeatures()
 {
 	MetaDataTable MD_class_features;
 	MD_class_features.setName("class_features");
-	for (int i=0; i<features_all_classes.size();i++)
+        MetaDataTable MD_normalized_class_features;
+        MD_normalized_class_features.setName("normalized_class_features");
+	
+        long int nr_stack = 0;
+        for (int i=0; i<features_all_classes.size();i++)
 	{
-        // First calculate class scores if this is for training purpose (as the calculation depends on minRes, which can only be obtained at the end of the loop of getFeatures())
-		if (!do_ranking)
-        {
+
+            MD_normalized_class_features.addObject();
+            MD_normalized_class_features.setValue(EMDL_MLMODEL_REF_IMAGE, features_all_classes[i].name);
+
+            MD_class_features.addObject();
+            MD_class_features.setValue(EMDL_MLMODEL_REF_IMAGE, features_all_classes[i].name);
+
+            // First calculate class scores if this is for training purpose (as the calculation depends on minRes, which can only be obtained at the end of the loop of getFeatures())
+            if (!do_ranking)
+            {
         	// for training: get a target class score from the jobscore and the resolution
     		// First calculate class score based on best resolution among red classes of the job, job score, estimated resolution, and the selection label
-			if (features_all_classes[i].particle_nr > 10)
-			{
-				features_all_classes[i].class_score = getClassScoreFromJobScore(features_all_classes[i], minRes);
-			}
-        }
+                if (features_all_classes[i].particle_nr > 10)
+                {
+                    features_all_classes[i].class_score = getClassScoreFromJobScore(features_all_classes[i], minRes);
+                    MD_class_features.setValue(EMDL_CLASS_FEAT_CLASS_SCORE, features_all_classes[i].class_score);
+                    MD_normalized_class_features.setValue(EMDL_CLASS_FEAT_CLASS_SCORE, features_all_classes[i].class_score);
+                }
+            }
 
-        MD_class_features.addObject();
-		MD_class_features.setValue(EMDL_MLMODEL_REF_IMAGE, features_all_classes[i].name);
-		if (!do_ranking)
-		{
-			MD_class_features.setValue(EMDL_CLASS_FEAT_CLASS_SCORE, features_all_classes[i].class_score);
-		}
-		MD_class_features.setValue(EMDL_CLASS_FEAT_IS_SELECTED,features_all_classes[i].is_selected);
-		MD_class_features.setValue(EMDL_CLASS_FEAT_CLASS_INDEX, features_all_classes[i].class_index);
-		MD_class_features.setValue(EMDL_MLMODEL_PDF_CLASS, features_all_classes[i].class_distribution);
-		MD_class_features.setValue(EMDL_MLMODEL_ACCURACY_ROT, features_all_classes[i].accuracy_rotation);
-		MD_class_features.setValue(EMDL_MLMODEL_ACCURACY_TRANS, features_all_classes[i].accuracy_translation);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_IS_SELECTED,features_all_classes[i].is_selected);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_CLASS_INDEX, features_all_classes[i].class_index);
+            MD_class_features.setValue(EMDL_MLMODEL_PDF_CLASS, features_all_classes[i].class_distribution);
+            MD_class_features.setValue(EMDL_MLMODEL_ACCURACY_ROT, features_all_classes[i].accuracy_rotation);
+            MD_class_features.setValue(EMDL_MLMODEL_ACCURACY_TRANS, features_all_classes[i].accuracy_translation);
 
-		MD_class_features.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, features_all_classes[i].estimated_resolution);
-		MD_class_features.setValue(EMDL_CLASS_FEAT_WEIGHTED_RESOLUTION, features_all_classes[i].weighted_resolution);
-		MD_class_features.setValue(EMDL_CLASS_FEAT_RELATIVE_RESOLUTION, features_all_classes[i].relative_resolution);
-		MD_class_features.setValue(EMDL_CLASS_FEAT_PARTICLE_NR, features_all_classes[i].particle_nr);
+            MD_class_features.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, features_all_classes[i].estimated_resolution);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_WEIGHTED_RESOLUTION, features_all_classes[i].weighted_resolution);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_RELATIVE_RESOLUTION, features_all_classes[i].relative_resolution);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_PARTICLE_NR, features_all_classes[i].particle_nr);
 
-		// Moments for the ring
-		if (radius > 0)
-		{
-			MD_class_features.setValue(EMDL_CLASS_FEAT_RING_MEAN, features_all_classes[i].ring_moments.mean);
-			MD_class_features.setValue(EMDL_CLASS_FEAT_RING_STDDEV, features_all_classes[i].ring_moments.stddev);
-			MD_class_features.setValue(EMDL_CLASS_FEAT_RING_SKEW, features_all_classes[i].ring_moments.skew);
-			MD_class_features.setValue(EMDL_CLASS_FEAT_RING_KURT, features_all_classes[i].ring_moments.kurt);
-		}
+            // Moments for the ring
+            if (radius > 0)
+            {
+                MD_class_features.setValue(EMDL_CLASS_FEAT_RING_MEAN, features_all_classes[i].ring_moments.mean);
+                MD_class_features.setValue(EMDL_CLASS_FEAT_RING_STDDEV, features_all_classes[i].ring_moments.stddev);
+                MD_class_features.setValue(EMDL_CLASS_FEAT_RING_SKEW, features_all_classes[i].ring_moments.skew);
+                MD_class_features.setValue(EMDL_CLASS_FEAT_RING_KURT, features_all_classes[i].ring_moments.kurt);
+            }
 
-		// Protein and solvent region moments
-		MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_AREA, features_all_classes[i].protein_area);
-		MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_SUM, features_all_classes[i].protein_moments.sum);
-		MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_MEAN, features_all_classes[i].protein_moments.mean);
-		MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_STDDEV, features_all_classes[i].protein_moments.stddev);
-		MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_SKEW, features_all_classes[i].protein_moments.skew);
-		MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_KURT, features_all_classes[i].protein_moments.kurt);
-		MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_AREA, features_all_classes[i].solvent_area);
-		MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_SUM, features_all_classes[i].solvent_moments.sum);
-		MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_MEAN, features_all_classes[i].solvent_moments.mean);
-		MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_STDDEV, features_all_classes[i].solvent_moments.stddev);
-		MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_SKEW, features_all_classes[i].solvent_moments.skew);
-		MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_KURT, features_all_classes[i].solvent_moments.kurt);
-		MD_class_features.setValue(EMDL_CLASS_FEAT_RELATIVE_SIGNAL_INT, features_all_classes[i].relative_signal_intensity);
-		MD_class_features.setValue(EMDL_CLASS_FEAT_SCATTERED_SIGNAL, features_all_classes[i].scattered_signal);
-		MD_class_features.setValue(EMDL_CLASS_FEAT_EDGE_SIGNAL, features_all_classes[i].edge_signal);
-		MD_class_features.setValue(EMDL_CLASS_FEAT_CAR, features_all_classes[i].CAR);
+            // Protein and solvent region moments
+            MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_AREA, features_all_classes[i].protein_area);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_SUM, features_all_classes[i].protein_moments.sum);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_MEAN, features_all_classes[i].protein_moments.mean);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_STDDEV, features_all_classes[i].protein_moments.stddev);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_SKEW, features_all_classes[i].protein_moments.skew);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_KURT, features_all_classes[i].protein_moments.kurt);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_AREA, features_all_classes[i].solvent_area);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_SUM, features_all_classes[i].solvent_moments.sum);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_MEAN, features_all_classes[i].solvent_moments.mean);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_STDDEV, features_all_classes[i].solvent_moments.stddev);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_SKEW, features_all_classes[i].solvent_moments.skew);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_KURT, features_all_classes[i].solvent_moments.kurt);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_RELATIVE_SIGNAL_INT, features_all_classes[i].relative_signal_intensity);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_SCATTERED_SIGNAL, features_all_classes[i].scattered_signal);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_EDGE_SIGNAL, features_all_classes[i].edge_signal);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_CAR, features_all_classes[i].CAR);
 
-        // Lowpass filtered image features
-		MD_class_features.setValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MEAN, features_all_classes[i].lowpass_filtered_img_avg);
-		MD_class_features.setValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_STDDEV, features_all_classes[i].lowpass_filtered_img_stddev);
-		MD_class_features.setValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MIN, features_all_classes[i].lowpass_filtered_img_minval);
-		MD_class_features.setValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MAX, features_all_classes[i].lowpass_filtered_img_maxval);
+            // Lowpass filtered image features
+            MD_class_features.setValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MEAN, features_all_classes[i].lowpass_filtered_img_avg);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_STDDEV, features_all_classes[i].lowpass_filtered_img_stddev);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MIN, features_all_classes[i].lowpass_filtered_img_minval);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MAX, features_all_classes[i].lowpass_filtered_img_maxval);
+            
+            if (do_granularity_features)
+            {
+                // Protein and solvent region LBP's
+                MD_class_features.setValue(EMDL_CLASS_FEAT_LBP, features_all_classes[i].lbp);
+                MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_LBP, features_all_classes[i].lbp_p);
+                MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_LBP, features_all_classes[i].lbp_s);
+                
+                // Protein and solvent region entropy
+                MD_class_features.setValue(EMDL_CLASS_FEAT_TOTAL_ENTROPY, features_all_classes[i].total_entropy);
+                MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_ENTROPY, features_all_classes[i].protein_entropy);
+                MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_ENTROPY, features_all_classes[i].solvent_entropy);
 
-		if (do_granularity_features)
-		{
-			// Protein and solvent region LBP's
-			MD_class_features.setValue(EMDL_CLASS_FEAT_LBP, features_all_classes[i].lbp);
-			MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_LBP, features_all_classes[i].lbp_p);
-			MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_LBP, features_all_classes[i].lbp_s);
+                MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_HARALICK, features_all_classes[i].haralick_p);
+                MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_HARALICK, features_all_classes[i].haralick_s);
+                
+                // Zernike moments
+                MD_class_features.setValue(EMDL_CLASS_FEAT_ZERNIKE_MOMENTS, features_all_classes[i].zernike_moments);
+                MD_class_features.setValue(EMDL_CLASS_FEAT_GRANULO, features_all_classes[i].granulo);
+            }
 
-			// Protein and solvent region entropy
-			MD_class_features.setValue(EMDL_CLASS_FEAT_TOTAL_ENTROPY, features_all_classes[i].total_entropy);
-			MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_ENTROPY, features_all_classes[i].protein_entropy);
-			MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_ENTROPY, features_all_classes[i].solvent_entropy);
+            if (do_subimages && NZYXSIZE(features_all_classes[i].subimages) > 1)
+            {
+                MetaDataTable MD_subimages;
+                MD_subimages.setName("subimages");
+                int nr_images = NSIZE(features_all_classes[i].subimages);
+                for (long n=0; n < nr_images; n++)
+                {
+                    nr_stack++;
+                    FileName fn_img;
+                    fn_img.compose(nr_stack, fn_out + "subimages.mrcs");
+                    MD_subimages.addObject();
+                    MD_subimages.setValue(EMDL_IMAGE_NAME, fn_img);
 
-			MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_HARALICK, features_all_classes[i].haralick_p);
-			MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_HARALICK, features_all_classes[i].haralick_s);
+                    Image<RFLOAT> img;
+                    features_all_classes[i].subimages.getImage(n, img());
+                    if (img().getSize() > 1)
+                    {
+                        img.write(fn_img, -1, false, (nr_stack == 1) ? WRITE_OVERWRITE : WRITE_APPEND);
+                    }
+                }
 
-			// Zernike moments
-			MD_class_features.setValue(EMDL_CLASS_FEAT_ZERNIKE_MOMENTS, features_all_classes[i].zernike_moments);
-			MD_class_features.setValue(EMDL_CLASS_FEAT_GRANULO, features_all_classes[i].granulo);
-		}
+                FileName fn_subimage_star;
+                fn_subimage_star.compose(fn_out + "subimages_class", features_all_classes[i].class_index, "star");
+                MD_subimages.write(fn_subimage_star);
+                MD_class_features.setValue(EMDL_CLASS_FEAT_SUBIMAGE_STARFILE, fn_subimage_star);
+                MD_normalized_class_features.setValue(EMDL_CLASS_FEAT_SUBIMAGE_STARFILE, fn_subimage_star);
+
+            }
+
+            std::vector<float> feature_vector = features_all_classes[i].toNormalizedVector();
+            MD_normalized_class_features.setValue(EMDL_CLASS_FEAT_NORM_VECTOR, feature_vector);
 
 	}
+
 	MD_class_features.write(fn_out+fn_features);
 	if (verb > 0) std::cout << " Written features to star file: " << fn_out << fn_features << std::endl;
 
-	if (do_subimages)
-	{
-		MetaDataTable MD_subimages;
-		MD_subimages.setName("subimages");
-		long int nr_stack = 0;
-		for (int f=0; f<features_all_classes.size();f++)
-		{
-			if (NZYXSIZE(features_all_classes[f].subimages) > 1)
-			{
-				int nr_images = NSIZE(features_all_classes[f].subimages);
-				for (long n=0; n < nr_images; n++)
-				{
-					FileName fnt;
-					fnt.compose(nr_stack+1, fn_out + fn_subimages);
-					MD_subimages.addObject();
-					MD_subimages.setValue(EMDL_IMAGE_NAME, fnt);
-					MD_subimages.setValue(EMDL_MLMODEL_REF_IMAGE, features_all_classes[f].name);
-					MD_subimages.setValue(EMDL_CLASS_FEAT_CLASS_SCORE, features_all_classes[f].class_score);
-
-					Image<RFLOAT> img;
-					features_all_classes[f].subimages.getImage(n, img());
-					if (img().getSize() > 1)
-					{
-						img.write(fn_out + fn_subimages, -1, false, (nr_stack == 0) ? WRITE_OVERWRITE : WRITE_APPEND);
-						nr_stack++;
-					}
-				}
-			}
-		}
-		MD_subimages.write(fn_out + fn_subimage_star);
-		if (verb > 0) std::cout << " Written subimages to: " << fn_out + fn_subimage_star << std::endl;
-
-	}
-
+        if (do_write_normalized_features)
+        {
+            FileName fntt = fn_out+fn_features.withoutExtension() + "_normalized.star";
+            MD_normalized_class_features.write(fntt);
+            if (verb > 0) std::cout << " Written normalized feature vectors to star file: " << fntt << std::endl;
+        }
 
 }
