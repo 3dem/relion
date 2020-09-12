@@ -516,6 +516,15 @@ void Blob2D::eraseLocally(
 	FFT::inverseFourierTransform(polarImageFS, polarImage);
 	FFT::inverseFourierTransform(polarWeightFS, polarWeight);
 	
+	const double eps = 1e-3;
+	
+	for (int i = 0; i < polarWeight.getSize(); i++)
+	{
+		if (polarWeight[i] < eps)
+		{
+			polarWeight[i] = eps;
+		}
+	}
 	
 	if (debug)
 	{
@@ -575,7 +584,7 @@ void Blob2D::eraseLocally(
 	const int y0 = minPos.y < 0?       0 : std::ceil(minPos.y);
 	const int y1 = maxPos.y >= h-1?  h-1 : std::floor(maxPos.y);
 	
-	const double eps = 0.001;
+	const double eps2 = 0.001;
 
 	for (int y = y0; y <= y1; y++)
 	for (int x = x0; x <= x1; x++)
@@ -597,7 +606,7 @@ void Blob2D::eraseLocally(
 		            phi_samples * phi / (2 * PI), 
 		            r);
 		
-		if (wgh < eps) continue;
+		if (wgh < eps2) continue;
 		
 		if (ru > radius)
 		{
@@ -641,7 +650,7 @@ void Blob2D::eraseLocally(
 		            phi_samples * phi / (2 * PI), 
 		            r);
 		
-		if (wgh < eps) continue;
+		if (wgh < eps2) continue;
 		
 		if (ru > radius)
 		{
@@ -651,8 +660,11 @@ void Blob2D::eraseLocally(
 		
 		const double blob_value = wgh * (pred - outside_val);
 
-		erased_out(x,y) -= blob_value;
-		blob_out(x,y)   += blob_value;
+		if (blob_value == blob_value)
+		{
+			erased_out(x,y) -= blob_value;
+			blob_out(x,y)   += blob_value;
+		}
 	}
 }
 
