@@ -287,7 +287,7 @@ void DeleteBlobs2DProgram::processMicrograph(
 	std::vector<std::vector<double>> all_blob_parameters;
 
 
-	for (int blob_id = 0; blob_id < blob_count; blob_id++)
+	for (int blob_id = 0; blob_id < 1/*blob_count*/; blob_id++)
 	{
 		if (verbose)
 		{
@@ -437,7 +437,7 @@ void DeleteBlobs2DProgram::processMicrograph(
 				Log::endSection();
 			}
 		}
-		
+				
 		if (verbose)
 		{
 			Log::print("Erasing");
@@ -447,6 +447,11 @@ void DeleteBlobs2DProgram::processMicrograph(
 		std::vector<double> final_parameters_fullsize = blob_parameters_cropped;
 		final_parameters_fullsize[0] += window_origin_full.x;
 		final_parameters_fullsize[1] += window_origin_full.y;
+		
+		/*final_parameters_fullsize = std::vector<double>{
+		        294.262, 3092.77, 
+		        13.7261, -12.9206, -4.36348, -32.0462, 9.58287, -3.23557, 2.9641, -1.14104, -2.80715, 
+		        -0.679285, 1.68214, 2.41016, 1.74737, 0.667932, -0.468658, -0.895502 };*/
 		
 		BufferedImage<float> blob_weight(w_full, h_full, 1);
 		

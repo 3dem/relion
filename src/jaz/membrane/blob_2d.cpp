@@ -490,6 +490,13 @@ void Blob2D::eraseLocally(
 	const int phi_samples = polarImage.xdim;
 	const int max_radius = polarImage.ydim;
 	
+	const bool debug = false;
+	
+	if (debug)
+	{
+		polarImage.write("DEBUG_polarImage_0.mrc");
+		polarWeight.write("DEBUG_polarWeight_0.mrc");
+	}
 	
 	BufferedImage<fComplex> polarImageFS, polarWeightFS;
 	
@@ -510,7 +517,18 @@ void Blob2D::eraseLocally(
 	FFT::inverseFourierTransform(polarWeightFS, polarWeight);
 	
 	
-	polarImage /= polarWeight;
+	if (debug)
+	{
+		polarImage.write("DEBUG_polarImage_1.mrc");
+		polarWeight.write("DEBUG_polarWeight_1.mrc");
+	}
+	
+	BufferedImage<float> polarImageNormalized = polarImage / polarWeight;
+	
+	if (debug)
+	{
+		polarImageNormalized.write("DEBUG_polarImageNormalized.mrc");
+	}
 	
 	const double cappingRadius = 1.75 * smoothingRadius;
 	
@@ -520,10 +538,10 @@ void Blob2D::eraseLocally(
 	for (int p = 0; p < phi_samples; p++)
 	for (int r = 0; r < cappingRadius && r < max_radius; r++)
 	{
-		const double t = polarWeight(p,r) * (cos(PI * r / cappingRadius) + 1.0) / 2;
+		const double t = (cos(PI * r / cappingRadius) + 1.0) / 2;
 		
 		tipAvg += t * polarImage(p,r);
-		tipWgh += t;
+		tipWgh += t * polarWeight(p,r);
 	}
 	
 	tipAvg /= tipWgh;
@@ -533,7 +551,12 @@ void Blob2D::eraseLocally(
 	{
 		const double t = (cos(PI * r / cappingRadius) + 1.0) / 2;
 		
-		polarImage(p,r) = t * tipAvg + (1-t) * polarImage(p,r);
+		polarImageNormalized(p,r) = t * tipAvg + (1-t) * polarImageNormalized(p,r);
+	}
+	
+	if (debug)
+	{
+		polarImageNormalized.write("DEBUG_polarImageNormalized_2.mrc");
 	}
 	
 	const int w = micrograph.xdim;
@@ -609,7 +632,7 @@ void Blob2D::eraseLocally(
 		}
 		
 		const double pred = Interpolation::cubicXY_wrap(
-		            polarImage, 
+		            polarImageNormalized, 
 		            phi_samples * phi / (2 * PI), 
 		            r);
 		
