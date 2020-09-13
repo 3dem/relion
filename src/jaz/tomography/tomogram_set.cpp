@@ -66,7 +66,7 @@ int TomogramSet::addTomogram(
 	
 	const CTF& ctf0 = ctfs[0];
 	
-	globalTable.setValue(EMDL_IMAGE_PIXEL_SIZE, pixelSize, index);
+	globalTable.setValue(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, pixelSize, index);
 	globalTable.setValue(EMDL_CTF_VOLTAGE, ctf0.kV, index);
 	globalTable.setValue(EMDL_CTF_CS, ctf0.Cs, index);
 	globalTable.setValue(EMDL_CTF_Q0, ctf0.Q0, index);
@@ -201,7 +201,7 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 	
 	double Q0;
 	
-	globalTable.getValueSafely(EMDL_IMAGE_PIXEL_SIZE, out.optics.pixelSize, index);
+	globalTable.getValueSafely(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, out.optics.pixelSize, index);
 	globalTable.getValueSafely(EMDL_CTF_VOLTAGE, out.optics.voltage, index);
 	globalTable.getValueSafely(EMDL_CTF_CS, out.optics.Cs, index);
 	globalTable.getValueSafely(EMDL_CTF_Q0, Q0, index);

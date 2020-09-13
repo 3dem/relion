@@ -23,10 +23,10 @@ ParticleSet::ParticleSet(std::string filename, std::string motionFilename)
 	optTable.read(filename, "optics");
 	partTable.read(filename, "particles");
 	
-	if (!optTable.labelExists(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE))
+	if (!optTable.labelExists(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE))
 	{
 		REPORT_ERROR("ParticleSet::ParticleSet: "
-					 + EMDL::label2Str(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE)
+					 + EMDL::label2Str(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE)
 					 + " missing from optics MetaDataTable.\n");
 	}
 
@@ -185,7 +185,7 @@ d3Vector ParticleSet::getPosition(long int particle_id) const
 	
 	const int og = getOpticsGroup(particle_id);
 	
-	const double originalPixelSize = optTable.getDouble(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, og);
+	const double originalPixelSize = optTable.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, og);
 	const double binnedPixelSize = optTable.getDouble(EMDL_IMAGE_PIXEL_SIZE, og);
 	
 	d3Vector out = (binnedPixelSize * pos - off) / originalPixelSize;
@@ -375,13 +375,13 @@ double ParticleSet::getBinnedPixelSize(int opticsGroup) const
 
 double ParticleSet::getOriginalPixelSize(int opticsGroup) const
 {
-	if (!optTable.labelExists(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE))
+	if (!optTable.labelExists(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE))
 	{
 		REPORT_ERROR("ParticleSet::getOriginalPixelSize: pixel size (rlnMicrographOriginalPixelSize) missing from optics table");
 	}
 	
 	double out;
-	optTable.getValueSafely(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, out, opticsGroup);
+	optTable.getValueSafely(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, out, opticsGroup);
 	return out;
 }
 

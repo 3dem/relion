@@ -139,11 +139,10 @@ void SubtomoProgram::run()
 
 	for (int og = 0; og < copy.numberOfOpticsGroups(); og++)
 	{
-		const double ps_img = copy.optTable.getDouble(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, og);
+		const double ps_img = copy.optTable.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, og);
 		const double ps_out = binning * ps_img;
 
-		copy.optTable.setValue(EMDL_MICROGRAPH_BINNING, binning, og);
-		copy.optTable.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, ps_out, og);
+		copy.optTable.setValue(EMDL_TOMO_SUBTOMOGRAM_BINNING, binning, og);
 		copy.optTable.setValue(EMDL_IMAGE_PIXEL_SIZE, ps_out, og);
 		copy.optTable.setValue(EMDL_IMAGE_SIZE, cropSize, og);
 	}

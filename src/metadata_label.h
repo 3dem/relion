@@ -530,6 +530,9 @@ enum EMDLabel
 	EMDL_TOMO_PROJECTION_W,
 	EMDL_TOMO_HANDEDNESS,
 	EMDL_TOMO_FIDUCIALS_STARFILE,
+	EMDL_TOMO_TILT_SERIES_PIXEL_SIZE,
+	EMDL_TOMO_SUBTOMOGRAM_BINNING,
+	EMDL_TOMO_BINNING,
 
 	EMDL_UNKNOWN_LABEL,
 
@@ -1084,6 +1087,8 @@ private:
 		EMDL::addLabel(EMDL_TOMO_HANDEDNESS, EMDL_DOUBLE, "rlnTomoHand", "Handedness of a tomogram (i.e. slope of defocus over the image-space z coordinate)");
 				
 		EMDL::addLabel(EMDL_TOMO_FIDUCIALS_STARFILE, EMDL_STRING, "rlnTomoFiducialsStarFile", "STAR file containing the 3D locations of fiducial markers");
+		EMDL::addLabel(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, EMDL_DOUBLE, "rlnTomoTiltSeriesPixelSize", "Pixel size of the original tilt series");
+		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_BINNING, EMDL_DOUBLE, "rlnTomoSubtomogramBinning", "Binning level of a subtomogram");
 				
 		EMDL::addLabel(EMDL_UNKNOWN_LABEL, EMDL_UNKNOWN, "rlnUnknownLabel", "NON-RELION label: values will be ignored, yet maintained in the STAR file.");
 	 }
