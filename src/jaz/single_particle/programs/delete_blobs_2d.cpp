@@ -44,7 +44,7 @@ void DeleteBlobs2DProgram::readParameters(int argc, char *argv[])
 		diag = parser.checkOption("--diag", "Write out diagnostic information");
 
 		max_frequencies = textToInteger(parser.getOption("--n", "Number of frequencies", "12"));
-		blob_thickness = textToDouble(parser.getOption("--th", "Blob thickness [fraction of radius]", "0.5"));
+		blob_thickness = textToDouble(parser.getOption("--th", "Blob thickness [fraction of radius]", "0.25"));
 		highpass_sigma_real_A = textToDouble(parser.getOption("--hp", "High-pass sigma [Å, real space]", "300"));
 		max_iters = textToInteger(parser.getOption("--max_iters", "Maximum number of iterations", "1000"));
 		convergence_threshold = textToDouble(parser.getOption("--cth", "Convergence threshold", "0.02"));
@@ -330,7 +330,11 @@ void DeleteBlobs2DProgram::processMicrograph(
 
 			if (window_size_binned_max.x < 1 || window_size_binned_max.y < 1)
 			{
-				Log::endSection();
+				if (verbose)
+				{
+					Log::endSection();
+				}
+				
 				continue;
 			}
 
@@ -412,7 +416,10 @@ void DeleteBlobs2DProgram::processMicrograph(
 			BufferedImage<float> dummy_weight = blob_mask_full;
 			dummy_weight.fill(1.f);
 			
-			Log::print("Pre-fitting globally");
+			if (verbose)
+			{
+				Log::print("Pre-fitting globally");
+			}
 			
 			std::pair<double, std::vector<double>> global_estimate =
 				GlobalBlobFit2D::fit(
@@ -440,7 +447,10 @@ void DeleteBlobs2DProgram::processMicrograph(
 					blobTag + "/global_initial.mrc");
 			}
 			
-			Log::print("Refining at bin " + ZIO::itoa((int)min_binning));
+			if (verbose)
+			{
+				Log::print("Refining at bin " + ZIO::itoa((int)min_binning));
+			}
 			
 			// try much thinner blobs
 			blob_parameters_cropped = fitBlob(

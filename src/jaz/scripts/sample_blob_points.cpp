@@ -13,7 +13,7 @@ using namespace gravis;
 int main(int argc, char *argv[])
 {
 	std::string micrographs_list_filename, micrographs_dir, blobs_dir, outPath;
-	double min_radius, max_radius, min_distance;
+	double min_radius, max_radius, min_distance, perimeter_margin;
 	int num_threads;
 	bool diag;
 	
@@ -27,7 +27,8 @@ int main(int argc, char *argv[])
 		micrographs_list_filename = parser.getOption("--ml", "Micrograph lists filename");
 		micrographs_dir = parser.getOption("--md", "Micrographs directory");
 		blobs_dir = parser.getOption("--bd", "Initial blobs directory");
-		min_distance = textToDouble(parser.getOption("--d", "Min. particle distance [bin-1 pixels]", "80"));
+		min_distance = textToDouble(parser.getOption("--d", "Min. particle distance [bin-1 pixels]", "128"));
+		perimeter_margin = textToDouble(parser.getOption("--pm", "Distance of perimeter points from the outline [bin-1 pixels]", "64"));
 		min_radius = textToDouble(parser.getOption("--r0", "Min. radius [bin-1 pixels]", "300"));
 		max_radius = textToDouble(parser.getOption("--r1", "Max. radius [bin-1 pixels]", "800"));
 		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
@@ -253,11 +254,13 @@ int main(int argc, char *argv[])
 				const double l = blob.perimeter();
 				const int samples = std::floor(l / min_distance);
 				
+				DelineatedBlob2D smaller_blob(blob);
+				smaller_blob.radius -= perimeter_margin;
 				
 				for (int i = 0; i < samples; i++)
 				{
 					const double phi = 2 * PI * i / (double) samples;
-					const d2Vector p = blob.getOutlinePoint(phi);
+					const d2Vector p = smaller_blob.getOutlinePoint(phi);
 					
 					if (p.x > margin && p.x < w - margin   
 					 && p.y > margin && p.y < h - margin)
