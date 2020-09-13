@@ -410,6 +410,7 @@ void DeleteBlobs2DProgram::processMicrograph(
 
 		std::vector<double> blob_parameters_cropped = initial_parameters_cropped;
 
+		double estimated_radius = radius;
 
 		if (global_prefit)
 		{
@@ -428,14 +429,14 @@ void DeleteBlobs2DProgram::processMicrograph(
 					blob_region_full,
 					dummy_weight);
 			
-			const double mean_radius = global_estimate.first;
+			estimated_radius = global_estimate.first;
 			blob_parameters_cropped = global_estimate.second;
 			
 			if (diag)
 			{
 				BufferedImage<float> outline = GlobalBlobFit2D::drawOutline(
 						blob_parameters_cropped,
-						mean_radius,
+						estimated_radius,
 						blob_region_full);
 				
 				
@@ -535,7 +536,17 @@ void DeleteBlobs2DProgram::processMicrograph(
 			final_blob.eraseLocally(micrograph, erased_image, blobs_image, blob_weight, 1.5 * radius, radius, smoothness);
 		}
 		
-		all_blob_parameters.push_back(final_parameters_fullsize);
+		const int param_count = final_parameters_fullsize.size();
+		std::vector<double> final_parameters_fullsize_with_radius(param_count + 1);
+		
+		final_parameters_fullsize_with_radius[0] = estimated_radius;
+		        
+		for (int i = 0; i < param_count; i++)
+		{
+			final_parameters_fullsize_with_radius[i+1] = final_parameters_fullsize[i];
+		}
+		
+		all_blob_parameters.push_back(final_parameters_fullsize_with_radius);
 		        
 		if (verbose)
 		{

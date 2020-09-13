@@ -15,7 +15,7 @@ int main(int argc, char *argv[])
 	std::string micrographs_list_filename, micrographs_dir, blobs_dir, outPath;
 	double min_radius, max_radius, min_distance, perimeter_margin;
 	int num_threads;
-	bool diag;
+	bool diag, estimate_radius;
 	
 	IOParser parser;
 
@@ -29,6 +29,7 @@ int main(int argc, char *argv[])
 		blobs_dir = parser.getOption("--bd", "Initial blobs directory");
 		min_distance = textToDouble(parser.getOption("--d", "Min. particle distance [bin-1 pixels]", "128"));
 		perimeter_margin = textToDouble(parser.getOption("--pm", "Distance of perimeter points from the outline [bin-1 pixels]", "64"));
+		estimate_radius = parser.checkOption("--est_rad", "Estimate the radius of the blob");
 		min_radius = textToDouble(parser.getOption("--r0", "Min. radius [bin-1 pixels]", "300"));
 		max_radius = textToDouble(parser.getOption("--r1", "Max. radius [bin-1 pixels]", "800"));
 		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
@@ -145,63 +146,76 @@ int main(int argc, char *argv[])
 					Log::updateProgress(b);
 				}
 				
-				Blob2D blob(blob_shapes[b]);
-				
-				std::pair<std::vector<double>,std::vector<double>> radAvgAndWgh 
-				        = blob.radialAverageAndWeight(
-				            micrograph, weight, max_radius);
-				
-				std::vector<double> radAvg = radAvgAndWgh.first;
-				std::vector<double> radWgh = radAvgAndWgh.second;
-				
-				const int bin_count = radAvg.size();
-								
-				int best_t = 0;
-				double best_separation = 0.0;
-				
-				int delta_t = 20;
-				
-				for (int t = min_radius; t <= max_radius - delta_t && t < bin_count; t++)
+				if (blob_shapes[b].size()%2 == 0)
 				{
-					double avg0 = 0.0;
-					double wgh0 = 0.0;
-					
-					int t0 = t - delta_t;
-					if (t0 < 0) t0 = 0;
-					
-					for (int i = t0; i < t; i++)
+					for (int i = 0; i < blob_shapes[b].size(); i++)
 					{
-						avg0 += radWgh[i] * radAvg[i];
-						wgh0 += radWgh[i];
+						std::cout << i << ": " << blob_shapes[b][i] << "\n";
 					}
 					
-					double avg1 = 0.0;
-					double wgh1 = 0.0;
-					
-					int t1 = t + delta_t + 1;
-					if (t0 > bin_count) t1 = bin_count;
-					
-					for (int i = t; i < t1; i++)
-					{
-						avg1 += radWgh[i] * radAvg[i];
-						wgh1 += radWgh[i];
-					}
-					
-					avg0 /= wgh0;
-					avg1 /= wgh1;
-					
-					const double separation = avg1 - avg0;
-					
-					if (separation > best_separation)
-					{
-						best_separation = separation;
-						best_t = t;
-					}
+					REPORT_ERROR("The blobs in "+blob_path+" do not have a radius");
 				}
 				
+				DelineatedBlob2D blob(blob_shapes[b]);
 				
-				DelineatedBlob2D delineated_blob(blob, best_t);				
-				blobs[b] = delineated_blob;
+				if (estimate_radius)
+				{				
+					std::pair<std::vector<double>,std::vector<double>> radAvgAndWgh 
+							= blob.radialAverageAndWeight(
+								micrograph, weight, max_radius);
+					
+					std::vector<double> radAvg = radAvgAndWgh.first;
+					std::vector<double> radWgh = radAvgAndWgh.second;
+					
+					const int bin_count = radAvg.size();
+									
+					int best_t = 0;
+					double best_separation = 0.0;
+					
+					int delta_t = 20;
+					
+					for (int t = min_radius; t <= max_radius - delta_t && t < bin_count; t++)
+					{
+						double avg0 = 0.0;
+						double wgh0 = 0.0;
+						
+						int t0 = t - delta_t;
+						if (t0 < 0) t0 = 0;
+						
+						for (int i = t0; i < t; i++)
+						{
+							avg0 += radWgh[i] * radAvg[i];
+							wgh0 += radWgh[i];
+						}
+						
+						double avg1 = 0.0;
+						double wgh1 = 0.0;
+						
+						int t1 = t + delta_t + 1;
+						if (t0 > bin_count) t1 = bin_count;
+						
+						for (int i = t; i < t1; i++)
+						{
+							avg1 += radWgh[i] * radAvg[i];
+							wgh1 += radWgh[i];
+						}
+						
+						avg0 /= wgh0;
+						avg1 /= wgh1;
+						
+						const double separation = avg1 - avg0;
+						
+						if (separation > best_separation)
+						{
+							best_separation = separation;
+							best_t = t;
+						}
+					}
+					
+					blob.radius = best_t;
+				}
+				
+				blobs[b] = blob;
 			}
 			
 			if (verbose)

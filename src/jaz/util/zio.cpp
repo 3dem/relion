@@ -132,13 +132,13 @@ std::vector<std::vector<double> > ZIO::readDoublesTable(std::string fn, char del
 		
 		std::stringstream sts;
 		sts << line;
+				
+		double d;
 		
-		while (sts)
+		while (sts >> d)
 		{
-			double d;
-			sts >> d;
-			
 			out[i].push_back(d);
+			std::cout << "[" << d << "]\n";
 		}
 	}
 	
