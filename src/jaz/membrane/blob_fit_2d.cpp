@@ -65,13 +65,9 @@ void BlobFit2D::computeWeight(const Blob2D& blob, double minRadius, double maxRa
 	{
 		const double r = blob.getDistance(d2Vector(x,y));
 		
-		if (r > maxRadius)
+		if (r < minRadius || r > maxRadius)
 		{
 			weight(x,y) = 0.f;
-		}
-		else if (r < minRadius)
-		{
-			weight(x,y) = r * mask(x,y) / minRadius;
 		}
 		else
 		{

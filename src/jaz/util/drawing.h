@@ -32,6 +32,12 @@ class Drawing
 		
 		template <typename T>
 		static void drawPoint(
+				gravis::d2Vector location,
+				T value,
+				RawImage<T>& target);
+		
+		template <typename T>
+		static void drawPoint(
 				gravis::i2Vector location,
 				T value,
 				RawImage<T>& target);
@@ -92,6 +98,14 @@ void Drawing::drawCrosses(
 
 		drawCross(pos, value, size, target);
 	}
+}
+
+template<typename T>
+void Drawing::drawPoint(gravis::d2Vector location, T value, RawImage<T>& target)
+{
+	drawPoint(
+		gravis::i2Vector((int)std::round(location.x), (int)std::round(location.y)),
+		value, target);
 }
 
 template<typename T>

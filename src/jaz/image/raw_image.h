@@ -10,7 +10,7 @@
 #include <src/jaz/single_particle/vtk_helper.h>
 #include <stddef.h>
 
-#define RAW_IMAGE_BOUNDS_CHECKING 0
+#define RAW_IMAGE_BOUNDS_CHECKING 1
 
 template <class T>
 class RawImage

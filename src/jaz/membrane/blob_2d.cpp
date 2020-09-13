@@ -674,10 +674,10 @@ Blob2D::transformToPolar(
         const RawImage<float> &mask, 
         double maxRadius) const
 {
-	const double l = 2 * PI * maxRadius;
+	const double len = 2 * PI * maxRadius;
 	        
-	const int h_out = (int) maxRadius;
-	const int w_out = (int) l;
+	const int h_out = 2 * (int) (maxRadius / 2.0) + 2;
+	const int w_out = 2 * (int) (len / 2.0);
 	
 	BufferedImage<float> out_data(w_out, h_out);
 	BufferedImage<float> out_weight(w_out, h_out);

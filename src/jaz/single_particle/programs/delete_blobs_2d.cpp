@@ -1,6 +1,7 @@
 #include "delete_blobs_2d.h"
 
 #include <src/jaz/membrane/blob_fit_2d.h>
+#include <src/jaz/membrane/global_blob_fit.h>
 #include <src/jaz/optimization/gradient_descent.h>
 #include <src/jaz/optimization/nelder_mead.h>
 #include <src/jaz/util/zio.h>
@@ -31,6 +32,7 @@ void DeleteBlobs2DProgram::readParameters(int argc, char *argv[])
 		blobs_dir = parser.getOption("--bd", "Initial blobs directory");
 		particles_file = parser.getOption("--ptc", "Optional particles file for phase flipping", "");
 
+		global_prefit = !parser.checkOption("--c2f", "Apply a coarse-to-fine progression instead of initialising with a global pre-fit");
 		roundedness = textToDouble(parser.getOption("--rnd", "Roundedness prior", "0"));
 		smoothness = textToDouble(parser.getOption("--smt", "Outline average smoothness (negative means full average)", "-1"));
 		prior_sigma_A = textToDouble(parser.getOption("--sig", "Weight of initial position", "0"));
@@ -346,7 +348,6 @@ void DeleteBlobs2DProgram::processMicrograph(
 			if (window_size_full.x > micrograph.xdim) window_size_full.x = micrograph.xdim;
 			if (window_size_full.y > micrograph.ydim) window_size_full.y = micrograph.ydim;
 
-
 			// shift full-size window to lie inside the image
 
 			if (window_origin_full.x + window_size_full.x > micrograph.xdim)
@@ -406,38 +407,86 @@ void DeleteBlobs2DProgram::processMicrograph(
 		std::vector<double> blob_parameters_cropped = initial_parameters_cropped;
 
 
-		double current_binning = max_binning;
-		
-		while (current_binning > min_binning - 1e-6)
+		if (global_prefit)
 		{
-			if (verbose)
+			BufferedImage<float> dummy_weight = blob_mask_full;
+			dummy_weight.fill(1.f);
+			
+			Log::print("Pre-fitting globally");
+			
+			std::pair<double, std::vector<double>> global_estimate =
+				GlobalBlobFit2D::fit(
+					blob_parameters_cropped, 
+					radius, max_frequencies,
+					blob_region_full,
+					dummy_weight);
+			
+			const double mean_radius = global_estimate.first;
+			blob_parameters_cropped = global_estimate.second;
+			
+			if (diag)
 			{
-				if (current_binning == max_binning)
-				{
-					Log::beginSection("Fitting at bin " + ZIO::itoa((int)current_binning));
-				}
-				else
-				{
-					Log::beginSection("Refining at bin " + ZIO::itoa((int)current_binning));
-				}
+				BufferedImage<float> outline = GlobalBlobFit2D::drawOutline(
+						blob_parameters_cropped,
+						mean_radius,
+						blob_region_full);
+				
+				
+				std::string blobTag = "blob_" + ZIO::itoa(blob_id);
+				ZIO::makeOutputDir(outPath + "diag/" + micrograph_name + "/" + blobTag);
+				
+				outline.write(
+					outPath + "diag/" + micrograph_name + "/" +
+					blobTag + "/global_initial.mrc");
 			}
 			
-			blob_parameters_cropped = fitBlob(
-				blob_id, blob_parameters_cropped,
-				radius, pixel_size, current_binning,
-				blob_region_full,
-				blob_mask_full,
-				micrograph_name,
-				verbose);
-
-			current_binning /= 2;
+			Log::print("Refining at bin " + ZIO::itoa((int)min_binning));
 			
-			if (verbose)
+			// try much thinner blobs
+			blob_parameters_cropped = fitBlob(
+					blob_id, blob_parameters_cropped,
+					radius, pixel_size, min_binning,
+					blob_region_full,
+					blob_mask_full,
+					micrograph_name,
+					verbose);
+		}
+		else
+		{
+			double current_binning = max_binning;
+			
+			while (current_binning > min_binning - 1e-6)
 			{
-				Log::endSection();
+				if (verbose)
+				{
+					if (current_binning == max_binning)
+					{
+						Log::beginSection("Fitting at bin " + ZIO::itoa((int)current_binning));
+					}
+					else
+					{
+						Log::beginSection("Refining at bin " + ZIO::itoa((int)current_binning));
+					}
+				}
+						   
+				blob_parameters_cropped = fitBlob(
+					blob_id, blob_parameters_cropped,
+					radius, pixel_size, current_binning,
+					blob_region_full,
+					blob_mask_full,
+					micrograph_name,
+					verbose);
+	
+				current_binning /= 2;
+				
+				if (verbose)
+				{
+					Log::endSection();
+				}
 			}
 		}
-				
+		
+		
 		if (verbose)
 		{
 			Log::print("Erasing");
@@ -608,6 +657,9 @@ std::vector<double> DeleteBlobs2DProgram::fitBlob(
 
 		if (diag)
 		{
+			Blob2D blob0(current_optimum, smoothing_radius_binned);
+			drawTestStack(blob0, blob_region_binned, blob_fit.weight).write(tag+"_initial_fit.mrc");
+			
 			Blob2D blob2(new_optimum, smoothing_radius_binned);
 			
 			const double E0 = blob_fit.f(current_optimum, 0);
@@ -618,7 +670,7 @@ std::vector<double> DeleteBlobs2DProgram::fitBlob(
 				Log::print("  E: "+ZIO::itoa(E0)+" -> "+ZIO::itoa(E1));
 			}
 
-			drawTestStack(blob2, blob_region_binned, blob_fit.weight).write(tag+"_fit.mrc");
+			drawTestStack(blob2, blob_region_binned, blob_fit.weight).write(tag+"_final_fit.mrc");
 			drawFit(blob2, blob_region_binned, blob_fit.weight).write(tag+"_residual.mrc");
 			blob_fit.weight.write(tag+"_weight.mrc");
 		}

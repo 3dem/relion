@@ -17,7 +17,7 @@ class DeleteBlobs2DProgram
 		
 			std::string outPath, micrographs_list_filename, micrographs_dir, blobs_dir, particles_file;
 			
-			bool diag, mask_other_blobs;
+			bool diag, global_prefit, mask_other_blobs;
 			
 			int max_frequencies, num_threads, max_iters;
 			
