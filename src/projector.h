@@ -27,6 +27,27 @@
 #include <src/jaz/single_particle/volume.h>
 #include <src/jaz/single_particle/gravis/t2Vector.h>
 
+#ifdef CUDA
+#include "src/acc/cuda/cuda_mem_utils.h"
+#include "src/acc/acc_ptr.h"
+void run_griddingCorrect(RFLOAT *vol, int interpolator, RFLOAT rrval, RFLOAT r_min_nn,
+						 size_t iX, size_t iY, size_t iZ);
+
+void run_padTranslatedMap(RFLOAT *d_in, RFLOAT *d_out,
+						  size_t isX, size_t ieX, size_t isY, size_t ieY, size_t isZ, size_t ieZ, //Input dimensions
+						  size_t osX, size_t oeX, size_t osY, size_t oeY, size_t osZ, size_t oeZ,  //Output dimensions
+						  cudaStream_t stream = 0);
+
+void run_CenterFFTbySign(Complex *img_in, int xSize, int ySize, int zSize, cudaStream_t = 0);
+
+void run_calcPowerSpectrum(Complex *dFaux, int padoridim, Complex *ddata, int data_sz, RFLOAT *dpower_spectrum, RFLOAT *dcounter,
+											  int max_r2, int min_r2, RFLOAT normfft, RFLOAT padding_factor, RFLOAT weight,
+											  RFLOAT *dfourier_mask, int fx, int fy, int fz, bool do_fourier_mask, bool if3D);
+
+void run_updatePowerSpectrum(RFLOAT *dcounter, int sz, RFLOAT *dpower_spectrum);
+#endif
+
+
 
 #define NEAREST_NEIGHBOUR 0
 #define TRILINEAR 1
@@ -204,7 +225,7 @@ public:
 	 */
 	void computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, MultidimArray<RFLOAT> &power_spectrum,
                                         int current_size = -1, int nr_threads = 1, bool do_gridding = true, bool do_heavy = true,
-	                                int min_ires = -1, const MultidimArray<RFLOAT> *fourier_mask = NULL);
+	                                int min_ires = -1, const MultidimArray<RFLOAT> *fourier_mask = NULL, bool do_gpu = false);
 
 	/* Because we interpolate in Fourier space to make projections and/or reconstructions, we have to correct
 	 * the real-space maps by dividing them by the Fourier Transform of the interpolator

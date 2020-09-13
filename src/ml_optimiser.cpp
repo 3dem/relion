@@ -1302,6 +1302,7 @@ void MlOptimiser::initialise()
 
 			cudaOptimiserDeviceMap.push_back(bundleId);
 		}
+		mymodel.do_gpu = do_gpu;
 #else
         REPORT_ERROR("GPU usage requested, but RELION was compiled without CUDA support");
 #endif

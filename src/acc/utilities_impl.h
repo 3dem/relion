@@ -655,6 +655,69 @@ void kernel_exponentiate_weights_fine(	XFLOAT *g_pdf_orientation,
 
 };  // namespace AccUtilities
 
+void run_griddingCorrect(RFLOAT *vol, int interpolator, RFLOAT rrval, RFLOAT r_min_nn,
+								size_t iX, size_t iY, size_t iZ)
+{
+#ifdef CUDA
+	dim3 bs(32,4,2);
+	dim3 gs(ceil(iX/(float)bs.x), ceil(iY/(float)bs.y), ceil(iZ/(float)bs.z));
+	cuda_kernel_griddingCorrect<<<gs,bs>>>(vol, interpolator, rrval, r_min_nn, iX, iY, iZ);
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
+#endif
+}
+
+void run_padTranslatedMap(
+		RFLOAT *d_in, RFLOAT *d_out,
+		size_t isX, size_t ieX, size_t isY, size_t ieY, size_t isZ, size_t ieZ, //Input dimensions
+		size_t osX, size_t oeX, size_t osY, size_t oeY, size_t osZ, size_t oeZ,  //Output dimensions
+		cudaStream_t stream)
+{
+#ifdef CUDA
+	size_t iszX = ieX - isX + 1; 
+	size_t iszY = ieY - isY + 1; 
+	size_t iszZ = ieZ - isZ + 1; 
+	size_t oszX = oeX - osX + 1; 
+	size_t oszY = oeY - osY + 1; 
+	size_t oszZ = oeZ - osZ + 1; 
+   
+	if(iszX == oszX && iszY == oszY && iszZ == oszZ)
+	{
+		cudaCpyDeviceToDevice(d_in, d_out, iszX*iszY*iszZ, stream);
+	}
+	else
+	{
+		dim3 block_dim(16,4,2);
+		dim3 grid_dim(ceil(oszX / (float) block_dim.x), ceil(oszY / (float) block_dim.y), ceil(oszZ / (float) block_dim.z));
+		cuda_kernel_window_transform<RFLOAT><<< grid_dim, block_dim, 0, stream >>>(
+				d_in, d_out,
+				iszX, iszY, iszZ, //Input dimensions
+				isX-osX, isY-osY, isZ-osZ, oszX, oszY, oszZ  //Output dimensions
+				);
+		LAUNCH_HANDLE_ERROR(cudaGetLastError());
+	}
+#endif
+}
+
+void run_CenterFFTbySign(Complex *img_in, int xSize, int ySize, int zSize, cudaStream_t stream)
+{
+#ifdef CUDA
+	dim3 bs(32,4,2);
+	dim3 gs(ceil(xSize/(float)bs.x), ceil(ySize/(float)bs.y), ceil(zSize/(float)bs.z));
+	if(sizeof(RFLOAT) == sizeof(double))
+		cuda_kernel_centerFFTbySign<<<gs,bs, 0, stream>>>(
+				(double2*)img_in,
+				xSize,
+				ySize,
+				zSize);
+	else
+		cuda_kernel_centerFFTbySign<<<gs,bs, 0, stream>>>(
+				(float2*)img_in,
+				xSize,
+				ySize,
+				zSize);
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
+#endif
+}
 
 #endif //ACC_UTILITIES_H_
 

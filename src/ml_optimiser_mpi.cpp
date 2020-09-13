@@ -295,6 +295,7 @@ void MlOptimiserMpi::initialise()
 					cudaDevices.push_back(deviceAffinity);
 					cudaDeviceShares.push_back(1);
 				}
+				HANDLE_ERROR(cudaSetDevice(deviceAffinity));
 				cudaOptimiserDeviceMap.push_back(bundleId);
 			}
 		}
@@ -453,6 +454,7 @@ will still yield good performance and possibly a more stable execution. \n" << s
 				}
 			}
 		}
+		mymodel.do_gpu = do_gpu;
 	}
 	/************************************************************************/
 #endif // CUDA

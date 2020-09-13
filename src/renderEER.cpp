@@ -160,8 +160,7 @@ void EERRenderer::read(FileName _fn_movie, int eer_upsampling)
 			REPORT_ERROR("Currently we support only 4096x4096 pixel EER movies.");
 
 		// Find the number of frames
-		nframes = 1;
-		while (TIFFSetDirectory(ftiff, nframes) != 0) nframes++;
+		nframes = TIFFNumberOfDirectories(ftiff);
 
 #ifdef DEBUG_EER
 		printf("EER in TIFF: %s nframes = %d\n", fn_movie.c_str(), nframes);
@@ -455,5 +454,7 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 
 // Instantiate for Polishing
 template long long EERRenderer::renderFrames<float>(int frame_start, int frame_end, MultidimArray<float> &image);
+template long long EERRenderer::renderFrames<short>(int frame_start, int frame_end, MultidimArray<short> &image);
 template long long EERRenderer::renderFrames<unsigned short>(int frame_start, int frame_end, MultidimArray<unsigned short> &image);
 template long long EERRenderer::renderFrames<char>(int frame_start, int frame_end, MultidimArray<char> &image);
+template long long EERRenderer::renderFrames<unsigned char>(int frame_start, int frame_end, MultidimArray<unsigned char> &image);
