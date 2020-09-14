@@ -498,41 +498,91 @@ void Blob2D::eraseLocally(
 		polarWeight.write("DEBUG_polarWeight_0.mrc");
 	}
 	
-	BufferedImage<fComplex> polarImageFS, polarWeightFS;
-	
-	FFT::FourierTransform(polarImage, polarImageFS);
-	FFT::FourierTransform(polarWeight, polarWeightFS);
-	
-	const double sigma = PI * phi_samples / smoothness;
-	const double sig22 = 2.0 * sigma * sigma;
+	BufferedImage<float> polarImageNormalized;
 	        
-	for (int y = 0; y < max_radius; y++)
-	for (int x = 0; x < phi_samples/2 + 1; x++)
+	const bool no_shear = true;
+	
+	if (no_shear)
 	{
-		polarImageFS(x,y)  *= exp(-x*x/sig22);
-		polarWeightFS(x,y) *= exp(-x*x/sig22);
-	}
-	
-	FFT::inverseFourierTransform(polarImageFS, polarImage);
-	FFT::inverseFourierTransform(polarWeightFS, polarWeight);
-	
-	const double eps = 1e-3;
-	
-	for (int i = 0; i < polarWeight.getSize(); i++)
-	{
-		if (polarWeight[i] < eps)
+		polarImageNormalized.resize(phi_samples, max_radius);
+		
+		BufferedImage<float> image_curve_RS(phi_samples, 1);
+		BufferedImage<float> weight_curve_RS(phi_samples, 1);
+		BufferedImage<fComplex> image_curve_FS(phi_samples/2 + 1, 1);
+		BufferedImage<fComplex> weight_curve_FS(phi_samples/2 + 1, 1);
+		
+		for (int y = 0; y < max_radius; y++)
 		{
-			polarWeight[i] = eps;
+			const double sigma_RS = smoothness * (radius+1) / (double) (y+1);
+			const double sigma_FS = PI * phi_samples / sigma_RS;			
+			const double sig22 = 2.0 * sigma_FS * sigma_FS;
+			        
+			for (int x = 0; x < phi_samples; x++)
+			{
+				image_curve_RS(x,0) = polarImage(x,y);
+				weight_curve_RS(x,0) = polarWeight(x,y);
+			}
+			
+			FFT::FourierTransform(image_curve_RS, image_curve_FS);
+			FFT::FourierTransform(weight_curve_RS, weight_curve_FS);
+			
+			for (int x = 0; x < phi_samples/2 + 1; x++)
+			{
+				image_curve_FS(x,0) *= exp(-x*x/sig22);
+				weight_curve_FS(x,0) *= exp(-x*x/sig22);
+			}
+			
+			FFT::inverseFourierTransform(image_curve_FS, image_curve_RS);
+			FFT::inverseFourierTransform(weight_curve_FS, weight_curve_RS);
+			
+			const double eps = 1e-3;
+			
+			for (int x = 0; x < phi_samples; x++)
+			{
+				polarImage(x,y) = image_curve_RS(x,0);
+				polarWeight(x,y) = weight_curve_RS[x] > eps? weight_curve_RS[x] : eps;
+			}
 		}
 	}
-	
+	else
+	{
+		BufferedImage<fComplex> polarImageFS, polarWeightFS;
+		
+		FFT::FourierTransform(polarImage, polarImageFS);
+		FFT::FourierTransform(polarWeight, polarWeightFS);
+		
+		const double sigma = PI * phi_samples / smoothness;
+		const double sig22 = 2.0 * sigma * sigma;
+				
+		for (int y = 0; y < max_radius; y++)
+		for (int x = 0; x < phi_samples/2 + 1; x++)
+		{
+			polarImageFS(x,y)  *= exp(-x*x/sig22);
+			polarWeightFS(x,y) *= exp(-x*x/sig22);
+		}
+		
+		FFT::inverseFourierTransform(polarImageFS, polarImage);
+		FFT::inverseFourierTransform(polarWeightFS, polarWeight);
+		
+		const double eps = 1e-3;
+		
+		for (int i = 0; i < polarWeight.getSize(); i++)
+		{
+			if (polarWeight[i] < eps)
+			{
+				polarWeight[i] = eps;
+			}
+		}
+	}
+		
 	if (debug)
 	{
 		polarImage.write("DEBUG_polarImage_1.mrc");
 		polarWeight.write("DEBUG_polarWeight_1.mrc");
 	}
 	
-	BufferedImage<float> polarImageNormalized = polarImage / polarWeight;
+	polarImageNormalized = polarImage / polarWeight;
+	
 	
 	if (debug)
 	{
