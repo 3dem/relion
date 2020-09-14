@@ -159,19 +159,20 @@ def resample_image(traj_star, eer_upsampling):
     traj_star['global_shift']['rlnMicrographShiftY'] = list(ys.astype(np.str0))
 
     # Hot pixels
-    hot_xs = np.array(traj_star['hot_pixels']['rlnCoordinateX'], dtype=np.float)
-    hot_ys = np.array(traj_star['hot_pixels']['rlnCoordinateY'], dtype=np.float)
-    if scale == 2:
-        hot_xs = np.hstack([2 * hot_xs, 2 * hot_xs, 2 * hot_xs + 1, 2 * hot_xs + 1])
-        hot_ys = np.hstack([2 * hot_ys, 2 * hot_ys + 1, 2 * hot_ys, 2 * hot_ys + 1])
-    elif scale == 0.5:
-        tmp = np.floor(np.vstack([hot_xs, hot_ys]) / 2.0).astype(np.int)
-        tmp = np.unique(tmp, axis = 1)
-        hot_xs = tmp[0, :]
-        hot_ys = tmp[1, :]
+    if 'hot_pixels' in traj_star:
+        hot_xs = np.array(traj_star['hot_pixels']['rlnCoordinateX'], dtype=np.float)
+        hot_ys = np.array(traj_star['hot_pixels']['rlnCoordinateY'], dtype=np.float)
+        if scale == 2:
+            hot_xs = np.hstack([2 * hot_xs, 2 * hot_xs, 2 * hot_xs + 1, 2 * hot_xs + 1])
+            hot_ys = np.hstack([2 * hot_ys, 2 * hot_ys + 1, 2 * hot_ys, 2 * hot_ys + 1])
+        elif scale == 0.5:
+            tmp = np.floor(np.vstack([hot_xs, hot_ys]) / 2.0).astype(np.int)
+            tmp = np.unique(tmp, axis = 1)
+            hot_xs = tmp[0, :]
+            hot_ys = tmp[1, :]
 
-    traj_star['hot_pixels']['rlnCoordinateX'] = list(hot_xs.astype(np.str0))
-    traj_star['hot_pixels']['rlnCoordinateY'] = list(hot_ys.astype(np.str0))
+        traj_star['hot_pixels']['rlnCoordinateX'] = list(hot_xs.astype(np.str0))
+        traj_star['hot_pixels']['rlnCoordinateY'] = list(hot_ys.astype(np.str0))
 
     return traj_star
 
