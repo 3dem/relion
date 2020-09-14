@@ -243,6 +243,41 @@ void FFT::inverseFourierTransform(
 	}
 }
 
+void FFT::FourierTransform(
+        const RawImage<double>& src,
+        BufferedImage<dComplex>& dest,
+        Normalization normalization)
+{
+	BufferedImage<double> copy(src);
+	FourierTransform(copy, dest, normalization);
+}
+
+void FFT::inverseFourierTransform(
+        const RawImage<dComplex>& src,
+        BufferedImage<double>& dest,
+        Normalization normalization)
+{
+	BufferedImage<dComplex> copy(src);
+	inverseFourierTransform(copy, dest, normalization, false);
+}
+
+void FFT::FourierTransform(
+        const RawImage<float>& src,
+        BufferedImage<fComplex>& dest,
+        Normalization normalization)
+{
+	BufferedImage<float> copy(src);
+	FourierTransform(copy, dest, normalization);
+}
+
+void FFT::inverseFourierTransform(
+        const RawImage<fComplex>& src,
+        BufferedImage<float>& dest,
+        Normalization normalization)
+{
+	BufferedImage<fComplex> copy(src);
+	inverseFourierTransform(copy, dest, normalization, false);
+}
 
 void FFT::_FourierTransform(
 		BufferedImage<double>& src,

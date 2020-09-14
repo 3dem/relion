@@ -46,7 +46,7 @@ class Resampling
 		
 		template <typename T>
 		static BufferedImage<T> downsampleMax_2D_full(
-				const BufferedImage<T>& img, int wout, int hout);
+				const RawImage<T>& img, int wout, int hout);
 		
 		template <typename T>
 		static BufferedImage<T> lowPassFilter_full(
@@ -54,7 +54,7 @@ class Resampling
 		
 		template <typename T>
 		static BufferedImage<T> subsample_2D_full(
-				const BufferedImage<T>& img, int wout, int hout, double factor = -1.0);
+				const RawImage<T>& img, int wout, int hout, double factor = -1.0);
 		
 		template <typename T>
 		static BufferedImage<T> subsample_3D_full(
@@ -64,6 +64,9 @@ class Resampling
 		static BufferedImage<T> FourierCrop_fullStack(
 				const BufferedImage<T>& img, double factor, int num_threads, bool keepSizeEven);
 		
+		static gravis::i2Vector getFourierCroppedSize2D(
+		        int w, int h, double factor, bool keepSizeEven);
+		
 		template <typename T>
 		static BufferedImage<T> FourierCrop_fftwHalfStack(
 				const BufferedImage<T>& img, double factor, int num_threads);
@@ -71,6 +74,7 @@ class Resampling
 		template <typename T>
 		static BufferedImage<T> FourierCrop_3D(
 				const BufferedImage<T>& img, int w, int h, int d, int num_threads);
+		
 		
 		
 		
@@ -257,7 +261,7 @@ BufferedImage<T> Resampling::downsampleFiltStack_2D_full(
 }
 
 template <typename T>
-BufferedImage<T> Resampling::downsampleMax_2D_full(const BufferedImage<T>& img, int wout, int hout)
+BufferedImage<T> Resampling::downsampleMax_2D_full(const RawImage<T>& img, int wout, int hout)
 {	
 	const long int w = img.xdim;
 	const long int h = img.ydim;
@@ -342,7 +346,7 @@ BufferedImage<T> Resampling::lowPassFilter_full(BufferedImage<T>& img, double ma
 }
 
 template <typename T>
-BufferedImage<T> Resampling::subsample_2D_full(const BufferedImage<T>& img, int wout, int hout, double factor)
+BufferedImage<T> Resampling::subsample_2D_full(const RawImage<T>& img, int wout, int hout, double factor)
 {
 	if (factor < 0.0) factor = img.xdim / (double) wout;
 			
@@ -389,7 +393,7 @@ BufferedImage<T> Resampling::FourierCrop_fullStack(
 	
 	int w_out = (int)(w_in / factor);
 	int h_out = (int)(h_in / factor);
-	
+
 	if (keepSizeEven)
 	{
 		w_out -= w_out % 2;

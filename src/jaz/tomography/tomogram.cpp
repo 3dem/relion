@@ -61,3 +61,72 @@ BufferedImage<float> Tomogram::computeNoiseWeight(int boxSize, double binning, d
 
 	return out;
 }
+
+CTF Tomogram::getCtf(int frame, d3Vector position, double zOffset) const
+{
+	const d4Matrix& projFrame = projectionMatrices[frame];
+	d4Vector pos2D = projFrame * d4Vector(position);
+	d4Vector cent2D = projFrame * d4Vector(centre);
+	
+	double dz_pos = pos2D.z - cent2D.z;
+	double dz = handedness * optics.pixelSize * dz_pos + zOffset;
+	
+	CTF ctf = centralCTFs[frame];
+	
+	ctf.DeltafU += dz;
+	ctf.DeltafV += dz;
+	
+	ctf.initialise();
+	
+	return ctf;
+}
+
+Tomogram Tomogram::extractSubstack(d3Vector position, int width, int height) const
+{
+	Tomogram out = *this;
+
+	out.stack.resize(width, height, frameCount);
+
+	for (int f = 0; f < frameCount; f++)
+	{
+		const d4Vector pf = projectionMatrices[f] * d4Vector(position);
+
+		const int x0 = (int)(pf.x - width/2  + 0.5);
+		const int y0 = (int)(pf.y - height/2 + 0.5);
+
+		for (int y = 0; y < height; y++)
+		for (int x = 0; x < width;  x++)
+		{
+			out.stack(x,y,f) = stack(x0+x, y0+y, f);
+		}
+
+		out.projectionMatrices[f](0,3) -= x0;
+		out.projectionMatrices[f](1,3) -= y0;
+	}
+
+	return out;
+}
+
+Tomogram Tomogram::FourierCrop(double factor, int num_threads, bool downsampleData) const
+{
+	Tomogram out = *this;
+
+	if (downsampleData && hasImage)
+	{
+		out.stack = Resampling::FourierCrop_fullStack(stack, factor, num_threads, true);
+	}
+	else
+	{
+		out.stack.resize(0,0,0);
+		out.hasImage = false;
+	}
+
+	for (int f = 0; f < frameCount; f++)
+	{
+		out.projectionMatrices[f] /= factor;
+	}
+
+	out.optics.pixelSize *= factor;
+
+	return out;
+}

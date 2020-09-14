@@ -23,18 +23,18 @@ class Tomogram
 			double handedness;
 			
 			BufferedImage<float> stack;
-			std::vector<gravis::d4Matrix> proj;
+			std::vector<gravis::d4Matrix> projectionMatrices;
 			
 			std::vector<CTF> centralCTFs;
 			std::vector<double> cumulativeDose;
 			gravis::d3Vector centre;
 			int w0, h0, d0;
 			std::vector<int> frameSequence;
+			std::string name, fiducialsFilename;
 		
 			
 		double getFrameDose() const;
-		
-		// - Get rid of boxSize ctor parameter -> losing doseWeights
+
 		// - Dissolve OpticsData?
 		
 		// gravis::d2Vector project(gravis::d3Vector pos, int frame);
@@ -44,7 +44,10 @@ class Tomogram
 		BufferedImage<float> computeDoseWeight(int boxSize, double binning) const;
 		BufferedImage<float> computeNoiseWeight(int boxSize, double binning, double overlap = 2.0) const;
 		
-		
+		CTF getCtf(int frame, gravis::d3Vector position, double zOffset = 0.0) const;
+
+		Tomogram extractSubstack(gravis::d3Vector position, int width, int height) const;
+		Tomogram FourierCrop(double factor, int num_threads, bool downsampleData = true) const;
 };
 
 

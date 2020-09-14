@@ -30,14 +30,11 @@ class Prediction
 			AmplitudeAndPhaseModulated = 3
 		};
 		
-		static BufferedImage<fComplex> predictFS(
+		static BufferedImage<fComplex> predictModulated(
 				int particle_id, 
 				const ParticleSet* dataSet,
 				gravis::d4Matrix proj,
-				int s, const CTF& centreCtf,
-				gravis::d3Vector tomo_centre,
-				double handedness, 
-				double pixelSize,
+				int s, const CTF& ctf, double pixelSize,
 				const std::vector<BufferedImage<fComplex>>& referenceFS,
 				HalfSet halfSet = OwnHalf,
 				Modulation modulation = AmplitudeAndPhaseModulated);
@@ -49,15 +46,7 @@ class Prediction
 				int s, 
 				const std::vector<BufferedImage<fComplex>>& referenceFS,
 				HalfSet halfSet = OwnHalf);
-		
-		static BufferedImage<float> predictRS(
-				int particle_id, 
-				const ParticleSet* dataSet,
-				gravis::d4Matrix proj,
-				int s, 
-				const std::vector<BufferedImage<fComplex>>& referenceFS,
-				HalfSet halfSet = OwnHalf);
-		
+
 		static std::vector<BufferedImage<double>> computeCroppedCCs(
 				const ParticleSet* dataSet,
 				const std::vector<int>& partIndices,

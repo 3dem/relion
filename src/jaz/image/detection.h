@@ -5,7 +5,7 @@
 #include "normalization.h"
 #include "local_extrema.h"
 #include <src/jaz/gravis/t3Vector.h>
-#include <src/jaz/tomography/tomo_stack.h>
+#include <src/jaz/tomography/tomogram.h>
 #include <src/jaz/tomography/projection/projection.h>
 
 class Detection
@@ -20,8 +20,8 @@ class Detection
 		
 		template <typename T>
 		static std::vector<gravis::d3Vector> findLocalMaxima(
-				const TomoStack<T>& tomogram, 
-				const std::vector<BufferedImage<T>>& similarities2D,
+				const Tomogram& tomogram,
+				const RawImage<T>& similarities2D,
 				gravis::d3Vector origin, 
 				gravis::d3Vector spacing,
 				gravis::d3Vector diagonal,
@@ -148,8 +148,8 @@ BufferedImage<T> Detection::circleKernel(double minRad, double maxRad, int w, in
 
 template <typename T>
 std::vector<gravis::d3Vector> Detection::findLocalMaxima(
-	const TomoStack<T>& tomogram, 
-	const std::vector<BufferedImage<T>>& similarities2D,
+	const Tomogram& tomogram,
+	const RawImage<T>& similarities2D,
 	gravis::d3Vector origin, 
 	gravis::d3Vector spacing,
 	gravis::d3Vector diagonal,
@@ -160,14 +160,14 @@ std::vector<gravis::d3Vector> Detection::findLocalMaxima(
 	int binning,
 	std::string diagFn)
 {
-	const int w2D = similarities2D[0].xdim;
-	const int h2D = similarities2D[0].ydim;
+	const int w2D = similarities2D.xdim;
+	const int h2D = similarities2D.ydim;
 	
-	const int wt2D = tomogram.images[0].xdim;
-	const int ht2D = tomogram.images[0].ydim;
-	
-	const int fc = tomogram.images.size();
-	
+	const int wt2D = tomogram.stack.xdim;
+	const int ht2D = tomogram.stack.ydim;
+	const int fc = tomogram.stack.zdim;
+
+
 	
 	if (w2D != wt2D || h2D != ht2D)
 	{
@@ -178,15 +178,18 @@ std::vector<gravis::d3Vector> Detection::findLocalMaxima(
 	const int w2Db = w2D / binning;
 	const int h2Db = h2D / binning;
 	
-	std::vector<BufferedImage<T>> simBin(fc);
+	BufferedImage<T> binnedSimilarity(w2Db, h2Db, fc);
 	
-	#pragma omp parallel for num_threads(num_threads)	
+	#pragma omp parallel for num_threads(num_threads)
 	for (int f = 0; f < fc; f++)
 	{
-		simBin[f] = Resampling::downsampleMax_2D_full(similarities2D[f], w2Db, h2Db);
+		BufferedImage<float> binned = Resampling::downsampleMax_2D_full(
+					similarities2D.getConstSliceRef(f), w2Db, h2Db);
+
+		binnedSimilarity.getSliceRef(f).copyFrom(binned);
 	}
-					
-	TomoStack<float> tsb = tomogram.downsample(binning, num_threads, false);
+
+	Tomogram binnedTomogram = tomogram.FourierCrop(binning, num_threads, false);
 	
 	const int w3D = diagonal.x;
 	const int h3D = diagonal.y;
@@ -195,11 +198,13 @@ std::vector<gravis::d3Vector> Detection::findLocalMaxima(
 	const int w3Db = w3D / binning;
 	const int h3Db = h3D / binning;
 	const int d3Db = d3D / binning;
-	
+
+
 	BufferedImage<T> coarseVol(w3Db, h3Db, d3Db), coarseMask(w3Db, h3Db, d3Db);
 			
 	RealSpaceBackprojection::backprojectRaw(
-		tsb, simBin, coarseVol, coarseMask, 
+		binnedTomogram.projectionMatrices, binnedSimilarity,
+		coarseVol, coarseMask,
 		origin, spacing * binning, num_threads, 
 		RealSpaceBackprojection::Linear,
 		20, 20, 10.0);
@@ -208,7 +213,7 @@ std::vector<gravis::d3Vector> Detection::findLocalMaxima(
 	
 	if (diagFn != "")
 	{
-		coarseVol.writeVtk(diagFn + "detection_binned-CC.vtk", origin, spacing * binning);
+		coarseVol.write(diagFn + "detection_binned-CC.mrc", spacing.x * binning);
 	}
 	
 	
@@ -217,7 +222,7 @@ std::vector<gravis::d3Vector> Detection::findLocalMaxima(
 	
 	if (diagFn != "")
 	{
-		boxMax.writeVtk(diagFn + "detection_coarse-max.vtk", origin, spacing * binning);
+		boxMax.write(diagFn + "detection_coarse-max.mrc", spacing.x * binning);
 	}
 	
 	std::vector<gravis::d3Vector> coarseMaxima, fineMaxima;
@@ -253,8 +258,10 @@ std::vector<gravis::d3Vector> Detection::findLocalMaxima(
 			}
 			
 			RealSpaceBackprojection::backprojectRaw(
-				tomogram, similarities2D, subvolume, subvolumeMask, 
-				p - gravis::d3Vector(binning), 
+				tomogram.projectionMatrices,
+				similarities2D,
+				subvolume, subvolumeMask,
+				p - gravis::d3Vector(binning), // @TODO: fix?
 				gravis::d3Vector(1.0), 
 				num_threads, 
 				RealSpaceBackprojection::Linear,
@@ -283,39 +290,6 @@ std::vector<gravis::d3Vector> Detection::findLocalMaxima(
 			peaks(x,y,z) = 0;
 		}		
 	}
-	
-	/*{
-		peaks.writeVtk("dev/peaks.vtk", origin, spacing * binning);
-		
-		const gravis::d3Vector cent = coarseMaxima[0];
-		const int s = 300;
-		const gravis::d3Vector halfDiag(s/2.0);
-				
-		TomoStack<float> tsVes = tomogram.extractSubStack(cent, 4*s/3, 4*s/3);
-		
-		tsVes.saveImages("dev/ves.vtk");
-	
-		Image<float> ves1(s,s,s), maskVes1(s,s,s);
-		
-		
-		BackprojectionHelper::backprojectRaw(
-			tsVes, ves1, maskVes1, 
-			cent - halfDiag, spacing, num_threads, 
-			BackprojectionHelper::Linear,
-			20, 20, 10.0);
-		
-		ves1.writeVtk("dev/ves0.vtk", cent - halfDiag, spacing);
-		
-		
-		
-		BackprojectionHelper::backprojectRaw(
-			tomogram, ves1, maskVes1, 
-			cent - halfDiag, spacing, num_threads, 
-			BackprojectionHelper::Linear,
-			20, 20, 10.0);
-		
-		ves1.writeVtk("dev/ves0_0.vtk", cent - halfDiag, spacing);
-	}*/
 	
 	return fineMaxima;
 	

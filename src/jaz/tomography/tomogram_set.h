@@ -21,7 +21,7 @@ class TomogramSet
 			std::vector<MetaDataTable> tomogramTables;
 			
 			
-		int add(
+		int addTomogram(
 			std::string tomoName, std::string stackFilename,
 			const std::vector<gravis::d4Matrix>& projections,
 			int w, int h, int d,
@@ -38,8 +38,12 @@ class TomogramSet
 		void setProjection(int tomogramIndex, int frame, const gravis::d4Matrix& P);
 		void setCtf(int tomogramIndex, int frame, const CTF& ctf);
 		void setDose(int tomogramIndex, int frame, double dose);
-		
+		void setTiltSeriesFile(int tomogramIndex, const std::string& filename);
+		void setFiducialsFile(int tomogramIndex, const std::string& filename);
+
 		Tomogram loadTomogram(int index, bool loadImageData) const;
+		int getTomogramIndex(std::string tomogramName) const;
+		int getTomogramIndexSafely(std::string tomogramName) const;
 };
 
 #endif

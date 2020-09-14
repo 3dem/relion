@@ -17,8 +17,8 @@ TomogramSet::TomogramSet(std::string filename)
 {
 	std::ifstream ifs(filename);
 
-    if (!ifs.fail())
-    {
+	if (!ifs.fail())
+	{
 		globalTable.readStar(ifs, "global");
 		
 		const int tc = globalTable.numberOfObjects();
@@ -33,11 +33,15 @@ TomogramSet::TomogramSet(std::string filename)
 			tomogramTables[t].setName("tomo_" + ZIO::itoa(t));
 		}	
 	}
+	else
+	{
+		REPORT_ERROR_STR("TomogramSet::TomogramSet: Unable to read " << filename);
+	}
 	
 	globalTable.setName("global");
 }
 
-int TomogramSet::add(
+int TomogramSet::addTomogram(
 		std::string tomoName, std::string stackFilename,
 		const std::vector<gravis::d4Matrix>& projections, 
 		int w, int h, int d, 
@@ -62,7 +66,7 @@ int TomogramSet::add(
 	
 	const CTF& ctf0 = ctfs[0];
 	
-	globalTable.setValue(EMDL_IMAGE_PIXEL_SIZE, pixelSize, index);
+	globalTable.setValue(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, pixelSize, index);
 	globalTable.setValue(EMDL_CTF_VOLTAGE, ctf0.kV, index);
 	globalTable.setValue(EMDL_CTF_CS, ctf0.Cs, index);
 	globalTable.setValue(EMDL_CTF_Q0, ctf0.Q0, index);
@@ -97,20 +101,20 @@ int TomogramSet::size() const
 void TomogramSet::write(std::string filename) const
 {
 	const int tc = tomogramTables.size();
-    
+
 	if (filename.find_last_of('/') != std::string::npos)
 	{
 		std::string path = filename.substr(0, filename.find_last_of('/'));
 		mktree(path);
 	}
 
-    std::ofstream ofs(filename);
+	std::ofstream ofs(filename);
 	
-    globalTable.write(ofs);
+	globalTable.write(ofs);
 
-    for (int t = 0; t < tc; t++)
-    {
-        tomogramTables[t].write(ofs);
+	for (int t = 0; t < tc; t++)
+	{
+		tomogramTables[t].write(ofs);
 	}
 }
 
@@ -157,6 +161,16 @@ void TomogramSet::setDose(int tomogramIndex, int frame, double dose)
 	m.setValue(EMDL_MICROGRAPH_PRE_EXPOSURE, dose, frame);
 }
 
+void TomogramSet::setTiltSeriesFile(int tomogramIndex, const std::string &filename)
+{
+	globalTable.setValue(EMDL_TOMO_TILT_SERIES_NAME, filename, tomogramIndex);
+}
+
+void TomogramSet::setFiducialsFile(int tomogramIndex, const std::string &filename)
+{
+	globalTable.setValue(EMDL_TOMO_FIDUCIALS_STARFILE, filename, tomogramIndex);
+}
+
 Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 {
 	Tomogram out;
@@ -169,7 +183,12 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 		
 	if (loadImageData)
 	{
-		out.stack.read(stackFn);	
+		out.stack.read(stackFn);
+		out.hasImage = true;
+	}
+	else
+	{
+		out.hasImage = false;
 	}
 		
 	globalTable.getValueSafely(EMDL_TOMO_SIZE_X, out.w0, index);
@@ -182,7 +201,7 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 	
 	double Q0;
 	
-	globalTable.getValueSafely(EMDL_IMAGE_PIXEL_SIZE, out.optics.pixelSize, index);
+	globalTable.getValueSafely(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, out.optics.pixelSize, index);
 	globalTable.getValueSafely(EMDL_CTF_VOLTAGE, out.optics.voltage, index);
 	globalTable.getValueSafely(EMDL_CTF_CS, out.optics.Cs, index);
 	globalTable.getValueSafely(EMDL_CTF_Q0, Q0, index);
@@ -192,11 +211,11 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 	
 	out.cumulativeDose.resize(out.frameCount);
 	out.centralCTFs.resize(out.frameCount);
-	out.proj.resize(out.frameCount);
+	out.projectionMatrices.resize(out.frameCount);
 	
 	for (int f = 0; f < out.frameCount; f++)
 	{
-		d4Matrix& P = out.proj[f];
+		d4Matrix& P = out.projectionMatrices[f];
 		
 		std::vector<EMDLabel> rows({
 			EMDL_TOMO_PROJECTION_X, 
@@ -231,6 +250,48 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 	}
 	
 	out.frameSequence = IndexSort<double>::sortIndices(out.cumulativeDose);
+	out.name = tomoName;
+	
+	if (globalTable.labelExists(EMDL_TOMO_FIDUCIALS_STARFILE))
+	{
+		 globalTable.getValue(EMDL_TOMO_FIDUCIALS_STARFILE, out.fiducialsFilename, index);
+	}
+	else
+	{
+		out.fiducialsFilename;
+	}
 	
 	return out;
+}
+
+int TomogramSet::getTomogramIndex(std::string tomogramName) const
+{
+	const int tc = globalTable.numberOfObjects();
+
+	for (int t = 0; t < tc; t++)
+	{
+		std::string name_t;
+		globalTable.getValueSafely(EMDL_TOMO_NAME, name_t, t);
+
+		if (name_t == tomogramName)
+		{
+			return t;
+		}
+	}
+
+	return -1;
+}
+
+int TomogramSet::getTomogramIndexSafely(std::string tomogramName) const
+{
+	int t = getTomogramIndex(tomogramName);
+
+	if (t < 0)
+	{
+		REPORT_ERROR_STR("No tomogram named '" << tomogramName << "' found in the set");
+	}
+	else
+	{
+		return t;
+	}
 }

@@ -37,7 +37,37 @@ void compareResidues(
 		std::string filename_out,
 		bool images_are_premultiplied);
 
-void computeUniformScaleAndIntercept(
+double computeShellAverage(
+		const RawImage<double>& map_RS,
+		double r0, double r1)
+{
+	const int s = map_RS.xdim;
+
+	double sum = 0.0;
+	double count = 0.0;
+
+	for (int z = 0; z < s; z++)
+	for (int y = 0; y < s; y++)
+	for (int x = 0; x < s; x++)
+	{
+		const d3Vector r(
+			x - s/2,
+			y - s/2,
+			z - s/2);
+
+		const double rl = r.length();
+
+		if (rl > r0 && rl < r1)
+		{
+			sum += map_RS(x,y,z);
+			count += 1.0;
+		}
+	}
+
+	return sum / count;
+}
+
+d2Vector computeUniformScaleAndIntercept(
 		const RawImage<double>& phase_map_RS,
 		const RawImage<double>& amp_map_RS)
 {
@@ -50,6 +80,13 @@ void computeUniformScaleAndIntercept(
 	for (int y = 0; y < s; y++)
 	for (int x = 0; x < s; x++)
 	{
+		const d3Vector r(
+			x - s/2,
+			y - s/2,
+			z - s/2);
+
+		if (r.length() >= s/2 - 10) continue;
+
 		const double vp = phase_map_RS(x,y,z);
 		const double va = amp_map_RS(x,y,z);
 
@@ -71,6 +108,8 @@ void computeUniformScaleAndIntercept(
 
 	std::cout << "optimal scale = " << optimal_scale << std::endl;
 	std::cout << "optimal offset = " << optimal_offset << std::endl;
+
+	return d2Vector(optimal_scale, optimal_offset);
 }
 
 double computeUniformScale(
@@ -86,6 +125,13 @@ double computeUniformScale(
 	for (int y = 0; y < s;  y++)
 	for (int x = 0; x < sh; x++)
 	{
+		const d3Vector r(
+			x - s/2,
+			y - s/2,
+			z - s/2);
+
+		if (r.length() >= s/4) continue;
+
 		const dComplex zp = phase_map_FS(x,y,z);
 		const dComplex za = amp_map_FS(x,y,z);
 
@@ -414,6 +460,8 @@ void plotAllAtoms(
 	all_atoms_plot.OutputPostScriptPlot(out_path+"all_atoms_" + tag + ".eps");
 }
 
+
+
 int main(int argc, char *argv[])
 {
 	IOParser parser;
@@ -422,8 +470,8 @@ int main(int argc, char *argv[])
 	double filter_freq, high_pass_frequency, sigma_scale, psModel;
 	d2Vector plot_start, plot_end;
 	bool plot_window_set;
-	int boxModel, boxOut;
-	bool normalise_by_shell, normalise_uniformly, write_filtered_maps, write_ratios;
+	int boxModel, boxOut, number_of_threads;
+	bool normalise_by_shell, normalise_uniformly, write_filtered_maps, write_ratios, subtract_solvent;
 	
 	
 	try
@@ -435,18 +483,20 @@ int main(int argc, char *argv[])
 		in_amplitude = parser.getOption("--amp", "Amplitude map");
 		in_model = parser.getOption("--pdb", "Atomic model");		
 		filter_freq = textToDouble(parser.getOption("--res", "Resolution [A]", "3.0"));
-		high_pass_frequency = textToDouble(parser.getOption("--hp", "High-pass frequency [px]", "10.0"));
+		high_pass_frequency = textToDouble(parser.getOption("--hp", "High-pass frequency [px]", "-1.0"));
 		sigma_scale = textToDouble(parser.getOption("--sc", "Region width for scale adaptation [px]", "7.0"));
 
 		boxModel = textToInteger(parser.getOption("--box_model", "Box size of the map corresponding to the PDB file"));
 		psModel = textToDouble(parser.getOption("--angpix_model", "Pixel size of the map corresponding to the PDB file"));
 		boxOut = textToInteger(parser.getOption("--box_out", "Box size of the map to be compared"));
 		
+		subtract_solvent = parser.checkOption("--zp", "Zero solvent phase");
 		normalise_uniformly = parser.checkOption("--nu", "Normalise phase map uniformly");
 		normalise_by_shell = parser.checkOption("--ns", "Normalise phase map per shell");
 
 		write_filtered_maps = parser.checkOption("--write_maps", "Write out filtered maps and their difference");
 		write_ratios = parser.checkOption("--write_ratios", "Write out ratio maps");
+		number_of_threads = textToInteger(parser.getOption("--j", "Number of threads", "6"));
 
 		std::string plot_window = parser.getOption("--window", "Area to plot (format: <x0>,<x1>,<y0>,<y1>)", "");
 		
@@ -514,20 +564,33 @@ int main(int argc, char *argv[])
 	phase_map_FS = ImageFilter::lowpass3D(phase_map_FS, resolution_pixels, 10);
 	amp_map_FS = ImageFilter::lowpass3D(amp_map_FS, resolution_pixels, 10);
 	
-	phase_map_FS = ImageFilter::highpassGauss3D(phase_map_FS, high_pass_frequency);
-	amp_map_FS = ImageFilter::highpassGauss3D(amp_map_FS, high_pass_frequency);
+	if (high_pass_frequency > 0)
+	{
+		phase_map_FS = ImageFilter::highpassGauss3D(phase_map_FS, high_pass_frequency);
+		amp_map_FS = ImageFilter::highpassGauss3D(amp_map_FS, high_pass_frequency);
+	}
 
 	FFT::inverseFourierTransform(phase_map_FS, phase_map_RS);
 	FFT::inverseFourierTransform(amp_map_FS, amp_map_RS);
 
-	Reconstruction::taper(phase_map_RS, 5, false, 6);
-	Reconstruction::taper(amp_map_RS, 5, false, 6);
+	if (subtract_solvent)
+	{
+		const double avg = computeShellAverage(phase_map_RS, s/4, s/2);
+		phase_map_RS -= avg;
+	}
+
+	Reconstruction::taper(phase_map_RS, 10, false, number_of_threads);
+	Reconstruction::taper(amp_map_RS, 10, false, number_of_threads);
 
 	FFT::FourierTransform(phase_map_RS, phase_map_FS);
 	FFT::FourierTransform(amp_map_RS, amp_map_FS);
 
 	const double optimal_ratio = computeUniformScale(phase_map_FS, amp_map_FS);
-	
+
+	/*const d2Vector scale_and_intercept = computeUniformScaleAndIntercept(phase_map_RS, amp_map_RS);
+	const double optimal_ratio = scale_and_intercept[0];
+	const double optimal_intercept = scale_and_intercept[1];*/
+
 	std::cout << "amplitude contrast: " << (100.0 * optimal_ratio) << '%' << std::endl;
 	
 	if (normalise_uniformly)
@@ -545,8 +608,15 @@ int main(int argc, char *argv[])
 	
 	if (write_filtered_maps)
 	{
-		BufferedImage<double> filtered_difference = amp_map_RS;
-		filtered_difference.addMultiple(-optimal_ratio, phase_map_RS);
+		BufferedImage<double> filtered_difference(s,s,s);
+
+		for (int z = 0; z < s; z++)
+		for (int y = 0; y < s; y++)
+		for (int x = 0; x < s; x++)
+		{
+			filtered_difference(x,y,z) = amp_map_RS(x,y,z) - optimal_ratio * phase_map_RS(x,y,z);
+		}
+
 
 		phase_map_RS.write(out_path + "phase_" + tag + ".mrc", pixel_size);
 		amp_map_RS.write(out_path + "amplitude_" + tag + ".mrc", pixel_size);

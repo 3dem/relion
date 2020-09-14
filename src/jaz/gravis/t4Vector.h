@@ -123,6 +123,11 @@ namespace gravis
         else return t3Vector<T>(x/w, y/w, z/w);
       }
 
+	  t3Vector<T> xyz() const
+	  {
+		return t3Vector<T>(x, y, z);
+	  }
+
       /*! \brief Return the euclidian norm of this 4D vector.
        *
        * Note, that there is no special treatment of the w-coordinate.
@@ -334,6 +339,7 @@ namespace gravis
 
   typedef t4Vector<float> f4Vector;
   typedef t4Vector<double> d4Vector;
+  typedef t4Vector<int> i4Vector;
 
 } /* Close Namespace "gravis" */
 

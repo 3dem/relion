@@ -13,13 +13,12 @@ class ParticleSet
 {
 	public:
 
-		static ParticleSet* load(std::string filename, std::string motionFilename);
+		static ParticleSet* load(std::string filename, std::string motionFilename = "");
 		
 		ParticleSet();
 		ParticleSet(std::string filename, std::string motionFilename);
 		
 			MetaDataTable partTable, optTable;
-			std::vector<double> binnedPixelSizes, originalPixelSizes;
 
 			bool hasMotion;
 			std::vector<Trajectory> motionTrajectories;
@@ -40,11 +39,11 @@ class ParticleSet
 		
 		void setImageFileNames(std::string data, std::string weight, long int particle_id);
 		
-		void getParticleOffset(long int particle_id, double& x, double& y, double& z) const;
-		void setParticleOffset(long int particle_id, double x, double y, double z);
+		gravis::d3Vector getParticleOffset(long int particle_id) const;
+		void setParticleOffset(long int particle_id, const gravis::d3Vector& v);
 		
-		void getParticleCoord(long int particle_id, double& x, double& y, double& z) const;
-		void setParticleCoord(long int particle_id, double x, double y, double z);
+		gravis::d3Vector getParticleCoord(long int particle_id) const;
+		void setParticleCoord(long int particle_id, const gravis::d3Vector& v);
 
 		int getOpticsGroup(long int particle_id) const;
 		int numberOfOpticsGroups() const;
@@ -53,7 +52,7 @@ class ParticleSet
 		double getOriginalPixelSize(int opticsGroup) const;
 
 
-		std::vector<gravis::d3Vector> getTrajectoryInPix(long int particle_id, int fc, double pixelSize) const;
+		std::vector<gravis::d3Vector> getTrajectoryInPixels(long int particle_id, int fc, double pixelSize) const;
 		void checkTrajectoryLengths(int p0, int np, int fc, std::string caller) const;
 };
 

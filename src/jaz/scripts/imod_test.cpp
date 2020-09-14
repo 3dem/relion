@@ -1,8 +1,8 @@
 
 #include <src/jaz/tomography/tomo_stack.h>
 #include <src/jaz/tomography/projection/projection.h>
-#include <src/jaz/tomography/membrane/blob.h>
-#include <src/jaz/tomography/membrane/blob_fit.h>
+#include <src/jaz/membrane/blob_3d.h>
+#include <src/jaz/membrane/blob_fit_3d.h>
 #include <src/jaz/optimization/nelder_mead.h>
 #include <src/jaz/optimization/lbfgs.h>
 #include <src/jaz/optimization/gradient_descent.h>
@@ -55,7 +55,7 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 	
-	if (false)
+	/*if (false)
 	{
 		std::string stack_fn = "gridStack.mrc";
 		std::string tlt_fn = "test_off2.tlt";
@@ -84,7 +84,7 @@ int main(int argc, char *argv[])
 			2, 2, 1.0);
 	
 		dest.writeVtk("gridStack_dyn_testC_off2.vtk", d3Vector(0.0, d/2, 0.0), d3Vector(1.0));
-	}
+	}*/
 	
 	//if (false)
 	{

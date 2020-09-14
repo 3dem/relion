@@ -51,7 +51,6 @@ void BfactorFitProgram::readParams(IOParser &parser)
 
 void BfactorFitProgram::run()
 {
-	REPORT_ERROR("B-factor fit is currently not operational. Reason: file format refactoring in progress.");
 	RefinementProgram::init();
 	
 	const int tc = particles.size();
@@ -109,8 +108,28 @@ void BfactorFitProgram::run()
 		k_t[t] = bkFacs.second;
 		
 		cumulativeDose[t] = tomogram.cumulativeDose;
-				
+
+
+		{
+			const int fc = tomogram.frameCount;
+			BufferedImage<double> scaleFactor(sh,fc);
+
+			for (int f = 0; f < fc; f++)
+			{
+				scaleFactor(0,f) = 0.0;
+
+				for (int x = 1; x < sh; x++)
+				{
+					scaleFactor(x,f) = FCC3(x,f,0) / FCC3(x,f,1);
+				}
+			}
+
+			scaleFactor.write(tag + "_scaleFactor.mrc");
+		}
+
 	}
+
+	return;
 	
 	Damage::renormalise(B_t, k_t);
 	

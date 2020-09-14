@@ -689,23 +689,23 @@ BufferedImage<float> CTF::getFftwImage_float(int w0, int h0, double angpix) cons
 	return out;
 }
 
-std::vector<double> CTF::getK()
+std::vector<double> CTF::getK() const
 {
 	// offset by one to maintain indices (K[1] = K1)
 	return std::vector<double>{0, K1, K2, K3, K4, K5};
 }
 
-double CTF::getAxx()
+double CTF::getAxx() const
 {
 	return Axx;
 }
 
-double CTF::getAxy()
+double CTF::getAxy() const
 {
 	return Axy;
 }
 
-double CTF::getAyy()
+double CTF::getAyy() const
 {
 	return Ayy;
 }

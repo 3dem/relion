@@ -62,7 +62,7 @@
  *     REPORT_ERROR("Error 1");
  * @endcode
  */
-#define REPORT_ERROR(ErrormMsg) throw RelionError(ErrormMsg, __FILE__, __LINE__)
+#define REPORT_ERROR(ErrormMsg) throw RelionError((ErrormMsg), __FILE__, __LINE__)
 
 /** Show message and throw exception
  * @ingroup ErrorHandling

@@ -1029,38 +1029,6 @@ void SpaBackproject::reconstructLegacy()
 					Log::print("Reconstructing");
 				}
 				
-				/*{				
-					std::cout << padded_box_size << std::endl; 
-					       
-					const int s = padded_box_size;
-					const int sh = s/2 + 1;
-					
-					MultidimArray<Complex> data_centered_xmipp(s,s,sh);
-					
-					std::cout 
-						<< data_centered_xmipp.xdim << "x" 
-						<< data_centered_xmipp.ydim << "x" 
-						<< data_centered_xmipp.zdim << std::endl; 
-					
-					backprojector.decenter(backprojector.data, data_centered_xmipp, s*s/4);
-					
-					std::cout 
-						<< data_centered_xmipp.xdim << "x" 
-						<< data_centered_xmipp.ydim << "x" 
-						<< data_centered_xmipp.zdim << std::endl; 
-					
-					RawImage<Complex> data_centered(data_centered_xmipp);
-					
-					std::cout 
-						<< data_centered.xdim << "x" 
-						<< data_centered.ydim << "x" 
-						<< data_centered.zdim << std::endl;
-					
-					data_centered.writeVtk("data_legacy.vtk");
-					
-					std::exit(0);
-				}*/
-				
 				backprojector.reconstruct(vol_xmipp(), iter, do_MAP, tau2);
 			}
 		}
@@ -1095,7 +1063,10 @@ void SpaBackproject::reconstructNew()
 			accumulation_volumes[i%2].weight +=
 						accumulation_volumes[i].weight;
 
-			spreading_functions[i%2] += spreading_functions[i];
+			if (explicit_spreading_function)
+			{
+				spreading_functions[i%2] += spreading_functions[i];
+			}
 
 			if (compute_multiplicity)
 			{

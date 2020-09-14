@@ -516,6 +516,7 @@ namespace gravis
 
   typedef t3Vector<float> f3Vector;
   typedef t3Vector<double> d3Vector;
+  typedef t3Vector<int> i3Vector;
 
 } // namespace gravis
 

@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 	
-	std::vector<std::vector<double>> order = ZIO::readDoublesTable(orderFn, 2, ',');
+	std::vector<std::vector<double>> order = ZIO::readFixedDoublesTable(orderFn, 2, ',');
 	std::vector<double> tilts = ZIO::readDoubles(tltFn);
 	
 	int fc = tilts.size();

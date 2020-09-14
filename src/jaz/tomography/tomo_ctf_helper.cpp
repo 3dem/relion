@@ -4,50 +4,6 @@
 
 using namespace gravis;
 
-
-CTF TomoCtfHelper::adaptToParticle(
-	const CTF& ctfFrame, 
-	const d4Matrix& projFrame, 
-	d3Vector pos, 
-	d3Vector tomoCentre, 
-	double handedness, 
-	double pixelSize, 
-	double zOffset)
-{
-	d4Vector pos2D = projFrame * d4Vector(pos);
-	d4Vector cent2D = projFrame * d4Vector(tomoCentre);
-	
-	double dz_pos = pos2D.z - cent2D.z;
-	double dz = handedness * pixelSize * dz_pos + zOffset;
-	
-	CTF ctf = ctfFrame;
-	
-	ctf.DeltafU += dz;
-	ctf.DeltafV += dz;
-	
-	ctf.initialise();
-	
-	return ctf;
-}
-
-BufferedImage<float> TomoCtfHelper::drawCTF(
-		const CTF &ctfFrame, const d4Matrix &projFrame, 
-		d3Vector pos, d3Vector tomoCentre, 
-		double handedness, double pixelSize, int boxSize, double zOffset)
-{
-	CTF ctf_part = TomoCtfHelper::adaptToParticle(
-		ctfFrame, projFrame, pos, tomoCentre, handedness, pixelSize, zOffset);
-	
-	const int s = boxSize;
-	const int sh = s/2 + 1;
-	
-	BufferedImage<float> ctfImg(sh,s);
-	ctf_part.draw(s, s, pixelSize, &ctfImg(0,0,0));
-	
-	return ctfImg;
-}
-
-
 std::vector<CTF> TomoCtfHelper :: loadCtffind4(
 		std::string path, int imageCount, 
 		double voltage, double Cs, double Q0, double Bfac, double scale)

@@ -10,31 +10,25 @@
 
 class Fiducials
 {
-		template <typename T>
-		std::vector<gravis::d3Vector> detect(
-				const Tomogram& tomo, 
-				gravis::d3Vector origin, 
-				gravis::d3Vector spacing,
-				gravis::d3Vector diagonal,
-				double avgRad, double exclusionRad, 
-				int maxNum, double minCC = 10.0,
-				int num_threads = 1, int coarseBin = 16);
+	public:
+
+		static std::vector<gravis::d3Vector> read(
+		        const std::string &filename,
+				double pixelSize);
+
+		static std::string write(
+				const std::vector<gravis::d3Vector>& positions,
+				double pixelSize,
+				const std::string& tomoName,
+				const std::string &path);
+
+		static void drawMask(
+				const std::vector<gravis::d3Vector>& positions,
+				const gravis::d4Matrix& proj,
+				double radius,
+				RawImage<float>& destination,
+				double value);
 };
 
-template <typename T>
-std::vector<gravis::d3Vector> Fiducials::detect(
-		const Tomogram& tomo, 
-		gravis::d3Vector origin, 
-		gravis::d3Vector spacing,
-		gravis::d3Vector diagonal,
-		double avgRad, double exclusionRad, 
-		int maxNum, double minCC, 
-		int num_threads, int coarseBin)
-{
-	const int w = tomo.stack.xdim;
-	const int h = tomo.stack.ydim;
-	
-	
-}
 
 #endif

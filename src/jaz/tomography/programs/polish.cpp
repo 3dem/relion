@@ -126,7 +126,7 @@ void PolishProgram::run()
 		Tomogram tomogram = tomogramSet.loadTomogram(t, true);
 		
 		const int fc = tomogram.frameCount;
-		std::vector<d4Matrix> projTomoCorr = tomogram.proj;
+		std::vector<d4Matrix> projTomoCorr = tomogram.projectionMatrices;
 		
 		
 		std::string tag = ZIO::itoa(t);
@@ -146,7 +146,7 @@ void PolishProgram::run()
 		
 		for (int f = 0; f < fc; f++)
 		{
-			projByTime[f] = tomogram.proj[tomogram.frameSequence[f]];
+			projByTime[f] = tomogram.projectionMatrices[tomogram.frameSequence[f]];
 		}
 		
 		const double t0 = omp_get_wtime();
@@ -269,7 +269,7 @@ void PolishProgram::run()
 		
 		if (diag)
 		{
-			tomogram.proj = projTomoCorr;
+			tomogram.projectionMatrices = projTomoCorr;
 			
 			FCC3 = FCC::compute3(
 				dataSet, particles[t], tomogram, referenceMap.image_FS,

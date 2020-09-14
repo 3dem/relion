@@ -23,22 +23,11 @@ ParticleSet::ParticleSet(std::string filename, std::string motionFilename)
 	optTable.read(filename, "optics");
 	partTable.read(filename, "particles");
 	
-	if (!optTable.labelExists(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE))
+	if (!optTable.labelExists(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE))
 	{
 		REPORT_ERROR("ParticleSet::ParticleSet: "
-					 + EMDL::label2Str(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE)
+					 + EMDL::label2Str(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE)
 					 + " missing from optics MetaDataTable.\n");
-	}
-	
-	const int groupCount = optTable.numberOfObjects();
-	
-	originalPixelSizes.resize(groupCount);
-	binnedPixelSizes.resize(groupCount);
-	
-	for (int i = 0; i < groupCount; i++)
-	{
-		optTable.getValueSafely(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, originalPixelSizes[i], i);
-		optTable.getValueSafely(EMDL_IMAGE_PIXEL_SIZE, binnedPixelSizes[i], i);
 	}
 
 	hasMotion = motionFilename != "";
@@ -193,9 +182,13 @@ d3Vector ParticleSet::getPosition(long int particle_id) const
 	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_X_ANGSTROM, off.x, particle_id);
 	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, off.y, particle_id);
 	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, off.z, particle_id);
-		
+	
 	const int og = getOpticsGroup(particle_id);
-	d3Vector out = (binnedPixelSizes[og] * pos - off) / originalPixelSizes[og];
+	
+	const double originalPixelSize = optTable.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, og);
+	const double binnedPixelSize = optTable.getDouble(EMDL_IMAGE_PIXEL_SIZE, og);
+	
+	d3Vector out = (binnedPixelSize * pos - off) / originalPixelSize;
 	
 	out.x += 1.0;
 	out.y += 1.0;
@@ -315,32 +308,40 @@ void ParticleSet::setImageFileNames(std::string data, std::string weight, long i
 	partTable.setValue(EMDL_CTF_IMAGE, weight, particle_id);
 }
 
-void ParticleSet::getParticleOffset(long particle_id, double& x, double& y, double& z) const
+d3Vector ParticleSet::getParticleOffset(long particle_id) const
 {
-	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_X_ANGSTROM, x, particle_id);
-	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, y, particle_id);
-	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, z, particle_id);
+	d3Vector out;
+	
+	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_X_ANGSTROM, out.x, particle_id);
+	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, out.y, particle_id);
+	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, out.z, particle_id);
+	
+	return out;
 }
 
-void ParticleSet::setParticleOffset(long particle_id, double x, double y, double z)
+void ParticleSet::setParticleOffset(long particle_id, const d3Vector& v)
 {
-	partTable.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, x, particle_id);
-	partTable.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, y, particle_id);
-	partTable.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, z, particle_id);
+	partTable.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, v.x, particle_id);
+	partTable.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, v.y, particle_id);
+	partTable.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, v.z, particle_id);
 }
 
-void ParticleSet::getParticleCoord(long particle_id, double& x, double& y, double& z) const
+d3Vector ParticleSet::getParticleCoord(long particle_id) const
 {
-	partTable.getValueSafely(EMDL_IMAGE_COORD_X, x, particle_id);
-	partTable.getValueSafely(EMDL_IMAGE_COORD_Y, y, particle_id);
-	partTable.getValueSafely(EMDL_IMAGE_COORD_Z, z, particle_id);
+	d3Vector out;
+	
+	partTable.getValueSafely(EMDL_IMAGE_COORD_X, out.x, particle_id);
+	partTable.getValueSafely(EMDL_IMAGE_COORD_Y, out.y, particle_id);
+	partTable.getValueSafely(EMDL_IMAGE_COORD_Z, out.z, particle_id);
+	
+	return out;
 }
 
-void ParticleSet::setParticleCoord(long particle_id, double x, double y, double z)
+void ParticleSet::setParticleCoord(long particle_id, const d3Vector& v)
 {
-	partTable.setValue(EMDL_IMAGE_COORD_X, x, particle_id);
-	partTable.setValue(EMDL_IMAGE_COORD_Y, y, particle_id);
-	partTable.setValue(EMDL_IMAGE_COORD_Z, z, particle_id);
+	partTable.setValue(EMDL_IMAGE_COORD_X, v.x, particle_id);
+	partTable.setValue(EMDL_IMAGE_COORD_Y, v.y, particle_id);
+	partTable.setValue(EMDL_IMAGE_COORD_Z, v.z, particle_id);
 }
 
 int ParticleSet::getOpticsGroup(long particle_id) const
@@ -374,17 +375,17 @@ double ParticleSet::getBinnedPixelSize(int opticsGroup) const
 
 double ParticleSet::getOriginalPixelSize(int opticsGroup) const
 {
-	if (!optTable.labelExists(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE))
+	if (!optTable.labelExists(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE))
 	{
 		REPORT_ERROR("ParticleSet::getOriginalPixelSize: pixel size (rlnMicrographOriginalPixelSize) missing from optics table");
 	}
 	
 	double out;
-	optTable.getValueSafely(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, out, opticsGroup);
+	optTable.getValueSafely(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, out, opticsGroup);
 	return out;
 }
 
-std::vector<d3Vector> ParticleSet::getTrajectoryInPix(long particle_id, int fc, double pixelSize) const
+std::vector<d3Vector> ParticleSet::getTrajectoryInPixels(long particle_id, int fc, double pixelSize) const
 {
 	const d3Vector p0 = getPosition(particle_id);
 

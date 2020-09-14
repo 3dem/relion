@@ -25,7 +25,29 @@ std::vector<double> ZIO::readDoubles(std::string fn)
 	return out;
 }
 
-std::vector<std::vector<double>> ZIO::readDoublesTable(std::string fn, int cols, char delim)
+std::vector<int> ZIO::readInts(std::string fn)
+{
+	std::vector<int> out(0);
+	std::ifstream ifs(fn);
+	std::string line;
+
+	out.reserve(128);
+
+	while (std::getline(ifs, line))
+	{
+		std::stringstream sts;
+		sts << line;
+
+		int i;
+		sts >> i;
+
+		out.push_back(i);
+	}
+
+	return out;
+}
+
+std::vector<std::vector<double>> ZIO::readFixedDoublesTable(std::string fn, int cols, char delim)
 {
 	std::vector<std::vector<double>> out(0);
 	
@@ -33,7 +55,7 @@ std::vector<std::vector<double>> ZIO::readDoublesTable(std::string fn, int cols,
 
 	if (!ifs)
 	{
-		REPORT_ERROR_STR("ZIO::readDoublesTable: unable to read "+fn);
+		REPORT_ERROR_STR("ZIO::readFixedDoublesTable: unable to read "+fn);
 	}
 	
 	std::string line;
@@ -67,6 +89,56 @@ std::vector<std::vector<double>> ZIO::readDoublesTable(std::string fn, int cols,
 			sts >> d;
 			
 			out[i][c] = d;
+		}
+	}
+	
+	return out;
+}
+
+std::vector<std::vector<double> > ZIO::readDoublesTable(std::string fn, char delim)
+{
+	std::vector<std::vector<double>> out(0);
+	
+	std::ifstream ifs(fn);
+
+	if (!ifs)
+	{
+		REPORT_ERROR_STR("ZIO::readFixedDoublesTable: unable to read "+fn);
+	}
+	
+	std::string line;
+	
+	out.reserve(128);
+	
+	int i = -1;
+	
+	while (std::getline(ifs, line))
+	{
+		out.push_back(std::vector<double>());
+		i++;
+
+		if (delim != ' ')
+		{
+			for (int i = 0; i < line.length(); i++)
+			{
+				if (line[i] == delim)
+				{
+					line[i] = ' ';
+				}
+			}
+		}
+		
+		out[i].reserve(line.length()/5 + 1);
+		
+		std::stringstream sts;
+		sts << line;
+				
+		double d;
+		
+		while (sts >> d)
+		{
+			out[i].push_back(d);
+			std::cout << "[" << d << "]\n";
 		}
 	}
 	
@@ -117,13 +189,35 @@ std::string ZIO::makeOutputDir(const std::string& dir)
 	
 	if (len > 0)
 	{
-		if (out[out.length()-1] != '/')
+		if (out[len-1] != '/')
 		{
 			out = out + "/";
 		}
 		
 		int res = system(("mkdir -p "+out).c_str());
+
+		if (res)
+		{
+			REPORT_ERROR_STR("Unable to write to: " << out);
+		}
 	}
 	
 	return out;
+}
+
+std::string ZIO::ensureEndingSlash(const std::string &dir)
+{
+	std::string out = dir;
+	
+	const int len = out.length();
+	
+	if (len > 0)
+	{
+		if (out[len-1] != '/')
+		{
+			out = out + "/";
+		}
+	}
+	
+	return out;	
 }

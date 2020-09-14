@@ -37,14 +37,20 @@ DefocusRefinementProgram::DefocusRefinementProgram(int argc, char *argv[])
 		
 		int def_section = parser.addSection("Defocus refinement options");
 				
-		scanDefocus = parser.checkOption("--scan_defocus", "Perform brute-force defocus scan");
+		scanDefocus = !parser.checkOption("--no_scan", "Skip accelerated defocus scan");
+		slowScan = parser.checkOption("--slow_scan", "Perform a slow, brute-force defocus scan instead");
+		refineFast = !parser.checkOption("--slow_scan_only", "Only perform a brute-force scan");
+		refineAstigmatism = !parser.checkOption("--no_astigmatism", "Do not refine the astigmatism");
+		scanAstigmatism = !parser.checkOption("--no_astigmatism_scan", "Refine astigmatism from initial optimum");
+		plotAstigmatism = parser.checkOption("--plot_astigmatism", "Plot the astigmatism cost function");
+
 		max_particles = textToInteger(parser.getOption("--max", "Max. number of particles to consider per tomogram", "-1"));
 		group_count = textToInteger(parser.getOption("--g", "Number of independent groups", "10"));
 		sigma_input = textToDouble(parser.getOption("--sig0", "Std. dev. of initial defoci (negative to turn off regularisation)", "-1"));
 		regularise = sigma_input > 0.0;
 		
-		minDelta = textToDouble(parser.getOption("--d0", "Min. defocus offset to test [Å]", "-100"));
-		maxDelta = textToDouble(parser.getOption("--d1", "Max. defocus offset to test [Å]", "100"));
+		minDelta = textToDouble(parser.getOption("--d0", "Min. defocus offset to test [Å]", "-300"));
+		maxDelta = textToDouble(parser.getOption("--d1", "Max. defocus offset to test [Å]", "300"));
 		deltaSteps = textToInteger(parser.getOption("--ds", "Number of defocus steps in-between", "100"));
 		
 		clearAstigmatism = parser.checkOption("--ca", "Clear the current astigmatism estimate");
@@ -62,6 +68,11 @@ DefocusRefinementProgram::DefocusRefinementProgram(int argc, char *argv[])
 		std::cerr << XE;
 		exit(1);
 	}
+
+	if (!refineFast)
+	{
+		slowScan = true;
+	}
 }
 
 void DefocusRefinementProgram::run()
@@ -71,7 +82,7 @@ void DefocusRefinementProgram::run()
 	RefinementProgram::init();
 		
 	const int tc = particles.size();
-	const bool flip_value = true;	
+	const bool flip_value = true;
 	
 	Log::endSection();
 		
@@ -80,7 +91,7 @@ void DefocusRefinementProgram::run()
 		int pc0 = particles[t].size();
 		if (pc0 == 0) continue;
 		
-		Log::beginSection("Tomogram " + ZIO::itoa(t+1) + " / " + ZIO::itoa(tc));		
+		Log::beginSection("Tomogram " + ZIO::itoa(t+1) + " / " + ZIO::itoa(tc));
 		Log::print("Loading");
 		
 		Tomogram tomogram = tomogramSet.loadTomogram(t, true);
@@ -103,6 +114,7 @@ void DefocusRefinementProgram::run()
 				
 				ctf.DeltafU = z0;
 				ctf.DeltafV = z0;
+				ctf.initialise();
 			}
 		}
 				
@@ -123,7 +135,7 @@ void DefocusRefinementProgram::run()
 		{
 			Log::beginSection("Frame " + ZIO::itoa(f+1));
 			
-			if (scanDefocus)
+			if (slowScan)
 			{
 				DefocusFit defocus = findDefocus(
 					f, minDelta, maxDelta, deltaSteps,  
@@ -152,6 +164,8 @@ void DefocusRefinementProgram::run()
 						
 					std::ofstream costOut(
 						outDir+"cost_tomo_"+ZIO::itoa(t)+"_frame_"+ZIO::itoa(f)+".dat");
+
+					costOut.precision(12);
 					
 					for (int di = 0; di < deltaSteps; di++)
 					{
@@ -167,8 +181,10 @@ void DefocusRefinementProgram::run()
 				const double s02 = sigma_input * sigma_input;
 				const double sf2 = offsetStdDev[f] * offsetStdDev[f];
 				
-				const double deltaZ = regularise? s02 * defocusOffset[f] / (sf2 + s02)
-												: defocusOffset[f];
+				const double deltaZ = regularise?
+					s02 * defocusOffset[f] / (sf2 + s02) :
+					defocusOffset[f];
+
 				ctf.DeltafU += deltaZ;
 				ctf.DeltafV += deltaZ;
 				
@@ -177,7 +193,7 @@ void DefocusRefinementProgram::run()
 				tomogramSet.setCtf(t,f,ctf);
 			}
 
-			// @TODO: find astigmatism using aberrations fit
+			if (refineFast)
 			{
 				const int s = referenceMap.image_real[0].xdim;
 				const int sh = s/2 + 1;
@@ -204,9 +220,10 @@ void DefocusRefinementProgram::run()
 					oddData_thread[th].fill(oddZero);
 				}
 				
+
 				Log::beginProgress("Accumulating evidence", pc/num_threads);
 				
-				#pragma omp parallel for num_threads(num_threads)		
+				#pragma omp parallel for num_threads(num_threads)
 				for (int p = 0; p < pc; p++)
 				{
 					const int th = omp_get_thread_num();
@@ -221,44 +238,60 @@ void DefocusRefinementProgram::run()
 						f, f, 
 						evenData_thread[th], oddData_thread[th]);
 				}
-				
+
 				Log::endProgress();
 				
+
 				for (int th = 0; th < num_threads; th++)
 				{
 					evenData += evenData_thread[th];
 					oddData += oddData_thread[th];
 				}
-						
+
+				CTF ctf0 = tomogram.centralCTFs[f];
+				CTF ctf_dz = ctf0;
+
+				double bestDeltaZ = 0;
+
+				if (scanDefocus)
 				{
-					std::vector<double> coeffs = AberrationFitProgram::solveEven(
-							evenData, 2, tomogram.optics.pixelSize, 
-							outDir+"diag_"+ZIO::itoa(t)+","+ZIO::itoa(f)+"_", diag);
-					
-					CTF ctf = tomogram.centralCTFs[f];
-					
-					//evenData.fill(evenZero);
-					
-					std::vector<double> coeffs0 = ZernikeHelper::convertSymmetrical(ctf);
-					
-					const int cc = coeffs0.size() < coeffs.size()? coeffs0.size() : coeffs.size();
-					
-					for (int i = 0; i < cc; i++)
-					{
-						coeffs0[i] += coeffs[i];
-					}
-					
-					ZernikeHelper::OldCtfBasis newCtf = ZernikeHelper::convertSymmetrical(
-							coeffs0, tomogram.optics.voltage);
-					
-					ctf.DeltafU = newCtf.defocusU;
-					ctf.DeltafV = newCtf.defocusV;
-					ctf.azimuthal_angle = newCtf.astigAzimuth_deg;
-					
-					// Q0, Cs and phase_shift are currently not being handled per particle.
-					
-					tomogramSet.setCtf(t, f, ctf);
+					bestDeltaZ = AberrationFitProgram::findDefocus(
+							evenData, tomogram.optics.pixelSize, tomogram.centralCTFs[f],
+							minDelta, maxDelta, deltaSteps);
+
+					ctf_dz.DeltafU = ctf0.DeltafU + bestDeltaZ;
+					ctf_dz.DeltafV = ctf0.DeltafV + bestDeltaZ;
 				}
+
+				CTF ctf1 = ctf_dz;
+
+				if (refineAstigmatism)
+				{
+					AberrationFitProgram::EvenSolution solution =
+							AberrationFitProgram::solveEven(evenData);
+
+					const double pixelSize = tomogram.optics.pixelSize;
+
+					d3Vector astig = AberrationFitProgram::findAstigmatism(
+						solution, ctf0, bestDeltaZ, pixelSize, 1.0);
+
+					if (plotAstigmatism)
+					{
+						BufferedImage<double> astigPlot =
+								AberrationFitProgram::plotAstigmatism(
+									solution, ctf0, bestDeltaZ, 100.0, pixelSize, 32);
+
+						astigPlot.write(
+							outDir+"astig_cost_"+ZIO::itoa(t)+"_"+ZIO::itoa(f)+".mrc");
+					}
+
+					ctf1.DeltafU = astig[0];
+					ctf1.DeltafV = astig[1];
+					ctf1.azimuthal_angle = astig[2];
+				}
+
+				tomogramSet.setCtf(t, f, ctf1);
+
 			}
 			
 			Log::endSection();
@@ -309,62 +342,58 @@ BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(
 		int time_NCCcalc = timer.setNew("NCC calculation");				
 	#endif
 	
-		
+
 	Log::beginProgress(
 		"Evaluating defocus offsets from "
 		+ZIO::itoa(z0)+"Å to "+ZIO::itoa(z1)+"Å in "
 		+ZIO::itoa(steps)+" steps of "+ZIO::itoa(deltaStep)+"Å", 
 		pc / num_threads);
-					
-	#pragma omp parallel for num_threads(num_threads)		
+
+	#pragma omp parallel for num_threads(num_threads)
 	for (int p = 0; p < pc; p++)
 	{
 		const int th = omp_get_thread_num();
 		
 		if (th == 0) Log::updateProgress(p);
 		
-		const int part_id = particles[p];	
+		const int part_id = particles[p];
 		
 		#if TIMING
 			if (th==0) timer.tic(time_extract);
-		#endif						
+		#endif
 		
 		const d3Vector pos = dataSet->getPosition(part_id);
-		const std::vector<d3Vector> traj = dataSet->getTrajectoryInPix(part_id, fc, pixelSize);
+		const std::vector<d3Vector> traj = dataSet->getTrajectoryInPixels(part_id, fc, pixelSize);
 		
-		d4Matrix projCut;	
-		
+		d4Matrix projCut;
+
 		BufferedImage<fComplex> observation(sh,s);
 		
 		TomoExtraction::extractFrameAt3D_Fourier(
-				tomogram.stack, f, s, 1.0, tomogram.proj[f], traj[f],
+				tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f], traj[f],
 				observation, projCut, 1, false, true);
 		
 		#if TIMING
 			if (th==0) timer.toc(time_extract);
 		#endif
-				
+
 		
 		#if TIMING
 			if (th==0) timer.tic(time_fwd_proj);
 		#endif
-								
+
 		BufferedImage<fComplex> prediction = Prediction::predictFS(
-				part_id, dataSet, projCut, s, referenceFS);	
-						
+				part_id, dataSet, projCut, s, referenceFS);
+
 		#if TIMING
 			if (th==0) timer.toc(time_fwd_proj);
 		#endif
-			
-		
-		CTF ctf_part_0 = TomoCtfHelper::adaptToParticle(
-				tomogram.centralCTFs[f], tomogram.proj[f], pos, tomogram.centre, 
-				handedness, pixelSize);
-		
+
+		CTF ctf_part_0 = tomogram.getCtf(f, pos);
 		CTF ctf_part = ctf_part_0;
-		
+
 		BufferedImage<float> CTFimage(sh,s);
-								
+
 		for (int di = 0; di < steps; di++)
 		{
 			const double deltaZ = z0 + di * deltaStep; 
@@ -372,7 +401,7 @@ BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(
 			#if TIMING
 				if (th==0) timer.tic(time_CTFdraw);
 			#endif
-					
+
 			ctf_part.DeltafU = ctf_part_0.DeltafU + deltaZ;
 			ctf_part.DeltafV = ctf_part_0.DeltafV + deltaZ;
 			
@@ -384,7 +413,7 @@ BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(
 				if (th==0) timer.toc(time_CTFdraw);
 			#endif
 			
-				
+
 			const float scale = flip_value? -1.f : 1.f;
 			
 			double CCp = 0.0;
@@ -400,15 +429,15 @@ BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(
 				const float wg = freqWeights(x,y,f);
 				
 				const double xx = x;
-				const double yy = y < sh/2? y : y - s;
+				const double yy = y < s/2? y : y - s;
 				const double r2 = xx * xx + yy * yy;
 				
 				if (r2 < sh2)
 				{
-					const fComplex zp = c * wg * prediction(x,y);
-					const fComplex zv = observation(x,y);
-					
-					CCp += zp.real * zv.real + zp.imag * zv.imag;
+					const fComplex zp = c * prediction(x,y);
+					const fComplex zo = observation(x,y);
+
+					CCp += wg * (zp - zo).norm();
 				}
 			}
 			
@@ -416,12 +445,11 @@ BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(
 				if (th==0) timer.toc(time_NCCcalc);
 			#endif
 			
-			CC[th](p, di) = CCp;
+			CC[th](p, di) = CCp / (s * s);
 		}
 	}
 	
 	Log::endProgress();
-	
 	
 	BufferedImage<double> CC_out(pc,steps);
 	
@@ -431,11 +459,11 @@ BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(
 	{
 		CC_out += CC[th];
 	}
-				
+
 	#if TIMING
 		timer.printTimes(true);
 	#endif
-		
+
 	return CC_out;
 }
 
@@ -461,7 +489,7 @@ DefocusRefinementProgram::DefocusFit DefocusRefinementProgram::findDefocus(
 	
 	Log::beginSection("Estimating coarse defoci");
 	
-	BufferedImage<double> CC = computeOffsetCost(
+	BufferedImage<double> cost = computeOffsetCost(
 		f, minDelta, maxDelta, steps, 
 		dataSet, particles, pc, tomogram,
 		referenceFS, freqWeights,   
@@ -478,24 +506,24 @@ DefocusRefinementProgram::DefocusFit DefocusRefinementProgram::findDefocus(
 	
 	for (int di = 0; di < steps; di++)
 	{
-		std::vector<double> ccByGroup(group_count, 0.0);
-		double totalCC = 0.0;
-				
+		std::vector<double> costByGroup(group_count, 0.0);
+		double totalCost = 0.0;
+
 		for (int p = 0; p < pc; p++)
 		{
 			const int g = p % group_count;
-			
-			totalCC += CC(p, di);
-			ccByGroup[g] += CC(p, di);
+
+			totalCost += cost(p, di);
+			costByGroup[g] += cost(p, di);
 		}
 		
 		for (int g = 0; g < group_count; g++)
 		{
-			out.costByGroup[g][di] = -ccByGroup[g];
+			out.costByGroup[g][di] = costByGroup[g];
 		}
 		
 		out.offsets[di] = minDelta + di * deltaStep;
-		out.totalCost[di] = -totalCC;		
+		out.totalCost[di] = totalCost;
 	}
 	
 	
@@ -640,7 +668,7 @@ DefocusRefinementProgram::DefocusFit DefocusRefinementProgram::findDefocus(
 		
 		const double delta_step_fine = diam / (double) (steps_fine - 1);
 						
-		BufferedImage<double> CC_fine = computeOffsetCost(
+		BufferedImage<double> cost_fine = computeOffsetCost(
 				f, 
 				bestDeltaZ - deltaStep, 
 				bestDeltaZ + deltaStep, 
@@ -656,16 +684,16 @@ DefocusRefinementProgram::DefocusFit DefocusRefinementProgram::findDefocus(
 		{
 			const double deltaZ = bestDeltaZ - deltaStep + di * delta_step_fine;
 			
-			double totalCC = 0.0;
+			double totalCost = 0.0;
 					
 			for (int p = 0; p < pc; p++)
 			{
 				const int g = p % group_count;
 				
-				totalCC += CC_fine(p, di);
+				totalCost += cost_fine(p, di);
 			}
 			
-			const double cost = -totalCC;
+			const double cost = totalCost;
 			
 			if (cost < minCost_fine)
 			{

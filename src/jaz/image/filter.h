@@ -5,6 +5,7 @@
 #include "stack_helper.h"
 #include "padding.h"
 #include <src/jaz/math/fft.h>
+#include <src/ctf.h>
 
 class ImageFilter
 {
@@ -38,9 +39,12 @@ class ImageFilter
 		template<class T>
 		static BufferedImage<T> Gauss2D(
 				const RawImage<T>& img, int z, double sigmaRS, bool pad);
-		
+
 		template<class T>
 		static BufferedImage<T> ramp(const RawImage<T>& img);
+
+		template<class T>
+		static BufferedImage<T> thresholdAbove(const RawImage<T>& img, T value);
 
 		
 		
@@ -50,7 +54,7 @@ class ImageFilter
 		
 		template<class T>
 		static BufferedImage<T> highpassStackGaussPadded(
-				const RawImage<T>& stack, double sigmaRS);
+				const RawImage<T>& stack, double sigmaRS, int num_threads = 1);
 		
 		template<class T>
 		static BufferedImage<T> lowpassStack(
@@ -67,6 +71,11 @@ class ImageFilter
 		template<class T>
 		static BufferedImage<T> separableGauss3D(
 				const RawImage<T>& img, double sigma);
+		
+		
+		template<class T>
+		static BufferedImage<T> phaseFlip(
+				const RawImage<T>& image, CTF& ctf, double pixelSize);
 		
 };
 
@@ -378,7 +387,7 @@ BufferedImage<T> ImageFilter::Gauss2D(const RawImage<T>& img, int z, double sigm
 	const int w = img.xdim;
 	const int h = img.ydim;
 	
-	int padding = pad? (int) (2.0 * sigmaRS + 0.5) : 0;
+	int padding = pad? (int) (3.0 * sigmaRS + 0.5) : 0;
 	
 	const double sigmaFSx = 0.5 / (PI * sigmaRS);
 	const double sigmaFSy = 0.5 / (PI * sigmaRS);
@@ -388,6 +397,7 @@ BufferedImage<T> ImageFilter::Gauss2D(const RawImage<T>& img, int z, double sigm
 	const int wph = wp/2 + 1;
 	
 	BufferedImage<T> imgPadded(wp, hp);
+	BufferedImage<T> weightPadded(wp, hp);
 	
 	for (int y = 0; y < hp; y++)
 	for (int x = 0; x < wp; x++)
@@ -395,18 +405,17 @@ BufferedImage<T> ImageFilter::Gauss2D(const RawImage<T>& img, int z, double sigm
 		int xx = x - padding;
 		int yy = y - padding;
 		
-		if (xx < 0) xx = 0;
-		else if (xx >= w) xx = w - 1;
-		
-		if (yy < 0) yy = 0;
-		else if (yy >= h) yy = h - 1;
-		
-		imgPadded(x,y) = img(xx,yy,z);
+		if (xx >= 0 && xx < w && yy >= 0 && yy < h) 
+		{
+			imgPadded(x,y) = img(xx,yy,z);
+			weightPadded(x,y) = 1; 
+		}
 	}
 	
-	BufferedImage<tComplex<T>> imgFS;
+	BufferedImage<tComplex<T>> imgFS, weightFS;
 	
 	FFT::FourierTransform(imgPadded, imgFS, FFT::Both);
+	FFT::FourierTransform(weightPadded, weightFS, FFT::Both);
 		
 	for (int y = 0; y < hp; y++)
 	for (int x = 0; x < wph; x++)
@@ -417,18 +426,20 @@ BufferedImage<T> ImageFilter::Gauss2D(const RawImage<T>& img, int z, double sigm
 		const double d = 
 			  xx * xx / (sigmaFSx * sigmaFSx) 
 			+ yy * yy / (sigmaFSy * sigmaFSy);
-				
+		
 		imgFS(x,y) *= exp(-d / 2.0);
+		weightFS(x,y) *= exp(-d / 2.0);
 	}
 	
-	BufferedImage<T> out, outCropped(w,h);
+	BufferedImage<T> out, weightOut, outCropped(w,h);
 	
 	FFT::inverseFourierTransform(imgFS, out, FFT::Both);
+	FFT::inverseFourierTransform(weightFS, weightOut, FFT::Both);
 	
 	for (int y = 0; y < h; y++)
 	for (int x = 0; x < w; x++)
 	{
-		outCropped(x,y) = out(x + padding, y + padding);
+		outCropped(x,y) = out(x + padding, y + padding) / weightOut(x + padding, y + padding);
 	}
 	
 	return outCropped;
@@ -464,6 +475,20 @@ BufferedImage<T> ImageFilter::ramp(const RawImage<T>& img)
 }
 
 template<class T>
+BufferedImage<T> ImageFilter::thresholdAbove(const RawImage<T>& img, T value)
+{
+	BufferedImage<T> out = img;
+	const size_t s = img.getSize();
+
+	for (size_t i = 0; i < s; i++)
+	{
+		if (out[i] < value) out[i] = value;
+	}
+
+	return out;
+}
+
+template<class T>
 BufferedImage<T> ImageFilter::highpassStack(
 		const RawImage<T>& stack, double freqPx, double widthPx, bool pad)
 {
@@ -472,8 +497,8 @@ BufferedImage<T> ImageFilter::highpassStack(
 	const int fc = stack.zdim;
 	
 	for (int f = 0; f < fc; f++)
-	{		
-		BufferedImage<T> sliceFilt = highpass2D(stack, f, freqPx, widthPx, pad);		
+	{
+		BufferedImage<T> sliceFilt = highpass2D(stack, f, freqPx, widthPx, pad);
 		NewStackHelper::insertSliceZ(sliceFilt, out, f);
 	}
 	
@@ -482,29 +507,30 @@ BufferedImage<T> ImageFilter::highpassStack(
 
 template<class T>
 BufferedImage<T> ImageFilter::highpassStackGaussPadded(
-		const RawImage<T>& stack, double sigmaRS)
+		const RawImage<T>& stack, double sigmaRS, int num_threads)
 {
 	BufferedImage<T> out(stack.xdim, stack.ydim, stack.zdim);
 	
 	const int fc = stack.zdim;
 	
 	BufferedImage<T> mask(stack.xdim, stack.ydim, 1);
-	mask.fill(T(1));	
-	mask = Padding::padCenter2D_full(mask, 2*sigmaRS);	
-	mask = Gauss2D(mask, 0, sigmaRS, false);	
+	mask.fill(T(1));
+	mask = Padding::padCenter2D_full(mask, 2*sigmaRS);
+	mask = Gauss2D(mask, 0, sigmaRS, false);
 	mask = Padding::unpadCenter2D_full(mask, 2*sigmaRS);
-	
+
+	#pragma omp parallel for num_threads(num_threads)
 	for (int f = 0; f < fc; f++)
 	{	
 		BufferedImage<T> slice0 = NewStackHelper::extractSliceZ(stack, f);
 		BufferedImage<T> slice = Padding::padCenter2D_full(slice0, 2*sigmaRS);
 		
 		slice = Gauss2D(slice, 0, sigmaRS, false);
-		slice = Padding::unpadCenter2D_full(slice, 2*sigmaRS);		
-		slice /= mask;		
+		slice = Padding::unpadCenter2D_full(slice, 2*sigmaRS);
+		slice /= mask;
 		slice = slice0 - slice;
 		
-		NewStackHelper::insertSliceZ(slice, out, f);
+		out.getSliceRef(f).copyFrom(slice);
 	}
 	
 	return out;
@@ -702,6 +728,42 @@ BufferedImage<T> ImageFilter::separableGauss3D(const RawImage<T>& img, double si
     }
 	
 	return out;
+}
+
+
+template<class T>
+BufferedImage<T> ImageFilter::phaseFlip(
+		const RawImage<T>& image, CTF& ctf, double pixelSize)
+{
+	const int w = image.xdim;
+	const int h = image.ydim;
+	const int wh = w/2 + 1;
+	
+	BufferedImage<T> imageCopy = image;
+	BufferedImage<tComplex<T>> imageFS;
+	
+	FFT::FourierTransform(imageCopy, imageFS);
+	
+	const double bw = w * pixelSize;
+	const double bh = h * pixelSize;
+	
+	for (int y = 0; y < h; y++)
+	for (int x = 0; x < wh; x++)
+	{
+		const double xx = x;
+		const double yy = y < h/2? y : y - h;
+		
+		const double c = ctf.getCTF(xx/bw, yy/bh);
+		
+		if (c < 0.0)
+		{
+			imageFS(x,y).imag *= -1;
+		}
+	}
+	
+	FFT::inverseFourierTransform(imageFS, imageCopy);
+	
+	return imageCopy;
 }
 
 #endif

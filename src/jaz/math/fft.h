@@ -212,6 +212,30 @@ class FFT
 			
 			return out;
 		}
+		
+		
+		// syntactic sugar (the RawImages are copied to BufferedImages internally)
+		
+		static void FourierTransform(
+                const RawImage<double>& src,
+                BufferedImage<dComplex>& dest,
+                Normalization normalization = FwdOnly);
+
+        static void inverseFourierTransform(
+                const RawImage<dComplex>& src,
+                BufferedImage<double>& dest,
+                Normalization normalization = FwdOnly);
+
+
+        static void FourierTransform(
+                const RawImage<float>& src,
+                BufferedImage<fComplex>& dest,
+                Normalization normalization = FwdOnly);
+
+        static void inverseFourierTransform(
+                const RawImage<fComplex>& src,
+                BufferedImage<float>& dest,
+                Normalization normalization = FwdOnly);
 	
 		
 	private:

@@ -16,10 +16,12 @@ class DefocusRefinementProgram : public RefinementProgram
 {
 	public:
 		
-		DefocusRefinementProgram(int argc, char *argv[]);					
+		DefocusRefinementProgram(int argc, char *argv[]);
 			
-			bool clearAstigmatism, scanDefocus, regularise;
-			int deltaSteps, max_particles, group_count;			
+			bool clearAstigmatism, scanDefocus, slowScan, refineFast,
+				refineAstigmatism, scanAstigmatism, plotAstigmatism, regularise;
+
+			int deltaSteps, max_particles, group_count;
 			double minDelta, maxDelta, sigma_input;
 			
 		void run();

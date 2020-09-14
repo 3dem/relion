@@ -413,6 +413,7 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 		if (gainFn != last_gainFn)
 		{
 			lastGainRef.read(gainFn);
+			last_gainFn = gainFn;
 			
 			if (isEER) // TODO: Takanori: Remove this once we updated RelionCor
 			{
@@ -421,7 +422,11 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 					eer_upsampling = micrograph.getEERUpsampling();
 				}
 				
-				EERRenderer::upsampleEERGain(lastGainRef(), eer_upsampling);
+				EERRenderer::loadEERGain(gainFn, lastGainRef(), eer_upsampling);
+			}
+			else
+			{
+				lastGainRef.read(gainFn);
 			}
 
 			last_gainFn = gainFn;
@@ -496,6 +501,7 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 			{
 				// NOTE: sqrt(fc) is a legacy scaling factor.
 				// It probably shouldn't be there.
+				//                   --JZ
 				RawImage<Complex>(movie[p][f]) /= s * sqrt(scale2 / fc); 
 			}
 		}

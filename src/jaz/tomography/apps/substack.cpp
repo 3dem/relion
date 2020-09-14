@@ -12,7 +12,7 @@ int main(int argc, char *argv[])
 		parser.setCommandLine(argc, argv);
 		int gen_section = parser.addSection("General options");
 		
-		sp.catFn = parser.getOption("--i", "Input particle set");
+		sp.particlesFn = parser.getOption("--i", "Input particle set");
 		sp.tomoListFn = parser.getOption("--t", "Tomogram list", "tomolist.txt");
 		sp.boxSize = textToInteger(parser.getOption("--b", "Box size", "512"));
         sp.binning = textToDouble(parser.getOption("--bin", "Binning factor", "1"));

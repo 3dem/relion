@@ -29,18 +29,12 @@ void RefinementProgram::_readParams(IOParser &parser)
 {
 	int gen_section = parser.addSection("General refinement options");
 	
-	catFn = parser.getOption("--i", "Input particle set");
+	particlesFn = parser.getOption("--i", "Input particle set");
 	tomoSetFn = parser.getOption("--t", "Tomogram set", "tomograms.star");
 	boxSize = textToInteger(parser.getOption("--b", "Box size", "384"));
-	
-	ref1Fn = parser.getOption("--ref1", "Reference map, half 1");
-	ref2Fn = parser.getOption("--ref2", "Reference map, half 2");
-	maskFn = parser.getOption("--mask", "Reference mask", "");
-	fscFn = parser.getOption("--fsc", "Star file containing the FSC of the reference", "");
-	
-	useFscThresh = !parser.checkOption("--fsc_act", "Use the actual FSC as the frq. weight");
-	fscThreshWidth = textToDouble(parser.getOption("--fsc_thresh_width", "Width of the frq. weight flank", "5"));
-			
+
+	referenceMap.read(parser);
+
 	first_frame = textToInteger(parser.getOption("--f0", "First frame", "0"));
 	last_frame = textToInteger(parser.getOption("--f1", "Last frame", "-1"));
 	
@@ -76,10 +70,10 @@ void RefinementProgram::init()
 
 	tomogramSet = TomogramSet(tomoSetFn);
 	
-	dataSet = ParticleSet::load(catFn, motFn);
+	dataSet = ParticleSet::load(particlesFn, motFn);
 	particles = dataSet->splitByTomogram(tomogramSet);
 		
-	referenceMap = TomoReferenceMap(ref1Fn, ref2Fn, boxSize, maskFn, fscFn, useFscThresh, fscThreshWidth);
+	referenceMap.load(boxSize);
 }
 
 BufferedImage<float> RefinementProgram::computeFrequencyWeights(

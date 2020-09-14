@@ -37,6 +37,8 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 	
+	std::cout << "slope = " << slope << std::endl;
+	
 	BufferedImage<float> img;
 	img.read(imgFn);
 	

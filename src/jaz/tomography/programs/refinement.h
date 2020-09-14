@@ -27,14 +27,12 @@ class RefinementProgram
 			int argc;
 			char** argv;
 			
-			std::string outDir, tomoSetFn, catFn, motFn,
-				ref1Fn, ref2Fn, maskFn, fscFn;
+			std::string outDir, tomoSetFn, particlesFn, motFn;
 			
-			bool diag, useFscThresh, timing;
+			bool diag, timing;
 			
 			int boxSize, num_threads, first_frame, last_frame;
-			
-			double fscThreshWidth;
+
 			
 			
 			ParticleSet* dataSet;

@@ -206,6 +206,8 @@ void Log::readParams(IOParser &parser)
 			}
 		}
 	}
+	
+	std::cout << '\n';
 }
 
 

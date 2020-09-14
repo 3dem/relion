@@ -661,7 +661,7 @@ T Interpolation::linearXY_symmetric_FftwHalf_wrap(
 	T sum  = 0;
 	
 	const int wh = img.xdim;
-	const int w = 2 * (w - 1);
+	const int w = 2 * (wh - 1);
 	const int h = img.ydim;
 	
 	for (int dy = 0; dy < 2; dy++)
@@ -674,7 +674,8 @@ T Interpolation::linearXY_symmetric_FftwHalf_wrap(
 		
 		if (xg >= wh)
 		{
-			xg = 2*wh - xg;
+			xg = 2*wh - xg - 2;
+			yg = (h - yg) % h;
 		}
 		
 		if (yg < 0)
@@ -725,22 +726,23 @@ tComplex<T> Interpolation::linearXY_complex_FftwHalf_wrap(
 	tComplex<T> sum  = 0;
 	
 	const int wh = img.xdim;
-	const int w = 2 * (w - 1);
+	const int w = 2 * (wh - 1);
 	const int h = img.ydim;
-	
+
 	for (int dy = 0; dy < 2; dy++)
 	for (int dx = 0; dx < 2; dx++)
 	{
 		int xg = x0 + dx;
 		int yg = y0 + dy;
-		
+
 		xg = xg % w;
-		
+
 		bool conj;
 		
 		if (xg >= wh)
 		{
-			xg = 2*wh - xg;
+			xg = 2*wh - xg - 2;
+			yg = (h - yg) % h;
 			
 			conj = !conj0;
 		}

@@ -14,7 +14,7 @@ class SubtomoProgram
 		SubtomoProgram(){}
 		
 		
-			std::string outTag, tomoSetFn, catFn, motFn;
+			std::string outTag, tomoSetFn, particlesFn, motFn;
 			
 			int 
 				boxSize, 
@@ -43,6 +43,7 @@ class SubtomoProgram
 				write_divided, 
 				write_normalised;
 		
+		void readParameters(int argc, char *argv[]);
 		void run();	
 		
 		BufferedImage<float> cropAndTaper(

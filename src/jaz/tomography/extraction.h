@@ -20,7 +20,7 @@ class TomoExtraction
 		
 		template <typename T>
 		static void extractFrameAt3D_Fourier(
-                const RawImage<T>& stack, int f, int s, double bin,
+				const RawImage<T>& stack, int f, int s, double bin,
 				const gravis::d4Matrix& projIn,
 				gravis::d3Vector center,
 				RawImage<tComplex<T>>& out,
@@ -31,7 +31,7 @@ class TomoExtraction
 		
 		template <typename T>
 		static void extractAt3D_Fourier(
-                const RawImage<T>& stack, int s, double bin,
+				const RawImage<T>& stack, int s, double bin,
 				const std::vector<gravis::d4Matrix>& projIn,
 				const std::vector<gravis::d3Vector>& trajectory,
 				RawImage<tComplex<T>>& out,
@@ -42,7 +42,7 @@ class TomoExtraction
 		
 		template <typename T>
 		static void extractAt2D_Fourier(
-                const RawImage<T>& stack, int s, double bin,
+				const RawImage<T>& stack, int s, double bin,
 				const std::vector<gravis::d4Matrix>& projIn,
 				const std::vector<gravis::d2Vector>& centers,
 				RawImage<tComplex<T>>& out,
@@ -53,7 +53,7 @@ class TomoExtraction
 		
 		template <typename T>
 		static void extractAt3D_real(
-                const RawImage<T>& stack, int s, double bin,
+				const RawImage<T>& stack, int s, double bin,
 				const std::vector<gravis::d4Matrix>& projIn,
 				gravis::d3Vector center,
 				RawImage<T>& out,
@@ -64,7 +64,7 @@ class TomoExtraction
 		
 		template <typename T>
 		static void extractAt2D_real(
-                const RawImage<T>& stack, int s, double bin,
+				const RawImage<T>& stack, int s, double bin,
 				const std::vector<gravis::d4Matrix>& projIn,
 				const std::vector<gravis::d2Vector>& centers,
 				RawImage<T>& out,
@@ -84,8 +84,9 @@ class TomoExtraction
 		
 		template <typename T>
 		static void cropCircle(
-				RawImage<T>& stack, 
-				float falloff,
+				RawImage<T>& stack,  
+		        double boundary, 
+		        double falloff,
 				int num_threads = 1);
 		
 		/*template <typename T>
@@ -179,7 +180,7 @@ void TomoExtraction::extractAt2D_Fourier(
 	
 	if (circle_crop) 
 	{
-		cropCircle(smallStack, EDGE_FALLOFF, num_threads);
+		cropCircle(smallStack, 0, EDGE_FALLOFF, num_threads);
 	}
 	
 	std::vector<gravis::d2Vector> posInNewImg(fc);
@@ -290,7 +291,7 @@ void TomoExtraction::extractAt2D_real(
 	
 	if (circle_crop) 
 	{
-		cropCircle(smallStack, EDGE_FALLOFF, num_threads);
+		cropCircle(smallStack, 0, EDGE_FALLOFF, num_threads);
 	}
 	
 	std::vector<gravis::d2Vector> posInNewImg(fc);
@@ -380,7 +381,8 @@ void TomoExtraction::extractSquares(
 template <typename T>
 void TomoExtraction::cropCircle(
 		RawImage<T>& stack, 
-		float falloff,
+        double boundary, 
+        double falloff,
 		int num_threads)
 {
 	const int  w = stack.xdim;

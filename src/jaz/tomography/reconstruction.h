@@ -441,15 +441,15 @@ void Reconstruction :: griddingCorrect3D_sinc2(
 			const double d = r / w;
 			const double sinc = sin(PI * d) / (PI * d);
 			const double sinc2 = sinc * sinc;
-			
-			if (sinc2 > eps)
+
+			if (sinc2 < eps || d > 1.0)
 			{
-				out(x,y,z) = dataImg(x,y,z) / sinc2;
+				out(x,y,z) = dataImg(x,y,z) / eps;
 			}
 			else
 			{
-				out(x,y,z) = dataImg(x,y,z) / eps;
-			}			
+				out(x,y,z) = dataImg(x,y,z) / sinc2;
+			}
 		}
 	}
 }
@@ -787,6 +787,7 @@ void Reconstruction :: correct3D_RS(
 	FFT::FourierTransform(dataImgRS, dataFS, FFT::Both);
 	FFT::FourierTransform(psfImgRS, psfFS, FFT::Both);
 	
+	#pragma omp parallel for num_threads(num_threads)
 	for (int z = 0; z < dataFS.zdim; z++)
 	for (int y = 0; y < dataFS.ydim; y++)
 	for (int x = 0; x < dataFS.xdim; x++)
@@ -817,7 +818,7 @@ void Reconstruction :: correctStack(
 	NewStackHelper::inverseFourierTransformStack(dataImgFS, data, center);
 	NewStackHelper::inverseFourierTransformStack(psfImgFS, psf, center);
 		
-	#pragma omp parallel for num_threads(num_threads)			
+	#pragma omp parallel for num_threads(num_threads)
 	for (long int f = 0; f < fc; f++)
 	for (long int y = 0; y < h; y++)
 	for (long int x = 0; x < w; x++)
@@ -908,7 +909,7 @@ void Reconstruction :: correctStack(
 	
 	// divide by ctf in Fourier space
 	
-	#pragma omp parallel for num_threads(num_threads)			
+	#pragma omp parallel for num_threads(num_threads)
 	for (long int f = 0; f < fc;  f++)
 	{
 		const int t = omp_get_thread_num();

@@ -205,17 +205,36 @@ inline void BufferedImage<T>::copyDataAndSizeFrom(const Image<T2>& img)
 {
 	this->xdim = img.data.xdim;
 	this->ydim = img.data.ydim;
-	this->zdim = img.data.zdim;
 	
-	dataVec.resize(this->xdim * this->ydim * this->zdim);
-	RawImage<T>::data = &(dataVec[0]);
-	
-	for (size_t z = 0; z < this->zdim; z++)
-	for (size_t y = 0; y < this->ydim; y++)
-	for (size_t x = 0; x < this->xdim; x++)
+	if (img.data.ndim == 1)
 	{
-		T value = (T)(DIRECT_A3D_ELEM(img(), z, y, x));
-		RawImage<T>::data[(z * this->ydim + y) * this->xdim + x] = value;
+		this->zdim = img.data.zdim;
+		
+		dataVec.resize(this->xdim * this->ydim * this->zdim);
+		RawImage<T>::data = &(dataVec[0]);
+		
+		for (size_t z = 0; z < this->zdim; z++)
+		for (size_t y = 0; y < this->ydim; y++)
+		for (size_t x = 0; x < this->xdim; x++)
+		{
+			T value = (T)(DIRECT_A3D_ELEM(img(), z, y, x));
+			RawImage<T>::data[(z * this->ydim + y) * this->xdim + x] = value;
+		}
+	}
+	else
+	{
+		this->zdim = img.data.ndim;
+		
+		dataVec.resize(this->xdim * this->ydim * this->zdim);
+		RawImage<T>::data = &(dataVec[0]);
+		
+		for (size_t z = 0; z < this->zdim; z++)
+		for (size_t y = 0; y < this->ydim; y++)
+		for (size_t x = 0; x < this->xdim; x++)
+		{
+			T value = (T)(DIRECT_NZYX_ELEM(img(), z, 0, y, x));
+			RawImage<T>::data[(z * this->ydim + y) * this->xdim + x] = value;
+		}
 	}
 }
 
