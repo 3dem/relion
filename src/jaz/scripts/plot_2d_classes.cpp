@@ -164,6 +164,8 @@ int main(int argc, char *argv[])
 		output.getSliceRef(2*m+1).copyFrom(micrograph);
 	}
 	
+	Log::endProgress();
+	
 	output.write(outDir+"class_average_plots.mrc");
 	
 	return 0;
