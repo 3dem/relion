@@ -3,6 +3,7 @@
 #include <src/jaz/image/normalization.h>
 #include <src/jaz/single_particle/obs_model.h>
 #include <src/jaz/single_particle/stack_helper.h>
+#include <src/jaz/single_particle/class_helper.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
 #include <src/jaz/util/image_file_helper.h>
@@ -18,7 +19,7 @@ using namespace gravis;
 int main(int argc, char *argv[])
 {
 	std::string particlesFn, class_averages_filename, classes_filename, micrograph_dir, outDir;
-	int num_threads, num_MG, pad;
+	int num_threads, num_MG, num_best_classes, pad;
 	bool diag;
 
 
@@ -35,7 +36,8 @@ int main(int argc, char *argv[])
 		particlesFn = parser.getOption("--i", "Input STAR file output by align_2d_classes");
 		class_averages_filename = parser.getOption("--ca", "Class averages stack");
 		micrograph_dir = parser.getOption("--mgdir", "Micrographs directory", "");
-		classes_filename = parser.getOption("--classes", "File with a list of 2D classes to consider");
+		classes_filename = parser.getOption("--classes", "File with a list of 2D classes to consider", "");
+		num_best_classes = textToInteger(parser.getOption("--bc", "Number of best 2D classes to consider otherwise", "20"));
 		num_MG = textToInteger(parser.getOption("--mgs", "Number of micrographs to use", "12"));
 		pad = textToInteger(parser.getOption("--pad", "Image padding (pixels)", "20"));
 		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
@@ -71,7 +73,33 @@ int main(int argc, char *argv[])
 	const double radius = midbox - pad;
 	const int num_classes = class_averages.zdim;
 
-	std::vector<int> classes_to_consider = ZIO::readInts(classes_filename);
+	std::vector<int> classes_to_consider;
+	
+	if (classes_filename != "")
+	{
+		classes_to_consider = ZIO::readInts(classes_filename);
+	}
+	else	
+	{
+		const int class_count = ClassHelper::countClasses(particles_table);
+		
+		if (class_count < num_best_classes)
+		{
+			REPORT_ERROR_STR("Cannot consider " << num_best_classes 
+			                 << " 2D classes, only " << class_count << " present");
+		}
+		
+		std::vector<int> particle_count = ClassHelper::getClassSizes(particles_table, class_count);
+		std::vector<int> order = ClassHelper::sortByAscendingFrequency(particle_count);
+		
+		classes_to_consider = std::vector<int>(num_best_classes);
+		
+		for (int i = 0; i < num_best_classes; i++)
+		{
+			classes_to_consider[i] = order[i];
+		}
+	}
+	
 	const int relevant_class_count = classes_to_consider.size();
 
 	std::vector<int> class_to_subset(num_classes, -1);
