@@ -20,7 +20,7 @@ int main(int argc, char *argv[])
 {
 	std::string particlesFn, class_averages_filename, classes_filename, micrograph_dir, outDir;
 	int num_threads, num_MG, num_best_classes, pad;
-	bool diag;
+	bool flip_contrast, diag;
 
 
 	IOParser parser;
@@ -41,6 +41,7 @@ int main(int argc, char *argv[])
 		num_MG = textToInteger(parser.getOption("--mgs", "Number of micrographs to use", "12"));
 		pad = textToInteger(parser.getOption("--pad", "Image padding (pixels)", "20"));
 		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
+		flip_contrast = parser.checkOption("--keep_contrast", "Do not flip the contrast");
 		diag = parser.checkOption("--diag", "Write out diagnostic information");
 		outDir = parser.getOption("--o", "Output directory");
 
@@ -121,6 +122,8 @@ int main(int argc, char *argv[])
 	            particles_by_micrograph[0].getString(EMDL_MICROGRAPH_NAME, 0));
 		
 	BufferedImage<float> output(mg_size.x, mg_size.y, 2 * micrograph_count);
+	
+	const float scale = flip_contrast? -1.f : 1.f;
 
 	
 	Log::beginProgress("Plotting 2D class averages", micrograph_count);
@@ -180,7 +183,7 @@ int main(int argc, char *argv[])
 					
 					if (xp * xp + yp * yp < radius * radius)
 					{
-						micrograph(x,y) = average_value + Interpolation::linearXY_clip(
+						micrograph(x,y) = average_value + scale * Interpolation::linearXY_clip(
 								class_averages.getSliceRef(global_class_id),
 								midbox + xp,
 								midbox + yp);
