@@ -77,6 +77,7 @@ public:
 class Micrograph
 {
 public:
+	// When you add a new field, don't forget to update the copy constructor!
 
 	bool ready;
 	static const RFLOAT NOT_OBSERVED;
@@ -97,7 +98,7 @@ public:
 	Micrograph(const Micrograph& m);
 
 	// Create from a movie or a STAR file
-	Micrograph(FileName filename, FileName fnGain="", RFLOAT binning=1.0);
+	Micrograph(FileName filename, FileName fnGain="", RFLOAT binning=1.0, int eer_upsampling=-1, int eer_grouping=-1);
 
 	~Micrograph();
 
@@ -134,13 +135,17 @@ public:
 	// Fills a pixel mask where defect and hot pixels are true
 	void fillDefectAndHotpixels(MultidimArray<bool> &mask) const;
 
-private:
+	int getEERUpsampling() const;
+	int getEERGrouping() const;
 
+private:
 	int width, height, n_frames;
 	RFLOAT binning;
 	FileName fnGain;
 	FileName fnMovie;
-	
+
+	int eer_upsampling, eer_grouping;
+
 	std::vector<RFLOAT> globalShiftX, globalShiftY;
 
 	// Read micrograph model from a STAR file

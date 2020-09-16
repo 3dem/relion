@@ -45,6 +45,21 @@ int main(int argc, char *argv[])
 			REPORT_ERROR("You cannot use MPI for reverting subtraction.");
 
 		prm.run();
+
+		if (prm.do_ssnr)
+		{
+			MultidimArray<RFLOAT> Maux(prm.sum_S2);
+			MPI_Allreduce(MULTIDIM_ARRAY(prm.sum_S2), MULTIDIM_ARRAY(Maux),
+					MULTIDIM_SIZE(prm.sum_S2), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+			prm.sum_S2 = Maux;
+			MPI_Allreduce(MULTIDIM_ARRAY(prm.sum_N2), MULTIDIM_ARRAY(Maux),
+					MULTIDIM_SIZE(prm.sum_N2), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+			prm.sum_N2 = Maux;
+			MPI_Allreduce(MULTIDIM_ARRAY(prm.sum_count), MULTIDIM_ARRAY(Maux),
+					MULTIDIM_SIZE(prm.sum_count), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+			prm.sum_count=Maux;
+		}
+
 		prm.saveStarFile(rank);
 
 		MPI_Barrier(MPI_COMM_WORLD);
