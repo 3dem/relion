@@ -120,17 +120,17 @@ void SubtomoProgram::run()
 			const int part_id = particles[t][p];
 
 			const int opticsGroup = copy.getOpticsGroup(part_id);
-			const double pixelSize = copy.getBinnedPixelSize(opticsGroup);
+			const double originalPixelSize = copy.getOriginalPixelSize(opticsGroup);
 
 			std::string outData = outTag + "/" + dataSet->getName(part_id) + "_data.mrc";
 			std::string outWeight = outTag + "/" + dataSet->getName(part_id) + "_weights.mrc";
 
 			copy.setImageFileNames(outData, outWeight, part_id);
 			
-			const d3Vector offset = copy.getParticleOffset(part_id);
+			const d3Vector offset_A = copy.getParticleOffset(part_id);
 			const d3Vector coord_0 = copy.getParticleCoord(part_id);
 			
-			const d3Vector coord_1 = coord_0 - offset / pixelSize;
+			const d3Vector coord_1 = coord_0 - offset_A / originalPixelSize;
 			
 			copy.setParticleOffset(part_id, d3Vector(0,0,0));
 			copy.setParticleCoord(part_id, coord_1);
