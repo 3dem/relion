@@ -11,10 +11,10 @@
 
 
 // COARSE DIFF -------------------------
-#define D2C_BLOCK_SIZE_2D 			512
-#define D2C_EULERS_PER_BLOCK_2D 	4
+#define D2C_BLOCK_SIZE_2D 			256
+#define D2C_EULERS_PER_BLOCK_2D 	16
 
-#define D2C_BLOCK_SIZE_REF3D 		128
+#define D2C_BLOCK_SIZE_REF3D 		256
 #define D2C_EULERS_PER_BLOCK_REF3D 	16
 
 #define D2C_BLOCK_SIZE_DATA3D 		64
