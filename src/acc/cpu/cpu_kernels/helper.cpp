@@ -356,17 +356,8 @@ void centerFFT_2D(	int     batch_size,
 			int y = floorf((XFLOAT)pixel/(XFLOAT)xdim);
 			int x = pixel % xdim;				// also = pixel - y*xdim, but this depends on y having been calculated, i.e. serial evaluation
 
-			int yp = y + yshift;
-			if (yp < 0)
-				yp += ydim;
-			else if (yp >= ydim)
-				yp -= ydim;
-
-			int xp = x + xshift;
-			if (xp < 0)
-				xp += xdim;
-			else if (xp >= xdim)
-				xp -= xdim;
+			int yp = (y + yshift + ydim)%ydim;
+			int xp = (x + xshift + xdim)%xdim;
 
 			size_t n_pixel = (size_t)yp*(size_t)xdim + (size_t)xp;
 
@@ -432,23 +423,9 @@ void centerFFT_3D(	int     batch_size,
 			int y = floorf((XFLOAT)xy/(XFLOAT)xdim);
 			int x = xy % xdim;
 
-			int xp = x + xshift;
-			if (xp < 0)
-				xp += xdim;
-			else if (xp >= xdim)
-				xp -= xdim;
-
-			int yp = y + yshift;
-			if (yp < 0)
-				yp += ydim;
-			else if (yp >= ydim)
-				yp -= ydim;
-
-			int zp = z + zshift;
-			if (zp < 0)
-				zp += zdim;
-			else if (zp >= zdim)
-				zp -= zdim;
+			int xp = (x + xshift + xdim)%xdim;
+			int yp = (y + yshift + ydim)%ydim;
+			int zp = (z + zshift + zdim)%zdim;
 
 			size_t n_pixel = (size_t)zp*(size_t)xydim + (size_t)yp*(size_t)xdim
 					+ (size_t)xp;

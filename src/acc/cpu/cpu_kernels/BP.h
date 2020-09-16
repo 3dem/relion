@@ -8,41 +8,6 @@
 
 namespace CpuKernels
 {
-
-// 2019Mar28: Takanori defined CPU_BP_INITIALIZE here to avoid template instantiation
-// problems with CTF_PREMULTIPLIED.
-// The result looks OK; I don't know why this is here in the first place.
-#define CPU_BP_INITIALIZE
-
-#ifndef CPU_BP_INITIALIZE //TODO Clean this up
-template < bool CTF_PREMULTIPLIED >
-	void backproject2D(
-		unsigned long imageCount,
-		int     block_size,
-		XFLOAT *g_img_real,
-		XFLOAT *g_img_imag,
-		XFLOAT *g_trans_x,
-		XFLOAT *g_trans_y,
-		XFLOAT* g_weights,
-		XFLOAT* g_Minvsigma2s,
-		XFLOAT* g_ctfs,
-		unsigned long translation_num,
-		XFLOAT significant_weight,
-		XFLOAT weight_norm,
-		XFLOAT *g_eulers,
-		XFLOAT *g_model_real,
-		XFLOAT *g_model_imag,
-		XFLOAT *g_model_weight,
-		int max_r,
-		int max_r2,
-		XFLOAT padding_factor,
-		unsigned img_x,
-		unsigned img_y,
-		unsigned img_xy,
-		unsigned mdl_x,
-		int mdl_inity,
-		tbb::spin_mutex *mutexes);
-#else
 template < bool CTF_PREMULTIPLIED >
 void backproject2D(
 		unsigned long imageCount,
@@ -75,138 +40,181 @@ void backproject2D(
 
 	int max_r2_out = max_r2 * padding_factor * padding_factor;
 
-	for (unsigned long img=0; img<imageCount; img++) {
-		XFLOAT s_eulers[4];
+	// pre-compute sin and cos for x and y direction
+	XFLOAT sin_x[translation_num][img_x], cos_x[translation_num][img_x];
+	XFLOAT sin_y[translation_num][img_y], cos_y[translation_num][img_y];
 
+	computeSincosLookupTable2D(translation_num, g_trans_x, g_trans_y, 
+								img_x, img_y,
+								&sin_x[0][0], &cos_x[0][0], 
+								&sin_y[0][0], &cos_y[0][0]);
+
+	// Set up some other variables
+	XFLOAT s_eulers[4];
+	
+	XFLOAT weight_norm_inverse = (XFLOAT) 1.0 / weight_norm;
+	
+	XFLOAT xp[img_x], yp[img_x];
+	XFLOAT real[img_x], imag[img_x], Fweight[img_x];
+	
+	for (unsigned long img=0; img<imageCount; img++) {
+
+		// Copy the rotation matrix to local variables
 		s_eulers[0] = g_eulers[img*9+0] * padding_factor;
 		s_eulers[1] = g_eulers[img*9+1] * padding_factor;
 		s_eulers[2] = g_eulers[img*9+3] * padding_factor;
 		s_eulers[3] = g_eulers[img*9+4] * padding_factor;
+		
+		size_t pixel = 0;
+		
+		for(int iy = 0; iy < img_y; iy++) {
+			int y = iy;
+			if (iy > img_y_half) {
+				y = iy - img_y;
+			}
+			
+			int xmax = img_x;
 
-		XFLOAT weight_norm_inverse = (XFLOAT) 1.0 / weight_norm;
-		XFLOAT inv_minsigma_ctf;
-
-		XFLOAT minvsigma2, ctf, img_real, img_imag, Fweight, real, imag, weight;
-
-		int pixel_pass_num(ceilf((float)img_xy/(float)block_size));
-
-		for(int tid=0; tid<block_size; tid++)
-		{
-			for (unsigned pass = 0; pass < pixel_pass_num; pass++)
+			memset(Fweight,0,sizeof(XFLOAT)*img_x);
+			memset(real,   0,sizeof(XFLOAT)*img_x);
+			memset(imag,   0,sizeof(XFLOAT)*img_x);
+			
+			for (unsigned long itrans = 0; itrans < translation_num; itrans++)
 			{
-				unsigned long pixel = (pass * block_size) + tid;
-
-				if (pixel >= img_xy)
+				XFLOAT weight = g_weights[img * translation_num + itrans];
+				
+				if (weight < significant_weight) 
 					continue;
 
-				int x = pixel % img_x;
-				int y = (int)floorf( (float)pixel / (float)img_x);
-
-				if (y > img_y_half)
-				{
-					y -= img_y;
+				XFLOAT trans_cos_y, trans_sin_y;
+				if ( y < 0) {
+					trans_cos_y =  cos_y[itrans][-y];
+					trans_sin_y = -sin_y[itrans][-y];            
+				}
+				else {
+					trans_cos_y = cos_y[itrans][y];
+					trans_sin_y = sin_y[itrans][y];
 				}
 
-				//WAVG
-				minvsigma2 = g_Minvsigma2s[pixel];
-				ctf = g_ctfs[pixel];
-				img_real = g_img_real[pixel];
-				img_imag = g_img_imag[pixel];
-				Fweight = (XFLOAT) 0.0;
-				real = (XFLOAT) 0.0;
-				imag = (XFLOAT) 0.0;
-				if(CTF_PREMULTIPLIED)
-					inv_minsigma_ctf = weight_norm_inverse * minvsigma2;
-				else
-					inv_minsigma_ctf = weight_norm_inverse * ctf * minvsigma2;
-
-				XFLOAT temp_real, temp_imag;
-				for (unsigned long itrans = 0; itrans < translation_num; itrans++)
-				{
-					weight = g_weights[img * translation_num + itrans];
-
-					if (weight >= significant_weight)
-					{
-						weight = weight * inv_minsigma_ctf;
-						if(CTF_PREMULTIPLIED)
-							Fweight += weight * ctf * ctf;
-						else
-							Fweight += weight * ctf;
-
-
-					CpuKernels::translatePixel(x, y, g_trans_x[itrans], g_trans_y[itrans], img_real, img_imag, temp_real, temp_imag);
-
-					real += temp_real * weight;
-					imag += temp_imag * weight;
+				XFLOAT *trans_cos_x = &cos_x[itrans][0];
+				XFLOAT *trans_sin_x = &sin_x[itrans][0];     
+			
+				for(int x=0; x<xmax; x++) {
+					//WAVG
+					XFLOAT minvsigma2 = g_Minvsigma2s[pixel + x];
+					XFLOAT ctf = g_ctfs[pixel + x];
+					XFLOAT my_weight;
+					
+					if(CTF_PREMULTIPLIED) {
+						my_weight = weight * weight_norm_inverse * minvsigma2;
+						Fweight[x] += my_weight  * ctf * ctf;
 					}
+					else {
+						my_weight = weight * weight_norm_inverse * ctf * minvsigma2;
+						Fweight[x] += my_weight  * ctf;
+					}
+					/*
+					CpuKernels::translatePixel(x, y, 
+					 * g_trans_x[itrans], g_trans_y[itrans], 
+					 * img_real, img_imag, temp_real, temp_imag);
+				     */
+					XFLOAT img_real = g_img_real[pixel + x];
+					XFLOAT img_imag = g_img_imag[pixel + x];
+				
+					XFLOAT ss = trans_sin_x[x] * trans_cos_y + trans_cos_x[x] * trans_sin_y;
+					XFLOAT cc = trans_cos_x[x] * trans_cos_y - trans_sin_x[x] * trans_sin_y;
+
+					XFLOAT temp_real = cc * img_real - ss * img_imag;
+					XFLOAT temp_imag = cc * img_imag + ss * img_real;
+
+					real[x] += temp_real * my_weight;
+					imag[x] += temp_imag * my_weight;
+				}  // for x
+			}  // for itrans
+
+			for(int x=0; x<xmax; x++) {	
+				if (Fweight[x] <= (XFLOAT) 0.0)
+					continue;
+				
+				// Get logical coordinates in the 3D map
+				xp[x] = (s_eulers[0] * x + s_eulers[1] * y );
+				yp[x] = (s_eulers[2] * x + s_eulers[3] * y );
+				
+				// Only consider pixels that are projected inside the allowed circle in output coordinates.
+				//     --JZ, Nov. 26th 2018
+				if ( ( xp[x] * xp[x] + yp[x] * yp[x] ) > max_r2_out)
+				{
+					Fweight[x]= (XFLOAT) 0.0;
+					continue;
 				}
 
-				if (Fweight > (XFLOAT) 0.0)
+				// Only asymmetric half is stored
+				if (xp[x] < (XFLOAT) 0.0)
 				{
+					// Get complex conjugated hermitian symmetry pair
+					xp[x] = -xp[x];
+					yp[x] = -yp[x];
+					imag[x] = -imag[x];
+				}
+			}  // for x
+			
+			for(int x=0; x<xmax; x++) {
+				if (Fweight[x] <= (XFLOAT) 0.0)
+					continue;
+				
+				int x0 = floorf(xp[x]);
+				XFLOAT fx = xp[x] - x0;
 
-					// Get logical coordinates in the 3D map
-					XFLOAT xp = (s_eulers[0] * x + s_eulers[1] * y );
-					XFLOAT yp = (s_eulers[2] * x + s_eulers[3] * y );
+				int y0 = floorf(yp[x]);
+				XFLOAT fy = yp[x] - y0;
+				y0 -= mdl_inity;
+				int y1 = y0 + 1;
+				
+				XFLOAT mfx = (XFLOAT) 1.0 - fx;
+				XFLOAT mfy = (XFLOAT) 1.0 - fy;
 
-					// Only consider pixels that are projected inside the allowed circle in output coordinates.
-					//     --JZ, Nov. 26th 2018
-					if ( ( xp * xp + yp * yp ) > max_r2_out)
-						continue;
+				XFLOAT dd00 = mfy * mfx;
+				XFLOAT dd01 = mfy *  fx;
+				XFLOAT dd10 =  fy * mfx;
+				XFLOAT dd11 =  fy *  fx;
 
-					// Only asymmetric half is stored
-					if (xp < 0)
-					{
-						// Get complex conjugated hermitian symmetry pair
-						xp = -xp;
-						yp = -yp;
-						imag = -imag;
-					}
+				size_t idx_tmp;
 
-					int x0 = floorf(xp);
-					XFLOAT fx = xp - x0;
-					int x1 = x0 + 1;
+				// Locking necessary since all threads share the same back projector
+				{
+					idx_tmp = (size_t)y0 * (size_t)mdl_x + (size_t)x0;
 
-					int y0 = floorf(yp);
-					XFLOAT fy = yp - y0;
-					y0 -= mdl_inity;
-					int y1 = y0 + 1;
+					tbb::spin_mutex::scoped_lock lock(mutexes[y0]);
+					g_model_real  [idx_tmp] += dd00 * real[x];
+					g_model_imag  [idx_tmp] += dd00 * imag[x];
+					g_model_weight[idx_tmp] += dd00 * Fweight[x];
 
-					XFLOAT mfx = (XFLOAT) 1.0 - fx;
-					XFLOAT mfy = (XFLOAT) 1.0 - fy;
+					idx_tmp = idx_tmp + 1;  // x1 = x0 + 1
 
-					XFLOAT dd00 = mfy * mfx;
-					XFLOAT dd01 = mfy *  fx;
-					XFLOAT dd10 =  fy * mfx;
-					XFLOAT dd11 =  fy *  fx;
+					g_model_real  [idx_tmp] += dd01 * real[x];
+					g_model_imag  [idx_tmp] += dd01 * imag[x];
+					g_model_weight[idx_tmp] += dd01 * Fweight[x];
+				}  // scoping for first lock
 
-					// Locking necessary since all threads share the same back projector
-					{
-						tbb::spin_mutex::scoped_lock lock(mutexes[y0]);
-						g_model_real  [y0 * mdl_x + x0]+=dd00 * real;
-						g_model_imag  [y0 * mdl_x + x0]+=dd00 * imag;
-						g_model_weight[y0 * mdl_x + x0]+=dd00 * Fweight;
+				{
+					idx_tmp = (size_t)y1 * (size_t)mdl_x + (size_t)x0;
 
-						g_model_real  [y0 * mdl_x + x1]+=dd01 * real;
-						g_model_imag  [y0 * mdl_x + x1]+=dd01 * imag;
-						g_model_weight[y0 * mdl_x + x1]+=dd01 * Fweight;
-					}
+					tbb::spin_mutex::scoped_lock lock(mutexes[y1]);
+					g_model_real  [idx_tmp] += dd10 * real[x];
+					g_model_imag  [idx_tmp] += dd10 * imag[x];
+					g_model_weight[idx_tmp] += dd10 * Fweight[x];
 
-					{
-						tbb::spin_mutex::scoped_lock lock(mutexes[y1]);
-						g_model_real  [y1 * mdl_x + x0]+=dd10 * real;
-						g_model_imag  [y1 * mdl_x + x0]+=dd10 * imag;
-						g_model_weight[y1 * mdl_x + x0]+=dd10 * Fweight;
-
-						g_model_real  [y1 * mdl_x + x1]+=dd11 * real;
-						g_model_imag  [y1 * mdl_x + x1]+=dd11 * imag;
-						g_model_weight[y1 * mdl_x + x1]+=dd11 * Fweight;
-					}
-				}  // Fweight > (RFLOAT) 0.0
-			} // for pass
-		}  // for tid
-	} // img
+					idx_tmp = idx_tmp + 1;  // x1 = x0 + 1
+					g_model_real  [idx_tmp] += dd11 * real[x];
+					g_model_imag  [idx_tmp] += dd11 * imag[x];
+					g_model_weight[idx_tmp] += dd11 * Fweight[x];
+				}  // scoping for second lock
+			}  // for x
+			
+			pixel += (size_t)img_x;
+		} // for y
+	} // for img
 }
-#endif // CPU_BP_INITIALIZE
 
 template < bool DATA3D, bool CTF_PREMULTIPLIED >
 void backproject3D(
@@ -244,9 +252,16 @@ void backproject3D(
 	int img_z_half = img_z / 2;
 
 	int max_r2_vol = max_r2 * padding_factor * padding_factor;
+	
+	// Set up some variables
+	XFLOAT s_eulers[9];
+	
+	//   We collect block_size number of values before storing the results to
+	//   help vectorization and control memory accesses
+	XFLOAT real[block_size], imag[block_size], Fweight[block_size];
+	XFLOAT xp[block_size], yp[block_size], zp[block_size];
 
 	for (unsigned long img=0; img<imageCount; img++) {
-		XFLOAT s_eulers[9];
 
 		 for (int i = 0; i < 9; i++)
 			 s_eulers[i] = g_eulers[img*9+i];
@@ -258,11 +273,6 @@ void backproject3D(
 			pixel_pass_num = (ceilf((float)img_xyz/(float)block_size));
 		else
 			pixel_pass_num = (ceilf((float)img_xyz/(float)block_size));
-
-		// We collect block_size number of values before storing the results to
-		// help vectorization and control memory accesses
-		XFLOAT real[block_size], imag[block_size], Fweight[block_size];
-		XFLOAT xp[block_size], yp[block_size], zp[block_size];
 
 		for (unsigned pass = 0; pass < pixel_pass_num; pass++)
 		{
@@ -486,37 +496,6 @@ void backproject3D(
 // translation index. Since sin(a+B) = sin(A) * cos(B) + cos(A) * sin(B), and
 // cos(A+B) = cos(A) * cos(B) - sin(A) * sin(B), we can use lookup table to
 // compute sin(x*tx + y*ty) and cos(x*tx + y*ty).
-#ifndef CPU_BP_INITIALIZE //TODO Clean this up
-template < bool CTF_PREMULTIPLIED >
-void backprojectRef3D(
-		unsigned long imageCount,
-		XFLOAT *g_img_real,
-		XFLOAT *g_img_imag,
-		XFLOAT *g_trans_x,
-		XFLOAT *g_trans_y,
-		XFLOAT* g_weights,
-		XFLOAT* g_Minvsigma2s,
-		XFLOAT* g_ctfs,
-		unsigned long trans_num,
-		XFLOAT significant_weight,
-		XFLOAT weight_norm,
-		XFLOAT *g_eulers,
-		XFLOAT *g_model_real,
-		XFLOAT *g_model_imag,
-		XFLOAT *g_model_weight,
-		int     max_r,
-		int     max_r2,
-		XFLOAT   padding_factor,
-		unsigned img_x,
-		unsigned img_y,
-		unsigned img_z,
-		size_t   img_xyz,
-		unsigned mdl_x,
-		unsigned mdl_y,
-		int      mdl_inity,
-		int      mdl_initz,
-		tbb::spin_mutex *mutexes);
-#else
 template < bool CTF_PREMULTIPLIED >
 void backprojectRef3D(
 		unsigned long imageCount,
@@ -553,23 +532,27 @@ void backprojectRef3D(
 
 	int max_r2_vol = max_r2 * padding_factor * padding_factor;
 
+	// Set up the sin and cos lookup tables
+	XFLOAT sin_x[trans_num][img_x], cos_x[trans_num][img_x];
+	XFLOAT sin_y[trans_num][img_y], cos_y[trans_num][img_y];
+
+	CpuKernels::computeSincosLookupTable2D(trans_num, g_trans_x, g_trans_y, img_x, img_y,
+							   &sin_x[0][0], &cos_x[0][0],
+							   &sin_y[0][0], &cos_y[0][0]);
+	
+	// Set up some other variables
+	XFLOAT s_eulers[9];
+	
+	XFLOAT weight_norm_inverse = (XFLOAT) 1.0 / weight_norm;
+
+	XFLOAT xp[img_x], yp[img_x], zp[img_x];
+	XFLOAT real[img_x], imag[img_x], Fweight[img_x];
+
+		
 	for (unsigned long img=0; img<imageCount; img++) {
-		XFLOAT s_eulers[9];
 
 		for(int i = 0; i < 9; i++)
 			s_eulers[i] = g_eulers[img*9+i];
-
-		XFLOAT sin_x[trans_num][img_x], cos_x[trans_num][img_x];
-		XFLOAT sin_y[trans_num][img_y], cos_y[trans_num][img_y];
-
-		CpuKernels::computeSincosLookupTable2D(trans_num, g_trans_x, g_trans_y, img_x, img_y,
-								   &sin_x[0][0], &cos_x[0][0],
-								   &sin_y[0][0], &cos_y[0][0]);
-
-		XFLOAT weight_norm_inverse = (XFLOAT) 1.0 / weight_norm;
-
-		XFLOAT xp[img_x], yp[img_x], zp[img_x];
-		XFLOAT real[img_x], imag[img_x], Fweight[img_x];
 
 		size_t mdl_x_mdl_y = (size_t)mdl_x * (size_t)mdl_y;
 		size_t pixel = 0;
@@ -580,7 +563,7 @@ void backprojectRef3D(
 			}
 
 			int y2 = y * y;
-			int xmax = sqrt((XFLOAT)(img_y_half_2 - y2));
+			int xmax = sqrt((XFLOAT)(img_y_half_2 - y2));  // minimize locking if possible
 
 			memset(Fweight,0,sizeof(XFLOAT)*img_x);
 			memset(real,   0,sizeof(XFLOAT)*img_x);
@@ -643,7 +626,7 @@ void backprojectRef3D(
 			}
 
 			#pragma omp simd
-			for(int x=0; x<img_x; x++) {
+			for(int x=0; x<xmax; x++) {
 				// Get logical coordinates in the 3D map
 				xp[x] = (s_eulers[0] * x + s_eulers[1] * y ) * padding_factor;
 				yp[x] = (s_eulers[3] * x + s_eulers[4] * y ) * padding_factor;
@@ -667,7 +650,7 @@ void backprojectRef3D(
 				}
 			}  // for x direction
 
-			for(int x=0; x<img_x; x++){
+			for(int x=0; x<xmax; x++){
 				if (Fweight[x] <= (XFLOAT) 0.0)
 					continue;
 
@@ -765,7 +748,6 @@ void backprojectRef3D(
 		} // for y direction
 	} // for img
 }
-#endif
 
 template < bool DATA3D, bool CTF_PREMULTIPLIED >
 void backprojectSGD(
@@ -804,28 +786,31 @@ void backprojectSGD(
 	int img_z_half = img_z / 2;
 
 	int max_r2_vol = max_r2 * padding_factor * padding_factor;
+	
+	// Set up some variables
+	XFLOAT s_eulers[9];
 
+	XFLOAT weight_norm_inverse = (XFLOAT) 1.0 / weight_norm;
+
+	//   TODO - does this really help with the call to the projector in here?
+	//
+	//   We collect block_size number of values before storing the results to
+	//   help vectorization and control memory accesses
+	XFLOAT real[block_size], imag[block_size], Fweight[block_size];
+	XFLOAT ref_real[block_size], ref_imag[block_size];
+	XFLOAT xp[block_size], yp[block_size], zp[block_size];
+		
 	for (unsigned long img=0; img<imageCount; img++) {
-		XFLOAT s_eulers[9];
 
 		for (int i = 0; i < 9; i++)
 			s_eulers[i] = g_eulers[img*9+i];
 
-		XFLOAT weight_norm_inverse = (XFLOAT) 1.0 / weight_norm;
 
 		int pixel_pass_num(0);
 		if(DATA3D)
 			pixel_pass_num = (ceilf((float)img_xyz/(float)block_size));
 		else
 			pixel_pass_num = (ceilf((float)img_xyz/(float)block_size));
-
-		// TODO - does this really help with the call to the projector in here?
-		//
-		// We collect block_size number of values before storing the results to
-		// help vectorization and control memory accesses
-		XFLOAT real[block_size], imag[block_size], Fweight[block_size];
-		XFLOAT ref_real[block_size], ref_imag[block_size];
-		XFLOAT xp[block_size], yp[block_size], zp[block_size];
 
 		for (unsigned pass = 0; pass < pixel_pass_num; pass++)   {
 			memset(Fweight,0,sizeof(XFLOAT)*block_size);

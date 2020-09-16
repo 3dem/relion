@@ -48,6 +48,7 @@
 #include <cuda_profiler_api.h>
 #endif
 #ifdef ALTCPU
+	#include <atomic>
 	#include <tbb/tbb.h>
 	#include <tbb/parallel_for.h>
 	#include <tbb/task_scheduler_init.h>
@@ -3503,11 +3504,11 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
 		// particles in parallel.  Like the GPU implementation, the lower-
 		// level parallelism is implemented by compiler vectorization
 		// (roughly equivalent to GPU "threads").
-		int tCount = 0;
+		std::atomic<int> tCount(0);
 
 		// process all passed particles in parallel
 		//for(unsigned long i=my_first_part_id; i<=my_last_part_id; i++) {
-		tbb::parallel_for(my_first_part_id, my_last_part_id+1, [&](int i) {
+		tbb::parallel_for(my_first_part_id, my_last_part_id+1, [&](long int i) {
 			CpuOptimiserType::reference ref = tbbCpuOptimiser.local();
 			MlOptimiserCpu *cpuOptimiser = (MlOptimiserCpu *)ref;
 			if(cpuOptimiser == NULL) {
@@ -3515,8 +3516,7 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
 				cpuOptimiser->resetData();
 				ref = cpuOptimiser;
 
-				cpuOptimiser->thread_id = tCount;
-				tCount++;  // Race condition!
+				cpuOptimiser->thread_id = tCount.fetch_add(1);
 			}  // cpuOptimiser == NULL
 
 			cpuOptimiser->expectationOneParticle(i, cpuOptimiser->thread_id);
