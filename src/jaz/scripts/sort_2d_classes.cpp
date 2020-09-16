@@ -112,10 +112,11 @@ int main(int argc, char *argv[])
 		const int j = order[class_count - i - 1];
 		
 		output_stack.getSliceRef(i).copyFrom(class_averages.getSliceRef(j));
-		class_size_file << i << ' ' << particle_count[j] << '\n';
+		class_size_file << i << " (old " << j << ") " << particle_count[j] << '\n';
 		
 		total += particle_count[j];
 	}
+	
 	class_size_file << "\ntotal: " << total << '\n';
 	
 	output_stack.write(outDir+"sorted_classes.mrc");

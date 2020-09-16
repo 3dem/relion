@@ -130,7 +130,7 @@ void SubtomoProgram::run()
 			const d3Vector offset = copy.getParticleOffset(part_id);
 			const d3Vector coord_0 = copy.getParticleCoord(part_id);
 			
-			const d3Vector coord_1 = (coord_0 - offset / pixelSize) / binning;
+			const d3Vector coord_1 = coord_0 - offset / pixelSize;
 			
 			copy.setParticleOffset(part_id, d3Vector(0,0,0));
 			copy.setParticleCoord(part_id, coord_1);
