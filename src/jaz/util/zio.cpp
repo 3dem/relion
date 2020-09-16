@@ -9,6 +9,11 @@ std::vector<double> ZIO::readDoubles(std::string fn)
 	std::ifstream ifs(fn);	
 	std::string line;
 	
+	if (!ifs)
+	{
+		REPORT_ERROR("ZIO::readDoubles: unable to read "+fn);
+	}
+	
 	out.reserve(128);
 	
 	while (std::getline(ifs, line))
@@ -29,6 +34,12 @@ std::vector<int> ZIO::readInts(std::string fn)
 {
 	std::vector<int> out(0);
 	std::ifstream ifs(fn);
+	
+	if (!ifs)
+	{
+		REPORT_ERROR("ZIO::readInts: unable to read "+fn);
+	}
+	
 	std::string line;
 
 	out.reserve(128);

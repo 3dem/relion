@@ -186,9 +186,8 @@ d3Vector ParticleSet::getPosition(long int particle_id) const
 	const int og = getOpticsGroup(particle_id);
 	
 	const double originalPixelSize = optTable.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, og);
-	const double binnedPixelSize = optTable.getDouble(EMDL_IMAGE_PIXEL_SIZE, og);
 	
-	d3Vector out = (binnedPixelSize * pos - off) / originalPixelSize;
+	d3Vector out = pos - off / originalPixelSize;
 	
 	out.x += 1.0;
 	out.y += 1.0;

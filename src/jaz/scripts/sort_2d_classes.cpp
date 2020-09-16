@@ -2,6 +2,7 @@
 #include <src/metadata_table.h>
 #include <src/jaz/image/buffered_image.h>
 #include <src/jaz/single_particle/obs_model.h>
+#include <src/jaz/single_particle/class_helper.h>
 #include <src/args.h>
 #include <src/metadata_table.h>
 #include <src/ctf.h>
@@ -61,39 +62,10 @@ int main(int argc, char *argv[])
 	MetaDataTable particles_table;
 	ObservationModel::loadSafely(particles_filename, obs_model, particles_table);
 
-	int max_class = -1;
-
-	for (long int p = 0; p < particles_table.numberOfObjects(); p++)
-	{
-		const int class_id = particles_table.getIntMinusOne(EMDL_PARTICLE_CLASS, p);
-
-		if (class_id > max_class) max_class = class_id;
-	}
-
-	const int class_count = max_class + 1;
-
-	if (class_count == 1)
-	{
-		Log::warn("1 class found");
-	}
-	else
-	{
-		Log::print(ZIO::itoa(class_count)+" classes found");
-	}
-	
-	
-	std::vector<int> particle_count(class_count, 0);
-
-	for (long int p = 0; p < particles_table.numberOfObjects(); p++)
-	{
-		const int class_id = particles_table.getIntMinusOne(
-					EMDL_PARTICLE_CLASS, p);
-
-		particle_count[class_id]++;
-	}
-	
-	std::vector<int> order = IndexSort<int>::sortIndices(particle_count);
-	
+	const int class_count = ClassHelper::countClasses(particles_table);
+	std::vector<int> particle_count = ClassHelper::getClassSizes(particles_table, class_count);
+	std::vector<int> order = ClassHelper::sortByAscendingFrequency(particle_count);
+	        
 	BufferedImage<float> class_averages;
 	class_averages.read(class_averages_filename);
 	
@@ -109,7 +81,7 @@ int main(int argc, char *argv[])
 	
 	for (int i = 0; i < class_count; i++)
 	{
-		const int j = order[class_count - i - 1];
+		const int j = order[i];
 		
 		output_stack.getSliceRef(i).copyFrom(class_averages.getSliceRef(j));
 		class_size_file << i << " (old " << j << ") " << particle_count[j] << '\n';
