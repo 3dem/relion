@@ -36,7 +36,6 @@ void SubtomoProgram::readParameters(int argc, char *argv[])
 		cropSize = textToInteger(parser.getOption("--crop", "Output box size", "-1"));
 		binning = textToDouble(parser.getOption("--bin", "Binning factor", "1"));
 		write_multiplicity = parser.checkOption("--multi", "Write out multiplicity volumes");
-		do_rotate = parser.checkOption("--rot", "Rotate the particles according to current angles");
 		SNR = textToDouble(parser.getOption("--SNR", "Assumed signal-to-noise ratio (negative means use a heuristic)", "-1"));
 		
 		do_cone_weight = parser.checkOption("--cone_weight", "Weight down a double cone along Z");		
@@ -217,14 +216,7 @@ void SubtomoProgram::run()
 			
 			for (int f = 0; f < fc; f++)
 			{
-				if (do_rotate)
-				{
-					projPart[f] = projCut[f] * dataSet->getMatrix4x4(part_id, s3D, s3D, s3D);
-				}
-				else
-				{
-					projPart[f] = projCut[f];
-				}
+				projPart[f] = projCut[f] * d4Matrix(dataSet->getSubtomogramMatrix(part_id));
 				
 				if (do_ctf)
 				{

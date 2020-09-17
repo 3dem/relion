@@ -26,9 +26,14 @@ class ParticleSet
 		
 		std::vector<std::vector<int>> splitByTomogram(const TomogramSet& tomogramSet) const;
 		int getTotalParticleNumber() const;
+		
 		gravis::d3Vector getPosition(long int particle_id) const;
+		
+		gravis::d3Matrix getSubtomogramMatrix(long int particle_id) const;
+		gravis::d3Matrix getParticleMatrix(long int particle_id) const;
 		gravis::d3Matrix getMatrix3x3(long int particle_id) const;
-		gravis::d4Matrix getMatrix4x4(long int particle_id, double w, double h, double d) const;	
+		gravis::d4Matrix getMatrix4x4(long int particle_id, double w, double h, double d) const;
+		
 		std::string getName(long int particle_id) const;
 		int getHalfSet(long int particle_id) const;
 		
@@ -54,6 +59,8 @@ class ParticleSet
 
 		std::vector<gravis::d3Vector> getTrajectoryInPixels(long int particle_id, int fc, double pixelSize) const;
 		void checkTrajectoryLengths(int p0, int np, int fc, std::string caller) const;
+		
+		static gravis::d3Matrix convert(const Matrix2D<double>& A);
 };
 
 #endif
