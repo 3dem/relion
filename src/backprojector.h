@@ -36,6 +36,17 @@
 #include "src/symmetries.h"
 #include "src/jaz/complex_io.h"
 
+#ifdef CUDA
+#include <cufft.h>
+
+extern void run_axpy(Complex *dFconv, RFLOAT *dFweight, double *dFnewweight, int sz);
+
+extern void run_updateFnewweight(double *dFnewweight, Complex *dFconv, int xsz, int ysz, int zsz, int max_r2);
+
+extern void run_multiplyBlobKernel(RFLOAT *dMconv, int xsize, int ysize, int zsize, 
+				RFLOAT *dtab_ftblob, int nSamples, int ori_size, RFLOAT padding_factor, bool do_mask);
+#endif
+
 class BackProjector: public Projector
 {
 public:
@@ -311,6 +322,7 @@ public:
 	                 RFLOAT normalise = 1.,
 	                 int minres_map = -1,
 	                 bool printTimes= false,
+	                 bool do_gpu= false,
 	                 Image<RFLOAT>* weight_out = 0);
 
 	/*	Enforce Hermitian symmetry, apply helical symmetry as well as point-group symmetry
@@ -336,11 +348,18 @@ public:
 	 * Note the convolution is done on the complex array inside the transformer object!!
 	 */
 	void convoluteBlobRealSpace(FourierTransformer &transformer, bool do_mask = false);
+#ifdef CUDA	
+	void convoluteBlobRealSpace_gpu(AccPtr<Complex> &dFconv, cufftHandle fplan, cufftHandle iplan, bool do_mask);
+#endif
 
 	/* Calculate the inverse FFT of Fin and windows the result to ori_size
 	 * Also pass the transformer, to prevent making and clearing a new one before clearing the one in reconstruct()
 	 */
+#ifdef CUDA	
+	void windowToOridimRealSpace(FourierTransformer &transformer, AccPtr<Complex> &dFconv, MultidimArray<RFLOAT> &Mout, bool do_gpu, bool printTimes = false);
+#else
 	void windowToOridimRealSpace(FourierTransformer &transformer, MultidimArray<RFLOAT> &Mout, bool printTimes = false);
+#endif
 
 	/*
 	 * The same, but without the spherical cropping and thus invertible

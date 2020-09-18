@@ -561,7 +561,10 @@ void getFourierTransformsAndCtfs(long int part_id,
 			XFLOAT radius_p = radius + cosine_width;
 
 			// For zero-masking, we need the background-value
-			XFLOAT bg_val(0.);
+			AccPtr<XFLOAT> bg_val = ptrFactory.make<XFLOAT>(2);
+			bg_val.allAlloc();
+			bg_val.hostInit(0);
+			bg_val.accInit(0);
 			if(baseMLO->do_zero_mask)
 			{
 				AccPtr<XFLOAT> softMaskSum    = ptrFactory.make<XFLOAT>((size_t)SOFTMASK_BLOCK_SIZE, 0);
@@ -581,12 +584,10 @@ void getFourierTransformsAndCtfs(long int part_id,
 						softMaskSum_bg);
 
 				LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
-				softMaskSum.streamSync();
 
 				// Finalize the background value
-				bg_val = (RFLOAT) AccUtilities::getSumOnDevice<XFLOAT>(softMaskSum_bg) /
-						 (RFLOAT) AccUtilities::getSumOnDevice<XFLOAT>(softMaskSum);
-				softMaskSum.streamSync();
+				AccUtilities::getSumOnDeviceSingleBlock<XFLOAT>(softMaskSum_bg, &(~bg_val)[0]);
+				AccUtilities::getSumOnDeviceSingleBlock<XFLOAT>(softMaskSum, &(~bg_val)[1]);
 			}
 
 			//avoid kernel-calls warning about null-pointer for RandomImage
@@ -1956,6 +1957,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 				XFLOAT weights_max = -std::numeric_limits<XFLOAT>::max();
+				AccPtr<XFLOAT> w_max = ptrFactory.make<XFLOAT>(sp.iclass_max - sp.iclass_min + 1);
+
+				w_max.accAlloc();
+				w_max.deviceInit(weights_max);
 
 				pdf_offset.streamSync();
 
@@ -1997,12 +2002,15 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 								FPCMasks[img_id][exp_iclass].jobNum,
 								accMLO->classStreams[exp_iclass]);
 
-						XFLOAT m = AccUtilities::getMaxOnDevice<XFLOAT>(thisClassPassWeights.weights);
-
-						if (m > weights_max)
-							weights_max = m;
+						AccUtilities::getMaxOnDeviceSingleBlock<XFLOAT>(thisClassPassWeights.weights, &(~w_max)[exp_iclass-sp.iclass_min]);
 					}
 				}
+
+				for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
+				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
+
+				weights_max = AccUtilities::getMaxOnDevice<XFLOAT>(w_max);
 
 				for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++) // TODO could use classStreams
 				{
@@ -2662,14 +2670,22 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
 		AccPtr<XFLOAT> sorted_weights = ptrFactory.make<XFLOAT>((size_t)(ProjectionData[img_id].orientationNumAllClasses * translation_num));
 		sorted_weights.allAlloc();
-		std::vector<AccPtr<XFLOAT> > eulers(baseMLO->mymodel.nr_classes, ptrFactory.make<XFLOAT>());
+		AccPtr<XFLOAT> eulers = ptrFactory.make<XFLOAT>();
+		std::vector<int> eulers_offsets(baseMLO->mymodel.nr_classes); // offsets for eulers
+		int         eulers_num = 0;
 
 		unsigned long classPos = 0;
 
-		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
-		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
+		for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++){
+			if((baseMLO->mymodel.pdf_class[iclass] == 0.) || (ProjectionData[img_id].class_entries[iclass] == 0))
+				continue;
 
+		    eulers_offsets[iclass] = eulers_num*9;
+			eulers_num += ProjectionData[img_id].orientation_num[iclass];	
+		}
+		eulers.setSize(eulers_num * 9);
+		eulers.allAlloc();
+		
 		for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
 		{
 			if((baseMLO->mymodel.pdf_class[iclass] == 0.) || (ProjectionData[img_id].class_entries[iclass] == 0))
@@ -2708,10 +2724,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				MBR = baseMLO->mymodel.orient_bodies[ibody];
 			}
 
-			eulers[iclass].setSize(orientation_num * 9);
-			eulers[iclass].setStream(accMLO->classStreams[iclass]);
-			eulers[iclass].hostAlloc();
-
 			CTIC(accMLO->timer,"generateEulerMatricesProjector");
 
 			Matrix2D<RFLOAT> mag;
@@ -2726,13 +2738,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			generateEulerMatrices(
 					thisClassProjectionData,
-					&eulers[iclass][0],
+					&eulers[eulers_offsets[iclass]],
 					true,
 					MBL,
 					MBR);
-
-			eulers[iclass].deviceAlloc();
-			eulers[iclass].cpToDevice();
 
 			CTOC(accMLO->timer,"generateEulerMatricesProjector");
 
@@ -2753,6 +2762,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			CTOC(accMLO->timer,"pre_wavg_map");
 		}
 		sorted_weights.cpToDevice();
+		eulers.cpToDevice();
 
 		// These syncs are necessary (for multiple ranks on the same GPU), and (assumed) low-cost.
 		for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
@@ -2784,7 +2794,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			runWavgKernel(
 					projKernel,
-					~eulers[iclass],
+					&(~eulers)[eulers_offsets[iclass]], //~eulers[iclass],
 					&(~Fimgs)[re_offset], //~Fimgs_real,
 					&(~Fimgs)[im_offset], //~Fimgs_imag,
 					&(~trans_xyz)[trans_x_offset], //~trans_x,
@@ -2832,7 +2842,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				translation_num,
 				(XFLOAT) op.significant_weight[img_id],
 				(XFLOAT) op.sum_weight[img_id],
-				~eulers[iclass],
+				&(~eulers)[eulers_offsets[iclass]], //~eulers[iclass],
 				op.local_Minvsigma2[img_id].xdim,
 				op.local_Minvsigma2[img_id].ydim,
 				op.local_Minvsigma2[img_id].zdim,

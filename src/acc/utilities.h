@@ -150,6 +150,19 @@ static T getSumOnDevice(AccPtr<T> &ptr)
 }
 
 template <typename T>
+static void getSumOnDeviceSingleBlock(AccPtr<T> &ptr, T *sum)
+{
+#ifdef CUDA
+	CudaKernels::getSumOnDeviceSingleBlock<T>(ptr, sum);
+#else
+	size_t size = ptr.getSize();
+	*sum = 0;
+	for (size_t i=0; i<size; i++)
+		*sum += ptr[i];
+#endif
+}
+
+template <typename T>
 static T getMinOnDevice(AccPtr<T> &ptr)
 {
 #ifdef CUDA
@@ -178,6 +191,16 @@ static T getMaxOnDevice(AccPtr<T> &ptr)
 		printf("DEBUG_ERROR: getMaxOnDevice called with null device pointer.\n");
 #endif
 	return CpuKernels::getMax<T>(ptr(), ptr.getSize());
+#endif
+}
+
+template <typename T>
+static void getMaxOnDeviceSingleBlock(AccPtr<T> &ptr, T* max_val)
+{
+#ifdef CUDA
+	CudaKernels::getMaxOnDeviceSingleBlock<T>(ptr, max_val);
+#else
+	*max_val = CpuKernels::getMax<T>(ptr(), ptr.getSize());
 #endif
 }
 
@@ -311,7 +334,7 @@ static void cosineFilter(
 		XFLOAT radius,
 		XFLOAT radius_p,
 		XFLOAT cosine_width,
-		XFLOAT sum_bg_total);
+		AccPtr<XFLOAT> &sum_bg);
 
 template<bool DATA3D>
 void powerClass(int		in_gridSize,

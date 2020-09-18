@@ -364,7 +364,6 @@ void normalizeAndTransformImage(	AccPtr<XFLOAT> &img_in,
 					);
 			accMLO->transformer1.reals.streamSync();
 			accMLO->transformer1.forward();
-			accMLO->transformer1.fouriers.streamSync();
 
 			size_t FMultiBsize = ( (int) ceilf(( float)accMLO->transformer1.fouriers.getSize()*2/(float)BLOCK_SIZE));
 			AccUtilities::multiply<XFLOAT>(FMultiBsize, BLOCK_SIZE, accMLO->transformer1.fouriers.getStream(),
@@ -375,14 +374,13 @@ void normalizeAndTransformImage(	AccPtr<XFLOAT> &img_in,
 
 			AccPtr<ACCCOMPLEX> d_Fimg = img_in.make<ACCCOMPLEX>(xSize * ySize * zSize);
 			d_Fimg.allAlloc();
-			accMLO->transformer1.fouriers.streamSync();
+			d_Fimg.setStream(accMLO->transformer1.fouriers.getStream());
 			windowFourierTransform2(
 					accMLO->transformer1.fouriers,
 					d_Fimg,
 					accMLO->transformer1.xFSize,accMLO->transformer1.yFSize, accMLO->transformer1.zFSize, //Input dimensions
 					xSize, ySize, zSize  //Output dimensions
 					);
-			accMLO->transformer1.fouriers.streamSync();
 
 			d_Fimg.cpToHost();
 			d_Fimg.streamSync();
@@ -446,7 +444,7 @@ static void cosineFilter(
 		XFLOAT radius,
 		XFLOAT radius_p,
 		XFLOAT cosine_width,
-		XFLOAT sum_bg_total)
+		AccPtr<XFLOAT> &sum_bg)
 {
 	int block_dim = 128; //TODO: set balanced (hardware-dep?)
 #ifdef CUDA
@@ -464,7 +462,7 @@ static void cosineFilter(
 			radius,
 			radius_p,
 			cosine_width,
-			sum_bg_total);
+			~sum_bg);
 #else
 	CpuKernels::cosineFilter(
 			block_dim,
@@ -482,7 +480,7 @@ static void cosineFilter(
 			radius,
 			radius_p,
 			cosine_width,
-			sum_bg_total);
+			(sum_bg[0] == 0.)?0.:sum_bg[0]/sum_bg[1]);
 #endif
 }
 
@@ -719,5 +717,43 @@ void run_CenterFFTbySign(Complex *img_in, int xSize, int ySize, int zSize, cudaS
 #endif
 }
 
+void run_axpy(Complex *dFconv, RFLOAT *dFweight, double *dFnewweight, int sz)
+{
+#ifdef CUDA
+	dim3 bs(512);
+	dim3 gs(ceil(sz/(float)bs.x));
+	if(sizeof(RFLOAT) == sizeof(double))
+		cuda_kernel_axpy<<<gs,bs>>>((double2*)dFconv, dFweight, dFnewweight, sz);
+	else
+		cuda_kernel_axpy<<<gs,bs>>>((float2*)dFconv, dFweight, dFnewweight, sz);
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
+#endif
+}
+
+void run_updateFnewweight(double *dFnewweight, Complex *dFconv, int xsz, int ysz, int zsz, int max_r2)
+{
+#ifdef CUDA
+	dim3 bs(32,4,2);
+	dim3 gs(ceil(xsz/(float)bs.x), ceil(ysz/(float)bs.y), ceil(zsz/(float)bs.z));
+	if(zsz == 1) gs.z = bs.z = 1;
+	if(sizeof(RFLOAT) == sizeof(double))
+		cuda_kernel_updateFnewweight<<<gs,bs>>>((double2*)dFconv, dFnewweight, xsz, ysz, zsz, max_r2);
+	else
+		cuda_kernel_updateFnewweight<<<gs,bs>>>((float2*)dFconv, dFnewweight, xsz, ysz, zsz, max_r2);
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
+#endif
+}
+
+void run_multiplyBlobKernel(RFLOAT *dMconv, int xsize, int ysize, int zsize, 
+				RFLOAT *dtab_ftblob, int nSamples, int ori_size, RFLOAT padding_factor, bool do_mask){
+#ifdef CUDA
+	dim3 bs(16, 16, 2);
+	dim3 gs(ceil(xsize/(float)bs.x), ceil(ysize/(float)bs.y), ceil(zsize/(float)bs.z));
+	if(zsize == 1) gs.z = bs.z = 1;
+	cuda_kernel_multiplyBlobKernel<<<gs, bs>>>
+			(dMconv, xsize, ysize, zsize, dtab_ftblob, nSamples, ori_size, padding_factor, do_mask);
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
+#endif				
+}
 #endif //ACC_UTILITIES_H_
 

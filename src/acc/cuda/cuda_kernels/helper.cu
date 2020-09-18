@@ -437,7 +437,7 @@ __global__ void cuda_kernel_cosineFilter(	XFLOAT *vol,
 											XFLOAT radius,
 											XFLOAT radius_p,
 											XFLOAT cosine_width,
-											XFLOAT bg_value)
+											XFLOAT *bg_value)
 {
 
 	int tid = threadIdx.x;
@@ -451,7 +451,7 @@ __global__ void cuda_kernel_cosineFilter(	XFLOAT *vol,
 	long int texel_pass_num = ceilfracf(vol_size,SOFTMASK_BLOCK_SIZE*gridDim.x);
 	int texel = bid*SOFTMASK_BLOCK_SIZE*texel_pass_num + tid;
 
-	defVal = bg_value;
+	defVal = (bg_value[0] == 0.)? 0. : bg_value[0]/bg_value[1];
 	for (int pass = 0; pass < texel_pass_num; pass++, texel+=SOFTMASK_BLOCK_SIZE) // loop the available warps enough to complete all translations for this orientation
 	{
 		if(texel<vol_size)
@@ -1013,3 +1013,30 @@ __global__ void cuda_kernel_updatePowerSpectrum(RFLOAT *dcounter, RFLOAT *dpower
 			dpower_spectrum[idx] /= dcounter[idx];
 	}
 }
+
+__global__ void cuda_kernel_multiplyBlobKernel(RFLOAT *dMconv, int xsize, int ysize, int zsize, 
+				RFLOAT *dtab_ftblob, int nSamples, int ori_size, RFLOAT padding_factor, bool do_mask){
+	int idx = blockIdx.x*blockDim.x + threadIdx.x;
+	int idy = blockIdx.y*blockDim.y + threadIdx.y;
+	int idz = blockIdx.z*blockDim.z + threadIdx.z;
+	int padhdim = xsize/2;
+	if(idx<xsize && idy<ysize && idz<zsize)
+	{
+		int jp = (idx<padhdim)?idx:idx-xsize;
+		int ip = (idy<padhdim)?idy:idy-xsize;
+		int kp = (idz<padhdim)?idz:idz-xsize;
+		int index =  idz*xsize*ysize + idy*xsize + idx;
+		RFLOAT normftblob = dtab_ftblob[0];
+		RFLOAT rval = sqrt ( (RFLOAT)(kp * kp + ip * ip + jp * jp) ) / (ori_size * padding_factor);
+		if (do_mask && rval > 1./(2. * padding_factor))
+			dMconv[index] = 0.;
+		else
+		{   // here we should call an appropriate device function as we have deiiferent
+			// tabular functions. 
+			int tab_ind = (int)(abs(rval) / (0.5/nSamples));
+			RFLOAT val = (tab_ind>=nSamples)? 0.0:dtab_ftblob[tab_ind];
+			dMconv[index] *= val/normftblob; //(tab_ftblob(rval) / normftblob);
+		}
+	}
+}
+

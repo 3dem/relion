@@ -25,6 +25,14 @@
  */
 
 #include "src/backprojector.h"
+#ifdef CUDA
+#include <cufft.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
+#define SEMKEY 826976737978L /* key value for semget() */
+#define PERMS 0666
+#endif
 
 #ifdef TIMING
 	#define RCTIC(timer,label) (timer.tic(label))
@@ -1342,6 +1350,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
                                 RFLOAT normalise,
                                 int minres_map,
                                 bool printTimes,
+                                bool do_gpu,
                                 Image<RFLOAT>* weight_out)
 {
 #ifdef TIMING
@@ -1371,6 +1380,87 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	int ReconS_22 = ReconTimer.setNew(" RcS22_tautauRest ");
 	int ReconS_23 = ReconTimer.setNew(" RcS23_tauShrinkToFit ");
 	int ReconS_24 = ReconTimer.setNew(" RcS24_extra ");
+#endif
+#ifdef CUDA
+	static int semid = -1;
+	struct sembuf op_lock[2]=  { 0, 0, 0, /* wait for sem #0 to become 0 */
+	     						 0, 1, SEM_UNDO /* then increment sem #0 by 1 */ };
+	struct sembuf op_unlock[1]= { 0, -1, (IPC_NOWAIT | SEM_UNDO) /* decrement sem #0 by 1 (sets it to 0) */ };
+
+	// Size of padded real-space volume
+	int padoridim = ROUND(padding_factor * ori_size);
+	// make sure padoridim is even
+	padoridim += padoridim%2;
+
+	size_t mem_req, ws_sz;
+	size_t Fconv_sz = pad_size/2+1;
+	size_t Mconv_sz = pad_size;
+	size_t Mout_sz = padoridim;
+
+	int n1[3] = {padoridim, padoridim, padoridim};
+	int n2[3] = {pad_size, pad_size, pad_size};
+	cufftType cufft_ftype = (sizeof(RFLOAT) == sizeof(double))?CUFFT_Z2D:CUFFT_C2R;
+	cufftType cufft_itype = (sizeof(RFLOAT) == sizeof(double))?CUFFT_D2Z:CUFFT_R2C;
+
+	CudaCustomAllocator *allocator = NULL;
+
+	for(int i = 1; i< ref_dim; i++) 
+	{
+		Fconv_sz *= pad_size;
+		Mconv_sz *= pad_size;
+		Mout_sz *= padoridim;
+	}
+
+	mem_req =  (size_t)1024;
+	if(do_gpu)
+	{
+		size_t est1,est2;
+
+		cufftEstimateMany(ref_dim, n1, NULL, 0, 0, NULL, 0, 0, cufft_ftype, 1, &ws_sz);
+		est1 =    (size_t)sizeof(Complex)*Mout_sz +               // dFin
+		          (size_t)sizeof(RFLOAT)*Mout_sz +                // dMout
+		          ws_sz + 4096;                                   // workspace for cuFFT + extra space for alingment
+
+		cufftEstimateMany(ref_dim, n2, NULL, 0, 0, NULL, 0, 0, cufft_ftype, 1, &ws_sz);
+		est2  =   (size_t)sizeof(Complex)*Fconv_sz +              // dFconv
+		          (size_t)sizeof(RFLOAT)*Mconv_sz +               // dMconv
+		          (size_t)sizeof(RFLOAT)*Fconv_sz +               // dFweight
+		          (size_t)sizeof(double)*Fconv_sz +               // dFnewweight
+		          (size_t)tab_ftblob.getSize()*sizeof(RFLOAT)+ 	  // dtab_ftblob
+		          ws_sz*2 + 4096;                                 // workspace for cuFFT + extra space for alingment
+
+		mem_req = (est1>est2)?est1:est2;
+
+		size_t mem_free, mem_tot;
+		cudaDeviceProp devProp;
+		if (semid <0) 
+		{
+			int devid;
+			HANDLE_ERROR(cudaGetDevice(&devid));
+			if ( ( semid=semget(SEMKEY+devid, 1, IPC_CREAT | PERMS )) < 0 ) 
+				REPORT_ERROR("semget error"); 
+		}
+		if (semop(semid, &op_lock[0], 2) < 0) 
+			REPORT_ERROR("semop lock error");
+	
+		HANDLE_ERROR(cudaMemGetInfo(&mem_free, &mem_tot));
+		if(mem_free > mem_req)
+			allocator = new CudaCustomAllocator(mem_req, (size_t)16);
+		else
+		{
+			do_gpu = false; // change local copy of do_gpu variable
+			if (semop(semid, &op_unlock[0], 1) < 0)
+				REPORT_ERROR("semop unlock error");
+		}
+	}
+	AccPtrFactory ptrFactory(allocator);
+
+	AccPtr<Complex> dFconv     = ptrFactory.make<Complex>(Fconv_sz);
+	AccPtr<RFLOAT> dFweight    = ptrFactory.make<RFLOAT>(Fconv_sz);
+	AccPtr<double> dFnewweight = ptrFactory.make<double>(Fconv_sz);
+	cufftHandle fplan, iplan;
+	AccPtr<char> fplan_ws =  ptrFactory.make<char>(ws_sz);
+	AccPtr<char> iplan_ws =  ptrFactory.make<char>(ws_sz);
 #endif
 
 	RCTIC(ReconTimer,ReconS_1);
@@ -1555,6 +1645,40 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 		decenter(weight, Fnewweight, max_r2);
 
 		RCTOC(ReconTimer,ReconS_5);
+#ifdef CUDA
+		if(do_gpu)
+		{
+			cufftResult err;
+
+			dFnewweight.setHostPtr(MULTIDIM_ARRAY(Fnewweight));
+			dFweight.setHostPtr(MULTIDIM_ARRAY(Fweight));
+			dFconv.setHostPtr(MULTIDIM_ARRAY(Fconv));
+			dFnewweight.accAlloc();
+			dFweight.accAlloc();
+			dFconv.accAlloc();
+			dFnewweight.cpToDevice();
+			dFweight.cpToDevice();
+			// create fft plans
+			err = cufftCreate(&fplan);
+			if(err != CUFFT_SUCCESS)
+				REPORT_ERROR("failed to create cufft plan");
+			cufftSetAutoAllocation(fplan, 0);      // do not allocate work area
+			fplan_ws.accAlloc();                   // allocate work space for cufft plan
+			cufftSetWorkArea(fplan, ~fplan_ws);
+			err = cufftMakePlanMany(fplan, ref_dim, n2, NULL, 0, 0, NULL, 0, 0, cufft_ftype, 1, &ws_sz);
+			if(err != CUFFT_SUCCESS)
+				REPORT_ERROR("failed to initialize cufft plan");
+			err = cufftCreate(&iplan);
+			if(err != CUFFT_SUCCESS)
+				REPORT_ERROR("failed to create cufft plan");
+			cufftSetAutoAllocation(iplan, 0);      // do not allocate work area
+			iplan_ws.accAlloc();                   // allocate work space for cufft plan
+			cufftSetWorkArea(iplan, ~iplan_ws);
+			err = cufftMakePlanMany(iplan, ref_dim, n2, NULL, 0, 0, NULL, 0, 0, cufft_itype, 1, &ws_sz);
+			if(err != CUFFT_SUCCESS)
+				REPORT_ERROR("failed to initialize cufft plan");
+		}
+#endif
 		// Iterative algorithm as in  Eq. [14] in Pipe & Menon (1999)
 		// or Eq. (4) in Matej (2001)
 		for (int iter = 0; iter < max_iter_preweight; iter++)
@@ -1568,6 +1692,11 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			// but each "sampling point" counts "Fweight" times!
 			// That is why Fnewweight is multiplied by Fweight prior to the convolution
 
+#ifdef CUDA
+			if(do_gpu)
+				run_axpy(~dFconv, ~dFweight, ~dFnewweight, dFconv.getSize());
+			else
+#endif
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fconv)
 			{
 				DIRECT_MULTIDIM_ELEM(Fconv, n) = DIRECT_MULTIDIM_ELEM(Fnewweight, n) * DIRECT_MULTIDIM_ELEM(Fweight, n);
@@ -1575,10 +1704,20 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 
 			// convolute through Fourier-transform (as both grids are rectangular)
 			// Note that convoluteRealSpace acts on the complex array inside the transformer
+#ifdef CUDA
+			if(do_gpu)
+				convoluteBlobRealSpace_gpu(dFconv, fplan, iplan, false);
+			else
+#endif
 			convoluteBlobRealSpace(transformer, false);
 
 			RFLOAT w, corr_min = LARGE_NUMBER, corr_max = -LARGE_NUMBER, corr_avg=0., corr_nn=0.;
 
+#ifdef CUDA
+			if(do_gpu)
+				run_updateFnewweight(~dFnewweight, ~dFconv, XSIZE(Fconv), YSIZE(Fconv), ZSIZE(Fconv), max_r2);
+			else
+#endif
 			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fconv)
 			{
 				if (kp * kp + ip * ip + jp * jp < max_r2)
@@ -1586,11 +1725,13 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 
 					// Make sure no division by zero can occur....
 					w = XMIPP_MAX(1e-6, abs(DIRECT_A3D_ELEM(Fconv, k, i, j)));
+#ifdef DEBUG_RECONSTRUCT
 					// Monitor min, max and avg conv_weight
 					corr_min = XMIPP_MIN(corr_min, w);
 					corr_max = XMIPP_MAX(corr_max, w);
 					corr_avg += w;
 					corr_nn += 1.;
+#endif
 					// Apply division of Eq. [14] in Pipe & Menon (1999)
 					DIRECT_A3D_ELEM(Fnewweight, k, i, j) /= w;
 				}
@@ -1606,6 +1747,21 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			std::cerr << " corr_max= " << corr_max << std::endl;
 #endif
 		}
+#ifdef CUDA	
+		if(do_gpu)
+		{
+			cufftDestroy(iplan);
+			iplan_ws.freeIfSet();
+			cufftDestroy(fplan);
+			fplan_ws.freeIfSet();
+
+			dFnewweight.cpToHost();
+
+			dFnewweight.freeIfSet();
+			dFweight.freeIfSet();
+			dFconv.freeIfSet();
+		}
+#endif
 
 		RCTIC(ReconTimer,ReconS_7);
 
@@ -1731,9 +1887,22 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	// Pass the transformer to prevent making and clearing a new one before clearing the one declared above....
 	// The latter may give memory problems as detected by electric fence....
 	RCTIC(ReconTimer,ReconS_17);
+#ifdef CUDA
+	windowToOridimRealSpace(transformer, dFconv, vol_out, do_gpu, printTimes);
+#else
 	windowToOridimRealSpace(transformer, vol_out, printTimes);
+#endif
 	RCTOC(ReconTimer,ReconS_17);
 
+#endif
+
+#ifdef CUDA	
+	if(allocator != NULL)
+	{
+		delete allocator;
+		if (semop(semid, &op_unlock[0], 1) < 0)
+			REPORT_ERROR("semop unlock error");
+	}
 #endif
 
 #ifdef DEBUG_RECONSTRUCT
@@ -2214,7 +2383,69 @@ void BackProjector::convoluteBlobRealSpace(FourierTransformer &transformer, bool
     transformer.FourierTransform();
 }
 
+#ifdef CUDA
+void BackProjector::convoluteBlobRealSpace_gpu(AccPtr<Complex> &dFconv, cufftHandle fplan, cufftHandle iplan, bool do_mask)
+{
+
+	MultidimArray<RFLOAT> Mconv;
+	int padhdim = pad_size / 2;
+
+	// Set up right dimension of real-space array
+	// TODO: resize this according to r_max!!!
+	if (ref_dim==2)
+		Mconv.reshape(pad_size, pad_size);
+	else
+		Mconv.reshape(pad_size, pad_size, pad_size);
+
+	AccPtrFactory ptrFactory(dFconv.getAllocator());
+	AccPtr<RFLOAT>dMconv = ptrFactory.make<RFLOAT>(MULTIDIM_SIZE(Mconv));
+	AccPtr<RFLOAT> dtab_ftblob  = ptrFactory.make<RFLOAT>(tab_ftblob.getSize());
+	
+	cufftResult err;
+	
+	dMconv.accAlloc();
+	dtab_ftblob.setHostPtr(tab_ftblob.getReference());
+	dtab_ftblob.accAlloc();
+	dtab_ftblob.cpToDevice();
+
+	// inverse FFT
+	if(sizeof(RFLOAT) == sizeof(double))
+		err = cufftExecZ2D(fplan,(cufftDoubleComplex*)~dFconv, (cufftDoubleReal*)~dMconv);
+	else
+		err = cufftExecC2R(fplan,(cufftComplex*)~dFconv, (cufftReal*)~dMconv);
+	if(err != CUFFT_SUCCESS)
+		REPORT_ERROR("failed to exec fft");
+
+	// Blob normalisation in Fourier space
+	RFLOAT normftblob = tab_ftblob(0.);
+
+    // Multiply with FT of the blob kernel
+	run_multiplyBlobKernel(~dMconv, XSIZE(Mconv), YSIZE(Mconv), ZSIZE(Mconv), 
+			~dtab_ftblob, dtab_ftblob.getSize(), ori_size, padding_factor, do_mask);
+
+    // forward FFT to go back to Fourier-space
+
+	if(sizeof(RFLOAT) == sizeof(double))
+		err = cufftExecD2Z(iplan, (cufftDoubleReal*)~dMconv,(cufftDoubleComplex*)~dFconv);
+	else
+		err = cufftExecR2C(iplan, (cufftReal*)~dMconv,(cufftComplex*)~dFconv);
+	if(err != CUFFT_SUCCESS)
+		REPORT_ERROR("failed to exec fft");
+	
+	size_t normfft = pad_size*pad_size;
+	if(ref_dim == 3) normfft *= pad_size;
+	scale((RFLOAT*)~dFconv, 2*dFconv.getSize(), 1./(RFLOAT)normfft);
+
+	dMconv.freeIfSet();
+	dtab_ftblob.freeIfSet();
+}
+#endif
+
+#ifdef CUDA
+void BackProjector::windowToOridimRealSpace(FourierTransformer &transformer, AccPtr<Complex> &dFconv, MultidimArray<RFLOAT> &Mout, bool do_gpu, bool printTimes)
+#else
 void BackProjector::windowToOridimRealSpace(FourierTransformer &transformer, MultidimArray<RFLOAT> &Mout, bool printTimes)
+#endif
 {
 
 #ifdef TIMING
@@ -2240,6 +2471,17 @@ void BackProjector::windowToOridimRealSpace(FourierTransformer &transformer, Mul
 	// make sure padoridim is even
 	padoridim += padoridim%2;
 	RFLOAT normfft;
+#ifdef CUDA
+	cufftResult err;
+	cufftHandle fplan;
+	int n[3] = {padoridim, padoridim, padoridim};
+	cufftType cufft_ftype = (sizeof(RFLOAT) == sizeof(double))?CUFFT_Z2D:CUFFT_C2R;
+	size_t ws_sz;
+
+	AccPtrFactory ptrFactory(dFconv.getAllocator());
+	cufftEstimateMany(ref_dim, n, NULL, 0, 0, NULL, 0, 0, cufft_ftype, 1, &ws_sz);
+	AccPtr<char> fft_ws = ptrFactory.make<char>(ws_sz);
+#endif
 
 //#define DEBUG_WINDOWORIDIMREALSPACE
 #ifdef DEBUG_WINDOWORIDIMREALSPACE
@@ -2291,14 +2533,55 @@ void BackProjector::windowToOridimRealSpace(FourierTransformer &transformer, Mul
 
 	// Do the inverse FFT
 	RCTIC(OriDimTimer,OriDim4);
+#ifdef CUDA
+	AccPtr<RFLOAT>dMout = ptrFactory.make<RFLOAT>(MULTIDIM_SIZE(Mout));
+	if(do_gpu)
+	{
+		dFconv.setSize(MULTIDIM_SIZE(Fin));
+		dFconv.setHostPtr(MULTIDIM_ARRAY(Fin));
+		dFconv.accAlloc();
+		dFconv.cpToDevice();
+		
+		dMout.accAlloc();
+		
+		err = cufftCreate(&fplan);
+		if(err != CUFFT_SUCCESS)
+			REPORT_ERROR("failed to create cufft plan");
+		cufftSetAutoAllocation(fplan, 0);      // do not allocate work area
+		fft_ws.accAlloc();                     // allocate work space for cufft plan
+		cufftSetWorkArea(fplan, ~fft_ws);
+		err = cufftMakePlanMany(fplan, ref_dim, n, NULL, 0, 0, NULL, 0, 0, cufft_ftype, 1, &ws_sz);
+	}
+	else
+#endif
 	transformer.setReal(Mout);
 	RCTOC(OriDimTimer,OriDim4);
 	RCTIC(OriDimTimer,OriDim5);
+#ifdef CUDA
+	if(do_gpu)
+	{
+		if(sizeof(RFLOAT) == sizeof(double))
+			err = cufftExecZ2D(fplan,(cufftDoubleComplex*)~dFconv, (cufftDoubleReal*)~dMout);
+		else
+			err = cufftExecC2R(fplan,(cufftComplex*)~dFconv, (cufftReal*)~dMout);
+		if(err != CUFFT_SUCCESS)
+			REPORT_ERROR("failed to exec fft");
+		
+		dMout.setHostPtr(MULTIDIM_ARRAY(Mout));
+		dMout.cpToHost();
+		dMout.streamSync();
+		dMout.freeIfSet();
+		dFconv.freeIfSet();
+	}
+	else
+#endif
+	{
 #ifdef TIMING
 	if(printTimes)
 		std::cout << std::endl << "FFTrealDims = (" << transformer.fReal->xdim << " , " << transformer.fReal->ydim << " , " << transformer.fReal->zdim << " ) " << std::endl;
 #endif
 	transformer.inverseFourierTransform();
+	}
 	RCTOC(OriDimTimer,OriDim5);
 	//transformer.inverseFourierTransform(Fin, Mout);
 	Fin.clear();

@@ -2085,7 +2085,8 @@ void MlOptimiserMpi::maximization()
 								mymodel.tau2_fudge_factor,
 								wsum_model.pdf_class[iclass],
 								minres_map,
-								false
+								false,
+								do_gpu
 							);
 						}
 						if (do_sgd)

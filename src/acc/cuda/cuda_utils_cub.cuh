@@ -123,6 +123,47 @@ if (ptr.getAllocator() == NULL)
 	return max_val[0];
 }
 
+template<typename T>
+__global__ void cuda_kernel_max(
+        T *g_array,
+        T *tmp,
+        size_t size)
+{
+    typedef cub::BlockReduce<T, BLOCK_SIZE> BlockReduce;
+
+    int idx = threadIdx.x + blockIdx.x*blockDim.x;
+    int bix = blockIdx.x;
+    int tid = threadIdx.x;
+    __shared__ typename BlockReduce::TempStorage temp_storage;
+    T s_tmp;
+
+    s_tmp = -99e99; // this magic constant is in the original code on CPU and left here for compatibility
+    while(idx<size)
+    {
+        s_tmp = (s_tmp>g_array[idx])? s_tmp:g_array[idx];
+        idx += blockDim.x*gridDim.x;
+    }
+    __syncthreads();
+    T  aggregate  = BlockReduce(temp_storage).Reduce(s_tmp, cub::Max());
+    __syncthreads();
+    if(tid == 0)
+        tmp[bix] = aggregate;
+}
+
+template <typename T>
+static void getMaxOnDeviceSingleBlock(AccPtr<T> &ptr, T* max_val)
+{
+#ifdef DEBUG_CUDA
+if (ptr.getSize() == 0)
+	printf("DEBUG_ERROR: getMaxOnDeviceSingleBlock called with pointer of zero size.\n");
+if (ptr.getDevicePtr() == NULL)
+	printf("DEBUG_ERROR: getMaxOnDeviceSingleBlock called with null device pointer.\n");
+#endif
+
+	cuda_kernel_max<T><<< 1, BLOCK_SIZE, 0, ptr.getStream()>>>(~ptr, max_val, ptr.getSize());
+	DEBUG_HANDLE_ERROR(cudaGetLastError());
+}
+
 template <typename T>
 static T getMinOnDevice(AccPtr<T> &ptr)
 {
@@ -185,6 +226,47 @@ if (ptr.getAllocator() == NULL)
 	ptr.getAllocator()->free(alloc);
 
 	return val[0];
+}
+
+template<typename T>
+__global__ void cuda_kernel_sum(
+        T *g_array,
+        T *tmp,
+        size_t size)
+{
+    typedef cub::BlockReduce<T, BLOCK_SIZE> BlockReduce;
+
+    int idx = threadIdx.x + blockIdx.x*blockDim.x;
+    int bix = blockIdx.x;
+    int tid = threadIdx.x;
+    __shared__ typename BlockReduce::TempStorage temp_storage;
+    T s_tmp;
+
+    s_tmp = 0;
+    while(idx<size)
+    {
+        s_tmp += g_array[idx];
+        idx += blockDim.x*gridDim.x;
+    }
+    __syncthreads();
+    T  aggregate  = BlockReduce(temp_storage).Reduce(s_tmp, cub::Sum());
+    __syncthreads();
+    if(tid == 0)
+        tmp[bix] = aggregate;
+}
+
+template <typename T>
+static void getSumOnDeviceSingleBlock(AccPtr<T> &ptr, T* sum)
+{
+#ifdef DEBUG_CUDA
+if (ptr.getSize() == 0)
+	printf("DEBUG_ERROR: getSumOnDeviceSingleBlock called with pointer of zero size.\n");
+if (ptr.getDevicePtr() == NULL)
+	printf("DEBUG_ERROR: getSumOnDeviceSingleBlock called with null device pointer.\n");
+#endif
+
+	cuda_kernel_sum<T><<< 1, BLOCK_SIZE, 0, ptr.getStream()>>>(~ptr, sum, ptr.getSize());
+	DEBUG_HANDLE_ERROR(cudaGetLastError());
 }
 
 template <typename T>

@@ -68,7 +68,15 @@ public:
         return *this;
     }
 
+	size_t getSize()
+	{
+		return XSIZE(tabulatedValues);
+	}
 
+	RFLOAT* getReference()
+	{
+		return MULTIDIM_ARRAY(tabulatedValues);
+	}	
 };
 
 class TabSine : public TabFunction

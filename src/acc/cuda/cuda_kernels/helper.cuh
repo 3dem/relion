@@ -234,10 +234,12 @@ __global__ void cuda_kernel_cosineFilter(	XFLOAT *vol,
 											XFLOAT radius,
 											XFLOAT radius_p,
 											XFLOAT cosine_width,
-											XFLOAT sum_bg_total);
+											XFLOAT *sum_bg);
 
 __global__ void cuda_kernel_initOrientations(RFLOAT *pdfs, XFLOAT *pdf_orientation, bool *pdf_orientation_zeros, size_t sz);
 
+__global__ void cuda_kernel_multiplyBlobKernel(RFLOAT *dMconv, int xsize, int ysize, int zsize, 
+				RFLOAT *dtab_ftblob, int nSamples, int ori_size, RFLOAT padding_factor, bool do_mask);
 //----------------------------------------------------------------------------
 namespace CudaKernels
 {
@@ -1011,10 +1013,50 @@ __global__ void cuda_kernel_calcPowerSpectrum(T *dFaux, int padoridim, T *ddata,
 	}
 }
 
+#define XMIPP_MAX(x,y) (((x)>=(y))?(x):(y))
+template <typename T>
+__global__ void cuda_kernel_updateFnewweight(T *dFconv, double *dFnewweight, int xsz, int ysz, int zsz, int max_r2)
+{
+	int idx = blockIdx.x*blockDim.x + threadIdx.x;
+	int idy = blockIdx.y*blockDim.y + threadIdx.y;
+	int idz = blockIdx.z*blockDim.z + threadIdx.z;
+	if(idx<xsz && idy<ysz && idz<zsz)
+	{
+		int jp = idx;
+		int ip = (idy<xsz)? idy:idy-ysz;
+		int kp = (idz<xsz)? idz:idz-zsz;
+		if (kp * kp + ip * ip + jp * jp < max_r2)
+		{
+			// Make sure no division by zero can occur....
+			RFLOAT w = XMIPP_MAX(1e-6, abs(dFconv[idz*xsz*ysz + idy*xsz + idx].x));
+			// Apply division of Eq. [14] in Pipe & Menon (1999)
+			dFnewweight[idz*xsz*ysz + idy*xsz + idx] /= w;
+		}
+	}
+}
+
+template <typename T>
+__global__ void cuda_kernel_axpy(T *dFconv, RFLOAT *dFweight, double *dFnewweight, int sz)
+{
+	int idx = blockIdx.x*blockDim.x + threadIdx.x;
+	T val;
+	if(idx<sz)
+	{
+		val.x = dFweight[idx]*dFnewweight[idx];
+		val.y = 0.;
+		dFconv[idx] = val;
+	}
+}
+
+
 template __global__ void cuda_kernel_calcPowerSpectrum(double2*, int, double2*, int , RFLOAT*, RFLOAT*, int, int, RFLOAT, RFLOAT, RFLOAT,
 											  RFLOAT*, int, int, int, bool);
 template __global__ void cuda_kernel_calcPowerSpectrum(float2*, int, float2*, int , RFLOAT*, RFLOAT*, int, int, RFLOAT, RFLOAT, RFLOAT,
 											  RFLOAT*, int, int, int, bool);
+template __global__ void cuda_kernel_updateFnewweight(double2*, double*, int, int, int, int);
+template __global__ void cuda_kernel_updateFnewweight(float2*, double*, int, int, int, int);
+template __global__ void cuda_kernel_axpy(double2*, RFLOAT*, double*, int);
+template __global__ void cuda_kernel_axpy(float2*, RFLOAT*, double*, int);
 
 __global__ void cuda_kernel_updatePowerSpectrum(RFLOAT *dcounter, RFLOAT *dpower_spectrum, int sz);
 #endif /* CUDA_HELPER_KERNELS_CUH_ */
