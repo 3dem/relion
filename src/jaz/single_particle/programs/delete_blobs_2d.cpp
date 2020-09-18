@@ -563,7 +563,7 @@ void DeleteBlobs2DProgram::processMicrograph(
 	
 	if (do_isolate_ring)
 	{
-		erased_image = isolateRing(all_blob_parameters, closest_blob, erased_image);
+		erased_image = isolateRing(all_blob_parameters, closest_blob, erased_image, micrograph_name);
 	}
 	
 	if (verbose)
@@ -717,17 +717,9 @@ std::vector<double> DeleteBlobs2DProgram::fitBlob(
 BufferedImage<float> DeleteBlobs2DProgram::isolateRing(
         const std::vector<std::vector<double> >& blob_parameters, 
         const BufferedImage<int>& closest_blob,
-        const BufferedImage<float>& image)
+        const BufferedImage<float>& image,
+        const std::string& micrograph_name)
 {
-	/* 
-		-	draw mask
-		-	blur mask with sigma -> m_sig
-		-	blur masked image with sigma -> i_m_sig		
-		-	subtract i_m_sig / m_sig from image
-		-	multiply image with m_sig
-			
-	*/
-	
 	const int w = image.xdim;
 	const int h = image.ydim;
 	
@@ -740,6 +732,16 @@ BufferedImage<float> DeleteBlobs2DProgram::isolateRing(
 		const int b = closest_blob(x,y);
 		
 		if (b >= 0)
+		{
+			if (b >= blob_parameters.size() || blob_parameters[b].size() == 0)
+			{
+				std::cout << "micrograph_name: " << micrograph_name << '\n';
+				std::cout << "blob_index: " << b << " out of " << blob_parameters.size() << '\n';
+				std::cout << "x, y: " << x << ", " << y << '\n' << std::endl;
+			}
+		}
+		
+		if (b >= 0 && b < blob_parameters.size() && blob_parameters[b].size() > 0)
 		{
 			DelineatedBlob2D blob(blob_parameters[b]);
 			

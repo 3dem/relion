@@ -68,7 +68,8 @@ class DeleteBlobs2DProgram
 		BufferedImage<float> isolateRing(
 		        const std::vector<std::vector<double>>& blob_parameters,
 		        const BufferedImage<int>& closest_blob,
-				const BufferedImage<float>& image);
+				const BufferedImage<float>& image,
+		        const std::string& micrograph_name);
 
 		BufferedImage<float> drawFit(
 				Blob2D& blob,
