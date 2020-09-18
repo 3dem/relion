@@ -31,7 +31,12 @@ void DeleteBlobs2DProgram::readParameters(int argc, char *argv[])
 		micrographs_dir = parser.getOption("--md", "Micrographs directory");
 		blobs_dir = parser.getOption("--bd", "Initial blobs directory");
 		particles_file = parser.getOption("--ptc", "Optional particles file for phase flipping", "");
-
+		
+		ring_min = textToDouble(parser.getOption("--ring_min", "Inner radius of ring to isolate (relative to blob surface)", "0"));
+		ring_max = textToDouble(parser.getOption("--ring_max", "Outer radius of ring to isolate", "0"));
+		ring_edge_sigma = textToDouble(parser.getOption("--ring_edge_sigma", "Smoothness sigma of isolation ring", "32"));
+		ring_filter_sigma = textToDouble(parser.getOption("--ring_edge_sigma", "Filtering sigma of isolation ring", "128"));
+		
 		global_prefit = !parser.checkOption("--c2f", "Apply a coarse-to-fine progression instead of initialising with a global pre-fit");
 		roundedness = textToDouble(parser.getOption("--rnd", "Roundedness prior", "0"));
 		smoothness = textToDouble(parser.getOption("--smt", "Outline average smoothness (negative means full average)", "-1"));
@@ -79,6 +84,8 @@ void DeleteBlobs2DProgram::readParameters(int argc, char *argv[])
 	
 	micrographs_dir = ZIO::ensureEndingSlash(micrographs_dir);
 	blobs_dir = ZIO::ensureEndingSlash(blobs_dir);
+	
+	do_isolate_ring = ring_min != ring_max;
 }
 
 void DeleteBlobs2DProgram::run()
@@ -552,7 +559,12 @@ void DeleteBlobs2DProgram::processMicrograph(
 		{
 			Log::endSection();
 		}
-	}	  
+	}
+	
+	if (do_isolate_ring)
+	{
+		erased_image = isolateRing(all_blob_parameters, closest_blob, erased_image);
+	}
 	
 	if (verbose)
 	{
@@ -700,6 +712,62 @@ std::vector<double> DeleteBlobs2DProgram::fitBlob(
 	}
 
 	return toBin1(last_optimum, binning_factor);
+}
+
+BufferedImage<float> DeleteBlobs2DProgram::isolateRing(
+        const std::vector<std::vector<double> >& blob_parameters, 
+        const BufferedImage<int>& closest_blob,
+        const BufferedImage<float>& image)
+{
+	/* 
+		-	draw mask
+		-	blur mask with sigma -> m_sig
+		-	blur masked image with sigma -> i_m_sig		
+		-	subtract i_m_sig / m_sig from image
+		-	multiply image with m_sig
+			
+	*/
+	
+	const int w = image.xdim;
+	const int h = image.ydim;
+	
+	
+	BufferedImage<float> mask(w,h);
+	
+	for (int y = 0; y < h; y++)
+	for (int x = 0; x < w; x++)
+	{
+		const int b = closest_blob(x,y);
+		
+		if (b >= 0)
+		{
+			DelineatedBlob2D blob(blob_parameters[b]);
+			
+			const double r = blob.getSignedDistance(d2Vector(x,y));
+			
+			mask(x,y) = (r >= ring_min && r <= ring_max)? 1.f : 0.f;
+		}
+		else
+		{
+			mask(x,y) = 0.f;
+		}
+	}
+	
+	BufferedImage<float> masked_image = image * mask;	
+	BufferedImage<float> local_average = ImageFilter::Gauss2D(masked_image, 0, ring_filter_sigma, true);
+	BufferedImage<float> smooth_mask = ImageFilter::Gauss2D(mask, 0, ring_filter_sigma, true);
+	
+	smooth_mask = ImageFilter::thresholdAbove(smooth_mask, 0.001f);
+	
+	local_average /= smooth_mask;
+	
+	BufferedImage<float> sharp_mask = ImageFilter::Gauss2D(mask, 0, ring_edge_sigma, true);
+	
+	BufferedImage<float> out = image - local_average;
+	
+	out *= sharp_mask;
+		
+	return out;
 }
 
 
