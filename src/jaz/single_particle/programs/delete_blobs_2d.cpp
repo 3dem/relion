@@ -574,20 +574,6 @@ void DeleteBlobs2DProgram::processMicrograph(
 		
 		closest_blob_vis.write("closest_blob_vis.mrc");
 		
-		for (int i = 0; i < all_blob_parameters.size(); i++)
-		{
-			std::cout << i << ":  ";
-			
-			const int n = all_blob_parameters[i].size();
-			
-			for (int j = 0; j < n; j++)
-			{
-				std::cout << j << (j < n-1? ", " : "\n");
-			}
-			
-			std::cout << std::endl;
-		}
-		
 		erased_image = isolateRing(all_blob_parameters, closest_blob, erased_image, micrograph_name);
 	}
 	

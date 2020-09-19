@@ -149,7 +149,6 @@ std::vector<std::vector<double> > ZIO::readDoublesTable(std::string fn, char del
 		while (sts >> d)
 		{
 			out[i].push_back(d);
-			std::cout << "[" << d << "]\n";
 		}
 	}
 	
