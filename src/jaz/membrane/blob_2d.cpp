@@ -942,7 +942,10 @@ std::vector<DelineatedBlob2D> DelineatedBlob2D::read(const std::string &filename
 			values.push_back(value);
 		}
 		
-		out.push_back(DelineatedBlob2D(values));
+		if (values.size() >= 3 && values[0] > 0.0)
+		{
+			out.push_back(DelineatedBlob2D(values));
+		}
 	}
 	
 	return out;

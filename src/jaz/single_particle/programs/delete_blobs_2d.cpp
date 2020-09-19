@@ -342,6 +342,8 @@ void DeleteBlobs2DProgram::processMicrograph(
 					Log::endSection();
 				}
 				
+				all_blob_parameters.push_back(std::vector<double>(0));
+				            
 				continue;
 			}
 
@@ -563,6 +565,29 @@ void DeleteBlobs2DProgram::processMicrograph(
 	
 	if (do_isolate_ring)
 	{
+		BufferedImage<float> closest_blob_vis(closest_blob.xdim, closest_blob.ydim);
+		
+		for (long int i = 0; i < closest_blob_vis.getSize(); i++)
+		{
+			closest_blob_vis[i] = (float) closest_blob[i];
+		}
+		
+		closest_blob_vis.write("closest_blob_vis.mrc");
+		
+		for (int i = 0; i < all_blob_parameters.size(); i++)
+		{
+			std::cout << i << ":  ";
+			
+			const int n = all_blob_parameters[i].size();
+			
+			for (int j = 0; j < n; j++)
+			{
+				std::cout << j << (j < n-1? ", " : "\n");
+			}
+			
+			std::cout << std::endl;
+		}
+		
 		erased_image = isolateRing(all_blob_parameters, closest_blob, erased_image, micrograph_name);
 	}
 	
@@ -726,6 +751,8 @@ BufferedImage<float> DeleteBlobs2DProgram::isolateRing(
 	
 	BufferedImage<float> mask(w,h);
 	
+	bool warned_already = false;
+	
 	for (int y = 0; y < h; y++)
 	for (int x = 0; x < w; x++)
 	{
@@ -733,11 +760,13 @@ BufferedImage<float> DeleteBlobs2DProgram::isolateRing(
 		
 		if (b >= 0)
 		{
-			if (b >= blob_parameters.size() || blob_parameters[b].size() == 0)
+			if (!warned_already && (b >= blob_parameters.size() || blob_parameters[b].size() == 0))
 			{
 				std::cout << "micrograph_name: " << micrograph_name << '\n';
 				std::cout << "blob_index: " << b << " out of " << blob_parameters.size() << '\n';
 				std::cout << "x, y: " << x << ", " << y << '\n' << std::endl;
+				
+				warned_already = true;
 			}
 		}
 		
