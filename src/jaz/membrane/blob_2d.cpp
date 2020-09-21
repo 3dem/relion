@@ -886,6 +886,14 @@ d2Vector DelineatedBlob2D::getOutlinePoint(double phi) const
 	return center + r * d2Vector(cos(phi), sin(phi));
 }
 
+d2Vector DelineatedBlob2D::estimateNormal(double phi, double scale) const
+{
+	d2Vector p0 = getOutlinePoint(phi - scale / 2.0);
+	d2Vector p1 = getOutlinePoint(phi + scale / 2.0);
+	
+	return d2Vector(p1.y - p0.y, p0.x - p1.x).normalize();
+}
+
 double DelineatedBlob2D::perimeter() const
 {
 	const int samples = std::round(2 * PI * radius);

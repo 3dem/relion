@@ -119,6 +119,12 @@ class RealSpaceBackprojection
 			double taperX = 20, 
 			double taperY = 20, 
 			double wMin = 3.0);
+		
+		template <typename SrcType>
+		static BufferedImage<SrcType> preWeight(
+			const RawImage<SrcType>& stack,
+			const std::vector<gravis::d4Matrix>& proj, 
+			int num_threads = 1);
 };
 
 
@@ -526,6 +532,77 @@ void RealSpaceBackprojection::backprojectRaw(
 			dest(x,y,z) = t * dest(x,y,z) + (1.0 - t) * mean;
 		}
 	}
+}
+
+template<typename SrcType>
+BufferedImage<SrcType> RealSpaceBackprojection::preWeight(
+        const RawImage<SrcType>& stack, 
+        const std::vector<gravis::d4Matrix>& proj, 
+        int num_threads)
+{
+	const int w  = stack.xdim;
+	const int h  = stack.ydim;
+	const int fc = stack.zdim;
+	const int wh = w/2 + 1;
+	
+	BufferedImage<SrcType> out(w,h,fc);
+	
+	#pragma omp parallel for num_threads(num_threads)	
+	for (int f = 0; f < fc; f++)
+	{
+		std::vector<gravis::d3Vector> f_to_others_z(fc);
+		
+		gravis::d3Matrix proj_f = gravis::d3Matrix::extract(proj[f]);
+		proj_f.transpose();
+		        
+		for (int ff = 0; ff < fc; ff++)	
+		{
+			gravis::d3Matrix proj_ff = gravis::d3Matrix::extract(proj[ff]);
+			proj_ff.transpose();
+			proj_ff.invert();
+			
+			gravis::d3Matrix A = proj_ff * proj_f;
+			
+			f_to_others_z[ff][0] = A(2,0);
+			f_to_others_z[ff][1] = A(2,1);
+			f_to_others_z[ff][2] = A(2,2);
+		}
+				        
+		BufferedImage<SrcType> frameRS = stack.getConstSliceRef(f);
+		BufferedImage<tComplex<SrcType>> frameFS;
+		
+		FFT::FourierTransform(frameRS, frameFS);
+		
+		for (int xi = 0; xi < wh; xi++)
+		for (int yi = 0; yi < h; yi++)
+		{
+			const double xx = xi;
+			const double yy = yi < h/2? yi : yi - h;
+			
+			const gravis::d3Vector r(xx,yy,0.0);
+			
+			double sum = 0.0;
+			
+			for (int ff = 0; ff < fc; ff++)	
+			{
+				const double z_f = r.dot(f_to_others_z[ff]);
+				const double weight = 1.0 - std::abs(z_f);
+				
+				if (weight > 0.0)
+				{
+					sum += weight;
+				}
+			}
+			
+			frameFS(xi,yi) *= (SrcType)(1.0 / (sum));
+		}
+		
+		FFT::inverseFourierTransform(frameFS, frameRS);
+		
+		out.copySliceFrom(f, frameRS);
+	}
+	
+	return out;
 }
 
 #endif

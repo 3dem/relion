@@ -19,7 +19,7 @@ int main(int argc, char *argv[])
 {
 	std::string tomoSetFn, outDir;
 	double thresh, binning_out, binning_in, beadRadius_A;
-	int num_threads;
+	int max_MG, num_threads;
 	bool diag, debug;
 	
 	IOParser parser;
@@ -38,6 +38,7 @@ int main(int argc, char *argv[])
 		binning_out = textToDouble(parser.getOption("--bin1", "CC binning level", "4"));
 		diag = parser.checkOption("--diag", "Write out diagnostic information");
 		debug = parser.checkOption("--debug", "Write out debugging information");
+		max_MG = textToInteger(parser.getOption("--max_MG", "Last tilt series to consider", "-1"));
 		
 		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 		
@@ -65,7 +66,12 @@ int main(int argc, char *argv[])
 
 	
 	TomogramSet tomogramSet(tomoSetFn);
-	const int tc = tomogramSet.size();
+	int tc = tomogramSet.size();
+	
+	if (max_MG >= 0 && max_MG < tc)
+	{
+		tc = max_MG + 1;
+	}
 	
 	BufferedImage<float> visualisation(0,0,0);
 
