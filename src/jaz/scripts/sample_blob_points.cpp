@@ -320,7 +320,7 @@ int main(int argc, char *argv[])
 					if (i == EDGE)
 					{
 						const d2Vector n = normals[p];						
-						const double phi_deg = RAD2DEG(atan2(n.x, -n.y));
+						double phi_deg = 180 - RAD2DEG(atan2(n.x, -n.y));
 						
 						table.setValue(EMDL_ORIENT_PSI, phi_deg, p);
 						table.setValue(EMDL_ORIENT_PSI_PRIOR, phi_deg, p);
