@@ -41,7 +41,6 @@ DefocusRefinementProgram::DefocusRefinementProgram(int argc, char *argv[])
 		slowScan = parser.checkOption("--slow_scan", "Perform a slow, brute-force defocus scan instead");
 		refineFast = !parser.checkOption("--slow_scan_only", "Only perform a brute-force scan");
 		refineAstigmatism = !parser.checkOption("--no_astigmatism", "Do not refine the astigmatism");
-		scanAstigmatism = !parser.checkOption("--no_astigmatism_scan", "Refine astigmatism from initial optimum");
 		plotAstigmatism = parser.checkOption("--plot_astigmatism", "Plot the astigmatism cost function");
 
 		max_particles = textToInteger(parser.getOption("--max", "Max. number of particles to consider per tomogram", "-1"));
