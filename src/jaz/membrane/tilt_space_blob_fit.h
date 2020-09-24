@@ -59,6 +59,14 @@ class TiltSpaceBlobFit : public DifferentiableOptimization
 		        double mean_radius_full, 
 		        double binning,  
 		        const std::vector<gravis::d4Matrix>& projections);
+		
+		static BufferedImage<float> visualiseBlob(
+		        const std::vector<double> parameters, 
+		        double mean_radius_full, 
+		        double radius_range, 
+		        double binning, 
+		        const RawImage<float>& preweighted_stack, 
+		        const std::vector<gravis::d4Matrix>& projections);
 };
 
 #endif

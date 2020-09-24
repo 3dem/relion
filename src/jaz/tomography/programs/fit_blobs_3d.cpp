@@ -17,23 +17,6 @@ using namespace gravis;
 
 void FitBlobs3DProgram::readParameters(int argc, char *argv[])
 {
-	/*{
-		const double binning = 2.0;
-		
-		const int falloff = 100 / binning;
-		const int width = 10 / binning;
-		const double spacing = 40.0 / binning;
-		const double ratio = 5.0;
-		const double depth = 1.25;
-		
-		BufferedImage<float> kernel = MembraneSegmentation::constructMembraneKernel(
-			1130, 120, 1, falloff, width, spacing, ratio, depth);  
-		
-		kernel.write("DEBUG_membrane_kernel.mrc");
-		
-		std::exit(0);
-	}*/
-
 	IOParser parser;
 	
 	double sphere_thickness_0;
@@ -222,9 +205,8 @@ void FitBlobs3DProgram::processTomogram(
 
 		const d3Vector sphere_position = sphere.xyz();
 		
-		d3Vector bad_sphere_position = sphere_position;
-		bad_sphere_position.y -= 50;
-
+		const std::string blob_tag = outPath+tomoName+"_blob_"+ZIO::itoa(blob_id);
+		
 		std::vector<double> blob_coeffs = segmentBlob(
 				sphere_position, 
 				sphere.w, 
@@ -232,13 +214,14 @@ void FitBlobs3DProgram::processTomogram(
 		        segmentation_binning,
 				preweighted_stack, 
 		        pixel_size,
-				tomogram_binned.projectionMatrices);
+				tomogram_binned.projectionMatrices,
+				diag? blob_tag : "");
 		
 		all_blob_coeffs.push_back(blob_coeffs);
 		
 		Mesh blob_mesh = createMesh(blob_coeffs, pixel_size, 50, 20);
 		
-		blob_mesh.writeObj("DEBUG_blob_"+ZIO::itoa(blob_id)+".obj");
+		blob_mesh.writeObj(blob_tag+".obj");
 
 		MeshBuilder::insert(blob_mesh, blob_meshes);
 		Log::endSection();
@@ -322,7 +305,8 @@ std::vector<double> FitBlobs3DProgram::segmentBlob(
         double binning, 
         const RawImage<float>& preweighted_stack, 
         double pixel_size,
-        const std::vector<d4Matrix>& projections)
+        const std::vector<d4Matrix>& projections,
+        const std::string& debug_prefix)
 {
 	BufferedImage<float> map = TiltSpaceBlobFit::computeTiltSpaceMap(
 			sphere_position, 
@@ -335,7 +319,10 @@ std::vector<double> FitBlobs3DProgram::segmentBlob(
 	BufferedImage<d3Vector> directions_XZ = TiltSpaceBlobFit::computeDirectionsXZ(
 	            mean_radius_full, binning, projections);
 	            
-	//map.write("DEBUG_tilt_space_map_binning.mrc");
+	if (debug_prefix != "")
+	{
+		map.write(debug_prefix+"_tilt_space_map.mrc");
+	}
 	
 	const int fc = projections.size();
 	
@@ -369,8 +356,11 @@ std::vector<double> FitBlobs3DProgram::segmentBlob(
 	
 	BufferedImage<float> kernel = MembraneSegmentation::constructMembraneKernel(
 		map.xdim, map.ydim, map.zdim, falloff, width, spacing, ratio, depth);   
-	 
-	//kernel.write("DEBUG_tilt_space_kernel.mrc");
+	
+	if (debug_prefix != "")
+	{
+		kernel.write(debug_prefix+"_tilt_space_kernel.mrc");
+	}
 	
 	BufferedImage<fComplex> map_FS, kernel_FS, correlation_FS;
 	
@@ -414,7 +404,10 @@ std::vector<double> FitBlobs3DProgram::segmentBlob(
 	const float corr_var = Normalization::computeVariance(correlation, 0.f);
 	correlation /= sqrt(corr_var);
 	
-	//correlation.write("DEBUG_tilt_space_correlation_binning.mrc");
+	if (debug_prefix != "")
+	{
+		correlation.write(debug_prefix+"_tilt_space_correlation.mrc");
+	}
 	
 	const double lambda = 0.00001;
 	
@@ -424,10 +417,9 @@ std::vector<double> FitBlobs3DProgram::segmentBlob(
 	
 	std::vector<double> last_params = {h0 / blob_pre_fit.basis(0,0,0)};
 	
-	
-	for (int SH_bands = 1; SH_bands < 10; SH_bands++)
+	for (int current_SH_bands = 1; current_SH_bands <= SH_bands; current_SH_bands++)
 	{
-		TiltSpaceBlobFit blob_fit(SH_bands, lambda, correlation, directions_XZ);
+		TiltSpaceBlobFit blob_fit(current_SH_bands, lambda, correlation, directions_XZ);
 		
 	    std::vector<double> params(blob_fit.getParameterCount(), 0.0);
 		
@@ -438,10 +430,19 @@ std::vector<double> FitBlobs3DProgram::segmentBlob(
 		
 		std::vector<double> final_params = LBFGS::optimize(params, blob_fit, 0, 1000, 1e-6);
 		
+		
 		/*BufferedImage<float> plot = blob_fit.drawSolution(final_params, map);
 		plot.write("DEBUG_tilt_space_plot_SH_"+ZIO::itoa(SH_bands)+".mrc");*/
 				
 		last_params = final_params;
+	}
+	
+	if (debug_prefix != "")
+	{
+		TiltSpaceBlobFit blob_fit(SH_bands, lambda, correlation, directions_XZ);
+		BufferedImage<float> plot = blob_fit.drawSolution(last_params, map);
+		
+		plot.write(debug_prefix+"_tilt_space_plot_SH_"+ZIO::itoa(SH_bands)+".mrc");
 	}
 	
 	/*BufferedImage<float> surfaceCost(map.xdim, map.ydim, map.zdim);
@@ -602,10 +603,27 @@ std::vector<double> FitBlobs3DProgram::segmentBlob(
 	
 	out[3] += min_radius_full / blob_pre_fit.basis(0,0,0);
 	
+	SphericalHarmonics SH_3(1);
+	std::vector<double> Y_3(4);
+	SH_3.computeY(1, 0, 0, &Y_3[0]);
+	
 	for (int i = 0; i < 3; i++)
 	{
-		out[i] = sphere_position[i] - out[i+4];
+		out[i] = sphere_position[i] - out[i+4] * Y_3[0];
 		out[i+4] = 0.0;
+	}
+	
+	if (debug_prefix != "")
+	{
+		BufferedImage<float> plot = TiltSpaceBlobFit::visualiseBlob(
+			out, 
+			mean_radius_full, 
+			radius_range, 
+			binning, 
+			preweighted_stack, 
+			projections);
+		
+		plot.write(debug_prefix+"_tilt_space_plot_SH_"+ZIO::itoa(SH_bands)+"_blob_space.mrc");
 	}
 	
 	return out;

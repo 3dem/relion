@@ -47,7 +47,8 @@ class FitBlobs3DProgram
 		        double binning,  
 		        const RawImage<float>& preweighted_stack, 
 		        double pixel_size,
-		        const std::vector<gravis::d4Matrix>& projections);
+		        const std::vector<gravis::d4Matrix>& projections,
+		        const std::string& debug_prefix);
 
 
 		std::vector<gravis::d4Vector> readSpheresCMM(
