@@ -1,12 +1,13 @@
 #include "fit_blobs_3d.h"
-
-#include <src/jaz/tomography/tomogram_set.h>
+#include <src/jaz/membrane/tilt_space_blob_fit.h>
 #include <src/jaz/membrane/blob_fit_3d.h>
 #include <src/jaz/membrane/membrane_segmentation.h>
 #include <src/jaz/optimization/gradient_descent.h>
 #include <src/jaz/optimization/nelder_mead.h>
+#include <src/jaz/optimization/lbfgs.h>
 #include <src/jaz/optics/damage.h>
 #include <src/jaz/tomography/fiducials.h>
+#include <src/jaz/tomography/tomogram_set.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
 
@@ -16,9 +17,26 @@ using namespace gravis;
 
 void FitBlobs3DProgram::readParameters(int argc, char *argv[])
 {
-	double sphere_thickness_0;
+	/*{
+		const double binning = 2.0;
+		
+		const int falloff = 100 / binning;
+		const int width = 10 / binning;
+		const double spacing = 40.0 / binning;
+		const double ratio = 5.0;
+		const double depth = 1.25;
+		
+		BufferedImage<float> kernel = MembraneSegmentation::constructMembraneKernel(
+			1130, 120, 1, falloff, width, spacing, ratio, depth);  
+		
+		kernel.write("DEBUG_membrane_kernel.mrc");
+		
+		std::exit(0);
+	}*/
 
 	IOParser parser;
+	
+	double sphere_thickness_0;
 
 	try
 	{
@@ -119,12 +137,7 @@ void FitBlobs3DProgram::run()
 		
 		processTomogram(
 			tomoName, spheresFn,
-			initial_tomogram_set,
-			subtracted_tomogram_set,
-			blobs_tomogram_set,
-			visualisation,
-			tomo_index,
-			tomoToSpheres.size());
+			initial_tomogram_set);
 		
 		Log::endSection();
 
@@ -143,12 +156,7 @@ void FitBlobs3DProgram::run()
 void FitBlobs3DProgram::processTomogram(
 		std::string tomoName,
 		std::string spheresFn,
-		TomogramSet& initial_tomogram_set,
-		TomogramSet& subtracted_tomogram_set,
-		TomogramSet& blobs_tomogram_set,
-		BufferedImage<float>& visualisation,
-		int tomo_batch_index,
-		int tomo_batch_size)
+		TomogramSet& initial_tomogram_set)
 {
 	Log::print("Loading tilt series");
 	
@@ -157,39 +165,10 @@ void FitBlobs3DProgram::processTomogram(
 	const int tomo_index = initial_tomogram_set.getTomogramIndexSafely(tomoName);
 
 	Tomogram tomogram0 = initial_tomogram_set.loadTomogram(tomo_index, true);
-	const int frame_count = tomogram0.frameCount;
-
-	const int w_full = tomogram0.stack.xdim;
-	const int h_full = tomogram0.stack.ydim;
 
 	const double pixel_size = tomogram0.optics.pixelSize;
 
-	const double highpass_sigma_real = highpass_sigma_real_A / pixel_size;
 	const double fiducials_radius = fiducials_radius_A / pixel_size;
-
-
-	
-	
-	/*BufferedImage<float> original_stack = tomogram0.stack;
-
-	tomogram0.stack = ImageFilter::highpassStackGaussPadded(
-						original_stack,
-						highpass_sigma_real,
-						num_threads);*/
-	
-	        
-	/*if (diag)
-	{
-		ZIO::makeOutputDir(outPath + "diag/" + tomogram0.name);
-
-		if (visualisation.xdim == 0)
-		{
-			visualisation.resize(w_full, h_full, 3 * tomo_batch_size);
-		}
-
-		visualisation.getSliceRef(3 * tomo_batch_index).copyFrom(
-				original_stack.getConstSliceRef(frame_count / 2));
-	}*/
 
 
 	std::vector<d3Vector> fiducials(0);
@@ -198,9 +177,6 @@ void FitBlobs3DProgram::processTomogram(
 	           tomogram0.fiducialsFilename.length() > 0 
 	        && tomogram0.fiducialsFilename != "empty";
 
-	//BufferedImage<float> fiducialsMask(w_full, h_full, frame_count);
-
-	
 	        
 	Log::print("Filtering");
 	
@@ -227,8 +203,6 @@ void FitBlobs3DProgram::processTomogram(
 			num_threads);
 	}
 	
-	tomogram_binned.stack.write("DEBUG_erased_binned.mrc");
-	
 	BufferedImage<float> preweighted_stack = RealSpaceBackprojection::preWeight(
 	            tomogram_binned.stack, tomogram_binned.projectionMatrices, num_threads);
 	
@@ -237,178 +211,131 @@ void FitBlobs3DProgram::processTomogram(
 			tomogram_binned.optics.pixelSize, 
 			tomogram_binned.cumulativeDose, num_threads);
 	
-	
-	/*BufferedImage<float> blobs_stack(w_full, h_full, frame_count);
-	blobs_stack.fill(0.f);*/
-
+	std::vector<std::vector<double>> all_blob_coeffs;
+	Mesh blob_meshes;
 
 	for (int blob_id = 0; blob_id < spheres.size(); blob_id++)
 	{
 		Log::beginSection("Blob #" + ZIO::itoa(blob_id + 1));
 		
 		const d4Vector sphere = spheres[blob_id];
-		std::vector<double> initial = {sphere.x, sphere.y, sphere.z};
-
-		std::vector<double> blob_coeffs = initial;
 
 		const d3Vector sphere_position = sphere.xyz();
-		const double outer_radius_full = sphere.w + sphere_thickness / 2;
+		
+		d3Vector bad_sphere_position = sphere_position;
+		bad_sphere_position.y -= 50;
 
-		const int substack_size_binned = 2 * std::ceil(outer_radius_full / max_binning);
-		const int substack_size = (int)(substack_size_binned * max_binning);
-
-		presegmentBlob(
+		std::vector<double> blob_coeffs = segmentBlob(
 				sphere_position, 
 				sphere.w, 
 				sphere_thickness, 
 		        segmentation_binning,
 				preweighted_stack, 
+		        pixel_size,
 				tomogram_binned.projectionMatrices);
-
-		/*Tomogram tomogram_cropped = tomogram0.extractSubstack(
-		            sphere_position, substack_size, substack_size);
-
-
-		double current_binning = max_binning;
-
-		while (current_binning > min_binning - 1e-6)
-		{
-			if (current_binning == max_binning)
-			{
-				Log::beginSection("Fitting at bin " + ZIO::itoa((int)current_binning));
-			}
-			else
-			{
-				Log::beginSection("Refining at bin " + ZIO::itoa((int)current_binning));
-			}
-			
-			blob_coeffs = fitBlob(blob_id, blob_coeffs, current_binning, tomogram_cropped, fiducials);
-			current_binning /= 2;
-			
-			Log::endSection();
-		}
-
-		SphericalHarmonics sh(SH_bands);
-		Blob3D blob(blob_coeffs, spheres[blob_id].w + sphere_thickness / 2, &sh);
-
-		#pragma omp parallel for num_threads(num_threads)
-		for (int f = 0; f < frame_count; f++)
-		{
-			RawImage<float> stackSlice = original_stack.getSliceRef(f);
-			RawImage<float> blobsSlice = blobs_stack.getSliceRef(f);
-
-			blob.decompose(
-				stackSlice, blobsSlice,
-				tomogram0.projectionMatrices[f],
-				fiducialsMask.getConstSliceRef(f),
-				50.0);
-		}*/
 		
+		all_blob_coeffs.push_back(blob_coeffs);
+		
+		Mesh blob_mesh = createMesh(blob_coeffs, pixel_size, 50, 20);
+		
+		blob_mesh.writeObj("DEBUG_blob_"+ZIO::itoa(blob_id)+".obj");
+
+		MeshBuilder::insert(blob_mesh, blob_meshes);
 		Log::endSection();
 	}
-
-	/*const std::string tag = outPath + tomogram0.name;
-
-	original_stack.write(tag + "_subtracted.mrc", tomogram0.optics.pixelSize);
-	blobs_stack.write(tag + "_blobs.mrc", tomogram0.optics.pixelSize);
-
-	subtracted_tomogram_set.setTiltSeriesFile(tomo_index, tag + "_subtracted.mrc");
-	blobs_tomogram_set.setTiltSeriesFile(tomo_index, tag + "_blobs.mrc");
-
-	if (diag)
-	{
-		visualisation.getSliceRef(3 * tomo_batch_index + 1).copyFrom(
-				original_stack.getConstSliceRef(frame_count / 2));
-
-		visualisation.getSliceRef(3 * tomo_batch_index + 2).copyFrom(
-				blobs_stack.getConstSliceRef(frame_count / 2));
-	}*/
 }
 
-BufferedImage<float> computeTiltSpaceMap(
-        d3Vector sphere_position, 
-        double mean_radius_full, 
-        double radius_range, 
-        double binning, 
-        const RawImage<float>& preweighted_stack, 
-        const std::vector<d4Matrix>& projections)
+Mesh FitBlobs3DProgram::createMesh(
+        const std::vector<double>& blob_coeffs,
+        double pixel_size,
+        double spacing, 
+        double max_tilt_deg)
 {
-	const int fc = projections.size();
-		
-	const double perimeter_length_full = 2 * PI * mean_radius_full;
+	const double max_tilt = DEG2RAD(max_tilt_deg);
+	const double rad = blob_coeffs[3];
+	const int azimuth_samples = (int) std::round(2 * PI * rad / spacing);
+	const int tilt_samples = (int) std::round(2 * max_tilt * rad / spacing);
+	const d3Vector centre(blob_coeffs[0],blob_coeffs[1],blob_coeffs[2]);
 	
-	const int w_map = perimeter_length_full / binning;
-	const int h_map = radius_range / binning;
+	const int vertex_count = azimuth_samples * tilt_samples;
 	
-	const int w_stack = preweighted_stack.xdim;
-	const int h_stack = preweighted_stack.ydim;
+	Mesh out;
+	out.vertices.resize(vertex_count);
 	
-	const double min_radius_full = mean_radius_full - radius_range/2;
+	const int SH_params = blob_coeffs.size() - 3;
 	
-	BufferedImage<float> map(w_map, h_map, fc);
+	const int SH_bands = (int) sqrt(SH_params - 1);
+	SphericalHarmonics SH(SH_bands);
 	
-	for (int z = 0; z < fc; z++)
-	for (int y = 0; y < h_map; y++)
-	for (int x = 0; x < w_map; x++)
+	std::vector<double> Y(SH_params);
+	
+	for (int a = 0; a < azimuth_samples; a++)
+	for (int t = 0; t < tilt_samples; t++)
 	{
-		const int f0 = z;
-		const d4Matrix& A = projections[f0];
+		const double phi   = 2 * PI * a / (double) azimuth_samples;
+		const double theta = -max_tilt + 2 * max_tilt * t / (double) (tilt_samples - 1);
 		
-		d3Vector dir_x(A(0,0), A(0,1), A(0,2));
-		d3Vector dir_y(A(1,0), A(1,1), A(1,2));
+		SH.computeY(SH_bands, sin(theta), phi, &Y[0]);
+		        
+		double dist = 0.0;
 		
-		dir_x.normalize();
-		dir_y.normalize();
-		
-		const double phi = 2 * PI * x / (double) w_map;
-		const double r = min_radius_full + radius_range * y / (double) h_map;
-		
-		const d3Vector pos = sphere_position + r * (cos(phi) * dir_x + sin(phi) * dir_y);
-		
-		float sum = 0.f;
-		float weight = 0.f;
-		
-		for (int f = 0; f < fc; f++)
+		for (int b = 0; b < SH_params; b++)
 		{
-			const d4Vector pi = projections[f] * d4Vector(pos);
-
-			if (pi.x >= 0.0 && pi.x < w_stack && pi.y >= 0.0 && pi.y < h_stack)
-			{
-				sum += Interpolation::linearXY_clip(preweighted_stack, pi.x, pi.y, f);
-				weight += 1.0;
-			}
+			dist += blob_coeffs[b+3] * Y[b];
 		}
 		
-		if (weight > 0)
-		{
-			map(x,y,z) = sum / weight;
-		}
-		else
-		{
-			map(x,y,z) = 0;
-		}     
+		out.vertices[t * azimuth_samples + a] = 
+			pixel_size * (centre + dist * d3Vector(cos(phi), sin(phi), sin(theta)));
 	}
 	
-	return map;
+	const int triangle_count = 2 * (tilt_samples - 1) * azimuth_samples;
+	        
+	out.triangles.resize(triangle_count);
+	
+	for (int a = 0; a < azimuth_samples; a++)
+	for (int t = 0; t < tilt_samples-1; t++)
+	{
+		Triangle tri0;
+		
+		tri0.a =  t      * azimuth_samples +  a;
+		tri0.b = (t + 1) * azimuth_samples +  a;
+		tri0.c = (t + 1) * azimuth_samples + (a + 1) % azimuth_samples;
+		
+		Triangle tri1;
+		
+		tri1.a =  t      * azimuth_samples +  a;
+		tri1.b = (t + 1) * azimuth_samples + (a + 1) % azimuth_samples;
+		tri1.c =  t      * azimuth_samples + (a + 1) % azimuth_samples;
+		
+		out.triangles[2 * (t * azimuth_samples + a)    ] = tri0;
+		out.triangles[2 * (t * azimuth_samples + a) + 1] = tri1;
+	}
+	
+	return out;
 }
 
-std::vector<double> FitBlobs3DProgram::presegmentBlob(
+
+std::vector<double> FitBlobs3DProgram::segmentBlob(
         d3Vector sphere_position, 
         double mean_radius_full, 
         double radius_range, 
         double binning, 
         const RawImage<float>& preweighted_stack, 
+        double pixel_size,
         const std::vector<d4Matrix>& projections)
 {
-	BufferedImage<float> map = computeTiltSpaceMap(
+	BufferedImage<float> map = TiltSpaceBlobFit::computeTiltSpaceMap(
 			sphere_position, 
 			mean_radius_full, 
 			radius_range, 
 			binning, 
 			preweighted_stack, 
-			projections);	            
+			projections);
+	
+	BufferedImage<d3Vector> directions_XZ = TiltSpaceBlobFit::computeDirectionsXZ(
+	            mean_radius_full, binning, projections);
 	            
-	map.write("DEBUG_tilt_space_map.mrc");
+	//map.write("DEBUG_tilt_space_map_binning.mrc");
 	
 	const int fc = projections.size();
 	
@@ -429,19 +356,21 @@ std::vector<double> FitBlobs3DProgram::presegmentBlob(
 		tilt_axis_azimuth[f] = std::atan2(tilt_axis_2D.y, tilt_axis_2D.x);
 	}
 	
-	const int falloff = 100 / binning; // falloff
-	const int width = 10 / binning; // width
-	const double spacing = 40.0 / binning; // spacing
-	const double ratio = 5.0; // ratio
+	const int y_prior = 100 / binning;
+	const int falloff = 100 / binning;
+	const int width = 10 / binning;
+	const double spacing = 40.0 / (pixel_size * binning);
+	const double ratio = 5.0;
+	const double depth = 0;
 	
 	const double min_radius_full = mean_radius_full - radius_range/2;
 	const double max_radius_full = mean_radius_full + radius_range/2;
 		
 	
 	BufferedImage<float> kernel = MembraneSegmentation::constructMembraneKernel(
-		map.xdim, map.ydim, map.zdim, falloff, width, spacing, ratio);   
+		map.xdim, map.ydim, map.zdim, falloff, width, spacing, ratio, depth);   
 	 
-	kernel.write("DEBUG_tilt_space_kernel.mrc");
+	//kernel.write("DEBUG_tilt_space_kernel.mrc");
 	
 	BufferedImage<fComplex> map_FS, kernel_FS, correlation_FS;
 	
@@ -463,7 +392,7 @@ std::vector<double> FitBlobs3DProgram::presegmentBlob(
 	
 	const double st = map.zdim / 4.0;
 	const double s2t = 2 * st * st;
-	const double s2f = 2 * falloff * falloff;
+	const double s2f = 2 * y_prior * y_prior;
 	        
 	for (int f = 0; f < map.zdim; f++)
 	for (int y = 0; y < map.ydim; y++)
@@ -485,9 +414,35 @@ std::vector<double> FitBlobs3DProgram::presegmentBlob(
 	const float corr_var = Normalization::computeVariance(correlation, 0.f);
 	correlation /= sqrt(corr_var);
 	
-	correlation.write("DEBUG_tilt_space_correlation.mrc");
+	//correlation.write("DEBUG_tilt_space_correlation_binning.mrc");
+	
+	const double lambda = 0.00001;
 	
 	
+	TiltSpaceBlobFit blob_pre_fit(0, lambda, correlation, directions_XZ);
+	double h0 = blob_pre_fit.estimateInitialHeight();
+	
+	std::vector<double> last_params = {h0 / blob_pre_fit.basis(0,0,0)};
+	
+	
+	for (int SH_bands = 1; SH_bands < 10; SH_bands++)
+	{
+		TiltSpaceBlobFit blob_fit(SH_bands, lambda, correlation, directions_XZ);
+		
+	    std::vector<double> params(blob_fit.getParameterCount(), 0.0);
+		
+		for (int i = 0; i < last_params.size() && i < params.size(); i++)
+		{
+			params[i] = last_params[i];
+		}
+		
+		std::vector<double> final_params = LBFGS::optimize(params, blob_fit, 0, 1000, 1e-6);
+		
+		/*BufferedImage<float> plot = blob_fit.drawSolution(final_params, map);
+		plot.write("DEBUG_tilt_space_plot_SH_"+ZIO::itoa(SH_bands)+".mrc");*/
+				
+		last_params = final_params;
+	}
 	
 	/*BufferedImage<float> surfaceCost(map.xdim, map.ydim, map.zdim);
 	BufferedImage<float> indicator(map.xdim, map.ydim, map.zdim);
@@ -638,103 +593,22 @@ std::vector<double> FitBlobs3DProgram::presegmentBlob(
 		}
 	}*/
 	
-	std::exit(0);
-}
-
-std::vector<double> FitBlobs3DProgram::fitBlob(
-		int blob_id,
-		const std::vector<double>& initial,
-		double binning_factor,
-		Tomogram& tomogram_cropped,
-		const std::vector<d3Vector>& fiducials)
-{
-	const double pixelSize_full = tomogram_cropped.optics.pixelSize;
-	const double pixelSize_binned = tomogram_cropped.optics.pixelSize * binning_factor;
-
-	// 3D coordinates live in bin-1 pixel coordinates;
-	const d4Vector sphere = spheres[blob_id];
-
-	// 2D radii, thicknesses and distances are binned
-	const double sphere_radius_full = sphere.w;
-	const double outer_radius_full = sphere.w + sphere_thickness / 2;
-	const double sphere_radius_binned = sphere_radius_full / binning_factor;
-	const double outer_radius_binned = outer_radius_full / binning_factor;
-
-	// The prior is evaluated in 2D: consider binning
-	const double prior_sigma = prior_sigma_A / pixelSize_full;
-
-
-	const double fiducials_radius_binned = fiducials_radius_A / pixelSize_binned;
-	const double sphere_thickness_binned = sphere_thickness / binning_factor;
-
-	const double initial_step = 2.0;
-
-	const std::string tomoTag = tomogram_cropped.name;
-	std::string blobTag = "blob_" + ZIO::itoa(blob_id);
-	std::string binTag = "bin_" + ZIO::itoa((int)binning_factor);
-
-	std::string outTag = outPath + "diag/" + tomoTag + "/" + blobTag + "/" + binTag;
-
-	Tomogram tomogram_binned = tomogram_cropped.FourierCrop(binning_factor, num_threads);
-
-	if (diag)
+	std::vector<double> out(last_params.size() + 3);
+	
+	for (int i = 3; i < out.size(); i++)
 	{
-		ZIO::makeOutputDir(outPath + "diag/" + tomoTag + "/" + blobTag);
-		tomogram_binned.stack.write(outTag + "_data.mrc");
+		out[i] = binning * last_params[i-3];
 	}
-
-	std::vector<double> last_optimum = fromBin1(initial, binning_factor);
-	int initial_SH_bands = initial.size() < 7? 0 : sqrt(initial.size() - 3) - 1;
-
-	for (int current_SH_bands = initial_SH_bands; current_SH_bands <= SH_bands; current_SH_bands++)
+	
+	out[3] += min_radius_full / blob_pre_fit.basis(0,0,0);
+	
+	for (int i = 0; i < 3; i++)
 	{
-		const int SH_coeffs = (current_SH_bands + 1) * (current_SH_bands + 1);
-		
-		Log::print(ZIO::itoa(current_SH_bands) + " SH bands (" + ZIO::itoa(SH_coeffs + 2) + " parameters)");
-
-		std::string tag = outTag + "_SH_" + ZIO::itoa(current_SH_bands);
-
-		BlobFit3D bf(
-			tomogram_binned, spheres[blob_id].xyz(), current_SH_bands,
-			sphere_radius_binned,
-			sphere_thickness_binned,
-			spheres,
-			fiducials, fiducials_radius_binned,
-			prior_sigma, num_threads);
-
-		std::vector<double> current_optimum(SH_coeffs + 3, 0.0);
-
-		for (int i = 0; i < last_optimum.size(); i++)
-		{
-			current_optimum[i] = last_optimum[i];
-		}
-
-		std::vector<double> new_optimum;
-
-		new_optimum = NelderMead::optimize(
-				current_optimum, bf, initial_step, 0.05, max_iters, 1.0, 2.0, 0.5, 0.5, false);
-
-		if (diag)
-		{
-			SphericalHarmonics sh(current_SH_bands);
-			Blob3D blob2(new_optimum, outer_radius_binned, &sh);
-			
-			const double E0 = bf.f(current_optimum, &sh);
-			const double E1 = bf.f(new_optimum, &sh);
-			
-			Log::print("  E: "+ZIO::itoa(E0)+" -> "+ZIO::itoa(E1));
-
-			drawTestStack(blob2, tomogram_binned, bf.weight).write(tag+"_fit.mrc");
-			drawFit(blob2, tomogram_binned, bf.weight).write(tag+"_residual.mrc");
-		}
-
-		last_optimum = new_optimum;
+		out[i] = sphere_position[i] - out[i+4];
+		out[i+4] = 0.0;
 	}
-
-
-	std::vector<double> upscaled_optimum = toBin1(last_optimum, binning_factor);
-
-	return upscaled_optimum;
+	
+	return out;
 }
 
 std::vector<d4Vector> FitBlobs3DProgram::readSpheresCMM(
@@ -773,97 +647,3 @@ std::vector<d4Vector> FitBlobs3DProgram::readSpheresCMM(
 	return spheres;
 }
 
-
-BufferedImage<float> FitBlobs3DProgram::drawFit(
-		Blob3D& blob,
-		const Tomogram& tomogram,
-		BufferedImage<float>& realWeight)
-{
-	const int fc = tomogram.frameCount;
-	const int w = tomogram.stack.xdim;
-	const int h = tomogram.stack.ydim;
-
-	BufferedImage<float> out(w,h,fc);
-
-	for (int f = 0; f < fc; f++)
-	{
-		std::vector<double> radAvg = blob.radialAverage(
-			tomogram.stack.getConstSliceRef(f),
-			tomogram.projectionMatrices[f],
-			realWeight.getConstSliceRef(f));
-
-		BufferedImage<float> diff = blob.drawError(
-			tomogram.stack.getConstSliceRef(f),
-			tomogram.projectionMatrices[f],
-			realWeight.getConstSliceRef(f),
-			radAvg);
-
-		out.copySliceFrom(f, diff);
-	}
-
-	return out;
-}
-
-
-BufferedImage<float> FitBlobs3DProgram::drawTestStack(
-		Blob3D& blob,
-		const Tomogram& tomogram,
-		BufferedImage<float>& realWeight)
-{
-	const int fc = tomogram.frameCount;
-	const int w = tomogram.stack.xdim;
-	const int h = tomogram.stack.ydim;
-
-	BufferedImage<float> out(w,h,fc);
-
-	for (int f = 0; f < fc; f++)
-	{
-		std::vector<double> radAvg = blob.radialAverage(
-			tomogram.stack.getConstSliceRef(f),
-			tomogram.projectionMatrices[f],
-			realWeight.getConstSliceRef(f));
-
-		BufferedImage<float> radAvgProj = blob.radialAverageProjection(
-			tomogram.stack.getConstSliceRef(f),
-			tomogram.projectionMatrices[f],
-			radAvg);
-
-		out.copySliceFrom(f, radAvgProj);
-	}
-
-	return out;
-}
-
-std::vector<double> FitBlobs3DProgram::toBin1(
-		const std::vector<double> &parameters,
-		double binning_factor)
-{
-	std::vector<double> upscaled_optimum = parameters;
-
-	for (int i = 3; i < upscaled_optimum.size(); i++)
-	{
-		upscaled_optimum[i] *= binning_factor;
-	}
-
-	return upscaled_optimum;
-}
-
-std::vector<double> FitBlobs3DProgram::fromBin1(
-		const std::vector<double> &parameters,
-		double binning_factor)
-{
-	const int xc = parameters.size();
-	std::vector<double> downscaled_optimum(xc);
-
-	for (int i = 0; i < downscaled_optimum.size(); i++)
-	{
-		downscaled_optimum[i] = parameters[i];
-
-		if (i > 2)
-		{
-			downscaled_optimum[i] /= binning_factor;
-		}
-	}
-
-	return downscaled_optimum;
-}

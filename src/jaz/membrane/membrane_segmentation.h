@@ -13,7 +13,8 @@ class MembraneSegmentation
 		        double falloff,
 				double kernel_width,
 				double spacing,
-				double ratio);
+				double ratio,
+		        double depth);
 		
 		static BufferedImage<float> determineMembraniness(
 				const RawImage<float>& tomo,

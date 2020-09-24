@@ -7,7 +7,7 @@ using namespace gravis;
 
 BufferedImage<float> MembraneSegmentation::constructMembraneKernel(
         int w, int h, int d, 
-        double falloff, double kernel_width, double spacing, double ratio)
+        double falloff, double kernel_width, double spacing, double ratio, double depth)
 {
 	BufferedImage<float> kernel(w,h,d);
 	kernel.fill(0.f);
@@ -19,7 +19,7 @@ BufferedImage<float> MembraneSegmentation::constructMembraneKernel(
 	for (int x = 0; x < w; x++)
 	{
 		const double xx = x < w/2? x : x - w;
-		const double yy = y < h/2? y : y - h;
+		const double yy = (y < h/2? y : y - h) - depth * spacing;
 		
 		const double yt = yy / spacing;
 		
@@ -31,7 +31,7 @@ BufferedImage<float> MembraneSegmentation::constructMembraneKernel(
 			
 			if (yt < 0)
 			{
-				wave *= (yt + 1.5) / 1.5;
+				wave *= (yt + 3) / 3;
 			}
 		}
 		else

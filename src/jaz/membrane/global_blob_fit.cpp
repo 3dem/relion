@@ -52,7 +52,7 @@ std::pair<double,std::vector<double>> GlobalBlobFit2D::fit(
 	const int num_freqs = max_frequencies;
 		
 	BufferedImage<float> kernel = MembraneSegmentation::constructMembraneKernel(
-		w, h, 1, falloff, width, spacing, ratio);   
+		w, h, 1, falloff, width, spacing, ratio, 0.0);   
 	 
 	if (debug)
 	{

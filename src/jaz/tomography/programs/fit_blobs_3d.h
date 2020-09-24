@@ -3,6 +3,7 @@
 
 #include <string>
 #include <src/jaz/image/buffered_image.h>
+#include <src/jaz/mesh/mesh_builder.h>
 
 class Tomogram;
 class TomogramSet;
@@ -35,52 +36,31 @@ class FitBlobs3DProgram
 	private:
 
 
-		void processTomogram(
-				std::string tomoName,
+		void processTomogram(std::string tomoName,
 				std::string spheresFn,
-				TomogramSet& initial_tomogram_set,
-				TomogramSet& subtracted_tomogram_set,
-				TomogramSet& blobs_tomogram_set,
-				BufferedImage<float>& visualisation,
-				int tomo_batch_index,
-				int tomo_batch_size);
+				TomogramSet& initial_tomogram_set);
 		
-		std::vector<double> presegmentBlob(
+		std::vector<double> segmentBlob(
 		        gravis::d3Vector sphere_position, 
 		        double mean_radius_full, 
 		        double radius_range, 
 		        double binning,  
 		        const RawImage<float>& preweighted_stack, 
+		        double pixel_size,
 		        const std::vector<gravis::d4Matrix>& projections);
 
-		std::vector<double> fitBlob(
-				int blob_id,
-				const std::vector<double>& initial,
-				double binning_factor,
-				Tomogram& tomogram0,
-				const std::vector<gravis::d3Vector>& fiducials);
 
 		std::vector<gravis::d4Vector> readSpheresCMM(
 				const std::string& filename,
 				double binning);
+		
+		
+		Mesh createMesh(
+		        const std::vector<double>& blob_coeffs,
+		        double pixel_size,
+		        double spacing, 
+		        double max_tilt_deg);
 
-		BufferedImage<float> drawFit(
-				Blob3D& blob,
-				const Tomogram& tomogram,
-				BufferedImage<float>& realWeight);
-
-		BufferedImage<float> drawTestStack(
-				Blob3D& blob,
-				const Tomogram& tomogram,
-				BufferedImage<float>& realWeight);
-
-		std::vector<double> toBin1(
-				const std::vector<double>& parameters,
-				double binning_factor);
-
-		std::vector<double> fromBin1(
-				const std::vector<double>& parameters,
-				double binning_factor);
 };
 
 #endif
