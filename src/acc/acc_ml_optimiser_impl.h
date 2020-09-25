@@ -41,12 +41,6 @@ void getFourierTransformsAndCtfs(long int part_id,
 		int optics_group = baseMLO->mydata.getOpticsGroup(part_id, img_id);
 		bool ctf_premultiplied = baseMLO->mydata.obsModel.getCtfPremultiplied(optics_group);
 
-		// SHWS 13feb2020: new ctf_premultiplied replaces ctf arrays by ctf^2 arrays, then one can no longer not apply CTF to references...
-		if (ctf_premultiplied && !baseMLO->refs_are_ctf_corrected)
-		{
-			REPORT_ERROR("ERROR: one can no longer use ctf_premultiplied and !refs_are_ctf_corrected together...");
-		}
-
 		// metadata offset for this image in the particle
 		int my_metadata_offset = op.metadata_offset + img_id;
 
