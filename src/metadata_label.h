@@ -1078,7 +1078,7 @@ private:
 		EMDL::addLabel(EMDL_RESOLUTION_ANGSTROM, EMDL_DOUBLE, "rlnAngstromResolution", "Resolution (in Angstroms)");
 		EMDL::addLabel(EMDL_RESOLUTION_INVPIXEL, EMDL_DOUBLE, "rlnResolutionInversePixel", "Resolution (in 1/pixel, Nyquist = 0.5)");
 		EMDL::addLabel(EMDL_SPECTRAL_IDX, EMDL_INT, "rlnSpectralIndex", "Spectral index (i.e. distance in pixels to the origin in Fourier space) ");
-		
+
 		EMDL::addLabel(EMDL_TOMO_NAME, EMDL_STRING, "rlnTomoName", "Arbitrary name for a tomogram");
 		EMDL::addLabel(EMDL_TOMO_TILT_SERIES_NAME, EMDL_STRING, "rlnTomoTiltSeriesName", "Tilt series file name");
 		EMDL::addLabel(EMDL_TOMO_FRAME_COUNT, EMDL_INT, "rlnTomoFrameCount", "Number of tilts in a tilt series");
@@ -1096,6 +1096,10 @@ private:
 		EMDL::addLabel(EMDL_TOMO_FIDUCIALS_STARFILE, EMDL_STRING, "rlnTomoFiducialsStarFile", "STAR file containing the 3D locations of fiducial markers");
 		EMDL::addLabel(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, EMDL_DOUBLE, "rlnTomoTiltSeriesPixelSize", "Pixel size of the original tilt series");
 		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_BINNING, EMDL_DOUBLE, "rlnTomoSubtomogramBinning", "Binning level of a subtomogram");
+
+		EMDL::addLabel(EMDL_TOMO_PARTICLE_ID, EMDL_INT, "rlnTomoParticleId", "Particle index");
+		EMDL::addLabel(EMDL_TOMO_PICK_PARTICLE_ID, EMDL_INT, "rlnTomoPickParticleId", "Virus Particle index");
+
 				
 		EMDL::addLabel(EMDL_UNKNOWN_LABEL, EMDL_UNKNOWN, "rlnUnknownLabel", "NON-RELION label: values will be ignored, yet maintained in the STAR file.");
 	 }
