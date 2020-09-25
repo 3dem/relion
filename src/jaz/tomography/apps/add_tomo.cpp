@@ -132,6 +132,8 @@ int main(int argc, char *argv[])
 				
 		Log::print("Writing culled frame stack to "+outFnCrop);
 		ii.writeCulledStack(mapping.oldFrameIndex, outFnCrop);
+		
+		tsFn = outFnCrop;
 	}
 	
 	if (tltFn == "")
