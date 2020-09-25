@@ -356,11 +356,35 @@ void diff2_coarse(
 	const int maxR = projector.maxR;
 	const unsigned pass_num(ceilfracf(image_size,block_sz));
 
+#ifdef __GNUC__
+	// pre-compute sin and cos for x and y component
+	XFLOAT sin_x[translation_num][xSize], cos_x[translation_num][xSize];
+	XFLOAT sin_y[translation_num][ySize], cos_y[translation_num][ySize];
+	XFLOAT sin_z[translation_num][zSize], cos_z[translation_num][zSize];
+
+	if (DATA3D)  {
+		computeSincosLookupTable3D(translation_num, trans_x, trans_y, trans_z,
+								xSize, ySize, zSize,                               
+								&sin_x[0][0], &cos_x[0][0], 
+								&sin_y[0][0], &cos_y[0][0],
+								&sin_z[0][0], &cos_z[0][0]);
+	} else {
+		computeSincosLookupTable2D(translation_num, trans_x, trans_y, 
+								xSize, ySize,
+								&sin_x[0][0], &cos_x[0][0], 
+								&sin_y[0][0], &cos_y[0][0]);	
+	}
+	
+	XFLOAT trans_cos_x[block_sz], trans_sin_x[block_sz];
+	XFLOAT trans_cos_y[block_sz], trans_sin_y[block_sz];
+	XFLOAT trans_cos_z[block_sz], trans_sin_z[block_sz];
+#endif  // __GNUC__
+	
 	int x[pass_num][block_sz], y[pass_num][block_sz], z[pass_num][block_sz];
 	XFLOAT s_real[pass_num][block_sz];
 	XFLOAT s_imag[pass_num][block_sz];
 	XFLOAT s_corr[pass_num][block_sz];
-
+	
 	// Pre-calculate x/y/z
 	for (unsigned pass = 0; pass < pass_num; pass++) { // finish an entire ref image each block
    		unsigned long start = pass * block_sz;
@@ -386,6 +410,7 @@ void diff2_coarse(
 			{
 				x[pass][tid] =            pixel % xSize;
 				y[pass][tid] = floorfracf(pixel, xSize);
+				z[pass][tid] = (XFLOAT)0.0;
 			}
 			if (y[pass][tid] > maxR)
 				y[pass][tid] -= ySize;
@@ -394,6 +419,14 @@ void diff2_coarse(
 			s_imag[pass][tid] = g_imag[pixel];
 			s_corr[pass][tid] = g_corr[pixel] * (XFLOAT)0.5;
 		}
+
+		// Make sure un-used elements are zeroed - just in case
+		if (elements != block_sz)
+			for (int tid=elements; tid < block_sz; tid++)
+			{
+				x[pass][tid] = (XFLOAT)0.0;
+				y[pass][tid] = (XFLOAT)0.0;
+			}
 	}
 
 	XFLOAT diff2s[translation_num][eulers_per_block];
@@ -464,6 +497,45 @@ void diff2_coarse(
 				XFLOAT ty = trans_y[i];
 				XFLOAT tz = trans_z[i];                 
 
+#ifdef __GNUC__
+				for (int tid=0; tid<elements; tid++) {
+
+					int xidx = x[pass][tid];
+					int yidx = y[pass][tid];
+					int zidx;
+
+					if(DATA3D) {
+						zidx = z[pass][tid];
+						if ( zidx < 0) {
+							trans_cos_z[tid] =  cos_z[i][-zidx];
+							trans_sin_z[tid] = -sin_z[i][-zidx];            
+						}
+						else {
+							trans_cos_z[tid] = cos_z[i][zidx];
+							trans_sin_z[tid] = sin_z[i][zidx];
+						}
+					}
+
+					if ( yidx < 0) {
+						trans_cos_y[tid] =  cos_y[i][-yidx];
+						trans_sin_y[tid] = -sin_y[i][-yidx];            
+					}
+					else {
+						trans_cos_y[tid] = cos_y[i][yidx];
+						trans_sin_y[tid] = sin_y[i][yidx];
+					}
+
+					if ( xidx < 0) {
+						trans_cos_x[tid] =  cos_x[i][-xidx];
+						trans_sin_x[tid] = -sin_x[i][-xidx];            
+					}
+					else {
+						trans_cos_x[tid] = cos_x[i][xidx];
+						trans_sin_x[tid] = sin_x[i][xidx];
+					}					
+				}  // tid  						
+#endif  // __GNUC__
+				
 				#pragma omp simd
 				for (int tid=0; tid<block_sz; tid++) {
 // This will generate masked SVML routines for Intel compiler
@@ -472,12 +544,34 @@ void diff2_coarse(
 						continue;                
 
 					XFLOAT real, imag;
+#ifdef __GNUC__
+					if(DATA3D) {
+//						translatePixel(x[tid], y[tid], z[tid], tx, ty, tz, s_real[tid], s_imag[tid], real, imag);
+						XFLOAT s  = trans_sin_x[tid] * trans_cos_y[tid] + trans_cos_x[tid] * trans_sin_y[tid];
+						XFLOAT c  = trans_cos_x[tid] * trans_cos_y[tid] - trans_sin_x[tid] * trans_sin_y[tid];
+
+						XFLOAT ss = s * trans_cos_z[tid] + c * trans_sin_z[tid];
+						XFLOAT cc = c * trans_cos_z[tid] - s * trans_sin_z[tid];				
+
+						real = cc * s_real[pass][tid] - ss * s_imag[pass][tid];
+						imag = cc * s_imag[pass][tid] + ss * s_real[pass][tid];
+					}
+					else  { // 2D data
+//						translatePixel(x[tid], y[tid],         tx, ty,     s_real[tid], s_imag[tid], real, imag);
+						XFLOAT ss = trans_sin_x[tid] * trans_cos_y[tid] + trans_cos_x[tid] * trans_sin_y[tid];
+						XFLOAT cc = trans_cos_x[tid] * trans_cos_y[tid] - trans_sin_x[tid] * trans_sin_y[tid];
+			
+						real = cc * s_real[pass][tid] - ss * s_imag[pass][tid];
+						imag = cc * s_imag[pass][tid] + ss * s_real[pass][tid];
+					}
+#else  // not GCC - accept the (hopefully vectorized) sincos call every iteration rather than caching
 					if(DATA3D)
 						translatePixel(x[pass][tid], y[pass][tid], z[pass][tid], tx, ty, tz,
 										s_real[pass][tid], s_imag[pass][tid], real, imag);
 					else
 						translatePixel(x[pass][tid], y[pass][tid], tx, ty,
 										s_real[pass][tid], s_imag[pass][tid], real, imag);
+#endif  // not __GNUC__
 
 #ifdef __INTEL_COMPILER
 					#pragma unroll(eulers_per_block)
@@ -692,7 +786,7 @@ void diff2_fine_3D(
 	XFLOAT imgs_real[xSize], imgs_imag[xSize];
 	
 	XFLOAT s[translation_num];   
-	
+		
 	// Now do calculations
 	for (unsigned long bid = 0; bid < grid_size; bid++) {
 		unsigned long trans_num        = (unsigned long)d_job_num[bid];     
