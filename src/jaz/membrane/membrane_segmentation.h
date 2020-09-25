@@ -8,6 +8,14 @@ class MembraneSegmentation
 {
 	public:
 		
+		static BufferedImage<float> constructMembraneKernel(
+		        int w, int h, int d,
+		        double falloff,
+				double kernel_width,
+				double spacing,
+				double ratio,
+		        double depth);
+		
 		static BufferedImage<float> determineMembraniness(
 				const RawImage<float>& tomo,
 				RawImage<Tensor3x3<float>>& J,

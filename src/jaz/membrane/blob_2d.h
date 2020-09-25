@@ -115,7 +115,10 @@ class DelineatedBlob2D : public Blob2D
 		double getRadius(double phi) const;
 		double getSignedDistance(gravis::d2Vector imgPos) const;
 		double getRelativeSignedDistance(gravis::d2Vector imgPos) const;
+
 		gravis::d2Vector getOutlinePoint(double phi) const;
+		gravis::d2Vector estimateNormal(double phi, double scale) const;
+		
 		double perimeter() const;
 		Blob2D getBlob2D() const;
 		

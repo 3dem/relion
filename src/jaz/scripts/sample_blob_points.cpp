@@ -228,6 +228,7 @@ int main(int argc, char *argv[])
 			const int FULL_BLOB = 2;
 			
 			std::vector<std::vector<d2Vector>> picks(3);
+			std::vector<d2Vector> normals;
 			
 			
 			for (int b = 0; b < blob_count; b++)
@@ -281,6 +282,9 @@ int main(int argc, char *argv[])
 					{
 						picks[EDGE].push_back(p);
 						
+						d2Vector n = smaller_blob.estimateNormal(phi, 2 * PI / (double) samples);						
+						normals.push_back(n);
+						
 						if (diag) Drawing::drawCross(p, 100.f, 10, plot);
 					}
 				}
@@ -302,6 +306,7 @@ int main(int argc, char *argv[])
 				table.addLabel(EMDL_PARTICLE_AUTOPICK_FOM);
 				table.addLabel(EMDL_PARTICLE_CLASS);
 				table.addLabel(EMDL_ORIENT_PSI);
+				table.addLabel(EMDL_ORIENT_PSI_PRIOR);
 				
 				for (int p = 0; p < pc; p++)
 				{
@@ -311,7 +316,20 @@ int main(int argc, char *argv[])
 					table.setValue(EMDL_IMAGE_COORD_Y, picks[i][p].y, p);
 					table.setValue(EMDL_PARTICLE_AUTOPICK_FOM, 1.0, p);
 					table.setValue(EMDL_PARTICLE_CLASS, 0, p);
-					table.setValue(EMDL_ORIENT_PSI, 0.0, p);
+					
+					if (i == EDGE)
+					{
+						const d2Vector n = normals[p];						
+						double phi_deg = 180 - RAD2DEG(atan2(n.x, -n.y));
+						
+						table.setValue(EMDL_ORIENT_PSI, phi_deg, p);
+						table.setValue(EMDL_ORIENT_PSI_PRIOR, phi_deg, p);
+					}
+					else
+					{
+						table.setValue(EMDL_ORIENT_PSI, 0.0, p);
+						table.setValue(EMDL_ORIENT_PSI_PRIOR, 0.0, p);
+					}
 				}
 			}
 			

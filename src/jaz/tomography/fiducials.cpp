@@ -1,4 +1,5 @@
 #include "fiducials.h"
+#include <omp.h>
 
 using namespace gravis;
 
@@ -76,6 +77,99 @@ void Fiducials::drawMask(
 			if (distF2 < fidRad2)
 			{
 				destination(x,y) = value;
+			}
+		}
+	}
+}
+
+void Fiducials::erase(
+        const std::vector<d3Vector>& positions, 
+        double radius,
+        Tomogram& tomogram, 
+        int num_threads)
+{
+	const int w  = tomogram.stack.xdim;
+	const int h  = tomogram.stack.ydim;
+	const int fc = tomogram.stack.zdim;
+	
+	const double averaging_radius = 2 * radius;
+	const double falloff = radius / 4;
+	
+	#pragma omp parallel for num_threads(num_threads)
+	for (int f = 0; f < fc; f++)
+	{
+		BufferedImage<float> is_good(w,h);
+		is_good.fill(1.f);
+	
+		drawMask(
+			positions, tomogram.projectionMatrices[f],
+			radius, is_good, 0.f);
+		
+		double frame_average = Normalization::computeMean(tomogram.stack.getSliceRef(f));
+		
+		for (int fid = 0; fid < positions.size(); fid++)
+		{
+			const d4Vector fid_img = tomogram.projectionMatrices[f] * d4Vector(positions[fid]);
+			
+			double sum_val = 0.0;
+			double sum_wgh = 0.0;
+			
+			for (int dy = 0; dy < 2*averaging_radius; dy++)
+			for (int dx = 0; dx < 2*averaging_radius; dx++)
+			{
+				const int x = (int) (fid_img.x - averaging_radius) + dx;
+				const int y = (int) (fid_img.y - averaging_radius) + dy;
+				
+				const double dxf = x - fid_img.x;
+				const double dyf = y - fid_img.y;
+				
+				const double r = sqrt(dxf*dxf + dyf*dyf);
+				
+				if (r > radius && r < averaging_radius && 
+				    x >= 0 && x < w && 
+				    y >= 0 && y < h)
+				{
+					const float m = is_good(x,y);
+					
+					sum_val += m * tomogram.stack(x,y,f);
+					sum_wgh += m;
+				}
+			}
+			
+			const double avg_val = sum_wgh == 0.0? frame_average : sum_val / sum_wgh;
+			
+			for (int dy = 0; dy < 2*radius; dy++)
+			for (int dx = 0; dx < 2*radius; dx++)
+			{
+				const int x = (int) (fid_img.x - radius) + dx;
+				const int y = (int) (fid_img.y - radius) + dy;
+				
+				const double dxf = x - fid_img.x;
+				const double dyf = y - fid_img.y;
+				
+				const double r = sqrt(dxf*dxf + dyf*dyf);
+				
+				if (r < radius && 
+				    x >= 0 && x < w && 
+				    y >= 0 && y < h)
+				{
+					double m;
+					
+					if (r < radius - falloff/2) 
+					{
+						m = 1;
+					}
+					else if (r < radius + falloff/2) 
+					{
+						m = 0.5 * (cos(PI * (r - radius + falloff/2) / falloff) + 1);
+					}
+					else
+					{
+						m = 0;
+					}
+					
+					tomogram.stack(x,y,f) = m * avg_val + (1 - m) * tomogram.stack(x,y,f);
+				}
 			}
 		}
 	}

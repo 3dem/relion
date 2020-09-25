@@ -1,4 +1,5 @@
 #include "global_blob_fit.h"
+#include "membrane_segmentation.h"
 #include <src/jaz/math/fft.h>
 #include <src/jaz/image/normalization.h>
 #include <src/jaz/util/drawing.h>
@@ -39,51 +40,20 @@ std::pair<double,std::vector<double>> GlobalBlobFit2D::fit(
 	const int w = polar_image.xdim;
 	const int wh = w/2 + 1;
 	const int h = polar_image.ydim;
-	const int d = 100;
-	const int q = 10;
-	const double th = 33.0;
-	const double dip = 5.0;
+	const int falloff = 100; // falloff
+	const int width = 10; // width
+	const double spacing = 33.0; // spacing
+	const double ratio = 5.0; // ratio
 	const double margin_out = h / 6.0;
 	const double margin_in = h / 3.0;
 		
 	const double step_cost = 15;
 	const int max_step = 5;
 	const int num_freqs = max_frequencies;
-	
-	const double ds2 = 2 * d * d;
-	
-	BufferedImage<float> kernel(w,h);
-	kernel.fill(0.f);
-	
-	for (int y = 0; y < h; y++)
-	for (int x = 0; x < w; x++)
-	{
-		const double xx = x < w/2? x : x - w;
-		const double yy = y < h/2? y : y - h;
 		
-		const double yt = yy / th;
-		
-		double wave;
-		
-		if (yt < 0.5 && yt > -1.5)
-		{
-			wave = sin(2*PI*yt);
-			
-			if (yt < 0)
-			{
-				wave *= (yt + 1.5) / 1.5;
-			}
-		}
-		else
-		{
-			wave = 0.0;
-		}
-		
-		double decay = yy >= 0 ? exp(-yy*yy/ds2) : -exp(-yy*yy/ds2);
-		
-		kernel(x,y) = exp(-xx*xx/(2*q*q)) * (dip * wave + decay);
-	}
-	
+	BufferedImage<float> kernel = MembraneSegmentation::constructMembraneKernel(
+		w, h, 1, falloff, width, spacing, ratio, 0.0);   
+	 
 	if (debug)
 	{
 		kernel.write("DEBUG_glob_kernel.mrc");

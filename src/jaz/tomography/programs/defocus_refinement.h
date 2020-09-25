@@ -19,7 +19,7 @@ class DefocusRefinementProgram : public RefinementProgram
 		DefocusRefinementProgram(int argc, char *argv[]);
 			
 			bool clearAstigmatism, scanDefocus, slowScan, refineFast,
-				refineAstigmatism, scanAstigmatism, plotAstigmatism, regularise;
+				refineAstigmatism, plotAstigmatism, regularise;
 
 			int deltaSteps, max_particles, group_count;
 			double minDelta, maxDelta, sigma_input;

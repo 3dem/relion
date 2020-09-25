@@ -196,36 +196,54 @@ d3Vector ParticleSet::getPosition(long int particle_id) const
 	return out;
 }
 
-d3Matrix ParticleSet::getMatrix3x3(long int particle_id) const
+d3Matrix ParticleSet::getSubtomogramMatrix(long particle_id) const
 {
-	Matrix2D<RFLOAT> A;
-	
+	if (partTable.labelExists(EMDL_TOMO_SUBTOMOGRAM_ROT))
+	{
+		double phi, theta, psi;
+		
+		partTable.getValueSafely(EMDL_TOMO_SUBTOMOGRAM_ROT,  phi,   particle_id);
+		partTable.getValueSafely(EMDL_TOMO_SUBTOMOGRAM_TILT, theta, particle_id);
+		partTable.getValueSafely(EMDL_TOMO_SUBTOMOGRAM_PSI,  psi,   particle_id);
+		
+		Matrix2D<double> A;
+		Euler_angles2matrix(phi, theta, psi, A, false);	
+		return convert(A);
+	}
+	else
+	{
+		return d3Matrix(
+			1, 0, 0,
+			0, 1, 0,
+			0, 0, 1 );
+	}
+}
+
+d3Matrix ParticleSet::getParticleMatrix(long particle_id) const
+{
 	double phi, theta, psi;
 	
 	partTable.getValueSafely(EMDL_ORIENT_ROT,  phi,   particle_id);
 	partTable.getValueSafely(EMDL_ORIENT_TILT, theta, particle_id);
 	partTable.getValueSafely(EMDL_ORIENT_PSI,  psi,   particle_id);
 	
-	Euler_angles2matrix(phi, theta, psi, A, false);
+	Matrix2D<double> A;
+	Euler_angles2matrix(phi, theta, psi, A, false);	
+	return convert(A);
 	
-	return d3Matrix(
-		A(0,0), A(0,1), A(0,2), 
-		A(1,0), A(1,1), A(1,2), 
-		A(2,0), A(2,1), A(2,2) );
+}
+
+d3Matrix ParticleSet::getMatrix3x3(long int particle_id) const
+{
+	const d3Matrix A_particle = getParticleMatrix(particle_id);
+	const d3Matrix A_subtomogram = getSubtomogramMatrix(particle_id);
+	
+	return A_subtomogram * A_particle;
 }
 
 d4Matrix ParticleSet::getMatrix4x4(long int particle_id, double w, double h, double d) const
 {
-	Matrix2D<RFLOAT> A;
-	
-	double phi, theta, psi;
-	
-	partTable.getValueSafely(EMDL_ORIENT_ROT,  phi,   particle_id);
-	partTable.getValueSafely(EMDL_ORIENT_TILT, theta, particle_id);
-	partTable.getValueSafely(EMDL_ORIENT_PSI,  psi,   particle_id);
-	
-	Euler_angles2matrix(phi, theta, psi, A, false);
-	
+	d3Matrix A = getMatrix3x3(particle_id);	
 	d3Vector pos = getPosition(particle_id);
 	
 	int cx = ((int)w) / 2;
@@ -411,4 +429,12 @@ void ParticleSet::checkTrajectoryLengths(int p0, int np, int fc, std::string cal
 			}
 		}
 	}
+}
+
+d3Matrix ParticleSet::convert(const Matrix2D<double> &A)
+{
+	return d3Matrix(
+				A(0,0), A(0,1), A(0,2), 
+				A(1,0), A(1,1), A(1,2), 
+				A(2,0), A(2,1), A(2,2) );
 }

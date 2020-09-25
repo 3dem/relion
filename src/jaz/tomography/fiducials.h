@@ -28,6 +28,12 @@ class Fiducials
 				double radius,
 				RawImage<float>& destination,
 				double value);
+		
+		static void erase(
+		        const std::vector<gravis::d3Vector>& positions,
+		        double radius,
+		        Tomogram& tomogram,
+		        int num_threads);
 };
 
 

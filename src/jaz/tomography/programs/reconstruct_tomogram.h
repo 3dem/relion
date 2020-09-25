@@ -16,7 +16,7 @@ class TomoBackprojectProgram
 			int thickness, w, h, tomoIndex;	
 			double spacing, stack_spacing, x0, y0, z0, taperRad;	
 			std::string tomoSetFn, outFn;	
-			bool weight, applyCtf, zeroDC;	
+			bool applyPreWeight, applyWeight, applyCtf, zeroDC;	
 			double SNR;
 			
 			

@@ -5,6 +5,48 @@
 using namespace gravis;
 
 
+BufferedImage<float> MembraneSegmentation::constructMembraneKernel(
+        int w, int h, int d, 
+        double falloff, double kernel_width, double spacing, double ratio, double depth)
+{
+	BufferedImage<float> kernel(w,h,d);
+	kernel.fill(0.f);
+	
+	const double s2x = 2 * kernel_width * kernel_width;
+	const double s2y = 2 * falloff * falloff;
+	
+	for (int y = 0; y < h; y++)
+	for (int x = 0; x < w; x++)
+	{
+		const double xx = x < w/2? x : x - w;
+		const double yy = (y < h/2? y : y - h) - depth * spacing;
+		
+		const double yt = yy / spacing;
+		
+		double wave;
+		
+		if (yt < 0.5 && yt > -1.5)
+		{
+			wave = sin(2*PI*yt);
+			
+			if (yt < 0)
+			{
+				wave *= (yt + 3) / 3;
+			}
+		}
+		else
+		{
+			wave = 0.0;
+		}
+		
+		double decay = yy >= 0 ? exp(-yy*yy/s2y) : -exp(-yy*yy/s2y);
+		
+		kernel(x,y) = exp(-xx*xx/s2x) * (ratio * wave + decay);
+	}
+	
+	return kernel;
+}
+
 BufferedImage<float> MembraneSegmentation::determineMembraniness(
 		const RawImage<float>& tomo,
 		RawImage<Tensor3x3<float>>& J,

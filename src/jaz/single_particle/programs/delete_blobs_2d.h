@@ -17,7 +17,7 @@ class DeleteBlobs2DProgram
 		
 			std::string outPath, micrographs_list_filename, micrographs_dir, blobs_dir, particles_file;
 			
-			bool diag, global_prefit, mask_other_blobs;
+			bool diag, global_prefit, mask_other_blobs, do_isolate_ring;
 			
 			int max_frequencies, num_threads, max_iters;
 			
@@ -29,7 +29,10 @@ class DeleteBlobs2DProgram
 				convergence_threshold,
 				roundedness,
 				smoothness,
-				mask_smooth_sigma;
+				mask_smooth_sigma,
+				ring_min, ring_max, 
+				ring_edge_sigma,
+				ring_filter_sigma;
 
 			std::vector<gravis::d4Vector> spheres;
 			
@@ -61,6 +64,12 @@ class DeleteBlobs2DProgram
 		        BufferedImage<float>& blob_mask_full,
 				const std::string& image_name,
 		        bool verbose);
+		
+		BufferedImage<float> isolateRing(
+		        const std::vector<std::vector<double>>& blob_parameters,
+		        const BufferedImage<int>& closest_blob,
+				const BufferedImage<float>& image,
+		        const std::string& micrograph_name);
 
 		BufferedImage<float> drawFit(
 				Blob2D& blob,

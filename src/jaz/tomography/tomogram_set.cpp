@@ -110,6 +110,11 @@ void TomogramSet::write(std::string filename) const
 
 	std::ofstream ofs(filename);
 	
+	if (!ofs)
+	{
+		REPORT_ERROR("TomogramSet::write: unable to write to "+filename);
+	}
+	
 	globalTable.write(ofs);
 
 	for (int t = 0; t < tc; t++)

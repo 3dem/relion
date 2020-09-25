@@ -26,8 +26,9 @@ void TomoBackprojectProgram::readParameters(int argc, char *argv[])
 		tomoSetFn = parser.getOption("--t", "Tomogram set", "tomograms.star");
 		tomoIndex = textToInteger(parser.getOption("--ti", "Tomogram index", "0"));
 		
-		weight = parser.checkOption("--wg", "Perform weighting in Fourier space (using a Wiener filter)");
-		SNR = textToDouble(parser.getOption("--SNR", "SNR assumed by the Wiener filter", "0.001"));
+		applyWeight = parser.checkOption("--wg3D", "Perform weighting in Fourier space (using a Wiener filter)");
+		applyPreWeight = parser.checkOption("--wg2D", "Pre-weight the 2D slices prior to backprojection");
+		SNR = textToDouble(parser.getOption("--SNR", "SNR assumed by the Wiener filter", "10"));
 		
 		applyCtf = !parser.checkOption("--noctf", "Ignore the CTF");
 		zeroDC = parser.checkOption("--0dc", "Zero the DC component of each frame");
@@ -57,6 +58,11 @@ void TomoBackprojectProgram::readParameters(int argc, char *argv[])
 		std::cerr << XE;
 		exit(1);
 	}
+	
+	if (applyPreWeight && applyWeight)
+	{
+		REPORT_ERROR("The options --wg3D and --wg2D are mutually exclusive.");
+	}	
 }
 
 void TomoBackprojectProgram::run()
@@ -126,6 +132,7 @@ void TomoBackprojectProgram::run()
 	
 	d3Vector orig(x0, y0, z0);
 	BufferedImage<float> out(w1, h1, t1);
+	out.fill(0.f);
 	
 	BufferedImage<float> psfStack;
 	
@@ -142,7 +149,7 @@ void TomoBackprojectProgram::run()
 			BufferedImage<float> frame = stackAct.getSliceRef(f);
 			
 			BufferedImage<fComplex> frameFS;
-			FFT::FourierTransform(frame, frameFS);
+			FFT::FourierTransform(frame, frameFS, FFT::Both);
 			
 			CTF ctf = tomogram.centralCTFs[f];
 			
@@ -164,18 +171,20 @@ void TomoBackprojectProgram::run()
 				frameFS(x,y) *= c;
 			}
 			
-			FFT::inverseFourierTransform(frameFS, frame);			
+			FFT::inverseFourierTransform(frameFS, frame, FFT::Both);			
 			stackAct.getSliceRef(f).copyFrom(frame);
 			
-			FFT::inverseFourierTransform(ctf2ImageFS, frame);			
+			FFT::inverseFourierTransform(ctf2ImageFS, frame, FFT::Both);			
 			psfStack.getSliceRef(f).copyFrom(frame);
 			
 			debug.getSliceRef(f).copyFrom(ctf2ImageFS);
 		}
-		
-		psfStack.write("DEBUG_psfStack.mrc");
-		debug.writeVtk("DEBUG_CtfStack.vtk");
 	}	
+	
+	if (applyPreWeight)
+	{
+		stackAct = RealSpaceBackprojection::preWeight(stackAct, projAct, n_threads);
+	}
 	
 	
 	std::cout << "backprojecting... " << std::endl;
@@ -185,9 +194,10 @@ void TomoBackprojectProgram::run()
 			orig, spacing, RealSpaceBackprojection::Linear, taperRad);
 	
 	
-	if (weight || applyCtf)
+	if (applyWeight || applyCtf)
 	{
 		BufferedImage<float> psf(w1, h1, t1);
+		psf.fill(0.f);
 		
 		if (applyCtf)
 		{
