@@ -7,6 +7,7 @@
 
 class Tomogram;
 class TomogramSet;
+class ManifoldSet;
 class Blob3D;
 
 class FitBlobs3DProgram
@@ -38,7 +39,8 @@ class FitBlobs3DProgram
 
 		void processTomogram(std::string tomoName,
 				std::string spheresFn,
-				TomogramSet& initial_tomogram_set);
+				TomogramSet& initial_tomogram_set,
+				ManifoldSet& manifold_set);
 		
 		std::vector<double> segmentBlob(
 		        gravis::d3Vector sphere_position, 

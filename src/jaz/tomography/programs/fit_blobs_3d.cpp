@@ -8,6 +8,7 @@
 #include <src/jaz/optics/damage.h>
 #include <src/jaz/tomography/fiducials.h>
 #include <src/jaz/tomography/tomogram_set.h>
+#include <src/jaz/tomography/manifold/manifold_set.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
 
@@ -74,11 +75,10 @@ void FitBlobs3DProgram::readParameters(int argc, char *argv[])
 
 void FitBlobs3DProgram::run()
 {
-	TomogramSet initial_tomogram_set = TomogramSet(tomoSetFn);
-	TomogramSet subtracted_tomogram_set = initial_tomogram_set;
-	TomogramSet blobs_tomogram_set = initial_tomogram_set;
+	TomogramSet tomogram_set = TomogramSet(tomoSetFn);	
+	ManifoldSet manifold_set;
 	
-	if (!initial_tomogram_set.globalTable.labelExists(EMDL_TOMO_FIDUCIALS_STARFILE))
+	if (!tomogram_set.globalTable.labelExists(EMDL_TOMO_FIDUCIALS_STARFILE))
 	{
 		Log::warn("No fiducial markers present: you are advised to run relion_tomo_find_fiducials first.");
 	}
@@ -93,19 +93,17 @@ void FitBlobs3DProgram::run()
 	std::map<std::string, std::string> tomoToSpheres;
 	
 	std::string line;
-
-	BufferedImage<float> visualisation(0,0,0);
 	
 	while (std::getline(list, line))
 	{
 		std::stringstream sts;
 		sts << line;
 	
-		std::string tomoName, spheresFn;
-		sts >> tomoName;
+		std::string tomogram_name, spheresFn;
+		sts >> tomogram_name;
 		sts >> spheresFn;
 		
-		tomoToSpheres[tomoName] = spheresFn;
+		tomoToSpheres[tomogram_name] = spheresFn;
 	}
 
 	int tomo_index = 0;
@@ -113,41 +111,38 @@ void FitBlobs3DProgram::run()
 	for (std::map<std::string, std::string>::iterator it = tomoToSpheres.begin();
 	     it != tomoToSpheres.end(); it++)
 	{
-		const std::string tomoName = it->first;
+		const std::string tomogram_name = it->first;
 		const std::string spheresFn = it->second;
 		
-		Log::beginSection("Tomogram " + tomoName);
+		Log::beginSection("Tomogram " + tomogram_name);
 		
 		processTomogram(
-			tomoName, spheresFn,
-			initial_tomogram_set);
+			tomogram_name, 
+			spheresFn,
+			tomogram_set,
+			manifold_set);
 		
 		Log::endSection();
 
 		tomo_index++;
 	}
-
-	subtracted_tomogram_set.write(outPath + "tomograms.star");
-	blobs_tomogram_set.write(outPath + "blob_tomograms.star");
-
-	if (diag)
-	{
-		visualisation.write(outPath + "diagnostic.mrc");
-	}
+	
+	manifold_set.write(outPath + "manifolds.star");
 }
 
 void FitBlobs3DProgram::processTomogram(
-		std::string tomoName,
+		std::string tomogram_name,
 		std::string spheresFn,
-		TomogramSet& initial_tomogram_set)
+		TomogramSet& tomogram_set,
+        ManifoldSet& manifold_set)
 {
 	Log::print("Loading tilt series");
 	
 	spheres = readSpheresCMM(spheresFn, spheres_binning);
 	
-	const int tomo_index = initial_tomogram_set.getTomogramIndexSafely(tomoName);
+	const int tomo_index = tomogram_set.getTomogramIndexSafely(tomogram_name);
 
-	Tomogram tomogram0 = initial_tomogram_set.loadTomogram(tomo_index, true);
+	Tomogram tomogram0 = tomogram_set.loadTomogram(tomo_index, true);
 
 	const double pixel_size = tomogram0.optics.pixelSize;
 
@@ -196,7 +191,9 @@ void FitBlobs3DProgram::processTomogram(
 	
 	std::vector<std::vector<double>> all_blob_coeffs;
 	Mesh blob_meshes;
+	TomogramManifoldSet tomogram_manifold_set;
 
+	
 	for (int blob_id = 0; blob_id < spheres.size(); blob_id++)
 	{
 		Log::beginSection("Blob #" + ZIO::itoa(blob_id + 1));
@@ -205,7 +202,7 @@ void FitBlobs3DProgram::processTomogram(
 
 		const d3Vector sphere_position = sphere.xyz();
 		
-		const std::string blob_tag = outPath+tomoName+"_blob_"+ZIO::itoa(blob_id);
+		const std::string blob_tag = outPath+tomogram_name+"_blob_"+ZIO::itoa(blob_id);
 		
 		std::vector<double> blob_coeffs = segmentBlob(
 				sphere_position, 
@@ -223,9 +220,13 @@ void FitBlobs3DProgram::processTomogram(
 		
 		blob_mesh.writeObj(blob_tag+".obj");
 
+		tomogram_manifold_set.addSpheroid(Spheroid(blob_coeffs, blob_id));
+		        
 		MeshBuilder::insert(blob_mesh, blob_meshes);
 		Log::endSection();
 	}
+	
+	manifold_set.add(tomogram_name, tomogram_manifold_set);
 }
 
 Mesh FitBlobs3DProgram::createMesh(
