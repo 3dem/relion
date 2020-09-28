@@ -7,7 +7,7 @@ int main(int argc, char *argv[])
 {
 	SampleManifoldProgram sp;
 
-	sp.SampleManifoldProgram(argc, argv);
+	sp.readParameters(argc, argv);
 	sp.run();
 
 	return 0;
