@@ -24,7 +24,8 @@ void SampleManifoldProgram::readParameters(int argc, char *argv[])
 		depth = textToDouble(parser.getOption("--depth", "Depth below surface [A]"));
 		const double max_tilt_deg = textToDouble(parser.getOption("--max_tilt", "Maximum tilt angle [degrees]"));
 		max_tilt = DEG2RAD(max_tilt_deg);
-		avoid_missing_wedge = parser.checkOption("--mw", "Do not sample particles from the missing wedges");
+		avoid_missing_wedge = parser.checkOption("--nmw", "Do not sample particles from the missing wedges");
+		avoid_present_wedge = parser.checkOption("--npw", "Do not sample particles from the present wedges");
 
 		output_path = parser.getOption("--o", "Output filename pattern");
 
@@ -71,7 +72,10 @@ void SampleManifoldProgram::run()
 			std::vector<RigidAlignment> locations = manifold->sampleParticles(
 						spacing / pixel_size,
 						depth / pixel_size,
-						-max_tilt,  max_tilt);
+						-max_tilt,  max_tilt,
+						!avoid_present_wedge,
+						!avoid_missing_wedge,
+						tomogram.projectionMatrices);
 
 			for (int i = 0; i < locations.size(); i++)
 			{

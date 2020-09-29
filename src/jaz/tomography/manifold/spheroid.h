@@ -18,10 +18,13 @@ class Spheroid : public Manifold
 			
 		
 		std::vector<RigidAlignment> sampleParticles(
-										double spacing,
-										double depth,
-										double minTilt,
-										double maxTilt) const;
+				double spacing,
+				double depth,
+				double minTilt,
+				double maxTilt,
+				bool sample_present_wedge,
+				bool sample_missing_wedge,
+				const std::vector<gravis::d4Matrix>& projections) const;
 
 		double getRadius(au::edu::anu::qm::ro::SphericalHarmonics& SH,
 				  double phi, double theta) const;
