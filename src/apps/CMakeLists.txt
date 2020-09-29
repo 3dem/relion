@@ -434,7 +434,7 @@ if(OPENMP_FOUND)
 endif()
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 # Set this flag to activate bounds checking in stl-vectors (incl. strings)
 # It is useful to do this periodically, as it catches 
