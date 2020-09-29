@@ -12,6 +12,14 @@ class SampleManifoldProgram
 	public:
 		
 		SampleManifoldProgram(){}
+
+			std::string
+				output_path,
+				tomogram_set_filename,
+				manifolds_filename;
+
+			bool avoid_missing_wedge;
+			double spacing, depth, max_tilt;
 		
 		void readParameters(int argc, char *argv[]);
 		void run();	

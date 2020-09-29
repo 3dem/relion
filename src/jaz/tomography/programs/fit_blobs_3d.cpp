@@ -18,6 +18,56 @@ using namespace gravis;
 
 void FitBlobs3DProgram::readParameters(int argc, char *argv[])
 {
+	/*{
+		std::vector<double> coeffs{1080.84647296,2236.68472926,446.145153131,1329.78224097,0,0,0,5.69892478898,1.91709780572,-24.8755854993,-12.6302521551,-17.7246886339,1.55812025632,-7.4936036406,2.96942350637,8.7270384811,0.485616463062,-2.93279471848,-3.80600467661,-2.36434021241,0.72088111026,4.38010542614,-8.00502611039,19.5472471121,10.8159943372,-4.58068480826,9.36735180724,4.44859782887,-3.9671935757,3.74586120166,5.32294074632,1.87896994577,3.5160805719,-5.37851663856,-3.68466357012,4.94011914426,0.0562709362189,3.81508875178,-4.66940147309,-3.61905874307,-3.26542150847,-2.26324788365,-3.48792116765,-4.2576115936,8.12632370956,-5.45823860754,-10.9251324509,0.539283336644,-3.3842147363,2.87763843233,2.56002880017,-0.257233146268,-2.6167868251,2.38533705733,2.35961187172,3.75660720051,2.61303599803,-0.931939629823,-3.50079710998,0.619105738505,2.31098845513,2.5451821698,-2.20830877685,2.24282523037,-1.91799108734,-3.07245611941,-1.31299531421,0.460276009386,0.248026238707,-2.79058664426,-0.902433127834,-3.39585997941,1.9635247805,-1.07421209709,-0.846555436224,1.41715250325,5.2188266101,-2.8679058452,-8.17604679237,-6.84753469469,-3.84826432601,-2.77920867067,-2.06013607156,1.86433191086,-0.620888746817,1.08568215665,4.83350535634,3.4402524021,2.54399188383,0.258152262306,0.448707133708,1.40518745627,-3.74111925035,-3.6381906405,-0.180809407531,-2.17997451046,-2.35023985301,1.09679873785,-0.624079213048,1.00651463779,-1.27290935466,1.90309859433,0.93853402108};
+
+		std::vector<double> Y(9);
+		SphericalHarmonics SH(2);
+		SH.computeY(2, 0, 0, &Y[0]);
+
+		std::cout << Y[0] << std::endl;
+		std::cout << Y[1] << std::endl;
+		std::cout << Y[2] << std::endl;
+		std::cout << Y[3] << std::endl;
+
+		//Mesh mesh = createMesh(coeffs, 1, 50, 90);
+		//mesh.writeObj("DEBUG_blob0.obj");
+		std::exit(0);
+	}*/
+
+	/*{
+		std::vector<double> coeffs0{0,0,0, 500, 0,0,0, 0,0,0,0,0};
+
+		std::vector<double> Y_equator(9);
+		std::vector<double> Y_north(9);
+		SphericalHarmonics SH(2);
+		SH.computeY(2, 0, 0, &Y_equator[0]);
+		SH.computeY(2, 1, 0, &Y_north[0]);
+
+		const int squish_samples = 5;
+		const double min_squish = 0.5;
+		const double max_squish = 1.0;
+
+		for (int q = 0; q < squish_samples; q++)
+		{
+			const double squish = min_squish + q * (max_squish - min_squish)
+					/ (squish_samples - 1);
+
+			std::vector<double> coeffs = coeffs0;
+
+			coeffs[9] = 2.0 * coeffs0[3] * (squish - 1.0)
+					/ (3.0 * sqrt(5.0));
+
+			coeffs[3] = coeffs0[3] + (sqrt(5.0) / 2.0) * coeffs[9];
+
+			Mesh mesh = createMesh(coeffs, 1, 50, 90);
+			mesh.writeObj("DEBUG_blob0_squish_"+ZIO::itoa(squish)+".obj");
+		}
+
+
+		std::exit(0);
+	}*/
+
 	IOParser parser;
 	
 	double sphere_thickness_0;
@@ -134,7 +184,7 @@ void FitBlobs3DProgram::processTomogram(
 		std::string tomogram_name,
 		std::string spheresFn,
 		TomogramSet& tomogram_set,
-        ManifoldSet& manifold_set)
+		ManifoldSet& manifold_set)
 {
 	Log::print("Loading tilt series");
 	
@@ -205,23 +255,23 @@ void FitBlobs3DProgram::processTomogram(
 		const std::string blob_tag = outPath+tomogram_name+"_blob_"+ZIO::itoa(blob_id);
 		
 		std::vector<double> blob_coeffs = segmentBlob(
-				sphere_position, 
-				sphere.w, 
-				sphere_thickness, 
-		        segmentation_binning,
-				preweighted_stack, 
-		        pixel_size,
-				tomogram_binned.projectionMatrices,
-				diag? blob_tag : "");
+					sphere_position,
+					sphere.w,
+					sphere_thickness,
+					segmentation_binning,
+					preweighted_stack,
+					pixel_size,
+					tomogram_binned.projectionMatrices,
+					diag? blob_tag : "");
 		
 		all_blob_coeffs.push_back(blob_coeffs);
 		
-		Mesh blob_mesh = createMesh(blob_coeffs, pixel_size, 50, 20);
+		Mesh blob_mesh = createMesh(blob_coeffs, pixel_size, 50, 60);
 		
 		blob_mesh.writeObj(blob_tag+".obj");
 
 		tomogram_manifold_set.addSpheroid(Spheroid(blob_coeffs, blob_id));
-		        
+
 		MeshBuilder::insert(blob_mesh, blob_meshes);
 		Log::endSection();
 	}
@@ -230,10 +280,10 @@ void FitBlobs3DProgram::processTomogram(
 }
 
 Mesh FitBlobs3DProgram::createMesh(
-        const std::vector<double>& blob_coeffs,
-        double pixel_size,
-        double spacing, 
-        double max_tilt_deg)
+		const std::vector<double>& blob_coeffs,
+		double pixel_size,
+		double spacing,
+		double max_tilt_deg)
 {
 	const double max_tilt = DEG2RAD(max_tilt_deg);
 	const double rad = blob_coeffs[3];
@@ -258,29 +308,29 @@ Mesh FitBlobs3DProgram::createMesh(
 	{
 		const double phi   = 2 * PI * a / (double) azimuth_samples;
 		const double theta = -max_tilt + 2 * max_tilt * t / (double) (tilt_samples - 1);
-		
+
 		SH.computeY(SH_bands, sin(theta), phi, &Y[0]);
-		        
+
 		double dist = 0.0;
-		
+
 		for (int b = 0; b < SH_params; b++)
 		{
 			dist += blob_coeffs[b+3] * Y[b];
 		}
-		
-		out.vertices[t * azimuth_samples + a] = 
-			pixel_size * (centre + dist * d3Vector(cos(phi), sin(phi), sin(theta)));
+
+		out.vertices[t * azimuth_samples + a] =
+				pixel_size * (centre + dist * d3Vector(cos(theta) * cos(phi), cos(theta) * sin(phi), sin(theta)));
 	}
 	
 	const int triangle_count = 2 * (tilt_samples - 1) * azimuth_samples;
-	        
+
 	out.triangles.resize(triangle_count);
 	
 	for (int a = 0; a < azimuth_samples; a++)
 	for (int t = 0; t < tilt_samples-1; t++)
 	{
 		Triangle tri0;
-		
+
 		tri0.a =  t      * azimuth_samples +  a;
 		tri0.b = (t + 1) * azimuth_samples +  a;
 		tri0.c = (t + 1) * azimuth_samples + (a + 1) % azimuth_samples;
@@ -300,14 +350,14 @@ Mesh FitBlobs3DProgram::createMesh(
 
 
 std::vector<double> FitBlobs3DProgram::segmentBlob(
-        d3Vector sphere_position, 
-        double mean_radius_full, 
-        double radius_range, 
-        double binning, 
-        const RawImage<float>& preweighted_stack, 
-        double pixel_size,
-        const std::vector<d4Matrix>& projections,
-        const std::string& debug_prefix)
+		d3Vector sphere_position,
+		double mean_radius_full,
+		double radius_range,
+		double binning,
+		const RawImage<float>& preweighted_stack,
+		double pixel_size,
+		const std::vector<d4Matrix>& projections,
+		const std::string& debug_prefix)
 {
 	BufferedImage<float> map = TiltSpaceBlobFit::computeTiltSpaceMap(
 			sphere_position, 
@@ -415,22 +465,70 @@ std::vector<double> FitBlobs3DProgram::segmentBlob(
 	
 	TiltSpaceBlobFit blob_pre_fit(0, lambda, correlation, directions_XZ);
 	double h0 = blob_pre_fit.estimateInitialHeight();
-	
-	std::vector<double> last_params = {h0 / blob_pre_fit.basis(0,0,0)};
+
+	const double Y00_norm = 1.0  / (2 * sqrt(PI));
+
+	std::vector<double> last_params = {h0 / Y00_norm};
 	
 	for (int current_SH_bands = 1; current_SH_bands <= SH_bands; current_SH_bands++)
 	{
 		TiltSpaceBlobFit blob_fit(current_SH_bands, lambda, correlation, directions_XZ);
 		
-	    std::vector<double> params(blob_fit.getParameterCount(), 0.0);
+		std::vector<double> params(blob_fit.getParameterCount(), 0.0);
 		
 		for (int i = 0; i < last_params.size() && i < params.size(); i++)
 		{
 			params[i] = last_params[i];
 		}
+
+
+		// try explicitly squishing Z to avoid local optima
+
+		/*if (current_SH_bands == 2)
+		{
+			BufferedImage<float> plot0 = blob_fit.drawSolution(params, map);
+			plot0.write(debug_prefix+"_squish_0.mrc");
+
+			const int squish_samples = 20;
+			const double min_squish = 0.5;
+			const double max_squish = 1.0;
+
+			double best_f = std::numeric_limits<double>::max();
+			double best_squish = 1.0;
+
+			for (int q = 0; q < squish_samples; q++)
+			{
+				const double squish = min_squish + q * (max_squish - min_squish)
+						/ (squish_samples - 1);
+
+				std::vector<double> squished_params = params;
+
+				squished_params[6] = 2.0 * params[0] * (squish - 1.0) / (3.0 * sqrt(5.0));
+				squished_params[0] = params[0] + (sqrt(5.0) / 2.0) * squished_params[6];
+
+				const double f = blob_fit.f(squished_params, 0);
+
+				std::cout << squish << ": " << f << std::endl;
+
+				if (f < best_f)
+				{
+					best_f = f;
+					best_squish = squish;
+				}
+			}
+
+			params[6] = 2.0 * params[0] * (best_squish - 1.0) / (3.0 * sqrt(5.0));
+			params[0] = params[0] + (sqrt(5.0) / 2.0) * params[6];
+
+			BufferedImage<float> plot1 = blob_fit.drawSolution(params, map);
+			plot1.write(debug_prefix+"_squish_1.mrc");
+		}*/
 		
 		std::vector<double> final_params = LBFGS::optimize(params, blob_fit, 0, 1000, 1e-6);
-		
+
+		BufferedImage<float> plot = blob_fit.drawSolution(final_params, map);
+
+		plot.write(debug_prefix+"_tilt_space_plot_SH_"+ZIO::itoa(current_SH_bands)+".mrc");
 		
 		/*BufferedImage<float> plot = blob_fit.drawSolution(final_params, map);
 		plot.write("DEBUG_tilt_space_plot_SH_"+ZIO::itoa(SH_bands)+".mrc");*/
@@ -601,8 +699,8 @@ std::vector<double> FitBlobs3DProgram::segmentBlob(
 	{
 		out[i] = binning * last_params[i-3];
 	}
-	
-	out[3] += min_radius_full / blob_pre_fit.basis(0,0,0);
+
+	out[3] += min_radius_full / Y00_norm;
 	
 	SphericalHarmonics SH_3(1);
 	std::vector<double> Y_3(4);

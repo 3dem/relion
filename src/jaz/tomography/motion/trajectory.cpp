@@ -10,42 +10,42 @@ std::vector<Trajectory> Trajectory::read(std::string filename)
 {
 	std::ifstream ifs(filename);
 
-    if (ifs.fail())
-    {
-        REPORT_ERROR("Trajectory::read: unable to read " + filename + ".");
-    }
+	if (!ifs)
+	{
+		REPORT_ERROR("Trajectory::read: unable to read " + filename + ".");
+	}
 
-    MetaDataTable mdt0;
+	MetaDataTable mdt0;
 
-    mdt0.readStar(ifs, "general");
+	mdt0.readStar(ifs, "general");
 
-    int pc;
+	int pc;
 
-    if (!mdt0.getValue(EMDL_PARTICLE_NUMBER, pc))
-    {
-        REPORT_ERROR("Trajectory::read: missing particle number in "+filename+".");
-    }
+	if (!mdt0.getValue(EMDL_PARTICLE_NUMBER, pc))
+	{
+		REPORT_ERROR("Trajectory::read: missing particle number in "+filename+".");
+	}
 
-    std::vector<Trajectory> out(pc);
+	std::vector<Trajectory> out(pc);
 	
 	
 	std::vector<MetaDataTable> mdts = MetaDataTable::readAll(ifs, pc+1);
 
-    for (int p = 0; p < pc; p++)
-    {
-        MetaDataTable& mdt = mdts[p+1];
+	for (int p = 0; p < pc; p++)
+	{
+		MetaDataTable& mdt = mdts[p+1];
 
-        int fc = mdt.numberOfObjects();
+		int fc = mdt.numberOfObjects();
 		
-        out[p] = Trajectory(fc);
+		out[p] = Trajectory(fc);
 
-        for (int f = 0; f < fc; f++)
-        {
-            mdt.getValueSafely(EMDL_ORIENT_ORIGIN_X_ANGSTROM, out[p].shifts_Ang[f].x, f);
+		for (int f = 0; f < fc; f++)
+		{
+			mdt.getValueSafely(EMDL_ORIENT_ORIGIN_X_ANGSTROM, out[p].shifts_Ang[f].x, f);
 			mdt.getValueSafely(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, out[p].shifts_Ang[f].y, f);
 			mdt.getValueSafely(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, out[p].shifts_Ang[f].z, f);
-        }
-    }
+		}
+	}
 	
 	return out;
 }
@@ -53,38 +53,38 @@ std::vector<Trajectory> Trajectory::read(std::string filename)
 void Trajectory::write(const std::vector<Trajectory>& shifts, std::string filename)
 {
 	const int pc = shifts.size();
-    
-    std::string path = filename.substr(0, filename.find_last_of('/'));
-    mktree(path);
 
-    std::ofstream ofs(filename);
-    MetaDataTable mdt;
+	std::string path = filename.substr(0, filename.find_last_of('/'));
+	mktree(path);
 
-    mdt.setName("general");
-    mdt.setIsList(true);
-    mdt.addObject();
-    mdt.setValue(EMDL_PARTICLE_NUMBER, pc);
+	std::ofstream ofs(filename);
+	MetaDataTable mdt;
 
-    mdt.write(ofs);
-    mdt.clear();
+	mdt.setName("general");
+	mdt.setIsList(true);
+	mdt.addObject();
+	mdt.setValue(EMDL_PARTICLE_NUMBER, pc);
 
-    for (int p = 0; p < pc; p++)
-    {
-        mdt.setName(ZIO::itoa(p));
+	mdt.write(ofs);
+	mdt.clear();
+
+	for (int p = 0; p < pc; p++)
+	{
+		mdt.setName(ZIO::itoa(p));
 		
 		const int fc = shifts[p].shifts_Ang.size();
 
-        for (int f = 0; f < fc; f++)
-        {
-            mdt.addObject();
+		for (int f = 0; f < fc; f++)
+		{
+			mdt.addObject();
 			
-            mdt.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, shifts[p].shifts_Ang[f].x);
+			mdt.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, shifts[p].shifts_Ang[f].x);
 			mdt.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, shifts[p].shifts_Ang[f].y);
 			mdt.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, shifts[p].shifts_Ang[f].z);
-        }
+		}
 
-        mdt.write(ofs);
-        mdt.clear();
+		mdt.write(ofs);
+		mdt.clear();
 	}
 }
 
@@ -93,7 +93,7 @@ Trajectory::Trajectory()
 }
 
 Trajectory::Trajectory(int fc)
-:	shifts_Ang(fc, d3Vector(0.0, 0.0, 0.0))
+	:	shifts_Ang(fc, d3Vector(0.0, 0.0, 0.0))
 {	
 }
 

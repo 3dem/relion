@@ -148,8 +148,8 @@ void SubtomoProgram::run()
 
 	copy.write(outTag + "_particles.star");
 		
-	
-	int dummy = std::system(("mkdir -p " + outTag).c_str());
+
+	ZIO::makeOutputDir(outTag);
 	
 	for (int t = 0; t < tc; t++)
 	{

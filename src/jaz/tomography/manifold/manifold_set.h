@@ -10,7 +10,7 @@ class TomogramManifoldSet
 	public:
 		
 		TomogramManifoldSet();
-		TomogramManifoldSet(const MetaDataTable& table);		
+		TomogramManifoldSet(const MetaDataTable& table);
 		
 			std::vector<Spheroid> spheroids;
 			
@@ -32,11 +32,11 @@ class ManifoldSet
 			
 			
 		void add(
-		        const std::string& tomogramName, 
-		        const TomogramManifoldSet& tomogramManifoldSet);
-		
+				const std::string& tomogramName,
+				const TomogramManifoldSet& tomogramManifoldSet);
+
 		std::map<int, const Manifold*> getManifoldsInTomogram(
-		        const std::string& tomogramName) const;
+				const std::string& tomogramName) const;
 		
 		void write(std::string filename) const;
 		

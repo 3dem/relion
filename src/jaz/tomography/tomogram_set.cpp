@@ -17,7 +17,11 @@ TomogramSet::TomogramSet(std::string filename)
 {
 	std::ifstream ifs(filename);
 
-	if (!ifs.fail())
+	if (!ifs)
+	{
+		REPORT_ERROR_STR("TomogramSet::TomogramSet: Unable to read " << filename);
+	}
+	else
 	{
 		globalTable.readStar(ifs, "global");
 		
@@ -32,10 +36,6 @@ TomogramSet::TomogramSet(std::string filename)
 			tomogramTables[t] = allTables[t+1];
 			tomogramTables[t].setName("tomo_" + ZIO::itoa(t));
 		}	
-	}
-	else
-	{
-		REPORT_ERROR_STR("TomogramSet::TomogramSet: Unable to read " << filename);
 	}
 	
 	globalTable.setName("global");

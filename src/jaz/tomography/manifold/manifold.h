@@ -21,7 +21,7 @@ class Manifold
 					double spacing,
 					double depth,
 					double minTilt,
-					double maxTilt) = 0;
+					double maxTilt) const = 0;
 			
 		virtual std::vector<double> getParameters() const = 0;
 

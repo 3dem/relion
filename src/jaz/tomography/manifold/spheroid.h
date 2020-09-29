@@ -2,6 +2,8 @@
 #define SPHEROID_H
 
 #include "manifold.h"
+#include <src/spherical-harmonics/SphericalHarmonics.h>
+
 
 class Spheroid : public Manifold
 {
@@ -19,7 +21,13 @@ class Spheroid : public Manifold
 										double spacing,
 										double depth,
 										double minTilt,
-										double maxTilt);
+										double maxTilt) const;
+
+		double getRadius(au::edu::anu::qm::ro::SphericalHarmonics& SH,
+				  double phi, double theta) const;
+
+		gravis::d3Vector getSurfacePoint(au::edu::anu::qm::ro::SphericalHarmonics& SH,
+				  double phi, double theta) const;
 		
 		std::vector<double> getParameters() const;
 		

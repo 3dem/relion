@@ -15,13 +15,16 @@ TomogramManifoldSet::TomogramManifoldSet(const MetaDataTable &table)
 		const std::string type = table.getString(EMDL_TOMO_MANIFOLD_TYPE, i);
 		const std::vector<double> parameters = table.getDoubleVector(EMDL_TOMO_MANIFOLD_PARAMETERS, i);
 		
-		if (type == Spheroid::getTypeName())
+		if (type.length() > 0)
 		{
-			addSpheroid(Spheroid(parameters, index));
-		}
-		else
-		{
-			REPORT_ERROR("TomogramManifoldSet::constructor: unknown manifold type: " + type);
+			if (type == Spheroid::getTypeName())
+			{
+				addSpheroid(Spheroid(parameters, index));
+			}
+			else
+			{
+				REPORT_ERROR("TomogramManifoldSet::constructor: unknown manifold type: " + type);
+			}
 		}
 	}
 }
@@ -55,10 +58,10 @@ MetaDataTable TomogramManifoldSet::composeTable() const
 	std::map<int, const Manifold*> manifolds = getMapToManifolds();
 	
 	for (std::map<int, const Manifold*>::iterator it = manifolds.begin();
-	     it != manifolds.end(); it++)
+		 it != manifolds.end(); it++)
 	{
 		const Manifold* m = it->second;
-		        
+
 		out.addObject();
 		
 		out.setValue(EMDL_TOMO_MANIFOLD_INDEX, m->index);
@@ -79,7 +82,11 @@ ManifoldSet::ManifoldSet(std::string filename)
 {
 	std::ifstream ifs(filename);
 
-	if (ifs)
+	if (!ifs)
+	{
+		REPORT_ERROR("ManifoldSet::constructor: Unable to read " + filename);
+	}
+	else
 	{
 		std::vector<MetaDataTable> allTables = MetaDataTable::readAll(ifs, 10);
 		const int mc = allTables.size();
@@ -88,35 +95,31 @@ ManifoldSet::ManifoldSet(std::string filename)
 		{
 			const std::string tomogramName = allTables[m].getName();
 			add(tomogramName, TomogramManifoldSet(allTables[m]));
-		}	
+		}
 	}
-	else
-	{
-		REPORT_ERROR("ManifoldSet::constructor: Unable to read " + filename);
-	}	
 }
 
 void ManifoldSet::add(
-        const std::string& tomogramName, 
-        const TomogramManifoldSet& tomogramManifoldSet)
+		const std::string& tomogramName,
+		const TomogramManifoldSet& tomogramManifoldSet)
 {
 	perTomogramSets[tomogramName] = tomogramManifoldSet;
 }
 
 std::map<int, const Manifold*> ManifoldSet::getManifoldsInTomogram(
-        const std::string& tomogramName) const
+		const std::string& tomogramName) const
 {
-	std::map<std::string, TomogramManifoldSet>::const_iterator it 
-	        = perTomogramSets.find(tomogramName);
+	std::map<std::string, TomogramManifoldSet>::const_iterator it
+			= perTomogramSets.find(tomogramName);
 	
 	if (it == perTomogramSets.end())
 	{
 		REPORT_ERROR("ManifoldSet::getManifoldsInTomogram: no manifolds found for tomogram "
-		             +tomogramName);
+					 +tomogramName);
 	}
 	else
 	{
-		const TomogramManifoldSet& tms = it->second;		
+		const TomogramManifoldSet& tms = it->second;
 		return tms.getMapToManifolds();
 	}
 }
@@ -137,11 +140,11 @@ void ManifoldSet::write(std::string filename) const
 	}
 	
 	for (std::map<std::string, TomogramManifoldSet>::const_iterator it = perTomogramSets.begin();
-	     it != perTomogramSets.end(); it++)
+		 it != perTomogramSets.end(); it++)
 	{
 		const std::string tomoName = it->first;
 		const TomogramManifoldSet& tms = it->second;
-	
+
 		MetaDataTable table = tms.composeTable();
 		table.setName(tomoName);
 		

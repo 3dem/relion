@@ -7,7 +7,7 @@ class RigidAlignment
 {
 	public:
 		
-		RigidAlignment(double x, double y, double z, double rot, double tilt, double psi);
+		RigidAlignment(gravis::d3Vector position, double rot, double tilt, double psi);
 		
 			gravis::d3Vector position;
 			double rot, tilt, psi;
