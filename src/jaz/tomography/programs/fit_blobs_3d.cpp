@@ -9,6 +9,7 @@
 #include <src/jaz/tomography/fiducials.h>
 #include <src/jaz/tomography/tomogram_set.h>
 #include <src/jaz/tomography/manifold/manifold_set.h>
+#include <src/jaz/tomography/manifold/manifold_loader.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
 
@@ -270,7 +271,7 @@ void FitBlobs3DProgram::processTomogram(
 		
 		blob_mesh.writeObj(blob_tag+".obj");
 
-		tomogram_manifold_set.addSpheroid(Spheroid(blob_coeffs, blob_id));
+		tomogram_manifold_set.add(new Spheroid(blob_coeffs, blob_id));
 
 		MeshBuilder::insert(blob_mesh, blob_meshes);
 		Log::endSection();

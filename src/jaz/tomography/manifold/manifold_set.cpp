@@ -1,4 +1,5 @@
 #include "manifold_set.h"
+#include "manifold_loader.h"
 
 using namespace gravis;
 
@@ -9,43 +10,18 @@ TomogramManifoldSet::TomogramManifoldSet()
 
 TomogramManifoldSet::TomogramManifoldSet(const MetaDataTable &table)
 {
-	for (int i = 0; i < table.numberOfObjects(); i++)
-	{
-		const int index  = table.getInt(EMDL_TOMO_MANIFOLD_INDEX, i);
-		const std::string type = table.getString(EMDL_TOMO_MANIFOLD_TYPE, i);
-		const std::vector<double> parameters = table.getDoubleVector(EMDL_TOMO_MANIFOLD_PARAMETERS, i);
-		
-		if (type.length() > 0)
-		{
-			if (type == Spheroid::getTypeName())
-			{
-				addSpheroid(Spheroid(parameters, index));
-			}
-			else
-			{
-				REPORT_ERROR("TomogramManifoldSet::constructor: unknown manifold type: " + type);
-			}
-		}
-	}
+	manifolds = ManifoldLoader::loadAll(table);
 }
-
-void TomogramManifoldSet::addSpheroid(const Spheroid& spheroid)
-{
-	spheroids.push_back(spheroid);
-}
-
-// @TODO: clean this up when we switch to C++11 (use unique pointers) 
-//                        --JZ, 25-9-2020 (!)
 
 std::map<int, const Manifold*> TomogramManifoldSet::getMapToManifolds() const
 {
 	std::map<int, const Manifold*> out;
 	
-	for (int i = 0; i < spheroids.size(); i++)
+	for (int i = 0; i < manifolds.size(); i++)
 	{
-		const Spheroid* s = &spheroids[i];
+		const Manifold* m = manifolds[i].get();
 		
-		out[s->index] = s;
+		out[m->index] = m;
 	}
 	
 	return out;
@@ -55,12 +31,9 @@ MetaDataTable TomogramManifoldSet::composeTable() const
 {
 	MetaDataTable out;
 	
-	std::map<int, const Manifold*> manifolds = getMapToManifolds();
-	
-	for (std::map<int, const Manifold*>::iterator it = manifolds.begin();
-		 it != manifolds.end(); it++)
+	for (int i = 0; i < manifolds.size(); i++)
 	{
-		const Manifold* m = it->second;
+		const Manifold* m = manifolds[i].get();
 
 		out.addObject();
 		
@@ -72,6 +45,13 @@ MetaDataTable TomogramManifoldSet::composeTable() const
 	return out;
 }
 
+void TomogramManifoldSet::add(Manifold* manifold)
+{
+	manifolds.push_back(std::shared_ptr<Manifold>(manifold));
+}
+
+
+// --- //
 
 
 ManifoldSet::ManifoldSet()

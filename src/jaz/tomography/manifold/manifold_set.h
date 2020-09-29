@@ -1,9 +1,10 @@
 #ifndef MANIFOLD_SET_H
 #define MANIFOLD_SET_H
 
+#include <memory>
 #include <string>
 #include <src/metadata_table.h>
-#include "spheroid.h"
+#include "manifold.h"
 
 class TomogramManifoldSet
 {
@@ -12,13 +13,12 @@ class TomogramManifoldSet
 		TomogramManifoldSet();
 		TomogramManifoldSet(const MetaDataTable& table);
 		
-			std::vector<Spheroid> spheroids;
-			
-		void addSpheroid(const Spheroid& spheroid);
+			std::vector<std::shared_ptr<Manifold>> manifolds;
 		
 		std::map<int, const Manifold*> getMapToManifolds() const;
-		
 		MetaDataTable composeTable() const;
+
+		void add(Manifold* manifold);
 };
 
 class ManifoldSet
