@@ -60,6 +60,8 @@ public:
 	// Skip the iterative gridding part of the reconstruction
 	bool skip_gridding;
 
+	MultidimArray<RFLOAT> grad_error_power;
+
 public:
 
 	BackProjector(){}
@@ -314,19 +316,11 @@ public:
 	                 Image<RFLOAT>* weight_out = 0);
 
 	/*
-	* Calculate the first or second moment of the gradient in real space
-	*/
-	void reweightGradRealSpace(
-	    MultidimArray<RFLOAT> &mom1, RFLOAT lambda1,
-	    MultidimArray<RFLOAT> &mom2, RFLOAT lambda2,
-	    bool init_mom);
-
-	/*
 	 * Calculate the first or second moment of the gradient
 	 */
 	void reweightGrad(
-			MultidimArray<RFLOAT> &mom1, RFLOAT lambda1,
-			MultidimArray<RFLOAT> &mom2, RFLOAT lambda2,
+			MultidimArray<Complex> &mom1, RFLOAT lambda1,
+			MultidimArray<Complex> &mom2, RFLOAT lambda2,
 			bool init_mom);
 
 	void reconstructGrad(

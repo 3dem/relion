@@ -653,8 +653,6 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	// SGD stuff
 	int grad_section = parser.addSection("Stochastic Gradient Descent");
 	do_grad = parser.checkOption("--grad", "Perform gradient based optimisation (instead of default expectation-maximization)");
-//	do_mom1 = parser.checkOption("--mom1", "Track the first moment of the gradient");
-//	do_mom2 = parser.checkOption("--mom2", "Track the second moment of the gradient");
 	if (do_grad) {
 		do_mom1 = true;
 		do_mom2 = true;
@@ -1412,9 +1410,9 @@ void MlOptimiser::initialise()
 				mymodel.pdf_class[i] = 0.;
 				mymodel.Iref[i] *= 0.;
 				if (do_mom1)
-					mymodel.Igrad1[i] *= 0.;
+					mymodel.Igrad1[i].initZeros();
 				if (do_mom2)
-					mymodel.Igrad2[i] *= 0.;
+					mymodel.Igrad2[i].initZeros();
 			}
 		}
 	}
@@ -4524,14 +4522,6 @@ int MlOptimiser::maximizationGradientParameters() {
 			if (mymodel.pdf_class[iclass] > 0. || mymodel.nr_bodies > 1) {
 				if ((wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY) {
 
-					if (do_grad_realspace)
-						(wsum_model.BPref[iclass]).reweightGradRealSpace(
-								mymodel.Igrad1[iclass],
-								do_mom1 ? 0.9 : 0.,
-								mymodel.Igrad2[iclass],
-								do_mom2 ? 0.999 : 0.,
-								iter == 1);
-					else
 						(wsum_model.BPref[iclass]).reweightGrad(
 								mymodel.Igrad1[iclass],
 								do_mom1 ? 0.9 : 0.,
@@ -4567,7 +4557,10 @@ int MlOptimiser::maximizationGradientParameters() {
 			// If both drop and expand are set, replace drop with expand
 			if (drop_class_idx != -1 && expand_class_idx != -1) {
 				mymodel.reset_class(drop_class_idx, expand_class_idx);
-				mymodel.Igrad1[drop_class_idx] *= 0.9; // Dampen momentum
+				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(mymodel.Igrad1[drop_class_idx]) { // Dampen momentum
+					mymodel.Igrad1[drop_class_idx].data[i].real *= 0.9;
+					mymodel.Igrad1[drop_class_idx].data[i].imag *= 0.9;
+				}
 				mymodel.class_age[drop_class_idx] = mymodel.class_age[expand_class_idx] * 0.9;
 				skip_class = drop_class_idx;
 				std::cerr << "Dropping class " << drop_class_idx << " replacing with " << expand_class_idx << std::endl;
@@ -4579,7 +4572,10 @@ int MlOptimiser::maximizationGradientParameters() {
 			    iter - mymodel.last_som_add_iter > 3) {
 				unsigned nn = mymodel.som.add_node(expand_class_idx, 0); //TODO Should be a parameter
 				mymodel.reset_class(nn, expand_class_idx);
-				mymodel.Igrad1[nn] *= 0.9; // Dampen momentum
+				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(mymodel.Igrad1[drop_class_idx]) { // Dampen momentum
+					mymodel.Igrad1[nn].data[i].real *= 0.9;
+					mymodel.Igrad1[nn].data[i].imag *= 0.9;
+				}
 				mymodel.class_age[nn] = mymodel.class_age[expand_class_idx] * 0.5;
 				skip_class = nn;
 				mymodel.last_som_add_iter = iter;

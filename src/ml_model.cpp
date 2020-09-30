@@ -251,6 +251,7 @@ void MlModel::read(FileName fn_in)
 		// Check to see whether there are gradient tracking entry as well
 		if (MDclass.getValue(EMDL_MLMODEL_GRADIENT_MOMENT1_IMAGE, fn_tmp))
 		{
+			Image<Complex> img;
 			do_mom1=true;
 			if (iclass == 0)
 				Igrad1.resize(nr_classes);
@@ -260,6 +261,7 @@ void MlModel::read(FileName fn_in)
 
 		if (MDclass.getValue(EMDL_MLMODEL_GRADIENT_MOMENT2_IMAGE, fn_tmp))
 		{
+			Image<Complex> img;
 			do_mom2=true;
 			if (iclass == 0)
 				Igrad2.resize(nr_classes);
@@ -461,6 +463,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 			{
 				fn_tmp.compose(fn_out+"_1moment", iclass+1, "mrc", 3);
 
+				Image<Complex> img;
 				img() = Igrad1[iclass];
 				img.write(fn_tmp);
 			}
@@ -472,6 +475,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 			{
 				fn_tmp.compose(fn_out+"_2moment", iclass+1, "mrc", 3);
 
+				Image<Complex> img;
 				img() = Igrad2[iclass];
 				img.write(fn_tmp);
 			}
@@ -801,10 +805,11 @@ void MlModel::initialiseFromImages(
 				ori_size = XSIZE(img());
 				ref_dim = img().getDim();
 				Iref.push_back(img());
+				MultidimArray<Complex> zeros(img().zdim, img().ydim, img().xdim/2+1);
 				if (_do_mom1)
-					Igrad1.push_back(img()*0.);
+					Igrad1.push_back(zeros);
 				if (_do_mom2)
-					Igrad2.push_back(img()*0.);
+					Igrad2.push_back(zeros);
 				nr_classes++;
 			}
 		}
@@ -852,10 +857,11 @@ void MlModel::initialiseFromImages(
 				for (int iclass = 0; iclass < nr_classes; iclass++)
 				{
 					Iref.push_back(img());
+					MultidimArray<Complex> zeros(img().zdim, img().ydim, img().xdim/2+1);
 					if (_do_mom1)
-						Igrad1.push_back(img()*0.);
+						Igrad1.push_back(zeros);
 					if (_do_mom2)
-			                        Igrad2.push_back(img()*0.);
+						Igrad2.push_back(zeros);
 				}
 			}
 			if (nr_classes > 1)
@@ -924,10 +930,12 @@ void MlModel::initialiseFromImages(
 		for (int iclass = 0; iclass < nr_classes; iclass++)
 		{
 			Iref.push_back(img());
+
+			MultidimArray<Complex> zeros(img().zdim, img().ydim, img().xdim/2+1);
 			if (_do_mom1)
-				Igrad1.push_back(img()*0.);
+				Igrad1.push_back(zeros);
 			if (_do_mom2)
-                		Igrad2.push_back(img()*0.);
+				Igrad2.push_back(zeros);
 		}
 	}
 
@@ -1473,8 +1481,8 @@ void MlModel::calculateTotalFourierCoverage()
 void MlModel::reset_class(int class_idx, int to_class_idx) {
 	if (to_class_idx == -1) {
 		Iref[class_idx] *= 0;
-		Igrad1[class_idx] *= 0;
-		Igrad2[class_idx] *= 0;
+		Igrad1[class_idx].initZeros();
+		Igrad2[class_idx].initZeros();
 		pdf_class[class_idx] = 0;
 		tau2_class[class_idx] *= 0.;
 		data_vs_prior_class[class_idx] *= 0.;

@@ -100,8 +100,8 @@ public:
 	std::vector<MultidimArray<RFLOAT> > Iref;
 
 	// Vector with all gradient moments
-	std::vector<MultidimArray<RFLOAT> > Igrad1;
-	std::vector<MultidimArray<RFLOAT> > Igrad2;
+	std::vector<MultidimArray<Complex> > Igrad1;
+	std::vector<MultidimArray<Complex> > Igrad2;
 
 	// Vector with masks for all bodies in multi-body refinement
 	std::vector<MultidimArray<RFLOAT> > masks_bodies;
