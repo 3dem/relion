@@ -1914,7 +1914,8 @@ void BackProjector::reweightGrad(
 				DIRECT_A1D_ELEM(power_b, ires) += (x.real * x.real) + (x.imag * x.imag);
 			}
         }
-        
+
+        RFLOAT L = 1;
         FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
         {
 			const int r2 = k * k + i * i + j * j;
@@ -1923,30 +1924,31 @@ void BackProjector::reweightGrad(
 				int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
 				RFLOAT a = DIRECT_A1D_ELEM(power_a, ires);
 				RFLOAT b = DIRECT_A1D_ELEM(power_b, ires);
-				A3D_ELEM(data, k, i, j) *= sqrt(a / (b + eps));
+				A3D_ELEM(data, k, i, j) *= sqrt((a*L + b*(1-L)) / (b + eps));
 			}
         }
 
-//		grad_error_power.initZeros(ori_size / 2 + 1);
-//		MultidimArray<RFLOAT> counter(grad_error_power);
-//
-//		FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
-//				{
-//					const int r2 = k * k + i * i + j * j;
-//					if (r2 <= max_r2)
-//					{
-//						int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
-//						DIRECT_A1D_ELEM(grad_error_power, ires) += sqrt(A3D_ELEM(mom2, k, i, j).real);
-//						DIRECT_A1D_ELEM(counter, ires) += 1;
-//					}
-//				}
-//
-//		//Average power spectra and calculate FSC estimate
-//		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(counter)
-//		{
-//			if (DIRECT_A1D_ELEM(counter, i) > 0.)
-//				DIRECT_A1D_ELEM(grad_error_power, i) /= DIRECT_A1D_ELEM(counter, i) * 100;
-//		}
+		grad_error_power.initZeros(ori_size / 2 + 1);
+		MultidimArray<RFLOAT> counter(grad_error_power);
+
+		FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
+				{
+					const int r2 = k * k + i * i + j * j;
+					if (r2 <= max_r2)
+					{
+						int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
+						Complex x = A3D_ELEM(mom2, k, i, j);
+						DIRECT_A1D_ELEM(grad_error_power, ires) += sqrt(x.real) + sqrt(x.imag);
+						DIRECT_A1D_ELEM(counter, ires) += 2; // Real and imag
+					}
+				}
+
+		//Average power spectra and calculate FSC estimate
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(counter)
+		{
+			if (DIRECT_A1D_ELEM(counter, i) > 0.)
+				DIRECT_A1D_ELEM(grad_error_power, i) /= DIRECT_A1D_ELEM(counter, i);
+		}
 	}
 }
 
@@ -2039,8 +2041,8 @@ void BackProjector::reconstructGrad(
 			if (DIRECT_A1D_ELEM(counter, i) > 0.)
 			{
 				prev = DIRECT_A1D_ELEM(prev_power, i) / DIRECT_A1D_ELEM(counter, i);
-				diff = DIRECT_A1D_ELEM(diff_power, i) / DIRECT_A1D_ELEM(counter, i);
-//				diff = DIRECT_A1D_ELEM(grad_error_power, i);
+//				diff = DIRECT_A1D_ELEM(diff_power, i) / DIRECT_A1D_ELEM(counter, i);
+				diff = DIRECT_A1D_ELEM(grad_error_power, i);
 				myfsc = prev / (prev + diff/tau2_fudge);
 
 #ifdef DEBUG_NGD

@@ -1433,7 +1433,7 @@ void MlOptimiser::initialise()
 					SomGraph::make_blobs_3d(
 							blobs_neg, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
 				}
-				mymodel.Iref[i] = blobs_pos/40 - blobs_neg/80;
+				mymodel.Iref[i] = blobs_pos/40 * 0.6 - blobs_neg/40 * 0.4;
 			}
 		}
 	}
@@ -4587,23 +4587,13 @@ int MlOptimiser::maximizationGradientParameters() {
 }
 
 float MlOptimiser::getGradientStepSize(int iclass) {
-	int nr_active_classes = 0;
-	float wsum_mode_pdf_class_sum = 0;
-	for (int i = 0; i < mymodel.nr_classes; i ++) {
-		wsum_mode_pdf_class_sum += wsum_model.pdf_class[i];
-		if (mymodel.pdf_class[i] > 0.)
-			nr_active_classes ++;
-	}
-
 	float a = grad_inbetween_iter;
 	float b = grad_ini_iter;
-	float x = mymodel.class_age[iclass] * nr_active_classes;
-	float scale = 1 / (pow(10, (x-b-a/2.)/(a/4.)) + 1.);
+	float x = iter;
+	float scale = 1 / (pow(10, (x-b-a/2.)/(a/4.)) + 1.); //Sigmoid function
+	float stepsize = (grad_ini_stepsize - grad_fin_stepsize) * scale + grad_fin_stepsize;
 
-	float _stepsize = (grad_ini_stepsize - grad_fin_stepsize) * scale + grad_fin_stepsize;
-	_stepsize *= sqrt(wsum_model.pdf_class[iclass]/wsum_mode_pdf_class_sum * nr_active_classes);
-
-	return _stepsize;
+	return stepsize;
 }
 
 void MlOptimiser::solventFlatten()
