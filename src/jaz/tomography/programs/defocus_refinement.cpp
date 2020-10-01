@@ -100,7 +100,7 @@ void DefocusRefinementProgram::run()
 		const int usedParticleCount = (max_particles > 0 && pc0 > max_particles)? max_particles : pc0;
 		const int fc = tomogram.frameCount;
 		
-		dataSet->checkTrajectoryLengths(
+		dataSet.checkTrajectoryLengths(
 				particles[t][0], usedParticleCount, fc, "DefocusRefinementProgram::run");
 		
 		
@@ -307,7 +307,7 @@ void DefocusRefinementProgram::run()
 BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(
 		int f, 
 		double z0, double z1, int steps, 
-		const ParticleSet* dataSet,
+		const ParticleSet& dataSet,
 		std::vector<int>& particles, int max_particles,
 		const Tomogram& tomogram,
 		std::vector<BufferedImage<fComplex>>& referenceFS,
@@ -361,8 +361,8 @@ BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(
 			if (th==0) timer.tic(time_extract);
 		#endif
 		
-		const d3Vector pos = dataSet->getPosition(part_id);
-		const std::vector<d3Vector> traj = dataSet->getTrajectoryInPixels(part_id, fc, pixelSize);
+		const d3Vector pos = dataSet.getPosition(part_id);
+		const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(part_id, fc, pixelSize);
 		
 		d4Matrix projCut;
 
@@ -471,7 +471,7 @@ DefocusRefinementProgram::DefocusFit DefocusRefinementProgram::findDefocus(
 		double minDelta, 
 		double maxDelta,
 		int steps, int group_count, double sigma_input,
-		const ParticleSet* dataSet,
+		const ParticleSet& dataSet,
 		std::vector<int>& particles, int max_particles,
 		const Tomogram& tomogram,
 		std::vector<BufferedImage<fComplex>>& referenceFS,

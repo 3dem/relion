@@ -56,14 +56,14 @@ int main(int argc, char *argv[])
 	int res = system(("mkdir -p "+outDir).c_str());
 	
 	
-	ParticleSet* dataSet0 = ParticleSet::load(partFn0, "");
-	ParticleSet* dataSet1 = ParticleSet::load(partFn1, "");
+	ParticleSet dataSet0(partFn0, "");
+	ParticleSet dataSet1(partFn1, "");
 
 	TomogramSet tomogramSet0(tomoSetFn0);
 	TomogramSet tomogramSet1(tomoSetFn1);
 
-	std::vector<std::vector<int>> particles0 = dataSet0->splitByTomogram(tomogramSet0);
-	std::vector<std::vector<int>> particles1 = dataSet1->splitByTomogram(tomogramSet1);
+	std::vector<std::vector<int>> particles0 = dataSet0.splitByTomogram(tomogramSet0);
+	std::vector<std::vector<int>> particles1 = dataSet1.splitByTomogram(tomogramSet1);
 	
 	const int tc0 = particles0.size();
 	const int tc1 = particles1.size();
@@ -105,8 +105,8 @@ int main(int argc, char *argv[])
 		{
 			const int p = particles0[t][pp];
 					
-			d3Vector p0 = dataSet0->getPosition(p);
-			d3Vector p1 = dataSet1->getPosition(p);
+			d3Vector p0 = dataSet0.getPosition(p);
+			d3Vector p1 = dataSet1.getPosition(p);
 			d3Vector m = (p0 + p1) / 2.0;
 			
 			p0 = m + scale * (p0 - m);

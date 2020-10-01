@@ -31,7 +31,7 @@ class MotionFit : public DifferentiableOptimization
 		MotionFit(
 				const std::vector<BufferedImage<double>>& CCs,
 				const std::vector<gravis::d4Matrix>& frameProj, 
-				ParticleSet* dataSet,
+				ParticleSet& dataSet,
 				const std::vector<int>& partIndices,
 				const std::vector<BufferedImage<fComplex>>& referenceFS,
 				MotionParameters motionParameters,
@@ -45,7 +45,7 @@ class MotionFit : public DifferentiableOptimization
 		
 			const std::vector<BufferedImage<double>>& CCs; // one frame stack for each particle		
 			const std::vector<gravis::d4Matrix>& frameProj;			
-			ParticleSet* dataSet;
+			ParticleSet& dataSet;
 			const std::vector<int>& partIndices;
 			const std::vector<BufferedImage<fComplex>>& referenceFS;
 			
@@ -76,7 +76,7 @@ class MotionFit : public DifferentiableOptimization
 		
 		void shiftParticles(
 				const std::vector<double>& x,
-				ParticleSet* target) const;
+				ParticleSet& target) const;
 		
 		Trajectory getTrajectory(
 				const std::vector<double>& x, 
@@ -85,7 +85,7 @@ class MotionFit : public DifferentiableOptimization
 		
 		void exportTrajectories(
 				const std::vector<double>& x, 
-				ParticleSet* dataSet,
+				ParticleSet& dataSet,
 				const std::vector<int>& frameSequence) const;
 		
 		int getParamCount();

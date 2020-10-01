@@ -35,7 +35,7 @@ class RefinementProgram
 
 			
 			
-			ParticleSet* dataSet;
+			ParticleSet dataSet;
 			std::vector<std::vector<int>> particles;
 			TomogramSet tomogramSet;
 			

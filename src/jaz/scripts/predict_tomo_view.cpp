@@ -88,8 +88,8 @@ int main(int argc, char *argv[])
 
 	TomogramSet tomogramSet(tomoSetFn);
 
-	ParticleSet* dataSet = ParticleSet::load(particleFn);
-	std::vector<std::vector<int>> particles = dataSet->splitByTomogram(tomogramSet);
+	ParticleSet dataSet(particleFn);
+	std::vector<std::vector<int>> particles = dataSet.splitByTomogram(tomogramSet);
 
 	referenceMap.load(boxSize);
 
@@ -117,7 +117,7 @@ int main(int argc, char *argv[])
 			BufferedImage<float> sliceRS(s,s);
 			BufferedImage<tComplex<float>> sliceFS(sh,s);
 
-			const std::vector<d3Vector> traj = dataSet->getTrajectoryInPixels(part_id, fc, tomogram.optics.pixelSize);
+			const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(part_id, fc, tomogram.optics.pixelSize);
 
 			for (int f = 0; f < fc; f++)
 			{
@@ -142,7 +142,7 @@ int main(int argc, char *argv[])
 
 		for (int f = 0; f < fc; f++)
 		{
-			CTF ctf = tomogram.getCtf(f, dataSet->getPosition(part_id));
+			CTF ctf = tomogram.getCtf(f, dataSet.getPosition(part_id));
 
 			BufferedImage<fComplex> prediction = Prediction::predictModulated(
 				part_id, dataSet, tomogram.projectionMatrices[f], s,

@@ -27,7 +27,7 @@ void SampleManifoldProgram::readParameters(int argc, char *argv[])
 		avoid_missing_wedge = parser.checkOption("--nmw", "Do not sample particles from the missing wedges");
 		avoid_present_wedge = parser.checkOption("--npw", "Do not sample particles from the present wedges");
 
-		output_path = parser.getOption("--o", "Output filename pattern");
+		output_path = parser.getOption("--o", "Output filename");
 
 		Log::readParams(parser);
 
@@ -49,7 +49,24 @@ void SampleManifoldProgram::run()
 	TomogramSet tomogram_set(tomogram_set_filename);
 	ManifoldSet manifold_set(manifolds_filename);
 
-	const int tomogram_count = 1;//tomogram_set.size();
+	MetaDataTable optics_table, particles_table;
+
+	optics_table.setName("optics");
+	particles_table.setName("particles");
+
+	Tomogram tomogram0 = tomogram_set.loadTomogram(0, false);
+
+	const std::string optics_group_name = "optics_group_1";
+
+	optics_table.addObject();
+	optics_table.setValue(EMDL_IMAGE_OPTICS_GROUP, 1);
+	optics_table.setValue(EMDL_IMAGE_OPTICS_GROUP_NAME, optics_group_name);
+	optics_table.setValue(EMDL_CTF_CS, tomogram0.optics.Cs);
+	optics_table.setValue(EMDL_CTF_VOLTAGE, tomogram0.optics.voltage);
+	optics_table.setValue(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, tomogram0.optics.pixelSize);
+
+
+	const int tomogram_count = tomogram_set.size();
 
 	for (int t = 0; t < tomogram_count; t++)
 	{
@@ -83,7 +100,44 @@ void SampleManifoldProgram::run()
 
 				Matrix2D<double> A;
 				Euler_angles2matrix(ra.rot, ra.tilt, ra.psi, A, false);
-				const d3Vector n(A(2,0), A(2,1), A(2,2));
+				const d3Vector n(A(0,2), A(1,2), A(2,2));
+
+
+				particles_table.addObject();
+				const int j = particles_table.numberOfObjects() - 1;
+
+				particles_table.setValue(EMDL_TOMO_NAME, tomogram.name, j);
+				particles_table.setValue(EMDL_TOMO_TILT_SERIES_NAME, tomogram.tiltSeriesFilename, j);
+
+				particles_table.setValue(EMDL_IMAGE_COORD_X, ra.position.x, j);
+				particles_table.setValue(EMDL_IMAGE_COORD_Y, ra.position.y, j);
+				particles_table.setValue(EMDL_IMAGE_COORD_Z, ra.position.z, j);
+
+				particles_table.setValue(EMDL_TOMO_SUBTOMOGRAM_ROT, ra.rot, j);
+				particles_table.setValue(EMDL_TOMO_SUBTOMOGRAM_TILT, ra.tilt, j);
+				particles_table.setValue(EMDL_TOMO_SUBTOMOGRAM_PSI, ra.psi, j);
+
+				particles_table.setValue(EMDL_ORIENT_TILT_PRIOR, 0.0, j);
+
+				particles_table.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, 0.0, j);
+				particles_table.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, 0.0, j);
+				particles_table.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, 0.0, j);
+
+				particles_table.setValue(EMDL_ORIENT_ORIGIN_X_PRIOR_ANGSTROM, 0.0, j);
+				particles_table.setValue(EMDL_ORIENT_ORIGIN_Y_PRIOR_ANGSTROM, 0.0, j);
+				particles_table.setValue(EMDL_ORIENT_ORIGIN_Z_PRIOR_ANGSTROM, 0.0, j);
+
+				particles_table.setValue(EMDL_ORIENT_ROT, 0.0, j);
+				particles_table.setValue(EMDL_ORIENT_TILT, 0.0, j);
+				particles_table.setValue(EMDL_ORIENT_PSI, 0.0, j);
+
+				particles_table.setValue(EMDL_MLMODEL_GROUP_NO, t, j);
+				particles_table.setValue(EMDL_PARTICLE_CLASS, 1, j);
+				particles_table.setValue(EMDL_IMAGE_OPTICS_GROUP, 1, j);
+				particles_table.setValue(EMDL_PARTICLE_RANDOM_SUBSET, j % 2, j);
+
+				particles_table.setValue(EMDL_TOMO_MANIFOLD_INDEX, manifold_index, j);
+
 
 				MeshBuilder::addCone(
 					pixel_size * ra.position,
@@ -94,4 +148,10 @@ void SampleManifoldProgram::run()
 
 		diagnostic.writeObj(output_path + tomogram.name + ".obj");
 	}
+
+
+	std::ofstream ofs(output_path + "particles.star");
+
+	optics_table.write(ofs);
+	particles_table.write(ofs);
 }

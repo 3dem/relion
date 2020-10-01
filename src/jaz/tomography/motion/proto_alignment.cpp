@@ -14,7 +14,7 @@ using namespace gravis;
 ProtoAlignment::ProtoAlignment(
 	const std::vector<BufferedImage<double>>& CCs,
 	const std::vector<gravis::d4Matrix>& frameProj, 
-	ParticleSet* dataSet,
+	const ParticleSet& dataSet,
 	const std::vector<int>& partIndices,
 	const std::vector<BufferedImage<fComplex>>& referenceFS,
 	bool constParticles,
@@ -44,7 +44,7 @@ ProtoAlignment::ProtoAlignment(
 	
 	for (int p = 0; p < pc; p++)
 	{
-		initialPos[p] = dataSet->getPosition(partIndices[p]);
+		initialPos[p] = dataSet.getPosition(partIndices[p]);
 	}
 	
 	minusCentre = d4Matrix(
@@ -245,7 +245,7 @@ std::vector<d4Matrix> ProtoAlignment::getProjections(const std::vector<double> &
 void ProtoAlignment::shiftParticles(
 		const std::vector<double> &x,
 		const std::vector<int>& partIndices, 
-		ParticleSet *target) const
+		ParticleSet& target) const
 {
 	if (constParticles) return;
 	
@@ -256,7 +256,7 @@ void ProtoAlignment::shiftParticles(
 		const d3Vector origin = initialPos[p] + d3Vector(
 					x[fs*fc + 3*p], x[fs*fc + 3*p+1], x[fs*fc + 3*p+2]);
 		
-		target->moveParticleTo(partIndices[p], origin);
+		target.moveParticleTo(partIndices[p], origin);
 	}
 }
 

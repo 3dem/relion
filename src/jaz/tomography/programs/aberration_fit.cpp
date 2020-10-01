@@ -185,7 +185,7 @@ void AberrationFitProgram :: considerParticle(
 		int part_id,
 		const Tomogram& tomogram, 
 		const TomoReferenceMap& referenceMap, 
-		const ParticleSet* dataSet,
+		const ParticleSet& dataSet,
 		bool flip_value,
 		const BufferedImage<float>& frqWeight,
 		int f0, int f1,
@@ -200,7 +200,7 @@ void AberrationFitProgram :: considerParticle(
 	if (f1 < 0) f1 = fc - 1;
 	
 	
-	const std::vector<d3Vector> traj = dataSet->getTrajectoryInPixels(
+	const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(
 				part_id, fc, tomogram.optics.pixelSize);
 	
 	d4Matrix projCut;
@@ -214,7 +214,7 @@ void AberrationFitProgram :: considerParticle(
 				tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f], traj[f],
 				observation, projCut, 1, false, true);
 		
-		CTF ctf = tomogram.getCtf(f, dataSet->getPosition(part_id));
+		CTF ctf = tomogram.getCtf(f, dataSet.getPosition(part_id));
 
 		BufferedImage<fComplex> prediction = Prediction::predictModulated(
 				part_id, dataSet, projCut, s, 

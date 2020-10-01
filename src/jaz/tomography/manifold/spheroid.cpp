@@ -98,9 +98,9 @@ std::vector<RigidAlignment> Spheroid::sampleParticles(
 			{
 				out.push_back(RigidAlignment(
 						surface - depth * normal,
-						RAD2DEG(atan2(normal.y, normal.x)),
-						RAD2DEG(acos(normal.z)),
-						0.0));
+						0,
+						-RAD2DEG(acos(normal.z)),
+						-RAD2DEG(atan2(normal.y, normal.x))));
 			}
 		}
 	}

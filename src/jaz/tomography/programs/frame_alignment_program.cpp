@@ -218,6 +218,6 @@ void FrameAlignmentProgram::run()
 	
 	if (!shiftOnly)
 	{
-		dataSet->write(outDir + "particles.star");
+		dataSet.write(outDir + "particles.star");
 	}
 }

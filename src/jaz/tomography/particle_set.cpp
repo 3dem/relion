@@ -10,11 +10,6 @@
 using namespace gravis;
 
 
-ParticleSet* ParticleSet::load(std::string filename, std::string motionFilename)
-{
-	return new ParticleSet(filename, motionFilename);
-}
-
 ParticleSet::ParticleSet()
 {}
 
@@ -394,7 +389,7 @@ double ParticleSet::getOriginalPixelSize(int opticsGroup) const
 {
 	if (!optTable.labelExists(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE))
 	{
-		REPORT_ERROR("ParticleSet::getOriginalPixelSize: pixel size (rlnMicrographOriginalPixelSize) missing from optics table");
+		REPORT_ERROR("ParticleSet::getOriginalPixelSize: tilt series pixel size (rlnTomoTiltSeriesPixelSize) missing from optics table");
 	}
 	
 	double out;

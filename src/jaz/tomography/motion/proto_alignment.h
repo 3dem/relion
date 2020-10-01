@@ -14,7 +14,7 @@ class ProtoAlignment : public DifferentiableOptimization
 		ProtoAlignment(
 				const std::vector<BufferedImage<double>>& CCs,
 				const std::vector<gravis::d4Matrix>& frameProj, 
-				ParticleSet* dataSet,
+				const ParticleSet& dataSet,
 				const std::vector<int>& partIndices,
 				const std::vector<BufferedImage<fComplex>>& referenceFS,
 				bool constParticles,
@@ -27,7 +27,7 @@ class ProtoAlignment : public DifferentiableOptimization
 		
 		
 			std::vector<gravis::d4Matrix> frameProj; // make a reference again
-			ParticleSet* dataSet;
+			const ParticleSet& dataSet;
 			const std::vector<int>& partIndices;
 			const std::vector<BufferedImage<fComplex>>& referenceFS;
 			
@@ -52,7 +52,7 @@ class ProtoAlignment : public DifferentiableOptimization
 		void shiftParticles(
 				const std::vector<double>& x,
 				const std::vector<int>& partIndices,
-				ParticleSet* target) const;
+				ParticleSet& target) const;
 		
 		int getParamCount();
 		

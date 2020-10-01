@@ -9,10 +9,11 @@
 using namespace gravis;
 
 
-void addPoint(d3Vector pos, d3Vector ref, double scale, double rad, double out_bin, Mesh& mesh)
+void addPoint(const d3Vector& pos, const d3Matrix& A, double rad, double out_bin, Mesh& mesh)
 {
-	const d3Vector pos2 = ref + scale * (pos - ref);	
-	MeshBuilder::addOctahedron(pos2 / out_bin, rad, mesh);
+	const d3Vector n(A(0,2), A(1,2), A(2,2));
+
+	MeshBuilder::addCone(pos / out_bin, (pos + 2 * rad * n) / out_bin, rad, 12, mesh);
 }
 
 int main(int argc, char *argv[])
@@ -22,7 +23,7 @@ int main(int argc, char *argv[])
 	double bin, rad, relScale;
 	bool allFrames;
 	
-			
+
 	IOParser parser;
 	
 	try
@@ -73,16 +74,10 @@ int main(int argc, char *argv[])
 	
 	TomogramSet tomogramSet(tomoSetFn);
 	
-	ParticleSet* dataSet = ParticleSet::load(inFn, motFn);
-	std::vector<std::vector<int>> particles = dataSet->splitByTomogram(tomogramSet);
+	ParticleSet dataSet(inFn, motFn);
+	std::vector<std::vector<int>> particles = dataSet.splitByTomogram(tomogramSet);
 	
-	ParticleSet* refDataSet = 0;
-	
-	if (refFn != "")
-	{
-		refDataSet = ParticleSet::load(refFn, "");
-	}
-	
+
 	const int tc = particles.size();
 	
 	if (t1 < 0) t1 = tc - 1;
@@ -101,7 +96,7 @@ int main(int argc, char *argv[])
 		std::vector<int> frameSeq = IndexSort<double>::sortIndices(tomogram.cumulativeDose);
 		
 		const int fc = tomogram.frameCount;
-		dataSet->checkTrajectoryLengths(particles[t][0], pc, fc, "backproject");
+		dataSet.checkTrajectoryLengths(particles[t][0], pc, fc, "backproject");
 		
 		
 		Mesh mesh;		
@@ -109,19 +104,20 @@ int main(int argc, char *argv[])
 		
 		for (int p = 0; p < pc; p++)
 		{
-			const int part_id = particles[t][p];
+			const long int part_id = particles[t][p];
+
+			const d3Matrix A = dataSet.getMatrix3x3(part_id);
 			
 			
 			if (f == 0 && !allFrames)
 			{
-				const d3Vector pos = dataSet->getPosition(part_id);
-				const d3Vector refPos = refDataSet? refDataSet->getPosition(part_id) : pos;
+				const d3Vector pos = dataSet.getPosition(part_id);
 				
-				addPoint(pos, refPos, relScale, rad, bin, mesh);
+				addPoint(pos, A, rad, bin, mesh);
 			}
 			else
 			{
-				const std::vector<d3Vector> traj = dataSet->getTrajectoryInPixels(
+				const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(
 							part_id, 0, tomogram.optics.pixelSize);
 				
 				if (allFrames)
@@ -131,9 +127,8 @@ int main(int argc, char *argv[])
 					for (int f = 0; f < fc; f++)
 					{
 						const d3Vector pos = traj[frameSeq[f]];
-						const d3Vector refPos = refDataSet? refDataSet->getPosition(part_id) : pos;
 						
-						addPoint(pos, refPos, relScale, rad, bin, meshes[f]);
+						addPoint(pos, A, rad, bin, meshes[f]);
 					}
 				}
 				else
@@ -153,9 +148,8 @@ int main(int argc, char *argv[])
 					}
 					
 					const d3Vector pos = traj[frameSeq[f]];
-					const d3Vector refPos = refDataSet? refDataSet->getPosition(part_id) : pos;
 					
-					addPoint(pos, refPos, relScale, rad, bin, mesh);
+					addPoint(pos, A, rad, bin, mesh);
 				}
 			}
 		}

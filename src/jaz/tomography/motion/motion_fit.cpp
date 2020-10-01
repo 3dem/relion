@@ -15,7 +15,7 @@ using namespace gravis;
 MotionFit::MotionFit(
 	const std::vector<BufferedImage<double>>& CCs,
 	const std::vector<gravis::d4Matrix>& frameProj, 
-	ParticleSet* dataSet,
+	ParticleSet& dataSet,
 	const std::vector<int>& partIndices,
 	const std::vector<BufferedImage<fComplex>>& referenceFS,
 	MotionParameters motionParameters,
@@ -46,7 +46,7 @@ MotionFit::MotionFit(
 	
 	for (int p = 0; p < pc; p++)
 	{
-		initialPos[p] = dataSet->getPosition(partIndices[p]);
+		initialPos[p] = dataSet.getPosition(partIndices[p]);
 	}
 	
 	minusCentre = d4Matrix(
@@ -393,7 +393,7 @@ std::vector<d4Matrix> MotionFit::getProjections(const std::vector<double> &x,
 
 void MotionFit::shiftParticles(
 		const std::vector<double> &x,
-		ParticleSet *target) const
+		ParticleSet& target) const
 {
 	if (settings.constParticles) return;
 	
@@ -404,7 +404,7 @@ void MotionFit::shiftParticles(
 		const d3Vector origin = initialPos[p] + d3Vector(
 					x[fs*fc + 3*p], x[fs*fc + 3*p+1], x[fs*fc + 3*p+2]);
 		
-		target->moveParticleTo(partIndices[p], origin);
+		target.moveParticleTo(partIndices[p], origin);
 	}
 }
 
@@ -436,14 +436,14 @@ Trajectory MotionFit::getTrajectory(const std::vector<double> &x, int p,
 
 void MotionFit::exportTrajectories(
 		const std::vector<double>& x, 
-		ParticleSet* dataSet,
+		ParticleSet& dataSet,
 		const std::vector<int>& frameSequence) const
 {
 	for (int p = 0; p < pc; p++)
 	{
 		const int pp = partIndices[p];
 
-		dataSet->motionTrajectories[pp] += getTrajectory(x, p, frameSequence);
+		dataSet.motionTrajectories[pp] += getTrajectory(x, p, frameSequence);
 	}
 }
 

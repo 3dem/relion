@@ -84,11 +84,11 @@ void PolishProgram::run()
 	Log::endSection();
 	
 	
-	int tpc = dataSet->getTotalParticleNumber();
+	int tpc = dataSet.getTotalParticleNumber();
 		
-	if (dataSet->motionTrajectories.size() != tpc)
+	if (dataSet.motionTrajectories.size() != tpc)
 	{
-		dataSet->motionTrajectories.resize(tpc);
+		dataSet.motionTrajectories.resize(tpc);
 	}
 			
 	for (int t = 0; t < tc; t++)
@@ -101,14 +101,14 @@ void PolishProgram::run()
 		
 		for (int p = 0; p < pc; p++)
 		{
-			if (dataSet->motionTrajectories[particles[t][p]].shifts_Ang.size() != fc)
+			if (dataSet.motionTrajectories[particles[t][p]].shifts_Ang.size() != fc)
 			{		
-				dataSet->motionTrajectories[particles[t][p]] = Trajectory(fc);
+				dataSet.motionTrajectories[particles[t][p]] = Trajectory(fc);
 			}
 		}
 	}
 	
-	dataSet->hasMotion = true;
+	dataSet.hasMotion = true;
 	
 	Log::endSection();
 		
@@ -228,7 +228,7 @@ void PolishProgram::run()
 					}
 				}
 				
-				specCC.write(diagPrefix + "_specCC_initial.mrc");				
+				specCC.write(diagPrefix + "_specCC_initial.mrc");
 			}
 		}
 		
@@ -336,7 +336,7 @@ void PolishProgram::run()
 		Log::endSection();
 	}
 	
-	Trajectory::write(dataSet->motionTrajectories, outDir + "motion.star");	
+	Trajectory::write(dataSet.motionTrajectories, outDir + "motion.star");
 	tomogramSetOut.write(outDir + "tomograms.star");
-	dataSet->write(outDir + "particles.star");
+	dataSet.write(outDir + "particles.star");
 }

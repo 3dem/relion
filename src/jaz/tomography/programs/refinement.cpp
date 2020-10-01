@@ -70,8 +70,8 @@ void RefinementProgram::init()
 
 	tomogramSet = TomogramSet(tomoSetFn);
 	
-	dataSet = ParticleSet::load(particlesFn, motFn);
-	particles = dataSet->splitByTomogram(tomogramSet);
+	dataSet = ParticleSet(particlesFn, motFn);
+	particles = dataSet.splitByTomogram(tomogramSet);
 		
 	referenceMap.load(boxSize);
 }

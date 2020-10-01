@@ -47,8 +47,8 @@ int main(int argc, char *argv[])
 
 	TomogramSet tomogramSet(tomoSetFn);
 	
-	ParticleSet* dataSet = ParticleSet::load(particlesFn, "");
-	std::vector<std::vector<int>> particles = dataSet->splitByTomogram(tomogramSet);
+	ParticleSet dataSet(particlesFn, "");
+	std::vector<std::vector<int>> particles = dataSet.splitByTomogram(tomogramSet);
 		
 	const int tc = particles.size();
 		
@@ -74,7 +74,7 @@ int main(int argc, char *argv[])
 			
 			const int part_id = particles[t][p];						
 			
-			const d3Vector pos = dataSet->getPosition(part_id);						
+			const d3Vector pos = dataSet.getPosition(part_id);
 			
 			const gravis::d4Vector pw(pos.x, pos.y, pos.z, 1.0);
 			

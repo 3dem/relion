@@ -23,7 +23,7 @@ using namespace gravis;
 
 
 BufferedImage<fComplex> Prediction::predictModulated(
-		int particle_id, const ParticleSet* dataSet, d4Matrix proj, int s,
+		int particle_id, const ParticleSet& dataSet, d4Matrix proj, int s,
 		const CTF& ctf, double pixelSize,
 		const std::vector<BufferedImage<fComplex>>& referenceFS,
 		HalfSet halfSet,
@@ -53,16 +53,16 @@ BufferedImage<fComplex> Prediction::predictModulated(
 }
 
 BufferedImage<fComplex> Prediction::predictFS(
-		int particle_id, const ParticleSet* dataSet, d4Matrix proj, int s,
+		int particle_id, const ParticleSet& dataSet, d4Matrix proj, int s,
 		const std::vector<BufferedImage<fComplex>>& referenceFS,
 		HalfSet halfSet)
 {
 	const int sh = s/2 + 1;
 
-	const d4Matrix particleToTomo = dataSet->getMatrix4x4(particle_id, s, s, s);
+	const d4Matrix particleToTomo = dataSet.getMatrix4x4(particle_id, s, s, s);
 	const d4Matrix projPart = proj * particleToTomo;
 
-	const int hs0 = dataSet->getHalfSet(particle_id);
+	const int hs0 = dataSet.getHalfSet(particle_id);
 	const int hs = (halfSet == OppositeHalf)? 1 - hs0: hs0;
 
 	BufferedImage<fComplex> prediction(sh,s), psf(sh,s);
@@ -74,7 +74,7 @@ BufferedImage<fComplex> Prediction::predictFS(
 }
 
 std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
-		const ParticleSet* dataSet,
+		const ParticleSet& dataSet,
 		const std::vector<int>& partIndices,
 		const Tomogram& tomogram,
 		const TomoReferenceMap& referenceMap,
@@ -143,7 +143,7 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 		
 		const int part_id = partIndices[p];	
 		
-		const std::vector<d3Vector> traj = dataSet->getTrajectoryInPixels(part_id, fc, tomogram.optics.pixelSize);
+		const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(part_id, fc, tomogram.optics.pixelSize);
 		
 		d4Matrix projCut;	
 		
@@ -159,7 +159,7 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 						
 			BufferedImage<fComplex> prediction = Prediction::predictModulated(
 					part_id, dataSet, projCut, s, 
-					tomogram.getCtf(f, dataSet->getPosition(part_id)),
+					tomogram.getCtf(f, dataSet.getPosition(part_id)),
 					tomogram.optics.pixelSize,
 					referenceMap.image_FS, halfSet);
 					

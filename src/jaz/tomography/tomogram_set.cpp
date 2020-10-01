@@ -195,6 +195,8 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 	{
 		out.hasImage = false;
 	}
+
+	out.tiltSeriesFilename = stackFn;
 		
 	globalTable.getValueSafely(EMDL_TOMO_SIZE_X, out.w0, index);
 	globalTable.getValueSafely(EMDL_TOMO_SIZE_Y, out.h0, index);

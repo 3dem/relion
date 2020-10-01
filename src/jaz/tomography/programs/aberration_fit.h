@@ -67,7 +67,7 @@ class AberrationFitProgram : public RefinementProgram
 				int part_id, 
 				const Tomogram& tomogram, 
 				const TomoReferenceMap& referenceMap, 
-				const ParticleSet* dataSet,
+				const ParticleSet& dataSet,
 				bool flip_value,
 				const BufferedImage<float>& frqWeight,
 				int f0, int f1,

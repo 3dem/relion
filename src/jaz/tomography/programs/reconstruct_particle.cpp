@@ -78,9 +78,9 @@ void BackprojectProgram::run()
 	Log::beginSection("Initialising");
 
 	TomogramSet tomoSet(tomoSetFn);
-	ParticleSet* dataSet = ParticleSet::load(particlesFn, motFn);
+	ParticleSet dataSet(particlesFn, motFn);
 
-	std::vector<std::vector<int>> particles = dataSet->splitByTomogram(tomoSet);
+	std::vector<std::vector<int>> particles = dataSet.splitByTomogram(tomoSet);
 	
 	const int tc = particles.size();
 	const int s = boxSize;
@@ -154,7 +154,7 @@ void BackprojectProgram::run()
 		
 		const int fc = tomogram.frameCount;
 		
-		dataSet->checkTrajectoryLengths(particles[t][0], pc, fc, "backproject");
+		dataSet.checkTrajectoryLengths(particles[t][0], pc, fc, "backproject");
 		
 		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s, binning);
 		BufferedImage<float> noiseWeights;
@@ -191,8 +191,8 @@ void BackprojectProgram::run()
 			
 			const int part_id = particles[t][p];	
 			
-			const d3Vector pos = dataSet->getPosition(part_id);
-			const std::vector<d3Vector> traj = dataSet->getTrajectoryInPixels(
+			const d3Vector pos = dataSet.getPosition(part_id);
+			const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(
 						part_id, fc, tomogram.optics.pixelSize);
 			std::vector<d4Matrix> projCut(fc), projPart(fc);
 			
@@ -201,9 +201,9 @@ void BackprojectProgram::run()
 					tomogram.stack, s02D, binning, tomogram.projectionMatrices, traj,
 					particleStack[th], projCut, inner_threads, no_subpix_off, true);
 			
-			const d4Matrix particleToTomo = dataSet->getMatrix4x4(part_id, s,s,s);
+			const d4Matrix particleToTomo = dataSet.getMatrix4x4(part_id, s,s,s);
 			
-			const int halfSet = dataSet->getHalfSet(part_id);
+			const int halfSet = dataSet.getHalfSet(part_id);
 			
 			
 			for (int f = 0; f < fc; f++)

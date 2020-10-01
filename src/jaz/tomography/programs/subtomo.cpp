@@ -32,7 +32,7 @@ void SubtomoProgram::readParameters(int argc, char *argv[])
 
 		particlesFn = parser.getOption("--i", "Catalogue .tbl or .star file");
 		tomoSetFn = parser.getOption("--t", "Tomogram set", "tomograms.star");
-		boxSize = textToInteger(parser.getOption("--b", "Projection box size", "100"));
+		boxSize = textToInteger(parser.getOption("--b", "Binned projection box size", "100"));
 		cropSize = textToInteger(parser.getOption("--crop", "Output box size", "-1"));
 		binning = textToDouble(parser.getOption("--bin", "Binning factor", "1"));
 		write_multiplicity = parser.checkOption("--multi", "Write out multiplicity volumes");
@@ -61,6 +61,7 @@ void SubtomoProgram::readParameters(int argc, char *argv[])
 		motFn = parser.getOption("--mot", "Particle trajectories", "");
 		
 		diag = parser.checkOption("--diag", "Write out diagnostic information");
+		do_sum_all = parser.checkOption("--sum", "Sum up all subtomograms (for debugging)");
 
 		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 		outTag = parser.getOption("--o", "Output filename pattern");
@@ -87,8 +88,8 @@ void SubtomoProgram::run()
 {
 	TomogramSet tomogramSet(tomoSetFn);
 
-	ParticleSet* dataSet = ParticleSet::load(particlesFn, motFn);
-	std::vector<std::vector<int> > particles = dataSet->splitByTomogram(tomogramSet);
+	ParticleSet dataSet(particlesFn, motFn);
+	std::vector<std::vector<int> > particles = dataSet.splitByTomogram(tomogramSet);
 	
 	if (cropSize < 0) cropSize = boxSize;
 	
@@ -105,8 +106,7 @@ void SubtomoProgram::run()
 	
 	const double relative_box_scale = cropSize / (double) boxSize;
 
-
-	ParticleSet copy = *dataSet;
+	ParticleSet copy = dataSet;
 
 	for (int t = 0; t < tc; t++)
 	{
@@ -121,8 +121,8 @@ void SubtomoProgram::run()
 			const int opticsGroup = copy.getOpticsGroup(part_id);
 			const double originalPixelSize = copy.getOriginalPixelSize(opticsGroup);
 
-			std::string outData = outTag + "/" + dataSet->getName(part_id) + "_data.mrc";
-			std::string outWeight = outTag + "/" + dataSet->getName(part_id) + "_weights.mrc";
+			std::string outData = outTag + "/" + dataSet.getName(part_id) + "_data.mrc";
+			std::string outWeight = outTag + "/" + dataSet.getName(part_id) + "_weights.mrc";
 
 			copy.setImageFileNames(outData, outWeight, part_id);
 			
@@ -141,29 +141,43 @@ void SubtomoProgram::run()
 		const double ps_img = copy.optTable.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, og);
 		const double ps_out = binning * ps_img;
 
+		copy.optTable.setValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, 1, og);
+		copy.optTable.setValue(EMDL_IMAGE_DIMENSIONALITY, 3, og);
 		copy.optTable.setValue(EMDL_TOMO_SUBTOMOGRAM_BINNING, binning, og);
 		copy.optTable.setValue(EMDL_IMAGE_PIXEL_SIZE, ps_out, og);
 		copy.optTable.setValue(EMDL_IMAGE_SIZE, cropSize, og);
 	}
 
 	copy.write(outTag + "_particles.star");
+
+
+	BufferedImage<float> sum_data, sum_weights;
+
+	if (do_sum_all)
+	{
+		sum_data.resize(s3D,s3D,s3D);
+		sum_data.fill(0.0);
+
+		sum_weights.resize(sh3D,s3D,s3D);
+		sum_weights.fill(0.0);
+	}
 		
 
 	ZIO::makeOutputDir(outTag);
 	
 	for (int t = 0; t < tc; t++)
 	{
-		const int pc = particles[t].size();		
-		if (pc == 0) continue;		
+		const int pc = particles[t].size();
+		if (pc == 0) continue;
 		
-		Log::beginSection("Tomogram " + ZIO::itoa(t+1) + " / " + ZIO::itoa(tc));		
+		Log::beginSection("Tomogram " + ZIO::itoa(t+1) + " / " + ZIO::itoa(tc));
 		Log::print("Loading");
 				
 		Tomogram tomogram = tomogramSet.loadTomogram(t, true);
 		
 		const int fc = tomogram.frameCount;
 		
-		dataSet->checkTrajectoryLengths(particles[t][0], pc, fc, "subtomo");
+		dataSet.checkTrajectoryLengths(particles[t][0], pc, fc, "subtomo");
 		
 		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s2D, binning);
 		BufferedImage<float> noiseWeights;
@@ -194,13 +208,13 @@ void SubtomoProgram::run()
 						
 			const int part_id = particles[t][p];
 			
-			const d3Vector pos = dataSet->getPosition(part_id);
-			const std::vector<d3Vector> traj = dataSet->getTrajectoryInPixels(
+			const d3Vector pos = dataSet.getPosition(part_id);
+			const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(
 						part_id, fc, tomogram.optics.pixelSize);
 			
-			std::vector<d4Matrix> projCut(fc), projPart(fc);			
+			std::vector<d4Matrix> projCut(fc), projPart(fc);
 			
-			BufferedImage<fComplex> particleStack = BufferedImage<fComplex>(sh2D,s2D,fc);			
+			BufferedImage<fComplex> particleStack = BufferedImage<fComplex>(sh2D,s2D,fc);
 			BufferedImage<float> weightStack(sh2D,s2D,fc);
 			
 			const bool noSubpixelShift = false;
@@ -216,7 +230,7 @@ void SubtomoProgram::run()
 			
 			for (int f = 0; f < fc; f++)
 			{
-				projPart[f] = projCut[f] * d4Matrix(dataSet->getSubtomogramMatrix(part_id));
+				projPart[f] = projCut[f] * d4Matrix(dataSet.getSubtomogramMatrix(part_id));
 				
 				if (do_ctf)
 				{
@@ -265,7 +279,7 @@ void SubtomoProgram::run()
 			
 			ctfImgFS.fill(0.0);
 			psfImgFS.fill(0.0);
-			dataImgRS.fill(0.0);			
+			dataImgRS.fill(0.0);
 			dataImgDivRS.fill(0.0);
 			
 			for (int f = 0; f < fc; f++)
@@ -295,8 +309,8 @@ void SubtomoProgram::run()
 			if (do_cone_weight)
 			{ 
 				FFT::FourierTransform(dataImgRS, dataImgFS);
-						
-				d3Matrix R = dataSet->getMatrix3x3(part_id);
+
+				d3Matrix R = dataSet.getMatrix3x3(part_id);
 				
 				for (int z = 0; z < s3D;  z++)
 				for (int y = 0; y < s3D;  y++)
@@ -314,24 +328,30 @@ void SubtomoProgram::run()
 					
 					const double m = 1.0 - exp(-0.5*t*t);
 					
-					dataImgFS(x,y,z) *= m;					
+					dataImgFS(x,y,z) *= m;
 					psfImgFS(x,y,z) *= m;
 					multiImageFS(x,y,z) *= m;
 				}
 				
 				FFT::inverseFourierTransform(dataImgFS, dataImgRS);
 			}
-				
-			std::string outData = outTag + "/" + dataSet->getName(part_id) + "_data.mrc";
-			std::string outWeight = outTag + "/" + dataSet->getName(part_id) + "_weights.mrc";
-			std::string outCTF = outTag + "/" + dataSet->getName(part_id) + "_CTF2.mrc";
-			std::string outDiv = outTag + "/" + dataSet->getName(part_id) + "_div.mrc";
-			std::string outMulti = outTag + "/" + dataSet->getName(part_id) + "_multi.mrc";
-			std::string outNrm = outTag + "/" + dataSet->getName(part_id) + "_data_nrm.mrc";
-			std::string outWeightNrm = outTag + "/" + dataSet->getName(part_id) + "_CTF2_nrm.mrc";
-						
+
+			std::string outData = outTag + "/" + dataSet.getName(part_id) + "_data.mrc";
+			std::string outWeight = outTag + "/" + dataSet.getName(part_id) + "_weights.mrc";
+			std::string outCTF = outTag + "/" + dataSet.getName(part_id) + "_CTF2.mrc";
+			std::string outDiv = outTag + "/" + dataSet.getName(part_id) + "_div.mrc";
+			std::string outMulti = outTag + "/" + dataSet.getName(part_id) + "_multi.mrc";
+			std::string outNrm = outTag + "/" + dataSet.getName(part_id) + "_data_nrm.mrc";
+			std::string outWeightNrm = outTag + "/" + dataSet.getName(part_id) + "_CTF2_nrm.mrc";
+
+			// What if we didn't? The 2D image is already tapered.
 			Reconstruction::taper(dataImgRS, taper, do_center, inner_thread_num);
 			
+			if (do_sum_all)
+			{
+				sum_data += dataImgRS;
+				sum_weights += ctfImgFS;
+			}
 			
 			
 			dataImgRS.write(outData, binnedPixelSize);
@@ -390,7 +410,7 @@ void SubtomoProgram::run()
 						0.001, inner_thread_num);
 				}
 				
-				Reconstruction::taper(dataImgDivRS, taper, do_center, inner_thread_num);				
+				Reconstruction::taper(dataImgDivRS, taper, do_center, inner_thread_num);
 				dataImgDivRS.write(outDiv, binnedPixelSize);
 			}
 		}
@@ -398,6 +418,30 @@ void SubtomoProgram::run()
 		Log::endProgress();
 		
 		Log::endSection(); // tomogram
+	}
+
+	if (do_sum_all)
+	{
+		sum_data.write(outTag + "_sum_data.mrc");
+		sum_weights.write(outTag + "_sum_weight.mrc");
+
+		BufferedImage<float> dataImgDivRS(s3D,s3D,s3D);
+		dataImgDivRS.fill(0.0);
+
+		if (SNR > 0.0)
+		{
+			Reconstruction::ctfCorrect3D_Wiener(
+				sum_data, sum_weights, dataImgDivRS,
+				1.0 / SNR, num_threads);
+		}
+		else
+		{
+			Reconstruction::ctfCorrect3D_heuristic(
+				sum_data, sum_weights, dataImgDivRS,
+				0.001, num_threads);
+		}
+
+		dataImgDivRS.write(outTag + "_sum_div.mrc");
 	}
 }
 

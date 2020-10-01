@@ -32,7 +32,7 @@ class Prediction
 		
 		static BufferedImage<fComplex> predictModulated(
 				int particle_id, 
-				const ParticleSet* dataSet,
+				const ParticleSet& dataSet,
 				gravis::d4Matrix proj,
 				int s, const CTF& ctf, double pixelSize,
 				const std::vector<BufferedImage<fComplex>>& referenceFS,
@@ -41,14 +41,14 @@ class Prediction
 		
 		static BufferedImage<fComplex> predictFS(
 				int particle_id, 
-				const ParticleSet* dataSet,
+				const ParticleSet& dataSet,
 				gravis::d4Matrix proj,
 				int s, 
 				const std::vector<BufferedImage<fComplex>>& referenceFS,
 				HalfSet halfSet = OwnHalf);
 
 		static std::vector<BufferedImage<double>> computeCroppedCCs(
-				const ParticleSet* dataSet,
+				const ParticleSet& dataSet,
 				const std::vector<int>& partIndices,
 				const Tomogram& tomogram,
 				const TomoReferenceMap& referenceMap,

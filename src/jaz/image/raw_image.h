@@ -117,7 +117,7 @@ class RawImage
 		{
 			const long int s = xdim * ydim * zdim;
 			
-			for (int i = 0; i < s; i++)
+			for (long int i = 0; i < s; i++)
 			{
 				data[i] += v.data[i];
 			}
@@ -130,7 +130,7 @@ class RawImage
 		{
 			const long int s = xdim * ydim * zdim;
 			
-			for (int i = 0; i < s; i++)
+			for (long int i = 0; i < s; i++)
 			{
 				data[i] -= v.data[i];
 			}
@@ -142,7 +142,7 @@ class RawImage
 		{
 			const long int s = xdim * ydim * zdim;
 			
-			for (int i = 0; i < s; i++)
+			for (long int i = 0; i < s; i++)
 			{
 				data[i] += t;
 			}
@@ -154,7 +154,7 @@ class RawImage
 		{
 			const long int s = xdim * ydim * zdim;
 			
-			for (int i = 0; i < s; i++)
+			for (long int i = 0; i < s; i++)
 			{
 				data[i] -= t;
 			}
@@ -167,7 +167,7 @@ class RawImage
 		{
 			const long int s = xdim * ydim * zdim;
 			
-			for (int i = 0; i < s; i++)
+			for (long int i = 0; i < s; i++)
 			{
 				data[i] *= v.data[i];
 			}
@@ -179,7 +179,7 @@ class RawImage
 		{
 			const long int s = xdim * ydim * zdim;
 			
-			for (int i = 0; i < s; i++)
+			for (long int i = 0; i < s; i++)
 			{
 				data[i] *= t;
 			}
@@ -192,7 +192,7 @@ class RawImage
 		{
 			const long int s = xdim * ydim * zdim;
 			
-			for (int i = 0; i < s; i++)
+			for (long int i = 0; i < s; i++)
 			{
 				data[i] /= v.data[i];
 			}
@@ -204,7 +204,7 @@ class RawImage
 		{
 			const long int s = xdim * ydim * zdim;
 			
-			for (int i = 0; i < s; i++)
+			for (long int i = 0; i < s; i++)
 			{
 				data[i] /= t;
 			}
@@ -273,8 +273,8 @@ RawImage<T> RawImage<T>::getSlabRef(size_t z, size_t thickness)
 template<class T> template<class T2>
 void RawImage<T>::copySliceFrom(size_t z_dest, const RawImage<T2>& src, size_t z_src)
 {
-	for (int y = 0; y < ydim; y++)
-	for (int x = 0; x < xdim; x++)
+	for (long int y = 0; y < ydim; y++)
+	for (long int x = 0; x < xdim; x++)
 	{
 		data[z_dest * ydim * xdim + y * xdim + x] = (T) src(x,y,z_src);
 	}
@@ -295,7 +295,7 @@ inline const T& RawImage<T>::operator() (size_t x, size_t y, size_t z) const
 {
 	#if RAW_IMAGE_BOUNDS_CHECKING
 
-	const int i = (z*ydim + y)*xdim + x;
+	const long int i = (z*ydim + y)*xdim + x;
 
 	if (i < 0 || i >= xdim*ydim*zdim)
 	{
@@ -314,7 +314,7 @@ inline T& RawImage<T>::operator() (size_t x, size_t y, size_t z)
 {
 	#if RAW_IMAGE_BOUNDS_CHECKING
 
-	const int i = (z*ydim + y)*xdim + x;
+	const long int i = (z*ydim + y)*xdim + x;
 
 	if (i < 0 || i >= xdim*ydim*zdim)
 	{
@@ -333,7 +333,7 @@ inline const T& RawImage<T>::operator() (size_t x, size_t y) const
 {
 	#if RAW_IMAGE_BOUNDS_CHECKING
 
-	const int i = y*xdim + x;
+	const long int i = y*xdim + x;
 
 	if (i < 0 || i >= xdim*ydim*zdim)
 	{
@@ -352,7 +352,7 @@ inline T& RawImage<T>::operator() (size_t x, size_t y)
 {
 	#if RAW_IMAGE_BOUNDS_CHECKING
 
-	const int i = y*xdim + x;
+	const long int i = y*xdim + x;
 
 	if (i < 0 || i >= xdim*ydim*zdim)
 	{
@@ -372,7 +372,7 @@ inline const T& RawImage<T>::operator[] (size_t i) const
 {
 	#if RAW_IMAGE_BOUNDS_CHECKING
 
-	if (i < 0 || i >= xdim*ydim*zdim)
+	if (i >= xdim*ydim*zdim)
 	{
 		REPORT_ERROR_STR("RawImage<T>::operator(): index "
 			<< i << " not in [0, " << (xdim*ydim*zdim) << "]");
@@ -388,7 +388,7 @@ inline T& RawImage<T>::operator[] (size_t i)
 {
 	#if RAW_IMAGE_BOUNDS_CHECKING
 
-	if (i < 0 || i >= xdim*ydim*zdim)
+	if (i >= xdim*ydim*zdim)
 	{
 		REPORT_ERROR_STR("RawImage<T>::operator(): index "
 			<< i << " not in [0, " << (xdim*ydim*zdim) << "]");
@@ -644,17 +644,17 @@ template<class T> template<class T2>
 bool RawImage<T>::containsPoint(gravis::t2Vector<T2> point) const
 {
 	return 
-	        point.x > 0 && point.x < xdim && 
-	        point.y > 0 && point.y < ydim;
+			point.x > 0 && point.x < xdim &&
+			point.y > 0 && point.y < ydim;
 }
 
 template<class T> template<class T2>
 bool RawImage<T>::containsPoint(gravis::t3Vector<T2> point) const
 {
 	return 
-	        point.x > 0 && point.x < xdim && 
-	        point.y > 0 && point.y < ydim && 
-	        point.z > 0 && point.z < zdim;
+			point.x > 0 && point.x < xdim &&
+			point.y > 0 && point.y < ydim &&
+			point.z > 0 && point.z < zdim;
 }
 
 template <class T1, class T2>
