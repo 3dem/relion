@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
 	std::string particlesFn, class_averages_filename, classes_filename, outDir;
 	int num_threads, num_frequencies, min_MG, max_MG, max_iterations;
 	double radius, edge_padding;
-	bool diag;
+	bool diag, flip_y;
 
 
 	IOParser parser;
@@ -50,6 +50,7 @@ int main(int argc, char *argv[])
 		class_averages_filename = parser.getOption("--ca", "Class averages stack");
 		classes_filename = parser.getOption("--classes", "File with a list of 2D classes to consider");
 		radius = textToDouble(parser.getOption("--r", "Average blob radius (in bin-1 pixels)", "600"));
+		flip_y = parser.checkOption("--flip_y", "Centre of blob lies in positive y direction");
 		edge_padding = textToDouble(parser.getOption("--pad", "Edge padding (in bin-1 pixels)", "20"));
 		num_frequencies = textToInteger(parser.getOption("--f", "Number of 1D frequencies used to model the blob", "10"));
 
@@ -122,7 +123,7 @@ int main(int argc, char *argv[])
 		const int class_id = classes_to_consider[cc];
 
 		RawImage<float> slice = class_averages.getSliceRef(class_id);
-		const d2Vector initial_centre(box_size/2, box_size/2 - radius);
+		const d2Vector initial_centre(box_size/2, box_size/2 + (flip_y? radius : -radius));
 
 		BlobFit2D blob_fit(
 			slice, initial_centre, radius/2, 0, 0, num_threads);
