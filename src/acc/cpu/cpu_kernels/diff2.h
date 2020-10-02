@@ -356,7 +356,7 @@ void diff2_coarse(
 	const int maxR = projector.maxR;
 	const unsigned pass_num(ceilfracf(image_size,block_sz));
 
-#ifdef __GNUC__
+#ifndef __INTEL_COMPILER
 	// pre-compute sin and cos for x and y component
 	XFLOAT sin_x[translation_num][xSize], cos_x[translation_num][xSize];
 	XFLOAT sin_y[translation_num][ySize], cos_y[translation_num][ySize];
@@ -378,7 +378,7 @@ void diff2_coarse(
 	XFLOAT trans_cos_x[block_sz], trans_sin_x[block_sz];
 	XFLOAT trans_cos_y[block_sz], trans_sin_y[block_sz];
 	XFLOAT trans_cos_z[block_sz], trans_sin_z[block_sz];
-#endif  // __GNUC__
+#endif  // not Intel Compiler
 	
 	int x[pass_num][block_sz], y[pass_num][block_sz], z[pass_num][block_sz];
 	XFLOAT s_real[pass_num][block_sz];
@@ -497,7 +497,7 @@ void diff2_coarse(
 				XFLOAT ty = trans_y[i];
 				XFLOAT tz = trans_z[i];                 
 
-#ifdef __GNUC__
+#ifndef __INTEL_COMPILER
 				for (int tid=0; tid<elements; tid++) {
 
 					int xidx = x[pass][tid];
@@ -534,7 +534,7 @@ void diff2_coarse(
 						trans_sin_x[tid] = sin_x[i][xidx];
 					}					
 				}  // tid  						
-#endif  // __GNUC__
+#endif  // not Intel Compiler
 				
 				#pragma omp simd
 				for (int tid=0; tid<block_sz; tid++) {
@@ -544,7 +544,7 @@ void diff2_coarse(
 						continue;                
 
 					XFLOAT real, imag;
-#ifdef __GNUC__
+#ifndef __INTEL_COMPILER
 					if(DATA3D) {
 //						translatePixel(x[tid], y[tid], z[tid], tx, ty, tz, s_real[tid], s_imag[tid], real, imag);
 						XFLOAT s  = trans_sin_x[tid] * trans_cos_y[tid] + trans_cos_x[tid] * trans_sin_y[tid];
@@ -564,14 +564,14 @@ void diff2_coarse(
 						real = cc * s_real[pass][tid] - ss * s_imag[pass][tid];
 						imag = cc * s_imag[pass][tid] + ss * s_real[pass][tid];
 					}
-#else  // not GCC - accept the (hopefully vectorized) sincos call every iteration rather than caching
+#else  // Intel Compiler - accept the (hopefully vectorized) sincos call every iteration rather than caching
 					if(DATA3D)
 						translatePixel(x[pass][tid], y[pass][tid], z[pass][tid], tx, ty, tz,
 										s_real[pass][tid], s_imag[pass][tid], real, imag);
 					else
 						translatePixel(x[pass][tid], y[pass][tid], tx, ty,
 										s_real[pass][tid], s_imag[pass][tid], real, imag);
-#endif  // not __GNUC__
+#endif  // not Intel Compiler
 
 #ifdef __INTEL_COMPILER
 					#pragma unroll(eulers_per_block)
