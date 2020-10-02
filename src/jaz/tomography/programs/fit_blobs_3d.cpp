@@ -10,6 +10,8 @@
 #include <src/jaz/tomography/tomogram_set.h>
 #include <src/jaz/tomography/manifold/manifold_set.h>
 #include <src/jaz/tomography/manifold/manifold_loader.h>
+#include <src/jaz/tomography/manifold/spheroid.h>
+#include <src/jaz/tomography/manifold/CMM_loader.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
 
@@ -19,56 +21,6 @@ using namespace gravis;
 
 void FitBlobs3DProgram::readParameters(int argc, char *argv[])
 {
-	/*{
-		std::vector<double> coeffs{1080.84647296,2236.68472926,446.145153131,1329.78224097,0,0,0,5.69892478898,1.91709780572,-24.8755854993,-12.6302521551,-17.7246886339,1.55812025632,-7.4936036406,2.96942350637,8.7270384811,0.485616463062,-2.93279471848,-3.80600467661,-2.36434021241,0.72088111026,4.38010542614,-8.00502611039,19.5472471121,10.8159943372,-4.58068480826,9.36735180724,4.44859782887,-3.9671935757,3.74586120166,5.32294074632,1.87896994577,3.5160805719,-5.37851663856,-3.68466357012,4.94011914426,0.0562709362189,3.81508875178,-4.66940147309,-3.61905874307,-3.26542150847,-2.26324788365,-3.48792116765,-4.2576115936,8.12632370956,-5.45823860754,-10.9251324509,0.539283336644,-3.3842147363,2.87763843233,2.56002880017,-0.257233146268,-2.6167868251,2.38533705733,2.35961187172,3.75660720051,2.61303599803,-0.931939629823,-3.50079710998,0.619105738505,2.31098845513,2.5451821698,-2.20830877685,2.24282523037,-1.91799108734,-3.07245611941,-1.31299531421,0.460276009386,0.248026238707,-2.79058664426,-0.902433127834,-3.39585997941,1.9635247805,-1.07421209709,-0.846555436224,1.41715250325,5.2188266101,-2.8679058452,-8.17604679237,-6.84753469469,-3.84826432601,-2.77920867067,-2.06013607156,1.86433191086,-0.620888746817,1.08568215665,4.83350535634,3.4402524021,2.54399188383,0.258152262306,0.448707133708,1.40518745627,-3.74111925035,-3.6381906405,-0.180809407531,-2.17997451046,-2.35023985301,1.09679873785,-0.624079213048,1.00651463779,-1.27290935466,1.90309859433,0.93853402108};
-
-		std::vector<double> Y(9);
-		SphericalHarmonics SH(2);
-		SH.computeY(2, 0, 0, &Y[0]);
-
-		std::cout << Y[0] << std::endl;
-		std::cout << Y[1] << std::endl;
-		std::cout << Y[2] << std::endl;
-		std::cout << Y[3] << std::endl;
-
-		//Mesh mesh = createMesh(coeffs, 1, 50, 90);
-		//mesh.writeObj("DEBUG_blob0.obj");
-		std::exit(0);
-	}*/
-
-	/*{
-		std::vector<double> coeffs0{0,0,0, 500, 0,0,0, 0,0,0,0,0};
-
-		std::vector<double> Y_equator(9);
-		std::vector<double> Y_north(9);
-		SphericalHarmonics SH(2);
-		SH.computeY(2, 0, 0, &Y_equator[0]);
-		SH.computeY(2, 1, 0, &Y_north[0]);
-
-		const int squish_samples = 5;
-		const double min_squish = 0.5;
-		const double max_squish = 1.0;
-
-		for (int q = 0; q < squish_samples; q++)
-		{
-			const double squish = min_squish + q * (max_squish - min_squish)
-					/ (squish_samples - 1);
-
-			std::vector<double> coeffs = coeffs0;
-
-			coeffs[9] = 2.0 * coeffs0[3] * (squish - 1.0)
-					/ (3.0 * sqrt(5.0));
-
-			coeffs[3] = coeffs0[3] + (sqrt(5.0) / 2.0) * coeffs[9];
-
-			Mesh mesh = createMesh(coeffs, 1, 50, 90);
-			mesh.writeObj("DEBUG_blob0_squish_"+ZIO::itoa(squish)+".obj");
-		}
-
-
-		std::exit(0);
-	}*/
-
 	IOParser parser;
 	
 	double sphere_thickness_0;
@@ -189,7 +141,7 @@ void FitBlobs3DProgram::processTomogram(
 {
 	Log::print("Loading tilt series");
 	
-	spheres = readSpheresCMM(spheresFn, spheres_binning);
+	spheres = CMM_Loader::readSpheres(spheresFn, spheres_binning);
 	
 	const int tomo_index = tomogram_set.getTomogramIndexSafely(tomogram_name);
 
@@ -202,11 +154,11 @@ void FitBlobs3DProgram::processTomogram(
 
 	std::vector<d3Vector> fiducials(0);
 	
-	bool has_fiducials = 
-	           tomogram0.fiducialsFilename.length() > 0 
-	        && tomogram0.fiducialsFilename != "empty";
+	bool has_fiducials =
+			tomogram0.fiducialsFilename.length() > 0
+			&& tomogram0.fiducialsFilename != "empty";
 
-	        
+
 	Log::print("Filtering");
 	
 	
@@ -369,8 +321,8 @@ std::vector<double> FitBlobs3DProgram::segmentBlob(
 			projections);
 	
 	BufferedImage<d3Vector> directions_XZ = TiltSpaceBlobFit::computeDirectionsXZ(
-	            mean_radius_full, binning, projections);
-	            
+				mean_radius_full, binning, projections);
+
 	if (debug_prefix != "")
 	{
 		map.write(debug_prefix+"_tilt_space_map.mrc");
@@ -727,41 +679,5 @@ std::vector<double> FitBlobs3DProgram::segmentBlob(
 	}
 	
 	return out;
-}
-
-std::vector<d4Vector> FitBlobs3DProgram::readSpheresCMM(
-		const std::string& filename,
-		double binning)
-{
-	std::string nextPointKey = "<marker ";
-
-	std::string formatStr =
-		"<marker id=\"%d\" x=\"%lf\" y=\"%lf\" z=\"%lf\" r=\"%*f\" g=\"%*f\" b=\"%*f\" radius=\"%lf\"/>";
-
-	std::ifstream ifs(filename);
-
-	char buffer[1024];
-
-	std::vector<d4Vector> spheres(0);
-
-	while (ifs.getline(buffer, 1024))
-	{
-		std::string line(buffer);
-
-		if (ZIO::beginsWith(line, nextPointKey))
-		{
-			int id;
-			double x, y, z, rad;
-
-			if (std::sscanf(line.c_str(), formatStr.c_str(), &id, &x, &y, &z, &rad) != 5)
-			{
-				REPORT_ERROR_STR("Bad syntax in " << filename << ": " << line);
-			}
-
-			spheres.push_back(binning * d4Vector(x,y,z,rad));
-		}
-	}
-
-	return spheres;
 }
 

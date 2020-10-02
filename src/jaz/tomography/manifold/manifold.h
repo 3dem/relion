@@ -14,6 +14,8 @@ class Manifold
 		:	index(index), 
 			type(type) 
 		{}
+
+		virtual ~Manifold() {}
 		
 			int index;
 			std::string type;

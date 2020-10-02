@@ -26,6 +26,7 @@ void SampleManifoldProgram::readParameters(int argc, char *argv[])
 		max_tilt = DEG2RAD(max_tilt_deg);
 		avoid_missing_wedge = parser.checkOption("--nmw", "Do not sample particles from the missing wedges");
 		avoid_present_wedge = parser.checkOption("--npw", "Do not sample particles from the present wedges");
+		store_tilt_series = parser.checkOption("--ts", "Store the name of the tilt series in the star file");
 
 		output_path = parser.getOption("--o", "Output filename");
 
@@ -106,8 +107,14 @@ void SampleManifoldProgram::run()
 				particles_table.addObject();
 				const int j = particles_table.numberOfObjects() - 1;
 
+				particles_table.setValue(EMDL_TOMO_PARTICLE_INDEX, j, j);
 				particles_table.setValue(EMDL_TOMO_NAME, tomogram.name, j);
-				particles_table.setValue(EMDL_TOMO_TILT_SERIES_NAME, tomogram.tiltSeriesFilename, j);
+				particles_table.setValue(EMDL_TOMO_MANIFOLD_INDEX, manifold_index, j);
+
+				if (store_tilt_series)
+				{
+					particles_table.setValue(EMDL_TOMO_TILT_SERIES_NAME, tomogram.tiltSeriesFilename, j);
+				}
 
 				particles_table.setValue(EMDL_IMAGE_COORD_X, ra.position.x, j);
 				particles_table.setValue(EMDL_IMAGE_COORD_Y, ra.position.y, j);
@@ -136,7 +143,6 @@ void SampleManifoldProgram::run()
 				particles_table.setValue(EMDL_IMAGE_OPTICS_GROUP, 1, j);
 				particles_table.setValue(EMDL_PARTICLE_RANDOM_SUBSET, j % 2, j);
 
-				particles_table.setValue(EMDL_TOMO_MANIFOLD_INDEX, manifold_index, j);
 
 
 				MeshBuilder::addCone(

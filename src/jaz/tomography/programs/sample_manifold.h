@@ -18,7 +18,7 @@ class SampleManifoldProgram
 				tomogram_set_filename,
 				manifolds_filename;
 
-			bool avoid_missing_wedge, avoid_present_wedge;
+			bool avoid_missing_wedge, avoid_present_wedge, store_tilt_series;
 			double spacing, depth, max_tilt;
 		
 		void readParameters(int argc, char *argv[]);

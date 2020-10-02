@@ -54,12 +54,6 @@ class FitBlobs3DProgram
 				double pixel_size,
 				const std::vector<gravis::d4Matrix>& projections,
 				const std::string& debug_prefix);
-
-
-		std::vector<gravis::d4Vector> readSpheresCMM(
-				const std::string& filename,
-				double binning);
-		
 		
 		Mesh createMesh(
 				const std::vector<double>& blob_coeffs,

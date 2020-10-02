@@ -1,22 +1,22 @@
-#ifndef SPHEROID_H
-#define SPHEROID_H
+#ifndef SPHERE_H
+#define SPHERE_H
 
 #include "manifold.h"
 #include <src/spherical-harmonics/SphericalHarmonics.h>
 
 
-class Spheroid : public Manifold
+class Sphere : public Manifold
 {
 	public:
-		
-		
-		Spheroid(const std::vector<double>& parameters, int index);
-		
-		
+
+
+		Sphere(const std::vector<double>& parameters, int index);
+
+
 			gravis::d3Vector position;
-			std::vector<double> SH_coefficients;
-			
-		
+			double radius;
+
+
 		std::vector<RigidAlignment> sampleParticles(
 				double spacing,
 				double depth,
@@ -26,12 +26,9 @@ class Spheroid : public Manifold
 				bool sample_missing_wedge,
 				const std::vector<gravis::d4Matrix>& projections) const;
 
-		double getRadius(au::edu::anu::qm::ro::SphericalHarmonics& SH,
-				  double phi, double theta) const;
+		gravis::d3Vector getSurfacePoint(
+				double phi, double theta) const;
 
-		gravis::d3Vector getSurfacePoint(au::edu::anu::qm::ro::SphericalHarmonics& SH,
-				  double phi, double theta) const;
-		
 		std::vector<double> getParameters() const;
 
 		static std::string getTypeName();

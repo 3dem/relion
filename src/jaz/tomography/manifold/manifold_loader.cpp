@@ -1,4 +1,6 @@
 #include "manifold_loader.h"
+#include "sphere.h"
+#include "spheroid.h"
 #include <memory>
 
 std::vector<std::shared_ptr<Manifold> > ManifoldLoader::loadAll(const MetaDataTable &table)
@@ -17,6 +19,10 @@ std::vector<std::shared_ptr<Manifold> > ManifoldLoader::loadAll(const MetaDataTa
 			if (type == Spheroid::getTypeName())
 			{
 				out.push_back(std::shared_ptr<Spheroid>(new Spheroid(parameters, index)));
+			}
+			else if (type == Sphere::getTypeName())
+			{
+				out.push_back(std::shared_ptr<Sphere>(new Sphere(parameters, index)));
 			}
 			else
 			{

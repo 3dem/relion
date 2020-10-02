@@ -3,7 +3,7 @@
 
 #include <memory>
 #include <src/metadata_table.h>
-#include "spheroid.h"
+#include "manifold.h"
 
 
 class ManifoldLoader
