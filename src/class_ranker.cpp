@@ -19,6 +19,7 @@
  ***************************************************************************/
 
 #include "src/class_ranker.h"
+static int IMGSIZE = 64;
 
 //
 // Calculates n! (uses double arithmetic to avoid overflow)
@@ -661,7 +662,6 @@ MultidimArray<RFLOAT> ClassRanker::getSubimages(MultidimArray<RFLOAT> &img, int 
 	img.window(newimg, y0, x0, yF, xF, 0.);
 	newimg.setXmippOrigin();
 
-	int IMGSIZE = 64;
 	// Then rescale onto a IMGSIZExIMGSIZE image
 	resizeMap(newimg, IMGSIZE);
 	newimg.setXmippOrigin();
@@ -1883,7 +1883,7 @@ float ClassRanker::deployTorchModel(FileName &model_path, std::vector<float> &fe
 	torch::Tensor t;
 	if (only_do_subimages)
 	{
-		torch::Tensor t = torch::from_blob(features.data(), {1, 1, 64, 64});
+		torch::Tensor t = torch::from_blob(features.data(), {1, 1, IMGSIZE, IMGSIZE});
 	}
 	else
 	{
