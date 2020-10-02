@@ -133,6 +133,9 @@ enum EMDLabel
 	EMDL_CLASS_FEAT_SOLVENT_HARALICK,
 	EMDL_CLASS_FEAT_ZERNIKE_MOMENTS,
 	EMDL_CLASS_FEAT_GRANULO,
+        EMDL_CLASS_FEAT_NORM_VECTOR,
+        EMDL_CLASS_FEAT_SUBIMAGE_STARFILE,
+        EMDL_CLASS_FEAT_SUBIMAGE_STACK,
 	EMDL_CLASS_PREDICTED_SCORE,
 
 	EMDL_CTF_ASTIGMATISM,
@@ -735,6 +738,9 @@ private:
         EMDL::addLabel(EMDL_CLASS_FEAT_SOLVENT_HARALICK, EMDL_DOUBLE_VECTOR, "rlnSolventHaralick", "Haralick features of the solvent area.");
         EMDL::addLabel(EMDL_CLASS_FEAT_ZERNIKE_MOMENTS, EMDL_DOUBLE_VECTOR, "rlnZernikeMoments", "Zernike moments of the image.");
         EMDL::addLabel(EMDL_CLASS_FEAT_GRANULO, EMDL_DOUBLE_VECTOR, "rlnGranulo", "Granulo features of the image.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_NORM_VECTOR, EMDL_DOUBLE_VECTOR, "rlnNormalizedFeatureVector", "Vector with normalized feature vector for neural network execution.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_SUBIMAGE_STARFILE, EMDL_STRING, "rlnSubImageStarFile", "Name of a STAR file pointing to all subimages of this class average");
+        EMDL::addLabel(EMDL_CLASS_FEAT_SUBIMAGE_STACK, EMDL_STRING, "rlnSubImageStack", "Name of an MRC stack containing all subimages of this class average");
         EMDL::addLabel(EMDL_CLASS_PREDICTED_SCORE, EMDL_DOUBLE, "rlnPredictedClassScore", "2D class merit scores predicted by RELION model.");
 
 		EMDL::addLabel(EMDL_CTF_ASTIGMATISM, EMDL_DOUBLE, "rlnCtfAstigmatism", "Absolute value of the difference between defocus in U- and V-direction (in A)");

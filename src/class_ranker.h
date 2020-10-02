@@ -255,7 +255,7 @@ public:
 		out[9] = (scattered_signal - feature_normalization_global_mean[9]) / feature_normalization_global_stddev[9];
 		out[10] = (edge_signal - feature_normalization_global_mean[10]) / feature_normalization_global_stddev[10];
 
-		out[11] = (lowpass_filtered_img_avg - feature_normalization_global_mean[11]) / feature_normalization_global_stddev[11];   
+		out[11] = (lowpass_filtered_img_avg - feature_normalization_global_mean[11]) / feature_normalization_global_stddev[11];
 		out[12] = (lowpass_filtered_img_stddev - feature_normalization_global_mean[12]) / feature_normalization_global_stddev[12];
 		out[13] = (lowpass_filtered_img_minval - feature_normalization_global_mean[13]) / feature_normalization_global_stddev[13];
 		out[14] = (lowpass_filtered_img_maxval - feature_normalization_global_mean[14]) / feature_normalization_global_stddev[14];
@@ -272,7 +272,7 @@ public:
                     REPORT_ERROR("BUG: local normalisation stddev values are zero. Call localNormalization before toNormalizedVector!");
                 }
 		out[21] = (protein_moments.sum - feature_normalization_local_ps_mean) / feature_normalization_local_ps_stddev;
-                out[22] = (solvent_moments.sum - feature_normalization_local_ss_mean) / feature_normalization_local_ss_stddev;
+		out[22] = (solvent_moments.sum - feature_normalization_local_ss_mean) / feature_normalization_local_ss_stddev;
 		out[23] = (relative_signal_intensity - feature_normalization_local_rsi_mean) / feature_normalization_local_rsi_stddev;
 
 		return out;
@@ -352,7 +352,7 @@ public:
         bool do_write_normalized_features;
 
 	// Make subimages out of class averages at standardized pixel size
-	bool do_subimages;
+	bool do_subimages, only_do_subimages;
     int nr_subimages, subimage_boxsize;
 
 	RFLOAT select_min_score, select_max_score;
@@ -426,6 +426,8 @@ private:
 	void correctCtfUntilFirstPeak(MultidimArray<RFLOAT> &in, CTF ctf);
 
 	void localNormalisation(std::vector<classFeatures> &features_all_classes);
+
+	void onlyGetSubimages();
 
 	void getFeatures();
 

@@ -409,9 +409,10 @@ void ClassRanker::read(int argc, char **argv, int rank)
 	fn_mask_dir = parser.getOption("--mask_folder_name", "Folder name for saving all masks.", "protein_solvent_masks");
 
 	int subimg_section = parser.addSection("Extract subimage for deep convolutional neural network analysis");
-	do_subimages = parser.checkOption("--extract_subimages", "Extract subimages within protein mask for each class");
+	do_subimages = parser.checkOption("--extract_subimages", "Extract subimages for each class");
 	nr_subimages = textToInteger(parser.getOption("--nr_subimages", "Number of subimage to extract (randonly)", "25"));
-	subimage_boxsize = textToInteger(parser.getOption("--subimage_boxsize", "Boxsize (in pixels) for subimages", "16"));
+	subimage_boxsize = textToInteger(parser.getOption("--subimage_boxsize", "Boxsize (in pixels) for subimages", "24"));
+	only_do_subimages = parser.checkOption("--only_do_subimages", "Dont do anything else than extracting subimages");
 
 	int expert_section = parser.addSection("Expert options");
 	radius_ratio = textToFloat(parser.getOption("--radius_ratio", "Ratio of inner radius of the interested ring area in proportion to the current circular mask radius", "0.95"));
@@ -521,7 +522,7 @@ void ClassRanker::initialise()
 			}
 		}
 
-		if (intact_ctf_first_peak || do_ranking || (!do_skip_angular_errors && !haveAllAccuracies))
+		if (!only_do_subimages && (intact_ctf_first_peak || do_ranking || (!do_skip_angular_errors && !haveAllAccuracies)) )
 		{
 			// Read in particles (otherwise wait until haveAllAccuracies or performRanking, as Liyi sometimes doesn't need mydata)
 			mydata.read(fn_data, true, true); // true true means: ignore particle_name and group name!
@@ -532,10 +533,10 @@ void ClassRanker::initialise()
 		else
 		{
 			MetaDataTable MDtmp;
-			total_nr_particles = MDtmp.read(fn_data, "", NULL, "", true); // true means do_only_count
+			total_nr_particles = MDtmp.read(fn_data, "particles", NULL, "", true); // true means do_only_count
 		}
 
-		if (intact_ctf_first_peak)
+		if (intact_ctf_first_peak && !only_do_subimages)
 		{
 			if (verb > 0) std::cout << " Doing first peak CTF correction ..." << std::endl;
 
@@ -610,9 +611,18 @@ void ClassRanker::run()
 {
 
 	initialise();
-	getFeatures();
-	if (do_ranking) performRanking();
-	writeFeatures();
+
+	if (only_do_subimages)
+	{
+		onlyGetSubimages();
+		if (do_ranking) performRanking();
+	}
+	else
+	{
+		getFeatures();
+		if (do_ranking) performRanking();
+		writeFeatures();
+	}
 
 	if (verb > 0) std::cout << "Done!" << std::endl;
 
@@ -630,30 +640,78 @@ int ClassRanker::getClassIndex(FileName &name)
 }
 
 // SHWS 15072020: extract subimages within protein mask
+// SHWS 14092020: change to extract within circle that never lets boxsize go outside the box with side particle diameter
 MultidimArray<RFLOAT> ClassRanker::getSubimages(MultidimArray<RFLOAT> &img, int boxsize, int nr_images, MultidimArray<int> *mask)
 {
 
+	// Only get the box within the particle_diameter plus 1 pixel
+	MultidimArray<RFLOAT> newimg, newimg2;
+	Matrix2D< RFLOAT > A;
+
+	int boxwidth = CEIL(particle_diameter/mymodel.pixel_size) + 1;
+	boxwidth += boxwidth%2; //make even in case it is not already
+
+	// Extract subimage here
+	int x0 = FIRST_XMIPP_INDEX(boxwidth);
+	int xF = LAST_XMIPP_INDEX(boxwidth);
+	int y0 = FIRST_XMIPP_INDEX(boxwidth);
+	int yF = LAST_XMIPP_INDEX(boxwidth);
+
+	MultidimArray<RFLOAT> subimg;
+	img.window(newimg, y0, x0, yF, xF, 0.);
+	newimg.setXmippOrigin();
+
+	int IMGSIZE = 64;
+	// Then rescale onto a IMGSIZExIMGSIZE image
+	resizeMap(newimg, IMGSIZE);
+	newimg.setXmippOrigin();
+
+	// Data augmentation: rotate and flip
+	MultidimArray<RFLOAT> subimages(8, 1, IMGSIZE, IMGSIZE);
+	subimages.setImage(0, newimg);
+	rotation2DMatrix(90., A);
+	applyGeometry(newimg, newimg2, A, false, false);
+	subimages.setImage(1, newimg2);
+	rotation2DMatrix(180., A);
+	applyGeometry(newimg, newimg2, A, false, false);
+	subimages.setImage(2, newimg2);
+	rotation2DMatrix(270., A);
+	applyGeometry(newimg, newimg2, A, false, false);
+	subimages.setImage(3, newimg2);
+
+	// Also rotate the mirrored versions
+    FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(newimg)
+    {
+            DIRECT_A2D_ELEM(newimg2, i, j) = DIRECT_A2D_ELEM(newimg, j, i);
+    }
+	subimages.setImage(4, newimg2);
+	rotation2DMatrix(90., A);
+	applyGeometry(newimg2, newimg, A, false, false);
+	subimages.setImage(5, newimg);
+	rotation2DMatrix(180., A);
+	applyGeometry(newimg2, newimg, A, false, false);
+	subimages.setImage(6, newimg);
+	rotation2DMatrix(270., A);
+	applyGeometry(newimg2, newimg, A, false, false);
+	subimages.setImage(7, newimg);
+
+	/*
 	// TODO: make the if statement for only making subimages for classes with non-zero protein area inside this function
 
 	MultidimArray<RFLOAT> subimages(nr_images, 1, boxsize, boxsize);
 	subimages.setXmippOrigin();
-	int imgsize = XSIZE(img);
+
+    int subimage_spread = CEIL(particle_diameter/uniform_angpix)/4;
+	//int imgsize = CEIL(particle_diameter/uniform_angpix) - boxsize;
+    //if (imgsize < 0) REPORT_ERROR("ERROR: particle diameter is too small to accommodate subimages");
 
 	for (int my_image = 0; my_image < nr_images; my_image++)
 	{
 		int xpos, ypos;
 
-		bool got_one = false;
-		while (!got_one)
-		{
-			// uniformly sample x and y and see if it is within the mask
-			xpos = FLOOR(rnd_unif(FIRST_XMIPP_INDEX(imgsize), LAST_XMIPP_INDEX(imgsize)));
-			ypos = FLOOR(rnd_unif(FIRST_XMIPP_INDEX(imgsize), LAST_XMIPP_INDEX(imgsize)));
-			if ((mask == NULL) || (A2D_ELEM(*mask, ypos, xpos) > 0) )
-			{
-				got_one = true;
-			}
-		}
+		// uniformly sample x and y and see if it is within the mask
+		xpos = FLOOR(rnd_unif(FIRST_XMIPP_INDEX(subimage_spread), LAST_XMIPP_INDEX(subimage_spread)));
+		ypos = FLOOR(rnd_unif(FIRST_XMIPP_INDEX(subimage_spread), LAST_XMIPP_INDEX(subimage_spread)));
 
 		// Extract subimage here
 		int x0 = xpos + FIRST_XMIPP_INDEX(boxsize);
@@ -666,6 +724,7 @@ MultidimArray<RFLOAT> ClassRanker::getSubimages(MultidimArray<RFLOAT> &img, int 
 		subimages.setImage(my_image, subimg);
 
 	}
+	*/
 	return subimages;
 }
 
@@ -1475,6 +1534,40 @@ void ClassRanker::localNormalisation(std::vector<classFeatures> &cf_all)
 }
 
 /** ======================================================== Collecting All Features ========================================================= */
+// Get features for non-empty classes
+// SHWS 16092020: temporary for development of subimage-CNN
+void ClassRanker::onlyGetSubimages()
+{
+
+	features_all_classes.clear();
+	features_all_classes.reserve(mymodel.nr_classes);
+
+	for (int iclass = start_class; iclass < end_class; iclass++)
+	{
+		classFeatures features_this_class;
+		MultidimArray<int> p_mask;
+		features_this_class.class_distribution = mymodel.pdf_class[iclass];
+		features_this_class.particle_nr = features_this_class.class_distribution * total_nr_particles;
+		features_this_class.estimated_resolution = mymodel.estimated_resolution[iclass];
+		features_this_class.accuracy_rotation = mymodel.acc_rot[iclass];
+		features_this_class.accuracy_translation = mymodel.acc_trans[iclass];
+		if (features_this_class.particle_nr > 10)
+		{
+			features_this_class.name = mymodel.ref_names[iclass];
+			features_this_class.class_index = getClassIndex(features_this_class.name);
+			features_this_class.subimages = getSubimages(mymodel.Iref[iclass], subimage_boxsize, nr_subimages, &p_mask);
+
+			FileName fn_stack;
+            fn_stack.compose(fn_out + "subimages_class", features_this_class.class_index, "mrcs");
+            Image<RFLOAT> img;
+            img()=features_this_class.subimages;
+            img.write(fn_stack, -1, true);
+
+            // Push back the features of this class in the vector for all classes
+    		features_all_classes.push_back(features_this_class);
+		}
+	}
+}
 
 // Get features for non-empty classes
 void ClassRanker::getFeatures()
@@ -1652,9 +1745,10 @@ void ClassRanker::getFeatures()
 //			std::cout << "solvent_area: " << features_this_class.solvent_area << std::endl;
 
 			// SHWS 15072020: new try small subimages with fixed boxsize at uniform_angpix for image-based CNN
-			if (do_subimages && protein_area>0)
+			if (do_subimages)
 			{
-				features_this_class.subimages = getSubimages(img(), subimage_boxsize, nr_subimages, &p_mask);
+				Image<RFLOAT> Itt;
+				features_this_class.subimages = getSubimages(mymodel.Iref[iclass], subimage_boxsize, nr_subimages, &p_mask);
 				if (debug> 0 ) std::cerr << " done with getSubimages" << std::endl;
 			}
 
@@ -1786,11 +1880,24 @@ float ClassRanker::deployTorchModel(FileName &model_path, std::vector<float> &fe
 
 	// Create an inputs with batch size=1.
 	std::vector<torch::jit::IValue> inputs;
-	torch::Tensor t = torch::from_blob(features.data(), {1, (int)features.size()});
+	torch::Tensor t;
+	if (only_do_subimages)
+	{
+		torch::Tensor t = torch::from_blob(features.data(), {1, 1, 64, 64});
+	}
+	else
+	{
+		torch::Tensor t = torch::from_blob(features.data(), {1, (int)features.size()});
+	}
 	inputs.push_back(t);
 
 	// Execute the model and turn its output into a tensor.
+	//at::Tensor output = module.forward(inputs).toTensor();
+	// Extract score value from tensor and return
+	//return output[0][0].item<float>();
+	std::cerr << "before forward" << std::endl;
 	at::Tensor output = module.forward(inputs).toTensor();
+	std::cerr << "after forward" << std::endl;
 
 	// Extract score value from tensor and return
 	return output[0][0].item<float>();
@@ -1833,7 +1940,22 @@ void ClassRanker::performRanking()
 	float max_score = -999.;
 	for (int i = 0; i < features_all_classes.size(); i++)
 	{
-		std::vector<float> feature_vector = features_all_classes[i].toNormalizedVector();
+		std::vector<float> feature_vector;
+		if (only_do_subimages)
+		{
+			MultidimArray<RFLOAT> myimg;
+			features_all_classes[i].subimages.getSlice(0, myimg);
+			feature_vector.resize(NZYXSIZE(myimg));
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(myimg)
+			{
+				feature_vector[n] = DIRECT_MULTIDIM_ELEM(myimg, n);
+			}
+
+		}
+		else
+		{
+			feature_vector = features_all_classes[i].toNormalizedVector();
+		}
 		scores[i] = (RFLOAT) deployTorchModel(fn_torch_model, feature_vector);
 		if (scores[i] > max_score) max_score = scores[i];
 	}
@@ -1952,8 +2074,7 @@ void ClassRanker::writeFeatures()
 	MD_class_features.setName("class_features");
         MetaDataTable MD_normalized_class_features;
         MD_normalized_class_features.setName("normalized_class_features");
-	
-        long int nr_stack = 0;
+
         for (int i=0; i<features_all_classes.size();i++)
 	{
 
@@ -2019,14 +2140,14 @@ void ClassRanker::writeFeatures()
             MD_class_features.setValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_STDDEV, features_all_classes[i].lowpass_filtered_img_stddev);
             MD_class_features.setValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MIN, features_all_classes[i].lowpass_filtered_img_minval);
             MD_class_features.setValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MAX, features_all_classes[i].lowpass_filtered_img_maxval);
-            
+
             if (do_granularity_features)
             {
                 // Protein and solvent region LBP's
                 MD_class_features.setValue(EMDL_CLASS_FEAT_LBP, features_all_classes[i].lbp);
                 MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_LBP, features_all_classes[i].lbp_p);
                 MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_LBP, features_all_classes[i].lbp_s);
-                
+
                 // Protein and solvent region entropy
                 MD_class_features.setValue(EMDL_CLASS_FEAT_TOTAL_ENTROPY, features_all_classes[i].total_entropy);
                 MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_ENTROPY, features_all_classes[i].protein_entropy);
@@ -2034,7 +2155,7 @@ void ClassRanker::writeFeatures()
 
                 MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_HARALICK, features_all_classes[i].haralick_p);
                 MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_HARALICK, features_all_classes[i].haralick_s);
-                
+
                 // Zernike moments
                 MD_class_features.setValue(EMDL_CLASS_FEAT_ZERNIKE_MOMENTS, features_all_classes[i].zernike_moments);
                 MD_class_features.setValue(EMDL_CLASS_FEAT_GRANULO, features_all_classes[i].granulo);
@@ -2042,31 +2163,13 @@ void ClassRanker::writeFeatures()
 
             if (do_subimages && NZYXSIZE(features_all_classes[i].subimages) > 1)
             {
-                MetaDataTable MD_subimages;
-                MD_subimages.setName("subimages");
-                int nr_images = NSIZE(features_all_classes[i].subimages);
-                for (long n=0; n < nr_images; n++)
-                {
-                    nr_stack++;
-                    FileName fn_img;
-                    fn_img.compose(nr_stack, fn_out + "subimages.mrcs");
-                    MD_subimages.addObject();
-                    MD_subimages.setValue(EMDL_IMAGE_NAME, fn_img);
-
-                    Image<RFLOAT> img;
-                    features_all_classes[i].subimages.getImage(n, img());
-                    if (img().getSize() > 1)
-                    {
-                        img.write(fn_img, -1, false, (nr_stack == 1) ? WRITE_OVERWRITE : WRITE_APPEND);
-                    }
-                }
-
-                FileName fn_subimage_star;
-                fn_subimage_star.compose(fn_out + "subimages_class", features_all_classes[i].class_index, "star");
-                MD_subimages.write(fn_subimage_star);
-                MD_class_features.setValue(EMDL_CLASS_FEAT_SUBIMAGE_STARFILE, fn_subimage_star);
-                MD_normalized_class_features.setValue(EMDL_CLASS_FEAT_SUBIMAGE_STARFILE, fn_subimage_star);
-
+                FileName fn_stack;
+                fn_stack.compose(fn_out + "subimages_class", features_all_classes[i].class_index, "mrcs");
+                Image<RFLOAT> img;
+                img()=features_all_classes[i].subimages;
+                img.write(fn_stack, -1, true);
+                MD_class_features.setValue(EMDL_CLASS_FEAT_SUBIMAGE_STACK, fn_stack);
+                MD_normalized_class_features.setValue(EMDL_CLASS_FEAT_SUBIMAGE_STACK, fn_stack);
             }
 
             std::vector<float> feature_vector = features_all_classes[i].toNormalizedVector();
