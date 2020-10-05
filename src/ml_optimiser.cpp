@@ -215,18 +215,21 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	if (fnt != "OLD")
 		particle_diameter = textToFloat(fnt);
 
-	// SGD stuff
-	fnt = parser.getOption("--grad_ini_iter", "Number of initial SGD iterations", "OLD");
+	// Gradient related
+	float ini_frac(0), fin_frac(0);
+	fnt = parser.getOption("--grad_ini_frac", "Fraction of iterations in the initial phase of refinement", "OLD");
 	if (fnt != "OLD")
-		grad_ini_iter = textToInteger(fnt);
+		ini_frac = textToFloat(fnt);
 
-	fnt = parser.getOption("--grad_fin_iter", "Number of final SGD iterations", "OLD");
+	fnt = parser.getOption("--grad_fin_frac", "Fraction of iterations in the final phase of refinement", "OLD");
 	if (fnt != "OLD")
-		grad_fin_iter = textToInteger(fnt);
+		fin_frac = textToFloat(fnt);
 
-	fnt = parser.getOption("--grad_inbetween_iter", "Number of SGD iterations between the initial and final ones", "OLD");
-	if (fnt != "OLD")
-		grad_inbetween_iter = textToInteger(fnt);
+	grad_ini_iter = nr_iter * ini_frac;
+	grad_fin_iter = nr_iter * fin_frac;
+	grad_inbetween_iter = nr_iter - grad_ini_iter - grad_fin_iter;
+	if (grad_inbetween_iter < 0)
+		grad_inbetween_iter = 0;
 
 	fnt = parser.getOption("--grad_ini_resol", "Resolution cutoff during the initial SGD iterations (A)", "OLD");
 	if (fnt != "OLD")
@@ -658,15 +661,22 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 		do_mom2 = true;
 	}
 	// Stochastic EM is implemented as a variant of SGD, though it is really a different algorithm!
-	grad_ini_iter = textToInteger(parser.getOption("--grad_ini_iter", "Number of initial SGD iterations", "50"));
-	grad_fin_iter = textToInteger(parser.getOption("--grad_fin_iter", "Number of final SGD iterations", "50"));
-	grad_inbetween_iter = textToInteger(parser.getOption("--grad_inbetween_iter", "Number of SGD iterations between the initial and final ones", "200"));
+
+	float ini_frac = textToFloat(parser.getOption("--grad_ini_frac", "Fraction of iterations in the initial phase of refinement", "0.2"));
+	float fin_frac = textToFloat(parser.getOption("--grad_fin_frac", "Fraction of iterations in the final phase of refinement", "0.3"));
+
+	grad_ini_iter = nr_iter * ini_frac;
+	grad_fin_iter = nr_iter * fin_frac;
+	grad_inbetween_iter = nr_iter - grad_ini_iter - grad_fin_iter;
+	if (grad_inbetween_iter < 0)
+		grad_inbetween_iter = 0;
+
 	grad_ini_resol = textToInteger(parser.getOption("--grad_ini_resol", "Resolution cutoff during the initial SGD iterations (A)", "-1"));
 	grad_fin_resol = textToInteger(parser.getOption("--grad_fin_resol", "Resolution cutoff during the final SGD iterations (A)", "-1"));
-	grad_ini_subset_size = textToInteger(parser.getOption("--grad_ini_subset", "Mini-batch size during the initial SGD iterations", "500"));
-	grad_fin_subset_size = textToInteger(parser.getOption("--grad_fin_subset", "Mini-batch size during the final SGD iterations", "5000"));
+	grad_ini_subset_size = textToInteger(parser.getOption("--grad_ini_subset", "Mini-batch size during the initial SGD iterations", "-1"));
+	grad_fin_subset_size = textToInteger(parser.getOption("--grad_fin_subset", "Mini-batch size during the final SGD iterations", "-1"));
 	mu = textToFloat(parser.getOption("--mu", "Momentum parameter for SGD updates", "0.9"));
-	grad_ini_stepsize = textToFloat(parser.getOption("--grad_ini_stepsize", "Step size parameter for initial gradient updates.", "0.5"));
+	grad_ini_stepsize = textToFloat(parser.getOption("--grad_ini_stepsize", "Step size parameter for initial gradient updates.", "0.2"));
 	grad_fin_stepsize = textToFloat(parser.getOption("--grad_fin_stepsize", "Step size parameter for final gradient updates.", "0.05"));
 	do_grad_realspace = parser.checkOption("--grad_realspace", "Claculate and apply gradient in real space.");
 	write_every_grad_iter = textToInteger(parser.getOption("--grad_write_iter", "Write out model every so many iterations in SGD (default is writing out all iters)", "10"));
@@ -2076,6 +2086,19 @@ void MlOptimiser::initialiseGeneral(int rank)
 	{
 		// for continuation jobs (iter>0): could do some more iterations as specified by nr_iter
 		nr_iter = grad_ini_iter + grad_fin_iter + grad_inbetween_iter;
+
+		// determine default subset sizes
+		if (grad_ini_subset_size == -1 || grad_fin_subset_size == -1) {
+			if (grad_ini_subset_size != -1 || grad_fin_subset_size != -1)
+				std::cout << " Since both --grad_ini_subset_size and --grad_fin_subset_size were not set, " <<
+				          "both will instead be determined automatically." << std::endl;
+
+			unsigned long dataset_size = mydata.numberOfParticles();
+			grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.001, 500), 100);
+			grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.01,  5000), 500);
+			std::cout << " Initial subset size set to " << grad_ini_subset_size << std::endl;
+			std::cout << " Final subset size set to " << grad_fin_subset_size << std::endl;
+		}
 	}
 	else
 	{
@@ -4214,7 +4237,7 @@ void MlOptimiser::maximization()
 						(wsum_model.BPref[iclass]).reconstructGrad(
 								mymodel.Iref[iclass],
 								_stepsize,
-								mymodel.tau2_fudge_factor,
+								mymodel.tau2_fudge_factor, //* wsum_model.pdf_class[iclass]*mymodel.nr_classes,
 								mymodel.fsc_halves_class[iclass],
 								do_split_random_halves,
 								(iclass == 0));
@@ -4587,8 +4610,8 @@ int MlOptimiser::maximizationGradientParameters() {
 }
 
 float MlOptimiser::getGradientStepSize(int iclass) {
-	float a = grad_inbetween_iter;
-	float b = grad_ini_iter;
+	float a = grad_fin_iter/4;
+	float b = grad_ini_iter + grad_inbetween_iter;
 	float x = iter;
 	float scale = 1 / (pow(10, (x-b-a/2.)/(a/4.)) + 1.); //Sigmoid function
 	float stepsize = (grad_ini_stepsize - grad_fin_stepsize) * scale + grad_fin_stepsize;
