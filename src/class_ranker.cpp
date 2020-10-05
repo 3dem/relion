@@ -616,13 +616,12 @@ void ClassRanker::run()
 	if (only_do_subimages)
 	{
 		onlyGetSubimages();
-		if (do_ranking) performRanking();
 	}
 	else
 	{
 		getFeatures();
 		if (do_ranking) performRanking();
-		writeFeatures();
+		else writeFeatures();
 	}
 
 	if (verb > 0) std::cout << "Done!" << std::endl;
@@ -1745,12 +1744,9 @@ void ClassRanker::getFeatures()
 //			std::cout << "solvent_area: " << features_this_class.solvent_area << std::endl;
 
 			// SHWS 15072020: new try small subimages with fixed boxsize at uniform_angpix for image-based CNN
-			if (do_subimages)
-			{
-				Image<RFLOAT> Itt;
-				features_this_class.subimages = getSubimages(mymodel.Iref[iclass], subimage_boxsize, nr_subimages, &p_mask);
-				if (debug> 0 ) std::cerr << " done with getSubimages" << std::endl;
-			}
+			Image<RFLOAT> Itt;
+			features_this_class.subimages = getSubimages(mymodel.Iref[iclass], subimage_boxsize, nr_subimages, &p_mask);
+			if (debug> 0 ) std::cerr << " done with getSubimages" << std::endl;
 
 			// Push back the features of this class in the vector for all classes
 			features_all_classes.push_back(features_this_class);
@@ -1865,7 +1861,7 @@ void ClassRanker::readFeatures()
 }
 
 
-float ClassRanker::deployTorchModel(FileName &model_path, std::vector<float> &features) {
+float ClassRanker::deployTorchModel(FileName &model_path, std::vector<float> &features, std::vector<float> &subimages) {
 
 #ifdef _TORCH_ENABLED
 	torch::jit::script::Module module;
@@ -1879,25 +1875,14 @@ float ClassRanker::deployTorchModel(FileName &model_path, std::vector<float> &fe
 	}
 
 	// Create an inputs with batch size=1.
+	torch::Tensor imagestensor = torch::from_blob(subimages.data(), {1, 1, IMGSIZE, IMGSIZE});
+	torch::Tensor featuretensor = torch::from_blob(features.data(), {1, (int)features.size()});
 	std::vector<torch::jit::IValue> inputs;
-	torch::Tensor t;
-	if (only_do_subimages)
-	{
-		torch::Tensor t = torch::from_blob(features.data(), {1, 1, IMGSIZE, IMGSIZE});
-	}
-	else
-	{
-		torch::Tensor t = torch::from_blob(features.data(), {1, (int)features.size()});
-	}
-	inputs.push_back(t);
+	inputs.push_back(imagestensor);
+	inputs.push_back(featuretensor);
 
 	// Execute the model and turn its output into a tensor.
-	//at::Tensor output = module.forward(inputs).toTensor();
-	// Extract score value from tensor and return
-	//return output[0][0].item<float>();
-	std::cerr << "before forward" << std::endl;
 	at::Tensor output = module.forward(inputs).toTensor();
-	std::cerr << "after forward" << std::endl;
 
 	// Extract score value from tensor and return
 	return output[0][0].item<float>();
@@ -1940,23 +1925,17 @@ void ClassRanker::performRanking()
 	float max_score = -999.;
 	for (int i = 0; i < features_all_classes.size(); i++)
 	{
-		std::vector<float> feature_vector;
-		if (only_do_subimages)
-		{
-			MultidimArray<RFLOAT> myimg;
-			features_all_classes[i].subimages.getSlice(0, myimg);
-			feature_vector.resize(NZYXSIZE(myimg));
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(myimg)
-			{
-				feature_vector[n] = DIRECT_MULTIDIM_ELEM(myimg, n);
-			}
+		std::vector<float> image_vector, feature_vector;
 
-		}
-		else
+		MultidimArray<RFLOAT> myimg;
+		features_all_classes[i].subimages.getSlice(0, myimg);
+		image_vector.resize(NZYXSIZE(myimg));
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(myimg)
 		{
-			feature_vector = features_all_classes[i].toNormalizedVector();
+			image_vector[n] = DIRECT_MULTIDIM_ELEM(myimg, n);
 		}
-		scores[i] = (RFLOAT) deployTorchModel(fn_torch_model, feature_vector);
+		feature_vector = features_all_classes[i].toNormalizedVector();
+		scores[i] = (RFLOAT) deployTorchModel(fn_torch_model, feature_vector, image_vector);
 		if (scores[i] > max_score) max_score = scores[i];
 	}
 

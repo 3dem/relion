@@ -435,7 +435,7 @@ private:
 
 	void writeFeatures();
 
-	float deployTorchModel(FileName &model_path, std::vector<float> &features);
+	float deployTorchModel(FileName &model_path, std::vector<float> &features, std::vector<float> &subimages);
 
 	void performRanking();
 };
