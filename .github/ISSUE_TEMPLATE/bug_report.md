@@ -12,6 +12,7 @@ This is a template for asking questions and reporting bugs. Please fill in as mu
 **Describe your problem**
 
 Please write a clear description of what the problem is.
+**DO NOT** cross post a same question to multiple issues and/or many mailing lists (CCPEM, 3DEM, etc).
 
 **Environment:**
  - OS: [e.g. Ubuntu 16.04 LTS]
