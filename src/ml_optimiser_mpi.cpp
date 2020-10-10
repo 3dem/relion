@@ -724,7 +724,7 @@ void MlOptimiserMpi::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFL
 
 	// First calculate the sum of all individual power spectra on each subset
 	MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(Mavg, node->rank == 1);
-
+	std::cerr << "RANK: " << node->rank << std::endl;
 	if (pipeline_control_check_abort_job())
 		MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
 
@@ -2078,10 +2078,9 @@ void MlOptimiserMpi::maximization()
 						{
 							if(do_grad)
 							{
-								float _stepsize = getGradientStepSize(iclass);
 								(wsum_model.BPref[ith_recons]).reconstructGrad(
 										mymodel.Iref[ith_recons],
-										_stepsize,
+										grad_current_stepsize,
 										mymodel.tau2_fudge_factor,
 										mymodel.fsc_halves_class[ith_recons],
 										do_split_random_halves,
@@ -2211,10 +2210,9 @@ void MlOptimiserMpi::maximization()
 							{
 								if(do_grad)
 								{
-									float _stepsize = getGradientStepSize(iclass);
 									(wsum_model.BPref[ith_recons]).reconstructGrad(
 											mymodel.Iref[ith_recons],
-											_stepsize,
+											grad_current_stepsize,
 											mymodel.tau2_fudge_factor,
 											mymodel.fsc_halves_class[ith_recons],
 											do_split_random_halves,

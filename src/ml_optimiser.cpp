@@ -247,10 +247,6 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	if (fnt != "OLD")
 		grad_fin_subset_size = textToInteger(fnt);
 
-	fnt = parser.getOption("--grad_stepsize", "Step size parameter for SGD updates", "OLD");
-	if (fnt != "OLD")
-		grad_stepsize = textToInteger(fnt);
-
 	fnt = parser.getOption("--mu", "Momentum parameter for SGD updates", "OLD");
 	if (fnt != "OLD")
 		mu = textToFloat(fnt);
@@ -676,9 +672,10 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	grad_ini_subset_size = textToInteger(parser.getOption("--grad_ini_subset", "Mini-batch size during the initial SGD iterations", "-1"));
 	grad_fin_subset_size = textToInteger(parser.getOption("--grad_fin_subset", "Mini-batch size during the final SGD iterations", "-1"));
 	mu = textToFloat(parser.getOption("--mu", "Momentum parameter for SGD updates", "0.9"));
-	grad_ini_stepsize = textToFloat(parser.getOption("--grad_ini_stepsize", "Step size parameter for initial gradient updates.", "0.2"));
-	grad_fin_stepsize = textToFloat(parser.getOption("--grad_fin_stepsize", "Step size parameter for final gradient updates.", "0.05"));
-	do_grad_realspace = parser.checkOption("--grad_realspace", "Claculate and apply gradient in real space.");
+	grad_stepsize = textToFloat(parser.getOption("--grad_stepsize", "Step size parameter for gradient optimisation.", "0.1"));
+	grad_stepsize_scheme = parser.getOption("--grad_stepsize_scheme",
+			"Gradient step size updates scheme. Valid values are plain, 2step-<b> or <a>-3step-<b>. Where <a> is the initial inflate and <b> is the final deflate factor.",
+			"3-3step-2");
 	write_every_grad_iter = textToInteger(parser.getOption("--grad_write_iter", "Write out model every so many iterations in SGD (default is writing out all iters)", "10"));
 	do_init_blobs = parser.checkOption("--init_blobs", "Initialize models with random Gaussians.");
 	do_som = parser.checkOption("--som", "Calculate self-organizing map instead of classification.");
@@ -980,11 +977,6 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 		REPORT_ERROR("MlOptimiser::readStar: splitting data into two random halves, but rlnModelStarFile2 is empty. Probably you specified an optimiser STAR file generated with --force_converge. You cannot perform continuation or subtraction from this file. Please use one from the previous iteration.");
 	if (!MD.getValue(EMDL_OPTIMISER_LOWRES_LIMIT_EXP, strict_lowres_exp))
 		strict_lowres_exp = -1.;
-	// backward compatibility with relion-3.1
-	if (!MD.getValue(EMDL_OPTIMISER_SGD_DO_MOM1, do_mom1))
-		do_mom1 = false;
-	if (!MD.getValue(EMDL_OPTIMISER_SGD_DO_MOM1, do_mom2))
-		do_mom2 = false;
 
 	// Initialise some stuff for first-iteration only (not relevant here...)
 	do_calculate_initial_sigma_noise = false;
@@ -1148,8 +1140,6 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_SGD_SUBSET_SIZE, subset_size);
 		MD.setValue(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, write_every_grad_iter);
 		MD.setValue(EMDL_OPTIMISER_SGD_STEPSIZE, grad_stepsize);
-		MD.setValue(EMDL_OPTIMISER_SGD_DO_MOM1, do_mom1);
-		MD.setValue(EMDL_OPTIMISER_SGD_DO_MOM2, do_mom2);
 		MD.setValue(EMDL_OPTIMISER_DO_AUTO_REFINE, do_auto_refine);
 		MD.setValue(EMDL_OPTIMISER_AUTO_LOCAL_HP_ORDER, autosampling_hporder_local_searches);
 		MD.setValue(EMDL_OPTIMISER_NR_ITER_WO_RESOL_GAIN, nr_iter_wo_resol_gain);
@@ -2086,18 +2076,21 @@ void MlOptimiser::initialiseGeneral(int rank)
 	{
 		// for continuation jobs (iter>0): could do some more iterations as specified by nr_iter
 		nr_iter = grad_ini_iter + grad_fin_iter + grad_inbetween_iter;
+		updateStepSize();
 
 		// determine default subset sizes
 		if (grad_ini_subset_size == -1 || grad_fin_subset_size == -1) {
 			if (grad_ini_subset_size != -1 || grad_fin_subset_size != -1)
-				std::cout << " Since both --grad_ini_subset_size and --grad_fin_subset_size were not set, " <<
+				std::cout << " WARNING: Since both --grad_ini_subset_size and --grad_fin_subset_size were not set, " <<
 				          "both will instead be determined automatically." << std::endl;
 
 			unsigned long dataset_size = mydata.numberOfParticles();
 			grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.001, 500), 100);
 			grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.01,  5000), 500);
-			std::cout << " Initial subset size set to " << grad_ini_subset_size << std::endl;
-			std::cout << " Final subset size set to " << grad_fin_subset_size << std::endl;
+			if (rank==0) {
+				std::cout << " Initial subset size set to " << grad_ini_subset_size << std::endl;
+				std::cout << " Final subset size set to " << grad_fin_subset_size << std::endl;
+			}
 		}
 	}
 	else
@@ -2675,8 +2668,10 @@ void MlOptimiser::iterate()
 		timer.tic(TIMING_EXP);
 #endif
 
-		if(do_som) {
+		if (do_grad)
+			updateStepSize();
 
+		if(do_som) {
 			if (do_generate_seeds && !do_firstiter_cc && iter == 1)
 				is_som_iter = false;
 			else
@@ -3027,9 +3022,10 @@ void MlOptimiser::expectation()
 	{
 		if (do_grad)
 		{
-			std::cout << " Variable-metric Gradient Descent iteration " << iter << " of " << nr_iter;
+			std::cout << " Gradient optimisation iteration " << iter << " of " << nr_iter;
 			if (my_nr_particles < mydata.numberOfParticles())
 				std::cout << " with " << my_nr_particles << " particles";
+			std::cout << " (Step size " << grad_current_stepsize << ")";
 		}
 		else
 		{
@@ -4187,8 +4183,6 @@ void MlOptimiser::maximization()
 
 	int skip_class = maximizationGradientParameters();
 
-	RFLOAT avg_stepsize = 0, avg_stepsize_count = 0;
-
 	// First reconstruct the images for each class
 	// multi-body refinement will never get here, as it is only 3D auto-refine and that requires MPI!
 	for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
@@ -4230,13 +4224,9 @@ void MlOptimiser::maximization()
 				{
 					if(do_grad) {
 
-						float _stepsize = getGradientStepSize(iclass);
-						avg_stepsize += _stepsize;
-						avg_stepsize_count ++;
-
 						(wsum_model.BPref[iclass]).reconstructGrad(
 								mymodel.Iref[iclass],
-								_stepsize,
+								grad_current_stepsize,
 								mymodel.tau2_fudge_factor, //* wsum_model.pdf_class[iclass]*mymodel.nr_classes,
 								mymodel.fsc_halves_class[iclass],
 								do_split_random_halves,
@@ -4276,8 +4266,6 @@ void MlOptimiser::maximization()
 	RCTOC(timer,RCT_4);
 	if (verb > 0)
 		progress_bar(mymodel.nr_classes);
-
-	std::cerr << "Average class stepsize " << avg_stepsize / avg_stepsize_count << std::endl;
 
 }
 
@@ -4607,16 +4595,6 @@ int MlOptimiser::maximizationGradientParameters() {
 		}
 	}
 	return skip_class;
-}
-
-float MlOptimiser::getGradientStepSize(int iclass) {
-	float a = grad_fin_iter/4;
-	float b = grad_ini_iter + grad_inbetween_iter;
-	float x = iter;
-	float scale = 1 / (pow(10, (x-b-a/2.)/(a/4.)) + 1.); //Sigmoid function
-	float stepsize = (grad_ini_stepsize - grad_fin_stepsize) * scale + grad_fin_stepsize;
-
-	return stepsize;
 }
 
 void MlOptimiser::solventFlatten()
@@ -9073,8 +9051,51 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 			subset_size = mydata.numberOfParticles();
 	}
 
-	if (myverb && subset_size != old_subset_size)
+	if (myverb && subset_size != old_subset_size && !do_grad)
 		std::cout << " Setting subset size to " << subset_size << " particles" << std::endl;
+}
+
+void MlOptimiser::updateStepSize()
+{
+	if (grad_stepsize_scheme == "plain") {
+		grad_current_stepsize = grad_stepsize;
+		return;
+	}
+
+	// If not plain scheme, parse the scheme description
+
+	float inflate(0), deflate(1);
+	bool is_2step = grad_stepsize_scheme.find("-2step") != std::string::npos;
+	bool is_3step = grad_stepsize_scheme.find("-3step-") != std::string::npos;
+
+	if (is_2step)
+		deflate = textToFloat(grad_stepsize_scheme.substr(0, 1));
+
+	if (is_3step) {
+		inflate = textToFloat(grad_stepsize_scheme.substr(0, 1));
+		deflate = textToFloat(grad_stepsize_scheme.substr(grad_stepsize_scheme.size()-1, grad_stepsize_scheme.size()));
+	}
+
+	if (is_2step or is_3step) {
+		if (inflate < 0 or 10 < inflate)
+			REPORT_ERROR("Invalid inflate value in --grad_stepsize_scheme");
+		if (deflate <= 0 or 10 < deflate)
+			REPORT_ERROR("Invalid deflate value in --grad_stepsize_scheme");
+
+		float x = iter;
+		float a1 = grad_inbetween_iter / 5.; //Sigmoid length
+		float b1 = grad_ini_iter; //Sigmoid start
+		float a2 = grad_fin_iter; //Sigmoid length
+		float b2 = grad_ini_iter + grad_inbetween_iter;//Sigmoid start
+		float scale1 = 1. / (pow(10, (x - b1 - a1 / 2.) / (a1 / 4.)) + 1.); //Sigmoid function
+		float scale2 = 1. / (pow(10, (x - b2 - a2 / 2.) / (a2 / 4.)) + 1.); //Sigmoid function
+		float c1 = grad_stepsize; //Baseline
+		float c = grad_stepsize / deflate; //Baseline
+		grad_current_stepsize = (grad_stepsize*inflate - c1) * scale1 + (grad_stepsize - c) * scale2 + c;
+		return;
+	}
+
+	REPORT_ERROR("Invalid value in --grad_stepsize_scheme");
 }
 
 void MlOptimiser::checkConvergence(bool myverb)

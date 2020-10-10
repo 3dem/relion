@@ -1961,23 +1961,6 @@ void BackProjector::reconstructGrad(
 	Projector PPref(ori_size, interpolator, padding_factor, r_min_nn, data_dim);
 	PPref.computeFourierTransformMap(vol_out, dummy, r_max*2, 1, false); // false means no gridding correction
 
-	// Set Fconv to the right size
-	if (ref_dim == 2)
-	{
-		vol_out.setDimensions(pad_size, pad_size, 1, 1);
-	}
-	else
-	{
-		// Too costly to actually allocate the space
-        // Trick transformer with the right dimensions
-        vol_out.setDimensions(pad_size, pad_size, pad_size, 1);
-	}
-
-	FourierTransformer transformer;
-	transformer.setReal(vol_out); // Fake set real. 1. Allocate space for Fconv 2. calculate plans.
-	MultidimArray<Complex>& Fconv = transformer.getFourierReference();
-
-
 //#define DEBUG_NGD
 #ifdef DEBUG_NGD
 	std::cerr << " oversampling_correction= " << oversampling_correction << std::endl;
@@ -2054,7 +2037,7 @@ void BackProjector::reconstructGrad(
 	
 	if (!use_fsc) //Aleady incorporated fudge factor if FCS is estimated
 		tau2_fudge = 1.;
-	
+
 	FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
 	{
 		const int r2 = k * k + i * i + j * j;
@@ -2083,6 +2066,20 @@ void BackProjector::reconstructGrad(
 	transformer.setReal(vol_out);
 #endif
 
+
+	// Set Fconv to the right size
+	if (ref_dim == 2) {
+		vol_out.setDimensions(pad_size, pad_size, 1, 1);
+	}
+	else {
+		// Too costly to actually allocate the space
+		// Trick transformer with the right dimensions
+		vol_out.setDimensions(pad_size, pad_size, pad_size, 1);
+	}
+
+	FourierTransformer transformer;
+	transformer.setReal(vol_out); // Fake set real. 1. Allocate space for Fconv 2. calculate plans.
+	MultidimArray<Complex>& Fconv = transformer.getFourierReference();
 
 	// Now do inverse FFT and window to original size in real-space
 	// Pass the transformer to prevent making and clearing a new one before clearing the one declared above....

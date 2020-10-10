@@ -363,16 +363,13 @@ public:
 	// (by default refs are kept the same during grad_nr_iter_initial and then slowly annealed during grad_nr_iter_inbetween)
 	bool do_grad_skip_anneal;
 
-	// Calculate and apply gradient in real space
-	bool do_grad_realspace;
-
 	// Momentum update parameter
 	RFLOAT mu;
 
 	// Step size of the gradient updates
 	RFLOAT grad_stepsize;
-	RFLOAT grad_ini_stepsize;
-	RFLOAT grad_fin_stepsize;
+	RFLOAT grad_current_stepsize;
+	std::string grad_stepsize_scheme;
 
 	//Self-organizing map
 	bool do_init_blobs;
@@ -908,10 +905,6 @@ public:
 	 */
 	int maximizationGradientParameters();
 
-	/* Update gradient related parameters
-	 */
-	float getGradientStepSize(int iclass);
-
 	/* Updates all other model parameters (besides the reconstructions)
 	 */
 	void maximizationOtherParameters();
@@ -1036,8 +1029,11 @@ public:
 	// Adjust angular sampling based on the expected angular accuracies for auto-refine procedure
 	void updateAngularSampling(bool verb = true);
 
-	// Adjust subset size in fast_subsets or GRAD algorithms
+	// Adjust subset size in fast_subsets or Gradient algorithms
 	void updateSubsetSize(bool verb = true);
+
+	// Adjust step size for the gradient algorithms
+	void updateStepSize();
 
 	// Check convergence for auto-refine procedure
 	// Also print convergence information to screen for auto-refine procedure

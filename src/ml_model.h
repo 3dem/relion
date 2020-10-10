@@ -25,7 +25,7 @@
 #include "src/metadata_table.h"
 #include "src/exp_model.h"
 #include "src/healpix_sampling.h"
-#include "src/som.h"
+#include "src/gradient_optimisation.h"
 
 #define ML_BLOB_ORDER 0
 #define ML_BLOB_RADIUS 1.9
