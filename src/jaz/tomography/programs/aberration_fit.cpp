@@ -235,7 +235,7 @@ void AberrationFitProgram :: considerParticle(
 			const double x_ang = pix2ang * x;
 			const double y_ang = pix2ang * (y < s/2? y : y - s);
 
-			const double gamma = ctf.getGamma(x_ang, y_ang);
+			const double gamma = ctf.getLowOrderGamma(x_ang, y_ang);
 			const double cg = cos(gamma);
 			const double sg = sin(gamma);
 			const double c = -sg;
@@ -552,8 +552,8 @@ double AberrationFitProgram::findDefocus(
 
 					const d2Vector opt = Ai * b;
 
-					const double gamma_0 = ctf0.getGamma(xx/as, yy/as);
-					const double gamma_z = ctfz.getGamma(xx/as, yy/as);
+					const double gamma_0 = ctf0.getLowOrderGamma(xx/as, yy/as);
+					const double gamma_z = ctfz.getLowOrderGamma(xx/as, yy/as);
 					const double delta = gamma_z - gamma_0;
 
 					const d2Vector dx = d2Vector(cos(delta), sin(delta)) - opt;

@@ -47,7 +47,7 @@ void CtfEquiphaseFit::averageAlongIso(
 		const double kx = xi;
 		const double ky = yi < s/2? yi : yi - s;
 		
-		const double r2 = -mapScale * ctf.getGamma(p2a * kx, p2a * ky);
+		const double r2 = -mapScale * ctf.getLowOrderGamma(p2a * kx, p2a * ky);
 		
 		const double r = r2 > 0.0? sqrt(r2) : 0.0;
 		
@@ -105,7 +105,7 @@ double CtfEquiphaseFit::compareWithExpansion(
 		
 		if (r2f < k0*k0 || r2f > k1*k1) continue;
 		
-		const double r2 = -mapScale * ctf.getGamma(p2a * kx, p2a * ky);
+		const double r2 = -mapScale * ctf.getLowOrderGamma(p2a * kx, p2a * ky);
 		
 		const double r = r2 > 0.0? sqrt(r2) : 0.0;
 		
@@ -146,7 +146,7 @@ BufferedImage<double> CtfEquiphaseFit::computeExpansion(
 		
 		if (kx*kx + ky*ky < k0*k0) continue;
 		
-		const double r2 = -mapScale * ctf.getGamma(p2a * kx, p2a * ky);
+		const double r2 = -mapScale * ctf.getLowOrderGamma(p2a * kx, p2a * ky);
 		
 		const double r = r2 > 0.0? sqrt(r2) : 0.0;
 		

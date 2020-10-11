@@ -33,6 +33,7 @@ void Backproject2D::read(int argc, char **argv)
 
 		particlesFn = parser.getOption("--i", "Input file (e.g. run_it023_data.star)", "");
 		reextract = parser.checkOption("--reextract", "Extract particles from the micrographs");
+		do_dual_contrast = parser.checkOption("--dual_contrast", "Perform a dual-contrast reconstruction");
 		SNR = textToDouble(parser.getOption("--SNR", "Assumed signal-to-noise ratio", "0.1"));
 		margin = textToDouble(parser.getOption("--m", "Margin around the particle [Px]", "20"));
 		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
@@ -98,14 +99,24 @@ void Backproject2D::run()
 	const double pixel_size = obs_model.getPixelSize(0);
 
 
-	BufferedImage<double> average_stack(box_size, box_size, class_count);
 
-	BufferedImage<dComplex> data(box_size / 2 + 1, box_size, num_threads * class_count);
-	data.fill(dComplex(0.0, 0.0));
+	BufferedImage<dComplex> data;
+	BufferedImage<double> weight;
+	BufferedImage<DualContrastVoxel<double>> data_dual_contrast;
 
-	BufferedImage<double> weight(box_size / 2 + 1, box_size, num_threads * class_count);
-	weight.fill(0.0);
+	if (do_dual_contrast)
+	{
+		data_dual_contrast = BufferedImage<DualContrastVoxel<double>>
+				(box_size / 2 + 1, box_size, num_threads * class_count);
+	}
+	else
+	{
+		data = BufferedImage<dComplex>(box_size / 2 + 1, box_size, num_threads * class_count);
+		weight = BufferedImage<double>(box_size / 2 + 1, box_size, num_threads * class_count);
 
+		data.fill(dComplex(0.0, 0.0));
+		weight.fill(0.0);
+	}
 
 	std::vector<MetaDataTable> particles_by_micrograph = StackHelper::splitByMicrographName(particles_table);
 
@@ -132,7 +143,7 @@ void Backproject2D::run()
 
 			// Round extraction scale to the third decimal to avoid numbers
 			// that are infinitesimally shy of the next integer
-			extraction_scale = std::round(1000 * extraction_scale)/1000.0;
+			extraction_scale = std::round(1000 * extraction_scale) / 1000.0;
 
 			micrograph.read(micrograph_filename);
 
@@ -231,15 +242,23 @@ void Backproject2D::run()
 			const double m = box_size / 2;
 			Translation::shiftInFourierSpace2D(particle_image_FS, shift.x + m, shift.y + m);
 
-			RawImage<dComplex> data_slice = data.getSliceRef(slice_id);
-			RawImage<double> weight_slice = weight.getSliceRef(slice_id);
-
-			backrotate_particle(
-				particle_image_FS,
-				p, particles,
-				obs_model,
-				data_slice,
-				weight_slice);
+			if (do_dual_contrast)
+			{
+				backrotate_particle_dual_contrast(
+					particle_image_FS,
+					p, particles,
+					obs_model,
+					data_dual_contrast.getSliceRef(slice_id));
+			}
+			else
+			{
+				backrotate_particle(
+					particle_image_FS,
+					p, particles,
+					obs_model,
+					data.getSliceRef(slice_id),
+					weight.getSliceRef(slice_id));
+			}
 		}
 	}
 
@@ -251,36 +270,78 @@ void Backproject2D::run()
 		{
 			const int slice_id = t * class_count + class_id;
 
-			data.getSliceRef(slice_id_0) += data.getSliceRef(slice_id);
-			weight.getSliceRef(slice_id_0) += weight.getSliceRef(slice_id);
+			if (do_dual_contrast)
+			{
+				data_dual_contrast.getSliceRef(slice_id_0) += data_dual_contrast.getSliceRef(slice_id);
+			}
+			else
+			{
+				data.getSliceRef(slice_id_0) += data.getSliceRef(slice_id);
+				weight.getSliceRef(slice_id_0) += weight.getSliceRef(slice_id);
+			}
 		}
 	}
 
-	for (int class_id = 0; class_id < class_count; class_id++)
+	if (do_dual_contrast)
 	{
-		RawImage<dComplex> data_slice = data.getSliceRef(class_id);
-		RawImage<double> weight_slice = weight.getSliceRef(class_id);
+		BufferedImage<double> average_phase_stack(box_size, box_size, class_count);
+		BufferedImage<double> average_amp_stack(box_size, box_size, class_count);
 
-		BufferedImage<double> average = reconstruct(
-					data_slice, weight_slice, 1.0/SNR);
+		for (int class_id = 0; class_id < class_count; class_id++)
+		{
+			BufferedImage<double> average_phase, average_amp;
 
-		const double radius = box_size/2;
+			std::pair<BufferedImage<double>, BufferedImage<double>> average =
+				reconstruct_dual_contrast(
+						data_dual_contrast.getSliceRef(class_id),
+						1.0/SNR);
 
-		Tapering::taperCircularly2D(average, radius - margin, radius - margin + 5);
+			average_phase = average.first;
+			average_amp = average.second;
 
-		average_stack.getSliceRef(class_id).copyFrom(average);
+			const double radius = box_size/2;
+
+			Tapering::taperCircularly2D(average_phase, radius - margin, radius - margin + 5);
+			Tapering::taperCircularly2D(average_amp, radius - margin, radius - margin + 5);
+
+			average_phase_stack.getSliceRef(class_id).copyFrom(average_phase);
+			average_amp_stack.getSliceRef(class_id).copyFrom(average_amp);
+		}
+
+		average_phase_stack.write(outDir + "class_averages_phase.mrc", pixel_size);
+		average_amp_stack.write(outDir + "class_averages_amplitude.mrc", pixel_size);
 	}
+	else
+	{
+		BufferedImage<double> average_stack(box_size, box_size, class_count);
 
-	average_stack.write(outDir + "class_averages.mrc", pixel_size);
+		for (int class_id = 0; class_id < class_count; class_id++)
+		{
+			BufferedImage<double> average;
+
+			average = reconstruct(
+						data.getSliceRef(class_id),
+						weight.getSliceRef(class_id),
+						1.0/SNR);
+
+			const double radius = box_size/2;
+
+			Tapering::taperCircularly2D(average, radius - margin, radius - margin + 5);
+
+			average_stack.getSliceRef(class_id).copyFrom(average);
+		}
+
+		average_stack.write(outDir + "class_averages.mrc", pixel_size);
+	}
 }
 
 void Backproject2D::backrotate_particle(
-		const RawImage<fComplex> image,
+		const RawImage<fComplex>& image,
 		long int particle_id,
 		const MetaDataTable& particles_table,
 		ObservationModel& obsModel,
-		RawImage<dComplex>& data,
-		RawImage<double>& weight)
+		RawImage<dComplex> data,
+		RawImage<double> weight)
 {
 	const int sh = data.xdim;
 	const int s  = data.ydim;
@@ -316,10 +377,62 @@ void Backproject2D::backrotate_particle(
 	}
 }
 
+void Backproject2D::backrotate_particle_dual_contrast(
+		const RawImage<fComplex>& image,
+		long particle_id,
+		const MetaDataTable& particles_table,
+		ObservationModel& obsModel,
+		RawImage<DualContrastVoxel<double>> average)
+{
+	const int sh = average.xdim;
+	const int s  = average.ydim;
+
+	const double pixel_size = obsModel.getPixelSize(0);
+	const double box_size_px = obsModel.getBoxSize(0);
+	const double box_size_A = box_size_px * pixel_size;
+
+
+	const double psi = DEG2RAD(particles_table.getDouble(EMDL_ORIENT_PSI, particle_id));
+
+	const d2Matrix rot(
+			 cos(psi), sin(psi),
+			-sin(psi), cos(psi)	);
+
+	CTF ctf;
+	ctf.readByGroup(particles_table, &obsModel, particle_id);
+	ctf.Q0 = 0.0;
+	ctf.initialise();
+
+
+	for (int y = 0; y < s;  y++)
+	for (int x = 0; x < sh; x++)
+	{
+		const d2Vector p0(x, (y < s/2? y : y - s));
+		const d2Vector p1 = rot * p0;
+
+		const fComplex z = Interpolation::linearXY_complex_FftwHalf_wrap(
+					image, p1.x, p1.y);
+
+		const double xx = p1.x / box_size_A;
+		const double yy = p1.y / box_size_A;
+
+		const double gamma = ctf.getLowOrderGamma(xx,yy);
+
+		DualContrastVoxel<double>& target = average(x,y);
+
+		target.data_sin += sin(gamma) * z;
+		target.data_cos += cos(gamma) * z;
+
+		target.weight_sin2    += sin(gamma) * sin(gamma);
+		target.weight_sin_cos += sin(gamma) * cos(gamma);
+		target.weight_cos2    += cos(gamma) * cos(gamma);
+	}
+}
+
 
 BufferedImage<double> Backproject2D::reconstruct(
-		RawImage<dComplex>& data,
-		RawImage<double>& weight,
+		const RawImage<dComplex>& data,
+		const RawImage<double>& weight,
 		double Wiener_offset)
 {
 	const int sh = data.xdim;
@@ -367,4 +480,62 @@ BufferedImage<double> Backproject2D::reconstruct(
 	}
 
 	return out_RS;
+}
+
+std::pair<BufferedImage<double>, BufferedImage<double>>
+	Backproject2D::reconstruct_dual_contrast(
+		const RawImage<DualContrastVoxel<double>> &data,
+		double Wiener_offset)
+{
+	const int sh = data.xdim;
+	const int s  = data.ydim;
+
+	BufferedImage<double> out_phase_RS(s,s), out_amp_RS(s,s);
+	BufferedImage<dComplex> out_phase_FS(sh,s), out_amp_FS(sh,s);
+
+	for (int y = 0; y < s;  y++)
+	for (int x = 0; x < sh; x++)
+	{
+		const double mod = (1 - 2 * (x % 2)) * (1 - 2 * (y % 2));
+
+		DualContrastVoxel<double>::Solution d = data(x,y).solve(Wiener_offset, 0.0);
+
+		out_phase_FS(x,y) = mod * d.phase;
+		out_amp_FS(x,y) = mod * d.amplitude;
+	}
+
+	FFT::inverseFourierTransform(out_phase_FS, out_phase_RS, FFT::Both);
+	FFT::inverseFourierTransform(out_amp_FS, out_amp_RS, FFT::Both);
+
+	for (int y = 0; y < s; y++)
+	for (int x = 0; x < s; x++)
+	{
+		const double xx = x - s/2;
+		const double yy = y - s/2;
+
+		if (xx == 0 && yy == 0)
+		{
+			// sinc at 0 is 1
+		}
+		else
+		{
+			const double r = sqrt(xx*xx + yy*yy);
+			const double d = r / s;
+			const double sinc = sin(PI * d) / (PI * d);
+			const double sinc2 = sinc * sinc;
+
+			if (d < 0.99)
+			{
+				out_phase_RS(x,y) /= sinc2;
+				out_amp_RS(x,y) /= sinc2;
+			}
+			else
+			{
+				out_phase_RS(x,y) = 0.0;
+				out_amp_RS(x,y) = 0.0;
+			}
+		}
+	}
+
+	return std::make_pair(out_phase_RS, out_amp_RS);
 }

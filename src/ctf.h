@@ -240,7 +240,7 @@ public:
 		return retval;
 	}
 
-	RFLOAT getGamma(RFLOAT X, RFLOAT Y) const;
+	RFLOAT getLowOrderGamma(RFLOAT X, RFLOAT Y) const;
 
 	// compute the local frequency of the ctf
 	// (i.e. the radial slope of 'double gamma' in getCTF())
@@ -407,7 +407,7 @@ public:
 				double xx = x / xs;
 				double yy = (y < h0/2? y : y - h0) / ys;
 		
-				dest[y*wh + x] = getGamma(xx,yy);
+				dest[y*wh + x] = getLowOrderGamma(xx,yy);
 			}
 		}
 		else
@@ -420,7 +420,7 @@ public:
 				double xx = x / xs;
 				double yy = (y < h0/2? y : y - h0) / ys;
 		
-				dest[y*wh + x] = getGamma(xx,yy) + gammaOffset(x,y);
+				dest[y*wh + x] = getLowOrderGamma(xx,yy) + gammaOffset(x,y);
 			}
 		}
 	}

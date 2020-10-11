@@ -255,7 +255,7 @@ void CTF::initialise()
 	Ayy = A(1,1);
 }
 
-RFLOAT CTF::getGamma(RFLOAT X, RFLOAT Y) const
+RFLOAT CTF::getLowOrderGamma(RFLOAT X, RFLOAT Y) const
 {
 	if (obsModel != 0 && obsModel->hasMagMatrices)
 	{
