@@ -404,28 +404,46 @@ void Backproject2D::backrotate_particle_dual_contrast(
 	ctf.initialise();
 
 
+	BufferedImage<fComplex>
+		data_sin(sh,s),
+		data_cos(sh,s);
+
+	BufferedImage<float>
+		weight_sin2(sh,s),
+		weight_sin_cos(sh,s),
+		weight_cos2(sh,s);
+
+	for (int y = 0; y < s;  y++)
+	for (int x = 0; x < sh; x++)
+	{
+		const double xx = x / box_size_A;
+		const double yy = (y < s/2? y : y - s) / box_size_A;
+
+		const double gamma = ctf.getLowOrderGamma(xx,yy);
+		const fComplex z = image(x,y);
+
+		data_sin(x,y) = sin(gamma) * z;
+		data_cos(x,y) = cos(gamma) * z;
+
+		weight_sin2(x,y)    = sin(gamma) * sin(gamma);
+		weight_sin_cos(x,y) = sin(gamma) * cos(gamma);
+		weight_cos2(x,y)    = cos(gamma) * cos(gamma);
+	}
+
 	for (int y = 0; y < s;  y++)
 	for (int x = 0; x < sh; x++)
 	{
 		const d2Vector p0(x, (y < s/2? y : y - s));
 		const d2Vector p1 = rot * p0;
 
-		const fComplex z = Interpolation::linearXY_complex_FftwHalf_wrap(
-					image, p1.x, p1.y);
+		DualContrastVoxel<double>& t = average(x,y);
 
-		const double xx = p1.x / box_size_A;
-		const double yy = p1.y / box_size_A;
+		t.data_sin += Interpolation::linearXY_complex_FftwHalf_wrap(data_sin, p1.x, p1.y);
+		t.data_cos += Interpolation::linearXY_complex_FftwHalf_wrap(data_cos, p1.x, p1.y);
 
-		const double gamma = ctf.getLowOrderGamma(xx,yy);
-
-		DualContrastVoxel<double>& target = average(x,y);
-
-		target.data_sin += sin(gamma) * z;
-		target.data_cos += cos(gamma) * z;
-
-		target.weight_sin2    += sin(gamma) * sin(gamma);
-		target.weight_sin_cos += sin(gamma) * cos(gamma);
-		target.weight_cos2    += cos(gamma) * cos(gamma);
+		t.weight_sin2    += Interpolation::linearXY_symmetric_FftwHalf_wrap(weight_sin2,    p1.x, p1.y);
+		t.weight_sin_cos += Interpolation::linearXY_symmetric_FftwHalf_wrap(weight_sin_cos, p1.x, p1.y);
+		t.weight_cos2    += Interpolation::linearXY_symmetric_FftwHalf_wrap(weight_cos2,    p1.x, p1.y);
 	}
 }
 
