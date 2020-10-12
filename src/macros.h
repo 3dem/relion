@@ -422,7 +422,7 @@ static void PRINT_VERSION_INFO()
 
 #if defined(CUDA) || defined(ALTCPU)
 
-	#ifdef CUDA
+	#ifdef _CUDA_ENABLED
 	<< ", CUDA-ACC="
 	#endif
 

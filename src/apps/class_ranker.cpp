@@ -1,7 +1,12 @@
 /***************************************************************************
  *
- * Author: "Sjors H.W. Scheres"
+ * Author: "Liyi Dong & Sjors H.W. Scheres"
  * MRC Laboratory of Molecular Biology
+ *
+ * The Haralick feature code was adapted from code written by Antonio Augusto Abello
+ * as hosted on: https://github.com/Abello966
+ *
+ * The LBP code was adapted from Scipion, written by Tomas Majtner, see license below
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,52 +22,26 @@
  * source code. Additional authorship citations may be added, but existing
  * author citations must be preserved.
  ***************************************************************************/
-#include <src/autopicker.h>
-#ifdef _CUDA_ENABLED
-#include <src/acc/cuda/cuda_autopicker.h>
-#endif
+#include <src/class_ranker.h>
 
 int main(int argc, char *argv[])
 {
-	AutoPicker prm;
+	ClassRanker prm;
 
 	try
 	{
 		prm.read(argc, argv);
-
-		prm.initialise();
-
-#ifdef _CUDA_ENABLED
-		if (prm.do_gpu)
-		{
-			std::stringstream didSs;
-			didSs << "AP";
-			int dev_id = prm.deviceInitialise();
-			prm.cudaPicker = (void*) new AutoPickerCuda((AutoPicker*)&prm, dev_id, didSs.str().c_str() );
-
-			((AutoPickerCuda*)prm.cudaPicker)->run();
-		}
-		else
-#endif
-		{
-			prm.run();
-		}
-
-		prm.generatePDFLogfile();
-
-#ifdef TIMING
-		std::cout << "timings:" << std::endl;
-		prm.timer.printTimes(false);
-#endif
+		prm.run();
 	}
 	catch (RelionError XE)
 	{
 		//prm.usage();
 		std::cerr << XE;
-
 		return RELION_EXIT_FAILURE;
 	}
 
 	return RELION_EXIT_SUCCESS;
 }
+
+
 

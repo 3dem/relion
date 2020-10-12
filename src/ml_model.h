@@ -220,6 +220,9 @@ public:
 	// Normalize overlapping regions in multibody masks
 	bool norm_body_mask_overlap;
 
+	// Store filenames of references for Liyi's class feature program
+	std::vector<FileName> ref_names;
+
 public:
 
 	// Constructor
@@ -335,6 +338,7 @@ public:
 			orientability_contrib = MD.orientability_contrib;
 			helical_twist = MD.helical_twist;
 			helical_rise = MD.helical_rise;
+			ref_names = MD.ref_names;
 	        }
         	return *this;
 	}
@@ -378,6 +382,7 @@ public:
 		orientability_contrib.clear();
 		helical_twist.clear();
 		helical_rise.clear();
+		ref_names.clear();
 		do_sgd=false;
 	}
 
@@ -385,10 +390,11 @@ public:
 	void initialise(bool _do_sgd = false);
 
 	//Read a model from a file
-	void read(FileName fn_in);
+	void read(FileName fn_in, bool read_only_one_group = false);
 
 	// Write a model to disc
-	void write(FileName fn_out, HealpixSampling &sampling, bool do_write_bild = true, bool do_only_write_images = false);
+	void write(FileName fn_out, HealpixSampling &sampling,
+			bool do_write_bild = true, bool do_only_write_images = false);
 
 	//Read a tau-spectrum from a STAR file
 	void readTauSpectrum(FileName fn_tau, int verb);

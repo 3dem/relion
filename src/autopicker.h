@@ -20,7 +20,7 @@
 #include "src/mask.h"
 #include "src/macros.h"
 #include "src/helix.h"
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 #include "src/acc/cuda/cuda_mem_utils.h"
 #include "src/acc/acc_projector.h"
 #include "src/acc/cuda/cuda_settings.h"
