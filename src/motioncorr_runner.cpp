@@ -20,7 +20,7 @@
 #include <omp.h>
 
 #include "src/motioncorr_runner.h"
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 #include "src/acc/cuda/cuda_mem_utils.h"
 #endif
 #include "src/micrograph_model.h"
@@ -211,7 +211,7 @@ void MotioncorrRunner::initialise()
 		REPORT_ERROR("ERROR: when not providing an input STAR file, it is mandatory to provide the voltage in kV through --voltage.");
 	}
 
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	if (do_motioncor2)
 	{
 		if (gpu_ids.length() > 0)

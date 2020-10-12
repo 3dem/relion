@@ -156,7 +156,7 @@ if(CUDA_FOUND)
     endif()
     
     if(CUDA)
-        add_definitions(-DCUDA)
+        add_definitions(-D_CUDA_ENABLED)
     endif()
 else(CUDA_FOUND)
     message(STATUS "Using non-cuda compilation....")
@@ -364,6 +364,16 @@ find_package(PNG)
 if(PNG_FOUND)
 	add_definitions(-DHAVE_PNG)
 endif()
+
+
+# -----------------------------------------------------------------------------Torch--
+
+option(TORCH "Enable support for Torch" OFF)
+if(TORCH)
+    message(STATUS "Torch support requested by user.")
+    include(${CMAKE_SOURCE_DIR}/cmake/BuildTorch.cmake)
+    add_definitions(-D_TORCH_ENABLED)
+endif(TORCH)
 
 # ----------------------------------------------------------------------COPY SCRIPTS--
 

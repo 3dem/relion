@@ -90,10 +90,11 @@ void MlModel::initialise(bool _do_sgd)
 	if (do_sgd)
 		Igrad.resize(nr_classes);
 
+	ref_names.resize(nr_classes);
 }
 
 // Reading from a file
-void MlModel::read(FileName fn_in)
+void MlModel::read(FileName fn_in, bool read_only_one_group)
 {
 
 	// Clear current model
@@ -186,7 +187,6 @@ void MlModel::read(FileName fn_in)
 	initialise();
 
 	// Read classes
-	FileName fn_tmp, fn_tmp2;
 	Image<RFLOAT> img;
 	if (nr_bodies > 1)
 		MDclass.readStar(in, "model_bodies");
@@ -209,7 +209,7 @@ void MlModel::read(FileName fn_in)
 			}
 		}
 
-		if (!MDclass.getValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp) ||
+		if (!MDclass.getValue(EMDL_MLMODEL_REF_IMAGE, ref_names[iclass]) ||
 		    !MDclass.getValue(EMDL_MLMODEL_ACCURACY_ROT, acc_rot[iclass]) )
 			REPORT_ERROR("MlModel::readStar: incorrect model_classes/bodies table: no ref_image or acc_rot");
 		// backwards compatible
@@ -239,11 +239,12 @@ void MlModel::read(FileName fn_in)
 		}
 
 		// Read in actual reference image
-		img.read(fn_tmp);
+		img.read(ref_names[iclass]);
 		img().setXmippOrigin();
 		Iref[iclass] = img();
 
 		// Check to see whether there is a SGD-gradient entry as well
+		FileName fn_tmp;
 		if (MDclass.getValue(EMDL_MLMODEL_SGD_GRADIENT_IMAGE, fn_tmp))
 		{
 			do_sgd=true;
@@ -295,7 +296,8 @@ void MlModel::read(FileName fn_in)
 	}
 
 	// Read sigma models for each group
-	for (int igroup = 0; igroup < nr_groups; igroup++)
+	long read_this_many_groups = (read_only_one_group) ? 1 : nr_groups;
+	for (int igroup = 0; igroup < read_this_many_groups; igroup++)
 	{
 		// Allow sigma2_noise with different sizes!
 		sigma2_noise[igroup].resize(ori_size/2 + 1);
@@ -375,6 +377,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 
 	// Treat classes or bodies (for multi-body refinement) in the same way...
 	int nr_classes_bodies = (nr_bodies > 1) ? nr_bodies : nr_classes;
+
 	// A. Write images
 	if (ref_dim == 2)
 	{
@@ -562,6 +565,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 
 		// For multiple bodies: only star PDF_CLASS in the first one!
 		int myclass = (nr_bodies > 1) ? 0 : iclass; // for multi-body: just set iclass=0
+
 		MDclass.setValue(EMDL_MLMODEL_PDF_CLASS, pdf_class[myclass]);
 		MDclass.setValue(EMDL_MLMODEL_ACCURACY_ROT, acc_rot[iclass]);
 		MDclass.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, acc_trans[iclass]);

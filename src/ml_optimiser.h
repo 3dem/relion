@@ -472,6 +472,9 @@ public:
 	/* Flag to use bimodal prior distributions on psi (2D classification of helical segments) */
 	bool do_bimodal_psi;
 
+	/* Flag to center classes */
+	bool do_center_classes;
+
 	//////// Special stuff for the first iterations /////////////////
 
 	// Skip marginalisation in first iteration and use signal cross-product instead of Gaussian
@@ -721,6 +724,8 @@ public:
 		do_calculate_initial_sigma_noise(0),
 		fix_sigma_offset(0),
 		do_firstiter_cc(0),
+		do_bimodal_psi(0),
+		do_center_classes(0),
 		exp_my_last_part_id(0),
 		particle_diameter(0),
 		smallest_changes_optimal_orientations(0),
@@ -750,6 +755,7 @@ public:
 		do_gpu(0),
 		anticipate_oom(0),
 		do_helical_refine(0),
+		do_preread_images(0),
 		ignore_helical_symmetry(0),
 		helical_twist_initial(0),
 		helical_rise_initial(0),
@@ -792,7 +798,8 @@ public:
 	void read(FileName fn_in, int rank = 0, bool do_prevent_preread = false);
 
 	// Write files to disc
-	void write(bool do_write_sampling, bool do_write_data, bool do_write_optimiser, bool do_write_model, int random_subset = 0);
+	void write(bool do_write_sampling, bool do_write_data, bool do_write_optimiser, bool do_write_model,
+			int random_subset = 0);
 
     /** ========================== Initialisation  =========================== */
 
@@ -898,6 +905,11 @@ public:
 	/* Apply a solvent flattening to a map
 	 */
 	void solventFlatten();
+
+	/* Center classes based on their center-of-mass
+	 * and also update the origin offsets in the _data.star file correspondingly
+	 */
+	void centerClasses();
 
 	/* Updates the current resolution (from data_vs_prior array) and keeps track of best resolution thus far
 	 *  and precalculates a 2D Fourier-space array with pointers to the resolution of each point in a FFTW-centered array

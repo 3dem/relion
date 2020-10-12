@@ -416,7 +416,6 @@ private:
 	};
 
 
-
 };
 
 #endif /* METADATA_MODEL_H_ */

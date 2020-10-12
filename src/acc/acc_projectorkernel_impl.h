@@ -20,7 +20,7 @@ public:
 
 	PROJECTOR_PTR_TYPE mdlReal;
 	PROJECTOR_PTR_TYPE mdlImag;
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	PROJECTOR_PTR_TYPE mdlComplex;
 #else
 	std::complex<XFLOAT> *mdlComplex;
@@ -32,7 +32,7 @@ public:
 			int mdlInitY, int mdlInitZ,
 			XFLOAT padding_factor,
 			int maxR,
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 			PROJECTOR_PTR_TYPE mdlComplex
 #else
 			std::complex<XFLOAT> *mdlComplex
@@ -61,8 +61,8 @@ public:
 				maxR(maxR), maxR2(maxR*maxR), maxR2_padded(maxR*maxR*padding_factor*padding_factor),
 				mdlReal(mdlReal), mdlImag(mdlImag)
 			{
-#ifndef CUDA
-				std::complex<XFLOAT> *pData = mdlComplex;
+#ifndef _CUDA_ENABLED
+std::complex<XFLOAT> *pData = mdlComplex;
 				for(size_t i=0; i<(size_t)mdlX * (size_t)mdlY * (size_t)mdlZ; i++) {
 					std::complex<XFLOAT> arrayval(*mdlReal ++, *mdlImag ++);
 					pData[i] = arrayval;
@@ -70,8 +70,8 @@ public:
 #endif
 			};
 
-#ifdef CUDA
-	__device__ __forceinline__
+#ifdef _CUDA_ENABLED
+__device__ __forceinline__
 #endif
 	void project3Dmodel(
 			int x,
@@ -112,8 +112,8 @@ public:
 				zp = -zp;
 			}
 
-#ifdef CUDA
-			real =   no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
+#ifdef _CUDA_ENABLED
+real =   no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 			imag = - no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 #else
 			CpuKernels::complex3D(mdlComplex, real, imag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
@@ -154,8 +154,8 @@ public:
 		}
 	}
 
-#ifdef CUDA
-	__device__ __forceinline__
+#ifdef _CUDA_ENABLED
+__device__ __forceinline__
 #endif
 	void project3Dmodel(
 			int x,
@@ -192,8 +192,8 @@ public:
 				zp = -zp;
 			}
 
-	#ifdef CUDA
-			real = no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
+	#ifdef _CUDA_ENABLED
+real = no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 			imag = no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 	#else
 				CpuKernels::complex3D(mdlComplex, real, imag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
@@ -232,8 +232,8 @@ public:
 		}
 	}
 
-#ifdef CUDA
-	__device__ __forceinline__
+#ifdef _CUDA_ENABLED
+__device__ __forceinline__
 #endif
 	void project2Dmodel(
 				int x,
@@ -265,8 +265,8 @@ public:
 				yp = -yp;
 			}
 
-	#ifdef CUDA
-			real = no_tex2D(mdlReal, xp, yp, mdlX, mdlInitY);
+	#ifdef _CUDA_ENABLED
+real = no_tex2D(mdlReal, xp, yp, mdlX, mdlInitY);
 			imag = no_tex2D(mdlImag, xp, yp, mdlX, mdlInitY);
 	#else
 			CpuKernels::complex2D(mdlComplex, real, imag, xp, yp, mdlX, mdlInitY);
@@ -315,8 +315,8 @@ public:
 					*p.mdlReal,
 					*p.mdlImag
 #else
-#ifdef CUDA
-					p.mdlReal,
+#ifdef _CUDA_ENABLED
+p.mdlReal,
 					p.mdlImag
 #else
 					p.mdlComplex

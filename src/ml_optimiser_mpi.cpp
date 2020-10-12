@@ -19,7 +19,7 @@
  ***************************************************************************/
 #include "src/ml_optimiser_mpi.h"
 #include "src/ml_optimiser.h"
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 #include "src/acc/cuda/cuda_ml_optimiser.h"
 #endif
 #ifdef ALTCPU
@@ -97,7 +97,7 @@ void MlOptimiserMpi::initialise()
 
 	// Print information about MPI nodes:
 	printMpiNodesMachineNames(*node, nr_threads);
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
     /************************************************************************/
 	//Setup GPU related resources
 	int devCount, deviceAffinity;
@@ -959,7 +959,7 @@ void MlOptimiserMpi::expectation()
 #define JOB_LEN_FN_RECIMG  (first_last_nr_images(5))
 #define JOB_NPAR  (JOB_LAST - JOB_FIRST + 1)
 
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	/************************************************************************/
 	//GPU memory setup
 
@@ -1442,7 +1442,7 @@ void MlOptimiserMpi::expectation()
 			}
 //		TODO: define MPI_COMM_SLAVES!!!!	MPI_Barrier(node->MPI_COMM_SLAVES);
 
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 			if (do_gpu)
 			{
 				for (int i = 0; i < accDataBundles.size(); i ++)
@@ -3265,6 +3265,9 @@ void MlOptimiserMpi::iterate()
 			}
 		}
 		MPI_Barrier(MPI_COMM_WORLD);
+
+
+		if (do_center_classes) centerClasses();
 
 		// Directly use fn_out, without "_it" specifier, so unmasked refs will be overwritten at every iteration
 		if (do_write_unmasked_refs && node->rank == 1)
