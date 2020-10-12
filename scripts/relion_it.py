@@ -311,17 +311,20 @@ class RelionItOptions(object):
     # Are these multi-frame movies? Set to False for single-frame micrographs (and motion-correction will be skipped)
     images_are_movies = True
 
-    
+
     ### MotionCorrection parameters
-    # Dose in electrons per squared Angstrom per frame
+    # Dose in electrons per squared Angstrom per fraction
     motioncor_doseperframe = 1.277
     # Gain-reference image in MRC format (only necessary if input movies are not yet gain-corrected, e.g. compressed TIFFs from K2)
     motioncor_gainreference = 'Movies/gain.mrc'
+    # EER upsampling (1 = 4K, 2 = 8K). If you use 8K rendering, the pixel size (angpix) MUST be the half of the physical pixel size and the motioncor_binning should be 2.
+    eer_upsampling = 1
+    # EER fractionation. The dose rate (motioncor_doseperframe) is e/A2/fraction after this fractionation.
+    eer_grouping = 20
 
 
     ### CTF estimation parameters
     # Most cases won't need changes here...
-
 
     ### Autopick parameters
     # Use reference-free Laplacian-of-Gaussian picking (otherwise use reference-based template matching instead)
@@ -437,7 +440,7 @@ class RelionItOptions(object):
     motioncor_patches_y = 4
     # B-factor in A^2 for downweighting of high-spatial frequencies
     motioncor_bfactor = 150
-    # Use binning=2 for super-resolution K2 movies
+    # Use binning=2 for super-resolution movies
     motioncor_binning = 1
     # Provide a defect file for your camera if you have one
     motioncor_defectfile = ''
@@ -1572,7 +1575,8 @@ def run_pipeline(opts):
                                   'Which GPUs to use: == {}'.format(opts.motioncor_gpu),
                                   'Other MOTIONCOR2 arguments == {}'.format(opts.motioncor_other_args),
                                   'Number of threads: == {}'.format(opts.motioncor_threads),
-                                  'Number of MPI procs: == {}'.format(opts.motioncor_mpi)]
+                                  'Number of MPI procs: == {}'.format(opts.motioncor_mpi),
+                                  'Additional arguments: == --eer_upsampling {} --eer_grouping {}'.format(opts.eer_upsampling, opts.eer_grouping)]
 
             if (opts.motioncor_do_own):
                 motioncorr_options.append('Use RELION\'s own implementation? == Yes')

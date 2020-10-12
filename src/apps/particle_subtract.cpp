@@ -39,6 +39,7 @@ int main(int argc, char *argv[])
 		{
 			prm.run();
 			prm.saveStarFile();
+			prm.combineStarFile();
 		}
 
 	}

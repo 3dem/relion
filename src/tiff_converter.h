@@ -66,6 +66,11 @@ public:
 			TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, 8);
 			TIFFSetField(tif, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_UINT);
 		}
+		else if (std::is_same<T, signed char>::value)
+		{
+			TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, 8);
+			TIFFSetField(tif, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_INT);
+		}
 		else
 		{
 			REPORT_ERROR("write_tiff_one_page: unknown data type");
@@ -98,17 +103,17 @@ private:
 	int rank, total_ranks;
 
 	FileName fn_in, fn_out, fn_gain, fn_compression;
-	bool do_estimate, input_type, lossy, dont_die_on_error, line_by_line, only_do_unfinished;
-	int deflate_level, thresh_reliable, nr_threads;
+	bool do_estimate, input_type, lossy, dont_die_on_error, line_by_line, only_do_unfinished, eer_short;
+	int deflate_level, thresh_reliable, nr_threads, eer_upsampling, eer_grouping;
 	IOParser parser;
 
 	MetaDataTable MD;
 	Image<short> defects;
 	Image<float> gain;
-	int nn, ny, nx, mrc_mode;
+	int mrc_mode; // -99 for EER
 
 	void estimate(FileName fn_movie);
-	int decide_filter(int nx);
+	int decide_filter(int nx, bool isEER=false);
 
 	template <typename T>
 	void unnormalise(FileName fn_movie, FileName fn_tiff);

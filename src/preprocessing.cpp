@@ -333,7 +333,7 @@ void Preprocessing::joinAllStarFiles()
 				MetaDataTable MDonestack;
 				MDonestack.read(fn_star);
 
-				if (!compareLabels(MDout, MDonestack))
+				if (MDout.numberOfObjects() > 0 && !compareLabels(MDout, MDonestack))
 				{
 					std::cout << "The STAR file " << fn_star << " contains a column not present in others. Missing values will be filled by default values (0 or empty string)" << std::endl;
 					MDout.addMissingLabels(&MDonestack);
@@ -873,6 +873,9 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 			Fctf.resize(YSIZE(FT), XSIZE(FT));
 			// do_abs, phase_flip, intact_first_peak, damping, padding
 			// 190802 TAKANORI: The original code using getCTF was do_damping=false, but for consistency with Polishing, I changed it.
+			// The boxsize in ObsModel has been updated above.
+			// In contrast to Polish, we premultiply particle BEFORE down-sampling, so PixelSize in ObsModel is OK.
+			// But we are doing this after extraction, so there is not much merit...
 			ctf.getFftwImage(Fctf, my_extract_size, my_extract_size, my_angpix, false, do_phase_flip, do_ctf_intact_first_peak, true, false);
 
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(FT)
@@ -885,7 +888,7 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 			if (extract_size != premultiply_ctf_extract_size)
 			{
 				Ipart().window(FIRST_XMIPP_INDEX(extract_size), FIRST_XMIPP_INDEX(extract_size),
-						LAST_XMIPP_INDEX(extract_size),  LAST_XMIPP_INDEX(extract_size));
+				               LAST_XMIPP_INDEX(extract_size),  LAST_XMIPP_INDEX(extract_size));
 			}
 		}
 

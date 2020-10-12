@@ -243,10 +243,20 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 # ----------------------------------  and build flags including MKL and TBB ---------
 
 message(STATUS "CMAKE_CXX_COMPILER_ID : ${CMAKE_CXX_COMPILER_ID}")
+
+if(MKLFFT)
+    if (NOT "$ENV{MKLROOT}" STREQUAL "")
+        include_directories("$ENV{MKLROOT}/include/fftw")
+        message(STATUS "MKL FFTW wrapper header files: $ENV{MKLROOT}/include/fftw")
+    else()
+        message("COMPILATION MAY FAIL since no MKL FFTW wrapper header files could be found. Please make sure the MKLROOT environmental variable is set.")
+    endif()
+    add_definitions(-DMKLFFT)
+endif(MKLFFT)
+
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
     if(MKLFFT)
         SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fopenmp -mkl -limf ")
-    	add_definitions(-DMKLFFT)
     endif(MKLFFT)
     if(ALTCPU)
         add_definitions(-DFAST_CENTERFFT)
@@ -260,7 +270,6 @@ else()
     if(MKLFFT)
         # For the time being, let's use the sequential version (as with FFTW)
         SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lmkl_intel_ilp64 -lmkl_core -lmkl_sequential ")
-        add_definitions(-DMKLFFT)
     endif(MKLFFT)
 endif()
 
@@ -421,8 +430,14 @@ ADD_SUBDIRECTORY(src/apps)
 # -----------------------------------------------------------------------------TESTS--
 # Include testing flag(s) as precomiler 
 # definitions and include test directives
-enable_testing()
-include(${CMAKE_SOURCE_DIR}/tests/RelionTests.cmake)
+#enable_testing()
+#include(${CMAKE_SOURCE_DIR}/tests/RelionTests.cmake)
+
+option(BUILD_TESTS "Build and configure tests" OFF)
+if(BUILD_TESTS)
+    include(CTest)
+    add_subdirectory(tests)
+endif()
 
 # ----------------------------------------------------------PRINT OUT ALL CMAKE VARS--
 #get_cmake_property(_variableNames VARIABLES)
