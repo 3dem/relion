@@ -1484,7 +1484,6 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 	////////// Now see which jobs needs cleaning up
 	if (processList[this_job].type == PROC_MOTIONCORR)
 	{
-
 		for (int idir = 0; idir < fns_subdir.size(); idir++)
 		{
 			if (do_harsh)
@@ -1504,11 +1503,9 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 				fn_pattern.globFiles(fns_del, false);
 			}
 		}
-
 	} // end if motioncorr
 	else if (processList[this_job].type == PROC_CTFFIND)
 	{
-
 		fn_pattern = processList[this_job].name + "gctf*.out";
 		fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
 		fn_pattern = processList[this_job].name + "gctf*.err";
@@ -1522,18 +1519,15 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 	} // end if ctffind
 	else if (processList[this_job].type == PROC_AUTOPICK)
 	{
-
 		for (int idir = 0; idir < fns_subdir.size(); idir++)
 		{
 			// remove the Spider files with the FOM maps
 			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*.spi";
 			fn_pattern.globFiles(fns_del, false);
 		}
-
 	} // end if autopick
 	else if (processList[this_job].type == PROC_EXTRACT)
 	{
-
 		for (int idir = 0; idir < fns_subdir.size(); idir++)
 		{
 			if (do_harsh)
@@ -1548,7 +1542,6 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 				fn_pattern.globFiles(fns_del, false);
 			}
 		}
-
 	} // end if extract
 	else if (processList[this_job].type == PROC_2DCLASS ||
 	         processList[this_job].type == PROC_3DCLASS ||
@@ -1556,7 +1549,6 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 	         processList[this_job].type == PROC_INIMODEL ||
 	         processList[this_job].type == PROC_MULTIBODY)
 	{
-
 		// First find the _data.star from each iteration
 		std::vector<FileName> fns_iter;
 		fn_pattern = processList[this_job].name + "run_it[0-9][0-9][0-9]_data.star";
@@ -1595,28 +1587,39 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 				fn_pattern = processList[this_job].name + "analyse_component???_bin???.mrc";
 				fn_pattern.globFiles(fns_del, false);
 			}
-
 		} //end loop over ifile (i.e. the _data.star files from all iterations)
-
 	} // end if refine job
 	else if (processList[this_job].type == PROC_CTFREFINE)
 	{
-
 		for (int idir = 0; idir < fns_subdir.size(); idir++)
 		{
 			// remove the temporary output files
-			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_wAcc.mrc";
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_wAcc_optics-group*.mrc";
 			fn_pattern.globFiles(fns_del, false);
-			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_xyAcc_real.mrc";
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_xyAcc_optics-group*.mrc";
 			fn_pattern.globFiles(fns_del, false);
-			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_xyAcc_imag.mrc";
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_aberr-Axx_optics-group_*.mrc";
+			fn_pattern.globFiles(fns_del, false);
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_aberr-Axx_optics-group_*.mrc";
+			fn_pattern.globFiles(fns_del, false);
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_aberr-Axy_optics-group_*.mrc";
+			fn_pattern.globFiles(fns_del, false);
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_aberr-Ayy_optics-group_*.mrc";
+			fn_pattern.globFiles(fns_del, false);
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_aberr-bx_optics-group_*.mrc";
+			fn_pattern.globFiles(fns_del, false);
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_aberr-by_optics-group_*.mrc";
+			fn_pattern.globFiles(fns_del, false);
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_mag_optics-group_*.mrc";
+			fn_pattern.globFiles(fns_del, false);
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_fit.star";
+			fn_pattern.globFiles(fns_del, false);
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_fit.eps";
 			fn_pattern.globFiles(fns_del, false);
 		}
-
 	} // end if ctf_refine
 	else if (processList[this_job].type == PROC_MOTIONREFINE)
 	{
-
 		for (int idir = 0; idir < fns_subdir.size(); idir++)
 		{
 			// remove the temporary output files
@@ -1635,26 +1638,20 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 				fn_pattern.globFiles(fns_del, false);
 			}
 		}
-
 	} // end if motion_refine
 	else if (processList[this_job].type == PROC_SUBTRACT)
 	{
-
 		if (do_harsh)
 		{
 			fn_pattern = processList[this_job].name + "subtracted.*";
 			fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
 		}
-
 	} // end if subtract
 	else if (processList[this_job].type == PROC_POST)
 	{
-
 		fn_pattern = processList[this_job].name + "*masked.mrc";
 		fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
-
 	} // end if postprocess
-
 
 	// Now actually move all the files
 	FileName fn_old_dir = "";
