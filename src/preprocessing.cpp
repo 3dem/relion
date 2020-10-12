@@ -328,7 +328,7 @@ void Preprocessing::joinAllStarFiles()
 		}
 
 		ObservationModel *myOutObsModel;
-		myOutObsModel = (fn_data == "") ? &obsModelMic : &obsModelPart;
+		myOutObsModel = (fn_data == "" || keep_ctf_from_micrographs) ? &obsModelMic : &obsModelPart;
 		RFLOAT my_angpix;
 		std::string optgroup_name;
 
