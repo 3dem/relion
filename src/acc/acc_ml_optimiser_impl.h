@@ -2026,6 +2026,20 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
+				if(baseMLO->is_som_iter) {
+					op.sum_weight_class[img_id].resize(baseMLO->mymodel.nr_classes, 0);
+
+					for (unsigned long exp_iclass = sp.iclass_min;
+					     exp_iclass <= sp.iclass_max; exp_iclass++) // TODO could use classStreams
+					{
+						if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) &&
+						    (FPCMasks[img_id][exp_iclass].weightNum > 0)) {
+							IndexedDataArray thisClassPassWeights(PassWeights[img_id], FPCMasks[img_id][exp_iclass]);
+							op.sum_weight_class[img_id][exp_iclass] = AccUtilities::getSumOnDevice(thisClassPassWeights.weights);
+						}
+					}
+				}
+
 				PassWeights[img_id].weights.cpToHost(); // note that the host-pointer is shared: we're copying to Mweight.
 
 
@@ -2808,9 +2822,68 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					accMLO->dataIs3D,
 					accMLO->classStreams[iclass]);
 
-			/*======================================================
-								BACKPROJECTION
-			======================================================*/
+			AAXA_pos += image_size;
+			classPos += orientation_num*translation_num;
+		}
+
+		/*======================================================
+							      SOM
+		======================================================*/
+
+		int nr_classes = baseMLO->mymodel.nr_classes;
+		std::vector<RFLOAT> class_sum_weight(nr_classes, baseMLO->is_som_iter ? 0 : op.sum_weight[img_id]);
+
+		if (baseMLO->is_som_iter)
+		{
+			std::vector<unsigned> s = SomGraph::arg_sort(op.sum_weight_class[img_id], false);
+			unsigned bpu = s[0];
+			unsigned sbpu = s[1];
+
+			baseMLO->wsum_model.som.add_edge_activity(bpu, sbpu);
+
+			class_sum_weight[bpu] = op.sum_weight_class[img_id][bpu];
+			thr_wsum_pdf_class[bpu] += 1;
+			baseMLO->wsum_model.som.add_node_activity(bpu);
+			baseMLO->mymodel.som.add_node_age(bpu);
+
+			std::vector<std::pair<unsigned, float> > weights = baseMLO->mymodel.som.get_neighbours(bpu);
+
+			for (int i = 0; i < weights.size(); i++) {
+				unsigned idx = weights[i].first;
+				float w = weights[i].second * baseMLO->som_neighbour_pull;
+				class_sum_weight[idx] = op.sum_weight_class[img_id][idx] / w;
+				thr_wsum_pdf_class[idx] += w;
+				baseMLO->wsum_model.som.add_node_activity(idx, w);
+				baseMLO->mymodel.som.add_node_age(idx, w);
+			}
+		}
+
+		/*======================================================
+							BACKPROJECTION
+		======================================================*/
+
+		classPos = 0;
+		for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
+		{
+
+			int iproj;
+			if (baseMLO->mymodel.nr_bodies > 1) iproj = ibody;
+			else                                iproj = iclass;
+
+			if((baseMLO->mymodel.pdf_class[iclass] == 0.) || (ProjectionData[img_id].class_entries[iclass] == 0))
+				continue;
+
+			if ( baseMLO->is_som_iter && class_sum_weight[iclass] == 0)
+				continue;
+
+			long unsigned orientation_num(ProjectionData[img_id].orientation_num[iclass]);
+
+			AccProjectorKernel projKernel = AccProjectorKernel::makeKernel(
+					accMLO->bundle->projectors[iproj],
+					op.local_Minvsigma2[img_id].xdim,
+					op.local_Minvsigma2[img_id].ydim,
+					op.local_Minvsigma2[img_id].zdim,
+					op.local_Minvsigma2[img_id].xdim - 1);
 
 #ifdef TIMING
 			if (op.part_id == baseMLO->exp_my_first_part_id)
@@ -2831,14 +2904,14 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				~ctfs,
 				translation_num,
 				(XFLOAT) op.significant_weight[img_id],
-				(XFLOAT) op.sum_weight[img_id],
+				(XFLOAT) (baseMLO->is_som_iter ? class_sum_weight[iclass] : op.sum_weight[img_id]),
 				~eulers[iclass],
 				op.local_Minvsigma2[img_id].xdim,
 				op.local_Minvsigma2[img_id].ydim,
 				op.local_Minvsigma2[img_id].zdim,
 				orientation_num,
 				accMLO->dataIs3D,
-				(baseMLO->do_sgd && !baseMLO->do_avoid_sgd),
+				(baseMLO->do_grad),
 				ctf_premultiplied,
 				accMLO->classStreams[iclass]);
 

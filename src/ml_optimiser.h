@@ -329,59 +329,64 @@ public:
 	// Number of particles to be processed simultaneously
 	int nr_pool;
 
-	//////////////// Stochastic gradient descent
-	bool do_sgd;
-
-	// Avoid problems with SGD patent in cryoSPARC: don't accumulate gradient, but do minibatch maximisation steps instead
-	bool do_avoid_sgd;
+	//////////////// Gradient optimisation
+	bool do_grad;
+	bool do_mom1;
+	bool do_mom2;
 
 	// Number of initial iterations at low resolution, and without annealing of references
-	int sgd_ini_iter;
+	int grad_ini_iter;
 
 	// Number of final iterations at high resolution, and without annealing of reference
-	int sgd_fin_iter;
+	int grad_fin_iter;
 
 	// Number of iterations between the initial and the final ones
-	// (during which a linear transform from sgd_ini_resol->sgd_fin_resol and sgd_ini_subset_size->sgd_fin_subset_size will be done)
-	int sgd_inbetween_iter;
+	// (during which a linear transform from grad_ini_resol->grad_fin_resol and grad_ini_subset_size->grad_fin_subset_size will be done)
+	int grad_inbetween_iter;
 
 	// Size of the subsets used in the initial iterations
-	int sgd_ini_subset_size;
+	int grad_ini_subset_size;
 
 	//Size of the subsets used in the final iterations
-	int sgd_fin_subset_size;
+	int grad_fin_subset_size;
+
+	// Effective size of subsets
+	int effective_setsize;
 
 	// The resolution in the initial iterations
-	RFLOAT sgd_ini_resol; // in A
+	RFLOAT grad_ini_resol; // in A
 
 	// The resolution in the final iterations
-	RFLOAT sgd_fin_resol; // in A
+	RFLOAT grad_fin_resol; // in A
 
 	// Skip annealing of multiple reference in SGD
-	// (by default refs are kept the same during sgd_nr_iter_initial and then slowly annealed during sgd_nr_iter_inbetween)
-	bool do_sgd_skip_anneal;
+	// (by default refs are kept the same during grad_nr_iter_initial and then slowly annealed during grad_nr_iter_inbetween)
+	bool do_grad_skip_anneal;
 
 	// Momentum update parameter
 	RFLOAT mu;
 
 	// Step size of the gradient updates
-	RFLOAT sgd_stepsize;
+	RFLOAT grad_stepsize;
+	RFLOAT grad_current_stepsize;
+	std::string grad_stepsize_scheme;
+
+	//Self-organizing map
+	bool do_init_blobs;
+	bool do_som;
+	bool is_som_iter;
+	int som_starting_nodes;
+	float som_connectivity;
+	float som_neighbour_pull;
+	float som_inactivity_threshold;
+
+	float class_inactivity_threshold;
 
 	// Size of the random subsets
 	long int subset_size;
 
 	// Every how many iterations should be written to disk when using subsets
-	int write_every_sgd_iter;
-
-	// Number of particles at which initial sigma2_fudge is reduced by 50%
-	long int sgd_sigma2fudge_halflife;
-
-	// Initial sigma2fudge for SGD
-	RFLOAT sgd_sigma2fudge_ini;
-
-	// derived from the above, so not given by user:
-	int sgd_inires_pix; // resolution in pixels at beginning of SGD
-	int sgd_finres_pix; // resolution in pixels at end of SGD
+	int write_every_grad_iter;
 
 	// Use subsets like in cisTEM to speed up 2D/3D classification
 	bool do_fast_subsets;
@@ -769,6 +774,14 @@ public:
 		asymmetric_padding(false),
 		maximum_significants(-1),
 		threadException(NULL),
+		do_init_blobs(false),
+		do_som(false),
+		is_som_iter(false),
+		som_starting_nodes(0),
+		som_connectivity(0),
+		som_inactivity_threshold(0),
+		som_neighbour_pull(0),
+		class_inactivity_threshold(0),
 #ifdef ALTCPU
 		tbbSchedulerInit(tbb::task_scheduler_init::deferred ),
 		mdlClassComplex(NULL),
@@ -894,6 +907,10 @@ public:
 	 * This is officially part of the maximization, but it is separated because of parallelisation issues.
 	 */
 	void maximizationReconstructClass(int iclass);
+
+	/* Update gradient related parameters, returns class index that should be skipped during SOM
+	 */
+	int maximizationGradientParameters();
 
 	/* Updates all other model parameters (besides the reconstructions)
 	 */
@@ -1024,8 +1041,11 @@ public:
 	// Adjust angular sampling based on the expected angular accuracies for auto-refine procedure
 	void updateAngularSampling(bool verb = true);
 
-	// Adjust subset size in fast_subsets or SGD algorithms
+	// Adjust subset size in fast_subsets or Gradient algorithms
 	void updateSubsetSize(bool verb = true);
+
+	// Adjust step size for the gradient algorithms
+	void updateStepSize();
 
 	// Check convergence for auto-refine procedure
 	// Also print convergence information to screen for auto-refine procedure

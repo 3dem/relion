@@ -1083,7 +1083,7 @@ void BackProjector::updateSSNRarrays(RFLOAT tau2_fudge,
 		else
 		{
 			std::cerr << " DIRECT_A1D_ELEM(sigma2, i)= " << DIRECT_A1D_ELEM(sigma2, i) << std::endl;
-			REPORT_ERROR("BackProjector::reconstruct: ERROR: unexpectedly small, yet non-zero sigma2 value, this should not happen...a");
+			REPORT_ERROR("BackProjector::reconstruct: ERROR: unexpectedly small, yet non-zero sigma2 value, this should not happen...");
 		}
 	}
 
@@ -1817,7 +1817,283 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			}
 		}
 	}
+}
 
+void BackProjector::reweightGrad(
+		MultidimArray<Complex> &mom1, RFLOAT lambda1,
+		MultidimArray<Complex> &mom2, RFLOAT lambda2,
+		bool init_mom)
+{
+	const int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
+
+	mom1.setXmippOrigin();
+	mom1.xinit = 0;
+	mom2.setXmippOrigin();
+	mom2.xinit = 0;
+
+	RFLOAT eps = 1e-12;
+
+    FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
+	{
+        const int r2 = k * k + i * i + j * j;
+		if (r2 < max_r2)
+		{
+			if (init_mom)
+			{
+				if (lambda1 > 0.)
+				{
+					A3D_ELEM(mom1, k, i, j).real = 0;
+					A3D_ELEM(mom1, k, i, j).imag = 0;
+				}
+				if (lambda2 > 0.)
+				{
+					A3D_ELEM(mom2, k, i, j).real = eps;
+                    A3D_ELEM(mom2, k, i, j).imag = eps;
+				}
+			}
+
+			Complex g = 0;
+
+			if (A3D_ELEM(weight, k, i, j) > 0.)
+				g = A3D_ELEM(data, k, i, j) / A3D_ELEM(weight, k, i, j);
+			else
+			{
+				A3D_ELEM(data, k, i, j) = 0;
+				continue; //We only update moments if any information was added (weight > 0.)
+			}
+
+			if (lambda1 > 0.)
+			{
+				Complex m = lambda1 * A3D_ELEM(mom1, k, i, j) +
+						(1-lambda1) * g;
+				A3D_ELEM(mom1, k, i, j) = m;
+				A3D_ELEM(data, k, i, j) = m;
+			}
+			else
+				A3D_ELEM(data, k, i, j) = g;
+
+			if (lambda2 > 0.) {
+				A3D_ELEM(mom2, k, i, j).real = lambda2 * A3D_ELEM(mom2, k, i, j).real +
+				                                      (1 - lambda2) * (g.real * g.real);
+				A3D_ELEM(mom2, k, i, j).imag = lambda2 * A3D_ELEM(mom2, k, i, j).imag +
+				                                      (1 - lambda2) * (g.imag * g.imag);
+			}
+		}
+	}
+    
+	// Mom2 shell-wise normalisation
+	if (lambda2 > 0.)
+	{
+	    MultidimArray<Complex> power_a(ori_size / 2 + 1);
+	    MultidimArray<Complex> power_b(ori_size / 2 + 1);
+	    
+        FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
+		{
+			const int r2 = k * k + i * i + j * j;
+			if (r2 < max_r2)
+			{
+				int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
+				Complex x = A3D_ELEM(data, k, i, j);
+				DIRECT_A1D_ELEM(power_a, ires) += (x.real * x.real) + (x.imag * x.imag);
+			}
+		}
+
+		grad_error_power.initZeros(ori_size / 2 + 1);
+		MultidimArray<RFLOAT> counter(grad_error_power);
+
+        FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
+        {
+			const int r2 = k * k + i * i + j * j;
+			if (r2 < max_r2)
+			{
+				int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
+
+				Complex x = A3D_ELEM(mom2, k, i, j);
+
+				A3D_ELEM(data, k, i, j).real /= sqrt(x.real) + eps;
+				A3D_ELEM(data, k, i, j).imag /= sqrt(x.imag) + eps;
+
+				// Store power to later be used in FSC regularization
+				DIRECT_A1D_ELEM(grad_error_power, ires) += sqrt(x.real) + sqrt(x.imag);
+				DIRECT_A1D_ELEM(counter, ires) += 2; // Real and imag
+
+				x = A3D_ELEM(data, k, i, j);
+				DIRECT_A1D_ELEM(power_b, ires) += (x.real * x.real) + (x.imag * x.imag);
+			}
+        }
+
+        RFLOAT L = 1;
+        FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
+        {
+			const int r2 = k * k + i * i + j * j;
+			if (r2 < max_r2)
+			{
+				int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
+				RFLOAT a = DIRECT_A1D_ELEM(power_a, ires);
+				RFLOAT b = DIRECT_A1D_ELEM(power_b, ires);
+				A3D_ELEM(data, k, i, j) *= sqrt((a*L + b*(1-L)) / (b + eps));
+			}
+        }
+
+		//Average power spectra and calculate FSC estimate
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(counter)
+		{
+			if (DIRECT_A1D_ELEM(counter, i) > 0.)
+				DIRECT_A1D_ELEM(grad_error_power, i) /= DIRECT_A1D_ELEM(counter, i);
+		}
+	}
+}
+
+void BackProjector::reconstructGrad(
+		MultidimArray<RFLOAT> &vol_out, //Should be const
+        RFLOAT grad_stepsize,
+		RFLOAT tau2_fudge,
+        const MultidimArray<RFLOAT> &fsc,
+		bool use_fsc,
+		bool printTimes)
+{
+
+	const int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
+	RFLOAT oversampling_correction = (ref_dim == 3) ? (padding_factor * padding_factor * padding_factor) : (padding_factor * padding_factor);
+
+	// Calculate Fourier transform of the current reference in the same way as done in the E-step
+	MultidimArray<RFLOAT> dummy;
+	Projector PPref(ori_size, interpolator, padding_factor, r_min_nn, data_dim);
+	PPref.computeFourierTransformMap(vol_out, dummy, r_max*2, 1, false); // false means no gridding correction
+
+//#define DEBUG_NGD
+#ifdef DEBUG_NGD
+	std::cerr << " oversampling_correction= " << oversampling_correction << std::endl;
+	std::cerr << " subset_size= " << subset_size << std::endl;
+	std::cerr << " pad_size= " << pad_size << " PPref.pad_size= " << PPref.pad_size << std::endl;
+	std::cerr << " r_max= " << r_max << " PPref.r_max= " << PPref.r_max << std::endl;
+	std::cerr << "PPref.data "; PPref.data.printShape(std::cerr);
+	std::cerr << "data "; data.printShape(std::cerr);
+	std::cerr << "weight "; weight.printShape(std::cerr);
+	std::cerr << "Fconv "; Fconv.printShape(std::cerr);
+#endif
+
+//#define WRITE_DIFF
+#ifdef WRITE_DIFF
+	MultidimArray<Complex> Fdiff_cen(PPref.data);
+#endif
+
+
+    //---------------------- FSC estimate ----------------------//
+
+    MultidimArray<RFLOAT> fsc_spectrum;
+
+	if (use_fsc)
+		fsc_spectrum = fsc;
+	else
+	{
+	    MultidimArray<RFLOAT> prev_power;
+	    prev_power.initZeros(ori_size / 2 + 1);
+	    MultidimArray<RFLOAT> diff_power(prev_power);
+	    MultidimArray<RFLOAT> counter(prev_power);
+	    fsc_spectrum.initZeros(ori_size / 2 + 1);
+
+	    // First get average Delta^2 from the accumulated gradient in data and weight
+        FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
+        {
+            const int r2 = k * k + i * i + j * j;
+			if (r2 <= max_r2)
+			{
+				int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
+				DIRECT_A1D_ELEM(prev_power, ires) += sqrt(norm(A3D_ELEM(PPref.data, k, i, j)));
+				DIRECT_A1D_ELEM(diff_power, ires) += sqrt(norm(A3D_ELEM(data, k, i, j)));
+				DIRECT_A1D_ELEM(counter, ires) += 1;
+			}
+		}
+
+		//Average power spectra and calculate FSC estimate
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(counter)
+		{
+			RFLOAT prev = 0.;
+			RFLOAT diff = 0.;
+			RFLOAT myfsc = 0.;
+
+			if (DIRECT_A1D_ELEM(counter, i) > 0.)
+			{
+				prev = DIRECT_A1D_ELEM(prev_power, i) / DIRECT_A1D_ELEM(counter, i);
+//				diff = DIRECT_A1D_ELEM(diff_power, i) / DIRECT_A1D_ELEM(counter, i);
+				diff = DIRECT_A1D_ELEM(grad_error_power, i);
+				myfsc = prev / (prev + diff/tau2_fudge);
+
+#ifdef DEBUG_NGD
+				std::cerr << i << " prev= " << prev
+						   << " diff= " << diff
+						   << " fsc= " << myfsc << std::endl;
+#endif
+				DIRECT_A1D_ELEM(fsc_spectrum, i) = myfsc;
+			}
+		}
+
+		// Always keep fsc(0) to 1
+	    DIRECT_A1D_ELEM(fsc_spectrum, 0) = 1.;
+	}
+
+    //---------------------- Make gradient update ----------------------//
+	
+	if (!use_fsc) //Aleady incorporated fudge factor if FCS is estimated
+		tau2_fudge = 1.;
+
+	FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
+	{
+		const int r2 = k * k + i * i + j * j;
+		if (r2 < max_r2)
+		{
+			int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
+
+#ifdef WRITE_DIFF
+			if (A3D_ELEM(weight, k, i, j) > 1e-20)
+				A3D_ELEM(Fdiff_cen, k, i, j) = (A3D_ELEM(data, k, i, j) ) / (A3D_ELEM(weight, k, i, j) );
+			else
+				A3D_ELEM(Fdiff_cen, k, i, j) = 0.;
+#endif
+
+			RFLOAT fsc = DIRECT_A1D_ELEM(fsc_spectrum, ires);
+			Complex Fgrad = fsc * A3D_ELEM(data, k, i, j) - (1. - fsc) / tau2_fudge * A3D_ELEM(PPref.data, k, i, j);
+			A3D_ELEM(PPref.data, k, i, j) += grad_stepsize * Fgrad;
+		}
+	}
+
+#ifdef WRITE_DIFF
+	Projector::decenter(Fdiff_cen, Fconv, max_r2);
+	Image<RFLOAT> Idiff;
+	windowToOridimRealSpace(transformer, Idiff(), printTimes);
+	Idiff.write("diff.spi");
+	transformer.setReal(vol_out);
+#endif
+
+
+	// Set Fconv to the right size
+	if (ref_dim == 2) {
+		vol_out.setDimensions(pad_size, pad_size, 1, 1);
+	}
+	else {
+		// Too costly to actually allocate the space
+		// Trick transformer with the right dimensions
+		vol_out.setDimensions(pad_size, pad_size, pad_size, 1);
+	}
+
+	FourierTransformer transformer;
+	transformer.setReal(vol_out); // Fake set real. 1. Allocate space for Fconv 2. calculate plans.
+	MultidimArray<Complex>& Fconv = transformer.getFourierReference();
+
+	// Now do inverse FFT and window to original size in real-space
+	// Pass the transformer to prevent making and clearing a new one before clearing the one declared above....
+	// The latter may give memory problems as detected by electric fence....
+	Projector::decenter(PPref.data, Fconv, max_r2);
+	RCTIC(ReconTimer,ReconS_17);
+	windowToOridimRealSpace(transformer, vol_out, printTimes);
+	RCTOC(ReconTimer,ReconS_17);
+
+#ifdef DEBUG_NGD
+	Image<RFLOAT> Itmp;
+	Itmp()=vol_out;
+	Itmp.write("debug.spi");
+#endif
 }
 
 void BackProjector::symmetrise(int nr_helical_asu, RFLOAT helical_twist, RFLOAT helical_rise, int threads)

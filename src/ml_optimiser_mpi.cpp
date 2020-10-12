@@ -724,7 +724,7 @@ void MlOptimiserMpi::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFL
 
 	// First calculate the sum of all individual power spectra on each subset
 	MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(Mavg, node->rank == 1);
-
+	std::cerr << "RANK: " << node->rank << std::endl;
 	if (pipeline_control_check_abort_job())
 		MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
 
@@ -843,7 +843,7 @@ void MlOptimiserMpi::expectation()
 	// C. Calculate expected angular errors
 	// Do not do this for maxCC
 	// Only the first (reconstructing) slave (i.e. from half1) calculates expected angular errors
-	if (!(iter==1 && do_firstiter_cc) && !(do_skip_align || do_skip_rotate) && !do_sgd)
+	if (!(iter==1 && do_firstiter_cc) && !(do_skip_align || do_skip_rotate) && !do_grad)
 	{
 		int my_nr_images, length_fn_ctf;
 		if (node->isMaster())
@@ -886,10 +886,8 @@ void MlOptimiserMpi::expectation()
 		timer.tic(TIMING_EXP_3);
 #endif
 	// D. Update the angular sampling (all nodes except master)
-	if (!node->isMaster() && ( (do_auto_refine || do_sgd) && iter > 1) || (mymodel.nr_classes > 1 && allow_coarser_samplings) )
-	{
+	if (!node->isMaster() && ( do_auto_refine && iter > 1 || (mymodel.nr_classes > 1 && allow_coarser_samplings) ))
 		updateAngularSampling(node->rank == 1);
-	}
 
 	// The master needs to know about the updated parameters from updateAngularSampling
 	node->relion_MPI_Bcast(&has_fine_enough_angular_sampling, 1, MPI_INT, first_slave, MPI_COMM_WORLD);
@@ -932,7 +930,7 @@ void MlOptimiserMpi::expectation()
 
 		// F. Precalculate AB-matrices for on-the-fly shifts
 		// Use tabulated sine and cosine values instead for 2D helical segments / 3D helical sub-tomogram averaging with on-the-fly shifts
-		if ( (do_shifts_onthefly) && (!((do_helical_refine) && (!ignore_helical_symmetry)))  && !(do_sgd && iter > 1))
+		if ( (do_shifts_onthefly) && (!((do_helical_refine) && (!ignore_helical_symmetry)))  && !(do_grad && iter > 1))
 			precalculateABMatrices();
 	}
 	// Slave 1 sends has_converged to everyone else (in particular the master needs it!)
@@ -1129,9 +1127,9 @@ void MlOptimiserMpi::expectation()
 
 			if (verb > 0)
 			{
-				if (do_sgd)
+				if (do_grad)
 				{
-					std::cout << " Stochastic Gradient Descent iteration " << iter << " of " << nr_iter;
+					std::cout << " Variable-metric Gradient Descent iteration " << iter << " of " << nr_iter;
 				}
 				else
 				{
@@ -2013,6 +2011,8 @@ void MlOptimiserMpi::maximization()
 		init_progress_bar(mymodel.nr_classes);
 	}
 
+	int skip_class = maximizationGradientParameters();
+
 	RFLOAT helical_twist_half1, helical_rise_half1, helical_twist_half2, helical_rise_half2;
 	helical_twist_half1 = helical_twist_half2 = helical_twist_initial;
 	helical_rise_half1 = helical_rise_half2 = helical_rise_initial;
@@ -2047,8 +2047,6 @@ void MlOptimiserMpi::maximization()
 
 						MultidimArray<RFLOAT> Iref_old;
 
-						if(do_sgd) Iref_old = mymodel.Iref[ith_recons];
-
 						(wsum_model.BPref[ith_recons]).updateSSNRarrays(mymodel.tau2_fudge_factor,
 								mymodel.tau2_class[ith_recons],
 								mymodel.sigma2_class[ith_recons],
@@ -2078,40 +2076,28 @@ void MlOptimiserMpi::maximization()
 						}
 						else
 						{
-							(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons],
-								gridding_nr_iter,
-								do_map,
-								mymodel.tau2_class[ith_recons],
-								mymodel.tau2_fudge_factor,
-								wsum_model.pdf_class[iclass],
-								minres_map,
-								false
-							);
-						}
-						if (do_sgd)
-						{
-
-							// Use stochastic expectation maximisation, instead of SGD.
-							if (do_avoid_sgd)
+							if(do_grad)
 							{
-								if (iter < sgd_ini_iter)
-								{
-									FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Iref[ith_recons])
-									{
-										DIRECT_MULTIDIM_ELEM(mymodel.Iref[ith_recons], n) = XMIPP_MAX(0., DIRECT_MULTIDIM_ELEM(mymodel.Iref[ith_recons], n));
-									}
-								}
-								mymodel.Iref[ith_recons] = mymodel.Iref[ith_recons] - Iref_old;
+								(wsum_model.BPref[ith_recons]).reconstructGrad(
+										mymodel.Iref[ith_recons],
+										grad_current_stepsize,
+										mymodel.tau2_fudge_factor,
+										mymodel.fsc_halves_class[ith_recons],
+										do_split_random_halves,
+										node->rank==1);
 							}
-
-							// Now update formula: dV_kl^(n) = (mu) * dV_kl^(n-1) + (1-mu)*step_size*G_kl^(n)
-							// where G_kl^(n) is now in mymodel.Iref[iclass]!!!
-							FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Igrad[ith_recons])
-								DIRECT_MULTIDIM_ELEM(mymodel.Igrad[ith_recons], n) = mu * DIRECT_MULTIDIM_ELEM(mymodel.Igrad[ith_recons], n) +
-										(1. - mu) * sgd_stepsize * DIRECT_MULTIDIM_ELEM(mymodel.Iref[ith_recons], n);
-
-							// update formula: V_kl^(n+1) = V_kl^(n) + dV_kl^(n)
-							mymodel.Iref[ith_recons] = Iref_old + mymodel.Igrad[ith_recons];
+							else
+							{
+								(wsum_model.BPref[ith_recons]).reconstruct(
+										mymodel.Iref[ith_recons],
+										gridding_nr_iter,
+										do_map,
+										mymodel.tau2_class[ith_recons],
+										mymodel.tau2_fudge_factor,
+										wsum_model.pdf_class[iclass],
+										minres_map,
+										false);
+							}
 						}
 					}
 
@@ -2194,13 +2180,6 @@ void MlOptimiserMpi::maximization()
 						// Rank 2 does not need to do the joined reconstruction
 						if (!do_join_random_halves)
 						{
-							MultidimArray<RFLOAT> Iref_old;
-							if(do_sgd)
-							{
-								Iref_old = mymodel.Iref[ith_recons];
-							}
-
-
 							(wsum_model.BPref[ith_recons]).updateSSNRarrays(mymodel.tau2_fudge_factor,
 									mymodel.tau2_class[ith_recons],
 									mymodel.sigma2_class[ith_recons],
@@ -2229,39 +2208,27 @@ void MlOptimiserMpi::maximization()
 							}
 							else
 							{
-								(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons],
-										gridding_nr_iter,
-										do_map,
-										mymodel.tau2_class[ith_recons],
-										mymodel.tau2_fudge_factor,
-										wsum_model.pdf_class[iclass],
-										minres_map,
-										false);
-							}
-
-							if (do_sgd)
-							{
-								// Use stochastic expectation maximisation, instead of SGD.
-								if(do_avoid_sgd)
+								if(do_grad)
 								{
-									if (iter < sgd_ini_iter)
-									{
-										FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Iref[ith_recons])
-										{
-											DIRECT_MULTIDIM_ELEM(mymodel.Iref[ith_recons], n) = XMIPP_MAX(0., DIRECT_MULTIDIM_ELEM(mymodel.Iref[ith_recons], n));
-										}
-									}
-									mymodel.Iref[ith_recons] = mymodel.Iref[ith_recons] - Iref_old;
+									(wsum_model.BPref[ith_recons]).reconstructGrad(
+											mymodel.Iref[ith_recons],
+											grad_current_stepsize,
+											mymodel.tau2_fudge_factor,
+											mymodel.fsc_halves_class[ith_recons],
+											do_split_random_halves,
+											false);
 								}
-
-								// Now update formula: dV_kl^(n) = (mu) * dV_kl^(n-1) + (1-mu)*step_size*G_kl^(n)
-								// where G_kl^(n) is now in mymodel.Iref[iclass]!!!
-								FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Igrad[ith_recons])
-									DIRECT_MULTIDIM_ELEM(mymodel.Igrad[ith_recons], n) = mu * DIRECT_MULTIDIM_ELEM(mymodel.Igrad[ith_recons], n) +
-											(1. - mu) * sgd_stepsize * DIRECT_MULTIDIM_ELEM(mymodel.Iref[ith_recons], n);
-
-								// update formula: V_kl^(n+1) = V_kl^(n) + dV_kl^(n)
-								mymodel.Iref[ith_recons] = Iref_old + mymodel.Igrad[ith_recons];
+								else
+								{
+									(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons],
+											gridding_nr_iter,
+											do_map,
+											mymodel.tau2_class[ith_recons],
+											mymodel.tau2_fudge_factor,
+											wsum_model.pdf_class[iclass],
+											minres_map,
+											false);
+								}
 							}
 
 							// Apply the body mask
@@ -2331,11 +2298,8 @@ void MlOptimiserMpi::maximization()
 			else
 			{
 				// When not doing SGD, initialise to zero, but when doing SGD just keep the previous reference
-				if (!do_sgd)
+				if (!do_grad)
 					mymodel.Iref[ith_recons].initZeros();
-				// When doing SGD also re-initialise the gradient to zero
-				if (do_sgd)
-					mymodel.Igrad[ith_recons].initZeros();
 			}
 			RCTOC(timer,RCT_1);
 //#define DEBUG_RECONSTRUCT
@@ -2390,6 +2354,12 @@ void MlOptimiserMpi::maximization()
 									std::cerr << "ihalfset= "<<ihalfset<<" Sending iclass="<<iclass<<" Sending ibody="<<ibody<<" from node "<<reconstruct_rank<<" to node "<<recv_node << std::endl;
 #endif
 									node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.Iref[ith_recons]), MULTIDIM_SIZE(mymodel.Iref[ith_recons]), MY_MPI_DOUBLE, recv_node, MPITAG_IMAGE, MPI_COMM_WORLD);
+									
+									if (do_mom1)
+										node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.Igrad1[ith_recons]), MULTIDIM_SIZE(mymodel.Igrad1[ith_recons]), MY_MPI_DOUBLE, recv_node, MPITAG_IMAGE, MPI_COMM_WORLD);
+									if (do_mom2)
+										node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.Igrad1[ith_recons]), MULTIDIM_SIZE(mymodel.Igrad1[ith_recons]), MY_MPI_DOUBLE, recv_node, MPITAG_IMAGE, MPI_COMM_WORLD);
+									
 									node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[ith_recons]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[ith_recons]), MY_MPI_DOUBLE, recv_node, MPITAG_METADATA, MPI_COMM_WORLD);
 									node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.fourier_coverage_class[ith_recons]), MULTIDIM_SIZE(mymodel.fourier_coverage_class[ith_recons]), MY_MPI_DOUBLE, recv_node, MPITAG_METADATA, MPI_COMM_WORLD);
 									node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.sigma2_class[ith_recons]), MULTIDIM_SIZE(mymodel.sigma2_class[ith_recons]), MY_MPI_DOUBLE, recv_node, MPITAG_RFLOAT, MPI_COMM_WORLD);
@@ -2398,6 +2368,12 @@ void MlOptimiserMpi::maximization()
 								else if (node->rank != reconstruct_rank && node->rank == recv_node)
 								{
 									node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.Iref[ith_recons]), MULTIDIM_SIZE(mymodel.Iref[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_IMAGE, MPI_COMM_WORLD, status);
+									
+									if (do_mom1)
+										node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.Igrad1[ith_recons]), MULTIDIM_SIZE(mymodel.Igrad1[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_IMAGE, MPI_COMM_WORLD, status);
+									if (do_mom2)
+										node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.Igrad2[ith_recons]), MULTIDIM_SIZE(mymodel.Igrad2[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_IMAGE, MPI_COMM_WORLD, status);
+										
 									node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[ith_recons]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_METADATA, MPI_COMM_WORLD, status);
 									node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.fourier_coverage_class[ith_recons]), MULTIDIM_SIZE(mymodel.fourier_coverage_class[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_METADATA, MPI_COMM_WORLD, status);
 									node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.sigma2_class[ith_recons]), MULTIDIM_SIZE(mymodel.sigma2_class[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_RFLOAT, MPI_COMM_WORLD, status);
@@ -2421,9 +2397,12 @@ void MlOptimiserMpi::maximization()
 				// Broadcast the reconstructed references to all other MPI nodes
 				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Iref[ith_recons]),
 						MULTIDIM_SIZE(mymodel.Iref[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
-				if (do_sgd)
-					node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Igrad[ith_recons]),
-						MULTIDIM_SIZE(mymodel.Igrad[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
+				if (do_mom1)
+					node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Igrad1[ith_recons]),
+						MULTIDIM_SIZE(mymodel.Igrad1[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
+				if (do_mom2)
+					node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Igrad2[ith_recons]),
+						MULTIDIM_SIZE(mymodel.Igrad2[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
 				// Broadcast the data_vs_prior spectra to all other MPI nodes
 				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[ith_recons]),
 						MULTIDIM_SIZE(mymodel.data_vs_prior_class[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
@@ -2443,8 +2422,8 @@ void MlOptimiserMpi::maximization()
 
 			// Re-set the origin (this may be lost in some cases??)
 			mymodel.Iref[ith_recons].setXmippOrigin();
-			if (do_sgd)
-				mymodel.Igrad[ith_recons].setXmippOrigin();
+			//if (do_grad)
+			//	mymodel.Igrad[ith_recons].setXmippOrigin();
 
 			// Aug05,2015 - Shaoda, helical symmetry refinement, broadcast refined helical parameters
 			if ( (iter > 1) && (do_helical_refine) && (!ignore_helical_symmetry) && (do_helical_symmetry_local_refinement) )
@@ -2642,7 +2621,7 @@ void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
 
 void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC()
 {
-	if (do_sgd || subset_size > 0)
+	if (do_grad || subset_size > 0)
 		REPORT_ERROR("BUG! You cannot do solvent-corrected FSCs and subsets!");
 
 	if (fn_mask == "")

@@ -113,7 +113,7 @@ void runBackProjectKernel(
 		int imgZ,
 		unsigned long imageCount,
 		bool data_is_3D,
-		bool do_sgd,
+		bool do_grad,
 		bool ctf_premultiplied,
 		cudaStream_t optStream);
 

@@ -317,7 +317,8 @@ enum EMDLabel
 	EMDL_MLMODEL_SIGMA_TILT,
 	EMDL_MLMODEL_SIGMA_PSI,
 	EMDL_MLMODEL_REF_IMAGE,
-	EMDL_MLMODEL_SGD_GRADIENT_IMAGE,
+	EMDL_MLMODEL_GRADIENT_MOMENT1_IMAGE,
+	EMDL_MLMODEL_GRADIENT_MOMENT2_IMAGE,
 	EMDL_MLMODEL_SIGMA2_NOISE,
 	EMDL_MLMODEL_SIGMA2_REF,
 	EMDL_MLMODEL_SSNR_REF,
@@ -348,7 +349,7 @@ enum EMDLabel
 	EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT,
 	EMDL_OPTIMISER_DO_REALIGN_MOVIES,
 	EMDL_OPTIMISER_DO_MAP,
-	EMDL_OPTIMISER_DO_SGD,
+	EMDL_OPTIMISER_DO_GRAD,
 	EMDL_OPTIMISER_DO_STOCHASTIC_EM,
 	EMDL_OPTIMISER_EXTERNAL_RECONS_DATA_REAL,
 	EMDL_OPTIMISER_EXTERNAL_RECONS_DATA_IMAG,
@@ -918,7 +919,8 @@ private:
 		EMDL::addLabel(EMDL_MLMODEL_POWER_REF, EMDL_DOUBLE, "rlnReferenceSpectralPower", "Spherical average of the power of the reference");
 		EMDL::addLabel(EMDL_MLMODEL_PRIOR_MODE, EMDL_INT, "rlnOrientationalPriorMode", "Mode for prior distributions on the orientations (0=no prior; 1=(rot,tilt,psi); 2=(rot,tilt); 3=rot; 4=tilt; 5=psi) ");
 		EMDL::addLabel(EMDL_MLMODEL_REF_IMAGE, EMDL_STRING, "rlnReferenceImage", "Name of a reference image");
-		EMDL::addLabel(EMDL_MLMODEL_SGD_GRADIENT_IMAGE, EMDL_STRING, "rlnSGDGradientImage", "Name of image containing the SGD gradient");
+		EMDL::addLabel(EMDL_MLMODEL_GRADIENT_MOMENT1_IMAGE, EMDL_STRING, "rlnGradMoment1", "Name of image containing the first moment of the gradient");
+		EMDL::addLabel(EMDL_MLMODEL_GRADIENT_MOMENT2_IMAGE, EMDL_STRING, "rlnGradMoment2", "Name of image containing the second moment of the gradient");
 		EMDL::addLabel(EMDL_MLMODEL_SIGMA_OFFSET, EMDL_DOUBLE, "rlnSigmaOffsets","Standard deviation in the origin offsets (in pixels)");
 		EMDL::addLabel(EMDL_MLMODEL_SIGMA_OFFSET_ANGSTROM, EMDL_DOUBLE, "rlnSigmaOffsetsAngst","Standard deviation in the origin offsets (in Angstroms)");
 		EMDL::addLabel(EMDL_MLMODEL_SIGMA2_NOISE, EMDL_DOUBLE, "rlnSigma2Noise", "Spherical average of the standard deviation in the noise (sigma)");
@@ -952,7 +954,7 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT, EMDL_BOOL, "rlnDoExternalReconstruct", "Flag to indicate that the reconstruction will be performed outside relion_refine, e.g. for learned priors");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_REALIGN_MOVIES, EMDL_BOOL, "rlnDoRealignMovies", "Flag to indicate that individual frames of movies are being re-aligned");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_MAP, EMDL_BOOL, "rlnDoMapEstimation", "Flag to indicate that MAP estimation should be performed (otherwise ML estimation)");
-		EMDL::addLabel(EMDL_OPTIMISER_DO_SGD, EMDL_BOOL, "rlnDoStochasticGradientDescent", "Flag to indicate that SGD-optimisation should be performed (otherwise expectation maximisation)");
+		EMDL::addLabel(EMDL_OPTIMISER_DO_GRAD, EMDL_BOOL, "rlnDoStochasticGradientDescent", "Flag to indicate that SGD-optimisation should be performed (otherwise expectation maximisation)");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_STOCHASTIC_EM,EMDL_BOOL, "rlnDoStochasticEM", "Flag to indicate that stochastic EM-optimisation should be performed (an alternative to SGD)");
 		EMDL::addLabel(EMDL_OPTIMISER_EXTERNAL_RECONS_DATA_REAL, EMDL_STRING, "rlnExtReconsDataReal", "Name of the map with the real components of the input data array for the external reconstruction program");
 		EMDL::addLabel(EMDL_OPTIMISER_EXTERNAL_RECONS_DATA_IMAG, EMDL_STRING, "rlnExtReconsDataImag", "Name of the map with the imaginary components of the input data array for the external reconstruction program");
