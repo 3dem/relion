@@ -2432,7 +2432,6 @@ void displayerGuiWindow::cb_display_i()
 			else
 			{
 				cl += " --sort " + (std::string)m2->label();
-				cl += " --text_label " + (std::string)m2->label();
 
 				if (getValue(reverse_sort_button))
 					cl += " --reverse ";
