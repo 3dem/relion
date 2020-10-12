@@ -2597,13 +2597,16 @@ the contribution of the experimental data and the prior. However, in practice on
 the experimental data to allow optimal results. Values greater than 1 for this regularisation parameter (T in the JMB2011 paper) put more \
 weight on the experimental data. Values around 2-4 have been observed to be useful for 3D refinements, values of 1-2 for 2D refinements. \
 Too small values yield too-low resolution structures; too high values result in over-estimated resolutions, mostly notable by the apparition of high-frequency noise in the references.");
+
+
 	joboptions["nr_iter"] = JobOption("Number of iterations:", 25, 1, 50, 1, "Number of iterations to be performed. \
 Note that the current implementation of 2D class averaging and 3D classification does NOT comprise a convergence criterium. \
 Therefore, the calculations will need to be stopped by the user if further iterations do not yield improvements in resolution or classes. \n\n \
 Also note that upon restarting, the iteration number continues to be increased, starting from the final iteration in the previous run. \
 The number given here is the TOTAL number of iterations. For example, if 10 iterations have been performed previously and one restarts to perform \
 an additional 5 iterations (for example with a finer angular sampling), then the number given here should be 10+5=15.");
-	joboptions["do_fast_subsets"] = JobOption("Use fast subsets (for large data sets)?", false, "If set to Yes, the first 5 iterations will be done with random subsets of only K*100 particles (K being the number of classes); the next 5 with K*300 particles, the next 5 with 30% of the data set; and the final ones with all data. This was inspired by a cisTEM implementation by Niko Grigorieff et al.");
+	joboptions["do_grad"] = JobOption("Use gradient-driven algorithm?", false, "If set to Yes, use the (faster&better?) NGrad algorithm instead of the defautl Expectation Maximization? If used, increase number of iterations to 200-250!");
+
 
 	joboptions["particle_diameter"] = JobOption("Mask diameter (A):", 200, 0, 1000, 10, "The experimental images will be masked with a soft \
 circular mask with this diameter. Make sure this radius is not set too small because that may mask away part of the signal! \
@@ -2753,12 +2756,16 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 	// Optimisation
 	command += " --iter " + joboptions["nr_iter"].getString();
 
+	if (joboptions["do_grad"].getBoolean())
+	{
+		command += " --grad --class_inactivity_threshold 0.1 ";
+		if (!is_continue) command += " --init_blobs";
+	}
+
 	command += " --tau2_fudge " + joboptions["tau_fudge"].getString();
         command += " --particle_diameter " + joboptions["particle_diameter"].getString();
 	if (!is_continue)
 	{
-		if (joboptions["do_fast_subsets"].getBoolean())
-			command += " --fast_subsets ";
 
 		command += " --K " + joboptions["nr_classes"].getString();
 		// Always flatten the solvent

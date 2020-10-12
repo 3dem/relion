@@ -1098,7 +1098,7 @@ void JobWindow::initialiseClass2DWindow()
 	current_y += STEPY/2;
 
 	place("nr_iter");
-	place("do_fast_subsets", TOGGLE_DEACTIVATE);
+	place("do_grad", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
