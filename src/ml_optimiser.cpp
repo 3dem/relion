@@ -220,13 +220,20 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	if (fnt != "OLD")
 		grad_ini_frac = textToFloat(fnt);
 
-	fnt = parser.getOption("--grad_ini_frac", "Fraction of iterations in the initial phase of refinement", "OLD");
-	if (fnt != "OLD")
-		grad_ini_frac = textToFloat(fnt);
-
 	fnt = parser.getOption("--grad_fin_frac", "Fraction of iterations in the final phase of refinement", "OLD");
 	if (fnt != "OLD")
 		grad_fin_frac = textToFloat(fnt);
+
+	if (grad_ini_frac <= 0 || 1 <= grad_ini_frac)
+		REPORT_ERROR("Invalid value for --grad_ini_frac.");
+	if (grad_fin_frac <= 0 || 1 <= grad_fin_frac)
+		REPORT_ERROR("Invalid value for --grad_fin_frac.");
+
+	if (grad_ini_frac + grad_fin_frac > 0.9) {
+		RFLOAT sum = grad_ini_frac + grad_fin_frac + 0.1;
+		grad_ini_frac /= sum;
+		grad_fin_frac /= sum;
+	}
 
 	grad_ini_iter = nr_iter * grad_ini_frac;
 	grad_fin_iter = nr_iter * grad_fin_frac;
@@ -257,6 +264,8 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	fnt = parser.getOption("--grad_write_iter", "Write out model every so many iterations in SGD", "OLD");
 	if (fnt != "OLD")
 		write_every_grad_iter = textToInteger(fnt);
+
+	class_inactivity_threshold = textToFloat(parser.getOption("--class_inactivity_threshold", "Replace classes with little activity during gradient based classification.", "OLD"));
 
 	do_join_random_halves = parser.checkOption("--join_random_halves", "Join previously split random halves again (typically to perform a final reconstruction).");
 
@@ -671,6 +680,16 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	grad_ini_frac = textToFloat(parser.getOption("--grad_ini_frac", "Fraction of iterations in the initial phase of refinement", "0.2"));
 	grad_fin_frac = textToFloat(parser.getOption("--grad_fin_frac", "Fraction of iterations in the final phase of refinement", "0.2"));
 
+	if (grad_ini_frac <= 0 || 1 <= grad_ini_frac)
+		REPORT_ERROR("Invalid value for --grad_ini_frac.");
+	if (grad_fin_frac <= 0 || 1 <= grad_fin_frac)
+		REPORT_ERROR("Invalid value for --grad_fin_frac.");
+
+	if (grad_ini_frac + grad_fin_frac > 0.9) {
+		RFLOAT sum = grad_ini_frac + grad_fin_frac + 0.1;
+		grad_ini_frac /= sum;
+		grad_fin_frac /= sum;
+	}
 	grad_ini_iter = nr_iter * grad_ini_frac;
 	grad_fin_iter = nr_iter * grad_fin_frac;
 	grad_inbetween_iter = nr_iter - grad_ini_iter - grad_fin_iter;
