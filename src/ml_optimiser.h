@@ -334,11 +334,17 @@ public:
 	bool do_mom1;
 	bool do_mom2;
 
-	// Number of initial iterations at low resolution, and without annealing of references
+	// Number of iterations in the initial phase of refinement
 	int grad_ini_iter;
 
-	// Number of final iterations at high resolution, and without annealing of reference
+	// Fraction of iterations in the initial phase of refinement
+	RFLOAT grad_ini_frac;
+
+	// Number of iterations in the final phase of refinement
 	int grad_fin_iter;
+
+	// Fraction of iterations in the initial phase of refinement
+	RFLOAT grad_fin_frac;
 
 	// Number of iterations between the initial and the final ones
 	// (during which a linear transform from grad_ini_resol->grad_fin_resol and grad_ini_subset_size->grad_fin_subset_size will be done)

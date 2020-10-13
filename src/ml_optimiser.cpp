@@ -216,17 +216,20 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 		particle_diameter = textToFloat(fnt);
 
 	// Gradient related
-	float ini_frac(0), fin_frac(0);
 	fnt = parser.getOption("--grad_ini_frac", "Fraction of iterations in the initial phase of refinement", "OLD");
 	if (fnt != "OLD")
-		ini_frac = textToFloat(fnt);
+		grad_ini_frac = textToFloat(fnt);
+
+	fnt = parser.getOption("--grad_ini_frac", "Fraction of iterations in the initial phase of refinement", "OLD");
+	if (fnt != "OLD")
+		grad_ini_frac = textToFloat(fnt);
 
 	fnt = parser.getOption("--grad_fin_frac", "Fraction of iterations in the final phase of refinement", "OLD");
 	if (fnt != "OLD")
-		fin_frac = textToFloat(fnt);
+		grad_fin_frac = textToFloat(fnt);
 
-	grad_ini_iter = nr_iter * ini_frac;
-	grad_fin_iter = nr_iter * fin_frac;
+	grad_ini_iter = nr_iter * grad_ini_frac;
+	grad_fin_iter = nr_iter * grad_fin_frac;
 	grad_inbetween_iter = nr_iter - grad_ini_iter - grad_fin_iter;
 	if (grad_inbetween_iter < 0)
 		grad_inbetween_iter = 0;
@@ -665,11 +668,11 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	}
 	// Stochastic EM is implemented as a variant of SGD, though it is really a different algorithm!
 
-	float ini_frac = textToFloat(parser.getOption("--grad_ini_frac", "Fraction of iterations in the initial phase of refinement", "0.2"));
-	float fin_frac = textToFloat(parser.getOption("--grad_fin_frac", "Fraction of iterations in the final phase of refinement", "0.3"));
+	grad_ini_frac = textToFloat(parser.getOption("--grad_ini_frac", "Fraction of iterations in the initial phase of refinement", "0.2"));
+	grad_fin_frac = textToFloat(parser.getOption("--grad_fin_frac", "Fraction of iterations in the final phase of refinement", "0.2"));
 
-	grad_ini_iter = nr_iter * ini_frac;
-	grad_fin_iter = nr_iter * fin_frac;
+	grad_ini_iter = nr_iter * grad_ini_frac;
+	grad_fin_iter = nr_iter * grad_fin_frac;
 	grad_inbetween_iter = nr_iter - grad_ini_iter - grad_fin_iter;
 	if (grad_inbetween_iter < 0)
 		grad_inbetween_iter = 0;
@@ -681,8 +684,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	mu = textToFloat(parser.getOption("--mu", "Momentum parameter for SGD updates", "0.9"));
 	grad_stepsize = textToFloat(parser.getOption("--grad_stepsize", "Step size parameter for gradient optimisation.", "0.1"));
 	grad_stepsize_scheme = parser.getOption("--grad_stepsize_scheme",
-			"Gradient step size updates scheme. Valid values are plain, 2step-<b> or <a>-3step-<b>. Where <a> is the initial inflate and <b> is the final deflate factor.",
-			"3-3step-2");
+			"Gradient step size updates scheme. Valid values are plain, <a>-2step or <a>-3step-<b>. Where <a> is the initial inflate and <b> is the final deflate factor.",
+			"3-2step");
 	write_every_grad_iter = textToInteger(parser.getOption("--grad_write_iter", "Write out model every so many iterations in SGD (default is writing out all iters)", "10"));
 	do_init_blobs = parser.checkOption("--init_blobs", "Initialize models with random Gaussians.");
 	do_som = parser.checkOption("--som", "Calculate self-organizing map instead of classification.");
@@ -938,12 +941,22 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	// New SGD (13Feb2018)
 	if (!MD.getValue(EMDL_OPTIMISER_DO_GRAD, do_grad))
 		do_grad = false;
-	if (!MD.getValue(EMDL_OPTIMISER_SGD_INI_ITER, grad_ini_iter))
-		grad_ini_iter = 50;
-	if (!MD.getValue(EMDL_OPTIMISER_SGD_FIN_ITER, grad_fin_iter))
-		grad_fin_iter = 50;
-	if (!MD.getValue(EMDL_OPTIMISER_SGD_INBETWEEN_ITER, grad_inbetween_iter))
-		grad_inbetween_iter = 200;
+	if (do_grad) {
+		do_mom1 = true;
+		do_mom2 = true;
+	}
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_STEPSIZE, grad_stepsize))
+		grad_stepsize = 0.1;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_STEPSIZE_SCHEME, grad_stepsize_scheme))
+		grad_stepsize_scheme = "3-2step";
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_INI_FRAC, grad_ini_frac)) {
+		grad_ini_frac = 0.2;
+		grad_ini_iter = nr_iter * grad_ini_frac;
+	}
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_FIN_FRAC, grad_fin_frac)) {
+		grad_fin_frac = 0.2;
+		grad_ini_iter = nr_iter * grad_fin_frac;
+	}
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_INI_RESOL, grad_ini_resol))
 		grad_ini_resol = 35.;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_FIN_RESOL, grad_fin_resol))
@@ -1137,9 +1150,8 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_FAST_SUBSETS, do_fast_subsets);
 		MD.setValue(EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT, do_external_reconstruct);
 		MD.setValue(EMDL_OPTIMISER_DO_GRAD, do_grad);
-		MD.setValue(EMDL_OPTIMISER_SGD_INI_ITER, grad_ini_iter);
-		MD.setValue(EMDL_OPTIMISER_SGD_FIN_ITER, grad_fin_iter);
-		MD.setValue(EMDL_OPTIMISER_SGD_INBETWEEN_ITER, grad_inbetween_iter);
+		MD.setValue(EMDL_OPTIMISER_SGD_INI_FRAC, grad_ini_frac);
+		MD.setValue(EMDL_OPTIMISER_SGD_FIN_FRAC, grad_fin_frac);
 		MD.setValue(EMDL_OPTIMISER_SGD_INI_RESOL, grad_ini_resol);
 		MD.setValue(EMDL_OPTIMISER_SGD_FIN_RESOL, grad_fin_resol);
 		MD.setValue(EMDL_OPTIMISER_SGD_INI_SUBSET_SIZE, grad_ini_subset_size);
@@ -1149,6 +1161,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_SGD_SUBSET_SIZE, subset_size);
 		MD.setValue(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, write_every_grad_iter);
 		MD.setValue(EMDL_OPTIMISER_SGD_STEPSIZE, grad_stepsize);
+		MD.setValue(EMDL_OPTIMISER_SGD_STEPSIZE_SCHEME, grad_stepsize_scheme);
 		MD.setValue(EMDL_OPTIMISER_DO_AUTO_REFINE, do_auto_refine);
 		MD.setValue(EMDL_OPTIMISER_AUTO_LOCAL_HP_ORDER, autosampling_hporder_local_searches);
 		MD.setValue(EMDL_OPTIMISER_NR_ITER_WO_RESOL_GAIN, nr_iter_wo_resol_gain);
@@ -3038,7 +3051,7 @@ void MlOptimiser::expectation()
 			std::cout << " Gradient optimisation iteration " << iter << " of " << nr_iter;
 			if (my_nr_particles < mydata.numberOfParticles())
 				std::cout << " with " << my_nr_particles << " particles";
-			std::cout << " (Step size " << grad_current_stepsize << ")";
+			std::cout << " (Step size " << (float) ( (int) (grad_current_stepsize * 100 + .5) ) / 100 << ")";
 		}
 		else
 		{
@@ -9107,11 +9120,12 @@ void MlOptimiser::updateStepSize()
 	bool is_3step = grad_stepsize_scheme.find("-3step-") != std::string::npos;
 
 	if (is_2step)
-		deflate = textToFloat(grad_stepsize_scheme.substr(0, 1));
+		inflate = textToFloat(grad_stepsize_scheme.substr(0, grad_stepsize_scheme.find("-2step")));
 
 	if (is_3step) {
-		inflate = textToFloat(grad_stepsize_scheme.substr(0, 1));
-		deflate = textToFloat(grad_stepsize_scheme.substr(grad_stepsize_scheme.size()-1, grad_stepsize_scheme.size()));
+		int pos = grad_stepsize_scheme.find("-3step-");
+		inflate = textToFloat(grad_stepsize_scheme.substr(0, pos));
+		deflate = textToFloat(grad_stepsize_scheme.substr(pos+7, grad_stepsize_scheme.size()));
 	}
 
 	if (is_2step or is_3step) {

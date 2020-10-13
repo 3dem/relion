@@ -601,6 +601,13 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 		}
 		MDclass.setValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp);
 
+		if (do_mom1)
+			MDclass.setValue(EMDL_MLMODEL_GRADIENT_MOMENT1_IMAGE, fn_out + "_1moment.mrcs");
+
+		if (do_mom2)
+			MDclass.setValue(EMDL_MLMODEL_GRADIENT_MOMENT2_IMAGE, fn_out + "_2moment.mrcs");
+
+
 		// For multiple bodies: only star PDF_CLASS in the first one!
 		int myclass = (nr_bodies > 1) ? 0 : iclass; // for multi-body: just set iclass=0
 
