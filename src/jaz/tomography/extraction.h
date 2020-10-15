@@ -81,12 +81,18 @@ class TomoExtraction
 				RawImage<T>& out,
 				bool center,
 				int num_threads = 1);
-		
+
 		template <typename T>
 		static void cropCircle(
-				RawImage<T>& stack,  
-		        double boundary, 
-		        double falloff,
+				RawImage<T>& stack,
+				double boundary,
+				double falloff,
+				int num_threads = 1);
+
+		template <typename T>
+		static void griddingPreCorrect(
+				RawImage<T>& stack,
+				double boundary,
 				int num_threads = 1);
 		
 		/*template <typename T>
@@ -143,7 +149,7 @@ void TomoExtraction::extractAt3D_Fourier(
 		centers[f] = gravis::d2Vector(q.x, q.y);
 	}
 	
-    extractAt2D_Fourier(stack, s, bin, projIn, centers, out, projOut, num_threads, 
+	extractAt2D_Fourier(stack, s, bin, projIn, centers, out, projOut, num_threads,
 						no_subpixel_shift, circle_crop);
 }
 
@@ -380,9 +386,9 @@ void TomoExtraction::extractSquares(
 
 template <typename T>
 void TomoExtraction::cropCircle(
-		RawImage<T>& stack, 
-        double boundary, 
-        double falloff,
+		RawImage<T>& stack,
+		double boundary,
+		double falloff,
 		int num_threads)
 {
 	const int  w = stack.xdim;
@@ -391,8 +397,10 @@ void TomoExtraction::cropCircle(
 	
 	const double mx = w / 2;
 	const double my = h / 2;
+
+	const double crop_rad = mx - boundary;
 		
-	#pragma omp parallel for num_threads(num_threads)		
+	#pragma omp parallel for num_threads(num_threads)
 	for (int f = 0; f < fc; f++)
 	{
 		double meanInside = 0.0;
@@ -407,8 +415,8 @@ void TomoExtraction::cropCircle(
 			
 			double c;
 			
-			if (r < mx - falloff) c = 1.0;
-			else if (r < mx) c = 0.5 - 0.5 * cos(PI * (mx - r) / falloff);
+			if (r < crop_rad - falloff) c = 1.0;
+			else if (r < crop_rad) c = 0.5 - 0.5 * cos(PI * (crop_rad - r) / falloff);
 			else c = 0.0;
 			
 			meanInside += c * stack(x,y,f);
@@ -426,13 +434,51 @@ void TomoExtraction::cropCircle(
 			
 			double c;
 			
-			if (r < mx - falloff) c = 1.0;
-			else if (r < mx) c = 0.5 - 0.5 * cos(PI * (mx - r) / falloff);
+			if (r < crop_rad - falloff) c = 1.0;
+			else if (r < crop_rad) c = 0.5 - 0.5 * cos(PI * (crop_rad - r) / falloff);
 			else c = 0.0;
 						
 			stack(x,y,f) = c * (stack(x,y,f) - meanInside);
 		}
 	}
 }
+
+template <typename T>
+void TomoExtraction::griddingPreCorrect(
+		RawImage<T>& stack,
+		double boundary,
+		int num_threads)
+{
+	const int  w = stack.xdim;
+	const int  h = stack.ydim;
+	const int fc = stack.zdim;
+
+	const double mx = w / 2;
+	const double my = h / 2;
+
+	const double crop_rad = mx - boundary;
+	const double eps = 1.0;
+
+	#pragma omp parallel for num_threads(num_threads)
+	for (int f = 0; f < fc; f++)
+	{
+		for (int y = 0; y < h; y++)
+		for (int x = 0; x < w; x++)
+		{
+			double xx = x - mx;
+			double yy = y - my;
+			double  r = sqrt(xx*xx + yy*yy);
+
+			double c;
+
+			if (r < eps) c = 1.0;
+			else if (r < crop_rad - eps) c = r / sin(PI * r / crop_rad);
+			else c = 0.0;
+
+			stack(x,y,f) *= c;
+		}
+	}
+}
+
 
 #endif

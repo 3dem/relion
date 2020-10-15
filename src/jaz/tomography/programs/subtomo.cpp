@@ -38,13 +38,14 @@ void SubtomoProgram::readParameters(int argc, char *argv[])
 		write_multiplicity = parser.checkOption("--multi", "Write out multiplicity volumes");
 		SNR = textToDouble(parser.getOption("--SNR", "Assumed signal-to-noise ratio (negative means use a heuristic)", "-1"));
 		
-		do_cone_weight = parser.checkOption("--cone_weight", "Weight down a double cone along Z");		
+		do_cone_weight = parser.checkOption("--cone_weight", "Weight down a double cone along Z");
 		const double alpha = 0.5 * textToDouble(parser.getOption("--cone_angle", "Opening angle of the cone in degrees", "10"));
 		cone_slope = sin(DEG2RAD(alpha));
 		cone_sig0 = textToDouble(parser.getOption("--cone_sig0", "Cone width at Z = 0", "2"));	
 
-		//do_gridding_correction = parser.checkOption("--grid_corr", "Perform individual gridding-correction on each subtomogram");
-		do_gridding_correction = false;
+		do_circle_crop = !parser.checkOption("--no_circle_crop", "Do not crop 2D images to a circle");
+		do_narrow_circle_crop = parser.checkOption("--narrow_circle_crop", "Crop CTF-modulated 2D images to a circle that fits the (smaller) output box size");
+		do_gridding_precorrection = parser.checkOption("--grid_precorr", "Perform gridding pre-correction on 2D images");
 
 		taper = textToDouble(parser.getOption("--taper", "Taper against the sphere by this number of pixels", "5"));
 		env_sigma = textToDouble(parser.getOption("--env", "Sigma of a Gaussian envelope applied before cropping", "-1"));
@@ -77,10 +78,10 @@ void SubtomoProgram::readParameters(int argc, char *argv[])
 		std::cerr << XE;
 		exit(1);
 	}
-	
-	if (do_gridding_correction)
+
+	if (do_gridding_precorrection)
 	{
-		REPORT_ERROR("Gridding correction is currently disabled.");
+		do_narrow_circle_crop = true;
 	}
 }
 
@@ -258,14 +259,23 @@ void SubtomoProgram::run()
 			}
 						
 			const int boundary = (boxSize - cropSize) / 2;
-					
-			if (boundary > 0)
+
+			if (do_gridding_precorrection || do_circle_crop)
 			{
 				BufferedImage<float> particlesRS;
 				
 				particlesRS = NewStackHelper::inverseFourierTransformStack(particleStack);
-				
-				TomoExtraction::cropCircle(particlesRS, boundary, 5, num_threads);
+
+				if (do_circle_crop)
+				{
+					const double crop_boundary = do_narrow_circle_crop? boundary : 0.0;
+					TomoExtraction::cropCircle(particlesRS, crop_boundary, 5, num_threads);
+				}
+
+				if (do_gridding_precorrection)
+				{
+					TomoExtraction::griddingPreCorrect(particlesRS, boundary, num_threads);
+				}
 				
 				particleStack = NewStackHelper::FourierTransformStack(particlesRS);
 			}
@@ -293,17 +303,8 @@ void SubtomoProgram::run()
 					multiImageFS);
 			}
 			
-			if (do_gridding_correction)
-			{
-				Reconstruction::griddingCorrect3D(
-						dataImgFS, psfImgFS, dataImgRS,
-						true, inner_thread_num);
-			}
-			else
-			{
-				Centering::shiftInSitu(dataImgFS);
-				FFT::inverseFourierTransform(dataImgFS, dataImgRS, FFT::Both);
-			}
+			Centering::shiftInSitu(dataImgFS);
+			FFT::inverseFourierTransform(dataImgFS, dataImgRS, FFT::Both);
 			
 			
 			if (do_cone_weight)
