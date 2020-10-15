@@ -1748,9 +1748,10 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 		// Read in the reference(s) and initialise mymodel
 		int refdim = (fn_ref == "denovo") ? 3 : 2;
-		mymodel.initialiseFromImages(fn_ref, is_3d_model, mydata,
-				do_average_unaligned, do_generate_seeds, refs_are_ctf_corrected, ref_angpix, do_trust_ref_size, do_mom1, do_mom2, (rank==0));
-
+		mymodel.initialiseFromImages(
+				fn_ref, is_3d_model, mydata,
+				do_average_unaligned, do_generate_seeds,refs_are_ctf_corrected,
+				ref_angpix, do_grad, do_trust_ref_size, do_mom1, do_mom2, (rank==0));
 	}
 
 	if (mymodel.nr_classes > 1 && do_split_random_halves)
@@ -2207,6 +2208,8 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 
 	int barstep, my_nr_particles = my_last_particle_id - my_first_particle_id + 1;
 
+	bool doing_subsets = my_nr_particles < mydata.numberOfParticles();
+
 	// Initialise Mavg
 	if (mydata.is_3D)
 	{
@@ -2260,7 +2263,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 		{
 			long int group_id = mydata.getGroupId(part_id, img_id);
 
-			if (do_grad) {
+			if (do_grad && !doing_subsets) {
 				mymodel.nr_particles_per_group[group_id] ++;
 				if (do_grad && mymodel.nr_particles_per_group[group_id] > grad_ini_subset_size)
 					continue;
@@ -2509,11 +2512,13 @@ void MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(MultidimArray<RFLOAT>
 	std::cerr<<"MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage Entering"<<std::endl;
 #endif
 
+	bool doing_subsets = my_last_particle_id - my_first_particle_id + 1 < mydata.numberOfParticles();
+
 	// First calculate average image
 	RFLOAT total_sum = 0.;
 	for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
 	{
-		if (! do_grad)
+		if (doing_subsets || !do_grad)
 			mymodel.nr_particles_per_group[igroup] = ROUND(wsum_model.sumw_group[igroup]);
 		total_sum += wsum_model.sumw_group[igroup];
 	}
