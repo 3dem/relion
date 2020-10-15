@@ -6008,7 +6008,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 	exp_local_Fctf.resize(exp_nr_images);
 	exp_local_sqrtXi2.resize(exp_nr_images);
 
-	bool do_subtomo_correction = is_for_store_wsums &&  NZYXSIZE(exp_STMulti[0]) > 0;
+	bool do_subtomo_correction = is_for_store_wsums && exp_STMulti.size() > 0 && NZYXSIZE(exp_STMulti[0]) > 0;
 
 	MultidimArray<Complex > Fimg, Fimg_nomask;
 	for (int img_id = 0, my_trans_image = 0; img_id < exp_nr_images; img_id++)
