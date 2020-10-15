@@ -1224,7 +1224,7 @@ void JobWindow::initialiseClass2DWindow()
 
 void JobWindow::initialiseInimodelWindow()
 {
-	setupTabs(5);
+	setupTabs(4);
 
 	tab1->begin();
 	tab1->label("I/O");
@@ -1256,8 +1256,13 @@ void JobWindow::initialiseInimodelWindow()
 	tab3->label("Optimisation");
 	resetHeight();
 
+	place("nr_iter");
+	place("grad_write_iter");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
 	place("nr_classes", TOGGLE_DEACTIVATE);
-	place("grad_anneal", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -1274,26 +1279,9 @@ void JobWindow::initialiseInimodelWindow()
 	place("offset_step");
 
 	tab3->end();
+
 	tab4->begin();
-	tab4->label("Gradient Optimization");
-
-	resetHeight();
-
-	place("grad_ini_iter");
-	place("grad_inbetween_iter");
-	place("grad_fin_iter");
-	place("grad_write_iter");
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	place("grad_ini_subset_size");
-	place("grad_fin_subset_size");
-
-	tab4->end();
-
-	tab5->begin();
-	tab5->label("Compute");
+	tab4->label("Compute");
 	resetHeight();
 
 	place("do_parallel_discio");
@@ -1323,7 +1311,7 @@ void JobWindow::initialiseInimodelWindow()
 
 	guientries["use_gpu"].cb_menu_i();
 
-	tab5->end();
+	tab4->end();
 }
 
 void JobWindow::initialiseClass3DWindow()
