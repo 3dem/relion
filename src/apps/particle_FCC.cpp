@@ -6,14 +6,15 @@
 #include <src/args.h>
 #include <src/image.h>
 #include <src/metadata_table.h>
-#include <src/jaz/img_proc/filter_helper.h>
-#include <src/jaz/stack_helper.h>
-#include <src/jaz/obs_model.h>
-#include <src/jaz/image_log.h>
-#include <src/jaz/new_ft.h>
-#include <src/jaz/noise_helper.h>
-#include <src/jaz/fftw_helper.h>
-#include <src/jaz/reference_map.h>
+#include <src/jaz/single_particle/img_proc/filter_helper.h>
+#include <src/jaz/single_particle/stack_helper.h>
+#include <src/jaz/single_particle/obs_model.h>
+#include <src/jaz/single_particle/image_log.h>
+#include <src/jaz/single_particle/new_ft.h>
+#include <src/jaz/single_particle/noise_helper.h>
+#include <src/jaz/single_particle/fftw_helper.h>
+#include <src/jaz/single_particle/reference_map.h>
+#include <src/jaz/single_particle/new_reference_map.h>
 
 #include <omp.h>
 
@@ -21,20 +22,20 @@ using namespace gravis;
 
 int main(int argc, char *argv[])
 {
-    std::string starFn, outPath;
+	std::string starFn, outPath;
 	double minFreqPx;
 	bool oppositeHalf, predictCTF;
 	int minMG, maxMG, threads;
 	
-	ReferenceMap reference;
+	NewReferenceMap reference;
 
-    IOParser parser;
+	IOParser parser;
 
-    try
-    {
-        parser.setCommandLine(argc, argv);
+	try
+	{
+		parser.setCommandLine(argc, argv);
 
-        parser.addSection("General options");
+		parser.addSection("General options");
 		
 		starFn = parser.getOption("--i", "Input particle *.star file");
 		reference.read(parser, argc, argv);
@@ -50,14 +51,14 @@ int main(int argc, char *argv[])
 		threads = textToInteger(parser.getOption("--j", "Number of threads", "1"));
 		outPath = parser.getOption("--o", "Output path");
 
-        parser.checkForErrors();
-    }
-    catch (RelionError XE)
-    {
-        parser.writeUsage(std::cout);
-        std::cerr << XE;
-        return RELION_EXIT_FAILURE;
-    }
+		parser.checkForErrors();
+	}
+	catch (RelionError XE)
+	{
+		parser.writeUsage(std::cout);
+		std::cerr << XE;
+		return RELION_EXIT_FAILURE;
+	}
 
 	ObservationModel obsModel;	
 	MetaDataTable mdt0;
@@ -72,8 +73,9 @@ int main(int argc, char *argv[])
 	const int sh = s/2 + 1;
 	
 	if (maxMG < 0) maxMG = allMdts.size() - 1;
-	
+
 	std::vector<double> num(sh, 0.0), denom0(sh, 0.0), denom1(sh, 0.0);
+	std::vector<double> squared_dist(sh, 0.0), sample_count(sh, 0.0);
 	
 	for (int m = 0; m <= maxMG; m++)
 	{
@@ -83,12 +85,11 @@ int main(int argc, char *argv[])
 		allMdts[m].getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, 0);
 		opticsGroup--;
 		
-		// both defocus_tit and tilt_fit need the same observations
 		obs = StackHelper::loadStackFS(allMdts[m], "", threads, true, &obsModel);
 		
 		pred = reference.predictAll(
 			allMdts[m], obsModel, 
-			oppositeHalf? ReferenceMap::Opposite : ReferenceMap::Own, 
+			oppositeHalf? NewReferenceMap::Opposite : NewReferenceMap::Own,
 			threads, predictCTF, true, false);
 		
 		const int pc = obs.size();
@@ -111,11 +112,15 @@ int main(int argc, char *argv[])
 				num[r] += z_pred.real * z_obs.real + z_pred.imag * z_obs.imag;
 				denom0[r] += z_pred.norm();
 				denom1[r] += z_obs.norm();
+
+				squared_dist[r] += (z_pred - z_obs).norm();
+				sample_count[r] += 1.0;
 			}
 		}
 	}
-	
-	std::ofstream os(outPath+"_FCC.dat");
+
+	std::ofstream os_fcc(outPath+"_FCC.dat");
+	std::ofstream os_l2(outPath+"_L2.dat");
 	
 	for (int r = minFreqPx; r < sh; r++)
 	{
@@ -124,10 +129,12 @@ int main(int argc, char *argv[])
 		if (wgh > 0.0)
 		{
 			double fcc = num[r] / sqrt(wgh);
-			
-			os << r << " " << fcc << "\n";
+			double l2 = squared_dist[r] / sample_count[r];
+
+			os_fcc << r << " " << fcc << "\n";
+			os_l2 << r << " " << l2 << "\n";
 		}
-	}		
+	}
 
 	return RELION_EXIT_SUCCESS;
 }

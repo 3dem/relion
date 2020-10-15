@@ -786,6 +786,9 @@ void Postprocessing::writeOutput()
 	// Also write XML file with FSC_true curve for EMDB submission
 	writeFscXml(MDfsc);
 
+	// Write a DAT file for easier plotting in xmgrace (JZ, June 2nd, 2020)
+	writeFscDat(MDfsc);
+
 	MDguinier.setName("guinier");
 	MetaDataTable MDextra1, MDextra2; // for postscript plot
 	for (int i = 0; i < guinierin.size(); i++)
@@ -904,6 +907,26 @@ void Postprocessing::writeFscXml(MetaDataTable &MDfsc)
 	}
 	fh << "</fsc>" << std::endl;
 	fh.close();
+}
+
+void Postprocessing::writeFscDat(MetaDataTable &MDfsc)
+{
+	const std::string fn_fsc = fn_out + "_fsc.dat";
+
+	std::ofstream fh(fn_fsc);
+
+	if (!fh)
+	{
+		REPORT_ERROR( (std::string)"MetaDataTable::write Cannot write to file: " + fn_fsc);
+	}
+
+	for (int i = 0; i < MDfsc.numberOfObjects(); i++)
+	{
+		const RFLOAT xx = MDfsc.getRfloat(EMDL_RESOLUTION, i);
+		const RFLOAT yy = MDfsc.getRfloat(EMDL_POSTPROCESS_FSC_TRUE, i);
+
+		fh << xx << ' ' << yy << '\n';
+	}
 }
 
 void Postprocessing::run_locres(int rank, int size)

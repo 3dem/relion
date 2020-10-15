@@ -221,8 +221,10 @@ void Assembly::readPDB(std::string filename, bool use_segid_instead_of_chainid, 
 	{
 		// Only look at lines with an ATOM label
 		std::string record(line,0,6);
-		if (record == "ATOM  ")
+		if (record == "ATOM  " || record == "HETATM")
 		{
+			const bool isConnected = record == "ATOM  ";
+			
 			// ======================== OLD VERSION ========================
 			/*
 			  char snum[5]={'\0'};
@@ -247,7 +249,7 @@ void Assembly::readPDB(std::string filename, bool use_segid_instead_of_chainid, 
 			if(strlen(line) < 20)
 			{
 		    	std::string str(line);
-		    	REPORT_ERROR("Assembly::readPDB ERROR: too few entries on ATOM line:" + str);
+		    	REPORT_ERROR("Assembly::readPDB ERROR: too few entries on ATOM/HETATM line:" + str);
 			}
 			char snum[6] = "", atomname[5] = "", altLoc[2] = "", resname[4] = "", chainID[2] = "";
 			int resnum = -1;
@@ -320,55 +322,66 @@ void Assembly::readPDB(std::string filename, bool use_segid_instead_of_chainid, 
 #ifdef DEBUG
 		      std::cerr << " molname= " << molname << " alt_molname= " << alt_molname << " str_chainID= " << str_chainID << " chainID= "<< chainID<<std::endl;
 #endif
-		      if (molname != old_molname)
-		      {
-		    	  // Check whether a molecule with the same name already exists
-		    	  mol_id = -1;
-		    	  for (long int imol = 0; imol < molecules.size(); imol++)
-		    	  {
-		    		  if (molname == molecules[imol].name)
-		    		  {
-		    			  mol_id = imol;
-		    			  break;
-		    		  }
-		    	  }
-
-		    	  // If not found, add a new molecule
-		    	  if (mol_id < 0)
-		    	  {
-#ifdef DEBUG
-		    		  std::cerr << " snum= " << snum << " atomname= " << atomname << " resname= " << resname ;
-		    		  std::cerr << " chainID= " << chainID << " resnum= " << resnum << " x= " << x ;
-		    		  std::cerr << " y= " << y << " z= " << z << " bfactor= " << bfactor << std::endl;
-#endif
-		    		  mol_id = addMolecule(molname, alt_molname);
-		    		  old_resnum = -1;
-		    	  }
-		    	  else
-		    	  {
-		    		  int lastres = molecules[mol_id].residues.size()-1;
-		    		  old_resnum = (molecules[mol_id]).residues[lastres].number;
-		    	  }
-		      }
-
-		      // 2. Check whether this is a new residue
-		      // All Atoms inside one Residue are assumed to be together!
-		      if (resnum != old_resnum)
-		      {
-		    	  res_id = molecules[mol_id].addResidue(str_resname, resnum);
-		    	  if (resnum < old_resnum && molname == old_molname && do_sort)
-		    	  {
-		    		  std::cout <<" Warning unsorted residues: " << resnum << " molname= " << molname << " old_resnum= " << old_resnum << " old_molname= " <<old_molname << ""<<std::endl;
-		    		  is_sorted = false;
-		    	  }
-		      }
-
-		      // 3. Add the actual atom
-		      molecules[mol_id].residues[res_id].addAtom(atomname, x, y, z, occupancy, bfactor);
-
-		      // For use in next line
-		      old_molname = molname;
-		      old_resnum = resnum;
+			  if (isConnected)
+			  {
+				  if (molname != old_molname)
+				  {
+					  // Check whether a molecule with the same name already exists
+					  mol_id = -1;
+					  for (long int imol = 0; imol < molecules.size(); imol++)
+					  {
+						  if (molname == molecules[imol].name)
+						  {
+							  mol_id = imol;
+							  break;
+						  }
+					  }
+	
+					  // If not found, add a new molecule
+					  if (mol_id < 0)
+					  {
+	#ifdef DEBUG
+						  std::cerr << " snum= " << snum << " atomname= " << atomname << " resname= " << resname ;
+						  std::cerr << " chainID= " << chainID << " resnum= " << resnum << " x= " << x ;
+						  std::cerr << " y= " << y << " z= " << z << " bfactor= " << bfactor << std::endl;
+	#endif
+						  mol_id = addMolecule(molname, alt_molname);
+						  old_resnum = -1;
+					  }
+					  else
+					  {
+						  int lastres = molecules[mol_id].residues.size()-1;
+						  old_resnum = (molecules[mol_id]).residues[lastres].number;
+					  }
+				  }
+	
+				  // 2. Check whether this is a new residue
+				  // All Atoms inside one Residue are assumed to be together!
+				  if (resnum != old_resnum)
+				  {
+					  res_id = molecules[mol_id].addResidue(str_resname, resnum);
+					  if (resnum < old_resnum && molname == old_molname && do_sort)
+					  {
+						  std::cout <<" Warning unsorted residues: " << resnum << " molname= " << molname << " old_resnum= " << old_resnum << " old_molname= " <<old_molname << ""<<std::endl;
+						  is_sorted = false;
+					  }
+				  }
+	
+				  // 3. Add the actual atom
+				  molecules[mol_id].residues[res_id].addAtom(atomname, x, y, z, occupancy, bfactor);
+				  
+				  // For use in next line
+				  old_molname = molname;
+				  old_resnum = resnum;
+			  }
+			  else
+			  {
+				  Atom atom(atomname);
+				  atom.coords = vectorR3(x,y,z);
+				  atom.occupancy = occupancy;
+				  atom.bfactor = bfactor;
+				  looseAtoms.push_back(atom);
+			  }
 		}
 		else
 		{

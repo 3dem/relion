@@ -23,7 +23,7 @@
 #include <src/symmetries.h>
 #include <src/euler.h>
 #include <src/time.h>
-#include <src/jaz/obs_model.h>
+#include <src/jaz/single_particle/obs_model.h>
 
 class particle_symmetry_expand_parameters
 {

@@ -147,8 +147,7 @@ void buildCorrImage(MlOptimiser *baseMLO,
 		OptimisationParamters &op,
 		AccPtr<XFLOAT> &corr_img,
 		int img_id,
-		long int group_id,
-		bool ctf_premultiplied)
+		long int group_id)
 {
 
 	// CC or not
@@ -165,9 +164,6 @@ void buildCorrImage(MlOptimiser *baseMLO,
 	if (baseMLO->do_ctf_correction)
 	{
 		if (baseMLO->refs_are_ctf_corrected)
-			for(size_t i = 0; i < corr_img.getSize(); i++)
-				corr_img[i] *= DIRECT_MULTIDIM_ELEM(op.local_Fctf[img_id], i)*DIRECT_MULTIDIM_ELEM(op.local_Fctf[img_id], i);
-		if (ctf_premultiplied)
 			for(size_t i = 0; i < corr_img.getSize(); i++)
 				corr_img[i] *= DIRECT_MULTIDIM_ELEM(op.local_Fctf[img_id], i)*DIRECT_MULTIDIM_ELEM(op.local_Fctf[img_id], i);
 	}
@@ -327,287 +323,143 @@ void runWavgKernel(
 {
 	//cudaFuncSetCacheConfig(cuda_kernel_wavg_fast, cudaFuncCachePreferShared);
 
-	if (ctf_premultiplied)
+	if (refs_are_ctf_corrected)
 	{
-		if (refs_are_ctf_corrected)
-		{
-			if(data_is_3D)
-				AccUtilities::kernel_wavg<true,true,true,true,WAVG_BLOCK_SIZE_DATA3D>(
-					eulers,
-					projector,
-					image_size,
-					orientation_num,
-					Fimg_real,
-					Fimg_imag,
-					trans_x,
-					trans_y,
-					trans_z,
-					sorted_weights,
-					ctfs,
-					wdiff2s_parts,
-					wdiff2s_AA,
-					wdiff2s_XA,
-					translation_num,
-					(XFLOAT) op.sum_weight[img_id],
-					(XFLOAT) op.significant_weight[img_id],
-					part_scale,
-					stream
-					);
-			else if (projector.mdlZ!=0)
-				AccUtilities::kernel_wavg<true,true,true,false,WAVG_BLOCK_SIZE>(
-					eulers,
-					projector,
-					image_size,
-					orientation_num,
-					Fimg_real,
-					Fimg_imag,
-					trans_x,
-					trans_y,
-					trans_z,
-					sorted_weights,
-					ctfs,
-					wdiff2s_parts,
-					wdiff2s_AA,
-					wdiff2s_XA,
-					translation_num,
-					(XFLOAT) op.sum_weight[img_id],
-					(XFLOAT) op.significant_weight[img_id],
-					part_scale,
-					stream
-					);
-			else
-				AccUtilities::kernel_wavg<true,true,false,false,WAVG_BLOCK_SIZE>(
-					eulers,
-					projector,
-					image_size,
-					orientation_num,
-					Fimg_real,
-					Fimg_imag,
-					trans_x,
-					trans_y,
-					trans_z,
-					sorted_weights,
-					ctfs,
-					wdiff2s_parts,
-					wdiff2s_AA,
-					wdiff2s_XA,
-					translation_num,
-					(XFLOAT) op.sum_weight[img_id],
-					(XFLOAT) op.significant_weight[img_id],
-					part_scale,
-					stream
-					);
-		}
+		if(data_is_3D)
+			AccUtilities::kernel_wavg<true,true,true,WAVG_BLOCK_SIZE_DATA3D>(
+				eulers,
+				projector,
+				image_size,
+				orientation_num,
+				Fimg_real,
+				Fimg_imag,
+				trans_x,
+				trans_y,
+				trans_z,
+				sorted_weights,
+				ctfs,
+				wdiff2s_parts,
+				wdiff2s_AA,
+				wdiff2s_XA,
+				translation_num,
+				(XFLOAT) op.sum_weight[img_id],
+				(XFLOAT) op.significant_weight[img_id],
+				part_scale,
+				stream
+				);
+		else if (projector.mdlZ!=0)
+			AccUtilities::kernel_wavg<true,true,false,WAVG_BLOCK_SIZE>(
+				eulers,
+				projector,
+				image_size,
+				orientation_num,
+				Fimg_real,
+				Fimg_imag,
+				trans_x,
+				trans_y,
+				trans_z,
+				sorted_weights,
+				ctfs,
+				wdiff2s_parts,
+				wdiff2s_AA,
+				wdiff2s_XA,
+				translation_num,
+				(XFLOAT) op.sum_weight[img_id],
+				(XFLOAT) op.significant_weight[img_id],
+				part_scale,
+				stream
+				);
 		else
-		{
-			if(data_is_3D)
-				AccUtilities::kernel_wavg<true,false,true,true,WAVG_BLOCK_SIZE_DATA3D>(
-					eulers,
-					projector,
-					image_size,
-					orientation_num,
-					Fimg_real,
-					Fimg_imag,
-					trans_x,
-					trans_y,
-					trans_z,
-					sorted_weights,
-					ctfs,
-					wdiff2s_parts,
-					wdiff2s_AA,
-					wdiff2s_XA,
-					translation_num,
-					(XFLOAT) op.sum_weight[img_id],
-					(XFLOAT) op.significant_weight[img_id],
-					part_scale,
-					stream
-					);
-			else if (projector.mdlZ!=0)
-				AccUtilities::kernel_wavg<true,false,true,false,WAVG_BLOCK_SIZE>(
-					eulers,
-					projector,
-					image_size,
-					orientation_num,
-					Fimg_real,
-					Fimg_imag,
-					trans_x,
-					trans_y,
-					trans_z,
-					sorted_weights,
-					ctfs,
-					wdiff2s_parts,
-					wdiff2s_AA,
-					wdiff2s_XA,
-					translation_num,
-					(XFLOAT) op.sum_weight[img_id],
-					(XFLOAT) op.significant_weight[img_id],
-					part_scale,
-					stream
-					);
-			else
-				AccUtilities::kernel_wavg<true,false,false,false,WAVG_BLOCK_SIZE>(
-					eulers,
-					projector,
-					image_size,
-					orientation_num,
-					Fimg_real,
-					Fimg_imag,
-					trans_x,
-					trans_y,
-					trans_z,
-					sorted_weights,
-					ctfs,
-					wdiff2s_parts,
-					wdiff2s_AA,
-					wdiff2s_XA,
-					translation_num,
-					(XFLOAT) op.sum_weight[img_id],
-					(XFLOAT) op.significant_weight[img_id],
-					part_scale,
-					stream
-					);
-		}
+			AccUtilities::kernel_wavg<true,false,false,WAVG_BLOCK_SIZE>(
+				eulers,
+				projector,
+				image_size,
+				orientation_num,
+				Fimg_real,
+				Fimg_imag,
+				trans_x,
+				trans_y,
+				trans_z,
+				sorted_weights,
+				ctfs,
+				wdiff2s_parts,
+				wdiff2s_AA,
+				wdiff2s_XA,
+				translation_num,
+				(XFLOAT) op.sum_weight[img_id],
+				(XFLOAT) op.significant_weight[img_id],
+				part_scale,
+				stream
+				);
 	}
-	else // not ctf_premultiplied
+	else
 	{
-		if (refs_are_ctf_corrected)
-		{
-			if(data_is_3D)
-				AccUtilities::kernel_wavg<false,true,true,true,WAVG_BLOCK_SIZE_DATA3D>(
-					eulers,
-					projector,
-					image_size,
-					orientation_num,
-					Fimg_real,
-					Fimg_imag,
-					trans_x,
-					trans_y,
-					trans_z,
-					sorted_weights,
-					ctfs,
-					wdiff2s_parts,
-					wdiff2s_AA,
-					wdiff2s_XA,
-					translation_num,
-					(XFLOAT) op.sum_weight[img_id],
-					(XFLOAT) op.significant_weight[img_id],
-					part_scale,
-					stream
-					);
-			else if (projector.mdlZ!=0)
-				AccUtilities::kernel_wavg<false,true,true,false,WAVG_BLOCK_SIZE>(
-					eulers,
-					projector,
-					image_size,
-					orientation_num,
-					Fimg_real,
-					Fimg_imag,
-					trans_x,
-					trans_y,
-					trans_z,
-					sorted_weights,
-					ctfs,
-					wdiff2s_parts,
-					wdiff2s_AA,
-					wdiff2s_XA,
-					translation_num,
-					(XFLOAT) op.sum_weight[img_id],
-					(XFLOAT) op.significant_weight[img_id],
-					part_scale,
-					stream
-					);
-			else
-				AccUtilities::kernel_wavg<false,true,false,false,WAVG_BLOCK_SIZE>(
-					eulers,
-					projector,
-					image_size,
-					orientation_num,
-					Fimg_real,
-					Fimg_imag,
-					trans_x,
-					trans_y,
-					trans_z,
-					sorted_weights,
-					ctfs,
-					wdiff2s_parts,
-					wdiff2s_AA,
-					wdiff2s_XA,
-					translation_num,
-					(XFLOAT) op.sum_weight[img_id],
-					(XFLOAT) op.significant_weight[img_id],
-					part_scale,
-					stream
-					);
-		}
+		if(data_is_3D)
+			AccUtilities::kernel_wavg<false,true,true,WAVG_BLOCK_SIZE_DATA3D>(
+				eulers,
+				projector,
+				image_size,
+				orientation_num,
+				Fimg_real,
+				Fimg_imag,
+				trans_x,
+				trans_y,
+				trans_z,
+				sorted_weights,
+				ctfs,
+				wdiff2s_parts,
+				wdiff2s_AA,
+				wdiff2s_XA,
+				translation_num,
+				(XFLOAT) op.sum_weight[img_id],
+				(XFLOAT) op.significant_weight[img_id],
+				part_scale,
+				stream
+				);
+		else if (projector.mdlZ!=0)
+			AccUtilities::kernel_wavg<false,true,false,WAVG_BLOCK_SIZE>(
+				eulers,
+				projector,
+				image_size,
+				orientation_num,
+				Fimg_real,
+				Fimg_imag,
+				trans_x,
+				trans_y,
+				trans_z,
+				sorted_weights,
+				ctfs,
+				wdiff2s_parts,
+				wdiff2s_AA,
+				wdiff2s_XA,
+				translation_num,
+				(XFLOAT) op.sum_weight[img_id],
+				(XFLOAT) op.significant_weight[img_id],
+				part_scale,
+				stream
+				);
 		else
-		{
-			if(data_is_3D)
-				AccUtilities::kernel_wavg<false,false,true,true,WAVG_BLOCK_SIZE_DATA3D>(
-					eulers,
-					projector,
-					image_size,
-					orientation_num,
-					Fimg_real,
-					Fimg_imag,
-					trans_x,
-					trans_y,
-					trans_z,
-					sorted_weights,
-					ctfs,
-					wdiff2s_parts,
-					wdiff2s_AA,
-					wdiff2s_XA,
-					translation_num,
-					(XFLOAT) op.sum_weight[img_id],
-					(XFLOAT) op.significant_weight[img_id],
-					part_scale,
-					stream
-					);
-			else if (projector.mdlZ!=0)
-				AccUtilities::kernel_wavg<false,false,true,false,WAVG_BLOCK_SIZE>(
-					eulers,
-					projector,
-					image_size,
-					orientation_num,
-					Fimg_real,
-					Fimg_imag,
-					trans_x,
-					trans_y,
-					trans_z,
-					sorted_weights,
-					ctfs,
-					wdiff2s_parts,
-					wdiff2s_AA,
-					wdiff2s_XA,
-					translation_num,
-					(XFLOAT) op.sum_weight[img_id],
-					(XFLOAT) op.significant_weight[img_id],
-					part_scale,
-					stream
-					);
-			else
-				AccUtilities::kernel_wavg<false,false,false,false,WAVG_BLOCK_SIZE>(
-					eulers,
-					projector,
-					image_size,
-					orientation_num,
-					Fimg_real,
-					Fimg_imag,
-					trans_x,
-					trans_y,
-					trans_z,
-					sorted_weights,
-					ctfs,
-					wdiff2s_parts,
-					wdiff2s_AA,
-					wdiff2s_XA,
-					translation_num,
-					(XFLOAT) op.sum_weight[img_id],
-					(XFLOAT) op.significant_weight[img_id],
-					part_scale,
-					stream
-					);
-		}
+			AccUtilities::kernel_wavg<false,false,false,WAVG_BLOCK_SIZE>(
+				eulers,
+				projector,
+				image_size,
+				orientation_num,
+				Fimg_real,
+				Fimg_imag,
+				trans_x,
+				trans_y,
+				trans_z,
+				sorted_weights,
+				ctfs,
+				wdiff2s_parts,
+				wdiff2s_AA,
+				wdiff2s_XA,
+				translation_num,
+				(XFLOAT) op.sum_weight[img_id],
+				(XFLOAT) op.significant_weight[img_id],
+				part_scale,
+				stream
+				);
 	}
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 }

@@ -28,7 +28,7 @@
 #include <src/euler.h>
 #include <src/time.h>
 #include <src/ml_model.h>
-#include <src/jaz/obs_model.h>
+#include <src/jaz/single_particle/obs_model.h>
 
 class Reconstructor
 {
@@ -51,7 +51,9 @@ public:
 	       helical_rise, helical_twist;
 
 	bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak,
-	     do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_ewald, skip_weighting, skip_mask, do_debug, do_ignore_optics;
+	     do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_ewald, skip_weighting, skip_mask, do_debug,
+	     do_ignore_optics, skip_subtomo_correction, normalised_subtomo, ctf3d_squared;
+
 
 	bool skip_gridding, do_reconstruct_ctf2, do_reconstruct_meas, is_reverse, read_weights, do_external_reconstruct;
 

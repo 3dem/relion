@@ -1,5 +1,5 @@
+
 RELION 3.1 (+ EER support)
-===========================
 
 RELION (for REgularised LIkelihood OptimisatioN) is a stand-alone computer
 program for Maximum A Posteriori refinement of (multiple) 3D reconstructions

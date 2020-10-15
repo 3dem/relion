@@ -25,17 +25,18 @@ namespace gravis
     public:
       T s,v1,v2,v3;
 
-      tQuaternion(const T& s=0, const T& v1=1, const T& v2=0, const T& v3=0) : s(s), v1(v1), v2(v2), v3(v3) {};
-      tQuaternion(const tQuaternion& q) : s(q.s), v1(q.v1), v2(q.v2), v3(q.v3) {};
-      tQuaternion(const T* q) : s(q[0]), v1(q[1]), v2(q[2]), v3(q[3]) {};
+      tQuaternion(const T& s=0, const T& v1=1, const T& v2=0, const T& v3=0) : s(s), v1(v1), v2(v2), v3(v3) {}
+      tQuaternion(const tQuaternion& q) : s(q.s), v1(q.v1), v2(q.v2), v3(q.v3) {}
+      tQuaternion(const T* q) : s(q[0]), v1(q[1]), v2(q[2]), v3(q[3]) {}
 
       tQuaternion(const T& phi, const gravis::t3Vector<T> &axis) :
-        s(cos(phi/T(2))), v1(axis.x* sin(phi/T(2))), v2(axis.y* sin(phi/T(2))), v3(axis.z* sin(phi/T(2))) {};
+        s(cos(phi/T(2))), v1(axis.x* sin(phi/T(2))), v2(axis.y* sin(phi/T(2))), v3(axis.z* sin(phi/T(2))) {}
 
       bool operator==(const tQuaternion& q) const
       {
         return (s==q.s) && (v1==q.v1) && (v2==q.v2) && (v3==q.v3);
-      };
+      }
+	  
       bool operator!=(const tQuaternion& q) const
       {
         return !(*this == q);
@@ -45,10 +46,12 @@ namespace gravis
       {
         return tQuaternion(q.s+s, q.v1+v1, q.v2+v2, q.v3+v3 );
       }
+	  
       tQuaternion operator - (const tQuaternion& q) const
       {
         return tQuaternion(s-q.s, v1-q.v1, v2-q.v2, v3-q.v3 );
-      };
+      }
+	  
       tQuaternion operator * (const tQuaternion& q) const
       {
         t3Vector<T> v00 (v1,v2,v3);

@@ -50,8 +50,7 @@ void buildCorrImage(MlOptimiser *baseMLO,
 		OptimisationParamters &op,
 		AccPtr<XFLOAT> &corr_img,
 		int img_id,
-		long int group_id,
-		bool ctf_premultiplied);
+		long int group_id);
 
 void generateEulerMatrices(
 		ProjectionParams &ProjectionData,

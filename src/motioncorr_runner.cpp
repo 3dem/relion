@@ -26,7 +26,7 @@
 #include "src/micrograph_model.h"
 #include "src/matrix2d.h"
 #include "src/matrix1d.h"
-#include "src/jaz/img_proc/image_op.h"
+#include <src/jaz/single_particle/img_proc/image_op.h>
 #include "src/funcs.h"
 #include "src/renderEER.h"
 

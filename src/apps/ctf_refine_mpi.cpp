@@ -18,7 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#include <src/jaz/ctf/ctf_refiner_mpi.h>
+#include <src/jaz/single_particle/ctf/ctf_refiner_mpi.h>
 
 
 int main(int argc, char *argv[])

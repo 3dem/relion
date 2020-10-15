@@ -24,7 +24,7 @@
 #include <vector>
 #include <string>
 #include "optimization.h"
-#include <src/jaz/lbfgs/lbfgs.h>
+#include <src/lbfgs/lbfgs.h>
 
 class LBFGS
 {
@@ -33,15 +33,14 @@ class LBFGS
         static std::vector<double> optimize(
             const std::vector<double>& initial,
             const DifferentiableOptimization& opt,
-            bool verbose = false,
+            int verbosity = 0,
             int max_iters = 0,
-            double epsilon = 1e-5);
+            double epsilon = 1e-5, 
+			double xtol = 1e-4);
 
         static void test();
 
     protected:
-		
-		static std::string translateError(int ret);
 
         static lbfgsfloatval_t evaluate(
             void *instance,
@@ -61,6 +60,8 @@ class LBFGS
             int n,
             int k,
             int ls);
+		
+		static std::string decodeStatus(int ret);
 
         class LibLbfgsAdapter
         {

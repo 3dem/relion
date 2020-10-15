@@ -40,7 +40,7 @@
 #include "src/funcs.h"
 #include "src/filename.h"
 #include "src/gui_entries.h"
-#include "src/jaz/obs_model.h"
+#include <src/jaz/single_particle/obs_model.h>
 
 #define MWCOL1 300
 #define MWCOL2 60

@@ -18,7 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#include <src/jaz/motion/motion_refiner_mpi.h>
+#include <src/jaz/single_particle/motion/motion_refiner_mpi.h>
 
 
 int main(int argc, char *argv[])
@@ -29,9 +29,14 @@ int main(int argc, char *argv[])
 	{
 		prm.read(argc, argv);
 		prm.init();
-
+		
 		MPI_Barrier(MPI_COMM_WORLD);
-		prm.run();
+		
+		prm.runWithFccUpdate();
+		
+		MPI_Barrier(MPI_COMM_WORLD);
+		
+		prm.runWithRecombination();
 	}
 
 	catch (RelionError XE)

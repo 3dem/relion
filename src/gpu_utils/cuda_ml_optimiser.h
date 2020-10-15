@@ -154,7 +154,7 @@ public:
 	unsigned long my_ori_particle;
 
 	std::vector<MultidimArray<Complex > > Fimgs, Fimgs_nomask, local_Fimgs_shifted, local_Fimgs_shifted_nomask;
-	std::vector<MultidimArray<RFLOAT> > Fctfs, local_Fctfs, local_Minvsigma2s;
+	std::vector<MultidimArray<RFLOAT> > Fctfs, local_Fctfs, local_Minvsigma2s, FstMulti;
 	std::vector<int> pointer_dir_nonzeroprior, pointer_psi_nonzeroprior;
 	std::vector<RFLOAT> directions_prior, psi_prior, local_sqrtXi2;
 	std::vector<RFLOAT> highres_Xi2_imgs, min_diff2, avg_diff2;
@@ -178,6 +178,7 @@ public:
 		old_offset.resize(nr_particles);
 		prior.resize(nr_particles);
 		max_index.resize(nr_particles);
+
 	};
 };
 

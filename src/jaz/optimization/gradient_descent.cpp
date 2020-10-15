@@ -60,6 +60,7 @@ std::vector<double> GradientDescent::optimize(
 
         if (verbose)
         {
+			opt.report(i, f, x);
             std::cout << i << ": " << f << " (" << act_step << ") [" << (f - last_f) << "]";
         }
 

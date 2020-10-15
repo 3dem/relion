@@ -27,14 +27,14 @@
 #include <src/time.h>
 #include <omp.h>
 
-#include <src/jaz/image_log.h>
-#include <src/jaz/complex_io.h>
-#include <src/jaz/stack_helper.h>
-#include <src/jaz/img_proc/image_op.h>
-#include <src/jaz/obs_model.h>
-#include <src/jaz/new_ft.h>
-#include <src/jaz/img_proc/filter_helper.h>
-#include <src/jaz/ctf/delocalisation_helper.h>
+#include <src/jaz/single_particle/image_log.h>
+#include <src/jaz/single_particle/complex_io.h>
+#include <src/jaz/single_particle/stack_helper.h>
+#include <src/jaz/single_particle/img_proc/image_op.h>
+#include <src/jaz/single_particle/obs_model.h>
+#include <src/jaz/single_particle/new_ft.h>
+#include <src/jaz/single_particle/img_proc/filter_helper.h>
+#include <src/jaz/single_particle/ctf/delocalisation_helper.h>
 
 class reconstruct_parameters
 {

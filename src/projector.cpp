@@ -18,8 +18,9 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/projector.h"
-#include "src/jaz/gravis/t3Vector.h"
+#include <src/jaz/single_particle/gravis/t3Vector.h>
 #include <src/time.h>
+#include <src/jaz/image/buffered_image.h>
 //#define DEBUG
 
 //#define PROJ_TIMING
@@ -601,7 +602,6 @@ void Projector::project(MultidimArray<Complex > &f2d, Matrix2D<RFLOAT> &A)
 
 		} // endif x-loop
 	} // endif y-loop
-
 
 #ifdef DEBUG
     std::cerr << "done with project..." << std::endl;

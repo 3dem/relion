@@ -1,5 +1,5 @@
 #include <src/image.h>
-#include <src/jaz/vtk_helper.h>
+#include <src/jaz/single_particle/vtk_helper.h>
 
 int main(int argc, char *argv[])
 {

@@ -5,8 +5,8 @@
 
 #include <src/args.h>
 #include <src/image.h>
-#include <src/jaz/damage_helper.h>
-#include <src/jaz/image_log.h>
+#include <src/jaz/single_particle/damage_helper.h>
+#include <src/jaz/single_particle/image_log.h>
 
 #include <omp.h>
 

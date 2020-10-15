@@ -1,4 +1,4 @@
-#include <src/jaz/interpolation.h>
+#include <src/jaz/single_particle/interpolation.h>
 
 int main(int argc, char *argv[])
 {

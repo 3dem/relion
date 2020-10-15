@@ -19,7 +19,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#include <src/jaz/obs_model.h>
+#include <src/jaz/single_particle/obs_model.h>
 #include <src/image.h>
 #include <src/metadata_table.h>
 

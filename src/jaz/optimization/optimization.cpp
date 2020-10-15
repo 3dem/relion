@@ -20,7 +20,6 @@
 
 #include "optimization.h"
 #include <iostream>
-#include <iomanip>
 
 double RosenbrockBanana::f(const std::vector<double> &x, void *tempStorage) const
 {
@@ -46,20 +45,20 @@ void RosenbrockBanana::grad(
 
 void DifferentiableOptimization::testGradient(const std::vector<double> &x, double eps)
 {
-	const int n = x.size();	
+	const int pc = x.size();
 	
-	std::vector<double> x1 = x, grad0(n,0.0);
+	const double fx0 = f(x, 0);
 	
-	const double f0 = f(x, 0);
-	grad(x, grad0, 0);
+	std::vector<double> gradX(pc, 0.0);
+	grad(x, gradX,0);
 	
-	for (int i = 0; i < n; i++)
+	for (int i = 0; i < pc; i++)
 	{
-		x1[i] = x[i] + eps;		
-		const double f1 = f(x1, 0);
+		std::vector<double> x1 = x;
+		x1[i] += eps;
 		
-		x1[i] = x[i];
+		const double fx1 = f(x1, 0);
 		
-		std::cout << i << ": " << std::setprecision(16) << (f1 - f0)/eps << " vs. " << grad0[i] << "\n";		
+		std::cout << i << ": " << gradX[i] << " vs. " << (fx1 - fx0) / eps << std::endl;
 	}
 }

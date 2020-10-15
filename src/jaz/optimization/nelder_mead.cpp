@@ -19,7 +19,7 @@
  ***************************************************************************/
 
 #include "nelder_mead.h"
-#include <src/jaz/index_sort.h>
+#include <src/jaz/util/index_sort.h>
 #include <iostream>
 #include <cmath>
 
@@ -66,11 +66,11 @@ std::vector<double> NelderMead::optimize(
         // sort x and f(x) by ascending f(x)
         std::vector<int> order = IndexSort<double>::sortIndices(values);
 
-        opt.report(i, values[order[0]], simplex[order[0]]);
-
         if (verbose)
         {
-            std::cout << i << ": " << values[order[0]] << std::endl;
+			opt.report(i, values[order[0]], simplex[order[0]]);
+			std::cout << std::endl;
+            //std::cout << i << ": " << values[order[0]] << std::endl;
         }
 
         for (int j = 0; j < m; j++)
@@ -119,9 +119,7 @@ std::vector<double> NelderMead::optimize(
         }
         if (allInside)
         {
-            if (verbose) std::cout << "Exiting because allInside" << std::endl;
-
-            opt.deallocateTempStorage(tempStorage);
+			if (verbose) std::cout << std::endl;
             return simplex[0];
         }
 
@@ -192,7 +190,8 @@ std::vector<double> NelderMead::optimize(
         }
     }
 
-    if (verbose) std::cout << "Exiting after reaching maxIter" << std::endl;
+	if (verbose) std::cout << std::endl;
+
     opt.deallocateTempStorage(tempStorage);
 
     std::vector<int> order = IndexSort<double>::sortIndices(values);

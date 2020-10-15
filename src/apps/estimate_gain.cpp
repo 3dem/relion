@@ -25,8 +25,10 @@
 #include <src/metadata_table.h>
 #include <src/args.h>
 #include <src/image.h>
-#include <src/jaz/obs_model.h>
+
+#include <src/jaz/single_particle/obs_model.h>
 #include <src/renderEER.h>
+
 
 /* A simple program to estimate the gain reference by averaging all unaligned frames and taking the inverse.
  * This program should be used only as a last resort when the gain reference was lost or badly calibrated.

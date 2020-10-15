@@ -18,7 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#include <src/jaz/motion/motion_refiner.h>
+#include <src/jaz/single_particle/motion/motion_refiner.h>
 
 int main(int argc, char *argv[])
 {
