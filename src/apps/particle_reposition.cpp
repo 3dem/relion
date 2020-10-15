@@ -49,7 +49,7 @@ public:
 		int general_section = parser.addSection("Options");
 
 		fn_in  = parser.getOption("--i", "Input STAR file with rlnMicrographName's ");
-		fn_out = parser.getOption("--o", "Output rootname, to be added to input micrograph names", "reposition");
+		fn_out = parser.getOption("--o", "Output rootname, to be added to input micrograph names", "");
 		fn_odir = parser.getOption("--odir", "Output directory (default is same as input micrographs directory", "");
 		fn_opt = parser.getOption("--opt", "Optimiser STAR file with the 2D classes or 3D maps to be repositioned");
 		fn_dat = parser.getOption("--data", "Data STAR file with selected particles (default is to use all particles)", "");
@@ -67,22 +67,26 @@ public:
 
 	void run()
 	{
+
+		if (fn_out == "" && fn_odir == "")
+			REPORT_ERROR("ERROR: You need to provide either --o or --odir");
+
+		if (fn_odir.length() > 0 && fn_odir[fn_odir.length()-1] != '/') fn_odir += "/";
+
 		int xdim, ydim, radius;
-		MetaDataTable DFi, DFopt;
+		MetaDataTable DFi, DFopt, MDmics_out;
 		ObservationModel::loadSafely(fn_in, obsModelMics, DFi, "micrographs");
 
 		MlOptimiser optimiser;
 		optimiser.do_preread_images = false;
 
-		std::cerr << "Reading optimiser ..." << std::endl;
 		optimiser.read(fn_opt);
 		optimiser.mymodel.setFourierTransformMaps(false);
-		radius = optimiser.particle_diameter / (2. * optimiser.mymodel.pixel_size);
 
 		// Use a user-provided subset of particles instead of all of them?
 		if (fn_dat != "")
 		{
-            std::cerr <<"Reading data ..." << std::endl;
+            std::cout <<" Reading data ..." << std::endl;
 			MetaDataTable MDdata;
 			MDdata.read(fn_dat);
 			optimiser.mydata.MDimg = MDdata;
@@ -97,16 +101,17 @@ public:
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(DFi)
 		{
 
-			FileName fn_mic, fn_mic_out, fn_coord_out;
+			FileName fn_mic, fn_mic_out;
 			DFi.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
-			fn_mic_out = fn_mic.insertBeforeExtension("_" + fn_out);
+			if (fn_out != "") fn_mic_out = fn_mic.insertBeforeExtension("_" + fn_out);
+			else fn_mic_out = fn_mic;
 			if (fn_odir != "")
 			{
 				FileName fn_pre, fn_jobnr, fn_post;
 				if (decomposePipelineFileName(fn_mic_out, fn_pre, fn_jobnr, fn_post))
-					fn_mic_out = fn_odir + "/" + fn_post;
+					fn_mic_out = fn_odir + fn_post;
 				else
-					fn_mic_out = fn_odir + "/" + fn_mic_out;
+					fn_mic_out = fn_odir + fn_mic_out;
 				FileName fn_onlydir = fn_mic_out.beforeLastOf("/");
 				if (fn_onlydir != fn_prevdir)
 				{
@@ -115,7 +120,6 @@ public:
 					fn_prevdir = fn_onlydir;
 				}
 			}
-			fn_coord_out = fn_mic_out.withoutExtension()+ "_coord.star";
 
 			FourierTransformer transformer;
 			MetaDataTable MDcoord;
@@ -147,6 +151,9 @@ public:
 			if (mic_pixel_size<0.)
 				REPORT_ERROR("ERROR: could not find correct optics group in micrograph star file...");
 
+			FileName fn_mic_pre, fn_mic_jobnr, fn_mic_post;
+			decomposePipelineFileName(fn_mic, fn_mic_pre, fn_mic_jobnr, fn_mic_post);
+
 			// Loop over all particles
 			bool found_one = false;
 			for (long int part_id = 0; part_id < optimiser.mydata.numberOfParticles(); part_id++)
@@ -156,10 +163,15 @@ public:
 				RFLOAT my_pixel_size = optimiser.mydata.getImagePixelSize(part_id, 0);
 				int my_image_size = optimiser.mydata.getOpticsImageSize(optics_group);
 
+				if (do_subtract && fabs(my_pixel_size - mic_pixel_size) > 1e-6)
+					REPORT_ERROR("ERROR: subtract code has only been validated with same pixel size for particles and micrographs... Sorry!");
+
 				FileName fn_mic2;
 				optimiser.mydata.MDimg.getValue(EMDL_MICROGRAPH_NAME, fn_mic2, ori_img_id);
+				FileName fn_mic2_pre, fn_mic2_jobnr, fn_mic2_post;
+				decomposePipelineFileName(fn_mic2, fn_mic2_pre, fn_mic2_jobnr, fn_mic2_post);
 
-				if (fn_mic2 == fn_mic)
+				if (fn_mic2_post == fn_mic_post)
 				{
 
 					found_one = true;
@@ -369,6 +381,7 @@ public:
 					Imic_sum.xinit = -ROUND(xcoord);
 					Imic_sum.yinit = -ROUND(ycoord);
 					Imic_sum.zinit = -ROUND(zcoord);
+					radius = optimiser.particle_diameter / (2. * mic_pixel_size);
 					FOR_ALL_ELEMENTS_IN_ARRAY3D(Mpart_mic)
 					{
 						long int idx = ROUND(sqrt(k*k + i*i + j*j));
@@ -381,7 +394,7 @@ public:
 							if (kp >= 0 && kp < ZSIZE(Imic_sum) && ip >= 0 && ip < YSIZE(Imic_sum) && jp >= 0 && jp < XSIZE(Imic_sum) )
 							{
 								A3D_ELEM(Imic_out(), k, i, j) += norm_factor * A3D_ELEM(Mpart_mic, k, i, j);
-								A3D_ELEM(Imic_sum, k, i, j) += norm_factor;
+								A3D_ELEM(Imic_sum, k, i, j) += 1.;
 							}
 						}
 					}
@@ -416,9 +429,19 @@ public:
 				// Write out the new micrograph
 				Imic_out.write(fn_mic_out);
 
+				MDmics_out.addObject();
+				MDmics_out.setObject(DFi.getObject());
+				MDmics_out.setValue(EMDL_MICROGRAPH_NAME, fn_mic_out);
+
 				// Also write out a STAR file with the particles used
+				FileName fn_coord_out = fn_mic_out.withoutExtension()+ "_coord.star";
 				MDcoord.write(fn_coord_out);
 				MDcoord.clear();
+			}
+			else
+			{
+				MDmics_out.addObject();
+				MDmics_out.setObject(DFi.getObject());
 			}
 
 			if (imgno%barstep==0) progress_bar(imgno);
@@ -426,6 +449,12 @@ public:
 
 		} // end loop over input MetadataTable
 		progress_bar(DFi.numberOfObjects());
+
+
+		FileName fn_star_out = fn_odir + "micrographs_reposition.star";
+		if (fn_out != "") fn_star_out = fn_star_out.insertBeforeExtension("_" + fn_out);
+		std::cout << "Writing out star file with the new micrographs: " << fn_star_out << std::endl;
+		obsModelMics.save(MDmics_out, fn_star_out, "micrographs");
 
 		std::cout << " Done!" << std::endl;
 	}// end run function
