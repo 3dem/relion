@@ -252,22 +252,32 @@ void MlModel::read(FileName fn_in, bool read_only_one_group)
 		// Check to see whether there are gradient tracking entry as well
 		if (MDclass.getValue(EMDL_MLMODEL_GRADIENT_MOMENT1_IMAGE, fn_tmp))
 		{
-			Image<Complex> img;
+			Image<RFLOAT> img;
 			do_mom1=true;
 			if (iclass == 0)
 				Igrad1.resize(nr_classes);
 			img.read(fn_tmp);
-			Igrad1[iclass] = img();
+
+			Igrad1[iclass].resize(Iref[0].zdim, Iref[0].ydim, Iref[0].xdim/2+1);
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Igrad1[iclass]) {
+				DIRECT_A3D_ELEM(Igrad1[iclass], k, i, j).real = DIRECT_A3D_ELEM(img(), k, i, j*2+0);
+				DIRECT_A3D_ELEM(Igrad1[iclass], k, i, j).imag = DIRECT_A3D_ELEM(img(), k, i, j*2+1);
+			}
 		}
 
 		if (MDclass.getValue(EMDL_MLMODEL_GRADIENT_MOMENT2_IMAGE, fn_tmp))
 		{
-			Image<Complex> img;
+			Image<RFLOAT> img;
 			do_mom2=true;
 			if (iclass == 0)
 				Igrad2.resize(nr_classes);
 			img.read(fn_tmp);
-			Igrad2[iclass] = img();
+
+			Igrad2[iclass].resize(Iref[0].zdim, Iref[0].ydim, Iref[0].xdim/2+1);
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Igrad2[iclass]) {
+				DIRECT_A3D_ELEM(Igrad2[iclass], k, i, j).real = DIRECT_A3D_ELEM(img(), k, i, j*2+0);
+				DIRECT_A3D_ELEM(Igrad2[iclass], k, i, j).imag = DIRECT_A3D_ELEM(img(), k, i, j*2+1);
+			}
 		}
 
 		iclass++;
@@ -388,7 +398,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 {
 
 	MetaDataTable MDclass, MDgroup, MDlog, MDsigma, MDbodies;
-	FileName fn_tmp, fn_tmp2;
+	FileName fn_tmp, fn_tmp2, fn_mom1, fn_mom2;
 	RFLOAT aux;
 	std::ofstream  fh;
 
@@ -414,12 +424,13 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 
 		if (do_mom1)
 		{
-			Image<RFLOAT> img(XSIZE(Igrad1[0]), YSIZE(Igrad1[0]), 1, nr_classes_bodies);
+			Image<RFLOAT> img(XSIZE(Igrad1[0])*2, YSIZE(Igrad1[0]), 1, nr_classes_bodies);
 			for (int iclass = 0; iclass < nr_classes; iclass++)
 			{
 				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(Igrad1[iclass])
 				{
-					DIRECT_NZYX_ELEM(img(), iclass, 0, i, j) = DIRECT_A2D_ELEM(Igrad1[iclass], i, j);
+					DIRECT_NZYX_ELEM(img(), iclass, 0, i, j*2+0) = DIRECT_A2D_ELEM(Igrad1[iclass], i, j).real;
+					DIRECT_NZYX_ELEM(img(), iclass, 0, i, j*2+1) = DIRECT_A2D_ELEM(Igrad1[iclass], i, j).imag;
 				}
 			}
 			img.write(fn_out + "_1moment.mrcs");
@@ -427,12 +438,13 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 
 		if (do_mom2)
 		{
-			Image<RFLOAT> img(XSIZE(Igrad2[0]), YSIZE(Igrad2[0]), 1, nr_classes_bodies);
+			Image<RFLOAT> img(XSIZE(Igrad2[0])*2, YSIZE(Igrad2[0]), 1, nr_classes_bodies);
 			for (int iclass = 0; iclass < nr_classes; iclass++)
 			{
 				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(Igrad2[iclass])
 				{
-					DIRECT_NZYX_ELEM(img(), iclass, 0, i, j) = DIRECT_A2D_ELEM(Igrad2[iclass], i, j);
+					DIRECT_NZYX_ELEM(img(), iclass, 0, i, j*2+0) = DIRECT_A2D_ELEM(Igrad2[iclass], i, j).real;
+					DIRECT_NZYX_ELEM(img(), iclass, 0, i, j*2+1) = DIRECT_A2D_ELEM(Igrad2[iclass], i, j).imag;
 				}
 
 			}
@@ -466,8 +478,11 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 			{
 				fn_tmp.compose(fn_out+"_1moment", iclass+1, "mrc", 3);
 
-				Image<Complex> img;
-				img() = Igrad1[iclass];
+				Image<RFLOAT> img(XSIZE(Igrad1[0])*2, YSIZE(Igrad1[0]), ZSIZE(Igrad1[0]));
+				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Igrad1[iclass]) {
+					DIRECT_A3D_ELEM(img(), k, i, j*2+0) = DIRECT_A3D_ELEM(Igrad1[iclass], k, i, j).real;
+					DIRECT_A3D_ELEM(img(), k, i, j*2+1) = DIRECT_A3D_ELEM(Igrad1[iclass], k, i, j).imag;
+				}
 				img.write(fn_tmp);
 			}
 		}
@@ -478,8 +493,11 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 			{
 				fn_tmp.compose(fn_out+"_2moment", iclass+1, "mrc", 3);
 
-				Image<Complex> img;
-				img() = Igrad2[iclass];
+				Image<RFLOAT> img(XSIZE(Igrad2[0])*2, YSIZE(Igrad2[0]), ZSIZE(Igrad2[0]));
+				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Igrad2[iclass]) {
+					DIRECT_A3D_ELEM(img(), k, i, j*2+0) = DIRECT_A3D_ELEM(Igrad2[iclass], k, i, j).real;
+					DIRECT_A3D_ELEM(img(), k, i, j*2+1) = DIRECT_A3D_ELEM(Igrad2[iclass], k, i, j).imag;
+				}
 				img.write(fn_tmp);
 			}
 		}
@@ -587,6 +605,9 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 				fn_tmp = fn_out + "_classes.mrcs";
 			}
 			fn_tmp.compose(iclass+1, fn_tmp); // fn_tmp = integerToString(iclass) + "@" + fn_tmp;
+
+			fn_mom1 = fn_out + "_1moment.mrcs";
+			fn_mom2 = fn_out + "_2moment.mrcs";
 		}
 		else
 		{
@@ -598,15 +619,17 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 			}
 			else
 				fn_tmp.compose(fn_out+"_class",iclass+1,"mrc", 3); // class number from 1 to K!
+
+			fn_mom1.compose(fn_out + "_1moment", iclass + 1, "mrc", 3);
+			fn_mom2.compose(fn_out + "_1moment", iclass + 1, "mrc", 3);
 		}
 		MDclass.setValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp);
 
 		if (do_mom1)
-			MDclass.setValue(EMDL_MLMODEL_GRADIENT_MOMENT1_IMAGE, fn_out + "_1moment.mrcs");
+			MDclass.setValue(EMDL_MLMODEL_GRADIENT_MOMENT1_IMAGE, fn_mom1);
 
 		if (do_mom2)
-			MDclass.setValue(EMDL_MLMODEL_GRADIENT_MOMENT2_IMAGE, fn_out + "_2moment.mrcs");
-
+			MDclass.setValue(EMDL_MLMODEL_GRADIENT_MOMENT2_IMAGE, fn_mom2);
 
 		// For multiple bodies: only star PDF_CLASS in the first one!
 		int myclass = (nr_bodies > 1) ? 0 : iclass; // for multi-body: just set iclass=0
