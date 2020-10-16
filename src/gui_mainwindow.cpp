@@ -3503,6 +3503,7 @@ Please also cite relevant papers when you used external programs or their algori
 * ResMap for local-resolution estimation:\n\
     Kucukelbir et al. (2014) Nat. Meth. (PMID: 24213166)\n\n\
 * Symmetry relaxation:\n\
+    Ilca et al. (2019) Nature (PMID: 31142835) \n\
     Abrishami et al. (2020) Prog. Biophys. Mol. Biol. (PMID: 32470354) \n\n\
 * Postscript plots are made using CPlot2D from http://www.amzsaki.com\n\n\
 \
