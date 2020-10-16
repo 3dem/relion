@@ -83,6 +83,21 @@ void SubtomoProgram::readParameters(int argc, char *argv[])
 	{
 		do_narrow_circle_crop = true;
 	}
+
+	ZIO::makeOutputDir(outTag);
+
+	{
+		std::ofstream ofs(outTag+"_note.txt");
+
+		ofs << "Command:\n\n";
+
+		for (int i = 0; i < argc; i++)
+		{
+			ofs << argv[i] << ' ';
+		}
+
+		ofs << '\n';
+	}
 }
 
 void SubtomoProgram::run()
@@ -162,9 +177,7 @@ void SubtomoProgram::run()
 		sum_weights.resize(sh3D,s3D,s3D);
 		sum_weights.fill(0.0);
 	}
-		
 
-	ZIO::makeOutputDir(outTag);
 	
 	for (int t = 0; t < tc; t++)
 	{
