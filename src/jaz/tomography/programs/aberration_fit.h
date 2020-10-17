@@ -2,6 +2,7 @@
 #define ABERRATION_FIT_PROGRAM_H
 
 #include "refinement.h"
+#include <src/jaz/optics/aberrations_cache.h>
 #include <src/jaz/math/tensor2x2.h>
 
 // @TODO: move to jaz/optics/
@@ -55,9 +56,9 @@ class AberrationFitProgram : public RefinementProgram
 		
 		AberrationFitProgram(int argc, char *argv[]);
 		
-		
-			Granularity granularity;
+
 			int n_even, n_odd;
+			bool do_even, do_odd;
 		
 		void readParams(IOParser& parser);
 		void run();
@@ -68,6 +69,7 @@ class AberrationFitProgram : public RefinementProgram
 				const Tomogram& tomogram, 
 				const TomoReferenceMap& referenceMap, 
 				const ParticleSet& dataSet,
+				const AberrationsCache& aberrationsCache,
 				bool flip_value,
 				const BufferedImage<float>& frqWeight,
 				int f0, int f1,

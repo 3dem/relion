@@ -682,13 +682,6 @@ void CTF::applyEwaldMask(RawImage<RFLOAT>& weight, int orixdim, int oriydim, dou
 	}	
 }
 
-BufferedImage<float> CTF::getFftwImage_float(int w0, int h0, double angpix) const
-{
-	BufferedImage<float> out(w0/2 + 1, h0, 1);
-	draw(w0, h0, angpix, &out(0,0,0));
-	return out;
-}
-
 std::vector<double> CTF::getK() const
 {
 	// offset by one to maintain indices (K[1] = K1)

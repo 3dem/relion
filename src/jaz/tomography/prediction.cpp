@@ -25,28 +25,41 @@ using namespace gravis;
 BufferedImage<fComplex> Prediction::predictModulated(
 		int particle_id, const ParticleSet& dataSet, d4Matrix proj, int s,
 		const CTF& ctf, double pixelSize,
+		const AberrationsCache& aberrationsCache,
 		const std::vector<BufferedImage<fComplex>>& referenceFS,
 		HalfSet halfSet,
 		Modulation modulation)
 {
 	BufferedImage<fComplex> prediction = predictFS(
 				particle_id, dataSet, proj, s, referenceFS, halfSet);
+
+	const int og = dataSet.getOpticsGroup(particle_id);
 	
 	if (  modulation == AmplitudeModulated
 	   || modulation == AmplitudeAndPhaseModulated)
 	{
 		const int sh = s / 2 + 1;
 		BufferedImage<float> ctfImg(sh, s);
-		
-		ctf.draw(s, s, pixelSize, &ctfImg[0]);
+
+		const BufferedImage<double>* gammaOffset =
+			aberrationsCache.hasSymmetrical? &aberrationsCache.symmetrical[og] : 0;
+
+		ctf.draw(s, s, pixelSize, gammaOffset, &ctfImg[0]);
 		
 		prediction *= ctfImg;
 	}
 	
-	if (  modulation == PhaseModulated
-	   || modulation == AmplitudeAndPhaseModulated)
+	if (aberrationsCache.hasAntisymmetrical &&
+		 (modulation == PhaseModulated || modulation == AmplitudeAndPhaseModulated) )
 	{
-		// @TODO: modulate phase
+		if (aberrationsCache.phaseShift[og].ydim != s)
+		{
+			REPORT_ERROR_STR(
+				"Prediction::predictModulated: wrong cached phase-shift size. Box size: "
+				<< s << ", cache size: " << aberrationsCache.phaseShift[og].ydim);
+		}
+
+		prediction *= aberrationsCache.phaseShift[og];
 	}
 	
 	return prediction;
@@ -77,6 +90,7 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 		const ParticleSet& dataSet,
 		const std::vector<int>& partIndices,
 		const Tomogram& tomogram,
+		const AberrationsCache& aberrationsCache,
 		const TomoReferenceMap& referenceMap,
 		const BufferedImage<float>& frqWghts,
 		const std::vector<int>& sequence,
@@ -161,6 +175,7 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 					part_id, dataSet, projCut, s, 
 					tomogram.getCtf(f, dataSet.getPosition(part_id)),
 					tomogram.optics.pixelSize,
+					aberrationsCache,
 					referenceMap.image_FS, halfSet);
 					
 			BufferedImage<fComplex> ccFS(sh,s);

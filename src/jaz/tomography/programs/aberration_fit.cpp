@@ -10,6 +10,7 @@
 #include <src/jaz/image/centering.h>
 #include <src/jaz/single_particle/ctf/magnification_helper.h>
 #include <src/jaz/optimization/nelder_mead.h>
+#include <src/jaz/optics/aberrations_cache.h>
 #include <omp.h> 
 
 using namespace gravis;
@@ -30,12 +31,13 @@ void AberrationFitProgram::readParams(IOParser &parser)
 		_readParams(parser);
 				
 		int defocus_section = parser.addSection("Alignment options");
-		
-		bool perTomogram = parser.checkOption("--per_tomo", "Estimate the aberrations per tomogram instead of globally");
-		
-		granularity = perTomogram? PerTomogram : Global;
+
+		do_even = !parser.checkOption("--no_symm", "Do not fit symmetrical aberrations");
+		do_odd = !parser.checkOption("--no_antisymm", "Do not fit antisymmetrical aberrations");
+
 		n_even = textToInteger(parser.getOption("--ne", "Maximal even N", "4"));
 		n_odd = textToInteger(parser.getOption("--no", "Maximal odd N", "3"));
+
 		
 		Log::readParams(parser);
 		
@@ -55,6 +57,31 @@ void AberrationFitProgram::readParams(IOParser &parser)
 
 void AberrationFitProgram::run()
 {
+	if (!do_even && !do_odd)
+	{
+		// This might happen if the program is called from a script.
+		// Let's make sure a particles.star is still written out.
+
+		Log::warn("Estimating neither symmetrical nor antisymmetrical aberrations: there is nothing to estimate.");
+
+		dataSet.write(outDir+"particles.star");
+
+		return;
+	}
+
+	if (do_even && do_odd)
+	{
+		Log::print("Estimating both symmetrical and antisymmetrical aberrations");
+	}
+	else if (do_even)
+	{
+		Log::print("Estimating symmetrical aberrations only");
+	}
+	else // do_odd
+	{
+		Log::print("Estimating antisymmetrical aberrations only");
+	}
+
 	Log::beginSection("Initialising");
 	
 	RefinementProgram::init();
@@ -62,29 +89,36 @@ void AberrationFitProgram::run()
 	const int s = boxSize;
 	const int sh = s/2 + 1;
 	const int tc = particles.size();
+	const int gc = dataSet.numberOfOpticsGroups();
 	const bool flip_value = true;
 	
-	Log::printBinaryChoice("Estimating the aberrations ", granularity == PerTomogram, 
-						   "per tomogram", "globally");
-	
 	Log::endSection();
-		
-	
-	
-	std::vector<BufferedImage<EvenData>> evenData_thread(num_threads);
-	std::vector<BufferedImage<OddData>> oddData_thread(num_threads);
+
+	// check for pixel size consistency!
+
+	std::vector<BufferedImage<EvenData>> evenData_perGroup(gc);
+	std::vector<BufferedImage<OddData>>  oddData_perGroup(gc);
+
+	std::vector<std::vector<BufferedImage<EvenData>>> evenData_perGroup_perThread(num_threads);
+	std::vector<std::vector<BufferedImage<OddData>>> oddData_perGroup_perThread(num_threads);
 	
 	EvenData evenZero({0.0, 0.0, 0.0, 0.0, 0.0});
 	OddData oddZero({0.0, dComplex(0.0, 0.0)});
-	
-	BufferedImage<EvenData> evenData(sh,s);
-	evenData.fill(evenZero);
-	
-	BufferedImage<OddData> oddData(sh,s);
-	oddData.fill(oddZero);
-	
-	// split tomograms by pixel size!
-	
+
+	for (int g = 0; g < gc; g++)
+	{
+		evenData_perGroup[g] = BufferedImage<EvenData>(sh,s);
+		evenData_perGroup[g].fill(evenZero);
+
+		oddData_perGroup[g] = BufferedImage<OddData>(sh,s);
+		oddData_perGroup[g].fill(oddZero);
+
+		evenData_perGroup_perThread[g] = std::vector<BufferedImage<EvenData>>(num_threads);
+		oddData_perGroup_perThread[g]  = std::vector<BufferedImage<OddData>>(num_threads);
+	}
+
+	AberrationsCache aberrationsCache(dataSet.optTable, boxSize);
+
 	double lastPixelSize = 0.0;
 	
 	
@@ -93,7 +127,7 @@ void AberrationFitProgram::run()
 		int pc = particles[t].size();
 		if (pc == 0) continue;
 		
-		Log::beginSection("Tomogram " + ZIO::itoa(t+1) + " / " + ZIO::itoa(tc));		
+		Log::beginSection("Tomogram " + ZIO::itoa(t+1) + " / " + ZIO::itoa(tc));
 		Log::print("Loading");
 		
 		Tomogram tomogram = tomogramSet.loadTomogram(t, true);
@@ -110,19 +144,22 @@ void AberrationFitProgram::run()
 			frqWeight.write(diagPrefix + "_noise_weight.mrc");
 			referenceMap.freqWeight.write(diagPrefix + "_FSC_weight.mrc");
 		}
-				
-		for (int th = 0; th < num_threads; th++)
+
+		for (int g = 0; g < gc; g++)
 		{
-			evenData_thread[th] = BufferedImage<EvenData>(sh,s);
-			evenData_thread[th].fill(evenZero);
-			
-			oddData_thread[th] = BufferedImage<OddData>(sh,s);
-			oddData_thread[th].fill(oddZero);
+			for (int th = 0; th < num_threads; th++)
+			{
+				evenData_perGroup_perThread[g][th] = BufferedImage<EvenData>(sh,s);
+				evenData_perGroup_perThread[g][th].fill(evenZero);
+
+				oddData_perGroup_perThread[g][th] = BufferedImage<OddData>(sh,s);
+				oddData_perGroup_perThread[g][th].fill(oddZero);
+			}
 		}
 				
 		Log::beginProgress("Accumulating evidence", pc/num_threads);
 		
-		#pragma omp parallel for num_threads(num_threads)		
+		#pragma omp parallel for num_threads(num_threads)
 		for (int p = 0; p < pc; p++)
 		{
 			const int th = omp_get_thread_num();
@@ -131,54 +168,87 @@ void AberrationFitProgram::run()
 			{
 				Log::updateProgress(p);
 			}
+
+			const int g = dataSet.getOpticsGroup(p);
 			
 			considerParticle(
-				particles[t][p], tomogram, referenceMap, dataSet, flip_value, frqWeight,
-				0, -1,
-				evenData_thread[th], oddData_thread[th]);
+				particles[t][p], tomogram, referenceMap, dataSet,
+				aberrationsCache, flip_value, frqWeight,
+				first_frame, last_frame,
+				evenData_perGroup_perThread[g][th],
+				oddData_perGroup_perThread[g][th]);
 		}
 		
 		Log::endProgress();
 		
-		for (int th = 0; th < num_threads; th++)
+		for (int g = 0; g < gc; g++)
 		{
-			evenData += evenData_thread[th];
-			oddData += oddData_thread[th];
-		}
-				
-		if (granularity == PerTomogram)
-		{
-			std::vector<double> initialEven(Zernike::numberOfEvenCoeffs(n_even), 0.0);
-			std::vector<double> initialOdd(Zernike::numberOfEvenCoeffs(n_odd), 0.0);
-
-			solveAndFitEven(
-				evenData, n_even, initialEven,
-				tomogram.optics.pixelSize, outDir + ZIO::itoa(t) + "_", true);
-
-			solveAndFitOdd(
-				oddData, n_odd, initialOdd,
-				tomogram.optics.pixelSize, outDir + ZIO::itoa(t) + "_", true);
-			
-			evenData.fill(evenZero);
-			oddData.fill(oddZero);
+			for (int th = 0; th < num_threads; th++)
+			{
+				evenData_perGroup[g] += evenData_perGroup_perThread[g][th];
+				oddData_perGroup[g]  += oddData_perGroup_perThread[g][th];
+			}
 		}
 		
 		Log::endSection();
 	}
-	
-	if (granularity == Global)
+
+	for (int g = 0; g < gc; g++)
 	{
-		std::vector<double> initialEven(Zernike::numberOfEvenCoeffs(n_even), 0.0);
-		std::vector<double> initialOdd(Zernike::numberOfEvenCoeffs(n_odd), 0.0);
+		if (do_even)
+		{
+			std::vector<double> initialEven(Zernike::numberOfEvenCoeffs(n_even), 0.0);
 
-		solveAndFitEven(
-			evenData, n_even, initialEven,
-			lastPixelSize, outDir, true);
+			std::vector<double> evenCoeffs = solveAndFitEven(
+				evenData_perGroup[g], n_even, initialEven,
+				lastPixelSize, outDir, true);
 
-		solveAndFitOdd(
-			oddData, n_odd, initialOdd,
-			lastPixelSize, outDir, true);
+			if (dataSet.optTable.labelExists(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS))
+			{
+				const std::vector<double> evenCoeffs0 = dataSet.optTable.getDoubleVector(
+					EMDL_IMAGE_EVEN_ZERNIKE_COEFFS, g);
+
+				for (int i = 0; i < evenCoeffs.size(); i++)
+				{
+					if (i < evenCoeffs0.size())
+					{
+						evenCoeffs[i] += evenCoeffs0[i];
+					}
+				}
+			}
+
+			dataSet.optTable.setValue(
+				EMDL_IMAGE_EVEN_ZERNIKE_COEFFS, evenCoeffs, g);
+		}
+
+		if (do_odd)
+		{
+			std::vector<double> initialOdd(Zernike::numberOfOddCoeffs(n_odd), 0.0);
+
+			std::vector<double> oddCoeffs = solveAndFitOdd(
+				oddData_perGroup[g], n_odd, initialOdd,
+				lastPixelSize, outDir, true);
+
+			if (dataSet.optTable.labelExists(EMDL_IMAGE_ODD_ZERNIKE_COEFFS))
+			{
+				const std::vector<double> oddCoeffs0 = dataSet.optTable.getDoubleVector(
+					EMDL_IMAGE_ODD_ZERNIKE_COEFFS, g);
+
+				for (int i = 0; i < oddCoeffs.size(); i++)
+				{
+					if (i < oddCoeffs0.size())
+					{
+						oddCoeffs[i] += oddCoeffs0[i];
+					}
+				}
+			}
+
+			dataSet.optTable.setValue(
+				EMDL_IMAGE_ODD_ZERNIKE_COEFFS, oddCoeffs, g);
+		}
 	}
+
+	dataSet.write(outDir+"particles.star");
 }
 
 void AberrationFitProgram :: considerParticle(
@@ -186,6 +256,7 @@ void AberrationFitProgram :: considerParticle(
 		const Tomogram& tomogram, 
 		const TomoReferenceMap& referenceMap, 
 		const ParticleSet& dataSet,
+		const AberrationsCache& aberrationsCache,
 		bool flip_value,
 		const BufferedImage<float>& frqWeight,
 		int f0, int f1,
@@ -195,6 +266,7 @@ void AberrationFitProgram :: considerParticle(
 	const int s = referenceMap.image_real[0].xdim;
 	const int sh = s/2 + 1;
 	const int fc = tomogram.frameCount;
+	const int og = dataSet.getOpticsGroup(part_id);
 	const double pix2ang = 1.0 / ((double)s * tomogram.optics.pixelSize);
 	
 	if (f1 < 0) f1 = fc - 1;
@@ -220,6 +292,7 @@ void AberrationFitProgram :: considerParticle(
 				part_id, dataSet, projCut, s, 
 				ctf,
 				tomogram.optics.pixelSize,
+				aberrationsCache,
 				referenceMap.image_FS, 
 				Prediction::OwnHalf,
 				Prediction::Unmodulated);
@@ -235,38 +308,49 @@ void AberrationFitProgram :: considerParticle(
 			const double x_ang = pix2ang * x;
 			const double y_ang = pix2ang * (y < s/2? y : y - s);
 
-			const double gamma = ctf.getLowOrderGamma(x_ang, y_ang);
+			double gamma = ctf.getLowOrderGamma(x_ang, y_ang);
+
+			if (aberrationsCache.hasSymmetrical)
+			{
+				gamma += aberrationsCache.symmetrical[og](x,y);
+			}
+
 			const double cg = cos(gamma);
 			const double sg = sin(gamma);
 			const double c = -sg;
 
 			fComplex zobs = observation(x,y);
 			fComplex zprd = scale * prediction(x,y);
-			
+
+			if (aberrationsCache.hasAntisymmetrical)
+			{
+				const fComplex r = aberrationsCache.phaseShift[og](x,y);
+				const fComplex z = zobs;
+
+				zobs.real = z.real * r.real + z.imag * r.imag;
+				zobs.imag = z.imag * r.real - z.real * r.imag;
+			}
+
 			const double zz = zobs.real * zprd.real + zobs.imag * zprd.imag;
 			const double zq = zobs.imag * zprd.real - zobs.real * zprd.imag;
 			const double nr = zprd.norm();
 			const double wg = frqWeight(x,y,f);
-			
-			
-			// NOTE: the prediction contains neither phase nor amp modulation!
-			// @TODO: when phase shifts are supported, consider them here.
-			
-			
+
+
 			EvenData& ed = even_out(x,y);
-			
+
 			ed.Axx += wg * nr * sg * sg;
 			ed.Axy += wg * nr * cg * sg;
 			ed.Ayy += wg * nr * cg * cg;
-	
+
 			ed.bx -= wg * zz * sg;
 			ed.by -= wg * zz * cg;
-			
-			
+
+
 			OddData& od = odd_out(x,y);
-			
+
 			od.a += wg * c * c * nr;
-			
+
 			od.b.real += wg * c * zz;
 			od.b.imag += wg * c * zq;
 		}
@@ -338,31 +422,26 @@ std::vector<double> AberrationFitProgram::fitEven(
 			" initial coefficient provided, but " << cc << " are required.");
 	}
 	
-	/*if (writeImages)
+	if (writeImages)
 	{
-		Centering::fftwHalfToHumanFull(phaseShift).write(prefix + "even_phase_per-pixel.mrc");
-	}*/
+		Centering::fftwHalfToHumanFull(solution.phaseShift).write(prefix + "even_phase_per-pixel.mrc");
+	}
 
 	BufferedImage<double> nonlinearFit;
-
-	/*if (writeImages)
-	{
-		Centering::fftwHalfToHumanFull(nonlinearFit).write(prefix + "even_phase_nonlinear-fit.mrc");
-	}*/
 
 	std::vector<double> coeffs = ZernikeHelper::optimiseEvenZernike(
 		solution.optimum,
 		solution.weight,
 		pixelSize, 
 		mag,
-		n_bands-1,
+		n_bands,
 		initialCoeffs,
 		&nonlinearFit);
 	
-	/*if (writeImages)
+	if (writeImages)
 	{
 		Centering::fftwHalfToHumanFull(nonlinearFit).write(prefix + "even_phase_nonlinear-fit.mrc");
-	}*/
+	}
 	
 	// @TODO: write coefficients to a file
 	
@@ -617,7 +696,7 @@ std::vector<double> AberrationFitProgram::fitOdd(
 {
 	const d2Matrix mag(1.0, 0.0, 0.0, 1.0);
 
-	const int cc = Zernike::numberOfOddCoeffs(n_bands - 1);
+	const int cc = Zernike::numberOfOddCoeffs(n_bands);
 
 	if (initialCoeffs.size() != cc)
 	{
@@ -626,11 +705,11 @@ std::vector<double> AberrationFitProgram::fitOdd(
 			" initial coefficient provided, but " << cc << " are required.");
 	}
 
-	/*if (writeImages)
+	if (writeImages)
 	{
-		Centering::fftwHalfAntisymmetricalToHumanFull(phaseShift).write(
+		Centering::fftwHalfAntisymmetricalToHumanFull(solution.phaseShift).write(
 					prefix + "odd_phase_per-pixel.mrc");
-	}*/
+	}
 	
 	BufferedImage<double> nonlinearFit;
 	
@@ -639,15 +718,15 @@ std::vector<double> AberrationFitProgram::fitOdd(
 		solution.weight,
 		pixelSize, 
 		mag,
-		n_bands-1,
+		n_bands,
 		initialCoeffs,
 		&nonlinearFit);
 	
-	/*if (writeImages)
+	if (writeImages)
 	{
 		Centering::fftwHalfAntisymmetricalToHumanFull(nonlinearFit).write(
 					prefix + "odd_phase_nonlinear-fit.mrc");
-	}*/
+	}
 	
 	return coeffs;
 }

@@ -82,6 +82,8 @@ void DefocusRefinementProgram::run()
 		
 	const int tc = particles.size();
 	const bool flip_value = true;
+
+	AberrationsCache aberrationsCache(dataSet.optTable, boxSize);
 	
 	Log::endSection();
 		
@@ -233,7 +235,8 @@ void DefocusRefinementProgram::run()
 					}
 					
 					AberrationFitProgram::considerParticle(
-						particles[t][p], tomogram, referenceMap, dataSet, flip_value, freqWeights,
+						particles[t][p], tomogram, referenceMap, dataSet,
+						aberrationsCache, flip_value, freqWeights,
 						f, f, 
 						evenData_thread[th], oddData_thread[th]);
 				}

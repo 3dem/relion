@@ -12,6 +12,7 @@
 #include <src/jaz/tomography/tomogram_set.h>
 #include <src/jaz/tomography/particle_set.h>
 #include <src/jaz/optics/damage.h>
+#include <src/jaz/optics/aberrations_cache.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
 #include <src/time.h>
@@ -154,7 +155,9 @@ void BackprojectProgram::run()
 		ctfImgFS[i].fill(0.0);
 		psfImgFS[i].fill(0.0);
 	}
-	
+
+	AberrationsCache aberrationsCache(dataSet.optTable, boxSize);
+
 	Log::endSection();
 	
 	
@@ -223,7 +226,11 @@ void BackprojectProgram::run()
 			const d4Matrix particleToTomo = dataSet.getMatrix4x4(part_id, s,s,s);
 			
 			const int halfSet = dataSet.getHalfSet(part_id);
-			
+
+			const int og = dataSet.getOpticsGroup(part_id);
+
+			const BufferedImage<double>* gammaOffset =
+				aberrationsCache.hasSymmetrical? &aberrationsCache.symmetrical[og] : 0;
 			
 			for (int f = 0; f < fc; f++)
 			{
@@ -234,7 +241,7 @@ void BackprojectProgram::run()
 				{
 					CTF ctf = tomogram.getCtf(f, pos);
 					BufferedImage<float> ctfImg(sh,s);
-					ctf.draw(s, s, binnedPixelSize, &ctfImg(0,0,0));
+					ctf.draw(s, s, binnedPixelSize, gammaOffset, &ctfImg(0,0,0));
 					
 					const float scale = flip_value? -1.f : 1.f;
 							
@@ -245,6 +252,26 @@ void BackprojectProgram::run()
 						
 						particleStack[th](x,y,f) *= c;
 						weightStack[th](x,y,f) = c * c;
+					}
+
+					if (aberrationsCache.hasAntisymmetrical)
+					{
+						if (aberrationsCache.phaseShift[og].ydim != s)
+						{
+							REPORT_ERROR_STR(
+								"reconstruct_particle: wrong cached phase-shift size. Box size: "
+								<< s << ", cache size: " << aberrationsCache.phaseShift[og].ydim);
+						}
+
+						for (int y = 0; y < s;  y++)
+						for (int x = 0; x < sh; x++)
+						{
+							const fComplex r = aberrationsCache.phaseShift[og](x,y);
+							const fComplex z = particleStack[th](x,y,f);
+
+							particleStack[th](x,y,f).real = z.real * r.real + z.imag * r.imag;
+							particleStack[th](x,y,f).imag = z.imag * r.real - z.real * r.imag;
+						}
 					}
 				}
 			}			

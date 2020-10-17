@@ -13,6 +13,7 @@
 #include <src/jaz/tomography/tomogram.h>
 #include <src/jaz/tomography/particle_set.h>
 #include <src/jaz/optics/damage.h>
+#include <src/jaz/optics/aberrations_cache.h>
 #include <src/time.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
@@ -178,6 +179,8 @@ void SubtomoProgram::run()
 		sum_weights.fill(0.0);
 	}
 
+	AberrationsCache aberrationsCache(dataSet.optTable, s2D);
+
 	
 	for (int t = 0; t < tc; t++)
 	{
@@ -240,7 +243,12 @@ void SubtomoProgram::run()
 			
 			
 			if (!do_ctf) weightStack.fill(1.f);
-			
+
+
+			const int og = dataSet.getOpticsGroup(part_id);
+
+			const BufferedImage<double>* gammaOffset =
+				aberrationsCache.hasSymmetrical? &aberrationsCache.symmetrical[og] : 0;
 			
 			for (int f = 0; f < fc; f++)
 			{
@@ -250,10 +258,10 @@ void SubtomoProgram::run()
 				{
 					CTF ctf = tomogram.getCtf(f, pos);
 					BufferedImage<float> ctfImg(sh2D, s2D);
-					ctf.draw(s2D, s2D, binnedPixelSize, &ctfImg(0,0,0));
+					ctf.draw(s2D, s2D, binnedPixelSize, gammaOffset, &ctfImg(0,0,0));
 					
 					const float sign = flip_value? -1.f : 1.f;
-							
+
 					for (int y = 0; y < s2D;  y++)
 					for (int x = 0; x < sh2D; x++)
 					{
@@ -261,6 +269,26 @@ void SubtomoProgram::run()
 						
 						particleStack(x,y,f) *= sign * c;
 						weightStack(x,y,f) = c * c;
+					}
+
+					if (aberrationsCache.hasAntisymmetrical)
+					{
+						if (aberrationsCache.phaseShift[og].ydim != s2D)
+						{
+							REPORT_ERROR_STR(
+								"subtomo: wrong cached phase-shift size. Box size: "
+								<< s2D << ", cache size: " << aberrationsCache.phaseShift[og].ydim);
+						}
+
+						for (int y = 0; y < s2D;  y++)
+						for (int x = 0; x < sh2D; x++)
+						{
+							const fComplex r = aberrationsCache.phaseShift[og](x,y);
+							const fComplex z = particleStack(x,y,f);
+
+							particleStack(x,y,f).real = z.real * r.real + z.imag * r.imag;
+							particleStack(x,y,f).imag = z.imag * r.real - z.real * r.imag;
+						}
 					}
 				}
 			}

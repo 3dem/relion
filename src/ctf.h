@@ -345,20 +345,43 @@ public:
 	// Methods using the new data types from 2019/2020 in src/jaz/
 	
 	template <typename T>
-	void draw(int w0, int h0, double angpix, T* dest) const
+	void draw(
+		int w0, int h0, double angpix,
+		const BufferedImage<double>* gammaOffset, T* dest) const
 	{
 		const int wh = w0 / 2 + 1;
 		
 		double xs = w0 * angpix;
 		double ys = h0 * angpix;
 		
-		for (int y = 0; y < h0; y++)
-		for (int x = 0; x < wh; x++)
+		if (gammaOffset)
 		{
-			double xx = x / xs;
-			double yy = (y < h0/2? y : y - h0) / ys;
-	
-			dest[y*wh + x] = getCTF(xx,yy);
+			if (gammaOffset->ydim != h0)
+			{
+				REPORT_ERROR_STR(
+					"CTF::draw: wrong cached gamma-offset size. Box size: "
+					<< w0 << ", cache size: " << gammaOffset->ydim);
+			}
+
+			for (int y = 0; y < h0; y++)
+			for (int x = 0; x < wh; x++)
+			{
+				double xx = x / xs;
+				double yy = (y < h0/2? y : y - h0) / ys;
+
+				dest[y*wh + x] = getCTF(xx, yy, false, false, false, true, (*gammaOffset)(x,y));
+			}
+		}
+		else
+		{
+			for (int y = 0; y < h0; y++)
+			for (int x = 0; x < wh; x++)
+			{
+				double xx = x / xs;
+				double yy = (y < h0/2? y : y - h0) / ys;
+
+				dest[y*wh + x] = getCTF(xx,yy);
+			}
 		}
 	}
 	
@@ -424,8 +447,6 @@ public:
 			}
 		}
 	}
-	
-	BufferedImage<float> getFftwImage_float(int w0, int h0, double angpix) const;
 	
 	double setDefocusMatrix(double axx, double axy, double ayy);
 			
