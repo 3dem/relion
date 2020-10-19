@@ -16,7 +16,7 @@
 #include <src/jaz/optics/damage.h>
 #include <src/jaz/math/Zernike_helper.h>
 #include <src/jaz/optimization/nelder_mead.h>
-#include <src/jaz/single_particle/ctf/magnification_helper.h>
+#include <src/jaz/optics/magnification_helper.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
 #include <iostream>
@@ -41,22 +41,23 @@ DefocusRefinementProgram::DefocusRefinementProgram(int argc, char *argv[])
 		
 		int def_section = parser.addSection("Defocus refinement options");
 				
-		scanDefocus = !parser.checkOption("--no_scan", "Skip accelerated defocus scan");
-		slowScan = parser.checkOption("--slow_scan", "Perform a slow, brute-force defocus scan instead");
-		refineFast = !parser.checkOption("--slow_scan_only", "Only perform a brute-force scan");
-		refineAstigmatism = !parser.checkOption("--no_astigmatism", "Do not refine the astigmatism");
+		do_scanDefocus = !parser.checkOption("--no_scan", "Skip accelerated defocus scan");
+		do_slowScan = parser.checkOption("--slow_scan", "Perform a slow, brute-force defocus scan instead");
+		do_refineFast = !parser.checkOption("--slow_scan_only", "Only perform a brute-force scan");
+		do_refineAstigmatism = !parser.checkOption("--no_astigmatism", "Do not refine the astigmatism");
 		do_plotAstigmatism = parser.checkOption("--plot_astigmatism", "Plot the astigmatism cost function");
+		do_slopeFit = parser.checkOption("--fit_slope", "Fit the slope of defocus over depth");
 
 		max_particles = textToInteger(parser.getOption("--max", "Max. number of particles to consider per tomogram", "-1"));
 		group_count = textToInteger(parser.getOption("--g", "Number of independent groups", "10"));
 		sigma_input = textToDouble(parser.getOption("--sig0", "Std. dev. of initial defoci (negative to turn off regularisation)", "-1"));
-		regularise = sigma_input > 0.0;
+		do_regularise = sigma_input > 0.0;
 		
 		minDelta = textToDouble(parser.getOption("--d0", "Min. defocus offset to test [Å]", "-300"));
 		maxDelta = textToDouble(parser.getOption("--d1", "Max. defocus offset to test [Å]", "300"));
 		deltaSteps = textToInteger(parser.getOption("--ds", "Number of defocus steps in-between", "100"));
 		
-		clearAstigmatism = parser.checkOption("--ca", "Clear the current astigmatism estimate");
+		do_clearAstigmatism = parser.checkOption("--ca", "Clear the current astigmatism estimate");
 		
 		Log::readParams(parser);
 		
@@ -72,9 +73,9 @@ DefocusRefinementProgram::DefocusRefinementProgram(int argc, char *argv[])
 		exit(1);
 	}
 
-	if (!refineFast)
+	if (!do_refineFast)
 	{
-		slowScan = true;
+		do_slowScan = true;
 	}
 }
 
@@ -90,7 +91,13 @@ void DefocusRefinementProgram::run()
 	AberrationsCache aberrationsCache(dataSet.optTable, boxSize);
 	
 	Log::endSection();
-		
+
+	const double min_slope = 0.97;
+	const double max_slope = 1.03;
+	const int slope_steps = 20;
+
+	std::vector<d2Vector> globalSlopeCost(slope_steps, d2Vector(0.0, 0.0));
+
 	for (int t = 0; t < tc; t++)
 	{
 		int pc0 = particles[t].size();
@@ -110,7 +117,7 @@ void DefocusRefinementProgram::run()
 				particles[t][0], usedParticleCount, fc, "DefocusRefinementProgram::run");
 		
 		
-		if (clearAstigmatism)
+		if (do_clearAstigmatism)
 		{
 			for (int f = 0; f < fc; f++)
 			{
@@ -134,19 +141,21 @@ void DefocusRefinementProgram::run()
 		
 		BufferedImage<float> freqWeights = computeFrequencyWeights(
 			tomogram, true, 0.0, 0.0, num_threads);
+
+		std::vector<d2Vector> tomogramSlopeCost(slope_steps, d2Vector(0.0, 0.0));
 		
 					
 		for (int f = f0; f <= f1; f++)
 		{
 			Log::beginSection("Frame " + ZIO::itoa(f+1));
 			
-			if (slowScan)
+			if (do_slowScan)
 			{
 				DefocusFit defocus = findDefocus(
 					f, minDelta, maxDelta, deltaSteps,  
 					group_count, sigma_input,	
 					dataSet, particles[t], usedParticleCount, 
-					tomogram, referenceMap.image_FS, 
+					tomogram, aberrationsCache, referenceMap.image_FS,
 					freqWeights, flip_value, num_threads);
 				
 				defocusOffset[f] = defocus.value;
@@ -186,7 +195,7 @@ void DefocusRefinementProgram::run()
 				const double s02 = sigma_input * sigma_input;
 				const double sf2 = offsetStdDev[f] * offsetStdDev[f];
 				
-				const double deltaZ = regularise?
+				const double deltaZ = do_regularise?
 					s02 * defocusOffset[f] / (sf2 + s02) :
 					defocusOffset[f];
 
@@ -198,7 +207,7 @@ void DefocusRefinementProgram::run()
 				tomogramSet.setCtf(t,f,ctf);
 			}
 
-			if (refineFast)
+			if (do_refineFast)
 			{
 				const int s = referenceMap.image_real[0].xdim;
 				const int sh = s/2 + 1;
@@ -259,7 +268,7 @@ void DefocusRefinementProgram::run()
 
 				double bestDeltaZ = 0;
 
-				if (scanDefocus)
+				if (do_scanDefocus)
 				{
 					bestDeltaZ = scanForDefocus(
 							evenData, tomogram.optics.pixelSize, tomogram.centralCTFs[f],
@@ -271,7 +280,7 @@ void DefocusRefinementProgram::run()
 
 				CTF ctf1 = ctf_dz;
 
-				if (refineAstigmatism)
+				if (do_refineAstigmatism)
 				{
 					EvenSolution solution = AberrationFit::solveEven(evenData);
 
@@ -297,28 +306,103 @@ void DefocusRefinementProgram::run()
 				tomogramSet.setCtf(t, f, ctf1);
 
 			}
+
+			if (do_slopeFit)
+			{
+				std::vector<d2Vector> slopeCost = computeSlopeCost(
+					f, min_slope, max_slope, slope_steps,
+					dataSet, particles[t], pc0, tomogram, aberrationsCache,
+					referenceMap.image_FS, freqWeights,
+					flip_value, num_threads);
+
+				double minVal = slopeCost[0][1];
+
+				for (int i = 0; i < slopeCost.size(); i++)
+				{
+					tomogramSlopeCost[i][0]  = slopeCost[i][0];
+					tomogramSlopeCost[i][1] += slopeCost[i][1];
+
+					if (slopeCost[i][1] < minVal)
+					{
+						minVal = slopeCost[i][1];
+					}
+				}
+
+				std::ofstream slopeFile(outDir+"t_"+ZIO::itoa(t)+"_f_"+ZIO::itoa(f)+"_slope.dat");
+
+				for (int i = 0; i < slopeCost.size(); i++)
+				{
+					slopeFile.precision(12);
+					slopeFile << slopeCost[i][0] << ' ' << (slopeCost[i][1] - minVal) << '\n';
+				}
+			}
 			
 			Log::endSection();
 			
 		} // all frames
 
+		if (do_slopeFit)
+		{
+			double minVal = tomogramSlopeCost[0][1];
+
+			for (int i = 0; i < tomogramSlopeCost.size(); i++)
+			{
+				globalSlopeCost[i][0]  = tomogramSlopeCost[i][0];
+				globalSlopeCost[i][1] += tomogramSlopeCost[i][1];
+
+				if (tomogramSlopeCost[i][1] < minVal)
+				{
+					minVal = tomogramSlopeCost[i][1];
+				}
+			}
+
+			std::ofstream slopeFile(outDir+"t_"+ZIO::itoa(t)+"_slope.dat");
+
+			for (int i = 0; i < tomogramSlopeCost.size(); i++)
+			{
+				slopeFile.precision(12);
+				slopeFile << tomogramSlopeCost[i][0] << ' ' << (tomogramSlopeCost[i][1] - minVal) << '\n';
+			}
+		}
+
 		Log::endSection();
 		
 	} // all tomograms
-	
+
+	if (do_slopeFit)
+	{
+		double minVal = globalSlopeCost[0][1];
+
+		for (int i = 0; i < globalSlopeCost.size(); i++)
+		{
+			if (globalSlopeCost[i][1] < minVal)
+			{
+				minVal = globalSlopeCost[i][1];
+			}
+		}
+
+		std::ofstream slopeFile(outDir+"slope.dat");
+
+		for (int i = 0; i < globalSlopeCost.size(); i++)
+		{
+			slopeFile.precision(12);
+			slopeFile << globalSlopeCost[i][0] << ' ' << (globalSlopeCost[i][1] - minVal) << '\n';
+		}
+	}
+
 	tomogramSet.write(outDir+"tomograms.star");
 }
 
 BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(
-		int f, 
-		double z0, double z1, int steps, 
+		int f,
+		double z0, double z1, int steps,
 		const ParticleSet& dataSet,
 		std::vector<int>& particles, int max_particles,
 		const Tomogram& tomogram,
+		const AberrationsCache& aberrationsCache,
 		std::vector<BufferedImage<fComplex>>& referenceFS,
 		const BufferedImage<float>& freqWeights,
-		bool flip_value, 
-		double handedness,
+		bool flip_value,
 		int num_threads)
 {
 	const double deltaStep = (z1 - z0) / (double) (steps - 1);
@@ -328,60 +412,60 @@ BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(
 	const int s = referenceFS[0].ydim;
 	const int sh = s/2 + 1;
 	const double sh2 = sh * (double) sh;
-	
-	
-	std::vector<BufferedImage<double>> 
+
+
+	std::vector<BufferedImage<double>>
 			CC(num_threads);
-	
+
 	for (int th = 0; th < num_threads; th++)
 	{
 		CC[th] = BufferedImage<double>(pc,steps);
 	}
-	
-	#if TIMING			
+
+	#if TIMING
 		Timer timer;
 		int time_extract = timer.setNew("extraction");
 		int time_fwd_proj = timer.setNew("fwd. projection");
 		int time_CTFdraw = timer.setNew("CTF drawing");
-		int time_NCCcalc = timer.setNew("NCC calculation");				
+		int time_NCCcalc = timer.setNew("NCC calculation");
 	#endif
-	
+
 
 	Log::beginProgress(
 		"Evaluating defocus offsets from "
 		+ZIO::itoa(z0)+"Å to "+ZIO::itoa(z1)+"Å in "
-		+ZIO::itoa(steps)+" steps of "+ZIO::itoa(deltaStep)+"Å", 
+		+ZIO::itoa(steps)+" steps of "+ZIO::itoa(deltaStep)+"Å",
 		pc / num_threads);
 
 	#pragma omp parallel for num_threads(num_threads)
 	for (int p = 0; p < pc; p++)
 	{
 		const int th = omp_get_thread_num();
-		
+
 		if (th == 0) Log::updateProgress(p);
-		
+
 		const int part_id = particles[p];
-		
+
 		#if TIMING
 			if (th==0) timer.tic(time_extract);
 		#endif
-		
+
 		const d3Vector pos = dataSet.getPosition(part_id);
 		const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(part_id, fc, pixelSize);
-		
+
 		d4Matrix projCut;
 
 		BufferedImage<fComplex> observation(sh,s);
-		
+
 		TomoExtraction::extractFrameAt3D_Fourier(
 				tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f], traj[f],
 				observation, projCut, 1, false, true);
-		
+
 		#if TIMING
 			if (th==0) timer.toc(time_extract);
 		#endif
 
-		
+
 		#if TIMING
 			if (th==0) timer.tic(time_fwd_proj);
 		#endif
@@ -398,44 +482,49 @@ BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(
 
 		BufferedImage<float> CTFimage(sh,s);
 
+		const int og = dataSet.getOpticsGroup(part_id);
+
+		const BufferedImage<double>* gammaOffset =
+				aberrationsCache.hasSymmetrical? &aberrationsCache.symmetrical[og] : 0;
+
 		for (int di = 0; di < steps; di++)
 		{
-			const double deltaZ = z0 + di * deltaStep; 
-			
+			const double deltaZ = z0 + di * deltaStep;
+
 			#if TIMING
 				if (th==0) timer.tic(time_CTFdraw);
 			#endif
 
 			ctf_part.DeltafU = ctf_part_0.DeltafU + deltaZ;
 			ctf_part.DeltafV = ctf_part_0.DeltafV + deltaZ;
-			
+
 			ctf_part.initialise();
-			
-			ctf_part.draw_fast(s, s, pixelSize, &CTFimage[0]);
-			
+
+			ctf_part.draw_fast(s, s, pixelSize, gammaOffset, &CTFimage[0]);
+
 			#if TIMING
 				if (th==0) timer.toc(time_CTFdraw);
 			#endif
-			
+
 
 			const float scale = flip_value? -1.f : 1.f;
-			
+
 			double CCp = 0.0;
-			
+
 			#if TIMING
 				if (th==0) timer.tic(time_NCCcalc);
 			#endif
-			
+
 			for (int y = 0; y < s;  y++)
 			for (int x = 0; x < sh; x++)
 			{
 				const float c = scale * CTFimage(x,y);
 				const float wg = freqWeights(x,y,f);
-				
+
 				const double xx = x;
 				const double yy = y < s/2? y : y - s;
 				const double r2 = xx * xx + yy * yy;
-				
+
 				if (r2 < sh2)
 				{
 					const fComplex zp = c * prediction(x,y);
@@ -444,21 +533,21 @@ BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(
 					CCp += wg * (zp - zo).norm();
 				}
 			}
-			
+
 			#if TIMING
 				if (th==0) timer.toc(time_NCCcalc);
 			#endif
-			
+
 			CC[th](p, di) = CCp / (s * s);
 		}
 	}
-	
+
 	Log::endProgress();
-	
+
 	BufferedImage<double> CC_out(pc,steps);
-	
+
 	CC_out.fill(0.0);
-	
+
 	for (int th = 0; th < num_threads; th++)
 	{
 		CC_out += CC[th];
@@ -471,6 +560,153 @@ BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(
 	return CC_out;
 }
 
+
+std::vector<d2Vector> DefocusRefinementProgram::computeSlopeCost(
+		int f,
+		double m0, double m1, int steps,
+		const ParticleSet& dataSet,
+		std::vector<int>& particles, int max_particles,
+		const Tomogram& tomogram,
+		const AberrationsCache& aberrationsCache,
+		std::vector<BufferedImage<fComplex>>& referenceFS,
+		const BufferedImage<float>& freqWeights,
+		bool flip_value,
+		int num_threads)
+{
+	const double deltaStep = (m1 - m0) / (double) (steps - 1);
+	const int fc = tomogram.stack.zdim;
+	const int pc = max_particles;
+	const double pixelSize = tomogram.optics.pixelSize;
+	const int s = referenceFS[0].ydim;
+	const int sh = s/2 + 1;
+	const double sh2 = sh * (double) sh;
+
+
+	double avg_offset = 0.0;
+
+	std::vector<double> particle_depth(pc);
+
+	for (int p = 0; p < pc; p++)
+	{
+		const d3Vector pos = dataSet.getPosition(p);
+		const double dz = tomogram.getDepthOffset(f, pos);
+
+		avg_offset += dz;
+
+		particle_depth[p] = dz;
+	}
+
+	avg_offset /= pc;
+
+
+	std::vector<std::vector<double>> cost_per_thread(num_threads);
+
+	for (int th = 0; th < num_threads; th++)
+	{
+		cost_per_thread[th] = std::vector<double>(steps, 0.0);
+	}
+
+	Log::beginProgress(
+		"Evaluating defocus slopes from "
+		+ZIO::itoa(m0)+" to "+ZIO::itoa(m1)+" in "
+		+ZIO::itoa(steps)+" steps of "+ZIO::itoa(deltaStep),
+		pc / num_threads);
+
+	#pragma omp parallel for num_threads(num_threads)
+	for (int p = 0; p < pc; p++)
+	{
+		const int th = omp_get_thread_num();
+
+		if (th == 0) Log::updateProgress(p);
+
+		const int part_id = particles[p];
+
+		const d3Vector pos = dataSet.getPosition(part_id);
+		const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(part_id, fc, pixelSize);
+
+		d4Matrix projCut;
+
+		BufferedImage<fComplex> observation(sh,s);
+
+		TomoExtraction::extractFrameAt3D_Fourier(
+				tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f], traj[f],
+				observation, projCut, 1, false, true);
+
+		BufferedImage<fComplex> prediction = Prediction::predictFS(
+				part_id, dataSet, projCut, s, referenceFS);
+
+		double dz0 = tomogram.getDepthOffset(f, pos);
+
+		CTF ctf0 = tomogram.centralCTFs[f];
+
+		CTF ctf_part = ctf0;
+		ctf_part.initialise();
+
+		const int og = dataSet.getOpticsGroup(part_id);
+
+		const BufferedImage<double>* gammaOffset =
+				aberrationsCache.hasSymmetrical? &aberrationsCache.symmetrical[og] : 0;
+
+		BufferedImage<float> CTFimage(sh,s);
+
+		for (int di = 0; di < steps; di++)
+		{
+			const double m = m0 + di * deltaStep;
+			const double deltaZ = avg_offset + m * (dz0 - avg_offset);
+			const double deltaF = tomogram.handedness * tomogram.optics.pixelSize * deltaZ;
+
+			ctf_part.DeltafU = ctf0.DeltafU + deltaF;
+			ctf_part.DeltafV = ctf0.DeltafV + deltaF;
+
+			ctf_part.initialise();
+
+			ctf_part.draw_fast(s, s, pixelSize, gammaOffset, &CTFimage[0]);
+
+
+			const float scale = flip_value? -1.f : 1.f;
+
+			double cost_p = 0.0;
+
+			for (int y = 0; y < s;  y++)
+			for (int x = 0; x < sh; x++)
+			{
+				const float c = scale * CTFimage(x,y);
+				const float wg = freqWeights(x,y,f);
+
+				const double xx = x;
+				const double yy = y < s/2? y : y - s;
+				const double r2 = xx * xx + yy * yy;
+
+				if (r2 < sh2)
+				{
+					const fComplex zp = c * prediction(x,y);
+					const fComplex zo = observation(x,y);
+
+					cost_p += wg * (zp - zo).norm();
+				}
+			}
+
+			cost_per_thread[th][di] += cost_p / (s * s);
+		}
+	}
+
+	Log::endProgress();
+
+	std::vector<d2Vector> cost(steps, d2Vector(0.0, 0.0));
+
+	for (int di = 0; di < steps; di++)
+	{
+		cost[di][0] = m0 + di * deltaStep;
+
+		for (int th = 0; th < num_threads; th++)
+		{
+			cost[di][1] += cost_per_thread[th][di];
+		}
+	}
+
+	return cost;
+}
+
 DefocusRefinementProgram::DefocusFit DefocusRefinementProgram::findDefocus(
 		int f,  
 		double minDelta, 
@@ -479,6 +715,7 @@ DefocusRefinementProgram::DefocusFit DefocusRefinementProgram::findDefocus(
 		const ParticleSet& dataSet,
 		std::vector<int>& particles, int max_particles,
 		const Tomogram& tomogram,
+		const AberrationsCache& aberrationsCache,
 		std::vector<BufferedImage<fComplex>>& referenceFS,
 		const BufferedImage<float>& freqWeights,
 		bool flip_value, 
@@ -495,9 +732,9 @@ DefocusRefinementProgram::DefocusFit DefocusRefinementProgram::findDefocus(
 	
 	BufferedImage<double> cost = computeOffsetCost(
 		f, minDelta, maxDelta, steps, 
-		dataSet, particles, pc, tomogram,
-		referenceFS, freqWeights,   
-		flip_value, tomogram.handedness, num_threads);
+		dataSet, particles, pc, tomogram, aberrationsCache,
+		referenceFS, freqWeights,
+		flip_value, num_threads);
 		
 	out.totalCost = std::vector<double>(steps, 0.0);
 	out.offsets.resize(steps);
@@ -677,9 +914,9 @@ DefocusRefinementProgram::DefocusFit DefocusRefinementProgram::findDefocus(
 				bestDeltaZ - deltaStep, 
 				bestDeltaZ + deltaStep, 
 				steps_fine, 
-				dataSet, particles, pc, tomogram,
+				dataSet, particles, pc, tomogram, aberrationsCache,
 				referenceFS, freqWeights,   
-				flip_value, tomogram.handedness, num_threads);
+				flip_value, num_threads);
 						
 		
 		double minCost_fine = std::numeric_limits<double>::max();

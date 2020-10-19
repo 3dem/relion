@@ -27,9 +27,9 @@
 #include <src/jaz/optimization/optimization.h>
 #include <src/jaz/single_particle/volume.h>
 #include <src/jaz/single_particle/gravis/t2Matrix.h>
+#include <src/jaz/math/equation2x2.h>
 #include <vector>
 
-#include "equation2x2.h"
 
 class MagnificationHelper
 {

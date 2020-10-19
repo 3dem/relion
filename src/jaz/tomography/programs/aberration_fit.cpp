@@ -170,7 +170,7 @@ void AberrationFitProgram::run()
 				Log::updateProgress(p);
 			}
 
-			const int g = dataSet.getOpticsGroup(p);
+			const int g = dataSet.getOpticsGroup(particles[t][p]);
 			
 			AberrationFit::considerParticle(
 				particles[t][p], tomogram, referenceMap, dataSet,

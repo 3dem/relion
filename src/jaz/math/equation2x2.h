@@ -18,10 +18,10 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#ifndef EQUATION_2X2_h
-#define EQUATION_2X2_h
+#ifndef EQUATION_2X2_H
+#define EQUATION_2X2_H
 
-#include <src/jaz/single_particle/gravis/t2Vector.h>
+#include <src/jaz/gravis/t2Vector.h>
 
 class Equation2x2
 {
@@ -32,15 +32,15 @@ class Equation2x2
 		double Axx, Axy, Ayy, bx, by;
 		
 		Equation2x2& operator += (const Equation2x2& arg)
-        {
-            Axx += arg.Axx;
+		{
+			Axx += arg.Axx;
 			Axy += arg.Axy;
 			Ayy += arg.Ayy;
 			bx += arg.bx;
 			by += arg.by;
 
-            return *this;
-        }
+			return *this;
+		}
 };
 
 #endif
