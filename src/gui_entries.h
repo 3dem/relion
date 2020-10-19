@@ -126,6 +126,7 @@ extern bool create_scheduler_gui;
 //version-3.1 #define GUI_BUTTON_COLOR (fl_rgb_color(238,130,238))
 //version-3.1 #define GUI_BUTTON_DARK_COLOR (fl_rgb_color(200, 110, 200))
 //version-3.1 #define GUI_RUNBUTTON_COLOR (fl_rgb_color(170, 0, 170))
+// Dont forget GUI  runbutton colour in src/displayer.h!
 //version-3.2 
 #define GUI_BUTTON_COLOR (fl_rgb_color(200,80,110))
 #define GUI_BUTTON_DARK_COLOR (fl_rgb_color(170, 40, 70))

@@ -160,19 +160,19 @@ static bool do_allow_change_minimum_dedicated;
 #define NODE_POST           14// Postprocess STAR file (with FSC curve, unfil half-maps, masks etc in it: used by Jasenko's programs
 #define NODE_POLISH_PARAMS  15// Txt file with optimal parameters for Bayesian polishing
 
-#define NODE_MOVIES_LABEL   	 "rlnMovieStar"
-#define NODE_MICS_LABEL			 "rlnMicrographStar"
-#define NODE_MIC_COORDS_LABEL	 "rlnCoordinateStar"
-#define NODE_PART_DATA_LABEL	 "rlnParticleStar"
-#define NODE_REFS_LABEL          "rlnReferenceStar"
-#define NODE_3DREF_LABEL       	 "rlnDensityMap"
-#define NODE_MASK_LABEL			 "rlnMask"
-#define NODE_OPTIMISER_LABEL	 "rlnOptimiserStar"
-#define NODE_HALFMAP_LABEL		 "rlnHalfMap"
-#define NODE_RESMAP_LABEL		 "rlnLocalResolutionMap"
-#define NODE_PDF_LOGFILE_LABEL   "rlnPdfLogfile"
-#define NODE_POST_LABEL          "rlnPostprocessStar"
-#define NODE_POLISH_PARAMS_LABEL "rlnPolishParams"
+#define NODE_MOVIES_LABEL   	 "relion.MovieStar"
+#define NODE_MICS_LABEL			 "relion.MicrographStar"
+#define NODE_MIC_COORDS_LABEL	 "relion.CoordinateStar"
+#define NODE_PART_DATA_LABEL	 "relion.ParticleStar"
+#define NODE_REFS_LABEL          "relion.ReferenceStar"
+#define NODE_3DREF_LABEL       	 "relion.DensityMap"
+#define NODE_MASK_LABEL			 "relion.Mask"
+#define NODE_OPTIMISER_LABEL	 "relion.OptimiserStar"
+#define NODE_HALFMAP_LABEL		 "relion.HalfMap"
+#define NODE_RESMAP_LABEL		 "relion.LocalResolutionMap"
+#define NODE_PDF_LOGFILE_LABEL   "relion.PdfLogfile"
+#define NODE_POST_LABEL          "relion.PostprocessStar"
+#define NODE_POLISH_PARAMS_LABEL "relion.PolishParams"
 
 static std::map<int, std::string> node_type2label = {{NODE_MOVIES, NODE_MOVIES_LABEL},
 		{NODE_MICS, NODE_MICS_LABEL},
