@@ -14,16 +14,20 @@
 #include <src/jaz/tomography/projection/projection.h>
 #include <src/jaz/tomography/tomogram.h>
 #include <src/jaz/optics/damage.h>
+#include <src/jaz/math/Zernike_helper.h>
+#include <src/jaz/optimization/nelder_mead.h>
+#include <src/jaz/single_particle/ctf/magnification_helper.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
 #include <iostream>
-#include <src/jaz/math/Zernike_helper.h>
 #include <src/time.h>
 
 #define TIMING 0
 
 
 using namespace gravis;
+using namespace aberration;
+
 
 DefocusRefinementProgram::DefocusRefinementProgram(int argc, char *argv[])
 	: RefinementProgram(argc, argv)
@@ -41,7 +45,7 @@ DefocusRefinementProgram::DefocusRefinementProgram(int argc, char *argv[])
 		slowScan = parser.checkOption("--slow_scan", "Perform a slow, brute-force defocus scan instead");
 		refineFast = !parser.checkOption("--slow_scan_only", "Only perform a brute-force scan");
 		refineAstigmatism = !parser.checkOption("--no_astigmatism", "Do not refine the astigmatism");
-		plotAstigmatism = parser.checkOption("--plot_astigmatism", "Plot the astigmatism cost function");
+		do_plotAstigmatism = parser.checkOption("--plot_astigmatism", "Plot the astigmatism cost function");
 
 		max_particles = textToInteger(parser.getOption("--max", "Max. number of particles to consider per tomogram", "-1"));
 		group_count = textToInteger(parser.getOption("--g", "Number of independent groups", "10"));
@@ -200,24 +204,24 @@ void DefocusRefinementProgram::run()
 				const int sh = s/2 + 1;
 				const int pc = particles[t].size();
 				
-				std::vector<BufferedImage<AberrationFitProgram::EvenData>> evenData_thread(num_threads);
-				std::vector<BufferedImage<AberrationFitProgram::OddData>> oddData_thread(num_threads);
+				std::vector<BufferedImage<EvenData>> evenData_thread(num_threads);
+				std::vector<BufferedImage<OddData>> oddData_thread(num_threads);
 				
-				const AberrationFitProgram::EvenData evenZero({0.0, 0.0, 0.0, 0.0, 0.0});
-				const AberrationFitProgram::OddData oddZero({0.0, dComplex(0.0, 0.0)});
+				const EvenData evenZero({0.0, 0.0, 0.0, 0.0, 0.0});
+				const OddData oddZero({0.0, dComplex(0.0, 0.0)});
 				
-				BufferedImage<AberrationFitProgram::EvenData> evenData(sh,s);
+				BufferedImage<EvenData> evenData(sh,s);
 				evenData.fill(evenZero);
 				
-				BufferedImage<AberrationFitProgram::OddData> oddData(sh,s);
+				BufferedImage<OddData> oddData(sh,s);
 				oddData.fill(oddZero);
 				
 				for (int th = 0; th < num_threads; th++)
 				{
-					evenData_thread[th] = BufferedImage<AberrationFitProgram::EvenData>(sh,s);
+					evenData_thread[th] = BufferedImage<EvenData>(sh,s);
 					evenData_thread[th].fill(evenZero);
 					
-					oddData_thread[th] = BufferedImage<AberrationFitProgram::OddData>(sh,s);
+					oddData_thread[th] = BufferedImage<OddData>(sh,s);
 					oddData_thread[th].fill(oddZero);
 				}
 				
@@ -234,7 +238,7 @@ void DefocusRefinementProgram::run()
 						Log::updateProgress(p);
 					}
 					
-					AberrationFitProgram::considerParticle(
+					AberrationFit::considerParticle(
 						particles[t][p], tomogram, referenceMap, dataSet,
 						aberrationsCache, flip_value, freqWeights,
 						f, f, 
@@ -257,7 +261,7 @@ void DefocusRefinementProgram::run()
 
 				if (scanDefocus)
 				{
-					bestDeltaZ = AberrationFitProgram::findDefocus(
+					bestDeltaZ = scanForDefocus(
 							evenData, tomogram.optics.pixelSize, tomogram.centralCTFs[f],
 							minDelta, maxDelta, deltaSteps);
 
@@ -269,18 +273,16 @@ void DefocusRefinementProgram::run()
 
 				if (refineAstigmatism)
 				{
-					AberrationFitProgram::EvenSolution solution =
-							AberrationFitProgram::solveEven(evenData);
+					EvenSolution solution = AberrationFit::solveEven(evenData);
 
 					const double pixelSize = tomogram.optics.pixelSize;
 
-					d3Vector astig = AberrationFitProgram::findAstigmatism(
+					d3Vector astig = findAstigmatism(
 						solution, ctf0, bestDeltaZ, pixelSize, 1.0);
 
-					if (plotAstigmatism)
+					if (do_plotAstigmatism)
 					{
-						BufferedImage<double> astigPlot =
-								AberrationFitProgram::plotAstigmatism(
+						BufferedImage<double> astigPlot = plotAstigmatism(
 									solution, ctf0, bestDeltaZ, 100.0, pixelSize, 32);
 
 						astigPlot.write(
@@ -725,5 +727,197 @@ DefocusRefinementProgram::DefocusFit DefocusRefinementProgram::findDefocus(
 		Log::endSection();
 	}
 	
+	return out;
+}
+
+double DefocusRefinementProgram::scanForDefocus(
+		const BufferedImage<EvenData>& evenData,
+		double pixelSize,
+		const CTF& ctf0,
+		double minDefocus,
+		double maxDefocus,
+		int steps)
+{
+	const int s = evenData.ydim;
+	const int sh = evenData.xdim;
+	const double as = s * pixelSize;
+	const double eps = 1e-30;
+	const double deltaStep = (maxDefocus - minDefocus) / (double) (steps - 1);
+
+
+	CTF ctfz = ctf0;
+
+	double best_deltaZ = minDefocus;
+	double minCost = std::numeric_limits<double>::max();
+
+
+	for (int di = 0; di < steps; di++)
+	{
+		const double deltaZ = minDefocus + di * deltaStep;
+
+		ctfz.DeltafU = ctf0.DeltafU + deltaZ;
+		ctfz.DeltafV = ctf0.DeltafV + deltaZ;
+
+		ctfz.initialise();
+
+		double cost = 0.0;
+
+		for (int y = 0; y < s;  y++)
+		for (int x = 0; x < sh; x++)
+		{
+			const double xx = x;
+			const double yy = y < s/2? y : y - s;
+			const double r2 = xx * xx + yy * yy;
+
+			if (r2 < s*s/4)
+			{
+				EvenData d = evenData(x,y);
+
+				d2Vector b(d.bx, d.by);
+				d2Matrix A(d.Axx, d.Axy, d.Axy, d.Ayy);
+
+				const double det = A(0,0) * A(1,1) - A(0,1) * A(1,0);
+
+				if (std::abs(det) > eps)
+				{
+					d2Matrix Ai = A;
+					Ai.invert();
+
+					const d2Vector opt = Ai * b;
+
+					const double gamma_0 = ctf0.getLowOrderGamma(xx/as, yy/as);
+					const double gamma_z = ctfz.getLowOrderGamma(xx/as, yy/as);
+					const double delta = gamma_z - gamma_0;
+
+					const d2Vector dx = d2Vector(cos(delta), sin(delta)) - opt;
+
+					cost += dx.dot(A * dx);
+				}
+			}
+		}
+
+		if (cost < minCost)
+		{
+			minCost = cost;
+			best_deltaZ = deltaZ;
+		}
+	}
+
+	return best_deltaZ;
+}
+
+gravis::d3Vector DefocusRefinementProgram::findAstigmatism(
+		const EvenSolution& solution,
+		const CTF& referenceCtf,
+		double initialDeltaZ,
+		double pixelSize,
+		double initialStep)
+{
+	const int s = solution.optimum.ydim;
+	const int sh = solution.optimum.xdim;
+	const double K1 = PI * referenceCtf.lambda;
+
+	BufferedImage<double> astigBasis(sh,s,3);
+
+	const double as = s * pixelSize;
+
+	for (int yi = 0; yi < s;  yi++)
+	for (int xi = 0; xi < sh; xi++)
+	{
+		const double xx = xi/as;
+		const double yy = (yi < s/2)? yi/as : (yi - s)/as;
+
+		astigBasis(xi,yi,0) = xx * xx + yy * yy;
+		astigBasis(xi,yi,1) = xx * xx - yy * yy;
+		astigBasis(xi,yi,2) = 2.0 * xx * yy;
+	}
+
+	ZernikeHelper::AnisoBasisOptimisation problem(
+				solution.optimum, solution.weight, astigBasis, false);
+
+	std::vector<double> nmOpt = NelderMead::optimize(
+		{-initialDeltaZ * K1, 0.0, 0.0},
+		problem, initialStep, 0.000001, 2000, 1.0, 2.0, 0.5, 0.5, false);
+
+	const double dz = nmOpt[0];
+	const double a1 = nmOpt[1];
+	const double a2 = nmOpt[2];
+
+	d2Matrix A_delta((dz+a1)/ K1,      a2 / K1,
+						 a2 / K1,  (dz-a1)/ K1);
+
+	d2Matrix A_ref(referenceCtf.getAxx(), referenceCtf.getAxy(),
+				   referenceCtf.getAxy(), referenceCtf.getAyy());
+
+	d2Matrix A_total = A_ref + A_delta;
+
+	RFLOAT defocusU, defocusV, angleDeg;
+	MagnificationHelper::matrixToPolar(
+			A_total, defocusU, defocusV, angleDeg);
+
+	return d3Vector(-defocusU, -defocusV, angleDeg);
+}
+
+BufferedImage<double> DefocusRefinementProgram::plotAstigmatism(
+		const EvenSolution& solution,
+		const CTF& referenceCtf,
+		double initialDeltaZ,
+		double range,
+		double pixelSize,
+		int size)
+{
+	const int s = solution.optimum.ydim;
+	const int sh = solution.optimum.xdim;
+	const double K1 = PI * referenceCtf.lambda;
+
+	BufferedImage<double> astigBasis(sh,s,3);
+
+	const double as = s * pixelSize;
+
+	for (int yi = 0; yi < s;  yi++)
+	for (int xi = 0; xi < sh; xi++)
+	{
+		const double xx = xi/as;
+		const double yy = (yi < s/2)? yi/as : (yi - s)/as;
+
+		astigBasis(xi,yi,0) = xx * xx + yy * yy;
+		astigBasis(xi,yi,1) = xx * xx - yy * yy;
+		astigBasis(xi,yi,2) = xx * yy;
+	}
+
+	ZernikeHelper::AnisoBasisOptimisation problem(
+				solution.optimum, solution.weight, astigBasis, false);
+
+	std::vector<double> globalOpt(3,0.0);
+	double minCost = std::numeric_limits<double>::max();
+
+	void* tempStorage = problem.allocateTempStorage();
+
+	const int steps = size-1;
+	const double mid = steps/2;
+	const double scale = 2.0 * K1 * range;
+
+	BufferedImage<double> out(size, size, 1);
+
+	for (int a1i = 0; a1i < size; a1i++)
+	for (int a2i = 0; a2i < size; a2i++)
+	{
+		const double dz = -initialDeltaZ * K1;
+		const double a1 = scale * (a1i - mid);
+		const double a2 = scale * (a2i - mid);
+
+		std::vector<double> params = {dz, a1, a2};
+
+		const double cost = problem.f(params, tempStorage);
+
+		if (cost < minCost)
+		{
+			minCost = cost;
+			globalOpt = params;
+		}
+
+		out(a1i,a2i) = cost;
+	}
+
 	return out;
 }

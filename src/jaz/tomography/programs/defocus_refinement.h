@@ -4,6 +4,7 @@
 #include <string>
 #include <src/jaz/math/t_complex.h>
 #include <src/jaz/image/buffered_image.h>
+#include <src/jaz/optics/aberration_fit.h>
 #include <src/jaz/gravis/t4Matrix.h>
 #include <vector>
 
@@ -19,7 +20,7 @@ class DefocusRefinementProgram : public RefinementProgram
 		DefocusRefinementProgram(int argc, char *argv[]);
 			
 			bool clearAstigmatism, scanDefocus, slowScan, refineFast,
-				refineAstigmatism, plotAstigmatism, regularise;
+				refineAstigmatism, do_plotAstigmatism, regularise;
 
 			int deltaSteps, max_particles, group_count;
 			double minDelta, maxDelta, sigma_input;
@@ -61,7 +62,29 @@ class DefocusRefinementProgram : public RefinementProgram
 				bool flip_value, 
 				double handedness,
 				int num_threads);
-									
+
+		static double scanForDefocus(
+				const BufferedImage<aberration::EvenData>& evenData,
+				double pixelSize,
+				const CTF& ctf0,
+				double minDefocus,
+				double maxDefocus,
+				int steps);
+
+		static gravis::d3Vector findAstigmatism(
+				const aberration::EvenSolution& solution,
+				const CTF& referenceCtf,
+				double initialDeltaZ,
+				double pixelSize,
+				double initialStep);
+
+		static BufferedImage<double> plotAstigmatism(
+				const aberration::EvenSolution& solution,
+				const CTF& referenceCtf,
+				double initialDeltaZ,
+				double range,
+				double pixelSize,
+				int size);
 };
 
 
