@@ -24,7 +24,7 @@
 #include <string>
 #include <map>
 
-#include <src/jaz/single_particle/gravis/t2Vector.h>
+#include <src/jaz/gravis/t2Vector.h>
 #include <src/jaz/single_particle/parallel_ft.h>
 
 #include <src/micrograph_model.h>

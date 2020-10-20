@@ -99,6 +99,10 @@ class DefocusRefinementProgram : public RefinementProgram
 				double range,
 				double pixelSize,
 				int size);
+
+		void writeSlopeCost(
+				const std::vector<gravis::d2Vector>& cost,
+				const std::string& filename);
 };
 
 

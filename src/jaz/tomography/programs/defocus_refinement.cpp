@@ -93,8 +93,8 @@ void DefocusRefinementProgram::run()
 	Log::endSection();
 
 	const double min_slope = 0.97;
-	const double max_slope = 1.03;
-	const int slope_steps = 20;
+	const double max_slope = 1.1;
+	const int slope_steps = 40;
 
 	std::vector<d2Vector> globalSlopeCost(slope_steps, d2Vector(0.0, 0.0));
 
@@ -143,6 +143,8 @@ void DefocusRefinementProgram::run()
 			tomogram, true, 0.0, 0.0, num_threads);
 
 		std::vector<d2Vector> tomogramSlopeCost(slope_steps, d2Vector(0.0, 0.0));
+		std::vector<d2Vector> tomogramSlopeCost_even(slope_steps, d2Vector(0.0, 0.0));
+		std::vector<d2Vector> tomogramSlopeCost_odd(slope_steps, d2Vector(0.0, 0.0));
 		
 					
 		for (int f = f0; f <= f1; f++)
@@ -315,26 +317,24 @@ void DefocusRefinementProgram::run()
 					referenceMap.image_FS, freqWeights,
 					flip_value, num_threads);
 
-				double minVal = slopeCost[0][1];
-
 				for (int i = 0; i < slopeCost.size(); i++)
 				{
 					tomogramSlopeCost[i][0]  = slopeCost[i][0];
 					tomogramSlopeCost[i][1] += slopeCost[i][1];
 
-					if (slopeCost[i][1] < minVal)
+					if (f%2 == 0)
 					{
-						minVal = slopeCost[i][1];
+						tomogramSlopeCost_even[i][0]  = slopeCost[i][0];
+						tomogramSlopeCost_even[i][1] += slopeCost[i][1];
+					}
+					else
+					{
+						tomogramSlopeCost_odd[i][0]  = slopeCost[i][0];
+						tomogramSlopeCost_odd[i][1] += slopeCost[i][1];
 					}
 				}
 
-				std::ofstream slopeFile(outDir+"t_"+ZIO::itoa(t)+"_f_"+ZIO::itoa(f)+"_slope.dat");
-
-				for (int i = 0; i < slopeCost.size(); i++)
-				{
-					slopeFile.precision(12);
-					slopeFile << slopeCost[i][0] << ' ' << (slopeCost[i][1] - minVal) << '\n';
-				}
+				writeSlopeCost(slopeCost, outDir+"t_"+ZIO::itoa(t)+"_f_"+ZIO::itoa(f)+"_slope.dat");
 			}
 			
 			Log::endSection();
@@ -343,26 +343,15 @@ void DefocusRefinementProgram::run()
 
 		if (do_slopeFit)
 		{
-			double minVal = tomogramSlopeCost[0][1];
-
 			for (int i = 0; i < tomogramSlopeCost.size(); i++)
 			{
 				globalSlopeCost[i][0]  = tomogramSlopeCost[i][0];
 				globalSlopeCost[i][1] += tomogramSlopeCost[i][1];
-
-				if (tomogramSlopeCost[i][1] < minVal)
-				{
-					minVal = tomogramSlopeCost[i][1];
-				}
 			}
 
-			std::ofstream slopeFile(outDir+"t_"+ZIO::itoa(t)+"_slope.dat");
-
-			for (int i = 0; i < tomogramSlopeCost.size(); i++)
-			{
-				slopeFile.precision(12);
-				slopeFile << tomogramSlopeCost[i][0] << ' ' << (tomogramSlopeCost[i][1] - minVal) << '\n';
-			}
+			writeSlopeCost(tomogramSlopeCost, outDir+"t_"+ZIO::itoa(t)+"_slope.dat");
+			writeSlopeCost(tomogramSlopeCost_even, outDir+"t_"+ZIO::itoa(t)+"_even_slope.dat");
+			writeSlopeCost(tomogramSlopeCost_odd, outDir+"t_"+ZIO::itoa(t)+"_odd_slope.dat");
 		}
 
 		Log::endSection();
@@ -371,26 +360,33 @@ void DefocusRefinementProgram::run()
 
 	if (do_slopeFit)
 	{
-		double minVal = globalSlopeCost[0][1];
-
-		for (int i = 0; i < globalSlopeCost.size(); i++)
-		{
-			if (globalSlopeCost[i][1] < minVal)
-			{
-				minVal = globalSlopeCost[i][1];
-			}
-		}
-
-		std::ofstream slopeFile(outDir+"slope.dat");
-
-		for (int i = 0; i < globalSlopeCost.size(); i++)
-		{
-			slopeFile.precision(12);
-			slopeFile << globalSlopeCost[i][0] << ' ' << (globalSlopeCost[i][1] - minVal) << '\n';
-		}
+		writeSlopeCost(globalSlopeCost, outDir+"slope.dat");
 	}
 
 	tomogramSet.write(outDir+"tomograms.star");
+}
+
+void DefocusRefinementProgram::writeSlopeCost(
+		const std::vector<d2Vector>& cost,
+		const std::string& filename)
+{
+	double minVal = cost[0][1];
+
+	for (int i = 0; i < cost.size(); i++)
+	{
+		if (cost[i][1] < minVal)
+		{
+			minVal = cost[i][1];
+		}
+	}
+
+	std::ofstream slopeFile(filename);
+
+	for (int i = 0; i < cost.size(); i++)
+	{
+		slopeFile.precision(12);
+		slopeFile << cost[i][0] << ' ' << (cost[i][1] - minVal) << '\n';
+	}
 }
 
 BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(

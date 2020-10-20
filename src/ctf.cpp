@@ -47,7 +47,7 @@
 #include "src/fftw.h"
 #include "src/metadata_table.h"
 #include <src/jaz/single_particle/obs_model.h>
-#include <src/jaz/single_particle/gravis/t2Matrix.h>
+#include <src/jaz/gravis/t2Matrix.h>
 
 using namespace gravis;
 

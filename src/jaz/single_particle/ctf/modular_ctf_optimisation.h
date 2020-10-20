@@ -3,7 +3,7 @@
 
 #include <src/jaz/optimization/optimization.h>
 #include <src/image.h>
-#include <src/jaz/single_particle/gravis/t2Matrix.h>
+#include <src/jaz/gravis/t2Matrix.h>
 #include <src/jaz/single_particle/obs_model.h>
 #include <vector>
 
