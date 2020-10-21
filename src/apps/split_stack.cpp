@@ -12,7 +12,7 @@
 #include <src/jaz/single_particle/img_proc/filter_helper.h>
 #include <src/jaz/single_particle/volume_converter.h>
 
-#include <src/jaz/single_particle/gravis/t4Matrix.h>
+#include <src/jaz/gravis/t4Matrix.h>
 using namespace gravis;
 
 int main(int argc, char *argv[])

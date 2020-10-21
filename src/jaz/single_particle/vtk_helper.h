@@ -23,7 +23,7 @@
 
 #include <src/image.h>
 #include <src/strings.h>
-#include <src/jaz/single_particle/gravis/t3Vector.h>
+#include <src/jaz/gravis/t3Vector.h>
 #include <src/jaz/single_particle/volume.h>
 #include <src/jaz/math/tensor3x3.h>
 

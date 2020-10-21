@@ -24,7 +24,7 @@
 #include <src/jaz/single_particle/image_log.h>
 #include <src/jaz/single_particle/ctf_helper.h>
 #include <src/jaz/single_particle/img_proc/filter_helper.h>
-#include <src/jaz/single_particle/gravis/t2Vector.h>
+#include <src/jaz/gravis/t2Vector.h>
 #include <src/error.h>
 
 using namespace gravis;

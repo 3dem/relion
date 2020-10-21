@@ -25,10 +25,10 @@
 #include <src/fftw.h>
 #include <src/strings.h>
 #include <src/ctf.h>
-#include <src/jaz/single_particle/gravis/t3Vector.h>
-#include <src/jaz/single_particle/gravis/t2Vector.h>
-#include <src/jaz/single_particle/gravis/t2Matrix.h>
-#include <src/jaz/single_particle/gravis/t3Matrix.h>
+#include <src/jaz/gravis/t3Vector.h>
+#include <src/jaz/gravis/t2Vector.h>
+#include <src/jaz/gravis/t2Matrix.h>
+#include <src/jaz/gravis/t3Matrix.h>
 #include <src/jaz/single_particle/volume.h>
 
 class FilterHelper

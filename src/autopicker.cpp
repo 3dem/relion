@@ -1016,6 +1016,7 @@ void AutoPicker::generatePDFLogfile()
 
 
 	FileName fn_coords = fn_odir + fn_out + ".star";
+	MDcoords.setName("coordinate_files");
 	MDcoords.write(fn_coords);
 
 	if (verb > 0 )

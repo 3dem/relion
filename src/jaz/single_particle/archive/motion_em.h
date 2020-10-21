@@ -26,7 +26,7 @@
 #include <src/image.h>
 #include <src/complex.h>
 #include <src/jaz/single_particle/legacy_obs_model.h>
-#include <src/jaz/single_particle/gravis/t2Vector.h>
+#include <src/jaz/gravis/t2Vector.h>
 #include <src/jaz/single_particle/parallel_ft.h>
 #include <vector>
 

@@ -24,7 +24,7 @@
 #include <src/image.h>
 #include <src/jaz/single_particle/volume.h>
 #include "tomo_stack.h"
-#include <src/jaz/single_particle/gravis/t3Vector.h>
+#include <src/jaz/gravis/t3Vector.h>
 #include <string>
 
 class BackprojectionHelper

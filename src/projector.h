@@ -25,7 +25,7 @@
 #include "src/image.h"
 
 #include <src/jaz/single_particle/volume.h>
-#include <src/jaz/single_particle/gravis/t2Vector.h>
+#include <src/jaz/gravis/t2Vector.h>
 
 #ifdef CUDA
 #include "src/acc/cuda/cuda_mem_utils.h"

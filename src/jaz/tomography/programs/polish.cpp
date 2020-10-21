@@ -109,6 +109,8 @@ void PolishProgram::run()
 	}
 	
 	dataSet.hasMotion = true;
+
+	AberrationsCache aberrationsCache(dataSet.optTable, boxSize);
 	
 	Log::endSection();
 		
@@ -153,7 +155,8 @@ void PolishProgram::run()
 		
 		
 		std::vector<BufferedImage<double>> CCs = Prediction::computeCroppedCCs(
-				dataSet, particles[t], tomogram, referenceMap, frqWeight, tomogram.frameSequence,
+				dataSet, particles[t], tomogram, aberrationsCache,
+				referenceMap, frqWeight, tomogram.frameSequence,
 				range, flip_value, num_threads, padding);
 					
 		

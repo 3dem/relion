@@ -18,7 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/projector.h"
-#include <src/jaz/single_particle/gravis/t3Vector.h>
+#include <src/jaz/gravis/t3Vector.h>
 #include <src/time.h>
 #include <src/jaz/image/buffered_image.h>
 #ifdef CUDA

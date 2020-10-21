@@ -22,8 +22,8 @@
 #define VOLUME_INTEGRATION_H
 
 #include "volume.h"
-#include "gravis/t4Matrix.h"
-#include "src/image.h"
+#include <src/jaz/gravis/t4Matrix.h>
+#include <src/image.h>
 
 class VolumeIntegration
 {

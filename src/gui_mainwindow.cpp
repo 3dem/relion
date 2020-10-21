@@ -1745,6 +1745,17 @@ void GuiMainWindow::cb_display_io_node_i()
 
 	if (pipeline.nodeList[mynode].type == NODE_MIC_COORDS)
 	{
+
+		// TODO: write error message saying this is no longer possible: use Continue to pick more/inspect results!
+		FileName fn_suffix = pipeline.nodeList[mynode].name;
+
+		if (!fn_suffix.contains("coords_suffix_"))
+		{
+			fl_message("ERROR: The 2-column coordinate file lists from relion-3.2+ cannot be displayed here. Use the Continue button to display the micrographs and pick more particles");
+			return;
+
+		}
+
 		// A manualpicker jobwindow for display of micrographs....
 		RelionJob manualpickjob;
 		FileName fn_job = ".gui_manualpick";
@@ -1760,7 +1771,6 @@ void GuiMainWindow::cb_display_io_node_i()
 		}
 
 		// Get the name of the micrograph STAR file from reading the suffix file
-		FileName fn_suffix = pipeline.nodeList[mynode].name;
 		if (fn_suffix.getExtension() == "star")
 		{
 			std::ifstream in(fn_suffix.data(), std::ios_base::in);

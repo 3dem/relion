@@ -24,8 +24,8 @@
 #include <string>
 #include <src/image.h>
 #include <src/ctf.h>
-#include <src/jaz/single_particle/gravis/t4Matrix.h>
-#include <src/jaz/single_particle/gravis/t2Vector.h>
+#include <src/jaz/gravis/t4Matrix.h>
+#include <src/jaz/gravis/t2Vector.h>
 
 class TomoStack
 {
