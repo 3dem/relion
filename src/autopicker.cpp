@@ -144,6 +144,14 @@ if(do_gpu)
 		REPORT_ERROR("The Laplacian-of-Gaussian picker does not support GPU acceleration. Please remove --gpu option.");
 	}
 
+	int topaz_section = parser.addSection("Topaz wrapper options");
+	do_topaz_train = parser.checkOption("--topaz_train", "Use wrapper to the topaz train command");
+	do_topaz_extract = parser.checkOption("--topaz_extract", "Use wrapper to the topaz extract command (i.e. predict particle positions)");
+	topaz_nr_particles = textToInteger(parser.getOption("--topaz_nr_particles", "Expected number of particles per micrograph for topaz", "200"));
+	topaz_downscale = textToInteger(parser.getOption("--topaz_downscale", "Downscale factor for topaz", "8"));
+	topaz_model = parser.getOption("--topaz_model", "Saved model model from topaz train for topaz extract", "");
+	topaz_radius = textToInteger(parser.getOption("--topaz_radius", "Particle radius (in pix) for topaz extract (default is from particle diameter)", "-1"));
+
 	int helix_section = parser.addSection("Helix options");
 	autopick_helical_segments = parser.checkOption("--helix", "Are the references 2D helical segments? If so, in-plane rotation angles (psi) are estimated for the references.");
 	helical_tube_curvature_factor_max = textToFloat(parser.getOption("--helical_tube_kappa_max", "Factor of maximum curvature relative to that of a circle", "0.25"));
@@ -338,9 +346,23 @@ void AutoPicker::initialise()
 			}
 		}
 	}
+	else if (do_topaz_train)
+	{
+		if (verb > 0)
+		{
+			std::cout << " + Will use topaz for training a model " << std::endl;
+		}
+	}
+	else if (do_topaz_extract)
+	{
+		if (verb > 0)
+		{
+			std::cout << " + Will use topaz for picking particle coordinates" << std::endl;
+		}
+	}
 	else if (fn_ref == "")
 	{
-		REPORT_ERROR("ERROR: Provide either --ref or use --LoG.");
+		REPORT_ERROR("ERROR: Provide either --ref, --topaz_train, --topaz_extract, or --LoG.");
 	}
 	else if (fn_ref == "gauss")
 	{
@@ -524,7 +546,7 @@ void AutoPicker::initialise()
 	timer.tic(TIMING_A3);
 #endif
 
-	if (!do_LoG)
+	if (!(do_LoG  || do_topaz_train || do_topaz_extract))
 	{
 		// Re-scale references if necessary
 		if (angpix_ref < 0)

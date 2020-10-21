@@ -171,6 +171,22 @@ public:
 	// Vector with all diameters to be sampled
 	std::vector<RFLOAT> diams_LoG;
 
+	/// Topaz wrappers
+	// Use topaz train or topaz extract instead of template-based picking
+	bool do_topaz_train, do_topaz_extract;
+
+	// Expected number of particles per micrograph
+	int topaz_nr_particles;
+
+	// Topaz downscale factor
+	int topaz_downscale;
+
+	// Topaz saved model for use in extract
+	FileName topaz_model;
+
+	// Topaz particle radius for use in extract
+	int topaz_radius;
+
 	//// Specific amyloid picker
 	bool do_amyloid;
 
