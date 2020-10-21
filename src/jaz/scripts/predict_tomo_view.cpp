@@ -107,7 +107,7 @@ int main(int argc, char *argv[])
 			REPORT_ERROR_STR("Only " << pc << " particles found in tomogram " << tomoIndex);
 		}
 
-		const ParticleIndex part_id = particleIndex;
+		const ParticleIndex part_id(particleIndex);
 
 		Tomogram tomogram = tomogramSet.loadTomogram(tomoIndex, true);
 

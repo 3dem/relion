@@ -8,7 +8,7 @@ using namespace gravis;
 
 
 TomoMagFit::TomoMagFit(
-		const std::vector<int>& particle_indices,
+		const std::vector<ParticleIndex>& particle_indices,
 		const Tomogram& tomogram,
 		const ParticleSet& particleSet,
 		const TomoReferenceMap& referenceMap,
@@ -30,7 +30,7 @@ TomoMagFit::TomoMagFit(
 }
 
 TomoIsoMagFit::TomoIsoMagFit(
-		const std::vector<int>& particle_indices,
+		const std::vector<ParticleIndex>& particle_indices,
 		const Tomogram& tomogram,
 		const ParticleSet& particleSet,
 		const TomoReferenceMap& referenceMap,

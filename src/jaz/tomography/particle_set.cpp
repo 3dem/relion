@@ -154,7 +154,7 @@ std::vector<std::vector<ParticleIndex> > ParticleSet::splitByTomogram(const Tomo
 		if (name_to_index.find(name) != name_to_index.end())
 		{
 			const int t = name_to_index[name];
-			out[t].push_back(i);
+			out[t].push_back(ParticleIndex(i));
 		}
 	}
 
@@ -178,7 +178,7 @@ d3Vector ParticleSet::getPosition(ParticleIndex particle_id) const
 	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, off.y, particle_id.value);
 	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, off.z, particle_id.value);
 	
-	const int og = getOpticsGroup(particle_id.value);
+	const int og = getOpticsGroup(particle_id);
 	
 	const double originalPixelSize = optTable.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, og);
 	
@@ -230,16 +230,16 @@ d3Matrix ParticleSet::getParticleMatrix(ParticleIndex particle_id) const
 
 d3Matrix ParticleSet::getMatrix3x3(ParticleIndex particle_id) const
 {
-	const d3Matrix A_particle = getParticleMatrix(particle_id.value);
-	const d3Matrix A_subtomogram = getSubtomogramMatrix(particle_id.value);
+	const d3Matrix A_particle = getParticleMatrix(particle_id);
+	const d3Matrix A_subtomogram = getSubtomogramMatrix(particle_id);
 	
 	return A_subtomogram * A_particle;
 }
 
 d4Matrix ParticleSet::getMatrix4x4(ParticleIndex particle_id, double w, double h, double d) const
 {
-	d3Matrix A = getMatrix3x3(particle_id.value);
-	d3Vector pos = getPosition(particle_id.value);
+	d3Matrix A = getMatrix3x3(particle_id);
+	d3Vector pos = getPosition(particle_id);
 	
 	int cx = ((int)w) / 2;
 	int cy = ((int)h) / 2;
@@ -399,7 +399,7 @@ double ParticleSet::getOriginalPixelSize(int opticsGroup) const
 
 std::vector<d3Vector> ParticleSet::getTrajectoryInPixels(ParticleIndex particle_id, int fc, double pixelSize) const
 {
-	const d3Vector p0 = getPosition(particle_id.value);
+	const d3Vector p0 = getPosition(particle_id);
 
 	if (hasMotion)
 	{

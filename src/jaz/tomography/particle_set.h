@@ -14,7 +14,7 @@ class ParticleIndex
 	public:
 
 		ParticleIndex(){}
-		ParticleIndex(long int value) : value(value) {}
+		explicit ParticleIndex(long int value) : value(value) {}
 
 		long int value;
 };

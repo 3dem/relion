@@ -11,7 +11,7 @@ class TomoMagFit
 	public:
 
 		TomoMagFit(
-				const std::vector<int>& particle_indices,
+				const std::vector<ParticleIndex>& particle_indices,
 				const Tomogram& tomogram,
 				const ParticleSet& particleSet,
 				const TomoReferenceMap& referenceMap,
@@ -22,7 +22,7 @@ class TomoMagFit
 
 
 			int boxSize, first_frame, last_frame, num_threads;
-			const std::vector<int>& particle_indices;
+			const std::vector<ParticleIndex>& particle_indices;
 			const Tomogram& tomogram;
 			const ParticleSet& particleSet;
 			const TomoReferenceMap& referenceMap;
@@ -34,7 +34,7 @@ class TomoIsoMagFit : public TomoMagFit
 	public:
 
 		TomoIsoMagFit(
-				const std::vector<int>& particle_indices,
+				const std::vector<ParticleIndex>& particle_indices,
 				const Tomogram& tomogram,
 				const ParticleSet& particleSet,
 				const TomoReferenceMap& referenceMap,
