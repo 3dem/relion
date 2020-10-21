@@ -393,7 +393,7 @@ BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(
 		int f,
 		double z0, double z1, int steps,
 		const ParticleSet& dataSet,
-		std::vector<int>& particles, int max_particles,
+		std::vector<ParticleIndex>& particles, int max_particles,
 		const Tomogram& tomogram,
 		const AberrationsCache& aberrationsCache,
 		std::vector<BufferedImage<fComplex>>& referenceFS,
@@ -440,7 +440,7 @@ BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(
 
 		if (th == 0) Log::updateProgress(p);
 
-		const int part_id = particles[p];
+		const ParticleIndex part_id = particles[p];
 
 		#if TIMING
 			if (th==0) timer.tic(time_extract);
@@ -561,7 +561,7 @@ std::vector<d2Vector> DefocusRefinementProgram::computeSlopeCost(
 		int f,
 		double m0, double m1, int steps,
 		const ParticleSet& dataSet,
-		std::vector<int>& particles, int max_particles,
+		std::vector<ParticleIndex>& particles, int max_particles,
 		const Tomogram& tomogram,
 		const AberrationsCache& aberrationsCache,
 		std::vector<BufferedImage<fComplex>>& referenceFS,
@@ -584,7 +584,7 @@ std::vector<d2Vector> DefocusRefinementProgram::computeSlopeCost(
 
 	for (int p = 0; p < pc; p++)
 	{
-		const int part_id = particles[p];
+		const ParticleIndex part_id = particles[p];
 
 		const d3Vector pos = dataSet.getPosition(part_id);
 		const double dz = tomogram.getDepthOffset(f, pos);
@@ -617,7 +617,7 @@ std::vector<d2Vector> DefocusRefinementProgram::computeSlopeCost(
 
 		if (th == 0) Log::updateProgress(p);
 
-		const int part_id = particles[p];
+		const ParticleIndex part_id = particles[p];
 
 		const d3Vector pos = dataSet.getPosition(part_id);
 		const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(part_id, fc, pixelSize);
@@ -711,7 +711,7 @@ DefocusRefinementProgram::DefocusFit DefocusRefinementProgram::findDefocus(
 		double maxDelta,
 		int steps, int group_count, double sigma_input,
 		const ParticleSet& dataSet,
-		std::vector<int>& particles, int max_particles,
+		std::vector<ParticleIndex>& particles, int max_particles,
 		const Tomogram& tomogram,
 		const AberrationsCache& aberrationsCache,
 		std::vector<BufferedImage<fComplex>>& referenceFS,

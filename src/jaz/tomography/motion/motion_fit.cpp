@@ -16,7 +16,7 @@ MotionFit::MotionFit(
 	const std::vector<BufferedImage<double>>& CCs,
 	const std::vector<gravis::d4Matrix>& frameProj, 
 	ParticleSet& dataSet,
-	const std::vector<int>& partIndices,
+	const std::vector<ParticleIndex>& partIndices,
 	const std::vector<BufferedImage<fComplex>>& referenceFS,
 	MotionParameters motionParameters,
 	Settings settings,
@@ -441,7 +441,7 @@ void MotionFit::exportTrajectories(
 {
 	for (int p = 0; p < pc; p++)
 	{
-		const int pp = partIndices[p];
+		const int pp = partIndices[p].value;
 
 		dataSet.motionTrajectories[pp] += getTrajectory(x, p, frameSequence);
 	}

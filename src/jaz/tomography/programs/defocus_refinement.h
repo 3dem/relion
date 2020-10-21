@@ -5,12 +5,12 @@
 #include <src/jaz/math/t_complex.h>
 #include <src/jaz/image/buffered_image.h>
 #include <src/jaz/optics/aberration_fit.h>
+#include <src/jaz/tomography/particle_set.h>
 #include <src/jaz/gravis/t4Matrix.h>
 #include <vector>
 
 #include "refinement.h"
 
-class ParticleSet;
 class CTF;
 
 class DefocusRefinementProgram : public RefinementProgram
@@ -45,7 +45,7 @@ class DefocusRefinementProgram : public RefinementProgram
 				double maxDelta,
 				int steps, int group_count, double sigma_input,
 				const ParticleSet& dataSet,
-				std::vector<int>& particles, int max_particles,
+				std::vector<ParticleIndex>& particles, int max_particles,
 				const Tomogram& tomogram,
 				const AberrationsCache& aberrationsCache,
 				std::vector<BufferedImage<fComplex>>& referenceFS,
@@ -57,7 +57,7 @@ class DefocusRefinementProgram : public RefinementProgram
 				int f,
 				double z0, double z1, int steps, 
 				const ParticleSet& dataSet,
-				std::vector<int>& particles, int max_particles,
+				std::vector<ParticleIndex>& particles, int max_particles,
 				const Tomogram& tomogram,
 				const AberrationsCache& aberrationsCache,
 				std::vector<BufferedImage<fComplex>>& referenceFS,
@@ -69,7 +69,7 @@ class DefocusRefinementProgram : public RefinementProgram
 				int f,
 				double m0, double m1, int steps,
 				const ParticleSet& dataSet,
-				std::vector<int>& particles, int max_particles,
+				std::vector<ParticleIndex>& particles, int max_particles,
 				const Tomogram& tomogram,
 				const AberrationsCache& aberrationsCache,
 				std::vector<BufferedImage<fComplex>>& referenceFS,

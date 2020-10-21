@@ -100,7 +100,7 @@ void BackprojectProgram::run()
 	TomogramSet tomoSet(tomoSetFn);
 	ParticleSet dataSet(particlesFn, motFn);
 
-	std::vector<std::vector<int>> particles = dataSet.splitByTomogram(tomoSet);
+	std::vector<std::vector<ParticleIndex>> particles = dataSet.splitByTomogram(tomoSet);
 	
 	const int tc = particles.size();
 	const int s = boxSize;
@@ -211,7 +211,7 @@ void BackprojectProgram::run()
 				Log::updateProgress(p);
 			}
 			
-			const int part_id = particles[t][p];	
+			const ParticleIndex part_id = particles[t][p];
 			
 			const d3Vector pos = dataSet.getPosition(part_id);
 			const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(

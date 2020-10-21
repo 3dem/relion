@@ -33,9 +33,9 @@ ParticleSet::ParticleSet(std::string filename, std::string motionFilename)
 	}
 }
 
-std::vector<std::vector<int> > ParticleSet::splitByTomogram(const TomogramSet& tomogramSet) const
+std::vector<std::vector<ParticleIndex> > ParticleSet::splitByTomogram(const TomogramSet& tomogramSet) const
 {
-	std::vector<std::vector<int>> out(0);
+	std::vector<std::vector<ParticleIndex>> out(0);
 
 	if (!partTable.labelExists(EMDL_TOMO_NAME))
 	{
@@ -85,7 +85,7 @@ std::vector<std::vector<int> > ParticleSet::splitByTomogram(const TomogramSet& t
 
 	for (int t = 0; t < tc; t++)
 	{
-		out[t] = std::vector<int>(0);
+		out[t] = std::vector<ParticleIndex>(0);
 		out[t].reserve(pc_t[t]);
 
 		if (any_particles_found[t])
@@ -166,19 +166,19 @@ int ParticleSet::getTotalParticleNumber() const
 	return partTable.numberOfObjects();
 }
 
-d3Vector ParticleSet::getPosition(long int particle_id) const
+d3Vector ParticleSet::getPosition(ParticleIndex particle_id) const
 {
 	d3Vector pos, off;
 	
-	partTable.getValueSafely(EMDL_IMAGE_COORD_X, pos.x, particle_id);
-	partTable.getValueSafely(EMDL_IMAGE_COORD_Y, pos.y, particle_id);
-	partTable.getValueSafely(EMDL_IMAGE_COORD_Z, pos.z, particle_id);
+	partTable.getValueSafely(EMDL_IMAGE_COORD_X, pos.x, particle_id.value);
+	partTable.getValueSafely(EMDL_IMAGE_COORD_Y, pos.y, particle_id.value);
+	partTable.getValueSafely(EMDL_IMAGE_COORD_Z, pos.z, particle_id.value);
 	
-	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_X_ANGSTROM, off.x, particle_id);
-	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, off.y, particle_id);
-	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, off.z, particle_id);
+	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_X_ANGSTROM, off.x, particle_id.value);
+	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, off.y, particle_id.value);
+	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, off.z, particle_id.value);
 	
-	const int og = getOpticsGroup(particle_id);
+	const int og = getOpticsGroup(particle_id.value);
 	
 	const double originalPixelSize = optTable.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, og);
 	
@@ -191,15 +191,15 @@ d3Vector ParticleSet::getPosition(long int particle_id) const
 	return out;
 }
 
-d3Matrix ParticleSet::getSubtomogramMatrix(long particle_id) const
+d3Matrix ParticleSet::getSubtomogramMatrix(ParticleIndex particle_id) const
 {
 	if (partTable.labelExists(EMDL_TOMO_SUBTOMOGRAM_ROT))
 	{
 		double phi, theta, psi;
 		
-		partTable.getValueSafely(EMDL_TOMO_SUBTOMOGRAM_ROT,  phi,   particle_id);
-		partTable.getValueSafely(EMDL_TOMO_SUBTOMOGRAM_TILT, theta, particle_id);
-		partTable.getValueSafely(EMDL_TOMO_SUBTOMOGRAM_PSI,  psi,   particle_id);
+		partTable.getValueSafely(EMDL_TOMO_SUBTOMOGRAM_ROT,  phi,   particle_id.value);
+		partTable.getValueSafely(EMDL_TOMO_SUBTOMOGRAM_TILT, theta, particle_id.value);
+		partTable.getValueSafely(EMDL_TOMO_SUBTOMOGRAM_PSI,  psi,   particle_id.value);
 		
 		Matrix2D<double> A;
 		Euler_angles2matrix(phi, theta, psi, A, false);	
@@ -214,13 +214,13 @@ d3Matrix ParticleSet::getSubtomogramMatrix(long particle_id) const
 	}
 }
 
-d3Matrix ParticleSet::getParticleMatrix(long particle_id) const
+d3Matrix ParticleSet::getParticleMatrix(ParticleIndex particle_id) const
 {
 	double phi, theta, psi;
 	
-	partTable.getValueSafely(EMDL_ORIENT_ROT,  phi,   particle_id);
-	partTable.getValueSafely(EMDL_ORIENT_TILT, theta, particle_id);
-	partTable.getValueSafely(EMDL_ORIENT_PSI,  psi,   particle_id);
+	partTable.getValueSafely(EMDL_ORIENT_ROT,  phi,   particle_id.value);
+	partTable.getValueSafely(EMDL_ORIENT_TILT, theta, particle_id.value);
+	partTable.getValueSafely(EMDL_ORIENT_PSI,  psi,   particle_id.value);
 	
 	Matrix2D<double> A;
 	Euler_angles2matrix(phi, theta, psi, A, false);	
@@ -228,18 +228,18 @@ d3Matrix ParticleSet::getParticleMatrix(long particle_id) const
 	
 }
 
-d3Matrix ParticleSet::getMatrix3x3(long int particle_id) const
+d3Matrix ParticleSet::getMatrix3x3(ParticleIndex particle_id) const
 {
-	const d3Matrix A_particle = getParticleMatrix(particle_id);
-	const d3Matrix A_subtomogram = getSubtomogramMatrix(particle_id);
+	const d3Matrix A_particle = getParticleMatrix(particle_id.value);
+	const d3Matrix A_subtomogram = getSubtomogramMatrix(particle_id.value);
 	
 	return A_subtomogram * A_particle;
 }
 
-d4Matrix ParticleSet::getMatrix4x4(long int particle_id, double w, double h, double d) const
+d4Matrix ParticleSet::getMatrix4x4(ParticleIndex particle_id, double w, double h, double d) const
 {
-	d3Matrix A = getMatrix3x3(particle_id);	
-	d3Vector pos = getPosition(particle_id);
+	d3Matrix A = getMatrix3x3(particle_id.value);
+	d3Vector pos = getPosition(particle_id.value);
 	
 	int cx = ((int)w) / 2;
 	int cy = ((int)h) / 2;
@@ -266,44 +266,44 @@ d4Matrix ParticleSet::getMatrix4x4(long int particle_id, double w, double h, dou
 	return Ts * R * Tc;
 }
 
-std::string ParticleSet::getName(long int particle_id) const
+std::string ParticleSet::getName(ParticleIndex particle_id) const
 {
 	std::stringstream sts;
-	sts << particle_id;
+	sts << particle_id.value;
 	
 	return sts.str();
 }
 
-int ParticleSet::getHalfSet(long int particle_id) const
+int ParticleSet::getHalfSet(ParticleIndex particle_id) const
 {
 	int s;
-	partTable.getValueSafely(EMDL_PARTICLE_RANDOM_SUBSET, s, particle_id);
+	partTable.getValueSafely(EMDL_PARTICLE_RANDOM_SUBSET, s, particle_id.value);
 	return s - 1;
 }
 
 
-void ParticleSet::moveParticleTo(long int particle_id, gravis::d3Vector pos)
+void ParticleSet::moveParticleTo(ParticleIndex particle_id, gravis::d3Vector pos)
 {
-	partTable.setValue(EMDL_IMAGE_COORD_X, pos.x - 1.0, particle_id);
-	partTable.setValue(EMDL_IMAGE_COORD_Y, pos.y - 1.0, particle_id);
-	partTable.setValue(EMDL_IMAGE_COORD_Z, pos.z - 1.0, particle_id);
+	partTable.setValue(EMDL_IMAGE_COORD_X, pos.x - 1.0, particle_id.value);
+	partTable.setValue(EMDL_IMAGE_COORD_Y, pos.y - 1.0, particle_id.value);
+	partTable.setValue(EMDL_IMAGE_COORD_Z, pos.z - 1.0, particle_id.value);
 	
-	partTable.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, 0.0, particle_id);
-	partTable.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, 0.0, particle_id);
-	partTable.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, 0.0, particle_id);
+	partTable.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, 0.0, particle_id.value);
+	partTable.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, 0.0, particle_id.value);
+	partTable.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, 0.0, particle_id.value);
 }
 
-void ParticleSet::shiftParticleBy(long int particle_id, gravis::d3Vector shift)
+void ParticleSet::shiftParticleBy(ParticleIndex particle_id, gravis::d3Vector shift)
 {
 	double x, y, z;
 	
-	partTable.getValueSafely(EMDL_IMAGE_COORD_X, x, particle_id);
-	partTable.getValueSafely(EMDL_IMAGE_COORD_Y, y, particle_id);
-	partTable.getValueSafely(EMDL_IMAGE_COORD_Z, z, particle_id);
+	partTable.getValueSafely(EMDL_IMAGE_COORD_X, x, particle_id.value);
+	partTable.getValueSafely(EMDL_IMAGE_COORD_Y, y, particle_id.value);
+	partTable.getValueSafely(EMDL_IMAGE_COORD_Z, z, particle_id.value);
 	
-	partTable.setValue(EMDL_IMAGE_COORD_X, x + shift.x, particle_id);
-	partTable.setValue(EMDL_IMAGE_COORD_Y, y + shift.y, particle_id);
-	partTable.setValue(EMDL_IMAGE_COORD_Z, z + shift.z, particle_id);
+	partTable.setValue(EMDL_IMAGE_COORD_X, x + shift.x, particle_id.value);
+	partTable.setValue(EMDL_IMAGE_COORD_Y, y + shift.y, particle_id.value);
+	partTable.setValue(EMDL_IMAGE_COORD_Z, z + shift.z, particle_id.value);
 }
 
 void ParticleSet::write(std::string fn) const
@@ -314,49 +314,49 @@ void ParticleSet::write(std::string fn) const
 	partTable.write(ofs);
 }
 
-void ParticleSet::setImageFileNames(std::string data, std::string weight, long int particle_id)
+void ParticleSet::setImageFileNames(std::string data, std::string weight, ParticleIndex particle_id)
 {
-	partTable.setValue(EMDL_IMAGE_NAME, data, particle_id);
-	partTable.setValue(EMDL_CTF_IMAGE, weight, particle_id);
+	partTable.setValue(EMDL_IMAGE_NAME, data, particle_id.value);
+	partTable.setValue(EMDL_CTF_IMAGE, weight, particle_id.value);
 }
 
-d3Vector ParticleSet::getParticleOffset(long particle_id) const
+d3Vector ParticleSet::getParticleOffset(ParticleIndex particle_id) const
 {
 	d3Vector out;
 	
-	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_X_ANGSTROM, out.x, particle_id);
-	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, out.y, particle_id);
-	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, out.z, particle_id);
+	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_X_ANGSTROM, out.x, particle_id.value);
+	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, out.y, particle_id.value);
+	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, out.z, particle_id.value);
 	
 	return out;
 }
 
-void ParticleSet::setParticleOffset(long particle_id, const d3Vector& v)
+void ParticleSet::setParticleOffset(ParticleIndex particle_id, const d3Vector& v)
 {
-	partTable.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, v.x, particle_id);
-	partTable.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, v.y, particle_id);
-	partTable.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, v.z, particle_id);
+	partTable.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, v.x, particle_id.value);
+	partTable.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, v.y, particle_id.value);
+	partTable.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, v.z, particle_id.value);
 }
 
-d3Vector ParticleSet::getParticleCoord(long particle_id) const
+d3Vector ParticleSet::getParticleCoord(ParticleIndex particle_id) const
 {
 	d3Vector out;
 	
-	partTable.getValueSafely(EMDL_IMAGE_COORD_X, out.x, particle_id);
-	partTable.getValueSafely(EMDL_IMAGE_COORD_Y, out.y, particle_id);
-	partTable.getValueSafely(EMDL_IMAGE_COORD_Z, out.z, particle_id);
+	partTable.getValueSafely(EMDL_IMAGE_COORD_X, out.x, particle_id.value);
+	partTable.getValueSafely(EMDL_IMAGE_COORD_Y, out.y, particle_id.value);
+	partTable.getValueSafely(EMDL_IMAGE_COORD_Z, out.z, particle_id.value);
 	
 	return out;
 }
 
-void ParticleSet::setParticleCoord(long particle_id, const d3Vector& v)
+void ParticleSet::setParticleCoord(ParticleIndex particle_id, const d3Vector& v)
 {
-	partTable.setValue(EMDL_IMAGE_COORD_X, v.x, particle_id);
-	partTable.setValue(EMDL_IMAGE_COORD_Y, v.y, particle_id);
-	partTable.setValue(EMDL_IMAGE_COORD_Z, v.z, particle_id);
+	partTable.setValue(EMDL_IMAGE_COORD_X, v.x, particle_id.value);
+	partTable.setValue(EMDL_IMAGE_COORD_Y, v.y, particle_id.value);
+	partTable.setValue(EMDL_IMAGE_COORD_Z, v.z, particle_id.value);
 }
 
-int ParticleSet::getOpticsGroup(long particle_id) const
+int ParticleSet::getOpticsGroup(ParticleIndex particle_id) const
 {
 	if (!partTable.labelExists(EMDL_IMAGE_OPTICS_GROUP))
 	{
@@ -364,7 +364,7 @@ int ParticleSet::getOpticsGroup(long particle_id) const
 	}
 	
 	int out;
-	partTable.getValueSafely(EMDL_IMAGE_OPTICS_GROUP, out, particle_id);
+	partTable.getValueSafely(EMDL_IMAGE_OPTICS_GROUP, out, particle_id.value);
 	return out - 1;
 }
 
@@ -397,13 +397,13 @@ double ParticleSet::getOriginalPixelSize(int opticsGroup) const
 	return out;
 }
 
-std::vector<d3Vector> ParticleSet::getTrajectoryInPixels(long particle_id, int fc, double pixelSize) const
+std::vector<d3Vector> ParticleSet::getTrajectoryInPixels(ParticleIndex particle_id, int fc, double pixelSize) const
 {
-	const d3Vector p0 = getPosition(particle_id);
+	const d3Vector p0 = getPosition(particle_id.value);
 
 	if (hasMotion)
 	{
-		return motionTrajectories[particle_id].getShiftsInPix(p0, pixelSize);
+		return motionTrajectories[particle_id.value].getShiftsInPix(p0, pixelSize);
 	}
 	else
 	{
@@ -411,11 +411,11 @@ std::vector<d3Vector> ParticleSet::getTrajectoryInPixels(long particle_id, int f
 	}
 }
 
-void ParticleSet::checkTrajectoryLengths(int p0, int np, int fc, std::string caller) const
+void ParticleSet::checkTrajectoryLengths(ParticleIndex p0, int np, int fc, std::string caller) const
 {
 	if (hasMotion)
 	{
-		for (int p = p0; p < p0 + np; p++)
+		for (int p = p0.value; p < p0.value + np; p++)
 		{
 			if (motionTrajectories[p].shifts_Ang.size() != fc)
 			{

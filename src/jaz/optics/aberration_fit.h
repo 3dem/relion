@@ -24,11 +24,11 @@
 #include <src/image.h>
 #include <src/metadata_table.h>
 #include <src/jaz/image/buffered_image.h>
+#include <src/jaz/tomography/particle_set.h>
 #include <src/jaz/math/tensor2x2.h>
 
 class Tomogram;
 class TomoReferenceMap;
-class ParticleSet;
 class AberrationsCache;
 
 
@@ -111,7 +111,7 @@ class AberrationFit
 
 
 		static void considerParticle(
-				int part_id,
+				ParticleIndex part_id,
 				const Tomogram& tomogram,
 				const TomoReferenceMap& referenceMap,
 				const ParticleSet& dataSet,

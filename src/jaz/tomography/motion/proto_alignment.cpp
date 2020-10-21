@@ -15,7 +15,7 @@ ProtoAlignment::ProtoAlignment(
 	const std::vector<BufferedImage<double>>& CCs,
 	const std::vector<gravis::d4Matrix>& frameProj, 
 	const ParticleSet& dataSet,
-	const std::vector<int>& partIndices,
+	const std::vector<ParticleIndex>& partIndices,
 	const std::vector<BufferedImage<fComplex>>& referenceFS,
 	bool constParticles,
 	bool constAngles,
@@ -244,7 +244,7 @@ std::vector<d4Matrix> ProtoAlignment::getProjections(const std::vector<double> &
 
 void ProtoAlignment::shiftParticles(
 		const std::vector<double> &x,
-		const std::vector<int>& partIndices, 
+		const std::vector<ParticleIndex>& partIndices, 
 		ParticleSet& target) const
 {
 	if (constParticles) return;

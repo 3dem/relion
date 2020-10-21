@@ -23,7 +23,7 @@ using namespace gravis;
 
 
 BufferedImage<fComplex> Prediction::predictModulated(
-		int particle_id, const ParticleSet& dataSet, d4Matrix proj, int s,
+		ParticleIndex particle_id, const ParticleSet& dataSet, d4Matrix proj, int s,
 		const CTF& ctf, double pixelSize,
 		const AberrationsCache& aberrationsCache,
 		const std::vector<BufferedImage<fComplex>>& referenceFS,
@@ -66,7 +66,7 @@ BufferedImage<fComplex> Prediction::predictModulated(
 }
 
 BufferedImage<fComplex> Prediction::predictFS(
-		int particle_id, const ParticleSet& dataSet, d4Matrix proj, int s,
+		ParticleIndex particle_id, const ParticleSet& dataSet, d4Matrix proj, int s,
 		const std::vector<BufferedImage<fComplex>>& referenceFS,
 		HalfSet halfSet)
 {
@@ -88,7 +88,7 @@ BufferedImage<fComplex> Prediction::predictFS(
 
 std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 		const ParticleSet& dataSet,
-		const std::vector<int>& partIndices,
+		const std::vector<ParticleIndex>& partIndices,
 		const Tomogram& tomogram,
 		const AberrationsCache& aberrationsCache,
 		const TomoReferenceMap& referenceMap,
@@ -155,7 +155,7 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 			Log::updateProgress(p);
 		}
 		
-		const int part_id = partIndices[p];	
+		const ParticleIndex part_id = partIndices[p];
 		
 		const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(part_id, fc, tomogram.optics.pixelSize);
 		

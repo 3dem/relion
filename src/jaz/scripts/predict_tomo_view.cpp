@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
 	TomogramSet tomogramSet(tomoSetFn);
 
 	ParticleSet dataSet(particleFn);
-	std::vector<std::vector<int>> particles = dataSet.splitByTomogram(tomogramSet);
+	std::vector<std::vector<ParticleIndex>> particles = dataSet.splitByTomogram(tomogramSet);
 
 	AberrationsCache aberrationsCache(dataSet.optTable, boxSize);
 
@@ -107,7 +107,7 @@ int main(int argc, char *argv[])
 			REPORT_ERROR_STR("Only " << pc << " particles found in tomogram " << tomoIndex);
 		}
 
-		const int part_id = particleIndex;
+		const ParticleIndex part_id = particleIndex;
 
 		Tomogram tomogram = tomogramSet.loadTomogram(tomoIndex, true);
 

@@ -48,7 +48,7 @@ int main(int argc, char *argv[])
 	TomogramSet tomogramSet(tomoSetFn);
 	
 	ParticleSet dataSet(particlesFn, "");
-	std::vector<std::vector<int>> particles = dataSet.splitByTomogram(tomogramSet);
+	std::vector<std::vector<ParticleIndex>> particles = dataSet.splitByTomogram(tomogramSet);
 		
 	const int tc = particles.size();
 		
@@ -72,7 +72,7 @@ int main(int argc, char *argv[])
 		{
 			output << "\n\tparticle " << p << ": \n\n";
 			
-			const int part_id = particles[t][p];						
+			const ParticleIndex part_id = particles[t][p];
 			
 			const d3Vector pos = dataSet.getPosition(part_id);
 			

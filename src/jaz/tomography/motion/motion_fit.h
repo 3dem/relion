@@ -3,11 +3,11 @@
 
 #include <src/jaz/optimization/optimization.h>
 #include <src/jaz/image/buffered_image.h>
+#include <src/jaz/tomography/particle_set.h>
 #include <src/jaz/mesh/mesh_builder.h>
 #include <src/jaz/util/log.h>
 #include "trajectory.h"
 
-class ParticleSet;
 class CTF;
 
 class MotionFit : public DifferentiableOptimization
@@ -32,7 +32,7 @@ class MotionFit : public DifferentiableOptimization
 				const std::vector<BufferedImage<double>>& CCs,
 				const std::vector<gravis::d4Matrix>& frameProj, 
 				ParticleSet& dataSet,
-				const std::vector<int>& partIndices,
+				const std::vector<ParticleIndex>& partIndices,
 				const std::vector<BufferedImage<fComplex>>& referenceFS,
 				MotionParameters motionParameters,
 				Settings settings,
@@ -46,7 +46,7 @@ class MotionFit : public DifferentiableOptimization
 			const std::vector<BufferedImage<double>>& CCs; // one frame stack for each particle		
 			const std::vector<gravis::d4Matrix>& frameProj;			
 			ParticleSet& dataSet;
-			const std::vector<int>& partIndices;
+			const std::vector<ParticleIndex>& partIndices;
 			const std::vector<BufferedImage<fComplex>>& referenceFS;
 			
 			MotionParameters motionParameters;

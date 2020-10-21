@@ -122,7 +122,7 @@ Image<RFLOAT> AberrationFit::draw(AberrationBasis *fit, double angpix, int s)
 
 
 void AberrationFit :: considerParticle(
-		int part_id,
+		ParticleIndex part_id,
 		const Tomogram& tomogram,
 		const TomoReferenceMap& referenceMap,
 		const ParticleSet& dataSet,

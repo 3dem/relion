@@ -112,7 +112,7 @@ void FrameAlignmentProgram::run()
 		
 		if (first_frame > 0 || last_frame >= 0)
 		{
-			#pragma omp parallel for num_threads(num_threads)		
+			#pragma omp parallel for num_threads(num_threads)
 			for (int p = 0; p < pc; p++)
 			{
 				for (int ff = 0; ff < fc; ff++)

@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
 	TomogramSet tomogramSet(tomoSetFn);
 	
 	ParticleSet dataSet(inFn, motFn);
-	std::vector<std::vector<int>> particles = dataSet.splitByTomogram(tomogramSet);
+	std::vector<std::vector<ParticleIndex>> particles = dataSet.splitByTomogram(tomogramSet);
 	
 
 	const int tc = particles.size();
@@ -104,7 +104,7 @@ int main(int argc, char *argv[])
 		
 		for (int p = 0; p < pc; p++)
 		{
-			const long int part_id = particles[t][p];
+			const ParticleIndex part_id = particles[t][p];
 
 			const d3Matrix A = dataSet.getMatrix3x3(part_id);
 			
@@ -139,7 +139,7 @@ int main(int argc, char *argv[])
 						{
 							REPORT_ERROR_STR(
 								"Bad frame index: only " << traj.size() << " frames available for particle "
-								<< part_id << " in " << motFn);
+								<< part_id.value << " in " << motFn);
 						}
 						else
 						{

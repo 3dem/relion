@@ -75,7 +75,7 @@ d2Vector TomoIsoMagFit::computeErrorAndSlope(double mag)
 	{
 		const int th = omp_get_thread_num();
 
-		const int particle_id = particle_indices[p];
+		const ParticleIndex particle_id = particle_indices[p];
 
 		const d3Vector pos = particleSet.getPosition(particle_id);
 		const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(

@@ -101,9 +101,9 @@ void PolishProgram::run()
 		
 		for (int p = 0; p < pc; p++)
 		{
-			if (dataSet.motionTrajectories[particles[t][p]].shifts_Ang.size() != fc)
+			if (dataSet.motionTrajectories[particles[t][p].value].shifts_Ang.size() != fc)
 			{		
-				dataSet.motionTrajectories[particles[t][p]] = Trajectory(fc);
+				dataSet.motionTrajectories[particles[t][p].value] = Trajectory(fc);
 			}
 		}
 	}

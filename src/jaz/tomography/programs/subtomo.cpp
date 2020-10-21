@@ -106,7 +106,7 @@ void SubtomoProgram::run()
 	TomogramSet tomogramSet(tomoSetFn);
 
 	ParticleSet dataSet(particlesFn, motFn);
-	std::vector<std::vector<int> > particles = dataSet.splitByTomogram(tomogramSet);
+	std::vector<std::vector<ParticleIndex> > particles = dataSet.splitByTomogram(tomogramSet);
 	
 	if (cropSize < 0) cropSize = boxSize;
 	
@@ -133,7 +133,7 @@ void SubtomoProgram::run()
 
 		for (int p = 0; p < pc; p++)
 		{
-			const int part_id = particles[t][p];
+			const ParticleIndex part_id = particles[t][p];
 
 			const int opticsGroup = copy.getOpticsGroup(part_id);
 			const double originalPixelSize = copy.getOriginalPixelSize(opticsGroup);
@@ -223,7 +223,7 @@ void SubtomoProgram::run()
 				Log::updateProgress(p);
 			}
 						
-			const int part_id = particles[t][p];
+			const ParticleIndex part_id = particles[t][p];
 			
 			const d3Vector pos = dataSet.getPosition(part_id);
 			const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(
