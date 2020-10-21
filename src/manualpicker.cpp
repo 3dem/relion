@@ -429,6 +429,7 @@ void manualpickerGuiWindow::writeOutputStarfiles(bool verb)
 	if (verb) std::cout << " Saved list of selected micrographs in: " << fn_sel << std::endl;
 
 	FileName fn_coords = global_fn_odir + global_pickname + ".star";
+	MDcoords.setName("coordinate_files");
 	MDcoords.write(fn_coords);
 	if (verb) std::cout << " Saved list with " << c << " coordinate files in: " << fn_coords << std::endl;
 
