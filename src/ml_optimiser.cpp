@@ -708,10 +708,24 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	grad_ini_subset_size = textToInteger(parser.getOption("--grad_ini_subset", "Mini-batch size during the initial SGD iterations", "-1"));
 	grad_fin_subset_size = textToInteger(parser.getOption("--grad_fin_subset", "Mini-batch size during the final SGD iterations", "-1"));
 	mu = textToFloat(parser.getOption("--mu", "Momentum parameter for SGD updates", "0.9"));
-	grad_stepsize = textToFloat(parser.getOption("--grad_stepsize", "Step size parameter for gradient optimisation.", "0.1"));
+
+	grad_stepsize = textToFloat(parser.getOption("--grad_stepsize", "Step size parameter for gradient optimisation.", "-1"));
+	if (grad_stepsize < 0) {
+		if (mymodel.ref_dim == 2)
+			grad_stepsize = 0.1;
+		else
+			grad_stepsize = 0.2;
+	}
+
 	grad_stepsize_scheme = parser.getOption("--grad_stepsize_scheme",
 			"Gradient step size updates scheme. Valid values are plain, <a>-2step or <a>-3step-<b>. Where <a> is the initial inflate and <b> is the final deflate factor.",
-			"3-2step");
+			"");
+	if (grad_stepsize_scheme == "") {
+		if (mymodel.ref_dim == 2)
+			grad_stepsize_scheme = "3-2step";
+		else
+			grad_stepsize_scheme = "plain";
+	}
 	write_every_grad_iter = textToInteger(parser.getOption("--grad_write_iter", "Write out model every so many iterations in SGD (default is writing out all iters)", "10"));
 	do_init_blobs = parser.checkOption("--init_blobs", "Initialize models with random Gaussians.");
 	do_som = parser.checkOption("--som", "Calculate self-organizing map instead of classification.");
@@ -719,7 +733,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	som_connectivity = textToFloat(parser.getOption("--som_connectivity", "Number of average active neighbour connections.", "5.0"));
 	som_inactivity_threshold = textToFloat(parser.getOption("--som_inactivity_threshold", "Threshold for inactivity before node is dropped.", "0.01"));
 	som_neighbour_pull = textToFloat(parser.getOption("--som_neighbour_pull", "Portion of gradient applied to connected nodes.", "0.2"));
-	class_inactivity_threshold = textToFloat(parser.getOption("--class_inactivity_threshold", "Replace classes with little activity during gradient based classification.", "-1"));
+	class_inactivity_threshold = textToFloat(parser.getOption("--class_inactivity_threshold", "Replace classes with little activity during gradient based classification.", "0.01"));
 
 	if (do_som && !do_grad)
 		REPORT_ERROR("SOM can only be calculated with a gradient optimization.");
@@ -1000,8 +1014,10 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 		grad_fin_subset_size = 500;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_MU, mu))
 		mu = 0.9;
-	if (!MD.getValue(EMDL_OPTIMISER_SGD_SKIP_ANNNEAL, do_grad_skip_anneal))
-		do_grad_skip_anneal = false;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_CLASS_INACTIVITY_THRESHOLD, class_inactivity_threshold))
+		class_inactivity_threshold = 0.01;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_MU, mu))
+		mu = 0.9;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_SUBSET_SIZE, subset_size))
 		subset_size = -1;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, write_every_grad_iter))
@@ -1191,6 +1207,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_SGD_FIN_SUBSET_SIZE, grad_fin_subset_size);
 		MD.setValue(EMDL_OPTIMISER_SGD_MU, mu);
 		MD.setValue(EMDL_OPTIMISER_SGD_SKIP_ANNNEAL, do_grad_skip_anneal);
+		MD.setValue(EMDL_OPTIMISER_SGD_CLASS_INACTIVITY_THRESHOLD, class_inactivity_threshold);
 		MD.setValue(EMDL_OPTIMISER_SGD_SUBSET_SIZE, subset_size);
 		MD.setValue(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, write_every_grad_iter);
 		MD.setValue(EMDL_OPTIMISER_SGD_STEPSIZE, grad_stepsize);
@@ -2142,8 +2159,8 @@ void MlOptimiser::initialiseGeneral(int rank)
 				          "both will instead be determined automatically." << std::endl;
 
 			unsigned long dataset_size = mydata.numberOfParticles();
-			grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.001, 500), 100);
-			grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.01,  5000), 500);
+			grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.001, 500), 200);
+			grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.01,  10000), 1000);
 			if (rank==0) {
 				std::cout << " Initial subset size set to " << grad_ini_subset_size << std::endl;
 				std::cout << " Final subset size set to " << grad_fin_subset_size << std::endl;
