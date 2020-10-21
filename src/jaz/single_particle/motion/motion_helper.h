@@ -28,8 +28,8 @@
 #include <src/complex.h>
 #include <src/jaz/optimization/optimization.h>
 #include <src/jaz/single_particle/volume.h>
-#include <src/jaz/single_particle/gravis/t2Matrix.h>
-#include <src/jaz/single_particle/gravis/t3Vector.h>
+#include <src/jaz/gravis/t2Matrix.h>
+#include <src/jaz/gravis/t3Vector.h>
 #include <src/jaz/single_particle/obs_model.h>
 #include <src/jaz/single_particle/parallel_ft.h>
 #include <vector>

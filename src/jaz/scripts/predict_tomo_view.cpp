@@ -91,6 +91,8 @@ int main(int argc, char *argv[])
 	ParticleSet dataSet(particleFn);
 	std::vector<std::vector<int>> particles = dataSet.splitByTomogram(tomogramSet);
 
+	AberrationsCache aberrationsCache(dataSet.optTable, boxSize);
+
 	referenceMap.load(boxSize);
 
 	const int s = referenceMap.getBoxSize();
@@ -146,8 +148,7 @@ int main(int argc, char *argv[])
 
 			BufferedImage<fComplex> prediction = Prediction::predictModulated(
 				part_id, dataSet, tomogram.projectionMatrices[f], s,
-				ctf,
-				tomogram.optics.pixelSize,
+				ctf, tomogram.optics.pixelSize, aberrationsCache,
 				referenceMap.image_FS,
 				oppositeHalf? Prediction::OppositeHalf : Prediction::OwnHalf,
 				predictCTF?   Prediction::AmplitudeModulated : Prediction::Unmodulated);

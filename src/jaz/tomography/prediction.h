@@ -3,6 +3,7 @@
 
 #include <src/jaz/image/buffered_image.h>
 #include <src/jaz/gravis/t4Matrix.h>
+#include <src/jaz/optics/aberrations_cache.h>
 
 #include "reference_map.h"
 
@@ -35,6 +36,7 @@ class Prediction
 				const ParticleSet& dataSet,
 				gravis::d4Matrix proj,
 				int s, const CTF& ctf, double pixelSize,
+				const AberrationsCache& aberrationsCache,
 				const std::vector<BufferedImage<fComplex>>& referenceFS,
 				HalfSet halfSet = OwnHalf,
 				Modulation modulation = AmplitudeAndPhaseModulated);
@@ -51,6 +53,7 @@ class Prediction
 				const ParticleSet& dataSet,
 				const std::vector<int>& partIndices,
 				const Tomogram& tomogram,
+				const AberrationsCache& aberrationsCache,
 				const TomoReferenceMap& referenceMap,
 				const BufferedImage<float>& frqWghts,
 				const std::vector<int>& sequence,

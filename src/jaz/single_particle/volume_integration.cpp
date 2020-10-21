@@ -20,7 +20,7 @@
 
 #include <src/jaz/single_particle/volume_integration.h>
 #include <src/jaz/single_particle/slice_helper.h>
-#include <src/jaz/single_particle/gravis/t2Matrix.h>
+#include <src/jaz/gravis/t2Matrix.h>
 
 using namespace gravis;
 

@@ -27,7 +27,7 @@
 #include <src/fftw.h>
 #include <src/micrograph_model.h>
 #include <src/jaz/single_particle/obs_model.h>
-#include <src/jaz/single_particle/gravis/t2Vector.h>
+#include <src/jaz/gravis/t2Vector.h>
 #include <src/jaz/single_particle/parallel_ft.h>
 
 #include <src/jaz/single_particle/micrograph_handler.h>

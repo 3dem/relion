@@ -19,15 +19,15 @@
  ***************************************************************************/
 
 #include "magnification_estimator.h"
-#include "magnification_helper.h"
 #include "ctf_refiner.h"
-#include "equation2x2.h"
 
 #include <src/jaz/single_particle/reference_map.h>
 #include <src/jaz/single_particle/fftw_helper.h>
 #include <src/jaz/single_particle/vtk_helper.h>
 #include <src/jaz/single_particle/image_log.h>
 #include <src/jaz/image/color_helper.h>
+#include <src/jaz/optics/magnification_helper.h>
+#include <src/jaz/math/equation2x2.h>
 
 #include <omp.h>
 
