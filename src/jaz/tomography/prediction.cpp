@@ -78,10 +78,10 @@ BufferedImage<fComplex> Prediction::predictFS(
 	const int hs0 = dataSet.getHalfSet(particle_id);
 	const int hs = (halfSet == OppositeHalf)? 1 - hs0: hs0;
 
-	BufferedImage<fComplex> prediction(sh,s), psf(sh,s);
+	BufferedImage<fComplex> prediction(sh,s);
 
 	ForwardProjection::forwardProject(
-			referenceFS[hs], {projPart}, prediction, psf, 1);
+			referenceFS[hs], {projPart}, prediction, 1);
 
 	return prediction;
 }

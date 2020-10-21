@@ -9,6 +9,15 @@
 
 class TomogramSet;
 
+class ParticleIndex
+{
+	public:
+
+		ParticleIndex(int value) : value(value) {}
+
+		int value;
+};
+
 class ParticleSet
 {
 	public:

@@ -72,7 +72,7 @@ class ObservationModel
 
 		// Prediction //
 
-		void predictObservation(
+		void predictObservation_DC(
 				const RawImage<Complex>& reference_map,
 				const RawImage<Complex>* amplitude_map,
 				const MetaDataTable& particle_table, long int particle_index,

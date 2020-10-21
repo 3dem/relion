@@ -230,7 +230,7 @@ int main(int argc, char *argv[])
 
 		BufferedImage<fComplex> prediction(sh,s), psf(sh,s);
 
-		ForwardProjection::forwardProject(data_div_FS, {proj}, prediction, psf, 1);
+		ForwardProjection::forwardProject_withPSF(data_div_FS, {proj}, prediction, psf, 1);
 
 		BufferedImage<float> predictionReal(s,s);
 

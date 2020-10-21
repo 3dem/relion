@@ -40,21 +40,145 @@ class ForwardProjection
 		static void forwardProject(
 				const RawImage<tComplex<T>>& reference,
 				const std::vector<gravis::d4Matrix>& proj,
-				RawImage<tComplex<T>>& destData,
-				RawImage<tComplex<T>>& destPsf,
+				RawImage<tComplex<T>>& dest,
 				int num_threads = 1);
 
 		template <typename T>
-		static void forwardProject_noPSF(
+		static void forwardProject3DGradient(
+				const RawImage<tComplex<T>>& reference,
+				const std::vector<gravis::d4Matrix>& proj,
+				RawImage<gravis::t3Vector<tComplex<T>>>& dest,
+				int num_threads = 1);
+
+		template <typename T>
+		static void forwardProject2DGradient(
+				const RawImage<tComplex<T>>& reference,
+				const std::vector<gravis::d4Matrix>& proj,
+				RawImage<gravis::t2Vector<tComplex<T>>>& dest,
+				int num_threads = 1);
+
+		template <typename T>
+		static void forwardProject_withPSF(
 				const RawImage<tComplex<T>>& reference,
 				const std::vector<gravis::d4Matrix>& proj,
 				RawImage<tComplex<T>>& destData,
+				RawImage<tComplex<T>>& destPsf,
 				int num_threads = 1);
 };
-						
+
 
 template <typename T>
 void ForwardProjection::forwardProject(
+		const RawImage<tComplex<T>>& reference,
+		const std::vector<gravis::d4Matrix>& proj,
+		RawImage<tComplex<T>>& dest,
+		int num_threads)
+{
+	const int wh2 = dest.xdim;
+	const int h2 = dest.ydim;
+	const int fc = dest.zdim;
+
+	std::vector<gravis::d3Matrix> projTransp(fc);
+
+	for (int f = 0; f < fc; f++)
+	{
+		gravis::d3Matrix A(
+				proj[f](0,0), proj[f](1,0), proj[f](2,0),
+				proj[f](0,1), proj[f](1,1), proj[f](2,1),
+				proj[f](0,2), proj[f](1,2), proj[f](2,2) );
+
+		projTransp[f] = A;
+	}
+
+	#pragma omp parallel for num_threads(num_threads)
+	for (int f = 0; f < fc; f++)
+	{
+		for (long int yi = 0; yi < h2;  yi++)
+		for (long int xi = 0; xi < wh2; xi++)
+		{
+			const double xd = xi;
+			const double yd = yi >= h2/2? yi - h2 : yi;
+
+			const gravis::d3Vector pi(xd, yd, 0.0);
+			gravis::d3Vector pw = projTransp[f] * pi;
+
+			dest(xi, yi, f) = Interpolation::linearXYZ_FftwHalf_complex(
+						reference, pw.x, pw.y, pw.z);
+		}
+	}
+}
+
+template <typename T>
+void ForwardProjection::forwardProject3DGradient(
+		const RawImage<tComplex<T>>& reference,
+		const std::vector<gravis::d4Matrix>& proj,
+		RawImage<gravis::t3Vector<tComplex<T>>>& dest,
+		int num_threads)
+{
+	const int wh2 = dest.xdim;
+	const int h2 = dest.ydim;
+	const int fc = dest.zdim;
+
+	std::vector<gravis::d3Matrix> projTransp(fc);
+
+	for (int f = 0; f < fc; f++)
+	{
+		gravis::d3Matrix A(
+				proj[f](0,0), proj[f](1,0), proj[f](2,0),
+				proj[f](0,1), proj[f](1,1), proj[f](2,1),
+				proj[f](0,2), proj[f](1,2), proj[f](2,2) );
+
+		projTransp[f] = A;
+	}
+
+	#pragma omp parallel for num_threads(num_threads)
+	for (int f = 0; f < fc; f++)
+	{
+		for (long int yi = 0; yi < h2;  yi++)
+		for (long int xi = 0; xi < wh2; xi++)
+		{
+			const double xd = xi;
+			const double yd = yi >= h2/2? yi - h2 : yi;
+
+			const gravis::d3Vector pi(xd, yd, 0.0);
+			gravis::d3Vector pw = projTransp[f] * pi;
+
+			dest(xi, yi, f) = Interpolation::linearXYZGradient_FftwHalf_complex(
+						reference, pw.x, pw.y, pw.z);
+		}
+	}
+}
+
+template <typename T>
+void ForwardProjection::forwardProject2DGradient(
+		const RawImage<tComplex<T>>& reference,
+		const std::vector<gravis::d4Matrix>& proj,
+		RawImage<gravis::t2Vector<tComplex<T>>>& dest,
+		int num_threads)
+{
+	const int w = dest.xdim;
+	const int h = dest.ydim;
+	const int fc = dest.zdim;
+
+	BufferedImage<gravis::t3Vector<tComplex<T>>> grad3D(w,h,fc);
+
+	forwardProject3DGradient(reference, proj, grad3D, num_threads);
+
+	for (int f = 0; f < fc; f++)
+	{
+		for (int yi = 0; yi < h; yi++)
+		for (int xi = 0; xi < w; xi++)
+		{
+			const gravis::t3Vector<tComplex<T>> g = grad3D(xi,yi,f);
+
+			dest(xi,yi).x = proj[f](0,0) * g.x + proj[f](0,1) * g.y + proj[f](0,2) * g.z;
+			dest(xi,yi).y = proj[f](1,0) * g.x + proj[f](1,1) * g.y + proj[f](1,2) * g.z;
+		}
+	}
+}
+
+template <typename T>
+void ForwardProjection::forwardProject_withPSF(
 		const RawImage<tComplex<T>>& reference,
 		const std::vector<gravis::d4Matrix>& proj,
 		RawImage<tComplex<T>>& destData,
@@ -103,46 +227,6 @@ void ForwardProjection::forwardProject(
 			{
 				destPsf(xi, yi, f) = 0.0;
 			}
-		}
-	}
-}
-
-template <typename T>
-void ForwardProjection::forwardProject_noPSF(
-		const RawImage<tComplex<T>>& reference,
-		const std::vector<gravis::d4Matrix>& proj,
-		RawImage<tComplex<T>>& destData,
-		int num_threads)
-{
-	const int wh2 = destData.xdim;
-	const int h2 = destData.ydim;
-	const int fc = destData.zdim;
-
-	std::vector<gravis::d3Matrix> projTransp(fc);
-
-	for (int f = 0; f < fc; f++)
-	{
-		gravis::d3Matrix A(proj[f](0,0), proj[f](1,0), proj[f](2,0),
-						   proj[f](0,1), proj[f](1,1), proj[f](2,1),
-						   proj[f](0,2), proj[f](1,2), proj[f](2,2) );
-
-		projTransp[f] = A;
-	}
-
-	#pragma omp parallel for num_threads(num_threads)
-	for (int f = 0; f < fc; f++)
-	{
-		for (long int yi = 0; yi < h2;  yi++)
-		for (long int xi = 0; xi < wh2; xi++)
-		{
-			const double xd = xi;
-			const double yd = yi >= h2/2? yi - h2 : yi;
-
-			const gravis::d3Vector pi(xd, yd, 0.0);
-			gravis::d3Vector pw = projTransp[f] * pi;
-
-			destData(xi, yi, f) = Interpolation::linearXYZ_FftwHalf_complex(
-						reference, pw.x, pw.y, pw.z);
 		}
 	}
 }

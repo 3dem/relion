@@ -584,7 +584,9 @@ std::vector<d2Vector> DefocusRefinementProgram::computeSlopeCost(
 
 	for (int p = 0; p < pc; p++)
 	{
-		const d3Vector pos = dataSet.getPosition(p);
+		const int part_id = particles[p];
+
+		const d3Vector pos = dataSet.getPosition(part_id);
 		const double dz = tomogram.getDepthOffset(f, pos);
 
 		avg_offset += dz;
