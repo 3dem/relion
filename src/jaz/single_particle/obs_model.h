@@ -27,7 +27,7 @@
 #include <src/metadata_table.h>
 #include <src/projector.h>
 #include <src/jaz/image/buffered_image.h>
-#include "gravis/t2Matrix.h"
+#include <src/jaz/gravis/t2Matrix.h>
 
 
 class BackProjector;

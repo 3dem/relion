@@ -71,8 +71,9 @@ void FrameAlignmentProgram::run()
 	Log::printBinaryChoice("Frame shifts: ", const_shifts, "static", "variable");
 	Log::printBinaryChoice("Particle positions: ", const_particles, "static", "variable");
 	Log::endSection();
-	
-	
+
+	AberrationsCache aberrationsCache(dataSet.optTable, boxSize);
+
 	TomogramSet tomogramSetOut = tomogramSet;
 	
 	for (int t = 0; t < tc; t++)
@@ -104,7 +105,8 @@ void FrameAlignmentProgram::run()
 		
 		
 		std::vector<BufferedImage<double>> CCs = Prediction::computeCroppedCCs(
-				dataSet, particles[t], tomogram, referenceMap, frqWeight, dummySeq,
+				dataSet, particles[t], tomogram, aberrationsCache,
+				referenceMap, frqWeight, dummySeq,
 				range, flip_value, num_threads, padding);
 		
 		

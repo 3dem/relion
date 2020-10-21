@@ -43,8 +43,9 @@ class Tomogram
 
 		BufferedImage<float> computeDoseWeight(int boxSize, double binning) const;
 		BufferedImage<float> computeNoiseWeight(int boxSize, double binning, double overlap = 2.0) const;
-		
-		CTF getCtf(int frame, gravis::d3Vector position, double zOffset = 0.0) const;
+
+		double getDepthOffset(int frame, gravis::d3Vector position) const;
+		CTF getCtf(int frame, gravis::d3Vector position) const;
 
 		Tomogram extractSubstack(gravis::d3Vector position, int width, int height) const;
 		Tomogram FourierCrop(double factor, int num_threads, bool downsampleData = true) const;

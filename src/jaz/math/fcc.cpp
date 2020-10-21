@@ -9,6 +9,7 @@
 #include <src/jaz/image/centering.h>
 #include <src/jaz/image/power_spectrum.h>
 #include <src/jaz/image/radial_avg.h>
+#include <src/jaz/optics/aberrations_cache.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
 
@@ -52,6 +53,8 @@ BufferedImage<double> FCC::compute3(
 		FCC_by_thread[th] = BufferedImage<double>(sh, fc, 3);
 		FCC_by_thread[th].fill(0.0);
 	}
+
+	AberrationsCache aberrationsCache(dataSet.optTable, s);
 	
 	Log::beginProgress("Computing Fourier-cylinder correlations", pc/num_threads);
 		
@@ -82,6 +85,7 @@ BufferedImage<double> FCC::compute3(
 					part_id, dataSet, projCut, s,
 					tomogram.getCtf(f, dataSet.getPosition(part_id)),
 					tomogram.optics.pixelSize,
+					aberrationsCache,
 					referenceFS,
 					Prediction::OppositeHalf,
 					Prediction::AmplitudeAndPhaseModulated);

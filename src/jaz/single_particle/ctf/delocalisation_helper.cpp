@@ -1,5 +1,5 @@
 #include "delocalisation_helper.h"
-#include <src/jaz/single_particle/gravis/t2Vector.h>
+#include <src/jaz/gravis/t2Vector.h>
 
 using namespace gravis;
 

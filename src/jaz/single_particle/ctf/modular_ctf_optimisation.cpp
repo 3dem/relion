@@ -1,5 +1,5 @@
 #include "modular_ctf_optimisation.h"
-#include <src/jaz/single_particle/ctf/magnification_helper.h>
+#include <src/jaz/optics/magnification_helper.h>
 #include <src/ctf.h>
 #include <omp.h>
 

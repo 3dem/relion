@@ -22,7 +22,7 @@
 #define PROJECTION_HELPER_H
 
 #include <vector>
-#include <src/jaz/single_particle/gravis/t4Matrix.h>
+#include <src/jaz/gravis/t4Matrix.h>
 
 class ProjectionHelper
 {

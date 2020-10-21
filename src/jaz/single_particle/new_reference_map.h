@@ -24,7 +24,7 @@
 #include <src/image.h>
 #include <src/projector.h>
 #include <src/jaz/single_particle/volume.h>
-#include <src/jaz/single_particle/gravis/t2Vector.h>
+#include <src/jaz/gravis/t2Vector.h>
 #include <src/jaz/image/buffered_image.h>
 
 #include <vector>

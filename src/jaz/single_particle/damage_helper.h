@@ -24,7 +24,7 @@
 #include <src/ctf.h>
 #include <src/image.h>
 #include <vector>
-#include <src/jaz/single_particle/gravis/t2Vector.h>
+#include <src/jaz/gravis/t2Vector.h>
 #include <src/jaz/optimization/optimization.h>
 
 class DamageFit : public Optimization
