@@ -1068,7 +1068,7 @@ void RelionJob::initialiseImportJob()
 	hidden_name = ".gui_import";
 
 	joboptions["do_raw"] = JobOption("Import raw movies/micrographs?", true, "Set this to Yes if you plan to import raw movies or micrographs");
-	joboptions["fn_in_raw"] = JobOption("Raw input files:", "Micrographs/*.tif", (std::string)"Movie or Image (*.{mrc,mrcs,tif,tiff})", ".", "Provide a Linux wildcard that selects all raw movies or micrographs to be imported.");
+	joboptions["fn_in_raw"] = JobOption("Raw input files:", "Micrographs/*.tif", (std::string)"Movie or Image (*.{mrc,mrcs,tif,tiff})", ".", "Provide a Linux wildcard that selects all raw movies or micrographs to be imported. The path must be a relative path from the project directory. To import files outside the project directory, first make a symbolic link by an absolute path and then specify the link by a relative path. See the FAQ page on RELION wiki (https://www3.mrc-lmb.cam.ac.uk/relion/index.php/FAQs#What_is_the_right_way_to_import_files_outside_the_project_directory.3F) for details.");
 	joboptions["is_multiframe"] = JobOption("Are these multi-frame movies?", true, "Set to Yes for multi-frame movies, set to No for single-frame micrographs.");
 
 	joboptions["optics_group_name"] = JobOption("Optics group name:", (std::string)"opticsGroup1", "Name of this optics group. Each group of movies/micrographs with different optics characteristics for CTF refinement should have a unique name.");
@@ -1126,6 +1126,19 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 	if (do_raw)
 	{
 		fn_in = joboptions["fn_in_raw"].getString();
+
+		if (fn_in.rfind("../", 0) == 0)
+		{
+			error_message = "ERROR: don't import files outside the project directory.\nPlease make a symbolic link by an absolute path before importing.";
+			return false;
+		}
+
+		if (fn_in.rfind("/", 0) == 0)
+		{
+			error_message = "ERROR: please import files by a relative path.\nIf you want to import files outside the project directory, make a symbolic link by an absolute path and\nimport the symbolic link by a relative path.";
+			return false;
+		}
+
 		if (joboptions["is_multiframe"].getBoolean())
 		{
 			fn_out = "movies.star";
