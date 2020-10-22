@@ -22,6 +22,7 @@
 
 std::vector<int> imics;
 std::vector<FileName> global_fn_mics;
+std::vector<FileName> global_fn_picks;
 std::vector<FileName> global_fn_ctfs;
 std::vector<bool> selected;
 std::vector<int> number_picked;
@@ -72,10 +73,7 @@ void cb_viewmic(Fl_Widget* w, void* data)
 		if (mymic >= 0 && mymic < count_displays.size())
 		{
 			MetaDataTable MDcoord;
-
-			FileName fn_pre, fn_jobnr, fn_post;
-			decomposePipelineSymlinkName(global_fn_mics[mymic], fn_pre, fn_jobnr, fn_post);
-			FileName fn_coord = global_fn_odir + fn_post.withoutExtension() + "_" + global_pickname + ".star";
+			FileName fn_coord = global_fn_picks[mymic];
 			int my_nr_picked;
 			if (exists(fn_coord))
 			{
@@ -101,9 +99,7 @@ void cb_viewmic(Fl_Widget* w, void* data)
 	last_pick_viewed = XMIPP_MIN(global_fn_mics.size() - 1, imic + nr_simultaneous - 1);
 	for (int mymic = first_pick_viewed; mymic <= last_pick_viewed; mymic++)
 	{
-		FileName fn_pre, fn_jobnr, fn_post;
-		decomposePipelineSymlinkName(global_fn_mics[mymic], fn_pre, fn_jobnr, fn_post);
-		FileName fn_coord = global_fn_odir + fn_post.withoutExtension() + "_" + global_pickname + ".star";
+		FileName fn_coord = global_fn_picks[mymic];
 
 		int rad = ROUND(global_particle_diameter/(2. * global_angpix));
 		std::string command;
@@ -242,7 +238,7 @@ int manualpickerGuiWindow::fill()
 
 	global_has_ctf = MDin.containsLabel(EMDL_CTF_IMAGE);
 
-	FileName fn_mic, fn_ctf;
+	FileName fn_mic, fn_pick, fn_ctf;
 	int ystep = 35;
 
 	imics.clear();
@@ -253,6 +249,7 @@ int manualpickerGuiWindow::fill()
 
 	int imic =0;
 	global_fn_mics.clear();
+	global_fn_picks.clear();
 	global_fn_ctfs.clear();
 	text_displays.clear();
 	viewmic_buttons.clear();
@@ -264,6 +261,21 @@ int manualpickerGuiWindow::fill()
 		// Display the name of the micrograph
 		global_fn_mics.push_back(fn_mic);
 
+		if (MDin.containsLabel(EMDL_MICROGRAPH_COORDINATES))
+		{
+			// relion 3.2+
+			MDin.getValue(EMDL_MICROGRAPH_COORDINATES, fn_pick);
+
+		}
+		else
+		{
+			//relion 3.1-
+			FileName fn_pre, fn_jobnr, fn_post;
+			decomposePipelineSymlinkName(fn_mic, fn_pre, fn_jobnr, fn_post);
+			fn_pick = global_fn_odir + fn_post.withoutExtension() + "_" + global_pickname + ".star";
+		}
+		global_fn_picks.push_back(fn_pick);
+
 		Fl_Check_Button *mycheck = new Fl_Check_Button(4, current_y, ystep-8, ystep-8, "");
 		mycheck->callback(cb_selectmic, &(imics[imic]));
 		mycheck->value(1);
@@ -271,7 +283,6 @@ int manualpickerGuiWindow::fill()
 			mycheck->deactivate();
 		selected.push_back(true);
 		check_buttons.push_back(mycheck);
-
 
 		Fl_Text_Buffer *textbuff = new Fl_Text_Buffer();
 		textbuff->text(fn_mic.c_str());
@@ -397,6 +408,8 @@ void manualpickerGuiWindow::readOutputStarfile()
 
 void manualpickerGuiWindow::writeOutputStarfiles(bool verb)
 {
+	if (!do_allow_save) return;
+
 	MDcoords.clear();
 	MetaDataTable MDmics;
 	int c = 0;
@@ -405,9 +418,7 @@ void manualpickerGuiWindow::writeOutputStarfiles(bool verb)
 		if (selected[imic])
 		{
 			MDmics.addObject(MDin.getObject(imic));
-			FileName fn_pre, fn_jobnr, fn_post;
-			decomposePipelineSymlinkName(global_fn_mics[imic], fn_pre, fn_jobnr, fn_post);
-			FileName fn_coord = global_fn_odir + fn_post.withoutExtension() + "_" + global_pickname + ".star";
+			FileName fn_coord = global_fn_picks[imic];
 			if (exists(fn_coord))
 			{
 				MDcoords.addObject();
@@ -506,10 +517,9 @@ void manualpickerGuiWindow::cb_menubar_recount_i()
 	int nr_sel_mic = 0;
 	for (int imic = 0; imic < global_fn_mics.size(); imic++)
 	{
+		FileName fn_coord = global_fn_picks[imic];
 		MetaDataTable MDcoord;
-		FileName fn_pre, fn_jobnr, fn_post;
-		decomposePipelineSymlinkName(global_fn_mics[imic], fn_pre, fn_jobnr, fn_post);
-		FileName fn_coord = global_fn_odir + fn_post.withoutExtension() + "_" + global_pickname + ".star";
+
 		int my_nr_picked;
 		if (exists(fn_coord))
 		{
@@ -520,6 +530,7 @@ void manualpickerGuiWindow::cb_menubar_recount_i()
 		{
 			my_nr_picked = 0;
 		}
+
 		Fl_Text_Buffer *textbuff2 = new Fl_Text_Buffer();
 		if (selected[imic])
 		{
@@ -590,22 +601,39 @@ void ManualPicker::initialise()
 {
 	if (fn_in.isStarFile())
 	{
-		ObservationModel::loadSafely(fn_in, obsModel, MDin, "micrographs");
-		if (obsModel.opticsMdt.containsLabel(EMDL_MICROGRAPH_PIXEL_SIZE))
-		{
-			obsModel.opticsMdt.getValue(EMDL_MICROGRAPH_PIXEL_SIZE, global_angpix, 0);
-			std::cout << " Setting angpix to " << global_angpix << " based on the input STAR file... " << std::endl;
-		}
-		else
+		// First try 2-column list of coordinate files as in relion-3.2+
+		MDin.read(fn_in, "coordinate_files");
+		if (MDin.numberOfObjects() > 0)
 		{
 			if (global_angpix < 0.)
 			{
-				REPORT_ERROR("ERROR: the input STAR file does not contain the micrograph pixel size, and it is not given through --angpix.");
+				std::cerr << " WARNING: no --angpix provided and no information about pixel size in input STAR file. Setting angpix to 1..." << std::endl;
+				global_angpix = 1.;
 			}
-			std::cout << " Setting angpix to " << global_angpix << " based on command-line input... " << std::endl;
-			FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
+
+		}
+		else
+		{
+
+			// Normal micrographs.star file (with optics table etc)
+
+			ObservationModel::loadSafely(fn_in, obsModel, MDin, "micrographs");
+			if (obsModel.opticsMdt.containsLabel(EMDL_MICROGRAPH_PIXEL_SIZE))
 			{
-				obsModel.opticsMdt.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, global_angpix);
+				obsModel.opticsMdt.getValue(EMDL_MICROGRAPH_PIXEL_SIZE, global_angpix, 0);
+				std::cout << " Setting angpix to " << global_angpix << " based on the input STAR file... " << std::endl;
+			}
+			else
+			{
+				if (global_angpix < 0.)
+				{
+					REPORT_ERROR("ERROR: the input STAR file does not contain the micrograph pixel size, and it is not given through --angpix.");
+				}
+				std::cout << " Setting angpix to " << global_angpix << " based on command-line input... " << std::endl;
+				FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
+				{
+					obsModel.opticsMdt.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, global_angpix);
+				}
 			}
 		}
 	}

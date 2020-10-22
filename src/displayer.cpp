@@ -2657,7 +2657,7 @@ void Displayer::initialise()
 			obsModel.opticsMdt.addObject();
 			if (angpix > 0.)
 			{
-				std::cout << " Using pixel size from command-line input of " << angpix << " Angstroms" << std::endl;
+				//std::cout << " Using pixel size from command-line input of " << angpix << " Angstroms" << std::endl;
 				obsModel.opticsMdt.setValue(EMDL_IMAGE_PIXEL_SIZE, angpix);
 			}
 			else
