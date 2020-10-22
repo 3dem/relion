@@ -181,6 +181,15 @@ public:
 	// Topaz downscale factor
 	int topaz_downscale;
 
+	// Topaz command executable
+	FileName fn_topaz_exe;
+
+	// Conda activate executable
+	FileName fn_conda_activate;
+
+	// Bash executable
+	FileName fn_bash;
+
 	// Topaz saved model for use in extract
 	FileName topaz_model;
 
@@ -369,6 +378,9 @@ public:
 			RFLOAT tube_length_min_pix,
 			int skip_side, float scale);
 
+	MetaDataTable readTopazCoordinates(FileName fn_coord, int _topaz_downscale = 1);
+
+	void autoPickTopazOneMicrograph(FileName &fn_mic, int rank = 0);
 	void autoPickLoGOneMicrograph(FileName &fn_mic, long int imic);
 	void autoPickOneMicrograph(FileName &fn_mic, long int imic);
 
