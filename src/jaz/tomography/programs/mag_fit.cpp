@@ -11,6 +11,7 @@
 #include <src/jaz/optimization/nelder_mead.h>
 #include <src/jaz/optics/aberrations_cache.h>
 #include <src/jaz/optics/aberration_fit.h>
+#include <src/jaz/optics/tomo_mag_fit.h>
 #include <omp.h>
 
 using namespace gravis;
@@ -67,6 +68,80 @@ void MagFitProgram::run()
 
 	Log::endSection();
 
+	for (int t = 0; t < tc; t++)
+	{
+		int pc = particles[t].size();
+		if (pc == 0) continue;
 
+		Log::beginSection("Tomogram " + ZIO::itoa(t+1) + " / " + ZIO::itoa(tc));
+		Log::print("Loading");
+
+		Tomogram tomogram = tomogramSet.loadTomogram(t, true);
+
+		const int fc = tomogram.frameCount;
+
+		BufferedImage<float> freqWeights = computeFrequencyWeights(
+			tomogram, true, 0.0, 0.0, num_threads);
+
+		dataSet.checkTrajectoryLengths(
+				particles[t][0], pc, fc, "MagFitProgram::run");
+
+		TomoIsoMagFit isoFit(
+			particles[t],
+			tomogram,
+			dataSet,
+			referenceMap,
+			freqWeights,
+			boxSize,
+			first_frame,
+			last_frame,
+			num_threads);
+
+
+		std::vector<d3Vector> results_full(0);
+		std::vector<d3Vector> results_defocus_only(0);
+		std::vector<d3Vector> results_scale_only(0);
+
+		for (double mag = 0.925; mag <= 1.075; mag += 0.025)
+		{
+			std::cout << mag << std::endl;
+
+			d2Vector full = isoFit.computeErrorAndSlope(mag, true, true);
+			d2Vector defocus_only = isoFit.computeErrorAndSlope(mag, false, true);
+			d2Vector scale_only = isoFit.computeErrorAndSlope(mag, true, false);
+
+			results_full.push_back(d3Vector(mag, full[0], full[1]));
+			results_defocus_only.push_back(d3Vector(mag, defocus_only[0], defocus_only[1]));
+			results_scale_only.push_back(d3Vector(mag, scale_only[0], scale_only[1]));
+		}
+
+		std::ofstream file_full(outDir + "t_" + ZIO::itoa(t) + "_full.dat");
+		std::ofstream file_defocus_only(outDir + "t_" + ZIO::itoa(t) + "_defocus_only.dat");
+		std::ofstream file_scale_only(outDir + "t_" + ZIO::itoa(t) + "_scale_only.dat");
+
+		file_full.precision(16);
+		file_defocus_only.precision(16);
+		file_scale_only.precision(16);
+
+		for (int i = 0; i < results_full.size(); i++)
+		{
+			file_full << results_full[i][0] << ' ' << results_full[i][1] << '\n';
+			file_defocus_only << results_defocus_only[i][0] << ' ' << results_defocus_only[i][1] << '\n';
+			file_scale_only << results_scale_only[i][0] << ' ' << results_scale_only[i][1] << '\n';
+		}
+
+		file_full << '\n';
+		file_defocus_only << '\n';
+		file_scale_only << '\n';
+
+		for (int i = 0; i < results_full.size(); i++)
+		{
+			file_full << results_full[i][0] << ' ' << results_full[i][2] << '\n';
+			file_defocus_only << results_defocus_only[i][0] << ' ' << results_defocus_only[i][2] << '\n';
+			file_scale_only << results_scale_only[i][0] << ' ' << results_scale_only[i][2] << '\n';
+		}
+
+		Log::endSection();
+	}
 }
 

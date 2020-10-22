@@ -15,6 +15,7 @@ class TomoMagFit
 				const Tomogram& tomogram,
 				const ParticleSet& particleSet,
 				const TomoReferenceMap& referenceMap,
+				const BufferedImage<float>& freqWeights,
 				int boxSize,
 				int first_frame,
 				int last_frame,
@@ -26,6 +27,7 @@ class TomoMagFit
 			const Tomogram& tomogram;
 			const ParticleSet& particleSet;
 			const TomoReferenceMap& referenceMap;
+			const BufferedImage<float>& freqWeights;
 
 };
 
@@ -38,12 +40,16 @@ class TomoIsoMagFit : public TomoMagFit
 				const Tomogram& tomogram,
 				const ParticleSet& particleSet,
 				const TomoReferenceMap& referenceMap,
+				const BufferedImage<float>& freqWeights,
 				int boxSize,
 				int first_frame,
 				int last_frame,
 				int num_threads);
 
-		gravis::d2Vector computeErrorAndSlope(double mag);
+		gravis::d2Vector computeErrorAndSlope(
+				double mag,
+				bool consider_image_scale,
+				bool consider_defocus_stretch);
 };
 
 #endif

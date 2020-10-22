@@ -123,12 +123,10 @@ void ForwardProjection::forwardProject3DGradient(
 
 	for (int f = 0; f < fc; f++)
 	{
-		gravis::d3Matrix A(
+		projTransp[f] = gravis::d3Matrix(
 				proj[f](0,0), proj[f](1,0), proj[f](2,0),
 				proj[f](0,1), proj[f](1,1), proj[f](2,1),
 				proj[f](0,2), proj[f](1,2), proj[f](2,2) );
-
-		projTransp[f] = A;
 	}
 
 	#pragma omp parallel for num_threads(num_threads)
