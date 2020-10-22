@@ -148,12 +148,15 @@ if(do_gpu)
 	do_topaz_train = parser.checkOption("--topaz_train", "Use wrapper to the topaz train command");
 	do_topaz_extract = parser.checkOption("--topaz_extract", "Use wrapper to the topaz extract command (i.e. predict particle positions)");
 	topaz_nr_particles = textToInteger(parser.getOption("--topaz_nr_particles", "Expected number of particles per micrograph for topaz", "200"));
-	topaz_downscale = textToInteger(parser.getOption("--topaz_downscale", "Downscale factor for topaz", "8"));
+	topaz_train_picks = parser.getOption("--topaz_train_picks", "Name of picking coordinates for topaz training", "");
+	topaz_test_ratio = textToFloat(parser.getOption("--topaz_test_ratio", "Ratio of picks in the test set for cross-validation in topaz training", "0.2"));
+	topaz_downscale = textToInteger(parser.getOption("--topaz_downscale", "Downscale factor for topaz", "-1"));
 	topaz_model = parser.getOption("--topaz_model", "Saved model model from topaz train for topaz extract", "");
 	topaz_radius = textToInteger(parser.getOption("--topaz_radius", "Particle radius (in pix) for topaz extract (default is from particle diameter)", "-1"));
 	fn_topaz_exe = parser.getOption("--topaz_exe", "Name of topaz executable", "topaz");
-	fn_bash = parser.getOption("--topaz_exe", "Name of bash executable", "/bin/bash");
-	fn_conda_activate = parser.getOption("--activate_exe", "Name of conda activate executable", "/lmb/home/scheres/app/anaconda3/bin/activate");
+	fn_bash = parser.getOption("--bash_exe", "Name of bash executable", "/bin/bash");
+	fn_conda_activate = parser.getOption("--activate_exe", "Name of conda activate executable (defaults to 'which activate')", "");
+	topaz_additional_args = parser.getOption("--topaz_args", "Additional arguments to be passed to topaz", "");
 
 	int helix_section = parser.addSection("Helix options");
 	autopick_helical_segments = parser.checkOption("--helix", "Are the references 2D helical segments? If so, in-plane rotation angles (psi) are estimated for the references.");
@@ -196,7 +199,7 @@ void AutoPicker::usage()
 	parser.writeUsage(std::cout);
 }
 
-void AutoPicker::initialise()
+void AutoPicker::initialise(int rank)
 {
 #ifdef TIMING
 	TIMING_A0  =           timer.setNew("Initialise()");
@@ -355,6 +358,11 @@ void AutoPicker::initialise()
 		{
 			std::cout << " + Will use topaz for training a model " << std::endl;
 		}
+
+		if (topaz_train_picks == "") REPORT_ERROR("ERROR: provide --topaz_train_picks with picked coordinates for training!");
+		MDtrain.read(topaz_train_picks, "coordinate_files");
+		if (MDtrain.numberOfObjects() < 1) REPORT_ERROR("ERROR: the coordinate_files table in the STAR file from --topaz_train_picks is empty or doesn't exist!");
+
 	}
 	else if (do_topaz_extract)
 	{
@@ -672,7 +680,35 @@ void AutoPicker::initialise()
 
 	} // end if !do_LoG
 
-	if ( !(do_topaz_train || do_topaz_extract) )
+	if ( (do_topaz_train || do_topaz_extract) )
+	{
+		// Which is my GPU?
+		std::vector < std::vector < std::string > > allThreadIDs;
+		untangleDeviceIDs(gpu_ids, allThreadIDs);
+		// Sequential initialisation of GPUs on all ranks
+		topaz_device_id = -1;
+		if (std::isdigit(*gpu_ids.begin()))
+			topaz_device_id = textToInteger((allThreadIDs[rank][0]).c_str());
+
+		// Get topaz_downscale from particle_diameter and micrograph pixel size
+		if (topaz_downscale < 0)
+		{
+			// Perceptive window of default resnet8 is 71 pixels, which should encapsulate particle_diameter*1.1
+			RFLOAT particle_box_pix = 1.1 * particle_diameter / angpix;
+			topaz_downscale = ROUND(particle_box_pix/71);
+			if (verb > 0)
+				std::cout << " + Setting topaz downscale factor to " << topaz_downscale << " (assuming resnet8 model and 1.1*particle_diameter receptive box)" << std::endl;
+		}
+
+		// Get topaz_radius from 90% of particle_diameter / 2
+		if (topaz_radius < 0)
+		{
+			topaz_radius = (particle_diameter * 0.45) / (angpix * topaz_downscale);
+			if (verb > 0)
+				std::cout << " + Setting topaz radius to " << topaz_radius << " downscaled pixels (based on 0.9*particle_diameter)" << std::endl;
+		}
+	}
+	else
 	{
 		// Get micrograph_size
 		Image<RFLOAT> Imic;
@@ -2618,8 +2654,183 @@ MetaDataTable AutoPicker::readTopazCoordinates(FileName fn_coord,  int _topaz_do
 	return MDcoord;
 }
 
+void AutoPicker::writeTopazCoordinates(FileName fn_coord, MetaDataTable &MDcoord, int _topaz_downscale)
+{
+
+
+
+}
+
+void AutoPicker::trainTopaz()
+{
+	int res = system(("mkdir -p " + fn_odir + "/proc").c_str());
+	res = system(("mkdir -p " + fn_odir + "/raw").c_str());
+
+	// Let's randomise the order of the input micrographs
+	MDtrain.randomiseOrder();
+
+	FileName fn_mic_list_train = fn_odir + "proc/image_list_train.txt";
+	FileName fn_mic_list_test  = fn_odir + "proc/image_list_test.txt";
+	FileName fn_pick_list_train = fn_odir + "proc/target_list_train.txt";
+	FileName fn_pick_list_test = fn_odir + "proc/target_list_test.txt";
+	std::ofstream fh_mic_list_train, fh_mic_list_test, fh_pick_list_train, fh_pick_list_test;
+	fh_mic_list_train.open((fn_mic_list_train).c_str(), std::ios::out);
+	if (!fh_mic_list_train)
+	 REPORT_ERROR( (std::string)"AutoPicker::autoPickTopazOneMicrograph cannot create file: " + fn_mic_list_train);
+	fh_mic_list_test.open((fn_mic_list_test).c_str(), std::ios::out);
+	if (!fh_mic_list_test)
+	 REPORT_ERROR( (std::string)"AutoPicker::autoPickTopazOneMicrograph cannot create file: " + fn_mic_list_test);
+	fh_pick_list_train.open((fn_pick_list_train).c_str(), std::ios::out);
+	if (!fh_pick_list_train)
+	 REPORT_ERROR( (std::string)"AutoPicker::autoPickTopazOneMicrograph cannot create file: " + fn_pick_list_train);
+	fh_pick_list_test.open((fn_pick_list_test).c_str(), std::ios::out);
+	if (!fh_pick_list_test)
+	 REPORT_ERROR( (std::string)"AutoPicker::autoPickTopazOneMicrograph cannot create file: " + fn_pick_list_test);
+
+	fh_mic_list_train  << "image_name" << '\t' << "path" << std::endl;
+	fh_mic_list_test   << "image_name" << '\t' << "path" << std::endl;
+	fh_pick_list_train << "image_name" << '\t' << "x_coord" << '\t' << "y_coord" << std::endl;
+	fh_pick_list_test  << "image_name" << '\t' << "x_coord" << '\t' << "y_coord" << std::endl;
+
+	long int total_nr_pick = 0;
+	std::vector<int> nr_picks;
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDtrain)
+	{
+		FileName fn_pick;
+		MDtrain.getValue(EMDL_MICROGRAPH_COORDINATES, fn_pick);
+		MetaDataTable MDpick;
+		MDpick.read(fn_pick);
+		int nr_pick = MDpick.numberOfObjects();
+		total_nr_pick+= nr_pick;
+		nr_picks.push_back(nr_pick);
+	}
+
+	long int total_nr_test = 0, total_nr_train = 0, nr_test_micrographs = 0;
+	bool have_enough_test = false;
+	for (int imic = 0; imic < MDtrain.numberOfObjects(); imic++)
+	{
+
+		FileName fn_mic, fn_pick;
+		MDtrain.getValue(EMDL_MICROGRAPH_NAME, fn_mic, imic);
+		MDtrain.getValue(EMDL_MICROGRAPH_COORDINATES, fn_pick, imic);
+
+		MetaDataTable MDpick;
+		MDpick.read(fn_pick);
+
+		// Symlink original micrograph to the raw directory
+		FileName fn_local_mic, fn_local_mic_proc;
+		fn_local_mic.compose(fn_odir + "raw/mic", imic, "mrc");
+		fn_local_mic_proc.compose(fn_odir + "proc/mic", imic, "mrc");
+		int res2 = symlink(realpath(fn_mic.c_str(), NULL), fn_local_mic.c_str());
+
+		// start with filling the training set
+		if (imic%2==0 || have_enough_test)
+		{
+			// Add micrograph to mic_list_train
+			char abspath[PATH_MAX];
+			realpath(fn_local_mic_proc.c_str(), abspath);
+			fh_mic_list_train << fn_local_mic_proc.withoutExtension().afterLastOf("/")
+					<< '\t' << abspath<< std::endl;
+
+			// Add all picks to the pick_list_train
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDpick)
+			{
+				RFLOAT xcoord, ycoord;
+				MDpick.getValue(EMDL_IMAGE_COORD_X, xcoord);
+				MDpick.getValue(EMDL_IMAGE_COORD_Y, ycoord);
+				fh_pick_list_train << fn_local_mic_proc.withoutExtension().afterLastOf("/")
+							<< '\t' << integerToString(ROUND(xcoord/topaz_downscale))
+							<< '\t' << integerToString(ROUND(ycoord/topaz_downscale)) << std::endl;
+				total_nr_train++;
+			}
+		}
+		else
+		{
+			// Add micrograph to mic_list_test
+			char abspath[PATH_MAX];
+			realpath(fn_local_mic_proc.c_str(), abspath);
+			fh_mic_list_test << fn_local_mic_proc.withoutExtension().afterLastOf("/")
+					<< '\t' << abspath<< std::endl;
+
+			// Add all picks to the pick_list_test
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDpick)
+			{
+				RFLOAT xcoord, ycoord;
+				MDpick.getValue(EMDL_IMAGE_COORD_X, xcoord);
+				MDpick.getValue(EMDL_IMAGE_COORD_Y, ycoord);
+				fh_pick_list_test << fn_local_mic_proc.withoutExtension().afterLastOf("/")
+							<< '\t' << integerToString(ROUND(xcoord/topaz_downscale))
+							<< '\t' << integerToString(ROUND(ycoord/topaz_downscale)) << std::endl;
+				total_nr_test++;
+			}
+			nr_test_micrographs++;
+
+			if ((float)(total_nr_test)/(float)(total_nr_pick) > topaz_test_ratio) have_enough_test = true;
+		}
+
+	}
+
+	if (verb > 0)
+	{
+		std::cout << " + Training with " << total_nr_test << " picks in test set; and " << total_nr_train << " picks in work set" << std::endl;
+		std::cout << " + By setting aside " << nr_test_micrographs << " micrographs for the test set " << std::endl;
+	}
+
+	fh_mic_list_train.close();
+	fh_mic_list_test.close();
+	fh_pick_list_train.close();
+	fh_pick_list_test.close();
+
+	// Now generate the topaz bash script
+	FileName fn_script = fn_odir+"topaz_train.bash";
+	FileName fn_log    = fn_odir+"run.out";
+	std::ofstream  fh;
+	fh.open((fn_script).c_str(), std::ios::out);
+	if (!fh)
+	 REPORT_ERROR( (std::string)"AutoPicker::trainTopaz cannot create file: " + fn_script);
+
+	fh << "#!" << fn_bash  << std::endl;
+	if (fn_conda_activate == "")
+		fh << "`which activate` topaz" << std::endl;
+	else
+		fh << fn_conda_activate << " topaz" << std::endl;
+
+	// Call Topaz to preprocess the images for normalisation and downscaling
+	fh << fn_topaz_exe + " preprocess ";
+	fh << " -s " + integerToString(topaz_downscale);
+	if (topaz_device_id >= 0)
+		fh << " -d " + integerToString(topaz_device_id);
+	fh << " -o " + fn_odir + "proc/";
+	fh << " " + fn_odir + "raw/*.mrc";
+	fh << " " + topaz_additional_args;
+	fh << std::endl;
+
+	// Call Topaz to train the network
+	fh << fn_topaz_exe + " train ";
+	fh << " -n " << integerToString(topaz_nr_particles);
+	fh << " -r " + integerToString(topaz_radius);
+	if (topaz_device_id >= 0)
+		fh << " -d " + integerToString(topaz_device_id);
+	fh << " -o " << fn_odir + "model_training.txt";
+	fh << " --num-workers=" << integerToString(1); // TODO: nr_threads
+	fh << " --train-images=" << fn_odir << "proc/image_list_train.txt";
+	fh << " --test-images=" << fn_odir << "proc/image_list_test.txt";
+	fh << " --train-targets=" << fn_odir << "proc/target_list_train.txt";
+	fh << " --test-targets=" << fn_odir << "proc/target_list_test.txt";
+	fh << " --save-prefix=" << fn_odir << "model";
+	fh << " " + topaz_additional_args;
+	fh << std::endl;
+	fh.close();
+
+	std::string command = fn_bash + " " + fn_script + " >& " + fn_log ;
+	if (system(command.c_str())) std::cerr << "WARNING: there was an error in executing: " << command << std::endl;
+
+
+}
+
 void AutoPicker::autoPickTopazOneMicrograph(FileName &fn_mic, int rank)
 {
+
 
 	// Local filenames
 	FileName fn_local_mic, fn_local_pick, fn_script, fn_log;
@@ -2634,7 +2845,10 @@ void AutoPicker::autoPickTopazOneMicrograph(FileName &fn_mic, int rank)
 	 REPORT_ERROR( (std::string)"AutoPicker::autoPickTopazOneMicrograph cannot create file: " + fn_script);
 
 	fh << "#!" << fn_bash  << std::endl;
-	fh << "`which activate` topaz" << std::endl;
+	if (fn_conda_activate == "")
+		fh << "`which activate` topaz" << std::endl;
+	else
+		fh << fn_conda_activate << " topaz" << std::endl;
 
 	// Make a symlink of the micrograph in the output Directory
 	fh << "cp " << fn_mic << " " << fn_odir << fn_local_mic << std::endl;
@@ -2642,17 +2856,24 @@ void AutoPicker::autoPickTopazOneMicrograph(FileName &fn_mic, int rank)
 	// Call Topaz to preprocess this file for normalisation and downscaling
 	fh << fn_topaz_exe + " preprocess ";
 	fh << " -s " + integerToString(topaz_downscale);
+	if (topaz_device_id >= 0)
+		fh << " -d " + integerToString(topaz_device_id);
 	fh << " -o " + fn_odir + "processed/";
 	fh << " " + fn_odir + fn_local_mic;
+	fh << " " + topaz_additional_args;
 	fh << std::endl;
 
 	// Then call Topaz to predict coordinates
 	fh << fn_topaz_exe + " extract ";
 	fh << " -r " + integerToString(topaz_radius);
+	if (topaz_device_id >= 0)
+		fh << " -d " + integerToString(topaz_device_id);
 	fh << " -m " + topaz_model;
 	fh << " -o " + fn_odir + "processed/" + fn_local_pick;
 	fh << " " << fn_odir + "processed/" + fn_local_mic;
+	fh << " " + topaz_additional_args;
 	fh << std::endl;
+	fh.close();
 
 	std::string command = fn_bash + " " + fn_script + " >& " + fn_log ;
 	if (system(command.c_str())) std::cerr << "WARNING: there was an error in executing: " << command << std::endl;

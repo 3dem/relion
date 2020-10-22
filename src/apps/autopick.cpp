@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
 		prm.initialise();
 
 #ifdef _CUDA_ENABLED
-		if (prm.do_gpu)
+		if (prm.do_gpu && !(prm.do_topaz_train || prm.do_topaz_extract) )
 		{
 			std::stringstream didSs;
 			didSs << "AP";
@@ -45,7 +45,8 @@ int main(int argc, char *argv[])
 		else
 #endif
 		{
-			prm.run();
+			if (prm.do_topaz_train) prm.trainTopaz();
+			else prm.run();
 		}
 
 		prm.generatePDFLogfile();

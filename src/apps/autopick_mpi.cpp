@@ -30,10 +30,10 @@ int main(int argc, char *argv[])
 	{
 		prm.read(argc, argv);
 
-		prm.initialise();
+		prm.initialise(prm.getRank());
 
 #ifdef _CUDA_ENABLED
-		if (prm.do_gpu)
+		if (prm.do_gpu && !(prm.do_topaz_train || prm.do_topaz_extract) )
 		{
 			std::stringstream didSs;
 			didSs << "APr" << prm.getRank();
@@ -45,7 +45,8 @@ int main(int argc, char *argv[])
 		else
 #endif
 		{
-			prm.run();
+			if (prm.do_topaz_train) prm.trainTopaz();
+			else prm.run();
 		}
 
 		MPI_Barrier(MPI_COMM_WORLD);

@@ -7,6 +7,7 @@
 
 #ifndef AUTOPICKER_H_
 #define AUTOPICKER_H_
+#include <stdlib.h>
 #include "src/image.h"
 #include "src/multidim_array.h"
 #include "src/metadata_table.h"
@@ -196,6 +197,21 @@ public:
 	// Topaz particle radius for use in extract
 	int topaz_radius;
 
+	// Device ID for topaz
+	int topaz_device_id;
+
+	// Filename for picks to be used for topaz training
+	FileName topaz_train_picks;
+
+	// Metadata table for training picks
+	MetaDataTable MDtrain;
+
+	// Default ratio of picks in the test validation set
+	RFLOAT topaz_test_ratio;
+
+	// Other arguments to be passed to topaz
+	FileName topaz_additional_args;
+
 	//// Specific amyloid picker
 	bool do_amyloid;
 
@@ -312,7 +328,7 @@ public:
 	void usage();
 
 	// Initialise some general stuff after reading
-	void initialise();
+	void initialise(int rank = 0);
 
 	// Set device-affinity
 	int deviceInitialise();
@@ -379,7 +395,9 @@ public:
 			int skip_side, float scale);
 
 	MetaDataTable readTopazCoordinates(FileName fn_coord, int _topaz_downscale = 1);
+	void writeTopazCoordinates(FileName fn_coord, MetaDataTable &MDcoord, int _topaz_downscale = 1);
 
+	void trainTopaz();
 	void autoPickTopazOneMicrograph(FileName &fn_mic, int rank = 0);
 	void autoPickLoGOneMicrograph(FileName &fn_mic, long int imic);
 	void autoPickOneMicrograph(FileName &fn_mic, long int imic);

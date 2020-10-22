@@ -1752,6 +1752,17 @@ void RelionJob::initialiseAutopickJob()
 	joboptions["log_adjust_thr"] = JobOption("Adjust default threshold (stddev):", 0, -1., 1., 0.05, "Use this to pick more (negative number -> lower threshold) or less (positive number -> higher threshold) particles compared to the default setting. The threshold is moved this many standard deviations away from the average.");
 	joboptions["log_upper_thr"] = JobOption("Upper threshold (stddev):", 999., 0., 10., 0.5, "Use this to discard picks with LoG thresholds that are this many standard deviations above the average, e.g. to avoid high contrast contamination like ice and ethane droplets. Good values depend on the contrast of micrographs and need to be interactively explored; for low contrast micrographs, values of ~ 1.5 may be reasonable, but the same value will be too low for high-contrast micrographs.");
 
+	joboptions["do_topaz"] = JobOption("OR: use Topaz?", false, "If set to Yes, topaz will be used for autopicking. Run 2 separate jobs from the Topaz tab: one for training the model and for the actual picking.");
+	joboptions["do_topaz_train"] = JobOption("Perform topaz training?", false, "Set this option to Yes if you want to train a topaz model.");
+	joboptions["topaz_train_picks"] = JobOption("Input picked coordinates for training:", NODE_MIC_COORDS, "", "Input micrographs (*.{star})", "Input STAR file (preferably with CTF information) with all micrographs to pick from.");
+	joboptions["do_topaz_train_parts"] = JobOption("OR train on a set of particles? ", false, "If set to Yes, the input Coordinates above will be ignored. Instead, one uses a _data.star file from a previous 2D or 3D refinement or selection to use those particle positions for training.");
+	joboptions["topaz_train_parts"] = JobOption("Particles STAR file for training: ", NODE_PART_DATA, "", "Input STAR file (*.{star})", "Filename of the STAR file with the particle coordinates to be used for training, e.g. from a previous 2D or 3D classification or selection.");
+	joboptions["do_topaz_pick"] = JobOption("Perform topaz picking?", false, "Set this option to Yes if you want to use a topaz model for autopicking.");
+	joboptions["topaz_particle_diameter"] = JobOption("Particle diameter (A) ", -1, 0, 2000, 20, "Diameter of the particle (to be used to infer topaz downscale factor and particle radius)");
+	joboptions["topaz_nr_parts"] = JobOption("Nr of particles per micrograph: ", -1, 0, 2000, 20, "Expected average number of particles per micrograph");
+	joboptions["topaz_model"] = JobOption("Trained topaz model: ", "", "SAV Files (*.sav)", ".", "Trained topaz model for topaz-based picking. Use on job for training and a next job for picking.");
+	joboptions["topaz_other_args"]= JobOption("Additional topaz arguments:", std::string(""), "These additional arguments will be passed onto all topaz programs.");
+
 	joboptions["fn_refs_autopick"] = JobOption("2D references:", NODE_REFS, "", "Input references (*.{star,mrcs})", "Input STAR file or MRC stack with the 2D references to be used for picking. Note that the absolute greyscale needs to be correct, so only use images created by RELION itself, e.g. by 2D class averaging or projecting a RELION reconstruction.");
 	joboptions["do_ref3d"]= JobOption("OR: provide a 3D reference?", false, "Set this option to Yes if you want to provide a 3D map, which will be projected into multiple directions to generate 2D references.");
 	joboptions["fn_ref3d_autopick"] = JobOption("3D reference:", NODE_3DREF, "", "Input reference (*.{mrc})", "Input MRC file with the 3D reference maps, from which 2D references will be made by projection. Note that the absolute greyscale needs to be correct, so only use maps created by RELION itself from this data set.");
@@ -1834,6 +1845,47 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 	command += " --odir " + outputname;
 	command += " --pickname autopick";
 
+	if (joboptions["do_topaz"].getBoolean())
+	{
+		if (!joboptions["use_gpu"].getBoolean())
+		{
+			error_message ="ERROR: Specify which GPUs to use on the autopicking tab";
+			return false;
+		}
+
+		command += " --topaz_nr_particles " + joboptions["topaz_nr_parts"].getString();
+		command += " --particle_diameter " + joboptions["topaz_particle_diameter"].getString();
+
+		if (joboptions["do_topaz_train"].getBoolean())
+		{
+			command += " --topaz_train";
+			if (joboptions["do_topaz_train_parts"].getBoolean())
+			{
+				error_message ="ERROR: do_topaz_train_parts not yet implemented...";
+				return false;
+			}
+			else
+			{
+				command += " --topaz_train_picks " + joboptions["topaz_train_picks"].getString();
+			}
+
+		}
+		else if (joboptions["do_topaz_pick"].getBoolean())
+		{
+			command += " --topaz_extract";
+			command += " --topaz_model " + joboptions["topaz_model"].getString();
+		}
+
+		if ((joboptions["topaz_other_args"].getString()).length() > 0)
+			command += " --topaz_args \" " + joboptions["topaz_other_args"].getString() + " \"";
+
+		// GPUs to use in topaz
+		if (joboptions["use_gpu"].getBoolean())
+		{
+			command += " --gpu \"" + joboptions["gpu_ids"].getString() + "\"";
+		}
+
+	}
 	if (joboptions["do_log"].getBoolean())
 	{
 		if (joboptions["use_gpu"].getBoolean())
