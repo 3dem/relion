@@ -1759,10 +1759,11 @@ void RelionJob::initialiseAutopickJob()
 	joboptions["topaz_train_parts"] = JobOption("Particles STAR file for training: ", NODE_PART_DATA, "", "Input STAR file (*.{star})", "Filename of the STAR file with the particle coordinates to be used for training, e.g. from a previous 2D or 3D classification or selection.");
 	joboptions["do_topaz_pick"] = JobOption("Perform topaz picking?", false, "Set this option to Yes if you want to use a topaz model for autopicking.");
 	joboptions["topaz_particle_diameter"] = JobOption("Particle diameter (A) ", -1, 0, 2000, 20, "Diameter of the particle (to be used to infer topaz downscale factor and particle radius)");
-	joboptions["topaz_nr_parts"] = JobOption("Nr of particles per micrograph: ", -1, 0, 2000, 20, "Expected average number of particles per micrograph");
+	joboptions["topaz_nr_particles"] = JobOption("Nr of particles per micrograph: ", -1, 0, 2000, 20, "Expected average number of particles per micrograph");
 	joboptions["topaz_model"] = JobOption("Trained topaz model: ", "", "SAV Files (*.sav)", ".", "Trained topaz model for topaz-based picking. Use on job for training and a next job for picking.");
 	joboptions["topaz_other_args"]= JobOption("Additional topaz arguments:", std::string(""), "These additional arguments will be passed onto all topaz programs.");
 
+	joboptions["do_refs"] = JobOption("Use reference-based template-matching?", false, "If set to Yes, 2D or 3D references, as defined on the References tab will be used for autopicking.");
 	joboptions["fn_refs_autopick"] = JobOption("2D references:", NODE_REFS, "", "Input references (*.{star,mrcs})", "Input STAR file or MRC stack with the 2D references to be used for picking. Note that the absolute greyscale needs to be correct, so only use images created by RELION itself, e.g. by 2D class averaging or projecting a RELION reconstruction.");
 	joboptions["do_ref3d"]= JobOption("OR: provide a 3D reference?", false, "Set this option to Yes if you want to provide a 3D map, which will be projected into multiple directions to generate 2D references.");
 	joboptions["fn_ref3d_autopick"] = JobOption("3D reference:", NODE_3DREF, "", "Input reference (*.{mrc})", "Input MRC file with the 3D reference maps, from which 2D references will be made by projection. Note that the absolute greyscale needs to be correct, so only use maps created by RELION itself from this data set.");
@@ -1771,7 +1772,6 @@ void RelionJob::initialiseAutopickJob()
 angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
 The samplings are approximate numbers and vary slightly over the sphere.\n\n For autopicking, 30 degrees is usually fine enough, but for highly symmetrical objects one may need to go finer to adequately sample the asymmetric part of the sphere.");
 
-	joboptions["particle_diameter"] = JobOption("Mask diameter (A)", -1, 0, 2000, 20, "Diameter of the circular mask that will be applied around the templates in Angstroms. When set to a negative value, this value is estimated automatically from the templates themselves.");
 	joboptions["lowpass"] = JobOption("Lowpass filter references (A)", 20, 10, 100, 5, "Lowpass filter that will be applied to the references before template matching. Do NOT use very high-resolution templates to search your micrographs. The signal will be too weak at high resolution anyway, and you may find Einstein from noise.... Give a negative value to skip the lowpass filter.");
 	joboptions["highpass"] = JobOption("Highpass filter (A)", -1, 100, 1000, 100, "Highpass filter that will be applied to the micrographs. This may be useful to get rid of background ramps due to uneven ice distributions. Give a negative value to skip the highpass filter.  Useful values are often in the range of 200-400 Angstroms.");
 	joboptions["angpix_ref"] = JobOption("Pixel size in references (A)", -1, 0.3, 5, 0.1, "Pixel size in Angstroms for the provided reference images. This will be used to calculate the filters and the particle diameter in pixels. If a negative value is given here, the pixel size in the references will be assumed to be the same as the one in the micrographs, i.e. the particles that were used to make the references were not rescaled upon extraction.");
@@ -1825,11 +1825,23 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 	if (error_message != "") return false;
 
 	// Input
-	if (joboptions["fn_input_autopick"].getString() == "")
+	int icheck = 0;
+	if (joboptions["do_log"].getBoolean()) icheck++;
+	if (joboptions["do_topaz"].getBoolean()) icheck++;
+	if (joboptions["do_refs"].getBoolean()) icheck++;
+
+	if ( icheck != 1)
+	{
+		error_message = "ERROR: On the I/O tab specify (only) one of three methods: template-matching, LoG or topaz ...";
+		return false;
+	}
+
+	if (joboptions["fn_input_autopick"].getString() == "" )
 	{
 		error_message = "ERROR: empty field for input STAR file...";
 		return false;
 	}
+
 	command += " --i " + joboptions["fn_input_autopick"].getString();
 	Node node(joboptions["fn_input_autopick"].getString(), joboptions["fn_input_autopick"].node_type);
 	inputNodes.push_back(node);
@@ -1853,8 +1865,23 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 			return false;
 		}
 
-		command += " --topaz_nr_particles " + joboptions["topaz_nr_parts"].getString();
-		command += " --particle_diameter " + joboptions["topaz_particle_diameter"].getString();
+		icheck = 0;
+		if (joboptions["do_topaz_train"].getBoolean()) icheck++;
+		if (joboptions["do_topaz_pick"].getBoolean()) icheck++;
+		if ( icheck != 1)
+		{
+			error_message = "ERROR: On the Topaz tab specify (only) one of two methods: training or picking...";
+			return false;
+		}
+
+
+		if (joboptions["topaz_nr_particles"].getNumber(error_message) > 0.)
+			command += " --topaz_nr_particles " + joboptions["topaz_nr_particles"].getString();
+		if (error_message != "") return false;
+
+		if (joboptions["topaz_particle_diameter"].getNumber(error_message) > 0.)
+			command += " --particle_diameter " + joboptions["topaz_particle_diameter"].getString();
+		if (error_message != "") return false;
 
 		if (joboptions["do_topaz_train"].getBoolean())
 		{
@@ -1879,14 +1906,15 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 		if ((joboptions["topaz_other_args"].getString()).length() > 0)
 			command += " --topaz_args \" " + joboptions["topaz_other_args"].getString() + " \"";
 
-		// GPUs to use in topaz
+		// GPU-stuff
 		if (joboptions["use_gpu"].getBoolean())
 		{
+			// for the moment always use --shrink 0 with GPUs ...
 			command += " --gpu \"" + joboptions["gpu_ids"].getString() + "\"";
 		}
 
 	}
-	if (joboptions["do_log"].getBoolean())
+	else if (joboptions["do_log"].getBoolean())
 	{
 		if (joboptions["use_gpu"].getBoolean())
 		{
@@ -1906,7 +1934,7 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 		if (joboptions["log_invert"].getBoolean())
 			command += " --Log_invert ";
 	}
-	else
+	else if (joboptions["do_refs"].getBoolean())
 	{
 		if (joboptions["do_ref3d"].getBoolean())
 		{
@@ -1973,10 +2001,6 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 			command += " --angpix_ref " + joboptions["angpix_ref"].getString();
 		if (error_message != "") return false;
 
-		if (joboptions["particle_diameter"].getNumber(error_message) > 0.)
-			command += " --particle_diameter " + joboptions["particle_diameter"].getString();
-		if (error_message != "") return false;
-
 		command += " --threshold " + joboptions["threshold_autopick"].getString();
 		if (joboptions["do_pick_helical_segments"].getBoolean())
 			command += " --min_distance " + floatToString(joboptions["helical_nr_asu"].getNumber(error_message) * joboptions["helical_rise"].getNumber(error_message));
@@ -2009,16 +2033,24 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 
 	}
 
-	// Although mainly for debugging, LoG-picking does have write/read_fom_maps...
-	if (joboptions["do_write_fom_maps"].getBoolean())
-		command += " --write_fom_maps ";
+	if (joboptions["do_refs"].getBoolean() || joboptions["do_log"].getBoolean())
+	{
 
-	if (joboptions["do_read_fom_maps"].getBoolean())
-		command += " --read_fom_maps ";
+		// Although mainly for debugging, LoG-picking does have write/read_fom_maps...
+		if (joboptions["do_write_fom_maps"].getBoolean())
+			command += " --write_fom_maps ";
 
-	if (is_continue && !(joboptions["do_read_fom_maps"].getBoolean() || joboptions["do_write_fom_maps"].getBoolean()))
-		command += " --only_do_unfinished ";
+		if (joboptions["do_read_fom_maps"].getBoolean())
+			command += " --read_fom_maps ";
 
+		if (is_continue && !(joboptions["do_read_fom_maps"].getBoolean() || joboptions["do_write_fom_maps"].getBoolean()))
+			command += " --only_do_unfinished ";
+	}
+	else if (joboptions["do_topaz"].getBoolean())
+	{
+		if (is_continue)
+			command += " --only_do_unfinished ";
+	}
 
 	// Other arguments
 	command += " " + joboptions["other_args"].getString();

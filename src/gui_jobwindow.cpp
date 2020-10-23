@@ -710,18 +710,7 @@ void JobWindow::initialiseAutopickWindow()
 
 	current_y += STEPY/2;
 
-	place("fn_refs_autopick", TOGGLE_DEACTIVATE);
-
-	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group1->end();
-	place("do_ref3d", TOGGLE_DEACTIVATE, group1);
-	group1->begin();
-	place("fn_ref3d_autopick", TOGGLE_DEACTIVATE);
-	place("ref3d_symmetry", TOGGLE_DEACTIVATE);
-	place("ref3d_sampling", TOGGLE_DEACTIVATE);
-	group1->end();
-	guientries["do_ref3d"].cb_menu_i();
-
+	place("do_refs", TOGGLE_DEACTIVATE);
 	place("do_log", TOGGLE_DEACTIVATE);
 	place("do_topaz", TOGGLE_DEACTIVATE);
 
@@ -784,7 +773,7 @@ void JobWindow::initialiseAutopickWindow()
 	current_y += STEPY/2;
 
 	place("topaz_particle_diameter", TOGGLE_DEACTIVATE);
-	place("topaz_nr_parts", TOGGLE_DEACTIVATE);
+	place("topaz_nr_particles", TOGGLE_DEACTIVATE);
 	place("topaz_other_args", TOGGLE_DEACTIVATE);
 
 	tab3->end();
@@ -792,23 +781,29 @@ void JobWindow::initialiseAutopickWindow()
 	tab4->label("References");
 	resetHeight();
 
+	place("fn_refs_autopick", TOGGLE_DEACTIVATE);
+
+	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group1->end();
+	place("do_ref3d", TOGGLE_DEACTIVATE, group1);
+	group1->begin();
+	place("fn_ref3d_autopick", TOGGLE_DEACTIVATE);
+	place("ref3d_symmetry", TOGGLE_DEACTIVATE);
+	place("ref3d_sampling", TOGGLE_DEACTIVATE);
+	group1->end();
+	guientries["do_ref3d"].cb_menu_i();
+
 	//set up group
 	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group2->end();
 
+	// Add a little spacer
+	current_y += STEPY/2;
+
 	place("lowpass", TOGGLE_DEACTIVATE);
 	place("highpass", TOGGLE_DEACTIVATE);
 	place("angpix_ref", TOGGLE_DEACTIVATE);
-	place("particle_diameter", TOGGLE_DEACTIVATE);
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
 	place("psi_sampling_autopick", TOGGLE_DEACTIVATE);
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
 	place("do_invert_refs", TOGGLE_DEACTIVATE);
 	place("do_ctf_autopick", TOGGLE_DEACTIVATE, group2);
 

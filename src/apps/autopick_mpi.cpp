@@ -45,7 +45,12 @@ int main(int argc, char *argv[])
 		else
 #endif
 		{
-			if (prm.do_topaz_train) prm.trainTopaz();
+			if (prm.do_topaz_train)
+			{
+				// only master trains!
+				if (prm.getRank() == 0) prm.trainTopaz();
+				else std::cerr << " WARNNG: rank " << prm.getRank() << " is doing nothing in training as it hasn't been parallelised ..." << std::endl;
+			}
 			else prm.run();
 		}
 

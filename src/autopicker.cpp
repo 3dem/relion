@@ -693,11 +693,11 @@ void AutoPicker::initialise(int rank)
 		// Get topaz_downscale from particle_diameter and micrograph pixel size
 		if (topaz_downscale < 0)
 		{
-			// Perceptive window of default resnet8 is 71 pixels, which should encapsulate particle_diameter*1.1
-			RFLOAT particle_box_pix = 1.1 * particle_diameter / angpix;
+			// Perceptive window of default resnet8 is 71 pixels, which should encapsulate particle_diameter*2
+			RFLOAT particle_box_pix = 2 * particle_diameter / angpix;
 			topaz_downscale = ROUND(particle_box_pix/71);
 			if (verb > 0)
-				std::cout << " + Setting topaz downscale factor to " << topaz_downscale << " (assuming resnet8 model and 1.1*particle_diameter receptive box)" << std::endl;
+				std::cout << " + Setting topaz downscale factor to " << topaz_downscale << " (assuming resnet8 model and 2*particle_diameter receptive box)" << std::endl;
 		}
 
 		// Get topaz_radius from 90% of particle_diameter / 2
@@ -2822,9 +2822,15 @@ void AutoPicker::trainTopaz()
 	fh << std::endl;
 	fh.close();
 
-	std::string command = fn_bash + " " + fn_script + " >& " + fn_log ;
+	std::string command = fn_bash + " " + fn_script + " >> " + fn_log ;
 	if (system(command.c_str())) std::cerr << "WARNING: there was an error in executing: " << command << std::endl;
 
+	// Now remove raw and proc directories
+	command = "rm -rf " + fn_odir + "raw/ " + fn_odir + "proc";
+	std::cerr << command << std::endl;
+	//if (system(command.c_str())) std::cerr << "WARNING: there was an error in executing: " << command << std::endl;
+
+	std::cout << " Done with training! Launch another Auto-picking job to use the model for picking coordinates. " << std::endl;
 
 }
 
@@ -2851,7 +2857,8 @@ void AutoPicker::autoPickTopazOneMicrograph(FileName &fn_mic, int rank)
 		fh << fn_conda_activate << " topaz" << std::endl;
 
 	// Make a symlink of the micrograph in the output Directory
-	fh << "cp " << fn_mic << " " << fn_odir << fn_local_mic << std::endl;
+	FileName fno = fn_odir + fn_local_mic;
+	int res2 = symlink(realpath(fn_mic.c_str(), NULL), fno.c_str());
 
 	// Call Topaz to preprocess this file for normalisation and downscaling
 	fh << fn_topaz_exe + " preprocess ";
