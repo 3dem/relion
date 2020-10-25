@@ -84,6 +84,11 @@ DefocusRefinementProgram::DefocusRefinementProgram(int argc, char *argv[])
 		{
 			REPORT_ERROR("You need to either refine the defoci or their slopes");
 		}
+		else
+		{
+			do_slowScan = false;
+			do_refineFast = false;
+		}
 	}
 	else if (!do_refineFast && !do_slopeFit)
 	{
