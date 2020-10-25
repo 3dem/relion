@@ -21,7 +21,7 @@ class DefocusRefinementProgram : public RefinementProgram
 			
 			bool do_clearAstigmatism, do_scanDefocus, do_slowScan, do_refineFast,
 				do_refineAstigmatism, do_plotAstigmatism, do_regularise,
-				do_slopeFit;
+				do_slopeFit, do_perTomogramSlope;
 
 			int deltaSteps, max_particles, group_count;
 			double minDelta, maxDelta, sigma_input;

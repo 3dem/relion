@@ -47,11 +47,12 @@ DefocusRefinementProgram::DefocusRefinementProgram(int argc, char *argv[])
 		do_slowScan = parser.checkOption("--slow_scan", "Perform a slow, brute-force defocus scan instead");
 		do_refineFast = !parser.checkOption("--slow_scan_only", "Only perform a brute-force scan");
 
-		no_defocus = parser.checkOption("--no_defocus", "Do not refine the defocus, only its slope");
+		no_defocus = parser.checkOption("--no_defocus", "Do not refine the defocus itself, only its slope");
 
 		do_refineAstigmatism = !parser.checkOption("--no_astigmatism", "Do not refine the astigmatism");
 		do_plotAstigmatism = parser.checkOption("--plot_astigmatism", "Plot the astigmatism cost function");
 		do_slopeFit = parser.checkOption("--fit_slope", "Fit the slope of defocus over depth");
+		do_perTomogramSlope = parser.checkOption("--tomo_slope", "Fit the defocus slope separately for each tomogram (not recommended)");
 
 		max_particles = textToInteger(parser.getOption("--max", "Max. number of particles to consider per tomogram", "-1"));
 		group_count = textToInteger(parser.getOption("--g", "Number of independent groups", "10"));
@@ -113,7 +114,7 @@ void DefocusRefinementProgram::run()
 	const double max_slope = 1.05;
 	const int slope_steps = 2;
 
-	//std::vector<d3Vector> globalSlopeCost(slope_steps, d3Vector(0.0, 0.0, 0.0));
+	std::vector<d3Vector> globalSlopeCost(slope_steps, d3Vector(0.0, 0.0, 0.0));
 
 	for (int t = 0; t < tc; t++)
 	{
@@ -344,32 +345,55 @@ void DefocusRefinementProgram::run()
 				referenceMap.image_FS, freqWeights,
 				flip_value, num_threads);
 
-			/*for (int i = 0; i < tomogramSlopeCost.size(); i++)
+			if (diag)
 			{
-				globalSlopeCost[i][0]  = tomogramSlopeCost[i][0];
-				globalSlopeCost[i][1] += tomogramSlopeCost[i][1];
-				globalSlopeCost[i][2] += tomogramSlopeCost[i][2];
-			}*/
+				writeSlopeCost(tomogramSlopeCost, outDir+"t_"+ZIO::itoa(t)+"_slope.dat");
+			}
 
-			writeSlopeCost(tomogramSlopeCost, outDir+"t_"+ZIO::itoa(t)+"_slope.dat");
+			if (do_perTomogramSlope)
+			{
+				const double slope = min_slope -
+						tomogramSlopeCost[0][2] * (max_slope - min_slope)
+						/ (tomogramSlopeCost[1][2] - tomogramSlopeCost[0][2]);
 
-			const double slope = min_slope -
-					tomogramSlopeCost[0][2] * (max_slope - min_slope)
-					/ (tomogramSlopeCost[1][2] - tomogramSlopeCost[0][2]);
+				tomogramSet.setDefocusSlope(t, slope);
+			}
+			else
+			{
+				for (int i = 0; i < tomogramSlopeCost.size(); i++)
+				{
+					globalSlopeCost[i][0]  = tomogramSlopeCost[i][0];
+					globalSlopeCost[i][1] += tomogramSlopeCost[i][1];
+					globalSlopeCost[i][2] += tomogramSlopeCost[i][2];
+				}
+			}
 
 			Log::endSection();
-
-			tomogramSet.setDefocusSlope(t, slope);
 		}
 
 		Log::endSection();
 		
 	} // all tomograms
 
-	/*if (do_slopeFit)
+	if (do_slopeFit)
 	{
-		writeSlopeCost(globalSlopeCost, outDir+"slope.dat");
-	}*/
+		if (diag)
+		{
+			writeSlopeCost(globalSlopeCost, outDir+"slope.dat");
+		}
+
+		if (!do_perTomogramSlope)
+		{
+			for (int t = 0; t < tc; t++)
+			{
+				const double slope = min_slope -
+						globalSlopeCost[0][2] * (max_slope - min_slope)
+						/ (globalSlopeCost[1][2] - globalSlopeCost[0][2]);
+
+				tomogramSet.setDefocusSlope(t, slope);
+			}
+		}
+	}
 
 	tomogramSet.write(outDir+"tomograms.star");
 }
