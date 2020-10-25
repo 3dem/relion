@@ -34,6 +34,8 @@ DefocusRefinementProgram::DefocusRefinementProgram(int argc, char *argv[])
 {
 	IOParser parser;
 	parser.setCommandLine(argc, argv);
+
+	bool no_defocus;
 	
 	try
 	{
@@ -44,6 +46,9 @@ DefocusRefinementProgram::DefocusRefinementProgram(int argc, char *argv[])
 		do_scanDefocus = !parser.checkOption("--no_scan", "Skip accelerated defocus scan");
 		do_slowScan = parser.checkOption("--slow_scan", "Perform a slow, brute-force defocus scan instead");
 		do_refineFast = !parser.checkOption("--slow_scan_only", "Only perform a brute-force scan");
+
+		no_defocus = parser.checkOption("--no_defocus", "Do not refine the defocus, only its slope");
+
 		do_refineAstigmatism = !parser.checkOption("--no_astigmatism", "Do not refine the astigmatism");
 		do_plotAstigmatism = parser.checkOption("--plot_astigmatism", "Plot the astigmatism cost function");
 		do_slopeFit = parser.checkOption("--fit_slope", "Fit the slope of defocus over depth");
@@ -73,7 +78,14 @@ DefocusRefinementProgram::DefocusRefinementProgram(int argc, char *argv[])
 		exit(1);
 	}
 
-	if (!do_refineFast)
+	if (no_defocus)
+	{
+		if (!do_slopeFit)
+		{
+			REPORT_ERROR("You need to either refine the defoci or their slopes");
+		}
+	}
+	else if (!do_refineFast && !do_slopeFit)
 	{
 		do_slowScan = true;
 	}
@@ -142,175 +154,178 @@ void DefocusRefinementProgram::run()
 		BufferedImage<float> freqWeights = computeFrequencyWeights(
 			tomogram, true, 0.0, 0.0, num_threads);
 
-		for (int f = f0; f <= f1; f++)
+		if (do_slowScan || do_refineFast)
 		{
-			Log::beginSection("Frame " + ZIO::itoa(f+1));
-			
-			if (do_slowScan)
+			for (int f = f0; f <= f1; f++)
 			{
-				DefocusFit defocus = findDefocus(
-					f, minDelta, maxDelta, deltaSteps,  
-					group_count, sigma_input,	
-					dataSet, particles[t], usedParticleCount, 
-					tomogram, aberrationsCache, referenceMap.image_FS,
-					freqWeights, flip_value, num_threads);
-				
-				defocusOffset[f] = defocus.value;
-				offsetStdDev[f] = defocus.stdDev;
-				
-				if (diag)
+				Log::beginSection("Frame " + ZIO::itoa(f+1));
+
+				if (do_slowScan)
 				{
-					std::ofstream costOutByGroup(
-						outDir+"cost_tomo_"+ZIO::itoa(t)+"_frame_"+ZIO::itoa(f)+"_by_group.dat");
-					
-					for (int g = 0; g < group_count; g++)
+					DefocusFit defocus = findDefocus(
+						f, minDelta, maxDelta, deltaSteps,
+						group_count, sigma_input,
+						dataSet, particles[t], usedParticleCount,
+						tomogram, aberrationsCache, referenceMap.image_FS,
+						freqWeights, flip_value, num_threads);
+
+					defocusOffset[f] = defocus.value;
+					offsetStdDev[f] = defocus.stdDev;
+
+					if (diag)
 					{
+						std::ofstream costOutByGroup(
+							outDir+"cost_tomo_"+ZIO::itoa(t)+"_frame_"+ZIO::itoa(f)+"_by_group.dat");
+
+						for (int g = 0; g < group_count; g++)
+						{
+							for (int di = 0; di < deltaSteps; di++)
+							{
+								costOutByGroup << defocus.offsets[di] << " " << defocus.costByGroup[g][di] << '\n';
+							}
+
+							costOutByGroup << '\n';
+						}
+
+						std::ofstream costOut(
+							outDir+"cost_tomo_"+ZIO::itoa(t)+"_frame_"+ZIO::itoa(f)+".dat");
+
+						costOut.precision(12);
+
 						for (int di = 0; di < deltaSteps; di++)
 						{
-							costOutByGroup << defocus.offsets[di] << " " << defocus.costByGroup[g][di] << '\n';
+							costOut << defocus.offsets[di] << " " << defocus.totalCost[di] << '\n';
 						}
-						
-						costOutByGroup << '\n';
-					}
-						
-					std::ofstream costOut(
-						outDir+"cost_tomo_"+ZIO::itoa(t)+"_frame_"+ZIO::itoa(f)+".dat");
 
-					costOut.precision(12);
-					
-					for (int di = 0; di < deltaSteps; di++)
+						costOut << '\n';
+					}
+
+
+					CTF& ctf = tomogram.centralCTFs[f];
+
+					const double s02 = sigma_input * sigma_input;
+					const double sf2 = offsetStdDev[f] * offsetStdDev[f];
+
+					const double deltaZ = do_regularise?
+						s02 * defocusOffset[f] / (sf2 + s02) :
+						defocusOffset[f];
+
+					ctf.DeltafU += deltaZ;
+					ctf.DeltafV += deltaZ;
+
+					ctf.initialise();
+
+					tomogramSet.setCtf(t,f,ctf);
+				}
+
+				if (do_refineFast)
+				{
+					const int s = referenceMap.image_real[0].xdim;
+					const int sh = s/2 + 1;
+					const int pc = particles[t].size();
+
+					std::vector<BufferedImage<EvenData>> evenData_thread(num_threads);
+					std::vector<BufferedImage<OddData>> oddData_thread(num_threads);
+
+					const EvenData evenZero({0.0, 0.0, 0.0, 0.0, 0.0});
+					const OddData oddZero({0.0, dComplex(0.0, 0.0)});
+
+					BufferedImage<EvenData> evenData(sh,s);
+					evenData.fill(evenZero);
+
+					BufferedImage<OddData> oddData(sh,s);
+					oddData.fill(oddZero);
+
+					for (int th = 0; th < num_threads; th++)
 					{
-						costOut << defocus.offsets[di] << " " << defocus.totalCost[di] << '\n';
+						evenData_thread[th] = BufferedImage<EvenData>(sh,s);
+						evenData_thread[th].fill(evenZero);
+
+						oddData_thread[th] = BufferedImage<OddData>(sh,s);
+						oddData_thread[th].fill(oddZero);
 					}
-					
-					costOut << '\n';
-				}
-	
-				
-				CTF& ctf = tomogram.centralCTFs[f];
-				
-				const double s02 = sigma_input * sigma_input;
-				const double sf2 = offsetStdDev[f] * offsetStdDev[f];
-				
-				const double deltaZ = do_regularise?
-					s02 * defocusOffset[f] / (sf2 + s02) :
-					defocusOffset[f];
 
-				ctf.DeltafU += deltaZ;
-				ctf.DeltafV += deltaZ;
-				
-				ctf.initialise();
-				
-				tomogramSet.setCtf(t,f,ctf);
-			}
 
-			if (do_refineFast)
-			{
-				const int s = referenceMap.image_real[0].xdim;
-				const int sh = s/2 + 1;
-				const int pc = particles[t].size();
-				
-				std::vector<BufferedImage<EvenData>> evenData_thread(num_threads);
-				std::vector<BufferedImage<OddData>> oddData_thread(num_threads);
-				
-				const EvenData evenZero({0.0, 0.0, 0.0, 0.0, 0.0});
-				const OddData oddZero({0.0, dComplex(0.0, 0.0)});
-				
-				BufferedImage<EvenData> evenData(sh,s);
-				evenData.fill(evenZero);
-				
-				BufferedImage<OddData> oddData(sh,s);
-				oddData.fill(oddZero);
-				
-				for (int th = 0; th < num_threads; th++)
-				{
-					evenData_thread[th] = BufferedImage<EvenData>(sh,s);
-					evenData_thread[th].fill(evenZero);
-					
-					oddData_thread[th] = BufferedImage<OddData>(sh,s);
-					oddData_thread[th].fill(oddZero);
-				}
-				
+					Log::beginProgress("Accumulating evidence", pc/num_threads);
 
-				Log::beginProgress("Accumulating evidence", pc/num_threads);
-				
-				#pragma omp parallel for num_threads(num_threads)
-				for (int p = 0; p < pc; p++)
-				{
-					const int th = omp_get_thread_num();
-					
-					if (th == 0)
+					#pragma omp parallel for num_threads(num_threads)
+					for (int p = 0; p < pc; p++)
 					{
-						Log::updateProgress(p);
+						const int th = omp_get_thread_num();
+
+						if (th == 0)
+						{
+							Log::updateProgress(p);
+						}
+
+						AberrationFit::considerParticle(
+							particles[t][p], tomogram, referenceMap, dataSet,
+							aberrationsCache, flip_value, freqWeights,
+							f, f,
+							evenData_thread[th], oddData_thread[th]);
 					}
-					
-					AberrationFit::considerParticle(
-						particles[t][p], tomogram, referenceMap, dataSet,
-						aberrationsCache, flip_value, freqWeights,
-						f, f, 
-						evenData_thread[th], oddData_thread[th]);
-				}
 
-				Log::endProgress();
-				
+					Log::endProgress();
 
-				for (int th = 0; th < num_threads; th++)
-				{
-					evenData += evenData_thread[th];
-					oddData += oddData_thread[th];
-				}
 
-				CTF ctf0 = tomogram.centralCTFs[f];
-				CTF ctf_dz = ctf0;
-
-				double bestDeltaZ = 0;
-
-				if (do_scanDefocus)
-				{
-					Log::print("Scanning for optimal defocus");
-
-					bestDeltaZ = scanForDefocus(
-							evenData, tomogram.optics.pixelSize, tomogram.centralCTFs[f],
-							minDelta, maxDelta, deltaSteps);
-
-					ctf_dz.DeltafU = ctf0.DeltafU + bestDeltaZ;
-					ctf_dz.DeltafV = ctf0.DeltafV + bestDeltaZ;
-				}
-
-				CTF ctf1 = ctf_dz;
-
-				if (do_refineAstigmatism)
-				{
-					Log::print("Refining astigmatism");
-
-					EvenSolution solution = AberrationFit::solveEven(evenData);
-
-					const double pixelSize = tomogram.optics.pixelSize;
-
-					d3Vector astig = findAstigmatism(
-						solution, ctf0, bestDeltaZ, pixelSize, 1.0);
-
-					if (do_plotAstigmatism)
+					for (int th = 0; th < num_threads; th++)
 					{
-						BufferedImage<double> astigPlot = plotAstigmatism(
-									solution, ctf0, bestDeltaZ, 100.0, pixelSize, 32);
-
-						astigPlot.write(
-							outDir+"astig_cost_"+ZIO::itoa(t)+"_"+ZIO::itoa(f)+".mrc");
+						evenData += evenData_thread[th];
+						oddData += oddData_thread[th];
 					}
 
-					ctf1.DeltafU = astig[0];
-					ctf1.DeltafV = astig[1];
-					ctf1.azimuthal_angle = astig[2];
+					CTF ctf0 = tomogram.centralCTFs[f];
+					CTF ctf_dz = ctf0;
+
+					double bestDeltaZ = 0;
+
+					if (do_scanDefocus)
+					{
+						Log::print("Scanning for optimal defocus");
+
+						bestDeltaZ = scanForDefocus(
+								evenData, tomogram.optics.pixelSize, tomogram.centralCTFs[f],
+								minDelta, maxDelta, deltaSteps);
+
+						ctf_dz.DeltafU = ctf0.DeltafU + bestDeltaZ;
+						ctf_dz.DeltafV = ctf0.DeltafV + bestDeltaZ;
+					}
+
+					CTF ctf1 = ctf_dz;
+
+					if (do_refineAstigmatism)
+					{
+						Log::print("Refining astigmatism");
+
+						EvenSolution solution = AberrationFit::solveEven(evenData);
+
+						const double pixelSize = tomogram.optics.pixelSize;
+
+						d3Vector astig = findAstigmatism(
+							solution, ctf0, bestDeltaZ, pixelSize, 1.0);
+
+						if (do_plotAstigmatism)
+						{
+							BufferedImage<double> astigPlot = plotAstigmatism(
+										solution, ctf0, bestDeltaZ, 100.0, pixelSize, 32);
+
+							astigPlot.write(
+								outDir+"astig_cost_"+ZIO::itoa(t)+"_"+ZIO::itoa(f)+".mrc");
+						}
+
+						ctf1.DeltafU = astig[0];
+						ctf1.DeltafV = astig[1];
+						ctf1.azimuthal_angle = astig[2];
+					}
+
+					tomogramSet.setCtf(t, f, ctf1);
+
 				}
 
-				tomogramSet.setCtf(t, f, ctf1);
+				Log::endSection();
 
-			}
-			
-			Log::endSection();
-			
-		} // all frames
+			} // all frames
+		} // do_slow_scan || do_refine_fast
 
 		if (do_slopeFit)
 		{
