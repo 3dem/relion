@@ -34,8 +34,6 @@ DefocusRefinementProgram::DefocusRefinementProgram(int argc, char *argv[])
 {
 	IOParser parser;
 	parser.setCommandLine(argc, argv);
-
-	bool no_defocus;
 	
 	try
 	{
@@ -47,12 +45,13 @@ DefocusRefinementProgram::DefocusRefinementProgram(int argc, char *argv[])
 		do_slowScan = parser.checkOption("--slow_scan", "Perform a slow, brute-force defocus scan instead");
 		do_refineFast = !parser.checkOption("--slow_scan_only", "Only perform a brute-force scan");
 
-		no_defocus = parser.checkOption("--no_defocus", "Do not refine the defocus itself, only its slope");
+		do_defocus = !parser.checkOption("--no_defocus", "Do not refine the defocus itself, only its slope");
 
 		do_refineAstigmatism = !parser.checkOption("--no_astigmatism", "Do not refine the astigmatism");
 		do_plotAstigmatism = parser.checkOption("--plot_astigmatism", "Plot the astigmatism cost function");
 		do_slopeFit = parser.checkOption("--fit_slope", "Fit the slope of defocus over depth");
 		do_perTomogramSlope = parser.checkOption("--tomo_slope", "Fit the defocus slope separately for each tomogram (not recommended)");
+		max_slope_dose = textToDouble(parser.getOption("--max_slope_dose", "Maximum dose for a frame to be considered for defocus slope estimation", "20"));
 
 		max_particles = textToInteger(parser.getOption("--max", "Max. number of particles to consider per tomogram", "-1"));
 		group_count = textToInteger(parser.getOption("--g", "Number of independent groups", "10"));
@@ -79,21 +78,19 @@ DefocusRefinementProgram::DefocusRefinementProgram(int argc, char *argv[])
 		exit(1);
 	}
 
-	if (no_defocus)
+	if (do_defocus)
+	{
+		if (!do_refineFast)
+		{
+			do_slowScan = true;
+		}
+	}
+	else
 	{
 		if (!do_slopeFit)
 		{
 			REPORT_ERROR("You need to either refine the defoci or their slopes");
 		}
-		else
-		{
-			do_slowScan = false;
-			do_refineFast = false;
-		}
-	}
-	else if (!do_refineFast && !do_slopeFit)
-	{
-		do_slowScan = true;
 	}
 }
 
@@ -160,7 +157,7 @@ void DefocusRefinementProgram::run()
 		BufferedImage<float> freqWeights = computeFrequencyWeights(
 			tomogram, true, 0.0, 0.0, num_threads);
 
-		if (do_slowScan || do_refineFast)
+		if (do_defocus)
 		{
 			for (int f = first_frame; f <= last_frame; f++)
 			{
@@ -336,8 +333,6 @@ void DefocusRefinementProgram::run()
 		if (do_slopeFit)
 		{
 			Log::beginSection("Fitting defocus slope");
-
-			const double max_slope_dose = 20.0;
 
 			std::vector<d3Vector> tomogramSlopeCost = computeSlopeCost(
 				max_slope_dose, min_slope, max_slope, slope_steps,
