@@ -539,6 +539,7 @@ enum EMDLabel
 	EMDL_TOMO_MANIFOLD_INDEX,
 	EMDL_TOMO_MANIFOLD_TYPE,
 	EMDL_TOMO_MANIFOLD_PARAMETERS,
+	EMDL_TOMO_DEFOCUS_SLOPE,
 
 	EMDL_TOMO_PARTICLE_ID,       // (deprecated, use EMDL_TOMO_PARTICLE_INDEX instead)
 	EMDL_TOMO_PICK_PARTICLE_ID,  // (deprecated, use EMDL_TOMO_MANIFOLD_INDEX instead)
@@ -1106,6 +1107,7 @@ private:
 		EMDL::addLabel(EMDL_TOMO_MANIFOLD_INDEX, EMDL_INT, "rlnTomoManifoldIndex", "Index of a 2D manifold in a tomogram");
 		EMDL::addLabel(EMDL_TOMO_MANIFOLD_TYPE, EMDL_STRING, "rlnTomoManifoldType", "Name of the manifold type");
 		EMDL::addLabel(EMDL_TOMO_MANIFOLD_PARAMETERS, EMDL_DOUBLE_VECTOR, "rlnTomoManifoldParams", "Set of coefficients pertaining to a generic 2D manifold in a tomogram");
+		EMDL::addLabel(EMDL_TOMO_DEFOCUS_SLOPE, EMDL_DOUBLE, "rlnTomoDefocusSlope", "Rate of change of defocus over depth");
 
 		EMDL::addLabel(EMDL_TOMO_PARTICLE_ID, EMDL_INT, "rlnTomoParticleId", "Particle index");
 		EMDL::addLabel(EMDL_TOMO_PICK_PARTICLE_ID, EMDL_INT, "rlnTomoPickParticleId", "Virus Particle index");

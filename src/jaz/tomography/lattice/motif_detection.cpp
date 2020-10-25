@@ -1,5 +1,5 @@
 #include "motif_detection.h"
-#include <src/jaz/math/Euler_angles.h>
+#include <src/jaz/math/Euler_angles_dynamo.h>
 
 
 using namespace gravis;
@@ -42,7 +42,7 @@ Catalogue MotifDetection::toCatalogue(
 		part.tag = p;
 		part.tomo = d.tomoIndex;
 		
-		d3Vector angs = Euler::matrixToAngles(d.alignment);
+		d3Vector angs = EulerDynamo::matrixToAngles(d.alignment);
 		
 		part.tdrot = -RAD2DEG(angs[2]);
 		part.tilt  = -RAD2DEG(angs[1]);

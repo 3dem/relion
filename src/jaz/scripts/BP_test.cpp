@@ -10,7 +10,7 @@
 #include <src/jaz/image/centering.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
-#include <src/jaz/math/Euler_angles.h>
+#include <src/jaz/math/Euler_angles_dynamo.h>
 #include <src/CPlot2D.h>
 #include <src/backprojector.h>
 
@@ -111,7 +111,7 @@ int main(int argc, char *argv[])
 		const double psi = 2.0 * PI * rand() / (double)RAND_MAX;		
 		const double tilt = (PI/2.0) * sin(PI * rand() / (double)RAND_MAX - PI/2.0);
 		
-		d4Matrix proj = Euler::anglesToMatrix4(phi, tilt, psi);
+		d4Matrix proj = EulerDynamo::anglesToMatrix4(phi, tilt, psi);
 				
 		if (legacy_backprojector)
 		{
@@ -225,7 +225,7 @@ int main(int argc, char *argv[])
 		const double psi = 2.0 * PI * rand() / (double)RAND_MAX;
 		const double tilt = (PI/2.0) * sin(PI * rand() / (double)RAND_MAX - PI/2.0);
 
-		d4Matrix proj = Euler::anglesToMatrix4(phi, tilt, psi);
+		d4Matrix proj = EulerDynamo::anglesToMatrix4(phi, tilt, psi);
 
 
 		BufferedImage<fComplex> prediction(sh,s), psf(sh,s);

@@ -52,6 +52,7 @@ class MagnificationHelper
 						RFLOAT& scaleMinor,
 						RFLOAT& angleDeg);
 
+		// deprecated: use the other one!
 		static void updateScaleFreq(
 						const Image<Complex>& prediction,
 						const Volume<gravis::t2Vector<Complex>>& predGradient,
@@ -59,6 +60,14 @@ class MagnificationHelper
 						CTF& ctf, double angpix,
 						Volume<Equation2x2>& eqs,
 						bool do_ctf_padding = false);
+
+		static void updateScale(
+						const RawImage<fComplex>& prediction,
+						const RawImage<gravis::t2Vector<fComplex>>& predGradient,
+						const RawImage<fComplex>& observation,
+						const RawImage<float>& freqWeights,
+						CTF& ctf, double angpix,
+						RawImage<Equation2x2>& eqs);
 
 		static void updateScaleReal(
 						const Image<Complex>& prediction,
@@ -68,14 +77,22 @@ class MagnificationHelper
 						Volume<Equation2x2>& eqs,
 						bool do_ctf_padding = false);
 
+		// deprecated: use the other one!
 		static void solvePerPixel(
 						const Volume<Equation2x2>& eqs,
 						Image<RFLOAT>& vx, Image<RFLOAT>& vy);
 
+		static BufferedImage<double> solvePerPixel(
+						const RawImage<Equation2x2>& eqs);
+
+		// deprecated: use the other one!
 		static Matrix2D<RFLOAT> solveLinearlyFreq(
 						const Volume<Equation2x2>& eqs,
 						const Image<RFLOAT>& snr,
 						Image<RFLOAT>& vx, Image<RFLOAT>& vy);
+
+		static gravis::d2Matrix solveLinearly(
+						const RawImage<Equation2x2>& eqs);
 
 		static void readEQs(std::string path, Volume<Equation2x2>& eqs);
 		static void writeEQs(const Volume<Equation2x2>& eqs, std::string path);

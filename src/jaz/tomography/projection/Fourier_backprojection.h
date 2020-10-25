@@ -884,7 +884,7 @@ void FourierBackprojection::backprojectSlice_forward(
 		const double xx = x;
 		const double yy = y < h2/2? y : y - h2;
 		
-		gravis::d3Vector pos3 = xx * u + yy * v;		
+		gravis::d3Vector pos3 = xx * u + yy * v;
 		
 		bool conj = false;
 		

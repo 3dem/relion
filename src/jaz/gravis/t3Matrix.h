@@ -99,7 +99,8 @@ namespace gravis
         return !(*this == o);
       }
 
-      t3Matrix operator*(T f) const;
+	  t3Matrix operator*(T f) const;
+	  t3Matrix operator/(T f) const;
       t3Matrix& operator*=(const T& f);
       t3Matrix& operator/=(const T& f);
       t3Vector<T> operator*(const t3Vector<T>&) const;
@@ -214,9 +215,18 @@ namespace gravis
   template <class T> inline
   t3Matrix<T> t3Matrix<T>::operator*(T f) const
   {
-    t3Matrix<T> out(*this);
-    out *= f;
-    return out;
+	t3Matrix<T> out(*this);
+	out *= f;
+	return out;
+  }
+
+  /*! \brief Matrix times scalar. */
+  template <class T> inline
+  t3Matrix<T> t3Matrix<T>::operator/(T f) const
+  {
+	t3Matrix<T> out(*this);
+	out /= f;
+	return out;
   }
 
   /*! \brief Multiply this matrix with a scalar. */

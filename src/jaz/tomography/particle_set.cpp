@@ -2,7 +2,7 @@
 #include "tomogram_set.h"
 #include <src/jaz/util/log.h>
 #include <src/jaz/util/zio.h>
-#include <src/euler.h>
+#include <src/jaz/math/Euler_angles_relion.h>
 #include <sstream>
 #include <set>
 #include <map>
@@ -195,15 +195,11 @@ d3Matrix ParticleSet::getSubtomogramMatrix(ParticleIndex particle_id) const
 {
 	if (partTable.labelExists(EMDL_TOMO_SUBTOMOGRAM_ROT))
 	{
-		double phi, theta, psi;
-		
-		partTable.getValueSafely(EMDL_TOMO_SUBTOMOGRAM_ROT,  phi,   particle_id.value);
-		partTable.getValueSafely(EMDL_TOMO_SUBTOMOGRAM_TILT, theta, particle_id.value);
-		partTable.getValueSafely(EMDL_TOMO_SUBTOMOGRAM_PSI,  psi,   particle_id.value);
-		
-		Matrix2D<double> A;
-		Euler_angles2matrix(phi, theta, psi, A, false);	
-		return convert(A);
+		const double phi  =  partTable.getAngleInRad(EMDL_TOMO_SUBTOMOGRAM_ROT,  particle_id.value);
+		const double theta = partTable.getAngleInRad(EMDL_TOMO_SUBTOMOGRAM_TILT, particle_id.value);
+		const double psi  =  partTable.getAngleInRad(EMDL_TOMO_SUBTOMOGRAM_PSI,  particle_id.value);
+
+		return Euler::anglesToMatrix3(phi, theta, psi);
 	}
 	else
 	{
@@ -216,16 +212,11 @@ d3Matrix ParticleSet::getSubtomogramMatrix(ParticleIndex particle_id) const
 
 d3Matrix ParticleSet::getParticleMatrix(ParticleIndex particle_id) const
 {
-	double phi, theta, psi;
-	
-	partTable.getValueSafely(EMDL_ORIENT_ROT,  phi,   particle_id.value);
-	partTable.getValueSafely(EMDL_ORIENT_TILT, theta, particle_id.value);
-	partTable.getValueSafely(EMDL_ORIENT_PSI,  psi,   particle_id.value);
-	
-	Matrix2D<double> A;
-	Euler_angles2matrix(phi, theta, psi, A, false);	
-	return convert(A);
-	
+	const double phi  =  partTable.getAngleInRad(EMDL_ORIENT_ROT,  particle_id.value);
+	const double theta = partTable.getAngleInRad(EMDL_ORIENT_TILT, particle_id.value);
+	const double psi  =  partTable.getAngleInRad(EMDL_ORIENT_PSI,  particle_id.value);
+
+	return Euler::anglesToMatrix3(phi, theta, psi);
 }
 
 d3Matrix ParticleSet::getMatrix3x3(ParticleIndex particle_id) const
@@ -264,6 +255,26 @@ d4Matrix ParticleSet::getMatrix4x4(ParticleIndex particle_id, double w, double h
 		0, 0, 0, 1);
 	
 	return Ts * R * Tc;
+}
+
+t4Vector<d3Matrix> ParticleSet::getMatrixDerivativesOverParticleAngles(
+		ParticleIndex particle_id) const
+{
+	const double phi  =  partTable.getAngleInRad(EMDL_ORIENT_ROT,  particle_id.value);
+	const double theta = partTable.getAngleInRad(EMDL_ORIENT_TILT, particle_id.value);
+	const double psi  =  partTable.getAngleInRad(EMDL_ORIENT_PSI,  particle_id.value);
+
+	t4Vector<d3Matrix> dA_particle =
+		Euler::anglesToMatrixAndDerivatives(phi, theta, psi);
+
+	const d3Matrix A_subtomogram = getSubtomogramMatrix(particle_id);
+
+	for (int i = 0; i < 4; i++)
+	{
+		dA_particle[i] = A_subtomogram * dA_particle[i];
+	}
+
+	return dA_particle;
 }
 
 std::string ParticleSet::getName(ParticleIndex particle_id) const

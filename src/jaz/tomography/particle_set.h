@@ -41,6 +41,8 @@ class ParticleSet
 		gravis::d3Matrix getParticleMatrix(ParticleIndex particle_id) const;
 		gravis::d3Matrix getMatrix3x3(ParticleIndex particle_id) const;
 		gravis::d4Matrix getMatrix4x4(ParticleIndex particle_id, double w, double h, double d) const;
+
+		gravis::t4Vector<gravis::d3Matrix> getMatrixDerivativesOverParticleAngles(ParticleIndex particle_id) const;
 		
 		std::string getName(ParticleIndex particle_id) const;
 		int getHalfSet(ParticleIndex particle_id) const;

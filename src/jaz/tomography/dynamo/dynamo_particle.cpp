@@ -1,5 +1,5 @@
 #include "dynamo_particle.h"
-#include <src/jaz/math/Euler_angles.h>
+#include <src/jaz/math/Euler_angles_dynamo.h>
 #include <sstream>
 
 #define ONE_BASED_COORDS 1
@@ -125,7 +125,7 @@ void DynamoParticle::setAlibiOrientation(d4Matrix A)
 	y = A(1,3);
 	z = A(2,3);
 			
-	d3Vector angs = Euler::matrixToAngles(A);
+	d3Vector angs = EulerDynamo::matrixToAngles(A);
 	
 	tdrot = -RAD2DEG(angs[2]);
 	tilt  = -RAD2DEG(angs[1]);

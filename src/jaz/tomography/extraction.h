@@ -178,8 +178,8 @@ void TomoExtraction::extractAt2D_Fourier(
 	for (int f = 0; f < fc; f++)
 	{
 		integralShift[f] = gravis::d2Vector(
-                round(centers[f].x) - s/2,
-                round(centers[f].y) - s/2);
+				round(centers[f].x) - s/2,
+				round(centers[f].y) - s/2);
 	}
 	
 	extractSquares(stack, s, s, integralShift, smallStack, false, num_threads);
@@ -206,11 +206,13 @@ void TomoExtraction::extractAt2D_Fourier(
 			projOut[f](1,3) += sb/2 - centers[f].y;
 		}
 		
-        posInNewImg[f] = (centers[f] - integralShift[f]) / bin;
+		posInNewImg[f] = (centers[f] - integralShift[f]) / bin;
 	}	
 	
 	BufferedImage<tComplex<T>> smallStackFS(sh,s,fc);
 	
+	// @TODO: excise 'no_subpixel_shift'
+
 	if (no_subpixel_shift && bin == 1.0)
 	{
 		NewStackHelper::FourierTransformStack(smallStack, smallStackFS, true, num_threads);

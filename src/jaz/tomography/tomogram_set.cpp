@@ -176,6 +176,11 @@ void TomogramSet::setFiducialsFile(int tomogramIndex, const std::string &filenam
 	globalTable.setValue(EMDL_TOMO_FIDUCIALS_STARFILE, filename, tomogramIndex);
 }
 
+void TomogramSet::setDefocusSlope(int tomogramIndex, double slope)
+{
+	globalTable.setValue(EMDL_TOMO_DEFOCUS_SLOPE, slope, tomogramIndex);
+}
+
 Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 {
 	Tomogram out;
@@ -265,7 +270,16 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 	}
 	else
 	{
-		out.fiducialsFilename;
+		out.fiducialsFilename = "";
+	}
+
+	if (globalTable.labelExists(EMDL_TOMO_DEFOCUS_SLOPE))
+	{
+		 globalTable.getValue(EMDL_TOMO_DEFOCUS_SLOPE, out.defocusSlope, index);
+	}
+	else
+	{
+		out.defocusSlope = 1.0;
 	}
 	
 	return out;

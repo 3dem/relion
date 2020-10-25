@@ -60,8 +60,6 @@ d2Vector TomoIsoMagFit::computeErrorAndSlope(
 	const double pixelSize0 = tomogram.optics.pixelSize;
 	const double ba0 = pixelSize0 * boxSize;
 
-	const double pixelSize = pixelSize0 / mag;
-
 	const int s = boxSize;
 	const int sh = s/2 + 1;
 
@@ -96,7 +94,7 @@ d2Vector TomoIsoMagFit::computeErrorAndSlope(
 
 		const d3Vector pos = particleSet.getPosition(particle_id);
 		const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
-					particle_id, fc, pixelSize);
+					particle_id, fc, pixelSize0);
 
 		d4Matrix projCut;
 
@@ -114,7 +112,7 @@ d2Vector TomoIsoMagFit::computeErrorAndSlope(
 
 
 			const d4Matrix particleToTomo = particleSet.getMatrix4x4(
-						particle_id, s, s, s);
+					particle_id, s, s, s);
 
 			d4Matrix projPart;
 
@@ -232,3 +230,308 @@ d2Vector TomoIsoMagFit::computeErrorAndSlope(
 
 	return out;
 }
+
+TomoAnisoMagFit::TomoAnisoMagFit(
+		const std::vector<ParticleIndex>& particle_indices,
+		const Tomogram& tomogram,
+		const ParticleSet& particleSet,
+		const TomoReferenceMap& referenceMap,
+		const BufferedImage<float>& freqWeights,
+		int boxSize,
+		int first_frame,
+		int last_frame,
+		int num_threads)
+:
+	TomoMagFit(
+		particle_indices, tomogram, particleSet, referenceMap, freqWeights,
+		boxSize, first_frame, last_frame, num_threads)
+{
+
+}
+
+BufferedImage<Equation2x2> TomoAnisoMagFit::computeEquations()
+{
+	const int pc = particle_indices.size();
+	const int fc = tomogram.frameCount;
+
+	const double pixelSize = tomogram.optics.pixelSize;
+
+	const int s = boxSize;
+	const int sh = s/2 + 1;
+
+	const int data_pad = 2;
+
+	std::vector<BufferedImage<Equation2x2>> equations_per_thread(
+					data_pad * num_threads, BufferedImage<Equation2x2>(sh,s));
+
+
+	#pragma omp parallel for num_threads(num_threads)
+	for (int p = 0; p < pc; p++)
+	{
+		const int th = omp_get_thread_num();
+
+		const ParticleIndex particle_id = particle_indices[p];
+
+		const d3Vector pos = particleSet.getPosition(particle_id);
+		const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
+					particle_id, fc, pixelSize);
+
+		d4Matrix projCut;
+
+		BufferedImage<fComplex> observation(sh,s);
+
+		for (int f = first_frame; f <= last_frame; f++)
+		{
+			TomoExtraction::extractFrameAt3D_Fourier(
+					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f],
+					traj[f], observation, projCut, 1, false, true);
+
+			observation *= -1.f;
+
+			const d4Matrix particleToTomo = particleSet.getMatrix4x4(
+					particle_id, s, s, s);
+
+			d4Matrix projPart = projCut * particleToTomo;
+
+			const int hs = particleSet.getHalfSet(particle_id);
+
+			BufferedImage<fComplex> prediction(sh,s);
+			BufferedImage<t2Vector<fComplex>> predGradient(sh,s);
+
+			ForwardProjection::forwardProject(
+					referenceMap.image_FS[hs], {projPart}, prediction, 1);
+
+			ForwardProjection::forwardProject2DGradient(
+					referenceMap.image_FS[hs], {projPart}, predGradient, 1);
+
+
+			const double dz0 = tomogram.getDepthOffset(f, pos);
+			const double deltaF = tomogram.handedness * tomogram.optics.pixelSize * dz0;
+
+			CTF ctf_part = tomogram.centralCTFs[f];
+
+			ctf_part.DeltafU += deltaF;
+			ctf_part.DeltafV += deltaF;
+
+			ctf_part.initialise();
+
+
+			MagnificationHelper::updateScale(
+					prediction, predGradient, observation, freqWeights.getConstSliceRef(f),
+					ctf_part, pixelSize, equations_per_thread[data_pad * th]);
+		}
+	}
+
+	BufferedImage<Equation2x2> equations(sh,s);
+
+	for (int th = 0; th < num_threads; th++)
+	{
+		equations += equations_per_thread[data_pad * th];
+	}
+
+	return equations;
+}
+
+std::vector<BufferedImage<Equation2x2>> TomoAnisoMagFit::computeEquations_even_odd()
+{
+	const int pc = particle_indices.size();
+	const int fc = tomogram.frameCount;
+
+	const double pixelSize = tomogram.optics.pixelSize;
+
+	const int s = boxSize;
+	const int sh = s/2 + 1;
+
+	const int data_pad = 2;
+
+	std::vector<std::vector<BufferedImage<Equation2x2>>> equations_per_thread(
+				3, std::vector<BufferedImage<Equation2x2>>(
+					data_pad * num_threads, BufferedImage<Equation2x2>(sh,s)));
+
+	#pragma omp parallel for num_threads(num_threads)
+	for (int p = 0; p < pc; p++)
+	{
+		const int th = omp_get_thread_num();
+
+		const ParticleIndex particle_id = particle_indices[p];
+
+		const d3Vector pos = particleSet.getPosition(particle_id);
+		const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
+					particle_id, fc, pixelSize);
+
+		d4Matrix projCut;
+
+		BufferedImage<fComplex> observation(sh,s);
+
+		for (int f = first_frame; f <= last_frame; f++)
+		{
+			TomoExtraction::extractFrameAt3D_Fourier(
+					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f],
+					traj[f], observation, projCut, 1, false, true);
+
+			observation *= -1.f;
+
+			const d4Matrix particleToTomo = particleSet.getMatrix4x4(
+					particle_id, s, s, s);
+
+			d4Matrix projPart = projCut * particleToTomo;
+
+			const int hs = particleSet.getHalfSet(particle_id);
+
+			BufferedImage<fComplex> prediction(sh,s);
+			BufferedImage<t2Vector<fComplex>> predGradient(sh,s);
+
+			ForwardProjection::forwardProject(
+					referenceMap.image_FS[hs], {projPart}, prediction, 1);
+
+			ForwardProjection::forwardProject2DGradient(
+					referenceMap.image_FS[hs], {projPart}, predGradient, 1);
+
+
+			const double dz0 = tomogram.getDepthOffset(f, pos);
+			const double deltaF = tomogram.handedness * tomogram.optics.pixelSize * dz0;
+
+			CTF ctf_part = tomogram.centralCTFs[f];
+
+			ctf_part.DeltafU += deltaF;
+			ctf_part.DeltafV += deltaF;
+
+			ctf_part.initialise();
+
+
+			MagnificationHelper::updateScale(
+					prediction, predGradient, observation, freqWeights.getConstSliceRef(f),
+					ctf_part, pixelSize, equations_per_thread[0][data_pad * th]);
+
+			if (f%2 == 0)
+			{
+				MagnificationHelper::updateScale(
+						prediction, predGradient, observation, freqWeights.getConstSliceRef(f),
+						ctf_part, pixelSize, equations_per_thread[1][data_pad * th]);
+			}
+			else
+			{
+				MagnificationHelper::updateScale(
+						prediction, predGradient, observation, freqWeights.getConstSliceRef(f),
+						ctf_part, pixelSize, equations_per_thread[2][data_pad * th]);
+			}
+		}
+	}
+
+	std::vector<BufferedImage<Equation2x2>> equations(3,
+				BufferedImage<Equation2x2>(sh,s));
+
+	for (int i = 0; i < 3; i++)
+	{
+		for (int th = 0; th < num_threads; th++)
+		{
+			equations[i] += equations_per_thread[i][data_pad * th];
+		}
+	}
+
+	return equations;
+}
+
+BufferedImage<double> TomoAnisoMagFit::computePerPixelSlope(const RawImage<Equation2x2> &equations)
+{
+	return MagnificationHelper::solvePerPixel(equations);
+}
+
+double TomoAnisoMagFit::evaluateMag(const d2Matrix& M)
+{
+	const int pc = particle_indices.size();
+	const int fc = tomogram.frameCount;
+
+	const double pixelSize = tomogram.optics.pixelSize;
+	const double ba = pixelSize * boxSize;
+
+	const int s = boxSize;
+	const int sh = s/2 + 1;
+
+	const int data_pad = 256;
+	const float scale = -1;
+
+	std::vector<double> L2_per_thread(num_threads * data_pad, 0.0);
+
+	const d4Matrix M4t(
+			M(0,0), M(1,0), 0.0, 0.0,
+			M(0,1), M(1,1), 0.0, 0.0,
+			   0.0,    0.0, 1.0, 0.0,
+			   0.0,    0.0, 0.0, 1.0);
+
+	#pragma omp parallel for num_threads(num_threads)
+	for (int p = 0; p < pc; p++)
+	{
+		const int th = omp_get_thread_num();
+
+		const ParticleIndex particle_id = particle_indices[p];
+
+		const d3Vector pos = particleSet.getPosition(particle_id);
+		const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
+					particle_id, fc, pixelSize);
+
+		d4Matrix projCut;
+
+		BufferedImage<fComplex> observation(sh,s);
+
+		for (int f = first_frame; f <= last_frame; f++)
+		{
+			TomoExtraction::extractFrameAt3D_Fourier(
+					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f],
+					traj[f], observation, projCut, 1, false, true);
+
+			const d4Matrix particleToTomo = particleSet.getMatrix4x4(
+					particle_id, s, s, s);
+
+			d4Matrix projPart = M4t * projCut * particleToTomo;
+
+			const int hs = particleSet.getHalfSet(particle_id);
+
+			BufferedImage<fComplex> prediction(sh,s);
+
+			ForwardProjection::forwardProject(
+					referenceMap.image_FS[hs], {projPart}, prediction, 1);
+
+			const double dz0 = tomogram.getDepthOffset(f, pos);
+			const double deltaF = tomogram.handedness * tomogram.optics.pixelSize * dz0;
+
+			CTF ctf_part = tomogram.centralCTFs[f];
+
+			ctf_part.DeltafU += deltaF;
+			ctf_part.DeltafV += deltaF;
+
+			ctf_part.initialise();
+
+			for (int y = 0; y < s;  y++)
+			for (int x = 0; x < sh; x++)
+			{
+				const double xp = x;
+				const double yp = y < s/2? y : y - s;
+
+				const double xa = xp / ba;
+				const double ya = yp / ba;
+
+				const double gamma = ctf_part.getLowOrderGamma(xa,ya);
+
+				const float c = -scale * sin(gamma);
+
+				const float wg = freqWeights(x,y,f);
+
+				const fComplex pred = prediction(x,y);
+				const fComplex dF = c * pred - observation(x,y);
+
+				L2_per_thread[th * data_pad] += wg * dF.norm();
+			}
+		}
+	}
+
+	double L2 = 0.0;
+
+	for (int th = 0; th < num_threads; th++)
+	{
+		L2 += L2_per_thread[data_pad * th];
+	}
+
+	return L2;
+}
+

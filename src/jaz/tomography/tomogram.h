@@ -8,7 +8,8 @@
 #include <src/ctf.h>
 #include "tomolist.h"
 
-
+class ParticleIndex;
+class ParticleSet;
 
 class Tomogram
 {
@@ -31,6 +32,7 @@ class Tomogram
 			int w0, h0, d0;
 			std::vector<int> frameSequence;
 			std::string name, tiltSeriesFilename, fiducialsFilename;
+			double defocusSlope;
 		
 			
 		double getFrameDose() const;
@@ -46,6 +48,10 @@ class Tomogram
 
 		double getDepthOffset(int frame, gravis::d3Vector position) const;
 		CTF getCtf(int frame, gravis::d3Vector position) const;
+
+		gravis::d3Vector computeCentreOfMass(
+				const ParticleSet& particleSet,
+				const std::vector<ParticleIndex>& particle_indices) const;
 
 		Tomogram extractSubstack(gravis::d3Vector position, int width, int height) const;
 		Tomogram FourierCrop(double factor, int num_threads, bool downsampleData = true) const;

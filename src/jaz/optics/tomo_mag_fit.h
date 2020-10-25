@@ -4,6 +4,7 @@
 #include <src/jaz/tomography/tomogram.h>
 #include <src/jaz/tomography/particle_set.h>
 #include <src/jaz/tomography/reference_map.h>
+#include <src/jaz/optics/magnification_helper.h>
 
 
 class TomoMagFit
@@ -50,6 +51,32 @@ class TomoIsoMagFit : public TomoMagFit
 				double mag,
 				bool consider_image_scale,
 				bool consider_defocus_stretch);
+};
+
+class TomoAnisoMagFit : public TomoMagFit
+{
+	public:
+
+		TomoAnisoMagFit(
+				const std::vector<ParticleIndex>& particle_indices,
+				const Tomogram& tomogram,
+				const ParticleSet& particleSet,
+				const TomoReferenceMap& referenceMap,
+				const BufferedImage<float>& freqWeights,
+				int boxSize,
+				int first_frame,
+				int last_frame,
+				int num_threads);
+
+		BufferedImage<Equation2x2> computeEquations();
+		std::vector<BufferedImage<Equation2x2>> computeEquations_even_odd();
+
+		BufferedImage<double> computePerPixelSlope(
+				const RawImage<Equation2x2>& equations);
+
+		double evaluateMag(const gravis::d2Matrix& M);
+
+
 };
 
 #endif

@@ -65,8 +65,8 @@ class DefocusRefinementProgram : public RefinementProgram
 				bool flip_value,
 				int num_threads);
 
-		std::vector<gravis::d2Vector> computeSlopeCost(
-				int f,
+		std::vector<gravis::d3Vector> computeSlopeCost(
+				double max_dose,
 				double m0, double m1, int steps,
 				const ParticleSet& dataSet,
 				std::vector<ParticleIndex>& particles, int max_particles,
@@ -101,7 +101,7 @@ class DefocusRefinementProgram : public RefinementProgram
 				int size);
 
 		void writeSlopeCost(
-				const std::vector<gravis::d2Vector>& cost,
+				const std::vector<gravis::d3Vector>& cost,
 				const std::string& filename);
 };
 
