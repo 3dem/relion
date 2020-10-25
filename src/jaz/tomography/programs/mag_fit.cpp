@@ -92,6 +92,9 @@ void MagFitProgram::run()
 		dataSet.checkTrajectoryLengths(
 				particles[t][0], pc, fc, "MagFitProgram::run");
 
+		const int first_frame = specified_first_frame;
+		const int last_frame = (specified_last_frame > 0 && specified_last_frame < fc)? specified_last_frame : fc-1;
+
 		/*{
 			const double pixelSize0 = tomogram.optics.pixelSize;
 

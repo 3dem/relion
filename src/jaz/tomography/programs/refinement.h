@@ -31,7 +31,7 @@ class RefinementProgram
 			
 			bool diag, timing;
 			
-			int boxSize, num_threads, first_frame, last_frame;
+			int boxSize, num_threads, specified_first_frame, specified_last_frame;
 
 			
 			

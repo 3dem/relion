@@ -135,7 +135,11 @@ void AberrationFitProgram::run()
 		lastPixelSize = tomogram.optics.pixelSize;
 		
 		std::string diagPrefix = outDir + "diag_" + ZIO::itoa(t);
-		
+
+		const int fc = tomogram.frameCount;
+		const int first_frame = specified_first_frame;
+		const int last_frame = (specified_last_frame > 0 && specified_last_frame < fc)? specified_last_frame : fc-1;
+
 		
 		BufferedImage<float> frqWeight = computeFrequencyWeights(
 			tomogram, true, 1.0, 0.0, num_threads);

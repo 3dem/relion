@@ -147,8 +147,8 @@ void DefocusRefinementProgram::run()
 			}
 		}
 				
-		const int f0 = first_frame;
-		const int f1 = (last_frame > 0 && last_frame < fc)? last_frame : fc-1;
+		const int first_frame = specified_first_frame;
+		const int last_frame = (specified_last_frame > 0 && specified_last_frame < fc)? specified_last_frame : fc-1;
 		
 		std::vector<double> defocusOffset(fc, 0.0), offsetStdDev(fc, 0.0);
 		
@@ -161,7 +161,7 @@ void DefocusRefinementProgram::run()
 
 		if (do_slowScan || do_refineFast)
 		{
-			for (int f = f0; f <= f1; f++)
+			for (int f = first_frame; f <= last_frame; f++)
 			{
 				Log::beginSection("Frame " + ZIO::itoa(f+1));
 
@@ -610,7 +610,7 @@ std::vector<d3Vector> DefocusRefinementProgram::computeSlopeCost(
 
 	std::vector<int> good_frames;
 
-	for (int f = first_frame; f <= last_frame; f++)
+	for (int f = 0; f < fc; f++)
 	{
 		if (tomogram.cumulativeDose[f] < max_dose)
 		{
@@ -621,8 +621,9 @@ std::vector<d3Vector> DefocusRefinementProgram::computeSlopeCost(
 
 	Log::beginProgress(
 		"Evaluating defocus slopes from "
-		+ZIO::itoa(m0)+" to "+ZIO::itoa(m1),
+		+ZIO::itoa(m0)+" to "+ZIO::itoa(m1)+" using "+ZIO::itoa(good_frames.size())+" frames",
 		good_frames.size() * pc / num_threads);
+
 
 	for (int ff = 0; ff < good_frames.size(); ff++)
 	{
