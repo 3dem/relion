@@ -221,7 +221,7 @@ void BackprojectProgram::run()
 			
 			TomoExtraction::extractAt3D_Fourier(
 					tomogram.stack, s02D, binning, tomogram.projectionMatrices, traj,
-					particleStack[th], projCut, inner_threads, no_subpix_off, true);
+					particleStack[th], projCut, inner_threads, true);
 			
 			const d4Matrix particleToTomo = dataSet.getMatrix4x4(part_id, s,s,s);
 			

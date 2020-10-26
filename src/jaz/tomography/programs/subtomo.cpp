@@ -233,13 +233,12 @@ void SubtomoProgram::run()
 			
 			BufferedImage<fComplex> particleStack = BufferedImage<fComplex>(sh2D,s2D,fc);
 			BufferedImage<float> weightStack(sh2D,s2D,fc);
-			
-			const bool noSubpixelShift = false;
+
 			const bool circleCrop = false;
 			
 			TomoExtraction::extractAt3D_Fourier(
 					tomogram.stack, s02D, binning, tomogram.projectionMatrices, traj,
-					particleStack, projCut, inner_thread_num, noSubpixelShift, circleCrop);
+					particleStack, projCut, inner_thread_num, circleCrop);
 			
 			
 			if (!do_ctf) weightStack.fill(1.f);

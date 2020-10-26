@@ -89,13 +89,13 @@ inline gravis::t4Vector<gravis::d3Matrix>
 		 dsc,  dcc,   0,
 		  0,   0,     0  );
 	
-	return gravis::t4Vector<gravis::d3Matrix>(				
+	return gravis::t4Vector<gravis::d3Matrix>(
 		// d_A / d_phi:
-		Rz * Ry * dRx,				
+		Rz * Ry * dRx,
 		// d_A / d_theta:
-		Rz * dRy * Rx,				
+		Rz * dRy * Rx,
 		// d_A / d_chi:
-		dRz * Ry * Rx,				
+		dRz * Ry * Rx,
 		// A:
 		Rz * Ry * Rx
 	);		

@@ -1,4 +1,4 @@
-#include "mag_fit.h"
+#include "local_particle_refine.h"
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
 #include <src/jaz/tomography/particle_set.h>
@@ -13,6 +13,8 @@
 #include <src/jaz/optics/aberration_fit.h>
 #include <src/jaz/optics/tomo_mag_fit.h>
 #include <src/jaz/tomography/projection/fwd_projection.h>
+#include <src/jaz/tomography/local_particle_refinement.h>
+#include <src/jaz/math/Tait_Bryan_angles.h>
 
 #include <src/jaz/math/Euler_angles_relion.h>
 #include <src/euler.h>
@@ -24,7 +26,7 @@ using namespace gravis;
 using namespace aberration;
 
 
-MagFitProgram::MagFitProgram(int argc, char *argv[])
+LocalParticleRefineProgram::LocalParticleRefineProgram(int argc, char *argv[])
 :	RefinementProgram(argc, argv)
 {
 	IOParser parser;
@@ -32,7 +34,7 @@ MagFitProgram::MagFitProgram(int argc, char *argv[])
 	readParams(parser);
 }
 
-void MagFitProgram::readParams(IOParser &parser)
+void LocalParticleRefineProgram::readParams(IOParser &parser)
 {
 	try
 	{
@@ -57,7 +59,7 @@ void MagFitProgram::readParams(IOParser &parser)
 	}
 }
 
-void MagFitProgram::run()
+void LocalParticleRefineProgram::run()
 {
 	Log::beginSection("Initialising");
 
@@ -69,9 +71,11 @@ void MagFitProgram::run()
 	const int gc = dataSet.numberOfOpticsGroups();
 	const bool flip_value = true;
 
+	AberrationsCache aberrationsCache(dataSet.optTable, boxSize);
+
 	Log::endSection();
 
-	for (int t = 0; t < tc; t++)
+	for (int t = 0; t < 1; t++)
 	{
 		int pc = particles[t].size();
 		if (pc == 0) continue;
@@ -86,31 +90,44 @@ void MagFitProgram::run()
 		BufferedImage<float> freqWeights = computeFrequencyWeights(
 			tomogram, true, 0.0, 0.0, num_threads);
 
+		freqWeights.write("DEBUG_freqWeights.mrc");
+
 		dataSet.checkTrajectoryLengths(
-				particles[t][0], pc, fc, "MagFitProgram::run");
+				particles[t][0], pc, fc, "LocalParticleRefineProgram::run");
 
 		const int first_frame = specified_first_frame;
 		const int last_frame = (specified_last_frame > 0 && specified_last_frame < fc)? specified_last_frame : fc-1;
 
 
-		TomoAnisoMagFit anisoFit(
-			particles[t],
-			tomogram,
-			dataSet,
-			referenceMap,
-			freqWeights,
-			boxSize,
-			first_frame,
-			last_frame,
-			num_threads);
+		for (int p = 0; p < 15; p++)
+		{
+			LocalParticleRefinement refinement(
+					particles[t][p], dataSet, tomogram, referenceMap,
+					freqWeights, aberrationsCache, false);
 
-		Log::print("Estimating magnification matrix");
+			const std::vector<double> initial {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
-		BufferedImage<Equation2x2> equations = anisoFit.computeEquations();
-		d2Matrix magMatrix = MagnificationHelper::solveLinearly(equations);
+			const std::vector<double> optimal = NelderMead::optimize(
+						initial, refinement, 2, 0.001, 300, 1, 2, 0.5, 0.5, false);
 
-		std::cout << magMatrix << std::endl;
+			{
+				for (int j = 0; j < 3; j++)
+				{
+					std::cout << optimal[j] << "  ";
+				}
 
+				std::cout << " : ";
+
+				for (int j = 3; j < 6; j++)
+				{
+					std::cout << optimal[j] << "  ";
+				}
+
+				std::cout << "   ->  ";
+			}
+
+			std::cout << "f = " << refinement.f(optimal, 0) << std::endl;
+		}
 
 		Log::endSection();
 	}

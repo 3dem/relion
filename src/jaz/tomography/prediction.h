@@ -9,7 +9,6 @@
 #include "reference_map.h"
 
 class CTF;
-class TomoList;
 class Tomogram;
 
 

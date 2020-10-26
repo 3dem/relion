@@ -44,6 +44,8 @@ class Optimization
 		
 		virtual void report(int iteration, double cost, const std::vector<double>& x) const 
 		{
+			std::cout.precision(16);
+
 			if (iteration == 0) 
 			{
 				return;
