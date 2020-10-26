@@ -1888,8 +1888,11 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 			command += " --topaz_train";
 			if (joboptions["do_topaz_train_parts"].getBoolean())
 			{
-				error_message ="ERROR: do_topaz_train_parts not yet implemented...";
-				return false;
+				command += " --topaz_train_parts " + joboptions["topaz_train_parts"].getString();
+				// Output new version: no longer save coords_suffix nodetype, but 2-column list of micrographs and coordinate files
+				Node nodet(outputname + "input_training_coords.star", NODE_MIC_COORDS);
+				outputNodes.push_back(nodet);
+
 			}
 			else
 			{

@@ -55,7 +55,7 @@ int main(int argc, char *argv[])
 		}
 
 		MPI_Barrier(MPI_COMM_WORLD);
-		if (prm.getRank() == 0)
+		if (prm.getRank() == 0 && !prm.do_topaz_train)
 			prm.generatePDFLogfile();
 	}
 

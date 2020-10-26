@@ -200,8 +200,8 @@ public:
 	// Device ID for topaz
 	int topaz_device_id;
 
-	// Filename for picks to be used for topaz training
-	FileName topaz_train_picks;
+	// Filename for picks or particles star file to be used for topaz training
+	FileName topaz_train_picks, topaz_train_parts;
 
 	// Metadata table for training picks
 	MetaDataTable MDtrain;
@@ -394,8 +394,8 @@ public:
 			RFLOAT tube_length_min_pix,
 			int skip_side, float scale);
 
+	MetaDataTable getMDtrainFromParticleStar(MetaDataTable &MDparts);
 	MetaDataTable readTopazCoordinates(FileName fn_coord, int _topaz_downscale = 1);
-	void writeTopazCoordinates(FileName fn_coord, MetaDataTable &MDcoord, int _topaz_downscale = 1);
 
 	void trainTopaz();
 	void autoPickTopazOneMicrograph(FileName &fn_mic, int rank = 0);

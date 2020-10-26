@@ -49,7 +49,8 @@ int main(int argc, char *argv[])
 			else prm.run();
 		}
 
-		prm.generatePDFLogfile();
+		if (!prm.do_topaz_train)
+			prm.generatePDFLogfile();
 
 #ifdef TIMING
 		std::cout << "timings:" << std::endl;
