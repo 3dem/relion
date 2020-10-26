@@ -71,8 +71,9 @@ void FrameAlignmentProgram::run()
 	Log::printBinaryChoice("Frame shifts: ", const_shifts, "static", "variable");
 	Log::printBinaryChoice("Particle positions: ", const_particles, "static", "variable");
 	Log::endSection();
-	
-	
+
+	AberrationsCache aberrationsCache(dataSet.optTable, boxSize);
+
 	TomogramSet tomogramSetOut = tomogramSet;
 	
 	for (int t = 0; t < tc; t++)
@@ -104,13 +105,17 @@ void FrameAlignmentProgram::run()
 		
 		
 		std::vector<BufferedImage<double>> CCs = Prediction::computeCroppedCCs(
-				dataSet, particles[t], tomogram, referenceMap, frqWeight, dummySeq,
+				dataSet, particles[t], tomogram, aberrationsCache,
+				referenceMap, frqWeight, dummySeq,
 				range, flip_value, num_threads, padding);
 		
-		
-		if (first_frame > 0 || last_frame >= 0)
+
+		const int first_frame = specified_first_frame;
+		const int last_frame = (specified_last_frame > 0 && specified_last_frame < fc)? specified_last_frame : fc-1;
+
+		if (first_frame > 0 || last_frame < fc-1)
 		{
-			#pragma omp parallel for num_threads(num_threads)		
+			#pragma omp parallel for num_threads(num_threads)
 			for (int p = 0; p < pc; p++)
 			{
 				for (int ff = 0; ff < fc; ff++)
@@ -218,6 +223,6 @@ void FrameAlignmentProgram::run()
 	
 	if (!shiftOnly)
 	{
-		dataSet->write(outDir + "particles.star");
+		dataSet.write(outDir + "particles.star");
 	}
 }

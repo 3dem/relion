@@ -23,7 +23,7 @@
 
 #include <src/image.h>
 #include <src/jaz/optimization/optimization.h>
-#include <src/jaz/single_particle/gravis/t2Vector.h>
+#include <src/jaz/gravis/t2Vector.h>
 #include <vector>
 
 class LocalMotionFit : public DifferentiableOptimization

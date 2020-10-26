@@ -22,7 +22,7 @@
 #define THREE_HYPERPARAMETER_PROBLEM_H
 
 #include <src/jaz/optimization/optimization.h>
-#include <src/jaz/single_particle/gravis/t3Vector.h>
+#include <src/jaz/gravis/t3Vector.h>
 
 class MotionParamEstimator;
 

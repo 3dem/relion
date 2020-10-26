@@ -11,16 +11,16 @@ class FCC
 	public:
 		
 		static BufferedImage<double> compute(
-				ParticleSet* dataSet,
-				const std::vector<int>& partIndices,
+				const ParticleSet& dataSet,
+				const std::vector<ParticleIndex>& partIndices,
 				const Tomogram& tomogram,
 				const std::vector<BufferedImage<fComplex>>& referenceFS,
 				bool flip_value,
 				int num_threads);
 		
 		static BufferedImage<double> compute3(
-				ParticleSet* dataSet,
-				const std::vector<int>& partIndices,
+				const ParticleSet& dataSet,
+				const std::vector<ParticleIndex>& partIndices,
 				const Tomogram& tomogram,
 				const std::vector<BufferedImage<fComplex>>& referenceFS,
 				bool flip_value,

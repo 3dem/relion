@@ -21,7 +21,7 @@
 #include <src/jaz/single_particle/img_proc/filter_helper.h>
 #include <src/jaz/single_particle/image_log.h>
 #include <src/jaz/single_particle/index_sort.h>
-#include <src/jaz/single_particle/gravis/t2Vector.h>
+#include <src/jaz/gravis/t2Vector.h>
 #include <src/jaz/math/tensor2x2.h>
 #include <src/jaz/single_particle/interpolation.h>
 

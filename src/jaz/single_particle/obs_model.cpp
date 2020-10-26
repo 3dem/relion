@@ -201,7 +201,7 @@ ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt, bool do_die_
 	if (hasTilt) hasOddZernike = true;
 }
 
-void ObservationModel::predictObservation(
+void ObservationModel::predictObservation_DC(
 		const RawImage<Complex>& reference_map,
 		const RawImage<Complex>* amplitude_map,
 		const MetaDataTable& particle_table,
@@ -258,38 +258,7 @@ void ObservationModel::predictObservation(
 
 	destination.fill(Complex(0,0));
 
-	// the maps are pre-sharpened, that seems to work better (and cost less)
-	const bool griddingCorrection = false;
-
-	if (griddingCorrection)
-	{
-		BufferedImage<Complex> data(sh_out, s_out), psf(sh_out, s_out);
-		psf.fill(Complex(0.0));
-
-		ForwardProjection::forwardProject(reference_map, Avec, data, psf, 1);
-
-		BufferedImage<RFLOAT> data_RS(s_out, s_out), psf_RS(s_out, s_out);
-
-		FFT::inverseFourierTransform(data, data_RS);
-		FFT::inverseFourierTransform(psf, psf_RS);
-
-		for (int y = 0; y < s_out; y++)
-		for (int x = 0; x < s_out; x++)
-		{
-			if (psf_RS(x,y) > 0.0)
-			{
-				data_RS(x,y) /= psf_RS(x,y);
-			}
-		}
-
-		FFT::FourierTransform(data_RS, data);
-
-		destination.copyFrom(data);
-	}
-	else
-	{
-		ForwardProjection::forwardProject_noPSF(reference_map, Avec, destination, 1);
-	}
+	ForwardProjection::forwardProject(reference_map, Avec, destination, 1);
 
 
 	if (applyShift)
@@ -306,7 +275,7 @@ void ObservationModel::predictObservation(
 			BufferedImage<Complex> ampProj(sh_out, s_out);
 			ampProj.fill(Complex(0,0));
 
-			ForwardProjection::forwardProject_noPSF(*amplitude_map, Avec, ampProj, 1);
+			ForwardProjection::forwardProject(*amplitude_map, Avec, ampProj, 1);
 
 			CTF ctf;
 			ctf.readByGroup(particle_table, this, particle_index);

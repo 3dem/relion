@@ -11,7 +11,7 @@
 #include <src/jaz/single_particle/fftw_helper.h>
 #include <src/jaz/single_particle/image_log.h>
 #include <src/jaz/single_particle/img_proc/filter_helper.h>
-#include <src/jaz/single_particle/gravis/t2Vector.h>
+#include <src/jaz/gravis/t2Vector.h>
 #include <src/jaz/single_particle/img_proc/image_op.h>
 #include <src/jaz/single_particle/img_proc/radial_avg.h>
 

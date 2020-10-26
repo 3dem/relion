@@ -3,7 +3,7 @@
 #include "motif_detection.h"
 #include "motif_alignment.h"
 #include "point_cloud.h"
-#include <src/jaz/math/Euler_angles.h>
+#include <src/jaz/math/Euler_angles_dynamo.h>
 
 
 using namespace gravis;
@@ -34,7 +34,7 @@ MotifRefinement::MotifRefinement(
 		const MotifDetection& dd = detections[d];
 		const d4Matrix& A = dd.alignment;
 		
-		const d3Vector ang = Euler::matrixToAngles(A);
+		const d3Vector ang = EulerDynamo::matrixToAngles(A);
 		
 		initialCenters[d] = d3Vector(A(0,3), A(1,3), A(2,3));
 		initialAngles[d] = d3Vector(ang[0], ang[1], ang[2]);
@@ -95,7 +95,7 @@ double MotifRefinement::f(
 			ang[i] = x[3*(mc-1) + 6*d + 3 + i];
 		}
 		
-		R[d] = Euler::anglesToMatrix3(ang[0], ang[1], ang[2]);
+		R[d] = EulerDynamo::anglesToMatrix3(ang[0], ang[1], ang[2]);
 	}
 	
 	const double r2 = tolerance * tolerance;
@@ -158,7 +158,7 @@ void MotifRefinement::grad(
 			ang[i] = x[det0 + 6*d + 3 + i];
 		}
 		
-		RdR[d] = Euler::anglesToMatrixAndDerivatives(ang[0], ang[1], ang[2]);
+		RdR[d] = EulerDynamo::anglesToMatrixAndDerivatives(ang[0], ang[1], ang[2]);
 	}
 	
 	const double r2 = tolerance * tolerance;
@@ -287,7 +287,7 @@ std::pair<Motif, std::vector<MotifDetection>> MotifRefinement::getDetections(con
 			ang[i] = x[3*(mc-1) + 6*d + 3 + i];
 		}
 		
-		d4Matrix R = Euler::anglesToMatrix4(ang[0], ang[1], ang[2]);
+		d4Matrix R = EulerDynamo::anglesToMatrix4(ang[0], ang[1], ang[2]);
 		
 		for (int i = 0; i < 3; i++)
 		{

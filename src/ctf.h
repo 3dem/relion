@@ -240,7 +240,7 @@ public:
 		return retval;
 	}
 
-	RFLOAT getGamma(RFLOAT X, RFLOAT Y) const;
+	RFLOAT getLowOrderGamma(RFLOAT X, RFLOAT Y) const;
 
 	// compute the local frequency of the ctf
 	// (i.e. the radial slope of 'double gamma' in getCTF())
@@ -345,25 +345,49 @@ public:
 	// Methods using the new data types from 2019/2020 in src/jaz/
 	
 	template <typename T>
-	void draw(int w0, int h0, double angpix, T* dest) const
+	void draw(
+		int w0, int h0, double angpix,
+		const BufferedImage<double>* gammaOffset, T* dest) const
 	{
 		const int wh = w0 / 2 + 1;
 		
 		double xs = w0 * angpix;
 		double ys = h0 * angpix;
 		
-		for (int y = 0; y < h0; y++)
-		for (int x = 0; x < wh; x++)
+		if (gammaOffset)
 		{
-			double xx = x / xs;
-			double yy = (y < h0/2? y : y - h0) / ys;
-	
-			dest[y*wh + x] = getCTF(xx,yy);
+			if (gammaOffset->ydim != h0)
+			{
+				REPORT_ERROR_STR(
+					"CTF::draw: wrong cached gamma-offset size. Box size: "
+					<< w0 << ", cache size: " << gammaOffset->ydim);
+			}
+
+			for (int y = 0; y < h0; y++)
+			for (int x = 0; x < wh; x++)
+			{
+				double xx = x / xs;
+				double yy = (y < h0/2? y : y - h0) / ys;
+
+				dest[y*wh + x] = getCTF(xx, yy, false, false, false, true, (*gammaOffset)(x,y));
+			}
+		}
+		else
+		{
+			for (int y = 0; y < h0; y++)
+			for (int x = 0; x < wh; x++)
+			{
+				double xx = x / xs;
+				double yy = (y < h0/2? y : y - h0) / ys;
+
+				dest[y*wh + x] = getCTF(xx,yy);
+			}
 		}
 	}
 	
 	template <typename T>
-	void draw_fast(int w0, int h0, double angpix, T* dest) const
+	void draw_fast(int w0, int h0, double angpix,
+				   const BufferedImage<double>* gammaOffset, T* dest) const
 	{
 		const int wh = w0 / 2 + 1;
 		
@@ -372,21 +396,51 @@ public:
 		
 		const double r2_max = wh * wh / (xs * xs);
 		
-		for (int y = 0; y < h0; y++)
-		for (int x = 0; x < wh; x++)
+		if (gammaOffset)
 		{
-			const double xx = x / xs;
-			const double yy = (y < h0/2? y : y - h0) / ys;
-			
-			const double u2 = xx * xx + yy * yy;
-			
-			if (u2 < r2_max)
+			if (gammaOffset->ydim != h0)
 			{
-				double u4 = u2 * u2;
-		
-				const double gamma = K1 * (Axx*xx*xx + 2.0*Axy*xx*yy + Ayy*yy*yy) + K2 * u4 - K5 - K3;
-				
-				dest[y*wh + x] = -sin(gamma);
+				REPORT_ERROR_STR(
+					"CTF::draw_fast: wrong cached gamma-offset size. Box size: "
+					<< w0 << ", cache size: " << gammaOffset->ydim);
+			}
+
+			for (int y = 0; y < h0; y++)
+			for (int x = 0; x < wh; x++)
+			{
+				const double xx = x / xs;
+				const double yy = (y < h0/2? y : y - h0) / ys;
+
+				const double u2 = xx * xx + yy * yy;
+
+				if (u2 < r2_max)
+				{
+					double u4 = u2 * u2;
+
+					const double gamma = K1 * (Axx*xx*xx + 2.0*Axy*xx*yy + Ayy*yy*yy) + K2 * u4 - K5 - K3 + (*gammaOffset)(x,y);
+
+					dest[y*wh + x] = -sin(gamma);
+				}
+			}
+		}
+		else
+		{
+			for (int y = 0; y < h0; y++)
+			for (int x = 0; x < wh; x++)
+			{
+				const double xx = x / xs;
+				const double yy = (y < h0/2? y : y - h0) / ys;
+
+				const double u2 = xx * xx + yy * yy;
+
+				if (u2 < r2_max)
+				{
+					double u4 = u2 * u2;
+
+					const double gamma = K1 * (Axx*xx*xx + 2.0*Axy*xx*yy + Ayy*yy*yy) + K2 * u4 - K5 - K3;
+
+					dest[y*wh + x] = -sin(gamma);
+				}
 			}
 		}
 	}
@@ -407,7 +461,7 @@ public:
 				double xx = x / xs;
 				double yy = (y < h0/2? y : y - h0) / ys;
 		
-				dest[y*wh + x] = getGamma(xx,yy);
+				dest[y*wh + x] = getLowOrderGamma(xx,yy);
 			}
 		}
 		else
@@ -420,12 +474,10 @@ public:
 				double xx = x / xs;
 				double yy = (y < h0/2? y : y - h0) / ys;
 		
-				dest[y*wh + x] = getGamma(xx,yy) + gammaOffset(x,y);
+				dest[y*wh + x] = getLowOrderGamma(xx,yy) + gammaOffset(x,y);
 			}
 		}
 	}
-	
-	BufferedImage<float> getFftwImage_float(int w0, int h0, double angpix) const;
 	
 	double setDefocusMatrix(double axx, double axy, double ayy);
 			

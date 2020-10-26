@@ -3,6 +3,7 @@
 #include "tomo_ctf_helper.h"
 #include <src/jaz/optics/damage.h>
 #include <src/jaz/image/power_spectrum.h>
+#include <src/jaz/tomography/particle_set.h>
 
 
 using namespace gravis;
@@ -62,23 +63,48 @@ BufferedImage<float> Tomogram::computeNoiseWeight(int boxSize, double binning, d
 	return out;
 }
 
-CTF Tomogram::getCtf(int frame, d3Vector position, double zOffset) const
+double Tomogram::getDepthOffset(int frame, d3Vector position) const
 {
 	const d4Matrix& projFrame = projectionMatrices[frame];
 	d4Vector pos2D = projFrame * d4Vector(position);
 	d4Vector cent2D = projFrame * d4Vector(centre);
-	
-	double dz_pos = pos2D.z - cent2D.z;
-	double dz = handedness * optics.pixelSize * dz_pos + zOffset;
-	
+
+	return pos2D.z - cent2D.z;
+}
+
+CTF Tomogram::getCtf(int frame, d3Vector position) const
+{
+	double dz_pos = getDepthOffset(frame, position);
+	double dz = handedness * optics.pixelSize * defocusSlope * dz_pos;
+
 	CTF ctf = centralCTFs[frame];
-	
+
 	ctf.DeltafU += dz;
 	ctf.DeltafV += dz;
-	
+
 	ctf.initialise();
-	
+
 	return ctf;
+}
+
+d3Vector Tomogram::computeCentreOfMass(
+		const ParticleSet& particleSet,
+		const std::vector<ParticleIndex>& particle_indices) const
+{
+	const int pc = particle_indices.size();
+
+	d3Vector centre_of_mass(0.0, 0.0, 0.0);
+
+	for (int p = 0; p < pc; p++)
+	{
+		const ParticleIndex particle_id = particle_indices[p];
+		const d3Vector pos = particleSet.getPosition(particle_id);
+		centre_of_mass += pos;
+	}
+
+	centre_of_mass /= pc;
+
+	return centre_of_mass;
 }
 
 Tomogram Tomogram::extractSubstack(d3Vector position, int width, int height) const

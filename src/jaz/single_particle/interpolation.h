@@ -23,8 +23,8 @@
 
 #include <src/image.h>
 #include <src/fftw.h>
-#include <src/jaz/single_particle/gravis/t2Vector.h>
-#include <src/jaz/single_particle/gravis/t4Matrix.h>
+#include <src/jaz/gravis/t2Vector.h>
+#include <src/jaz/gravis/t4Matrix.h>
 
 #define INTERPOL_WRAP(i,n) ((i) >= 0 ? (i) % (n) : -(i) % (n) ? (n) - (-(i) % (n)) : 0)
 

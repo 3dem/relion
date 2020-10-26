@@ -23,7 +23,7 @@
 #include <src/projector.h>
 #include <src/jaz/single_particle/img_proc/filter_helper.h>
 #include <src/jaz/optimization/nelder_mead.h>
-#include <src/jaz/single_particle/gravis/t4Matrix.h>
+#include <src/jaz/gravis/t4Matrix.h>
 
 
 std::vector<CTF> CtfHelper :: loadCtffind4(

@@ -25,8 +25,8 @@
 #include <vector>
 #include <src/error.h>
 #include <src/jaz/single_particle/index_sort.h>
-#include <src/jaz/single_particle/gravis/t3Vector.h>
-#include <src/jaz/single_particle/gravis/t3Matrix.h>
+#include <src/jaz/gravis/t3Vector.h>
+#include <src/jaz/gravis/t3Matrix.h>
 
 extern "C"
 {

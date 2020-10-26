@@ -10,11 +10,11 @@ using namespace au::edu::anu::qm::ro;
 TiltSpaceBlobFit::TiltSpaceBlobFit(
 	int sh_bands, 
 	double lambda,
-	const RawImage<float>& correlation, 
+	const RawImage<float>& correlation,
 	const RawImage<d3Vector>& directions_xz)
-	:	
+	:
 	sh_bands(sh_bands),
-    lambda(lambda),
+	lambda(lambda),
 	correlation(correlation)
 {
 	SphericalHarmonics* SH = new SphericalHarmonics(sh_bands);
@@ -84,9 +84,9 @@ double TiltSpaceBlobFit::f(
 }
 
 void TiltSpaceBlobFit::grad(
-        const std::vector<double>& x, 
-        std::vector<double>& gradDest, 
-        void *tempStorage) const
+		const std::vector<double>& x,
+		std::vector<double>& gradDest,
+		void *tempStorage) const
 {
 	const int w  = correlation.xdim;
 	const int h  = correlation.ydim;

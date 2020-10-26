@@ -535,11 +535,14 @@ enum EMDLabel
 	EMDL_TOMO_SUBTOMOGRAM_TILT,
 	EMDL_TOMO_SUBTOMOGRAM_PSI,
 	EMDL_TOMO_SUBTOMOGRAM_BINNING,
+	EMDL_TOMO_PARTICLE_INDEX,
 	EMDL_TOMO_MANIFOLD_INDEX,
 	EMDL_TOMO_MANIFOLD_TYPE,
 	EMDL_TOMO_MANIFOLD_PARAMETERS,
-	EMDL_TOMO_PARTICLE_ID,
-	EMDL_TOMO_PICK_PARTICLE_ID,
+	EMDL_TOMO_DEFOCUS_SLOPE,
+
+	EMDL_TOMO_PARTICLE_ID,       // (deprecated, use EMDL_TOMO_PARTICLE_INDEX instead)
+	EMDL_TOMO_PICK_PARTICLE_ID,  // (deprecated, use EMDL_TOMO_MANIFOLD_INDEX instead)
 
 	EMDL_UNKNOWN_LABEL,
 
@@ -1095,12 +1098,20 @@ private:
 				
 		EMDL::addLabel(EMDL_TOMO_FIDUCIALS_STARFILE, EMDL_STRING, "rlnTomoFiducialsStarFile", "STAR file containing the 3D locations of fiducial markers");
 		EMDL::addLabel(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, EMDL_DOUBLE, "rlnTomoTiltSeriesPixelSize", "Pixel size of the original tilt series");
+		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_ROT, EMDL_DOUBLE, "rlnTomoSubtomogramRot", "First Euler angle of a subtomogram (rot, in degrees)");
+		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_TILT, EMDL_DOUBLE, "rlnTomoSubtomogramTilt", "Second Euler angle of a subtomogram (tilt, in degrees)");
+		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_PSI, EMDL_DOUBLE, "rlnTomoSubtomogramPsi", "Third Euler angle of a subtomogram (psi, in degrees)");
 		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_BINNING, EMDL_DOUBLE, "rlnTomoSubtomogramBinning", "Binning level of a subtomogram");
+		
+		EMDL::addLabel(EMDL_TOMO_PARTICLE_INDEX, EMDL_INT, "rlnTomoParticleIndex", "Global index of a tomography particle");
+		EMDL::addLabel(EMDL_TOMO_MANIFOLD_INDEX, EMDL_INT, "rlnTomoManifoldIndex", "Index of a 2D manifold in a tomogram");
+		EMDL::addLabel(EMDL_TOMO_MANIFOLD_TYPE, EMDL_STRING, "rlnTomoManifoldType", "Name of the manifold type");
+		EMDL::addLabel(EMDL_TOMO_MANIFOLD_PARAMETERS, EMDL_DOUBLE_VECTOR, "rlnTomoManifoldParams", "Set of coefficients pertaining to a generic 2D manifold in a tomogram");
+		EMDL::addLabel(EMDL_TOMO_DEFOCUS_SLOPE, EMDL_DOUBLE, "rlnTomoDefocusSlope", "Rate of change of defocus over depth");
 
 		EMDL::addLabel(EMDL_TOMO_PARTICLE_ID, EMDL_INT, "rlnTomoParticleId", "Particle index");
 		EMDL::addLabel(EMDL_TOMO_PICK_PARTICLE_ID, EMDL_INT, "rlnTomoPickParticleId", "Virus Particle index");
 
-				
 		EMDL::addLabel(EMDL_UNKNOWN_LABEL, EMDL_UNKNOWN, "rlnUnknownLabel", "NON-RELION label: values will be ignored, yet maintained in the STAR file.");
 	 }
 

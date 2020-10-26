@@ -1,5 +1,5 @@
 #include "motif_alignment.h"
-#include <src/jaz/math/Euler_angles.h>
+#include <src/jaz/math/Euler_angles_dynamo.h>
 
 using namespace gravis;
 
@@ -26,7 +26,7 @@ double MotifAlignment::f(
 		const std::vector<double> &x, void *tempStorage) const
 {
 	const d3Vector t(x[TX],x[TY],x[TZ]);
-	const d3Matrix R = Euler::anglesToMatrix3(x[PHI], x[THETA], x[CHI]);
+	const d3Matrix R = EulerDynamo::anglesToMatrix3(x[PHI], x[THETA], x[CHI]);
 	
 	const double r2 = tolerance * tolerance;
 		
@@ -55,7 +55,7 @@ void MotifAlignment::grad(
 {
 	const d3Vector t(x[TX],x[TY],x[TZ]);
 	
-	const t4Vector<d3Matrix> RdR = Euler::anglesToMatrixAndDerivatives(x[PHI], x[THETA], x[CHI]);
+	const t4Vector<d3Matrix> RdR = EulerDynamo::anglesToMatrixAndDerivatives(x[PHI], x[THETA], x[CHI]);
 	
 	const d3Matrix R = RdR.w;
 	
@@ -103,7 +103,7 @@ void MotifAlignment::grad(
 
 d4Matrix MotifAlignment::getMatrix(const std::vector<double> &x)
 {
-	d4Matrix out = Euler::anglesToMatrix4(x[PHI], x[THETA], x[CHI]);
+	d4Matrix out = EulerDynamo::anglesToMatrix4(x[PHI], x[THETA], x[CHI]);
 	
 	out(0,3) = x[TX];
 	out(1,3) = x[TY];
@@ -120,7 +120,7 @@ std::vector<double> MotifAlignment::getParams(d4Matrix A)
 	out[TY] = A(1,3);
 	out[TZ] = A(2,3);
 	
-	d3Vector ang = Euler::matrixToAngles(A);
+	d3Vector ang = EulerDynamo::matrixToAngles(A);
 	
 	out[PHI]   = ang[0];
 	out[THETA] = ang[1];

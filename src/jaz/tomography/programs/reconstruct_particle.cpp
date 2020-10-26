@@ -12,6 +12,7 @@
 #include <src/jaz/tomography/tomogram_set.h>
 #include <src/jaz/tomography/particle_set.h>
 #include <src/jaz/optics/damage.h>
+#include <src/jaz/optics/aberrations_cache.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
 #include <src/time.h>
@@ -71,6 +72,25 @@ void BackprojectProgram::readParameters(int argc, char *argv[])
 		std::cerr << XE;
 		exit(1);
 	}
+
+	if (outTag.find_last_of("/") != std::string::npos)
+	{
+		std::string dir = outTag.substr(0, outTag.find_last_of("/"));
+		int res = system(("mkdir -p "+dir).c_str());
+	}
+
+	{
+		std::ofstream ofs(outTag+"_note.txt");
+
+		ofs << "Command:\n\n";
+
+		for (int i = 0; i < argc; i++)
+		{
+			ofs << argv[i] << ' ';
+		}
+
+		ofs << '\n';
+	}
 }
 
 void BackprojectProgram::run()
@@ -78,9 +98,9 @@ void BackprojectProgram::run()
 	Log::beginSection("Initialising");
 
 	TomogramSet tomoSet(tomoSetFn);
-	ParticleSet* dataSet = ParticleSet::load(particlesFn, motFn);
+	ParticleSet dataSet(particlesFn, motFn);
 
-	std::vector<std::vector<int>> particles = dataSet->splitByTomogram(tomoSet);
+	std::vector<std::vector<ParticleIndex>> particles = dataSet.splitByTomogram(tomoSet);
 	
 	const int tc = particles.size();
 	const int s = boxSize;
@@ -135,7 +155,9 @@ void BackprojectProgram::run()
 		ctfImgFS[i].fill(0.0);
 		psfImgFS[i].fill(0.0);
 	}
-	
+
+	AberrationsCache aberrationsCache(dataSet.optTable, boxSize);
+
 	Log::endSection();
 	
 	
@@ -154,7 +176,7 @@ void BackprojectProgram::run()
 		
 		const int fc = tomogram.frameCount;
 		
-		dataSet->checkTrajectoryLengths(particles[t][0], pc, fc, "backproject");
+		dataSet.checkTrajectoryLengths(particles[t][0], pc, fc, "backproject");
 		
 		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s, binning);
 		BufferedImage<float> noiseWeights;
@@ -189,10 +211,10 @@ void BackprojectProgram::run()
 				Log::updateProgress(p);
 			}
 			
-			const int part_id = particles[t][p];	
+			const ParticleIndex part_id = particles[t][p];
 			
-			const d3Vector pos = dataSet->getPosition(part_id);
-			const std::vector<d3Vector> traj = dataSet->getTrajectoryInPixels(
+			const d3Vector pos = dataSet.getPosition(part_id);
+			const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(
 						part_id, fc, tomogram.optics.pixelSize);
 			std::vector<d4Matrix> projCut(fc), projPart(fc);
 			
@@ -201,10 +223,14 @@ void BackprojectProgram::run()
 					tomogram.stack, s02D, binning, tomogram.projectionMatrices, traj,
 					particleStack[th], projCut, inner_threads, no_subpix_off, true);
 			
-			const d4Matrix particleToTomo = dataSet->getMatrix4x4(part_id, s,s,s);
+			const d4Matrix particleToTomo = dataSet.getMatrix4x4(part_id, s,s,s);
 			
-			const int halfSet = dataSet->getHalfSet(part_id);
-			
+			const int halfSet = dataSet.getHalfSet(part_id);
+
+			const int og = dataSet.getOpticsGroup(part_id);
+
+			const BufferedImage<double>* gammaOffset =
+				aberrationsCache.hasSymmetrical? &aberrationsCache.symmetrical[og] : 0;
 			
 			for (int f = 0; f < fc; f++)
 			{
@@ -215,7 +241,7 @@ void BackprojectProgram::run()
 				{
 					CTF ctf = tomogram.getCtf(f, pos);
 					BufferedImage<float> ctfImg(sh,s);
-					ctf.draw(s, s, binnedPixelSize, &ctfImg(0,0,0));
+					ctf.draw(s, s, binnedPixelSize, gammaOffset, &ctfImg(0,0,0));
 					
 					const float scale = flip_value? -1.f : 1.f;
 							
@@ -226,6 +252,26 @@ void BackprojectProgram::run()
 						
 						particleStack[th](x,y,f) *= c;
 						weightStack[th](x,y,f) = c * c;
+					}
+
+					if (aberrationsCache.hasAntisymmetrical)
+					{
+						if (aberrationsCache.phaseShift[og].ydim != s)
+						{
+							REPORT_ERROR_STR(
+								"reconstruct_particle: wrong cached phase-shift size. Box size: "
+								<< s << ", cache size: " << aberrationsCache.phaseShift[og].ydim);
+						}
+
+						for (int y = 0; y < s;  y++)
+						for (int x = 0; x < sh; x++)
+						{
+							const fComplex r = aberrationsCache.phaseShift[og](x,y);
+							const fComplex z = particleStack[th](x,y,f);
+
+							particleStack[th](x,y,f).real = z.real * r.real + z.imag * r.imag;
+							particleStack[th](x,y,f).imag = z.imag * r.real - z.real * r.imag;
+						}
 					}
 				}
 			}			

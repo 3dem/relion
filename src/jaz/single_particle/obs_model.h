@@ -27,7 +27,7 @@
 #include <src/metadata_table.h>
 #include <src/projector.h>
 #include <src/jaz/image/buffered_image.h>
-#include "gravis/t2Matrix.h"
+#include <src/jaz/gravis/t2Matrix.h>
 
 
 class BackProjector;
@@ -72,7 +72,7 @@ class ObservationModel
 
 		// Prediction //
 
-		void predictObservation(
+		void predictObservation_DC(
 				const RawImage<Complex>& reference_map,
 				const RawImage<Complex>* amplitude_map,
 				const MetaDataTable& particle_table, long int particle_index,

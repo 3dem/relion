@@ -35,8 +35,8 @@ void RefinementProgram::_readParams(IOParser &parser)
 
 	referenceMap.read(parser);
 
-	first_frame = textToInteger(parser.getOption("--f0", "First frame", "0"));
-	last_frame = textToInteger(parser.getOption("--f1", "Last frame", "-1"));
+	specified_first_frame = textToInteger(parser.getOption("--f0", "First frame", "0"));
+	specified_last_frame = textToInteger(parser.getOption("--f1", "Last frame", "-1"));
 	
 	motFn = parser.getOption("--mot", "Particle trajectories", "");
 	
@@ -70,8 +70,8 @@ void RefinementProgram::init()
 
 	tomogramSet = TomogramSet(tomoSetFn);
 	
-	dataSet = ParticleSet::load(particlesFn, motFn);
-	particles = dataSet->splitByTomogram(tomogramSet);
+	dataSet = ParticleSet(particlesFn, motFn);
+	particles = dataSet.splitByTomogram(tomogramSet);
 		
 	referenceMap.load(boxSize);
 }

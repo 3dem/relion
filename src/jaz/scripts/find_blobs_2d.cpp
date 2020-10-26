@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
 	std::string particlesFn, class_averages_filename, outDir;
 	int num_threads, max_class, min_MG, max_MG;
 	double radius, binning, additional_binning;
-	bool diag;
+	bool flip_y, diag;
 	
 	
 	IOParser parser;
@@ -46,6 +46,8 @@ int main(int argc, char *argv[])
 		particlesFn = parser.getOption("--i", "Input file (e.g. run_it023_data.star)");
 		class_averages_filename = parser.getOption("--ca", "Class averages stack");
 		radius = textToDouble(parser.getOption("--r", "Average blob radius (in bin-1 pixels)", "300"));
+		flip_y = parser.checkOption("--flip_y", "Centre of blob lies in positive y direction");
+
 		
 		max_class = textToInteger(parser.getOption("--max_class", "Last 2D class to consider", "25"));
 		min_MG = textToInteger(parser.getOption("--min_MG", "First micrograph index", "0"));
@@ -100,13 +102,13 @@ int main(int argc, char *argv[])
 		full_size.y = micrograph.ydim;
 		
 		BufferedImage<float> micrograph_binned = Resampling::FourierCrop_fullStack(
-		            micrograph, binning, num_threads, true);
+					micrograph, binning, num_threads, true);
 		
 		binned_size.x = micrograph_binned.xdim;
 		binned_size.y = micrograph_binned.ydim;
 		
 		BufferedImage<float> micrograph_binned_2 = Resampling::FourierCrop_fullStack(
-		            micrograph_binned, additional_binning, num_threads, true);
+					micrograph_binned, additional_binning, num_threads, true);
 		
 		log_size.x = micrograph_binned_2.xdim;
 		log_size.y = micrograph_binned_2.ydim;
@@ -146,7 +148,7 @@ int main(int argc, char *argv[])
 		micrograph.read(micrograph_fn);
 		
 		BufferedImage<float> micrograph_binned = Resampling::FourierCrop_fullStack(
-		            micrograph, binning, 1, true);
+					micrograph, binning, 1, true);
 		
 		if (diag)
 		{
@@ -172,7 +174,8 @@ int main(int argc, char *argv[])
 			
 				const double phi = DEG2RAD(particles.getDouble(EMDL_ORIENT_PSI, p));
 				     
-				const d2Vector predicted_centre = 
+				const d2Vector predicted_centre = flip_y?
+						(image_coord + radius * d2Vector(sin(phi), cos(phi))) / binning :
 						(image_coord - radius * d2Vector(sin(phi), cos(phi))) / binning;
 				
 				const int xi = (int)(predicted_centre.x + 0.5);

@@ -2,9 +2,9 @@
 #define PROTO_ALIGNMENT_H
 
 #include <src/jaz/optimization/optimization.h>
+#include <src/jaz/tomography/particle_set.h>
 #include <src/jaz/image/buffered_image.h>
 
-class ParticleSet;
 class CTF;
 
 class ProtoAlignment : public DifferentiableOptimization
@@ -14,8 +14,8 @@ class ProtoAlignment : public DifferentiableOptimization
 		ProtoAlignment(
 				const std::vector<BufferedImage<double>>& CCs,
 				const std::vector<gravis::d4Matrix>& frameProj, 
-				ParticleSet* dataSet,
-				const std::vector<int>& partIndices,
+				const ParticleSet& dataSet,
+				const std::vector<ParticleIndex>& partIndices,
 				const std::vector<BufferedImage<fComplex>>& referenceFS,
 				bool constParticles,
 				bool constAngles,
@@ -27,8 +27,8 @@ class ProtoAlignment : public DifferentiableOptimization
 		
 		
 			std::vector<gravis::d4Matrix> frameProj; // make a reference again
-			ParticleSet* dataSet;
-			const std::vector<int>& partIndices;
+			const ParticleSet& dataSet;
+			const std::vector<ParticleIndex>& partIndices;
 			const std::vector<BufferedImage<fComplex>>& referenceFS;
 			
 			bool constParticles, constAngles, constShifts;
@@ -51,8 +51,8 @@ class ProtoAlignment : public DifferentiableOptimization
 		
 		void shiftParticles(
 				const std::vector<double>& x,
-				const std::vector<int>& partIndices,
-				ParticleSet* target) const;
+				const std::vector<ParticleIndex>& partIndices,
+				ParticleSet& target) const;
 		
 		int getParamCount();
 		

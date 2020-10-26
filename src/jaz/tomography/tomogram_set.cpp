@@ -17,7 +17,11 @@ TomogramSet::TomogramSet(std::string filename)
 {
 	std::ifstream ifs(filename);
 
-	if (!ifs.fail())
+	if (!ifs)
+	{
+		REPORT_ERROR_STR("TomogramSet::TomogramSet: Unable to read " << filename);
+	}
+	else
 	{
 		globalTable.readStar(ifs, "global");
 		
@@ -32,10 +36,6 @@ TomogramSet::TomogramSet(std::string filename)
 			tomogramTables[t] = allTables[t+1];
 			tomogramTables[t].setName("tomo_" + ZIO::itoa(t));
 		}	
-	}
-	else
-	{
-		REPORT_ERROR_STR("TomogramSet::TomogramSet: Unable to read " << filename);
 	}
 	
 	globalTable.setName("global");
@@ -176,6 +176,11 @@ void TomogramSet::setFiducialsFile(int tomogramIndex, const std::string &filenam
 	globalTable.setValue(EMDL_TOMO_FIDUCIALS_STARFILE, filename, tomogramIndex);
 }
 
+void TomogramSet::setDefocusSlope(int tomogramIndex, double slope)
+{
+	globalTable.setValue(EMDL_TOMO_DEFOCUS_SLOPE, slope, tomogramIndex);
+}
+
 Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 {
 	Tomogram out;
@@ -195,6 +200,8 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 	{
 		out.hasImage = false;
 	}
+
+	out.tiltSeriesFilename = stackFn;
 		
 	globalTable.getValueSafely(EMDL_TOMO_SIZE_X, out.w0, index);
 	globalTable.getValueSafely(EMDL_TOMO_SIZE_Y, out.h0, index);
@@ -263,7 +270,16 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 	}
 	else
 	{
-		out.fiducialsFilename;
+		out.fiducialsFilename = "";
+	}
+
+	if (globalTable.labelExists(EMDL_TOMO_DEFOCUS_SLOPE))
+	{
+		 globalTable.getValue(EMDL_TOMO_DEFOCUS_SLOPE, out.defocusSlope, index);
+	}
+	else
+	{
+		out.defocusSlope = 1.0;
 	}
 	
 	return out;

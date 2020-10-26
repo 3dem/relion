@@ -26,7 +26,7 @@
 #include <src/image.h>
 #include <src/time.h>
 
-#include <src/jaz/single_particle/gravis/t4Vector.h>
+#include <src/jaz/gravis/t4Vector.h>
 
 
 //#define TIMING 1

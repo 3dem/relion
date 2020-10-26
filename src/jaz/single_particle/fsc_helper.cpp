@@ -19,7 +19,7 @@
  ***************************************************************************/
 
 #include <src/jaz/single_particle/fsc_helper.h>
-#include <src/jaz/single_particle/gravis/t2Matrix.h>
+#include <src/jaz/gravis/t2Matrix.h>
 #include <src/jaz/optimization/nelder_mead.h>
 
 using namespace gravis;

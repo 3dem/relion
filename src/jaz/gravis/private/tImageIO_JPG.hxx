@@ -123,8 +123,7 @@ namespace gravis
       FILE* infile;		/* source file */
       if ((infile = fopen(filename.c_str(), "rb")) == NULL)
       {
-        GRAVIS_THROW3(gravis::Exception, "Could not open file", filename);
-        return 0;
+		GRAVIS_THROW3(gravis::Exception, "Could not open file", filename);
       }
       /* We set up the normal JPEG error routines, then override error_exit. */
       struct gravis_jpg_error_mgr jerr;
@@ -185,8 +184,7 @@ namespace gravis
          */
         jpeg_destroy_decompress(&cinfo);
         fclose(infile);
-        GRAVIS_THROW3(gravis::Exception, "Could not read jpeg file", filename);
-        return;
+		GRAVIS_THROW3(gravis::Exception, "Could not read jpeg file", filename);
       }
       /* Now we can initialize the JPEG decompression object. */
       jpeg_create_decompress(&cinfo);

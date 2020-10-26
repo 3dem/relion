@@ -88,8 +88,10 @@ int main(int argc, char *argv[])
 
 	TomogramSet tomogramSet(tomoSetFn);
 
-	ParticleSet* dataSet = ParticleSet::load(particleFn);
-	std::vector<std::vector<int>> particles = dataSet->splitByTomogram(tomogramSet);
+	ParticleSet dataSet(particleFn);
+	std::vector<std::vector<ParticleIndex>> particles = dataSet.splitByTomogram(tomogramSet);
+
+	AberrationsCache aberrationsCache(dataSet.optTable, boxSize);
 
 	referenceMap.load(boxSize);
 
@@ -105,7 +107,7 @@ int main(int argc, char *argv[])
 			REPORT_ERROR_STR("Only " << pc << " particles found in tomogram " << tomoIndex);
 		}
 
-		const int part_id = particleIndex;
+		const ParticleIndex part_id(particleIndex);
 
 		Tomogram tomogram = tomogramSet.loadTomogram(tomoIndex, true);
 
@@ -117,7 +119,7 @@ int main(int argc, char *argv[])
 			BufferedImage<float> sliceRS(s,s);
 			BufferedImage<tComplex<float>> sliceFS(sh,s);
 
-			const std::vector<d3Vector> traj = dataSet->getTrajectoryInPixels(part_id, fc, tomogram.optics.pixelSize);
+			const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(part_id, fc, tomogram.optics.pixelSize);
 
 			for (int f = 0; f < fc; f++)
 			{
@@ -142,12 +144,11 @@ int main(int argc, char *argv[])
 
 		for (int f = 0; f < fc; f++)
 		{
-			CTF ctf = tomogram.getCtf(f, dataSet->getPosition(part_id));
+			CTF ctf = tomogram.getCtf(f, dataSet.getPosition(part_id));
 
 			BufferedImage<fComplex> prediction = Prediction::predictModulated(
 				part_id, dataSet, tomogram.projectionMatrices[f], s,
-				ctf,
-				tomogram.optics.pixelSize,
+				ctf, tomogram.optics.pixelSize, aberrationsCache,
 				referenceMap.image_FS,
 				oppositeHalf? Prediction::OppositeHalf : Prediction::OwnHalf,
 				predictCTF?   Prediction::AmplitudeModulated : Prediction::Unmodulated);

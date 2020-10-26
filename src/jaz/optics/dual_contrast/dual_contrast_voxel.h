@@ -24,7 +24,7 @@ class DualContrastVoxel
 		Solution solve(
 				double WienerOffset,
 				double lambda,
-				bool isotropicWiener = true);
+				bool isotropicWiener = true) const;
 
 		inline DualContrastVoxel<T>& operator += (const DualContrastVoxel<T>& rhs)
 		{
@@ -86,7 +86,7 @@ DualContrastVoxel<T> :: DualContrastVoxel()
 template <typename T>
 typename DualContrastVoxel<T>::Solution
 	DualContrastVoxel<T>::solve(
-		double WienerOffset, double lambda, bool isotropicWiener)
+		double WienerOffset, double lambda, bool isotropicWiener) const
 {
 	const double Q0 = 0.07;
 

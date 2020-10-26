@@ -18,7 +18,7 @@
 #include <src/jaz/image/color_helper.h>
 
 #ifdef HAVE_PNG
-#include <src/jaz/single_particle/gravis/tImage.h>
+#include <src/jaz/gravis/tImage.h>
 #endif
 
 #include <omp.h>

@@ -7,7 +7,7 @@
 #include <src/jaz/optics/ctf_helper.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
-#include <src/jaz/math/Euler_angles.h>
+#include <src/jaz/math/Euler_angles_dynamo.h>
 #include <src/CPlot2D.h>
 #include <src/backprojector.h>
 
@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
 			tilt = DEG2RAD(0);
 		}
 		
-		d4Matrix proj = Euler::anglesToMatrix4(phi, tilt, psi);
+		d4Matrix proj = EulerDynamo::anglesToMatrix4(phi, tilt, psi);
 				
 		if (legacy_backprojector)
 		{

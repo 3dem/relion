@@ -10,7 +10,7 @@
 #include <src/jaz/single_particle/fftw_helper.h>
 #include <src/jaz/single_particle/vtk_helper.h>
 #include <src/jaz/single_particle/image_log.h>
-#include <src/jaz/single_particle/gravis/t2Vector.h>
+#include <src/jaz/gravis/t2Vector.h>
 #include <src/jaz/image/color_helper.h>
 
 #include <src/args.h>
@@ -111,7 +111,7 @@ void AberrationEstimator::processMicrograph(
 				const double xf = x;
 				const double yf = y < sh[og]? y : y - s[og];
 
-				const double gamma_i = ctf.getGamma(xf/as, yf/as);
+				const double gamma_i = ctf.getLowOrderGamma(xf/as, yf/as);
 				const double cg = cos(gamma_i);
 				const double sg = sin(gamma_i);
 

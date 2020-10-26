@@ -40,6 +40,7 @@ class TomogramSet
 		void setDose(int tomogramIndex, int frame, double dose);
 		void setTiltSeriesFile(int tomogramIndex, const std::string& filename);
 		void setFiducialsFile(int tomogramIndex, const std::string& filename);
+		void setDefocusSlope(int tomogramIndex, double slope);
 
 		Tomogram loadTomogram(int index, bool loadImageData) const;
 		int getTomogramIndex(std::string tomogramName) const;

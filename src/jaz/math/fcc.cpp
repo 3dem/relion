@@ -9,6 +9,7 @@
 #include <src/jaz/image/centering.h>
 #include <src/jaz/image/power_spectrum.h>
 #include <src/jaz/image/radial_avg.h>
+#include <src/jaz/optics/aberrations_cache.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
 
@@ -18,8 +19,8 @@ using namespace gravis;
 
 
 BufferedImage<double> FCC::compute(
-	ParticleSet* dataSet,
-	const std::vector<int>& partIndices, 
+	const ParticleSet& dataSet,
+	const std::vector<ParticleIndex>& partIndices,
 	const Tomogram& tomogram,
 	const std::vector<BufferedImage<fComplex>>& referenceFS, 
 	bool flip_value, 
@@ -32,8 +33,8 @@ BufferedImage<double> FCC::compute(
 }
 
 BufferedImage<double> FCC::compute3(
-	ParticleSet* dataSet,
-	const std::vector<int>& partIndices,
+	const ParticleSet& dataSet,
+	const std::vector<ParticleIndex>& partIndices,
 	const Tomogram& tomogram,
 	const std::vector<BufferedImage<fComplex>>& referenceFS,
 	bool flip_value,
@@ -52,6 +53,8 @@ BufferedImage<double> FCC::compute3(
 		FCC_by_thread[th] = BufferedImage<double>(sh, fc, 3);
 		FCC_by_thread[th].fill(0.0);
 	}
+
+	AberrationsCache aberrationsCache(dataSet.optTable, s);
 	
 	Log::beginProgress("Computing Fourier-cylinder correlations", pc/num_threads);
 		
@@ -65,9 +68,9 @@ BufferedImage<double> FCC::compute3(
 			Log::updateProgress(p);
 		}
 		
-		const int part_id = partIndices[p];
+		const ParticleIndex part_id = partIndices[p];
 		
-		const std::vector<d3Vector> traj = dataSet->getTrajectoryInPixels(part_id, fc, tomogram.optics.pixelSize);
+		const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(part_id, fc, tomogram.optics.pixelSize);
 		d4Matrix projCut;
 				
 		BufferedImage<fComplex> observation(sh,s);
@@ -80,8 +83,9 @@ BufferedImage<double> FCC::compute3(
 
 			BufferedImage<fComplex> prediction = Prediction::predictModulated(
 					part_id, dataSet, projCut, s,
-					tomogram.getCtf(f, dataSet->getPosition(part_id)),
+					tomogram.getCtf(f, dataSet.getPosition(part_id)),
 					tomogram.optics.pixelSize,
+					aberrationsCache,
 					referenceFS,
 					Prediction::OppositeHalf,
 					Prediction::AmplitudeAndPhaseModulated);

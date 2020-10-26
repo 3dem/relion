@@ -23,9 +23,9 @@
 
 #include <vector>
 #include <src/image.h>
-#include <src/jaz/single_particle/gravis/t2Vector.h>
-#include <src/jaz/single_particle/gravis/t3Vector.h>
-#include <src/jaz/single_particle/gravis/t4Vector.h>
+#include <src/jaz/gravis/t2Vector.h>
+#include <src/jaz/gravis/t3Vector.h>
+#include <src/jaz/gravis/t4Vector.h>
 #include <src/jaz/optimization/optimization.h>
 
 class CorruptedGaussFit : public Optimization
