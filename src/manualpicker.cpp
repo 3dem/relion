@@ -48,6 +48,7 @@ RFLOAT global_white_val;
 RFLOAT global_micscale;
 RFLOAT global_ctfscale;
 RFLOAT global_ctfsigma;
+RFLOAT global_minimum_fom;
 RFLOAT global_blue_value;
 RFLOAT global_red_value;
 int    global_total_count;
@@ -78,7 +79,28 @@ void cb_viewmic(Fl_Widget* w, void* data)
 			if (exists(fn_coord))
 			{
 				MDcoord.read(fn_coord);
-				my_nr_picked = MDcoord.numberOfObjects();
+				if (fabs(global_minimum_fom + 9999.) > 1e-6)
+				{
+					if (MDcoord.containsLabel(EMDL_PARTICLE_AUTOPICK_FOM))
+					{
+						my_nr_picked = 0;
+						FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDcoord)
+						{
+							RFLOAT fom;
+							MDcoord.getValue(EMDL_PARTICLE_AUTOPICK_FOM, fom);
+							if (fom > global_minimum_fom) my_nr_picked++;
+						}
+					}
+					else
+					{
+						my_nr_picked = MDcoord.numberOfObjects();
+					}
+
+				}
+				else
+				{
+					my_nr_picked = MDcoord.numberOfObjects();
+				}
 			}
 			else
 			{
@@ -117,6 +139,10 @@ void cb_viewmic(Fl_Widget* w, void* data)
 		if (global_pick_startend)
 			command += " --pick_start_end ";
 
+		if (fabs(global_minimum_fom + 9999.) > 1e-6)
+		{
+			command += " --minimum_pick_fom " + floatToString(global_minimum_fom);
+		}
 		if (global_color_label != "")
 		{
 			command += " --color_label " + global_color_label;
@@ -524,7 +550,29 @@ void manualpickerGuiWindow::cb_menubar_recount_i()
 		if (exists(fn_coord))
 		{
 			MDcoord.read(fn_coord);
-			my_nr_picked = MDcoord.numberOfObjects();
+
+			if (fabs(global_minimum_fom + 9999.) > 1e-6)
+			{
+				if (MDcoord.containsLabel(EMDL_PARTICLE_AUTOPICK_FOM))
+				{
+					my_nr_picked = 0;
+					FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDcoord)
+					{
+						RFLOAT fom;
+						MDcoord.getValue(EMDL_PARTICLE_AUTOPICK_FOM, fom);
+						if (fom > global_minimum_fom) my_nr_picked++;
+					}
+				}
+				else
+				{
+					my_nr_picked = MDcoord.numberOfObjects();
+				}
+
+			}
+			else
+			{
+				my_nr_picked = MDcoord.numberOfObjects();
+			}
 		}
 		else
 		{
@@ -577,10 +625,9 @@ void ManualPicker::read(int argc, char **argv)
 	global_sigma_contrast  = textToFloat(parser.getOption("--sigma_contrast", "Set white and black pixel values this many times the image stddev from the mean (default is auto-contrast)", "0"));
 	global_lowpass = textToFloat(parser.getOption("--lowpass", "Lowpass filter in Angstroms for the micrograph (0 for no filtering)","0"));
 	global_highpass = textToFloat(parser.getOption("--highpass", "Highpass filter in Angstroms for the micrograph (0 for no filtering)","0"));
-
 	global_ctfscale = textToFloat(parser.getOption("--ctf_scale", "Relative scale for the CTF-image display", "1"));
 	global_ctfsigma = textToFloat(parser.getOption("--ctf_sigma_contrast", "Sigma-contrast for the CTF-image display", "3"));
-
+	global_minimum_fom = textToFloat(parser.getOption("--minimum_pick_fom", "Minimum value for rlnAutopickFigureOfMerit to display picks", "-9999."));
 	// coloring
 	global_fn_color = parser.getOption("--color_star", "STAR file with a column for red-blue coloring (a subset of) the particles", "");
 	global_color_label = parser.getOption("--color_label", "MetaDataLabel to color particles on (e.g. rlnParticleSelectZScore)", "");

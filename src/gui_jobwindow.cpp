@@ -671,7 +671,15 @@ void JobWindow::initialiseManualpickWindow()
 	place ("do_startend");
 
 	current_y += STEPY/2;
-	place("ctfscale");
+
+	group7 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group7->end();
+	place("do_fom_threshold", TOGGLE_DEACTIVATE, group7);
+	group7->begin();
+	place("minimum_pick_fom", TOGGLE_DEACTIVATE);
+	group7->end();
+	guientries["do_fom_threshold"].cb_menu_i();
+
 
 	tab2->end();
 	tab3->begin();
@@ -951,6 +959,17 @@ Pixels values higher than this many times the image stddev will be replaced with
 	place("rescale", TOGGLE_DEACTIVATE);
 	group4->end();
 	guientries["do_rescale"].cb_menu_i();
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	group7 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group7->end();
+	place("do_fom_threshold", TOGGLE_DEACTIVATE, group7);
+	group7->begin();
+	place("minimum_pick_fom", TOGGLE_DEACTIVATE);
+	group7->end();
+	guientries["do_fom_threshold"].cb_menu_i();
 
 	tab2->end();
 	tab3->begin();

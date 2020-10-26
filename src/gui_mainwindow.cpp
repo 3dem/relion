@@ -1805,9 +1805,11 @@ void GuiMainWindow::cb_display_io_node_i()
 			if (myangpix > 0.)
 				command += " --angpix " + manualpickjob.joboptions["angpix"].getString();
 
-			command += " --ctf_scale " + manualpickjob.joboptions["ctfscale"].getString();
-
 			command += " --particle_diameter " + manualpickjob.joboptions["diameter"].getString();
+			if (manualpickjob.joboptions["do_fom_threshold"].getBoolean())
+			{
+				command += " --minimum_pick_fom " + manualpickjob.joboptions["minimum_pick_fom"].getString();
+			}
 
 			if (manualpickjob.joboptions["do_color"].getBoolean())
 			{
@@ -3508,6 +3510,8 @@ Please also cite relevant papers when you used external programs or their algori
 * Symmetry relaxation:\n\
     Ilca et al. (2019) Nature (PMID: 31142835) \n\
     Abrishami et al. (2020) Prog. Biophys. Mol. Biol. (PMID: 32470354) \n\n\
+* Topaz auto-picking:\n\
+    Bepler et al. (2019) Nature Methods (PMID: 31591578) \n\
 * Postscript plots are made using CPlot2D from http://www.amzsaki.com\n\n\
 \
 About the start up screen:\n\n\

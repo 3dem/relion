@@ -149,7 +149,8 @@ public:
 	int fillSingleViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale);
 	int fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale, RFLOAT _coord_scale,
 	                           int _particle_radius, bool do_startend = false, FileName _fn_coords = "",
-	                           FileName _fn_color = "", FileName _fn_mic= "", FileName _color_label = "", RFLOAT _color_blue_value = 0., RFLOAT _color_red_value = 1.);
+	                           FileName _fn_color = "", FileName _fn_mic= "", FileName _color_label = "", RFLOAT _color_blue_value = 0., RFLOAT _color_red_value = 1.,
+							   RFLOAT _minimum_pick_fom = -999.);
 };
 
 class basisViewerCanvas : public Fl_Widget
@@ -390,6 +391,9 @@ public:
 	// FileName of the STAR file that contains the color-based column
 	FileName fn_color;
 
+	// Minimum value for rlnAutopickFigureOfMerit to display picks
+	RFLOAT minimum_pick_fom;
+
 	// Label to base coloring on
 	EMDLabel color_label;
 
@@ -564,6 +568,9 @@ public:
 
 	// Values for blue and red coloring
 	RFLOAT color_blue_value, color_red_value;
+
+	// Minimum value for rlnAutopickFigureOfMerit to display picks
+	RFLOAT minimum_pick_fom;
 
 	// Tablename to read from in the input STAR file
 	FileName table_name;

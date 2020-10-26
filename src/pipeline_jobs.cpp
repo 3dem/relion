@@ -1650,7 +1650,8 @@ to the average PLUS this value times the standard deviation. Use zero to set the
 
 	joboptions["do_startend"] = JobOption("Pick start-end coordinates helices?", false, "If set to true, start and end coordinates are picked subsequently and a line will be drawn between each pair");
 
-	joboptions["ctfscale"] = JobOption("Scale for CTF image:", 1, 0.1, 2, 0.1, "CTFFINDs CTF image (with the Thonrings) will be displayed at this relative scale, i.e. a value of 0.5 means that only every second pixel will be displayed." );
+	joboptions["do_fom_threshold"] = JobOption("Use autopick FOM threshold?", false, "If set to Yes, only particles with rlnAutopickFigureOfMerit values below the threshold below will be extracted.");
+	joboptions["minimum_pick_fom"] = JobOption("Minimum autopick FOM: ", 0, -5, 10, 0.1, "The minimum value for the rlnAutopickFigureOfMerit for particles to be extracted.");
 
 	joboptions["do_color"] = JobOption("Blue<>red color particles?", false, "If set to true, then the circles for each particles are coloured from red to blue (or the other way around) for a given metadatalabel. If this metadatalabel is not in the picked coordinates STAR file \
 (basically only the rlnAutopickFigureOfMerit or rlnClassNumber) would be useful values there, then you may provide an additional STAR file (e.g. after classification/refinement below. Particles with values -999, or that are not in the additional STAR file will be coloured the default color: green");
@@ -1711,7 +1712,10 @@ bool RelionJob::getCommandsManualpickJob(std::string &outputname, std::vector<st
 		command += " --angpix " + joboptions["angpix"].getString();
 	if (error_message != "") return false;
 
-	command += " --ctf_scale " + joboptions["ctfscale"].getString();
+	if (joboptions["do_fom_threshold"].getBoolean())
+	{
+		command += " --minimum_pick_fom " + joboptions["minimum_pick_fom"].getString();
+	}
 
 	command += " --particle_diameter " + joboptions["diameter"].getString();
 
@@ -2088,6 +2092,8 @@ Pixels values higher than this many times the image stddev will be replaced with
 Pixels values higher than this many times the image stddev will be replaced with values from a Gaussian distribution. \n \n Use negative value to switch off dust removal.");
 	joboptions["do_rescale"] = JobOption("Rescale particles?", false, "If set to Yes, particles will be re-scaled. Note that the particle diameter below will be in the down-scaled images.");
 	joboptions["rescale"] = JobOption("Re-scaled size (pixels): ", 128, 64, 512, 8, "The re-scaled value needs to be an even number");
+	joboptions["do_fom_threshold"] = JobOption("Use autopick FOM threshold?", false, "If set to Yes, only particles with rlnAutopickFigureOfMerit values below the threshold below will be extracted.");
+	joboptions["minimum_pick_fom"] = JobOption("Minimum autopick FOM: ", 0, -5, 10, 0.1, "The minimum value for the rlnAutopickFigureOfMerit for particles to be extracted.");
 
 	joboptions["do_extract_helix"] = JobOption("Extract helical segments?", false, "Set to Yes if you want to extract helical segments. RELION (.star), EMAN2 (.box) and XIMDISP (.coords) formats of tube or segment coordinates are supported.");
 	joboptions["helical_tube_outer_diameter"] = JobOption("Tube diameter (A): ", 200, 100, 1000, 10, "Outer diameter (in Angstroms) of helical tubes. \
@@ -2186,6 +2192,11 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 	command += " --part_dir " + outputname;
 	command += " --extract";
 	command += " --extract_size " + joboptions["extract_size"].getString();
+
+	if (joboptions["do_fom_threshold"].getBoolean())
+	{
+		command += " --minimum_pick_fom " + joboptions["minimum_pick_fom"].getString();
+	}
 
 	// Operate stuff
 	// Get an integer number for the bg_radius

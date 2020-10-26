@@ -712,12 +712,21 @@ void AutoPicker::initialise(int rank)
 				std::cout << " + Setting topaz downscale factor to " << topaz_downscale << " (assuming resnet8 model and 2*particle_diameter receptive box)" << std::endl;
 		}
 
-		// Get topaz_radius from 90% of particle_diameter / 2
+		// Get topaz_radius to particle_diameter / 2
 		if (topaz_radius < 0)
 		{
-			topaz_radius = (particle_diameter * 0.45) / (angpix * topaz_downscale);
-			if (verb > 0)
-				std::cout << " + Setting topaz radius to " << topaz_radius << " downscaled pixels (based on 0.9*particle_diameter)" << std::endl;
+			if (do_topaz_train)
+			{
+				topaz_radius = (particle_diameter) / (8. * angpix * topaz_downscale); // 25% of particle radius for training!
+				if (verb > 0)
+					std::cout << " + Setting topaz radius to " << topaz_radius << " downscaled pixels (based on 25% of particle_diameter/2)" << std::endl;
+			}
+			else if (do_topaz_extract)
+			{
+				topaz_radius = (particle_diameter) / (2. * angpix * topaz_downscale); // 100% of particle radius for picking!
+				if (verb > 0)
+					std::cout << " + Setting topaz radius to " << topaz_radius << " downscaled pixels (based on particle_diameter/2)" << std::endl;
+			}
 		}
 	}
 	else
@@ -1085,6 +1094,9 @@ void AutoPicker::generatePDFLogfile()
 		long avg = 0;
 		if (fn_ori_micrographs.size() > 0) avg = ROUND((RFLOAT)total_nr_picked/fn_ori_micrographs.size());
 		std::cout << " i.e. on average there were " << avg << " particles per micrograph" << std::endl;
+		if (do_topaz_extract)
+			std::cout << " but for Topaz picking, you will want to select on rlnAutopickFigureOfMerit in the Particle extraction." << std::endl;
+
 		std::cout << " Saved list with " << nr_coord_files << " coordinate files in: " << fn_coords << std::endl;
 	}
 
@@ -2704,6 +2716,7 @@ MetaDataTable AutoPicker::getMDtrainFromParticleStar(MetaDataTable &MDparts)
 	}
 
 	FileName fn_train = fn_odir + "input_training_coords.star";
+	MDresult.setName("coordinate_files");
 	MDresult.write(fn_train);
 	std::cout << " + Written out list of input training coordinates: " << fn_train << std::endl;
 
@@ -2761,6 +2774,19 @@ MetaDataTable AutoPicker::readTopazCoordinates(FileName fn_coord,  int _topaz_do
 	}
 
 	return MDcoord;
+}
+
+void AutoPicker::preprocessTopazMicrograph(FileName fn_mic_in, int downscale, FileName fn_mic_out)
+{
+
+	Image<RFLOAT> Imic;
+	Imic.read(fn_mic_in);
+	int newxsize = (int)(XSIZE(Imic())/downscale);
+	int newysize = (int)(YSIZE(Imic())/downscale);
+	//rescale(Imic(), newxsize);
+
+	// TODO: finish this. Think about non-square micrographs!!!
+
 }
 
 void AutoPicker::trainTopaz()
@@ -2903,6 +2929,7 @@ void AutoPicker::trainTopaz()
 	if (topaz_device_id >= 0)
 		fh << " -d " << integerToString(topaz_device_id);
 	fh << " -o " << fn_odir << "proc/";
+	fh << " --affine ";
 	fh << " " << fn_odir << "raw/*.mrc";
 	fh << " " << topaz_additional_args;
 	fh << std::endl;
@@ -2910,11 +2937,11 @@ void AutoPicker::trainTopaz()
 	// Call Topaz to train the network
 	fh << fn_topaz_exe << " train ";
 	fh << " -n " << integerToString(topaz_nr_particles);
+	// Let's use 25% of particle_radius for training...
 	fh << " -r " << integerToString(topaz_radius);
 	if (topaz_device_id >= 0)
 		fh << " -d " << integerToString(topaz_device_id);
 	fh << " -o " << fn_odir << "model_training.txt";
-	fh << " --num-workers=" << integerToString(1); // TODO: nr_threads
 	fh << " --train-images=" << fn_odir << "proc/image_list_train.txt";
 	fh << " --test-images=" << fn_odir << "proc/image_list_test.txt";
 	fh << " --train-targets=" << fn_odir << "proc/target_list_train.txt";
@@ -2969,6 +2996,7 @@ void AutoPicker::autoPickTopazOneMicrograph(FileName &fn_mic, int rank)
 	if (topaz_device_id >= 0)
 		fh << " -d " << integerToString(topaz_device_id);
 	fh << " -o " << fn_odir << fn_proc;
+	fh << " --affine ";
 	fh << " " << fn_odir << fn_local_mic;
 	fh << " " << topaz_additional_args;
 	fh << std::endl;
@@ -2978,6 +3006,7 @@ void AutoPicker::autoPickTopazOneMicrograph(FileName &fn_mic, int rank)
 	fh << " -r " << integerToString(topaz_radius);
 	if (topaz_device_id >= 0)
 		fh << " -d " << integerToString(topaz_device_id);
+	fh << " -x " << integerToString(topaz_downscale);
 	fh << " -m " << topaz_model;
 	fh << " -o " << fn_odir << fn_proc << fn_local_pick;
 	fh << " " << fn_odir << fn_proc << fn_local_mic;
@@ -2989,14 +3018,16 @@ void AutoPicker::autoPickTopazOneMicrograph(FileName &fn_mic, int rank)
 	if (system(command.c_str())) std::cerr << "WARNING: there was an error in executing: " << command << std::endl;
 
 	// Now convert output .txt into Relion-style .star files!
-	MetaDataTable MDout = readTopazCoordinates(fn_odir + fn_proc + fn_local_pick, topaz_downscale);
+	// No need to pass downscale factor, as picks are already up-scaled using -x in topaz extract command above!
+	MetaDataTable MDout = readTopazCoordinates(fn_odir + fn_proc + fn_local_pick);
 	if (verb > 1)
 		std::cerr << "Picked " << MDout.numberOfObjects() << " of particles " << std::endl;
 	FileName fn_pick = getOutputRootName(fn_mic) + "_" + fn_out + ".star";
 	MDout.write(fn_pick);
 
 	// Delete rank-specific process directory to remove all intermediate results
-    command = "rm -rf " + fn_odir + fn_proc;
+    // Also delete the symlink, as otherwise the symlink will fail for the next micrograph!
+	command = "rm -rf " + fn_odir + fn_proc + " " + fno;
     if (system(command.c_str())) std::cerr << "WARNING: there was an error in executing: " << command << std::endl;
 
 }

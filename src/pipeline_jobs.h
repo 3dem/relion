@@ -46,11 +46,6 @@
 #define TOGGLE_ALWAYS_DEACTIVATE 2
 #define TOGGLE_LEAVE_ACTIVE 3
 
-#define HAS_MPI true
-#define HAS_NOT_MPI false
-#define HAS_THREAD true
-#define HAS_NOT_THREAD false
-
 #define RADIO_SAMPLING 0
 #define RADIO_NODETYPE 1
 #define RADIO_GAIN_ROTATION 2

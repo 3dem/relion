@@ -387,7 +387,8 @@ int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, Observat
 
 int basisViewerWindow::fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast,
                                               RFLOAT _scale, RFLOAT _coord_scale, int _particle_radius, bool _do_startend, FileName _fn_coords,
-                                              FileName _fn_color, FileName _fn_mic, FileName _color_label, RFLOAT _color_blue_value, RFLOAT _color_red_value)
+                                              FileName _fn_color, FileName _fn_mic, FileName _color_label, RFLOAT _color_blue_value, RFLOAT _color_red_value,
+											  RFLOAT _minimum_pick_fom)
 {
 	current_selection_type = 2; // Green
 
@@ -407,6 +408,7 @@ int basisViewerWindow::fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOA
 	canvas.color_label = EMDL::str2Label(_color_label);
 	canvas.smallest_color_value = XMIPP_MIN(_color_blue_value, _color_red_value);
 	canvas.biggest_color_value = XMIPP_MAX(_color_blue_value, _color_red_value);
+	canvas.minimum_pick_fom = _minimum_pick_fom;
 	canvas.do_blue_to_red = (_color_blue_value < _color_red_value);
 	canvas.do_read_whole_stacks = false;
 	if (_fn_coords != "" && exists(_fn_coords))
@@ -1762,6 +1764,13 @@ void pickerViewerCanvas::draw()
 		MDcoords.getValue(EMDL_IMAGE_COORD_X, xcoor);
 		MDcoords.getValue(EMDL_IMAGE_COORD_Y, ycoor);
 
+		if (MDcoords.containsLabel(EMDL_PARTICLE_AUTOPICK_FOM) && fabs(minimum_pick_fom + 9999.) > 1e-6)
+		{
+			RFLOAT fom;
+			MDcoords.getValue(EMDL_PARTICLE_AUTOPICK_FOM, fom);
+			if (fom < minimum_pick_fom) continue;
+		}
+
 		if (color_label != EMDL_UNDEFINED)
 		{
 			RFLOAT colval;
@@ -2557,6 +2566,7 @@ void Displayer::read(int argc, char **argv)
 	particle_radius *= coord_scale;
 	lowpass = textToFloat(parser.getOption("--lowpass", "Lowpass filter (in A) to filter micrograph before displaying", "0"));
 	highpass = textToFloat(parser.getOption("--highpass", "Highpass filter (in A) to filter micrograph before displaying", "0"));
+	minimum_pick_fom = textToFloat(parser.getOption("--minimum_pick_fom", "Minimum value for rlnAutopickFigureOfMerit to display picks", "-9999."));
 	fn_color = parser.getOption("--color_star", "STAR file with a column for red-blue coloring (a subset of) the particles", "");
 	color_label = parser.getOption("--color_label", "MetaDataLabel to color particles on (e.g. rlnParticleSelectZScore)", "");
 	color_blue_value = textToFloat(parser.getOption("--blue", "Value of the blue color", "1."));
@@ -2826,7 +2836,7 @@ void Displayer::run()
 		if (fn_coords=="")
 			fn_coords = fn_in.withoutExtension()+"_coords.star";
 		win.fillPickerViewerCanvas(img(), minval, maxval, sigma_contrast, scale, coord_scale, ROUND(scale*particle_radius), do_pick_startend, fn_coords,
-    		fn_color, fn_in, color_label, color_blue_value, color_red_value);
+    		fn_color, fn_in, color_label, color_blue_value, color_red_value, minimum_pick_fom);
 	}
 	else if (fn_in.isStarFile())
 	{

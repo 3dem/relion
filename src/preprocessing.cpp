@@ -73,6 +73,7 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	extract_bias_x  = textToInteger(parser.getOption("--extract_bias_x", "Bias in X-direction of picked particles (this value in pixels will be added to the coords)", "0"));
 	extract_bias_y  = textToInteger(parser.getOption("--extract_bias_y", "Bias in Y-direction of picked particles (this value in pixels will be added to the coords)", "0"));
 	only_extract_unfinished = parser.checkOption("--only_do_unfinished", "Extract only particles if the STAR file for that micrograph does not yet exist.");
+	extract_minimum_fom = textToFloat(parser.getOption("--minimum_fom", "Minimum value for rlnAutopickFigureOfMerit for particle extraction","-999."));
 
 	int perpart_section = parser.addSection("Particle operations");
 	do_project_3d = parser.checkOption("--project3d", "Project sub-tomograms along Z to generate 2D particles");
@@ -700,6 +701,25 @@ bool Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 			readCoordinates(fn_coord, MDin);
 	}
 	TIMING_TOC(TIMING_READ_COORD);
+
+	// If an extract_minimum_fom was given, remove
+	if (fabs(extract_minimum_fom + 999.) > 1e-6)
+	{
+		if (!MDin.containsLabel(EMDL_PARTICLE_AUTOPICK_FOM))
+			REPORT_ERROR("ERROR: cannot apply minimum threshold for FOM, as input coordinate file does not contain rlnAutopickFigureOfMerit label.");
+		MetaDataTable MDcopy;
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
+		{
+			RFLOAT fom;
+			MDin.getValue(EMDL_PARTICLE_AUTOPICK_FOM, fom);
+			if (fom > extract_minimum_fom)
+			{
+				MDcopy.addObject(MDin.getObject(current_object));
+			}
+		}
+		MDin = MDcopy;
+	}
+
 
 	if (MDin.numberOfObjects() > 0)
 	{

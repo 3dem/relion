@@ -209,6 +209,9 @@ public:
 	// Default ratio of picks in the test validation set
 	RFLOAT topaz_test_ratio;
 
+	// Number of topaz workers
+	int nr_topaz_threads;
+
 	// Other arguments to be passed to topaz
 	FileName topaz_additional_args;
 
@@ -397,6 +400,7 @@ public:
 	MetaDataTable getMDtrainFromParticleStar(MetaDataTable &MDparts);
 	MetaDataTable readTopazCoordinates(FileName fn_coord, int _topaz_downscale = 1);
 
+	void preprocessTopazMicrograph(FileName fn_mic_in, int downscale, FileName fn_mic_out);
 	void trainTopaz();
 	void autoPickTopazOneMicrograph(FileName &fn_mic, int rank = 0);
 	void autoPickLoGOneMicrograph(FileName &fn_mic, long int imic);
