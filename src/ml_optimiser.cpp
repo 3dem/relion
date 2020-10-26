@@ -709,23 +709,11 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	grad_fin_subset_size = textToInteger(parser.getOption("--grad_fin_subset", "Mini-batch size during the final SGD iterations", "-1"));
 	mu = textToFloat(parser.getOption("--mu", "Momentum parameter for SGD updates", "0.9"));
 
-	grad_stepsize = textToFloat(parser.getOption("--grad_stepsize", "Step size parameter for gradient optimisation.", "-1"));
-	if (grad_stepsize < 0) {
-		if (mymodel.ref_dim == 2)
-			grad_stepsize = 0.1;
-		else
-			grad_stepsize = 0.2;
-	}
-
+	grad_stepsize = textToFloat(parser.getOption("--grad_stepsize", "Step size parameter for gradient optimisation.", "0.2"));
 	grad_stepsize_scheme = parser.getOption("--grad_stepsize_scheme",
 			"Gradient step size updates scheme. Valid values are plain, <a>-2step or <a>-3step-<b>. Where <a> is the initial inflate and <b> is the final deflate factor.",
-			"");
-	if (grad_stepsize_scheme == "") {
-		if (mymodel.ref_dim == 2)
-			grad_stepsize_scheme = "3-2step";
-		else
-			grad_stepsize_scheme = "plain";
-	}
+			"plain");
+
 	write_every_grad_iter = textToInteger(parser.getOption("--grad_write_iter", "Write out model every so many iterations in SGD (default is writing out all iters)", "10"));
 	do_init_blobs = parser.checkOption("--init_blobs", "Initialize models with random Gaussians.");
 	do_som = parser.checkOption("--som", "Calculate self-organizing map instead of classification.");
@@ -4310,7 +4298,6 @@ void MlOptimiser::maximization()
 				else
 				{
 					if(do_grad) {
-
 						(wsum_model.BPref[iclass]).reconstructGrad(
 								mymodel.Iref[iclass],
 								grad_current_stepsize,
