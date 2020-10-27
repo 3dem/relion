@@ -227,6 +227,8 @@ void MotioncorrRunner::initialise()
 	{
 		MetaDataTable MDin;
 		ObservationModel::loadSafely(fn_in, obsModel, MDin, "movies", verb);
+		if (MDin.numberOfObjects() > 0 && !MDin.containsLabel(EMDL_MICROGRAPH_MOVIE_NAME))
+			REPORT_ERROR("The input STAR file does not contain the rlnMicrographMovieName column. Are you sure you imported files as movies, not single frame images?");
 
 		fn_micrographs.clear();
 		optics_group_micrographs.clear();
