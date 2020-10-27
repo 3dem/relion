@@ -2947,7 +2947,8 @@ void MlOptimiser::expectation()
 
 	// C. Calculate expected minimum angular errors (only for 3D refinements)
 	// And possibly update orientational sampling automatically
-	if (!((iter==1 && do_firstiter_cc) || do_always_cc) && !(do_skip_align || do_only_sample_tilt) && !do_grad)
+	if (!((iter==1 && do_firstiter_cc) || do_always_cc) && !(do_skip_align || do_only_sample_tilt) &&
+		(!do_grad || (iter % 10 == 0 && mymodel.nr_classes > 1 && allow_coarser_samplings)))
 	{
 		// Set the exp_metadata (but not the exp_imagedata which is not needed for calculateExpectedAngularErrors)
 		int n_trials_acc = (mymodel.ref_dim==3 && mymodel.data_dim != 3) ? 100 : 10;
@@ -4357,6 +4358,8 @@ void MlOptimiser::maximization()
 	if (verb > 0)
 		progress_bar(mymodel.nr_classes);
 
+	if (skip_class >= 0)
+		std::cerr << " Class " << skip_class << " replaced due to inactivity." << std::endl;
 }
 
 void MlOptimiser::centerClasses()
@@ -4689,7 +4692,6 @@ int MlOptimiser::maximizationGradientParameters() {
 				}
 				mymodel.class_age[drop_class_idx] = mymodel.class_age[expand_class_idx] * 0.9;
 				skip_class = drop_class_idx;
-				std::cerr << "Dropping class " << drop_class_idx << " replacing with " << expand_class_idx << std::endl;
 			}
 
 			// If SOM, sometimes expand without a drop
@@ -9148,6 +9150,7 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 	}
 
 }
+
 void MlOptimiser::updateSubsetSize(bool myverb)
 {
 	// If we're doing cisTEM-like acceleration of refinement through subsets: set the subset size here
