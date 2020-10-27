@@ -1590,6 +1590,18 @@ void basisViewerCanvas::setSelectionType()
 	win.fill();
 }
 
+void basisViewerCanvas::setFOMThreshold()
+{
+	const char *pfom;
+	std::string currentval = floatToString(minimum_pick_fom);
+	pfom =  fl_input("Minimum rlnAutopickFigureOfMerit to display: ", currentval.c_str());
+	if (pfom == NULL)
+		return;
+	std::string newval(pfom);
+	minimum_pick_fom = textToFloat(newval);
+
+}
+
 int popupSelectionTypeWindow::fill()
 {
 	color(GUI_BACKGROUND_COLOR);
@@ -1933,6 +1945,7 @@ int pickerViewerCanvas::handle(int ev)
 				{ "Reload coordinates" },
 				{ "Clear coordinates" },
 				{ "Set selection type" },
+				{ "Set FOM threshold" },
 				{ "Help" },
 				{ "Quit (CTRL-q)" },
 				{ 0 }
@@ -1952,6 +1965,11 @@ int pickerViewerCanvas::handle(int ev)
 				clearCoordinates();
 			else if ( strcmp(m->label(), "Set selection type") == 0)
 				setSelectionType();
+			else if ( strcmp(m->label(), "Set FOM threshold") == 0)
+			{
+				setFOMThreshold();
+				loadCoordinates(false);
+			}
 			else if ( strcmp(m->label(), "Help") == 0 )
 				printHelp();
 			else if ( strcmp(m->label(), "Quit (CTRL-q)") == 0 )

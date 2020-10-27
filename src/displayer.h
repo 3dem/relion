@@ -178,6 +178,9 @@ public:
 	// Read stacks at once to speed up?
 	bool do_read_whole_stacks;
 
+	// Minimum value for rlnAutopickFigureOfMerit to display picks
+	RFLOAT minimum_pick_fom;
+
 	// Constructor with w x h size of the window and a title
 	basisViewerCanvas(int X,int Y, int W, int H, const char* title=0) : Fl_Widget(X,Y,W, H, title) { }
 
@@ -188,6 +191,7 @@ public:
 	          RFLOAT lowpass = -1.0, RFLOAT highpass = -1.0);
 	void fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale = 1.);
 	void setSelectionType();
+	void setFOMThreshold();
 };
 
 class multiViewerCanvas : public basisViewerCanvas
@@ -390,9 +394,6 @@ public:
 
 	// FileName of the STAR file that contains the color-based column
 	FileName fn_color;
-
-	// Minimum value for rlnAutopickFigureOfMerit to display picks
-	RFLOAT minimum_pick_fom;
 
 	// Label to base coloring on
 	EMDLabel color_label;

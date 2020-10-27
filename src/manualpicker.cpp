@@ -252,6 +252,7 @@ int manualpickerGuiWindow::fill()
 		menubar->add("File/Invert selection",  FL_ALT+'i', cb_menubar_invert_selection, this);
 	}
 	menubar->add("File/Recount picked particles",  FL_ALT+'c', cb_menubar_recount, this);
+	menubar->add("File/Set FOM threshold",  FL_ALT+'c', cb_menubar_setFOM, this);
 	menubar->add("File/Quit", FL_ALT+'q', cb_menubar_quit, this);
 	int current_y = 25;
 
@@ -599,6 +600,24 @@ void manualpickerGuiWindow::cb_menubar_recount_i()
 	writeOutputStarfiles();
 }
 
+void manualpickerGuiWindow::cb_menubar_setFOM(Fl_Widget* w, void* v)
+{
+	manualpickerGuiWindow* T=(manualpickerGuiWindow*)v;
+	T->cb_menubar_setFOM_i();
+	T->cb_menubar_recount_i();
+}
+
+void manualpickerGuiWindow::cb_menubar_setFOM_i()
+{
+	const char *pfom;
+	std::string currentval = floatToString(global_minimum_fom);
+	pfom =  fl_input("Minimum rlnAutopickFigureOfMerit to display: ", currentval.c_str());
+	if (pfom == NULL)
+		return;
+	std::string newval(pfom);
+	global_minimum_fom = textToFloat(newval);
+
+}
 
 
 void ManualPicker::read(int argc, char **argv)
