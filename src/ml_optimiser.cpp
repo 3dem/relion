@@ -217,6 +217,18 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 		particle_diameter = textToFloat(fnt);
 
 	// Gradient related
+	fnt = parser.getOption("--grad_em_iters", "Number of iterations at the end of a gradient refinement using Expectation-Maximization", "OLD");
+	if (fnt != "OLD")
+		grad_em_iters = textToInteger(fnt);
+
+	fnt = parser.getOption("--grad_stepsize", "Step size parameter for gradient optimisation.", "OLD");
+	if (fnt != "OLD")
+		grad_stepsize = textToFloat(fnt);
+
+	fnt = parser.getOption("--grad_stepsize_scheme", "Gradient step size updates scheme. Valid values are plain, <a>-2step or <a>-3step-<b>. Where <a> is the initial inflate and <b> is the final deflate factor.", "OLD");
+	if (fnt != "OLD")
+		grad_stepsize_scheme = fnt;
+
 	fnt = parser.getOption("--grad_ini_frac", "Fraction of iterations in the initial phase of refinement", "OLD");
 	if (fnt != "OLD")
 		grad_ini_frac = textToFloat(fnt);
@@ -677,11 +689,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 
 	// SGD stuff
 	int grad_section = parser.addSection("Stochastic Gradient Descent");
-	do_grad = parser.checkOption("--grad", "Perform gradient based optimisation (instead of default expectation-maximization)");
-	if (do_grad) {
-		do_mom1 = true;
-		do_mom2 = true;
-	}
+	gradient_refine = parser.checkOption("--grad", "Perform gradient based optimisation (instead of default expectation-maximization)");
+	grad_em_iters = textToInteger(parser.getOption("--grad_em_iters", "Number of iterations at the end of a gradient refinement using Expectation-Maximization", "1"));
 	// Stochastic EM is implemented as a variant of SGD, though it is really a different algorithm!
 
 	grad_ini_frac = textToFloat(parser.getOption("--grad_ini_frac", "Fraction of iterations in the initial phase of refinement", "0.2"));
@@ -709,7 +718,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	grad_fin_subset_size = textToInteger(parser.getOption("--grad_fin_subset", "Mini-batch size during the final SGD iterations", "-1"));
 	mu = textToFloat(parser.getOption("--mu", "Momentum parameter for SGD updates", "0.9"));
 
-	grad_stepsize = textToFloat(parser.getOption("--grad_stepsize", "Step size parameter for gradient optimisation.", "0.2"));
+	grad_stepsize = textToFloat(parser.getOption("--grad_stepsize", "Step size parameter for gradient optimisation.", "-1"));
 	grad_stepsize_scheme = parser.getOption("--grad_stepsize_scheme",
 			"Gradient step size updates scheme. Valid values are plain, <a>-2step or <a>-3step-<b>. Where <a> is the initial inflate and <b> is the final deflate factor.",
 			"plain");
@@ -723,7 +732,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	som_neighbour_pull = textToFloat(parser.getOption("--som_neighbour_pull", "Portion of gradient applied to connected nodes.", "0.2"));
 	class_inactivity_threshold = textToFloat(parser.getOption("--class_inactivity_threshold", "Replace classes with little activity during gradient based classification.", "0.01"));
 
-	if (do_som && !do_grad)
+	if (do_som && !gradient_refine)
 		REPORT_ERROR("SOM can only be calculated with a gradient optimization.");
 
 	if (do_som && mymodel.nr_classes < 3)
@@ -783,7 +792,7 @@ if(do_gpu)
 	// Expert options
 	int expert_section = parser.addSection("Expert options");
 	mymodel.padding_factor = textToFloat(parser.getOption("--pad", "Oversampling factor for the Fourier transforms of the references", "2"));
-	if (do_grad)
+	if (gradient_refine)
 		mymodel.padding_factor = 1;
 	ref_angpix = textToFloat(parser.getOption("--ref_angpix", "Pixel size (in A) for the input reference (default is to read from header)", "-1."));
 	mymodel.interpolator = (parser.checkOption("--NN", "Perform nearest-neighbour instead of linear Fourier-space interpolation?")) ? NEAREST_NEIGHBOUR : TRILINEAR;
@@ -974,16 +983,14 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_KEEP_TILT_PRIOR_FIXED, helical_keep_tilt_prior_fixed))
     		helical_keep_tilt_prior_fixed = false;
 	// New SGD (13Feb2018)
-	if (!MD.getValue(EMDL_OPTIMISER_DO_GRAD, do_grad))
-		do_grad = false;
-	if (do_grad) {
-		do_mom1 = true;
-		do_mom2 = true;
-	}
+	if (!MD.getValue(EMDL_OPTIMISER_DO_GRAD, gradient_refine))
+		gradient_refine = false;
+	if (!MD.getValue(EMDL_OPTIMISER_GRAD_EM_ITERS, grad_em_iters))
+		grad_em_iters = 1;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_STEPSIZE, grad_stepsize))
-		grad_stepsize = 0.1;
+		grad_stepsize = 0.2;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_STEPSIZE_SCHEME, grad_stepsize_scheme))
-		grad_stepsize_scheme = "3-2step";
+		grad_stepsize_scheme = "plain";
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_INI_FRAC, grad_ini_frac)) {
 		grad_ini_frac = 0.2;
 		grad_ini_iter = nr_iter * grad_ini_frac;
@@ -1186,7 +1193,8 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_DO_MAP, do_map);
 		MD.setValue(EMDL_OPTIMISER_FAST_SUBSETS, do_fast_subsets);
 		MD.setValue(EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT, do_external_reconstruct);
-		MD.setValue(EMDL_OPTIMISER_DO_GRAD, do_grad);
+		MD.setValue(EMDL_OPTIMISER_DO_GRAD, gradient_refine);
+		MD.setValue(EMDL_OPTIMISER_GRAD_EM_ITERS, grad_em_iters);
 		MD.setValue(EMDL_OPTIMISER_SGD_INI_FRAC, grad_ini_frac);
 		MD.setValue(EMDL_OPTIMISER_SGD_FIN_FRAC, grad_fin_frac);
 		MD.setValue(EMDL_OPTIMISER_SGD_INI_RESOL, grad_ini_resol);
@@ -1277,6 +1285,11 @@ void MlOptimiser::initialise()
 #ifdef DEBUG
 	std::cerr<<"MlOptimiser::initialise Entering"<<std::endl;
 #endif
+
+	if (gradient_refine) {
+		do_mom1 = true;
+		do_mom2 = true;
+	}
 
 	if (do_gpu)
 	{
@@ -1770,7 +1783,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		mymodel.initialiseFromImages(
 				fn_ref, is_3d_model, mydata,
 				do_average_unaligned, do_generate_seeds,refs_are_ctf_corrected,
-				ref_angpix, do_grad, do_trust_ref_size, do_mom1, do_mom2, (rank==0));
+				ref_angpix, gradient_refine, do_trust_ref_size, do_mom1, do_mom2, (rank==0));
 	}
 
 	if (mymodel.nr_classes > 1 && do_split_random_halves)
@@ -1798,7 +1811,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 		if (mymodel.nr_classes > 1)
 			REPORT_ERROR("ERROR: One cannot use multiple classes with multi-body refinement!");
-		if (do_grad)
+		if (gradient_refine)
 			REPORT_ERROR("ERROR: One cannot use SGD with multi-body refinement!");
 		if (do_helical_refine)
 			REPORT_ERROR("ERROR: One cannot use helical symmetry with multi-body refinement!");
@@ -2134,7 +2147,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 	// For new thread-parallelization: each thread does 1 particle, so nr_pool=nr_threads
 	nr_pool = x_pool*nr_threads;
 
-	if (do_grad)
+	if (gradient_refine)
 	{
 		// for continuation jobs (iter>0): could do some more iterations as specified by nr_iter
 		nr_iter = grad_ini_iter + grad_fin_iter + grad_inbetween_iter;
@@ -2174,7 +2187,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 	if (fn_mask2 != "None") checkMask(fn_mask2, 2, rank);
 
 	// Write out unmasked 2D class averages
-	do_write_unmasked_refs = (mymodel.ref_dim == 2 && !do_grad);
+	do_write_unmasked_refs = (mymodel.ref_dim == 2 && !gradient_refine);
 
 #ifdef DEBUG
 	std::cerr << "Leaving initialiseGeneral" << std::endl;
@@ -2282,9 +2295,9 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 		{
 			long int group_id = mydata.getGroupId(part_id, img_id);
 
-			if (do_grad && !doing_subsets) {
+			if (gradient_refine && !doing_subsets) {
 				mymodel.nr_particles_per_group[group_id] ++;
-				if (do_grad && mymodel.nr_particles_per_group[group_id] > grad_ini_subset_size)
+				if (gradient_refine && mymodel.nr_particles_per_group[group_id] > grad_ini_subset_size)
 					continue;
 			}
 
@@ -2443,7 +2456,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			wsum_model.sumw_group[group_id] += 1.;
 
 			// When doing SGD, only take the first grad_ini_subset_size*mymodel.nr_classes images to calculate the initial reconstruction
-			if (fn_ref == "None" && !(do_grad && part_id > grad_ini_subset_size*mymodel.nr_classes) )
+			if (fn_ref == "None" && !(gradient_refine && part_id > grad_ini_subset_size*mymodel.nr_classes) )
 			{
 
 				MultidimArray<RFLOAT> Fctf, Fweight;
@@ -2537,7 +2550,7 @@ void MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(MultidimArray<RFLOAT>
 	RFLOAT total_sum = 0.;
 	for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
 	{
-		if (doing_subsets || !do_grad)
+		if (doing_subsets || !gradient_refine)
 			mymodel.nr_particles_per_group[igroup] = ROUND(wsum_model.sumw_group[igroup]);
 		total_sum += wsum_model.sumw_group[igroup];
 	}
@@ -2733,6 +2746,9 @@ void MlOptimiser::iterate()
 #ifdef TIMING
 		timer.tic(TIMING_EXP);
 #endif
+
+		if (gradient_refine)
+			do_grad = iter <= nr_iter - grad_em_iters;
 
 		if (do_grad)
 			updateStepSize();
@@ -9158,7 +9174,7 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 		if (subset_size > mydata.numberOfParticles())
 			subset_size = -1;
 	}
-	else if (do_grad)
+	else if (gradient_refine)
 	{
 		// Do grad_ini_iter iterations with completely identical K references, sigd_ini_subset_size, enforce non-negativity and grad_ini_resol resolution limit
 		if (iter < grad_ini_iter)
@@ -9174,10 +9190,10 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 			subset_size = grad_fin_subset_size;
 		}
 
-		if (iter == nr_iter)
+		if (subset_size > mydata.numberOfParticles())
 			subset_size = mydata.numberOfParticles();
 
-		if (subset_size > mydata.numberOfParticles())
+		if (nr_iter - iter < grad_em_iters)
 			subset_size = mydata.numberOfParticles();
 	}
 
@@ -9185,10 +9201,18 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 		std::cout << " Setting subset size to " << subset_size << " particles" << std::endl;
 }
 
-void MlOptimiser::updateStepSize()
-{
+void MlOptimiser::updateStepSize() {
+	RFLOAT _stepsize;
+
+	if (grad_stepsize <= 0) {
+		if (mymodel.ref_dim == 2)
+			_stepsize = 0.2;
+		else
+			_stepsize = 0.1;
+	}
+
 	if (grad_stepsize_scheme == "plain") {
-		grad_current_stepsize = grad_stepsize;
+		grad_current_stepsize = _stepsize;
 		return;
 	}
 
@@ -9220,9 +9244,9 @@ void MlOptimiser::updateStepSize()
 		float b2 = grad_ini_iter + grad_inbetween_iter;//Sigmoid start
 		float scale1 = 1. / (pow(10, (x - b1 - a1 / 2.) / (a1 / 4.)) + 1.); //Sigmoid function
 		float scale2 = 1. / (pow(10, (x - b2 - a2 / 2.) / (a2 / 4.)) + 1.); //Sigmoid function
-		float c1 = grad_stepsize; //Baseline
-		float c = grad_stepsize / deflate; //Baseline
-		grad_current_stepsize = (grad_stepsize*inflate - c1) * scale1 + (grad_stepsize - c) * scale2 + c;
+		float c1 = _stepsize; //Baseline
+		float c = _stepsize / deflate; //Baseline
+		grad_current_stepsize = (_stepsize*inflate - c1) * scale1 + (_stepsize - c) * scale2 + c;
 		return;
 	}
 

@@ -330,9 +330,20 @@ public:
 	int nr_pool;
 
 	//////////////// Gradient optimisation
+	// If current refinement is gradient based
+	bool gradient_refine;
+
+	// Id current iteration is gradient based
 	bool do_grad;
+
+	// Track first gradient moment
 	bool do_mom1;
+
+	// Track second gradient moment
 	bool do_mom2;
+
+	// Number of iterations at the end of a gradient refinement using Expectation-Maximization
+	int grad_em_iters;
 
 	// Number of iterations in the initial phase of refinement
 	int grad_ini_iter;
