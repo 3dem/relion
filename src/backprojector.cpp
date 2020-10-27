@@ -2015,8 +2015,8 @@ void BackProjector::reconstructGrad(
 
 			if (DIRECT_A1D_ELEM(counter, i) > 0.)
 			{
-				prev = DIRECT_A1D_ELEM(prev_power, i) / DIRECT_A1D_ELEM(counter, i);
-//				diff = DIRECT_A1D_ELEM(diff_power, i) / DIRECT_A1D_ELEM(counter, i);
+//				prev = DIRECT_A1D_ELEM(prev_power, i) / DIRECT_A1D_ELEM(counter, i);
+				prev = DIRECT_A1D_ELEM(diff_power, i) / DIRECT_A1D_ELEM(counter, i);
 				diff = DIRECT_A1D_ELEM(grad_error_power, i);
 				myfsc = prev / (prev + diff/tau2_fudge);
 
