@@ -1127,13 +1127,13 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 	{
 		fn_in = joboptions["fn_in_raw"].getString();
 
-		if (fn_in.rfind("../", 0) == 0)
+		if (fn_in.rfind("../") != std::string::npos) // Forbid at any place
 		{
 			error_message = "ERROR: don't import files outside the project directory.\nPlease make a symbolic link by an absolute path before importing.";
 			return false;
 		}
 
-		if (fn_in.rfind("/", 0) == 0)
+		if (fn_in.rfind("/", 0) == 0) // Forbid only at the beginning
 		{
 			error_message = "ERROR: please import files by a relative path.\nIf you want to import files outside the project directory, make a symbolic link by an absolute path and\nimport the symbolic link by a relative path.";
 			return false;
