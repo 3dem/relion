@@ -9,6 +9,7 @@
 #include <src/jaz/gravis/t2Matrix.h>
 #include <src/jaz/image/centering.h>
 #include <src/jaz/optimization/nelder_mead.h>
+#include <src/jaz/optimization/lbfgs.h>
 #include <src/jaz/optics/aberrations_cache.h>
 #include <src/jaz/optics/aberration_fit.h>
 #include <src/jaz/optics/tomo_mag_fit.h>

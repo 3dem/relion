@@ -909,7 +909,7 @@ gravis::t3Vector<tComplex<T>> Interpolation::linearXYZGradient_FftwHalf_complex(
 	const tComplex<T> vxy0_y = vx10 - vx00;
 	const tComplex<T> vxy1_y = vx11 - vx01;
 
-	const tComplex<T> vxyz_z = (1 - zf) * vxy0 + zf * vxy1;
+	const tComplex<T> vxyz_z = vxy1 - vxy0;
 
 	gravis::t3Vector<tComplex<T>> out(
 		(1 - zf) * ((1 - yf) * vx00_x + yf * vx10_x) + zf * ((1 - yf) * vx01_x + yf * vx11_x),
@@ -920,7 +920,7 @@ gravis::t3Vector<tComplex<T>> Interpolation::linearXYZGradient_FftwHalf_complex(
 	{
 		for (int i = 0; i < 3; i++)
 		{
-			out[i].imag *= -1;
+			out[i].real *= -1;
 		}
 	}
 

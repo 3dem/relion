@@ -84,7 +84,6 @@ LocalParticleRefinement::LocalParticleRefinement(
 double LocalParticleRefinement::f(const std::vector<double>& x, void* tempStorage) const
 {
 	const int s = reference.getBoxSize();
-	const int sh = s/2 + 1;
 	const int fc = tomogram.frameCount;
 	const int hs = particleSet.getHalfSet(particle_id);
 	const double pixelSize = tomogram.optics.pixelSize;
@@ -185,6 +184,21 @@ void LocalParticleRefinement::grad(const std::vector<double> &x, std::vector<dou
 		gradDest[i] = 0.0;
 	}
 
+				/*BufferedImage<double> dP3D_dphi_num_x(sh,s,fc), dP3D_dphi_num_y(sh,s,fc), dP3D_dphi_num_z(sh,s,fc);
+				BufferedImage<double> dP3D_dphi_anl_x(sh,s,fc), dP3D_dphi_anl_y(sh,s,fc), dP3D_dphi_anl_z(sh,s,fc);
+
+				BufferedImage<double> dPred_dphi_num_real(sh,s,fc), dPred_dphi_anl_real(sh,s,fc);
+				BufferedImage<double> dPred_dphi_num_imag(sh,s,fc), dPred_dphi_anl_imag(sh,s,fc);
+
+				BufferedImage<double> dPred_dP3D_x_num_real(sh,s,fc), dPred_dP3D_y_num_real(sh,s,fc), dPred_dP3D_z_num_real(sh,s,fc);
+				BufferedImage<double> dPred_dP3D_x_num_imag(sh,s,fc), dPred_dP3D_y_num_imag(sh,s,fc), dPred_dP3D_z_num_imag(sh,s,fc);
+
+				BufferedImage<double> dPred_dP3D_x_anl_real(sh,s,fc), dPred_dP3D_y_anl_real(sh,s,fc), dPred_dP3D_z_anl_real(sh,s,fc);
+				BufferedImage<double> dPred_dP3D_x_anl_imag(sh,s,fc), dPred_dP3D_y_anl_imag(sh,s,fc), dPred_dP3D_z_anl_imag(sh,s,fc);
+
+				const double eps = 1e-5;
+				const d3Matrix At_1phi = TaitBryan::anglesToMatrix3(phi+eps, theta, chi);*/
+
 
 	for (int f = 0; f < fc; f++)
 	{
@@ -198,6 +212,15 @@ void LocalParticleRefinement::grad(const std::vector<double> &x, std::vector<dou
 
 		const double tx = P(0,0) * tX + P(0,1) * tY + P(0,2) * tZ;
 		const double ty = P(1,0) * tX + P(1,1) * tY + P(1,2) * tZ;
+
+		const double dtx_dtX = P(0,0);
+		const double dtx_dtY = P(0,1);
+		const double dtx_dtZ = P(0,2);
+
+		const double dty_dtX = P(1,0);
+		const double dty_dtY = P(1,1);
+		const double dty_dtZ = P(1,2);
+
 
 		const int rad = max_radius[f];
 
@@ -229,28 +252,83 @@ void LocalParticleRefinement::grad(const std::vector<double> &x, std::vector<dou
 					const t3Vector<fComplex> dPred_dP3D = Interpolation::linearXYZGradient_FftwHalf_complex(
 						reference.image_FS[hs], p3D.x, p3D.y, p3D.z);
 
+
+
+
+							/*const d3Vector p3D_1phi = At_1phi * Pt[f] * p2D;
+							const fComplex pred_1phi = Interpolation::linearXYZ_FftwHalf_complex(
+								reference.image_FS[hs], p3D_1phi.x, p3D_1phi.y, p3D_1phi.z);
+
+							dP3D_dphi_num_x(xi,yi,f) = (p3D_1phi.x - p3D.x) / eps;
+							dP3D_dphi_num_y(xi,yi,f) = (p3D_1phi.y - p3D.y) / eps;
+							dP3D_dphi_num_z(xi,yi,f) = (p3D_1phi.z - p3D.z) / eps;
+
+							dP3D_dphi_anl_x(xi,yi,f) = dP3D_dphi.x;
+							dP3D_dphi_anl_y(xi,yi,f) = dP3D_dphi.y;
+							dP3D_dphi_anl_z(xi,yi,f) = dP3D_dphi.z;
+
+							dPred_dphi_num_real(xi,yi,f) = (pred_1phi.real - pred.real) / eps;
+							dPred_dphi_num_imag(xi,yi,f) = (pred_1phi.imag - pred.imag) / eps;
+
+							dPred_dphi_anl_real(xi,yi,f) = (
+								dPred_dP3D.x * dP3D_dphi.x + dPred_dP3D.y * dP3D_dphi.y + dPred_dP3D.z * dP3D_dphi.z ).real;
+
+							dPred_dphi_anl_imag(xi,yi,f) = (
+								dPred_dP3D.x * dP3D_dphi.x + dPred_dP3D.y * dP3D_dphi.y + dPred_dP3D.z * dP3D_dphi.z ).imag;
+
+
+							const fComplex pred_1x = Interpolation::linearXYZ_FftwHalf_complex(
+								reference.image_FS[hs], p3D.x + eps, p3D.y, p3D.z);
+
+							const fComplex pred_1y = Interpolation::linearXYZ_FftwHalf_complex(
+								reference.image_FS[hs], p3D.x, p3D.y + eps, p3D.z);
+
+							const fComplex pred_1z = Interpolation::linearXYZ_FftwHalf_complex(
+								reference.image_FS[hs], p3D.x, p3D.y, p3D.z + eps);
+
+							dPred_dP3D_x_num_real(xi,yi,f) = (pred_1x.real - pred.real) / eps;
+							dPred_dP3D_y_num_real(xi,yi,f) = (pred_1y.real - pred.real) / eps;
+							dPred_dP3D_z_num_real(xi,yi,f) = (pred_1z.real - pred.real) / eps;
+							dPred_dP3D_x_num_imag(xi,yi,f) = (pred_1x.imag - pred.imag) / eps;
+							dPred_dP3D_y_num_imag(xi,yi,f) = (pred_1y.imag - pred.imag) / eps;
+							dPred_dP3D_z_num_imag(xi,yi,f) = (pred_1z.imag - pred.imag) / eps;
+
+							dPred_dP3D_x_anl_real(xi,yi,f) = dPred_dP3D.x.real;
+							dPred_dP3D_y_anl_real(xi,yi,f) = dPred_dP3D.y.real;
+							dPred_dP3D_z_anl_real(xi,yi,f) = dPred_dP3D.z.real;
+							dPred_dP3D_x_anl_imag(xi,yi,f) = dPred_dP3D.x.imag;
+							dPred_dP3D_y_anl_imag(xi,yi,f) = dPred_dP3D.y.imag;
+							dPred_dP3D_z_anl_imag(xi,yi,f) = dPred_dP3D.z.imag;*/
+
+
+					const fComplex dPred_dphi   = (
+						dPred_dP3D.x * dP3D_dphi.x   +
+						dPred_dP3D.y * dP3D_dphi.y   +
+						dPred_dP3D.z * dP3D_dphi.z );
+
+					const fComplex dPred_dTheta = (
+						dPred_dP3D.x * dP3D_dtheta.x +
+						dPred_dP3D.y * dP3D_dtheta.y +
+						dPred_dP3D.z * dP3D_dtheta.z );
+
+					const fComplex dPred_dChi   = (
+						dPred_dP3D.x * dP3D_dchi.x   +
+						dPred_dP3D.y * dP3D_dchi.y   +
+						dPred_dP3D.z * dP3D_dchi.z );
+
+
 					const fComplex obs = observations(xi,yi,f);
 
 					const float c = -CTFs[f].getCTF(
 						xA, yA, false, false, false, true, gamma_offset);
 
 					const double t = 2.0 * PI * (tx * xp + ty * yp) / (double) s;
+					const double dt_dtx =  2.0 * PI * xp / (double) s;
+					const double dt_dty =  2.0 * PI * yp / (double) s;
 
 					const fComplex shift(cos(t), sin(t));
-
 					const fComplex dShift_dt(-sin(t), cos(t));
-					const float dt_dtx =  2.0 * PI * xp / (float) s;
-					const float dt_dty =  2.0 * PI * yp / (float) s;
 
-					const float dtx_dtX = P(0,0);
-					const float dtx_dtY = P(0,1);
-					const float dtx_dtZ = P(0,2);
-
-					const float dty_dtX = P(1,0);
-					const float dty_dtY = P(1,1);
-					const float dty_dtZ = P(1,2);
-
-					const fComplex ddF_dShift = c * pred;
 					const fComplex dShift_dtX = (dt_dtx * dtx_dtX + dt_dty * dty_dtX) * dShift_dt;
 					const fComplex dShift_dtY = (dt_dtx * dtx_dtY + dt_dty * dty_dtY) * dShift_dt;
 					const fComplex dShift_dtZ = (dt_dtx * dtx_dtZ + dt_dty * dty_dtZ) * dShift_dt;
@@ -258,37 +336,73 @@ void LocalParticleRefinement::grad(const std::vector<double> &x, std::vector<dou
 
 					const fComplex dF = c * shift * pred - obs;
 
-					const fComplex ddF_dPhi   = c * shift * (
-						dPred_dP3D.x * dP3D_dphi.x   + dPred_dP3D.y * dP3D_dphi.y   + dPred_dP3D.z * dP3D_dphi.z);
+					const fComplex ddF_dPhi   = c * shift * dPred_dphi;
+					const fComplex ddF_dTheta = c * shift * dPred_dTheta;
+					const fComplex ddF_dChi   = c * shift * dPred_dChi;
 
-					const fComplex ddF_dTheta = c * shift * (
-						dPred_dP3D.x * dP3D_dtheta.x + dPred_dP3D.y * dP3D_dtheta.y + dPred_dP3D.z * dP3D_dtheta.z);
+					const fComplex ddF_dShift = c * pred;
 
-					const fComplex ddF_dChi   = c * shift * (
-						dPred_dP3D.x * dP3D_dchi.x   + dPred_dP3D.y * dP3D_dchi.y   + dPred_dP3D.z * dP3D_dchi.z);
+					const fComplex ddF_dtX = ddF_dShift * dShift_dtX;
+					const fComplex ddF_dtY = ddF_dShift * dShift_dtY;
+					const fComplex ddF_dtZ = ddF_dShift * dShift_dtZ;
 
 
-					const fComplex alpha = 2.f * frqWeight(xi,yi,f) * dF;
+					// L2 += frqWeight(xi,yi,f) * dF.norm();
 
-					gradDest[0] += ANGLE_SCALE * alpha * (dF.real * ddF_dPhi.real   + dF.imag * ddF_dPhi.imag);
-					gradDest[1] += ANGLE_SCALE * alpha * (dF.real * ddF_dTheta.real + dF.imag * ddF_dTheta.imag);
-					gradDest[2] += ANGLE_SCALE * alpha * (dF.real * ddF_dChi.real   + dF.imag * ddF_dChi.imag);
+					const fComplex dL2_ddF = 2.f * frqWeight(xi,yi,f) * dF;
 
-					gradDest[3] += SHIFT_SCALE * alpha *
-							(dF.real * ddF_dShift.real * dShift_dtX.real +
-							 dF.imag * ddF_dShift.imag * dShift_dtX.imag);
 
-					gradDest[4] += SHIFT_SCALE * alpha *
-							(dF.real * ddF_dShift.real * dShift_dtY.real +
-							 dF.imag * ddF_dShift.imag * dShift_dtY.imag);
+					gradDest[0] += ANGLE_SCALE *
+						(dL2_ddF.real * ddF_dPhi.real   + dL2_ddF.imag * ddF_dPhi.imag);
 
-					gradDest[5] += SHIFT_SCALE * alpha *
-							(dF.real * ddF_dShift.real * dShift_dtZ.real +
-							 dF.imag * ddF_dShift.imag * dShift_dtZ.imag);
+					gradDest[1] += ANGLE_SCALE *
+						(dL2_ddF.real * ddF_dTheta.real + dL2_ddF.imag * ddF_dTheta.imag);
+
+					gradDest[2] += ANGLE_SCALE *
+						(dL2_ddF.real * ddF_dChi.real   + dL2_ddF.imag * ddF_dChi.imag);
+
+
+					gradDest[3] += SHIFT_SCALE *
+						(dL2_ddF.real * ddF_dtX.real + dL2_ddF.imag * ddF_dtX.imag);
+
+					gradDest[4] += SHIFT_SCALE *
+						(dL2_ddF.real * ddF_dtY.real + dL2_ddF.imag * ddF_dtY.imag);
+
+					gradDest[5] += SHIFT_SCALE *
+						(dL2_ddF.real * ddF_dtZ.real + dL2_ddF.imag * ddF_dtZ.imag);
 				}
 			}
 		}
 	}
+
+	/*dPred_dphi_num_real.write("DEBUG_dPred_dphi_num_real.mrc");
+	dPred_dphi_num_imag.write("DEBUG_dPred_dphi_num_imag.mrc");
+
+	dPred_dphi_anl_real.write("DEBUG_dPred_dphi_anl_real.mrc");
+	dPred_dphi_anl_imag.write("DEBUG_dPred_dphi_anl_imag.mrc");
+
+	dP3D_dphi_num_x.write("DEBUG_dP3D_dphi_num_x.mrc");
+	dP3D_dphi_num_y.write("DEBUG_dP3D_dphi_num_y.mrc");
+	dP3D_dphi_num_z.write("DEBUG_dP3D_dphi_num_z.mrc");
+	dP3D_dphi_anl_x.write("DEBUG_dP3D_dphi_anl_x.mrc");
+	dP3D_dphi_anl_y.write("DEBUG_dP3D_dphi_anl_y.mrc");
+	dP3D_dphi_anl_z.write("DEBUG_dP3D_dphi_anl_z.mrc");
+
+	dPred_dP3D_x_num_real.write("DEBUG_dPred_dP3D_x_num_real.mrc");
+	dPred_dP3D_y_num_real.write("DEBUG_dPred_dP3D_y_num_real.mrc");
+	dPred_dP3D_z_num_real.write("DEBUG_dPred_dP3D_z_num_real.mrc");
+	dPred_dP3D_x_num_imag.write("DEBUG_dPred_dP3D_x_num_imag.mrc");
+	dPred_dP3D_y_num_imag.write("DEBUG_dPred_dP3D_y_num_imag.mrc");
+	dPred_dP3D_z_num_imag.write("DEBUG_dPred_dP3D_z_num_imag.mrc");
+
+	dPred_dP3D_x_anl_real.write("DEBUG_dPred_dP3D_x_anl_real.mrc");
+	dPred_dP3D_y_anl_real.write("DEBUG_dPred_dP3D_y_anl_real.mrc");
+	dPred_dP3D_z_anl_real.write("DEBUG_dPred_dP3D_z_anl_real.mrc");
+	dPred_dP3D_x_anl_imag.write("DEBUG_dPred_dP3D_x_anl_imag.mrc");
+	dPred_dP3D_y_anl_imag.write("DEBUG_dPred_dP3D_y_anl_imag.mrc");
+	dPred_dP3D_z_anl_imag.write("DEBUG_dPred_dP3D_z_anl_imag.mrc");*/
+
+	//std::exit(0);
 }
 
 void LocalParticleRefinement::applyChange(const std::vector<double>& x, ParticleSet& target)
