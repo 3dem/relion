@@ -58,11 +58,11 @@ std::vector<double> LBFGS::optimize(
 	param.epsilon = epsilon;
 	param.xtol = xtol;
 
-    pthread_mutex_lock(&lib_lbfgs_mutex);
+	//pthread_mutex_lock(&lib_lbfgs_mutex);
     {
         ret = lbfgs(N, m_x, &fx, evaluate, progress, &adapter, &param);
     }
-    pthread_mutex_unlock(&lib_lbfgs_mutex);
+	//pthread_mutex_unlock(&lib_lbfgs_mutex);
 
     if (verbosity > 1)
     {

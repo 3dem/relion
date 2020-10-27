@@ -96,3 +96,28 @@ AberrationsCache::AberrationsCache(const MetaDataTable &opticsTable, const int s
 		}
 	}
 }
+
+void AberrationsCache::correctObservations(RawImage<fComplex> &observations, int optics_group) const
+{
+	const int sh = observations.xdim;
+	const int s  = observations.ydim;
+	const int fc = observations.zdim;
+
+	if (phaseShift[optics_group].ydim != s)
+	{
+		REPORT_ERROR_STR(
+			"reconstruct_particle: wrong cached phase-shift size. Box size: "
+			<< s << ", cache size: " << phaseShift[optics_group].ydim);
+	}
+
+	for (int f  = 0; f  < fc; f++)
+	for (int yi = 0; yi < s;  yi++)
+	for (int xi = 0; xi < sh; xi++)
+	{
+		const fComplex r = phaseShift[optics_group](xi,yi);
+		const fComplex z = observations(xi,yi,f);
+
+		observations(xi,yi,f).real = z.real * r.real + z.imag * r.imag;
+		observations(xi,yi,f).imag = z.imag * r.real - z.real * r.imag;
+	}
+}

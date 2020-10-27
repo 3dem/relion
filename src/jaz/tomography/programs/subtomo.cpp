@@ -269,28 +269,10 @@ void SubtomoProgram::run()
 						particleStack(x,y,f) *= sign * c;
 						weightStack(x,y,f) = c * c;
 					}
-
-					if (aberrationsCache.hasAntisymmetrical)
-					{
-						if (aberrationsCache.phaseShift[og].ydim != s2D)
-						{
-							REPORT_ERROR_STR(
-								"subtomo: wrong cached phase-shift size. Box size: "
-								<< s2D << ", cache size: " << aberrationsCache.phaseShift[og].ydim);
-						}
-
-						for (int y = 0; y < s2D;  y++)
-						for (int x = 0; x < sh2D; x++)
-						{
-							const fComplex r = aberrationsCache.phaseShift[og](x,y);
-							const fComplex z = particleStack(x,y,f);
-
-							particleStack(x,y,f).real = z.real * r.real + z.imag * r.imag;
-							particleStack(x,y,f).imag = z.imag * r.real - z.real * r.imag;
-						}
-					}
 				}
 			}
+
+			aberrationsCache.correctObservations(particleStack, og);
 
 			if (do_whiten)
 			{

@@ -66,17 +66,13 @@ void LocalParticleRefineProgram::run()
 
 	RefinementProgram::init();
 
-	const int s = boxSize;
-	const int sh = s/2 + 1;
 	const int tc = particles.size();
-	const int gc = dataSet.numberOfOpticsGroups();
-	const bool flip_value = true;
 
 	AberrationsCache aberrationsCache(dataSet.optTable, boxSize);
 
 	Log::endSection();
 
-	for (int t = 0; t < 1; t++)
+	for (int t = 0; t < tc; t++)
 	{
 		int pc = particles[t].size();
 		if (pc == 0) continue;
@@ -99,38 +95,61 @@ void LocalParticleRefineProgram::run()
 		const int first_frame = specified_first_frame;
 		const int last_frame = (specified_last_frame > 0 && specified_last_frame < fc)? specified_last_frame : fc-1;
 
+		const int pc_max = 36;
+		const int data_pad = 256;
 
-		for (int p = 0; p < 15; p++)
+		std::vector<double> results(pc * data_pad);
+
+
+		Log::beginProgress("Aligning particles", pc/num_threads);
+
+		#pragma omp parallel for num_threads(num_threads)
+		for (int p = 0; p < pc; p++)
 		{
+			const int th = omp_get_thread_num();
+
+			if (th == 0)
+			{
+				Log::updateProgress(p);
+			}
+
 			LocalParticleRefinement refinement(
 					particles[t][p], dataSet, tomogram, referenceMap,
 					freqWeights, aberrationsCache, false);
 
 			const std::vector<double> initial {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
-			const std::vector<double> optimal = NelderMead::optimize(
-						initial, refinement, 2, 0.001, 300, 1, 2, 0.5, 0.5, false);
+			/*const std::vector<double> optimal = NelderMead::optimize(
+						initial, refinement, 2, 0.001, 300, 1, 2, 0.5, 0.5, false);*/
 
+			const std::vector<double> optimal = LBFGS::optimize(
+						initial, refinement, false, 300, 1e-5, 1e-4);
+
+			for (int i = 0; i < 6; i++)
 			{
-				for (int j = 0; j < 3; j++)
-				{
-					std::cout << optimal[j] << "  ";
-				}
+				results[p * data_pad + i] = optimal[i];
+			}
+		}
 
-				std::cout << " : ";
+		Log::endProgress();
 
-				for (int j = 3; j < 6; j++)
-				{
-					std::cout << optimal[j] << "  ";
-				}
 
-				std::cout << "   ->  ";
+		for (int p = 0; p < pc; p++)
+		{
+			std::vector<double> opt(6);
+
+			for (int i = 0; i < 6; i++)
+			{
+				opt[i] = results[p * data_pad + i];
 			}
 
-			std::cout << "f = " << refinement.f(optimal, 0) << std::endl;
+			LocalParticleRefinement::applyChange(
+				opt, dataSet, particles[t][p], tomogram.optics.pixelSize);
 		}
 
 		Log::endSection();
 	}
+
+	dataSet.write(outDir+"particles.star");
 }
 

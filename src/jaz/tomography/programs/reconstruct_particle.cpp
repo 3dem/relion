@@ -253,28 +253,13 @@ void BackprojectProgram::run()
 						particleStack[th](x,y,f) *= c;
 						weightStack[th](x,y,f) = c * c;
 					}
-
-					if (aberrationsCache.hasAntisymmetrical)
-					{
-						if (aberrationsCache.phaseShift[og].ydim != s)
-						{
-							REPORT_ERROR_STR(
-								"reconstruct_particle: wrong cached phase-shift size. Box size: "
-								<< s << ", cache size: " << aberrationsCache.phaseShift[og].ydim);
-						}
-
-						for (int y = 0; y < s;  y++)
-						for (int x = 0; x < sh; x++)
-						{
-							const fComplex r = aberrationsCache.phaseShift[og](x,y);
-							const fComplex z = particleStack[th](x,y,f);
-
-							particleStack[th](x,y,f).real = z.real * r.real + z.imag * r.imag;
-							particleStack[th](x,y,f).imag = z.imag * r.real - z.real * r.imag;
-						}
-					}
 				}
-			}			
+			}
+
+			if (aberrationsCache.hasAntisymmetrical)
+			{
+				aberrationsCache.correctObservations(particleStack[th], og);
+			}
 
 			if (do_whiten)
 			{

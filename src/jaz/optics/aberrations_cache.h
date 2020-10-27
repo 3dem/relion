@@ -15,6 +15,9 @@ class AberrationsCache
 			bool hasSymmetrical, hasAntisymmetrical;
 			std::vector<BufferedImage<double>> symmetrical, antisymmetrical;
 			std::vector<BufferedImage<fComplex>> phaseShift;
+
+
+		void correctObservations(RawImage<fComplex>& observations, int optics_group) const;
 };
 
 #endif

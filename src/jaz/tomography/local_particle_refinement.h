@@ -41,9 +41,11 @@ class LocalParticleRefinement : public DifferentiableOptimization
 		double f(const std::vector<double>& x, void* tempStorage) const;
 		void grad(const std::vector<double>& x, std::vector<double>& gradDest, void* tempStorage) const;
 
-		void applyChange(
+		static void applyChange(
 				const std::vector<double>& x,
-				ParticleSet& target);
+				ParticleSet& target,
+				ParticleIndex particle_id,
+				double pixel_size);
 };
 
 #endif

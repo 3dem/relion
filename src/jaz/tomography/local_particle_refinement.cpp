@@ -33,6 +33,7 @@ LocalParticleRefinement::LocalParticleRefinement(
 	const int fc = tomogram.frameCount;
 	const double pixelSize = tomogram.optics.pixelSize;
 	const double ba = s * pixelSize;
+	const int og = particleSet.getOpticsGroup(particle_id);
 
 	position = particleSet.getPosition(particle_id);
 
@@ -45,7 +46,7 @@ LocalParticleRefinement::LocalParticleRefinement(
 
 	TomoExtraction::extractAt3D_Fourier(
 			tomogram.stack, s, 1.0, tomogram.projectionMatrices,
-				trajectory, observations, tomo_to_image, 1, true);
+			trajectory, observations, tomo_to_image, 1, true);
 
 	const d4Matrix particle_to_tomo = particleSet.getMatrix4x4(
 			particle_id, s, s, s);
@@ -79,18 +80,26 @@ LocalParticleRefinement::LocalParticleRefinement(
 			}
 		}
 	}
+
+	if (aberrationsCache.hasAntisymmetrical)
+	{
+		aberrationsCache.correctObservations(observations, og);
+	}
 }
 
 double LocalParticleRefinement::f(const std::vector<double>& x, void* tempStorage) const
 {
+	for (int i = 0; i < 6; i++)
+	{
+		if (isnan(x[i])) return std::numeric_limits<double>::max();
+	}
+
 	const int s = reference.getBoxSize();
 	const int fc = tomogram.frameCount;
 	const int hs = particleSet.getHalfSet(particle_id);
 	const double pixelSize = tomogram.optics.pixelSize;
 	const double ba = s * pixelSize;
-
-	// @TODO: consider aberrations
-	const double gamma_offset = 0.0;
+	const double og = particleSet.getOpticsGroup(particle_id);
 
 	const double phi   = ANGLE_SCALE * x[0];
 	const double theta = ANGLE_SCALE * x[1];
@@ -138,6 +147,9 @@ double LocalParticleRefinement::f(const std::vector<double>& x, void* tempStorag
 
 					const fComplex obs = observations(xi,yi,f);
 
+					const double gamma_offset = aberrationsCache.hasSymmetrical?
+						aberrationsCache.symmetrical[og](xi,yi) : 0.0;
+
 					const float c = -CTFs[f].getCTF(
 						xA, yA, false, false, false, true, gamma_offset);
 
@@ -153,20 +165,25 @@ double LocalParticleRefinement::f(const std::vector<double>& x, void* tempStorag
 		}
 	}
 
-	return L2;
+	const double scale = 1e7 / ((double)s * (double)s * (double)fc);
+
+	return scale * L2;
 }
 
 void LocalParticleRefinement::grad(const std::vector<double> &x, std::vector<double> &gradDest, void *tempStorage) const
 {
+	for (int i = 0; i < 6; i++)
+	{
+		if (isnan(x[i])) return;
+	}
+
 	const int s = reference.getBoxSize();
 	const int sh = s/2 + 1;
 	const int fc = tomogram.frameCount;
 	const int hs = particleSet.getHalfSet(particle_id);
 	const double pixelSize = tomogram.optics.pixelSize;
 	const double ba = s * pixelSize;
-
-	// @TODO: consider aberrations
-	const double gamma_offset = 0.0;
+	const double og = particleSet.getOpticsGroup(particle_id);
 
 	const double phi   = ANGLE_SCALE * x[0];
 	const double theta = ANGLE_SCALE * x[1];
@@ -183,22 +200,6 @@ void LocalParticleRefinement::grad(const std::vector<double> &x, std::vector<dou
 	{
 		gradDest[i] = 0.0;
 	}
-
-				/*BufferedImage<double> dP3D_dphi_num_x(sh,s,fc), dP3D_dphi_num_y(sh,s,fc), dP3D_dphi_num_z(sh,s,fc);
-				BufferedImage<double> dP3D_dphi_anl_x(sh,s,fc), dP3D_dphi_anl_y(sh,s,fc), dP3D_dphi_anl_z(sh,s,fc);
-
-				BufferedImage<double> dPred_dphi_num_real(sh,s,fc), dPred_dphi_anl_real(sh,s,fc);
-				BufferedImage<double> dPred_dphi_num_imag(sh,s,fc), dPred_dphi_anl_imag(sh,s,fc);
-
-				BufferedImage<double> dPred_dP3D_x_num_real(sh,s,fc), dPred_dP3D_y_num_real(sh,s,fc), dPred_dP3D_z_num_real(sh,s,fc);
-				BufferedImage<double> dPred_dP3D_x_num_imag(sh,s,fc), dPred_dP3D_y_num_imag(sh,s,fc), dPred_dP3D_z_num_imag(sh,s,fc);
-
-				BufferedImage<double> dPred_dP3D_x_anl_real(sh,s,fc), dPred_dP3D_y_anl_real(sh,s,fc), dPred_dP3D_z_anl_real(sh,s,fc);
-				BufferedImage<double> dPred_dP3D_x_anl_imag(sh,s,fc), dPred_dP3D_y_anl_imag(sh,s,fc), dPred_dP3D_z_anl_imag(sh,s,fc);
-
-				const double eps = 1e-5;
-				const d3Matrix At_1phi = TaitBryan::anglesToMatrix3(phi+eps, theta, chi);*/
-
 
 	for (int f = 0; f < fc; f++)
 	{
@@ -253,54 +254,6 @@ void LocalParticleRefinement::grad(const std::vector<double> &x, std::vector<dou
 						reference.image_FS[hs], p3D.x, p3D.y, p3D.z);
 
 
-
-
-							/*const d3Vector p3D_1phi = At_1phi * Pt[f] * p2D;
-							const fComplex pred_1phi = Interpolation::linearXYZ_FftwHalf_complex(
-								reference.image_FS[hs], p3D_1phi.x, p3D_1phi.y, p3D_1phi.z);
-
-							dP3D_dphi_num_x(xi,yi,f) = (p3D_1phi.x - p3D.x) / eps;
-							dP3D_dphi_num_y(xi,yi,f) = (p3D_1phi.y - p3D.y) / eps;
-							dP3D_dphi_num_z(xi,yi,f) = (p3D_1phi.z - p3D.z) / eps;
-
-							dP3D_dphi_anl_x(xi,yi,f) = dP3D_dphi.x;
-							dP3D_dphi_anl_y(xi,yi,f) = dP3D_dphi.y;
-							dP3D_dphi_anl_z(xi,yi,f) = dP3D_dphi.z;
-
-							dPred_dphi_num_real(xi,yi,f) = (pred_1phi.real - pred.real) / eps;
-							dPred_dphi_num_imag(xi,yi,f) = (pred_1phi.imag - pred.imag) / eps;
-
-							dPred_dphi_anl_real(xi,yi,f) = (
-								dPred_dP3D.x * dP3D_dphi.x + dPred_dP3D.y * dP3D_dphi.y + dPred_dP3D.z * dP3D_dphi.z ).real;
-
-							dPred_dphi_anl_imag(xi,yi,f) = (
-								dPred_dP3D.x * dP3D_dphi.x + dPred_dP3D.y * dP3D_dphi.y + dPred_dP3D.z * dP3D_dphi.z ).imag;
-
-
-							const fComplex pred_1x = Interpolation::linearXYZ_FftwHalf_complex(
-								reference.image_FS[hs], p3D.x + eps, p3D.y, p3D.z);
-
-							const fComplex pred_1y = Interpolation::linearXYZ_FftwHalf_complex(
-								reference.image_FS[hs], p3D.x, p3D.y + eps, p3D.z);
-
-							const fComplex pred_1z = Interpolation::linearXYZ_FftwHalf_complex(
-								reference.image_FS[hs], p3D.x, p3D.y, p3D.z + eps);
-
-							dPred_dP3D_x_num_real(xi,yi,f) = (pred_1x.real - pred.real) / eps;
-							dPred_dP3D_y_num_real(xi,yi,f) = (pred_1y.real - pred.real) / eps;
-							dPred_dP3D_z_num_real(xi,yi,f) = (pred_1z.real - pred.real) / eps;
-							dPred_dP3D_x_num_imag(xi,yi,f) = (pred_1x.imag - pred.imag) / eps;
-							dPred_dP3D_y_num_imag(xi,yi,f) = (pred_1y.imag - pred.imag) / eps;
-							dPred_dP3D_z_num_imag(xi,yi,f) = (pred_1z.imag - pred.imag) / eps;
-
-							dPred_dP3D_x_anl_real(xi,yi,f) = dPred_dP3D.x.real;
-							dPred_dP3D_y_anl_real(xi,yi,f) = dPred_dP3D.y.real;
-							dPred_dP3D_z_anl_real(xi,yi,f) = dPred_dP3D.z.real;
-							dPred_dP3D_x_anl_imag(xi,yi,f) = dPred_dP3D.x.imag;
-							dPred_dP3D_y_anl_imag(xi,yi,f) = dPred_dP3D.y.imag;
-							dPred_dP3D_z_anl_imag(xi,yi,f) = dPred_dP3D.z.imag;*/
-
-
 					const fComplex dPred_dphi   = (
 						dPred_dP3D.x * dP3D_dphi.x   +
 						dPred_dP3D.y * dP3D_dphi.y   +
@@ -318,6 +271,9 @@ void LocalParticleRefinement::grad(const std::vector<double> &x, std::vector<dou
 
 
 					const fComplex obs = observations(xi,yi,f);
+
+					const double gamma_offset = aberrationsCache.hasSymmetrical?
+						aberrationsCache.symmetrical[og](xi,yi) : 0.0;
 
 					const float c = -CTFs[f].getCTF(
 						xA, yA, false, false, false, true, gamma_offset);
@@ -375,39 +331,17 @@ void LocalParticleRefinement::grad(const std::vector<double> &x, std::vector<dou
 		}
 	}
 
-	/*dPred_dphi_num_real.write("DEBUG_dPred_dphi_num_real.mrc");
-	dPred_dphi_num_imag.write("DEBUG_dPred_dphi_num_imag.mrc");
+	const double scale = 1e7 / ((double)s * (double)s * (double)fc);
 
-	dPred_dphi_anl_real.write("DEBUG_dPred_dphi_anl_real.mrc");
-	dPred_dphi_anl_imag.write("DEBUG_dPred_dphi_anl_imag.mrc");
-
-	dP3D_dphi_num_x.write("DEBUG_dP3D_dphi_num_x.mrc");
-	dP3D_dphi_num_y.write("DEBUG_dP3D_dphi_num_y.mrc");
-	dP3D_dphi_num_z.write("DEBUG_dP3D_dphi_num_z.mrc");
-	dP3D_dphi_anl_x.write("DEBUG_dP3D_dphi_anl_x.mrc");
-	dP3D_dphi_anl_y.write("DEBUG_dP3D_dphi_anl_y.mrc");
-	dP3D_dphi_anl_z.write("DEBUG_dP3D_dphi_anl_z.mrc");
-
-	dPred_dP3D_x_num_real.write("DEBUG_dPred_dP3D_x_num_real.mrc");
-	dPred_dP3D_y_num_real.write("DEBUG_dPred_dP3D_y_num_real.mrc");
-	dPred_dP3D_z_num_real.write("DEBUG_dPred_dP3D_z_num_real.mrc");
-	dPred_dP3D_x_num_imag.write("DEBUG_dPred_dP3D_x_num_imag.mrc");
-	dPred_dP3D_y_num_imag.write("DEBUG_dPred_dP3D_y_num_imag.mrc");
-	dPred_dP3D_z_num_imag.write("DEBUG_dPred_dP3D_z_num_imag.mrc");
-
-	dPred_dP3D_x_anl_real.write("DEBUG_dPred_dP3D_x_anl_real.mrc");
-	dPred_dP3D_y_anl_real.write("DEBUG_dPred_dP3D_y_anl_real.mrc");
-	dPred_dP3D_z_anl_real.write("DEBUG_dPred_dP3D_z_anl_real.mrc");
-	dPred_dP3D_x_anl_imag.write("DEBUG_dPred_dP3D_x_anl_imag.mrc");
-	dPred_dP3D_y_anl_imag.write("DEBUG_dPred_dP3D_y_anl_imag.mrc");
-	dPred_dP3D_z_anl_imag.write("DEBUG_dPred_dP3D_z_anl_imag.mrc");*/
-
-	//std::exit(0);
+	for (int i = 0; i < 6; i++)
+	{
+		gradDest[i] *= scale;
+	}
 }
 
-void LocalParticleRefinement::applyChange(const std::vector<double>& x, ParticleSet& target)
+void LocalParticleRefinement::applyChange(const std::vector<double>& x, ParticleSet& target, ParticleIndex particle_id, double pixel_size)
 {
-	d3Matrix A0 = particleSet.getParticleMatrix(particle_id);
+	d3Matrix A0 = target.getParticleMatrix(particle_id);
 	d3Matrix B = TaitBryan::anglesToMatrix3(ANGLE_SCALE * x[0], ANGLE_SCALE * x[1], ANGLE_SCALE * x[2]).transpose();
 	d3Matrix A = A0 * B;
 
@@ -417,17 +351,25 @@ void LocalParticleRefinement::applyChange(const std::vector<double>& x, Particle
 	target.partTable.setValue(EMDL_ORIENT_TILT, RAD2DEG(ang[1]), particle_id.value);
 	target.partTable.setValue(EMDL_ORIENT_PSI, RAD2DEG(ang[2]), particle_id.value);
 
-
 	d3Vector pos0;
 
-	pos0[0] = particleSet.partTable.getDouble(EMDL_ORIENT_ORIGIN_X_ANGSTROM, particle_id.value);
-	pos0[1] = particleSet.partTable.getDouble(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, particle_id.value);
-	pos0[2] = particleSet.partTable.getDouble(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, particle_id.value);
+	pos0[0] = target.partTable.getDouble(EMDL_ORIENT_ORIGIN_X_ANGSTROM, particle_id.value);
+	pos0[1] = target.partTable.getDouble(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, particle_id.value);
+	pos0[2] = target.partTable.getDouble(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, particle_id.value);
 
-	const double pix2ang = tomogram.optics.pixelSize;
+	target.partTable.setValue(
+			EMDL_ORIENT_ORIGIN_X_ANGSTROM,
+			pos0[0] + pixel_size * SHIFT_SCALE * x[3],
+			particle_id.value);
 
-	target.partTable.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, pos0[0] + pix2ang * SHIFT_SCALE * x[3], particle_id.value);
-	target.partTable.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, pos0[1] + pix2ang * SHIFT_SCALE * x[4], particle_id.value);
-	target.partTable.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, pos0[2] + pix2ang * SHIFT_SCALE * x[5], particle_id.value);
+	target.partTable.setValue(
+			EMDL_ORIENT_ORIGIN_Y_ANGSTROM,
+			pos0[1] + pixel_size * SHIFT_SCALE * x[4],
+			particle_id.value);
+
+	target.partTable.setValue(
+			EMDL_ORIENT_ORIGIN_Z_ANGSTROM,
+			pos0[2] + pixel_size * SHIFT_SCALE * x[5],
+			particle_id.value);
 }
 
