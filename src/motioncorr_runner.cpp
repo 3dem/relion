@@ -90,7 +90,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	if (first_frame_sum < 1) first_frame_sum = 1;
 	last_frame_sum =  textToInteger(parser.getOption("--last_frame_sum", "Last movie frame used in output sum (0 or negative: use all)", "-1"));
 	eer_grouping = textToInteger(parser.getOption("--eer_grouping", "EER grouping", "40"));
-	eer_upsampling = textToInteger(parser.getOption("--eer_upsampling", "EER upsampling (1 = 4K or 2 = 8K)", "2"));
+	eer_upsampling = textToInteger(parser.getOption("--eer_upsampling", "EER upsampling (1 = 4K or 2 = 8K)", "1"));
 
 	int motioncor2_section = parser.addSection("MOTIONCOR2 options");
 	do_motioncor2 = parser.checkOption("--use_motioncor2", "Use Shawn Zheng's MOTIONCOR2.");
@@ -227,6 +227,8 @@ void MotioncorrRunner::initialise()
 	{
 		MetaDataTable MDin;
 		ObservationModel::loadSafely(fn_in, obsModel, MDin, "movies", verb);
+		if (MDin.numberOfObjects() > 0 && !MDin.containsLabel(EMDL_MICROGRAPH_MOVIE_NAME))
+			REPORT_ERROR("The input STAR file does not contain the rlnMicrographMovieName column. Are you sure you imported files as movies, not single frame images?");
 
 		fn_micrographs.clear();
 		optics_group_micrographs.clear();

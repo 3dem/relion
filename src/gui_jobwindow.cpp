@@ -501,6 +501,7 @@ void JobWindow::initialiseMotioncorrWindow()
 	place("last_frame_sum", TOGGLE_DEACTIVATE);
 	place("dose_per_frame", TOGGLE_DEACTIVATE);
 	place("pre_exposure", TOGGLE_DEACTIVATE);
+	place("eer_grouping", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
