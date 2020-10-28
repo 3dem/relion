@@ -92,10 +92,6 @@ void LocalParticleRefineProgram::run()
 		dataSet.checkTrajectoryLengths(
 				particles[t][0], pc, fc, "LocalParticleRefineProgram::run");
 
-		const int first_frame = specified_first_frame;
-		const int last_frame = (specified_last_frame > 0 && specified_last_frame < fc)? specified_last_frame : fc-1;
-
-		const int pc_max = 36;
 		const int data_pad = 256;
 
 		std::vector<double> results(pc * data_pad);
@@ -119,11 +115,10 @@ void LocalParticleRefineProgram::run()
 
 			const std::vector<double> initial {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
-			/*const std::vector<double> optimal = NelderMead::optimize(
-						initial, refinement, 2, 0.001, 300, 1, 2, 0.5, 0.5, false);*/
-
 			const std::vector<double> optimal = LBFGS::optimize(
 						initial, refinement, false, 300, 1e-5, 1e-4);
+
+			// average gradient length is roughly in [0,100]
 
 			for (int i = 0; i < 6; i++)
 			{
@@ -132,7 +127,6 @@ void LocalParticleRefineProgram::run()
 		}
 
 		Log::endProgress();
-
 
 		for (int p = 0; p < pc; p++)
 		{

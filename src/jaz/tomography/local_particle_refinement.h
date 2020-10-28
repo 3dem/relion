@@ -8,7 +8,7 @@
 #include <src/jaz/optics/aberrations_cache.h>
 
 
-class LocalParticleRefinement : public DifferentiableOptimization
+class LocalParticleRefinement : public FastDifferentiableOptimization
 {
 	public:
 
@@ -40,6 +40,8 @@ class LocalParticleRefinement : public DifferentiableOptimization
 
 		double f(const std::vector<double>& x, void* tempStorage) const;
 		void grad(const std::vector<double>& x, std::vector<double>& gradDest, void* tempStorage) const;
+
+		double gradAndValue(const std::vector<double>& x, std::vector<double>& gradDest) const;
 
 		static void applyChange(
 				const std::vector<double>& x,
