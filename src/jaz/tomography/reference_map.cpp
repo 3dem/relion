@@ -4,6 +4,7 @@
 #include <src/jaz/math/fft.h>
 #include <src/jaz/util/log.h>
 #include <src/jaz/util/zio.h>
+#include <src/jaz/tomography/reconstruction.h>
 
 using namespace gravis;
 
@@ -66,6 +67,12 @@ void TomoReferenceMap::load(int boxSize)
 		}
 	}
 
+	const double taper_edge_width = 10;
+
+	for (int i = 0; i < 2; i++)
+	{
+		Reconstruction::taper(image_real[i], taper_edge_width, true, 1);
+	}
 
 	image_FS.resize(2);
 
