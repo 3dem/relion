@@ -104,6 +104,11 @@ class Interpolation
 				const RawImage<tComplex<T>>& img,
 				double xSgn, double ySgn, double zSgn);
 
+		template<typename T> inline
+		static gravis::t4Vector<tComplex<T>> linearXYZGradientAndValue_FftwHalf_complex(
+				const RawImage<tComplex<T>>& img,
+				double xSgn, double ySgn, double zSgn);
+
 		template<typename T1, typename T2> inline
 		static void insertLinearXY_FftwHalf(
 				T1 val, T2 wgh, 
@@ -922,6 +927,95 @@ gravis::t3Vector<tComplex<T>> Interpolation::linearXYZGradient_FftwHalf_complex(
 		{
 			out[i].real *= -1;
 		}
+	}
+
+	return out;
+}
+
+template<typename T> inline
+gravis::t4Vector<tComplex<T>> Interpolation::linearXYZGradientAndValue_FftwHalf_complex(
+		const RawImage<tComplex<T>>& img,
+		double xSgn, double ySgn, double zSgn)
+{
+	double xd, yd, zd;
+	bool conj;
+
+	if (xSgn > 0.0)
+	{
+		xd = xSgn;
+		yd = ySgn;
+		zd = zSgn;
+		conj = false;
+	}
+	else
+	{
+		xd = -xSgn;
+		yd = -ySgn;
+		zd = -zSgn;
+		conj = true;
+	}
+
+	if (yd < 0.0) yd += img.ydim;
+	if (zd < 0.0) zd += img.zdim;
+
+	int x0 = (int) xd;
+	int y0 = (int) yd;
+	int z0 = (int) zd;
+
+	const double xf = xd - x0;
+	const double yf = yd - y0;
+	const double zf = zd - z0;
+
+	if (x0 >= img.xdim) x0 = img.xdim-1;
+
+	int x1 = x0 + 1;
+	if (x1 >= img.xdim) x1 = img.xdim-2;
+
+
+	if (y0 < 0) y0 = 0;
+	else if (y0 >= img.ydim) y0 = img.ydim-1;
+
+	int y1 = (y0 + 1) % img.ydim;
+
+	if (z0 < 0) z0 = 0;
+	else if (z0 >= img.zdim) z0 = img.zdim-1;
+
+	int z1 = (z0 + 1) % img.zdim;
+
+	const tComplex<T> vx00 = (1 - xf) * img(x0,y0,z0) + xf * img(x1,y0,z0);
+	const tComplex<T> vx10 = (1 - xf) * img(x0,y1,z0) + xf * img(x1,y1,z0);
+	const tComplex<T> vx01 = (1 - xf) * img(x0,y0,z1) + xf * img(x1,y0,z1);
+	const tComplex<T> vx11 = (1 - xf) * img(x0,y1,z1) + xf * img(x1,y1,z1);
+
+	const tComplex<T> vx00_x = img(x1,y0,z0) - img(x0,y0,z0);
+	const tComplex<T> vx10_x = img(x1,y1,z0) - img(x0,y1,z0);
+	const tComplex<T> vx01_x = img(x1,y0,z1) - img(x0,y0,z1);
+	const tComplex<T> vx11_x = img(x1,y1,z1) - img(x0,y1,z1);
+
+	const tComplex<T> vxy0 = (1 - yf) * vx00 + yf * vx10;
+	const tComplex<T> vxy1 = (1 - yf) * vx01 + yf * vx11;
+
+	const tComplex<T> vxy0_y = vx10 - vx00;
+	const tComplex<T> vxy1_y = vx11 - vx01;
+
+	const tComplex<T> vxyz_z = vxy1 - vxy0;
+
+	const tComplex<T> vxyz = (1 - zf) * vxy0 + zf * vxy1;
+
+	gravis::t4Vector<tComplex<T>> out(
+		(1 - zf) * ((1 - yf) * vx00_x + yf * vx10_x) + zf * ((1 - yf) * vx01_x + yf * vx11_x),
+		(1 - zf) * (vxy0_y) + zf * (vxy1_y),
+		vxyz_z,
+		vxyz);
+
+	if (conj)
+	{
+		for (int i = 0; i < 3; i++)
+		{
+			out[i].real *= -1;
+		}
+
+		out[3].imag *= -1;
 	}
 
 	return out;

@@ -247,12 +247,10 @@ void LocalParticleRefinement::grad(const std::vector<double> &x, std::vector<dou
 					const d3Vector dP3D_dtheta = dPAt_dtheta * p2D;
 					const d3Vector dP3D_dchi   = dPAt_dchi   * p2D;
 
-					const fComplex pred = Interpolation::linearXYZ_FftwHalf_complex(
+					const t4Vector<fComplex> dPred_dP3D = Interpolation::linearXYZGradientAndValue_FftwHalf_complex(
 						reference.image_FS[hs], p3D.x, p3D.y, p3D.z);
 
-					const t3Vector<fComplex> dPred_dP3D = Interpolation::linearXYZGradient_FftwHalf_complex(
-						reference.image_FS[hs], p3D.x, p3D.y, p3D.z);
-
+					const fComplex pred = dPred_dP3D.w;
 
 					const fComplex dPred_dphi   = (
 						dPred_dP3D.x * dP3D_dphi.x   +
