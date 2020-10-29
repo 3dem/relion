@@ -66,6 +66,11 @@ void TomoReferenceMap::load(int boxSize)
 			image_real[i] = Padding::padCenter3D_full(image_real[i], (boxSize - sr)/2);
 		}
 	}
+	else if (image_real[0].xdim > s)
+	{
+		REPORT_ERROR_STR("Reference map is too big: " << image_real[0].xdim
+				<< " pixels instead of " << s);
+	}
 
 	const double taper_edge_width = 10;
 
