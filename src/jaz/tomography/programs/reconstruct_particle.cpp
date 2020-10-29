@@ -22,7 +22,31 @@
 using namespace gravis;
 
 
-void BackprojectProgram::readParameters(int argc, char *argv[])
+void ReconstructParticleProgram::readParameters(int argc, char *argv[])
+{
+	readBasicParameters(argc, argv);
+
+	if (outTag.find_last_of("/") != std::string::npos)
+	{
+		std::string dir = outTag.substr(0, outTag.find_last_of("/"));
+		int res = system(("mkdir -p "+dir).c_str());
+	}
+
+	{
+		std::ofstream ofs(outTag+"_note.txt");
+
+		ofs << "Command:\n\n";
+
+		for (int i = 0; i < argc; i++)
+		{
+			ofs << argv[i] << ' ';
+		}
+
+		ofs << '\n';
+	}
+}
+
+void ReconstructParticleProgram::readBasicParameters(int argc, char *argv[])
 {
 	IOParser parser;
 	
@@ -72,28 +96,9 @@ void BackprojectProgram::readParameters(int argc, char *argv[])
 		std::cerr << XE;
 		exit(1);
 	}
-
-	if (outTag.find_last_of("/") != std::string::npos)
-	{
-		std::string dir = outTag.substr(0, outTag.find_last_of("/"));
-		int res = system(("mkdir -p "+dir).c_str());
-	}
-
-	{
-		std::ofstream ofs(outTag+"_note.txt");
-
-		ofs << "Command:\n\n";
-
-		for (int i = 0; i < argc; i++)
-		{
-			ofs << argv[i] << ' ';
-		}
-
-		ofs << '\n';
-	}
 }
 
-void BackprojectProgram::run()
+void ReconstructParticleProgram::run()
 {
 	Log::beginSection("Initialising");
 
@@ -147,7 +152,7 @@ void BackprojectProgram::run()
 	
 	for (int i = 0; i < outCount; i++)
 	{	
-		dataImgFS[i] = BufferedImage<dComplex>(sh,s,s);		
+		dataImgFS[i] = BufferedImage<dComplex>(sh,s,s);
 		ctfImgFS[i] = BufferedImage<double>(sh,s,s),
 		psfImgFS[i] = BufferedImage<double>(sh,s,s);
 		
@@ -160,143 +165,15 @@ void BackprojectProgram::run()
 
 	Log::endSection();
 	
-	
-	long int tpc = 0;
-	
-	for (int t = 0; t < tc; t++)
-	{
-		const int pc = particles[t].size();
-		
-		if (pc == 0) continue;
-		
-		Log::beginSection("Tomogram " + ZIO::itoa(t+1) + " / " + ZIO::itoa(tc));		
-		Log::print("Loading");
-		
-		Tomogram tomogram = tomoSet.loadTomogram(t, true);
-		
-		const int fc = tomogram.frameCount;
-		
-		dataSet.checkTrajectoryLengths(particles[t][0], pc, fc, "backproject");
-		
-		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s, binning);
-		BufferedImage<float> noiseWeights;
 
-		if (do_whiten)
-		{
-			noiseWeights = tomogram.computeNoiseWeight(s, binning);
-		}
 
-		const double binnedPixelSize = tomogram.optics.pixelSize * binning;
-				
-		std::vector<BufferedImage<float>> weightStack(outer_threads, BufferedImage<float>(sh,s,fc));
-		std::vector<BufferedImage<fComplex>> particleStack(outer_threads, BufferedImage<fComplex>(sh,s,fc));
-		
-		if (!do_ctf) 
-		{
-			for (int i = 0; i < outer_threads; i++)
-			{
-				weightStack[i].fill(1.f);
-			}
-		}	
-		
-		Log::beginProgress("Backprojecting", (int)ceil(pc/(double)outer_threads));
-		
-		#pragma omp parallel for num_threads(outer_threads)
-		for (int p = 0; p < pc; p++)
-		{
-			const int th = omp_get_thread_num();
-			
-			if (th == 0)
-			{
-				Log::updateProgress(p);
-			}
-			
-			const ParticleIndex part_id = particles[t][p];
-			
-			const d3Vector pos = dataSet.getPosition(part_id);
-			const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(
-						part_id, fc, tomogram.optics.pixelSize);
-			std::vector<d4Matrix> projCut(fc), projPart(fc);
-			
-			
-			TomoExtraction::extractAt3D_Fourier(
-					tomogram.stack, s02D, binning, tomogram.projectionMatrices, traj,
-					particleStack[th], projCut, inner_threads, true);
-			
-			const d4Matrix particleToTomo = dataSet.getMatrix4x4(part_id, s,s,s);
-			
-			const int halfSet = dataSet.getHalfSet(part_id);
+	processTomograms(
+		0, tc-1, tomoSet, dataSet, particles, aberrationsCache,
+		dataImgFS, ctfImgFS, psfImgFS, binnedOutPixelSize,
+		s02D, do_ctf, flip_value, 1);
 
-			const int og = dataSet.getOpticsGroup(part_id);
 
-			const BufferedImage<double>* gammaOffset =
-				aberrationsCache.hasSymmetrical? &aberrationsCache.symmetrical[og] : 0;
-			
-			for (int f = 0; f < fc; f++)
-			{
-				const double scaleRatio = binnedOutPixelSize / binnedPixelSize;
-				projPart[f] = scaleRatio * projCut[f] * particleToTomo;
-			
-				if (do_ctf)
-				{
-					CTF ctf = tomogram.getCtf(f, pos);
-					BufferedImage<float> ctfImg(sh,s);
-					ctf.draw(s, s, binnedPixelSize, gammaOffset, &ctfImg(0,0,0));
-					
-					const float scale = flip_value? -1.f : 1.f;
-							
-					for (int y = 0; y < s;  y++)
-					for (int x = 0; x < sh; x++)
-					{
-						const float c = scale * ctfImg(x,y) * doseWeights(x,y,f);
-						
-						particleStack[th](x,y,f) *= c;
-						weightStack[th](x,y,f) = c * c;
-					}
-				}
-			}
 
-			if (aberrationsCache.hasAntisymmetrical)
-			{
-				aberrationsCache.correctObservations(particleStack[th], og);
-			}
-
-			if (do_whiten)
-			{
-				particleStack[th] *= noiseWeights;
-				weightStack[th] *= noiseWeights;
-			}
-			
-			if (explicit_gridding)
-			{
-				FourierBackprojection::backprojectStack_backward(
-					particleStack[th], weightStack[th], projPart, 
-					dataImgFS[2*th + halfSet], 
-					psfImgFS[2*th + halfSet], 
-					ctfImgFS[2*th + halfSet],
-					inner_threads);
-			}
-			else
-			{
-				for (int f = 0; f < fc; f++)
-				{
-					FourierBackprojection::backprojectSlice_backward(
-						particleStack[th].getSliceRef(f), 
-						weightStack[th].getSliceRef(f), 
-						projPart[f], 
-						dataImgFS[2*th + halfSet],
-						ctfImgFS[2*th + halfSet],
-						inner_threads);
-				}
-			}
-			
-			tpc++;
-		}
-		
-		Log::endProgress();
-		Log::endSection();
-	}
-	
 	if (outCount > 2)
 	{		
 		Log::print("Merging volumes");
@@ -337,33 +214,199 @@ void BackprojectProgram::run()
 		}
 	}
 
-	
+	finalise(dataImgFS, ctfImgFS, psfImgFS, binnedOutPixelSize);
+}
+
+void ReconstructParticleProgram::processTomograms(
+	int first_t,
+	int last_t,
+	const TomogramSet& tomoSet,
+	const ParticleSet& dataSet,
+	const std::vector<std::vector<ParticleIndex>>& particles,
+	const AberrationsCache& aberrationsCache,
+	std::vector<BufferedImage<dComplex>>& dataImgFS,
+	std::vector<BufferedImage<double>>& ctfImgFS,
+	std::vector<BufferedImage<double>>& psfImgFS,
+	const double binnedOutPixelSize,
+	int s02D,
+	bool do_ctf,
+	bool flip_value,
+	int verbosity)
+{
+	const int s = dataImgFS[0].ydim;
+	const int sh = s/2 + 1;
+	const int tc = last_t - first_t + 1;
+
+	for (int t = first_t; t <= last_t; t++)
+	{
+		const int pc = particles[t].size();
+
+		if (pc == 0) continue;
+
+		if (verbosity > 0)
+		{
+			Log::beginSection("Tomogram " + ZIO::itoa(t+1-first_t) + " / " + ZIO::itoa(tc));
+			Log::print("Loading");
+		}
+
+		Tomogram tomogram = tomoSet.loadTomogram(t, true);
+
+		const int fc = tomogram.frameCount;
+
+		dataSet.checkTrajectoryLengths(particles[t][0], pc, fc, "backproject");
+
+		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s, binning);
+		BufferedImage<float> noiseWeights;
+
+		if (do_whiten)
+		{
+			noiseWeights = tomogram.computeNoiseWeight(s, binning);
+		}
+
+		const double binnedPixelSize = tomogram.optics.pixelSize * binning;
+
+		std::vector<BufferedImage<float>> weightStack(outer_threads, BufferedImage<float>(sh,s,fc));
+		std::vector<BufferedImage<fComplex>> particleStack(outer_threads, BufferedImage<fComplex>(sh,s,fc));
+
+		if (!do_ctf)
+		{
+			for (int i = 0; i < outer_threads; i++)
+			{
+				weightStack[i].fill(1.f);
+			}
+		}
+
+		Log::beginProgress("Backprojecting", (int)ceil(pc/(double)outer_threads));
+
+		#pragma omp parallel for num_threads(outer_threads)
+		for (int p = 0; p < pc; p++)
+		{
+			const int th = omp_get_thread_num();
+
+			if (th == 0)
+			{
+				Log::updateProgress(p);
+			}
+
+			const ParticleIndex part_id = particles[t][p];
+
+			const d3Vector pos = dataSet.getPosition(part_id);
+			const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(
+						part_id, fc, tomogram.optics.pixelSize);
+			std::vector<d4Matrix> projCut(fc), projPart(fc);
+
+
+			TomoExtraction::extractAt3D_Fourier(
+					tomogram.stack, s02D, binning, tomogram.projectionMatrices, traj,
+					particleStack[th], projCut, inner_threads, true);
+
+			const d4Matrix particleToTomo = dataSet.getMatrix4x4(part_id, s,s,s);
+
+			const int halfSet = dataSet.getHalfSet(part_id);
+
+			const int og = dataSet.getOpticsGroup(part_id);
+
+			const BufferedImage<double>* gammaOffset =
+				aberrationsCache.hasSymmetrical? &aberrationsCache.symmetrical[og] : 0;
+
+			for (int f = 0; f < fc; f++)
+			{
+				const double scaleRatio = binnedOutPixelSize / binnedPixelSize;
+				projPart[f] = scaleRatio * projCut[f] * particleToTomo;
+
+				if (do_ctf)
+				{
+					CTF ctf = tomogram.getCtf(f, pos);
+					BufferedImage<float> ctfImg(sh,s);
+					ctf.draw(s, s, binnedPixelSize, gammaOffset, &ctfImg(0,0,0));
+
+					const float scale = flip_value? -1.f : 1.f;
+
+					for (int y = 0; y < s;  y++)
+					for (int x = 0; x < sh; x++)
+					{
+						const float c = scale * ctfImg(x,y) * doseWeights(x,y,f);
+
+						particleStack[th](x,y,f) *= c;
+						weightStack[th](x,y,f) = c * c;
+					}
+				}
+			}
+
+			if (aberrationsCache.hasAntisymmetrical)
+			{
+				aberrationsCache.correctObservations(particleStack[th], og);
+			}
+
+			if (do_whiten)
+			{
+				particleStack[th] *= noiseWeights;
+				weightStack[th] *= noiseWeights;
+			}
+
+			if (explicit_gridding)
+			{
+				FourierBackprojection::backprojectStack_backward(
+					particleStack[th], weightStack[th], projPart,
+					dataImgFS[2*th + halfSet],
+					psfImgFS[2*th + halfSet],
+					ctfImgFS[2*th + halfSet],
+					inner_threads);
+			}
+			else
+			{
+				for (int f = 0; f < fc; f++)
+				{
+					FourierBackprojection::backprojectSlice_backward(
+						particleStack[th].getSliceRef(f),
+						weightStack[th].getSliceRef(f),
+						projPart[f],
+						dataImgFS[2*th + halfSet],
+						ctfImgFS[2*th + halfSet],
+						inner_threads);
+				}
+			}
+		}
+
+		Log::endProgress();
+		Log::endSection();
+	}
+}
+
+void ReconstructParticleProgram::finalise(
+	std::vector<BufferedImage<dComplex>>& dataImgFS,
+	std::vector<BufferedImage<double>>& ctfImgFS,
+	std::vector<BufferedImage<double>>& psfImgFS,
+	const double binnedOutPixelSize)
+{
+	const int s = dataImgFS[0].ydim;
+
 	std::vector<BufferedImage<double>> dataImgRS(2), dataImgDivRS(2);
-	
+
 	BufferedImage<dComplex> dataImgFS_both = dataImgFS[0] + dataImgFS[1];
 	BufferedImage<double> ctfImgFS_both = ctfImgFS[0] + ctfImgFS[1];
-	
+
 	BufferedImage<double> psfImgFS_both;
-	
+
 	if (explicit_gridding)
 	{
 		psfImgFS_both = psfImgFS[0] + psfImgFS[1];
 	}
 
-	
+
 	Log::beginSection("Reconstructing");
-	
+
 	for (int half = 0; half < 2; half++)
-	{		
+	{
 		Log::print("Half " + ZIO::itoa(half));
-		
+
 		dataImgRS[half] = BufferedImage<double>(s,s,s);
 		dataImgDivRS[half] = BufferedImage<double>(s,s,s);
 
 		reconstruct(
 			dataImgRS[half], dataImgDivRS[half], ctfImgFS[half],
 			&psfImgFS[half], dataImgFS[half]);
-		
+
 		writeOutput(
 			dataImgDivRS[half], dataImgRS[half], ctfImgFS[half],
 			"_half"+ZIO::itoa(half+1), binnedOutPixelSize);
@@ -380,7 +423,7 @@ void BackprojectProgram::run()
 	Log::endSection();
 }
 
-void BackprojectProgram::reconstruct(
+void ReconstructParticleProgram::reconstruct(
 		BufferedImage<double>& dataImgRS,
 		BufferedImage<double>& dataImgDivRS,
 		BufferedImage<double>& ctfImgFS,
@@ -413,7 +456,7 @@ void BackprojectProgram::reconstruct(
 }
 
 
-void BackprojectProgram::writeOutput(
+void ReconstructParticleProgram::writeOutput(
 		const BufferedImage<double>& corrected,
 		const BufferedImage<double>& data,
 		const BufferedImage<double>& weight,
