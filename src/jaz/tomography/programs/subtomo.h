@@ -8,6 +8,13 @@
 #include <src/jaz/image/buffered_image.h>
 #include <src/jaz/tomography/optimisation_set.h>
 
+
+class ParticleSet;
+class ParticleIndex;
+class TomogramSet;
+class AberrationsCache;
+
+
 class SubtomoProgram
 {
 	public:
@@ -47,13 +54,37 @@ class SubtomoProgram
 				write_multiplicity, 
 				write_divided, 
 				write_normalised;
-		
-		void readParameters(int argc, char *argv[]);
-		void run();	
-		
+
+		void readBasicParameters(IOParser& parser);
+		virtual void readParameters(int argc, char *argv[]);
+		virtual void run();
+
+
+	protected:
+
+		void writeParticleSet(
+				const ParticleSet& particleSet,
+				const std::vector<std::vector<ParticleIndex>>& particles);
+
+		void processTomograms(
+				int first_t,
+				int last_t,
+				const TomogramSet& tomogramSet,
+				const ParticleSet& particleSet,
+				const std::vector<std::vector<ParticleIndex>>& particles,
+				const AberrationsCache& aberrationsCache,
+				long int s02D,
+				long int s2D,
+				long int s3D,
+				double relative_box_scale,
+				bool do_ctf,
+				int verbose,
+				BufferedImage<float>& sum_data,
+				BufferedImage<float>& sum_weights );
+
 		BufferedImage<float> cropAndTaper(
-				const BufferedImage<float>& imgFS, 
-				int boundary, 
+				const BufferedImage<float>& imgFS,
+				int boundary,
 				int num_threads) const;
 };
 

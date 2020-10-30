@@ -99,6 +99,8 @@ AberrationsCache::AberrationsCache(const MetaDataTable &opticsTable, const int s
 
 void AberrationsCache::correctObservations(RawImage<fComplex> &observations, int optics_group) const
 {
+	if (!hasAntisymmetrical) return;
+
 	const int sh = observations.xdim;
 	const int s  = observations.ydim;
 	const int fc = observations.zdim;
