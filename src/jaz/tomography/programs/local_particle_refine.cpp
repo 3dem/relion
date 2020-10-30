@@ -43,6 +43,10 @@ void LocalParticleRefineProgram::readParams(IOParser &parser)
 
 		int defocus_section = parser.addSection("Alignment options");
 
+		max_iterations = textToInteger(parser.getOption("--max_it", "Maximum number of iterations", "300"));
+		eps = textToDouble(parser.getOption("--eps", "Optimisation change threshold", "1e-5"));
+		xtol = textToDouble(parser.getOption("--xtol", "Optimisation gradient threshold", "1e-4"));
+		verbose_opt = parser.checkOption("--verbose_opt", "Print out the cost function after each iteration (for the first thread)");
 
 		Log::readParams(parser);
 
@@ -68,7 +72,7 @@ void LocalParticleRefineProgram::run()
 
 	const int tc = particles.size();
 
-	AberrationsCache aberrationsCache(dataSet.optTable, boxSize);
+	AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
 
 	Log::endSection();
 
@@ -89,7 +93,7 @@ void LocalParticleRefineProgram::run()
 
 		freqWeights.write("DEBUG_freqWeights.mrc");
 
-		dataSet.checkTrajectoryLengths(
+		particleSet.checkTrajectoryLengths(
 				particles[t][0], pc, fc, "LocalParticleRefineProgram::run");
 
 		const int data_pad = 256;
@@ -110,13 +114,14 @@ void LocalParticleRefineProgram::run()
 			}
 
 			LocalParticleRefinement refinement(
-					particles[t][p], dataSet, tomogram, referenceMap,
+					particles[t][p], particleSet, tomogram, referenceMap,
 					freqWeights, aberrationsCache, false);
 
 			const std::vector<double> initial {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
 			const std::vector<double> optimal = LBFGS::optimize(
-						initial, refinement, false, 300, 1e-5, 1e-4);
+					initial, refinement, verbose_opt && (th == 0),
+					max_iterations, eps, xtol);
 
 			// average gradient length is roughly in [0,100]
 
@@ -138,12 +143,15 @@ void LocalParticleRefineProgram::run()
 			}
 
 			LocalParticleRefinement::applyChange(
-				opt, dataSet, particles[t][p], tomogram.optics.pixelSize);
+				opt, particleSet, particles[t][p], tomogram.optics.pixelSize);
 		}
 
 		Log::endSection();
 	}
 
-	dataSet.write(outDir+"particles.star");
+	particleSet.write(outDir+"particles.star");
+
+	optimisationSet.particles = outDir+"particles.star";
+	optimisationSet.write(outDir+"optimisation_set.star");
 }
 

@@ -84,11 +84,11 @@ void PolishProgram::run()
 	Log::endSection();
 	
 	
-	int tpc = dataSet.getTotalParticleNumber();
+	int tpc = particleSet.getTotalParticleNumber();
 		
-	if (dataSet.motionTrajectories.size() != tpc)
+	if (particleSet.motionTrajectories.size() != tpc)
 	{
-		dataSet.motionTrajectories.resize(tpc);
+		particleSet.motionTrajectories.resize(tpc);
 	}
 			
 	for (int t = 0; t < tc; t++)
@@ -101,16 +101,16 @@ void PolishProgram::run()
 		
 		for (int p = 0; p < pc; p++)
 		{
-			if (dataSet.motionTrajectories[particles[t][p].value].shifts_Ang.size() != fc)
+			if (particleSet.motionTrajectories[particles[t][p].value].shifts_Ang.size() != fc)
 			{		
-				dataSet.motionTrajectories[particles[t][p].value] = Trajectory(fc);
+				particleSet.motionTrajectories[particles[t][p].value] = Trajectory(fc);
 			}
 		}
 	}
 	
-	dataSet.hasMotion = true;
+	particleSet.hasMotion = true;
 
-	AberrationsCache aberrationsCache(dataSet.optTable, boxSize);
+	AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
 	
 	Log::endSection();
 		
@@ -155,13 +155,13 @@ void PolishProgram::run()
 		
 		
 		std::vector<BufferedImage<double>> CCs = Prediction::computeCroppedCCs(
-				dataSet, particles[t], tomogram, aberrationsCache,
+				particleSet, particles[t], tomogram, aberrationsCache,
 				referenceMap, frqWeight, tomogram.frameSequence,
 				range, flip_value, num_threads, padding);
 					
 		
 		MotionFit motionFit(
-				CCs, projByTime, dataSet, particles[t], referenceMap.image_FS, 
+				CCs, projByTime, particleSet, particles[t], referenceMap.image_FS, 
 				motParams, mfSettings, tomogram.centre, 
 				tomogram.getFrameDose(), tomogram.optics.pixelSize, padding, num_threads);
 		
@@ -182,7 +182,7 @@ void PolishProgram::run()
 			}
 						
 			FCC3 = FCC::compute3(
-				dataSet, particles[t], tomogram, referenceMap.image_FS,
+				particleSet, particles[t], tomogram, referenceMap.image_FS,
 				flip_value, num_threads);
 			
 			FCC3.write(diagPrefix + "_FCC3_initial.mrc");
@@ -258,8 +258,8 @@ void PolishProgram::run()
 		}
 		
 		projTomoCorr = motionFit.getProjections(opt, tomogram.frameSequence);
-		motionFit.shiftParticles(opt, dataSet);
-		motionFit.exportTrajectories(opt, dataSet, tomogram.frameSequence);
+		motionFit.shiftParticles(opt, particleSet);
+		motionFit.exportTrajectories(opt, particleSet, tomogram.frameSequence);
 		
 		tomogramSetOut.setProjections(t, projTomoCorr);
 				
@@ -275,7 +275,7 @@ void PolishProgram::run()
 			tomogram.projectionMatrices = projTomoCorr;
 			
 			FCC3 = FCC::compute3(
-				dataSet, particles[t], tomogram, referenceMap.image_FS,
+				particleSet, particles[t], tomogram, referenceMap.image_FS,
 				flip_value, num_threads);
 			
 			FCC3.write(diagPrefix + "_FCC3_final.mrc");
@@ -339,7 +339,13 @@ void PolishProgram::run()
 		Log::endSection();
 	}
 	
-	Trajectory::write(dataSet.motionTrajectories, outDir + "motion.star");
+	Trajectory::write(particleSet.motionTrajectories, outDir + "motion.star");
 	tomogramSetOut.write(outDir + "tomograms.star");
-	dataSet.write(outDir + "particles.star");
+	particleSet.write(outDir + "particles.star");
+
+	optimisationSet.particles = outDir+"particles.star";
+	optimisationSet.tomograms = outDir+"tomograms.star";
+	optimisationSet.trajectories = outDir+"motion.star";
+
+	optimisationSet.write(outDir+"optimisation_set.star");
 }

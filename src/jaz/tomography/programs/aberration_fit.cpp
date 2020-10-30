@@ -31,7 +31,7 @@ void AberrationFitProgram::readParams(IOParser &parser)
 	{
 		_readParams(parser);
 				
-		int defocus_section = parser.addSection("Alignment options");
+		int defocus_section = parser.addSection("Aberration fit options");
 
 		do_even = !parser.checkOption("--no_symm", "Do not fit symmetrical aberrations");
 		do_odd = !parser.checkOption("--no_antisymm", "Do not fit antisymmetrical aberrations");
@@ -65,7 +65,7 @@ void AberrationFitProgram::run()
 
 		Log::warn("Estimating neither symmetrical nor antisymmetrical aberrations: there is nothing to estimate.");
 
-		dataSet.write(outDir+"particles.star");
+		particleSet.write(outDir+"particles.star");
 
 		return;
 	}
@@ -90,7 +90,7 @@ void AberrationFitProgram::run()
 	const int s = boxSize;
 	const int sh = s/2 + 1;
 	const int tc = particles.size();
-	const int gc = dataSet.numberOfOpticsGroups();
+	const int gc = particleSet.numberOfOpticsGroups();
 	const bool flip_value = true;
 	
 	Log::endSection();
@@ -118,7 +118,7 @@ void AberrationFitProgram::run()
 		oddData_perGroup_perThread[g]  = std::vector<BufferedImage<OddData>>(num_threads);
 	}
 
-	AberrationsCache aberrationsCache(dataSet.optTable, boxSize);
+	AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
 
 	double lastPixelSize = 0.0;
 	
@@ -174,10 +174,10 @@ void AberrationFitProgram::run()
 				Log::updateProgress(p);
 			}
 
-			const int g = dataSet.getOpticsGroup(particles[t][p]);
+			const int g = particleSet.getOpticsGroup(particles[t][p]);
 			
 			AberrationFit::considerParticle(
-				particles[t][p], tomogram, referenceMap, dataSet,
+				particles[t][p], tomogram, referenceMap, particleSet,
 				aberrationsCache, flip_value, frqWeight,
 				first_frame, last_frame,
 				evenData_perGroup_perThread[g][th],
@@ -208,9 +208,9 @@ void AberrationFitProgram::run()
 				evenData_perGroup[g], n_even, initialEven,
 				lastPixelSize, outDir, true);
 
-			if (dataSet.optTable.labelExists(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS))
+			if (particleSet.optTable.labelExists(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS))
 			{
-				const std::vector<double> evenCoeffs0 = dataSet.optTable.getDoubleVector(
+				const std::vector<double> evenCoeffs0 = particleSet.optTable.getDoubleVector(
 					EMDL_IMAGE_EVEN_ZERNIKE_COEFFS, g);
 
 				for (int i = 0; i < evenCoeffs.size(); i++)
@@ -222,7 +222,7 @@ void AberrationFitProgram::run()
 				}
 			}
 
-			dataSet.optTable.setValue(
+			particleSet.optTable.setValue(
 				EMDL_IMAGE_EVEN_ZERNIKE_COEFFS, evenCoeffs, g);
 		}
 
@@ -234,9 +234,9 @@ void AberrationFitProgram::run()
 				oddData_perGroup[g], n_odd, initialOdd,
 				lastPixelSize, outDir, true);
 
-			if (dataSet.optTable.labelExists(EMDL_IMAGE_ODD_ZERNIKE_COEFFS))
+			if (particleSet.optTable.labelExists(EMDL_IMAGE_ODD_ZERNIKE_COEFFS))
 			{
-				const std::vector<double> oddCoeffs0 = dataSet.optTable.getDoubleVector(
+				const std::vector<double> oddCoeffs0 = particleSet.optTable.getDoubleVector(
 					EMDL_IMAGE_ODD_ZERNIKE_COEFFS, g);
 
 				for (int i = 0; i < oddCoeffs.size(); i++)
@@ -248,10 +248,13 @@ void AberrationFitProgram::run()
 				}
 			}
 
-			dataSet.optTable.setValue(
+			particleSet.optTable.setValue(
 				EMDL_IMAGE_ODD_ZERNIKE_COEFFS, oddCoeffs, g);
 		}
 	}
 
-	dataSet.write(outDir+"particles.star");
+	particleSet.write(outDir+"particles.star");
+
+	optimisationSet.particles = outDir+"particles.star";
+	optimisationSet.write(outDir+"optimisation_set.star");
 }

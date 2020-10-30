@@ -541,6 +541,15 @@ enum EMDLabel
 	EMDL_TOMO_MANIFOLD_PARAMETERS,
 	EMDL_TOMO_DEFOCUS_SLOPE,
 
+	EMDL_TOMO_PARTICLES_FILE_NAME,
+	EMDL_TOMO_TOMOGRAMS_FILE_NAME,
+	EMDL_TOMO_MANIFOLDS_FILE_NAME,
+	EMDL_TOMO_TRAJECTORIES_FILE_NAME,
+	EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME,
+	EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME,
+	EMDL_TOMO_REFERENCE_MASK_FILE_NAME,
+	EMDL_TOMO_REFERENCE_FSC_FILE_NAME,
+
 	EMDL_TOMO_PARTICLE_ID,       // (deprecated, use EMDL_TOMO_PARTICLE_INDEX instead)
 	EMDL_TOMO_PICK_PARTICLE_ID,  // (deprecated, use EMDL_TOMO_MANIFOLD_INDEX instead)
 
@@ -1108,6 +1117,15 @@ private:
 		EMDL::addLabel(EMDL_TOMO_MANIFOLD_TYPE, EMDL_STRING, "rlnTomoManifoldType", "Name of the manifold type");
 		EMDL::addLabel(EMDL_TOMO_MANIFOLD_PARAMETERS, EMDL_DOUBLE_VECTOR, "rlnTomoManifoldParams", "Set of coefficients pertaining to a generic 2D manifold in a tomogram");
 		EMDL::addLabel(EMDL_TOMO_DEFOCUS_SLOPE, EMDL_DOUBLE, "rlnTomoDefocusSlope", "Rate of change of defocus over depth");
+
+		EMDL::addLabel(EMDL_TOMO_PARTICLES_FILE_NAME, EMDL_STRING, "rlnTomoParticlesFile", "Name of particles STAR file");
+		EMDL::addLabel(EMDL_TOMO_TOMOGRAMS_FILE_NAME, EMDL_STRING, "rlnTomoTomogramsFile", "Name of tomograms STAR file");
+		EMDL::addLabel(EMDL_TOMO_MANIFOLDS_FILE_NAME, EMDL_STRING, "rlnTomoManifoldsFile", "Name of manifolds STAR file");
+		EMDL::addLabel(EMDL_TOMO_TRAJECTORIES_FILE_NAME, EMDL_STRING, "rlnTomoTrajectoriesFile", "Name of trajectories STAR file");
+		EMDL::addLabel(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, EMDL_STRING, "rlnTomoReferenceMap1File", "Name of first reference map file");
+		EMDL::addLabel(EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME, EMDL_STRING, "rlnTomoReferenceMap2File", "Name of second reference map file");
+		EMDL::addLabel(EMDL_TOMO_REFERENCE_MASK_FILE_NAME, EMDL_STRING, "rlnTomoReferenceMaskFile", "Name of mask file corresponding to a pair of reference maps");
+		EMDL::addLabel(EMDL_TOMO_REFERENCE_FSC_FILE_NAME, EMDL_STRING, "rlnTomoReferenceFscFile", "Name of FSC STAR file corresponding to a pair of reference maps");
 
 		EMDL::addLabel(EMDL_TOMO_PARTICLE_ID, EMDL_INT, "rlnTomoParticleId", "Particle index");
 		EMDL::addLabel(EMDL_TOMO_PICK_PARTICLE_ID, EMDL_INT, "rlnTomoPickParticleId", "Virus Particle index");

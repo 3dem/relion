@@ -4,6 +4,7 @@
 #include <src/jaz/image/buffered_image.h>
 #include <vector>
 
+class OptimisationSet;
 
 class TomoReferenceMap
 {
@@ -12,6 +13,7 @@ class TomoReferenceMap
 		TomoReferenceMap();
 
 		void read(IOParser& parser);
+		void read(const OptimisationSet& optimisationSet);
 		
 			std::string mapFilenames[2], maskFilename, fscFilename;
 			bool useFscThreshold;

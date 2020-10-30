@@ -89,7 +89,7 @@ void BfactorFitProgram::run()
 		else
 		{
 			FCC3 = FCC::compute3(
-				dataSet, particles[t], tomogram, referenceMap.image_FS,
+				particleSet, particles[t], tomogram, referenceMap.image_FS,
 				flip_value, num_threads);
 			
 			FCC3.write(fcc3fn);
@@ -197,4 +197,7 @@ void BfactorFitProgram::run()
 	}
 	
 	tomogramSetOut.write(outDir + "tomograms.star");
+
+	optimisationSet.tomograms = outDir+"tomograms.star";
+	optimisationSet.write(outDir+"optimisation_set.star");
 }

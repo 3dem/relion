@@ -5,6 +5,7 @@
 #include <src/jaz/util/log.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/tomography/reconstruction.h>
+#include <src/jaz/tomography/optimisation_set.h>
 
 using namespace gravis;
 
@@ -20,6 +21,17 @@ void TomoReferenceMap::read(IOParser &parser)
 
 	useFscThreshold = !parser.checkOption("--fsc_act", "Use the actual FSC as the frq. weight");
 	fscThresholdWidth = textToDouble(parser.getOption("--fsc_thresh_width", "Width of the frq. weight flank", "5"));
+}
+
+void TomoReferenceMap::read(const OptimisationSet &optimisationSet)
+{
+	mapFilenames[0] = optimisationSet.refMap1;
+	mapFilenames[1] = optimisationSet.refMap2;
+	maskFilename = optimisationSet.refMask;
+	fscFilename = optimisationSet.refFSC;
+
+	useFscThreshold = optimisationSet.useFscThreshold;
+	fscThresholdWidth = optimisationSet.fscThresholdWidth;
 }
 
 void TomoReferenceMap::load(int boxSize)

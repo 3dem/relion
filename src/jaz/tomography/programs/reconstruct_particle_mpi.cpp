@@ -59,10 +59,10 @@ void ReconstructParticleProgramMpi::run()
 {
 	Log::beginSection("Initialising");
 
-	TomogramSet tomoSet(tomoSetFn);
-	ParticleSet dataSet(particlesFn, motFn);
+	TomogramSet tomoSet(optimisationSet.tomograms);
+	ParticleSet particleSet(optimisationSet.particles, optimisationSet.trajectories);
 
-	std::vector<std::vector<ParticleIndex>> particles = dataSet.splitByTomogram(tomoSet);
+	std::vector<std::vector<ParticleIndex>> particles = particleSet.splitByTomogram(tomoSet);
 
 	const int tc = particles.size();
 	const int s = boxSize;
@@ -118,7 +118,7 @@ void ReconstructParticleProgramMpi::run()
 		psfImgFS[i].fill(0.0);
 	}
 
-	AberrationsCache aberrationsCache(dataSet.optTable, boxSize);
+	AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
 
 	Log::endSection();
 
@@ -127,7 +127,7 @@ void ReconstructParticleProgramMpi::run()
 	const int last_tomo = (rank == nodeCount - 1)? tc - 1 : (rank + 1) * tc / nodeCount - 1;
 
 	processTomograms(
-		first_tomo, last_tomo, tomoSet, dataSet, particles, aberrationsCache,
+		first_tomo, last_tomo, tomoSet, particleSet, particles, aberrationsCache,
 		dataImgFS, ctfImgFS, psfImgFS, binnedOutPixelSize,
 		s02D, do_ctf, flip_value, 1);
 

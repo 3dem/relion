@@ -72,7 +72,7 @@ void FrameAlignmentProgram::run()
 	Log::printBinaryChoice("Particle positions: ", const_particles, "static", "variable");
 	Log::endSection();
 
-	AberrationsCache aberrationsCache(dataSet.optTable, boxSize);
+	AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
 
 	TomogramSet tomogramSetOut = tomogramSet;
 	
@@ -105,7 +105,7 @@ void FrameAlignmentProgram::run()
 		
 		
 		std::vector<BufferedImage<double>> CCs = Prediction::computeCroppedCCs(
-				dataSet, particles[t], tomogram, aberrationsCache,
+				particleSet, particles[t], tomogram, aberrationsCache,
 				referenceMap, frqWeight, dummySeq,
 				range, flip_value, num_threads, padding);
 		
@@ -131,7 +131,7 @@ void FrameAlignmentProgram::run()
 		}
 		
 		ProtoAlignment protoAlignment(
-				CCs, tomogram.projectionMatrices, dataSet, particles[t], referenceMap.image_FS, 
+				CCs, tomogram.projectionMatrices, particleSet, particles[t], referenceMap.image_FS, 
 				const_particles, const_angles, const_shifts, range,
 				tomogram.centre, num_threads, padding);
 		
@@ -140,7 +140,7 @@ void FrameAlignmentProgram::run()
 		if (diag)
 		{
 			FCC3 = FCC::compute3(
-				dataSet, particles[t], tomogram, referenceMap.image_FS,
+				particleSet, particles[t], tomogram, referenceMap.image_FS,
 				flip_value, num_threads);
 			
 			FCC3.write(diagPrefix + "_FCC3_initial.mrc");
@@ -195,7 +195,7 @@ void FrameAlignmentProgram::run()
 
 			
 			projTomoCorr = protoAlignment.getProjections(opt);
-			protoAlignment.shiftParticles(opt, particles[t], dataSet);
+			protoAlignment.shiftParticles(opt, particles[t], particleSet);
 			
 		}
 		
@@ -206,7 +206,7 @@ void FrameAlignmentProgram::run()
 			tomogram.projectionMatrices = projTomoCorr;
 			
 			FCC3 = FCC::compute3(
-				dataSet, particles[t], tomogram, referenceMap.image_FS,
+				particleSet, particles[t], tomogram, referenceMap.image_FS,
 				flip_value, num_threads);
 			
 			FCC3.write(diagPrefix + "_FCC3_final.mrc");
@@ -220,9 +220,13 @@ void FrameAlignmentProgram::run()
 	}
 	
 	tomogramSetOut.write(outDir + "tomograms.star");
+	optimisationSet.tomograms = outDir+"tomograms.star";
 	
 	if (!shiftOnly)
 	{
-		dataSet.write(outDir + "particles.star");
+		particleSet.write(outDir + "particles.star");
+		optimisationSet.particles = outDir+"particles.star";
 	}
+
+	optimisationSet.write(outDir+"optimisation_set.star");
 }

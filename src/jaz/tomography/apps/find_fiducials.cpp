@@ -8,6 +8,7 @@
 #include <src/jaz/image/similarity.h>
 #include <src/jaz/mesh/mesh.h>
 #include <src/jaz/mesh/mesh_builder.h>
+#include <src/jaz/tomography/optimisation_set.h>
 #include <src/jaz/tomography/fiducials.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
@@ -17,10 +18,12 @@ using namespace gravis;
 
 int main(int argc, char *argv[])
 {
-	std::string tomoSetFn, outDir;
+	std::string outDir;
 	double thresh, binning_out, binning_in, beadRadius_A;
 	int max_MG, num_threads;
 	bool diag, debug;
+
+	OptimisationSet optimisationSet;
 	
 	IOParser parser;
 
@@ -28,10 +31,18 @@ int main(int argc, char *argv[])
 	{	
 		parser.setCommandLine(argc, argv);
 
-		int gen_section = parser.addSection("General refinement options");
+		optimisationSet.read(
+			parser,
+			true,            // optimisation set
+			false,  false,   // particles
+			true,   true,    // tomograms
+			false,  false,   // trajectories
+			true,   true,    // manifolds
+			false,  false);  // reference
+
+		int gen_section = parser.addSection("General options");
 
 		outDir = parser.getOption("--o", "Output directory");
-		tomoSetFn = parser.getOption("--t", "Tomogram set", "tomograms.star");
 		thresh = textToDouble(parser.getOption("--d", "Detection threshold", "7"));
 		beadRadius_A = textToDouble(parser.getOption("--r", "Bead radius [Å]", "100"));
 		binning_in = textToDouble(parser.getOption("--bin0", "Search binning level", "4"));
@@ -65,7 +76,7 @@ int main(int argc, char *argv[])
 	}
 
 	
-	TomogramSet tomogramSet(tomoSetFn);
+	TomogramSet tomogramSet(optimisationSet.tomograms);
 	int tc = tomogramSet.size();
 	
 	if (max_MG >= 0 && max_MG < tc)
@@ -197,7 +208,10 @@ int main(int argc, char *argv[])
 		Log::endSection();
 	}
 	
-	tomogramSet.write(outDir+"tomograms.star");
+	tomogramSet.write(outDir + "tomograms.star");
+
+	optimisationSet.tomograms = outDir + "tomograms.star";
+	optimisationSet.write(outDir + "optimisation_set.star");
 
 	if (diag)
 	{

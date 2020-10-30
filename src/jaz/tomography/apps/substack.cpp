@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
 		sp.num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 		sp.outTag = parser.getOption("--o", "Output filename pattern");
 		
-		parser.checkForErrors();
+		if (parser.checkForErrors()) std::exit(-1);
 	}
 	catch (RelionError XE)
 	{

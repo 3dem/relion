@@ -4,6 +4,7 @@
 #include <src/error.h>
 #include <src/jaz/optics/damage.h>
 #include <src/jaz/util/zio.h>
+#include <src/jaz/util/log.h>
 
 using namespace gravis;
 
@@ -16,6 +17,8 @@ TomogramSet::TomogramSet()
 TomogramSet::TomogramSet(std::string filename)
 {
 	std::ifstream ifs(filename);
+
+	bool namesAreOld = false;
 
 	if (!ifs)
 	{
@@ -33,12 +36,30 @@ TomogramSet::TomogramSet(std::string filename)
 		
 		for (int t = 0; t < tc; t++)
 		{
+			const std::string expectedOldName = "tomo_" + ZIO::itoa(t);
+			const std::string expectedNewName = globalTable.getString(EMDL_TOMO_NAME, t);
+			const std::string name = allTables[t+1].getName();
+
+			if (name == expectedOldName)
+			{
+				namesAreOld = true;
+			}
+			else if (name != expectedNewName)
+			{
+				REPORT_ERROR_STR("TomogramSet::TomogramSet: file is corrupted " << filename);
+			}
+
 			tomogramTables[t] = allTables[t+1];
-			tomogramTables[t].setName("tomo_" + ZIO::itoa(t));
+			tomogramTables[t].setName(expectedNewName);
 		}	
 	}
 	
 	globalTable.setName("global");
+
+	if (namesAreOld)
+	{
+		Log::warn("Tomogram set " + filename + " is out of date. You are recommended to run relion_exp_update_tomogram_set on it.");
+	}
 }
 
 int TomogramSet::addTomogram(

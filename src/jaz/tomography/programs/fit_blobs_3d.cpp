@@ -28,9 +28,19 @@ void FitBlobs3DProgram::readParameters(int argc, char *argv[])
 	try
 	{
 		parser.setCommandLine(argc, argv);
+
+		optimisationSet.read(
+			parser,
+			true,            // optimisation set
+			false,  false,   // particles
+			true,   true,    // tomograms
+			false,  false,   // trajectories
+			false,  false,   // manifolds
+			false,  false);  // reference
+
 		int gen_section = parser.addSection("General options");
 
-		tomoSetFn = parser.getOption("--t", "Tomogram set filename", "tomograms.star");
+
 		listFn = parser.getOption("--i", "File containing a list of tomogram-name/spheres-file pairs");
 
 		sphere_thickness_0 = textToDouble(parser.getOption("--th", "Sphere thickness (same units as sphere centres)"));
@@ -78,7 +88,7 @@ void FitBlobs3DProgram::readParameters(int argc, char *argv[])
 
 void FitBlobs3DProgram::run()
 {
-	TomogramSet tomogram_set = TomogramSet(tomoSetFn);	
+	TomogramSet tomogram_set = TomogramSet(optimisationSet.tomograms);
 	ManifoldSet manifold_set;
 	
 	if (!tomogram_set.globalTable.labelExists(EMDL_TOMO_FIDUCIALS_STARFILE))
@@ -131,6 +141,9 @@ void FitBlobs3DProgram::run()
 	}
 	
 	manifold_set.write(outPath + "manifolds.star");
+
+	optimisationSet.manifolds = outPath + "manifolds.star";
+	optimisationSet.write(outPath + "optimisation_set.star");
 }
 
 void FitBlobs3DProgram::processTomogram(
@@ -169,11 +182,6 @@ void FitBlobs3DProgram::processTomogram(
 	if (has_fiducials)
 	{
 		Log::print("Erasing fiducial markers");
-		
-		if (fiducialsDir[fiducialsDir.length()-1] != '/')
-		{
-			fiducialsDir = fiducialsDir + "/";
-		}
 
 		fiducials = Fiducials::read(tomogram0.fiducialsFilename, tomogram0.optics.pixelSize);
 

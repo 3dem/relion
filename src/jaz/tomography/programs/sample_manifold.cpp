@@ -17,8 +17,14 @@ void SampleManifoldProgram::readParameters(int argc, char *argv[])
 		parser.setCommandLine(argc, argv);
 		int gen_section = parser.addSection("General options");
 
-		tomogram_set_filename = parser.getOption("--t", "Tomogram set", "tomograms.star");
-		manifolds_filename = parser.getOption("--m", "Manifolds set", "manifolds.star");
+		optimisationSet.read(
+			parser,
+			true,            // optimisation set
+			false,  false,   // particles
+			true,   true,    // tomograms
+			false,  false,   // trajectories
+			true,   true,    // manifolds
+			false,  false);  // reference
 
 		spacing = textToDouble(parser.getOption("--spacing", "Particle spacing [A]"));
 		depth = textToDouble(parser.getOption("--depth", "Depth below surface [A]"));
@@ -32,7 +38,7 @@ void SampleManifoldProgram::readParameters(int argc, char *argv[])
 
 		Log::readParams(parser);
 
-		parser.checkForErrors();
+		if (parser.checkForErrors()) std::exit(-1);
 
 	}
 	catch (RelionError XE)
@@ -47,8 +53,8 @@ void SampleManifoldProgram::run()
 {
 	output_path = ZIO::makeOutputDir(output_path);
 
-	TomogramSet tomogram_set(tomogram_set_filename);
-	ManifoldSet manifold_set(manifolds_filename);
+	TomogramSet tomogram_set(optimisationSet.tomograms);
+	ManifoldSet manifold_set(optimisationSet.manifolds);
 
 	MetaDataTable optics_table, particles_table;
 
@@ -160,4 +166,7 @@ void SampleManifoldProgram::run()
 
 	optics_table.write(ofs);
 	particles_table.write(ofs);
+
+	optimisationSet.particles = output_path + "particles.star";
+	optimisationSet.write(output_path + "optimisation_set.star");
 }

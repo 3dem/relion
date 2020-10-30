@@ -53,10 +53,18 @@ void ReconstructParticleProgram::readBasicParameters(int argc, char *argv[])
 	try
 	{
 		parser.setCommandLine(argc, argv);
-		int gen_section = parser.addSection("General options");
-		
-		particlesFn = parser.getOption("--i", "Input particle set");
-		tomoSetFn = parser.getOption("--t", "Tomogram set", "tomograms.star");
+
+		optimisationSet.read(
+			parser,
+			true,           // optimisation set
+			true,   true,   // particles
+			true,   true,   // tomograms
+			true,   false,  // trajectories
+			false,  false,  // manifolds
+			false,  false); // reference
+
+		int gen_section = parser.addSection("Reconstruction options");
+
 		boxSize = textToInteger(parser.getOption("--b", "Box size", "100"));
 		cropSize = textToInteger(parser.getOption("--crop", "Size of (additionally output) cropped image", "-1"));
 
@@ -72,8 +80,6 @@ void ReconstructParticleProgram::readBasicParameters(int argc, char *argv[])
 		explicit_gridding = parser.checkOption("--xg", "Perform gridding correction using a measured spreading function");
 		diag = parser.checkOption("--diag", "Write out diagnostic information");
 		no_subpix_off = parser.checkOption("--nso", "No subpixel offset (debugging)");
-		
-		motFn = parser.getOption("--mot", "Particle trajectories", "");
 		
 		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 		inner_threads = textToInteger(parser.getOption("--j_in", "Number of inner threads (slower, needs less memory)", "3"));
@@ -102,10 +108,10 @@ void ReconstructParticleProgram::run()
 {
 	Log::beginSection("Initialising");
 
-	TomogramSet tomoSet(tomoSetFn);
-	ParticleSet dataSet(particlesFn, motFn);
+	TomogramSet tomoSet(optimisationSet.tomograms);
+	ParticleSet particleSet(optimisationSet.particles, optimisationSet.trajectories);
 
-	std::vector<std::vector<ParticleIndex>> particles = dataSet.splitByTomogram(tomoSet);
+	std::vector<std::vector<ParticleIndex>> particles = particleSet.splitByTomogram(tomoSet);
 	
 	const int tc = particles.size();
 	const int s = boxSize;
@@ -161,14 +167,14 @@ void ReconstructParticleProgram::run()
 		psfImgFS[i].fill(0.0);
 	}
 
-	AberrationsCache aberrationsCache(dataSet.optTable, boxSize);
+	AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
 
 	Log::endSection();
 	
 
 
 	processTomograms(
-		0, tc-1, tomoSet, dataSet, particles, aberrationsCache,
+		0, tc-1, tomoSet, particleSet, particles, aberrationsCache,
 		dataImgFS, ctfImgFS, psfImgFS, binnedOutPixelSize,
 		s02D, do_ctf, flip_value, 1);
 
@@ -221,7 +227,7 @@ void ReconstructParticleProgram::processTomograms(
 	int first_t,
 	int last_t,
 	const TomogramSet& tomoSet,
-	const ParticleSet& dataSet,
+	const ParticleSet& particleSet,
 	const std::vector<std::vector<ParticleIndex>>& particles,
 	const AberrationsCache& aberrationsCache,
 	std::vector<BufferedImage<dComplex>>& dataImgFS,
@@ -253,7 +259,7 @@ void ReconstructParticleProgram::processTomograms(
 
 		const int fc = tomogram.frameCount;
 
-		dataSet.checkTrajectoryLengths(particles[t][0], pc, fc, "backproject");
+		particleSet.checkTrajectoryLengths(particles[t][0], pc, fc, "backproject");
 
 		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s, binning);
 		BufferedImage<float> noiseWeights;
@@ -290,8 +296,8 @@ void ReconstructParticleProgram::processTomograms(
 
 			const ParticleIndex part_id = particles[t][p];
 
-			const d3Vector pos = dataSet.getPosition(part_id);
-			const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(
+			const d3Vector pos = particleSet.getPosition(part_id);
+			const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
 						part_id, fc, tomogram.optics.pixelSize);
 			std::vector<d4Matrix> projCut(fc), projPart(fc);
 
@@ -300,11 +306,11 @@ void ReconstructParticleProgram::processTomograms(
 					tomogram.stack, s02D, binning, tomogram.projectionMatrices, traj,
 					particleStack[th], projCut, inner_threads, true);
 
-			const d4Matrix particleToTomo = dataSet.getMatrix4x4(part_id, s,s,s);
+			const d4Matrix particleToTomo = particleSet.getMatrix4x4(part_id, s,s,s);
 
-			const int halfSet = dataSet.getHalfSet(part_id);
+			const int halfSet = particleSet.getHalfSet(part_id);
 
-			const int og = dataSet.getOpticsGroup(part_id);
+			const int og = particleSet.getOpticsGroup(part_id);
 
 			const BufferedImage<double>* gammaOffset =
 				aberrationsCache.hasSymmetrical? &aberrationsCache.symmetrical[og] : 0;

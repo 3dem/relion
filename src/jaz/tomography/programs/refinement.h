@@ -12,6 +12,7 @@
 #include <src/jaz/tomography/particle_set.h>
 #include <src/jaz/tomography/tomogram.h>
 #include <src/jaz/tomography/reference_map.h>
+#include <src/jaz/tomography/optimisation_set.h>
 #include <src/jaz/optics/optics_data.h>
 
 
@@ -27,7 +28,8 @@ class RefinementProgram
 			int argc;
 			char** argv;
 			
-			std::string outDir, tomoSetFn, particlesFn, motFn;
+			std::string outDir;
+			OptimisationSet optimisationSet;
 			
 			bool diag, timing;
 			
@@ -35,7 +37,7 @@ class RefinementProgram
 
 			
 			
-			ParticleSet dataSet;
+			ParticleSet particleSet;
 			std::vector<std::vector<ParticleIndex>> particles;
 			TomogramSet tomogramSet;
 			

@@ -6,6 +6,7 @@
 #include <src/jaz/gravis/t4Matrix.h>
 #include <src/jaz/gravis/t2Vector.h>
 #include <src/jaz/image/buffered_image.h>
+#include <src/jaz/tomography/optimisation_set.h>
 
 class SubtomoProgram
 {
@@ -13,8 +14,9 @@ class SubtomoProgram
 		
 		SubtomoProgram(){}
 		
-		
-			std::string outTag, tomoSetFn, particlesFn, motFn;
+			OptimisationSet optimisationSet;
+
+			std::string outTag;
 			
 			int 
 				boxSize, 

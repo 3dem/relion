@@ -40,7 +40,7 @@ DefocusRefinementProgram::DefocusRefinementProgram(int argc, char *argv[])
 		_readParams(parser);
 		
 		int def_section = parser.addSection("Defocus refinement options");
-				
+
 		do_scanDefocus = !parser.checkOption("--no_scan", "Skip accelerated defocus scan");
 		do_slowScan = parser.checkOption("--slow_scan", "Perform a slow, brute-force defocus scan instead");
 		do_refineFast = !parser.checkOption("--slow_scan_only", "Only perform a brute-force scan");
@@ -103,7 +103,7 @@ void DefocusRefinementProgram::run()
 	const int tc = particles.size();
 	const bool flip_value = true;
 
-	AberrationsCache aberrationsCache(dataSet.optTable, boxSize);
+	AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
 	
 	Log::endSection();
 
@@ -128,7 +128,7 @@ void DefocusRefinementProgram::run()
 		const int usedParticleCount = (max_particles > 0 && pc0 > max_particles)? max_particles : pc0;
 		const int fc = tomogram.frameCount;
 		
-		dataSet.checkTrajectoryLengths(
+		particleSet.checkTrajectoryLengths(
 				particles[t][0], usedParticleCount, fc, "DefocusRefinementProgram::run");
 		
 		
@@ -168,7 +168,7 @@ void DefocusRefinementProgram::run()
 					DefocusFit defocus = findDefocus(
 						f, minDelta, maxDelta, deltaSteps,
 						group_count, sigma_input,
-						dataSet, particles[t], usedParticleCount,
+						particleSet, particles[t], usedParticleCount,
 						tomogram, aberrationsCache, referenceMap.image_FS,
 						freqWeights, flip_value, num_threads);
 
@@ -262,7 +262,7 @@ void DefocusRefinementProgram::run()
 						}
 
 						AberrationFit::considerParticle(
-							particles[t][p], tomogram, referenceMap, dataSet,
+							particles[t][p], tomogram, referenceMap, particleSet,
 							aberrationsCache, flip_value, freqWeights,
 							f, f,
 							evenData_thread[th], oddData_thread[th]);
@@ -336,7 +336,7 @@ void DefocusRefinementProgram::run()
 
 			std::vector<d3Vector> tomogramSlopeCost = computeSlopeCost(
 				max_slope_dose, min_slope, max_slope, slope_steps,
-				dataSet, particles[t], pc0, tomogram, aberrationsCache,
+				particleSet, particles[t], pc0, tomogram, aberrationsCache,
 				referenceMap.image_FS, freqWeights,
 				flip_value, num_threads);
 
@@ -391,6 +391,9 @@ void DefocusRefinementProgram::run()
 	}
 
 	tomogramSet.write(outDir+"tomograms.star");
+
+	optimisationSet.tomograms = outDir+"tomograms.star";
+	optimisationSet.write(outDir+"optimisation_set.star");
 }
 
 void DefocusRefinementProgram::writeSlopeCost(

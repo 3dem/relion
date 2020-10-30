@@ -27,18 +27,23 @@ RefinementProgram::RefinementProgram(int argc, char *argv[])
 
 void RefinementProgram::_readParams(IOParser &parser)
 {
+	optimisationSet.read(
+		parser,
+		true,           // optimisation set
+		true,   true,   // particles
+		true,   true,   // tomograms
+		true,   false,  // trajectories
+		false,  false,  // manifolds
+		true,   true);  // reference
+
 	int gen_section = parser.addSection("General refinement options");
-	
-	particlesFn = parser.getOption("--i", "Input particle set");
-	tomoSetFn = parser.getOption("--t", "Tomogram set", "tomograms.star");
+
 	boxSize = textToInteger(parser.getOption("--b", "Box size", "384"));
 
-	referenceMap.read(parser);
+	referenceMap.read(optimisationSet);
 
 	specified_first_frame = textToInteger(parser.getOption("--f0", "First frame", "0"));
 	specified_last_frame = textToInteger(parser.getOption("--f1", "Last frame", "-1"));
-	
-	motFn = parser.getOption("--mot", "Particle trajectories", "");
 	
 	diag = parser.checkOption("--diag", "Write out diagnostic information");
 	timing = parser.checkOption("--time", "Measure the elapsed time");
@@ -68,10 +73,10 @@ void RefinementProgram::init()
 		ofs << '\n';
 	}
 
-	tomogramSet = TomogramSet(tomoSetFn);
+	tomogramSet = TomogramSet(optimisationSet.tomograms);
 	
-	dataSet = ParticleSet(particlesFn, motFn);
-	particles = dataSet.splitByTomogram(tomogramSet);
+	particleSet = ParticleSet(optimisationSet.particles, optimisationSet.trajectories);
+	particles = particleSet.splitByTomogram(tomogramSet);
 		
 	referenceMap.load(boxSize);
 }

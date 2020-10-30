@@ -29,10 +29,18 @@ void SubtomoProgram::readParameters(int argc, char *argv[])
 	try
 	{
 		parser.setCommandLine(argc, argv);
-		int gen_section = parser.addSection("General options");
 
-		particlesFn = parser.getOption("--i", "Catalogue .tbl or .star file");
-		tomoSetFn = parser.getOption("--t", "Tomogram set", "tomograms.star");
+		optimisationSet.read(
+			parser,
+			true,           // optimisation set
+			true,   true,   // particles
+			true,   true,   // tomograms
+			true,   false,  // trajectories
+			false,  false,  // manifolds
+			false,  false); // reference
+
+		int gen_section = parser.addSection("Reconstruction options");
+
 		boxSize = textToInteger(parser.getOption("--b", "Binned projection box size", "100"));
 		cropSize = textToInteger(parser.getOption("--crop", "Output box size", "-1"));
 		binning = textToDouble(parser.getOption("--bin", "Binning factor", "1"));
@@ -60,8 +68,6 @@ void SubtomoProgram::readParameters(int argc, char *argv[])
 		write_divided = parser.checkOption("--div", "Write CTF-corrected subtomograms");
 		write_normalised = parser.checkOption("--nrm", "Write multiplicity-normalised subtomograms");
 		
-		motFn = parser.getOption("--mot", "Particle trajectories", "");
-		
 		diag = parser.checkOption("--diag", "Write out diagnostic information");
 		do_sum_all = parser.checkOption("--sum", "Sum up all subtomograms (for debugging)");
 
@@ -70,7 +76,7 @@ void SubtomoProgram::readParameters(int argc, char *argv[])
 		
 		Log::readParams(parser);
 
-		parser.checkForErrors();
+		if (parser.checkForErrors()) std::exit(-1);
 
 	}
 	catch (RelionError XE)
@@ -103,10 +109,10 @@ void SubtomoProgram::readParameters(int argc, char *argv[])
 
 void SubtomoProgram::run()
 {
-	TomogramSet tomogramSet(tomoSetFn);
+	TomogramSet tomogramSet(optimisationSet.tomograms);
 
-	ParticleSet dataSet(particlesFn, motFn);
-	std::vector<std::vector<ParticleIndex> > particles = dataSet.splitByTomogram(tomogramSet);
+	ParticleSet particleSet(optimisationSet.particles, optimisationSet.trajectories);
+	std::vector<std::vector<ParticleIndex> > particles = particleSet.splitByTomogram(tomogramSet);
 	
 	if (cropSize < 0) cropSize = boxSize;
 	
@@ -123,7 +129,7 @@ void SubtomoProgram::run()
 	
 	const double relative_box_scale = cropSize / (double) boxSize;
 
-	ParticleSet copy = dataSet;
+	ParticleSet copy = particleSet;
 
 	for (int t = 0; t < tc; t++)
 	{
@@ -138,8 +144,8 @@ void SubtomoProgram::run()
 			const int opticsGroup = copy.getOpticsGroup(part_id);
 			const double originalPixelSize = copy.getOriginalPixelSize(opticsGroup);
 
-			std::string outData = outTag + "/" + dataSet.getName(part_id) + "_data.mrc";
-			std::string outWeight = outTag + "/" + dataSet.getName(part_id) + "_weights.mrc";
+			std::string outData = outTag + "/" + particleSet.getName(part_id) + "_data.mrc";
+			std::string outWeight = outTag + "/" + particleSet.getName(part_id) + "_weights.mrc";
 
 			copy.setImageFileNames(outData, outWeight, part_id);
 			
@@ -167,6 +173,9 @@ void SubtomoProgram::run()
 
 	copy.write(outTag + "_particles.star");
 
+	optimisationSet.particles = outTag + "_particles.star";
+	optimisationSet.write(outTag + "_optimisation_set.star");
+
 
 	BufferedImage<float> sum_data, sum_weights;
 
@@ -179,7 +188,7 @@ void SubtomoProgram::run()
 		sum_weights.fill(0.0);
 	}
 
-	AberrationsCache aberrationsCache(dataSet.optTable, s2D);
+	AberrationsCache aberrationsCache(particleSet.optTable, s2D);
 
 	
 	for (int t = 0; t < tc; t++)
@@ -194,7 +203,7 @@ void SubtomoProgram::run()
 		
 		const int fc = tomogram.frameCount;
 		
-		dataSet.checkTrajectoryLengths(particles[t][0], pc, fc, "subtomo");
+		particleSet.checkTrajectoryLengths(particles[t][0], pc, fc, "subtomo");
 		
 		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s2D, binning);
 		BufferedImage<float> noiseWeights;
@@ -225,8 +234,8 @@ void SubtomoProgram::run()
 						
 			const ParticleIndex part_id = particles[t][p];
 			
-			const d3Vector pos = dataSet.getPosition(part_id);
-			const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(
+			const d3Vector pos = particleSet.getPosition(part_id);
+			const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
 						part_id, fc, tomogram.optics.pixelSize);
 			
 			std::vector<d4Matrix> projCut(fc), projPart(fc);
@@ -244,14 +253,14 @@ void SubtomoProgram::run()
 			if (!do_ctf) weightStack.fill(1.f);
 
 
-			const int og = dataSet.getOpticsGroup(part_id);
+			const int og = particleSet.getOpticsGroup(part_id);
 
 			const BufferedImage<double>* gammaOffset =
 				aberrationsCache.hasSymmetrical? &aberrationsCache.symmetrical[og] : 0;
 			
 			for (int f = 0; f < fc; f++)
 			{
-				projPart[f] = projCut[f] * d4Matrix(dataSet.getSubtomogramMatrix(part_id));
+				projPart[f] = projCut[f] * d4Matrix(particleSet.getSubtomogramMatrix(part_id));
 				
 				if (do_ctf)
 				{
@@ -333,7 +342,7 @@ void SubtomoProgram::run()
 			{ 
 				FFT::FourierTransform(dataImgRS, dataImgFS);
 
-				d3Matrix R = dataSet.getMatrix3x3(part_id);
+				d3Matrix R = particleSet.getMatrix3x3(part_id);
 				
 				for (int z = 0; z < s3D;  z++)
 				for (int y = 0; y < s3D;  y++)
@@ -359,13 +368,13 @@ void SubtomoProgram::run()
 				FFT::inverseFourierTransform(dataImgFS, dataImgRS);
 			}
 
-			std::string outData = outTag + "/" + dataSet.getName(part_id) + "_data.mrc";
-			std::string outWeight = outTag + "/" + dataSet.getName(part_id) + "_weights.mrc";
-			std::string outCTF = outTag + "/" + dataSet.getName(part_id) + "_CTF2.mrc";
-			std::string outDiv = outTag + "/" + dataSet.getName(part_id) + "_div.mrc";
-			std::string outMulti = outTag + "/" + dataSet.getName(part_id) + "_multi.mrc";
-			std::string outNrm = outTag + "/" + dataSet.getName(part_id) + "_data_nrm.mrc";
-			std::string outWeightNrm = outTag + "/" + dataSet.getName(part_id) + "_CTF2_nrm.mrc";
+			std::string outData = outTag + "/" + particleSet.getName(part_id) + "_data.mrc";
+			std::string outWeight = outTag + "/" + particleSet.getName(part_id) + "_weights.mrc";
+			std::string outCTF = outTag + "/" + particleSet.getName(part_id) + "_CTF2.mrc";
+			std::string outDiv = outTag + "/" + particleSet.getName(part_id) + "_div.mrc";
+			std::string outMulti = outTag + "/" + particleSet.getName(part_id) + "_multi.mrc";
+			std::string outNrm = outTag + "/" + particleSet.getName(part_id) + "_data_nrm.mrc";
+			std::string outWeightNrm = outTag + "/" + particleSet.getName(part_id) + "_CTF2_nrm.mrc";
 
 			// What if we didn't? The 2D image is already tapered.
 			Reconstruction::taper(dataImgRS, taper, do_center, inner_thread_num);

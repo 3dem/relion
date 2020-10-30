@@ -4,6 +4,7 @@
 #include <string>
 #include <src/jaz/image/buffered_image.h>
 #include <src/jaz/mesh/mesh_builder.h>
+#include <src/jaz/tomography/optimisation_set.h>
 
 class Tomogram;
 class TomogramSet;
@@ -18,7 +19,9 @@ class FitBlobs3DProgram
 		FitBlobs3DProgram(){}
 
 		
-			std::string outPath, tomoSetFn, listFn, fiducialsDir;
+			std::string outPath, listFn;
+
+			OptimisationSet optimisationSet;
 
 			bool diag;
 			int SH_bands, num_threads, max_iters;

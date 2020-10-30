@@ -423,6 +423,11 @@ void IOParser::writeUsage(std::ostream &out)
 	out << " : Print RELION version and exit" << std::endl;
 }
 
+void IOParser::reportError(const std::string& message)
+{
+	error_messages.push_back(message);
+}
+
 void untangleDeviceIDs(std::string &tangled, std::vector < std::vector < std::string > > &untangled)
 {
 	// Handle GPU (device) assignments for each rank, if speficied

@@ -21,7 +21,7 @@ int main(int argc, char *argv[])
 		
 		pp.outFn = parser.getOption("--o", "Output filename");
 				
-		parser.checkForErrors();
+		if (parser.checkForErrors()) std::exit(-1);
 	}
 	catch (RelionError XE)
 	{

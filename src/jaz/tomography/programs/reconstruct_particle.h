@@ -3,6 +3,7 @@
 
 #include <string>
 #include <src/jaz/image/buffered_image.h>
+#include <src/jaz/tomography/optimisation_set.h>
 
 class TomogramSet;
 class ParticleSet;
@@ -16,7 +17,9 @@ class ReconstructParticleProgram
 		
 		ReconstructParticleProgram(){}
 		
-			std::string outTag, tomoSetFn, particlesFn, motFn, symmName;
+
+			OptimisationSet optimisationSet;
+			std::string outTag, symmName;
 			
 			bool do_whiten, diag, no_subpix_off, explicit_gridding, no_reconstruction;
 			int boxSize, cropSize, num_threads, outer_threads, inner_threads, max_mem_GB;
