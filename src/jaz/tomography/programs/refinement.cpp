@@ -38,7 +38,7 @@ void RefinementProgram::_readParams(IOParser &parser)
 
 	int gen_section = parser.addSection("General refinement options");
 
-	boxSize = textToInteger(parser.getOption("--b", "Box size", "384"));
+	boxSize = textToInteger(parser.getOption("--b", "Box size"));
 
 	referenceMap.read(optimisationSet);
 

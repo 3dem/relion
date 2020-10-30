@@ -65,7 +65,7 @@ void ReconstructParticleProgram::readBasicParameters(int argc, char *argv[])
 
 		int gen_section = parser.addSection("Reconstruction options");
 
-		boxSize = textToInteger(parser.getOption("--b", "Box size", "100"));
+		boxSize = textToInteger(parser.getOption("--b", "Box size"));
 		cropSize = textToInteger(parser.getOption("--crop", "Size of (additionally output) cropped image", "-1"));
 
 		do_whiten = parser.checkOption("--whiten", "Whiten the noise by flattening the power spectrum");

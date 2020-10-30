@@ -35,7 +35,7 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 
 	int gen_section = parser.addSection("Reconstruction options");
 
-	boxSize = textToInteger(parser.getOption("--b", "Binned projection box size", "100"));
+	boxSize = textToInteger(parser.getOption("--b", "Binned projection box size"));
 	cropSize = textToInteger(parser.getOption("--crop", "Output box size", "-1"));
 	binning = textToDouble(parser.getOption("--bin", "Binning factor", "1"));
 	write_multiplicity = parser.checkOption("--multi", "Write out multiplicity volumes");
