@@ -1,0 +1,52 @@
+body 
+{
+	padding-left: 4em;
+	padding-right: 4em;
+	font-family: Georgia, "Times New Roman", Times, serif;
+	color: black;
+	background-color: #c0c0c0;
+	max-width: 800px;
+	margin-bottom: 10em;
+}
+
+h1 
+{
+	font-family: Helvetica, Geneva, Arial, SunSans-Regular, sans-serif 
+}
+
+p 
+{
+	font-family: Helvetica, Geneva, Arial, SunSans-Regular, sans-serif;
+	font-size: large;
+	text-align: justify;
+	text-justify: inter-word;
+}
+
+.center {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+ul 
+{
+	font-family: Helvetica, Geneva, Arial, SunSans-Regular, sans-serif;
+	font-size: large;
+	text-align: justify;
+	text-justify: inter-word;
+}
+
+a
+{
+	text-align:left
+}
+
+a:link 
+{
+	color: blue 
+}
+
+a:visited 
+{
+	color: purple 
+}
