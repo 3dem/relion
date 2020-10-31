@@ -66,7 +66,7 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 	do_sum_all = parser.checkOption("--sum", "Sum up all subtomograms (for debugging)");
 
 	num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
-	outTag = parser.getOption("--o", "Output filename pattern");
+	outDir = parser.getOption("--o", "Output filename pattern");
 }
 
 void SubtomoProgram::readParameters(int argc, char *argv[])
@@ -97,20 +97,8 @@ void SubtomoProgram::readParameters(int argc, char *argv[])
 		do_narrow_circle_crop = true;
 	}
 
-	ZIO::makeOutputDir(outTag);
-
-	{
-		std::ofstream ofs(outTag+"_note.txt");
-
-		ofs << "Command:\n\n";
-
-		for (int i = 0; i < argc; i++)
-		{
-			ofs << argv[i] << ' ';
-		}
-
-		ofs << '\n';
-	}
+	outDir = ZIO::prepareTomoOutputDirectory(outDir, argc, argv);
+	int res = system(("mkdir -p " + outDir + "/Subtomograms").c_str());
 }
 
 void SubtomoProgram::run()
@@ -170,8 +158,8 @@ void SubtomoProgram::run()
 
 	if (do_sum_all)
 	{
-		sum_data.write(outTag + "_sum_data.mrc");
-		sum_weights.write(outTag + "_sum_weight.mrc");
+		sum_data.write(outDir + "sum_data.mrc");
+		sum_weights.write(outDir + "sum_weight.mrc");
 
 		BufferedImage<float> dataImgDivRS(s3D,s3D,s3D);
 		dataImgDivRS.fill(0.0);
@@ -189,7 +177,7 @@ void SubtomoProgram::run()
 				0.001, num_threads);
 		}
 
-		dataImgDivRS.write(outTag + "_sum_div.mrc");
+		dataImgDivRS.write(outDir + "sum_div.mrc");
 	}
 }
 
@@ -214,8 +202,8 @@ void SubtomoProgram::writeParticleSet(
 			const int opticsGroup = copy.getOpticsGroup(part_id);
 			const double originalPixelSize = copy.getOriginalPixelSize(opticsGroup);
 
-			std::string outData = outTag + "/" + particleSet.getName(part_id) + "_data.mrc";
-			std::string outWeight = outTag + "/" + particleSet.getName(part_id) + "_weights.mrc";
+			std::string outData = outDir + "Subtomograms/" + particleSet.getName(part_id) + "_data.mrc";
+			std::string outWeight = outDir + "Subtomograms/" + particleSet.getName(part_id) + "_weights.mrc";
 
 			copy.setImageFileNames(outData, outWeight, part_id);
 
@@ -241,10 +229,10 @@ void SubtomoProgram::writeParticleSet(
 		copy.optTable.setValue(EMDL_IMAGE_SIZE, cropSize, og);
 	}
 
-	copy.write(outTag + "_particles.star");
+	copy.write(outDir + "particles.star");
 
-	optimisationSet.particles = outTag + "_particles.star";
-	optimisationSet.write(outTag + "_optimisation_set.star");
+	optimisationSet.particles = outDir + "particles.star";
+	optimisationSet.write(outDir + "optimisation_set.star");
 }
 
 void SubtomoProgram::processTomograms(
@@ -452,13 +440,13 @@ void SubtomoProgram::processTomograms(
 				FFT::inverseFourierTransform(dataImgFS, dataImgRS);
 			}
 
-			std::string outData = outTag + "/" + particleSet.getName(part_id) + "_data.mrc";
-			std::string outWeight = outTag + "/" + particleSet.getName(part_id) + "_weights.mrc";
-			std::string outCTF = outTag + "/" + particleSet.getName(part_id) + "_CTF2.mrc";
-			std::string outDiv = outTag + "/" + particleSet.getName(part_id) + "_div.mrc";
-			std::string outMulti = outTag + "/" + particleSet.getName(part_id) + "_multi.mrc";
-			std::string outNrm = outTag + "/" + particleSet.getName(part_id) + "_data_nrm.mrc";
-			std::string outWeightNrm = outTag + "/" + particleSet.getName(part_id) + "_CTF2_nrm.mrc";
+			std::string outData = outDir + "Subtomograms/" + particleSet.getName(part_id) + "_data.mrc";
+			std::string outWeight = outDir + "Subtomograms/" + particleSet.getName(part_id) + "_weights.mrc";
+			std::string outCTF = outDir + "Subtomograms/" + particleSet.getName(part_id) + "_CTF2.mrc";
+			std::string outDiv = outDir + "Subtomograms/" + particleSet.getName(part_id) + "_div.mrc";
+			std::string outMulti = outDir + "Subtomograms/" + particleSet.getName(part_id) + "_multi.mrc";
+			std::string outNrm = outDir + "Subtomograms/" + particleSet.getName(part_id) + "_data_nrm.mrc";
+			std::string outWeightNrm = outDir + "Subtomograms/" + particleSet.getName(part_id) + "_CTF2_nrm.mrc";
 
 			// What if we didn't? The 2D image is already tapered.
 			Reconstruction::taper(dataImgRS, taper, do_center, inner_thread_num);

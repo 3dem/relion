@@ -229,5 +229,32 @@ std::string ZIO::ensureEndingSlash(const std::string &dir)
 		}
 	}
 	
-	return out;	
+	return out;
+}
+
+std::string ZIO::prepareTomoOutputDirectory(const std::string &dir, int argc, char *argv[])
+{
+	std::string outDir = dir;
+
+	if (outDir[outDir.length()-1] != '/')
+	{
+		outDir = outDir + "/";
+	}
+
+	int res = system(("mkdir -p "+outDir).c_str());
+
+	{
+		std::ofstream ofs(outDir+"note.txt");
+
+		ofs << "Command:\n\n";
+
+		for (int i = 0; i < argc; i++)
+		{
+			ofs << argv[i] << ' ';
+		}
+
+		ofs << '\n';
+	}
+
+	return outDir;
 }

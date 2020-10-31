@@ -23,7 +23,7 @@ class SubtomoProgram
 		
 			OptimisationSet optimisationSet;
 
-			std::string outTag;
+			std::string outDir;
 			
 			int 
 				boxSize, 

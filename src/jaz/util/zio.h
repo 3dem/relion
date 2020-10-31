@@ -42,6 +42,10 @@ class ZIO
 		
 		static std::string makeOutputDir(const std::string& dir);
 		static std::string ensureEndingSlash(const std::string& dir);
+
+		static std::string prepareTomoOutputDirectory(
+				const std::string& dir,
+				int argc, char *argv[]);
 };
 
 template <typename T>

@@ -32,27 +32,7 @@ void ReconstructParticleProgramMpi::readParameters(int argc, char *argv[])
 {
 	readBasicParameters(argc, argv);
 
-	if (rank == 0)
-	{
-		if (outTag.find_last_of("/") != std::string::npos)
-		{
-			std::string dir = outTag.substr(0, outTag.find_last_of("/"));
-			int res = system(("mkdir -p "+dir).c_str());
-		}
-
-		{
-			std::ofstream ofs(outTag+"_note.txt");
-
-			ofs << "Command:\n\n";
-
-			for (int i = 0; i < argc; i++)
-			{
-				ofs << argv[i] << ' ';
-			}
-
-			ofs << '\n';
-		}
-	}
+	outDir = ZIO::prepareTomoOutputDirectory(outDir, argc, argv);
 }
 
 void ReconstructParticleProgramMpi::run()

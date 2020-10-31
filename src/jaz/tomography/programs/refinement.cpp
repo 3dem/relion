@@ -53,25 +53,7 @@ void RefinementProgram::_readParams(IOParser &parser)
 
 void RefinementProgram::init()
 {
-	if (outDir[outDir.length()-1] != '/')
-	{
-		outDir = outDir + "/";
-	}
-	
-	int res = system(("mkdir -p "+outDir).c_str());
-	
-	{
-		std::ofstream ofs(outDir+"/note.txt");
-		
-		ofs << "Command:\n\n";
-		
-		for (int i = 0; i < argc; i++)
-		{
-			ofs << argv[i] << ' ';
-		}
-		
-		ofs << '\n';
-	}
+	outDir = ZIO::prepareTomoOutputDirectory(outDir, argc, argv);
 
 	tomogramSet = TomogramSet(optimisationSet.tomograms);
 	
