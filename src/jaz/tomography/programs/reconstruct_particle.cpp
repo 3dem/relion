@@ -62,7 +62,6 @@ void ReconstructParticleProgram::readBasicParameters(int argc, char *argv[])
 				
 		explicit_gridding = parser.checkOption("--xg", "Perform gridding correction using a measured spreading function");
 		diag = parser.checkOption("--diag", "Write out diagnostic information");
-		no_subpix_off = parser.checkOption("--nso", "No subpixel offset (debugging)");
 		
 		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 		inner_threads = textToInteger(parser.getOption("--j_in", "Number of inner threads (slower, needs less memory)", "3"));

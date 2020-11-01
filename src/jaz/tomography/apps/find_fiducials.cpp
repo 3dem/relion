@@ -19,9 +19,9 @@ using namespace gravis;
 int main(int argc, char *argv[])
 {
 	std::string outDir;
-	double thresh, binning_out, binning_in, beadRadius_A;
+	double thresh, binning_out, binning_in, beadRadius_A, rel_spacing;
 	int max_MG, num_threads;
-	bool diag, debug;
+	bool diag;
 
 	OptimisationSet optimisationSet;
 	
@@ -37,18 +37,18 @@ int main(int argc, char *argv[])
 			false,  false,   // particles
 			true,   true,    // tomograms
 			false,  false,   // trajectories
-			true,   true,    // manifolds
+			false,  false,   // manifolds
 			false,  false);  // reference
 
 		int gen_section = parser.addSection("General options");
 
 		outDir = parser.getOption("--o", "Output directory");
-		thresh = textToDouble(parser.getOption("--d", "Detection threshold", "7"));
-		beadRadius_A = textToDouble(parser.getOption("--r", "Bead radius [Å]", "100"));
+		thresh = textToDouble(parser.getOption("--d", "Detection threshold", "5"));
+		beadRadius_A = textToDouble(parser.getOption("--r", "Bead radius [Å]", "50"));
+		rel_spacing = textToDouble(parser.getOption("--sp", "Minimal bead spacing (as a multiple of radius, L^inf distance)", "1.5"));
 		binning_in = textToDouble(parser.getOption("--bin0", "Search binning level", "4"));
 		binning_out = textToDouble(parser.getOption("--bin1", "CC binning level", "4"));
 		diag = parser.checkOption("--diag", "Write out diagnostic information");
-		debug = parser.checkOption("--debug", "Write out debugging information");
 		max_MG = textToInteger(parser.getOption("--max_MG", "Last tilt series to consider", "-1"));
 		
 		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
@@ -70,9 +70,9 @@ int main(int argc, char *argv[])
 
 	outDir = ZIO::makeOutputDir(outDir);
 
-	if (debug)
+	if (diag)
 	{
-		ZIO::makeOutputDir("debug");
+		ZIO::makeOutputDir(outDir+"Diagnostic");
 	}
 
 	
@@ -83,9 +83,10 @@ int main(int argc, char *argv[])
 	{
 		tc = max_MG + 1;
 	}
-	
+
 	BufferedImage<float> visualisation(0,0,0);
 
+	double vis_pixel_size = 1;
 
 	for (int t = 0; t < tc; t++)
 	{
@@ -98,6 +99,8 @@ int main(int argc, char *argv[])
 
 		const int w = tomogram.stack.xdim;
 		const int h = tomogram.stack.ydim;
+
+		vis_pixel_size = tomogram.optics.pixelSize;
 
 		const double beadRadius_px = beadRadius_A / tomogram.optics.pixelSize;
 
@@ -114,8 +117,8 @@ int main(int argc, char *argv[])
 		for (int f = 0; f < fc; f++)
 		{
 			BufferedImage<float> slice = tomogram.stack.getSliceRef(f);
-			BufferedImage<float> sliceHP = ImageFilter::highpassStackGaussPadded(slice, 2 * beadRadius_px);
-			BufferedImage<float> sliceBP = ImageFilter::Gauss2D(sliceHP, 0, beadRadius_px / 2, true);
+			BufferedImage<float> sliceHP = ImageFilter::highpassStackGaussPadded(slice, beadRadius_px/4);
+			BufferedImage<float> sliceBP = ImageFilter::Gauss2D(sliceHP, 0, beadRadius_px/2, true);
 			BufferedImage<float> CC2D = Similarity::CC_2D(fidKernel, sliceBP);
 
 			fidCC.getSliceRef(f).copyFrom(CC2D);
@@ -128,12 +131,11 @@ int main(int argc, char *argv[])
 
 		std::vector<gravis::d3Vector> detections = Detection::findLocalMaxima(
 			tomogram, fidCC, origin, spacing, diagonal,
-			(float)thresh, 10000, beadRadius_px / 2,
+			(float)thresh, 10000, rel_spacing * beadRadius_px,
 			num_threads, binning_in,
-			debug? "debug/" + tomogram.name + "_" : "");
+			diag? outDir+"Diagnostic/" + tomogram.name + "_" : "");
 
 		Log::print(ZIO::itoa(detections.size()) + " blobs found.");
-		
 
 		if (diag)
 		{
@@ -147,7 +149,7 @@ int main(int argc, char *argv[])
 					mesh);
 			}
 
-			mesh.writePly(outDir+"fiducials_"+tomogram0.name+".ply");
+			mesh.writePly(outDir+"Diagnostic/fiducials_"+tomogram0.name+".ply");
 		}
 
 		std::string fidFn = Fiducials::write(
@@ -158,51 +160,49 @@ int main(int argc, char *argv[])
 		
 		tomogramSet.setFiducialsFile(t, fidFn);
 
-		if (diag)
+
+		if (visualisation.xdim == 0)
 		{
-			if (visualisation.xdim == 0)
+			visualisation.resize(w,h,tc);
+		}
+
+		const int best_frame = IndexSort<double>::sortIndices(tomogram.cumulativeDose)[0];
+
+		visualisation.getSliceRef(t).copyFrom(tomogram.stack.getSliceRef(best_frame));
+
+		const float mu = Normalization::computeMean(visualisation.getSliceRef(t));
+		const float var = Normalization::computeVariance(visualisation.getSliceRef(t), mu);
+		const float val = mu + 6 * sqrt(var);
+
+
+		for (int i = 0; i < detections.size(); i++)
+		{
+			d3Vector pw = detections[i];
+			d4Vector pi = tomogram.projectionMatrices[best_frame] * d4Vector(pw);
+
+			const int d = 21;
+			const int q = 1;
+			const int x0 = std::round(pi.x);
+			const int y0 = std::round(pi.y);
+
+			for (int i = 0; i < d; i++)
+			for (int j = -q; j <= q; j++)
 			{
-				visualisation.resize(w,h,tc);
-			}
+				const int xx = x0 + i - d/2;
+				const int yy = y0 + i - d/2;
+				const int x1 = x0 + j;
+				const int y1 = y0 + j;
 
-			visualisation.getSliceRef(t).copyFrom(
-					tomogram.stack.getSliceRef(fc/2));
-
-			const float mu = Normalization::computeMean(visualisation.getSliceRef(t));
-			const float var = Normalization::computeVariance(visualisation.getSliceRef(t), mu);
-			const float val = mu + 6 * sqrt(var);
-
-
-			for (int i = 0; i < detections.size(); i++)
-			{
-				d3Vector pw = detections[i];
-				d4Vector pi = tomogram.projectionMatrices[fc/2] * d4Vector(pw);
-
-				const int d = 21;
-				const int q = 1;
-				const int x0 = std::round(pi.x);
-				const int y0 = std::round(pi.y);
-
-				for (int i = 0; i < d; i++)
-				for (int j = -q; j <= q; j++)
+				if (xx >= 0 && xx < w && y1 >= 0 && y1 < h)
 				{
-					const int xx = x0 + i - d/2;
-					const int yy = y0 + i - d/2;
-					const int x1 = x0 + j;
-					const int y1 = y0 + j;
+					visualisation(xx,y1,t) = val;
+				}
 
-					if (xx >= 0 && xx < w && y1 >= 0 && y1 < h)
-					{
-						visualisation(xx,y1,t) += val;
-					}
-
-					if (x1 >= 0 && x1 < w && yy >= 0 && yy < h)
-					{
-						visualisation(x1,yy,t) += val;
-					}
+				if (x1 >= 0 && x1 < w && yy >= 0 && yy < h)
+				{
+					visualisation(x1,yy,t) = val;
 				}
 			}
-
 		}
 		
 		Log::endSection();
@@ -213,8 +213,5 @@ int main(int argc, char *argv[])
 	optimisationSet.tomograms = outDir + "tomograms.star";
 	optimisationSet.write(outDir + "optimisation_set.star");
 
-	if (diag)
-	{
-		visualisation.write(outDir+"diagnostic.mrc");
-	}
+	visualisation.write(outDir+"detections.mrc", vis_pixel_size);
 }

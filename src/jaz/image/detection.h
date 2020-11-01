@@ -213,7 +213,9 @@ std::vector<gravis::d3Vector> Detection::findLocalMaxima(
 	
 	if (diagFn != "")
 	{
-		coarseVol.write(diagFn + "detection_binned-CC.mrc", spacing.x * binning);
+		coarseVol.write(
+			diagFn + "detection_binned-CC.mrc",
+			binnedTomogram.optics.pixelSize);
 	}
 	
 	
@@ -222,16 +224,21 @@ std::vector<gravis::d3Vector> Detection::findLocalMaxima(
 	
 	if (diagFn != "")
 	{
-		boxMax.write(diagFn + "detection_coarse-max.mrc", spacing.x * binning);
+		boxMax.write(
+			diagFn + "detection_coarse-max.mrc",
+			binnedTomogram.optics.pixelSize);
 	}
 	
 	std::vector<gravis::d3Vector> coarseMaxima, fineMaxima;
 	coarseMaxima.reserve(1024);
 	fineMaxima.reserve(1024);
+
+	const double localSearchRadius = 3.0 * binning;
+	const int localSearchRegion = 2 * localSearchRadius;
 	
 	BufferedImage<T> peaks(w3Db,h3Db,d3Db);
-	BufferedImage<T> subvolume(2*binning, 2*binning, 2*binning);	
-	BufferedImage<T> subvolumeMask(2*binning, 2*binning, 2*binning);	
+	BufferedImage<T> subvolume(localSearchRegion, localSearchRegion, localSearchRegion);
+	BufferedImage<T> subvolumeMask(localSearchRegion, localSearchRegion, localSearchRegion);
 	
 	
 	for (int z = 0; z < d3Db; z++)
@@ -261,7 +268,7 @@ std::vector<gravis::d3Vector> Detection::findLocalMaxima(
 				tomogram.projectionMatrices,
 				similarities2D,
 				subvolume, subvolumeMask,
-				p - gravis::d3Vector(binning), // @TODO: fix?
+				p - gravis::d3Vector(localSearchRadius),
 				gravis::d3Vector(1.0), 
 				num_threads, 
 				RealSpaceBackprojection::Linear,
@@ -270,9 +277,9 @@ std::vector<gravis::d3Vector> Detection::findLocalMaxima(
 			double maxVal = subvolume(0,0,0);
 			gravis::d3Vector bestInd(0,0,0);
 					
-			for (int zz = 0; zz < 2*binning; zz++)
-			for (int yy = 0; yy < 2*binning; yy++)
-			for (int xx = 0; xx < 2*binning; xx++)
+			for (int zz = 0; zz < localSearchRegion; zz++)
+			for (int yy = 0; yy < localSearchRegion; yy++)
+			for (int xx = 0; xx < localSearchRegion; xx++)
 			{
 				if (subvolume(xx,yy,zz) > maxVal)
 				{
@@ -281,8 +288,8 @@ std::vector<gravis::d3Vector> Detection::findLocalMaxima(
 				}
 			}
 			
-			gravis::d3Vector p2 = p - gravis::d3Vector(binning) + bestInd;
-						
+			gravis::d3Vector p2 = p - gravis::d3Vector(localSearchRadius) + bestInd;
+
 			fineMaxima.push_back(p2);
 		}
 		else

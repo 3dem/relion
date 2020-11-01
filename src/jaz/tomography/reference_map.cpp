@@ -194,7 +194,7 @@ void TomoReferenceMap::presharpen(
 		BufferedImage<float>& map_RS,
 		double padding)
 {
-	const int s = image_real[0].xdim;
+	const int s = map_RS.xdim;
 
 	const double epsilon = 0.02;
 

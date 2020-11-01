@@ -9,7 +9,10 @@ class OptimisationSet;
 class TomoReferenceMap
 {
 	public:
+
+		static void presharpen(BufferedImage<float>& map_RS, double padding);
 		
+
 		TomoReferenceMap();
 
 		void read(IOParser& parser);
@@ -28,10 +31,6 @@ class TomoReferenceMap
 			
 		int getBoxSize() const;
 
-
-	protected:
-
-		void presharpen(BufferedImage<float>& map_RS, double padding);
 };
 
 #endif

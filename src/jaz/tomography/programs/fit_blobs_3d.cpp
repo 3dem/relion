@@ -166,10 +166,8 @@ void FitBlobs3DProgram::processTomogram(
 
 
 	std::vector<d3Vector> fiducials(0);
-	
-	bool has_fiducials =
-			tomogram0.fiducialsFilename.length() > 0
-			&& tomogram0.fiducialsFilename != "empty";
+
+	bool has_fiducials = tomogram0.hasFiducials();
 
 
 	Log::print("Filtering");
