@@ -207,7 +207,7 @@ std::vector<gravis::d3Vector> Detection::findLocalMaxima(
 		coarseVol, coarseMask,
 		origin, spacing * binning, num_threads, 
 		RealSpaceBackprojection::Linear,
-		20, 20, 10.0);
+		20, 0, 10.0);
 	
 	coarseVol = Normalization::byNormalDist(coarseVol);
 	
@@ -272,7 +272,7 @@ std::vector<gravis::d3Vector> Detection::findLocalMaxima(
 				gravis::d3Vector(1.0), 
 				num_threads, 
 				RealSpaceBackprojection::Linear,
-				20, 20, 10.0);
+				20, 0, 10.0);
 			
 			double maxVal = subvolume(0,0,0);
 			gravis::d3Vector bestInd(0,0,0);

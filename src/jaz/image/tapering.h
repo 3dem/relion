@@ -47,7 +47,8 @@ class Tapering
 			double y,
 			int w,
 			int h,
-			double r);
+			double falloff,
+			double dist);
 		
 		inline static double getTaperWeight3D(
 			double x, 
@@ -103,28 +104,47 @@ inline double Tapering::getRadialTaperWeight2D(
 	return getRadialTaperWeight(d, r0, r1);
 }
 
-inline double Tapering::getTaperWeight2D(double x, double y, int w, int h, double r)
+inline double Tapering::getTaperWeight2D(
+		double x, double y,
+		int w, int h,
+		double falloff, double dist)
 {
 	double wx(1.0), wy(1.0);
 
-	if (x < r)
+	if (x < dist)
 	{
-		wx *= (1.0 - cos(PI * (x+1) / r))/2.0;
+		return 0.0;
+	}
+	else if (x < dist + falloff)
+	{
+		wx *= (1.0 - cos(PI * (x + 1 - dist) / falloff)) / 2.0;
 	}
 
-	if (x >= w - r)
+	if (x >= w - dist)
 	{
-		wx *= (1.0 - cos(PI * (w - x) / r))/2.0;
+		return 0.0;
+	}
+	if (x >= w - dist - falloff)
+	{
+		wx *= (1.0 - cos(PI * (w - dist - x) / falloff)) / 2.0;
 	}
 
-	if (y < r)
+	if (y < dist)
 	{
-		wy *= (1.0 - cos(PI * (y+1) / r))/2.0;
+		return 0.0;
+	}
+	else if (y < dist + falloff)
+	{
+		wy *= (1.0 - cos(PI * (y + 1 - dist) / falloff)) / 2.0;
 	}
 
-	if (y >= h - r)
+	if (y >= h - dist)
 	{
-		wy *= (1.0 - cos(PI * (h - y) / r))/2.0;
+		return 0.0;
+	}
+	if (y >= h - dist - falloff)
+	{
+		wy *= (1.0 - cos(PI * (h - dist - y) / falloff)) / 2.0;
 	}
 
 	return wx * wy;
@@ -230,7 +250,7 @@ void Tapering::taper2D(RawImage<T>& img, double r, int num_threads, bool exactMe
 		for (size_t y = 0; y < h; y++)
 		for (size_t x = 0; x < w; x++)
 		{
-			const double t = getTaperWeight2D(x,y,w,h,r);
+			const double t = getTaperWeight2D(x,y,w,h,r,0);
 
 			dSum += t * img(x,y);
 			wgSum += t;
@@ -242,7 +262,7 @@ void Tapering::taper2D(RawImage<T>& img, double r, int num_threads, bool exactMe
 		for (size_t y = 0; y < h; y++)
 		for (size_t x = 0; x < w; x++)
 		{
-			const double t = getTaperWeight2D(x,y,w,h,r);
+			const double t = getTaperWeight2D(x,y,w,h,r,0);
 
 			img(x,y) = t * img(x,y) + (1.0 - t) * wgMean;
 		}
@@ -253,7 +273,7 @@ void Tapering::taper2D(RawImage<T>& img, double r, int num_threads, bool exactMe
 		for (size_t y = 0; y < h; y++)
 		for (size_t x = 0; x < w; x++)
 		{
-			img(x,y) *= getTaperWeight2D(x,y,w,h,r);
+			img(x,y) *= getTaperWeight2D(x,y,w,h,r,0);
 		}
 	}
 }

@@ -19,7 +19,7 @@ class LocalParticleRefinement : public FastDifferentiableOptimization
 				const TomoReferenceMap& reference,
 				const BufferedImage<float>& frqWeight,
 				const AberrationsCache& aberrationsCache,
-				bool debug = false);
+				double dose_cutoff = 0.01);
 
 
 			const ParticleIndex particle_id;
@@ -34,8 +34,6 @@ class LocalParticleRefinement : public FastDifferentiableOptimization
 			std::vector<CTF> CTFs;
 			gravis::d3Vector position;
 			std::vector<int> max_radius;
-
-			bool debug;
 
 
 		double f(const std::vector<double>& x, void* tempStorage) const;

@@ -47,6 +47,7 @@ class TemplatePickerProgram
 				double rot, double tilt, double psi,
 				const Tomogram& tomogram,
 				const BufferedImage<fComplex>& framesFS,
+				//const BufferedImage<float>& maskedFramesSqRS,
 				int num_threads);
 };
 

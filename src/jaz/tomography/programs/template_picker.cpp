@@ -77,7 +77,7 @@ void TemplatePickerProgram::initialise()
 	const double taper_edge_width = 5.0;
 	Reconstruction::taper(template_map_RS, taper_edge_width, true, 1);
 
-	FFT::FourierTransform(template_map_RS, template_map_FS);
+	FFT::FourierTransform(template_map_RS, template_map_FS, FFT::Both);
 
 	Centering::shiftInSitu(template_map_FS);
 
@@ -101,6 +101,7 @@ void TemplatePickerProgram::run()
 	const int h = tomogram.stack.ydim;
 	const int fc = tomogram.frameCount;
 	const double pixel_size = tomogram.optics.pixelSize;
+	const double ba = pixel_size;
 
 	bool has_fiducials = tomogram.hasFiducials();
 
@@ -145,11 +146,6 @@ void TemplatePickerProgram::run()
 
 		std::vector<double> powSpec1D = RadialAvg::fftwHalf_2D_lin(powSpec);
 
-		if (f == 0)
-		{
-			std::cout << powSpec.getSizeString() << " -> " << powSpec1D.size() << '\n';
-		}
-
 		std::vector<float> frqWghts1D(powSpec1D.size());
 
 		for (int i = 0; i < powSpec1D.size(); i++)
@@ -159,12 +155,15 @@ void TemplatePickerProgram::run()
 			frqWghts1D[i] = (float)(1.0 / powSpec1D[i]);
 		}
 
+		const double dose = tomogram.cumulativeDose[f];
+
 		for (int yy = 0; yy < h; yy++)
 		for (int xx = 0; xx < wh; xx++)
 		{
 			const double x = xx;
 			const double y = yy < h/2? yy : yy - h;
-			const double rd = s_powSpec * sqrt(x*x/(w*w) + y*y/(h*h));
+			const double ru = sqrt(x*x/(w*w) + y*y/(h*h));
+			const double rd = s_powSpec * ru;
 
 			const int r0 = (int)(rd);
 			const int r1 = r0 + 1;
@@ -179,20 +178,88 @@ void TemplatePickerProgram::run()
 
 				framesFS(xx,yy,f) *= (1 - t) * frqWghts1D[r0] + t * frqWghts1D[r1];
 			}
+
+			framesFS(xx,yy,f) *= Damage::getWeight(dose, ru / ba);
 		}
 	}
 
-	BufferedImage<float> framesFilteredRS(w,h,fc);
+	/*BufferedImage<float> framesFilteredRS(w,h,fc);
 	NewStackHelper::inverseFourierTransformStack(framesFS, framesFilteredRS, true);
 	framesFilteredRS.write(out_dir+"stack_filtered.mrc");
 
-	pick(0, DEG2RAD(30), 0, tomogram, framesFS, num_threads);
+	BufferedImage<float> maskRS(w,h);
+	const double maskRad = template_map_RS.xdim / 2.0;
+	const double maskFalloff = 20;
+
+	for (int yy = 0; yy < h; yy++)
+	for (int xx = 0; xx < w; xx++)
+	{
+		const double x = xx < w/2? xx : xx - w;
+		const double y = yy < h/2? yy : yy - h;
+
+		const double r = sqrt(x*x + y*y);
+
+		if (r > maskRad)
+		{
+			maskRS(xx,yy) = 0.f;
+		}
+		else if (r > maskRad - maskFalloff)
+		{
+			const double dr = (r - maskRad + maskFalloff) / maskFalloff;
+			maskRS(xx,yy) = 0.5f * (cos(PI * dr) + 1.f);
+		}
+		else
+		{
+			maskRS(xx,yy) = 1.f;
+		}
+	}
+
+	maskRS.write(out_dir + "maskRS.mrc");
+
+	BufferedImage<fComplex> maskFS;
+
+	FFT::FourierTransform(maskRS, maskFS, FFT::Both);
+
+	BufferedImage<float> framesSqRS(w,h,fc);
+
+	#pragma omp parallel for num_threads(num_threads)
+	for (int f = 0; f < fc; f++)
+	{
+		for (int yy = 0; yy < h; yy++)
+		for (int xx = 0; xx < w; xx++)
+		{
+			framesSqRS(xx,yy,f) = framesFilteredRS(xx,yy,f) * framesFilteredRS(xx,yy,f);
+		}
+	}
+
+	framesSqRS.write(out_dir + "framesSqRS.mrc");
+
+	BufferedImage<fComplex> framesSqFS(wh,h,fc);
+
+	NewStackHelper::FourierTransformStack(framesSqRS, framesSqFS, true);
+
+	#pragma omp parallel for num_threads(num_threads)
+	for (int f = 0; f < fc; f++)
+	{
+		for (int yy = 0; yy < h; yy++)
+		for (int xx = 0; xx < wh; xx++)
+		{
+			framesSqFS(xx,yy,f) = framesSqFS(xx,yy,f) * maskFS(xx,yy).conj();
+		}
+	}
+
+	NewStackHelper::inverseFourierTransformStack(framesSqFS, framesSqRS, true);
+
+	framesSqRS.write(out_dir + "framesSqRS_filt.mrc");*/
+
+	pick(0, DEG2RAD(45), 0, tomogram, framesFS, /*framesSqRS,*/ num_threads);
 }
 
 void TemplatePickerProgram::pick(
 		double rot, double tilt, double psi,
 		const Tomogram& tomogram,
 		const BufferedImage<fComplex>& framesFS,
+		//const BufferedImage<float>& maskedFramesSqRS,
 		int num_threads)
 {
 	const int s = template_map_FS.ydim;
@@ -243,12 +310,6 @@ void TemplatePickerProgram::pick(
 
 		ForwardProjection::forwardProject(template_map_FS, {P}, prediction2D_small_FS[th], 1);
 
-		/*if (f == 19)
-		{
-			FFT::inverseFourierTransform(prediction2D_small_FS[th], prediction2D_small_RS[th]);
-			prediction2D_small_RS[th].write(out_dir+"prediction2D_small_RS[19]_noCTF.mrc");
-		}*/
-
 		CTF ctf = tomogram.centralCTFs[f];
 
 		for (int y = 0; y < s; y++)
@@ -260,12 +321,7 @@ void TemplatePickerProgram::pick(
 			prediction2D_small_FS[th](x,y) *= -ctf.getCTF(xa,ya);
 		}
 
-		FFT::inverseFourierTransform(prediction2D_small_FS[th], prediction2D_small_RS[th]);
-
-		/*if (f == 19)
-		{
-			prediction2D_small_RS[th].write(out_dir+"prediction2D_small_RS[19].mrc");
-		}*/
+		FFT::inverseFourierTransform(prediction2D_small_FS[th], prediction2D_small_RS[th], FFT::Both);
 
 		for (int y = 0; y < s; y++)
 		for (int x = 0; x < s; x++)
@@ -276,12 +332,7 @@ void TemplatePickerProgram::pick(
 			predictions2D_large_RS[th](xx,yy) = prediction2D_small_RS[th](x,y);
 		}
 
-		/*if (f == 19)
-		{
-			predictions2D_large_RS[th].write(out_dir+"predictions2D_large_RS[19].mrc");
-		}*/
-
-		FFT::FourierTransform(predictions2D_large_RS[th], predictions2D_large_FS[th]);
+		FFT::FourierTransform(predictions2D_large_RS[th], predictions2D_large_FS[th], FFT::Both);
 
 
 		for (int y = 0; y < h;  y++)
@@ -292,16 +343,23 @@ void TemplatePickerProgram::pick(
 			CC_FS[th](x,y) = mod * framesFS(x,y,f) * predictions2D_large_FS[th](x,y).conj();
 		}
 
-		FFT::inverseFourierTransform(CC_FS[th], CC_RS_temp[th]);
+		FFT::inverseFourierTransform(CC_FS[th], CC_RS_temp[th], FFT::Both);
 
 		CC_RS.getSliceRef(f).copyFrom(CC_RS_temp[th]);
+
+		/*for (int y = 0; y < h; y++)
+		for (int x = 0; x < w; x++)
+		{
+			CC_RS(x,y,f) -= 0.5f * maskedFramesSqRS(x,y,f);
+		}*/
 	}
 
-	CC_RS.write(out_dir+"DEBUG_CC_RS.mrc");
+	CC_RS.write(out_dir+"DEBUG_CC_RS_unnrm.mrc");
 
 
 	{
 		const double binning = 8;
+		const double taper_dist = template_map_RS.xdim / binning;
 
 		const d3Vector origin(0.0);
 		const d3Vector spacing(1.0);
@@ -336,9 +394,10 @@ void TemplatePickerProgram::pick(
 			binnedSimilarity.getSliceRef(f).copyFrom(binned);
 		}
 
-		binnedSimilarity.write(out_dir+"DEBUG_CC_RS_binned.mrc");
-
 		Tomogram binnedTomogram = tomogram.FourierCrop(binning, num_threads, false);
+
+		binnedSimilarity.write(out_dir+"DEBUG_CC_RS_binned_max.mrc");
+
 
 		const int w3D = diagonal.x;
 		const int h3D = diagonal.y;
@@ -356,7 +415,7 @@ void TemplatePickerProgram::pick(
 			coarseVol, coarseMask,
 			origin, spacing * binning, num_threads,
 			RealSpaceBackprojection::Linear,
-			20, 20, 10.0);
+			taper_dist, taper_dist, 3.0);
 
 		coarseVol.write(out_dir+"DEBUG_coarseVol.mrc");
 	}
