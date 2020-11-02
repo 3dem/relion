@@ -92,8 +92,6 @@ void LocalParticleRefineProgram::run()
 		BufferedImage<float> freqWeights = computeFrequencyWeights(
 			tomogram, true, 0.0, 0.0, num_threads);
 
-		freqWeights.write("DEBUG_freqWeights.mrc");
-
 		particleSet.checkTrajectoryLengths(
 				particles[t][0], pc, fc, "LocalParticleRefineProgram::run");
 

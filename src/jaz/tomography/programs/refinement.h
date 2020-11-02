@@ -31,7 +31,7 @@ class RefinementProgram
 			std::string outDir;
 			OptimisationSet optimisationSet;
 			
-			bool diag, timing;
+			bool diag, timing, static_noise;
 			
 			int boxSize, num_threads, specified_first_frame, specified_last_frame;
 

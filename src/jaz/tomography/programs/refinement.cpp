@@ -44,6 +44,8 @@ void RefinementProgram::_readParams(IOParser &parser)
 
 	specified_first_frame = textToInteger(parser.getOption("--f0", "First frame", "0"));
 	specified_last_frame = textToInteger(parser.getOption("--f1", "Last frame", "-1"));
+
+	static_noise = !parser.checkOption("--per_frame_noise", "Assume a different noise distribution for each frame");
 	
 	diag = parser.checkOption("--diag", "Write out diagnostic information");
 	timing = parser.checkOption("--time", "Measure the elapsed time");
@@ -98,6 +100,35 @@ BufferedImage<float> RefinementProgram::computeFrequencyWeights(
 			
 			RawImage<float> fw = frqWghts.getSliceRef(f);
 			RadialAvg::toFftwHalf_2D_lin(frqWghts1D, sh, s, fw);
+		}
+
+		if (static_noise)
+		{
+			BufferedImage<float> staticSigma2(sh,s);
+			staticSigma2.fill(0.f);
+
+			for (int f = 0; f < fc; f++)
+			{
+				for (int y = 0; y < s;  y++)
+				for (int x = 0; x < sh; x++)
+				{
+					const double val = frqWghts(x,y,f);
+
+					if (val > 0.f)
+					{
+						staticSigma2(x,y) += 1.f / val;
+					}
+				}
+			}
+
+			for (int f = 0; f < fc; f++)
+			{
+				for (int y = 0; y < s;  y++)
+				for (int x = 0; x < sh; x++)
+				{
+					frqWghts(x,y,f) = fc / staticSigma2(x,y);
+				}
+			}
 		}
 	}
 	else
