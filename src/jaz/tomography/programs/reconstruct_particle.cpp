@@ -282,14 +282,17 @@ void ReconstructParticleProgram::processTomograms(
 			}
 		}
 
-		Log::beginProgress("Backprojecting", (int)ceil(pc/(double)outer_threads));
+		if (verbosity > 0)
+		{
+			Log::beginProgress("Backprojecting", (int)ceil(pc/(double)outer_threads));
+		}
 
 		#pragma omp parallel for num_threads(outer_threads)
 		for (int p = 0; p < pc; p++)
 		{
 			const int th = omp_get_thread_num();
 
-			if (th == 0)
+			if (th == 0 && verbosity > 0)
 			{
 				Log::updateProgress(p);
 			}
@@ -374,8 +377,11 @@ void ReconstructParticleProgram::processTomograms(
 			}
 		}
 
-		Log::endProgress();
-		Log::endSection();
+		if (verbosity > 0)
+		{
+			Log::endProgress();
+			Log::endSection();
+		}
 	}
 }
 
