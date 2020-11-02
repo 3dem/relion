@@ -22,22 +22,42 @@
 using namespace gravis;
 
 
-ReconstructParticleProgramMpi::ReconstructParticleProgramMpi(int rank, int nodeCount)
+/*ReconstructParticleProgramMpi::ReconstructParticleProgramMpi(int rank, int nodeCount)
 : rank(rank),
   nodeCount(nodeCount)
 {
-}
+}*/
 
 void ReconstructParticleProgramMpi::readParameters(int argc, char *argv[])
 {
+	// Define a new MpiNode
+	node = new MpiNode(argc, argv);
+	rank = node->rank;
+	nodeCount = node->size;
+
+	// Don't put any output to screen for mpi slaves
+	verb = (node->isMaster()) ? verb : 0;
+
 	readBasicParameters(argc, argv);
 
+	if (nodeCount < 2)
+		REPORT_ERROR("ReconstructParticleProgramMpi::read ERROR: this program needs to be run with at least two MPI processes!");
+
+	// Print out MPI info
+	printMpiNodesMachineNames(*node);
+
+	if (rank == 0)
+	{
 	outDir = ZIO::prepareTomoOutputDirectory(outDir, argc, argv);
+	}
 }
 
 void ReconstructParticleProgramMpi::run()
 {
-	Log::beginSection("Initialising");
+	if (verb)
+	{
+		Log::beginSection("Initialising");
+	}
 
 	TomogramSet tomoSet(optimisationSet.tomograms);
 	ParticleSet particleSet(optimisationSet.particles, optimisationSet.trajectories);
@@ -79,11 +99,13 @@ void ReconstructParticleProgramMpi::run()
 
 	const int outCount = 2 * outer_threads;
 
-	Log::print("Memory required for accumulation: " + ZIO::itoa(
+	if (verb)
+	{
+		Log::print("Memory required for accumulation: " + ZIO::itoa(
 			(3.0 * sizeof(double) * (long int) outCount * (double)voxelNum)
 			  / (1024.0 * 1024.0 * 1024.0)
 			) + " GB");
-
+	}
 	std::vector<BufferedImage<double>> ctfImgFS(outCount), psfImgFS(outCount);
 	std::vector<BufferedImage<dComplex>> dataImgFS(outCount);
 
@@ -100,8 +122,10 @@ void ReconstructParticleProgramMpi::run()
 
 	AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
 
-	Log::endSection();
-
+	if (verb)
+	{
+		Log::endSection();
+	}
 	// determine tomogram range based on node rank:
 	const int first_tomo = rank * tc / nodeCount;
 	const int last_tomo = (rank == nodeCount - 1)? tc - 1 : (rank + 1) * tc / nodeCount - 1;
@@ -109,13 +133,15 @@ void ReconstructParticleProgramMpi::run()
 	processTomograms(
 		first_tomo, last_tomo, tomoSet, particleSet, particles, aberrationsCache,
 		dataImgFS, ctfImgFS, psfImgFS, binnedOutPixelSize,
-		s02D, do_ctf, flip_value, 1);
+		s02D, do_ctf, flip_value, verb);
 
 
 	if (outCount > 2)
 	{
-		Log::print("Merging volumes");
-
+		if (verb)
+		{
+			Log::print("Merging volumes");
+		}
 		for (int i = 2; i < outCount; i++)
 		{
 			dataImgFS[i%2] += dataImgFS[i];
@@ -128,20 +154,31 @@ void ReconstructParticleProgramMpi::run()
 		}
 	}
 
+	std::vector<BufferedImage<double>> sumCtfImgFS(2), sumPsfImgFS(2);
+	std::vector<BufferedImage<dComplex>> sumDataImgFS(2);
 
-	/*
-
-	if (rank > 0)
+	for (int i = 0; i < 2; i++)
 	{
-		write dataImgFS, ctfImgFS and psfImgFS to disk (may need to IFFT them first)
+		sumDataImgFS[i] = BufferedImage<dComplex>(sh,s,s);
+		sumCtfImgFS[i] = BufferedImage<double>(sh,s,s),
+		sumPsfImgFS[i] = BufferedImage<double>(sh,s,s);
 	}
-	else
-	{
-		barrier
-		read all results from disk and add them up
-	}
+	size_t sizeData = sh*s*s;
 
-	*/
+	MPI_Allreduce(MULTIDIM_ARRAY(dataImgFS[0]), MULTIDIM_ARRAY(sumDataImgFS[0]), sizeData,
+			MY_MPI_COMPLEX, MPI_SUM, MPI_COMM_WORLD);
+	MPI_Allreduce(MULTIDIM_ARRAY(dataImgFS[1]), MULTIDIM_ARRAY(sumDataImgFS[1]), sizeData,
+			MY_MPI_COMPLEX, MPI_SUM, MPI_COMM_WORLD);
+
+	MPI_Allreduce(MULTIDIM_ARRAY(ctfImgFS[0]), MULTIDIM_ARRAY(sumCtfImgFS[0]), sizeData,
+			MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+	MPI_Allreduce(MULTIDIM_ARRAY(ctfImgFS[1]), MULTIDIM_ARRAY(sumCtfImgFS[1]), sizeData,
+			MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
+	MPI_Allreduce(MULTIDIM_ARRAY(psfImgFS[0]), MULTIDIM_ARRAY(sumPsfImgFS[0]), sizeData,
+			MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+	MPI_Allreduce(MULTIDIM_ARRAY(psfImgFS[1]), MULTIDIM_ARRAY(sumPsfImgFS[1]), sizeData,
+			MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
 
 	if (rank == 0)
@@ -154,21 +191,21 @@ void ReconstructParticleProgramMpi::run()
 
 			for (int half = 0; half < 2; half++)
 			{
-				dataImgFS[half] = Symmetry::symmetrise_FS_complex(
-							dataImgFS[half], symmName, num_threads);
+				sumDataImgFS[half] = Symmetry::symmetrise_FS_complex(
+							sumDataImgFS[half], symmName, num_threads);
 
-				ctfImgFS[half] = Symmetry::symmetrise_FS_real(
-							ctfImgFS[half], symmName, num_threads);
+				sumCtfImgFS[half] = Symmetry::symmetrise_FS_real(
+							sumCtfImgFS[half], symmName, num_threads);
 
 				if (explicit_gridding)
 				{
-					psfImgFS[half] = Symmetry::symmetrise_FS_real(
-							psfImgFS[half], symmName, num_threads);
+					sumPsfImgFS[half] = Symmetry::symmetrise_FS_real(
+							sumPsfImgFS[half], symmName, num_threads);
 				}
 			}
 		}
 
-		finalise(dataImgFS, ctfImgFS, psfImgFS, binnedOutPixelSize);
+		finalise(sumDataImgFS, sumCtfImgFS, sumPsfImgFS, binnedOutPixelSize);
 	}
 }
 
