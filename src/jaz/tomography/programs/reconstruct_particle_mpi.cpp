@@ -47,6 +47,7 @@ void ReconstructParticleProgramMpi::readParameters(int argc, char *argv[])
 	printMpiNodesMachineNames(*node);
 
 	if (rank == 0)
+	{
 	outDir = ZIO::prepareTomoOutputDirectory(outDir, argc, argv);
 	}
 }
