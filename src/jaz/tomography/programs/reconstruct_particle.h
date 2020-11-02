@@ -46,7 +46,8 @@ class ReconstructParticleProgram
 				int s02D,
 				bool do_ctf,
 				bool flip_value,
-				int verbosity);
+				int verbosity,
+				bool per_tomogram_progress);
 
 		void finalise(
 				std::vector<BufferedImage<dComplex>>& dataImgFS,

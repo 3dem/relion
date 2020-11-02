@@ -158,7 +158,7 @@ void ReconstructParticleProgram::run()
 	processTomograms(
 		0, tc-1, tomoSet, particleSet, particles, aberrationsCache,
 		dataImgFS, ctfImgFS, psfImgFS, binnedOutPixelSize,
-		s02D, do_ctf, flip_value, 1);
+		s02D, do_ctf, flip_value, 1, true);
 
 
 
@@ -219,11 +219,30 @@ void ReconstructParticleProgram::processTomograms(
 	int s02D,
 	bool do_ctf,
 	bool flip_value,
-	int verbosity)
+	int verbosity,
+	bool per_tomogram_progress)
 {
 	const int s = dataImgFS[0].ydim;
 	const int sh = s/2 + 1;
 	const int tc = last_t - first_t + 1;
+
+	if (verbosity > 0 && !per_tomogram_progress)
+	{
+		int total_particles_on_first_thread = 0;
+
+		for (int t = first_t; t <= last_t; t++)
+		{
+			const int pc_all = particles[t].size();
+			const int pc_th0 = (int)ceil(pc_all/(double)outer_threads);
+
+			total_particles_on_first_thread += pc_th0;
+		}
+
+		Log::beginProgress("Backprojecting", total_particles_on_first_thread);
+	}
+
+	int particles_in_previous_tomograms = 0;
+
 
 	for (int t = first_t; t <= last_t; t++)
 	{
@@ -233,8 +252,11 @@ void ReconstructParticleProgram::processTomograms(
 
 		if (verbosity > 0)
 		{
-			Log::beginSection("Tomogram " + ZIO::itoa(t+1-first_t) + " / " + ZIO::itoa(tc));
-			Log::print("Loading");
+			if (per_tomogram_progress)
+			{
+				Log::beginSection("Tomogram " + ZIO::itoa(t+1-first_t) + " / " + ZIO::itoa(tc));
+				Log::print("Loading");
+			}
 		}
 
 		Tomogram tomogram = tomoSet.loadTomogram(t, true);
@@ -264,7 +286,7 @@ void ReconstructParticleProgram::processTomograms(
 			}
 		}
 
-		if (verbosity > 0)
+		if (verbosity > 0 && per_tomogram_progress)
 		{
 			Log::beginProgress("Backprojecting", (int)ceil(pc/(double)outer_threads));
 		}
@@ -276,7 +298,14 @@ void ReconstructParticleProgram::processTomograms(
 
 			if (th == 0 && verbosity > 0)
 			{
-				Log::updateProgress(p);
+				if (per_tomogram_progress)
+				{
+					Log::updateProgress(p);
+				}
+				else
+				{
+					Log::updateProgress(particles_in_previous_tomograms + p);
+				}
 			}
 
 			const ParticleIndex part_id = particles[t][p];
@@ -357,13 +386,22 @@ void ReconstructParticleProgram::processTomograms(
 						inner_threads);
 				}
 			}
-		}
 
-		if (verbosity > 0)
+		} // particles
+
+		if (verbosity > 0 && per_tomogram_progress)
 		{
 			Log::endProgress();
 			Log::endSection();
 		}
+
+		particles_in_previous_tomograms += (int)ceil(pc/(double)outer_threads);
+
+	} // tomograms
+
+	if (verbosity > 0 && !per_tomogram_progress)
+	{
+		Log::endProgress();
 	}
 }
 

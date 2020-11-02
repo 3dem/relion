@@ -41,14 +41,16 @@ void ReconstructParticleProgramMpi::readParameters(int argc, char *argv[])
 	readBasicParameters(argc, argv);
 
 	if (nodeCount < 2)
+	{
 		REPORT_ERROR("ReconstructParticleProgramMpi::read ERROR: this program needs to be run with at least two MPI processes!");
+	}
 
 	// Print out MPI info
 	printMpiNodesMachineNames(*node);
 
 	if (rank == 0)
 	{
-	outDir = ZIO::prepareTomoOutputDirectory(outDir, argc, argv);
+		outDir = ZIO::prepareTomoOutputDirectory(outDir, argc, argv);
 	}
 }
 
@@ -126,6 +128,7 @@ void ReconstructParticleProgramMpi::run()
 	{
 		Log::endSection();
 	}
+
 	// determine tomogram range based on node rank:
 	const int first_tomo = rank * tc / nodeCount;
 	const int last_tomo = (rank == nodeCount - 1)? tc - 1 : (rank + 1) * tc / nodeCount - 1;
@@ -133,7 +136,7 @@ void ReconstructParticleProgramMpi::run()
 	processTomograms(
 		first_tomo, last_tomo, tomoSet, particleSet, particles, aberrationsCache,
 		dataImgFS, ctfImgFS, psfImgFS, binnedOutPixelSize,
-		s02D, do_ctf, flip_value, verb);
+		s02D, do_ctf, flip_value, verb, false);
 
 
 	if (outCount > 2)
@@ -142,6 +145,7 @@ void ReconstructParticleProgramMpi::run()
 		{
 			Log::print("Merging volumes");
 		}
+
 		for (int i = 2; i < outCount; i++)
 		{
 			dataImgFS[i%2] += dataImgFS[i];
@@ -163,6 +167,7 @@ void ReconstructParticleProgramMpi::run()
 		sumCtfImgFS[i] = BufferedImage<double>(sh,s,s),
 		sumPsfImgFS[i] = BufferedImage<double>(sh,s,s);
 	}
+
 	size_t sizeData = sh*s*s;
 
 	MPI_Allreduce(MULTIDIM_ARRAY(dataImgFS[0]), MULTIDIM_ARRAY(sumDataImgFS[0]), sizeData,
