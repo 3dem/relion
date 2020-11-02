@@ -183,13 +183,15 @@ void TemplatePickerProgram::run()
 		}
 	}
 
-	/*BufferedImage<float> framesFilteredRS(w,h,fc);
+	BufferedImage<float> framesFilteredRS(w,h,fc);
 	NewStackHelper::inverseFourierTransformStack(framesFS, framesFilteredRS, true);
 	framesFilteredRS.write(out_dir+"stack_filtered.mrc");
 
 	BufferedImage<float> maskRS(w,h);
 	const double maskRad = template_map_RS.xdim / 2.0;
 	const double maskFalloff = 20;
+
+	double maskSum = 0.0;
 
 	for (int yy = 0; yy < h; yy++)
 	for (int xx = 0; xx < w; xx++)
@@ -212,7 +214,11 @@ void TemplatePickerProgram::run()
 		{
 			maskRS(xx,yy) = 1.f;
 		}
+
+		maskSum += maskRS(xx,yy);
 	}
+
+	maskRS /= maskSum;
 
 	maskRS.write(out_dir + "maskRS.mrc");
 
@@ -250,16 +256,16 @@ void TemplatePickerProgram::run()
 
 	NewStackHelper::inverseFourierTransformStack(framesSqFS, framesSqRS, true);
 
-	framesSqRS.write(out_dir + "framesSqRS_filt.mrc");*/
+	framesSqRS.write(out_dir + "framesSqRS_filt.mrc");
 
-	pick(0, DEG2RAD(45), 0, tomogram, framesFS, /*framesSqRS,*/ num_threads);
+	pick(0, DEG2RAD(45), 0, tomogram, framesFS, framesSqRS, num_threads);
 }
 
 void TemplatePickerProgram::pick(
 		double rot, double tilt, double psi,
 		const Tomogram& tomogram,
 		const BufferedImage<fComplex>& framesFS,
-		//const BufferedImage<float>& maskedFramesSqRS,
+		const BufferedImage<float>& maskedFramesSqRS,
 		int num_threads)
 {
 	const int s = template_map_FS.ydim;
@@ -347,14 +353,14 @@ void TemplatePickerProgram::pick(
 
 		CC_RS.getSliceRef(f).copyFrom(CC_RS_temp[th]);
 
-		/*for (int y = 0; y < h; y++)
+		for (int y = 0; y < h; y++)
 		for (int x = 0; x < w; x++)
 		{
 			CC_RS(x,y,f) -= 0.5f * maskedFramesSqRS(x,y,f);
-		}*/
+		}
 	}
 
-	CC_RS.write(out_dir+"DEBUG_CC_RS_unnrm.mrc");
+	CC_RS.write(out_dir+"DEBUG_CC_RS_nrm.mrc");
 
 
 	{
