@@ -156,3 +156,8 @@ Tomogram Tomogram::FourierCrop(double factor, int num_threads, bool downsampleDa
 
 	return out;
 }
+
+bool Tomogram::hasFiducials()
+{
+	return fiducialsFilename.length() > 0 && fiducialsFilename != "empty";
+}

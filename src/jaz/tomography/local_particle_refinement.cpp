@@ -19,15 +19,14 @@ LocalParticleRefinement::LocalParticleRefinement(
 		const TomoReferenceMap& reference,
 		const BufferedImage<float>& frqWeight,
 		const AberrationsCache& aberrationsCache,
-		bool debug)
+		double dose_cutoff)
 :
 	particle_id(particle_id),
 	particleSet(particleSet),
 	tomogram(tomogram),
 	reference(reference),
 	frqWeight(frqWeight),
-	aberrationsCache(aberrationsCache),
-	debug(debug)
+	aberrationsCache(aberrationsCache)
 {
 	const int s = reference.getBoxSize();
 	const int sh = s/2 + 1;
@@ -56,8 +55,6 @@ LocalParticleRefinement::LocalParticleRefinement(
 	CTFs.resize(fc);
 	max_radius = std::vector<int>(fc,sh);
 
-	const double weight_threshold = 0.05;
-
 	for (int f = 0; f < fc; f++)
 	{
 		const d4Matrix A = tomo_to_image[f] * particle_to_tomo;
@@ -74,7 +71,7 @@ LocalParticleRefinement::LocalParticleRefinement(
 			const double dose = tomogram.cumulativeDose[f];
 			const double dose_weight = Damage::getWeight(dose, x / ba);
 
-			if (dose_weight < weight_threshold)
+			if (dose_weight < dose_cutoff)
 			{
 				max_radius[f] = x;
 				break;

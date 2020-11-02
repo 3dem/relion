@@ -26,24 +26,7 @@ void ReconstructParticleProgram::readParameters(int argc, char *argv[])
 {
 	readBasicParameters(argc, argv);
 
-	if (outTag.find_last_of("/") != std::string::npos)
-	{
-		std::string dir = outTag.substr(0, outTag.find_last_of("/"));
-		int res = system(("mkdir -p "+dir).c_str());
-	}
-
-	{
-		std::ofstream ofs(outTag+"_note.txt");
-
-		ofs << "Command:\n\n";
-
-		for (int i = 0; i < argc; i++)
-		{
-			ofs << argv[i] << ' ';
-		}
-
-		ofs << '\n';
-	}
+	outDir = ZIO::prepareTomoOutputDirectory(outDir, argc, argv);
 }
 
 void ReconstructParticleProgram::readBasicParameters(int argc, char *argv[])
@@ -65,7 +48,7 @@ void ReconstructParticleProgram::readBasicParameters(int argc, char *argv[])
 
 		int gen_section = parser.addSection("Reconstruction options");
 
-		boxSize = textToInteger(parser.getOption("--b", "Box size", "100"));
+		boxSize = textToInteger(parser.getOption("--b", "Box size"));
 		cropSize = textToInteger(parser.getOption("--crop", "Size of (additionally output) cropped image", "-1"));
 
 		do_whiten = parser.checkOption("--whiten", "Whiten the noise by flattening the power spectrum");
@@ -79,15 +62,14 @@ void ReconstructParticleProgram::readBasicParameters(int argc, char *argv[])
 				
 		explicit_gridding = parser.checkOption("--xg", "Perform gridding correction using a measured spreading function");
 		diag = parser.checkOption("--diag", "Write out diagnostic information");
-		no_subpix_off = parser.checkOption("--nso", "No subpixel offset (debugging)");
 		
 		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 		inner_threads = textToInteger(parser.getOption("--j_in", "Number of inner threads (slower, needs less memory)", "3"));
 		outer_threads = textToInteger(parser.getOption("--j_out", "Number of outer threads (faster, needs more memory)", "2"));
 		
 		no_reconstruction = parser.checkOption("--no_recon", "Do not reconstruct the volume, only backproject (for benchmarking purposes)");
-		
-		outTag = parser.getOption("--o", "Output filename pattern");
+
+		outDir = parser.getOption("--o", "Output directory");
 		
 		Log::readParams(parser);
 
@@ -421,7 +403,7 @@ void ReconstructParticleProgram::finalise(
 
 		writeOutput(
 			dataImgDivRS[half], dataImgRS[half], ctfImgFS[half],
-			"_half"+ZIO::itoa(half+1), binnedOutPixelSize);
+			"half"+ZIO::itoa(half+1), binnedOutPixelSize);
 	}
 
 	reconstruct(
@@ -430,7 +412,7 @@ void ReconstructParticleProgram::finalise(
 
 	writeOutput(
 		dataImgDivRS[0], dataImgRS[0], ctfImgFS[0],
-			"_merged", binnedOutPixelSize);
+			"merged", binnedOutPixelSize);
 
 	Log::endSection();
 }
@@ -475,26 +457,26 @@ void ReconstructParticleProgram::writeOutput(
 		const std::string& tag,
 		double pixelSize)
 {
-	data.write(outTag+"_data"+tag+".mrc", pixelSize);
+	data.write(outDir+"data_"+tag+".mrc", pixelSize);
 
-	Centering::fftwHalfToHumanFull(weight).write(outTag+"_weight"+tag+".mrc", pixelSize);
+	Centering::fftwHalfToHumanFull(weight).write(outDir+"weight_"+tag+".mrc", pixelSize);
 
 	if (cropSize > 0 && cropSize < boxSize)
 	{
-		corrected.write(outTag+tag+"_full.mrc", pixelSize);
+		corrected.write(outDir+tag+"_full.mrc", pixelSize);
 
 		BufferedImage<double> cropped = Padding::unpadCenter3D_full(
 					corrected, (boxSize - cropSize)/2);
 
 		Reconstruction::taper(cropped, taper, true, num_threads);
 
-		cropped.write(outTag+tag+".mrc", pixelSize);
+		cropped.write(outDir+tag+".mrc", pixelSize);
 	}
 	else
 	{
 		BufferedImage<double> tapered = corrected;
 		Reconstruction::taper(tapered, taper, true, num_threads);
 
-		tapered.write(outTag+tag+".mrc", pixelSize);
+		tapered.write(outDir+tag+".mrc", pixelSize);
 	}
 }

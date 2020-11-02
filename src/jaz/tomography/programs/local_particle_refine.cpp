@@ -44,6 +44,7 @@ void LocalParticleRefineProgram::readParams(IOParser &parser)
 		int defocus_section = parser.addSection("Alignment options");
 
 		max_iterations = textToInteger(parser.getOption("--max_it", "Maximum number of iterations", "300"));
+		dose_cutoff = textToDouble(parser.getOption("--dose_cutoff", "Neglect pixels with a smaller dose weight", "0.01"));
 		eps = textToDouble(parser.getOption("--eps", "Optimisation change threshold", "1e-5"));
 		xtol = textToDouble(parser.getOption("--xtol", "Optimisation gradient threshold", "1e-4"));
 		verbose_opt = parser.checkOption("--verbose_opt", "Print out the cost function after each iteration (for the first thread)");
@@ -91,8 +92,6 @@ void LocalParticleRefineProgram::run()
 		BufferedImage<float> freqWeights = computeFrequencyWeights(
 			tomogram, true, 0.0, 0.0, num_threads);
 
-		freqWeights.write("DEBUG_freqWeights.mrc");
-
 		particleSet.checkTrajectoryLengths(
 				particles[t][0], pc, fc, "LocalParticleRefineProgram::run");
 
@@ -115,7 +114,7 @@ void LocalParticleRefineProgram::run()
 
 			LocalParticleRefinement refinement(
 					particles[t][p], particleSet, tomogram, referenceMap,
-					freqWeights, aberrationsCache, false);
+					freqWeights, aberrationsCache, dose_cutoff);
 
 			const std::vector<double> initial {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 

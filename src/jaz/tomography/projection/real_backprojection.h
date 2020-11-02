@@ -48,7 +48,8 @@ class RealSpaceBackprojection
 			gravis::d3Vector origin = gravis::d3Vector(0.0, 0.0, 0.0),
 			double spacing = 1.0,
 			InterpolationType interpolation = Linear,
-			double taper = 0.0);
+			double taperFalloff = 20,
+			double taperDist = 0);
 
 		template <typename SrcType, typename DestType>
 		static void backprojectSmooth(
@@ -59,7 +60,8 @@ class RealSpaceBackprojection
 			gravis::d3Vector origin = gravis::d3Vector(0.0, 0.0, 0.0),
 			double spacing = 1.0,
 			InterpolationType interpolation = Linear,
-			double taper = 0.0);
+			double taperFalloff = 20,
+			double taperDist = 0);
 
 		template <typename SrcType, typename DestType>
 		static void backprojectCoverage(
@@ -70,7 +72,8 @@ class RealSpaceBackprojection
 			gravis::d3Vector origin = gravis::d3Vector(0.0, 0.0, 0.0),
 			double spacing = 1.0,
 			InterpolationType interpolation = Linear,
-			double taper = 0.0);
+			double taperFalloff = 20,
+			double taperDist = 0);
 
 		template <typename SrcType, typename DestType>
 		static void backprojectSmoothCoverage(
@@ -81,7 +84,8 @@ class RealSpaceBackprojection
 			gravis::d3Vector origin = gravis::d3Vector(0.0, 0.0, 0.0),
 			double spacing = 1.0,
 			InterpolationType interpolation = Linear,
-			double taper = 0.0);
+			double taperFalloff = 20,
+			double taperDist = 0);
 		
 		template <typename SrcType, typename DestType>
 		static void backprojectPsf(
@@ -102,8 +106,8 @@ class RealSpaceBackprojection
 			gravis::d3Vector spacing = 1.0,
 			int num_threads = 1,
 			InterpolationType interpolation = Linear,
-			double taperX = 20,
-			double taperY = 20,
+			double taperFalloff = 20,
+			double taperDist = 0,
 			double wMin = 3.0);
 		
 		template <typename T>
@@ -116,8 +120,8 @@ class RealSpaceBackprojection
 			gravis::d3Vector spacing = 1.0, 
 			int num_threads = 1,
 			InterpolationType interpolation = Linear,
-			double taperX = 20, 
-			double taperY = 20, 
+			double taperFalloff = 20,
+			double taperDist = 0,
 			double wMin = 3.0);
 		
 		template <typename SrcType>
@@ -137,11 +141,12 @@ void RealSpaceBackprojection::backproject(
 				gravis::d3Vector origin,
 				double spacing,
 				InterpolationType interpolation,
-				double taper)
+				double taperFalloff,
+				double taperDist)
 {
 	const int fc = stack.zdim;
 
-	const bool doTaper = taper != 0.0;
+	const bool doTaper = taperFalloff != 0.0 && taperDist != 0.0;
 
 	#pragma omp parallel for num_threads(num_threads)
 	for (size_t z = 0; z < dest.zdim; z++)
@@ -167,7 +172,7 @@ void RealSpaceBackprojection::backproject(
 				if (doTaper)
 				{
 					const double t = Tapering::getTaperWeight2D(
-								pi.x, pi.y, stack.xdim, stack.ydim, taper);
+								pi.x, pi.y, stack.xdim, stack.ydim, taperFalloff, taperDist);
 
 					if (t > taperMax) taperMax = t;
 				}
@@ -200,7 +205,8 @@ void RealSpaceBackprojection::backprojectSmooth(
 				gravis::d3Vector origin,
 				double spacing,
 				InterpolationType interpolation,
-				double taper)
+				double taperFalloff,
+				double taperDist)
 {
 	const int fc = stack.zdim;
 
@@ -225,7 +231,7 @@ void RealSpaceBackprojection::backprojectSmooth(
 			if (pi.x >= 0.0 && pi.x < stack.xdim && pi.y >= 0.0 && pi.y < stack.ydim)
 			{
 				const double t = Tapering::getTaperWeight2D(
-						pi.x, pi.y, stack.xdim, stack.ydim, taper);
+						pi.x, pi.y, stack.xdim, stack.ydim, taperFalloff, taperDist);
 
 				if (interpolation == Linear)
 				{
@@ -256,11 +262,12 @@ void RealSpaceBackprojection::backprojectCoverage(
 				gravis::d3Vector origin,
 				double spacing,
 				InterpolationType interpolation,
-				double taper)
+				double taperFalloff,
+				double taperDist)
 {
 	const int fc = stack.zdim;
-	
-	const bool doTaper = taper != 0.0;
+
+	const bool doTaper = taperFalloff != 0.0 && taperDist != 0.0;
 	
 	#pragma omp parallel for num_threads(num_threads)	
 	for (size_t z = 0; z < dest.zdim; z++)
@@ -285,7 +292,7 @@ void RealSpaceBackprojection::backprojectCoverage(
 				if (doTaper)
 				{
 					const double t = Tapering::getTaperWeight2D(
-								pi.x, pi.y, stack.xdim, stack.ydim, taper);
+								pi.x, pi.y, stack.xdim, stack.ydim, taperFalloff, taperDist);
 					
 					if (t > taperMax) taperMax = t;
 				}
@@ -314,7 +321,8 @@ void RealSpaceBackprojection::backprojectSmoothCoverage(
 				gravis::d3Vector origin,
 				double spacing,
 				InterpolationType interpolation,
-				double taper)
+				double taperFalloff,
+				double taperDist)
 {
 	const int fc = stack.zdim;
 
@@ -339,7 +347,7 @@ void RealSpaceBackprojection::backprojectSmoothCoverage(
 			if (pi.x >= 0.0 && pi.x < stack.xdim && pi.y >= 0.0 && pi.y < stack.ydim)
 			{
 				const double t = Tapering::getTaperWeight2D(
-						pi.x, pi.y, stack.xdim, stack.ydim, taper);
+						pi.x, pi.y, stack.xdim, stack.ydim, taperFalloff, taperDist);
 
 				if (interpolation == Linear)
 				{
@@ -419,14 +427,14 @@ void RealSpaceBackprojection::backprojectRaw(
 				gravis::d3Vector spacing, 
 				int num_threads,
 				InterpolationType interpolation,
-				double taperX, 
-				double taperY, 
+				double taperFalloff,
+				double taperDist,
 				double wMin)
 {
 	backprojectRaw(
 		tomogram.projectionMatrices, tomogram.stack, dest, maskDest,
 		origin, spacing, num_threads,
-		interpolation, taperX, taperY, wMin);
+		interpolation, taperFalloff, taperDist, wMin);
 }
 
 template <typename T>
@@ -439,8 +447,8 @@ void RealSpaceBackprojection::backprojectRaw(
 				gravis::d3Vector spacing,
 				int num_threads, 
 				InterpolationType interpolation,
-				double taperX, 
-				double taperY, 
+				double taperFalloff,
+				double taperDist,
 				double wMin)
 {
 	gravis::d4Matrix vol2world;
@@ -481,7 +489,7 @@ void RealSpaceBackprojection::backprojectRaw(
 					&& pi.y >= 0.0 && pi.y < h-1)
 			{
 				double wghi = Tapering::getTaperWeight2D(
-							pi.x, pi.y, w, h, taperX);
+							pi.x, pi.y, w, h, taperFalloff, taperDist);
 
 				if (interpolation == Linear)
 				{

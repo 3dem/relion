@@ -55,6 +55,8 @@ class Tomogram
 
 		Tomogram extractSubstack(gravis::d3Vector position, int width, int height) const;
 		Tomogram FourierCrop(double factor, int num_threads, bool downsampleData = true) const;
+
+		bool hasFiducials();
 };
 
 
