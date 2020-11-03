@@ -73,6 +73,7 @@ void PolishProgram::run()
 	Log::beginSection("Initialising");
 	
 	RefinementProgram::init();
+	int res = system(("mkdir -p " + outDir + "/Trajectories").c_str());
 		
 	const int tc = particles.size();
 	const bool flip_value = true;
@@ -122,7 +123,7 @@ void PolishProgram::run()
 		int pc = particles[t].size();
 		if (pc == 0) continue;
 		
-		Log::beginSection("Tomogram " + ZIO::itoa(t+1) + " / " + ZIO::itoa(tc));		
+		Log::beginSection("Tomogram " + ZIO::itoa(t+1) + " / " + ZIO::itoa(tc));
 		Log::print("Loading");
 		
 		Tomogram tomogram = tomogramSet.loadTomogram(t, true);
@@ -265,10 +266,10 @@ void PolishProgram::run()
 				
 		
 		Mesh mesh8 = motionFit.visualiseTrajectories(opt, 8.0);
-		mesh8.writePly(outDir + "tracks_" + tag + "_x8.ply");
+		mesh8.writePly(outDir + "Trajectories/" + tomogram.name + "_x8.ply");
 		
 		Mesh mesh1 = motionFit.visualiseTrajectories(opt, 1.0);
-		mesh1.writePly(outDir + "tracks_" + tag + "_x1.ply");
+		mesh1.writePly(outDir + "Trajectories/" + tomogram.name + "_x1.ply");
 		
 		if (diag)
 		{
