@@ -324,6 +324,14 @@ int TomogramSet::getTomogramIndex(std::string tomogramName) const
 	return -1;
 }
 
+std::string TomogramSet::getTomogramName(int index) const
+{
+	std::string name;
+	globalTable.getValueSafely(EMDL_TOMO_NAME, name, index);
+
+	return name;
+}
+
 int TomogramSet::getTomogramIndexSafely(std::string tomogramName) const
 {
 	int t = getTomogramIndex(tomogramName);

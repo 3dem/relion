@@ -28,10 +28,11 @@ class FitBlobs3DProgram
 			int SH_bands, num_threads, max_iters;
 
 			double
-				radius_range,
+				relative_radius_range,
 				membrane_separation,
 				fiducials_radius_A,
-				highpass_sigma_real_A;
+				highpass_sigma_real_A,
+				fit_binning;
 
 
 
@@ -48,7 +49,7 @@ class FitBlobs3DProgram
 				int tomo_index,
 				const std::string& tomogram_name,
 				const std::map<int, const Manifold*>& input_manifolds_map,
-				TomogramSet& tomogram_set,
+				const TomogramSet& tomogram_set,
 				ManifoldSet& output_manifold_set);
 		
 		std::vector<double> segmentBlob(

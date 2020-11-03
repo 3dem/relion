@@ -34,18 +34,19 @@ void FitBlobs3DProgram::readParameters(int argc, char *argv[])
 			false,  false,   // particles
 			true,   true,    // tomograms
 			false,  false,   // trajectories
-			true,  true,     // manifolds
+			true,   true,    // manifolds
 			false,  false);  // reference
 
 		int gen_section = parser.addSection("General options");
 
-		radius_range = textToDouble(parser.getOption("--th", "Sphere radius range [pixels]"));
+		relative_radius_range = textToDouble(parser.getOption("--rr", "Sphere radius range as a multiple of radius", "1"));
 		membrane_separation = textToDouble(parser.getOption("--ms", "Membrane separation [Å]", "40"));
 		fiducials_radius_A = textToDouble(parser.getOption("--frad", "Fiducial marker radius [Å]", "100"));
+		fit_binning = textToDouble(parser.getOption("--bin", "Binning at which to perform the fit", "2"));
 
 		diag = parser.checkOption("--diag", "Write out diagnostic information");
 
-		SH_bands = textToInteger(parser.getOption("--n", "Number of spherical harmonics bands", "9"));
+		SH_bands = textToInteger(parser.getOption("--n", "Number of spherical harmonics bands", "5"));
 		highpass_sigma_real_A = textToDouble(parser.getOption("--hp", "High-pass sigma [Å, real space]", "300"));
 		max_iters = textToInteger(parser.getOption("--max_iters", "Maximum number of iterations", "1000"));
 		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
@@ -94,18 +95,16 @@ void FitBlobs3DProgram::run()
 		
 	for (int t = 0; t < tc; t++)
 	{
-		Tomogram tomogram0 = tomogram_set.loadTomogram(t, false);
+		std::string tomogram_name = tomogram_set.getTomogramName(t);
 
-		std::map<int, const Manifold*> manifolds_map = input_manifold_set.getManifoldsInTomogram(tomogram0.name);
+		std::map<int, const Manifold*> manifolds_map = input_manifold_set.getManifoldsInTomogram(tomogram_name);
 
 		if (manifolds_map.empty()) continue;
 
-		Tomogram tomogram = tomogram_set.loadTomogram(t, true);
-
-		Log::beginSection("Tomogram " + tomogram.name);
+		Log::beginSection("Tomogram " + tomogram_name);
 
 		processTomogram(
-			t, tomogram.name, manifolds_map, tomogram_set, output_manifold_set);
+			t, tomogram_name, manifolds_map, tomogram_set, output_manifold_set);
 		
 		Log::endSection();
 	}
@@ -120,7 +119,7 @@ void FitBlobs3DProgram::processTomogram(
 		int tomo_index,
 		const std::string& tomogram_name,
 		const std::map<int, const Manifold*>& input_manifolds_map,
-		TomogramSet& tomogram_set,
+		const TomogramSet& tomogram_set,
 		ManifoldSet& output_manifold_set)
 {
 	Log::print("Loading tilt series");
@@ -134,9 +133,7 @@ void FitBlobs3DProgram::processTomogram(
 
 	Log::print("Filtering");
 		
-	const double segmentation_binning = 2;
-	
-	Tomogram tomogram_binned = tomogram0.FourierCrop(segmentation_binning, num_threads);
+	Tomogram tomogram_binned = tomogram0.FourierCrop(fit_binning, num_threads);
 	
 	if (has_fiducials)
 	{
@@ -146,7 +143,7 @@ void FitBlobs3DProgram::processTomogram(
 
 		Fiducials::erase(
 			fiducials, 
-			fiducials_radius / segmentation_binning, 
+			fiducials_radius / fit_binning,
 			tomogram_binned, 
 			num_threads);
 	}
@@ -183,9 +180,9 @@ void FitBlobs3DProgram::processTomogram(
 		std::vector<double> blob_coeffs = segmentBlob(
 					sphere_position,
 					sphere_radius,
-					radius_range,
+					relative_radius_range * sphere_radius,
 					membrane_separation,
-					segmentation_binning,
+					fit_binning,
 					preweighted_stack,
 					pixel_size,
 					tomogram_binned.projectionMatrices,
