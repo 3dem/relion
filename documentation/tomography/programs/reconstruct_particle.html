@@ -30,7 +30,16 @@
 		<li><b>--o</b>: name of the output directory (that will be created).</li>
 	</ul>
 	
+	<h3>Program output:</h3>
 	
+	<p>After running the program, the output directory (<tt>--o</tt> argument) will contain the following items:</p>
+	<ul>
+		<li><b>&lt;half1/half2/merged&gt;.mrc</b>: the reconstructed cropped maps.</li>
+		<li><b>&lt;half1/half2/merged&gt;_full.mrc</b>: the reconstructed full-size maps, in case the full size (<tt>--b</tt> argument) differs from the cropped size (<tt>--crop</tt> argument).</li>
+		<li><b>data_&lt;half1/half2/merged&gt;.mrc</b>: the reconstructed data term at full size.</li>
+		<li><b>weight_&lt;half1/half2/merged&gt;.mrc</b>: the reconstructed weight term at full size.</li>
+		<li><b>note.txt</b>: a text file containing the command issued to run the program.</li>
+	</ul>
 	
 </body>
 

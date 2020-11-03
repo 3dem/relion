@@ -3,7 +3,7 @@
 
 <head>
 	<meta charset="utf-8">
-	<title>Reconstruct Particle</title>
+	<title>Refine Defocus</title>
 	<link rel="stylesheet" href="../style.css">
 </head>
 
@@ -22,6 +22,15 @@
 		<li><b>--no_astigmatism</b>: do not refine the astigmatism, but only a scalar defocus value. This is useful if the number of particles is too small to allow for accurate astigmatism estimation. If the number is even smaller, do not use this program.</li>
 		<li><b>--j</b>: number of threads to be used. This should be set to the number of CPU cores available.</li>
 		<li><b>--o</b>: name of the output directory (that will be created).</li>
+	</ul>
+	
+	<h3>Program output:</h3>
+	
+	<p>After running the program, the output directory (<tt>--o</tt> argument) will contain the following items:</p>
+	<ul>
+		<li><b>tomograms.star</b>: a new tomogram set containing the newly estimated defoci (<tt>rlnDefocus&lt;U/V&gt;</tt> and <tt>rlnDefocusAngle</tt>)</li>
+		<li><b>optimisation_set.star</b>: a new optimisation set pointing to the new tomogram set.</li>
+		<li><b>note.txt</b>: a text file containing the command issued to run the program.</li>
 	</ul>
 	
 	
