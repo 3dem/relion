@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<title>Fit Aberrations</title>
+	<link rel="stylesheet" href="../style.css">
+</head>
+
+<body>
+	<h1><tt>relion_tomo_fit_aberrations</tt></h1>
+	
+	<p>This program estimates higher-order optical aberrations, analogously to <tt>relion_ctf_refine</tt> for single-particle analysis. As in single-particle analysis, the aberrations are estimated per optics group. This allows the user to group particles that are expected to share the same aberrations, either by image region or by subset of tilt series, or both. Both symmetrical (even) and antisymmetrical (odd) aberrations are supported. A detailed description of the aberrations estimation algorithm can be found in the Relion <a href="https://journals.iucr.org/m/issues/2020/02/00/fq5009/">aberrations paper</a></p>
+	
+	<p>The estimated aberrations are written into the output <a href="../data_types/particle_set.html">particle set</a> which replaces the given particle set in the output <a href="../data_types/optimisation_set.html">optimisation set</a>.</p>
+	
+	<h3>Relevant program arguments:</h3>
+	
+	<ul>
+		<li><b>--i</b> and/or <b>--p</b>, <b>--t</b>, <b>--mot</b>, <b>--ref&lt;1/2&gt;</b>, <b>--mask</b> and <b>--fsc</b>: input optimisation-set and/or its components (see <a href="../data_types/optimisation_set.html">optimisation set</a>).</li>
+		<li><b>--b</b>: box size to be used for the estimation. Note that this can be larger than the box size of the reference map. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.</li>
+		<li><b>--no_symm</b>: do not estimate the symmetrical aberrations.</li>
+		<li><b>--no_antisymm</b>: do not estimate the antisymmetrical aberrations. If neither are estimated, the given particle set will be written out unchanged.</li>
+		<li><b>--j</b>: number of threads to be used. This should be set to the number of CPU cores available.</li>
+		<li><b>--o</b>: name of the output directory (that will be created).</li>
+	</ul>
+	
+	<h3>Program output:</h3>
+	
+	<p>After running the program, the output directory (<tt>--o</tt> argument) will contain the following items:</p>
+	<ul>
+		<li><b>particles.star</b>: a new particle set containing the newly estimated aberrations, expressed in <a href="https://en.wikipedia.org/wiki/Zernike_polynomials">Zernike coefficients</a> (<tt>rln&lt;Even/Odd&gt;Zernike</tt>)</li>
+		<li><b>optimisation_set.star</b>: a new optimisation set pointing to the new particle set.</li>
+		<li><b>&lt;<tt>optics_group</tt>&gt;_&lt;even/odd&gt;_phase_per-pixel.mrc</b>: visualisations showing the optimal phase-shift for each pixel. Inspecting this allows the user to ensure that the estimated pattern is not mere noise.</li>
+		<li><b>&lt;<tt>optics_group</tt>&gt;_&lt;even/odd&gt;_phase_nonlinear-fit.mrc</b>: visualisations of the fits using Zernike polynomials, as they will be used by the programs.</li>
+		<li><b>note.txt</b>: a text file containing the command issued to run the program.</li>
+	</ul>
+	
+	
+</body>
+
+</html>

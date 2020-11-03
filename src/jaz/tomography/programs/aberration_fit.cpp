@@ -206,7 +206,7 @@ void AberrationFitProgram::run()
 
 			std::vector<double> evenCoeffs = AberrationFit::solveAndFitEven(
 				evenData_perGroup[g], n_even, initialEven,
-				lastPixelSize, outDir, true);
+				lastPixelSize, outDir + ZIO::itoa(g+1) + "_", true);
 
 			if (particleSet.optTable.labelExists(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS))
 			{
@@ -232,7 +232,7 @@ void AberrationFitProgram::run()
 
 			std::vector<double> oddCoeffs = AberrationFit::solveAndFitOdd(
 				oddData_perGroup[g], n_odd, initialOdd,
-				lastPixelSize, outDir, true);
+				lastPixelSize, outDir + ZIO::itoa(g+1) + "_", true);
 
 			if (particleSet.optTable.labelExists(EMDL_IMAGE_ODD_ZERNIKE_COEFFS))
 			{

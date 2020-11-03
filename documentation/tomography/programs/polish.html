@@ -33,7 +33,7 @@
 	<ul>
 		<li><b>motion.star</b>: a new trajectory set</li>
 		<li><b>tomograms.star</b>: a new tomogram set containing the newly estimated projection matrices (<tt>rlnTomoProj&lt;X/Y/Z/W&gt;</tt>)</li>
-		<li><b>particles.star</b>: a new particles set containing the newly estimated particle positions in 3D (<tt>rlnCoordinate&lt;X/Y/Z&gt;</tt>)</li>
+		<li><b>particles.star</b>: a new particles set containing the newly estimated (initial) particle positions in 3D (<tt>rlnCoordinate&lt;X/Y/Z&gt;</tt>)</li>
 		<li><b>optimisation_set.star</b>: a new optimisation set pointing to the new trajectory, tomogram and particle sets.</li>
 		<li><b>Trajectories/&lt;tomogram_name&gt;_x&lt;1/8&gt;.ply"</b>: meshes of 3D trajectories in <a href="https://en.wikipedia.org/wiki/PLY_(file_format).ply"><tt>.ply</tt></a> format, scaled by a factor of 1 or 8, respectively. Note that only the trajectories themselves are scaled - their positions are those of the particles. They can be viewed in relation to (low-magnification) tomograms as produced by <a href="reconstruct_tomogram.html"><tt>relion_tomo_reconstruct_tomogram</tt></a> in a viewer that supports both meshes and 3D images (such as e.g. <a href="https://www.paraview.org/"><tt>Paraview</tt></a>).
 		<li><b>note.txt</b>: a text file containing the command issued to run the program.</li>
