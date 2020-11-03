@@ -39,7 +39,8 @@ void FitBlobs3DProgram::readParameters(int argc, char *argv[])
 
 		int gen_section = parser.addSection("General options");
 
-		sphere_thickness = textToDouble(parser.getOption("--th", "Sphere radius range [pixels]"));
+		radius_range = textToDouble(parser.getOption("--th", "Sphere radius range [pixels]"));
+		membrane_separation = textToDouble(parser.getOption("--ms", "Membrane separation [Å]", "40"));
 		fiducials_radius_A = textToDouble(parser.getOption("--frad", "Fiducial marker radius [Å]", "100"));
 
 		diag = parser.checkOption("--diag", "Write out diagnostic information");
@@ -182,7 +183,8 @@ void FitBlobs3DProgram::processTomogram(
 		std::vector<double> blob_coeffs = segmentBlob(
 					sphere_position,
 					sphere_radius,
-					sphere_thickness,
+					radius_range,
+					membrane_separation,
 					segmentation_binning,
 					preweighted_stack,
 					pixel_size,
@@ -278,6 +280,7 @@ std::vector<double> FitBlobs3DProgram::segmentBlob(
 		d3Vector sphere_position,
 		double mean_radius_full,
 		double radius_range,
+		double membrane_separation,
 		double binning,
 		const RawImage<float>& preweighted_stack,
 		double pixel_size,
@@ -322,7 +325,7 @@ std::vector<double> FitBlobs3DProgram::segmentBlob(
 	const int y_prior = 100 / binning;
 	const int falloff = 100 / binning;
 	const int width = 10 / binning;
-	const double spacing = 40.0 / (pixel_size * binning);
+	const double spacing = membrane_separation / (pixel_size * binning);
 	const double ratio = 5.0;
 	const double depth = 0;
 	

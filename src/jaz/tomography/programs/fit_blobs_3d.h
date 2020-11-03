@@ -28,7 +28,8 @@ class FitBlobs3DProgram
 			int SH_bands, num_threads, max_iters;
 
 			double
-				sphere_thickness,
+				radius_range,
+				membrane_separation,
 				fiducials_radius_A,
 				highpass_sigma_real_A;
 
@@ -54,6 +55,7 @@ class FitBlobs3DProgram
 				gravis::d3Vector sphere_position,
 				double mean_radius_full,
 				double radius_range,
+				double membrane_separation,
 				double binning,
 				const RawImage<float>& preweighted_stack,
 				double pixel_size,
