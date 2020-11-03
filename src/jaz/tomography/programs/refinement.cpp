@@ -50,7 +50,7 @@ void RefinementProgram::_readParams(IOParser &parser)
 	diag = parser.checkOption("--diag", "Write out diagnostic information");
 	timing = parser.checkOption("--time", "Measure the elapsed time");
 	num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
-	outDir = parser.getOption("--o", "Output filename pattern");
+	outDir = parser.getOption("--o", "Output directory");
 }
 
 void RefinementProgram::init()

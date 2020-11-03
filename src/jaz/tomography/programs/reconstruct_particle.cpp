@@ -61,7 +61,6 @@ void ReconstructParticleProgram::readBasicParameters(int argc, char *argv[])
 		max_mem_GB = textToInteger(parser.getOption("--mem", "Max. amount of memory to use for accumulation (--j_out will be reduced)", "-1"));
 				
 		explicit_gridding = parser.checkOption("--xg", "Perform gridding correction using a measured spreading function");
-		diag = parser.checkOption("--diag", "Write out diagnostic information");
 		
 		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 		inner_threads = textToInteger(parser.getOption("--j_in", "Number of inner threads (slower, needs less memory)", "3"));

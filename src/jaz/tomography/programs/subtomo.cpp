@@ -47,7 +47,7 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 	cone_sig0 = textToDouble(parser.getOption("--cone_sig0", "Cone width at Z = 0", "2"));
 
 	do_circle_crop = !parser.checkOption("--no_circle_crop", "Do not crop 2D images to a circle");
-	do_narrow_circle_crop = parser.checkOption("--narrow_circle_crop", "Crop CTF-modulated 2D images to a circle that fits the (smaller) output box size");
+	do_narrow_circle_crop = true;
 	do_gridding_precorrection = parser.checkOption("--grid_precorr", "Perform gridding pre-correction on 2D images");
 
 	taper = textToDouble(parser.getOption("--taper", "Taper against the sphere by this number of pixels", "5"));
