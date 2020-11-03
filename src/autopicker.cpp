@@ -156,7 +156,7 @@ if(do_gpu)
 	topaz_radius = textToInteger(parser.getOption("--topaz_radius", "Particle radius (in pix) for topaz extract (default is from particle diameter)", "-1"));
 	fn_topaz_exe = parser.getOption("--topaz_exe", "Name of topaz executable", "topaz");
 	fn_bash = parser.getOption("--bash_exe", "Name of bash executable", "/bin/bash");
-	fn_conda_activate = parser.getOption("--activate_exe", "Name of conda activate executable (defaults to 'which activate')", "");
+	fn_conda_activate = parser.getOption("--activate_exe", "Name of conda activate executable (defaults to 'source activate')", "");
 	topaz_additional_args = parser.getOption("--topaz_args", "Additional arguments to be passed to topaz", "");
 
 	int helix_section = parser.addSection("Helix options");
@@ -2919,7 +2919,7 @@ void AutoPicker::trainTopaz()
 
 	fh << "#!" << fn_bash  << std::endl;
 	if (fn_conda_activate == "")
-		fh << "`which activate` topaz" << std::endl;
+		fh << "source activate topaz" << std::endl;
 	else
 		fh << fn_conda_activate << " topaz" << std::endl;
 
@@ -2982,7 +2982,7 @@ void AutoPicker::autoPickTopazOneMicrograph(FileName &fn_mic, int rank)
 
 	fh << "#!" << fn_bash  << std::endl;
 	if (fn_conda_activate == "")
-		fh << "`which activate` topaz" << std::endl;
+		fh << "source activate topaz" << std::endl;
 	else
 		fh << fn_conda_activate << " topaz" << std::endl;
 
