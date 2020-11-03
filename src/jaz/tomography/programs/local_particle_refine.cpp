@@ -44,7 +44,7 @@ void LocalParticleRefineProgram::readParams(IOParser &parser)
 		int defocus_section = parser.addSection("Alignment options");
 
 		max_iterations = textToInteger(parser.getOption("--max_it", "Maximum number of iterations", "300"));
-		dose_cutoff = textToDouble(parser.getOption("--dose_cutoff", "Neglect pixels with a smaller dose weight", "0.01"));
+		dose_cutoff = textToDouble(parser.getOption("--dose_cutoff", "Neglect pixels with a smaller dose weight", "0.05"));
 		eps = textToDouble(parser.getOption("--eps", "Optimisation change threshold", "1e-5"));
 		xtol = textToDouble(parser.getOption("--xtol", "Optimisation gradient threshold", "1e-4"));
 		verbose_opt = parser.checkOption("--verbose_opt", "Print out the cost function after each iteration (for the first thread)");
