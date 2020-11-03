@@ -94,8 +94,7 @@ std::map<int, const Manifold*> ManifoldSet::getManifoldsInTomogram(
 	
 	if (it == perTomogramSets.end())
 	{
-		REPORT_ERROR("ManifoldSet::getManifoldsInTomogram: no manifolds found for tomogram "
-					 +tomogramName);
+		return std::map<int, const Manifold*>();
 	}
 	else
 	{

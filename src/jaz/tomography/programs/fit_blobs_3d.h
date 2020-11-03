@@ -9,6 +9,7 @@
 class Tomogram;
 class TomogramSet;
 class ManifoldSet;
+class Manifold;
 class Blob3D;
 
 class FitBlobs3DProgram
@@ -19,18 +20,18 @@ class FitBlobs3DProgram
 		FitBlobs3DProgram(){}
 
 		
-			std::string outPath, listFn;
-
+			std::string outPath;
 			OptimisationSet optimisationSet;
 
 			bool diag;
-			int SH_bands, num_threads, max_iters;
-			double sphere_thickness, spheres_binning,
-			prior_sigma_A, fiducials_radius_A,
-			highpass_sigma_real_A,
-			max_binning, min_binning;
 
-			std::vector<gravis::d4Vector> spheres;
+			int SH_bands, num_threads, max_iters;
+
+			double
+				sphere_thickness,
+				fiducials_radius_A,
+				highpass_sigma_real_A;
+
 
 
 		void readParameters(int argc, char *argv[]);
@@ -43,10 +44,11 @@ class FitBlobs3DProgram
 
 
 		void processTomogram(
-				std::string tomoName,
-				std::string spheresFn,
-				TomogramSet& initial_tomogram_set,
-				ManifoldSet& manifold_set);
+				int tomo_index,
+				const std::string& tomogram_name,
+				const std::map<int, const Manifold*>& input_manifolds_map,
+				TomogramSet& tomogram_set,
+				ManifoldSet& output_manifold_set);
 		
 		std::vector<double> segmentBlob(
 				gravis::d3Vector sphere_position,

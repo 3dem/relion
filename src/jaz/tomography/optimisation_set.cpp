@@ -18,7 +18,10 @@ void OptimisationSet::read(
 		optimisationSet = parser.getOption("--i", "Optimisation set", "");
 	}
 
-	int indiv_section = parser.addSection("Individual optimisation components (overriding the optimisation set)");
+	if (showParticles || showTomograms || showTrajectories || showManifolds || showReferenceMap)
+	{
+		int indiv_section = parser.addSection("Individual optimisation components (overriding the optimisation set)");
+	}
 
 	if (showParticles)
 	{

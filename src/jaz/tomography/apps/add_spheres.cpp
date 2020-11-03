@@ -1,6 +1,7 @@
 #include <src/args.h>
-#include <src/jaz/tomography/manifold/CMM_loader.h>
 #include <src/jaz/tomography/tomogram_set.h>
+#include <src/jaz/tomography/optimisation_set.h>
+#include <src/jaz/tomography/manifold/CMM_loader.h>
 #include <src/jaz/tomography/manifold/manifold_set.h>
 #include <src/jaz/tomography/manifold/sphere.h>
 #include <src/jaz/util/zio.h>
@@ -11,17 +12,26 @@ int main(int argc, char *argv[])
 {
 	IOParser parser;
 
-	std::string listFn, outPath, tomoSetFn;
+	std::string listFn, outPath;
 	double spheres_binning;
 	bool diag;
+
+	OptimisationSet optimisationSet;
 
 	try
 	{
 		parser.setCommandLine(argc, argv);
-		int gen_section = parser.addSection("General options");
 
-		tomoSetFn = parser.getOption("--t", "Tomogram set filename", "tomograms.star");
-		listFn = parser.getOption("--i", "File containing a list of tomogram-name/spheres-file pairs");
+		optimisationSet.read(
+			parser,
+			true,            // optimisation set
+			false,  false,   // particles
+			false,  false,   // tomograms
+			false,  false,   // trajectories
+			false,  false,   // manifolds
+			false,  false);  // reference
+
+		listFn = parser.getOption("--sph", "File containing a list of tomogram-name/spheres-file pairs");
 
 		spheres_binning = textToDouble(parser.getOption("--sbin", "Binning factor of the sphere coordinates"));
 
@@ -60,6 +70,7 @@ int main(int argc, char *argv[])
 		REPORT_ERROR_STR("Unable to read "+listFn);
 	}
 
+
 	std::map<std::string, std::string> tomoToSpheres;
 
 	std::string line;
@@ -75,8 +86,6 @@ int main(int argc, char *argv[])
 
 		tomoToSpheres[tomogram_name] = spheresFn;
 	}
-
-
 
 
 	for (std::map<std::string, std::string>::iterator it = tomoToSpheres.begin();
@@ -111,6 +120,9 @@ int main(int argc, char *argv[])
 
 
 	manifold_set.write(outPath + "manifolds.star");
+
+	optimisationSet.manifolds = outPath + "manifolds.star";
+	optimisationSet.write(outPath + "optimisation_set.star");
 
 
 	return 0;
