@@ -104,6 +104,9 @@ private:
     static void cb_menubar_recount(Fl_Widget*, void*);
     inline void cb_menubar_recount_i();
 
+    static void cb_menubar_setFOM(Fl_Widget*, void*);
+    inline void cb_menubar_setFOM_i();
+
     void readOutputStarfile();
     void writeOutputStarfiles(bool verb = true);
 

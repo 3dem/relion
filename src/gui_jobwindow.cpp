@@ -672,7 +672,15 @@ void JobWindow::initialiseManualpickWindow()
 	place ("do_startend");
 
 	current_y += STEPY/2;
-	place("ctfscale");
+
+	group7 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group7->end();
+	place("do_fom_threshold", TOGGLE_DEACTIVATE, group7);
+	group7->begin();
+	place("minimum_pick_fom", TOGGLE_DEACTIVATE);
+	group7->end();
+	guientries["do_fom_threshold"].cb_menu_i();
+
 
 	tab2->end();
 	tab3->begin();
@@ -700,7 +708,7 @@ void JobWindow::initialiseManualpickWindow()
 
 void JobWindow::initialiseAutopickWindow()
 {
-	setupTabs(5);
+	setupTabs(6);
 
 	tab1->begin();
 	tab1->label("I/O");
@@ -711,19 +719,9 @@ void JobWindow::initialiseAutopickWindow()
 
 	current_y += STEPY/2;
 
-	place("fn_refs_autopick", TOGGLE_DEACTIVATE);
-
-	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group1->end();
-	place("do_ref3d", TOGGLE_DEACTIVATE, group1);
-	group1->begin();
-	place("fn_ref3d_autopick", TOGGLE_DEACTIVATE);
-	place("ref3d_symmetry", TOGGLE_DEACTIVATE);
-	place("ref3d_sampling", TOGGLE_DEACTIVATE);
-	group1->end();
-	guientries["do_ref3d"].cb_menu_i();
-
+	place("do_refs", TOGGLE_DEACTIVATE);
 	place("do_log", TOGGLE_DEACTIVATE);
+	place("do_topaz", TOGGLE_DEACTIVATE);
 
 	tab1->end();
 	tab2->begin();
@@ -742,26 +740,79 @@ void JobWindow::initialiseAutopickWindow()
 
 	tab2->end();
 	tab3->begin();
-	tab3->label("References");
+	tab3->label("Topaz");
 	resetHeight();
+
+	group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group5->end();
+	place("do_topaz_train", TOGGLE_DEACTIVATE, group5);
+
+	group5->begin();
+	place("topaz_train_picks", TOGGLE_DEACTIVATE);
+
+	group6 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group6->end();
+
+	place("do_topaz_train_parts", TOGGLE_DEACTIVATE, group6);
+	group6->end();
+
+	group6->begin();
+	place("topaz_train_parts", TOGGLE_DEACTIVATE);
+	group6->end();
+	guientries["do_topaz_train_parts"].cb_menu_i();
+
+	group5->end();
+	guientries["do_topaz_train"].cb_menu_i();
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	group7 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group7->end();
+
+	place("do_topaz_pick", TOGGLE_DEACTIVATE, group7);
+	group7->end();
+
+	group7->begin();
+	place("topaz_model", TOGGLE_DEACTIVATE);
+	group7->end();
+	guientries["do_topaz_pick"].cb_menu_i();
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	place("topaz_particle_diameter", TOGGLE_DEACTIVATE);
+	place("topaz_nr_particles", TOGGLE_DEACTIVATE);
+	place("topaz_other_args", TOGGLE_DEACTIVATE);
+
+	tab3->end();
+	tab4->begin();
+	tab4->label("References");
+	resetHeight();
+
+	place("fn_refs_autopick", TOGGLE_DEACTIVATE);
+
+	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group1->end();
+	place("do_ref3d", TOGGLE_DEACTIVATE, group1);
+	group1->begin();
+	place("fn_ref3d_autopick", TOGGLE_DEACTIVATE);
+	place("ref3d_symmetry", TOGGLE_DEACTIVATE);
+	place("ref3d_sampling", TOGGLE_DEACTIVATE);
+	group1->end();
+	guientries["do_ref3d"].cb_menu_i();
 
 	//set up group
 	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group2->end();
 
+	// Add a little spacer
+	current_y += STEPY/2;
+
 	place("lowpass", TOGGLE_DEACTIVATE);
 	place("highpass", TOGGLE_DEACTIVATE);
 	place("angpix_ref", TOGGLE_DEACTIVATE);
-	place("particle_diameter", TOGGLE_DEACTIVATE);
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
 	place("psi_sampling_autopick", TOGGLE_DEACTIVATE);
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
 	place("do_invert_refs", TOGGLE_DEACTIVATE);
 	place("do_ctf_autopick", TOGGLE_DEACTIVATE, group2);
 
@@ -772,9 +823,9 @@ void JobWindow::initialiseAutopickWindow()
 	group2->end();
 	guientries["do_ctf_autopick"].cb_menu_i();
 
-	tab3->end();
-	tab4->begin();
-	tab4->label("autopicking");
+	tab4->end();
+	tab5->begin();
+	tab5->label("autopicking");
 	resetHeight();
 
 	place("threshold_autopick");
@@ -803,9 +854,9 @@ void JobWindow::initialiseAutopickWindow()
 
 	guientries["use_gpu"].cb_menu_i();
 
-	tab4->end();
-	tab5->begin();
-	tab5->label("Helix");
+	tab5->end();
+	tab6->begin();
+	tab6->label("Helix");
 	resetHeight();
 
 	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
@@ -832,7 +883,7 @@ void JobWindow::initialiseAutopickWindow()
 
 	guientries["do_pick_helical_segments"].cb_menu_i();
 
-	tab5->end();
+	tab6->end();
 }
 
 void JobWindow::initialiseExtractWindow()
@@ -909,6 +960,17 @@ Pixels values higher than this many times the image stddev will be replaced with
 	place("rescale", TOGGLE_DEACTIVATE);
 	group4->end();
 	guientries["do_rescale"].cb_menu_i();
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	group7 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group7->end();
+	place("do_fom_threshold", TOGGLE_DEACTIVATE, group7);
+	group7->begin();
+	place("minimum_pick_fom", TOGGLE_DEACTIVATE);
+	group7->end();
+	guientries["do_fom_threshold"].cb_menu_i();
 
 	tab2->end();
 	tab3->begin();

@@ -119,6 +119,9 @@ public:
 	// Box size to extract the particles in
 	int extract_size;
 
+	// Minimum threshold for autopickFigureOfMerit to extract particles
+	RFLOAT extract_minimum_fom;
+
 	// Box size to extract the particle for premultiplication with the CTF
 	int premultiply_ctf_extract_size;
 

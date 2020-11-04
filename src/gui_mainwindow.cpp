@@ -1749,13 +1749,6 @@ void GuiMainWindow::cb_display_io_node_i()
 		// TODO: write error message saying this is no longer possible: use Continue to pick more/inspect results!
 		FileName fn_suffix = pipeline.nodeList[mynode].name;
 
-		if (!fn_suffix.contains("coords_suffix_"))
-		{
-			fl_message("ERROR: The 2-column coordinate file lists from relion-3.2+ cannot be displayed here. Use the Continue button to display the micrographs and pick more particles");
-			return;
-
-		}
-
 		// A manualpicker jobwindow for display of micrographs....
 		RelionJob manualpickjob;
 		FileName fn_job = ".gui_manualpick";
@@ -1773,60 +1766,62 @@ void GuiMainWindow::cb_display_io_node_i()
 		// Get the name of the micrograph STAR file from reading the suffix file
 		if (fn_suffix.getExtension() == "star")
 		{
-			std::ifstream in(fn_suffix.data(), std::ios_base::in);
-			FileName fn_star;
-			in >> fn_star ;
-			in.close();
-			if (fn_star != "")
+			if (!fn_suffix.contains("coords_suffix_"))
 			{
+				command="`which relion_manualpick` --i " + fn_suffix;
+			}
+			else
+			{
+				std::ifstream in(fn_suffix.data(), std::ios_base::in);
+				FileName fn_star;
+				in >> fn_star ;
+				in.close();
 				FileName fn_dirs = fn_suffix.beforeLastOf("/")+"/";
 				fn_suffix = fn_suffix.afterLastOf("/").without("coords_suffix_");
 				fn_suffix = fn_suffix.withoutExtension();
 				// Launch the manualpicker...
 				command="`which relion_manualpick` --i " + fn_star;
-				command += " --odir " + fn_dirs;
 				command += " --pickname " + fn_suffix;
-				command += " --scale " + manualpickjob.joboptions["micscale"].getString();
-				command += " --sigma_contrast " + manualpickjob.joboptions["sigma_contrast"].getString();
-				command += " --black " + manualpickjob.joboptions["black_val"].getString();
-				command += " --white " + manualpickjob.joboptions["white_val"].getString();
-
-				std::string error_message = "";
-				float mylowpass = manualpickjob.joboptions["lowpass"].getNumber(error_message);
-				if (error_message != "") {fl_message("joboption['lowpass'] %s", error_message.c_str()); return;}
-				if (mylowpass > 0.)
-					command += " --lowpass " + manualpickjob.joboptions["lowpass"].getString();
-
-				float myhighpass = manualpickjob.joboptions["highpass"].getNumber(error_message);
-				if (error_message != "") {fl_message("joboption['highpass'] %s", error_message.c_str()); return;}
-				if (myhighpass > 0.)
-					command += " --highpass " + manualpickjob.joboptions["highpass"].getString();
-
-				float myangpix = manualpickjob.joboptions["angpix"].getNumber(error_message);
-				if (error_message != "") {fl_message("joboption['angpix'] %s", error_message.c_str()); return;}
-				if (myangpix > 0.)
-					command += " --angpix " + manualpickjob.joboptions["angpix"].getString();
-
-				command += " --ctf_scale " + manualpickjob.joboptions["ctfscale"].getString();
-
-				command += " --particle_diameter " + manualpickjob.joboptions["diameter"].getString();
-
-				if (manualpickjob.joboptions["do_color"].getBoolean())
-				{
-					command += " --color_label " + manualpickjob.joboptions["color_label"].getString();
-					command += " --blue " + manualpickjob.joboptions["blue_value"].getString();
-					command += " --red " + manualpickjob.joboptions["red_value"].getString();
-					if (manualpickjob.joboptions["fn_color"].getString().length() > 0)
-						command += " --color_star " + manualpickjob.joboptions["fn_color"].getString();
-				}
-
-				// Other arguments for extraction
-				command += " " + manualpickjob.joboptions["other_args"].getString() + " &";
+				command += " --odir " + fn_dirs;
 			}
-			else
+			command += " --scale " + manualpickjob.joboptions["micscale"].getString();
+			command += " --sigma_contrast " + manualpickjob.joboptions["sigma_contrast"].getString();
+			command += " --black " + manualpickjob.joboptions["black_val"].getString();
+			command += " --white " + manualpickjob.joboptions["white_val"].getString();
+
+			std::string error_message = "";
+			float mylowpass = manualpickjob.joboptions["lowpass"].getNumber(error_message);
+			if (error_message != "") {fl_message("joboption['lowpass'] %s", error_message.c_str()); return;}
+			if (mylowpass > 0.)
+				command += " --lowpass " + manualpickjob.joboptions["lowpass"].getString();
+
+			float myhighpass = manualpickjob.joboptions["highpass"].getNumber(error_message);
+			if (error_message != "") {fl_message("joboption['highpass'] %s", error_message.c_str()); return;}
+			if (myhighpass > 0.)
+				command += " --highpass " + manualpickjob.joboptions["highpass"].getString();
+
+			float myangpix = manualpickjob.joboptions["angpix"].getNumber(error_message);
+			if (error_message != "") {fl_message("joboption['angpix'] %s", error_message.c_str()); return;}
+			if (myangpix > 0.)
+				command += " --angpix " + manualpickjob.joboptions["angpix"].getString();
+
+			command += " --particle_diameter " + manualpickjob.joboptions["diameter"].getString();
+			if (manualpickjob.joboptions["do_fom_threshold"].getBoolean())
 			{
-				fl_message("Only coordinates in .star format, generated in the pipeline, can be displayed here.");
+				command += " --minimum_pick_fom " + manualpickjob.joboptions["minimum_pick_fom"].getString();
 			}
+
+			if (manualpickjob.joboptions["do_color"].getBoolean())
+			{
+				command += " --color_label " + manualpickjob.joboptions["color_label"].getString();
+				command += " --blue " + manualpickjob.joboptions["blue_value"].getString();
+				command += " --red " + manualpickjob.joboptions["red_value"].getString();
+				if (manualpickjob.joboptions["fn_color"].getString().length() > 0)
+					command += " --color_star " + manualpickjob.joboptions["fn_color"].getString();
+			}
+
+			// Other arguments for extraction
+			command += " " + manualpickjob.joboptions["other_args"].getString() + " &";
 		}
 		else
 		{
@@ -3515,6 +3510,8 @@ Please also cite relevant papers when you used external programs or their algori
 * Symmetry relaxation:\n\
     Ilca et al. (2019) Nature (PMID: 31142835) \n\
     Abrishami et al. (2020) Prog. Biophys. Mol. Biol. (PMID: 32470354) \n\n\
+* Topaz auto-picking:\n\
+    Bepler et al. (2019) Nature Methods (PMID: 31591578) \n\
 * Postscript plots are made using CPlot2D from http://www.amzsaki.com\n\n\
 \
 About the start up screen:\n\n\

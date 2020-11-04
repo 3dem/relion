@@ -7,6 +7,7 @@
 
 #ifndef AUTOPICKER_H_
 #define AUTOPICKER_H_
+#include <stdlib.h>
 #include "src/image.h"
 #include "src/multidim_array.h"
 #include "src/metadata_table.h"
@@ -171,6 +172,49 @@ public:
 	// Vector with all diameters to be sampled
 	std::vector<RFLOAT> diams_LoG;
 
+	/// Topaz wrappers
+	// Use topaz train or topaz extract instead of template-based picking
+	bool do_topaz_train, do_topaz_extract;
+
+	// Expected number of particles per micrograph
+	int topaz_nr_particles;
+
+	// Topaz downscale factor
+	int topaz_downscale;
+
+	// Topaz command executable
+	FileName fn_topaz_exe;
+
+	// Conda activate executable
+	FileName fn_conda_activate;
+
+	// Bash executable
+	FileName fn_bash;
+
+	// Topaz saved model for use in extract
+	FileName topaz_model;
+
+	// Topaz particle radius for use in extract
+	int topaz_radius;
+
+	// Device ID for topaz
+	int topaz_device_id;
+
+	// Filename for picks or particles star file to be used for topaz training
+	FileName topaz_train_picks, topaz_train_parts;
+
+	// Metadata table for training picks
+	MetaDataTable MDtrain;
+
+	// Default ratio of picks in the test validation set
+	RFLOAT topaz_test_ratio;
+
+	// Number of topaz workers
+	int nr_topaz_threads;
+
+	// Other arguments to be passed to topaz
+	FileName topaz_additional_args;
+
 	//// Specific amyloid picker
 	bool do_amyloid;
 
@@ -287,7 +331,7 @@ public:
 	void usage();
 
 	// Initialise some general stuff after reading
-	void initialise();
+	void initialise(int rank = 0);
 
 	// Set device-affinity
 	int deviceInitialise();
@@ -353,6 +397,12 @@ public:
 			RFLOAT tube_length_min_pix,
 			int skip_side, float scale);
 
+	MetaDataTable getMDtrainFromParticleStar(MetaDataTable &MDparts);
+	MetaDataTable readTopazCoordinates(FileName fn_coord, int _topaz_downscale = 1);
+
+	void preprocessTopazMicrograph(FileName fn_mic_in, int downscale, FileName fn_mic_out);
+	void trainTopaz();
+	void autoPickTopazOneMicrograph(FileName &fn_mic, int rank = 0);
 	void autoPickLoGOneMicrograph(FileName &fn_mic, long int imic);
 	void autoPickOneMicrograph(FileName &fn_mic, long int imic);
 
