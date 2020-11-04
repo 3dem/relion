@@ -3503,8 +3503,6 @@ Please also cite relevant papers when you used external programs or their algori
     Rohou & Grigorieff (2015) J. Struct. Biol. (PMID: 26278980)\n\n\
 * GCTF for CTF-estimation:\n\
     Zhang (2016) J. Struct. Biol. (PMID: 26592709)\n\n\
-* Stochastic Gradient Descent for initial model generation:\n\
-    Punjani et al. (2017) Nat. Meth. (PMID: 28165473)\n\n\
 * ResMap for local-resolution estimation:\n\
     Kucukelbir et al. (2014) Nat. Meth. (PMID: 24213166)\n\n\
 * Symmetry relaxation:\n\
