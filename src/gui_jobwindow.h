@@ -124,6 +124,8 @@ private:
 	void initialiseLocresWindow();
 	void initialiseMotionrefineWindow();
 	void initialiseCtfrefineWindow();
+	// tomo stuff
+	void initialiseSubtomoWindow();
 	void initialiseExternalWindow();
 
 };

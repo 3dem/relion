@@ -448,6 +448,7 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 		    type != PROC_INIMODEL &&
 		    type != PROC_MOTIONREFINE &&
 		    type != PROC_CTFREFINE &&
+		    type != PROC_SUBTOMO &&
 		    type != PROC_EXTERNAL)
 			REPORT_ERROR("ERROR: cannot find correct job type in " + myfilename + "run.job, with type= " + integerToString(type));
 
@@ -851,6 +852,11 @@ void RelionJob::initialise(int _job_type)
 		has_mpi = has_thread = true;
 		initialiseCtfrefineJob();
 	}
+	else if (type == PROC_SUBTOMO)
+	{
+		has_mpi = has_thread = true;
+		initialiseSubtomoJob();
+	}
 	else if (type == PROC_EXTERNAL)
 	{
 		has_mpi = false;
@@ -1064,6 +1070,10 @@ bool RelionJob::getCommands(std::string &outputname, std::vector<std::string> &c
 	else if (type == PROC_CTFREFINE)
 	{
 		result = getCommandsCtfrefineJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
+	}
+	else if (type == PROC_SUBTOMO)
+	{
+		result = getCommandsSubtomoJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
 	else if (type == PROC_EXTERNAL)
 	{
@@ -5316,6 +5326,46 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
+}
+
+void RelionJob::initialiseSubtomoJob()
+{
+        hidden_name = ".gui_subtomo";
+
+        // Optional input nodes
+        // TODO: declare optimisation set nodetype!!!
+        joboptions["in_optset"] = JobOption("Input optimisation set: ", NODE_PART_DATA, "", "particles STAR file (*.star)", "Input particles. This will be passed with a --in_parts argument to the executable.");
+
+}
+
+bool RelionJob::getCommandsSubtomoJob(std::string &outputname, std::vector<std::string> &commands,
+                std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
+{
+        commands.clear();
+        initialisePipeline(outputname, PROC_SUBTOMO_LABEL, job_counter);
+        std::string command;
+
+        if (joboptions["nr_mpi"].getNumber(error_message) > 1)
+                command="`which relion_tomo_subtomo_mpi`";
+        else
+                command="`which relion_tomo_subtomo`";
+        if (error_message != "") return false;
+
+        if (joboptions["in_optset"].getString() != "")
+        {
+                Node node(joboptions["in_optset"].getString(), joboptions["in_optset"].node_type);
+                inputNodes.push_back(node);
+                command += " --i " + joboptions["in_optset"].getString();
+        }
+
+        // Running stuff
+        command += " --j " + joboptions["nr_threads"].getString();
+
+        // Other arguments for extraction
+        command += " " + joboptions["other_args"].getString();
+        commands.push_back(command);
+
+        return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
 
 void RelionJob::initialiseExternalJob()

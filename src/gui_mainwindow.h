@@ -64,7 +64,7 @@
 
 // This class organises the main window of the relion GUI
 static Fl_Hold_Browser *browser;
-static Fl_Group *browse_grp[NR_BROWSE_TABS];
+static Fl_Group *browse_grp[MAX_JOBS_BROWSER];
 static Fl_Group *background_grp;
 static Fl_Group *pipeliner_jobs_grp;
 static Fl_Group *pipeliner_grp;
@@ -81,7 +81,7 @@ static std::vector<long int> running_processes, finished_processes, scheduled_pr
 static bool is_main_continue;
 static bool do_overwrite_continue;
 
-static JobWindow *gui_jobwindows[NR_BROWSE_TABS];
+static JobWindow *gui_jobwindows[MAX_JOBS_BROWSER];
 
 // Run button
 // Sjors 16feb2018: somehow suddenly this run_button needs to be a non-static: otherwise it doesn't change to 'continue now' and doesnt grey out...
@@ -302,12 +302,16 @@ public:
 	// Exit GUI after how many seconds idle?
 	float exit_after_sec;
 
+	// Numbr of browse tabs
+	int nr_browse_tabs;
+
 	// For job submission
     std::string final_command;
     std::vector<std::string> commands;
 
     // Constructor with w x h size of the window and a title
-	GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, FileName fn_sched, int _update_every_sec, int _exit_after_sec, bool _do_read_only = false);
+	GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, FileName fn_sched,
+			int _update_every_sec, int _exit_after_sec, bool _do_read_only = false, bool _do_tomo = false);
 
     // Destructor
     ~GuiMainWindow(){ clear(); };

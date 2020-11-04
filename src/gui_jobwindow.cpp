@@ -405,6 +405,11 @@ void JobWindow::initialise(int my_job_type)
 		myjob.initialise(my_job_type);
 		initialiseCtfrefineWindow();
 	}
+	else if (my_job_type == PROC_SUBTOMO)
+	{
+		myjob.initialise(my_job_type);
+		initialiseSubtomoWindow();
+	}
 	else if (my_job_type == PROC_EXTERNAL)
 	{
 		myjob.initialise(my_job_type);
@@ -2218,6 +2223,27 @@ void JobWindow::initialiseCtfrefineWindow()
 	current_y += STEPY /2 ;
 
 	place("minres", TOGGLE_DEACTIVATE);
+
+	tab2->end();
+}
+
+void JobWindow::initialiseSubtomoWindow()
+{
+	setupTabs(2);
+
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
+
+	// I/O
+	place("in_optset", TOGGLE_DEACTIVATE);
+
+	tab1->end();
+
+	tab2->begin();
+	tab2->label("TODO");
+	resetHeight();
+
 
 	tab2->end();
 }

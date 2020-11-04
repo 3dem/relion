@@ -225,6 +225,7 @@ static std::map<std::string, int> node_label2type = {{NODE_MOVIES_LABEL, NODE_MO
 #define PROC_MULTIBODY_LABEL	 "MultiBody"    // Multi-body refinement
 #define PROC_MOTIONREFINE_LABEL  "Polish"       // Jasenko's motion fitting program for Bayesian polishing (to replace MovieRefine?)
 #define PROC_CTFREFINE_LABEL     "CtfRefine"    // Jasenko's program for defocus and beamtilt optimisation
+#define PROC_SUBTOMO_LABEL       "Subtomo"      // Creation of subtomograms from tilt series images
 #define PROC_EXTERNAL_LABEL      "External"     // For running non-relion programs
 
 
@@ -250,8 +251,9 @@ static std::map<std::string, int> node_label2type = {{NODE_MOVIES_LABEL, NODE_MO
 #define PROC_MULTIBODY      19// Multi-body refinement
 #define PROC_MOTIONREFINE   20// Jasenko's motion_refine
 #define PROC_CTFREFINE      21// Jasenko's ctf_refine
+#define PROC_SUBTOMO        50// Creation of subtomograms from tilt series images
 #define PROC_EXTERNAL       99// External scripts
-#define NR_BROWSE_TABS      20
+
 
 static std::map<int, std::string> proc_type2label = {{PROC_IMPORT, PROC_IMPORT_LABEL},
 		{PROC_MOTIONCORR, PROC_MOTIONCORR_LABEL},
@@ -272,6 +274,7 @@ static std::map<int, std::string> proc_type2label = {{PROC_IMPORT, PROC_IMPORT_L
 		{PROC_MULTIBODY, PROC_MULTIBODY_LABEL},
 		{PROC_MOTIONREFINE, PROC_MOTIONREFINE_LABEL},
 		{PROC_CTFREFINE, PROC_CTFREFINE_LABEL},
+		{PROC_SUBTOMO, PROC_SUBTOMO_LABEL},
 		{PROC_EXTERNAL, PROC_EXTERNAL_LABEL}};
 
 static std::map<std::string, int> proc_label2type = {{PROC_IMPORT_LABEL, PROC_IMPORT},
@@ -293,6 +296,7 @@ static std::map<std::string, int> proc_label2type = {{PROC_IMPORT_LABEL, PROC_IM
 		{PROC_MULTIBODY_LABEL, PROC_MULTIBODY},
 		{PROC_MOTIONREFINE_LABEL, PROC_MOTIONREFINE},
 		{PROC_CTFREFINE_LABEL, PROC_CTFREFINE},
+		{PROC_SUBTOMO_LABEL, PROC_SUBTOMO},
 		{PROC_EXTERNAL_LABEL, PROC_EXTERNAL}};
 
 // Status a Process may have
@@ -592,6 +596,10 @@ public:
 
 	void initialiseCtfrefineJob();
 	bool getCommandsCtfrefineJob(std::string &outputname, std::vector<std::string> &commands,
+			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+
+	void initialiseSubtomoJob();
+	bool getCommandsSubtomoJob(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
 	void initialiseExternalJob();
