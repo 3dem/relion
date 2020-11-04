@@ -27,7 +27,7 @@
 		<li><b>--keep_mean</b>: do not subtract the mean from (i.e. do not zero the DC component of) every 2D image prior to reconstruction.</li>
 		<li><b>--td</b>: taper distance. Do not backproject image regions closer than this to the edge of a 2D image.</li>
 		<li><b>--tf</b>: taper falloff. Fade out the contribution of each 2D image along this distance to the edge of the effective image. If a value has been specified for the <tt>--td</tt> argument, then this falloff begins at that edge. These two options are useful if the images show artifacts near the edge, and the resulting tomogram is to be used for automated detection.</li>		
-		<li><b>--&lt;x0/y0/z0/&gt;</b>: the origin of the 3D region to be reconstructed. Note: to maintain consistency with other processing software, the default origin (corresponding to the one used by IMOD) is equal to 1. Therefore, 1 is also the default value for these arguments.</li>		
+		<li><b>--&lt;x0/y0/z0/&gt;</b>: the origin of the 3D region to be reconstructed. Note: to maintain consistency with other processing software, the default origin (corresponding to the one used by <a href="https://bio3d.colorado.edu/imod/">IMOD</a>) is equal to 1. Therefore, 1 is also the default value for these arguments.</li>		
 		<li><b>--&lt;w/h/d&gt;</b>: the size of the 3D region to be reconstructed (in bin-1 pixels). If not specified, the size indicated in the tomogram set will be used, which should correspond to the region defined in IMOD.</li>		
 		<li><b>--bin</b>: the binning level of the reconstruction. Note: the default value for this is 8, in order to prevent accidentally reconstructing a bin-1 tomogram.</li>
 		<li><b>--j</b>: number of threads to be used. This should be set to the number of CPU cores available.</li>
