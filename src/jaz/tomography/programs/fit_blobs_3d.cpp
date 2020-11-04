@@ -321,7 +321,7 @@ std::vector<double> FitBlobs3DProgram::segmentBlob(
 	
 	const int y_prior = 100 / binning;
 	const int falloff = 100 / binning;
-	const int width = 10 / binning;
+	const int width = 30 / binning;
 	const double spacing = membrane_separation / (pixel_size * binning);
 	const double ratio = 5.0;
 	const double depth = 0;
@@ -329,8 +329,11 @@ std::vector<double> FitBlobs3DProgram::segmentBlob(
 	const double min_radius_full = mean_radius_full - radius_range/2;
 	const double max_radius_full = mean_radius_full + radius_range/2;
 		
-	
-	BufferedImage<float> kernel = MembraneSegmentation::constructMembraneKernel(
+	const double max_tilt = DEG2RAD(30);
+	const double tilt_steps = 15;
+
+
+	/*BufferedImage<float> kernel = MembraneSegmentation::constructMembraneKernel(
 		map.xdim, map.ydim, map.zdim, falloff, width, spacing, ratio, depth);   
 	
 	if (debug_prefix != "")
@@ -354,7 +357,17 @@ std::vector<double> FitBlobs3DProgram::segmentBlob(
 	
 	BufferedImage<float> correlation;
 	        
-	FFT::inverseFourierTransform(correlation_FS, correlation);
+	FFT::inverseFourierTransform(correlation_FS, correlation);*/
+
+
+
+
+	BufferedImage<float> correlation =
+		MembraneSegmentation::correlateWithMembraneMultiAngle(
+			map, falloff, width, spacing, ratio, depth,
+			max_tilt, tilt_steps);
+
+
 	
 	const double st = map.zdim / 4.0;
 	const double s2t = 2 * st * st;
@@ -366,7 +379,7 @@ std::vector<double> FitBlobs3DProgram::segmentBlob(
 	{
 		const double r = (min_radius_full + radius_range * y / (double) map.ydim) / max_radius_full;
 		
-		const double ay = map.ydim - y - 1;		        
+		const double ay = map.ydim - y - 1;
 		const double q0 = 1.0 - exp( -y*y  / s2f);
 		const double q1 = 1.0 - exp(-ay*ay / s2f);
 		
