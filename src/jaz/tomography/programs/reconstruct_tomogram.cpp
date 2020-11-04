@@ -6,8 +6,9 @@
 #include <src/jaz/tomography/tomogram_set.h>
 #include <src/jaz/image/normalization.h>
 #include <src/jaz/image/centering.h>
-#include <src/args.h>
 #include <src/jaz/gravis/t4Matrix.h>
+#include <src/jaz/util/log.h>
+#include <src/args.h>
 
 #include <omp.h>
 
@@ -21,36 +22,53 @@ void TomoBackprojectProgram::readParameters(int argc, char *argv[])
 	try
 	{
 		parser.setCommandLine(argc, argv);
+		
+		optimisationSet.read(
+			parser,
+			true,             // optimisation set
+			false,   false,   // particles
+			true,    true,    // tomograms
+			false,   false,   // trajectories
+			false,   false,   // manifolds
+			false,   false);  // reference
+
 		int gen_section = parser.addSection("General options");
+
+		tomoName = parser.getOption("--tn", "Tomogram name");
 		
-		tomoSetFn = parser.getOption("--t", "Tomogram set", "tomograms.star");
-		tomoIndex = textToInteger(parser.getOption("--ti", "Tomogram index", "0"));
-		
-		applyWeight = parser.checkOption("--wg3D", "Perform weighting in Fourier space (using a Wiener filter)");
-		applyPreWeight = parser.checkOption("--wg2D", "Pre-weight the 2D slices prior to backprojection");
+		applyWeight = !parser.checkOption("--no_weight", "Do not perform weighting in Fourier space using a Wiener filter");
+		applyPreWeight = parser.checkOption("--pre_weight", "Pre-weight the 2D slices prior to backprojection");
+
 		SNR = textToDouble(parser.getOption("--SNR", "SNR assumed by the Wiener filter", "10"));
 		
 		applyCtf = !parser.checkOption("--noctf", "Ignore the CTF");
-		zeroDC = parser.checkOption("--0dc", "Zero the DC component of each frame");
-		
-		taperRad = textToDouble(parser.getOption("--td", "Tapering distance", "0.0"));
 
-		thickness = textToInteger(parser.getOption("--th", "Thickness (read from .tlt file by default)", "-1"));
-		
+		zeroDC = !parser.checkOption("--keep_mean", "Do not zero the DC component of each frame");
+
+		taperDist = textToDouble(parser.getOption("--td", "Tapering distance", "0.0"));
+		taperFalloff = textToDouble(parser.getOption("--tf", "Tapering falloff", "0.0"));
+
 		x0 = textToDouble(parser.getOption("--x0", "X origin", "1.0"));
 		y0 = textToDouble(parser.getOption("--y0", "Y origin", "1.0"));
 		z0 = textToDouble(parser.getOption("--z0", "Z origin", "1.0"));
 		
 		w = textToInteger(parser.getOption("--w", "Width",  "-1.0"));
 		h = textToInteger(parser.getOption("--h", "Height", "-1.0"));
+		d = textToInteger(parser.getOption("--d", "Thickness", "-1.0"));
 		
-		spacing = textToDouble(parser.getOption("--bin", "Binning (pixel spacing)", "8.0"));
-		stack_spacing = textToDouble(parser.getOption("--stack_bin", "Binning level of the stack", "1.0"));	
+		spacing = textToDouble(parser.getOption("--bin", "Binning", "8.0"));
+
 		n_threads = textToInteger(parser.getOption("--j", "Number of threads", "1"));
 		
 		outFn = parser.getOption("--o", "Output filename");
 
-		if (parser.checkForErrors()) std::exit(-1);
+		Log::readParams(parser);
+
+		if (parser.checkForErrors())
+		{
+			parser.writeUsage(std::cout);
+			std::exit(-1);
+		}
 	}
 	catch (RelionError XE)
 	{
@@ -59,33 +77,28 @@ void TomoBackprojectProgram::readParameters(int argc, char *argv[])
 		exit(1);
 	}
 	
-	if (applyPreWeight && applyWeight)
+	if (applyPreWeight)
 	{
-		REPORT_ERROR("The options --wg3D and --wg2D are mutually exclusive.");
-	}	
+		applyWeight = false;
+	}
+
+	ZIO::ensureParentDir(outFn);
 }
 
 void TomoBackprojectProgram::run()
 {
-	TomogramSet tomogramSet(tomoSetFn);
+	TomogramSet tomogramSet(optimisationSet.tomograms);
+	const int tomoIndex = tomogramSet.getTomogramIndex(tomoName);
 	Tomogram tomogram = tomogramSet.loadTomogram(tomoIndex, true);
 	
 	const int w0 = tomogram.w0;
 	const int h0 = tomogram.h0;
-	
-	std::cout << w0 << " x " << h0 << std::endl;
-	
-	if (thickness < 0)
-	{
-		thickness = tomogram.d0;
-		std::cout << "Using thickness from '" << tomoSetFn << "': " << thickness << std::endl;
-	}
-	
+	const int d0 = tomogram.d0;
+
 	if (zeroDC) Normalization::zeroDC_stack(tomogram.stack);
-		
 	
 	const int fc = tomogram.frameCount;
-		
+
 	BufferedImage<float> stackAct;
 	std::vector<d4Matrix> projAct(fc);
 	double pixelSizeAct = tomogram.optics.pixelSize;
@@ -93,9 +106,8 @@ void TomoBackprojectProgram::run()
 	
 	const int w1 = w > 0? w : w0 / spacing + 0.5;
 	const int h1 = h > 0? h : h0 / spacing + 0.5;
-	const int t1 = (int)(thickness/spacing);
-	
-	std::cout << w1 << "x" << h1 << "x" << t1 << std::endl; 
+	const int t1 = d > 0? d : d0 / spacing;
+
 		
 	if (std::abs(spacing - 1.0) < 1e-2)
 	{
@@ -110,14 +122,14 @@ void TomoBackprojectProgram::run()
 			projAct[f](3,3) = 1.0;
 		}
 		
-		if (std::abs(spacing / stack_spacing - 1.0) > 1e-2)
+		if (std::abs(spacing - 1.0) > 1e-2)
 		{
-			std::cout << "resampling image stack... " << std::endl;
+			Log::print("Resampling image stack");
 			
 			stackAct = Resampling::downsampleFiltStack_2D_full(
-			            tomogram.stack, spacing / stack_spacing, n_threads);
+						tomogram.stack, spacing, n_threads);
 			
-			pixelSizeAct *= spacing / stack_spacing;
+			pixelSizeAct *= spacing;
 		}
 		else
 		{
@@ -171,10 +183,10 @@ void TomoBackprojectProgram::run()
 				frameFS(x,y) *= c;
 			}
 			
-			FFT::inverseFourierTransform(frameFS, frame, FFT::Both);			
+			FFT::inverseFourierTransform(frameFS, frame, FFT::Both);
 			stackAct.getSliceRef(f).copyFrom(frame);
 			
-			FFT::inverseFourierTransform(ctf2ImageFS, frame, FFT::Both);			
+			FFT::inverseFourierTransform(ctf2ImageFS, frame, FFT::Both);
 			psfStack.getSliceRef(f).copyFrom(frame);
 			
 			debug.getSliceRef(f).copyFrom(ctf2ImageFS);
@@ -185,13 +197,12 @@ void TomoBackprojectProgram::run()
 	{
 		stackAct = RealSpaceBackprojection::preWeight(stackAct, projAct, n_threads);
 	}
-	
-	
-	std::cout << "backprojecting... " << std::endl;
+
+	Log::print("Backprojecting");
 	
 	RealSpaceBackprojection::backproject(
-			stackAct, projAct, out, n_threads, 
-			orig, spacing, RealSpaceBackprojection::Linear, taperRad);
+		stackAct, projAct, out, n_threads,
+		orig, spacing, RealSpaceBackprojection::Linear, taperFalloff, taperDist);
 	
 	
 	if (applyWeight || applyCtf)
@@ -203,7 +214,7 @@ void TomoBackprojectProgram::run()
 		{
 			RealSpaceBackprojection::backproject(
 					psfStack, projAct, psf, n_threads, 
-					orig, spacing, RealSpaceBackprojection::Linear, taperRad);
+					orig, spacing, RealSpaceBackprojection::Linear, taperFalloff, taperDist);
 		}
 		else
 		{
@@ -213,8 +224,8 @@ void TomoBackprojectProgram::run()
 		
 		Reconstruction::correct3D_RS(out, psf, out, 1.0 / SNR, n_threads);
 	}
-	
-	std::cout << "writing output..." << std::endl;
+
+	Log::print("Writing output");
 	
 	const double samplingRate = tomogram.optics.pixelSize * spacing;
 

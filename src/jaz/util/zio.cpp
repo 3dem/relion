@@ -232,6 +232,16 @@ std::string ZIO::ensureEndingSlash(const std::string &dir)
 	return out;
 }
 
+void ZIO::ensureParentDir(const std::string &path)
+{
+	if (path.find_last_of("/") != std::string::npos)
+	{
+		std::string dir = path.substr(0, path.find_last_of("/"));
+
+		int res = system(("mkdir -p "+dir).c_str());
+	}
+}
+
 std::string ZIO::prepareTomoOutputDirectory(const std::string &dir, int argc, char *argv[])
 {
 	std::string outDir = dir;

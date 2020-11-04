@@ -146,7 +146,7 @@ void RealSpaceBackprojection::backproject(
 {
 	const int fc = stack.zdim;
 
-	const bool doTaper = taperFalloff != 0.0 && taperDist != 0.0;
+	const bool doTaper = taperFalloff != 0.0 || taperDist != 0.0;
 
 	#pragma omp parallel for num_threads(num_threads)
 	for (size_t z = 0; z < dest.zdim; z++)
@@ -267,7 +267,7 @@ void RealSpaceBackprojection::backprojectCoverage(
 {
 	const int fc = stack.zdim;
 
-	const bool doTaper = taperFalloff != 0.0 && taperDist != 0.0;
+	const bool doTaper = taperFalloff != 0.0 || taperDist != 0.0;
 	
 	#pragma omp parallel for num_threads(num_threads)	
 	for (size_t z = 0; z < dest.zdim; z++)

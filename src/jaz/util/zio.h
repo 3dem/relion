@@ -42,6 +42,7 @@ class ZIO
 		
 		static std::string makeOutputDir(const std::string& dir);
 		static std::string ensureEndingSlash(const std::string& dir);
+		static void ensureParentDir(const std::string& path);
 
 		static std::string prepareTomoOutputDirectory(
 				const std::string& dir,
