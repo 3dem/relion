@@ -217,7 +217,7 @@ bool PipeLine::touchTemporaryNodeFile(Node &node, bool touch_even_if_not_exist)
 	if (exists(node.name) || touch_even_if_not_exist)
 	{
 		// Make subdirectory for each type of node
-		FileName fn_type = integerToString(node.type) + "/";
+                FileName fn_type = node_type2label.at(node.type) + "/";
 		FileName mydir = fn_dir + fn_type + fnt.substr(0, fnt.rfind("/") + 1);
 		FileName mynode = fn_dir + fn_type + fnt;
 		std::string command;
@@ -274,7 +274,7 @@ void PipeLine::deleteTemporaryNodeFile(Node &node)
 	else
 		fnt = node.name;
 
-	FileName fn_type = integerToString(node.type) + "/";
+        FileName fn_type = node_type2label.at(node.type) + "/";
 	FileName fn = fn_dir + fn_type + fnt;
 	int res = remove(fn.c_str());
 
