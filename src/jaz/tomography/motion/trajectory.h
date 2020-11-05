@@ -4,12 +4,20 @@
 #include <src/jaz/gravis/t3Vector.h>
 #include <vector>
 
+class ParticleSet;
+
 class Trajectory
 {
 	public:
 		
-		static std::vector<Trajectory> read(std::string filename);
-		static void write(const std::vector<Trajectory>& shifts, std::string filename);
+		static std::vector<Trajectory> read(
+				std::string filename,
+				ParticleSet& particleSet);
+
+		static void write(
+				const std::vector<Trajectory>& shifts,
+				ParticleSet& particleSet,
+				std::string filename);
 		
 		
 		Trajectory();

@@ -340,7 +340,7 @@ void PolishProgram::run()
 		Log::endSection();
 	}
 	
-	Trajectory::write(particleSet.motionTrajectories, outDir + "motion.star");
+	Trajectory::write(particleSet.motionTrajectories, particleSet, outDir + "motion.star");
 	tomogramSetOut.write(outDir + "tomograms.star");
 	particleSet.write(outDir + "particles.star");
 

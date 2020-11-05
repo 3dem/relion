@@ -25,11 +25,34 @@ ParticleSet::ParticleSet(std::string filename, std::string motionFilename)
 					 + " missing from optics MetaDataTable.\n");
 	}
 
+	if (!partTable.labelExists(EMDL_TOMO_PARTICLE_NAME))
+	{
+		Log::warn("The particles in "+filename+
+			" do not have names (rlnTomoParticleName). They are being added now.");
+
+		std::map<std::string, int> tomoParticleCount;
+
+		for (int p = 0; p < partTable.numberOfObjects(); p++)
+		{
+			const std::string tomoName = partTable.getString(EMDL_TOMO_NAME, p);
+
+			if (tomoParticleCount.find(tomoName) == tomoParticleCount.end())
+			{
+				tomoParticleCount[tomoName] = 1;
+			}
+
+			const int id = tomoParticleCount[tomoName];
+			tomoParticleCount[tomoName]++;
+
+			partTable.setValue(EMDL_TOMO_PARTICLE_NAME, tomoName + "_" + ZIO::itoa(id), p);
+		}
+	}
+
 	hasMotion = motionFilename != "";
 
 	if (hasMotion)
 	{
-		motionTrajectories = Trajectory::read(motionFilename);
+		motionTrajectories = Trajectory::read(motionFilename, *this);
 	}
 }
 
@@ -279,10 +302,7 @@ t4Vector<d3Matrix> ParticleSet::getMatrixDerivativesOverParticleAngles(
 
 std::string ParticleSet::getName(ParticleIndex particle_id) const
 {
-	std::stringstream sts;
-	sts << particle_id.value;
-	
-	return sts.str();
+	return partTable.getString(EMDL_TOMO_PARTICLE_NAME, particle_id.value);
 }
 
 int ParticleSet::getHalfSet(ParticleIndex particle_id) const
