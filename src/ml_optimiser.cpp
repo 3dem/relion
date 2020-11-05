@@ -278,7 +278,9 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	if (fnt != "OLD")
 		write_every_grad_iter = textToInteger(fnt);
 
-	class_inactivity_threshold = textToFloat(parser.getOption("--class_inactivity_threshold", "Replace classes with little activity during gradient based classification.", "OLD"));
+        fnt = parser.getOption("--class_inactivity_threshold", "Replace classes with little activity during gradient based classification.", "OLD");
+        if (fnt != "OLD")
+            class_inactivity_threshold = textToFloat(fnt);
 
 	do_join_random_halves = parser.checkOption("--join_random_halves", "Join previously split random halves again (typically to perform a final reconstruction).");
 

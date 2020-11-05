@@ -3276,14 +3276,15 @@ void MlOptimiserMpi::iterate()
 #endif
 
 		// If we are joining random halves, then do not write an optimiser file so that it cannot be restarted!
-		bool do_write_optimiser = !do_join_random_halves;
+                // SHWS 11052020: from release-3.2 optimiser.star is an output node, so always write it out....
+		//bool do_write_optimiser = !do_join_random_halves;
 		// Write out final map without iteration number in the filename
 		if (do_join_random_halves)
 			iter = -1;
 
 		if (node->rank == 1 || (do_split_random_halves && !do_join_random_halves && node->rank == 2))
 			//Only the first_slave of each subset writes model to disc (do not write the data.star file, only master will do this)
-			MlOptimiser::write(DO_WRITE_SAMPLING, DONT_WRITE_DATA, do_write_optimiser, DO_WRITE_MODEL, node->rank);
+			MlOptimiser::write(DO_WRITE_SAMPLING, DONT_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, node->rank);
 		else if (node->isMaster())
 			// The master only writes the data file (he's the only one who has and manages these data!)
 			MlOptimiser::write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, node->rank);

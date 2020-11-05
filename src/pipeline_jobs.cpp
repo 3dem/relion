@@ -55,16 +55,13 @@ std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, 
 		Node node1(fn_out + "_data.star", NODE_PART_DATA);
 		result.push_back(node1);
 
-		if (iter > 0)
+                // SHWS 27nov2019: as optimiser.star already is a node type, and it contains model.star, only keep NODE_OPTIMISER
+                Node node2(fn_out + "_optimiser.star", NODE_OPTIMISER);
+                result.push_back(node2);
+
+                // For auto-refine: also output the run_half1_class001_unfil.mrc map
+		if (iter < 0)
 		{
-			// For classifications: output node model.star to make selections
-			// SHWS 27nov2019: as optimiser.star already is a node type, and it contains model.star, only keep NODE_OPTIMISER
-			Node node2(fn_out + "_optimiser.star", NODE_OPTIMISER);
-			result.push_back(node2);
-		}
-		else
-		{
-			// For auto-refine: also output the run_half1_class001_unfil.mrc map
 			Node node4(fn_out+"_half1_class001_unfil.mrc", NODE_HALFMAP);
 			result.push_back(node4);
 		}
@@ -3657,7 +3654,7 @@ void RelionJob::initialiseAutorefineJob()
 
 	joboptions["fn_img"] = JobOption("Input images STAR file:", NODE_PART_DATA, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
 nor will it be possible to perform noise spectra estimation or intensity scale corrections in image groups. Therefore, running RELION with an input stack will in general provide sub-optimal results and is therefore not recommended!! Use the Preprocessing procedure to get the input STAR file in a semi-automated manner. Read the RELION wiki for more information.");
-	joboptions["fn_cont"] = JobOption("Continue from here: ", std::string(""), "STAR Files (*_optimiser.star)", "CURRENT_ODIR", "Select the *_optimiser.star file for the iteration \
+	joboptions["fn_cont"] = JobOption("Continue from here: ", std::string(""), "STAR Files (run_it*_optimiser.star)", "CURRENT_ODIR", "Select the *_optimiser.star file for the iteration \
 from which you want to continue a previous run. \
 Note that the Output rootname of the continued run and the rootname of the previous run cannot be the same. \
 If they are the same, the program will automatically add a '_ctX' to the output rootname, \
