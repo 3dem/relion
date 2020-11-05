@@ -3654,7 +3654,7 @@ void RelionJob::initialiseAutorefineJob()
 
 	joboptions["fn_img"] = JobOption("Input images STAR file:", NODE_PART_DATA, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
 nor will it be possible to perform noise spectra estimation or intensity scale corrections in image groups. Therefore, running RELION with an input stack will in general provide sub-optimal results and is therefore not recommended!! Use the Preprocessing procedure to get the input STAR file in a semi-automated manner. Read the RELION wiki for more information.");
-	joboptions["fn_cont"] = JobOption("Continue from here: ", std::string(""), "STAR Files (run_it*_optimiser.star)", "CURRENT_ODIR", "Select the *_optimiser.star file for the iteration \
+	joboptions["fn_cont"] = JobOption("Continue from here: ", std::string(""), "STAR Files (*_it*_optimiser.star)", "CURRENT_ODIR", "Select the *_optimiser.star file for the iteration \
 from which you want to continue a previous run. \
 Note that the Output rootname of the continued run and the rootname of the previous run cannot be the same. \
 If they are the same, the program will automatically add a '_ctX' to the output rootname, \
@@ -3851,7 +3851,11 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 		int pos_it = joboptions["fn_cont"].getString().rfind("_it");
 		int pos_op = joboptions["fn_cont"].getString().rfind("_optimiser");
 		if (pos_it < 0 || pos_op < 0)
-			std::cerr << "Warning: invalid optimiser.star filename provided for continuation run: " << joboptions["fn_cont"].getString() << std::endl;
+                {
+			error_message = "Invalid optimiser.star filename provided for auto-refine continuation run: " + joboptions["fn_cont"].getString();
+                        return false;
+                }
+
 		int it = (int)textToFloat((joboptions["fn_cont"].getString().substr(pos_it+3, 6)).c_str());
 		fn_run += "_ct" + floatToString(it);
 		command += " --continue " + joboptions["fn_cont"].getString();

@@ -3280,7 +3280,10 @@ void MlOptimiserMpi::iterate()
 		//bool do_write_optimiser = !do_join_random_halves;
 		// Write out final map without iteration number in the filename
 		if (do_join_random_halves)
+                {
 			iter = -1;
+                        do_split_random_halves = false;
+                }
 
 		if (node->rank == 1 || (do_split_random_halves && !do_join_random_halves && node->rank == 2))
 			//Only the first_slave of each subset writes model to disc (do not write the data.star file, only master will do this)
