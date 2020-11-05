@@ -550,6 +550,16 @@ enum EMDLabel
 	EMDL_TOMO_REFERENCE_MASK_FILE_NAME,
 	EMDL_TOMO_REFERENCE_FSC_FILE_NAME,
 
+	EMDL_TOMO_IMPORT_OFFSET_X,
+	EMDL_TOMO_IMPORT_OFFSET_Y,
+	EMDL_TOMO_IMPORT_OFFSET_Z,
+	EMDL_TOMO_IMPORT_IMOD_DIR,
+	EMDL_TOMO_IMPORT_CTFFIND_FILE,
+	EMDL_TOMO_IMPORT_CTFPLOTTER_FILE,
+	EMDL_TOMO_IMPORT_ORDER_LIST,
+	EMDL_TOMO_IMPORT_FRACT_DOSE,
+	EMDL_TOMO_IMPORT_CULLED_FILE,
+
 	EMDL_TOMO_PARTICLE_ID,       // (deprecated, use EMDL_TOMO_PARTICLE_NAME instead)
 	EMDL_TOMO_PICK_PARTICLE_ID,  // (deprecated, use EMDL_TOMO_PARTICLE_NAME instead)
 	EMDL_TOMO_PARTICLE_INDEX,    // (deprecated, use EMDL_TOMO_PARTICLE_NAME instead)
@@ -1128,6 +1138,16 @@ private:
 		EMDL::addLabel(EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME, EMDL_STRING, "rlnTomoReferenceMap2File", "Name of second reference map file");
 		EMDL::addLabel(EMDL_TOMO_REFERENCE_MASK_FILE_NAME, EMDL_STRING, "rlnTomoReferenceMaskFile", "Name of mask file corresponding to a pair of reference maps");
 		EMDL::addLabel(EMDL_TOMO_REFERENCE_FSC_FILE_NAME, EMDL_STRING, "rlnTomoReferenceFscFile", "Name of FSC STAR file corresponding to a pair of reference maps");
+
+		EMDL::addLabel(EMDL_TOMO_IMPORT_OFFSET_X, EMDL_DOUBLE, "rlnTomoImportOffsetX", "X offset of a tomogram");
+		EMDL::addLabel(EMDL_TOMO_IMPORT_OFFSET_Y, EMDL_DOUBLE, "rlnTomoImportOffsetY", "Y offset of a tomogram");
+		EMDL::addLabel(EMDL_TOMO_IMPORT_OFFSET_Z, EMDL_DOUBLE, "rlnTomoImportOffsetZ", "Z offset of a tomogram");
+		EMDL::addLabel(EMDL_TOMO_IMPORT_IMOD_DIR, EMDL_STRING, "rlnTomoImportImodDir", "IMOD tilt-series directory");
+		EMDL::addLabel(EMDL_TOMO_IMPORT_CTFFIND_FILE, EMDL_STRING, "rlnTomoImportCtfFindFile", "CTFFind output file");
+		EMDL::addLabel(EMDL_TOMO_IMPORT_CTFPLOTTER_FILE, EMDL_STRING, "rlnTomoImportCtfPlotterFile", "CTFPlotter output file");
+		EMDL::addLabel(EMDL_TOMO_IMPORT_ORDER_LIST, EMDL_STRING, "rlnTomoImportOrderList", "Frame order list");
+		EMDL::addLabel(EMDL_TOMO_IMPORT_FRACT_DOSE, EMDL_DOUBLE, "rlnTomoImportFractionalDose", "Fractional dose of a tilt series");
+		EMDL::addLabel(EMDL_TOMO_IMPORT_CULLED_FILE, EMDL_STRING, "rlnTomoImportCulledFile", "File name of a tilt series with certain frames removed");
 
 		EMDL::addLabel(EMDL_TOMO_PARTICLE_ID, EMDL_INT, "rlnTomoParticleId", "Particle index");
 		EMDL::addLabel(EMDL_TOMO_PICK_PARTICLE_ID, EMDL_INT, "rlnTomoPickParticleId", "Virus Particle index");

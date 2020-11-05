@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
 	std::string outFn, outFnCrop, name, tsFn, orderFn, tltFn, ctfFindFn, ctfPlotterFn;
 	CtfSource ctfSource;
 	ImodImport ii;
-			
+
 	try
 	{
 		parser.setCommandLine(argc, argv);
