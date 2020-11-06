@@ -99,6 +99,9 @@ private:
 	// Recenter the subtracted particles at the centre-of-mass of the input mask?
 	bool do_recenter_on_mask;
 
+	// Ignore class in the particle STAR file
+	bool ignore_class;
+
 	// User-provided 3D-center (in pixels), which will be projected to provide the 2D centre of the subtracted particle images
 	Matrix1D<RFLOAT> new_center;
 

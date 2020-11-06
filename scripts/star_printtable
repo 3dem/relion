@@ -1,28 +1,43 @@
 #!/usr/bin/env bash
-if [ $# != 0 ]; then
- cat ${1} | awk -v"tab=${2}" 'BEGIN {a=0} {if ($0 ~ tab) {a = 22}; if (a==22) {if ($0 ~ "loop") a+=1} if (a==23) {if (length($0) < 2 || $1 ~ "data_") {exit} else {print $0} }}'  |grep -v "loop_" > tmp.dat
- if [ $# == 2 ]; then
-    awk '{if (index($1,"_")!= 1) print; }' < tmp.dat
- else
-  awk '{if (index($1,"_")!= 1) {j++; print j;} }' < tmp.dat > tmp1.dat
-  for (( c=3; c<=$#; c++ ))
-   do
-    awk -v"label=${!c}" '{i++; if ($1 ~ label) {col = i}; if (index($1,"_")!= 1) { j++; print j, $col} }' < tmp.dat >tmp2.dat
-    join tmp1.dat tmp2.dat > tmp3.dat
-    mv -f tmp3.dat tmp1.dat
-   done
-   awk '{for (i=2; i<=NF;i++) printf("%s%s", $i,(i==NF) ? "\n" : OFS)}' <tmp1.dat
+if [ $# -ge 2 ]; then
+ tmpdir=$(mktemp -d -t relion_print_star_temp.XXXXXX)
+
+ # Get the desired data block
+ awk -v"tab=${2}" 'BEGIN {if (tab!~/^data_/) tab="data_"tab} (a==0 && $1==tab) {a=22; next} (a==22) {if ($1=="loop_") a+=1; else if ($1~/^data_/) exit;} (a==23) {if (length($0)<2 || $1~/^data_/) exit; else print $0;}' ${1} | grep -v loop_ > $tmpdir/tmp.dat
+
+ if [ $# == 2 ]; then # print all columns
+  awk '$1!~/^_/ {print;}' < $tmpdir/tmp.dat
+ else # print selected columns
+  awk '$1!~/^_/ {j++; print j}' < $tmpdir/tmp.dat > $tmpdir/tmp1.dat
+  for (( c=3; c<=$#; c++ )); do
+   awk -v"label=${!c}" 'BEGIN {if (label!~/^_/) label="_"label} {if ($1~/^_/) {i++; if ($1==label) col=i;} else {j++; print j, $col}}' < $tmpdir/tmp.dat > $tmpdir/tmp2.dat
+   join $tmpdir/tmp1.dat $tmpdir/tmp2.dat > $tmpdir/tmp3.dat
+   mv -f $tmpdir/tmp3.dat $tmpdir/tmp1.dat
+  done
+  awk '{for (i=2; i<=NF;i++) printf("%s%s", $i, (i==NF)?"\n":OFS)}' < $tmpdir/tmp1.dat
  fi
- rm -f tmp.dat tmp1.dat tmp2.dat tmp3.dat
+ rm -fr $tmpdir
 else
  echo " === Usage: === "
- echo " ${0} <starfile> <tablename> <label1> <label2> ..."
+ echo " ${0} <starfile> <tablename> [<label1> <label2> ...]"
  echo " "
  echo " === Purpose: === "
  echo " This (bash) script prints the contents of a datablock (with name tablename) from a starfile"
  echo " If any labels are given, then only those will be printed "
  echo " "
  echo " === Example: === "
- echo " ${0} run3_it024_model.star data_model_class_1 _rlnResolution _rlnSsnrMap"
+ echo " ${0} run3_it024_model.star data_model_class_1 rlnResolution rlnSsnrMap"
+ echo " (NOTE: not _rlnResolution)"
+ echo " "
+ echo " === Limitations: === "
+ echo " This program makes a temporary directory under \$TMPDIR. This folder must be writable and have sufficient space."
+ echo " "
+ echo " This program does not perform any error checks."
+ echo " When specified table and/or column(s) are absent in the input, the program might give incorrect results."
+ echo " In older versions, table names and column names could match only partially. For example, rlnFourierShellCorrelationCorrected matched rlnFourierShellCorrelation. This was dangerous and the match is exact now."
+ echo " "
+ echo " To address these issues, this program will be completely re-written in the next major update (RELION 3.2)."
+ echo " In the new version, the errors are handled more strictly. Please update your scripts to prepare for transition."
+ echo ""
 fi
 
