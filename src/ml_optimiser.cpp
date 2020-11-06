@@ -678,7 +678,10 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	if (do_ctf_padding)
 		REPORT_ERROR("--pad_ctf currently disabled.");
 	intact_ctf_first_peak = parser.checkOption("--ctf_intact_first_peak", "Ignore CTFs until their first peak?");
-	refs_are_ctf_corrected = parser.checkOption("--ctf_corrected_ref", "Have the input references been CTF-amplitude corrected?");
+	refs_are_ctf_corrected = !parser.checkOption("--ctf_uncorrected_ref", "Have the input references not been CTF-amplitude corrected?");
+	if (checkParameter(argc, argv, "--ctf_corrected_ref"))
+		std::cerr << "Warning: the option --ctf_corrected_ref has been removed. By default, this is assumed to be true. If the reference is not CTF corrected, use --ctf_uncorrected_ref.\n" << std::endl;
+
 	ctf_phase_flipped = parser.checkOption("--ctf_phase_flipped", "Have the data been CTF phase-flipped?");
 	only_flip_phases = parser.checkOption("--only_flip_phases", "Only perform CTF phase-flipping? (default is full amplitude-correction)");
 	do_norm_correction = parser.checkOption("--norm", "Perform normalisation-error correction?");

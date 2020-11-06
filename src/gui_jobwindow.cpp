@@ -1418,7 +1418,6 @@ void JobWindow::initialiseClass3DWindow()
 	place("do_ctf_correction", TOGGLE_DEACTIVATE, group1);
 	group1->begin();
 
-	place("ctf_corrected_ref", TOGGLE_DEACTIVATE);
 	place("ctf_intact_first_peak", TOGGLE_DEACTIVATE);
 
 	group1->end();
@@ -1601,7 +1600,6 @@ void JobWindow::initialiseAutorefineWindow()
 
 	group1->begin();
 
-	place("ctf_corrected_ref", TOGGLE_DEACTIVATE);
 	place("ctf_intact_first_peak", TOGGLE_DEACTIVATE);
 
 	group1->end();
