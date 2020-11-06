@@ -390,7 +390,7 @@ void readRelionFormatMasksAndOperators(
 			|| (!MD.containsLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM))
 			|| (!MD.containsLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM))
 			|| (!MD.containsLabel(EMDL_ORIENT_ORIGIN_Z_ANGSTROM)) )
-		REPORT_ERROR("ERROR: Some of the MetaDataLabels are missing in STAR file " + (std::string)(fn_info) + " !");
+		REPORT_ERROR("ERROR: You need rlnMaskName, rlnAngleRot, rlnAngleTilt, rlnAnglePsi, rlnOriginXAngst, rlnOriginYAngst and rlnOriginZAngst columns. Some of them are missing in your STAR file " + (std::string)(fn_info) + ". Note that rlnOriginX/Y/Z were changed to rlnOriginX/Y/ZAngst in RELION 3.1. Since the values in the symmetry definition file were in Angstrom from the beginning, please only edit the column names, not values.");
 
 	// Load mask names
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)

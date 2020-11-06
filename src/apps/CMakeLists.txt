@@ -112,7 +112,7 @@ file(GLOB RELION_JAZ_SPA_TARGETS "${CMAKE_SOURCE_DIR}/src/jaz/single_particle/ap
 file(GLOB RELION_JAZ_TOMO_TARGETS "${CMAKE_SOURCE_DIR}/src/jaz/tomography/apps/*.cpp")
 file(GLOB RELION_JAZ_EXPERIMENTAL_TARGETS "${CMAKE_SOURCE_DIR}/src/jaz/scripts/*.cpp")
 
-set(GUI_TARGETS display maingui manualpick pipeliner)
+set(GUI_TARGETS maingui display manualpick)
 
 #--Remove apps using X11 if no GUI--
 if(NOT GUI)
@@ -326,13 +326,18 @@ endif(TORCH)
 
 foreach (_target ${RELION_TARGETS})
 	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)  #specify target name WE=WithoutExtension
-	
-	add_executable(${_target} ${_target}.cpp )
+
+	if(${_target} STREQUAL "maingui") # We no longer want "relion_maingui"
+		set(_target "relion")
+		add_executable(${_target} maingui.cpp)
+	else()
+		add_executable(${_target} ${_target}.cpp )
+		set_target_properties(${_target} PROPERTIES PREFIX "relion_")
+	endif()
+
 	set(LIB relion_lib)
 	
  	add_dependencies(${_target} relion_lib)
-	
-	set_target_properties(${_target} PROPERTIES PREFIX "relion_")
 
 	if(NOT MKLFFT)
 		target_link_libraries(${_target} ${LIB} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
@@ -355,7 +360,7 @@ foreach (_target ${RELION_TARGETS})
 	)
 	
 	list(FIND GUI_TARGETS ${_target} IS_GUI_TARGET)
-	if(NOT ${IS_GUI_TARGET} LESS 0)
+	if((NOT ${IS_GUI_TARGET} LESS 0) OR (${_target} STREQUAL "relion"))
 		add_dependencies(${_target} relion_gui_lib)
 		target_link_libraries(${_target} relion_gui_lib ${FLTK_LIBRARIES} ${X11})
 	endif()
@@ -364,15 +369,10 @@ foreach (_target ${RELION_TARGETS})
 		target_link_libraries(${_target} ${TIFF_LIBRARIES})
 	endif()
     
-	#message(STATUS "added ${_target}...")
-	
 	install (TARGETS ${_target} RUNTIME DESTINATION bin)
 endforeach()
 
-
-
 foreach (_target ${RELION_JAZ_SPA_TARGETS})
-
 	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)	
 	add_executable(${_target} ${CMAKE_SOURCE_DIR}/src/jaz/single_particle/apps/${_target}.cpp)
 	set(LIB relion_lib)	
@@ -386,13 +386,10 @@ foreach (_target ${RELION_JAZ_SPA_TARGETS})
 	endif()
 	
 	install (TARGETS ${_target} RUNTIME DESTINATION bin/spa)
-	
 endforeach()
 
 # former Dynamite programs:
-
 foreach (_target ${RELION_JAZ_TOMO_TARGETS})
-
 	GET_FILENAME_COMPONENT(_target "relion_tomo_${_target}" NAME_WE)	
 	add_executable(${_target} ${CMAKE_SOURCE_DIR}/src/jaz/tomography/apps/${_target}.cpp)
 	set(LIB relion_lib)	
@@ -406,11 +403,9 @@ foreach (_target ${RELION_JAZ_TOMO_TARGETS})
 	endif()
 	
 	install (TARGETS ${_target} RUNTIME DESTINATION bin/tomo)
-	
 endforeach()
 
 foreach (_target ${RELION_JAZ_EXPERIMENTAL_TARGETS})
-
 	GET_FILENAME_COMPONENT(_target "relion_exp_${_target}" NAME_WE)	
 	add_executable(${_target} ${CMAKE_SOURCE_DIR}/src/jaz/scripts/${_target}.cpp)		
 	set(LIB relion_lib)	
@@ -424,18 +419,7 @@ foreach (_target ${RELION_JAZ_EXPERIMENTAL_TARGETS})
 	endif()
 	
 	install (TARGETS ${_target} RUNTIME DESTINATION bin/scripts)
-	
 endforeach()
-
-
-
-
-if(GUI)
-	ADD_CUSTOM_COMMAND(TARGET maingui
-	                   POST_BUILD
-                           COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/bin/relion_maingui ${PROJECT_BINARY_DIR}/bin/relion
-	)
-endif(GUI)
 
 FIND_PACKAGE( OpenMP REQUIRED)
 if(OPENMP_FOUND)
