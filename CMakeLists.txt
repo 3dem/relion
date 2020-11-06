@@ -326,10 +326,15 @@ endif(GUI)
 
 if(NOT MKLFFT)
 	option(FORCE_OWN_FFTW "FORCE_OWN_FFTW" OFF)
+	option(AMDFFTW "Use AMD optimized version of FFTW. This needs a new version of GCC (>= 8.3 recommended)." OFF)
 	
 	set(FFTW_DOUBLE_REQUIRED TRUE)
 	set(FFTW_SINGLE_REQUIRED TRUE)
-		
+	
+	if(AMDFFTW)
+		set(FORCE_OWN_FFTW ON)
+	endif()
+
 	if(NOT FORCE_OWN_FFTW)
 		FIND_PACKAGE(FFTW COMPONENTS SINGLE DOUBLE)
 	endif(NOT FORCE_OWN_FFTW)
