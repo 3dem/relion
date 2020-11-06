@@ -28,7 +28,7 @@ class import_parameters
 	public:
    	FileName fn_in, fn_odir, fn_out, fn_mtf;
 	bool do_write_types, do_continue, do_movies, do_micrographs, do_coordinates, do_halfmaps, do_particles, do_other;
-   	std::string optics_group_name, node_type, particles_optics_group_name;
+   	FileName optics_group_name, node_type, particles_optics_group_name;
    	RFLOAT kV, Cs, Q0, beamtilt_x, beamtilt_y, pixel_size;
 
 	// I/O Parser
@@ -137,6 +137,9 @@ class import_parameters
 
 			if (do_new_optics_group)
 			{
+				if (!optics_group_name.validateCharactersStrict())
+					REPORT_ERROR("The optics group name may contain only numbers, alphabets and hyphen(-).");
+
 				// Generate MDopt for the optics group
 				MDopt.setName("optics");
 				MDopt.addObject();
@@ -254,6 +257,9 @@ class import_parameters
 			// This is only a valid option if there was a single optics_group in the input file
 			if (particles_optics_group_name != "")
 			{
+				if (!particles_optics_group_name.validateCharactersStrict())
+					REPORT_ERROR("The optics group name may contain only numbers, alphabets and hyphen(-).");
+
 				if (obsModel.opticsMdt.numberOfObjects() != 1)
 				{
 					obsModel.opticsMdt.write(std::cerr);
