@@ -127,7 +127,7 @@ void CtfRefinementProgram::run()
 				particles[t][0], pc, fc, "CtfRefinementProgram::run");
 
 		BufferedImage<float> freqWeights = computeFrequencyWeights(
-			tomogram, true, 0.0, 0.0, true, num_threads);
+			tomogram, true, 0.0, 0.0, false, num_threads);
 
 		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(boxSize,1);
 
@@ -425,6 +425,8 @@ void CtfRefinementProgram::fitScale(
 			tomogram.centralCTFs[f] = ctf;
 		}
 	}
+
+	Log::endSection();
 }
 
 void CtfRefinementProgram::updateAberrations(

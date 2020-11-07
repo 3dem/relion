@@ -34,7 +34,7 @@ void SampleManifoldProgram::readParameters(int argc, char *argv[])
 		avoid_present_wedge = parser.checkOption("--npw", "Do not sample particles from the present wedges");
 		store_tilt_series = parser.checkOption("--ts", "Store the name of the tilt series in the star file");
 
-		output_path = parser.getOption("--o", "Output filename");
+		output_path = parser.getOption("--o", "Output directory");
 
 		Log::readParams(parser);
 
@@ -47,12 +47,12 @@ void SampleManifoldProgram::readParameters(int argc, char *argv[])
 		std::cerr << XE;
 		exit(1);
 	}
+
+	output_path = ZIO::prepareTomoOutputDirectory(output_path, argc, argv);
 }
 
 void SampleManifoldProgram::run()
 {
-	output_path = ZIO::makeOutputDir(output_path);
-
 	TomogramSet tomogram_set(optimisationSet.tomograms);
 	ManifoldSet manifold_set(optimisationSet.manifolds);
 
