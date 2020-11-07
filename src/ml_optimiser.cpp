@@ -1422,9 +1422,10 @@ void MlOptimiser::checkMask(FileName &_fn_mask, int solvent_nr, int rank)
 
 		if (rank == 0) // only master writes out the new mask
 		{
-			int rescale_size = ROUND( ref_box_size * (mymodel.pixel_size / mask_pixel_size));
-			rescale_size += rescale_size%2; //make even in case it is not already
+			int rescale_size = ROUND(XSIZE(Isolvent()) * mask_pixel_size / mymodel.pixel_size);
+			rescale_size += rescale_size % 2; //make even in case it is not already
 			resizeMap(Isolvent(), rescale_size);
+			Isolvent.setSamplingRateInHeader(mymodel.pixel_size);
 		}
 	}
 
@@ -1441,10 +1442,11 @@ void MlOptimiser::checkMask(FileName &_fn_mask, int solvent_nr, int rank)
 
 		if (rank == 0) // only master writes out the new mask
 		{
+			Isolvent().setXmippOrigin();
 			Isolvent().window(FIRST_XMIPP_INDEX(ref_box_size), FIRST_XMIPP_INDEX(ref_box_size), FIRST_XMIPP_INDEX(ref_box_size),
-								LAST_XMIPP_INDEX(ref_box_size), LAST_XMIPP_INDEX(ref_box_size),  LAST_XMIPP_INDEX(ref_box_size));
+			                  LAST_XMIPP_INDEX(ref_box_size), LAST_XMIPP_INDEX(ref_box_size),  LAST_XMIPP_INDEX(ref_box_size));
+			Isolvent().setXmippOrigin();
 		}
-
 	}
 
 	RFLOAT solv_min = Isolvent().computeMin();
@@ -1462,7 +1464,6 @@ void MlOptimiser::checkMask(FileName &_fn_mask, int solvent_nr, int rank)
 
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isolvent())
 		{
-
 			if (DIRECT_MULTIDIM_ELEM(Isolvent(),n) < 0.) DIRECT_MULTIDIM_ELEM(Isolvent(), n) = 0.;
 			else if (DIRECT_MULTIDIM_ELEM(Isolvent(),n) > 1.) DIRECT_MULTIDIM_ELEM(Isolvent(), n) = 1.;
 		}
@@ -1480,11 +1481,9 @@ void MlOptimiser::checkMask(FileName &_fn_mask, int solvent_nr, int rank)
 			_fn_mask = fn_out + "_solvent" + integerToString(solvent_nr) + ".mrc";
 		}
 		if (rank == 0) Isolvent.write(_fn_mask);
-
 	}
 
 	return;
-
 }
 
 void MlOptimiser::initialiseGeneral(int rank)
