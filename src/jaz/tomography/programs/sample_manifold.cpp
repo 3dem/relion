@@ -15,7 +15,6 @@ void SampleManifoldProgram::readParameters(int argc, char *argv[])
 	try
 	{
 		parser.setCommandLine(argc, argv);
-		int gen_section = parser.addSection("General options");
 
 		optimisationSet.read(
 			parser,
@@ -25,6 +24,8 @@ void SampleManifoldProgram::readParameters(int argc, char *argv[])
 			false,  false,   // trajectories
 			true,   true,    // manifolds
 			false,  false);  // reference
+
+		int gen_section = parser.addSection("General options");
 
 		spacing = textToDouble(parser.getOption("--spacing", "Particle spacing [A]"));
 		depth = textToDouble(parser.getOption("--depth", "Depth below surface [A]"));
@@ -147,7 +148,7 @@ void SampleManifoldProgram::run()
 				particles_table.setValue(EMDL_MLMODEL_GROUP_NO, t, j);
 				particles_table.setValue(EMDL_PARTICLE_CLASS, 1, j);
 				particles_table.setValue(EMDL_IMAGE_OPTICS_GROUP, 1, j);
-				particles_table.setValue(EMDL_PARTICLE_RANDOM_SUBSET, j % 2, j);
+				particles_table.setValue(EMDL_PARTICLE_RANDOM_SUBSET, j % 2 + 1, j);
 
 
 
