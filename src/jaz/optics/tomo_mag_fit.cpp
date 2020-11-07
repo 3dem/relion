@@ -186,7 +186,7 @@ d2Vector TomoIsoMagFit::computeErrorAndSlope(
 
 				const float wg = freqWeights(x,y,f);
 
-				const fComplex pred = prediction(x,y);
+				const fComplex pred = ctf_part.scale * prediction(x,y);
 				const t2Vector<fComplex> grad = predGradient(x,y);
 
 				const fComplex dF = c * pred - observation(x,y);

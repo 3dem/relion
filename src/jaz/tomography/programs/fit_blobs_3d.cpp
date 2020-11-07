@@ -47,7 +47,7 @@ void FitBlobs3DProgram::readParameters(int argc, char *argv[])
 		diag = parser.checkOption("--diag", "Write out diagnostic information");
 
 		SH_bands = textToInteger(parser.getOption("--n", "Number of spherical harmonics bands", "5"));
-		highpass_sigma_real_A = textToDouble(parser.getOption("--hp", "High-pass sigma [Å, real space]", "300"));
+		lowpass_sigma_real_A = textToDouble(parser.getOption("--lp", "Low-pass sigma [Å, real space]", "-1"));
 		max_iters = textToInteger(parser.getOption("--max_iters", "Maximum number of iterations", "1000"));
 		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 
@@ -134,7 +134,16 @@ void FitBlobs3DProgram::processTomogram(
 	Log::print("Filtering");
 		
 	Tomogram tomogram_binned = tomogram0.FourierCrop(fit_binning, num_threads);
-	
+
+
+	if (lowpass_sigma_real_A > 0.0)
+	{
+		tomogram_binned.stack = ImageFilter::lowpassStack(
+			tomogram_binned.stack,
+			lowpass_sigma_real_A / (pixel_size * fit_binning),
+			30.0, false);
+	}
+
 	if (has_fiducials)
 	{
 		Log::print("Erasing fiducial markers");

@@ -8,6 +8,7 @@
 #include <src/jaz/tomography/particle_set.h>
 #include <src/jaz/gravis/t4Matrix.h>
 #include <src/jaz/optimization/optimization.h>
+#include <src/jaz/optics/aberration_fit.h>
 #include <vector>
 
 #include "refinement.h"
@@ -20,9 +21,10 @@ class CtfRefinementProgram : public RefinementProgram
 		
 		CtfRefinementProgram(int argc, char *argv[]);
 			
-			bool do_refine_defocus, do_refine_scale, do_refine_aberrations;
+			bool do_refine_defocus, do_refine_scale, do_refine_aberrations,
+				do_even_aberrations, do_odd_aberrations;
 
-			int deltaSteps;
+			int deltaSteps, n_even, n_odd;
 			double minDelta, maxDelta, lambda_reg;
 			
 		void run();
@@ -30,13 +32,38 @@ class CtfRefinementProgram : public RefinementProgram
 		
 	private:
 		
-		struct DefocusFit
-		{
-			double value, stdDev;
-			std::vector<double> offsets;
-			std::vector<double> totalCost;
-			std::vector<std::vector<double>> costByGroup;
-		};
+		void refineDefocus(
+				int t,
+				Tomogram& tomogram,
+				const AberrationsCache& aberrationsCache,
+				const BufferedImage<float>& freqWeights,
+				const BufferedImage<float>& doseWeights);
+
+		void fitScale(
+				int t,
+				Tomogram& tomogram,
+				const AberrationsCache& aberrationsCache,
+				const BufferedImage<float>& freqWeights,
+				const BufferedImage<float>& doseWeights);
+
+		void updateAberrations(
+				int t,
+				const Tomogram& tomogram,
+				const AberrationsCache& aberrationsCache,
+				const BufferedImage<float>& freqWeights,
+				const BufferedImage<float>& doseWeights,
+				std::vector<BufferedImage<aberration::EvenData>>& evenData_perGroup,
+				std::vector<std::vector<BufferedImage<aberration::EvenData>>>& evenData_perGroup_perThread,
+				std::vector<BufferedImage<aberration::OddData>>& oddData_perGroup,
+				std::vector<std::vector<BufferedImage<aberration::OddData>>>& oddData_perGroup_perThread);
+
+		void fitAberrations(
+				std::vector<BufferedImage<aberration::EvenData>>& evenData_perGroup,
+				std::vector<BufferedImage<aberration::OddData>>& oddData_perGroup,
+				double pixelSize);
+
+
+
 
 		BufferedImage<double> evaluateDefocusRange(
 				const BufferedImage<aberration::EvenData>& evenData,
@@ -67,26 +94,6 @@ class CtfRefinementProgram : public RefinementProgram
 				double range,
 				double pixelSize,
 				int size);
-
-		void writeSlopeCost(
-				const std::vector<gravis::d3Vector>& cost,
-				const std::string& filename);
-};
-
-
-class GlobalDefocusFit : public Optimization
-{
-	public:
-
-		GlobalDefocusFit(
-			const BufferedImage<double>& dataTerm,
-			double defocusStep,
-			double lambda);
-
-			const BufferedImage<double>& dataTerm;
-			double defocusStep, lambda;
-
-		double f(const std::vector<double>& x, void* tempStorage) const;
 };
 
 

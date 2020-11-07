@@ -178,6 +178,7 @@ void TomogramSet::setCtf(int tomogramIndex, int frame, const CTF& ctf)
 	m.setValue(EMDL_CTF_DEFOCUSU, ctf.DeltafU, frame);
 	m.setValue(EMDL_CTF_DEFOCUSV, ctf.DeltafV, frame);
 	m.setValue(EMDL_CTF_DEFOCUS_ANGLE, ctf.azimuthal_angle, frame);
+	m.setValue(EMDL_CTF_SCALEFACTOR, ctf.scale, frame);
 }
 
 void TomogramSet::setDose(int tomogramIndex, int frame, double dose)
@@ -276,6 +277,11 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 		ctf.Q0 = Q0;
 		ctf.Cs = out.optics.Cs;
 		ctf.kV = out.optics.voltage;
+
+		if (m.labelExists(EMDL_CTF_SCALEFACTOR))
+		{
+			ctf.scale = m.getDouble(EMDL_CTF_SCALEFACTOR, f);
+		}
 		
 		ctf.initialise();
 		

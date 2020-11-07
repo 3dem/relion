@@ -31,7 +31,7 @@ class FitBlobs3DProgram
 				relative_radius_range,
 				membrane_separation,
 				fiducials_radius_A,
-				highpass_sigma_real_A,
+				lowpass_sigma_real_A,
 				fit_binning;
 
 

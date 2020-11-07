@@ -191,7 +191,7 @@ void AberrationFit :: considerParticle(
 			const double c = -sg;
 
 			fComplex zobs = observation(x,y);
-			fComplex zprd = scale * frqEnvelope(x,y,f) * prediction(x,y);
+			fComplex zprd = scale * ctf.scale * frqEnvelope(x,y,f) * prediction(x,y);
 
 			if (aberrationsCache.hasAntisymmetrical)
 			{
