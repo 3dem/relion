@@ -11,12 +11,18 @@
 class Damage
 {
     public:
-		
+
 		static void applyWeight(
-		        RawImage<float>& stack, 
-		        double pixelSize, 
-		        const std::vector<double> &doses, 
-		        int num_threads);
+				RawImage<float>& stack,
+				double pixelSize,
+				const std::vector<double> &doses,
+				int num_threads);
+
+		static void applyWeight(
+				RawImage<fComplex>& stack,
+				double pixelSize,
+				const std::vector<double> &doses,
+				int num_threads);
 		
 		static std::vector<double> criticalDamageVector(double pixelSize, int boxSize);
 		

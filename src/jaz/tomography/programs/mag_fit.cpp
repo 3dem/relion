@@ -81,7 +81,7 @@ void MagFitProgram::run()
 		const int fc = tomogram.frameCount;
 
 		BufferedImage<float> freqWeights = computeFrequencyWeights(
-			tomogram, true, 0.0, 0.0, num_threads);
+			tomogram, true, 0.0, 0.0, true, num_threads);
 
 		particleSet.checkTrajectoryLengths(
 				particles[t][0], pc, fc, "MagFitProgram::run");

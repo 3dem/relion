@@ -51,7 +51,7 @@ class RefinementProgram
 		BufferedImage<float> computeFrequencyWeights(
 						const Tomogram& tomogram,
 						bool whiten, double sig2RampPower, double hiPass_px,
-						int num_threads);
+						bool applyDoseWeight, int num_threads);
 };
 
 

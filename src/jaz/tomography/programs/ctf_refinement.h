@@ -20,7 +20,7 @@ class CtfRefinementProgram : public RefinementProgram
 		
 		CtfRefinementProgram(int argc, char *argv[]);
 			
-			bool do_defocus, do_refineFast;
+			bool do_refine_defocus, do_refine_scale, do_refine_aberrations;
 
 			int deltaSteps;
 			double minDelta, maxDelta, lambda_reg;

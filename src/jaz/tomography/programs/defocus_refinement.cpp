@@ -155,7 +155,9 @@ void DefocusRefinementProgram::run()
 		*/
 		
 		BufferedImage<float> freqWeights = computeFrequencyWeights(
-			tomogram, true, 0.0, 0.0, num_threads);
+			tomogram, true, 0.0, 0.0, true, num_threads);
+
+		BufferedImage<float> doseWeight = tomogram.computeDoseWeight(boxSize,1);
 
 		if (do_defocus)
 		{
@@ -263,7 +265,7 @@ void DefocusRefinementProgram::run()
 
 						AberrationFit::considerParticle(
 							particles[t][p], tomogram, referenceMap, particleSet,
-							aberrationsCache, flip_value, freqWeights,
+							aberrationsCache, flip_value, freqWeights, doseWeight,
 							f, f,
 							evenData_thread[th], oddData_thread[th]);
 					}

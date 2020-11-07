@@ -68,13 +68,13 @@ void FitBlobs3DProgram::readParameters(int argc, char *argv[])
 		exit(1);
 	}
 
+	outPath = ZIO::prepareTomoOutputDirectory(outPath, argc, argv);
 
-	outPath = ZIO::makeOutputDir(outPath);
-	int res = system(("mkdir -p " + outPath + "Meshes").c_str());
+	ZIO::makeDir(outPath + "Meshes");
 
 	if (diag)
 	{
-		ZIO::makeOutputDir(outPath + "diag");
+		ZIO::makeDir(outPath + "diag");
 	}
 }
 

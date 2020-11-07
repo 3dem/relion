@@ -83,7 +83,7 @@ void BfactorFitProgram::run()
 		BufferedImage<double> FCC3;
 
 		BufferedImage<float> frqWeight = computeFrequencyWeights(
-			tomogram, true, 0, -1, num_threads);
+			tomogram, true, 0, -1, true, num_threads);
 
 		frqWeight.write(outDir + "DEBUG_frqWeight.mrc");
 		std::exit(0);

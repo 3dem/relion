@@ -140,9 +140,11 @@ void AberrationFitProgram::run()
 		const int first_frame = specified_first_frame;
 		const int last_frame = (specified_last_frame > 0 && specified_last_frame < fc)? specified_last_frame : fc-1;
 
-		
+
 		BufferedImage<float> frqWeight = computeFrequencyWeights(
-			tomogram, true, 1.0, 0.0, num_threads);
+			tomogram, true, 1.0, 0.0, true, num_threads);
+
+		BufferedImage<float> doseWeight = tomogram.computeDoseWeight(s,1);
 		
 		if (diag)
 		{
@@ -178,7 +180,7 @@ void AberrationFitProgram::run()
 			
 			AberrationFit::considerParticle(
 				particles[t][p], tomogram, referenceMap, particleSet,
-				aberrationsCache, flip_value, frqWeight,
+				aberrationsCache, flip_value, frqWeight, doseWeight,
 				first_frame, last_frame,
 				evenData_perGroup_perThread[g][th],
 				oddData_perGroup_perThread[g][th]);

@@ -62,6 +62,7 @@ class RawImage
 		RawImage<T> getSliceRef(size_t z);
 		const RawImage<T> getConstSliceRef(size_t z) const;
 		RawImage<T> getSlabRef(size_t z, size_t thickness);
+		const RawImage<T> getConstSlabRef(size_t z, size_t thickness);
 		
 		template <class T2>
 		void copySliceFrom(size_t z, const RawImage<T2>& src, size_t z_src = 0);
@@ -266,6 +267,12 @@ const RawImage<T> RawImage<T>::getConstSliceRef(size_t z) const
 
 template<class T>
 RawImage<T> RawImage<T>::getSlabRef(size_t z, size_t thickness)
+{
+	return RawImage<T>(xdim, ydim, thickness, data + xdim * ydim * z);
+}
+
+template<class T>
+const RawImage<T> RawImage<T>::getConstSlabRef(size_t z, size_t thickness)
 {
 	return RawImage<T>(xdim, ydim, thickness, data + xdim * ydim * z);
 }

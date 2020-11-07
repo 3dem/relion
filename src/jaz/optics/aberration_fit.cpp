@@ -129,6 +129,7 @@ void AberrationFit :: considerParticle(
 		const AberrationsCache& aberrationsCache,
 		bool flip_value,
 		const BufferedImage<float>& frqWeight,
+		const BufferedImage<float>& frqEnvelope,
 		int f0, int f1,
 		BufferedImage<EvenData>& even_out,
 		BufferedImage<OddData>& odd_out)
@@ -190,7 +191,7 @@ void AberrationFit :: considerParticle(
 			const double c = -sg;
 
 			fComplex zobs = observation(x,y);
-			fComplex zprd = scale * prediction(x,y);
+			fComplex zprd = scale * frqEnvelope(x,y,f) * prediction(x,y);
 
 			if (aberrationsCache.hasAntisymmetrical)
 			{
@@ -586,6 +587,72 @@ EvenData &EvenData::operator+=(const EvenData& d)
 	Ayy += d.Ayy;
 	bx += d.bx;
 	by += d.by;
+}
+
+void EvenData::write(const RawImage<EvenData> &evenData, std::string filename)
+{
+	const int sh = evenData.xdim;
+	const int s  = evenData.ydim;
+	const int fc = evenData.zdim;
+
+	BufferedImage<float>
+		Axx(sh,s,fc),
+		Axy(sh,s,fc),
+		Ayy(sh,s,fc),
+		bx(sh,s,fc),
+		by(sh,s,fc);
+
+	for (int f = 0; f < fc; f++)
+	for (int y = 0; y <  s; y++)
+	for (int x = 0; x < sh; x++)
+	{
+		Axx(x,y,f) = evenData(x,y,f).Axx;
+		Axy(x,y,f) = evenData(x,y,f).Axy;
+		Ayy(x,y,f) = evenData(x,y,f).Ayy;
+		bx(x,y,f)  = evenData(x,y,f).bx;
+		by(x,y,f)  = evenData(x,y,f).by;
+	}
+
+	Axx.write(filename + "_Axx.mrc");
+	Axy.write(filename + "_Axy.mrc");
+	Ayy.write(filename + "_Ayy.mrc");
+	bx.write( filename + "_bx.mrc");
+	by.write( filename + "_by.mrc");
+}
+
+BufferedImage<EvenData> EvenData::read(std::string filename)
+{
+	BufferedImage<double>
+		Axx,
+		Axy,
+		Ayy,
+		bx,
+		by;
+
+	Axx.read(filename + "_Axx.mrc");
+	Axy.read(filename + "_Axy.mrc");
+	Ayy.read(filename + "_Ayy.mrc");
+	bx.read( filename + "_bx.mrc");
+	by.read( filename + "_by.mrc");
+
+	const int sh = Axx.xdim;
+	const int s  = Axx.ydim;
+	const int fc = Axx.zdim;
+
+	BufferedImage<EvenData> evenData;
+
+	for (int f = 0; f < fc; f++)
+	for (int y = 0; y <  s; y++)
+	for (int x = 0; x < sh; x++)
+	{
+		evenData(x,y,f).Axx = Axx(x,y,f);
+		evenData(x,y,f).Axy = Axy(x,y,f);
+		evenData(x,y,f).Ayy = Ayy(x,y,f);
+		evenData(x,y,f).bx  = bx(x,y,f);
+		evenData(x,y,f).by  = by(x,y,f);
+	}
+
+	return evenData;
 }
 
 OddData &OddData::operator+=(const OddData& d)

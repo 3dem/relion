@@ -102,7 +102,7 @@ int TomogramSet::addTomogram(
 	
 	tomogramTables.push_back(MetaDataTable());
 	MetaDataTable& m = tomogramTables[index];
-	m.setName("tomo_" + ZIO::itoa(index));
+	m.setName(tomoName);
 		
 	for (int f = 0; f < fc; f++)
 	{

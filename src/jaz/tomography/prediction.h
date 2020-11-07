@@ -21,13 +21,19 @@ class Prediction
 			OwnHalf = 0,
 			OppositeHalf = 1
 		};
-		
+
 		enum Modulation
 		{
 			Unmodulated = 0,
 			AmplitudeModulated = 1,
 			PhaseModulated = 2,
 			AmplitudeAndPhaseModulated = 3
+		};
+
+		enum DoseWeight
+		{
+			NotDoseWeighted = 0,
+			DoseWeighted = 1
 		};
 		
 		static BufferedImage<fComplex> predictModulated(
@@ -38,7 +44,9 @@ class Prediction
 				const AberrationsCache& aberrationsCache,
 				const std::vector<BufferedImage<fComplex>>& referenceFS,
 				HalfSet halfSet = OwnHalf,
-				Modulation modulation = AmplitudeAndPhaseModulated);
+				Modulation modulation = AmplitudeAndPhaseModulated,
+				DoseWeight doseWeight = NotDoseWeighted,
+				double cumulativeDose = 0.0);
 		
 		static BufferedImage<fComplex> predictFS(
 				ParticleIndex particle_id,

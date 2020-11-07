@@ -68,11 +68,12 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	outDir = ZIO::makeOutputDir(outDir);
+	outDir = ZIO::prepareTomoOutputDirectory(outDir, argc, argv);
+
 
 	if (diag)
 	{
-		ZIO::makeOutputDir(outDir+"Diagnostic");
+		ZIO::makeDir(outDir+"Diagnostic");
 	}
 
 	
@@ -135,7 +136,7 @@ int main(int argc, char *argv[])
 			num_threads, binning_in,
 			diag? outDir+"Diagnostic/" + tomogram.name + "_" : "");
 
-		Log::print(ZIO::itoa(detections.size()) + " blobs found.");
+		Log::print(ZIO::itoa(detections.size()) + " beads found.");
 
 		if (diag)
 		{

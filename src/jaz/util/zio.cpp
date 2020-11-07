@@ -191,19 +191,24 @@ bool ZIO::endsWith(const std::string &string, const std::string &prefix)
 			&& string.substr(string.length() - prefix.length()) == prefix;
 }
 
+void ZIO::makeDir(const std::string& dir)
+{
+	int res = system(("mkdir -p "+dir).c_str());
+}
+
 std::string ZIO::makeOutputDir(const std::string& dir)
 {
 	std::string out = dir;
-	
+
 	const int len = out.length();
-	
+
 	if (len > 0)
 	{
 		if (out[len-1] != '/')
 		{
 			out = out + "/";
 		}
-		
+
 		int res = system(("mkdir -p "+out).c_str());
 
 		if (res)
@@ -211,7 +216,7 @@ std::string ZIO::makeOutputDir(const std::string& dir)
 			REPORT_ERROR_STR("Unable to write to: " << out);
 		}
 	}
-	
+
 	return out;
 }
 

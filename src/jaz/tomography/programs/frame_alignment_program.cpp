@@ -94,7 +94,7 @@ void FrameAlignmentProgram::run()
 		
 		
 		BufferedImage<float> frqWeight = computeFrequencyWeights(
-			tomogram, whiten, sig2RampPower, hiPass_px, num_threads);
+			tomogram, whiten, sig2RampPower, hiPass_px, true, num_threads);
 		
 		std::vector<int> dummySeq(fc);
 		

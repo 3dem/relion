@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	outPath = ZIO::makeOutputDir(outPath);
+	outPath = ZIO::prepareTomoOutputDirectory(outPath, argc, argv);
 
 	if (diag)
 	{

@@ -67,7 +67,7 @@ void RefinementProgram::init()
 
 BufferedImage<float> RefinementProgram::computeFrequencyWeights(
 		const Tomogram& tomogram,
-		bool whiten, double sig2RampPower, double hiPass_px,
+		bool whiten, double sig2RampPower, double hiPass_px, bool applyDoseWeight,
 		int num_threads)
 {
 	const int s = boxSize;
@@ -158,8 +158,11 @@ BufferedImage<float> RefinementProgram::computeFrequencyWeights(
 		frqWghts.getSliceRef(f) *= referenceMap.freqWeight;
 	}
 	
-	BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s, 1.0);
-	frqWghts *= doseWeights;
+	if (applyDoseWeight)
+	{
+		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s, 1.0);
+		frqWghts *= doseWeights;
+	}
 		
 	return frqWghts;
 }
