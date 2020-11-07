@@ -233,17 +233,19 @@ EvenSolution AberrationFit::solveEven(
 	const double eps = 1e-30;
 	const int s  = data.ydim;
 	const int sh = data.xdim;
+	const int fc = data.zdim;
 
 	EvenSolution out;
 
-	out.optimum = BufferedImage<dComplex>(sh,s);
-	out.phaseShift = BufferedImage<double>(sh,s);
-	out.weight = BufferedImage<Tensor2x2<double>>(sh,s);
+	out.optimum = BufferedImage<dComplex>(sh,s,fc);
+	out.phaseShift = BufferedImage<double>(sh,s,fc);
+	out.weight = BufferedImage<Tensor2x2<double>>(sh,s,fc);
 
+	for (int f = 0; f < fc; f++)
 	for (int y = 0; y < s;  y++)
 	for (int x = 0; x < sh; x++)
 	{
-		EvenData d = data(x,y);
+		EvenData d = data(x,y,f);
 
 		d2Vector b(d.bx, d.by);
 		d2Matrix A(d.Axx, d.Axy, d.Axy, d.Ayy);
@@ -258,15 +260,15 @@ EvenSolution AberrationFit::solveEven(
 
 			const d2Vector opt = Ai * b;
 
-			out.optimum(x,y) = dComplex(opt.x, opt.y);
-			out.phaseShift(x,y) = std::abs(opt.x) > 0.0? atan2(opt.y, opt.x) : 0.0;
-			out.weight(x,y) = Tensor2x2<double>(d.Axx, d.Axy, d.Ayy);
+			out.optimum(x,y,f) = dComplex(opt.x, opt.y);
+			out.phaseShift(x,y,f) = std::abs(opt.x) > 0.0? atan2(opt.y, opt.x) : 0.0;
+			out.weight(x,y,f) = Tensor2x2<double>(d.Axx, d.Axy, d.Ayy);
 		}
 		else
 		{
-			out.optimum(x,y) = dComplex(0.0, 0.0);
-			out.phaseShift(x,y) = 0.0;
-			out.weight(x,y) = Tensor2x2<double>(0.0, 0.0, 0.0);
+			out.optimum(x,y,f) = dComplex(0.0, 0.0);
+			out.phaseShift(x,y,f) = 0.0;
+			out.weight(x,y,f) = Tensor2x2<double>(0.0, 0.0, 0.0);
 		}
 	}
 
