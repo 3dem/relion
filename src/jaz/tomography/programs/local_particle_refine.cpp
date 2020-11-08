@@ -93,7 +93,9 @@ void LocalParticleRefineProgram::run()
 		const int fc = tomogram.frameCount;
 
 		BufferedImage<float> freqWeights = computeFrequencyWeights(
-			tomogram, true, 0.0, 0.0, true, num_threads);
+			tomogram, true, 0.0, 0.0, false, num_threads);
+
+		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(boxSize,1);
 
 		particleSet.checkTrajectoryLengths(
 				particles[t][0], pc, fc, "LocalParticleRefineProgram::run");
@@ -117,7 +119,7 @@ void LocalParticleRefineProgram::run()
 
 			LocalParticleRefinement refinement(
 					particles[t][p], particleSet, tomogram, referenceMap,
-					freqWeights, aberrationsCache, dose_cutoff);
+					freqWeights, doseWeights, aberrationsCache, dose_cutoff);
 
 			const std::vector<double> initial {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 

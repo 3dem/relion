@@ -12,6 +12,7 @@
 #include <src/jaz/tomography/prediction.h>
 #include <src/jaz/tomography/projection/projection.h>
 #include <src/jaz/tomography/tomogram.h>
+#include <src/jaz/tomography/tilt_geometry.h>
 #include <src/jaz/math/Zernike_helper.h>
 #include <src/jaz/optimization/nelder_mead.h>
 #include <src/jaz/optimization/lbfgs.h>
@@ -116,6 +117,78 @@ void CtfRefinementProgram::run()
 		evenData_perGroup_perThread[g] = std::vector<BufferedImage<EvenData>>(num_threads);
 		oddData_perGroup_perThread[g]  = std::vector<BufferedImage<OddData>>(num_threads);
 	}
+
+
+	/*{
+		Tomogram tomogram = tomogramSet.loadTomogram(0, false);
+
+		std::ifstream DEBUG_sum_prdObs_file("DEBUG_sum_prdObs_f.dat");
+		std::ifstream DEBUG_sum_prdSqr_file("DEBUG_sum_prdSqr_f.dat");
+
+		const int fc = tomogram.frameCount;
+
+		std::vector<double> sum_prdObs_f(fc), sum_prdSqr_f(fc);
+
+		for (int f = 0; f < fc; f++)
+		{
+			DEBUG_sum_prdObs_file >> sum_prdObs_f[f];
+			DEBUG_sum_prdSqr_file >> sum_prdSqr_f[f];
+		}
+
+		std::vector<double> per_frame_scale(fc);
+
+		for (int f = 0; f < fc; f++)
+		{
+			per_frame_scale[f] = sum_prdObs_f[f] / sum_prdSqr_f[f];
+		}
+
+
+		double max_scale = 0.0;
+		int max_scale_f = 0;
+
+		for (int f = 0; f < fc; f++)
+		{
+			if (per_frame_scale[f] > max_scale)
+			{
+				max_scale = per_frame_scale[f];
+				max_scale_f = f;
+			}
+		}
+
+		d3Vector max_scale_view;
+
+		for (int i = 0; i < 3; i++)
+		{
+			max_scale_view[i] = tomogram.projectionMatrices[max_scale_f](2,i);
+		}
+
+		BeerLambertFit blf(
+			tomogram.projectionMatrices,
+			sum_prdObs_f,
+			sum_prdSqr_f);
+
+		std::vector<double> initial {
+			2.0 * max_scale,
+			0.5,
+			atan2(max_scale_view.dot(blf.tilt_p), max_scale_view.dot(blf.tilt_q))};
+
+		std::vector<double> opt = NelderMead::optimize(initial, blf, 0.01, 0.0001, 10000);
+
+		std::ofstream scaleFile(outDir + tomogram.name + "_fitted_scale_debug.dat");
+
+		for (int f = 0; f < fc; f++)
+		{
+			const double est = blf.getScale(f, opt);
+
+			std::cout << est << ' ';
+
+			scaleFile << f << ' ' << est << '\n';
+		}
+
+		scaleFile.flush();
+
+		std::exit(0);
+	}*/
 
 
 	processTomograms(
@@ -367,6 +440,8 @@ void CtfRefinementProgram::refineDefocus(
 		{
 			meanDefocus << f << ' ' << (astig[f][0] + astig[f][1]) / 2.0 << '\n';
 		}
+
+		meanDefocus.flush();
 	}
 
 	Log::endSection();
@@ -461,6 +536,8 @@ void CtfRefinementProgram::fitScale(
 		{
 			scaleFile << f << ' ' << per_frame_scale[f] << '\n';
 		}
+
+		scaleFile.flush();
 	}
 
 
@@ -485,17 +562,15 @@ void CtfRefinementProgram::fitScale(
 			max_scale_view[i] = tomogram.projectionMatrices[max_scale_f](2,i);
 		}
 
-		std::vector<double> initial {
-			2.0 * max_scale,
-			0.5,
-			max_scale_view.x,
-			max_scale_view.y,
-			max_scale_view.z};
-
 		BeerLambertFit blf(
 			tomogram.projectionMatrices,
 			sum_prdObs_f,
 			sum_prdSqr_f);
+
+		std::vector<double> initial {
+			2.0 * max_scale,
+			0.5,
+			atan2(max_scale_view.dot(blf.tilt_p), max_scale_view.dot(blf.tilt_q))};
 
 		std::vector<double> opt = NelderMead::optimize(initial, blf, 0.01, 0.0001, 10000);
 
@@ -511,7 +586,7 @@ void CtfRefinementProgram::fitScale(
 			tomogram.centralCTFs[f] = ctf;
 
 			const double rel_thickness = -log(opt[1]);
-			d3Vector ice_normal(opt[2], opt[3], opt[4]);
+			d3Vector ice_normal = sin(opt[2]) * blf.tilt_p + cos(opt[2]) * blf.tilt_q;
 			ice_normal.normalize();
 
 			tomogramSet.globalTable.setValue(EMDL_TOMO_RELATIVE_LUMINANCE, opt[0], t);
@@ -531,6 +606,8 @@ void CtfRefinementProgram::fitScale(
 
 				scaleFile << f << ' ' << est << '\n';
 			}
+
+			scaleFile.flush();
 		}
 	}
 	else
@@ -910,20 +987,20 @@ BeerLambertFit::BeerLambertFit(
 
 		view_dir[f].normalize();
 	}
+
+	d3Matrix w2t = TiltGeometry::worldToTiltSpace(projections);
+
+	tilt_p = d3Vector(w2t(0,0), w2t(0,1), w2t(0,2));
+	tilt_q = d3Vector(w2t(1,0), w2t(1,1), w2t(1,2));
 }
 
 double BeerLambertFit::f(const std::vector<double> &x, void *tempStorage) const
 {
 	const double a      = x[0];
 	const double kappa  = x[1];
+	const double phi    = x[2];
 
-	d3Vector n;
-
-	for (int i = 0; i < 3; i++)
-	{
-		n[i] = x[i+2];
-	}
-
+	d3Vector n = cos(phi) * tilt_q + sin(phi) * tilt_p;
 	n.normalize();
 
 	const int fc = projections.size();
@@ -946,14 +1023,9 @@ double BeerLambertFit::getScale(int f, const std::vector<double> &x)
 {
 	const double a      = x[0];
 	const double kappa  = x[1];
+	const double phi    = x[2];
 
-	d3Vector n;
-
-	for (int i = 0; i < 3; i++)
-	{
-		n[i] = x[i+2];
-	}
-
+	d3Vector n = cos(phi) * tilt_q + sin(phi) * tilt_p;
 	n.normalize();
 
 	const double cos_f = n.dot(view_dir[f]);

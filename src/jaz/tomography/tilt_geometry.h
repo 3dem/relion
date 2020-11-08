@@ -9,6 +9,13 @@ class TiltGeometry
 {
 	public:
 
+		static gravis::d3Vector estimateTiltAxis(
+				const std::vector<gravis::d4Matrix>& projections);
+
+		/* returns a matrix with the following properties:
+		  - z axis (third row) points parallel to the tilt axis
+		  - y axis (second row) points forward (average view-z direction)
+		  - all axes orthogonal */
 		static gravis::d3Matrix worldToTiltSpace(
 			const std::vector<gravis::d4Matrix>& projections);
 

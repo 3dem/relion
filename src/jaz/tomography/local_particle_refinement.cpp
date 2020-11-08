@@ -18,6 +18,7 @@ LocalParticleRefinement::LocalParticleRefinement(
 		const Tomogram& tomogram,
 		const TomoReferenceMap& reference,
 		const BufferedImage<float>& frqWeight,
+		const BufferedImage<float>& frqEnvelope,
 		const AberrationsCache& aberrationsCache,
 		double dose_cutoff)
 :
@@ -26,6 +27,7 @@ LocalParticleRefinement::LocalParticleRefinement(
 	tomogram(tomogram),
 	reference(reference),
 	frqWeight(frqWeight),
+	frqEnvelope(frqEnvelope),
 	aberrationsCache(aberrationsCache)
 {
 	const int s = reference.getBoxSize();
@@ -148,7 +150,7 @@ double LocalParticleRefinement::f(const std::vector<double>& x, void* tempStorag
 					const double gamma_offset = aberrationsCache.hasSymmetrical?
 						aberrationsCache.symmetrical[og](xi,yi) : 0.0;
 
-					const float c = -CTFs[f].getCTF(
+					const float c = -frqEnvelope(xi,yi,f) * CTFs[f].getCTF(
 						xA, yA, false, false, false, true, gamma_offset);
 
 					const double t = 2.0 * PI * (tx * xp + ty * yp) / (double) s;
@@ -271,7 +273,7 @@ void LocalParticleRefinement::grad(const std::vector<double> &x, std::vector<dou
 					const double gamma_offset = aberrationsCache.hasSymmetrical?
 						aberrationsCache.symmetrical[og](xi,yi) : 0.0;
 
-					const float c = -CTFs[f].getCTF(
+					const float c = -frqEnvelope(xi,yi,f) * CTFs[f].getCTF(
 						xA, yA, false, false, false, true, gamma_offset);
 
 					const double t = 2.0 * PI * (tx * xp + ty * yp) / (double) s;
@@ -440,7 +442,7 @@ double LocalParticleRefinement::gradAndValue(const std::vector<double> &x, std::
 					const double gamma_offset = aberrationsCache.hasSymmetrical?
 						aberrationsCache.symmetrical[og](xi,yi) : 0.0;
 
-					const float c = -CTFs[f].getCTF(
+					const float c = -frqEnvelope(xi,yi,f) * CTFs[f].getCTF(
 						xA, yA, false, false, false, true, gamma_offset);
 
 					const double t = 2.0 * PI * (tx * xp + ty * yp) / (double) s;

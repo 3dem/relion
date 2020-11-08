@@ -117,9 +117,9 @@ class BeerLambertFit : public Optimization
 			const std::vector<double>& sum_prdSqr);
 
 			const std::vector<gravis::d4Matrix>& projections;
-			const std::vector<double>& sum_prdObs;
-			const std::vector<double>& sum_prdSqr;
+			const std::vector<double> &sum_prdObs, &sum_prdSqr;
 			std::vector<gravis::d3Vector> view_dir;
+			gravis::d3Vector tilt_p, tilt_q;
 
 		double f(const std::vector<double>& x, void* tempStorage) const;
 

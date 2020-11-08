@@ -18,6 +18,7 @@ class LocalParticleRefinement : public FastDifferentiableOptimization
 				const Tomogram& tomogram,
 				const TomoReferenceMap& reference,
 				const BufferedImage<float>& frqWeight,
+				const BufferedImage<float>& frqEnvelope,
 				const AberrationsCache& aberrationsCache,
 				double dose_cutoff = 0.01);
 
@@ -27,6 +28,7 @@ class LocalParticleRefinement : public FastDifferentiableOptimization
 			const Tomogram& tomogram;
 			const TomoReferenceMap& reference;
 			const BufferedImage<float>& frqWeight;
+			const BufferedImage<float>& frqEnvelope;
 			const AberrationsCache& aberrationsCache;
 
 			BufferedImage<fComplex> observations;
