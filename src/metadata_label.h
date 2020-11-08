@@ -560,6 +560,12 @@ enum EMDLabel
 	EMDL_TOMO_IMPORT_FRACT_DOSE,
 	EMDL_TOMO_IMPORT_CULLED_FILE,
 
+	EMDL_TOMO_RELATIVE_ICE_THICKNESS,
+	EMDL_TOMO_RELATIVE_LUMINANCE,
+	EMDL_TOMO_ICE_NORMAL_X,
+	EMDL_TOMO_ICE_NORMAL_Y,
+	EMDL_TOMO_ICE_NORMAL_Z,
+
 	EMDL_TOMO_PARTICLE_ID,       // (deprecated, use EMDL_TOMO_PARTICLE_NAME instead)
 	EMDL_TOMO_PICK_PARTICLE_ID,  // (deprecated, use EMDL_TOMO_PARTICLE_NAME instead)
 	EMDL_TOMO_PARTICLE_INDEX,    // (deprecated, use EMDL_TOMO_PARTICLE_NAME instead)
@@ -1148,6 +1154,12 @@ private:
 		EMDL::addLabel(EMDL_TOMO_IMPORT_ORDER_LIST, EMDL_STRING, "rlnTomoImportOrderList", "Frame order list");
 		EMDL::addLabel(EMDL_TOMO_IMPORT_FRACT_DOSE, EMDL_DOUBLE, "rlnTomoImportFractionalDose", "Fractional dose of a tilt series");
 		EMDL::addLabel(EMDL_TOMO_IMPORT_CULLED_FILE, EMDL_STRING, "rlnTomoImportCulledFile", "File name of a tilt series with certain frames removed");
+
+		EMDL::addLabel(EMDL_TOMO_RELATIVE_ICE_THICKNESS, EMDL_DOUBLE, "rlnTomoRelativeIceThickness", "Relative ice thickness times its extinction coefficient");
+		EMDL::addLabel(EMDL_TOMO_RELATIVE_LUMINANCE, EMDL_DOUBLE, "rlnTomoRelativeLuminance", "Relative beam luminance");
+		EMDL::addLabel(EMDL_TOMO_ICE_NORMAL_X, EMDL_DOUBLE, "rlnTomoIceNormalX", "X component of the estimated ice normal");
+		EMDL::addLabel(EMDL_TOMO_ICE_NORMAL_Y, EMDL_DOUBLE, "rlnTomoIceNormalY", "Y component of the estimated ice normal");
+		EMDL::addLabel(EMDL_TOMO_ICE_NORMAL_Z, EMDL_DOUBLE, "rlnTomoIceNormalZ", "Z component of the estimated ice normal");
 
 		EMDL::addLabel(EMDL_TOMO_PARTICLE_ID, EMDL_INT, "rlnTomoParticleId", "Particle index");
 		EMDL::addLabel(EMDL_TOMO_PICK_PARTICLE_ID, EMDL_INT, "rlnTomoPickParticleId", "Virus Particle index");

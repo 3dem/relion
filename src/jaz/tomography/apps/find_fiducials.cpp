@@ -167,7 +167,7 @@ int main(int argc, char *argv[])
 			visualisation.resize(w,h,tc);
 		}
 
-		const int best_frame = IndexSort<double>::sortIndices(tomogram.cumulativeDose)[0];
+		const int best_frame = tomogram0.getLeastDoseFrame();
 
 		visualisation.getSliceRef(t).copyFrom(tomogram.stack.getSliceRef(best_frame));
 

@@ -87,6 +87,11 @@ CTF Tomogram::getCtf(int frame, d3Vector position) const
 	return ctf;
 }
 
+int Tomogram::getLeastDoseFrame() const
+{
+	return IndexSort<double>::sortIndices(cumulativeDose)[0];
+}
+
 d3Vector Tomogram::computeCentreOfMass(
 		const ParticleSet& particleSet,
 		const std::vector<ParticleIndex>& particle_indices) const

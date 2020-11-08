@@ -22,7 +22,7 @@ class CtfRefinementProgram : public RefinementProgram
 		CtfRefinementProgram(int argc, char *argv[]);
 			
 			bool do_refine_defocus, do_refine_scale, do_refine_aberrations,
-				do_even_aberrations, do_odd_aberrations;
+				do_even_aberrations, do_odd_aberrations, do_fit_Beer_Lambert;
 
 			int deltaSteps, n_even, n_odd;
 			double minDelta, maxDelta, lambda_reg;
@@ -31,6 +31,17 @@ class CtfRefinementProgram : public RefinementProgram
 		
 		
 	private:
+
+		void processTomograms(
+				int first_t,
+				int last_t,
+				const AberrationsCache& aberrationsCache,
+				std::vector<BufferedImage<aberration::EvenData>>& evenData_perGroup,
+				std::vector<std::vector<BufferedImage<aberration::EvenData>>>& evenData_perGroup_perThread,
+				std::vector<BufferedImage<aberration::OddData>>& oddData_perGroup,
+				std::vector<std::vector<BufferedImage<aberration::OddData>>>& oddData_perGroup_perThread,
+				int verbosity);
+
 		
 		void refineDefocus(
 				int t,
@@ -96,5 +107,24 @@ class CtfRefinementProgram : public RefinementProgram
 				int size);
 };
 
+class BeerLambertFit : public Optimization
+{
+	public:
+
+		BeerLambertFit(
+			const std::vector<gravis::d4Matrix>& projections,
+			const std::vector<double>& sum_prdObs,
+			const std::vector<double>& sum_prdSqr);
+
+			const std::vector<gravis::d4Matrix>& projections;
+			const std::vector<double>& sum_prdObs;
+			const std::vector<double>& sum_prdSqr;
+			std::vector<gravis::d3Vector> view_dir;
+
+		double f(const std::vector<double>& x, void* tempStorage) const;
+
+		double getScale(int f, const std::vector<double>& x);
+
+};
 
 #endif

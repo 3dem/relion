@@ -48,6 +48,7 @@ class Tomogram
 
 		double getDepthOffset(int frame, gravis::d3Vector position) const;
 		CTF getCtf(int frame, gravis::d3Vector position) const;
+		int getLeastDoseFrame() const;
 
 		gravis::d3Vector computeCentreOfMass(
 				const ParticleSet& particleSet,
