@@ -302,6 +302,11 @@ public:
 
 	/// Generate (Fourier-space, i.e. FFTW format) image with all CTF values.
 	/// The dimensions of the result array should have been set correctly already
+	//  FFTW format means the Nyquist component is on the positive side.
+	//   e.g. for N = 6,  kx = [0, 1, 2, 3], ky = [0, 1, 2, 3, -2, -1]
+	//  Unfortunately, codes in jaz/ use different convention.
+	//   e.g. for N - 6, kx = [0, 1, 2, 3], ky = [0, 1, 2, -3, -2, -1]
+	//  TODO: FIXME: Thus, the returned values at Nyquist are WRONG!!!
 	void getFftwImage(MultidimArray < RFLOAT > &result, int orixdim, int oriydim, RFLOAT angpix,
 	                  bool do_abs = false, bool do_only_flip_phases = false, bool do_intact_until_first_peak = false,
 	                  bool do_damping = true, bool do_ctf_padding = false, bool do_intact_after_first_peak = false) const;
