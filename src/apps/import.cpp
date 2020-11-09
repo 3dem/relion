@@ -99,6 +99,12 @@ class import_parameters
 		// For micrographs or movies
 		if (do_movies || do_micrographs)
 		{
+			if (fn_in.rfind("../") != std::string::npos) // Forbid at any place
+				REPORT_ERROR("Please don't import files outside the project directory.\nPlease make a symbolic link by an absolute path before importing.");
+
+			if (fn_in.rfind("/", 0) == 0) // Forbid only at the beginning
+				REPORT_ERROR("Please import files by a relative path.\nIf you want to import files outside the project directory, make a symbolic link by an absolute path and\nimport the symbolic link by a relative path.");
+
 			std::string tablename = (do_movies) ? "movies" : "micrographs";
 			bool do_new_optics_group = true;
 			int old_optics_group_number, optics_group_number = 1;

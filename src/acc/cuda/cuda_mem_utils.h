@@ -1,7 +1,7 @@
 #ifndef CUDA_DEVICE_MEM_UTILS_H_
 #define CUDA_DEVICE_MEM_UTILS_H_
 
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 #include <cuda_runtime.h>
 #include <curand.h>
 #include "src/acc/cuda/cuda_settings.h"

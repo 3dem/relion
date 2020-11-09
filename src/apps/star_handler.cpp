@@ -199,8 +199,11 @@ class star_handler_parameters
 		EMDLabel label1, label2, label3;
 
 		// Read in the observationModel
-		read_check_ignore_optics(MD1, fn_in);
 		read_check_ignore_optics(MD2, fn_compare);
+		// read_check_ignore_optics() overwrites the member variable obsModel (BAD DESIGN!)
+		// so we have to back up.
+		ObservationModel obsModelCompare = obsModel;
+		read_check_ignore_optics(MD1, fn_in);
 
 		label1 = EMDL::str2Label(fn_label1);
 		label2 = (fn_label2 == "") ? EMDL_UNDEFINED : EMDL::str2Label(fn_label2);
@@ -216,6 +219,8 @@ class star_handler_parameters
 		std::cout << " Written: " << fn_out.insertBeforeExtension("_both") << std::endl;
 		write_check_ignore_optics(MDonly1, fn_out.insertBeforeExtension("_only1"), MD1.getName());
 		std::cout << " Written: " << fn_out.insertBeforeExtension("_only1") << std::endl;
+		// Use MD2's optics group for MDonly2.
+		obsModel = obsModelCompare;
 		write_check_ignore_optics(MDonly2, fn_out.insertBeforeExtension("_only2"), MD1.getName());
 		std::cout << " Written: " << fn_out.insertBeforeExtension("_only2") << std::endl;
 	}
@@ -330,7 +335,7 @@ class star_handler_parameters
 		std::vector<FileName> fns_in;
 		std::vector<std::string> words;
 		tokenize(fn_in, words);
-		for (int iword = 0; iword < words.size(); iword++)
+                for (int iword = 0; iword < words.size(); iword++)
 		{
 			FileName fnt = words[iword];
 			fnt.globFiles(fns_in, false);
@@ -340,7 +345,7 @@ class star_handler_parameters
 		std::vector<MetaDataTable> MDsin, MDoptics;
 		std::vector<ObservationModel> obsModels;
 		// Read the first table into the global obsModel
-		read_check_ignore_optics(MDin, fns_in[0]);
+		read_check_ignore_optics(MDin, fns_in[0], tablename_in);
 		MDsin.push_back(MDin);
 		// Read all the rest of the tables into local obsModels
 		for (int i = 1; i < fns_in.size(); i++)

@@ -144,6 +144,7 @@ public:
 	MultidimArray<bool> Mcoarse_significant;
 	// And from storeWeightedSums
 	std::vector<RFLOAT> sum_weight, significant_weight, max_weight;
+	std::vector< std::vector<RFLOAT> > sum_weight_class;
 	std::vector<Matrix1D<RFLOAT> > old_offset, prior;
 	std::vector<MultidimArray<RFLOAT> > power_img;
 	MultidimArray<XFLOAT> Mweight;
@@ -161,6 +162,7 @@ public:
 		old_offset.resize(nr_images);
 		prior.resize(nr_images);
 		max_index.resize(nr_images);
+		sum_weight_class.resize(nr_images);
 	};
 };
 

@@ -102,7 +102,7 @@ bool AccProjector::setMdlDim(
 	HANDLE_ERROR(cudaCreateTextureObject(mdlImag, &resDesc_imag, &texDesc, NULL));
 
 #else
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &mdlReal, mdlXYZ * sizeof(XFLOAT)));
 	DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &mdlImag, mdlXYZ * sizeof(XFLOAT)));
 #else
@@ -120,7 +120,7 @@ void AccProjector::initMdl(XFLOAT *real, XFLOAT *imag)
         printf("DEBUG_ERROR: Model dimensions must be set with setMdlDim before call to setMdlData.");
 		CRITICAL(ERR_MDLDIM);
 	}
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	if (mdlReal == NULL)
 	{
         printf("DEBUG_ERROR: initMdl called before call to setMdlData.");
@@ -157,7 +157,7 @@ void AccProjector::initMdl(XFLOAT *real, XFLOAT *imag)
 		DEBUG_HANDLE_ERROR(cudaMemcpy2D(texArrayImag2D, pitch2D, imag, sizeof(XFLOAT) * mdlX, sizeof(XFLOAT) * mdlX, mdlY, cudaMemcpyHostToDevice));
 	}
 #else
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	DEBUG_HANDLE_ERROR(cudaMemcpy( mdlReal, real, mdlXYZ * sizeof(XFLOAT), cudaMemcpyHostToDevice));
 	DEBUG_HANDLE_ERROR(cudaMemcpy( mdlImag, imag, mdlXYZ * sizeof(XFLOAT), cudaMemcpyHostToDevice));
 #else
@@ -171,7 +171,7 @@ void AccProjector::initMdl(XFLOAT *real, XFLOAT *imag)
 
 }
 
-#ifndef CUDA
+#ifndef _CUDA_ENABLED
 void AccProjector::initMdl(std::complex<XFLOAT> *data)
 {
 	mdlComplex = data;  // No copy needed - everyone shares the complex reference arrays
@@ -211,7 +211,7 @@ void AccProjector::clear()
 	padding_factor = 0;
 	allocaton_size = 0;
 
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	if (mdlReal != 0)
 	{
 #ifndef PROJECTOR_NO_TEXTURES

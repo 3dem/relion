@@ -501,6 +501,7 @@ void JobWindow::initialiseMotioncorrWindow()
 	place("last_frame_sum", TOGGLE_DEACTIVATE);
 	place("dose_per_frame", TOGGLE_DEACTIVATE);
 	place("pre_exposure", TOGGLE_DEACTIVATE);
+	place("eer_grouping", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -969,6 +970,37 @@ void JobWindow::initialiseSelectWindow()
 	tab2->label("Class options");
 	resetHeight();
 
+	group6 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group6->end();
+
+#ifdef _TORCH_ENABLED
+
+	place("do_class_ranker", TOGGLE_DEACTIVATE, group6);
+	group6->begin();
+	place("rank_threshold", TOGGLE_DEACTIVATE);
+
+#else
+
+	Fl_Text_Buffer *textbuff1 = new Fl_Text_Buffer();
+        textbuff1->text("For auto-selection build with pyTorch, using -DTORCH=ON in cmake.");
+        Fl_Text_Display* textdisp1 = new Fl_Text_Display(XCOL1, current_y, WCOL1+WCOL2+WCOL3+10, STEPY*1.2);
+        textdisp1->textsize(12);
+        textdisp1->color(GUI_BACKGROUND_COLOR);
+        textdisp1->buffer(textbuff1);
+
+        current_y += STEPY*1.5;
+
+	place("do_class_ranker", TOGGLE_ALWAYS_DEACTIVATE, group6);
+	group6->begin();
+	place("rank_threshold", TOGGLE_ALWAYS_DEACTIVATE);
+
+#endif
+
+	group6->end();
+	guientries["do_class_ranker"].cb_menu_i();
+
+	current_y += STEPY/2;
+
 	place("do_recenter", TOGGLE_DEACTIVATE);
 	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group1->end();
@@ -1087,7 +1119,7 @@ void JobWindow::initialiseClass2DWindow()
 	current_y += STEPY/2;
 
 	place("nr_iter");
-	place("do_fast_subsets", TOGGLE_DEACTIVATE);
+	place("do_grad", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -1193,7 +1225,7 @@ void JobWindow::initialiseClass2DWindow()
 
 void JobWindow::initialiseInimodelWindow()
 {
-	setupTabs(5);
+	setupTabs(4);
 
 	tab1->begin();
 	tab1->label("I/O");
@@ -1210,7 +1242,6 @@ void JobWindow::initialiseInimodelWindow()
 	group1->end();
 
 	resetHeight();
-#ifdef ALLOW_CTF_IN_SGD
 
 	place("do_ctf_correction", TOGGLE_DEACTIVATE, group1);
 
@@ -1220,30 +1251,17 @@ void JobWindow::initialiseInimodelWindow()
 
 	guientries["do_ctf_correction"].cb_menu_i(); // To make default effective
 
-#else
-
-	Fl_Text_Buffer *textbuff1 = new Fl_Text_Buffer();
-	textbuff1->text("CTF-modulation, as mentioned in claim 1 of patent US10,282,513B2, is disabled\nYou can enable it by rebuilding, using -DALLOW_CTF_IN_SGD=ON in cmake.");
-	Fl_Text_Display* textdisp1 = new Fl_Text_Display(XCOL1, current_y, WCOL1+WCOL2+WCOL3+10, STEPY*1.8);
-	textdisp1->textsize(11);
-	textdisp1->color(GUI_BACKGROUND_COLOR);
-	textdisp1->buffer(textbuff1);
-
-	current_y += STEPY*2.5;
-
-	place("do_ctf_correction", TOGGLE_ALWAYS_DEACTIVATE);
-
-	group1->begin();
-	place("ctf_phase_flipped", TOGGLE_ALWAYS_DEACTIVATE);
-	place("ctf_intact_first_peak", TOGGLE_ALWAYS_DEACTIVATE);
-	group1->end();
-
-#endif
 	tab2->end();
 
 	tab3->begin();
 	tab3->label("Optimisation");
 	resetHeight();
+
+	place("nr_iter");
+	place("grad_write_iter");
+
+	// Add a little spacer
+	current_y += STEPY/2;
 
 	place("nr_classes", TOGGLE_DEACTIVATE);
 
@@ -1262,37 +1280,9 @@ void JobWindow::initialiseInimodelWindow()
 	place("offset_step");
 
 	tab3->end();
+
 	tab4->begin();
-	tab4->label("SGD");
-
-	resetHeight();
-
-	place("sgd_ini_iter");
-	place("sgd_inbetween_iter");
-	place("sgd_fin_iter");
-	place("sgd_write_iter");
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	place("sgd_ini_resol");
-	place("sgd_fin_resol");
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	place("sgd_ini_subset_size");
-	place("sgd_fin_subset_size");
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	place("sgd_sigma2fudge_halflife", TOGGLE_DEACTIVATE);
-
-	tab4->end();
-
-	tab5->begin();
-	tab5->label("Compute");
+	tab4->label("Compute");
 	resetHeight();
 
 	place("do_parallel_discio");
@@ -1322,7 +1312,7 @@ void JobWindow::initialiseInimodelWindow()
 
 	guientries["use_gpu"].cb_menu_i();
 
-	tab5->end();
+	tab4->end();
 }
 
 void JobWindow::initialiseClass3DWindow()
@@ -1423,6 +1413,7 @@ void JobWindow::initialiseClass3DWindow()
 
 	group4->begin();
 	place("sigma_angles");
+	place("relax_sym");
 	group4->end();
 	guientries["do_local_ang_searches"].cb_menu_i(); // to make default effective
 
@@ -1572,7 +1563,7 @@ void JobWindow::initialiseAutorefineWindow()
 
 	current_y += STEPY/2;
 	place("auto_local_sampling", TOGGLE_DEACTIVATE);
-
+	place("relax_sym");
 	current_y += STEPY/2;
 	place("auto_faster");
 

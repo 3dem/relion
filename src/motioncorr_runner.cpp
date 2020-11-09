@@ -20,7 +20,7 @@
 #include <omp.h>
 
 #include "src/motioncorr_runner.h"
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 #include "src/acc/cuda/cuda_mem_utils.h"
 #endif
 #include "src/micrograph_model.h"
@@ -90,7 +90,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	if (first_frame_sum < 1) first_frame_sum = 1;
 	last_frame_sum =  textToInteger(parser.getOption("--last_frame_sum", "Last movie frame used in output sum (0 or negative: use all)", "-1"));
 	eer_grouping = textToInteger(parser.getOption("--eer_grouping", "EER grouping", "40"));
-	eer_upsampling = textToInteger(parser.getOption("--eer_upsampling", "EER upsampling (1 = 4K or 2 = 8K)", "2"));
+	eer_upsampling = textToInteger(parser.getOption("--eer_upsampling", "EER upsampling (1 = 4K or 2 = 8K)", "1"));
 
 	int motioncor2_section = parser.addSection("MOTIONCOR2 options");
 	do_motioncor2 = parser.checkOption("--use_motioncor2", "Use Shawn Zheng's MOTIONCOR2.");
@@ -125,7 +125,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	interpolate_shifts = parser.checkOption("--interpolate_shifts", "(EXPERIMENTAL) Interpolate shifts");
 	ccf_downsample = textToFloat(parser.getOption("--ccf_downsample", "(EXPERT) Downsampling rate of CC map. default = 0 = automatic based on B factor", "0"));
 	if (parser.checkOption("--early_binning", "Do binning before alignment to reduce memory usage. This might dampen signal near Nyquist. (ON by default)"))
-		std::cerr << "Since RELION 3.1, --early_binning is on by default. Use --early_binning to disable it." << std::endl;
+		std::cerr << "Since RELION 3.1, --early_binning is on by default. Use --no_early_binning to disable it." << std::endl;
 
 	early_binning = !parser.checkOption("--no_early_binning", "Disable --early_binning");
 	if (fabs(bin_factor - 1) < 0.01)
@@ -211,7 +211,7 @@ void MotioncorrRunner::initialise()
 		REPORT_ERROR("ERROR: when not providing an input STAR file, it is mandatory to provide the voltage in kV through --voltage.");
 	}
 
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	if (do_motioncor2)
 	{
 		if (gpu_ids.length() > 0)
@@ -227,6 +227,8 @@ void MotioncorrRunner::initialise()
 	{
 		MetaDataTable MDin;
 		ObservationModel::loadSafely(fn_in, obsModel, MDin, "movies", verb);
+		if (MDin.numberOfObjects() > 0 && !MDin.containsLabel(EMDL_MICROGRAPH_MOVIE_NAME))
+			REPORT_ERROR("The input STAR file does not contain the rlnMicrographMovieName column. Are you sure you imported files as movies, not single frame images?");
 
 		fn_micrographs.clear();
 		optics_group_micrographs.clear();
@@ -1164,9 +1166,9 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 		const RFLOAT frame_mean = mean / n_frames;
 		const RFLOAT frame_std = std / n_frames;
 
-		// 25 neighbours; should be enough even for super-resolution images.
 		const int NUM_MIN_OK = 6;
-		const int D_MAX = 2;
+		const int D_MAX = isEER ? 4 : 2;
+		const int PBUF_SIZE = 100;
 		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(bBad)
 		{
 			if (!DIRECT_A2D_ELEM(bBad, i, j)) continue;
@@ -1174,8 +1176,9 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 			#pragma omp parallel for num_threads(n_threads)
 			for (int iframe = 0; iframe < n_frames; iframe++)
 			{
+				RFLOAT pbuf[PBUF_SIZE];
+//				std::cout << "Frame: "<< iframe << std::endl;
 				int n_ok = 0;
-				RFLOAT val = 0;
 				for (int dy= -D_MAX; dy <= D_MAX; dy++)
 				{
 					int y = i + dy;
@@ -1184,15 +1187,19 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 					{
 						int x = j + dx;
 						if (x < 0 || x >= nx) continue;
+//						std::cout << " " << DIRECT_A2D_ELEM(Iframes[iframe](), y, x);
 						if (DIRECT_A2D_ELEM(bBad, y, x)) continue;
-
+//						std::cout << "o";
+						pbuf[n_ok] = DIRECT_A2D_ELEM(Iframes[iframe](), y, x);
 						n_ok++;
-						val += DIRECT_A2D_ELEM(Iframes[iframe](), y, x);
 					}
+//					std::cout << std::endl;
 				}
-//				std::cout << "n_ok = " << n_ok << " val = " << val;
-				if (n_ok > NUM_MIN_OK) DIRECT_A2D_ELEM(Iframes[iframe](), i, j) = val / n_ok;
-				else DIRECT_A2D_ELEM(Iframes[iframe](), i, j) = rnd_gaus(frame_mean, frame_std);
+//				std::cout << "n_ok = " << n_ok;
+				if (n_ok > NUM_MIN_OK) 
+					DIRECT_A2D_ELEM(Iframes[iframe](), i, j) = pbuf[rand() % n_ok];
+				else
+					DIRECT_A2D_ELEM(Iframes[iframe](), i, j) = rnd_gaus(frame_mean, frame_std);
 //				std::cout << " set = " << DIRECT_A2D_ELEM(Iframes[iframe](), i, j) << std::endl;
 			}
 		}

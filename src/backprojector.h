@@ -60,6 +60,8 @@ public:
 	// Skip the iterative gridding part of the reconstruction
 	bool skip_gridding;
 
+	MultidimArray<RFLOAT> grad_error_power;
+
 public:
 
 	BackProjector(){}
@@ -312,6 +314,22 @@ public:
 	                 int minres_map = -1,
 	                 bool printTimes= false,
 	                 Image<RFLOAT>* weight_out = 0);
+
+	/*
+	 * Calculate the first or second moment of the gradient
+	 */
+	void reweightGrad(
+			MultidimArray<Complex> &mom1, RFLOAT lambda1,
+			MultidimArray<Complex> &mom2, RFLOAT lambda2,
+			bool init_mom);
+
+	void reconstructGrad(
+			MultidimArray<RFLOAT> &vol_out,
+			RFLOAT grad_stepsize,
+			RFLOAT tau2_fudge,
+			const MultidimArray<RFLOAT> &fsc,
+			bool use_fsc,
+			bool printTimes= false);
 
 	/*	Enforce Hermitian symmetry, apply helical symmetry as well as point-group symmetry
 	 */

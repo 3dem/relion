@@ -2647,7 +2647,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				op.local_Minvsigma2s[0].zdim,
 				orientation_num,
 				cudaMLO->dataIs3D,
-				baseMLO->do_sgd,
+				baseMLO->do_grad,
 				cudaMLO->classStreams[exp_iclass]);
 
 			CTOC(cudaMLO->timer,"backproject");

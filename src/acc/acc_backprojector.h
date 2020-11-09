@@ -1,14 +1,14 @@
 #ifndef ACC_BACKPROJECTOR_H_
 #define ACC_BACKPROJECTOR_H_
 
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 #  include <cuda_runtime.h>
 #endif
 #include "src/complex.h"
 #include "src/acc/settings.h"
 #include "src/acc/acc_ptr.h"
 
-#ifndef CUDA
+#ifndef _CUDA_ENABLED
 #  include <tbb/spin_mutex.h>
 #endif
 
@@ -22,8 +22,8 @@ public:
 	XFLOAT padding_factor;
 	size_t mdlXYZ;
 
-#ifndef CUDA
-	tbb::spin_mutex *mutexes;
+#ifndef _CUDA_ENABLED
+tbb::spin_mutex *mutexes;
 #endif
 
 	size_t allocaton_size;
@@ -43,8 +43,8 @@ public:
 				allocaton_size(0), voxelCount(0),
 				d_mdlReal(NULL), d_mdlImag(NULL), d_mdlWeight(NULL),
 				stream(0)
-#ifndef CUDA
-				, mutexes(0)
+#ifndef _CUDA_ENABLED
+, mutexes(0)
 #endif
 	{}
 

@@ -137,8 +137,8 @@ XFLOAT no_tex2D(XFLOAT* mdl, XFLOAT xp, XFLOAT yp, int mdlX, int mdlInitY)
 
 // 2D linear interpolation for complex data that interleaves real and
 // imaginary data, rather than storing them in a separate array
-static inline
-void complex2D(std::complex<XFLOAT> *mdlComplex, XFLOAT &real, XFLOAT &imag,
+#pragma omp declare simd uniform(mdlX,mdlInitY)
+static void complex2D(std::complex<XFLOAT> *mdlComplex, XFLOAT &real, XFLOAT &imag,
                XFLOAT xp, XFLOAT yp, int mdlX, int mdlInitY)
 {
 	int x0 = floorf(xp);
@@ -225,11 +225,8 @@ XFLOAT no_tex3D(
 
 // 3D linear interpolation for complex data that interleaves real and
 // imaginary data, rather than storing them in a separate array
-#ifdef __INTEL_COMPILER
-__attribute__((vector(uniform(mdlX,mdlXY,mdlInitY,mdlInitZ))))
-#endif
-static inline
-void complex3D(
+#pragma omp declare simd uniform(mdlX,mdlXY,mdlInitY,mdlInitZ)
+static void complex3D(
 				std::complex<XFLOAT> * mdlComplex, 
 				XFLOAT &real, XFLOAT &imag,
 				XFLOAT xp, XFLOAT yp, XFLOAT zp, int mdlX, int mdlXY, int mdlInitY, int mdlInitZ

@@ -51,7 +51,7 @@ else()
 	set(FFTW_EXTERNAL_LIBS_TAR_DIRECTORY  ${FFTW_EXTERNAL_PATH})
 	set(FFTW_EXTERNAL_LIBS_EXTRACT_TARGET ${FFTW_EXTERNAL_LIBS_TAR_DIRECTORY})
 
-	set(FFTW_FFTW3_TAR_FILE ftp://ftp.fftw.org/pub/fftw/fftw-3.3.4.tar.gz)
+	set(FFTW_FFTW3_TAR_FILE http://fftw.org/fftw-3.3.4.tar.gz)
 	#set(FFTW_FFTW3_TAR_FILE https://drive.google.com/uc?export=download&id=0B942d76zVnSeazZWcExRaXIyVDg) #backup location fftw-3.3.4
 	#set(FFTW_TAR_NAME fftw-3.3.4.tar.gz)
 

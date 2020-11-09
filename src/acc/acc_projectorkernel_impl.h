@@ -20,7 +20,7 @@ public:
 
 	PROJECTOR_PTR_TYPE mdlReal;
 	PROJECTOR_PTR_TYPE mdlImag;
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	PROJECTOR_PTR_TYPE mdlComplex;
 #else
 	std::complex<XFLOAT> *mdlComplex;
@@ -32,7 +32,7 @@ public:
 			int mdlInitY, int mdlInitZ,
 			XFLOAT padding_factor,
 			int maxR,
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 			PROJECTOR_PTR_TYPE mdlComplex
 #else
 			std::complex<XFLOAT> *mdlComplex
@@ -61,8 +61,8 @@ public:
 				maxR(maxR), maxR2(maxR*maxR), maxR2_padded(maxR*maxR*padding_factor*padding_factor),
 				mdlReal(mdlReal), mdlImag(mdlImag)
 			{
-#ifndef CUDA
-				std::complex<XFLOAT> *pData = mdlComplex;
+#ifndef _CUDA_ENABLED
+std::complex<XFLOAT> *pData = mdlComplex;
 				for(size_t i=0; i<(size_t)mdlX * (size_t)mdlY * (size_t)mdlZ; i++) {
 					std::complex<XFLOAT> arrayval(*mdlReal ++, *mdlImag ++);
 					pData[i] = arrayval;
@@ -70,8 +70,8 @@ public:
 #endif
 			};
 
-#ifdef CUDA
-	__device__ __forceinline__
+#ifdef _CUDA_ENABLED
+__device__ __forceinline__
 #endif
 	void project3Dmodel(
 			int x,
@@ -89,16 +89,11 @@ public:
 			XFLOAT &real,
 			XFLOAT &imag)
 	{
-		int r2;
-
-        real=(XFLOAT)0;
-		imag=(XFLOAT)0;
-
 		XFLOAT xp = (e0 * x + e1 * y + e2 * z) * padding_factor;
 		XFLOAT yp = (e3 * x + e4 * y + e5 * z) * padding_factor;
 		XFLOAT zp = (e6 * x + e7 * y + e8 * z) * padding_factor;
 
-		r2 = xp*xp + yp*yp + zp*zp;
+		int r2 = xp*xp + yp*yp + zp*zp;
 
 		if (r2 <= maxR2_padded)
 		{
@@ -112,8 +107,8 @@ public:
 				zp = -zp;
 			}
 
-#ifdef CUDA
-			real =   no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
+#ifdef _CUDA_ENABLED
+real =   no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 			imag = - no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 #else
 			CpuKernels::complex3D(mdlComplex, real, imag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
@@ -154,8 +149,10 @@ public:
 		}
 	}
 
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	__device__ __forceinline__
+#else
+	inline
 #endif
 	void project3Dmodel(
 			int x,
@@ -169,16 +166,11 @@ public:
 			XFLOAT &real,
 			XFLOAT &imag)
 	{
-		int r2;
-
-        real=(XFLOAT)0;
-		imag=(XFLOAT)0;
-
 		XFLOAT xp = (e0 * x + e1 * y ) * padding_factor;
 		XFLOAT yp = (e3 * x + e4 * y ) * padding_factor;
 		XFLOAT zp = (e6 * x + e7 * y ) * padding_factor;
 
-		r2 = xp*xp + yp*yp + zp*zp;
+		int r2 = xp*xp + yp*yp + zp*zp;
 
 		if (r2 <= maxR2_padded)
 		{
@@ -192,11 +184,11 @@ public:
 				zp = -zp;
 			}
 
-	#ifdef CUDA
-			real = no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
+	#ifdef _CUDA_ENABLED
+real = no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 			imag = no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 	#else
-				CpuKernels::complex3D(mdlComplex, real, imag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
+			CpuKernels::complex3D(mdlComplex, real, imag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 	#endif
 
 			if(invers)
@@ -232,8 +224,10 @@ public:
 		}
 	}
 
-#ifdef CUDA
-	__device__ __forceinline__
+#ifdef _CUDA_ENABLED
+__device__ __forceinline__
+#else
+	inline
 #endif
 	void project2Dmodel(
 				int x,
@@ -245,15 +239,10 @@ public:
 				XFLOAT &real,
 				XFLOAT &imag)
 	{
-		int r2;
-
-        real=(XFLOAT)0;
-		imag=(XFLOAT)0;
-
 		XFLOAT xp = (e0 * x + e1 * y ) * padding_factor;
 		XFLOAT yp = (e3 * x + e4 * y ) * padding_factor;
 
-		r2 = xp*xp + yp*yp;
+		int r2 = xp*xp + yp*yp;
 
 		if (r2 <= maxR2_padded)
 		{
@@ -265,8 +254,8 @@ public:
 				yp = -yp;
 			}
 
-	#ifdef CUDA
-			real = no_tex2D(mdlReal, xp, yp, mdlX, mdlInitY);
+	#ifdef _CUDA_ENABLED
+real = no_tex2D(mdlReal, xp, yp, mdlX, mdlInitY);
 			imag = no_tex2D(mdlImag, xp, yp, mdlX, mdlInitY);
 	#else
 			CpuKernels::complex2D(mdlComplex, real, imag, xp, yp, mdlX, mdlInitY);
@@ -315,8 +304,8 @@ public:
 					*p.mdlReal,
 					*p.mdlImag
 #else
-#ifdef CUDA
-					p.mdlReal,
+#ifdef _CUDA_ENABLED
+p.mdlReal,
 					p.mdlImag
 #else
 					p.mdlComplex

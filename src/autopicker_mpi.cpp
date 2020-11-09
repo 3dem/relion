@@ -44,7 +44,7 @@ void AutoPickerMpi::read(int argc, char **argv)
 	printMpiNodesMachineNames(*node);
 }
 
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 int AutoPickerMpi::deviceInitialise()
 {
 	int devCount;
