@@ -71,9 +71,6 @@ void LocalParticleRefineProgram::run()
 
 	RefinementProgram::init();
 
-	particleSet.write("DEBUG_particleNames.star");
-	std::exit(0);
-
 	const int tc = particles.size();
 
 	AberrationsCache aberrationsCache(particleSet.optTable, boxSize);

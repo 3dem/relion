@@ -457,10 +457,82 @@ void ParticleSet::checkTrajectoryLengths(ParticleIndex p0, int np, int fc, std::
 	}
 }
 
-d3Matrix ParticleSet::convert(const Matrix2D<double> &A)
+std::vector<std::vector<int>> ParticleSet::splitEvenly(
+		const std::vector<std::vector<ParticleIndex>>& particlesByTomogram,
+		int segment_count)
 {
-	return d3Matrix(
-				A(0,0), A(0,1), A(0,2), 
-				A(1,0), A(1,1), A(1,2), 
-				A(2,0), A(2,1), A(2,2) );
+	const int tc = particlesByTomogram.size();
+	const int sc = segment_count;
+
+	std::vector<int> tomo_weight(tc);
+	std::vector<std::set<int>> segments(sc);
+	std::vector<int> segment_weight(sc, 0);
+
+	int total_weight = 0;
+
+	for (int t = 0; t < tc; t++)
+	{
+		tomo_weight[t] = particlesByTomogram[t].size();
+		total_weight += tomo_weight[t];
+
+		segments[0].insert(t);
+	}
+
+
+	while (true)
+	{
+		for (int s = 0; s < sc; s++)
+		{
+			segment_weight[s] = 0;
+
+			for (std::set<int>::iterator it = segments[s].begin();
+				 it != segments[s].end(); it++)
+			{
+				segment_weight[s] += tomo_weight[*it];
+			}
+		}
+
+		std::vector<int> order = IndexSort<int>::sortIndices(segment_weight);
+
+		int heaviest_segment = order[order.size()-1];
+		int lightest_segment = order[0];
+
+		int lightest_tomo = 0;
+		int lightest_tomo_weight = total_weight;
+
+		for (std::set<int>::iterator it = segments[heaviest_segment].begin();
+			 it != segments[heaviest_segment].end(); it++)
+		{
+			if (tomo_weight[*it] < lightest_tomo_weight)
+			{
+				lightest_tomo = *it;
+				lightest_tomo_weight = tomo_weight[*it];
+			}
+		}
+
+		if (segment_weight[lightest_segment] + tomo_weight[lightest_tomo]
+				< segment_weight[heaviest_segment])
+		{
+			segments[lightest_segment].insert(lightest_tomo);
+			segments[heaviest_segment].erase(lightest_tomo);
+
+		}
+		else
+		{
+			break;
+		}
+	}
+
+	std::vector<std::vector<int>> out(sc);
+
+	for (int s = 0; s < sc; s++)
+	{
+		for (std::set<int>::iterator it = segments[s].begin();
+			 it != segments[s].end(); it++)
+		{
+			out[s].push_back(*it);
+		}
+	}
+
+	return out;
 }

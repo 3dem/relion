@@ -36,6 +36,7 @@ class LocalParticleRefinement : public FastDifferentiableOptimization
 			std::vector<CTF> CTFs;
 			gravis::d3Vector position;
 			std::vector<int> max_radius;
+			BufferedImage<float> precomputedCTFs;
 
 
 		double f(const std::vector<double>& x, void* tempStorage) const;

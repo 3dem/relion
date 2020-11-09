@@ -2,6 +2,7 @@
 #define RELION_TOMO_PARTICLE_SET_H
 
 #include <src/metadata_table.h>
+#include <src/jaz/gravis/t2Vector.h>
 #include <src/jaz/gravis/t3Matrix.h>
 #include <src/jaz/gravis/t4Matrix.h>
 #include "motion/trajectory.h"
@@ -69,8 +70,10 @@ class ParticleSet
 
 		std::vector<gravis::d3Vector> getTrajectoryInPixels(ParticleIndex particle_id, int fc, double pixelSize) const;
 		void checkTrajectoryLengths(ParticleIndex p0, int np, int fc, std::string caller) const;
-		
-		static gravis::d3Matrix convert(const Matrix2D<double>& A);
+
+		static std::vector<std::vector<int>> splitEvenly(
+				const std::vector<std::vector<ParticleIndex>>& particlesByTomogram,
+				int segment_count);
 };
 
 #endif

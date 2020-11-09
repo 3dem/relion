@@ -57,6 +57,8 @@ LocalParticleRefinement::LocalParticleRefinement(
 	CTFs.resize(fc);
 	max_radius = std::vector<int>(fc,sh);
 
+	precomputedCTFs = BufferedImage<float>(sh,s,fc);
+
 	for (int f = 0; f < fc; f++)
 	{
 		const d4Matrix A = tomo_to_image[f] * particle_to_tomo;
@@ -77,6 +79,33 @@ LocalParticleRefinement::LocalParticleRefinement(
 			{
 				max_radius[f] = x;
 				break;
+			}
+		}
+
+		const int rad = max_radius[f];
+
+		for (int yi = 0; yi < s;  yi++)
+		{
+			const double yp = yi < s/2? yi : yi - s;
+
+			if (yp < rad && yp > -rad)
+			{
+				const int x_max = (int) sqrt(rad*rad - yp*yp);
+
+				for (int xi = 0; xi < x_max; xi++)
+				{
+					const double xp = xi;
+
+					const double xA = xp / ba;
+					const double yA = yp / ba;
+
+					const double gamma_offset = aberrationsCache.hasSymmetrical?
+						aberrationsCache.symmetrical[og](xi,yi) : 0.0;
+
+					precomputedCTFs(xi,yi,f) = -frqEnvelope(xi,yi,f) * CTFs[f].getCTF(
+						xA, yA, false, false, false, true, gamma_offset);
+
+				}
 			}
 		}
 	}
@@ -147,11 +176,13 @@ double LocalParticleRefinement::f(const std::vector<double>& x, void* tempStorag
 
 					const fComplex obs = observations(xi,yi,f);
 
-					const double gamma_offset = aberrationsCache.hasSymmetrical?
+					/*const double gamma_offset = aberrationsCache.hasSymmetrical?
 						aberrationsCache.symmetrical[og](xi,yi) : 0.0;
 
 					const float c = -frqEnvelope(xi,yi,f) * CTFs[f].getCTF(
-						xA, yA, false, false, false, true, gamma_offset);
+						xA, yA, false, false, false, true, gamma_offset);*/
+
+					const float c = precomputedCTFs(xi,yi,f);
 
 					const double t = 2.0 * PI * (tx * xp + ty * yp) / (double) s;
 
@@ -270,11 +301,13 @@ void LocalParticleRefinement::grad(const std::vector<double> &x, std::vector<dou
 
 					const fComplex obs = observations(xi,yi,f);
 
-					const double gamma_offset = aberrationsCache.hasSymmetrical?
+					/*const double gamma_offset = aberrationsCache.hasSymmetrical?
 						aberrationsCache.symmetrical[og](xi,yi) : 0.0;
 
 					const float c = -frqEnvelope(xi,yi,f) * CTFs[f].getCTF(
-						xA, yA, false, false, false, true, gamma_offset);
+						xA, yA, false, false, false, true, gamma_offset);*/
+
+					const float c = precomputedCTFs(xi,yi,f);
 
 					const double t = 2.0 * PI * (tx * xp + ty * yp) / (double) s;
 					const double dt_dtx =  2.0 * PI * xp / (double) s;
@@ -439,11 +472,13 @@ double LocalParticleRefinement::gradAndValue(const std::vector<double> &x, std::
 
 					const fComplex obs = observations(xi,yi,f);
 
-					const double gamma_offset = aberrationsCache.hasSymmetrical?
+					/*const double gamma_offset = aberrationsCache.hasSymmetrical?
 						aberrationsCache.symmetrical[og](xi,yi) : 0.0;
 
 					const float c = -frqEnvelope(xi,yi,f) * CTFs[f].getCTF(
-						xA, yA, false, false, false, true, gamma_offset);
+						xA, yA, false, false, false, true, gamma_offset);*/
+
+					const float c = precomputedCTFs(xi,yi,f);
 
 					const double t = 2.0 * PI * (tx * xp + ty * yp) / (double) s;
 					const double dt_dtx =  2.0 * PI * xp / (double) s;
