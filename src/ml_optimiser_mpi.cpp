@@ -2068,7 +2068,7 @@ void MlOptimiserMpi::maximization()
 							if (do_split_random_halves && !do_join_random_halves) fn_ext_root += "_half1";
 							if (mymodel.nr_bodies > 1) fn_ext_root.compose(fn_ext_root+"_body", ibody+1, "", 3);
 							else fn_ext_root.compose(fn_ext_root+"_class", iclass+1, "", 3);
-							(wsum_model.BPref[iclass]).externalReconstruct(mymodel.Iref[ith_recons],
+							(wsum_model.BPref[ith_recons]).externalReconstruct(mymodel.Iref[ith_recons],
 									fn_ext_root,
 									mymodel.fsc_halves_class[ith_recons],
 									mymodel.tau2_class[ith_recons],
@@ -2201,7 +2201,7 @@ void MlOptimiserMpi::maximization()
 								if (do_split_random_halves && !do_join_random_halves) fn_ext_root += "_half2";
 								if (mymodel.nr_bodies > 1) fn_ext_root.compose(fn_ext_root+"_body", ibody+1, "", 3);
 								else fn_ext_root.compose(fn_ext_root+"_class", iclass+1, "", 3);
-								(wsum_model.BPref[iclass]).externalReconstruct(mymodel.Iref[ith_recons],
+								(wsum_model.BPref[ith_recons]).externalReconstruct(mymodel.Iref[ith_recons],
 										fn_ext_root,
 										mymodel.fsc_halves_class[ith_recons],
 										mymodel.tau2_class[ith_recons],
