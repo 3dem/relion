@@ -106,6 +106,7 @@ class ObservationModel
 				bool do_multiply_instead = false, bool do_correct_average_mtf = true);
 
 		// 2D image with the MTF (cached)
+		// Nyquist X is positive, Y is negative (non-FFTW!!)
 		const BufferedImage<RFLOAT>& getMtfImage(int optGroup, int s);
 
 		// 2D image with the average MTF (cached)
@@ -123,11 +124,12 @@ class ObservationModel
 				long int particle, MultidimArray<Complex>& obsImage,
 				bool do_modulate_instead = false);
 
-
 		// effect of antisymmetric aberration (cached)
+		// Nyquist X is positive, Y is negative (non-FFTW!!)
 		const BufferedImage<Complex>& getPhaseCorrection(int optGroup, int s);
 
 		// effect of symmetric aberration (cached)
+		// Nyquist X is positive, Y is negative (non-FFTW!!)
 		const BufferedImage<RFLOAT>& getGammaOffset(int optGroup, int s);
 
 		Matrix2D<RFLOAT> applyAnisoMag(Matrix2D<RFLOAT> A3D, int opticsGroup);

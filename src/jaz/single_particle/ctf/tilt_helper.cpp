@@ -321,7 +321,7 @@ std::vector<Image<RFLOAT> > TiltHelper::computeOddZernike(
 		for (int x = 0; x < sh; x++)
 		{
 			const double xx0 = x/as;
-			const double yy0 = y < sh? y/as : (y-s)/as;
+			const double yy0 = y < sh-1? y/as : (y-s)/as;
 
 			const double xx = mag(0,0) * xx0 + mag(0,1) * yy0;
 			const double yy = mag(1,0) * xx0 + mag(1,1) * yy0;
@@ -515,7 +515,7 @@ std::vector<Image<RFLOAT> > TiltHelper::computeEvenZernike(
 		for (int x = 0; x < sh; x++)
 		{
 			const double xx0 = x/as;
-			const double yy0 = y < sh? y/as : (y-s)/as;
+			const double yy0 = y < sh-1? y/as : (y-s)/as;
 
 			const double xx = mag(0,0) * xx0 + mag(0,1) * yy0;
 			const double yy = mag(1,0) * xx0 + mag(1,1) * yy0;
