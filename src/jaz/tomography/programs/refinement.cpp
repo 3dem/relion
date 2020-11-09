@@ -27,58 +27,47 @@ RefinementProgram::RefinementProgram(int argc, char *argv[])
 
 void RefinementProgram::_readParams(IOParser &parser)
 {
-	int gen_section = parser.addSection("General refinement options");
-	
-	particlesFn = parser.getOption("--i", "Input particle set");
-	tomoSetFn = parser.getOption("--t", "Tomogram set", "tomograms.star");
-	boxSize = textToInteger(parser.getOption("--b", "Box size", "384"));
+	optimisationSet.read(
+		parser,
+		true,           // optimisation set
+		true,   true,   // particles
+		true,   true,   // tomograms
+		true,   false,  // trajectories
+		false,  false,  // manifolds
+		true,   true);  // reference
 
-	referenceMap.read(parser);
+	int gen_section = parser.addSection("General refinement options");
+
+	boxSize = textToInteger(parser.getOption("--b", "Box size"));
+
+	referenceMap.read(optimisationSet);
 
 	specified_first_frame = textToInteger(parser.getOption("--f0", "First frame", "0"));
 	specified_last_frame = textToInteger(parser.getOption("--f1", "Last frame", "-1"));
-	
-	motFn = parser.getOption("--mot", "Particle trajectories", "");
+
+	static_noise = !parser.checkOption("--per_frame_noise", "Assume a different noise distribution for each frame");
 	
 	diag = parser.checkOption("--diag", "Write out diagnostic information");
 	timing = parser.checkOption("--time", "Measure the elapsed time");
 	num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
-	outDir = parser.getOption("--o", "Output filename pattern");
+	outDir = parser.getOption("--o", "Output directory");
 }
 
 void RefinementProgram::init()
 {
-	if (outDir[outDir.length()-1] != '/')
-	{
-		outDir = outDir + "/";
-	}
-	
-	int res = system(("mkdir -p "+outDir).c_str());
-	
-	{
-		std::ofstream ofs(outDir+"/note.txt");
-		
-		ofs << "Command:\n\n";
-		
-		for (int i = 0; i < argc; i++)
-		{
-			ofs << argv[i] << ' ';
-		}
-		
-		ofs << '\n';
-	}
+	outDir = ZIO::prepareTomoOutputDirectory(outDir, argc, argv);
 
-	tomogramSet = TomogramSet(tomoSetFn);
+	tomogramSet = TomogramSet(optimisationSet.tomograms);
 	
-	dataSet = ParticleSet(particlesFn, motFn);
-	particles = dataSet.splitByTomogram(tomogramSet);
+	particleSet = ParticleSet(optimisationSet.particles, optimisationSet.trajectories);
+	particles = particleSet.splitByTomogram(tomogramSet);
 		
 	referenceMap.load(boxSize);
 }
 
 BufferedImage<float> RefinementProgram::computeFrequencyWeights(
 		const Tomogram& tomogram,
-		bool whiten, double sig2RampPower, double hiPass_px,
+		bool whiten, double sig2RampPower, double hiPass_px, bool applyDoseWeight,
 		int num_threads)
 {
 	const int s = boxSize;
@@ -112,6 +101,35 @@ BufferedImage<float> RefinementProgram::computeFrequencyWeights(
 			RawImage<float> fw = frqWghts.getSliceRef(f);
 			RadialAvg::toFftwHalf_2D_lin(frqWghts1D, sh, s, fw);
 		}
+
+		if (static_noise)
+		{
+			BufferedImage<float> staticSigma2(sh,s);
+			staticSigma2.fill(0.f);
+
+			for (int f = 0; f < fc; f++)
+			{
+				for (int y = 0; y < s;  y++)
+				for (int x = 0; x < sh; x++)
+				{
+					const double val = frqWghts(x,y,f);
+
+					if (val > 0.f)
+					{
+						staticSigma2(x,y) += 1.f / val;
+					}
+				}
+			}
+
+			for (int f = 0; f < fc; f++)
+			{
+				for (int y = 0; y < s;  y++)
+				for (int x = 0; x < sh; x++)
+				{
+					frqWghts(x,y,f) = fc / staticSigma2(x,y);
+				}
+			}
+		}
 	}
 	else
 	{
@@ -140,8 +158,11 @@ BufferedImage<float> RefinementProgram::computeFrequencyWeights(
 		frqWghts.getSliceRef(f) *= referenceMap.freqWeight;
 	}
 	
-	BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s, 1.0);
-	frqWghts *= doseWeights;
+	if (applyDoseWeight)
+	{
+		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s, 1.0);
+		frqWghts *= doseWeights;
+	}
 		
 	return frqWghts;
 }

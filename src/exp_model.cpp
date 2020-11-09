@@ -1158,13 +1158,12 @@ void Experiment::read(FileName fn_exp, bool do_ignore_particle_name, bool do_ign
 }
 
 // Write to file
-void Experiment::write(FileName fn_root)
+void Experiment::write(FileName fn_out)
 {
 	std::ofstream  fh;
-	FileName fn_tmp = fn_root+"_data.star";
-	fh.open((fn_tmp).c_str(), std::ios::out);
+	fh.open((fn_out).c_str(), std::ios::out);
 	if (!fh)
-		REPORT_ERROR( (std::string)"Experiment::write: Cannot write file: " + fn_tmp);
+		REPORT_ERROR( (std::string)"Experiment::write: Cannot write file: " + fn_out);
 
 	obsModel.opticsMdt.setName("optics");
 	obsModel.opticsMdt.write(fh);

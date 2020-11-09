@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
 		
 		tomoSetFn = parser.getOption("--t", "Tomogram set", "tomograms.star");
 		optFn = parser.getOption("--ctf", "Consider a CTF using parameters from the supplied file");
-		boxSize = textToInteger(parser.getOption("--b", "Box size", "384"));
+		boxSize = textToInteger(parser.getOption("--b", "Box size"));
 		normalise = parser.checkOption("--nrm", "Scale each column to make its sum 1");
 		outDir = parser.getOption("--o", "Output directory");
 		

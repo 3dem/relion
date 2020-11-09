@@ -7,7 +7,7 @@
 #include "src/acc/acc_ptr.h"
 //#include <cuda_runtime.h>
 //#include "src/acc/cuda/cuda_kernels/cuda_device_utils.cuh"
-#ifndef CUDA
+#ifndef _CUDA_ENABLED
 #include <complex>
 #endif
 
@@ -30,7 +30,7 @@ class AccProjector
 
 	size_t pitch2D;
 #else
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	XFLOAT *mdlReal, *mdlImag;
 #else
 	std::complex<XFLOAT> *mdlComplex;
@@ -56,7 +56,7 @@ public:
 		mdlImag = 0;
 		pitch2D = 0;
 #else
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 		mdlReal = 0;
 		mdlImag = 0;
 #else
@@ -73,8 +73,8 @@ public:
 
 	void initMdl(XFLOAT *real, XFLOAT *imag);
 	void initMdl(Complex *data);
-#ifndef CUDA
-	void initMdl(std::complex<XFLOAT> *data);
+#ifndef _CUDA_ENABLED
+void initMdl(std::complex<XFLOAT> *data);
 #endif
 
 	void clear();

@@ -29,7 +29,7 @@
 #define TIMING_TOC(id)
 #endif
 
-void MlModel::initialise(bool _do_sgd)
+void MlModel::initialise(bool _do_mom1, bool _do_mom2)
 {
 
 	// Auxiliary vector with relevant size in Fourier space
@@ -49,6 +49,7 @@ void MlModel::initialise(bool _do_sgd)
 	pointer_body_overlap.resize(nr_bodies, nr_bodies);
 	max_radius_mask_bodies.resize(nr_bodies, -1);
 	pdf_class.resize(nr_classes, 1./(RFLOAT)nr_classes);
+	class_age.resize(nr_classes, 0);
 	pdf_direction.resize(nr_classes * nr_bodies);
 	group_names.resize(nr_groups, "");
 	sigma2_noise.resize(nr_groups);
@@ -86,14 +87,18 @@ void MlModel::initialise(bool _do_sgd)
 		REPORT_ERROR("MlModel::initialise() - nr_bodies or nr_classes must be 1");
 	PPref.resize(nr_classes * nr_bodies, ref);
 
-	do_sgd = _do_sgd;
-	if (do_sgd)
-		Igrad.resize(nr_classes);
+	do_mom1 = _do_mom1;
+	do_mom2 = _do_mom2;
+	if (_do_mom1)
+		Igrad1.resize(nr_classes);
+	if (_do_mom2)
+		Igrad2.resize(nr_classes);
 
+	ref_names.resize(nr_classes);
 }
 
 // Reading from a file
-void MlModel::read(FileName fn_in)
+void MlModel::read(FileName fn_in, bool read_only_one_group)
 {
 
 	// Clear current model
@@ -186,7 +191,6 @@ void MlModel::read(FileName fn_in)
 	initialise();
 
 	// Read classes
-	FileName fn_tmp, fn_tmp2;
 	Image<RFLOAT> img;
 	if (nr_bodies > 1)
 		MDclass.readStar(in, "model_bodies");
@@ -194,7 +198,8 @@ void MlModel::read(FileName fn_in)
 		MDclass.readStar(in, "model_classes");
 
 	int iclass = 0;
-	do_sgd = false;
+	do_mom1 = false;
+	do_mom2 = false;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDclass)
 	{
 		if (!MDclass.getValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, acc_trans[iclass]))
@@ -209,7 +214,7 @@ void MlModel::read(FileName fn_in)
 			}
 		}
 
-		if (!MDclass.getValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp) ||
+		if (!MDclass.getValue(EMDL_MLMODEL_REF_IMAGE, ref_names[iclass]) ||
 		    !MDclass.getValue(EMDL_MLMODEL_ACCURACY_ROT, acc_rot[iclass]) )
 			REPORT_ERROR("MlModel::readStar: incorrect model_classes/bodies table: no ref_image or acc_rot");
 		// backwards compatible
@@ -239,19 +244,42 @@ void MlModel::read(FileName fn_in)
 		}
 
 		// Read in actual reference image
-		img.read(fn_tmp);
+		img.read(ref_names[iclass]);
 		img().setXmippOrigin();
 		Iref[iclass] = img();
 
-		// Check to see whether there is a SGD-gradient entry as well
-		if (MDclass.getValue(EMDL_MLMODEL_SGD_GRADIENT_IMAGE, fn_tmp))
+		FileName fn_tmp;
+		// Check to see whether there are gradient tracking entry as well
+		if (MDclass.getValue(EMDL_MLMODEL_GRADIENT_MOMENT1_IMAGE, fn_tmp))
 		{
-			do_sgd=true;
+			Image<RFLOAT> img;
+			do_mom1=true;
 			if (iclass == 0)
-				Igrad.resize(nr_classes);
+				Igrad1.resize(nr_classes);
 			img.read(fn_tmp);
-			Igrad[iclass] = img();
+
+			Igrad1[iclass].resize(Iref[0].zdim, Iref[0].ydim, Iref[0].xdim/2+1);
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Igrad1[iclass]) {
+				DIRECT_A3D_ELEM(Igrad1[iclass], k, i, j).real = DIRECT_A3D_ELEM(img(), k, i, j*2+0);
+				DIRECT_A3D_ELEM(Igrad1[iclass], k, i, j).imag = DIRECT_A3D_ELEM(img(), k, i, j*2+1);
+			}
 		}
+
+		if (MDclass.getValue(EMDL_MLMODEL_GRADIENT_MOMENT2_IMAGE, fn_tmp))
+		{
+			Image<RFLOAT> img;
+			do_mom2=true;
+			if (iclass == 0)
+				Igrad2.resize(nr_classes);
+			img.read(fn_tmp);
+
+			Igrad2[iclass].resize(Iref[0].zdim, Iref[0].ydim, Iref[0].xdim/2+1);
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Igrad2[iclass]) {
+				DIRECT_A3D_ELEM(Igrad2[iclass], k, i, j).real = DIRECT_A3D_ELEM(img(), k, i, j*2+0);
+				DIRECT_A3D_ELEM(Igrad2[iclass], k, i, j).imag = DIRECT_A3D_ELEM(img(), k, i, j*2+1);
+			}
+		}
+
 		iclass++;
 	}
 
@@ -295,7 +323,8 @@ void MlModel::read(FileName fn_in)
 	}
 
 	// Read sigma models for each group
-	for (int igroup = 0; igroup < nr_groups; igroup++)
+	long read_this_many_groups = (read_only_one_group) ? 1 : nr_groups;
+	for (int igroup = 0; igroup < read_this_many_groups; igroup++)
 	{
 		// Allow sigma2_noise with different sizes!
 		sigma2_noise[igroup].resize(ori_size/2 + 1);
@@ -369,12 +398,13 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 {
 
 	MetaDataTable MDclass, MDgroup, MDlog, MDsigma, MDbodies;
-	FileName fn_tmp, fn_tmp2;
+	FileName fn_tmp, fn_tmp2, fn_mom1, fn_mom2;
 	RFLOAT aux;
 	std::ofstream  fh;
 
 	// Treat classes or bodies (for multi-body refinement) in the same way...
 	int nr_classes_bodies = (nr_bodies > 1) ? nr_bodies : nr_classes;
+
 	// A. Write images
 	if (ref_dim == 2)
 	{
@@ -392,16 +422,33 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 		else
 			img.write(fn_out + "_classes.mrcs");
 
-		if (do_sgd)
+		if (do_mom1)
 		{
+			Image<RFLOAT> img(XSIZE(Igrad1[0])*2, YSIZE(Igrad1[0]), 1, nr_classes_bodies);
 			for (int iclass = 0; iclass < nr_classes; iclass++)
 			{
-				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(Igrad[iclass])
+				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(Igrad1[iclass])
 				{
-					DIRECT_NZYX_ELEM(img(), iclass, 0, i, j) = DIRECT_A2D_ELEM(Igrad[iclass], i, j);
+					DIRECT_NZYX_ELEM(img(), iclass, 0, i, j*2+0) = DIRECT_A2D_ELEM(Igrad1[iclass], i, j).real;
+					DIRECT_NZYX_ELEM(img(), iclass, 0, i, j*2+1) = DIRECT_A2D_ELEM(Igrad1[iclass], i, j).imag;
 				}
 			}
-			img.write(fn_out + "_gradients.mrcs");
+			img.write(fn_out + "_1moment.mrcs");
+		}
+
+		if (do_mom2)
+		{
+			Image<RFLOAT> img(XSIZE(Igrad2[0])*2, YSIZE(Igrad2[0]), 1, nr_classes_bodies);
+			for (int iclass = 0; iclass < nr_classes; iclass++)
+			{
+				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(Igrad2[iclass])
+				{
+					DIRECT_NZYX_ELEM(img(), iclass, 0, i, j*2+0) = DIRECT_A2D_ELEM(Igrad2[iclass], i, j).real;
+					DIRECT_NZYX_ELEM(img(), iclass, 0, i, j*2+1) = DIRECT_A2D_ELEM(Igrad2[iclass], i, j).imag;
+				}
+
+			}
+			img.write(fn_out + "_2moment.mrcs");
 		}
 	}
 	else
@@ -424,13 +471,33 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 
 			img.write(fn_tmp);
 		}
-		if (do_sgd)
+
+		if (do_mom1)
 		{
 			for (int iclass = 0; iclass < nr_classes; iclass++)
 			{
-				fn_tmp.compose(fn_out+"_grad", iclass+1, "mrc", 3);
+				fn_tmp.compose(fn_out+"_1moment", iclass+1, "mrc", 3);
 
-				img() = Igrad[iclass];
+				Image<RFLOAT> img(XSIZE(Igrad1[0])*2, YSIZE(Igrad1[0]), ZSIZE(Igrad1[0]));
+				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Igrad1[iclass]) {
+					DIRECT_A3D_ELEM(img(), k, i, j*2+0) = DIRECT_A3D_ELEM(Igrad1[iclass], k, i, j).real;
+					DIRECT_A3D_ELEM(img(), k, i, j*2+1) = DIRECT_A3D_ELEM(Igrad1[iclass], k, i, j).imag;
+				}
+				img.write(fn_tmp);
+			}
+		}
+
+		if (do_mom2)
+		{
+			for (int iclass = 0; iclass < nr_classes; iclass++)
+			{
+				fn_tmp.compose(fn_out+"_2moment", iclass+1, "mrc", 3);
+
+				Image<RFLOAT> img(XSIZE(Igrad2[0])*2, YSIZE(Igrad2[0]), ZSIZE(Igrad2[0]));
+				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Igrad2[iclass]) {
+					DIRECT_A3D_ELEM(img(), k, i, j*2+0) = DIRECT_A3D_ELEM(Igrad2[iclass], k, i, j).real;
+					DIRECT_A3D_ELEM(img(), k, i, j*2+1) = DIRECT_A3D_ELEM(Igrad2[iclass], k, i, j).imag;
+				}
 				img.write(fn_tmp);
 			}
 		}
@@ -538,6 +605,9 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 				fn_tmp = fn_out + "_classes.mrcs";
 			}
 			fn_tmp.compose(iclass+1, fn_tmp); // fn_tmp = integerToString(iclass) + "@" + fn_tmp;
+
+			fn_mom1 = fn_out + "_1moment.mrcs";
+			fn_mom2 = fn_out + "_2moment.mrcs";
 		}
 		else
 		{
@@ -549,19 +619,21 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 			}
 			else
 				fn_tmp.compose(fn_out+"_class",iclass+1,"mrc", 3); // class number from 1 to K!
+
+			fn_mom1.compose(fn_out + "_1moment", iclass + 1, "mrc", 3);
+			fn_mom2.compose(fn_out + "_1moment", iclass + 1, "mrc", 3);
 		}
 		MDclass.setValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp);
-		if (do_sgd)
-		{
-			if (ref_dim==2)
-				fn_tmp.compose(iclass+1, fn_out + "_gradients.mrcs");
-			else
-				fn_tmp.compose(fn_out+"_grad",iclass+1,"mrc", 3);
-			MDclass.setValue(EMDL_MLMODEL_SGD_GRADIENT_IMAGE, fn_tmp);
-		}
+
+		if (do_mom1)
+			MDclass.setValue(EMDL_MLMODEL_GRADIENT_MOMENT1_IMAGE, fn_mom1);
+
+		if (do_mom2)
+			MDclass.setValue(EMDL_MLMODEL_GRADIENT_MOMENT2_IMAGE, fn_mom2);
 
 		// For multiple bodies: only star PDF_CLASS in the first one!
 		int myclass = (nr_bodies > 1) ? 0 : iclass; // for multi-body: just set iclass=0
+
 		MDclass.setValue(EMDL_MLMODEL_PDF_CLASS, pdf_class[myclass]);
 		MDclass.setValue(EMDL_MLMODEL_ACCURACY_ROT, acc_rot[iclass]);
 		MDclass.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, acc_trans[iclass]);
@@ -696,9 +768,10 @@ void  MlModel::readTauSpectrum(FileName fn_tau, int verb)
 }
 
 // Reading images from disc
-void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experiment &_mydata,
-			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected,
-			RFLOAT _ref_angpix, bool _do_sgd, bool _do_trust_ref_size, bool verb)
+void MlModel::initialiseFromImages(
+	FileName fn_ref, bool _is_3d_model, Experiment &_mydata,
+	bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected,
+	RFLOAT _ref_angpix, bool _do_grad, bool _do_trust_ref_size, bool _do_mom1, bool _do_mom2, bool verb)
 {
 
 
@@ -734,7 +807,8 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 			// ignore nr_classes from the command line, use number of entries in STAR file
 			nr_classes = 0;
 			Iref.clear();
-			Igrad.clear();
+			Igrad1.clear();
+			Igrad2.clear();
 			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDref)
 			{
 				MDref.getValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp);
@@ -765,11 +839,11 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 				ori_size = XSIZE(img());
 				ref_dim = img().getDim();
 				Iref.push_back(img());
-				if (_do_sgd)
-				{
-					img() *= 0.;
-					Igrad.push_back(img());
-				}
+				MultidimArray<Complex> zeros(img().zdim, img().ydim, img().xdim/2+1);
+				if (_do_mom1)
+					Igrad1.push_back(zeros);
+				if (_do_mom2)
+					Igrad2.push_back(zeros);
 				nr_classes++;
 			}
 		}
@@ -801,7 +875,8 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 				REPORT_ERROR("MlOptimiser::read: size of reference image is not the same as the experimental images!");
 			}
 			Iref.clear();
-			Igrad.clear();
+			Igrad1.clear();
+			Igrad2.clear();
 			if (nr_bodies > 1)
 			{
 				for (int ibody = 0; ibody < nr_bodies; ibody++)
@@ -816,11 +891,11 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 				for (int iclass = 0; iclass < nr_classes; iclass++)
 				{
 					Iref.push_back(img());
-					if (_do_sgd)
-					{
-						img() *= 0.;
-						Igrad.push_back(img());
-					}
+					MultidimArray<Complex> zeros(img().zdim, img().ydim, img().xdim/2+1);
+					if (_do_mom1)
+						Igrad1.push_back(zeros);
+					if (_do_mom2)
+						Igrad2.push_back(zeros);
 				}
 			}
 			if (nr_classes > 1)
@@ -884,12 +959,17 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 		}
 		img().setXmippOrigin();
 		Iref.clear();
-		Igrad.clear();
+		Igrad1.clear();
+		Igrad2.clear();
 		for (int iclass = 0; iclass < nr_classes; iclass++)
 		{
 			Iref.push_back(img());
-			if (_do_sgd)
-				Igrad.push_back(img());
+
+			MultidimArray<Complex> zeros(img().zdim, img().ydim, img().xdim/2+1);
+			if (_do_mom1)
+				Igrad1.push_back(zeros);
+			if (_do_mom2)
+				Igrad2.push_back(zeros);
 		}
 	}
 
@@ -900,7 +980,7 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 	aux.initZeros(ori_size/2 + 1);
 	sigma2_noise.resize(nr_groups, aux);
 
-	initialise(_do_sgd);
+	initialise(_do_mom1, _do_mom2);
 
 	// Now set the group names from the Experiment groups list
 	for (int i=0; i< nr_groups; i++)
@@ -1432,6 +1512,30 @@ void MlModel::calculateTotalFourierCoverage()
 }
 
 
+void MlModel::reset_class(int class_idx, int to_class_idx) {
+	if (to_class_idx == -1) {
+		Iref[class_idx] *= 0;
+		Igrad1[class_idx].initZeros();
+		Igrad2[class_idx].initZeros();
+		pdf_class[class_idx] = 0;
+		tau2_class[class_idx] *= 0.;
+		data_vs_prior_class[class_idx] *= 0.;
+		pdf_class[class_idx] *= 0;
+		pdf_direction[class_idx] *= 0.;
+	} else {
+		Iref[class_idx] = Iref[to_class_idx];
+		Igrad1[class_idx] = Igrad1[to_class_idx];
+		Igrad2[class_idx] = Igrad2[to_class_idx];
+		pdf_class[class_idx] = pdf_class[to_class_idx];
+		tau2_class[class_idx] = tau2_class[to_class_idx];
+		data_vs_prior_class[class_idx] = data_vs_prior_class[to_class_idx];
+		pdf_class[class_idx] = pdf_class[to_class_idx];
+		pdf_direction[class_idx] = pdf_direction[to_class_idx];
+
+	}
+}
+
+
 /////////// MlWsumModel
 void MlWsumModel::initialise(MlModel &_model, FileName fn_sym, bool asymmetric_padding, bool _skip_gridding)
 {
@@ -1444,6 +1548,7 @@ void MlWsumModel::initialise(MlModel &_model, FileName fn_sym, bool asymmetric_p
 	data_dim = _model.data_dim;
 	ori_size = _model.ori_size;
 	pdf_class = _model.pdf_class;
+	class_age = _model.class_age;
 	if (ref_dim == 2)
 		prior_offset_class = _model.prior_offset_class;
 	pdf_direction = _model.pdf_direction;
@@ -1528,6 +1633,7 @@ void MlWsumModel::initZeros()
 	for (int iclass = 0; iclass < nr_classes; iclass++)
 	{
 		pdf_class[iclass] = 0.;
+		class_age[iclass] = 0.;
 		if (ref_dim == 2)
 			prior_offset_class[iclass].initZeros();
 	}

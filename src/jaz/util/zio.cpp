@@ -191,19 +191,24 @@ bool ZIO::endsWith(const std::string &string, const std::string &prefix)
 			&& string.substr(string.length() - prefix.length()) == prefix;
 }
 
+void ZIO::makeDir(const std::string& dir)
+{
+	int res = system(("mkdir -p "+dir).c_str());
+}
+
 std::string ZIO::makeOutputDir(const std::string& dir)
 {
 	std::string out = dir;
-	
+
 	const int len = out.length();
-	
+
 	if (len > 0)
 	{
 		if (out[len-1] != '/')
 		{
 			out = out + "/";
 		}
-		
+
 		int res = system(("mkdir -p "+out).c_str());
 
 		if (res)
@@ -211,7 +216,7 @@ std::string ZIO::makeOutputDir(const std::string& dir)
 			REPORT_ERROR_STR("Unable to write to: " << out);
 		}
 	}
-	
+
 	return out;
 }
 
@@ -229,5 +234,42 @@ std::string ZIO::ensureEndingSlash(const std::string &dir)
 		}
 	}
 	
-	return out;	
+	return out;
+}
+
+void ZIO::ensureParentDir(const std::string &path)
+{
+	if (path.find_last_of("/") != std::string::npos)
+	{
+		std::string dir = path.substr(0, path.find_last_of("/"));
+
+		int res = system(("mkdir -p "+dir).c_str());
+	}
+}
+
+std::string ZIO::prepareTomoOutputDirectory(const std::string &dir, int argc, char *argv[])
+{
+	std::string outDir = dir;
+
+	if (outDir[outDir.length()-1] != '/')
+	{
+		outDir = outDir + "/";
+	}
+
+	int res = system(("mkdir -p "+outDir).c_str());
+
+	{
+		std::ofstream ofs(outDir+"note.txt");
+
+		ofs << "Command:\n\n";
+
+		for (int i = 0; i < argc; i++)
+		{
+			ofs << argv[i] << ' ';
+		}
+
+		ofs << '\n';
+	}
+
+	return outDir;
 }

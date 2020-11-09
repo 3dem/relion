@@ -4,7 +4,7 @@
 #include "src/acc/acc_ptr.h"
 #include "src/acc/data_types.h"
 #include "src/acc/acc_helper_functions.h"
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 #include "src/acc/cuda/cuda_kernels/helper.cuh"
 #include "src/acc/cuda/cuda_kernels/wavg.cuh"
 #include "src/acc/cuda/cuda_kernels/diff2.cuh"
@@ -236,7 +236,7 @@ void makeNoiseImage(XFLOAT sigmaFudgeFactor,
     FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sigmaNoiseSpectra)
             NoiseSpectra[n] = (XFLOAT)sqrt(sigmaFudgeFactor*sigmaNoiseSpectra.data[n]);
 
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
     // Set up states to seeda and run randomization on the GPU
     // AccDataTypes::Image<curandState > RandomStates(RND_BLOCK_NUM*RND_BLOCK_SIZE,ptrFactory);
     AccPtr<curandState> RandomStates = RandomImage.make<curandState>(RND_BLOCK_NUM*RND_BLOCK_SIZE);
@@ -321,7 +321,7 @@ static void TranslateAndNormCorrect(MultidimArray<RFLOAT > &img_in,
 	// Apply the norm_correction term
 	if (normcorr!=1)
 	{
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 		int BSZ = ( (int) ceilf(( float)temp.getSize() /(float)BLOCK_SIZE));
 		CudaKernels::cuda_kernel_multi<XFLOAT><<<BSZ,BLOCK_SIZE,0,temp.getStream()>>>(temp(),normcorr,temp.getSize());
 #else
@@ -332,7 +332,7 @@ static void TranslateAndNormCorrect(MultidimArray<RFLOAT > &img_in,
 
 	if(temp.getAccPtr()==img_out.getAccPtr())
 		CRITICAL(ERRUNSAFEOBJECTREUSE);
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	int BSZ = ( (int) ceilf(( float)temp.getSize() /(float)BLOCK_SIZE));
 	if (DATA3D)
 		CudaKernels::cuda_kernel_translate3D<XFLOAT><<<BSZ,BLOCK_SIZE,0,temp.getStream()>>>(temp(),img_out(),img_in.zyxdim,img_in.xdim,img_in.ydim,img_in.zdim,xOff,yOff,zOff);
@@ -404,7 +404,7 @@ static void softMaskBackgroundValue(
 	AccPtr<XFLOAT> &g_sum_bg)
 {
 	int block_dim = 128; //TODO: set balanced (hardware-dep?)
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 		cuda_kernel_softMaskBackgroundValue<<<block_dim,SOFTMASK_BLOCK_SIZE,0, vol.getStream()>>>(
 				~vol,
 				vol.getxyz(),
@@ -449,7 +449,7 @@ static void cosineFilter(
 		XFLOAT sum_bg_total)
 {
 	int block_dim = 128; //TODO: set balanced (hardware-dep?)
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	cuda_kernel_cosineFilter<<<block_dim,SOFTMASK_BLOCK_SIZE,0,vol.getStream()>>>(
 			~vol,
 			vol.getxyz(),
@@ -488,7 +488,7 @@ static void cosineFilter(
 
 void initOrientations(AccPtr<RFLOAT> &pdfs, AccPtr<XFLOAT> &pdf_orientation, AccPtr<bool> &pdf_orientation_zeros)
 {
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	int bs = 512;
 	int gs = ceil(pdfs.getSize()/(float)(bs));
 	cuda_kernel_initOrientations<<<gs, bs, 0, pdfs.getStream()>>>(~pdfs, ~pdf_orientation, ~pdf_orientation_zeros, pdfs.getSize());
@@ -520,7 +520,7 @@ void centerFFT_2D(int grid_size, int batch_size, int block_size,
 				int xshift,
 				int yshift)
 {
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	dim3 blocks(grid_size, batch_size);
 	cuda_kernel_centerFFT_2D<<<blocks,block_size,0,stream>>>(
 				img_in,
@@ -548,7 +548,7 @@ void centerFFT_2D(int grid_size, int batch_size, int block_size,
 				int xshift,
 				int yshift)
 {
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	dim3 blocks(grid_size, batch_size);
 	cuda_kernel_centerFFT_2D<<<blocks,block_size>>>(
 				img_in,
@@ -579,7 +579,7 @@ void centerFFT_3D(int grid_size, int batch_size, int block_size,
 				int yshift,
 				int zshift)
 {
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	dim3 blocks(grid_size, batch_size);
 	cuda_kernel_centerFFT_3D<<<blocks,block_size, 0, stream>>>(
 				img_in,
@@ -620,8 +620,8 @@ void kernel_exponentiate_weights_fine(	XFLOAT *g_pdf_orientation,
 {
 	long block_num = ceil((double)job_num / (double)SUMW_BLOCK_SIZE);
 
-#ifdef CUDA
-	cuda_kernel_exponentiate_weights_fine<<<block_num,SUMW_BLOCK_SIZE,0,stream>>>(
+#ifdef _CUDA_ENABLED
+cuda_kernel_exponentiate_weights_fine<<<block_num,SUMW_BLOCK_SIZE,0,stream>>>(
 		g_pdf_orientation,
 		g_pdf_orientation_zeros,
 		g_pdf_offset,

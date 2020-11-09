@@ -13,7 +13,7 @@
 
 namespace gravis
 {
-  namespace access
+  namespace image_access
   {
 
     //! Functor for access behind the image borders

@@ -203,6 +203,9 @@ public:
 
     /** Write the usage for all options to outstream */
     void writeUsage(std::ostream &outstream);
+
+	/** Add an error message to be displayed after parsing */
+	void reportError(const std::string& message);
 };
 
 /*

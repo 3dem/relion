@@ -44,6 +44,7 @@ class TomogramSet
 
 		Tomogram loadTomogram(int index, bool loadImageData) const;
 		int getTomogramIndex(std::string tomogramName) const;
+		std::string getTomogramName(int index) const;
 		int getTomogramIndexSafely(std::string tomogramName) const;
 };
 

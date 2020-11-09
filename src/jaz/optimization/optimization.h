@@ -44,6 +44,8 @@ class Optimization
 		
 		virtual void report(int iteration, double cost, const std::vector<double>& x) const 
 		{
+			std::cout.precision(16);
+
 			if (iteration == 0) 
 			{
 				return;
@@ -66,10 +68,41 @@ class Optimization
 class DifferentiableOptimization : public Optimization
 {
 	public:
-		
+
 		virtual void grad(const std::vector<double>& x, std::vector<double>& gradDest, void* tempStorage) const = 0;
-		
+
 		void testGradient(const std::vector<double>& x, double eps);
+};
+
+class FastDifferentiableOptimization
+{
+	public:
+
+		virtual double gradAndValue(const std::vector<double>& x, std::vector<double>& gradDest) const = 0;
+
+		void testGradient(const std::vector<double>& x, double eps);
+
+		virtual void report(int iteration, double cost, const std::vector<double>& x) const
+		{
+			std::cout.precision(16);
+
+			if (iteration == 0)
+			{
+				return;
+			}
+			else if (iteration == 1)
+			{
+				std::cout << "iteration    cost\n";
+				std::cout << ' ' << std::setw(6) << iteration << "       " << cost;
+			}
+			else
+			{
+				std::cout << "\r                                                                         ";
+				std::cout << '\r' << ' ' << std::setw(6) << iteration << "       " << cost;
+			}
+
+			std::cout.flush();
+		}
 };
 
 class RosenbrockBanana : public DifferentiableOptimization

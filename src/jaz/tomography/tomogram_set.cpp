@@ -4,6 +4,7 @@
 #include <src/error.h>
 #include <src/jaz/optics/damage.h>
 #include <src/jaz/util/zio.h>
+#include <src/jaz/util/log.h>
 
 using namespace gravis;
 
@@ -16,6 +17,8 @@ TomogramSet::TomogramSet()
 TomogramSet::TomogramSet(std::string filename)
 {
 	std::ifstream ifs(filename);
+
+	bool namesAreOld = false;
 
 	if (!ifs)
 	{
@@ -33,12 +36,30 @@ TomogramSet::TomogramSet(std::string filename)
 		
 		for (int t = 0; t < tc; t++)
 		{
+			const std::string expectedOldName = "tomo_" + ZIO::itoa(t);
+			const std::string expectedNewName = globalTable.getString(EMDL_TOMO_NAME, t);
+			const std::string name = allTables[t+1].getName();
+
+			if (name == expectedOldName)
+			{
+				namesAreOld = true;
+			}
+			else if (name != expectedNewName)
+			{
+				REPORT_ERROR_STR("TomogramSet::TomogramSet: file is corrupted " << filename);
+			}
+
 			tomogramTables[t] = allTables[t+1];
-			tomogramTables[t].setName("tomo_" + ZIO::itoa(t));
+			tomogramTables[t].setName(expectedNewName);
 		}	
 	}
 	
 	globalTable.setName("global");
+
+	if (namesAreOld)
+	{
+		Log::warn("Tomogram set " + filename + " is out of date. You are recommended to run relion_exp_update_tomogram_set on it.");
+	}
 }
 
 int TomogramSet::addTomogram(
@@ -81,7 +102,7 @@ int TomogramSet::addTomogram(
 	
 	tomogramTables.push_back(MetaDataTable());
 	MetaDataTable& m = tomogramTables[index];
-	m.setName("tomo_" + ZIO::itoa(index));
+	m.setName(tomoName);
 		
 	for (int f = 0; f < fc; f++)
 	{
@@ -157,6 +178,7 @@ void TomogramSet::setCtf(int tomogramIndex, int frame, const CTF& ctf)
 	m.setValue(EMDL_CTF_DEFOCUSU, ctf.DeltafU, frame);
 	m.setValue(EMDL_CTF_DEFOCUSV, ctf.DeltafV, frame);
 	m.setValue(EMDL_CTF_DEFOCUS_ANGLE, ctf.azimuthal_angle, frame);
+	m.setValue(EMDL_CTF_SCALEFACTOR, ctf.scale, frame);
 }
 
 void TomogramSet::setDose(int tomogramIndex, int frame, double dose)
@@ -255,6 +277,11 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 		ctf.Q0 = Q0;
 		ctf.Cs = out.optics.Cs;
 		ctf.kV = out.optics.voltage;
+
+		if (m.labelExists(EMDL_CTF_SCALEFACTOR))
+		{
+			ctf.scale = m.getDouble(EMDL_CTF_SCALEFACTOR, f);
+		}
 		
 		ctf.initialise();
 		
@@ -301,6 +328,14 @@ int TomogramSet::getTomogramIndex(std::string tomogramName) const
 	}
 
 	return -1;
+}
+
+std::string TomogramSet::getTomogramName(int index) const
+{
+	std::string name;
+	globalTable.getValueSafely(EMDL_TOMO_NAME, name, index);
+
+	return name;
 }
 
 int TomogramSet::getTomogramIndexSafely(std::string tomogramName) const

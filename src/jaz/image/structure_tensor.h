@@ -181,7 +181,7 @@ BufferedImage<Tensor2x2<T>> StructureTensor :: computeEdgeTensor2D(const RawImag
 		gravis::t2Vector<T> g = Gradient::sobelGrid2D(src, x, y, f);
 		
 		T wgh;		
-		if (taper > 0.0) wgh = Tapering::getTaperWeight2D(x,y,w,h,taper);
+		if (taper > 0.0) wgh = Tapering::getTaperWeight2D(x,y,w,h,taper,0.0);
 		else wgh = 1.0;
 			
         out(x,y,f) = Tensor2x2<T>::autoDyadicProduct(wgh * g);

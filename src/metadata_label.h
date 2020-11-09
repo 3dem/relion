@@ -80,6 +80,64 @@ enum EMDLabel
 	EMDL_BODY_SIGMA_PSI,
 	EMDL_BODY_STAR_FILE,
 
+	EMDL_CLASS_FEAT_CLASS_INDEX,
+	EMDL_CLASS_FEAT_PARTICLE_NR,
+	EMDL_CLASS_FEAT_IS_SELECTED, ///whether a class is selected
+	EMDL_CLASS_FEAT_CIRCLEMASKED_MEAN, ///moments of the circular area within mask diameter specified in 2D classification
+	EMDL_CLASS_FEAT_CIRCLEMASKED_STDDEV,
+	EMDL_CLASS_FEAT_CIRCLEMASKED_SKEW,
+	EMDL_CLASS_FEAT_CIRCLEMASKED_KURT,
+	EMDL_CLASS_FEAT_RING_MEAN, ///moments of the ring area specified by inner & outer radius / inner & outer radius ratio
+	EMDL_CLASS_FEAT_RING_STDDEV,
+	EMDL_CLASS_FEAT_RING_SKEW,
+	EMDL_CLASS_FEAT_RING_KURT,
+	EMDL_CLASS_FEAT_INNERCIRCLE_MEAN, /// moments of the smaller circular area specified by inner / outer radius
+	EMDL_CLASS_FEAT_INNERCIRCLE_STDDEV,
+	EMDL_CLASS_FEAT_INNERCIRCLE_SKEW,
+	EMDL_CLASS_FEAT_INNERCIRCLE_KURT,
+	EMDL_CLASS_FEAT_CLASS_SCORE,
+	EMDL_CLASS_FEAT_JOB_SCORE,
+	EMDL_CLASS_FEAT_FFT_MEAN, /// moments in Fourier space
+	EMDL_CLASS_FEAT_FFT_STDDEV,
+	EMDL_CLASS_FEAT_FFT_SKEW,
+	EMDL_CLASS_FEAT_FFT_KURT,
+	EMDL_CLASS_FEAT_PROTEIN_AREA,
+	EMDL_CLASS_FEAT_PROTEIN_SUM,
+	EMDL_CLASS_FEAT_PROTEIN_MEAN,        /// stats in the protein area
+	EMDL_CLASS_FEAT_PROTEIN_STDDEV,
+	EMDL_CLASS_FEAT_PROTEIN_SKEW,
+	EMDL_CLASS_FEAT_PROTEIN_KURT,
+	EMDL_CLASS_FEAT_SOLVENT_AREA,
+	EMDL_CLASS_FEAT_SOLVENT_SUM,
+	EMDL_CLASS_FEAT_SOLVENT_MEAN,
+	EMDL_CLASS_FEAT_SOLVENT_STDDEV,
+	EMDL_CLASS_FEAT_SOLVENT_SKEW,
+	EMDL_CLASS_FEAT_SOLVENT_KURT,
+	EMDL_CLASS_FEAT_RELATIVE_SIGNAL_INT,
+	EMDL_CLASS_FEAT_SCATTERED_SIGNAL,
+	EMDL_CLASS_FEAT_EDGE_SIGNAL,
+	EMDL_CLASS_FEAT_CAR, // circumference to area ratio (relative to a perfect circle)
+	EMDL_CLASS_FEAT_WEIGHTED_RESOLUTION,
+	EMDL_CLASS_FEAT_RELATIVE_RESOLUTION,
+	EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MAX,
+	EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MIN,
+	EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MEAN,
+	EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_STDDEV,
+	EMDL_CLASS_FEAT_LBP,
+	EMDL_CLASS_FEAT_PROTEIN_LBP,
+	EMDL_CLASS_FEAT_SOLVENT_LBP,
+	EMDL_CLASS_FEAT_TOTAL_ENTROPY,
+	EMDL_CLASS_FEAT_PROTEIN_ENTROPY,
+	EMDL_CLASS_FEAT_SOLVENT_ENTROPY,
+	EMDL_CLASS_FEAT_PROTEIN_HARALICK,
+	EMDL_CLASS_FEAT_SOLVENT_HARALICK,
+	EMDL_CLASS_FEAT_ZERNIKE_MOMENTS,
+	EMDL_CLASS_FEAT_GRANULO,
+        EMDL_CLASS_FEAT_NORM_VECTOR,
+        EMDL_CLASS_FEAT_SUBIMAGE_STARFILE,
+        EMDL_CLASS_FEAT_SUBIMAGE_STACK,
+	EMDL_CLASS_PREDICTED_SCORE,
+
 	EMDL_CTF_ASTIGMATISM,
 	EMDL_CTF_BFACTOR, ///< B-factor
 	EMDL_CTF_MAXRES, ///< Maximum resolution with Thon rings
@@ -151,7 +209,7 @@ enum EMDLabel
 
 	EMDL_JOB_IS_CONTINUE,
 	EMDL_JOB_TYPE,
-	EMDL_JOB_TYPE_NAME,
+	EMDL_JOB_TYPE_LABEL,
 
 	EMDL_JOBOPTION_TYPE,
 	EMDL_JOBOPTION_VARIABLE,
@@ -179,6 +237,7 @@ enum EMDLabel
 	EMDL_MICROGRAPH_ACCUM_MOTION_TOTAL,
 	EMDL_MICROGRAPH_ACCUM_MOTION_EARLY,
 	EMDL_MICROGRAPH_ACCUM_MOTION_LATE,
+	EMDL_MICROGRAPH_COORDINATES,
 	EMDL_MICROGRAPH_ID,
 	EMDL_MICROGRAPH_NAME,
 	EMDL_MICROGRAPH_GAIN_NAME,
@@ -258,7 +317,8 @@ enum EMDLabel
 	EMDL_MLMODEL_SIGMA_TILT,
 	EMDL_MLMODEL_SIGMA_PSI,
 	EMDL_MLMODEL_REF_IMAGE,
-	EMDL_MLMODEL_SGD_GRADIENT_IMAGE,
+	EMDL_MLMODEL_GRADIENT_MOMENT1_IMAGE,
+	EMDL_MLMODEL_GRADIENT_MOMENT2_IMAGE,
 	EMDL_MLMODEL_SIGMA2_NOISE,
 	EMDL_MLMODEL_SIGMA2_REF,
 	EMDL_MLMODEL_SSNR_REF,
@@ -289,7 +349,8 @@ enum EMDLabel
 	EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT,
 	EMDL_OPTIMISER_DO_REALIGN_MOVIES,
 	EMDL_OPTIMISER_DO_MAP,
-	EMDL_OPTIMISER_DO_SGD,
+	EMDL_OPTIMISER_DO_GRAD,
+	EMDL_OPTIMISER_GRAD_EM_ITERS,
 	EMDL_OPTIMISER_DO_STOCHASTIC_EM,
 	EMDL_OPTIMISER_EXTERNAL_RECONS_DATA_REAL,
 	EMDL_OPTIMISER_EXTERNAL_RECONS_DATA_IMAG,
@@ -297,9 +358,8 @@ enum EMDLabel
 	EMDL_OPTIMISER_EXTERNAL_RECONS_RESULT,
 	EMDL_OPTIMISER_EXTERNAL_RECONS_NEWSTAR,
 	EMDL_OPTIMISER_FAST_SUBSETS,
-	EMDL_OPTIMISER_SGD_INI_ITER,
-	EMDL_OPTIMISER_SGD_FIN_ITER,
-	EMDL_OPTIMISER_SGD_INBETWEEN_ITER,
+	EMDL_OPTIMISER_SGD_INI_FRAC,
+	EMDL_OPTIMISER_SGD_FIN_FRAC,
 	EMDL_OPTIMISER_SGD_INI_RESOL,
 	EMDL_OPTIMISER_SGD_FIN_RESOL,
 	EMDL_OPTIMISER_SGD_INI_SUBSET_SIZE,
@@ -308,10 +368,13 @@ enum EMDLabel
 	EMDL_OPTIMISER_SGD_SIGMA2FUDGE_INI,
 	EMDL_OPTIMISER_SGD_SIGMA2FUDGE_HALFLIFE,
 	EMDL_OPTIMISER_SGD_SKIP_ANNNEAL,
+	EMDL_OPTIMISER_SGD_CLASS_INACTIVITY_THRESHOLD,
 	EMDL_OPTIMISER_SGD_SUBSET_SIZE,
 	EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET,
 	EMDL_OPTIMISER_SGD_MAX_SUBSETS,
 	EMDL_OPTIMISER_SGD_STEPSIZE,
+	EMDL_OPTIMISER_SGD_STEPSIZE_SCHEME,
+	EMDL_OPTIMISER_DO_CENTER_CLASSES,
 	EMDL_OPTIMISER_DO_SOLVENT_FLATTEN,
 	EMDL_OPTIMISER_DO_SOLVENT_FSC,
 	EMDL_OPTIMISER_DO_SKIP_ALIGN,
@@ -418,10 +481,13 @@ enum EMDLabel
 	EMDL_PIPELINE_JOB_COUNTER,
 	EMDL_PIPELINE_NODE_NAME,
 	EMDL_PIPELINE_NODE_TYPE,
+	EMDL_PIPELINE_NODE_TYPE_LABEL,
 	EMDL_PIPELINE_PROCESS_ALIAS,
 	EMDL_PIPELINE_PROCESS_NAME,
 	EMDL_PIPELINE_PROCESS_TYPE,
+	EMDL_PIPELINE_PROCESS_TYPE_LABEL,
 	EMDL_PIPELINE_PROCESS_STATUS,
+	EMDL_PIPELINE_PROCESS_STATUS_LABEL,
 	EMDL_PIPELINE_EDGE_FROM,
 	EMDL_PIPELINE_EDGE_TO,
 	EMDL_PIPELINE_EDGE_PROCESS,
@@ -455,6 +521,9 @@ enum EMDLabel
 	EMDL_POSTPROCESS_RANDOMISE_FROM,
 	EMDL_POSTPROCESS_UNFIL_HALFMAP1,
 	EMDL_POSTPROCESS_UNFIL_HALFMAP2,
+	EMDL_POSTPROCESSED_MAP,
+	EMDL_POSTPROCESSED_MAP_MASKED,
+
 
 	EMDL_SAMPLING_IS_3D,
 	EMDL_SAMPLING_IS_3D_TRANS,
@@ -535,14 +604,40 @@ enum EMDLabel
 	EMDL_TOMO_SUBTOMOGRAM_TILT,
 	EMDL_TOMO_SUBTOMOGRAM_PSI,
 	EMDL_TOMO_SUBTOMOGRAM_BINNING,
-	EMDL_TOMO_PARTICLE_INDEX,
+	EMDL_TOMO_PARTICLE_NAME,
 	EMDL_TOMO_MANIFOLD_INDEX,
 	EMDL_TOMO_MANIFOLD_TYPE,
 	EMDL_TOMO_MANIFOLD_PARAMETERS,
 	EMDL_TOMO_DEFOCUS_SLOPE,
 
-	EMDL_TOMO_PARTICLE_ID,       // (deprecated, use EMDL_TOMO_PARTICLE_INDEX instead)
-	EMDL_TOMO_PICK_PARTICLE_ID,  // (deprecated, use EMDL_TOMO_MANIFOLD_INDEX instead)
+	EMDL_TOMO_PARTICLES_FILE_NAME,
+	EMDL_TOMO_TOMOGRAMS_FILE_NAME,
+	EMDL_TOMO_MANIFOLDS_FILE_NAME,
+	EMDL_TOMO_TRAJECTORIES_FILE_NAME,
+	EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME,
+	EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME,
+	EMDL_TOMO_REFERENCE_MASK_FILE_NAME,
+	EMDL_TOMO_REFERENCE_FSC_FILE_NAME,
+
+	EMDL_TOMO_IMPORT_OFFSET_X,
+	EMDL_TOMO_IMPORT_OFFSET_Y,
+	EMDL_TOMO_IMPORT_OFFSET_Z,
+	EMDL_TOMO_IMPORT_IMOD_DIR,
+	EMDL_TOMO_IMPORT_CTFFIND_FILE,
+	EMDL_TOMO_IMPORT_CTFPLOTTER_FILE,
+	EMDL_TOMO_IMPORT_ORDER_LIST,
+	EMDL_TOMO_IMPORT_FRACT_DOSE,
+	EMDL_TOMO_IMPORT_CULLED_FILE,
+
+	EMDL_TOMO_RELATIVE_ICE_THICKNESS,
+	EMDL_TOMO_RELATIVE_LUMINANCE,
+	EMDL_TOMO_ICE_NORMAL_X,
+	EMDL_TOMO_ICE_NORMAL_Y,
+	EMDL_TOMO_ICE_NORMAL_Z,
+
+	EMDL_TOMO_PARTICLE_ID,       // (deprecated, use EMDL_TOMO_PARTICLE_NAME instead)
+	EMDL_TOMO_PICK_PARTICLE_ID,  // (deprecated, use EMDL_TOMO_PARTICLE_NAME instead)
+	EMDL_TOMO_PARTICLE_INDEX,    // (deprecated, use EMDL_TOMO_PARTICLE_NAME instead)
 
 	EMDL_UNKNOWN_LABEL,
 
@@ -647,6 +742,64 @@ private:
 		EMDL::addLabel(EMDL_BODY_SIGMA_PSI, EMDL_DOUBLE, "rlnBodySigmaPsi", "Width of prior on psi angles of a body in multibody refinement (in degrees)");
 		EMDL::addLabel(EMDL_BODY_STAR_FILE, EMDL_STRING, "rlnBodyStarFile", "Name of STAR file with body masks and metadata");
 
+        EMDL::addLabel(EMDL_CLASS_FEAT_CLASS_INDEX, EMDL_INT, "rlnClassIndex", "Class number of each class from the model STAR file of 2D classification");
+        EMDL::addLabel(EMDL_CLASS_FEAT_PARTICLE_NR, EMDL_DOUBLE, "rlnParticleNr", "Number of particles in this class");
+        EMDL::addLabel(EMDL_CLASS_FEAT_IS_SELECTED, EMDL_INT, "rlnIsSelected", "Whether this class is selected");
+        EMDL::addLabel(EMDL_CLASS_FEAT_CIRCLEMASKED_MEAN,EMDL_DOUBLE, "rlnCircleMaskedMean", "Average value for the pixels in the circularly masked area of this class average image");
+        EMDL::addLabel(EMDL_CLASS_FEAT_CIRCLEMASKED_STDDEV,EMDL_DOUBLE, "rlnCircleMaskedStddev", "Standard deviation for the pixel values in the circularly masked area of this class average image");
+        EMDL::addLabel(EMDL_CLASS_FEAT_CIRCLEMASKED_SKEW,EMDL_DOUBLE, "rlnCircleMaskedSkew", "Skewness (3rd moment) for the pixel values in the circularly masked area of this class average image");
+        EMDL::addLabel(EMDL_CLASS_FEAT_CIRCLEMASKED_KURT,EMDL_DOUBLE, "rlnCircleMaskedKurt", "Kurtosis (4th moment) for the pixel values in the circularly masked area of this class average image");
+        EMDL::addLabel(EMDL_CLASS_FEAT_RING_MEAN,EMDL_DOUBLE, "rlnRingMean", "Average value for the pixels in the area of this class average image specified by inner and outer radius");
+        EMDL::addLabel(EMDL_CLASS_FEAT_RING_STDDEV,EMDL_DOUBLE, "rlnRingStddev", "Standard deviation for the pixel values in the area of this class average image specified by inner and outer radius");
+        EMDL::addLabel(EMDL_CLASS_FEAT_RING_SKEW,EMDL_DOUBLE, "rlnRingSkew", "Skewness (3rd moment) for the pixel values in the area of this class average image specified by inner and outer radius");
+        EMDL::addLabel(EMDL_CLASS_FEAT_RING_KURT,EMDL_DOUBLE, "rlnRingKurt", "Kurtosis (4th moment) for the pixel values in the area of this class average image specified by inner and outer radius");
+        EMDL::addLabel(EMDL_CLASS_FEAT_INNERCIRCLE_MEAN, EMDL_DOUBLE, "rlnInnerCircleMean", "Average pixel value of the smaller circular area specified by inner / outer radius");
+        EMDL::addLabel(EMDL_CLASS_FEAT_INNERCIRCLE_STDDEV, EMDL_DOUBLE, "rlnInnerCircleStddev", "Pixel value standard deviation of the smaller circular area specified by inner / outer radius");
+        EMDL::addLabel(EMDL_CLASS_FEAT_INNERCIRCLE_SKEW, EMDL_DOUBLE, "rlnInnerCircleSkew", "Pixel value skewness (3rd moment) of the smaller circular area specified by inner / outer radius");
+        EMDL::addLabel(EMDL_CLASS_FEAT_INNERCIRCLE_KURT, EMDL_DOUBLE, "rlnInnerCircleKurt", "Pixel value kurtosis (4th moment) of the smaller circular area specified by inner / outer radius");
+        EMDL::addLabel(EMDL_CLASS_FEAT_CLASS_SCORE, EMDL_DOUBLE, "rlnClassScore", "Class score calculated based on estimated resolution and selection label");
+        EMDL::addLabel(EMDL_CLASS_FEAT_JOB_SCORE, EMDL_DOUBLE, "rlnJobScore", "Overall score of this 2D classification job, read from the job score file.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_FFT_MEAN, EMDL_DOUBLE, "rlnFftMean", "Mean of Fourier components (amplitude only) up to resolution limit.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_FFT_STDDEV, EMDL_DOUBLE, "rlnFftStddev", "Standard deviation of Fourier components (amplitude only) up to resolution limit.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_FFT_SKEW, EMDL_DOUBLE, "rlnFftSkew", "Skewness of Fourier components (amplitude only) up to resolution limit.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_FFT_KURT, EMDL_DOUBLE, "rlnFftKurt", "Kurtosis of Fourier components (amplitude only) up to resolution limit.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_PROTEIN_AREA, EMDL_INT, "rlnProteinArea", "Whether protein area is non-zero.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_PROTEIN_SUM, EMDL_DOUBLE, "rlnProteinSum", "Sum of protein region.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_PROTEIN_MEAN, EMDL_DOUBLE, "rlnProteinMean", "Mean of protein region.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_PROTEIN_STDDEV, EMDL_DOUBLE, "rlnProteinStddev", "Standard deviation of protein region.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_PROTEIN_SKEW, EMDL_DOUBLE, "rlnProteinSkew", "Skewness of protein region.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_PROTEIN_KURT, EMDL_DOUBLE, "rlnProteinKurt", "Kurtosis of protein region.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_SOLVENT_AREA, EMDL_INT, "rlnSolventArea", "Whether solvent area is non-zero.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_SOLVENT_SUM, EMDL_DOUBLE, "rlnSolventSum", "Sum of solvent region.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_SOLVENT_MEAN, EMDL_DOUBLE, "rlnSolventMean", "Mean of solvent region.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_SOLVENT_STDDEV, EMDL_DOUBLE, "rlnSolventStddev", "Standard deviation of solvent region.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_SOLVENT_SKEW, EMDL_DOUBLE, "rlnSolventSkew", "Skewness of solvent region.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_SOLVENT_KURT, EMDL_DOUBLE, "rlnSolventKurt", "Kurtosis of solvent region.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_RELATIVE_SIGNAL_INT,EMDL_DOUBLE, "rlnRelativeSignalIntensity", "Sum of protein area's individual pixel values subtracting solvent area mean.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_SCATTERED_SIGNAL, EMDL_DOUBLE, "rlnScatteredSignal", "Ratio of excluded white pixels when making the protein mask.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_EDGE_SIGNAL, EMDL_DOUBLE, "rlnEdgeSignal", "Ratio of white pixels on the edge in the protein mask.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_CAR, EMDL_DOUBLE, "rlnProteinCAR", "Circumference to area ratio of protein area (relative to a perfect circle).");
+        EMDL::addLabel(EMDL_CLASS_FEAT_WEIGHTED_RESOLUTION, EMDL_DOUBLE, "rlnWeightedResolution", "Estimated resolution weighted by the number of particles in the class.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_RELATIVE_RESOLUTION, EMDL_DOUBLE, "rlnRelativeResolution", "Estimated resolution weighted by the image dimension.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MAX, EMDL_DOUBLE, "rlnLowpassFilteredImageMax", "Maximum pixel value of the lowpass filtered image.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MIN, EMDL_DOUBLE, "rlnLowpassFilteredImageMin", "Minimum pixel value of the lowpass filtered image.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MEAN, EMDL_DOUBLE, "rlnLowpassFilteredImageMean", "Mean pixel value of the lowpass filtered image.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_STDDEV, EMDL_DOUBLE, "rlnLowpassFilteredImageStddev", "Standard deviation of pixel values of the lowpass filtered image.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_LBP, EMDL_DOUBLE_VECTOR, "rlnLBP", "Histogram of the local binary pattern of the image.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_PROTEIN_LBP, EMDL_DOUBLE_VECTOR, "rlnProteinLBP", "Histogram of the local binary pattern of the protein area.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_SOLVENT_LBP, EMDL_DOUBLE_VECTOR, "rlnSolventLBP", "Histogram of the local binary pattern of the solvent area.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_TOTAL_ENTROPY, EMDL_DOUBLE, "rlnTotalEntropy", "Entropy of the entire image.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_PROTEIN_ENTROPY, EMDL_DOUBLE, "rlnProteinEntropy", "Entropy of the protein area.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_SOLVENT_ENTROPY, EMDL_DOUBLE, "rlnSolventEntropy", "Entropy of the solvent area.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_PROTEIN_HARALICK, EMDL_DOUBLE_VECTOR, "rlnProteinHaralick", "Haralick features of the protein area.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_SOLVENT_HARALICK, EMDL_DOUBLE_VECTOR, "rlnSolventHaralick", "Haralick features of the solvent area.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_ZERNIKE_MOMENTS, EMDL_DOUBLE_VECTOR, "rlnZernikeMoments", "Zernike moments of the image.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_GRANULO, EMDL_DOUBLE_VECTOR, "rlnGranulo", "Granulo features of the image.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_NORM_VECTOR, EMDL_DOUBLE_VECTOR, "rlnNormalizedFeatureVector", "Vector with normalized feature vector for neural network execution.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_SUBIMAGE_STARFILE, EMDL_STRING, "rlnSubImageStarFile", "Name of a STAR file pointing to all subimages of this class average");
+        EMDL::addLabel(EMDL_CLASS_FEAT_SUBIMAGE_STACK, EMDL_STRING, "rlnSubImageStack", "Name of an MRC stack containing all subimages of this class average");
+        EMDL::addLabel(EMDL_CLASS_PREDICTED_SCORE, EMDL_DOUBLE, "rlnPredictedClassScore", "2D class merit scores predicted by RELION model.");
+
 		EMDL::addLabel(EMDL_CTF_ASTIGMATISM, EMDL_DOUBLE, "rlnCtfAstigmatism", "Absolute value of the difference between defocus in U- and V-direction (in A)");
 		EMDL::addLabel(EMDL_CTF_BFACTOR, EMDL_DOUBLE, "rlnCtfBfactor", "B-factor (in A^2) that describes CTF power spectrum fall-off");
 		EMDL::addLabel(EMDL_CTF_MAXRES, EMDL_DOUBLE, "rlnCtfMaxResolution", "Estimated maximum resolution (in A) of significant CTF Thon rings");
@@ -719,7 +872,7 @@ private:
 
 		EMDL::addLabel(EMDL_JOB_IS_CONTINUE, EMDL_BOOL, "rlnJobIsContinue", "Is tthis a continuation job?");
 		EMDL::addLabel(EMDL_JOB_TYPE, EMDL_INT, "rlnJobType", "Which type of job is this?");
-		EMDL::addLabel(EMDL_JOB_TYPE_NAME, EMDL_STRING, "rlnJobTypeName", "The name for this type of job (also name of main directory for output jobs)");
+		EMDL::addLabel(EMDL_JOB_TYPE_LABEL, EMDL_STRING, "rlnJobTypeLabel", "The name for this type of job (also name of main directory for output jobs)");
 
 		EMDL::addLabel(EMDL_JOBOPTION_TYPE, EMDL_INT, "rlnJoboptionType", "Which type of joboption is this?");
 		EMDL::addLabel(EMDL_JOBOPTION_VARIABLE, EMDL_STRING, "rlnJobOptionVariable", "Name of the joboption variable");
@@ -747,6 +900,7 @@ private:
 		EMDL::addLabel(EMDL_MICROGRAPH_ACCUM_MOTION_TOTAL, EMDL_DOUBLE, "rlnAccumMotionTotal","Accumulated global motion during the entire movie (in A)");
 		EMDL::addLabel(EMDL_MICROGRAPH_ACCUM_MOTION_EARLY, EMDL_DOUBLE, "rlnAccumMotionEarly","Accumulated global motion during the first frames of the movie (in A)");
 		EMDL::addLabel(EMDL_MICROGRAPH_ACCUM_MOTION_LATE, EMDL_DOUBLE, "rlnAccumMotionLate","Accumulated global motion during the last frames of the movie (in A)");
+		EMDL::addLabel(EMDL_MICROGRAPH_COORDINATES, EMDL_STRING, "rlnMicrographCoordinates", "Filename of a file (in .star, .box or .txt format) with X,Y (Z) coordinates of picked particles in micrographs/tomograms");
 		EMDL::addLabel(EMDL_MICROGRAPH_ID, EMDL_INT, "rlnMicrographId", "ID (i.e. a unique number) of a micrograph");
 		EMDL::addLabel(EMDL_MICROGRAPH_NAME, EMDL_STRING, "rlnMicrographName", "Name of a micrograph");
 		EMDL::addLabel(EMDL_MICROGRAPH_GAIN_NAME, EMDL_STRING, "rlnMicrographGainName", "Name of a gain reference");
@@ -819,7 +973,8 @@ private:
 		EMDL::addLabel(EMDL_MLMODEL_POWER_REF, EMDL_DOUBLE, "rlnReferenceSpectralPower", "Spherical average of the power of the reference");
 		EMDL::addLabel(EMDL_MLMODEL_PRIOR_MODE, EMDL_INT, "rlnOrientationalPriorMode", "Mode for prior distributions on the orientations (0=no prior; 1=(rot,tilt,psi); 2=(rot,tilt); 3=rot; 4=tilt; 5=psi) ");
 		EMDL::addLabel(EMDL_MLMODEL_REF_IMAGE, EMDL_STRING, "rlnReferenceImage", "Name of a reference image");
-		EMDL::addLabel(EMDL_MLMODEL_SGD_GRADIENT_IMAGE, EMDL_STRING, "rlnSGDGradientImage", "Name of image containing the SGD gradient");
+		EMDL::addLabel(EMDL_MLMODEL_GRADIENT_MOMENT1_IMAGE, EMDL_STRING, "rlnGradMoment1", "Name of image containing the first moment of the gradient");
+		EMDL::addLabel(EMDL_MLMODEL_GRADIENT_MOMENT2_IMAGE, EMDL_STRING, "rlnGradMoment2", "Name of image containing the second moment of the gradient");
 		EMDL::addLabel(EMDL_MLMODEL_SIGMA_OFFSET, EMDL_DOUBLE, "rlnSigmaOffsets","Standard deviation in the origin offsets (in pixels)");
 		EMDL::addLabel(EMDL_MLMODEL_SIGMA_OFFSET_ANGSTROM, EMDL_DOUBLE, "rlnSigmaOffsetsAngst","Standard deviation in the origin offsets (in Angstroms)");
 		EMDL::addLabel(EMDL_MLMODEL_SIGMA2_NOISE, EMDL_DOUBLE, "rlnSigma2Noise", "Spherical average of the standard deviation in the noise (sigma)");
@@ -853,7 +1008,8 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT, EMDL_BOOL, "rlnDoExternalReconstruct", "Flag to indicate that the reconstruction will be performed outside relion_refine, e.g. for learned priors");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_REALIGN_MOVIES, EMDL_BOOL, "rlnDoRealignMovies", "Flag to indicate that individual frames of movies are being re-aligned");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_MAP, EMDL_BOOL, "rlnDoMapEstimation", "Flag to indicate that MAP estimation should be performed (otherwise ML estimation)");
-		EMDL::addLabel(EMDL_OPTIMISER_DO_SGD, EMDL_BOOL, "rlnDoStochasticGradientDescent", "Flag to indicate that SGD-optimisation should be performed (otherwise expectation maximisation)");
+		EMDL::addLabel(EMDL_OPTIMISER_DO_GRAD, EMDL_BOOL, "rlnDoStochasticGradientDescent", "Flag to indicate that SGD-optimisation should be performed (otherwise expectation maximisation)");
+		EMDL::addLabel(EMDL_OPTIMISER_GRAD_EM_ITERS, EMDL_INT, "rlnGradEmIters", "Finish gradient optimization with this many iterations of Expectation-Maximization.");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_STOCHASTIC_EM,EMDL_BOOL, "rlnDoStochasticEM", "Flag to indicate that stochastic EM-optimisation should be performed (an alternative to SGD)");
 		EMDL::addLabel(EMDL_OPTIMISER_EXTERNAL_RECONS_DATA_REAL, EMDL_STRING, "rlnExtReconsDataReal", "Name of the map with the real components of the input data array for the external reconstruction program");
 		EMDL::addLabel(EMDL_OPTIMISER_EXTERNAL_RECONS_DATA_IMAG, EMDL_STRING, "rlnExtReconsDataImag", "Name of the map with the imaginary components of the input data array for the external reconstruction program");
@@ -861,9 +1017,8 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_EXTERNAL_RECONS_RESULT, EMDL_STRING, "rlnExtReconsResult", "Name of the output reconstruction from the external reconstruction program");
 		EMDL::addLabel(EMDL_OPTIMISER_EXTERNAL_RECONS_NEWSTAR, EMDL_STRING, "rlnExtReconsResultStarfile", "Name of the output STAR file with updated FSC or tau curves");
 		EMDL::addLabel(EMDL_OPTIMISER_FAST_SUBSETS, EMDL_BOOL, "rlnDoFastSubsetOptimisation", "Use subsets of the data in the earlier iterations to speed up convergence");
-		EMDL::addLabel(EMDL_OPTIMISER_SGD_INI_ITER, EMDL_INT, "rlnSgdInitialIterations", "Number of initial SGD iterations (at rlnSgdInitialResolution and with rlnSgdInitialSubsetSize)");
-		EMDL::addLabel(EMDL_OPTIMISER_SGD_FIN_ITER, EMDL_INT, "rlnSgdFinalIterations", "Number of final SGD iterations (at rlnSgdFinalResolution and with rlnSgdFinalSubsetSize)");
-		EMDL::addLabel(EMDL_OPTIMISER_SGD_INBETWEEN_ITER, EMDL_INT, "rlnSgdInBetweenIterations", "Number of SGD iteration in between the initial ones to the final ones (with linear interpolation of resolution and subset size)");
+		EMDL::addLabel(EMDL_OPTIMISER_SGD_INI_FRAC, EMDL_DOUBLE, "rlnSgdInitialIterationsFraction", "Fraction of initial gradient iterations (at rlnSgdInitialResolution and with rlnSgdInitialSubsetSize)");
+		EMDL::addLabel(EMDL_OPTIMISER_SGD_FIN_FRAC, EMDL_DOUBLE, "rlnSgdFinalIterationsFraction", "fraction of final gradient iterations (at rlnSgdFinalResolution and with rlnSgdFinalSubsetSize)");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_INI_RESOL, EMDL_DOUBLE, "rlnSgdInitialResolution", "Resolution (in A) to use during the initial SGD iterations");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_FIN_RESOL, EMDL_DOUBLE, "rlnSgdFinalResolution", "Resolution (in A) to use during the final SGD iterations");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_INI_SUBSET_SIZE, EMDL_INT, "rlnSgdInitialSubsetSize", "Number of particles in a mini-batch (subset) during the initial SGD iterations");
@@ -872,12 +1027,15 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_SIGMA2FUDGE_INI, EMDL_DOUBLE, "rlnSgdSigma2FudgeInitial", "The variance of the noise will initially be multiplied with this value (larger than 1)");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_SIGMA2FUDGE_HALFLIFE, EMDL_INT, "rlnSgdSigma2FudgeHalflife", "After processing this many particles the multiplicative factor for the noise variance will have halved");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_SKIP_ANNNEAL, EMDL_BOOL, "rlnSgdSkipAnneal", "Option to switch off annealing of multiple references in SGD");
+		EMDL::addLabel(EMDL_OPTIMISER_SGD_CLASS_INACTIVITY_THRESHOLD, EMDL_DOUBLE, "rlnSgdClassInactivityThreshold", "Threshold for dropping classes with low activity during gradient optimisation.");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_SUBSET_SIZE, EMDL_INT, "rlnSgdSubsetSize", "The number of particles in the random subsets for SGD");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, EMDL_INT, "rlnSgdWriteEverySubset", "Every this many iterations the model is written to disk in SGD");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_MAX_SUBSETS, EMDL_INT, "rlnSgdMaxSubsets", "Stop SGD after doing this many subsets (possibly spanning more than 1 iteration)");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_STEPSIZE, EMDL_DOUBLE, "rlnSgdStepsize", "Stepsize in SGD updates)");
+		EMDL::addLabel(EMDL_OPTIMISER_SGD_STEPSIZE_SCHEME, EMDL_STRING, "rlnSgdStepsizeScheme", "Stepsize scheme used in SGD updates)");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_AUTO_REFINE, EMDL_BOOL, "rlnDoAutoRefine", "Flag to indicate that 3D auto-refine procedure is being used");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_ONLY_FLIP_CTF_PHASES, EMDL_BOOL, "rlnDoOnlyFlipCtfPhases", "Flag to indicate that CTF-correction should only comprise phase-flipping");
+		EMDL::addLabel(EMDL_OPTIMISER_DO_CENTER_CLASSES, EMDL_BOOL, "rlnDoCenterClasses", "Flag to indicate that the class averages or reconstructions should be centered based on their center-of-mass during every iteration.");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_SOLVENT_FLATTEN, EMDL_BOOL, "rlnDoSolventFlattening", "Flag to indicate that the references should be masked to set their solvent areas to a constant density");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_SOLVENT_FSC, EMDL_BOOL, "rlnDoSolventFscCorrection", "Flag to indicate that the FSCs should be solvent-corrected during refinement");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_SKIP_ALIGN, EMDL_BOOL, "rlnDoSkipAlign", "Flag to indicate that orientational (i.e. rotational and translational) searches will be omitted from the refinement, only marginalisation over classes will take place");
@@ -987,10 +1145,13 @@ private:
 		EMDL::addLabel(EMDL_PIPELINE_JOB_COUNTER, EMDL_INT, "rlnPipeLineJobCounter", "Number of the last job in the pipeline");
 		EMDL::addLabel(EMDL_PIPELINE_NODE_NAME, EMDL_STRING , "rlnPipeLineNodeName", "Name of a Node in the pipeline");
 		EMDL::addLabel(EMDL_PIPELINE_NODE_TYPE, EMDL_INT, "rlnPipeLineNodeType", "Type of a Node in the pipeline");
+		EMDL::addLabel(EMDL_PIPELINE_NODE_TYPE_LABEL, EMDL_STRING, "rlnPipeLineNodeTypeLabel", "Name for the Node Type in the pipeline");
 		EMDL::addLabel(EMDL_PIPELINE_PROCESS_ALIAS, EMDL_STRING , "rlnPipeLineProcessAlias", "Alias of a Process in the pipeline");
 		EMDL::addLabel(EMDL_PIPELINE_PROCESS_NAME, EMDL_STRING , "rlnPipeLineProcessName", "Name of a Process in the pipeline");
 		EMDL::addLabel(EMDL_PIPELINE_PROCESS_TYPE, EMDL_INT, "rlnPipeLineProcessType", "Type of a Process in the pipeline");
-		EMDL::addLabel(EMDL_PIPELINE_PROCESS_STATUS, EMDL_INT, "rlnPipeLineProcessStatus", "Status of a Process in the pipeline (running, scheduled, finished or cancelled)");
+		EMDL::addLabel(EMDL_PIPELINE_PROCESS_TYPE_LABEL, EMDL_STRING, "rlnPipeLineProcessTypeLabel", "Name for the Process type in the pipeline");
+		EMDL::addLabel(EMDL_PIPELINE_PROCESS_STATUS, EMDL_INT, "rlnPipeLineProcessStatus", "Status of a Process in the pipeline (integer for running, scheduled, finished or cancelled)");
+		EMDL::addLabel(EMDL_PIPELINE_PROCESS_STATUS_LABEL, EMDL_STRING, "rlnPipeLineProcessStatusLabel", "Name for the status of a Process in the pipeline (running, scheduled, finished or cancelled)");
 		EMDL::addLabel(EMDL_PIPELINE_EDGE_FROM, EMDL_STRING , "rlnPipeLineEdgeFromNode", "Name of the origin of an edge");
 		EMDL::addLabel(EMDL_PIPELINE_EDGE_TO, EMDL_STRING ,"rlnPipeLineEdgeToNode", "Name of the to-Node in an edge");
 		EMDL::addLabel(EMDL_PIPELINE_EDGE_PROCESS, EMDL_STRING ,"rlnPipeLineEdgeProcess", "Name of the destination of an edge");
@@ -1024,6 +1185,8 @@ private:
 		EMDL::addLabel(EMDL_POSTPROCESS_RANDOMISE_FROM, EMDL_DOUBLE, "rlnRandomiseFrom", "Resolution (in A) from which the phases are randomised in the postprocessing step");
 		EMDL::addLabel(EMDL_POSTPROCESS_UNFIL_HALFMAP1, EMDL_STRING, "rlnUnfilteredMapHalf1", "Name of the unfiltered map from halfset 1");
 		EMDL::addLabel(EMDL_POSTPROCESS_UNFIL_HALFMAP2, EMDL_STRING, "rlnUnfilteredMapHalf2", "Name of the unfiltered map from halfset 2");
+		EMDL::addLabel(EMDL_POSTPROCESSED_MAP, EMDL_STRING, "rlnPostprocessedMap", "Name of the postprocssed map");
+		EMDL::addLabel(EMDL_POSTPROCESSED_MAP_MASKED, EMDL_STRING, "rlnPostprocessedMapMasked", "Name of the masked postprocssed map");
 
 		EMDL::addLabel(EMDL_SAMPLING_IS_3D, EMDL_BOOL, "rlnIs3DSampling", "Flag to indicate this concerns a 3D sampling ");
 		EMDL::addLabel(EMDL_SAMPLING_IS_3D_TRANS, EMDL_BOOL, "rlnIs3DTranslationalSampling", "Flag to indicate this concerns a x,y,z-translational sampling ");
@@ -1102,15 +1265,42 @@ private:
 		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_TILT, EMDL_DOUBLE, "rlnTomoSubtomogramTilt", "Second Euler angle of a subtomogram (tilt, in degrees)");
 		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_PSI, EMDL_DOUBLE, "rlnTomoSubtomogramPsi", "Third Euler angle of a subtomogram (psi, in degrees)");
 		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_BINNING, EMDL_DOUBLE, "rlnTomoSubtomogramBinning", "Binning level of a subtomogram");
-		
-		EMDL::addLabel(EMDL_TOMO_PARTICLE_INDEX, EMDL_INT, "rlnTomoParticleIndex", "Global index of a tomography particle");
+		EMDL::addLabel(EMDL_TOMO_PARTICLE_NAME, EMDL_STRING, "rlnTomoParticleName", "Name of each individual particle");
+
+
 		EMDL::addLabel(EMDL_TOMO_MANIFOLD_INDEX, EMDL_INT, "rlnTomoManifoldIndex", "Index of a 2D manifold in a tomogram");
 		EMDL::addLabel(EMDL_TOMO_MANIFOLD_TYPE, EMDL_STRING, "rlnTomoManifoldType", "Name of the manifold type");
 		EMDL::addLabel(EMDL_TOMO_MANIFOLD_PARAMETERS, EMDL_DOUBLE_VECTOR, "rlnTomoManifoldParams", "Set of coefficients pertaining to a generic 2D manifold in a tomogram");
 		EMDL::addLabel(EMDL_TOMO_DEFOCUS_SLOPE, EMDL_DOUBLE, "rlnTomoDefocusSlope", "Rate of change of defocus over depth");
 
+		EMDL::addLabel(EMDL_TOMO_PARTICLES_FILE_NAME, EMDL_STRING, "rlnTomoParticlesFile", "Name of particles STAR file");
+		EMDL::addLabel(EMDL_TOMO_TOMOGRAMS_FILE_NAME, EMDL_STRING, "rlnTomoTomogramsFile", "Name of tomograms STAR file");
+		EMDL::addLabel(EMDL_TOMO_MANIFOLDS_FILE_NAME, EMDL_STRING, "rlnTomoManifoldsFile", "Name of manifolds STAR file");
+		EMDL::addLabel(EMDL_TOMO_TRAJECTORIES_FILE_NAME, EMDL_STRING, "rlnTomoTrajectoriesFile", "Name of trajectories STAR file");
+		EMDL::addLabel(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, EMDL_STRING, "rlnTomoReferenceMap1File", "Name of first reference map file");
+		EMDL::addLabel(EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME, EMDL_STRING, "rlnTomoReferenceMap2File", "Name of second reference map file");
+		EMDL::addLabel(EMDL_TOMO_REFERENCE_MASK_FILE_NAME, EMDL_STRING, "rlnTomoReferenceMaskFile", "Name of mask file corresponding to a pair of reference maps");
+		EMDL::addLabel(EMDL_TOMO_REFERENCE_FSC_FILE_NAME, EMDL_STRING, "rlnTomoReferenceFscFile", "Name of FSC STAR file corresponding to a pair of reference maps");
+
+		EMDL::addLabel(EMDL_TOMO_IMPORT_OFFSET_X, EMDL_DOUBLE, "rlnTomoImportOffsetX", "X offset of a tomogram");
+		EMDL::addLabel(EMDL_TOMO_IMPORT_OFFSET_Y, EMDL_DOUBLE, "rlnTomoImportOffsetY", "Y offset of a tomogram");
+		EMDL::addLabel(EMDL_TOMO_IMPORT_OFFSET_Z, EMDL_DOUBLE, "rlnTomoImportOffsetZ", "Z offset of a tomogram");
+		EMDL::addLabel(EMDL_TOMO_IMPORT_IMOD_DIR, EMDL_STRING, "rlnTomoImportImodDir", "IMOD tilt-series directory");
+		EMDL::addLabel(EMDL_TOMO_IMPORT_CTFFIND_FILE, EMDL_STRING, "rlnTomoImportCtfFindFile", "CTFFind output file");
+		EMDL::addLabel(EMDL_TOMO_IMPORT_CTFPLOTTER_FILE, EMDL_STRING, "rlnTomoImportCtfPlotterFile", "CTFPlotter output file");
+		EMDL::addLabel(EMDL_TOMO_IMPORT_ORDER_LIST, EMDL_STRING, "rlnTomoImportOrderList", "Frame order list");
+		EMDL::addLabel(EMDL_TOMO_IMPORT_FRACT_DOSE, EMDL_DOUBLE, "rlnTomoImportFractionalDose", "Fractional dose of a tilt series");
+		EMDL::addLabel(EMDL_TOMO_IMPORT_CULLED_FILE, EMDL_STRING, "rlnTomoImportCulledFile", "File name of a tilt series with certain frames removed");
+
+		EMDL::addLabel(EMDL_TOMO_RELATIVE_ICE_THICKNESS, EMDL_DOUBLE, "rlnTomoRelativeIceThickness", "Relative ice thickness times its extinction coefficient");
+		EMDL::addLabel(EMDL_TOMO_RELATIVE_LUMINANCE, EMDL_DOUBLE, "rlnTomoRelativeLuminance", "Relative beam luminance");
+		EMDL::addLabel(EMDL_TOMO_ICE_NORMAL_X, EMDL_DOUBLE, "rlnTomoIceNormalX", "X component of the estimated ice normal");
+		EMDL::addLabel(EMDL_TOMO_ICE_NORMAL_Y, EMDL_DOUBLE, "rlnTomoIceNormalY", "Y component of the estimated ice normal");
+		EMDL::addLabel(EMDL_TOMO_ICE_NORMAL_Z, EMDL_DOUBLE, "rlnTomoIceNormalZ", "Z component of the estimated ice normal");
+
 		EMDL::addLabel(EMDL_TOMO_PARTICLE_ID, EMDL_INT, "rlnTomoParticleId", "Particle index");
 		EMDL::addLabel(EMDL_TOMO_PICK_PARTICLE_ID, EMDL_INT, "rlnTomoPickParticleId", "Virus Particle index");
+		EMDL::addLabel(EMDL_TOMO_PARTICLE_INDEX, EMDL_INT, "rlnTomoParticleIndex", "Global index of a tomography particle");
 
 		EMDL::addLabel(EMDL_UNKNOWN_LABEL, EMDL_UNKNOWN, "rlnUnknownLabel", "NON-RELION label: values will be ignored, yet maintained in the STAR file.");
 	 }

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<title>Reconstruct Tomogram</title>
+	<link rel="stylesheet" href="../style.css">
+</head>
+
+<body>
+	<h1><tt>relion_tomo_reconstruct_tomogram</tt></h1>
+	
+	<p>This program creates a tomogram (i.e. a 3D image approximating the scattering potential within a cryo-EM sample) from a tilt series defined in a given <a href="../data_types/tomogram_set.html">tomogram set</a>. Please note that these tomograms are <i>not</i> intended for further processing. Instead, their purpose is only to allow for the inspection of the sample and the detection of specific structures, such as manifolds or individual particles. In order to perform subtomogram averaging, the detected particles should be written into a <a href="../data_types/particle_set.html">particle set</a>, from which <i>pseudo subtomograms</i> should be constructed using the program <a href="subtomo.html"><tt>relion_tomo_subtomo</tt></a>. These pseudo subtomograms can then be refined using <tt>relion_refine</tt>.</p>
+	
+	<p>This program is also not intended for the reconstruction of full-size tomograms, since the resulting 3D image needs to fit into memory.</p>
+	
+	<h3>Relevant program arguments:</h3>
+	
+	<ul>
+		<li><b>--i</b> or <b>--t</b>: input optimisation-set or tomogram set (see <a href="../data_types/optimisation_set.html">optimisation set</a>).</li>
+		
+		<li><b>--tn</b>: <tt>tomogram_name</tt> of the tomogram to reconstruct (see <a href="../data_types/tomogram_set.html">tomogram set</a>).</li>
+		<li><b>--no_weight</b>: reconstruct an unweighted tomogram, as opposed to applying a weighting in 3D using a <a href="https://en.wikipedia.org/wiki/Wiener_filter">Wiener filter</a>. If the purpose of the tomogram is for a human to slice through it along the viewing direction, then an unweighted tomogram offers the most contrast. It will introduce streaking artifacts along the viewing direction, however.</li>
+		<li><b>--pre_weight</b>: apply a pre-weighting in 2D instead of a 3D weighting. This is significantly more efficient for large tomograms.</li>
+		<li><b>--SNR</b>: the signal-to-noise ratio assumed by the Wiener filter. Note: a realistic SNR might lead to an excessive dampening of the high frequencies. If the purpose of the tomogram is only for humans to inspect it, then this dampening might make the image clearer.</li>
+		<li><b>--noctf</b>: do not modulate the input images by a (spatially constant) CTF.</li>
+		<li><b>--keep_mean</b>: do not subtract the mean from (i.e. do not zero the DC component of) every 2D image prior to reconstruction.</li>
+		<li><b>--td</b>: taper distance. Do not backproject image regions closer than this to the edge of a 2D image.</li>
+		<li><b>--tf</b>: taper falloff. Fade out the contribution of each 2D image along this distance to the edge of the effective image. If a value has been specified for the <tt>--td</tt> argument, then this falloff begins at that edge. These two options are useful if the images show artifacts near the edge, and the resulting tomogram is to be used for automated detection.</li>		
+		<li><b>--&lt;x0/y0/z0/&gt;</b>: the origin of the 3D region to be reconstructed. Note: to maintain consistency with other processing software, the default origin (corresponding to the one used by <a href="https://bio3d.colorado.edu/imod/">IMOD</a>) is equal to 1. Therefore, 1 is also the default value for these arguments.</li>		
+		<li><b>--&lt;w/h/d&gt;</b>: the size of the 3D region to be reconstructed (in bin-1 pixels). If not specified, the size indicated in the tomogram set will be used, which should correspond to the region defined in IMOD.</li>		
+		<li><b>--bin</b>: the binning level of the reconstruction. Note: the default value for this is 8, in order to prevent accidentally reconstructing a bin-1 tomogram.</li>
+		<li><b>--j</b>: number of threads to be used. This should be set to the number of CPU cores available.</li>
+		<li><b>--o</b>: name of the output 3D image. This is the only file created by this program. If the file name contains subdirectories, then those will also be created.</li>
+	</ul>
+	
+	
+</body>
+
+</html>

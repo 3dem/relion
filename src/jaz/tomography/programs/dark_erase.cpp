@@ -30,11 +30,11 @@ void DarkEraseProgram::run()
 	
 	
 	const int bin = 8;
-	const double minFreq0 = 1.0 / 500.0;
-	const double maxFreq0 = 1.0 / 64.0;
+	const double minFreq0 = 500.0;
+	const double maxFreq0 = 64.0;
 	
-	const double minFreq = bin * minFreq0;
-	const double maxFreq = bin * maxFreq0;
+	const double minFreq = minFreq0 / bin;
+	const double maxFreq = maxFreq0 / bin;
 	
 	std::cout << "resampling images..." << std::endl;
 		

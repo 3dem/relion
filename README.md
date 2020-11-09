@@ -1,5 +1,5 @@
-
-RELION 3.1 (+ EER support)
+RELION 3.2 alpha
+=================
 
 RELION (for REgularised LIkelihood OptimisatioN) is a stand-alone computer
 program for Maximum A Posteriori refinement of (multiple) 3D reconstructions
@@ -32,12 +32,16 @@ Once git and cmake are installed, relion can be easily installed through:
 ```
 git clone https://github.com/3dem/relion.git
 cd relion
-git checkout ver3.1
+git checkout master
 mkdir build
 cd build
 cmake ..
 make
 ```
+
+By performing `git checkout ver3.1` instead of `git checkout master`, you can access
+the latest (developmental) updates for RELION 3.1.x. The code there is not
+tested as throughfully as that in the master branch and not generally recommended.
 
 The binaries will be produced in the `build/bin` directory. If you want to copy binaries
 into somewhere else, run `cmake` with `-DCMAKE_INSTALL_PREFIX=/where/to/install/` and

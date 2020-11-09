@@ -40,7 +40,7 @@ DefocusRefinementProgram::DefocusRefinementProgram(int argc, char *argv[])
 		_readParams(parser);
 		
 		int def_section = parser.addSection("Defocus refinement options");
-				
+
 		do_scanDefocus = !parser.checkOption("--no_scan", "Skip accelerated defocus scan");
 		do_slowScan = parser.checkOption("--slow_scan", "Perform a slow, brute-force defocus scan instead");
 		do_refineFast = !parser.checkOption("--slow_scan_only", "Only perform a brute-force scan");
@@ -103,7 +103,7 @@ void DefocusRefinementProgram::run()
 	const int tc = particles.size();
 	const bool flip_value = true;
 
-	AberrationsCache aberrationsCache(dataSet.optTable, boxSize);
+	AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
 	
 	Log::endSection();
 
@@ -128,7 +128,7 @@ void DefocusRefinementProgram::run()
 		const int usedParticleCount = (max_particles > 0 && pc0 > max_particles)? max_particles : pc0;
 		const int fc = tomogram.frameCount;
 		
-		dataSet.checkTrajectoryLengths(
+		particleSet.checkTrajectoryLengths(
 				particles[t][0], usedParticleCount, fc, "DefocusRefinementProgram::run");
 		
 		
@@ -155,7 +155,9 @@ void DefocusRefinementProgram::run()
 		*/
 		
 		BufferedImage<float> freqWeights = computeFrequencyWeights(
-			tomogram, true, 0.0, 0.0, num_threads);
+			tomogram, true, 0.0, 0.0, true, num_threads);
+
+		BufferedImage<float> doseWeight = tomogram.computeDoseWeight(boxSize,1);
 
 		if (do_defocus)
 		{
@@ -168,7 +170,7 @@ void DefocusRefinementProgram::run()
 					DefocusFit defocus = findDefocus(
 						f, minDelta, maxDelta, deltaSteps,
 						group_count, sigma_input,
-						dataSet, particles[t], usedParticleCount,
+						particleSet, particles[t], usedParticleCount,
 						tomogram, aberrationsCache, referenceMap.image_FS,
 						freqWeights, flip_value, num_threads);
 
@@ -262,8 +264,8 @@ void DefocusRefinementProgram::run()
 						}
 
 						AberrationFit::considerParticle(
-							particles[t][p], tomogram, referenceMap, dataSet,
-							aberrationsCache, flip_value, freqWeights,
+							particles[t][p], tomogram, referenceMap, particleSet,
+							aberrationsCache, flip_value, freqWeights, doseWeight,
 							f, f,
 							evenData_thread[th], oddData_thread[th]);
 					}
@@ -336,7 +338,7 @@ void DefocusRefinementProgram::run()
 
 			std::vector<d3Vector> tomogramSlopeCost = computeSlopeCost(
 				max_slope_dose, min_slope, max_slope, slope_steps,
-				dataSet, particles[t], pc0, tomogram, aberrationsCache,
+				particleSet, particles[t], pc0, tomogram, aberrationsCache,
 				referenceMap.image_FS, freqWeights,
 				flip_value, num_threads);
 
@@ -391,6 +393,9 @@ void DefocusRefinementProgram::run()
 	}
 
 	tomogramSet.write(outDir+"tomograms.star");
+
+	optimisationSet.tomograms = outDir+"tomograms.star";
+	optimisationSet.write(outDir+"optimisation_set.star");
 }
 
 void DefocusRefinementProgram::writeSlopeCost(
@@ -490,7 +495,7 @@ BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(
 
 		TomoExtraction::extractFrameAt3D_Fourier(
 				tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f], traj[f],
-				observation, projCut, 1, false, true);
+				observation, projCut, 1, true);
 
 		#if TIMING
 			if (th==0) timer.toc(time_extract);
@@ -668,7 +673,7 @@ std::vector<d3Vector> DefocusRefinementProgram::computeSlopeCost(
 			TomoExtraction::extractFrameAt3D_Fourier(
 					tomogram.stack, f, s, 1.0,
 					tomogram.projectionMatrices[f], traj[f],
-					observation, projCut, 1, false, true);
+					observation, projCut, 1, true);
 
 			BufferedImage<fComplex> prediction = Prediction::predictFS(
 					part_id, dataSet, projCut, s, referenceFS);

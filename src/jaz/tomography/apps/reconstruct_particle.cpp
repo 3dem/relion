@@ -5,7 +5,7 @@
 
 int main(int argc, char *argv[])
 {
-	BackprojectProgram bp;
+	ReconstructParticleProgram bp;
 	
 	bp.readParameters(argc, argv);	
 	bp.run();

@@ -52,7 +52,7 @@ void TIFFConverter::read(int argc, char **argv)
 
 	int eer_section = parser.addSection("EER rendering options");	
 	eer_grouping = textToInteger(parser.getOption("--eer_grouping", "EER grouping", "40"));
-	eer_upsampling = textToInteger(parser.getOption("--eer_upsampling", "EER upsampling (1 = 4K or 2 = 8K)", "2"));
+	eer_upsampling = textToInteger(parser.getOption("--eer_upsampling", "EER upsampling (1 = 4K or 2 = 8K)", "1"));
 	// --eer_upsampling 3 is only for debugging. Hidden.
 	if (eer_upsampling != 1 && eer_upsampling != 2 && eer_upsampling != 3)
 		REPORT_ERROR("eer_upsampling must be 1, 2 or 3");

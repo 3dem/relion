@@ -38,12 +38,6 @@ void MagFitProgram::readParams(IOParser &parser)
 	{
 		_readParams(parser);
 
-		int defocus_section = parser.addSection("Alignment options");
-
-
-		initial_step = textToDouble(parser.getOption("--ins", "Initial step (in %)", "2"));
-
-
 		Log::readParams(parser);
 
 		if (parser.checkForErrors())
@@ -69,7 +63,7 @@ void MagFitProgram::run()
 	const int s = boxSize;
 	const int sh = s/2 + 1;
 	const int tc = particles.size();
-	const int gc = dataSet.numberOfOpticsGroups();
+	const int gc = particleSet.numberOfOpticsGroups();
 	const bool flip_value = true;
 
 	Log::endSection();
@@ -87,9 +81,9 @@ void MagFitProgram::run()
 		const int fc = tomogram.frameCount;
 
 		BufferedImage<float> freqWeights = computeFrequencyWeights(
-			tomogram, true, 0.0, 0.0, num_threads);
+			tomogram, true, 0.0, 0.0, true, num_threads);
 
-		dataSet.checkTrajectoryLengths(
+		particleSet.checkTrajectoryLengths(
 				particles[t][0], pc, fc, "MagFitProgram::run");
 
 		const int first_frame = specified_first_frame;
@@ -99,7 +93,7 @@ void MagFitProgram::run()
 		TomoAnisoMagFit anisoFit(
 			particles[t],
 			tomogram,
-			dataSet,
+			particleSet,
 			referenceMap,
 			freqWeights,
 			boxSize,

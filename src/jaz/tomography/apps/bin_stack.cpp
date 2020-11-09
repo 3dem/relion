@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
 		n_threads = textToInteger(parser.getOption("--j", "Number of threads", "1"));		
 		outStackFn = parser.getOption("--o", "Output stack filename");
 				
-		parser.checkForErrors();
+		if (parser.checkForErrors()) std::exit(-1);
 	}
 	catch (RelionError XE)
 	{

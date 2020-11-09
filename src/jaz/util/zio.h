@@ -39,9 +39,15 @@ class ZIO
 		
 		static bool beginsWith(const std::string& string, const std::string& prefix);
 		static bool endsWith(const std::string& string, const std::string& suffix);
-		
+
+		static void makeDir(const std::string& dir);
 		static std::string makeOutputDir(const std::string& dir);
 		static std::string ensureEndingSlash(const std::string& dir);
+		static void ensureParentDir(const std::string& path);
+
+		static std::string prepareTomoOutputDirectory(
+				const std::string& dir,
+				int argc, char *argv[]);
 };
 
 template <typename T>

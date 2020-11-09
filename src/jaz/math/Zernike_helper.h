@@ -121,25 +121,52 @@ class ZernikeHelper
 				const BufferedImage<double>& basis;
 				const bool L1;
 		};
-		
+
 		class AnisoBasisOptimisation : public Optimization
 		{
 			public:
-		
+
 				AnisoBasisOptimisation(
 						const BufferedImage<dComplex>& xy,
 						const BufferedImage<Tensor2x2<double>>& A,
 						const BufferedImage<double>& basis,
 						bool L1 = false);
-		
+
 				double f(const std::vector<double>& x, void* tempStorage) const;
-		
+
 				void* allocateTempStorage() const;
 				void deallocateTempStorage(void* ts);
-		
+
 			private:
-		
+
 				const int w, h, cc;
+				const BufferedImage<dComplex>& xy;
+				const BufferedImage<Tensor2x2<double>>& A;
+				const BufferedImage<double>& basis;
+				const bool L1;
+		};
+
+		class MultiAnisoBasisOptimisation : public FastDifferentiableOptimization
+		{
+			public:
+
+				MultiAnisoBasisOptimisation(
+						const BufferedImage<dComplex>& xy,
+						const BufferedImage<Tensor2x2<double>>& A,
+						const BufferedImage<double>& basis,
+						double lambda,
+						bool L1 = false);
+
+				double gradAndValue(const std::vector<double>& x, std::vector<double>& gradDest) const;
+				double f(const std::vector<double>& x, void* tempStorage) const;
+
+				void* allocateTempStorage() const;
+				void deallocateTempStorage(void* ts);
+
+			private:
+
+				const int w, h, fc, cc;
+				const double lambda;
 				const BufferedImage<dComplex>& xy;
 				const BufferedImage<Tensor2x2<double>>& A;
 				const BufferedImage<double>& basis;

@@ -129,6 +129,7 @@ void AberrationFit :: considerParticle(
 		const AberrationsCache& aberrationsCache,
 		bool flip_value,
 		const BufferedImage<float>& frqWeight,
+		const BufferedImage<float>& frqEnvelope,
 		int f0, int f1,
 		BufferedImage<EvenData>& even_out,
 		BufferedImage<OddData>& odd_out)
@@ -154,7 +155,7 @@ void AberrationFit :: considerParticle(
 	{
 		TomoExtraction::extractFrameAt3D_Fourier(
 				tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f], traj[f],
-				observation, projCut, 1, false, true);
+				observation, projCut, 1, true);
 
 		CTF ctf = tomogram.getCtf(f, dataSet.getPosition(part_id));
 
@@ -190,7 +191,7 @@ void AberrationFit :: considerParticle(
 			const double c = -sg;
 
 			fComplex zobs = observation(x,y);
-			fComplex zprd = scale * prediction(x,y);
+			fComplex zprd = scale * ctf.scale * frqEnvelope(x,y,f) * prediction(x,y);
 
 			if (aberrationsCache.hasAntisymmetrical)
 			{
@@ -233,17 +234,19 @@ EvenSolution AberrationFit::solveEven(
 	const double eps = 1e-30;
 	const int s  = data.ydim;
 	const int sh = data.xdim;
+	const int fc = data.zdim;
 
 	EvenSolution out;
 
-	out.optimum = BufferedImage<dComplex>(sh,s);
-	out.phaseShift = BufferedImage<double>(sh,s);
-	out.weight = BufferedImage<Tensor2x2<double>>(sh,s);
+	out.optimum = BufferedImage<dComplex>(sh,s,fc);
+	out.phaseShift = BufferedImage<double>(sh,s,fc);
+	out.weight = BufferedImage<Tensor2x2<double>>(sh,s,fc);
 
+	for (int f = 0; f < fc; f++)
 	for (int y = 0; y < s;  y++)
 	for (int x = 0; x < sh; x++)
 	{
-		EvenData d = data(x,y);
+		EvenData d = data(x,y,f);
 
 		d2Vector b(d.bx, d.by);
 		d2Matrix A(d.Axx, d.Axy, d.Axy, d.Ayy);
@@ -258,15 +261,15 @@ EvenSolution AberrationFit::solveEven(
 
 			const d2Vector opt = Ai * b;
 
-			out.optimum(x,y) = dComplex(opt.x, opt.y);
-			out.phaseShift(x,y) = std::abs(opt.x) > 0.0? atan2(opt.y, opt.x) : 0.0;
-			out.weight(x,y) = Tensor2x2<double>(d.Axx, d.Axy, d.Ayy);
+			out.optimum(x,y,f) = dComplex(opt.x, opt.y);
+			out.phaseShift(x,y,f) = std::abs(opt.x) > 0.0? atan2(opt.y, opt.x) : 0.0;
+			out.weight(x,y,f) = Tensor2x2<double>(d.Axx, d.Axy, d.Ayy);
 		}
 		else
 		{
-			out.optimum(x,y) = dComplex(0.0, 0.0);
-			out.phaseShift(x,y) = 0.0;
-			out.weight(x,y) = Tensor2x2<double>(0.0, 0.0, 0.0);
+			out.optimum(x,y,f) = dComplex(0.0, 0.0);
+			out.phaseShift(x,y,f) = 0.0;
+			out.weight(x,y,f) = Tensor2x2<double>(0.0, 0.0, 0.0);
 		}
 	}
 
@@ -584,6 +587,72 @@ EvenData &EvenData::operator+=(const EvenData& d)
 	Ayy += d.Ayy;
 	bx += d.bx;
 	by += d.by;
+}
+
+void EvenData::write(const RawImage<EvenData> &evenData, std::string filename)
+{
+	const int sh = evenData.xdim;
+	const int s  = evenData.ydim;
+	const int fc = evenData.zdim;
+
+	BufferedImage<float>
+		Axx(sh,s,fc),
+		Axy(sh,s,fc),
+		Ayy(sh,s,fc),
+		bx(sh,s,fc),
+		by(sh,s,fc);
+
+	for (int f = 0; f < fc; f++)
+	for (int y = 0; y <  s; y++)
+	for (int x = 0; x < sh; x++)
+	{
+		Axx(x,y,f) = evenData(x,y,f).Axx;
+		Axy(x,y,f) = evenData(x,y,f).Axy;
+		Ayy(x,y,f) = evenData(x,y,f).Ayy;
+		bx(x,y,f)  = evenData(x,y,f).bx;
+		by(x,y,f)  = evenData(x,y,f).by;
+	}
+
+	Axx.write(filename + "_Axx.mrc");
+	Axy.write(filename + "_Axy.mrc");
+	Ayy.write(filename + "_Ayy.mrc");
+	bx.write( filename + "_bx.mrc");
+	by.write( filename + "_by.mrc");
+}
+
+BufferedImage<EvenData> EvenData::read(std::string filename)
+{
+	BufferedImage<double>
+		Axx,
+		Axy,
+		Ayy,
+		bx,
+		by;
+
+	Axx.read(filename + "_Axx.mrc");
+	Axy.read(filename + "_Axy.mrc");
+	Ayy.read(filename + "_Ayy.mrc");
+	bx.read( filename + "_bx.mrc");
+	by.read( filename + "_by.mrc");
+
+	const int sh = Axx.xdim;
+	const int s  = Axx.ydim;
+	const int fc = Axx.zdim;
+
+	BufferedImage<EvenData> evenData;
+
+	for (int f = 0; f < fc; f++)
+	for (int y = 0; y <  s; y++)
+	for (int x = 0; x < sh; x++)
+	{
+		evenData(x,y,f).Axx = Axx(x,y,f);
+		evenData(x,y,f).Axy = Axy(x,y,f);
+		evenData(x,y,f).Ayy = Ayy(x,y,f);
+		evenData(x,y,f).bx  = bx(x,y,f);
+		evenData(x,y,f).by  = by(x,y,f);
+	}
+
+	return evenData;
 }
 
 OddData &OddData::operator+=(const OddData& d)

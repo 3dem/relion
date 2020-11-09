@@ -10,6 +10,7 @@
 #include <src/jaz/image/centering.h>
 #include <src/jaz/image/power_spectrum.h>
 #include <src/jaz/image/radial_avg.h>
+#include <src/jaz/optics/damage.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
 
@@ -28,7 +29,9 @@ BufferedImage<fComplex> Prediction::predictModulated(
 		const AberrationsCache& aberrationsCache,
 		const std::vector<BufferedImage<fComplex>>& referenceFS,
 		HalfSet halfSet,
-		Modulation modulation)
+		Modulation modulation,
+		DoseWeight doseWeight,
+		double cumulativeDose)
 {
 	BufferedImage<fComplex> prediction = predictFS(
 				particle_id, dataSet, proj, s, referenceFS, halfSet);
@@ -60,6 +63,11 @@ BufferedImage<fComplex> Prediction::predictModulated(
 		}
 
 		prediction *= aberrationsCache.phaseShift[og];
+	}
+
+	if (doseWeight == DoseWeighted && cumulativeDose > 0.0)
+	{
+		Damage::applyWeight(prediction, pixelSize, {cumulativeDose}, 1);
 	}
 	
 	return prediction;
@@ -169,7 +177,7 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 			
 			TomoExtraction::extractFrameAt3D_Fourier(
 					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f], traj[f],
-					observation, projCut, 1, false, true);
+					observation, projCut, 1, true);
 						
 			BufferedImage<fComplex> prediction = Prediction::predictModulated(
 					part_id, dataSet, projCut, s, 

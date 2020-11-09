@@ -467,7 +467,6 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 	img.read(opt.mydata.particles[part_id].images[0].name);
 	img().setXmippOrigin();
 
-
 	// Make sure gold-standard is adhered to!
 	int my_subset = (rank % 2 == 1) ? 1 : 2;
 	if (opt.do_split_random_halves && my_subset != opt.mydata.getRandomSubset(part_id))
@@ -770,7 +769,6 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 	}
 	else
 	{
-
 		// And go finally back to real-space
 		CenterFFTbySign(Fimg);
 		transformer.inverseFourierTransform(Fimg, img());

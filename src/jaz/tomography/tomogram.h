@@ -48,6 +48,7 @@ class Tomogram
 
 		double getDepthOffset(int frame, gravis::d3Vector position) const;
 		CTF getCtf(int frame, gravis::d3Vector position) const;
+		int getLeastDoseFrame() const;
 
 		gravis::d3Vector computeCentreOfMass(
 				const ParticleSet& particleSet,
@@ -55,6 +56,8 @@ class Tomogram
 
 		Tomogram extractSubstack(gravis::d3Vector position, int width, int height) const;
 		Tomogram FourierCrop(double factor, int num_threads, bool downsampleData = true) const;
+
+		bool hasFiducials();
 };
 
 

@@ -28,73 +28,135 @@
 
 class LBFGS
 {
-    public:
+	public:
 
-        static std::vector<double> optimize(
-            const std::vector<double>& initial,
-            const DifferentiableOptimization& opt,
-            int verbosity = 0,
-            int max_iters = 0,
-            double epsilon = 1e-5, 
-			double xtol = 1e-4);
+		static std::vector<double> optimize(
+				const std::vector<double>& initial,
+				const DifferentiableOptimization& opt,
+				int verbosity = 0,
+				int max_iters = 0,
+				double epsilon = 1e-5,
+				double xtol = 1e-4);
 
-        static void test();
+		static std::vector<double> optimize(
+				const std::vector<double>& initial,
+				const FastDifferentiableOptimization& opt,
+				int verbosity = 0,
+				int max_iters = 0,
+				double epsilon = 1e-5,
+				double xtol = 1e-4);
 
-    protected:
+		static void test();
 
-        static lbfgsfloatval_t evaluate(
-            void *instance,
-            const lbfgsfloatval_t *x,
-            lbfgsfloatval_t *g,
-            const int n,
-            const lbfgsfloatval_t step);
 
-        static int progress(
-            void *instance,
-            const lbfgsfloatval_t *x,
-            const lbfgsfloatval_t *g,
-            const lbfgsfloatval_t fx,
-            const lbfgsfloatval_t xnorm,
-            const lbfgsfloatval_t gnorm,
-            const lbfgsfloatval_t step,
-            int n,
-            int k,
-            int ls);
+	protected:
+
+		static lbfgsfloatval_t evaluate(
+				void *instance,
+				const lbfgsfloatval_t *x,
+				lbfgsfloatval_t *g,
+				const int n,
+				const lbfgsfloatval_t step);
+
+		static lbfgsfloatval_t evaluate_fast(
+				void *instance,
+				const lbfgsfloatval_t *x,
+				lbfgsfloatval_t *g,
+				const int n,
+				const lbfgsfloatval_t step);
+
+		static int progress(
+				void *instance,
+				const lbfgsfloatval_t *x,
+				const lbfgsfloatval_t *g,
+				const lbfgsfloatval_t fx,
+				const lbfgsfloatval_t xnorm,
+				const lbfgsfloatval_t gnorm,
+				const lbfgsfloatval_t step,
+				int n,
+				int k,
+				int ls);
+
+		static int progress_fast(
+				void *instance,
+				const lbfgsfloatval_t *x,
+				const lbfgsfloatval_t *g,
+				const lbfgsfloatval_t fx,
+				const lbfgsfloatval_t xnorm,
+				const lbfgsfloatval_t gnorm,
+				const lbfgsfloatval_t step,
+				int n,
+				int k,
+				int ls);
 		
 		static std::string decodeStatus(int ret);
 
-        class LibLbfgsAdapter
-        {
-            public:
+		class LibLbfgsAdapter
+		{
+			public:
 
-                LibLbfgsAdapter(
-                    const DifferentiableOptimization& opt,
-                    void* tempStorage, int n, bool verbose);
-
-                const DifferentiableOptimization& opt;
-                int n;
-                bool verbose;
-                std::vector<double> x_vec, grad_vec;
-                void* tempStorage;
+				LibLbfgsAdapter(
+						const DifferentiableOptimization& opt,
+						void* tempStorage, int n, bool verbose);
 
 
-                lbfgsfloatval_t evaluate(
-                    const lbfgsfloatval_t *x,
-                    lbfgsfloatval_t *g,
-                    const int n,
-                    const lbfgsfloatval_t step);
+					const DifferentiableOptimization& opt;
+					int n;
+					bool verbose;
+					std::vector<double> x_vec, grad_vec;
+					void* tempStorage;
 
-                int progress(
-                    const lbfgsfloatval_t *x,
-                    const lbfgsfloatval_t *g,
-                    const lbfgsfloatval_t fx,
-                    const lbfgsfloatval_t xnorm,
-                    const lbfgsfloatval_t gnorm,
-                    const lbfgsfloatval_t step,
-                    int n,
-                    int k,
-                    int ls);
-        };
+
+				lbfgsfloatval_t evaluate(
+						const lbfgsfloatval_t *x,
+						lbfgsfloatval_t *g,
+						const int n,
+						const lbfgsfloatval_t step);
+
+				int progress(
+						const lbfgsfloatval_t *x,
+						const lbfgsfloatval_t *g,
+						const lbfgsfloatval_t fx,
+						const lbfgsfloatval_t xnorm,
+						const lbfgsfloatval_t gnorm,
+						const lbfgsfloatval_t step,
+						int n,
+						int k,
+						int ls);
+		};
+
+		class FastLibLbfgsAdapter
+		{
+			public:
+
+				FastLibLbfgsAdapter(
+						const FastDifferentiableOptimization& opt,
+						int n, bool verbose);
+
+
+					const FastDifferentiableOptimization& opt;
+					int n;
+					bool verbose;
+					std::vector<double> x_vec, grad_vec;
+
+
+				lbfgsfloatval_t evaluate(
+						const lbfgsfloatval_t *x,
+						lbfgsfloatval_t *g,
+						const int n,
+						const lbfgsfloatval_t step);
+
+				int progress(
+						const lbfgsfloatval_t *x,
+						const lbfgsfloatval_t *g,
+						const lbfgsfloatval_t fx,
+						const lbfgsfloatval_t xnorm,
+						const lbfgsfloatval_t gnorm,
+						const lbfgsfloatval_t step,
+						int n,
+						int k,
+						int ls);
+		};
 };
 
 #endif

@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<title>Trajectory Set</title>
+	<link rel="stylesheet" href="../style.css">
+</head>
+
+<body>
+	<h1>Trajectory Set</h1>
+	
+	<p>The trajectory set (typically named <tt>motion.star</tt>) contains the motion trajectories of all particles in a corresponding <a href="particle_set.html">particle set</a>. The trajectories can be estimated using the program <a href="polish.html"><tt>relion_tomo_polish</tt></a>, and they will be considered by any Relion tomography program that requires particle positions.</p>
+	
+	<p>The trajectory file consists of <tt>P+1</tt> tables, where <tt>P</tt> is the number of particles in the corresponding particle set. The first table only contains the number of particles, while every successive table lists the trajectory of each particle. The trajectories are given in &#8491;, and they are relative to the position of the particle in the chronologically first tilt image (i.e. the image with the lowest cumulative dose).<p>
+		
+	
+	
+</body>
+
+</html>

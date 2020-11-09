@@ -20,7 +20,7 @@
 #include "src/ctffind_runner.h"
 #include <cmath>
 
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 #include "src/acc/cuda/cuda_mem_utils.h"
 #endif
 
@@ -145,6 +145,9 @@ void CtffindRunner::initialise()
 	{
 		MetaDataTable MDin;
 		ObservationModel::loadSafely(fn_in, obsModel, MDin, "micrographs", verb);
+
+		if (MDin.numberOfObjects() > 0 && !MDin.containsLabel(EMDL_MICROGRAPH_NAME))
+			REPORT_ERROR("ERROR: There is no rlnMicrographName label in the input micrograph STAR file.");
 
 		if (do_use_without_doseweighting && MDin.numberOfObjects() > 0 && !MDin.containsLabel(EMDL_MICROGRAPH_NAME_WODOSE))
 			REPORT_ERROR("ERROR: You are using --use_noDW, but there is no rlnMicrographNameNoDW label in the input micrograph STAR file.");
@@ -323,7 +326,7 @@ void CtffindRunner::initialise()
 		untangleDeviceIDs(gpu_ids, allThreadIDs);
 		if (allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
 		{
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 			if (verb>0)
 				std::cout << "gpu-ids were not specified, so threads will automatically be mapped to devices (incrementally)."<< std::endl;
 			HANDLE_ERROR(cudaGetDeviceCount(&devCount));

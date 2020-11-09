@@ -78,6 +78,9 @@ public:
 	// MetaDataTable of input micrographs
 	MetaDataTable MDin;
 
+	// MetaDataTable with the output coordinate files
+	MetaDataTable MDcoords;
+
 	// Observation model of input micrographs
 	ObservationModel obsModel;
 
@@ -102,7 +105,7 @@ private:
     inline void cb_menubar_recount_i();
 
     void readOutputStarfile();
-    void writeOutputStarfile();
+    void writeOutputStarfiles(bool verb = true);
 
 };
 
@@ -115,6 +118,9 @@ public:
 
 	// The input micrographs
 	MetaDataTable MDin;
+
+	// MetaDataTable with the output coordinate files
+	MetaDataTable MDcoords;
 
 	// Observation model for the input mirographs
 	ObservationModel obsModel;
@@ -141,10 +147,6 @@ public:
 
 	// General function to decide what to do
 	void run();
-
-private:
-
-	void writeOutput();
 
 };
 

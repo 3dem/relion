@@ -10,6 +10,7 @@
 #include <src/jaz/tomography/tomogram_set.h>
 #include <src/jaz/tomography/manifold/manifold_set.h>
 #include <src/jaz/tomography/manifold/manifold_loader.h>
+#include <src/jaz/tomography/manifold/sphere.h>
 #include <src/jaz/tomography/manifold/spheroid.h>
 #include <src/jaz/tomography/manifold/CMM_loader.h>
 #include <src/jaz/util/zio.h>
@@ -22,30 +23,31 @@ using namespace gravis;
 void FitBlobs3DProgram::readParameters(int argc, char *argv[])
 {
 	IOParser parser;
-	
-	double sphere_thickness_0;
 
 	try
 	{
 		parser.setCommandLine(argc, argv);
+
+		optimisationSet.read(
+			parser,
+			true,            // optimisation set
+			false,  false,   // particles
+			true,   true,    // tomograms
+			false,  false,   // trajectories
+			true,   true,    // manifolds
+			false,  false);  // reference
+
 		int gen_section = parser.addSection("General options");
 
-		tomoSetFn = parser.getOption("--t", "Tomogram set filename", "tomograms.star");
-		listFn = parser.getOption("--i", "File containing a list of tomogram-name/spheres-file pairs");
-
-		sphere_thickness_0 = textToDouble(parser.getOption("--th", "Sphere thickness (same units as sphere centres)"));
-		spheres_binning = textToDouble(parser.getOption("--sbin", "Binning factor of the sphere coordinates"));
-
+		relative_radius_range = textToDouble(parser.getOption("--rr", "Sphere radius range as a multiple of radius", "1"));
+		membrane_separation = textToDouble(parser.getOption("--ms", "Membrane separation [Å]", "40"));
 		fiducials_radius_A = textToDouble(parser.getOption("--frad", "Fiducial marker radius [Å]", "100"));
-
-		prior_sigma_A = textToDouble(parser.getOption("--sig", "Uncertainty std. dev. of initial position [Å]", "10"));
-		max_binning = textToDouble(parser.getOption("--bin0", "Initial (maximal) binning factor", "8"));
-		min_binning = textToDouble(parser.getOption("--bin1", "Final (minimal) binning factor", "2"));
+		fit_binning = textToDouble(parser.getOption("--bin", "Binning at which to perform the fit", "2"));
 
 		diag = parser.checkOption("--diag", "Write out diagnostic information");
 
-		SH_bands = textToInteger(parser.getOption("--n", "Number of spherical harmonics bands", "2"));
-		highpass_sigma_real_A = textToDouble(parser.getOption("--hp", "High-pass sigma [Å, real space]", "300"));
+		SH_bands = textToInteger(parser.getOption("--n", "Number of spherical harmonics bands", "5"));
+		lowpass_sigma_real_A = textToDouble(parser.getOption("--lp", "Low-pass sigma [Å, real space]", "-1"));
 		max_iters = textToInteger(parser.getOption("--max_iters", "Maximum number of iterations", "1000"));
 		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 
@@ -66,152 +68,130 @@ void FitBlobs3DProgram::readParameters(int argc, char *argv[])
 		exit(1);
 	}
 
-	sphere_thickness = sphere_thickness_0 * spheres_binning;
+	outPath = ZIO::prepareTomoOutputDirectory(outPath, argc, argv);
 
-	outPath = ZIO::makeOutputDir(outPath);
+	ZIO::makeDir(outPath + "Meshes");
 
 	if (diag)
 	{
-		ZIO::makeOutputDir(outPath + "diag");
+		ZIO::makeDir(outPath + "diag");
 	}
 }
 
 void FitBlobs3DProgram::run()
 {
-	TomogramSet tomogram_set = TomogramSet(tomoSetFn);	
-	ManifoldSet manifold_set;
+	TomogramSet tomogram_set(optimisationSet.tomograms);
+	ManifoldSet input_manifold_set(optimisationSet.manifolds);
+
+	ManifoldSet output_manifold_set;
 	
+
 	if (!tomogram_set.globalTable.labelExists(EMDL_TOMO_FIDUCIALS_STARFILE))
 	{
 		Log::warn("No fiducial markers present: you are advised to run relion_tomo_find_fiducials first.");
 	}
-	
-	std::ifstream list(listFn);
-	
-	if (!list)
-	{
-		REPORT_ERROR_STR("Unable to read "+listFn);
-	}
-	
-	std::map<std::string, std::string> tomoToSpheres;
-	
-	std::string line;
-	
-	while (std::getline(list, line))
-	{
-		std::stringstream sts;
-		sts << line;
-	
-		std::string tomogram_name, spheresFn;
-		sts >> tomogram_name;
-		sts >> spheresFn;
-		
-		tomoToSpheres[tomogram_name] = spheresFn;
-	}
 
-	int tomo_index = 0;
+	const int tc = tomogram_set.size();
 		
-	for (std::map<std::string, std::string>::iterator it = tomoToSpheres.begin();
-	     it != tomoToSpheres.end(); it++)
+	for (int t = 0; t < tc; t++)
 	{
-		const std::string tomogram_name = it->first;
-		const std::string spheresFn = it->second;
-		
+		std::string tomogram_name = tomogram_set.getTomogramName(t);
+
+		std::map<int, const Manifold*> manifolds_map = input_manifold_set.getManifoldsInTomogram(tomogram_name);
+
+		if (manifolds_map.empty()) continue;
+
 		Log::beginSection("Tomogram " + tomogram_name);
-		
+
 		processTomogram(
-			tomogram_name, 
-			spheresFn,
-			tomogram_set,
-			manifold_set);
+			t, tomogram_name, manifolds_map, tomogram_set, output_manifold_set);
 		
 		Log::endSection();
-
-		tomo_index++;
 	}
 	
-	manifold_set.write(outPath + "manifolds.star");
+	output_manifold_set.write(outPath + "manifolds.star");
+
+	optimisationSet.manifolds = outPath + "manifolds.star";
+	optimisationSet.write(outPath + "optimisation_set.star");
 }
 
 void FitBlobs3DProgram::processTomogram(
-		std::string tomogram_name,
-		std::string spheresFn,
-		TomogramSet& tomogram_set,
-		ManifoldSet& manifold_set)
+		int tomo_index,
+		const std::string& tomogram_name,
+		const std::map<int, const Manifold*>& input_manifolds_map,
+		const TomogramSet& tomogram_set,
+		ManifoldSet& output_manifold_set)
 {
 	Log::print("Loading tilt series");
-	
-	spheres = CMM_Loader::readSpheres(spheresFn, spheres_binning);
-	
-	const int tomo_index = tomogram_set.getTomogramIndexSafely(tomogram_name);
 
 	Tomogram tomogram0 = tomogram_set.loadTomogram(tomo_index, true);
-
 	const double pixel_size = tomogram0.optics.pixelSize;
-
 	const double fiducials_radius = fiducials_radius_A / pixel_size;
 
-
 	std::vector<d3Vector> fiducials(0);
-	
-	bool has_fiducials =
-			tomogram0.fiducialsFilename.length() > 0
-			&& tomogram0.fiducialsFilename != "empty";
-
+	bool has_fiducials = tomogram0.hasFiducials();
 
 	Log::print("Filtering");
-	
-	
-	const double segmentation_binning = 2;
-	
-	Tomogram tomogram_binned = tomogram0.FourierCrop(segmentation_binning, num_threads);
-	
+		
+	Tomogram tomogram_binned = tomogram0.FourierCrop(fit_binning, num_threads);
+
+
+	if (lowpass_sigma_real_A > 0.0)
+	{
+		tomogram_binned.stack = ImageFilter::lowpassStack(
+			tomogram_binned.stack,
+			lowpass_sigma_real_A / (pixel_size * fit_binning),
+			30.0, false);
+	}
+
 	if (has_fiducials)
 	{
 		Log::print("Erasing fiducial markers");
-		
-		if (fiducialsDir[fiducialsDir.length()-1] != '/')
-		{
-			fiducialsDir = fiducialsDir + "/";
-		}
 
 		fiducials = Fiducials::read(tomogram0.fiducialsFilename, tomogram0.optics.pixelSize);
 
 		Fiducials::erase(
 			fiducials, 
-			fiducials_radius / segmentation_binning, 
+			fiducials_radius / fit_binning,
 			tomogram_binned, 
 			num_threads);
 	}
 	
 	BufferedImage<float> preweighted_stack = RealSpaceBackprojection::preWeight(
-	            tomogram_binned.stack, tomogram_binned.projectionMatrices, num_threads);
+			tomogram_binned.stack, tomogram_binned.projectionMatrices, num_threads);
 	
 	Damage::applyWeight(
-			preweighted_stack, 
-			tomogram_binned.optics.pixelSize, 
+			preweighted_stack,
+			tomogram_binned.optics.pixelSize,
 			tomogram_binned.cumulativeDose, num_threads);
 	
 	std::vector<std::vector<double>> all_blob_coeffs;
 	Mesh blob_meshes;
-	TomogramManifoldSet tomogram_manifold_set;
+	TomogramManifoldSet output_tomogram_manifold_set;
 
-	
-	for (int blob_id = 0; blob_id < spheres.size(); blob_id++)
+	for (std::map<int, const Manifold*>::const_iterator it = input_manifolds_map.begin();
+		 it != input_manifolds_map.end(); it++)
 	{
-		Log::beginSection("Blob #" + ZIO::itoa(blob_id + 1));
-		
-		const d4Vector sphere = spheres[blob_id];
+		const int sphere_id = it->first;
+		const Manifold* manifold = it->second;
 
-		const d3Vector sphere_position = sphere.xyz();
+		if (manifold->type != Sphere::getTypeName()) continue;
+
+		Log::beginSection("Sphere #" + ZIO::itoa(sphere_id + 1));
 		
-		const std::string blob_tag = outPath+tomogram_name+"_blob_"+ZIO::itoa(blob_id);
+		std::vector<double> sphere_params = manifold->getParameters();
+
+		const d3Vector sphere_position(sphere_params[0], sphere_params[1], sphere_params[2]);
+		const double sphere_radius = sphere_params[3];
+		
+		const std::string blob_tag = outPath + "diag/" + tomogram_name + "_blob_" + ZIO::itoa(sphere_id);
 		
 		std::vector<double> blob_coeffs = segmentBlob(
 					sphere_position,
-					sphere.w,
-					sphere_thickness,
-					segmentation_binning,
+					sphere_radius,
+					relative_radius_range * sphere_radius,
+					membrane_separation,
+					fit_binning,
 					preweighted_stack,
 					pixel_size,
 					tomogram_binned.projectionMatrices,
@@ -220,16 +200,16 @@ void FitBlobs3DProgram::processTomogram(
 		all_blob_coeffs.push_back(blob_coeffs);
 		
 		Mesh blob_mesh = createMesh(blob_coeffs, pixel_size, 50, 60);
-		
-		blob_mesh.writeObj(blob_tag+".obj");
 
-		tomogram_manifold_set.add(new Spheroid(blob_coeffs, blob_id));
+		output_tomogram_manifold_set.add(new Spheroid(blob_coeffs, sphere_id));
 
 		MeshBuilder::insert(blob_mesh, blob_meshes);
 		Log::endSection();
 	}
+
+	blob_meshes.writePly(outPath + "Meshes/" + tomogram_name + ".ply");
 	
-	manifold_set.add(tomogram_name, tomogram_manifold_set);
+	output_manifold_set.add(tomogram_name, output_tomogram_manifold_set);
 }
 
 Mesh FitBlobs3DProgram::createMesh(
@@ -306,6 +286,7 @@ std::vector<double> FitBlobs3DProgram::segmentBlob(
 		d3Vector sphere_position,
 		double mean_radius_full,
 		double radius_range,
+		double membrane_separation,
 		double binning,
 		const RawImage<float>& preweighted_stack,
 		double pixel_size,
@@ -349,16 +330,19 @@ std::vector<double> FitBlobs3DProgram::segmentBlob(
 	
 	const int y_prior = 100 / binning;
 	const int falloff = 100 / binning;
-	const int width = 10 / binning;
-	const double spacing = 40.0 / (pixel_size * binning);
+	const int width = 30 / binning;
+	const double spacing = membrane_separation / (pixel_size * binning);
 	const double ratio = 5.0;
 	const double depth = 0;
 	
 	const double min_radius_full = mean_radius_full - radius_range/2;
 	const double max_radius_full = mean_radius_full + radius_range/2;
 		
-	
-	BufferedImage<float> kernel = MembraneSegmentation::constructMembraneKernel(
+	const double max_tilt = DEG2RAD(30);
+	const double tilt_steps = 15;
+
+
+	/*BufferedImage<float> kernel = MembraneSegmentation::constructMembraneKernel(
 		map.xdim, map.ydim, map.zdim, falloff, width, spacing, ratio, depth);   
 	
 	if (debug_prefix != "")
@@ -382,7 +366,17 @@ std::vector<double> FitBlobs3DProgram::segmentBlob(
 	
 	BufferedImage<float> correlation;
 	        
-	FFT::inverseFourierTransform(correlation_FS, correlation);
+	FFT::inverseFourierTransform(correlation_FS, correlation);*/
+
+
+
+
+	BufferedImage<float> correlation =
+		MembraneSegmentation::correlateWithMembraneMultiAngle(
+			map, falloff, width, spacing, ratio, depth,
+			max_tilt, tilt_steps);
+
+
 	
 	const double st = map.zdim / 4.0;
 	const double s2t = 2 * st * st;
@@ -394,7 +388,7 @@ std::vector<double> FitBlobs3DProgram::segmentBlob(
 	{
 		const double r = (min_radius_full + radius_range * y / (double) map.ydim) / max_radius_full;
 		
-		const double ay = map.ydim - y - 1;		        
+		const double ay = map.ydim - y - 1;
 		const double q0 = 1.0 - exp( -y*y  / s2f);
 		const double q1 = 1.0 - exp(-ay*ay / s2f);
 		

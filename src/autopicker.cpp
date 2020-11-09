@@ -107,8 +107,8 @@ void AutoPicker::read(int argc, char **argv)
 	do_only_unfinished = parser.checkOption("--only_do_unfinished", "Only autopick those micrographs for which the coordinate file does not yet exist");
 	do_gpu = parser.checkOption("--gpu", "Use GPU acceleration when availiable");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
-#ifndef CUDA
-	if(do_gpu)
+#ifndef _CUDA_ENABLED
+if(do_gpu)
 	{
 		std::cerr << "+ WARNING : Relion was compiled without CUDA of at least version 7.0 - you do NOT have support for GPUs" << std::endl;
 		do_gpu = false;
@@ -340,7 +340,7 @@ void AutoPicker::initialise()
 	}
 	else if (fn_ref == "")
 	{
-		REPORT_ERROR("ERROR: Provide either --ref or use --LoG.");
+		REPORT_ERROR("ERROR: Provide either --ref, --topaz_train, --topaz_extract, or --LoG.");
 	}
 	else if (fn_ref == "gauss")
 	{
@@ -524,7 +524,7 @@ void AutoPicker::initialise()
 	timer.tic(TIMING_A3);
 #endif
 
-	if (!do_LoG)
+	if ( !(do_LoG) )
 	{
 		// Re-scale references if necessary
 		if (angpix_ref < 0)
@@ -866,7 +866,7 @@ void AutoPicker::initialise()
 #endif
 }
 
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 int AutoPicker::deviceInitialise()
 {
 	int devCount;
@@ -914,8 +914,8 @@ void AutoPicker::run()
 			progress_bar(imic);
 
 		// Check new-style outputdirectory exists and make it if not!
-		FileName fn_dir = getOutputRootName(fn_micrographs[imic]);
-		fn_dir = fn_dir.beforeLastOf("/");
+		FileName fn_oroot = getOutputRootName(fn_micrographs[imic]);
+		FileName fn_dir = fn_oroot.beforeLastOf("/");
 		if (fn_dir != fn_olddir)
 		{
 			// Make a Particles directory
@@ -929,13 +929,17 @@ void AutoPicker::run()
 			autoPickLoGOneMicrograph(fn_micrographs[imic], imic);
 		else
 			autoPickOneMicrograph(fn_micrographs[imic], imic);
+
 #ifdef TIMING
 		timer.toc(TIMING_A5);
 #endif
 	}
 
+
 	if (verb > 0)
 		progress_bar(fn_micrographs.size());
+
+
 }
 
 void AutoPicker::generatePDFLogfile()
@@ -944,18 +948,26 @@ void AutoPicker::generatePDFLogfile()
 	long int barstep = XMIPP_MAX(1, fn_ori_micrographs.size() / 60);
 	if (verb > 0)
 	{
-		std::cout << " Generating logfile.pdf ... " << std::endl;
+		std::cout << " Generating logfile.pdf and output list of coordinate files ... " << std::endl;
 		init_progress_bar(fn_ori_micrographs.size());
 	}
 
+	MetaDataTable MDcoords;
 	MetaDataTable MDresult;
 	long total_nr_picked = 0;
+	int nr_coord_files = 0;
 	for (long int imic = 0; imic < fn_ori_micrographs.size(); imic++)
 	{
 		MetaDataTable MD;
 		FileName fn_pick = getOutputRootName(fn_ori_micrographs[imic]) + "_" + fn_out + ".star";
 		if (exists(fn_pick))
 		{
+
+			MDcoords.addObject();
+			MDcoords.setValue(EMDL_MICROGRAPH_NAME, fn_ori_micrographs[imic]);
+			MDcoords.setValue(EMDL_MICROGRAPH_COORDINATES, fn_pick);
+			nr_coord_files++;
+
 			MD.read(fn_pick);
 			long nr_pick = MD.numberOfObjects();
 			total_nr_picked += nr_pick;
@@ -981,6 +993,10 @@ void AutoPicker::generatePDFLogfile()
 	}
 
 
+	FileName fn_coords = fn_odir + fn_out + ".star";
+	MDcoords.setName("coordinate_files");
+	MDcoords.write(fn_coords);
+
 	if (verb > 0 )
 	{
 		progress_bar(fn_ori_micrographs.size());
@@ -988,6 +1004,7 @@ void AutoPicker::generatePDFLogfile()
 		long avg = 0;
 		if (fn_ori_micrographs.size() > 0) avg = ROUND((RFLOAT)total_nr_picked/fn_ori_micrographs.size());
 		std::cout << " i.e. on average there were " << avg << " particles per micrograph" << std::endl;
+		std::cout << " Saved list with " << nr_coord_files << " coordinate files in: " << fn_coords << std::endl;
 	}
 
 	// Values for all micrographs

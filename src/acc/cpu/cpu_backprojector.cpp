@@ -13,7 +13,6 @@
 #include "src/acc/cpu/cpu_kernels/helper.h"
 #include "src/acc/cpu/cpu_kernels/diff2.h"
 #include "src/acc/cpu/cpu_kernels/wavg.h"
-#define CPU_BP_INITIALIZE 1
 #include "src/acc/cpu/cpu_kernels/BP.h"
 #include "src/acc/utilities.h"
 #include "src/acc/data_types.h"

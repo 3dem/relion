@@ -12,6 +12,7 @@
 #include <src/jaz/tomography/particle_set.h>
 #include <src/jaz/tomography/tomogram.h>
 #include <src/jaz/tomography/reference_map.h>
+#include <src/jaz/tomography/optimisation_set.h>
 #include <src/jaz/optics/optics_data.h>
 
 
@@ -27,15 +28,16 @@ class RefinementProgram
 			int argc;
 			char** argv;
 			
-			std::string outDir, tomoSetFn, particlesFn, motFn;
+			std::string outDir;
+			OptimisationSet optimisationSet;
 			
-			bool diag, timing;
+			bool diag, timing, static_noise;
 			
 			int boxSize, num_threads, specified_first_frame, specified_last_frame;
 
 			
 			
-			ParticleSet dataSet;
+			ParticleSet particleSet;
 			std::vector<std::vector<ParticleIndex>> particles;
 			TomogramSet tomogramSet;
 			
@@ -49,7 +51,7 @@ class RefinementProgram
 		BufferedImage<float> computeFrequencyWeights(
 						const Tomogram& tomogram,
 						bool whiten, double sig2RampPower, double hiPass_px,
-						int num_threads);
+						bool applyDoseWeight, int num_threads);
 };
 
 

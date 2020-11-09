@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
 		dmp.doNcHist = parser.checkOption("--nch", "Compute neighbor-count histogram, then quit");
 		dmp.maxNcHist = textToInteger(parser.getOption("--nchmax", "Max. neighbor count", "20"));
 				
-		parser.checkForErrors();
+		if (parser.checkForErrors()) std::exit(-1);
 	}
 	catch (RelionError XE)
 	{

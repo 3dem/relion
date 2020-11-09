@@ -9,6 +9,7 @@
 #include <src/jaz/tomography/extraction.h>
 #include <src/jaz/image/interpolation.h>
 #include <src/jaz/util/zio.h>
+#include <src/jaz/util/log.h>
 #include <src/jaz/optimization/nelder_mead.h>
 #include <src/jaz/optimization/gradient_descent.h>
 #include <src/jaz/optimization/lbfgs.h>
@@ -38,7 +39,9 @@ void BfactorFitProgram::readParams(IOParser &parser)
 		kMin = textToInteger(parser.getOption("--kmin", "Min. freq. used for estimation [Px]", "20"));
 		kMin2 = textToInteger(parser.getOption("--kmin2", "Throw out frames with an estimated sigma below this [Px]", "10"));
 		useCache = parser.checkOption("--cache", "Use the FCC3 files computed during a previous run (if available)");
-		
+
+		Log::readParams(parser);
+
 		if (parser.checkForErrors()) std::exit(-1);
 	}
 	catch (RelionError XE)
@@ -57,8 +60,8 @@ void BfactorFitProgram::run()
 	const int s = boxSize;
 	const int sh = s/2 + 1;
 	const bool flip_value = true;
-	
-	
+
+
 	TomogramSet tomogramSetOut = tomogramSet;
 	
 	std::vector<std::vector<double>> B_t(tc), k_t(tc), cumulativeDose(tc);
@@ -70,15 +73,22 @@ void BfactorFitProgram::run()
 	{
 		int pc = particles[t].size();
 		if (pc == 0) continue;
-		
-		
-		std::string tag = outDir + ZIO::itoa(t);
+
 		
 		Tomogram tomogram = tomogramSet.loadTomogram(t, true);
 		pixelSizes[t] = tomogram.optics.pixelSize;
-		
+
+		std::string tag = outDir + tomogram.name;
+
 		BufferedImage<double> FCC3;
-		
+
+		BufferedImage<float> frqWeight = computeFrequencyWeights(
+			tomogram, true, 0, -1, true, num_threads);
+
+		frqWeight.write(outDir + "DEBUG_frqWeight.mrc");
+		std::exit(0);
+
+
 		const std::string fcc3fn = tag + "_FCC3.mrc";
 		
 		if (useCache && exists(fcc3fn))
@@ -89,7 +99,7 @@ void BfactorFitProgram::run()
 		else
 		{
 			FCC3 = FCC::compute3(
-				dataSet, particles[t], tomogram, referenceMap.image_FS,
+				particleSet, particles[t], tomogram, referenceMap.image_FS,
 				flip_value, num_threads);
 			
 			FCC3.write(fcc3fn);
@@ -197,4 +207,7 @@ void BfactorFitProgram::run()
 	}
 	
 	tomogramSetOut.write(outDir + "tomograms.star");
+
+	optimisationSet.tomograms = outDir+"tomograms.star";
+	optimisationSet.write(outDir+"optimisation_set.star");
 }

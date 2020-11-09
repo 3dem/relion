@@ -19,8 +19,14 @@ file(GLOB REL_GUI_SRC "${CMAKE_SOURCE_DIR}/src/manualpicker.cpp" "${CMAKE_SOURCE
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
 include(GetGitRevisionDescription)
 get_git_head_revision(GIT_REFSPEC GIT_SHA1_FULL)
-string(SUBSTRING ${GIT_SHA1_FULL} 0 6 GIT_SHA1)
-message(STATUS "Git commit ID: ${GIT_SHA1_FULL}")
+set(RELION_VERSION_SUFFIX "")
+if (GIT_SHA1_FULL)
+   string(SUBSTRING ${GIT_SHA1_FULL} 0 6 GIT_SHA1_PREFIX)
+   if (NOT GIT_SHA1_PREFIX STREQUAL "GITDIR")
+      message(STATUS "Git commit ID: ${GIT_SHA1_FULL}")
+      set(RELION_VERSION_SUFFIX "-commit-${GIT_SHA1_PREFIX}")
+   endif()
+endif()
 configure_file("${CMAKE_SOURCE_DIR}/src/macros.cpp.in" "${CMAKE_BINARY_DIR}/macros.cpp" @ONLY)
 
 if (ALTCPU)
@@ -310,6 +316,14 @@ if(BUILD_OWN_TBB)
 	add_dependencies(relion_lib OWN_TBB)
 endif()
 
+if(TORCH)
+	target_link_libraries(relion_lib ${TORCH_LIBRARIES})
+	set_property(TARGET relion_lib PROPERTY CXX_STANDARD 14)
+	if(BUILD_OWN_Torch)
+		add_dependencies(relion_lib OWN_Torch)
+	endif()
+endif(TORCH)
+
 foreach (_target ${RELION_TARGETS})
 	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)  #specify target name WE=WithoutExtension
 	
@@ -420,7 +434,6 @@ if(GUI)
 	ADD_CUSTOM_COMMAND(TARGET maingui
 	                   POST_BUILD
                            COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/bin/relion_maingui ${PROJECT_BINARY_DIR}/bin/relion
-                           COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/bin/relion_qsub.csh ${PROJECT_BINARY_DIR}/bin/qsub.csh
 	)
 endif(GUI)
 
@@ -434,7 +447,12 @@ if(OPENMP_FOUND)
 endif()
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+
+if(TORCH)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
+else(TORCH)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+endif(TORCH)
 
 # Set this flag to activate bounds checking in stl-vectors (incl. strings)
 # It is useful to do this periodically, as it catches 

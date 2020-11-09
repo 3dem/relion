@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
 	std::string outFn, outFnCrop, name, tsFn, orderFn, tltFn, ctfFindFn, ctfPlotterFn;
 	CtfSource ctfSource;
 	ImodImport ii;
-			
+
 	try
 	{
 		parser.setCommandLine(argc, argv);
@@ -30,12 +30,12 @@ int main(int argc, char *argv[])
 		
 		int gen_section = parser.addSection("General options");
 		
-		tsFn = parser.getOption("--i", "Tilt series file name");
+		tsFn = parser.getOption("--ts", "Tilt series file name");
 		
 		name = parser.getOption("--name", "Tomogram name (default: ts_<N>)", "");
 		hand = textToDouble(parser.getOption("--hand", "Handedness of the tilt geometry", "-1"));
 		
-		outFn = parser.getOption("--o", "Output filename");
+		outFn = parser.getOption("--io", "Input and output tomogram set");
 		outFnCrop = parser.getOption("--oc", 
 			"Output filename for culled stack (if frames have been excluded)", "");
 		
@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
 		int dose_section = parser.addSection("Electron dose options");
 				
 		orderFn = parser.getOption("--ol", "Frame-order list (*.csv)", "order_list.csv");
-		tltFn = parser.getOption("--t", "Tilt angles list (*.tlt, the one from IMOD is used by default)", "");
+		tltFn = parser.getOption("--tlt", "Tilt angles list (*.tlt, the one from IMOD is used by default)", "");
 		fractionalDose = textToDouble(parser.getOption("--fd", "Fractional dose in electrons per Å²"));
 		
 		
@@ -101,12 +101,12 @@ int main(int argc, char *argv[])
 		ctfSource = None;
 		Log::print("Not considering the CTF");
 	}
-	else if (ctfPlotterFn == "")		
+	else if (ctfPlotterFn == "")
 	{
 		ctfSource = CtfFind;
 		Log::print("The CTF will be read from the CTFFind output file "+ctfFindFn);
 	}
-	else if (ctfFindFn == "")		
+	else if (ctfFindFn == "")
 	{
 		ctfSource = CtfPlotter;
 		Log::print("The CTF will be read from the ctfplotter output file "+ctfPlotterFn);

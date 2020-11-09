@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<title>Particle Set</title>
+	<link rel="stylesheet" href="../style.css">
+</head>
+
+<body>
+	<h1>Particle Set</h1>
+	
+	<p>The particle set (typically named <tt>particles.star</tt>) lists all the particles in a data set. It is roughly equivalent to the corresponding particles file used by the SPA programs in Relion, and it serves as the binding element between the tomography programs and the ones used for the general refinement. It is also the only tomography data file that can be understood by the SPA programs in Relion.</p>
+	
+	<p>Like an SPA particle set, the tomography particle set consists of an optics table and a particle table. Unlike in an SPA particle set, the coordinates of the particles are given in 3 dimensions (<tt>rlnCoordinate&lt;X/Y/Z&gt;</tt> and <tt>rlnOrigin&lt;X/Y/Z&gt;Angst</tt>), and each particle also requires a tomogram name (<tt>rlnTomoName</tt>) that identifies the particle's tomogram of origin, as defined in the <a href="tomogram_set.html">tomogram set</a>.</p>
+	
+	<p>Also unlike in SPA, the tomography particles should not be thought of as pixel data stored on disk, but instead as abstract entities defined in this file. The 3D images that are used for refinement can be created using the program <a href="subtomo.html"><tt>relion_tomo_subtomo</tt></a>, but they should be regarded as transient data that become invalid once any of the other properties of their tomograms have been updated. Therefore, during the processing of a tomography data set, those 3D images are typically created multiple times.</p>
+	
+	<p>Another difference to a 2D particle set is that tomography particles can optionally posess two different orientations. In tomography, the approximate orientation of a particle is often dictated by the geometric context (e.g. the orientation of a membrane in which they are embedded). Therefore, the subtomogram alignment can be greatly accelerated by defining the initial orientation of each subtomogram in relation to that geometry (using the fields <tt>rlnTomoSubtomogram&lt;Rot/Tilt/Psi&gt;</tt>) and then applying strong priors during refinement to constrain the angles that describe the orientation of the particle itself with respect to its subtomogram (<tt>rlnAngle&lt;Rot/Tilt/Psi&gt;</tt>). Since only the latter angles are considered by <tt>relion_refine</tt>, the priors will only affect those angles. Typically, this means that the <tt>rlnAngleTilt</tt> angle will be constrained, while the other two are usually unknown, even in tomography.<p>
+	
+	<img src="subtomogram.svg" class="center">
+	
+	<p>There are currently two ways in which a new particle set can be created: it can be either imported from an existing data set, or the particles can be sampled along a set of user-defined (and possibly fitted) <a href="manifold_set.html">manifolds</a> using the program <a href="sample_manifold.html"><tt>relion_tomo_sample_manifold</tt></a>. In the latter case, the program will automatically define the subtomogram orientations in relation to the manifold, such that the Z axis of the (yet to be created) subtomograms will point perpendicularly to the manifold. A more detailed description on how to import particles from existing data sets is provided in <a href="importing_particles.html">importing particles</a>.</p>
+	
+	
+	
+</body>
+
+</html>

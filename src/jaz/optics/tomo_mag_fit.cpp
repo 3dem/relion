@@ -108,7 +108,7 @@ d2Vector TomoIsoMagFit::computeErrorAndSlope(
 		{
 			TomoExtraction::extractFrameAt3D_Fourier(
 					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f],
-					traj[f], observation, projCut, 1, false, true);
+					traj[f], observation, projCut, 1, true);
 
 
 			const d4Matrix particleToTomo = particleSet.getMatrix4x4(
@@ -186,7 +186,7 @@ d2Vector TomoIsoMagFit::computeErrorAndSlope(
 
 				const float wg = freqWeights(x,y,f);
 
-				const fComplex pred = prediction(x,y);
+				const fComplex pred = ctf_part.scale * prediction(x,y);
 				const t2Vector<fComplex> grad = predGradient(x,y);
 
 				const fComplex dF = c * pred - observation(x,y);
@@ -284,7 +284,7 @@ BufferedImage<Equation2x2> TomoAnisoMagFit::computeEquations()
 		{
 			TomoExtraction::extractFrameAt3D_Fourier(
 					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f],
-					traj[f], observation, projCut, 1, false, true);
+					traj[f], observation, projCut, 1, true);
 
 			observation *= -1.f;
 
@@ -367,7 +367,7 @@ std::vector<BufferedImage<Equation2x2>> TomoAnisoMagFit::computeEquations_even_o
 		{
 			TomoExtraction::extractFrameAt3D_Fourier(
 					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f],
-					traj[f], observation, projCut, 1, false, true);
+					traj[f], observation, projCut, 1, true);
 
 			observation *= -1.f;
 
@@ -478,7 +478,7 @@ double TomoAnisoMagFit::evaluateMag(const d2Matrix& M)
 		{
 			TomoExtraction::extractFrameAt3D_Fourier(
 					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f],
-					traj[f], observation, projCut, 1, false, true);
+					traj[f], observation, projCut, 1, true);
 
 			const d4Matrix particleToTomo = particleSet.getMatrix4x4(
 					particle_id, s, s, s);

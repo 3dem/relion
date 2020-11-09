@@ -4,14 +4,19 @@
 #include <src/jaz/image/buffered_image.h>
 #include <vector>
 
+class OptimisationSet;
 
 class TomoReferenceMap
 {
 	public:
+
+		static void presharpen(BufferedImage<float>& map_RS, double padding);
 		
+
 		TomoReferenceMap();
 
 		void read(IOParser& parser);
+		void read(const OptimisationSet& optimisationSet);
 		
 			std::string mapFilenames[2], maskFilename, fscFilename;
 			bool useFscThreshold;
@@ -26,10 +31,6 @@ class TomoReferenceMap
 			
 		int getBoxSize() const;
 
-
-	protected:
-
-		void presharpen(BufferedImage<float>& map_RS, double padding);
 };
 
 #endif

@@ -4,6 +4,8 @@
 #include <src/jaz/math/fft.h>
 #include <src/jaz/util/log.h>
 #include <src/jaz/util/zio.h>
+#include <src/jaz/tomography/reconstruction.h>
+#include <src/jaz/tomography/optimisation_set.h>
 
 using namespace gravis;
 
@@ -19,6 +21,17 @@ void TomoReferenceMap::read(IOParser &parser)
 
 	useFscThreshold = !parser.checkOption("--fsc_act", "Use the actual FSC as the frq. weight");
 	fscThresholdWidth = textToDouble(parser.getOption("--fsc_thresh_width", "Width of the frq. weight flank", "5"));
+}
+
+void TomoReferenceMap::read(const OptimisationSet &optimisationSet)
+{
+	mapFilenames[0] = optimisationSet.refMap1;
+	mapFilenames[1] = optimisationSet.refMap2;
+	maskFilename = optimisationSet.refMask;
+	fscFilename = optimisationSet.refFSC;
+
+	useFscThreshold = optimisationSet.useFscThreshold;
+	fscThresholdWidth = optimisationSet.fscThresholdWidth;
 }
 
 void TomoReferenceMap::load(int boxSize)
@@ -65,7 +78,18 @@ void TomoReferenceMap::load(int boxSize)
 			image_real[i] = Padding::padCenter3D_full(image_real[i], (boxSize - sr)/2);
 		}
 	}
+	else if (image_real[0].xdim > s)
+	{
+		REPORT_ERROR_STR("Reference map is too big: " << image_real[0].xdim
+				<< " pixels instead of " << s);
+	}
 
+	const double taper_edge_width = 10;
+
+	for (int i = 0; i < 2; i++)
+	{
+		Reconstruction::taper(image_real[i], taper_edge_width, true, 1);
+	}
 
 	image_FS.resize(2);
 
@@ -170,7 +194,7 @@ void TomoReferenceMap::presharpen(
 		BufferedImage<float>& map_RS,
 		double padding)
 {
-	const int s = image_real[0].xdim;
+	const int s = map_RS.xdim;
 
 	const double epsilon = 0.02;
 

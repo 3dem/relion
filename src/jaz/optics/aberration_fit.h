@@ -71,6 +71,10 @@ namespace aberration
 			double Axx, Axy, Ayy, bx, by;
 
 			EvenData& operator+=(const EvenData& d);
+
+			static void write(const RawImage<EvenData>& evenData, std::string filename);
+			static BufferedImage<EvenData> read(std::string filename);
+
 	};
 
 	class OddData
@@ -118,6 +122,7 @@ class AberrationFit
 				const AberrationsCache& aberrationsCache,
 				bool flip_value,
 				const BufferedImage<float>& frqWeight,
+				const BufferedImage<float>& frqEnvelope,
 				int f0, int f1,
 				BufferedImage<aberration::EvenData>& even_out,
 				BufferedImage<aberration::OddData>& odd_out);
