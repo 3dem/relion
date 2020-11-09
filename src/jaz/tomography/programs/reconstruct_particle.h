@@ -33,8 +33,7 @@ class ReconstructParticleProgram
 	protected:
 
 		void processTomograms(
-				int first_t,
-				int last_t,
+				const std::vector<int>& tomoIndices,
 				const TomogramSet& tomoSet,
 				const ParticleSet& dataSet,
 				const std::vector<std::vector<ParticleIndex>>& particles,

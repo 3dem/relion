@@ -153,9 +153,10 @@ void ReconstructParticleProgram::run()
 	Log::endSection();
 	
 
+	std::vector<int> tomoIndices = ParticleSet::enumerate(particles);
 
 	processTomograms(
-		0, tc-1, tomoSet, particleSet, particles, aberrationsCache,
+		tomoIndices, tomoSet, particleSet, particles, aberrationsCache,
 		dataImgFS, ctfImgFS, psfImgFS, binnedOutPixelSize,
 		s02D, do_ctf, flip_value, 1, true);
 
@@ -205,8 +206,7 @@ void ReconstructParticleProgram::run()
 }
 
 void ReconstructParticleProgram::processTomograms(
-	int first_t,
-	int last_t,
+	const std::vector<int>& tomoIndices,
 	const TomogramSet& tomoSet,
 	const ParticleSet& particleSet,
 	const std::vector<std::vector<ParticleIndex>>& particles,
@@ -223,14 +223,15 @@ void ReconstructParticleProgram::processTomograms(
 {
 	const int s = dataImgFS[0].ydim;
 	const int sh = s/2 + 1;
-	const int tc = last_t - first_t + 1;
+	const int tc = tomoIndices.size();
 
 	if (verbosity > 0 && !per_tomogram_progress)
 	{
 		int total_particles_on_first_thread = 0;
 
-		for (int t = first_t; t <= last_t; t++)
+		for (int tt = 0; tt < tc; tt++)
 		{
+			const int t = tomoIndices[tt];
 			const int pc_all = particles[t].size();
 			const int pc_th0 = (int)ceil(pc_all/(double)outer_threads);
 
@@ -243,8 +244,9 @@ void ReconstructParticleProgram::processTomograms(
 	int particles_in_previous_tomograms = 0;
 
 
-	for (int t = first_t; t <= last_t; t++)
+	for (int tt = 0; tt < tc; tt++)
 	{
+		const int t = tomoIndices[tt];
 		const int pc = particles[t].size();
 
 		if (pc == 0) continue;
@@ -253,7 +255,7 @@ void ReconstructParticleProgram::processTomograms(
 		{
 			if (per_tomogram_progress)
 			{
-				Log::beginSection("Tomogram " + ZIO::itoa(t+1-first_t) + " / " + ZIO::itoa(tc));
+				Log::beginSection("Tomogram " + ZIO::itoa(tt+1) + " / " + ZIO::itoa(tc));
 				Log::print("Loading");
 			}
 		}
@@ -262,7 +264,7 @@ void ReconstructParticleProgram::processTomograms(
 
 		const int fc = tomogram.frameCount;
 
-		particleSet.checkTrajectoryLengths(particles[t][0], pc, fc, "backproject");
+		particleSet.checkTrajectoryLengths(particles[t][0], pc, fc, "reconstruct_particle");
 
 		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s, binning);
 		BufferedImage<float> noiseWeights;

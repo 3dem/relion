@@ -38,6 +38,7 @@ void SubtomoProgramMpi::readParameters(int argc, char *argv[])
 		parser.setCommandLine(argc, argv);
 
 		readBasicParameters(parser);
+		do_sum_all = false;
 
 		Log::readParams(parser);
 
@@ -52,7 +53,10 @@ void SubtomoProgramMpi::readParameters(int argc, char *argv[])
 	}
 
 	if (nodeCount < 2)
-		REPORT_ERROR("SubtomoProgramMpi::read ERROR: this program needs to be run with at least two MPI processes!");
+	{
+		REPORT_ERROR("SubtomoProgramMpi::read: this program needs to be run with at least two MPI processes!");
+	}
+
 	// Print out MPI info
 	printMpiNodesMachineNames(*node);
 
@@ -108,13 +112,11 @@ void SubtomoProgramMpi::run()
 
 	AberrationsCache aberrationsCache(particleSet.optTable, s2D);
 
-	// determine tomogram range based on node rank:
-	const int first_tomo = rank * tc / nodeCount;
-	const int last_tomo = (rank == nodeCount - 1)? tc - 1 : (rank + 1) * tc / nodeCount - 1;
+
+	std::vector<std::vector<int>> tomoIndices = ParticleSet::splitEvenly(particles, nodeCount);
 
 	processTomograms(
-			first_tomo,
-			last_tomo,
+			tomoIndices[rank],
 			tomogramSet,
 			particleSet,
 			particles,
@@ -127,43 +129,4 @@ void SubtomoProgramMpi::run()
 			1,
 			sum_data,
 			sum_weights);
-
-
-	if (do_sum_all)
-	{
-		BufferedImage<float> sum_data_global, sum_weights_global;
-		if (node->isMaster())
-		{
-			sum_data_global.resize(sum_data);
-			sum_weights_global.resize(sum_weights);
-		}
-		MPI_Reduce(MULTIDIM_ARRAY(sum_data), MULTIDIM_ARRAY(sum_data_global), sum_data.getSize(),
-					  MY_MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-		MPI_Reduce(MULTIDIM_ARRAY(sum_weights), MULTIDIM_ARRAY(sum_weights_global), sum_weights.getSize(),
-					  MY_MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-
-		if (node->isMaster())
-		{
-			sum_data_global.write(outDir + "sum_data.mrc");
-			sum_weights_global.write(outDir + "sum_weight.mrc");
-
-			BufferedImage<float> dataImgDivRS(s3D, s3D, s3D);
-			dataImgDivRS.fill(0.0);
-
-			if (SNR > 0.0)
-			{
-				Reconstruction::ctfCorrect3D_Wiener(
-						sum_data_global, sum_weights_global, dataImgDivRS,
-						1.0 / SNR, num_threads);
-			}
-			else
-			{
-				Reconstruction::ctfCorrect3D_heuristic(
-						sum_data_global, sum_weights_global, dataImgDivRS,
-						0.001, num_threads);
-			}
-
-			dataImgDivRS.write(outDir + "sum_div.mrc");
-		}
-	}
 }

@@ -67,8 +67,7 @@ class SubtomoProgram
 				const std::vector<std::vector<ParticleIndex>>& particles);
 
 		void processTomograms(
-				int first_t,
-				int last_t,
+				const std::vector<int>& tomoIndices,
 				const TomogramSet& tomogramSet,
 				const ParticleSet& particleSet,
 				const std::vector<std::vector<ParticleIndex>>& particles,

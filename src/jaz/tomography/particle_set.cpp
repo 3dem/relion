@@ -536,3 +536,18 @@ std::vector<std::vector<int>> ParticleSet::splitEvenly(
 
 	return out;
 }
+
+std::vector<int> ParticleSet::enumerate(
+		const std::vector<std::vector<ParticleIndex>>& particlesByTomogram)
+{
+	const int tc = particlesByTomogram.size();
+
+	std::vector<int> indices(tc);
+
+	for (int t = 0; t < tc; t++)
+	{
+		indices[t] = t;
+	}
+
+	return indices;
+}

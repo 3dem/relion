@@ -22,12 +22,6 @@
 using namespace gravis;
 
 
-/*ReconstructParticleProgramMpi::ReconstructParticleProgramMpi(int rank, int nodeCount)
-: rank(rank),
-  nodeCount(nodeCount)
-{
-}*/
-
 void ReconstructParticleProgramMpi::readParameters(int argc, char *argv[])
 {
 	// Define a new MpiNode
@@ -42,7 +36,7 @@ void ReconstructParticleProgramMpi::readParameters(int argc, char *argv[])
 
 	if (nodeCount < 2)
 	{
-		REPORT_ERROR("ReconstructParticleProgramMpi::read ERROR: this program needs to be run with at least two MPI processes!");
+		REPORT_ERROR("ReconstructParticleProgramMpi::read: this program needs to be run with at least two MPI processes!");
 	}
 
 	// Print out MPI info
@@ -129,12 +123,10 @@ void ReconstructParticleProgramMpi::run()
 		Log::endSection();
 	}
 
-	// determine tomogram range based on node rank:
-	const int first_tomo = rank * tc / nodeCount;
-	const int last_tomo = (rank == nodeCount - 1)? tc - 1 : (rank + 1) * tc / nodeCount - 1;
+	std::vector<std::vector<int>> tomoIndices = ParticleSet::splitEvenly(particles, nodeCount);
 
 	processTomograms(
-		first_tomo, last_tomo, tomoSet, particleSet, particles, aberrationsCache,
+		tomoIndices[rank], tomoSet, particleSet, particles, aberrationsCache,
 		dataImgFS, ctfImgFS, psfImgFS, binnedOutPixelSize,
 		s02D, do_ctf, flip_value, verb, false);
 
@@ -170,19 +162,19 @@ void ReconstructParticleProgramMpi::run()
 
 	size_t sizeData = sh*s*s;
 
-	MPI_Allreduce(MULTIDIM_ARRAY(dataImgFS[0]), MULTIDIM_ARRAY(sumDataImgFS[0]), sizeData,
+	MPI_Allreduce(dataImgFS[0].data, sumDataImgFS[0].data, sizeData,
 			MY_MPI_COMPLEX, MPI_SUM, MPI_COMM_WORLD);
-	MPI_Allreduce(MULTIDIM_ARRAY(dataImgFS[1]), MULTIDIM_ARRAY(sumDataImgFS[1]), sizeData,
+	MPI_Allreduce(dataImgFS[1].data, sumDataImgFS[1].data, sizeData,
 			MY_MPI_COMPLEX, MPI_SUM, MPI_COMM_WORLD);
 
-	MPI_Allreduce(MULTIDIM_ARRAY(ctfImgFS[0]), MULTIDIM_ARRAY(sumCtfImgFS[0]), sizeData,
+	MPI_Allreduce(ctfImgFS[0].data, sumCtfImgFS[0].data, sizeData,
 			MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-	MPI_Allreduce(MULTIDIM_ARRAY(ctfImgFS[1]), MULTIDIM_ARRAY(sumCtfImgFS[1]), sizeData,
+	MPI_Allreduce(ctfImgFS[1].data, sumCtfImgFS[1].data, sizeData,
 			MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
-	MPI_Allreduce(MULTIDIM_ARRAY(psfImgFS[0]), MULTIDIM_ARRAY(sumPsfImgFS[0]), sizeData,
+	MPI_Allreduce(psfImgFS[0].data, sumPsfImgFS[0].data, sizeData,
 			MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-	MPI_Allreduce(MULTIDIM_ARRAY(psfImgFS[1]), MULTIDIM_ARRAY(sumPsfImgFS[1]), sizeData,
+	MPI_Allreduce(psfImgFS[1].data, sumPsfImgFS[1].data, sizeData,
 			MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
 

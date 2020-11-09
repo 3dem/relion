@@ -63,7 +63,6 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 	write_normalised = parser.checkOption("--nrm", "Write multiplicity-normalised subtomograms");
 
 	diag = parser.checkOption("--diag", "Write out diagnostic information");
-	do_sum_all = parser.checkOption("--sum", "Sum up all subtomograms (for debugging)");
 
 	num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 	outDir = parser.getOption("--o", "Output filename pattern");
@@ -80,6 +79,8 @@ void SubtomoProgram::readParameters(int argc, char *argv[])
 		readBasicParameters(parser);
 		
 		Log::readParams(parser);
+
+		do_sum_all = parser.checkOption("--sum", "Sum up all subtomograms (for debugging)");
 
 		if (parser.checkForErrors()) std::exit(-1);
 
@@ -140,8 +141,10 @@ void SubtomoProgram::run()
 	AberrationsCache aberrationsCache(particleSet.optTable, s2D);
 
 
+	std::vector<int> tomoIndices = ParticleSet::enumerate(particles);
+
 	processTomograms(
-		0, tc - 1,
+		tomoIndices,
 		tomogramSet,
 		particleSet,
 		particles,
@@ -236,8 +239,7 @@ void SubtomoProgram::writeParticleSet(
 }
 
 void SubtomoProgram::processTomograms(
-		int first_t,
-		int last_t,
+		const std::vector<int>& tomoIndices,
 		const TomogramSet& tomogramSet,
 		const ParticleSet& particleSet,
 		const std::vector<std::vector<ParticleIndex>>& particles,
@@ -251,18 +253,20 @@ void SubtomoProgram::processTomograms(
 		BufferedImage<float>& sum_data,
 		BufferedImage<float>& sum_weights )
 {
-	const int tc = last_t - first_t + 1;
+	const int tc = tomoIndices.size();
 	const int sh2D = s2D / 2 + 1;
 	const int sh3D = s3D / 2 + 1;
 
-	for (int t = first_t; t <= last_t; t++)
+	for (int tt = 0; tt < tc; tt++)
 	{
+		const int t = tomoIndices[tt];
+
 		const int pc = particles[t].size();
 		if (pc == 0) continue;
 
 		if (verbosity > 0)
 		{
-			Log::beginSection("Tomogram " + ZIO::itoa(t+1) + " / " + ZIO::itoa(tc));
+			Log::beginSection("Tomogram " + ZIO::itoa(tt+1) + " / " + ZIO::itoa(tc));
 			Log::print("Loading");
 		}
 
