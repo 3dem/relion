@@ -18,7 +18,7 @@ class AberrationsCache;
 class SubtomoProgram
 {
 	public:
-		
+
 		SubtomoProgram(){}
 		
 			OptimisationSet optimisationSet;
