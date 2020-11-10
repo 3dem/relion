@@ -405,10 +405,30 @@ void JobWindow::initialise(int my_job_type)
 		myjob.initialise(my_job_type);
 		initialiseCtfrefineWindow();
 	}
-	else if (my_job_type == PROC_SUBTOMO)
+	else if (my_job_type == PROC_SUBTOMO_IMPORT)
 	{
 		myjob.initialise(my_job_type);
-		initialiseSubtomoWindow();
+		initialiseSubtomoImportWindow();
+	}
+	else if (my_job_type == PROC_SUBTOMO_RECONSTRUCT)
+	{
+		myjob.initialise(my_job_type);
+		initialiseSubtomoReconstructWindow();
+	}
+	else if (my_job_type == PROC_SUBTOMO_CTFREFINE)
+	{
+		myjob.initialise(my_job_type);
+		initialiseSubtomoCtfRefineWindow();
+	}
+	else if (my_job_type == PROC_SUBTOMO_POLISH)
+	{
+		myjob.initialise(my_job_type);
+		initialiseSubtomoPolishWindow();
+	}
+	else if (my_job_type == PROC_SUBTOMO_AVERAGE)
+	{
+		myjob.initialise(my_job_type);
+		initialiseSubtomoAverageWindow();
 	}
 	else if (my_job_type == PROC_EXTERNAL)
 	{
@@ -2225,27 +2245,6 @@ void JobWindow::initialiseCtfrefineWindow()
 	tab2->end();
 }
 
-void JobWindow::initialiseSubtomoWindow()
-{
-	setupTabs(2);
-
-	tab1->begin();
-	tab1->label("I/O");
-	resetHeight();
-
-	// I/O
-	place("in_optset", TOGGLE_DEACTIVATE);
-
-	tab1->end();
-
-	tab2->begin();
-	tab2->label("TODO");
-	resetHeight();
-
-
-	tab2->end();
-}
-
 void JobWindow::initialiseExternalWindow()
 {
 	setupTabs(2);
@@ -2284,3 +2283,198 @@ void JobWindow::initialiseExternalWindow()
 
 	tab2->end();
 }
+
+void JobWindow::placeSubtomoInput(bool has_tomograms, bool has_particles,
+		bool has_trajectories, bool has_manifolds, bool has_postprocess)
+{
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
+
+	place("in_optimisation", TOGGLE_DEACTIVATE);
+
+	current_y += STEPY /2 ;
+
+	if (has_tomograms) place("in_tomograms", TOGGLE_DEACTIVATE);
+	if (has_particles) place("in_particles", TOGGLE_DEACTIVATE);
+	if (has_trajectories) place("in_trajectories", TOGGLE_DEACTIVATE);
+	if (has_manifolds) place("in_manifolds", TOGGLE_DEACTIVATE);
+	if (has_postprocess) place("in_post", TOGGLE_DEACTIVATE);
+
+	tab1->end();
+
+}
+
+void JobWindow::initialiseSubtomoImportWindow()
+{
+	setupTabs(2);
+
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
+
+	tab1->end();
+
+	tab2->begin();
+	tab2->label("TODO");
+	resetHeight();
+
+
+	tab2->end();
+}
+
+void JobWindow::initialiseSubtomoReconstructWindow()
+{
+	setupTabs(2);
+
+	placeSubtomoInput(true, true, true, false, false);
+
+	tab2->begin();
+	tab2->label("Reconstruct");
+	resetHeight();
+
+	place("box_size", TOGGLE_DEACTIVATE);
+	place("crop_size", TOGGLE_DEACTIVATE);
+	place("binning", TOGGLE_DEACTIVATE);
+
+	current_y += STEPY /2 ;
+
+	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group1->end();
+	place("do_cone_weight", TOGGLE_DEACTIVATE, group1);
+
+	group1->begin();
+
+	place("cone_angle", TOGGLE_DEACTIVATE);
+
+	group1->end();
+	guientries["do_cone_weight"].cb_menu_i();
+
+	tab2->end();
+}
+
+void JobWindow::initialiseSubtomoCtfRefineWindow()
+{
+	setupTabs(3);
+
+	placeSubtomoInput(true, true, true, false, true);
+
+	tab2->begin();
+	tab2->label("Defocus");
+	resetHeight();
+
+	place("box_size", TOGGLE_DEACTIVATE);
+
+	current_y += STEPY /2 ;
+
+	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group1->end();
+	place("do_defocus", TOGGLE_DEACTIVATE, group1);
+
+	group1->begin();
+
+	place("focus_range", TOGGLE_DEACTIVATE);
+	place("lambda", TOGGLE_DEACTIVATE);
+
+	group1->end();
+	guientries["do_defocus"].cb_menu_i();
+
+	current_y += STEPY /2 ;
+
+	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group2->end();
+	place("do_scale", TOGGLE_DEACTIVATE, group2);
+
+	group2->begin();
+
+	place("do_frame_scale", TOGGLE_DEACTIVATE);
+	place("do_tomo_scale", TOGGLE_DEACTIVATE);
+
+	group2->end();
+	guientries["do_scale"].cb_menu_i();
+
+	tab2->end();
+	tab3->begin();
+	tab3->label("Aberrations");
+	resetHeight();
+
+	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group3->end();
+	place("do_odd_aberr", TOGGLE_DEACTIVATE, group3);
+
+	group3->begin();
+
+	place("nr_odd_aberr", TOGGLE_DEACTIVATE);
+
+	group3->end();
+	guientries["do_odd_aberr"].cb_menu_i();
+
+	current_y += STEPY /2 ;
+
+	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group4->end();
+	place("do_even_aberr", TOGGLE_DEACTIVATE, group4);
+
+	group4->begin();
+
+	place("nr_even_aberr", TOGGLE_DEACTIVATE);
+
+	group4->end();
+	guientries["do_even_aberr"].cb_menu_i();
+
+	tab3->end();
+}
+
+void JobWindow::initialiseSubtomoPolishWindow()
+{
+	setupTabs(2);
+
+	placeSubtomoInput(true, true, true, false, true);
+
+	tab2->begin();
+	tab2->label("Polish");
+	resetHeight();
+
+	place("box_size", TOGGLE_DEACTIVATE);
+	place("max_error", TOGGLE_DEACTIVATE);
+
+	current_y += STEPY /2 ;
+
+	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group1->end();
+	place("do_polish", TOGGLE_DEACTIVATE, group1);
+
+	group1->begin();
+
+	place("sigma_vel", TOGGLE_DEACTIVATE);
+	place("sigma_div", TOGGLE_DEACTIVATE);
+	place("do_sq_exp_ker", TOGGLE_DEACTIVATE);
+
+	group1->end();
+	guientries["do_polish"].cb_menu_i();
+
+	tab2->end();
+}
+
+void JobWindow::initialiseSubtomoAverageWindow()
+{
+	setupTabs(2);
+
+	placeSubtomoInput(true, true, true, false, false);
+
+	tab2->begin();
+	tab2->label("Average");
+	resetHeight();
+
+	place("box_size", TOGGLE_DEACTIVATE);
+	place("crop_size", TOGGLE_DEACTIVATE);
+	place("binning", TOGGLE_DEACTIVATE);
+
+	current_y += STEPY /2 ;
+
+	place("snr", TOGGLE_DEACTIVATE);
+	place("sym_name", TOGGLE_DEACTIVATE);
+
+	tab2->end();
+}
+

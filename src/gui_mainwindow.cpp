@@ -397,16 +397,25 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	nr_browse_tabs = 0;
 	if (_do_tomo)
 	{
+
 		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-		browser->add("Subtomo generation");
+		browser->add("Subtomo import");
 		gui_jobwindows[nr_browse_tabs] = new JobWindow();
-		gui_jobwindows[nr_browse_tabs]->initialise(PROC_SUBTOMO);
+		gui_jobwindows[nr_browse_tabs]->initialise(PROC_SUBTOMO_IMPORT);
+		browse_grp[nr_browse_tabs]->end();
+		nr_browse_tabs++;
+
+		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+		browser->add("Subtomo reconstruct");
+		gui_jobwindows[nr_browse_tabs] = new JobWindow();
+		gui_jobwindows[nr_browse_tabs]->initialise(PROC_SUBTOMO_RECONSTRUCT);
 		browse_grp[nr_browse_tabs]->end();
 		nr_browse_tabs++;
 
 	}
 	else
 	{
+
 		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 		browser->add("Import");
 		gui_jobwindows[nr_browse_tabs] = new JobWindow();
@@ -493,19 +502,48 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	browse_grp[nr_browse_tabs]->end();
 	nr_browse_tabs++;
 
-	browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("CTF refinement");
-	gui_jobwindows[nr_browse_tabs] = new JobWindow();
-	gui_jobwindows[nr_browse_tabs]->initialise(PROC_CTFREFINE);
-	browse_grp[nr_browse_tabs]->end();
-	nr_browse_tabs++;
+	if (_do_tomo)
+	{
 
-	browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("Bayesian polishing");
-	gui_jobwindows[nr_browse_tabs] = new JobWindow();
-	gui_jobwindows[nr_browse_tabs]->initialise(PROC_MOTIONREFINE);
-	browse_grp[nr_browse_tabs]->end();
-	nr_browse_tabs++;
+		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+		browser->add("Subtomo CTF refine");
+		gui_jobwindows[nr_browse_tabs] = new JobWindow();
+		gui_jobwindows[nr_browse_tabs]->initialise(PROC_SUBTOMO_CTFREFINE);
+		browse_grp[nr_browse_tabs]->end();
+		nr_browse_tabs++;
+
+		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+		browser->add("Subtomo polishing");
+		gui_jobwindows[nr_browse_tabs] = new JobWindow();
+		gui_jobwindows[nr_browse_tabs]->initialise(PROC_SUBTOMO_POLISH);
+		browse_grp[nr_browse_tabs]->end();
+		nr_browse_tabs++;
+
+		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+		browser->add("Subtomo averaging");
+		gui_jobwindows[nr_browse_tabs] = new JobWindow();
+		gui_jobwindows[nr_browse_tabs]->initialise(PROC_SUBTOMO_AVERAGE);
+		browse_grp[nr_browse_tabs]->end();
+		nr_browse_tabs++;
+
+	}
+	else
+	{
+
+		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+		browser->add("CTF refinement");
+		gui_jobwindows[nr_browse_tabs] = new JobWindow();
+		gui_jobwindows[nr_browse_tabs]->initialise(PROC_CTFREFINE);
+		browse_grp[nr_browse_tabs]->end();
+		nr_browse_tabs++;
+
+		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+		browser->add("Bayesian polishing");
+		gui_jobwindows[nr_browse_tabs] = new JobWindow();
+		gui_jobwindows[nr_browse_tabs]->initialise(PROC_MOTIONREFINE);
+		browse_grp[nr_browse_tabs]->end();
+		nr_browse_tabs++;
+	}
 
 	browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("Mask creation");
@@ -595,7 +633,6 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 		menubar2->add("Job actions/Abort running", 0, cb_abort, this);
 		menubar2->add("Job actions/Mark as finished", 0, cb_mark_as_finished, this);
 		menubar2->add("Job actions/Mark as failed", 0, cb_mark_as_failed, this);
-		menubar2->add("Job actions/Make flowchart", 0, cb_make_flowchart, this);
 		menubar2->add("Job actions/Gentle clean", 0, cb_gentle_cleanup, this);
 		menubar2->add("Job actions/Harsh clean", 0, cb_harsh_cleanup, this);
 		menubar2->add("Job actions/Delete", 0, cb_delete, this);
@@ -2941,28 +2978,6 @@ void GuiMainWindow::cb_mark_as_finished_i(bool is_failed)
 	else
 		updateJobLists();
 
-}
-
-// Run button call-back functions
-void GuiMainWindow::cb_make_flowchart(Fl_Widget* o, void* v)
-{
-	GuiMainWindow* T=(GuiMainWindow*)v;
-	T->cb_make_flowchart_i();
-}
-
-void GuiMainWindow::cb_make_flowchart_i()
-{
-	if (current_job < 0)
-	{
-		fl_message("Please select a job.");
-		return;
-	}
-
-	std::string error_message;
-	if (!pipeline.makeFlowChart(current_job, true, error_message))
-		fl_message("%s",error_message.c_str());
-	else
-		updateJobLists();
 }
 
 void GuiMainWindow::cb_edit_note(Fl_Widget*, void* v)
