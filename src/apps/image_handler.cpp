@@ -715,7 +715,10 @@ class image_handler_parameters
 			}
 			if (fn_out.getExtension() != "mrcs")
 				std::cout << "NOTE: the input (--i) is a STAR file but the output (--o) does not have .mrcs extension. The output is treated as a suffix, not a path." << std::endl;
-			input_is_stack = true;
+			FileName fn_img;
+			MD.getValue(EMDL_IMAGE_NAME, fn_img, 0);
+			fn_img.decompose(slice_id, fn_stem);
+			input_is_stack = (fn_in.getExtension() == "mrcs" || fn_in.getExtension() == "tif" || fn_in.getExtension() == "tiff") && (slice_id == -1);
 		}
 		else if (input_is_stack)
 		{
@@ -980,14 +983,15 @@ class image_handler_parameters
 					if (input_is_stack)
 					{
 						my_fn_out = fn_img.insertBeforeExtension("_" + fn_out);
-						if (input_is_star)
-						{
-							long int dummy;
-							FileName fn_tmp;
-							my_fn_out.decompose(dummy, fn_tmp);
-							n_images[fn_tmp]++; // this is safe. see https://stackoverflow.com/questions/16177596/stdmapstring-int-default-initialization-of-value.
-							my_fn_out.compose(n_images[fn_tmp], fn_tmp);
-						}
+						long int dummy;
+						FileName fn_tmp;
+						my_fn_out.decompose(dummy, fn_tmp);
+						n_images[fn_tmp]++; // this is safe. see https://stackoverflow.com/questions/16177596/stdmapstring-int-default-initialization-of-value.
+						my_fn_out.compose(n_images[fn_tmp], fn_tmp);
+					}
+					else if (input_is_star)
+					{
+						my_fn_out = fn_img.insertBeforeExtension("_" + fn_out);
 					}
 					else
 					{
