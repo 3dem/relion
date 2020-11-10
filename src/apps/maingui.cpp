@@ -74,6 +74,7 @@ int main(int argc, char *argv[])
 			std::cerr << " [--refresh 2]  : refresh rate in seconds" << std::endl;
 			std::cerr << " [--idle 3600]  : quit GUI after this many second" << std::endl;
 			std::cerr << " [--readonly]   : limited version of GUI that does not touch any files" << std::endl;
+			std::cerr << " [--tomo]       : show tomography-specific GUI" << std::endl;
 			std::cerr << " [--version]    : show the version of this program" << std::endl;
 			exit(0);
 		}
@@ -89,7 +90,8 @@ int main(int argc, char *argv[])
 		int _update_every_sec = textToInteger(getParameter(argc, argv, "--refresh", "2"));
 		int _exit_after_sec = textToInteger(getParameter(argc, argv, "--idle", "3600"));
 		bool _do_read_only = checkParameter(argc, argv, "--readonly");
-		GuiMainWindow window(GUIWIDTH, GUIHEIGHT_EXT, titletext, fn_pipe, fn_sched, _update_every_sec, _exit_after_sec, _do_read_only);
+		bool _do_tomo = checkParameter(argc, argv, "--tomo");
+		GuiMainWindow window(GUIWIDTH, GUIHEIGHT_EXT, titletext, fn_pipe, fn_sched, _update_every_sec, _exit_after_sec, _do_read_only, _do_tomo);
 
 		// Show and run the window
 		window.show();

@@ -40,7 +40,6 @@ if(NOT APPLE)
     # which point to directories outside the build tree to the install RPATH
     SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
-
     # the RPATH to be used when installing, but only if it's not a system directory
     LIST(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
     IF("${isSystemDir}" STREQUAL "-1")
@@ -315,10 +314,15 @@ endif(GUI)
 
 if(NOT MKLFFT)
 	option(FORCE_OWN_FFTW "FORCE_OWN_FFTW" OFF)
+	option(AMDFFTW "Use AMD optimized version of FFTW. This needs a new version of GCC (>= 8.3 recommended)." OFF)
 	
 	set(FFTW_DOUBLE_REQUIRED TRUE)
 	set(FFTW_SINGLE_REQUIRED TRUE)
-		
+	
+	if(AMDFFTW)
+		set(FORCE_OWN_FFTW ON)
+	endif()
+
 	if(NOT FORCE_OWN_FFTW)
 		FIND_PACKAGE(FFTW COMPONENTS SINGLE DOUBLE)
 	endif(NOT FORCE_OWN_FFTW)

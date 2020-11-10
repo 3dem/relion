@@ -1082,7 +1082,7 @@ const BufferedImage<RFLOAT>& ObservationModel::getMtfImage(int optGroup, int s)
 			for (int x = 0; x < sh; x++)
 			{
 				const double xx = x/as;  // logical X-coordinate in 1/A
-				const double yy = y < sh? y/as : (y-s)/as; // logical Y-coordinate in 1/A
+				const double yy = y < sh-1? y/as : (y-s)/as; // logical Y-coordinate in 1/A
 
 				RFLOAT res = sqrt(xx*xx + yy*yy); // get resolution in 1/Ang
 				int i_0 = FLOOR(res / res_per_elem);

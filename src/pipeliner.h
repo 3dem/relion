@@ -63,7 +63,6 @@ public:
 #define DO_LOCK true
 #define DONT_LOCK false
 // Forward definition
-class PipeLineFlowChart;
 
 
 #define PIPELINE_HAS_CHANGED ".pipeline_has_changed"
@@ -184,9 +183,6 @@ public:
 	// Set the alias for a job, return true for success, false otherwise
 	bool setAliasJob(int this_job, std::string alias, std::string &error_message);
 
-	// Make the flowchart for this job
-	bool makeFlowChart(long int current_job, bool do_display_pdf, std::string &error_message);
-
 	// Undelete a JOb from the pipeline
 	void undeleteJob(FileName fn_undel);
 
@@ -214,54 +210,6 @@ public:
 
 	// Read in the pipeline from a STAR file
 	void read(bool do_lock = false, std::string lock_message = "Undefined lock message");
-};
-
-class PipeLineFlowChart
-{
-public:
-
-	// Use short process names, or original, full ones
-	bool do_short_names;
-
-	// Also make upwardsFlowCharts for all branches?
-	bool do_branches;
-
-	// All the processes for which a upwardFlowChart will be made
-	std::vector<long int> todo_list;
-
-public:
-
-	PipeLineFlowChart()
-	{
-		do_branches= true;
-		do_short_names = false;
-	}
-
-	// Write how many particles or classes or whatever the node is that represents a downward arrow
-	std::string getDownwardsArrowLabel(PipeLine &pipeline, long int lower_process, long int new_process);
-
-	// The process will be added to the top
-	// The function returns the parent process from which the upper_node came
-	// It will return a negative value if there was no parent process
-	long int addProcessToUpwardsFlowChart(std::ofstream &fh, PipeLine &pipeline, long int lower_process,
-			long int new_process, std::vector<long int> &branched_procs);
-
-	void makeOneUpwardsFlowChart(std::ofstream &fh, PipeLine &pipeline, long int from_node,
-			std::vector<long int> &all_branches, bool is_main_flow);
-
-	void makeAllUpwardsFlowCharts(FileName &fn_out, PipeLine &pipeline, long int from_process);
-
-	// Open and close a new flowchart picture
-	void openTikZPicture(std::ofstream &fh, bool is_main_flow);
-
-	void closeTikZPicture(std::ofstream &fh, bool is_main_flow);
-
-	void adaptNamesForTikZ(FileName &name);
-
-	// Open and close a new output file
-	void openFlowChartFile(FileName &fn_out, std::ofstream &fh);
-
-	void closeFlowChartFile(std::ofstream &fh);
 };
 
 #endif /* PIPELINER_H_ */

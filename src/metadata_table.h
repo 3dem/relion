@@ -153,19 +153,19 @@ public:
 	int getVersion() const;
 	static int getCurrentVersion();
 
-	
+
 	// getValue: returns true if the label exists
 	// objectID is 0-indexed.
 	template<class T>
 	bool getValue(EMDLabel label, T& value, long objectID = -1) const;
-	
+
 	// syntactic sugar: crashes if the label does not exist
 	template<class T>
 	void getValueSafely(EMDLabel label, T& value, long objectID = -1) const;
 
 	bool getValueToString(EMDLabel label, std::string &value, long int objectID = -1, bool escape=false) const;
-	
-	// more syntactic sugar to avoid having to declare output variables separately:	
+
+	// more syntactic sugar to avoid having to declare output variables separately:
 	int getInt(EMDLabel label, long objectID = -1) const;
 	int getIntMinusOne(EMDLabel label, long objectID = -1) const;
 	RFLOAT getRfloat(EMDLabel label, long objectID = -1) const;
@@ -284,17 +284,17 @@ public:
 	 * If no data block is found the function will return 0 and the MetaDataTable remains empty
 	 */
 	long int readStar(
-			std::ifstream& in, 
-			const std::string &name = "", 
-			std::vector<EMDLabel> *labelsVector = NULL, 
-			std::string grep_pattern = "", 
+			std::ifstream& in,
+			const std::string &name = "",
+			std::vector<EMDLabel> *labelsVector = NULL,
+			std::string grep_pattern = "",
 			bool do_only_count = false);
-	
+
 	static std::vector<MetaDataTable> readAll(
-			std::ifstream& in, 
-			int expectedNumber = 0, 
-			std::vector<EMDLabel> *desiredLabels = NULL, 
-			std::string grep_pattern = "", 
+			std::ifstream& in,
+			int expectedNumber = 0,
+			std::vector<EMDLabel> *desiredLabels = NULL,
+			std::string grep_pattern = "",
 			bool do_only_count = false);
 
 	// Read a MetaDataTable (get file format from extension)
@@ -370,6 +370,7 @@ MetaDataTable subsetMetaDataTable(MetaDataTable &MDin, EMDLabel label, std::stri
 // OriginX/Y are multiplied by origin_scale before added to CoordinateX/Y to compensate for down-sampling
 MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label, RFLOAT threshold, RFLOAT origin_scale=1.0, FileName fn_removed="", bool verb=true);
 
+#define METADATA_TABLE_TYPE_CHECK
 #ifdef METADATA_TABLE_TYPE_CHECK
 //#pragma message("typecheck enabled")
 template<class T>

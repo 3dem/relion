@@ -149,7 +149,8 @@ public:
 	int fillSingleViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale);
 	int fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale, RFLOAT _coord_scale,
 	                           int _particle_radius, bool do_startend = false, FileName _fn_coords = "",
-	                           FileName _fn_color = "", FileName _fn_mic= "", FileName _color_label = "", RFLOAT _color_blue_value = 0., RFLOAT _color_red_value = 1.);
+	                           FileName _fn_color = "", FileName _fn_mic= "", FileName _color_label = "", RFLOAT _color_blue_value = 0., RFLOAT _color_red_value = 1.,
+							   RFLOAT _minimum_pick_fom = -999.);
 };
 
 class basisViewerCanvas : public Fl_Widget
@@ -177,6 +178,9 @@ public:
 	// Read stacks at once to speed up?
 	bool do_read_whole_stacks;
 
+	// Minimum value for rlnAutopickFigureOfMerit to display picks
+	RFLOAT minimum_pick_fom;
+
 	// Constructor with w x h size of the window and a title
 	basisViewerCanvas(int X,int Y, int W, int H, const char* title=0) : Fl_Widget(X,Y,W, H, title) { }
 
@@ -187,6 +191,7 @@ public:
 	          RFLOAT lowpass = -1.0, RFLOAT highpass = -1.0);
 	void fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale = 1.);
 	void setSelectionType();
+	void setFOMThreshold();
 };
 
 class multiViewerCanvas : public basisViewerCanvas
@@ -564,6 +569,9 @@ public:
 
 	// Values for blue and red coloring
 	RFLOAT color_blue_value, color_red_value;
+
+	// Minimum value for rlnAutopickFigureOfMerit to display picks
+	RFLOAT minimum_pick_fom;
 
 	// Tablename to read from in the input STAR file
 	FileName table_name;

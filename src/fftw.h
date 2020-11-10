@@ -78,6 +78,11 @@
  * physical definition. It also defines 'kp', 'ip' and 'jp', which are the logical coordinates
  * It also works for 1D or 2D FFTW transforms
  *
+ * FFTW format means, for N = 6,
+ *  kx = [0, 1, 2, 3], XSIZE = 4 = N/2 + 1
+ *  ky = [0, 1, 2, 3, -2, -1], YSIZE = 6
+ *  kz = [0, 1, 2, 3, -2, -1], ZSIZE = 6
+ *
  * @code
  * FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(V)
  * {
