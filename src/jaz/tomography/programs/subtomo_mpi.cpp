@@ -99,16 +99,7 @@ void SubtomoProgramMpi::run()
 		writeParticleSet(particleSet, particles);
 	}
 
-	BufferedImage<float> sum_data, sum_weights;
-
-	if (do_sum_all)
-	{
-		sum_data.resize(s3D,s3D,s3D);
-		sum_data.fill(0.0);
-
-		sum_weights.resize(sh3D,s3D,s3D);
-		sum_weights.fill(0.0);
-	}
+	BufferedImage<float> dummy;
 
 	AberrationsCache aberrationsCache(particleSet.optTable, s2D);
 
@@ -126,7 +117,7 @@ void SubtomoProgramMpi::run()
 			s3D,
 			relative_box_scale,
 			do_ctf,
-			1,
-			sum_data,
-			sum_weights);
+			verb,
+			dummy,
+			dummy);
 }
