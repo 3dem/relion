@@ -48,6 +48,8 @@ class ZIO
 		static std::string prepareTomoOutputDirectory(
 				const std::string& dir,
 				int argc, char *argv[]);
+
+		static bool fileExists(std::string filename);
 };
 
 template <typename T>

@@ -16,7 +16,8 @@ Tomogram::Tomogram()
 
 double Tomogram::getFrameDose() const
 {
-	return cumulativeDose[frameSequence[1]] - cumulativeDose[frameSequence[0]];
+	return fractionalDose;
+	//cumulativeDose[frameSequence[1]] - cumulativeDose[frameSequence[0]];
 }
 
 BufferedImage<float> Tomogram::computeDoseWeight(int boxSize, double binning) const

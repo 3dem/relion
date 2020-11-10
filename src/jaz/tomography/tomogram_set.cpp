@@ -66,7 +66,8 @@ int TomogramSet::addTomogram(
 		std::string tomoName, std::string stackFilename,
 		const std::vector<gravis::d4Matrix>& projections, 
 		int w, int h, int d, 
-		const std::vector<double>& dose, 
+		const std::vector<double>& dose,
+		double fractionalDose,
 		const std::vector<CTF>& ctfs, 
 		double handedness, 
 		double pixelSize)
@@ -91,7 +92,7 @@ int TomogramSet::addTomogram(
 	globalTable.setValue(EMDL_CTF_VOLTAGE, ctf0.kV, index);
 	globalTable.setValue(EMDL_CTF_CS, ctf0.Cs, index);
 	globalTable.setValue(EMDL_CTF_Q0, ctf0.Q0, index);
-	
+	globalTable.setValue(EMDL_TOMO_IMPORT_FRACT_DOSE, fractionalDose, index);
 	
 	if (tomogramTables.size() != index)
 	{
@@ -289,6 +290,17 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 	}
 	
 	out.frameSequence = IndexSort<double>::sortIndices(out.cumulativeDose);
+
+	if (globalTable.labelExists(EMDL_TOMO_IMPORT_FRACT_DOSE))
+	{
+		out.fractionalDose = globalTable.getDouble(EMDL_TOMO_IMPORT_FRACT_DOSE, index);
+	}
+	else
+	{
+		out.fractionalDose = out.cumulativeDose[out.frameSequence[1]] - out.cumulativeDose[out.frameSequence[0]];
+	}
+
+
 	out.name = tomoName;
 	
 	if (globalTable.labelExists(EMDL_TOMO_FIDUCIALS_STARFILE))

@@ -273,3 +273,9 @@ std::string ZIO::prepareTomoOutputDirectory(const std::string &dir, int argc, ch
 
 	return outDir;
 }
+
+bool ZIO::fileExists(std::string filename)
+{
+	struct stat buffer;
+	return (stat(filename.c_str(), &buffer) == 0);
+}

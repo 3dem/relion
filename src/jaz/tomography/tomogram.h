@@ -21,7 +21,7 @@ class Tomogram
 			bool hasOptics, hasImage;
 			OpticsData optics;
 			int frameCount;
-			double handedness;
+			double handedness, fractionalDose;
 			
 			BufferedImage<float> stack;
 			std::vector<gravis::d4Matrix> projectionMatrices;

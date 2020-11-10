@@ -26,6 +26,7 @@ class TomogramSet
 			const std::vector<gravis::d4Matrix>& projections,
 			int w, int h, int d,
 			const std::vector<double>& dose,
+			double fractionalDose,
 			const std::vector<CTF>& ctfs,
 			double handedness, 
 			double pixelSize);

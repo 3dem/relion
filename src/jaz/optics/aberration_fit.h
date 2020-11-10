@@ -85,6 +85,9 @@ namespace aberration
 			dComplex b;
 
 			OddData& operator+=(const OddData& d);
+
+			static void write(const RawImage<OddData>& evenData, std::string filename);
+			static BufferedImage<OddData> read(std::string filename);
 	};
 
 	class EvenSolution

@@ -195,7 +195,8 @@ int main(int argc, char *argv[])
 		name, tsFn,
 		mapping.projections, 
 		mapping.w, mapping.h, mapping.d, 
-		cumulativeDose, ctfs, hand, pixelSize);
+		cumulativeDose, fractionalDose,
+		ctfs, hand, pixelSize);
 	
 	tomograms.write(outFn);
 	

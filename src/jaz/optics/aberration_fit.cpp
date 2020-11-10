@@ -589,11 +589,11 @@ EvenData &EvenData::operator+=(const EvenData& d)
 	by += d.by;
 }
 
-void EvenData::write(const RawImage<EvenData> &evenData, std::string filename)
+void EvenData::write(const RawImage<EvenData> &data, std::string filename)
 {
-	const int sh = evenData.xdim;
-	const int s  = evenData.ydim;
-	const int fc = evenData.zdim;
+	const int sh = data.xdim;
+	const int s  = data.ydim;
+	const int fc = data.zdim;
 
 	BufferedImage<float>
 		Axx(sh,s,fc),
@@ -606,11 +606,11 @@ void EvenData::write(const RawImage<EvenData> &evenData, std::string filename)
 	for (int y = 0; y <  s; y++)
 	for (int x = 0; x < sh; x++)
 	{
-		Axx(x,y,f) = evenData(x,y,f).Axx;
-		Axy(x,y,f) = evenData(x,y,f).Axy;
-		Ayy(x,y,f) = evenData(x,y,f).Ayy;
-		bx(x,y,f)  = evenData(x,y,f).bx;
-		by(x,y,f)  = evenData(x,y,f).by;
+		Axx(x,y,f) = data(x,y,f).Axx;
+		Axy(x,y,f) = data(x,y,f).Axy;
+		Ayy(x,y,f) = data(x,y,f).Ayy;
+		bx(x,y,f)  = data(x,y,f).bx;
+		by(x,y,f)  = data(x,y,f).by;
 	}
 
 	Axx.write(filename + "_Axx.mrc");
@@ -639,24 +639,78 @@ BufferedImage<EvenData> EvenData::read(std::string filename)
 	const int s  = Axx.ydim;
 	const int fc = Axx.zdim;
 
-	BufferedImage<EvenData> evenData;
+	BufferedImage<EvenData> data(sh,s,fc);
 
 	for (int f = 0; f < fc; f++)
 	for (int y = 0; y <  s; y++)
 	for (int x = 0; x < sh; x++)
 	{
-		evenData(x,y,f).Axx = Axx(x,y,f);
-		evenData(x,y,f).Axy = Axy(x,y,f);
-		evenData(x,y,f).Ayy = Ayy(x,y,f);
-		evenData(x,y,f).bx  = bx(x,y,f);
-		evenData(x,y,f).by  = by(x,y,f);
+		data(x,y,f).Axx = Axx(x,y,f);
+		data(x,y,f).Axy = Axy(x,y,f);
+		data(x,y,f).Ayy = Ayy(x,y,f);
+		data(x,y,f).bx  = bx(x,y,f);
+		data(x,y,f).by  = by(x,y,f);
 	}
 
-	return evenData;
+	return data;
 }
 
 OddData &OddData::operator+=(const OddData& d)
 {
 	a += d.a;
 	b += d.b;
+}
+
+void OddData::write(const RawImage<OddData> &data, std::string filename)
+{
+	const int sh = data.xdim;
+	const int s  = data.ydim;
+	const int fc = data.zdim;
+
+	BufferedImage<float>
+		a(sh,s,fc),
+		b_real(sh,s,fc),
+		b_imag(sh,s,fc);
+
+	for (int f = 0; f < fc; f++)
+	for (int y = 0; y < s;  y++)
+	for (int x = 0; x < sh; x++)
+	{
+		a(x,y,f) = data(x,y,f).a;
+		b_real(x,y,f) = data(x,y,f).b.real;
+		b_imag(x,y,f) = data(x,y,f).b.imag;
+	}
+
+	a.write(filename + "_a.mrc");
+	b_real.write(filename + "_b_real.mrc");
+	b_imag.write(filename + "_b_imag.mrc");
+}
+
+BufferedImage<OddData> OddData::read(std::string filename)
+{
+	BufferedImage<double>
+		a,
+		b_real,
+		b_imag;
+
+	a.read(filename + "_a.mrc");
+	b_real.read(filename + "_b_real.mrc");
+	b_imag.read(filename + "_b_imag.mrc");
+
+	const int sh = a.xdim;
+	const int s  = a.ydim;
+	const int fc = a.zdim;
+
+	BufferedImage<OddData> data(sh,s,fc);
+
+	for (int f = 0; f < fc; f++)
+	for (int y = 0; y < s;  y++)
+	for (int x = 0; x < sh; x++)
+	{
+		data(x,y,f).a = a(x,y,f);
+		data(x,y,f).b.real = b_real(x,y,f);
+		data(x,y,f).b.imag = b_imag(x,y,f);
+	}
+
+	return data;
 }
