@@ -5909,7 +5909,10 @@ bool RelionJob::getCommandsSubtomoAverageJob(std::string &outputname, std::vecto
 
 	command += " --o " + outputname;
 
-	std::cerr << "TODO: define output NODES!!!!";
+	Node node1(outputname+"merged.mrc", NODE_3DREF);
+	outputNodes.push_back(node1);
+	Node node2(outputname+"half1.mrc", NODE_HALFMAP);
+	outputNodes.push_back(node1);
 
 	// Job-specific stuff goes here
 	command += " --b " + joboptions["box_size"].getString();

@@ -1874,20 +1874,22 @@ void BackProjector::reweightGrad(
 
 			if (lambda2 > 0.) {
 				A3D_ELEM(mom2, k, i, j).real = lambda2 * A3D_ELEM(mom2, k, i, j).real +
-				                                      (1 - lambda2) * (g.real * g.real);
+				                                      (1 - lambda2) * sqrt(g.real * g.real);
 				A3D_ELEM(mom2, k, i, j).imag = lambda2 * A3D_ELEM(mom2, k, i, j).imag +
-				                                      (1 - lambda2) * (g.imag * g.imag);
+				                                      (1 - lambda2) * sqrt(g.imag * g.imag);
 			}
 		}
 	}
-    
+
 	// Mom2 shell-wise normalisation
 	if (lambda2 > 0.)
 	{
-	    MultidimArray<Complex> power_a(ori_size / 2 + 1);
-	    MultidimArray<Complex> power_b(ori_size / 2 + 1);
-	    
-        FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
+		MultidimArray<Complex> power_a;
+		MultidimArray<Complex> power_b;
+		power_a.initZeros(ori_size / 2 + 1);
+		power_b.initZeros(ori_size / 2 + 1);
+
+		FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
 		{
 			const int r2 = k * k + i * i + j * j;
 			if (r2 < max_r2)
@@ -1898,11 +1900,8 @@ void BackProjector::reweightGrad(
 			}
 		}
 
-		grad_error_power.initZeros(ori_size / 2 + 1);
-		MultidimArray<RFLOAT> counter(grad_error_power);
-
-        FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
-        {
+		FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
+		{
 			const int r2 = k * k + i * i + j * j;
 			if (r2 < max_r2)
 			{
@@ -1913,43 +1912,54 @@ void BackProjector::reweightGrad(
 				A3D_ELEM(data, k, i, j).real /= sqrt(x.real) + eps;
 				A3D_ELEM(data, k, i, j).imag /= sqrt(x.imag) + eps;
 
-				// Store power to later be used in FSC regularization
-				DIRECT_A1D_ELEM(grad_error_power, ires) += sqrt(x.real) + sqrt(x.imag);
-				DIRECT_A1D_ELEM(counter, ires) += 2; // Real and imag
-
 				x = A3D_ELEM(data, k, i, j);
 				DIRECT_A1D_ELEM(power_b, ires) += (x.real * x.real) + (x.imag * x.imag);
 			}
-        }
+		}
 
-        RFLOAT L = 1;
-        FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
-        {
+		FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
+		{
 			const int r2 = k * k + i * i + j * j;
 			if (r2 < max_r2)
 			{
 				int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
 				RFLOAT a = DIRECT_A1D_ELEM(power_a, ires);
 				RFLOAT b = DIRECT_A1D_ELEM(power_b, ires);
-				A3D_ELEM(data, k, i, j) *= sqrt((a*L + b*(1-L)) / (b + eps));
+				A3D_ELEM(data, k, i, j) *= sqrt(a / (b + eps));
 			}
-        }
+		}
+	}
 
-		//Average power spectra and calculate FSC estimate
-		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(counter)
-		{
-			if (DIRECT_A1D_ELEM(counter, i) > 0.)
-				DIRECT_A1D_ELEM(grad_error_power, i) /= DIRECT_A1D_ELEM(counter, i);
+	// Store powers of both momentums
+	MultidimArray<RFLOAT> counter;
+	mom1_power.initZeros(ori_size / 2 + 1);
+	mom2_power.initZeros(ori_size / 2 + 1);
+	counter.initZeros(ori_size / 2 + 1);
+
+	FOR_ALL_ELEMENTS_IN_ARRAY3D(data) {
+				const int r2 = k * k + i * i + j * j;
+				if (r2 <= max_r2) {
+					int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
+					DIRECT_A1D_ELEM(mom1_power, ires) += sqrt(norm(A3D_ELEM(mom1, k, i, j)));
+					DIRECT_A1D_ELEM(mom2_power, ires) += sqrt(norm(A3D_ELEM(mom2, k, i, j)));
+					DIRECT_A1D_ELEM(counter, ires) += 1;
+				}
+			}
+
+	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(counter) {
+		if (DIRECT_A1D_ELEM(counter, i) > 0.) {
+			DIRECT_A1D_ELEM(mom1_power, i) /= DIRECT_A1D_ELEM(counter, i);
+			DIRECT_A1D_ELEM(mom2_power, i) /= DIRECT_A1D_ELEM(counter, i);
 		}
 	}
 }
 
 void BackProjector::reconstructGrad(
 		MultidimArray<RFLOAT> &vol_out, //Should be const
-        RFLOAT grad_stepsize,
+		RFLOAT grad_stepsize,
 		RFLOAT tau2_fudge,
-        const MultidimArray<RFLOAT> &fsc,
-		bool use_fsc,
+		const MultidimArray<RFLOAT> &fsc_spectrum,
+		bool expand_fsc,
 		bool printTimes)
 {
 
@@ -1981,62 +1991,49 @@ void BackProjector::reconstructGrad(
 
     //---------------------- FSC estimate ----------------------//
 
-    MultidimArray<RFLOAT> fsc_spectrum;
+	MultidimArray<RFLOAT> fsc_estimate;
 
-	if (use_fsc)
-		fsc_spectrum = fsc;
-	else
-	{
-	    MultidimArray<RFLOAT> prev_power;
-	    prev_power.initZeros(ori_size / 2 + 1);
-	    MultidimArray<RFLOAT> diff_power(prev_power);
-	    MultidimArray<RFLOAT> counter(prev_power);
-	    fsc_spectrum.initZeros(ori_size / 2 + 1);
+	if (expand_fsc) {
+		MultidimArray<RFLOAT> prev_power;
+		MultidimArray<RFLOAT> counter;
+		prev_power.initZeros(ori_size / 2 + 1);
+		counter.initZeros(ori_size / 2 + 1);
+		fsc_estimate.initZeros(ori_size / 2 + 1);
 
-	    // First get average Delta^2 from the accumulated gradient in data and weight
-        FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
-        {
-            const int r2 = k * k + i * i + j * j;
-			if (r2 <= max_r2)
-			{
-				int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
+		// First get average Delta^2 from the accumulated gradient in data and weight
+		FOR_ALL_ELEMENTS_IN_ARRAY3D(data) {
+			const int r2 = k * k + i * i + j * j;
+			if (r2 <= max_r2) {
+				int ires = ROUND(sqrt((RFLOAT) r2) / padding_factor);
 				DIRECT_A1D_ELEM(prev_power, ires) += sqrt(norm(A3D_ELEM(PPref.data, k, i, j)));
-				DIRECT_A1D_ELEM(diff_power, ires) += sqrt(norm(A3D_ELEM(data, k, i, j)));
 				DIRECT_A1D_ELEM(counter, ires) += 1;
 			}
 		}
 
 		//Average power spectra and calculate FSC estimate
-		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(counter)
-		{
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(counter) {
 			RFLOAT prev = 0.;
-			RFLOAT diff = 0.;
-			RFLOAT myfsc = 0.;
+			RFLOAT f = 0.;
 
-			if (DIRECT_A1D_ELEM(counter, i) > 0.)
-			{
-//				prev = DIRECT_A1D_ELEM(prev_power, i) / DIRECT_A1D_ELEM(counter, i);
-				prev = DIRECT_A1D_ELEM(diff_power, i) / DIRECT_A1D_ELEM(counter, i);
-				diff = DIRECT_A1D_ELEM(grad_error_power, i);
-				myfsc = prev / (prev + diff/tau2_fudge);
+			if (DIRECT_A1D_ELEM(counter, i) > 0.) {
+				prev = DIRECT_A1D_ELEM(prev_power, i) / DIRECT_A1D_ELEM(counter, i);
+				DIRECT_A1D_ELEM(prev_power, i) = prev;
 
-#ifdef DEBUG_NGD
-				std::cerr << i << " prev= " << prev
-						   << " diff= " << diff
-						   << " fsc= " << myfsc << std::endl;
-#endif
-				DIRECT_A1D_ELEM(fsc_spectrum, i) = myfsc;
+				if(prev > 0.)
+					f = 1 - (DIRECT_A1D_ELEM(mom1_power, i) + DIRECT_A1D_ELEM(mom2_power, i)) / (tau2_fudge*prev);
+				else
+					f = 1e-4;
+
+				DIRECT_A1D_ELEM(fsc_estimate, i) = XMIPP_MIN(XMIPP_MAX(f, DIRECT_A1D_ELEM(fsc_spectrum, i)), 1);
 			}
 		}
 
-		// Always keep fsc(0) to 1
-	    DIRECT_A1D_ELEM(fsc_spectrum, 0) = 1.;
+		tau2_fudge = 1;
 	}
+	else
+		fsc_estimate = fsc_spectrum;
 
     //---------------------- Make gradient update ----------------------//
-	
-	if (!use_fsc) //Aleady incorporated fudge factor if FCS is estimated
-		tau2_fudge = 1.;
 
 	FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
 	{
@@ -2052,7 +2049,7 @@ void BackProjector::reconstructGrad(
 				A3D_ELEM(Fdiff_cen, k, i, j) = 0.;
 #endif
 
-			RFLOAT fsc = DIRECT_A1D_ELEM(fsc_spectrum, ires);
+			RFLOAT fsc = DIRECT_A1D_ELEM(fsc_estimate, ires);
 			Complex Fgrad = fsc * A3D_ELEM(data, k, i, j) - (1. - fsc) / tau2_fudge * A3D_ELEM(PPref.data, k, i, j);
 			A3D_ELEM(PPref.data, k, i, j) += grad_stepsize * Fgrad;
 		}

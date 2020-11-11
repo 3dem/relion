@@ -360,6 +360,7 @@ enum EMDLabel
 	EMDL_OPTIMISER_FAST_SUBSETS,
 	EMDL_OPTIMISER_SGD_INI_FRAC,
 	EMDL_OPTIMISER_SGD_FIN_FRAC,
+	EMDL_OPTIMISER_SGD_MIN_RESOL,
 	EMDL_OPTIMISER_SGD_INI_RESOL,
 	EMDL_OPTIMISER_SGD_FIN_RESOL,
 	EMDL_OPTIMISER_SGD_INI_SUBSET_SIZE,
@@ -1022,6 +1023,7 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_FAST_SUBSETS, EMDL_BOOL, "rlnDoFastSubsetOptimisation", "Use subsets of the data in the earlier iterations to speed up convergence");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_INI_FRAC, EMDL_DOUBLE, "rlnSgdInitialIterationsFraction", "Fraction of initial gradient iterations (at rlnSgdInitialResolution and with rlnSgdInitialSubsetSize)");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_FIN_FRAC, EMDL_DOUBLE, "rlnSgdFinalIterationsFraction", "fraction of final gradient iterations (at rlnSgdFinalResolution and with rlnSgdFinalSubsetSize)");
+		EMDL::addLabel(EMDL_OPTIMISER_SGD_MIN_RESOL, EMDL_DOUBLE, "rlnSgdMinimumResolution", "Adjust under-estimated signal power in gradient optimization to this resolution.");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_INI_RESOL, EMDL_DOUBLE, "rlnSgdInitialResolution", "Resolution (in A) to use during the initial SGD iterations");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_FIN_RESOL, EMDL_DOUBLE, "rlnSgdFinalResolution", "Resolution (in A) to use during the final SGD iterations");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_INI_SUBSET_SIZE, EMDL_INT, "rlnSgdInitialSubsetSize", "Number of particles in a mini-batch (subset) during the initial SGD iterations");

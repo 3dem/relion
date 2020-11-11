@@ -2321,6 +2321,14 @@ void JobWindow::initialiseSubtomoImportWindow()
 
 
 	tab2->end();
+
+	tab3->begin();
+	tab3->label("Others");
+	resetHeight();
+
+	// insert options to inport masks, reference etc here, a la SPA
+
+	tab3->end();
 }
 
 void JobWindow::initialiseSubtomoReconstructWindow()
