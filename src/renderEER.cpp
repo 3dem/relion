@@ -179,7 +179,8 @@ void EERRenderer::readLegacy(FILE *fh)
 	buf = (unsigned char*)malloc(file_size);
 	if (buf == NULL)
 		REPORT_ERROR("Failed to allocate the buffer.");
-	int dummy = fread(buf, sizeof(char), file_size, fh);
+	if (fread(buf, sizeof(char), file_size, fh) != file_size)
+		REPORT_ERROR("Failed to read the EER file.");
 	RCTOC(TIMING_READ_EER);
 
 	/* Build frame index */

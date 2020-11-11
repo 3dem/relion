@@ -987,8 +987,8 @@ void AutoPicker::run()
 
 	if (do_topaz_extract)
 	{
-		int res = system(("mkdir -p " + fn_odir + "/proc").c_str());
-		res = system(("mkdir -p " + fn_odir + "/raw").c_str());
+		mktree(fn_odir + "/proc");
+		mktree(fn_odir + "/raw");
 	}
 
 	FileName fn_olddir="";
@@ -1008,7 +1008,7 @@ void AutoPicker::run()
 		if (fn_dir != fn_olddir)
 		{
 			// Make a Particles directory
-			int res = system(("mkdir -p " + fn_dir).c_str());
+			mktree(fn_dir);
 			fn_olddir = fn_dir;
 		}
 #ifdef TIMING
@@ -2704,7 +2704,7 @@ MetaDataTable AutoPicker::getMDtrainFromParticleStar(MetaDataTable &MDparts)
 		if (fn_dir != fn_olddir && !exists(fn_dir))
 		{
 			// Make a Particles directory
-			int res = system(("mkdir -p " + fn_dir).c_str());
+			mktree(fn_dir);
 			fn_olddir = fn_dir;
 		}
 		MDcoords.write(fn_coords);
@@ -2791,8 +2791,8 @@ void AutoPicker::preprocessTopazMicrograph(FileName fn_mic_in, int downscale, Fi
 
 void AutoPicker::trainTopaz()
 {
-	int res = system(("mkdir -p " + fn_odir + "/proc").c_str());
-	res = system(("mkdir -p " + fn_odir + "/raw").c_str());
+	mktree(fn_odir + "/proc");
+	mktree(fn_odir + "/raw");
 
 	// Let's randomise the order of the input micrographs
 	MDtrain.randomiseOrder();
@@ -2849,14 +2849,15 @@ void AutoPicker::trainTopaz()
 		FileName fn_local_mic, fn_local_mic_proc;
 		fn_local_mic.compose(fn_odir + "raw/mic", imic, "mrc");
 		fn_local_mic_proc.compose(fn_odir + "proc/mic", imic, "mrc");
-		int res2 = symlink(realpath(fn_mic.c_str(), NULL), fn_local_mic.c_str());
+		FileName abspath = realpath(fn_mic);
+		symlink(abspath, fn_local_mic);
+
+		abspath = realpath(fn_local_mic_proc);
 
 		// start with filling the training set
 		if (imic%2==0 || have_enough_test)
 		{
 			// Add micrograph to mic_list_train
-			char abspath[PATH_MAX];
-			char* dummy = realpath(fn_local_mic_proc.c_str(), abspath);
 			fh_mic_list_train << fn_local_mic_proc.withoutExtension().afterLastOf("/")
 					<< '\t' << abspath<< std::endl;
 
@@ -2874,9 +2875,6 @@ void AutoPicker::trainTopaz()
 		}
 		else
 		{
-			// Add micrograph to mic_list_test
-			char abspath[PATH_MAX];
-			char* dummy = realpath(fn_local_mic_proc.c_str(), abspath);
 			fh_mic_list_test << fn_local_mic_proc.withoutExtension().afterLastOf("/")
 					<< '\t' << abspath<< std::endl;
 
@@ -2988,7 +2986,7 @@ void AutoPicker::autoPickTopazOneMicrograph(FileName &fn_mic, int rank)
 
 	// Make a symlink of the micrograph in the output Directory
 	FileName fno = fn_odir + fn_local_mic;
-	int res2 = symlink(realpath(fn_mic.c_str(), NULL), fno.c_str());
+	symlink(realpath(fn_mic), fno);
 
 	// Call Topaz to preprocess this file for normalisation and downscaling
 	fh << fn_topaz_exe << " preprocess ";
