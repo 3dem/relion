@@ -2856,7 +2856,7 @@ void AutoPicker::trainTopaz()
 		{
 			// Add micrograph to mic_list_train
 			char abspath[PATH_MAX];
-			realpath(fn_local_mic_proc.c_str(), abspath);
+			char* dummy = realpath(fn_local_mic_proc.c_str(), abspath);
 			fh_mic_list_train << fn_local_mic_proc.withoutExtension().afterLastOf("/")
 					<< '\t' << abspath<< std::endl;
 
@@ -2876,7 +2876,7 @@ void AutoPicker::trainTopaz()
 		{
 			// Add micrograph to mic_list_test
 			char abspath[PATH_MAX];
-			realpath(fn_local_mic_proc.c_str(), abspath);
+			char* dummy = realpath(fn_local_mic_proc.c_str(), abspath);
 			fh_mic_list_test << fn_local_mic_proc.withoutExtension().afterLastOf("/")
 					<< '\t' << abspath<< std::endl;
 
