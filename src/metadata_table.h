@@ -369,7 +369,6 @@ MetaDataTable subsetMetaDataTable(MetaDataTable &MDin, EMDLabel label, std::stri
 // OriginX/Y are multiplied by origin_scale before added to CoordinateX/Y to compensate for down-sampling
 MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label, RFLOAT threshold, RFLOAT origin_scale=1.0, FileName fn_removed="", bool verb=true);
 
-#define METADATA_TABLE_TYPE_CHECK
 #ifdef METADATA_TABLE_TYPE_CHECK
 //#pragma message("typecheck enabled")
 template<class T>
@@ -446,6 +445,7 @@ bool MetaDataTable::setValue(EMDLabel label, const T &value, long int objectID)
 {
 	if (label < 0 || label >= EMDL_LAST_LABEL) return false;
 
+#define METADATA_TABLE_TYPE_CHECK
 #ifdef METADATA_TABLE_TYPE_CHECK
 	if (!isTypeCompatible(label, value))
 		REPORT_ERROR("Runtime error: wrong type given to MetaDataTable::setValue for label " + EMDL::label2Str(label));
