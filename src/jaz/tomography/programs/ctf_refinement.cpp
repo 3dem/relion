@@ -97,15 +97,18 @@ void CtfRefinementProgram::run()
 	
 	RefinementProgram::init();
 
+
 	if (do_fit_Beer_Lambert_globally)
 	{
-		ZIO::makeDir(outDir + "temp/scale");
+		ZIO::ensureParentDir(getScaleTempFilename(""));
 	}
 
 	if (do_refine_aberrations)
 	{
-		ZIO::makeDir(outDir + "temp/aberrations");
+		ZIO::ensureParentDir(getEvenAberrationsTempFilename("", 0));
+		ZIO::ensureParentDir(getOddAberrationsTempFilename("", 0));
 	}
+
 
 	const int tc = particles.size();
 
@@ -446,17 +449,17 @@ void CtfRefinementProgram::updateScale(
 
 	if (do_fit_Beer_Lambert_globally)
 	{
-		std::ofstream sum_prdObs_file(outDir + "temp/scale/" + tomogram.name + "_sum_predObs.dat");
-		std::ofstream sum_prdSqr_file(outDir + "temp/scale/" + tomogram.name + "_sum_predSqr.dat");
+		MetaDataTable tempFile;
 
 		for (int f = 0; f < fc; f++)
 		{
-			sum_prdObs_file << sum_prdObs_f[f] << ' ';
-			sum_prdSqr_file << sum_prdSqr_f[f] << ' ';
+			tempFile.addObject();
+			tempFile.setValue(EMDL_TOMO_TEMP_PRED_TIMES_OBS, sum_prdObs_f[f], f);
+			tempFile.setValue(EMDL_TOMO_TEMP_PRED_SQUARED, sum_prdSqr_f[f], f);
 		}
 
-		sum_prdObs_file << '\n';
-		sum_prdSqr_file << '\n';
+		const std::string tempFilename = getScaleTempFilename(tomogram.name);
+		tempFile.write(tempFilename);
 	}
 	else if (do_fit_Beer_Lambert_per_tomo)
 	{
@@ -629,12 +632,12 @@ void CtfRefinementProgram::updateAberrations(
 		}
 
 		EvenData::write(
-			evenData_perGroup[g], outDir + "temp/aberrations/" +
-			tomogram.name + "_group_" + ZIO::itoa(g) + "_even");
+			evenData_perGroup[g],
+			getEvenAberrationsTempFilename(tomogram.name, g));
 
 		OddData::write(
-			oddData_perGroup[g], outDir + "temp/aberrations/" +
-			tomogram.name + "_group_" + ZIO::itoa(g) + "_odd");
+			oddData_perGroup[g],
+			getOddAberrationsTempFilename(tomogram.name, g));
 	}
 
 	Log::endSection();
@@ -663,8 +666,7 @@ void CtfRefinementProgram::fitAberrations()
 				Tomogram tomogram = tomogramSet.loadTomogram(t, false);
 
 				BufferedImage<EvenData> even = EvenData::read(
-						outDir + "temp/aberrations/" +
-						tomogram.name + "_group_" + ZIO::itoa(g) + "_even");
+						getEvenAberrationsTempFilename(tomogram.name, g));
 
 				even_data_sum += even;
 			}
@@ -704,8 +706,7 @@ void CtfRefinementProgram::fitAberrations()
 				Tomogram tomogram = tomogramSet.loadTomogram(t, false);
 
 				BufferedImage<OddData> odd = OddData::read(
-						outDir + "temp/aberrations/" +
-						tomogram.name + "_group_" + ZIO::itoa(g) + "_odd");
+						getOddAberrationsTempFilename(tomogram.name, g));
 
 				odd_data_sum += odd;
 			}
@@ -736,6 +737,8 @@ void CtfRefinementProgram::fitAberrations()
 	}
 }
 
+
+
 void CtfRefinementProgram::fitGlobalScale()
 {
 	const int tc = tomogramSet.size();
@@ -748,25 +751,27 @@ void CtfRefinementProgram::fitGlobalScale()
 	{
 		Tomogram tomogram = tomogramSet.loadTomogram(t, false);
 
-		std::ifstream sum_prdObs_file(outDir + "temp/scale/" + tomogram.name + "_sum_predObs.dat");
-		std::ifstream sum_prdSqr_file(outDir + "temp/scale/" + tomogram.name + "_sum_predSqr.dat");
+		const std::string tempFilename = getScaleTempFilename(tomogram.name);
+		MetaDataTable tempFile;
+		tempFile.read(tempFilename);
 
-		if (sum_prdObs_file && sum_prdSqr_file)
+		const int fc = tomogram.frameCount;
+
+		if (tempFile.numberOfObjects() != fc)
 		{
-			const int fc = tomogram.frameCount;
-
-			all_sum_prdObs[t] = std::vector<double>(fc);
-			all_sum_prdSqr[t] = std::vector<double>(fc);
-
-			for (int f = 0; f < fc; f++)
-			{
-				sum_prdObs_file >> all_sum_prdObs[t][f];
-				sum_prdSqr_file >> all_sum_prdSqr[t][f];
-			}
-
-			all_proj_matrices[t] = tomogram.projectionMatrices;
+			REPORT_ERROR("ctf_refinement: temporary file "+tempFilename+" is corrupted.");
 		}
 
+		all_sum_prdObs[t] = std::vector<double>(fc);
+		all_sum_prdSqr[t] = std::vector<double>(fc);
+
+		for (int f = 0; f < fc; f++)
+		{
+			all_sum_prdObs[t][f] = tempFile.getDouble(EMDL_TOMO_TEMP_PRED_TIMES_OBS, f);
+			all_sum_prdSqr[t][f] = tempFile.getDouble(EMDL_TOMO_TEMP_PRED_SQUARED, f);
+		}
+
+		all_proj_matrices[t] = tomogram.projectionMatrices;
 		all_fract_doses[t] = tomogram.getFrameDose();
 	}
 
@@ -1086,6 +1091,27 @@ std::vector<d3Vector> CtfRefinementProgram::findMultiAstigmatism(
 	}
 
 	return out;
+}
+
+
+
+std::string CtfRefinementProgram::getScaleTempFilename(const std::string& tomogram_name)
+{
+	return outDir + "temp/scale/" + tomogram_name + "_scale.star";
+}
+
+std::string CtfRefinementProgram::getEvenAberrationsTempFilename(
+		const std::string& tomogram_name, int opticsGroup)
+{
+	return outDir + "temp/aberrations/" + tomogram_name
+			+ "_group_" + ZIO::itoa(opticsGroup) + "_even";
+}
+
+std::string CtfRefinementProgram::getOddAberrationsTempFilename(
+		const std::string& tomogram_name, int opticsGroup)
+{
+	return outDir + "temp/aberrations/" + tomogram_name
+			+ "_group_" + ZIO::itoa(opticsGroup) + "_odd";
 }
 
 

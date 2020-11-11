@@ -67,6 +67,16 @@ class CtfRefinementProgram : public RefinementProgram
 		void fitAberrations();
 
 
+		std::string getScaleTempFilename(
+				const std::string& tomogram_name);
+
+		std::string getEvenAberrationsTempFilename(
+				const std::string& tomogram_name, int opticsGroup);
+
+		std::string getOddAberrationsTempFilename(
+				const std::string& tomogram_name, int opticsGroup);
+
+
 
 		BufferedImage<double> evaluateDefocusRange(
 				const BufferedImage<aberration::EvenData>& evenData,
