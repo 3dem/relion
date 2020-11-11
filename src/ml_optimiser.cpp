@@ -695,7 +695,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	// SGD stuff
 	int grad_section = parser.addSection("Stochastic Gradient Descent");
 	gradient_refine = parser.checkOption("--grad", "Perform gradient based optimisation (instead of default expectation-maximization)");
-	grad_em_iters = textToInteger(parser.getOption("--grad_em_iters", "Number of iterations at the end of a gradient refinement using Expectation-Maximization", "1"));
+	grad_em_iters = textToInteger(parser.getOption("--grad_em_iters", "Number of iterations at the end of a gradient refinement using Expectation-Maximization", "0"));
 	// Stochastic EM is implemented as a variant of SGD, though it is really a different algorithm!
 
 	grad_ini_frac = textToFloat(parser.getOption("--grad_ini_frac", "Fraction of iterations in the initial phase of refinement", "0.2"));
@@ -717,16 +717,16 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	if (grad_inbetween_iter < 0)
 		grad_inbetween_iter = 0;
 
+	grad_min_resol = textToInteger(parser.getOption("--grad_min_resol", "Adjusting the signal under-estimation during gradient optimization to this resolution.", "20"));
 	grad_ini_resol = textToInteger(parser.getOption("--grad_ini_resol", "Resolution cutoff during the initial SGD iterations (A)", "-1"));
 	grad_fin_resol = textToInteger(parser.getOption("--grad_fin_resol", "Resolution cutoff during the final SGD iterations (A)", "-1"));
 	grad_ini_subset_size = textToInteger(parser.getOption("--grad_ini_subset", "Mini-batch size during the initial SGD iterations", "-1"));
 	grad_fin_subset_size = textToInteger(parser.getOption("--grad_fin_subset", "Mini-batch size during the final SGD iterations", "-1"));
 	mu = textToFloat(parser.getOption("--mu", "Momentum parameter for SGD updates", "0.9"));
 
-	grad_stepsize = textToFloat(parser.getOption("--grad_stepsize", "Step size parameter for gradient optimisation.", "-1"));
+	grad_stepsize = textToFloat(parser.getOption("--grad_stepsize", "Step size parameter for gradient optimisation.", "0.2"));
 	grad_stepsize_scheme = parser.getOption("--grad_stepsize_scheme",
-			"Gradient step size updates scheme. Valid values are plain, <a>-2step or <a>-3step-<b>. Where <a> is the initial inflate and <b> is the final deflate factor.",
-			"plain");
+			"Gradient step size updates scheme. Valid values are plain, <a>-2step or <a>-3step-<b>. Where <a> is the initial inflate and <b> is the final deflate factor.","2-2step");
 
 	write_every_grad_iter = textToInteger(parser.getOption("--grad_write_iter", "Write out model every so many iterations in SGD (default is writing out all iters)", "10"));
 	do_init_blobs = parser.checkOption("--init_blobs", "Initialize models with random Gaussians.");
@@ -991,11 +991,11 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	if (!MD.getValue(EMDL_OPTIMISER_DO_GRAD, gradient_refine))
 		gradient_refine = false;
 	if (!MD.getValue(EMDL_OPTIMISER_GRAD_EM_ITERS, grad_em_iters))
-		grad_em_iters = 1;
+		grad_em_iters = 0;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_STEPSIZE, grad_stepsize))
 		grad_stepsize = 0.2;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_STEPSIZE_SCHEME, grad_stepsize_scheme))
-		grad_stepsize_scheme = "plain";
+		grad_stepsize_scheme = "2-2step";
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_INI_FRAC, grad_ini_frac)) {
 		grad_ini_frac = 0.2;
 		grad_ini_iter = nr_iter * grad_ini_frac;
@@ -1004,6 +1004,8 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 		grad_fin_frac = 0.2;
 		grad_ini_iter = nr_iter * grad_fin_frac;
 	}
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_MIN_RESOL, grad_min_resol))
+		grad_min_resol = 20.;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_INI_RESOL, grad_ini_resol))
 		grad_ini_resol = 35.;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_FIN_RESOL, grad_fin_resol))
@@ -1202,6 +1204,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_GRAD_EM_ITERS, grad_em_iters);
 		MD.setValue(EMDL_OPTIMISER_SGD_INI_FRAC, grad_ini_frac);
 		MD.setValue(EMDL_OPTIMISER_SGD_FIN_FRAC, grad_fin_frac);
+		MD.setValue(EMDL_OPTIMISER_SGD_MIN_RESOL, grad_min_resol);
 		MD.setValue(EMDL_OPTIMISER_SGD_INI_RESOL, grad_ini_resol);
 		MD.setValue(EMDL_OPTIMISER_SGD_FIN_RESOL, grad_fin_resol);
 		MD.setValue(EMDL_OPTIMISER_SGD_INI_SUBSET_SIZE, grad_ini_subset_size);
@@ -2170,6 +2173,14 @@ void MlOptimiser::initialiseGeneral(int rank)
 				std::cout << " Initial subset size set to " << grad_ini_subset_size << std::endl;
 				std::cout << " Final subset size set to " << grad_fin_subset_size << std::endl;
 			}
+		}
+
+		grad_baseline_fsc.initZeros(mymodel.ori_size / 2 + 1);
+		RFLOAT a = mymodel.getPixelFromResolution(1./grad_min_resol); //sigmoid end
+		RFLOAT b = 1; // Sigmoid start
+
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(grad_baseline_fsc) {
+			DIRECT_A1D_ELEM(grad_baseline_fsc, i) = 1. / (pow(10, (i - b - a / 2.) / (a / 4.)) + 1.);
 		}
 	}
 	else
@@ -4271,13 +4282,13 @@ void MlOptimiser::makeGoodHelixForEachRef()
 void MlOptimiser::maximization()
 {
 
+	int skip_class = maximizationGradientParameters();
+
 	if (verb > 0)
 	{
 		std::cout << " Maximization ..." << std::endl;
 		init_progress_bar(mymodel.nr_classes);
 	}
-
-	int skip_class = maximizationGradientParameters();
 
 	// First reconstruct the images for each class
 	// multi-body refinement will never get here, as it is only 3D auto-refine and that requires MPI!
@@ -4322,9 +4333,9 @@ void MlOptimiser::maximization()
 						(wsum_model.BPref[iclass]).reconstructGrad(
 								mymodel.Iref[iclass],
 								grad_current_stepsize,
-								mymodel.tau2_fudge_factor, //* wsum_model.pdf_class[iclass]*mymodel.nr_classes,
-								mymodel.fsc_halves_class[iclass],
-								do_split_random_halves,
+								mymodel.tau2_fudge_factor ,
+								do_split_random_halves ? mymodel.fsc_halves_class[iclass] : grad_baseline_fsc,
+								!do_split_random_halves,
 								(iclass == 0));
 					}
 					else
@@ -4472,6 +4483,7 @@ void MlOptimiser::maximizationOtherParameters()
 	RCTOC(timer,RCT_5);
 	RCTIC(timer,RCT_6);
 	// Update model.pdf_class vector (for each k)
+	RFLOAT pdf_class_sum = 0;
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 	{
 		// Update pdf_class (for SGD: update with taking mu into account! For non-SGD: mu equals zero)
@@ -4489,7 +4501,11 @@ void MlOptimiser::maximizationOtherParameters()
 			else
 				mymodel.prior_offset_class[iclass].initZeros();
 		}
+		pdf_class_sum += mymodel.pdf_class[iclass];
 	}
+	if (pdf_class_sum > 0.)
+		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+			mymodel.pdf_class[iclass] /= pdf_class_sum;
 
 	for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
 	{
@@ -9209,16 +9225,16 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 }
 
 void MlOptimiser::updateStepSize() {
-	RFLOAT _stepsize;
+	RFLOAT _stepsize = grad_stepsize;
+	std::string _scheme = grad_stepsize_scheme;
 
-	if (grad_stepsize <= 0) {
-		if (mymodel.ref_dim == 2)
-			_stepsize = 0.2;
-		else
-			_stepsize = 0.1;
-	}
+	if (_stepsize <= 0)
+		_stepsize = 0.1;
 
-	if (grad_stepsize_scheme == "plain") {
+	if (_scheme == "")
+		_scheme = "2-2step";
+
+	if (_scheme == "plain") {
 		grad_current_stepsize = _stepsize;
 		return;
 	}
@@ -9226,16 +9242,16 @@ void MlOptimiser::updateStepSize() {
 	// If not plain scheme, parse the scheme description
 
 	float inflate(0), deflate(1);
-	bool is_2step = grad_stepsize_scheme.find("-2step") != std::string::npos;
-	bool is_3step = grad_stepsize_scheme.find("-3step-") != std::string::npos;
+	bool is_2step = _scheme.find("-2step") != std::string::npos;
+	bool is_3step = _scheme.find("-3step-") != std::string::npos;
 
 	if (is_2step)
-		inflate = textToFloat(grad_stepsize_scheme.substr(0, grad_stepsize_scheme.find("-2step")));
+		inflate = textToFloat(_scheme.substr(0, _scheme.find("-2step")));
 
 	if (is_3step) {
-		int pos = grad_stepsize_scheme.find("-3step-");
-		inflate = textToFloat(grad_stepsize_scheme.substr(0, pos));
-		deflate = textToFloat(grad_stepsize_scheme.substr(pos+7, grad_stepsize_scheme.size()));
+		int pos = _scheme.find("-3step-");
+		inflate = textToFloat(_scheme.substr(0, pos));
+		deflate = textToFloat(_scheme.substr(pos+7, _scheme.size()));
 	}
 
 	if (is_2step or is_3step) {
