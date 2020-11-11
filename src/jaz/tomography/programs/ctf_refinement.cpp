@@ -68,9 +68,10 @@ CtfRefinementProgram::CtfRefinementProgram(int argc, char *argv[])
 
 		int aberr_section = parser.addSection("Aberration refinement options");
 
-		do_refine_aberrations = parser.checkOption("--do_aberrations", "Refine higher-order aberrations");
-		do_even_aberrations = !parser.checkOption("--no_even_aberrations", "Do not refine even aberrations");
-		do_odd_aberrations = !parser.checkOption("--no_odd_aberrations", "Do not refine odd aberrations");
+		do_even_aberrations = !parser.checkOption("--do_even_aberrations", "Refine even higher-order aberrations");
+		do_odd_aberrations = !parser.checkOption("--do_odd_aberrations", "Refine odd higher-order aberrations");
+		do_refine_aberrations = do_odd_aberrations || do_even_aberrations;
+
 		n_even = textToInteger(parser.getOption("--ne", "Maximal N for even aberrations", "4"));
 		n_odd = textToInteger(parser.getOption("--no", "Maximal N for odd aberrations", "3"));
 
