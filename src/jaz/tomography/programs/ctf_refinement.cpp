@@ -43,7 +43,7 @@ CtfRefinementProgram::CtfRefinementProgram(int argc, char *argv[])
 
 		int defocus_section = parser.addSection("Defocus refinement options");
 
-		do_refine_defocus = parser.checkOption("--do_defocus", "Do not refine the (astigmatic) defocus.");
+		do_refine_defocus = parser.checkOption("--do_defocus", "Refine the (astigmatic) defocus.");
 		lambda_reg = textToDouble(parser.getOption("--lambda", "Defocus regularisation scale", "0.1"));
 
 		minDelta = textToDouble(parser.getOption("--d0", "Min. defocus offset to test [Å]", "-3000"));
@@ -53,13 +53,13 @@ CtfRefinementProgram::CtfRefinementProgram(int argc, char *argv[])
 
 		int scale_section = parser.addSection("Scale estimation options");
 
-		do_refine_scale = parser.checkOption("--do_scale", "Do not refine the contrast scale");
+		do_refine_scale = parser.checkOption("--do_scale", "Refine the contrast scale");
 		bool per_frame_scale = parser.checkOption("--per_frame_scale", "Estimate the scale per frame (no Beer-Lambert fit)");
 		bool per_tomogram_scale = parser.checkOption("--per_tomogram_scale", "Estimate the scale per tomogram (luminance becomes unstable)");
 
 		if (per_frame_scale && per_tomogram_scale)
 		{
-			parser.reportError("The options --per_tomogram_scale and --per_tomogram_scale are mutually exclusive");
+			parser.reportError("The options --per_frame_scale and --per_tomogram_scale are mutually exclusive");
 		}
 
 		do_fit_Beer_Lambert_per_tomo = do_refine_scale && per_tomogram_scale;
@@ -68,9 +68,9 @@ CtfRefinementProgram::CtfRefinementProgram(int argc, char *argv[])
 
 		int aberr_section = parser.addSection("Aberration refinement options");
 
-		do_refine_aberrations = parser.checkOption("--do_aberrations", "Do not refine higher-order aberrations");
-		do_even_aberrations = parser.checkOption("--do_even_aberrations", "Do not refine even aberrations");
-		do_odd_aberrations = parser.checkOption("--do_odd_aberrations", "Do not refine odd aberrations");
+		do_refine_aberrations = parser.checkOption("--do_aberrations", "Refine higher-order aberrations");
+		do_even_aberrations = !parser.checkOption("--no_even_aberrations", "Do not refine even aberrations");
+		do_odd_aberrations = !parser.checkOption("--no_odd_aberrations", "Do not refine odd aberrations");
 		n_even = textToInteger(parser.getOption("--ne", "Maximal N for even aberrations", "4"));
 		n_odd = textToInteger(parser.getOption("--no", "Maximal N for odd aberrations", "3"));
 
