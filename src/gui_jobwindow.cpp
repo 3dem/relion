@@ -2307,28 +2307,54 @@ void JobWindow::placeSubtomoInput(bool has_tomograms, bool has_particles,
 
 void JobWindow::initialiseSubtomoImportWindow()
 {
-	setupTabs(3);
+	setupTabs(2);
 
 	tab1->begin();
-	tab1->label("I/O");
+	tab1->label("Tomograms");
 	resetHeight();
+
+	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group1->end();
+	place("do_tomo", TOGGLE_DEACTIVATE, group1, false);
+	group1->begin();
+
+	place("in_star", TOGGLE_DEACTIVATE);
+	place("io_tomos", TOGGLE_DEACTIVATE);
+	place("angpix", TOGGLE_DEACTIVATE);
+	place("kV", TOGGLE_DEACTIVATE);
+	place("Cs", TOGGLE_DEACTIVATE);
+	place("Q0", TOGGLE_DEACTIVATE);
+
+	group1->end();
+	guientries["do_tomo"].cb_menu_i(); // make default active
 
 	tab1->end();
 
 	tab2->begin();
-	tab2->label("TODO");
+	tab2->label("Others");
 	resetHeight();
 
+	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group2->end();
+
+	place("do_other", TOGGLE_DEACTIVATE, group2, false);
+	group2->begin();
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	place("fn_in_other", TOGGLE_DEACTIVATE);
+	place("node_type", TOGGLE_DEACTIVATE);
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	place("optics_group_particles", TOGGLE_DEACTIVATE);
+
+	group2->end();
+	guientries["do_other"].cb_menu_i(); // make default active
 
 	tab2->end();
-
-	tab3->begin();
-	tab3->label("Others");
-	resetHeight();
-
-	// insert options to inport masks, reference etc here, a la SPA
-
-	tab3->end();
 }
 
 void JobWindow::initialiseSubtomoReconstructWindow()

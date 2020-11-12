@@ -1262,7 +1262,7 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 			int mynodetype;
 			if (node_type == "Particles STAR file (.star)")
 				mynodetype = NODE_PART_DATA;
-			else if (node_type == "Multiple (2D/3D) references (.star or .mrcs)")
+			else if (node_type == "Multiple (2D or 3D) references (.star or .mrcs)")
 				mynodetype = NODE_REFS;
 			else if (node_type == "3D reference (.mrc)")
 				mynodetype = NODE_3DREF;
@@ -5598,6 +5598,27 @@ void RelionJob::initialiseSubtomoImportJob()
 {
         hidden_name = ".gui_subtomo_import";
 
+       	joboptions["do_tomo"] = JobOption("Import tomograms?", true, "Set this to Yes for importing tomogram directories from IMOD.");
+        joboptions["io_tomos"] = JobOption("Input/Output tomograms set: ", NODE_SUBTOMO_TOMOGRAMS, "tomograms.star", "Tomogram set STAR file (*.star)", "The imported tomograms will be output into this tomogram set. If any tomograms were already in this tomogram set, then the newly imported ones will be added to those.");
+        joboptions["in_star"] = JobOption("STAR file with tomograms: ", "", "Input file (*.star)", ".", "Provide a STAR file with the following information to input tomograms: \n \n TODO TODO TODO ");
+    	joboptions["angpix"] = JobOption("Pixel size (Angstrom):", (std::string)"", "Pixel size in Angstroms. ");
+    	joboptions["kV"] = JobOption("Voltage (kV):", (std::string)"", "Voltage the microscope was operated on (in kV)");
+    	joboptions["Cs"] = JobOption("Spherical aberration (mm):", (std::string)"", "Spherical aberration of the microscope used to collect these images (in mm). Typical values are 2.7 (FEI Titan & Talos, most JEOL CRYO-ARM), 2.0 (FEI Polara), 1.4 (some JEOL CRYO-ARM) and 0.01 (microscopes with a Cs corrector).");
+    	joboptions["Q0"] = JobOption("Amplitude contrast:", (std::string)"", "Fraction of amplitude contrast. Often values around 10% work better than theoretically more accurate lower values...");
+
+    	joboptions["do_other"] = JobOption("Import other node types?", false, "Set this to Yes  if you plan to import anything else than movies or micrographs");
+
+    	joboptions["fn_in_other"] = JobOption("Input file:", "ref.mrc", "Input file (*.*)", ".", "Select any file(s) to import. \n \n \
+    Note that for importing coordinate files, one has to give a Linux wildcard, where the *-symbol is before the coordinate-file suffix, e.g. if the micrographs are called mic1.mrc and the coordinate files mic1.box or mic1_autopick.star, one HAS to give '*.box' or '*_autopick.star', respectively.\n \n \
+    Also note that micrographs, movies and coordinate files all need to be in the same directory (with the same rootnames, e.g.mic1 in the example above) in order to be imported correctly. 3D masks or references can be imported from anywhere. \n \n \
+    Note that movie-particle STAR files cannot be imported from a previous version of RELION, as the way movies are handled has changed in RELION-2.0. \n \n \
+    For the import of a particle, 2D references or micrograph STAR file or of a 3D reference or mask, only a single file can be imported at a time. \n \n \
+    Note that due to a bug in a fltk library, you cannot import from directories that contain a substring  of the current directory, e.g. dont important from /home/betagal if your current directory is called /home/betagal_r2. In this case, just change one of the directory names.");
+
+    	joboptions["node_type"] = JobOption("Node type:", job_nodetype_options_tomo, 0, "Select the type of Node this is.");
+    	joboptions["optics_group_particles"] = JobOption("Rename optics group for particles:", (std::string)"", "Only for the import of a particles STAR file with a single, or no, optics groups defined: rename the optics group for the imported particles to this string.");
+
+
 
 }
 
@@ -5608,6 +5629,127 @@ bool RelionJob::getCommandsSubtomoImportJob(std::string &outputname, std::vector
 	commands.clear();
     initialisePipeline(outputname, PROC_SUBTOMO_IMPORT_LABEL, job_counter);
     std::string command;
+
+	// Some code here was copied from the SPA import job...
+    bool do_tomo = joboptions["do_tomo"].getBoolean();
+	bool do_other = joboptions["do_other"].getBoolean();
+
+	if (do_tomo && do_other)
+	{
+		error_message = "ERROR: you cannot import BOTH raw tomograms AND other node types at the same time...";
+		return false;
+	}
+	if ((!do_tomo) && (!do_other))
+	{
+		error_message = "ERROR: nothing to do... ";
+		return false;
+	}
+
+	if (do_tomo)
+	{
+
+		if (joboptions["in_star"].getString() == "")
+		{
+			error_message = "ERROR: you need to provide an input STAR file with information about the tomograms to be imported";
+			return false;
+		}
+		if (joboptions["io_tomos"].getString() == "")
+		{
+			error_message = "ERROR: you need to provide a tomogram set filename. If this file does not exist yet, it will be created.";
+			return false;
+		}
+
+		// TODO: insert call to relion_tomo_add_tomos here
+		command = "relion_tomo_add_tomos ";
+
+		command += " --i " + joboptions["in_star"].getString();
+		command += " --io " + joboptions["io_tomos"].getString();
+
+		if (joboptions["angpix"].getString() != "") command += " --angpix " + joboptions["angpix"].getString();
+		if (joboptions["kV"].getString() != "") command += " --voltage " + joboptions["kV"].getString();
+		if (joboptions["Cs"].getString() != "") command += " --Cs " + joboptions["Cs"].getString();
+		if (joboptions["Q0"].getString() != "") command += " --Q0 " + joboptions["Q0"].getString();
+
+
+	}
+	else if (do_other)
+	{
+		FileName fn_out, fn_in;
+		command = "relion_import ";
+
+		fn_in = joboptions["fn_in_other"].getString();
+		std::string node_type = joboptions["node_type"].getString();
+
+		fn_out = "/" + fn_in;
+		fn_out = fn_out.afterLastOf("/");
+
+		int mynodetype;
+		if (node_type == "Particles STAR file (.star)")
+			mynodetype = NODE_PART_DATA;
+		else if (node_type == "Multiple (2D or 3D) references (.star or .mrcs)")
+			mynodetype = NODE_REFS;
+		else if (node_type == "3D reference (.mrc)")
+			mynodetype = NODE_3DREF;
+		else if (node_type == "3D mask (.mrc)")
+			mynodetype = NODE_MASK;
+		else if (node_type == "Unfiltered half-map (unfil.mrc)")
+			mynodetype = NODE_HALFMAP;
+		else
+		{
+			error_message = "Unrecognized menu option for node_type = " + node_type;
+			return false;
+		}
+
+		Node node(outputname + fn_out, mynodetype);
+		outputNodes.push_back(node);
+
+		// Also get the other half-map
+		if (mynodetype == NODE_HALFMAP)
+		{
+			FileName fn_inb = "/" + fn_in;
+			size_t pos = fn_inb.find("half1");
+			if (pos != std::string::npos)
+			{
+				fn_inb.replace(pos, 5, "half2");
+			}
+			else
+			{
+				pos = fn_inb.find("half2");
+				if (pos != std::string::npos)
+				{
+					fn_inb.replace(pos, 5, "half1");
+				}
+			}
+			fn_inb = fn_inb.afterLastOf("/");
+			Node node2(outputname + fn_inb, mynodetype);
+			outputNodes.push_back(node2);
+			command += " --do_halfmaps";
+		}
+		else if (mynodetype == NODE_PART_DATA)
+		{
+			command += " --do_particles";
+			FileName optics_group = joboptions["optics_group_particles"].getString();
+			if (optics_group != "")
+			{
+				if (!optics_group.validateCharactersStrict())
+				{
+					error_message = "ERROR: an optics group name may contain only numbers, alphabets and hyphen(-).";
+					return false;
+				}
+				command += " --particles_optics_group_name \"" + optics_group + "\"";
+			}
+		}
+		else
+		{
+			command += " --do_other";
+		}
+
+		// Now finish the command call to relion_import program, which does the actual copying
+		command += " --i \"" + fn_in + "\"";
+		command += " --odir " + outputname;
+		command += " --ofile " + fn_out;
+
+	}
 
 
     // Other arguments for extraction
