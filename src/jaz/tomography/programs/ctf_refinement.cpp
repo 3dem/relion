@@ -200,6 +200,7 @@ void CtfRefinementProgram::processTomograms(
 			updateAberrations(t, tomogram, aberrationsCache, freqWeights, doseWeights);
 		}
 
+
 		if (verbosity > 0)
 		{
 			Log::endSection();
@@ -408,7 +409,8 @@ void CtfRefinementProgram::refineDefocus(
 		tempTable.setValue(EMDL_CTF_DEFOCUS_ANGLE, ctf1.azimuthal_angle, f);
 
 		// Also store the new defoci in the tomogram set, so they can be
-		// used for consecutive fits on the same node:
+		// used for consecutive fits on the same node.
+		// Note: this does not work when a run has been resumed.
 
 		tomogramSet.setCtf(t, f, ctf1);
 		tomogram.centralCTFs[f] = ctf1;
@@ -620,6 +622,10 @@ void CtfRefinementProgram::updateScale(
 			tempPerFrameTable.write(ofs);
 		}
 
+		// Also store the new scale in the tomogram set, so it can be
+		// used for consecutive fits on the same node.
+		// Note: this does not work when a run has been resumed.
+
 		tomogramSet.globalTable.setValue(EMDL_TOMO_RELATIVE_LUMINANCE, opt[0], t);
 		tomogramSet.globalTable.setValue(EMDL_TOMO_RELATIVE_ICE_THICKNESS, rel_thickness, t);
 		tomogramSet.globalTable.setValue(EMDL_TOMO_ICE_NORMAL_X, ice_normal.x, t);
@@ -652,6 +658,10 @@ void CtfRefinementProgram::updateScale(
 
 			tempPerFrameTable.addObject();
 			tempPerFrameTable.setValue(EMDL_CTF_SCALEFACTOR, ctf.scale, f);
+
+			// Also store the new scale in the tomogram set, so it can be
+			// used for consecutive fits on the same node.
+			// Note: this does not work when a run has been resumed.
 
 			tomogramSet.setCtf(t, f, ctf);
 			tomogram.centralCTFs[f] = ctf;
