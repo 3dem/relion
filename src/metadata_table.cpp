@@ -999,7 +999,7 @@ long int MetaDataTable::readStarLoop(std::ifstream& in, bool do_only_count)
 	return nr_objects;
 }
 
-bool MetaDataTable::readStarList(std::ifstream& in)//, std::vector<EMDLabel> *desiredLabels)
+bool MetaDataTable::readStarList(std::ifstream& in)
 {
 	setIsList(true);
 	addObject();
@@ -1559,7 +1559,8 @@ void MetaDataTable::checkObjectID(long id, std::string caller) const
 	}
 }
 
-//FIXME: does not support unknownLabels
+//FIXME: does not support unknownLabels but this function is only used by relion_star_handler
+//       so I will leave this for future...
 void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 		MetaDataTable &MDboth, MetaDataTable &MDonly1, MetaDataTable &MDonly2,
 		EMDLabel label1, double eps, EMDLabel label2, EMDLabel label3)
