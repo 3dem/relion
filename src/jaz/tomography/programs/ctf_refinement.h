@@ -22,7 +22,7 @@ class CtfRefinementProgram : public RefinementProgram
 		CtfRefinementProgram(int argc, char *argv[]);
 			
 			bool do_refine_defocus, do_refine_scale, do_refine_aberrations,
-				do_fit_Beer_Lambert_per_tomo, do_fit_Beer_Lambert_globally,
+				do_fit_Lambert_per_tomo, do_fit_Lambert_globally,
 				do_even_aberrations, do_odd_aberrations;
 
 			int deltaSteps, n_even, n_odd;
@@ -31,7 +31,9 @@ class CtfRefinementProgram : public RefinementProgram
 		void run();
 		
 		
-	private:
+	protected:
+
+		void initTempDirectories();
 
 		void processTomograms(
 				int first_t,
@@ -39,6 +41,9 @@ class CtfRefinementProgram : public RefinementProgram
 				const AberrationsCache& aberrationsCache,
 				int verbosity);
 
+		void finalise();
+
+	private:
 		
 		void refineDefocus(
 				int t,
@@ -62,19 +67,12 @@ class CtfRefinementProgram : public RefinementProgram
 				const BufferedImage<float>& doseWeights);
 
 
+		void collectDefocus();
+
 		void fitGlobalScale();
+		void collectScale();
 
 		void fitAberrations();
-
-
-		std::string getScaleTempFilename(
-				const std::string& tomogram_name);
-
-		std::string getEvenAberrationsTempFilename(
-				const std::string& tomogram_name, int opticsGroup);
-
-		std::string getOddAberrationsTempFilename(
-				const std::string& tomogram_name, int opticsGroup);
 
 
 
@@ -107,13 +105,31 @@ class CtfRefinementProgram : public RefinementProgram
 				double range,
 				double pixelSize,
 				int size);
+
+
+		std::string getDefocusTempFilename(
+				const std::string& tomogram_name);
+
+		std::string getScaleTempFilename(
+				const std::string& tomogram_name);
+
+		std::string getEvenAberrationsTempFilename(
+				const std::string& tomogram_name, int opticsGroup);
+
+		std::string getOddAberrationsTempFilename(
+				const std::string& tomogram_name, int opticsGroup);
+
+
+		bool defocusAlreadyDone(const std::string& tomogram_name);
+		bool scaleAlreadyDone(const std::string& tomogram_name);
+		bool aberrationsAlreadyDone(const std::string& tomogram_name, int group_count);
 };
 
-class BeerLambertFit : public Optimization
+class LambertFit : public Optimization
 {
 	public:
 
-		BeerLambertFit(
+		LambertFit(
 				const std::vector<gravis::d4Matrix>& projections,
 				const std::vector<double>& sum_prdObs,
 				const std::vector<double>& sum_prdSqr);
@@ -131,11 +147,11 @@ class BeerLambertFit : public Optimization
 
 };
 
-class MultiBeerLambertFit : public FastDifferentiableOptimization
+class MultiLambertFit : public FastDifferentiableOptimization
 {
 	public:
 
-		MultiBeerLambertFit(
+		MultiLambertFit(
 				const std::vector<std::vector<gravis::d4Matrix>>& projections,
 				const std::vector<std::vector<double>>& sum_prdObs,
 				const std::vector<std::vector<double>>& sum_prdSqr,

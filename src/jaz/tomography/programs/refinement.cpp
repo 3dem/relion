@@ -40,6 +40,8 @@ void RefinementProgram::_readParams(IOParser &parser)
 
 	boxSize = textToInteger(parser.getOption("--b", "Box size"));
 
+	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Only process tomograms for which no temporary output data can be found");
+
 	referenceMap.read(optimisationSet);
 
 	specified_first_frame = textToInteger(parser.getOption("--f0", "First frame", "0"));
