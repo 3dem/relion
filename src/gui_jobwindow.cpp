@@ -2307,7 +2307,7 @@ void JobWindow::placeSubtomoInput(bool has_tomograms, bool has_particles,
 
 void JobWindow::initialiseSubtomoImportWindow()
 {
-	setupTabs(2);
+	setupTabs(3);
 
 	tab1->begin();
 	tab1->label("I/O");
@@ -2474,13 +2474,21 @@ void JobWindow::initialiseSubtomoAverageWindow()
 	tab2->label("Average");
 	resetHeight();
 
+	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group1->end();
+	place("do_from2d", TOGGLE_DEACTIVATE, group1);
+
+	group1->begin();
 	place("box_size", TOGGLE_DEACTIVATE);
 	place("crop_size", TOGGLE_DEACTIVATE);
 	place("binning", TOGGLE_DEACTIVATE);
+	place("snr", TOGGLE_DEACTIVATE);
+
+	group1->end();
+	guientries["do_from2d"].cb_menu_i();
 
 	current_y += STEPY /2 ;
 
-	place("snr", TOGGLE_DEACTIVATE);
 	place("sym_name", TOGGLE_DEACTIVATE);
 
 	tab2->end();

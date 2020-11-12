@@ -5742,7 +5742,7 @@ bool RelionJob::getCommandsSubtomoCtfRefineJob(std::string &outputname, std::vec
 
 	if (joboptions["do_defocus"].getBoolean())
 	{
-		command += " --defocus";
+		command += " --do_defocus";
 		command += " --d0 -" + joboptions["focus_range"].getString();
 		command += " --d1 " + joboptions["focus_range"].getString();
 		command += " --lambda " + joboptions["lambda"].getString();
@@ -5750,7 +5750,7 @@ bool RelionJob::getCommandsSubtomoCtfRefineJob(std::string &outputname, std::vec
 
 	if (joboptions["do_scale"].getBoolean())
 	{
-		command += " --scale";
+		command += " --do_scale";
 		if (joboptions["do_frame_scale"].getBoolean() && joboptions["do_tomo_scale"].getBoolean())
 		{
 			error_message = "ERROR: per-tomogram scale estimation and per-frame scale estimation are mutually exclusive";
@@ -5763,12 +5763,12 @@ bool RelionJob::getCommandsSubtomoCtfRefineJob(std::string &outputname, std::vec
 
 	if (joboptions["do_even_aberr"].getBoolean())
 	{
-		command += " --even_aberrations --ne " + joboptions["nr_even_aberr"].getString();
+		command += " --do_even_aberrations --ne " + joboptions["nr_even_aberr"].getString();
 	}
 
 	if (joboptions["do_odd_aberr"].getBoolean())
 	{
-		command += " --odd_aberrations --no " + joboptions["nr_odd_aberr"].getString();
+		command += " --do_odd_aberrations --no " + joboptions["nr_odd_aberr"].getString();
 	}
 
 	// Running stuff
@@ -5873,6 +5873,7 @@ void RelionJob::initialiseSubtomoAverageJob()
 
 	addSubtomoInputOptions(true, true, true, false, false);
 
+   	joboptions["do_from2d"] = JobOption("Average from 2D tilt series?", true, "If set to Yes, then relion_tomo_reconstruct_particle is used, with the options below, to calculate the new average from the original 2D tilt series images. This yields the best results. If set to No, then relion_reconstruct is used to calculate the average of the 3D subtomogram images in the particle set on the I/O tab. This is quicker, but gives worse results.");
 	joboptions["box_size"] = JobOption("Box size (pix):", 128, 32, 512, 16, "Box size of the reconstruction. Note that this is independent of the box size that has been used to refine the particle. This allows the user to construct a 3D map of arbitrary size to gain an overview of the structure surrounding the particle. A sufficiently large box size also allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
 	joboptions["crop_size"] = JobOption("Cropped box size (pix):", -1, -1, 512, 16, "If set to a positive value, the program will output an additional set of maps that have been cropped to this size. This is useful if a map is desired that is smaller than the box size required to retrieve the CTF-delocalised signal.");
 	joboptions["binning"] = JobOption("Binning factor:", 1, 1, 16, 1, "The tilt series images will be binned by this (real-valued) factor and then reconstructed in the specified box size above. Note that thereby the reconstructed region becomes larger when specifying binning factors larger than one.");
@@ -5897,42 +5898,71 @@ bool RelionJob::getCommandsSubtomoAverageJob(std::string &outputname, std::vecto
     initialisePipeline(outputname, PROC_SUBTOMO_AVERAGE_LABEL, job_counter);
     std::string command;
 
-    if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-            command="`which relion_tomo_reconstruct_particle_mpi`";
+    if (joboptions["do_from2d"].getBoolean())
+    {
+		if (joboptions["nr_mpi"].getNumber(error_message) > 1)
+			command="`which relion_tomo_reconstruct_particle_mpi`";
+		else
+			command="`which relion_tomo_reconstruct_particle`";
+		if (error_message != "") return false;
+
+		// I/O
+		error_message = getSubtomoInputCommmand(command, true, true, true, false, false);
+		if (error_message != "") return false;
+
+		command += " --o " + outputname;
+
+		Node node1(outputname+"merged.mrc", NODE_3DREF);
+		outputNodes.push_back(node1);
+		Node node2(outputname+"half1.mrc", NODE_HALFMAP);
+		outputNodes.push_back(node2);
+
+		// Job-specific stuff goes here
+		command += " --b " + joboptions["box_size"].getString();
+
+		int crop_size = joboptions["crop_size"].getNumber(error_message);
+		if (error_message != "") return false;
+		if (crop_size > 0.) command += " --crop " + joboptions["crop_size"].getString();
+
+		command += " --bin " + joboptions["binning"].getString();
+
+		float SNR = joboptions["snr"].getNumber(error_message);
+		if (error_message != "") return false;
+		if (SNR > 0.) command += " --SNR " + joboptions["snr"].getString();
+
+    }
     else
-            command="`which relion_tomo_reconstruct_particle`";
-    if (error_message != "") return false;
+    {
+		if (joboptions["in_particles"].getString() == "")
+		{
+			error_message = "ERROR: when not reconstructing from the 2D tilt series images, you need to provide a particle set on the I/O tab.";
+			return false;
+		}
 
-    // I/O
-    error_message = getSubtomoInputCommmand(command, true, true, true, false, false);
-	if (error_message != "") return false;
+		if (joboptions["nr_mpi"].getNumber(error_message) > 1)
+			command="`which relion_reconstruct_mpi`";
+		else
+			command="`which relion_reconstruct`";
+		if (error_message != "") return false;
 
-	command += " --o " + outputname;
+		Node node(joboptions["in_particles"].getString(), joboptions["in_particles"].node_type);
+		inputNodes.push_back(node);
+    	command += " --i " + joboptions["in_particles"].getString();
 
-	Node node1(outputname+"merged.mrc", NODE_3DREF);
-	outputNodes.push_back(node1);
-	Node node2(outputname+"half1.mrc", NODE_HALFMAP);
-	outputNodes.push_back(node1);
+		Node node1(outputname+"reconstruct.mrc", NODE_3DREF);
+		outputNodes.push_back(node1);
+    	command += " --o " + outputname + "reconstruct.mrc";
 
-	// Job-specific stuff goes here
-	command += " --b " + joboptions["box_size"].getString();
+    	command += " --ctf --skp_gridding";
 
-	int crop_size = joboptions["crop_size"].getNumber(error_message);
-    if (error_message != "") return false;
-    if (crop_size > 0.) command += " --crop " + joboptions["crop_size"].getString();
+    }
 
-    command += " --bin " + joboptions["binning"].getString();
-
-	float SNR = joboptions["snr"].getNumber(error_message);
-    if (error_message != "") return false;
-    if (SNR > 0.) command += " --SNR " + joboptions["snr"].getString();
-
-    command += " --sym " + joboptions["sym_name"].getString();
+	command += " --sym " + joboptions["sym_name"].getString();
 
 	// Running stuff
-    command += " --j " + joboptions["nr_threads"].getString();
+	command += " --j " + joboptions["nr_threads"].getString();
 
-    // Other arguments for extraction
+	// Other arguments for extraction
     command += " " + joboptions["other_args"].getString();
     commands.push_back(command);
 
