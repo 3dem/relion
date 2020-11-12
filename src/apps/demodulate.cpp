@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
 	
 	for (int m = 0; m < mc; m++)
 	{
-		const int pc = mdts[m].size();		
+		const int pc = mdts[m].numberOfObjects();
 		
 		std::vector<Image<Complex>> obs;		
 		obs = StackHelper::loadStackFS(mdts[m], "", nr_omp_threads, false);

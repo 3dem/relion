@@ -74,7 +74,28 @@
  *	- each column corresponds to a label
  *	- each row represents a data point
  *	- the rows are stored in per-type contiguous blocks of memory
- *	-
+ *
+ *	2020/Nov/12:
+ *	  This class is organized as an array (`objects`) of structures (`MetaDataContainer`).
+ *
+ *        `activeLabels` contains all valid labels.
+ *        Even when a label is `deactivateLabel`-ed, the values remain in `MetaDataContainer`s.
+ *        The label is only removed from `activeLabels`.
+ *
+ *        Each data type (int, double, etc) contains its own storage array inside `MetaDataContainer`.
+ *        Thus, values in `label2offsets` are NOT unique. Accessing columns via a wrong type is
+ *        very DANGEROUS. Use `cmake -DMDT_TYPE_CHECK=ON` to enable runtime checks.
+ *
+ *        Handling of labels unknown to RELION needs care.
+ *        They all share the same label, EMD_UNKNOWN_LABEL. Thus, `addLabel`, `containsLabel`,
+ *        `compareLabels` etc must check not only EMDLabel in `activeLabels` but also the
+ *        real labels stored in `unknownLabelNames`. This should be done via `getUnknownLabelNameAt`.
+ *	  Note that two STAR files might contain the same set of unknown labels, but in different orders.
+ *
+ *        Whenever `activeLabels` is modified, `unknownLabelPosition2Offset` MUST be updated accordingly.
+ *        When the label for a column is EMD_UNKNOWN_LABEL, the corresponding element in
+ *        `unknownLabelPosition2Offset` must store the offset in `unknownLabelNames` and
+ *        `MetaDataContainer->unknowns`. Otherwise, the value does not matter.
  */
 class MetaDataTable
 {
@@ -90,9 +111,14 @@ class MetaDataTable
 	//	 objects[r]->strings[label2offset[EMDL_IMAGE_NAME]]
 	std::vector<long> label2offset;
 
-	//// TODO: add these to the clear, copy etc
+	/** What labels have been read from a docfile/metadata file
+	 *  and/or will be stored on a new metadata file when "save" is
+	 *  called
+	 **/
+	std::vector<EMDLabel> activeLabels;
+
 	std::vector<std::string> unknownLabelNames;
-	std::map<long, long> unknownLabelPosition2Offset;
+	std::vector<long> unknownLabelPosition2Offset;
 
 	// Current object id
 	long current_objectID;
@@ -114,12 +140,6 @@ class MetaDataTable
 
 public:
 
-	/** What labels have been read from a docfile/metadata file
-	 *  and/or will be stored on a new metadata file when "save" is
-	 *  called
-	 **/
-	std::vector<EMDLabel> activeLabels;
-
 	MetaDataTable();
 
 	// Copy constructor and assignment operator:
@@ -128,7 +148,6 @@ public:
 	MetaDataTable& operator = (const MetaDataTable &MD);
 
 	~MetaDataTable();
-
 
 	bool isAList()
 	{
@@ -139,7 +158,6 @@ public:
 
 	bool isEmpty() const;
 	size_t numberOfObjects() const;
-	size_t size(void) const; // @TODO: redundant
 	void clear();
 
 	void setComment(const std::string Comment);
@@ -153,13 +171,14 @@ public:
 	int getVersion() const;
 	static int getCurrentVersion();
 
-
 	// getValue: returns true if the label exists
 	// objectID is 0-indexed.
 	template<class T>
 	bool getValue(EMDLabel label, T& value, long objectID = -1) const;
 
 	bool getValueToString(EMDLabel label, std::string &value, long int objectID = -1, bool escape=false) const;
+
+	std::string getUnknownLabelNameAt(int i) const;
 
 	// Set the value of label for a specified object.
 	// If no objectID is given, the internal iterator 'current_objectID' is used
@@ -175,19 +194,20 @@ public:
 	void sort(EMDLabel name, bool do_reverse = false, bool only_set_index = false, bool do_random = false);
 	void newSort(const EMDLabel name, bool do_reverse = false, bool do_sort_after_at = false, bool do_sort_before_at = false);
 
-	// Check whether a label is defined in the table. (@TODO: change name)
+	// Check whether a label is defined in the table.
+	// This is redundant and will be removed in 3.2.
 	bool labelExists(EMDLabel name) const;
 
-	// Check whether a label is contained in activeLabels. (@TODO: change name)
-	bool containsLabel(const EMDLabel label) const;
+	// Check whether a label is contained in activeLabels.
+	bool containsLabel(const EMDLabel label, const std::string unknownLabel="") const;
 
-	std::vector<EMDLabel> getActiveLabels() const; // @TODO: redundant; activeLabels is public
+	std::vector<EMDLabel> getActiveLabels() const;
 
 	// Deactivate a column from a table, so that it is no longer written out
-	void deactivateLabel(EMDLabel label);
+	void deactivateLabel(EMDLabel label, std::string unknownLabel="");
 
 	// add a new label and update all objects
-	void addLabel(EMDLabel label);
+	void addLabel(EMDLabel label, std::string unknownLabel="");
 
 	// add missing labels that are present in 'app'
 	void addMissingLabels(const MetaDataTable* app);
@@ -252,11 +272,11 @@ public:
 	long goToObject(long objectID);
 
 	// Read a STAR loop structure
-	long int readStarLoop(std::ifstream& in, std::vector<EMDLabel> *labelsVector = NULL, std::string grep_pattern = "", bool do_only_count = false);
+	long int readStarLoop(std::ifstream& in, bool do_only_count = false);
 
 	/* Read a STAR list
 	 * The function returns true if the list is followed by a loop, false otherwise */
-	bool readStarList(std::ifstream& in, std::vector<EMDLabel> *labelsVector = NULL);
+	bool readStarList(std::ifstream& in);
 
 	/* Read a MetaDataTable from a STAR-format data block
 	 *
@@ -269,10 +289,10 @@ public:
 	 *
 	 * If no data block is found the function will return 0 and the MetaDataTable remains empty
 	 */
-	long int readStar(std::ifstream& in, const std::string &name = "", std::vector<EMDLabel> *labelsVector = NULL, std::string grep_pattern = "", bool do_only_count = false);
+	long int readStar(std::ifstream& in, const std::string &name = "", bool do_only_count = false);
 
 	// Read a MetaDataTable (get file format from extension)
-	long int read(const FileName &filename, const std::string &name = "", std::vector<EMDLabel> *labelsVector = NULL, std::string grep_pattern = "", bool do_only_count = false);
+	long int read(const FileName &filename, const std::string &name = "", bool do_only_count = false);
 
 	// Write a MetaDataTable in STAR format
 	void write(std::ostream& out = std::cout);
@@ -297,6 +317,12 @@ public:
 
 	// Randomise the order inside the STAR file
 	void randomiseOrder();
+
+	// Feb14,2017 - Shaoda, Check whether the two MetaDataTables contain the same set of activeLabels
+	static bool compareLabels(const MetaDataTable &MD1, const MetaDataTable &MD2);
+
+	// Join 2 metadata tables. Only include labels that are present in both of them.
+	static MetaDataTable combineMetaDataTables(std::vector<MetaDataTable> &MDin);
 
 	// legacy error codes:
 	// @TODO: remove after changing:
@@ -327,12 +353,6 @@ private:
 void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
                           MetaDataTable &MDboth, MetaDataTable &MDonly1, MetaDataTable &MDonly2,
                           EMDLabel label1, double eps = 0., EMDLabel label2 = EMDL_UNDEFINED, EMDLabel label3 = EMDL_UNDEFINED);
-
-// Join 2 metadata tables. Only include labels that are present in both of them.
-MetaDataTable combineMetaDataTables(std::vector<MetaDataTable> &MDin);
-
-// Feb14,2017 - Shaoda, Check whether the two MetaDataTables contain the same set of activeLabels
-bool compareLabels(const MetaDataTable &MD1, const MetaDataTable &MD2);
 
 // find a subset of the input metadata table that has corresponding entries between the specified min and max values
 MetaDataTable subsetMetaDataTable(MetaDataTable &MDin, EMDLabel label, RFLOAT min_value, RFLOAT max_value);
