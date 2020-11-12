@@ -363,3 +363,8 @@ int TomogramSet::getTomogramIndexSafely(std::string tomogramName) const
 		return t;
 	}
 }
+
+int TomogramSet::getFrameCount(int index) const
+{
+	return tomogramTables[index].numberOfObjects();
+}

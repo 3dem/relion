@@ -36,10 +36,10 @@ class CtfRefinementProgram : public RefinementProgram
 		void initTempDirectories();
 
 		void processTomograms(
-				int first_t,
-				int last_t,
+				const std::vector<int>& tomoIndices,
 				const AberrationsCache& aberrationsCache,
-				int verbosity);
+				int verbosity,
+				bool per_tomogram_progress);
 
 		void finalise();
 
@@ -50,21 +50,24 @@ class CtfRefinementProgram : public RefinementProgram
 				Tomogram& tomogram,
 				const AberrationsCache& aberrationsCache,
 				const BufferedImage<float>& freqWeights,
-				const BufferedImage<float>& doseWeights);
+				const BufferedImage<float>& doseWeights,
+				int verbosity);
 
 		void updateScale(
 				int t,
 				Tomogram& tomogram,
 				const AberrationsCache& aberrationsCache,
 				const BufferedImage<float>& freqWeights,
-				const BufferedImage<float>& doseWeights);
+				const BufferedImage<float>& doseWeights,
+				int verbosity);
 
 		void updateAberrations(
 				int t,
 				const Tomogram& tomogram,
 				const AberrationsCache& aberrationsCache,
 				const BufferedImage<float>& freqWeights,
-				const BufferedImage<float>& doseWeights);
+				const BufferedImage<float>& doseWeights,
+				int verbosity);
 
 
 		void collectDefocus();

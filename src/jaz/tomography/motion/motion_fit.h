@@ -74,18 +74,17 @@ class MotionFit : public DifferentiableOptimization
 				const std::vector<double>& x,
 				const std::vector<int>& frameSequence) const;	
 		
-		void shiftParticles(
-				const std::vector<double>& x,
-				ParticleSet& target) const;
+		std::vector<gravis::d3Vector> getParticlePositions(
+				const std::vector<double>& x) const;
 		
 		Trajectory getTrajectory(
 				const std::vector<double>& x, 
 				int p, 
 				const std::vector<int>& frameSequence) const;
 		
-		void exportTrajectories(
+		std::vector<Trajectory> exportTrajectories(
 				const std::vector<double>& x, 
-				ParticleSet& dataSet,
+				const ParticleSet& dataSet,
 				const std::vector<int>& frameSequence) const;
 		
 		int getParamCount();

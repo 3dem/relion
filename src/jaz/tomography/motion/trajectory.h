@@ -4,6 +4,7 @@
 #include <src/jaz/gravis/t3Vector.h>
 #include <vector>
 
+class ParticleIndex;
 class ParticleSet;
 
 class Trajectory
@@ -16,7 +17,8 @@ class Trajectory
 
 		static void write(
 				const std::vector<Trajectory>& shifts,
-				ParticleSet& particleSet,
+				const ParticleSet& particleSet,
+				const std::vector<std::vector<ParticleIndex>>& particles,
 				std::string filename);
 		
 		
@@ -47,5 +49,8 @@ class Trajectory
 		}
 		
 };
+
+Trajectory operator + (const Trajectory& t1, const Trajectory& t2);
+
 
 #endif

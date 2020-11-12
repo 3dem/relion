@@ -99,14 +99,14 @@ void CtfRefinementProgram::run()
 
 		initTempDirectories();
 
-		const int tc = particles.size();
-
 		AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
 
 	Log::endSection();
 
 
-	processTomograms(0, tc-1, aberrationsCache, 1);
+	std::vector<int> tomoIndices = ParticleSet::enumerate(particles);
+
+	processTomograms(tomoIndices, aberrationsCache, 1, true);
 
 
 	finalise();
@@ -139,13 +139,27 @@ void CtfRefinementProgram::initTempDirectories()
 }
 
 void CtfRefinementProgram::processTomograms(
-		int first_t,
-		int last_t,
+		const std::vector<int>& tomoIndices,
 		const AberrationsCache& aberrationsCache,
-		int verbosity)
+		int verbosity,
+		bool per_tomogram_progress)
 {
-	for (int t = first_t; t <= last_t; t++)
+	const int ttc = tomoIndices.size();
+
+	if (verbosity > 0 && !per_tomogram_progress)
 	{
+		Log::beginProgress("Processing tomograms", ttc);
+	}
+
+	for (int tt = 0; tt < ttc; tt++)
+	{
+		if (verbosity > 0 && !per_tomogram_progress)
+		{
+			Log::updateProgress(tt);
+		}
+
+		const int t = tomoIndices[tt];
+
 		int pc = particles[t].size();
 		if (pc == 0) continue;
 
@@ -160,11 +174,10 @@ void CtfRefinementProgram::processTomograms(
 			continue;
 		}
 
-		if (verbosity > 0)
+		if (verbosity > 0 && per_tomogram_progress)
 		{
 			Log::beginSection(
-					"Tomogram " + ZIO::itoa(t - first_t + 1)
-					+ " / " + ZIO::itoa(last_t - first_t + 1));
+				"Tomogram " + ZIO::itoa(tt + 1) + " / " + ZIO::itoa(ttc));
 
 			Log::print("Loading");
 		}
@@ -183,30 +196,43 @@ void CtfRefinementProgram::processTomograms(
 		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(boxSize,1);
 
 
+		const int item_verbosity = per_tomogram_progress? verbosity : 0;
+
 		if (do_refine_defocus)
 		{
-			refineDefocus(t, tomogram, aberrationsCache, freqWeights, doseWeights);
+			refineDefocus(
+				t, tomogram, aberrationsCache, freqWeights, doseWeights,
+				item_verbosity);
 		}
 
 
 		if (do_refine_scale)
 		{
-			updateScale(t, tomogram, aberrationsCache, freqWeights, doseWeights);
+			updateScale(
+				t, tomogram, aberrationsCache, freqWeights, doseWeights,
+				item_verbosity);
 		}
 
 
 		if (do_refine_aberrations)
 		{
-			updateAberrations(t, tomogram, aberrationsCache, freqWeights, doseWeights);
+			updateAberrations(
+				t, tomogram, aberrationsCache, freqWeights, doseWeights,
+				item_verbosity);
 		}
 
 
-		if (verbosity > 0)
+		if (verbosity > 0 && per_tomogram_progress)
 		{
 			Log::endSection();
 		}
 
 	} // all tomograms
+
+	if (verbosity > 0 && !per_tomogram_progress)
+	{
+		Log::endProgress();
+	}
 }
 
 void CtfRefinementProgram::finalise()
@@ -268,7 +294,8 @@ void CtfRefinementProgram::refineDefocus(
 		Tomogram& tomogram,
 		const AberrationsCache& aberrationsCache,
 		const BufferedImage<float>& freqWeights,
-		const BufferedImage<float>& doseWeights)
+		const BufferedImage<float>& doseWeights,
+		int verbosity)
 {
 	const int s = boxSize;
 	const int sh = s/2 + 1;
@@ -283,7 +310,10 @@ void CtfRefinementProgram::refineDefocus(
 		return;
 	}
 
-	Log::beginSection("Refining defocus");
+	if (verbosity > 0)
+	{
+		Log::beginSection("Refining defocus");
+	}
 
 	BufferedImage<EvenData> evenData(sh,s,fc);
 	evenData.fill(evenZero);
@@ -301,11 +331,18 @@ void CtfRefinementProgram::refineDefocus(
 	}
 
 
-
-	Log::beginProgress("Accumulating defocus evidence", pc * fc / num_threads);
+	if (verbosity > 0)
+	{
+		Log::beginProgress("Accumulating defocus evidence", fc);
+	}
 
 	for (int f = 0; f < fc; f++)
 	{
+		if (verbosity > 0)
+		{
+			Log::updateProgress(f);
+		}
+
 		std::vector<BufferedImage<EvenData>> evenData_thread(num_threads);
 		std::vector<BufferedImage<OddData>> oddData_thread(num_threads);
 
@@ -323,11 +360,6 @@ void CtfRefinementProgram::refineDefocus(
 		{
 			const int th = omp_get_thread_num();
 
-			if (th == 0)
-			{
-				Log::updateProgress(pc * f / num_threads + p);
-			}
-
 			AberrationFit::considerParticle(
 				particles[t][p], tomogram, referenceMap, particleSet,
 				aberrationsCache, true, freqWeights, doseWeights,
@@ -342,9 +374,12 @@ void CtfRefinementProgram::refineDefocus(
 		}
 	}
 
-	Log::endProgress();
+	if (verbosity > 0)
+	{
+		Log::endProgress();
 
-	Log::print("Fitting");
+		Log::print("Fitting");
+	}
 
 
 	const BufferedImage<double> dataTerm = evaluateDefocusRange(
@@ -380,7 +415,10 @@ void CtfRefinementProgram::refineDefocus(
 
 	const double bestDeltaZ = minDelta + best_di * deltaStep;
 
-	Log::print("Refining astigmatic defocus");
+	if (verbosity > 0)
+	{
+		Log::print("Refining astigmatic defocus");
+	}
 
 	EvenSolution solution = AberrationFit::solveEven(evenData);
 
@@ -430,7 +468,10 @@ void CtfRefinementProgram::refineDefocus(
 		meanDefocus.flush();
 	}
 
-	Log::endSection();
+	if (verbosity > 0)
+	{
+		Log::endSection();
+	}
 }
 
 void CtfRefinementProgram::updateScale(
@@ -438,7 +479,8 @@ void CtfRefinementProgram::updateScale(
 		Tomogram& tomogram,
 		const AberrationsCache& aberrationsCache,
 		const BufferedImage<float>& freqWeights,
-		const BufferedImage<float>& doseWeights)
+		const BufferedImage<float>& doseWeights,
+		int verbosity)
 {
 	const int s = boxSize;
 	const int sh = s/2 + 1;
@@ -450,16 +492,25 @@ void CtfRefinementProgram::updateScale(
 		return;
 	}
 
-	Log::beginSection("Refining scale");
+	if (verbosity > 0)
+	{
+		Log::beginSection("Refining scale");
+	}
 
 	std::vector<double> sum_prdObs_f(fc, 0.0);
 	std::vector<double> sum_prdSqr_f(fc, 0.0);
 
-	Log::beginProgress("Accumulating scale evidence", pc);
+	if (verbosity > 0)
+	{
+		Log::beginProgress("Accumulating scale evidence", pc);
+	}
 
 	for (int p = 0; p < pc; p++)
 	{
-		Log::updateProgress(p);
+		if (verbosity > 0)
+		{
+			Log::updateProgress(p);
+		}
 
 		const ParticleIndex part_id = particles[t][p];
 
@@ -509,7 +560,10 @@ void CtfRefinementProgram::updateScale(
 
 	} // all particles
 
-	Log::endProgress();
+	if (verbosity > 0)
+	{
+		Log::endProgress();
+	}
 
 
 	std::vector<double> per_frame_scale(fc);
@@ -670,7 +724,10 @@ void CtfRefinementProgram::updateScale(
 		tempPerFrameTable.write(getScaleTempFilename(tomogram.name));
 	}
 
-	Log::endSection();
+	if (verbosity > 0)
+	{
+		Log::endSection();
+	}
 }
 
 void CtfRefinementProgram::updateAberrations(
@@ -678,7 +735,8 @@ void CtfRefinementProgram::updateAberrations(
 		const Tomogram& tomogram,
 		const AberrationsCache& aberrationsCache,
 		const BufferedImage<float>& freqWeights,
-		const BufferedImage<float>& doseWeights)
+		const BufferedImage<float>& doseWeights,
+		int verbosity)
 {
 	const int s = boxSize;
 	const int sh = s/2 + 1;
@@ -692,7 +750,10 @@ void CtfRefinementProgram::updateAberrations(
 		return;
 	}
 
-	Log::beginSection("Updating aberrations");
+	if (verbosity > 0)
+	{
+		Log::beginSection("Updating aberrations");
+	}
 
 
 	std::vector<BufferedImage<EvenData>> evenData_perGroup(gc);
@@ -730,14 +791,17 @@ void CtfRefinementProgram::updateAberrations(
 	}
 
 
-	Log::beginProgress("Accumulating aberrations evidence", pc/num_threads);
+	if (verbosity > 0)
+	{
+		Log::beginProgress("Accumulating aberrations evidence", pc/num_threads);
+	}
 
 	#pragma omp parallel for num_threads(num_threads)
 	for (int p = 0; p < pc; p++)
 	{
 		const int th = omp_get_thread_num();
 
-		if (th == 0)
+		if (th == 0 && verbosity > 0)
 		{
 			Log::updateProgress(p/num_threads);
 		}
@@ -752,7 +816,10 @@ void CtfRefinementProgram::updateAberrations(
 			oddData_perGroup_perThread[g][th]);
 	}
 
-	Log::endProgress();
+	if (verbosity > 0)
+	{
+		Log::endProgress();
+	}
 
 
 	for (int g = 0; g < gc; g++)
@@ -772,7 +839,10 @@ void CtfRefinementProgram::updateAberrations(
 			getOddAberrationsTempFilename(tomogram.name, g));
 	}
 
-	Log::endSection();
+	if (verbosity > 0)
+	{
+		Log::endSection();
+	}
 }
 
 
