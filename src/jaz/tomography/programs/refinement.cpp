@@ -44,13 +44,9 @@ void RefinementProgram::_readParams(IOParser &parser)
 
 	referenceMap.read(optimisationSet);
 
-	specified_first_frame = textToInteger(parser.getOption("--f0", "First frame", "0"));
-	specified_last_frame = textToInteger(parser.getOption("--f1", "Last frame", "-1"));
-
 	static_noise = !parser.checkOption("--per_frame_noise", "Assume a different noise distribution for each frame");
 	
 	diag = parser.checkOption("--diag", "Write out diagnostic information");
-	timing = parser.checkOption("--time", "Measure the elapsed time");
 	num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 	outDir = parser.getOption("--o", "Output directory");
 }

@@ -151,9 +151,7 @@ void PolishProgram::run()
 		{
 			projByTime[f] = tomogram.projectionMatrices[tomogram.frameSequence[f]];
 		}
-		
-		const double t0 = omp_get_wtime();
-		
+
 		
 		std::vector<BufferedImage<double>> CCs = Prediction::computeCroppedCCs(
 				particleSet, particles[t], tomogram, aberrationsCache,
@@ -165,9 +163,7 @@ void PolishProgram::run()
 				CCs, projByTime, particleSet, particles[t], referenceMap.image_FS, 
 				motParams, mfSettings, tomogram.centre, 
 				tomogram.getFrameDose(), tomogram.optics.pixelSize, padding, num_threads);
-		
-		
-		
+
 		
 		BufferedImage<double> FCC3, FCC1, specCC;
 		
@@ -240,23 +236,11 @@ void PolishProgram::run()
 		std::vector<double> initial(motionFit.getParamCount(), 0.0);
 		
 		Log::beginProgress("Performing optimisation", num_iters);
-				
-		const double t1 = omp_get_wtime();
-		
+
 		std::vector<double> opt = LBFGS::optimize(
 			initial, motionFit, 1, num_iters, 1e-3, 1e-4);
-		
-		const double t2 = omp_get_wtime();
-		
+
 		Log::endProgress();
-						
-		if (timing)
-		{
-			Log::beginSection("Time");
-			Log::print("setup:        " + ZIO::itoa(t1-t0) + " sec");
-			Log::print("optimisation: " + ZIO::itoa(t2-t1) + " sec");
-			Log::endSection();
-		}
 		
 		projTomoCorr = motionFit.getProjections(opt, tomogram.frameSequence);
 		motionFit.shiftParticles(opt, particleSet);
@@ -284,57 +268,6 @@ void PolishProgram::run()
 			FCC1_new.write(diagPrefix + "_FCC_final.mrc");
 			
 			(FCC1_new - FCC1).write(diagPrefix + "_FCC_delta.mrc");
-			
-			/*if (outputShiftedCCs)
-			{
-				Log::print("Computing shifted cross-correlations");
-				
-				std::vector<Image<double>> shiftedCCs = motionFit.drawShiftedCCs(opt);
-				
-				const int diam = shiftedCCs[0].xdim;
-				
-				Image<double> CCsum(diam, diam, fc);
-						
-				CCsum.fill(0.f);
-				
-				for (int p = 0; p < pc; p++)
-				{
-					CCsum += shiftedCCs[p];
-				}				
-				
-				CCsum.write(diagPrefix + "_CC_sum_" + tag + "_final.mrc");
-				
-				Image<double> specCC0 = specCC;
-				
-				const int d = CCsum.xdim;
-				const int dh = d/2 + 1;
-				
-				specCC = Image<double>(dh,fc);
-				specCC.fill(0.0);
-					
-				Image<fComplex> CCsumFS;
-				
-				for (int f = 0; f < fc; f++)
-				{
-					Image<float> CCsum_f = CCsum.getSliceRef(f);
-					FFT::FourierTransform(CCsum_f, CCsumFS, FFT::Both);
-					
-					for (int y = 0; y < d; y++)
-					for (int x = 0; x < dh; x++)
-					{
-						const double yy = y < d/2? y : y - d;
-						const double rd = sqrt(x*x + yy*yy);
-						const int r = (int) rd;			
-						
-						const double mod = (1 - 2 * (x % 2)) * (1 - 2 * (y % 2));
-						
-						if (r < dh) specCC(r,f) += mod * CCsumFS(x,y).real;
-					}
-				}
-				
-				specCC.write(diagPrefix + "_specCC_final.mrc");				
-				(specCC - specCC0).write(diagPrefix + "_specCC_delta.mrc");
-			}*/
 		}
 		
 		Log::endSection();

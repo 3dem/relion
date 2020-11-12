@@ -110,26 +110,6 @@ void FrameAlignmentProgram::run()
 				range, flip_value, num_threads, padding);
 		
 
-		const int first_frame = specified_first_frame;
-		const int last_frame = (specified_last_frame > 0 && specified_last_frame < fc)? specified_last_frame : fc-1;
-
-		if (first_frame > 0 || last_frame < fc-1)
-		{
-			#pragma omp parallel for num_threads(num_threads)
-			for (int p = 0; p < pc; p++)
-			{
-				for (int ff = 0; ff < fc; ff++)
-				{
-					int f = tomogram.frameSequence[ff];
-					
-					if (ff < first_frame || ff > last_frame)
-					{
-						CCs[p].getSliceRef(f) *= 0.f;
-					}
-				}
-			}
-		}
-		
 		ProtoAlignment protoAlignment(
 				CCs, tomogram.projectionMatrices, particleSet, particles[t], referenceMap.image_FS, 
 				const_particles, const_angles, const_shifts, range,
