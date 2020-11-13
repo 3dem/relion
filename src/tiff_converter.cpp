@@ -308,7 +308,8 @@ int TIFFConverter::checkMRCtype(FileName fn_movie)
 	// Check data type; Unfortunately I cannot do this through Image object.
 	FILE *mrcin = fopen(fn_movie.c_str(), "r");
 	int headers[25];
-	int dummy = fread(headers, sizeof(int), 24, mrcin);
+	if (fread(headers, sizeof(int), 24, mrcin) != 24) // fread returns the number of items, not bytes
+		REPORT_ERROR(std::string("Failed to read the header of ") + fn_movie);
 	fclose(mrcin);
 
 	return headers[3];
@@ -366,7 +367,7 @@ void TIFFConverter::initialise(int _rank, int _total_ranks)
 		REPORT_ERROR(fn_first + ": the input must be MRC, MRCS or EER files");
 
 	if (fn_out.contains("/"))
-		int dummy = system(("mkdir -p " + fn_out.beforeLastOf("/")).c_str());
+		mktree(fn_out.beforeLastOf("/"));
 
 	if (EERRenderer::isEER(fn_first))
 	{
@@ -529,7 +530,7 @@ void TIFFConverter::run()
 		std::cout << std::endl;
 
 		if (fn_tiff.contains("/"))
-			int dummy = system(("mkdir -p " + fn_tiff.beforeLastOf("/")).c_str());
+			mktree(fn_tiff.beforeLastOf("/"));
 
 		processOneMovie(fn_movie, fn_tiff);
 	}

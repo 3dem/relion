@@ -95,9 +95,16 @@ static const std::vector<std::string> job_sampling_options{
 static const std::vector<std::string> job_nodetype_options{
 	"Particle coordinates (*.box, *_pick.star)",
 	"Particles STAR file (.star)",
-	"Movie-particles STAR file (.star)",
-	"2D references (.star or .mrcs)",
+	"Multiple (2D or 3D) references (.star or .mrcs)",
 	"Micrographs STAR file (.star)",
+	"3D reference (.mrc)",
+	"3D mask (.mrc)",
+	"Unfiltered half-map (unfil.mrc)"
+};
+
+static const std::vector<std::string> job_nodetype_options_tomo{
+	"Particles STAR file (.star)",
+	"Multiple (2D or 3D) references (.star or .mrcs)",
 	"3D reference (.mrc)",
 	"3D mask (.mrc)",
 	"Unfiltered half-map (unfil.mrc)"
