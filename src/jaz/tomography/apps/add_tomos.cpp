@@ -69,7 +69,7 @@ int main(int argc, char *argv[])
 		int gen_section = parser.addSection("General options");
 
 		inStarFn = parser.getOption("--i", "Input STAR file containing per-tomogram arguments");
-		inOutFn = parser.getOption("--io", "Input and output tomogram set");
+		inOutFn = parser.getOption("--io", "Input and output tomogram set", "");
 		hand = textToDouble(parser.getOption("--hand", "Handedness of the tilt geometry", "-1"));
 
 
@@ -275,6 +275,10 @@ int main(int argc, char *argv[])
 		perTomoArguments.getValue(EMDL_TOMO_IMPORT_OFFSET_Y, ii.offset3Dy, tomo_index);
 		perTomoArguments.getValue(EMDL_TOMO_IMPORT_OFFSET_Z, ii.offset3Dz, tomo_index);
 
+		const std::string tsFn0 = perTomoArguments.getString(EMDL_TOMO_TILT_SERIES_NAME, tomo_index);
+		const std::string orderFn = perTomoArguments.getString(EMDL_TOMO_IMPORT_ORDER_LIST, tomo_index);
+		const double fractionalDose = perTomoArguments.getDouble(EMDL_TOMO_IMPORT_FRACT_DOSE, tomo_index);
+
 		std::string name;
 
 		if (perTomoArguments.containsLabel(EMDL_TOMO_NAME))
@@ -283,12 +287,8 @@ int main(int argc, char *argv[])
 		}
 		else
 		{
-			name = ii.inDir;
+			name = tsFn0;
 		}
-
-		const std::string tsFn0 = perTomoArguments.getString(EMDL_TOMO_TILT_SERIES_NAME, tomo_index);
-		const std::string orderFn = perTomoArguments.getString(EMDL_TOMO_IMPORT_ORDER_LIST, tomo_index);
-		const double fractionalDose = perTomoArguments.getDouble(EMDL_TOMO_IMPORT_FRACT_DOSE, tomo_index);
 
 		std::string outFnCrop;
 		perTomoArguments.getValue(EMDL_TOMO_IMPORT_CULLED_FILE, outFnCrop, tomo_index);
