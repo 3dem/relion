@@ -55,75 +55,76 @@ void handleMissingOptionalLabel(
 
 int main(int argc, char *argv[])
 {
-	IOParser parser;
-
-	double voltage, Cs, Q0, hand, pixelSize;
-	std::string inStarFn, inOutFn, orderFn, fractionalDoseStr;
-	ImodImport global_IMOD_import;
-
 	try
 	{
-		parser.setCommandLine(argc, argv);
+		IOParser parser;
 
+		double voltage, Cs, Q0, hand, pixelSize;
+		std::string inStarFn, inOutFn, orderFn, fractionalDoseStr;
+		ImodImport global_IMOD_import;
 
-		int gen_section = parser.addSection("General options");
-
-		inStarFn = parser.getOption("--i", "Input STAR file containing per-tomogram arguments");
-		inOutFn = parser.getOption("--io", "Input and output tomogram set", "");
-		hand = textToDouble(parser.getOption("--hand", "Handedness of the tilt geometry", "-1"));
-
-
-		int optics_section = parser.addSection("Optics options");
-
-		pixelSize = textToDouble(parser.getOption("--angpix", "Pixel size in Å"));
-		voltage = textToDouble(parser.getOption("--voltage", "Voltage in kV", "300"));
-		Cs = textToDouble(parser.getOption("--Cs", "Spherical aberration in mm", "2.7"));
-		Q0 = textToDouble(parser.getOption("--Q0", "Amplitude contrast", "0.1"));
-
-
-		int dose_section = parser.addSection("Electron dose options");
-
-		orderFn = parser.getOption("--ol", "Frame-order list", "");
-		fractionalDoseStr = parser.getOption("--fd", "Fractional dose in electrons per Å²", "");
-
-
-		int imod_section = parser.addSection("IMOD import options");
-
-		global_IMOD_import.newstComFn = parser.getOption("--nc", "Input command to IMOD's newstack", "newst.com");
-		global_IMOD_import.tltComFn = parser.getOption("--tc", "Input command to IMOD's tilt", "tilt.com");
-
-		global_IMOD_import.thicknessCmd = textToDouble(parser.getOption(
-			"--thick",
-			"Thickness of original IMOD tomogram (overrides the value in tilt.com)",
-			"-1.0"));
-
-		global_IMOD_import.offset3Dx = textToDouble(parser.getOption("--offx", "3D offset, X", "0.0"));
-		global_IMOD_import.offset3Dy = textToDouble(parser.getOption("--offy", "3D offset, Y", "0.0"));
-		global_IMOD_import.offset3Dz = textToDouble(parser.getOption("--offz", "3D offset, Z", "0.0"));
-
-		global_IMOD_import.flipYZ = parser.checkOption("--flipYZ", "Interchange the Y and Z coordinates");
-		global_IMOD_import.flipZ = parser.checkOption("--flipZ", "Change the sign of the Z coordinate");
-		global_IMOD_import.flipAngles = parser.checkOption("--flipAng", "Change the sign of all tilt angles");
-
-		global_IMOD_import.ali = parser.checkOption("--ali", "Map to aligned stack (.ali)");
-		global_IMOD_import.aliSize = parser.checkOption("--ali_size", "Use the size indicated in newst.com");
-
-		Log::readParams(parser);
-
-		if (parser.checkForErrors())
+		try
 		{
+			parser.setCommandLine(argc, argv);
+
+
+			int gen_section = parser.addSection("General options");
+
+			inStarFn = parser.getOption("--i", "Input STAR file containing per-tomogram arguments");
+			inOutFn = parser.getOption("--io", "Input and output tomogram set", "");
+			hand = textToDouble(parser.getOption("--hand", "Handedness of the tilt geometry", "-1"));
+
+
+			int optics_section = parser.addSection("Optics options");
+
+			pixelSize = textToDouble(parser.getOption("--angpix", "Pixel size in Å"));
+			voltage = textToDouble(parser.getOption("--voltage", "Voltage in kV", "300"));
+			Cs = textToDouble(parser.getOption("--Cs", "Spherical aberration in mm", "2.7"));
+			Q0 = textToDouble(parser.getOption("--Q0", "Amplitude contrast", "0.1"));
+
+
+			int dose_section = parser.addSection("Electron dose options");
+
+			orderFn = parser.getOption("--ol", "Frame-order list", "");
+			fractionalDoseStr = parser.getOption("--fd", "Fractional dose in electrons per Å²", "");
+
+
+			int imod_section = parser.addSection("IMOD import options");
+
+			global_IMOD_import.newstComFn = parser.getOption("--nc", "Input command to IMOD's newstack", "newst.com");
+			global_IMOD_import.tltComFn = parser.getOption("--tc", "Input command to IMOD's tilt", "tilt.com");
+
+			global_IMOD_import.thicknessCmd = textToDouble(parser.getOption(
+				"--thick",
+				"Thickness of original IMOD tomogram (overrides the value in tilt.com)",
+				"-1.0"));
+
+			global_IMOD_import.offset3Dx = textToDouble(parser.getOption("--offx", "3D offset, X", "0.0"));
+			global_IMOD_import.offset3Dy = textToDouble(parser.getOption("--offy", "3D offset, Y", "0.0"));
+			global_IMOD_import.offset3Dz = textToDouble(parser.getOption("--offz", "3D offset, Z", "0.0"));
+
+			global_IMOD_import.flipYZ = parser.checkOption("--flipYZ", "Interchange the Y and Z coordinates");
+			global_IMOD_import.flipZ = parser.checkOption("--flipZ", "Change the sign of the Z coordinate");
+			global_IMOD_import.flipAngles = parser.checkOption("--flipAng", "Change the sign of all tilt angles");
+
+			global_IMOD_import.ali = parser.checkOption("--ali", "Map to aligned stack (.ali)");
+			global_IMOD_import.aliSize = parser.checkOption("--ali_size", "Use the size indicated in newst.com");
+
+			Log::readParams(parser);
+
+			if (parser.checkForErrors())
+			{
+				exit(RELION_EXIT_FAILURE);
+			}
+		}
+		catch (RelionError XE)
+		{
+			parser.writeUsage(std::cout);
+			std::cerr << XE;
 			exit(RELION_EXIT_FAILURE);
 		}
-	}
-	catch (RelionError XE)
-	{
-		parser.writeUsage(std::cout);
-		std::cerr << XE;
-		exit(RELION_EXIT_FAILURE);
-	}
 
-	try
-	{
+
 		MetaDataTable perTomoArguments;
 		perTomoArguments.read(inStarFn);
 
@@ -228,21 +229,6 @@ int main(int argc, char *argv[])
 
 			return RELION_EXIT_FAILURE;
 		}
-
-		/*
-
-		EMDL_TOMO_NAME,
-		EMDL_TOMO_TILT_SERIES_NAME,
-		EMDL_TOMO_IMPORT_OFFSET_X,
-		EMDL_TOMO_IMPORT_OFFSET_Y,
-		EMDL_TOMO_IMPORT_OFFSET_Z,
-		EMDL_TOMO_IMPORT_IMOD_DIR,
-		EMDL_TOMO_IMPORT_CTFFIND_FILE,
-		EMDL_TOMO_IMPORT_CTFPLOTTER_FILE,
-		EMDL_TOMO_IMPORT_ORDER_LIST,
-		EMDL_TOMO_IMPORT_FRACT_DOSE,
-		EMDL_TOMO_IMPORT_CULLED_FILE,
-		*/
 
 
 		TomogramSet tomograms;
