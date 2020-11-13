@@ -141,6 +141,15 @@ void FrameAlignmentProgram::processTomograms(
 			Log::updateProgress(tt);
 		}
 
+		const std::string temp_filename_root = getTempFilenameRoot(
+					tomogramSet.getTomogramName(t));
+
+		if (only_do_unfinished &&
+				ZIO::fileExists(temp_filename_root + "_projections.star"))
+		{
+			continue;
+		}
+
 		int pc = particles[t].size();
 		if (pc == 0) continue;
 
@@ -179,7 +188,7 @@ void FrameAlignmentProgram::processTomograms(
 		ProtoAlignment protoAlignment(
 				CCs, tomogram.projectionMatrices, particleSet, particles[t], referenceMap.image_FS,
 				const_particles, const_angles, const_shifts, range,
-				tomogram.centre, num_threads, padding);
+				tomogram.centre, 0, num_threads, padding);
 
 		BufferedImage<double> FCC3, FCC1;
 

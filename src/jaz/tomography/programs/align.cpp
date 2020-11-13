@@ -1,7 +1,8 @@
-#include "polish.h"
+#include "align.h"
 #include <src/ctf.h>
 #include <src/jaz/tomography/tomogram.h>
 #include <src/jaz/tomography/motion/motion_fit.h>
+#include <src/jaz/tomography/motion/proto_alignment.h>
 #include <src/jaz/tomography/motion/trajectory_set.h>
 #include <src/jaz/tomography/projection_IO.h>
 #include <src/jaz/tomography/prediction.h>
@@ -19,7 +20,7 @@
 using namespace gravis;
 
 
-PolishProgram::PolishProgram(int argc, char *argv[])
+AlignProgram::AlignProgram(int argc, char *argv[])
 	: RefinementProgram(argc, argv)
 {
 	IOParser parser;
@@ -27,34 +28,43 @@ PolishProgram::PolishProgram(int argc, char *argv[])
 	readParams(parser);
 }
 
-void PolishProgram::readParams(IOParser &parser)
+void AlignProgram::readParams(IOParser &parser)
 {
 	try
 	{
 		_readParams(parser);
-				
-		int defocus_section = parser.addSection("Alignment options");
-		
+
+
+		int alignment_section = parser.addSection("General alignment options");
+
+		shiftOnly = parser.checkOption("--shift_only", "Only apply an optimal rigid shift to each frame (no iterative optimisation)");
+		range = textToInteger(parser.getOption("--r", "Max. particle shift allowed [Pixels]", "20"));
+		mfSettings.constParticles = parser.checkOption("--const_p", "Keep the particle positions constant");
+		mfSettings.constAngles = parser.checkOption("--const_a", "Keep the frame angles constant");
+		mfSettings.constShifts = parser.checkOption("--const_s", "Keep the frame shifts constant");
+		num_iters = textToInteger(parser.getOption("--it", "Max. number of iterations", "1000"));
+
+
+		int motion_section = parser.addSection("Motion estimation options");
+
+		do_motion = parser.checkOption("--motion", "Estimate particle motion (expensive)");
+
 		motParams.sig_vel = textToDouble(parser.getOption("--s_vel", "Velocity sigma [Å/dose]", "0.5"));
 		motParams.sig_div = textToDouble(parser.getOption("--s_div", "Divergence sigma [Å]", "5000.0"));
-		
+
 		mfSettings.params_scaled_by_dose = !parser.checkOption("--abs_params", "Do not scale the sigmas by the dose");
-		
+
 		mfSettings.sqExpKernel = parser.checkOption("--sq_exp_ker", "Use a square-exponential kernel instead of an exponential one");
 		mfSettings.maxEDs = textToInteger(parser.getOption("--max_ed", "Maximum number of eigendeformations", "-1"));
-		
-		range = textToInteger(parser.getOption("--r", "Max. shift allowed [Pixels]", "20"));
+
+
+		int expert_section = parser.addSection("Expert options");
+
 		padding = textToDouble(parser.getOption("--pad", "Apply Fourier padding to the cross-correlation images", "1"));
 		whiten = !parser.checkOption("--no_whiten", "Do not not whiten the noise spectra");
 		whiten_abs = parser.checkOption("--whiten_abs", "Divide by the square root of the power spectrum");
 		hiPass_px = textToDouble(parser.getOption("--hp", "High-pass filter the cross-correlation images by this sigma", "-1"));
 		sig2RampPower = textToDouble(parser.getOption("--srp", "Noise variance is divided by k^this during whitening", "0"));
-		mfSettings.constParticles = parser.checkOption("--const_p", "Keep the particle positions constant");
-		mfSettings.constAngles = parser.checkOption("--const_a", "Keep the frame angles constant");
-		mfSettings.constShifts = parser.checkOption("--const_s", "Keep the frame shifts constant");
-		num_iters = textToInteger(parser.getOption("--it", "Max. number of iterations", "10000"));
-		
-		outputShiftedCCs = parser.checkOption("--diag_CC", "Output shifted CCs (expensive)");
 		
 		Log::readParams(parser);
 		
@@ -66,9 +76,14 @@ void PolishProgram::readParams(IOParser &parser)
 		std::cerr << XE;
 		exit(1);
 	}
+
+	if (shiftOnly && do_motion)
+	{
+		REPORT_ERROR("The options --shift_only and --motion are mutually exclusive");
+	}
 }
 
-void PolishProgram::run()
+void AlignProgram::run()
 {
 	Log::beginSection("Initialising");
 
@@ -86,50 +101,53 @@ void PolishProgram::run()
 	finalise();
 }
 
-void PolishProgram::initialise()
+void AlignProgram::initialise()
 {
 	RefinementProgram::init();
-	int res = system(("mkdir -p " + outDir + "/Trajectories").c_str());
 
 	const int tc = particles.size();
 
 	Log::beginSection("Configuration");
-	Log::printBinaryChoice("Frame angles: ", mfSettings.constAngles, "static", "variable");
-	Log::printBinaryChoice("Frame shifts: ", mfSettings.constShifts, "static", "variable");
-	Log::printBinaryChoice("Particle positions: ", mfSettings.constParticles, "static", "variable");
+	Log::printBinaryChoice("Particle motion: ", do_motion, "considered", "not considered");
+	Log::printBinaryChoice("Frame angles: ", mfSettings.constAngles, "constant", "variable");
+	Log::printBinaryChoice("Frame shifts: ", mfSettings.constShifts, "constant", "variable");
+	Log::printBinaryChoice("Particle positions: ", mfSettings.constParticles, "constant", "variable");
 	Log::endSection();
 
-
-	int tpc = particleSet.getTotalParticleNumber();
-
-	if (particleSet.motionTrajectories.size() != tpc)
+	if (do_motion)
 	{
-		particleSet.motionTrajectories.resize(tpc);
-	}
+		ZIO::makeDir(outDir + "/Trajectories");
 
-	for (int t = 0; t < tc; t++)
-	{
-		int pc = particles[t].size();
-		if (pc == 0) continue;
+		int tpc = particleSet.getTotalParticleNumber();
 
-		Tomogram tomogram = tomogramSet.loadTomogram(t, false);
-		const int fc = tomogram.frameCount;
-
-		for (int p = 0; p < pc; p++)
+		if (particleSet.motionTrajectories.size() != tpc)
 		{
-			if (particleSet.motionTrajectories[particles[t][p].value].shifts_Ang.size() != fc)
+			particleSet.motionTrajectories.resize(tpc);
+		}
+
+		for (int t = 0; t < tc; t++)
+		{
+			int pc = particles[t].size();
+			if (pc == 0) continue;
+
+			const int fc = tomogramSet.getFrameCount(t);
+
+			for (int p = 0; p < pc; p++)
 			{
-				particleSet.motionTrajectories[particles[t][p].value] = Trajectory(fc);
+				if (particleSet.motionTrajectories[particles[t][p].value].shifts_Ang.size() != fc)
+				{
+					particleSet.motionTrajectories[particles[t][p].value] = Trajectory(fc);
+				}
 			}
 		}
-	}
 
-	particleSet.hasMotion = true;
+		particleSet.hasMotion = true;
+	}
 
 	ZIO::ensureParentDir(getTempFilenameRoot(""));
 }
 
-void PolishProgram::finalise()
+void AlignProgram::finalise()
 {
 	const int tc = particles.size();
 
@@ -141,21 +159,28 @@ void PolishProgram::finalise()
 		readTempData(t);
 	}
 
-	Trajectory::write(
-		particleSet.motionTrajectories, particleSet,
-		particles, outDir + "motion.star");
+	if (do_motion)
+	{
+		Trajectory::write(
+			particleSet.motionTrajectories, particleSet,
+			particles, outDir + "motion.star");
+
+		optimisationSet.trajectories = outDir+"motion.star";
+	}
+
+	if (!shiftOnly)
+	{
+		particleSet.write(outDir + "particles.star");
+		optimisationSet.particles = outDir+"particles.star";
+	}
 
 	tomogramSet.write(outDir + "tomograms.star");
-	particleSet.write(outDir + "particles.star");
-
-	optimisationSet.particles = outDir+"particles.star";
 	optimisationSet.tomograms = outDir+"tomograms.star";
-	optimisationSet.trajectories = outDir+"motion.star";
 
 	optimisationSet.write(outDir+"optimisation_set.star");
 }
 
-void PolishProgram::processTomograms(
+void AlignProgram::processTomograms(
 		const std::vector<int>& tomoIndices,
 		const AberrationsCache& aberrationsCache,
 		int verbosity,
@@ -165,17 +190,12 @@ void PolishProgram::processTomograms(
 
 	if (verbosity > 0 && !per_tomogram_progress)
 	{
-		Log::beginProgress("Processing tomograms", ttc);
+		Log::beginProgress("Processing tomograms", ttc * num_iters);
 	}
 
 	for (int tt = 0; tt < ttc; tt++)
 	{
 		const int t = tomoIndices[tt];
-
-		if (verbosity > 0 && !per_tomogram_progress)
-		{
-			Log::updateProgress(tt);
-		}
 
 		const std::string temp_filename_root = getTempFilenameRoot(
 					tomogramSet.getTomogramName(t));
@@ -220,23 +240,55 @@ void PolishProgram::processTomograms(
 			projByTime[f] = tomogram.projectionMatrices[tomogram.frameSequence[f]];
 		}
 
+		// motion estimation requires the CCs to be given in chronological order
+
+		std::vector<int> frameSequence(fc);
+
+		if (do_motion)
+		{
+			frameSequence = tomogram.frameSequence;
+		}
+		else
+		{
+			for (int f = 0; f < fc; f++)
+			{
+				frameSequence[f] = f;
+			}
+		}
 
 		std::vector<BufferedImage<double>> CCs = Prediction::computeCroppedCCs(
 				particleSet, particles[t], tomogram, aberrationsCache,
-				referenceMap, frqWeight, tomogram.frameSequence,
+				referenceMap, frqWeight, frameSequence,
 				range, true, num_threads, padding);
 
 
-		MotionFit motionFit(
-				CCs, projByTime, particleSet, particles[t], referenceMap.image_FS,
-				motParams, mfSettings, tomogram.centre,
-				tomogram.getFrameDose(), tomogram.optics.pixelSize, padding, 0, num_threads);
-
-
-		BufferedImage<double> FCC3, FCC1, specCC;
+		BufferedImage<double> FCC;
 
 		if (diag)
 		{
+			BufferedImage<double> FCC3 = FCC::compute3(
+				particleSet, particles[t], tomogram, referenceMap.image_FS,
+				true, num_threads);
+
+			FCC3.write(diagPrefix + "_FCC3_initial.mrc");
+
+			FCC = FCC::divide(FCC3);
+			FCC.write(diagPrefix + "_FCC_initial.mrc");
+		}
+
+
+		const int progress_bar_offset = per_tomogram_progress? 0 : tt * num_iters;
+
+		if (do_motion)
+		{
+
+			MotionFit motionFit(
+				CCs, projByTime, particleSet, particles[t], referenceMap.image_FS,
+				motParams, mfSettings, tomogram.centre,
+				tomogram.getFrameDose(), tomogram.optics.pixelSize, padding,
+				progress_bar_offset, num_threads);
+
+			if (diag)
 			{
 				std::ofstream evDat(diagPrefix + "_deformation_eigenvalues.dat");
 
@@ -246,96 +298,41 @@ void PolishProgram::processTomograms(
 				}
 			}
 
-			FCC3 = FCC::compute3(
-				particleSet, particles[t], tomogram, referenceMap.image_FS,
-				true, num_threads);
+			std::vector<double> initial(motionFit.getParamCount(), 0.0);
 
-			FCC3.write(diagPrefix + "_FCC3_initial.mrc");
-			FCC1 = FCC::divide(FCC3);
-			FCC1.write(diagPrefix + "_FCC_initial.mrc");
 
-			if (outputShiftedCCs)
+			if (verbosity > 0 && per_tomogram_progress)
 			{
-				const int diam = CCs[0].xdim;
-
-				BufferedImage<float> CCsum(diam, diam, fc);
-
-				CCsum.fill(0.f);
-
-				for (int p = 0; p < pc; p++)
-				{
-					CCsum += CCs[p];
-				}
-
-				CCsum.write(diagPrefix + "_CC_sum_" + tag + "_initial.mrc");
-
-
-				const int d = CCsum.xdim;
-				const int dh = d/2 + 1;
-
-				specCC = BufferedImage<double>(dh,fc);
-				specCC.fill(0.0);
-
-				BufferedImage<fComplex> CCsumFS;
-
-				for (int f = 0; f < fc; f++)
-				{
-					BufferedImage<float> CCsum_f = CCsum.getSliceRef(f);
-					FFT::FourierTransform(CCsum_f, CCsumFS, FFT::Both);
-
-					for (int y = 0; y < d; y++)
-					for (int x = 0; x < dh; x++)
-					{
-						const double yy = y < d/2? y : y - d;
-						const double rd = sqrt(x*x + yy*yy);
-						const int r = (int) rd;
-
-						const double mod = (1 - 2 * (x % 2)) * (1 - 2 * (y % 2));
-
-						if (r < dh) specCC(r,f) += mod * CCsumFS(x,y).real;
-					}
-				}
-
-				specCC.write(diagPrefix + "_specCC_initial.mrc");
+				Log::beginProgress("Performing optimisation", num_iters);
 			}
-		}
+
+			std::vector<double> opt = LBFGS::optimize(
+				initial, motionFit, 1, num_iters, 1e-3, 1e-4);
 
 
-		std::vector<double> initial(motionFit.getParamCount(), 0.0);
+			if (verbosity > 0 && per_tomogram_progress)
+			{
+				Log::endProgress();
+			}
 
-		if (verbosity > 0 && per_tomogram_progress)
-		{
-			Log::beginProgress("Performing optimisation", num_iters);
-		}
-
-
-		std::vector<double> opt = LBFGS::optimize(
-			initial, motionFit, 1, num_iters, 1e-3, 1e-4);
-
-
-		if (verbosity > 0 && per_tomogram_progress)
-		{
-			Log::endProgress();
-		}
+			std::vector<d4Matrix> projections = motionFit.getProjections(opt, tomogram.frameSequence);
+			std::vector<d3Vector> positions = motionFit.getParticlePositions(opt);
+			std::vector<Trajectory> trajectories = motionFit.exportTrajectories(
+						opt, particleSet, tomogram.frameSequence);
 
 
-		std::vector<d4Matrix> projections = motionFit.getProjections(opt, tomogram.frameSequence);
-		std::vector<d3Vector> positions = motionFit.getParticlePositions(opt);
-		std::vector<Trajectory> trajectories = motionFit.exportTrajectories(
-					opt, particleSet, tomogram.frameSequence);
-
-		writeTempData(trajectories, projections, positions, t);
+			writeTempData(&trajectories, projections, positions, t);
 
 
+			Mesh mesh8 = motionFit.visualiseTrajectories(opt, 8.0);
+			mesh8.writePly(outDir + "Trajectories/" + tomogram.name + "_x8.ply");
 
-		Mesh mesh8 = motionFit.visualiseTrajectories(opt, 8.0);
-		mesh8.writePly(outDir + "Trajectories/" + tomogram.name + "_x8.ply");
+			Mesh mesh1 = motionFit.visualiseTrajectories(opt, 1.0);
+			mesh1.writePly(outDir + "Trajectories/" + tomogram.name + "_x1.ply");
 
-		Mesh mesh1 = motionFit.visualiseTrajectories(opt, 1.0);
-		mesh1.writePly(outDir + "Trajectories/" + tomogram.name + "_x1.ply");
 
-		if (diag)
-		{
+			// Update the particle set in case an FCC is to be evaluated
+
 			for (int p = 0; p < pc; p++)
 			{
 				const ParticleIndex pp = particles[t][p];
@@ -345,16 +342,121 @@ void PolishProgram::processTomograms(
 			}
 
 			tomogram.projectionMatrices = projections;
+		}
+		else
+		{
+			std::vector<d4Matrix> projections = tomogram.projectionMatrices;
+			std::vector<d3Vector> positions;
 
-			FCC3 = FCC::compute3(
+			if (shiftOnly)
+			{
+				const int diam = (int)(2*range*padding);
+
+				BufferedImage<float> CCsum(diam, diam, fc);
+
+				CCsum.fill(0.f);
+
+				if (verbosity > 0 && per_tomogram_progress)
+				{
+					Log::beginProgress("Adding up cross-correlations", pc);
+				}
+
+				for (int p = 0; p < pc; p++)
+				{
+					if (verbosity > 0 && per_tomogram_progress)
+					{
+						Log::updateProgress(p);
+					}
+
+					CCsum += CCs[p];
+				}
+
+				if (verbosity > 0 && per_tomogram_progress)
+				{
+					Log::endProgress();
+				}
+
+				if (diag) CCsum.write(outDir + "CCsum_" + tag + ".mrc");
+
+				d2Vector origin(padding*range, padding*range);
+
+				for (int f = 0; f < fc; f++)
+				{
+					d2Vector opt = (Interpolation::quadraticMaxXY(CCsum.getSliceRef(f)) - origin)/padding;
+
+					projections[f](0,3) += opt.x;
+					projections[f](1,3) += opt.y;
+				}
+
+				if (!per_tomogram_progress)
+				{
+					Log::updateProgress(progress_bar_offset + num_iters);
+				}
+
+				positions.resize(pc);
+
+				for (int p = 0; p < pc; p++)
+				{
+					positions[p] = particleSet.getPosition(particles[t][p]);
+				}
+			}
+			else
+			{
+				ProtoAlignment protoAlignment(
+					CCs, tomogram.projectionMatrices, particleSet, particles[t],
+					referenceMap.image_FS,
+					mfSettings.constParticles,
+					mfSettings.constAngles,
+					mfSettings.constShifts,
+					range,
+					tomogram.centre, progress_bar_offset,
+					num_threads, padding);
+
+				std::vector<double> initial(protoAlignment.getParamCount(), 0.0);
+
+				if (verbosity > 0 && per_tomogram_progress)
+				{
+					Log::beginProgress("Performing optimisation", num_iters);
+				}
+
+				std::vector<double> opt = LBFGS::optimize(
+					initial, protoAlignment, 1, num_iters, 1e-6, 1e-4);
+
+				if (verbosity > 0 && per_tomogram_progress)
+				{
+					Log::endProgress();
+				}
+
+				projections = protoAlignment.getProjections(opt);
+				positions = protoAlignment.getParticlePositions(opt);
+			}
+
+			writeTempData(0, projections, positions, t);
+
+
+			// Update the particle set in case an FCC is to be evaluated
+
+			for (int p = 0; p < pc; p++)
+			{
+				const ParticleIndex pp = particles[t][p];
+				particleSet.moveParticleTo(pp, positions[p]);
+			}
+
+			tomogram.projectionMatrices = projections;
+		}
+
+		if (diag)
+		{
+
+			BufferedImage<double> FCC3 = FCC::compute3(
 				particleSet, particles[t], tomogram, referenceMap.image_FS,
 				true, num_threads);
 
 			FCC3.write(diagPrefix + "_FCC3_final.mrc");
-			BufferedImage<double> FCC1_new = FCC::divide(FCC3);
-			FCC1_new.write(diagPrefix + "_FCC_final.mrc");
+			BufferedImage<double> FCC_new = FCC::divide(FCC3);
+			FCC_new.write(diagPrefix + "_FCC_final.mrc");
 
-			(FCC1_new - FCC1).write(diagPrefix + "_FCC_delta.mrc");
+			(FCC_new - FCC).write(diagPrefix + "_FCC_delta.mrc");
 		}
 
 		if (verbosity > 0 && per_tomogram_progress)
@@ -370,14 +472,13 @@ void PolishProgram::processTomograms(
 }
 
 
-
-std::string PolishProgram::getTempFilenameRoot(const std::string& tomogram_name)
+std::string AlignProgram::getTempFilenameRoot(const std::string& tomogram_name)
 {
 	return outDir + "temp/" + tomogram_name;
 }
 
-void PolishProgram::writeTempData(
-		const std::vector<Trajectory>& traj,
+void AlignProgram::writeTempData(
+		const std::vector<Trajectory>* traj,
 		const std::vector<d4Matrix>& proj,
 		const std::vector<d3Vector>& pos,
 		int t)
@@ -403,7 +504,10 @@ void PolishProgram::writeTempData(
 	temp_positions.write(temp_filename_root + "_positions.star");
 
 
-	Trajectory::write(traj, particleSet, {particles[t]}, temp_filename_root + "_motion.star");
+	if (do_motion && traj != 0)
+	{
+		Trajectory::write(*traj, particleSet, {particles[t]}, temp_filename_root + "_motion.star");
+	}
 
 
 	MetaDataTable temp_projections;
@@ -423,7 +527,7 @@ void PolishProgram::writeTempData(
 	temp_projections.write(temp_filename_root + "_projections.star");
 }
 
-void PolishProgram::readTempData(int t)
+void AlignProgram::readTempData(int t)
 {
 	const int pc = particles[t].size();
 
@@ -456,25 +560,28 @@ void PolishProgram::readTempData(int t)
 	}
 
 
-	std::ifstream ifs(temp_filename_root + "_motion.star");
-
-	std::vector<MetaDataTable> mdts = MetaDataTable::readAll(ifs, pc+1);
-
-	for (int p = 0; p < pc; p++)
+	if (do_motion)
 	{
-		MetaDataTable& mdt = mdts[p+1];
+		std::ifstream ifs(temp_filename_root + "_motion.star");
 
-		int fc = mdt.numberOfObjects();
+		std::vector<MetaDataTable> mdts = MetaDataTable::readAll(ifs, pc+1);
 
-		d3Vector shift;
-
-		for (int f = 0; f < fc; f++)
+		for (int p = 0; p < pc; p++)
 		{
-			mdt.getValueSafely(EMDL_ORIENT_ORIGIN_X_ANGSTROM, shift.x, f);
-			mdt.getValueSafely(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, shift.y, f);
-			mdt.getValueSafely(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, shift.z, f);
+			MetaDataTable& mdt = mdts[p+1];
 
-			particleSet.motionTrajectories[particles[t][p].value].shifts_Ang[f] = shift;
+			int fc = mdt.numberOfObjects();
+
+			d3Vector shift;
+
+			for (int f = 0; f < fc; f++)
+			{
+				mdt.getValueSafely(EMDL_ORIENT_ORIGIN_X_ANGSTROM, shift.x, f);
+				mdt.getValueSafely(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, shift.y, f);
+				mdt.getValueSafely(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, shift.z, f);
+
+				particleSet.motionTrajectories[particles[t][p].value].shifts_Ang[f] = shift;
+			}
 		}
 	}
 
