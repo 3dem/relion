@@ -607,6 +607,9 @@ void MetaDataTable::deactivateLabel(EMDLabel label, std::string unknownLabel)
 		{
 			activeLabels.erase(activeLabels.begin() + i);
 			unknownLabelPosition2Offset.erase(unknownLabelPosition2Offset.begin() + i);
+
+			if (label != EMDL_UNKNOWN_LABEL)
+				label2offset[label] = -1;
 		}
 	}
 }

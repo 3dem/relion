@@ -400,6 +400,9 @@ bool MetaDataTable::getValue(EMDLabel label, T& value, long objectID) const
 {
 	if (label < 0 || label >= EMDL_LAST_LABEL) return false;
 
+	if (label == EMDL_UNKNOWN_LABEL)
+		REPORT_ERROR("MetaDataTable::setValue does not support unknown label.");
+
 #ifdef METADATA_TABLE_TYPE_CHECK
 	if (!isTypeCompatible(label, value))
 		REPORT_ERROR("Runtime error: wrong type given to MetaDataTable::getValue for label " + EMDL::label2Str(label));
@@ -428,6 +431,8 @@ template<class T>
 bool MetaDataTable::setValue(EMDLabel label, const T &value, long int objectID)
 {
 	if (label < 0 || label >= EMDL_LAST_LABEL) return false;
+	if (label == EMDL_UNKNOWN_LABEL)
+		REPORT_ERROR("MetaDataTable::setValue does not support unknown label.");
 
 #ifdef METADATA_TABLE_TYPE_CHECK
 	if (!isTypeCompatible(label, value))
