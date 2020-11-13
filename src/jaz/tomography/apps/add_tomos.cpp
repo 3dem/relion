@@ -122,270 +122,279 @@ int main(int argc, char *argv[])
 		exit(RELION_EXIT_FAILURE);
 	}
 
-	MetaDataTable perTomoArguments;
-	perTomoArguments.read(inStarFn);
-
-
-	bool inputsOkay = true;
-
-	std::vector<std::vector<EMDLabel>> missingMandatoryLabels;
-
-	checkMissingMandatoryLabel({EMDL_TOMO_IMPORT_IMOD_DIR}, perTomoArguments, missingMandatoryLabels);
-	checkMissingMandatoryLabel({EMDL_TOMO_TILT_SERIES_NAME}, perTomoArguments, missingMandatoryLabels);
-	checkMissingMandatoryLabel({EMDL_TOMO_IMPORT_CTFFIND_FILE, EMDL_TOMO_IMPORT_CTFPLOTTER_FILE}, perTomoArguments, missingMandatoryLabels);
-	//checkMissingMandatoryLabel({EMDL_TOMO_IMPORT_CULLED_FILE}, perTomoArguments, missingMandatoryLabels);
-
-	if (missingMandatoryLabels.size() == 1)
+	try
 	{
-		std::vector<EMDLabel> missing = missingMandatoryLabels[0];
+		MetaDataTable perTomoArguments;
+		perTomoArguments.read(inStarFn);
 
-		if (missing.size() == 1)
-		{
-			std::cerr
-				<< "The following label needs to be present in the input STAR file: "
-				<< EMDL::label2Str(missing[0]) << std::endl;
-		}
-		else
-		{
-			std::cerr
-				<< "One of the following labels needs to be present in the input STAR file: "
-				<< EMDL::label2Str(missing[0]) << " or " << EMDL::label2Str(missing[1]) << std::endl;
-		}
-	}
-	else if (missingMandatoryLabels.size() > 1)
-	{
-		std::cerr << "The following labels need to be present in the input star file:" << std::endl;
 
-		for (int i = 0; i < missingMandatoryLabels.size(); i++)
+		bool inputsOkay = true;
+
+		std::vector<std::vector<EMDLabel>> missingMandatoryLabels;
+
+		checkMissingMandatoryLabel({EMDL_TOMO_IMPORT_IMOD_DIR}, perTomoArguments, missingMandatoryLabels);
+		checkMissingMandatoryLabel({EMDL_TOMO_TILT_SERIES_NAME}, perTomoArguments, missingMandatoryLabels);
+		checkMissingMandatoryLabel({EMDL_TOMO_IMPORT_CTFFIND_FILE, EMDL_TOMO_IMPORT_CTFPLOTTER_FILE}, perTomoArguments, missingMandatoryLabels);
+		//checkMissingMandatoryLabel({EMDL_TOMO_IMPORT_CULLED_FILE}, perTomoArguments, missingMandatoryLabels);
+
+		if (missingMandatoryLabels.size() == 1)
 		{
-			std::vector<EMDLabel> missing = missingMandatoryLabels[i];
+			std::vector<EMDLabel> missing = missingMandatoryLabels[0];
 
 			if (missing.size() == 1)
 			{
-				std::cerr << " - " << EMDL::label2Str(missing[0]) << std::endl;
+				std::cerr
+					<< "The following label needs to be present in the input STAR file: "
+					<< EMDL::label2Str(missing[0]) << std::endl;
 			}
 			else
 			{
-				std::cerr << " - either "
-					<< EMDL::label2Str(missing[0]) << " or "
-					<< EMDL::label2Str(missing[1]) << std::endl;
+				std::cerr
+					<< "One of the following labels needs to be present in the input STAR file: "
+					<< EMDL::label2Str(missing[0]) << " or " << EMDL::label2Str(missing[1]) << std::endl;
 			}
 		}
-	}
-
-	inputsOkay = missingMandatoryLabels.size() == 0;
-
-	std::vector<std::pair<EMDLabel,std::string>> missingOptionalLabels;
-
-	handleMissingOptionalLabel(
-		EMDL_TOMO_IMPORT_ORDER_LIST, perTomoArguments,
-		"--ol", orderFn, missingOptionalLabels);
-
-	handleMissingOptionalLabel(
-		EMDL_TOMO_IMPORT_FRACT_DOSE, perTomoArguments,
-		"--fd", fractionalDoseStr, missingOptionalLabels);
-
-	if (missingOptionalLabels.size() == 1)
-	{
-		std::pair<EMDLabel,std::string> missing = missingOptionalLabels[0];
-
-		std::cerr
-			<< "The following property needs to be either present in the input STAR file or supplied as a command-line argument: "
-			<< EMDL::label2Str(missing.first) << " or " << missing.second << std::endl;
-	}
-	else if (missingOptionalLabels.size() > 1)
-	{
-		std::cerr << "The following properties need to be either present in the input STAR file or supplied as command-line arguments: " << std::endl;
-
-		for (int i = 0; i < missingOptionalLabels.size(); i++)
+		else if (missingMandatoryLabels.size() > 1)
 		{
-			std::pair<EMDLabel,std::string> missing = missingOptionalLabels[i];
+			std::cerr << "The following labels need to be present in the input star file:" << std::endl;
 
-			std::cerr
-				<< " - "<< EMDL::label2Str(missing.first) << " or " << missing.second << std::endl;
-		}
-	}
-
-	inputsOkay = inputsOkay && missingOptionalLabels.size() == 0;
-
-	if (!inputsOkay)
-	{
-		return RELION_EXIT_FAILURE;
-	}
-
-
-	if (perTomoArguments.containsLabel(EMDL_TOMO_IMPORT_CTFFIND_FILE) &&
-		perTomoArguments.containsLabel(EMDL_TOMO_IMPORT_CTFPLOTTER_FILE))
-	{
-		std::cerr
-			<< "The CTF can only be imported from CTFFind ("
-			<< EMDL::label2Str(EMDL_TOMO_IMPORT_CTFFIND_FILE) << ")"
-			<< " or ctfplotter ("
-			<< EMDL::label2Str(EMDL_TOMO_IMPORT_CTFPLOTTER_FILE) << ")"
-			<< "), not both.";
-
-		return RELION_EXIT_FAILURE;
-	}
-
-	/*
-
-	EMDL_TOMO_NAME,
-	EMDL_TOMO_TILT_SERIES_NAME,
-	EMDL_TOMO_IMPORT_OFFSET_X,
-	EMDL_TOMO_IMPORT_OFFSET_Y,
-	EMDL_TOMO_IMPORT_OFFSET_Z,
-	EMDL_TOMO_IMPORT_IMOD_DIR,
-	EMDL_TOMO_IMPORT_CTFFIND_FILE,
-	EMDL_TOMO_IMPORT_CTFPLOTTER_FILE,
-	EMDL_TOMO_IMPORT_ORDER_LIST,
-	EMDL_TOMO_IMPORT_FRACT_DOSE,
-	EMDL_TOMO_IMPORT_CULLED_FILE,
-	*/
-
-
-	TomogramSet tomograms;
-
-	if (inOutFn != "" && ZIO::fileExists(inOutFn))
-	{
-		tomograms = TomogramSet(inOutFn);
-	}
-
-
-	std::cout << perTomoArguments.size() << " tomograms to be imported" << std::endl;
-
-	for (int tomo_index = 0; tomo_index < perTomoArguments.size(); tomo_index++)
-	{
-		CtfSource ctfSource;
-
-		Log::beginSection("Tomogram " + ZIO::itoa(tomo_index + 1) + " / " + ZIO::itoa(perTomoArguments.size()));
-
-		std::string ctfFindFn, ctfPlotterFn;
-		perTomoArguments.getValue(EMDL_TOMO_IMPORT_CTFFIND_FILE, ctfFindFn, tomo_index);
-		perTomoArguments.getValue(EMDL_TOMO_IMPORT_CTFPLOTTER_FILE, ctfPlotterFn, tomo_index);
-
-		if (ctfPlotterFn == "")
-		{
-			ctfSource = CtfFind;
-			Log::print("The CTF will be read from the CTFFind output file "+ctfFindFn);
-		}
-		else if (ctfFindFn == "")
-		{
-			ctfSource = CtfPlotter;
-			Log::print("The CTF will be read from the ctfplotter output file "+ctfPlotterFn);
-		}
-
-		ImodImport ii = global_IMOD_import;
-
-		ii.inDir = perTomoArguments.getString(EMDL_TOMO_IMPORT_IMOD_DIR, tomo_index);
-
-		perTomoArguments.getValue(EMDL_TOMO_IMPORT_OFFSET_X, ii.offset3Dx, tomo_index);
-		perTomoArguments.getValue(EMDL_TOMO_IMPORT_OFFSET_Y, ii.offset3Dy, tomo_index);
-		perTomoArguments.getValue(EMDL_TOMO_IMPORT_OFFSET_Z, ii.offset3Dz, tomo_index);
-
-		const std::string tsFn0 = perTomoArguments.getString(EMDL_TOMO_TILT_SERIES_NAME, tomo_index);
-		const std::string orderFn = perTomoArguments.getString(EMDL_TOMO_IMPORT_ORDER_LIST, tomo_index);
-		const double fractionalDose = perTomoArguments.getDouble(EMDL_TOMO_IMPORT_FRACT_DOSE, tomo_index);
-
-		ii.tsFn = tsFn0;
-
-		std::string name;
-
-		if (perTomoArguments.containsLabel(EMDL_TOMO_NAME))
-		{
-			name = perTomoArguments.getString(EMDL_TOMO_NAME, tomo_index);
-		}
-		else
-		{
-			name = tsFn0;
-		}
-
-		std::string outFnCrop;
-		perTomoArguments.getValue(EMDL_TOMO_IMPORT_CULLED_FILE, outFnCrop, tomo_index);
-
-		std::string tsFn;
-
-		Log::print("Importing frame alignment from "+ii.inDir);
-
-
-		ImodImport::Mapping mapping = ii.import();
-
-		if (mapping.framesMissing)
-		{
-			if (outFnCrop == "")
+			for (int i = 0; i < missingMandatoryLabels.size(); i++)
 			{
-				std::cerr << "According to " << ii.inDir + ii.tltComFn << ", frames have been excluded, "
-					<< "but no output filename has been specified for the culled stack ("
-					<< EMDL::label2Str(EMDL_TOMO_IMPORT_CULLED_FILE) << ").";
+				std::vector<EMDLabel> missing = missingMandatoryLabels[i];
 
-				return RELION_EXIT_FAILURE;
-			}
-
-			Log::print("Writing culled frame stack to "+outFnCrop);
-			ii.writeCulledStack(mapping.oldFrameIndex, outFnCrop);
-
-			tsFn = outFnCrop;
-		}
-		else
-		{
-			tsFn = tsFn0;
-		}
-
-		const std::string tltFn = ii.lastTltFn;
-
-		Log::print("Deducing frame sequence from "+orderFn+" and "+tltFn);
-
-		std::vector<std::vector<double>> order = ZIO::readFixedDoublesTable(orderFn, 2, ',');
-		std::vector<double> tilts = ZIO::readDoubles(tltFn);
-
-		int fc = tilts.size();
-
-		std::vector<double> cumulativeDose(fc);
-
-		for (int i = 0; i < fc; i++)
-		{
-			double minDist = 720.0;
-			int bestJ = -1;
-
-			// find the tilt angle in *.tlt closest to the angle in the order list
-			for (int j = 0; j < order.size(); j++)
-			{
-				double d = order[j][1] - tilts[i];
-				double dd = d*d;
-
-				if (dd < minDist)
+				if (missing.size() == 1)
 				{
-					bestJ = j;
-					minDist = dd;
+					std::cerr << " - " << EMDL::label2Str(missing[0]) << std::endl;
+				}
+				else
+				{
+					std::cerr << " - either "
+						<< EMDL::label2Str(missing[0]) << " or "
+						<< EMDL::label2Str(missing[1]) << std::endl;
 				}
 			}
-
-			cumulativeDose[i] = bestJ * fractionalDose;
 		}
 
-		std::vector<CTF> ctfs;
+		inputsOkay = missingMandatoryLabels.size() == 0;
 
-		if (ctfSource == CtfFind)
+		std::vector<std::pair<EMDLabel,std::string>> missingOptionalLabels;
+
+		handleMissingOptionalLabel(
+			EMDL_TOMO_IMPORT_ORDER_LIST, perTomoArguments,
+			"--ol", orderFn, missingOptionalLabels);
+
+		handleMissingOptionalLabel(
+			EMDL_TOMO_IMPORT_FRACT_DOSE, perTomoArguments,
+			"--fd", fractionalDoseStr, missingOptionalLabels);
+
+		if (missingOptionalLabels.size() == 1)
 		{
-			ctfs = TomoCtfHelper::loadCtffind4(ctfFindFn, fc, voltage, Cs, Q0);
+			std::pair<EMDLabel,std::string> missing = missingOptionalLabels[0];
+
+			std::cerr
+				<< "The following property needs to be either present in the input STAR file or supplied as a command-line argument: "
+				<< EMDL::label2Str(missing.first) << " or " << missing.second << std::endl;
 		}
-		else
+		else if (missingOptionalLabels.size() > 1)
 		{
-			ctfs = TomoCtfHelper::loadCtfplotter(ctfPlotterFn, fc, voltage, Cs, Q0);
+			std::cerr << "The following properties need to be either present in the input STAR file or supplied as command-line arguments: " << std::endl;
+
+			for (int i = 0; i < missingOptionalLabels.size(); i++)
+			{
+				std::pair<EMDLabel,std::string> missing = missingOptionalLabels[i];
+
+				std::cerr
+					<< " - "<< EMDL::label2Str(missing.first) << " or " << missing.second << std::endl;
+			}
 		}
 
-		tomograms.addTomogram(
-			name, tsFn,
-			mapping.projections,
-			mapping.w, mapping.h, mapping.d,
-			cumulativeDose, fractionalDose,
-			ctfs, hand, pixelSize);
+		inputsOkay = inputsOkay && missingOptionalLabels.size() == 0;
 
-		Log::endSection();
+		if (!inputsOkay)
+		{
+			return RELION_EXIT_FAILURE;
+		}
+
+
+		if (perTomoArguments.containsLabel(EMDL_TOMO_IMPORT_CTFFIND_FILE) &&
+			perTomoArguments.containsLabel(EMDL_TOMO_IMPORT_CTFPLOTTER_FILE))
+		{
+			std::cerr
+				<< "The CTF can only be imported from CTFFind ("
+				<< EMDL::label2Str(EMDL_TOMO_IMPORT_CTFFIND_FILE) << ")"
+				<< " or ctfplotter ("
+				<< EMDL::label2Str(EMDL_TOMO_IMPORT_CTFPLOTTER_FILE) << ")"
+				<< "), not both.";
+
+			return RELION_EXIT_FAILURE;
+		}
+
+		/*
+
+		EMDL_TOMO_NAME,
+		EMDL_TOMO_TILT_SERIES_NAME,
+		EMDL_TOMO_IMPORT_OFFSET_X,
+		EMDL_TOMO_IMPORT_OFFSET_Y,
+		EMDL_TOMO_IMPORT_OFFSET_Z,
+		EMDL_TOMO_IMPORT_IMOD_DIR,
+		EMDL_TOMO_IMPORT_CTFFIND_FILE,
+		EMDL_TOMO_IMPORT_CTFPLOTTER_FILE,
+		EMDL_TOMO_IMPORT_ORDER_LIST,
+		EMDL_TOMO_IMPORT_FRACT_DOSE,
+		EMDL_TOMO_IMPORT_CULLED_FILE,
+		*/
+
+
+		TomogramSet tomograms;
+
+		if (inOutFn != "" && ZIO::fileExists(inOutFn))
+		{
+			tomograms = TomogramSet(inOutFn);
+		}
+
+
+		std::cout << perTomoArguments.size() << " tomograms to be imported" << std::endl;
+
+		for (int tomo_index = 0; tomo_index < perTomoArguments.size(); tomo_index++)
+		{
+			CtfSource ctfSource;
+
+			Log::beginSection("Tomogram " + ZIO::itoa(tomo_index + 1) + " / " + ZIO::itoa(perTomoArguments.size()));
+
+			std::string ctfFindFn, ctfPlotterFn;
+			perTomoArguments.getValue(EMDL_TOMO_IMPORT_CTFFIND_FILE, ctfFindFn, tomo_index);
+			perTomoArguments.getValue(EMDL_TOMO_IMPORT_CTFPLOTTER_FILE, ctfPlotterFn, tomo_index);
+
+			if (ctfPlotterFn == "")
+			{
+				ctfSource = CtfFind;
+				Log::print("The CTF will be read from the CTFFind output file "+ctfFindFn);
+			}
+			else if (ctfFindFn == "")
+			{
+				ctfSource = CtfPlotter;
+				Log::print("The CTF will be read from the ctfplotter output file "+ctfPlotterFn);
+			}
+
+			ImodImport ii = global_IMOD_import;
+
+			ii.inDir = perTomoArguments.getString(EMDL_TOMO_IMPORT_IMOD_DIR, tomo_index);
+
+			perTomoArguments.getValue(EMDL_TOMO_IMPORT_OFFSET_X, ii.offset3Dx, tomo_index);
+			perTomoArguments.getValue(EMDL_TOMO_IMPORT_OFFSET_Y, ii.offset3Dy, tomo_index);
+			perTomoArguments.getValue(EMDL_TOMO_IMPORT_OFFSET_Z, ii.offset3Dz, tomo_index);
+
+			const std::string tsFn0 = perTomoArguments.getString(EMDL_TOMO_TILT_SERIES_NAME, tomo_index);
+			const std::string orderFn = perTomoArguments.getString(EMDL_TOMO_IMPORT_ORDER_LIST, tomo_index);
+			const double fractionalDose = perTomoArguments.getDouble(EMDL_TOMO_IMPORT_FRACT_DOSE, tomo_index);
+
+			ii.tsFn = tsFn0;
+
+			std::string name;
+
+			if (perTomoArguments.containsLabel(EMDL_TOMO_NAME))
+			{
+				name = perTomoArguments.getString(EMDL_TOMO_NAME, tomo_index);
+			}
+			else
+			{
+				name = tsFn0;
+			}
+
+			std::string outFnCrop;
+			perTomoArguments.getValue(EMDL_TOMO_IMPORT_CULLED_FILE, outFnCrop, tomo_index);
+
+			std::string tsFn;
+
+			Log::print("Importing frame alignment from "+ii.inDir);
+
+
+			ImodImport::Mapping mapping = ii.import();
+
+			if (mapping.framesMissing)
+			{
+				if (outFnCrop == "")
+				{
+					std::cerr << "According to " << ii.inDir + ii.tltComFn << ", frames have been excluded, "
+						<< "but no output filename has been specified for the culled stack ("
+						<< EMDL::label2Str(EMDL_TOMO_IMPORT_CULLED_FILE) << ").";
+
+					return RELION_EXIT_FAILURE;
+				}
+
+				Log::print("Writing culled frame stack to "+outFnCrop);
+				ii.writeCulledStack(mapping.oldFrameIndex, outFnCrop);
+
+				tsFn = outFnCrop;
+			}
+			else
+			{
+				tsFn = tsFn0;
+			}
+
+			const std::string tltFn = ii.lastTltFn;
+
+			Log::print("Deducing frame sequence from "+orderFn+" and "+tltFn);
+
+			std::vector<std::vector<double>> order = ZIO::readFixedDoublesTable(orderFn, 2, ',');
+			std::vector<double> tilts = ZIO::readDoubles(tltFn);
+
+			int fc = tilts.size();
+
+			std::vector<double> cumulativeDose(fc);
+
+			for (int i = 0; i < fc; i++)
+			{
+				double minDist = 720.0;
+				int bestJ = -1;
+
+				// find the tilt angle in *.tlt closest to the angle in the order list
+				for (int j = 0; j < order.size(); j++)
+				{
+					double d = order[j][1] - tilts[i];
+					double dd = d*d;
+
+					if (dd < minDist)
+					{
+						bestJ = j;
+						minDist = dd;
+					}
+				}
+
+				cumulativeDose[i] = bestJ * fractionalDose;
+			}
+
+			std::vector<CTF> ctfs;
+
+			if (ctfSource == CtfFind)
+			{
+				ctfs = TomoCtfHelper::loadCtffind4(ctfFindFn, fc, voltage, Cs, Q0);
+			}
+			else
+			{
+				ctfs = TomoCtfHelper::loadCtfplotter(ctfPlotterFn, fc, voltage, Cs, Q0);
+			}
+
+			tomograms.addTomogram(
+				name, tsFn,
+				mapping.projections,
+				mapping.w, mapping.h, mapping.d,
+				cumulativeDose, fractionalDose,
+				ctfs, hand, pixelSize);
+
+			Log::endSection();
+		}
+
+		std::cout << "writing: " << inOutFn << std::endl;
+
+		tomograms.write(inOutFn);
 	}
+	catch (RelionError e)
+	{
+		//std::cerr << e.msg << '\n';
 
-	std::cout << "writing: " << inOutFn << std::endl;
-
-	tomograms.write(inOutFn);
+		return RELION_EXIT_FAILURE;
+	}
 
 	return RELION_EXIT_SUCCESS;
 }
