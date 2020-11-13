@@ -377,8 +377,6 @@ int main(int argc, char *argv[])
 	}
 	catch (RelionError e)
 	{
-		//std::cerr << e.msg << '\n';
-
 		return RELION_EXIT_FAILURE;
 	}
 
