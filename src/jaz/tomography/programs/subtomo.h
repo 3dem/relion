@@ -53,7 +53,8 @@ class SubtomoProgram
 				write_ctf,
 				write_multiplicity, 
 				write_divided, 
-				write_normalised;
+				write_normalised,
+				only_do_unfinished;
 
 		void readBasicParameters(IOParser& parser);
 		virtual void readParameters(int argc, char *argv[]);
