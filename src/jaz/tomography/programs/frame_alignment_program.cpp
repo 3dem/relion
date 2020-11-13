@@ -141,6 +141,15 @@ void FrameAlignmentProgram::processTomograms(
 			Log::updateProgress(tt);
 		}
 
+		const std::string temp_filename_root = getTempFilenameRoot(
+					tomogramSet.getTomogramName(t));
+
+		if (only_do_unfinished &&
+				ZIO::fileExists(temp_filename_root + "_projections.star"))
+		{
+			continue;
+		}
+
 		int pc = particles[t].size();
 		if (pc == 0) continue;
 
