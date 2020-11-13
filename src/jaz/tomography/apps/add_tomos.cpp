@@ -112,20 +112,18 @@ int main(int argc, char *argv[])
 
 		if (parser.checkForErrors())
 		{
-			exit(1);
+			exit(RELION_EXIT_FAILURE);
 		}
 	}
 	catch (RelionError XE)
 	{
 		parser.writeUsage(std::cout);
 		std::cerr << XE;
-		exit(1);
+		exit(RELION_EXIT_FAILURE);
 	}
 
 	MetaDataTable perTomoArguments;
 	perTomoArguments.read(inStarFn);
-
-	std::cout << "inStarFn = '" << inStarFn << "': " << perTomoArguments.size() << ", " << perTomoArguments.numberOfObjects() << std::endl;
 
 
 	bool inputsOkay = true;
@@ -389,5 +387,5 @@ int main(int argc, char *argv[])
 
 	tomograms.write(inOutFn);
 
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }
