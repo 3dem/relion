@@ -260,6 +260,24 @@ void ProtoAlignment::shiftParticles(
 	}
 }
 
+std::vector<d3Vector> ProtoAlignment::getParticlePositions(
+		const std::vector<double>& x) const
+{
+	std::vector<d3Vector> out(pc);
+
+	const int fs = getFrameStride();
+
+	for (int p = 0; p < pc; p++)
+	{
+		out[p] = initialPos[p] + d3Vector(
+			x[fs*fc + 3*p],
+			x[fs*fc + 3*p+1],
+			x[fs*fc + 3*p+2]);
+	}
+
+	return out;
+}
+
 int ProtoAlignment::getParamCount()
 {
 	const int fs = getFrameStride();

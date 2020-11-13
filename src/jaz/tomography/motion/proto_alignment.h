@@ -48,11 +48,14 @@ class ProtoAlignment : public DifferentiableOptimization
 		void grad(const std::vector<double>& x, std::vector<double>& gradDest, void* tempStorage) const;
 				
 		std::vector<gravis::d4Matrix> getProjections(const std::vector<double>& x) const;	
-		
+
 		void shiftParticles(
 				const std::vector<double>& x,
 				const std::vector<ParticleIndex>& partIndices,
 				ParticleSet& target) const;
+
+		std::vector<gravis::d3Vector> getParticlePositions(
+				const std::vector<double>& x) const;
 		
 		int getParamCount();
 		
