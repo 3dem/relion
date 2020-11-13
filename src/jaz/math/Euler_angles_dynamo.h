@@ -3,21 +3,21 @@
 
 #include <src/jaz/gravis/t4Matrix.h>
 
-class Euler
+class EulerDynamo
 {
 	public:
-		
+
 		inline static gravis::d4Matrix anglesToMatrix4(double phi, double theta, double chi);
 		inline static gravis::d3Matrix anglesToMatrix3(double phi, double theta, double chi);
-		
-		inline static gravis::t4Vector<gravis::d3Matrix> 
+
+		inline static gravis::t4Vector<gravis::d3Matrix>
 			anglesToMatrixAndDerivatives(double phi, double theta, double chi);
-		
+
 		inline static gravis::d3Vector matrixToAngles(const gravis::d4Matrix& A);
 		inline static gravis::d3Vector matrixToAngles(const gravis::d3Matrix& A);
 };
 
-inline gravis::d4Matrix Euler::anglesToMatrix4(double phi, double theta, double chi)
+inline gravis::d4Matrix EulerDynamo::anglesToMatrix4(double phi, double theta, double chi)
 {
 	const double sp = sin(phi),   cp = cos(phi);
 	const double st = sin(theta), ct = cos(theta);
@@ -30,7 +30,7 @@ inline gravis::d4Matrix Euler::anglesToMatrix4(double phi, double theta, double 
 		 0,                        0,                        0,       1  );
 }
 
-inline gravis::d3Matrix Euler::anglesToMatrix3(double phi, double theta, double chi)
+inline gravis::d3Matrix EulerDynamo::anglesToMatrix3(double phi, double theta, double chi)
 {
 	const double sp = sin(phi),   cp = cos(phi);
 	const double st = sin(theta), ct = cos(theta);
@@ -43,7 +43,7 @@ inline gravis::d3Matrix Euler::anglesToMatrix3(double phi, double theta, double 
 }
 
 inline gravis::t4Vector<gravis::d3Matrix> 
-	Euler::anglesToMatrixAndDerivatives(double phi, double theta, double chi)
+	EulerDynamo::anglesToMatrixAndDerivatives(double phi, double theta, double chi)
 {
 	const double sp = sin(phi),   cp = cos(phi);
 	const double st = sin(theta), ct = cos(theta);
@@ -82,7 +82,7 @@ inline gravis::t4Vector<gravis::d3Matrix>
 		
 }
 
-inline gravis::d3Vector Euler::matrixToAngles(const gravis::d4Matrix& A)
+inline gravis::d3Vector EulerDynamo::matrixToAngles(const gravis::d4Matrix& A)
 {
 	const double st2 = A(2,0) * A(2,0) + A(2,1) * A(2,1);
 	const double theta = atan2(sqrt(st2), A(2,2));
@@ -105,7 +105,7 @@ inline gravis::d3Vector Euler::matrixToAngles(const gravis::d4Matrix& A)
 	return gravis::d3Vector(phi, theta, chi);
 }
  
-inline gravis::d3Vector Euler::matrixToAngles(const gravis::d3Matrix& A)
+inline gravis::d3Vector EulerDynamo::matrixToAngles(const gravis::d3Matrix& A)
 {
 	const double st2 = A(2,0) * A(2,0) + A(2,1) * A(2,1);
 	const double theta = atan2(sqrt(st2), A(2,2));

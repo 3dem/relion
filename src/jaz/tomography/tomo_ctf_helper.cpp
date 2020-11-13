@@ -205,7 +205,7 @@ void TomoCtfHelper::read(
 				mdt.getValueSafely(EMDL_MICROGRAPH_PRE_EXPOSURE, cumulativeDose_out[f], f);
 			}
 			
-			if (mdt.labelExists(EMDL_CTF_BFACTOR) && mdt.labelExists(EMDL_CTF_SCALEFACTOR))
+			if (mdt.containsLabel(EMDL_CTF_BFACTOR) && mdt.containsLabel(EMDL_CTF_SCALEFACTOR))
 			{
 				for (int f = 0; f < fc; f++)
 				{

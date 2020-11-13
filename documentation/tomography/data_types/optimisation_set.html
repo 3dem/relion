@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<title>Optimisation Set</title>
+	<link rel="stylesheet" href="../style.css">
+</head>
+
+<body>
+	<h1>Optimisation Set</h1>
+	
+	<p>The optimisation set is the central data type in a Relion tomography project, and it only contains paths to other files. It is usually named <tt>optimisation_set.star</tt>.</p>
+	
+	<img src="optimisation_set.svg">
+	
+	<p>Specifically, it can point to the following data files:</p>
+	<ul>
+		<li>A <a href="tomogram_set.html">tomogram set</a> listing all tomograms</li>
+		<li>A <a href="particle_set.html">particle set</a> listing all particles</li>
+		<li>A <a href="trajectory_set.html">trajectory set</a> describing the motion of all particles.</li>
+		<li>A <a href="manifold_set.html">manifold set</a> listing all manifolds (e.g. spheres or blobs).</li>
+		<li>A pair of reference maps</a></li>
+		<li>The FSC corresponding to the reference maps</li>
+		<li>A mask to be used with the reference maps</li>
+	</ul>
+	
+	<p>All of those entries are optional, and different programs require different inputs. All programs take an optimisation set as input, and most of them also write one out. If a data file is created or updated by a program, it is added to the optimisation set that the program writes out. This frees the user from having to track which programs update which data files. For example, <a href="refine_defocus.html">relion_tomo_refine_defocus</a> will only update the <i>tomogram set</i>, because the defoci are only defined once for each tilt image, while <a href="polish.html">relion_tomo_polish</a> will update the <i>tomogram set</i>, the <i>particle set</i> and the <i>trajectory set</i>.</p>
+		
+	<p>When running a program, the input optimisation set is always specified with the <tt>--i</tt> argument. In addition, the idividual data files can also be specified separately, in which case the individual files will override the ones listed in the optimisation set. This allows the user to easily perform the same procedure with specific data files exchanged. If all data files required by a program have been specified individually, then an optimisation set is not required at all. The input arguments for the individual data files are always named as follows:</p>
+	
+	<ul>
+		<li><tt>--t</tt> &nbsp; for the tomogram set</li>
+		<li><tt>--p</tt> &nbsp; for the particle set</li>
+		<li><tt>--mot</tt> &nbsp; for the trajectory set</li>
+		<li><tt>--man</tt> &nbsp; for the manifold set.</li>
+		<li><tt>--ref&lt;1/2&gt; </tt> &nbsp; for the respective reference map</li>
+		<li><tt>--mask</tt> &nbsp; for the reference mask</li>
+		<li><tt>--fsc</tt> &nbsp; for the reference FSC</li>
+	</ul>
+	
+	<p>There are 3 ways to create an initial optimisation set:</p>
+	
+	<ul>
+		<li>Use the utility program <tt>relion_tomo_make_optimisation_set.</tt></li>
+		<li>Run any program and specify the individual data files. The program will then output a new optimisation set.</li>
+		<li>Write one manually.</li>
+	</ul>
+	
+	<p></p>
+	
+</body>
+
+</html>

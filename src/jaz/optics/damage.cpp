@@ -5,39 +5,65 @@ using namespace gravis;
 
 
 void Damage::applyWeight(
-        RawImage<float>& stack, 
-        double pixelSize, 
-        const std::vector<double>& doses,
-        int num_threads)
+		RawImage<float>& stack,
+		double pixelSize,
+		const std::vector<double>& doses,
+		int num_threads)
 {
 	const int w  = stack.xdim;
 	const int h  = stack.ydim;
 	const int fc = stack.zdim;
-	
+
 	#pragma omp parallel for num_threads(num_threads)
 	for (int f = 0; f < fc; f++)
 	{
 		BufferedImage<float> frame = stack.getConstSliceRef(f);
 		BufferedImage<fComplex> frame_FS;
-		
+
 		FFT::FourierTransform(frame, frame_FS);
-		
+
 		const int wh = frame_FS.xdim;
-		
+
 		for (int y = 0; y < h;  y++)
 		for (int x = 0; x < wh; x++)
 		{
 			const double xx = x / (pixelSize * w);
 			const double yy = (y < h/2? y : y - h) / (pixelSize * h);
-			
+
 			const double k = sqrt(xx*xx + yy*yy);
-			
+
 			frame_FS(x,y) *= getWeight(doses[f], k);
 		}
-		
+
 		FFT::inverseFourierTransform(frame_FS, frame);
-		
+
 		stack.getSliceRef(f).copyFrom(frame);
+	}
+}
+
+void Damage::applyWeight(
+		RawImage<fComplex>& stack,
+		double pixelSize,
+		const std::vector<double>& doses,
+		int num_threads)
+{
+	const int wh = stack.xdim;
+	const int h  = stack.ydim;
+	const int fc = stack.zdim;
+	const int w = 2 * (wh - 1);
+
+	for (int f = 0; f < fc; f++)
+	{
+		for (int y = 0; y < h;  y++)
+		for (int x = 0; x < wh; x++)
+		{
+			const double xx = x / (pixelSize * w);
+			const double yy = (y < h/2? y : y - h) / (pixelSize * h);
+
+			const double k = sqrt(xx*xx + yy*yy);
+
+			stack(x,y,f) *= getWeight(doses[f], k);
+		}
 	}
 }
 

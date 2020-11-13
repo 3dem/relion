@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<title>Local Particle Refine</title>
+	<link rel="stylesheet" href="../style.css">
+</head>
+
+<body>
+	<h1><tt>relion_tomo_local_particle_refine</tt></h1>
+	
+	<p>This program optimises the viewing angles and 3D positions of all particles. This is done by following the local gradient of the L2 error function downhill, so it is significantly faster than a full refinement using <tt>relion_refine</tt>. Currently, the results are slightly worse than those from <tt>relion_refine</tt>, though.</p>
+	
+	<p>The estimated particle angles and positions are written into the output <a href="../data_types/particle_set.html">particle set</a> which replaces the given particle set in the output <a href="../data_types/optimisation_set.html">optimisation set</a>.</p>
+	
+	<h3>Relevant program arguments:</h3>
+	
+	<ul>
+		<li><b>--i</b> and/or <b>--p</b>, <b>--t</b>, <b>--mot</b>, <b>--ref&lt;1/2&gt;</b>, <b>--mask</b> and <b>--fsc</b>: input optimisation-set and/or its components (see <a href="../data_types/optimisation_set.html">optimisation set</a>).</li>
+		<li><b>--b</b>: box size to be used for the estimation. Note that this can be larger than the box size of the reference map. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.</li>
+		<li><b>--j</b>: number of threads to be used. This should be set to the number of CPU cores available.</li>
+		<li><b>--o</b>: name of the output directory (that will be created).</li>
+	</ul>
+	
+	<h3>Program output:</h3>
+	
+	<p>After running the program, the output directory (<tt>--o</tt> argument) will contain the following items:</p>
+	<ul>
+		<li><b>particles.star</b>: a new particle set containing the newly estimated angles and positions.</li>
+		<li><b>optimisation_set.star</b>: a new optimisation set pointing to the new particle set.</li>
+		<li><b>note.txt</b>: a text file containing the command issued to run the program.</li>
+	</ul>
+	
+	
+</body>
+
+</html>

@@ -33,23 +33,19 @@ void FindLatticeProgram::run()
 	}
 	
 	const double spacing_px = spacing_ang / angpix;
-	const double freq_px = 1.0 / spacing_px;
 		
-	BufferedImage<float> tomoBP = ImageFilter::bandpass(tomo, freq_px, filter_width / tomo.xdim, overtones);
+	BufferedImage<float> tomoBP = ImageFilter::bandpass(tomo, spacing_px, tomo.xdim / filter_width, overtones);
 	
 	tomoBP.write(outFn+"_bandpass.mrc");
 	
 	BufferedImage<float> latticeDensity(tomoBP.xdim, tomoBP.ydim, tomoBP.zdim);
 	
 	{
-		const double frq_pos = 1.0 / (spacing_px + 2);
-		const double frq_neg = 1.0 / (spacing_px - 2);
-		
 		BufferedImage<float> tomoBP_pos = ImageFilter::bandpass(
-					tomo, frq_pos, filter_width / tomo.xdim, overtones);
+					tomo, spacing_px + 2, filter_width / tomo.xdim, overtones);
 		
 		BufferedImage<float> tomoBP_neg = ImageFilter::bandpass(
-					tomo, frq_neg, filter_width / tomo.xdim, overtones);
+					tomo, spacing_px - 2, filter_width / tomo.xdim, overtones);
 		
 		BufferedImage<float> tomoBP_env = tomoBP_pos + tomoBP_neg;
 		

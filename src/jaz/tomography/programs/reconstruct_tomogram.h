@@ -5,6 +5,7 @@
 #include <vector>
 #include <src/jaz/gravis/t4Matrix.h>
 #include <src/jaz/gravis/t2Vector.h>
+#include <src/jaz/tomography/optimisation_set.h>
 
 class TomoBackprojectProgram
 {
@@ -12,15 +13,17 @@ class TomoBackprojectProgram
 		
 		TomoBackprojectProgram(){}
 			
-			int n_threads;	
-			int thickness, w, h, tomoIndex;	
-			double spacing, stack_spacing, x0, y0, z0, taperRad;	
-			std::string tomoSetFn, outFn;	
-			bool applyPreWeight, applyWeight, applyCtf, zeroDC;	
+			int n_threads;
+			int w, h, d;
+			double spacing, x0, y0, z0, taperDist, taperFalloff;
+			std::string tomoName, outFn;
+			bool applyPreWeight, applyWeight, applyCtf, zeroDC;
 			double SNR;
+
+			OptimisationSet optimisationSet;
 			
 			
-		void readParameters(int argc, char *argv[]);		
+		void readParameters(int argc, char *argv[]);
 		void run();		
 };
 

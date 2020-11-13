@@ -122,13 +122,14 @@ Image<RFLOAT> AberrationFit::draw(AberrationBasis *fit, double angpix, int s)
 
 
 void AberrationFit :: considerParticle(
-		int part_id,
+		ParticleIndex part_id,
 		const Tomogram& tomogram,
 		const TomoReferenceMap& referenceMap,
 		const ParticleSet& dataSet,
 		const AberrationsCache& aberrationsCache,
 		bool flip_value,
 		const BufferedImage<float>& frqWeight,
+		const BufferedImage<float>& frqEnvelope,
 		int f0, int f1,
 		BufferedImage<EvenData>& even_out,
 		BufferedImage<OddData>& odd_out)
@@ -154,7 +155,7 @@ void AberrationFit :: considerParticle(
 	{
 		TomoExtraction::extractFrameAt3D_Fourier(
 				tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f], traj[f],
-				observation, projCut, 1, false, true);
+				observation, projCut, 1, true);
 
 		CTF ctf = tomogram.getCtf(f, dataSet.getPosition(part_id));
 
@@ -190,7 +191,7 @@ void AberrationFit :: considerParticle(
 			const double c = -sg;
 
 			fComplex zobs = observation(x,y);
-			fComplex zprd = scale * prediction(x,y);
+			fComplex zprd = scale * ctf.scale * frqEnvelope(x,y,f) * prediction(x,y);
 
 			if (aberrationsCache.hasAntisymmetrical)
 			{
@@ -233,17 +234,19 @@ EvenSolution AberrationFit::solveEven(
 	const double eps = 1e-30;
 	const int s  = data.ydim;
 	const int sh = data.xdim;
+	const int fc = data.zdim;
 
 	EvenSolution out;
 
-	out.optimum = BufferedImage<dComplex>(sh,s);
-	out.phaseShift = BufferedImage<double>(sh,s);
-	out.weight = BufferedImage<Tensor2x2<double>>(sh,s);
+	out.optimum = BufferedImage<dComplex>(sh,s,fc);
+	out.phaseShift = BufferedImage<double>(sh,s,fc);
+	out.weight = BufferedImage<Tensor2x2<double>>(sh,s,fc);
 
+	for (int f = 0; f < fc; f++)
 	for (int y = 0; y < s;  y++)
 	for (int x = 0; x < sh; x++)
 	{
-		EvenData d = data(x,y);
+		EvenData d = data(x,y,f);
 
 		d2Vector b(d.bx, d.by);
 		d2Matrix A(d.Axx, d.Axy, d.Axy, d.Ayy);
@@ -258,15 +261,15 @@ EvenSolution AberrationFit::solveEven(
 
 			const d2Vector opt = Ai * b;
 
-			out.optimum(x,y) = dComplex(opt.x, opt.y);
-			out.phaseShift(x,y) = std::abs(opt.x) > 0.0? atan2(opt.y, opt.x) : 0.0;
-			out.weight(x,y) = Tensor2x2<double>(d.Axx, d.Axy, d.Ayy);
+			out.optimum(x,y,f) = dComplex(opt.x, opt.y);
+			out.phaseShift(x,y,f) = std::abs(opt.x) > 0.0? atan2(opt.y, opt.x) : 0.0;
+			out.weight(x,y,f) = Tensor2x2<double>(d.Axx, d.Axy, d.Ayy);
 		}
 		else
 		{
-			out.optimum(x,y) = dComplex(0.0, 0.0);
-			out.phaseShift(x,y) = 0.0;
-			out.weight(x,y) = Tensor2x2<double>(0.0, 0.0, 0.0);
+			out.optimum(x,y,f) = dComplex(0.0, 0.0);
+			out.phaseShift(x,y,f) = 0.0;
+			out.weight(x,y,f) = Tensor2x2<double>(0.0, 0.0, 0.0);
 		}
 	}
 
@@ -586,8 +589,128 @@ EvenData &EvenData::operator+=(const EvenData& d)
 	by += d.by;
 }
 
+void EvenData::write(const RawImage<EvenData> &data, std::string filename)
+{
+	const int sh = data.xdim;
+	const int s  = data.ydim;
+	const int fc = data.zdim;
+
+	BufferedImage<float>
+		Axx(sh,s,fc),
+		Axy(sh,s,fc),
+		Ayy(sh,s,fc),
+		bx(sh,s,fc),
+		by(sh,s,fc);
+
+	for (int f = 0; f < fc; f++)
+	for (int y = 0; y <  s; y++)
+	for (int x = 0; x < sh; x++)
+	{
+		Axx(x,y,f) = data(x,y,f).Axx;
+		Axy(x,y,f) = data(x,y,f).Axy;
+		Ayy(x,y,f) = data(x,y,f).Ayy;
+		bx(x,y,f)  = data(x,y,f).bx;
+		by(x,y,f)  = data(x,y,f).by;
+	}
+
+	Axx.write(filename + "_Axx.mrc");
+	Axy.write(filename + "_Axy.mrc");
+	Ayy.write(filename + "_Ayy.mrc");
+	bx.write( filename + "_bx.mrc");
+	by.write( filename + "_by.mrc");
+}
+
+BufferedImage<EvenData> EvenData::read(std::string filename)
+{
+	BufferedImage<double>
+		Axx,
+		Axy,
+		Ayy,
+		bx,
+		by;
+
+	Axx.read(filename + "_Axx.mrc");
+	Axy.read(filename + "_Axy.mrc");
+	Ayy.read(filename + "_Ayy.mrc");
+	bx.read( filename + "_bx.mrc");
+	by.read( filename + "_by.mrc");
+
+	const int sh = Axx.xdim;
+	const int s  = Axx.ydim;
+	const int fc = Axx.zdim;
+
+	BufferedImage<EvenData> data(sh,s,fc);
+
+	for (int f = 0; f < fc; f++)
+	for (int y = 0; y <  s; y++)
+	for (int x = 0; x < sh; x++)
+	{
+		data(x,y,f).Axx = Axx(x,y,f);
+		data(x,y,f).Axy = Axy(x,y,f);
+		data(x,y,f).Ayy = Ayy(x,y,f);
+		data(x,y,f).bx  = bx(x,y,f);
+		data(x,y,f).by  = by(x,y,f);
+	}
+
+	return data;
+}
+
 OddData &OddData::operator+=(const OddData& d)
 {
 	a += d.a;
 	b += d.b;
+}
+
+void OddData::write(const RawImage<OddData> &data, std::string filename)
+{
+	const int sh = data.xdim;
+	const int s  = data.ydim;
+	const int fc = data.zdim;
+
+	BufferedImage<float>
+		a(sh,s,fc),
+		b_real(sh,s,fc),
+		b_imag(sh,s,fc);
+
+	for (int f = 0; f < fc; f++)
+	for (int y = 0; y < s;  y++)
+	for (int x = 0; x < sh; x++)
+	{
+		a(x,y,f) = data(x,y,f).a;
+		b_real(x,y,f) = data(x,y,f).b.real;
+		b_imag(x,y,f) = data(x,y,f).b.imag;
+	}
+
+	a.write(filename + "_a.mrc");
+	b_real.write(filename + "_b_real.mrc");
+	b_imag.write(filename + "_b_imag.mrc");
+}
+
+BufferedImage<OddData> OddData::read(std::string filename)
+{
+	BufferedImage<double>
+		a,
+		b_real,
+		b_imag;
+
+	a.read(filename + "_a.mrc");
+	b_real.read(filename + "_b_real.mrc");
+	b_imag.read(filename + "_b_imag.mrc");
+
+	const int sh = a.xdim;
+	const int s  = a.ydim;
+	const int fc = a.zdim;
+
+	BufferedImage<OddData> data(sh,s,fc);
+
+	for (int f = 0; f < fc; f++)
+	for (int y = 0; y < s;  y++)
+	for (int x = 0; x < sh; x++)
+	{
+		data(x,y,f).a = a(x,y,f);
+		data(x,y,f).b.real = b_real(x,y,f);
+		data(x,y,f).b.imag = b_imag(x,y,f);
+	}
+
+	return data;
 }

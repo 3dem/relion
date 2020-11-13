@@ -243,6 +243,8 @@ void ImodImport::writeCulledStack(const std::vector<int>& oldIndex, std::string 
 			ts1(x,y,f) = ts0(x,y,oldIndex[f]);
 		}
 	}
+
+	ts1.write(outFnCrop);
 	
 	Log::endSection();
 }

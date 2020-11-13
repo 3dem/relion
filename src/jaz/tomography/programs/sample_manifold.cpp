@@ -15,10 +15,17 @@ void SampleManifoldProgram::readParameters(int argc, char *argv[])
 	try
 	{
 		parser.setCommandLine(argc, argv);
-		int gen_section = parser.addSection("General options");
 
-		tomogram_set_filename = parser.getOption("--t", "Tomogram set", "tomograms.star");
-		manifolds_filename = parser.getOption("--m", "Manifolds set", "manifolds.star");
+		optimisationSet.read(
+			parser,
+			true,            // optimisation set
+			false,  false,   // particles
+			true,   true,    // tomograms
+			false,  false,   // trajectories
+			true,   true,    // manifolds
+			false,  false);  // reference
+
+		int gen_section = parser.addSection("General options");
 
 		spacing = textToDouble(parser.getOption("--spacing", "Particle spacing [A]"));
 		depth = textToDouble(parser.getOption("--depth", "Depth below surface [A]"));
@@ -28,11 +35,11 @@ void SampleManifoldProgram::readParameters(int argc, char *argv[])
 		avoid_present_wedge = parser.checkOption("--npw", "Do not sample particles from the present wedges");
 		store_tilt_series = parser.checkOption("--ts", "Store the name of the tilt series in the star file");
 
-		output_path = parser.getOption("--o", "Output filename");
+		output_path = parser.getOption("--o", "Output directory");
 
 		Log::readParams(parser);
 
-		parser.checkForErrors();
+		if (parser.checkForErrors()) std::exit(-1);
 
 	}
 	catch (RelionError XE)
@@ -41,14 +48,14 @@ void SampleManifoldProgram::readParameters(int argc, char *argv[])
 		std::cerr << XE;
 		exit(1);
 	}
+
+	output_path = ZIO::prepareTomoOutputDirectory(output_path, argc, argv);
 }
 
 void SampleManifoldProgram::run()
 {
-	output_path = ZIO::makeOutputDir(output_path);
-
-	TomogramSet tomogram_set(tomogram_set_filename);
-	ManifoldSet manifold_set(manifolds_filename);
+	TomogramSet tomogram_set(optimisationSet.tomograms);
+	ManifoldSet manifold_set(optimisationSet.manifolds);
 
 	MetaDataTable optics_table, particles_table;
 
@@ -141,7 +148,7 @@ void SampleManifoldProgram::run()
 				particles_table.setValue(EMDL_MLMODEL_GROUP_NO, t, j);
 				particles_table.setValue(EMDL_PARTICLE_CLASS, 1, j);
 				particles_table.setValue(EMDL_IMAGE_OPTICS_GROUP, 1, j);
-				particles_table.setValue(EMDL_PARTICLE_RANDOM_SUBSET, j % 2, j);
+				particles_table.setValue(EMDL_PARTICLE_RANDOM_SUBSET, j % 2 + 1, j);
 
 
 
@@ -160,4 +167,7 @@ void SampleManifoldProgram::run()
 
 	optics_table.write(ofs);
 	particles_table.write(ofs);
+
+	optimisationSet.particles = output_path + "particles.star";
+	optimisationSet.write(output_path + "optimisation_set.star");
 }

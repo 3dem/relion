@@ -214,7 +214,7 @@ int TiltSpaceBlobFit::getParameterCount()
 BufferedImage<float> TiltSpaceBlobFit::computeTiltSpaceMap(
         d3Vector sphere_position, 
         double mean_radius_full, 
-        double radius_range, 
+		double radius_range,
         double binning, 
         const RawImage<float>& preweighted_stack, 
         const std::vector<d4Matrix>& projections)

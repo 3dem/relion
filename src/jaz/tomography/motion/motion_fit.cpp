@@ -16,7 +16,7 @@ MotionFit::MotionFit(
 	const std::vector<BufferedImage<double>>& CCs,
 	const std::vector<gravis::d4Matrix>& frameProj, 
 	ParticleSet& dataSet,
-	const std::vector<int>& partIndices,
+	const std::vector<ParticleIndex>& partIndices,
 	const std::vector<BufferedImage<fComplex>>& referenceFS,
 	MotionParameters motionParameters,
 	Settings settings,
@@ -391,21 +391,22 @@ std::vector<d4Matrix> MotionFit::getProjections(const std::vector<double> &x,
 	return out;
 }
 
-void MotionFit::shiftParticles(
-		const std::vector<double> &x,
-		ParticleSet& target) const
+std::vector<d3Vector> MotionFit::getParticlePositions(
+		const std::vector<double>& x) const
 {
-	if (settings.constParticles) return;
+	std::vector<d3Vector> out(pc);
 	
 	const int fs = getFrameStride();
 	
 	for (int p = 0; p < pc; p++)
 	{
-		const d3Vector origin = initialPos[p] + d3Vector(
-					x[fs*fc + 3*p], x[fs*fc + 3*p+1], x[fs*fc + 3*p+2]);
-		
-		target.moveParticleTo(partIndices[p], origin);
+		out[p] = initialPos[p] + d3Vector(
+			x[fs*fc + 3*p],
+			x[fs*fc + 3*p+1],
+			x[fs*fc + 3*p+2]);
 	}
+
+	return out;
 }
 
 Trajectory MotionFit::getTrajectory(const std::vector<double> &x, int p,
@@ -434,17 +435,21 @@ Trajectory MotionFit::getTrajectory(const std::vector<double> &x, int p,
 	return out;
 }
 
-void MotionFit::exportTrajectories(
+std::vector<Trajectory> MotionFit::exportTrajectories(
 		const std::vector<double>& x, 
-		ParticleSet& dataSet,
+		const ParticleSet& dataSet,
 		const std::vector<int>& frameSequence) const
 {
+	std::vector<Trajectory> out(pc);
+
 	for (int p = 0; p < pc; p++)
 	{
-		const int pp = partIndices[p];
+		const int pp = partIndices[p].value;
 
-		dataSet.motionTrajectories[pp] += getTrajectory(x, p, frameSequence);
+		out[p] = dataSet.motionTrajectories[pp] + getTrajectory(x, p, frameSequence);
 	}
+
+	return out;
 }
 
 int MotionFit::getParamCount()

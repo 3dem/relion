@@ -4,12 +4,22 @@
 #include <src/jaz/gravis/t3Vector.h>
 #include <vector>
 
+class ParticleIndex;
+class ParticleSet;
+
 class Trajectory
 {
 	public:
 		
-		static std::vector<Trajectory> read(std::string filename);
-		static void write(const std::vector<Trajectory>& shifts, std::string filename);
+		static std::vector<Trajectory> read(
+				std::string filename,
+				ParticleSet& particleSet);
+
+		static void write(
+				const std::vector<Trajectory>& shifts,
+				const ParticleSet& particleSet,
+				const std::vector<std::vector<ParticleIndex>>& particles,
+				std::string filename);
 		
 		
 		Trajectory();
@@ -39,5 +49,8 @@ class Trajectory
 		}
 		
 };
+
+Trajectory operator + (const Trajectory& t1, const Trajectory& t2);
+
 
 #endif

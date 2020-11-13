@@ -385,7 +385,7 @@ public:
 				double xx = x / xs;
 				double yy = (y < h0/2? y : y - h0) / ys;
 
-				dest[y*wh + x] = getCTF(xx,yy);
+				dest[y*wh + x] = getCTF(xx,yy, false, false, false, true);
 			}
 		}
 	}
@@ -424,7 +424,7 @@ public:
 
 					const double gamma = K1 * (Axx*xx*xx + 2.0*Axy*xx*yy + Ayy*yy*yy) + K2 * u4 - K5 - K3 + (*gammaOffset)(x,y);
 
-					dest[y*wh + x] = -sin(gamma);
+					dest[y*wh + x] = -scale*sin(gamma);
 				}
 			}
 		}

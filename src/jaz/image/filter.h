@@ -14,8 +14,8 @@ class ImageFilter
 		template<class T>
 		static BufferedImage<T> bandpass(
 				const RawImage<T>& img, double freqPx, double widthPx, int numOvertones = 0);
-		
-		
+
+
 		template<class T>
 		static BufferedImage<T> highpass2D(
 				const RawImage<T>& img, int z, double freqPx, double widthPx, bool pad);
@@ -86,12 +86,12 @@ BufferedImage<T> ImageFilter::bandpass(const RawImage<T>& img, double freqPx, do
 	const int wh = w/2 + 1;
 	const int h = img.ydim;
 	const int d = img.zdim;
-	
+
 	BufferedImage<T> imgCp = img;
 	BufferedImage<tComplex<T>> imgFS;
-	
+
 	FFT::FourierTransform(imgCp, imgFS, FFT::Both);
-	
+
 	for (int z = 0; z < d; z++)
 	for (int y = 0; y < h; y++)
 	for (int x = 0; x < wh; x++)
@@ -99,30 +99,30 @@ BufferedImage<T> ImageFilter::bandpass(const RawImage<T>& img, double freqPx, do
 		const double xx = x / (double) w;
 		const double yy = (((y + h/2) % h) - h/2) / (double) h;
 		const double zz = (((z + d/2) % d) - d/2) / (double) d;
-		
+
 		const double f = sqrt(xx * xx + yy * yy + zz * zz);
-		
+
 		double freqPxAct;
-		
-		if (numOvertones > 0 && f > freqPx)
+
+		if (numOvertones > 0 && f > 1.0 / freqPx)
 		{
-			int nearestMultiple = (int) (f / freqPx + 0.5);
-			
-			if (nearestMultiple > numOvertones + 1) 
+			int nearestMultiple = (int) (f * freqPx + 0.5);
+
+			if (nearestMultiple > numOvertones + 1)
 			{
 				nearestMultiple = numOvertones + 1;
 			}
-					
-			freqPxAct = nearestMultiple * freqPx;
+
+			freqPxAct = nearestMultiple / freqPx;
 		}
 		else
 		{
-			freqPxAct = freqPx;
+			freqPxAct = 1.0 / freqPx;
 		}
-		
-		const double df = std::abs((f - freqPxAct) / widthPx);
-		
-		if (df > 1.0) 
+
+		const double df = std::abs(widthPx * (f - freqPxAct));
+
+		if (df > 1.0)
 		{
 			imgFS(x,y,z) = tComplex<T>(0.0, 0.0);
 		}
@@ -131,11 +131,11 @@ BufferedImage<T> ImageFilter::bandpass(const RawImage<T>& img, double freqPx, do
 			imgFS(x,y,z) *= (T) (0.5 * (cos(PI * df) + 1.0));
 		}
 	}
-	
+
 	BufferedImage<T> out;
-	
+
 	FFT::inverseFourierTransform(imgFS, out, FFT::Both);
-	
+
 	return out;
 }
 
@@ -146,7 +146,7 @@ BufferedImage<T> ImageFilter::highpass2D(const RawImage<T>& img, int z, double f
 	const int h = img.ydim;
 	const int wh = w/2 + 1;
 	
-	int padding = pad? (int) (1.0 / freqPx + 0.5) : 0;
+	int padding = pad? (int) (freqPx + 0.5) : 0;
 	
 	const int wp = w + 2 * padding;
 	const int hp = h + 2 * padding;
@@ -181,7 +181,7 @@ BufferedImage<T> ImageFilter::highpass2D(const RawImage<T>& img, int z, double f
 		
 		const double f = sqrt(xx * xx + yy * yy);
 				
-		const double df = (f - freqPx) / widthPx + 0.5;
+		const double df = widthPx * (f - 1.0/freqPx) + 0.5;
 		
 		if (df < 0.0) 
 		{
@@ -227,7 +227,7 @@ BufferedImage<tComplex<T>> ImageFilter::highpass3D(
 
 		const double f = sqrt(xx * xx + yy * yy + zz * zz);
 
-		const double df = (f - freqPx) / widthPx + 0.5;
+		const double df = widthPx * (f - 1.0/freqPx)  + 0.5;
 
 		if (df < 0.0)
 		{
@@ -280,7 +280,7 @@ BufferedImage<T> ImageFilter::lowpass2D(const RawImage<T>& img, int z, double fr
 	const int w = img.xdim;
 	const int h = img.ydim;
 	
-	int padding = pad? (int) (1.0 / freqPx + 0.5) : 0;
+	int padding = pad? (int) (freqPx + 0.5) : 0;
 	
 	const int wp = w + 2 * padding;
 	const int hp = h + 2 * padding;
@@ -315,7 +315,7 @@ BufferedImage<T> ImageFilter::lowpass2D(const RawImage<T>& img, int z, double fr
 		
 		const double f = sqrt(xx * xx + yy * yy);
 				
-		const double df = (f - freqPx) / widthPx + 0.5;
+		const double df = widthPx * (f - 1.0 / freqPx)  + 0.5;
 		
 		if (df > 1.0) 
 		{
@@ -361,7 +361,7 @@ BufferedImage<tComplex<T>> ImageFilter::lowpass3D(
 
 		const double f = sqrt(xx * xx + yy * yy + zz * zz);
 
-		const double df = (f - freqPx) / widthPx + 0.5;
+		const double df = widthPx * (f - 1.0/freqPx) + 0.5;
 
 		if (df < 0.0)
 		{

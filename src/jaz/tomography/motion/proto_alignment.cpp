@@ -15,7 +15,7 @@ ProtoAlignment::ProtoAlignment(
 	const std::vector<BufferedImage<double>>& CCs,
 	const std::vector<gravis::d4Matrix>& frameProj, 
 	const ParticleSet& dataSet,
-	const std::vector<int>& partIndices,
+	const std::vector<ParticleIndex>& partIndices,
 	const std::vector<BufferedImage<fComplex>>& referenceFS,
 	bool constParticles,
 	bool constAngles,
@@ -244,7 +244,7 @@ std::vector<d4Matrix> ProtoAlignment::getProjections(const std::vector<double> &
 
 void ProtoAlignment::shiftParticles(
 		const std::vector<double> &x,
-		const std::vector<int>& partIndices, 
+		const std::vector<ParticleIndex>& partIndices, 
 		ParticleSet& target) const
 {
 	if (constParticles) return;
@@ -258,6 +258,24 @@ void ProtoAlignment::shiftParticles(
 		
 		target.moveParticleTo(partIndices[p], origin);
 	}
+}
+
+std::vector<d3Vector> ProtoAlignment::getParticlePositions(
+		const std::vector<double>& x) const
+{
+	std::vector<d3Vector> out(pc);
+
+	const int fs = getFrameStride();
+
+	for (int p = 0; p < pc; p++)
+	{
+		out[p] = initialPos[p] + d3Vector(
+			x[fs*fc + 3*p],
+			x[fs*fc + 3*p+1],
+			x[fs*fc + 3*p+2]);
+	}
+
+	return out;
 }
 
 int ProtoAlignment::getParamCount()

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<title>Reconstruct Particle</title>
+	<link rel="stylesheet" href="../style.css">
+</head>
+
+<body>
+	<h1><tt>relion_tomo_reconstruct_particle</tt></h1>
+	
+	<p>This program constructs high-resolution 3D reference maps from a given <a href="../data_types/optimisation_set.html">optimisation set</a>. It is similar to <tt>relion_reconstruct</tt>, except that it does not require pre-extracted particle images. Instead, it extracts square windows of arbitrary size (<tt>--b</tt> argument) directly from the tilt series and it uses those for the reconstruction (using Fourier inversion). It considers the defoci of the individual particles, as well as particle motion and higher-order aberrations.</p>
+	
+	<p>The output consists of a pair of maps (one for each half set) as well as a merged map. In addition, the numerator (data term) and denominator (weight term) (see Eq. 3 in the <a href="https://www.sciencedirect.com/science/article/pii/S1047847712002481">Relion paper</a>) of all 3 maps are also written out to facilitate further processing.</p>
+	
+	<h3>Relevant program arguments:</h3>
+	
+	<ul>
+		<li><b>--i</b> and/or <b>--p</b>, <b>--t</b> and <b>--mot</b>: input optimisation-set and/or its components (see <a href="../data_types/optimisation_set.html">optimisation set</a>).</li>
+		<li><b>--b</b>: box size of the reconstruction. Note that this is independent of the box size that has been used to refine the particle. This allows the user to construct a 3D map of arbitrary size to gain an overview of the structure surrounding the particle. A sufficiently large box size also allows more of the high-frequency signal to be captured that has been delocalised by the CTF.</li>
+		<li><b>--crop</b>: cropped box size. If set, the program will output an additional set of maps that have been cropped to this size. This is useful if a map is desired that is smaller than the box size required to retrieve the CTF-delocalised signal.</li>
+		<li><b>--bin</b>: downsampling (binning) factor. Note that this does not alter the box size. The reconstructed region instead becomes larger.</li>
+		<li><b>--SNR</b>: apply a <a href="https://en.wikipedia.org/wiki/Wiener_filter">Wiener filter</a> with this signal-to-noise ratio. If omitted, the reconstruction will use a heuristic to prevent divisions by excessively small numbers. Please note that using a low (even though realistic) SNR might wash out the higher frequencies, which could make the map unsuitable to be used for further refinement.</li>
+		<li><b>--sym</b>: name of the symmetry class (e.g. C6 for six-fold point symmetry).</li>
+		<li><b>--mem</b>: (approximate) maximum amount of memory to be used for the reconstruction (see below).</li>
+		<li><b>--j</b>: number of threads used for the non-reconstruction parts of the program (e.g. symmetry application or gridding correction). This should be set to the number of CPU cores available.</li>		
+		<li><b>--j_out</b>: number of threads that compute partial reconstructions in parallel. This is faster, but it requires additional memory for each thread. When used together with the <tt>--mem</tt> argument, this number will be reduced to (approximately) maintain the imposed memory limitation.</li>
+		<li><b>--j_in</b>: number of threads to be used for each partial reconstruction. This is a slower way to parallelise the procedure, but it does not require additional memory. Unless memory is limited, the <tt>--j_out</tt> option should be preferred. The product of <tt>--j_out</tt> and <tt>--j_in</tt> should not exceed the number of CPU cores available.</li>
+		<li><b>--o</b>: name of the output directory (that will be created).</li>
+	</ul>
+	
+	<h3>Program output:</h3>
+	
+	<p>After running the program, the output directory (<tt>--o</tt> argument) will contain the following items:</p>
+	<ul>
+		<li><b>&lt;half1/half2/merged&gt;.mrc</b>: the reconstructed cropped maps.</li>
+		<li><b>&lt;half1/half2/merged&gt;_full.mrc</b>: the reconstructed full-size maps, in case the full size (<tt>--b</tt> argument) differs from the cropped size (<tt>--crop</tt> argument).</li>
+		<li><b>data_&lt;half1/half2/merged&gt;.mrc</b>: the reconstructed data term at full size.</li>
+		<li><b>weight_&lt;half1/half2/merged&gt;.mrc</b>: the reconstructed weight term at full size.</li>
+		<li><b>note.txt</b>: a text file containing the command issued to run the program.</li>
+	</ul>
+	
+</body>
+
+</html>

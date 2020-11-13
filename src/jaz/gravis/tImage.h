@@ -185,7 +185,7 @@ namespace gravis
       inline
       T access(const int& x, const int& y) const
       {
-        return access::Repeat::getPixel(*this, x, y);
+        return image_access::Repeat::getPixel(*this, x, y);
       }
 
       /**
@@ -258,7 +258,7 @@ namespace gravis
        **/
       tImage convolve(const tImage< typename tImageTraits<T>::Float_t >& kernel) const
       {
-        return (*this).template convolve<access::Repeat>(kernel);
+        return (*this).template convolve<image_access::Repeat>(kernel);
       }
 
       /** Clamp an image by calling the clamp() method on each element **/

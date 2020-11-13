@@ -24,11 +24,11 @@
 #include <src/image.h>
 #include <src/metadata_table.h>
 #include <src/jaz/image/buffered_image.h>
+#include <src/jaz/tomography/particle_set.h>
 #include <src/jaz/math/tensor2x2.h>
 
 class Tomogram;
 class TomoReferenceMap;
-class ParticleSet;
 class AberrationsCache;
 
 
@@ -71,6 +71,10 @@ namespace aberration
 			double Axx, Axy, Ayy, bx, by;
 
 			EvenData& operator+=(const EvenData& d);
+
+			static void write(const RawImage<EvenData>& evenData, std::string filename);
+			static BufferedImage<EvenData> read(std::string filename);
+
 	};
 
 	class OddData
@@ -81,6 +85,9 @@ namespace aberration
 			dComplex b;
 
 			OddData& operator+=(const OddData& d);
+
+			static void write(const RawImage<OddData>& evenData, std::string filename);
+			static BufferedImage<OddData> read(std::string filename);
 	};
 
 	class EvenSolution
@@ -111,13 +118,14 @@ class AberrationFit
 
 
 		static void considerParticle(
-				int part_id,
+				ParticleIndex part_id,
 				const Tomogram& tomogram,
 				const TomoReferenceMap& referenceMap,
 				const ParticleSet& dataSet,
 				const AberrationsCache& aberrationsCache,
 				bool flip_value,
 				const BufferedImage<float>& frqWeight,
+				const BufferedImage<float>& frqEnvelope,
 				int f0, int f1,
 				BufferedImage<aberration::EvenData>& even_out,
 				BufferedImage<aberration::OddData>& odd_out);

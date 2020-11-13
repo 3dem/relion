@@ -605,13 +605,43 @@ enum EMDLabel
 	EMDL_TOMO_SUBTOMOGRAM_TILT,
 	EMDL_TOMO_SUBTOMOGRAM_PSI,
 	EMDL_TOMO_SUBTOMOGRAM_BINNING,
-	EMDL_TOMO_PARTICLE_INDEX,
+	EMDL_TOMO_PARTICLE_NAME,
 	EMDL_TOMO_MANIFOLD_INDEX,
 	EMDL_TOMO_MANIFOLD_TYPE,
 	EMDL_TOMO_MANIFOLD_PARAMETERS,
+	EMDL_TOMO_DEFOCUS_SLOPE,
 
-	EMDL_TOMO_PARTICLE_ID,       // (deprecated, use EMDL_TOMO_PARTICLE_INDEX instead)
-	EMDL_TOMO_PICK_PARTICLE_ID,  // (deprecated, use EMDL_TOMO_MANIFOLD_INDEX instead)
+	EMDL_TOMO_PARTICLES_FILE_NAME,
+	EMDL_TOMO_TOMOGRAMS_FILE_NAME,
+	EMDL_TOMO_MANIFOLDS_FILE_NAME,
+	EMDL_TOMO_TRAJECTORIES_FILE_NAME,
+	EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME,
+	EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME,
+	EMDL_TOMO_REFERENCE_MASK_FILE_NAME,
+	EMDL_TOMO_REFERENCE_FSC_FILE_NAME,
+
+	EMDL_TOMO_IMPORT_OFFSET_X,
+	EMDL_TOMO_IMPORT_OFFSET_Y,
+	EMDL_TOMO_IMPORT_OFFSET_Z,
+	EMDL_TOMO_IMPORT_IMOD_DIR,
+	EMDL_TOMO_IMPORT_CTFFIND_FILE,
+	EMDL_TOMO_IMPORT_CTFPLOTTER_FILE,
+	EMDL_TOMO_IMPORT_ORDER_LIST,
+	EMDL_TOMO_IMPORT_FRACT_DOSE,
+	EMDL_TOMO_IMPORT_CULLED_FILE,
+
+	EMDL_TOMO_RELATIVE_ICE_THICKNESS,
+	EMDL_TOMO_RELATIVE_LUMINANCE,
+	EMDL_TOMO_ICE_NORMAL_X,
+	EMDL_TOMO_ICE_NORMAL_Y,
+	EMDL_TOMO_ICE_NORMAL_Z,
+
+	EMDL_TOMO_TEMP_PRED_TIMES_OBS,
+	EMDL_TOMO_TEMP_PRED_SQUARED,
+
+	EMDL_TOMO_PARTICLE_ID,       // (deprecated, use EMDL_TOMO_PARTICLE_NAME instead)
+	EMDL_TOMO_PICK_PARTICLE_ID,  // (deprecated, use EMDL_TOMO_PARTICLE_NAME instead)
+	EMDL_TOMO_PARTICLE_INDEX,    // (deprecated, use EMDL_TOMO_PARTICLE_NAME instead)
 
 	EMDL_UNKNOWN_LABEL,
 
@@ -1240,14 +1270,46 @@ private:
 		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_TILT, EMDL_DOUBLE, "rlnTomoSubtomogramTilt", "Second Euler angle of a subtomogram (tilt, in degrees)");
 		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_PSI, EMDL_DOUBLE, "rlnTomoSubtomogramPsi", "Third Euler angle of a subtomogram (psi, in degrees)");
 		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_BINNING, EMDL_DOUBLE, "rlnTomoSubtomogramBinning", "Binning level of a subtomogram");
-		
-		EMDL::addLabel(EMDL_TOMO_PARTICLE_INDEX, EMDL_INT, "rlnTomoParticleIndex", "Global index of a tomography particle");
+		EMDL::addLabel(EMDL_TOMO_PARTICLE_NAME, EMDL_STRING, "rlnTomoParticleName", "Name of each individual particle");
+
+
 		EMDL::addLabel(EMDL_TOMO_MANIFOLD_INDEX, EMDL_INT, "rlnTomoManifoldIndex", "Index of a 2D manifold in a tomogram");
 		EMDL::addLabel(EMDL_TOMO_MANIFOLD_TYPE, EMDL_STRING, "rlnTomoManifoldType", "Name of the manifold type");
 		EMDL::addLabel(EMDL_TOMO_MANIFOLD_PARAMETERS, EMDL_DOUBLE_VECTOR, "rlnTomoManifoldParams", "Set of coefficients pertaining to a generic 2D manifold in a tomogram");
+		EMDL::addLabel(EMDL_TOMO_DEFOCUS_SLOPE, EMDL_DOUBLE, "rlnTomoDefocusSlope", "Rate of change of defocus over depth");
+
+		EMDL::addLabel(EMDL_TOMO_PARTICLES_FILE_NAME, EMDL_STRING, "rlnTomoParticlesFile", "Name of particles STAR file");
+		EMDL::addLabel(EMDL_TOMO_TOMOGRAMS_FILE_NAME, EMDL_STRING, "rlnTomoTomogramsFile", "Name of tomograms STAR file");
+		EMDL::addLabel(EMDL_TOMO_MANIFOLDS_FILE_NAME, EMDL_STRING, "rlnTomoManifoldsFile", "Name of manifolds STAR file");
+		EMDL::addLabel(EMDL_TOMO_TRAJECTORIES_FILE_NAME, EMDL_STRING, "rlnTomoTrajectoriesFile", "Name of trajectories STAR file");
+		EMDL::addLabel(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, EMDL_STRING, "rlnTomoReferenceMap1File", "Name of first reference map file");
+		EMDL::addLabel(EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME, EMDL_STRING, "rlnTomoReferenceMap2File", "Name of second reference map file");
+		EMDL::addLabel(EMDL_TOMO_REFERENCE_MASK_FILE_NAME, EMDL_STRING, "rlnTomoReferenceMaskFile", "Name of mask file corresponding to a pair of reference maps");
+		EMDL::addLabel(EMDL_TOMO_REFERENCE_FSC_FILE_NAME, EMDL_STRING, "rlnTomoReferenceFscFile", "Name of FSC STAR file corresponding to a pair of reference maps");
+
+		EMDL::addLabel(EMDL_TOMO_IMPORT_OFFSET_X, EMDL_DOUBLE, "rlnTomoImportOffsetX", "X offset of a tomogram");
+		EMDL::addLabel(EMDL_TOMO_IMPORT_OFFSET_Y, EMDL_DOUBLE, "rlnTomoImportOffsetY", "Y offset of a tomogram");
+		EMDL::addLabel(EMDL_TOMO_IMPORT_OFFSET_Z, EMDL_DOUBLE, "rlnTomoImportOffsetZ", "Z offset of a tomogram");
+		EMDL::addLabel(EMDL_TOMO_IMPORT_IMOD_DIR, EMDL_STRING, "rlnTomoImportImodDir", "IMOD tilt-series directory");
+		EMDL::addLabel(EMDL_TOMO_IMPORT_CTFFIND_FILE, EMDL_STRING, "rlnTomoImportCtfFindFile", "CTFFind output file");
+		EMDL::addLabel(EMDL_TOMO_IMPORT_CTFPLOTTER_FILE, EMDL_STRING, "rlnTomoImportCtfPlotterFile", "CTFPlotter output file");
+		EMDL::addLabel(EMDL_TOMO_IMPORT_ORDER_LIST, EMDL_STRING, "rlnTomoImportOrderList", "Frame order list");
+		EMDL::addLabel(EMDL_TOMO_IMPORT_FRACT_DOSE, EMDL_DOUBLE, "rlnTomoImportFractionalDose", "Fractional dose of a tilt series");
+		EMDL::addLabel(EMDL_TOMO_IMPORT_CULLED_FILE, EMDL_STRING, "rlnTomoImportCulledFile", "File name of a tilt series with certain frames removed");
+
+		EMDL::addLabel(EMDL_TOMO_RELATIVE_ICE_THICKNESS, EMDL_DOUBLE, "rlnTomoRelativeIceThickness", "Relative ice thickness times its extinction coefficient");
+		EMDL::addLabel(EMDL_TOMO_RELATIVE_LUMINANCE, EMDL_DOUBLE, "rlnTomoRelativeLuminance", "Relative beam luminance");
+		EMDL::addLabel(EMDL_TOMO_ICE_NORMAL_X, EMDL_DOUBLE, "rlnTomoIceNormalX", "X component of the estimated ice normal");
+		EMDL::addLabel(EMDL_TOMO_ICE_NORMAL_Y, EMDL_DOUBLE, "rlnTomoIceNormalY", "Y component of the estimated ice normal");
+		EMDL::addLabel(EMDL_TOMO_ICE_NORMAL_Z, EMDL_DOUBLE, "rlnTomoIceNormalZ", "Z component of the estimated ice normal");
+
+		EMDL::addLabel(EMDL_TOMO_TEMP_PRED_TIMES_OBS, EMDL_DOUBLE, "rlnTomoTempPredTimesObs", "Sum over products of predicted and observed values");
+		EMDL::addLabel(EMDL_TOMO_TEMP_PRED_SQUARED, EMDL_DOUBLE, "rlnTomoTempPredSquared", "Sum over squares of predicted values");
+
 
 		EMDL::addLabel(EMDL_TOMO_PARTICLE_ID, EMDL_INT, "rlnTomoParticleId", "Particle index");
 		EMDL::addLabel(EMDL_TOMO_PICK_PARTICLE_ID, EMDL_INT, "rlnTomoPickParticleId", "Virus Particle index");
+		EMDL::addLabel(EMDL_TOMO_PARTICLE_INDEX, EMDL_INT, "rlnTomoParticleIndex", "Global index of a tomography particle");
 
 		EMDL::addLabel(EMDL_UNKNOWN_LABEL, EMDL_UNKNOWN, "rlnUnknownLabel", "NON-RELION label: values will be ignored, yet maintained in the STAR file.");
 	 }

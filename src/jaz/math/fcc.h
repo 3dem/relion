@@ -12,7 +12,7 @@ class FCC
 		
 		static BufferedImage<double> compute(
 				const ParticleSet& dataSet,
-				const std::vector<int>& partIndices,
+				const std::vector<ParticleIndex>& partIndices,
 				const Tomogram& tomogram,
 				const std::vector<BufferedImage<fComplex>>& referenceFS,
 				bool flip_value,
@@ -20,7 +20,7 @@ class FCC
 		
 		static BufferedImage<double> compute3(
 				const ParticleSet& dataSet,
-				const std::vector<int>& partIndices,
+				const std::vector<ParticleIndex>& partIndices,
 				const Tomogram& tomogram,
 				const std::vector<BufferedImage<fComplex>>& referenceFS,
 				bool flip_value,

@@ -4,6 +4,7 @@
 #include <src/error.h>
 #include <src/jaz/optics/damage.h>
 #include <src/jaz/util/zio.h>
+#include <src/jaz/util/log.h>
 
 using namespace gravis;
 
@@ -16,6 +17,8 @@ TomogramSet::TomogramSet()
 TomogramSet::TomogramSet(std::string filename)
 {
 	std::ifstream ifs(filename);
+
+	bool namesAreOld = false;
 
 	if (!ifs)
 	{
@@ -33,19 +36,38 @@ TomogramSet::TomogramSet(std::string filename)
 		
 		for (int t = 0; t < tc; t++)
 		{
+			const std::string expectedOldName = "tomo_" + ZIO::itoa(t);
+			const std::string expectedNewName = globalTable.getString(EMDL_TOMO_NAME, t);
+			const std::string name = allTables[t+1].getName();
+
+			if (name == expectedOldName)
+			{
+				namesAreOld = true;
+			}
+			else if (name != expectedNewName)
+			{
+				REPORT_ERROR_STR("TomogramSet::TomogramSet: file is corrupted " << filename);
+			}
+
 			tomogramTables[t] = allTables[t+1];
-			tomogramTables[t].setName("tomo_" + ZIO::itoa(t));
+			tomogramTables[t].setName(expectedNewName);
 		}	
 	}
 	
 	globalTable.setName("global");
+
+	if (namesAreOld)
+	{
+		Log::warn("Tomogram set " + filename + " is out of date. You are recommended to run relion_exp_update_tomogram_set on it.");
+	}
 }
 
 int TomogramSet::addTomogram(
 		std::string tomoName, std::string stackFilename,
 		const std::vector<gravis::d4Matrix>& projections, 
 		int w, int h, int d, 
-		const std::vector<double>& dose, 
+		const std::vector<double>& dose,
+		double fractionalDose,
 		const std::vector<CTF>& ctfs, 
 		double handedness, 
 		double pixelSize)
@@ -70,7 +92,7 @@ int TomogramSet::addTomogram(
 	globalTable.setValue(EMDL_CTF_VOLTAGE, ctf0.kV, index);
 	globalTable.setValue(EMDL_CTF_CS, ctf0.Cs, index);
 	globalTable.setValue(EMDL_CTF_Q0, ctf0.Q0, index);
-	
+	globalTable.setValue(EMDL_TOMO_IMPORT_FRACT_DOSE, fractionalDose, index);
 	
 	if (tomogramTables.size() != index)
 	{
@@ -81,7 +103,7 @@ int TomogramSet::addTomogram(
 	
 	tomogramTables.push_back(MetaDataTable());
 	MetaDataTable& m = tomogramTables[index];
-	m.setName("tomo_" + ZIO::itoa(index));
+	m.setName(tomoName);
 		
 	for (int f = 0; f < fc; f++)
 	{
@@ -157,6 +179,7 @@ void TomogramSet::setCtf(int tomogramIndex, int frame, const CTF& ctf)
 	m.setValue(EMDL_CTF_DEFOCUSU, ctf.DeltafU, frame);
 	m.setValue(EMDL_CTF_DEFOCUSV, ctf.DeltafV, frame);
 	m.setValue(EMDL_CTF_DEFOCUS_ANGLE, ctf.azimuthal_angle, frame);
+	m.setValue(EMDL_CTF_SCALEFACTOR, ctf.scale, frame);
 }
 
 void TomogramSet::setDose(int tomogramIndex, int frame, double dose)
@@ -174,6 +197,11 @@ void TomogramSet::setTiltSeriesFile(int tomogramIndex, const std::string &filena
 void TomogramSet::setFiducialsFile(int tomogramIndex, const std::string &filename)
 {
 	globalTable.setValue(EMDL_TOMO_FIDUCIALS_STARFILE, filename, tomogramIndex);
+}
+
+void TomogramSet::setDefocusSlope(int tomogramIndex, double slope)
+{
+	globalTable.setValue(EMDL_TOMO_DEFOCUS_SLOPE, slope, tomogramIndex);
 }
 
 Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
@@ -250,6 +278,11 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 		ctf.Q0 = Q0;
 		ctf.Cs = out.optics.Cs;
 		ctf.kV = out.optics.voltage;
+
+		if (m.containsLabel(EMDL_CTF_SCALEFACTOR))
+		{
+			ctf.scale = m.getDouble(EMDL_CTF_SCALEFACTOR, f);
+		}
 		
 		ctf.initialise();
 		
@@ -257,15 +290,35 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 	}
 	
 	out.frameSequence = IndexSort<double>::sortIndices(out.cumulativeDose);
+
+	if (globalTable.containsLabel(EMDL_TOMO_IMPORT_FRACT_DOSE))
+	{
+		out.fractionalDose = globalTable.getDouble(EMDL_TOMO_IMPORT_FRACT_DOSE, index);
+	}
+	else
+	{
+		out.fractionalDose = out.cumulativeDose[out.frameSequence[1]] - out.cumulativeDose[out.frameSequence[0]];
+	}
+
+
 	out.name = tomoName;
 	
-	if (globalTable.labelExists(EMDL_TOMO_FIDUCIALS_STARFILE))
+	if (globalTable.containsLabel(EMDL_TOMO_FIDUCIALS_STARFILE))
 	{
 		 globalTable.getValue(EMDL_TOMO_FIDUCIALS_STARFILE, out.fiducialsFilename, index);
 	}
 	else
 	{
-		out.fiducialsFilename;
+		out.fiducialsFilename = "";
+	}
+
+	if (globalTable.containsLabel(EMDL_TOMO_DEFOCUS_SLOPE))
+	{
+		 globalTable.getValue(EMDL_TOMO_DEFOCUS_SLOPE, out.defocusSlope, index);
+	}
+	else
+	{
+		out.defocusSlope = 1.0;
 	}
 	
 	return out;
@@ -289,6 +342,14 @@ int TomogramSet::getTomogramIndex(std::string tomogramName) const
 	return -1;
 }
 
+std::string TomogramSet::getTomogramName(int index) const
+{
+	std::string name;
+	globalTable.getValueSafely(EMDL_TOMO_NAME, name, index);
+
+	return name;
+}
+
 int TomogramSet::getTomogramIndexSafely(std::string tomogramName) const
 {
 	int t = getTomogramIndex(tomogramName);
@@ -301,4 +362,9 @@ int TomogramSet::getTomogramIndexSafely(std::string tomogramName) const
 	{
 		return t;
 	}
+}
+
+int TomogramSet::getFrameCount(int index) const
+{
+	return tomogramTables[index].numberOfObjects();
 }

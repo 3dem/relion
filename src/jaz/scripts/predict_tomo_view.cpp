@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
 		tomoSetFn = parser.getOption("--t", "Tomogram set", "tomograms.star");
 		tomoIndex = textToInteger(parser.getOption("--ti", "Tomogram index", "0"));
 		particleIndex = textToInteger(parser.getOption("--pi", "Particle index", "0"));
-		boxSize = textToInteger(parser.getOption("--b", "Box size", "-1"));
+		boxSize = textToInteger(parser.getOption("--b", "Box size"));
 
 		referenceMap.read(parser);
 
@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
 	TomogramSet tomogramSet(tomoSetFn);
 
 	ParticleSet dataSet(particleFn);
-	std::vector<std::vector<int>> particles = dataSet.splitByTomogram(tomogramSet);
+	std::vector<std::vector<ParticleIndex>> particles = dataSet.splitByTomogram(tomogramSet);
 
 	AberrationsCache aberrationsCache(dataSet.optTable, boxSize);
 
@@ -107,7 +107,7 @@ int main(int argc, char *argv[])
 			REPORT_ERROR_STR("Only " << pc << " particles found in tomogram " << tomoIndex);
 		}
 
-		const int part_id = particleIndex;
+		const ParticleIndex part_id(particleIndex);
 
 		Tomogram tomogram = tomogramSet.loadTomogram(tomoIndex, true);
 
@@ -127,7 +127,7 @@ int main(int argc, char *argv[])
 
 				TomoExtraction::extractFrameAt3D_Fourier(
 					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f], traj[f],
-					sliceFS, projCut, 1, false, true);
+					sliceFS, projCut, 1, true);
 
 				Centering::shiftInSitu(sliceFS);
 				FFT::inverseFourierTransform(sliceFS, sliceRS);

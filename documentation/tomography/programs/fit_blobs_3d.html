@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<title>Fit Blobs 3D</title>
+	<link rel="stylesheet" href="../style.css">
+</head>
+
+<body>
+	<h1><tt>relion_tomo_fit_blobs_3d</tt></h1>
+	
+	<p>This program refines spherical manifolds to better fit the double membranes of vesicles, producing spheroidal manifolds. The resulting manifold will run along the outer interface of the outer membrane, where the signal is the strongest. These spheroidal manifolds can then be used to sample random particles at a specific depth and with an appropriate initial orientation using the program <a href="sample_manifold.html"><tt>relion_tomo_sample_manifold</tt></a>.</p>
+	
+	<p>The initial spherical manifolds need to be part of the input <a href="../data_types/manifold_set.html">manifold set</a> that can be created using the program <a href="add_spheres.html"><tt>relion_tomo_add_spheres</tt></a>. The estimated spheroids are written into the output manifold set which replaces the given one in the output <a href="../data_types/optimisation_set.html">optimisation set</a>. Note: the user is recommended to first detect all fiducials in the input tomograms, since their strong signal can disturb the membrane estimation. This can be done using the program <a href="find_fiducials.html"><tt>relion_tomo_find_fiducials</tt></a>.</p>
+	
+	<h3>Relevant program arguments:</h3>
+	
+	<ul>
+		<li><b>--i</b> and/or  <b>--t</b> and <b>--man</b>: input optimisation-set and/or its components (see <a href="../data_types/optimisation_set.html">optimisation set</a>).</li>
+		<li><b>--ms</b>: approximate membrane separation in &#8491;.</li>
+		<li><b>--rr</b>: the expected variation of the vesicle radius as a multiple of the initial sphere radius.</li>
+		<li><b>--frad</b>: approximate radius of the fiducial markers (required for their deletion).</li>
+		<li><b>--bin</b>: binning level at which to perform the membrane estimation. This needs to allow multiple pixels of separation between the two membranes.</li>
+		<li><b>--n</b>: number of <a href="https://en.wikipedia.org/wiki/Spherical_harmonics">Spherical Harmonics</a> bands used to represent the spheroids. A greater number will allow for a more precise membrane fit, but it will also make overfitting more likey. A value between 5 and 9 is recommended.</li>
+		<li><b>--j</b>: number of threads to be used. This should be set to the number of CPU cores available.</li>
+		<li><b>--o</b>: name of the output directory (that will be created).</li>
+	</ul>
+	
+	<h3>Program output:</h3>
+	
+	<p>After running the program, the output directory (<tt>--o</tt> argument) will contain the following items:</p>
+	<ul>
+		<li><b>manifolds.star</b>: a new manifold set containing the spheroidal membranes. It will <i>not</i> contain the initial spheres, nor any other initial manifolds.</li>
+		<li><b>optimisation_set.star</b>: a new optimisation set pointing to the new manifold set.</li>
+		<li><b>Meshes/&lt;<tt>tomogram_name</tt>&gt;.ply</b>: visualisations showing the fitted spheroids for each tomogram in <a href="https://en.wikipedia.org/wiki/PLY_(file_format).ply"><tt>.ply</tt></a> format. They can be viewed in relation to (low-magnification) tomograms as produced by <a href="reconstruct_tomogram.html"><tt>relion_tomo_reconstruct_tomogram</tt></a> in a viewer that supports both meshes and 3D images (such as e.g. <a href="https://www.paraview.org/"><tt>Paraview</tt></a>).</li>
+		<li><b>note.txt</b>: a text file containing the command issued to run the program.</li>
+	</ul>
+	
+	
+</body>
+
+</html>

@@ -6,7 +6,6 @@
 #include <src/jaz/optics/aberration_fit.h>
 #include <src/jaz/math/tensor2x2.h>
 
-// @TODO: move to jaz/optics/
 
 class AberrationFitProgram : public RefinementProgram
 {

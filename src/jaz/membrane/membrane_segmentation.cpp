@@ -6,8 +6,9 @@ using namespace gravis;
 
 
 BufferedImage<float> MembraneSegmentation::constructMembraneKernel(
-        int w, int h, int d, 
-        double falloff, double kernel_width, double spacing, double ratio, double depth)
+		int w, int h, int d,
+		double falloff, double kernel_width, double spacing, double ratio, double depth,
+		double angle)
 {
 	BufferedImage<float> kernel(w,h,d);
 	kernel.fill(0.f);
@@ -18,8 +19,14 @@ BufferedImage<float> MembraneSegmentation::constructMembraneKernel(
 	for (int y = 0; y < h; y++)
 	for (int x = 0; x < w; x++)
 	{
-		const double xx = x < w/2? x : x - w;
-		const double yy = (y < h/2? y : y - h) - depth * spacing;
+		//const double xx = x < w/2? x : x - w;
+		//const double yy = (y < h/2? y : y - h) - depth * spacing;
+
+		const double x0 = x < w/2? x : x - w;
+		const double y0 = y < h/2? y : y - h;
+
+		const double xx = cos(angle) * x0 - sin(angle) * y0;
+		const double yy = sin(angle) * x0 + cos(angle) * y0 - depth * spacing;
 		
 		const double yt = yy / spacing;
 		
@@ -45,6 +52,62 @@ BufferedImage<float> MembraneSegmentation::constructMembraneKernel(
 	}
 	
 	return kernel;
+}
+
+BufferedImage<float> MembraneSegmentation::correlateWithMembrane(
+		BufferedImage<float>& map,
+		double falloff, double kernel_width, double spacing, double ratio, double depth,
+		double angle)
+{
+	BufferedImage<float> kernel = MembraneSegmentation::constructMembraneKernel(
+		map.xdim, map.ydim, map.zdim, falloff, kernel_width, spacing, ratio, depth, angle);
+
+	BufferedImage<fComplex> map_FS, kernel_FS, correlation_FS;
+
+	FFT::FourierTransform(map, map_FS);
+	FFT::FourierTransform(kernel, kernel_FS);
+
+	correlation_FS.resize(map_FS.xdim, map_FS.ydim, map_FS.zdim);
+
+	for (int z = 0; z < map_FS.zdim; z++)
+	for (int y = 0; y < map_FS.ydim; y++)
+	for (int x = 0; x < map_FS.xdim; x++)
+	{
+		correlation_FS(x,y,z) = map_FS(x,y,z) * kernel_FS(x,y,z).conj();
+	}
+
+	BufferedImage<float> correlation;
+
+	FFT::inverseFourierTransform(correlation_FS, correlation);
+
+	return correlation;
+}
+
+BufferedImage<float> MembraneSegmentation::correlateWithMembraneMultiAngle(
+		BufferedImage<float>& map,
+		double falloff, double kernel_width, double spacing, double ratio, double depth, double max_tilt, int tilt_steps)
+{
+	BufferedImage<float> correlation = correlateWithMembrane(
+		map, falloff, kernel_width, spacing, ratio, depth);
+
+	for (int t = -tilt_steps/2; t <= tilt_steps/2; t++)
+	{
+		if (t == 0) continue;
+
+		BufferedImage<float> correlation_t = correlateWithMembrane(
+			map, falloff, kernel_width, spacing, ratio, depth,
+			2 * t * max_tilt / tilt_steps);
+
+		for (int i = 0; i < correlation.getSize(); i++)
+		{
+			if (correlation_t[i] > correlation[i])
+			{
+				correlation[i] = correlation_t[i];
+			}
+		}
+	}
+
+	return correlation;
 }
 
 BufferedImage<float> MembraneSegmentation::determineMembraniness(

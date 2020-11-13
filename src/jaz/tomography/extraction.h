@@ -25,8 +25,7 @@ class TomoExtraction
 				gravis::d3Vector center,
 				RawImage<tComplex<T>>& out,
 				gravis::d4Matrix& projOut,
-				int num_threads = 1, 
-				bool no_subpixel_shift = false,
+				int num_threads = 1,
 				bool circle_crop = true);
 		
 		template <typename T>
@@ -36,8 +35,7 @@ class TomoExtraction
 				const std::vector<gravis::d3Vector>& trajectory,
 				RawImage<tComplex<T>>& out,
 				std::vector<gravis::d4Matrix>& projOut,
-				int num_threads = 1, 
-				bool no_subpixel_shift = false,
+				int num_threads = 1,
 				bool circle_crop = true);
 		
 		template <typename T>
@@ -47,8 +45,7 @@ class TomoExtraction
 				const std::vector<gravis::d2Vector>& centers,
 				RawImage<tComplex<T>>& out,
 				std::vector<gravis::d4Matrix>& projOut,
-				int num_threads = 1, 
-				bool no_subpixel_shift = false,
+				int num_threads = 1,
 				bool circle_crop = true);
 		
 		template <typename T>
@@ -58,8 +55,7 @@ class TomoExtraction
 				gravis::d3Vector center,
 				RawImage<T>& out,
 				std::vector<gravis::d4Matrix>& projOut,
-				int num_threads = 1, 
-				bool no_subpixel_shift = false,
+				int num_threads = 1,
 				bool circle_crop = true);
 		
 		template <typename T>
@@ -69,8 +65,7 @@ class TomoExtraction
 				const std::vector<gravis::d2Vector>& centers,
 				RawImage<T>& out,
 				std::vector<gravis::d4Matrix>& projOut,
-				int num_threads = 1, 
-				bool no_subpixel_shift = false,
+				int num_threads = 1,
 				bool circle_crop = true);
 		
 		template <typename T>
@@ -94,19 +89,6 @@ class TomoExtraction
 				RawImage<T>& stack,
 				double boundary,
 				int num_threads = 1);
-		
-		/*template <typename T>
-		static void extractSquares(
-				const RawImage<T>& stack, 
-				int w2D, int h2D, 
-				const std::vector<gravis::d4Matrix>& projIn,
-				int w3D, int h3D, int d3D,
-				RawImage<T>& out,
-				std::vector<gravis::d4Matrix>& projOut,
-				bool center,
-				int num_threads = 1);*/
-		
-				
 };
 
 template <typename T>
@@ -116,15 +98,14 @@ void TomoExtraction::extractFrameAt3D_Fourier(
 		gravis::d3Vector center,
 		RawImage<tComplex<T>>& out,
 		gravis::d4Matrix& projOut,
-		int num_threads, 
-		bool no_subpixel_shift,
+		int num_threads,
 		bool circle_crop)
 {
 	std::vector<gravis::d4Matrix> projVec;
 	
 	extractAt3D_Fourier(
 		stack.getConstSliceRef(f), s, bin, {projIn}, {center}, out, projVec, 
-		num_threads, no_subpixel_shift, circle_crop);
+		num_threads, circle_crop);
 	
 	projOut = projVec[0];
 }
@@ -136,8 +117,7 @@ void TomoExtraction::extractAt3D_Fourier(
 		const std::vector<gravis::d3Vector>& trajectory,
 		RawImage<tComplex<T>>& out,
 		std::vector<gravis::d4Matrix>& projOut,
-		int num_threads, 
-		bool no_subpixel_shift,
+		int num_threads,
 		bool circle_crop)
 {
 	const int fc = projIn.size();
@@ -149,8 +129,8 @@ void TomoExtraction::extractAt3D_Fourier(
 		centers[f] = gravis::d2Vector(q.x, q.y);
 	}
 	
-	extractAt2D_Fourier(stack, s, bin, projIn, centers, out, projOut, num_threads,
-						no_subpixel_shift, circle_crop);
+	extractAt2D_Fourier(
+		stack, s, bin, projIn, centers, out, projOut, num_threads, circle_crop);
 }
 
 template <typename T>
@@ -160,8 +140,7 @@ void TomoExtraction::extractAt2D_Fourier(
 		const std::vector<gravis::d2Vector>& centers,
 		RawImage<tComplex<T>>& out,
 		std::vector<gravis::d4Matrix>& projOut,
-		int num_threads, 
-		bool no_subpixel_shift,
+		int num_threads,
 		bool circle_crop)
 {
 	const int sh = s/2 + 1;
@@ -178,8 +157,8 @@ void TomoExtraction::extractAt2D_Fourier(
 	for (int f = 0; f < fc; f++)
 	{
 		integralShift[f] = gravis::d2Vector(
-                round(centers[f].x) - s/2,
-                round(centers[f].y) - s/2);
+				round(centers[f].x) - s/2,
+				round(centers[f].y) - s/2);
 	}
 	
 	extractSquares(stack, s, s, integralShift, smallStack, false, num_threads);
@@ -195,47 +174,23 @@ void TomoExtraction::extractAt2D_Fourier(
 	{
 		projOut[f] = projIn[f];
 		
-		if (no_subpixel_shift)
-		{
-			projOut[f](0,3) += sb/2 - round(centers[f].x);
-			projOut[f](1,3) += sb/2 - round(centers[f].y);
-		}
-		else
-		{
-			projOut[f](0,3) += sb/2 - centers[f].x;
-			projOut[f](1,3) += sb/2 - centers[f].y;
-		}
+		projOut[f](0,3) += sb/2 - centers[f].x;
+		projOut[f](1,3) += sb/2 - centers[f].y;
 		
-        posInNewImg[f] = (centers[f] - integralShift[f]) / bin;
+		posInNewImg[f] = (centers[f] - integralShift[f]) / bin;
 	}	
 	
 	BufferedImage<tComplex<T>> smallStackFS(sh,s,fc);
-	
-	if (no_subpixel_shift && bin == 1.0)
-	{
-		NewStackHelper::FourierTransformStack(smallStack, smallStackFS, true, num_threads);
-		out.copyFrom(smallStackFS);
-	}
-	else
-	{	
-		NewStackHelper::FourierTransformStack(smallStack, smallStackFS, true, num_threads);
-	
-		if (bin != 1.0)
-		{
-			smallStackFS = Resampling::FourierCrop_fftwHalfStack(
-					smallStackFS, bin, num_threads);
-		}
 
-		if (no_subpixel_shift)
-		{
-			//NewStackHelper::inverseFourierTransformStack(smallStackFS, smallStack, true, num_threads);
-			out.copyFrom(smallStackFS);
-		}
-		else
-		{
-			NewStackHelper::shiftStack(smallStackFS, posInNewImg, out, true, num_threads);
-		}
+	NewStackHelper::FourierTransformStack(smallStack, smallStackFS, true, num_threads);
+
+	if (bin != 1.0)
+	{
+		smallStackFS = Resampling::FourierCrop_fftwHalfStack(
+				smallStackFS, bin, num_threads);
 	}
+
+	NewStackHelper::shiftStack(smallStackFS, posInNewImg, out, true, num_threads);
 }
 
 template <typename T>
@@ -245,8 +200,7 @@ void TomoExtraction::extractAt3D_real(
 		gravis::d3Vector center,
 		RawImage<T>& out,
 		std::vector<gravis::d4Matrix>& projOut,
-		int num_threads, 
-		bool no_subpixel_shift,
+		int num_threads,
 		bool circle_crop)
 {
 	const int fc = projIn.size();
@@ -260,8 +214,8 @@ void TomoExtraction::extractAt3D_real(
 		centers[f] = gravis::d2Vector(q.x, q.y);
 	}
 	
-    extractAt2D_real(stack, s, bin, projIn, centers, out, projOut, num_threads, 
-					 no_subpixel_shift, circle_crop);
+	extractAt2D_real(
+		stack, s, bin, projIn, centers, out, projOut, num_threads, circle_crop);
 }
 
 template <typename T>
@@ -271,8 +225,7 @@ void TomoExtraction::extractAt2D_real(
 		const std::vector<gravis::d2Vector>& centers,
 		RawImage<T>& out,
 		std::vector<gravis::d4Matrix>& projOut,
-		int num_threads, 
-		bool no_subpixel_shift,
+		int num_threads,
 		bool circle_crop)
 {
 	const int sh = s/2 + 1;
@@ -305,50 +258,27 @@ void TomoExtraction::extractAt2D_real(
 	for (int f = 0; f < fc; f++)
 	{
 		projOut[f] = projIn[f];
-		
-		if (no_subpixel_shift)
-		{
-			projOut[f](0,3) += sb/2 - round(centers[f].x);
-			projOut[f](1,3) += sb/2 - round(centers[f].y);
-		}
-		else
-		{
-			projOut[f](0,3) += sb/2 - centers[f].x;
-			projOut[f](1,3) += sb/2 - centers[f].y;
-		}
-		
-        posInNewImg[f] = (centers[f] - integralShift[f]) / bin;
-	}	
-	
-	if (no_subpixel_shift && bin == 1.0)
-	{
-		out.copyFrom(smallStack);
-	}
-	else
-	{	
-		BufferedImage<tComplex<T>> smallStackFS(sh,s,fc);
-		NewStackHelper::FourierTransformStack(smallStack, smallStackFS, true, num_threads);
-	
-		if (bin != 1.0)
-		{
-			smallStackFS = Resampling::FourierCrop_fftwHalfStack(
-					smallStackFS, bin, num_threads);
-			
-			smallStack = BufferedImage<T>(sb,sb,fc);
-		}
 
-		if (no_subpixel_shift)
-		{
-			NewStackHelper::inverseFourierTransformStack(smallStackFS, smallStack, true, num_threads);
-			out.copyFrom(smallStack);
-		}
-		else
-		{
-			NewStackHelper::shiftStack(smallStackFS, posInNewImg, smallStackFS, true, num_threads);
-			NewStackHelper::inverseFourierTransformStack(smallStackFS, smallStack, true, num_threads);
-			out.copyFrom(smallStack);
-		}
+		projOut[f](0,3) += sb/2 - centers[f].x;
+		projOut[f](1,3) += sb/2 - centers[f].y;
+		
+		posInNewImg[f] = (centers[f] - integralShift[f]) / bin;
+	}	
+
+	BufferedImage<tComplex<T>> smallStackFS(sh,s,fc);
+	NewStackHelper::FourierTransformStack(smallStack, smallStackFS, true, num_threads);
+
+	if (bin != 1.0)
+	{
+		smallStackFS = Resampling::FourierCrop_fftwHalfStack(
+				smallStackFS, bin, num_threads);
+
+		smallStack = BufferedImage<T>(sb,sb,fc);
 	}
+
+	NewStackHelper::shiftStack(smallStackFS, posInNewImg, smallStackFS, true, num_threads);
+	NewStackHelper::inverseFourierTransformStack(smallStackFS, smallStack, true, num_threads);
+	out.copyFrom(smallStack);
 }
 
 template <typename T>
@@ -364,7 +294,7 @@ void TomoExtraction::extractSquares(
 	const int h0 = stack.ydim;
 	const int fc = stack.zdim;
 		
-	#pragma omp parallel for num_threads(num_threads)		
+	#pragma omp parallel for num_threads(num_threads)
 	for (int f = 0; f < fc; f++)
 	{
 		for (int y = 0; y < h; y++)

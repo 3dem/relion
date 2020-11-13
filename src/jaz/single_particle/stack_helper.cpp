@@ -40,7 +40,7 @@ std::vector<MetaDataTable> StackHelper::splitByMicrographName(const MetaDataTabl
 {
 	std::vector<MetaDataTable> out(0);
 
-	if (!mdt.labelExists(EMDL_MICROGRAPH_NAME))
+	if (!mdt.containsLabel(EMDL_MICROGRAPH_NAME))
 	{
 		REPORT_ERROR("StackHelper::splitByMicrographName: "
 					 + EMDL::label2Str(EMDL_MICROGRAPH_NAME)
@@ -92,7 +92,7 @@ std::vector<MetaDataTable> StackHelper::splitByStack(const MetaDataTable* mdt)
 {
 	std::vector<MetaDataTable> out(0);
 
-	if (!mdt->labelExists(EMDL_IMAGE_NAME))
+	if (!mdt->containsLabel(EMDL_IMAGE_NAME))
 	{
 		REPORT_ERROR("StackHelper::splitByStack: "+EMDL::label2Str(EMDL_IMAGE_NAME)+" missing in meta_data_table.\n");
 	}

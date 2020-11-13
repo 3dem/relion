@@ -96,15 +96,15 @@ class Reconstruction
 		static void taper(
 				BufferedImage<T>& img,
 				double dist,
-				bool do_center,
+				bool do_subtract_mean,
 				int num_threads);
 		
 		template <typename T>
 		static void GaussEnvelope(
 				BufferedImage<T>& img,
 				double sigma,
-				bool do_center,
-				int num_threads);		
+				bool do_subtract_mean,
+				int num_threads);
 		
 		
 		template <typename T>
@@ -658,7 +658,7 @@ template <typename T>
 void Reconstruction :: taper(
 		BufferedImage<T>& img,
 		double dist,
-		bool do_center,
+		bool do_subtract_mean,
 		int num_threads)
 {
 	double innerAvg = 0.0;
@@ -667,7 +667,7 @@ void Reconstruction :: taper(
 	const int s = img.xdim;
 	const double m = s/2.0;
 	
-	if (do_center)
+	if (do_subtract_mean)
 	{
 		for (int z = 0; z < s; z++)
 		for (int y = 0; y < s; y++)
@@ -724,7 +724,7 @@ template <typename T>
 void Reconstruction :: GaussEnvelope(
 		BufferedImage<T>& img,
 		double sigma,
-		bool do_center,
+		bool do_subtract_mean,
 		int num_threads)
 {
 	if (sigma < 0.0) return;
@@ -736,7 +736,7 @@ void Reconstruction :: GaussEnvelope(
 	const double m = s/2.0;
 	const double beta = -1.0 / (2.0 * sigma * sigma);
 	
-	if (do_center)
+	if (do_subtract_mean)
 	{
 		for (int z = 0; z < s; z++)
 		for (int y = 0; y < s; y++)

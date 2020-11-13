@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<title>Subtomo</title>
+	<link rel="stylesheet" href="../style.css">
+</head>
+
+<body>
+	<h1><tt>relion_tomo_subtomo</tt></h1>
+	
+	<p>This program creates <i>pseudo subtomograms</i> that can be fed into <tt>relion_refine</tt> to perform subtomogram alignment. Those pseudo subtomograms are not meant to represent the actual density distributions of the particles, but instead abstract 3D image terms that allow <tt>relion_refine</tt> to approximate the cost function that would arise if the alignment were to be performed on the stack of corresponding 2D images instead. Specifically, each pseudo subtomogram consists of a sum of CTF-weighted observations (data term) as well as the corresponding sum of CTF&sup2; terms (weight term). In addition, the output weight term also contains - concatenated along the Z axis - a 3D multiplicity-image (number of Fourier slices contributing to each Fourier voxel) that allows <tt>relion_refine</tt> to estimate a spherically symmetrical noise distribution.</p>
+	
+	<p>The reconstructed pseudo subtomograms consider the motion of the particles as well as higher-order aberrations, if either have been estimated. The program will output a new <a href="../data_types/particle_set.html">particle set</a>, as well as a new <a href="../data_types/optimisation_set.html">optimisation set</a> in which the initial particle set has been replaced by the newly generated one. That particle set can be fed into <tt>relion_refine</tt>.</p>
+	
+	<p>If a subtomogram orientation has been defined (see <a href="../data_types/particle_set.html">particle set</a>), then the subtomogram will be constructed in that coordinate system. If the approximate orientation of the particle is known a-priori from the surrounding geometry, this allows angle priors to be used in <tt>relion_refine</tt> to avoid searching through implausible orientations. In particular, for particles sampled from a manifold (using <a href="sample_manifold.html"><tt>relion_tomo_sample_manifold</tt></a>), the Z axis of the subtomogram coordinate-system is always perpendicular to the local manifold. A strong tilt-angle prior can then be applied to only search through orientations that do not tilt the particle too far away from that orientation, while leaving the remaining two angles unconstrained (i.e. the direction of tilt and the rotation around the Z axis).</p>
+	
+	<h3>Relevant program arguments:</h3>
+	
+	<ul>
+		<li><b>--i</b> and/or <b>--p</b>, <b>--t</b> and <b>--mot</b>: input optimisation-set and/or its components (see <a href="../data_types/optimisation_set.html">optimisation set</a>).</li>
+		<li><b>--b</b>: initial box size of the reconstruction. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.</li>
+		<li><b>--crop</b>: cropped output box size. After construction, the resulting pseudo subtomograms are cropped to this size. A smaller box size allows the (generally expensive) refinement using <tt>relion_refine</tt> to proceed more rapidly.</li>
+		<li><b>--bin</b>: downsampling (binning) factor. Note that this does not alter the initial or the cropped box size. The reconstructed region instead becomes larger.</li>
+		<li><b>--cone_weight</b>: downweight a cone in Fourier space along the Z axis (as defined by the coordinate system of the particle). This is useful for particles embedded in a membrane, as it can prevent the alignment from being driven by the membrane signal (the signal of a planar membrane is localised within one line in 3D Fourier space). Note that the coordinate system of a particle is given by both the subtomogram orientation (if defined) <i>and</i> the particle orientation (see <a href="../data_types/particle_set.html">particle set</a>). This allows the user to first obtain a membrane-driven alignment, and to then specifically suppress the signal in that direction.</li>
+		<li><b>--cone_angle</b>: the (full) opening angle of the cone to be suppressed, given in degrees. This angle should include both the uncertainty about the membrane orientation and its variation across the region represented in the subtomogram.</li>
+		<li><b>--j</b>: number of threads used to reconstruct pseudo subtomograms in parallel. Each thread will require additional memory, so this should be set to the number of CPU cores available, unless the memory requirements become prohibitive.</li>
+		<li><b>--o</b>: name of the output directory (that will be created).</li>
+	</ul>
+	
+	<h3>Program output:</h3>
+	
+	<p>After running the program, the output directory (<tt>--o</tt> argument) will contain the following items:</p>
+	<ul>
+		<li><b>particles.star</b>: a new particle set containing the file names of the reconstructed subtomograms. This file can be understood by <tt>relion_refine</tt></li>
+		<li><b>optimisation_set.star</b>: a new optimisation set pointing to the new particle set.</li>
+		<li><b>Subtomograms/&lt;<tt>particle_name</tt>&gt;_data.mrc</b>: 3D images representing the data terms of all subtomograms.</li>
+		<li><b>Subtomograms/&lt;<tt>particle_name</tt>&gt;_weights.mrc</b>: the weight terms of all subtomograms. Each 3D image contains, concatenated along Z, an image describing the sums over all CTF&sup2; and an image describing the multiplicities.</li>
+		<li><b>note.txt</b>: a text file containing the command issued to run the program.</li>
+	</ul>
+	
+</body>
+
+</html>

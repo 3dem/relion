@@ -559,10 +559,10 @@ int main(int argc, char *argv[])
 	const int sh = amp_map_FS.xdim;
 
 
-	const double resolution_pixels = (s * pixel_size) / filter_freq;
+	const double resolution_pixels = filter_freq / (s * pixel_size);
 	
-	phase_map_FS = ImageFilter::lowpass3D(phase_map_FS, resolution_pixels, 10);
-	amp_map_FS = ImageFilter::lowpass3D(amp_map_FS, resolution_pixels, 10);
+	phase_map_FS = ImageFilter::lowpass3D(phase_map_FS, resolution_pixels, 0.1);
+	amp_map_FS = ImageFilter::lowpass3D(amp_map_FS, resolution_pixels, 0.1);
 	
 	if (high_pass_frequency > 0)
 	{

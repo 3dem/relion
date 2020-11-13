@@ -20,7 +20,7 @@ using namespace gravis;
 
 BufferedImage<double> FCC::compute(
 	const ParticleSet& dataSet,
-	const std::vector<int>& partIndices, 
+	const std::vector<ParticleIndex>& partIndices,
 	const Tomogram& tomogram,
 	const std::vector<BufferedImage<fComplex>>& referenceFS, 
 	bool flip_value, 
@@ -34,7 +34,7 @@ BufferedImage<double> FCC::compute(
 
 BufferedImage<double> FCC::compute3(
 	const ParticleSet& dataSet,
-	const std::vector<int>& partIndices,
+	const std::vector<ParticleIndex>& partIndices,
 	const Tomogram& tomogram,
 	const std::vector<BufferedImage<fComplex>>& referenceFS,
 	bool flip_value,
@@ -68,7 +68,7 @@ BufferedImage<double> FCC::compute3(
 			Log::updateProgress(p);
 		}
 		
-		const int part_id = partIndices[p];
+		const ParticleIndex part_id = partIndices[p];
 		
 		const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(part_id, fc, tomogram.optics.pixelSize);
 		d4Matrix projCut;
@@ -79,7 +79,7 @@ BufferedImage<double> FCC::compute3(
 		{
 			TomoExtraction::extractFrameAt3D_Fourier(
 					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f], traj[f],
-					observation, projCut, 1, false, true);
+					observation, projCut, 1, true);
 
 			BufferedImage<fComplex> prediction = Prediction::predictModulated(
 					part_id, dataSet, projCut, s,

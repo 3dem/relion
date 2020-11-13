@@ -5,12 +5,12 @@
 #include <src/jaz/math/t_complex.h>
 #include <src/jaz/image/buffered_image.h>
 #include <src/jaz/optics/aberration_fit.h>
+#include <src/jaz/tomography/particle_set.h>
 #include <src/jaz/gravis/t4Matrix.h>
 #include <vector>
 
 #include "refinement.h"
 
-class ParticleSet;
 class CTF;
 
 class DefocusRefinementProgram : public RefinementProgram
@@ -19,12 +19,12 @@ class DefocusRefinementProgram : public RefinementProgram
 		
 		DefocusRefinementProgram(int argc, char *argv[]);
 			
-			bool do_clearAstigmatism, do_scanDefocus, do_slowScan, do_refineFast,
+			bool do_clearAstigmatism, do_defocus, do_scanDefocus, do_slowScan, do_refineFast,
 				do_refineAstigmatism, do_plotAstigmatism, do_regularise,
-				do_slopeFit;
+				do_slopeFit, do_perTomogramSlope;
 
 			int deltaSteps, max_particles, group_count;
-			double minDelta, maxDelta, sigma_input;
+			double minDelta, maxDelta, sigma_input, max_slope_dose;
 			
 		void run();
 		
@@ -44,8 +44,8 @@ class DefocusRefinementProgram : public RefinementProgram
 				double minDelta, 
 				double maxDelta,
 				int steps, int group_count, double sigma_input,
-				const ParticleSet& dataSet,
-				std::vector<int>& particles, int max_particles,
+				const ParticleSet& particleSet,
+				std::vector<ParticleIndex>& particles, int max_particles,
 				const Tomogram& tomogram,
 				const AberrationsCache& aberrationsCache,
 				std::vector<BufferedImage<fComplex>>& referenceFS,
@@ -56,8 +56,8 @@ class DefocusRefinementProgram : public RefinementProgram
 		static BufferedImage<double> computeOffsetCost(
 				int f,
 				double z0, double z1, int steps, 
-				const ParticleSet& dataSet,
-				std::vector<int>& particles, int max_particles,
+				const ParticleSet& particleSet,
+				std::vector<ParticleIndex>& particles, int max_particles,
 				const Tomogram& tomogram,
 				const AberrationsCache& aberrationsCache,
 				std::vector<BufferedImage<fComplex>>& referenceFS,
@@ -65,11 +65,11 @@ class DefocusRefinementProgram : public RefinementProgram
 				bool flip_value,
 				int num_threads);
 
-		std::vector<gravis::d2Vector> computeSlopeCost(
-				int f,
+		std::vector<gravis::d3Vector> computeSlopeCost(
+				double max_dose,
 				double m0, double m1, int steps,
-				const ParticleSet& dataSet,
-				std::vector<int>& particles, int max_particles,
+				const ParticleSet& particleSet,
+				std::vector<ParticleIndex>& particles, int max_particles,
 				const Tomogram& tomogram,
 				const AberrationsCache& aberrationsCache,
 				std::vector<BufferedImage<fComplex>>& referenceFS,
@@ -101,7 +101,7 @@ class DefocusRefinementProgram : public RefinementProgram
 				int size);
 
 		void writeSlopeCost(
-				const std::vector<gravis::d2Vector>& cost,
+				const std::vector<gravis::d3Vector>& cost,
 				const std::string& filename);
 };
 

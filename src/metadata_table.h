@@ -170,6 +170,7 @@ public:
 	int getIntMinusOne(EMDLabel label, long objectID = -1) const;
 	RFLOAT getRfloat(EMDLabel label, long objectID = -1) const;
 	RFLOAT getDouble(EMDLabel label, long objectID = -1) const;
+	RFLOAT getAngleInRad(EMDLabel label, long objectID = -1) const;
 	bool getBool(EMDLabel label, long objectID = -1) const;
 	std::string getString(EMDLabel label, long objectID = -1) const;
 	std::vector<double> getDoubleVector(EMDLabel label, long objectID = -1) const;

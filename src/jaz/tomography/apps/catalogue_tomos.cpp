@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
 			
 		outTag = parser.getOption("--o", "Output filename pattern");
 		
-		parser.checkForErrors();
+		if (parser.checkForErrors()) std::exit(-1);
 	}
 	catch (RelionError XE)
 	{

@@ -546,6 +546,11 @@ void ZernikeHelper::BasisOptimisation::deallocateTempStorage(void* ts)
 	delete (BufferedImage<double>*)ts;
 }
 
+
+
+
+
+
 ZernikeHelper::AnisoBasisOptimisation::AnisoBasisOptimisation(
 		const BufferedImage<dComplex>& xy,
 		const BufferedImage<Tensor2x2<double>>& A,
@@ -580,9 +585,9 @@ double ZernikeHelper::AnisoBasisOptimisation::f(const std::vector<double>& x, vo
 	{
 		d2Vector e(cos(recomb(x,y)) - xy(x,y).real, sin(recomb(x,y)) - xy(x,y).imag);
 
-		sum += 
-					A(x,y).xx * e.x * e.x 
-			+ 2.0 * A(x,y).xy * e.x * e.y 
+		sum +=
+					A(x,y).xx * e.x * e.x
+			+ 2.0 * A(x,y).xy * e.x * e.y
 			+       A(x,y).yy * e.y * e.y;
 	}
 
@@ -595,6 +600,139 @@ void* ZernikeHelper::AnisoBasisOptimisation::allocateTempStorage() const
 }
 
 void ZernikeHelper::AnisoBasisOptimisation::deallocateTempStorage(void *ts)
+{
+	delete (BufferedImage<double>*)ts;
+}
+
+
+
+
+
+ZernikeHelper::MultiAnisoBasisOptimisation::MultiAnisoBasisOptimisation(const BufferedImage<dComplex>& xy,
+		const BufferedImage<Tensor2x2<double>>& A,
+		const BufferedImage<double>& basis,
+		double lambda,
+		bool L1)
+:
+	w(xy.xdim),
+	h(xy.ydim),
+	fc(xy.zdim),
+	cc(basis.zdim),
+	lambda(lambda),
+	xy(xy),
+	A(A),
+	basis(basis),
+	L1(L1)
+{
+}
+
+double ZernikeHelper::MultiAnisoBasisOptimisation::gradAndValue(const std::vector<double> &x, std::vector<double> &gradDest) const
+{
+	BufferedImage<double> recomb(w,h);
+	recomb.fill(0.0);
+
+	for (int i = 0; i < gradDest.size(); i++)
+	{
+		gradDest[i] = 0.0;
+	}
+
+	double sum = 0.0;
+
+	for (int f = 0; f < fc; f++)
+	{
+		recomb.fill(0.0);
+
+		for (int c  = 0; c < cc; c++)
+		for (int yy = 0; yy < h; yy++)
+		for (int xx = 0; xx < w; xx++)
+		{
+			recomb(xx,yy) += x[3*f + c + 3] * basis(xx,yy,c);
+		}
+
+		for (int yy = 0; yy < h; yy++)
+		for (int xx = 0; xx < w; xx++)
+		{
+			const dComplex rot(cos(recomb(xx,yy)), sin(recomb(xx,yy)));
+			const dComplex e(rot.real - xy(xx,yy,f).real, rot.imag - xy(xx,yy,f).imag);
+
+			sum +=
+						A(xx,yy,f).xx * e.real * e.real
+				+ 2.0 * A(xx,yy,f).xy * e.real * e.imag
+				+       A(xx,yy,f).yy * e.imag * e.imag;
+
+			// drecomb_dx[3*f + c + 3] = basis(xp,yp,c)
+
+			const dComplex drot_drecomb(-sin(recomb(xx,yy)), cos(recomb(xx,yy)));
+
+			// de_drot = 1, 1
+
+			const dComplex dsum_de(
+				2.0 * (A(xx,yy,f).xx * e.real + A(xx,yy,f).xy * e.imag),
+				2.0 * (A(xx,yy,f).yy * e.imag + A(xx,yy,f).xy * e.real));
+
+			const double dsum_drecomb =
+					  dsum_de.real * drot_drecomb.real
+					+ dsum_de.imag * drot_drecomb.imag;
+
+			for (int c  = 0; c < cc; c++)
+			{
+				gradDest[3*f + c + 3] += dsum_drecomb * basis(xx,yy,c);
+			}
+		}
+	}
+
+	for (int i = 3; i < gradDest.size(); i++)
+	{
+		const double d = x[i] - x[i%3];
+		const double q = lambda * w * h / 1e6;
+
+		sum += q * d * d;
+
+		gradDest[i]   += 2.0 * q * d;
+		gradDest[i%3] -= 2.0 * q * d;
+	}
+
+	return sum;
+}
+
+double ZernikeHelper::MultiAnisoBasisOptimisation::f(const std::vector<double>& x, void* tempStorage) const
+{
+	BufferedImage<double>& recomb = *((BufferedImage<double>*)tempStorage);
+
+	double sum = 0.0;
+
+	for (int f = 0; f < fc; f++)
+	{
+		recomb.fill(0.0);
+
+		for (int c  = 0; c < cc; c++)
+		for (int yp = 0; yp < h; yp++)
+		for (int xp = 0; xp < w; xp++)
+		{
+			recomb(xp,yp) += x[3*f + c + 3] * basis(xp,yp,c);
+		}
+
+		for (int yy = 0; yy < h; yy++)
+		for (int xx = 0; xx < w; xx++)
+		{
+			d2Vector e(cos(recomb(xx,yy)) - xy(xx,yy,f).real, sin(recomb(xx,yy)) - xy(xx,yy,f).imag);
+
+			sum +=
+						A(xx,yy,f).xx * e.x * e.x
+				+ 2.0 * A(xx,yy,f).xy * e.x * e.y
+				+       A(xx,yy,f).yy * e.y * e.y;
+		}
+	}
+
+	return sum;
+}
+
+void* ZernikeHelper::MultiAnisoBasisOptimisation::allocateTempStorage() const
+{
+	return new BufferedImage<double>(w,h);
+}
+
+void ZernikeHelper::MultiAnisoBasisOptimisation::deallocateTempStorage(void *ts)
 {
 	delete (BufferedImage<double>*)ts;
 }

@@ -14,7 +14,7 @@ int main(int argc, char *argv[])
 		
 		sp.particlesFn = parser.getOption("--i", "Input particle set");
 		sp.tomoListFn = parser.getOption("--t", "Tomogram list", "tomolist.txt");
-		sp.boxSize = textToInteger(parser.getOption("--b", "Box size", "512"));
+		sp.boxSize = textToInteger(parser.getOption("--b", "Box size"));
         sp.binning = textToDouble(parser.getOption("--bin", "Binning factor", "1"));
 		
 		sp.do_center = !parser.checkOption("--no_center", "Do not subtract the mean from the voxel values");		
@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
 		sp.num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 		sp.outTag = parser.getOption("--o", "Output filename pattern");
 		
-		parser.checkForErrors();
+		if (parser.checkForErrors()) std::exit(-1);
 	}
 	catch (RelionError XE)
 	{

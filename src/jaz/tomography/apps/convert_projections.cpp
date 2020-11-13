@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
 			"Output filename for culled stack (with frames excluded)",
 			"");
 				
-		parser.checkForErrors();
+		if (parser.checkForErrors()) std::exit(-1);
 	}
 	catch (RelionError XE)
 	{

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<title>Manifold Set</title>
+	<link rel="stylesheet" href="../style.css">
+</head>
+
+<body>
+	<h1>Manifold Set</h1>
+	
+	<p>The manifold set is typically named <tt>manifolds.star</tt>, and it lists all the manifolds defined in all tomograms. In this context, all manifolds are 2D surfaces embedded in 3D space. Currently, only <i>spheres</i> and <i>spheroids</i> are supported. Spheroids are sphere-like surfaces (blobs) whose deviation from a sphere is expressed using the <a href="https://en.wikipedia.org/wiki/Spherical_harmonics">Spherical Harmonics</a> basis. Spheres can be imported by using the program <a href="add_sphere.html"><tt>relion_tomo_add_sphere</tt></a>, while spheroids can be fitted to membrane vesicles from initial spheres using the program <a href="fit_blobs_3d.html"><tt>relion_tomo_fit_blobs_3d</tt></a>.<p>
+	
+	<p>The manifolds file contains one table for each tomogram, each named after the corresponding <i>tomogram name</i> (see <a href="tomogram_set.html">tomogram set</a>). Each row of a table corresponds to one manifold, listing its:</p>
+	
+<ul>
+	<li>number (<tt>rlnTomoManifoldIndex</tt>), </li>
+	<li>type (<tt>rlnTomoManifoldType</tt>) </li> 
+	<li>and parameters (<tt>rlnTomoManifoldParams</tt>).</li>
+</ul>
+
+<p>The parameter set varies depending on the manifold type: for spheres, the first 3 coefficients describe the position of the centre of the sphere, while the fourth describes its radius. For spheroids, the first 3 coefficients also describe the position, while the remaining ones are coefficients that describe the contribution of each Spherical Harmonics basis function. Please note that for spheroids, the fourth parameter is <i>not</i> equal to the radius, but to the radius multiplied by 2&#8730;&pi;. Every consecutive parameter then distorts the sphere of that radius by applying higher-order Spherical Hamonics functions.<p>
+
+<p>Given a set of manifolds, the program <a href="sample_manifold.html"><tt>relion_tomo_sample_manifold</tt></a> allows the user to sample particles along each manifold, generating a novel <a href="particle_set.html">particle set</a>. Those particles are aligned such that their Z direction points perpendicularly to the surface normal of the manifold. This allows strong tilt priors to be applied during refinement in order to save time.</p>
+	
+	
+	
+</body>
+
+</html>

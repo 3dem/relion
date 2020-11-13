@@ -62,3 +62,23 @@ void DifferentiableOptimization::testGradient(const std::vector<double> &x, doub
 		std::cout << i << ": " << gradX[i] << " vs. " << (fx1 - fx0) / eps << std::endl;
 	}
 }
+
+void FastDifferentiableOptimization::testGradient(const std::vector<double> &x, double eps)
+{
+	const int pc = x.size();
+
+	std::vector<double> gradX(pc, 0.0);
+	const double fx0 = gradAndValue(x, gradX);
+
+	std::vector<double> dummy(pc, 0.0);
+
+	for (int i = 0; i < pc; i++)
+	{
+		std::vector<double> x1 = x;
+		x1[i] += eps;
+
+		const double fx1 = gradAndValue(x1, dummy);
+
+		std::cout << i << ": " << gradX[i] << " vs. " << (fx1 - fx0) / eps << std::endl;
+	}
+}

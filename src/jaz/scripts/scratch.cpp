@@ -1,4 +1,4 @@
-#include <src/jaz/math/Euler_angles.h>
+#include <src/jaz/math/Euler_angles_dynamo.h>
 #include <src/macros.h>
 #include <src/jaz/image/interpolation.h>
 #include <src/jaz/image/buffered_image.h>

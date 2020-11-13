@@ -3,11 +3,11 @@
 
 #include <src/jaz/optimization/optimization.h>
 #include <src/jaz/image/buffered_image.h>
+#include <src/jaz/tomography/particle_set.h>
 #include <src/jaz/mesh/mesh_builder.h>
 #include <src/jaz/util/log.h>
 #include "trajectory.h"
 
-class ParticleSet;
 class CTF;
 
 class MotionFit : public DifferentiableOptimization
@@ -32,7 +32,7 @@ class MotionFit : public DifferentiableOptimization
 				const std::vector<BufferedImage<double>>& CCs,
 				const std::vector<gravis::d4Matrix>& frameProj, 
 				ParticleSet& dataSet,
-				const std::vector<int>& partIndices,
+				const std::vector<ParticleIndex>& partIndices,
 				const std::vector<BufferedImage<fComplex>>& referenceFS,
 				MotionParameters motionParameters,
 				Settings settings,
@@ -46,7 +46,7 @@ class MotionFit : public DifferentiableOptimization
 			const std::vector<BufferedImage<double>>& CCs; // one frame stack for each particle		
 			const std::vector<gravis::d4Matrix>& frameProj;			
 			ParticleSet& dataSet;
-			const std::vector<int>& partIndices;
+			const std::vector<ParticleIndex>& partIndices;
 			const std::vector<BufferedImage<fComplex>>& referenceFS;
 			
 			MotionParameters motionParameters;
@@ -74,18 +74,17 @@ class MotionFit : public DifferentiableOptimization
 				const std::vector<double>& x,
 				const std::vector<int>& frameSequence) const;	
 		
-		void shiftParticles(
-				const std::vector<double>& x,
-				ParticleSet& target) const;
+		std::vector<gravis::d3Vector> getParticlePositions(
+				const std::vector<double>& x) const;
 		
 		Trajectory getTrajectory(
 				const std::vector<double>& x, 
 				int p, 
 				const std::vector<int>& frameSequence) const;
 		
-		void exportTrajectories(
+		std::vector<Trajectory> exportTrajectories(
 				const std::vector<double>& x, 
-				ParticleSet& dataSet,
+				const ParticleSet& dataSet,
 				const std::vector<int>& frameSequence) const;
 		
 		int getParamCount();

@@ -4,12 +4,11 @@
 #include <src/jaz/image/buffered_image.h>
 #include <src/jaz/gravis/t4Matrix.h>
 #include <src/jaz/optics/aberrations_cache.h>
+#include <src/jaz/tomography/particle_set.h>
 
 #include "reference_map.h"
 
-class ParticleSet;
 class CTF;
-class TomoList;
 class Tomogram;
 
 
@@ -22,7 +21,7 @@ class Prediction
 			OwnHalf = 0,
 			OppositeHalf = 1
 		};
-		
+
 		enum Modulation
 		{
 			Unmodulated = 0,
@@ -30,19 +29,27 @@ class Prediction
 			PhaseModulated = 2,
 			AmplitudeAndPhaseModulated = 3
 		};
+
+		enum DoseWeight
+		{
+			NotDoseWeighted = 0,
+			DoseWeighted = 1
+		};
 		
 		static BufferedImage<fComplex> predictModulated(
-				int particle_id, 
+				ParticleIndex particle_id,
 				const ParticleSet& dataSet,
 				gravis::d4Matrix proj,
 				int s, const CTF& ctf, double pixelSize,
 				const AberrationsCache& aberrationsCache,
 				const std::vector<BufferedImage<fComplex>>& referenceFS,
 				HalfSet halfSet = OwnHalf,
-				Modulation modulation = AmplitudeAndPhaseModulated);
+				Modulation modulation = AmplitudeAndPhaseModulated,
+				DoseWeight doseWeight = NotDoseWeighted,
+				double cumulativeDose = 0.0);
 		
 		static BufferedImage<fComplex> predictFS(
-				int particle_id, 
+				ParticleIndex particle_id,
 				const ParticleSet& dataSet,
 				gravis::d4Matrix proj,
 				int s, 
@@ -51,7 +58,7 @@ class Prediction
 
 		static std::vector<BufferedImage<double>> computeCroppedCCs(
 				const ParticleSet& dataSet,
-				const std::vector<int>& partIndices,
+				const std::vector<ParticleIndex>& partIndices,
 				const Tomogram& tomogram,
 				const AberrationsCache& aberrationsCache,
 				const TomoReferenceMap& referenceMap,

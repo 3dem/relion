@@ -94,6 +94,7 @@ void MagnificationHelper::matrixToPolar(
 	return;
 }
 
+// deprecated: use the other one!
 void MagnificationHelper::updateScaleFreq(
 		const Image<Complex> &prediction,
 		const Volume<t2Vector<Complex>>& predGradient,
@@ -128,6 +129,40 @@ void MagnificationHelper::updateScaleFreq(
 
 		eqs(x,y,0).bx += c * (gr.x * (vy.real - c * vx.real) + gi.x * (vy.imag - c * vx.imag));
 		eqs(x,y,0).by += c * (gr.y * (vy.real - c * vx.real) + gi.y * (vy.imag - c * vx.imag));
+	}
+}
+
+void MagnificationHelper::updateScale(
+		const RawImage<fComplex>& prediction,
+		const RawImage<t2Vector<fComplex>>& predGradient,
+		const RawImage<fComplex>& observation,
+		const RawImage<float>& freqWeights,
+		CTF& ctf, double angpix,
+		RawImage<Equation2x2>& eqs)
+{
+	const long w = prediction.xdim;
+	const long h = prediction.ydim;
+
+	BufferedImage<float> ctfImg(w,h);
+	ctf.draw(h, h, angpix, 0, &ctfImg(0,0));
+
+	for (long y = 0; y < h; y++)
+	for (long x = 0; x < w; x++)
+	{
+		const fComplex vx = prediction(x,y);
+		const fComplex vy = observation(x,y);
+		const double c = ctfImg(x,y);
+		const double g = freqWeights(x,y) * freqWeights(x,y);
+
+		d2Vector gr(predGradient(x,y,0).x.real, predGradient(x,y,0).y.real);
+		d2Vector gi(predGradient(x,y,0).x.imag, predGradient(x,y,0).y.imag);
+
+		eqs(x,y).Axx += g * c * c * (gr.x * gr.x + gi.x * gi.x);
+		eqs(x,y).Axy += g * c * c * (gr.x * gr.y + gi.x * gi.y);
+		eqs(x,y).Ayy += g * c * c * (gr.y * gr.y + gi.y * gi.y);
+
+		eqs(x,y).bx += g * c * (gr.x * (vy.real - c * vx.real) + gi.x * (vy.imag - c * vx.imag));
+		eqs(x,y).by += g * c * (gr.y * (vy.real - c * vx.real) + gi.y * (vy.imag - c * vx.imag));
 	}
 }
 
@@ -227,6 +262,48 @@ void MagnificationHelper::solvePerPixel(
 	}
 }
 
+BufferedImage<double> MagnificationHelper::solvePerPixel(
+			const RawImage<Equation2x2>& eqs)
+{
+	const long w = eqs.xdim;
+	const long h = eqs.ydim;
+
+	BufferedImage<double> out(w,h,2);
+
+	for (long y = 0; y < h; y++)
+	for (long x = 0; x < w; x++)
+	{
+		Equation2x2 eq = eqs(x,y);
+
+		gravis::d2Vector b(eq.bx, eq.by);
+		gravis::d2Matrix A;
+		A(0,0) = eq.Axx;
+		A(0,1) = eq.Axy;
+		A(1,0) = eq.Axy;
+		A(1,1) = eq.Ayy;
+
+		double det = A(0,0)*A(1,1) - A(0,1)*A(1,0);
+
+		if (det == 0.0)
+		{
+			out(x,y,0) = 0.0;
+			out(x,y,1) = 0.0;
+		}
+		else
+		{
+			gravis::d2Matrix Ai = A;
+			Ai.invert();
+
+			gravis::d2Vector xx = Ai * b;
+
+			out(x,y,0) = xx.x;
+			out(x,y,1) = xx.y;
+		}
+	}
+
+	return out;
+}
+
 Matrix2D<RFLOAT> MagnificationHelper::solveLinearlyFreq(
 		const Volume<Equation2x2> &eqs,
 		const Image<RFLOAT>& snr,
@@ -304,6 +381,71 @@ Matrix2D<RFLOAT> MagnificationHelper::solveLinearlyFreq(
 		DIRECT_A2D_ELEM(vx.data, yi, xi) = opt[0] * x + opt[1] * y;
 		DIRECT_A2D_ELEM(vy.data, yi, xi) = opt[2] * x + opt[3] * y;
 	}
+
+	return mat;
+}
+
+d2Matrix MagnificationHelper::solveLinearly(
+		const RawImage<Equation2x2>& eqs)
+{
+	d2Matrix mat(0.0, 0.0, 0.0, 0.0);
+
+	const long w = eqs.xdim;
+	const long h = eqs.ydim;
+
+
+	d4Vector b(0.0, 0.0, 0.0, 0.0);
+
+	d4Matrix A(0.0, 0.0, 0.0, 0.0,
+			   0.0, 0.0, 0.0, 0.0,
+			   0.0, 0.0, 0.0, 0.0,
+			   0.0, 0.0, 0.0, 0.0);
+
+	for (long yi = 1; yi < h-1; yi++)
+	for (long xi = 1; xi < w-1; xi++)
+	{
+		Equation2x2 eq = eqs(xi,yi,0);
+
+		const double x = xi;
+		const double y = yi < h/2? yi : (yi - h);
+
+		const double wgh = (x*x + y*y < (w-1)*(w-1))? 1.0 : 0.0;
+
+		A(0,0) += wgh * x * x * eq.Axx;
+		A(0,1) += wgh * x * y * eq.Axx;
+		A(0,2) += wgh * x * x * eq.Axy;
+		A(0,3) += wgh * x * y * eq.Axy;
+
+		A(1,0) += wgh * x * y * eq.Axx;
+		A(1,1) += wgh * y * y * eq.Axx;
+		A(1,2) += wgh * x * y * eq.Axy;
+		A(1,3) += wgh * y * y * eq.Axy;
+
+		A(2,0) += wgh * x * x * eq.Axy;
+		A(2,1) += wgh * x * y * eq.Axy;
+		A(2,2) += wgh * x * x * eq.Ayy;
+		A(2,3) += wgh * x * y * eq.Ayy;
+
+		A(3,0) += wgh * x * y * eq.Axy;
+		A(3,1) += wgh * y * y * eq.Axy;
+		A(3,2) += wgh * x * y * eq.Ayy;
+		A(3,3) += wgh * y * y * eq.Ayy;
+
+		b[0] += wgh * x * eq.bx;
+		b[1] += wgh * y * eq.bx;
+		b[2] += wgh * x * eq.by;
+		b[3] += wgh * y * eq.by;
+	}
+
+	d4Matrix Ai = A;
+	Ai.invert();
+
+	d4Vector opt = Ai * b;
+
+	mat(0,0) = opt[0] + 1.0;
+	mat(0,1) = opt[1];
+	mat(1,0) = opt[2];
+	mat(1,1) = opt[3] + 1.0;
 
 	return mat;
 }

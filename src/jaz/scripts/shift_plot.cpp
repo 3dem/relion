@@ -62,8 +62,8 @@ int main(int argc, char *argv[])
 	TomogramSet tomogramSet0(tomoSetFn0);
 	TomogramSet tomogramSet1(tomoSetFn1);
 
-	std::vector<std::vector<int>> particles0 = dataSet0.splitByTomogram(tomogramSet0);
-	std::vector<std::vector<int>> particles1 = dataSet1.splitByTomogram(tomogramSet1);
+	std::vector<std::vector<ParticleIndex>> particles0 = dataSet0.splitByTomogram(tomogramSet0);
+	std::vector<std::vector<ParticleIndex>> particles1 = dataSet1.splitByTomogram(tomogramSet1);
 	
 	const int tc0 = particles0.size();
 	const int tc1 = particles1.size();
@@ -103,7 +103,7 @@ int main(int argc, char *argv[])
 		
 		for (int pp = 0; pp < pc; pp++)
 		{
-			const int p = particles0[t][pp];
+			const ParticleIndex p = particles0[t][pp];
 					
 			d3Vector p0 = dataSet0.getPosition(p);
 			d3Vector p1 = dataSet1.getPosition(p);

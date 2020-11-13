@@ -299,7 +299,7 @@ Image<Complex> NewReferenceMap::predict(
 
 	BufferedImage<Complex>* ampMap = dualContrast? &amplitudeMap[pi] : 0;
 
-	obs.predictObservation(
+	obs.predictObservation_DC(
 		phaseMap[pi], ampMap, mdt, p, temp, angpix,
 		applyCtf, applyTilt, applyShift, applyMtf, applyCtfPadding);
 
