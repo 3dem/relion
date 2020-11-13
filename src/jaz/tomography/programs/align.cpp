@@ -42,7 +42,7 @@ void AlignProgram::readParams(IOParser &parser)
 		mfSettings.constParticles = parser.checkOption("--const_p", "Keep the particle positions constant");
 		mfSettings.constAngles = parser.checkOption("--const_a", "Keep the frame angles constant");
 		mfSettings.constShifts = parser.checkOption("--const_s", "Keep the frame shifts constant");
-		num_iters = textToInteger(parser.getOption("--it", "Max. number of iterations", "10000"));
+		num_iters = textToInteger(parser.getOption("--it", "Max. number of iterations", "1000"));
 
 
 		int motion_section = parser.addSection("Motion estimation options");
@@ -300,6 +300,12 @@ void AlignProgram::processTomograms(
 
 			std::vector<double> initial(motionFit.getParamCount(), 0.0);
 
+
+			if (verbosity > 0 && per_tomogram_progress)
+			{
+				Log::beginProgress("Performing optimisation", num_iters);
+			}
+
 			std::vector<double> opt = LBFGS::optimize(
 				initial, motionFit, 1, num_iters, 1e-3, 1e-4);
 
@@ -308,7 +314,6 @@ void AlignProgram::processTomograms(
 			{
 				Log::endProgress();
 			}
-
 
 			std::vector<d4Matrix> projections = motionFit.getProjections(opt, tomogram.frameSequence);
 			std::vector<d3Vector> positions = motionFit.getParticlePositions(opt);

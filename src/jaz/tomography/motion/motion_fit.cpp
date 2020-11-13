@@ -206,73 +206,73 @@ void MotionFit::grad(const std::vector<double> &x, std::vector<double> &gradDest
 {
 	const int fs = getFrameStride();
 	const int xs = x.size();
-	const int data_pad = 512;	
+	const int data_pad = 512;
 	const int step_grad = xs + data_pad;
 	const int step_frame = fc + data_pad;
-	
+
 	std::vector<d4Matrix> P(fc), P_phi(fc), P_theta(fc), P_psi(fc);
-	
+
 	for (int f = 0; f < fc; f++)
 	{
-		double phi, theta, psi, dx, dy;		
+		double phi, theta, psi, dx, dy;
 		readParams(x, fs*f, phi, theta, psi, dx, dy);
-		
-		const d4Matrix Q = TaitBryan::anglesToMatrix4(phi, theta, psi);	
-		t4Vector<gravis::d3Matrix> dQ = TaitBryan::anglesToMatrixAndDerivatives(phi, theta, psi);	
-		
+
+		const d4Matrix Q = TaitBryan::anglesToMatrix4(phi, theta, psi);
+		t4Vector<gravis::d3Matrix> dQ = TaitBryan::anglesToMatrixAndDerivatives(phi, theta, psi);
+
 		d4Matrix Q_phi(dQ[0]);
 		d4Matrix Q_theta(dQ[1]);
 		d4Matrix Q_psi(dQ[2]);
-		
+
 		Q_phi(3,3) = 0.0;
 		Q_theta(3,3) = 0.0;
 		Q_psi(3,3) = 0.0;
-		
+
 		const d4Matrix centProj = minusCentre * frameProj[f];
-		
+
 		P[f] = plusCentre * Q * centProj;
-		
+
 		P_phi[f]   = plusCentre * Q_phi   * centProj;
 		P_theta[f] = plusCentre * Q_theta * centProj;
 		P_psi[f]   = plusCentre * Q_psi   * centProj;
-		
+
 		P[f](0,3) += dx;
 		P[f](1,3) += dy;
 	}
-	
-	
+
+
 	std::vector<double> grad_par(step_grad * num_threads, 0.0);
 	std::vector<d3Vector> dC_dPos(step_frame * num_threads, d3Vector(0.0, 0.0, 0.0));
-	
-	
+
+
 	#pragma omp parallel for num_threads(num_threads)
 	for (int p = 0; p < pc; p++)
 	{
-		
+
 		const int th = omp_get_thread_num();
-		
-		d3Vector shift = settings.constParticles? 
-					d3Vector(0.0, 0.0, 0.0) : 
+
+		d3Vector shift = settings.constParticles?
+					d3Vector(0.0, 0.0, 0.0) :
 					d3Vector(x[fs*fc + 3*p], x[fs*fc + 3*p+1], x[fs*fc + 3*p+2]);
 
 		for (int f = 0; f < fc; f++)
 		{
 			const d4Vector pos4(initialPos[p] + shift);
-			
+
 			const d4Vector dp  = P[f] * pos4 - frameProj[f] * d4Vector(initialPos[p]);
-						
+
 			const double dx_img = (dp.x + maxRange) * paddingFactor;
 			const double dy_img = (dp.y + maxRange) * paddingFactor;
-			
+
 			const d4Vector dp_phi   = P_phi[f]   * pos4;
 			const d4Vector dp_theta = P_theta[f] * pos4;
 			const d4Vector dp_psi   = P_psi[f]   * pos4;
-			
-			
+
+
 			d2Vector g = -((double)paddingFactor) * Interpolation::cubicXYGrad_clip(
 						CCs[p], dx_img, dy_img, f);
-			
-			
+
+
 			if (settings.constAngles)
 			{
 				if (!settings.constShifts)
@@ -298,46 +298,46 @@ void MotionFit::grad(const std::vector<double> &x, std::vector<double> &gradDest
 					grad_par[th*step_grad + fs*f + 4]  +=  g.y;
 				}
 			}
-			
+
 			if (!settings.constParticles)
 			{
 				const d3Vector dC_dPos_f(
 					P[f](0,0) * g.x  +  P[f](1,0) * g.y,
 					P[f](0,1) * g.x  +  P[f](1,1) * g.y,
 					P[f](0,2) * g.x  +  P[f](1,2) * g.y);
-				
+
 				dC_dPos[th*step_frame + f] = dC_dPos_f;
-						
+
 				grad_par[th*step_grad + fs*fc + 3*p    ]  +=  dC_dPos_f.x;
 				grad_par[th*step_grad + fs*fc + 3*p + 1]  +=  dC_dPos_f.y;
 				grad_par[th*step_grad + fs*fc + 3*p + 2]  +=  dC_dPos_f.z;
-				
+
 				if (f < fc-1)
 				{
 					shift += getPosChange(x, p, f, fs * fc + 3 * pc);
 				}
 			}
 		}
-		
+
 		if (!settings.constParticles)
 		{
 			for (int m = 0; m < fc-1; m++)
 			{
 				for (int b = 0; b < bc; b++)
 				{
-					d3Vector dC_dXm(0.0, 0.0, 0.0);					
+					d3Vector dC_dXm(0.0, 0.0, 0.0);
 					const double def = deformationBasis[p*bc + b];
-					
+
 					for (int f = m+1; f < fc; f++)
 					{
 						dC_dXm += def * dC_dPos[th*step_frame + f];
 					}
-					
+
 					const int i0 = th*step_grad + fs*fc + 3*(pc + m*bc + b);
-					
+
 					grad_par[i0    ] += dC_dXm.x;
 					grad_par[i0 + 1] += dC_dXm.y;
-					grad_par[i0 + 2] += dC_dXm.z;					
+					grad_par[i0 + 2] += dC_dXm.z;
 				}
 			}
 		}
@@ -347,13 +347,13 @@ void MotionFit::grad(const std::vector<double> &x, std::vector<double> &gradDest
 	{
 		gradDest[i] = 0.0;
 	}
-	
+
 	for (int th = 0; th < num_threads; th++)
 	for (int i = 0; i < xs; i++)
 	{
 		gradDest[i] += grad_par[th*step_grad + i];
 	}
-	
+
 	if (!settings.constParticles)
 	{
 		for (int m = 0; m < fc-1; m++)
@@ -361,11 +361,190 @@ void MotionFit::grad(const std::vector<double> &x, std::vector<double> &gradDest
 			for (int b = 0; b < bc; b++)
 			{
 				const int i0 = fs*fc + 3*(pc + m*bc + b);
-				
+
 				gradDest[i0] += 2.0 * (x[i0] + x[i0+1] + x[i0+2]);
 			}
 		}
 	}
+}
+
+double MotionFit::gradAndValue(const std::vector<double> &x, std::vector<double> &gradDest) const
+{
+	const int fs = getFrameStride();
+	const int xs = x.size();
+	const int data_pad = 512;
+	const int step_grad = xs + data_pad;
+	const int step_frame = fc + data_pad;
+
+	std::vector<d4Matrix> P(fc), P_phi(fc), P_theta(fc), P_psi(fc);
+
+	for (int f = 0; f < fc; f++)
+	{
+		double phi, theta, psi, dx, dy;
+		readParams(x, fs*f, phi, theta, psi, dx, dy);
+
+		const d4Matrix Q = TaitBryan::anglesToMatrix4(phi, theta, psi);
+		t4Vector<gravis::d3Matrix> dQ = TaitBryan::anglesToMatrixAndDerivatives(phi, theta, psi);
+
+		d4Matrix Q_phi(dQ[0]);
+		d4Matrix Q_theta(dQ[1]);
+		d4Matrix Q_psi(dQ[2]);
+
+		Q_phi(3,3) = 0.0;
+		Q_theta(3,3) = 0.0;
+		Q_psi(3,3) = 0.0;
+
+		const d4Matrix centProj = minusCentre * frameProj[f];
+
+		P[f] = plusCentre * Q * centProj;
+
+		P_phi[f]   = plusCentre * Q_phi   * centProj;
+		P_theta[f] = plusCentre * Q_theta * centProj;
+		P_psi[f]   = plusCentre * Q_psi   * centProj;
+
+		P[f](0,3) += dx;
+		P[f](1,3) += dy;
+	}
+
+
+	std::vector<double> grad_par(step_grad * num_threads, 0.0);
+	std::vector<double> val_par(data_pad * num_threads, 0.0);
+	std::vector<d3Vector> dC_dPos(step_frame * num_threads, d3Vector(0.0, 0.0, 0.0));
+
+
+	#pragma omp parallel for num_threads(num_threads)
+	for (int p = 0; p < pc; p++)
+	{
+
+		const int th = omp_get_thread_num();
+
+		d3Vector shift = settings.constParticles?
+					d3Vector(0.0, 0.0, 0.0) :
+					d3Vector(x[fs*fc + 3*p], x[fs*fc + 3*p+1], x[fs*fc + 3*p+2]);
+
+		for (int f = 0; f < fc; f++)
+		{
+			const d4Vector pos4(initialPos[p] + shift);
+
+			const d4Vector dp  = P[f] * pos4 - frameProj[f] * d4Vector(initialPos[p]);
+
+			const double dx_img = (dp.x + maxRange) * paddingFactor;
+			const double dy_img = (dp.y + maxRange) * paddingFactor;
+
+			const d4Vector dp_phi   = P_phi[f]   * pos4;
+			const d4Vector dp_theta = P_theta[f] * pos4;
+			const d4Vector dp_psi   = P_psi[f]   * pos4;
+
+
+			const d3Vector g = -((double)paddingFactor) *
+				Interpolation::cubicXYGradAndValue_clip(CCs[p], dx_img, dy_img, f);
+
+			val_par[th*data_pad] += g.z;
+
+
+			if (settings.constAngles)
+			{
+				if (!settings.constShifts)
+				{
+					grad_par[th*step_grad + fs*f    ]  +=  g.x;
+					grad_par[th*step_grad + fs*f + 1]  +=  g.y;
+				}
+			}
+			else
+			{
+				if (settings.constShifts)
+				{
+					grad_par[th*step_grad + fs*f    ]  +=  dp_phi.x   * g.x  +  dp_phi.y   * g.y;
+					grad_par[th*step_grad + fs*f + 1]  +=  dp_theta.x * g.x  +  dp_theta.y * g.y;
+					grad_par[th*step_grad + fs*f + 2]  +=  dp_psi.x   * g.x  +  dp_psi.y   * g.y;
+				}
+				else
+				{
+					grad_par[th*step_grad + fs*f    ]  +=  dp_phi.x   * g.x  +  dp_phi.y   * g.y;
+					grad_par[th*step_grad + fs*f + 1]  +=  dp_theta.x * g.x  +  dp_theta.y * g.y;
+					grad_par[th*step_grad + fs*f + 2]  +=  dp_psi.x   * g.x  +  dp_psi.y   * g.y;
+					grad_par[th*step_grad + fs*f + 3]  +=  g.x;
+					grad_par[th*step_grad + fs*f + 4]  +=  g.y;
+				}
+			}
+
+			if (!settings.constParticles)
+			{
+				const d3Vector dC_dPos_f(
+					P[f](0,0) * g.x  +  P[f](1,0) * g.y,
+					P[f](0,1) * g.x  +  P[f](1,1) * g.y,
+					P[f](0,2) * g.x  +  P[f](1,2) * g.y);
+
+				dC_dPos[th*step_frame + f] = dC_dPos_f;
+
+				grad_par[th*step_grad + fs*fc + 3*p    ]  +=  dC_dPos_f.x;
+				grad_par[th*step_grad + fs*fc + 3*p + 1]  +=  dC_dPos_f.y;
+				grad_par[th*step_grad + fs*fc + 3*p + 2]  +=  dC_dPos_f.z;
+
+				if (f < fc-1)
+				{
+					shift += getPosChange(x, p, f, fs * fc + 3 * pc);
+				}
+			}
+		}
+
+		if (!settings.constParticles)
+		{
+			for (int m = 0; m < fc-1; m++)
+			{
+				for (int b = 0; b < bc; b++)
+				{
+					d3Vector dC_dXm(0.0, 0.0, 0.0);
+					const double def = deformationBasis[p*bc + b];
+
+					for (int f = m+1; f < fc; f++)
+					{
+						dC_dXm += def * dC_dPos[th*step_frame + f];
+					}
+
+					const int i0 = th*step_grad + fs*fc + 3*(pc + m*bc + b);
+
+					grad_par[i0    ] += dC_dXm.x;
+					grad_par[i0 + 1] += dC_dXm.y;
+					grad_par[i0 + 2] += dC_dXm.z;
+				}
+			}
+		}
+	}
+
+	for (int i = 0; i < xs; i++)
+	{
+		gradDest[i] = 0.0;
+	}
+
+	double cost = 0.0;
+
+	for (int th = 0; th < num_threads; th++)
+	{
+		cost += val_par[th*data_pad];
+	}
+
+	for (int th = 0; th < num_threads; th++)
+	for (int i = 0; i < xs; i++)
+	{
+		gradDest[i] += grad_par[th*step_grad + i];
+	}
+
+	if (!settings.constParticles)
+	{
+		for (int m = 0; m < fc-1; m++)
+		{
+			for (int b = 0; b < bc; b++)
+			{
+				const int i0 = fs*fc + 3*(pc + m*bc + b);
+
+				gradDest[i0] += 2.0 * (x[i0] + x[i0+1] + x[i0+2]);
+				cost += x[i0]*x[i0] + x[i0+1]*x[i0+1] + x[i0+2]*x[i0+2];
+			}
+		}
+	}
+
+	return cost;
 }
 
 std::vector<d4Matrix> MotionFit::getProjections(

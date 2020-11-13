@@ -40,9 +40,12 @@ class Interpolation
 		
 		template<typename T> inline
 		static T cubicXY_clip(const RawImage<T>& img, double x, double y, int z = 0);	
-		
+
 		template<typename T> inline
-		static gravis::t2Vector<T> cubicXYGrad_clip(const RawImage<T>& img, double x, double y, int z = 0);		
+		static gravis::t2Vector<T> cubicXYGrad_clip(const RawImage<T>& img, double x, double y, int z = 0);
+
+		template<typename T> inline
+		static gravis::t3Vector<T> cubicXYGradAndValue_clip(const RawImage<T>& img, double x, double y, int z = 0);
 		
 		template<typename T> inline
 		static T cubicXY_wrap(const RawImage<T>& img, double x, double y, int z = 0);
@@ -342,13 +345,13 @@ gravis::t2Vector<T> Interpolation::cubicXYGrad_clip(const RawImage<T>& img, doub
 	const T f32 = img(xi_p1, yi_p2, z);
 	const T f33 = img(xi_p2, yi_p2, z);
 
-	const gravis::d4Matrix A(  
+	const gravis::d4Matrix A(
 			-1.0/2.0,  3.0/2.0, -3.0/2.0,  1.0/2.0,
 			 1.0,     -5.0/2.0,  2.0,     -1.0/2.0,
 			-1.0/2.0,  0.0,      1.0/2.0,  0.0,
 			 0.0,      1.0,      0.0,      0.0);
 
-	const gravis::d4Matrix V(  
+	const gravis::d4Matrix V(
 			f00, f10, f20, f30,
 			f01, f11, f21, f31,
 			f02, f12, f22, f32,
@@ -358,13 +361,83 @@ gravis::t2Vector<T> Interpolation::cubicXYGrad_clip(const RawImage<T>& img, doub
 	At.transpose();
 
 	gravis::d4Matrix AVA = A * V * At;
-	
+
 	const gravis::d4Vector xx(xf*xf*xf, xf*xf, xf, 1.0);
 	const gravis::d4Vector yy(yf*yf*yf, yf*yf, yf, 1.0);
 	const gravis::d4Vector xxd(3.0*xf*xf, 2.0*xf, 1.0, 0.0);
 	const gravis::d4Vector yyd(3.0*yf*yf, 2.0*yf, 1.0, 0.0);
 
 	return gravis::t2Vector<T>(xxd.dot(AVA * yy), xx.dot(AVA * yyd));
+}
+
+
+template<typename T> inline
+gravis::t3Vector<T> Interpolation::cubicXYGradAndValue_clip(const RawImage<T>& img, double x, double y, int z)
+{
+	int xi    = (int)std::floor(x);
+	int yi    = (int)std::floor(y);
+	int xi_n1 = xi-1;
+	int yi_n1 = yi-1;
+	int xi_p1 = xi+1;
+	int yi_p1 = yi+1;
+	int xi_p2 = xi+2;
+	int yi_p2 = yi+2;
+
+	const double xf = x - xi;
+	const double yf = y - yi;
+
+	xi    = XMIPP_MAX(0, XMIPP_MIN(img.xdim - 1, xi));
+	yi    = XMIPP_MAX(0, XMIPP_MIN(img.ydim - 1, yi));
+	xi_n1 = XMIPP_MAX(0, XMIPP_MIN(img.xdim - 1, xi_n1));
+	yi_n1 = XMIPP_MAX(0, XMIPP_MIN(img.ydim - 1, yi_n1));
+	xi_p1 = XMIPP_MAX(0, XMIPP_MIN(img.xdim - 1, xi_p1));
+	yi_p1 = XMIPP_MAX(0, XMIPP_MIN(img.ydim - 1, yi_p1));
+	xi_p2 = XMIPP_MAX(0, XMIPP_MIN(img.xdim - 1, xi_p2));
+	yi_p2 = XMIPP_MAX(0, XMIPP_MIN(img.ydim - 1, yi_p2));
+
+	const T f00 = img(xi_n1, yi_n1, z);
+	const T f01 = img(xi,    yi_n1, z);
+	const T f02 = img(xi_p1, yi_n1, z);
+	const T f03 = img(xi_p2, yi_n1, z);
+
+	const T f10 = img(xi_n1, yi,    z);
+	const T f11 = img(xi,    yi,    z);
+	const T f12 = img(xi_p1, yi,    z);
+	const T f13 = img(xi_p2, yi,    z);
+
+	const T f20 = img(xi_n1, yi_p1, z);
+	const T f21 = img(xi,    yi_p1, z);
+	const T f22 = img(xi_p1, yi_p1, z);
+	const T f23 = img(xi_p2, yi_p1, z);
+
+	const T f30 = img(xi_n1, yi_p2, z);
+	const T f31 = img(xi,    yi_p2, z);
+	const T f32 = img(xi_p1, yi_p2, z);
+	const T f33 = img(xi_p2, yi_p2, z);
+
+	const gravis::d4Matrix A(
+			-1.0/2.0,  3.0/2.0, -3.0/2.0,  1.0/2.0,
+			 1.0,     -5.0/2.0,  2.0,     -1.0/2.0,
+			-1.0/2.0,  0.0,      1.0/2.0,  0.0,
+			 0.0,      1.0,      0.0,      0.0);
+
+	const gravis::d4Matrix V(
+			f00, f10, f20, f30,
+			f01, f11, f21, f31,
+			f02, f12, f22, f32,
+			f03, f13, f23, f33);
+
+	gravis::d4Matrix At = A;
+	At.transpose();
+
+	gravis::d4Matrix AVA = A * V * At;
+
+	const gravis::d4Vector xx(xf*xf*xf, xf*xf, xf, 1.0);
+	const gravis::d4Vector yy(yf*yf*yf, yf*yf, yf, 1.0);
+	const gravis::d4Vector xxd(3.0*xf*xf, 2.0*xf, 1.0, 0.0);
+	const gravis::d4Vector yyd(3.0*yf*yf, 2.0*yf, 1.0, 0.0);
+
+	return gravis::t3Vector<T>(xxd.dot(AVA * yy), xx.dot(AVA * yyd), xx.dot(AVA * yy));
 }
 
 template<typename T> inline
