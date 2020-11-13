@@ -2227,4 +2227,3 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 	// Touch a file to indicate to the GUI that the pipeline has just changed
 	touch(PIPELINE_HAS_CHANGED);
 }
-

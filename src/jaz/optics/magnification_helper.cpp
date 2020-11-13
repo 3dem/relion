@@ -560,7 +560,7 @@ void MagnificationHelper::adaptAstigmatism(
 
 	for (long int m = 0; m < mc; m++)
 	{
-		const int pc = partMdts[m].size();
+		const int pc = partMdts[m].numberOfObjects();
 
 		std::vector<d2Matrix> A(pc), D(pc), Q(pc);
 

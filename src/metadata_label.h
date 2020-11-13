@@ -1320,7 +1320,4 @@ private:
 	friend class EMDL;
 };
 
-/**Just an utility function */
-bool vectorContainsLabel(const std::vector<EMDLabel>& labelsVector, const EMDLabel label);
-
 #endif
