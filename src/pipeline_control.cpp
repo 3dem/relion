@@ -61,6 +61,11 @@ int pipeline_control_relion_exit(int mode)
 
 }
 
+bool is_under_pipeline_control()
+{
+	return (pipeline_control_outputname != "");
+}
+
 bool pipeline_control_check_abort_job()
 {
 	if (pipeline_control_outputname == "")
