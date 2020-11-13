@@ -125,6 +125,8 @@ int main(int argc, char *argv[])
 	MetaDataTable perTomoArguments;
 	perTomoArguments.read(inStarFn);
 
+	std::cout << "inStarFn = '" << inStarFn << "': " << perTomoArguments.size() << ", " << perTomoArguments.numberOfObjects() << std::endl;
+
 
 	bool inputsOkay = true;
 
@@ -243,8 +245,15 @@ int main(int argc, char *argv[])
 	*/
 
 
-	TomogramSet tomograms(inOutFn);
+	TomogramSet tomograms;
 
+	if (inOutFn != "" && ZIO::fileExists(inOutFn))
+	{
+		tomograms = TomogramSet(inOutFn);
+	}
+
+
+	std::cout << perTomoArguments.size() << " tomograms to be imported" << std::endl;
 
 	for (int tomo_index = 0; tomo_index < perTomoArguments.size(); tomo_index++)
 	{
@@ -279,6 +288,8 @@ int main(int argc, char *argv[])
 		const std::string orderFn = perTomoArguments.getString(EMDL_TOMO_IMPORT_ORDER_LIST, tomo_index);
 		const double fractionalDose = perTomoArguments.getDouble(EMDL_TOMO_IMPORT_FRACT_DOSE, tomo_index);
 
+		ii.tsFn = tsFn0;
+
 		std::string name;
 
 		if (perTomoArguments.containsLabel(EMDL_TOMO_NAME))
@@ -296,6 +307,7 @@ int main(int argc, char *argv[])
 		std::string tsFn;
 
 		Log::print("Importing frame alignment from "+ii.inDir);
+
 
 		ImodImport::Mapping mapping = ii.import();
 
@@ -372,6 +384,8 @@ int main(int argc, char *argv[])
 
 		Log::endSection();
 	}
+
+	std::cout << "writing: " << inOutFn << std::endl;
 
 	tomograms.write(inOutFn);
 
