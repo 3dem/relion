@@ -195,7 +195,7 @@ std::string OptimisationSet::readFromFile(
 		bool mandatory,
 		IOParser& parser)
 {
-	if (table.labelExists(label))
+	if (table.containsLabel(label))
 	{
 		return table.getString(label);
 	}

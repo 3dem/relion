@@ -21,7 +21,7 @@ void checkMissingMandatoryLabel(
 {
 	for (int i = 0; i < labelAlternatives.size(); i++)
 	{
-		if (table.labelExists(labelAlternatives[i]))
+		if (table.containsLabel(labelAlternatives[i]))
 		{
 			return;
 		}
@@ -37,7 +37,7 @@ void handleMissingOptionalLabel(
 		const std::string& argumentValue,
 		std::vector<std::pair<EMDLabel,std::string>> missingLabels)
 {
-	if (!table.labelExists(label))
+	if (!table.containsLabel(label))
 	{
 		if (argumentValue == "")
 		{
@@ -214,8 +214,8 @@ int main(int argc, char *argv[])
 	}
 
 
-	if (perTomoArguments.labelExists(EMDL_TOMO_IMPORT_CTFFIND_FILE) &&
-		perTomoArguments.labelExists(EMDL_TOMO_IMPORT_CTFPLOTTER_FILE))
+	if (perTomoArguments.containsLabel(EMDL_TOMO_IMPORT_CTFFIND_FILE) &&
+		perTomoArguments.containsLabel(EMDL_TOMO_IMPORT_CTFPLOTTER_FILE))
 	{
 		std::cerr
 			<< "The CTF can only be imported from CTFFind ("
@@ -277,7 +277,7 @@ int main(int argc, char *argv[])
 
 		std::string name;
 
-		if (perTomoArguments.labelExists(EMDL_TOMO_NAME))
+		if (perTomoArguments.containsLabel(EMDL_TOMO_NAME))
 		{
 			name = perTomoArguments.getString(EMDL_TOMO_NAME, tomo_index);
 		}

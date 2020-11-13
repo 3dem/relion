@@ -1129,7 +1129,7 @@ void CtfRefinementProgram::fitAberrations()
 				even_data_sum, n_even, initialEven,
 				pixelSize, outDir + "group_" + ZIO::itoa(g+1) + "_", true);
 
-			if (particleSet.optTable.labelExists(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS))
+			if (particleSet.optTable.containsLabel(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS))
 			{
 				const std::vector<double> evenCoeffs0 = particleSet.optTable.getDoubleVector(
 					EMDL_IMAGE_EVEN_ZERNIKE_COEFFS, g);
@@ -1169,7 +1169,7 @@ void CtfRefinementProgram::fitAberrations()
 				odd_data_sum, n_odd, initialOdd,
 				pixelSize, outDir + "group_" + ZIO::itoa(g+1) + "_", true);
 
-			if (particleSet.optTable.labelExists(EMDL_IMAGE_ODD_ZERNIKE_COEFFS))
+			if (particleSet.optTable.containsLabel(EMDL_IMAGE_ODD_ZERNIKE_COEFFS))
 			{
 				const std::vector<double> oddCoeffs0 = particleSet.optTable.getDoubleVector(
 					EMDL_IMAGE_ODD_ZERNIKE_COEFFS, g);

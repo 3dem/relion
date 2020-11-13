@@ -75,7 +75,7 @@ void DeleteBlobsProgram::run()
 	TomogramSet subtracted_tomogram_set = initial_tomogram_set;
 	TomogramSet blobs_tomogram_set = initial_tomogram_set;
 	
-	if (!initial_tomogram_set.globalTable.labelExists(EMDL_TOMO_FIDUCIALS_STARFILE))
+	if (!initial_tomogram_set.globalTable.containsLabel(EMDL_TOMO_FIDUCIALS_STARFILE))
 	{
 		Log::warn("No fiducial markers present: you are advised to run relion_tomo_find_fiducials first.");
 	}

@@ -154,10 +154,6 @@ void MagnificationEstimator::parametricFit(
 	const int gc = mdts.size();
 	const int ogc = obsModel->numberOfOpticsGroups();
 
-	bool hasMagMatrices = optOut.labelExists(EMDL_IMAGE_MAG_MATRIX_00)
-	                   && optOut.labelExists(EMDL_IMAGE_MAG_MATRIX_01)
-	                   && optOut.labelExists(EMDL_IMAGE_MAG_MATRIX_10)
-	                   && optOut.labelExists(EMDL_IMAGE_MAG_MATRIX_11);
 
 	std::vector<Matrix2D<RFLOAT>> mat_by_optGroup(ogc);
 

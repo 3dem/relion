@@ -83,7 +83,7 @@ void TemplatePickerProgram::initialise()
 
 	tomogramSet = TomogramSet(optimisation_set.tomograms);
 
-	if (!tomogramSet.globalTable.labelExists(EMDL_TOMO_FIDUCIALS_STARFILE))
+	if (!tomogramSet.globalTable.containsLabel(EMDL_TOMO_FIDUCIALS_STARFILE))
 	{
 		Log::warn("No fiducial markers present: you are advised to run relion_tomo_find_fiducials first.");
 	}

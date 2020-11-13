@@ -279,7 +279,7 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 		ctf.Cs = out.optics.Cs;
 		ctf.kV = out.optics.voltage;
 
-		if (m.labelExists(EMDL_CTF_SCALEFACTOR))
+		if (m.containsLabel(EMDL_CTF_SCALEFACTOR))
 		{
 			ctf.scale = m.getDouble(EMDL_CTF_SCALEFACTOR, f);
 		}
@@ -291,7 +291,7 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 	
 	out.frameSequence = IndexSort<double>::sortIndices(out.cumulativeDose);
 
-	if (globalTable.labelExists(EMDL_TOMO_IMPORT_FRACT_DOSE))
+	if (globalTable.containsLabel(EMDL_TOMO_IMPORT_FRACT_DOSE))
 	{
 		out.fractionalDose = globalTable.getDouble(EMDL_TOMO_IMPORT_FRACT_DOSE, index);
 	}
@@ -303,7 +303,7 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 
 	out.name = tomoName;
 	
-	if (globalTable.labelExists(EMDL_TOMO_FIDUCIALS_STARFILE))
+	if (globalTable.containsLabel(EMDL_TOMO_FIDUCIALS_STARFILE))
 	{
 		 globalTable.getValue(EMDL_TOMO_FIDUCIALS_STARFILE, out.fiducialsFilename, index);
 	}
@@ -312,7 +312,7 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 		out.fiducialsFilename = "";
 	}
 
-	if (globalTable.labelExists(EMDL_TOMO_DEFOCUS_SLOPE))
+	if (globalTable.containsLabel(EMDL_TOMO_DEFOCUS_SLOPE))
 	{
 		 globalTable.getValue(EMDL_TOMO_DEFOCUS_SLOPE, out.defocusSlope, index);
 	}
