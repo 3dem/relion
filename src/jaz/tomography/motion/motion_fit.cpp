@@ -24,6 +24,7 @@ MotionFit::MotionFit(
 	double frameDose,
 	double pixelSize,
 	double paddingFactor,
+	int progressBarOffset,
 	int num_threads)
 	:	
 	  CCs(CCs),
@@ -37,7 +38,8 @@ MotionFit::MotionFit(
 	  frameDose(frameDose),
 	  pixelSize(pixelSize),
 	  paddingFactor(paddingFactor),
-	  num_threads(num_threads),	  
+	  progressBarOffset(progressBarOffset),
+	  num_threads(num_threads),
 	  fc(frameProj.size()),
 	  pc(partIndices.size()),
 	  maxRange(CCs[0].xdim / (2 * paddingFactor))
@@ -366,8 +368,9 @@ void MotionFit::grad(const std::vector<double> &x, std::vector<double> &gradDest
 	}
 }
 
-std::vector<d4Matrix> MotionFit::getProjections(const std::vector<double> &x,
-												const std::vector<int>& frameSequence) const
+std::vector<d4Matrix> MotionFit::getProjections(
+		const std::vector<double> &x,
+		const std::vector<int>& frameSequence) const
 {
 	std::vector<d4Matrix> out(fc);
 	
@@ -553,7 +556,7 @@ Mesh MotionFit::visualiseTrajectories(const std::vector<double> &x, double scale
 
 void MotionFit::report(int iteration, double cost, const std::vector<double> &x) const
 {
-	Log::updateProgress(iteration);
+	Log::updateProgress(progressBarOffset + iteration);
 }
 
 void MotionFit::analyseGradient(const std::vector<double>& x, int particle, int frame, double epsilon)

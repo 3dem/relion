@@ -26,8 +26,8 @@ class MotionFit : public DifferentiableOptimization
 		{
 				double sig_vel, sig_div;
 		};
-		
-		
+
+
 		MotionFit(
 				const std::vector<BufferedImage<double>>& CCs,
 				const std::vector<gravis::d4Matrix>& frameProj, 
@@ -40,6 +40,7 @@ class MotionFit : public DifferentiableOptimization
 				double frameDose,
 				double pixelSize,
 				double paddingFactor,
+				int progressBarOffset,
 				int num_threads);
 		
 		
@@ -54,7 +55,7 @@ class MotionFit : public DifferentiableOptimization
 			
 			gravis::d3Vector tomoCentre;
 			double frameDose, pixelSize, paddingFactor;
-			int num_threads;
+			int progressBarOffset, num_threads;
 			
 			int fc, pc, bc, maxRange;	
 			

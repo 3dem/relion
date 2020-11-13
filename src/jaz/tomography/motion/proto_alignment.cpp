@@ -22,6 +22,7 @@ ProtoAlignment::ProtoAlignment(
 	bool constShifts,
 	int maxRange, 
 	d3Vector tomoCentre,
+	int progressBarOffset,
 	int num_threads,
 	double paddingFactor)
 	:	
@@ -37,6 +38,7 @@ ProtoAlignment::ProtoAlignment(
 	  pc(partIndices.size()),
 	  maxRange(maxRange),
 	  tomoCentre(tomoCentre),
+	  progressBarOffset(progressBarOffset),
 	  num_threads(num_threads),
 	  paddingFactor(paddingFactor)
 {	
@@ -220,7 +222,8 @@ void ProtoAlignment::grad(const std::vector<double> &x, std::vector<double> &gra
 	}
 }
 
-std::vector<d4Matrix> ProtoAlignment::getProjections(const std::vector<double> &x) const
+std::vector<d4Matrix> ProtoAlignment::getProjections(
+		const std::vector<double> &x) const
 {
 	std::vector<d4Matrix> out(fc);
 	
@@ -231,8 +234,8 @@ std::vector<d4Matrix> ProtoAlignment::getProjections(const std::vector<double> &
 		double phi, theta, psi, dx, dy;		
 		readParams(x, fs*f, phi, theta, psi, dx, dy);
 		
-		const d4Matrix Q = TaitBryan::anglesToMatrix4(phi, theta, psi);		
-		
+		const d4Matrix Q = TaitBryan::anglesToMatrix4(phi, theta, psi);
+
 		out[f] = plusCentre * Q * minusCentre * frameProj[f];
 		
 		out[f](0,3) += dx;
@@ -391,5 +394,5 @@ std::vector<BufferedImage<double>> ProtoAlignment::drawShiftedCCs(const std::vec
 
 void ProtoAlignment::report(int iteration, double cost, const std::vector<double> &x) const
 {
-	Log::updateProgress(iteration);
+	Log::updateProgress(progressBarOffset + iteration);
 }

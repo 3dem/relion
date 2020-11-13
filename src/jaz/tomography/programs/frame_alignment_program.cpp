@@ -188,7 +188,7 @@ void FrameAlignmentProgram::processTomograms(
 		ProtoAlignment protoAlignment(
 				CCs, tomogram.projectionMatrices, particleSet, particles[t], referenceMap.image_FS,
 				const_particles, const_angles, const_shifts, range,
-				tomogram.centre, num_threads, padding);
+				tomogram.centre, 0, num_threads, padding);
 
 		BufferedImage<double> FCC3, FCC1;
 
