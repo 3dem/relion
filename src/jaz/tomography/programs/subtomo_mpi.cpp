@@ -96,8 +96,11 @@ void SubtomoProgramMpi::run()
 
 	if (node->isMaster())
 	{
-		writeParticleSet(particleSet, particles);
+		initialise(particleSet, particles, tomogramSet);
 	}
+
+	MPI_Barrier(MPI_COMM_WORLD);
+
 
 	BufferedImage<float> dummy;
 
