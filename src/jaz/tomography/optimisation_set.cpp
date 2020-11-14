@@ -205,6 +205,8 @@ std::string OptimisationSet::readFromFile(
 			"ERROR: No "+argName+" file was found in the optimisation-set file "
 			+filename+" nor specified on the command line.",
 			parser);
+
+		return "";
 	}
 	else
 	{
