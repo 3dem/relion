@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
 		IOParser parser;
 
 		double voltage, Cs, Q0, hand, pixelSize;
-		std::string inStarFn, inOutFn, orderFn, fractionalDoseStr;
+		std::string inStarFn, inTomoSet, outFn, orderFn, fractionalDoseStr;
 		ImodImport global_IMOD_import;
 
 		try
@@ -71,7 +71,8 @@ int main(int argc, char *argv[])
 			int gen_section = parser.addSection("General options");
 
 			inStarFn = parser.getOption("--i", "Input STAR file containing per-tomogram arguments");
-			inOutFn = parser.getOption("--io", "Input and output tomogram set", "");
+			inTomoSet = parser.getOption("--t", "Input tomogram set", "");
+			outFn = parser.getOption("--o", "Output tomogram set");
 			hand = textToDouble(parser.getOption("--hand", "Handedness of the tilt geometry", "-1"));
 
 
@@ -233,13 +234,14 @@ int main(int argc, char *argv[])
 
 		TomogramSet tomograms;
 
-		if (inOutFn != "" && ZIO::fileExists(inOutFn))
+		if (inTomoSet != "")
 		{
-			tomograms = TomogramSet(inOutFn);
+			Log::print("Appending new tomograms to "+inTomoSet);
+			tomograms = TomogramSet(inTomoSet);
 		}
 
 
-		std::cout << perTomoArguments.size() << " tomograms to be imported" << std::endl;
+		Log::print(ZIO::itoa(perTomoArguments.size()) + " tomograms to be imported");
 
 		for (int tomo_index = 0; tomo_index < perTomoArguments.size(); tomo_index++)
 		{
@@ -371,14 +373,12 @@ int main(int argc, char *argv[])
 			Log::endSection();
 		}
 
-		std::cout << "writing: " << inOutFn << std::endl;
+		tomograms.write(outFn);
 
-		tomograms.write(inOutFn);
+		Log::print("Tomogram set written to " + outFn);
 	}
 	catch (RelionError e)
 	{
-		//std::cerr << e.msg << '\n';
-
 		return RELION_EXIT_FAILURE;
 	}
 

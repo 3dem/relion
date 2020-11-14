@@ -2325,6 +2325,15 @@ void JobWindow::initialiseSubtomoImportWindow()
 	place("Cs", TOGGLE_DEACTIVATE);
 	place("Q0", TOGGLE_DEACTIVATE);
 
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	place("dose", TOGGLE_DEACTIVATE);
+	place("order_list", TOGGLE_DEACTIVATE);
+	place("do_flipYZ", TOGGLE_DEACTIVATE);
+	place("do_flipZ", TOGGLE_DEACTIVATE);
+	place("hand", TOGGLE_DEACTIVATE);
+
 	group1->end();
 	guientries["do_tomo"].cb_menu_i(); // make default active
 

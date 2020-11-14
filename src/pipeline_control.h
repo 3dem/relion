@@ -40,6 +40,8 @@ extern std::string pipeline_control_outputname;
 
 int pipeline_control_relion_exit(int mode);
 
+bool is_under_pipeline_control();
+
 bool pipeline_control_check_abort_job();
 
 void pipeline_control_delete_exit_files();
