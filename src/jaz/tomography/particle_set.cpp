@@ -44,7 +44,7 @@ ParticleSet::ParticleSet(std::string filename, std::string motionFilename)
 			const int id = tomoParticleCount[tomoName];
 			tomoParticleCount[tomoName]++;
 
-			partTable.setValue(EMDL_TOMO_PARTICLE_NAME, tomoName + "_" + ZIO::itoa(id), p);
+			partTable.setValue(EMDL_TOMO_PARTICLE_NAME, tomoName + "/" + ZIO::itoa(id), p);
 		}
 	}
 
