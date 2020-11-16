@@ -49,6 +49,7 @@ class TomogramSet
 		std::string getTomogramName(int index) const;
 		int getTomogramIndexSafely(std::string tomogramName) const;
 		int getFrameCount(int index) const;
+		double getPixelSize(int index) const;
 };
 
 #endif
