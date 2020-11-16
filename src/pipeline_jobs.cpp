@@ -5518,35 +5518,35 @@ void RelionJob::addSubtomoInputOptions(bool has_tomograms, bool has_particles,
      if (has_postprocess) joboptions["in_post"] = JobOption("Input postprocess STAR: ", NODE_POST, "", "Postprocess STAR file (postprocess.star)", "Input STAR file from a relion_postprocess job. This will be passed with a --post argument to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
 }
 
-std::string RelionJob::getSubtomoInputCommmand(std::string &command, bool has_tomograms, bool has_particles,
-		bool has_trajectories, bool has_manifolds, bool has_postprocess)
+std::string RelionJob::getSubtomoInputCommmand(std::string &command, int has_tomograms, int has_particles,
+		int has_trajectories, int has_manifolds, int has_postprocess)
 {
 	std::string error_message = "";
 
 	// if no optimisation set is given, check all other necessary files are present
 	if (joboptions["in_optimisation"].getString() == "")
 	{
-		if (has_tomograms && joboptions["in_tomograms"].getString() == "")
+		if (has_tomograms == HAS_COMPULSORY && joboptions["in_tomograms"].getString() == "")
 		{
 			error_message = "ERROR: no optimisation set is specified, yet also no tomogram set is specified";
 			return error_message;
 		}
-		if (has_particles && joboptions["in_particles"].getString() == "")
+		if (has_particles == HAS_COMPULSORY && joboptions["in_particles"].getString() == "")
 		{
 			error_message = "ERROR: no optimisation set is specified, yet also no particle set is specified";
 			return error_message;
 		}
-		if (has_trajectories && joboptions["in_trajectories"].getString() == "")
+		if (has_trajectories == HAS_COMPULSORY && joboptions["in_trajectories"].getString() == "")
 		{
 			error_message = "ERROR: no optimisation set is specified, yet also no trajectory set is specified";
 			return error_message;
 		}
-		if (has_manifolds && joboptions["in_manifolds"].getString() == "")
+		if (has_manifolds == HAS_COMPULSORY && joboptions["in_manifolds"].getString() == "")
 		{
 			error_message = "ERROR: no optimisation set is specified, yet also no manifold set is specified";
 			return error_message;
 		}
-		if (has_postprocess && joboptions["in_post"].getString() == "")
+		if (has_postprocess == HAS_COMPULSORY && joboptions["in_post"].getString() == "")
 		{
 			error_message = "ERROR: no optimisation set is specified, yet also no postprocess star file is specified";
 			return error_message;
@@ -5559,31 +5559,31 @@ std::string RelionJob::getSubtomoInputCommmand(std::string &command, bool has_to
 		inputNodes.push_back(node);
     	command += " --i " + joboptions["in_optimisation"].getString();
 	}
-	if (has_tomograms && joboptions["in_tomograms"].getString() != "")
+	if (has_tomograms != HAS_NOT && joboptions["in_tomograms"].getString() != "")
 	{
 		Node node(joboptions["in_tomograms"].getString(), joboptions["in_tomograms"].node_type);
 		inputNodes.push_back(node);
     	command += " --t " + joboptions["in_tomograms"].getString();
 	}
-	if (has_particles && joboptions["in_particles"].getString() != "")
+	if (has_particles != HAS_NOT && joboptions["in_particles"].getString() != "")
 	{
 		Node node(joboptions["in_particles"].getString(), joboptions["in_particles"].node_type);
 		inputNodes.push_back(node);
     	command += " --p " + joboptions["in_particles"].getString();
 	}
-	if (has_trajectories && joboptions["in_trajectories"].getString() != "")
+	if (has_trajectories != HAS_NOT && joboptions["in_trajectories"].getString() != "")
 	{
 		Node node(joboptions["in_trajectories"].getString(), joboptions["in_trajectories"].node_type);
 		inputNodes.push_back(node);
     	command += " --mot " + joboptions["in_trajectories"].getString();
 	}
-	if (has_manifolds && joboptions["in_manifolds"].getString() != "")
+	if (has_manifolds != HAS_NOT && joboptions["in_manifolds"].getString() != "")
 	{
 		Node node(joboptions["in_manifolds"].getString(), joboptions["in_manifolds"].node_type);
 		inputNodes.push_back(node);
     	command += " --man " + joboptions["in_manifolds"].getString();
 	}
-	if (has_manifolds && joboptions["in_post"].getString() != "")
+	if (has_manifolds != HAS_NOT && joboptions["in_post"].getString() != "")
 	{
 		Node node(joboptions["in_post"].getString(), joboptions["in_post"].node_type);
 		inputNodes.push_back(node);
@@ -5659,12 +5659,12 @@ bool RelionJob::getCommandsSubtomoImportJob(std::string &outputname, std::vector
 			return false;
 		}
 
-		// TODO: insert call to relion_tomo_add_tomos here
-		command = "relion_tomo_add_tomos ";
+		// TODO: insert call to relion_tomo_import_tomograms here
+		command = "relion_tomo_import_tomograms ";
 
 		command += " --i " + joboptions["in_star"].getString();
-		// TODO: separate input and output!!! command += " --io " + joboptions["io_tomos"].getString();
-		command += " --io " + outputname+"tomograms.star";
+		command += " --o " + outputname+"tomograms.star";
+                if (joboptions["io_tomos"].getString() != "") command += " --t " + joboptions["io_tomos"].getString();
 
 		Node node(outputname+"tomograms.star", NODE_SUBTOMO_TOMOGRAMS);
 		outputNodes.push_back(node);
@@ -5780,7 +5780,7 @@ void RelionJob::initialiseSubtomoReconstructJob()
 	joboptions["crop_size"] = JobOption("Cropped box size (pix):", -1, -1, 512, 16, "If set to a positive value, after construction, the resulting pseudo subtomograms are cropped to this size. A smaller box size allows the (generally expensive) refinement using relion_refine to proceed more rapidly.");
 	joboptions["binning"] = JobOption("Binning factor:", 1, 1, 16, 1, "The tilt series images will be binned by this (real-valued) factor and then reconstructed in the specified box size above. Note that thereby the reconstructed region becomes larger when specifying binning factors larger than one.");
 
-	joboptions["do_cone_weight"] = JobOption("Use cone weight?", true, "If set to Yes, then downweight a cone in Fourier space along the Z axis (as defined by the coordinate system of the particle). This is useful for particles embedded in a membrane, as it can prevent the alignment from being driven by the membrane signal (the signal of a planar membrane is localised within one line in 3D Fourier space). Note that the coordinate system of a particle is given by both the subtomogram orientation (if defined) and the particle orientation (see particle set). This allows the user to first obtain a membrane-driven alignment, and to then specifically suppress the signal in that direction.");
+	joboptions["do_cone_weight"] = JobOption("Use cone weight?", false, "If set to Yes, then downweight a cone in Fourier space along the Z axis (as defined by the coordinate system of the particle). This is useful for particles embedded in a membrane, as it can prevent the alignment from being driven by the membrane signal (the signal of a planar membrane is localised within one line in 3D Fourier space). Note that the coordinate system of a particle is given by both the subtomogram orientation (if defined) and the particle orientation (see particle set). This allows the user to first obtain a membrane-driven alignment, and to then specifically suppress the signal in that direction.");
 	joboptions["cone_angle"] = JobOption("Cone angle:", 10, 1, 50, 1, "The (full) opening angle of the cone to be suppressed, given in degrees. This angle should include both the uncertainty about the membrane orientation and its variation across the region represented in the subtomogram.");
 
 }
@@ -5801,7 +5801,7 @@ bool RelionJob::getCommandsSubtomoReconstructJob(std::string &outputname, std::v
 	if (error_message != "") return false;
 
 	// I/O
-	error_message = getSubtomoInputCommmand(command, true, true, true, false, false);
+	error_message = getSubtomoInputCommmand(command, HAS_COMPULSORY, HAS_COMPULSORY, HAS_OPTIONAL, HAS_NOT, HAS_NOT);
 	if (error_message != "") return false;
 
 	command += " --o " + outputname;
@@ -5877,7 +5877,7 @@ bool RelionJob::getCommandsSubtomoCtfRefineJob(std::string &outputname, std::vec
     if (error_message != "") return false;
 
     // I/O
-    error_message = getSubtomoInputCommmand(command, true, true, true, false, true);
+    error_message = getSubtomoInputCommmand(command, HAS_COMPULSORY, HAS_COMPULSORY, HAS_OPTIONAL, HAS_NOT, HAS_COMPULSORY);
 	if (error_message != "") return false;
 
 	command += " --o " + outputname;
@@ -5975,8 +5975,8 @@ bool RelionJob::getCommandsSubtomoPolishJob(std::string &outputname, std::vector
     }
 
 	// I/O
-    error_message = getSubtomoInputCommmand(command, true, true, true, false, true);
-	if (error_message != "") return false;
+    error_message = getSubtomoInputCommmand(command, HAS_COMPULSORY, HAS_COMPULSORY, HAS_OPTIONAL, HAS_NOT, HAS_COMPULSORY);
+    if (error_message != "") return false;
 
 	command += " --o " + outputname;
 
@@ -6058,7 +6058,7 @@ bool RelionJob::getCommandsSubtomoAverageJob(std::string &outputname, std::vecto
 		if (error_message != "") return false;
 
 		// I/O
-		error_message = getSubtomoInputCommmand(command, true, true, true, false, false);
+		error_message = getSubtomoInputCommmand(command, HAS_COMPULSORY, HAS_COMPULSORY, HAS_OPTIONAL, HAS_NOT, HAS_NOT);
 		if (error_message != "") return false;
 
 		command += " --o " + outputname;

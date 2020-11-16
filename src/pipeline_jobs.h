@@ -362,6 +362,10 @@ static std::map<int, std::string> procstatus_type2label = {
 		{PROC_FINISHED_ABORTED, "Aborted"}};
 
 
+#define HAS_NOT 0
+#define HAS_OPTIONAL 1
+#define HAS_COMPULSORY 2
+
 struct gui_layout
 {
     /// Name for the tab
@@ -647,8 +651,8 @@ public:
 	// relion-3.2: add subtomogram averaging programs by Jasenko
 	void addSubtomoInputOptions(bool has_tomograms, bool has_particles,
 			bool has_trajectories, bool has_manifolds, bool has_postprocess);
-	std::string getSubtomoInputCommmand(std::string &command, bool has_tomograms, bool has_particles,
-			bool has_trajectories, bool has_manifolds, bool has_postprocess);
+	std::string getSubtomoInputCommmand(std::string &command, int has_tomograms, int has_particles,
+			int has_trajectories, int has_manifolds, int has_postprocess);
 
 	void initialiseSubtomoImportJob();
 	bool getCommandsSubtomoImportJob(std::string &outputname, std::vector<std::string> &commands,
