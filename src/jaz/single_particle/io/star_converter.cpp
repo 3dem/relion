@@ -50,7 +50,7 @@ void StarConverter::convert_3p0_particlesTo_3p1(const MetaDataTable &in, MetaDat
 
 	for (int l = 0; l < allOpticsLabels_double.size(); l++)
 	{
-		if (in.labelExists(allOpticsLabels_double[l]))
+		if (in.containsLabel(allOpticsLabels_double[l]))
 		{
 			opticsLabels_double.push_back(allOpticsLabels_double[l]);
 		}

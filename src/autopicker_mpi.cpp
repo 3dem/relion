@@ -109,7 +109,9 @@ void AutoPickerMpi::run()
 			fn_olddir = fn_dir;
 		}
 
-		if (do_LoG)
+		if (do_topaz_extract)
+			autoPickTopazOneMicrograph(fn_micrographs[imic], node->rank);
+		else if (do_LoG)
 			autoPickLoGOneMicrograph(fn_micrographs[imic], imic);
 		else
 			autoPickOneMicrograph(fn_micrographs[imic], imic);

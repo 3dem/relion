@@ -86,7 +86,7 @@ void FitBlobs3DProgram::run()
 	ManifoldSet output_manifold_set;
 	
 
-	if (!tomogram_set.globalTable.labelExists(EMDL_TOMO_FIDUCIALS_STARFILE))
+	if (!tomogram_set.globalTable.containsLabel(EMDL_TOMO_FIDUCIALS_STARFILE))
 	{
 		Log::warn("No fiducial markers present: you are advised to run relion_tomo_find_fiducials first.");
 	}

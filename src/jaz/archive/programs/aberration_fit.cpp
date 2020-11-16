@@ -210,7 +210,7 @@ void AberrationFitProgram::run()
 				evenData_perGroup[g], n_even, initialEven,
 				lastPixelSize, outDir + ZIO::itoa(g+1) + "_", true);
 
-			if (particleSet.optTable.labelExists(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS))
+			if (particleSet.optTable.containsLabel(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS))
 			{
 				const std::vector<double> evenCoeffs0 = particleSet.optTable.getDoubleVector(
 					EMDL_IMAGE_EVEN_ZERNIKE_COEFFS, g);
@@ -236,7 +236,7 @@ void AberrationFitProgram::run()
 				oddData_perGroup[g], n_odd, initialOdd,
 				lastPixelSize, outDir + ZIO::itoa(g+1) + "_", true);
 
-			if (particleSet.optTable.labelExists(EMDL_IMAGE_ODD_ZERNIKE_COEFFS))
+			if (particleSet.optTable.containsLabel(EMDL_IMAGE_ODD_ZERNIKE_COEFFS))
 			{
 				const std::vector<double> oddCoeffs0 = particleSet.optTable.getDoubleVector(
 					EMDL_IMAGE_ODD_ZERNIKE_COEFFS, g);

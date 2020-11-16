@@ -39,6 +39,21 @@ class FftwHelper
         template <typename T>
         static void recenterFull(const MultidimArray<T> &src, MultidimArray<T> &dest);
 
+	/*
+ 	    decenterUnflip2D and decenterDouble2D uses Jasenko's convention of
+	    taking the X Nyquist at positive and the Y Nyquist negative.
+	    For N = 6, the input is treated as kx = [0, 1, 2, 3] and ky = [0, 1, 2, -3, -2, -1].
+
+	    The output obeys the XMIPP convention, so both X and Y are [-3, -2, -1, 0, 1, 2].
+  
+	    We have two problems:
+	        - Outside the jaz folder, the Y Nyquist is positive. So ky = [0, 1, 2, 3, -2, -1].
+	          See comments in fftw.h and ctf.h.
+	        - For aberration functions, f(kx = 3) is not always the same as f(kx = -3), because it is not periodic.
+
+	    Because the Nyquist component is unreliable due to these issues, values from neighbouring row/column
+            are taken instead.
+  	*/
         static void decenterUnflip2D(const MultidimArray<RFLOAT> &src, MultidimArray<RFLOAT> &dest);
         static void decenterDouble2D(const MultidimArray<RFLOAT> &src, MultidimArray<RFLOAT> &dest);
 };

@@ -40,15 +40,13 @@ void RefinementProgram::_readParams(IOParser &parser)
 
 	boxSize = textToInteger(parser.getOption("--b", "Box size"));
 
-	referenceMap.read(optimisationSet);
+	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Only process tomograms for which no temporary output data can be found");
 
-	specified_first_frame = textToInteger(parser.getOption("--f0", "First frame", "0"));
-	specified_last_frame = textToInteger(parser.getOption("--f1", "Last frame", "-1"));
+	referenceMap.read(optimisationSet);
 
 	static_noise = !parser.checkOption("--per_frame_noise", "Assume a different noise distribution for each frame");
 	
 	diag = parser.checkOption("--diag", "Write out diagnostic information");
-	timing = parser.checkOption("--time", "Measure the elapsed time");
 	num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 	outDir = parser.getOption("--o", "Output directory");
 }

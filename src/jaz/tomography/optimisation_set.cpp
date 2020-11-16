@@ -195,7 +195,7 @@ std::string OptimisationSet::readFromFile(
 		bool mandatory,
 		IOParser& parser)
 {
-	if (table.labelExists(label))
+	if (table.containsLabel(label))
 	{
 		return table.getString(label);
 	}
@@ -205,6 +205,8 @@ std::string OptimisationSet::readFromFile(
 			"ERROR: No "+argName+" file was found in the optimisation-set file "
 			+filename+" nor specified on the command line.",
 			parser);
+
+		return "";
 	}
 	else
 	{

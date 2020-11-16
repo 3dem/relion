@@ -17,11 +17,6 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 add_definitions(-DINSTALL_LIBRARY_DIR=${CMAKE_INSTALL_PREFIX}/lib/)
 add_definitions(-DSOURCE_DIR=${CMAKE_SOURCE_DIR}/src/)
 
-if(MDT_TYPE_CHECK)
-    message(" DEVELOPER MODE: MetaDataTable type check is enabled.")
-    add_definitions(-DMETADATA_TABLE_TYPE_CHECK)
-endif()
-
 # message(STATUS "INSTALL_LIBRARY_DIR set to ${CMAKE_INSTALL_PREFIX}/lib/")
 # message(STATUS "SOURCE_DIR set to ${CMAKE_SOURCE_DIR}/src/")
 
@@ -39,7 +34,6 @@ if(NOT APPLE)
     # add the automatically determined parts of the RPATH
     # which point to directories outside the build tree to the install RPATH
     SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-
 
     # the RPATH to be used when installing, but only if it's not a system directory
     LIST(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
@@ -65,6 +59,11 @@ if(NOT ${CMAKE_BUILD_TYPE} STREQUAL "")
 	message(STATUS "BUILD TYPE set to '${CMAKE_BUILD_TYPE}'")
 	SET(CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE} CACHE STRING "Choose the type of
 build, options are: 'None', 'Release', 'Debug', 'RelWithDebInfo', and 'Profiling'.")
+
+	if (${CMAKE_BUILD_TYPE_LOWER} STREQUAL "debug")
+		set(MDT_TYPE_CHECK ON)
+	endif()
+
 else()
 	SET(CMAKE_BUILD_TYPE "Release")
 	message(STATUS "BUILD TYPE set to the default type:  '${CMAKE_BUILD_TYPE}'")
@@ -127,6 +126,11 @@ if(DoublePrec_ACC)
 else(DoublePrec_ACC)
     message(STATUS "Setting accelerated code precision to single")
 endif(DoublePrec_ACC)
+
+if(MDT_TYPE_CHECK)
+    message("-- MetaDataTable type check is enabled.")
+    add_definitions(-DMETADATA_TABLE_TYPE_CHECK)
+endif()
 
 # ----------------------------------------------------------INCLUDE ALL BUILD TYPES--
  #This *has* to be AFTER project()
@@ -315,10 +319,15 @@ endif(GUI)
 
 if(NOT MKLFFT)
 	option(FORCE_OWN_FFTW "FORCE_OWN_FFTW" OFF)
+	option(AMDFFTW "Use AMD optimized version of FFTW. This needs a new version of GCC (>= 8.3 recommended)." OFF)
 	
 	set(FFTW_DOUBLE_REQUIRED TRUE)
 	set(FFTW_SINGLE_REQUIRED TRUE)
-		
+	
+	if(AMDFFTW)
+		set(FORCE_OWN_FFTW ON)
+	endif()
+
 	if(NOT FORCE_OWN_FFTW)
 		FIND_PACKAGE(FFTW COMPONENTS SINGLE DOUBLE)
 	endif(NOT FORCE_OWN_FFTW)

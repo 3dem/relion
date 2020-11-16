@@ -55,16 +55,13 @@ std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, 
 		Node node1(fn_out + "_data.star", NODE_PART_DATA);
 		result.push_back(node1);
 
-		if (iter > 0)
+                // SHWS 27nov2019: as optimiser.star already is a node type, and it contains model.star, only keep NODE_OPTIMISER
+                Node node2(fn_out + "_optimiser.star", NODE_OPTIMISER);
+                result.push_back(node2);
+
+                // For auto-refine: also output the run_half1_class001_unfil.mrc map
+		if (iter < 0)
 		{
-			// For classifications: output node model.star to make selections
-			// SHWS 27nov2019: as optimiser.star already is a node type, and it contains model.star, only keep NODE_OPTIMISER
-			Node node2(fn_out + "_optimiser.star", NODE_OPTIMISER);
-			result.push_back(node2);
-		}
-		else
-		{
-			// For auto-refine: also output the run_half1_class001_unfil.mrc map
 			Node node4(fn_out+"_half1_class001_unfil.mrc", NODE_HALFMAP);
 			result.push_back(node4);
 		}
@@ -448,6 +445,11 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 		    type != PROC_INIMODEL &&
 		    type != PROC_MOTIONREFINE &&
 		    type != PROC_CTFREFINE &&
+		    type != PROC_SUBTOMO_IMPORT &&
+		    type != PROC_SUBTOMO_RECONSTRUCT &&
+		    type != PROC_SUBTOMO_CTFREFINE &&
+		    type != PROC_SUBTOMO_POLISH &&
+		    type != PROC_SUBTOMO_AVERAGE &&
 		    type != PROC_EXTERNAL)
 			REPORT_ERROR("ERROR: cannot find correct job type in " + myfilename + "run.job, with type= " + integerToString(type));
 
@@ -851,6 +853,31 @@ void RelionJob::initialise(int _job_type)
 		has_mpi = has_thread = true;
 		initialiseCtfrefineJob();
 	}
+	else if (type == PROC_SUBTOMO_IMPORT)
+	{
+		has_mpi = has_thread = false;
+		initialiseSubtomoImportJob();
+	}
+	else if (type == PROC_SUBTOMO_RECONSTRUCT)
+	{
+		has_mpi = has_thread = true;
+		initialiseSubtomoReconstructJob();
+	}
+	else if (type == PROC_SUBTOMO_CTFREFINE)
+	{
+		has_mpi = has_thread = true;
+		initialiseSubtomoCtfRefineJob();
+	}
+	else if (type == PROC_SUBTOMO_POLISH)
+	{
+		has_mpi = has_thread = true;
+		initialiseSubtomoPolishJob();
+	}
+	else if (type == PROC_SUBTOMO_AVERAGE)
+	{
+		has_mpi = has_thread = true;
+		initialiseSubtomoAverageJob();
+	}
 	else if (type == PROC_EXTERNAL)
 	{
 		has_mpi = false;
@@ -1065,6 +1092,26 @@ bool RelionJob::getCommands(std::string &outputname, std::vector<std::string> &c
 	{
 		result = getCommandsCtfrefineJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
+	else if (type == PROC_SUBTOMO_IMPORT)
+	{
+		result = getCommandsSubtomoImportJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
+	}
+	else if (type == PROC_SUBTOMO_RECONSTRUCT)
+	{
+		result = getCommandsSubtomoReconstructJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
+	}
+	else if (type == PROC_SUBTOMO_CTFREFINE)
+	{
+		result = getCommandsSubtomoCtfRefineJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
+	}
+	else if (type == PROC_SUBTOMO_POLISH)
+	{
+		result = getCommandsSubtomoPolishJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
+	}
+	else if (type == PROC_SUBTOMO_AVERAGE)
+	{
+		result = getCommandsSubtomoAverageJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
+	}
 	else if (type == PROC_EXTERNAL)
 	{
 		result = getCommandsExternalJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
@@ -1215,7 +1262,7 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 			int mynodetype;
 			if (node_type == "Particles STAR file (.star)")
 				mynodetype = NODE_PART_DATA;
-			else if (node_type == "Multiple (2D/3D) references (.star or .mrcs)")
+			else if (node_type == "Multiple (2D or 3D) references (.star or .mrcs)")
 				mynodetype = NODE_REFS;
 			else if (node_type == "3D reference (.mrc)")
 				mynodetype = NODE_3DREF;
@@ -1665,7 +1712,8 @@ to the average PLUS this value times the standard deviation. Use zero to set the
 
 	joboptions["do_startend"] = JobOption("Pick start-end coordinates helices?", false, "If set to true, start and end coordinates are picked subsequently and a line will be drawn between each pair");
 
-	joboptions["ctfscale"] = JobOption("Scale for CTF image:", 1, 0.1, 2, 0.1, "CTFFINDs CTF image (with the Thonrings) will be displayed at this relative scale, i.e. a value of 0.5 means that only every second pixel will be displayed." );
+	joboptions["do_fom_threshold"] = JobOption("Use autopick FOM threshold?", false, "If set to Yes, only particles with rlnAutopickFigureOfMerit values below the threshold below will be extracted.");
+	joboptions["minimum_pick_fom"] = JobOption("Minimum autopick FOM: ", 0, -5, 10, 0.1, "The minimum value for the rlnAutopickFigureOfMerit for particles to be extracted.");
 
 	joboptions["do_color"] = JobOption("Blue<>red color particles?", false, "If set to true, then the circles for each particles are coloured from red to blue (or the other way around) for a given metadatalabel. If this metadatalabel is not in the picked coordinates STAR file \
 (basically only the rlnAutopickFigureOfMerit or rlnClassNumber) would be useful values there, then you may provide an additional STAR file (e.g. after classification/refinement below. Particles with values -999, or that are not in the additional STAR file will be coloured the default color: green");
@@ -1726,7 +1774,10 @@ bool RelionJob::getCommandsManualpickJob(std::string &outputname, std::vector<st
 		command += " --angpix " + joboptions["angpix"].getString();
 	if (error_message != "") return false;
 
-	command += " --ctf_scale " + joboptions["ctfscale"].getString();
+	if (joboptions["do_fom_threshold"].getBoolean())
+	{
+		command += " --minimum_pick_fom " + joboptions["minimum_pick_fom"].getString();
+	}
 
 	command += " --particle_diameter " + joboptions["diameter"].getString();
 
@@ -1767,6 +1818,18 @@ void RelionJob::initialiseAutopickJob()
 	joboptions["log_adjust_thr"] = JobOption("Adjust default threshold (stddev):", 0, -1., 1., 0.05, "Use this to pick more (negative number -> lower threshold) or less (positive number -> higher threshold) particles compared to the default setting. The threshold is moved this many standard deviations away from the average.");
 	joboptions["log_upper_thr"] = JobOption("Upper threshold (stddev):", 999., 0., 10., 0.5, "Use this to discard picks with LoG thresholds that are this many standard deviations above the average, e.g. to avoid high contrast contamination like ice and ethane droplets. Good values depend on the contrast of micrographs and need to be interactively explored; for low contrast micrographs, values of ~ 1.5 may be reasonable, but the same value will be too low for high-contrast micrographs.");
 
+	joboptions["do_topaz"] = JobOption("OR: use Topaz?", false, "If set to Yes, topaz will be used for autopicking. Run 2 separate jobs from the Topaz tab: one for training the model and for the actual picking.");
+	joboptions["do_topaz_train"] = JobOption("Perform topaz training?", false, "Set this option to Yes if you want to train a topaz model.");
+	joboptions["topaz_train_picks"] = JobOption("Input picked coordinates for training:", NODE_MIC_COORDS, "", "Input micrographs (*.{star})", "Input STAR file (preferably with CTF information) with all micrographs to pick from.");
+	joboptions["do_topaz_train_parts"] = JobOption("OR train on a set of particles? ", false, "If set to Yes, the input Coordinates above will be ignored. Instead, one uses a _data.star file from a previous 2D or 3D refinement or selection to use those particle positions for training.");
+	joboptions["topaz_train_parts"] = JobOption("Particles STAR file for training: ", NODE_PART_DATA, "", "Input STAR file (*.{star})", "Filename of the STAR file with the particle coordinates to be used for training, e.g. from a previous 2D or 3D classification or selection.");
+	joboptions["do_topaz_pick"] = JobOption("Perform topaz picking?", false, "Set this option to Yes if you want to use a topaz model for autopicking.");
+	joboptions["topaz_particle_diameter"] = JobOption("Particle diameter (A) ", -1, 0, 2000, 20, "Diameter of the particle (to be used to infer topaz downscale factor and particle radius)");
+	joboptions["topaz_nr_particles"] = JobOption("Nr of particles per micrograph: ", -1, 0, 2000, 20, "Expected average number of particles per micrograph");
+	joboptions["topaz_model"] = JobOption("Trained topaz model: ", "", "SAV Files (*.sav)", ".", "Trained topaz model for topaz-based picking. Use on job for training and a next job for picking.");
+	joboptions["topaz_other_args"]= JobOption("Additional topaz arguments:", std::string(""), "These additional arguments will be passed onto all topaz programs.");
+
+	joboptions["do_refs"] = JobOption("Use reference-based template-matching?", false, "If set to Yes, 2D or 3D references, as defined on the References tab will be used for autopicking.");
 	joboptions["fn_refs_autopick"] = JobOption("2D references:", NODE_REFS, "", "Input references (*.{star,mrcs})", "Input STAR file or MRC stack with the 2D references to be used for picking. Note that the absolute greyscale needs to be correct, so only use images created by RELION itself, e.g. by 2D class averaging or projecting a RELION reconstruction.");
 	joboptions["do_ref3d"]= JobOption("OR: provide a 3D reference?", false, "Set this option to Yes if you want to provide a 3D map, which will be projected into multiple directions to generate 2D references.");
 	joboptions["fn_ref3d_autopick"] = JobOption("3D reference:", NODE_3DREF, "", "Input reference (*.{mrc})", "Input MRC file with the 3D reference maps, from which 2D references will be made by projection. Note that the absolute greyscale needs to be correct, so only use maps created by RELION itself from this data set.");
@@ -1775,7 +1838,6 @@ void RelionJob::initialiseAutopickJob()
 angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
 The samplings are approximate numbers and vary slightly over the sphere.\n\n For autopicking, 30 degrees is usually fine enough, but for highly symmetrical objects one may need to go finer to adequately sample the asymmetric part of the sphere.");
 
-	joboptions["particle_diameter"] = JobOption("Mask diameter (A)", -1, 0, 2000, 20, "Diameter of the circular mask that will be applied around the templates in Angstroms. When set to a negative value, this value is estimated automatically from the templates themselves.");
 	joboptions["lowpass"] = JobOption("Lowpass filter references (A)", 20, 10, 100, 5, "Lowpass filter that will be applied to the references before template matching. Do NOT use very high-resolution templates to search your micrographs. The signal will be too weak at high resolution anyway, and you may find Einstein from noise.... Give a negative value to skip the lowpass filter.");
 	joboptions["highpass"] = JobOption("Highpass filter (A)", -1, 100, 1000, 100, "Highpass filter that will be applied to the micrographs. This may be useful to get rid of background ramps due to uneven ice distributions. Give a negative value to skip the highpass filter.  Useful values are often in the range of 200-400 Angstroms.");
 	joboptions["angpix_ref"] = JobOption("Pixel size in references (A)", -1, 0.3, 5, 0.1, "Pixel size in Angstroms for the provided reference images. This will be used to calculate the filters and the particle diameter in pixels. If a negative value is given here, the pixel size in the references will be assumed to be the same as the one in the micrographs, i.e. the particles that were used to make the references were not rescaled upon extraction.");
@@ -1829,11 +1891,23 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 	if (error_message != "") return false;
 
 	// Input
-	if (joboptions["fn_input_autopick"].getString() == "")
+	int icheck = 0;
+	if (joboptions["do_log"].getBoolean()) icheck++;
+	if (joboptions["do_topaz"].getBoolean()) icheck++;
+	if (joboptions["do_refs"].getBoolean()) icheck++;
+
+	if ( icheck != 1)
+	{
+		error_message = "ERROR: On the I/O tab specify (only) one of three methods: template-matching, LoG or topaz ...";
+		return false;
+	}
+
+	if (joboptions["fn_input_autopick"].getString() == "" )
 	{
 		error_message = "ERROR: empty field for input STAR file...";
 		return false;
 	}
+
 	command += " --i " + joboptions["fn_input_autopick"].getString();
 	Node node(joboptions["fn_input_autopick"].getString(), joboptions["fn_input_autopick"].node_type);
 	inputNodes.push_back(node);
@@ -1849,7 +1923,67 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 	command += " --odir " + outputname;
 	command += " --pickname autopick";
 
-	if (joboptions["do_log"].getBoolean())
+	if (joboptions["do_topaz"].getBoolean())
+	{
+		if (!joboptions["use_gpu"].getBoolean())
+		{
+			error_message ="ERROR: Specify which GPUs to use on the autopicking tab";
+			return false;
+		}
+
+		icheck = 0;
+		if (joboptions["do_topaz_train"].getBoolean()) icheck++;
+		if (joboptions["do_topaz_pick"].getBoolean()) icheck++;
+		if ( icheck != 1)
+		{
+			error_message = "ERROR: On the Topaz tab specify (only) one of two methods: training or picking...";
+			return false;
+		}
+
+
+		if (joboptions["topaz_nr_particles"].getNumber(error_message) > 0.)
+			command += " --topaz_nr_particles " + joboptions["topaz_nr_particles"].getString();
+		if (error_message != "") return false;
+
+		if (joboptions["topaz_particle_diameter"].getNumber(error_message) > 0.)
+			command += " --particle_diameter " + joboptions["topaz_particle_diameter"].getString();
+		if (error_message != "") return false;
+
+		if (joboptions["do_topaz_train"].getBoolean())
+		{
+			command += " --topaz_train";
+			if (joboptions["do_topaz_train_parts"].getBoolean())
+			{
+				command += " --topaz_train_parts " + joboptions["topaz_train_parts"].getString();
+				// Output new version: no longer save coords_suffix nodetype, but 2-column list of micrographs and coordinate files
+				Node nodet(outputname + "input_training_coords.star", NODE_MIC_COORDS);
+				outputNodes.push_back(nodet);
+
+			}
+			else
+			{
+				command += " --topaz_train_picks " + joboptions["topaz_train_picks"].getString();
+			}
+
+		}
+		else if (joboptions["do_topaz_pick"].getBoolean())
+		{
+			command += " --topaz_extract";
+			command += " --topaz_model " + joboptions["topaz_model"].getString();
+		}
+
+		if ((joboptions["topaz_other_args"].getString()).length() > 0)
+			command += " --topaz_args \" " + joboptions["topaz_other_args"].getString() + " \"";
+
+		// GPU-stuff
+		if (joboptions["use_gpu"].getBoolean())
+		{
+			// for the moment always use --shrink 0 with GPUs ...
+			command += " --gpu \"" + joboptions["gpu_ids"].getString() + "\"";
+		}
+
+	}
+	else if (joboptions["do_log"].getBoolean())
 	{
 		if (joboptions["use_gpu"].getBoolean())
 		{
@@ -1869,7 +2003,7 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 		if (joboptions["log_invert"].getBoolean())
 			command += " --Log_invert ";
 	}
-	else
+	else if (joboptions["do_refs"].getBoolean())
 	{
 		if (joboptions["do_ref3d"].getBoolean())
 		{
@@ -1936,10 +2070,6 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 			command += " --angpix_ref " + joboptions["angpix_ref"].getString();
 		if (error_message != "") return false;
 
-		if (joboptions["particle_diameter"].getNumber(error_message) > 0.)
-			command += " --particle_diameter " + joboptions["particle_diameter"].getString();
-		if (error_message != "") return false;
-
 		command += " --threshold " + joboptions["threshold_autopick"].getString();
 		if (joboptions["do_pick_helical_segments"].getBoolean())
 			command += " --min_distance " + floatToString(joboptions["helical_nr_asu"].getNumber(error_message) * joboptions["helical_rise"].getNumber(error_message));
@@ -1972,16 +2102,24 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 
 	}
 
-	// Although mainly for debugging, LoG-picking does have write/read_fom_maps...
-	if (joboptions["do_write_fom_maps"].getBoolean())
-		command += " --write_fom_maps ";
+	if (joboptions["do_refs"].getBoolean() || joboptions["do_log"].getBoolean())
+	{
 
-	if (joboptions["do_read_fom_maps"].getBoolean())
-		command += " --read_fom_maps ";
+		// Although mainly for debugging, LoG-picking does have write/read_fom_maps...
+		if (joboptions["do_write_fom_maps"].getBoolean())
+			command += " --write_fom_maps ";
 
-	if (is_continue && !(joboptions["do_read_fom_maps"].getBoolean() || joboptions["do_write_fom_maps"].getBoolean()))
-		command += " --only_do_unfinished ";
+		if (joboptions["do_read_fom_maps"].getBoolean())
+			command += " --read_fom_maps ";
 
+		if (is_continue && !(joboptions["do_read_fom_maps"].getBoolean() || joboptions["do_write_fom_maps"].getBoolean()))
+			command += " --only_do_unfinished ";
+	}
+	else if (joboptions["do_topaz"].getBoolean())
+	{
+		if (is_continue)
+			command += " --only_do_unfinished ";
+	}
 
 	// Other arguments
 	command += " " + joboptions["other_args"].getString();
@@ -2016,6 +2154,8 @@ Pixels values higher than this many times the image stddev will be replaced with
 Pixels values higher than this many times the image stddev will be replaced with values from a Gaussian distribution. \n \n Use negative value to switch off dust removal.");
 	joboptions["do_rescale"] = JobOption("Rescale particles?", false, "If set to Yes, particles will be re-scaled. Note that the particle diameter below will be in the down-scaled images.");
 	joboptions["rescale"] = JobOption("Re-scaled size (pixels): ", 128, 64, 512, 8, "The re-scaled value needs to be an even number");
+	joboptions["do_fom_threshold"] = JobOption("Use autopick FOM threshold?", false, "If set to Yes, only particles with rlnAutopickFigureOfMerit values below the threshold below will be extracted.");
+	joboptions["minimum_pick_fom"] = JobOption("Minimum autopick FOM: ", 0, -5, 10, 0.1, "The minimum value for the rlnAutopickFigureOfMerit for particles to be extracted.");
 
 	joboptions["do_extract_helix"] = JobOption("Extract helical segments?", false, "Set to Yes if you want to extract helical segments. RELION (.star), EMAN2 (.box) and XIMDISP (.coords) formats of tube or segment coordinates are supported.");
 	joboptions["helical_tube_outer_diameter"] = JobOption("Tube diameter (A): ", 200, 100, 1000, 10, "Outer diameter (in Angstroms) of helical tubes. \
@@ -2114,6 +2254,11 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 	command += " --part_dir " + outputname;
 	command += " --extract";
 	command += " --extract_size " + joboptions["extract_size"].getString();
+
+	if (joboptions["do_fom_threshold"].getBoolean())
+	{
+		command += " --minimum_pick_fom " + joboptions["minimum_pick_fom"].getString();
+	}
 
 	// Operate stuff
 	// Get an integer number for the bg_radius
@@ -3120,9 +3265,6 @@ The resulting algorithm intrinsically implements the optimal linear, or Wiener f
 Note that CTF parameters for all images need to be given in the input STAR file. \
 The command 'relion_refine --print_metadata_labels' will print a list of all possible metadata labels for that STAR file. \
 See the RELION Wiki for more details.\n\n Also make sure that the correct pixel size (in Angstrom) is given above!)");
-	joboptions["ctf_corrected_ref"] = JobOption("Has reference been CTF-corrected?", false, "Set this option to Yes if the reference map \
-represents density that is unaffected by CTF phases and amplitudes, e.g. it was created using CTF correction (Wiener filtering) inside RELION or from a PDB. \n\n\
-If set to No, then in the first iteration, the Fourier transforms of the reference projections are not multiplied by the CTFs.");
 	joboptions["ctf_intact_first_peak"] = JobOption("Ignore CTFs until first peak?", false, "If set to Yes, then CTF-amplitude correction will \
 only be performed from the first peak of each CTF onward. This can be useful if the CTF model is inadequate at the lowest resolution. \
 Still, in general using higher amplitude contrast on the CTFs (e.g. 10-20%) often yields better results. \
@@ -3367,8 +3509,6 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 		if (joboptions["do_ctf_correction"].getBoolean())
 		{
 			command += " --ctf";
-			if (joboptions["ctf_corrected_ref"].getBoolean())
-				command += " --ctf_corrected_ref";
 			if (joboptions["ctf_intact_first_peak"].getBoolean())
 				command += " --ctf_intact_first_peak";
 		}
@@ -3549,7 +3689,7 @@ void RelionJob::initialiseAutorefineJob()
 
 	joboptions["fn_img"] = JobOption("Input images STAR file:", NODE_PART_DATA, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
 nor will it be possible to perform noise spectra estimation or intensity scale corrections in image groups. Therefore, running RELION with an input stack will in general provide sub-optimal results and is therefore not recommended!! Use the Preprocessing procedure to get the input STAR file in a semi-automated manner. Read the RELION wiki for more information.");
-	joboptions["fn_cont"] = JobOption("Continue from here: ", std::string(""), "STAR Files (*_optimiser.star)", "CURRENT_ODIR", "Select the *_optimiser.star file for the iteration \
+	joboptions["fn_cont"] = JobOption("Continue from here: ", std::string(""), "STAR Files (*_it*_optimiser.star)", "CURRENT_ODIR", "Select the *_optimiser.star file for the iteration \
 from which you want to continue a previous run. \
 Note that the Output rootname of the continued run and the rootname of the previous run cannot be the same. \
 If they are the same, the program will automatically add a '_ctX' to the output rootname, \
@@ -3593,9 +3733,6 @@ RELION uses XMIPP's libraries for symmetry operations. \
 Therefore, look at the XMIPP Wiki for more details:  http://xmipp.cnb.csic.es/twiki/bin/view/Xmipp/WebHome?topic=Symmetry");
 
 	joboptions["do_ctf_correction"] = JobOption("Do CTF-correction?", true, "If set to Yes, CTFs will be applied to the projections of the map. This requires that CTF information is present in the input STAR file.");
-	joboptions["ctf_corrected_ref"] = JobOption("Has reference been CTF-corrected?", false, "Set this option to Yes if the reference map \
-represents density that is unaffected by CTF phases and amplitudes, e.g. it was created using CTF correction (Wiener filtering) inside RELION or from a PDB. \n\n\
-If set to No, then in the first iteration, the Fourier transforms of the reference projections are not multiplied by the CTFs.");
 	joboptions["ctf_intact_first_peak"] = JobOption("Ignore CTFs until first peak?", false, "If set to Yes, then CTF-amplitude correction will \
 only be performed from the first peak of each CTF onward. This can be useful if the CTF model is inadequate at the lowest resolution. \
 Still, in general using higher amplitude contrast on the CTFs (e.g. 10-20%) often yields better results. \
@@ -3746,7 +3883,11 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 		int pos_it = joboptions["fn_cont"].getString().rfind("_it");
 		int pos_op = joboptions["fn_cont"].getString().rfind("_optimiser");
 		if (pos_it < 0 || pos_op < 0)
-			std::cerr << "Warning: invalid optimiser.star filename provided for continuation run: " << joboptions["fn_cont"].getString() << std::endl;
+                {
+			error_message = "Invalid optimiser.star filename provided for auto-refine continuation run: " + joboptions["fn_cont"].getString();
+                        return false;
+                }
+
 		int it = (int)textToFloat((joboptions["fn_cont"].getString().substr(pos_it+3, 6)).c_str());
 		fn_run += "_ct" + floatToString(it);
 		command += " --continue " + joboptions["fn_cont"].getString();
@@ -3815,8 +3956,6 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 		if (joboptions["do_ctf_correction"].getBoolean())
 		{
 			command += " --ctf";
-			if (joboptions["ctf_corrected_ref"].getBoolean())
-				command += " --ctf_corrected_ref";
 			if (joboptions["ctf_intact_first_peak"].getBoolean())
 				command += " --ctf_intact_first_peak";
 		}
@@ -5098,6 +5237,8 @@ This option cannot be done simultaneously with higher-order aberration estimatio
 	joboptions["do_4thorder"] = JobOption("Estimate 4th order aberrations?", false, "If set to Yes, then relion_ctf_refine will also estimate the Cs and the tetrafoil (4-fold astigmatism) per optics group. This option is only recommended for data sets that extend beyond 3 Angstrom resolution.");
 }
 
+
+
 bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
@@ -5219,6 +5360,7 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
+
 
 void RelionJob::initialiseExternalJob()
 {
@@ -5363,3 +5505,619 @@ bool RelionJob::getCommandsExternalJob(std::string &outputname, std::vector<std:
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
+
+void RelionJob::addSubtomoInputOptions(bool has_tomograms, bool has_particles,
+		bool has_trajectories, bool has_manifolds, bool has_postprocess)
+{
+    // Optional input nodes
+     joboptions["in_optimisation"] = JobOption("Input optimisation set: ", NODE_SUBTOMO_OPTIMISATION, "", "Optimisation set STAR file (*.star)", "Input optimisation set. This will be passed with a --i argument to the executable. If any inidividual components of the optimisation set are specified below, then they will override the components in this optimisation set.");
+     if (has_tomograms) joboptions["in_tomograms"] = JobOption("Input tomogram set: ", NODE_SUBTOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "Input tomogram set. This will be passed with a --m argument to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
+     if (has_particles) joboptions["in_particles"] = JobOption("Input particle set: ", NODE_PART_DATA, "", "Particle STAR file (*.star)", "Input particle set. This will be passed with a --p argument to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
+     if (has_trajectories) joboptions["in_trajectories"] = JobOption("Input trajectory set: ", NODE_SUBTOMO_TRAJECTORIES, "", "Trajectory set STAR file (*.star)", "Input trajectory set. This will be passed with a --mot argument to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
+     if (has_manifolds) joboptions["in_manifolds"] = JobOption("Input manifold set: ", NODE_SUBTOMO_MANIFOLDS, "", "Manifold set STAR file (*.star)", "Input manifold set. This will be passed with a --man argument to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
+     if (has_postprocess) joboptions["in_post"] = JobOption("Input postprocess STAR: ", NODE_POST, "", "Postprocess STAR file (postprocess.star)", "Input STAR file from a relion_postprocess job. This will be passed with a --post argument to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
+}
+
+std::string RelionJob::getSubtomoInputCommmand(std::string &command, bool has_tomograms, bool has_particles,
+		bool has_trajectories, bool has_manifolds, bool has_postprocess)
+{
+	std::string error_message = "";
+
+	// if no optimisation set is given, check all other necessary files are present
+	if (joboptions["in_optimisation"].getString() == "")
+	{
+		if (has_tomograms && joboptions["in_tomograms"].getString() == "")
+		{
+			error_message = "ERROR: no optimisation set is specified, yet also no tomogram set is specified";
+			return error_message;
+		}
+		if (has_particles && joboptions["in_particles"].getString() == "")
+		{
+			error_message = "ERROR: no optimisation set is specified, yet also no particle set is specified";
+			return error_message;
+		}
+		if (has_trajectories && joboptions["in_trajectories"].getString() == "")
+		{
+			error_message = "ERROR: no optimisation set is specified, yet also no trajectory set is specified";
+			return error_message;
+		}
+		if (has_manifolds && joboptions["in_manifolds"].getString() == "")
+		{
+			error_message = "ERROR: no optimisation set is specified, yet also no manifold set is specified";
+			return error_message;
+		}
+		if (has_postprocess && joboptions["in_post"].getString() == "")
+		{
+			error_message = "ERROR: no optimisation set is specified, yet also no postprocess star file is specified";
+			return error_message;
+		}
+	}
+
+	if (joboptions["in_optimisation"].getString() != "")
+	{
+		Node node(joboptions["in_optimisation"].getString(), joboptions["in_optimisation"].node_type);
+		inputNodes.push_back(node);
+    	command += " --i " + joboptions["in_optimisation"].getString();
+	}
+	if (has_tomograms && joboptions["in_tomograms"].getString() != "")
+	{
+		Node node(joboptions["in_tomograms"].getString(), joboptions["in_tomograms"].node_type);
+		inputNodes.push_back(node);
+    	command += " --t " + joboptions["in_tomograms"].getString();
+	}
+	if (has_particles && joboptions["in_particles"].getString() != "")
+	{
+		Node node(joboptions["in_particles"].getString(), joboptions["in_particles"].node_type);
+		inputNodes.push_back(node);
+    	command += " --p " + joboptions["in_particles"].getString();
+	}
+	if (has_trajectories && joboptions["in_trajectories"].getString() != "")
+	{
+		Node node(joboptions["in_trajectories"].getString(), joboptions["in_trajectories"].node_type);
+		inputNodes.push_back(node);
+    	command += " --mot " + joboptions["in_trajectories"].getString();
+	}
+	if (has_manifolds && joboptions["in_manifolds"].getString() != "")
+	{
+		Node node(joboptions["in_manifolds"].getString(), joboptions["in_manifolds"].node_type);
+		inputNodes.push_back(node);
+    	command += " --man " + joboptions["in_manifolds"].getString();
+	}
+	if (has_manifolds && joboptions["in_post"].getString() != "")
+	{
+		Node node(joboptions["in_post"].getString(), joboptions["in_post"].node_type);
+		inputNodes.push_back(node);
+    	command += " --post " + joboptions["in_post"].getString();
+	}
+
+	return error_message;
+}
+
+
+void RelionJob::initialiseSubtomoImportJob()
+{
+        hidden_name = ".gui_subtomo_import";
+
+       	joboptions["do_tomo"] = JobOption("Import tomograms?", true, "Set this to Yes for importing tomogram directories from IMOD.");
+        joboptions["io_tomos"] = JobOption("Append to tomograms set: ", NODE_SUBTOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "The imported tomograms will be output into this tomogram set. If any tomograms were already in this tomogram set, then the newly imported ones will be added to those.");
+        joboptions["in_star"] = JobOption("STAR file with tomograms: ", "", "Input file (*.star)", ".", "Provide a STAR file with the following information to input tomograms: \n \n TODO TODO TODO ");
+    	joboptions["angpix"] = JobOption("Pixel size (Angstrom):", (std::string)"", "Pixel size in Angstroms. If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
+    	joboptions["kV"] = JobOption("Voltage (kV):", (std::string)"", "Voltage the microscope was operated on (in kV; default=300). If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
+    	joboptions["Cs"] = JobOption("Spherical aberration (mm):", (std::string)"", "Spherical aberration of the microscope used to collect these images (in mm; default=2.7). Typical values are 2.7 (FEI Titan & Talos, most JEOL CRYO-ARM), 2.0 (FEI Polara), 1.4 (some JEOL CRYO-ARM) and 0.01 (microscopes with a Cs corrector). If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
+    	joboptions["Q0"] = JobOption("Amplitude contrast:", (std::string)"", "Fraction of amplitude contrast (default=0.1). Often values around 10% work better than theoretically more accurate lower values.  If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
+    	joboptions["dose"] = JobOption("Frame dose:", (std::string)"", "Electron dose (in e/A^2) per frame (image) in the tilt series.  If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
+    	joboptions["order_list"] = JobOption("Ordered list:", (std::string)"", "A 2-column, comma-separated file with the frame-order list of the tilt series, where the first column is the frame (image) number (starting at 1) and the second column is the tilt angle (in degrees). If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
+    	joboptions["do_flipYZ"] = JobOption("Flip YZ?", true, "Set this to Yes if you want to interchange the Y and Z coordinates.  If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
+    	joboptions["do_flipZ"] = JobOption("Flip Z?", true, "Set this to Yes if you want to change the sign of the Z coordinates.  If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
+    	joboptions["hand"] = JobOption("Tilt handedness:", (std::string)"", "Set this to indicate the handedness of the tilt geometry (default=-1). The value of this parameter is either +1 or -1, and it describes whether the focus increases or decreases as a function of Z distance. It has to be determined experimentally. In our experiments, it has always been -1. Y If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
+
+    	joboptions["do_other"] = JobOption("Import other node types?", false, "Set this to Yes  if you plan to import anything else than movies or micrographs");
+
+    	joboptions["fn_in_other"] = JobOption("Input file:", "ref.mrc", "Input file (*.*)", ".", "Select any file(s) to import. \n \n \
+    Note that for importing coordinate files, one has to give a Linux wildcard, where the *-symbol is before the coordinate-file suffix, e.g. if the micrographs are called mic1.mrc and the coordinate files mic1.box or mic1_autopick.star, one HAS to give '*.box' or '*_autopick.star', respectively.\n \n \
+    Also note that micrographs, movies and coordinate files all need to be in the same directory (with the same rootnames, e.g.mic1 in the example above) in order to be imported correctly. 3D masks or references can be imported from anywhere. \n \n \
+    Note that movie-particle STAR files cannot be imported from a previous version of RELION, as the way movies are handled has changed in RELION-2.0. \n \n \
+    For the import of a particle, 2D references or micrograph STAR file or of a 3D reference or mask, only a single file can be imported at a time. \n \n \
+    Note that due to a bug in a fltk library, you cannot import from directories that contain a substring  of the current directory, e.g. dont important from /home/betagal if your current directory is called /home/betagal_r2. In this case, just change one of the directory names.");
+
+    	joboptions["node_type"] = JobOption("Node type:", job_nodetype_options_tomo, 0, "Select the type of Node this is.");
+    	joboptions["optics_group_particles"] = JobOption("Rename optics group for particles:", (std::string)"", "Only for the import of a particles STAR file with a single, or no, optics groups defined: rename the optics group for the imported particles to this string.");
+
+
+
+}
+
+bool RelionJob::getCommandsSubtomoImportJob(std::string &outputname, std::vector<std::string> &commands,
+                std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
+{
+
+	commands.clear();
+    initialisePipeline(outputname, PROC_SUBTOMO_IMPORT_LABEL, job_counter);
+    std::string command;
+
+	// Some code here was copied from the SPA import job...
+    bool do_tomo = joboptions["do_tomo"].getBoolean();
+	bool do_other = joboptions["do_other"].getBoolean();
+
+	if (do_tomo && do_other)
+	{
+		error_message = "ERROR: you cannot import BOTH raw tomograms AND other node types at the same time...";
+		return false;
+	}
+	if ((!do_tomo) && (!do_other))
+	{
+		error_message = "ERROR: nothing to do... ";
+		return false;
+	}
+
+	if (do_tomo)
+	{
+
+		if (joboptions["in_star"].getString() == "")
+		{
+			error_message = "ERROR: you need to provide an input STAR file with information about the tomograms to be imported";
+			return false;
+		}
+
+		// TODO: insert call to relion_tomo_add_tomos here
+		command = "relion_tomo_add_tomos ";
+
+		command += " --i " + joboptions["in_star"].getString();
+		// TODO: separate input and output!!! command += " --io " + joboptions["io_tomos"].getString();
+		command += " --io " + outputname+"tomograms.star";
+
+		Node node(outputname+"tomograms.star", NODE_SUBTOMO_TOMOGRAMS);
+		outputNodes.push_back(node);
+
+		if (joboptions["angpix"].getString() != "") command += " --angpix " + joboptions["angpix"].getString();
+		if (joboptions["kV"].getString() != "") command += " --voltage " + joboptions["kV"].getString();
+		if (joboptions["Cs"].getString() != "") command += " --Cs " + joboptions["Cs"].getString();
+		if (joboptions["Q0"].getString() != "") command += " --Q0 " + joboptions["Q0"].getString();
+		if (joboptions["dose"].getString() != "") command += " --fd " + joboptions["dose"].getString();
+		if (joboptions["order_list"].getString() != "") command += " --ol " + joboptions["order_list"].getString();
+		if (joboptions["do_flipYZ"].getBoolean()) command += " --flipYZ ";
+		if (joboptions["do_flipZ"].getBoolean()) command += " --flipZ ";
+		if (joboptions["hand"].getString() != "") command += " --hand " + joboptions["hand"].getString();
+
+
+	}
+	else if (do_other)
+	{
+		FileName fn_out, fn_in;
+		command = "relion_import ";
+
+		fn_in = joboptions["fn_in_other"].getString();
+		std::string node_type = joboptions["node_type"].getString();
+
+		fn_out = "/" + fn_in;
+		fn_out = fn_out.afterLastOf("/");
+
+		int mynodetype;
+		if (node_type == "Particles STAR file (.star)")
+			mynodetype = NODE_PART_DATA;
+		else if (node_type == "Multiple (2D or 3D) references (.star or .mrcs)")
+			mynodetype = NODE_REFS;
+		else if (node_type == "3D reference (.mrc)")
+			mynodetype = NODE_3DREF;
+		else if (node_type == "3D mask (.mrc)")
+			mynodetype = NODE_MASK;
+		else if (node_type == "Unfiltered half-map (unfil.mrc)")
+			mynodetype = NODE_HALFMAP;
+		else
+		{
+			error_message = "Unrecognized menu option for node_type = " + node_type;
+			return false;
+		}
+
+		Node node(outputname + fn_out, mynodetype);
+		outputNodes.push_back(node);
+
+		// Also get the other half-map
+		if (mynodetype == NODE_HALFMAP)
+		{
+			FileName fn_inb = "/" + fn_in;
+			size_t pos = fn_inb.find("half1");
+			if (pos != std::string::npos)
+			{
+				fn_inb.replace(pos, 5, "half2");
+			}
+			else
+			{
+				pos = fn_inb.find("half2");
+				if (pos != std::string::npos)
+				{
+					fn_inb.replace(pos, 5, "half1");
+				}
+			}
+			fn_inb = fn_inb.afterLastOf("/");
+			Node node2(outputname + fn_inb, mynodetype);
+			outputNodes.push_back(node2);
+			command += " --do_halfmaps";
+		}
+		else if (mynodetype == NODE_PART_DATA)
+		{
+			command += " --do_particles";
+			FileName optics_group = joboptions["optics_group_particles"].getString();
+			if (optics_group != "")
+			{
+				if (!optics_group.validateCharactersStrict())
+				{
+					error_message = "ERROR: an optics group name may contain only numbers, alphabets and hyphen(-).";
+					return false;
+				}
+				command += " --particles_optics_group_name \"" + optics_group + "\"";
+			}
+		}
+		else
+		{
+			command += " --do_other";
+		}
+
+		// Now finish the command call to relion_import program, which does the actual copying
+		command += " --i \"" + fn_in + "\"";
+		command += " --odir " + outputname;
+		command += " --ofile " + fn_out;
+
+	}
+
+
+    // Other arguments for extraction
+    command += " " + joboptions["other_args"].getString();
+    commands.push_back(command);
+
+    return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
+
+}
+
+void RelionJob::initialiseSubtomoReconstructJob()
+{
+
+	hidden_name = ".gui_subtomo_reconstruct";
+
+	addSubtomoInputOptions(true, true, true, false, false);
+
+	joboptions["box_size"] = JobOption("Box size (pix):", 128, 32, 512, 16, "The initial box size of the reconstruction. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
+	joboptions["crop_size"] = JobOption("Cropped box size (pix):", -1, -1, 512, 16, "If set to a positive value, after construction, the resulting pseudo subtomograms are cropped to this size. A smaller box size allows the (generally expensive) refinement using relion_refine to proceed more rapidly.");
+	joboptions["binning"] = JobOption("Binning factor:", 1, 1, 16, 1, "The tilt series images will be binned by this (real-valued) factor and then reconstructed in the specified box size above. Note that thereby the reconstructed region becomes larger when specifying binning factors larger than one.");
+
+	joboptions["do_cone_weight"] = JobOption("Use cone weight?", true, "If set to Yes, then downweight a cone in Fourier space along the Z axis (as defined by the coordinate system of the particle). This is useful for particles embedded in a membrane, as it can prevent the alignment from being driven by the membrane signal (the signal of a planar membrane is localised within one line in 3D Fourier space). Note that the coordinate system of a particle is given by both the subtomogram orientation (if defined) and the particle orientation (see particle set). This allows the user to first obtain a membrane-driven alignment, and to then specifically suppress the signal in that direction.");
+	joboptions["cone_angle"] = JobOption("Cone angle:", 10, 1, 50, 1, "The (full) opening angle of the cone to be suppressed, given in degrees. This angle should include both the uncertainty about the membrane orientation and its variation across the region represented in the subtomogram.");
+
+}
+
+
+
+bool RelionJob::getCommandsSubtomoReconstructJob(std::string &outputname, std::vector<std::string> &commands,
+                std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
+{
+	commands.clear();
+	initialisePipeline(outputname, PROC_SUBTOMO_RECONSTRUCT_LABEL, job_counter);
+	std::string command;
+
+	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
+		command="`which relion_tomo_subtomo_mpi`";
+	else
+		command="`which relion_tomo_subtomo`";
+	if (error_message != "") return false;
+
+	// I/O
+	error_message = getSubtomoInputCommmand(command, true, true, true, false, false);
+	if (error_message != "") return false;
+
+	command += " --o " + outputname;
+
+	Node node1(outputname+"optimisation_set.star", NODE_SUBTOMO_OPTIMISATION);
+	outputNodes.push_back(node1);
+	Node node2(outputname+"particles.star", NODE_PART_DATA);
+	outputNodes.push_back(node2);
+
+	// Job-specific stuff goes here
+
+	command += " --b " + joboptions["box_size"].getString();
+
+	int crop_size = joboptions["crop_size"].getNumber(error_message);
+    if (error_message != "") return false;
+    if (crop_size > 0.) command += " --crop " + joboptions["crop_size"].getString();
+
+    command += " --bin " + joboptions["binning"].getString();
+
+    if (joboptions["do_cone_weight"].getBoolean())
+    {
+    	command += " --cone_weight --cone_angle " + joboptions["cone_angle"].getString();
+    }
+
+	// Running stuff
+	command += " --j " + joboptions["nr_threads"].getString();
+
+	// Other arguments for extraction
+	command += " " + joboptions["other_args"].getString();
+	commands.push_back(command);
+
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
+}
+
+
+void RelionJob::initialiseSubtomoCtfRefineJob()
+{
+        hidden_name = ".gui_subtomo_ctfrefine";
+
+        addSubtomoInputOptions(true, true, true, false, true);
+
+    	joboptions["box_size"] = JobOption("Box size for estimation (pix):", 128, 32, 512, 16, "Box size to be used for the estimation. Note that this can be larger than the box size of the reference map. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
+    	joboptions["do_defocus"] = JobOption("Refine defocus?", true, "If set to Yes, then estimate the defoci of the individual tilt images.");
+    	joboptions["focus_range"] = JobOption("Defocus search range (A):", 3000, 0, 10000, 500, "Defocus search range (in A). This search range will be defualt be samples 100 times. Use the additional argument --ds to change the number of sampling points.");
+    	std::cerr << "TODO: finish help texts here!!" << std::endl;
+    	joboptions["lambda"] = JobOption("Defocus regularisation:", 0.1, 0, 1, 0.05, "Defocus regularisation scale.");
+
+    	//joboptions["do_astigmatism"] = JobOption("Refine astigmatism?", false, "If set to Yes, then refine the astigmatism. If set to No, then only a scalar defocus value will be estimated. The latter is useful if the number of particles is too small to allow for accurate astigmatism estimation. If defocus refinement is unstable in general (i.e. because of very few particles per tomogram), then do not use this program.");
+
+    	joboptions["do_scale"] = JobOption("Refine contrast scale?", true, "If set to Yes, then estimate contrast scale factor.");
+    	joboptions["do_frame_scale"] = JobOption("Refine scale per form?", true, "If set to Yes, then estimate contrast scale factor.");
+    	joboptions["do_tomo_scale"] = JobOption("Refine scale per tomogram?", false, "If set to Yes, then estimate contrast scale factor.");
+
+    	joboptions["do_even_aberr"] = JobOption("Refine even aberrations?", true, "If set to Yes, then estimates the even higher-order aberrations.");
+    	joboptions["nr_even_aberr"] = JobOption("Order of even aberrations:", 4, 4, 8, 2, "The maximum order for the even aberrations to be estimated.");
+    	joboptions["do_odd_aberr"] = JobOption("Refine odd aberrations?", true, "If set to Yes, then estimates the odd higher-order aberrations.");
+    	joboptions["nr_odd_aberr"] = JobOption("Order of odd aberrations:", 3, 3, 7, 2, "The maximum order for the odd aberrations to be estimated.");
+
+}
+
+bool RelionJob::getCommandsSubtomoCtfRefineJob(std::string &outputname, std::vector<std::string> &commands,
+                std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
+{
+
+	commands.clear();
+    initialisePipeline(outputname, PROC_SUBTOMO_CTFREFINE_LABEL, job_counter);
+    std::string command;
+
+    if (joboptions["nr_mpi"].getNumber(error_message) > 1)
+            command="`which relion_tomo_ctf_refine_mpi`";
+    else
+            command="`which relion_tomo_ctf_refine`";
+    if (error_message != "") return false;
+
+    // I/O
+    error_message = getSubtomoInputCommmand(command, true, true, true, false, true);
+	if (error_message != "") return false;
+
+	command += " --o " + outputname;
+
+	Node node1(outputname+"optimisation_set.star", NODE_SUBTOMO_OPTIMISATION);
+	outputNodes.push_back(node1);
+	Node node2(outputname+"tomograms.star", NODE_SUBTOMO_TOMOGRAMS);
+	outputNodes.push_back(node2);
+
+	// Job-specific stuff goes here
+
+	command += " --b " + joboptions["box_size"].getString();
+
+	if (joboptions["do_defocus"].getBoolean())
+	{
+		command += " --do_defocus";
+		command += " --d0 -" + joboptions["focus_range"].getString();
+		command += " --d1 " + joboptions["focus_range"].getString();
+		command += " --lambda " + joboptions["lambda"].getString();
+	}
+
+	if (joboptions["do_scale"].getBoolean())
+	{
+		command += " --do_scale";
+		if (joboptions["do_frame_scale"].getBoolean() && joboptions["do_tomo_scale"].getBoolean())
+		{
+			error_message = "ERROR: per-tomogram scale estimation and per-frame scale estimation are mutually exclusive";
+			return false;
+		}
+		if (joboptions["do_frame_scale"].getBoolean()) command += " --per_frame_scale";
+		if (joboptions["do_tomo_scale"].getBoolean()) command += " --per_tomo_scale";
+
+	}
+
+	if (joboptions["do_even_aberr"].getBoolean())
+	{
+		command += " --do_even_aberrations --ne " + joboptions["nr_even_aberr"].getString();
+	}
+
+	if (joboptions["do_odd_aberr"].getBoolean())
+	{
+		command += " --do_odd_aberrations --no " + joboptions["nr_odd_aberr"].getString();
+	}
+
+	// Running stuff
+    command += " --j " + joboptions["nr_threads"].getString();
+
+    // Other arguments for extraction
+    command += " " + joboptions["other_args"].getString();
+    commands.push_back(command);
+
+    return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
+
+}
+
+void RelionJob::initialiseSubtomoPolishJob()
+{
+        hidden_name = ".gui_subtomo_polish";
+
+        addSubtomoInputOptions(true, true, true, false, true);
+
+    	joboptions["box_size"] = JobOption("Box size for estimation (pix):", 128, 32, 512, 16, "Box size to be used for the estimation. Note that this can be larger than the box size of the reference map. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
+    	joboptions["max_error"] = JobOption("Max position error (pix):", 5, 0, 64, 1, "maximal assumed error in the initial 2D particle-positions (distances between the projected 3D positions and their true positions in the images), given in pixels.");
+
+    	joboptions["do_polish"] = JobOption("Fit per-particle motion?", false, "If set to Yes, then the subtomogram version of Bayesian polishing will be used to fit per-particle (3D) motion tracks, besides the rigid part of the motion in the tilt series.");
+    	joboptions["sigma_vel"] = JobOption("Sigma for velocity (A/dose): ", 0.2, 1., 10., 0.1, "The expected amount of motion (i.e. the std. deviation of particle positions in Angstroms after 1 electron per A^2 of radiation)");
+    	joboptions["sigma_div"] = JobOption("Sigma for divergence (A): ", 5000, 0, 10000, 10000, "The expected spatial smoothness of the particle trajectories in A (a greater value means spatially smoother motion");
+    	joboptions["do_sq_exp_ker"] = JobOption("Use Gaussian decay?", true, "If set to Yes, then assume that the correlation of the velocities of two particles decays as a Gaussian over their distance, instead of as an exponential. This will produce spatially smoother motion and result in a shorter program runtime.");
+
+}
+
+bool RelionJob::getCommandsSubtomoPolishJob(std::string &outputname, std::vector<std::string> &commands,
+                std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
+{
+
+	commands.clear();
+    initialisePipeline(outputname, PROC_SUBTOMO_POLISH_LABEL, job_counter);
+    std::string command;
+
+    if (joboptions["do_polish"].getBoolean())
+    {
+        if (joboptions["nr_mpi"].getNumber(error_message) > 1)
+                command="`which relion_tomo_polish_mpi`";
+        else
+                command="`which relion_tomo_polish`";
+        if (error_message != "") return false;
+    }
+    else
+    {
+        if (joboptions["nr_mpi"].getNumber(error_message) > 1)
+                command="`which relion_tomo_align_frames_mpi`";
+        else
+                command="`which relion_tomo_align_frames`";
+        if (error_message != "") return false;
+    }
+
+	// I/O
+    error_message = getSubtomoInputCommmand(command, true, true, true, false, true);
+	if (error_message != "") return false;
+
+	command += " --o " + outputname;
+
+	Node node1(outputname+"optimisation_set.star", NODE_SUBTOMO_OPTIMISATION);
+	outputNodes.push_back(node1);
+	Node node2(outputname+"tomograms.star", NODE_SUBTOMO_TOMOGRAMS);
+	outputNodes.push_back(node2);
+	Node node3(outputname+"particles.star", NODE_PART_DATA);
+	outputNodes.push_back(node3);
+    if (joboptions["do_polish"].getBoolean())
+	{
+		Node node4(outputname+"motion.star", NODE_SUBTOMO_TRAJECTORIES);
+		outputNodes.push_back(node4);
+	}
+
+	// Job-specific stuff goes here
+	command += " --b " + joboptions["box_size"].getString();
+	command += " --r " + joboptions["max_error"].getString();
+
+    if (joboptions["do_polish"].getBoolean())
+	{
+    	command += " --s_vel " + joboptions["sigma_vel"].getString();
+    	command += " --s_div " + joboptions["sigma_div"].getString();
+    	if (joboptions["do_sq_exp_ker"].getBoolean())
+    	{
+    		command += " --sq_exp_ker";
+    	}
+	}
+
+
+	// Running stuff
+    command += " --j " + joboptions["nr_threads"].getString();
+
+    // Other arguments for extraction
+    command += " " + joboptions["other_args"].getString();
+    commands.push_back(command);
+
+    return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
+
+}
+
+void RelionJob::initialiseSubtomoAverageJob()
+{
+	hidden_name = ".gui_subtomo_average";
+
+	addSubtomoInputOptions(true, true, true, false, false);
+
+   	joboptions["do_from2d"] = JobOption("Average from 2D tilt series?", true, "If set to Yes, then relion_tomo_reconstruct_particle is used, with the options below, to calculate the new average from the original 2D tilt series images. This yields the best results. If set to No, then relion_reconstruct is used to calculate the average of the 3D subtomogram images in the particle set on the I/O tab. This is quicker, but gives worse results.");
+	joboptions["box_size"] = JobOption("Box size (pix):", 128, 32, 512, 16, "Box size of the reconstruction. Note that this is independent of the box size that has been used to refine the particle. This allows the user to construct a 3D map of arbitrary size to gain an overview of the structure surrounding the particle. A sufficiently large box size also allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
+	joboptions["crop_size"] = JobOption("Cropped box size (pix):", -1, -1, 512, 16, "If set to a positive value, the program will output an additional set of maps that have been cropped to this size. This is useful if a map is desired that is smaller than the box size required to retrieve the CTF-delocalised signal.");
+	joboptions["binning"] = JobOption("Binning factor:", 1, 1, 16, 1, "The tilt series images will be binned by this (real-valued) factor and then reconstructed in the specified box size above. Note that thereby the reconstructed region becomes larger when specifying binning factors larger than one.");
+	joboptions["snr"] = JobOption("Wiener SNR constant:", 0, 0, 0.0001, 0.00001, "If set to a positive value, apply a Wiener filter with this signal-to-noise ratio. If omitted, the reconstruction will use a heuristic to prevent divisions by excessively small numbers. Please note that using a low (even though realistic) SNR might wash out the higher frequencies, which could make the map unsuitable to be used for further refinement.");
+	joboptions["sym_name"] = JobOption("Symmetry:", std::string("C1"), "If the molecule is asymmetric, \
+set Symmetry group to C1. Note their are multiple possibilities for icosahedral symmetry: \n \
+* I1: No-Crowther 222 (standard in Heymann, Chagoyen & Belnap, JSB, 151 (2005) 196–207) \n \
+* I2: Crowther 222 \n \
+* I3: 52-setting (as used in SPIDER?)\n \
+* I4: A different 52 setting \n \
+The command 'relion_refine --sym D2 --print_symmetry_ops' prints a list of all symmetry operators for symmetry group D2. \
+RELION uses XMIPP's libraries for symmetry operations. \
+Therefore, look at the XMIPP Wiki for more details:  http://xmipp.cnb.csic.es/twiki/bin/view/Xmipp/WebHome?topic=Symmetry");
+
+}
+
+bool RelionJob::getCommandsSubtomoAverageJob(std::string &outputname, std::vector<std::string> &commands,
+                std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
+{
+
+	commands.clear();
+    initialisePipeline(outputname, PROC_SUBTOMO_AVERAGE_LABEL, job_counter);
+    std::string command;
+
+    if (joboptions["do_from2d"].getBoolean())
+    {
+		if (joboptions["nr_mpi"].getNumber(error_message) > 1)
+			command="`which relion_tomo_reconstruct_particle_mpi`";
+		else
+			command="`which relion_tomo_reconstruct_particle`";
+		if (error_message != "") return false;
+
+		// I/O
+		error_message = getSubtomoInputCommmand(command, true, true, true, false, false);
+		if (error_message != "") return false;
+
+		command += " --o " + outputname;
+
+		Node node1(outputname+"merged.mrc", NODE_3DREF);
+		outputNodes.push_back(node1);
+		Node node2(outputname+"half1.mrc", NODE_HALFMAP);
+		outputNodes.push_back(node2);
+
+		// Job-specific stuff goes here
+		command += " --b " + joboptions["box_size"].getString();
+
+		int crop_size = joboptions["crop_size"].getNumber(error_message);
+		if (error_message != "") return false;
+		if (crop_size > 0.) command += " --crop " + joboptions["crop_size"].getString();
+
+		command += " --bin " + joboptions["binning"].getString();
+
+		float SNR = joboptions["snr"].getNumber(error_message);
+		if (error_message != "") return false;
+		if (SNR > 0.) command += " --SNR " + joboptions["snr"].getString();
+
+    }
+    else
+    {
+		if (joboptions["in_particles"].getString() == "")
+		{
+			error_message = "ERROR: when not reconstructing from the 2D tilt series images, you need to provide a particle set on the I/O tab.";
+			return false;
+		}
+
+		if (joboptions["nr_mpi"].getNumber(error_message) > 1)
+			command="`which relion_reconstruct_mpi`";
+		else
+			command="`which relion_reconstruct`";
+		if (error_message != "") return false;
+
+		Node node(joboptions["in_particles"].getString(), joboptions["in_particles"].node_type);
+		inputNodes.push_back(node);
+    	command += " --i " + joboptions["in_particles"].getString();
+
+		Node node1(outputname+"reconstruct.mrc", NODE_3DREF);
+		outputNodes.push_back(node1);
+    	command += " --o " + outputname + "reconstruct.mrc";
+
+    	command += " --ctf --skp_gridding";
+
+    }
+
+	command += " --sym " + joboptions["sym_name"].getString();
+
+	// Running stuff
+	command += " --j " + joboptions["nr_threads"].getString();
+
+	// Other arguments for extraction
+    command += " " + joboptions["other_args"].getString();
+    commands.push_back(command);
+
+    return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
+
+}
+

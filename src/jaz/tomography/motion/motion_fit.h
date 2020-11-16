@@ -10,7 +10,7 @@
 
 class CTF;
 
-class MotionFit : public DifferentiableOptimization
+class MotionFit : public FastDifferentiableOptimization
 {
 	public:
 		
@@ -26,8 +26,8 @@ class MotionFit : public DifferentiableOptimization
 		{
 				double sig_vel, sig_div;
 		};
-		
-		
+
+
 		MotionFit(
 				const std::vector<BufferedImage<double>>& CCs,
 				const std::vector<gravis::d4Matrix>& frameProj, 
@@ -40,6 +40,7 @@ class MotionFit : public DifferentiableOptimization
 				double frameDose,
 				double pixelSize,
 				double paddingFactor,
+				int progressBarOffset,
 				int num_threads);
 		
 		
@@ -54,7 +55,7 @@ class MotionFit : public DifferentiableOptimization
 			
 			gravis::d3Vector tomoCentre;
 			double frameDose, pixelSize, paddingFactor;
-			int num_threads;
+			int progressBarOffset, num_threads;
 			
 			int fc, pc, bc, maxRange;	
 			
@@ -67,25 +68,25 @@ class MotionFit : public DifferentiableOptimization
 			
 			
 			
-		double f(const std::vector<double>& x, void* tempStorage) const;	
+		double f(const std::vector<double>& x, void* tempStorage) const;
 		void grad(const std::vector<double>& x, std::vector<double>& gradDest, void* tempStorage) const;
+		double gradAndValue(const std::vector<double>& x, std::vector<double>& gradDest) const;
 				
 		std::vector<gravis::d4Matrix> getProjections(
 				const std::vector<double>& x,
 				const std::vector<int>& frameSequence) const;	
 		
-		void shiftParticles(
-				const std::vector<double>& x,
-				ParticleSet& target) const;
+		std::vector<gravis::d3Vector> getParticlePositions(
+				const std::vector<double>& x) const;
 		
 		Trajectory getTrajectory(
 				const std::vector<double>& x, 
 				int p, 
 				const std::vector<int>& frameSequence) const;
 		
-		void exportTrajectories(
+		std::vector<Trajectory> exportTrajectories(
 				const std::vector<double>& x, 
-				ParticleSet& dataSet,
+				const ParticleSet& dataSet,
 				const std::vector<int>& frameSequence) const;
 		
 		int getParamCount();
@@ -175,9 +176,6 @@ class MotionFit : public DifferentiableOptimization
 			
 			return out;
 		}
-				
-			   
-			   
 };
 
 #endif

@@ -360,6 +360,7 @@ enum EMDLabel
 	EMDL_OPTIMISER_FAST_SUBSETS,
 	EMDL_OPTIMISER_SGD_INI_FRAC,
 	EMDL_OPTIMISER_SGD_FIN_FRAC,
+	EMDL_OPTIMISER_SGD_MIN_RESOL,
 	EMDL_OPTIMISER_SGD_INI_RESOL,
 	EMDL_OPTIMISER_SGD_FIN_RESOL,
 	EMDL_OPTIMISER_SGD_INI_SUBSET_SIZE,
@@ -634,6 +635,9 @@ enum EMDLabel
 	EMDL_TOMO_ICE_NORMAL_X,
 	EMDL_TOMO_ICE_NORMAL_Y,
 	EMDL_TOMO_ICE_NORMAL_Z,
+
+	EMDL_TOMO_TEMP_PRED_TIMES_OBS,
+	EMDL_TOMO_TEMP_PRED_SQUARED,
 
 	EMDL_TOMO_PARTICLE_ID,       // (deprecated, use EMDL_TOMO_PARTICLE_NAME instead)
 	EMDL_TOMO_PICK_PARTICLE_ID,  // (deprecated, use EMDL_TOMO_PARTICLE_NAME instead)
@@ -1019,6 +1023,7 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_FAST_SUBSETS, EMDL_BOOL, "rlnDoFastSubsetOptimisation", "Use subsets of the data in the earlier iterations to speed up convergence");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_INI_FRAC, EMDL_DOUBLE, "rlnSgdInitialIterationsFraction", "Fraction of initial gradient iterations (at rlnSgdInitialResolution and with rlnSgdInitialSubsetSize)");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_FIN_FRAC, EMDL_DOUBLE, "rlnSgdFinalIterationsFraction", "fraction of final gradient iterations (at rlnSgdFinalResolution and with rlnSgdFinalSubsetSize)");
+		EMDL::addLabel(EMDL_OPTIMISER_SGD_MIN_RESOL, EMDL_DOUBLE, "rlnSgdMinimumResolution", "Adjust under-estimated signal power in gradient optimization to this resolution.");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_INI_RESOL, EMDL_DOUBLE, "rlnSgdInitialResolution", "Resolution (in A) to use during the initial SGD iterations");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_FIN_RESOL, EMDL_DOUBLE, "rlnSgdFinalResolution", "Resolution (in A) to use during the final SGD iterations");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_INI_SUBSET_SIZE, EMDL_INT, "rlnSgdInitialSubsetSize", "Number of particles in a mini-batch (subset) during the initial SGD iterations");
@@ -1297,6 +1302,10 @@ private:
 		EMDL::addLabel(EMDL_TOMO_ICE_NORMAL_X, EMDL_DOUBLE, "rlnTomoIceNormalX", "X component of the estimated ice normal");
 		EMDL::addLabel(EMDL_TOMO_ICE_NORMAL_Y, EMDL_DOUBLE, "rlnTomoIceNormalY", "Y component of the estimated ice normal");
 		EMDL::addLabel(EMDL_TOMO_ICE_NORMAL_Z, EMDL_DOUBLE, "rlnTomoIceNormalZ", "Z component of the estimated ice normal");
+
+		EMDL::addLabel(EMDL_TOMO_TEMP_PRED_TIMES_OBS, EMDL_DOUBLE, "rlnTomoTempPredTimesObs", "Sum over products of predicted and observed values");
+		EMDL::addLabel(EMDL_TOMO_TEMP_PRED_SQUARED, EMDL_DOUBLE, "rlnTomoTempPredSquared", "Sum over squares of predicted values");
+
 
 		EMDL::addLabel(EMDL_TOMO_PARTICLE_ID, EMDL_INT, "rlnTomoParticleId", "Particle index");
 		EMDL::addLabel(EMDL_TOMO_PICK_PARTICLE_ID, EMDL_INT, "rlnTomoPickParticleId", "Virus Particle index");

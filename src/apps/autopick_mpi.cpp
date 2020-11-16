@@ -30,10 +30,10 @@ int main(int argc, char *argv[])
 	{
 		prm.read(argc, argv);
 
-		prm.initialise();
+		prm.initialise(prm.getRank());
 
 #ifdef _CUDA_ENABLED
-		if (prm.do_gpu)
+		if (prm.do_gpu && !(prm.do_topaz_train || prm.do_topaz_extract) )
 		{
 			std::stringstream didSs;
 			didSs << "APr" << prm.getRank();
@@ -45,11 +45,17 @@ int main(int argc, char *argv[])
 		else
 #endif
 		{
-			prm.run();
+			if (prm.do_topaz_train)
+			{
+				// only master trains!
+				if (prm.getRank() == 0) prm.trainTopaz();
+				else std::cerr << " WARNNG: rank " << prm.getRank() << " is doing nothing in training as it hasn't been parallelised ..." << std::endl;
+			}
+			else prm.run();
 		}
 
 		MPI_Barrier(MPI_COMM_WORLD);
-		if (prm.getRank() == 0)
+		if (prm.getRank() == 0 && !prm.do_topaz_train)
 			prm.generatePDFLogfile();
 	}
 

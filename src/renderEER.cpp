@@ -14,14 +14,14 @@
 
 //#define TIMING
 #ifdef TIMING
-	#define RCTIC(label) (timer.tic(label))
-	#define RCTOC(label) (timer.toc(label))
+	#define RCTIC(label) (EERtimer.tic(label))
+	#define RCTOC(label) (EERtimer.toc(label))
 
-	Timer timer;
-	int TIMING_READ_EER = timer.setNew("read EER");
-	int TIMING_BUILD_INDEX = timer.setNew("build index");
-	int TIMING_UNPACK_RLE = timer.setNew("unpack RLE");
-	int TIMING_RENDER_ELECTRONS = timer.setNew("render electrons");
+	Timer EERtimer;
+	int TIMING_READ_EER = EERtimer.setNew("read EER");
+	int TIMING_BUILD_INDEX = EERtimer.setNew("build index");
+	int TIMING_UNPACK_RLE = EERtimer.setNew("unpack RLE");
+	int TIMING_RENDER_ELECTRONS = EERtimer.setNew("render electrons");
 #else
 	#define RCTIC(label)
 	#define RCTOC(label)
@@ -179,7 +179,8 @@ void EERRenderer::readLegacy(FILE *fh)
 	buf = (unsigned char*)malloc(file_size);
 	if (buf == NULL)
 		REPORT_ERROR("Failed to allocate the buffer.");
-	fread(buf, sizeof(char), file_size, fh);
+	if (fread(buf, sizeof(char), file_size, fh) != file_size)
+		REPORT_ERROR("Failed to read the EER file.");
 	RCTOC(TIMING_READ_EER);
 
 	/* Build frame index */
@@ -446,7 +447,7 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 #endif
 
 #ifdef TIMING
-	timer.printTimes(false);
+	EERtimer.printTimes(false);
 #endif
 
 	return total_n_electron;

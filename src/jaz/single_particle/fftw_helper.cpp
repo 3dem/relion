@@ -25,25 +25,40 @@ void FftwHelper::decenterUnflip2D(const MultidimArray<RFLOAT> &src, MultidimArra
     const long int w = src.xdim;
     const long int h = src.ydim;
 
-    dest.reshape(h, 2*(w - 1));
+    if (h != 2 * (w - 1))
+    {
+        std::cerr << "w = " << w << " h = " << h << std::endl;
+        REPORT_ERROR("FftwHelper::decenterUnflip2D: illegal input size");
+    }
+    dest.reshape(h, h);
 
-    const long int yc = dest.ydim/2;
+    const long int origin = w - 1;
+    const long int nyquist = origin;
 
     for (long int y = 0; y < dest.ydim; y++)
     for (long int x = 0; x < dest.xdim; x++)
     {
-        long int xs = x - w;
+        // Logical coordinates of destination
+        long int xl = x - origin;
+        long int yl = y - origin;
+        int sign = 1;
 
-        if (xs < 0)
+        if (xl < 0)
         {
-            long int ys = (y + yc - 1) % dest.ydim;
-            DIRECT_A2D_ELEM(dest, y, x) = -DIRECT_A2D_ELEM(src, h-ys-1, -xs-1);
+            sign = -1;
+            xl = -xl;
+            yl = -yl;
         }
-        else
-        {
-            long int ys = (y + yc) % dest.ydim;
-            DIRECT_A2D_ELEM(dest, y, x) =  DIRECT_A2D_ELEM(src, ys, xs);
-        }
+
+	// Cannot trust Nyquist
+        if (xl == nyquist)
+            xl--;
+        if (yl == nyquist)
+            yl--;
+        if (xl == -nyquist)
+            yl++;
+
+        DIRECT_A2D_ELEM(dest, y, x) = sign * DIRECT_A2D_ELEM(src, (yl + h) % h, xl); 
     }
 }
 
@@ -52,24 +67,37 @@ void FftwHelper::decenterDouble2D(const MultidimArray<RFLOAT> &src, MultidimArra
     const long int w = src.xdim;
     const long int h = src.ydim;
 
-    dest.reshape(h, 2*(w - 1));
+    if (h != 2 * (w - 1))
+    {
+        std::cerr << "w = " << w << " h = " << h << std::endl;
+        REPORT_ERROR("FftwHelper::decenterDouble2D: illegal input size");
+    }
+    dest.reshape(h, h);
 
-    const long int yc = dest.ydim/2;
+    const long int origin = w - 1;
+    const long int nyquist = origin;
 
     for (long int y = 0; y < dest.ydim; y++)
     for (long int x = 0; x < dest.xdim; x++)
     {
-        long int xs = x - w;
+        // Logical coordinates of destination
+        long int xl = x - origin;
+        long int yl = y - origin;
 
-        if (xs < 0)
+        if (xl < 0)
         {
-            long int ys = (y + yc - 1) % dest.ydim;
-            DIRECT_A2D_ELEM(dest, y, x) = DIRECT_A2D_ELEM(src, h-ys-1, -xs-1);
+            xl = -xl;
+            yl = -yl;
         }
-        else
-        {
-            long int ys = (y + yc) % dest.ydim;
-            DIRECT_A2D_ELEM(dest, y, x) =  DIRECT_A2D_ELEM(src, ys, xs+1);
-        }
+
+	// Cannot trust Nyquist
+        if (xl == nyquist)
+            xl--;
+        if (yl == nyquist)
+            yl--;
+        if (xl == -nyquist)
+            yl++;
+
+        DIRECT_A2D_ELEM(dest, y, x) = DIRECT_A2D_ELEM(src, (yl + h) % h, xl); 
     }
 }

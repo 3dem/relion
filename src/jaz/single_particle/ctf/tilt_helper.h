@@ -160,6 +160,7 @@ class TiltHelper
                 const std::vector<double>& coeffs,
                 Image<RFLOAT>* fit);
 
+		// Nyquist X is positive, Y is negative (non-FFTW!!)
 		static std::vector<Image<RFLOAT>> computeOddZernike(
 				int s, double angpix, const Matrix2D<RFLOAT>& mag, int n_max);
 
@@ -199,6 +200,7 @@ class TiltHelper
                 const std::vector<double>& coeffs,
                 Image<RFLOAT>* fit);
 
+		// Nyquist X is positive, Y is negative (non-FFTW!!)
 		static std::vector<Image<RFLOAT>> computeEvenZernike(
 				int s,
 				double angpix, const Matrix2D<RFLOAT>& mag,

@@ -46,11 +46,6 @@
 #define TOGGLE_ALWAYS_DEACTIVATE 2
 #define TOGGLE_LEAVE_ACTIVE 3
 
-#define HAS_MPI true
-#define HAS_NOT_MPI false
-#define HAS_THREAD true
-#define HAS_NOT_THREAD false
-
 #define RADIO_SAMPLING 0
 #define RADIO_NODETYPE 1
 #define RADIO_GAIN_ROTATION 2
@@ -100,9 +95,16 @@ static const std::vector<std::string> job_sampling_options{
 static const std::vector<std::string> job_nodetype_options{
 	"Particle coordinates (*.box, *_pick.star)",
 	"Particles STAR file (.star)",
-	"Movie-particles STAR file (.star)",
-	"2D references (.star or .mrcs)",
+	"Multiple (2D or 3D) references (.star or .mrcs)",
 	"Micrographs STAR file (.star)",
+	"3D reference (.mrc)",
+	"3D mask (.mrc)",
+	"Unfiltered half-map (unfil.mrc)"
+};
+
+static const std::vector<std::string> job_nodetype_options_tomo{
+	"Particles STAR file (.star)",
+	"Multiple (2D or 3D) references (.star or .mrcs)",
 	"3D reference (.mrc)",
 	"3D mask (.mrc)",
 	"Unfiltered half-map (unfil.mrc)"
@@ -160,6 +162,12 @@ static bool do_allow_change_minimum_dedicated;
 #define NODE_POST           14// Postprocess STAR file (with FSC curve, unfil half-maps, masks etc in it: used by Jasenko's programs
 #define NODE_POLISH_PARAMS  15// Txt file with optimal parameters for Bayesian polishing
 
+#define NODE_SUBTOMO_OPTIMISATION 50 // Jasenko's combined optimisation set for subtomogram averaging
+#define NODE_SUBTOMO_TOMOGRAMS    51 // Jasenko's set of tomograms
+#define NODE_SUBTOMO_TRAJECTORIES 52 // Jaseno's definition of subtomogram motion trajectories
+#define NODE_SUBTOMO_MANIFOLDS    53 // Jaseno's definition of 3D shapes (for picking of subtomograms)
+
+
 #define NODE_MOVIES_LABEL   	 "relion.MovieStar"
 #define NODE_MICS_LABEL			 "relion.MicrographStar"
 #define NODE_MIC_COORDS_LABEL	 "relion.CoordinateStar"
@@ -173,6 +181,10 @@ static bool do_allow_change_minimum_dedicated;
 #define NODE_PDF_LOGFILE_LABEL   "relion.PdfLogfile"
 #define NODE_POST_LABEL          "relion.PostprocessStar"
 #define NODE_POLISH_PARAMS_LABEL "relion.PolishParams"
+#define NODE_SUBTOMO_OPTIMISATION_LABEL "relion.SubtomoOptimisationSet"
+#define NODE_SUBTOMO_TOMOGRAMS_LABEL    "relion.SubtomoTomogramSet"
+#define NODE_SUBTOMO_TRAJECTORIES_LABEL "relion.SubtomoTrajectorySet"
+#define NODE_SUBTOMO_MANIFOLDS_LABEL    "relion.SubtomoManifoldSet"
 
 static std::map<int, std::string> node_type2label = {{NODE_MOVIES, NODE_MOVIES_LABEL},
 		{NODE_MICS, NODE_MICS_LABEL},
@@ -188,7 +200,11 @@ static std::map<int, std::string> node_type2label = {{NODE_MOVIES, NODE_MOVIES_L
 		{NODE_RESMAP, NODE_3DREF_LABEL},
 		{NODE_PDF_LOGFILE, NODE_PDF_LOGFILE_LABEL},
 		{NODE_POST, NODE_POST_LABEL},
-		{NODE_POLISH_PARAMS, NODE_POLISH_PARAMS_LABEL}};
+		{NODE_POLISH_PARAMS, NODE_POLISH_PARAMS_LABEL},
+		{NODE_SUBTOMO_OPTIMISATION, NODE_SUBTOMO_OPTIMISATION_LABEL},
+		{NODE_SUBTOMO_TOMOGRAMS, NODE_SUBTOMO_TOMOGRAMS_LABEL},
+		{NODE_SUBTOMO_TRAJECTORIES, NODE_SUBTOMO_TRAJECTORIES_LABEL},
+		{NODE_SUBTOMO_MANIFOLDS, NODE_SUBTOMO_MANIFOLDS_LABEL} };
 
 static std::map<std::string, int> node_label2type = {{NODE_MOVIES_LABEL, NODE_MOVIES},
 		{NODE_MICS_LABEL, NODE_MICS},
@@ -204,7 +220,11 @@ static std::map<std::string, int> node_label2type = {{NODE_MOVIES_LABEL, NODE_MO
 		{NODE_RESMAP_LABEL, NODE_RESMAP},
 		{NODE_PDF_LOGFILE_LABEL, NODE_PDF_LOGFILE},
 		{NODE_POST_LABEL, NODE_POST},
-		{NODE_POLISH_PARAMS_LABEL, NODE_POLISH_PARAMS}};
+		{NODE_POLISH_PARAMS_LABEL, NODE_POLISH_PARAMS},
+		{NODE_SUBTOMO_OPTIMISATION_LABEL, NODE_SUBTOMO_OPTIMISATION},
+		{NODE_SUBTOMO_TOMOGRAMS_LABEL, NODE_SUBTOMO_TOMOGRAMS},
+		{NODE_SUBTOMO_TRAJECTORIES_LABEL, NODE_SUBTOMO_TRAJECTORIES},
+		{NODE_SUBTOMO_MANIFOLDS_LABEL, NODE_SUBTOMO_MANIFOLDS} };
 
 
 
@@ -230,6 +250,11 @@ static std::map<std::string, int> node_label2type = {{NODE_MOVIES_LABEL, NODE_MO
 #define PROC_MULTIBODY_LABEL	 "MultiBody"    // Multi-body refinement
 #define PROC_MOTIONREFINE_LABEL  "Polish"       // Jasenko's motion fitting program for Bayesian polishing (to replace MovieRefine?)
 #define PROC_CTFREFINE_LABEL     "CtfRefine"    // Jasenko's program for defocus and beamtilt optimisation
+#define PROC_SUBTOMO_IMPORT_LABEL      "SubtomoImport"      // Import for tomography GUI
+#define PROC_SUBTOMO_RECONSTRUCT_LABEL "SubtomoReconstruct" // Creation of subtomograms from tilt series images
+#define PROC_SUBTOMO_CTFREFINE_LABEL   "SubtomoCtfRefine"   // CTF refinement (defocus & aberrations) for subtomograms
+#define PROC_SUBTOMO_POLISH_LABEL      "SubtomoPolish"      // Frame alignment and particle polishing for subtomograms
+#define PROC_SUBTOMO_AVERAGE_LABEL     "SubtomoAverage"     // Calculation of subtomogram average from the inidividual tilt series images
 #define PROC_EXTERNAL_LABEL      "External"     // For running non-relion programs
 
 
@@ -255,8 +280,13 @@ static std::map<std::string, int> node_label2type = {{NODE_MOVIES_LABEL, NODE_MO
 #define PROC_MULTIBODY      19// Multi-body refinement
 #define PROC_MOTIONREFINE   20// Jasenko's motion_refine
 #define PROC_CTFREFINE      21// Jasenko's ctf_refine
+#define PROC_SUBTOMO_IMPORT        50// Import for tomography GUI
+#define PROC_SUBTOMO_RECONSTRUCT   51// Creation of subtomograms from tilt series images
+#define PROC_SUBTOMO_CTFREFINE     52// CTF refinement (defocus & aberrations for subtomograms)
+#define PROC_SUBTOMO_POLISH        53// Frame alignment and particle polishing for subtomogra,s
+#define PROC_SUBTOMO_AVERAGE       54// Calculation of subtomogram average from the inidividual tilt series images
 #define PROC_EXTERNAL       99// External scripts
-#define NR_BROWSE_TABS      20
+
 
 static std::map<int, std::string> proc_type2label = {{PROC_IMPORT, PROC_IMPORT_LABEL},
 		{PROC_MOTIONCORR, PROC_MOTIONCORR_LABEL},
@@ -277,6 +307,11 @@ static std::map<int, std::string> proc_type2label = {{PROC_IMPORT, PROC_IMPORT_L
 		{PROC_MULTIBODY, PROC_MULTIBODY_LABEL},
 		{PROC_MOTIONREFINE, PROC_MOTIONREFINE_LABEL},
 		{PROC_CTFREFINE, PROC_CTFREFINE_LABEL},
+		{PROC_SUBTOMO_IMPORT, PROC_SUBTOMO_IMPORT_LABEL},
+		{PROC_SUBTOMO_RECONSTRUCT, PROC_SUBTOMO_RECONSTRUCT_LABEL},
+		{PROC_SUBTOMO_CTFREFINE, PROC_SUBTOMO_CTFREFINE_LABEL},
+		{PROC_SUBTOMO_POLISH, PROC_SUBTOMO_POLISH_LABEL},
+		{PROC_SUBTOMO_AVERAGE, PROC_SUBTOMO_AVERAGE_LABEL},
 		{PROC_EXTERNAL, PROC_EXTERNAL_LABEL}};
 
 static std::map<std::string, int> proc_label2type = {{PROC_IMPORT_LABEL, PROC_IMPORT},
@@ -298,6 +333,11 @@ static std::map<std::string, int> proc_label2type = {{PROC_IMPORT_LABEL, PROC_IM
 		{PROC_MULTIBODY_LABEL, PROC_MULTIBODY},
 		{PROC_MOTIONREFINE_LABEL, PROC_MOTIONREFINE},
 		{PROC_CTFREFINE_LABEL, PROC_CTFREFINE},
+		{PROC_SUBTOMO_IMPORT_LABEL, PROC_SUBTOMO_IMPORT},
+		{PROC_SUBTOMO_RECONSTRUCT_LABEL, PROC_SUBTOMO_RECONSTRUCT},
+		{PROC_SUBTOMO_CTFREFINE_LABEL, PROC_SUBTOMO_CTFREFINE},
+		{PROC_SUBTOMO_POLISH_LABEL, PROC_SUBTOMO_POLISH},
+		{PROC_SUBTOMO_AVERAGE_LABEL, PROC_SUBTOMO_AVERAGE},
 		{PROC_EXTERNAL_LABEL, PROC_EXTERNAL}};
 
 // Status a Process may have
@@ -602,6 +642,34 @@ public:
 	void initialiseExternalJob();
 	bool getCommandsExternalJob(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+
+
+	// relion-3.2: add subtomogram averaging programs by Jasenko
+	void addSubtomoInputOptions(bool has_tomograms, bool has_particles,
+			bool has_trajectories, bool has_manifolds, bool has_postprocess);
+	std::string getSubtomoInputCommmand(std::string &command, bool has_tomograms, bool has_particles,
+			bool has_trajectories, bool has_manifolds, bool has_postprocess);
+
+	void initialiseSubtomoImportJob();
+	bool getCommandsSubtomoImportJob(std::string &outputname, std::vector<std::string> &commands,
+			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+
+	void initialiseSubtomoReconstructJob();
+	bool getCommandsSubtomoReconstructJob(std::string &outputname, std::vector<std::string> &commands,
+			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+
+	void initialiseSubtomoCtfRefineJob();
+	bool getCommandsSubtomoCtfRefineJob(std::string &outputname, std::vector<std::string> &commands,
+			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+
+	void initialiseSubtomoPolishJob();
+	bool getCommandsSubtomoPolishJob(std::string &outputname, std::vector<std::string> &commands,
+			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+
+	void initialiseSubtomoAverageJob();
+	bool getCommandsSubtomoAverageJob(std::string &outputname, std::vector<std::string> &commands,
+			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+
 };
 
 #endif /* SRC_PIPELINE_JOBS_H_ */

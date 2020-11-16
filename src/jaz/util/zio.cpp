@@ -1,4 +1,5 @@
 #include "zio.h"
+#include <src/pipeline_control.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -258,6 +259,7 @@ std::string ZIO::prepareTomoOutputDirectory(const std::string &dir, int argc, ch
 
 	int res = system(("mkdir -p "+outDir).c_str());
 
+	if (!is_under_pipeline_control())
 	{
 		std::ofstream ofs(outDir+"note.txt");
 
@@ -272,4 +274,10 @@ std::string ZIO::prepareTomoOutputDirectory(const std::string &dir, int argc, ch
 	}
 
 	return outDir;
+}
+
+bool ZIO::fileExists(std::string filename)
+{
+	struct stat buffer;
+	return (stat(filename.c_str(), &buffer) == 0);
 }

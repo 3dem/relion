@@ -22,6 +22,7 @@ class ProtoAlignment : public DifferentiableOptimization
 				bool constShifts,
 				int maxRange, 
 				gravis::d3Vector tomoCentre,
+				int progressBarOffset,
 				int num_threads,
 				double paddingFactor);
 		
@@ -34,7 +35,7 @@ class ProtoAlignment : public DifferentiableOptimization
 			bool constParticles, constAngles, constShifts;
 			int fc, pc, maxRange;	
 			gravis::d3Vector tomoCentre;
-			int num_threads;
+			int progressBarOffset, num_threads;
 			double paddingFactor;
 			
 			const std::vector<BufferedImage<double>>& CCs; // one frame stack for each particle
@@ -44,15 +45,19 @@ class ProtoAlignment : public DifferentiableOptimization
 			
 			
 			
-		double f(const std::vector<double>& x, void* tempStorage) const;	
+		double f(const std::vector<double>& x, void* tempStorage) const;
 		void grad(const std::vector<double>& x, std::vector<double>& gradDest, void* tempStorage) const;
 				
-		std::vector<gravis::d4Matrix> getProjections(const std::vector<double>& x) const;	
-		
+		std::vector<gravis::d4Matrix> getProjections(
+				const std::vector<double>& x) const;
+
 		void shiftParticles(
 				const std::vector<double>& x,
 				const std::vector<ParticleIndex>& partIndices,
 				ParticleSet& target) const;
+
+		std::vector<gravis::d3Vector> getParticlePositions(
+				const std::vector<double>& x) const;
 		
 		int getParamCount();
 		

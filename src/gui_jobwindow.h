@@ -126,6 +126,15 @@ private:
 	void initialiseCtfrefineWindow();
 	void initialiseExternalWindow();
 
+	// relion-3.2: add subtomogram averaging programs by Jasenko
+	void placeSubtomoInput(bool has_tomograms, bool has_particles,
+			bool has_trajectories, bool has_manifolds, bool has_postprocess);
+	void initialiseSubtomoImportWindow();
+	void initialiseSubtomoReconstructWindow();
+	void initialiseSubtomoCtfRefineWindow();
+	void initialiseSubtomoPolishWindow();
+	void initialiseSubtomoAverageWindow();
+
 };
 
 

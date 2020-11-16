@@ -370,6 +370,12 @@ public:
 	// Effective size of subsets
 	int effective_setsize;
 
+	// Adjusting the under-estimation of signal of low-resolution components during gradient optimization to this resolution
+	RFLOAT grad_min_resol;
+
+	// The minimum estimated FSC during gradient optimization
+	MultidimArray<RFLOAT> grad_baseline_fsc;
+
 	// The resolution in the initial iterations
 	RFLOAT grad_ini_resol; // in A
 
@@ -814,6 +820,25 @@ public:
 		som_inactivity_threshold(0),
 		som_neighbour_pull(0),
 		class_inactivity_threshold(0),
+		gradient_refine(false),
+		do_grad(false),
+		do_mom1(false),
+		do_mom2(false),
+		grad_em_iters(0),
+		grad_ini_iter(0),
+		grad_ini_frac(0),
+		grad_fin_iter(0),
+		grad_fin_frac(0),
+		grad_inbetween_iter(0),
+		grad_ini_subset_size(0),
+		grad_fin_subset_size(0),
+		grad_min_resol(0),
+		grad_ini_resol(0),
+		grad_fin_resol(0),
+		do_grad_skip_anneal(false),
+		mu(0),
+		grad_stepsize(0),
+		grad_current_stepsize(0),
 #ifdef ALTCPU
 		tbbSchedulerInit(tbb::task_scheduler_init::deferred ),
 		mdlClassComplex(NULL),

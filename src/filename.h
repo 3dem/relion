@@ -496,8 +496,14 @@ void copy(const FileName &fn_src, const FileName &fn_dest);
 /** Move a file */
 void move(const FileName &fn_src, const FileName &fn_dest);
 
-/** Make a directory tree*/
+/** Make a directory tree. mode=0777 is OK, because it is modified by umask.*/
 int mktree(const FileName &fn_dir, mode_t mode = 0777);
+
+/* wrapper to realpath in stdlib */
+FileName realpath(const FileName &fn);
+
+/* wrapper to symlink in stdlib */
+void symlink(const FileName &src, const FileName &dst);
 
 /** True if the path is a directory */
 bool isDirectory (const FileName &fn);

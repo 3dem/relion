@@ -22,7 +22,8 @@ class CtfRefinementProgram : public RefinementProgram
 		CtfRefinementProgram(int argc, char *argv[]);
 			
 			bool do_refine_defocus, do_refine_scale, do_refine_aberrations,
-				do_even_aberrations, do_odd_aberrations, do_fit_Beer_Lambert;
+				do_fit_Lambert_per_tomo, do_fit_Lambert_globally,
+				do_even_aberrations, do_odd_aberrations;
 
 			int deltaSteps, n_even, n_odd;
 			double minDelta, maxDelta, lambda_reg;
@@ -30,32 +31,35 @@ class CtfRefinementProgram : public RefinementProgram
 		void run();
 		
 		
-	private:
+	protected:
+
+		void initTempDirectories();
 
 		void processTomograms(
-				int first_t,
-				int last_t,
+				const std::vector<int>& tomoIndices,
 				const AberrationsCache& aberrationsCache,
-				std::vector<BufferedImage<aberration::EvenData>>& evenData_perGroup,
-				std::vector<std::vector<BufferedImage<aberration::EvenData>>>& evenData_perGroup_perThread,
-				std::vector<BufferedImage<aberration::OddData>>& oddData_perGroup,
-				std::vector<std::vector<BufferedImage<aberration::OddData>>>& oddData_perGroup_perThread,
-				int verbosity);
+				int verbosity,
+				bool per_tomogram_progress);
 
+		void finalise();
+
+	private:
 		
 		void refineDefocus(
 				int t,
 				Tomogram& tomogram,
 				const AberrationsCache& aberrationsCache,
 				const BufferedImage<float>& freqWeights,
-				const BufferedImage<float>& doseWeights);
+				const BufferedImage<float>& doseWeights,
+				int verbosity);
 
-		void fitScale(
+		void updateScale(
 				int t,
 				Tomogram& tomogram,
 				const AberrationsCache& aberrationsCache,
 				const BufferedImage<float>& freqWeights,
-				const BufferedImage<float>& doseWeights);
+				const BufferedImage<float>& doseWeights,
+				int verbosity);
 
 		void updateAberrations(
 				int t,
@@ -63,16 +67,15 @@ class CtfRefinementProgram : public RefinementProgram
 				const AberrationsCache& aberrationsCache,
 				const BufferedImage<float>& freqWeights,
 				const BufferedImage<float>& doseWeights,
-				std::vector<BufferedImage<aberration::EvenData>>& evenData_perGroup,
-				std::vector<std::vector<BufferedImage<aberration::EvenData>>>& evenData_perGroup_perThread,
-				std::vector<BufferedImage<aberration::OddData>>& oddData_perGroup,
-				std::vector<std::vector<BufferedImage<aberration::OddData>>>& oddData_perGroup_perThread);
+				int verbosity);
 
-		void fitAberrations(
-				std::vector<BufferedImage<aberration::EvenData>>& evenData_perGroup,
-				std::vector<BufferedImage<aberration::OddData>>& oddData_perGroup,
-				double pixelSize);
 
+		void collectDefocus();
+
+		void fitGlobalScale();
+		void collectScale();
+
+		void fitAberrations();
 
 
 
@@ -105,16 +108,34 @@ class CtfRefinementProgram : public RefinementProgram
 				double range,
 				double pixelSize,
 				int size);
+
+
+		std::string getDefocusTempFilename(
+				const std::string& tomogram_name);
+
+		std::string getScaleTempFilename(
+				const std::string& tomogram_name);
+
+		std::string getEvenAberrationsTempFilename(
+				const std::string& tomogram_name, int opticsGroup);
+
+		std::string getOddAberrationsTempFilename(
+				const std::string& tomogram_name, int opticsGroup);
+
+
+		bool defocusAlreadyDone(const std::string& tomogram_name);
+		bool scaleAlreadyDone(const std::string& tomogram_name);
+		bool aberrationsAlreadyDone(const std::string& tomogram_name, int group_count);
 };
 
-class BeerLambertFit : public Optimization
+class LambertFit : public Optimization
 {
 	public:
 
-		BeerLambertFit(
-			const std::vector<gravis::d4Matrix>& projections,
-			const std::vector<double>& sum_prdObs,
-			const std::vector<double>& sum_prdSqr);
+		LambertFit(
+				const std::vector<gravis::d4Matrix>& projections,
+				const std::vector<double>& sum_prdObs,
+				const std::vector<double>& sum_prdSqr);
 
 			const std::vector<gravis::d4Matrix>& projections;
 			const std::vector<double> &sum_prdObs, &sum_prdSqr;
@@ -123,7 +144,34 @@ class BeerLambertFit : public Optimization
 
 		double f(const std::vector<double>& x, void* tempStorage) const;
 
+		double gradAndValue(const std::vector<double>& x, std::vector<double>& gradDest) const;
+
 		double getScale(int f, const std::vector<double>& x);
+
+};
+
+class MultiLambertFit : public FastDifferentiableOptimization
+{
+	public:
+
+		MultiLambertFit(
+				const std::vector<std::vector<gravis::d4Matrix>>& projections,
+				const std::vector<std::vector<double>>& sum_prdObs,
+				const std::vector<std::vector<double>>& sum_prdSqr,
+				const std::vector<double>& fractional_dose);
+
+			const std::vector<std::vector<gravis::d4Matrix>>& projections;
+			const std::vector<std::vector<double>> &sum_prdObs, &sum_prdSqr;
+			const std::vector<double>& fractional_dose;
+			std::vector<std::vector<gravis::d3Vector>> view_dir;
+			std::vector<gravis::d3Vector> tilt_p, tilt_q;
+
+
+		double gradAndValue(const std::vector<double>& x, std::vector<double>& gradDest) const;
+
+		double getScale(int t, int f, const std::vector<double>& x);
+
+		void report(int iteration, double cost, const std::vector<double>& x) const;
 
 };
 

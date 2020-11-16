@@ -86,10 +86,6 @@ void MagFitProgram::run()
 		particleSet.checkTrajectoryLengths(
 				particles[t][0], pc, fc, "MagFitProgram::run");
 
-		const int first_frame = specified_first_frame;
-		const int last_frame = (specified_last_frame > 0 && specified_last_frame < fc)? specified_last_frame : fc-1;
-
-
 		TomoAnisoMagFit anisoFit(
 			particles[t],
 			tomogram,
@@ -97,8 +93,8 @@ void MagFitProgram::run()
 			referenceMap,
 			freqWeights,
 			boxSize,
-			first_frame,
-			last_frame,
+			0,
+			fc-1,
 			num_threads);
 
 		Log::print("Estimating magnification matrix");

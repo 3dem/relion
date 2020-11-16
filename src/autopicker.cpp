@@ -144,6 +144,21 @@ if(do_gpu)
 		REPORT_ERROR("The Laplacian-of-Gaussian picker does not support GPU acceleration. Please remove --gpu option.");
 	}
 
+	int topaz_section = parser.addSection("Topaz wrapper options");
+	do_topaz_train = parser.checkOption("--topaz_train", "Use wrapper to the topaz train command");
+	do_topaz_extract = parser.checkOption("--topaz_extract", "Use wrapper to the topaz extract command (i.e. predict particle positions)");
+	topaz_nr_particles = textToInteger(parser.getOption("--topaz_nr_particles", "Expected number of particles per micrograph for topaz", "200"));
+	topaz_train_picks = parser.getOption("--topaz_train_picks", "Name of picking coordinates for topaz training", "");
+	topaz_train_parts = parser.getOption("--topaz_train_parts", "OR: name of particle star file for topaz training", "");
+	topaz_test_ratio = textToFloat(parser.getOption("--topaz_test_ratio", "Ratio of picks in the test set for cross-validation in topaz training", "0.2"));
+	topaz_downscale = textToInteger(parser.getOption("--topaz_downscale", "Downscale factor for topaz", "-1"));
+	topaz_model = parser.getOption("--topaz_model", "Saved model model from topaz train for topaz extract", "");
+	topaz_radius = textToInteger(parser.getOption("--topaz_radius", "Particle radius (in pix) for topaz extract (default is from particle diameter)", "-1"));
+	fn_topaz_exe = parser.getOption("--topaz_exe", "Name of topaz executable", "topaz");
+	fn_bash = parser.getOption("--bash_exe", "Name of bash executable", "/bin/bash");
+	fn_conda_activate = parser.getOption("--activate_exe", "Name of conda activate executable (defaults to 'source activate')", "");
+	topaz_additional_args = parser.getOption("--topaz_args", "Additional arguments to be passed to topaz", "");
+
 	int helix_section = parser.addSection("Helix options");
 	autopick_helical_segments = parser.checkOption("--helix", "Are the references 2D helical segments? If so, in-plane rotation angles (psi) are estimated for the references.");
 	helical_tube_curvature_factor_max = textToFloat(parser.getOption("--helical_tube_kappa_max", "Factor of maximum curvature relative to that of a circle", "0.25"));
@@ -185,7 +200,7 @@ void AutoPicker::usage()
 	parser.writeUsage(std::cout);
 }
 
-void AutoPicker::initialise()
+void AutoPicker::initialise(int rank)
 {
 #ifdef TIMING
 	TIMING_A0  =           timer.setNew("Initialise()");
@@ -336,6 +351,36 @@ void AutoPicker::initialise()
 				else
 					std::cout << "   * " << myd << " (ok)" << std::endl;
 			}
+		}
+	}
+	else if (do_topaz_train)
+	{
+		if (verb > 0)
+		{
+			std::cout << " + Will use topaz for training a model " << std::endl;
+		}
+
+		int icheck = 0;
+		if (topaz_train_picks == "" && topaz_train_parts == "") REPORT_ERROR("ERROR: provide either --topaz_train_picks OR --topaz_train_parts with picked coordinates for training!");
+		if (topaz_train_picks != "")
+		{
+			MDtrain.read(topaz_train_picks, "coordinate_files");
+			if (MDtrain.numberOfObjects() < 1) REPORT_ERROR("ERROR: the coordinate_files table in the STAR file from --topaz_train_picks is empty or doesn't exist!");
+		}
+		else if (topaz_train_parts != "")
+		{
+			// Generate MDtrain from input particles.star file
+			ObservationModel obsModel;
+			MetaDataTable MDparts;
+			ObservationModel::loadSafely(topaz_train_parts, obsModel, MDparts, "particles");
+			MDtrain = getMDtrainFromParticleStar(MDparts);
+		}
+	}
+	else if (do_topaz_extract)
+	{
+		if (verb > 0)
+		{
+			std::cout << " + Will use topaz for picking particle coordinates" << std::endl;
 		}
 	}
 	else if (fn_ref == "")
@@ -524,7 +569,7 @@ void AutoPicker::initialise()
 	timer.tic(TIMING_A3);
 #endif
 
-	if ( !(do_LoG) )
+	if (!(do_LoG  || do_topaz_train || do_topaz_extract))
 	{
 		// Re-scale references if necessary
 		if (angpix_ref < 0)
@@ -647,126 +692,189 @@ void AutoPicker::initialise()
 
 	} // end if !do_LoG
 
-	// Get micrograph_size
-	Image<RFLOAT> Imic;
-	Imic.read(fn_micrographs[0], false);
-	micrograph_xsize = XSIZE(Imic());
-	micrograph_ysize = YSIZE(Imic());
-	micrograph_size = (micrograph_xsize != micrograph_ysize) ? XMIPP_MAX(micrograph_xsize, micrograph_ysize) : micrograph_xsize;
-	if (extra_padding > 0)
-		micrograph_size += 2*extra_padding;
-
-	if (lowpass < 0.)
+	if ( (do_topaz_train || do_topaz_extract) )
 	{
-		downsize_mic = micrograph_size;
+		// Which is my GPU?
+		std::vector < std::vector < std::string > > allThreadIDs;
+		untangleDeviceIDs(gpu_ids, allThreadIDs);
+		// Sequential initialisation of GPUs on all ranks
+		topaz_device_id = -1;
+		if (std::isdigit(*gpu_ids.begin()))
+			topaz_device_id = textToInteger((allThreadIDs[rank][0]).c_str());
+
+		// Get topaz_downscale from particle_diameter and micrograph pixel size
+		if (topaz_downscale < 0)
+		{
+			// Perceptive window of default resnet8 is 71 pixels, which should encapsulate particle_diameter*2
+			RFLOAT particle_box_pix = 2 * particle_diameter / angpix;
+			topaz_downscale = ROUND(particle_box_pix/71);
+			if (verb > 0)
+				std::cout << " + Setting topaz downscale factor to " << topaz_downscale << " (assuming resnet8 model and 2*particle_diameter receptive box)" << std::endl;
+		}
+
+		// Get topaz_radius to particle_diameter / 2
+		if (topaz_radius < 0)
+		{
+			if (do_topaz_train)
+			{
+				topaz_radius = (particle_diameter) / (8. * angpix * topaz_downscale); // 25% of particle radius for training!
+				if (verb > 0)
+					std::cout << " + Setting topaz radius to " << topaz_radius << " downscaled pixels (based on 25% of particle_diameter/2)" << std::endl;
+			}
+			else if (do_topaz_extract)
+			{
+				topaz_radius = (particle_diameter) / (2. * angpix * topaz_downscale); // 100% of particle radius for picking!
+				if (verb > 0)
+					std::cout << " + Setting topaz radius to " << topaz_radius << " downscaled pixels (based on particle_diameter/2)" << std::endl;
+			}
+		}
 	}
 	else
 	{
-		downsize_mic = 2 * ROUND(micrograph_size * angpix / lowpass);
-	}
+		// Get micrograph_size
+		Image<RFLOAT> Imic;
+		Imic.read(fn_micrographs[0], false);
+		micrograph_xsize = XSIZE(Imic());
+		micrograph_ysize = YSIZE(Imic());
+		micrograph_size = (micrograph_xsize != micrograph_ysize) ? XMIPP_MAX(micrograph_xsize, micrograph_ysize) : micrograph_xsize;
+		if (extra_padding > 0)
+			micrograph_size += 2*extra_padding;
 
-	/*
-	 * Here we set the size of the micrographs during cross-correlation calculation. The final size is still the same size as
-	 * the input micrographs, we simply adjust the frequencies used in fourier space by cropping the frequency-space images in
-	 * intermediate calculations.
-	 */
-
-	if(workFrac>1) // set size directly
-	{
-		int tempFrac = (int)ROUND(workFrac);
-		tempFrac -= tempFrac%2;
-		if(tempFrac<micrograph_size)
+		if (lowpass < 0.)
 		{
-			workSize = getGoodFourierDims(tempFrac,micrograph_size);
+			downsize_mic = micrograph_size;
 		}
 		else
-			REPORT_ERROR("workFrac larger than micrograph_size (--shrink) cannot be used. Choose a fraction 0<frac<1  OR  size<micrograph_size");
-	}
-	else if(workFrac<=1) // set size as fraction of original
-	{
-
-		if(workFrac>0)
 		{
-			int tempFrac = (int)ROUND(workFrac*(RFLOAT)micrograph_size);
+			downsize_mic = 2 * ROUND(micrograph_size * angpix / lowpass);
+		}
+
+		/*
+		 * Here we set the size of the micrographs during cross-correlation calculation. The final size is still the same size as
+		 * the input micrographs, we simply adjust the frequencies used in fourier space by cropping the frequency-space images in
+		 * intermediate calculations.
+		 */
+
+		if(workFrac>1) // set size directly
+		{
+			int tempFrac = (int)ROUND(workFrac);
 			tempFrac -= tempFrac%2;
-			workSize = getGoodFourierDims(tempFrac,micrograph_size);
-		}
-		else if(workFrac==0)
-		{
-			workSize = getGoodFourierDims((int)downsize_mic,micrograph_size);
-		}
-		else
-			REPORT_ERROR("negative workFrac (--shrink) cannot be used. Choose a fraction 0<frac<1  OR size<micrograph_size");
-	}
-	workSize -= workSize%2; //make even in case it is not already
-
-	if ( verb > 0 && workSize < downsize_mic)
-	{
-		std::cout << " + WARNING: The calculations will be done at a lower resolution than requested." << std::endl;
-	}
-
-	if ( verb > 0 && (autopick_helical_segments) && (!do_amyloid) && ((float(workSize) / float(micrograph_size)) < 0.4999) )
-	{
-		std::cerr << " + WARNING: Please consider using a shrink value 0.5~1 for picking helical segments. Smaller values may lead to poor results." << std::endl;
-	}
-
-	//printf("workSize = %d, corresponding to a resolution of %g for these settings. \n", workSize, 2*(((RFLOAT)micrograph_size*angpix)/(RFLOAT)workSize));
-
-	if (min_particle_distance < 0)
-	{
-		min_particle_distance = particle_size * angpix / 2.;
-	}
-#ifdef TIMING
-	timer.toc(TIMING_A3);
-#endif
-#ifdef TIMING
-	timer.tic(TIMING_A4);
-#endif
-
-	// Pre-calculate and store Projectors for all references at the right size
-	if (!do_read_fom_maps && !do_LoG)
-	{
-		if (verb > 0)
-		{
-			std::cout << " Initialising FFTs for the references and masks ... " << std::endl;
-		}
-
-		// Calculate a circular mask based on the particle_diameter and then store its FT
-		FourierTransformer transformer;
-		MultidimArray<RFLOAT> Mcirc_mask(particle_size, particle_size);
-		MultidimArray<RFLOAT> Maux(micrograph_size, micrograph_size);
-		Mcirc_mask.setXmippOrigin();
-		Maux.setXmippOrigin();
-
-		// Sjors 17jan2018; also make a specific circular mask to calculate local average value, for removal of carbon areas with helices
-		if (autopick_helical_segments)
-		{
-
-			Mcirc_mask.initConstant(1.);
-			nr_pixels_avg_mask = Mcirc_mask.nzyxdim;
-
-			long int inner_radius = ROUND(helical_tube_diameter/(2.*angpix));
-			FOR_ALL_ELEMENTS_IN_ARRAY2D(Mcirc_mask)
+			if(tempFrac<micrograph_size)
 			{
-				if (i*i + j*j < inner_radius*inner_radius)
-				{
-					A2D_ELEM(Mcirc_mask, i, j) = 0.;
-					nr_pixels_avg_mask--;
-				}
+				workSize = getGoodFourierDims(tempFrac,micrograph_size);
+			}
+			else
+				REPORT_ERROR("workFrac larger than micrograph_size (--shrink) cannot be used. Choose a fraction 0<frac<1  OR  size<micrograph_size");
+		}
+		else if(workFrac<=1) // set size as fraction of original
+		{
+
+			if(workFrac>0)
+			{
+				int tempFrac = (int)ROUND(workFrac*(RFLOAT)micrograph_size);
+				tempFrac -= tempFrac%2;
+				workSize = getGoodFourierDims(tempFrac,micrograph_size);
+			}
+			else if(workFrac==0)
+			{
+				workSize = getGoodFourierDims((int)downsize_mic,micrograph_size);
+			}
+			else
+				REPORT_ERROR("negative workFrac (--shrink) cannot be used. Choose a fraction 0<frac<1  OR size<micrograph_size");
+		}
+		workSize -= workSize%2; //make even in case it is not already
+
+		if ( verb > 0 && workSize < downsize_mic)
+		{
+			std::cout << " + WARNING: The calculations will be done at a lower resolution than requested." << std::endl;
+		}
+
+		if ( verb > 0 && (autopick_helical_segments) && (!do_amyloid) && ((float(workSize) / float(micrograph_size)) < 0.4999) )
+		{
+			std::cerr << " + WARNING: Please consider using a shrink value 0.5~1 for picking helical segments. Smaller values may lead to poor results." << std::endl;
+		}
+
+		//printf("workSize = %d, corresponding to a resolution of %g for these settings. \n", workSize, 2*(((RFLOAT)micrograph_size*angpix)/(RFLOAT)workSize));
+
+		if (min_particle_distance < 0)
+		{
+			min_particle_distance = particle_size * angpix / 2.;
+		}
+	#ifdef TIMING
+		timer.toc(TIMING_A3);
+	#endif
+	#ifdef TIMING
+		timer.tic(TIMING_A4);
+	#endif
+
+		// Pre-calculate and store Projectors for all references at the right size
+		if (!do_read_fom_maps && !do_LoG)
+		{
+			if (verb > 0)
+			{
+				std::cout << " Initialising FFTs for the references and masks ... " << std::endl;
 			}
 
-			if (max_local_avg_diameter > 0)
+			// Calculate a circular mask based on the particle_diameter and then store its FT
+			FourierTransformer transformer;
+			MultidimArray<RFLOAT> Mcirc_mask(particle_size, particle_size);
+			MultidimArray<RFLOAT> Maux(micrograph_size, micrograph_size);
+			Mcirc_mask.setXmippOrigin();
+			Maux.setXmippOrigin();
+
+			// Sjors 17jan2018; also make a specific circular mask to calculate local average value, for removal of carbon areas with helices
+			if (autopick_helical_segments)
 			{
-				long int outer_radius = ROUND(max_local_avg_diameter/(2.*angpix));
+
+				Mcirc_mask.initConstant(1.);
+				nr_pixels_avg_mask = Mcirc_mask.nzyxdim;
+
+				long int inner_radius = ROUND(helical_tube_diameter/(2.*angpix));
 				FOR_ALL_ELEMENTS_IN_ARRAY2D(Mcirc_mask)
 				{
-					if (i*i + j*j > outer_radius*outer_radius)
+					if (i*i + j*j < inner_radius*inner_radius)
 					{
 						A2D_ELEM(Mcirc_mask, i, j) = 0.;
 						nr_pixels_avg_mask--;
 					}
 				}
 
+				if (max_local_avg_diameter > 0)
+				{
+					long int outer_radius = ROUND(max_local_avg_diameter/(2.*angpix));
+					FOR_ALL_ELEMENTS_IN_ARRAY2D(Mcirc_mask)
+					{
+						if (i*i + j*j > outer_radius*outer_radius)
+						{
+							A2D_ELEM(Mcirc_mask, i, j) = 0.;
+							nr_pixels_avg_mask--;
+						}
+					}
+
+				}
+
+				// Now set the mask in the large square and store its FFT
+				Maux.initZeros();
+				FOR_ALL_ELEMENTS_IN_ARRAY2D(Mcirc_mask)
+				{
+					A2D_ELEM(Maux, i, j ) = A2D_ELEM(Mcirc_mask, i, j);
+				}
+				transformer.FourierTransform(Maux, Favgmsk);
+				CenterFFTbySign(Favgmsk);
+
+			}
+
+
+			// For squared difference, need the mask of the background to locally normalise the micrograph
+			nr_pixels_circular_invmask = 0;
+			Mcirc_mask.initZeros();
+			FOR_ALL_ELEMENTS_IN_ARRAY2D(Mcirc_mask)
+			{
+				if (i*i + j*j >= particle_radius2)
+				{
+					A2D_ELEM(Mcirc_mask, i, j) = 1.;
+					nr_pixels_circular_invmask++;
+				}
 			}
 
 			// Now set the mask in the large square and store its FFT
@@ -775,87 +883,63 @@ void AutoPicker::initialise()
 			{
 				A2D_ELEM(Maux, i, j ) = A2D_ELEM(Mcirc_mask, i, j);
 			}
-			transformer.FourierTransform(Maux, Favgmsk);
-			CenterFFTbySign(Favgmsk);
+			transformer.FourierTransform(Maux, Finvmsk);
+			CenterFFTbySign(Finvmsk);
 
-		}
-
-
-		// For squared difference, need the mask of the background to locally normalise the micrograph
-		nr_pixels_circular_invmask = 0;
-		Mcirc_mask.initZeros();
-		FOR_ALL_ELEMENTS_IN_ARRAY2D(Mcirc_mask)
-		{
-			if (i*i + j*j >= particle_radius2)
+			// Also get the particle-area mask
+			nr_pixels_circular_mask = 0;
+			Mcirc_mask.initZeros();
+			FOR_ALL_ELEMENTS_IN_ARRAY2D(Mcirc_mask)
 			{
-				A2D_ELEM(Mcirc_mask, i, j) = 1.;
-				nr_pixels_circular_invmask++;
-			}
-		}
-
-		// Now set the mask in the large square and store its FFT
-		Maux.initZeros();
-		FOR_ALL_ELEMENTS_IN_ARRAY2D(Mcirc_mask)
-		{
-			A2D_ELEM(Maux, i, j ) = A2D_ELEM(Mcirc_mask, i, j);
-		}
-		transformer.FourierTransform(Maux, Finvmsk);
-		CenterFFTbySign(Finvmsk);
-
-		// Also get the particle-area mask
-		nr_pixels_circular_mask = 0;
-		Mcirc_mask.initZeros();
-		FOR_ALL_ELEMENTS_IN_ARRAY2D(Mcirc_mask)
-		{
-			if (i*i + j*j < particle_radius2)
-			{
-				A2D_ELEM(Mcirc_mask, i, j) = 1.;
-				nr_pixels_circular_mask++;
-			}
-		}
-
-#ifdef DEBUG
-		std::cerr << " min_particle_distance= " << min_particle_distance << " micrograph_size= " << micrograph_size << " downsize_mic= " << downsize_mic << std::endl;
-		std::cerr << " nr_pixels_circular_mask= " << nr_pixels_circular_mask << " nr_pixels_circular_invmask= " << nr_pixels_circular_invmask << std::endl;
-#endif
-
-
-		PPref.clear();
-		if (verb > 0)
-			init_progress_bar(Mrefs.size());
-
-		Projector PP(micrograph_size, TRILINEAR, padding);
-		MultidimArray<RFLOAT> dummy;
-
-		for (int iref = 0; iref < Mrefs.size(); iref++)
-		{
-
-			// (Re-)apply the mask to the references
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mrefs[iref])
-			{
-				DIRECT_MULTIDIM_ELEM(Mrefs[iref], n) *= DIRECT_MULTIDIM_ELEM(Mcirc_mask, n);
+				if (i*i + j*j < particle_radius2)
+				{
+					A2D_ELEM(Mcirc_mask, i, j) = 1.;
+					nr_pixels_circular_mask++;
+				}
 			}
 
-			// Set reference in the large box of the micrograph
-			Maux.initZeros();
-			Maux.setXmippOrigin();
-			FOR_ALL_ELEMENTS_IN_ARRAY2D(Mrefs[iref])
-			{
-				A2D_ELEM(Maux, i, j) = A2D_ELEM(Mrefs[iref], i, j);
-			}
+	#ifdef DEBUG
+			std::cerr << " min_particle_distance= " << min_particle_distance << " micrograph_size= " << micrograph_size << " downsize_mic= " << downsize_mic << std::endl;
+			std::cerr << " nr_pixels_circular_mask= " << nr_pixels_circular_mask << " nr_pixels_circular_invmask= " << nr_pixels_circular_invmask << std::endl;
+	#endif
 
-			// And compute its Fourier Transform inside the Projector
-			PP.computeFourierTransformMap(Maux, dummy, downsize_mic, 1, false);
-			PPref.push_back(PP);
+
+			PPref.clear();
+			if (verb > 0)
+				init_progress_bar(Mrefs.size());
+
+			Projector PP(micrograph_size, TRILINEAR, padding);
+			MultidimArray<RFLOAT> dummy;
+
+			for (int iref = 0; iref < Mrefs.size(); iref++)
+			{
+
+				// (Re-)apply the mask to the references
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mrefs[iref])
+				{
+					DIRECT_MULTIDIM_ELEM(Mrefs[iref], n) *= DIRECT_MULTIDIM_ELEM(Mcirc_mask, n);
+				}
+
+				// Set reference in the large box of the micrograph
+				Maux.initZeros();
+				Maux.setXmippOrigin();
+				FOR_ALL_ELEMENTS_IN_ARRAY2D(Mrefs[iref])
+				{
+					A2D_ELEM(Maux, i, j) = A2D_ELEM(Mrefs[iref], i, j);
+				}
+
+				// And compute its Fourier Transform inside the Projector
+				PP.computeFourierTransformMap(Maux, dummy, downsize_mic, 1, false);
+				PPref.push_back(PP);
+
+				if (verb > 0)
+					progress_bar(iref+1);
+
+			}
 
 			if (verb > 0)
-				progress_bar(iref+1);
-
+				progress_bar(Mrefs.size());
 		}
-
-		if (verb > 0)
-			progress_bar(Mrefs.size());
-
 	}
 #ifdef TIMING
 	timer.toc(TIMING_A4);
@@ -901,6 +985,11 @@ void AutoPicker::run()
 		barstep = XMIPP_MAX(1, fn_micrographs.size() / 60);
 	}
 
+	if (do_topaz_extract)
+	{
+		mktree(fn_odir + "/proc");
+		mktree(fn_odir + "/raw");
+	}
 
 	FileName fn_olddir="";
 	for (long int imic = 0; imic < fn_micrographs.size(); imic++)
@@ -919,13 +1008,15 @@ void AutoPicker::run()
 		if (fn_dir != fn_olddir)
 		{
 			// Make a Particles directory
-			int res = system(("mkdir -p " + fn_dir).c_str());
+			mktree(fn_dir);
 			fn_olddir = fn_dir;
 		}
 #ifdef TIMING
 		timer.tic(TIMING_A5);
 #endif
-		if (do_LoG)
+		if (do_topaz_extract)
+			autoPickTopazOneMicrograph(fn_micrographs[imic]);
+		else if (do_LoG)
 			autoPickLoGOneMicrograph(fn_micrographs[imic], imic);
 		else
 			autoPickOneMicrograph(fn_micrographs[imic], imic);
@@ -934,7 +1025,6 @@ void AutoPicker::run()
 		timer.toc(TIMING_A5);
 #endif
 	}
-
 
 	if (verb > 0)
 		progress_bar(fn_micrographs.size());
@@ -1004,6 +1094,9 @@ void AutoPicker::generatePDFLogfile()
 		long avg = 0;
 		if (fn_ori_micrographs.size() > 0) avg = ROUND((RFLOAT)total_nr_picked/fn_ori_micrographs.size());
 		std::cout << " i.e. on average there were " << avg << " particles per micrograph" << std::endl;
+		if (do_topaz_extract)
+			std::cout << " but for Topaz picking, you will want to select on rlnAutopickFigureOfMerit in the Particle extraction." << std::endl;
+
 		std::cout << " Saved list with " << nr_coord_files << " coordinate files in: " << fn_coords << std::endl;
 	}
 
@@ -1266,8 +1359,6 @@ AmyloidCoord AutoPicker::findNextAmyloidCoordinate(AmyloidCoord &mycoord, std::v
 		return new1coords[best_inew1];
 	}
 }
-
-
 
 void AutoPicker::pickAmyloids(
 		MultidimArray<RFLOAT>& Mccf,
@@ -2536,6 +2627,407 @@ void AutoPicker::exportHelicalTubes(
 	MDout.write(fn_tmp);
 
 	return;
+}
+MetaDataTable AutoPicker::getMDtrainFromParticleStar(MetaDataTable &MDparts)
+{
+
+	// Sort input particle star file on micrographname, so that searching can be linear instead of quadratic
+	MDparts.newSort(EMDL_MICROGRAPH_NAME);
+
+	MetaDataTable MDresult;
+	FileName fn_last_mic = "", fn_olddir = "";
+	std::vector<FileName> fn_mics;
+
+	// First, get list of all unique micrograph names
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDparts)
+	{
+		FileName fn_mic;
+		MDparts.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
+		if (fn_mic != fn_last_mic)
+		{
+			fn_last_mic = fn_mic;
+			fn_mics.push_back(fn_mic);
+		}
+	}
+
+	// Second, make a particle STAR file for each micrograph name
+	long int my_start_object = MDparts.firstObject();
+	for (int imic = 0; imic < fn_mics.size(); imic++)
+	{
+
+
+		MetaDataTable MDcoords;
+		for (long current_object = my_start_object;
+				current_object < MDparts.numberOfObjects() && current_object >= 0;
+				current_object = MDparts.nextObject())
+		{
+			FileName fn_mic;
+			MDparts.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
+			if (fn_mic == fn_mics[imic])
+			{
+				MDcoords.addObject();
+				RFLOAT xcoord, ycoord, fom, psi;
+				int classnr;
+				MDparts.getValue(EMDL_IMAGE_COORD_X, xcoord);
+				MDcoords.setValue(EMDL_IMAGE_COORD_X, xcoord);
+				MDparts.getValue(EMDL_IMAGE_COORD_Y, ycoord);
+				MDcoords.setValue(EMDL_IMAGE_COORD_Y, ycoord);
+				if (MDparts.containsLabel(EMDL_ORIENT_PSI))
+				{
+					MDparts.getValue(EMDL_ORIENT_PSI, psi);
+					MDcoords.setValue(EMDL_ORIENT_PSI, psi);
+				}
+				if (MDparts.containsLabel(EMDL_PARTICLE_CLASS))
+				{
+					MDparts.getValue(EMDL_PARTICLE_CLASS, classnr);
+					MDcoords.setValue(EMDL_PARTICLE_CLASS, classnr);
+				}
+				if (MDparts.containsLabel(EMDL_PARTICLE_AUTOPICK_FOM))
+				{
+					MDparts.getValue(EMDL_PARTICLE_AUTOPICK_FOM, fom);
+					MDcoords.setValue(EMDL_PARTICLE_AUTOPICK_FOM, fom);
+				}
+			}
+			else
+			{
+				break; // We can break now, as MDparts is sorted on EMDL_MICROGRAPH_NAME
+			}
+			my_start_object = current_object;
+		}
+
+		// Write the output coordinate file
+		FileName fn_coords;
+		FileName fn_pre, fn_jobnr, fn_post;
+		decomposePipelineFileName(fn_mics[imic], fn_pre, fn_jobnr, fn_post);
+		fn_coords = fn_odir + fn_post.withoutExtension() + "_train.star";
+		FileName fn_dir = fn_coords.beforeLastOf("/");
+		if (fn_dir != fn_olddir && !exists(fn_dir))
+		{
+			// Make a Particles directory
+			mktree(fn_dir);
+			fn_olddir = fn_dir;
+		}
+		MDcoords.write(fn_coords);
+
+		// And fill the MDtrain table
+		MDresult.addObject();
+		MDresult.setValue(EMDL_MICROGRAPH_NAME, fn_mics[imic]);
+		MDresult.setValue(EMDL_MICROGRAPH_COORDINATES, fn_coords);
+	}
+
+	FileName fn_train = fn_odir + "input_training_coords.star";
+	MDresult.setName("coordinate_files");
+	MDresult.write(fn_train);
+	std::cout << " + Written out list of input training coordinates: " << fn_train << std::endl;
+
+	return MDresult;
+
+}
+
+MetaDataTable AutoPicker::readTopazCoordinates(FileName fn_coord,  int _topaz_downscale)
+{
+	std::ifstream fin;
+	std::string line;
+	std::vector<std::string> words;
+	fin.open(fn_coord.c_str(), std::ios_base::in);
+	if (fin.fail())
+		REPORT_ERROR("AutoPicker::readTopazCoordinate ERROR: Cannot open input file " + fn_coord);
+
+	// First line is the header
+	getline(fin, line, '\n');
+	tokenize(line, words);
+	int nr_cols = words.size();
+	if (nr_cols < 3) REPORT_ERROR("AutoPicker::readTopazCoordinate ERROR: topaz .txt file with less than 3 columns: " + fn_coord);
+
+	int xcol=-1, ycol=-1, scol=-1;
+	for (int i = 0; i < nr_cols; i++)
+	{
+		if (words[i].find("x_coord") < words[i].length() ) xcol = i;
+		else if (words[i].find("y_coord") < words[i].length() ) ycol = i;
+		else if (words[i].find("score") < words[i].length() ) scol = i;
+	}
+	if (xcol <0 || ycol < 0 || scol < 0) REPORT_ERROR("AutoPicker::readTopazCoordinate ERROR: topaz .txt file has unexpected header: " + fn_coord);
+
+	// Rest of the lines are coordinates
+	MetaDataTable MDcoord;
+	while (getline(fin, line, '\n'))
+	{
+
+		// Read in new coordinate line
+		if (line.size() < 2) // End of file
+			break;
+		words.clear();
+		tokenize(line, words);
+
+		RFLOAT xcoord, ycoord, score;
+		xcoord = _topaz_downscale * textToFloat(words[xcol]);
+		ycoord = _topaz_downscale * textToFloat(words[ycol]);
+		score  = textToFloat(words[scol]);
+
+		MDcoord.addObject();
+		MDcoord.setValue(EMDL_IMAGE_COORD_X, xcoord);
+		MDcoord.setValue(EMDL_IMAGE_COORD_Y, ycoord);
+		MDcoord.setValue(EMDL_PARTICLE_AUTOPICK_FOM, score);
+		MDcoord.setValue(EMDL_PARTICLE_CLASS, 0); // Dummy values to avoid problems in JoinStar
+		MDcoord.setValue(EMDL_ORIENT_PSI, 0.0);
+
+	}
+
+	return MDcoord;
+}
+
+void AutoPicker::preprocessTopazMicrograph(FileName fn_mic_in, int downscale, FileName fn_mic_out)
+{
+
+	Image<RFLOAT> Imic;
+	Imic.read(fn_mic_in);
+	int newxsize = (int)(XSIZE(Imic())/downscale);
+	int newysize = (int)(YSIZE(Imic())/downscale);
+	//rescale(Imic(), newxsize);
+
+	// TODO: finish this. Think about non-square micrographs!!!
+
+}
+
+void AutoPicker::trainTopaz()
+{
+	mktree(fn_odir + "/proc");
+	mktree(fn_odir + "/raw");
+
+	// Let's randomise the order of the input micrographs
+	MDtrain.randomiseOrder();
+
+	FileName fn_mic_list_train = fn_odir + "proc/image_list_train.txt";
+	FileName fn_mic_list_test  = fn_odir + "proc/image_list_test.txt";
+	FileName fn_pick_list_train = fn_odir + "proc/target_list_train.txt";
+	FileName fn_pick_list_test = fn_odir + "proc/target_list_test.txt";
+	std::ofstream fh_mic_list_train, fh_mic_list_test, fh_pick_list_train, fh_pick_list_test;
+	fh_mic_list_train.open((fn_mic_list_train).c_str(), std::ios::out);
+	if (!fh_mic_list_train)
+	 REPORT_ERROR( (std::string)"AutoPicker::autoPickTopazOneMicrograph cannot create file: " + fn_mic_list_train);
+	fh_mic_list_test.open((fn_mic_list_test).c_str(), std::ios::out);
+	if (!fh_mic_list_test)
+	 REPORT_ERROR( (std::string)"AutoPicker::autoPickTopazOneMicrograph cannot create file: " + fn_mic_list_test);
+	fh_pick_list_train.open((fn_pick_list_train).c_str(), std::ios::out);
+	if (!fh_pick_list_train)
+	 REPORT_ERROR( (std::string)"AutoPicker::autoPickTopazOneMicrograph cannot create file: " + fn_pick_list_train);
+	fh_pick_list_test.open((fn_pick_list_test).c_str(), std::ios::out);
+	if (!fh_pick_list_test)
+	 REPORT_ERROR( (std::string)"AutoPicker::autoPickTopazOneMicrograph cannot create file: " + fn_pick_list_test);
+
+	fh_mic_list_train  << "image_name" << '\t' << "path" << std::endl;
+	fh_mic_list_test   << "image_name" << '\t' << "path" << std::endl;
+	fh_pick_list_train << "image_name" << '\t' << "x_coord" << '\t' << "y_coord" << std::endl;
+	fh_pick_list_test  << "image_name" << '\t' << "x_coord" << '\t' << "y_coord" << std::endl;
+
+	long int total_nr_pick = 0;
+	std::vector<int> nr_picks;
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDtrain)
+	{
+		FileName fn_pick;
+		MDtrain.getValue(EMDL_MICROGRAPH_COORDINATES, fn_pick);
+		MetaDataTable MDpick;
+		MDpick.read(fn_pick);
+		int nr_pick = MDpick.numberOfObjects();
+		total_nr_pick+= nr_pick;
+		nr_picks.push_back(nr_pick);
+	}
+
+	long int total_nr_test = 0, total_nr_train = 0, nr_test_micrographs = 0;
+	bool have_enough_test = false;
+	for (int imic = 0; imic < MDtrain.numberOfObjects(); imic++)
+	{
+
+		FileName fn_mic, fn_pick;
+		MDtrain.getValue(EMDL_MICROGRAPH_NAME, fn_mic, imic);
+		MDtrain.getValue(EMDL_MICROGRAPH_COORDINATES, fn_pick, imic);
+
+		MetaDataTable MDpick;
+		MDpick.read(fn_pick);
+
+		// Symlink original micrograph to the raw directory
+		FileName fn_local_mic, fn_local_mic_proc;
+		fn_local_mic.compose(fn_odir + "raw/mic", imic, "mrc");
+		fn_local_mic_proc.compose(fn_odir + "proc/mic", imic, "mrc");
+		FileName abspath = realpath(fn_mic);
+		symlink(abspath, fn_local_mic);
+
+		abspath = realpath(fn_local_mic_proc);
+
+		// start with filling the training set
+		if (imic%2==0 || have_enough_test)
+		{
+			// Add micrograph to mic_list_train
+			fh_mic_list_train << fn_local_mic_proc.withoutExtension().afterLastOf("/")
+					<< '\t' << abspath<< std::endl;
+
+			// Add all picks to the pick_list_train
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDpick)
+			{
+				RFLOAT xcoord, ycoord;
+				MDpick.getValue(EMDL_IMAGE_COORD_X, xcoord);
+				MDpick.getValue(EMDL_IMAGE_COORD_Y, ycoord);
+				fh_pick_list_train << fn_local_mic_proc.withoutExtension().afterLastOf("/")
+							<< '\t' << integerToString(ROUND(xcoord/topaz_downscale))
+							<< '\t' << integerToString(ROUND(ycoord/topaz_downscale)) << std::endl;
+				total_nr_train++;
+			}
+		}
+		else
+		{
+			fh_mic_list_test << fn_local_mic_proc.withoutExtension().afterLastOf("/")
+					<< '\t' << abspath<< std::endl;
+
+			// Add all picks to the pick_list_test
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDpick)
+			{
+				RFLOAT xcoord, ycoord;
+				MDpick.getValue(EMDL_IMAGE_COORD_X, xcoord);
+				MDpick.getValue(EMDL_IMAGE_COORD_Y, ycoord);
+				fh_pick_list_test << fn_local_mic_proc.withoutExtension().afterLastOf("/")
+							<< '\t' << integerToString(ROUND(xcoord/topaz_downscale))
+							<< '\t' << integerToString(ROUND(ycoord/topaz_downscale)) << std::endl;
+				total_nr_test++;
+			}
+			nr_test_micrographs++;
+
+			if ((float)(total_nr_test)/(float)(total_nr_pick) > topaz_test_ratio) have_enough_test = true;
+		}
+
+	}
+
+	if (verb > 0)
+	{
+		std::cout << " + Training with " << total_nr_test << " picks in test set; and " << total_nr_train << " picks in work set" << std::endl;
+		std::cout << " + By setting aside " << nr_test_micrographs << " micrographs for the test set " << std::endl;
+	}
+
+	fh_mic_list_train.close();
+	fh_mic_list_test.close();
+	fh_pick_list_train.close();
+	fh_pick_list_test.close();
+
+	// Now generate the topaz bash script
+	FileName fn_script = fn_odir+"topaz_train.bash";
+	FileName fn_log    = fn_odir+"run.out";
+	std::ofstream  fh;
+	fh.open((fn_script).c_str(), std::ios::out);
+	if (!fh)
+	 REPORT_ERROR( (std::string)"AutoPicker::trainTopaz cannot create file: " + fn_script);
+
+	fh << "#!" << fn_bash  << std::endl;
+	if (fn_conda_activate == "")
+		fh << "source activate topaz" << std::endl;
+	else
+		fh << fn_conda_activate << " topaz" << std::endl;
+
+	// Call Topaz to preprocess the images for normalisation and downscaling
+	fh << fn_topaz_exe << " preprocess ";
+	fh << " -s " << integerToString(topaz_downscale);
+	if (topaz_device_id >= 0)
+		fh << " -d " << integerToString(topaz_device_id);
+	fh << " -o " << fn_odir << "proc/";
+	fh << " --affine ";
+	fh << " " << fn_odir << "raw/*.mrc";
+	fh << " " << topaz_additional_args;
+	fh << std::endl;
+
+	// Call Topaz to train the network
+	fh << fn_topaz_exe << " train ";
+	fh << " -n " << integerToString(topaz_nr_particles);
+	// Let's use 25% of particle_radius for training...
+	fh << " -r " << integerToString(topaz_radius);
+	if (topaz_device_id >= 0)
+		fh << " -d " << integerToString(topaz_device_id);
+	fh << " -o " << fn_odir << "model_training.txt";
+	fh << " --train-images=" << fn_odir << "proc/image_list_train.txt";
+	fh << " --test-images=" << fn_odir << "proc/image_list_test.txt";
+	fh << " --train-targets=" << fn_odir << "proc/target_list_train.txt";
+	fh << " --test-targets=" << fn_odir << "proc/target_list_test.txt";
+	fh << " --save-prefix=" << fn_odir << "model";
+	fh << " " << topaz_additional_args;
+	fh << std::endl;
+	fh.close();
+
+	std::string command = fn_bash + " " + fn_script + " >> " + fn_log ;
+	if (system(command.c_str())) std::cerr << "WARNING: there was an error in executing: " << command << std::endl;
+
+	// Now remove raw and proc directories
+	command = "rm -rf " + fn_odir + "raw/ " + fn_odir + "proc";
+	if (system(command.c_str())) std::cerr << "WARNING: there was an error in executing: " << command << std::endl;
+
+	std::cout << " Done with training! Launch another Auto-picking job to use the model for picking coordinates. " << std::endl;
+
+}
+
+void AutoPicker::autoPickTopazOneMicrograph(FileName &fn_mic, int rank)
+{
+
+	// Local filenames
+	FileName fn_local_mic, fn_local_pick, fn_script, fn_proc, fn_log;
+	fn_local_mic.compose("rank", rank, "mrc");
+	fn_local_pick.compose("rank", rank, "txt");
+	fn_script.compose(fn_odir + "rank", rank, "bash");
+	fn_log.compose(fn_odir + "rank", rank, "log");
+	// each rank has its own proc directory, so they can be deleted below independently
+	// that's necessary as topaz cannot have this directory existing already when outputing to it in preprocess...
+	fn_proc = "proc" + integerToString(rank) + "/";
+
+	std::ofstream  fh;
+	fh.open((fn_script).c_str(), std::ios::out);
+	if (!fh)
+	 REPORT_ERROR( (std::string)"AutoPicker::autoPickTopazOneMicrograph cannot create file: " + fn_script);
+
+	fh << "#!" << fn_bash  << std::endl;
+	if (fn_conda_activate == "")
+		fh << "source activate topaz" << std::endl;
+	else
+		fh << fn_conda_activate << " topaz" << std::endl;
+
+	// Make a symlink of the micrograph in the output Directory
+	FileName fno = fn_odir + fn_local_mic;
+	symlink(realpath(fn_mic), fno);
+
+	// Call Topaz to preprocess this file for normalisation and downscaling
+	fh << fn_topaz_exe << " preprocess ";
+	fh << " -s " << integerToString(topaz_downscale);
+	if (topaz_device_id >= 0)
+		fh << " -d " << integerToString(topaz_device_id);
+	fh << " -o " << fn_odir << fn_proc;
+	fh << " --affine ";
+	fh << " " << fn_odir << fn_local_mic;
+	fh << " " << topaz_additional_args;
+	fh << std::endl;
+
+	// Then call Topaz to predict coordinates
+	fh << fn_topaz_exe << " extract ";
+	fh << " -r " << integerToString(topaz_radius);
+	if (topaz_device_id >= 0)
+		fh << " -d " << integerToString(topaz_device_id);
+	fh << " -x " << integerToString(topaz_downscale);
+	fh << " -m " << topaz_model;
+	fh << " -o " << fn_odir << fn_proc << fn_local_pick;
+	fh << " " << fn_odir << fn_proc << fn_local_mic;
+	fh << " " << topaz_additional_args;
+	fh << std::endl;
+	fh.close();
+
+	std::string command = fn_bash + " " + fn_script + " >& " + fn_log ;
+	if (system(command.c_str())) std::cerr << "WARNING: there was an error in executing: " << command << std::endl;
+
+	// Now convert output .txt into Relion-style .star files!
+	// No need to pass downscale factor, as picks are already up-scaled using -x in topaz extract command above!
+	MetaDataTable MDout = readTopazCoordinates(fn_odir + fn_proc + fn_local_pick);
+	if (verb > 1)
+		std::cerr << "Picked " << MDout.numberOfObjects() << " of particles " << std::endl;
+	FileName fn_pick = getOutputRootName(fn_mic) + "_" + fn_out + ".star";
+	MDout.write(fn_pick);
+
+	// Delete rank-specific process directory to remove all intermediate results
+    // Also delete the symlink, as otherwise the symlink will fail for the next micrograph!
+	command = "rm -rf " + fn_odir + fn_proc + " " + fno;
+    if (system(command.c_str())) std::cerr << "WARNING: there was an error in executing: " << command << std::endl;
+
 }
 
 void AutoPicker::autoPickLoGOneMicrograph(FileName &fn_mic, long int imic)

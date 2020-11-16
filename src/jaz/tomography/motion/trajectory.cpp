@@ -97,7 +97,8 @@ std::vector<Trajectory> Trajectory::read(std::string filename, ParticleSet& part
 
 void Trajectory::write(
 		const std::vector<Trajectory>& shifts,
-		ParticleSet& particleSet,
+		const ParticleSet& particleSet,
+		const std::vector<std::vector<ParticleIndex>>& particles,
 		std::string filename)
 {
 	const int pc = shifts.size();
@@ -116,23 +117,30 @@ void Trajectory::write(
 	mdt.write(ofs);
 	mdt.clear();
 
-	for (int p = 0; p < pc; p++)
+	const int tc = particles.size();
+
+	int index = 0;
+
+	for (int t = 0; t < tc; t++)
+	for (int pp = 0; pp < particles[t].size(); pp++)
 	{
-		mdt.setName(particleSet.getName(ParticleIndex(p)));
+		mdt.setName(particleSet.getName(particles[t][pp]));
 		
-		const int fc = shifts[p].shifts_Ang.size();
+		const int fc = shifts[index].shifts_Ang.size();
 
 		for (int f = 0; f < fc; f++)
 		{
 			mdt.addObject();
 			
-			mdt.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, shifts[p].shifts_Ang[f].x);
-			mdt.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, shifts[p].shifts_Ang[f].y);
-			mdt.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, shifts[p].shifts_Ang[f].z);
+			mdt.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, shifts[index].shifts_Ang[f].x);
+			mdt.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, shifts[index].shifts_Ang[f].y);
+			mdt.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, shifts[index].shifts_Ang[f].z);
 		}
 
 		mdt.write(ofs);
 		mdt.clear();
+
+		index++;
 	}
 }
 
@@ -156,5 +164,12 @@ std::vector<d3Vector> Trajectory::getShiftsInPix(d3Vector origin, double pixelSi
 		out[f] = origin + shifts_Ang[f] / pixelSize;
 	}
 	
+	return out;
+}
+
+Trajectory operator + (const Trajectory& t1, const Trajectory& t2)
+{
+	Trajectory out = t1;
+	out += t2;
 	return out;
 }

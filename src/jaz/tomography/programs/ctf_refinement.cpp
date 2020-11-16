@@ -43,7 +43,7 @@ CtfRefinementProgram::CtfRefinementProgram(int argc, char *argv[])
 
 		int defocus_section = parser.addSection("Defocus refinement options");
 
-		do_refine_defocus = !parser.checkOption("--no_defocus", "Do not refine the (astigmatic) defocus.");
+		do_refine_defocus = parser.checkOption("--do_defocus", "Refine the (astigmatic) defocus.");
 		lambda_reg = textToDouble(parser.getOption("--lambda", "Defocus regularisation scale", "0.1"));
 
 		minDelta = textToDouble(parser.getOption("--d0", "Min. defocus offset to test [Å]", "-3000"));
@@ -53,15 +53,25 @@ CtfRefinementProgram::CtfRefinementProgram(int argc, char *argv[])
 
 		int scale_section = parser.addSection("Scale estimation options");
 
-		do_refine_scale = !parser.checkOption("--no_scale", "Do not refine the contrast scale");
-		do_fit_Beer_Lambert = !parser.checkOption("--per_frame_scale", "Do not fit the ice thickness using the Beer-Lambert law");
+		do_refine_scale = parser.checkOption("--do_scale", "Refine the contrast scale");
+		bool per_frame_scale = parser.checkOption("--per_frame_scale", "Estimate the scale per frame (no Lambert fit)");
+		bool per_tomogram_scale = parser.checkOption("--per_tomogram_scale", "Estimate the scale per tomogram (luminance may become unstable)");
+
+		if (per_frame_scale && per_tomogram_scale)
+		{
+			parser.reportError("The options --per_frame_scale and --per_tomogram_scale are mutually exclusive");
+		}
+
+		do_fit_Lambert_per_tomo = do_refine_scale && per_tomogram_scale;
+		do_fit_Lambert_globally = do_refine_scale && !per_frame_scale && !per_tomogram_scale;
 
 
 		int aberr_section = parser.addSection("Aberration refinement options");
 
-		do_refine_aberrations = !parser.checkOption("--no_aberrations", "Do not refine higher-order aberrations");
-		do_even_aberrations = !parser.checkOption("--no_even_aberrations", "Do not refine even aberrations");
-		do_odd_aberrations = !parser.checkOption("--no_odd_aberrations", "Do not refine odd aberrations");
+		do_even_aberrations = parser.checkOption("--do_even_aberrations", "Refine even higher-order aberrations");
+		do_odd_aberrations = parser.checkOption("--do_odd_aberrations", "Refine odd higher-order aberrations");
+		do_refine_aberrations = do_odd_aberrations || do_even_aberrations;
+
 		n_even = textToInteger(parser.getOption("--ne", "Maximal N for even aberrations", "4"));
 		n_odd = textToInteger(parser.getOption("--no", "Maximal N for odd aberrations", "3"));
 
@@ -84,90 +94,90 @@ CtfRefinementProgram::CtfRefinementProgram(int argc, char *argv[])
 void CtfRefinementProgram::run()
 {
 	Log::beginSection("Initialising");
-	
-	RefinementProgram::init();
 
-	const int s = boxSize;
-	const int sh = s/2 + 1;
-	const int tc = particles.size();
-	const int gc = particleSet.numberOfOpticsGroups();
+		RefinementProgram::init();
 
-	AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
-	
+		initTempDirectories();
+
+		AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
+
 	Log::endSection();
 
 
-	std::vector<BufferedImage<EvenData>> evenData_perGroup(gc);
-	std::vector<BufferedImage<OddData>>  oddData_perGroup(gc);
+	std::vector<int> tomoIndices = ParticleSet::enumerate(particles);
 
-	std::vector<std::vector<BufferedImage<EvenData>>> evenData_perGroup_perThread(num_threads);
-	std::vector<std::vector<BufferedImage<OddData>>> oddData_perGroup_perThread(num_threads);
+	processTomograms(tomoIndices, aberrationsCache, 1, true);
 
-	EvenData evenZero({0.0, 0.0, 0.0, 0.0, 0.0});
-	OddData oddZero({0.0, dComplex(0.0, 0.0)});
 
-	for (int g = 0; g < gc; g++)
+	finalise();
+}
+
+void CtfRefinementProgram::initTempDirectories()
+{
+	if (do_refine_defocus)
 	{
-		evenData_perGroup[g] = BufferedImage<EvenData>(sh,s);
-		evenData_perGroup[g].fill(evenZero);
-
-		oddData_perGroup[g] = BufferedImage<OddData>(sh,s);
-		oddData_perGroup[g].fill(oddZero);
-
-		evenData_perGroup_perThread[g] = std::vector<BufferedImage<EvenData>>(num_threads);
-		oddData_perGroup_perThread[g]  = std::vector<BufferedImage<OddData>>(num_threads);
+		ZIO::ensureParentDir(getDefocusTempFilename(""));
 	}
 
-
-	processTomograms(
-		0, tc-1, aberrationsCache,
-		evenData_perGroup,
-		evenData_perGroup_perThread,
-		oddData_perGroup,
-		oddData_perGroup_perThread,
-		1);
-
-
-	Tomogram tomogram0 = tomogramSet.loadTomogram(0, false);
-	const double firstTomoPixelSize = tomogram0.optics.pixelSize;
+	if (do_refine_scale)
+	{
+		ZIO::ensureParentDir(getScaleTempFilename(""));
+	}
 
 	if (do_refine_aberrations)
 	{
-		fitAberrations(evenData_perGroup, oddData_perGroup, firstTomoPixelSize);
+		if (do_even_aberrations)
+		{
+			ZIO::ensureParentDir(getEvenAberrationsTempFilename("", 0));
+		}
 
-		particleSet.write(outDir+"particles.star");
-		optimisationSet.particles = outDir+"particles.star";
+		if (do_odd_aberrations)
+		{
+			ZIO::ensureParentDir(getOddAberrationsTempFilename("", 0));
+		}
 	}
-
-	if (do_refine_defocus || do_refine_scale)
-	{
-		tomogramSet.write(outDir+"tomograms.star");
-		optimisationSet.tomograms = outDir+"tomograms.star";
-	}
-
-	optimisationSet.write(outDir+"optimisation_set.star");
 }
 
 void CtfRefinementProgram::processTomograms(
-		int first_t,
-		int last_t,
+		const std::vector<int>& tomoIndices,
 		const AberrationsCache& aberrationsCache,
-		std::vector<BufferedImage<EvenData>>& evenData_perGroup,
-		std::vector<std::vector<BufferedImage<EvenData>>>& evenData_perGroup_perThread,
-		std::vector<BufferedImage<OddData>>& oddData_perGroup,
-		std::vector<std::vector<BufferedImage<OddData>>>& oddData_perGroup_perThread,
-		int verbosity)
+		int verbosity,
+		bool per_tomogram_progress)
 {
-	for (int t = first_t; t <= last_t; t++)
+	const int ttc = tomoIndices.size();
+
+	if (verbosity > 0 && !per_tomogram_progress)
 	{
+		Log::beginProgress("Processing tomograms", ttc);
+	}
+
+	for (int tt = 0; tt < ttc; tt++)
+	{
+		if (verbosity > 0 && !per_tomogram_progress)
+		{
+			Log::updateProgress(tt);
+		}
+
+		const int t = tomoIndices[tt];
+
 		int pc = particles[t].size();
 		if (pc == 0) continue;
 
-		if (verbosity > 0)
+		const std::string tomogram_name = tomogramSet.getTomogramName(t);
+		const int gc = particleSet.numberOfOpticsGroups();
+
+		if (only_do_unfinished &&
+				defocusAlreadyDone(tomogram_name) &&
+				scaleAlreadyDone(tomogram_name) &&
+				aberrationsAlreadyDone(tomogram_name, gc) )
+		{
+			continue;
+		}
+
+		if (verbosity > 0 && per_tomogram_progress)
 		{
 			Log::beginSection(
-						"Tomogram " + ZIO::itoa(t - first_t + 1)
-						+ " / " + ZIO::itoa(last_t - first_t + 1));
+				"Tomogram " + ZIO::itoa(tt + 1) + " / " + ZIO::itoa(ttc));
 
 			Log::print("Loading");
 		}
@@ -186,15 +196,21 @@ void CtfRefinementProgram::processTomograms(
 		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(boxSize,1);
 
 
+		const int item_verbosity = per_tomogram_progress? verbosity : 0;
+
 		if (do_refine_defocus)
 		{
-			refineDefocus(t, tomogram, aberrationsCache, freqWeights, doseWeights);
+			refineDefocus(
+				t, tomogram, aberrationsCache, freqWeights, doseWeights,
+				item_verbosity);
 		}
 
 
 		if (do_refine_scale)
 		{
-			fitScale(t, tomogram, aberrationsCache, freqWeights, doseWeights);
+			updateScale(
+				t, tomogram, aberrationsCache, freqWeights, doseWeights,
+				item_verbosity);
 		}
 
 
@@ -202,24 +218,84 @@ void CtfRefinementProgram::processTomograms(
 		{
 			updateAberrations(
 				t, tomogram, aberrationsCache, freqWeights, doseWeights,
-				evenData_perGroup, evenData_perGroup_perThread,
-				oddData_perGroup, oddData_perGroup_perThread);
+				item_verbosity);
 		}
 
-		if (verbosity > 0)
+
+		if (verbosity > 0 && per_tomogram_progress)
 		{
 			Log::endSection();
 		}
 
 	} // all tomograms
+
+	if (verbosity > 0 && !per_tomogram_progress)
+	{
+		Log::endProgress();
+	}
 }
+
+void CtfRefinementProgram::finalise()
+{
+	if (!do_fit_Lambert_globally && !do_refine_aberrations)
+	{
+		Log::print("Merging temporary data");
+	}
+	else
+	{
+		Log::print("Merging temporary data and performing global fits");
+	}
+
+	if (do_refine_defocus)
+	{
+		collectDefocus();
+	}
+
+	if (do_refine_scale)
+	{
+		if (do_fit_Lambert_globally)
+		{
+			fitGlobalScale();
+		}
+		else
+		{
+			collectScale();
+		}
+	}
+
+	if (do_refine_aberrations)
+	{
+		fitAberrations();
+	}
+
+	Log::print("Writing output data");
+
+	if (do_refine_aberrations)
+	{
+		particleSet.write(outDir + "particles.star");
+		optimisationSet.particles = outDir + "particles.star";
+	}
+
+	if (do_refine_defocus || do_refine_scale)
+	{
+		tomogramSet.write(outDir + "tomograms.star");
+		optimisationSet.tomograms = outDir + "tomograms.star";
+	}
+
+	optimisationSet.write(outDir + "optimisation_set.star");
+
+	std::cout << std::endl;
+}
+
+
 
 void CtfRefinementProgram::refineDefocus(
 		int t,
 		Tomogram& tomogram,
 		const AberrationsCache& aberrationsCache,
 		const BufferedImage<float>& freqWeights,
-		const BufferedImage<float>& doseWeights)
+		const BufferedImage<float>& doseWeights,
+		int verbosity)
 {
 	const int s = boxSize;
 	const int sh = s/2 + 1;
@@ -229,8 +305,15 @@ void CtfRefinementProgram::refineDefocus(
 	EvenData evenZero({0.0, 0.0, 0.0, 0.0, 0.0});
 	OddData oddZero({0.0, dComplex(0.0, 0.0)});
 
+	if (only_do_unfinished && defocusAlreadyDone(tomogram.name))
+	{
+		return;
+	}
 
-	Log::beginSection("Refining defocus");
+	if (verbosity > 0)
+	{
+		Log::beginSection("Refining defocus");
+	}
 
 	BufferedImage<EvenData> evenData(sh,s,fc);
 	evenData.fill(evenZero);
@@ -248,11 +331,18 @@ void CtfRefinementProgram::refineDefocus(
 	}
 
 
-
-	Log::beginProgress("Accumulating defocus evidence", pc * fc / num_threads);
+	if (verbosity > 0)
+	{
+		Log::beginProgress("Accumulating defocus evidence", fc);
+	}
 
 	for (int f = 0; f < fc; f++)
 	{
+		if (verbosity > 0)
+		{
+			Log::updateProgress(f);
+		}
+
 		std::vector<BufferedImage<EvenData>> evenData_thread(num_threads);
 		std::vector<BufferedImage<OddData>> oddData_thread(num_threads);
 
@@ -270,11 +360,6 @@ void CtfRefinementProgram::refineDefocus(
 		{
 			const int th = omp_get_thread_num();
 
-			if (th == 0)
-			{
-				Log::updateProgress(pc * f / num_threads + p);
-			}
-
 			AberrationFit::considerParticle(
 				particles[t][p], tomogram, referenceMap, particleSet,
 				aberrationsCache, true, freqWeights, doseWeights,
@@ -289,17 +374,12 @@ void CtfRefinementProgram::refineDefocus(
 		}
 	}
 
-	Log::endProgress();
+	if (verbosity > 0)
+	{
+		Log::endProgress();
 
-	/*{
-		EvenData::write(evenData, outDir+"DEBUG");
-	}*/
-
-	/*{
-		evenData = EvenData::read(outDir+"DEBUG");
-	}*/
-
-	Log::print("Fitting");
+		Log::print("Fitting");
+	}
 
 
 	const BufferedImage<double> dataTerm = evaluateDefocusRange(
@@ -335,12 +415,17 @@ void CtfRefinementProgram::refineDefocus(
 
 	const double bestDeltaZ = minDelta + best_di * deltaStep;
 
-	Log::print("Refining astigmatic defocus");
+	if (verbosity > 0)
+	{
+		Log::print("Refining astigmatic defocus");
+	}
 
 	EvenSolution solution = AberrationFit::solveEven(evenData);
 
 	std::vector<d3Vector> astig = findMultiAstigmatism(
 		solution, tomogram.centralCTFs, bestDeltaZ, tomogram.optics.pixelSize, lambda_reg);
+
+	MetaDataTable tempTable;
 
 	for (int f = 0; f < fc; f++)
 	{
@@ -356,9 +441,20 @@ void CtfRefinementProgram::refineDefocus(
 		ctf1.DeltafV = astig[f][1];
 		ctf1.azimuthal_angle = astig[f][2];
 
+		tempTable.addObject();
+		tempTable.setValue(EMDL_CTF_DEFOCUSU, ctf1.DeltafU, f);
+		tempTable.setValue(EMDL_CTF_DEFOCUSV, ctf1.DeltafV, f);
+		tempTable.setValue(EMDL_CTF_DEFOCUS_ANGLE, ctf1.azimuthal_angle, f);
+
+		// Also store the new defoci in the tomogram set, so they can be
+		// used for consecutive fits on the same node.
+		// Note: this does not work when a run has been resumed.
+
 		tomogramSet.setCtf(t, f, ctf1);
 		tomogram.centralCTFs[f] = ctf1;
 	}
+
+	tempTable.write(getDefocusTempFilename(tomogram.name));
 
 	if (diag)
 	{
@@ -372,31 +468,49 @@ void CtfRefinementProgram::refineDefocus(
 		meanDefocus.flush();
 	}
 
-	Log::endSection();
+	if (verbosity > 0)
+	{
+		Log::endSection();
+	}
 }
 
-void CtfRefinementProgram::fitScale(
+void CtfRefinementProgram::updateScale(
 		int t,
 		Tomogram& tomogram,
 		const AberrationsCache& aberrationsCache,
 		const BufferedImage<float>& freqWeights,
-		const BufferedImage<float>& doseWeights)
+		const BufferedImage<float>& doseWeights,
+		int verbosity)
 {
 	const int s = boxSize;
 	const int sh = s/2 + 1;
 	const int fc = tomogram.frameCount;
 	const int pc = particles[t].size();
 
-	Log::beginSection("Refining scale");
+	if (only_do_unfinished && scaleAlreadyDone(tomogram.name))
+	{
+		return;
+	}
+
+	if (verbosity > 0)
+	{
+		Log::beginSection("Refining scale");
+	}
 
 	std::vector<double> sum_prdObs_f(fc, 0.0);
 	std::vector<double> sum_prdSqr_f(fc, 0.0);
 
-	Log::beginProgress("Accumulating scale evidence", pc);
+	if (verbosity > 0)
+	{
+		Log::beginProgress("Accumulating scale evidence", pc);
+	}
 
 	for (int p = 0; p < pc; p++)
 	{
-		Log::updateProgress(p);
+		if (verbosity > 0)
+		{
+			Log::updateProgress(p);
+		}
 
 		const ParticleIndex part_id = particles[t][p];
 
@@ -446,7 +560,10 @@ void CtfRefinementProgram::fitScale(
 
 	} // all particles
 
-	Log::endProgress();
+	if (verbosity > 0)
+	{
+		Log::endProgress();
+	}
 
 
 	std::vector<double> per_frame_scale(fc);
@@ -468,8 +585,21 @@ void CtfRefinementProgram::fitScale(
 		scaleFile.flush();
 	}
 
+	if (do_fit_Lambert_globally)
+	{
+		MetaDataTable tempFile;
 
-	if (do_fit_Beer_Lambert)
+		for (int f = 0; f < fc; f++)
+		{
+			tempFile.addObject();
+			tempFile.setValue(EMDL_TOMO_TEMP_PRED_TIMES_OBS, sum_prdObs_f[f], f);
+			tempFile.setValue(EMDL_TOMO_TEMP_PRED_SQUARED, sum_prdSqr_f[f], f);
+		}
+
+		const std::string tempFilename = getScaleTempFilename(tomogram.name);
+		tempFile.write(tempFilename);
+	}
+	else if (do_fit_Lambert_per_tomo)
 	{
 		double max_scale = 0.0;
 		int max_scale_f = 0;
@@ -490,7 +620,7 @@ void CtfRefinementProgram::fitScale(
 			max_scale_view[i] = tomogram.projectionMatrices[max_scale_f](2,i);
 		}
 
-		BeerLambertFit blf(
+		LambertFit blf(
 			tomogram.projectionMatrices,
 			sum_prdObs_f,
 			sum_prdSqr_f);
@@ -502,6 +632,10 @@ void CtfRefinementProgram::fitScale(
 
 		std::vector<double> opt = NelderMead::optimize(initial, blf, 0.01, 0.0001, 10000);
 
+
+
+		MetaDataTable tempGlobalTable, tempPerFrameTable;
+
 		for (int f = 0; f < fc; f++)
 		{
 			const double est = blf.getScale(f, opt);
@@ -510,19 +644,48 @@ void CtfRefinementProgram::fitScale(
 
 			ctf.scale = est;
 
+			tempPerFrameTable.addObject();
+			tempPerFrameTable.setValue(EMDL_CTF_SCALEFACTOR, ctf.scale, f);
+
 			tomogramSet.setCtf(t, f, ctf);
 			tomogram.centralCTFs[f] = ctf;
-
-			const double rel_thickness = -log(opt[1]);
-			d3Vector ice_normal = sin(opt[2]) * blf.tilt_p + cos(opt[2]) * blf.tilt_q;
-			ice_normal.normalize();
-
-			tomogramSet.globalTable.setValue(EMDL_TOMO_RELATIVE_LUMINANCE, opt[0], t);
-			tomogramSet.globalTable.setValue(EMDL_TOMO_RELATIVE_ICE_THICKNESS, rel_thickness, t);
-			tomogramSet.globalTable.setValue(EMDL_TOMO_ICE_NORMAL_X, ice_normal.x, t);
-			tomogramSet.globalTable.setValue(EMDL_TOMO_ICE_NORMAL_Y, ice_normal.y, t);
-			tomogramSet.globalTable.setValue(EMDL_TOMO_ICE_NORMAL_Z, ice_normal.z, t);
 		}
+
+		const double rel_thickness = -log(opt[1]);
+		d3Vector ice_normal = sin(opt[2]) * blf.tilt_p + cos(opt[2]) * blf.tilt_q;
+		ice_normal.normalize();
+
+		tempGlobalTable.addObject();
+
+		tempGlobalTable.setValue(EMDL_TOMO_RELATIVE_LUMINANCE, opt[0], 0);
+		tempGlobalTable.setValue(EMDL_TOMO_RELATIVE_ICE_THICKNESS, rel_thickness, 0);
+		tempGlobalTable.setValue(EMDL_TOMO_ICE_NORMAL_X, ice_normal.x, 0);
+		tempGlobalTable.setValue(EMDL_TOMO_ICE_NORMAL_Y, ice_normal.y, 0);
+		tempGlobalTable.setValue(EMDL_TOMO_ICE_NORMAL_Z, ice_normal.z, 0);
+
+		{
+			const std::string tempFilename = getScaleTempFilename(tomogram.name);
+			std::ofstream ofs(tempFilename);
+
+			if (!ofs)
+			{
+				REPORT_ERROR("TomogramSet::write: unable to write to "+tempFilename);
+			}
+
+			tempGlobalTable.write(ofs);
+			tempPerFrameTable.write(ofs);
+		}
+
+		// Also store the new scale in the tomogram set, so it can be
+		// used for consecutive fits on the same node.
+		// Note: this does not work when a run has been resumed.
+
+		tomogramSet.globalTable.setValue(EMDL_TOMO_RELATIVE_LUMINANCE, opt[0], t);
+		tomogramSet.globalTable.setValue(EMDL_TOMO_RELATIVE_ICE_THICKNESS, rel_thickness, t);
+		tomogramSet.globalTable.setValue(EMDL_TOMO_ICE_NORMAL_X, ice_normal.x, t);
+		tomogramSet.globalTable.setValue(EMDL_TOMO_ICE_NORMAL_Y, ice_normal.y, t);
+		tomogramSet.globalTable.setValue(EMDL_TOMO_ICE_NORMAL_Z, ice_normal.z, t);
+
 
 		if (diag)
 		{
@@ -538,20 +701,33 @@ void CtfRefinementProgram::fitScale(
 			scaleFile.flush();
 		}
 	}
-	else
+	else // !do_fit_Lambert_per_tomo && !do_fit_Lambert_globally
 	{
+		MetaDataTable tempPerFrameTable;
+
 		for (int f = 0; f < fc; f++)
 		{
 			CTF ctf = tomogram.centralCTFs[f];
-
 			ctf.scale = per_frame_scale[f];
+
+			tempPerFrameTable.addObject();
+			tempPerFrameTable.setValue(EMDL_CTF_SCALEFACTOR, ctf.scale, f);
+
+			// Also store the new scale in the tomogram set, so it can be
+			// used for consecutive fits on the same node.
+			// Note: this does not work when a run has been resumed.
 
 			tomogramSet.setCtf(t, f, ctf);
 			tomogram.centralCTFs[f] = ctf;
 		}
+
+		tempPerFrameTable.write(getScaleTempFilename(tomogram.name));
 	}
 
-	Log::endSection();
+	if (verbosity > 0)
+	{
+		Log::endSection();
+	}
 }
 
 void CtfRefinementProgram::updateAberrations(
@@ -560,10 +736,7 @@ void CtfRefinementProgram::updateAberrations(
 		const AberrationsCache& aberrationsCache,
 		const BufferedImage<float>& freqWeights,
 		const BufferedImage<float>& doseWeights,
-		std::vector<BufferedImage<EvenData>>& evenData_perGroup,
-		std::vector<std::vector<BufferedImage<EvenData>>>& evenData_perGroup_perThread,
-		std::vector<BufferedImage<OddData>>& oddData_perGroup,
-		std::vector<std::vector<BufferedImage<OddData>>>& oddData_perGroup_perThread)
+		int verbosity)
 {
 	const int s = boxSize;
 	const int sh = s/2 + 1;
@@ -572,11 +745,38 @@ void CtfRefinementProgram::updateAberrations(
 	const int gc = particleSet.numberOfOpticsGroups();
 
 
+	if (only_do_unfinished && aberrationsAlreadyDone(tomogram.name, gc))
+	{
+		return;
+	}
+
+	if (verbosity > 0)
+	{
+		Log::beginSection("Updating aberrations");
+	}
+
+
+	std::vector<BufferedImage<EvenData>> evenData_perGroup(gc);
+	std::vector<BufferedImage<OddData>>  oddData_perGroup(gc);
+
+	std::vector<std::vector<BufferedImage<EvenData>>> evenData_perGroup_perThread(num_threads);
+	std::vector<std::vector<BufferedImage<OddData>>> oddData_perGroup_perThread(num_threads);
+
 	EvenData evenZero({0.0, 0.0, 0.0, 0.0, 0.0});
 	OddData oddZero({0.0, dComplex(0.0, 0.0)});
 
+	for (int g = 0; g < gc; g++)
+	{
+		evenData_perGroup[g] = BufferedImage<EvenData>(sh,s);
+		evenData_perGroup[g].fill(evenZero);
 
-	Log::beginSection("Updating aberrations");
+		oddData_perGroup[g] = BufferedImage<OddData>(sh,s);
+		oddData_perGroup[g].fill(oddZero);
+
+		evenData_perGroup_perThread[g] = std::vector<BufferedImage<EvenData>>(num_threads);
+		oddData_perGroup_perThread[g]  = std::vector<BufferedImage<OddData>>(num_threads);
+	}
+
 
 	for (int g = 0; g < gc; g++)
 	{
@@ -590,14 +790,18 @@ void CtfRefinementProgram::updateAberrations(
 		}
 	}
 
-	Log::beginProgress("Accumulating aberrations evidence", pc/num_threads);
+
+	if (verbosity > 0)
+	{
+		Log::beginProgress("Accumulating aberrations evidence", pc/num_threads);
+	}
 
 	#pragma omp parallel for num_threads(num_threads)
 	for (int p = 0; p < pc; p++)
 	{
 		const int th = omp_get_thread_num();
 
-		if (th == 0)
+		if (th == 0 && verbosity > 0)
 		{
 			Log::updateProgress(p/num_threads);
 		}
@@ -612,7 +816,11 @@ void CtfRefinementProgram::updateAberrations(
 			oddData_perGroup_perThread[g][th]);
 	}
 
-	Log::endProgress();
+	if (verbosity > 0)
+	{
+		Log::endProgress();
+	}
+
 
 	for (int g = 0; g < gc; g++)
 	{
@@ -621,29 +829,307 @@ void CtfRefinementProgram::updateAberrations(
 			evenData_perGroup[g] += evenData_perGroup_perThread[g][th];
 			oddData_perGroup[g]  += oddData_perGroup_perThread[g][th];
 		}
+
+		EvenData::write(
+			evenData_perGroup[g],
+			getEvenAberrationsTempFilename(tomogram.name, g));
+
+		OddData::write(
+			oddData_perGroup[g],
+			getOddAberrationsTempFilename(tomogram.name, g));
 	}
 
-	Log::endSection();
+	if (verbosity > 0)
+	{
+		Log::endSection();
+	}
 }
 
-void CtfRefinementProgram::fitAberrations(
-		std::vector<BufferedImage<EvenData>>& evenData_perGroup,
-		std::vector<BufferedImage<OddData>>& oddData_perGroup,
-		double pixelSize)
+
+
+void CtfRefinementProgram::collectDefocus()
 {
+	const int tc = tomogramSet.size();
+
+	for (int t = 0; t < tc; t++)
+	{
+		Tomogram tomogram = tomogramSet.loadTomogram(t, false);
+
+		const std::string tempFilename = getDefocusTempFilename(tomogram.name);
+		MetaDataTable tempTable;
+		tempTable.read(tempFilename);
+
+		const int fc = tomogram.frameCount;
+
+		for (int f = 0; f < fc; f++)
+		{
+			CTF& ctf = tomogram.centralCTFs[f];
+
+			ctf.DeltafU = tempTable.getDouble(EMDL_CTF_DEFOCUSU, f);
+			ctf.DeltafV = tempTable.getDouble(EMDL_CTF_DEFOCUSV, f);
+			ctf.azimuthal_angle = tempTable.getDouble(EMDL_CTF_DEFOCUS_ANGLE, f);
+
+			ctf.initialise();
+
+			tomogramSet.setCtf(t, f, ctf);
+		}
+	}
+}
+
+void CtfRefinementProgram::fitGlobalScale()
+{
+	const int tc = tomogramSet.size();
+
+	std::vector<std::vector<double>> all_sum_prdObs(tc), all_sum_prdSqr(tc);
+	std::vector<std::vector<d4Matrix>> all_proj_matrices(tc);
+	std::vector<double> all_fract_doses(tc);
+
+	for (int t = 0; t < tc; t++)
+	{
+		Tomogram tomogram = tomogramSet.loadTomogram(t, false);
+
+		const std::string tempFilename = getScaleTempFilename(tomogram.name);
+		MetaDataTable tempFile;
+		tempFile.read(tempFilename);
+
+		const int fc = tomogram.frameCount;
+
+		if (tempFile.numberOfObjects() != fc)
+		{
+			REPORT_ERROR("CtfRefinementProgram::fitGlobalScale: temporary file "+tempFilename+" is corrupted.");
+		}
+
+		all_sum_prdObs[t] = std::vector<double>(fc);
+		all_sum_prdSqr[t] = std::vector<double>(fc);
+
+		for (int f = 0; f < fc; f++)
+		{
+			all_sum_prdObs[t][f] = tempFile.getDouble(EMDL_TOMO_TEMP_PRED_TIMES_OBS, f);
+			all_sum_prdSqr[t][f] = tempFile.getDouble(EMDL_TOMO_TEMP_PRED_SQUARED, f);
+		}
+
+		all_proj_matrices[t] = tomogram.projectionMatrices;
+		all_fract_doses[t] = tomogram.getFrameDose();
+	}
+
+	std::vector<double> initial(2*tc + 1);
+
+	double avg_max_scale = 0.0;
+	double nonempty_tomos = 0.0;
+
+	for (int t = 0; t < tc; t++)
+	{
+		const int fc = all_sum_prdObs[t].size();
+
+		if (fc > 0)
+		{
+			std::vector<double> per_frame_scale(fc);
+
+			for (int f = 0; f < fc; f++)
+			{
+				per_frame_scale[f] = all_sum_prdObs[t][f] / all_sum_prdSqr[t][f];
+			}
+
+			double max_scale = 0.0;
+			int max_scale_f = 0;
+
+			for (int f = 0; f < fc; f++)
+			{
+				if (per_frame_scale[f] > max_scale)
+				{
+					max_scale = per_frame_scale[f];
+					max_scale_f = f;
+				}
+			}
+
+			d3Vector max_scale_view;
+
+			for (int i = 0; i < 3; i++)
+			{
+				max_scale_view[i] = all_proj_matrices[t][max_scale_f](2,i);
+			}
+
+			d3Matrix w2t = TiltGeometry::worldToTiltSpace(all_proj_matrices[t]);
+
+			d3Vector tilt_p = d3Vector(w2t(0,0), w2t(0,1), w2t(0,2));
+			d3Vector tilt_q = d3Vector(w2t(1,0), w2t(1,1), w2t(1,2));
+
+			initial[2*t + 1] = 0.5;
+			initial[2*t + 2] = atan2(max_scale_view.dot(tilt_p), max_scale_view.dot(tilt_q));
+
+			avg_max_scale += max_scale;
+			nonempty_tomos += 1.0;
+		}
+		else
+		{
+			initial[2*t + 1] = 0.5;
+			initial[2*t + 2] = 0.0;
+		}
+	}
+
+	avg_max_scale /= nonempty_tomos;
+
+	initial[0] = 2.0 * avg_max_scale;
+
+	MultiLambertFit mblf(
+			all_proj_matrices, all_sum_prdObs,
+			all_sum_prdSqr,
+			all_fract_doses);
+
+	std::vector<double> opt = LBFGS::optimize(initial, mblf, 0, 1000, 1e-5, 1e-4);
+
+	for (int t = 0; t < tc; t++)
+	{
+		Tomogram tomogram = tomogramSet.loadTomogram(t, false);
+
+		const int fc = tomogram.frameCount;
+
+		const double lum    = opt[0];
+		const double kappa  = opt[2*t + 1];
+		const double phi    = opt[2*t + 2];
+
+		for (int f = 0; f < fc; f++)
+		{
+			const double est = mblf.getScale(t, f, opt);
+
+			CTF ctf = tomogram.centralCTFs[f];
+
+			ctf.scale = est;
+
+			tomogramSet.setCtf(t, f, ctf);
+			tomogram.centralCTFs[f] = ctf;
+
+			const double rel_thickness = -log(kappa);
+			d3Vector ice_normal = sin(phi) * mblf.tilt_p[t] + cos(phi) * mblf.tilt_q[t];
+			ice_normal.normalize();
+
+			tomogramSet.globalTable.setValue(EMDL_TOMO_RELATIVE_LUMINANCE, lum, t);
+			tomogramSet.globalTable.setValue(EMDL_TOMO_RELATIVE_ICE_THICKNESS, rel_thickness, t);
+			tomogramSet.globalTable.setValue(EMDL_TOMO_ICE_NORMAL_X, ice_normal.x, t);
+			tomogramSet.globalTable.setValue(EMDL_TOMO_ICE_NORMAL_Y, ice_normal.y, t);
+			tomogramSet.globalTable.setValue(EMDL_TOMO_ICE_NORMAL_Z, ice_normal.z, t);
+		}
+
+		if (diag)
+		{
+			std::ofstream scaleFile(outDir + tomogram.name + "_multifitted_scale.dat");
+
+			for (int f = 0; f < fc; f++)
+			{
+				const double est = mblf.getScale(t, f, opt);
+
+				scaleFile << f << ' ' << est << '\n';
+			}
+
+			scaleFile.flush();
+		}
+	}
+}
+
+void CtfRefinementProgram::collectScale()
+{
+	const int tc = tomogramSet.size();
+
+	for (int t = 0; t < tc; t++)
+	{
+		Tomogram tomogram = tomogramSet.loadTomogram(t, false);
+		std::string tempFilename = getScaleTempFilename(tomogram.name);
+
+		const int fc = tomogram.frameCount;
+
+
+		std::ifstream ifs(tempFilename);
+
+		if (!ifs)
+		{
+			REPORT_ERROR_STR("CtfRefinementProgram::collectScale: Unable to read " << tempFilename);
+		}
+
+
+		if (do_fit_Lambert_per_tomo)
+		{
+			std::vector<MetaDataTable> bothTables = MetaDataTable::readAll(ifs, 2);
+
+			MetaDataTable& tempGlobalTable = bothTables[0];
+			MetaDataTable& tempPerFrameTable = bothTables[1];
+
+			tomogramSet.globalTable.setValue(EMDL_TOMO_RELATIVE_LUMINANCE,
+				   tempGlobalTable.getDouble(EMDL_TOMO_RELATIVE_LUMINANCE, 0), t);
+
+			tomogramSet.globalTable.setValue(EMDL_TOMO_RELATIVE_ICE_THICKNESS,
+				   tempGlobalTable.getDouble(EMDL_TOMO_RELATIVE_ICE_THICKNESS, 0), t);
+
+			tomogramSet.globalTable.setValue(EMDL_TOMO_ICE_NORMAL_X,
+				   tempGlobalTable.getDouble(EMDL_TOMO_ICE_NORMAL_X, 0), t);
+
+			tomogramSet.globalTable.setValue(EMDL_TOMO_ICE_NORMAL_Y,
+				   tempGlobalTable.getDouble(EMDL_TOMO_ICE_NORMAL_Y, 0), t);
+
+			tomogramSet.globalTable.setValue(EMDL_TOMO_ICE_NORMAL_Z,
+				   tempGlobalTable.getDouble(EMDL_TOMO_ICE_NORMAL_Z, 0), t);
+
+
+			for (int f = 0; f < fc; f++)
+			{
+				CTF& ctf = tomogram.centralCTFs[f];
+				ctf.scale = tempPerFrameTable.getDouble(EMDL_CTF_SCALEFACTOR, f);
+				ctf.initialise();
+
+				tomogramSet.setCtf(t, f, ctf);
+			}
+		}
+		else
+		{
+			MetaDataTable tempPerFrameTable;
+			tempPerFrameTable.read(getScaleTempFilename(tomogram.name));
+
+			for (int f = 0; f < fc; f++)
+			{
+				CTF& ctf = tomogram.centralCTFs[f];
+				ctf.scale = tempPerFrameTable.getDouble(EMDL_CTF_SCALEFACTOR, f);
+				ctf.initialise();
+
+				tomogramSet.setCtf(t, f, ctf);
+			}
+		}
+	}
+}
+
+void CtfRefinementProgram::fitAberrations()
+{
+	const int s  = boxSize;
+	const int sh = s/2 + 1;
 	const int gc = particleSet.numberOfOpticsGroups();
+	const int tc = tomogramSet.size();
+
+	Tomogram tomogram0 = tomogramSet.loadTomogram(0, false);
+	const double pixelSize = tomogram0.optics.pixelSize;
 
 	for (int g = 0; g < gc; g++)
 	{
 		if (do_even_aberrations)
 		{
+			EvenData evenZero({0.0, 0.0, 0.0, 0.0, 0.0});
+			BufferedImage<EvenData> even_data_sum(sh,s);
+			even_data_sum.fill(evenZero);
+
+			for (int t = 0; t < tc; t++)
+			{
+				Tomogram tomogram = tomogramSet.loadTomogram(t, false);
+
+				BufferedImage<EvenData> even = EvenData::read(
+						getEvenAberrationsTempFilename(tomogram.name, g));
+
+				even_data_sum += even;
+			}
+
 			std::vector<double> initialEven(Zernike::numberOfEvenCoeffs(n_even), 0.0);
 
 			std::vector<double> evenCoeffs = AberrationFit::solveAndFitEven(
-				evenData_perGroup[g], n_even, initialEven,
-				pixelSize, outDir + ZIO::itoa(g+1) + "_", true);
+				even_data_sum, n_even, initialEven,
+				pixelSize, outDir + "group_" + ZIO::itoa(g+1) + "_", true);
 
-			if (particleSet.optTable.labelExists(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS))
+			if (particleSet.optTable.containsLabel(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS))
 			{
 				const std::vector<double> evenCoeffs0 = particleSet.optTable.getDoubleVector(
 					EMDL_IMAGE_EVEN_ZERNIKE_COEFFS, g);
@@ -663,13 +1149,27 @@ void CtfRefinementProgram::fitAberrations(
 
 		if (do_odd_aberrations)
 		{
+			OddData oddZero({0.0, dComplex(0.0, 0.0)});
+			BufferedImage<OddData> odd_data_sum(sh,s);
+			odd_data_sum.fill(oddZero);
+
+			for (int t = 0; t < tc; t++)
+			{
+				Tomogram tomogram = tomogramSet.loadTomogram(t, false);
+
+				BufferedImage<OddData> odd = OddData::read(
+						getOddAberrationsTempFilename(tomogram.name, g));
+
+				odd_data_sum += odd;
+			}
+
 			std::vector<double> initialOdd(Zernike::numberOfOddCoeffs(n_odd), 0.0);
 
 			std::vector<double> oddCoeffs = AberrationFit::solveAndFitOdd(
-				oddData_perGroup[g], n_odd, initialOdd,
-				pixelSize, outDir + ZIO::itoa(g+1) + "_", true);
+				odd_data_sum, n_odd, initialOdd,
+				pixelSize, outDir + "group_" + ZIO::itoa(g+1) + "_", true);
 
-			if (particleSet.optTable.labelExists(EMDL_IMAGE_ODD_ZERNIKE_COEFFS))
+			if (particleSet.optTable.containsLabel(EMDL_IMAGE_ODD_ZERNIKE_COEFFS))
 			{
 				const std::vector<double> oddCoeffs0 = particleSet.optTable.getDoubleVector(
 					EMDL_IMAGE_ODD_ZERNIKE_COEFFS, g);
@@ -688,6 +1188,8 @@ void CtfRefinementProgram::fitAberrations(
 		}
 	}
 }
+
+
 
 BufferedImage<double> CtfRefinementProgram::evaluateDefocusRange(
 		const BufferedImage<EvenData>& evenData,
@@ -894,7 +1396,57 @@ std::vector<d3Vector> CtfRefinementProgram::findMultiAstigmatism(
 }
 
 
-BeerLambertFit::BeerLambertFit(
+
+std::string CtfRefinementProgram::getDefocusTempFilename(const std::string &tomogram_name)
+{
+	return outDir + "temp/defocus/" + tomogram_name + ".star";
+}
+
+std::string CtfRefinementProgram::getScaleTempFilename(const std::string& tomogram_name)
+{
+	return outDir + "temp/scale/" + tomogram_name + ".star";
+}
+
+std::string CtfRefinementProgram::getEvenAberrationsTempFilename(
+		const std::string& tomogram_name, int opticsGroup)
+{
+	return outDir + "temp/aberrations/" + tomogram_name
+			+ "_group_" + ZIO::itoa(opticsGroup) + "_even";
+}
+
+std::string CtfRefinementProgram::getOddAberrationsTempFilename(
+		const std::string& tomogram_name, int opticsGroup)
+{
+	return outDir + "temp/aberrations/" + tomogram_name
+			+ "_group_" + ZIO::itoa(opticsGroup) + "_odd";
+}
+
+
+bool CtfRefinementProgram::defocusAlreadyDone(const std::string &tomogram_name)
+{
+	return !do_refine_defocus || ZIO::fileExists(getDefocusTempFilename(tomogram_name));
+}
+
+bool CtfRefinementProgram::scaleAlreadyDone(const std::string &tomogram_name)
+{
+	return !do_refine_scale || ZIO::fileExists(getScaleTempFilename(tomogram_name));
+}
+
+bool CtfRefinementProgram::aberrationsAlreadyDone(
+		const std::string &tomogram_name, int group_count)
+{
+	return
+		(!do_even_aberrations ||
+			ZIO::fileExists(getEvenAberrationsTempFilename(
+					tomogram_name, group_count-1) + "_by.mrc") ) &&
+		(!do_odd_aberrations  ||
+			ZIO::fileExists(getOddAberrationsTempFilename(
+					tomogram_name, group_count-1) + "_b_imag.mrc") );
+}
+
+
+
+LambertFit::LambertFit(
 	const std::vector<d4Matrix> &projections,
 	const std::vector<double> &sum_prdObs,
 	const std::vector<double> &sum_prdSqr)
@@ -922,7 +1474,7 @@ BeerLambertFit::BeerLambertFit(
 	tilt_q = d3Vector(w2t(1,0), w2t(1,1), w2t(1,2));
 }
 
-double BeerLambertFit::f(const std::vector<double> &x, void *tempStorage) const
+double LambertFit::f(const std::vector<double> &x, void *tempStorage) const
 {
 	const double a      = x[0];
 	const double kappa  = x[1];
@@ -947,7 +1499,49 @@ double BeerLambertFit::f(const std::vector<double> &x, void *tempStorage) const
 	return out;
 }
 
-double BeerLambertFit::getScale(int f, const std::vector<double> &x)
+double LambertFit::gradAndValue(const std::vector<double> &x, std::vector<double> &gradDest) const
+{
+	const double a      = x[0];
+	const double kappa  = x[1];
+	const double phi    = x[2];
+
+	d3Vector n = cos(phi) * tilt_q + sin(phi) * tilt_p;
+	n.normalize();
+
+	const int fc = projections.size();
+
+	double out = 0.0;
+
+	for (int i = 0; i < 3; i++)
+	{
+		gradDest[i] = 0.0;
+	}
+
+	for (int f = 0; f < fc; f++)
+	{
+		const double cos_f = n.dot(view_dir[f]);
+		const double est = a * pow(kappa, 1.0 / std::abs(cos_f));
+		const double d = sum_prdSqr[f] * est - sum_prdObs[f];
+
+		out += d * d;
+
+		const double dout_dd = 2.0 * d;
+		const double dd_dest = sum_prdSqr[f];
+		const double dest_da = pow(kappa, 1.0 / std::abs(cos_f));
+		const double dest_dkappa = a * pow(kappa, 1.0 / std::abs(cos_f)) / (kappa * cos_f);
+		const d3Vector dn_dphi = cos(phi) * tilt_p - sin(phi) * tilt_q;
+		const double dcosf_dphi = view_dir[f].dot(dn_dphi);
+		const double dest_dphi = a * pow(kappa, 1.0 / std::abs(cos_f)) * log(kappa) * dcosf_dphi / (-cos_f * cos_f);
+
+		gradDest[0] += dout_dd * dd_dest * dest_da;
+		gradDest[1] += dout_dd * dd_dest * dest_dkappa;
+		gradDest[2] += dout_dd * dd_dest * dest_dphi;
+	}
+
+	return out;
+}
+
+double LambertFit::getScale(int f, const std::vector<double> &x)
 {
 	const double a      = x[0];
 	const double kappa  = x[1];
@@ -959,4 +1553,123 @@ double BeerLambertFit::getScale(int f, const std::vector<double> &x)
 	const double cos_f = n.dot(view_dir[f]);
 
 	return a * pow(kappa, 1.0 / std::abs(cos_f));
+}
+
+
+MultiLambertFit::MultiLambertFit(
+	const std::vector<std::vector<d4Matrix>>& projections,
+	const std::vector<std::vector<double>>& sum_prdObs,
+	const std::vector<std::vector<double>>& sum_prdSqr,
+	const std::vector<double>& fractional_dose)
+:
+  projections(projections),
+  sum_prdObs(sum_prdObs),
+  sum_prdSqr(sum_prdSqr),
+  fractional_dose(fractional_dose)
+{
+	const int tc = projections.size();
+
+	view_dir = std::vector<std::vector<d3Vector>>(tc);
+	tilt_p = std::vector<d3Vector>(tc);
+	tilt_q = std::vector<d3Vector>(tc);
+
+	for (int t = 0; t < tc; t++)
+	{
+		const int fc = projections[t].size();
+
+		if (fc == 0) continue;
+
+		view_dir[t].resize(fc);
+
+		for (int f = 0; f < fc; f++)
+		{
+			for (int i = 0; i < 3; i++)
+			{
+				view_dir[t][f][i] = projections[t][f](2,i);
+			}
+
+			view_dir[t][f].normalize();
+		}
+
+		d3Matrix w2t = TiltGeometry::worldToTiltSpace(projections[t]);
+
+		tilt_p[t] = d3Vector(w2t(0,0), w2t(0,1), w2t(0,2));
+		tilt_q[t] = d3Vector(w2t(1,0), w2t(1,1), w2t(1,2));
+	}
+}
+
+double MultiLambertFit::gradAndValue(const std::vector<double> &x, std::vector<double> &gradDest) const
+{
+	// @TODO: add fractional dose!
+
+	const double a0 = x[0];
+	const int tc = projections.size();
+
+	const double kappa_min = 1e-3;
+
+	double out = 0.0;
+
+	for (int i = 0; i < 2*tc + 1; i++)
+	{
+		gradDest[i] = 0.0;
+	}
+
+	for (int t = 0; t < tc; t++)
+	{
+		const double kappa  = x[2*t + 1] > kappa_min? x[2*t + 1] : kappa_min;
+		const double phi    = x[2*t + 2];
+
+		d3Vector n = cos(phi) * tilt_q[t] + sin(phi) * tilt_p[t];
+		n.normalize();
+
+		const double a = a0 * fractional_dose[t];
+
+		const int fc = projections[t].size();
+
+		for (int f = 0; f < fc; f++)
+		{
+			const double cos_f = n.dot(view_dir[t][f]);
+			const double est = a * pow(kappa, 1.0 / std::abs(cos_f));
+			const double d = sum_prdSqr[t][f] * est - sum_prdObs[t][f];
+
+			out += d * d;
+
+			const double dout_dd = 2.0 * d;
+			const double dd_dest = sum_prdSqr[t][f];
+			const double dest_da = pow(kappa, 1.0 / std::abs(cos_f));
+			const double dest_dkappa = a * pow(kappa, 1.0 / std::abs(cos_f)) / (kappa * cos_f);
+			const d3Vector dn_dphi = cos(phi) * tilt_p[t] - sin(phi) * tilt_q[t];
+			const double dcosf_dphi = view_dir[t][f].dot(dn_dphi);
+			const double dest_dphi = a * pow(kappa, 1.0 / std::abs(cos_f)) * log(kappa) * dcosf_dphi / (-cos_f * cos_f);
+
+			gradDest[0] += dout_dd * dd_dest * dest_da;
+
+			gradDest[2*t + 1] += dout_dd * dd_dest * dest_dkappa;
+			gradDest[2*t + 2] += dout_dd * dd_dest * dest_dphi;
+		}
+	}
+
+	return out;
+}
+
+double MultiLambertFit::getScale(int t, int f, const std::vector<double> &x)
+{
+	const double a = x[0] * fractional_dose[t];
+
+	const double kappa  = x[2*t + 1];
+	const double phi    = x[2*t + 2];
+
+	d3Vector n = cos(phi) * tilt_q[t] + sin(phi) * tilt_p[t];
+	n.normalize();
+
+	const double cos_f = n.dot(view_dir[t][f]);
+
+	return a * pow(kappa, 1.0 / std::abs(cos_f));
+}
+
+void MultiLambertFit::report(int iteration, double cost, const std::vector<double> &x) const
+{
+	std::cout.precision(16);
+
+	std::cout << iteration << ": " << cost << std::endl;
 }

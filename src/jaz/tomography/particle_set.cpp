@@ -18,14 +18,14 @@ ParticleSet::ParticleSet(std::string filename, std::string motionFilename)
 	optTable.read(filename, "optics");
 	partTable.read(filename, "particles");
 	
-	if (!optTable.labelExists(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE))
+	if (!optTable.containsLabel(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE))
 	{
 		REPORT_ERROR("ParticleSet::ParticleSet: "
 					 + EMDL::label2Str(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE)
 					 + " missing from optics MetaDataTable.\n");
 	}
 
-	if (!partTable.labelExists(EMDL_TOMO_PARTICLE_NAME))
+	if (!partTable.containsLabel(EMDL_TOMO_PARTICLE_NAME))
 	{
 		Log::warn("The particles in "+filename+
 			" do not have names (rlnTomoParticleName). They are being added now.");
@@ -44,7 +44,7 @@ ParticleSet::ParticleSet(std::string filename, std::string motionFilename)
 			const int id = tomoParticleCount[tomoName];
 			tomoParticleCount[tomoName]++;
 
-			partTable.setValue(EMDL_TOMO_PARTICLE_NAME, tomoName + "_" + ZIO::itoa(id), p);
+			partTable.setValue(EMDL_TOMO_PARTICLE_NAME, tomoName + "/" + ZIO::itoa(id), p);
 		}
 	}
 
@@ -60,7 +60,7 @@ std::vector<std::vector<ParticleIndex> > ParticleSet::splitByTomogram(const Tomo
 {
 	std::vector<std::vector<ParticleIndex>> out(0);
 
-	if (!partTable.labelExists(EMDL_TOMO_NAME))
+	if (!partTable.containsLabel(EMDL_TOMO_NAME))
 	{
 		REPORT_ERROR("ParticleSet::splitByTomogram: "
 					 + EMDL::label2Str(EMDL_TOMO_NAME)
@@ -216,7 +216,7 @@ d3Vector ParticleSet::getPosition(ParticleIndex particle_id) const
 
 d3Matrix ParticleSet::getSubtomogramMatrix(ParticleIndex particle_id) const
 {
-	if (partTable.labelExists(EMDL_TOMO_SUBTOMOGRAM_ROT))
+	if (partTable.containsLabel(EMDL_TOMO_SUBTOMOGRAM_ROT))
 	{
 		const double phi  =  partTable.getAngleInRad(EMDL_TOMO_SUBTOMOGRAM_ROT,  particle_id.value);
 		const double theta = partTable.getAngleInRad(EMDL_TOMO_SUBTOMOGRAM_TILT, particle_id.value);
@@ -389,7 +389,7 @@ void ParticleSet::setParticleCoord(ParticleIndex particle_id, const d3Vector& v)
 
 int ParticleSet::getOpticsGroup(ParticleIndex particle_id) const
 {
-	if (!partTable.labelExists(EMDL_IMAGE_OPTICS_GROUP))
+	if (!partTable.containsLabel(EMDL_IMAGE_OPTICS_GROUP))
 	{
 		REPORT_ERROR("ParticleSet::getPixelSize: pixel size (rlnImagePixelSize) missing from optics table");
 	}
@@ -406,7 +406,7 @@ int ParticleSet::numberOfOpticsGroups() const
 
 double ParticleSet::getBinnedPixelSize(int opticsGroup) const
 {
-	if (!optTable.labelExists(EMDL_IMAGE_PIXEL_SIZE))
+	if (!optTable.containsLabel(EMDL_IMAGE_PIXEL_SIZE))
 	{
 		REPORT_ERROR("ParticleSet::getBinnedPixelSize: pixel size (rlnImagePixelSize) missing from optics table");
 	}
@@ -418,7 +418,7 @@ double ParticleSet::getBinnedPixelSize(int opticsGroup) const
 
 double ParticleSet::getOriginalPixelSize(int opticsGroup) const
 {
-	if (!optTable.labelExists(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE))
+	if (!optTable.containsLabel(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE))
 	{
 		REPORT_ERROR("ParticleSet::getOriginalPixelSize: tilt series pixel size (rlnTomoTiltSeriesPixelSize) missing from optics table");
 	}

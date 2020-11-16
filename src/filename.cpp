@@ -534,6 +534,26 @@ int mktree(const FileName &fn_dir, mode_t mode)
 	return mdret;
 }
 
+FileName realpath(const FileName &fn)
+{
+	char retval[PATH_MAX];
+
+	if (realpath(fn.c_str(), retval) == NULL)
+	{
+		REPORT_ERROR(std::string("Failed to resolve realpath of ") + fn);
+	}
+
+	return FileName(retval);
+}
+
+void symlink(const FileName &src, const FileName &dst)
+{
+	if (symlink(src.c_str(), dst.c_str()) != 0)
+	{
+		REPORT_ERROR(std::string("Failed to make a symlink from ") + src.c_str() + " to " + dst.c_str());	
+	}
+}
+
 bool decomposePipelineFileName(FileName fn_in, FileName &fn_pre, FileName &fn_jobnr, FileName &fn_post)
 {
 	size_t slashpos = 0;
