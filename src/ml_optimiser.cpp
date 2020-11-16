@@ -8332,13 +8332,13 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 								getline(split, fn_ctf);
 						}
 						Ictf.read(fn_ctf);
+						Fctf.resize(current_image_size, current_image_size, current_image_size / 2 + 1);
 
 						// If there is a redundant half, get rid of it
 						if (XSIZE(Ictf()) == YSIZE(Ictf()))
 						{
 							// Set the CTF-image in Fctf
 							Ictf().setXmippOrigin();
-							Fctf.resize(current_image_size, current_image_size, current_image_size / 2 + 1);
 							FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
 							{
 								// Use negative kp, ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
