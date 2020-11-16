@@ -5659,12 +5659,12 @@ bool RelionJob::getCommandsSubtomoImportJob(std::string &outputname, std::vector
 			return false;
 		}
 
-		// TODO: insert call to relion_tomo_add_tomos here
-		command = "relion_tomo_add_tomos ";
+		// TODO: insert call to relion_tomo_import_tomograms here
+		command = "relion_tomo_import_tomograms ";
 
 		command += " --i " + joboptions["in_star"].getString();
-		// TODO: separate input and output!!! command += " --io " + joboptions["io_tomos"].getString();
-		command += " --io " + outputname+"tomograms.star";
+		command += " --o " + outputname+"tomograms.star";
+                if (joboptions["io_tomos"].getString() != "") command += " --t " + joboptions["io_tomos"].getString();
 
 		Node node(outputname+"tomograms.star", NODE_SUBTOMO_TOMOGRAMS);
 		outputNodes.push_back(node);
