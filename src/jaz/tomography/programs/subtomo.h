@@ -62,9 +62,10 @@ class SubtomoProgram
 
 	protected:
 
-		void writeParticleSet(
+		void initialise(
 				const ParticleSet& particleSet,
-				const std::vector<std::vector<ParticleIndex>>& particles);
+				const std::vector<std::vector<ParticleIndex>>& particles,
+				const TomogramSet& tomogramSet);
 
 		void processTomograms(
 				const std::vector<int>& tomoIndices,
@@ -80,6 +81,22 @@ class SubtomoProgram
 				int verbose,
 				BufferedImage<float>& sum_data,
 				BufferedImage<float>& sum_weights );
+
+
+	private:
+
+			bool directoriesPerTomogram;
+
+		std::string getOutputFilename(
+				ParticleIndex p,
+				int tomogramIndex,
+				const ParticleSet& particleSet,
+				const TomogramSet& tomogramSet);
+
+		void writeParticleSet(
+				const ParticleSet& particleSet,
+				const std::vector<std::vector<ParticleIndex>>& particles,
+				const TomogramSet& tomogramSet);
 
 		BufferedImage<float> cropAndTaper(
 				const BufferedImage<float>& imgFS,
