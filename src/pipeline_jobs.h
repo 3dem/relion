@@ -250,11 +250,11 @@ static std::map<std::string, int> node_label2type = {{NODE_MOVIES_LABEL, NODE_MO
 #define PROC_MULTIBODY_LABEL	 "MultiBody"    // Multi-body refinement
 #define PROC_MOTIONREFINE_LABEL  "Polish"       // Jasenko's motion fitting program for Bayesian polishing (to replace MovieRefine?)
 #define PROC_CTFREFINE_LABEL     "CtfRefine"    // Jasenko's program for defocus and beamtilt optimisation
-#define PROC_SUBTOMO_IMPORT_LABEL      "SubtomoImport"      // Import for tomography GUI
-#define PROC_SUBTOMO_RECONSTRUCT_LABEL "SubtomoReconstruct" // Creation of subtomograms from tilt series images
-#define PROC_SUBTOMO_CTFREFINE_LABEL   "SubtomoCtfRefine"   // CTF refinement (defocus & aberrations) for subtomograms
-#define PROC_SUBTOMO_POLISH_LABEL      "SubtomoPolish"      // Frame alignment and particle polishing for subtomograms
-#define PROC_SUBTOMO_AVERAGE_LABEL     "SubtomoAverage"     // Calculation of subtomogram average from the inidividual tilt series images
+#define PROC_SUBTOMO_IMPORT_LABEL      "ImportSubtomo"      // Import for tomography GUI
+#define PROC_SUBTOMO_RECONSTRUCT_LABEL "ReconstructSubtomo" // Creation of subtomograms from tilt series images
+#define PROC_SUBTOMO_CTFREFINE_LABEL   "CtfRefineSubtomo"   // CTF refinement (defocus & aberrations) for subtomograms
+#define PROC_SUBTOMO_POLISH_LABEL      "PolishSubtomo"      // Frame alignment and particle polishing for subtomograms
+#define PROC_SUBTOMO_AVERAGE_LABEL     "AverageSubtomo"     // Calculation of subtomogram average from the inidividual tilt series images
 #define PROC_EXTERNAL_LABEL      "External"     // For running non-relion programs
 
 
