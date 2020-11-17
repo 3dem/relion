@@ -48,13 +48,11 @@ void ReconstructParticleProgramMpi::readParameters(int argc, char *argv[])
 	}
 	else
 	{
-		if (outDir[outDir.length()-1] != '/')
-		{
-			outDir = outDir + "/";
-		}
+		outDir = ZIO::ensureEndingSlash(outDir);
 	}
 
-	tmpOutRootBase = outDir + "tmp_sum_";
+	ZIO::makeDir(outDir + "temp");
+	tmpOutRootBase = outDir + "temp/sum_rank_";
 	tmpOutRoot = tmpOutRootBase + ZIO::itoa(rank) + "_";
 }
 
@@ -109,18 +107,17 @@ void ReconstructParticleProgramMpi::run()
 	{
 		Log::print("Memory required for accumulation: " + ZIO::itoa(GB_per_thread  * (long int) outCount) + " GB");
 	}
-	std::vector<BufferedImage<double>> ctfImgFS(2), psfImgFS(2);
+
+	std::vector<BufferedImage<double>> ctfImgFS(2);
 	std::vector<BufferedImage<dComplex>> dataImgFS(2);
 
 	for (int i = 0; i < 2; i++)
 	{
 		dataImgFS[i] = BufferedImage<dComplex>(sh,s,s);
 		ctfImgFS[i] = BufferedImage<double>(sh,s,s),
-		psfImgFS[i] = BufferedImage<double>(sh,s,s);
 
 		dataImgFS[i].fill(dComplex(0.0, 0.0));
 		ctfImgFS[i].fill(0.0);
-		psfImgFS[i].fill(0.0);
 	}
 
 	AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
@@ -134,7 +131,7 @@ void ReconstructParticleProgramMpi::run()
 
 	processTomograms(
 		tomoIndices[rank], tomoSet, particleSet, particles, aberrationsCache,
-		dataImgFS, ctfImgFS, psfImgFS, binnedOutPixelSize,
+		dataImgFS, ctfImgFS, binnedOutPixelSize,
 		s02D, do_ctf, flip_value, verb, false);
 
 
@@ -161,11 +158,6 @@ void ReconstructParticleProgramMpi::run()
 	MPI_Reduce(ctfImgFS[1].data, sumCtfImgFS[1].data, sizeData,
 			MY_MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
 
-	MPI_Reduce(psfImgFS[0].data, sumPsfImgFS[0].data, sizeData,
-			MY_MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-	MPI_Reduce(psfImgFS[1].data, sumPsfImgFS[1].data, sizeData,
-			MY_MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-
 
 	if (rank == 0)
 	{
@@ -182,17 +174,12 @@ void ReconstructParticleProgramMpi::run()
 
 				sumCtfImgFS[half] = Symmetry::symmetrise_FS_real(
 							sumCtfImgFS[half], symmName, num_threads);
-
-				if (explicit_gridding)
-				{
-					sumPsfImgFS[half] = Symmetry::symmetrise_FS_real(
-							sumPsfImgFS[half], symmName, num_threads);
-				}
 			}
 		}
 
-		finalise(sumDataImgFS, sumCtfImgFS, sumPsfImgFS, binnedOutPixelSize);
+		finalise(sumDataImgFS, sumCtfImgFS, binnedOutPixelSize);
 	}
+
 	// Delete temporary files
 	int res = system(("rm -rf "+ tmpOutRootBase + "*.mrc").c_str());
 }
