@@ -29,7 +29,7 @@ void SubtomoProgramMpi::readParameters(int argc, char *argv[])
 	nodeCount = node->size;
 
 	// Don't put any output to screen for mpi slaves
-	verb = (node->isMaster()) ? verb : 0;
+	verb = (node->isMaster()) ? 1 : 0;
 
 	IOParser parser;
 

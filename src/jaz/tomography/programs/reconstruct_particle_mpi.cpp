@@ -30,7 +30,7 @@ void ReconstructParticleProgramMpi::readParameters(int argc, char *argv[])
 	nodeCount = node->size;
 
 	// Don't put any output to screen for mpi slaves
-	verb = (node->isMaster()) ? verb : 0;
+	verb = (node->isMaster()) ? 1 : 0;
 
 	readBasicParameters(argc, argv);
 
@@ -46,6 +46,16 @@ void ReconstructParticleProgramMpi::readParameters(int argc, char *argv[])
 	{
 		outDir = ZIO::prepareTomoOutputDirectory(outDir, argc, argv);
 	}
+	else
+	{
+		if (outDir[outDir.length()-1] != '/')
+		{
+			outDir = outDir + "/";
+		}
+	}
+
+	tmpOutRootBase = outDir + "tmp_sum_";
+	tmpOutRoot = tmpOutRootBase + ZIO::itoa(rank) + "_";
 }
 
 void ReconstructParticleProgramMpi::run()
@@ -75,12 +85,12 @@ void ReconstructParticleProgramMpi::run()
 
 	const long int voxelNum = (long int) sh * (long int) s * (long int) s;
 
-	if (max_mem_GB > 0)
-	{
-		const double GB_per_thread =
-		   2.0 * voxelNum * 3.0 * sizeof(double)   // two halves  *  box size  *  (data (x2) + ctf)
+	const double GB_per_thread =
+			2.0 * voxelNum * 3.0 * sizeof(double)   // two halves  *  box size  *  (data (x2) + ctf)
 			/ (1024.0 * 1024.0 * 1024.0);          // in GB
 
+	if (max_mem_GB > 0)
+	{
 		const double maxThreads = max_mem_GB / GB_per_thread;
 
 		if (maxThreads < outer_threads)
@@ -93,19 +103,16 @@ void ReconstructParticleProgramMpi::run()
 		}
 	}
 
-	const int outCount = 2 * outer_threads;
+	const int outCount = 2 * outer_threads + 1; // One more count for the accumulated sum
 
 	if (verb)
 	{
-		Log::print("Memory required for accumulation: " + ZIO::itoa(
-			(3.0 * sizeof(double) * (long int) outCount * (double)voxelNum)
-			  / (1024.0 * 1024.0 * 1024.0)
-			) + " GB");
+		Log::print("Memory required for accumulation: " + ZIO::itoa(GB_per_thread  * (long int) outCount) + " GB");
 	}
-	std::vector<BufferedImage<double>> ctfImgFS(outCount), psfImgFS(outCount);
-	std::vector<BufferedImage<dComplex>> dataImgFS(outCount);
+	std::vector<BufferedImage<double>> ctfImgFS(2), psfImgFS(2);
+	std::vector<BufferedImage<dComplex>> dataImgFS(2);
 
-	for (int i = 0; i < outCount; i++)
+	for (int i = 0; i < 2; i++)
 	{
 		dataImgFS[i] = BufferedImage<dComplex>(sh,s,s);
 		ctfImgFS[i] = BufferedImage<double>(sh,s,s),
@@ -130,25 +137,6 @@ void ReconstructParticleProgramMpi::run()
 		dataImgFS, ctfImgFS, psfImgFS, binnedOutPixelSize,
 		s02D, do_ctf, flip_value, verb, false);
 
-
-	if (outCount > 2)
-	{
-		if (verb)
-		{
-			Log::print("Merging volumes");
-		}
-
-		for (int i = 2; i < outCount; i++)
-		{
-			dataImgFS[i%2] += dataImgFS[i];
-			ctfImgFS[i%2] += ctfImgFS[i];
-
-			if (explicit_gridding)
-			{
-				psfImgFS[i%2] += psfImgFS[i];
-			}
-		}
-	}
 
 	std::vector<BufferedImage<double>> sumCtfImgFS(2), sumPsfImgFS(2);
 	std::vector<BufferedImage<dComplex>> sumDataImgFS(2);
@@ -205,5 +193,7 @@ void ReconstructParticleProgramMpi::run()
 
 		finalise(sumDataImgFS, sumCtfImgFS, sumPsfImgFS, binnedOutPixelSize);
 	}
+	// Delete temporary files
+	int res = system(("rm -rf "+ tmpOutRootBase + "*.mrc").c_str());
 }
 
