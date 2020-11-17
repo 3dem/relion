@@ -30,9 +30,7 @@
 
 /// Reserve large vectors with some reasonable estimate
 // Larger numbers will still be OK, but memory management might suffer
-#define MAX_NR_PARTICLES_PER_MICROGRAPH 1000
-#define MAX_NR_MICROGRAPHS 2000
-#define MAX_NR_FRAMES_PER_MOVIE 100
+#define MAX_NR_GROUPS 2000
 
 ////////////// Hierarchical metadata model
 
@@ -50,9 +48,6 @@ public:
 
 	// Name of this image (by this name it will be recognised upon reading)
 	std::string name;
-
-	// ID of the micrograph that this image comes from
-	long int micrograph_id;
 
 	// ID of the group that this image comes from
 	long int group_id;
@@ -76,7 +71,6 @@ public:
 		particle_id = copy.particle_id;
 		optics_group_id = copy.optics_group_id;
 		name = copy.name;
-		micrograph_id = copy.micrograph_id;
 		group_id = copy.group_id;
 		optics_group = copy.optics_group;
 		img = copy.img;
@@ -90,7 +84,6 @@ public:
 		particle_id = copy.particle_id;
 		optics_group_id = copy.optics_group_id;
 		name = copy.name;
-		micrograph_id = copy.micrograph_id;
 		group_id = copy.group_id;
 		optics_group = copy.optics_group;
 		img = copy.img;
@@ -140,43 +133,6 @@ public:
 	}
 };
 
-class ExpMicrograph
-{
-public:
-	// ID of this micrograph, i.e. which number in the MDmic am I?
-	long int id;
-
-	// Name of this micrograph (by this name it will be recognised upon reading)
-	std::string name;
-
-	// All the original images that were recorded on this micrograph
-	std::vector<long int> image_ids;
-
-	// Empty Constructor
-	ExpMicrograph() {}
-
-	// Destructor needed for work with vectors
-	~ExpMicrograph() {}
-
-	// Copy constructor needed for work with vectors
-	ExpMicrograph(ExpMicrograph const& copy)
-	{
-		id = copy.id;
-		name = copy.name;
-		image_ids = copy.image_ids;
-
-	}
-
-	// Define assignment operator in terms of the copy constructor
-	ExpMicrograph& operator=(ExpMicrograph const& copy)
-	{
-		id = copy.id;
-		name = copy.name;
-		image_ids = copy.image_ids;
-		return *this;
-	}
-};
-
 class ExpGroup
 {
 public:
@@ -219,9 +175,6 @@ public:
 	// All groups in the experiment
 	std::vector<ExpGroup> groups;
 
-	// All micrographs in the experiment
-	std::vector<ExpMicrograph> micrographs;
-
 	// All particles in the experiment
 	std::vector<ExpParticle> particles;
 
@@ -242,9 +195,6 @@ public:
 
 	// Vector with MetaDataTables for orientations of different bodies in the multi-body refinement
 	std::vector<MetaDataTable> MDbodies;
-
-	// Removed: One large MetaDataTable for all micrographs
-	// MetaDataTable MDmic;
 
 	// Observation model holding the data for all optics groups
 	ObservationModel obsModel;
@@ -275,9 +225,7 @@ public:
 	void clear()
 	{
 		groups.clear();
-		groups.reserve(MAX_NR_MICROGRAPHS);
-		micrographs.clear();
-		micrographs.reserve(MAX_NR_MICROGRAPHS);
+		groups.reserve(MAX_NR_GROUPS);
 		particles.clear(); // reserve upon reading
 		sorted_idx.clear();
 		nr_particles_subset1 = nr_particles_subset2 = 0;
@@ -298,9 +246,6 @@ public:
 	// Get the total number of images in a given particle
 	long int numberOfImagesInParticle(long int part_id);
 
-	// Calculate the total number of micrographs in this experiment
-	long int numberOfMicrographs();
-
 	// Calculate the total number of groups in this experiment
 	long int numberOfGroups();
 
@@ -318,9 +263,6 @@ public:
 
 	// Get the random_subset for this particle
 	int getRandomSubset(long int part_id);
-
-	// Get the micrograph_id for the N'th image for this particle
-	long int getMicrographId(long int part_id, int img_id);
 
 	// Get the group_id for the N'th image for this particle
 	long int getGroupId(long int part_id, int img_id);
@@ -340,18 +282,19 @@ public:
 	// Get the metadata-row for this image in a separate MetaDataTable
 	MetaDataTable getMetaDataImage(long int part_id, int img_id);
 
+	// Which micrograph (or tomogram) doe this particle image comes from?
+	FileName getMicrographName(long int ori_img_id);
+	FileName getMicrographName(long int part_id, int img_id);
+
 	// Add a particle
 	long int addParticle(std::string part_name, int random_subset = 0);
 
  	// Add an image to the given particle
-	int addImageToParticle(long int part_id, std::string img_name, long int ori_img_id, long int group_id, long int micrograph_id,
+	int addImageToParticle(long int part_id, std::string img_name, long int ori_img_id, long int group_id,
 	                       int optics_group, bool unique);
 
 	// Add a group
 	long int addGroup(std::string mic_name, int optics_group);
-
-	// Add a micrograph
-	long int addMicrograph(std::string mic_name);
 
 	// for separate refinement of random halves of the data
 	void divideParticlesInRandomHalves(int seed, bool do_helical_refine = false);
