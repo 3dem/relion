@@ -388,7 +388,7 @@ void AlignProgram::processTomograms(
 					projections[f](1,3) += opt.y;
 				}
 
-				if (!per_tomogram_progress)
+				if (verbosity > 0 && !per_tomogram_progress)
 				{
 					Log::updateProgress(progress_bar_offset + num_iters);
 				}
