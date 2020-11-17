@@ -57,6 +57,7 @@ void AlignProgramMpi::run()
 
 	processTomograms(tomoIndices[rank], aberrationsCache, verb, false);
 
+	MPI_Barrier(MPI_COMM_WORLD);
 	if (node->isMaster())
 	{
 		finalise();

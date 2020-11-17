@@ -5,16 +5,15 @@
 
 int main(int argc, char *argv[])
 {
-	//MpiNode node(argc, argv);
+	AlignProgramMpi ap(argc, argv);
 
 	try
 	{
-		AlignProgramMpi ap(argc, argv);
 		ap.run();
 	}
 	catch (RelionError XE)
 	{
-		//if (node.isMaster())
+		if (ap.rank == 0)
 			std::cerr << XE;
 		MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_FAILURE);
 	}
