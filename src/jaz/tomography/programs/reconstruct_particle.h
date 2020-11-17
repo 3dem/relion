@@ -19,9 +19,9 @@ class ReconstructParticleProgram
 		
 
 			OptimisationSet optimisationSet;
-			std::string outDir, symmName;
+			std::string outDir, symmName, tmpOutRoot;
 			
-			bool do_whiten, explicit_gridding, no_reconstruction;
+			bool do_whiten, explicit_gridding, no_reconstruction, only_do_unfinished;
 			int boxSize, cropSize, num_threads, outer_threads, inner_threads, max_mem_GB;
 			double SNR, taper, binning;
 
