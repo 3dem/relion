@@ -368,3 +368,8 @@ int TomogramSet::getFrameCount(int index) const
 {
 	return tomogramTables[index].numberOfObjects();
 }
+
+double TomogramSet::getPixelSize(int index) const
+{
+	return globalTable.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, index);
+}

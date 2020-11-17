@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
 		IOParser parser;
 
 		double voltage, Cs, Q0, hand, pixelSize;
-		std::string inStarFn, inTomoSet, outFn, orderFn, fractionalDoseStr;
+		std::string inStarFn, inTomoSet, outFn, orderFn, fractionalDoseStr, rootDir;
 		ImodImport global_IMOD_import;
 
 		try
@@ -71,6 +71,7 @@ int main(int argc, char *argv[])
 			int gen_section = parser.addSection("General options");
 
 			inStarFn = parser.getOption("--i", "Input STAR file containing per-tomogram arguments");
+			rootDir = parser.getOption("--root", "Root directory containing all IMOD directories", "");
 			inTomoSet = parser.getOption("--t", "Input tomogram set", "");
 			outFn = parser.getOption("--o", "Output tomogram set");
 			hand = textToDouble(parser.getOption("--hand", "Handedness of the tilt geometry", "-1"));
@@ -125,6 +126,8 @@ int main(int argc, char *argv[])
 			exit(RELION_EXIT_FAILURE);
 		}
 
+
+		rootDir = ZIO::ensureEndingSlash(rootDir);
 
 		MetaDataTable perTomoArguments;
 		perTomoArguments.read(inStarFn);
@@ -253,26 +256,29 @@ int main(int argc, char *argv[])
 			perTomoArguments.getValue(EMDL_TOMO_IMPORT_CTFFIND_FILE, ctfFindFn, tomo_index);
 			perTomoArguments.getValue(EMDL_TOMO_IMPORT_CTFPLOTTER_FILE, ctfPlotterFn, tomo_index);
 
+
 			if (ctfPlotterFn == "")
 			{
 				ctfSource = CtfFind;
+				ctfFindFn = rootDir + ctfFindFn;
 				Log::print("The CTF will be read from the CTFFind output file "+ctfFindFn);
 			}
 			else if (ctfFindFn == "")
 			{
 				ctfSource = CtfPlotter;
+				ctfPlotterFn = rootDir + ctfPlotterFn;
 				Log::print("The CTF will be read from the ctfplotter output file "+ctfPlotterFn);
 			}
 
 			ImodImport ii = global_IMOD_import;
 
-			ii.inDir = perTomoArguments.getString(EMDL_TOMO_IMPORT_IMOD_DIR, tomo_index);
+			ii.inDir = rootDir + perTomoArguments.getString(EMDL_TOMO_IMPORT_IMOD_DIR, tomo_index);
 
 			perTomoArguments.getValue(EMDL_TOMO_IMPORT_OFFSET_X, ii.offset3Dx, tomo_index);
 			perTomoArguments.getValue(EMDL_TOMO_IMPORT_OFFSET_Y, ii.offset3Dy, tomo_index);
 			perTomoArguments.getValue(EMDL_TOMO_IMPORT_OFFSET_Z, ii.offset3Dz, tomo_index);
 
-			const std::string tsFn0 = perTomoArguments.getString(EMDL_TOMO_TILT_SERIES_NAME, tomo_index);
+			const std::string tsFn0 = rootDir + perTomoArguments.getString(EMDL_TOMO_TILT_SERIES_NAME, tomo_index);
 			const std::string orderFn = perTomoArguments.getString(EMDL_TOMO_IMPORT_ORDER_LIST, tomo_index);
 			const double fractionalDose = perTomoArguments.getDouble(EMDL_TOMO_IMPORT_FRACT_DOSE, tomo_index);
 
@@ -287,6 +293,11 @@ int main(int argc, char *argv[])
 			else
 			{
 				name = tsFn0;
+
+				if (name.find_last_of(".") != std::string::npos)
+				{
+					name = name.substr(0, name.find_last_of("."));
+				}
 			}
 
 			std::string outFnCrop;
