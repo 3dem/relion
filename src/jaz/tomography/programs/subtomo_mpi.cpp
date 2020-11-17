@@ -29,7 +29,7 @@ void SubtomoProgramMpi::readParameters(int argc, char *argv[])
 	nodeCount = node->size;
 
 	// Don't put any output to screen for mpi slaves
-	verb = (node->isMaster()) ? verb : 0;
+	verb = (node->isMaster()) ? 1 : 0;
 
 	IOParser parser;
 
@@ -96,8 +96,11 @@ void SubtomoProgramMpi::run()
 
 	if (node->isMaster())
 	{
-		writeParticleSet(particleSet, particles);
+		initialise(particleSet, particles, tomogramSet);
 	}
+
+	MPI_Barrier(MPI_COMM_WORLD);
+
 
 	BufferedImage<float> dummy;
 

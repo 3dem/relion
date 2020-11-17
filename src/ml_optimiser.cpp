@@ -2578,8 +2578,7 @@ void MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(MultidimArray<RFLOAT>
 
 			MultidimArray<RFLOAT> dummy;
 			(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, false, dummy);
-			// 2D projection data were CTF-corrected, subtomograms were not
-			refs_are_ctf_corrected = (mymodel.data_dim == 3) ? false : true;
+                        refs_are_ctf_corrected = true;
 		}
 	}
 
@@ -9660,7 +9659,6 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 			// Note beamtilt is no longer part of this: it is now in the optics group
 			if (do_ctf_correction)
 			{
-				long int mic_id = mydata.getMicrographId(part_id, img_id);
 				RFLOAT DeltafU, DeltafV, azimuthal_angle, Bfac, kfac, phase_shift;
 
 				if (!mydata.MDimg.getValue(EMDL_CTF_DEFOCUSU, DeltafU, ori_img_id))

@@ -62,6 +62,8 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 	write_divided = parser.checkOption("--div", "Write CTF-corrected subtomograms");
 	write_normalised = parser.checkOption("--nrm", "Write multiplicity-normalised subtomograms");
 
+	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Only process undone subtomograms");
+
 	diag = parser.checkOption("--diag", "Write out diagnostic information");
 
 	num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
@@ -99,7 +101,6 @@ void SubtomoProgram::readParameters(int argc, char *argv[])
 	}
 
 	outDir = ZIO::prepareTomoOutputDirectory(outDir, argc, argv);
-	int res = system(("mkdir -p " + outDir + "/Subtomograms").c_str());
 }
 
 void SubtomoProgram::run()
@@ -124,7 +125,7 @@ void SubtomoProgram::run()
 	const double relative_box_scale = cropSize / (double) boxSize;
 
 
-	writeParticleSet(particleSet, particles);
+	initialise(particleSet, particles, tomogramSet);
 
 
 	BufferedImage<float> sum_data, sum_weights;
@@ -184,9 +185,71 @@ void SubtomoProgram::run()
 	}
 }
 
+void SubtomoProgram::initialise(
+		const ParticleSet& particleSet,
+		const std::vector<std::vector<ParticleIndex>>& particles,
+		const TomogramSet& tomogramSet)
+{
+	const int tc = tomogramSet.size();
+
+	int firstGoodTomo = 0;
+
+	for (int t = 0; t < tc; t++)
+	{
+		if (particles[t].size() > 0)
+		{
+			firstGoodTomo = t;
+			break;
+		}
+	}
+
+	const std::string firstName = particleSet.getName(particles[firstGoodTomo][0]);
+
+	directoriesPerTomogram = firstName.find_first_of('/') == std::string::npos;
+
+	if (directoriesPerTomogram)
+	{
+		Log::print("No slashes found in first particle name: creating subdirectories for each tomogram");
+	}
+	else
+	{
+		Log::print("Slash found in first particle name: not creating subdirectories for each tomogram");
+	}
+
+	for (int t = 0; t < tc; t++)
+	{
+		if (particles[t].size() > 0)
+		{
+			ZIO::ensureParentDir(getOutputFilename(
+				particles[t][0], t, particleSet, tomogramSet));
+		}
+	}
+
+	writeParticleSet(particleSet, particles, tomogramSet);
+}
+
+std::string SubtomoProgram::getOutputFilename(
+		ParticleIndex p,
+		int tomogramIndex,
+		const ParticleSet& particleSet,
+		const TomogramSet& tomogramSet)
+{
+	if (directoriesPerTomogram)
+	{
+		return outDir + "Subtomograms/"
+				+ tomogramSet.getTomogramName(tomogramIndex) + "/"
+				+ particleSet.getName(p);
+	}
+	else
+	{
+		return outDir + "Subtomograms/" + particleSet.getName(p);
+	}
+}
+
 void SubtomoProgram::writeParticleSet(
 		const ParticleSet& particleSet,
-		const std::vector<std::vector<ParticleIndex>>& particles)
+		const std::vector<std::vector<ParticleIndex>>& particles,
+		const TomogramSet& tomogramSet)
 {
 	const int tc = particles.size();
 
@@ -205,8 +268,11 @@ void SubtomoProgram::writeParticleSet(
 			const int opticsGroup = copy.getOpticsGroup(part_id);
 			const double originalPixelSize = copy.getOriginalPixelSize(opticsGroup);
 
-			std::string outData = outDir + "Subtomograms/" + particleSet.getName(part_id) + "_data.mrc";
-			std::string outWeight = outDir + "Subtomograms/" + particleSet.getName(part_id) + "_weights.mrc";
+			const std::string filenameRoot = getOutputFilename(
+				part_id, t, particleSet, tomogramSet);
+
+			std::string outData = filenameRoot + "_data.mrc";
+			std::string outWeight = filenameRoot + "_weights.mrc";
 
 			copy.setImageFileNames(outData, outWeight, part_id);
 
@@ -309,6 +375,22 @@ void SubtomoProgram::processTomograms(
 			}
 
 			const ParticleIndex part_id = particles[t][p];
+
+			const std::string filenameRoot = getOutputFilename(
+				part_id, t, particleSet, tomogramSet);
+
+			std::string outData = filenameRoot + "_data.mrc";
+			std::string outWeight = filenameRoot + "_weights.mrc";
+			std::string outCTF = filenameRoot + "_CTF2.mrc";
+			std::string outDiv = filenameRoot + "_div.mrc";
+			std::string outMulti = filenameRoot + "_multi.mrc";
+			std::string outNrm = filenameRoot + "_data_nrm.mrc";
+			std::string outWeightNrm = filenameRoot + "_CTF2_nrm.mrc";
+
+			if (only_do_unfinished && ZIO::fileExists(outData))
+			{
+				continue;
+			}
 
 			const d3Vector pos = particleSet.getPosition(part_id);
 			const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
@@ -443,14 +525,6 @@ void SubtomoProgram::processTomograms(
 
 				FFT::inverseFourierTransform(dataImgFS, dataImgRS);
 			}
-
-			std::string outData = outDir + "Subtomograms/" + particleSet.getName(part_id) + "_data.mrc";
-			std::string outWeight = outDir + "Subtomograms/" + particleSet.getName(part_id) + "_weights.mrc";
-			std::string outCTF = outDir + "Subtomograms/" + particleSet.getName(part_id) + "_CTF2.mrc";
-			std::string outDiv = outDir + "Subtomograms/" + particleSet.getName(part_id) + "_div.mrc";
-			std::string outMulti = outDir + "Subtomograms/" + particleSet.getName(part_id) + "_multi.mrc";
-			std::string outNrm = outDir + "Subtomograms/" + particleSet.getName(part_id) + "_data_nrm.mrc";
-			std::string outWeightNrm = outDir + "Subtomograms/" + particleSet.getName(part_id) + "_CTF2_nrm.mrc";
 
 			// What if we didn't? The 2D image is already tapered.
 			Reconstruction::taper(dataImgRS, taper, do_center, inner_thread_num);

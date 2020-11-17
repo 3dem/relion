@@ -2307,7 +2307,7 @@ void JobWindow::placeSubtomoInput(bool has_tomograms, bool has_particles,
 
 void JobWindow::initialiseSubtomoImportWindow()
 {
-	setupTabs(2);
+	setupTabs(3);
 
 	tab1->begin();
 	tab1->label("Tomograms");
@@ -2318,7 +2318,7 @@ void JobWindow::initialiseSubtomoImportWindow()
 	place("do_tomo", TOGGLE_DEACTIVATE, group1, false);
 	group1->begin();
 
-	place("in_star", TOGGLE_DEACTIVATE);
+	place("tomo_star", TOGGLE_DEACTIVATE);
 	place("io_tomos", TOGGLE_DEACTIVATE);
 	place("angpix", TOGGLE_DEACTIVATE);
 	place("kV", TOGGLE_DEACTIVATE);
@@ -2340,14 +2340,31 @@ void JobWindow::initialiseSubtomoImportWindow()
 	tab1->end();
 
 	tab2->begin();
-	tab2->label("Others");
+	tab2->label("Particles");
 	resetHeight();
 
 	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group2->end();
-
-	place("do_other", TOGGLE_DEACTIVATE, group2, false);
+	place("do_parts", TOGGLE_DEACTIVATE, group2, false);
 	group2->begin();
+
+	place("part_star", TOGGLE_DEACTIVATE);
+	place("part_tomos", TOGGLE_DEACTIVATE);
+
+	group2->end();
+	guientries["do_parts"].cb_menu_i(); // make default active
+
+	tab2->end();
+
+	tab3->begin();
+	tab3->label("Others");
+	resetHeight();
+
+	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group3->end();
+
+	place("do_other", TOGGLE_DEACTIVATE, group3, false);
+	group3->begin();
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -2360,10 +2377,10 @@ void JobWindow::initialiseSubtomoImportWindow()
 
 	place("optics_group_particles", TOGGLE_DEACTIVATE);
 
-	group2->end();
+	group3->end();
 	guientries["do_other"].cb_menu_i(); // make default active
 
-	tab2->end();
+	tab3->end();
 }
 
 void JobWindow::initialiseSubtomoReconstructWindow()
