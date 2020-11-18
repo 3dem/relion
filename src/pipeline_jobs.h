@@ -103,6 +103,7 @@ static const std::vector<std::string> job_nodetype_options{
 };
 
 static const std::vector<std::string> job_nodetype_options_tomo{
+	"Set of tomograms STAR file (.star)",
 	"Particles STAR file (.star)",
 	"Multiple (2D or 3D) references (.star or .mrcs)",
 	"3D reference (.mrc)",

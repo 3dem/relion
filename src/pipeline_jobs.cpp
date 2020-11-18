@@ -5600,7 +5600,7 @@ void RelionJob::initialiseSubtomoImportJob()
 
        	joboptions["do_tomo"] = JobOption("Import tomograms?", true, "Set this to Yes for importing tomogram directories from IMOD.");
         joboptions["io_tomos"] = JobOption("Append to tomograms set: ", NODE_SUBTOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "The imported tomograms will be output into this tomogram set. If any tomograms were already in this tomogram set, then the newly imported ones will be added to those.");
-        joboptions["tomo_star"] = JobOption("STAR file with tomograms: ", "", "Input file (*.star)", ".", "Provide a STAR file with the following information to input tomograms: \n \n TODO TODO TODO ");
+        joboptions["tomo_star"] = JobOption("STAR file with tomograms description: ", "", "Input file (*.star)", ".", "Provide a STAR file with the following information to input tomograms: \n \n TODO TODO TODO ");
     	joboptions["angpix"] = JobOption("Pixel size (Angstrom):", (std::string)"", "Pixel size in Angstroms. If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
     	joboptions["kV"] = JobOption("Voltage (kV):", (std::string)"", "Voltage the microscope was operated on (in kV; default=300). If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
     	joboptions["Cs"] = JobOption("Spherical aberration (mm):", (std::string)"", "Spherical aberration of the microscope used to collect these images (in mm; default=2.7). Typical values are 2.7 (FEI Titan & Talos, most JEOL CRYO-ARM), 2.0 (FEI Polara), 1.4 (some JEOL CRYO-ARM) and 0.01 (microscopes with a Cs corrector). If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
@@ -5725,6 +5725,8 @@ bool RelionJob::getCommandsSubtomoImportJob(std::string &outputname, std::vector
 		int mynodetype;
 		if (node_type == "Particles STAR file (.star)")
 			mynodetype = NODE_PART_DATA;
+		else if (node_type == "Set of tomograms STAR file (.star)")
+			mynodetype = NODE_SUBTOMO_TOMOGRAMS;
 		else if (node_type == "Multiple (2D or 3D) references (.star or .mrcs)")
 			mynodetype = NODE_REFS;
 		else if (node_type == "3D reference (.mrc)")
