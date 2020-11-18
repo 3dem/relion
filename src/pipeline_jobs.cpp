@@ -5710,6 +5710,8 @@ bool RelionJob::getCommandsSubtomoImportJob(std::string &outputname, std::vector
 
 		Node node(outputname+"particles.star", NODE_PART_DATA);
 		outputNodes.push_back(node);
+		Node node2(outputname+"optimisation_set.star", NODE_SUBTOMO_OPTIMISATION);
+		outputNodes.push_back(node2);
 	}
 	else if (do_other)
 	{
