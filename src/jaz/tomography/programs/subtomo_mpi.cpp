@@ -23,6 +23,8 @@ using namespace gravis;
 
 void SubtomoProgramMpi::readParameters(int argc, char *argv[])
 {
+	run_from_MPI = true;
+
 	// Define a new MpiNode
 	node = new MpiNode(argc, argv);
 	rank = node->rank;

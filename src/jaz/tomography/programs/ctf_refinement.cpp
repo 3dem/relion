@@ -22,6 +22,7 @@
 #include <src/jaz/util/log.h>
 #include <iostream>
 #include <src/time.h>
+#include <mpi.h>
 
 #define TIMING 0
 
@@ -151,7 +152,15 @@ void CtfRefinementProgram::processTomograms(
 
 		if (run_from_GUI && pipeline_control_check_abort_job())
 		{
-			exit(RELION_EXIT_ABORTED);
+			if (run_from_MPI)
+			{
+				MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
+				exit(RELION_EXIT_ABORTED);
+			}
+			else
+			{
+				exit(RELION_EXIT_ABORTED);
+			}
 		}
 
 		const int t = tomoIndices[tt];
@@ -196,7 +205,15 @@ void CtfRefinementProgram::processTomograms(
 
 		if (run_from_GUI && pipeline_control_check_abort_job())
 		{
-			exit(RELION_EXIT_ABORTED);
+			if (run_from_MPI)
+			{
+				MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
+				exit(RELION_EXIT_ABORTED);
+			}
+			else
+			{
+				exit(RELION_EXIT_ABORTED);
+			}
 		}
 
 		if (do_refine_defocus)
@@ -207,7 +224,15 @@ void CtfRefinementProgram::processTomograms(
 
 			if (run_from_GUI && pipeline_control_check_abort_job())
 			{
-				exit(RELION_EXIT_ABORTED);
+				if (run_from_MPI)
+				{
+					MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
+					exit(RELION_EXIT_ABORTED);
+				}
+				else
+				{
+					exit(RELION_EXIT_ABORTED);
+				}
 			}
 		}
 
@@ -220,7 +245,15 @@ void CtfRefinementProgram::processTomograms(
 
 			if (run_from_GUI && pipeline_control_check_abort_job())
 			{
-				exit(RELION_EXIT_ABORTED);
+				if (run_from_MPI)
+				{
+					MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
+					exit(RELION_EXIT_ABORTED);
+				}
+				else
+				{
+					exit(RELION_EXIT_ABORTED);
+				}
 			}
 		}
 
@@ -233,7 +266,15 @@ void CtfRefinementProgram::processTomograms(
 
 			if (run_from_GUI && pipeline_control_check_abort_job())
 			{
-				exit(RELION_EXIT_ABORTED);
+				if (run_from_MPI)
+				{
+					MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
+					exit(RELION_EXIT_ABORTED);
+				}
+				else
+				{
+					exit(RELION_EXIT_ABORTED);
+				}
 			}
 		}
 

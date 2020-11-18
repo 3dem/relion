@@ -22,7 +22,7 @@
 using namespace gravis;
 
 RefinementProgram::RefinementProgram(int argc, char *argv[])
-:	argc(argc), argv(argv)
+:	argc(argc), argv(argv), run_from_MPI(false)
 {}
 
 void RefinementProgram::_readParams(IOParser &parser)

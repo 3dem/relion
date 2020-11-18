@@ -15,6 +15,7 @@
 #include <src/jaz/optimization/lbfgs.h>
 #include <src/jaz/math/fcc.h>
 #include <src/jaz/util/log.h>
+#include <mpi.h>
 #include <omp.h>
 
 using namespace gravis;
@@ -202,7 +203,15 @@ void AlignProgram::processTomograms(
 
 		if (run_from_GUI && pipeline_control_check_abort_job())
 		{
-			exit(RELION_EXIT_ABORTED);
+			if (run_from_MPI)
+			{
+				MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
+				exit(RELION_EXIT_ABORTED);
+			}
+			else
+			{
+				exit(RELION_EXIT_ABORTED);
+			}
 		}
 
 		int pc = particles[t].size();

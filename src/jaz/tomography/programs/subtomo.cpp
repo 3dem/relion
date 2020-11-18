@@ -17,10 +17,17 @@
 #include <src/time.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
+#include <mpi.h>
 #include <iostream>
 
 using namespace gravis;
 
+
+SubtomoProgram::SubtomoProgram()
+: run_from_MPI(false)
+{
+
+}
 
 void SubtomoProgram::readBasicParameters(IOParser& parser)
 {
@@ -326,7 +333,15 @@ void SubtomoProgram::processTomograms(
 
 		if (run_from_GUI && pipeline_control_check_abort_job())
 		{
-			exit(RELION_EXIT_ABORTED);
+			if (run_from_MPI)
+			{
+				MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
+				exit(RELION_EXIT_ABORTED);
+			}
+			else
+			{
+				exit(RELION_EXIT_ABORTED);
+			}
 		}
 
 		if (verbosity > 0)

@@ -16,11 +16,18 @@
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
 #include <src/time.h>
+#include <mpi.h>
 #include <iostream>
 
 
 using namespace gravis;
 
+
+ReconstructParticleProgram::ReconstructParticleProgram()
+: run_from_MPI(false)
+{
+
+}
 
 void ReconstructParticleProgram::readParameters(int argc, char *argv[])
 {
@@ -251,7 +258,15 @@ void ReconstructParticleProgram::processTomograms(
 	{
 		if (run_from_GUI && pipeline_control_check_abort_job())
 		{
-			exit(RELION_EXIT_ABORTED);
+			if (run_from_MPI)
+			{
+				MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
+				exit(RELION_EXIT_ABORTED);
+			}
+			else
+			{
+				exit(RELION_EXIT_ABORTED);
+			}
 		}
 
 		const int t = tomoIndices[tt];
