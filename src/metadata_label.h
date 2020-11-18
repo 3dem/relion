@@ -629,6 +629,7 @@ enum EMDLabel
 	EMDL_TOMO_IMPORT_ORDER_LIST,
 	EMDL_TOMO_IMPORT_FRACT_DOSE,
 	EMDL_TOMO_IMPORT_CULLED_FILE,
+	EMDL_TOMO_IMPORT_PARTICLE_FILE,
 
 	EMDL_TOMO_RELATIVE_ICE_THICKNESS,
 	EMDL_TOMO_RELATIVE_LUMINANCE,
@@ -1296,6 +1297,7 @@ private:
 		EMDL::addLabel(EMDL_TOMO_IMPORT_ORDER_LIST, EMDL_STRING, "rlnTomoImportOrderList", "Frame order list");
 		EMDL::addLabel(EMDL_TOMO_IMPORT_FRACT_DOSE, EMDL_DOUBLE, "rlnTomoImportFractionalDose", "Fractional dose of a tilt series");
 		EMDL::addLabel(EMDL_TOMO_IMPORT_CULLED_FILE, EMDL_STRING, "rlnTomoImportCulledFile", "File name of a tilt series with certain frames removed");
+		EMDL::addLabel(EMDL_TOMO_IMPORT_PARTICLE_FILE, EMDL_STRING, "rlnTomoImportParticleFile", "File name of a STAR file containing 3D particle coordinates");
 
 		EMDL::addLabel(EMDL_TOMO_RELATIVE_ICE_THICKNESS, EMDL_DOUBLE, "rlnTomoRelativeIceThickness", "Relative ice thickness times its extinction coefficient");
 		EMDL::addLabel(EMDL_TOMO_RELATIVE_LUMINANCE, EMDL_DOUBLE, "rlnTomoRelativeLuminance", "Relative beam luminance");

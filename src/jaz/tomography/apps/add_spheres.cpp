@@ -18,40 +18,30 @@ int main(int argc, char *argv[])
 
 	OptimisationSet optimisationSet;
 
-	try
+	parser.setCommandLine(argc, argv);
+
+	optimisationSet.read(
+		parser,
+		true,            // optimisation set
+		false,  false,   // particles
+		false,  false,   // tomograms
+		false,  false,   // trajectories
+		false,  false,   // manifolds
+		false,  false);  // reference
+
+	listFn = parser.getOption("--sph", "File containing a list of tomogram-name/spheres-file pairs");
+
+	spheres_binning = textToDouble(parser.getOption("--sbin", "Binning factor of the sphere coordinates"));
+
+	diag = parser.checkOption("--diag", "Write out diagnostic information");
+
+	outPath = parser.getOption("--o", "Output filename pattern");
+
+	Log::readParams(parser);
+
+	if (parser.checkForErrors())
 	{
-		parser.setCommandLine(argc, argv);
-
-		optimisationSet.read(
-			parser,
-			true,            // optimisation set
-			false,  false,   // particles
-			false,  false,   // tomograms
-			false,  false,   // trajectories
-			false,  false,   // manifolds
-			false,  false);  // reference
-
-		listFn = parser.getOption("--sph", "File containing a list of tomogram-name/spheres-file pairs");
-
-		spheres_binning = textToDouble(parser.getOption("--sbin", "Binning factor of the sphere coordinates"));
-
-		diag = parser.checkOption("--diag", "Write out diagnostic information");
-
-		outPath = parser.getOption("--o", "Output filename pattern");
-
-		Log::readParams(parser);
-
-		if (parser.checkForErrors())
-		{
-			parser.writeUsage(std::cout);
-			exit(1);
-		}
-	}
-	catch (RelionError XE)
-	{
-		parser.writeUsage(std::cout);
-		std::cerr << XE;
-		exit(1);
+		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
 
 	outPath = ZIO::prepareTomoOutputDirectory(outPath, argc, argv);

@@ -20,6 +20,7 @@ class ReconstructParticleProgramMpi : public ReconstructParticleProgram
 		}
 
 		int rank, nodeCount, verb;
+		std::string tmpOutRootBase;
 
 		void readParameters(int argc, char *argv[]);
 		void run();

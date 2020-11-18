@@ -12,41 +12,34 @@ void SampleManifoldProgram::readParameters(int argc, char *argv[])
 {
 	IOParser parser;
 
-	try
+	parser.setCommandLine(argc, argv);
+
+	optimisationSet.read(
+		parser,
+		true,            // optimisation set
+		false,  false,   // particles
+		true,   true,    // tomograms
+		false,  false,   // trajectories
+		true,   true,    // manifolds
+		false,  false);  // reference
+
+	int gen_section = parser.addSection("General options");
+
+	spacing = textToDouble(parser.getOption("--spacing", "Particle spacing [A]"));
+	depth = textToDouble(parser.getOption("--depth", "Depth below surface [A]"));
+	const double max_tilt_deg = textToDouble(parser.getOption("--max_tilt", "Maximum tilt angle [degrees]"));
+	max_tilt = DEG2RAD(max_tilt_deg);
+	avoid_missing_wedge = parser.checkOption("--nmw", "Do not sample particles from the missing wedges");
+	avoid_present_wedge = parser.checkOption("--npw", "Do not sample particles from the present wedges");
+	store_tilt_series = parser.checkOption("--ts", "Store the name of the tilt series in the star file");
+
+	output_path = parser.getOption("--o", "Output directory");
+
+	Log::readParams(parser);
+
+	if (parser.checkForErrors())
 	{
-		parser.setCommandLine(argc, argv);
-
-		optimisationSet.read(
-			parser,
-			true,            // optimisation set
-			false,  false,   // particles
-			true,   true,    // tomograms
-			false,  false,   // trajectories
-			true,   true,    // manifolds
-			false,  false);  // reference
-
-		int gen_section = parser.addSection("General options");
-
-		spacing = textToDouble(parser.getOption("--spacing", "Particle spacing [A]"));
-		depth = textToDouble(parser.getOption("--depth", "Depth below surface [A]"));
-		const double max_tilt_deg = textToDouble(parser.getOption("--max_tilt", "Maximum tilt angle [degrees]"));
-		max_tilt = DEG2RAD(max_tilt_deg);
-		avoid_missing_wedge = parser.checkOption("--nmw", "Do not sample particles from the missing wedges");
-		avoid_present_wedge = parser.checkOption("--npw", "Do not sample particles from the present wedges");
-		store_tilt_series = parser.checkOption("--ts", "Store the name of the tilt series in the star file");
-
-		output_path = parser.getOption("--o", "Output directory");
-
-		Log::readParams(parser);
-
-		if (parser.checkForErrors()) std::exit(-1);
-
-	}
-	catch (RelionError XE)
-	{
-		parser.writeUsage(std::cout);
-		std::cerr << XE;
-		exit(1);
+		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
 
 	output_path = ZIO::prepareTomoOutputDirectory(output_path, argc, argv);

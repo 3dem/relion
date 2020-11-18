@@ -1,17 +1,15 @@
 #include <src/args.h>
 #include <mpi.h>
-#include <src/jaz/tomography/programs/subtomo_mpi.h>
-#include <src/jaz/util/log.h>
+#include <src/jaz/tomography/programs/ctf_refinement_mpi.h>
 
 
 int main(int argc, char *argv[])
 {
-	SubtomoProgramMpi prm;
 
 	try
 	{
-		prm.readParameters(argc, argv);
-		prm.run();
+		CtfRefinementProgramMpi crp(argc, argv);
+		crp.run();
 	}
 	catch (RelionError XE)
 	{

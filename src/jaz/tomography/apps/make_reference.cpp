@@ -12,13 +12,14 @@ using namespace gravis;
 
 int main(int argc, char *argv[])
 {
-	IOParser parser;
-
-	OptimisationSet os;
-	std::string reconstructionPath, evalMaskFn, refMaskFn, outDir;
-
 	try
 	{
+		IOParser parser;
+
+		OptimisationSet os;
+		std::string reconstructionPath, evalMaskFn, refMaskFn, outDir;
+
+
 		parser.setCommandLine(argc, argv);
 		int gen_section = parser.addSection("General options");
 
@@ -37,50 +38,51 @@ int main(int argc, char *argv[])
 			true,   false,  // manifolds
 			false,  false); // reference
 
-		if (parser.checkForErrors()) std::exit(-1);
-	}
-	catch (RelionError XE)
-	{
-		parser.writeUsage(std::cout);
-		std::cerr << XE;
-		exit(1);
-	}
-
-	if (outDir[outDir.length()-1] != '/')
-	{
-		outDir = outDir + "/";
-	}
-
-	int res = system(("mkdir -p "+outDir).c_str());
-
-	{
-		std::ofstream ofs(outDir+"/note.txt");
-
-		ofs << "Command:\n\n";
-
-		for (int i = 0; i < argc; i++)
+		if (parser.checkForErrors())
 		{
-			ofs << argv[i] << ' ';
+			REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 		}
 
-		ofs << '\n';
+		if (outDir[outDir.length()-1] != '/')
+		{
+			outDir = outDir + "/";
+		}
+
+		int res = system(("mkdir -p "+outDir).c_str());
+
+		{
+			std::ofstream ofs(outDir+"/note.txt");
+
+			ofs << "Command:\n\n";
+
+			for (int i = 0; i < argc; i++)
+			{
+				ofs << argv[i] << ' ';
+			}
+
+			ofs << '\n';
+		}
+
+		res = system(("mkdir -p "+outDir+"PostProcess").c_str());
+
+		res = system(("relion_postprocess --i " + reconstructionPath + "_half1.mrc --mask "
+					  + evalMaskFn+" --o " + outDir + "PostProcess/post").c_str());
+
+		os.refMap1 = reconstructionPath + "_half1.mrc";
+		os.refMap2 = reconstructionPath + "_half2.mrc";
+		os.refFSC = outDir + "PostProcess/post.star";
+
+		if (refMaskFn != "")
+		{
+			os.refMask = refMaskFn;
+		}
+
+		os.write(outDir+"optimisation_set.star");
 	}
-
-	res = system(("mkdir -p "+outDir+"PostProcess").c_str());
-
-	res = system(("relion_postprocess --i " + reconstructionPath + "_half1.mrc --mask "
-				  + evalMaskFn+" --o " + outDir + "PostProcess/post").c_str());
-
-	os.refMap1 = reconstructionPath + "_half1.mrc";
-	os.refMap2 = reconstructionPath + "_half2.mrc";
-	os.refFSC = outDir + "PostProcess/post.star";
-
-	if (refMaskFn != "")
+	catch (RelionError e)
 	{
-		os.refMask = refMaskFn;
+		return RELION_EXIT_FAILURE;
 	}
 
-	os.write(outDir+"optimisation_set.star");
-
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }

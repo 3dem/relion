@@ -19,9 +19,9 @@ class ReconstructParticleProgram
 		
 
 			OptimisationSet optimisationSet;
-			std::string outDir, symmName;
+			std::string outDir, symmName, tmpOutRoot;
 			
-			bool do_whiten, explicit_gridding, no_reconstruction;
+			bool do_whiten, no_reconstruction, only_do_unfinished;
 			int boxSize, cropSize, num_threads, outer_threads, inner_threads, max_mem_GB;
 			double SNR, taper, binning;
 
@@ -40,7 +40,6 @@ class ReconstructParticleProgram
 				const AberrationsCache& aberrationsCache,
 				std::vector<BufferedImage<dComplex>>& dataImgFS,
 				std::vector<BufferedImage<double>>& ctfImgFS,
-				std::vector<BufferedImage<double>>& psfImgFS,
 				const double binnedOutPixelSize,
 				int s02D,
 				bool do_ctf,
@@ -51,14 +50,12 @@ class ReconstructParticleProgram
 		void finalise(
 				std::vector<BufferedImage<dComplex>>& dataImgFS,
 				std::vector<BufferedImage<double>>& ctfImgFS,
-				std::vector<BufferedImage<double>>& psfImgFS,
 				const double binnedOutPixelSize);
 
 		void reconstruct(
 				BufferedImage<double>& dataImgRS,
 				BufferedImage<double>& dataImgDivRS,
 				BufferedImage<double>& ctfImgFS,
-				BufferedImage<double>* psfImgFS,
 				BufferedImage<dComplex>& dataImgFS);
 
 		void writeOutput(

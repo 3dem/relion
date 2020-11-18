@@ -6,9 +6,16 @@
 int main(int argc, char *argv[])
 {
 	DeleteBlobsProgram program;
-	
-	program.readParameters(argc, argv);	
-	program.run();
-	
-	return 0;
+
+	try
+	{
+		program.readParameters(argc, argv);
+		program.run();
+	}
+	catch (RelionError XE)
+	{
+		return RELION_EXIT_FAILURE;
+	}
+
+	return RELION_EXIT_SUCCESS;
 }

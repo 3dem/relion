@@ -37,31 +37,21 @@ LocalParticleRefineProgram::LocalParticleRefineProgram(int argc, char *argv[])
 
 void LocalParticleRefineProgram::readParams(IOParser &parser)
 {
-	try
+	_readParams(parser);
+
+	int defocus_section = parser.addSection("Alignment options");
+
+	max_iterations = textToInteger(parser.getOption("--max_it", "Maximum number of iterations", "300"));
+	dose_cutoff = textToDouble(parser.getOption("--dose_cutoff", "Neglect pixels with a smaller dose weight", "0.05"));
+	eps = textToDouble(parser.getOption("--eps", "Optimisation change threshold", "1e-5"));
+	xtol = textToDouble(parser.getOption("--xtol", "Optimisation gradient threshold", "1e-4"));
+	verbose_opt = parser.checkOption("--verbose_opt", "Print out the cost function after each iteration (for the first thread)");
+
+	Log::readParams(parser);
+
+	if (parser.checkForErrors())
 	{
-		_readParams(parser);
-
-		int defocus_section = parser.addSection("Alignment options");
-
-		max_iterations = textToInteger(parser.getOption("--max_it", "Maximum number of iterations", "300"));
-		dose_cutoff = textToDouble(parser.getOption("--dose_cutoff", "Neglect pixels with a smaller dose weight", "0.05"));
-		eps = textToDouble(parser.getOption("--eps", "Optimisation change threshold", "1e-5"));
-		xtol = textToDouble(parser.getOption("--xtol", "Optimisation gradient threshold", "1e-4"));
-		verbose_opt = parser.checkOption("--verbose_opt", "Print out the cost function after each iteration (for the first thread)");
-
-		Log::readParams(parser);
-
-		if (parser.checkForErrors())
-		{
-			parser.writeUsage(std::cout);
-			std::exit(-1);
-		}
-	}
-	catch (RelionError XE)
-	{
-		parser.writeUsage(std::cout);
-		std::cerr << XE;
-		exit(1);
+		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
 }
 

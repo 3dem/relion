@@ -62,6 +62,8 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 	write_divided = parser.checkOption("--div", "Write CTF-corrected subtomograms");
 	write_normalised = parser.checkOption("--nrm", "Write multiplicity-normalised subtomograms");
 
+	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Only process undone subtomograms");
+
 	diag = parser.checkOption("--diag", "Write out diagnostic information");
 
 	num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
@@ -71,26 +73,18 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 void SubtomoProgram::readParameters(int argc, char *argv[])
 {
 	IOParser parser;
-	
-	try
+
+	parser.setCommandLine(argc, argv);
+
+	readBasicParameters(parser);
+
+	Log::readParams(parser);
+
+	do_sum_all = parser.checkOption("--sum", "Sum up all subtomograms (for debugging)");
+
+	if (parser.checkForErrors())
 	{
-		parser.setCommandLine(argc, argv);
-
-		readBasicParameters(parser);
-		
-		Log::readParams(parser);
-
-		do_sum_all = parser.checkOption("--sum", "Sum up all subtomograms (for debugging)");
-
-		if (parser.checkForErrors()) std::exit(-1);
-
-	}
-
-	catch (RelionError XE)
-	{
-		parser.writeUsage(std::cout);
-		std::cerr << XE;
-		exit(1);
+		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
 
 	if (do_gridding_precorrection)
@@ -374,6 +368,22 @@ void SubtomoProgram::processTomograms(
 
 			const ParticleIndex part_id = particles[t][p];
 
+			const std::string filenameRoot = getOutputFilename(
+				part_id, t, particleSet, tomogramSet);
+
+			std::string outData = filenameRoot + "_data.mrc";
+			std::string outWeight = filenameRoot + "_weights.mrc";
+			std::string outCTF = filenameRoot + "_CTF2.mrc";
+			std::string outDiv = filenameRoot + "_div.mrc";
+			std::string outMulti = filenameRoot + "_multi.mrc";
+			std::string outNrm = filenameRoot + "_data_nrm.mrc";
+			std::string outWeightNrm = filenameRoot + "_CTF2_nrm.mrc";
+
+			if (only_do_unfinished && ZIO::fileExists(outData))
+			{
+				continue;
+			}
+
 			const d3Vector pos = particleSet.getPosition(part_id);
 			const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
 						part_id, fc, tomogram.optics.pixelSize);
@@ -507,17 +517,6 @@ void SubtomoProgram::processTomograms(
 
 				FFT::inverseFourierTransform(dataImgFS, dataImgRS);
 			}
-
-			const std::string filenameRoot = getOutputFilename(
-				part_id, t, particleSet, tomogramSet);
-
-			std::string outData = filenameRoot + "_data.mrc";
-			std::string outWeight = filenameRoot + "_weights.mrc";
-			std::string outCTF = filenameRoot + "_CTF2.mrc";
-			std::string outDiv = filenameRoot + "_div.mrc";
-			std::string outMulti = filenameRoot + "_multi.mrc";
-			std::string outNrm = filenameRoot + "_data_nrm.mrc";
-			std::string outWeightNrm = filenameRoot + "_CTF2_nrm.mrc";
 
 			// What if we didn't? The 2D image is already tapered.
 			Reconstruction::taper(dataImgRS, taper, do_center, inner_thread_num);

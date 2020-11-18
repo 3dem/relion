@@ -29,7 +29,8 @@ class TomogramSet
 			double fractionalDose,
 			const std::vector<CTF>& ctfs,
 			double handedness, 
-			double pixelSize);
+			double pixelSize,
+			const std::string& opticsGroupName);
 		
 		int size() const;
 		
@@ -49,6 +50,8 @@ class TomogramSet
 		std::string getTomogramName(int index) const;
 		int getTomogramIndexSafely(std::string tomogramName) const;
 		int getFrameCount(int index) const;
+		double getPixelSize(int index) const;
+		std::string getOpticsGroupName(int index) const;
 };
 
 #endif
