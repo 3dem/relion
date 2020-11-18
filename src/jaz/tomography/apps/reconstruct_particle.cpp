@@ -5,10 +5,17 @@
 
 int main(int argc, char *argv[])
 {
-	ReconstructParticleProgram bp;
-	
-	bp.readParameters(argc, argv);	
-	bp.run();
-	
-	return 0;
+	try
+	{
+		ReconstructParticleProgram program;
+
+		program.readParameters(argc, argv);
+		program.run();
+	}
+	catch (RelionError e)
+	{
+		return RELION_EXIT_FAILURE;
+	}
+
+	return RELION_EXIT_SUCCESS;
 }

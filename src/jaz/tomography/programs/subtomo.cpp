@@ -73,26 +73,18 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 void SubtomoProgram::readParameters(int argc, char *argv[])
 {
 	IOParser parser;
-	
-	try
+
+	parser.setCommandLine(argc, argv);
+
+	readBasicParameters(parser);
+
+	Log::readParams(parser);
+
+	do_sum_all = parser.checkOption("--sum", "Sum up all subtomograms (for debugging)");
+
+	if (parser.checkForErrors())
 	{
-		parser.setCommandLine(argc, argv);
-
-		readBasicParameters(parser);
-		
-		Log::readParams(parser);
-
-		do_sum_all = parser.checkOption("--sum", "Sum up all subtomograms (for debugging)");
-
-		if (parser.checkForErrors()) std::exit(-1);
-
-	}
-
-	catch (RelionError XE)
-	{
-		parser.writeUsage(std::cout);
-		std::cerr << XE;
-		exit(1);
+		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
 
 	if (do_gridding_precorrection)

@@ -3,9 +3,17 @@
 
 int main(int argc, char *argv[])
 {
-	BfactorFitProgram bffp(argc, argv);
-	
-	bffp.run();
-	
-	return 0;
+
+	try
+	{
+		BfactorFitProgram program(argc, argv);
+
+		program.run();
+	}
+	catch (RelionError XE)
+	{
+		return RELION_EXIT_FAILURE;
+	}
+
+	return RELION_EXIT_SUCCESS;
 }

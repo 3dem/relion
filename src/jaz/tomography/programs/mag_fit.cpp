@@ -34,23 +34,13 @@ MagFitProgram::MagFitProgram(int argc, char *argv[])
 
 void MagFitProgram::readParams(IOParser &parser)
 {
-	try
-	{
-		_readParams(parser);
+	_readParams(parser);
 
-		Log::readParams(parser);
+	Log::readParams(parser);
 
-		if (parser.checkForErrors())
-		{
-			parser.writeUsage(std::cout);
-			std::exit(-1);
-		}
-	}
-	catch (RelionError XE)
+	if (parser.checkForErrors())
 	{
-		parser.writeUsage(std::cout);
-		std::cerr << XE;
-		exit(1);
+		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
 }
 

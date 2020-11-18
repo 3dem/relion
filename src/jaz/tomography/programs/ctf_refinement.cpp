@@ -35,59 +35,50 @@ CtfRefinementProgram::CtfRefinementProgram(int argc, char *argv[])
 {
 	IOParser parser;
 	parser.setCommandLine(argc, argv);
-	
-	try
+
+	_readParams(parser);
+
+
+	int defocus_section = parser.addSection("Defocus refinement options");
+
+	do_refine_defocus = parser.checkOption("--do_defocus", "Refine the (astigmatic) defocus.");
+	lambda_reg = textToDouble(parser.getOption("--lambda", "Defocus regularisation scale", "0.1"));
+
+	minDelta = textToDouble(parser.getOption("--d0", "Min. defocus offset to test [Å]", "-3000"));
+	maxDelta = textToDouble(parser.getOption("--d1", "Max. defocus offset to test [Å]", "3000"));
+	deltaSteps = textToInteger(parser.getOption("--ds", "Number of defocus steps in-between", "100"));
+
+
+	int scale_section = parser.addSection("Scale estimation options");
+
+	do_refine_scale = parser.checkOption("--do_scale", "Refine the contrast scale");
+	bool per_frame_scale = parser.checkOption("--per_frame_scale", "Estimate the scale per frame (no Lambert fit)");
+	bool per_tomogram_scale = parser.checkOption("--per_tomogram_scale", "Estimate the scale per tomogram (luminance may become unstable)");
+
+	if (per_frame_scale && per_tomogram_scale)
 	{
-		_readParams(parser);
-		
-
-		int defocus_section = parser.addSection("Defocus refinement options");
-
-		do_refine_defocus = parser.checkOption("--do_defocus", "Refine the (astigmatic) defocus.");
-		lambda_reg = textToDouble(parser.getOption("--lambda", "Defocus regularisation scale", "0.1"));
-
-		minDelta = textToDouble(parser.getOption("--d0", "Min. defocus offset to test [Å]", "-3000"));
-		maxDelta = textToDouble(parser.getOption("--d1", "Max. defocus offset to test [Å]", "3000"));
-		deltaSteps = textToInteger(parser.getOption("--ds", "Number of defocus steps in-between", "100"));
-
-
-		int scale_section = parser.addSection("Scale estimation options");
-
-		do_refine_scale = parser.checkOption("--do_scale", "Refine the contrast scale");
-		bool per_frame_scale = parser.checkOption("--per_frame_scale", "Estimate the scale per frame (no Lambert fit)");
-		bool per_tomogram_scale = parser.checkOption("--per_tomogram_scale", "Estimate the scale per tomogram (luminance may become unstable)");
-
-		if (per_frame_scale && per_tomogram_scale)
-		{
-			parser.reportError("The options --per_frame_scale and --per_tomogram_scale are mutually exclusive");
-		}
-
-		do_fit_Lambert_per_tomo = do_refine_scale && per_tomogram_scale;
-		do_fit_Lambert_globally = do_refine_scale && !per_frame_scale && !per_tomogram_scale;
-
-
-		int aberr_section = parser.addSection("Aberration refinement options");
-
-		do_even_aberrations = parser.checkOption("--do_even_aberrations", "Refine even higher-order aberrations");
-		do_odd_aberrations = parser.checkOption("--do_odd_aberrations", "Refine odd higher-order aberrations");
-		do_refine_aberrations = do_odd_aberrations || do_even_aberrations;
-
-		n_even = textToInteger(parser.getOption("--ne", "Maximal N for even aberrations", "4"));
-		n_odd = textToInteger(parser.getOption("--no", "Maximal N for odd aberrations", "3"));
-
-		
-		Log::readParams(parser);
-		
-		if (parser.checkForErrors())
-		{
-			std::exit(-2);
-		}
+		parser.reportError("The options --per_frame_scale and --per_tomogram_scale are mutually exclusive");
 	}
-	catch (RelionError XE)
+
+	do_fit_Lambert_per_tomo = do_refine_scale && per_tomogram_scale;
+	do_fit_Lambert_globally = do_refine_scale && !per_frame_scale && !per_tomogram_scale;
+
+
+	int aberr_section = parser.addSection("Aberration refinement options");
+
+	do_even_aberrations = parser.checkOption("--do_even_aberrations", "Refine even higher-order aberrations");
+	do_odd_aberrations = parser.checkOption("--do_odd_aberrations", "Refine odd higher-order aberrations");
+	do_refine_aberrations = do_odd_aberrations || do_even_aberrations;
+
+	n_even = textToInteger(parser.getOption("--ne", "Maximal N for even aberrations", "4"));
+	n_odd = textToInteger(parser.getOption("--no", "Maximal N for odd aberrations", "3"));
+
+
+	Log::readParams(parser);
+
+	if (parser.checkForErrors())
 	{
-		parser.writeUsage(std::cout);
-		std::cerr << XE;
-		exit(1);
+		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
 }
 

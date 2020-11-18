@@ -18,63 +18,53 @@ using namespace gravis;
 void TomoBackprojectProgram::readParameters(int argc, char *argv[])
 {
 	IOParser parser;
-		
-	try
+
+	parser.setCommandLine(argc, argv);
+
+	optimisationSet.read(
+		parser,
+		true,             // optimisation set
+		false,   false,   // particles
+		true,    true,    // tomograms
+		false,   false,   // trajectories
+		false,   false,   // manifolds
+		false,   false);  // reference
+
+	int gen_section = parser.addSection("General options");
+
+	tomoName = parser.getOption("--tn", "Tomogram name");
+
+	applyWeight = !parser.checkOption("--no_weight", "Do not perform weighting in Fourier space using a Wiener filter");
+	applyPreWeight = parser.checkOption("--pre_weight", "Pre-weight the 2D slices prior to backprojection");
+
+	SNR = textToDouble(parser.getOption("--SNR", "SNR assumed by the Wiener filter", "10"));
+
+	applyCtf = !parser.checkOption("--noctf", "Ignore the CTF");
+
+	zeroDC = !parser.checkOption("--keep_mean", "Do not zero the DC component of each frame");
+
+	taperDist = textToDouble(parser.getOption("--td", "Tapering distance", "0.0"));
+	taperFalloff = textToDouble(parser.getOption("--tf", "Tapering falloff", "0.0"));
+
+	x0 = textToDouble(parser.getOption("--x0", "X origin", "1.0"));
+	y0 = textToDouble(parser.getOption("--y0", "Y origin", "1.0"));
+	z0 = textToDouble(parser.getOption("--z0", "Z origin", "1.0"));
+
+	w = textToInteger(parser.getOption("--w", "Width",  "-1.0"));
+	h = textToInteger(parser.getOption("--h", "Height", "-1.0"));
+	d = textToInteger(parser.getOption("--d", "Thickness", "-1.0"));
+
+	spacing = textToDouble(parser.getOption("--bin", "Binning", "8.0"));
+
+	n_threads = textToInteger(parser.getOption("--j", "Number of threads", "1"));
+
+	outFn = parser.getOption("--o", "Output filename");
+
+	Log::readParams(parser);
+
+	if (parser.checkForErrors())
 	{
-		parser.setCommandLine(argc, argv);
-		
-		optimisationSet.read(
-			parser,
-			true,             // optimisation set
-			false,   false,   // particles
-			true,    true,    // tomograms
-			false,   false,   // trajectories
-			false,   false,   // manifolds
-			false,   false);  // reference
-
-		int gen_section = parser.addSection("General options");
-
-		tomoName = parser.getOption("--tn", "Tomogram name");
-		
-		applyWeight = !parser.checkOption("--no_weight", "Do not perform weighting in Fourier space using a Wiener filter");
-		applyPreWeight = parser.checkOption("--pre_weight", "Pre-weight the 2D slices prior to backprojection");
-
-		SNR = textToDouble(parser.getOption("--SNR", "SNR assumed by the Wiener filter", "10"));
-		
-		applyCtf = !parser.checkOption("--noctf", "Ignore the CTF");
-
-		zeroDC = !parser.checkOption("--keep_mean", "Do not zero the DC component of each frame");
-
-		taperDist = textToDouble(parser.getOption("--td", "Tapering distance", "0.0"));
-		taperFalloff = textToDouble(parser.getOption("--tf", "Tapering falloff", "0.0"));
-
-		x0 = textToDouble(parser.getOption("--x0", "X origin", "1.0"));
-		y0 = textToDouble(parser.getOption("--y0", "Y origin", "1.0"));
-		z0 = textToDouble(parser.getOption("--z0", "Z origin", "1.0"));
-		
-		w = textToInteger(parser.getOption("--w", "Width",  "-1.0"));
-		h = textToInteger(parser.getOption("--h", "Height", "-1.0"));
-		d = textToInteger(parser.getOption("--d", "Thickness", "-1.0"));
-		
-		spacing = textToDouble(parser.getOption("--bin", "Binning", "8.0"));
-
-		n_threads = textToInteger(parser.getOption("--j", "Number of threads", "1"));
-		
-		outFn = parser.getOption("--o", "Output filename");
-
-		Log::readParams(parser);
-
-		if (parser.checkForErrors())
-		{
-			parser.writeUsage(std::cout);
-			std::exit(-1);
-		}
-	}
-	catch (RelionError XE)
-	{
-		parser.writeUsage(std::cout);
-		std::cerr << XE;
-		exit(1);
+		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
 	
 	if (applyPreWeight)

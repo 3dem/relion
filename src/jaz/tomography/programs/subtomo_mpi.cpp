@@ -33,23 +33,16 @@ void SubtomoProgramMpi::readParameters(int argc, char *argv[])
 
 	IOParser parser;
 
-	try
+	parser.setCommandLine(argc, argv);
+
+	readBasicParameters(parser);
+	do_sum_all = false;
+
+	Log::readParams(parser);
+
+	if (parser.checkForErrors())
 	{
-		parser.setCommandLine(argc, argv);
-
-		readBasicParameters(parser);
-		do_sum_all = false;
-
-		Log::readParams(parser);
-
-		if (parser.checkForErrors()) std::exit(-1);
-
-	}
-	catch (RelionError XE)
-	{
-		parser.writeUsage(std::cout);
-		std::cerr << XE;
-		exit(1);
+		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
 
 	if (nodeCount < 2)
