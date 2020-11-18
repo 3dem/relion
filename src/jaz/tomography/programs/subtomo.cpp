@@ -68,6 +68,8 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 
 	num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 	outDir = parser.getOption("--o", "Output filename pattern");
+
+	run_from_GUI = is_under_pipeline_control();
 }
 
 void SubtomoProgram::readParameters(int argc, char *argv[])
@@ -321,6 +323,11 @@ void SubtomoProgram::processTomograms(
 
 		const int pc = particles[t].size();
 		if (pc == 0) continue;
+
+		if (run_from_GUI && pipeline_control_check_abort_job())
+		{
+			exit(RELION_EXIT_ABORTED);
+		}
 
 		if (verbosity > 0)
 		{

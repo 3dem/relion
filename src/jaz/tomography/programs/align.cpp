@@ -66,14 +66,14 @@ void AlignProgram::readParams(IOParser &parser)
 
 	Log::readParams(parser);
 
+	if (shiftOnly && do_motion)
+	{
+		parser.reportError("ERROR: The options --shift_only and --motion are mutually exclusive");
+	}
+
 	if (parser.checkForErrors())
 	{
 		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
-	}
-
-	if (shiftOnly && do_motion)
-	{
-		REPORT_ERROR("The options --shift_only and --motion are mutually exclusive");
 	}
 }
 
@@ -198,6 +198,11 @@ void AlignProgram::processTomograms(
 				ZIO::fileExists(temp_filename_root + "_projections.star"))
 		{
 			continue;
+		}
+
+		if (run_from_GUI && pipeline_control_check_abort_job())
+		{
+			exit(RELION_EXIT_ABORTED);
 		}
 
 		int pc = particles[t].size();

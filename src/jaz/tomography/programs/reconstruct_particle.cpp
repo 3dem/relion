@@ -30,6 +30,8 @@ void ReconstructParticleProgram::readParameters(int argc, char *argv[])
 
 	ZIO::makeDir(outDir + "temp");
 	tmpOutRoot = outDir + "temp/sum_";
+
+	run_from_GUI = is_under_pipeline_control();
 }
 
 void ReconstructParticleProgram::readBasicParameters(int argc, char *argv[])
@@ -247,6 +249,11 @@ void ReconstructParticleProgram::processTomograms(
 
 	for (int tt = ttIni; tt < tc; tt++)
 	{
+		if (run_from_GUI && pipeline_control_check_abort_job())
+		{
+			exit(RELION_EXIT_ABORTED);
+		}
+
 		const int t = tomoIndices[tt];
 		const int pc = particles[t].size();
 

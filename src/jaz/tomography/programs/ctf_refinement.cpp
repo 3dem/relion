@@ -57,7 +57,7 @@ CtfRefinementProgram::CtfRefinementProgram(int argc, char *argv[])
 
 	if (per_frame_scale && per_tomogram_scale)
 	{
-		parser.reportError("The options --per_frame_scale and --per_tomogram_scale are mutually exclusive");
+		parser.reportError("ERROR: The options --per_frame_scale and --per_tomogram_scale are mutually exclusive");
 	}
 
 	do_fit_Lambert_per_tomo = do_refine_scale && per_tomogram_scale;
@@ -149,6 +149,11 @@ void CtfRefinementProgram::processTomograms(
 			Log::updateProgress(tt);
 		}
 
+		if (run_from_GUI && pipeline_control_check_abort_job())
+		{
+			exit(RELION_EXIT_ABORTED);
+		}
+
 		const int t = tomoIndices[tt];
 
 		int pc = particles[t].size();
@@ -189,11 +194,21 @@ void CtfRefinementProgram::processTomograms(
 
 		const int item_verbosity = per_tomogram_progress? verbosity : 0;
 
+		if (run_from_GUI && pipeline_control_check_abort_job())
+		{
+			exit(RELION_EXIT_ABORTED);
+		}
+
 		if (do_refine_defocus)
 		{
 			refineDefocus(
 				t, tomogram, aberrationsCache, freqWeights, doseWeights,
 				item_verbosity);
+
+			if (run_from_GUI && pipeline_control_check_abort_job())
+			{
+				exit(RELION_EXIT_ABORTED);
+			}
 		}
 
 
@@ -202,6 +217,11 @@ void CtfRefinementProgram::processTomograms(
 			updateScale(
 				t, tomogram, aberrationsCache, freqWeights, doseWeights,
 				item_verbosity);
+
+			if (run_from_GUI && pipeline_control_check_abort_job())
+			{
+				exit(RELION_EXIT_ABORTED);
+			}
 		}
 
 
@@ -210,6 +230,11 @@ void CtfRefinementProgram::processTomograms(
 			updateAberrations(
 				t, tomogram, aberrationsCache, freqWeights, doseWeights,
 				item_verbosity);
+
+			if (run_from_GUI && pipeline_control_check_abort_job())
+			{
+				exit(RELION_EXIT_ABORTED);
+			}
 		}
 
 

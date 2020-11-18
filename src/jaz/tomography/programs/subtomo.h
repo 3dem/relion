@@ -54,7 +54,8 @@ class SubtomoProgram
 				write_multiplicity, 
 				write_divided, 
 				write_normalised,
-				only_do_unfinished;
+				only_do_unfinished,
+				run_from_GUI;
 
 		void readBasicParameters(IOParser& parser);
 		virtual void readParameters(int argc, char *argv[]);
