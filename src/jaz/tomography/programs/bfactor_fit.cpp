@@ -29,26 +29,20 @@ BfactorFitProgram::BfactorFitProgram(int argc, char *argv[])
 
 void BfactorFitProgram::readParams(IOParser &parser)
 {
-	try
-	{
-		_readParams(parser);
-		
-		int def_section = parser.addSection("B factor refinement options");
-		
-		useL2 = parser.checkOption("--L2", "Use L2 based formulation instead of the FCC");
-		kMin = textToInteger(parser.getOption("--kmin", "Min. freq. used for estimation [Px]", "20"));
-		kMin2 = textToInteger(parser.getOption("--kmin2", "Throw out frames with an estimated sigma below this [Px]", "10"));
-		useCache = parser.checkOption("--cache", "Use the FCC3 files computed during a previous run (if available)");
+	_readParams(parser);
 
-		Log::readParams(parser);
+	int def_section = parser.addSection("B factor refinement options");
 
-		if (parser.checkForErrors()) std::exit(-1);
-	}
-	catch (RelionError XE)
+	useL2 = parser.checkOption("--L2", "Use L2 based formulation instead of the FCC");
+	kMin = textToInteger(parser.getOption("--kmin", "Min. freq. used for estimation [Px]", "20"));
+	kMin2 = textToInteger(parser.getOption("--kmin2", "Throw out frames with an estimated sigma below this [Px]", "10"));
+	useCache = parser.checkOption("--cache", "Use the FCC3 files computed during a previous run (if available)");
+
+	Log::readParams(parser);
+
+	if (parser.checkForErrors())
 	{
-		parser.writeUsage(std::cout);
-		std::cerr << XE;
-		exit(1);
+		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
 }
 
@@ -81,12 +75,6 @@ void BfactorFitProgram::run()
 		std::string tag = outDir + tomogram.name;
 
 		BufferedImage<double> FCC3;
-
-		BufferedImage<float> frqWeight = computeFrequencyWeights(
-			tomogram, true, 0, -1, true, num_threads);
-
-		frqWeight.write(outDir + "DEBUG_frqWeight.mrc");
-		std::exit(0);
 
 
 		const std::string fcc3fn = tag + "_FCC3.mrc";

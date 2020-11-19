@@ -16,11 +16,18 @@
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
 #include <src/time.h>
+#include <mpi.h>
 #include <iostream>
 
 
 using namespace gravis;
 
+
+ReconstructParticleProgram::ReconstructParticleProgram()
+: run_from_MPI(false)
+{
+
+}
 
 void ReconstructParticleProgram::readParameters(int argc, char *argv[])
 {
@@ -30,61 +37,54 @@ void ReconstructParticleProgram::readParameters(int argc, char *argv[])
 
 	ZIO::makeDir(outDir + "temp");
 	tmpOutRoot = outDir + "temp/sum_";
+
+	run_from_GUI = is_under_pipeline_control();
 }
 
 void ReconstructParticleProgram::readBasicParameters(int argc, char *argv[])
 {
 	IOParser parser;
-	
-	try
+
+	parser.setCommandLine(argc, argv);
+
+	optimisationSet.read(
+		parser,
+		true,           // optimisation set
+		true,   true,   // particles
+		true,   true,   // tomograms
+		true,   false,  // trajectories
+		false,  false,  // manifolds
+		false,  false); // reference
+
+	int gen_section = parser.addSection("Reconstruction options");
+
+	boxSize = textToInteger(parser.getOption("--b", "Box size"));
+	cropSize = textToInteger(parser.getOption("--crop", "Size of (additionally output) cropped image", "-1"));
+
+	do_whiten = parser.checkOption("--whiten", "Whiten the noise by flattening the power spectrum");
+
+	binning = textToDouble(parser.getOption("--bin", "Binning factor", "1"));
+	taper = textToDouble(parser.getOption("--taper", "Taper against the sphere by this number of pixels (only if cropping)", "10"));
+	SNR = textToDouble(parser.getOption("--SNR", "Assumed signal-to-noise ratio (negative means use a heuristic)", "-1"));
+	symmName = parser.getOption("--sym", "Symmetry group", "C1");
+
+	max_mem_GB = textToInteger(parser.getOption("--mem", "Max. amount of memory to use for accumulation (--j_out will be reduced)", "-1"));
+
+	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Only process undone subtomograms");
+
+	num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
+	inner_threads = textToInteger(parser.getOption("--j_in", "Number of inner threads (slower, needs less memory)", "3"));
+	outer_threads = textToInteger(parser.getOption("--j_out", "Number of outer threads (faster, needs more memory)", "2"));
+
+	no_reconstruction = parser.checkOption("--no_recon", "Do not reconstruct the volume, only backproject (for benchmarking purposes)");
+
+	outDir = parser.getOption("--o", "Output directory");
+
+	Log::readParams(parser);
+
+	if (parser.checkForErrors())
 	{
-		parser.setCommandLine(argc, argv);
-
-		optimisationSet.read(
-			parser,
-			true,           // optimisation set
-			true,   true,   // particles
-			true,   true,   // tomograms
-			true,   false,  // trajectories
-			false,  false,  // manifolds
-			false,  false); // reference
-
-		int gen_section = parser.addSection("Reconstruction options");
-
-		boxSize = textToInteger(parser.getOption("--b", "Box size"));
-		cropSize = textToInteger(parser.getOption("--crop", "Size of (additionally output) cropped image", "-1"));
-
-		do_whiten = parser.checkOption("--whiten", "Whiten the noise by flattening the power spectrum");
-
-		binning = textToDouble(parser.getOption("--bin", "Binning factor", "1"));
-		taper = textToDouble(parser.getOption("--taper", "Taper against the sphere by this number of pixels (only if cropping)", "10"));
-		SNR = textToDouble(parser.getOption("--SNR", "Assumed signal-to-noise ratio (negative means use a heuristic)", "-1"));
-		symmName = parser.getOption("--sym", "Symmetry group", "C1");
-				
-		max_mem_GB = textToInteger(parser.getOption("--mem", "Max. amount of memory to use for accumulation (--j_out will be reduced)", "-1"));
-				
-		only_do_unfinished = parser.checkOption("--only_do_unfinished", "Only process undone subtomograms");
-
-		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
-		inner_threads = textToInteger(parser.getOption("--j_in", "Number of inner threads (slower, needs less memory)", "3"));
-		outer_threads = textToInteger(parser.getOption("--j_out", "Number of outer threads (faster, needs more memory)", "2"));
-
-		no_reconstruction = parser.checkOption("--no_recon", "Do not reconstruct the volume, only backproject (for benchmarking purposes)");
-
-		outDir = parser.getOption("--o", "Output directory");
-		
-		Log::readParams(parser);
-
-		if (parser.checkForErrors())
-		{
-			REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
-		}
-	}
-	catch (RelionError XE)
-	{
-		parser.writeUsage(std::cout);
-		std::cerr << XE;
-		exit(1);
+		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
 }
 
@@ -256,6 +256,19 @@ void ReconstructParticleProgram::processTomograms(
 
 	for (int tt = ttIni; tt < tc; tt++)
 	{
+		if (run_from_GUI && pipeline_control_check_abort_job())
+		{
+			if (run_from_MPI)
+			{
+				MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
+				exit(RELION_EXIT_ABORTED);
+			}
+			else
+			{
+				exit(RELION_EXIT_ABORTED);
+			}
+		}
+
 		const int t = tomoIndices[tt];
 		const int pc = particles[t].size();
 

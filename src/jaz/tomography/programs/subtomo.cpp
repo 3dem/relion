@@ -17,10 +17,17 @@
 #include <src/time.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
+#include <mpi.h>
 #include <iostream>
 
 using namespace gravis;
 
+
+SubtomoProgram::SubtomoProgram()
+: run_from_MPI(false)
+{
+
+}
 
 void SubtomoProgram::readBasicParameters(IOParser& parser)
 {
@@ -68,31 +75,25 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 
 	num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 	outDir = parser.getOption("--o", "Output filename pattern");
+
+	run_from_GUI = is_under_pipeline_control();
 }
 
 void SubtomoProgram::readParameters(int argc, char *argv[])
 {
 	IOParser parser;
-	
-	try
+
+	parser.setCommandLine(argc, argv);
+
+	readBasicParameters(parser);
+
+	Log::readParams(parser);
+
+	do_sum_all = parser.checkOption("--sum", "Sum up all subtomograms (for debugging)");
+
+	if (parser.checkForErrors())
 	{
-		parser.setCommandLine(argc, argv);
-
-		readBasicParameters(parser);
-		
-		Log::readParams(parser);
-
-		do_sum_all = parser.checkOption("--sum", "Sum up all subtomograms (for debugging)");
-
-		if (parser.checkForErrors()) std::exit(-1);
-
-	}
-
-	catch (RelionError XE)
-	{
-		parser.writeUsage(std::cout);
-		std::cerr << XE;
-		exit(1);
+		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
 
 	if (do_gridding_precorrection)
@@ -329,6 +330,19 @@ void SubtomoProgram::processTomograms(
 
 		const int pc = particles[t].size();
 		if (pc == 0) continue;
+
+		if (run_from_GUI && pipeline_control_check_abort_job())
+		{
+			if (run_from_MPI)
+			{
+				MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
+				exit(RELION_EXIT_ABORTED);
+			}
+			else
+			{
+				exit(RELION_EXIT_ABORTED);
+			}
+		}
 
 		if (verbosity > 0)
 		{

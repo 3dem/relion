@@ -4,9 +4,15 @@
 
 int main(int argc, char *argv[])
 {
-	AlignProgram ap(argc, argv);
+	try
+	{
+		AlignProgram ap(argc, argv);
+		ap.run();
+	}
+	catch (RelionError XE)
+	{
+		return RELION_EXIT_FAILURE;
+	}
 	
-	ap.run();
-	
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }

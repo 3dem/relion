@@ -15,6 +15,7 @@
 #include <src/jaz/optimization/lbfgs.h>
 #include <src/jaz/math/fcc.h>
 #include <src/jaz/util/log.h>
+#include <mpi.h>
 #include <omp.h>
 
 using namespace gravis;
@@ -30,56 +31,50 @@ AlignProgram::AlignProgram(int argc, char *argv[])
 
 void AlignProgram::readParams(IOParser &parser)
 {
-	try
-	{
-		_readParams(parser);
+	_readParams(parser);
 
 
-		int alignment_section = parser.addSection("General alignment options");
+	int alignment_section = parser.addSection("General alignment options");
 
-		shiftOnly = parser.checkOption("--shift_only", "Only apply an optimal rigid shift to each frame (no iterative optimisation)");
-		range = textToInteger(parser.getOption("--r", "Max. particle shift allowed [Pixels]", "20"));
-		mfSettings.constParticles = parser.checkOption("--const_p", "Keep the particle positions constant");
-		mfSettings.constAngles = parser.checkOption("--const_a", "Keep the frame angles constant");
-		mfSettings.constShifts = parser.checkOption("--const_s", "Keep the frame shifts constant");
-		num_iters = textToInteger(parser.getOption("--it", "Max. number of iterations", "1000"));
-
-
-		int motion_section = parser.addSection("Motion estimation options");
-
-		do_motion = parser.checkOption("--motion", "Estimate particle motion (expensive)");
-
-		motParams.sig_vel = textToDouble(parser.getOption("--s_vel", "Velocity sigma [Å/dose]", "0.5"));
-		motParams.sig_div = textToDouble(parser.getOption("--s_div", "Divergence sigma [Å]", "5000.0"));
-
-		mfSettings.params_scaled_by_dose = !parser.checkOption("--abs_params", "Do not scale the sigmas by the dose");
-
-		mfSettings.sqExpKernel = parser.checkOption("--sq_exp_ker", "Use a square-exponential kernel instead of an exponential one");
-		mfSettings.maxEDs = textToInteger(parser.getOption("--max_ed", "Maximum number of eigendeformations", "-1"));
+	shiftOnly = parser.checkOption("--shift_only", "Only apply an optimal rigid shift to each frame (no iterative optimisation)");
+	range = textToInteger(parser.getOption("--r", "Max. particle shift allowed [Pixels]", "20"));
+	mfSettings.constParticles = parser.checkOption("--const_p", "Keep the particle positions constant");
+	mfSettings.constAngles = parser.checkOption("--const_a", "Keep the frame angles constant");
+	mfSettings.constShifts = parser.checkOption("--const_s", "Keep the frame shifts constant");
+	num_iters = textToInteger(parser.getOption("--it", "Max. number of iterations", "1000"));
 
 
-		int expert_section = parser.addSection("Expert options");
+	int motion_section = parser.addSection("Motion estimation options");
 
-		padding = textToDouble(parser.getOption("--pad", "Apply Fourier padding to the cross-correlation images", "1"));
-		whiten = !parser.checkOption("--no_whiten", "Do not not whiten the noise spectra");
-		whiten_abs = parser.checkOption("--whiten_abs", "Divide by the square root of the power spectrum");
-		hiPass_px = textToDouble(parser.getOption("--hp", "High-pass filter the cross-correlation images by this sigma", "-1"));
-		sig2RampPower = textToDouble(parser.getOption("--srp", "Noise variance is divided by k^this during whitening", "0"));
-		
-		Log::readParams(parser);
-		
-		if (parser.checkForErrors()) std::exit(-1);
-	}
-	catch (RelionError XE)
-	{
-		parser.writeUsage(std::cout);
-		std::cerr << XE;
-		exit(1);
-	}
+	do_motion = parser.checkOption("--motion", "Estimate particle motion (expensive)");
+
+	motParams.sig_vel = textToDouble(parser.getOption("--s_vel", "Velocity sigma [Å/dose]", "0.5"));
+	motParams.sig_div = textToDouble(parser.getOption("--s_div", "Divergence sigma [Å]", "5000.0"));
+
+	mfSettings.params_scaled_by_dose = !parser.checkOption("--abs_params", "Do not scale the sigmas by the dose");
+
+	mfSettings.sqExpKernel = parser.checkOption("--sq_exp_ker", "Use a square-exponential kernel instead of an exponential one");
+	mfSettings.maxEDs = textToInteger(parser.getOption("--max_ed", "Maximum number of eigendeformations", "-1"));
+
+
+	int expert_section = parser.addSection("Expert options");
+
+	padding = textToDouble(parser.getOption("--pad", "Apply Fourier padding to the cross-correlation images", "1"));
+	whiten = !parser.checkOption("--no_whiten", "Do not not whiten the noise spectra");
+	whiten_abs = parser.checkOption("--whiten_abs", "Divide by the square root of the power spectrum");
+	hiPass_px = textToDouble(parser.getOption("--hp", "High-pass filter the cross-correlation images by this sigma", "-1"));
+	sig2RampPower = textToDouble(parser.getOption("--srp", "Noise variance is divided by k^this during whitening", "0"));
+
+	Log::readParams(parser);
 
 	if (shiftOnly && do_motion)
 	{
-		REPORT_ERROR("The options --shift_only and --motion are mutually exclusive");
+		parser.reportError("ERROR: The options --shift_only and --motion are mutually exclusive");
+	}
+
+	if (parser.checkForErrors())
+	{
+		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
 }
 
@@ -204,6 +199,19 @@ void AlignProgram::processTomograms(
 				ZIO::fileExists(temp_filename_root + "_projections.star"))
 		{
 			continue;
+		}
+
+		if (run_from_GUI && pipeline_control_check_abort_job())
+		{
+			if (run_from_MPI)
+			{
+				MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
+				exit(RELION_EXIT_ABORTED);
+			}
+			else
+			{
+				exit(RELION_EXIT_ABORTED);
+			}
 		}
 
 		int pc = particles[t].size();

@@ -15,13 +15,13 @@ class ReconstructParticleProgram
 {
 	public:
 		
-		ReconstructParticleProgram(){}
+		ReconstructParticleProgram();
 		
 
 			OptimisationSet optimisationSet;
 			std::string outDir, symmName, tmpOutRoot;
 			
-			bool do_whiten, no_reconstruction, only_do_unfinished;
+			bool do_whiten, no_reconstruction, only_do_unfinished, run_from_GUI, run_from_MPI;
 			int boxSize, cropSize, num_threads, outer_threads, inner_threads, max_mem_GB;
 			double SNR, taper, binning;
 

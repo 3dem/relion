@@ -45,24 +45,15 @@ void TemplatePickerProgram::readParameters(int argc, char *argv[])
 {
 	IOParser parser;
 
-	try
+	parser.setCommandLine(argc, argv);
+
+	readBasicParameters(parser, argc, argv);
+
+	Log::readParams(parser);
+
+	if (parser.checkForErrors())
 	{
-		parser.setCommandLine(argc, argv);
-
-		readBasicParameters(parser, argc, argv);
-
-		Log::readParams(parser);
-
-		if (parser.checkForErrors())
-		{
-			REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
-		}
-	}
-	catch (RelionError XE)
-	{
-		parser.writeUsage(std::cout);
-		std::cerr << XE;
-		exit(1);
+		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
 
 	out_dir = ZIO::prepareTomoOutputDirectory(out_dir, argc, argv);

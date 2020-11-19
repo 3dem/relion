@@ -19,7 +19,7 @@ class SubtomoProgram
 {
 	public:
 
-		SubtomoProgram(){}
+		SubtomoProgram();
 		
 			OptimisationSet optimisationSet;
 
@@ -54,7 +54,9 @@ class SubtomoProgram
 				write_multiplicity, 
 				write_divided, 
 				write_normalised,
-				only_do_unfinished;
+				only_do_unfinished,
+				run_from_GUI,
+				run_from_MPI;
 
 		void readBasicParameters(IOParser& parser);
 		virtual void readParameters(int argc, char *argv[]);

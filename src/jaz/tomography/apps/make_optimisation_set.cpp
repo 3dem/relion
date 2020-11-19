@@ -12,13 +12,13 @@ using namespace gravis;
 
 int main(int argc, char *argv[])
 {
-	IOParser parser;
-
-	OptimisationSet os;
-	std::string outFn;
-
 	try
 	{
+		IOParser parser;
+
+		OptimisationSet os;
+		std::string outFn;
+
 		parser.setCommandLine(argc, argv);
 		int gen_section = parser.addSection("General options");
 
@@ -33,17 +33,17 @@ int main(int argc, char *argv[])
 
 		outFn = parser.getOption("--o", "Output file name");
 
-		if (parser.checkForErrors()) std::exit(-1);
+		if (parser.checkForErrors())
+		{
+			REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
+		}
+
+		os.write(outFn);
 	}
 	catch (RelionError XE)
 	{
-		parser.writeUsage(std::cout);
-		std::cerr << XE;
-		exit(1);
+		return RELION_EXIT_FAILURE;
 	}
 
-
-	os.write(outFn);
-
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }

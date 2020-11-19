@@ -202,7 +202,7 @@ std::vector<d4Matrix> ProjectionIO::read(std::string filename, int& w, int& h, i
     if (v != "v" || version != PROJ_VERSION)
     {
         std::cerr << "\nERROR: The file '" << filename << "' does not have the right version number (" << PROJ_VERSION << ").\n" << std::endl;
-        std::exit(666);
+		std::exit(RELION_EXIT_FAILURE);
     }
 	
 	int fc = -1;	
