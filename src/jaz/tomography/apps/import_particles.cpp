@@ -163,7 +163,7 @@ int main(int argc, char *argv[])
 
 		// split tomograms into optics groups
 
-		std::map<double,std::vector<std::string>> pixelSize_to_tomoName;
+		std::map<std::string,std::vector<std::string>> opticsGroupName_to_tomoName;
 
 		TomogramSet tomogramSet(tomoFn);
 
@@ -171,40 +171,37 @@ int main(int argc, char *argv[])
 
 		for (int t = 0; t < tc; t++)
 		{
-			const double pixelSize = tomogramSet.getPixelSize(t);
-			const std::string name = tomogramSet.getTomogramName(t);
+			const std::string opticsGroupName = tomogramSet.getOpticsGroupName(t);
+			const std::string tomogramName = tomogramSet.getTomogramName(t);
 
-			pixelSize_to_tomoName[pixelSize].push_back(name);
+			opticsGroupName_to_tomoName[opticsGroupName].push_back(tomogramName);
 		}
 
-		std::map<std::string, int> tomoName_to_optGroup;
-		std::map<std::string, double> tomoName_to_pixelSize;
-		int optGroup = 0;
 
+		std::map<std::string, int> tomoName_to_optGroup;
+		int optGroup = 0;
 
 		MetaDataTable opticsTable;
 		opticsTable.setName("optics");
 
-		for (std::map<double,std::vector<std::string>>::iterator it = pixelSize_to_tomoName.begin();
-			 it != pixelSize_to_tomoName.end(); it++)
+		for (std::map<std::string,std::vector<std::string>>::iterator it = opticsGroupName_to_tomoName.begin();
+			 it != opticsGroupName_to_tomoName.end(); it++)
 		{
-			const double pixelSize = it->first;
-			const std::vector<std::string> allNames = it->second;
+			const std::string opticsGroupName = it->first;
+			const std::vector<std::string> allTomoNames = it->second;
 
-			for (int t = 0; t < allNames.size(); t++)
+			for (int t = 0; t < allTomoNames.size(); t++)
 			{
-				tomoName_to_optGroup[allNames[t]] = optGroup;
-				tomoName_to_pixelSize[allNames[t]] = pixelSize;
+				tomoName_to_optGroup[allTomoNames[t]] = optGroup;
 			}
 
 			Tomogram tomogram = tomogramSet.loadTomogram(
-						tomogramSet.getTomogramIndex(allNames[0]), false);
+						tomogramSet.getTomogramIndex(allTomoNames[0]), false);
 
 			opticsTable.addObject();
 
 			opticsTable.setValue(EMDL_IMAGE_OPTICS_GROUP, optGroup + 1, optGroup);
-			opticsTable.setValue(EMDL_IMAGE_OPTICS_GROUP_NAME,
-				std::string("opticsGroup") + ZIO::itoa(optGroup + 1), optGroup);
+			opticsTable.setValue(EMDL_IMAGE_OPTICS_GROUP_NAME, opticsGroupName, optGroup);
 			opticsTable.setValue(EMDL_CTF_CS, tomogram.optics.Cs, optGroup);
 			opticsTable.setValue(EMDL_CTF_VOLTAGE, tomogram.optics.voltage, optGroup);
 			opticsTable.setValue(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, tomogram.optics.pixelSize, optGroup);

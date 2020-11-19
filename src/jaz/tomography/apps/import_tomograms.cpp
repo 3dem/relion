@@ -374,12 +374,17 @@ int main(int argc, char *argv[])
 				ctfs = TomoCtfHelper::loadCtfplotter(ctfPlotterFn, fc, voltage, Cs, Q0);
 			}
 
+			std::string opticsGroupName = "opticsGroup1";
+
+			perTomoArguments.getValue(EMDL_IMAGE_OPTICS_GROUP_NAME, opticsGroupName, tomo_index);
+
+
 			tomograms.addTomogram(
 				name, tsFn,
 				mapping.projections,
 				mapping.w, mapping.h, mapping.d,
 				cumulativeDose, fractionalDose,
-				ctfs, hand, pixelSize);
+				ctfs, hand, pixelSize, opticsGroupName);
 
 			Log::endSection();
 		}
