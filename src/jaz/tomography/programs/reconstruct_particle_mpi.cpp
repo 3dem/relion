@@ -103,17 +103,17 @@ void ReconstructParticleProgramMpi::run()
 		}
 	}
 
-	const int outCount = 2 * outer_threads + 1; // One more count for the accumulated sum
+	const int outCount = 2 * outer_threads; // One more count for the accumulated sum
 
 	if (verb)
 	{
 		Log::print("Memory required for accumulation: " + ZIO::itoa(GB_per_thread  * (long int) outCount) + " GB");
 	}
 
-	std::vector<BufferedImage<double>> ctfImgFS(2);
-	std::vector<BufferedImage<dComplex>> dataImgFS(2);
+	std::vector<BufferedImage<double>> ctfImgFS(outCount);
+	std::vector<BufferedImage<dComplex>> dataImgFS(outCount);
 
-	for (int i = 0; i < 2; i++)
+	for (int i = 0; i < outCount; i++)
 	{
 		dataImgFS[i] = BufferedImage<dComplex>(sh,s,s);
 		ctfImgFS[i] = BufferedImage<double>(sh,s,s),
@@ -136,30 +136,33 @@ void ReconstructParticleProgramMpi::run()
 		dataImgFS, ctfImgFS, binnedOutPixelSize,
 		s02D, do_ctf, flip_value, verb, false);
 
-
-	std::vector<BufferedImage<double>> sumCtfImgFS(2), sumPsfImgFS(2);
+	std::vector<BufferedImage<double>> sumCtfImgFS(2);
 	std::vector<BufferedImage<dComplex>> sumDataImgFS(2);
 
-	if (node->isMaster())
-	{for (int i = 0; i < 2; i++)
-		{
-			sumDataImgFS[i] = BufferedImage<dComplex>(sh,s,s);
-			sumCtfImgFS[i] = BufferedImage<double>(sh,s,s),
-			sumPsfImgFS[i] = BufferedImage<double>(sh,s,s);
-		}
-	}
 	size_t sizeData = sh*s*s;
 
-	MPI_Reduce(dataImgFS[0].data, sumDataImgFS[0].data, sizeData,
-			MY_MPI_COMPLEX, MPI_SUM, 0, MPI_COMM_WORLD);
-	MPI_Reduce(dataImgFS[1].data, sumDataImgFS[1].data, sizeData,
-			MY_MPI_COMPLEX, MPI_SUM, 0, MPI_COMM_WORLD);
+	if (node->isMaster())
+	{
+		for (int i = 0; i < 2; i++)
+		{
+			sumDataImgFS[i] = BufferedImage<dComplex>(sh,s,s);
+			sumCtfImgFS[i] = BufferedImage<double>(sh,s,s);
+		}
+	}
 
-	MPI_Reduce(ctfImgFS[0].data, sumCtfImgFS[0].data, sizeData,
-			MY_MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-	MPI_Reduce(ctfImgFS[1].data, sumCtfImgFS[1].data, sizeData,
-			MY_MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+	for (int i = 0; i < 2; i++)
+	{
+		if (node->isMaster())
+		{
+			Log::print("Gathering half "+ZIO::itoa(i+1));
+		}
 
+		MPI_Reduce(dataImgFS[i].data, sumDataImgFS[i].data, sizeData,
+				MY_MPI_COMPLEX, MPI_SUM, 0, MPI_COMM_WORLD);
+
+		MPI_Reduce(ctfImgFS[i].data, sumCtfImgFS[i].data, sizeData,
+				MY_MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+	}
 
 	if (rank == 0)
 	{
