@@ -344,6 +344,7 @@ void ReconstructParticleProgram::processTomograms(
 					tomogram.stack, s02D, binning, tomogram.projectionMatrices, traj,
 					particleStack[th], projCut, inner_threads, true);
 
+
 			const d4Matrix particleToTomo = particleSet.getMatrix4x4(part_id, s,s,s);
 
 			const int halfSet = particleSet.getHalfSet(part_id);
