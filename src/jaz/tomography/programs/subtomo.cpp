@@ -486,12 +486,11 @@ void SubtomoProgram::processTomograms(
 			BufferedImage<fComplex> dataImgFS(sh3D,s3D,s3D);
 			dataImgFS.fill(fComplex(0.0, 0.0));
 
-			BufferedImage<float> ctfImgFS(sh3D,s3D,s3D), psfImgFS(sh3D,s3D,s3D),
+			BufferedImage<float> ctfImgFS(sh3D,s3D,s3D),
 					dataImgRS(s3D,s3D,s3D), dataImgDivRS(s3D,s3D,s3D),
 					multiImageFS(sh3D,s3D,s3D);
 
 			ctfImgFS.fill(0.0);
-			psfImgFS.fill(0.0);
 			dataImgRS.fill(0.0);
 			dataImgDivRS.fill(0.0);
 
@@ -533,7 +532,6 @@ void SubtomoProgram::processTomograms(
 					const double m = 1.0 - exp(-0.5*t*t);
 
 					dataImgFS(x,y,z) *= m;
-					psfImgFS(x,y,z) *= m;
 					multiImageFS(x,y,z) *= m;
 				}
 

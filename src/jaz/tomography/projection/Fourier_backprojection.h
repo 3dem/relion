@@ -935,7 +935,7 @@ void FourierBackprojection::backprojectSlice_forward_with_multiplicity(
 		const double xx = x;
 		const double yy = y < h2/2? y : y - h2;
 		
-		gravis::d3Vector pos3 = xx * u + yy * v;		
+		gravis::d3Vector pos3 = xx * u + yy * v;
 		
 		bool conj = false;
 		
@@ -957,7 +957,7 @@ void FourierBackprojection::backprojectSlice_forward_with_multiplicity(
 			for (int dy = 0; dy < 2; dy++)
 			for (int dx = 0; dx < 2; dx++)
 			{
-				const int xg = x0 + dx;			
+				const int xg = x0 + dx;
 				const int yg = y0 + dy;
 				const int zg = z0 + dz;
 				
@@ -965,7 +965,7 @@ void FourierBackprojection::backprojectSlice_forward_with_multiplicity(
 				  && yg >= -h3/2 && yg < h3/2
 				  && zg >= -d3/2 && zg < d3/2)
 				{
-					const int xi = xg;			
+					const int xi = xg;
 					const int yi = yg >= 0? yg : yg + h3;
 					const int zi = zg >= 0? zg : zg + d3;
 					
