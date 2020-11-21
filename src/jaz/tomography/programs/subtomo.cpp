@@ -164,7 +164,7 @@ void SubtomoProgram::run()
 	if (do_sum_all)
 	{
 		sum_data.write(outDir + "sum_data.mrc");
-		sum_weights.write(outDir + "sum_weight.mrc");
+		Centering::fftwHalfToHumanFull(sum_weights).write(outDir + "sum_weight.mrc");
 
 		BufferedImage<float> dataImgDivRS(s3D,s3D,s3D);
 		dataImgDivRS.fill(0.0);
@@ -378,6 +378,9 @@ void SubtomoProgram::processTomograms(
 				(int)ceil(pc/(double)outer_thread_num));
 		}
 
+		omp_lock_t writelock;
+		if (do_sum_all) omp_init_lock(&writelock);
+
 		#pragma omp parallel for num_threads(outer_thread_num)
 		for (int p = 0; p < pc; p++)
 		{
@@ -415,12 +418,11 @@ void SubtomoProgram::processTomograms(
 			BufferedImage<fComplex> particleStack = BufferedImage<fComplex>(sh2D,s2D,fc);
 			BufferedImage<float> weightStack(sh2D,s2D,fc);
 
-			const bool circleCrop = false;
+			const bool circleCrop = true;
 
 			TomoExtraction::extractAt3D_Fourier(
 					tomogram.stack, s02D, binning, tomogram.projectionMatrices, traj,
 					particleStack, projCut, inner_thread_num, circleCrop);
-
 
 			if (!do_ctf) weightStack.fill(1.f);
 
@@ -506,8 +508,15 @@ void SubtomoProgram::processTomograms(
 			}
 
 			Centering::shiftInSitu(dataImgFS);
-			FFT::inverseFourierTransform(dataImgFS, dataImgRS, FFT::Both);
 
+			// correct FT scale because of the implicit cropping:
+
+			if (s3D != s2D)
+			{
+				dataImgFS *= s2D / (float) s3D;
+			}
+
+			FFT::inverseFourierTransform(dataImgFS, dataImgRS, FFT::Both);
 
 			if (do_cone_weight)
 			{
@@ -532,7 +541,8 @@ void SubtomoProgram::processTomograms(
 					const double m = 1.0 - exp(-0.5*t*t);
 
 					dataImgFS(x,y,z) *= m;
-					multiImageFS(x,y,z) *= m;
+					ctfImgFS(x,y,z) *= m;
+					multiImageFS(x,y,z) *= m; // apply to both multiplicity and weight?
 				}
 
 				FFT::inverseFourierTransform(dataImgFS, dataImgRS);
@@ -543,8 +553,12 @@ void SubtomoProgram::processTomograms(
 
 			if (do_sum_all)
 			{
+				omp_set_lock(&writelock);
+
 				sum_data += dataImgRS;
 				sum_weights += ctfImgFS;
+
+				omp_unset_lock(&writelock);
 			}
 
 

@@ -340,9 +340,11 @@ void ReconstructParticleProgram::processTomograms(
 			std::vector<d4Matrix> projCut(fc), projPart(fc);
 
 
+			const bool circle_crop = true;
+
 			TomoExtraction::extractAt3D_Fourier(
 					tomogram.stack, s02D, binning, tomogram.projectionMatrices, traj,
-					particleStack[th], projCut, inner_threads, true);
+					particleStack[th], projCut, inner_threads, circle_crop);
 
 
 			const d4Matrix particleToTomo = particleSet.getMatrix4x4(part_id, s,s,s);
@@ -402,6 +404,7 @@ void ReconstructParticleProgram::processTomograms(
 
 		} // particles
 
+
 		for (int i = 2; i < dataImgFS.size(); i++)
 		{
 			dataImgFS[i%2] += dataImgFS[i];
@@ -448,6 +451,7 @@ void ReconstructParticleProgram::processTomograms(
 			Log::endProgress();
 			Log::endSection();
 		}
+
 
 		particles_in_previous_tomograms += (int)ceil(pc/(double)outer_threads);
 
