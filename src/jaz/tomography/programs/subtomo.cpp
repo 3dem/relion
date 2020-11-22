@@ -24,7 +24,8 @@ using namespace gravis;
 
 
 SubtomoProgram::SubtomoProgram()
-: run_from_MPI(false)
+: do_not_write_any(false),
+  run_from_MPI(false)
 {
 
 }
@@ -71,6 +72,7 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 
 	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Only process undone subtomograms");
 
+
 	diag = parser.checkOption("--diag", "Write out diagnostic information");
 
 	num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
@@ -90,6 +92,7 @@ void SubtomoProgram::readParameters(int argc, char *argv[])
 	Log::readParams(parser);
 
 	do_sum_all = parser.checkOption("--sum", "Sum up all subtomograms (for debugging)");
+	do_not_write_any = parser.checkOption("--no_writing", "Do not write out any files, only a sum");
 
 	if (parser.checkForErrors())
 	{
@@ -163,8 +166,10 @@ void SubtomoProgram::run()
 
 	if (do_sum_all)
 	{
-		sum_data.write(outDir + "sum_data.mrc");
-		Centering::fftwHalfToHumanFull(sum_weights).write(outDir + "sum_weight.mrc");
+		const double pixel_size = binning * tomogramSet.getPixelSize(0);
+
+		sum_data.write(outDir + "sum_data.mrc", pixel_size);
+		Centering::fftwHalfToHumanFull(sum_weights).write(outDir + "sum_weight.mrc", pixel_size);
 
 		BufferedImage<float> dataImgDivRS(s3D,s3D,s3D);
 		dataImgDivRS.fill(0.0);
@@ -182,7 +187,7 @@ void SubtomoProgram::run()
 				0.001, num_threads);
 		}
 
-		dataImgDivRS.write(outDir + "sum_div.mrc");
+		dataImgDivRS.write(outDir + "sum_div.mrc", pixel_size);
 	}
 }
 
@@ -560,6 +565,8 @@ void SubtomoProgram::processTomograms(
 
 				omp_unset_lock(&writelock);
 			}
+
+			if (do_not_write_any) continue;
 
 
 			dataImgRS.write(outData, binnedPixelSize);

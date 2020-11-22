@@ -54,6 +54,7 @@ class SubtomoProgram
 				write_multiplicity, 
 				write_divided, 
 				write_normalised,
+				do_not_write_any,
 				only_do_unfinished,
 				run_from_GUI,
 				run_from_MPI;
