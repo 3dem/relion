@@ -89,10 +89,10 @@ void SubtomoProgram::readParameters(int argc, char *argv[])
 
 	readBasicParameters(parser);
 
-	Log::readParams(parser);
-
 	do_sum_all = parser.checkOption("--sum", "Sum up all subtomograms (for debugging)");
 	do_not_write_any = parser.checkOption("--no_writing", "Do not write out any files, only a sum");
+
+	Log::readParams(parser);
 
 	if (parser.checkForErrors())
 	{

@@ -71,6 +71,7 @@ void ReconstructParticleProgram::readBasicParameters(int argc, char *argv[])
 	max_mem_GB = textToInteger(parser.getOption("--mem", "Max. amount of memory to use for accumulation (--j_out will be reduced)", "-1"));
 
 	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Only process undone subtomograms");
+	no_backup = parser.checkOption("--no_backup", "Do not make backups (makes it impossible to use --only_do_unfinished)");
 
 	num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 	inner_threads = textToInteger(parser.getOption("--j_in", "Number of inner threads (slower, needs less memory)", "3"));
@@ -404,47 +405,49 @@ void ReconstructParticleProgram::processTomograms(
 
 		} // particles
 
-
-		for (int i = 2; i < dataImgFS.size(); i++)
+		if (!no_backup)
 		{
-			dataImgFS[i%2] += dataImgFS[i];
-			ctfImgFS[i%2]  += ctfImgFS[i];
-		}
-
-		for (int i = 2; i < dataImgFS.size(); i++)
-		{
-			dataImgFS[i].fill(dComplex(0.0, 0.0));
-			ctfImgFS[i].fill(0.0);
-		}
-
-		//Save temporary files
-
-		for (int half = 0; half < 2; half++)
-		{
-			BufferedImage<double> tmpDataImg(sh, s, s*2);
-
-			for (int z = 0; z < s;  z++)
-			for (int y = 0; y < s;  y++)
-			for (int x = 0; x < sh; x++)
+			for (int i = 2; i < dataImgFS.size(); i++)
 			{
-				fComplex pv = dataImgFS[half](x,y,z);
-				tmpDataImg(x,y,z) = pv.real;
-				tmpDataImg(x,y,z+s) = pv.imag;
+				dataImgFS[i%2] += dataImgFS[i];
+				ctfImgFS[i%2]  += ctfImgFS[i];
 			}
 
-			std::string tmpOutRootTT = tmpOutRoot + ZIO::itoa(tt);
-			tmpDataImg.write(tmpOutRootTT + "_data_half" + ZIO::itoa(half) + ".mrc");
-			ctfImgFS[half].write(tmpOutRootTT + "_ctf_half" + ZIO::itoa(half) + ".mrc");
+			for (int i = 2; i < dataImgFS.size(); i++)
+			{
+				dataImgFS[i].fill(dComplex(0.0, 0.0));
+				ctfImgFS[i].fill(0.0);
+			}
+
+			//Save temporary files
+
+			for (int half = 0; half < 2; half++)
+			{
+				BufferedImage<double> tmpDataImg(sh, s, s*2);
+
+				for (int z = 0; z < s;  z++)
+				for (int y = 0; y < s;  y++)
+				for (int x = 0; x < sh; x++)
+				{
+					fComplex pv = dataImgFS[half](x,y,z);
+					tmpDataImg(x,y,z) = pv.real;
+					tmpDataImg(x,y,z+s) = pv.imag;
+				}
+
+				std::string tmpOutRootTT = tmpOutRoot + ZIO::itoa(tt);
+				tmpDataImg.write(tmpOutRootTT + "_data_half" + ZIO::itoa(half) + ".mrc");
+				ctfImgFS[half].write(tmpOutRootTT + "_ctf_half" + ZIO::itoa(half) + ".mrc");
+			}
+
+			// Delete temporary files from previous tomogram
+
+			if (ttPrevious > -1)
+			{
+				int res = system(("rm -rf "+ tmpOutRoot  + ZIO::itoa(ttPrevious) + "*.mrc").c_str());
+			}
+
+			ttPrevious = tt;
 		}
-
-		// Delete temporary files from previous tomogram
-
-		if (ttPrevious > -1)
-		{
-			int res = system(("rm -rf "+ tmpOutRoot  + ZIO::itoa(ttPrevious) + "*.mrc").c_str());
-		}
-
-		ttPrevious = tt;
 
 		if (verbosity > 0 && per_tomogram_progress)
 		{
@@ -456,6 +459,15 @@ void ReconstructParticleProgram::processTomograms(
 		particles_in_previous_tomograms += (int)ceil(pc/(double)outer_threads);
 
 	} // tomograms
+
+	if (no_backup)
+	{
+		for (int i = 2; i < dataImgFS.size(); i++)
+		{
+			dataImgFS[i%2] += dataImgFS[i];
+			ctfImgFS[i%2]  += ctfImgFS[i];
+		}
+	}
 
 	if (verbosity > 0 && !per_tomogram_progress)
 	{
