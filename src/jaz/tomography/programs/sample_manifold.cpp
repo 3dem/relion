@@ -107,7 +107,9 @@ void SampleManifoldProgram::run()
 				particles_table.addObject();
 				const int j = particles_table.numberOfObjects() - 1;
 
-				particles_table.setValue(EMDL_TOMO_PARTICLE_INDEX, j, j);
+
+				particles_table.setValue(EMDL_TOMO_PARTICLE_NAME,  tomogram.name + "/" + ZIO::itoa(j), j);
+
 				particles_table.setValue(EMDL_TOMO_NAME, tomogram.name, j);
 				particles_table.setValue(EMDL_TOMO_MANIFOLD_INDEX, manifold_index, j);
 

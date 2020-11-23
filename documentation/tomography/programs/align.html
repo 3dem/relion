@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<title>Align</title>
+	<link rel="stylesheet" href="../style.css">
+</head>
+
+<body>
+	<h1><tt>relion_tomo_align</tt></h1>
+	
+	<p>This program refines the projections that map 3D space onto the images of the tilt series, as well as (optionally) also the beam-induced motion trajectories of the particles. Each projection is optimised using the full 5 degrees of freedom: the assumption of a common tilt axis is abandoned. Even if no beam-induced motion is estimated, the (in that case static) 3D particle-positions are also optimised by the program. This is because those 3D positions cannot be assumed to be known in advance, since they have only been inferred from the observed 2D particle-positions in the individual tilt images. Therefore, this program always looks for the optimal set of 3D positions <i>and</i> projections.</p>
+	
+	<p>If the particle motion is also being estimated (using the <tt>--motion</tt> argument), then the 3D positions of the particles are allowed to differ between tilt images, albeit only in a limited and spatially smooth manner. This is done analogously to <a href="https://journals.iucr.org/m/issues/2019/01/00/fq5003/">Bayesian polishing</a> in 2D (implemented in <tt>relion_motion_refine</tt>), except that the trajectories are estimated in 3D, and that no acceleration constraint is imposed. Because part of the particle motion is rigid, the motion estimation also always includes a rigid alignment of the frames.</p>
+	
+	<p>Please note that estimating beam-induced motion significantly increases the runtime of the program, so it should only be done in the final rounds of optimisation.</p>
+		
+	<p>The estimated particle trajectories are written into the output <a href="../data_types/trajectory_set.html">trajectory set</a>, the projection matrices (containing the rigid part of the motion as well as the alignment of the tilt series - these cannot be distinguished) into the output <a href="../data_types/tomogram_set.html">tomogram set</a> and the estimated (initial) particle positions into the output <a href="../data_types/particle_set.html">particle set</a> which replace the given trajectory, tomogram and particle sets in the output <a href="../data_types/optimisation_set.html">optimisation set</a>.</p>
+	
+	<h3>General program arguments:</h3>
+	
+	<ul>
+		<li><b>--i</b> and/or <b>--p</b>, <b>--t</b>, <b>--mot</b>, <b>--ref&lt;1/2&gt;</b>, <b>--mask</b> and <b>--fsc</b>: input optimisation-set and/or its components (see <a href="../data_types/optimisation_set.html">optimisation set</a>).</li>
+		<li><b>--b</b>: box size to be used for the estimation. Note that this can be larger than the box size of the reference map. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.</li>
+		<li><b>--r</b>: maximal assumed error in the initial 2D particle-positions (distances between the projected 3D positions and their true positions in the images), given in pixels.</li>
+		<li><b>--j</b>: number of threads to be used. This should be set to the number of CPU cores available.</li>
+		<li><b>--o</b>: name of the output directory (that will be created).</li>
+	</ul>
+	
+	<h3>Motion-related arguments:</h3>
+	
+	<ul>
+		<li><b>--motion</b>: perform motion estimation simultaneously with the tilt-image alignment.</li>
+		<li><b>--s_vel</b>: the expected amount of motion (i.e. the std. deviation of particle positions in &#8491; after 1 electron per &#8491;&sup2 of radiation).</li>
+		<li><b>--s_div</b>: the expected spatial smoothness of the particle trajectories (a greater value means spatially smoother motion)</li>
+		<li><b>--sq_exp_ker</b>: assume that the correlation of the velocities of two particles decays as a Gaussian over their distance, instead of as an exponential. This will produce spatially smoother motion and result in a shorter program runtime.</li>
+	</ul>
+	
+	
+	<h3>Program output:</h3>
+	
+	<p>After running the program, the output directory (<tt>--o</tt> argument) will contain the following items:</p>
+	<ul>
+		<li><b>motion.star</b>: a new trajectory set</li>
+		<li><b>tomograms.star</b>: a new tomogram set containing the newly estimated projection matrices (<tt>rlnTomoProj&lt;X/Y/Z/W&gt;</tt>)</li>
+		<li><b>particles.star</b>: a new particles set containing the newly estimated particle positions in 3D (<tt>rlnCoordinate&lt;X/Y/Z&gt;</tt>)</li>
+		<li><b>optimisation_set.star</b>: a new optimisation set pointing to the new trajectory, tomogram and particle sets.</li>
+		<li><b>Trajectories/&lt;tomogram_name&gt;_x&lt;1/8&gt;.ply"</b>: meshes of 3D trajectories in <a href="https://en.wikipedia.org/wiki/PLY_(file_format).ply"><tt>.ply</tt></a> format, scaled by a factor of 1 or 8, respectively. Note that only the trajectories themselves are scaled - their positions are those of the particles. They can be viewed in relation to (low-magnification) tomograms as produced by <a href="reconstruct_tomogram.html"><tt>relion_tomo_reconstruct_tomogram</tt></a> in a viewer that supports both meshes and 3D images (such as e.g. <a href="https://www.paraview.org/"><tt>Paraview</tt></a>).</li>
+		<li><b>note.txt</b>: a text file containing the command issued to run the program.</li>
+	</ul>
+	
+	
+</body>
+
+</html>

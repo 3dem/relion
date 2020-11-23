@@ -15,6 +15,7 @@
 #include <src/jaz/optimization/lbfgs.h>
 #include <src/jaz/math/fcc.h>
 #include <src/jaz/util/log.h>
+#include <mpi.h>
 #include <omp.h>
 
 using namespace gravis;
@@ -66,14 +67,14 @@ void AlignProgram::readParams(IOParser &parser)
 
 	Log::readParams(parser);
 
+	if (shiftOnly && do_motion)
+	{
+		parser.reportError("ERROR: The options --shift_only and --motion are mutually exclusive");
+	}
+
 	if (parser.checkForErrors())
 	{
 		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
-	}
-
-	if (shiftOnly && do_motion)
-	{
-		REPORT_ERROR("The options --shift_only and --motion are mutually exclusive");
 	}
 }
 
@@ -198,6 +199,19 @@ void AlignProgram::processTomograms(
 				ZIO::fileExists(temp_filename_root + "_projections.star"))
 		{
 			continue;
+		}
+
+		if (run_from_GUI && pipeline_control_check_abort_job())
+		{
+			if (run_from_MPI)
+			{
+				MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
+				exit(RELION_EXIT_ABORTED);
+			}
+			else
+			{
+				exit(RELION_EXIT_ABORTED);
+			}
 		}
 
 		int pc = particles[t].size();

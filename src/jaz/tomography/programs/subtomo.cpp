@@ -17,10 +17,18 @@
 #include <src/time.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
+#include <mpi.h>
 #include <iostream>
 
 using namespace gravis;
 
+
+SubtomoProgram::SubtomoProgram()
+: do_not_write_any(false),
+  run_from_MPI(false)
+{
+
+}
 
 void SubtomoProgram::readBasicParameters(IOParser& parser)
 {
@@ -64,10 +72,13 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 
 	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Only process undone subtomograms");
 
+
 	diag = parser.checkOption("--diag", "Write out diagnostic information");
 
 	num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 	outDir = parser.getOption("--o", "Output filename pattern");
+
+	run_from_GUI = is_under_pipeline_control();
 }
 
 void SubtomoProgram::readParameters(int argc, char *argv[])
@@ -78,9 +89,10 @@ void SubtomoProgram::readParameters(int argc, char *argv[])
 
 	readBasicParameters(parser);
 
-	Log::readParams(parser);
-
 	do_sum_all = parser.checkOption("--sum", "Sum up all subtomograms (for debugging)");
+	do_not_write_any = parser.checkOption("--no_writing", "Do not write out any files, only a sum");
+
+	Log::readParams(parser);
 
 	if (parser.checkForErrors())
 	{
@@ -154,8 +166,10 @@ void SubtomoProgram::run()
 
 	if (do_sum_all)
 	{
-		sum_data.write(outDir + "sum_data.mrc");
-		sum_weights.write(outDir + "sum_weight.mrc");
+		const double pixel_size = binning * tomogramSet.getPixelSize(0);
+
+		sum_data.write(outDir + "sum_data.mrc", pixel_size);
+		Centering::fftwHalfToHumanFull(sum_weights).write(outDir + "sum_weight.mrc", pixel_size);
 
 		BufferedImage<float> dataImgDivRS(s3D,s3D,s3D);
 		dataImgDivRS.fill(0.0);
@@ -173,7 +187,7 @@ void SubtomoProgram::run()
 				0.001, num_threads);
 		}
 
-		dataImgDivRS.write(outDir + "sum_div.mrc");
+		dataImgDivRS.write(outDir + "sum_div.mrc", pixel_size);
 	}
 }
 
@@ -322,6 +336,19 @@ void SubtomoProgram::processTomograms(
 		const int pc = particles[t].size();
 		if (pc == 0) continue;
 
+		if (run_from_GUI && pipeline_control_check_abort_job())
+		{
+			if (run_from_MPI)
+			{
+				MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
+				exit(RELION_EXIT_ABORTED);
+			}
+			else
+			{
+				exit(RELION_EXIT_ABORTED);
+			}
+		}
+
 		if (verbosity > 0)
 		{
 			Log::beginSection("Tomogram " + ZIO::itoa(tt+1) + " / " + ZIO::itoa(tc));
@@ -355,6 +382,9 @@ void SubtomoProgram::processTomograms(
 				"Backprojecting subtomograms",
 				(int)ceil(pc/(double)outer_thread_num));
 		}
+
+		omp_lock_t writelock;
+		if (do_sum_all) omp_init_lock(&writelock);
 
 		#pragma omp parallel for num_threads(outer_thread_num)
 		for (int p = 0; p < pc; p++)
@@ -393,12 +423,11 @@ void SubtomoProgram::processTomograms(
 			BufferedImage<fComplex> particleStack = BufferedImage<fComplex>(sh2D,s2D,fc);
 			BufferedImage<float> weightStack(sh2D,s2D,fc);
 
-			const bool circleCrop = false;
+			const bool circleCrop = true;
 
 			TomoExtraction::extractAt3D_Fourier(
 					tomogram.stack, s02D, binning, tomogram.projectionMatrices, traj,
 					particleStack, projCut, inner_thread_num, circleCrop);
-
 
 			if (!do_ctf) weightStack.fill(1.f);
 
@@ -464,12 +493,11 @@ void SubtomoProgram::processTomograms(
 			BufferedImage<fComplex> dataImgFS(sh3D,s3D,s3D);
 			dataImgFS.fill(fComplex(0.0, 0.0));
 
-			BufferedImage<float> ctfImgFS(sh3D,s3D,s3D), psfImgFS(sh3D,s3D,s3D),
+			BufferedImage<float> ctfImgFS(sh3D,s3D,s3D),
 					dataImgRS(s3D,s3D,s3D), dataImgDivRS(s3D,s3D,s3D),
 					multiImageFS(sh3D,s3D,s3D);
 
 			ctfImgFS.fill(0.0);
-			psfImgFS.fill(0.0);
 			dataImgRS.fill(0.0);
 			dataImgDivRS.fill(0.0);
 
@@ -485,8 +513,15 @@ void SubtomoProgram::processTomograms(
 			}
 
 			Centering::shiftInSitu(dataImgFS);
-			FFT::inverseFourierTransform(dataImgFS, dataImgRS, FFT::Both);
 
+			// correct FT scale because of the implicit cropping:
+
+			if (s3D != s2D)
+			{
+				dataImgFS *= s2D / (float) s3D;
+			}
+
+			FFT::inverseFourierTransform(dataImgFS, dataImgRS, FFT::Both);
 
 			if (do_cone_weight)
 			{
@@ -511,8 +546,8 @@ void SubtomoProgram::processTomograms(
 					const double m = 1.0 - exp(-0.5*t*t);
 
 					dataImgFS(x,y,z) *= m;
-					psfImgFS(x,y,z) *= m;
-					multiImageFS(x,y,z) *= m;
+					ctfImgFS(x,y,z) *= m;
+					multiImageFS(x,y,z) *= m; // apply to both multiplicity and weight?
 				}
 
 				FFT::inverseFourierTransform(dataImgFS, dataImgRS);
@@ -523,9 +558,15 @@ void SubtomoProgram::processTomograms(
 
 			if (do_sum_all)
 			{
+				omp_set_lock(&writelock);
+
 				sum_data += dataImgRS;
 				sum_weights += ctfImgFS;
+
+				omp_unset_lock(&writelock);
 			}
+
+			if (do_not_write_any) continue;
 
 
 			dataImgRS.write(outData, binnedPixelSize);
