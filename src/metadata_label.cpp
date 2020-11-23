@@ -161,11 +161,3 @@ bool EMDL::isValidLabel(const std::string &labelName)
     return EMDL::isValidLabel(label);
 }
 
-bool vectorContainsLabel(const std::vector<EMDLabel>& labelsVector, const EMDLabel label)
-{
-    std::vector<EMDLabel>::const_iterator location;
-    location = std::find(labelsVector.begin(), labelsVector.end(), label);
-
-    return (location != labelsVector.end());
-}
-

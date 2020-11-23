@@ -534,7 +534,7 @@ void ClassRanker::initialise()
 		else
 		{
 			MetaDataTable MDtmp;
-			total_nr_particles = MDtmp.read(fn_data, "particles", NULL, "", true); // true means do_only_count
+			total_nr_particles = MDtmp.read(fn_data, "particles", true); // true means do_only_count
 		}
 
 		if (intact_ctf_first_peak && !only_do_subimages)

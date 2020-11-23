@@ -28,9 +28,9 @@ void addParticles(
 		 && table.containsLabel(EMDL_ORIENT_TILT)
 		 && table.containsLabel(EMDL_ORIENT_PSI);
 
-	outputData.resize(table.size());
+	outputData.resize(table.numberOfObjects());
 
-	for (int i = 0; i < table.size(); i++)
+	for (int i = 0; i < table.numberOfObjects(); i++)
 	{
 		ParticleData& d = outputData[i];
 
@@ -119,7 +119,7 @@ int main(int argc, char *argv[])
 		{
 			int numberWithAngles = 0;
 
-			for (int i = 0; i < inputTable.size(); i++)
+			for (int i = 0; i < inputTable.numberOfObjects(); i++)
 			{
 				const std::string subTableName = inputTable.getString(
 							EMDL_TOMO_IMPORT_PARTICLE_FILE, i);
@@ -148,10 +148,10 @@ int main(int argc, char *argv[])
 				}
 			}
 
-			if (numberWithAngles != 0 && numberWithAngles != inputTable.size())
+			if (numberWithAngles != 0 && numberWithAngles != inputTable.numberOfObjects())
 			{
 				Log::warn("Only " + ZIO::itoa(numberWithAngles) + " out of "
-					+ ZIO::itoa(inputTable.size()) + " partial particle files contain angles.");
+					+ ZIO::itoa(inputTable.numberOfObjects()) + " partial particle files contain angles.");
 			}
 		}
 		else

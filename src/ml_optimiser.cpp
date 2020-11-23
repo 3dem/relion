@@ -9215,7 +9215,7 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 		if (subset_size > mydata.numberOfParticles())
 			subset_size = mydata.numberOfParticles();
 
-		if (nr_iter - iter < grad_em_iters)
+		if (nr_iter - iter < grad_em_iters || nr_iter == iter)
 			subset_size = mydata.numberOfParticles();
 	}
 

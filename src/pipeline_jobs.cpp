@@ -5600,13 +5600,13 @@ void RelionJob::initialiseSubtomoImportJob()
 
        	joboptions["do_tomo"] = JobOption("Import tomograms?", true, "Set this to Yes for importing tomogram directories from IMOD.");
         joboptions["io_tomos"] = JobOption("Append to tomograms set: ", NODE_SUBTOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "The imported tomograms will be output into this tomogram set. If any tomograms were already in this tomogram set, then the newly imported ones will be added to those.");
-        joboptions["tomo_star"] = JobOption("STAR file with tomograms: ", "", "Input file (*.star)", ".", "Provide a STAR file with the following information to input tomograms: \n \n TODO TODO TODO ");
+        joboptions["tomo_star"] = JobOption("STAR file with tomograms description: ", "", "Input file (*.star)", ".", "Provide a STAR file with the following information to input tomograms: \n \n TODO TODO TODO ");
     	joboptions["angpix"] = JobOption("Pixel size (Angstrom):", (std::string)"", "Pixel size in Angstroms. If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
     	joboptions["kV"] = JobOption("Voltage (kV):", (std::string)"", "Voltage the microscope was operated on (in kV; default=300). If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
     	joboptions["Cs"] = JobOption("Spherical aberration (mm):", (std::string)"", "Spherical aberration of the microscope used to collect these images (in mm; default=2.7). Typical values are 2.7 (FEI Titan & Talos, most JEOL CRYO-ARM), 2.0 (FEI Polara), 1.4 (some JEOL CRYO-ARM) and 0.01 (microscopes with a Cs corrector). If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
     	joboptions["Q0"] = JobOption("Amplitude contrast:", (std::string)"", "Fraction of amplitude contrast (default=0.1). Often values around 10% work better than theoretically more accurate lower values.  If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
     	joboptions["dose"] = JobOption("Frame dose:", (std::string)"", "Electron dose (in e/A^2) per frame (image) in the tilt series.  If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
-    	joboptions["order_list"] = JobOption("Ordered list:", (std::string)"", "A 2-column, comma-separated file with the frame-order list of the tilt series, where the first column is the frame (image) number (starting at 1) and the second column is the tilt angle (in degrees). If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
+    	joboptions["order_list"] = JobOption("Ordered list:", (std::string)"", "", ".", "A 2-column, comma-separated file with the frame-order list of the tilt series, where the first column is the frame (image) number (starting at 1) and the second column is the tilt angle (in degrees). If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
     	joboptions["do_flipYZ"] = JobOption("Flip YZ?", true, "Set this to Yes if you want to interchange the Y and Z coordinates.  If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
     	joboptions["do_flipZ"] = JobOption("Flip Z?", true, "Set this to Yes if you want to change the sign of the Z coordinates.  If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
     	joboptions["hand"] = JobOption("Tilt handedness:", (std::string)"", "Set this to indicate the handedness of the tilt geometry (default=-1). The value of this parameter is either +1 or -1, and it describes whether the focus increases or decreases as a function of Z distance. It has to be determined experimentally. In our experiments, it has always been -1. Y If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
@@ -5710,6 +5710,8 @@ bool RelionJob::getCommandsSubtomoImportJob(std::string &outputname, std::vector
 
 		Node node(outputname+"particles.star", NODE_PART_DATA);
 		outputNodes.push_back(node);
+		Node node2(outputname+"optimisation_set.star", NODE_SUBTOMO_OPTIMISATION);
+		outputNodes.push_back(node2);
 	}
 	else if (do_other)
 	{
@@ -5725,6 +5727,8 @@ bool RelionJob::getCommandsSubtomoImportJob(std::string &outputname, std::vector
 		int mynodetype;
 		if (node_type == "Particles STAR file (.star)")
 			mynodetype = NODE_PART_DATA;
+		else if (node_type == "Set of tomograms STAR file (.star)")
+			mynodetype = NODE_SUBTOMO_TOMOGRAMS;
 		else if (node_type == "Multiple (2D or 3D) references (.star or .mrcs)")
 			mynodetype = NODE_REFS;
 		else if (node_type == "3D reference (.mrc)")
