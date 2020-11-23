@@ -9215,7 +9215,7 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 		if (subset_size > mydata.numberOfParticles())
 			subset_size = mydata.numberOfParticles();
 
-		if (nr_iter - iter < grad_em_iters)
+		if (nr_iter - iter < grad_em_iters || nr_iter == iter)
 			subset_size = mydata.numberOfParticles();
 	}
 
@@ -9659,7 +9659,6 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 			// Note beamtilt is no longer part of this: it is now in the optics group
 			if (do_ctf_correction)
 			{
-				long int mic_id = mydata.getMicrographId(part_id, img_id);
 				RFLOAT DeltafU, DeltafV, azimuthal_angle, Bfac, kfac, phase_shift;
 
 				if (!mydata.MDimg.getValue(EMDL_CTF_DEFOCUSU, DeltafU, ori_img_id))

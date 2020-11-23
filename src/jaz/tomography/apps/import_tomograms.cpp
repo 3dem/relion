@@ -244,13 +244,13 @@ int main(int argc, char *argv[])
 		}
 
 
-		Log::print(ZIO::itoa(perTomoArguments.size()) + " tomograms to be imported");
+		Log::print(ZIO::itoa(perTomoArguments.numberOfObjects()) + " tomograms to be imported");
 
-		for (int tomo_index = 0; tomo_index < perTomoArguments.size(); tomo_index++)
+		for (int tomo_index = 0; tomo_index < perTomoArguments.numberOfObjects(); tomo_index++)
 		{
 			CtfSource ctfSource;
 
-			Log::beginSection("Tomogram " + ZIO::itoa(tomo_index + 1) + " / " + ZIO::itoa(perTomoArguments.size()));
+			Log::beginSection("Tomogram " + ZIO::itoa(tomo_index + 1) + " / " + ZIO::itoa(perTomoArguments.numberOfObjects()));
 
 			std::string ctfFindFn, ctfPlotterFn;
 			perTomoArguments.getValue(EMDL_TOMO_IMPORT_CTFFIND_FILE, ctfFindFn, tomo_index);

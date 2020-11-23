@@ -213,7 +213,7 @@ int main(int argc, char *argv[])
 		Log::updateProgress(m);
 
 		const MetaDataTable& particles = particles_by_micrograph[m];
-		const int particle_count = particles.size();
+		const int particle_count = particles.numberOfObjects();
 
 
 		std::vector<int> compressed_particle_indices(particle_count, -1);
