@@ -376,7 +376,6 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 	FileName movieFn = micrograph.getMovieFilename();
 	std::string gainFn = micrograph.getGainFilename();
 	MultidimArray<bool> defectMask;
-	last_movieFn = movieFn;
 
 	bool hasDefect = (micrograph.fnDefect != "" || micrograph.hotpixelX.size() != 0);
 	
@@ -392,6 +391,7 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 			lastDefectMask = defectMask;
 		}
 	}
+	last_movieFn = movieFn;
 
 	if (debug)
 	{
