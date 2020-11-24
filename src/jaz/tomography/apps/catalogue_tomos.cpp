@@ -19,24 +19,19 @@ int main(int argc, char *argv[])
 	int num_threads;
     double binning;
 		
-	try
+
+	parser.setCommandLine(argc, argv);
+	int gen_section = parser.addSection("General options");
+
+	tomoListFn = parser.getOption("--t", "Tomogram list");
+	num_threads = textToInteger(parser.getOption("--j", "Number of threads", "6"));
+	binning = textToDouble(parser.getOption("--bin", "Binning factor", "8"));
+
+	outTag = parser.getOption("--o", "Output filename pattern");
+
+	if (parser.checkForErrors())
 	{
-		parser.setCommandLine(argc, argv);
-		int gen_section = parser.addSection("General options");
-		
-		tomoListFn = parser.getOption("--t", "Tomogram list");
-		num_threads = textToInteger(parser.getOption("--j", "Number of threads", "6"));
-		binning = textToDouble(parser.getOption("--bin", "Binning factor", "8"));
-			
-		outTag = parser.getOption("--o", "Output filename pattern");
-		
-		if (parser.checkForErrors()) std::exit(-1);
-	}
-	catch (RelionError XE)
-	{
-		parser.writeUsage(std::cout);
-		std::cerr << XE;
-		exit(1);
+		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
 	
 	TomoList tomoList(tomoListFn);

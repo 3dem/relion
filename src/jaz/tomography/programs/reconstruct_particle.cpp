@@ -16,75 +16,76 @@
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
 #include <src/time.h>
+#include <mpi.h>
 #include <iostream>
 
 
 using namespace gravis;
 
 
+ReconstructParticleProgram::ReconstructParticleProgram()
+: run_from_MPI(false)
+{
+
+}
+
 void ReconstructParticleProgram::readParameters(int argc, char *argv[])
 {
 	readBasicParameters(argc, argv);
 
 	outDir = ZIO::prepareTomoOutputDirectory(outDir, argc, argv);
-	tmpOutRoot = outDir + "tmp_sum_";
+
+	ZIO::makeDir(outDir + "temp");
+	tmpOutRoot = outDir + "temp/sum_";
+
+	run_from_GUI = is_under_pipeline_control();
 }
 
 void ReconstructParticleProgram::readBasicParameters(int argc, char *argv[])
 {
 	IOParser parser;
-	
-	try
+
+	parser.setCommandLine(argc, argv);
+
+	optimisationSet.read(
+		parser,
+		true,           // optimisation set
+		true,   true,   // particles
+		true,   true,   // tomograms
+		true,   false,  // trajectories
+		false,  false,  // manifolds
+		false,  false); // reference
+
+	int gen_section = parser.addSection("Reconstruction options");
+
+	boxSize = textToInteger(parser.getOption("--b", "Box size"));
+	cropSize = textToInteger(parser.getOption("--crop", "Size of (additionally output) cropped image", "-1"));
+
+	do_whiten = parser.checkOption("--whiten", "Whiten the noise by flattening the power spectrum");
+
+	binning = textToDouble(parser.getOption("--bin", "Binning factor", "1"));
+	taper = textToDouble(parser.getOption("--taper", "Taper against the sphere by this number of pixels (only if cropping)", "10"));
+	SNR = textToDouble(parser.getOption("--SNR", "Assumed signal-to-noise ratio (negative means use a heuristic)", "-1"));
+	symmName = parser.getOption("--sym", "Symmetry group", "C1");
+
+	max_mem_GB = textToInteger(parser.getOption("--mem", "Max. amount of memory to use for accumulation (--j_out will be reduced)", "-1"));
+
+	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Only process undone subtomograms");
+	no_backup = parser.checkOption("--no_backup", "Do not make backups (makes it impossible to use --only_do_unfinished)");
+
+	num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
+	inner_threads = textToInteger(parser.getOption("--j_in", "Number of inner threads (slower, needs less memory)", "3"));
+	outer_threads = textToInteger(parser.getOption("--j_out", "Number of outer threads (faster, needs more memory)", "2"));
+
+	no_reconstruction = parser.checkOption("--no_recon", "Do not reconstruct the volume, only backproject (for benchmarking purposes)");
+
+	outDir = parser.getOption("--o", "Output directory");
+
+	Log::readParams(parser);
+
+	if (parser.checkForErrors())
 	{
-		parser.setCommandLine(argc, argv);
-
-		optimisationSet.read(
-			parser,
-			true,           // optimisation set
-			true,   true,   // particles
-			true,   true,   // tomograms
-			true,   false,  // trajectories
-			false,  false,  // manifolds
-			false,  false); // reference
-
-		int gen_section = parser.addSection("Reconstruction options");
-
-		boxSize = textToInteger(parser.getOption("--b", "Box size"));
-		cropSize = textToInteger(parser.getOption("--crop", "Size of (additionally output) cropped image", "-1"));
-
-		do_whiten = parser.checkOption("--whiten", "Whiten the noise by flattening the power spectrum");
-
-		binning = textToDouble(parser.getOption("--bin", "Binning factor", "1"));
-		taper = textToDouble(parser.getOption("--taper", "Taper against the sphere by this number of pixels (only if cropping)", "10"));
-		SNR = textToDouble(parser.getOption("--SNR", "Assumed signal-to-noise ratio (negative means use a heuristic)", "-1"));
-		symmName = parser.getOption("--sym", "Symmetry group", "C1");
-				
-		max_mem_GB = textToInteger(parser.getOption("--mem", "Max. amount of memory to use for accumulation (--j_out will be reduced)", "-1"));
-				
-		explicit_gridding = parser.checkOption("--xg", "Perform gridding correction using a measured spreading function");
-
-		only_do_unfinished = parser.checkOption("--only_do_unfinished", "Only process undone subtomograms");
-
-		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
-		inner_threads = textToInteger(parser.getOption("--j_in", "Number of inner threads (slower, needs less memory)", "3"));
-		outer_threads = textToInteger(parser.getOption("--j_out", "Number of outer threads (faster, needs more memory)", "2"));
-
-		no_reconstruction = parser.checkOption("--no_recon", "Do not reconstruct the volume, only backproject (for benchmarking purposes)");
-
-		outDir = parser.getOption("--o", "Output directory");
-		
-		Log::readParams(parser);
-
-		if (parser.checkForErrors())
-		{
-			REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
-		}
-	}
-	catch (RelionError XE)
-	{
-		parser.writeUsage(std::cout);
-		std::cerr << XE;
-		exit(1);
+		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
 }
 
@@ -114,7 +115,7 @@ void ReconstructParticleProgram::run()
 
 	const double GB_per_thread =
 			2.0 * voxelNum * 3.0 * sizeof(double)   // two halves  *  box size  *  (data (x2) + ctf)
-			/ (1024.0 * 1024.0 * 1024.0);          // in GB
+			/ (1024.0 * 1024.0 * 1024.0);           // in GB
 
 	if (max_mem_GB > 0)
 	{
@@ -130,22 +131,20 @@ void ReconstructParticleProgram::run()
 		}
 	}
 	
-	const int outCount = 2 * outer_threads + 1; // One more count for the accumulated sum
+	const int outCount = 2 * outer_threads;
 		
 	Log::print("Memory required for accumulation: " + ZIO::itoa(GB_per_thread  * (long int) outCount) + " GB");
 	
-	std::vector<BufferedImage<double>> ctfImgFS(2), psfImgFS(2);
-	std::vector<BufferedImage<dComplex>> dataImgFS(2);
+	std::vector<BufferedImage<double>> ctfImgFS(outCount);
+	std::vector<BufferedImage<dComplex>> dataImgFS(outCount);
 	
-	for (int i = 0; i < 2; i++)
+	for (int i = 0; i < outCount; i++)
 	{	
 		dataImgFS[i] = BufferedImage<dComplex>(sh,s,s);
-		ctfImgFS[i] = BufferedImage<double>(sh,s,s),
-		psfImgFS[i] = BufferedImage<double>(sh,s,s);
+		ctfImgFS[i] = BufferedImage<double>(sh,s,s);
 		
 		dataImgFS[i].fill(dComplex(0.0, 0.0));
 		ctfImgFS[i].fill(0.0);
-		psfImgFS[i].fill(0.0);
 	}
 
 	AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
@@ -157,7 +156,7 @@ void ReconstructParticleProgram::run()
 
 	processTomograms(
 		tomoIndices, tomoSet, particleSet, particles, aberrationsCache,
-		dataImgFS, ctfImgFS, psfImgFS, binnedOutPixelSize,
+		dataImgFS, ctfImgFS, binnedOutPixelSize,
 		s02D, do_ctf, flip_value, 1, true);
 
 	if (no_reconstruction) return;
@@ -173,16 +172,10 @@ void ReconstructParticleProgram::run()
 			
 			ctfImgFS[half] = Symmetry::symmetrise_FS_real(
 						ctfImgFS[half], symmName, num_threads);
-			
-			if (explicit_gridding)
-			{
-				psfImgFS[half] = Symmetry::symmetrise_FS_real(
-						psfImgFS[half], symmName, num_threads);
-			}
 		}
 	}
 
-	finalise(dataImgFS, ctfImgFS, psfImgFS, binnedOutPixelSize);
+	finalise(dataImgFS, ctfImgFS, binnedOutPixelSize);
 
 	// Delete temporary files
 	int res = system(("rm -rf "+ tmpOutRoot + "*.mrc").c_str());
@@ -196,7 +189,6 @@ void ReconstructParticleProgram::processTomograms(
 	const AberrationsCache& aberrationsCache,
 	std::vector<BufferedImage<dComplex>>& dataImgFS,
 	std::vector<BufferedImage<double>>& ctfImgFS,
-	std::vector<BufferedImage<double>>& psfImgFS,
 	const double binnedOutPixelSize,
 	int s02D,
 	bool do_ctf,
@@ -226,16 +218,6 @@ void ReconstructParticleProgram::processTomograms(
 
 	int particles_in_previous_tomograms = 0;
 
-	const int outCount = 2 * outer_threads;
-	std::vector<BufferedImage<double>> ctfImgFStomo(outCount), psfImgFStomo(outCount);
-	std::vector<BufferedImage<dComplex>> dataImgFStomo(outCount);
-
-	for (int i = 0; i < outCount; i++)
-	{
-		dataImgFStomo[i] = BufferedImage<dComplex>(sh,s,s);
-		ctfImgFStomo[i] = BufferedImage<double>(sh,s,s),
-		psfImgFStomo[i] = BufferedImage<double>(sh,s,s);
-	}
 
 	int ttIni = 0, ttPrevious = -1;
 
@@ -250,35 +232,44 @@ void ReconstructParticleProgram::processTomograms(
 				break;
 			}
 		}
-	}
 
-	if (ttIni > 0)
-	{
-		//Read temporary files
-		std::vector<BufferedImage<double>> tmpDataImg(2);
-		tmpDataImg[0] = BufferedImage<double>(sh, s, s*2);
-		tmpDataImg[1] = BufferedImage<double>(sh, s, s*2);
-
-		std::string tmpOutRootTT = tmpOutRoot + ZIO::itoa(ttIni-1);
-
-		tmpDataImg[0].read(tmpOutRootTT + "_data_half1.mrc");
-		tmpDataImg[1].read(tmpOutRootTT + "_data_half2.mrc");
-		ctfImgFS[0].read(tmpOutRootTT + "_ctf_half1.mrc");
-		ctfImgFS[1].read(tmpOutRootTT + "_ctf_half2.mrc");
-		psfImgFS[0].read(tmpOutRootTT + "_psf_half1.mrc");
-		psfImgFS[1].read(tmpOutRootTT + "_psf_half2.mrc");
-
-		for (int z = 0; z < s;  z++)
-		for (int y = 0; y < s;  y++)
-		for (int x = 0; x < sh; x++)
-		for (int i =0; i < 2; i++)
+		if (ttIni > 0)
 		{
-			dataImgFS[i](x,y,z) = fComplex(tmpDataImg[i](x,y,z), tmpDataImg[i](x,y,z+s));
+			//Read temporary files
+			std::vector<BufferedImage<double>> tmpDataImg(2);
+
+			std::string tmpOutRootTT = tmpOutRoot + ZIO::itoa(ttIni-1);
+
+			for (int half = 0; half < 2; half++)
+			{
+				tmpDataImg[half].read(tmpOutRootTT + "_data_half" + ZIO::itoa(half) + ".mrc");
+				ctfImgFS[half].read(tmpOutRootTT + "_ctf_half" + ZIO::itoa(half) + ".mrc");
+
+				for (int z = 0; z < s;  z++)
+				for (int y = 0; y < s;  y++)
+				for (int x = 0; x < sh; x++)
+				{
+					dataImgFS[half](x,y,z) = fComplex(tmpDataImg[half](x,y,z), tmpDataImg[half](x,y,z+s));
+				}
+			}
 		}
 	}
 
 	for (int tt = ttIni; tt < tc; tt++)
 	{
+		if (run_from_GUI && pipeline_control_check_abort_job())
+		{
+			if (run_from_MPI)
+			{
+				MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
+				exit(RELION_EXIT_ABORTED);
+			}
+			else
+			{
+				exit(RELION_EXIT_ABORTED);
+			}
+		}
+
 		const int t = tomoIndices[tt];
 		const int pc = particles[t].size();
 
@@ -325,13 +316,6 @@ void ReconstructParticleProgram::processTomograms(
 			Log::beginProgress("Backprojecting", (int)ceil(pc/(double)outer_threads));
 		}
 
-		for (int i = 0; i < outCount; i++)
-		{
-			dataImgFStomo[i].fill(dComplex(0.0, 0.0));
-			ctfImgFStomo[i].fill(0.0);
-			psfImgFStomo[i].fill(0.0);
-		}
-
 		#pragma omp parallel for num_threads(outer_threads)
 		for (int p = 0; p < pc; p++)
 		{
@@ -357,9 +341,12 @@ void ReconstructParticleProgram::processTomograms(
 			std::vector<d4Matrix> projCut(fc), projPart(fc);
 
 
+			const bool circle_crop = true;
+
 			TomoExtraction::extractAt3D_Fourier(
 					tomogram.stack, s02D, binning, tomogram.projectionMatrices, traj,
-					particleStack[th], projCut, inner_threads, true);
+					particleStack[th], projCut, inner_threads, circle_crop);
+
 
 			const d4Matrix particleToTomo = particleSet.getMatrix4x4(part_id, s,s,s);
 
@@ -405,74 +392,62 @@ void ReconstructParticleProgram::processTomograms(
 				weightStack[th] *= noiseWeights;
 			}
 
-			if (explicit_gridding)
+			for (int f = 0; f < fc; f++)
 			{
-				FourierBackprojection::backprojectStack_backward(
-					particleStack[th], weightStack[th], projPart,
-					dataImgFStomo[2*th + halfSet],
-					psfImgFStomo[2*th + halfSet],
-					ctfImgFStomo[2*th + halfSet],
+				FourierBackprojection::backprojectSlice_backward(
+					particleStack[th].getSliceRef(f),
+					weightStack[th].getSliceRef(f),
+					projPart[f],
+					dataImgFS[2*th + halfSet],
+					ctfImgFS[2*th + halfSet],
 					inner_threads);
-			}
-			else
-			{
-				for (int f = 0; f < fc; f++)
-				{
-					FourierBackprojection::backprojectSlice_backward(
-						particleStack[th].getSliceRef(f),
-						weightStack[th].getSliceRef(f),
-						projPart[f],
-						dataImgFStomo[2*th + halfSet],
-						ctfImgFStomo[2*th + halfSet],
-						inner_threads);
-				}
 			}
 
 		} // particles
 
-		if (outCount > 2)
+		if (!no_backup)
 		{
-			for (int i = 2; i < outCount; i++)
+			for (int i = 2; i < dataImgFS.size(); i++)
 			{
-				dataImgFS[i%2] += dataImgFStomo[i];
-				ctfImgFS[i%2] += ctfImgFStomo[i];
-
-				if (explicit_gridding)
-				{
-					psfImgFS[i%2] += psfImgFStomo[i];
-				}
+				dataImgFS[i%2] += dataImgFS[i];
+				ctfImgFS[i%2]  += ctfImgFS[i];
 			}
+
+			for (int i = 2; i < dataImgFS.size(); i++)
+			{
+				dataImgFS[i].fill(dComplex(0.0, 0.0));
+				ctfImgFS[i].fill(0.0);
+			}
+
+			//Save temporary files
+
+			for (int half = 0; half < 2; half++)
+			{
+				BufferedImage<double> tmpDataImg(sh, s, s*2);
+
+				for (int z = 0; z < s;  z++)
+				for (int y = 0; y < s;  y++)
+				for (int x = 0; x < sh; x++)
+				{
+					fComplex pv = dataImgFS[half](x,y,z);
+					tmpDataImg(x,y,z) = pv.real;
+					tmpDataImg(x,y,z+s) = pv.imag;
+				}
+
+				std::string tmpOutRootTT = tmpOutRoot + ZIO::itoa(tt);
+				tmpDataImg.write(tmpOutRootTT + "_data_half" + ZIO::itoa(half) + ".mrc");
+				ctfImgFS[half].write(tmpOutRootTT + "_ctf_half" + ZIO::itoa(half) + ".mrc");
+			}
+
+			// Delete temporary files from previous tomogram
+
+			if (ttPrevious > -1)
+			{
+				int res = system(("rm -rf "+ tmpOutRoot  + ZIO::itoa(ttPrevious) + "*.mrc").c_str());
+			}
+
+			ttPrevious = tt;
 		}
-
-		//Save temporary files
-		std::vector<BufferedImage<double>> tmpDataImg(2);
-		tmpDataImg[0] = BufferedImage<double>(sh, s, s*2);
-		tmpDataImg[1] = BufferedImage<double>(sh, s, s*2);
-
-		for (int i =0; i < 2; i++)
-		for (int z = 0; z < s;  z++)
-		for (int y = 0; y < s;  y++)
-		for (int x = 0; x < sh; x++)
-		{
-			fComplex pv = dataImgFS[i](x,y,z);
-			tmpDataImg[i](x,y,z) = pv.real;
-			tmpDataImg[i](x,y,z+s) = pv.imag;
-		}
-
-		std::string tmpOutRootTT = tmpOutRoot + ZIO::itoa(tt);
-		tmpDataImg[0].write(tmpOutRootTT + "_data_half1.mrc");
-		tmpDataImg[1].write(tmpOutRootTT + "_data_half2.mrc");
-		ctfImgFS[0].write(tmpOutRootTT + "_ctf_half1.mrc");
-		ctfImgFS[1].write(tmpOutRootTT + "_ctf_half2.mrc");
-		psfImgFS[0].write(tmpOutRootTT + "_psf_half1.mrc");
-		psfImgFS[1].write(tmpOutRootTT + "_psf_half2.mrc");
-
-		// Delete temporary files from previous iteration
-		if (ttPrevious > -1)
-		{
-			int res = system(("rm -rf "+ tmpOutRoot  + ZIO::itoa(ttPrevious) + "*.mrc").c_str());
-		}
-		ttPrevious = tt;
 
 		if (verbosity > 0 && per_tomogram_progress)
 		{
@@ -480,9 +455,19 @@ void ReconstructParticleProgram::processTomograms(
 			Log::endSection();
 		}
 
+
 		particles_in_previous_tomograms += (int)ceil(pc/(double)outer_threads);
 
 	} // tomograms
+
+	if (no_backup)
+	{
+		for (int i = 2; i < dataImgFS.size(); i++)
+		{
+			dataImgFS[i%2] += dataImgFS[i];
+			ctfImgFS[i%2]  += ctfImgFS[i];
+		}
+	}
 
 	if (verbosity > 0 && !per_tomogram_progress)
 	{
@@ -493,7 +478,6 @@ void ReconstructParticleProgram::processTomograms(
 void ReconstructParticleProgram::finalise(
 	std::vector<BufferedImage<dComplex>>& dataImgFS,
 	std::vector<BufferedImage<double>>& ctfImgFS,
-	std::vector<BufferedImage<double>>& psfImgFS,
 	const double binnedOutPixelSize)
 {
 	const int s = dataImgFS[0].ydim;
@@ -502,13 +486,6 @@ void ReconstructParticleProgram::finalise(
 
 	BufferedImage<dComplex> dataImgFS_both = dataImgFS[0] + dataImgFS[1];
 	BufferedImage<double> ctfImgFS_both = ctfImgFS[0] + ctfImgFS[1];
-
-	BufferedImage<double> psfImgFS_both;
-
-	if (explicit_gridding)
-	{
-		psfImgFS_both = psfImgFS[0] + psfImgFS[1];
-	}
 
 
 	Log::beginSection("Reconstructing");
@@ -522,7 +499,7 @@ void ReconstructParticleProgram::finalise(
 
 		reconstruct(
 			dataImgRS[half], dataImgDivRS[half], ctfImgFS[half],
-			&psfImgFS[half], dataImgFS[half]);
+			dataImgFS[half]);
 
 		writeOutput(
 			dataImgDivRS[half], dataImgRS[half], ctfImgFS[half],
@@ -531,7 +508,7 @@ void ReconstructParticleProgram::finalise(
 
 	reconstruct(
 		dataImgRS[0], dataImgDivRS[0], ctfImgFS_both,
-		&psfImgFS_both, dataImgFS_both);
+		dataImgFS_both);
 
 	writeOutput(
 		dataImgDivRS[0], dataImgRS[0], ctfImgFS[0],
@@ -544,19 +521,10 @@ void ReconstructParticleProgram::reconstruct(
 		BufferedImage<double>& dataImgRS,
 		BufferedImage<double>& dataImgDivRS,
 		BufferedImage<double>& ctfImgFS,
-		BufferedImage<double>* psfImgFS,
 		BufferedImage<dComplex>& dataImgFS)
 {
-	if (explicit_gridding)
-	{
-		Reconstruction::griddingCorrect3D(
-			dataImgFS, *psfImgFS, dataImgRS, true, num_threads);
-	}
-	else
-	{
-		Reconstruction::griddingCorrect3D_sinc2(
+	Reconstruction::griddingCorrect3D_sinc2(
 			dataImgFS, dataImgRS, true, num_threads);
-	}
 
 	if (SNR > 0.0)
 	{

@@ -24,6 +24,8 @@ using namespace gravis;
 
 void ReconstructParticleProgramMpi::readParameters(int argc, char *argv[])
 {
+	run_from_MPI = true;
+
 	// Define a new MpiNode
 	node = new MpiNode(argc, argv);
 	rank = node->rank;
@@ -48,13 +50,11 @@ void ReconstructParticleProgramMpi::readParameters(int argc, char *argv[])
 	}
 	else
 	{
-		if (outDir[outDir.length()-1] != '/')
-		{
-			outDir = outDir + "/";
-		}
+		outDir = ZIO::ensureEndingSlash(outDir);
 	}
 
-	tmpOutRootBase = outDir + "tmp_sum_";
+	ZIO::makeDir(outDir + "temp");
+	tmpOutRootBase = outDir + "temp/sum_rank_";
 	tmpOutRoot = tmpOutRootBase + ZIO::itoa(rank) + "_";
 }
 
@@ -103,24 +103,23 @@ void ReconstructParticleProgramMpi::run()
 		}
 	}
 
-	const int outCount = 2 * outer_threads + 1; // One more count for the accumulated sum
+	const int outCount = 2 * outer_threads; // One more count for the accumulated sum
 
 	if (verb)
 	{
 		Log::print("Memory required for accumulation: " + ZIO::itoa(GB_per_thread  * (long int) outCount) + " GB");
 	}
-	std::vector<BufferedImage<double>> ctfImgFS(2), psfImgFS(2);
-	std::vector<BufferedImage<dComplex>> dataImgFS(2);
 
-	for (int i = 0; i < 2; i++)
+	std::vector<BufferedImage<double>> ctfImgFS(outCount);
+	std::vector<BufferedImage<dComplex>> dataImgFS(outCount);
+
+	for (int i = 0; i < outCount; i++)
 	{
 		dataImgFS[i] = BufferedImage<dComplex>(sh,s,s);
 		ctfImgFS[i] = BufferedImage<double>(sh,s,s),
-		psfImgFS[i] = BufferedImage<double>(sh,s,s);
 
 		dataImgFS[i].fill(dComplex(0.0, 0.0));
 		ctfImgFS[i].fill(0.0);
-		psfImgFS[i].fill(0.0);
 	}
 
 	AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
@@ -134,38 +133,36 @@ void ReconstructParticleProgramMpi::run()
 
 	processTomograms(
 		tomoIndices[rank], tomoSet, particleSet, particles, aberrationsCache,
-		dataImgFS, ctfImgFS, psfImgFS, binnedOutPixelSize,
+		dataImgFS, ctfImgFS, binnedOutPixelSize,
 		s02D, do_ctf, flip_value, verb, false);
 
-
-	std::vector<BufferedImage<double>> sumCtfImgFS(2), sumPsfImgFS(2);
+	std::vector<BufferedImage<double>> sumCtfImgFS(2);
 	std::vector<BufferedImage<dComplex>> sumDataImgFS(2);
 
-	if (node->isMaster())
-	{for (int i = 0; i < 2; i++)
-		{
-			sumDataImgFS[i] = BufferedImage<dComplex>(sh,s,s);
-			sumCtfImgFS[i] = BufferedImage<double>(sh,s,s),
-			sumPsfImgFS[i] = BufferedImage<double>(sh,s,s);
-		}
-	}
 	size_t sizeData = sh*s*s;
 
-	MPI_Reduce(dataImgFS[0].data, sumDataImgFS[0].data, sizeData,
-			MY_MPI_COMPLEX, MPI_SUM, 0, MPI_COMM_WORLD);
-	MPI_Reduce(dataImgFS[1].data, sumDataImgFS[1].data, sizeData,
-			MY_MPI_COMPLEX, MPI_SUM, 0, MPI_COMM_WORLD);
+	if (node->isMaster())
+	{
+		for (int i = 0; i < 2; i++)
+		{
+			sumDataImgFS[i] = BufferedImage<dComplex>(sh,s,s);
+			sumCtfImgFS[i] = BufferedImage<double>(sh,s,s);
+		}
+	}
 
-	MPI_Reduce(ctfImgFS[0].data, sumCtfImgFS[0].data, sizeData,
-			MY_MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-	MPI_Reduce(ctfImgFS[1].data, sumCtfImgFS[1].data, sizeData,
-			MY_MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+	for (int i = 0; i < 2; i++)
+	{
+		if (node->isMaster())
+		{
+			Log::print("Gathering half "+ZIO::itoa(i+1));
+		}
 
-	MPI_Reduce(psfImgFS[0].data, sumPsfImgFS[0].data, sizeData,
-			MY_MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-	MPI_Reduce(psfImgFS[1].data, sumPsfImgFS[1].data, sizeData,
-			MY_MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+		MPI_Reduce(dataImgFS[i].data, sumDataImgFS[i].data, sizeData,
+				MY_MPI_COMPLEX, MPI_SUM, 0, MPI_COMM_WORLD);
 
+		MPI_Reduce(ctfImgFS[i].data, sumCtfImgFS[i].data, sizeData,
+				MY_MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+	}
 
 	if (rank == 0)
 	{
@@ -182,17 +179,12 @@ void ReconstructParticleProgramMpi::run()
 
 				sumCtfImgFS[half] = Symmetry::symmetrise_FS_real(
 							sumCtfImgFS[half], symmName, num_threads);
-
-				if (explicit_gridding)
-				{
-					sumPsfImgFS[half] = Symmetry::symmetrise_FS_real(
-							sumPsfImgFS[half], symmName, num_threads);
-				}
 			}
 		}
 
-		finalise(sumDataImgFS, sumCtfImgFS, sumPsfImgFS, binnedOutPixelSize);
+		finalise(sumDataImgFS, sumCtfImgFS, binnedOutPixelSize);
 	}
+
 	// Delete temporary files
 	int res = system(("rm -rf "+ tmpOutRootBase + "*.mrc").c_str());
 }

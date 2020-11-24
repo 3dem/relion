@@ -22,7 +22,7 @@
 using namespace gravis;
 
 RefinementProgram::RefinementProgram(int argc, char *argv[])
-:	argc(argc), argv(argv)
+:	argc(argc), argv(argv), run_from_MPI(false)
 {}
 
 void RefinementProgram::_readParams(IOParser &parser)
@@ -49,6 +49,8 @@ void RefinementProgram::_readParams(IOParser &parser)
 	diag = parser.checkOption("--diag", "Write out diagnostic information");
 	num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 	outDir = parser.getOption("--o", "Output directory");
+
+	run_from_GUI = is_under_pipeline_control();
 }
 
 void RefinementProgram::init()

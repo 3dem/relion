@@ -5,10 +5,17 @@
 
 int main(int argc, char *argv[])
 {
-	FitBlobs3DProgram program;
-	
-	program.readParameters(argc, argv);	
-	program.run();
-	
-	return 0;
+	try
+	{
+		FitBlobs3DProgram program;
+
+		program.readParameters(argc, argv);
+		program.run();
+	}
+	catch (RelionError XE)
+	{
+		return RELION_EXIT_FAILURE;
+	}
+
+	return RELION_EXIT_SUCCESS;
 }

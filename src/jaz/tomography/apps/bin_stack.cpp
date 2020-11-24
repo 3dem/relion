@@ -20,25 +20,20 @@ int main(int argc, char *argv[])
 	std::string stackFn, projFn, outStackFn, outProjFn;	
 	bool zeroDC, FourierCrop;
 
-	try
+
+	parser.setCommandLine(argc, argv);
+	int gen_section = parser.addSection("General options");
+
+	stackFn = parser.getOption("--i", "Tilt sequence image stack (e.g. *.st:mrc)");
+	zeroDC = parser.checkOption("--0dc", "Zero the DC component of each frame");
+	spacing = textToDouble(parser.getOption("--bin", "Binning (pixel spacing)", "8.0"));
+	FourierCrop = parser.checkOption("--F", "Use Fourier cropping to downsample (warning: can produce an inexact aspect ratio)");
+	n_threads = textToInteger(parser.getOption("--j", "Number of threads", "1"));
+	outStackFn = parser.getOption("--o", "Output stack filename");
+
+	if (parser.checkForErrors())
 	{
-		parser.setCommandLine(argc, argv);
-		int gen_section = parser.addSection("General options");
-		
-		stackFn = parser.getOption("--i", "Tilt sequence image stack (e.g. *.st:mrc)");	
-		zeroDC = parser.checkOption("--0dc", "Zero the DC component of each frame");		
-		spacing = textToDouble(parser.getOption("--bin", "Binning (pixel spacing)", "8.0"));
-		FourierCrop = parser.checkOption("--F", "Use Fourier cropping to downsample (warning: can produce an inexact aspect ratio)");		
-		n_threads = textToInteger(parser.getOption("--j", "Number of threads", "1"));		
-		outStackFn = parser.getOption("--o", "Output stack filename");
-				
-		if (parser.checkForErrors()) std::exit(-1);
-	}
-	catch (RelionError XE)
-	{
-		parser.writeUsage(std::cout);
-		std::cerr << XE;
-		exit(1);
+		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
 	
 	

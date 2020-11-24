@@ -70,7 +70,8 @@ int TomogramSet::addTomogram(
 		double fractionalDose,
 		const std::vector<CTF>& ctfs, 
 		double handedness, 
-		double pixelSize)
+		double pixelSize,
+		const std::string& opticsGroupName)
 {
 	const int index = globalTable.numberOfObjects();
 	const int fc = projections.size();
@@ -88,6 +89,7 @@ int TomogramSet::addTomogram(
 	
 	const CTF& ctf0 = ctfs[0];
 	
+	globalTable.setValue(EMDL_IMAGE_OPTICS_GROUP_NAME, opticsGroupName, index);
 	globalTable.setValue(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, pixelSize, index);
 	globalTable.setValue(EMDL_CTF_VOLTAGE, ctf0.kV, index);
 	globalTable.setValue(EMDL_CTF_CS, ctf0.Cs, index);
@@ -300,6 +302,15 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 		out.fractionalDose = out.cumulativeDose[out.frameSequence[1]] - out.cumulativeDose[out.frameSequence[0]];
 	}
 
+	if (globalTable.containsLabel(EMDL_IMAGE_OPTICS_GROUP_NAME))
+	{
+		out.opticsGroupName = globalTable.getDouble(EMDL_IMAGE_OPTICS_GROUP_NAME, index);
+	}
+	else
+	{
+		out.opticsGroupName = "opticsGroup1";
+	}
+
 
 	out.name = tomoName;
 	
@@ -372,4 +383,16 @@ int TomogramSet::getFrameCount(int index) const
 double TomogramSet::getPixelSize(int index) const
 {
 	return globalTable.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, index);
+}
+
+std::string TomogramSet::getOpticsGroupName(int index) const
+{
+	if (!globalTable.containsLabel(EMDL_IMAGE_OPTICS_GROUP_NAME))
+	{
+		return "opticsGroup1";
+	}
+	else
+	{
+		return globalTable.getString(EMDL_IMAGE_OPTICS_GROUP_NAME, index);
+	}
 }

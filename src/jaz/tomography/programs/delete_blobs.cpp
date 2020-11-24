@@ -18,45 +18,35 @@ void DeleteBlobsProgram::readParameters(int argc, char *argv[])
 
 	IOParser parser;
 
-	try
+	parser.setCommandLine(argc, argv);
+	int gen_section = parser.addSection("General options");
+
+	tomoSetFn = parser.getOption("--t", "Tomogram set filename", "tomograms.star");
+	listFn = parser.getOption("--i", "File containing a list of tomogram-name/spheres-file pairs");
+
+	sphere_thickness_0 = textToDouble(parser.getOption("--th", "Sphere thickness (same units as sphere centres)"));
+	spheres_binning = textToDouble(parser.getOption("--sbin", "Binning factor of the sphere coordinates"));
+
+	fiducials_radius_A = textToDouble(parser.getOption("--frad", "Fiducial marker radius [Å]", "100"));
+
+	prior_sigma_A = textToDouble(parser.getOption("--sig", "Uncertainty std. dev. of initial position [Å]", "10"));
+	max_binning = textToDouble(parser.getOption("--bin0", "Initial (maximal) binning factor", "8"));
+	min_binning = textToDouble(parser.getOption("--bin1", "Final (minimal) binning factor", "2"));
+
+	diag = parser.checkOption("--diag", "Write out diagnostic information");
+
+	SH_bands = textToInteger(parser.getOption("--n", "Number of spherical harmonics bands", "2"));
+	highpass_sigma_real_A = textToDouble(parser.getOption("--hp", "High-pass sigma [Å, real space]", "300"));
+	max_iters = textToInteger(parser.getOption("--max_iters", "Maximum number of iterations", "1000"));
+	num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
+
+	outPath = parser.getOption("--o", "Output filename pattern");
+
+	Log::readParams(parser);
+
+	if (parser.checkForErrors())
 	{
-		parser.setCommandLine(argc, argv);
-		int gen_section = parser.addSection("General options");
-
-		tomoSetFn = parser.getOption("--t", "Tomogram set filename", "tomograms.star");
-		listFn = parser.getOption("--i", "File containing a list of tomogram-name/spheres-file pairs");
-
-		sphere_thickness_0 = textToDouble(parser.getOption("--th", "Sphere thickness (same units as sphere centres)"));
-		spheres_binning = textToDouble(parser.getOption("--sbin", "Binning factor of the sphere coordinates"));
-
-		fiducials_radius_A = textToDouble(parser.getOption("--frad", "Fiducial marker radius [Å]", "100"));
-
-		prior_sigma_A = textToDouble(parser.getOption("--sig", "Uncertainty std. dev. of initial position [Å]", "10"));
-		max_binning = textToDouble(parser.getOption("--bin0", "Initial (maximal) binning factor", "8"));
-		min_binning = textToDouble(parser.getOption("--bin1", "Final (minimal) binning factor", "2"));
-
-		diag = parser.checkOption("--diag", "Write out diagnostic information");
-
-		SH_bands = textToInteger(parser.getOption("--n", "Number of spherical harmonics bands", "2"));
-		highpass_sigma_real_A = textToDouble(parser.getOption("--hp", "High-pass sigma [Å, real space]", "300"));
-		max_iters = textToInteger(parser.getOption("--max_iters", "Maximum number of iterations", "1000"));
-		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
-
-		outPath = parser.getOption("--o", "Output filename pattern");
-
-		Log::readParams(parser);
-
-		if (parser.checkForErrors())
-		{
-			parser.writeUsage(std::cout);
-			exit(1);
-		}
-	}
-	catch (RelionError XE)
-	{
-		parser.writeUsage(std::cout);
-		std::cerr << XE;
-		exit(1);
+		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
 
 	sphere_thickness = sphere_thickness_0 * spheres_binning;

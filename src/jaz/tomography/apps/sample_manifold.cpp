@@ -5,10 +5,17 @@
 
 int main(int argc, char *argv[])
 {
-	SampleManifoldProgram sp;
+	try
+	{
+		SampleManifoldProgram sp;
 
-	sp.readParameters(argc, argv);
-	sp.run();
+		sp.readParameters(argc, argv);
+		sp.run();
+	}
+	catch (RelionError e)
+	{
+		return RELION_EXIT_FAILURE;
+	}
 
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }
