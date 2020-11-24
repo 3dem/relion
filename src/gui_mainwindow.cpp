@@ -412,6 +412,13 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 		browse_grp[nr_browse_tabs]->end();
 		nr_browse_tabs++;
 
+		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+		browser->add("Subtomo averaging");
+		gui_jobwindows[nr_browse_tabs] = new JobWindow();
+		gui_jobwindows[nr_browse_tabs]->initialise(PROC_SUBTOMO_AVERAGE);
+		browse_grp[nr_browse_tabs]->end();
+		nr_browse_tabs++;
+
 	}
 	else
 	{
@@ -518,14 +525,6 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 		gui_jobwindows[nr_browse_tabs]->initialise(PROC_SUBTOMO_POLISH);
 		browse_grp[nr_browse_tabs]->end();
 		nr_browse_tabs++;
-
-		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-		browser->add("Subtomo averaging");
-		gui_jobwindows[nr_browse_tabs] = new JobWindow();
-		gui_jobwindows[nr_browse_tabs]->initialise(PROC_SUBTOMO_AVERAGE);
-		browse_grp[nr_browse_tabs]->end();
-		nr_browse_tabs++;
-
 	}
 	else
 	{
