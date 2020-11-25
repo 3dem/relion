@@ -518,7 +518,7 @@ void SubtomoProgram::processTomograms(
 
 			if (s3D != s2D)
 			{
-				dataImgFS *= s2D / (float) s3D;
+				dataImgFS *= (float) pow(s2D / (double)s3D, 1.5);
 			}
 
 			FFT::inverseFourierTransform(dataImgFS, dataImgRS, FFT::Both);
