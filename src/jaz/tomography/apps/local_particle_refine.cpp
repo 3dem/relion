@@ -4,9 +4,15 @@
 
 int main(int argc, char *argv[])
 {
-	LocalParticleRefineProgram lprp(argc, argv);
+	try
+	{
+		LocalParticleRefineProgram program(argc, argv);
+		program.run();
+	}
+	catch (RelionError XE)
+	{
+		return RELION_EXIT_FAILURE;
+	}
 
-	lprp.run();
-
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }

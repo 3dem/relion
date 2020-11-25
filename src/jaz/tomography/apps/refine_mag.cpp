@@ -4,9 +4,15 @@
 
 int main(int argc, char *argv[])
 {
-	MagFitProgram mfp(argc, argv);
+	try
+	{
+		MagFitProgram program(argc, argv);
+		program.run();
+	}
+	catch (RelionError e)
+	{
+		return RELION_EXIT_FAILURE;
+	}
 
-	mfp.run();
-
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }

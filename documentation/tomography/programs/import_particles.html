@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<title>Import Particles</title>
+	<link rel="stylesheet" href="../style.css">
+</head>
+
+<body>
+	<h1><tt>relion_tomo_import_particles</tt></h1>
+	
+	<p>This program imports a set of 3D coordinates and (optionally) Euler angles to construct a new <a href="../data_types/particle_set.html">particle set</a>. The 3D coordinates can be provided either in one big .star file, or as a set of shorter files, one for each tomogram.</p>
+	
+	<p>If all the coordinates are provided as one .star file, it has to contain at least the following columns:</p>
+		
+	<ul>		
+		<li><tt><b>rlnTomoName</b></tt>: name of the tomogram to which a particle belongs.</li>
+		<li><tt><b>rlnCoordinate&lt;X/Y/Z&gt;</b></tt>: the 3D coordinates within that tomogram.</li>
+	</ul>
+	
+	<p>Optionally, the file may also contain the particle angles: <tt><b>rlnAngle&lt;Rot/Tilt/Psi&gt;</b></tt></p>
+	
+	<p>In case the other format is chosen, then the input file only needs to contain the following columns: <tt><b>rlnTomoName</b></tt> and <tt><b>rlnTomoImportParticleFile</b></tt>. The latter column points to a set of files (one for each tomogram) that contain the coordinates (<tt><b>rlnCoordinate&lt;X/Y/Z&gt;</b></tt>) and (optionally) angles (<tt><b>rlnAngle&lt;Rot/Tilt/Psi&gt;</b></tt>)</p>
+	
+	
+</body>
+
+</html>

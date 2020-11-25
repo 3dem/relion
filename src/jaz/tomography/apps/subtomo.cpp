@@ -5,10 +5,19 @@
 
 int main(int argc, char *argv[])
 {
-	SubtomoProgram sp;
+	try
+	{
+		SubtomoProgram program;
 
-	sp.readParameters(argc, argv);
-	sp.run();
+		program.readParameters(argc, argv);
+		program.run();
+	}
+	catch (RelionError e)
+	{
+		return RELION_EXIT_FAILURE;
+	}
+
+	return RELION_EXIT_SUCCESS;
 
 	return 0;
 }

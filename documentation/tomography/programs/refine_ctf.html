@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<title>Refine CTF</title>
+	<link rel="stylesheet" href="../style.css">
+</head>
+
+<body>
+	<h1><tt>relion_tomo_refine_ctf</tt></h1>
+	
+	<p>This program estimates the astigmatic defoci of the individual tilt images, the ice thickness (which determines the overall signal intensity) and higher-order optical aberrations. 
+	
+	<p><b>Defocus</b>: In tomography, the relative depth distances between particles are known from the 3D positions of the particles. Therefore, only one defocus value is estimated for all the particles in each tilt image. Because of the often large number of particles in each tomogram, this value can typically be estimated to greater precision than in single-particle analysis, where the defocus of each particle has to be estimated independently.</p>
+	
+	<p><b>Ice-thickness</b>: A thicker sample permits fewer electrons to pass through, which reduces the scale of the signal. In addition to the actual variation in sample thickness, the effective thickness of the ice also increases as the sample is tilted. This program allows the user to estimate the signal intensity either independently for each tilt image, or by fitting the base thickness, the initial beam luminance and the surface normal of the sample assuming <a href="https://en.wikipedia.org/wiki/Beer%E2%80%93Lambert_law">Lambert's Law</a>. In the latter case, only one surface normal and base thickness are estimated for an entire tilt series, which allows for a more stable fit from tomograms with fewer particles.</p>
+	
+	<p><b>Higher-order optical aberrations</b>: This algorithm works analogously to <tt>relion_ctf_refine</tt> for single-particle analysis. As in single-particle analysis, the aberrations are estimated per optics group. This allows the user to group particles that are expected to share the same aberrations, either by image region or by subset of tilt series, or both. Both symmetrical (even) and antisymmetrical (odd) aberrations are supported. A detailed description of the aberrations estimation algorithm can be found in the Relion <a href="https://journals.iucr.org/m/issues/2020/02/00/fq5009/">aberrations paper</a></p>
+	
+	<p>The estimated defocus and ice-thickness values are written into the output <a href="../data_types/tomogram_set.html">tomogram set</a> and the aberrations into the <a href="../data_types/particle_set.html">particle set</a>, both of which replace the given sets in the output <a href="../data_types/optimisation_set.html">optimisation set</a>.</p>
+	
+	<h3>General program arguments:</h3>
+	
+	<ul>
+		<li><b>--i</b> and/or <b>--p</b>, <b>--t</b>, <b>--mot</b>, <b>--ref&lt;1/2&gt;</b>, <b>--mask</b> and <b>--fsc</b>: input optimisation-set and/or its components (see <a href="../data_types/optimisation_set.html">optimisation set</a>).</li>
+		<li><b>--b</b>: box size to be used for the estimation. Note that this can be larger than the box size of the reference map. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.</li>
+		<li><b>--j</b>: number of threads to be used. This should be set to the number of CPU cores available.</li>
+		<li><b>--o</b>: name of the output directory (that will be created).</li>
+	</ul>
+	
+	<h3>Defocus-estimation arguments:</h3>
+	
+	<ul>
+		<li><b>--do_defocus</b>: instructs the program to estimate the defoci.</li>
+		<li><b>--lambda</b>: regularisation strength. High-tilt images do not offer enough signal to recover the defocus value precisely. The regularisation forces the estimated defoci to assume similar values within a given tilt series, which prevents those high-tilt images from overfitting.</li>
+		<li><b>--d0</b> and <b>--d1</b>: minimal and maximal defocus offset (from the initial value) to scan in the initial part of the defocus estimation. This scan allows the algorithm to escape a local minimum in case it has been intialised in one. Afterwards, a local astigmatic-defocus refinement is performed. Both values are assumed to be given in &#8491;.</li>
+		<li><b>--ds</b>: number of steps between <tt>--d0</tt> and <tt>--d1</tt>.</li>
+	</ul>
+	
+	<h3>Ice-thickness estimation arguments:</h3>
+	
+	<ul>
+		<li><b>--do_scale</b>: instructs the program to estimate the signal scale or ice thickness.</li>
+		<li><b>--per_frame_scale</b>: estimate the signal-scale parameter independently for each tilt. If not specified, the ice thickness, beam luminance and surface normal are estimated instead. Those three parameters then imply the signal intensity for each frame. Due to the smaller number of parameters, the ice thickness model is more robust to noise. By default, the ice thickness and surface normal will be estimated per tilt-series, and the beam luminance globally.</li>
+		<li><b>--per_tomogram_scale</b>: estimate the beam luminance separately for each tilt series. This is not recommended.</li>
+	</ul>
+	
+	<h3>Aberrations-estimation arguments:</h3>
+	
+	<ul>
+		<li><b>--do_even_aberrations</b>: instructs the program to estimate the even (i.e. symmetrical) aberrations. These deform the shape of the CTF.</li>
+		<li><b>--do_odd_aberrations</b>: instructs the program to estimate the odd (i.e. anti-symmetrical) aberrations. These rotate the phases of the observed images.</li>
+		<li><b>--ne</b>: number of Zernike bands used to fit the even aberrations. A greater number can quickly lead to overfitting. The user is advised to keep this value at 4 - this will allow for a correction to the spherical aberration term, as well as four-fold and first- and second-order two-fold astigmatism.</li>
+		<li><b>--ne</b>: number of odd Zernike bands. The user is advised to keep this value at 3 - this will allow for beam tilt and three-fold astigmatism.</li>
+	</ul>
+	
+	<h3>Program output:</h3>
+	
+	<p>After running the program, the output directory (<tt>--o</tt> argument) will contain the following items:</p>
+	<ul>
+		<li><b>tomograms.star</b>: a new tomogram set containing the newly estimated defoci (<tt>rlnDefocus&lt;U/V&gt;</tt> and <tt>rlnDefocusAngle</tt>) and ice thickness values. Note that only the signal scale (<tt>rlnCtfScalefactor</tt>) implied by the ice thickness is used by other programs.</li>
+		<li><b>particles.star</b>: a new particle set containing the estimated aberrations.</li>
+		<li><b>optimisation_set.star</b>: a new optimisation set pointing to the new tomogram and particle sets.</li>
+		<li><b>note.txt</b>: a text file containing the command issued to run the program.</li>
+		<li><b>group_&lt;<tt>optics_group</tt>&gt;_&lt;even/odd&gt;_phase_per-pixel.mrc</b>: visualisations showing the optimal phase-shift for each pixel. Inspecting this allows the user to ensure that the estimated pattern is not mere noise.</li>
+		<li><b>group_&lt;<tt>optics_group</tt>&gt;_&lt;even/odd&gt;_phase_nonlinear-fit.mrc</b>: visualisations of the fits using Zernike polynomials, which will be used by the other programs.</li>
+	</ul>
+	
+	
+</body>
+
+</html>

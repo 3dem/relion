@@ -140,13 +140,17 @@ BufferedImage<T> MovieLoader::readEER(
 	const bool useGain = gainRef != 0;
 	if (useGain && (w0 != gainRef->xdim || h0 != gainRef->ydim))
 	{
-		REPORT_ERROR_STR(tag << "incompatible gain reference - size is different from " << movieFn);
+		REPORT_ERROR_STR(tag << "incompatible gain reference - size (x = " <<  gainRef->xdim << 
+                                 ", y = " << gainRef->ydim << ") is different from " << movieFn <<
+                                 " (x = " << w0 << ", y = " << h0 << ")");
 	}
 	
 	const bool do_fixDefect = defectivePixels != 0;
 	if (do_fixDefect && (w0 != defectivePixels->xdim || h0 != defectivePixels->ydim))
 	{
-		REPORT_ERROR_STR(tag << "incompatible defect mask - size is different from " << movieFn);
+		REPORT_ERROR_STR(tag << "incompatible defect mask - size (x = " << defectivePixels->xdim <<
+                                 ", y = " << defectivePixels->ydim << ") is different from " << movieFn <<
+                                 " (x = " << w0 << ", y = " << h0 << ")");
 	}
 	
 	

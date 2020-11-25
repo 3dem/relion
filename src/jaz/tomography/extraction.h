@@ -188,6 +188,8 @@ void TomoExtraction::extractAt2D_Fourier(
 	{
 		smallStackFS = Resampling::FourierCrop_fftwHalfStack(
 				smallStackFS, bin, num_threads);
+
+		smallStackFS /= (T) bin;
 	}
 
 	NewStackHelper::shiftStack(smallStackFS, posInNewImg, out, true, num_threads);

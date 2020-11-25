@@ -15,11 +15,11 @@ int main(int argc, char *argv[])
 	}
 	catch (RelionError XE)
 	{
-		if (prm.verb > 0)
-			std::cerr << XE;
 		MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_FAILURE);
+		return RELION_EXIT_FAILURE;
 	}
 
 	MPI_Barrier(MPI_COMM_WORLD);
+
 	return RELION_EXIT_SUCCESS;
 }

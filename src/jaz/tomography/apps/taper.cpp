@@ -20,23 +20,17 @@ int main(int argc, char *argv[])
 	double width;
 	std::string inFn, outFn;
 
-	try
+	parser.setCommandLine(argc, argv);
+	int gen_section = parser.addSection("General options");
+
+	inFn = parser.getOption("--i", "Image to be tapered");
+	width = textToDouble(parser.getOption("--w", "Filter edge width", "10"));
+	n_threads = textToInteger(parser.getOption("--j", "Number of threads", "5"));
+	outFn = parser.getOption("--o", "Output filename");
+
+	if (parser.checkForErrors())
 	{
-		parser.setCommandLine(argc, argv);
-		int gen_section = parser.addSection("General options");
-		
-		inFn = parser.getOption("--i", "Image to be tapered");
-		width = textToDouble(parser.getOption("--w", "Filter edge width", "10"));
-		n_threads = textToInteger(parser.getOption("--j", "Number of threads", "5"));
-		outFn = parser.getOption("--o", "Output filename");
-			
-		if (parser.checkForErrors()) std::exit(-1);
-	}
-	catch (RelionError XE)
-	{
-		parser.writeUsage(std::cout);
-		std::cerr << XE;
-		exit(1);
+		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
 	
 	BufferedImage<float> imgIn;

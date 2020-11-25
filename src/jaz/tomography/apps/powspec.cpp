@@ -7,27 +7,21 @@ int main(int argc, char *argv[])
 	IOParser parser;
 	
 	PowspecProgram pp;
-	
-	try
+
+	parser.setCommandLine(argc, argv);
+	int gen_section = parser.addSection("General options");
+
+	pp.stackFn = parser.getOption("--ts", "Tilt stack(s) (e.g. 'a.mrc,b.mrc')");
+	pp.separate = parser.checkOption("--sep", "Compute separate spectra for all frames");
+	pp.res = textToInteger(parser.getOption("--r", "Resolution (in pixels)", "512"));
+	pp.pixSize = textToDouble(parser.getOption("--angpix", "Pixel size in Å", "1.0"));
+	pp.ratio = textToInteger(parser.getOption("--ratio", "Compute the ratio against this frame", "-1"));
+
+	pp.outFn = parser.getOption("--o", "Output filename");
+
+	if (parser.checkForErrors())
 	{
-		parser.setCommandLine(argc, argv);
-		int gen_section = parser.addSection("General options");
-		
-		pp.stackFn = parser.getOption("--ts", "Tilt stack(s) (e.g. 'a.mrc,b.mrc')");	
-		pp.separate = parser.checkOption("--sep", "Compute separate spectra for all frames");
-		pp.res = textToInteger(parser.getOption("--r", "Resolution (in pixels)", "512"));
-		pp.pixSize = textToDouble(parser.getOption("--angpix", "Pixel size in Å", "1.0"));
-		pp.ratio = textToInteger(parser.getOption("--ratio", "Compute the ratio against this frame", "-1"));
-		
-		pp.outFn = parser.getOption("--o", "Output filename");
-				
-		if (parser.checkForErrors()) std::exit(-1);
-	}
-	catch (RelionError XE)
-	{
-		parser.writeUsage(std::cout);
-		std::cerr << XE;
-		exit(1);
+		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
 	
 	pp.run();

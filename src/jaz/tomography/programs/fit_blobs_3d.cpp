@@ -24,48 +24,38 @@ void FitBlobs3DProgram::readParameters(int argc, char *argv[])
 {
 	IOParser parser;
 
-	try
+	parser.setCommandLine(argc, argv);
+
+	optimisationSet.read(
+		parser,
+		true,            // optimisation set
+		false,  false,   // particles
+		true,   true,    // tomograms
+		false,  false,   // trajectories
+		true,   true,    // manifolds
+		false,  false);  // reference
+
+	int gen_section = parser.addSection("General options");
+
+	relative_radius_range = textToDouble(parser.getOption("--rr", "Sphere radius range as a multiple of radius", "1"));
+	membrane_separation = textToDouble(parser.getOption("--ms", "Membrane separation [Å]", "40"));
+	fiducials_radius_A = textToDouble(parser.getOption("--frad", "Fiducial marker radius [Å]", "100"));
+	fit_binning = textToDouble(parser.getOption("--bin", "Binning at which to perform the fit", "2"));
+
+	diag = parser.checkOption("--diag", "Write out diagnostic information");
+
+	SH_bands = textToInteger(parser.getOption("--n", "Number of spherical harmonics bands", "5"));
+	lowpass_sigma_real_A = textToDouble(parser.getOption("--lp", "Low-pass sigma [Å, real space]", "-1"));
+	max_iters = textToInteger(parser.getOption("--max_iters", "Maximum number of iterations", "1000"));
+	num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
+
+	outPath = parser.getOption("--o", "Output filename pattern");
+
+	Log::readParams(parser);
+
+	if (parser.checkForErrors())
 	{
-		parser.setCommandLine(argc, argv);
-
-		optimisationSet.read(
-			parser,
-			true,            // optimisation set
-			false,  false,   // particles
-			true,   true,    // tomograms
-			false,  false,   // trajectories
-			true,   true,    // manifolds
-			false,  false);  // reference
-
-		int gen_section = parser.addSection("General options");
-
-		relative_radius_range = textToDouble(parser.getOption("--rr", "Sphere radius range as a multiple of radius", "1"));
-		membrane_separation = textToDouble(parser.getOption("--ms", "Membrane separation [Å]", "40"));
-		fiducials_radius_A = textToDouble(parser.getOption("--frad", "Fiducial marker radius [Å]", "100"));
-		fit_binning = textToDouble(parser.getOption("--bin", "Binning at which to perform the fit", "2"));
-
-		diag = parser.checkOption("--diag", "Write out diagnostic information");
-
-		SH_bands = textToInteger(parser.getOption("--n", "Number of spherical harmonics bands", "5"));
-		lowpass_sigma_real_A = textToDouble(parser.getOption("--lp", "Low-pass sigma [Å, real space]", "-1"));
-		max_iters = textToInteger(parser.getOption("--max_iters", "Maximum number of iterations", "1000"));
-		num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
-
-		outPath = parser.getOption("--o", "Output filename pattern");
-
-		Log::readParams(parser);
-
-		if (parser.checkForErrors())
-		{
-			parser.writeUsage(std::cout);
-			exit(1);
-		}
-	}
-	catch (RelionError XE)
-	{
-		parser.writeUsage(std::cout);
-		std::cerr << XE;
-		exit(1);
+		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
 
 	outPath = ZIO::prepareTomoOutputDirectory(outPath, argc, argv);
