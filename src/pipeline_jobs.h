@@ -651,9 +651,9 @@ public:
 
 	// relion-3.2: add subtomogram averaging programs by Jasenko
 	void addSubtomoInputOptions(bool has_tomograms, bool has_particles,
-			bool has_trajectories, bool has_manifolds, bool has_postprocess);
+			bool has_trajectories, bool has_manifolds, bool has_halfmaps, bool has_postprocess);
 	std::string getSubtomoInputCommmand(std::string &command, int has_tomograms, int has_particles,
-			int has_trajectories, int has_manifolds, int has_postprocess);
+			int has_trajectories, int has_manifolds, bool has_halfmaps, int has_postprocess);
 
 	void initialiseSubtomoImportJob();
 	bool getCommandsSubtomoImportJob(std::string &outputname, std::vector<std::string> &commands,

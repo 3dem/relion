@@ -2285,7 +2285,7 @@ void JobWindow::initialiseExternalWindow()
 }
 
 void JobWindow::placeSubtomoInput(bool has_tomograms, bool has_particles,
-		bool has_trajectories, bool has_manifolds, bool has_postprocess)
+		bool has_trajectories, bool has_manifolds, bool has_halfmaps, bool has_postprocess)
 {
 	tab1->begin();
 	tab1->label("I/O");
@@ -2295,11 +2295,16 @@ void JobWindow::placeSubtomoInput(bool has_tomograms, bool has_particles,
 
 	current_y += STEPY /2 ;
 
-	if (has_tomograms) place("in_tomograms", TOGGLE_DEACTIVATE);
 	if (has_particles) place("in_particles", TOGGLE_DEACTIVATE);
+	if (has_tomograms) place("in_tomograms", TOGGLE_DEACTIVATE);
 	if (has_trajectories) place("in_trajectories", TOGGLE_DEACTIVATE);
 	if (has_manifolds) place("in_manifolds", TOGGLE_DEACTIVATE);
-	if (has_postprocess) place("in_post", TOGGLE_DEACTIVATE);
+	if (has_halfmaps) place("in_halfmaps", TOGGLE_DEACTIVATE);
+	if (has_postprocess)
+	{
+		place("in_refmask", TOGGLE_DEACTIVATE);
+		place("in_post", TOGGLE_DEACTIVATE);
+	}
 
 	tab1->end();
 
@@ -2387,7 +2392,7 @@ void JobWindow::initialiseSubtomoReconstructWindow()
 {
 	setupTabs(2);
 
-	placeSubtomoInput(true, true, true, false, false);
+	placeSubtomoInput(true, true, true, false, false, false);
 
 	tab2->begin();
 	tab2->label("Reconstruct");
@@ -2417,7 +2422,7 @@ void JobWindow::initialiseSubtomoCtfRefineWindow()
 {
 	setupTabs(3);
 
-	placeSubtomoInput(true, true, true, false, true);
+	placeSubtomoInput(true, true, true, false, true, true);
 
 	tab2->begin();
 	tab2->label("Defocus");
@@ -2489,7 +2494,7 @@ void JobWindow::initialiseSubtomoPolishWindow()
 {
 	setupTabs(2);
 
-	placeSubtomoInput(true, true, true, false, true);
+	placeSubtomoInput(true, true, true, false, true, true);
 
 	tab2->begin();
 	tab2->label("Polish");
@@ -2520,7 +2525,7 @@ void JobWindow::initialiseSubtomoAverageWindow()
 {
 	setupTabs(2);
 
-	placeSubtomoInput(true, true, true, false, false);
+	placeSubtomoInput(true, true, true, false, false, false);
 
 	tab2->begin();
 	tab2->label("Average");

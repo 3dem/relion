@@ -87,18 +87,29 @@ void OptimisationSet::read(
 				optimisationSet, manifoldsMandatory, parser);
 		}
 
-		refMap1 = readFromFile(
-			table, EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, "", "", false, parser);
+		if (refMap1 == "")
+		{
+			refMap1 = readFromFile(
+					table, EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, "", "", false, parser);
+		}
 
-		refMap2 = readFromFile(
-			table, EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME, "", "", false, parser);
+		if (refMap2 == "")
+		{
+			refMap2 = readFromFile(
+					table, EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME, "", "", false, parser);
+		}
 
-		refMask = readFromFile(
-			table, EMDL_TOMO_REFERENCE_MASK_FILE_NAME, "", "", false, parser);
+		if (refMask == "")
+		{
+			refMask = readFromFile(
+					table, EMDL_TOMO_REFERENCE_MASK_FILE_NAME, "", "", false, parser);
+		}
 
-		refFSC = readFromFile(
-			table, EMDL_TOMO_REFERENCE_FSC_FILE_NAME, "", "", false, parser);
-
+		if (refFSC == "")
+		{
+			refFSC = readFromFile(
+					table, EMDL_TOMO_REFERENCE_FSC_FILE_NAME, "", "", false, parser);
+		}
 		if (referenceMandatory && (refMap1 == "" || refMap2 == ""))
 		{
 			reportError(

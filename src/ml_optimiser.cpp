@@ -7473,7 +7473,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 	long int exp_nr_oversampled_trans = sampling.oversamplingFactorTranslations(exp_current_oversampling);
 
 	std::vector<MultidimArray<RFLOAT> > exp_local_STMulti;
-	bool do_subtomo_correction = NZYXSIZE(exp_STMulti[0]) > 0;
+	bool do_subtomo_correction = exp_STMulti.size() > 0 && NZYXSIZE(exp_STMulti[0]) > 0;
 	if (do_subtomo_correction)
 		exp_local_STMulti.resize(exp_nr_images);
 
