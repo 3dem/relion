@@ -36,7 +36,6 @@ const unsigned int EERRenderer::EER_LEN_FOOTER = 24;
 const uint16_t EERRenderer::TIFF_COMPRESSION_EER8bit = 65000;
 const uint16_t EERRenderer::TIFF_COMPRESSION_EER7bit = 65001;
 
-#ifdef HAVE_TIFF
 TIFFErrorHandler RELION_prevTIFFWarningHandler = NULL;
 
 void RELION_TIFFWarningHandler(const char* module, const char* fmt, va_list ap)
@@ -47,7 +46,6 @@ void RELION_TIFFWarningHandler(const char* module, const char* fmt, va_list ap)
 
 	RELION_prevTIFFWarningHandler(module, fmt, ap);
 }
-#endif
 
 template <typename T>
 void EERRenderer::render16K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons)
@@ -106,9 +104,6 @@ void EERRenderer::read(FileName _fn_movie, int eer_upsampling)
 		REPORT_ERROR("EERRenderer::read: eer_upsampling must be 1, 2 or 3.");
 	}
 
-#ifndef HAVE_TIFF
-	REPORT_ERROR("To use EER, you have to re-compile RELION with libtiff.");
-#else
 	fn_movie = _fn_movie;
 
 	// First of all, check the file size
@@ -169,7 +164,6 @@ void EERRenderer::read(FileName _fn_movie, int eer_upsampling)
 
 	fclose(fh);
 	ready = true;
-#endif
 }
 
 void EERRenderer::readLegacy(FILE *fh)

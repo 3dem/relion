@@ -30,8 +30,6 @@
 // TODO: Make less verbose
 //       Lossy strategy
 
-#ifdef HAVE_TIFF
-
 void TIFFConverter::usage()
 {
 	parser.writeUsage(std::cerr);
@@ -534,4 +532,3 @@ void TIFFConverter::run()
 		processOneMovie(fn_movie, fn_tiff);
 	}
 }
-#endif

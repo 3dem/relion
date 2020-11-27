@@ -7,17 +7,13 @@
 
 #include <src/image.h>
 
-#ifdef HAVE_TIFF
 #include <tiffio.h>
-#endif
 
 class EERRenderer {
 	private:
 
 	FileName fn_movie;
-#ifdef HAVE_TIFF
 	TIFF *ftiff;
-#endif
 
 	bool ready;
 	bool is_legacy;

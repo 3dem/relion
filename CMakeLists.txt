@@ -358,7 +358,7 @@ endif()
 
 # ------------------------------------------------------------------------------TIFF--
 
-find_package(TIFF)
+find_package(TIFF REQUIRED)
 if(TIFF_FOUND)
 	add_definitions(-DHAVE_TIFF)
 endif()
