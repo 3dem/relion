@@ -164,9 +164,7 @@ class stack_create_parameters
 			// Make all output directories if necessary
 			if (fn_out.contains("/"))
 			{
-				FileName path = fn_out.beforeLastOf("/");
-				std::string command = " mkdir -p " + path;
-				int res = system(command.c_str());
+				mktree(fn_out.beforeLastOf("/"));
 			}
 
 			int n = 0;

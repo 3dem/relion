@@ -115,8 +115,7 @@ public:
 				FileName fn_onlydir = fn_mic_out.beforeLastOf("/");
 				if (fn_onlydir != fn_prevdir)
 				{
-					std::string command = " mkdir -p " + fn_onlydir;
-					int res = system(command.c_str());
+					mktree(fn_onlydir);
 					fn_prevdir = fn_onlydir;
 				}
 			}

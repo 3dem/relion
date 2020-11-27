@@ -490,7 +490,7 @@ void Preprocessing::runExtractParticles()
 		if (fn_dir != fn_olddir && !exists(fn_dir))
 		{
 			// Make a Particles directory
-			int res = system(("mkdir -p " + fn_dir).c_str());
+			mktree(fn_dir);
 			fn_olddir = fn_dir;
 		}
 

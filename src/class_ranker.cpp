@@ -451,10 +451,7 @@ void ClassRanker::initialise()
 
 	// Make sure output rootname ends with a "/" and make directory
 	if (fn_out[fn_out.length()-1] != '/') fn_out += "/";
-	if (!exists(fn_out))
-	{
-		int res = system(("mkdir -p " + fn_out).c_str());
-	}
+	mktree(fn_out);
 
 	if (do_skip_angular_errors)
 	{
@@ -1411,11 +1408,7 @@ void ClassRanker::saveMasks(Image<RFLOAT> &img, MultidimArray<RFLOAT> &lpf, Mult
 	char foldername[256];
 	snprintf(foldername, 255, "%s", fn_mask_dir.c_str());
 	FileName filtered_mask_folder = foldername;
-	if (!exists(filtered_mask_folder))
-	{
-		std::string filtered_mask_fn_command = "mkdir -p " + fn_out+filtered_mask_folder;
-		int result = system(filtered_mask_fn_command.c_str());
-	}
+	mktree(filtered_mask_folder);
 
 	Image<RFLOAT> p_out, s_out, lpf_out;
 	lpf_out() = lpf;
@@ -1473,8 +1466,7 @@ void ClassRanker::maskCircumference(MultidimArray<int> p_mask, RFLOAT &protein_C
 	}
 	if (do_save_mask_c)
 	{
-		std::string mask_c_fn_command = "mkdir -p mask_C";
-		int result = system(mask_c_fn_command.c_str());
+		mktree("mask_C");
 
 		FileName fc_out;
 		fc_out = "./mask_C/class_"+integerToString(cf.class_index)+"_mask_c.mrc";
