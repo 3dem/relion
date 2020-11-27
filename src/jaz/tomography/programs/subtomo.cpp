@@ -514,11 +514,11 @@ void SubtomoProgram::processTomograms(
 
 			Centering::shiftInSitu(dataImgFS);
 
-			// correct FT scale because of the implicit cropping:
+			// correct FT scale after the implicit cropping:
 
 			if (s3D != s2D)
 			{
-				dataImgFS *= (float) pow(s2D / (double)s3D, 1.5);
+				dataImgFS *= (float) sqrt(s2D / (double) s3D);
 			}
 
 			FFT::inverseFourierTransform(dataImgFS, dataImgRS, FFT::Both);
