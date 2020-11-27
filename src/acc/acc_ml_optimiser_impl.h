@@ -2121,13 +2121,13 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	std::vector<MultidimArray<Complex > > dummy;
 	std::vector<std::vector<MultidimArray<Complex > > > dummy2;
 	std::vector<MultidimArray<RFLOAT> > exp_local_STMulti;
-	exp_local_STMulti.resize(sp.nr_images);
+	bool do_subtomo_correction = op.FstMulti.size() > 0 && NZYXSIZE(op.FstMulti[0]) > 0;
+	if (do_subtomo_correction)
+		exp_local_STMulti.resize(sp.nr_images);
 
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, true, op.part_id, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimg, op.Fimg_nomask, op.Fctf, dummy2, dummy2,
 			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2, op.FstMulti, exp_local_STMulti);
-
-	bool do_subtomo_correction = op.FstMulti.size() > 0 && NZYXSIZE(op.FstMulti[0]) > 0;
 
 	// In doThreadPrecalculateShiftedImagesCtfsAndInvSigma2s() the origin of the op.local_Minvsigma2s was omitted.
 	// Set those back here
