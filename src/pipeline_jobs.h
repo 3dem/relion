@@ -103,6 +103,7 @@ static const std::vector<std::string> job_nodetype_options{
 };
 
 static const std::vector<std::string> job_nodetype_options_tomo{
+	"Set of tomograms STAR file (.star)",
 	"Particles STAR file (.star)",
 	"Multiple (2D or 3D) references (.star or .mrcs)",
 	"3D reference (.mrc)",
@@ -250,11 +251,11 @@ static std::map<std::string, int> node_label2type = {{NODE_MOVIES_LABEL, NODE_MO
 #define PROC_MULTIBODY_LABEL	 "MultiBody"    // Multi-body refinement
 #define PROC_MOTIONREFINE_LABEL  "Polish"       // Jasenko's motion fitting program for Bayesian polishing (to replace MovieRefine?)
 #define PROC_CTFREFINE_LABEL     "CtfRefine"    // Jasenko's program for defocus and beamtilt optimisation
-#define PROC_SUBTOMO_IMPORT_LABEL      "SubtomoImport"      // Import for tomography GUI
-#define PROC_SUBTOMO_RECONSTRUCT_LABEL "SubtomoReconstruct" // Creation of subtomograms from tilt series images
-#define PROC_SUBTOMO_CTFREFINE_LABEL   "SubtomoCtfRefine"   // CTF refinement (defocus & aberrations) for subtomograms
-#define PROC_SUBTOMO_POLISH_LABEL      "SubtomoPolish"      // Frame alignment and particle polishing for subtomograms
-#define PROC_SUBTOMO_AVERAGE_LABEL     "SubtomoAverage"     // Calculation of subtomogram average from the inidividual tilt series images
+#define PROC_SUBTOMO_IMPORT_LABEL      "ImportSubtomo"      // Import for tomography GUI
+#define PROC_SUBTOMO_RECONSTRUCT_LABEL "ReconstructSubtomo" // Creation of subtomograms from tilt series images
+#define PROC_SUBTOMO_CTFREFINE_LABEL   "CtfRefineSubtomo"   // CTF refinement (defocus & aberrations) for subtomograms
+#define PROC_SUBTOMO_POLISH_LABEL      "PolishSubtomo"      // Frame alignment and particle polishing for subtomograms
+#define PROC_SUBTOMO_AVERAGE_LABEL     "AverageSubtomo"     // Calculation of subtomogram average from the inidividual tilt series images
 #define PROC_EXTERNAL_LABEL      "External"     // For running non-relion programs
 
 
@@ -361,6 +362,10 @@ static std::map<int, std::string> procstatus_type2label = {
 		{PROC_FINISHED_FAILURE, "Failed"},
 		{PROC_FINISHED_ABORTED, "Aborted"}};
 
+
+#define HAS_NOT 0
+#define HAS_OPTIONAL 1
+#define HAS_COMPULSORY 2
 
 struct gui_layout
 {
@@ -647,8 +652,8 @@ public:
 	// relion-3.2: add subtomogram averaging programs by Jasenko
 	void addSubtomoInputOptions(bool has_tomograms, bool has_particles,
 			bool has_trajectories, bool has_manifolds, bool has_postprocess);
-	std::string getSubtomoInputCommmand(std::string &command, bool has_tomograms, bool has_particles,
-			bool has_trajectories, bool has_manifolds, bool has_postprocess);
+	std::string getSubtomoInputCommmand(std::string &command, int has_tomograms, int has_particles,
+			int has_trajectories, int has_manifolds, int has_postprocess);
 
 	void initialiseSubtomoImportJob();
 	bool getCommandsSubtomoImportJob(std::string &outputname, std::vector<std::string> &commands,

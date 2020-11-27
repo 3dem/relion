@@ -2790,10 +2790,11 @@ int Displayer::runGui()
 
 		// Get which labels are stored in this metadatatable and generate choice menus for display and sorting
 
-		for (int ilab = 0; ilab < MD.activeLabels.size(); ilab++)
+		std::vector<EMDLabel> activeLabels = MD.getActiveLabels();
+		for (int ilab = 0; ilab < activeLabels.size(); ilab++)
 		{
-			if (EMDL::isNumber(MD.activeLabels[ilab]))
-				win.sort_labels.push_back(EMDL::label2Str(MD.activeLabels[ilab]));
+			if (EMDL::isNumber(activeLabels[ilab]))
+				win.sort_labels.push_back(EMDL::label2Str(activeLabels[ilab]));
 		}
 
 		// Preferred order of defaults!

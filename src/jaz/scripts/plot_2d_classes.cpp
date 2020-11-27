@@ -132,7 +132,7 @@ int main(int argc, char *argv[])
 	{
 		Log::updateProgress(m);
 		
-		if (particles_by_micrograph[m].size() == 0) continue;
+		if (particles_by_micrograph[m].numberOfObjects() == 0) continue;
 		
 		MetaDataTable& particles = particles_by_micrograph[m];
 		        
