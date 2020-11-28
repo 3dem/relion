@@ -185,7 +185,7 @@ void ReconstructParticleProgramMpi::run()
 		finalise(sumDataImgFS, sumCtfImgFS, binnedOutPixelSize);
 	}
 
-	// Delete temporary files
+	// Delete temporary files (or try to; no error checking intentional)
 	int res = system(("rm -rf "+ tmpOutRootBase + "*.mrc").c_str());
 }
 

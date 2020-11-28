@@ -178,6 +178,7 @@ void ReconstructParticleProgram::run()
 	finalise(dataImgFS, ctfImgFS, binnedOutPixelSize);
 
 	// Delete temporary files
+	// No error checking - do not bother the user if it fails
 	int res = system(("rm -rf "+ tmpOutRoot + "*.mrc").c_str());
 }
 
@@ -440,6 +441,7 @@ void ReconstructParticleProgram::processTomograms(
 			}
 
 			// Delete temporary files from previous tomogram
+			// Intentionally no error checking
 
 			if (ttPrevious > -1)
 			{

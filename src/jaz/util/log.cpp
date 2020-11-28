@@ -100,7 +100,7 @@ void Log::readParams(IOParser &parser)
 		choices.push_back(make_pair("monochrome", make_pair(ANSI_RESET, ANSI_RESET)));
 		
 		std::string homeDir = std::getenv("HOME");
-		std::string settingsDir = homeDir+"/.dynamite";
+		std::string settingsDir = homeDir+"/.relion";
 		std::string settingsFile = settingsDir + "/theme.conf";
 		
 		std::string defaultTheme = choices[0].first;
@@ -181,11 +181,10 @@ void Log::readParams(IOParser &parser)
 			
 			if (themeStr == defaultTheme)
 			{
-				logger->print( "Unknown display theme " + themeStr + " found in " + settingsFile);
+				logger->warn("Unknown display theme " + themeStr + " found in " + settingsFile);
 				logger->extend("Reverting to '" + choices[0].first + "'");
-				
-				int res = system((std::string("mkdir -p ")+settingsDir).c_str());
-				res = system((std::string("echo ")+choices[0].first+" > "+settingsFile).c_str());
+
+				saveSettingsFile(choices[0].first, settingsDir, settingsFile);
 			}
 			else
 			{
@@ -201,13 +200,31 @@ void Log::readParams(IOParser &parser)
 				logger->print("Saving theme choice '" + std::string(ANSI_BOLD) + themeStr 
 							  + std::string(ANSI_RESET) + "' to " + settingsFile);
 				
-				int res = system((std::string("mkdir -p ")+settingsDir).c_str());
-				res = system((std::string("echo ")+themeStr+" > "+settingsFile).c_str());
+				saveSettingsFile(themeStr, settingsDir, settingsFile);
 			}
 		}
 	}
 	
 	std::cout << '\n';
+}
+
+void Log::saveSettingsFile(const std::string &contents, const std::string &directory, const std::string &file)
+{
+	int res0 = system((std::string("mkdir -p ")+directory).c_str());
+
+	if (res0)
+	{
+		logger->warn("Unable to create UI settings directory " + directory);
+	}
+	else
+	{
+		int res1 = system((std::string("echo ")+contents+" > "+file).c_str());
+
+		if (res1)
+		{
+			logger->warn("Unable to write to UI settings file " + file);
+		}
+	}
 }
 
 

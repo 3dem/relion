@@ -64,7 +64,7 @@ void SubtomoProgramMpi::readParameters(int argc, char *argv[])
 
 	if (node->isMaster())
 	{
-		int res = system(("mkdir -p " + outDir + "/Subtomograms").c_str());
+		ZIO::makeDir(outDir + "/Subtomograms");
 	}
 }
 
