@@ -68,7 +68,8 @@ class Prediction
 				bool flip_value,
 				int num_threads,
 				double paddingFactor,
-				HalfSet halfSet = OwnHalf);
+				HalfSet halfSet = OwnHalf,
+				bool verbose = true);
 				
 				
 };

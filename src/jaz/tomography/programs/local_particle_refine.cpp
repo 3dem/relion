@@ -30,13 +30,13 @@ using namespace aberration;
 LocalParticleRefineProgram::LocalParticleRefineProgram(int argc, char *argv[])
 :	RefinementProgram(argc, argv)
 {
-	IOParser parser;
-	parser.setCommandLine(argc, argv);
-	readParams(parser);
 }
 
-void LocalParticleRefineProgram::readParams(IOParser &parser)
+void LocalParticleRefineProgram::readParams()
 {
+	IOParser parser;
+	parser.setCommandLine(argc, argv);
+
 	_readParams(parser);
 
 	int defocus_section = parser.addSection("Alignment options");
@@ -57,13 +57,15 @@ void LocalParticleRefineProgram::readParams(IOParser &parser)
 
 void LocalParticleRefineProgram::run()
 {
+	readParams();
+
 	Log::beginSection("Initialising");
 
-	RefinementProgram::init();
+		RefinementProgram::init();
 
-	const int tc = particles.size();
+		const int tc = particles.size();
 
-	AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
+		AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
 
 	Log::endSection();
 

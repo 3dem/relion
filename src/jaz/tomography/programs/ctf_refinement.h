@@ -33,12 +33,13 @@ class CtfRefinementProgram : public RefinementProgram
 		
 	protected:
 
+		void parseInput();
+
 		void initTempDirectories();
 
 		void processTomograms(
 				const std::vector<int>& tomoIndices,
 				const AberrationsCache& aberrationsCache,
-				int verbosity,
 				bool per_tomogram_progress);
 
 		void finalise();

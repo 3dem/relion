@@ -4,13 +4,16 @@
 
 int main(int argc, char *argv[])
 {
+	CtfRefinementProgram program(argc, argv);
+
 	try
 	{
-		CtfRefinementProgram program(argc, argv);
 		program.run();
 	}
 	catch (RelionError e)
 	{
+		std::cerr << e << std::endl;
+
 		return RELION_EXIT_FAILURE;
 	}
 

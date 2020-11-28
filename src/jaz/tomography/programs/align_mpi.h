@@ -20,7 +20,7 @@ public:
 		delete node;
 	}
 
-	int rank, nodeCount, verb;
+	int rank, nodeCount;
 
 	void run();
 };

@@ -31,17 +31,14 @@ AlignProgramMpi::AlignProgramMpi(int argc, char *argv[])
 	nodeCount = node->size;
 
 	// Don't put any output to screen for mpi slaves
-	verb = (node->isMaster()) ? 1 : 0;
-
-	if (nodeCount < 2)
-	{
-		REPORT_ERROR("SubtomoProgramMpi::read: this program needs to be run with at least two MPI processes!");
-	}
+	verbosity = (node->isMaster()) ? 1 : 0;
 }
 
 void AlignProgramMpi::run()
 {
-	if (verb > 0)
+	parseInput();
+
+	if (verbosity > 0)
 	{
 		Log::beginSection("Initialising");
 	}
@@ -50,19 +47,19 @@ void AlignProgramMpi::run()
 
 	AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
 
-	if (verb > 0)
+	if (verbosity > 0)
 	{
 		Log::endSection();
 	}
 
 	std::vector<std::vector<int>> tomoIndices = ParticleSet::splitEvenly(particles, nodeCount);
 
-	processTomograms(tomoIndices[rank], aberrationsCache, verb, false);
+	processTomograms(tomoIndices[rank], aberrationsCache, false);
 
 	MPI_Barrier(MPI_COMM_WORLD);
+
 	if (node->isMaster())
 	{
 		finalise();
 	}
-
 }

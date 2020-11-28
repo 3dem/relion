@@ -70,10 +70,10 @@ void SubtomoProgramMpi::readParameters(int argc, char *argv[])
 
 void SubtomoProgramMpi::run()
 {
-	TomogramSet tomogramSet(optimisationSet.tomograms);
+	TomogramSet tomogramSet(optimisationSet.tomograms, verb > 0);
 
-	ParticleSet particleSet(optimisationSet.particles, optimisationSet.trajectories);
-	std::vector<std::vector<ParticleIndex> > particles = particleSet.splitByTomogram(tomogramSet);
+	ParticleSet particleSet(optimisationSet.particles, optimisationSet.trajectories, verb > 0);
+	std::vector<std::vector<ParticleIndex> > particles = particleSet.splitByTomogram(tomogramSet, verb > 0);
 
 	if (cropSize < 0) cropSize = boxSize;
 

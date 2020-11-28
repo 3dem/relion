@@ -93,10 +93,10 @@ void ReconstructParticleProgram::run()
 {
 	Log::beginSection("Initialising");
 
-	TomogramSet tomoSet(optimisationSet.tomograms);
-	ParticleSet particleSet(optimisationSet.particles, optimisationSet.trajectories);
+	TomogramSet tomoSet(optimisationSet.tomograms, true);
+	ParticleSet particleSet(optimisationSet.particles, optimisationSet.trajectories, true);
 
-	std::vector<std::vector<ParticleIndex>> particles = particleSet.splitByTomogram(tomoSet);
+	std::vector<std::vector<ParticleIndex>> particles = particleSet.splitByTomogram(tomoSet, true);
 	
 	const int tc = particles.size();
 	const int s = boxSize;
@@ -442,7 +442,6 @@ void ReconstructParticleProgram::processTomograms(
 
 			// Delete temporary files from previous tomogram
 			// Intentionally no error checking
-
 			if (ttPrevious > -1)
 			{
 				int res = system(("rm -rf "+ tmpOutRoot  + ZIO::itoa(ttPrevious) + "*.mrc").c_str());

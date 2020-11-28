@@ -60,15 +60,15 @@ void ReconstructParticleProgramMpi::readParameters(int argc, char *argv[])
 
 void ReconstructParticleProgramMpi::run()
 {
-	if (verb)
+	if (verb > 0)
 	{
 		Log::beginSection("Initialising");
 	}
 
-	TomogramSet tomoSet(optimisationSet.tomograms);
-	ParticleSet particleSet(optimisationSet.particles, optimisationSet.trajectories);
+	TomogramSet tomoSet(optimisationSet.tomograms, verb > 0);
+	ParticleSet particleSet(optimisationSet.particles, optimisationSet.trajectories, verb > 0);
 
-	std::vector<std::vector<ParticleIndex>> particles = particleSet.splitByTomogram(tomoSet);
+	std::vector<std::vector<ParticleIndex>> particles = particleSet.splitByTomogram(tomoSet, verb > 0);
 
 	const int tc = particles.size();
 	const int s = boxSize;
@@ -87,7 +87,7 @@ void ReconstructParticleProgramMpi::run()
 
 	const double GB_per_thread =
 			2.0 * voxelNum * 3.0 * sizeof(double)   // two halves  *  box size  *  (data (x2) + ctf)
-			/ (1024.0 * 1024.0 * 1024.0);          // in GB
+			/ (1024.0 * 1024.0 * 1024.0);           // in GB
 
 	if (max_mem_GB > 0)
 	{
@@ -98,14 +98,17 @@ void ReconstructParticleProgramMpi::run()
 			int lastOuterThreads = outer_threads;
 			outer_threads = (int) maxThreads;
 
-			Log::print("Outer thread number reduced from " + ZIO::itoa(lastOuterThreads) +
+			if (verb > 0)
+			{
+				Log::print("Outer thread number reduced from " + ZIO::itoa(lastOuterThreads) +
 					  " to " + ZIO::itoa(outer_threads) + " due to memory constraints (--mem).");
+			}
 		}
 	}
 
 	const int outCount = 2 * outer_threads; // One more count for the accumulated sum
 
-	if (verb)
+	if (verb > 0)
 	{
 		Log::print("Memory required for accumulation: " + ZIO::itoa(GB_per_thread  * (long int) outCount) + " GB");
 	}
@@ -124,7 +127,7 @@ void ReconstructParticleProgramMpi::run()
 
 	AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
 
-	if (verb)
+	if (verb > 0)
 	{
 		Log::endSection();
 	}

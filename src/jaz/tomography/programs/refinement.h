@@ -33,7 +33,7 @@ class RefinementProgram
 			
 			bool diag, static_noise, only_do_unfinished, run_from_GUI, run_from_MPI;
 			
-			int boxSize, num_threads;
+			int boxSize, num_threads, verbosity;
 
 			
 			
