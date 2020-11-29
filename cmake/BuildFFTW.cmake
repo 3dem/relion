@@ -55,8 +55,8 @@ else()
 	set(FFTW_EXTERNAL_LIBS_TAR_DIRECTORY  ${FFTW_EXTERNAL_PATH})
 	set(FFTW_EXTERNAL_LIBS_EXTRACT_TARGET ${FFTW_EXTERNAL_LIBS_TAR_DIRECTORY})
 
-	set(FFTW_FFTW3_TAR_FILE http://fftw.org/fftw-3.3.4.tar.gz)
-	set(FFTW_MD5 2edab8c06b24feeb3b82bbb3ebf3e7b3)
+	set(FFTW_FFTW3_TAR_FILE http://fftw.org/fftw-3.3.8.tar.gz)
+	set(FFTW_MD5 8aac833c943d8e90d51b697b27d4384d)
 
 	if (AMDFFTW)
 		set(FFTW_FFTW3_TAR_FILE https://github.com/amd/amd-fftw/archive/2.2.zip)
