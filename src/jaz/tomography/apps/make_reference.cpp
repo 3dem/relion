@@ -63,19 +63,18 @@ int main(int argc, char *argv[])
 			ofs << '\n';
 		}
 
-		res = system(("mkdir -p "+outDir+"PostProcess").c_str());
-
-		res = system(("relion_postprocess --i " + reconstructionPath + "_half1.mrc --mask "
-					  + evalMaskFn+" --o " + outDir + "PostProcess/post").c_str());
-
-		os.refMap1 = reconstructionPath + "_half1.mrc";
-		os.refMap2 = reconstructionPath + "_half2.mrc";
-		os.refFSC = outDir + "PostProcess/post.star";
-
+		os.refMap1 = reconstructionPath + "half1.mrc";
+		os.refMap2 = reconstructionPath + "half2.mrc";
+		os.refFSC = outDir + "PostProcess/postprocess.star";
 		if (refMaskFn != "")
 		{
 			os.refMask = refMaskFn;
 		}
+
+		res = system(("mkdir -p "+outDir+"PostProcess").c_str());
+
+		res = system(("relion_postprocess --i " + os.refMap1 + " --mask "
+					  + evalMaskFn+" --o " + outDir + "PostProcess/postprocess").c_str());
 
 		os.write(outDir+"optimisation_set.star");
 	}
