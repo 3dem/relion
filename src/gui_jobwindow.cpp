@@ -2540,6 +2540,7 @@ void JobWindow::initialiseSubtomoAverageWindow()
 	place("crop_size", TOGGLE_DEACTIVATE);
 	place("binning", TOGGLE_DEACTIVATE);
 	place("snr", TOGGLE_DEACTIVATE);
+	place("fn_mask", TOGGLE_DEACTIVATE);
 
 	group1->end();
 	guientries["do_from2d"].cb_menu_i();
