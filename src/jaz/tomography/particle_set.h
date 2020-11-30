@@ -25,7 +25,7 @@ class ParticleSet
 	public:
 
 		ParticleSet();
-		ParticleSet(std::string filename, std::string motionFilename = "");
+		ParticleSet(std::string filename, std::string motionFilename = "", bool verbose = true);
 		
 			MetaDataTable partTable, optTable;
 
@@ -33,7 +33,7 @@ class ParticleSet
 			std::vector<Trajectory> motionTrajectories;
 
 		
-		std::vector<std::vector<ParticleIndex>> splitByTomogram(const TomogramSet& tomogramSet) const;
+		std::vector<std::vector<ParticleIndex>> splitByTomogram(const TomogramSet& tomogramSet, bool verbose = true) const;
 		int getTotalParticleNumber() const;
 		
 		gravis::d3Vector getPosition(ParticleIndex particle_id) const;

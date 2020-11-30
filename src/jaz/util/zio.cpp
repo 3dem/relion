@@ -195,6 +195,11 @@ bool ZIO::endsWith(const std::string &string, const std::string &prefix)
 void ZIO::makeDir(const std::string& dir)
 {
 	int res = system(("mkdir -p "+dir).c_str());
+
+	if (res)
+	{
+		REPORT_ERROR("ZIO::makeDir: unable to create directory: " + dir);
+	}
 }
 
 std::string ZIO::makeOutputDir(const std::string& dir)
@@ -214,7 +219,7 @@ std::string ZIO::makeOutputDir(const std::string& dir)
 
 		if (res)
 		{
-			REPORT_ERROR_STR("Unable to write to: " << out);
+			REPORT_ERROR("ZIO::makeOutputDir: unable to create directory: " + out);
 		}
 	}
 
@@ -245,6 +250,11 @@ void ZIO::ensureParentDir(const std::string &path)
 		std::string dir = path.substr(0, path.find_last_of("/"));
 
 		int res = system(("mkdir -p "+dir).c_str());
+
+		if (res)
+		{
+			REPORT_ERROR("ZIO::ensureParentDir: unable to create directory: " + dir);
+		}
 	}
 }
 
@@ -259,6 +269,11 @@ std::string ZIO::prepareTomoOutputDirectory(const std::string &dir, int argc, ch
 
 	int res = system(("mkdir -p "+outDir).c_str());
 
+	if (res)
+	{
+		REPORT_ERROR("ZIO::prepareSpaOutputDirectory: unable to create directory "+outDir);
+	}
+
 	if (!is_under_pipeline_control())
 	{
 		std::ofstream ofs(outDir+"note.txt");
@@ -271,6 +286,25 @@ std::string ZIO::prepareTomoOutputDirectory(const std::string &dir, int argc, ch
 		}
 
 		ofs << '\n';
+	}
+
+	return outDir;
+}
+
+std::string ZIO::prepareSpaOutputDirectory(const std::string &dir)
+{
+	std::string outDir = dir;
+
+	if (outDir[outDir.length()-1] != '/')
+	{
+		outDir = outDir + "/";
+	}
+
+	int res = system(("mkdir -p "+outDir).c_str());
+
+	if (res)
+	{
+		REPORT_ERROR("ZIO::prepareSpaOutputDirectory: unable to create directory "+outDir);
 	}
 
 	return outDir;

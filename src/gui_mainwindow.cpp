@@ -321,8 +321,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 		}
 		else
 		{
-			std::string command = "mkdir -p " + fn_sched;
-			int res = system(command.c_str());
+			mktree(fn_sched);
 			schedule.write(DONT_LOCK); // empty write
 		}
 	}
@@ -3368,8 +3367,7 @@ void GuiMainWindow::cb_toggle_schedule_i(bool do_pipeline, FileName fn_new_sched
 		}
 		else
 		{
-			std::string command = "mkdir -p " + fn_sched;
-			int res = system(command.c_str());
+			mktree(fn_sched);
 			schedule.write(DONT_LOCK); // empty write
 		}
 		fillStdOutAndErr();

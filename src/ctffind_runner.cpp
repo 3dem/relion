@@ -315,10 +315,9 @@ void CtffindRunner::initialise()
 		FileName newdir = output.beforeLastOf("/");
 		if (newdir != prevdir)
 		{
-			std::string command = " mkdir -p " + newdir;
-			int res = system(command.c_str());
+			mktree(newdir);
 		}
-		int slk = symlink((currdir+myname).c_str(), output.c_str());
+		symlink(currdir + myname, output);
 	}
 
 	if (do_use_gctf && fn_micrographs.size()>0)

@@ -32,6 +32,8 @@
 #include <src/jaz/single_particle/img_proc/image_op.h>
 #include <src/jaz/single_particle/parallel_ft.h>
 
+#include <src/jaz/util/zio.h>
+
 #include <src/ctf.h>
 #include <src/image.h>
 #include <src/fftw.h>
@@ -110,13 +112,7 @@ void CtfRefiner::read(int argc, char **argv)
 	}
 
 	// Make sure outPath ends with a slash and exists
-	if (outPath[outPath.length()-1] != '/')
-	{
-		outPath += "/";
-
-		std::string command = " mkdir -p " + outPath;
-		int ret = system(command.c_str());
-	}
+	outPath = ZIO::prepareSpaOutputDirectory(outPath);
 }
 
 void CtfRefiner::init()
@@ -286,7 +282,6 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 		// applyMtf is always true
 
 		// Four booleans in predictAll are applyCtf, applyTilt, applyShift, applyMtf.
-		// use prediction from same half-set for defocus estimation (overfitting danger):
 		if (do_defocus_fit || do_bfac_fit)
 		{
 			predSameT = reference.predictAll(
@@ -294,18 +289,17 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 				false, true, false, true, do_ctf_padding);
 		}
 
-		// use predictions from opposite half-set otherwise:
 		if (do_tilt_fit)
 		{
 			predOppNT = reference.predictAll(
-				unfinishedMdts[g], obsModel, ReferenceMap::Opposite, nr_omp_threads,
+				unfinishedMdts[g], obsModel, ReferenceMap::Own, nr_omp_threads,
 				false, false, false, true, do_ctf_padding);
 		}
 
 		if (do_aberr_fit || do_mag_fit)
 		{
 			predOppT = reference.predictAll(
-				unfinishedMdts[g], obsModel, ReferenceMap::Opposite, nr_omp_threads,
+				unfinishedMdts[g], obsModel, ReferenceMap::Own, nr_omp_threads,
 				false, true, false, true, do_ctf_padding);
 		}
 

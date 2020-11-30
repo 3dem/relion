@@ -22,7 +22,7 @@
 using namespace gravis;
 
 RefinementProgram::RefinementProgram(int argc, char *argv[])
-:	argc(argc), argv(argv), run_from_MPI(false)
+:	argc(argc), argv(argv), run_from_MPI(false), verbosity(1)
 {}
 
 void RefinementProgram::_readParams(IOParser &parser)
@@ -57,12 +57,12 @@ void RefinementProgram::init()
 {
 	outDir = ZIO::prepareTomoOutputDirectory(outDir, argc, argv);
 
-	tomogramSet = TomogramSet(optimisationSet.tomograms);
+	tomogramSet = TomogramSet(optimisationSet.tomograms, verbosity > 0);
 	
-	particleSet = ParticleSet(optimisationSet.particles, optimisationSet.trajectories);
-	particles = particleSet.splitByTomogram(tomogramSet);
+	particleSet = ParticleSet(optimisationSet.particles, optimisationSet.trajectories, verbosity > 0);
+	particles = particleSet.splitByTomogram(tomogramSet, verbosity > 0);
 		
-	referenceMap.load(boxSize);
+	referenceMap.load(boxSize, verbosity > 0);
 }
 
 BufferedImage<float> RefinementProgram::computeFrequencyWeights(

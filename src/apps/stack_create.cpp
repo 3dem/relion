@@ -55,7 +55,7 @@ class stack_create_parameters
 		do_split_per_micrograph = parser.checkOption("--split_per_micrograph", "Write out separate stacks for each micrograph (needs rlnMicrographName in STAR file)");
 		do_apply_trans = parser.checkOption("--apply_transformation", "Apply the inplane-transformations (needs _rlnOriginX/Y and _rlnAnglePsi in STAR file) by real space interpolation");
 		do_apply_trans_only = parser.checkOption("--apply_rounded_offsets_only", "Apply the rounded translations only (so-recentering without interpolation; needs _rlnOriginX/Y in STAR file)");
-		do_ignore_optics = parser.checkOption("--ignore_optics", "Ignore optics groups, run like in relion 3.0");
+		do_ignore_optics = parser.checkOption("--ignore_optics", "Ignore optics groups. This allows you to read and write RELION 3.0 STAR files but does NOT allow you to convert 3.1 STAR files back to the 3.0 format.");
 		do_one_by_one = parser.checkOption("--one_by_one", "Write particles one by one. This saves memory but can be slower.");
 
 		if (do_apply_trans)
@@ -78,7 +78,7 @@ class stack_create_parameters
 
 		// Check for rlnImageName label
 		if (!MD.containsLabel(EMDL_IMAGE_NAME))
-			REPORT_ERROR("ERROR: Input STAR file does not contain the rlnImageName label");
+			REPORT_ERROR("ERROR: Input STAR file does not contain the rlnImageName label. Aren't you reading RELION 3.1 STAR files with --ignore_optics?");
 
 		if (do_split_per_micrograph && !MD.containsLabel(EMDL_MICROGRAPH_NAME))
 			REPORT_ERROR("ERROR: Input STAR file does not contain the rlnMicrographName label");
@@ -164,9 +164,7 @@ class stack_create_parameters
 			// Make all output directories if necessary
 			if (fn_out.contains("/"))
 			{
-				FileName path = fn_out.beforeLastOf("/");
-				std::string command = " mkdir -p " + path;
-				int res = system(command.c_str());
+				mktree(fn_out.beforeLastOf("/"));
 			}
 
 			int n = 0;

@@ -28,8 +28,10 @@
 #include <src/jaz/single_particle/img_proc/filter_helper.h>
 #include <src/jaz/single_particle/vtk_helper.h>
 
+#include <src/jaz/util/zio.h>
 
 using namespace gravis;
+
 
 const double MotionParamEstimator::velScale = 10000.0;
 const double MotionParamEstimator::divScale = 1.0;
@@ -307,8 +309,8 @@ void MotionParamEstimator::run()
               << " --s_acc " << rnd[2] << "\n\n";
 
 	FileName newdir = FileName(outPath).beforeLastOf("/");
-	std::string command = " mkdir -p " + newdir;
-	int ret = system(command.c_str());
+
+	ZIO::makeDir(newdir);
 
 	std::string paramFn;
 

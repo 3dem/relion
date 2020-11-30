@@ -71,7 +71,6 @@ class CtfRefiner
 		// symmetric aberrations and anisotropic magnification, respectively
 		bool do_defocus_fit, do_bfac_fit, do_tilt_fit, do_aberr_fit, do_mag_fit, do_ctf_padding;
 
-
 		bool debug,     // write out debugging info
 		     diag;      // write out diagnostic info
 

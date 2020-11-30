@@ -29,6 +29,10 @@ class Log
 		static void endProgress();
 		
 		static void readParams(IOParser& parser);
+		static void saveSettingsFile(
+				const std::string& contents,
+				const std::string& directory,
+				const std::string& file);
 		
 		
 	private:

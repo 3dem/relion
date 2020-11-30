@@ -18,7 +18,7 @@ class LocalParticleRefineProgram : public RefinementProgram
 			double eps, xtol, dose_cutoff;
 			bool verbose_opt;
 
-		void readParams(IOParser& parser);
+		void readParams();
 		void run();
 };
 
