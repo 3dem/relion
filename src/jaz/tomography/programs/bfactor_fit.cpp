@@ -22,13 +22,13 @@ using namespace gravis;
 BfactorFitProgram::BfactorFitProgram(int argc, char *argv[])
 	: RefinementProgram(argc, argv)
 {
-	IOParser parser;
-	parser.setCommandLine(argc, argv);
-	readParams(parser);
 }
 
-void BfactorFitProgram::readParams(IOParser &parser)
+void BfactorFitProgram::readParams()
 {
+	IOParser parser;
+	parser.setCommandLine(argc, argv);
+
 	_readParams(parser);
 
 	int def_section = parser.addSection("B factor refinement options");
@@ -48,6 +48,8 @@ void BfactorFitProgram::readParams(IOParser &parser)
 
 void BfactorFitProgram::run()
 {
+	readParams();
+
 	RefinementProgram::init();
 	
 	const int tc = particles.size();

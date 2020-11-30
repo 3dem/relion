@@ -49,6 +49,9 @@ class ZIO
 				const std::string& dir,
 				int argc, char *argv[]);
 
+		static std::string prepareSpaOutputDirectory(
+				const std::string& dir);
+
 		static bool fileExists(std::string filename);
 };
 

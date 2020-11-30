@@ -4,13 +4,16 @@
 
 int main(int argc, char *argv[])
 {
+	AlignProgram ap(argc, argv);
+
 	try
 	{
-		AlignProgram ap(argc, argv);
 		ap.run();
 	}
-	catch (RelionError XE)
+	catch (RelionError e)
 	{
+		std::cerr << e << std::endl;
+
 		return RELION_EXIT_FAILURE;
 	}
 	

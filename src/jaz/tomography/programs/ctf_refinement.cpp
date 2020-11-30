@@ -34,6 +34,33 @@ using namespace aberration;
 CtfRefinementProgram::CtfRefinementProgram(int argc, char *argv[])
 	: RefinementProgram(argc, argv)
 {
+}
+
+void CtfRefinementProgram::run()
+{
+	parseInput();
+
+	Log::beginSection("Initialising");
+
+		RefinementProgram::init();
+
+		initTempDirectories();
+
+		AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
+
+	Log::endSection();
+
+
+	std::vector<int> tomoIndices = ParticleSet::enumerate(particles);
+
+	processTomograms(tomoIndices, aberrationsCache, true);
+
+
+	finalise();
+}
+
+void CtfRefinementProgram::parseInput()
+{
 	IOParser parser;
 	parser.setCommandLine(argc, argv);
 
@@ -83,27 +110,6 @@ CtfRefinementProgram::CtfRefinementProgram(int argc, char *argv[])
 	}
 }
 
-void CtfRefinementProgram::run()
-{
-	Log::beginSection("Initialising");
-
-		RefinementProgram::init();
-
-		initTempDirectories();
-
-		AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
-
-	Log::endSection();
-
-
-	std::vector<int> tomoIndices = ParticleSet::enumerate(particles);
-
-	processTomograms(tomoIndices, aberrationsCache, 1, true);
-
-
-	finalise();
-}
-
 void CtfRefinementProgram::initTempDirectories()
 {
 	if (do_refine_defocus)
@@ -133,7 +139,6 @@ void CtfRefinementProgram::initTempDirectories()
 void CtfRefinementProgram::processTomograms(
 		const std::vector<int>& tomoIndices,
 		const AberrationsCache& aberrationsCache,
-		int verbosity,
 		bool per_tomogram_progress)
 {
 	const int ttc = tomoIndices.size();

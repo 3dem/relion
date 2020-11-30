@@ -14,7 +14,7 @@ class TomogramSet
 	public:
 		
 		TomogramSet();
-		TomogramSet(std::string filename);
+		TomogramSet(std::string filename, bool verbose = true);
 		
 		
 			MetaDataTable globalTable;
