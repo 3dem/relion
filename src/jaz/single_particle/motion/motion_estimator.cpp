@@ -32,7 +32,10 @@
 #include <src/jaz/single_particle/stack_helper.h>
 #include <src/jaz/single_particle/img_proc/image_op.h>
 #include <src/jaz/single_particle/image_log.h>
+
 #include <src/jaz/optimization/lbfgs.h>
+#include <src/jaz/util/zio.h>
+
 
 using namespace gravis;
 
@@ -265,8 +268,7 @@ void MotionEstimator::process(
 
 		if (newdir != prevdir)
 		{
-			std::string command = " mkdir -p " + newdir;
-			int ret = system(command.c_str());
+			ZIO::makeDir(newdir);
 		}
 
 		std::vector<std::vector<Image<Complex>>> movie;

@@ -106,7 +106,8 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 		bool flip_value,
 		int num_threads,
 		double paddingFactor,
-		HalfSet halfSet)
+		HalfSet halfSet,
+		bool verbose)
 {
 	const int s = referenceMap.getBoxSize();
 	const int sh = s/2 + 1;
@@ -150,15 +151,18 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 		
 	#endif	
 		
-		
-	Log::beginProgress("Computing cross correlations", pc/num_threads);
+
+	if (verbose)
+	{
+		Log::beginProgress("Computing cross correlations", pc/num_threads);
+	}
 	
 	#pragma omp parallel for num_threads(num_threads)		
 	for (int p = 0; p < pc; p++)
 	{
 		const int th = omp_get_thread_num();
 		
-		if (th == 0)
+		if (verbose && th == 0)
 		{
 			Log::updateProgress(p);
 		}
@@ -313,7 +317,10 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 		}
 	}
 	
-	Log::endProgress();
+	if (verbose)
+	{
+		Log::endProgress();
+	}
 	
 	#if TEST_SPECTRAL_POWER
 			

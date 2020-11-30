@@ -34,7 +34,7 @@ void TomoReferenceMap::read(const OptimisationSet &optimisationSet)
 	fscThresholdWidth = optimisationSet.fscThresholdWidth;
 }
 
-void TomoReferenceMap::load(int boxSize)
+void TomoReferenceMap::load(int boxSize, int verbosity)
 {
 	image_real.resize(2);
 	image_real[0].read(mapFilenames[0]);
@@ -71,7 +71,10 @@ void TomoReferenceMap::load(int boxSize)
 	{
 		const int sr = image_real[0].xdim;
 
-		Log::print("Padding reference from "+ZIO::itoa(sr)+" to "+ZIO::itoa(boxSize));
+		if (verbosity > 0)
+		{
+			Log::print("Padding reference from "+ZIO::itoa(sr)+" to "+ZIO::itoa(boxSize));
+		}
 
 		for (int i = 0; i < 2; i++)
 		{

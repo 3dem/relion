@@ -13,7 +13,7 @@ using namespace gravis;
 ParticleSet::ParticleSet()
 {}
 
-ParticleSet::ParticleSet(std::string filename, std::string motionFilename)
+ParticleSet::ParticleSet(std::string filename, std::string motionFilename, bool verbose)
 {
 	optTable.read(filename, "optics");
 	partTable.read(filename, "particles");
@@ -27,8 +27,11 @@ ParticleSet::ParticleSet(std::string filename, std::string motionFilename)
 
 	if (!partTable.containsLabel(EMDL_TOMO_PARTICLE_NAME))
 	{
-		Log::warn("The particles in "+filename+
-			" do not have names (rlnTomoParticleName). They are being added now.");
+		if (verbose)
+		{
+			Log::warn("The particles in "+filename+
+				" do not have names (rlnTomoParticleName). They are being added now.");
+		}
 
 		std::map<std::string, int> tomoParticleCount;
 
@@ -56,7 +59,7 @@ ParticleSet::ParticleSet(std::string filename, std::string motionFilename)
 	}
 }
 
-std::vector<std::vector<ParticleIndex> > ParticleSet::splitByTomogram(const TomogramSet& tomogramSet) const
+std::vector<std::vector<ParticleIndex> > ParticleSet::splitByTomogram(const TomogramSet& tomogramSet, bool verbose) const
 {
 	std::vector<std::vector<ParticleIndex>> out(0);
 
@@ -140,7 +143,10 @@ std::vector<std::vector<ParticleIndex> > ParticleSet::splitByTomogram(const Tomo
 			}
 		}
 
-		Log::warn("No particles were found for the following tomograms: "+empty_names_list.str());
+		if (verbose)
+		{
+			Log::warn("No particles were found for the following tomograms: "+empty_names_list.str());
+		}
 	}
 
 	if (!unknown_tomo_names.empty())
@@ -160,7 +166,10 @@ std::vector<std::vector<ParticleIndex> > ParticleSet::splitByTomogram(const Tomo
 			empty_so_far++;
 		}
 
-		Log::warn("Particles were found belonging to the following undefined tomograms: "+empty_names_list.str());
+		if (verbose)
+		{
+			Log::warn("Particles were found belonging to the following undefined tomograms: "+empty_names_list.str());
+		}
 	}
 
 	if (all_empty)

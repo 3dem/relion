@@ -109,10 +109,10 @@ void SubtomoProgram::readParameters(int argc, char *argv[])
 
 void SubtomoProgram::run()
 {
-	TomogramSet tomogramSet(optimisationSet.tomograms);
+	TomogramSet tomogramSet(optimisationSet.tomograms, true);
 
-	ParticleSet particleSet(optimisationSet.particles, optimisationSet.trajectories);
-	std::vector<std::vector<ParticleIndex> > particles = particleSet.splitByTomogram(tomogramSet);
+	ParticleSet particleSet(optimisationSet.particles, optimisationSet.trajectories, true);
+	std::vector<std::vector<ParticleIndex> > particles = particleSet.splitByTomogram(tomogramSet, true);
 	
 	if (cropSize < 0) cropSize = boxSize;
 	
@@ -514,11 +514,11 @@ void SubtomoProgram::processTomograms(
 
 			Centering::shiftInSitu(dataImgFS);
 
-			// correct FT scale because of the implicit cropping:
+			// correct FT scale after the implicit cropping:
 
 			if (s3D != s2D)
 			{
-				dataImgFS *= s2D / (float) s3D;
+				dataImgFS *= (float) sqrt(s2D / (double) s3D);
 			}
 
 			FFT::inverseFourierTransform(dataImgFS, dataImgRS, FFT::Both);
