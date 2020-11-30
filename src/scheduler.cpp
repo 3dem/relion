@@ -361,11 +361,18 @@ bool SchedulerOperator::performOperation() const
 	}
 	else if (type == SCHEDULE_FLOAT_OPERATOR_COUNT_IMAGES)
 	{
-		ObservationModel obsmodel;
-		MetaDataTable MDimg;
-		std::string mytablename = (isStringVariable(input2)) ? scheduler_global_strings[input2].value : "particles";
-		ObservationModel::loadSafely(scheduler_global_strings[input1].value, obsmodel, MDimg, mytablename);
-		scheduler_global_floats[output].value = MDimg.numberOfObjects();
+		if (!exists(scheduler_global_strings[input1].value))
+		{
+			scheduler_global_floats[output].value = 0;
+		}
+		else
+		{
+			ObservationModel obsmodel;
+			MetaDataTable MDimg;
+			std::string mytablename = (isStringVariable(input2)) ? scheduler_global_strings[input2].value : "particles";
+			ObservationModel::loadSafely(scheduler_global_strings[input1].value, obsmodel, MDimg, mytablename);
+			scheduler_global_floats[output].value = MDimg.numberOfObjects();
+		}
 	}
 	else if (type == SCHEDULE_FLOAT_OPERATOR_COUNT_WORDS)
 	{
