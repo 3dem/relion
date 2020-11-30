@@ -5649,7 +5649,7 @@ void RelionJob::initialiseSubtomoImportJob()
     	joboptions["hand"] = JobOption("Tilt handedness:", (std::string)"", "Set this to indicate the handedness of the tilt geometry (default=-1). The value of this parameter is either +1 or -1, and it describes whether the focus increases or decreases as a function of Z distance. It has to be determined experimentally. In our experiments, it has always been -1. Y If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
 
 
-       	joboptions["do_parts"] = JobOption("Import particles?", false, "Set this to Yes for importing particle coordinates.");
+       	joboptions["do_coords"] = JobOption("Import coordinates?", false, "Set this to Yes for importing particle coordinates.");
         joboptions["part_star"] = JobOption("STAR file with coordinates: ", "", "Input file (*.star)", ".", "Provide a STAR file with the following information to input particles: \n \n TODO TODO TODO ");
         joboptions["part_tomos"] = JobOption("Tomograms set: ", NODE_SUBTOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "The tomograms set from which these particles were picked.");
 
@@ -5678,20 +5678,20 @@ bool RelionJob::getCommandsSubtomoImportJob(std::string &outputname, std::vector
     std::string command;
 
 	// Some code here was copied from the SPA import job...
-        bool do_tomo = joboptions["do_tomo"].getBoolean();
-        bool do_parts = joboptions["do_parts"].getBoolean();
+	bool do_tomo = joboptions["do_tomo"].getBoolean();
+	bool do_coords = joboptions["do_coords"].getBoolean();
 	bool do_other = joboptions["do_other"].getBoolean();
 
-        int i = 0;
-        if (do_tomo) i++;
-        if (do_parts) i++;
-        if (do_other) i++;
+	int i = 0;
+	if (do_tomo) i++;
+	if (do_coords) i++;
+	if (do_other) i++;
 
-        if (i != 1)
-        {
-            error_message = "ERROR: you can only select to import tomograms, import particles, OR import other nodes.";
-		return false;
-        }
+	if (i != 1)
+	{
+		error_message = "ERROR: you can only select to import tomograms, import particles, OR import other nodes.";
+	return false;
+	}
 
 	if (do_tomo)
 	{
@@ -5724,7 +5724,7 @@ bool RelionJob::getCommandsSubtomoImportJob(std::string &outputname, std::vector
 
 
 	}
-	else if (do_parts)
+	else if (do_coords)
 	{
 
 		if (joboptions["part_star"].getString() == "")

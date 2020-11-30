@@ -2345,19 +2345,19 @@ void JobWindow::initialiseSubtomoImportWindow()
 	tab1->end();
 
 	tab2->begin();
-	tab2->label("Particles");
+	tab2->label("Coordinates");
 	resetHeight();
 
 	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group2->end();
-	place("do_parts", TOGGLE_DEACTIVATE, group2, false);
+	place("do_coords", TOGGLE_DEACTIVATE, group2, false);
 	group2->begin();
 
 	place("part_star", TOGGLE_DEACTIVATE);
 	place("part_tomos", TOGGLE_DEACTIVATE);
 
 	group2->end();
-	guientries["do_parts"].cb_menu_i(); // make default active
+	guientries["do_coords"].cb_menu_i(); // make default active
 
 	tab2->end();
 
