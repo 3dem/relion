@@ -14,7 +14,7 @@ TomogramSet::TomogramSet()
 	globalTable.setName("global");
 }
 
-TomogramSet::TomogramSet(std::string filename)
+TomogramSet::TomogramSet(std::string filename, bool verbose)
 {
 	std::ifstream ifs(filename);
 
@@ -56,7 +56,7 @@ TomogramSet::TomogramSet(std::string filename)
 	
 	globalTable.setName("global");
 
-	if (namesAreOld)
+	if (verbose && namesAreOld)
 	{
 		Log::warn("Tomogram set " + filename + " is out of date. You are recommended to run relion_exp_update_tomogram_set on it.");
 	}

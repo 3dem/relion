@@ -121,8 +121,7 @@ int main(int argc, char *argv[])
     }
 	
 	{
-		std::string command = " mkdir -p ctf_test";
-		int ret = system(command.c_str());
+		mktree("ctf_test");
 	}
 
     for (int c = 0; c < perCnt; c++)

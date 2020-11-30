@@ -221,11 +221,7 @@ bool PipeLine::touchTemporaryNodeFile(Node &node, bool touch_even_if_not_exist)
 		FileName mydir = fn_dir + fn_type + fnt.substr(0, fnt.rfind("/") + 1);
 		FileName mynode = fn_dir + fn_type + fnt;
 		std::string command;
-		if (!exists(mydir))
-		{
-			command = "mkdir -p " + mydir;
-			int res = system(command.c_str());
-		}
+		mktree(mydir);
 		touch(mynode);
 		return true;
 	}
@@ -1295,7 +1291,7 @@ bool PipeLine::setAliasJob(int this_job, std::string alias, std::string &error_m
 		//Make the new symbolic link
 		FileName path1 = "../" + processList[this_job].name;
 		FileName path2 = processList[this_job].alias;
-		int res = symlink(path1.c_str(), path2.beforeLastOf("/").c_str());
+		symlink(path1, path2.beforeLastOf("/"));
 
 	}
 
@@ -1626,9 +1622,7 @@ void PipeLine::replaceFilesForImportExportOfScheduledJobs(FileName fn_in_dir, Fi
 			// Create directory first time round
 			if (ipatt == 0)
 			{
-				FileName dirs = outfile.beforeLastOf("/");
-				command =  "mkdir -p " + dirs;
-				res = system(command.c_str());
+				mktree(outfile.beforeLastOf("/"));
 			}
 			command =  "sed 's|" + find_pattern[ipatt] + "|" + replace_pattern[ipatt] + "|g' < " + infile + " > " + outfile;
 			//std::cerr << " Executing: " << command<<std::endl;
@@ -1646,8 +1640,7 @@ bool PipeLine::exportAllScheduledJobs(std::string mydir, std::string &error_mess
 {
 	// Make sure the directory name ends with a slash
 	mydir += "/";
-	std::string command = "mkdir -p ExportJobs/" + mydir;
-	int res = system(command.c_str());
+	mktree("ExportJobs/" + mydir);
 
 	MetaDataTable MDexported;
 
@@ -1940,7 +1933,7 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 				//std::string command = " ln -s ../" + name + " " + fn_alias;
 				//int res= system(command.c_str());
 				std::string path1 = "../" + name;
-				int res = symlink(path1.c_str(), fn_alias.c_str());
+				symlink(path1, fn_alias);
 			}
 		}
 	}

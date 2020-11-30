@@ -24,15 +24,34 @@ using namespace gravis;
 AlignProgram::AlignProgram(int argc, char *argv[])
 	: RefinementProgram(argc, argv)
 {
-	IOParser parser;
-	parser.setCommandLine(argc, argv);
-	readParams(parser);
 }
 
-void AlignProgram::readParams(IOParser &parser)
+void AlignProgram::run()
 {
-	_readParams(parser);
+	parseInput();
 
+	Log::beginSection("Initialising");
+
+		initialise();
+
+		AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
+	
+	Log::endSection();
+
+
+	std::vector<int> tomoIndices = ParticleSet::enumerate(particles);
+
+	processTomograms(tomoIndices, aberrationsCache, true);
+
+	finalise();
+}
+
+void AlignProgram::parseInput()
+{
+	IOParser parser;
+	parser.setCommandLine(argc, argv);
+
+	_readParams(parser);
 
 	int alignment_section = parser.addSection("General alignment options");
 
@@ -78,36 +97,21 @@ void AlignProgram::readParams(IOParser &parser)
 	}
 }
 
-void AlignProgram::run()
-{
-	Log::beginSection("Initialising");
-
-		initialise();
-
-		AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
-	
-	Log::endSection();
-
-
-	std::vector<int> tomoIndices = ParticleSet::enumerate(particles);
-
-	processTomograms(tomoIndices, aberrationsCache, 1, true);
-
-	finalise();
-}
-
 void AlignProgram::initialise()
 {
 	RefinementProgram::init();
 
 	const int tc = particles.size();
 
-	Log::beginSection("Configuration");
-	Log::printBinaryChoice("Particle motion: ", do_motion, "considered", "not considered");
-	Log::printBinaryChoice("Frame angles: ", mfSettings.constAngles, "constant", "variable");
-	Log::printBinaryChoice("Frame shifts: ", mfSettings.constShifts, "constant", "variable");
-	Log::printBinaryChoice("Particle positions: ", mfSettings.constParticles, "constant", "variable");
-	Log::endSection();
+	if (verbosity > 0)
+	{
+		Log::beginSection("Configuration");
+		Log::printBinaryChoice("Particle motion: ", do_motion, "considered", "not considered");
+		Log::printBinaryChoice("Frame angles: ", mfSettings.constAngles, "constant", "variable");
+		Log::printBinaryChoice("Frame shifts: ", mfSettings.constShifts, "constant", "variable");
+		Log::printBinaryChoice("Particle positions: ", mfSettings.constParticles, "constant", "variable");
+		Log::endSection();
+	}
 
 	if (do_motion)
 	{
@@ -178,7 +182,6 @@ void AlignProgram::finalise()
 void AlignProgram::processTomograms(
 		const std::vector<int>& tomoIndices,
 		const AberrationsCache& aberrationsCache,
-		int verbosity,
 		bool per_tomogram_progress)
 {
 	const int ttc = tomoIndices.size();
@@ -267,7 +270,8 @@ void AlignProgram::processTomograms(
 		std::vector<BufferedImage<double>> CCs = Prediction::computeCroppedCCs(
 				particleSet, particles[t], tomogram, aberrationsCache,
 				referenceMap, frqWeight, frameSequence,
-				range, true, num_threads, padding);
+				range, true, num_threads, padding, Prediction::OwnHalf,
+				per_tomogram_progress && verbosity > 0);
 
 
 		BufferedImage<double> FCC;
@@ -294,7 +298,8 @@ void AlignProgram::processTomograms(
 				CCs, projByTime, particleSet, particles[t], referenceMap.image_FS,
 				motParams, mfSettings, tomogram.centre,
 				tomogram.getFrameDose(), tomogram.optics.pixelSize, padding,
-				progress_bar_offset, num_threads);
+				progress_bar_offset, num_threads,
+				per_tomogram_progress && verbosity > 0);
 
 			if (diag)
 			{

@@ -27,13 +27,13 @@ using namespace aberration;
 MagFitProgram::MagFitProgram(int argc, char *argv[])
 :	RefinementProgram(argc, argv)
 {
-	IOParser parser;
-	parser.setCommandLine(argc, argv);
-	readParams(parser);
 }
 
-void MagFitProgram::readParams(IOParser &parser)
+void MagFitProgram::readParams()
 {
+	IOParser parser;
+	parser.setCommandLine(argc, argv);
+
 	_readParams(parser);
 
 	Log::readParams(parser);
@@ -46,15 +46,17 @@ void MagFitProgram::readParams(IOParser &parser)
 
 void MagFitProgram::run()
 {
+	readParams();
+
 	Log::beginSection("Initialising");
 
-	RefinementProgram::init();
+		RefinementProgram::init();
 
-	const int s = boxSize;
-	const int sh = s/2 + 1;
-	const int tc = particles.size();
-	const int gc = particleSet.numberOfOpticsGroups();
-	const bool flip_value = true;
+		const int s = boxSize;
+		const int sh = s/2 + 1;
+		const int tc = particles.size();
+		const int gc = particleSet.numberOfOpticsGroups();
+		const bool flip_value = true;
 
 	Log::endSection();
 

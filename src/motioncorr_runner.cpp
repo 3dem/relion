@@ -344,8 +344,7 @@ void MotioncorrRunner::initialise()
 
 		if (newdir != prevdir)
 		{
-			std::string command = " mkdir -p " + newdir;
-			int res = system(command.c_str());
+			mktree(newdir);
 			prevdir = newdir;
 		}
 	}

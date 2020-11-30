@@ -25,7 +25,8 @@ MotionFit::MotionFit(
 	double pixelSize,
 	double paddingFactor,
 	int progressBarOffset,
-	int num_threads)
+	int num_threads,
+	bool verbose)
 	:	
 	  CCs(CCs),
 	  frameProj(frameProj),
@@ -40,6 +41,7 @@ MotionFit::MotionFit(
 	  paddingFactor(paddingFactor),
 	  progressBarOffset(progressBarOffset),
 	  num_threads(num_threads),
+	  verbose(verbose),
 	  fc(frameProj.size()),
 	  pc(partIndices.size()),
 	  maxRange(CCs[0].xdim / (2 * paddingFactor))
@@ -77,12 +79,15 @@ MotionFit::MotionFit(
 		sig_div_px = motionParameters.sig_div / pixelSize;
 	}
 	
-	Log::beginSection("Effective motion parameters:");
-	
-	Log::print("σ_vel = "+ZIO::itoa(sig_vel_px)+" px/frame");
-	Log::print("σ_div = "+ZIO::itoa(sig_div_px)+" px/frame");
-	
-	Log::endSection();
+	if (verbose)
+	{
+		Log::beginSection("Effective motion parameters:");
+
+		Log::print("σ_vel = "+ZIO::itoa(sig_vel_px)+" px/frame");
+		Log::print("σ_div = "+ZIO::itoa(sig_div_px)+" px/frame");
+
+		Log::endSection();
+	}
 	
 	GpKernel* kernel(0);
 	
@@ -99,7 +104,10 @@ MotionFit::MotionFit(
 	
 	delete kernel;
 	
-	Log::print("Decomposing covariance matrix");
+	if (verbose)
+	{
+		Log::print("Decomposing covariance matrix");
+	}
 	
 	GaussianProcess::Basis defBasis = GaussianProcess::getBasis(C, settings.maxEDs);
 	
@@ -108,13 +116,16 @@ MotionFit::MotionFit(
 	
 	bc = deformationLambda.size();
 	
-	if (bc == pc)
+	if (verbose)
 	{
-		Log::print("Keeping all " + ZIO::itoa(bc) + " eigendeformations");
-	}
-	else
-	{
-		Log::print("Keeping " + ZIO::itoa(bc) + " out of " + ZIO::itoa(pc) + " eigendeformations");
+		if (bc == pc)
+		{
+			Log::print("Keeping all " + ZIO::itoa(bc) + " eigendeformations");
+		}
+		else
+		{
+			Log::print("Keeping " + ZIO::itoa(bc) + " out of " + ZIO::itoa(pc) + " eigendeformations");
+		}
 	}
 }
 
@@ -735,7 +746,10 @@ Mesh MotionFit::visualiseTrajectories(const std::vector<double> &x, double scale
 
 void MotionFit::report(int iteration, double cost, const std::vector<double> &x) const
 {
-	Log::updateProgress(progressBarOffset + iteration);
+	if (verbose)
+	{
+		Log::updateProgress(progressBarOffset + iteration);
+	}
 }
 
 void MotionFit::analyseGradient(const std::vector<double>& x, int particle, int frame, double epsilon)

@@ -77,7 +77,7 @@ void TomoCtfFind::initialize(int num_threads)
 	
 	if (diag)
 	{
-		int res = system("mkdir -p debug");
+		ZIO::makeDir("debug");
 	}
 	
 	

@@ -43,38 +43,22 @@ int main(int argc, char *argv[])
 			REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 		}
 
-		if (outDir[outDir.length()-1] != '/')
-		{
-			outDir = outDir + "/";
-		}
+		outDir = ZIO::prepareTomoOutputDirectory(outDir, argc, argv);
+		ZIO::makeDir(outDir+"PostProcess");
 
-		int res = system(("mkdir -p "+outDir).c_str());
+		int res = system(("relion_postprocess --i " + reconstructionPath + "half1.mrc --mask "
+					  + evalMaskFn+" --o " + outDir + "PostProcess/postprocess").c_str());
 
-		{
-			std::ofstream ofs(outDir+"/note.txt");
-
-			ofs << "Command:\n\n";
-
-			for (int i = 0; i < argc; i++)
-			{
-				ofs << argv[i] << ' ';
-			}
-
-			ofs << '\n';
-		}
+		if (res != RELION_EXIT_SUCCESS) return res;
 
 		os.refMap1 = reconstructionPath + "half1.mrc";
 		os.refMap2 = reconstructionPath + "half2.mrc";
 		os.refFSC = outDir + "PostProcess/postprocess.star";
+
 		if (refMaskFn != "")
 		{
 			os.refMask = refMaskFn;
 		}
-
-		res = system(("mkdir -p "+outDir+"PostProcess").c_str());
-
-		res = system(("relion_postprocess --i " + os.refMap1 + " --mask "
-					  + evalMaskFn+" --o " + outDir + "PostProcess/postprocess").c_str());
 
 		os.write(outDir+"optimisation_set.star");
 	}

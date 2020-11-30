@@ -144,12 +144,7 @@ public:
 			return; // exit now
 		}
 
-		if (!exists(mydir))
-		{
-			std::string command = "mkdir -p " + mydir;
-			int res = system(command.c_str());
-
-		}
+		mktree(mydir);
 		if (do_abort)
 		{
 			schedule.read();

@@ -670,9 +670,7 @@ bool RelionJob::prepareFinalCommand(std::string &outputname, std::vector<std::st
 		int last_slash = outputname.rfind("/");
 		if (last_slash < outputname.size())
 		{
-			std::string dirs = outputname.substr(0, last_slash);
-			std::string makedirs = "mkdir -p " + dirs;
-			int res = system(makedirs.c_str());
+			mktree(outputname.substr(0, last_slash));
 		}
 	}
 

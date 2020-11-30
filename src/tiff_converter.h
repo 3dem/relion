@@ -24,7 +24,6 @@
 #include <src/image.h>
 #include <src/metadata_table.h>
 
-#ifdef HAVE_TIFF
 #include <tiffio.h>
 
 class TIFFConverter 
@@ -123,4 +122,3 @@ private:
 	int checkMRCtype(FileName fn_movie);
 	void processOneMovie(FileName fn_movie, FileName fn_tiff);
 };
-#endif

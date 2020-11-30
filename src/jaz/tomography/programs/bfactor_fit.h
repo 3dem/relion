@@ -18,7 +18,7 @@ class BfactorFitProgram : public RefinementProgram
 		int kMin, kMin2;
 		bool useL2, useCache;
 		
-		void readParams(IOParser& parser);
+		void readParams();
 		void run();
 };
 

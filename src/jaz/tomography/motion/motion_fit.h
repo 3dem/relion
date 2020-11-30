@@ -41,7 +41,8 @@ class MotionFit : public FastDifferentiableOptimization
 				double pixelSize,
 				double paddingFactor,
 				int progressBarOffset,
-				int num_threads);
+				int num_threads,
+				bool verbose);
 		
 		
 			const std::vector<BufferedImage<double>>& CCs; // one frame stack for each particle		
@@ -56,6 +57,8 @@ class MotionFit : public FastDifferentiableOptimization
 			gravis::d3Vector tomoCentre;
 			double frameDose, pixelSize, paddingFactor;
 			int progressBarOffset, num_threads;
+
+			bool verbose;
 			
 			int fc, pc, bc, maxRange;	
 			

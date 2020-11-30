@@ -27,20 +27,21 @@ class AlignProgram : public RefinementProgram
 			
 			MotionFit::MotionParameters motParams;
 			MotionFit::Settings mfSettings;
-		
-		void readParams(IOParser& parser);
+
 		void run();
 
 
 	protected:
 
+		void parseInput();
+
 		void initialise();
+
 		void finalise();
 
 		void processTomograms(
 				const std::vector<int>& tomoIndices,
 				const AberrationsCache& aberrationsCache,
-				int verbosity,
 				bool per_tomogram_progress);
 
 

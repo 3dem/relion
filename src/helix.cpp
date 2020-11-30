@@ -1991,13 +1991,15 @@ void convertHelicalTubeCoordsToMetaDataTable(
 
     if (nr_segments < 1)
     {
-    	std::cout << " WARNING: no segments extracted from file '" << fn_in << "'!" << std::endl;
+    	std::cerr << " WARNING: no segments extracted from file '" << fn_in << "'!" << std::endl;
     }
+    /*
     else
     {
     	std::cout << "Input STAR file = " << fn_in << ", tubes = " << x1_coord_list.size()
     			<< ", segments = " << nr_segments << ", subunits ~ " << (nr_segments * nr_asu) << std::endl;
     }
+    */
     total_segments = nr_segments;
     total_tubes = x1_coord_list.size();
 }

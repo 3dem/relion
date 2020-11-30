@@ -92,7 +92,7 @@ void ParticleSubtractor::initialise(int _rank, int _size)
 	if (fn_out[fn_out.length()-1] != '/') fn_out += "/";
 	if (verb > 0)
 	{
-		int res = system(("mkdir -p " + fn_out + "Particles").c_str());
+		mktree(fn_out + "Particles");
 	}
 
 	opt.read(fn_opt, rank, true); // true means: prevent prereading all particle images

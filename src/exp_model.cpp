@@ -862,7 +862,7 @@ void Experiment::read(FileName fn_exp, bool do_ignore_particle_name, bool do_ign
 			else
 			{
 				// All images belong to the same micrograph and group
-				group_id = 0;
+				group_id = addGroup("group", 0);
 			}
 
 #ifdef DEBUG_READ

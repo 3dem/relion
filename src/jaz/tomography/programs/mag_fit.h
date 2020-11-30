@@ -14,7 +14,7 @@ class MagFitProgram : public RefinementProgram
 
 		MagFitProgram(int argc, char *argv[]);
 
-		void readParams(IOParser& parser);
+		void readParams();
 		void run();
 };
 

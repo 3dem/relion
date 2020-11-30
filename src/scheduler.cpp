@@ -361,11 +361,18 @@ bool SchedulerOperator::performOperation() const
 	}
 	else if (type == SCHEDULE_FLOAT_OPERATOR_COUNT_IMAGES)
 	{
-		ObservationModel obsmodel;
-		MetaDataTable MDimg;
-		std::string mytablename = (isStringVariable(input2)) ? scheduler_global_strings[input2].value : "particles";
-		ObservationModel::loadSafely(scheduler_global_strings[input1].value, obsmodel, MDimg, mytablename);
-		scheduler_global_floats[output].value = MDimg.numberOfObjects();
+		if (!exists(scheduler_global_strings[input1].value))
+		{
+			scheduler_global_floats[output].value = 0;
+		}
+		else
+		{
+			ObservationModel obsmodel;
+			MetaDataTable MDimg;
+			std::string mytablename = (isStringVariable(input2)) ? scheduler_global_strings[input2].value : "particles";
+			ObservationModel::loadSafely(scheduler_global_strings[input1].value, obsmodel, MDimg, mytablename);
+			scheduler_global_floats[output].value = MDimg.numberOfObjects();
+		}
 	}
 	else if (type == SCHEDULE_FLOAT_OPERATOR_COUNT_WORDS)
 	{
@@ -460,8 +467,7 @@ bool SchedulerOperator::performOperation() const
 		if (scheduler_global_strings[input2].value.contains("/"))
 		{
 			FileName mydirs = scheduler_global_strings[input2].value.beforeLastOf("/");
-			std::string mycommand = "mkdir -p " + mydirs;
- 			int res = system(mycommand.c_str());
+			mktree(mydirs);
 		}
 		// Execute the command
 		mycommand += scheduler_global_strings[input1].value + " " + scheduler_global_strings[input2].value;
@@ -1238,8 +1244,7 @@ void Schedule::addJob(RelionJob &myjob, std::string jobname, std::string mode)
 	std::string output_name = name + jobname + '/';
 
 	// Save a copy of the job in the Schedules directory
-	std::string command = "mkdir -p " + name + jobname;
-	int res = system(command.c_str());
+	mktree(name + jobname);
 
 	myjob.write(output_name);
 
@@ -1334,8 +1339,7 @@ void Schedule::copy(FileName newname)
 	if (newname[newname.length()-1] != '/') newname += "/";
 
 	// Make the output directory,
-	std::string command = "mkdir -p " + newname;
-	int res = system(command.c_str());
+	mktree(newname);
 
 	// Replace original name in all stringVariables
 	for (std::map<std::string, SchedulerStringVariable>::iterator it = scheduler_global_strings.begin(); it != scheduler_global_strings.end(); it++ )
@@ -1379,8 +1383,7 @@ void Schedule::copy(FileName newname)
 
 		// Write the new job in the new directory
 		std::string mydir = newname + it->first + '/';
-		std::string command = "mkdir -p " + mydir;
-		int res = system(command.c_str());
+		mktree(mydir);
 		myjob.write(mydir);
 	}
 

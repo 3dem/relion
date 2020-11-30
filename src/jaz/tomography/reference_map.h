@@ -27,7 +27,7 @@ class TomoReferenceMap
 			std::vector<BufferedImage<fComplex>> image_FS;
 
 
-		void load(int boxSize = -1);
+		void load(int boxSize = -1, int verbosity = 1);
 			
 		int getBoxSize() const;
 
