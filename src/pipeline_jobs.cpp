@@ -445,11 +445,11 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 		    type != PROC_INIMODEL &&
 		    type != PROC_MOTIONREFINE &&
 		    type != PROC_CTFREFINE &&
-		    type != PROC_SUBTOMO_IMPORT &&
-		    type != PROC_SUBTOMO_RECONSTRUCT &&
-		    type != PROC_SUBTOMO_CTFREFINE &&
-		    type != PROC_SUBTOMO_POLISH &&
-		    type != PROC_SUBTOMO_AVERAGE &&
+			type != PROC_TOMO_IMPORT &&
+			type != PROC_TOMO_SUBTOMO &&
+			type != PROC_TOMO_CTFREFINE &&
+			type != PROC_TOMO_ALIGN &&
+			type != PROC_TOMO_RECONSTRUCT &&
 		    type != PROC_EXTERNAL)
 			REPORT_ERROR("ERROR: cannot find correct job type in " + myfilename + "run.job, with type= " + integerToString(type));
 
@@ -853,27 +853,27 @@ void RelionJob::initialise(int _job_type)
 		has_mpi = has_thread = true;
 		initialiseCtfrefineJob();
 	}
-	else if (type == PROC_SUBTOMO_IMPORT)
+	else if (type == PROC_TOMO_IMPORT)
 	{
 		has_mpi = has_thread = false;
 		initialiseSubtomoImportJob();
 	}
-	else if (type == PROC_SUBTOMO_RECONSTRUCT)
+	else if (type == PROC_TOMO_SUBTOMO)
 	{
 		has_mpi = has_thread = true;
 		initialiseSubtomoReconstructJob();
 	}
-	else if (type == PROC_SUBTOMO_CTFREFINE)
+	else if (type == PROC_TOMO_CTFREFINE)
 	{
 		has_mpi = has_thread = true;
 		initialiseSubtomoCtfRefineJob();
 	}
-	else if (type == PROC_SUBTOMO_POLISH)
+	else if (type == PROC_TOMO_ALIGN)
 	{
 		has_mpi = has_thread = true;
 		initialiseSubtomoPolishJob();
 	}
-	else if (type == PROC_SUBTOMO_AVERAGE)
+	else if (type == PROC_TOMO_RECONSTRUCT)
 	{
 		has_mpi = has_thread = true;
 		initialiseSubtomoAverageJob();
@@ -1092,23 +1092,23 @@ bool RelionJob::getCommands(std::string &outputname, std::vector<std::string> &c
 	{
 		result = getCommandsCtfrefineJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
-	else if (type == PROC_SUBTOMO_IMPORT)
+	else if (type == PROC_TOMO_IMPORT)
 	{
 		result = getCommandsSubtomoImportJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
-	else if (type == PROC_SUBTOMO_RECONSTRUCT)
+	else if (type == PROC_TOMO_SUBTOMO)
 	{
 		result = getCommandsSubtomoReconstructJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
-	else if (type == PROC_SUBTOMO_CTFREFINE)
+	else if (type == PROC_TOMO_CTFREFINE)
 	{
 		result = getCommandsSubtomoCtfRefineJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
-	else if (type == PROC_SUBTOMO_POLISH)
+	else if (type == PROC_TOMO_ALIGN)
 	{
 		result = getCommandsSubtomoPolishJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
-	else if (type == PROC_SUBTOMO_AVERAGE)
+	else if (type == PROC_TOMO_RECONSTRUCT)
 	{
 		result = getCommandsSubtomoAverageJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
@@ -5674,7 +5674,7 @@ bool RelionJob::getCommandsSubtomoImportJob(std::string &outputname, std::vector
 {
 
 	commands.clear();
-    initialisePipeline(outputname, PROC_SUBTOMO_IMPORT_LABEL, job_counter);
+    initialisePipeline(outputname, PROC_TOMO_IMPORT_LABEL, job_counter);
     std::string command;
 
 	// Some code here was copied from the SPA import job...
@@ -5862,7 +5862,7 @@ bool RelionJob::getCommandsSubtomoReconstructJob(std::string &outputname, std::v
                 std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
-	initialisePipeline(outputname, PROC_SUBTOMO_RECONSTRUCT_LABEL, job_counter);
+	initialisePipeline(outputname, PROC_TOMO_SUBTOMO_LABEL, job_counter);
 	std::string command;
 
 	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
@@ -5944,7 +5944,7 @@ bool RelionJob::getCommandsSubtomoCtfRefineJob(std::string &outputname, std::vec
 {
 
 	commands.clear();
-    initialisePipeline(outputname, PROC_SUBTOMO_CTFREFINE_LABEL, job_counter);
+    initialisePipeline(outputname, PROC_TOMO_CTFREFINE_LABEL, job_counter);
     std::string command;
 
     if (joboptions["nr_mpi"].getNumber(error_message) > 1)
@@ -6037,7 +6037,7 @@ bool RelionJob::getCommandsSubtomoPolishJob(std::string &outputname, std::vector
 {
 
 	commands.clear();
-    initialisePipeline(outputname, PROC_SUBTOMO_POLISH_LABEL, job_counter);
+    initialisePipeline(outputname, PROC_TOMO_ALIGN_LABEL, job_counter);
     std::string command;
 
 	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
@@ -6124,8 +6124,8 @@ bool RelionJob::getCommandsSubtomoAverageJob(std::string &outputname, std::vecto
 {
 
 	commands.clear();
-    initialisePipeline(outputname, PROC_SUBTOMO_AVERAGE_LABEL, job_counter);
-    std::string command;
+    initialisePipeline(outputname, PROC_TOMO_RECONSTRUCT_LABEL, job_counter);
+    std::string command, command2;
 
     if (joboptions["do_from2d"].getBoolean())
     {

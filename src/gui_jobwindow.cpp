@@ -405,27 +405,27 @@ void JobWindow::initialise(int my_job_type)
 		myjob.initialise(my_job_type);
 		initialiseCtfrefineWindow();
 	}
-	else if (my_job_type == PROC_SUBTOMO_IMPORT)
+	else if (my_job_type == PROC_TOMO_IMPORT)
 	{
 		myjob.initialise(my_job_type);
 		initialiseSubtomoImportWindow();
 	}
-	else if (my_job_type == PROC_SUBTOMO_RECONSTRUCT)
+	else if (my_job_type == PROC_TOMO_SUBTOMO)
 	{
 		myjob.initialise(my_job_type);
 		initialiseSubtomoReconstructWindow();
 	}
-	else if (my_job_type == PROC_SUBTOMO_CTFREFINE)
+	else if (my_job_type == PROC_TOMO_CTFREFINE)
 	{
 		myjob.initialise(my_job_type);
 		initialiseSubtomoCtfRefineWindow();
 	}
-	else if (my_job_type == PROC_SUBTOMO_POLISH)
+	else if (my_job_type == PROC_TOMO_ALIGN)
 	{
 		myjob.initialise(my_job_type);
 		initialiseSubtomoPolishWindow();
 	}
-	else if (my_job_type == PROC_SUBTOMO_AVERAGE)
+	else if (my_job_type == PROC_TOMO_RECONSTRUCT)
 	{
 		myjob.initialise(my_job_type);
 		initialiseSubtomoAverageWindow();
