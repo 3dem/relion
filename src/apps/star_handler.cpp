@@ -341,16 +341,19 @@ class star_handler_parameters
 			fnt.globFiles(fns_in, false);
 		}
 
-		MetaDataTable MDin, MDout;
+		MetaDataTable MDin0, MDout;
 		std::vector<MetaDataTable> MDsin, MDoptics;
 		std::vector<ObservationModel> obsModels;
+		ObservationModel myobsModel0;
 		// Read the first table into the global obsModel
-		read_check_ignore_optics(MDin, fns_in[0], tablename_in);
-		MDsin.push_back(MDin);
+		if (do_ignore_optics) MDin0.read(fns_in[0], tablename_in);
+		else ObservationModel::loadSafely(fns_in[0], obsModel, MDin0, "discover", 1);
+		MDsin.push_back(MDin0);
 		// Read all the rest of the tables into local obsModels
 		for (int i = 1; i < fns_in.size(); i++)
 		{
 			ObservationModel myobsModel;
+			MetaDataTable MDin; // define again, as reading from previous one may linger here...
 			if (do_ignore_optics) MDin.read(fns_in[i], tablename_in);
 			else ObservationModel::loadSafely(fns_in[i], myobsModel, MDin, "discover", 1);
 			MDsin.push_back(MDin);
@@ -638,7 +641,7 @@ class star_handler_parameters
 				std::cerr << " WARNING: Total number of duplicate "<< fn_check << " entries: " << nr_duplicates << std::endl;
 		}
 
-		write_check_ignore_optics(MDout, fn_out, MDin.getName());
+		write_check_ignore_optics(MDout, fn_out, MDin0.getName());
 		std::cout << " Written: " << fn_out << std::endl;
 	}
 
