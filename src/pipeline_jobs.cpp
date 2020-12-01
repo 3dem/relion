@@ -5614,15 +5614,17 @@ std::string RelionJob::getSubtomoInputCommmand(std::string &command, int has_tom
 		command += " --ref1 " + fn_half1;
 		command += " --ref2 " + fn_half2;
 	}
-	if (has_postprocess != HAS_NOT && joboptions["in_post"].getString() != "")
+	if (has_postprocess != HAS_NOT && joboptions["in_refmask"].getString() != "")
 	{
 		Node node(joboptions["in_refmask"].getString(), joboptions["in_refmask"].node_type);
 		inputNodes.push_back(node);
 		command += " --mask " + joboptions["in_refmask"].getString();
-
-		Node node2(joboptions["in_post"].getString(), joboptions["in_post"].node_type);
-		inputNodes.push_back(node2);
-    	command += " --fsc " + joboptions["in_post"].getString();
+	}
+	if (has_postprocess != HAS_NOT && joboptions["in_post"].getString() != "")
+	{
+		Node node(joboptions["in_post"].getString(), joboptions["in_post"].node_type);
+		inputNodes.push_back(node);
+		command += " --fsc " + joboptions["in_post"].getString();
 	}
 
 	return error_message;
