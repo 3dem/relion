@@ -445,11 +445,11 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 		    type != PROC_INIMODEL &&
 		    type != PROC_MOTIONREFINE &&
 		    type != PROC_CTFREFINE &&
-		    type != PROC_SUBTOMO_IMPORT &&
-		    type != PROC_SUBTOMO_RECONSTRUCT &&
-		    type != PROC_SUBTOMO_CTFREFINE &&
-		    type != PROC_SUBTOMO_POLISH &&
-		    type != PROC_SUBTOMO_AVERAGE &&
+			type != PROC_TOMO_IMPORT &&
+			type != PROC_TOMO_SUBTOMO &&
+			type != PROC_TOMO_CTFREFINE &&
+			type != PROC_TOMO_ALIGN &&
+			type != PROC_TOMO_RECONSTRUCT &&
 		    type != PROC_EXTERNAL)
 			REPORT_ERROR("ERROR: cannot find correct job type in " + myfilename + "run.job, with type= " + integerToString(type));
 
@@ -851,27 +851,27 @@ void RelionJob::initialise(int _job_type)
 		has_mpi = has_thread = true;
 		initialiseCtfrefineJob();
 	}
-	else if (type == PROC_SUBTOMO_IMPORT)
+	else if (type == PROC_TOMO_IMPORT)
 	{
 		has_mpi = has_thread = false;
 		initialiseSubtomoImportJob();
 	}
-	else if (type == PROC_SUBTOMO_RECONSTRUCT)
+	else if (type == PROC_TOMO_SUBTOMO)
 	{
 		has_mpi = has_thread = true;
 		initialiseSubtomoReconstructJob();
 	}
-	else if (type == PROC_SUBTOMO_CTFREFINE)
+	else if (type == PROC_TOMO_CTFREFINE)
 	{
 		has_mpi = has_thread = true;
 		initialiseSubtomoCtfRefineJob();
 	}
-	else if (type == PROC_SUBTOMO_POLISH)
+	else if (type == PROC_TOMO_ALIGN)
 	{
 		has_mpi = has_thread = true;
 		initialiseSubtomoPolishJob();
 	}
-	else if (type == PROC_SUBTOMO_AVERAGE)
+	else if (type == PROC_TOMO_RECONSTRUCT)
 	{
 		has_mpi = has_thread = true;
 		initialiseSubtomoAverageJob();
@@ -1090,23 +1090,23 @@ bool RelionJob::getCommands(std::string &outputname, std::vector<std::string> &c
 	{
 		result = getCommandsCtfrefineJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
-	else if (type == PROC_SUBTOMO_IMPORT)
+	else if (type == PROC_TOMO_IMPORT)
 	{
 		result = getCommandsSubtomoImportJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
-	else if (type == PROC_SUBTOMO_RECONSTRUCT)
+	else if (type == PROC_TOMO_SUBTOMO)
 	{
 		result = getCommandsSubtomoReconstructJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
-	else if (type == PROC_SUBTOMO_CTFREFINE)
+	else if (type == PROC_TOMO_CTFREFINE)
 	{
 		result = getCommandsSubtomoCtfRefineJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
-	else if (type == PROC_SUBTOMO_POLISH)
+	else if (type == PROC_TOMO_ALIGN)
 	{
 		result = getCommandsSubtomoPolishJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
-	else if (type == PROC_SUBTOMO_AVERAGE)
+	else if (type == PROC_TOMO_RECONSTRUCT)
 	{
 		result = getCommandsSubtomoAverageJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
@@ -4755,7 +4755,7 @@ void RelionJob::initialisePostprocessJob()
 {
 	hidden_name = ".gui_post";
 
-	joboptions["fn_in"] = JobOption("One of the 2 unfiltered half-maps:", NODE_HALFMAP, "", "MRC map files (*half1_*_unfil.mrc)",  "Provide one of the two unfiltered half-reconstructions that were output upon convergence of a 3D auto-refine run.");
+	joboptions["fn_in"] = JobOption("One of the 2 unfiltered half-maps:", NODE_HALFMAP, "", "MRC map files (*half1*.mrc)",  "Provide one of the two unfiltered half-reconstructions that were output upon convergence of a 3D auto-refine run.");
 	joboptions["fn_mask"] = JobOption("Solvent mask:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a soft mask where the protein is white (1) and the solvent is black (0). Often, the softer the mask the higher resolution estimates you will get. A soft edge of 5-10 pixels is often a good edge width.");
 	joboptions["angpix"] = JobOption("Calibrated pixel size (A)", -1, 0.3, 5, 0.1, "Provide the final, calibrated pixel size in Angstroms. This value may be different from the pixel-size used thus far, e.g. when you have recalibrated the pixel size using the fit to a PDB model. The X-axis of the output FSC plot will use this calibrated value.");
 
@@ -5614,15 +5614,17 @@ std::string RelionJob::getSubtomoInputCommmand(std::string &command, int has_tom
 		command += " --ref1 " + fn_half1;
 		command += " --ref2 " + fn_half2;
 	}
-	if (has_postprocess != HAS_NOT && joboptions["in_post"].getString() != "")
+	if (has_postprocess != HAS_NOT && joboptions["in_refmask"].getString() != "")
 	{
 		Node node(joboptions["in_refmask"].getString(), joboptions["in_refmask"].node_type);
 		inputNodes.push_back(node);
 		command += " --mask " + joboptions["in_refmask"].getString();
-
-		Node node2(joboptions["in_post"].getString(), joboptions["in_post"].node_type);
-		inputNodes.push_back(node2);
-    	command += " --fsc " + joboptions["in_post"].getString();
+	}
+	if (has_postprocess != HAS_NOT && joboptions["in_post"].getString() != "")
+	{
+		Node node(joboptions["in_post"].getString(), joboptions["in_post"].node_type);
+		inputNodes.push_back(node);
+		command += " --fsc " + joboptions["in_post"].getString();
 	}
 
 	return error_message;
@@ -5647,7 +5649,7 @@ void RelionJob::initialiseSubtomoImportJob()
     	joboptions["hand"] = JobOption("Tilt handedness:", (std::string)"", "Set this to indicate the handedness of the tilt geometry (default=-1). The value of this parameter is either +1 or -1, and it describes whether the focus increases or decreases as a function of Z distance. It has to be determined experimentally. In our experiments, it has always been -1. Y If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
 
 
-       	joboptions["do_parts"] = JobOption("Import particles?", false, "Set this to Yes for importing particle coordinates.");
+       	joboptions["do_coords"] = JobOption("Import coordinates?", false, "Set this to Yes for importing particle coordinates.");
         joboptions["part_star"] = JobOption("STAR file with coordinates: ", "", "Input file (*.star)", ".", "Provide a STAR file with the following information to input particles: \n \n TODO TODO TODO ");
         joboptions["part_tomos"] = JobOption("Tomograms set: ", NODE_SUBTOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "The tomograms set from which these particles were picked.");
 
@@ -5672,24 +5674,24 @@ bool RelionJob::getCommandsSubtomoImportJob(std::string &outputname, std::vector
 {
 
 	commands.clear();
-    initialisePipeline(outputname, PROC_SUBTOMO_IMPORT_LABEL, job_counter);
+    initialisePipeline(outputname, PROC_TOMO_IMPORT_LABEL, job_counter);
     std::string command;
 
 	// Some code here was copied from the SPA import job...
-        bool do_tomo = joboptions["do_tomo"].getBoolean();
-        bool do_parts = joboptions["do_parts"].getBoolean();
+	bool do_tomo = joboptions["do_tomo"].getBoolean();
+	bool do_coords = joboptions["do_coords"].getBoolean();
 	bool do_other = joboptions["do_other"].getBoolean();
 
-        int i = 0;
-        if (do_tomo) i++;
-        if (do_parts) i++;
-        if (do_other) i++;
+	int i = 0;
+	if (do_tomo) i++;
+	if (do_coords) i++;
+	if (do_other) i++;
 
-        if (i != 1)
-        {
-            error_message = "ERROR: you can only select to import tomograms, import particles, OR import other nodes.";
-		return false;
-        }
+	if (i != 1)
+	{
+		error_message = "ERROR: you can only select to import tomograms, import particles, OR import other nodes.";
+	return false;
+	}
 
 	if (do_tomo)
 	{
@@ -5722,7 +5724,7 @@ bool RelionJob::getCommandsSubtomoImportJob(std::string &outputname, std::vector
 
 
 	}
-	else if (do_parts)
+	else if (do_coords)
 	{
 
 		if (joboptions["part_star"].getString() == "")
@@ -5860,7 +5862,7 @@ bool RelionJob::getCommandsSubtomoReconstructJob(std::string &outputname, std::v
                 std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
-	initialisePipeline(outputname, PROC_SUBTOMO_RECONSTRUCT_LABEL, job_counter);
+	initialisePipeline(outputname, PROC_TOMO_SUBTOMO_LABEL, job_counter);
 	std::string command;
 
 	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
@@ -5942,7 +5944,7 @@ bool RelionJob::getCommandsSubtomoCtfRefineJob(std::string &outputname, std::vec
 {
 
 	commands.clear();
-    initialisePipeline(outputname, PROC_SUBTOMO_CTFREFINE_LABEL, job_counter);
+    initialisePipeline(outputname, PROC_TOMO_CTFREFINE_LABEL, job_counter);
     std::string command;
 
     if (joboptions["nr_mpi"].getNumber(error_message) > 1)
@@ -6035,7 +6037,7 @@ bool RelionJob::getCommandsSubtomoPolishJob(std::string &outputname, std::vector
 {
 
 	commands.clear();
-    initialisePipeline(outputname, PROC_SUBTOMO_POLISH_LABEL, job_counter);
+    initialisePipeline(outputname, PROC_TOMO_ALIGN_LABEL, job_counter);
     std::string command;
 
 	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
@@ -6105,6 +6107,7 @@ void RelionJob::initialiseSubtomoAverageJob()
 	joboptions["crop_size"] = JobOption("Cropped box size (pix):", -1, -1, 512, 16, "If set to a positive value, the program will output an additional set of maps that have been cropped to this size. This is useful if a map is desired that is smaller than the box size required to retrieve the CTF-delocalised signal.");
 	joboptions["binning"] = JobOption("Binning factor:", 1, 1, 16, 1, "The tilt series images will be binned by this (real-valued) factor and then reconstructed in the specified box size above. Note that thereby the reconstructed region becomes larger when specifying binning factors larger than one.");
 	joboptions["snr"] = JobOption("Wiener SNR constant:", 0, 0, 0.0001, 0.00001, "If set to a positive value, apply a Wiener filter with this signal-to-noise ratio. If omitted, the reconstruction will use a heuristic to prevent divisions by excessively small numbers. Please note that using a low (even though realistic) SNR might wash out the higher frequencies, which could make the map unsuitable to be used for further refinement.");
+	joboptions["fn_mask"] = JobOption("FSC Solvent mask:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a soft mask to automatically estimate the postprocess FSC. It will also create an optimisation set file to be used in other Subtomo protocols.");
 	joboptions["sym_name"] = JobOption("Symmetry:", std::string("C1"), "If the molecule is asymmetric, \
 set Symmetry group to C1. Note their are multiple possibilities for icosahedral symmetry: \n \
 * I1: No-Crowther 222 (standard in Heymann, Chagoyen & Belnap, JSB, 151 (2005) 196–207) \n \
@@ -6122,8 +6125,8 @@ bool RelionJob::getCommandsSubtomoAverageJob(std::string &outputname, std::vecto
 {
 
 	commands.clear();
-    initialisePipeline(outputname, PROC_SUBTOMO_AVERAGE_LABEL, job_counter);
-    std::string command;
+    initialisePipeline(outputname, PROC_TOMO_RECONSTRUCT_LABEL, job_counter);
+    std::string command, command2;
 
     if (joboptions["do_from2d"].getBoolean())
     {
@@ -6166,7 +6169,24 @@ bool RelionJob::getCommandsSubtomoAverageJob(std::string &outputname, std::vecto
 		{
 			command += " --only_do_unfinished ";
 		}
-    }
+
+		// Estimate FSC anc create output optimiset set
+		if (joboptions["fn_mask"].getString() != "")
+		{
+			command2 = "`which relion_tomo_make_reference`";
+			command2 += " --rec "+ outputname;
+			command2 += " --o "+ outputname;
+			command2 += " --mask "+ joboptions["fn_mask"].getString();
+			error_message = getSubtomoInputCommmand(command2, HAS_COMPULSORY, HAS_COMPULSORY, HAS_OPTIONAL, HAS_NOT, HAS_NOT,
+													HAS_NOT);
+			Node node3(outputname+"optimisation_set.star", NODE_SUBTOMO_OPTIMISATION);
+			outputNodes.push_back(node3);
+			Node node4(outputname+"PostProcess/logfile.pdf", NODE_PDF_LOGFILE);
+			outputNodes.push_back(node4);
+			Node node5(outputname+"PostProcess/postprocess.star", NODE_POST);
+			outputNodes.push_back(node5);
+		}
+	}
     else
     {
 		if (joboptions["in_particles"].getString() == "")
@@ -6188,17 +6208,19 @@ bool RelionJob::getCommandsSubtomoAverageJob(std::string &outputname, std::vecto
 		Node node1(outputname+"reconstruct.mrc", NODE_3DREF);
 		outputNodes.push_back(node1);
     	command += " --o " + outputname + "reconstruct.mrc";
-
     	command += " --ctf --skip_gridding";
-
     }
 
 	command += " --sym " + joboptions["sym_name"].getString();
 
-
 	// Other arguments for extraction
     command += " " + joboptions["other_args"].getString();
     commands.push_back(command);
+
+	if (command2 != "")
+	{
+		commands.push_back(command2);
+	}
 
     return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 

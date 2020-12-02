@@ -405,27 +405,27 @@ void JobWindow::initialise(int my_job_type)
 		myjob.initialise(my_job_type);
 		initialiseCtfrefineWindow();
 	}
-	else if (my_job_type == PROC_SUBTOMO_IMPORT)
+	else if (my_job_type == PROC_TOMO_IMPORT)
 	{
 		myjob.initialise(my_job_type);
 		initialiseSubtomoImportWindow();
 	}
-	else if (my_job_type == PROC_SUBTOMO_RECONSTRUCT)
+	else if (my_job_type == PROC_TOMO_SUBTOMO)
 	{
 		myjob.initialise(my_job_type);
 		initialiseSubtomoReconstructWindow();
 	}
-	else if (my_job_type == PROC_SUBTOMO_CTFREFINE)
+	else if (my_job_type == PROC_TOMO_CTFREFINE)
 	{
 		myjob.initialise(my_job_type);
 		initialiseSubtomoCtfRefineWindow();
 	}
-	else if (my_job_type == PROC_SUBTOMO_POLISH)
+	else if (my_job_type == PROC_TOMO_ALIGN)
 	{
 		myjob.initialise(my_job_type);
 		initialiseSubtomoPolishWindow();
 	}
-	else if (my_job_type == PROC_SUBTOMO_AVERAGE)
+	else if (my_job_type == PROC_TOMO_RECONSTRUCT)
 	{
 		myjob.initialise(my_job_type);
 		initialiseSubtomoAverageWindow();
@@ -2345,19 +2345,19 @@ void JobWindow::initialiseSubtomoImportWindow()
 	tab1->end();
 
 	tab2->begin();
-	tab2->label("Particles");
+	tab2->label("Coordinates");
 	resetHeight();
 
 	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group2->end();
-	place("do_parts", TOGGLE_DEACTIVATE, group2, false);
+	place("do_coords", TOGGLE_DEACTIVATE, group2, false);
 	group2->begin();
 
 	place("part_star", TOGGLE_DEACTIVATE);
 	place("part_tomos", TOGGLE_DEACTIVATE);
 
 	group2->end();
-	guientries["do_parts"].cb_menu_i(); // make default active
+	guientries["do_coords"].cb_menu_i(); // make default active
 
 	tab2->end();
 
@@ -2540,6 +2540,7 @@ void JobWindow::initialiseSubtomoAverageWindow()
 	place("crop_size", TOGGLE_DEACTIVATE);
 	place("binning", TOGGLE_DEACTIVATE);
 	place("snr", TOGGLE_DEACTIVATE);
+	place("fn_mask", TOGGLE_DEACTIVATE);
 
 	group1->end();
 	guientries["do_from2d"].cb_menu_i();

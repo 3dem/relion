@@ -398,26 +398,18 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	{
 
 		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-		browser->add("Subtomo import");
+		browser->add("Tomo import");
 		gui_jobwindows[nr_browse_tabs] = new JobWindow();
-		gui_jobwindows[nr_browse_tabs]->initialise(PROC_SUBTOMO_IMPORT);
+		gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_IMPORT);
 		browse_grp[nr_browse_tabs]->end();
 		nr_browse_tabs++;
 
 		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-		browser->add("Subtomo reconstruct");
+		browser->add("Make pseudo-subtomos");
 		gui_jobwindows[nr_browse_tabs] = new JobWindow();
-		gui_jobwindows[nr_browse_tabs]->initialise(PROC_SUBTOMO_RECONSTRUCT);
+		gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_SUBTOMO);
 		browse_grp[nr_browse_tabs]->end();
 		nr_browse_tabs++;
-
-		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-		browser->add("Subtomo averaging");
-		gui_jobwindows[nr_browse_tabs] = new JobWindow();
-		gui_jobwindows[nr_browse_tabs]->initialise(PROC_SUBTOMO_AVERAGE);
-		browse_grp[nr_browse_tabs]->end();
-		nr_browse_tabs++;
-
 	}
 	else
 	{
@@ -510,18 +502,24 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 
 	if (_do_tomo)
 	{
-
 		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-		browser->add("Subtomo CTF refine");
+		browser->add("Tomo reconstruct particles");
 		gui_jobwindows[nr_browse_tabs] = new JobWindow();
-		gui_jobwindows[nr_browse_tabs]->initialise(PROC_SUBTOMO_CTFREFINE);
+		gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_RECONSTRUCT);
 		browse_grp[nr_browse_tabs]->end();
 		nr_browse_tabs++;
 
 		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-		browser->add("Subtomo polishing");
+		browser->add("Tomo CTF refinement");
 		gui_jobwindows[nr_browse_tabs] = new JobWindow();
-		gui_jobwindows[nr_browse_tabs]->initialise(PROC_SUBTOMO_POLISH);
+		gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_CTFREFINE);
+		browse_grp[nr_browse_tabs]->end();
+		nr_browse_tabs++;
+
+		browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+		browser->add("Tomo frame alignment");
+		gui_jobwindows[nr_browse_tabs] = new JobWindow();
+		gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_ALIGN);
 		browse_grp[nr_browse_tabs]->end();
 		nr_browse_tabs++;
 	}

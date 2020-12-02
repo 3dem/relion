@@ -251,11 +251,11 @@ static std::map<std::string, int> node_label2type = {{NODE_MOVIES_LABEL, NODE_MO
 #define PROC_MULTIBODY_LABEL	 "MultiBody"    // Multi-body refinement
 #define PROC_MOTIONREFINE_LABEL  "Polish"       // Jasenko's motion fitting program for Bayesian polishing (to replace MovieRefine?)
 #define PROC_CTFREFINE_LABEL     "CtfRefine"    // Jasenko's program for defocus and beamtilt optimisation
-#define PROC_SUBTOMO_IMPORT_LABEL      "ImportSubtomo"      // Import for tomography GUI
-#define PROC_SUBTOMO_RECONSTRUCT_LABEL "ReconstructSubtomo" // Creation of subtomograms from tilt series images
-#define PROC_SUBTOMO_CTFREFINE_LABEL   "CtfRefineSubtomo"   // CTF refinement (defocus & aberrations) for subtomograms
-#define PROC_SUBTOMO_POLISH_LABEL      "PolishSubtomo"      // Frame alignment and particle polishing for subtomograms
-#define PROC_SUBTOMO_AVERAGE_LABEL     "AverageSubtomo"     // Calculation of subtomogram average from the inidividual tilt series images
+#define PROC_TOMO_IMPORT_LABEL      "ImportTomo"              // Import for tomography GUI
+#define PROC_TOMO_SUBTOMO_LABEL     "PseudoSubtomo"           // Creation of pseudo-subtomograms from tilt series images
+#define PROC_TOMO_CTFREFINE_LABEL   "CtfRefineTomo"           // CTF refinement (defocus & aberrations) for tomography
+#define PROC_TOMO_ALIGN_LABEL       "FrameAlignTomo"          // Frame alignment and particle polishing for subtomography
+#define PROC_TOMO_RECONSTRUCT_LABEL "ReconstructParticleTomo" // Calculation of particle average from the individual tilt series images
 #define PROC_EXTERNAL_LABEL      "External"     // For running non-relion programs
 
 
@@ -281,11 +281,11 @@ static std::map<std::string, int> node_label2type = {{NODE_MOVIES_LABEL, NODE_MO
 #define PROC_MULTIBODY      19// Multi-body refinement
 #define PROC_MOTIONREFINE   20// Jasenko's motion_refine
 #define PROC_CTFREFINE      21// Jasenko's ctf_refine
-#define PROC_SUBTOMO_IMPORT        50// Import for tomography GUI
-#define PROC_SUBTOMO_RECONSTRUCT   51// Creation of subtomograms from tilt series images
-#define PROC_SUBTOMO_CTFREFINE     52// CTF refinement (defocus & aberrations for subtomograms)
-#define PROC_SUBTOMO_POLISH        53// Frame alignment and particle polishing for subtomogra,s
-#define PROC_SUBTOMO_AVERAGE       54// Calculation of subtomogram average from the inidividual tilt series images
+#define PROC_TOMO_IMPORT        50// Import for tomography GUI
+#define PROC_TOMO_SUBTOMO   51// Creation of pseudo-subtomograms from tilt series images
+#define PROC_TOMO_CTFREFINE     52// CTF refinement (defocus & aberrations for tomography)
+#define PROC_TOMO_ALIGN        53// Frame alignment and particle polishing for subtomography
+#define PROC_TOMO_RECONSTRUCT       54// Calculation of particle average from the individual tilt series images
 #define PROC_EXTERNAL       99// External scripts
 
 
@@ -299,21 +299,21 @@ static std::map<int, std::string> proc_type2label = {{PROC_IMPORT, PROC_IMPORT_L
 		{PROC_2DCLASS, PROC_2DCLASS_LABEL},
 		{PROC_3DCLASS, PROC_3DCLASS_LABEL},
 		{PROC_3DAUTO, PROC_3DAUTO_LABEL},
-		{PROC_MASKCREATE, PROC_MASKCREATE_LABEL},
-		{PROC_JOINSTAR, PROC_JOINSTAR_LABEL},
-		{PROC_SUBTRACT, PROC_SUBTRACT_LABEL},
-		{PROC_POST, PROC_POST_LABEL},
-		{PROC_RESMAP, PROC_RESMAP_LABEL},
-		{PROC_INIMODEL, PROC_INIMODEL_LABEL},
-		{PROC_MULTIBODY, PROC_MULTIBODY_LABEL},
-		{PROC_MOTIONREFINE, PROC_MOTIONREFINE_LABEL},
-		{PROC_CTFREFINE, PROC_CTFREFINE_LABEL},
-		{PROC_SUBTOMO_IMPORT, PROC_SUBTOMO_IMPORT_LABEL},
-		{PROC_SUBTOMO_RECONSTRUCT, PROC_SUBTOMO_RECONSTRUCT_LABEL},
-		{PROC_SUBTOMO_CTFREFINE, PROC_SUBTOMO_CTFREFINE_LABEL},
-		{PROC_SUBTOMO_POLISH, PROC_SUBTOMO_POLISH_LABEL},
-		{PROC_SUBTOMO_AVERAGE, PROC_SUBTOMO_AVERAGE_LABEL},
-		{PROC_EXTERNAL, PROC_EXTERNAL_LABEL}};
+		{PROC_MASKCREATE,        PROC_MASKCREATE_LABEL},
+		{PROC_JOINSTAR,        PROC_JOINSTAR_LABEL},
+		{PROC_SUBTRACT,        PROC_SUBTRACT_LABEL},
+		{PROC_POST,             PROC_POST_LABEL},
+		{PROC_RESMAP,           PROC_RESMAP_LABEL},
+		{PROC_INIMODEL,         PROC_INIMODEL_LABEL},
+		{PROC_MULTIBODY,        PROC_MULTIBODY_LABEL},
+		{PROC_MOTIONREFINE,     PROC_MOTIONREFINE_LABEL},
+		{PROC_CTFREFINE,        PROC_CTFREFINE_LABEL},
+		{PROC_TOMO_IMPORT,      PROC_TOMO_IMPORT_LABEL},
+		{PROC_TOMO_SUBTOMO,     PROC_TOMO_SUBTOMO_LABEL},
+		{PROC_TOMO_CTFREFINE,   PROC_TOMO_CTFREFINE_LABEL},
+		{PROC_TOMO_ALIGN,       PROC_TOMO_ALIGN_LABEL},
+		{PROC_TOMO_RECONSTRUCT, PROC_TOMO_RECONSTRUCT_LABEL},
+		{PROC_EXTERNAL,         PROC_EXTERNAL_LABEL}};
 
 static std::map<std::string, int> proc_label2type = {{PROC_IMPORT_LABEL, PROC_IMPORT},
 		{PROC_MOTIONCORR_LABEL, PROC_MOTIONCORR},
@@ -324,22 +324,22 @@ static std::map<std::string, int> proc_label2type = {{PROC_IMPORT_LABEL, PROC_IM
 		{PROC_CLASSSELECT_LABEL, PROC_CLASSSELECT},
 		{PROC_2DCLASS_LABEL, PROC_2DCLASS},
 		{PROC_3DCLASS_LABEL, PROC_3DCLASS},
-		{PROC_3DAUTO_LABEL, PROC_3DAUTO},
-		{PROC_MASKCREATE_LABEL, PROC_MASKCREATE},
-		{PROC_JOINSTAR_LABEL, PROC_JOINSTAR},
-		{PROC_SUBTRACT_LABEL, PROC_SUBTRACT},
-		{PROC_POST_LABEL, PROC_POST},
-		{PROC_RESMAP_LABEL, PROC_RESMAP},
-		{PROC_INIMODEL_LABEL, PROC_INIMODEL},
-		{PROC_MULTIBODY_LABEL, PROC_MULTIBODY},
-		{PROC_MOTIONREFINE_LABEL, PROC_MOTIONREFINE},
-		{PROC_CTFREFINE_LABEL, PROC_CTFREFINE},
-		{PROC_SUBTOMO_IMPORT_LABEL, PROC_SUBTOMO_IMPORT},
-		{PROC_SUBTOMO_RECONSTRUCT_LABEL, PROC_SUBTOMO_RECONSTRUCT},
-		{PROC_SUBTOMO_CTFREFINE_LABEL, PROC_SUBTOMO_CTFREFINE},
-		{PROC_SUBTOMO_POLISH_LABEL, PROC_SUBTOMO_POLISH},
-		{PROC_SUBTOMO_AVERAGE_LABEL, PROC_SUBTOMO_AVERAGE},
-		{PROC_EXTERNAL_LABEL, PROC_EXTERNAL}};
+		{PROC_3DAUTO_LABEL,           PROC_3DAUTO},
+		{PROC_MASKCREATE_LABEL,       PROC_MASKCREATE},
+		{PROC_JOINSTAR_LABEL,         PROC_JOINSTAR},
+		{PROC_SUBTRACT_LABEL,         PROC_SUBTRACT},
+		{PROC_POST_LABEL,             PROC_POST},
+		{PROC_RESMAP_LABEL,           PROC_RESMAP},
+		{PROC_INIMODEL_LABEL,         PROC_INIMODEL},
+		{PROC_MULTIBODY_LABEL,        PROC_MULTIBODY},
+		{PROC_MOTIONREFINE_LABEL,     PROC_MOTIONREFINE},
+		{PROC_CTFREFINE_LABEL,        PROC_CTFREFINE},
+		{PROC_TOMO_IMPORT_LABEL,      PROC_TOMO_IMPORT},
+		{PROC_TOMO_SUBTOMO_LABEL,     PROC_TOMO_SUBTOMO},
+		{PROC_TOMO_CTFREFINE_LABEL,   PROC_TOMO_CTFREFINE},
+		{PROC_TOMO_ALIGN_LABEL,       PROC_TOMO_ALIGN},
+		{PROC_TOMO_RECONSTRUCT_LABEL, PROC_TOMO_RECONSTRUCT},
+		{PROC_EXTERNAL_LABEL,         PROC_EXTERNAL}};
 
 // Status a Process may have
 #define PROC_RUNNING          0 // (hopefully) running

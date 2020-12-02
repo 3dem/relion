@@ -46,14 +46,14 @@ int main(int argc, char *argv[])
 		outDir = ZIO::prepareTomoOutputDirectory(outDir, argc, argv);
 		ZIO::makeDir(outDir+"PostProcess");
 
-		int res = system(("relion_postprocess --i " + reconstructionPath + "_half1.mrc --mask "
-					  + evalMaskFn+" --o " + outDir + "PostProcess/post").c_str());
+		int res = system(("relion_postprocess --i " + reconstructionPath + "half1.mrc --mask "
+					  + evalMaskFn+" --o " + outDir + "PostProcess/postprocess").c_str());
 
 		if (res != RELION_EXIT_SUCCESS) return res;
 
-		os.refMap1 = reconstructionPath + "_half1.mrc";
-		os.refMap2 = reconstructionPath + "_half2.mrc";
-		os.refFSC = outDir + "PostProcess/post.star";
+		os.refMap1 = reconstructionPath + "half1.mrc";
+		os.refMap2 = reconstructionPath + "half2.mrc";
+		os.refFSC = outDir + "PostProcess/postprocess.star";
 
 		if (refMaskFn != "")
 		{
