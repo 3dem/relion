@@ -860,6 +860,11 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	scheduler_operator_input2->label("i2:");
 	scheduler_operator_input2->textsize(RLN_FONTSIZE-2);
 	scheduler_operator_input2->color(GUI_INPUT_COLOR);
+	scheduler_operator_name = new Fl_Input(XJOBCOL2+50, GUIHEIGHT_EXT_START+height_var+65, JOBCOLWIDTH-50, 21);
+	scheduler_operator_name->label("name:");
+	scheduler_operator_name->color(GUI_INPUT_COLOR);
+	scheduler_operator_name->textsize(RLN_FONTSIZE-2);
+
 	delete_scheduler_operator_button = new Fl_Button(XJOBCOL2+JOBCOLWIDTH-105, GUIHEIGHT_EXT_START + height_var, 50, 23);
 	delete_scheduler_operator_button->color(GUI_BUTTON_COLOR);
 	delete_scheduler_operator_button->labelfont(FL_ITALIC);
@@ -872,7 +877,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	add_scheduler_operator_button->labelsize(RLN_FONTSIZE);
 	add_scheduler_operator_button->label("Add");
 	add_scheduler_operator_button->callback(cb_add_scheduler_operator, this);
-	scheduler_operator_browser  = new Fl_Hold_Browser(XJOBCOL2, GUIHEIGHT_EXT_START + height_var + 65, JOBCOLWIDTH, 161);
+	scheduler_operator_browser  = new Fl_Hold_Browser(XJOBCOL2, GUIHEIGHT_EXT_START + height_var + 88, JOBCOLWIDTH, 138);
 	scheduler_operator_browser->callback(cb_select_scheduler_operator, this);
 	scheduler_operator_browser->textsize(RLN_FONTSIZE-2);
 	scheduler_operator_browser->end();
@@ -2109,6 +2114,7 @@ void GuiMainWindow::cb_add_scheduler_operator_i()
 	std::string input1 = (idx < 0 || idx >= scheduler_operator_input1->size()) ? "" : scheduler_operator_input1->text(idx);
 	idx = scheduler_operator_input2->value();
 	std::string input2 = (idx < 0 || idx >= scheduler_operator_input2->size()) ? "" : scheduler_operator_input2->text(idx);
+	std::string myname = scheduler_operator_name->value();
 	std::string error_message;
 	SchedulerOperator myop = schedule.initialiseOperator(type, input1, input2, output, error_message);
 	if (error_message != "")
@@ -2118,20 +2124,21 @@ void GuiMainWindow::cb_add_scheduler_operator_i()
 	}
 	else
 	{
-		std::string newname = myop.getName();
-		if (schedule.isOperator(newname))
+		if (myname=="") myname = myop.getName();
+		if (schedule.isOperator(myname))
 		{
-			fl_message("ERROR: this operator already exists...");
+			fl_message("ERROR: an operator with this name already exists...");
 			return;
 		}
 		schedule.read(DO_LOCK);
-		schedule.addOperator(myop);
+		schedule.addOperator(myop, myname);
 		schedule.write(DO_LOCK);
 		// Also reset entry fields
 		scheduler_operator_type->value(-1);
 		scheduler_operator_output->value(-1);
 		scheduler_operator_input1->value(-1);
 		scheduler_operator_input2->value(-1);
+		scheduler_operator_name->value("");
 		fillSchedulerNodesAndVariables();
 	}
 }
@@ -2221,14 +2228,17 @@ void GuiMainWindow::cb_select_scheduler_operator_i()
 		schedule.getOperatorParameters(myname, type, input1, input2, output);
 
 		scheduler_operator_type->value(scheduler_operator_type->find_item(type.c_str()));
+		scheduler_operator_name->value(myname.c_str());
 		if (scheduler_operator_output->find_item(output.c_str()))
 			scheduler_operator_output->value(scheduler_operator_output->find_item(output.c_str()));
 		else
 			scheduler_operator_output->value(scheduler_operator_output->find_item(""));
+
 		if (scheduler_operator_input1->find_item(input1.c_str()))
 			scheduler_operator_input1->value(scheduler_operator_input1->find_item(input1.c_str()));
 		else
 			scheduler_operator_input1->value(scheduler_operator_input1->find_item(""));
+
 		if (scheduler_operator_input2->find_item(input2.c_str()))
 			scheduler_operator_input2->value(scheduler_operator_input2->find_item(input2.c_str()));
 		else
@@ -2240,6 +2250,7 @@ void GuiMainWindow::cb_select_scheduler_operator_i()
 		scheduler_operator_output->value(-1);
 		scheduler_operator_input1->value(-1);
 		scheduler_operator_input2->value(-1);
+		scheduler_operator_name->value("");
 	}
 }
 
@@ -2412,11 +2423,15 @@ void GuiMainWindow::cb_scheduler_unlock(Fl_Widget *o, void* v)
 
 void GuiMainWindow::cb_scheduler_unlock_i()
 {
-	schedule.unlock();
-	show_expand_stdout = true;
-	cb_toggle_expand_stdout_i();
-	scheduler_run_grp->activate();
-	return;
+	std::string ask = "Unlocking manually is only needed for improper aborts. Make sure the scheduler is no longer running! Are you sure you want to unlock this schedule?";
+	int proceed =  fl_choice("%s", "Cancel", "Unlock!", NULL, ask.c_str());
+	if (proceed)
+	{
+		schedule.unlock();
+		show_expand_stdout = true;
+		cb_toggle_expand_stdout_i();
+		scheduler_run_grp->activate();
+	}
 }
 
 void GuiMainWindow::cb_scheduler_abort(Fl_Widget *o, void* v)
@@ -2432,7 +2447,6 @@ void GuiMainWindow::cb_scheduler_abort_i()
 	if (proceed)
 	{
 		schedule.abort();
-		return;
 	}
 }
 

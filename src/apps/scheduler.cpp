@@ -29,7 +29,7 @@ public:
 	float myconstant;
 	bool do_reset, do_run, do_abort, has_ori_value;
 	int verb;
-	std::string add, set_var, set_mode, start_node, current_node, email, type, name, value, ori_value, mode, input, input2, output, output2, boolvar;
+	std::string add, set_var, set_mode, start_node, current_node, email, type, name, opname, value, ori_value, mode, input, input2, output, output2, boolvar;
 	std::string run_pipeline;
 
 	// The actual pipeline
@@ -48,11 +48,11 @@ public:
 		std::cerr << "    --schedule test --add variable --name is_finished --value False" << std::endl;
 		std::cerr << "    --schedule test --add variable --name initial_model --value map.mrc" << std::endl;
 		std::cerr << std::endl << " ++ Add an operator node (of type float, bool or file): " << std::endl;
-		std::cerr << "    --schedule test --add operator --type " << SCHEDULE_FLOAT_OPERATOR_PLUS << " --i iter --i2 iter_step --o iter" << std::endl;
-		std::cerr << "    --schedule test --add operator --type " << SCHEDULE_FLOAT_OPERATOR_PLUS << " --i iter --i2 1 --o iter" << std::endl;
-		std::cerr << "    --schedule test --add operator --type " << SCHEDULE_OPERATOR_TOUCH_FILE << " --i initial_model" << std::endl;
-		std::cerr << "    --schedule test --add operator --type " << SCHEDULE_BOOLEAN_OPERATOR_GT << " --i iter --i2 10 --o is_finished" << std::endl;
-		std::cerr << "    --schedule test --add operator --type " << SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS << " --i initial_model --o is_finished" << std::endl;
+		std::cerr << "    --schedule test --add operator --name INCR_iter--type " << SCHEDULE_FLOAT_OPERATOR_PLUS << " --i iter --i2 iter_step --o iter" << std::endl;
+		std::cerr << "    --schedule test --add operator --name INCR_iter --type " << SCHEDULE_FLOAT_OPERATOR_PLUS << " --i iter --i2 1 --o iter" << std::endl;
+		std::cerr << "    --schedule test --add operator --name CHECK_iter --type " << SCHEDULE_BOOLEAN_OPERATOR_GT << " --i iter --i2 10 --o is_finished" << std::endl;
+		std::cerr << "    --schedule test --add operator --name TOUCH_inimodel --type " << SCHEDULE_OPERATOR_TOUCH_FILE << " --i initial_model" << std::endl;
+		std::cerr << "    --schedule test --add operator --name CHECK_inimodel --type " << SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS << " --i initial_model --o is_finished" << std::endl;
 		std::cerr << std::endl << " ++ Add a job node: " << std::endl;
 		std::cerr << "    --schedule test --add job --i my_import --mode continue/new/overwrite" << std::endl;
 		std::cerr << "    --schedule test --add job --i exit" << std::endl;
@@ -83,7 +83,7 @@ public:
 		boolvar = parser.getOption("--bool", "Name of boolean variable (for forks)", "");
 		output = parser.getOption("--o", "Specify output of the element ", "");
 		output2 = parser.getOption("--o2", "Specify 2nd output of the element ", "");
-		name = parser.getOption("--name", "Name of the variable or job to be added","");
+		name = parser.getOption("--name", "Name of the variable, operator or job to be added","");
 		value = parser.getOption("--value", "Value of the variable to be added","");
 		ori_value = parser.getOption("--original_value", "Original value of the variable to be added","");
 		mode = parser.getOption("--mode", "Mode (for jobs): new, overwrite or continue","");
@@ -176,7 +176,7 @@ public:
 				std::string error;
 				SchedulerOperator myop = schedule.initialiseOperator(type, input, input2, output, error);
 				if (error != "") REPORT_ERROR(error);
-				else schedule.addOperator(myop);
+				else schedule.addOperator(myop, name);
 			}
 			else if (add == "job")
 			{

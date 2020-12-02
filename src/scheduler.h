@@ -112,6 +112,7 @@ bool isScheduleOperator(std::string name);
 #define SCHEDULE_OPERATOR_DELETE_FILE "delete_file"
 #define SCHEDULE_WAIT_OPERATOR_SINCE_LAST_TIME "wait"
 #define SCHEDULE_EMAIL_OPERATOR "email"
+#define SCHEDULE_EXIT_MAXTIME "exit_maxtime"
 #define SCHEDULE_EXIT_OPERATOR "exit"
 
 // A class that performs operators on variables
@@ -291,7 +292,7 @@ public:
     // Add operators (of any kind), also adds its corresponding node
     SchedulerOperator initialiseOperator(std::string type, std::string input_name, std::string input2_name,
     		std::string output_name, std::string &error_message);
-    void addOperator(SchedulerOperator &op);
+    void addOperator(SchedulerOperator &op, std::string &myname);
 
     // Add a new job, also adds its corresponding node
     void addJob(RelionJob &myjob, std::string jobname, std::string mode);
@@ -326,6 +327,11 @@ public:
 
     // Modify a job to set variables and input nodes from the Scheduler
     void setVariablesInJob(RelionJob &job, FileName original_job_name, bool &needs_a_restart);
+
+    // Modify an operator to set variables from the Scheduler
+    void setVariablesInOperator(SchedulerOperator &my_op);
+    // And tidy up tmp variables again...
+    void removeVariablesFromOperator(SchedulerOperator &my_op);
 
     // Run the Schedule
     void run(PipeLine &pipeline);

@@ -21,7 +21,10 @@
 
 // one global timestamp...
 static time_t annotated_time;
+static time_t exit_time;
 bool has_annotated_time = false;
+bool has_exit_time = false;
+
 
 // Global variables, but only with reach within this file!
 std::map<std::string, SchedulerBooleanVariable> scheduler_global_bools;
@@ -100,15 +103,16 @@ std::string SchedulerOperator::initialise(std::string _type, std::string _input1
 	// Check input1
 	if ((type == SCHEDULE_BOOLEAN_OPERATOR_AND ||
 		type == SCHEDULE_BOOLEAN_OPERATOR_OR )  && !isBooleanVariable(_input1))
-		return "ERROR: boolean operator does not have valid boolean input1: " + _input1;
+		return "ERROR: operator does not have valid boolean input1: " + _input1;
 	if ((type == SCHEDULE_FLOAT_OPERATOR_SET ||
 		 type == SCHEDULE_FLOAT_OPERATOR_PLUS ||
 		 type == SCHEDULE_FLOAT_OPERATOR_MINUS ||
 		 type == SCHEDULE_FLOAT_OPERATOR_MULT ||
 		 type == SCHEDULE_FLOAT_OPERATOR_DIVIDE ||
-		 type == SCHEDULE_FLOAT_OPERATOR_ROUND
+		 type == SCHEDULE_FLOAT_OPERATOR_ROUND ||
+		 type == SCHEDULE_EXIT_MAXTIME
 		 ) && !isFloatVariable(_input1))
-		return "ERROR: float operator does not have valid float input1: " + _input1;
+		return "ERROR: operator does not have valid float input1: " + _input1;
 	if ((type == SCHEDULE_BOOLEAN_OPERATOR_READ_STAR ||
 		 type == SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS ||
 		 type == SCHEDULE_FLOAT_OPERATOR_COUNT_IMAGES ||
@@ -137,7 +141,7 @@ std::string SchedulerOperator::initialise(std::string _type, std::string _input1
 	if ((type == SCHEDULE_BOOLEAN_OPERATOR_AND ||
 		 type == SCHEDULE_BOOLEAN_OPERATOR_OR
 		 ) && !isBooleanVariable(_input2))
-		return "ERROR: boolean operator does not have valid boolean input2: " + _input2;
+		return "ERROR: operator does not have valid boolean input2: " + _input2;
 	if ((type == SCHEDULE_BOOLEAN_OPERATOR_GT ||
 		 type == SCHEDULE_BOOLEAN_OPERATOR_LT ||
 		 type == SCHEDULE_BOOLEAN_OPERATOR_EQ ||
@@ -491,7 +495,19 @@ bool SchedulerOperator::performOperation() const
 			if (wait_seconds > 0)
 			{
 				std::cout << " + Waiting for " << wait_seconds << " seconds ..." << std::endl;
-				sleep(wait_seconds);
+				RFLOAT waited = 0.;
+				while (waited < wait_seconds)
+				{
+					sleep(10);
+					waited += 10.;
+					// Abort mechanism
+					if (pipeline_control_check_abort_job())
+					{
+						std::cout << " + Interrupted waiting due to a abort signal." << std::endl;
+						break;
+					}
+				}
+
 				std::cout << " + Finished waiting." << std::endl;
 			}
 			else
@@ -522,9 +538,34 @@ bool SchedulerOperator::performOperation() const
 
 		schedulerSendEmail(mymessage);
 	}
+	else if (type == SCHEDULE_EXIT_MAXTIME)
+	{
+		// The first time round, set the exit time, else check whether it has passed
+		if (!has_exit_time)
+		{
+			time_t my_time = time(NULL);
+			// input1 maximum time is in hours, add to my_time in seconds
+			exit_time = my_time + scheduler_global_floats[input1].value*3600;
+			has_exit_time = true;
+			tm *gmt_time = gmtime(&exit_time);
+			std::cout << " + Setting exit time at: " << asctime(gmt_time) << std::endl;
+		}
+		else
+		{
+			time_t my_time = time(NULL);
+			if (my_time >= exit_time)
+			{
+				tm *gmt_time = gmtime(&my_time);
+				std::cout << " + It is now: " << asctime(gmt_time) << std::endl;
+				std::cout << " + The schedule has reached its exit time. Exiting ..." << std::endl;
+				return false; // to exit the schedule
+			}
+		}
+
+	}
 	else if (type == SCHEDULE_EXIT_OPERATOR)
 	{
-		std::cout << " + The schedule has reached an exit point ..." << std::endl;
+		std::cout << " + The schedule has reached an exit point. Exiting ..." << std::endl;
 		return false; // to exit the schedule
 	}
 	else
@@ -1219,9 +1260,9 @@ SchedulerOperator Schedule::initialiseOperator(std::string type, std::string inp
 	return myop;
 }
 
-void Schedule::addOperator(SchedulerOperator &myop)
+void Schedule::addOperator(SchedulerOperator &myop, std::string &myname)
 {
-	std::string myname = myop.getName();
+	if (name == "") myname = myop.getName();
 	scheduler_global_operators[myname] = myop;
 }
 
@@ -1486,45 +1527,9 @@ bool Schedule::gotoNextJob()
 		if (isOperator(current_node))
 		{
 			SchedulerOperator my_op = scheduler_global_operators[current_node];
-
-			// Now change any original job names in input/output for their corresponding current_names
-			std::map<std::string, SchedulerJob>::iterator it;
-			for ( it = jobs.begin(); it != jobs.end(); it++ )
-			{
-				if (isStringVariable(my_op.input1) && scheduler_global_strings[my_op.input1].value.contains(it->first))
-				{
-					// Make a new temporary stringVariable, act on it with my_op and then delete again?
-					FileName newval = scheduler_global_strings[my_op.input1].value;
-					newval.replaceAllSubstrings(name+it->first+"/", it->second.current_name);
-					addStringVariable("xxx_tmp_input1", newval);
-					my_op.input1 = "xxx_tmp_input1";
-				}
-				if (isStringVariable(my_op.input2) && scheduler_global_strings[my_op.input2].value.contains(it->first))
-				{
-					FileName newval = scheduler_global_strings[my_op.input2].value;
-					newval.replaceAllSubstrings(name+it->first+"/", it->second.current_name);
-					addStringVariable("xxx_tmp_input2", newval);
-					my_op.input2 = "xxx_tmp_input2";
-				}
-				if (isStringVariable(my_op.output) && scheduler_global_strings[my_op.output].value.contains(it->first))
-				{
-					FileName newval = scheduler_global_strings[my_op.output].value;
-					newval.replaceAllSubstrings(name+it->first+"/", it->second.current_name);
-					addStringVariable("xxx_tmp_output", newval);
-					my_op.output = "xxx_tmp_input1";
-				}
-			}
-
+			setVariablesInOperator(my_op);
 			bool op_success = my_op.performOperation();
-			if (isStringVariable("xxx_tmp_input1")) removeVariable("xxx_tmp_input1");
-			if (isStringVariable("xxx_tmp_input2")) removeVariable("xxx_tmp_input2");
-			if (isStringVariable("xxx_tmp_output"))
-			{
-				// Set output in the variable from the original operator, and then remove tmp_output
-				std::string myname = scheduler_global_operators[current_node].output;
-				scheduler_global_strings[myname].value = scheduler_global_strings["xxx_tmp_output"].value;
-				removeVariable("xxx_tmp_output");
-			}
+			removeVariablesFromOperator(my_op);
 
 			if (verb > 0 && op_success)
 			{
@@ -1543,6 +1548,56 @@ bool Schedule::gotoNextJob()
 	}
 
 	return false;
+}
+
+
+// Modify an operator to set variables from the Scheduler
+void Schedule::setVariablesInOperator(SchedulerOperator &my_op)
+{
+
+	// Now change any original job names in input/output for their corresponding current_names
+	std::map<std::string, SchedulerJob>::iterator it;
+	for ( it = jobs.begin(); it != jobs.end(); it++ )
+	{
+		if (isStringVariable(my_op.input1) && scheduler_global_strings[my_op.input1].value.contains(it->first))
+		{
+			// Make a new temporary stringVariable, act on it with my_op and then delete again?
+			FileName newval = scheduler_global_strings[my_op.input1].value;
+			newval.replaceAllSubstrings(name+it->first+"/", it->second.current_name);
+			addStringVariable("xxx_tmp_input1", newval);
+			my_op.input1 = "xxx_tmp_input1";
+		}
+		if (isStringVariable(my_op.input2) && scheduler_global_strings[my_op.input2].value.contains(it->first))
+		{
+			FileName newval = scheduler_global_strings[my_op.input2].value;
+			newval.replaceAllSubstrings(name+it->first+"/", it->second.current_name);
+			addStringVariable("xxx_tmp_input2", newval);
+			my_op.input2 = "xxx_tmp_input2";
+		}
+		if (isStringVariable(my_op.output) && scheduler_global_strings[my_op.output].value.contains(it->first))
+		{
+			FileName newval = scheduler_global_strings[my_op.output].value;
+			newval.replaceAllSubstrings(name+it->first+"/", it->second.current_name);
+			addStringVariable("xxx_tmp_output", newval);
+			my_op.output = "xxx_tmp_input1";
+		}
+	}
+}
+
+void Schedule::removeVariablesFromOperator(SchedulerOperator &my_op)
+{
+
+	if (isStringVariable("xxx_tmp_input1")) removeVariable("xxx_tmp_input1");
+	if (isStringVariable("xxx_tmp_input2")) removeVariable("xxx_tmp_input2");
+
+	if (isStringVariable("xxx_tmp_output"))
+	{
+		// Set output in the variable from the original operator, and then remove tmp_output
+		std::string myname = scheduler_global_operators[current_node].output;
+		scheduler_global_strings[myname].value = scheduler_global_strings["xxx_tmp_output"].value;
+		removeVariable("xxx_tmp_output");
+	}
+
 }
 
 // Modify a job to set variables from the Scheduler
@@ -1683,7 +1738,11 @@ void Schedule::run(PipeLine &pipeline)
 	bool has_more_jobs = true;
     if (isOperator(current_node))
     {
-		bool op_success = scheduler_global_operators[current_node].performOperation();
+		SchedulerOperator my_op = scheduler_global_operators[current_node];
+    	setVariablesInOperator(my_op);
+		bool op_success = my_op.performOperation();
+		removeVariablesFromOperator(my_op);
+
 		if (op_success)
 		{
 			if (scheduler_global_operators[current_node].output != "undefined" && verb > 0)
@@ -1767,6 +1826,7 @@ void Schedule::run(PipeLine &pipeline)
 		for (long int inode = 0; inode < pipeline.processList[current_job].inputNodeList.size(); inode++)
 		{
 			long int mynode = pipeline.processList[current_job].inputNodeList[inode];
+			int itry = 0;
 			while (!exists(pipeline.nodeList[mynode].name))
 			{
 				std::cerr << " + -- Warning " << pipeline.nodeList[mynode].name << " does not exist. Waiting 10 seconds ... " << std::endl;
@@ -1778,7 +1838,14 @@ void Schedule::run(PipeLine &pipeline)
 					write(DO_LOCK);
 					exit(RELION_EXIT_ABORTED);
 				}
+				else if (itry > 20)
+				{
+					std::cout << " + -- Gave up on waiting for " << pipeline.nodeList[mynode].name << ". Aborting ... " << std::endl;
+					write(DO_LOCK);
+					exit(RELION_EXIT_ABORTED);
+				}
 
+				itry++;
 			}
 		}
 

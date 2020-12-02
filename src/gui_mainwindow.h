@@ -110,7 +110,7 @@ static Fl_Menu_Item job_has_started_options[] = {
 static Fl_Hold_Browser *scheduler_variable_browser;
 static Fl_Button *set_scheduler_variable_button, *add_scheduler_operator_button;
 static Fl_Button *delete_scheduler_variable_button, *delete_scheduler_operator_button;
-static Fl_Input *scheduler_variable_name, *scheduler_variable_value;
+static Fl_Input *scheduler_variable_name, *scheduler_variable_value, *scheduler_operator_name;
 //Scheduler Operators
 static Fl_Hold_Browser *scheduler_operator_browser;
 static std::vector<std::string> operators_list;
@@ -152,6 +152,7 @@ static Fl_Menu_Item operator_type_options[] = {
 	   {SCHEDULE_OPERATOR_DELETE_FILE},
 	   {SCHEDULE_WAIT_OPERATOR_SINCE_LAST_TIME},
 	   {SCHEDULE_EMAIL_OPERATOR},
+	   {SCHEDULE_EXIT_MAXTIME},
 	   {SCHEDULE_EXIT_OPERATOR},
 	   {0} // this should be the last entry
 	   };
