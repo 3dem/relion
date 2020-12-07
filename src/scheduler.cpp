@@ -656,8 +656,10 @@ void Schedule::read(bool do_lock, FileName fn)
 #ifdef DEBUG_LOCK
 	std::cerr << "entering read lock_message=" << lock_message << std::endl;
 #endif
-	FileName name_wo_dir = name;
-	name_wo_dir = name_wo_dir.beforeLastOf("/");
+
+	if (fn == "") fn = name + "schedule.star";
+
+	FileName name_wo_dir = fn.beforeLastOf("/");
 	FileName dir_lock=".relion_lock_schedule_" + name_wo_dir.afterLastOf("/"), fn_lock=dir_lock + "/lock_schedule";;
 	if (do_lock && !do_read_only)
 	{
@@ -701,8 +703,6 @@ void Schedule::read(bool do_lock, FileName fn)
 		fh << lock_message << std::endl;
 		fh.close();
 	}
-
-	if (fn == "") fn = name + "schedule.star";
 
 	// Clear current model
 	clear();
@@ -816,9 +816,6 @@ void Schedule::read(bool do_lock, FileName fn)
 
 	// Close file handler
 	in.close();
-
-	// Also read in the schedule_pipeline (no need to lock now?)
-	schedule_pipeline.read();
 
 }
 
@@ -978,9 +975,6 @@ void Schedule::write(bool do_lock, FileName fn)
 
 	// Close the file handler
 	fh.close();
-
-	// Also write out the schedule_pipeline (no need to lock now?)
-	schedule_pipeline.write();
 
 	if (do_lock)
 	{
@@ -1278,7 +1272,7 @@ void Schedule::addJob(RelionJob &myjob, std::string jobname, std::string mode)
 	// Check whether the jobname is unique
 	if (isNode(jobname))
 		REPORT_ERROR("ERROR: trying to add a JobNode that already exists: " + jobname);
-	// Now add this job to the local schedule_pipeline
+	// Now add this job to the local Schedule
 	std::string error_message;
 	std::vector<std::string> commands;
 	std::string final_command;
@@ -1289,13 +1283,8 @@ void Schedule::addJob(RelionJob &myjob, std::string jobname, std::string mode)
 
 	myjob.write(output_name);
 
-	if (!myjob.getCommands(output_name, commands, final_command, false, schedule_pipeline.job_counter, error_message))
+	if (!myjob.getCommands(output_name, commands, final_command, false, 1, error_message))
 		REPORT_ERROR("ERROR in getting commands for scheduled job: " + error_message);
-
-	int current_job = schedule_pipeline.addJob(myjob, PROC_SCHEDULED, false, false); // 1st false is do_overwrite, 2nd false is do_write_minipipeline
-
-	if (current_job < 0)
-		REPORT_ERROR("ERROR: current job should not be negative now ...");
 
 	SchedulerJob mynode(jobname, mode, false);
 	jobs[jobname] = mynode;
@@ -1387,21 +1376,6 @@ void Schedule::copy(FileName newname)
 	{
 		(it->second.value).replaceAllSubstrings(name, newname);
 		(it->second.original_value).replaceAllSubstrings(name, newname);
-	}
-
-	// Also replace all names of Nodes and Processes in the Pipeliner
-	for (int i = 0; i < schedule_pipeline.nodeList.size(); i++)
-	{
-		FileName myname = schedule_pipeline.nodeList[i].name;
-		if (myname.contains(name)) myname.replaceAllSubstrings(name, newname);
-		schedule_pipeline.nodeList[i].name = myname;
-	}
-
-	for (int i = 0; i < schedule_pipeline.processList.size(); i++)
-	{
-		FileName myname = schedule_pipeline.processList[i].name;
-		if (myname.contains(name)) myname.replaceAllSubstrings(name, newname);
-		schedule_pipeline.processList[i].name = myname;
 	}
 
 	// Replace all names in the pipeliner jobs
@@ -1526,20 +1500,7 @@ bool Schedule::gotoNextJob()
 
 		if (isOperator(current_node))
 		{
-			SchedulerOperator my_op = scheduler_global_operators[current_node];
-			setVariablesInOperator(my_op);
-			bool op_success = my_op.performOperation();
-			removeVariablesFromOperator(my_op);
-
-			if (verb > 0 && op_success)
-			{
-				if (scheduler_global_operators[current_node].output != "undefined")
-				{
-					std::cout << " + " << current_node << " => " <<getVariableValueAsString(scheduler_global_operators[current_node].output) << std::endl;
-				}
-			}
-
-			if (!op_success) return false;
+			if (!executeOperator(current_node)) return false;
 		}
 		else // this is a job, get its current_name and options
 		{
@@ -1551,167 +1512,222 @@ bool Schedule::gotoNextJob()
 }
 
 
-// Modify an operator to set variables from the Scheduler
-void Schedule::setVariablesInOperator(SchedulerOperator &my_op)
+bool Schedule::changeStringForJobnames(FileName &mystring)
 {
 
-	// Now change any original job names in input/output for their corresponding current_names
-	std::map<std::string, SchedulerJob>::iterator it;
-	for ( it = jobs.begin(); it != jobs.end(); it++ )
+	// Check for any strings containing the 'name' of this Schedule; if so, replace by current_name of the corresponding job
+	if (mystring.contains(name))
 	{
-		if (isStringVariable(my_op.input1) && scheduler_global_strings[my_op.input1].value.contains(it->first))
-		{
-			// Make a new temporary stringVariable, act on it with my_op and then delete again?
-			FileName newval = scheduler_global_strings[my_op.input1].value;
-			newval.replaceAllSubstrings(name+it->first+"/", it->second.current_name);
-			addStringVariable("xxx_tmp_input1", newval);
-			my_op.input1 = "xxx_tmp_input1";
-		}
-		if (isStringVariable(my_op.input2) && scheduler_global_strings[my_op.input2].value.contains(it->first))
-		{
-			FileName newval = scheduler_global_strings[my_op.input2].value;
-			newval.replaceAllSubstrings(name+it->first+"/", it->second.current_name);
-			addStringVariable("xxx_tmp_input2", newval);
-			my_op.input2 = "xxx_tmp_input2";
-		}
-		if (isStringVariable(my_op.output) && scheduler_global_strings[my_op.output].value.contains(it->first))
-		{
-			FileName newval = scheduler_global_strings[my_op.output].value;
-			newval.replaceAllSubstrings(name+it->first+"/", it->second.current_name);
-			addStringVariable("xxx_tmp_output", newval);
-			my_op.output = "xxx_tmp_input1";
-		}
+
+		// Remove leading directory and tailing slash to get the process current_name in the pipeline_scheduler
+		FileName my_ori_name = (mystring.afterFirstOf(name)).beforeLastOf("/");
+		// find that process in the nodes, and get its current current_name
+		std::string my_current_name =jobs[my_ori_name].current_name;
+		mystring.replaceAllSubstrings(name  + my_ori_name + '/', my_current_name);
+		//std::cerr << " A REPLACING: " << name << my_ori_name << " TO: " << mystring << std::endl;
+		return true;
+
 	}
+	// Also check for any other Schedule that might run in parallel
+	else if (mystring.contains("Schedules/"))
+	{
+
+		// Remove leading directory and tailing slash to get the process current_name in the pipeline_scheduler
+		FileName my_schedule_name = (mystring.afterFirstOf("Schedules/")).beforeFirstOf("/");
+		FileName my_schedule_star = my_schedule_name+"/schedule.star";
+		if (exists(my_schedule_star))
+		{
+			Schedule other_schedule;
+			// Do a save (locked read/write cycle to prevent crashes with this other pipeline simultaneously writing to the same file
+			other_schedule.read(DO_LOCK);
+			other_schedule.write(DO_LOCK);
+
+			// Remove leading directory and tailing slash to get the process current_name in the pipeline_scheduler
+			FileName my_ori_name = (mystring.afterFirstOf(my_schedule_name)).beforeLastOf("/");
+			FileName my_current_name = "undefined";
+			for (std::map<std::string, SchedulerJob>::iterator it2 = other_schedule.jobs.begin(); it2 != other_schedule.jobs.end(); it2++ )
+			{
+				if (my_ori_name == it2->first)
+				{
+					my_current_name = it2->second.current_name;
+				}
+			}
+
+			if (my_current_name == "undefined")
+			{
+				REPORT_ERROR("ERROR: cannot find " + my_ori_name + " in schedule: " + my_schedule_star);
+			}
+
+			mystring.replaceAllSubstrings(my_schedule_name + my_ori_name + '/', my_current_name);
+			//std::cerr << " B REPLACING: " << my_schedule_name  << my_ori_name  << " TO:" << mystring  << std::endl;
+			return true;
+		}
+		else
+		{
+			REPORT_ERROR("ERROR: cannot find Schedule STAR file: " + my_schedule_star);
+		}
+
+	}
+
+	return false;
+
 }
 
-void Schedule::removeVariablesFromOperator(SchedulerOperator &my_op)
+// Modify an operator to set variables from the Scheduler
+bool Schedule::executeOperator(FileName current_node)
 {
+	SchedulerOperator my_op = scheduler_global_operators[current_node];
+
+	// Use temporary variables to store the current values, then perform the operation and delete the temporary ones again
+	// This is so that the original values in input1,2 or output are retained
+	if (isStringVariable(my_op.input1))
+	{
+		FileName mystring = scheduler_global_strings[my_op.input1].value;
+		if (changeStringForJobnames(mystring))
+		{
+			addStringVariable("xxx_tmp_input1", mystring);
+			my_op.input1 = "xxx_tmp_input1";
+		}
+	}
+	if (isStringVariable(my_op.input2))
+	{
+		FileName mystring = scheduler_global_strings[my_op.input2].value;
+		if (changeStringForJobnames(mystring))
+		{
+			addStringVariable("xxx_tmp_input2", mystring);
+			my_op.input1 = "xxx_tmp_input2";
+		}
+	}
+	if (isStringVariable(my_op.output))
+	{
+		FileName mystring = scheduler_global_strings[my_op.output].value;
+		if (changeStringForJobnames(mystring))
+		{
+			addStringVariable("xxx_tmp_output", mystring);
+			my_op.output = "xxx_tmp_output";
+		}
+	}
+
+	bool my_success = my_op.performOperation();
 
 	if (isStringVariable("xxx_tmp_input1")) removeVariable("xxx_tmp_input1");
 	if (isStringVariable("xxx_tmp_input2")) removeVariable("xxx_tmp_input2");
-
 	if (isStringVariable("xxx_tmp_output"))
 	{
 		// Set output in the variable from the original operator, and then remove tmp_output
-		std::string myname = scheduler_global_operators[current_node].output;
-		scheduler_global_strings[myname].value = scheduler_global_strings["xxx_tmp_output"].value;
+		std::string myoutputvariable = scheduler_global_operators[current_node].output;
+		scheduler_global_strings[myoutputvariable].value = scheduler_global_strings["xxx_tmp_output"].value;
 		removeVariable("xxx_tmp_output");
 	}
 
+	if (verb > 0 && scheduler_global_operators[current_node].output != "undefined")
+	{
+		std::cout << " + " << current_node << " => " <<getVariableValueAsString(scheduler_global_operators[current_node].output) << std::endl;
+	}
+
+	return my_success;
+
 }
+
 
 // Modify a job to set variables from the Scheduler
-void Schedule::setVariablesInJob(RelionJob &job, FileName original_job_name, bool &needs_a_restart)
+RelionJob Schedule::prepareJob(FileName current_node)
 {
-	needs_a_restart = false;
 
-	RelionJob ori_job;
-	bool dummy;
-	ori_job.read(name + original_job_name + '/', dummy, true);
+	RelionJob myjob;
+	bool dummy, is_continue, do_overwrite_current, needs_to_add_job = false;
 
-	// Check where this job gets its input from: change names from local scheduler ones to the current pipeline
-	int ori_process = schedule_pipeline.findProcessByName(name + original_job_name + '/');
-	// Loop over all input nodes to this job
-	for (int inode = 0; inode <  schedule_pipeline.processList[ori_process].inputNodeList.size(); inode++)
-	{
-		int mynode = schedule_pipeline.processList[ori_process].inputNodeList[inode];
-		// find from which pipeline_scheduler job this jobs gets its input nodes
-		int output_from_process =  schedule_pipeline.nodeList[mynode].outputFromProcess;
+	// Always re-read from the original job.star from the Schedule directory,
+	// because $$ variables and input jobnames may have been replaced when continuing existing jobs
+	myjob.read(name + current_node + '/', dummy, true);
 
-		if (output_from_process < 0)
-		{
-			// This was not a process, just continue
-			break;
-		}
-
-		// Get the original current_name in the pipeline_scheduler of this job
-		FileName my_ori_name = schedule_pipeline.processList[output_from_process].name;
-		// Remove leading directory and tailing slash to get the process current_name in the pipeline_scheduler
-		FileName my_process_name = (my_ori_name.afterFirstOf(name)).beforeLastOf("/");
-		// find that process in the nodes, and get its current current_name
-		std::string my_current_name =jobs[my_process_name].current_name;
-
-		// Change all instances of the my_ori_name to my_current_name, take from ori_job and set into this job
-		for (std::map<std::string,JobOption>::iterator it=ori_job.joboptions.begin(); it!=ori_job.joboptions.end(); ++it)
-		{
-			FileName mystring = (it->second).value;
-			if (mystring.contains(my_ori_name))
-			{
-				mystring.replaceAllSubstrings(my_ori_name, my_current_name);
-				FileName myval = job.joboptions[it->first].value;
-				myval = myval.beforeLastOf("/") + "/";
-				// If any of the input nodes are not the same as my_current_name (from continuation jobs) or my_ori_name (from new jobs)
-				if (myval != my_current_name && myval != my_ori_name)
-				{
-					std::cerr << "restart needed!" << std::endl;
-					needs_a_restart = true;
-				}
-				job.joboptions[it->first].value = mystring;
-			}
-		}
-	}
-
-	// Check whether there are any options with a value containing $$, which is the sign for inserting Scheduler variables
-	for (std::map<std::string,JobOption>::iterator it=ori_job.joboptions.begin(); it!=ori_job.joboptions.end(); ++it)
+    // Check whether there are any joboption values with a jobname from one of the processes in this Scheduler
+	// And replace these by their corresponding 'current_name'
+	for (std::map<std::string,JobOption>::iterator it=myjob.joboptions.begin(); it!=myjob.joboptions.end(); ++it)
 	{
 		FileName mystring = (it->second).value;
-		std::vector< std::string > myvars;
-		bool has_found = false;
-		while (mystring.contains("$$"))
+
+		if (changeStringForJobnames(mystring)) myjob.joboptions[it->first].value = mystring;
+
+		// Also check for options with a value containing $$, and replace with the current value of the corresponding Variable
+		else if (mystring.contains("$$"))
 		{
-			has_found = true;
-			FileName before = mystring.beforeFirstOf("$$");
-			FileName after = mystring.afterFirstOf("$$");
-			std::vector< std::string > splits;
-			int nr_splits = splitString(after, " ", splits);
-			if (splits.size() == 0)
-				REPORT_ERROR(" ERROR: cannot find anything after $$ sign in string: " + mystring);
-			std::string mypat = splits[0];
-			myvars.push_back(mypat);
-
-			// Found an option that needs replacement! Now find which variable to insert
-			std::string my_value;
-			if (isBooleanVariable(mypat))
+			std::vector< std::string > myvars;
+			bool has_found = false;
+			while (mystring.contains("$$"))
 			{
-				if (job.joboptions[it->first].joboption_type != JOBOPTION_BOOLEAN)
-					REPORT_ERROR(" ERROR: trying to set a BooleanVariable: " + mypat + " into a non-boolean option: " + it->first);
+				has_found = true;
+				FileName before = mystring.beforeFirstOf("$$");
+				FileName after = mystring.afterFirstOf("$$");
+				std::vector< std::string > splits;
+				int nr_splits = splitString(after, " ", splits);
+				if (splits.size() == 0)
+				{
+					REPORT_ERROR(" ERROR: cannot find anything after $$ sign in string: " + mystring);
+				}
+				std::string mypat = splits[0];
+				myvars.push_back(mypat);
 
-				my_value = (scheduler_global_bools[mypat].value) ? "Yes" : "No";
+				// Found an option that needs replacement! Now find which variable to insert
+				std::string my_value;
+				if (isBooleanVariable(mypat))
+				{
+					if (myjob.joboptions[it->first].joboption_type != JOBOPTION_BOOLEAN)
+					{
+						REPORT_ERROR(" ERROR: trying to set a BooleanVariable: " + mypat + " into a non-boolean option: " + it->first);
+					}
+
+					my_value = (scheduler_global_bools[mypat].value) ? "Yes" : "No";
+				}
+				else if (isFloatVariable(mypat))
+				{
+					if (myjob.joboptions[it->first].joboption_type == JOBOPTION_BOOLEAN)
+					{
+						REPORT_ERROR(" ERROR: trying to set FloatVariable: " + mypat + " into a boolean option: " + it->first);
+					}
+
+					my_value = floatToString(scheduler_global_floats[mypat].value);
+				}
+				else if (isStringVariable(splits[0]))
+				{
+					if (myjob.joboptions[it->first].joboption_type == JOBOPTION_BOOLEAN)
+					{
+						REPORT_ERROR(" ERROR: trying to set StringVariable: " + mypat + " into a boolean option: " + it->first);
+					}
+					if (myjob.joboptions[it->first].joboption_type == JOBOPTION_SLIDER)
+					{
+						REPORT_ERROR(" ERROR: trying to set StringVariable: " + mypat + " into a slider option: " + it->first);
+					}
+
+					my_value = scheduler_global_strings[mypat].value;
+				}
+				else
+				{
+					REPORT_ERROR(" ERROR: variable in job is not part of this Schedule: " + mypat);
+				}
+
+				mystring = before + my_value;
+				for (int i = 1; i < splits.size(); i++)
+					mystring += " " + splits[i];
 			}
-			else if (isFloatVariable(mypat))
+
+			if (has_found)
 			{
-				if (job.joboptions[it->first].joboption_type == JOBOPTION_BOOLEAN)
-					REPORT_ERROR(" ERROR: trying to set FloatVariable: " + mypat + " into a boolean option: " + it->first);
-
-				my_value = floatToString(scheduler_global_floats[mypat].value);
+				myjob.joboptions[it->first].value = mystring;
+				std::string myvarsstr = "";
+				for (int i = 0; i < myvars.size(); i++)
+					myvarsstr+= myvars[i]+ " ";
+				if (verb > 2) std::cout << " +++ Setting joboption " << it->first << " to " << mystring << " based on variable(s): " << myvarsstr<< std::endl;
 			}
-			else if (isStringVariable(splits[0]))
-			{
-				if (job.joboptions[it->first].joboption_type == JOBOPTION_BOOLEAN)
-					REPORT_ERROR(" ERROR: trying to set StringVariable: " + mypat + " into a boolean option: " + it->first);
-				if (job.joboptions[it->first].joboption_type == JOBOPTION_SLIDER)
-					REPORT_ERROR(" ERROR: trying to set StringVariable: " + mypat + " into a slider option: " + it->first);
 
-				my_value = scheduler_global_strings[mypat].value;
-			}
-			else
-				REPORT_ERROR(" ERROR: variable in job is not part of this Schedule: " + mypat);
+		} //end if mystring contains $$
 
-			mystring = before + my_value;
-			for (int i = 1; i < splits.size(); i++)
-				mystring += " " + splits[i];
-		}
-
-		if (has_found)
-		{
-			job.joboptions[it->first].value = mystring;
-			std::string myvarsstr = "";
-			for (int i = 0; i < myvars.size(); i++)
-				myvarsstr+= myvars[i]+ " ";
-			if (verb > 2) std::cout << " +++ Setting joboption " << it->first << " to " << mystring << " based on variable(s): " << myvarsstr<< std::endl;
-		}
 	}
+
+	return myjob;
 }
+
+
 
 void Schedule::run(PipeLine &pipeline)
 {
@@ -1738,21 +1754,7 @@ void Schedule::run(PipeLine &pipeline)
 	bool has_more_jobs = true;
     if (isOperator(current_node))
     {
-		SchedulerOperator my_op = scheduler_global_operators[current_node];
-    	setVariablesInOperator(my_op);
-		bool op_success = my_op.performOperation();
-		removeVariablesFromOperator(my_op);
-
-		if (op_success)
-		{
-			if (scheduler_global_operators[current_node].output != "undefined" && verb > 0)
-				std::cout << " + " << current_node << " => " <<getVariableValueAsString(scheduler_global_operators[current_node].output) << std::endl;
-		}
-		else
-		{
-			REPORT_ERROR("ERROR: something went wrong with execution of the initial operator...");
-		}
-
+		if (!executeOperator(current_node)) REPORT_ERROR("ERROR: something went wrong with execution of the initial operator...");
 		has_more_jobs = gotoNextJob();
     }
 
@@ -1767,60 +1769,36 @@ void Schedule::run(PipeLine &pipeline)
 			exit(RELION_EXIT_ABORTED);
 		}
 
-		RelionJob myjob;
-		bool is_continue, do_overwrite_current, dummy;
+		RelionJob myjob = prepareJob(current_node);
+
+		bool is_continue = false, do_overwrite_current = false, dummy;
 		int current_job;
 		if (!jobs[current_node].job_has_started || jobs[current_node].mode == SCHEDULE_NODE_JOB_MODE_NEW)
 		{
-			// Read the job from inside the Schedule schedule_pipeline to a new job
-			bool dummy;
-			myjob.read(name + current_node + '/', dummy, true); // true means initialise the job
-
-			// This function replaces variable calls starting with a '$$' from the original_job into the current_job
-			// It will also take care of dealing with inheritance of the correct inputNode names
-			setVariablesInJob(myjob, current_node, dummy);
 
 			// Now add this job to the pipeline we will actually be running in
 			current_job = pipeline.addScheduledJob(myjob);
-			is_continue = false;
-			do_overwrite_current = false;
 
 			// Set the current_name of the current node now
 			jobs[current_node].current_name = pipeline.processList[current_job].name;
-				if (verb > 0) std::cout << " + Creating new Job: " << jobs[current_node].current_name << " from Node: " << current_node << std::endl;
+			if (verb > 0) std::cout << " + Creating new Job: " << jobs[current_node].current_name << " from Node: " << current_node << std::endl;
+
 		}
 		else if (jobs[current_node].mode == SCHEDULE_NODE_JOB_MODE_CONTINUE || jobs[current_node].mode == SCHEDULE_NODE_JOB_MODE_OVERWRITE)
 		{
+
 			is_continue = (jobs[current_node].mode == SCHEDULE_NODE_JOB_MODE_CONTINUE);
 			do_overwrite_current = (jobs[current_node].mode == SCHEDULE_NODE_JOB_MODE_OVERWRITE);
-
 			current_job = pipeline.findProcessByName(jobs[current_node].current_name);
+
 			if (current_job < 0)
 				REPORT_ERROR("ERROR: RunSchedule cannot find process with name: " + jobs[current_node].current_name);
 
-			// Read the job from the pipeline we are running in
-			if (!myjob.read(pipeline.processList[current_job].name, dummy, true)) // true means also initialise the job
-				REPORT_ERROR("There was an error reading job: " + pipeline.processList[current_job].name);
-
-			// This function replaces variable calls starting with a '$$' from the original_job into the current_job
-			// It will also take care of dealing with inheritance of the correct inputNode names
-			bool needs_a_restart = false;
-			setVariablesInJob(myjob, current_node, needs_a_restart);
-
-			if (needs_a_restart)
-			{
-				// Now add this job to the pipeline we will actually be running in
-				current_job = pipeline.addScheduledJob(myjob);
-				is_continue = false;
-				do_overwrite_current = false;
-
-				// Set the current_name of the current node now
-				jobs[current_node].current_name = pipeline.processList[current_job].name;
-				if (verb > 0) std::cout << " + Creating new Job: " << jobs[current_node].current_name << " from node " << current_node << std::endl;
-			}
 		}
 		else
+		{
 			REPORT_ERROR("ERROR: unrecognised mode for running a new process: " + jobs[current_node].mode);
+		}
 
 		// Check whether the input nodes are there, before executing the job
 		for (long int inode = 0; inode < pipeline.processList[current_job].inputNodeList.size(); inode++)
@@ -1838,7 +1816,7 @@ void Schedule::run(PipeLine &pipeline)
 					write(DO_LOCK);
 					exit(RELION_EXIT_ABORTED);
 				}
-				else if (itry > 20)
+				else if (itry > 3)
 				{
 					std::cout << " + -- Gave up on waiting for " << pipeline.nodeList[mynode].name << ". Aborting ... " << std::endl;
 					write(DO_LOCK);

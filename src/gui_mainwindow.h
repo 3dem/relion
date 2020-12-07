@@ -158,7 +158,7 @@ static Fl_Menu_Item operator_type_options[] = {
 	   };
 static Fl_Choice *scheduler_operator_type, *scheduler_operator_output, *scheduler_operator_input1, *scheduler_operator_input2;
 // Scheduler jobs
-static Fl_Hold_Browser *scheduler_job_browser, *scheduler_input_job_browser, *scheduler_output_job_browser;
+static Fl_Hold_Browser *scheduler_job_browser;
 static Fl_Button *scheduler_delete_job_button;
 
 //Scheduler Edges
@@ -412,6 +412,9 @@ private:
 
     static void cb_delete_scheduler_job(Fl_Widget*, void*);
     inline void cb_delete_scheduler_job_i();
+
+    static void cb_select_scheduler_job(Fl_Widget*, void*);
+    inline void cb_select_scheduler_job_i();
 
     static void cb_scheduler_add_job(Fl_Widget*, void*);
     inline void cb_scheduler_add_job_i();

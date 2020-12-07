@@ -214,8 +214,6 @@ public:
 	std::map<std::string, SchedulerJob> jobs;
 	std::vector<SchedulerEdge> edges;
 
-	PipeLine schedule_pipeline;
-
 public:
 
 	Schedule()
@@ -228,9 +226,7 @@ public:
 	void setName(std::string _name)
 	{
 		name = _name;
-		schedule_pipeline.setName(_name + "schedule");
 	}
-
 
 	void read(bool do_lock = false, FileName fn = "");
 
@@ -324,14 +320,15 @@ public:
     bool gotoNextNode();
     bool gotoNextJob();
 
+    // Checks a string for any jobnames that are part of this or any other Schedules and changes for their corresponding current_name
+    // Returns true if my string was changed
+    bool changeStringForJobnames(FileName &mystring);
 
-    // Modify a job to set variables and input nodes from the Scheduler
-    void setVariablesInJob(RelionJob &job, FileName original_job_name, bool &needs_a_restart);
+    // Execute an operator from the Scheduler and return true if successful
+    bool executeOperator(FileName current_node);
 
-    // Modify an operator to set variables from the Scheduler
-    void setVariablesInOperator(SchedulerOperator &my_op);
-    // And tidy up tmp variables again...
-    void removeVariablesFromOperator(SchedulerOperator &my_op);
+    // This read in the original job.star, checks for pipeliner node dependencies and $$ variables and adds the new job to the pipeliner if neccesary
+    RelionJob prepareJob(FileName current_node);
 
     // Run the Schedule
     void run(PipeLine &pipeline);

@@ -677,6 +677,10 @@ int PipeLine::addScheduledJob(std::string typestring, std::string fn_options)
 // Adds a scheduled job to the pipeline from the command line
 int PipeLine::addScheduledJob(int job_type, std::string fn_options)
 {
+	// Make sure we have the very latest version of the pipeline
+	read(DO_LOCK, "lock from addScheduledJob");
+	write(DO_LOCK);
+
 	RelionJob job;
 	job.initialise(job_type);
 	std::vector<std::string> options;
@@ -699,6 +703,10 @@ int PipeLine::addScheduledJob(int job_type, std::string fn_options)
 // Adds a scheduled job to the pipeline from the command line
 int PipeLine::addScheduledJob(RelionJob &job, std::string fn_options)
 {
+	// Make sure we have the very latest version of the pipeline
+	read(DO_LOCK, "lock from addScheduledJob");
+	write(DO_LOCK);
+
 	if (fn_options != "")
 	{
 		std::vector<std::string> options;
