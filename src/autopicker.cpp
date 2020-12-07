@@ -2852,7 +2852,7 @@ void AutoPicker::trainTopaz()
 		FileName abspath = realpath(fn_mic);
 		symlink(abspath, fn_local_mic);
 
-		abspath = realpath(fn_local_mic_proc);
+		abspath = realpath(fn_local_mic_proc, true); // true means allow non-existing path
 
 		// start with filling the training set
 		if (imic%2==0 || have_enough_test)
