@@ -534,13 +534,24 @@ int mktree(const FileName &fn_dir, mode_t mode)
 	return mdret;
 }
 
-FileName realpath(const FileName &fn)
+FileName realpath(const FileName &fn, bool allow_nonexisting_path)
 {
 	char retval[PATH_MAX];
 
-	if (realpath(fn.c_str(), retval) == NULL)
+	if (allow_nonexisting_path)
 	{
-		REPORT_ERROR(std::string("Failed to resolve realpath of ") + fn);
+		realpath(fn.c_str(), retval);
+		if (retval == NULL)
+		{
+			REPORT_ERROR(std::string("Failed to resolve realpath of ") + fn);
+		}
+	}
+	else
+	{
+		if (realpath(fn.c_str(), retval) == NULL)
+		{
+			REPORT_ERROR(std::string("Failed to resolve realpath of ") + fn);
+		}
 	}
 
 	return FileName(retval);
@@ -548,9 +559,18 @@ FileName realpath(const FileName &fn)
 
 void symlink(const FileName &src, const FileName &dst)
 {
+	// If the output file exists, remove it first
+	if (exists(dst))
+	{
+		if (remove(dst.c_str()) != 0)
+		{
+			REPORT_ERROR(std::string("Failed to remove existing file ") + dst.c_str() + " to make symlink ");
+		}
+	}
+
 	if (symlink(src.c_str(), dst.c_str()) != 0)
 	{
-		REPORT_ERROR(std::string("Failed to make a symlink from ") + src.c_str() + " to " + dst.c_str());	
+		REPORT_ERROR(std::string("Failed to make a symlink from ") + src.c_str() + " to " + dst.c_str());
 	}
 }
 

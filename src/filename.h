@@ -500,7 +500,7 @@ void move(const FileName &fn_src, const FileName &fn_dest);
 int mktree(const FileName &fn_dir, mode_t mode = 0777);
 
 /* wrapper to realpath in stdlib */
-FileName realpath(const FileName &fn);
+FileName realpath(const FileName &fn, bool allow_nonexisting_path = false);
 
 /* wrapper to symlink in stdlib */
 void symlink(const FileName &src, const FileName &dst);
