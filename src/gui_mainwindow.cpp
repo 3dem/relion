@@ -2272,10 +2272,10 @@ void GuiMainWindow::cb_select_scheduler_job_i()
 
 	// Get the jobtype straight from the job.star file
 	FileName jobname = scheduler_job_browser->text(idx);
-	FileName jobdir = schedule.name + jobname;
+	FileName jobdir = schedule.name + jobname + "/";
 	FileName typelabel;
 	MetaDataTable MDjob;
-	MDjob.read(jobdir+"/job.star", "job");
+	MDjob.read(jobdir+"job.star", "job");
 	MDjob.getValue(EMDL_JOB_TYPE_LABEL, typelabel);
 	int itype = proc_label2type[typelabel];
 
