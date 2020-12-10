@@ -758,6 +758,28 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	scheduler_run_button->labelsize(14);
 	scheduler_run_button->callback(cb_scheduler_run, this);
 
+	scheduler_job_name = new Fl_Input(GUIWIDTH - 550, h-83, 150, 25, "Name:");
+	scheduler_job_name->color(GUI_INPUT_COLOR);
+
+	// Select one of three modes for adding a new job
+	scheduler_job_mode  = new Fl_Choice(GUIWIDTH - 400 , h-83, 80, 25);
+	scheduler_job_mode->label("");
+	scheduler_job_mode->color(GUI_BUTTON_COLOR);
+	scheduler_job_mode->textsize(12);
+	scheduler_job_mode->menu(job_mode_options);
+
+	scheduler_job_has_started = new Fl_Choice(GUIWIDTH - 320 , h-83, 100, 25);
+	scheduler_job_has_started->label("");
+	scheduler_job_has_started->color(GUI_BUTTON_COLOR);
+	scheduler_job_has_started->textsize(12);
+	scheduler_job_has_started->menu(job_has_started_options);
+
+	add_job_button = new Fl_Button(GUIWIDTH - 110 , h-90, 100, 32, "Add job");
+	add_job_button->color(GUI_RUNBUTTON_COLOR);
+	add_job_button->labelfont(FL_ITALIC);
+	add_job_button->labelsize(14);
+	add_job_button->callback(cb_scheduler_add_job, this);
+
 	scheduler_run_grp->end();
 
 	scheduler_unlock_button = new Fl_Button(GUIWIDTH - 256, GUIHEIGHT_EXT_START + 1, 80, 25);
@@ -777,31 +799,13 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 
 	//scheduler_grp->end();
 
-	scheduler_job_name = new Fl_Input(GUIWIDTH - 550, h-83, 150, 25, "Name:");
-	scheduler_job_name->color(GUI_INPUT_COLOR);
 
-	add_job_button = new Fl_Button(GUIWIDTH - 110 , h-90, 100, 32, "Add job");
-	add_job_button->color(GUI_RUNBUTTON_COLOR);
-	add_job_button->labelfont(FL_ITALIC);
-	add_job_button->labelsize(14);
-	add_job_button->callback(cb_scheduler_add_job, this);
-
-	// Select one of three modes for adding a new job
-	scheduler_job_mode  = new Fl_Choice(GUIWIDTH - 400 , h-83, 80, 25);
-	scheduler_job_mode->label("");
-	scheduler_job_mode->color(GUI_BUTTON_COLOR);
-	scheduler_job_mode->textsize(12);
-	scheduler_job_mode->menu(job_mode_options);
-
-	scheduler_job_has_started = new Fl_Choice(GUIWIDTH - 320 , h-83, 100, 25);
-	scheduler_job_has_started->label("");
-	scheduler_job_has_started->color(GUI_BUTTON_COLOR);
-	scheduler_job_has_started->textsize(12);
-	scheduler_job_has_started->menu(job_has_started_options);
 	// TODO: fill options for this choice!
 
 	scheduler_jobs_grp = new Fl_Group(0, 0, 4*w, 4*h);
 	scheduler_jobs_grp->begin();
+
+	scheduler_run_grp->begin();
 
 	// Scheduler variables
 	int height_var = 35;
@@ -1514,13 +1518,13 @@ void GuiMainWindow::tickTimeLastChanged()
 
 void GuiMainWindow::updateJobLists()
 {
-	pipeline.checkProcessCompletion();
 	if (show_scheduler)
 	{
 		fillSchedulerNodesAndVariables();
 	}
 	else
 	{
+		pipeline.checkProcessCompletion();
 		fillRunningJobLists();
 		fillToAndFromJobLists();
 	}
@@ -1757,20 +1761,6 @@ void GuiMainWindow::cb_display_io_node_i()
 		// TODO: write error message saying this is no longer possible: use Continue to pick more/inspect results!
 		FileName fn_suffix = pipeline.nodeList[mynode].name;
 
-		// A manualpicker jobwindow for display of micrographs....
-		RelionJob manualpickjob;
-		FileName fn_job = ".gui_manualpick";
-		bool iscont=false;
-		if (exists(fn_job+"job.star") || exists(fn_job+"run.job"))
-		{
-			manualpickjob.read(fn_job.c_str(), iscont, true); // true means do initialise
-		}
-		else
-		{
-			fl_message("ERROR: Save a Manual picking job parameter file (using the Save jobs settings option from the Jobs menu) before displaying coordinate files. ");
-			return;
-		}
-
 		// Get the name of the micrograph STAR file from reading the suffix file
 		if (fn_suffix.getExtension() == "star")
 		{
@@ -1792,6 +1782,20 @@ void GuiMainWindow::cb_display_io_node_i()
 				command += " --pickname " + fn_suffix;
 				command += " --odir " + fn_dirs;
 			}
+		}
+		else
+		{
+			fl_message("Only coordinates in .star format, generated in the pipeline, can be displayed here.");
+		}
+
+		// A manualpicker jobwindow for display of micrographs....
+		RelionJob manualpickjob;
+		FileName fn_job = ".gui_manualpick";
+		bool iscont=false;
+		if (exists(fn_job+"job.star") || exists(fn_job+"run.job"))
+		{
+			manualpickjob.read(fn_job.c_str(), iscont, true); // true means do initialise
+
 			command += " --scale " + manualpickjob.joboptions["micscale"].getString();
 			command += " --sigma_contrast " + manualpickjob.joboptions["sigma_contrast"].getString();
 			command += " --black " + manualpickjob.joboptions["black_val"].getString();
@@ -1828,13 +1832,18 @@ void GuiMainWindow::cb_display_io_node_i()
 					command += " --color_star " + manualpickjob.joboptions["fn_color"].getString();
 			}
 
-			// Other arguments for extraction
-			command += " " + manualpickjob.joboptions["other_args"].getString() + " &";
 		}
 		else
 		{
-			fl_message("Only coordinates in .star format, generated in the pipeline, can be displayed here.");
+			fl_message("WARNING: Using default of scale=0.25, sigma_contrast 3, lowpass 20A and circle diameter of 100A. \n Save a Manual picking job parameter file (using the Save jobs settings option from the Jobs menu) to use other settings. ");
+			command += " --scale 0.25";
+			command += " --sigma_contrast 3";
+			command += " --lowpass 20";
+			command += " --particle_diameter 100";
 		}
+
+		// Other arguments for extraction
+		command += " " + manualpickjob.joboptions["other_args"].getString() + " &";
 	}
 	else if (pipeline.nodeList[mynode].type == NODE_PDF_LOGFILE)
 	{
@@ -1878,6 +1887,11 @@ void GuiMainWindow::cb_add_scheduler_edge_i()
 	else
 	{
 		input = scheduler_edge_input->text(idx);
+	}
+	if (!schedule.checkUniqueInput(input))
+	{
+		fl_message("ERROR: an edge or fork with this input node already exists.");
+		return;
 	}
 
 	idx = scheduler_edge_output->value();
@@ -2122,7 +2136,7 @@ void GuiMainWindow::cb_delete_scheduler_operator_i()
 	if (scheduler_operator_input2->value() >= 0)
 		input2 = scheduler_operator_input2->text(scheduler_operator_input2->value());
 
-	const std::string name = schedule.getOperatorName(type, input1, input2, output);
+	const std::string name = scheduler_operator_name->value();
 
 	schedule.read(DO_LOCK);
 	schedule.removeOperator(name);
@@ -2215,43 +2229,30 @@ void GuiMainWindow::cb_delete_scheduler_job(Fl_Widget* o, void* v)
 
 void GuiMainWindow::cb_delete_scheduler_job_i()
 {
-	std::vector<bool> deleteProcesses, deleteNodes;
-	pipeline.deleteJobGetNodesAndProcesses(current_job, true, deleteNodes, deleteProcesses);
+
+	// Show the 'selected' group, hide the others
+	int idx = scheduler_job_browser->value();
+	if (idx < 0) return;
+
+	// Get the jobtype straight from the job.star file
+	FileName jobname = scheduler_job_browser->text(idx);
 
 	// Before we do anything: confirm this is really what the user wants to do....
-	std::string ask;
-	ask = "Are you sure you want to delete the following jobs, and their connecting edges? \n";
-	for (size_t i = 0; i < deleteProcesses.size(); i++)
-	{
-		if (deleteProcesses[i])
-		{
-			std::string name = getJobNameForDisplay(pipeline.processList[i]);
-			ask += " - " + name + "\n";
-		}
-	}
+	std::string ask = "Are you sure you want to delete job " + jobname + " and all its connecting edges?";
 	if (fl_choice("%s", "Cancel", "Move", NULL, ask.c_str()))
 	{
 
+
 		// Remove the jobs from the schedule itself
 		schedule.read(DO_LOCK);
-		for (int i = 0; i < deleteProcesses.size(); i++)
-			if (deleteProcesses[i]) schedule.removeJob(getJobNameForDisplay(pipeline.processList[i]));
+		schedule.removeJob(jobname);
 		schedule.write(DO_LOCK);
 
-		// And remove from the local pipeliner
-		pipeline.deleteNodesAndProcesses(deleteNodes, deleteProcesses);
-
-		// Reset current_job
-		current_job = -1;
-		scheduler_job_name->value("");
-		fillStdOutAndErr();
-
 		// Update all job lists in the main GUI
-		updateJobLists();
+		fillSchedulerNodesAndVariables();
 
 	}
 
-	std::string jobname = scheduler_job_name->value();
 }
 
 void GuiMainWindow::cb_select_scheduler_job(Fl_Widget* o, void* v)
@@ -2342,7 +2343,7 @@ void GuiMainWindow::cb_scheduler_add_job_i()
 
 		// Get the jobtype straight from the job.star file
 		FileName jobname = scheduler_job_browser->text(idx);
-		gui_jobwindows[iwin]->myjob.write(schedule.name + jobname);
+		gui_jobwindows[iwin]->myjob.write(schedule.name + jobname + '/');
 
 		// Also write the possibly updated job_mode
 		std::string mode = job_mode_options[scheduler_job_mode->value()].label();
@@ -2354,11 +2355,17 @@ void GuiMainWindow::cb_scheduler_add_job_i()
 	}
 	else
 	{
+
 		// Add job to the schedule
 		// Get the mode, and the jobname
 		if (jobname == "")
 		{
 			fl_message("%s","You need to provide a Name for this job in the scheduler.");
+			return;
+		}
+		else if (schedule.isJob(jobname))
+		{
+			fl_message("ERROR: a job with this name already exists...");
 			return;
 		}
 
@@ -2375,7 +2382,6 @@ void GuiMainWindow::cb_scheduler_add_job_i()
 		schedule.write(DO_LOCK);
 
 		scheduler_job_name->value("");
-		updateJobLists();
 	}
 
 }
@@ -3391,6 +3397,8 @@ void GuiMainWindow::cb_toggle_schedule_i(bool do_pipeline, FileName fn_new_sched
 			pipeline.write();
 		}
 
+		updateJobLists();
+
 	}
 	else
 	{
@@ -3421,11 +3429,11 @@ void GuiMainWindow::cb_toggle_schedule_i(bool do_pipeline, FileName fn_new_sched
 			schedule.write(DONT_LOCK); // empty write
 		}
 		fillStdOutAndErr();
+		fillSchedulerNodesAndVariables();
 	}
 
 	cb_toggle_pipeliner_scheduler_i();
 
-	updateJobLists();
 }
 
 void GuiMainWindow::cb_start_pipeliner(Fl_Widget* o, void* v)

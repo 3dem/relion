@@ -308,6 +308,7 @@ public:
     void copy(FileName newname);
 
     // Add edges and forks in between the nodes
+    bool checkUniqueInput(std::string inputnode_name);
     void addEdge(std::string inputnode_name, std::string outputnode_name);
     void addFork(std::string inputnode_name, std::string mybool_name, std::string outputnode_name, std::string outputnode_name_if_false );
 
@@ -322,7 +323,7 @@ public:
 
     // Checks a string for any jobnames that are part of this or any other Schedules and changes for their corresponding current_name
     // Returns true if my string was changed
-    bool changeStringForJobnames(FileName &mystring);
+    bool changeStringForJobnames(FileName &mystring, FileName current_node);
 
     // Execute an operator from the Scheduler and return true if successful
     bool executeOperator(FileName current_node);

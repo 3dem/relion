@@ -548,7 +548,7 @@ bool SchedulerOperator::performOperation() const
 			exit_time = my_time + scheduler_global_floats[input1].value*3600;
 			has_exit_time = true;
 			tm *gmt_time = gmtime(&exit_time);
-			std::cout << " + Setting exit time at: " << asctime(gmt_time) << std::endl;
+			std::cout << " + Setting exit time at: " << asctime(gmt_time);
 		}
 		else
 		{
@@ -556,7 +556,7 @@ bool SchedulerOperator::performOperation() const
 			if (my_time >= exit_time)
 			{
 				tm *gmt_time = gmtime(&my_time);
-				std::cout << " + It is now: " << asctime(gmt_time) << std::endl;
+				std::cout << " + It is now: " << asctime(gmt_time);
 				std::cout << " + The schedule has reached its exit time. Exiting ..." << std::endl;
 				return false; // to exit the schedule
 			}
@@ -1418,6 +1418,16 @@ void schedulerSendEmail(std::string message, std::string subject)
 	}
 }
 
+bool Schedule::checkUniqueInput(std::string inputnode_name)
+{
+	for (int i = 0; i < edges.size(); i++)
+	{
+		if (edges[i].inputNode == inputnode_name) return false;
+	}
+
+	return true;
+}
+
 void Schedule::addEdge(std::string inputnode_name, std::string outputnode_name)
 {
 	SchedulerEdge myval(inputnode_name, outputnode_name);
@@ -1512,10 +1522,11 @@ bool Schedule::gotoNextJob()
 }
 
 
-bool Schedule::changeStringForJobnames(FileName &mystring)
+bool Schedule::changeStringForJobnames(FileName &mystring, FileName current_node)
 {
 
 	// Check for any strings containing the 'name' of this Schedule; if so, replace by current_name of the corresponding job
+	FileName original_string = mystring;
 	if (mystring.contains(name))
 	{
 
@@ -1523,8 +1534,10 @@ bool Schedule::changeStringForJobnames(FileName &mystring)
 		FileName my_ori_name = (mystring.afterFirstOf(name)).beforeLastOf("/");
 		// find that process in the nodes, and get its current current_name
 		std::string my_current_name =jobs[my_ori_name].current_name;
-		mystring.replaceAllSubstrings(name  + my_ori_name + '/', my_current_name);
-		//std::cerr << " A REPLACING: " << name << my_ori_name << " TO: " << mystring << std::endl;
+		std::string to_replace = name  + my_ori_name + '/';
+		mystring.replaceAllSubstrings(to_replace, my_current_name);
+		std::cout << " ++ in " << current_node << ": " << original_string  << " -> " << mystring << std::endl;
+
 		return true;
 
 	}
@@ -1534,32 +1547,40 @@ bool Schedule::changeStringForJobnames(FileName &mystring)
 
 		// Remove leading directory and tailing slash to get the process current_name in the pipeline_scheduler
 		FileName my_schedule_name = (mystring.afterFirstOf("Schedules/")).beforeFirstOf("/");
-		FileName my_schedule_star = my_schedule_name+"/schedule.star";
+		FileName my_schedule_star = "Schedules/"+my_schedule_name+"/schedule.star";
 		if (exists(my_schedule_star))
 		{
-			Schedule other_schedule;
-			// Do a save (locked read/write cycle to prevent crashes with this other pipeline simultaneously writing to the same file
-			other_schedule.read(DO_LOCK);
-			other_schedule.write(DO_LOCK);
 
 			// Remove leading directory and tailing slash to get the process current_name in the pipeline_scheduler
-			FileName my_ori_name = (mystring.afterFirstOf(my_schedule_name)).beforeLastOf("/");
-			FileName my_current_name = "undefined";
-			for (std::map<std::string, SchedulerJob>::iterator it2 = other_schedule.jobs.begin(); it2 != other_schedule.jobs.end(); it2++ )
+			FileName my_ori_name = (mystring.afterFirstOf(my_schedule_name+"/")).beforeLastOf("/");
+
+			// Read only the jobs table from the other schedule;
+			// otherwise global variables like scheduler_global_floats, strings etc get overwritten!
+			MetaDataTable MDjobs;
+			MDjobs.read(my_schedule_star, "schedule_jobs");
+			FileName job_current_name, job_ori_name, my_current_name = "undefined";
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDjobs)
 			{
-				if (my_ori_name == it2->first)
+				MDjobs.getValue(EMDL_SCHEDULE_JOB_ORI_NAME, job_ori_name);
+				MDjobs.getValue(EMDL_SCHEDULE_JOB_NAME, job_current_name);
+				if (job_ori_name == my_ori_name)
 				{
-					my_current_name = it2->second.current_name;
+					my_current_name = job_current_name;
 				}
 			}
 
+			if (my_current_name[my_current_name.length()-1] != '/')
+				my_current_name += "/";
+
 			if (my_current_name == "undefined")
 			{
-				REPORT_ERROR("ERROR: cannot find " + my_ori_name + " in schedule: " + my_schedule_star);
+				REPORT_ERROR("ERROR: cannot find job " + my_ori_name + " in schedule: " + my_schedule_star);
 			}
+			std::string to_replace = "Schedules/" + my_schedule_name + "/" + my_ori_name + "/";
+			mystring.replaceAllSubstrings(to_replace, my_current_name);
 
-			mystring.replaceAllSubstrings(my_schedule_name + my_ori_name + '/', my_current_name);
-			//std::cerr << " B REPLACING: " << my_schedule_name  << my_ori_name  << " TO:" << mystring  << std::endl;
+			std::cout << " ++ in " << current_node << ": " << original_string  << " -> " << mystring << std::endl;
+
 			return true;
 		}
 		else
@@ -1583,7 +1604,7 @@ bool Schedule::executeOperator(FileName current_node)
 	if (isStringVariable(my_op.input1))
 	{
 		FileName mystring = scheduler_global_strings[my_op.input1].value;
-		if (changeStringForJobnames(mystring))
+		if (changeStringForJobnames(mystring, current_node))
 		{
 			addStringVariable("xxx_tmp_input1", mystring);
 			my_op.input1 = "xxx_tmp_input1";
@@ -1592,7 +1613,7 @@ bool Schedule::executeOperator(FileName current_node)
 	if (isStringVariable(my_op.input2))
 	{
 		FileName mystring = scheduler_global_strings[my_op.input2].value;
-		if (changeStringForJobnames(mystring))
+		if (changeStringForJobnames(mystring, current_node))
 		{
 			addStringVariable("xxx_tmp_input2", mystring);
 			my_op.input1 = "xxx_tmp_input2";
@@ -1601,7 +1622,7 @@ bool Schedule::executeOperator(FileName current_node)
 	if (isStringVariable(my_op.output))
 	{
 		FileName mystring = scheduler_global_strings[my_op.output].value;
-		if (changeStringForJobnames(mystring))
+		if (changeStringForJobnames(mystring, current_node))
 		{
 			addStringVariable("xxx_tmp_output", mystring);
 			my_op.output = "xxx_tmp_output";
@@ -1647,10 +1668,8 @@ RelionJob Schedule::prepareJob(FileName current_node)
 	{
 		FileName mystring = (it->second).value;
 
-		if (changeStringForJobnames(mystring)) myjob.joboptions[it->first].value = mystring;
-
-		// Also check for options with a value containing $$, and replace with the current value of the corresponding Variable
-		else if (mystring.contains("$$"))
+		// Check for options with a value containing $$, and replace with the current value of the corresponding Variable
+		if (mystring.contains("$$"))
 		{
 			std::vector< std::string > myvars;
 			bool has_found = false;
@@ -1721,6 +1740,9 @@ RelionJob Schedule::prepareJob(FileName current_node)
 			}
 
 		} //end if mystring contains $$
+
+		// Also check for jobnames
+		if (changeStringForJobnames(mystring, current_node)) myjob.joboptions[it->first].value = mystring;
 
 	}
 
@@ -1807,7 +1829,7 @@ void Schedule::run(PipeLine &pipeline)
 			int itry = 0;
 			while (!exists(pipeline.nodeList[mynode].name))
 			{
-				std::cerr << " + -- Warning " << pipeline.nodeList[mynode].name << " does not exist. Waiting 10 seconds ... " << std::endl;
+				std::cerr << " + Warning " << pipeline.nodeList[mynode].name << " does not exist. Waiting 10 seconds ... " << std::endl;
 				sleep(10);
 
 				// Abort mechanism
@@ -1818,7 +1840,7 @@ void Schedule::run(PipeLine &pipeline)
 				}
 				else if (itry > 3)
 				{
-					std::cout << " + -- Gave up on waiting for " << pipeline.nodeList[mynode].name << ". Aborting ... " << std::endl;
+					std::cout << " + Gave up on waiting for " << pipeline.nodeList[mynode].name << ". Aborting ... " << std::endl;
 					write(DO_LOCK);
 					exit(RELION_EXIT_ABORTED);
 				}
@@ -1891,13 +1913,14 @@ void Schedule::unlock()
 
 void Schedule::abort()
 {
-	std::cout << " Aborting schedule while at: " << current_node << std::endl;
-	if (isJob(current_node))
+	std::cout << " + Aborting schedule while at: " << current_node << std::endl;
+	// Only abort the job if current_name is no longer the original name from the Scheduler!
+	if (isJob(current_node) && current_node != jobs[current_node].current_name)
 	{
 		touch(jobs[current_node].current_name + RELION_JOB_ABORT_NOW);
-		std::cerr << " Touched file: " << jobs[current_node].current_name << RELION_JOB_ABORT_NOW << std::endl;
+		std::cout << " ++ Touched file: " << jobs[current_node].current_name << RELION_JOB_ABORT_NOW << std::endl;
 	}
 	touch(name + RELION_JOB_ABORT_NOW);
-	std::cerr << " Touched file: " << name << RELION_JOB_ABORT_NOW << std::endl;
-	std::cerr << " Now wait for the job and the scheduler to abort ..." << std::endl;
+	std::cout << " ++ Touched file: " << name << RELION_JOB_ABORT_NOW << std::endl;
+	std::cout << " ++ Now wait for the job and the scheduler to abort ..." << std::endl;
 }

@@ -1910,13 +1910,16 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 	Node node(joboptions["fn_input_autopick"].getString(), joboptions["fn_input_autopick"].node_type);
 	inputNodes.push_back(node);
 
-	// Output new version: no longer save coords_suffix nodetype, but 2-column list of micrographs and coordinate files
-	Node node3(outputname + "autopick.star", NODE_MIC_COORDS);
-	outputNodes.push_back(node3);
+	if (!(joboptions["do_topaz"].getBoolean() && joboptions["do_topaz_train"].getBoolean()))
+	{
+		// Output new version: no longer save coords_suffix nodetype, but 2-column list of micrographs and coordinate files
+		Node node3(outputname + "autopick.star", NODE_MIC_COORDS);
+		outputNodes.push_back(node3);
 
-	// PDF with histograms of the eigenvalues
-	Node node3b(outputname + "logfile.pdf", NODE_PDF_LOGFILE);
-	outputNodes.push_back(node3b);
+		// PDF with histograms of the eigenvalues
+		Node node3b(outputname + "logfile.pdf", NODE_PDF_LOGFILE);
+		outputNodes.push_back(node3b);
+	}
 
 	command += " --odir " + outputname;
 	command += " --pickname autopick";
