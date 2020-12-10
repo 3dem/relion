@@ -2514,7 +2514,6 @@ void GuiMainWindow::cb_scheduler_prev_i()
 	if (schedule.current_node == "undefined") return;
 
 	std::string myprev = schedule.getPreviousNode();
-	std::cerr << " myprev= " << myprev << std::endl;
 	if (myprev == "undefined")
 	{
 		fl_message("ERROR: previous node is undefined");
