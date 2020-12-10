@@ -1536,7 +1536,7 @@ bool Schedule::changeStringForJobnames(FileName &mystring, FileName current_node
 		std::string my_current_name =jobs[my_ori_name].current_name;
 		std::string to_replace = name  + my_ori_name + '/';
 		mystring.replaceAllSubstrings(to_replace, my_current_name);
-		std::cout << " ++ in " << current_node << ": " << original_string  << " -> " << mystring << std::endl;
+		std::cout << " + " << current_node << ": " << original_string  << " -> " << mystring << std::endl;
 
 		return true;
 
@@ -1643,7 +1643,7 @@ bool Schedule::executeOperator(FileName current_node)
 
 	if (verb > 0 && scheduler_global_operators[current_node].output != "undefined")
 	{
-		std::cout << " + " << current_node << " => " <<getVariableValueAsString(scheduler_global_operators[current_node].output) << std::endl;
+		std::cout << " + " << current_node << ": " << scheduler_global_operators[current_node].output << " -> " <<getVariableValueAsString(scheduler_global_operators[current_node].output) << std::endl;
 	}
 
 	return my_success;
