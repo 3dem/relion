@@ -2859,8 +2859,9 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 			error_message = "Warning: invalid optimiser.star filename provided for continuation run!";
 			return false;
 		}
-		int it = (int)textToFloat((joboptions["fn_cont"].getString().substr(pos_it+3, 6)).c_str());
-		fn_run += "_ct" + floatToString(it);
+		// SHWS 10dec2020: switch off using run_ctXX output for continue jobs, as this will affect Schedulers
+		//int it = (int)textToFloat((joboptions["fn_cont"].getString().substr(pos_it+3, 6)).c_str());
+		//fn_run += "_ct" + floatToString(it);
 		command += " --continue " + joboptions["fn_cont"].getString();
 	}
 
@@ -3110,8 +3111,9 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 		int pos_op = joboptions["fn_cont"].getString().rfind("_optimiser");
 		if (pos_it < 0 || pos_op < 0)
 			std::cerr << "Warning: invalid optimiser.star filename provided for continuation run: " << joboptions["fn_cont"].getString() << std::endl;
-		int it = (int)textToFloat((joboptions["fn_cont"].getString().substr(pos_it+3, 6)).c_str());
-		fn_run += "_ct" + floatToString(it);
+		// SHWS 10dec2020: switch off using run_ctXX output for continue jobs, as this will affect Schedulers
+		//int it = (int)textToFloat((joboptions["fn_cont"].getString().substr(pos_it+3, 6)).c_str());
+		//fn_run += "_ct" + floatToString(it);
 		command += " --continue " + joboptions["fn_cont"].getString();
 	}
 
@@ -3438,8 +3440,9 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 		int pos_op = joboptions["fn_cont"].getString().rfind("_optimiser");
 		if (pos_it < 0 || pos_op < 0)
 			std::cerr << "Warning: invalid optimiser.star filename provided for continuation run: " << joboptions["fn_cont"].getString() << std::endl;
-		int it = (int)textToFloat((joboptions["fn_cont"].getString().substr(pos_it+3, 6)).c_str());
-		fn_run += "_ct" + floatToString(it);;
+		// SHWS 10dec2020: switch off using run_ctXX output for continue jobs, as this will affect Schedulers
+		//int it = (int)textToFloat((joboptions["fn_cont"].getString().substr(pos_it+3, 6)).c_str());
+		//fn_run += "_ct" + floatToString(it);;
 		command += " --continue " + joboptions["fn_cont"].getString();
 	}
 
@@ -3889,8 +3892,9 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
                         return false;
                 }
 
-		int it = (int)textToFloat((joboptions["fn_cont"].getString().substr(pos_it+3, 6)).c_str());
-		fn_run += "_ct" + floatToString(it);
+		// SHWS 10dec2020: switch off using run_ctXX output for continue jobs, as this will affect Schedulers
+		//int it = (int)textToFloat((joboptions["fn_cont"].getString().substr(pos_it+3, 6)).c_str());
+		//fn_run += "_ct" + floatToString(it);
 		command += " --continue " + joboptions["fn_cont"].getString();
 	}
 
