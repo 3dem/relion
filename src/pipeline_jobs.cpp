@@ -6165,8 +6165,9 @@ bool RelionJob::getCommandsSubtomoAverageJob(std::string &outputname, std::vecto
 		if (SNR > 0.) command += " --SNR " + joboptions["snr"].getString();
 
 		// Running stuff
+		command += " --j " + joboptions["nr_threads"].getString();
 		command += " --j_out " + joboptions["nr_threads"].getString();
-		command += " --j 1 --j_in 1 ";
+		command += " --j_in 1 ";
 
 		if (is_continue)
 		{

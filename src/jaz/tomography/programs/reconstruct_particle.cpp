@@ -68,7 +68,7 @@ void ReconstructParticleProgram::readBasicParameters(int argc, char *argv[])
 	SNR = textToDouble(parser.getOption("--SNR", "Assumed signal-to-noise ratio (negative means use a heuristic)", "-1"));
 	symmName = parser.getOption("--sym", "Symmetry group", "C1");
 
-	max_mem_GB = textToInteger(parser.getOption("--mem", "Max. amount of memory to use for accumulation (--j_out will be reduced)", "-1"));
+	max_mem_GB = textToInteger(parser.getOption("--mem", "Max. amount of memory (in GB) to use for accumulation (--j_out will be reduced)", "-1"));
 
 	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Only process undone subtomograms");
 	no_backup = parser.checkOption("--no_backup", "Do not make backups (makes it impossible to use --only_do_unfinished)");
