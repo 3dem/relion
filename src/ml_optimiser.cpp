@@ -695,7 +695,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	// SGD stuff
 	int grad_section = parser.addSection("Stochastic Gradient Descent");
 	gradient_refine = parser.checkOption("--grad", "Perform gradient based optimisation (instead of default expectation-maximization)");
-	grad_em_iters = textToInteger(parser.getOption("--grad_em_iters", "Number of iterations at the end of a gradient refinement using Expectation-Maximization", "0"));
+	grad_em_iters = textToInteger(parser.getOption("--grad_em_iters", "Number of iterations at the end of a gradient refinement using Expectation-Maximization", "1"));
 	// Stochastic EM is implemented as a variant of SGD, though it is really a different algorithm!
 
 	grad_ini_frac = textToFloat(parser.getOption("--grad_ini_frac", "Fraction of iterations in the initial phase of refinement", "0.2"));
@@ -991,7 +991,7 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	if (!MD.getValue(EMDL_OPTIMISER_DO_GRAD, gradient_refine))
 		gradient_refine = false;
 	if (!MD.getValue(EMDL_OPTIMISER_GRAD_EM_ITERS, grad_em_iters))
-		grad_em_iters = 0;
+		grad_em_iters = 1;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_STEPSIZE, grad_stepsize))
 		grad_stepsize = 0.2;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_STEPSIZE_SCHEME, grad_stepsize_scheme))
@@ -2173,14 +2173,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 				std::cout << " Initial subset size set to " << grad_ini_subset_size << std::endl;
 				std::cout << " Final subset size set to " << grad_fin_subset_size << std::endl;
 			}
-		}
-
-		grad_baseline_fsc.initZeros(mymodel.ori_size / 2 + 1);
-		RFLOAT a = mymodel.getPixelFromResolution(1./grad_min_resol); //sigmoid end
-		RFLOAT b = 1; // Sigmoid start
-
-		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(grad_baseline_fsc) {
-			DIRECT_A1D_ELEM(grad_baseline_fsc, i) = 1. / (pow(10, (i - b - a / 2.) / (a / 4.)) + 1.);
 		}
 	}
 	else
@@ -4332,8 +4324,9 @@ void MlOptimiser::maximization()
 						(wsum_model.BPref[iclass]).reconstructGrad(
 								mymodel.Iref[iclass],
 								grad_current_stepsize,
-								mymodel.tau2_fudge_factor ,
-								do_split_random_halves ? mymodel.fsc_halves_class[iclass] : grad_baseline_fsc,
+								mymodel.tau2_fudge_factor,
+								mymodel.getPixelFromResolution(1./grad_min_resol),
+								mymodel.fsc_halves_class[iclass],
 								!do_split_random_halves,
 								(iclass == 0));
 					}

@@ -373,9 +373,6 @@ public:
 	// Adjusting the under-estimation of signal of low-resolution components during gradient optimization to this resolution
 	RFLOAT grad_min_resol;
 
-	// The minimum estimated FSC during gradient optimization
-	MultidimArray<RFLOAT> grad_baseline_fsc;
-
 	// The resolution in the initial iterations
 	RFLOAT grad_ini_resol; // in A
 

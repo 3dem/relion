@@ -1848,19 +1848,13 @@ void BackProjector::reweightGrad(
 				if (lambda2 > 0.)
 				{
 					A3D_ELEM(mom2, k, i, j).real = eps;
-                    A3D_ELEM(mom2, k, i, j).imag = eps;
+					A3D_ELEM(mom2, k, i, j).imag = eps;
 				}
 			}
 
-			Complex g = 0;
-
-			if (A3D_ELEM(weight, k, i, j) > 0.)
-				g = A3D_ELEM(data, k, i, j) / A3D_ELEM(weight, k, i, j);
-			else
-			{
-				A3D_ELEM(data, k, i, j) = 0;
-				continue; //We only update moments if any information was added (weight > 0.)
-			}
+			RFLOAT w = XMIPP_MAX(1., A3D_ELEM(weight, k, i, j)); //Suppress week signal
+			Complex g = A3D_ELEM(data, k, i, j) / w;
+			A3D_ELEM(data, k, i, j) = g;
 
 			if (lambda1 > 0.)
 			{
@@ -1930,7 +1924,7 @@ void BackProjector::reweightGrad(
 		}
 	}
 
-	// Store powers of both momentums
+	// Store powers of both momenta
 	MultidimArray<RFLOAT> counter;
 	mom1_power.initZeros(ori_size / 2 + 1);
 	mom2_power.initZeros(ori_size / 2 + 1);
@@ -1958,6 +1952,7 @@ void BackProjector::reconstructGrad(
 		MultidimArray<RFLOAT> &vol_out, //Should be const
 		RFLOAT grad_stepsize,
 		RFLOAT tau2_fudge,
+		RFLOAT min_resol_shell,
 		const MultidimArray<RFLOAT> &fsc_spectrum,
 		bool expand_fsc,
 		bool printTimes)
@@ -2010,6 +2005,8 @@ void BackProjector::reconstructGrad(
 			}
 		}
 
+		RFLOAT threshold(0);
+
 		//Average power spectra and calculate FSC estimate
 		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(counter) {
 			RFLOAT prev = 0.;
@@ -2020,12 +2017,20 @@ void BackProjector::reconstructGrad(
 				DIRECT_A1D_ELEM(prev_power, i) = prev;
 
 				if(prev > 0.)
-					f = 1 - (DIRECT_A1D_ELEM(mom1_power, i) + DIRECT_A1D_ELEM(mom2_power, i)) / (tau2_fudge*prev);
-				else
-					f = 1e-4;
+					f = 1 - (DIRECT_A1D_ELEM(mom1_power, i) + DIRECT_A1D_ELEM(mom2_power, i)) / prev;
 
-				DIRECT_A1D_ELEM(fsc_estimate, i) = XMIPP_MIN(XMIPP_MAX(f, DIRECT_A1D_ELEM(fsc_spectrum, i)), 1);
+				threshold += XMIPP_MIN(XMIPP_MAX(f, DIRECT_A1D_ELEM(fsc_spectrum, i)), 1);
 			}
+		}
+
+		threshold = threshold * tau2_fudge;
+
+		fsc_estimate.initZeros(ori_size / 2 + 1);
+		RFLOAT a = XMIPP_MAX(min_resol_shell, threshold); //Sigmoid end
+		RFLOAT b = min_resol_shell; // Sigmoid start
+
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_estimate) {
+			DIRECT_A1D_ELEM(fsc_estimate, i) = 1. / (pow(10, (i - b - a / 2.) / (a / 4.)) + 1.);
 		}
 
 		tau2_fudge = 1;
