@@ -834,7 +834,7 @@ public:
 		grad_fin_resol(0),
 		do_grad_skip_anneal(false),
 		mu(0),
-		grad_stepsize(0),
+		grad_stepsize(-1),
 		grad_current_stepsize(0),
 #ifdef ALTCPU
 		tbbSchedulerInit(tbb::task_scheduler_init::deferred ),
