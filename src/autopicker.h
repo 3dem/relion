@@ -182,6 +182,9 @@ public:
 	// Topaz downscale factor
 	int topaz_downscale;
 
+	// Number of topaz workers for training
+	int topaz_workers;
+
 	// Topaz command executable
 	FileName fn_topaz_exe;
 
@@ -397,10 +400,9 @@ public:
 			RFLOAT tube_length_min_pix,
 			int skip_side, float scale);
 
-	MetaDataTable getMDtrainFromParticleStar(MetaDataTable &MDparts);
+	MetaDataTable getMDtrainFromParticleStar(MetaDataTable &MDparts, ObservationModel &obsModel);
 	MetaDataTable readTopazCoordinates(FileName fn_coord, int _topaz_downscale = 1);
 
-	void preprocessTopazMicrograph(FileName fn_mic_in, int downscale, FileName fn_mic_out);
 	void trainTopaz();
 	void autoPickTopazOneMicrograph(FileName &fn_mic, int rank = 0);
 	void autoPickLoGOneMicrograph(FileName &fn_mic, long int imic);

@@ -158,6 +158,7 @@ if(do_gpu)
 	fn_bash = parser.getOption("--bash_exe", "Name of bash executable", "/bin/bash");
 	fn_conda_activate = parser.getOption("--activate_exe", "Name of conda activate executable (defaults to 'source activate')", "");
 	topaz_additional_args = parser.getOption("--topaz_args", "Additional arguments to be passed to topaz", "");
+	topaz_workers = textToInteger(parser.getOption("--topaz_workers", "Number of topaz workers for parallelized training", "4"));
 
 	int helix_section = parser.addSection("Helix options");
 	autopick_helical_segments = parser.checkOption("--helix", "Are the references 2D helical segments? If so, in-plane rotation angles (psi) are estimated for the references.");
@@ -165,7 +166,7 @@ if(do_gpu)
 	helical_tube_diameter = textToFloat(parser.getOption("--helical_tube_outer_diameter", "Tube diameter in Angstroms", "-1"));
 	helical_tube_length_min = textToFloat(parser.getOption("--helical_tube_length_min", "Minimum tube length in Angstroms", "-1"));
 	do_amyloid = parser.checkOption("--amyloid", "Activate specific algorithm for amyloid picking?");
-	max_local_avg_diameter = textToFloat(parser.getOption("----max_diam_local_avg", "Maximum diameter to calculate local average density in Angstroms", "-1"));
+	max_local_avg_diameter = textToFloat(parser.getOption("--max_diam_local_avg", "Maximum diameter to calculate local average density in Angstroms", "-1"));
 
 	int peak_section = parser.addSection("Peak-search options");
 	min_fraction_expected_Pratio = textToFloat(parser.getOption("--threshold", "Fraction of expected probability ratio in order to consider peaks?", "0.25"));
@@ -365,7 +366,6 @@ void AutoPicker::initialise(int rank)
 		if (topaz_train_picks != "")
 		{
 			MDtrain.read(topaz_train_picks, "coordinate_files");
-			if (MDtrain.numberOfObjects() < 1) REPORT_ERROR("ERROR: the coordinate_files table in the STAR file from --topaz_train_picks is empty or doesn't exist!");
 		}
 		else if (topaz_train_parts != "")
 		{
@@ -373,8 +373,9 @@ void AutoPicker::initialise(int rank)
 			ObservationModel obsModel;
 			MetaDataTable MDparts;
 			ObservationModel::loadSafely(topaz_train_parts, obsModel, MDparts, "particles");
-			MDtrain = getMDtrainFromParticleStar(MDparts);
+			MDtrain = getMDtrainFromParticleStar(MDparts, obsModel);
 		}
+		if (MDtrain.numberOfObjects() < 1) REPORT_ERROR("ERROR: there are no micrographs to train topaz on!");
 	}
 	else if (do_topaz_extract)
 	{
@@ -717,13 +718,13 @@ void AutoPicker::initialise(int rank)
 		{
 			if (do_topaz_train)
 			{
-				topaz_radius = (particle_diameter) / (8. * angpix * topaz_downscale); // 25% of particle radius for training!
+				topaz_radius = ROUND((particle_diameter) / (8. * angpix * topaz_downscale)); // 25% of particle radius for training!
 				if (verb > 0)
 					std::cout << " + Setting topaz radius to " << topaz_radius << " downscaled pixels (based on 25% of particle_diameter/2)" << std::endl;
 			}
 			else if (do_topaz_extract)
 			{
-				topaz_radius = (particle_diameter) / (2. * angpix * topaz_downscale); // 100% of particle radius for picking!
+				topaz_radius = ROUND((particle_diameter) / (2. * angpix * topaz_downscale)); // 100% of particle radius for picking!
 				if (verb > 0)
 					std::cout << " + Setting topaz radius to " << topaz_radius << " downscaled pixels (based on particle_diameter/2)" << std::endl;
 			}
@@ -2628,7 +2629,7 @@ void AutoPicker::exportHelicalTubes(
 
 	return;
 }
-MetaDataTable AutoPicker::getMDtrainFromParticleStar(MetaDataTable &MDparts)
+MetaDataTable AutoPicker::getMDtrainFromParticleStar(MetaDataTable &MDparts, ObservationModel &obsModelParts)
 {
 
 	// Sort input particle star file on micrographname, so that searching can be linear instead of quadratic
@@ -2666,11 +2667,15 @@ MetaDataTable AutoPicker::getMDtrainFromParticleStar(MetaDataTable &MDparts)
 			if (fn_mic == fn_mics[imic])
 			{
 				MDcoords.addObject();
-				RFLOAT xcoord, ycoord, fom, psi;
+				RFLOAT xcoord, ycoord, xoff, yoff, fom, psi;
 				int classnr;
 				MDparts.getValue(EMDL_IMAGE_COORD_X, xcoord);
+				MDparts.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff);
+				xcoord -= ROUND(xoff/angpix);
 				MDcoords.setValue(EMDL_IMAGE_COORD_X, xcoord);
 				MDparts.getValue(EMDL_IMAGE_COORD_Y, ycoord);
+				MDparts.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff);
+				ycoord -= ROUND(yoff/angpix);
 				MDcoords.setValue(EMDL_IMAGE_COORD_Y, ycoord);
 				if (MDparts.containsLabel(EMDL_ORIENT_PSI))
 				{
@@ -2774,19 +2779,6 @@ MetaDataTable AutoPicker::readTopazCoordinates(FileName fn_coord,  int _topaz_do
 	}
 
 	return MDcoord;
-}
-
-void AutoPicker::preprocessTopazMicrograph(FileName fn_mic_in, int downscale, FileName fn_mic_out)
-{
-
-	Image<RFLOAT> Imic;
-	Imic.read(fn_mic_in);
-	int newxsize = (int)(XSIZE(Imic())/downscale);
-	int newysize = (int)(YSIZE(Imic())/downscale);
-	//rescale(Imic(), newxsize);
-
-	// TODO: finish this. Think about non-square micrographs!!!
-
 }
 
 void AutoPicker::trainTopaz()
@@ -2896,6 +2888,11 @@ void AutoPicker::trainTopaz()
 
 	}
 
+	if (total_nr_test == 0)
+		REPORT_ERROR("ERROR: there are no particle picks in the test set for topaz training!");
+	if (total_nr_train == 0)
+		REPORT_ERROR("ERROR: there are no particle picks in the work set for topaz training!");
+
 	if (verb > 0)
 	{
 		std::cout << " + Training with " << total_nr_test << " picks in test set; and " << total_nr_train << " picks in work set" << std::endl;
@@ -2935,11 +2932,13 @@ void AutoPicker::trainTopaz()
 	// Call Topaz to train the network
 	fh << fn_topaz_exe << " train ";
 	fh << " -n " << integerToString(topaz_nr_particles);
-	// Let's use 25% of particle_radius for training...
+	// Let's use 25% of particle_radius (set in initialise()) for training...
 	fh << " -r " << integerToString(topaz_radius);
 	if (topaz_device_id >= 0)
 		fh << " -d " << integerToString(topaz_device_id);
 	fh << " -o " << fn_odir << "model_training.txt";
+	fh << " --num-threads=" << integerToString(topaz_workers); // pyTorch threads
+	fh << " --num-workers=" << integerToString(topaz_workers); // parallelize data augmentation
 	fh << " --train-images=" << fn_odir << "proc/image_list_train.txt";
 	fh << " --test-images=" << fn_odir << "proc/image_list_test.txt";
 	fh << " --train-targets=" << fn_odir << "proc/target_list_train.txt";
