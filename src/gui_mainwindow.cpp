@@ -265,7 +265,7 @@ void NoteEditorWindow::cb_save_i()
 }
 
 GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, FileName fn_sched,
-		int _update_every_sec, int _exit_after_sec, bool _do_read_only, bool _do_tomo):Fl_Window(w,h,title)
+		int _update_every_sec, int _exit_after_sec, bool _do_read_only, bool _do_tomo, bool _do_projdir):Fl_Window(w,h,title)
 {
 	// Set initial Timer
 	tickTimeLastChanged();
@@ -280,15 +280,22 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	FileName fn_lock=".gui_projectdir";
 	if (!exists(fn_lock))
 	{
-		std::cout << " Only run the relion GUI from your ProjectDirectory. Do you want to start a new project here [y/n]? ";
-		char c;
-		std::cin >> c;
-		if (c == 'y' || c == 'Y')
-			touch(".gui_projectdir");
+		if (_do_projdir)
+		{
+			touch(fn_lock);
+		}
 		else
 		{
-			std::cout << " Exiting ... " << std::endl;
-			exit(0);
+			std::cout << " Only run the relion GUI from your ProjectDirectory. Do you want to start a new project here [y/n]? ";
+			char c;
+			std::cin >> c;
+			if (c == 'y' || c == 'Y')
+				touch(fn_lock);
+			else
+			{
+				std::cout << " Exiting ... " << std::endl;
+				exit(0);
+			}
 		}
 	}
 
