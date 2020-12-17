@@ -490,11 +490,17 @@ void RelionJob::write(std::string fn)
 	fh.close();
 	 */
 
+	FileName fn_star = myfilename;
+	if (fn_star.getExtension() != "star") // full name was given
+	{
+		fn_star += "job.star"; // "Refine3D/job123" OR ".gui_auto3d"
+	}
+
 	// Also write 3.1-style STAR file
 	std::ofstream fh;
-	fh.open((myfilename+"job.star").c_str(), std::ios::out);
+	fh.open((fn_star).c_str(), std::ios::out);
 	if (!fh)
-		REPORT_ERROR("ERROR: Cannot write to file: " + myfilename + "job.star");
+		REPORT_ERROR("ERROR: Cannot write to file: " + fn_star);
 
 	MetaDataTable MDhead;
 	MetaDataTable MDvals, MDopts;
@@ -1715,7 +1721,7 @@ to the average PLUS this value times the standard deviation. Use zero to set the
 
 	joboptions["do_color"] = JobOption("Blue<>red color particles?", false, "If set to true, then the circles for each particles are coloured from red to blue (or the other way around) for a given metadatalabel. If this metadatalabel is not in the picked coordinates STAR file \
 (basically only the rlnAutopickFigureOfMerit or rlnClassNumber) would be useful values there, then you may provide an additional STAR file (e.g. after classification/refinement below. Particles with values -999, or that are not in the additional STAR file will be coloured the default color: green");
-	joboptions["color_label"] = JobOption("MetaDataLabel for color:", std::string("rlnParticleSelectZScore"), "The Metadata label of the value to plot from red<>blue. Useful examples might be: \n \
+	joboptions["color_label"] = JobOption("MetaDataLabel for color:", std::string("rlnAutopickFigureOfMerit"), "The Metadata label of the value to plot from red<>blue. Useful examples might be: \n \
 rlnParticleSelectZScore \n rlnClassNumber \n rlnAutopickFigureOfMerit \n rlnAngleTilt \n rlnLogLikeliContribution \n rlnMaxValueProbDistribution \n rlnNrOfSignificantSamples\n");
 	joboptions["fn_color"] = JobOption("STAR file with color label: ", "", "STAR file (*.star)", ".", "The program will figure out which particles in this STAR file are on the current micrograph and color their circles according to the value in the corresponding column. \
 Particles that are not in this STAR file, but present in the picked coordinates file will be colored green. If this field is left empty, then the color label (e.g. rlnAutopickFigureOfMerit) should be present in the coordinates STAR file.");
