@@ -1,0 +1,20 @@
+ + Creating new Job: Class2D/job085/ from Node: class2d_rest
+ + Executing Job: Class2D/job085/ at Thu Dec 17 06:41:58 2020
+ + select_rest: Schedules/class2d/class2d_rest/run_it250_optimiser.star -> Class2D/job085/run_it250_optimiser.star
+ + Creating new Job: Select/job086/ from Node: select_rest
+ + Executing Job: Select/job086/ at Thu Dec 17 08:44:02 2020
+ + SET_prev_rest_size: prev_rest_size -> 487247
+ + Not waiting, as more than 180 seconds have passed.
+ + HAS_topaz_model: Schedules/class2d/train_topaz/model_epoch10.sav -> AutoPick/job054/model_epoch10.sav
+ + HAS_topaz_model: has_topaz_model -> True
+ ++ in COUNT_restbatch: Schedules/preprocess/extract_topazpick/particles.star -> Extract/job056/particles.star
+ + COUNT_restbatch: current_rest_size -> 559728
+ + HAS_rest_increased: has_larger_rest_size -> True
+ ++ in class2d_rest: Schedules/preprocess/extract_topazpick/particles.star -> Extract/job056/particles.star
+ + Creating new Job: Class2D/job087/ from Node: class2d_rest
+ + Executing Job: Class2D/job087/ at Thu Dec 17 08:45:38 2020
+ + Stopping schedule due to user abort of job Class2D/job087/ ...
+ + Found an ABORT signal... 
+ + Scheduler Schedules/class2d/ stops now... 
++++++++++++++++++++++++++++++++++++++++++++++++++
+
