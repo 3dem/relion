@@ -9222,13 +9222,13 @@ void MlOptimiser::updateStepSize() {
 
 	if (_stepsize <= 0)
 		if (mymodel.ref_dim == 2)
-			_stepsize = 1.;
+			_stepsize = 0.2;
 		else
 			_stepsize = 0.2;
 
 	if (_scheme == "")
 		if (mymodel.ref_dim == 2)
-			_scheme = "2-2step";
+			_scheme = "4-2step";
 		else
 			_scheme = "2-2step";
 

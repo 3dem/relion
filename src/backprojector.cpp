@@ -1852,8 +1852,7 @@ void BackProjector::reweightGrad(
 				}
 			}
 
-			RFLOAT w = XMIPP_MAX(1., A3D_ELEM(weight, k, i, j)); //Suppress week signal
-			Complex g = A3D_ELEM(data, k, i, j) / w;
+			Complex g = A3D_ELEM(data, k, i, j) / XMIPP_MAX(1., A3D_ELEM(weight, k, i, j));
 			A3D_ELEM(data, k, i, j) = g;
 
 			if (lambda1 > 0.)
