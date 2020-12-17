@@ -2086,6 +2086,7 @@ void MlOptimiserMpi::maximization()
 										mymodel.Iref[ith_recons],
 										grad_current_stepsize,
 										mymodel.tau2_fudge_factor,
+										mymodel.getPixelFromResolution(1./grad_min_resol),
 										mymodel.fsc_halves_class[ith_recons],
 										do_split_random_halves,
 										node->rank==1);
@@ -2218,6 +2219,7 @@ void MlOptimiserMpi::maximization()
 											mymodel.Iref[ith_recons],
 											grad_current_stepsize,
 											mymodel.tau2_fudge_factor,
+											mymodel.getPixelFromResolution(1./grad_min_resol),
 											mymodel.fsc_halves_class[ith_recons],
 											do_split_random_halves,
 											false);

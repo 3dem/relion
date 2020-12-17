@@ -695,7 +695,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	// SGD stuff
 	int grad_section = parser.addSection("Stochastic Gradient Descent");
 	gradient_refine = parser.checkOption("--grad", "Perform gradient based optimisation (instead of default expectation-maximization)");
-	grad_em_iters = textToInteger(parser.getOption("--grad_em_iters", "Number of iterations at the end of a gradient refinement using Expectation-Maximization", "0"));
+	grad_em_iters = textToInteger(parser.getOption("--grad_em_iters", "Number of iterations at the end of a gradient refinement using Expectation-Maximization", "1"));
 	// Stochastic EM is implemented as a variant of SGD, though it is really a different algorithm!
 
 	grad_ini_frac = textToFloat(parser.getOption("--grad_ini_frac", "Fraction of iterations in the initial phase of refinement", "0.2"));
@@ -724,9 +724,9 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	grad_fin_subset_size = textToInteger(parser.getOption("--grad_fin_subset", "Mini-batch size during the final SGD iterations", "-1"));
 	mu = textToFloat(parser.getOption("--mu", "Momentum parameter for SGD updates", "0.9"));
 
-	grad_stepsize = textToFloat(parser.getOption("--grad_stepsize", "Step size parameter for gradient optimisation.", "0.2"));
+	grad_stepsize = textToFloat(parser.getOption("--grad_stepsize", "Step size parameter for gradient optimisation.", "-1"));
 	grad_stepsize_scheme = parser.getOption("--grad_stepsize_scheme",
-			"Gradient step size updates scheme. Valid values are plain, <a>-2step or <a>-3step-<b>. Where <a> is the initial inflate and <b> is the final deflate factor.","2-2step");
+			"Gradient step size updates scheme. Valid values are plain, <a>-2step or <a>-3step-<b>. Where <a> is the initial inflate and <b> is the final deflate factor.","");
 
 	write_every_grad_iter = textToInteger(parser.getOption("--grad_write_iter", "Write out model every so many iterations in SGD (default is writing out all iters)", "10"));
 	do_init_blobs = parser.checkOption("--init_blobs", "Initialize models with random Gaussians.");
@@ -735,7 +735,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	som_connectivity = textToFloat(parser.getOption("--som_connectivity", "Number of average active neighbour connections.", "5.0"));
 	som_inactivity_threshold = textToFloat(parser.getOption("--som_inactivity_threshold", "Threshold for inactivity before node is dropped.", "0.01"));
 	som_neighbour_pull = textToFloat(parser.getOption("--som_neighbour_pull", "Portion of gradient applied to connected nodes.", "0.2"));
-	class_inactivity_threshold = textToFloat(parser.getOption("--class_inactivity_threshold", "Replace classes with little activity during gradient based classification.", "0.01"));
+	class_inactivity_threshold = textToFloat(parser.getOption("--class_inactivity_threshold", "Replace classes with little activity during gradient based classification.", "0"));
 
 	if (do_som && !gradient_refine)
 		REPORT_ERROR("SOM can only be calculated with a gradient optimization.");
@@ -991,11 +991,11 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	if (!MD.getValue(EMDL_OPTIMISER_DO_GRAD, gradient_refine))
 		gradient_refine = false;
 	if (!MD.getValue(EMDL_OPTIMISER_GRAD_EM_ITERS, grad_em_iters))
-		grad_em_iters = 0;
+		grad_em_iters = 1;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_STEPSIZE, grad_stepsize))
-		grad_stepsize = 0.2;
+		grad_stepsize = -1;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_STEPSIZE_SCHEME, grad_stepsize_scheme))
-		grad_stepsize_scheme = "2-2step";
+		grad_stepsize_scheme = "";
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_INI_FRAC, grad_ini_frac)) {
 		grad_ini_frac = 0.2;
 		grad_ini_iter = nr_iter * grad_ini_frac;
@@ -1017,7 +1017,7 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_MU, mu))
 		mu = 0.9;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_CLASS_INACTIVITY_THRESHOLD, class_inactivity_threshold))
-		class_inactivity_threshold = 0.01;
+		class_inactivity_threshold = 0.;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_MU, mu))
 		mu = 0.9;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_SUBSET_SIZE, subset_size))
@@ -2173,14 +2173,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 				std::cout << " Initial subset size set to " << grad_ini_subset_size << std::endl;
 				std::cout << " Final subset size set to " << grad_fin_subset_size << std::endl;
 			}
-		}
-
-		grad_baseline_fsc.initZeros(mymodel.ori_size / 2 + 1);
-		RFLOAT a = mymodel.getPixelFromResolution(1./grad_min_resol); //sigmoid end
-		RFLOAT b = 1; // Sigmoid start
-
-		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(grad_baseline_fsc) {
-			DIRECT_A1D_ELEM(grad_baseline_fsc, i) = 1. / (pow(10, (i - b - a / 2.) / (a / 4.)) + 1.);
 		}
 	}
 	else
@@ -4332,8 +4324,9 @@ void MlOptimiser::maximization()
 						(wsum_model.BPref[iclass]).reconstructGrad(
 								mymodel.Iref[iclass],
 								grad_current_stepsize,
-								mymodel.tau2_fudge_factor ,
-								do_split_random_halves ? mymodel.fsc_halves_class[iclass] : grad_baseline_fsc,
+								mymodel.tau2_fudge_factor,
+								mymodel.getPixelFromResolution(1./grad_min_resol),
+								mymodel.fsc_halves_class[iclass],
 								!do_split_random_halves,
 								(iclass == 0));
 					}
@@ -9228,10 +9221,16 @@ void MlOptimiser::updateStepSize() {
 	std::string _scheme = grad_stepsize_scheme;
 
 	if (_stepsize <= 0)
-		_stepsize = 0.1;
+		if (mymodel.ref_dim == 2)
+			_stepsize = 0.2;
+		else
+			_stepsize = 0.2;
 
 	if (_scheme == "")
-		_scheme = "2-2step";
+		if (mymodel.ref_dim == 2)
+			_scheme = "4-2step";
+		else
+			_scheme = "2-2step";
 
 	if (_scheme == "plain") {
 		grad_current_stepsize = _stepsize;
