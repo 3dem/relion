@@ -30,6 +30,7 @@ class pipeliner_parameters
 {
 public:
 	FileName fn_sched, fn_jobids, fn_options, fn_alias, run_schedule, abort_schedule, add_job_star;
+	FileName edit_job_in, edit_job_out, edit_label, edit_value;
 	int nr_repeat;
 	bool do_check_complete, do_overwrite_current;
 	long int minutes_wait, minutes_wait_before, seconds_wait_after, gentle_clean, harsh_clean;
@@ -66,6 +67,11 @@ public:
 		minutes_wait = textToInteger(parser.getOption("--min_wait", "Wait at least this many minutes between each repeat", "0"));
 		minutes_wait_before = textToInteger(parser.getOption("--min_wait_before", "Wait this many minutes before starting the running the first job", "0"));
 		seconds_wait_after = textToInteger(parser.getOption("--sec_wait_after", "Wait this many seconds after a process finishes (workaround for slow IO)", "10"));
+		int edit_job_section = parser.addSection("Edit jobs");
+		edit_job_in = parser.getOption("--editJob", "Star file of a job to be edited", "");
+		edit_job_out = parser.getOption("--editJobOut", "Output star file of the edited job (default is to overwrite input)", "");
+		edit_label = parser.getOption("--editOption", "The name of the joboption to be edited. This needs to be present in the input star file.", "");
+		edit_value = parser.getOption("--editValue", "The value of the joboption to be set.", "");
 		int expert_section = parser.addSection("Expert options");
 		pipeline.name = parser.getOption("--pipeline", "Name of the pipeline", "default");
 		gentle_clean = textToInteger(parser.getOption("--gentle_clean", "Gentle clean this job", "-1"));
@@ -78,14 +84,40 @@ public:
 
 	void run()
 	{
-		pipeline.read(DO_LOCK);
-		pipeline.write(DO_LOCK);
 		if (do_check_complete)
 		{
+			pipeline.read(DO_LOCK);
+			pipeline.write(DO_LOCK);
 			pipeline.checkProcessCompletion();
+		}
+		else if (edit_job_in != "")
+		{
+			if (edit_job_out == "") edit_job_out = edit_job_in;
+			if (edit_label == "") REPORT_ERROR("ERROR: no --editOption argument was found for --editJob.");
+			if (edit_value == "") REPORT_ERROR("ERROR: no --editValue argument was found for --editJob.");
+
+			RelionJob myjob;
+			bool dummy;
+			myjob.read(edit_job_in, dummy, true);
+
+			if (myjob.joboptions.find(edit_label) != myjob.joboptions.end())
+			{
+				if (edit_value == "True" || edit_value == "true") edit_value = "Yes";
+				if (edit_value == "False" || edit_value == "false") edit_value = "No";
+				myjob.joboptions[edit_label].setString(edit_value);
+			}
+			else
+			{
+				REPORT_ERROR("ERROR: could not find the joboption " + edit_label + " in job: " + edit_job_in);
+			}
+
+			myjob.write(edit_job_out);
+
 		}
 		else if (add_job_star != "")
 		{
+			pipeline.read(DO_LOCK);
+			pipeline.write(DO_LOCK);
 			RelionJob job;
 			bool is_continue;
 			job.read(add_job_star, is_continue, true); // true = do_initialise
@@ -102,6 +134,8 @@ public:
 		}
 		else if (add_type != "")
 		{
+			pipeline.read(DO_LOCK);
+			pipeline.write(DO_LOCK);
 			int job_num = pipeline.addScheduledJob(add_type, fn_options);
 			if (fn_alias != "")
 			{
@@ -115,6 +149,8 @@ public:
 		}
 		else if (gentle_clean > 0 || harsh_clean > 0)
 		{
+			pipeline.read(DO_LOCK);
+			pipeline.write(DO_LOCK);
 			bool found = false;
 			for (int i = 0, ilim = pipeline.processList.size(); i < ilim; i++)
 			{
@@ -147,6 +183,8 @@ public:
 		}
 		else if (nr_repeat > 0)
 		{
+			pipeline.read(DO_LOCK);
+			pipeline.write(DO_LOCK);
 			pipeline.runScheduledJobs(fn_sched, fn_jobids, nr_repeat, minutes_wait, minutes_wait_before, seconds_wait_after, do_overwrite_current);
 		}
 	}
