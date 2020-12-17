@@ -78,6 +78,7 @@ import time
 import traceback
 import ast 
 import collections
+from shutil import copytree
 
 try:
     import Tkinter as tk
@@ -248,7 +249,7 @@ class RelionItGui(object):
         self.phaseplate_var = tk.IntVar()
         phaseplate_button = tk.Checkbutton(expt_frame, var=self.phaseplate_var)
         phaseplate_button.grid(row=row, column=1, sticky=tk.W)
-        if options['preprocess__ctffind__do_phaseshift']:
+        if options['preprocess__ctffind__do_phaseshift'] == 'True':
             phaseplate_button.select()
 
         row += 1
@@ -776,6 +777,15 @@ def run_scheduler(options, do_gui):
 
         print(' RELION_IT: Now control execution of the preprocess and class2d Schedules from the RELION GUI ...')
 
+def copy_schedule(schedulename):
+
+    ## Only copy the Schedule directory structure from the RELION installation directory if it doesn't exist yet
+    if not os.path.isdir('Schedules/'+schedulename):
+        mydir = os.path.dirname(os.path.realpath(__file__))
+        print(' RELION_IT: copying Schedules/' + schedulename + ' from: ' + mydir)
+        copytree(mydir+'/Schedules/'+schedulename, 'Schedules/'+schedulename)
+
+
 def main():
     """
     Run the RELION 3.2 Scheduler.
@@ -802,6 +812,7 @@ def main():
     
 
     opts = collections.OrderedDict(RelionItOptions)
+
     """
     for user_opt_file in args.extra_options:
         print(' RELION_IT: reading options from {}'.format(user_opt_file))
@@ -813,6 +824,10 @@ def main():
         with open(user_opt_file) as file: 
             user_opts = collections.OrderedDict(ast.literal_eval(file.read()))
             opts.update(user_opts)
+
+    # Copy Schedules over from RELION directory if they dont exit
+    copy_schedule('preprocess')
+    copy_schedule('class2d')
 
     if args.nogui:
         run_scheduler(opts, False)
