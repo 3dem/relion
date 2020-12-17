@@ -690,6 +690,7 @@ class RelionItGui(object):
             if len(warnings) == 0 or tkMessageBox.askokcancel("Warning", "\n".join(warnings), icon='warning',
                                                               default=tkMessageBox.CANCEL):
 
+                # Write the current options to a .py file
                 with open(OPTIONS_FILE, 'w') as file:
                     file.write("{\n") 
                     for k,v in self.options.items():
@@ -698,6 +699,44 @@ class RelionItGui(object):
 
                 print(" RELION_IT: Written all options to {}".format(OPTIONS_FILE))
                 
+                # loop over all options and change the scheduler STAR files
+                for option, value in self.options.items():
+                    
+                    if (value == ''):
+                        value = '\\"\\"'
+                    
+                    # Set variables in schedule.star
+                    if option.count('__') == 1:
+                        splits = option.split('__')
+                        schedulename = splits[0]
+                        varname = splits[1]
+                        schedulestar = 'Schedules/' + schedulename + '/schedule.star'
+                        if not os.path.isfile(schedulestar):
+                            message = 'Error: ' + schedulestar + ' does not exist'
+                            print(message)
+                            tkMessageBox.showerror(message)
+                            return False
+                    
+                        command = 'relion_scheduler --schedule ' + schedulename + ' --set_var ' + varname + ' --value \"' + str(value) + '\"' + ' --original_value \"' + str(value) + '\"'
+                        print(' RELION_IT: excuting: ', command)
+                        os.system(command)
+                        
+                    # Set joboptions in job.star
+                    elif option.count('__') == 2:
+                        splits = option.split('__')
+                        schedulename = splits[0]
+                        jobname = splits[1]
+                        joboption = splits[2]
+                        jobstar = 'Schedules/' + schedulename + '/' + jobname + '/job.star'
+                        if not os.path.isfile(jobstar):
+                            message = 'Error: ' + jobstar + 'does not exist'
+                            print(message)
+                            tkMessageBox.showerror(message)
+                        
+                        command = 'relion_pipeliner --editJob ' + jobstar + ' --editOption ' + joboption + ' --editValue \"' + str(value) + '\"'
+                        print(' RELION_IT: excuting: ', command)
+                        os.system(command)
+
                 return True
 
         except Exception as ex:
@@ -714,68 +753,31 @@ class RelionItGui(object):
             run_scheduler(self.options, True) #True means launch the RELION GUI
  
 def run_scheduler(options, do_gui):
-    # loop over all options and change the scheduler
-    for option, value in options.items():
 
-        if (value == ''):
-            value = '\\"\\"'
+    command = 'relion_scheduler --schedule preprocess --reset &'
+    print(' RELION_IT: excuting: ', command)
+    os.system(command)
 
-        # Set variables in schedule.star
-        if option.count('__') == 1:
-            splits = option.split('__')
-            schedulename = splits[0]
-            varname = splits[1]
-            schedulestar = 'Schedules/' + schedulename + '/schedule.star'
-            if not os.path.isfile(schedulestar):
-                message = 'Error: ' + schedulestar + ' does not exist'
-                print(message)
-                tkMessageBox.showerror(message)
-                return False
+    command = 'relion_scheduler --schedule preprocess --run --pipeline_control Schedules/preprocess/ >> Schedules/preprocess/run.out 2>> Schedules/preprocess/run.err &'
+    print(' RELION_IT: excuting: ', command)
+    os.system(command)
 
-            command = 'relion_scheduler --schedule ' + schedulename + ' --set_var ' + varname + ' --value \"' + str(value) + '\"' + ' --original_value \"' + str(value) + '\"'
-            print(' RELION_IT: excuting: ', command)
-            os.system(command)
+    if not options['preprocess__do_until_ctf'] == 'True':
 
-        # Set joboptions in job.star
-        elif option.count('__') == 2:
-            splits = option.split('__')
-            schedulename = splits[0]
-            jobname = splits[1]
-            joboption = splits[2]
-            jobstar = 'Schedules/' + schedulename + '/' + jobname + '/job.star'
-            if not os.path.isfile(jobstar):
-                message = 'Error: ' + jobstar + 'does not exist'
-                print(message)
-                tkMessageBox.showerror(message)
-            
-            command = 'relion_pipeliner --editJob ' + jobstar + ' --editOption ' + joboption + ' --editValue \"' + str(value) + '\"'
-            print(' RELION_IT: excuting: ', command)
-            os.system(command)
+        command = 'relion_scheduler --schedule class2d --reset &'
+        print(' RELION_IT: excuting: ', command)
+        os.system(command)
+
+        command = 'relion_scheduler --schedule class2d --run  --pipeline_control Schedules/class2d/ >> Schedules/class2d/run.out 2>> Schedules/class2d/run.err  &'
+        print(' RELION_IT: excuting: ', command)
+        os.system(command)
+
+    print(' RELION_IT: Now monitor the preprocess and class2d Schedules from the RELION GUI ...')
 
     if do_gui:
         command = 'relion --do_projdir &'
         os.system(command)
-        print(' RELION_IT: Now execute the preprocess and class2d Schedules from the RELION GUI ...')
-    else:
-        command = 'relion_scheduler --schedule preprocess --reset &'
-        print(' RELION_IT: excuting: ', command)
-        os.system(command)
 
-        command = 'relion_scheduler --schedule preprocess --run --pipeline_control Schedules/preprocess/ >> Schedules/preprocess/run.out 2>> Schedules/preprocess/run.err &'
-        print(' RELION_IT: excuting: ', command)
-        os.system(command)
-
-        if not self.get_var_as_bool(self.stop_after_ctf_var):
-
-            command = 'relion_scheduler --schedule class2d --reset &'
-            print(' RELION_IT: excuting: ', command)
-            os.system(command)
-
-            command = 'relion_scheduler --schedule class2d --run  --pipeline_control Schedules/class2d/ >> Schedules/class2d/run.out 2>> Schedules/class2d/run.err  &'
-            print(' RELION_IT: excuting: ', command)
-            os.system(command)
-
-        print(' RELION_IT: Now control execution of the preprocess and class2d Schedules from the RELION GUI ...')
 
 def copy_schedule(schedulename):
 

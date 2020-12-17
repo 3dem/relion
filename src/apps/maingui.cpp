@@ -93,7 +93,7 @@ int main(int argc, char *argv[])
 		bool _do_read_only = checkParameter(argc, argv, "--readonly");
 		bool _do_tomo = checkParameter(argc, argv, "--tomo");
 		bool _do_projdir = checkParameter(argc, argv, "--do_projdir");
-		GuiMainWindow window(GUIWIDTH, GUIHEIGHT_EXT, titletext, fn_pipe, fn_sched, _update_every_sec, _exit_after_sec, _do_read_only, _do_tomo);
+		GuiMainWindow window(GUIWIDTH, GUIHEIGHT_EXT, titletext, fn_pipe, fn_sched, _update_every_sec, _exit_after_sec, _do_read_only, _do_tomo, _do_projdir);
 
 		// Show and run the window
 		window.show();
