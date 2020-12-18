@@ -29,7 +29,7 @@ duplicate_threshold         30
  fn_coords         "" 
    fn_data         "" 
     fn_mic         "" 
-  fn_model Schedules/class2d/class2d_logbatch/run_it025_optimiser.star 
+  fn_model Schedules/class2d/class2d_logbatch/run_it100_optimiser.star 
 image_angpix         -1 
 min_dedicated         24 
  nr_groups          1 
