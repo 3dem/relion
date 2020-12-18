@@ -648,7 +648,6 @@ void AutoPicker::initialise(int rank)
 			REPORT_ERROR("ERROR: the particle mask diameter is larger than the size of the box.");
 		}
 
-
 		if ( (verb > 0) && (autopick_helical_segments))
 		{
 			std::cout << " + Helical tube diameter = " << helical_tube_diameter << " Angstroms " << std::endl;
@@ -696,12 +695,19 @@ void AutoPicker::initialise(int rank)
 	if ( (do_topaz_train || do_topaz_extract) )
 	{
 		// Which is my GPU?
-		std::vector < std::vector < std::string > > allThreadIDs;
-		untangleDeviceIDs(gpu_ids, allThreadIDs);
-		// Sequential initialisation of GPUs on all ranks
 		topaz_device_id = -1;
 		if (std::isdigit(*gpu_ids.begin()))
-			topaz_device_id = textToInteger((allThreadIDs[rank][0]).c_str());
+		{
+			std::vector < std::vector < std::string > > allThreadIDs;
+			untangleDeviceIDs(gpu_ids, allThreadIDs);
+			if (allThreadIDs.size() > 0)
+			{
+				if (allThreadIDs.size() > rank)
+					topaz_device_id = textToInteger((allThreadIDs[rank][0]).c_str());
+				else
+					topaz_device_id = textToInteger((allThreadIDs[0][0]).c_str());
+			}
+		}
 
 		// Get topaz_downscale from particle_diameter and micrograph pixel size
 		if (topaz_downscale < 0)
@@ -729,6 +735,7 @@ void AutoPicker::initialise(int rank)
 					std::cout << " + Setting topaz radius to " << topaz_radius << " downscaled pixels (based on particle_diameter/2)" << std::endl;
 			}
 		}
+
 	}
 	else
 	{
@@ -942,6 +949,7 @@ void AutoPicker::initialise(int rank)
 				progress_bar(Mrefs.size());
 		}
 	}
+
 #ifdef TIMING
 	timer.toc(TIMING_A4);
 	timer.toc(TIMING_A0);
@@ -2706,7 +2714,7 @@ MetaDataTable AutoPicker::getMDtrainFromParticleStar(MetaDataTable &MDparts, Obs
 		decomposePipelineFileName(fn_mics[imic], fn_pre, fn_jobnr, fn_post);
 		fn_coords = fn_odir + fn_post.withoutExtension() + "_train.star";
 		FileName fn_dir = fn_coords.beforeLastOf("/");
-		if (fn_dir != fn_olddir && !exists(fn_dir))
+		if (fn_dir != fn_olddir)
 		{
 			// Make a Particles directory
 			mktree(fn_dir);
@@ -3025,7 +3033,7 @@ void AutoPicker::autoPickTopazOneMicrograph(FileName &fn_mic, int rank)
 	// Delete rank-specific process directory to remove all intermediate results
     // Also delete the symlink, as otherwise the symlink will fail for the next micrograph!
 	command = "rm -rf " + fn_odir + fn_proc + " " + fno;
-    if (system(command.c_str())) std::cerr << "WARNING: there was an error in executing: " << command << std::endl;
+	if (system(command.c_str())) std::cerr << "WARNING: there was an error in executing: " << command << std::endl;
 
 }
 
