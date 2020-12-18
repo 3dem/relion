@@ -162,7 +162,6 @@ RelionItOptions = {
     'preprocess__extract_logpick__do_rescale' : True,
     # Box size of the down-scaled particles (in pixels)
     'preprocess__extract_logpick__rescale' : 64,
-
     ### Split parameters after logpick (this will be the maximum number of particles in the first batch)
     'preprocess__split_logpick__split_size' : 10000,
 
@@ -173,6 +172,8 @@ RelionItOptions = {
     'preprocess__extract_topazpick__do_rescale' : True,
     # Box size of the down-scaled particles (in pixels)
     'preprocess__extract_topazpick__rescale' : 64,
+    # Minimum FOM for topaz extraction
+    'preprocess__extract_topazpick__minimum_pick_fom' : -3,
     
     ### Parameters for Topaz picking
     # Expected number of particles per micrograph
@@ -181,6 +182,12 @@ RelionItOptions = {
     'class2d__train_topaz__gpu_ids' : 0,
     # How many MPI processes to use in parallel for picking
     'preprocess__topazpicker__nr_mpi' : 2,
+
+    ### Parameters for automated 2D class selection
+    # Minimum rank score for particles after LoG picking
+    'class2d__select_logbatch__rank_threshold' : 0.35,
+    # Minimum rank score for particles after Topaz picking
+    'class2d__select_rest__rank_threshold' : 0.5,
 
     ### Parameters for 2D classification (logbatch and rest)
     # Which (single) GPU to run on for logbatch and rest
@@ -222,6 +229,43 @@ class RelionItGui(object):
 
         right_frame = tk.Frame(main_frame)
         right_frame.pack(side=tk.LEFT, anchor=tk.N, fill=tk.X, expand=1)
+
+        ###
+
+        project_frame = tk.LabelFrame(left_frame, text="Movie details", padx=5, pady=5)
+        project_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
+        tk.Grid.columnconfigure(project_frame, 1, weight=1)
+
+        row = 0
+
+        tk.Label(project_frame, text="Pattern for movies:").grid(row=row, sticky=tk.W)
+        self.import_images_var = tk.StringVar()  # for data binding
+        self.import_images_entry = tk.Entry(project_frame, textvariable=self.import_images_var)
+        self.import_images_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
+        self.import_images_entry.insert(0, self.options['preprocess__importmovies__fn_in_raw'])
+
+        import_button = new_browse_button(project_frame, self.import_images_var,
+                                          filetypes=(('Image file', '{*.mrc, *.mrcs, *.tif, *.tiff}'), ('All files', '*')))
+        import_button.grid(row=row, column=2)
+
+        row += 1
+        
+        tk.Label(project_frame, text="Gain reference (optional):").grid(row=row, sticky=tk.W)
+        self.gainref_var = tk.StringVar()  # for data binding
+        self.gainref_entry = tk.Entry(project_frame, textvariable=self.gainref_var)
+        self.gainref_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
+        self.gainref_entry.insert(0, self.options['preprocess__motioncorr__fn_gain_ref'])
+
+        new_browse_button(project_frame, self.gainref_var).grid(row=row, column=2)
+        
+        row += 1
+         
+        tk.Label(project_frame, text="Super-resolution?").grid(row=row, sticky=tk.W)
+        self.superres_var = tk.IntVar()
+        superres_button = tk.Checkbutton(project_frame, var=self.superres_var)
+        superres_button.grid(row=row, column=1, sticky=tk.W)
+        if options['preprocess__motioncorr__bin_factor'] == '2':
+            superres_button.select()
 
         ###
         
@@ -274,14 +318,6 @@ class RelionItGui(object):
         tk.Grid.columnconfigure(particle_frame, 1, weight=1)
 
         row = 0
-
-        tk.Label(particle_frame, text="Nr particles for LoG picking:").grid(row=row, sticky=tk.W)
-        self.logbatch_var = tk.StringVar()  # for data binding
-        self.logbatch_entry = tk.Entry(particle_frame, textvariable=self.logbatch_var)
-        self.logbatch_entry.grid(row=row, column=1, sticky=tk.W)
-        self.logbatch_entry.insert(0, str(options['preprocess__split_logpick__split_size']))
-
-        row += 1
 
         tk.Label(particle_frame, text="Nr particles per micrograph:").grid(row=row, sticky=tk.W)
         self.partspermic_var = tk.StringVar()  # for data binding
@@ -344,44 +380,53 @@ class RelionItGui(object):
 
         ###
 
-        project_frame = tk.LabelFrame(right_frame, text="Movie details", padx=5, pady=5)
-        project_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
-        tk.Grid.columnconfigure(project_frame, 1, weight=1)
+        picking_frame = tk.LabelFrame(right_frame, text="Picking details", padx=5, pady=5)
+        picking_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
+        tk.Grid.columnconfigure(picking_frame, 1, weight=1)
 
         row = 0
 
-        tk.Label(project_frame, text="Pattern for movies:").grid(row=row, sticky=tk.W)
-        self.import_images_var = tk.StringVar()  # for data binding
-        self.import_images_entry = tk.Entry(project_frame, textvariable=self.import_images_var)
-        self.import_images_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
-        self.import_images_entry.insert(0, self.options['preprocess__importmovies__fn_in_raw'])
-
-        import_button = new_browse_button(project_frame, self.import_images_var,
-                                          filetypes=(('Image file', '{*.mrc, *.mrcs, *.tif, *.tiff}'), ('All files', '*')))
-        import_button.grid(row=row, column=2)
+        tk.Label(picking_frame, text="Nr particles for LoG picking:").grid(row=row, sticky=tk.W)
+        self.logbatch_var = tk.StringVar()  # for data binding
+        self.logbatch_entry = tk.Entry(picking_frame, textvariable=self.logbatch_var)
+        self.logbatch_entry.grid(row=row, column=1, sticky=tk.W)
+        self.logbatch_entry.insert(0, str(options['preprocess__split_logpick__split_size']))
 
         row += 1
-        
-        tk.Label(project_frame, text="Gain reference (optional):").grid(row=row, sticky=tk.W)
-        self.gainref_var = tk.StringVar()  # for data binding
-        self.gainref_entry = tk.Entry(project_frame, textvariable=self.gainref_var)
-        self.gainref_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
-        self.gainref_entry.insert(0, self.options['preprocess__motioncorr__fn_gain_ref'])
 
-        new_browse_button(project_frame, self.gainref_var).grid(row=row, column=2)
-        
+        tk.Label(picking_frame, text="LoG picking threshold:").grid(row=row, sticky=tk.W)
+        self.log_thresh_var = tk.StringVar()  # for data binding
+        self.log_thresh_entry = tk.Entry(picking_frame, textvariable=self.log_thresh_var)
+        self.log_thresh_entry.grid(row=row, column=1, sticky=tk.W)
+        self.log_thresh_entry.insert(0, str(options['preprocess__logpicker__log_adjust_thr']))
+
         row += 1
-         
-        tk.Label(project_frame, text="Super-resolution?").grid(row=row, sticky=tk.W)
-        self.superres_var = tk.IntVar()
-        superres_button = tk.Checkbutton(project_frame, var=self.superres_var)
-        superres_button.grid(row=row, column=1, sticky=tk.W)
-        if options['preprocess__motioncorr__bin_factor'] == '2':
-            superres_button.select()
 
-         ###
+        tk.Label(picking_frame, text="LoG class2d score:").grid(row=row, sticky=tk.W)
+        self.log_classscore_var = tk.StringVar()  # for data binding
+        self.log_classscore_entry = tk.Entry(picking_frame, textvariable=self.log_classscore_var)
+        self.log_classscore_entry.grid(row=row, column=1, sticky=tk.W)
+        self.log_classscore_entry.insert(0, str(options['class2d__select_logbatch__rank_threshold']))
 
-        compute_frame = tk.LabelFrame(right_frame, text="Computation", padx=5, pady=5)
+        row += 1
+
+        tk.Label(picking_frame, text="Topaz picking threshold:").grid(row=row, sticky=tk.W)
+        self.topaz_thresh_var = tk.StringVar()  # for data binding
+        self.topaz_thresh_entry = tk.Entry(picking_frame, textvariable=self.topaz_thresh_var)
+        self.topaz_thresh_entry.grid(row=row, column=1, sticky=tk.W)
+        self.topaz_thresh_entry.insert(0, str(options['preprocess__extract_topazpick__minimum_pick_fom']))
+
+        row += 1
+
+        tk.Label(picking_frame, text="Topaz class2d score:").grid(row=row, sticky=tk.W)
+        self.topaz_classscore_var = tk.StringVar()  # for data binding
+        self.topaz_classscore_entry = tk.Entry(picking_frame, textvariable=self.topaz_classscore_var)
+        self.topaz_classscore_entry.grid(row=row, column=1, sticky=tk.W)
+        self.topaz_classscore_entry.insert(0, str(options['class2d__select_rest__rank_threshold']))
+
+        ###
+
+        compute_frame = tk.LabelFrame(right_frame, text="Computation details", padx=5, pady=5)
         compute_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
         tk.Grid.columnconfigure(expt_frame, 1, weight=1)
 
@@ -655,12 +700,33 @@ class RelionItGui(object):
             warnings.append("- Nr particles for topaz training should be a positive number")
 
         try:
+            opts['preprocess__logpicker__log_adjust_thr'] = float(self.log_thresh_var.get())
+        except ValueError:
+            raise ValueError("LoG picking threshold must be a number")
+
+        try:
+            opts['class2d__select_logbatch__rank_threshold'] = float(self.log_classscore_var.get())
+        except ValueError:
+            raise ValueError("LoG class2d score must be a number")
+
+        try:
+            opts['preprocess__extract_topazpick__minimum_pick_fom'] = float(self.topaz_thresh_var.get())
+        except ValueError:
+            raise ValueError("Topaz picking threshold must be a number")
+
+        try:
+            opts['class2d__select_rest__rank_threshold'] = float(self.topaz_classscore_var.get())
+        except ValueError:
+            raise ValueError("Topaz class2d score must be a number")
+
+        try:
             opts['class2d__train_topaz__topaz_nr_particles'] = int(self.partspermic_entry.get())
             opts['preprocess__topazpicker__topaz_nr_particles'] = int(self.partspermic_entry.get())
         except ValueError:
             raise ValueError("Nr particles per micrograph must be a number")
         if opts['class2d__train_topaz__topaz_nr_particles'] <= 0:
             warnings.append("- Nr particles per micrograph should be a positive number")
+
 
         try:
             opts['class2d__train_topaz__gpu_ids'] = int(self.gpu_topaz_entry.get())
