@@ -34,7 +34,7 @@ do_write_fom_maps         No
 fn_input_autopick Schedules/preprocess/ctffind/micrographs_ctf.star 
 fn_ref3d_autopick         "" 
 fn_refs_autopick         "" 
-   gpu_ids          4 
+   gpu_ids          0
 helical_nr_asu          1 
 helical_rise         -1 
 helical_tube_kappa_max        0.1 
