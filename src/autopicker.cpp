@@ -3025,10 +3025,13 @@ void AutoPicker::autoPickTopazOneMicrograph(FileName &fn_mic, int rank)
 	// Now convert output .txt into Relion-style .star files!
 	// No need to pass downscale factor, as picks are already up-scaled using -x in topaz extract command above!
 	MetaDataTable MDout = readTopazCoordinates(fn_odir + fn_proc + fn_local_pick);
-	if (verb > 1)
-		std::cerr << "Picked " << MDout.numberOfObjects() << " of particles " << std::endl;
-	FileName fn_pick = getOutputRootName(fn_mic) + "_" + fn_out + ".star";
-	MDout.write(fn_pick);
+	if (MDout.numberOfObjects() > 0)
+	{
+		if (verb > 1)
+			std::cerr << "Picked " << MDout.numberOfObjects() << " of particles " << std::endl;
+		FileName fn_pick = getOutputRootName(fn_mic) + "_" + fn_out + ".star";
+		MDout.write(fn_pick);
+	}
 
 	// Delete rank-specific process directory to remove all intermediate results
     // Also delete the symlink, as otherwise the symlink will fail for the next micrograph!
