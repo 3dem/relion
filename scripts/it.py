@@ -847,15 +847,15 @@ def run_scheduler(options, do_gui):
 
     if not options['preprocess__do_until_ctf'] == 'True':
 
-        command = 'relion_scheduler --schedule class2d --reset &'
+        command = 'relion_scheduler --schedule refine --reset &'
         print(' RELION_IT: excuting: ', command)
         os.system(command)
 
-        command = 'relion_scheduler --schedule class2d --run  --pipeline_control Schedules/refine/ >> Schedules/refine/run.out 2>> Schedules/refine/run.err  &'
+        command = 'relion_scheduler --schedule refine --run  --pipeline_control Schedules/refine/ >> Schedules/refine/run.out 2>> Schedules/refine/run.err  &'
         print(' RELION_IT: excuting: ', command)
         os.system(command)
 
-    print(' RELION_IT: Now monitor the preprocess and class2d Schedules from the RELION GUI ...')
+    print(' RELION_IT: Now monitor the preprocess and refine Schedules from the RELION GUI ...')
 
     if do_gui:
         command = 'relion --do_projdir &'
@@ -912,7 +912,7 @@ def main():
 
     # Copy Schedules over from RELION directory if they dont exit
     copy_schedule('preprocess')
-    copy_schedule('class2d')
+    copy_schedule('refine')
 
     if args.nogui:
         run_scheduler(opts, False)
