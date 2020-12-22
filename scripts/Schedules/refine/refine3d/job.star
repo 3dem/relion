@@ -55,7 +55,7 @@ nr_threads          6
 offset_range          5 
 offset_step          1 
 other_args         "" 
-particle_diameter        550 
+particle_diameter        200 
       qsub       qsub 
 qsubscript /public/EM/RELION/relion/bin/relion_qsub.csh 
  queuename    openmpi 
@@ -65,7 +65,7 @@ range_tilt         15
 ref_correct_greyscale        Yes 
  relax_sym         "" 
   sampling "7.5 degrees" 
-scratch_dir       /ssd 
+scratch_dir       "" 
 skip_gridding        Yes 
   sym_name         C1
    use_gpu        Yes 

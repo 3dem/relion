@@ -187,7 +187,7 @@ RelionItOptions = {
     # Minimum rank score for particles after LoG picking
     'refine__select_logbatch__rank_threshold' : 0.35,
     # Minimum rank score for particles after Topaz picking
-    'refine__select_rest__rank_threshold' : 0.5,
+    'refine__select_rest__rank_threshold' : 0.35,
 
     ### Parameters for 2D classification (logbatch and rest)
     # Which (single) GPU to run on for logbatch and rest
@@ -202,8 +202,12 @@ RelionItOptions = {
     'refine__do_until_class2d' : False,
 
     # Options for inimodel3d and refine3d
+    # Symmetry
     'refine__inimodel3d__sym_name' : 'C1',
     'refine__refine3d__sym_name' : 'C1',
+    # Diameter of the mask used for inimodel3d and refine3d (in Angstrom)
+    'refine__inimodel3d__particle_diameter' : 200,
+    'refine__refine3d__particle_diameter' : 200,
 
 
     ### End of options
@@ -675,6 +679,8 @@ class RelionItGui(object):
         try:
             opts['refine__class2d_logbatch__particle_diameter'] = float(self.mask_diameter_entry.get())
             opts['refine__class2d_rest__particle_diameter'] = float(self.mask_diameter_entry.get())
+            opts['refine__inimodel3d__particle_diameter'] = float(self.mask_diameter_entry.get())
+            opts['refine__refine3d__particle_diameter'] = float(self.mask_diameter_entry.get())
         except ValueError:
             raise ValueError("Mask diameter must be a number")
         if opts['refine__class2d_logbatch__particle_diameter'] <= 0:

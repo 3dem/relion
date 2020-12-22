@@ -28,19 +28,19 @@ do_solvent        Yes
 grad_write_iter         10 
 min_dedicated         24 
 nr_classes          1 
-   nr_iter        200 
+   nr_iter        100 
     nr_mpi          1 
    nr_pool         30 
 nr_threads         12 
 offset_range          6 
 offset_step          2 
 other_args         "" 
-particle_diameter        550 
+particle_diameter        200 
       qsub       qsub 
 qsubscript /public/EM/RELION/relion/bin/relion_qsub.csh 
  queuename    openmpi 
   sampling "15 degrees" 
-scratch_dir       /ssd 
+scratch_dir       "" 
 skip_gridding        Yes 
   sym_name         C1
    use_gpu        Yes 
