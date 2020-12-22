@@ -71,11 +71,12 @@ else(NOT TORCH_FOUND)
 	message(STATUS "Found previously built non-system Torch libraries that will be used.")
 endif()
 
+set(TORCH_LIBRARY_DIRS "${TORCH_EXTERNAL_PATH}/lib")
+
 include_directories("${TORCH_INCLUDE_DIRS}")
 link_directories(${TORCH_LIBRARY_DIRS})
 
-install(DIRECTORY ${TORCH_LIBRARY_DIRS}/ DESTINATION lib
-	USE_SOURCE_PERMISSIONS FILES_MATCHING PATTERN "*.so*")
+install(DIRECTORY ${TORCH_LIBRARY_DIRS}/ DESTINATION lib FILES_MATCHING PATTERN "lib*.so*")
 
 #message(STATUS "TORCH_INCLUDE_DIRS: ${TORCH_INCLUDE_DIRS}")
 #message(STATUS "TORCH_LIBRARY_DIRS: ${TORCH_LIBRARY_DIRS}")
