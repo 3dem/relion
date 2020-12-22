@@ -1140,7 +1140,7 @@ long int MetaDataTable::readStar(std::ifstream& in, const std::string &name, boo
 	// The loop statement may be necessary for data blocks that have a list AND a table inside them
 	while (getline(in, line, '\n'))
 	{
-		if (line[line.size() - 1] == '\r')
+		if (line.size() >= 2 && line[line.size() - 1] == '\r')
 			REPORT_ERROR("RELION does not support CR+LF as a new line code. Didn't you edit a STAR file in Windows? Convert it to the UNIX style (LF only) by for example `dos2unix` command.");
 
 		trim(line);
