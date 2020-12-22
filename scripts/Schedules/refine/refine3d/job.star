@@ -29,9 +29,9 @@ do_preread_images         No
 do_solvent_fsc         No 
 do_zero_mask        Yes 
    fn_cont         "" 
-    fn_img Schedules/class2d/inimodel3d/run_it100_data.star 
+    fn_img Schedules/refine/inimodel3d/run_it100_data.star 
    fn_mask         "" 
-    fn_ref Schedules/class2d/inimodel3d/run_it100_class001.mrc 
+    fn_ref Schedules/refine/inimodel3d/run_it100_class001.mrc 
    gpu_ids        0:1 
 helical_nr_asu          1 
 helical_range_distance         -1 

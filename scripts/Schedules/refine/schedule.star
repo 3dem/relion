@@ -3,7 +3,7 @@
 
 data_schedule_general
 
-_rlnScheduleName                       Schedules/class2d/
+_rlnScheduleName                       Schedules/refine/
 _rlnScheduleCurrentNodeName            WAIT
  
 
@@ -48,7 +48,7 @@ _rlnScheduleStringVariableResetValue #3
   logbatch Schedules/preprocess/split_logpick/particles_split1.star Schedules/preprocess/split_logpick/particles_split1.star 
  particles  particles  particles 
 rest_batch Schedules/preprocess/extract_topazpick/particles.star Schedules/preprocess/extract_topazpick/particles.star 
-topaz_model Schedules/class2d/train_topaz/model_epoch10.sav Schedules/class2d/train_topaz/model_epoch10.sav 
+topaz_model Schedules/refine/train_topaz/model_epoch10.sav Schedules/refine/train_topaz/model_epoch10.sav 
 
 # version 30001
 

@@ -35,7 +35,7 @@ Use double underscores to separate SCHEDULENAME__JOBNAME_JOBOPTION
 'preprocess__importmovies__angpix' defines the value for the 'angpix' option in the file 'Schedules/preprocess/importmovies/job.star'
 
 Likewise, use SCHEDULENAME__VARIABLENAME for Schedule variables
- E.g. 'class2d__logbatch_size' refers to the variablename 'logbatch_size' in the file 'Schedules/class2d/schedule.star'
+ E.g. 'refine__logbatch_size' refers to the variablename 'logbatch_size' in the file 'Schedules/refine/schedule.star'
 
 This python script will set the corresponding values of these joboption and schedule-variable values in the Schedule STAR files. 
 The RELION scheduler can then be used to run the scheduler.
@@ -102,7 +102,7 @@ RelionItOptions = {
     #
     # Likewise, use SCHEDULENAME__VARIABLENAME for Schedule variables
     #
-    # E.g. 'class2d__logbatch_size' refers to the variablename 'logbatch_size' in the file 'Schedules/class2d/schedule.star'
+    # E.g. 'refine__logbatch_size' refers to the variablename 'logbatch_size' in the file 'Schedules/refine/schedule.star'
     #
     #  This python script will modify the joboption and schedule-variable values in these files
     #
@@ -177,27 +177,34 @@ RelionItOptions = {
     
     ### Parameters for Topaz picking
     # Expected number of particles per micrograph
-    'class2d__train_topaz__topaz_nr_particles' : 300,
+    'refine__train_topaz__topaz_nr_particles' : 300,
     # Which (single) GPU to run training on 
-    'class2d__train_topaz__gpu_ids' : 0,
+    'refine__train_topaz__gpu_ids' : 0,
     # How many MPI processes to use in parallel for picking
     'preprocess__topazpicker__nr_mpi' : 2,
 
     ### Parameters for automated 2D class selection
     # Minimum rank score for particles after LoG picking
-    'class2d__select_logbatch__rank_threshold' : 0.35,
+    'refine__select_logbatch__rank_threshold' : 0.35,
     # Minimum rank score for particles after Topaz picking
-    'class2d__select_rest__rank_threshold' : 0.5,
+    'refine__select_rest__rank_threshold' : 0.5,
 
     ### Parameters for 2D classification (logbatch and rest)
     # Which (single) GPU to run on for logbatch and rest
-    'class2d__class2d_rest__gpu_ids' : '0,1',
-    'class2d__class2d_logbatch__gpu_ids' : '0,1',
+    'refine__class2d_rest__gpu_ids' : '0,1',
+    'refine__class2d_logbatch__gpu_ids' : '0,1',
 
     # Minimum number of particles in the first batch of logpicked particles to perform 2D classification on (this should be <= 'preprocess__split_logpick__split_size' above)
-    'class2d__logbatch_size' : 10000,
+    'refine__logbatch_size' : 10000,
     # Diameter of the mask used for 2D classification (in Angstrom)
-    'class2d__class2d_logbatch__particle_diameter' : 200
+    'refine__class2d_logbatch__particle_diameter' : 200,
+    # Stop after class2d, so skip inimodel3d and refine3d
+    'refine__do_until_class2d' : False,
+
+    # Options for inimodel3d and refine3d
+    'refine__inimodel3d__sym_name' : 'C1',
+    'refine__refine3d__sym_name' : 'C1',
+
 
     ### End of options
     }
@@ -319,11 +326,19 @@ class RelionItGui(object):
 
         row = 0
 
+        tk.Label(particle_frame, text="Symmetry:").grid(row=row, sticky=tk.W)
+        self.symmetry_var = tk.StringVar()  # for data binding
+        self.symmetry_entry = tk.Entry(particle_frame, textvariable=self.symmetry_var)
+        self.symmetry_entry.grid(row=row, column=1, sticky=tk.W)
+        self.symmetry_entry.insert(0, str(options['refine__inimodel3d__sym_name']))
+
+        row += 1
+
         tk.Label(particle_frame, text="Nr particles per micrograph:").grid(row=row, sticky=tk.W)
         self.partspermic_var = tk.StringVar()  # for data binding
         self.partspermic_entry = tk.Entry(particle_frame, textvariable=self.partspermic_var)
         self.partspermic_entry.grid(row=row, column=1, sticky=tk.W)
-        self.partspermic_entry.insert(0, str(options['class2d__train_topaz__topaz_nr_particles']))
+        self.partspermic_entry.insert(0, str(options['refine__train_topaz__topaz_nr_particles']))
 
         row += 1
 
@@ -346,7 +361,7 @@ class RelionItGui(object):
         self.mask_diameter_var = tk.StringVar()  # for data binding
         self.mask_diameter_entry = tk.Entry(particle_frame, textvariable=self.mask_diameter_var)
         self.mask_diameter_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
-        self.mask_diameter_entry.insert(0, str(options['class2d__class2d_logbatch__particle_diameter']))
+        self.mask_diameter_entry.insert(0, str(options['refine__class2d_logbatch__particle_diameter']))
         self.mask_diameter_px = tk.Label(particle_frame, text="= NNN px")
         self.mask_diameter_px.grid(row=row, column=2,sticky=tk.W)
 
@@ -406,7 +421,7 @@ class RelionItGui(object):
         self.log_classscore_var = tk.StringVar()  # for data binding
         self.log_classscore_entry = tk.Entry(picking_frame, textvariable=self.log_classscore_var)
         self.log_classscore_entry.grid(row=row, column=1, sticky=tk.W)
-        self.log_classscore_entry.insert(0, str(options['class2d__select_logbatch__rank_threshold']))
+        self.log_classscore_entry.insert(0, str(options['refine__select_logbatch__rank_threshold']))
 
         row += 1
 
@@ -422,7 +437,7 @@ class RelionItGui(object):
         self.topaz_classscore_var = tk.StringVar()  # for data binding
         self.topaz_classscore_entry = tk.Entry(picking_frame, textvariable=self.topaz_classscore_var)
         self.topaz_classscore_entry.grid(row=row, column=1, sticky=tk.W)
-        self.topaz_classscore_entry.insert(0, str(options['class2d__select_rest__rank_threshold']))
+        self.topaz_classscore_entry.insert(0, str(options['refine__select_rest__rank_threshold']))
 
         ###
 
@@ -432,12 +447,21 @@ class RelionItGui(object):
 
         row = 0
 
-        tk.Label(compute_frame, text="Only do until CTF estimation?").grid(row=row, sticky=tk.W)
-        self.stop_after_ctf_var = tk.IntVar()
-        stop_after_ctf_button = tk.Checkbutton(compute_frame, var=self.stop_after_ctf_var)
-        stop_after_ctf_button.grid(row=row, column=1, sticky=tk.W)
-        if options['preprocess__do_until_ctf'] == 'True':
-            stop_after_ctf_button.select()
+        tk.Label(compute_frame, text="Do Autopick & Class2D?").grid(row=row, sticky=tk.W)
+        self.do_class2d_var = tk.IntVar()
+        do_class2d_button = tk.Checkbutton(compute_frame, var=self.do_class2d_var)
+        do_class2d_button.grid(row=row, column=1, sticky=tk.W)
+        if options['preprocess__do_until_ctf'] == 'False':
+            do_class2d_button.select()
+
+        row += 1
+        
+        tk.Label(compute_frame, text="Do Inimodel3D & Refine3D?").grid(row=row, sticky=tk.W)
+        self.do_refine3d_var = tk.IntVar()
+        do_refine3d_button = tk.Checkbutton(compute_frame, var=self.do_refine3d_var)
+        do_refine3d_button.grid(row=row, column=1, sticky=tk.W)
+        if options['refine__do_until_class2d'] == 'False':
+            do_refine3d_button.select()
 
         row += 1
         
@@ -449,7 +473,6 @@ class RelionItGui(object):
 
         row += 1
 
-
         tk.Label(compute_frame, text="Nr MPIs for Topaz picking:").grid(row=row, sticky=tk.W)
         self.mpi_topaz_var = tk.StringVar()  # for data binding
         self.mpi_topaz_entry = tk.Entry(compute_frame, textvariable=self.mpi_topaz_var)
@@ -458,19 +481,11 @@ class RelionItGui(object):
 
         row += 1
 
-        tk.Label(compute_frame, text="GPU for Topaz training:").grid(row=row, sticky=tk.W)
-        self.gpu_topaz_var = tk.StringVar()  # for data binding
-        self.gpu_topaz_entry = tk.Entry(compute_frame, textvariable=self.gpu_topaz_var)
-        self.gpu_topaz_entry.grid(row=row, column=1, sticky=tk.W)
-        self.gpu_topaz_entry.insert(0, str(options['class2d__train_topaz__gpu_ids']))
-
-        row += 1
-
-        tk.Label(compute_frame, text="GPUs for Class2D:").grid(row=row, sticky=tk.W)
-        self.gpu_class2d_var = tk.StringVar()  # for data binding
-        self.gpu_class2d_entry = tk.Entry(compute_frame, textvariable=self.gpu_class2d_var)
-        self.gpu_class2d_entry.grid(row=row, column=1, sticky=tk.W)
-        self.gpu_class2d_entry.insert(0, str(options['class2d__class2d_logbatch__gpu_ids']))
+        tk.Label(compute_frame, text="GPUs (comma-separated):").grid(row=row, sticky=tk.W)
+        self.gpu_var = tk.StringVar()  # for data binding
+        self.gpu_entry = tk.Entry(compute_frame, textvariable=self.gpu_var)
+        self.gpu_entry.grid(row=row, column=1, sticky=tk.W)
+        self.gpu_entry.insert(0, str(options['refine__class2d_rest__gpu_ids']))
 
          ### Add logic to the box size boxes
 
@@ -595,7 +610,9 @@ class RelionItGui(object):
         opts = self.options
         warnings = []
 
-        opts['preprocess__do_until_ctf'] = self.get_var_as_bool(self.stop_after_ctf_var)
+        opts['preprocess__do_until_ctf'] = not self.get_var_as_bool(self.do_class2d_var)
+
+        opts['refine__do_until_class2d'] = not self.get_var_as_bool(self.do_refine3d_var)
 
         try:
             opts['preprocess__importmovies__kV'] = float(self.voltage_entry.get())
@@ -637,7 +654,7 @@ class RelionItGui(object):
 
         try:
             opts['preprocess__logpicker__log_diam_max'] = float(self.particle_max_diam_entry.get())
-            opts['class2d__train_topaz__topaz_particle_diameter'] = float(self.particle_max_diam_entry.get())
+            opts['refine__train_topaz__topaz_particle_diameter'] = float(self.particle_max_diam_entry.get())
             opts['preprocess__topazpicker__topaz_particle_diameter'] = float(self.particle_max_diam_entry.get())
         except ValueError:
             if len(self.particle_max_diam_entry.get()) == 0 and opts['preprocess__do_until_ctf'] == 'True':
@@ -656,11 +673,11 @@ class RelionItGui(object):
                 raise ValueError("Particle shortest diameter must be a number")
 
         try:
-            opts['class2d__class2d_logbatch__particle_diameter'] = float(self.mask_diameter_entry.get())
-            opts['class2d__class2d_rest__particle_diameter'] = float(self.mask_diameter_entry.get())
+            opts['refine__class2d_logbatch__particle_diameter'] = float(self.mask_diameter_entry.get())
+            opts['refine__class2d_rest__particle_diameter'] = float(self.mask_diameter_entry.get())
         except ValueError:
             raise ValueError("Mask diameter must be a number")
-        if opts['class2d__class2d_logbatch__particle_diameter'] <= 0:
+        if opts['refine__class2d_logbatch__particle_diameter'] <= 0:
             warnings.append("- Mask diameter should be a positive number")
 
         try:
@@ -693,7 +710,7 @@ class RelionItGui(object):
 
         try:
             opts['preprocess__split_logpick__split_size'] = int(self.logbatch_entry.get())
-            opts['class2d__logbatch_size'] = int(self.logbatch_entry.get())
+            opts['refine__logbatch_size'] = int(self.logbatch_entry.get())
         except ValueError:
             raise ValueError("Nr particles for topaz training must be a number")
         if opts['preprocess__split_logpick__split_size'] <= 0:
@@ -705,7 +722,7 @@ class RelionItGui(object):
             raise ValueError("LoG picking threshold must be a number")
 
         try:
-            opts['class2d__select_logbatch__rank_threshold'] = float(self.log_classscore_var.get())
+            opts['refine__select_logbatch__rank_threshold'] = float(self.log_classscore_var.get())
         except ValueError:
             raise ValueError("LoG class2d score must be a number")
 
@@ -715,31 +732,31 @@ class RelionItGui(object):
             raise ValueError("Topaz picking threshold must be a number")
 
         try:
-            opts['class2d__select_rest__rank_threshold'] = float(self.topaz_classscore_var.get())
+            opts['refine__select_rest__rank_threshold'] = float(self.topaz_classscore_var.get())
         except ValueError:
             raise ValueError("Topaz class2d score must be a number")
 
         try:
-            opts['class2d__train_topaz__topaz_nr_particles'] = int(self.partspermic_entry.get())
+            opts['refine__train_topaz__topaz_nr_particles'] = int(self.partspermic_entry.get())
             opts['preprocess__topazpicker__topaz_nr_particles'] = int(self.partspermic_entry.get())
         except ValueError:
             raise ValueError("Nr particles per micrograph must be a number")
-        if opts['class2d__train_topaz__topaz_nr_particles'] <= 0:
+        if opts['refine__train_topaz__topaz_nr_particles'] <= 0:
             warnings.append("- Nr particles per micrograph should be a positive number")
 
-
-        try:
-            opts['class2d__train_topaz__gpu_ids'] = int(self.gpu_topaz_entry.get())
-        except ValueError:
-            raise ValueError("GPU ID for topaz training must be a single number")
+        opts['refine__inimodel3d__sym_name'] = self.symmetry_entry.get()
+        opts['refine__refine3d__sym_name'] = self.symmetry_entry.get()
 
         try:
             opts['preprocess__topazpicker__nr_mpi'] = int(self.mpi_topaz_entry.get())
         except ValueError:
             raise ValueError("Nr MPI for topaz picking must be a single number")
-         
-        opts['class2d__class2d_logbatch__gpu_ids'] = self.gpu_class2d_entry.get()
-        opts['class2d__class2d_rest__gpu_ids'] = self.gpu_class2d_entry.get()
+        
+        opts['refine__train_topaz__gpu_ids'] = (self.gpu_entry.get()).split(',')[0]
+        opts['refine__class2d_logbatch__gpu_ids'] = self.gpu_entry.get()
+        opts['refine__class2d_rest__gpu_ids'] = self.gpu_entry.get()
+        opts['refine__inimodel3d__gpu_ids'] = self.gpu_entry.get()
+        opts['refine__refine3d__gpu_ids'] = (self.gpu_entry.get()).replace(',',':')
 
 
         return warnings
@@ -834,7 +851,7 @@ def run_scheduler(options, do_gui):
         print(' RELION_IT: excuting: ', command)
         os.system(command)
 
-        command = 'relion_scheduler --schedule class2d --run  --pipeline_control Schedules/class2d/ >> Schedules/class2d/run.out 2>> Schedules/class2d/run.err  &'
+        command = 'relion_scheduler --schedule class2d --run  --pipeline_control Schedules/refine/ >> Schedules/refine/run.out 2>> Schedules/refine/run.err  &'
         print(' RELION_IT: excuting: ', command)
         os.system(command)
 

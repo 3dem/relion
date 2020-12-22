@@ -40,7 +40,7 @@ loop_
 _rlnScheduleStringVariableName #1 
 _rlnScheduleStringVariableValue #2 
 _rlnScheduleStringVariableResetValue #3 
-topaz_model Schedules/class2d/train_topaz/model_epoch10.sav Schedules/class2d/train_topaz/model_epoch10.sav 
+topaz_model Schedules/refine/train_topaz/model_epoch10.sav Schedules/refine/train_topaz/model_epoch10.sav 
  
 
 # version 30001

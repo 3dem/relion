@@ -23,7 +23,7 @@ do_preread_images         No
   do_queue         No 
 do_solvent        Yes 
    fn_cont         "" 
-    fn_img Schedules/class2d/select_rest/particles.star 
+    fn_img Schedules/refine/select_rest/particles.star 
    gpu_ids        0,1 
 grad_write_iter         10 
 min_dedicated         24 
