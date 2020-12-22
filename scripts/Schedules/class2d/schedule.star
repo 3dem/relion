@@ -31,6 +31,7 @@ loop_
 _rlnScheduleBooleanVariableName #1 
 _rlnScheduleBooleanVariableValue #2 
 _rlnScheduleBooleanVariableResetValue #3 
+do_until_class2d            0            0 
 has_larger_rest_size            0            0 
 has_topaz_model            0            0 
 logbatch_big_enough            0            0 
@@ -48,7 +49,6 @@ _rlnScheduleStringVariableResetValue #3
  particles  particles  particles 
 rest_batch Schedules/preprocess/extract_topazpick/particles.star Schedules/preprocess/extract_topazpick/particles.star 
 topaz_model Schedules/class2d/train_topaz/model_epoch10.sav Schedules/class2d/train_topaz/model_epoch10.sav 
- 
 
 # version 30001
 
@@ -81,6 +81,8 @@ _rlnScheduleJobMode #3
 _rlnScheduleJobHasStarted #4 
 class2d_logbatch class2d_logbatch        new            0 
 class2d_rest class2d_rest        new            0 
+inimodel3d inimodel3d        new            0 
+  refine3d   refine3d        new            0 
 select_logbatch select_logbatch        new            0 
 select_rest select_rest        new            0 
 train_topaz train_topaz        new            0 
@@ -107,6 +109,8 @@ train_topaz       WAIT            0  undefined  undefined
 COUNT_restbatch HAS_rest_increased            0  undefined  undefined 
 HAS_rest_increased       WAIT            1 class2d_rest has_larger_rest_size 
 class2d_rest select_rest            0  undefined  undefined 
-select_rest SET_prev_rest_size            0  undefined  undefined 
+select_rest inimodel3d            1 SET_prev_rest_size do_until_class2d 
+inimodel3d   refine3d            0  undefined  undefined 
+  refine3d SET_prev_rest_size            0  undefined  undefined 
 SET_prev_rest_size       WAIT            0  undefined  undefined 
  
