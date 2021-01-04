@@ -1,3 +1,4 @@
+
 /***************************************************************************
  *
  * Author: "Sjors H.W. Scheres"
@@ -3019,7 +3020,7 @@ void AutoPicker::autoPickTopazOneMicrograph(FileName &fn_mic, int rank)
 	fh << std::endl;
 	fh.close();
 
-	std::string command = fn_bash + " " + fn_script + " >& " + fn_log ;
+	std::string command = fn_bash + " " + fn_script + " &> " + fn_log ;
 	if (system(command.c_str())) std::cerr << "WARNING: there was an error in executing: " << command << std::endl;
 
 	// Now convert output .txt into Relion-style .star files!
