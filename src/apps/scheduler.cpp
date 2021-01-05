@@ -187,10 +187,18 @@ public:
 			}
 			else if (add == "edge")
 			{
+				if (!schedule.checkUniqueInput(input))
+				{
+					REPORT_ERROR("ERROR: an edge/fork with this input node already exists!");
+				}
 				schedule.addEdge(input, output);
 			}
 			else if (add == "fork")
 			{
+				if (!schedule.checkUniqueInput(input))
+				{
+					REPORT_ERROR("ERROR: an edge/fork with this input node already exists!");
+				}
 				schedule.addFork(input, boolvar, output, output2);
 			}
 		}

@@ -312,7 +312,8 @@ public:
 
     // Constructor with w x h size of the window and a title
 	GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, FileName fn_sched,
-			int _update_every_sec, int _exit_after_sec, bool _do_read_only = false, bool _do_tomo = false);
+			int _update_every_sec, int _exit_after_sec, bool _do_read_only = false,
+			bool _do_tomo = false, bool _do_projdir = false);
 
     // Destructor
     ~GuiMainWindow(){ clear(); };

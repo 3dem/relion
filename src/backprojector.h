@@ -328,6 +328,7 @@ public:
 			MultidimArray<RFLOAT> &vol_out,
 			RFLOAT grad_stepsize,
 			RFLOAT tau2_fudge,
+			RFLOAT min_resol,
 			const MultidimArray<RFLOAT> &fsc,
 			bool use_fsc,
 			bool printTimes= false);

@@ -373,9 +373,6 @@ public:
 	// Adjusting the under-estimation of signal of low-resolution components during gradient optimization to this resolution
 	RFLOAT grad_min_resol;
 
-	// The minimum estimated FSC during gradient optimization
-	MultidimArray<RFLOAT> grad_baseline_fsc;
-
 	// The resolution in the initial iterations
 	RFLOAT grad_ini_resol; // in A
 
@@ -837,7 +834,7 @@ public:
 		grad_fin_resol(0),
 		do_grad_skip_anneal(false),
 		mu(0),
-		grad_stepsize(0),
+		grad_stepsize(-1),
 		grad_current_stepsize(0),
 #ifdef ALTCPU
 		tbbSchedulerInit(tbb::task_scheduler_init::deferred ),

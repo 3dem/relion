@@ -75,6 +75,7 @@ int main(int argc, char *argv[])
 			std::cerr << " [--idle 3600]  : quit GUI after this many second" << std::endl;
 			std::cerr << " [--readonly]   : limited version of GUI that does not touch any files" << std::endl;
 			std::cerr << " [--tomo]       : show tomography-specific GUI" << std::endl;
+			std::cerr << " [--do_projdir] : Don't confirm the creation of a new project directory, just make it if it doesn't exist" << std::endl;
 			std::cerr << " [--version]    : show the version of this program" << std::endl;
 			exit(0);
 		}
@@ -91,7 +92,8 @@ int main(int argc, char *argv[])
 		int _exit_after_sec = textToInteger(getParameter(argc, argv, "--idle", "3600"));
 		bool _do_read_only = checkParameter(argc, argv, "--readonly");
 		bool _do_tomo = checkParameter(argc, argv, "--tomo");
-		GuiMainWindow window(GUIWIDTH, GUIHEIGHT_EXT, titletext, fn_pipe, fn_sched, _update_every_sec, _exit_after_sec, _do_read_only, _do_tomo);
+		bool _do_projdir = checkParameter(argc, argv, "--do_projdir");
+		GuiMainWindow window(GUIWIDTH, GUIHEIGHT_EXT, titletext, fn_pipe, fn_sched, _update_every_sec, _exit_after_sec, _do_read_only, _do_tomo, _do_projdir);
 
 		// Show and run the window
 		window.show();

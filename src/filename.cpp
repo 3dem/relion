@@ -508,6 +508,8 @@ void move(const FileName &fn_src, const FileName &fn_dest)
 
 int mktree(const FileName &fn_dir, mode_t mode)
 {
+	if (exists(fn_dir)) return 0;
+
 	std::string s = fn_dir;
 	size_t pre=0,pos;
 	std::string dir;
