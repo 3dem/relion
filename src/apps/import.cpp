@@ -109,7 +109,6 @@ class import_parameters
 			bool do_new_optics_group = true;
 			int old_optics_group_number, optics_group_number = 1;
 			long old_nr_files = 0;
-			fn_out = (do_movies) ? "movies.star" : "micrographs.star";
 
 			// When continuing old jobs in the pipeliner, the old names are moved out of the way. Read it in anyway!
 			FileName old_fn_out = fn_odir + fn_out;
