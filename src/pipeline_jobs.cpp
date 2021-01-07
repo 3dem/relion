@@ -581,7 +581,7 @@ bool RelionJob::saveJobSubmissionScript(std::string newfilename, std::string out
 		replacing["XXXerrfileXXX"] = outputname + "run.err";
 		replacing["XXXoutfileXXX"] = outputname + "run.out";
 		replacing["XXXqueueXXX"] = joboptions["queuename"].getString();
-		char * extra_count_text = getenv ("RELION_QSUB_EXTRA_COUNT");
+		char *extra_count_text = getenv("RELION_QSUB_EXTRA_COUNT");
 		const char extra_count_val = (extra_count_text ? atoi(extra_count_text) : 2);
 		for (int i=1; i<=extra_count_val; i++)
 		{
@@ -737,7 +737,7 @@ bool RelionJob::prepareFinalCommand(std::string &outputname, std::vector<std::st
 		}
 	}
 
-	char * my_warn = getenv ("RELION_ERROR_LOCAL_MPI");
+	char * my_warn = getenv("RELION_ERROR_LOCAL_MPI");
 	int my_nr_warn = (my_warn == NULL) ? DEFAULTWARNINGLOCALMPI : textToInteger(my_warn);
 
 	if (nr_mpi > my_nr_warn && !joboptions["do_queue"].getBoolean())
@@ -894,7 +894,7 @@ void RelionJob::initialise(int _job_type)
 	// Check for environment variable RELION_MPI_MAX and RELION_QSUB_NRMPI
 	const char *mpi_max_input = getenv("RELION_MPI_MAX");
 	int mpi_max = (mpi_max_input == NULL) ? DEFAULTMPIMAX : textToInteger(mpi_max_input);
-	char * qsub_nrmpi_text = getenv ("RELION_QSUB_NRMPI");
+	char * qsub_nrmpi_text = getenv("RELION_QSUB_NRMPI");
 	const char qsub_nrmpi_val = (qsub_nrmpi_text ? atoi(qsub_nrmpi_text) : DEFAULTNRMPI);
 	if (has_mpi)
 	{
@@ -903,7 +903,7 @@ void RelionJob::initialise(int _job_type)
 
 	const char *thread_max_input = getenv("RELION_THREAD_MAX");
 	int thread_max = (thread_max_input == NULL) ? DEFAULTTHREADMAX : textToInteger(thread_max_input);
-	char * qsub_nrthr_text = getenv ("RELION_QSUB_NRTHREADS");
+	char * qsub_nrthr_text = getenv("RELION_QSUB_NRTHREADS");
 	const char qsub_nrthreads_val = (qsub_nrthr_text ? atoi(qsub_nrthr_text) : DEFAULTNRTHREADS);
 	if (has_thread)
 	{
@@ -938,14 +938,14 @@ Note that the person who installed RELION should have made a custom script for y
 (or create your own script following the RELION Wiki) if you have trouble submitting jobs. The default command can be set through the environment variable RELION_QSUB_COMMAND.");
 
 	// additional options that may be set through environment variables RELION_QSUB_EXTRAi and RELION_QSUB_EXTRAi (for more flexibility)
-	char * extra_count_text = getenv ("RELION_QSUB_EXTRA_COUNT");
+	char * extra_count_text = getenv("RELION_QSUB_EXTRA_COUNT");
 	const char extra_count_val = (extra_count_text ? atoi(extra_count_text) : 2);
 	for (int i=1; i<=extra_count_val; i++)
 	{
 		std::stringstream out;
 		out<<i;
 		const std::string i_str=out.str();
-		char * extra_text = getenv ((std::string("RELION_QSUB_EXTRA")+i_str).c_str());
+		char * extra_text = getenv((std::string("RELION_QSUB_EXTRA")+i_str).c_str());
 		if (extra_text != NULL)
 		{
 			const std::string query_default=std::string("RELION_QSUB_EXTRA")+i_str+"_DEFAULT";
@@ -972,10 +972,10 @@ Note that the person who installed RELION should have made a custom script for y
 
 	// Check for environment variable RELION_QSUB_TEMPLATE
 	char * default_location = getenv("RELION_QSUB_TEMPLATE");
-	char mydefault[]=DEFAULTQSUBLOCATION;
-	if (default_location==NULL)
+	char default_qsub[] = DEFAULTQSUBLOCATION;
+	if (default_location == NULL)
 	{
-		default_location=mydefault;
+		default_location = default_qsub;
 	}
 	joboptions["qsubscript"] = JobOption("Standard submission script:", std::string(default_location), "Script Files (*.{csh,sh,bash,script})", ".",
 "The template for your standard queue job submission script. \
@@ -1351,13 +1351,11 @@ void RelionJob::initialiseMotioncorrJob()
 	joboptions["eer_grouping"] = JobOption("EER fractionation:", 32, 1, 100, 1, "The number of hardware frames to group into one fraction. This option is relevant only for Falcon4 movies in the EER format. Note that all 'frames' in the GUI (e.g. first and last frame for corrected sum, dose per frame) refer to fractions, not raw detector frames. See https://www3.mrc-lmb.cam.ac.uk/relion/index.php/Image_compression#Falcon4_EER for detailed guidance on EER processing.");
 
 	// Motioncor2
-
-	// Check for environment variable RELION_MOTIONCOR2_EXECUTABLE
-	char * default_location = getenv ("RELION_MOTIONCOR2_EXECUTABLE");
-	char mydefault[]=DEFAULTMOTIONCOR2LOCATION;
+	char *default_location = getenv ("RELION_MOTIONCOR2_EXECUTABLE");
+	char default_motioncor2[] = DEFAULTMOTIONCOR2LOCATION;
 	if (default_location == NULL)
 	{
-		default_location=mydefault;
+		default_location = default_motioncor2;
 	}
 
 	// Common arguments RELION and UCSF implementation
@@ -1559,10 +1557,10 @@ void RelionJob::initialiseCtffindJob()
 	joboptions["use_ctffind4"] = JobOption("Use CTFFIND-4.1?", false, "If set to Yes, the wrapper will use CTFFIND4 (version 4.1) for CTF estimation. This includes thread-support, calculation of Thon rings from movie frames and phase-shift estimation for phase-plate data.");
 	joboptions["use_given_ps"] = JobOption("Use power spectra from MotionCorr job?", false, "If set to Yes, the CTF estimation will be done using power spectra calculated during motion correction.");
 	default_location = getenv ("RELION_CTFFIND_EXECUTABLE");
-	char mydefault[]=DEFAULTCTFFINDLOCATION;
+	char default_ctffind[] = DEFAULTCTFFINDLOCATION;
 	if (default_location == NULL)
 	{
-		default_location=mydefault;
+		default_location = default_ctffind;
 	}
 	joboptions["fn_ctffind_exe"] = JobOption("CTFFIND-4.1 executable:", std::string(default_location), "*", ".", "Location of the CTFFIND (release 4.1 or later) executable. You can control the default of this field by setting environment variable RELION_CTFFIND_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 	joboptions["slow_search"] = JobOption("Use exhaustive search?", false, "If set to Yes, CTFFIND4 will use slower but more exhaustive search. This option is recommended for CTFFIND version 4.1.8 and earlier, but probably not necessary for 4.1.10 and later. It is also worth trying this option when astigmatism and/or phase shifts are difficult to fit.");
@@ -1577,12 +1575,11 @@ void RelionJob::initialiseCtffindJob()
 	joboptions["ctf_win"] = JobOption("Estimate CTF on window size (pix) ", -1, -16, 4096, 16, "If a positive value is given, a squared window of this size at the center of the micrograph will be used to estimate the CTF. This may be useful to exclude parts of the micrograph that are unsuitable for CTF estimation, e.g. the labels at the edge of phtographic film. \n \n The original micrograph will be used (i.e. this option will be ignored) if a negative value is given.");
 
 	joboptions["use_gctf"] = JobOption("Use Gctf instead?", false, "If set to Yes, Kai Zhang's Gctf program (which runs on NVIDIA GPUs) will be used instead of Niko Grigorieff's CTFFIND4.");
-	// Check for environment variable RELION_CTFFIND_EXECUTABLE
-	default_location = getenv ("RELION_GCTF_EXECUTABLE");
-	char mydefault2[]=DEFAULTGCTFLOCATION;
+	default_location = getenv("RELION_GCTF_EXECUTABLE");
+	char default_gctf[] = DEFAULTGCTFLOCATION;
 	if (default_location == NULL)
 	{
-		default_location=mydefault2;
+		default_location = default_gctf;
 	}
 	joboptions["fn_gctf_exe"] = JobOption("Gctf executable:", std::string(default_location), "*", ".", "Location of the Gctf executable. You can control the default of this field by setting environment variable RELION_GCTF_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 	joboptions["do_ignore_ctffind_params"] = JobOption("Ignore 'Searches' parameters?", true, "If set to Yes, all parameters EXCEPT for phase shift search and its ranges on the 'Searches' tab will be ignored, and Gctf's default parameters will be used (box.size=1024; min.resol=50; max.resol=4; min.defocus=500; max.defocus=90000; step.defocus=500; astigm=1000) \n \
@@ -1823,6 +1820,13 @@ void RelionJob::initialiseAutopickJob()
 	joboptions["log_upper_thr"] = JobOption("Upper threshold (stddev):", 999., 0., 10., 0.5, "Use this to discard picks with LoG thresholds that are this many standard deviations above the average, e.g. to avoid high contrast contamination like ice and ethane droplets. Good values depend on the contrast of micrographs and need to be interactively explored; for low contrast micrographs, values of ~ 1.5 may be reasonable, but the same value will be too low for high-contrast micrographs.");
 
 	joboptions["do_topaz"] = JobOption("OR: use Topaz?", false, "If set to Yes, topaz will be used for autopicking. Run 2 separate jobs from the Topaz tab: one for training the model and for the actual picking.");
+	char *default_location = getenv ("RELION_TOPAZ_EXECUTABLE");
+	char default_topaz[] = DEFAULTTOPAZLOCATION;
+	if (default_location == NULL)
+	{
+		default_location = default_topaz;
+	}
+	joboptions["fn_topaz_exec"] = JobOption("Topaz executable", std::string(default_topaz), "The location of the Topaz executable. If you need to activate conda environment, please make a wrapper shell script to do so and specify it. You can control the default of this field by setting environment variable RELION_TOPAZ_EXECUTABLE.");
 	joboptions["do_topaz_train"] = JobOption("Perform topaz training?", false, "Set this option to Yes if you want to train a topaz model.");
 	joboptions["topaz_train_picks"] = JobOption("Input picked coordinates for training:", NODE_MIC_COORDS, "", "Input micrographs (*.{star})", "Input STAR file (preferably with CTF information) with all micrographs to pick from.");
 	joboptions["do_topaz_train_parts"] = JobOption("OR train on a set of particles? ", false, "If set to Yes, the input Coordinates above will be ignored. Instead, one uses a _data.star file from a previous 2D or 3D refinement or selection to use those particle positions for training.");
@@ -1830,7 +1834,7 @@ void RelionJob::initialiseAutopickJob()
 	joboptions["do_topaz_pick"] = JobOption("Perform topaz picking?", false, "Set this option to Yes if you want to use a topaz model for autopicking.");
 	joboptions["topaz_particle_diameter"] = JobOption("Particle diameter (A) ", -1, 0, 2000, 20, "Diameter of the particle (to be used to infer topaz downscale factor and particle radius)");
 	joboptions["topaz_nr_particles"] = JobOption("Nr of particles per micrograph: ", -1, 0, 2000, 20, "Expected average number of particles per micrograph");
-	joboptions["topaz_model"] = JobOption("Trained topaz model: ", "", "SAV Files (*.sav)", ".", "Trained topaz model for topaz-based picking. Use on job for training and a next job for picking.");
+	joboptions["topaz_model"] = JobOption("Trained topaz model: ", "", "SAV Files (*.sav)", ".", "Trained topaz model for topaz-based picking. Use on job for training and a next job for picking. Leave this empty to use the default (general) model.");
 	joboptions["topaz_other_args"]= JobOption("Additional topaz arguments:", std::string(""), "These additional arguments will be passed onto all topaz programs.");
 
 	joboptions["do_refs"] = JobOption("Use reference-based template-matching?", false, "If set to Yes, 2D or 3D references, as defined on the References tab will be used for autopicking.");
@@ -1976,7 +1980,8 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 		else if (joboptions["do_topaz_pick"].getBoolean())
 		{
 			command += " --topaz_extract";
-			command += " --topaz_model " + joboptions["topaz_model"].getString();
+			if (joboptions["topaz_model"].getString() != "")
+				command += " --topaz_model " + joboptions["topaz_model"].getString();
 		}
 
 		if ((joboptions["topaz_other_args"].getString()).length() > 0)
@@ -1985,10 +1990,8 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 		// GPU-stuff
 		if (joboptions["use_gpu"].getBoolean())
 		{
-			// for the moment always use --shrink 0 with GPUs ...
 			command += " --gpu \"" + joboptions["gpu_ids"].getString() + "\"";
 		}
-
 	}
 	else if (joboptions["do_log"].getBoolean())
 	{
@@ -4878,11 +4881,11 @@ void RelionJob::initialiseLocalresJob()
 	joboptions["angpix"] = JobOption("Calibrated pixel size (A)", 1, 0.3, 5, 0.1, "Provide the final, calibrated pixel size in Angstroms. This value may be different from the pixel-size used thus far, e.g. when you have recalibrated the pixel size using the fit to a PDB model. The X-axis of the output FSC plot will use this calibrated value.");
 
 	// Check for environment variable RELION_RESMAP_TEMPLATE
-	char * default_location = getenv ("RELION_RESMAP_EXECUTABLE");
-	char mydefault[] = DEFAULTRESMAPLOCATION;
+	char *default_location = getenv("RELION_RESMAP_EXECUTABLE");
+	char default_resmap[] = DEFAULTRESMAPLOCATION;
 	if (default_location == NULL)
 	{
-		default_location = mydefault;
+		default_location = default_resmap;
 	}
 
 	joboptions["do_resmap_locres"] = JobOption("Use ResMap?", true, "If set to Yes, then ResMap will be used for local resolution estimation.");

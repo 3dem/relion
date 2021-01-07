@@ -188,11 +188,8 @@ public:
 	// Topaz command executable
 	FileName fn_topaz_exe;
 
-	// Conda activate executable
-	FileName fn_conda_activate;
-
-	// Bash executable
-	FileName fn_bash;
+	// sh executable
+	FileName fn_shell;
 
 	// Topaz saved model for use in extract
 	FileName topaz_model;

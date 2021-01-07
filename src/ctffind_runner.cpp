@@ -112,7 +112,7 @@ void CtffindRunner::initialise()
 			fn_gctf_exe = (std::string)penv;
 	}
 
-	fn_shell = "csh";
+	fn_shell = "/bin/sh";
 	char *shell_name;
 	shell_name = getenv("RELION_SHELL");
 	if (shell_name != NULL)
@@ -138,7 +138,6 @@ void CtffindRunner::initialise()
 	// Make sure fn_out ends with a slash
 	if (fn_out[fn_out.length()-1] != '/')
 		fn_out += "/";
-
 
 	// Set up which micrographs to estimate CTFs from
 	if (fn_in.isStarFile())
