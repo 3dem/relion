@@ -103,6 +103,14 @@ void MlOptimiserMpi::initialise()
 	int devCount, deviceAffinity;
 	bool is_split(false);
 
+	if (gradient_refine) {
+		if (node->isMaster())
+			REPORT_ERROR("Gradient refinement is not supported together with MPI. \nPlease rerun with Number of MPI processes: 1");
+		else
+			exit(1);
+	}
+
+
 	if (do_gpu)
 	{
 		MPI_Status status;
