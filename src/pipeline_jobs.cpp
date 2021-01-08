@@ -1951,6 +1951,7 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 			return false;
 		}
 
+		command += " --topaz_exe " + joboptions["fn_topaz_exec"].getString();
 
 		if (joboptions["topaz_nr_particles"].getNumber(error_message) > 0.)
 			command += " --topaz_nr_particles " + joboptions["topaz_nr_particles"].getString();
