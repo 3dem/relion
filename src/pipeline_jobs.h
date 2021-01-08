@@ -182,10 +182,10 @@ static bool do_allow_change_minimum_dedicated;
 #define NODE_PDF_LOGFILE_LABEL   "relion.PdfLogfile"
 #define NODE_POST_LABEL          "relion.PostprocessStar"
 #define NODE_POLISH_PARAMS_LABEL "relion.PolishParams"
-#define NODE_TOMO_OPTIMISATION_LABEL "relion.SubtomoOptimisationSet"
-#define NODE_TOMO_TOMOGRAMS_LABEL    "relion.SubtomoTomogramSet"
-#define NODE_TOMO_TRAJECTORIES_LABEL "relion.SubtomoTrajectorySet"
-#define NODE_TOMO_MANIFOLDS_LABEL    "relion.SubtomoManifoldSet"
+#define NODE_TOMO_OPTIMISATION_LABEL "relion.TomoOptimisationSet"
+#define NODE_TOMO_TOMOGRAMS_LABEL    "relion.TomoTomogramSet"
+#define NODE_TOMO_TRAJECTORIES_LABEL "relion.TomoTrajectorySet"
+#define NODE_TOMO_MANIFOLDS_LABEL    "relion.TomoManifoldSet"
 
 static std::map<int, std::string> node_type2label = {{NODE_MOVIES, NODE_MOVIES_LABEL},
 		{NODE_MICS, NODE_MICS_LABEL},
