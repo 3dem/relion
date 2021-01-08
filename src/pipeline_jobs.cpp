@@ -1826,7 +1826,7 @@ void RelionJob::initialiseAutopickJob()
 	{
 		default_location = default_topaz;
 	}
-	joboptions["fn_topaz_exec"] = JobOption("Topaz executable", std::string(default_topaz), "The location of the Topaz executable. If you need to activate conda environment, please make a wrapper shell script to do so and specify it. You can control the default of this field by setting environment variable RELION_TOPAZ_EXECUTABLE.");
+	joboptions["fn_topaz_exec"] = JobOption("Topaz executable", std::string(default_location), "The location of the Topaz executable. If you need to activate conda environment, please make a wrapper shell script to do so and specify it. You can control the default of this field by setting environment variable RELION_TOPAZ_EXECUTABLE.");
 	joboptions["do_topaz_train"] = JobOption("Perform topaz training?", false, "Set this option to Yes if you want to train a topaz model.");
 	joboptions["topaz_train_picks"] = JobOption("Input picked coordinates for training:", NODE_MIC_COORDS, "", "Input micrographs (*.{star})", "Input STAR file (preferably with CTF information) with all micrographs to pick from.");
 	joboptions["do_topaz_train_parts"] = JobOption("OR train on a set of particles? ", false, "If set to Yes, the input Coordinates above will be ignored. Instead, one uses a _data.star file from a previous 2D or 3D refinement or selection to use those particle positions for training.");
