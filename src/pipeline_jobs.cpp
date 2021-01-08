@@ -860,27 +860,27 @@ void RelionJob::initialise(int _job_type)
 	else if (type == PROC_TOMO_IMPORT)
 	{
 		has_mpi = has_thread = false;
-		initialiseSubtomoImportJob();
+		initialiseTomoImportJob();
 	}
 	else if (type == PROC_TOMO_SUBTOMO)
 	{
 		has_mpi = has_thread = true;
-		initialiseSubtomoReconstructJob();
+		initialiseTomoSubtomoJob();
 	}
 	else if (type == PROC_TOMO_CTFREFINE)
 	{
 		has_mpi = has_thread = true;
-		initialiseSubtomoCtfRefineJob();
+		initialiseTomoCtfRefineJob();
 	}
 	else if (type == PROC_TOMO_ALIGN)
 	{
 		has_mpi = has_thread = true;
-		initialiseSubtomoPolishJob();
+		initialiseTomoAlignJob();
 	}
 	else if (type == PROC_TOMO_RECONSTRUCT)
 	{
 		has_mpi = has_thread = true;
-		initialiseSubtomoAverageJob();
+		initialiseTomoReconPartJob();
 	}
 	else if (type == PROC_EXTERNAL)
 	{
@@ -1098,23 +1098,25 @@ bool RelionJob::getCommands(std::string &outputname, std::vector<std::string> &c
 	}
 	else if (type == PROC_TOMO_IMPORT)
 	{
-		result = getCommandsSubtomoImportJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
+		result = getCommandsTomoImportJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
 	else if (type == PROC_TOMO_SUBTOMO)
 	{
-		result = getCommandsSubtomoReconstructJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
+		result = getCommandsTomoSubtomoJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
 	else if (type == PROC_TOMO_CTFREFINE)
 	{
-		result = getCommandsSubtomoCtfRefineJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
+		result = getCommandsTomoCtfRefineJob(outputname, commands, final_command, do_makedir, job_counter,
+											 error_message);
 	}
 	else if (type == PROC_TOMO_ALIGN)
 	{
-		result = getCommandsSubtomoPolishJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
+		result = getCommandsTomoAlignJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
 	else if (type == PROC_TOMO_RECONSTRUCT)
 	{
-		result = getCommandsSubtomoAverageJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
+		result = getCommandsTomoReconPartJob(outputname, commands, final_command, do_makedir, job_counter,
+											 error_message);
 	}
 	else if (type == PROC_EXTERNAL)
 	{
@@ -5517,15 +5519,15 @@ bool RelionJob::getCommandsExternalJob(std::string &outputname, std::vector<std:
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
 
-void RelionJob::addSubtomoInputOptions(bool has_tomograms, bool has_particles,
+void RelionJob::addTomoInputOptions(bool has_tomograms, bool has_particles,
 		bool has_trajectories, bool has_manifolds, bool has_halfmaps, bool has_postprocess)
 {
     // Optional input nodes
-     joboptions["in_optimisation"] = JobOption("Input optimisation set: ", NODE_SUBTOMO_OPTIMISATION, "", "Optimisation set STAR file (*.star)", "Input optimisation set. This will be passed with a --i argument to the executable. If any inidividual components of the optimisation set are specified below, then they will override the components in this optimisation set.");
+     joboptions["in_optimisation"] = JobOption("Input optimisation set: ", NODE_TOMO_OPTIMISATION, "", "Optimisation set STAR file (*.star)", "Input optimisation set. This will be passed with a --i argument to the executable. If any inidividual components of the optimisation set are specified below, then they will override the components in this optimisation set.");
      if (has_particles) joboptions["in_particles"] = JobOption("Input particle set: ", NODE_PART_DATA, "", "Particle STAR file (*.star)", "Input particle set. This will be passed with a --p argument to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
-     if (has_tomograms) joboptions["in_tomograms"] = JobOption("Input tomogram set: ", NODE_SUBTOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "Input tomogram set. This will be passed with a --m argument to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
-     if (has_trajectories) joboptions["in_trajectories"] = JobOption("Input trajectory set: ", NODE_SUBTOMO_TRAJECTORIES, "", "Trajectory set STAR file (*.star)", "Input trajectory set. This will be passed with a --mot argument to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
-     if (has_manifolds) joboptions["in_manifolds"] = JobOption("Input manifold set: ", NODE_SUBTOMO_MANIFOLDS, "", "Manifold set STAR file (*.star)", "Input manifold set. This will be passed with a --man argument to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
+     if (has_tomograms) joboptions["in_tomograms"] = JobOption("Input tomogram set: ", NODE_TOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "Input tomogram set. This will be passed with a --m argument to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
+     if (has_trajectories) joboptions["in_trajectories"] = JobOption("Input trajectory set: ", NODE_TOMO_TRAJECTORIES, "", "Trajectory set STAR file (*.star)", "Input trajectory set. This will be passed with a --mot argument to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
+     if (has_manifolds) joboptions["in_manifolds"] = JobOption("Input manifold set: ", NODE_TOMO_MANIFOLDS, "", "Manifold set STAR file (*.star)", "Input manifold set. This will be passed with a --man argument to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
 	 if (has_halfmaps) joboptions["in_halfmaps"] = JobOption("One of the 2 reference half-maps:", NODE_HALFMAP, "", "MRC map files (*half1*.mrc)", "Provide one of the two reference half-reconstructions. Both maps will be passed with a --ref1 and --ref2 arguments to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
 	 if (has_postprocess)
 	 {
@@ -5534,7 +5536,7 @@ void RelionJob::addSubtomoInputOptions(bool has_tomograms, bool has_particles,
 	 }
 }
 
-std::string RelionJob::getSubtomoInputCommmand(std::string &command, int has_tomograms, int has_particles,
+std::string RelionJob::getTomoInputCommmand(std::string &command, int has_tomograms, int has_particles,
 		int has_trajectories, int has_manifolds, bool has_halfmaps, int has_postprocess)
 {
 	std::string error_message = "";
@@ -5644,12 +5646,12 @@ std::string RelionJob::getSubtomoInputCommmand(std::string &command, int has_tom
 }
 
 
-void RelionJob::initialiseSubtomoImportJob()
+void RelionJob::initialiseTomoImportJob()
 {
-        hidden_name = ".gui_subtomo_import";
+        hidden_name = ".gui_tomo_import";
 
        	joboptions["do_tomo"] = JobOption("Import tomograms?", true, "Set this to Yes for importing tomogram directories from IMOD.");
-        joboptions["io_tomos"] = JobOption("Append to tomograms set: ", NODE_SUBTOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "The imported tomograms will be output into this tomogram set. If any tomograms were already in this tomogram set, then the newly imported ones will be added to those.");
+        joboptions["io_tomos"] = JobOption("Append to tomograms set: ", NODE_TOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "The imported tomograms will be output into this tomogram set. If any tomograms were already in this tomogram set, then the newly imported ones will be added to those.");
         joboptions["tomo_star"] = JobOption("STAR file with tomograms description: ", "", "Input file (*.star)", ".", "Provide a STAR file with the following information to input tomograms: \n \n TODO TODO TODO ");
     	joboptions["angpix"] = JobOption("Pixel size (Angstrom):", (std::string)"", "Pixel size in Angstroms. If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
     	joboptions["kV"] = JobOption("Voltage (kV):", (std::string)"", "Voltage the microscope was operated on (in kV; default=300). If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
@@ -5664,7 +5666,7 @@ void RelionJob::initialiseSubtomoImportJob()
 
        	joboptions["do_coords"] = JobOption("Import coordinates?", false, "Set this to Yes for importing particle coordinates.");
         joboptions["part_star"] = JobOption("STAR file with coordinates: ", "", "Input file (*.star)", ".", "Provide a STAR file with the following information to input particles: \n \n TODO TODO TODO ");
-        joboptions["part_tomos"] = JobOption("Tomograms set: ", NODE_SUBTOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "The tomograms set from which these particles were picked.");
+        joboptions["part_tomos"] = JobOption("Tomograms set: ", NODE_TOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "The tomograms set from which these particles were picked.");
 
     	joboptions["do_other"] = JobOption("Import other node types?", false, "Set this to Yes  if you plan to import anything else than movies or micrographs");
 
@@ -5682,8 +5684,8 @@ void RelionJob::initialiseSubtomoImportJob()
 
 }
 
-bool RelionJob::getCommandsSubtomoImportJob(std::string &outputname, std::vector<std::string> &commands,
-                std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
+bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<std::string> &commands,
+		 std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 
 	commands.clear();
@@ -5722,7 +5724,7 @@ bool RelionJob::getCommandsSubtomoImportJob(std::string &outputname, std::vector
 		command += " --o " + outputname+"tomograms.star";
                 if (joboptions["io_tomos"].getString() != "") command += " --t " + joboptions["io_tomos"].getString();
 
-		Node node(outputname+"tomograms.star", NODE_SUBTOMO_TOMOGRAMS);
+		Node node(outputname+"tomograms.star", NODE_TOMO_TOMOGRAMS);
 		outputNodes.push_back(node);
 
 		if (joboptions["angpix"].getString() != "") command += " --angpix " + joboptions["angpix"].getString();
@@ -5760,7 +5762,7 @@ bool RelionJob::getCommandsSubtomoImportJob(std::string &outputname, std::vector
 
 		Node node(outputname+"particles.star", NODE_PART_DATA);
 		outputNodes.push_back(node);
-		Node node2(outputname+"optimisation_set.star", NODE_SUBTOMO_OPTIMISATION);
+		Node node2(outputname+"optimisation_set.star", NODE_TOMO_OPTIMISATION);
 		outputNodes.push_back(node2);
 	}
 	else if (do_other)
@@ -5778,7 +5780,7 @@ bool RelionJob::getCommandsSubtomoImportJob(std::string &outputname, std::vector
 		if (node_type == "Particles STAR file (.star)")
 			mynodetype = NODE_PART_DATA;
 		else if (node_type == "Set of tomograms STAR file (.star)")
-			mynodetype = NODE_SUBTOMO_TOMOGRAMS;
+			mynodetype = NODE_TOMO_TOMOGRAMS;
 		else if (node_type == "Multiple (2D or 3D) references (.star or .mrcs)")
 			mynodetype = NODE_REFS;
 		else if (node_type == "3D reference (.mrc)")
@@ -5853,12 +5855,12 @@ bool RelionJob::getCommandsSubtomoImportJob(std::string &outputname, std::vector
 
 }
 
-void RelionJob::initialiseSubtomoReconstructJob()
+void RelionJob::initialiseTomoSubtomoJob()
 {
 
-	hidden_name = ".gui_subtomo_reconstruct";
+	hidden_name = ".gui_tomo_subtomo";
 
-	addSubtomoInputOptions(true, true, true, false, false, false);
+	addTomoInputOptions(true, true, true, false, false, false);
 
 	joboptions["box_size"] = JobOption("Box size (pix):", 128, 32, 512, 16, "The initial box size of the reconstruction. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
 	joboptions["crop_size"] = JobOption("Cropped box size (pix):", -1, -1, 512, 16, "If set to a positive value, after construction, the resulting pseudo subtomograms are cropped to this size. A smaller box size allows the (generally expensive) refinement using relion_refine to proceed more rapidly.");
@@ -5871,8 +5873,8 @@ void RelionJob::initialiseSubtomoReconstructJob()
 
 
 
-bool RelionJob::getCommandsSubtomoReconstructJob(std::string &outputname, std::vector<std::string> &commands,
-                std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
+bool RelionJob::getCommandsTomoSubtomoJob(std::string &outputname, std::vector<std::string> &commands,
+				std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
 	initialisePipeline(outputname, PROC_TOMO_SUBTOMO_LABEL, job_counter);
@@ -5885,13 +5887,13 @@ bool RelionJob::getCommandsSubtomoReconstructJob(std::string &outputname, std::v
 	if (error_message != "") return false;
 
 	// I/O
-	error_message = getSubtomoInputCommmand(command, HAS_COMPULSORY, HAS_COMPULSORY, HAS_OPTIONAL, HAS_NOT, HAS_NOT,
+	error_message = getTomoInputCommmand(command, HAS_COMPULSORY, HAS_COMPULSORY, HAS_OPTIONAL, HAS_NOT, HAS_NOT,
 										 HAS_NOT);
 	if (error_message != "") return false;
 
 	command += " --o " + outputname;
 
-	Node node1(outputname+"optimisation_set.star", NODE_SUBTOMO_OPTIMISATION);
+	Node node1(outputname+"optimisation_set.star", NODE_TOMO_OPTIMISATION);
 	outputNodes.push_back(node1);
 	Node node2(outputname+"particles.star", NODE_PART_DATA);
 	outputNodes.push_back(node2);
@@ -5927,11 +5929,11 @@ bool RelionJob::getCommandsSubtomoReconstructJob(std::string &outputname, std::v
 }
 
 
-void RelionJob::initialiseSubtomoCtfRefineJob()
+void RelionJob::initialiseTomoCtfRefineJob()
 {
-        hidden_name = ".gui_subtomo_ctfrefine";
+        hidden_name = ".gui_tomo_refine_ctf";
 
-        addSubtomoInputOptions(true, true, true, false, true, true);
+	addTomoInputOptions(true, true, true, false, true, true);
 
     	joboptions["box_size"] = JobOption("Box size for estimation (pix):", 128, 32, 512, 16, "Box size to be used for the estimation. Note that this can be larger than the box size of the reference map. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
     	joboptions["do_defocus"] = JobOption("Refine defocus?", true, "If set to Yes, then estimate the defoci of the individual tilt images.");
@@ -5952,8 +5954,8 @@ void RelionJob::initialiseSubtomoCtfRefineJob()
 
 }
 
-bool RelionJob::getCommandsSubtomoCtfRefineJob(std::string &outputname, std::vector<std::string> &commands,
-                std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
+bool RelionJob::getCommandsTomoCtfRefineJob(std::string &outputname, std::vector<std::string> &commands,
+				std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 
 	commands.clear();
@@ -5967,15 +5969,15 @@ bool RelionJob::getCommandsSubtomoCtfRefineJob(std::string &outputname, std::vec
     if (error_message != "") return false;
 
     // I/O
-    error_message = getSubtomoInputCommmand(command, HAS_COMPULSORY, HAS_COMPULSORY, HAS_OPTIONAL, HAS_NOT, HAS_COMPULSORY,
-											HAS_OPTIONAL);
+    error_message = getTomoInputCommmand(command, HAS_COMPULSORY, HAS_COMPULSORY, HAS_OPTIONAL, HAS_NOT, HAS_COMPULSORY,
+										 HAS_OPTIONAL);
 	if (error_message != "") return false;
 
 	command += " --o " + outputname;
 
-	Node node1(outputname+"optimisation_set.star", NODE_SUBTOMO_OPTIMISATION);
+	Node node1(outputname+"optimisation_set.star", NODE_TOMO_OPTIMISATION);
 	outputNodes.push_back(node1);
-	Node node2(outputname+"tomograms.star", NODE_SUBTOMO_TOMOGRAMS);
+	Node node2(outputname+"tomograms.star", NODE_TOMO_TOMOGRAMS);
 	outputNodes.push_back(node2);
 
 	// Job-specific stuff goes here
@@ -6029,11 +6031,11 @@ bool RelionJob::getCommandsSubtomoCtfRefineJob(std::string &outputname, std::vec
 
 }
 
-void RelionJob::initialiseSubtomoPolishJob()
+void RelionJob::initialiseTomoAlignJob()
 {
-        hidden_name = ".gui_subtomo_polish";
+        hidden_name = ".gui_tomo_align";
 
-        addSubtomoInputOptions(true, true, true, false, true, true);
+	addTomoInputOptions(true, true, true, false, true, true);
 
     	joboptions["box_size"] = JobOption("Box size for estimation (pix):", 128, 32, 512, 16, "Box size to be used for the estimation. Note that this can be larger than the box size of the reference map. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
     	joboptions["max_error"] = JobOption("Max position error (pix):", 5, 0, 64, 1, "maximal assumed error in the initial 2D particle-positions (distances between the projected 3D positions and their true positions in the images), given in pixels.");
@@ -6045,8 +6047,8 @@ void RelionJob::initialiseSubtomoPolishJob()
 
 }
 
-bool RelionJob::getCommandsSubtomoPolishJob(std::string &outputname, std::vector<std::string> &commands,
-                std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
+bool RelionJob::getCommandsTomoAlignJob(std::string &outputname, std::vector<std::string> &commands,
+				std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 
 	commands.clear();
@@ -6060,21 +6062,21 @@ bool RelionJob::getCommandsSubtomoPolishJob(std::string &outputname, std::vector
 	if (error_message != "") return false;
 
 	// I/O
-    error_message = getSubtomoInputCommmand(command, HAS_COMPULSORY, HAS_COMPULSORY, HAS_OPTIONAL, HAS_NOT, HAS_COMPULSORY
-											, HAS_OPTIONAL);
+    error_message = getTomoInputCommmand(command, HAS_COMPULSORY, HAS_COMPULSORY, HAS_OPTIONAL, HAS_NOT, HAS_COMPULSORY,
+					HAS_OPTIONAL);
     if (error_message != "") return false;
 
 	command += " --o " + outputname;
 
-	Node node1(outputname+"optimisation_set.star", NODE_SUBTOMO_OPTIMISATION);
+	Node node1(outputname+"optimisation_set.star", NODE_TOMO_OPTIMISATION);
 	outputNodes.push_back(node1);
-	Node node2(outputname+"tomograms.star", NODE_SUBTOMO_TOMOGRAMS);
+	Node node2(outputname+"tomograms.star", NODE_TOMO_TOMOGRAMS);
 	outputNodes.push_back(node2);
 	Node node3(outputname+"particles.star", NODE_PART_DATA);
 	outputNodes.push_back(node3);
     if (joboptions["do_polish"].getBoolean())
 	{
-		Node node4(outputname+"motion.star", NODE_SUBTOMO_TRAJECTORIES);
+		Node node4(outputname+"motion.star", NODE_TOMO_TRAJECTORIES);
 		outputNodes.push_back(node4);
 	}
 
@@ -6109,11 +6111,11 @@ bool RelionJob::getCommandsSubtomoPolishJob(std::string &outputname, std::vector
 
 }
 
-void RelionJob::initialiseSubtomoAverageJob()
+void RelionJob::initialiseTomoReconPartJob()
 {
-	hidden_name = ".gui_subtomo_average";
+	hidden_name = ".gui_tomo_reconstruct_particle";
 
-	addSubtomoInputOptions(true, true, true, false, false, false);
+	addTomoInputOptions(true, true, true, false, false, false);
 
    	joboptions["do_from2d"] = JobOption("Average from 2D tilt series?", true, "If set to Yes, then relion_tomo_reconstruct_particle is used, with the options below, to calculate the new average from the original 2D tilt series images. This yields the best results. If set to No, then relion_reconstruct is used to calculate the average of the 3D subtomogram images in the particle set on the I/O tab. This is quicker, but gives worse results.");
 	joboptions["box_size"] = JobOption("Box size (pix):", 128, 32, 512, 16, "Box size of the reconstruction. Note that this is independent of the box size that has been used to refine the particle. This allows the user to construct a 3D map of arbitrary size to gain an overview of the structure surrounding the particle. A sufficiently large box size also allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
@@ -6133,8 +6135,8 @@ Therefore, look at the XMIPP Wiki for more details:  http://xmipp.cnb.csic.es/tw
 
 }
 
-bool RelionJob::getCommandsSubtomoAverageJob(std::string &outputname, std::vector<std::string> &commands,
-                std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
+bool RelionJob::getCommandsTomoReconPartJob(std::string &outputname, std::vector<std::string> &commands,
+				std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 
 	commands.clear();
@@ -6150,8 +6152,8 @@ bool RelionJob::getCommandsSubtomoAverageJob(std::string &outputname, std::vecto
 		if (error_message != "") return false;
 
 		// I/O
-		error_message = getSubtomoInputCommmand(command, HAS_COMPULSORY, HAS_COMPULSORY, HAS_OPTIONAL, HAS_NOT, HAS_NOT,
-										  HAS_NOT);
+		error_message = getTomoInputCommmand(command, HAS_COMPULSORY, HAS_COMPULSORY, HAS_OPTIONAL, HAS_NOT, HAS_NOT,
+						HAS_NOT);
 		if (error_message != "") return false;
 
 		command += " --o " + outputname;
@@ -6191,9 +6193,10 @@ bool RelionJob::getCommandsSubtomoAverageJob(std::string &outputname, std::vecto
 			command2 += " --rec "+ outputname;
 			command2 += " --o "+ outputname;
 			command2 += " --mask "+ joboptions["fn_mask"].getString();
-			error_message = getSubtomoInputCommmand(command2, HAS_COMPULSORY, HAS_COMPULSORY, HAS_OPTIONAL, HAS_NOT, HAS_NOT,
-													HAS_NOT);
-			Node node3(outputname+"optimisation_set.star", NODE_SUBTOMO_OPTIMISATION);
+			error_message = getTomoInputCommmand(command2, HAS_COMPULSORY, HAS_COMPULSORY, HAS_OPTIONAL, HAS_NOT,
+												 HAS_NOT,
+												 HAS_NOT);
+			Node node3(outputname+"optimisation_set.star", NODE_TOMO_OPTIMISATION);
 			outputNodes.push_back(node3);
 			Node node4(outputname+"PostProcess/logfile.pdf", NODE_PDF_LOGFILE);
 			outputNodes.push_back(node4);

@@ -163,10 +163,10 @@ static bool do_allow_change_minimum_dedicated;
 #define NODE_POST           14// Postprocess STAR file (with FSC curve, unfil half-maps, masks etc in it: used by Jasenko's programs
 #define NODE_POLISH_PARAMS  15// Txt file with optimal parameters for Bayesian polishing
 
-#define NODE_SUBTOMO_OPTIMISATION 50 // Jasenko's combined optimisation set for subtomogram averaging
-#define NODE_SUBTOMO_TOMOGRAMS    51 // Jasenko's set of tomograms
-#define NODE_SUBTOMO_TRAJECTORIES 52 // Jaseno's definition of subtomogram motion trajectories
-#define NODE_SUBTOMO_MANIFOLDS    53 // Jaseno's definition of 3D shapes (for picking of subtomograms)
+#define NODE_TOMO_OPTIMISATION 50 // Jasenko's combined optimisation set for subtomogram averaging
+#define NODE_TOMO_TOMOGRAMS    51 // Jasenko's set of tomograms
+#define NODE_TOMO_TRAJECTORIES 52 // Jasenko's definition of subtomogram motion trajectories
+#define NODE_TOMO_MANIFOLDS    53 // Jasenko's definition of 3D shapes (for picking of subtomograms)
 
 
 #define NODE_MOVIES_LABEL   	 "relion.MovieStar"
@@ -182,10 +182,10 @@ static bool do_allow_change_minimum_dedicated;
 #define NODE_PDF_LOGFILE_LABEL   "relion.PdfLogfile"
 #define NODE_POST_LABEL          "relion.PostprocessStar"
 #define NODE_POLISH_PARAMS_LABEL "relion.PolishParams"
-#define NODE_SUBTOMO_OPTIMISATION_LABEL "relion.SubtomoOptimisationSet"
-#define NODE_SUBTOMO_TOMOGRAMS_LABEL    "relion.SubtomoTomogramSet"
-#define NODE_SUBTOMO_TRAJECTORIES_LABEL "relion.SubtomoTrajectorySet"
-#define NODE_SUBTOMO_MANIFOLDS_LABEL    "relion.SubtomoManifoldSet"
+#define NODE_TOMO_OPTIMISATION_LABEL "relion.SubtomoOptimisationSet"
+#define NODE_TOMO_TOMOGRAMS_LABEL    "relion.SubtomoTomogramSet"
+#define NODE_TOMO_TRAJECTORIES_LABEL "relion.SubtomoTrajectorySet"
+#define NODE_TOMO_MANIFOLDS_LABEL    "relion.SubtomoManifoldSet"
 
 static std::map<int, std::string> node_type2label = {{NODE_MOVIES, NODE_MOVIES_LABEL},
 		{NODE_MICS, NODE_MICS_LABEL},
@@ -202,10 +202,10 @@ static std::map<int, std::string> node_type2label = {{NODE_MOVIES, NODE_MOVIES_L
 		{NODE_PDF_LOGFILE, NODE_PDF_LOGFILE_LABEL},
 		{NODE_POST, NODE_POST_LABEL},
 		{NODE_POLISH_PARAMS, NODE_POLISH_PARAMS_LABEL},
-		{NODE_SUBTOMO_OPTIMISATION, NODE_SUBTOMO_OPTIMISATION_LABEL},
-		{NODE_SUBTOMO_TOMOGRAMS, NODE_SUBTOMO_TOMOGRAMS_LABEL},
-		{NODE_SUBTOMO_TRAJECTORIES, NODE_SUBTOMO_TRAJECTORIES_LABEL},
-		{NODE_SUBTOMO_MANIFOLDS, NODE_SUBTOMO_MANIFOLDS_LABEL} };
+		{NODE_TOMO_OPTIMISATION, NODE_TOMO_OPTIMISATION_LABEL},
+		{NODE_TOMO_TOMOGRAMS, NODE_TOMO_TOMOGRAMS_LABEL},
+		{NODE_TOMO_TRAJECTORIES, NODE_TOMO_TRAJECTORIES_LABEL},
+		{NODE_TOMO_MANIFOLDS, NODE_TOMO_MANIFOLDS_LABEL} };
 
 static std::map<std::string, int> node_label2type = {{NODE_MOVIES_LABEL, NODE_MOVIES},
 		{NODE_MICS_LABEL, NODE_MICS},
@@ -222,10 +222,10 @@ static std::map<std::string, int> node_label2type = {{NODE_MOVIES_LABEL, NODE_MO
 		{NODE_PDF_LOGFILE_LABEL, NODE_PDF_LOGFILE},
 		{NODE_POST_LABEL, NODE_POST},
 		{NODE_POLISH_PARAMS_LABEL, NODE_POLISH_PARAMS},
-		{NODE_SUBTOMO_OPTIMISATION_LABEL, NODE_SUBTOMO_OPTIMISATION},
-		{NODE_SUBTOMO_TOMOGRAMS_LABEL, NODE_SUBTOMO_TOMOGRAMS},
-		{NODE_SUBTOMO_TRAJECTORIES_LABEL, NODE_SUBTOMO_TRAJECTORIES},
-		{NODE_SUBTOMO_MANIFOLDS_LABEL, NODE_SUBTOMO_MANIFOLDS} };
+		{NODE_TOMO_OPTIMISATION_LABEL, NODE_TOMO_OPTIMISATION},
+		{NODE_TOMO_TOMOGRAMS_LABEL,    NODE_TOMO_TOMOGRAMS},
+		{NODE_TOMO_TRAJECTORIES_LABEL, NODE_TOMO_TRAJECTORIES},
+		{NODE_TOMO_MANIFOLDS_LABEL,    NODE_TOMO_MANIFOLDS} };
 
 
 
@@ -650,30 +650,30 @@ public:
 
 
 	// relion-3.2: add subtomogram averaging programs by Jasenko
-	void addSubtomoInputOptions(bool has_tomograms, bool has_particles,
-			bool has_trajectories, bool has_manifolds, bool has_halfmaps, bool has_postprocess);
-	std::string getSubtomoInputCommmand(std::string &command, int has_tomograms, int has_particles,
-			int has_trajectories, int has_manifolds, bool has_halfmaps, int has_postprocess);
+	void addTomoInputOptions(bool has_tomograms, bool has_particles,
+							 bool has_trajectories, bool has_manifolds, bool has_halfmaps, bool has_postprocess);
+	std::string getTomoInputCommmand(std::string &command, int has_tomograms, int has_particles,
+									 int has_trajectories, int has_manifolds, bool has_halfmaps, int has_postprocess);
 
-	void initialiseSubtomoImportJob();
-	bool getCommandsSubtomoImportJob(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+	void initialiseTomoImportJob();
+	bool getCommandsTomoImportJob(std::string &outputname, std::vector<std::string> &commands,
+								  std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
-	void initialiseSubtomoReconstructJob();
-	bool getCommandsSubtomoReconstructJob(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+	void initialiseTomoSubtomoJob();
+	bool getCommandsTomoSubtomoJob(std::string &outputname, std::vector<std::string> &commands,
+								   std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
-	void initialiseSubtomoCtfRefineJob();
-	bool getCommandsSubtomoCtfRefineJob(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+	void initialiseTomoCtfRefineJob();
+	bool getCommandsTomoCtfRefineJob(std::string &outputname, std::vector<std::string> &commands,
+									 std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
-	void initialiseSubtomoPolishJob();
-	bool getCommandsSubtomoPolishJob(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+	void initialiseTomoAlignJob();
+	bool getCommandsTomoAlignJob(std::string &outputname, std::vector<std::string> &commands,
+								 std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
-	void initialiseSubtomoAverageJob();
-	bool getCommandsSubtomoAverageJob(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+	void initialiseTomoReconPartJob();
+	bool getCommandsTomoReconPartJob(std::string &outputname, std::vector<std::string> &commands,
+									 std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
 };
 
