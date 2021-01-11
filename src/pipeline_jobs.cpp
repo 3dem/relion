@@ -2925,6 +2925,12 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 
 	if (joboptions["do_grad"].getBoolean())
 	{
+		if (joboptions["nr_mpi"].getNumber(error_message) > 1)
+		{
+			error_message = "Gradient refinement is not supported together with MPI.";
+			return false;
+		}
+
 		command += " --grad --class_inactivity_threshold 0.1 ";
 		if (!is_continue) command += " --init_blobs";
 	}
@@ -3102,12 +3108,15 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 
 	initialisePipeline(outputname, PROC_INIMODEL_LABEL, job_counter);
 
-	std::string command;
 	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-		command="`which relion_refine_mpi`";
-	else
-		command="`which relion_refine`";
+	{
+		error_message = "Gradient refinement is not supported together with MPI.";
+		return false;
+	}
 	if (error_message != "") return false;
+
+	std::string command;
+	command="`which relion_refine`";
 
 	FileName fn_run = "run";
 	if (is_continue)
