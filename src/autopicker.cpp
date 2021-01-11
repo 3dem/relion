@@ -153,11 +153,9 @@ if(do_gpu)
 	topaz_train_parts = parser.getOption("--topaz_train_parts", "OR: name of particle star file for topaz training", "");
 	topaz_test_ratio = textToFloat(parser.getOption("--topaz_test_ratio", "Ratio of picks in the test set for cross-validation in topaz training", "0.2"));
 	topaz_downscale = textToInteger(parser.getOption("--topaz_downscale", "Downscale factor for topaz", "-1"));
-	topaz_model = parser.getOption("--topaz_model", "Saved model model from topaz train for topaz extract", "");
+	topaz_model = parser.getOption("--topaz_model", "Saved model model from topaz train for topaz extract. Leave this empty to use the default (general) model.", "");
 	topaz_radius = textToInteger(parser.getOption("--topaz_radius", "Particle radius (in pix) for topaz extract (default is from particle diameter)", "-1"));
 	fn_topaz_exe = parser.getOption("--topaz_exe", "Name of topaz executable", "topaz");
-	fn_bash = parser.getOption("--bash_exe", "Name of bash executable", "/bin/bash");
-	fn_conda_activate = parser.getOption("--activate_exe", "Name of conda activate executable (defaults to 'source activate')", "");
 	topaz_additional_args = parser.getOption("--topaz_args", "Additional arguments to be passed to topaz", "");
 	topaz_workers = textToInteger(parser.getOption("--topaz_workers", "Number of topaz workers for parallelized training", "4"));
 
@@ -195,6 +193,12 @@ if(do_gpu)
 		if (!(min_particle_distance > 0.))
 			REPORT_ERROR("Error: Helical rise and the number of asymmetrical units between neighbouring helical segments should be positive!");
 	}
+
+	fn_shell = "/bin/sh";
+	char *shell_name;
+	shell_name = getenv("RELION_SHELL");
+	if (shell_name != NULL)
+		fn_shell = (std::string)shell_name;
 }
 
 void AutoPicker::usage()
@@ -2638,9 +2642,9 @@ void AutoPicker::exportHelicalTubes(
 
 	return;
 }
+
 MetaDataTable AutoPicker::getMDtrainFromParticleStar(MetaDataTable &MDparts, ObservationModel &obsModelParts)
 {
-
 	// Sort input particle star file on micrographname, so that searching can be linear instead of quadratic
 	MDparts.newSort(EMDL_MICROGRAPH_NAME);
 
@@ -2664,8 +2668,6 @@ MetaDataTable AutoPicker::getMDtrainFromParticleStar(MetaDataTable &MDparts, Obs
 	long int my_start_object = MDparts.firstObject();
 	for (int imic = 0; imic < fn_mics.size(); imic++)
 	{
-
-
 		MetaDataTable MDcoords;
 		for (long current_object = my_start_object;
 				current_object < MDparts.numberOfObjects() && current_object >= 0;
@@ -2735,7 +2737,6 @@ MetaDataTable AutoPicker::getMDtrainFromParticleStar(MetaDataTable &MDparts, Obs
 	std::cout << " + Written out list of input training coordinates: " << fn_train << std::endl;
 
 	return MDresult;
-
 }
 
 MetaDataTable AutoPicker::readTopazCoordinates(FileName fn_coord,  int _topaz_downscale)
@@ -2921,11 +2922,7 @@ void AutoPicker::trainTopaz()
 	if (!fh)
 	 REPORT_ERROR( (std::string)"AutoPicker::trainTopaz cannot create file: " + fn_script);
 
-	fh << "#!" << fn_bash  << std::endl;
-	if (fn_conda_activate == "")
-		fh << "source activate topaz" << std::endl;
-	else
-		fh << fn_conda_activate << " topaz" << std::endl;
+	fh << "#!" << fn_shell  << std::endl;
 
 	// Call Topaz to preprocess the images for normalisation and downscaling
 	fh << fn_topaz_exe << " preprocess ";
@@ -2957,7 +2954,7 @@ void AutoPicker::trainTopaz()
 	fh << std::endl;
 	fh.close();
 
-	std::string command = fn_bash + " " + fn_script + " >> " + fn_log ;
+	std::string command = fn_shell + " " + fn_script + " >> " + fn_log + " 2>&1";
 	if (system(command.c_str())) std::cerr << "WARNING: there was an error in executing: " << command << std::endl;
 
 	// Now remove raw and proc directories
@@ -2965,12 +2962,10 @@ void AutoPicker::trainTopaz()
 	if (system(command.c_str())) std::cerr << "WARNING: there was an error in executing: " << command << std::endl;
 
 	std::cout << " Done with training! Launch another Auto-picking job to use the model for picking coordinates. " << std::endl;
-
 }
 
 void AutoPicker::autoPickTopazOneMicrograph(FileName &fn_mic, int rank)
 {
-
 	// Local filenames
 	FileName fn_local_mic, fn_local_pick, fn_script, fn_proc, fn_log;
 	fn_local_mic.compose("rank", rank, "mrc");
@@ -2986,11 +2981,7 @@ void AutoPicker::autoPickTopazOneMicrograph(FileName &fn_mic, int rank)
 	if (!fh)
 	 REPORT_ERROR( (std::string)"AutoPicker::autoPickTopazOneMicrograph cannot create file: " + fn_script);
 
-	fh << "#!" << fn_bash  << std::endl;
-	if (fn_conda_activate == "")
-		fh << "source activate topaz" << std::endl;
-	else
-		fh << fn_conda_activate << " topaz" << std::endl;
+	fh << "#!" << fn_shell  << std::endl;
 
 	// Make a symlink of the micrograph in the output Directory
 	FileName fno = fn_odir + fn_local_mic;
@@ -3013,14 +3004,23 @@ void AutoPicker::autoPickTopazOneMicrograph(FileName &fn_mic, int rank)
 	if (topaz_device_id >= 0)
 		fh << " -d " << integerToString(topaz_device_id);
 	fh << " -x " << integerToString(topaz_downscale);
-	fh << " -m " << topaz_model;
+	if (topaz_model != "")
+		fh << " -m " << topaz_model;
 	fh << " -o " << fn_odir << fn_proc << fn_local_pick;
 	fh << " " << fn_odir << fn_proc << fn_local_mic;
 	fh << " " << topaz_additional_args;
 	fh << std::endl;
 	fh.close();
 
-	std::string command = fn_bash + " " + fn_script + " &> " + fn_log ;
+	// "&>" merges stdout and stderr but this is not POSIX comliant.
+	//  https://unix.stackexchange.com/questions/590694/posix-compliant-way-to-redirect-stdout-and-stderr-to-a-file
+	// csh is NOT POSIX compliant and does not support redirects by fd.
+	//  https://www.mkssoftware.com/docs/man1/csh.1.asp
+	// Fortunately, system() always uses sh, regardless of $SHELL. So we can ignore csh.
+	// sh is not fully POSIX compliant but at least supports 2>&1.
+	//  http://heirloom.sourceforge.net/sh/sh.1.html
+	//  https://unix.stackexchange.com/questions/590694/posix-compliant-way-to-redirect-stdout-and-stderr-to-a-file
+	std::string command = fn_shell + " " + fn_script + " > " + fn_log + " 2>&1";
 	if (system(command.c_str())) std::cerr << "WARNING: there was an error in executing: " << command << std::endl;
 
 	// Now convert output .txt into Relion-style .star files!
