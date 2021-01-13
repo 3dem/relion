@@ -617,7 +617,7 @@ void MetaDataTable::deactivateLabel(EMDLabel label, std::string unknownLabel)
 void MetaDataTable::addLabel(EMDLabel label, std::string unknownLabel)
 {
 	if (label >= EMDL_LAST_LABEL)
-		REPORT_ERROR("MetaDataTable::addLabel: unrecognised label: " + std::to_string(label));
+		REPORT_ERROR(std::string("MetaDataTable::addLabel: unrecognised label: ") + EMDL::label2Str(label));
 	if (label == EMDL_UNKNOWN_LABEL && unknownLabel == "")
 		REPORT_ERROR("MetaDataTable::addLabel: unknownLabel is empty");
 
