@@ -2163,7 +2163,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		// determine default subset sizes
 		if (grad_ini_subset_size == -1 || grad_fin_subset_size == -1) {
 			if (grad_ini_subset_size != -1 || grad_fin_subset_size != -1)
-				std::cout << " WARNING: Since both --grad_ini_subset_size and --grad_fin_subset_size were not set, " <<
+				std::cout << " WARNING: Since both --grad_ini_subset and --grad_fin_subset were not set, " <<
 				          "both will instead be determined automatically." << std::endl;
 
 			unsigned long dataset_size = mydata.numberOfParticles();
@@ -4323,11 +4323,11 @@ void MlOptimiser::maximization()
 					if(do_grad) {
 						(wsum_model.BPref[iclass]).reconstructGrad(
 								mymodel.Iref[iclass],
+								mymodel.fsc_halves_class[iclass],
 								grad_current_stepsize,
 								mymodel.tau2_fudge_factor,
 								mymodel.getPixelFromResolution(1./grad_min_resol),
-								mymodel.fsc_halves_class[iclass],
-								!do_split_random_halves,
+								do_split_random_halves,
 								(iclass == 0));
 					}
 					else
@@ -4655,7 +4655,7 @@ int MlOptimiser::maximizationGradientParameters() {
 			nr_active_classes ++;
 	}
 
-	if(do_grad) {
+	if(do_grad && !do_split_random_halves) {
 		std::vector<float> avg_class_errors(mymodel.nr_classes * mymodel.nr_bodies, 0);
 		for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++) {
 			mymodel.class_age[iclass] += wsum_model.pdf_class[iclass]/wsum_mode_pdf_class_sum;
@@ -9224,7 +9224,7 @@ void MlOptimiser::updateStepSize() {
 		if (mymodel.ref_dim == 2)
 			_stepsize = 0.2;
 		else
-			_stepsize = 0.2;
+			_stepsize = 0.1;
 
 	if (_scheme == "")
 		if (mymodel.ref_dim == 2)
