@@ -18,8 +18,35 @@
  * author citations must be preserved.
  ***************************************************************************/
 
+#include <unistd.h>
+#include <limits.h>
+
 #include "src/class_ranker.h"
 static int IMGSIZE = 64;
+
+// Get the current binary system path [LINUX ONLY]
+// Can be used to find auxiliary files after installation
+ std::string get_selfpath()
+ {
+	 std::vector<char> buff(512);
+	 ssize_t len;
+
+	 //Read path string into buffer
+	 do {
+		 buff.resize(buff.size() + 128);
+		 len = ::readlink("/proc/self/exe", &(buff[0]), buff.size());
+	 } while (buff.size() == len);
+
+	 // Convert to string and return
+	 if (len > 0) {
+		 buff[len] = '\0'; //Mark end of string
+		 std::string path = std::string(&(buff[0]));
+		 std::size_t found = path.find_last_of("/\\");
+		 return path.substr(0,found+1);
+	 }
+
+	 return "";
+ }
 
 //
 // Calculates n! (uses double arithmetic to avoid overflow)
@@ -602,6 +629,13 @@ void ClassRanker::initialise()
 	{
 		std::cout << "WARNING: Should not provide radius ratio and radius at the same time. Ignoring the radius ratio..." << std::endl;
 	}
+
+#ifdef _TORCH_ENABLED
+	if (fn_torch_model == "") {
+		fn_torch_model = get_selfpath() + CLASS_RANKER_DEFAULT_MODEL_FILE_NAME;
+		std::cout << "Using default pytorch model: " << fn_torch_model << std::endl;
+	}
+#endif
 }
 
 

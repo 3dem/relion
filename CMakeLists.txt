@@ -370,6 +370,7 @@ option(TORCH "Enable support for Torch" OFF)
 if(TORCH)
     message(STATUS "Torch support requested by user.")
     include(${CMAKE_SOURCE_DIR}/cmake/BuildTorch.cmake)
+    include(${CMAKE_SOURCE_DIR}/cmake/FetchTorchModels.cmake)
     add_definitions(-D_TORCH_ENABLED)
 endif(TORCH)
 
