@@ -5,7 +5,7 @@
 #################################################################################
 
 include(ExternalProject)
-set(CLASS_RANKER_DEFAULT_MODEL_FILE_NAME "class_ranker_default_model.pt")
+set(CLASS_RANKER_DEFAULT_MODEL_FILE_NAME "relion_class_ranker_default_model.pt")
 
 set(MODELS_DIR  ${CMAKE_SOURCE_DIR}/external/torch_models)
 if(NOT EXISTS ${MODELS_DIR})
