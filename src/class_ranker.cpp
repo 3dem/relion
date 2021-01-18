@@ -2188,7 +2188,7 @@ std::string ClassRanker::get_default_torch_model_path()
 		buff[len] = '\0'; //Mark end of string
 		std::string path = std::string(&(buff[0]));
 		std::size_t found = path.find_last_of("/\\");
-		path = path.substr(0,found+1) + CLASS_RANKER_DEFAULT_MODEL_FILE_NAME;
+		path = path.substr(0,found) + "/relion_class_ranker_default_model.pt";
 		if (FILE *file = fopen(path.c_str(), "r")) { //Check if file can be opened
 			fclose(file);
 			return path;
