@@ -11,10 +11,10 @@
 
 option(TORCH_EXTERNAL_VERBOSE "Verbose mode during Torch fetch and configure." OFF)
 set(TORCH_EXTERNAL_PATH "${CMAKE_SOURCE_DIR}/external/libtorch")
-set(TORCH_FILE_NAME libtorch-commit-4c7fb8c2-cxx11-abi-glibc2.17-shared_rpath.zip)
+set(TORCH_FILE_NAME libtorch-commit-4c7fb8c2-cxx11-abi-glibc2.17-shared_rpath.tar.gz)
 set(TORCH_FILE_PATH ${TORCH_EXTERNAL_PATH}/${TORCH_FILE_NAME})
 set(TORCH_URL "ftp://ftp.mrc-lmb.cam.ac.uk/pub/dari/${TORCH_FILE_NAME}")
-set(TORCH_HASH 83e0f73d33a8853e359443bfd9a1f928)
+set(TORCH_HASH 9876bfb7ec3e61638ccb01dd9bab849a)
 set(TORCH_FOUND 0)
 
 if(EXISTS ${TORCH_FILE_PATH})
@@ -46,21 +46,21 @@ if(NOT TORCH_FOUND)
 			if (${CHECKSUM} STREQUAL ${TORCH_HASH})
 				if (BUILD_TORCH_VERBOSE)
 					execute_process(
-							COMMAND unzip libtorch/${TORCH_FILE_NAME}
+							COMMAND ${CMAKE_COMMAND} -E tar xzf libtorch/${TORCH_FILE_NAME}
 							WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/external
-							RESULT_VARIABLE UNZIP_FAIL)
+							RESULT_VARIABLE UNTAR_FAIL)
 				else()
 					execute_process(
-							COMMAND unzip libtorch/${TORCH_FILE_NAME}
+							COMMAND ${CMAKE_COMMAND} -E tar xzf libtorch/${TORCH_FILE_NAME}
 							WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/external
-							RESULT_VARIABLE UNZIP_FAIL
+							RESULT_VARIABLE UNTAR_FAIL
 							OUTPUT_QUIET ERROR_QUIET)
 				endif()
-				if(NOT UNZIP_FAIL)
+				if(NOT UNTAR_FAIL)
 					message(STATUS "Torch was successfully downloaded and configured")
 					break()
 				else()
-					message(FATAL_ERROR "Unpacking failed with error: ${UNZIP_FAIL}")
+					message(FATAL_ERROR "Unpacking failed with error: ${UNTAR_FAIL}")
 				endif()
 			else()
 				message(STATUS "Torch checksum mismatch")
