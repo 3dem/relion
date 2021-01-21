@@ -4369,6 +4369,7 @@ void MlOptimiser::maximization()
 		std::cerr << " Class " << skip_class << " replaced due to inactivity." << std::endl;
 }
 
+
 void MlOptimiser::centerClasses()
 {
 	// Don't do this for auto_refinement or multibody refinement
@@ -4376,6 +4377,8 @@ void MlOptimiser::centerClasses()
 		return;
 
 	RFLOAT offset_range_pix = sampling.offset_range / mymodel.pixel_size;
+	if (do_grad)
+		offset_range_pix /= 5.;
 
 	// Shift all classes to their center-of-mass, and store all center-of-mass in coms vector
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
@@ -4390,9 +4393,22 @@ void MlOptimiser::centerClasses()
 		my_com *= -1;
 		MultidimArray<RFLOAT> aux = mymodel.Iref[iclass];
 		translate(aux, mymodel.Iref[iclass], my_com, DONT_WRAP, (RFLOAT)0.);
-	}
 
+		if (do_grad) {
+			if (do_mom1) {
+				MultidimArray<Complex > aux = mymodel.Igrad1[iclass];
+				shiftImageInFourierTransform(aux, mymodel.Igrad1[iclass],
+				                             mymodel.ori_size, XX(my_com), YY(my_com), ZZ(my_com));
+			}
+			if (do_mom2) {
+				MultidimArray<Complex > aux = mymodel.Igrad2[iclass];
+				shiftImageInFourierTransform(aux, mymodel.Igrad2[iclass],
+				                             mymodel.ori_size, XX(my_com), YY(my_com), ZZ(my_com));
+			}
+		}
+	}
 }
+
 
 void MlOptimiser::maximizationOtherParameters()
 {
