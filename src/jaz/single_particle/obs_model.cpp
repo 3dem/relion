@@ -51,7 +51,8 @@ ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt, bool do_die_
 {
 	if (!(opticsMdt.containsLabel(EMDL_IMAGE_PIXEL_SIZE) ||
 	      opticsMdt.containsLabel(EMDL_MICROGRAPH_PIXEL_SIZE) ||
-	      opticsMdt.containsLabel(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE))
+	      opticsMdt.containsLabel(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE) ||
+	      opticsMdt.containsLabel(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE))
 	  || !opticsMdt.containsLabel(EMDL_CTF_VOLTAGE)
 	  || !opticsMdt.containsLabel(EMDL_CTF_CS))
 	{
