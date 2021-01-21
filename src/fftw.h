@@ -927,6 +927,11 @@ void shiftImageInFourierTransformWithTabSincos(MultidimArray<Complex> &in, Multi
 void shiftImageInFourierTransform(MultidimArray<Complex> &in, MultidimArray<Complex> &out,
                                   RFLOAT oridim, RFLOAT shift_x, RFLOAT shift_y, RFLOAT shift_z = 0.);
 
+// As shiftImageInFourierTransform, but performs shifts on continues Fourier transforms,
+// which is not the format that FFTW outputs but rather that which is outputted by e.g. backprojection.
+void shiftImageInContinuousFourierTransform(MultidimArray<Complex > &in, MultidimArray<Complex > &out,
+                                            RFLOAT oridim, RFLOAT xshift, RFLOAT yshift, RFLOAT zshift);
+
 #define POWER_SPECTRUM 0
 #define AMPLITUDE_SPECTRUM 1
 #define AMPLITUDE_MAP 0
