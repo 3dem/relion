@@ -408,27 +408,27 @@ void JobWindow::initialise(int my_job_type)
 	else if (my_job_type == PROC_TOMO_IMPORT)
 	{
 		myjob.initialise(my_job_type);
-		initialiseSubtomoImportWindow();
+		initialiseTomoImportWindow();
 	}
 	else if (my_job_type == PROC_TOMO_SUBTOMO)
 	{
 		myjob.initialise(my_job_type);
-		initialiseSubtomoReconstructWindow();
+		initialiseTomoSubtomoWindow();
 	}
 	else if (my_job_type == PROC_TOMO_CTFREFINE)
 	{
 		myjob.initialise(my_job_type);
-		initialiseSubtomoCtfRefineWindow();
+		initialiseTomoCtfRefineWindow();
 	}
 	else if (my_job_type == PROC_TOMO_ALIGN)
 	{
 		myjob.initialise(my_job_type);
-		initialiseSubtomoPolishWindow();
+		initialiseTomoAlignWindow();
 	}
 	else if (my_job_type == PROC_TOMO_RECONSTRUCT)
 	{
 		myjob.initialise(my_job_type);
-		initialiseSubtomoAverageWindow();
+		initialiseTomoReconParWindow();
 	}
 	else if (my_job_type == PROC_EXTERNAL)
 	{
@@ -2286,8 +2286,8 @@ void JobWindow::initialiseExternalWindow()
 	tab2->end();
 }
 
-void JobWindow::placeSubtomoInput(bool has_tomograms, bool has_particles,
-		bool has_trajectories, bool has_manifolds, bool has_halfmaps, bool has_postprocess)
+void JobWindow::placeTomoInput(bool has_tomograms, bool has_particles,
+							   bool has_trajectories, bool has_manifolds, bool has_halfmaps, bool has_postprocess)
 {
 	tab1->begin();
 	tab1->label("I/O");
@@ -2312,7 +2312,7 @@ void JobWindow::placeSubtomoInput(bool has_tomograms, bool has_particles,
 
 }
 
-void JobWindow::initialiseSubtomoImportWindow()
+void JobWindow::initialiseTomoImportWindow()
 {
 	setupTabs(3);
 
@@ -2390,11 +2390,11 @@ void JobWindow::initialiseSubtomoImportWindow()
 	tab3->end();
 }
 
-void JobWindow::initialiseSubtomoReconstructWindow()
+void JobWindow::initialiseTomoSubtomoWindow()
 {
 	setupTabs(2);
 
-	placeSubtomoInput(true, true, true, false, false, false);
+	placeTomoInput(true, true, true, false, false, false);
 
 	tab2->begin();
 	tab2->label("Reconstruct");
@@ -2420,11 +2420,11 @@ void JobWindow::initialiseSubtomoReconstructWindow()
 	tab2->end();
 }
 
-void JobWindow::initialiseSubtomoCtfRefineWindow()
+void JobWindow::initialiseTomoCtfRefineWindow()
 {
 	setupTabs(3);
 
-	placeSubtomoInput(true, true, true, false, true, true);
+	placeTomoInput(true, true, true, false, true, true);
 
 	tab2->begin();
 	tab2->label("Defocus");
@@ -2492,11 +2492,11 @@ void JobWindow::initialiseSubtomoCtfRefineWindow()
 	tab3->end();
 }
 
-void JobWindow::initialiseSubtomoPolishWindow()
+void JobWindow::initialiseTomoAlignWindow()
 {
 	setupTabs(2);
 
-	placeSubtomoInput(true, true, true, false, true, true);
+	placeTomoInput(true, true, true, false, true, true);
 
 	tab2->begin();
 	tab2->label("Polish");
@@ -2523,11 +2523,11 @@ void JobWindow::initialiseSubtomoPolishWindow()
 	tab2->end();
 }
 
-void JobWindow::initialiseSubtomoAverageWindow()
+void JobWindow::initialiseTomoReconParWindow()
 {
 	setupTabs(2);
 
-	placeSubtomoInput(true, true, true, false, false, false);
+	placeTomoInput(true, true, true, false, false, false);
 
 	tab2->begin();
 	tab2->label("Average");
