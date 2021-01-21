@@ -338,7 +338,7 @@ int main(int argc, char *argv[])
 			std::vector<std::vector<double>> order = ZIO::readFixedDoublesTable(orderFn, 2, ',');
 			std::vector<double> tilts = ZIO::readDoubles(tltFn);
 
-			int fc = tilts.size();
+			int fc = mapping.oldFrameIndex.size();
 
 			std::vector<double> cumulativeDose(fc);
 
@@ -350,7 +350,7 @@ int main(int argc, char *argv[])
 				// find the tilt angle in *.tlt closest to the angle in the order list
 				for (int j = 0; j < order.size(); j++)
 				{
-					double d = order[j][1] - tilts[i];
+					double d = order[j][1] - tilts[mapping.oldFrameIndex[i]];
 					double dd = d*d;
 
 					if (dd < minDist)
@@ -364,14 +364,21 @@ int main(int argc, char *argv[])
 			}
 
 			std::vector<CTF> ctfs;
+			int fcTilt = tilts.size();
 
 			if (ctfSource == CtfFind)
 			{
-				ctfs = TomoCtfHelper::loadCtffind4(ctfFindFn, fc, voltage, Cs, Q0);
+				ctfs = TomoCtfHelper::loadCtffind4(ctfFindFn, fcTilt, voltage, Cs, Q0);
 			}
 			else
 			{
-				ctfs = TomoCtfHelper::loadCtfplotter(ctfPlotterFn, fc, voltage, Cs, Q0);
+				ctfs = TomoCtfHelper::loadCtfplotter(ctfPlotterFn, fcTilt, voltage, Cs, Q0);
+			}
+
+			if (mapping.framesMissing)
+			{
+				for (int i = 0; i < fc; i++)
+					ctfs[i] = ctfs[mapping.oldFrameIndex[i]];
 			}
 
 			std::string opticsGroupName = "opticsGroup1";
