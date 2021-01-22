@@ -600,9 +600,11 @@ bool decomposePipelineSymlinkName(FileName fn_in, FileName &fn_pre, FileName &fn
 	if (!dont_expand && len != -1)
 	{
 			// This is a symbolic link!
-		if (linkname[len - 1] == '/')
-			linkname[len - 1] = '\0'; // remove trailing '/'
+
+			if (linkname[len - 1] == '/')
+				linkname[len - 1] = '\0'; // remove trailing '/'
 			linkname[len] = '\0';
+
 			FileName fn_link = std::string(linkname);
 			// TODO: FIXME: This condition is still not perfect. For example,
 			// Micrograph/mic001.mrc -> ../../../storage/mic001.mrc breaks the code.

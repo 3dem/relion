@@ -296,7 +296,7 @@ void Preprocessing::joinAllStarFiles()
 				MetaDataTable MDonestack;
 				MDonestack.read(fn_star);
 
-				if (MDout.numberOfObjects() > 0 && !compareLabels(MDout, MDonestack))
+				if (MDout.numberOfObjects() > 0 && !MetaDataTable::compareLabels(MDout, MDonestack))
 				{
 					std::cout << "The STAR file " << fn_star << " contains a column not present in others. Missing values will be filled by default values (0 or empty string)" << std::endl;
 					MDout.addMissingLabels(&MDonestack);
@@ -328,7 +328,7 @@ void Preprocessing::joinAllStarFiles()
 		}
 
 		ObservationModel *myOutObsModel;
-		myOutObsModel = (fn_data == "") ? &obsModelMic : &obsModelPart;
+		myOutObsModel = (fn_data == "" || keep_ctf_from_micrographs) ? &obsModelMic : &obsModelPart;
 		RFLOAT my_angpix;
 		std::string optgroup_name;
 

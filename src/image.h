@@ -54,9 +54,7 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <unistd.h>
-#ifdef HAVE_TIFF
 #include <tiffio.h>
-#endif
 #include "src/funcs.h"
 #include "src/memory.h"
 #include "src/filename.h"
@@ -99,7 +97,6 @@ typedef enum
 	WRITE_READONLY	 //only can read the file
 } WriteMode;
 
-#ifdef HAVE_TIFF
 extern "C" {
 	typedef struct TiffInMemory
 	{
@@ -195,7 +192,6 @@ extern "C" {
 		return;
 	}
 }
-#endif
 
 /** File handler class
  * This struct is used to share the File handlers with Image Collection class
@@ -205,9 +201,7 @@ class fImageHandler
 public:
 	FILE*	  fimg;	// Image File handler
 	FILE*	  fhed;	// Image File header handler
-#ifdef HAVE_TIFF
 	TIFF*	  ftiff;
-#endif
 	FileName  ext_name; // Filename extension
 	bool	  exist;    // Shows if the file exists
 	bool	  isTiff;   // Shows if this is a TIFF file
@@ -218,9 +212,7 @@ public:
 	{
 		fimg=NULL;
 		fhed=NULL;
-#ifdef HAVE_TIFF
 		ftiff=NULL;
-#endif
 		ext_name="";
 		exist=false;
 		isTiff=false;
@@ -299,17 +291,12 @@ public:
 		}
 
 		isTiff = ext_name.contains("tif");
-#ifndef HAVE_TIFF
-		if (isTiff) REPORT_ERROR((std::string)"TIFF support was not enabled during compilation");
-#endif
 		if (isTiff && mode != WRITE_READONLY)
 			REPORT_ERROR((std::string)"TIFF is supported only for reading");
 
 		// Open image file
 		if ((!isTiff && ((fimg  = fopen(fileName.c_str(), wmChar.c_str())) == NULL))
-#ifdef HAVE_TIFF
 		    || (isTiff && ((ftiff = TIFFOpen(fileName.c_str(), "r")) == NULL))
-#endif
 		   )
 			REPORT_ERROR((std::string)"Image::openFile cannot open: " + name);
 
@@ -329,18 +316,13 @@ public:
 		exist=false;
 
 		// Check whether the file was closed already
-		if (fimg == NULL && fhed == NULL)
-#ifdef HAVE_TIFF
-			if (ftiff == NULL)
-#endif
+		if (fimg == NULL && fhed == NULL && ftiff == NULL)
 			return;
 
-#ifdef HAVE_TIFF
 		if (isTiff && ftiff != NULL) {
 			TIFFClose(ftiff);
 			ftiff = NULL;
 		}
-#endif
 
 		if (!isTiff && fclose(fimg) != 0)
 			REPORT_ERROR((std::string)"Can not close image file ");
@@ -470,9 +452,7 @@ public:
 #include "src/rwSPIDER.h"
 #include "src/rwMRC.h"
 #include "src/rwIMAGIC.h"
-#ifdef HAVE_TIFF
 #include "src/rwTIFF.h"
-#endif
 
 	/** Is this file an image
 	 *
@@ -1315,7 +1295,6 @@ public:
 	{
 		int err = 0;
 
-#ifdef HAVE_TIFF
 		TiffInMemory handle;
 		handle.buf = (unsigned char*)buf;
 		handle.size = size;
@@ -1336,9 +1315,7 @@ public:
 		                             TiffInMemoryUnmapFileProc);
 		err = readTIFF(ftiff, select_img, readdata, true, "in-memory-tiff");
 		TIFFClose(ftiff);
-#else
-		REPORT_ERROR("TIFF support was not enabled during compilation");
-#endif
+
 		return err;
 	}
 
@@ -1389,11 +1366,7 @@ private:
 		else if (ext_name.contains("mrcs") || (is_2D && ext_name.contains("mrc")) )//mrc stack MUST go BEFORE plain MRC
 			err = readMRC(select_img, true, name);
 		else if (ext_name.contains("tif"))
-#ifdef HAVE_TIFF
 			err = readTIFF(hFile.ftiff, select_img, readdata, true, name);
-#else
-			REPORT_ERROR("TIFF support was not enabled during compilation");
-#endif
 		else if (select_img >= 0 && ext_name.contains("mrc"))
 			REPORT_ERROR("Image::read ERROR: stacks of images in MRC-format should have extension .mrcs; .mrc extensions are reserved for 3D maps.");
 		else if (ext_name.contains("mrc")) // mrc 3D map

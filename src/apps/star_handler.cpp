@@ -596,11 +596,11 @@ class star_handler_parameters
 			}
 
 			// Now combine all optics tables into one
-			obsModel.opticsMdt = combineMetaDataTables(MDoptics);
+			obsModel.opticsMdt = MetaDataTable::combineMetaDataTables(MDoptics);
 		}
 
 		// Combine the particles tables
-		MDout = combineMetaDataTables(MDsin);
+		MDout = MetaDataTable::combineMetaDataTables(MDsin);
 
 		//Deactivate the group_name column
 		MDout.deactivateLabel(EMDL_MLMODEL_GROUP_NO);

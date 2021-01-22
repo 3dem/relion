@@ -28,6 +28,7 @@ void ParticleSubtractor::read(int argc, char **argv)
 	fn_out = parser.getOption("--o", "Output directory name", "Subtract/");
 	fn_msk = parser.getOption("--mask", "Name of the 3D mask with all density that should be kept, i.e. not subtracted", "");
 	fn_sel = parser.getOption("--data", "Name of particle STAR file, in case not all particles from optimiser are to be used", "");
+	ignore_class = parser.checkOption("--ignore_class", "Ignore the rlnClassNumber column in the particle STAR file.");
 	fn_revert = parser.getOption("--revert", "Name of particle STAR file to revert. When this is provided, all other options are ignored.", "");
 	do_ssnr = parser.checkOption("--ssnr", "Don't subtract, only calculate average spectral SNR in the images");
 
@@ -467,7 +468,6 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 	img.read(opt.mydata.particles[part_id].images[0].name);
 	img().setXmippOrigin();
 
-
 	// Make sure gold-standard is adhered to!
 	int my_subset = (rank % 2 == 1) ? 1 : 2;
 	if (opt.do_split_random_halves && my_subset != opt.mydata.getRandomSubset(part_id))
@@ -482,14 +482,14 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 	Matrix1D<RFLOAT> my_old_offset(3), my_residual_offset(3), centering_offset(3);
 	Matrix2D<RFLOAT> Aori;
 	RFLOAT rot, tilt, psi, xoff, yoff, zoff, mynorm, scale;
-	int myclass=0;
-	if (opt.mydata.MDimg.containsLabel(EMDL_PARTICLE_CLASS))
+	int myclass = 0;
+	if (!ignore_class && opt.mydata.MDimg.containsLabel(EMDL_PARTICLE_CLASS))
 	{
 		opt.mydata.MDimg.getValue(EMDL_PARTICLE_CLASS, myclass, ori_img_id);
 		if (myclass > opt.mymodel.nr_classes)
 		{
 			std::cerr << "A particle belongs to class " << myclass << " while the number of classes in the optimiser.star is only " << opt.mymodel.nr_classes << "." << std::endl;
-			REPORT_ERROR("Tried to subtract a non-existing class from a particle.");
+			REPORT_ERROR("Tried to subtract a non-existing class from a particle. If you have performed non-alignment Class3D after Refine3D and want to subtract a map from the Refine3D job, use the --ignore_class option.");
 		}
 		myclass--; // start counting at zero instead of one
 	}
@@ -738,7 +738,6 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 	}
 	else
 	{
-
 		// And go finally back to real-space
 		CenterFFTbySign(Fimg);
 		transformer.inverseFourierTransform(Fimg, img());

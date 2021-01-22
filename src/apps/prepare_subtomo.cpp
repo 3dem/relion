@@ -429,7 +429,7 @@ public:
 					MD_tmp = MD_this_tomo;
 				else
 				{
-					if (!compareLabels(MD_tmp, MD_this_tomo))
+					if (!MetaDataTable::compareLabels(MD_tmp, MD_this_tomo))
 						REPORT_ERROR("Coordinates STAR file " + fn3 + " has a different set of activeLabels!");
 				}
 				if ( (!MD_this_tomo.containsLabel(EMDL_IMAGE_COORD_X))

@@ -1,6 +1,5 @@
 build
-build-debug
-build-release
+build-*
 cmake-build-debug
 cmake-build-release
 external

@@ -39,7 +39,11 @@ else()
 	
 	set(ext_conf_flags_fft --enable-shared --prefix=${FFTW_EXTERNAL_PATH})
 	if(TARGET_X86)
-		set(ext_conf_flags_fft ${ext_conf_flags_fft} --enable-avx)
+		if (AMDFFTW)
+			set(ext_conf_flags_fft ${ext_conf_flags_fft} --enable-sse2 --enable-avx --enable-avx2 --enable-amd-opt)
+		else()
+			set(ext_conf_flags_fft ${ext_conf_flags_fft} --enable-avx)
+		endif()
 	endif()
 	
 	set(OWN_FFTW_SINGLE ${FFTW_EXTERNAL_PATH}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}fftw3${CMAKE_SHARED_LIBRARY_SUFFIX})
@@ -51,9 +55,13 @@ else()
 	set(FFTW_EXTERNAL_LIBS_TAR_DIRECTORY  ${FFTW_EXTERNAL_PATH})
 	set(FFTW_EXTERNAL_LIBS_EXTRACT_TARGET ${FFTW_EXTERNAL_LIBS_TAR_DIRECTORY})
 
-	set(FFTW_FFTW3_TAR_FILE http://fftw.org/fftw-3.3.4.tar.gz)
-	#set(FFTW_FFTW3_TAR_FILE https://drive.google.com/uc?export=download&id=0B942d76zVnSeazZWcExRaXIyVDg) #backup location fftw-3.3.4
-	#set(FFTW_TAR_NAME fftw-3.3.4.tar.gz)
+	set(FFTW_FFTW3_TAR_FILE http://fftw.org/fftw-3.3.8.tar.gz)
+	set(FFTW_MD5 8aac833c943d8e90d51b697b27d4384d)
+
+	if (AMDFFTW)
+		set(FFTW_FFTW3_TAR_FILE https://github.com/amd/amd-fftw/archive/2.2.zip)
+		set(FFTW_MD5 2e9c59ad80ec5bd75ce04c7970c9f47a)
+	endif()
 
 	set(FFTW_FFTW3_LIB_DIR ${FFTW_EXTERNAL_LIBS_EXTRACT_TARGET}/fftw3)
 	set(FFTW_FFTW3_BUILD_DIR ${FFTW_EXTERNAL_LIBS_EXTRACT_TARGET}/fftw3-build)
@@ -67,14 +75,16 @@ else()
 	if (FFTW_DOUBLE_REQUIRED)
 		set(BUILD_OWN_FFTWF TRUE)
 	endif()
-	
+
+	# Rather messy logic:
+	# We build double prec here but if double prec is not required, build single prec	
 	if (NOT FFTW_DOUBLE_REQUIRED)
 		set(ext_conf_flags_fft ${ext_conf_flags_fft} --enable-float --enable-sse)
 	endif()
-	
+
 	externalproject_add(own_fftw_lib
 	URL ${FFTW_FFTW3_TAR_FILE}
-	URL_MD5 2edab8c06b24feeb3b82bbb3ebf3e7b3
+	URL_MD5 ${FFTW_MD5}
 	DOWNLOAD_DIR ${FFTW_EXTERNAL_LIBS_TAR_DIRECTORY}
 	SOURCE_DIR ${FFTW_FFTW3_LIB_DIR}
 	CONFIGURE_COMMAND <SOURCE_DIR>/configure ${ext_conf_flags_fft}
@@ -84,7 +94,6 @@ else()
 	#	LOG_CONFIGURE
 	#	LOG_BUILD
 	LOG_INSTALL)
-	
 
 	add_custom_command(
 		COMMAND ${CMAKE_COMMAND} -E echo "Registering own FFTW byproducts"
@@ -92,12 +101,12 @@ else()
 		DEPENDS own_fftw_lib)
 	add_custom_target(own_fftw_lib_byproducts
 		DEPENDS "${FFTW_EXTERNAL_PATH}/lib/libfftw3.so")
-	
+
+	# When both double and single prec are required, build single later.	
 	if (FFTW_DOUBLE_REQUIRED AND FFTW_SINGLE_REQUIRED)
-		
 		externalproject_add(own_fftwf_lib
 		URL ${FFTW_FFTW3_TAR_FILE}
-		URL_MD5 2edab8c06b24feeb3b82bbb3ebf3e7b3
+		URL_MD5 ${FFTW_MD5}
 		DOWNLOAD_DIR ${FFTW_EXTERNAL_LIBS_TAR_DIRECTORY}
 		SOURCE_DIR ${FFTW_FFTW3_LIB_DIR}
 		CONFIGURE_COMMAND <SOURCE_DIR>/configure ${ext_conf_flags_fft}  --enable-float --enable-sse
