@@ -2570,7 +2570,7 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 			outputNodes.push_back(node4);
 
 			// perform the actual prediction and selection
-			command += " --do_granularity_features --fn_torch_model /lmb/home/scheres/run22_train_out_images_features_batch32_rate5e-05_drop0.3_epoch50_model.pt ";
+			command += " --do_granularity_features ";
 			command += " --auto_select ";
 			command += " --min_score " + joboptions["rank_threshold"].getString();
 		}

@@ -1011,9 +1011,9 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_FIN_RESOL, grad_fin_resol))
 		grad_fin_resol = 15.;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_INI_SUBSET_SIZE, grad_ini_subset_size))
-		grad_ini_subset_size = 100;
+		grad_ini_subset_size = -1;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_FIN_SUBSET_SIZE, grad_fin_subset_size))
-		grad_fin_subset_size = 500;
+		grad_fin_subset_size = -1;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_MU, mu))
 		mu = 0.9;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_CLASS_INACTIVITY_THRESHOLD, class_inactivity_threshold))
@@ -2163,12 +2163,12 @@ void MlOptimiser::initialiseGeneral(int rank)
 		// determine default subset sizes
 		if (grad_ini_subset_size == -1 || grad_fin_subset_size == -1) {
 			if (grad_ini_subset_size != -1 || grad_fin_subset_size != -1)
-				std::cout << " WARNING: Since both --grad_ini_subset_size and --grad_fin_subset_size were not set, " <<
+				std::cout << " WARNING: Since both --grad_ini_subset and --grad_fin_subset were not set, " <<
 				          "both will instead be determined automatically." << std::endl;
 
 			unsigned long dataset_size = mydata.numberOfParticles();
 			grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.001, 500), 200);
-			grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.01,  10000), 1000);
+			grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.05,  50000), 1000);
 			if (rank==0) {
 				std::cout << " Initial subset size set to " << grad_ini_subset_size << std::endl;
 				std::cout << " Final subset size set to " << grad_fin_subset_size << std::endl;
@@ -4323,11 +4323,11 @@ void MlOptimiser::maximization()
 					if(do_grad) {
 						(wsum_model.BPref[iclass]).reconstructGrad(
 								mymodel.Iref[iclass],
+								mymodel.fsc_halves_class[iclass],
 								grad_current_stepsize,
 								mymodel.tau2_fudge_factor,
 								mymodel.getPixelFromResolution(1./grad_min_resol),
-								mymodel.fsc_halves_class[iclass],
-								!do_split_random_halves,
+								do_split_random_halves,
 								(iclass == 0));
 					}
 					else
@@ -4377,6 +4377,9 @@ void MlOptimiser::centerClasses()
 
 	RFLOAT offset_range_pix = sampling.offset_range / mymodel.pixel_size;
 
+	if (do_grad)
+		offset_range_pix /= 5;
+
 	// Shift all classes to their center-of-mass, and store all center-of-mass in coms vector
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 	{
@@ -4390,8 +4393,15 @@ void MlOptimiser::centerClasses()
 		my_com *= -1;
 		MultidimArray<RFLOAT> aux = mymodel.Iref[iclass];
 		translate(aux, mymodel.Iref[iclass], my_com, DONT_WRAP, (RFLOAT)0.);
-	}
 
+		if (do_grad) {
+			if (do_mom1) {
+				MultidimArray<Complex > aux = mymodel.Igrad1[iclass];
+				shiftImageInContinuousFourierTransform(aux, mymodel.Igrad1[iclass],
+				                                       mymodel.ori_size, XX(my_com), YY(my_com), ZZ(my_com));
+			}
+		}
+	}
 }
 
 void MlOptimiser::maximizationOtherParameters()
@@ -4655,7 +4665,7 @@ int MlOptimiser::maximizationGradientParameters() {
 			nr_active_classes ++;
 	}
 
-	if(do_grad) {
+	if(do_grad && !do_split_random_halves) {
 		std::vector<float> avg_class_errors(mymodel.nr_classes * mymodel.nr_bodies, 0);
 		for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++) {
 			mymodel.class_age[iclass] += wsum_model.pdf_class[iclass]/wsum_mode_pdf_class_sum;
@@ -9224,7 +9234,7 @@ void MlOptimiser::updateStepSize() {
 		if (mymodel.ref_dim == 2)
 			_stepsize = 0.2;
 		else
-			_stepsize = 0.2;
+			_stepsize = 0.1;
 
 	if (_scheme == "")
 		if (mymodel.ref_dim == 2)

@@ -23,6 +23,9 @@
 
 #include <stack>
 #include "src/ml_optimiser.h"
+#include <unistd.h>
+#include <limits.h>
+#include <fstream>
 
 #ifdef _TORCH_ENABLED
 #include <torch/script.h> // One-stop header.
@@ -394,6 +397,9 @@ public:
 	// Execute the program
 	void run();
 
+	// Get path to the default torch model [LINUX ONLY]
+	// Check if file exists, return empty string otherwise
+	static std::string get_default_torch_model_path();
 
 private:
 

@@ -1857,8 +1857,7 @@ void BackProjector::reweightGrad(
 
 			if (lambda1 > 0.)
 			{
-				Complex m = lambda1 * A3D_ELEM(mom1, k, i, j) +
-						(1-lambda1) * g;
+				Complex m = lambda1 * A3D_ELEM(mom1, k, i, j) + (1-lambda1) * g;
 				A3D_ELEM(mom1, k, i, j) = m;
 				A3D_ELEM(data, k, i, j) = m;
 			}
@@ -1931,7 +1930,7 @@ void BackProjector::reweightGrad(
 
 	FOR_ALL_ELEMENTS_IN_ARRAY3D(data) {
 				const int r2 = k * k + i * i + j * j;
-				if (r2 <= max_r2) {
+				if (r2 < max_r2) {
 					int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
 					DIRECT_A1D_ELEM(mom1_power, ires) += sqrt(norm(A3D_ELEM(mom1, k, i, j)));
 					DIRECT_A1D_ELEM(mom2_power, ires) += sqrt(norm(A3D_ELEM(mom2, k, i, j)));
@@ -1948,12 +1947,12 @@ void BackProjector::reweightGrad(
 }
 
 void BackProjector::reconstructGrad(
-		MultidimArray<RFLOAT> &vol_out, //Should be const
+		MultidimArray<RFLOAT> &vol_out,
+		const MultidimArray<RFLOAT> &fsc_spectrum,
 		RFLOAT grad_stepsize,
 		RFLOAT tau2_fudge,
 		RFLOAT min_resol_shell,
-		const MultidimArray<RFLOAT> &fsc_spectrum,
-		bool expand_fsc,
+		bool use_fsc,
 		bool printTimes)
 {
 
@@ -1987,7 +1986,7 @@ void BackProjector::reconstructGrad(
 
 	MultidimArray<RFLOAT> fsc_estimate;
 
-	if (expand_fsc) {
+	if (!use_fsc) {
 		MultidimArray<RFLOAT> prev_power;
 		MultidimArray<RFLOAT> counter;
 		prev_power.initZeros(ori_size / 2 + 1);
@@ -1997,7 +1996,7 @@ void BackProjector::reconstructGrad(
 		// First get average Delta^2 from the accumulated gradient in data and weight
 		FOR_ALL_ELEMENTS_IN_ARRAY3D(data) {
 			const int r2 = k * k + i * i + j * j;
-			if (r2 <= max_r2) {
+			if (r2 < max_r2) {
 				int ires = ROUND(sqrt((RFLOAT) r2) / padding_factor);
 				DIRECT_A1D_ELEM(prev_power, ires) += sqrt(norm(A3D_ELEM(PPref.data, k, i, j)));
 				DIRECT_A1D_ELEM(counter, ires) += 1;

@@ -29,7 +29,6 @@
 #include <src/euler.h>
 #include <src/time.h>
 #include <src/metadata_table.h>
-#include <src/ml_model.h>
 #include <src/exp_model.h>
 #include <src/healpix_sampling.h>
 #include <src/jaz/single_particle/obs_model.h>
@@ -46,7 +45,6 @@ public:
 	RFLOAT simulate_SNR;
 	// I/O Parser
 	IOParser parser;
-	MlModel model;
 	ObservationModel obsModel;
 
 	void usage()
@@ -109,6 +107,10 @@ public:
 
 	void project()
 	{
+		int ori_size, nr_groups;
+		std::vector<FileName> group_names;
+		std::vector<MultidimArray<RFLOAT > > sigma2_noise;
+
 		MetaDataTable DFo, MDang, MDang_sim;
 		Matrix2D<RFLOAT> A3D;
 		FileName fn_expimg;
@@ -284,7 +286,44 @@ public:
 			if (do_add_noise)
 			{
 				if (fn_model != "")
-					model.read(fn_model);
+				{
+					std::ifstream in(fn_model.data(), std::ios_base::in);
+					if (in.fail())
+						REPORT_ERROR( (std::string) "MlModel::readStar: File " + fn_model + " cannot be read." );
+
+					MetaDataTable MDlog, MDgroup, MDsigma;
+					MDlog.readStar(in, "model_general");
+					if (!MDlog.getValue(EMDL_MLMODEL_ORIGINAL_SIZE, ori_size) ||
+					    !MDlog.getValue(EMDL_MLMODEL_NR_GROUPS, nr_groups) )
+						REPORT_ERROR("MlModel::readStar: incorrect model_general table");
+
+					MDgroup.readStar(in, "model_groups");
+					group_names.resize(nr_groups, "");
+					FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDgroup)
+					{
+						long int igroup;
+						if (!MDgroup.getValue(EMDL_MLMODEL_GROUP_NO, igroup))
+							REPORT_ERROR("MlModel::readStar: incorrect model_groups table");
+						//Start counting of groups at 1, not at 0....
+						if (!MDgroup.getValue(EMDL_MLMODEL_GROUP_NAME, group_names[igroup-1]))
+							REPORT_ERROR("MlModel::readStar: incorrect model_groups table");
+					}
+
+					sigma2_noise.resize(nr_groups);
+					for (int igroup = 0; igroup < nr_groups; igroup++)
+					{
+						sigma2_noise[igroup].resize(ori_size/2 + 1);
+						MDsigma.readStar(in, "model_group_" + integerToString(igroup + 1));
+						int idx;
+						FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsigma)
+						{
+							if (!MDsigma.getValue(EMDL_SPECTRAL_IDX, idx))
+								REPORT_ERROR("MlModel::readStar: incorrect table model_group_" + integerToString(igroup + 1));
+							if (!MDsigma.getValue(EMDL_MLMODEL_SIGMA2_NOISE, sigma2_noise[igroup](idx)))
+								REPORT_ERROR("MlModel::readStar: incorrect table model_group_" + integerToString(igroup + 1));
+						}
+					}
+				}
 				else if (stddev_white_noise > 0.)
 					stddev_white_noise /= XSIZE(vol()) * sqrt(2); // fftw normalization and factor sqrt(2) for two-dimensionality of complex plane
 				else
@@ -405,9 +444,9 @@ public:
 							}
 						}
 						int my_mic_id = -1;
-						for (int mic_id = 0; mic_id < model.group_names.size(); mic_id++)
+						for (int mic_id = 0; mic_id < group_names.size(); mic_id++)
 						{
-							if (fn_group == model.group_names[mic_id])
+							if (fn_group == group_names[mic_id])
 							{
 								my_mic_id = mic_id;
 								break;
@@ -426,9 +465,9 @@ public:
 						FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(F2D)
 						{
 							int ires = ROUND( sqrt( (RFLOAT)(kp*kp + ip*ip + jp*jp) ) );
-							ires = XMIPP_MIN(ires, model.ori_size/2); // at freqs higher than Nyquist: use last sigma2 value
+							ires = XMIPP_MIN(ires, ori_size/2); // at freqs higher than Nyquist: use last sigma2 value
 
-							RFLOAT sigma = sqrt(DIRECT_A1D_ELEM(model.sigma2_noise[my_mic_id], ires));
+							RFLOAT sigma = sqrt(DIRECT_A1D_ELEM(sigma2_noise[my_mic_id], ires));
 							DIRECT_A3D_ELEM(F2D, k, i, j).real += rnd_gaus(0., sigma);
 							DIRECT_A3D_ELEM(F2D, k, i, j).imag += rnd_gaus(0., sigma);
 						}

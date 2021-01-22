@@ -326,12 +326,12 @@ public:
 
 	void reconstructGrad(
 			MultidimArray<RFLOAT> &vol_out,
-			RFLOAT grad_stepsize,
-			RFLOAT tau2_fudge,
-			RFLOAT min_resol,
-			const MultidimArray<RFLOAT> &fsc,
-			bool use_fsc,
-			bool printTimes= false);
+			const MultidimArray<RFLOAT> &fsc_spectrum,
+			RFLOAT grad_stepsize=0.1,
+			RFLOAT tau2_fudge=2,
+			RFLOAT min_resol_shell=0,
+			bool use_fsc=true,
+			bool printTimes=false);
 
 	/*	Enforce Hermitian symmetry, apply helical symmetry as well as point-group symmetry
 	 */

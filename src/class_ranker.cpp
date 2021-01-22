@@ -18,6 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 
+
 #include "src/class_ranker.h"
 static int IMGSIZE = 64;
 
@@ -602,6 +603,14 @@ void ClassRanker::initialise()
 	{
 		std::cout << "WARNING: Should not provide radius ratio and radius at the same time. Ignoring the radius ratio..." << std::endl;
 	}
+
+#ifdef _TORCH_ENABLED
+	if (fn_torch_model == "") {
+		fn_torch_model = get_default_torch_model_path();
+		if (fn_torch_model != "")
+			std::cout << "Using default pytorch model: " << fn_torch_model << std::endl;
+	}
+#endif
 }
 
 
@@ -2158,4 +2167,33 @@ void ClassRanker::writeFeatures()
             if (verb > 0) std::cout << " Written normalized feature vectors to star file: " << fntt << std::endl;
         }
 
+}
+
+
+std::string ClassRanker::get_default_torch_model_path()
+{
+
+#ifdef _TORCH_ENABLED
+	std::vector<char> buff(512);
+	ssize_t len;
+
+	//Read path string into buffer
+	do {
+		buff.resize(buff.size() + 128);
+		len = ::readlink("/proc/self/exe", &(buff[0]), buff.size());
+	} while (buff.size() == len);
+
+	// Convert to string and return
+	if (len > 0) {
+		buff[len] = '\0'; //Mark end of string
+		std::string path = std::string(&(buff[0]));
+		std::size_t found = path.find_last_of("/\\");
+		path = path.substr(0,found) + "/relion_class_ranker_default_model.pt";
+		if (FILE *file = fopen(path.c_str(), "r")) { //Check if file can be opened
+			fclose(file);
+			return path;
+		}
+	}
+#endif
+	return "";
 }

@@ -95,6 +95,11 @@ void MlOptimiserMpi::initialise()
 	std::cerr<<"MlOptimiserMpi::initialise Entering"<<std::endl;
 #endif
 
+	if (gradient_refine) {
+		do_mom1 = true;
+		do_mom2 = true;
+	}
+	
 	// Print information about MPI nodes:
 	printMpiNodesMachineNames(*node, nr_threads);
 #ifdef _CUDA_ENABLED
@@ -103,7 +108,7 @@ void MlOptimiserMpi::initialise()
 	int devCount, deviceAffinity;
 	bool is_split(false);
 
-	if (gradient_refine) {
+	if (gradient_refine && !do_split_random_halves) {
 		if (node->isMaster())
 			REPORT_ERROR("Gradient refinement is not supported together with MPI. \nPlease rerun with Number of MPI processes: 1");
 		else
@@ -1137,7 +1142,10 @@ void MlOptimiserMpi::expectation()
 			{
 				if (do_grad)
 				{
-					std::cout << " Variable-metric Gradient Descent iteration " << iter << " of " << nr_iter;
+					std::cout << " Gradient optimisation iteration " << iter << " of " << nr_iter;
+					if (my_nr_particles < mydata.numberOfParticles())
+						std::cout << " with " << my_nr_particles << " particles";
+					std::cout << " (Step size " << (float) ( (int) (grad_current_stepsize * 100 + .5) ) / 100 << ")";
 				}
 				else
 				{
@@ -2090,12 +2098,20 @@ void MlOptimiserMpi::maximization()
 						{
 							if(do_grad)
 							{
+								if (do_split_random_halves)
+									(wsum_model.BPref[ith_recons]).reweightGrad(
+											mymodel.Igrad1[ith_recons],
+											do_mom1 ? 0.9 : 0.,
+											mymodel.Igrad2[ith_recons],
+											do_mom2 ? 0.999 : 0.,
+											iter == 1);
+
 								(wsum_model.BPref[ith_recons]).reconstructGrad(
 										mymodel.Iref[ith_recons],
+										mymodel.fsc_halves_class[ith_recons],
 										grad_current_stepsize,
 										mymodel.tau2_fudge_factor,
 										mymodel.getPixelFromResolution(1./grad_min_resol),
-										mymodel.fsc_halves_class[ith_recons],
 										do_split_random_halves,
 										node->rank==1);
 							}
@@ -2223,12 +2239,20 @@ void MlOptimiserMpi::maximization()
 							{
 								if(do_grad)
 								{
+									if (do_split_random_halves)
+										(wsum_model.BPref[ith_recons]).reweightGrad(
+												mymodel.Igrad1[ith_recons],
+												do_mom1 ? 0.9 : 0.,
+												mymodel.Igrad2[ith_recons],
+												do_mom2 ? 0.999 : 0.,
+												iter == 1);
+
 									(wsum_model.BPref[ith_recons]).reconstructGrad(
 											mymodel.Iref[ith_recons],
+											mymodel.fsc_halves_class[ith_recons],
 											grad_current_stepsize,
 											mymodel.tau2_fudge_factor,
 											mymodel.getPixelFromResolution(1./grad_min_resol),
-											mymodel.fsc_halves_class[ith_recons],
 											do_split_random_halves,
 											false);
 								}
@@ -2635,7 +2659,7 @@ void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
 
 void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC()
 {
-	if (do_grad || subset_size > 0)
+	if (!do_grad && subset_size > 0)
 		REPORT_ERROR("BUG! You cannot do solvent-corrected FSCs and subsets!");
 
 	if (fn_mask == "")
@@ -2665,9 +2689,13 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 			else
 				fn_root.compose(fn_root+"_class", 1, "", 3);
 
-			BackProjector BPextra(wsum_model.BPref[ibody]);
-
-			BPextra.reconstruct(Iunreg(), gridding_nr_iter, false, dummy);
+			if (do_grad) {
+				Iunreg() = mymodel.Iref[ibody];
+			}
+			else {
+				BackProjector BPextra(wsum_model.BPref[ibody]);
+				BPextra.reconstruct(Iunreg(), gridding_nr_iter, false, dummy);
+			}
 
 			if (mymodel.nr_bodies > 1)
 			{
@@ -2969,7 +2997,13 @@ void MlOptimiserMpi::compareTwoHalves()
 		if (node->rank == 1 || node->rank == 2)
 		{
 			MultidimArray<Complex > avg1;
-			wsum_model.BPref[ibody].getDownsampledAverage(avg1);
+			if (do_grad) {
+				MultidimArray<RFLOAT> dummy;
+				Projector PPref(mymodel.ori_size, mymodel.interpolator, 1, mymodel.r_min_nn, mymodel.data_dim);
+				PPref.computeFourierTransformMap(mymodel.Iref[ibody], dummy, wsum_model.BPref[ibody].r_max*2, 1, false);
+				avg1 = PPref.data;
+			} else
+				wsum_model.BPref[ibody].getDownsampledAverage(avg1);
 
 //#define DEBUG_FSC
 #ifdef DEBUG_FSC
@@ -3049,6 +3083,9 @@ void MlOptimiserMpi::iterate()
 #ifdef TIMING
 		timer.tic(TIMING_EXP);
 #endif
+
+		if (gradient_refine)
+			do_grad = !(has_converged || iter > nr_iter - grad_em_iters);
 
 		// Update subset_size
 		updateSubsetSize(node->isMaster());
@@ -3150,6 +3187,27 @@ void MlOptimiserMpi::iterate()
 #ifdef DEBUG
 			std::cerr << " before compareHalves..." << std::endl;
 #endif
+			//If doing GD, do an exponenetial averaged FSC
+			std::vector<MultidimArray<RFLOAT> > old_fscs(mymodel.nr_bodies);
+			if (do_grad)
+				for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
+				{
+					old_fscs[ibody] = mymodel.fsc_halves_class[ibody];
+					if (iter == 1) {
+						RFLOAT radius = mymodel.ori_size * mymodel.pixel_size / ini_high;
+						radius -= WIDTH_FMASK_EDGE / 2.;
+						RFLOAT radius_p = radius + WIDTH_FMASK_EDGE;
+
+						FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(mymodel.fsc_halves_class[ibody]) {
+							if (i > radius_p)
+								DIRECT_A1D_ELEM(old_fscs[ibody], i) = 0;
+							else
+								DIRECT_A1D_ELEM(old_fscs[ibody], i) = 1;
+						}
+					}
+				}
+
+
 			// Sjors 27-oct-2015
 			// Calculate gold-standard FSC curve
 			if (do_phase_random_fsc && (fn_mask != "None" || mymodel.nr_bodies > 1) )
@@ -3159,6 +3217,17 @@ void MlOptimiserMpi::iterate()
 #ifdef DEBUG
 			std::cerr << " after compareHalves..." << std::endl;
 #endif
+
+			//If doing GD, do an exponenetial averaged FSC
+			if (do_grad)
+				for (int ibody = 0; ibody< mymodel.nr_bodies; ibody++)
+					FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(mymodel.fsc_halves_class[ibody]) {
+						DIRECT_A1D_ELEM(mymodel.fsc_halves_class[ibody], i) =
+								DIRECT_A1D_ELEM(old_fscs[ibody], i) * mu +
+								DIRECT_A1D_ELEM(mymodel.fsc_halves_class[ibody], i) * (1-mu);
+						DIRECT_A1D_ELEM(mymodel.fsc_halves_class[ibody], i) =
+								XMIPP_MAX(XMIPP_MIN(DIRECT_A1D_ELEM(mymodel.fsc_halves_class[ibody], i), 1), 0);
+					}
 
 			// For automated sampling procedure
 			if (!node->isMaster()) // the master does not have the correct mymodel.current_size, it only handles metadata!

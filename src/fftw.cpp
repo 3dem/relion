@@ -958,6 +958,56 @@ void shiftImageInFourierTransform(MultidimArray<Complex > &in,
 	}
 }
 
+// Shift an image through phase-shifts in its Fourier Transform (without pretabulated sine and cosine)
+void shiftImageInContinuousFourierTransform(MultidimArray<Complex > &in, MultidimArray<Complex > &out,
+                                            RFLOAT oridim, RFLOAT xshift, RFLOAT yshift, RFLOAT zshift)
+{
+	out.resize(in);
+	RFLOAT dotp, a, b, c, d, ac, bd, ab_cd, x, y, z;
+
+	xshift /= -oridim;
+	yshift /= -oridim;
+	zshift /= -oridim;
+	if (ABS(xshift) < XMIPP_EQUAL_ACCURACY && ABS(yshift) < XMIPP_EQUAL_ACCURACY && ABS(zshift) < XMIPP_EQUAL_ACCURACY)
+	{
+		out = in;
+		return;
+	}
+
+	long iniY(0), iniZ(0);
+
+	if (YSIZE(in) > 1)
+		iniY = YSIZE(in) / 2;
+
+	if (ZSIZE(in) > 1)
+		iniZ = ZSIZE(in) / 2;
+
+	for (long int k=0; k<ZSIZE(in); k++)
+	{
+		z = k - iniZ;
+		for (long int i=0; i<YSIZE(in); i++)
+		{
+			y = i - iniY;
+			for (long int j=0; j<XSIZE(in); j++)
+			{
+				x = j;
+				dotp = 2 * PI * (x * xshift + y * yshift + z * zshift);
+#ifdef RELION_SINGLE_PRECISION
+				SINCOSF(dotp, &b, &a);
+#else
+				SINCOS(dotp, &b, &a);
+#endif
+				c = DIRECT_A3D_ELEM(in, k, i, j).real;
+				d = DIRECT_A3D_ELEM(in, k, i, j).imag;
+				ac = a * c;
+				bd = b * d;
+				ab_cd = (a + b) * (c + d);
+				DIRECT_A3D_ELEM(out, k, i, j) = Complex(ac - bd, ab_cd - ac - bd);
+			}
+		}
+	}
+}
+
 void getSpectrum(MultidimArray<RFLOAT> &Min,
 				 MultidimArray<RFLOAT> &spectrum,
 				 int spectrum_type)
