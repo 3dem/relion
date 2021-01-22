@@ -51,7 +51,11 @@
 	#include <atomic>
 	#include <tbb/tbb.h>
 	#include <tbb/parallel_for.h>
-	#include <tbb/task_scheduler_init.h>
+	#if TBB_VERSION_MAJOR>2019
+		#include <tbb/task_group.h>
+	#else
+		#include <tbb/task_scheduler_init.h>
+	#endif
 	#include "src/acc/cpu/cpu_ml_optimiser.h"
 #endif
 
@@ -1305,7 +1309,12 @@ void MlOptimiser::initialise()
 	if (do_cpu)
 	{
 		// Set the size of the TBB thread pool for the entire run
-		tbbSchedulerInit.initialize(nr_threads);
+		#if TBB_VERSION_MAJOR>2019
+			auto mp = tbb::global_control::max_allowed_parallelism;
+			tbb::global_control tbbTaskGroup(mp, nr_threads);
+		#else
+			tbbSchedulerInit.initialize(nr_threads);
+		#endif
 	}
 #endif
 #ifdef MKLFFT
