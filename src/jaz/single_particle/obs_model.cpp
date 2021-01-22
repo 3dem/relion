@@ -113,7 +113,10 @@ ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt, bool do_die_
 		{
 			if (!opticsMdt.getValue(EMDL_MICROGRAPH_PIXEL_SIZE, angpix[i], i))
 			{
-				opticsMdt.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix[i], i);
+				if (!opticsMdt.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix[i], i))
+				{
+					opticsMdt.getValue(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, angpix[i], i);
+				}
 			}
 		}
 
