@@ -981,6 +981,7 @@ public:
 	 * and also update the origin offsets in the _data.star file correspondingly
 	 */
 	void centerClasses();
+	MultidimArray<RFLOAT> centerClassesGrad(const MultidimArray<RFLOAT> &map);
 
 	/* Updates the current resolution (from data_vs_prior array) and keeps track of best resolution thus far
 	 *  and precalculates a 2D Fourier-space array with pointers to the resolution of each point in a FFTW-centered array

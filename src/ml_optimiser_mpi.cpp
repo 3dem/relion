@@ -2098,13 +2098,15 @@ void MlOptimiserMpi::maximization()
 						{
 							if(do_grad)
 							{
-								if (do_split_random_halves)
-									(wsum_model.BPref[ith_recons]).reweightGrad(
+								if (do_split_random_halves) {
+									(wsum_model.BPref[ith_recons]).reweightGrad();
+									(wsum_model.BPref[ith_recons]).applyMomenta(
 											mymodel.Igrad1[ith_recons],
 											do_mom1 ? 0.9 : 0.,
 											mymodel.Igrad2[ith_recons],
 											do_mom2 ? 0.999 : 0.,
 											iter == 1);
+								}
 
 								(wsum_model.BPref[ith_recons]).reconstructGrad(
 										mymodel.Iref[ith_recons],
@@ -2239,13 +2241,15 @@ void MlOptimiserMpi::maximization()
 							{
 								if(do_grad)
 								{
-									if (do_split_random_halves)
-										(wsum_model.BPref[ith_recons]).reweightGrad(
+									if (do_split_random_halves) {
+										(wsum_model.BPref[ith_recons]).reweightGrad();
+										(wsum_model.BPref[ith_recons]).applyMomenta(
 												mymodel.Igrad1[ith_recons],
 												do_mom1 ? 0.9 : 0.,
 												mymodel.Igrad2[ith_recons],
 												do_mom2 ? 0.999 : 0.,
 												iter == 1);
+									}
 
 									(wsum_model.BPref[ith_recons]).reconstructGrad(
 											mymodel.Iref[ith_recons],
