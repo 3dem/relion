@@ -2880,7 +2880,7 @@ void MlOptimiser::iterate()
 			}
 		}
 
-		if (!do_grad && do_center_classes)
+		if (do_center_classes)
 			centerClasses();
 
 		// Directly use fn_out, without "_it" specifier, so unmasked refs will be overwritten at every iteration
@@ -4376,6 +4376,9 @@ void MlOptimiser::centerClasses()
 
 	RFLOAT offset_range_pix = sampling.offset_range / mymodel.pixel_size;
 
+	if (do_grad)
+		offset_range_pix /= 10;
+
 	// Shift all classes to their center-of-mass, and store all center-of-mass in coms vector
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 	{
@@ -4383,56 +4386,21 @@ void MlOptimiser::centerClasses()
 		mymodel.Iref[iclass].centerOfMass(my_com);
 		// Maximum number of pixels to shift center-of-mass is the current search range of translations
 		if (my_com.module() > offset_range_pix)
-		{
 			my_com *= offset_range_pix/my_com.module();
-		}
 		my_com *= -1;
+
 		MultidimArray<RFLOAT> aux = mymodel.Iref[iclass];
 		translate(aux, mymodel.Iref[iclass], my_com, DONT_WRAP, (RFLOAT)0.);
+
+		if (do_grad) {
+			if (do_mom1) {
+				MultidimArray<Complex > aux = mymodel.Igrad1[iclass];
+				shiftImageInContinuousFourierTransform(aux, mymodel.Igrad1[iclass],
+				                                       mymodel.ori_size, XX(my_com), YY(my_com), ZZ(my_com));
+			}
+		}
 	}
 }
-
-
-MultidimArray<RFLOAT> MlOptimiser::centerClassesGrad(const MultidimArray<RFLOAT> &map) {
-
-	MultidimArray<RFLOAT> grad;
-	grad.initZeros(map);
-	RFLOAT m(0), sx(0), sy(0), sz(0); //Sums
-
-	FOR_ALL_ELEMENTS_IN_ARRAY3D(map)
-	{
-		RFLOAT v = NZYX_ELEM(map, 0, k, i, j);
-		sz += k * v;
-		sy += i * v;
-		sx += j * v;
-		m += v;
-	}
-
-	if (map.ydim == 1)
-		sy = 0;
-
-	if (map.zdim == 1)
-		sz = 0;
-
-	if (m == 0)
-		return grad;
-
-	RFLOAT msx(sx/m), msy(sy/m), msz(sz/m);
-	RFLOAT com_norm = sqrt(msx*msx + msy*msy + msz*msz);
-	RFLOAT c = 1 / (com_norm * m*m);
-
-	FOR_ALL_ELEMENTS_IN_ARRAY3D(grad) {
-		NZYX_ELEM(grad, 0, k, i, j) = c *
-				(
-					j * sx - sx*msx +
-					i * sy - sy*msy +
-					k * sz - sz*msz
-				);
-	}
-
-	return grad;
-}
-
 
 void MlOptimiser::maximizationOtherParameters()
 {
@@ -4699,38 +4667,6 @@ int MlOptimiser::maximizationGradientParameters() {
 	if (do_grad)
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 			wsum_model.BPref[iclass].reweightGrad();
-
-	// Calculate the gradient of center of mass in real space and add to gradient in Fourier space
-	if (do_grad && do_center_classes) {
-		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
-		{
-			MultidimArray<RFLOAT> grad = centerClassesGrad(mymodel.Iref[iclass]);
-
-			if (grad.sum2() == 0)
-				continue;
-
-			Projector PPref(
-					wsum_model.BPref[iclass].ori_size,
-					wsum_model.BPref[iclass].interpolator,
-					wsum_model.BPref[iclass].padding_factor,
-					wsum_model.BPref[iclass].r_min_nn,
-					wsum_model.BPref[iclass].data_dim
-			);
-
-			int max_r2 = wsum_model.BPref[iclass].r_max * wsum_model.BPref[iclass].padding_factor;
-			max_r2 = ROUND(max_r2 * max_r2);
-			MultidimArray<RFLOAT> dummy;
-			PPref.computeFourierTransformMap(grad, dummy, wsum_model.BPref[iclass].r_max*2, 1, false);
-
-			FOR_ALL_ELEMENTS_IN_ARRAY3D(grad) {
-				const int r2 = k * k + i * i + j * j;
-				if (r2 < max_r2) {
-					A3D_ELEM(wsum_model.BPref[iclass].data, k, i, j).real -= .1 * A3D_ELEM(PPref.data, k, i, j).real;
-					A3D_ELEM(wsum_model.BPref[iclass].data, k, i, j).imag -= .1 * A3D_ELEM(PPref.data, k, i, j).imag;
-				}
-			}
-		}
-	}
 
 	if(do_grad && !do_split_random_halves) {
 		std::vector<float> avg_class_errors(mymodel.nr_classes * mymodel.nr_bodies, 0);
