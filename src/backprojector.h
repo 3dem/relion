@@ -316,10 +316,12 @@ public:
 	                 bool printTimes= false,
 	                 Image<RFLOAT>* weight_out = 0);
 
+	void reweightGrad();
+
 	/*
 	 * Calculate the first or second moment of the gradient
 	 */
-	void reweightGrad(
+	void applyMomenta(
 			MultidimArray<Complex> &mom1, RFLOAT lambda1,
 			MultidimArray<Complex> &mom2, RFLOAT lambda2,
 			bool init_mom);

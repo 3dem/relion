@@ -1819,7 +1819,17 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	}
 }
 
-void BackProjector::reweightGrad(
+void BackProjector::reweightGrad() {
+
+	const int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
+	FOR_ALL_ELEMENTS_IN_ARRAY3D(data) {
+		const int r2 = k * k + i * i + j * j;
+		if (r2 < max_r2)
+			A3D_ELEM(data, k, i, j) = A3D_ELEM(data, k, i, j) / XMIPP_MAX(1., A3D_ELEM(weight, k, i, j));
+	}
+}
+
+void BackProjector::applyMomenta(
 		MultidimArray<Complex> &mom1, RFLOAT lambda1,
 		MultidimArray<Complex> &mom2, RFLOAT lambda2,
 		bool init_mom)
@@ -1852,8 +1862,7 @@ void BackProjector::reweightGrad(
 				}
 			}
 
-			Complex g = A3D_ELEM(data, k, i, j) / XMIPP_MAX(1., A3D_ELEM(weight, k, i, j));
-			A3D_ELEM(data, k, i, j) = g;
+			Complex g = A3D_ELEM(data, k, i, j);
 
 			if (lambda1 > 0.)
 			{
