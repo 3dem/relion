@@ -4394,8 +4394,6 @@ void MlOptimiser::centerClasses()
 		MultidimArray<RFLOAT> aux = mymodel.Iref[iclass];
 		translate(aux, mymodel.Iref[iclass], my_com, DONT_WRAP, (RFLOAT)0.);
 
-		std::cout << XX(my_com) << " " << YY(my_com) << " " << ZZ(my_com) << std::endl;
-
 		if (do_grad && do_mom1) {
 			MultidimArray<Complex > aux = mymodel.Igrad1[iclass];
 			shiftImageInContinuousFourierTransform(aux, mymodel.Igrad1[iclass],
