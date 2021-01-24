@@ -4376,9 +4376,6 @@ void MlOptimiser::centerClasses()
 
 	RFLOAT offset_range_pix = sampling.offset_range / mymodel.pixel_size;
 
-	if (do_grad)
-		offset_range_pix /= 10;
-
 	// Shift all classes to their center-of-mass, and store all center-of-mass in coms vector
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 	{
@@ -4389,15 +4386,20 @@ void MlOptimiser::centerClasses()
 			my_com *= offset_range_pix/my_com.module();
 		my_com *= -1;
 
+		// Prevent small "vibrations", which seem to cause mismatches between momenta and ref
+		if (do_grad &&
+		    my_com.module() < XMIPP_MAX(0.01 * particle_diameter / mymodel.pixel_size, 2))
+			return;
+
 		MultidimArray<RFLOAT> aux = mymodel.Iref[iclass];
 		translate(aux, mymodel.Iref[iclass], my_com, DONT_WRAP, (RFLOAT)0.);
 
-		if (do_grad) {
-			if (do_mom1) {
-				MultidimArray<Complex > aux = mymodel.Igrad1[iclass];
-				shiftImageInContinuousFourierTransform(aux, mymodel.Igrad1[iclass],
-				                                       mymodel.ori_size, XX(my_com), YY(my_com), ZZ(my_com));
-			}
+		std::cout << XX(my_com) << " " << YY(my_com) << " " << ZZ(my_com) << std::endl;
+
+		if (do_grad && do_mom1) {
+			MultidimArray<Complex > aux = mymodel.Igrad1[iclass];
+			shiftImageInContinuousFourierTransform(aux, mymodel.Igrad1[iclass],
+			                                       mymodel.ori_size, XX(my_com), YY(my_com), ZZ(my_com));
 		}
 	}
 }
