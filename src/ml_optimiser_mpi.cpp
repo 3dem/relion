@@ -472,6 +472,11 @@ will still yield good performance and possibly a more stable execution. \n" << s
 	/************************************************************************/
 #endif // CUDA
 
+	// Split the data into two random halves
+	if (do_split_random_halves)
+	{
+		my_halfset = node->myRandomSubset();
+	}
 
 	MlOptimiser::initialiseGeneral(node->rank);
 
@@ -617,7 +622,6 @@ void MlOptimiserMpi::initialiseWorkLoad()
 	if (do_split_random_halves)
 	{
 		mydata.divideParticlesInRandomHalves(random_seed, do_helical_refine);
-		my_halfset = node->myRandomSubset();
 	}
 
 	if (node->isMaster())

@@ -425,7 +425,7 @@ public:
 	void initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experiment &_mydata,
 			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected,
 			RFLOAT ref_angpix = -1., bool _do_grad = false, bool do_trust_ref = false,
-			bool _do_mom1 = false, bool _do_mom2 = false, bool verb = false);
+			bool _do_mom1 = false, bool _do_mom2 = false, int halfset = -1, bool verb = false);
 
 	RFLOAT getResolution(int ipix)	{ return (RFLOAT)ipix/(pixel_size * ori_size); }
 

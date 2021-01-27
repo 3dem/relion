@@ -786,6 +786,7 @@ public:
 		max_coarse_size(0),
 		autosampling_hporder_local_searches(0),
 		do_split_random_halves(0),
+		my_halfset(-1),
 		debug_split_random_half(0),
 		random_seed(0),
 		do_gpu(0),

@@ -1753,8 +1753,10 @@ void MlOptimiser::initialiseGeneral(int rank)
 		REPORT_ERROR("ERROR: provide both --i and --o arguments");
 	}
 
-	// For safeguarding the gold-standard separation
-	my_halfset = (debug_split_random_half > 0) ? debug_split_random_half : -1;
+	// For safeguarding the gold-standard separation. Half already set in mpiversion. We only overwrite if debugging.
+	// my_halfset used to read specific reference halfmap
+	if (debug_split_random_half > 0)
+		my_halfset = debug_split_random_half;
 
 	// Check if output directory exists
 	FileName fn_dir = fn_out.beforeLastOf("/");
@@ -1790,7 +1792,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		mymodel.initialiseFromImages(
 				fn_ref, is_3d_model, mydata,
 				do_average_unaligned, do_generate_seeds,refs_are_ctf_corrected,
-				ref_angpix, gradient_refine, do_trust_ref_size, do_mom1, do_mom2, (rank==0));
+				ref_angpix, gradient_refine, do_trust_ref_size, do_mom1, do_mom2, my_halfset, (rank==0));
 	}
 
 	if (mymodel.nr_classes > 1 && do_split_random_halves)
