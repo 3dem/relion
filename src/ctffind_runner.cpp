@@ -251,7 +251,7 @@ void CtffindRunner::initialise()
 
 		if (continue_old)
 		{
-			FileName fn_microot = fn_mic_ctf_given_all[imic].without(".mrc");
+			FileName fn_microot = fn_mic_ctf_given_all[imic].withoutExtension();
 			RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep, maxres=-1., valscore = -1., phaseshift = 0.;
 			if (getCtffindResults(fn_microot, defU, defV, defAng, CC,
 			     HT, CS, AmpCnst, XMAG, DStep, maxres, valscore, phaseshift, false)) // false: dont warn if not found Final values
@@ -429,7 +429,7 @@ void CtffindRunner::joinCtffindResults()
 	MetaDataTable MDctf;
 	for (long int imic = 0; imic < fn_micrographs_all.size(); imic++)
 	{
-		FileName fn_microot = fn_micrographs_ctf_all[imic].without(".mrc");
+		FileName fn_microot = fn_micrographs_ctf_all[imic].withoutExtension();
 		RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep;
 		RFLOAT maxres = -999., valscore = -999., phaseshift = -999.;
 		bool has_this_ctf = getCtffindResults(fn_microot, defU, defV, defAng, CC,

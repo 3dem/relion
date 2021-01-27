@@ -286,9 +286,9 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 		}
 		else
 		{
-			int ret = fl_choice("Your current directory does not look like a RELION project directory.\nOnly run the RELION GUI from your project directory.\nDo you want to start a new project here?", "Yes", "No", 0);
+			int ret = fl_choice("Your current directory does not look like a RELION project directory.\nOnly run the RELION GUI from your project directory.\nDo you want to start a new project here?", "No", "Yes", 0);
 			this->begin(); // apparently fl_choice changes Fl_Group::current. Thus, we have to reclaim it.
-			if (ret == 0)
+			if (ret == 1)
 			{
 				touch(fn_lock);
 			}
