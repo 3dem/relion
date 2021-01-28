@@ -72,7 +72,7 @@ public:
 		//Delete this lastly
 		delete allocator;
 		HANDLE_ERROR(cudaSetDevice(device_id));
-		HANDLE_ERROR(cudaDeviceReset());
+		//HANDLE_ERROR(cudaDeviceReset());
 	}
 
 };
