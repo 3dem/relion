@@ -4389,15 +4389,18 @@ void MlOptimiser::centerClasses()
 		// Prevent small "vibrations", which seem to cause mismatches between momenta and ref
 		if (do_grad &&
 		    my_com.module() < XMIPP_MAX(0.01 * particle_diameter / mymodel.pixel_size, 2))
-			return;
+			continue;
 
 		MultidimArray<RFLOAT> aux = mymodel.Iref[iclass];
 		translate(aux, mymodel.Iref[iclass], my_com, DONT_WRAP, (RFLOAT)0.);
 
 		if (do_grad && do_mom1) {
 			MultidimArray<Complex > aux = mymodel.Igrad1[iclass];
+			RFLOAT x(XX(my_com)), y(YY(my_com)), z(0);
+			if (mymodel.Iref[iclass].getDim() == 2)
+				z = ZZ(my_com);
 			shiftImageInContinuousFourierTransform(aux, mymodel.Igrad1[iclass],
-			                                       mymodel.ori_size, XX(my_com), YY(my_com), ZZ(my_com));
+			                                       mymodel.ori_size, x, y, z);
 		}
 	}
 }
