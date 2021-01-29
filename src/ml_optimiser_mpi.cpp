@@ -856,7 +856,8 @@ void MlOptimiserMpi::expectation()
 	// C. Calculate expected angular errors
 	// Do not do this for maxCC
 	// Only the first (reconstructing) slave (i.e. from half1) calculates expected angular errors
-	if (!(iter==1 && do_firstiter_cc) && !(do_skip_align || do_skip_rotate) && !do_grad)
+	if (!(iter==1 && do_firstiter_cc) && !(do_skip_align || do_skip_rotate) &&
+         (do_auto_refine || !do_grad || (iter % 10 == 0 && mymodel.nr_classes > 1 && allow_coarser_samplings)))
 	{
 		int my_nr_images, length_fn_ctf;
 		if (node->isMaster())
@@ -3088,6 +3089,13 @@ void MlOptimiserMpi::iterate()
 		timer.tic(TIMING_EXP);
 #endif
 
+		// Nobody can start the next iteration until everyone has finished
+		MPI_Barrier(MPI_COMM_WORLD);
+
+		// Only first slave checks for convergence and prints stats to the stdout
+		if (do_auto_refine)
+			checkConvergence(node->rank == 1);
+
 		if (gradient_refine)
 			do_grad = !(has_converged || iter > nr_iter - grad_em_iters);
 
@@ -3103,13 +3111,6 @@ void MlOptimiserMpi::iterate()
 		{
 			std::cerr << " WARNING: skipping randomisation of particle order because random_seed equals zero..." << std::endl;
 		}
-
-		// Nobody can start the next iteration until everyone has finished
-		MPI_Barrier(MPI_COMM_WORLD);
-
-		// Only first slave checks for convergence and prints stats to the stdout
-		if (do_auto_refine)
-			checkConvergence(node->rank == 1);
 
 		expectation();
 #ifdef DEBUG

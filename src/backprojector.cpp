@@ -2054,27 +2054,22 @@ void BackProjector::reconstructGrad(
 		{
 			int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
 
-#ifdef WRITE_DIFF
-			if (A3D_ELEM(weight, k, i, j) > 1e-20)
-				A3D_ELEM(Fdiff_cen, k, i, j) = (A3D_ELEM(data, k, i, j) ) / (A3D_ELEM(weight, k, i, j) );
-			else
-				A3D_ELEM(Fdiff_cen, k, i, j) = 0.;
-#endif
-
 			RFLOAT fsc = DIRECT_A1D_ELEM(fsc_estimate, ires);
 			Complex Fgrad = fsc * A3D_ELEM(data, k, i, j) - (1. - fsc) / tau2_fudge * A3D_ELEM(PPref.data, k, i, j);
 			A3D_ELEM(PPref.data, k, i, j) += grad_stepsize * Fgrad;
 		}
 	}
-
 #ifdef WRITE_DIFF
-	Projector::decenter(Fdiff_cen, Fconv, max_r2);
-	Image<RFLOAT> Idiff;
-	windowToOridimRealSpace(transformer, Idiff(), printTimes);
-	Idiff.write("diff.spi");
-	transformer.setReal(vol_out);
+	{
+		FourierTransformer transformer;
+		transformer.setReal(vol_out);
+		MultidimArray<Complex>& Ftmp = transformer.getFourierReference();
+		Projector::decenter(data, Ftmp, max_r2);
+		Image<RFLOAT> Idiff;
+		windowToOridimRealSpace(transformer, Idiff(), printTimes);
+		Idiff.write("diff.mrc");
+	}
 #endif
-
 
 	// Set Fconv to the right size
 	if (ref_dim == 2) {
