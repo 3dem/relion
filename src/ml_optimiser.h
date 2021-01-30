@@ -25,11 +25,6 @@
 
 #ifdef ALTCPU
 	#include <tbb/enumerable_thread_specific.h>
-	#if TBB_VERSION_MAJOR>2019
-		#include <tbb/task_group.h>
-	#else
-		#include <tbb/task_scheduler_init.h>
-	#endif
 	#include <complex>
 #endif
 
@@ -117,11 +112,6 @@ public:
 	typedef tbb::enumerable_thread_specific< void * > CpuOptimiserType;
 
 	CpuOptimiserType   tbbCpuOptimiser;
-#if TBB_VERSION_MAJOR>2019
-	tbb::task_group tbbTaskGroup;
-#else
-	tbb::task_scheduler_init tbbSchedulerInit;
-#endif
 
 	std::complex<XFLOAT> **mdlClassComplex __attribute__((aligned(64)));
 #endif
@@ -772,9 +762,6 @@ public:
 		maximum_significants(-1),
 		threadException(NULL),
 #ifdef ALTCPU
-		#if TBB_VERSION_MAJOR<=2019
-			tbbSchedulerInit(tbb::task_scheduler_init::deferred ),
-		#endif
 		mdlClassComplex(NULL),
 #endif
 		failsafe_threshold(40),

@@ -464,19 +464,6 @@ will still yield good performance and possibly a more stable execution. \n" << s
 
 	initialiseWorkLoad();
 
-#ifdef ALTCPU
-	// Don't start threading until after most I/O is over
-	if (do_cpu)
-	{
-		// Set the size of the TBB thread pool for the entire run
-		#if TBB_VERSION_MAJOR>2019
-			auto mp = tbb::global_control::max_allowed_parallelism;
-			tbb::global_control tbbTaskGroup(mp, nr_threads);
-		#else
-			tbbSchedulerInit.initialize(nr_threads);
-		#endif
-	}
-#endif
 #ifdef MKLFFT
 	// Enable multi-threaded FFTW
 	int success = fftw_init_threads();
