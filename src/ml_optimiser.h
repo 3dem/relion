@@ -337,6 +337,7 @@ public:
 
 	// Id current iteration is gradient based
 	bool do_grad;
+	bool do_grad_next_iter;
 
 	// Track first gradient moment
 	bool do_mom1;
@@ -393,7 +394,7 @@ public:
 	RFLOAT grad_current_stepsize;
 	std::string grad_stepsize_scheme;
 
-	//Self-organizing map
+	// Self-organizing map
 	bool do_init_blobs;
 	bool do_som;
 	bool is_som_iter;
@@ -406,6 +407,10 @@ public:
 
 	// Size of the random subsets
 	long int subset_size;
+
+	// Automatic doubling of subset size during auto refinement
+	// Usage: subset_size = grad_ini_subset * 2 ^ auto_subest_size_order
+	int auto_subset_size_order;
 
 	// Every how many iterations should be written to disk when using subsets
 	int write_every_grad_iter;

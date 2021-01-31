@@ -95,11 +95,6 @@ void MlOptimiserMpi::initialise()
 	std::cerr<<"MlOptimiserMpi::initialise Entering"<<std::endl;
 #endif
 
-	if (gradient_refine) {
-		do_mom1 = true;
-		do_mom2 = true;
-	}
-	
 	// Print information about MPI nodes:
 	printMpiNodesMachineNames(*node, nr_threads);
 #ifdef _CUDA_ENABLED
@@ -888,7 +883,9 @@ void MlOptimiserMpi::expectation()
 				exp_fn_ctf = rec_buf2;
 				free(rec_buf2);
 			}
-			calculateExpectedAngularErrors(0, n_trials_acc-1);
+			if (!do_grad || iter > 10 ) {
+				calculateExpectedAngularErrors(0, n_trials_acc - 1);
+			}
 		}
 
 		// The reconstructing slave Bcast acc_rottilt, acc_psi, acc_trans to all other nodes!
@@ -3092,12 +3089,23 @@ void MlOptimiserMpi::iterate()
 		// Nobody can start the next iteration until everyone has finished
 		MPI_Barrier(MPI_COMM_WORLD);
 
+		if (gradient_refine && iter < 10) {
+			nr_iter_wo_resol_gain = 0;
+			nr_iter_wo_large_hidden_variable_changes = 0;
+		}
+
 		// Only first slave checks for convergence and prints stats to the stdout
 		if (do_auto_refine)
 			checkConvergence(node->rank == 1);
 
-		if (gradient_refine)
-			do_grad = !(has_converged || iter > nr_iter - grad_em_iters);
+		if (gradient_refine) {
+			updateStepSize();
+			do_grad = !(has_converged || iter > nr_iter - grad_em_iters) &&
+			          !(do_firstiter_cc && iter == 1);
+			int iter_next = iter + 1;
+			do_grad_next_iter = !(has_converged || iter_next > nr_iter - grad_em_iters) &&
+			                    !(do_firstiter_cc && iter_next == 1);
+		}
 
 		// Update subset_size
 		updateSubsetSize(node->isMaster());
@@ -3229,7 +3237,7 @@ void MlOptimiserMpi::iterate()
 					FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(mymodel.fsc_halves_class[ibody]) {
 						DIRECT_A1D_ELEM(mymodel.fsc_halves_class[ibody], i) =
 								DIRECT_A1D_ELEM(old_fscs[ibody], i) * mu +
-								DIRECT_A1D_ELEM(mymodel.fsc_halves_class[ibody], i) * (1-mu);
+								DIRECT_A1D_ELEM(mymodel.fsc_halves_class[ibody], i) * (1 - mu);
 						DIRECT_A1D_ELEM(mymodel.fsc_halves_class[ibody], i) =
 								XMIPP_MAX(XMIPP_MIN(DIRECT_A1D_ELEM(mymodel.fsc_halves_class[ibody], i), 1), 0);
 					}
@@ -3333,8 +3341,8 @@ void MlOptimiserMpi::iterate()
 		}
 		MPI_Barrier(MPI_COMM_WORLD);
 
-
-		if (do_center_classes) centerClasses();
+		if (do_center_classes && !do_grad_next_iter)
+			centerClasses();
 
 		// Directly use fn_out, without "_it" specifier, so unmasked refs will be overwritten at every iteration
 		if (do_write_unmasked_refs && node->rank == 1)

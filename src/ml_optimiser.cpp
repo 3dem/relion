@@ -533,7 +533,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	int general_section = parser.addSection("General options");
 	fn_data = parser.getOption("--i", "Input images (in a star-file)", "");
 	fn_out = parser.getOption("--o", "Output rootname", "");
-	nr_iter = textToInteger(parser.getOption("--iter", "Maximum number of iterations to perform", "50"));
+	nr_iter = textToInteger(parser.getOption("--iter", "Maximum number of iterations to perform", "-1"));
 	mymodel.tau2_fudge_factor = textToFloat(parser.getOption("--tau2_fudge", "Regularisation parameter (values higher than 1 give more weight to the data)", "1"));
 	mymodel.nr_classes = textToInteger(parser.getOption("--K", "Number of references to be refined", "1"));
 	particle_diameter = textToFloat(parser.getOption("--particle_diameter", "Diameter of the circular mask that will be applied to the experimental images (in Angstroms)", "-1"));
@@ -1294,11 +1294,6 @@ void MlOptimiser::initialise()
 	std::cerr<<"MlOptimiser::initialise Entering"<<std::endl;
 #endif
 
-	if (gradient_refine) {
-		do_mom1 = true;
-		do_mom2 = true;
-	}
-
 	if (do_gpu)
 	{
 #ifdef _CUDA_ENABLED
@@ -1467,58 +1462,6 @@ void MlOptimiser::initialise()
 	// Initialise the data_versus_prior ratio to get the initial current_size right
 	if (iter == 0 && !do_initialise_bodies)
 		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
-
-	if (do_som)
-	{
-		mymodel.som.set_max_node_count(mymodel.nr_classes);
-		// Add the initial nodes to the graph and connect them with an edge
-		for (unsigned i = 0; i < som_starting_nodes; i++)
-			mymodel.som.add_node();
-
-		std::vector<unsigned> nodes = mymodel.som.get_all_nodes();
-		for (unsigned i = 0; i < nodes.size(); i ++) {
-			mymodel.pdf_class[nodes[i]] = 1./nodes.size();
-			mymodel.som.set_node_activity(nodes[i], 1);
-		}
-
-		// Clear all non-node
-		for (unsigned i = 0; i < mymodel.nr_classes; i ++) {
-			bool clear = true;
-			for (unsigned j = 0; j < nodes.size(); j++)
-				if (i == nodes[j])
-					clear = false;
-
-			if (clear) {
-				mymodel.pdf_class[i] = 0.;
-				mymodel.Iref[i] *= 0.;
-				if (do_mom1)
-					mymodel.Igrad1[i].initZeros();
-				if (do_mom2)
-					mymodel.Igrad2[i].initZeros();
-			}
-		}
-	}
-
-	if (do_init_blobs) {
-		for (unsigned i = 0; i < mymodel.nr_classes; i ++) {
-			if (mymodel.pdf_class[i] > 0.) {
-				MultidimArray<RFLOAT> blobs_pos(mymodel.Iref[i]), blobs_neg(mymodel.Iref[i]);
-				if (mymodel.ref_dim == 2) {
-					SomGraph::make_blobs_2d(
-							blobs_pos, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
-					SomGraph::make_blobs_2d(
-							blobs_neg, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
-				}
-				else {
-					SomGraph::make_blobs_3d(
-							blobs_pos, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
-					SomGraph::make_blobs_3d(
-							blobs_neg, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
-				}
-				mymodel.Iref[i] = blobs_pos/40 * 0.6 - blobs_neg/40 * 0.4;
-			}
-		}
-	}
 
 	// Check minimum group size of 10 particles
 	if (verb > 0)
@@ -1717,6 +1660,18 @@ void MlOptimiser::initialiseGeneral(int rank)
 	RCT_8 = timer.setNew(" RcT8_initials ");
 
 #endif
+
+	if (gradient_refine) {
+		do_mom1 = true;
+		do_mom2 = true;
+	}
+
+	if (nr_iter < 0) {
+		if (gradient_refine)
+			nr_iter = 200;
+		else
+			nr_iter = 50;
+	}
 
 	// Check for errors in the command-line option
 	if (parser.checkForErrors(verb))
@@ -2153,6 +2108,58 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 	// For new thread-parallelization: each thread does 1 particle, so nr_pool=nr_threads
 	nr_pool = x_pool*nr_threads;
+
+	if (do_som)
+	{
+		mymodel.som.set_max_node_count(mymodel.nr_classes);
+		// Add the initial nodes to the graph and connect them with an edge
+		for (unsigned i = 0; i < som_starting_nodes; i++)
+			mymodel.som.add_node();
+
+		std::vector<unsigned> nodes = mymodel.som.get_all_nodes();
+		for (unsigned i = 0; i < nodes.size(); i ++) {
+			mymodel.pdf_class[nodes[i]] = 1./nodes.size();
+			mymodel.som.set_node_activity(nodes[i], 1);
+		}
+
+		// Clear all non-node
+		for (unsigned i = 0; i < mymodel.nr_classes; i ++) {
+			bool clear = true;
+			for (unsigned j = 0; j < nodes.size(); j++)
+				if (i == nodes[j])
+					clear = false;
+
+			if (clear) {
+				mymodel.pdf_class[i] = 0.;
+				mymodel.Iref[i] *= 0.;
+				if (do_mom1)
+					mymodel.Igrad1[i].initZeros();
+				if (do_mom2)
+					mymodel.Igrad2[i].initZeros();
+			}
+		}
+	}
+
+	if (do_init_blobs) {
+		for (unsigned i = 0; i < mymodel.nr_classes; i ++) {
+			if (mymodel.pdf_class[i] > 0.) {
+				MultidimArray<RFLOAT> blobs_pos(mymodel.Iref[i]), blobs_neg(mymodel.Iref[i]);
+				if (mymodel.ref_dim == 2) {
+					SomGraph::make_blobs_2d(
+							blobs_pos, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
+					SomGraph::make_blobs_2d(
+							blobs_neg, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
+				}
+				else {
+					SomGraph::make_blobs_3d(
+							blobs_pos, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
+					SomGraph::make_blobs_3d(
+							blobs_neg, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
+				}
+				mymodel.Iref[i] = blobs_pos/40 * 0.6 - blobs_neg/40 * 0.4;
+			}
+		}
+	}
 
 	if (gradient_refine)
 	{
@@ -2753,11 +2760,26 @@ void MlOptimiser::iterate()
 		timer.tic(TIMING_EXP);
 #endif
 
-		if (gradient_refine)
-			do_grad = iter <= nr_iter - grad_em_iters;
+		if (gradient_refine && iter < 10) {
+			nr_iter_wo_resol_gain = 0;
+			nr_iter_wo_large_hidden_variable_changes = 0;
+		}
 
-		if (do_grad)
+		if (do_auto_refine)
+		{
+			// Check whether we have converged by now
+			// If we have, set do_join_random_halves and do_use_all_data for the next iteration
+			checkConvergence();
+		}
+
+		if (gradient_refine) {
 			updateStepSize();
+			do_grad = !(has_converged || iter > nr_iter - grad_em_iters) &&
+			          !(do_firstiter_cc && iter == 1);
+			int iter_next = iter + 1;
+			do_grad_next_iter = !(has_converged || iter_next > nr_iter - grad_em_iters) &&
+			                    !(do_firstiter_cc && iter_next == 1);
+		}
 
 		if(do_som) {
 			if (do_generate_seeds && !do_firstiter_cc && iter == 1)
@@ -2792,13 +2814,6 @@ void MlOptimiser::iterate()
 		}
 		else if (do_grad)
 			REPORT_ERROR("ERROR: Random seed must be set for gradient optimisation.");
-
-		if (do_auto_refine)
-		{
-			// Check whether we have converged by now
-			// If we have, set do_join_random_halves and do_use_all_data for the next iteration
-			checkConvergence();
-		}
 
 		expectation();
 
@@ -2880,7 +2895,7 @@ void MlOptimiser::iterate()
 			}
 		}
 
-		if (do_center_classes)
+		if (do_center_classes && !do_grad_next_iter)
 			centerClasses();
 
 		// Directly use fn_out, without "_it" specifier, so unmasked refs will be overwritten at every iteration
@@ -4386,22 +4401,8 @@ void MlOptimiser::centerClasses()
 			my_com *= offset_range_pix/my_com.module();
 		my_com *= -1;
 
-		// Prevent small "vibrations", which seem to cause mismatches between momenta and ref
-		if (do_grad &&
-		    my_com.module() < XMIPP_MAX(0.01 * particle_diameter / mymodel.pixel_size, 2))
-			continue;
-
 		MultidimArray<RFLOAT> aux = mymodel.Iref[iclass];
 		translate(aux, mymodel.Iref[iclass], my_com, DONT_WRAP, (RFLOAT)0.);
-
-		if (do_grad && do_mom1) {
-			MultidimArray<Complex > aux = mymodel.Igrad1[iclass];
-			RFLOAT x(XX(my_com)), y(YY(my_com)), z(0);
-			if (mymodel.Iref[iclass].getDim() == 2)
-				z = ZZ(my_com);
-			shiftImageInContinuousFourierTransform(aux, mymodel.Igrad1[iclass],
-			                                       mymodel.ori_size, x, y, z);
-		}
 	}
 }
 
@@ -9211,43 +9212,57 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 	}
 	else if (gradient_refine)
 	{
-		// Do grad_ini_iter iterations with completely identical K references, sigd_ini_subset_size, enforce non-negativity and grad_ini_resol resolution limit
-		if (iter < grad_ini_iter)
-		{
-			subset_size = grad_ini_subset_size;
+		if (do_auto_refine) {
+			if (nr_iter_wo_resol_gain == 3)
+				auto_subset_size_order += 1;
+			subset_size = grad_ini_subset_size * std::pow(2, auto_subset_size_order);
+			subset_size = XMIPP_MIN(subset_size, grad_fin_subset_size);
 		}
-		else if (iter < grad_ini_iter + grad_inbetween_iter)
-		{
-			subset_size = grad_ini_subset_size + ROUND((RFLOAT(iter - grad_ini_iter)/RFLOAT(grad_inbetween_iter))*(grad_fin_subset_size-grad_ini_subset_size));
-		}
-		else
-		{
-			subset_size = grad_fin_subset_size;
+		else {
+			// Do grad_ini_iter iterations with completely identical K references, sigd_ini_subset_size, enforce non-negativity and grad_ini_resol resolution limit
+			if (iter < grad_ini_iter) {
+				subset_size = grad_ini_subset_size;
+			}
+			else if (iter < grad_ini_iter + grad_inbetween_iter) {
+				subset_size = grad_ini_subset_size +
+				              ROUND((RFLOAT(iter - grad_ini_iter) / RFLOAT(grad_inbetween_iter)) *
+				                    (grad_fin_subset_size - grad_ini_subset_size));
+			}
+			else {
+				subset_size = grad_fin_subset_size;
+			}
 		}
 
-		if (nr_iter - iter < grad_em_iters || nr_iter == iter || subset_size > mydata.numberOfParticles() || has_converged)
+		long nr_particles = mydata.numberOfParticles();
+		if (do_split_random_halves)
+			nr_particles = floor(nr_particles/2);
+
+		if (!do_grad || nr_iter - iter < grad_em_iters || nr_iter == iter || subset_size >= nr_particles || has_converged)
 			subset_size = -1;
 	}
 
-	if (myverb && subset_size != old_subset_size && !do_grad)
+	if (myverb && subset_size != old_subset_size && !gradient_refine)
 		std::cout << " Setting subset size to " << subset_size << " particles" << std::endl;
 }
 
 void MlOptimiser::updateStepSize() {
 	RFLOAT _stepsize = grad_stepsize;
-	std::string _scheme = grad_stepsize_scheme;
 
 	if (_stepsize <= 0)
-		if (mymodel.ref_dim == 2)
 			_stepsize = 0.2;
-		else
-			_stepsize = 0.1;
 
-	if (_scheme == "")
+	std::string _scheme = grad_stepsize_scheme;
+
+	if (_scheme == "") {
 		if (mymodel.ref_dim == 2)
 			_scheme = "4-2step";
-		else
-			_scheme = "2-2step";
+		else {
+			if (do_auto_refine)
+				_scheme = "3-2step";
+			else
+				_scheme = "2-2step";
+		}
+	}
 
 	if (_scheme == "plain") {
 		grad_current_stepsize = _stepsize;
@@ -9266,29 +9281,40 @@ void MlOptimiser::updateStepSize() {
 	if (is_3step) {
 		int pos = _scheme.find("-3step-");
 		inflate = textToFloat(_scheme.substr(0, pos));
-		deflate = textToFloat(_scheme.substr(pos+7, _scheme.size()));
+		deflate = textToFloat(_scheme.substr(pos + 7, _scheme.size()));
 	}
 
-	if (is_2step or is_3step) {
-		if (inflate < 0 or 10 < inflate)
-			REPORT_ERROR("Invalid inflate value in --grad_stepsize_scheme");
-		if (deflate <= 0 or 10 < deflate)
-			REPORT_ERROR("Invalid deflate value in --grad_stepsize_scheme");
+	if (do_auto_refine) {
+		if (grad_current_stepsize == 0)
+			grad_current_stepsize = _stepsize * 2;
 
-		float x = iter;
-		float a1 = grad_inbetween_iter / 5.; //Sigmoid length
-		float b1 = grad_ini_iter; //Sigmoid start
-		float a2 = grad_fin_iter; //Sigmoid length
-		float b2 = grad_ini_iter + grad_inbetween_iter;//Sigmoid start
-		float scale1 = 1. / (pow(10, (x - b1 - a1 / 2.) / (a1 / 4.)) + 1.); //Sigmoid function
-		float scale2 = 1. / (pow(10, (x - b2 - a2 / 2.) / (a2 / 4.)) + 1.); //Sigmoid function
-		float c1 = _stepsize; //Baseline
-		float c = _stepsize / deflate; //Baseline
-		grad_current_stepsize = (_stepsize*inflate - c1) * scale1 + (_stepsize - c) * scale2 + c;
-		return;
+		if (nr_iter_wo_resol_gain == 3)
+			grad_current_stepsize *= 0.75;
+
+		grad_current_stepsize = XMIPP_MAX(grad_current_stepsize, grad_stepsize/deflate);
 	}
+	else {
+		if (is_2step or is_3step) {
+			if (inflate < 0 or 10 < inflate)
+				REPORT_ERROR("Invalid inflate value in --grad_stepsize_scheme");
+			if (deflate <= 0 or 10 < deflate)
+				REPORT_ERROR("Invalid deflate value in --grad_stepsize_scheme");
 
-	REPORT_ERROR("Invalid value in --grad_stepsize_scheme");
+			float x = iter;
+			float a1 = grad_inbetween_iter / 5.; //Sigmoid length
+			float b1 = grad_ini_iter; //Sigmoid start
+			float a2 = grad_fin_iter; //Sigmoid length
+			float b2 = grad_ini_iter + grad_inbetween_iter;//Sigmoid start
+			float scale1 = 1. / (pow(10, (x - b1 - a1 / 2.) / (a1 / 4.)) + 1.); //Sigmoid function
+			float scale2 = 1. / (pow(10, (x - b2 - a2 / 2.) / (a2 / 4.)) + 1.); //Sigmoid function
+			float c1 = _stepsize; //Baseline
+			float c = _stepsize / deflate; //Baseline
+			grad_current_stepsize = (_stepsize * inflate - c1) * scale1 + (_stepsize - c) * scale2 + c;
+			return;
+		}
+
+		REPORT_ERROR("Invalid value in --grad_stepsize_scheme");
+	}
 }
 
 void MlOptimiser::checkConvergence(bool myverb)
