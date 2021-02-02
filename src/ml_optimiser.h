@@ -412,6 +412,9 @@ public:
 	// Usage: subset_size = grad_ini_subset * 2 ^ auto_subest_size_order
 	int auto_subset_size_order;
 
+	// Gradient auto refinement has converged;
+	bool grad_has_converged;
+
 	// Every how many iterations should be written to disk when using subsets
 	int write_every_grad_iter;
 
@@ -843,6 +846,8 @@ public:
 		mu(0),
 		grad_stepsize(-1),
 		grad_current_stepsize(0),
+		auto_subset_size_order(0),
+		grad_has_converged(false),
 #ifdef ALTCPU
 		tbbSchedulerInit(tbb::task_scheduler_init::deferred ),
 		mdlClassComplex(NULL),
