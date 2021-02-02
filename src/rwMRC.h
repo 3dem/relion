@@ -209,39 +209,37 @@ int readMRC(long int img_select, bool isStack=false, const FileName &name="")
 
 	DataType datatype;
 
-	if (header->mode == 12)
-		REPORT_ERROR("RELION 3.1 does not support half-precision floating point numbers (MRC mode 12). Please use later versions.");
-
-	if (header->mode == 101)
+	switch (header->mode)
 	{
+	case 0:
+		datatype = SChar; // Changed to SIGNED in RELION 3.1 to be compatible with the official speficifation and SerialEM 
+		break;
+	case 1:
+		datatype = SShort;
+		break;
+	case 2:
+		datatype = Float;
+		break;
+	case 3:
+		REPORT_ERROR("readMRC: only real-space images may be read into RELION.");
+	case 4:
+		REPORT_ERROR("readMRC: only real-space images may be read into RELION.");
+	case 6:
+		datatype = UShort;
+		break;
+	case 12:
+		datatype = Float16;
+		break;
+	case 101:
 		// This is SerialEM's non-standard extension.
 		// https://bio3d.colorado.edu/imod/doc/mrc_format.txt
 		// http://bio3d.colorado.edu/SerialEM/hlp/html/hidd_k2_save_options.htm
 		if (_xDim % 2 == 1 && _yDim % 2 == 1)
 			REPORT_ERROR("Currently we support 4-bit MRC (mode 101) only when nx * ny is an even number.");
 		datatype = UHalf;
-	}
-	else 
-	{
-		switch (header->mode % 5)
-		{
-		case 0:
-			datatype = SChar; // Changed to SIGNED in RELION 3.1 to be compatible with the official speficifation and SerialEM 
-			break;
-		case 1:
-			datatype = Short;
-			break;
-		case 2:
-			datatype = Float;
-			break;
-		case 3:
-			REPORT_ERROR("readMRC: only real-space images may be read into RELION.");
-		case 4:
-			REPORT_ERROR("readMRC: only real-space images may be read into RELION.");
-		default:
-			datatype = SChar;
-			break;
-		}
+		break;
+	default:
+		REPORT_ERROR((std::string)"readMRC: unsupported MRC mode " + integerToString(header->mode));
 	}
 	offset = MRCSIZE + header->nsymbt;
 
@@ -278,7 +276,7 @@ int readMRC(long int img_select, bool isStack=false, const FileName &name="")
 /** MRC Writer
   * @ingroup MRC
 */
-int writeMRC(long int img_select, bool isStack=false, int mode=WRITE_OVERWRITE)
+int writeMRC(long int img_select, bool isStack=false, const int mode=WRITE_OVERWRITE, const DataType datatype=Unknown_Type) /* TODO: add type */
 {
 	MRChead *header = (MRChead *) askMemory(sizeof(MRChead));
 
@@ -331,26 +329,40 @@ int writeMRC(long int img_select, bool isStack=false, int mode=WRITE_OVERWRITE)
 
 	// Convert T to datatype
 	DataType output_type;
-	if (typeid(T) == typeid(RFLOAT) ||
-	    typeid(T) == typeid(float) ||
-	    typeid(T) == typeid(int))
+	if ((datatype == Unknown_Type && (typeid(T) == typeid(RFLOAT) ||
+	                                  typeid(T) == typeid(float) ||
+	                                  typeid(T) == typeid(int)))
+           || datatype == Float)
 	{
 		header->mode = 2;
 		output_type = Float;
 	}
-	else if (typeid(T) == typeid(unsigned char) ||
-		 typeid(T) == typeid(signed char))
+	else if ((datatype == Unknown_Type && (typeid(T) == typeid(unsigned char) ||
+	                                       typeid(T) == typeid(signed char)))
+	        || datatype == SChar)
 	{
 		header->mode = 0;
-		output_type = UChar;
+		output_type = SChar;
 	}
-	else if (typeid(T) == typeid(short))
+	else if ((datatype == Unknown_Type && typeid(T) == typeid(signed short))
+	        || datatype == SShort)
 	{
 		header->mode = 1;
-		output_type = Short;
+		output_type = SShort;
+	}
+	else if ((datatype == Unknown_Type && typeid(T) == typeid(unsigned short))
+	        || datatype == UShort)
+	{
+		header->mode = 6;
+		output_type = UShort;
+	}
+	else if (datatype == Float16)
+	{
+		header->mode = 12;
+		output_type = Float16;
 	}
 	else
-		REPORT_ERROR("ERROR write MRC image: invalid typeid(T)");
+		REPORT_ERROR(std::string("writeMRC(): invalid output data type. datatype = ") + integerToString(datatype));
 
 	//Set this to zero till we decide if we want to update it
 	header->mx = header->nx; //(int) (ua/ux + 0.5);

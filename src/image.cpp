@@ -28,11 +28,12 @@ unsigned long  gettypesize(DataType type)
 
 	switch ( type ) {
 		case UChar: case SChar:  size = sizeof(char); break;
-		case UShort: case Short: size = sizeof(short); break;
+		case UShort: case SShort: size = sizeof(short); break;
 		case UInt: case Int:     size = sizeof(int); break;
 		case Float:              size = sizeof(float); break;
 		case Double:             size = sizeof(RFLOAT); break;
 		case Boolean:            size = sizeof(bool); break;
+		case Float16:            size = sizeof(short); break;
 		case UHalf: REPORT_ERROR("Logic error: UHalf (4-bit) needs special consideration. Don't use this function."); break;
 		default: size = 0;
 	}
@@ -53,7 +54,7 @@ int datatypeString2Int(std::string s)
 	}
 	else if (!strcmp(s.c_str(),"short"))
 	{
-		return Short;
+		return SShort;
 	}
 	else if (!strcmp(s.c_str(),"uint"))
 	{
@@ -66,6 +67,10 @@ int datatypeString2Int(std::string s)
 	else if (!strcmp(s.c_str(),"float"))
 	{
 		return Float;
+	}
+	else if (!strcmp(s.c_str(),"float16"))
+	{
+		return Float16;
 	}
 	else REPORT_ERROR("datatypeString2int; unknown datatype");
 }
