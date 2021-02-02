@@ -64,6 +64,9 @@ public:
 	bool do_own;
 	bool interpolate_shifts;
 
+	// Write in float16 (MRC mode 12)?
+	bool write_float16;
+
 	// Maximum number of iterations
 	int max_iter;
 

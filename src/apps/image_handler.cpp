@@ -36,7 +36,7 @@ class image_handler_parameters
 	public:
    	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_mask, fn_fsc, fn_adjust_power, fn_correct_ampl, fn_fourfilter, fn_cosDPhi;
 	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box, minr_ampl_corr, my_new_box_size;
-	bool do_add_edge, do_invert_hand, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_calc_com, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan, do_average_all_frames, do_power, do_ignore_optics, do_optimise_scale_subtract;
+	bool do_add_edge, do_invert_hand, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_calc_com, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan, do_average_all_frames, do_power, do_ignore_optics, do_optimise_scale_subtract, write_float16;
 	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, requested_angpix, real_angpix, force_header_angpix, lowpass, highpass, logfilter, bfactor, shift_x, shift_y, shift_z, replace_nan, randomize_at, optimise_bfactor_subtract;
 	// PNG options
 	RFLOAT minval, maxval, sigma_contrast;
@@ -73,6 +73,7 @@ class image_handler_parameters
 		int general_section = parser.addSection("General options");
 		fn_in = parser.getOption("--i", "Input STAR file, image (.mrc) or movie/stack (.mrcs)");
 		fn_out = parser.getOption("--o", "Output name (for STAR-input: insert this string before each image's extension)", "");
+		write_float16  = parser.checkOption("--float16", "Write in half-precision 16 bit floating point numbers (MRC mode 12), instead of 32 bit (MRC mode 0).");
 
 		int cst_section = parser.addSection("image-by-constant operations");
 		multiply_constant = textToFloat(parser.getOption("--multiply_constant", "Multiply the image(s) pixel values by this constant", "1"));
@@ -659,12 +660,12 @@ class image_handler_parameters
 
 				// The following assumes the images in the stack come ordered...
 				if (n == 0)
-					Iout.write(fn_tmp, n, true, WRITE_OVERWRITE); // make a new stack
+					Iout.write(fn_tmp, n, true, WRITE_OVERWRITE, write_float16 ? Float16: Float); // make a new stack
 				else
-					Iout.write(fn_tmp, n, true, WRITE_APPEND);
+					Iout.write(fn_tmp, n, true, WRITE_APPEND, write_float16 ? Float16: Float);
 			}
 			else
-				Iout.write(my_fn_out);
+				Iout.write(my_fn_out, -1, false, WRITE_OVERWRITE, write_float16 ? Float16: Float);
 		}
 		else
 		{
@@ -833,7 +834,6 @@ class image_handler_parameters
 					    		dAkij(Iop(), k, i, j) = 1.;
 					}
 					avg_ampl = Iop();
-					Iop.write("test.mrc");
 				}
 
 				if (fn_mult != "" || fn_div != "" || fn_add != "" || fn_subtract != "" || fn_fsc != "" || fn_adjust_power != "" ||fn_fourfilter != "")
@@ -954,7 +954,7 @@ class image_handler_parameters
 						{
 							FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(Iin())
 							{
-								DIRECT_NZYX_ELEM(Iavg(),myframe,0,i,j) += DIRECT_A2D_ELEM(Iin(), i, j); // just store sum
+								DIRECT_NZYX_ELEM(Iavg(), myframe, 0, i, j) += DIRECT_A2D_ELEM(Iin(), i, j); // just store sum
 							}
 						}
 					}
@@ -966,7 +966,7 @@ class image_handler_parameters
 						}
 					}
 				}
-				Iavg.write(fn_out);
+				Iavg.write(fn_out, -1, true, WRITE_OVERWRITE, write_float16 ? Float16: Float);
 			}
 			else
 			{
@@ -1013,7 +1013,7 @@ class image_handler_parameters
 		{
 			avg_ampl /= (RFLOAT)i_img;
 			Iout() = avg_ampl;
-			Iout.write(fn_out);
+			Iout.write(fn_out, -1, false, WRITE_OVERWRITE, write_float16 ? Float16: Float);
 		}
 
 		if (verb > 0)

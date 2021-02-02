@@ -65,7 +65,7 @@ class FrameRecombiner
 	protected:
 
 		// read from cmd. line:
-		bool doCombineFrames, bfac_diag, do_ctf_multiply, do_recenter;
+		bool doCombineFrames, bfac_diag, do_ctf_multiply, do_recenter, write_float16;
 		int k0, k1, box_arg, scale_arg, crop_arg;
 		double k0a, k1a, recenter_x, recenter_y, recenter_z;
 		std::string bfacFn, suffix;

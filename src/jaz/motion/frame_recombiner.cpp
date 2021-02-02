@@ -41,6 +41,7 @@ void FrameRecombiner::read(IOParser& parser, int argc, char* argv[])
 	parser.addSection("Combine frames options");
 
 	doCombineFrames = parser.checkOption("--combine_frames", "Combine movie frames into polished particles.");
+	write_float16  = parser.checkOption("--float16", "Write in half-precision 16 bit floating point numbers (MRC mode 12), instead of 32 bit (MRC mode 0).");
 	scale_arg = textToInteger(parser.getOption("--scale", "Re-scale the particles to this size (by default read from particles star file)", "-1"));
 	box_arg = textToInteger(parser.getOption("--window", "Re-window the particles to this size (in movie-pixels; by default read from particles star file)", "-1"));
 	crop_arg = textToInteger(parser.getOption("--crop", "Crop the scaled particles to this size after CTF pre-multiplication", "-1"));
@@ -397,7 +398,7 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 		}
 
 		stack.setSamplingRateInHeader(angpix_out[ogmg]);
-		stack.write(fn_root+"_shiny" + suffix + ".mrcs");
+		stack.write(fn_root+"_shiny" + suffix + ".mrcs", -1, true, WRITE_OVERWRITE, write_float16 ? Float16: Float);
 
 		if (debug)
 		{

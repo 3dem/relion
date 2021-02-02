@@ -52,6 +52,7 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	fn_part_dir = parser.getOption("--part_dir", "Output directory for particle stacks", "Particles/");
 	fn_part_star = parser.getOption("--part_star", "Output STAR file with all particles metadata", "");
 	fn_data = parser.getOption("--reextract_data_star", "A _data.star file from a refinement to re-extract, e.g. with different binning or re-centered (instead of --coord_suffix)", "");
+	write_float16  = parser.checkOption("--float16", "Write in half-precision 16 bit floating point numbers (MRC mode 12), instead of 32 bit (MRC mode 0).");
 	keep_ctf_from_micrographs  = parser.checkOption("--keep_ctfs_micrographs", "By default, CTFs from fn_data will be kept. Use this flag to keep CTFs from input micrographs STAR file");
 	do_reset_offsets = parser.checkOption("--reset_offsets", "reset the origin offsets from the input _data.star file to zero?");
 	do_recenter = parser.checkOption("--recenter", "Re-center particle according to rlnOriginX/Y in --reextract_data_star STAR file");
@@ -1099,7 +1100,7 @@ void Preprocessing::performPerImageOperations(
 		// Write one mrc file for every subtomogram
 		FileName fn_img;
 		fn_img.compose(fn_output_img_root, image_nr + 1, "mrc");
-		Ipart.write(fn_img);
+		Ipart.write(fn_img, -1, false, WRITE_OVERWRITE, write_float16 ? Float16: Float);
 		TIMING_TOC(TIMING_PER_IMG_OP_WRITE);
 	}
 	else
@@ -1126,9 +1127,9 @@ void Preprocessing::performPerImageOperations(
 		// Write this particle to the stack on disc
 		// First particle: write stack in overwrite mode, from then on just append to it
 		if (image_nr == 0)
-			Ipart.write(fn_output_img_root+".mrcs", -1, (nr_of_images > 1), WRITE_OVERWRITE);
+			Ipart.write(fn_output_img_root+".mrcs", -1, (nr_of_images > 1), WRITE_OVERWRITE, write_float16 ? Float16: Float);
 		else
-			Ipart.write(fn_output_img_root+".mrcs", -1, false, WRITE_APPEND);
+			Ipart.write(fn_output_img_root+".mrcs", -1, false, WRITE_APPEND, write_float16 ? Float16: Float);
 		TIMING_TOC(TIMING_PER_IMG_OP_WRITE);
 	}
 }
