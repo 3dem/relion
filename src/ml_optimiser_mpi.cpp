@@ -1140,7 +1140,9 @@ void MlOptimiserMpi::expectation()
 			{
 				if (do_grad)
 				{
-					std::cout << " Gradient optimisation iteration " << iter << " of " << nr_iter;
+					std::cout << " Gradient optimisation iteration " << iter;
+					if (!do_auto_refine)
+						std::cout << " of " << nr_iter;
 					if (my_nr_particles < mydata.numberOfParticles())
 						std::cout << " with " << my_nr_particles << " particles";
 					std::cout << " (Step size " << (float) ( (int) (grad_current_stepsize * 100 + .5) ) / 100 << ")";
@@ -3101,10 +3103,12 @@ void MlOptimiserMpi::iterate()
 		if (gradient_refine) {
 			updateStepSize();
 			do_grad = !(has_converged || iter > nr_iter - grad_em_iters) &&
-			          !(do_firstiter_cc && iter == 1);
+			          !(do_firstiter_cc && iter == 1) &&
+			          !grad_has_converged;
 			int iter_next = iter + 1;
 			do_grad_next_iter = !(has_converged || iter_next > nr_iter - grad_em_iters) &&
-			                    !(do_firstiter_cc && iter_next == 1);
+			                    !(do_firstiter_cc && iter_next == 1) &&
+			                    !grad_has_converged;
 		}
 
 		// Update subset_size

@@ -2775,10 +2775,12 @@ void MlOptimiser::iterate()
 		if (gradient_refine) {
 			updateStepSize();
 			do_grad = !(has_converged || iter > nr_iter - grad_em_iters) &&
-			          !(do_firstiter_cc && iter == 1);
+			          !(do_firstiter_cc && iter == 1) &&
+			          !grad_has_converged;
 			int iter_next = iter + 1;
 			do_grad_next_iter = !(has_converged || iter_next > nr_iter - grad_em_iters) &&
-			                    !(do_firstiter_cc && iter_next == 1);
+			                    !(do_firstiter_cc && iter_next == 1) &&
+			                    !grad_has_converged;
 		}
 
 		if(do_som) {
@@ -3129,7 +3131,9 @@ void MlOptimiser::expectation()
 	{
 		if (do_grad)
 		{
-			std::cout << " Gradient optimisation iteration " << iter << " of " << nr_iter;
+			std::cout << " Gradient optimisation iteration " << iter;
+			if (!do_auto_refine)
+				std::cout << " of " << nr_iter;
 			if (my_nr_particles < mydata.numberOfParticles())
 				std::cout << " with " << my_nr_particles << " particles";
 			std::cout << " (Step size " << (float) ( (int) (grad_current_stepsize * 100 + .5) ) / 100 << ")";
@@ -9323,12 +9327,22 @@ void MlOptimiser::checkConvergence(bool myverb)
 	                    (auto_ignore_angle_changes || nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES);
 
     bool gd_converged = nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN_GRAD &&
-                        (auto_ignore_angle_changes || nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES_GRAD);
+    		            (auto_ignore_angle_changes || nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES_GRAD);
+
+	if (!grad_has_converged && gd_converged) {
+		if (myverb)
+			std::cout << " Auto-refine: Switching to Expectation Maximization " << std::endl;
+		grad_has_converged = true;
+		nr_iter_wo_resol_gain = 0;
+		nr_iter_wo_large_hidden_variable_changes = 0;
+		em_converged = false;
+		gd_converged = false;
+		do_grad = false;
+	}
 
 	if (
 			has_fine_enough_angular_sampling &&
-	        ( (!do_grad && em_converged) || (do_grad && gd_converged)) &&
-			(do_grad && iter >= 10)
+	        ( (!do_grad && em_converged) || (do_grad && gd_converged))
 	   )
 	{
 		has_converged = true;
