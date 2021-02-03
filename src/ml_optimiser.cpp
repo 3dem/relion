@@ -2163,6 +2163,11 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 	if (gradient_refine)
 	{
+		if (do_auto_refine) {
+			auto_resolution_based_angles = true;
+			auto_ignore_angle_changes = true;
+		}
+		
 		// for continuation jobs (iter>0): could do some more iterations as specified by nr_iter
 		nr_iter = grad_ini_iter + grad_fin_iter + grad_inbetween_iter;
 		updateStepSize();
@@ -9005,15 +9010,9 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 		bool do_proceed_resolution = (auto_resolution_based_angles &&
 									  myresol_angstep < old_rottilt_step &&
 						 		      sampling.healpix_order + 1 != autosampling_hporder_local_searches);
-		do_proceed_resolution = (do_proceed_resolution ||
-				(!do_grad && nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN) ||
-				(do_grad && nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN_GRAD) ||
-				(do_grad && iter < 10));
+		do_proceed_resolution = (do_proceed_resolution || nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN);
 
-		const bool do_proceed_hidden_variables = (auto_ignore_angle_changes ||
-				(!do_grad && nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES) ||
-				(do_grad && nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES_GRAD) ||
-				(do_grad && iter < 10));
+		const bool do_proceed_hidden_variables = (auto_ignore_angle_changes || nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES);
 
 		// Only use a finer angular sampling if the angular accuracy is still above 75% of the estimated accuracy
 		// If it is already below, nothing will change and eventually nr_iter_wo_resol_gain or nr_iter_wo_large_hidden_variable_changes will go above MAX_NR_ITER_WO_RESOL_GAIN
