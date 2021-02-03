@@ -93,7 +93,7 @@ void CtffindRunner::usage()
 	parser.writeUsage(std::cout);
 }
 
-void CtffindRunner::initialise()
+void CtffindRunner::initialise(bool is_master)
 {
 	// Get the CTFFIND executable
 	if (fn_ctffind_exe == "")
@@ -290,33 +290,37 @@ void CtffindRunner::initialise()
 		}
 	}
 
-	if (false) {
+	if (is_master)
+	{
 		std::cout << fn_mic_given_all.size() << " micrographs were given but we process only ";
 		std::cout  << do_at_most << " micrographs as specified in --do_at_most." << std::endl;
 	}
 
 	// Make symbolic links of the input micrographs in the output directory because ctffind and gctf write output files alongside the input micropgraph
-	char temp [180];
-	char *cwd = getcwd(temp, 180);
-	currdir = std::string(temp);
-	// Make sure fn_out ends with a slash
-	if (currdir[currdir.length()-1] != '/')
-		currdir += "/";
-	FileName prevdir="";
-	for (size_t i = 0; i < fn_micrographs.size(); i++)
+	if (is_master)
 	{
-		FileName myname = fn_micrographs_ctf[i];
-		if (do_movie_thon_rings)
-			myname = myname.withoutExtension() + movie_rootname;
-		// Remove the UNIQDATE part of the filename if present
-		FileName output = getOutputFileWithNewUniqueDate(myname, fn_out);
-		// Create output directory if neccesary
-		FileName newdir = output.beforeLastOf("/");
-		if (newdir != prevdir)
+		char temp [180];
+		char *cwd = getcwd(temp, 180);
+		currdir = std::string(temp);
+		// Make sure fn_out ends with a slash
+		if (currdir[currdir.length()-1] != '/')
+			currdir += "/";
+		FileName prevdir="";
+		for (size_t i = 0; i < fn_micrographs.size(); i++)
 		{
-			mktree(newdir);
+			FileName myname = fn_micrographs_ctf[i];
+			if (do_movie_thon_rings)
+				myname = myname.withoutExtension() + movie_rootname;
+			// Remove the UNIQDATE part of the filename if present
+			FileName output = getOutputFileWithNewUniqueDate(myname, fn_out);
+			// Create output directory if neccesary
+			FileName newdir = output.beforeLastOf("/");
+			if (newdir != prevdir)
+			{
+				mktree(newdir);
+			}
+			symlink(currdir + myname, output);
 		}
-		symlink(currdir + myname, output);
 	}
 
 	if (do_use_gctf && fn_micrographs.size()>0)
