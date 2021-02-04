@@ -769,9 +769,9 @@ void  MlModel::readTauSpectrum(FileName fn_tau, int verb)
 
 // Reading images from disc
 void MlModel::initialiseFromImages(
-		FileName fn_ref, bool _is_3d_model, Experiment &_mydata,
-		bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected,
-		RFLOAT _ref_angpix, bool _do_grad, bool _do_trust_ref_size, bool _do_mom1, bool _do_mom2, int halfset, bool verb)
+	FileName fn_ref, bool _is_3d_model, Experiment &_mydata,
+	bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected,
+	RFLOAT _ref_angpix, bool _do_grad, bool _do_trust_ref_size, bool _do_mom1, bool _do_mom2, bool verb)
 {
 
 
@@ -793,25 +793,8 @@ void MlModel::initialiseFromImages(
 	{
 		// Read the references into memory
 		do_average_unaligned = false;
-		// If this is a STAR file, check if it's an optimiser set or a model file. If the former, each halfmap is read
-		bool isModelFile = false;
+		// If this is a STAR file, ignore nr_classes and read all references from this file
 		if (fn_ref.isStarFile())
-		{
-			if (halfset == -1)
-			{
-				isModelFile = true;
-			}
-			else
-			{
-				MetaDataTable MDref;
-				EMDLabel refHalfMapLabel = (halfset == 1) ? EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME : EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME;
-				MDref.read(fn_ref);
-				if(!MDref.getValue(refHalfMapLabel, fn_ref)) // if we did not find the halfmap label we assume is model file
-					isModelFile = true;
-			}
-		}
-			// If this is a model STAR file, ignore nr_classes and read all references from this file
-		if (isModelFile)
 		{
 			MetaDataTable MDref;
 			MDref.read(fn_ref,"model_classes");
