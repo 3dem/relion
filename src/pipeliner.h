@@ -58,6 +58,12 @@ public:
 		outputNodeList.clear();
 	}
 
+	long int getJobNumber()
+	{
+		FileName mynumstr = name;
+		return textToInteger(mynumstr.afterFirstOf("/job"));
+	}
+
 };
 
 #define DO_LOCK true
@@ -118,12 +124,15 @@ public:
 	long int addNode(Node &_Node, bool touch_if_not_exist = false);
 
 	// Add a new Process to the list (no checks are performed)
-	long int addNewProcess(Process &_Process, bool do_overwrite = false);
+	long int addNewProcess(Process &_Process);
 
 	// Find nodes or process (by name or alias)
 	long int findNodeByName(std::string name);
 	long int findProcessByName(std::string name);
 	long int findProcessByAlias(std::string name);
+
+	// Check whether any outputnode from this process is used as input for any other process
+	bool checkDependency(long int process);
 
 	// Touch each individual Node name in the temporary Nodes directory
 	// Return true if Node output file exists and temporary file is written, false otherwise
@@ -134,6 +143,9 @@ public:
 	void deleteTemporaryNodeFile(Node &node);
 	void deleteTemporaryNodeFiles(Process &process);
 
+	// Decrease job counter by one for overwriting jobs
+	void setJobCounter(long int value);
+
 	// Re-make entries of all NodeNames in the hidden .Nodes directory (for file browsing for InputNode I/O)
 	void remakeNodeDirectory();
 
@@ -141,17 +153,17 @@ public:
 	// Returns true if any of the running processes has completed, false otherwise
 	bool checkProcessCompletion();
 
+
 	// Get the command line arguments for thisjob
-	bool getCommandLineJob(RelionJob &thisjob, int current_job, bool is_main_continue,
-			bool is_scheduled, bool do_makedir, bool do_overwrite_current,
+	bool getCommandLineJob(RelionJob &thisjob, int current_job, bool is_main_continue, bool is_scheduled, bool do_makedir,
 			std::vector<std::string> &commands, std::string &final_command, std::string &error_message);
 
 	// Adds _job to the pipeline and return the id of the newprocess
-	long int addJob(RelionJob &_job, int as_status, bool do_overwrite, bool do_write_minipipeline = true);
+	long int addJob(RelionJob &_job, int as_status, bool do_write_minipipeline = true);
 
 	// Runs a job and adds it to the pipeline
 	bool runJob(RelionJob &_job, int &current_job, bool only_schedule, bool is_main_continue,
-			bool is_scheduled, bool do_overwrite_current, std::string &error_message);
+			bool is_scheduled, std::string &error_message);
 
 	// Adds a scheduled job to the pipeline from the command line (with a name for job type)
 	int addScheduledJob(std::string job_type, std::string fn_options);
@@ -166,7 +178,7 @@ public:
 
 	// Runs a series of scheduled jobs, possibly in a loop, from the command line
 	void runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat,
-			long int minutes_wait, long int minutes_wait_before = 0, long int seconds_wait_after = 10, bool do_overwrite_current = false);
+			long int minutes_wait, long int minutes_wait_before = 0, long int seconds_wait_after = 10);
 
 	// If I'm deleting this_job from the pipeline, which Nodes and which Processes need to be deleted?
 	void deleteJobGetNodesAndProcesses(int this_job, bool do_recursive, std::vector<bool> &deleteNodes, std::vector<bool> &deleteProcesses);

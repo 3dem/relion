@@ -54,7 +54,7 @@ public:
 		std::cerr << "    --schedule test --add operator --name TOUCH_inimodel --type " << SCHEDULE_OPERATOR_TOUCH_FILE << " --i initial_model" << std::endl;
 		std::cerr << "    --schedule test --add operator --name CHECK_inimodel --type " << SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS << " --i initial_model --o is_finished" << std::endl;
 		std::cerr << std::endl << " ++ Add a job node: " << std::endl;
-		std::cerr << "    --schedule test --add job --i my_import --mode continue/new/overwrite" << std::endl;
+		std::cerr << "    --schedule test --add job --i my_import --mode continue/new" << std::endl;
 		std::cerr << "    --schedule test --add job --i exit" << std::endl;
 		std::cerr << std::endl << " ++ Add an edge: " << std::endl;
 		std::cerr << "    --schedule test --add edge --i inputnodename --o outputnodename" << std::endl;
@@ -86,7 +86,7 @@ public:
 		name = parser.getOption("--name", "Name of the variable, operator or job to be added","");
 		value = parser.getOption("--value", "Value of the variable to be added","");
 		ori_value = parser.getOption("--original_value", "Original value of the variable to be added","");
-		mode = parser.getOption("--mode", "Mode (for jobs): new, overwrite or continue","");
+		mode = parser.getOption("--mode", "Mode (for jobs): new or continue","");
 		int set_section = parser.addSection("Set values of variables in the schedule");
 		do_reset = parser.checkOption("--reset", "Reset all variables to their original values");
 		do_abort = parser.checkOption("--abort", "Abort a schedule that is running");
@@ -249,7 +249,7 @@ public:
 		{
 			if (schedule.isJob(set_mode))
 			{
-				if (!(value == SCHEDULE_NODE_JOB_MODE_NEW || value == SCHEDULE_NODE_JOB_MODE_CONTINUE || value == SCHEDULE_NODE_JOB_MODE_OVERWRITE))
+				if (!(value == SCHEDULE_NODE_JOB_MODE_NEW || value == SCHEDULE_NODE_JOB_MODE_CONTINUE))
 					REPORT_ERROR("ERROR: unvalid option for job mode: " + value);
 				schedule.jobs[set_mode].mode = value;
 			}

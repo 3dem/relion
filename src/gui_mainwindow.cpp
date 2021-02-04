@@ -2309,7 +2309,7 @@ void GuiMainWindow::cb_select_scheduler_job_i()
 	scheduler_job_name->value(jobname.c_str());
 	scheduler_job_name->deactivate();
 	bool found = false;
-	for (int i = 0; i < 3; i++)
+	for (int i = 0; i < 2; i++)
 	{
 		if (schedule.jobs[jobname].mode == job_mode_options[i].label())
 		{
@@ -2669,7 +2669,7 @@ void GuiMainWindow::cb_print_cl_i()
 
 	std::string error_message;
 	if (!pipeline.getCommandLineJob(gui_jobwindows[iwin]->myjob, current_job, is_main_continue, false,
-	                                DONT_MKDIR, do_overwrite_continue, commands, final_command, error_message))
+	                                DONT_MKDIR, commands, final_command, error_message))
 	{
 		fl_message("%s",error_message.c_str());
 	}
@@ -2706,6 +2706,7 @@ void GuiMainWindow::cb_schedule(Fl_Widget* o, void* v)
 
 void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 {
+	long int my_overwrite_job_counter = pipeline.job_counter;
 	if (do_overwrite_continue)
 	{
 		std::string ask = "Are you sure you want to overwrite this job?";
@@ -2714,6 +2715,20 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 		{
 			do_overwrite_continue = false;
 			return;
+		}
+
+		if (pipeline.checkDependency(current_job))
+		{
+			std::string error_message = "This jobs output nodes are used as inputs for other jobs, so you cannot overwrite this job.";
+			fl_message("%s", error_message.c_str());
+			run_button->activate();
+			return;
+		}
+		else
+		{
+			long int overwrite_job_nr =  (pipeline.processList[current_job]).getJobNumber();
+			cb_delete_i(false, false);
+			pipeline.setJobCounter(overwrite_job_nr);
 		}
 	}
 
@@ -2726,13 +2741,16 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 	tickTimeLastChanged();
 
 	std::string error_message;
-	if (!pipeline.runJob(gui_jobwindows[iwin]->myjob, current_job, only_schedule, is_main_continue, false, do_overwrite_continue, error_message))
+	if (!pipeline.runJob(gui_jobwindows[iwin]->myjob, current_job, only_schedule, is_main_continue, false, error_message))
 	{
 		fl_message("%s", error_message.c_str());
 		// Allow the user to fix the error and submit this job again
 		run_button->activate();
 		return;
 	}
+
+	// If do_overwrite, revert to the correct job_counter
+	if (do_overwrite_continue) pipeline.setJobCounter(my_overwrite_job_counter);
 
 	// Update all job lists in the main GUI
 	updateJobLists();

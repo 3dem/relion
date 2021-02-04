@@ -98,7 +98,6 @@ static Fl_Choice *scheduler_job_mode, *scheduler_job_has_started;
 static Fl_Menu_Item job_mode_options[] = {
 			      {"new"},
 			      {"continue"},
-			      {"overwrite"},
 			      {0} // this should be the last entry
 			      };
 static Fl_Menu_Item job_has_started_options[] = {

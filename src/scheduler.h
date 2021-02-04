@@ -142,7 +142,6 @@ class SchedulerOperator
 
 #define SCHEDULE_NODE_JOB_MODE_NEW "new"
 #define SCHEDULE_NODE_JOB_MODE_CONTINUE "continue"
-#define SCHEDULE_NODE_JOB_MODE_OVERWRITE "overwrite"
 
 class SchedulerJob
 {

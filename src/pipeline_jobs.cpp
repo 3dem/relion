@@ -2349,7 +2349,7 @@ void RelionJob::initialiseSelectJob()
 	joboptions["fn_model"] = JobOption("Select classes from job:", NODE_OPTIMISER, "", "STAR files (*_optimiser.star)", "A _optimiser.star (or for backwards compatibility also a _model.star) file from a previous 2D or 3D classification run to select classes from.");
 	joboptions["fn_mic"] = JobOption("OR select from micrographs.star:", NODE_MICS, "", "STAR files (*.star)", "A micrographs.star file to select micrographs from.");
 	joboptions["fn_data"] = JobOption("OR select from particles.star:", NODE_PART_DATA, "", "STAR files (*.star)", "A particles.star file to select individual particles from.");
-	joboptions["fn_coords"] = JobOption("OR select from picked coords:", NODE_MIC_COORDS, "", "STAR files (coords_suffix*.star)", "A coordinate suffix .star file to select micrographs while inspecting coordinates (and/or CTFs).");
+	joboptions["fn_coords"] = JobOption("OR select from picked coords:", NODE_MIC_COORDS, "", "Input coordinates list file (*.star)", "Starfile with a 2-column list of micrograph names and corresponding coordinate filenames (in .star, .box or as 2 or 3-column free text format)");
 
 	joboptions["do_class_ranker"] = JobOption("Automatically select 2D classes?", false, "If set to True, the class_ranker program will be used to make an automated class selection, based on the parameters below. This option only works when selecting classes from a relion_refine job (input optimiser.star on the I.O tab)");
 	joboptions["rank_threshold"] = JobOption("Minimum threshold for auto-selection: ", 0.5, 0, 1, 0.05, "Only classes with a predicted threshold above this value will be selected.");
@@ -2647,30 +2647,13 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 					return false;
 				}
 
-				// Get the name of the micrograph STAR file from reading the suffix file
-				FileName fn_suffix = joboptions["fn_coords"].getString();
-				FileName fn_star;
-				if (is_continue)
-				{
-					fn_star = outputname + "micrographs_selected.star";
-				}
-				else
-				{
-					std::ifstream in(fn_suffix.data(), std::ios_base::in);
-					in >> fn_star ;
-					in.close();
-				}
-				FileName fn_dirs = fn_suffix.beforeLastOf("/")+"/";
-				fn_suffix = fn_suffix.afterLastOf("/").without("coords_suffix_");
-				fn_suffix = fn_suffix.withoutExtension();
-
 				// Launch the manualpicker...
-				command="`which relion_manualpick` --i " + fn_star;
+				command="`which relion_manualpick` --i " + joboptions["fn_coords"].getString();
 				Node node4(joboptions["fn_coords"].getString(), joboptions["fn_coords"].node_type);
 				inputNodes.push_back(node4);
 
-				command += " --odir " + fn_dirs;
-				command += " --pickname " + fn_suffix;
+				//command += " --odir " + fn_dirs;
+				//command += " --pickname " + fn_suffix;
 
 				// The output selection
 				FileName fn_outstar = outputname + "micrographs_selected.star";
