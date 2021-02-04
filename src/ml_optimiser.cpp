@@ -2167,7 +2167,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 			auto_resolution_based_angles = true;
 			auto_ignore_angle_changes = true;
 		}
-		
+
 		// for continuation jobs (iter>0): could do some more iterations as specified by nr_iter
 		nr_iter = grad_ini_iter + grad_fin_iter + grad_inbetween_iter;
 		updateStepSize();
@@ -2811,7 +2811,7 @@ void MlOptimiser::iterate()
 		updateSubsetSize();
 
 		// Randomly take different subset of the particles each time we do a new "iteration" in SGD
-		if (random_seed > 0)
+		if (random_seed != 0)
 		{
 			mydata.randomiseParticlesOrder(random_seed+iter, do_split_random_halves,  subset_size < mydata.numberOfParticles() );
 		}
