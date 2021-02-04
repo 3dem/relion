@@ -1661,11 +1661,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 #endif
 
-	if (gradient_refine) {
-		do_mom1 = true;
-		do_mom2 = true;
-	}
-
 	if (nr_iter < 0) {
 		if (gradient_refine)
 			nr_iter = 200;
@@ -1745,7 +1740,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		mymodel.initialiseFromImages(
 				fn_ref, is_3d_model, mydata,
 				do_average_unaligned, do_generate_seeds,refs_are_ctf_corrected,
-				ref_angpix, gradient_refine, do_trust_ref_size, do_mom1, do_mom2, (rank==0));
+				ref_angpix, gradient_refine, do_trust_ref_size, (rank==0));
 	}
 
 	if (mymodel.nr_classes > 1 && do_split_random_halves)
@@ -2132,10 +2127,8 @@ void MlOptimiser::initialiseGeneral(int rank)
 			if (clear) {
 				mymodel.pdf_class[i] = 0.;
 				mymodel.Iref[i] *= 0.;
-				if (do_mom1)
-					mymodel.Igrad1[i].initZeros();
-				if (do_mom2)
-					mymodel.Igrad2[i].initZeros();
+				mymodel.Igrad1[i].initZeros();
+				mymodel.Igrad2[i].initZeros();
 			}
 		}
 	}
@@ -4688,9 +4681,9 @@ int MlOptimiser::maximizationGradientParameters() {
 					wsum_model.BPref[iclass].reweightGrad();
 					(wsum_model.BPref[iclass]).applyMomenta(
 							mymodel.Igrad1[iclass],
-							do_mom1 ? 0.9 : 0.,
+							0.9,
 							mymodel.Igrad2[iclass],
-							do_mom2 ? 0.999 : 0.,
+							0.999,
 							iter == 1);
 
 					RFLOAT avg_grad(0);
