@@ -257,9 +257,9 @@ void MlModel::read(FileName fn_in, bool read_only_one_group)
 			img.read(fn_tmp);
 
 			Igrad1[iclass].resize(Iref[0].zdim, Iref[0].ydim, Iref[0].xdim/2+1);
-			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Igrad1[iclass]) {
-				DIRECT_A3D_ELEM(Igrad1[iclass], k, i, j).real = DIRECT_A3D_ELEM(img(), k, i, j*2+0);
-				DIRECT_A3D_ELEM(Igrad1[iclass], k, i, j).imag = DIRECT_A3D_ELEM(img(), k, i, j*2+1);
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Igrad1[iclass]) {
+				DIRECT_MULTIDIM_ELEM(Igrad1[iclass], n).real = DIRECT_MULTIDIM_ELEM(img(), n * 2 + 0);
+				DIRECT_MULTIDIM_ELEM(Igrad1[iclass], n).imag = DIRECT_MULTIDIM_ELEM(img(), n * 2 + 1);
 			}
 		}
 
@@ -272,9 +272,9 @@ void MlModel::read(FileName fn_in, bool read_only_one_group)
 			img.read(fn_tmp);
 
 			Igrad2[iclass].resize(Iref[0].zdim, Iref[0].ydim, Iref[0].xdim/2+1);
-			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Igrad2[iclass]) {
-				DIRECT_A3D_ELEM(Igrad2[iclass], k, i, j).real = DIRECT_A3D_ELEM(img(), k, i, j*2+0);
-				DIRECT_A3D_ELEM(Igrad2[iclass], k, i, j).imag = DIRECT_A3D_ELEM(img(), k, i, j*2+1);
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Igrad2[iclass]) {
+				DIRECT_MULTIDIM_ELEM(Igrad2[iclass], n).real = DIRECT_MULTIDIM_ELEM(img(), n * 2 + 0);
+				DIRECT_MULTIDIM_ELEM(Igrad2[iclass], n).imag = DIRECT_MULTIDIM_ELEM(img(), n * 2 + 1);
 			}
 		}
 
