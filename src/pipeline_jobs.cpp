@@ -2633,27 +2633,10 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 			}
 			else if  (joboptions["fn_coords"].getString() != "")
 			{
-				RelionJob manualpickjob;
-
-				FileName fn_job = ".gui_manualpick";
-				bool iscont=false;
-				if (exists(fn_job+"job.star") || exists(fn_job+"run.job"))
-				{
-					manualpickjob.read(fn_job.c_str(), iscont, true); // true means do initialise
-				}
-				else
-				{
-					error_message = "You need to save 'Manual picking' job settings (using the Jobs menu) before you can display coordinate files.";
-					return false;
-				}
-
 				// Launch the manualpicker...
 				command="`which relion_manualpick` --i " + joboptions["fn_coords"].getString();
 				Node node4(joboptions["fn_coords"].getString(), joboptions["fn_coords"].node_type);
 				inputNodes.push_back(node4);
-
-				//command += " --odir " + fn_dirs;
-				//command += " --pickname " + fn_suffix;
 
 				// The output selection
 				FileName fn_outstar = outputname + "micrographs_selected.star";
@@ -2661,41 +2644,56 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 				outputNodes.push_back(node3);
 				command += " --allow_save  --selection " + fn_outstar;
 
-				// All the stuff from the saved manualpickjob
-				command += " --scale " + manualpickjob.joboptions["micscale"].getString();
-				command += " --sigma_contrast " + manualpickjob.joboptions["sigma_contrast"].getString();
-				command += " --black " + manualpickjob.joboptions["black_val"].getString();
-				command += " --white " + manualpickjob.joboptions["white_val"].getString();
-
-				if (manualpickjob.joboptions["lowpass"].getNumber(error_message) > 0.)
-					command += " --lowpass " + manualpickjob.joboptions["lowpass"].getString();
-				if (error_message != "") return false;
-
-				if (manualpickjob.joboptions["highpass"].getNumber(error_message) > 0.)
-					command += " --highpass " + manualpickjob.joboptions["highpass"].getString();
-				if (error_message != "") return false;
-
-				if (manualpickjob.joboptions["angpix"].getNumber(error_message) > 0.)
-					command += " --angpix " + manualpickjob.joboptions["angpix"].getString();
-				if (error_message != "") return false;
-
-
-				command += " --ctf_scale " + manualpickjob.joboptions["ctfscale"].getString();
-
-				command += " --particle_diameter " + manualpickjob.joboptions["diameter"].getString();
-
-
-				if (manualpickjob.joboptions["do_color"].getBoolean())
+				// A manualpicker jobwindow for display of micrographs....
+				RelionJob manualpickjob;
+				FileName fn_job = ".gui_manualpick";
+				bool iscont=false;
+				if (exists(fn_job+"job.star") || exists(fn_job+"run.job"))
 				{
-					command += " --color_label " + manualpickjob.joboptions["color_label"].getString();
-					command += " --blue " + manualpickjob.joboptions["blue_value"].getString();
-					command += " --red " + manualpickjob.joboptions["red_value"].getString();
-					if (manualpickjob.joboptions["fn_color"].getString().length() > 0)
-						command += " --color_star " + manualpickjob.joboptions["fn_color"].getString();
+					manualpickjob.read(fn_job.c_str(), iscont, true); // true means do initialise
+
+					command += " --scale " + manualpickjob.joboptions["micscale"].getString();
+					command += " --sigma_contrast " + manualpickjob.joboptions["sigma_contrast"].getString();
+					command += " --black " + manualpickjob.joboptions["black_val"].getString();
+					command += " --white " + manualpickjob.joboptions["white_val"].getString();
+
+					std::string error_message = "";
+					float mylowpass = manualpickjob.joboptions["lowpass"].getNumber(error_message);
+					if (mylowpass > 0.)
+						command += " --lowpass " + manualpickjob.joboptions["lowpass"].getString();
+
+					float myhighpass = manualpickjob.joboptions["highpass"].getNumber(error_message);
+					if (myhighpass > 0.)
+						command += " --highpass " + manualpickjob.joboptions["highpass"].getString();
+
+					float myangpix = manualpickjob.joboptions["angpix"].getNumber(error_message);
+					if (myangpix > 0.)
+						command += " --angpix " + manualpickjob.joboptions["angpix"].getString();
+
+					command += " --particle_diameter " + manualpickjob.joboptions["diameter"].getString();
+					if (manualpickjob.joboptions["do_fom_threshold"].getBoolean())
+					{
+						command += " --minimum_pick_fom " + manualpickjob.joboptions["minimum_pick_fom"].getString();
+					}
+
+					if (manualpickjob.joboptions["do_color"].getBoolean())
+					{
+						command += " --color_label " + manualpickjob.joboptions["color_label"].getString();
+						command += " --blue " + manualpickjob.joboptions["blue_value"].getString();
+						command += " --red " + manualpickjob.joboptions["red_value"].getString();
+						if (manualpickjob.joboptions["fn_color"].getString().length() > 0)
+							command += " --color_star " + manualpickjob.joboptions["fn_color"].getString();
+					}
+
+				}
+				else
+				{
+					command += " --scale 0.25";
+					command += " --sigma_contrast 3";
+					command += " --lowpass 20";
+					command += " --particle_diameter 100";
 				}
 
-				// Other arguments for extraction
-				command += " " + manualpickjob.joboptions["other_args"].getString();
 			}
 		}
 	}
