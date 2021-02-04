@@ -476,6 +476,8 @@ will still yield good performance and possibly a more stable execution. \n" << s
 	if (do_split_random_halves)
 	{
 		my_halfset = node->myRandomSubset();
+		// If a halfmap file is passed we read the proper halfset number
+		fn_ref.getHalf(fn_ref, my_halfset);
 	}
 
 	MlOptimiser::initialiseGeneral(node->rank);
