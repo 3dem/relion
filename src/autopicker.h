@@ -14,6 +14,7 @@
 #include "src/projector.h"
 #include "src/healpix_sampling.h"
 #include "src/projector.h"
+#include <src/jaz/single_particle/new_ft.h>
 #include <src/jaz/single_particle/obs_model.h>
 #include "src/ctf.h"
 #include "src/fftw.h"
@@ -400,6 +401,7 @@ public:
 	MetaDataTable getMDtrainFromParticleStar(MetaDataTable &MDparts, ObservationModel &obsModel);
 	MetaDataTable readTopazCoordinates(FileName fn_coord, int _topaz_downscale = 1);
 
+	void preprocessMicrographTopaz(FileName fn_in, FileName fn_out, int downscale);
 	void trainTopaz();
 	void autoPickTopazOneMicrograph(FileName &fn_mic, int rank = 0);
 	void autoPickLoGOneMicrograph(FileName &fn_mic, long int imic);

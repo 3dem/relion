@@ -699,6 +699,9 @@ void AutoPicker::initialise(int rank)
 
 	if ( (do_topaz_train || do_topaz_extract) )
 	{
+		// Make an proc directory inside the output directory
+		mktree(fn_odir + "/proc");
+
 		// Which is my GPU?
 		topaz_device_id = -1;
 		if (std::isdigit(*gpu_ids.begin()))
@@ -997,12 +1000,6 @@ void AutoPicker::run()
 		std::cout << " Autopicking ..." << std::endl;
 		init_progress_bar(fn_micrographs.size());
 		barstep = XMIPP_MAX(1, fn_micrographs.size() / 60);
-	}
-
-	if (do_topaz_extract)
-	{
-		mktree(fn_odir + "/proc");
-		mktree(fn_odir + "/raw");
 	}
 
 	FileName fn_olddir="";
@@ -2790,11 +2787,53 @@ MetaDataTable AutoPicker::readTopazCoordinates(FileName fn_coord,  int _topaz_do
 
 	return MDcoord;
 }
+void AutoPicker::preprocessMicrographTopaz(FileName fn_in, FileName fn_out, int bin_factor)
+{
+	Image<float> Iwork;
+	Iwork.read(fn_in);
+
+	const int nx = XSIZE(Iwork()), ny = YSIZE(Iwork());
+	int new_nx = nx / bin_factor, new_ny = ny / bin_factor;
+
+	MultidimArray<fComplex> Fref(ny, nx / 2 + 1), Fbinned(new_ny, new_nx / 2 + 1);
+	NewFFT::FourierTransform(Iwork(), Fref);
+
+	cropInFourierSpace(Fref, Fbinned);
+
+	Iwork().reshape(new_ny, new_nx);
+	NewFFT::inverseFourierTransform(Fbinned, Iwork());
+
+	// Calculate avg and stddev ; use double-pass for increased numerical stability?
+	float avg=0, stddev=0;
+    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iwork())
+    {
+    	avg += DIRECT_MULTIDIM_ELEM(Iwork(), n);
+    }
+    avg /= NZYXSIZE(Iwork());
+
+    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iwork())
+    {
+    	stddev += (DIRECT_MULTIDIM_ELEM(Iwork(), n) - avg) * (DIRECT_MULTIDIM_ELEM(Iwork(), n) - avg);
+    }
+    stddev = sqrt (stddev / NZYXSIZE(Iwork()));
+
+	if (stddev < 1e-10)
+	{
+		std::cerr << " WARNING! Stddev of image " << fn_in << " is zero after downscaling! Skipping normalisation..." << std::endl;
+	}
+	else
+	{
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iwork())
+		{
+			DIRECT_MULTIDIM_ELEM(Iwork(), n) = (DIRECT_MULTIDIM_ELEM(Iwork(), n) - avg) / stddev;
+		}
+	}
+
+	Iwork.write(fn_out);
+}
 
 void AutoPicker::trainTopaz()
 {
-	mktree(fn_odir + "/proc");
-	mktree(fn_odir + "/raw");
 
 	// Let's randomise the order of the input micrographs
 	MDtrain.randomiseOrder();
@@ -2847,14 +2886,11 @@ void AutoPicker::trainTopaz()
 		MetaDataTable MDpick;
 		MDpick.read(fn_pick);
 
-		// Symlink original micrograph to the raw directory
-		FileName fn_local_mic, fn_local_mic_proc;
-		fn_local_mic.compose(fn_odir + "raw/mic", imic, "mrc");
+		// Use RELION code to preprocess the micrograph, analogous to --afine preprocess option in topaz
+		FileName fn_local_mic_proc;
 		fn_local_mic_proc.compose(fn_odir + "proc/mic", imic, "mrc");
-		FileName abspath = realpath(fn_mic);
-		symlink(abspath, fn_local_mic);
-
-		abspath = realpath(fn_local_mic_proc, true); // true means allow non-existing path
+		preprocessMicrographTopaz(fn_mic, fn_local_mic_proc, topaz_downscale);
+		FileName abspath = realpath(fn_local_mic_proc, true); // true means allow non-existing path
 
 		// start with filling the training set
 		if (imic%2==0 || have_enough_test)
@@ -2924,17 +2960,6 @@ void AutoPicker::trainTopaz()
 
 	fh << "#!" << fn_shell  << std::endl;
 
-	// Call Topaz to preprocess the images for normalisation and downscaling
-	fh << fn_topaz_exe << " preprocess ";
-	fh << " -s " << integerToString(topaz_downscale);
-	if (topaz_device_id >= 0)
-		fh << " -d " << integerToString(topaz_device_id);
-	fh << " -o " << fn_odir << "proc/";
-	fh << " --affine ";
-	fh << " " << fn_odir << "raw/*.mrc";
-	fh << " " << topaz_additional_args;
-	fh << std::endl;
-
 	// Call Topaz to train the network
 	fh << fn_topaz_exe << " train ";
 	fh << " -n " << integerToString(topaz_nr_particles);
@@ -2958,7 +2983,7 @@ void AutoPicker::trainTopaz()
 	if (system(command.c_str())) std::cerr << "WARNING: there was an error in executing: " << command << std::endl;
 
 	// Now remove raw and proc directories
-	command = "rm -rf " + fn_odir + "raw/ " + fn_odir + "proc";
+	command = "rm -rf " + fn_odir + "proc/";
 	if (system(command.c_str())) std::cerr << "WARNING: there was an error in executing: " << command << std::endl;
 
 	std::cout << " Done with training! Launch another Auto-picking job to use the model for picking coordinates. " << std::endl;
@@ -2967,38 +2992,26 @@ void AutoPicker::trainTopaz()
 void AutoPicker::autoPickTopazOneMicrograph(FileName &fn_mic, int rank)
 {
 	// Local filenames
-	FileName fn_local_mic, fn_local_pick, fn_script, fn_proc, fn_log;
+	FileName fn_local_mic, fn_local_pick, fn_script, fn_log;
 	fn_local_mic.compose("rank", rank, "mrc");
 	fn_local_pick.compose("rank", rank, "txt");
+	fn_local_mic = fn_odir + "proc/" + fn_local_mic;
+	fn_local_pick = fn_odir + "proc/" + fn_local_pick;
 	fn_script.compose(fn_odir + "rank", rank, "bash");
 	fn_log.compose(fn_odir + "rank", rank, "log");
 	// each rank has its own proc directory, so they can be deleted below independently
 	// that's necessary as topaz cannot have this directory existing already when outputing to it in preprocess...
-	fn_proc = "proc" + integerToString(rank) + "/";
 
+	// Preprocess analogous to --afine option in topaz, but use RELION code
+	preprocessMicrographTopaz(fn_mic, fn_local_mic, topaz_downscale);
+
+	// Then call Topaz to predict coordinates
 	std::ofstream  fh;
 	fh.open((fn_script).c_str(), std::ios::out);
 	if (!fh)
 	 REPORT_ERROR( (std::string)"AutoPicker::autoPickTopazOneMicrograph cannot create file: " + fn_script);
 
 	fh << "#!" << fn_shell  << std::endl;
-
-	// Make a symlink of the micrograph in the output Directory
-	FileName fno = fn_odir + fn_local_mic;
-	symlink(realpath(fn_mic), fno);
-
-	// Call Topaz to preprocess this file for normalisation and downscaling
-	fh << fn_topaz_exe << " preprocess ";
-	fh << " -s " << integerToString(topaz_downscale);
-	if (topaz_device_id >= 0)
-		fh << " -d " << integerToString(topaz_device_id);
-	fh << " -o " << fn_odir << fn_proc;
-	fh << " --affine ";
-	fh << " " << fn_odir << fn_local_mic;
-	fh << " " << topaz_additional_args;
-	fh << std::endl;
-
-	// Then call Topaz to predict coordinates
 	fh << fn_topaz_exe << " extract ";
 	fh << " -r " << integerToString(topaz_radius);
 	if (topaz_device_id >= 0)
@@ -3006,8 +3019,8 @@ void AutoPicker::autoPickTopazOneMicrograph(FileName &fn_mic, int rank)
 	fh << " -x " << integerToString(topaz_downscale);
 	if (topaz_model != "")
 		fh << " -m " << topaz_model;
-	fh << " -o " << fn_odir << fn_proc << fn_local_pick;
-	fh << " " << fn_odir << fn_proc << fn_local_mic;
+	fh << " -o " << fn_local_pick;
+	fh << " " << fn_local_mic;
 	fh << " " << topaz_additional_args;
 	fh << std::endl;
 	fh.close();
@@ -3025,7 +3038,7 @@ void AutoPicker::autoPickTopazOneMicrograph(FileName &fn_mic, int rank)
 
 	// Now convert output .txt into Relion-style .star files!
 	// No need to pass downscale factor, as picks are already up-scaled using -x in topaz extract command above!
-	MetaDataTable MDout = readTopazCoordinates(fn_odir + fn_proc + fn_local_pick);
+	MetaDataTable MDout = readTopazCoordinates(fn_local_pick);
 	if (MDout.numberOfObjects() > 0)
 	{
 		if (verb > 1)
@@ -3035,9 +3048,8 @@ void AutoPicker::autoPickTopazOneMicrograph(FileName &fn_mic, int rank)
 	}
 
 	// Delete rank-specific process directory to remove all intermediate results
-    // Also delete the symlink, as otherwise the symlink will fail for the next micrograph!
-	command = "rm -rf " + fn_odir + fn_proc + " " + fno;
-	if (system(command.c_str())) std::cerr << "WARNING: there was an error in executing: " << command << std::endl;
+	if (std::remove(fn_local_mic.c_str())) REPORT_ERROR("ERROR: in removing file "+fn_local_mic);
+	if (std::remove(fn_local_pick.c_str())) REPORT_ERROR("ERROR: in removing file "+fn_local_pick);
 
 }
 
