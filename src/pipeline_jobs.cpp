@@ -1938,11 +1938,6 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 
 	if (joboptions["do_topaz"].getBoolean())
 	{
-		if (!joboptions["use_gpu"].getBoolean())
-		{
-			error_message ="ERROR: Specify which GPUs to use on the autopicking tab";
-			return false;
-		}
 
 		icheck = 0;
 		if (joboptions["do_topaz_train"].getBoolean()) icheck++;
@@ -1965,6 +1960,13 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 
 		if (joboptions["do_topaz_train"].getBoolean())
 		{
+
+			if (!joboptions["use_gpu"].getBoolean())
+			{
+				error_message ="ERROR: For Topaz training, specify which GPUs to use on the autopicking tab; for Topaz picking GPU usage is optional";
+				return false;
+			}
+
 			command += " --topaz_train";
 			if (joboptions["do_topaz_train_parts"].getBoolean())
 			{
@@ -1995,6 +1997,7 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 		{
 			command += " --gpu \"" + joboptions["gpu_ids"].getString() + "\"";
 		}
+
 	}
 	else if (joboptions["do_log"].getBoolean())
 	{
