@@ -31,11 +31,11 @@ any particular option, look at the comment above its definition in this script, 
 how it is used.
 
 Use double underscores to separate SCHEDULENAME__JOBNAME_JOBOPTION
- E.g. for SCHEDULENAME=preprocess, JOBNAME=importmovies and JOBOPTION=angpix
-'preprocess__importmovies__angpix' defines the value for the 'angpix' option in the file 'Schedules/preprocess/importmovies/job.star'
+ E.g. for SCHEDULENAME=prep, JOBNAME=importmovies and JOBOPTION=angpix
+'prep__importmovies__angpix' defines the value for the 'angpix' option in the file 'Schedules/prep/importmovies/job.star'
 
 Likewise, use SCHEDULENAME__VARIABLENAME for Schedule variables
- E.g. 'refine__logbatch_size' refers to the variablename 'logbatch_size' in the file 'Schedules/refine/schedule.star'
+ E.g. 'proc__logbatch_size' refers to the variablename 'logbatch_size' in the file 'Schedules/proc/schedule.star'
 
 This python script will set the corresponding values of these joboption and schedule-variable values in the Schedule STAR files. 
 The RELION scheduler can then be used to run the scheduler.
@@ -97,117 +97,122 @@ RelionItOptions = {
     # Change the parameters below to reflect your experiment
     # Use double underscores to separate SCHEDULENAME__JOBNAME__JOBOPTION
     #
-    # E.g. for SCHEDULENAME=preprocess, JOBNAME=importmovies and JOBOPTION=angpix
-    #  'preprocess__importmovies__angpix' defines the value for the 'angpix' option in the file 'Schedules/preprocess/importmovies/job.star'
+    # E.g. for SCHEDULENAME=prep, JOBNAME=importmovies and JOBOPTION=angpix
+    #  'prep__importmovies__angpix' defines the value for the 'angpix' option in the file 'Schedules/prep/importmovies/job.star'
     #
     # Likewise, use SCHEDULENAME__VARIABLENAME for Schedule variables
     #
-    # E.g. 'refine__logbatch_size' refers to the variablename 'logbatch_size' in the file 'Schedules/refine/schedule.star'
+    # E.g. 'proc__logbatch_size' refers to the variablename 'logbatch_size' in the file 'Schedules/proc/schedule.star'
     #
     #  This python script will modify the joboption and schedule-variable values in these files
     #
     #############################################################################
 
+    ### How many micrograph movies to do in each iteration of the prep Schedule
+    'prep__do_at_most' : 50,
 
     ### General parameters
     # Pixel size in Angstroms in the input movies
-    'preprocess__importmovies__angpix' : 1.1,
+    'prep__importmovies__angpix' : 1.1,
     # Acceleration voltage (in kV)
-    'preprocess__importmovies__kV' : 300,
+    'prep__importmovies__kV' : 300,
     # Polara = 2.0; Talos/Krios = 2.7; some Cryo-ARM = 1.4 
-    'preprocess__importmovies__Cs' : 2.7,
+    'prep__importmovies__Cs' : 2.7,
 
     ### Import images (Linux wild card; movies as *.mrc, *.mrcs, *.tiff or *.tif; single-frame micrographs as *.mrc)
-    'preprocess__importmovies__fn_in_raw' : 'Movies/*.tiff',
+    'prep__importmovies__fn_in_raw' : 'Movies/*.tiff',
     # Are these multi-frame movies? Set to False for single-frame micrographs (and motion-correction will be skipped)
-    'preprocess__importmovies__is_multiframe' : True,
+    'prep__importmovies__is_multiframe' : True,
 
     ### MotionCorrection parameters
     # Dose in electrons per squared Angstrom per fraction
-    'preprocess__motioncorr__dose_per_frame' : 1.2,
+    'prep__motioncorr__dose_per_frame' : 1.2,
     # Gain-reference image in MRC format (only necessary if input movies are not yet gain-corrected, e.g. compressed TIFFs from K2)
-    'preprocess__motioncorr__fn_gain_ref' : 'Movies/gain.mrc',
+    'prep__motioncorr__fn_gain_ref' : 'Movies/gain.mrc',
     # EER fractionation. The dose rate (motioncor_doseperframe) is e/A2/fraction after this fractionation.
-    'preprocess__motioncorr__eer_grouping' : 20,
+    'prep__motioncorr__eer_grouping' : 20,
     # For super-resolution movies, bin by factor of 2 straight away, as we don't believe in super-resolution
-    'preprocess__motioncorr__bin_factor' : 1,
+    'prep__motioncorr__bin_factor' : 1,
     # Number of threads to use for Relioncor2
-    'preprocess__motioncorr__nr_threads' : 12,
+    'prep__motioncorr__nr_threads' : 16,
 
     ### CTF estimation parameters
     # Most cases won't need changes here...
-    'preprocess__ctffind__do_phaseshift' : False,
-    'preprocess__do_until_ctf' : False,
+    'prep__ctffind__do_phaseshift' : False,
+
+    # Perform any picking and processing of particles?
+    # This option isn't really used in the schedule, it only serves to store the checkbox selected from the relion_it.py GUI....
+    'proc__do_2d' : True,
+
+    ### Perform Topaz retraining of network, based on selected LoG-picked particles?
+    'proc__do_retrain_topaz' : True,
 
     ### Autopick parameters
     # Minimum and maximum diameter in Angstrom for the LoG filter
-    'preprocess__logpicker__log_diam_min' : 150,
-    'preprocess__logpicker__log_diam_max' : 180,
+    'proc__logpicker__log_diam_min' : 150,
+    'proc__logpicker__log_diam_max' : 180,
     # Use positive values (0-1) to pick fewer particles; use negative values (-1-0) to pick more particles
-    'preprocess__logpicker__log_adjust_thr' : 0.0,
-
-    #
-    # For both LoG and refs:
-    #
+    'proc__logpicker__log_adjust_thr' : 0.0,
     # Use this to remove false positives from carbon edges (useful range: 1.0-1.2, -1 to switch off)
-    'preprocess__logpicker__maxstddevnoise_autopick' : -1,
+    'proc__logpicker__maxstddevnoise_autopick' : -1,
     # Use this to remove false positives from carbon edges (useful range: -0.5-0.0; -999 to switch off)
-    'preprocess__logpicker__minavgnoise_autopick' : -999,
+    'proc__logpicker__minavgnoise_autopick' : -999,
 
 
     ### Extract parameters for Logpicker job
     # Box size of particles in the averaged micrographs (in pixels)
-    'preprocess__extract_logpick__extract_size' : 256,
+    'proc__extract_logpick__extract_size' : 256,
     # Down-scale the particles upon extraction?
-    'preprocess__extract_logpick__do_rescale' : True,
+    'proc__extract_logpick__do_rescale' : True,
     # Box size of the down-scaled particles (in pixels)
-    'preprocess__extract_logpick__rescale' : 64,
+    'proc__extract_logpick__rescale' : 64,
     ### Split parameters after logpick (this will be the maximum number of particles in the first batch)
-    'preprocess__split_logpick__split_size' : 5000,
+    'proc__split_logpick__split_size' : 5000,
 
     ### Extract parameters for Topaz job
     # Box size of particles in the averaged micrographs (in pixels)
-    'preprocess__extract_topazpick__extract_size' : 256,
+    'proc__extract_topazpick__extract_size' : 256,
     # Down-scale the particles upon extraction?
-    'preprocess__extract_topazpick__do_rescale' : True,
+    'proc__extract_topazpick__do_rescale' : True,
     # Box size of the down-scaled particles (in pixels)
-    'preprocess__extract_topazpick__rescale' : 64,
+    'proc__extract_topazpick__rescale' : 64,
     # Minimum FOM for topaz extraction
-    'preprocess__extract_topazpick__minimum_pick_fom' : -3,
+    'proc__extract_topazpick__minimum_pick_fom' : -3,
     
     ### Parameters for Topaz picking
     # Expected number of particles per micrograph
-    'refine__train_topaz__topaz_nr_particles' : 300,
+    'proc__train_topaz__topaz_nr_particles' : 300,
     # Which (single) GPU to run training on 
-    'refine__train_topaz__gpu_ids' : 0,
+    'proc__train_topaz__gpu_ids' : 0,
     # How many MPI processes to use in parallel for picking
-    'preprocess__topazpicker__nr_mpi' : 2,
+    'proc__topazpicker__nr_mpi' : 4,
 
     ### Parameters for automated 2D class selection
     # Minimum rank score for particles after LoG picking
-    'refine__select_logbatch__rank_threshold' : 0.35,
+    'proc__select_logbatch__rank_threshold' : 0.35,
     # Minimum rank score for particles after Topaz picking
-    'refine__select_rest__rank_threshold' : 0.35,
+    'proc__select_rest__rank_threshold' : 0.35,
 
     ### Parameters for 2D classification (logbatch and rest)
     # Which (single) GPU to run on for logbatch and rest
-    'refine__class2d_rest__gpu_ids' : '0,1',
-    'refine__class2d_logbatch__gpu_ids' : '0,1',
+    'proc__class2d_rest__gpu_ids' : '0,1',
+    'proc__class2d_logbatch__gpu_ids' : '0,1',
 
-    # Minimum number of particles in the first batch of logpicked particles to perform 2D classification on (this should be <= 'preprocess__split_logpick__split_size' above)
-    'refine__logbatch_size' : 5000,
+    # Minimum number of particles in the first batch of logpicked particles to perform 2D classification on (this should be <= 'proc__split_logpick__split_size' above)
+    'proc__logbatch_size' : 5000,
     # Diameter of the mask used for 2D classification (in Angstrom)
-    'refine__class2d_logbatch__particle_diameter' : 200,
-    # Stop after class2d, so skip inimodel3d and refine3d
-    'refine__do_until_class2d' : False,
+    'proc__class2d_logbatch__particle_diameter' : 200,
+
+    # Continue with Inimodel3D and Refine3D after Class2D?
+    'proc__do_3d' : True,
 
     # Options for inimodel3d and refine3d
     # Symmetry
-    'refine__inimodel3d__sym_name' : 'C1',
-    'refine__refine3d__sym_name' : 'C1',
+    'proc__inimodel3d__sym_name' : 'C1',
+    'proc__refine3d__sym_name' : 'C1',
     # Diameter of the mask used for inimodel3d and refine3d (in Angstrom)
-    'refine__inimodel3d__particle_diameter' : 200,
-    'refine__refine3d__particle_diameter' : 200,
+    'proc__inimodel3d__particle_diameter' : 200,
+    'proc__refine3d__particle_diameter' : 200,
 
 
     ### End of options
@@ -253,7 +258,7 @@ class RelionItGui(object):
         self.import_images_var = tk.StringVar()  # for data binding
         self.import_images_entry = tk.Entry(project_frame, textvariable=self.import_images_var)
         self.import_images_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
-        self.import_images_entry.insert(0, self.options['preprocess__importmovies__fn_in_raw'])
+        self.import_images_entry.insert(0, self.options['prep__importmovies__fn_in_raw'])
 
         import_button = new_browse_button(project_frame, self.import_images_var,
                                           filetypes=(('Image file', '{*.mrc, *.mrcs, *.tif, *.tiff}'), ('All files', '*')))
@@ -265,7 +270,7 @@ class RelionItGui(object):
         self.gainref_var = tk.StringVar()  # for data binding
         self.gainref_entry = tk.Entry(project_frame, textvariable=self.gainref_var)
         self.gainref_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
-        self.gainref_entry.insert(0, self.options['preprocess__motioncorr__fn_gain_ref'])
+        self.gainref_entry.insert(0, self.options['prep__motioncorr__fn_gain_ref'])
 
         new_browse_button(project_frame, self.gainref_var).grid(row=row, column=2)
         
@@ -275,7 +280,7 @@ class RelionItGui(object):
         self.superres_var = tk.IntVar()
         superres_button = tk.Checkbutton(project_frame, var=self.superres_var)
         superres_button.grid(row=row, column=1, sticky=tk.W)
-        if options['preprocess__motioncorr__bin_factor'] == '2':
+        if options['prep__motioncorr__bin_factor'] == '2':
             superres_button.select()
 
         ###
@@ -289,14 +294,14 @@ class RelionItGui(object):
         tk.Label(expt_frame, text="Voltage (kV):").grid(row=row, sticky=tk.W)
         self.voltage_entry = tk.Entry(expt_frame)
         self.voltage_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
-        self.voltage_entry.insert(0, str(options['preprocess__importmovies__kV']))
+        self.voltage_entry.insert(0, str(options['prep__importmovies__kV']))
 
         row += 1
         
         tk.Label(expt_frame, text="Cs (mm):").grid(row=row, sticky=tk.W)
         self.cs_entry = tk.Entry(expt_frame)
         self.cs_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
-        self.cs_entry.insert(0, str(options['preprocess__importmovies__Cs']))
+        self.cs_entry.insert(0, str(options['prep__importmovies__Cs']))
 
         row += 1
         
@@ -304,7 +309,7 @@ class RelionItGui(object):
         self.phaseplate_var = tk.IntVar()
         phaseplate_button = tk.Checkbutton(expt_frame, var=self.phaseplate_var)
         phaseplate_button.grid(row=row, column=1, sticky=tk.W)
-        if options['preprocess__ctffind__do_phaseshift'] == 'True':
+        if options['prep__ctffind__do_phaseshift']:
             phaseplate_button.select()
 
         row += 1
@@ -313,14 +318,14 @@ class RelionItGui(object):
         self.angpix_var = tk.StringVar()  # for data binding
         self.angpix_entry = tk.Entry(expt_frame, textvariable=self.angpix_var)
         self.angpix_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
-        self.angpix_entry.insert(0, str(options['preprocess__importmovies__angpix']))
+        self.angpix_entry.insert(0, str(options['prep__importmovies__angpix']))
 
         row += 1
         
         tk.Label(expt_frame, text=u"Exposure rate (e\u207B / \u212B\u00B2 / frame):").grid(row=row, sticky=tk.W)
         self.exposure_entry = tk.Entry(expt_frame)
         self.exposure_entry.grid(row=row, column=1, sticky=tk.W + tk.E)
-        self.exposure_entry.insert(0, str(options['preprocess__motioncorr__dose_per_frame']))
+        self.exposure_entry.insert(0, str(options['prep__motioncorr__dose_per_frame']))
 
         ###
 
@@ -334,7 +339,7 @@ class RelionItGui(object):
         self.symmetry_var = tk.StringVar()  # for data binding
         self.symmetry_entry = tk.Entry(particle_frame, textvariable=self.symmetry_var)
         self.symmetry_entry.grid(row=row, column=1, sticky=tk.W)
-        self.symmetry_entry.insert(0, str(options['refine__inimodel3d__sym_name']))
+        self.symmetry_entry.insert(0, str(options['proc__inimodel3d__sym_name']))
 
         row += 1
 
@@ -342,7 +347,7 @@ class RelionItGui(object):
         self.partspermic_var = tk.StringVar()  # for data binding
         self.partspermic_entry = tk.Entry(particle_frame, textvariable=self.partspermic_var)
         self.partspermic_entry.grid(row=row, column=1, sticky=tk.W)
-        self.partspermic_entry.insert(0, str(options['refine__train_topaz__topaz_nr_particles']))
+        self.partspermic_entry.insert(0, str(options['proc__train_topaz__topaz_nr_particles']))
 
         row += 1
 
@@ -350,14 +355,14 @@ class RelionItGui(object):
         self.particle_max_diam_var = tk.StringVar()  # for data binding
         self.particle_max_diam_entry = tk.Entry(particle_frame, textvariable=self.particle_max_diam_var)
         self.particle_max_diam_entry.grid(row=row, column=1, sticky=tk.W+tk.E, columnspan=2)
-        self.particle_max_diam_entry.insert(0, str(options['preprocess__logpicker__log_diam_max']))
+        self.particle_max_diam_entry.insert(0, str(options['proc__logpicker__log_diam_max']))
 
         row += 1
 
         tk.Label(particle_frame, text=u"Shortest diameter (\u212B):").grid(row=row, sticky=tk.W)
         self.particle_min_diam_entry = tk.Entry(particle_frame)
         self.particle_min_diam_entry.grid(row=row, column=1, sticky=tk.W+tk.E, columnspan=2)
-        self.particle_min_diam_entry.insert(0, str(options['preprocess__logpicker__log_diam_min']))
+        self.particle_min_diam_entry.insert(0, str(options['proc__logpicker__log_diam_min']))
 
         row += 1
         
@@ -365,7 +370,7 @@ class RelionItGui(object):
         self.mask_diameter_var = tk.StringVar()  # for data binding
         self.mask_diameter_entry = tk.Entry(particle_frame, textvariable=self.mask_diameter_var)
         self.mask_diameter_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
-        self.mask_diameter_entry.insert(0, str(options['refine__class2d_logbatch__particle_diameter']))
+        self.mask_diameter_entry.insert(0, str(options['proc__class2d_logbatch__particle_diameter']))
         self.mask_diameter_px = tk.Label(particle_frame, text="= NNN px")
         self.mask_diameter_px.grid(row=row, column=2,sticky=tk.W)
 
@@ -375,7 +380,7 @@ class RelionItGui(object):
         self.box_size_var = tk.StringVar()  # for data binding
         self.box_size_entry = tk.Entry(particle_frame, textvariable=self.box_size_var)
         self.box_size_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
-        self.box_size_entry.insert(0, str(options['preprocess__extract_logpick__extract_size']))
+        self.box_size_entry.insert(0, str(options['proc__extract_logpick__extract_size']))
         self.box_size_in_angstrom = tk.Label(particle_frame, text=u"= NNN \u212B")
         self.box_size_in_angstrom.grid(row=row, column=2,sticky=tk.W)
 
@@ -385,7 +390,7 @@ class RelionItGui(object):
         self.extract_small_boxsize_var = tk.StringVar()  # for data binding
         self.extract_small_boxsize_entry = tk.Entry(particle_frame, textvariable=self.extract_small_boxsize_var)
         self.extract_small_boxsize_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
-        self.extract_small_boxsize_entry.insert(0, str(options['preprocess__extract_logpick__rescale']))
+        self.extract_small_boxsize_entry.insert(0, str(options['proc__extract_logpick__rescale']))
         self.extract_angpix = tk.Label(particle_frame, text=u"= NNN \u212B/px")
         self.extract_angpix.grid(row=row, column=2,sticky=tk.W)
 
@@ -405,11 +410,20 @@ class RelionItGui(object):
 
         row = 0
 
+        tk.Label(picking_frame, text="Retrain topaz network?").grid(row=row, sticky=tk.W)
+        self.do_retrain_topaz_var = tk.IntVar()
+        retrain_topaz_button = tk.Checkbutton(picking_frame, var=self.do_retrain_topaz_var)
+        retrain_topaz_button.grid(row=row, column=1, sticky=tk.W)
+        if options['proc__do_retrain_topaz']:
+            retrain_topaz_button.select()
+
+        row += 1
+
         tk.Label(picking_frame, text="Nr particles for LoG picking:").grid(row=row, sticky=tk.W)
         self.logbatch_var = tk.StringVar()  # for data binding
         self.logbatch_entry = tk.Entry(picking_frame, textvariable=self.logbatch_var)
         self.logbatch_entry.grid(row=row, column=1, sticky=tk.W)
-        self.logbatch_entry.insert(0, str(options['preprocess__split_logpick__split_size']))
+        self.logbatch_entry.insert(0, str(options['proc__split_logpick__split_size']))
 
         row += 1
 
@@ -417,7 +431,7 @@ class RelionItGui(object):
         self.log_thresh_var = tk.StringVar()  # for data binding
         self.log_thresh_entry = tk.Entry(picking_frame, textvariable=self.log_thresh_var)
         self.log_thresh_entry.grid(row=row, column=1, sticky=tk.W)
-        self.log_thresh_entry.insert(0, str(options['preprocess__logpicker__log_adjust_thr']))
+        self.log_thresh_entry.insert(0, str(options['proc__logpicker__log_adjust_thr']))
 
         row += 1
 
@@ -425,7 +439,7 @@ class RelionItGui(object):
         self.log_classscore_var = tk.StringVar()  # for data binding
         self.log_classscore_entry = tk.Entry(picking_frame, textvariable=self.log_classscore_var)
         self.log_classscore_entry.grid(row=row, column=1, sticky=tk.W)
-        self.log_classscore_entry.insert(0, str(options['refine__select_logbatch__rank_threshold']))
+        self.log_classscore_entry.insert(0, str(options['proc__select_logbatch__rank_threshold']))
 
         row += 1
 
@@ -433,7 +447,7 @@ class RelionItGui(object):
         self.topaz_thresh_var = tk.StringVar()  # for data binding
         self.topaz_thresh_entry = tk.Entry(picking_frame, textvariable=self.topaz_thresh_var)
         self.topaz_thresh_entry.grid(row=row, column=1, sticky=tk.W)
-        self.topaz_thresh_entry.insert(0, str(options['preprocess__extract_topazpick__minimum_pick_fom']))
+        self.topaz_thresh_entry.insert(0, str(options['proc__extract_topazpick__minimum_pick_fom']))
 
         row += 1
 
@@ -441,7 +455,7 @@ class RelionItGui(object):
         self.topaz_classscore_var = tk.StringVar()  # for data binding
         self.topaz_classscore_entry = tk.Entry(picking_frame, textvariable=self.topaz_classscore_var)
         self.topaz_classscore_entry.grid(row=row, column=1, sticky=tk.W)
-        self.topaz_classscore_entry.insert(0, str(options['refine__select_rest__rank_threshold']))
+        self.topaz_classscore_entry.insert(0, str(options['proc__select_rest__rank_threshold']))
 
         ###
 
@@ -455,7 +469,7 @@ class RelionItGui(object):
         self.do_class2d_var = tk.IntVar()
         do_class2d_button = tk.Checkbutton(compute_frame, var=self.do_class2d_var)
         do_class2d_button.grid(row=row, column=1, sticky=tk.W)
-        if not options['preprocess__do_until_ctf']:
+        if options['proc__do_2d']:
             do_class2d_button.select()
 
         row += 1
@@ -464,24 +478,16 @@ class RelionItGui(object):
         self.do_refine3d_var = tk.IntVar()
         do_refine3d_button = tk.Checkbutton(compute_frame, var=self.do_refine3d_var)
         do_refine3d_button.grid(row=row, column=1, sticky=tk.W)
-        if not options['refine__do_until_class2d']:
+        if options['proc__do_3d']:
             do_refine3d_button.select()
 
         row += 1
         
-        tk.Label(compute_frame, text="Nr CPU cores:").grid(row=row, sticky=tk.W)
-        self.nthreads_var = tk.StringVar()  # for data binding
-        self.nthreads_entry = tk.Entry(compute_frame, textvariable=self.nthreads_var)
-        self.nthreads_entry.grid(row=row, column=1, sticky=tk.W)
-        self.nthreads_entry.insert(0, str(options['preprocess__motioncorr__nr_threads']))
-
-        row += 1
-
         tk.Label(compute_frame, text="GPUs (comma-separated):").grid(row=row, sticky=tk.W)
         self.gpu_var = tk.StringVar()  # for data binding
         self.gpu_entry = tk.Entry(compute_frame, textvariable=self.gpu_var)
         self.gpu_entry.grid(row=row, column=1, sticky=tk.W)
-        self.gpu_entry.insert(0, str(options['refine__class2d_rest__gpu_ids']))
+        self.gpu_entry.insert(0, str(options['proc__class2d_rest__gpu_ids']))
 
          ### Add logic to the box size boxes
 
@@ -539,6 +545,16 @@ class RelionItGui(object):
                 # Can't update the downscaled pixel size unless the downscaled box size is valid
                 self.extract_angpix.config(text=u"= NNN \u212B/px")
 
+        def update_logpick_status(*args_ignored, **kwargs_ignored):
+            if self.get_var_as_bool(self.do_retrain_topaz_var):
+                self.logbatch_entry.config(state=tk.NORMAL)
+                self.log_thresh_entry.config(state=tk.NORMAL)
+                self.log_classscore_entry.config(state=tk.NORMAL)
+            else:
+                self.logbatch_entry.config(state=tk.DISABLED)
+                self.log_thresh_entry.config(state=tk.DISABLED)
+                self.log_classscore_entry.config(state=tk.DISABLED)
+
         def update_box_sizes(*args_ignored, **kwargs_ignored):
             # Always activate entry boxes - either we're activating them anyway, or we need to edit the text.
             # For text editing we need to activate the box first then deactivate again afterwards.
@@ -576,6 +592,8 @@ class RelionItGui(object):
         self.particle_max_diam_var.trace('w', update_box_sizes)
         auto_boxsize_button.config(command=update_box_sizes)
 
+        retrain_topaz_button.config(command=update_logpick_status)
+
         button_frame = tk.Frame(right_frame)
         button_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
 
@@ -587,6 +605,8 @@ class RelionItGui(object):
 
         # Show initial pixel sizes
         update_box_sizes()
+        # Show initial logpick status
+        update_logpick_status()
 
     def get_var_as_bool(self, var):
         """Helper function to convert a Tk IntVar (linked to a checkbox) to a boolean value"""
@@ -606,156 +626,145 @@ class RelionItGui(object):
         opts = self.options
         warnings = []
 
-        opts['preprocess__do_until_ctf'] = not self.get_var_as_bool(self.do_class2d_var)
-
-        opts['refine__do_until_class2d'] = not self.get_var_as_bool(self.do_refine3d_var)
+        opts['proc__do_2d'] = self.get_var_as_bool(self.do_class2d_var)
+        opts['proc__do_3d'] = self.get_var_as_bool(self.do_refine3d_var)
+        opts['proc__do_retrain_topaz'] = self.get_var_as_bool(self.do_retrain_topaz_var)
+        opts['prep__ctffind__do_phaseshift'] = self.get_var_as_bool(self.phaseplate_var)
 
         try:
-            opts['preprocess__importmovies__kV'] = float(self.voltage_entry.get())
+            opts['prep__importmovies__kV'] = float(self.voltage_entry.get())
         except ValueError:
             raise ValueError("Voltage must be a number")
-        if opts['preprocess__importmovies__kV'] <= 0.0:
+        if opts['prep__importmovies__kV'] <= 0.0:
             warnings.append("- Voltage should be a positive number")
 
         try:
-            opts['preprocess__importmovies__Cs'] = float(self.cs_entry.get())
+            opts['prep__importmovies__Cs'] = float(self.cs_entry.get())
         except ValueError:
             raise ValueError("Cs must be a number")
 
-        opts['preprocess__ctffind__do_phaseshift'] = self.get_var_as_bool(self.phaseplate_var)
-
         try:
-            opts['preprocess__importmovies__angpix'] = float(self.angpix_entry.get())
+            opts['prep__importmovies__angpix'] = float(self.angpix_entry.get())
         except ValueError:
             raise ValueError("Pixel size must be a number")
-        if opts['preprocess__importmovies__angpix'] <= 0.0:
+        if opts['prep__importmovies__angpix'] <= 0.0:
             warnings.append("- Pixel size should be a positive number")
 
         try:
-            opts['preprocess__motioncorr__nr_threads'] = int(self.nthreads_entry.get())
-        except ValueError:
-            raise ValueError("Number of threads for RelionCor2 must be a number")
-
-        try:
-            opts['preprocess__motioncorr__dose_per_frame'] = float(self.exposure_entry.get())
+            opts['prep__motioncorr__dose_per_frame'] = float(self.exposure_entry.get())
         except ValueError:
             raise ValueError("Exposure rate must be a number")
-        if opts['preprocess__motioncorr__dose_per_frame'] <= 0.0:
+        if opts['prep__motioncorr__dose_per_frame'] <= 0.0:
             warnings.append("- Exposure rate should be a positive number")
 
         if self.get_var_as_bool(self.superres_var):
-            opts['preprocess__motioncorr__bin_factor'] = 2;
+            opts['prep__motioncorr__bin_factor'] = 2;
         else:
-            opts['preprocess__motioncorr__bin_factor'] = 1;
+            opts['prep__motioncorr__bin_factor'] = 1;
 
         try:
-            opts['preprocess__logpicker__log_diam_max'] = float(self.particle_max_diam_entry.get())
-            opts['refine__train_topaz__topaz_particle_diameter'] = float(self.particle_max_diam_entry.get())
-            opts['preprocess__topazpicker__topaz_particle_diameter'] = float(self.particle_max_diam_entry.get())
+            opts['proc__logpicker__log_diam_max'] = float(self.particle_max_diam_entry.get())
+            opts['proc__train_topaz__topaz_particle_diameter'] = float(self.particle_max_diam_entry.get())
+            opts['proc__topazpicker__topaz_particle_diameter'] = float(self.particle_max_diam_entry.get())
         except ValueError:
-            if len(self.particle_max_diam_entry.get()) == 0 and opts['preprocess__do_until_ctf'] == 'True':
+            if len(self.particle_max_diam_entry.get()) == 0 and (not self.get_var_as_bool(self.do_class2d_var) or not self.get_var_as_bool(self.do_retrain_topaz_var)):
                 # This was left blank and won't be used, set to zero to avoid errors in calculations later
-                opts['preprocess__logpicker__log_diam_max'] = 0.0
+                opts['proc__logpicker__log_diam_max'] = 0.0
             else:
                 raise ValueError("Particle longest diameter must be a number")
 
         try:
-            opts['preprocess__logpicker__log_diam_min'] = float(self.particle_min_diam_entry.get())
+            opts['proc__logpicker__log_diam_min'] = float(self.particle_min_diam_entry.get())
         except ValueError:
-            if len(self.particle_min_diam_entry.get()) == 0 and opts['preprocess__do_until_ctf'] == 'True':
+            if len(self.particle_min_diam_entry.get()) == 0 and (not self.get_var_as_bool(self.do_class2d_var) or not self.get_var_as_bool(self.do_retrain_topaz_var)):
                 # This was left blank and won't be used, set to zero to avoid errors in calculations later
-                opts['preprocess__logpicker__log_diam_min'] = 0.0
+                opts['proc__logpicker__log_diam_min'] = 0.0
             else:
                 raise ValueError("Particle shortest diameter must be a number")
 
         try:
-            opts['refine__class2d_logbatch__particle_diameter'] = float(self.mask_diameter_entry.get())
-            opts['refine__class2d_rest__particle_diameter'] = float(self.mask_diameter_entry.get())
-            opts['refine__inimodel3d__particle_diameter'] = float(self.mask_diameter_entry.get())
-            opts['refine__refine3d__particle_diameter'] = float(self.mask_diameter_entry.get())
+            opts['proc__class2d_logbatch__particle_diameter'] = float(self.mask_diameter_entry.get())
+            opts['proc__class2d_rest__particle_diameter'] = float(self.mask_diameter_entry.get())
+            opts['proc__inimodel3d__particle_diameter'] = float(self.mask_diameter_entry.get())
+            opts['proc__refine3d__particle_diameter'] = float(self.mask_diameter_entry.get())
         except ValueError:
             raise ValueError("Mask diameter must be a number")
-        if opts['refine__class2d_logbatch__particle_diameter'] <= 0:
+        if opts['proc__class2d_logbatch__particle_diameter'] <= 0:
             warnings.append("- Mask diameter should be a positive number")
 
         try:
-            opts['preprocess__extract_logpick__extract_size'] = int(self.box_size_entry.get())
-            opts['preprocess__extract_topazpick__extract_size'] = int(self.box_size_entry.get())
+            opts['proc__extract_logpick__extract_size'] = int(self.box_size_entry.get())
+            opts['proc__extract_topazpick__extract_size'] = int(self.box_size_entry.get())
         except ValueError:
             raise ValueError("Box size must be a number")
-        if opts['preprocess__extract_logpick__extract_size'] <= 0:
+        if opts['proc__extract_logpick__extract_size'] <= 0:
             warnings.append("- Box size should be a positive number")
 
         try:
-            opts['preprocess__extract_logpick__rescale'] = int(self.extract_small_boxsize_entry.get())
-            opts['preprocess__extract_logpick__do_rescale'] = True
-            opts['preprocess__extract_topazpick__rescale'] = int(self.extract_small_boxsize_entry.get())
-            opts['preprocess__extract_topazpick__do_rescale'] = True
+            opts['proc__extract_logpick__rescale'] = int(self.extract_small_boxsize_entry.get())
+            opts['proc__extract_logpick__do_rescale'] = True
+            opts['proc__extract_topazpick__rescale'] = int(self.extract_small_boxsize_entry.get())
+            opts['proc__extract_topazpick__do_rescale'] = True
         except ValueError:
             raise ValueError("Down-sampled box size must be a number")
-        if opts['preprocess__extract_logpick__rescale'] <= 0:
+        if opts['proc__extract_logpick__rescale'] <= 0:
             warnings.append("- Down-sampled box size should be a positive number")
 
-        opts['preprocess__importmovies__fn_in_raw'] = self.import_images_entry.get()
-        if opts['preprocess__importmovies__fn_in_raw'].startswith(('/', '..')):
+        opts['prep__importmovies__fn_in_raw'] = self.import_images_entry.get()
+        if opts['prep__importmovies__fn_in_raw'].startswith(('/', '..')):
             warnings.append("- Movies should be located inside the project directory")
-        if '*' not in opts['preprocess__importmovies__fn_in_raw']:
+        if '*' not in opts['prep__importmovies__fn_in_raw']:
             warnings.append("- Pattern for input movies should normally contain a '*' to select more than one file")
 
-        opts['preprocess__motioncorr__fn_gain_ref'] = self.gainref_entry.get()
-        if len(opts['preprocess__motioncorr__fn_gain_ref']) > 0 and not os.path.isfile(opts['preprocess__motioncorr__fn_gain_ref']):
-            warnings.append("- Gain reference file '{}' does not exist".format(opts['preprocess__motioncorr__fn_gain_ref']))
+        opts['prep__motioncorr__fn_gain_ref'] = self.gainref_entry.get()
+        if len(opts['prep__motioncorr__fn_gain_ref']) > 0 and not os.path.isfile(opts['prep__motioncorr__fn_gain_ref']):
+            warnings.append("- Gain reference file '{}' does not exist".format(opts['prep__motioncorr__fn_gain_ref']))
 
         try:
-            opts['preprocess__split_logpick__split_size'] = int(self.logbatch_entry.get())
-            opts['refine__logbatch_size'] = int(self.logbatch_entry.get())
+            opts['proc__split_logpick__split_size'] = int(self.logbatch_entry.get())
+            opts['proc__logbatch_size'] = int(self.logbatch_entry.get())
         except ValueError:
             raise ValueError("Nr particles for topaz training must be a number")
-        if opts['preprocess__split_logpick__split_size'] <= 0:
+        if opts['proc__split_logpick__split_size'] <= 0:
             warnings.append("- Nr particles for topaz training should be a positive number")
 
         try:
-            opts['preprocess__logpicker__log_adjust_thr'] = float(self.log_thresh_var.get())
+            opts['proc__logpicker__log_adjust_thr'] = float(self.log_thresh_var.get())
         except ValueError:
             raise ValueError("LoG picking threshold must be a number")
 
         try:
-            opts['refine__select_logbatch__rank_threshold'] = float(self.log_classscore_var.get())
+            opts['proc__select_logbatch__rank_threshold'] = float(self.log_classscore_var.get())
         except ValueError:
             raise ValueError("LoG class2d score must be a number")
 
         try:
-            opts['preprocess__extract_topazpick__minimum_pick_fom'] = float(self.topaz_thresh_var.get())
+            opts['proc__extract_topazpick__minimum_pick_fom'] = float(self.topaz_thresh_var.get())
         except ValueError:
             raise ValueError("Topaz picking threshold must be a number")
 
         try:
-            opts['refine__select_rest__rank_threshold'] = float(self.topaz_classscore_var.get())
+            opts['proc__select_rest__rank_threshold'] = float(self.topaz_classscore_var.get())
         except ValueError:
             raise ValueError("Topaz class2d score must be a number")
 
         try:
-            opts['refine__train_topaz__topaz_nr_particles'] = int(self.partspermic_entry.get())
-            opts['preprocess__topazpicker__topaz_nr_particles'] = int(self.partspermic_entry.get())
+            opts['proc__train_topaz__topaz_nr_particles'] = int(self.partspermic_entry.get())
+            opts['proc__topazpicker__topaz_nr_particles'] = int(self.partspermic_entry.get())
         except ValueError:
             raise ValueError("Nr particles per micrograph must be a number")
-        if opts['refine__train_topaz__topaz_nr_particles'] <= 0:
+        if opts['proc__train_topaz__topaz_nr_particles'] <= 0:
             warnings.append("- Nr particles per micrograph should be a positive number")
 
-        opts['refine__inimodel3d__sym_name'] = self.symmetry_entry.get()
-        opts['refine__refine3d__sym_name'] = self.symmetry_entry.get()
+        opts['proc__inimodel3d__sym_name'] = self.symmetry_entry.get()
+        opts['proc__refine3d__sym_name'] = self.symmetry_entry.get()
 
-        try:
-            opts['preprocess__topazpicker__nr_mpi'] = int(self.mpi_topaz_entry.get())
-        except ValueError:
-            raise ValueError("Nr MPI for topaz picking must be a single number")
-        
-        opts['refine__train_topaz__gpu_ids'] = (self.gpu_entry.get()).split(',')[0]
-        opts['refine__class2d_logbatch__gpu_ids'] = self.gpu_entry.get()
-        opts['refine__class2d_rest__gpu_ids'] = self.gpu_entry.get()
-        opts['refine__inimodel3d__gpu_ids'] = self.gpu_entry.get()
-        opts['refine__refine3d__gpu_ids'] = (self.gpu_entry.get()).replace(',',':')
-
+        # Set GPU IDs in all jobs
+        opts['proc__train_topaz__gpu_ids'] = (self.gpu_entry.get()).split(',')[0]
+        opts['proc__class2d_logbatch__gpu_ids'] = self.gpu_entry.get()
+        opts['proc__class2d_rest__gpu_ids'] = self.gpu_entry.get()
+        opts['proc__inimodel3d__gpu_ids'] = self.gpu_entry.get()
+        opts['proc__refine3d__gpu_ids'] = (self.gpu_entry.get()).replace(',',':')
 
         return warnings
 
@@ -835,25 +844,25 @@ class RelionItGui(object):
  
 def run_scheduler(options, do_gui):
 
-    command = 'relion_scheduler --schedule preprocess --reset &'
+    command = 'relion_scheduler --schedule prep --reset &'
     print(' RELION_IT: excuting: ', command)
     os.system(command)
 
-    command = 'relion_scheduler --schedule preprocess --run --pipeline_control Schedules/preprocess/ >> Schedules/preprocess/run.out 2>> Schedules/preprocess/run.err &'
+    command = 'relion_scheduler --schedule prep --run --pipeline_control Schedules/prep/ >> Schedules/prep/run.out 2>> Schedules/prep/run.err &'
     print(' RELION_IT: excuting: ', command)
     os.system(command)
 
-    if not options['preprocess__do_until_ctf'] == 'True':
+    if options['proc__do_2d']:
 
-        command = 'relion_scheduler --schedule refine --reset &'
+        command = 'relion_scheduler --schedule proc --reset &'
         print(' RELION_IT: excuting: ', command)
         os.system(command)
 
-        command = 'relion_scheduler --schedule refine --run  --pipeline_control Schedules/refine/ >> Schedules/refine/run.out 2>> Schedules/refine/run.err  &'
+        command = 'relion_scheduler --schedule proc --run  --pipeline_control Schedules/proc/ >> Schedules/proc/run.out 2>> Schedules/proc/run.err  &'
         print(' RELION_IT: excuting: ', command)
         os.system(command)
 
-    print(' RELION_IT: Now monitor the preprocess and refine Schedules from the RELION GUI ...')
+    print(' RELION_IT: Now monitor the prep (and proc) Schedules from the RELION GUI ...')
 
     if do_gui:
         command = 'relion --do_projdir &'
@@ -906,11 +915,16 @@ def main():
         print(' RELION_IT: reading options from {}'.format(user_opt_file))
         with open(user_opt_file) as file: 
             user_opts = collections.OrderedDict(ast.literal_eval(file.read()))
+            for k,v in user_opts.items():
+                if v == 'True':
+                    user_opts[k] = True
+                elif v == 'False':
+                    user_opts[k] = False
             opts.update(user_opts)
 
     # Copy Schedules over from RELION directory if they dont exit
-    copy_schedule('preprocess')
-    copy_schedule('refine')
+    copy_schedule('prep')
+    copy_schedule('proc')
 
     if args.nogui:
         run_scheduler(opts, False)
