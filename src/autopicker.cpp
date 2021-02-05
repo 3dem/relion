@@ -3014,8 +3014,7 @@ void AutoPicker::autoPickTopazOneMicrograph(FileName &fn_mic, int rank)
 	fh << "#!" << fn_shell  << std::endl;
 	fh << fn_topaz_exe << " extract ";
 	fh << " -r " << integerToString(topaz_radius);
-	if (topaz_device_id >= 0)
-		fh << " -d " << integerToString(topaz_device_id);
+	fh << " -d " << integerToString(topaz_device_id);
 	fh << " -x " << integerToString(topaz_downscale);
 	if (topaz_model != "")
 		fh << " -m " << topaz_model;
