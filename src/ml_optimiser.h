@@ -339,12 +339,6 @@ public:
 	bool do_grad;
 	bool do_grad_next_iter;
 
-	// Track first gradient moment
-	bool do_mom1;
-
-	// Track second gradient moment
-	bool do_mom2;
-
 	// Number of iterations at the end of a gradient refinement using Expectation-Maximization
 	int grad_em_iters;
 
@@ -829,8 +823,6 @@ public:
 		class_inactivity_threshold(0),
 		gradient_refine(false),
 		do_grad(false),
-		do_mom1(false),
-		do_mom2(false),
 		grad_em_iters(0),
 		grad_ini_iter(0),
 		grad_ini_frac(0),

@@ -2102,9 +2102,9 @@ void MlOptimiserMpi::maximization()
 									(wsum_model.BPref[ith_recons]).reweightGrad();
 									(wsum_model.BPref[ith_recons]).applyMomenta(
 											mymodel.Igrad1[ith_recons],
-											do_mom1 ? 0.9 : 0.,
+											0.9,
 											mymodel.Igrad2[ith_recons],
-											do_mom2 ? 0.999 : 0.,
+											0.999,
 											iter == 1);
 								}
 
@@ -2245,9 +2245,9 @@ void MlOptimiserMpi::maximization()
 										(wsum_model.BPref[ith_recons]).reweightGrad();
 										(wsum_model.BPref[ith_recons]).applyMomenta(
 												mymodel.Igrad1[ith_recons],
-												do_mom1 ? 0.9 : 0.,
+												0.9,
 												mymodel.Igrad2[ith_recons],
-												do_mom2 ? 0.999 : 0.,
+												0.999,
 												iter == 1);
 									}
 
@@ -2397,10 +2397,14 @@ void MlOptimiserMpi::maximization()
 #endif
 									node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.Iref[ith_recons]), MULTIDIM_SIZE(mymodel.Iref[ith_recons]), MY_MPI_DOUBLE, recv_node, MPITAG_IMAGE, MPI_COMM_WORLD);
 
-									if (do_mom1)
-										node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.Igrad1[ith_recons]), MULTIDIM_SIZE(mymodel.Igrad1[ith_recons]), MY_MPI_DOUBLE, recv_node, MPITAG_IMAGE, MPI_COMM_WORLD);
-									if (do_mom2)
-										node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.Igrad2[ith_recons]), MULTIDIM_SIZE(mymodel.Igrad2[ith_recons]), MY_MPI_DOUBLE, recv_node, MPITAG_IMAGE, MPI_COMM_WORLD);
+									if (do_grad) {
+										node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.Igrad1[ith_recons]),
+										                      MULTIDIM_SIZE(mymodel.Igrad1[ith_recons]), MY_MPI_DOUBLE,
+										                      recv_node, MPITAG_IMAGE, MPI_COMM_WORLD);
+										node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.Igrad2[ith_recons]),
+										                      MULTIDIM_SIZE(mymodel.Igrad2[ith_recons]), MY_MPI_DOUBLE,
+										                      recv_node, MPITAG_IMAGE, MPI_COMM_WORLD);
+									}
 
 									node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[ith_recons]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[ith_recons]), MY_MPI_DOUBLE, recv_node, MPITAG_METADATA, MPI_COMM_WORLD);
 									node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.fourier_coverage_class[ith_recons]), MULTIDIM_SIZE(mymodel.fourier_coverage_class[ith_recons]), MY_MPI_DOUBLE, recv_node, MPITAG_METADATA, MPI_COMM_WORLD);
@@ -2411,10 +2415,14 @@ void MlOptimiserMpi::maximization()
 								{
 									node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.Iref[ith_recons]), MULTIDIM_SIZE(mymodel.Iref[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_IMAGE, MPI_COMM_WORLD, status);
 
-									if (do_mom1)
-										node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.Igrad1[ith_recons]), MULTIDIM_SIZE(mymodel.Igrad1[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_IMAGE, MPI_COMM_WORLD, status);
-									if (do_mom2)
-										node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.Igrad2[ith_recons]), MULTIDIM_SIZE(mymodel.Igrad2[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_IMAGE, MPI_COMM_WORLD, status);
+									if (do_grad) {
+										node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.Igrad1[ith_recons]),
+										                      MULTIDIM_SIZE(mymodel.Igrad1[ith_recons]), MY_MPI_DOUBLE,
+										                      reconstruct_rank, MPITAG_IMAGE, MPI_COMM_WORLD, status);
+										node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.Igrad2[ith_recons]),
+										                      MULTIDIM_SIZE(mymodel.Igrad2[ith_recons]), MY_MPI_DOUBLE,
+										                      reconstruct_rank, MPITAG_IMAGE, MPI_COMM_WORLD, status);
+									}
 
 									node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[ith_recons]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_METADATA, MPI_COMM_WORLD, status);
 									node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.fourier_coverage_class[ith_recons]), MULTIDIM_SIZE(mymodel.fourier_coverage_class[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_METADATA, MPI_COMM_WORLD, status);
@@ -2439,12 +2447,14 @@ void MlOptimiserMpi::maximization()
 				// Broadcast the reconstructed references to all other MPI nodes
 				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Iref[ith_recons]),
 						MULTIDIM_SIZE(mymodel.Iref[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
-				if (do_mom1)
+				if (do_grad) {
 					node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Igrad1[ith_recons]),
-						MULTIDIM_SIZE(mymodel.Igrad1[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
-				if (do_mom2)
+					                       MULTIDIM_SIZE(mymodel.Igrad1[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank,
+					                       MPI_COMM_WORLD);
 					node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Igrad2[ith_recons]),
-						MULTIDIM_SIZE(mymodel.Igrad2[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
+					                       MULTIDIM_SIZE(mymodel.Igrad2[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank,
+					                       MPI_COMM_WORLD);
+				}
 				// Broadcast the data_vs_prior spectra to all other MPI nodes
 				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[ith_recons]),
 						MULTIDIM_SIZE(mymodel.data_vs_prior_class[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);

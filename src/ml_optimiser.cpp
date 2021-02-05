@@ -157,6 +157,8 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 			if (mymodel.nr_bodies > 1)
 				REPORT_ERROR("ERROR: cannot change padding factor in a continuation of a multi-body refinement...");
 			mymodel.padding_factor = textToInteger(fnt);
+			if (gradient_refine)
+				mymodel.padding_factor = 1;
 			// Re-initialise the model to get the right padding factors in the PPref vectors
 			mymodel.initialise();
 		}
@@ -798,6 +800,7 @@ if(do_gpu)
 	mymodel.padding_factor = textToFloat(parser.getOption("--pad", "Oversampling factor for the Fourier transforms of the references", "2"));
 	if (gradient_refine)
 		mymodel.padding_factor = 1;
+
 	ref_angpix = textToFloat(parser.getOption("--ref_angpix", "Pixel size (in A) for the input reference (default is to read from header)", "-1."));
 	mymodel.interpolator = (parser.checkOption("--NN", "Perform nearest-neighbour instead of linear Fourier-space interpolation?")) ? NEAREST_NEIGHBOUR : TRILINEAR;
 	mymodel.r_min_nn = textToInteger(parser.getOption("--r_min_nn", "Minimum number of Fourier shells to perform linear Fourier-space interpolation", "10"));
@@ -1660,11 +1663,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 #endif
 
-	if (gradient_refine) {
-		do_mom1 = true;
-		do_mom2 = true;
-	}
-
 	if (nr_iter < 0) {
 		if (gradient_refine)
 			nr_iter = 200;
@@ -1744,7 +1742,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		mymodel.initialiseFromImages(
 				fn_ref, is_3d_model, mydata,
 				do_average_unaligned, do_generate_seeds,refs_are_ctf_corrected,
-				ref_angpix, gradient_refine, do_trust_ref_size, do_mom1, do_mom2, (rank==0));
+				ref_angpix, gradient_refine, do_trust_ref_size, (rank==0));
 	}
 
 	if (mymodel.nr_classes > 1 && do_split_random_halves)
@@ -2131,10 +2129,8 @@ void MlOptimiser::initialiseGeneral(int rank)
 			if (clear) {
 				mymodel.pdf_class[i] = 0.;
 				mymodel.Iref[i] *= 0.;
-				if (do_mom1)
-					mymodel.Igrad1[i].initZeros();
-				if (do_mom2)
-					mymodel.Igrad2[i].initZeros();
+				mymodel.Igrad1[i].initZeros();
+				mymodel.Igrad2[i].initZeros();
 			}
 		}
 	}
@@ -4687,9 +4683,9 @@ int MlOptimiser::maximizationGradientParameters() {
 					wsum_model.BPref[iclass].reweightGrad();
 					(wsum_model.BPref[iclass]).applyMomenta(
 							mymodel.Igrad1[iclass],
-							do_mom1 ? 0.9 : 0.,
+							0.9,
 							mymodel.Igrad2[iclass],
-							do_mom2 ? 0.999 : 0.,
+							0.999,
 							iter == 1);
 
 					RFLOAT avg_grad(0);

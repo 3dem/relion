@@ -2769,6 +2769,7 @@ High-resolution refinements (e.g. ribosomes or other large complexes in 3D auto-
 	joboptions["highres_limit"] = JobOption("Limit resolution E-step to (A): ", -1, -1, 20, 1, "If set to a positive number, then the expectation step (i.e. the alignment) will be done only including the Fourier components up to this resolution (in Angstroms). \
 This is useful to prevent overfitting, as the classification runs in RELION are not to be guaranteed to be 100% overfitting-free (unlike the 3D auto-refine with its gold-standard FSC). In particular for very difficult data sets, e.g. of very small or featureless particles, this has been shown to give much better class averages. \
 In such cases, values in the range of 7-12 Angstroms have proven useful.");
+	joboptions["do_center"] = JobOption("Center class averages?", true, "If set to Yes, every iteration the class average images will be centered on their center-of-mass. This will only work for positive signals, so the particles should be white.");
 
 	joboptions["dont_skip_align"] = JobOption("Perform image alignment?", true, "If set to No, then rather than \
 performing both alignment and classification, only classification will be performed. This allows the use of very focused masks.\
@@ -2934,6 +2935,10 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 
 	}
 
+	if (joboptions["do_center"].getBoolean())
+	{
+		command += " --center_classes ";
+	}
 	// Sampling
 	int iover = 1;
 	command += " --oversampling " + floatToString((float)iover);
