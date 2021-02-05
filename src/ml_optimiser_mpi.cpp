@@ -2121,7 +2121,7 @@ void MlOptimiserMpi::maximization()
 							{
 								(wsum_model.BPref[ith_recons]).reconstruct(
 										mymodel.Iref[ith_recons],
-										gridding_nr_iter,
+										gradient_refine ? 0: gridding_nr_iter,
 										do_map,
 										mymodel.tau2_class[ith_recons],
 										mymodel.tau2_fudge_factor,
@@ -2263,7 +2263,7 @@ void MlOptimiserMpi::maximization()
 								else
 								{
 									(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons],
-											gridding_nr_iter,
+                                            gradient_refine ? 0: gridding_nr_iter,
 											do_map,
 											mymodel.tau2_class[ith_recons],
 											mymodel.tau2_fudge_factor,

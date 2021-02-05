@@ -4350,7 +4350,7 @@ void MlOptimiser::maximization()
 					}
 					else
 						(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass],
-								gridding_nr_iter,
+								gradient_refine ? 0: gridding_nr_iter,
 								do_map,
 								mymodel.tau2_class[iclass],
 								mymodel.tau2_fudge_factor,

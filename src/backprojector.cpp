@@ -1453,7 +1453,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	} //end if do_map
 
 	RCTOC(ReconTimer,ReconS_2_5);
-	if (skip_gridding)
+	if (skip_gridding || max_iter_preweight <= 0)
 	{
 		RCTIC(ReconTimer,ReconS_3);
 		Fconv.initZeros(); // to remove any stuff from the input volume
