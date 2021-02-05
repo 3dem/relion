@@ -2897,7 +2897,8 @@ void MlOptimiser::iterate()
 			}
 		}
 
-		if (do_center_classes && !do_grad_next_iter)
+		// Skip center classes in the final stages of gradient descent steps
+		if (do_center_classes && (!do_grad_next_iter || iter < grad_ini_iter + grad_inbetween_iter))
 			centerClasses();
 
 		// Directly use fn_out, without "_it" specifier, so unmasked refs will be overwritten at every iteration
@@ -4405,8 +4406,43 @@ void MlOptimiser::centerClasses()
 			my_com *= offset_range_pix/my_com.module();
 		my_com *= -1;
 
+		// Prevent small "vibrations", which seem to cause mismatches between momenta and ref
+		if (do_grad &&
+		    my_com.module() < XMIPP_MAX(0.01 * particle_diameter / mymodel.pixel_size, 2))
+			continue;
+
 		MultidimArray<RFLOAT> aux = mymodel.Iref[iclass];
 		translate(aux, mymodel.Iref[iclass], my_com, DONT_WRAP, (RFLOAT)0.);
+
+//		std::cout << "CENTER CLASS " << iclass << " " << XX(my_com) << " " << YY(my_com) << " " << ZZ(my_com) << std::endl;
+
+		if (do_grad) {
+			MultidimArray<Complex > aux = mymodel.Igrad1[iclass];
+			RFLOAT x(XX(my_com)), y(YY(my_com)), z(0);
+			if (mymodel.Iref[iclass].getDim() == 2)
+				z = ZZ(my_com);
+			shiftImageInContinuousFourierTransform(aux, mymodel.Igrad1[iclass],
+			                                       mymodel.ori_size, x, y, z);
+
+			// Reset mom2 but preserve its power
+			MultidimArray<RFLOAT> counter, power;
+			power.initZeros(mymodel.Igrad2[iclass].xdim*3);
+			counter.initZeros(mymodel.Igrad2[iclass].xdim*3);
+
+			FOR_ALL_ELEMENTS_IN_ARRAY3D(mymodel.Igrad2[iclass]) {
+				int ires = ROUND(sqrt((RFLOAT) (k * k + i * i + j * j)));
+				DIRECT_A1D_ELEM(power, ires) += sqrt(norm(A3D_ELEM(mymodel.Igrad2[iclass], k, i, j)));
+				DIRECT_A1D_ELEM(counter, ires) += 1;
+			}
+
+			mymodel.Igrad2[iclass].initZeros();
+
+			FOR_ALL_ELEMENTS_IN_ARRAY3D(mymodel.Igrad2[iclass]) {
+				int ires = ROUND(sqrt((RFLOAT) (k * k + i * i + j * j)));
+				RFLOAT v =  DIRECT_A1D_ELEM(power, ires)/ DIRECT_A1D_ELEM(counter, ires);
+				A3D_ELEM(mymodel.Igrad2[iclass], k, i, j) = v;
+			}
+		}
 	}
 }
 
