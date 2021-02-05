@@ -19,7 +19,7 @@ ctf_intact_first_peak         No
 do_bimodal_psi        Yes 
 do_combine_thru_disc         No 
 do_ctf_correction        Yes 
-   do_grad         Yes 
+   do_grad         No
   do_helix         No 
 do_parallel_discio        Yes 
 do_preread_images         No 
@@ -34,8 +34,8 @@ helical_rise       4.75
 helical_tube_outer_diameter        200 
 highres_limit         -1 
 min_dedicated         24 
-nr_classes        100 
-   nr_iter        100 
+nr_classes        50 
+   nr_iter        25 
     nr_mpi          1 
    nr_pool         30 
 nr_threads         12 

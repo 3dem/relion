@@ -95,7 +95,7 @@ RelionItOptions = {
     #############################################################################
     #
     # Change the parameters below to reflect your experiment
-    # Use double underscores to separate SCHEDULENAME__JOBNAME_JOBOPTION
+    # Use double underscores to separate SCHEDULENAME__JOBNAME__JOBOPTION
     #
     # E.g. for SCHEDULENAME=preprocess, JOBNAME=importmovies and JOBOPTION=angpix
     #  'preprocess__importmovies__angpix' defines the value for the 'angpix' option in the file 'Schedules/preprocess/importmovies/job.star'
@@ -163,7 +163,7 @@ RelionItOptions = {
     # Box size of the down-scaled particles (in pixels)
     'preprocess__extract_logpick__rescale' : 64,
     ### Split parameters after logpick (this will be the maximum number of particles in the first batch)
-    'preprocess__split_logpick__split_size' : 10000,
+    'preprocess__split_logpick__split_size' : 5000,
 
     ### Extract parameters for Topaz job
     # Box size of particles in the averaged micrographs (in pixels)
@@ -195,7 +195,7 @@ RelionItOptions = {
     'refine__class2d_logbatch__gpu_ids' : '0,1',
 
     # Minimum number of particles in the first batch of logpicked particles to perform 2D classification on (this should be <= 'preprocess__split_logpick__split_size' above)
-    'refine__logbatch_size' : 10000,
+    'refine__logbatch_size' : 5000,
     # Diameter of the mask used for 2D classification (in Angstrom)
     'refine__class2d_logbatch__particle_diameter' : 200,
     # Stop after class2d, so skip inimodel3d and refine3d
@@ -455,7 +455,7 @@ class RelionItGui(object):
         self.do_class2d_var = tk.IntVar()
         do_class2d_button = tk.Checkbutton(compute_frame, var=self.do_class2d_var)
         do_class2d_button.grid(row=row, column=1, sticky=tk.W)
-        if options['preprocess__do_until_ctf'] == 'False':
+        if not options['preprocess__do_until_ctf']:
             do_class2d_button.select()
 
         row += 1
@@ -464,24 +464,16 @@ class RelionItGui(object):
         self.do_refine3d_var = tk.IntVar()
         do_refine3d_button = tk.Checkbutton(compute_frame, var=self.do_refine3d_var)
         do_refine3d_button.grid(row=row, column=1, sticky=tk.W)
-        if options['refine__do_until_class2d'] == 'False':
+        if not options['refine__do_until_class2d']:
             do_refine3d_button.select()
 
         row += 1
         
-        tk.Label(compute_frame, text="Nr threads for RelionCor2:").grid(row=row, sticky=tk.W)
+        tk.Label(compute_frame, text="Nr CPU cores:").grid(row=row, sticky=tk.W)
         self.nthreads_var = tk.StringVar()  # for data binding
         self.nthreads_entry = tk.Entry(compute_frame, textvariable=self.nthreads_var)
         self.nthreads_entry.grid(row=row, column=1, sticky=tk.W)
         self.nthreads_entry.insert(0, str(options['preprocess__motioncorr__nr_threads']))
-
-        row += 1
-
-        tk.Label(compute_frame, text="Nr MPIs for Topaz picking:").grid(row=row, sticky=tk.W)
-        self.mpi_topaz_var = tk.StringVar()  # for data binding
-        self.mpi_topaz_entry = tk.Entry(compute_frame, textvariable=self.mpi_topaz_var)
-        self.mpi_topaz_entry.grid(row=row, column=1, sticky=tk.W)
-        self.mpi_topaz_entry.insert(0, str(options['preprocess__topazpicker__nr_mpi']))
 
         row += 1
 
