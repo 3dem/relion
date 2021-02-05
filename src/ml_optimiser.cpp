@@ -393,11 +393,10 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	else
 		do_bimodal_psi = false;
 
-	fnt = parser.getOption("--center_classes", "Re-center classes based on their center-of-mass?", "OLD");
-	if (fnt != "OLD")
-	{
+	if (parser.checkOption("--center_classes", "Re-center classes based on their center-of-mass?"))
 		do_center_classes = true;
-	}
+	else
+		do_center_classes = false;
 
 	do_skip_maximization = parser.checkOption("--skip_maximize", "Skip maximization step (only write out data.star file)?");
 
