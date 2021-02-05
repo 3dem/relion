@@ -31,6 +31,7 @@ void JobWindow::clear()
 	group1 = group2 = group3 = group4 = group5 = group6 = group7 = queue_group = NULL;
 	current_y = start_y = 0;
 	is_continue = false;
+	is_tomo = false;
 	guientries.clear();
 }
 
@@ -308,8 +309,11 @@ void JobWindow::updateMyJob()
 	}
 }
 
-void JobWindow::initialise(int my_job_type)
+void JobWindow::initialise(int my_job_type, bool do_tomo)
 {
+	is_tomo = do_tomo;
+	myjob.setTomo(do_tomo);
+
 	if (my_job_type == PROC_IMPORT)
 	{
 		myjob.initialise(my_job_type);
@@ -1594,6 +1598,12 @@ void JobWindow::initialiseAutorefineWindow()
 	tab1->label("I/O");
 	resetHeight();
 
+	if (is_tomo)
+	{
+		place("in_optimisation", TOGGLE_DEACTIVATE);
+		current_y += STEPY /2 ;
+	}
+
 	place("fn_img", TOGGLE_DEACTIVATE);
 	place("fn_cont", TOGGLE_REACTIVATE);
 	place("fn_ref", TOGGLE_DEACTIVATE);
@@ -1984,6 +1994,13 @@ void JobWindow::initialisePostprocessWindow()
 	tab1->begin();
 	tab1->label("I/O");
 	resetHeight();
+
+	if (is_tomo)
+	{
+		place("in_optimisation", TOGGLE_DEACTIVATE);
+		current_y += STEPY /2 ;
+	}
+
 	place("fn_in", TOGGLE_DEACTIVATE); //(current_y, "One of the 2 unfiltered half-maps:", NODE_HALFMAP, "", "MRC map files (*half1_class001_unfil.mrc)",  "Provide one of the two unfiltered half-reconstructions that were output upon convergence of a 3D auto-refine run.");
 	place("fn_mask", TOGGLE_DEACTIVATE); //(current_y, "Solvent mask:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a soft mask where the protein is white (1) and the solvent is black (0). Often, the softer the mask the higher resolution estimates you will get. A soft edge of 5-10 pixels is often a good edge width.");
 

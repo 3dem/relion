@@ -36,6 +36,9 @@ public:
 	// Which job is this for?
 	RelionJob myjob;
 
+	// Is this for tomo?
+	bool is_tomo;
+
 	// All the GuiEntries of this job
 	std::map<std::string, GuiEntry> guientries;
 
@@ -68,7 +71,7 @@ public:
 	// set up the tabs
 	void setupTabs(int nr_tabs);
 
-	void initialise(int my_job_type);
+	void initialise(int my_job_type, bool do_tomo = false);
 
 	void resetHeight();
 
