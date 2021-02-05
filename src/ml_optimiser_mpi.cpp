@@ -3361,7 +3361,8 @@ void MlOptimiserMpi::iterate()
 		}
 		MPI_Barrier(MPI_COMM_WORLD);
 
-		if (do_center_classes && !do_grad_next_iter)
+		// Skip center classes in the final stages of gradient refinement
+		if (do_center_classes && (!do_grad_next_iter || iter < grad_ini_iter + grad_inbetween_iter))
 			centerClasses();
 
 		// Directly use fn_out, without "_it" specifier, so unmasked refs will be overwritten at every iteration
