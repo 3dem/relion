@@ -31,6 +31,7 @@ loop_
 _rlnScheduleBooleanVariableName #1 
 _rlnScheduleBooleanVariableValue #2 
 _rlnScheduleBooleanVariableResetValue #3 
+has_ctffind 0 0
 do_2d 1 1 
 do_3d 1 1 
 has_larger_rest_size            0            0 
@@ -47,6 +48,7 @@ loop_
 _rlnScheduleStringVariableName #1 
 _rlnScheduleStringVariableValue #2 
 _rlnScheduleStringVariableResetValue #3 
+ctffind_mics Schedules/prep/ctffind/micrographs_ctf.star Schedules/prep/ctffind/micrographs_ctf.star 
 logbatch Schedules/proc/split_logpick/particles_split1.star Schedules/proc/split_logpick/particles_split1.star 
 particles  particles  particles 
 rest_batch Schedules/proc/extract_topazpick/particles.star Schedules/proc/extract_topazpick/particles.star 
@@ -62,6 +64,7 @@ _rlnScheduleOperatorType #2
 _rlnScheduleOperatorOutput #3 
 _rlnScheduleOperatorInput1 #4 
 _rlnScheduleOperatorInput2 #5 
+HAS_ctffind bool=file_exists has_ctffind ctffind_mics undefined
 CHECK_logbatch    bool=ge logbatch_big_enough current_logbatch_size logbatch_size 
 COUNT_logbatch float=count_images current_logbatch_size   logbatch  particles 
 COUNT_restbatch float=count_images current_rest_size rest_batch  particles 
@@ -105,7 +108,8 @@ _rlnScheduleEdgeOutputNodeName #2
 _rlnScheduleEdgeIsFork #3 
 _rlnScheduleEdgeOutputNodeNameIfTrue #4 
 _rlnScheduleEdgeBooleanVariable #5 
-WAIT EXIT_maxtime            0  undefined  undefined 
+WAIT HAS_ctffind              0  undefined  undefined 
+HAS_ctffind WAIT             1 EXIT_maxtime has_ctffind
 EXIT_maxtime topazpicker            1 HAS_topaz_model do_retrain_topaz
 HAS_topaz_model  logpicker            1 topazpicker has_topaz_model 
 logpicker extract_logpick            0  undefined  undefined 
