@@ -27,10 +27,9 @@
 
 class CtffindRunnerMpi: public CtffindRunner
 {
-private:
+public:
 	MpiNode *node;
 
-public:
 	/** Destructor, calls MPI_Finalize */
     ~CtffindRunnerMpi()
     {

@@ -1656,7 +1656,7 @@ RelionJob Schedule::prepareJob(FileName current_node)
 {
 
 	RelionJob myjob;
-	bool dummy, is_continue, do_overwrite_current, needs_to_add_job = false;
+	bool dummy, is_continue, needs_to_add_job = false;
 
 	// Always re-read from the original job.star from the Schedule directory,
 	// because $$ variables and input jobnames may have been replaced when continuing existing jobs
@@ -1793,7 +1793,7 @@ void Schedule::run(PipeLine &pipeline)
 
 		RelionJob myjob = prepareJob(current_node);
 
-		bool is_continue = false, do_overwrite_current = false, dummy;
+		bool dummy, is_continue = false;
 		int current_job;
 		if (!jobs[current_node].job_has_started || jobs[current_node].mode == SCHEDULE_NODE_JOB_MODE_NEW)
 		{
@@ -1806,11 +1806,10 @@ void Schedule::run(PipeLine &pipeline)
 			if (verb > 0) std::cout << " + Creating new Job: " << jobs[current_node].current_name << " from Node: " << current_node << std::endl;
 
 		}
-		else if (jobs[current_node].mode == SCHEDULE_NODE_JOB_MODE_CONTINUE || jobs[current_node].mode == SCHEDULE_NODE_JOB_MODE_OVERWRITE)
+		else if (jobs[current_node].mode == SCHEDULE_NODE_JOB_MODE_CONTINUE)
 		{
 
 			is_continue = (jobs[current_node].mode == SCHEDULE_NODE_JOB_MODE_CONTINUE);
-			do_overwrite_current = (jobs[current_node].mode == SCHEDULE_NODE_JOB_MODE_OVERWRITE);
 			current_job = pipeline.findProcessByName(jobs[current_node].current_name);
 
 			if (current_job < 0)
@@ -1858,7 +1857,7 @@ void Schedule::run(PipeLine &pipeline)
 		}
 		jobs[current_node].job_has_started = true;
 
-		if (!pipeline.runJob(myjob, current_job, false, is_continue, true, do_overwrite_current, error_message))
+		if (!pipeline.runJob(myjob, current_job, false, is_continue, true, error_message))
 			REPORT_ERROR(error_message);
 
 		// Write out current status, but maintain lock on the directory!

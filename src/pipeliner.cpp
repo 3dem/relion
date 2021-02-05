@@ -129,7 +129,7 @@ void PipeLine::addNewOutputEdge(long int myProcess, Node &_Node)
 
 }
 
-long int PipeLine::addNewProcess(Process &_Process, bool do_overwrite)
+long int PipeLine::addNewProcess(Process &_Process)
 {
 	// Check whether Process with the same name already exists in the processList
 	bool is_found = false;
@@ -147,10 +147,6 @@ long int PipeLine::addNewProcess(Process &_Process, bool do_overwrite)
 	{
 		processList.push_back(_Process);
 		job_counter++;
-	}
-	else if (!do_overwrite)
-	{
-		REPORT_ERROR("PipeLine::addNewProcess: ERROR: trying to add existing Process to the pipeline, while overwriting is not allowed.");
 	}
 	return i;
 }
@@ -187,6 +183,25 @@ long int PipeLine::findProcessByAlias(std::string name)
 			return ipos;
 	}
 	return -1;
+}
+
+bool PipeLine::checkDependency(long int process)
+{
+
+	bool has_dependecies = false;
+
+	for (size_t inode = 0; inode < (processList[process]).outputNodeList.size(); inode++)
+	{
+		long int mynode = (processList[process]).outputNodeList[inode];
+		if (nodeList[mynode].inputForProcessList.size() > 0)
+		{
+			has_dependecies = true;
+			break;
+		}
+	}
+
+	return has_dependecies;
+
 }
 
 bool PipeLine::touchTemporaryNodeFile(Node &node, bool touch_even_if_not_exist)
@@ -292,6 +307,13 @@ void PipeLine::deleteTemporaryNodeFiles(Process &process)
 		deleteTemporaryNodeFile(nodeList[mynode]);
 	}
 
+}
+
+void PipeLine::setJobCounter(long int value)
+{
+	read(DO_LOCK);
+	job_counter = value;
+	write(DO_LOCK);
 }
 
 void PipeLine::remakeNodeDirectory()
@@ -413,16 +435,13 @@ bool PipeLine::checkProcessCompletion()
 
 }
 
-bool PipeLine::getCommandLineJob(RelionJob &thisjob, int current_job, bool is_main_continue,
-                                 bool is_scheduled, bool do_makedir, bool do_overwrite_current,
+bool PipeLine::getCommandLineJob(RelionJob &thisjob, int current_job, bool is_main_continue, bool is_scheduled, bool do_makedir,
                                  std::vector<std::string> &commands, std::string &final_command, std::string &error_message)
 {
 
-	if (do_overwrite_current) is_main_continue = false;
-
 	// Except for continuation or scheduled jobs, all jobs get a new unique directory
 	std::string my_outputname;
-	if ((is_main_continue || is_scheduled || do_overwrite_current) && current_job < processList.size())
+	if ((is_main_continue || is_scheduled) && current_job < processList.size())
 	{
 		if (current_job < 0)
 			REPORT_ERROR("BUG: current_job < 0");
@@ -447,7 +466,7 @@ bool PipeLine::getCommandLineJob(RelionJob &thisjob, int current_job, bool is_ma
 }
 
 // Adds thisjob to the pipeline and returns the id of the newprocess
-long int PipeLine::addJob(RelionJob &thisjob, int as_status, bool do_overwrite, bool do_write_minipipeline)
+long int PipeLine::addJob(RelionJob &thisjob, int as_status, bool do_write_minipipeline)
 {
 
 	// Also write a mini-pipeline in the output directory
@@ -456,7 +475,7 @@ long int PipeLine::addJob(RelionJob &thisjob, int as_status, bool do_overwrite, 
 
 	// Add Process to the processList of the pipeline
 	Process process(thisjob.outputName, thisjob.type, as_status);
-	long int myProcess = addNewProcess(process, do_overwrite);
+	long int myProcess = addNewProcess(process);
 	mini_pipeline.addNewProcess(process);
 
 	// Add all input nodes
@@ -483,30 +502,15 @@ long int PipeLine::addJob(RelionJob &thisjob, int as_status, bool do_overwrite, 
 }
 
 bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, bool is_main_continue,
-                      bool is_scheduled, bool do_overwrite_current, std::string &error_message)
+                      bool is_scheduled, std::string &error_message)
 {
 	std::vector<std::string> commands;
 	std::string final_command;
 
-	// Remove run.out and run.err when overwriting a job
-	if (do_overwrite_current) is_main_continue = false;
-
 	// true means makedir
-	if (!getCommandLineJob(_job, current_job, is_main_continue, is_scheduled, true, do_overwrite_current, commands, final_command, error_message))
+	if (!getCommandLineJob(_job, current_job, is_main_continue, is_scheduled, true, commands, final_command, error_message))
 	{
 		return false;
-	}
-
-	// Remove run.out and run.err when overwriting a job
-	if (do_overwrite_current)
-	{
-		// Completely empty the output directory, NOTE that  _job.outputName+ is not defined until AFTER calling getCommandLineJob!!!
-		std::string command = " rm -rf " + _job.outputName + "*";
-		int res = system(command.c_str());
-
-		// Above deletes run_submit.script too, so we have to call this again ...
-		if (!getCommandLineJob(_job, current_job, is_main_continue, is_scheduled, true, do_overwrite_current, commands, final_command, error_message))
-			return false;
 	}
 
 	// Read in the latest version of the pipeline, just in case anyone else made a change meanwhile...
@@ -524,72 +528,6 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 	std::remove((_job.outputName+RELION_JOB_EXIT_ABORTED).c_str());
 	std::remove((_job.outputName+RELION_JOB_EXIT_SUCCESS).c_str());
 	std::remove((_job.outputName+RELION_JOB_EXIT_FAILURE).c_str());
-
-
-	/*
-	// If this is a continuation job, check whether output files exist and move away!
-	// This is to ensure that the continuation job goes OK and will show up as 'running' in the GUI
-	bool do_move_output_nodes_to_old = false;
-	if (!only_schedule && is_main_continue)
-	{
-		do_move_output_nodes_to_old = !(processList[current_job].type == PROC_2DCLASS ||
-		                                processList[current_job].type == PROC_3DCLASS ||
-		                                processList[current_job].type == PROC_INIMODEL ||
-		                                processList[current_job].type == PROC_3DAUTO ||
-		                                processList[current_job].type == PROC_MULTIBODY ||
-		                                processList[current_job].type == PROC_MANUALPICK ||
-		                                processList[current_job].type == PROC_CLASSSELECT);
-
-		// For continuation of relion_refine jobs, remove the original output nodes from the list
-		if (processList[current_job].type == PROC_2DCLASS ||
-		    processList[current_job].type == PROC_3DCLASS ||
-		    processList[current_job].type == PROC_3DAUTO ||
-		    processList[current_job].type == PROC_MULTIBODY ||
-		    processList[current_job].type == PROC_INIMODEL)
-		{
-
-			std::vector<bool> deleteNodes, deleteProcesses;
-			deleteNodes.resize(nodeList.size(), false);
-			deleteProcesses.resize(processList.size(), false);
-
-			for (long int inode = 0; inode < (processList[current_job]).outputNodeList.size(); inode++)
-			{
-				long int mynode = (processList[current_job]).outputNodeList[inode];
-				if(!exists(nodeList[mynode].name))
-					deleteNodes[mynode] = true;
-			}
-
-			FileName fn_del = "tmp";
-			write(DO_LOCK, fn_del, deleteNodes, deleteProcesses);
-			std::remove("tmpdeleted_pipeline.star");
-
-			// Read the updated pipeline back in again
-			lock_message += " part 2";
-			read(DO_LOCK, lock_message);
-
-		}
-	} // end if !only_schedule && is_main_continue
-
-	// If a job is executed with a non-continue scheduled job, then also move away any existing output node files
-	if (current_job >= 0 && (is_scheduled && !is_main_continue) || do_overwrite_current)
-		do_move_output_nodes_to_old = true;
-
-	// Move away existing output nodes
-	if (do_move_output_nodes_to_old)
-	{
-
-		for (int i = 0; i < processList[current_job].outputNodeList.size(); i++)
-		{
-			int j = processList[current_job].outputNodeList[i];
-			std::string fn_node = nodeList[j].name;
-			if (exists(fn_node))
-			{
-				std::string path2 =  fn_node + ".old";
-				rename(fn_node.c_str(), path2.c_str());
-			}
-		}
-	}
-	*/
 
 	// For continuation of relion_refine jobs, remove the original output nodes from the list
 	if (!only_schedule && is_main_continue)
@@ -632,7 +570,7 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 	bool allow_overwrite = is_main_continue || is_scheduled; // continuation and scheduled jobs always allow overwriting into the existing directory
 
 	// Add the job to the pipeline, and set current_job to the new one
-	current_job = addJob(_job, mynewstatus, allow_overwrite || do_overwrite_current);
+	current_job = addJob(_job, mynewstatus);
 
 	// Write out the new pipeline
 	write(DO_LOCK);
@@ -694,7 +632,7 @@ int PipeLine::addScheduledJob(int job_type, std::string fn_options)
 
 	std::string error_message;
 	int current_job = processList.size();
-	if (!runJob(job, current_job, true, job.is_continue, false, false, error_message)) // true is only_schedule, false means !is_scheduled, 2nd false means dont overwrite current
+	if (!runJob(job, current_job, true, job.is_continue, false, error_message)) // true is only_schedule, false means !is_scheduled
 		REPORT_ERROR(error_message.c_str());
 
 	return current_job;
@@ -717,7 +655,7 @@ int PipeLine::addScheduledJob(RelionJob &job, std::string fn_options)
 
 	std::string error_message;
 	int current_job = processList.size();
-	if (!runJob(job, current_job, true, job.is_continue, false, false, error_message)) // true is only_schedule, false means !is_scheduled, 2nd false means dont overwrite current
+	if (!runJob(job, current_job, true, job.is_continue, false, error_message)) // true is only_schedule, false means !is_scheduled
 		REPORT_ERROR(error_message.c_str());
 
 	return current_job;
@@ -752,7 +690,7 @@ void PipeLine::waitForJobToFinish(int current_job, bool &is_failure, bool &is_ab
 }
 
 void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat,
-		long int minutes_wait, long int minutes_wait_before, long int seconds_wait_after, bool do_overwrite_current)
+		long int minutes_wait, long int minutes_wait_before, long int seconds_wait_after)
 {
 
 	std::vector<FileName> my_scheduled_processes;
@@ -851,7 +789,7 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 			fh << " + " << ctime(&now) << " ---- Executing " << processList[current_job].name  << std::endl;
 			std::string error_message;
 
-			if (!runJob(myjob, current_job, false, is_continue, true, do_overwrite_current, error_message)) // true means is_scheduled; false=dont overwrite current
+			if (!runJob(myjob, current_job, false, is_continue, true, error_message)) // true means is_scheduled;
 				REPORT_ERROR(error_message);
 
 			// Now wait until that job is done!
@@ -1069,7 +1007,8 @@ void PipeLine::deleteNodesAndProcesses(std::vector<bool> &deleteNodes, std::vect
 			FileName firstdirs = alldirs.beforeLastOf("/");
 			FileName fn_tree="Trash/" + firstdirs;
 			int res = mktree(fn_tree);
-			std::string command = "mv -f " + alldirs + " " + "Trash/" + firstdirs+"/.";
+			// Can't use mv in case Trash directory is non-empty when overwriting jobs
+			std::string command = "rsync -a " + alldirs + " " + "Trash/" + firstdirs+"/. ; rm -rf "+alldirs;
 			res = system(command.c_str());
 			// Also remove the symlink if it exists
 			FileName fn_alias = (processList[i]).alias;

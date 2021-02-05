@@ -779,7 +779,6 @@ void JobWindow::initialiseAutopickWindow()
 	place("do_topaz_train", TOGGLE_DEACTIVATE, group5);
 
 	group5->begin();
-	place("topaz_nr_particles", TOGGLE_DEACTIVATE);
 	place("topaz_train_picks", TOGGLE_DEACTIVATE);
 
 	group6 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
@@ -814,6 +813,7 @@ void JobWindow::initialiseAutopickWindow()
 	current_y += STEPY/2;
 
 	place("topaz_particle_diameter", TOGGLE_DEACTIVATE);
+	place("topaz_nr_particles", TOGGLE_DEACTIVATE);
 	place("topaz_other_args", TOGGLE_DEACTIVATE);
 
 	tab3->end();
@@ -1227,6 +1227,8 @@ void JobWindow::initialiseClass2DWindow()
 
 	// Add a little spacer
 	current_y += STEPY/2;
+
+	place("do_center");
 
 	tab3->end();
 

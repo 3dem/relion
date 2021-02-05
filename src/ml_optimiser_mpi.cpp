@@ -95,11 +95,6 @@ void MlOptimiserMpi::initialise()
 	std::cerr<<"MlOptimiserMpi::initialise Entering"<<std::endl;
 #endif
 
-	if (gradient_refine) {
-		do_mom1 = true;
-		do_mom2 = true;
-	}
-	
 	// Print information about MPI nodes:
 	printMpiNodesMachineNames(*node, nr_threads);
 #ifdef _CUDA_ENABLED
@@ -862,7 +857,8 @@ void MlOptimiserMpi::expectation()
 	// C. Calculate expected angular errors
 	// Do not do this for maxCC
 	// Only the first (reconstructing) slave (i.e. from half1) calculates expected angular errors
-	if (!(iter==1 && do_firstiter_cc) && !(do_skip_align || do_skip_rotate) && !do_grad)
+	if (!(iter==1 && do_firstiter_cc) && !(do_skip_align || do_skip_rotate) &&
+         (do_auto_refine || !do_grad || (iter % 10 == 0 && mymodel.nr_classes > 1 && allow_coarser_samplings)))
 	{
 		int my_nr_images, length_fn_ctf;
 		if (node->isMaster())
@@ -893,7 +889,9 @@ void MlOptimiserMpi::expectation()
 				exp_fn_ctf = rec_buf2;
 				free(rec_buf2);
 			}
-			calculateExpectedAngularErrors(0, n_trials_acc-1);
+			if (!do_grad || iter > 10 ) {
+				calculateExpectedAngularErrors(0, n_trials_acc - 1);
+			}
 		}
 
 		// The reconstructing slave Bcast acc_rottilt, acc_psi, acc_trans to all other nodes!
@@ -1148,7 +1146,9 @@ void MlOptimiserMpi::expectation()
 			{
 				if (do_grad)
 				{
-					std::cout << " Gradient optimisation iteration " << iter << " of " << nr_iter;
+					std::cout << " Gradient optimisation iteration " << iter;
+					if (!do_auto_refine)
+						std::cout << " of " << nr_iter;
 					if (my_nr_particles < mydata.numberOfParticles())
 						std::cout << " with " << my_nr_particles << " particles";
 					std::cout << " (Step size " << (float) ( (int) (grad_current_stepsize * 100 + .5) ) / 100 << ")";
@@ -2108,9 +2108,9 @@ void MlOptimiserMpi::maximization()
 									(wsum_model.BPref[ith_recons]).reweightGrad();
 									(wsum_model.BPref[ith_recons]).applyMomenta(
 											mymodel.Igrad1[ith_recons],
-											do_mom1 ? 0.9 : 0.,
+											0.9,
 											mymodel.Igrad2[ith_recons],
-											do_mom2 ? 0.999 : 0.,
+											0.999,
 											iter == 1);
 								}
 
@@ -2127,7 +2127,7 @@ void MlOptimiserMpi::maximization()
 							{
 								(wsum_model.BPref[ith_recons]).reconstruct(
 										mymodel.Iref[ith_recons],
-										gridding_nr_iter,
+										gradient_refine ? 0: gridding_nr_iter,
 										do_map,
 										mymodel.tau2_class[ith_recons],
 										mymodel.tau2_fudge_factor,
@@ -2251,9 +2251,9 @@ void MlOptimiserMpi::maximization()
 										(wsum_model.BPref[ith_recons]).reweightGrad();
 										(wsum_model.BPref[ith_recons]).applyMomenta(
 												mymodel.Igrad1[ith_recons],
-												do_mom1 ? 0.9 : 0.,
+												0.9,
 												mymodel.Igrad2[ith_recons],
-												do_mom2 ? 0.999 : 0.,
+												0.999,
 												iter == 1);
 									}
 
@@ -2269,7 +2269,7 @@ void MlOptimiserMpi::maximization()
 								else
 								{
 									(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons],
-											gridding_nr_iter,
+                                            gradient_refine ? 0: gridding_nr_iter,
 											do_map,
 											mymodel.tau2_class[ith_recons],
 											mymodel.tau2_fudge_factor,
@@ -2402,12 +2402,16 @@ void MlOptimiserMpi::maximization()
 									std::cerr << "ihalfset= "<<ihalfset<<" Sending iclass="<<iclass<<" Sending ibody="<<ibody<<" from node "<<reconstruct_rank<<" to node "<<recv_node << std::endl;
 #endif
 									node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.Iref[ith_recons]), MULTIDIM_SIZE(mymodel.Iref[ith_recons]), MY_MPI_DOUBLE, recv_node, MPITAG_IMAGE, MPI_COMM_WORLD);
-									
-									if (do_mom1)
-										node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.Igrad1[ith_recons]), MULTIDIM_SIZE(mymodel.Igrad1[ith_recons]), MY_MPI_DOUBLE, recv_node, MPITAG_IMAGE, MPI_COMM_WORLD);
-									if (do_mom2)
-										node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.Igrad2[ith_recons]), MULTIDIM_SIZE(mymodel.Igrad2[ith_recons]), MY_MPI_DOUBLE, recv_node, MPITAG_IMAGE, MPI_COMM_WORLD);
-									
+
+									if (do_grad) {
+										node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.Igrad1[ith_recons]),
+										                      MULTIDIM_SIZE(mymodel.Igrad1[ith_recons]), MY_MPI_DOUBLE,
+										                      recv_node, MPITAG_IMAGE, MPI_COMM_WORLD);
+										node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.Igrad2[ith_recons]),
+										                      MULTIDIM_SIZE(mymodel.Igrad2[ith_recons]), MY_MPI_DOUBLE,
+										                      recv_node, MPITAG_IMAGE, MPI_COMM_WORLD);
+									}
+
 									node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[ith_recons]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[ith_recons]), MY_MPI_DOUBLE, recv_node, MPITAG_METADATA, MPI_COMM_WORLD);
 									node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.fourier_coverage_class[ith_recons]), MULTIDIM_SIZE(mymodel.fourier_coverage_class[ith_recons]), MY_MPI_DOUBLE, recv_node, MPITAG_METADATA, MPI_COMM_WORLD);
 									node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.sigma2_class[ith_recons]), MULTIDIM_SIZE(mymodel.sigma2_class[ith_recons]), MY_MPI_DOUBLE, recv_node, MPITAG_RFLOAT, MPI_COMM_WORLD);
@@ -2416,12 +2420,16 @@ void MlOptimiserMpi::maximization()
 								else if (node->rank != reconstruct_rank && node->rank == recv_node)
 								{
 									node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.Iref[ith_recons]), MULTIDIM_SIZE(mymodel.Iref[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_IMAGE, MPI_COMM_WORLD, status);
-									
-									if (do_mom1)
-										node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.Igrad1[ith_recons]), MULTIDIM_SIZE(mymodel.Igrad1[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_IMAGE, MPI_COMM_WORLD, status);
-									if (do_mom2)
-										node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.Igrad2[ith_recons]), MULTIDIM_SIZE(mymodel.Igrad2[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_IMAGE, MPI_COMM_WORLD, status);
-										
+
+									if (do_grad) {
+										node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.Igrad1[ith_recons]),
+										                      MULTIDIM_SIZE(mymodel.Igrad1[ith_recons]), MY_MPI_DOUBLE,
+										                      reconstruct_rank, MPITAG_IMAGE, MPI_COMM_WORLD, status);
+										node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.Igrad2[ith_recons]),
+										                      MULTIDIM_SIZE(mymodel.Igrad2[ith_recons]), MY_MPI_DOUBLE,
+										                      reconstruct_rank, MPITAG_IMAGE, MPI_COMM_WORLD, status);
+									}
+
 									node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[ith_recons]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_METADATA, MPI_COMM_WORLD, status);
 									node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.fourier_coverage_class[ith_recons]), MULTIDIM_SIZE(mymodel.fourier_coverage_class[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_METADATA, MPI_COMM_WORLD, status);
 									node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.sigma2_class[ith_recons]), MULTIDIM_SIZE(mymodel.sigma2_class[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_RFLOAT, MPI_COMM_WORLD, status);
@@ -2445,12 +2453,14 @@ void MlOptimiserMpi::maximization()
 				// Broadcast the reconstructed references to all other MPI nodes
 				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Iref[ith_recons]),
 						MULTIDIM_SIZE(mymodel.Iref[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
-				if (do_mom1)
+				if (do_grad) {
 					node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Igrad1[ith_recons]),
-						MULTIDIM_SIZE(mymodel.Igrad1[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
-				if (do_mom2)
+					                       MULTIDIM_SIZE(mymodel.Igrad1[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank,
+					                       MPI_COMM_WORLD);
 					node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Igrad2[ith_recons]),
-						MULTIDIM_SIZE(mymodel.Igrad2[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
+					                       MULTIDIM_SIZE(mymodel.Igrad2[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank,
+					                       MPI_COMM_WORLD);
+				}
 				// Broadcast the data_vs_prior spectra to all other MPI nodes
 				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[ith_recons]),
 						MULTIDIM_SIZE(mymodel.data_vs_prior_class[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
@@ -3094,14 +3104,34 @@ void MlOptimiserMpi::iterate()
 		timer.tic(TIMING_EXP);
 #endif
 
-		if (gradient_refine)
-			do_grad = !(has_converged || iter > nr_iter - grad_em_iters);
+		// Nobody can start the next iteration until everyone has finished
+		MPI_Barrier(MPI_COMM_WORLD);
+
+		if (gradient_refine && iter < 10) {
+			nr_iter_wo_resol_gain = 0;
+			nr_iter_wo_large_hidden_variable_changes = 0;
+		}
+
+		// Only first slave checks for convergence and prints stats to the stdout
+		if (do_auto_refine)
+			checkConvergence(node->rank == 1);
+
+		if (gradient_refine) {
+			updateStepSize();
+			do_grad = !(has_converged || iter > nr_iter - grad_em_iters) &&
+			          !(do_firstiter_cc && iter == 1) &&
+			          !grad_has_converged;
+			int iter_next = iter + 1;
+			do_grad_next_iter = !(has_converged || iter_next > nr_iter - grad_em_iters) &&
+			                    !(do_firstiter_cc && iter_next == 1) &&
+			                    !grad_has_converged;
+		}
 
 		// Update subset_size
 		updateSubsetSize(node->isMaster());
 
 		// Randomly take different subset of the particles each time we do a new "iteration" in SGD
-		if (random_seed > 0)
+		if (random_seed != 0)
 		{
 			mydata.randomiseParticlesOrder(random_seed+iter, do_split_random_halves,  subset_size < mydata.numberOfParticles() );
 		}
@@ -3109,13 +3139,6 @@ void MlOptimiserMpi::iterate()
 		{
 			std::cerr << " WARNING: skipping randomisation of particle order because random_seed equals zero..." << std::endl;
 		}
-
-		// Nobody can start the next iteration until everyone has finished
-		MPI_Barrier(MPI_COMM_WORLD);
-
-		// Only first slave checks for convergence and prints stats to the stdout
-		if (do_auto_refine)
-			checkConvergence(node->rank == 1);
 
 		expectation();
 #ifdef DEBUG
@@ -3234,7 +3257,7 @@ void MlOptimiserMpi::iterate()
 					FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(mymodel.fsc_halves_class[ibody]) {
 						DIRECT_A1D_ELEM(mymodel.fsc_halves_class[ibody], i) =
 								DIRECT_A1D_ELEM(old_fscs[ibody], i) * mu +
-								DIRECT_A1D_ELEM(mymodel.fsc_halves_class[ibody], i) * (1-mu);
+								DIRECT_A1D_ELEM(mymodel.fsc_halves_class[ibody], i) * (1 - mu);
 						DIRECT_A1D_ELEM(mymodel.fsc_halves_class[ibody], i) =
 								XMIPP_MAX(XMIPP_MIN(DIRECT_A1D_ELEM(mymodel.fsc_halves_class[ibody], i), 1), 0);
 					}
@@ -3338,8 +3361,8 @@ void MlOptimiserMpi::iterate()
 		}
 		MPI_Barrier(MPI_COMM_WORLD);
 
-
-		if (do_center_classes) centerClasses();
+		if (do_center_classes && !do_grad_next_iter)
+			centerClasses();
 
 		// Directly use fn_out, without "_it" specifier, so unmasked refs will be overwritten at every iteration
 		if (do_write_unmasked_refs && node->rank == 1)

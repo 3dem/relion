@@ -63,8 +63,7 @@ public:
 	int nr_groups;
 
 	// Keep track of the first and/or second moment of the gradient
-	bool do_mom1;
-	bool do_mom2;
+	bool do_grad;
 
 	// Number of particles in each group
 	std::vector<long int> nr_particles_per_group;
@@ -298,8 +297,7 @@ public:
 			nr_classes = MD.nr_classes;
 			nr_bodies = MD.nr_bodies;
 			nr_groups = MD.nr_groups;
-			do_mom1 = MD.do_mom1;
-			do_mom2 = MD.do_mom2;
+			do_grad = MD.do_grad;
 			nr_directions = MD.nr_directions;
 			LL = MD.LL;
 			padding_factor = MD.padding_factor;
@@ -403,12 +401,11 @@ public:
 		helical_twist.clear();
 		helical_rise.clear();
 		ref_names.clear();
-		do_mom1=false;
-		do_mom2=false;
+		do_grad=false;
 	}
 
 	// Initialise vectors with the right size
-	void initialise(bool _do_mom1 = false, bool _do_mom2 = false);
+	void initialise(bool _do_grad = false);
 
 	//Read a model from a file
 	void read(FileName fn_in, bool read_only_one_group = false);
@@ -424,8 +421,7 @@ public:
 	// Also set do_average_unaligned and do_generate_seeds flags
 	void initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experiment &_mydata,
 			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected,
-			RFLOAT ref_angpix = -1., bool _do_grad = false, bool do_trust_ref = false,
-			bool _do_mom1 = false, bool _do_mom2 = false, bool verb = false);
+			RFLOAT ref_angpix = -1., bool _do_grad = false, bool do_trust_ref = false, bool verb = false);
 
 	RFLOAT getResolution(int ipix)	{ return (RFLOAT)ipix/(pixel_size * ori_size); }
 

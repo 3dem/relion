@@ -27,7 +27,8 @@ int main(int argc, char *argv[])
 	try
 	{
 		prm.read(argc, argv);
-		prm.initialise();
+		prm.initialise(prm.node->isMaster());
+		MPI_Barrier(MPI_COMM_WORLD);
 		prm.run();
 	}
 	catch (RelionError XE)

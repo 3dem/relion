@@ -2349,7 +2349,7 @@ void RelionJob::initialiseSelectJob()
 	joboptions["fn_model"] = JobOption("Select classes from job:", NODE_OPTIMISER, "", "STAR files (*_optimiser.star)", "A _optimiser.star (or for backwards compatibility also a _model.star) file from a previous 2D or 3D classification run to select classes from.");
 	joboptions["fn_mic"] = JobOption("OR select from micrographs.star:", NODE_MICS, "", "STAR files (*.star)", "A micrographs.star file to select micrographs from.");
 	joboptions["fn_data"] = JobOption("OR select from particles.star:", NODE_PART_DATA, "", "STAR files (*.star)", "A particles.star file to select individual particles from.");
-	joboptions["fn_coords"] = JobOption("OR select from picked coords:", NODE_MIC_COORDS, "", "STAR files (coords_suffix*.star)", "A coordinate suffix .star file to select micrographs while inspecting coordinates (and/or CTFs).");
+	joboptions["fn_coords"] = JobOption("OR select from picked coords:", NODE_MIC_COORDS, "", "Input coordinates list file (*.star)", "Starfile with a 2-column list of micrograph names and corresponding coordinate filenames (in .star, .box or as 2 or 3-column free text format)");
 
 	joboptions["do_class_ranker"] = JobOption("Automatically select 2D classes?", false, "If set to True, the class_ranker program will be used to make an automated class selection, based on the parameters below. This option only works when selecting classes from a relion_refine job (input optimiser.star on the I.O tab)");
 	joboptions["rank_threshold"] = JobOption("Minimum threshold for auto-selection: ", 0.5, 0, 1, 0.05, "Only classes with a predicted threshold above this value will be selected.");
@@ -2633,44 +2633,10 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 			}
 			else if  (joboptions["fn_coords"].getString() != "")
 			{
-				RelionJob manualpickjob;
-
-				FileName fn_job = ".gui_manualpick";
-				bool iscont=false;
-				if (exists(fn_job+"job.star") || exists(fn_job+"run.job"))
-				{
-					manualpickjob.read(fn_job.c_str(), iscont, true); // true means do initialise
-				}
-				else
-				{
-					error_message = "You need to save 'Manual picking' job settings (using the Jobs menu) before you can display coordinate files.";
-					return false;
-				}
-
-				// Get the name of the micrograph STAR file from reading the suffix file
-				FileName fn_suffix = joboptions["fn_coords"].getString();
-				FileName fn_star;
-				if (is_continue)
-				{
-					fn_star = outputname + "micrographs_selected.star";
-				}
-				else
-				{
-					std::ifstream in(fn_suffix.data(), std::ios_base::in);
-					in >> fn_star ;
-					in.close();
-				}
-				FileName fn_dirs = fn_suffix.beforeLastOf("/")+"/";
-				fn_suffix = fn_suffix.afterLastOf("/").without("coords_suffix_");
-				fn_suffix = fn_suffix.withoutExtension();
-
 				// Launch the manualpicker...
-				command="`which relion_manualpick` --i " + fn_star;
+				command="`which relion_manualpick` --i " + joboptions["fn_coords"].getString();
 				Node node4(joboptions["fn_coords"].getString(), joboptions["fn_coords"].node_type);
 				inputNodes.push_back(node4);
-
-				command += " --odir " + fn_dirs;
-				command += " --pickname " + fn_suffix;
 
 				// The output selection
 				FileName fn_outstar = outputname + "micrographs_selected.star";
@@ -2678,41 +2644,56 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 				outputNodes.push_back(node3);
 				command += " --allow_save  --selection " + fn_outstar;
 
-				// All the stuff from the saved manualpickjob
-				command += " --scale " + manualpickjob.joboptions["micscale"].getString();
-				command += " --sigma_contrast " + manualpickjob.joboptions["sigma_contrast"].getString();
-				command += " --black " + manualpickjob.joboptions["black_val"].getString();
-				command += " --white " + manualpickjob.joboptions["white_val"].getString();
-
-				if (manualpickjob.joboptions["lowpass"].getNumber(error_message) > 0.)
-					command += " --lowpass " + manualpickjob.joboptions["lowpass"].getString();
-				if (error_message != "") return false;
-
-				if (manualpickjob.joboptions["highpass"].getNumber(error_message) > 0.)
-					command += " --highpass " + manualpickjob.joboptions["highpass"].getString();
-				if (error_message != "") return false;
-
-				if (manualpickjob.joboptions["angpix"].getNumber(error_message) > 0.)
-					command += " --angpix " + manualpickjob.joboptions["angpix"].getString();
-				if (error_message != "") return false;
-
-
-				command += " --ctf_scale " + manualpickjob.joboptions["ctfscale"].getString();
-
-				command += " --particle_diameter " + manualpickjob.joboptions["diameter"].getString();
-
-
-				if (manualpickjob.joboptions["do_color"].getBoolean())
+				// A manualpicker jobwindow for display of micrographs....
+				RelionJob manualpickjob;
+				FileName fn_job = ".gui_manualpick";
+				bool iscont=false;
+				if (exists(fn_job+"job.star") || exists(fn_job+"run.job"))
 				{
-					command += " --color_label " + manualpickjob.joboptions["color_label"].getString();
-					command += " --blue " + manualpickjob.joboptions["blue_value"].getString();
-					command += " --red " + manualpickjob.joboptions["red_value"].getString();
-					if (manualpickjob.joboptions["fn_color"].getString().length() > 0)
-						command += " --color_star " + manualpickjob.joboptions["fn_color"].getString();
+					manualpickjob.read(fn_job.c_str(), iscont, true); // true means do initialise
+
+					command += " --scale " + manualpickjob.joboptions["micscale"].getString();
+					command += " --sigma_contrast " + manualpickjob.joboptions["sigma_contrast"].getString();
+					command += " --black " + manualpickjob.joboptions["black_val"].getString();
+					command += " --white " + manualpickjob.joboptions["white_val"].getString();
+
+					std::string error_message = "";
+					float mylowpass = manualpickjob.joboptions["lowpass"].getNumber(error_message);
+					if (mylowpass > 0.)
+						command += " --lowpass " + manualpickjob.joboptions["lowpass"].getString();
+
+					float myhighpass = manualpickjob.joboptions["highpass"].getNumber(error_message);
+					if (myhighpass > 0.)
+						command += " --highpass " + manualpickjob.joboptions["highpass"].getString();
+
+					float myangpix = manualpickjob.joboptions["angpix"].getNumber(error_message);
+					if (myangpix > 0.)
+						command += " --angpix " + manualpickjob.joboptions["angpix"].getString();
+
+					command += " --particle_diameter " + manualpickjob.joboptions["diameter"].getString();
+					if (manualpickjob.joboptions["do_fom_threshold"].getBoolean())
+					{
+						command += " --minimum_pick_fom " + manualpickjob.joboptions["minimum_pick_fom"].getString();
+					}
+
+					if (manualpickjob.joboptions["do_color"].getBoolean())
+					{
+						command += " --color_label " + manualpickjob.joboptions["color_label"].getString();
+						command += " --blue " + manualpickjob.joboptions["blue_value"].getString();
+						command += " --red " + manualpickjob.joboptions["red_value"].getString();
+						if (manualpickjob.joboptions["fn_color"].getString().length() > 0)
+							command += " --color_star " + manualpickjob.joboptions["fn_color"].getString();
+					}
+
+				}
+				else
+				{
+					command += " --scale 0.25";
+					command += " --sigma_contrast 3";
+					command += " --lowpass 20";
+					command += " --particle_diameter 100";
 				}
 
-				// Other arguments for extraction
-				command += " " + manualpickjob.joboptions["other_args"].getString();
 			}
 		}
 	}
@@ -2788,6 +2769,7 @@ High-resolution refinements (e.g. ribosomes or other large complexes in 3D auto-
 	joboptions["highres_limit"] = JobOption("Limit resolution E-step to (A): ", -1, -1, 20, 1, "If set to a positive number, then the expectation step (i.e. the alignment) will be done only including the Fourier components up to this resolution (in Angstroms). \
 This is useful to prevent overfitting, as the classification runs in RELION are not to be guaranteed to be 100% overfitting-free (unlike the 3D auto-refine with its gold-standard FSC). In particular for very difficult data sets, e.g. of very small or featureless particles, this has been shown to give much better class averages. \
 In such cases, values in the range of 7-12 Angstroms have proven useful.");
+	joboptions["do_center"] = JobOption("Center class averages?", true, "If set to Yes, every iteration the class average images will be centered on their center-of-mass. This will only work for positive signals, so the particles should be white.");
 
 	joboptions["dont_skip_align"] = JobOption("Perform image alignment?", true, "If set to No, then rather than \
 performing both alignment and classification, only classification will be performed. This allows the use of very focused masks.\
@@ -2953,6 +2935,10 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 
 	}
 
+	if (joboptions["do_center"].getBoolean())
+	{
+		command += " --center_classes ";
+	}
 	// Sampling
 	int iover = 1;
 	command += " --oversampling " + floatToString((float)iover);
@@ -4108,24 +4094,27 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 			else
 				command += " --ignore_helical_symmetry";
 
-			float val = joboptions["range_tilt"].getNumber(error_message);
-			if (error_message != "") return false;
-			val = (val < 0.) ? (0.) : (val);
-			val = (val > 90.) ? (90.) : (val);
-			command += " --sigma_tilt " + floatToString(val / 3.);
+			float val;
+			if (sampling != auto_local_sampling)
+			{
+				val = joboptions["range_tilt"].getNumber(error_message);
+				if (error_message != "") return false;
+				val = (val < 0.) ? (0.) : (val);
+				val = (val > 90.) ? (90.) : (val);
+				command += " --sigma_tilt " + floatToString(val / 3.);
 
-			val = joboptions["range_psi"].getNumber(error_message);
-			if (error_message != "") return false;
-			val = (val < 0.) ? (0.) : (val);
-			val = (val > 90.) ? (90.) : (val);
-			command += " --sigma_psi " + floatToString(val / 3.);
+				val = joboptions["range_psi"].getNumber(error_message);
+				if (error_message != "") return false;
+				val = (val < 0.) ? (0.) : (val);
+				val = (val > 90.) ? (90.) : (val);
+				command += " --sigma_psi " + floatToString(val / 3.);
 
-			val = joboptions["range_rot"].getNumber(error_message);
-			if (error_message != "") return false;
-			val = (val < 0.) ? (0.) : (val);
-			val = (val > 90.) ? (90.) : (val);
-			command += " --sigma_rot " + floatToString(val / 3.);
-
+				val = joboptions["range_rot"].getNumber(error_message);
+				if (error_message != "") return false;
+				val = (val < 0.) ? (0.) : (val);
+				val = (val > 90.) ? (90.) : (val);
+				command += " --sigma_rot " + floatToString(val / 3.);
+			}
 
 			val = joboptions["helical_range_distance"].getNumber(error_message);
 			if (error_message != "") return false;

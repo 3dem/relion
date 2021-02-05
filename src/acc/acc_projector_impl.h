@@ -201,16 +201,6 @@ void AccProjector::initMdl(Complex *data)
 
 void AccProjector::clear()
 {
-	mdlX = 0;
-	mdlY = 0;
-	mdlZ = 0;
-	mdlXYZ = 0;
-	mdlInitY = 0;
-	mdlInitZ = 0;
-	mdlMaxR = 0;
-	padding_factor = 0;
-	allocaton_size = 0;
-
 #ifdef _CUDA_ENABLED
 	if (mdlReal != 0)
 	{
@@ -242,6 +232,17 @@ void AccProjector::clear()
 		mdlReal = 0;
 		mdlImag = 0;
 	}
+
+	mdlX = 0;
+	mdlY = 0;
+	mdlZ = 0;
+	mdlXYZ = 0;
+	mdlInitY = 0;
+	mdlInitZ = 0;
+	mdlMaxR = 0;
+	padding_factor = 0;
+	allocaton_size = 0;
+
 #else // ifdef CUDA
 	if ((mdlComplex != NULL) && (externalFree == 0))
 	{

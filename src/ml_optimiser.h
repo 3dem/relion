@@ -90,6 +90,8 @@
 #define WIDTH_FMASK_EDGE 2.
 #define MAX_NR_ITER_WO_RESOL_GAIN 1
 #define MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES 1
+#define MAX_NR_ITER_WO_RESOL_GAIN_GRAD 5
+#define MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES_GRAD 5
 
 // for profiling
 //#define TIMING
@@ -335,12 +337,7 @@ public:
 
 	// Id current iteration is gradient based
 	bool do_grad;
-
-	// Track first gradient moment
-	bool do_mom1;
-
-	// Track second gradient moment
-	bool do_mom2;
+	bool do_grad_next_iter;
 
 	// Number of iterations at the end of a gradient refinement using Expectation-Maximization
 	int grad_em_iters;
@@ -391,7 +388,7 @@ public:
 	RFLOAT grad_current_stepsize;
 	std::string grad_stepsize_scheme;
 
-	//Self-organizing map
+	// Self-organizing map
 	bool do_init_blobs;
 	bool do_som;
 	bool is_som_iter;
@@ -404,6 +401,13 @@ public:
 
 	// Size of the random subsets
 	long int subset_size;
+
+	// Automatic doubling of subset size during auto refinement
+	// Usage: subset_size = grad_ini_subset * 2 ^ auto_subest_size_order
+	int auto_subset_size_order;
+
+	// Gradient auto refinement has converged;
+	bool grad_has_converged;
 
 	// Every how many iterations should be written to disk when using subsets
 	int write_every_grad_iter;
@@ -820,8 +824,6 @@ public:
 		class_inactivity_threshold(0),
 		gradient_refine(false),
 		do_grad(false),
-		do_mom1(false),
-		do_mom2(false),
 		grad_em_iters(0),
 		grad_ini_iter(0),
 		grad_ini_frac(0),
@@ -837,6 +839,8 @@ public:
 		mu(0),
 		grad_stepsize(-1),
 		grad_current_stepsize(0),
+		auto_subset_size_order(0),
+		grad_has_converged(false),
 #ifdef ALTCPU
 		tbbSchedulerInit(tbb::task_scheduler_init::deferred ),
 		mdlClassComplex(NULL),
@@ -982,7 +986,6 @@ public:
 	 * and also update the origin offsets in the _data.star file correspondingly
 	 */
 	void centerClasses();
-	MultidimArray<RFLOAT> centerClassesGrad(const MultidimArray<RFLOAT> &map);
 
 	/* Updates the current resolution (from data_vs_prior array) and keeps track of best resolution thus far
 	 *  and precalculates a 2D Fourier-space array with pointers to the resolution of each point in a FFTW-centered array
