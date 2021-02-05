@@ -16,7 +16,7 @@ _rlnJobOptionVariable #1
 _rlnJobOptionValue #2 
 bg_diameter         -1 
 black_dust         -1 
-coords_suffix Schedules/prep/topazpicker/autopick.star 
+coords_suffix Schedules/proc/topazpicker/autopick.star 
 do_cut_into_segments        Yes 
 do_extract_helical_tubes        Yes 
 do_extract_helix         No 
@@ -45,6 +45,6 @@ recenter_x          0
 recenter_y          0 
 recenter_z          0 
    rescale         48 
- star_mics Schedules/prep/ctffind/micrographs_ctf.star 
+ star_mics Schedules/prep/ctffind//micrographs_ctf.star 
 white_dust         -1 
  
