@@ -907,6 +907,7 @@ void MlOptimiserMpi::expectation()
 		updateAngularSampling(node->rank == 1);
 
 	// The master needs to know about the updated parameters from updateAngularSampling
+	node->relion_MPI_Bcast(&grad_suspended_local_searches_iter, 1, MPI_INT, first_slave, MPI_COMM_WORLD);
 	node->relion_MPI_Bcast(&has_fine_enough_angular_sampling, 1, MPI_INT, first_slave, MPI_COMM_WORLD);
 	node->relion_MPI_Bcast(&nr_iter_wo_resol_gain, 1, MPI_INT, first_slave, MPI_COMM_WORLD);
 	node->relion_MPI_Bcast(&nr_iter_wo_large_hidden_variable_changes, 1, MPI_INT, first_slave, MPI_COMM_WORLD);
@@ -1138,8 +1139,6 @@ void MlOptimiserMpi::expectation()
 				my_last_particle_halfset1 = my_nr_particles;
 				my_last_particle_halfset2 = mydata.numberOfParticles(1) + my_nr_particles;
 
-				if (do_split_random_halves)
-					progress_bar_step_size = XMIPP_MAX(1, my_nr_particles * 2 / 60);
 			}
 
 			if (verb > 0)
@@ -1204,7 +1203,10 @@ void MlOptimiserMpi::expectation()
 					if (verb > 0 && nr_particles_done - prev_barstep> progress_bar_step_size)
 					{
 						prev_barstep = nr_particles_done;
-						progress_bar(nr_particles_done + JOB_NPAR);
+						if (subset_size > 0 && do_split_random_halves)
+							progress_bar(nr_particles_done/2);
+						else
+							progress_bar(nr_particles_done + JOB_NPAR);
 					}
 				}
 
