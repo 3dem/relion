@@ -406,8 +406,11 @@ public:
 	// Usage: subset_size = grad_ini_subset * 2 ^ auto_subest_size_order
 	int auto_subset_size_order;
 
-	// Gradient auto refinement has converged;
+	// Gradient auto refinement has converged
 	bool grad_has_converged;
+
+	// Suspended finer sampling order with local searches for one iteration
+	int grad_suspended_local_searches_iter;
 
 	// Every how many iterations should be written to disk when using subsets
 	int write_every_grad_iter;
@@ -790,6 +793,7 @@ public:
 		max_coarse_size(0),
 		autosampling_hporder_local_searches(0),
 		do_split_random_halves(0),
+		my_halfset(-1),
 		debug_split_random_half(0),
 		random_seed(0),
 		do_gpu(0),
@@ -840,6 +844,7 @@ public:
 		grad_current_stepsize(0),
 		auto_subset_size_order(0),
 		grad_has_converged(false),
+		grad_suspended_local_searches_iter(-1),
 #ifdef ALTCPU
 		tbbSchedulerInit(tbb::task_scheduler_init::deferred ),
 		mdlClassComplex(NULL),

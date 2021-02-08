@@ -110,7 +110,7 @@ void ReconstructParticleProgramMpi::run()
 
 	if (verb > 0)
 	{
-		Log::print("Memory required for accumulation: " + ZIO::itoa(GB_per_thread  * (long int) outCount) + " GB");
+		Log::print("Memory required for accumulation: " + ZIO::itoa(GB_per_thread  * outer_threads) + " GB");
 	}
 
 	std::vector<BufferedImage<double>> ctfImgFS(outCount);

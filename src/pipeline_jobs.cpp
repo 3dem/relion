@@ -3701,6 +3701,10 @@ void RelionJob::initialiseAutorefineJob()
 
 	hidden_name = ".gui_auto3d";
 
+	if (do_tomo)
+	{
+		joboptions["in_optimisation"] = JobOption("Input optimisation set: ", NODE_TOMO_OPTIMISATION, "", "Optimisation set STAR file (*.star)", "Input tomo optimisation set. Input images STAR file, reference halfmaps and reference mask files will be extracted. If input files are specified below, then they will override the components in this optimisation set.");
+	}
 	joboptions["fn_img"] = JobOption("Input images STAR file:", NODE_PART_DATA, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
 nor will it be possible to perform noise spectra estimation or intensity scale corrections in image groups. Therefore, running RELION with an input stack will in general provide sub-optimal results and is therefore not recommended!! Use the Preprocessing procedure to get the input STAR file in a semi-automated manner. Read the RELION wiki for more information.");
 	joboptions["fn_cont"] = JobOption("Continue from here: ", std::string(""), "STAR Files (*_it*_optimiser.star)", "CURRENT_ODIR", "Select the *_optimiser.star file for the iteration \
@@ -3914,6 +3918,23 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 
 	if (!is_continue)
 	{
+		if (do_tomo && joboptions["in_optimisation"].getString() != "")
+		{
+			MetaDataTable MD;
+			MD.read(joboptions["in_optimisation"].getString());
+			FileName fn_tmp;
+			if(joboptions["fn_img"].getString() == "" && MD.getValue(EMDL_TOMO_PARTICLES_FILE_NAME, fn_tmp))
+				joboptions["fn_img"].setString(fn_tmp);
+			// If half maps are present we set as fn_ref one of them. relion_refine auto detects both halves
+			if(joboptions["fn_ref"].getString() == "" && MD.getValue(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, fn_tmp))
+				joboptions["fn_ref"].setString(fn_tmp);
+			if(joboptions["fn_mask"].getString() == "" && MD.getValue(EMDL_TOMO_REFERENCE_MASK_FILE_NAME, fn_tmp))
+				joboptions["fn_mask"].setString(fn_tmp);
+
+			Node node(joboptions["in_optimisation"].getString(), joboptions["in_optimisation"].node_type);
+			inputNodes.push_back(node);
+		}
+
 		command += " --auto_refine --split_random_halves --i " + joboptions["fn_img"].getString();
 		if (joboptions["fn_img"].getString() == "")
 		{
@@ -4124,6 +4145,21 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 	command += " " + joboptions["other_args"].getString();
 
 	commands.push_back(command);
+
+	// Create output optimisation set
+	if (do_tomo)
+	{
+		std::string command2;
+		std::string outputname_run = outputname + fn_run;
+
+		setTomoOutputCommand(command2, joboptions["in_optimisation"].getString(), "",
+							 outputname_run + "_data.star", "", "",
+							 outputname_run + "_half1_class001_unfil.mrc", "",
+							 joboptions["fn_mask"].getString(),
+							 outputname + "optimisation_set.star");
+
+		commands.push_back(command2);
+	}
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
@@ -4775,6 +4811,10 @@ void RelionJob::initialisePostprocessJob()
 {
 	hidden_name = ".gui_post";
 
+	if (do_tomo)
+	{
+		joboptions["in_optimisation"] = JobOption("Input optimisation set: ", NODE_TOMO_OPTIMISATION, "", "Optimisation set STAR file (*.star)", "Input tomo optimisation set. Half map files will be extracted. If half maps are specified below, then they will override the components in this optimisation set.");
+	}
 	joboptions["fn_in"] = JobOption("One of the 2 unfiltered half-maps:", NODE_HALFMAP, "", "MRC map files (*half1*.mrc)",  "Provide one of the two unfiltered half-reconstructions that were output upon convergence of a 3D auto-refine run.");
 	joboptions["fn_mask"] = JobOption("Solvent mask:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a soft mask where the protein is white (1) and the solvent is black (0). Often, the softer the mask the higher resolution estimates you will get. A soft edge of 5-10 pixels is often a good edge width.");
 	joboptions["angpix"] = JobOption("Calibrated pixel size (A)", -1, 0.3, 5, 0.1, "Provide the final, calibrated pixel size in Angstroms. This value may be different from the pixel-size used thus far, e.g. when you have recalibrated the pixel size using the fit to a PDB model. The X-axis of the output FSC plot will use this calibrated value.");
@@ -4818,6 +4858,19 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 
 	// Input half map (one of them)
 	FileName fn_half1 = joboptions["fn_in"].getString();
+
+	if (do_tomo && joboptions["in_optimisation"].getString() != "")
+	{
+		MetaDataTable MD;
+		MD.read(joboptions["in_optimisation"].getString());
+		FileName fn_tmp;
+		if(fn_half1 == "" && MD.getValue(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, fn_tmp))
+			fn_half1 = fn_tmp;
+
+		Node node(joboptions["in_optimisation"].getString(), joboptions["in_optimisation"].node_type);
+		inputNodes.push_back(node);
+	}
+
 	if (fn_half1 == "")
 	{
 		error_message = "ERROR: empty field for input half-map...";
@@ -4874,6 +4927,18 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 	command += " " + joboptions["other_args"].getString();
 
 	commands.push_back(command);
+
+	// Create output optimisation set
+	if (do_tomo)
+	{
+		std::string command2;
+		setTomoOutputCommand(command2, joboptions["in_optimisation"].getString(), "", "", "", "",
+							 fn_half1,
+							 outputname + "postprocess.star", "",
+							 outputname + "optimisation_set.star");
+
+		commands.push_back(command2);
+	}
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
 
@@ -4881,7 +4946,7 @@ void RelionJob::initialiseLocalresJob()
 {
 	hidden_name = ".gui_localres";
 
-	joboptions["fn_in"] = JobOption("One of the 2 unfiltered half-maps:", NODE_HALFMAP, "", "MRC map files (*_unfil.mrc)",  "Provide one of the two unfiltered half-reconstructions that were output upon convergence of a 3D auto-refine run.");
+	joboptions["fn_in"] = JobOption("One of the 2 unfiltered half-maps:", NODE_HALFMAP, "", "MRC map files (*half1*.mrc)",  "Provide one of the two unfiltered half-reconstructions that were output upon convergence of a 3D auto-refine run.");
 	joboptions["angpix"] = JobOption("Calibrated pixel size (A)", 1, 0.3, 5, 0.1, "Provide the final, calibrated pixel size in Angstroms. This value may be different from the pixel-size used thus far, e.g. when you have recalibrated the pixel size using the fit to a PDB model. The X-axis of the output FSC plot will use this calibrated value.");
 
 	// Check for environment variable RELION_RESMAP_TEMPLATE
@@ -5650,6 +5715,43 @@ std::string RelionJob::getTomoInputCommmand(std::string &command, int has_tomogr
 	return error_message;
 }
 
+std::string RelionJob::setTomoOutputCommand(std::string &command, std::string optimisationSet,	std::string tomograms,
+								std::string particles, std::string trajectories, std::string manifolds,
+								std::string halfmap1, std::string postprocess, std::string refmask,
+								std::string optimisationSetOut)
+{
+	std::string error_message = "";
+
+	// Create output optimisation set
+	command = "`which relion_tomo_make_optimisation_set`";
+	command += " --o " + optimisationSetOut;
+
+	if (optimisationSet != "") command += " --i " + optimisationSet;
+	if (tomograms != "") command += " --t " + tomograms;
+	if (particles != "") command += " --p " + particles;
+	if (trajectories != "") command += " --mot " + trajectories;
+	if (manifolds != "") command += " --man " + manifolds;
+	if (halfmap1 != "")
+	{
+		FileName fn_half1 = halfmap1;
+		FileName halfmap2;
+		if (!fn_half1.getTheOtherHalf(halfmap2))
+		{
+			error_message = "ERROR: cannot find 'half' substring in the input filename...";
+			return error_message;
+		}
+		command += " --ref1 " + halfmap1;
+		command += " --ref2 " + halfmap2;
+	}
+	if (postprocess != "") command += " --fsc " + postprocess;
+	if (refmask != "") command += " --mask " + refmask;
+
+	Node node1(optimisationSetOut, NODE_TOMO_OPTIMISATION);
+	outputNodes.push_back(node1);
+
+	return error_message;
+}
+
 
 void RelionJob::initialiseTomoImportJob()
 {
@@ -6048,7 +6150,7 @@ void RelionJob::initialiseTomoAlignJob()
     	joboptions["do_polish"] = JobOption("Fit per-particle motion?", false, "If set to Yes, then the subtomogram version of Bayesian polishing will be used to fit per-particle (3D) motion tracks, besides the rigid part of the motion in the tilt series.");
     	joboptions["sigma_vel"] = JobOption("Sigma for velocity (A/dose): ", 0.2, 1., 10., 0.1, "The expected amount of motion (i.e. the std. deviation of particle positions in Angstroms after 1 electron per A^2 of radiation)");
     	joboptions["sigma_div"] = JobOption("Sigma for divergence (A): ", 5000, 0, 10000, 10000, "The expected spatial smoothness of the particle trajectories in A (a greater value means spatially smoother motion");
-    	joboptions["do_sq_exp_ker"] = JobOption("Use Gaussian decay?", true, "If set to Yes, then assume that the correlation of the velocities of two particles decays as a Gaussian over their distance, instead of as an exponential. This will produce spatially smoother motion and result in a shorter program runtime.");
+    	joboptions["do_sq_exp_ker"] = JobOption("Use Gaussian decay?", false, "If set to Yes, then assume that the correlation of the velocities of two particles decays as a Gaussian over their distance, instead of as an exponential. This will produce spatially smoother motion and result in a shorter program runtime.");
 
 }
 
@@ -6127,7 +6229,7 @@ void RelionJob::initialiseTomoReconPartJob()
 	joboptions["crop_size"] = JobOption("Cropped box size (pix):", -1, -1, 512, 16, "If set to a positive value, the program will output an additional set of maps that have been cropped to this size. This is useful if a map is desired that is smaller than the box size required to retrieve the CTF-delocalised signal.");
 	joboptions["binning"] = JobOption("Binning factor:", 1, 1, 16, 1, "The tilt series images will be binned by this (real-valued) factor and then reconstructed in the specified box size above. Note that thereby the reconstructed region becomes larger when specifying binning factors larger than one.");
 	joboptions["snr"] = JobOption("Wiener SNR constant:", 0, 0, 0.0001, 0.00001, "If set to a positive value, apply a Wiener filter with this signal-to-noise ratio. If omitted, the reconstruction will use a heuristic to prevent divisions by excessively small numbers. Please note that using a low (even though realistic) SNR might wash out the higher frequencies, which could make the map unsuitable to be used for further refinement.");
-	joboptions["fn_mask"] = JobOption("FSC Solvent mask:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a soft mask to automatically estimate the postprocess FSC. It will also create an optimisation set file to be used in other Subtomo protocols.");
+	joboptions["fn_mask"] = JobOption("FSC Solvent mask:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a soft mask to automatically estimate the postprocess FSC. It will also create an optimisation set file to be used in other tomo protocols.");
 	joboptions["sym_name"] = JobOption("Symmetry:", std::string("C1"), "If the molecule is asymmetric, \
 set Symmetry group to C1. Note their are multiple possibilities for icosahedral symmetry: \n \
 * I1: No-Crowther 222 (standard in Heymann, Chagoyen & Belnap, JSB, 151 (2005) 196–207) \n \

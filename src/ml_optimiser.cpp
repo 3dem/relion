@@ -1124,7 +1124,7 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 
 void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_write_optimiser, bool do_write_model, int random_subset)
 {
-	if (gradient_refine && subset_size > 0 && (iter % write_every_grad_iter) != 0 && iter != nr_iter)
+	if (do_grad && subset_size > 0 && (iter % write_every_grad_iter) != 0 && iter != nr_iter)
 		return;
 
 	FileName fn_root, fn_tmp, fn_model, fn_model2, fn_data, fn_sampling, fn_root2;
@@ -1705,8 +1705,10 @@ void MlOptimiser::initialiseGeneral(int rank)
 		REPORT_ERROR("ERROR: provide both --i and --o arguments");
 	}
 
-	// For safeguarding the gold-standard separation
-	my_halfset = (debug_split_random_half > 0) ? debug_split_random_half : -1;
+	// For safeguarding the gold-standard separation. Half already set in mpiversion. We only overwrite if debugging.
+	// my_halfset used to read specific reference halfmap
+	if (debug_split_random_half > 0)
+		my_halfset = debug_split_random_half;
 
 	// Check if output directory exists
 	FileName fn_dir = fn_out.beforeLastOf("/");
@@ -2897,7 +2899,8 @@ void MlOptimiser::iterate()
 			}
 		}
 
-		if (do_center_classes && !do_grad_next_iter)
+		// Skip center classes in the final stages of gradient descent steps
+		if (do_center_classes && (!do_grad_next_iter || iter < grad_ini_iter + grad_inbetween_iter))
 			centerClasses();
 
 		// Directly use fn_out, without "_it" specifier, so unmasked refs will be overwritten at every iteration
@@ -4350,7 +4353,7 @@ void MlOptimiser::maximization()
 					}
 					else
 						(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass],
-								gridding_nr_iter,
+								gradient_refine ? 0: gridding_nr_iter,
 								do_map,
 								mymodel.tau2_class[iclass],
 								mymodel.tau2_fudge_factor,
@@ -4405,8 +4408,43 @@ void MlOptimiser::centerClasses()
 			my_com *= offset_range_pix/my_com.module();
 		my_com *= -1;
 
+		// Prevent small "vibrations", which seem to cause mismatches between momenta and ref
+		if (do_grad &&
+		    my_com.module() < XMIPP_MAX(0.01 * particle_diameter / mymodel.pixel_size, 2))
+			continue;
+
 		MultidimArray<RFLOAT> aux = mymodel.Iref[iclass];
 		translate(aux, mymodel.Iref[iclass], my_com, DONT_WRAP, (RFLOAT)0.);
+
+//		std::cout << "CENTER CLASS " << iclass << " " << XX(my_com) << " " << YY(my_com) << " " << ZZ(my_com) << std::endl;
+
+		if (do_grad) {
+			MultidimArray<Complex > aux = mymodel.Igrad1[iclass];
+			RFLOAT x(XX(my_com)), y(YY(my_com)), z(0);
+			if (mymodel.Iref[iclass].getDim() == 2)
+				z = ZZ(my_com);
+			shiftImageInContinuousFourierTransform(aux, mymodel.Igrad1[iclass],
+			                                       mymodel.ori_size, x, y, z);
+
+			// Reset mom2 but preserve its power
+			MultidimArray<RFLOAT> counter, power;
+			power.initZeros(mymodel.Igrad2[iclass].xdim*3);
+			counter.initZeros(mymodel.Igrad2[iclass].xdim*3);
+
+			FOR_ALL_ELEMENTS_IN_ARRAY3D(mymodel.Igrad2[iclass]) {
+				int ires = ROUND(sqrt((RFLOAT) (k * k + i * i + j * j)));
+				DIRECT_A1D_ELEM(power, ires) += sqrt(norm(A3D_ELEM(mymodel.Igrad2[iclass], k, i, j)));
+				DIRECT_A1D_ELEM(counter, ires) += 1;
+			}
+
+			mymodel.Igrad2[iclass].initZeros();
+
+			FOR_ALL_ELEMENTS_IN_ARRAY3D(mymodel.Igrad2[iclass]) {
+				int ires = ROUND(sqrt((RFLOAT) (k * k + i * i + j * j)));
+				RFLOAT v =  DIRECT_A1D_ELEM(power, ires)/ DIRECT_A1D_ELEM(counter, ires);
+				A3D_ELEM(mymodel.Igrad2[iclass], k, i, j) = v;
+			}
+		}
 	}
 }
 
@@ -9011,7 +9049,7 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 
 		// Only use a finer angular sampling if the angular accuracy is still above 75% of the estimated accuracy
 		// If it is already below, nothing will change and eventually nr_iter_wo_resol_gain or nr_iter_wo_large_hidden_variable_changes will go above MAX_NR_ITER_WO_RESOL_GAIN
-		if (do_proceed_resolution && do_proceed_hidden_variables )
+		if (do_proceed_resolution && do_proceed_hidden_variables || grad_suspended_local_searches_iter >= 0)
 		{
 
 			bool all_bodies_are_done = false;
@@ -9095,6 +9133,29 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 				if (mymodel.ref_dim == 3)
 				{
 					new_hp_order = sampling.healpix_order + 1;
+
+					if (do_grad) {
+						if (grad_suspended_local_searches_iter < 0) {
+							if (new_hp_order >= autosampling_hporder_local_searches &&
+							    mymodel.orientational_prior_mode == NOPRIOR) {
+								grad_suspended_local_searches_iter = 2;
+								nr_iter_wo_resol_gain = 0;
+								nr_iter_wo_large_hidden_variable_changes = 0;
+								if (myverb)
+									std::cout << " Auto-refine: Switch to local searches suspended for two iteration. "
+									          << std::endl;
+							}
+						}
+
+						if (grad_suspended_local_searches_iter >= 0) {
+							if (grad_suspended_local_searches_iter > 0)
+								new_hp_order = autosampling_hporder_local_searches - 1;
+							else if (grad_suspended_local_searches_iter == 0)
+								new_hp_order = autosampling_hporder_local_searches;
+							grad_suspended_local_searches_iter -= 1;
+						}
+					}
+
 					new_rottilt_step = new_psi_step = 360. / (6 * ROUND(std::pow(2., new_hp_order + adaptive_oversampling)));
 
 					// Set the new sampling in the sampling-object
@@ -9235,7 +9296,12 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 		if (do_split_random_halves)
 			nr_particles = floor(nr_particles/2);
 
-		if (!do_grad || nr_iter - iter < grad_em_iters || nr_iter == iter || subset_size >= nr_particles || has_converged)
+		if (!do_grad ||
+			nr_iter - iter < grad_em_iters ||
+			nr_iter == iter ||
+			subset_size >= nr_particles ||
+			grad_suspended_local_searches_iter == 1 ||
+			has_converged)
 			subset_size = -1;
 	}
 

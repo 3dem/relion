@@ -454,6 +454,24 @@ bool FileName::getTheOtherHalf(FileName &fn_out) const
 	return true;
 }
 
+bool FileName::getHalf(FileName &fn_out, int halfset) const
+{
+	FileName ret = this->afterLastOf("/");
+
+	if (ret.contains("half1") && halfset == 2)
+		ret.replaceAllSubstrings("half1", "half2");
+	else if (ret.contains("half2") && halfset == 1)
+		ret.replaceAllSubstrings("half2", "half1");
+	else
+		return false;
+
+	if (this->contains("/"))
+		ret = this->beforeLastOf("/") + "/" + ret;
+
+	fn_out = ret;
+	return true;
+}
+
 bool FileName::validateCharactersStrict(bool do_allow_double_dollar) const
 {
 

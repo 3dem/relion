@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
 		parser.setCommandLine(argc, argv);
 		int gen_section = parser.addSection("General options");
 
-		reconstructionPath = parser.getOption("--rec", "Reconstruction path (--o argument to reconstruct_particle)");
+		reconstructionPath = parser.getOption("--rec", "Reconstruction path (--o argument to reconstruct_particle. Optional)", "");
 		evalMaskFn = parser.getOption("--mask", "Mask to be used for FSC computation");
 		refMaskFn = parser.getOption("--opt_mask", "Mask to be used for subsequent optimisation procedures (optional)", "");
 
@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
 			true,   false,  // tomograms
 			true,   false,  // trajectories
 			true,   false,  // manifolds
-			false,  false); // reference
+			true,  false); // reference
 
 		if (parser.checkForErrors())
 		{
@@ -46,13 +46,17 @@ int main(int argc, char *argv[])
 		outDir = ZIO::prepareTomoOutputDirectory(outDir, argc, argv);
 		ZIO::makeDir(outDir+"PostProcess");
 
-		int res = system(("relion_postprocess --i " + reconstructionPath + "half1.mrc --mask "
+		if (reconstructionPath.length() > 0)
+		{
+			os.refMap1 = reconstructionPath + "half1.mrc";
+			os.refMap2 = reconstructionPath + "half2.mrc";
+		}
+
+		int res = system(("relion_postprocess --i " + os.refMap1 + " --mask "
 					  + evalMaskFn+" --o " + outDir + "PostProcess/postprocess").c_str());
 
 		if (res != RELION_EXIT_SUCCESS) return res;
 
-		os.refMap1 = reconstructionPath + "half1.mrc";
-		os.refMap2 = reconstructionPath + "half2.mrc";
 		os.refFSC = outDir + "PostProcess/postprocess.star";
 
 		if (refMaskFn != "")

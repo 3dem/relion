@@ -512,6 +512,9 @@ public:
 	// Is this a continuation job?
 	bool is_continue;
 
+	// Activate custom stuff for tomo
+	bool do_tomo;
+
 	// List of Nodes of input to this process
 	std::vector<Node> inputNodes;
 
@@ -537,6 +540,7 @@ public:
 		outputNodes.clear();
 		joboptions.clear();
 		is_continue = false;
+		do_tomo = false;
 	}
 
 	// Returns true if the option is present in joboptions
@@ -544,6 +548,12 @@ public:
 
 	// Set this option in the job
 	void setOption(std::string setOptionLine);
+
+	// Activate specific options for tomo
+	void setTomo(bool _do_tomo)
+	{
+		do_tomo = _do_tomo;
+	}
 
 	// write/read settings to disc
 	// fn is a directory name (e.g. Refine3D/job123/) or a STAR file
@@ -655,6 +665,11 @@ public:
 							 bool has_trajectories, bool has_manifolds, bool has_halfmaps, bool has_postprocess);
 	std::string getTomoInputCommmand(std::string &command, int has_tomograms, int has_particles,
 									 int has_trajectories, int has_manifolds, bool has_halfmaps, int has_postprocess);
+
+	std::string setTomoOutputCommand(std::string &command, std::string optimisationSet, std::string tomograms,
+									 std::string particles, std::string trajectories, std::string manifolds,
+									 std::string halfmap1, std::string postprocess, std::string refmask,
+									 std::string optimisationSetOut);
 
 	void initialiseTomoImportJob();
 	bool getCommandsTomoImportJob(std::string &outputname, std::vector<std::string> &commands,

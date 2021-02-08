@@ -180,7 +180,7 @@ class star_handler_parameters
 			ObservationModel::loadSafely(fn, obsModel, MD, tablename, 1, false);
 			if (obsModel.opticsMdt.numberOfObjects() == 0)
 			{
-				std::cerr << " + WARNGING: could not read optics groups table, proceeding without it ..." << std::endl;
+				std::cerr << " + WARNING: could not read optics groups table, proceeding without it ..." << std::endl;
 				MD.read(fn, tablename);
 				do_ignore_optics = true;
 			}

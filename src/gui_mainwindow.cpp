@@ -489,7 +489,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("3D auto-refine");
 	gui_jobwindows[nr_browse_tabs] = new JobWindow();
-	gui_jobwindows[nr_browse_tabs]->initialise(PROC_3DAUTO);
+	gui_jobwindows[nr_browse_tabs]->initialise(PROC_3DAUTO, _do_tomo);
 	browse_grp[nr_browse_tabs]->end();
 	nr_browse_tabs++;
 
@@ -572,7 +572,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("Post-processing");
 	gui_jobwindows[nr_browse_tabs] = new JobWindow();
-	gui_jobwindows[nr_browse_tabs]->initialise(PROC_POST);
+	gui_jobwindows[nr_browse_tabs]->initialise(PROC_POST, _do_tomo);
 	browse_grp[nr_browse_tabs]->end();
 	nr_browse_tabs++;
 

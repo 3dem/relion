@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
 
 		os.read(
 			parser,
-			false,          // optimisation set
+			true,          // optimisation set
 			true,   false,  // particles
 			true,   false,  // tomograms
 			true,   false,  // trajectories
