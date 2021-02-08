@@ -51,7 +51,7 @@ keep_tilt_prior_fixed        Yes
 min_dedicated         24 
     nr_mpi          3 
    nr_pool         30 
-nr_threads          6 
+nr_threads         8 
 offset_range          5 
 offset_step          1 
 other_args         "" 

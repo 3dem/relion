@@ -37,7 +37,8 @@ do_3d 1 1
 has_larger_rest_size            0            0 
 do_retrain_topaz            1            1 
 has_topaz_model            0            0 
-logbatch_big_enough            0            0 
+logbatch_big_enough            0            0
+has_iniref            0            0  
  
 
 # version 30001
@@ -53,6 +54,7 @@ logbatch Schedules/proc/split_logpick/particles_split1.star Schedules/proc/split
 particles  particles  particles 
 rest_batch Schedules/proc/extract_topazpick/particles.star Schedules/proc/extract_topazpick/particles.star 
 topaz_model Schedules/proc/train_topaz/model_epoch10.sav Schedules/proc/train_topaz/model_epoch10.sav 
+iniref iniref.mrc
 
 # version 30001
 
@@ -65,7 +67,8 @@ _rlnScheduleOperatorOutput #3
 _rlnScheduleOperatorInput1 #4 
 _rlnScheduleOperatorInput2 #5 
 HAS_ctffind bool=file_exists has_ctffind ctffind_mics undefined
-CHECK_logbatch    bool=ge logbatch_big_enough current_logbatch_size logbatch_size 
+CHECK_logbatch    bool=ge logbatch_big_enough current_logbatch_size logbatch_size
+CHECK_iniref  bool=file_exists has_iniref iniref  undefined 
 COUNT_logbatch float=count_images current_logbatch_size   logbatch  particles 
 COUNT_restbatch float=count_images current_rest_size rest_batch  particles 
 EXIT_maxtime exit_maxtime  undefined    maxtime_hr  undefined 
@@ -114,6 +117,7 @@ EXIT_maxtime topazpicker            1 HAS_topaz_model do_retrain_topaz
 HAS_topaz_model  logpicker            1 topazpicker has_topaz_model 
 logpicker extract_logpick            0  undefined  undefined 
 extract_logpick split_logpick            0  undefined  undefined 
+split_logpick COUNT_logbatch            0  undefined  undefined 
 COUNT_logbatch CHECK_logbatch            0  undefined  undefined 
 CHECK_logbatch       WAIT            1 class2d_logbatch logbatch_big_enough 
 class2d_logbatch select_logbatch            0  undefined  undefined 
@@ -124,7 +128,8 @@ COUNT_restbatch HAS_rest_increased            0  undefined  undefined
 HAS_rest_increased       WAIT            1 class2d_rest has_larger_rest_size 
 class2d_rest select_rest            0  undefined  undefined 
 select_rest   SET_prev_rest_size         0  undefined  undefined 
-SET_prev_rest_size  WAIT       1 inimodel3d do_3d 
+SET_prev_rest_size  WAIT       1 CHECK_iniref  do_3d 
+CHECK_iniref inimodel3d 1 refine3dref has_iniref
 inimodel3d   refine3d            0  undefined  undefined 
 refine3d WAIT            0  undefined  undefined 
- 
+refine3dref WAIT            0  undefined  undefined 

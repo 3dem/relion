@@ -206,6 +206,9 @@ RelionItOptions = {
     # Continue with Inimodel3D and Refine3D after Class2D?
     'proc__do_3d' : True,
 
+    # Name for initial 3D reference for Refine3D. If this file does not exist, a 3D Initial Model job will be run
+    'proc__iniref' : 'None',
+
     # Options for inimodel3d and refine3d
     # Symmetry
     'proc__inimodel3d__sym_name' : 'C1',
@@ -329,157 +332,35 @@ class RelionItGui(object):
 
         ###
 
-        particle_frame = tk.LabelFrame(left_frame, text="Particle details", padx=5, pady=5)
-        particle_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
-        tk.Grid.columnconfigure(particle_frame, 1, weight=1)
-
-        row = 0
-
-        tk.Label(particle_frame, text="Symmetry:").grid(row=row, sticky=tk.W)
-        self.symmetry_var = tk.StringVar()  # for data binding
-        self.symmetry_entry = tk.Entry(particle_frame, textvariable=self.symmetry_var)
-        self.symmetry_entry.grid(row=row, column=1, sticky=tk.W)
-        self.symmetry_entry.insert(0, str(options['proc__inimodel3d__sym_name']))
-
-        row += 1
-
-        tk.Label(particle_frame, text="Nr particles per micrograph:").grid(row=row, sticky=tk.W)
-        self.partspermic_var = tk.StringVar()  # for data binding
-        self.partspermic_entry = tk.Entry(particle_frame, textvariable=self.partspermic_var)
-        self.partspermic_entry.grid(row=row, column=1, sticky=tk.W)
-        self.partspermic_entry.insert(0, str(options['proc__train_topaz__topaz_nr_particles']))
-
-        row += 1
-
-        tk.Label(particle_frame, text=u"Longest diameter (\u212B):").grid(row=row, sticky=tk.W)
-        self.particle_max_diam_var = tk.StringVar()  # for data binding
-        self.particle_max_diam_entry = tk.Entry(particle_frame, textvariable=self.particle_max_diam_var)
-        self.particle_max_diam_entry.grid(row=row, column=1, sticky=tk.W+tk.E, columnspan=2)
-        self.particle_max_diam_entry.insert(0, str(options['proc__logpicker__log_diam_max']))
-
-        row += 1
-
-        tk.Label(particle_frame, text=u"Shortest diameter (\u212B):").grid(row=row, sticky=tk.W)
-        self.particle_min_diam_entry = tk.Entry(particle_frame)
-        self.particle_min_diam_entry.grid(row=row, column=1, sticky=tk.W+tk.E, columnspan=2)
-        self.particle_min_diam_entry.insert(0, str(options['proc__logpicker__log_diam_min']))
-
-        row += 1
-        
-        tk.Label(particle_frame, text=u"Mask diameter (\u212B):").grid(row=row, sticky=tk.W)
-        self.mask_diameter_var = tk.StringVar()  # for data binding
-        self.mask_diameter_entry = tk.Entry(particle_frame, textvariable=self.mask_diameter_var)
-        self.mask_diameter_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
-        self.mask_diameter_entry.insert(0, str(options['proc__class2d_logbatch__particle_diameter']))
-        self.mask_diameter_px = tk.Label(particle_frame, text="= NNN px")
-        self.mask_diameter_px.grid(row=row, column=2,sticky=tk.W)
-
-        row += 1
-
-        tk.Label(particle_frame, text="Box size (px):").grid(row=row, sticky=tk.W)
-        self.box_size_var = tk.StringVar()  # for data binding
-        self.box_size_entry = tk.Entry(particle_frame, textvariable=self.box_size_var)
-        self.box_size_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
-        self.box_size_entry.insert(0, str(options['proc__extract_logpick__extract_size']))
-        self.box_size_in_angstrom = tk.Label(particle_frame, text=u"= NNN \u212B")
-        self.box_size_in_angstrom.grid(row=row, column=2,sticky=tk.W)
-
-        row += 1
-
-        tk.Label(particle_frame, text="Down-sample to (px):").grid(row=row, sticky=tk.W)
-        self.extract_small_boxsize_var = tk.StringVar()  # for data binding
-        self.extract_small_boxsize_entry = tk.Entry(particle_frame, textvariable=self.extract_small_boxsize_var)
-        self.extract_small_boxsize_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
-        self.extract_small_boxsize_entry.insert(0, str(options['proc__extract_logpick__rescale']))
-        self.extract_angpix = tk.Label(particle_frame, text=u"= NNN \u212B/px")
-        self.extract_angpix.grid(row=row, column=2,sticky=tk.W)
-
-        row += 1
-
-        tk.Label(particle_frame, text="Calculate for me:").grid(row=row, sticky=tk.W)
-        self.auto_boxsize_var = tk.IntVar()
-        auto_boxsize_button = tk.Checkbutton(particle_frame, var=self.auto_boxsize_var)
-        auto_boxsize_button.grid(row=row, column=1, sticky=tk.W)
-        auto_boxsize_button.select()
-
-        ###
-
-        picking_frame = tk.LabelFrame(right_frame, text="Picking details", padx=5, pady=5)
-        picking_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
-        tk.Grid.columnconfigure(picking_frame, 1, weight=1)
-
-        row = 0
-
-        tk.Label(picking_frame, text="Retrain topaz network?").grid(row=row, sticky=tk.W)
-        self.do_retrain_topaz_var = tk.IntVar()
-        retrain_topaz_button = tk.Checkbutton(picking_frame, var=self.do_retrain_topaz_var)
-        retrain_topaz_button.grid(row=row, column=1, sticky=tk.W)
-        if options['proc__do_retrain_topaz']:
-            retrain_topaz_button.select()
-
-        row += 1
-
-        tk.Label(picking_frame, text="Nr particles for LoG picking:").grid(row=row, sticky=tk.W)
-        self.logbatch_var = tk.StringVar()  # for data binding
-        self.logbatch_entry = tk.Entry(picking_frame, textvariable=self.logbatch_var)
-        self.logbatch_entry.grid(row=row, column=1, sticky=tk.W)
-        self.logbatch_entry.insert(0, str(options['proc__split_logpick__split_size']))
-
-        row += 1
-
-        tk.Label(picking_frame, text="LoG picking threshold:").grid(row=row, sticky=tk.W)
-        self.log_thresh_var = tk.StringVar()  # for data binding
-        self.log_thresh_entry = tk.Entry(picking_frame, textvariable=self.log_thresh_var)
-        self.log_thresh_entry.grid(row=row, column=1, sticky=tk.W)
-        self.log_thresh_entry.insert(0, str(options['proc__logpicker__log_adjust_thr']))
-
-        row += 1
-
-        tk.Label(picking_frame, text="LoG class2d score:").grid(row=row, sticky=tk.W)
-        self.log_classscore_var = tk.StringVar()  # for data binding
-        self.log_classscore_entry = tk.Entry(picking_frame, textvariable=self.log_classscore_var)
-        self.log_classscore_entry.grid(row=row, column=1, sticky=tk.W)
-        self.log_classscore_entry.insert(0, str(options['proc__select_logbatch__rank_threshold']))
-
-        row += 1
-
-        tk.Label(picking_frame, text="Topaz picking threshold:").grid(row=row, sticky=tk.W)
-        self.topaz_thresh_var = tk.StringVar()  # for data binding
-        self.topaz_thresh_entry = tk.Entry(picking_frame, textvariable=self.topaz_thresh_var)
-        self.topaz_thresh_entry.grid(row=row, column=1, sticky=tk.W)
-        self.topaz_thresh_entry.insert(0, str(options['proc__extract_topazpick__minimum_pick_fom']))
-
-        row += 1
-
-        tk.Label(picking_frame, text="Topaz class2d score:").grid(row=row, sticky=tk.W)
-        self.topaz_classscore_var = tk.StringVar()  # for data binding
-        self.topaz_classscore_entry = tk.Entry(picking_frame, textvariable=self.topaz_classscore_var)
-        self.topaz_classscore_entry.grid(row=row, column=1, sticky=tk.W)
-        self.topaz_classscore_entry.insert(0, str(options['proc__select_rest__rank_threshold']))
-
-        ###
-
-        compute_frame = tk.LabelFrame(right_frame, text="Computation details", padx=5, pady=5)
+        compute_frame = tk.LabelFrame(left_frame, text="Computation details", padx=5, pady=5)
         compute_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
         tk.Grid.columnconfigure(expt_frame, 1, weight=1)
 
         row = 0
 
         tk.Label(compute_frame, text="Do Autopick & Class2D?").grid(row=row, sticky=tk.W)
-        self.do_class2d_var = tk.IntVar()
-        do_class2d_button = tk.Checkbutton(compute_frame, var=self.do_class2d_var)
-        do_class2d_button.grid(row=row, column=1, sticky=tk.W)
+        self.do_2d_var = tk.IntVar()
+        self.do_2d_button = tk.Checkbutton(compute_frame, var=self.do_2d_var)
+        self.do_2d_button.grid(row=row, column=1, sticky=tk.W)
         if options['proc__do_2d']:
-            do_class2d_button.select()
+            self.do_2d_button.select()
 
         row += 1
         
-        tk.Label(compute_frame, text="Do Inimodel3D & Refine3D?").grid(row=row, sticky=tk.W)
-        self.do_refine3d_var = tk.IntVar()
-        do_refine3d_button = tk.Checkbutton(compute_frame, var=self.do_refine3d_var)
-        do_refine3d_button.grid(row=row, column=1, sticky=tk.W)
+        tk.Label(compute_frame, text="Do Refine3D?").grid(row=row, sticky=tk.W)
+        self.do_3d_var = tk.IntVar()
+        self.do_3d_button = tk.Checkbutton(compute_frame, var=self.do_3d_var)
+        self.do_3d_button.grid(row=row, column=1, sticky=tk.W)
         if options['proc__do_3d']:
-            do_refine3d_button.select()
+            self.do_3d_button.select()
+
+        row += 1
+
+        tk.Label(compute_frame, text="3D reference:").grid(row=row, sticky=tk.W)
+        self.iniref_var = tk.StringVar()  # for data binding
+        self.iniref_entry = tk.Entry(compute_frame, textvariable=self.iniref_var)
+        self.iniref_entry.grid(row=row, column=1, sticky=tk.W)
+        self.iniref_entry.insert(0, str(options['proc__iniref']))
 
         row += 1
         
@@ -488,6 +369,139 @@ class RelionItGui(object):
         self.gpu_entry = tk.Entry(compute_frame, textvariable=self.gpu_var)
         self.gpu_entry.grid(row=row, column=1, sticky=tk.W)
         self.gpu_entry.insert(0, str(options['proc__class2d_rest__gpu_ids']))
+
+        ###
+
+        self.particle_frame = tk.LabelFrame(right_frame, text="Particle details", padx=5, pady=5)
+        self.particle_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
+        tk.Grid.columnconfigure(self.particle_frame, 1, weight=1)
+
+        row = 0
+
+        tk.Label(self.particle_frame, text="Symmetry:").grid(row=row, sticky=tk.W)
+        self.symmetry_var = tk.StringVar()  # for data binding
+        self.symmetry_entry = tk.Entry(self.particle_frame, textvariable=self.symmetry_var)
+        self.symmetry_entry.grid(row=row, column=1, sticky=tk.W)
+        self.symmetry_entry.insert(0, str(options['proc__inimodel3d__sym_name']))
+
+        row += 1
+
+        tk.Label(self.particle_frame, text="Nr particles per micrograph:").grid(row=row, sticky=tk.W)
+        self.partspermic_var = tk.StringVar()  # for data binding
+        self.partspermic_entry = tk.Entry(self.particle_frame, textvariable=self.partspermic_var)
+        self.partspermic_entry.grid(row=row, column=1, sticky=tk.W)
+        self.partspermic_entry.insert(0, str(options['proc__train_topaz__topaz_nr_particles']))
+
+        row += 1
+
+        tk.Label(self.particle_frame, text=u"Longest diameter (\u212B):").grid(row=row, sticky=tk.W)
+        self.particle_max_diam_var = tk.StringVar()  # for data binding
+        self.particle_max_diam_entry = tk.Entry(self.particle_frame, textvariable=self.particle_max_diam_var)
+        self.particle_max_diam_entry.grid(row=row, column=1, sticky=tk.W+tk.E, columnspan=2)
+        self.particle_max_diam_entry.insert(0, str(options['proc__logpicker__log_diam_max']))
+
+        row += 1
+
+        tk.Label(self.particle_frame, text=u"Shortest diameter (\u212B):").grid(row=row, sticky=tk.W)
+        self.particle_min_diam_entry = tk.Entry(self.particle_frame)
+        self.particle_min_diam_entry.grid(row=row, column=1, sticky=tk.W+tk.E, columnspan=2)
+        self.particle_min_diam_entry.insert(0, str(options['proc__logpicker__log_diam_min']))
+
+        row += 1
+        
+        tk.Label(self.particle_frame, text=u"Mask diameter (\u212B):").grid(row=row, sticky=tk.W)
+        self.mask_diameter_var = tk.StringVar()  # for data binding
+        self.mask_diameter_entry = tk.Entry(self.particle_frame, textvariable=self.mask_diameter_var)
+        self.mask_diameter_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
+        self.mask_diameter_entry.insert(0, str(options['proc__class2d_logbatch__particle_diameter']))
+        self.mask_diameter_px = tk.Label(self.particle_frame, text="= NNN px")
+        self.mask_diameter_px.grid(row=row, column=2,sticky=tk.W)
+
+        row += 1
+
+        tk.Label(self.particle_frame, text="Box size (px):").grid(row=row, sticky=tk.W)
+        self.box_size_var = tk.StringVar()  # for data binding
+        self.box_size_entry = tk.Entry(self.particle_frame, textvariable=self.box_size_var)
+        self.box_size_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
+        self.box_size_entry.insert(0, str(options['proc__extract_logpick__extract_size']))
+        self.box_size_in_angstrom = tk.Label(self.particle_frame, text=u"= NNN \u212B")
+        self.box_size_in_angstrom.grid(row=row, column=2,sticky=tk.W)
+
+        row += 1
+
+        tk.Label(self.particle_frame, text="Down-sample to (px):").grid(row=row, sticky=tk.W)
+        self.extract_small_boxsize_var = tk.StringVar()  # for data binding
+        self.extract_small_boxsize_entry = tk.Entry(self.particle_frame, textvariable=self.extract_small_boxsize_var)
+        self.extract_small_boxsize_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
+        self.extract_small_boxsize_entry.insert(0, str(options['proc__extract_logpick__rescale']))
+        self.extract_angpix = tk.Label(self.particle_frame, text=u"= NNN \u212B/px")
+        self.extract_angpix.grid(row=row, column=2,sticky=tk.W)
+
+        row += 1
+
+        tk.Label(self.particle_frame, text="Calculate for me:").grid(row=row, sticky=tk.W)
+        self.auto_boxsize_var = tk.IntVar()
+        auto_boxsize_button = tk.Checkbutton(self.particle_frame, var=self.auto_boxsize_var)
+        auto_boxsize_button.grid(row=row, column=1, sticky=tk.W)
+        auto_boxsize_button.select()
+
+        ###
+
+        self.picking_frame = tk.LabelFrame(right_frame, text="Picking details", padx=5, pady=5)
+        self.picking_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
+        tk.Grid.columnconfigure(self.picking_frame, 1, weight=1)
+
+        row = 0
+
+        tk.Label(self.picking_frame, text="Retrain topaz network?").grid(row=row, sticky=tk.W)
+        self.do_retrain_topaz_var = tk.IntVar()
+        self.retrain_topaz_button = tk.Checkbutton(self.picking_frame, var=self.do_retrain_topaz_var)
+        self.retrain_topaz_button.grid(row=row, column=1, sticky=tk.W)
+        if options['proc__do_retrain_topaz']:
+            self.retrain_topaz_button.select()
+
+        row += 1
+
+        tk.Label(self.picking_frame, text="Nr particles for LoG picking:").grid(row=row, sticky=tk.W)
+        self.logbatch_var = tk.StringVar()  # for data binding
+        self.logbatch_entry = tk.Entry(self.picking_frame, textvariable=self.logbatch_var)
+        self.logbatch_entry.grid(row=row, column=1, sticky=tk.W)
+        self.logbatch_entry.insert(0, str(options['proc__split_logpick__split_size']))
+
+        row += 1
+
+        tk.Label(self.picking_frame, text="LoG picking threshold:").grid(row=row, sticky=tk.W)
+        self.log_thresh_var = tk.StringVar()  # for data binding
+        self.log_thresh_entry = tk.Entry(self.picking_frame, textvariable=self.log_thresh_var)
+        self.log_thresh_entry.grid(row=row, column=1, sticky=tk.W)
+        self.log_thresh_entry.insert(0, str(options['proc__logpicker__log_adjust_thr']))
+
+        row += 1
+
+        tk.Label(self.picking_frame, text="LoG class2d score:").grid(row=row, sticky=tk.W)
+        self.log_classscore_var = tk.StringVar()  # for data binding
+        self.log_classscore_entry = tk.Entry(self.picking_frame, textvariable=self.log_classscore_var)
+        self.log_classscore_entry.grid(row=row, column=1, sticky=tk.W)
+        self.log_classscore_entry.insert(0, str(options['proc__select_logbatch__rank_threshold']))
+
+        row += 1
+
+        tk.Label(self.picking_frame, text="Topaz picking threshold:").grid(row=row, sticky=tk.W)
+        self.topaz_thresh_var = tk.StringVar()  # for data binding
+        self.topaz_thresh_entry = tk.Entry(self.picking_frame, textvariable=self.topaz_thresh_var)
+        self.topaz_thresh_entry.grid(row=row, column=1, sticky=tk.W)
+        self.topaz_thresh_entry.insert(0, str(options['proc__extract_topazpick__minimum_pick_fom']))
+
+        row += 1
+
+        tk.Label(self.picking_frame, text="Topaz class2d score:").grid(row=row, sticky=tk.W)
+        self.topaz_classscore_var = tk.StringVar()  # for data binding
+        self.topaz_classscore_entry = tk.Entry(self.picking_frame, textvariable=self.topaz_classscore_var)
+        self.topaz_classscore_entry.grid(row=row, column=1, sticky=tk.W)
+        self.topaz_classscore_entry.insert(0, str(options['proc__select_rest__rank_threshold']))
+
+        ###
+
 
          ### Add logic to the box size boxes
 
@@ -545,6 +559,30 @@ class RelionItGui(object):
                 # Can't update the downscaled pixel size unless the downscaled box size is valid
                 self.extract_angpix.config(text=u"= NNN \u212B/px")
 
+        def update_2d_status(*args_ignored, **kwargs_ignored):
+            if self.get_var_as_bool(self.do_2d_var):
+                for child in self.particle_frame.winfo_children():
+                    child.configure(state=tk.NORMAL)
+                for child in self.picking_frame.winfo_children():
+                    child.configure(state=tk.NORMAL)
+                self.do_3d_button.configure(state=tk.NORMAL)
+                self.iniref_entry.configure(state=tk.NORMAL)
+                update_box_sizes()
+                update_logpick_status()
+            else:
+                for child in self.particle_frame.winfo_children():
+                    child.configure(state=tk.DISABLED)
+                for child in self.picking_frame.winfo_children():
+                    child.configure(state=tk.DISABLED)
+                self.do_3d_button.configure(state=tk.DISABLED)
+                self.iniref_entry.configure(state=tk.DISABLED)
+
+        def update_3d_status(*args_ignored, **kwargs_ignored):
+            if self.get_var_as_bool(self.do_3d_var):
+                self.iniref_entry.configure(state=tk.NORMAL)
+            else:
+                self.iniref_entry.configure(state=tk.DISABLED)
+
         def update_logpick_status(*args_ignored, **kwargs_ignored):
             if self.get_var_as_bool(self.do_retrain_topaz_var):
                 self.logbatch_entry.config(state=tk.NORMAL)
@@ -554,6 +592,7 @@ class RelionItGui(object):
                 self.logbatch_entry.config(state=tk.DISABLED)
                 self.log_thresh_entry.config(state=tk.DISABLED)
                 self.log_classscore_entry.config(state=tk.DISABLED)
+
 
         def update_box_sizes(*args_ignored, **kwargs_ignored):
             # Always activate entry boxes - either we're activating them anyway, or we need to edit the text.
@@ -591,8 +630,10 @@ class RelionItGui(object):
         self.angpix_var.trace('w', update_box_sizes)
         self.particle_max_diam_var.trace('w', update_box_sizes)
         auto_boxsize_button.config(command=update_box_sizes)
-
-        retrain_topaz_button.config(command=update_logpick_status)
+      
+        self.retrain_topaz_button.config(command=update_logpick_status)
+        self.do_2d_button.config(command=update_2d_status)
+        self.do_3d_button.config(command=update_3d_status)
 
         button_frame = tk.Frame(right_frame)
         button_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
@@ -607,6 +648,10 @@ class RelionItGui(object):
         update_box_sizes()
         # Show initial logpick status
         update_logpick_status()
+        # Show initial 2d status
+        update_2d_status()
+        # Show initial 3d status
+        update_3d_status()
 
     def get_var_as_bool(self, var):
         """Helper function to convert a Tk IntVar (linked to a checkbox) to a boolean value"""
@@ -626,8 +671,8 @@ class RelionItGui(object):
         opts = self.options
         warnings = []
 
-        opts['proc__do_2d'] = self.get_var_as_bool(self.do_class2d_var)
-        opts['proc__do_3d'] = self.get_var_as_bool(self.do_refine3d_var)
+        opts['proc__do_2d'] = self.get_var_as_bool(self.do_2d_var)
+        opts['proc__do_3d'] = self.get_var_as_bool(self.do_3d_var)
         opts['proc__do_retrain_topaz'] = self.get_var_as_bool(self.do_retrain_topaz_var)
         opts['prep__ctffind__do_phaseshift'] = self.get_var_as_bool(self.phaseplate_var)
 
@@ -667,7 +712,7 @@ class RelionItGui(object):
             opts['proc__train_topaz__topaz_particle_diameter'] = float(self.particle_max_diam_entry.get())
             opts['proc__topazpicker__topaz_particle_diameter'] = float(self.particle_max_diam_entry.get())
         except ValueError:
-            if len(self.particle_max_diam_entry.get()) == 0 and (not self.get_var_as_bool(self.do_class2d_var) or not self.get_var_as_bool(self.do_retrain_topaz_var)):
+            if len(self.particle_max_diam_entry.get()) == 0 and (not self.get_var_as_bool(self.do_2d_var) or not self.get_var_as_bool(self.do_retrain_topaz_var)):
                 # This was left blank and won't be used, set to zero to avoid errors in calculations later
                 opts['proc__logpicker__log_diam_max'] = 0.0
             else:
@@ -676,7 +721,7 @@ class RelionItGui(object):
         try:
             opts['proc__logpicker__log_diam_min'] = float(self.particle_min_diam_entry.get())
         except ValueError:
-            if len(self.particle_min_diam_entry.get()) == 0 and (not self.get_var_as_bool(self.do_class2d_var) or not self.get_var_as_bool(self.do_retrain_topaz_var)):
+            if len(self.particle_min_diam_entry.get()) == 0 and (not self.get_var_as_bool(self.do_2d_var) or not self.get_var_as_bool(self.do_retrain_topaz_var)):
                 # This was left blank and won't be used, set to zero to avoid errors in calculations later
                 opts['proc__logpicker__log_diam_min'] = 0.0
             else:
@@ -827,6 +872,7 @@ class RelionItGui(object):
                         print(' RELION_IT: excuting: ', command)
                         os.system(command)
 
+                print(' RELION_IT: done saving all options in the Schedules.') 
                 return True
 
         except Exception as ex:
