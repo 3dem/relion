@@ -11,10 +11,10 @@
 
 option(TORCH_EXTERNAL_VERBOSE "Verbose mode during Torch fetch and configure." OFF)
 set(TORCH_EXTERNAL_PATH "${CMAKE_SOURCE_DIR}/external/libtorch")
-set(TORCH_FILE_NAME libtorch-commit-4c7fb8c2-cxx11-abi-glibc2.17-shared_rpath.tar.gz)
+set(TORCH_FILE_NAME libtorch-cxx11-abi-glibc2.17-shared_openblas_rpath.tar.gz)
 set(TORCH_FILE_PATH ${TORCH_EXTERNAL_PATH}/${TORCH_FILE_NAME})
 set(TORCH_URL "ftp://ftp.mrc-lmb.cam.ac.uk/pub/dari/${TORCH_FILE_NAME}")
-set(TORCH_HASH 9876bfb7ec3e61638ccb01dd9bab849a)
+set(TORCH_HASH 38b21f006fb8c639e03f093da3c9c186)
 set(TORCH_FOUND 0)
 
 if(EXISTS ${TORCH_FILE_PATH})
