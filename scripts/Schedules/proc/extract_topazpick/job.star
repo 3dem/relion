@@ -36,7 +36,7 @@ helical_rise          1
 helical_tube_outer_diameter        200 
 min_dedicated         24 
 minimum_pick_fom         -3 
-    nr_mpi          1 
+    nr_mpi          4 
 other_args         "" 
       qsub       qsub 
 qsubscript /public/EM/RELION/relion/bin/relion_qsub.csh 

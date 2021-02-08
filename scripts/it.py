@@ -169,7 +169,9 @@ RelionItOptions = {
     ### Split parameters after logpick (this will be the maximum number of particles in the first batch)
     'proc__split_logpick__split_size' : 5000,
 
-    ### Extract parameters for Topaz job
+    ### Extract parameters for Topaz job, leave empty for using general topaz model
+    # Model for topaz picking (this will be automatically set to Schedules/proc/train_topaz/model_epoch10.sav for retraining)
+    'proc__topaz_model' : '',
     # Box size of particles in the averaged micrographs (in pixels)
     'proc__extract_topazpick__extract_size' : 256,
     # Down-scale the particles upon extraction?
@@ -386,14 +388,6 @@ class RelionItGui(object):
 
         row += 1
 
-        tk.Label(self.particle_frame, text="Nr particles per micrograph:").grid(row=row, sticky=tk.W)
-        self.partspermic_var = tk.StringVar()  # for data binding
-        self.partspermic_entry = tk.Entry(self.particle_frame, textvariable=self.partspermic_var)
-        self.partspermic_entry.grid(row=row, column=1, sticky=tk.W)
-        self.partspermic_entry.insert(0, str(options['proc__train_topaz__topaz_nr_particles']))
-
-        row += 1
-
         tk.Label(self.particle_frame, text=u"Longest diameter (\u212B):").grid(row=row, sticky=tk.W)
         self.particle_max_diam_var = tk.StringVar()  # for data binding
         self.particle_max_diam_entry = tk.Entry(self.particle_frame, textvariable=self.particle_max_diam_var)
@@ -483,6 +477,22 @@ class RelionItGui(object):
         self.log_classscore_entry = tk.Entry(self.picking_frame, textvariable=self.log_classscore_var)
         self.log_classscore_entry.grid(row=row, column=1, sticky=tk.W)
         self.log_classscore_entry.insert(0, str(options['proc__select_logbatch__rank_threshold']))
+
+        row += 1
+
+        tk.Label(self.picking_frame, text="Topaz model:").grid(row=row, sticky=tk.W)
+        self.topaz_model_var = tk.StringVar()  # for data binding
+        self.topaz_model_entry = tk.Entry(self.picking_frame, textvariable=self.topaz_model_var)
+        self.topaz_model_entry.grid(row=row, column=1, sticky=tk.W)
+        self.topaz_model_entry.insert(0, str(options['proc__topaz_model']))
+
+        row += 1
+
+        tk.Label(self.picking_frame, text="Nr particles per micrograph:").grid(row=row, sticky=tk.W)
+        self.partspermic_var = tk.StringVar()  # for data binding
+        self.partspermic_entry = tk.Entry(self.picking_frame, textvariable=self.partspermic_var)
+        self.partspermic_entry.grid(row=row, column=1, sticky=tk.W)
+        self.partspermic_entry.insert(0, str(options['proc__train_topaz__topaz_nr_particles']))
 
         row += 1
 
@@ -588,10 +598,16 @@ class RelionItGui(object):
                 self.logbatch_entry.config(state=tk.NORMAL)
                 self.log_thresh_entry.config(state=tk.NORMAL)
                 self.log_classscore_entry.config(state=tk.NORMAL)
+                self.topaz_model_entry.delete(0,tk.END)
+                self.topaz_model_entry.insert(0, 'Schedules/proc/train_topaz/model_epoch10.sav')
+                self.topaz_model_entry.config(state=tk.DISABLED)
             else:
                 self.logbatch_entry.config(state=tk.DISABLED)
                 self.log_thresh_entry.config(state=tk.DISABLED)
                 self.log_classscore_entry.config(state=tk.DISABLED)
+                self.topaz_model_entry.delete(0,tk.END)
+                self.topaz_model_entry.insert(0, str(options['proc__topaz_model']))
+                self.topaz_model_entry.config(state=tk.NORMAL)
 
 
         def update_box_sizes(*args_ignored, **kwargs_ignored):
@@ -674,6 +690,8 @@ class RelionItGui(object):
         opts['proc__do_2d'] = self.get_var_as_bool(self.do_2d_var)
         opts['proc__do_3d'] = self.get_var_as_bool(self.do_3d_var)
         opts['proc__do_retrain_topaz'] = self.get_var_as_bool(self.do_retrain_topaz_var)
+        opts['proc__topaz_model'] = self.topaz_model_entry.get()
+
         opts['prep__ctffind__do_phaseshift'] = self.get_var_as_bool(self.phaseplate_var)
 
         try:
@@ -802,6 +820,7 @@ class RelionItGui(object):
             warnings.append("- Nr particles per micrograph should be a positive number")
 
         opts['proc__inimodel3d__sym_name'] = self.symmetry_entry.get()
+        opts['proc__iniref'] = self.iniref_entry.get()
         opts['proc__refine3d__sym_name'] = self.symmetry_entry.get()
 
         # Set GPU IDs in all jobs

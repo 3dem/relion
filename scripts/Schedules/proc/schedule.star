@@ -124,6 +124,7 @@ class2d_logbatch select_logbatch            0  undefined  undefined
 select_logbatch train_topaz            0  undefined  undefined 
 train_topaz       WAIT            0  undefined  undefined 
 topazpicker extract_topazpick            0  undefined  undefined 
+extract_topazpick COUNT_restbatch       0  undefined  undefined 
 COUNT_restbatch HAS_rest_increased            0  undefined  undefined 
 HAS_rest_increased       WAIT            1 class2d_rest has_larger_rest_size 
 class2d_rest select_rest            0  undefined  undefined 
