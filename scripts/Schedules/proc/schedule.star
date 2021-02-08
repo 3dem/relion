@@ -54,7 +54,7 @@ logbatch Schedules/proc/split_logpick/particles_split1.star Schedules/proc/split
 particles  particles  particles 
 rest_batch Schedules/proc/extract_topazpick/particles.star Schedules/proc/extract_topazpick/particles.star 
 topaz_model Schedules/proc/train_topaz/model_epoch10.sav Schedules/proc/train_topaz/model_epoch10.sav 
-iniref iniref.mrc
+iniref None None
 
 # version 30001
 
