@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
 	
 	for (int m = 0; m < allMdts.size(); m++)
 	{
-		const int pc = allMdts[m].size();
+		const int pc = allMdts[m].numberOfObjects();
 		
 		const double mgContrib = allParts? 1.0 : pc;
 		const int p_max = allParts? pc : 1;

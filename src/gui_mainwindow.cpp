@@ -279,10 +279,9 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	FileName fn_lock=".gui_projectdir";
 	if (!exists(fn_lock))
 	{
-		std::cout << " Only run the relion GUI from your ProjectDirectory. Do you want to start a new project here [y/n]? ";
-		char c;
-		std::cin >> c;
-		if (c == 'y' || c == 'Y')
+		int ret = fl_choice("Your current directory does not look like a RELION project directory.\nOnly run the RELION GUI from your project directory.\nDo you want to start a new project here?", "No", "Yes", 0);
+		this->begin(); // apparently fl_choice changes Fl_Group::current. Thus, we have to reclaim it.
+		if (ret == 1)
 			touch(".gui_projectdir");
 		else
 		{

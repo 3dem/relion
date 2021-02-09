@@ -66,7 +66,7 @@ file(GLOB REL_LBFGS_H "${CMAKE_SOURCE_DIR}/src/jaz/lbfgs/*.h")
 file(GLOB REL_HP "${CMAKE_SOURCE_DIR}/src/Healpix_2.15a/*.cc")
 file(GLOB RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/*.cpp")
 
-set(GUI_TARGETS display maingui manualpick pipeliner)
+set(GUI_TARGETS maingui display manualpick)
 
 #--Remove apps using X11 if no GUI--
 if(NOT GUI)
@@ -201,12 +201,18 @@ endif()
 foreach (_target ${RELION_TARGETS})
 	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)  #specify target name WE=WithoutExtension
 
-	add_executable(${_target} ${_target}.cpp )
+
+	if(${_target} STREQUAL "maingui") # We no longer want "relion_maingui"
+		set(_target "relion")
+		add_executable(${_target} maingui.cpp)
+	else()
+		add_executable(${_target} ${_target}.cpp )
+		set_target_properties(${_target} PROPERTIES PREFIX "relion_")
+	endif()
+
 	set(LIB relion_lib)
 
  	add_dependencies(${_target} relion_lib)
-
-	set_target_properties(${_target} PROPERTIES PREFIX "relion_")
 
 	if(NOT MKLFFT)
 		target_link_libraries(${_target} ${LIB} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
@@ -237,7 +243,7 @@ foreach (_target ${RELION_TARGETS})
 	)
 
 	list(FIND GUI_TARGETS ${_target} IS_GUI_TARGET)
-	if(NOT ${IS_GUI_TARGET} LESS 0)
+	if((NOT ${IS_GUI_TARGET} LESS 0) OR (${_target} STREQUAL "relion"))
 		add_dependencies(${_target} relion_gui_lib)
 		target_link_libraries(${_target} relion_gui_lib ${FLTK_LIBRARIES} ${X11})
 	endif()
@@ -250,14 +256,6 @@ foreach (_target ${RELION_TARGETS})
 
 	install (TARGETS ${_target} RUNTIME DESTINATION bin)
 endforeach()
-
-if(GUI)
-	ADD_CUSTOM_COMMAND(TARGET maingui
-	                   POST_BUILD
-                           COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/bin/relion_maingui ${PROJECT_BINARY_DIR}/bin/relion
-                           COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/bin/relion_qsub.csh ${PROJECT_BINARY_DIR}/bin/qsub.csh
-	)
-endif(GUI)
 
 FIND_PACKAGE( OpenMP REQUIRED)
 if(OPENMP_FOUND)

@@ -2312,19 +2312,19 @@ std::string PipeLineFlowChart::getDownwardsArrowLabel(PipeLine &pipeline, long i
 	{
 		case NODE_MOVIES:
 		{
-			nr_obj = MD.read(pipeline.nodeList[mynode].name, "", NULL, "", true); // true means: only count nr entries;
+			nr_obj = MD.read(pipeline.nodeList[mynode].name, "", true); // true means: only count nr entries;
 			mylabel = integerToString(nr_obj) + " movies";
 			break;
 		}
 		case NODE_MICS:
 		{
-			nr_obj = MD.read(pipeline.nodeList[mynode].name, "", NULL, "", true); // true means: only count nr entries;
+			nr_obj = MD.read(pipeline.nodeList[mynode].name, "", true); // true means: only count nr entries;
 			mylabel = integerToString(nr_obj) + " micrographs";
 			break;
 		}
 		case NODE_PART_DATA:
 		{
-			nr_obj = MD.read(pipeline.nodeList[mynode].name, "", NULL, "", true); // true means: only count nr entries;
+			nr_obj = MD.read(pipeline.nodeList[mynode].name, "", true); // true means: only count nr entries;
 			mylabel = integerToString(nr_obj) + " particles";
 			break;
 		}
@@ -2345,7 +2345,7 @@ std::string PipeLineFlowChart::getDownwardsArrowLabel(PipeLine &pipeline, long i
 		}
 		case NODE_MODEL:
 		{
-			nr_obj = MD.read(pipeline.nodeList[mynode].name, "model_classes", NULL, "", true); // true means: only count nr entries;
+			nr_obj = MD.read(pipeline.nodeList[mynode].name, "model_classes", true); // true means: only count nr entries;
 			mylabel = integerToString(nr_obj) + " classes";
 			break;
 		}

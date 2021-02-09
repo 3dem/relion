@@ -3882,24 +3882,27 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 			else
 				command += " --ignore_helical_symmetry";
 
-			float val = joboptions["range_tilt"].getNumber(error_message);
-			if (error_message != "") return false;
-			val = (val < 0.) ? (0.) : (val);
-			val = (val > 90.) ? (90.) : (val);
-			command += " --sigma_tilt " + floatToString(val / 3.);
+			float val;
+			if (sampling != auto_local_sampling)
+			{
+				val = joboptions["range_tilt"].getNumber(error_message);
+				if (error_message != "") return false;
+				val = (val < 0.) ? (0.) : (val);
+				val = (val > 90.) ? (90.) : (val);
+				command += " --sigma_tilt " + floatToString(val / 3.);
 
-			val = joboptions["range_psi"].getNumber(error_message);
-			if (error_message != "") return false;
-			val = (val < 0.) ? (0.) : (val);
-			val = (val > 90.) ? (90.) : (val);
-			command += " --sigma_psi " + floatToString(val / 3.);
+				val = joboptions["range_psi"].getNumber(error_message);
+				if (error_message != "") return false;
+				val = (val < 0.) ? (0.) : (val);
+				val = (val > 90.) ? (90.) : (val);
+				command += " --sigma_psi " + floatToString(val / 3.);
 
-			val = joboptions["range_rot"].getNumber(error_message);
-			if (error_message != "") return false;
-			val = (val < 0.) ? (0.) : (val);
-			val = (val > 90.) ? (90.) : (val);
-			command += " --sigma_rot " + floatToString(val / 3.);
-
+				val = joboptions["range_rot"].getNumber(error_message);
+				if (error_message != "") return false;
+				val = (val < 0.) ? (0.) : (val);
+				val = (val > 90.) ? (90.) : (val);
+				command += " --sigma_rot " + floatToString(val / 3.);
+			}
 
 			val = joboptions["helical_range_distance"].getNumber(error_message);
 			if (error_message != "") return false;
