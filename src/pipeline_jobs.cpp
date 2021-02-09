@@ -3214,6 +3214,10 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 
 	commands.push_back(command);
 
+	// Quickly remove RELION_JOB_EXIT_SUCCESS
+	std::string command0 = "rm -f " + outputname + RELION_JOB_EXIT_SUCCESS;
+	commands.push_back(command0);
+
 	// Now align&apply symmetry, or copy output from relion_refine to initial_model.mrc
 	FileName fn_ref;
 	int iter = (int)((joboptions["nr_iter"]).getNumber(error_message));
@@ -3243,6 +3247,10 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 		command2 += " --o " + outputname + "initial_model.mrc";
 		commands.push_back(command2);
 	}
+
+	// And re-introduce RELION_JOB_EXIT_SUCCESS
+	std::string commandF = "touch " + outputname + RELION_JOB_EXIT_SUCCESS;
+	commands.push_back(commandF);
 
 	Node node2(outputname + "initial_model.mrc", NODE_3DREF);
 	outputNodes.push_back(node2);
