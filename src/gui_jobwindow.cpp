@@ -1353,11 +1353,6 @@ void JobWindow::initialiseInimodelWindow()
 	resetHeight();
 
 	place("nr_iter");
-	place("grad_write_iter");
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
 	place("nr_classes", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
@@ -1382,7 +1377,6 @@ void JobWindow::initialiseInimodelWindow()
 
 	place("do_parallel_discio");
 	place("nr_pool");
-	place("do_pad1");
 	place("skip_gridding");
 	group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group5->end();

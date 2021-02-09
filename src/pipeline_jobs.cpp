@@ -3028,8 +3028,7 @@ Note that the Output rootname of the continued run and the rootname of the previ
 If they are the same, the program will automatically add a '_ctX' to the output rootname, \
 with X being the iteration from which one continues the previous run.");
 
-	joboptions["nr_iter"] = JobOption("Number of iterations:", 200, 50, 500, 10, "How many iterations (i.e. mini-batches) to perform?");
-	joboptions["grad_write_iter"] = JobOption("Write-out frequency (iter):", 10, 1, 50, 1, "Every how many iterations do you want to write the model to disk?");
+	joboptions["nr_iter"] = JobOption("Number of iterations:", 100, 50, 500, 10, "How many iterations (i.e. mini-batches) to perform?");
 
 	joboptions["nr_classes"] = JobOption("Number of classes:", 1, 1, 50, 1, "The number of classes (K) for a multi-reference ab initio SGD refinement. \
 These classes will be made in an unsupervised manner, starting from a single reference in the initial iterations of the SGD, and the references will become increasingly dissimilar during the inbetween iterations.");
@@ -3072,7 +3071,6 @@ Otherwise, only the master will read images and send them through the network to
 	joboptions["nr_pool"] = JobOption("Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI slaves. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
 All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
 This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
-	joboptions["do_pad1"] = JobOption("Skip padding?", false, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
 	joboptions["skip_gridding"] = JobOption("Skip gridding?", true, "If set to Yes, the calculations will skip gridding in the M step to save time, typically with just as good results.");
 	joboptions["do_preread_images"] = JobOption("Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in float-precision, it will take ( N * box_size * box_size * 4 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 15Gb, or 60 Gb for the same number of 400x400 particles. \
@@ -3134,10 +3132,8 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
         int nr_classes = joboptions["nr_classes"].getNumber(error_message);
 	if (error_message != "") return false;
 
-	outputNodes = getOutputNodesRefine(outputname + fn_run, total_nr_iter, nr_classes, 3, 1);
-
 	command += " --iter " + joboptions["nr_iter"].getString();
-	command += " --grad_write_iter " + joboptions["grad_write_iter"].getString();
+	command += " --grad_write_iter 10 ";
 
 	if (!is_continue)
 	{
@@ -3161,7 +3157,7 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 		}
 
 		command += " --K " + joboptions["nr_classes"].getString();
-		command += " --sym " + joboptions["sym_name"].getString();
+		command += " --sym C1 ";
 
 		if (joboptions["do_solvent"].getBoolean())
 			command += " --flatten_solvent ";
@@ -3178,10 +3174,7 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 	else if (joboptions["scratch_dir"].getString() != "")
 	command += " --scratch_dir " +  joboptions["scratch_dir"].getString();
 	command += " --pool " + joboptions["nr_pool"].getString();
-	if (joboptions["do_pad1"].getBoolean())
-		command += " --pad 1 ";
-	else
-		command += " --pad 2 ";
+	command += " --pad 1 ";
 	if (joboptions["skip_gridding"].getBoolean())
 		command += " --skip_gridding ";
 
@@ -3220,6 +3213,39 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 	command += " " + joboptions["other_args"].getString();
 
 	commands.push_back(command);
+
+	// Now align&apply symmetry, or copy output from relion_refine to initial_model.mrc
+	FileName fn_ref;
+	int iter = (int)((joboptions["nr_iter"]).getNumber(error_message));
+	if (error_message != "") return false;
+	fn_ref.compose(outputname+"run_it", iter, "", 3);
+	fn_ref.compose(fn_ref+"_class", 1, "mrc", 3);
+	if (joboptions["sym_name"].getString() != "C1" || joboptions["sym_name"].getString() != "c1")
+	{
+		// Align with symmetry axes and apply symmetry
+		std::string command2 = "`which relion_align_symmetry`";
+		command2 += " --i " + fn_ref;
+		command2 += " --o " + outputname + "symmetry_aligned.mrc";
+		command2 += " --sym " + joboptions["sym_name"].getString();
+		commands.push_back(command2);
+
+		std::string command3 = "`which relion_image_handler`";
+		command3 += " --i " + outputname + "symmetry_aligned.mrc";
+		command3 += " --o " + outputname + "initial_model.mrc";
+		command3 += " --sym " + joboptions["sym_name"].getString();
+		commands.push_back(command3);
+	}
+	else
+	{
+		// Just copy to expected output filename
+		std::string command2 = "`which relion_image_handler`";
+		command2 += " --i " + fn_ref;
+		command2 += " --o " + outputname + "initial_model.mrc";
+		commands.push_back(command2);
+	}
+
+	Node node2(outputname + "initial_model.mrc", NODE_3DREF);
+	outputNodes.push_back(node2);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
