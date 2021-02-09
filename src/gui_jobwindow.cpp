@@ -1656,7 +1656,7 @@ void JobWindow::initialiseAutorefineWindow()
 
 	current_y += STEPY/2;
 	place("auto_local_sampling", TOGGLE_DEACTIVATE);
-	place("relax_sym", TOGGLE_DEACTIVATE);
+	place("relax_sym");
 	current_y += STEPY/2;
 	place("auto_faster");
 
