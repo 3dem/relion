@@ -32,6 +32,7 @@ _rlnScheduleBooleanVariableName #1
 _rlnScheduleBooleanVariableValue #2 
 _rlnScheduleBooleanVariableResetValue #3 
 has_ctffind 0 0
+do_prep 1 1 
 do_2d 1 1 
 do_3d 1 1 
 has_larger_rest_size            0            0 

@@ -108,6 +108,12 @@ RelionItOptions = {
     #
     #############################################################################
 
+    # Perform Import, Motion correction and CTF estimation?
+    # This option isn't really used in the schedule, it only serves to store the checkbox selected from the relion_it.py GUI....
+    'proc__do_prep' : True,
+    # If the above option is false, then use this to provide a specific star file to the micrographs instead
+    'proc__ctffind_mics' : 'Schedules/prep/ctffind/micrographs_ctf.star',
+
     ### How many micrograph movies to do in each iteration of the prep Schedule
     'prep__do_at_most' : 50,
 
@@ -319,7 +325,7 @@ class RelionItGui(object):
 
         row += 1
 
-        tk.Label(expt_frame, text=u"Pixel size (\u212B):").grid(row=row, sticky=tk.W)
+        tk.Label(expt_frame, text=u"(Super-res) pixel size (\u212B):").grid(row=row, sticky=tk.W)
         self.angpix_var = tk.StringVar()  # for data binding
         self.angpix_entry = tk.Entry(expt_frame, textvariable=self.angpix_var)
         self.angpix_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
@@ -340,6 +346,26 @@ class RelionItGui(object):
 
         row = 0
 
+        tk.Label(compute_frame, text="Do MotionCorr & CTF?").grid(row=row, sticky=tk.W)
+        self.do_prep_var = tk.IntVar()
+        self.do_prep_button = tk.Checkbutton(compute_frame, var=self.do_prep_var)
+        self.do_prep_button.grid(row=row, column=1, sticky=tk.W)
+        if options['proc__do_prep']:
+            self.do_prep_button.select()
+
+        row += 1
+        
+        tk.Label(compute_frame, text="micrographs_ctf.star:").grid(row=row, sticky=tk.W)
+        self.mics_var = tk.StringVar()  # for data binding
+        self.mics_entry = tk.Entry(compute_frame, textvariable=self.mics_var)
+        self.mics_entry.grid(row=row, column=1, sticky=tk.W)
+        self.mics_entry.insert(0, str(options['proc__ctffind_mics']))
+
+        mics_button = new_browse_button(compute_frame, self.mics_var, filetypes=(('STAR file', '{*.star}'), ('All files', '*')))
+        mics_button.grid(row=row, column=2)
+
+        row += 1
+ 
         tk.Label(compute_frame, text="Do Autopick & Class2D?").grid(row=row, sticky=tk.W)
         self.do_2d_var = tk.IntVar()
         self.do_2d_button = tk.Checkbutton(compute_frame, var=self.do_2d_var)
@@ -363,6 +389,9 @@ class RelionItGui(object):
         self.iniref_entry = tk.Entry(compute_frame, textvariable=self.iniref_var)
         self.iniref_entry.grid(row=row, column=1, sticky=tk.W)
         self.iniref_entry.insert(0, str(options['proc__iniref']))
+
+        ref_button = new_browse_button(compute_frame, self.iniref_var, filetypes=(('MRC file', '{*.mrc}'), ('All files', '*')))
+        ref_button.grid(row=row, column=2)
 
         row += 1
         
@@ -486,6 +515,9 @@ class RelionItGui(object):
         self.topaz_model_entry.grid(row=row, column=1, sticky=tk.W)
         self.topaz_model_entry.insert(0, str(options['proc__topaz_model']))
 
+        self.topaz_model_button = new_browse_button(self.picking_frame, self.topaz_model_var, filetypes=(('Topaz model file', '{*.sav}'), ('All files', '*')))
+        self.topaz_model_button.grid(row=row, column=2)
+
         row += 1
 
         tk.Label(self.picking_frame, text="Nr particles per micrograph:").grid(row=row, sticky=tk.W)
@@ -569,6 +601,14 @@ class RelionItGui(object):
                 # Can't update the downscaled pixel size unless the downscaled box size is valid
                 self.extract_angpix.config(text=u"= NNN \u212B/px")
 
+        def update_prep_status(*args_ignored, **kwargs_ignored):
+            if self.get_var_as_bool(self.do_prep_var):
+                self.mics_entry.delete(0,tk.END)
+                self.mics_entry.insert(0, 'Schedules/prep/ctffind/micrographs_ctf.star')
+                self.mics_entry.configure(state=tk.DISABLED)
+            else:
+                self.mics_entry.configure(state=tk.NORMAL)
+
         def update_2d_status(*args_ignored, **kwargs_ignored):
             if self.get_var_as_bool(self.do_2d_var):
                 for child in self.particle_frame.winfo_children():
@@ -601,6 +641,7 @@ class RelionItGui(object):
                 self.topaz_model_entry.delete(0,tk.END)
                 self.topaz_model_entry.insert(0, 'Schedules/proc/train_topaz/model_epoch10.sav')
                 self.topaz_model_entry.config(state=tk.DISABLED)
+                self.topaz_model_button.config(state=tk.DISABLED)
             else:
                 self.logbatch_entry.config(state=tk.DISABLED)
                 self.log_thresh_entry.config(state=tk.DISABLED)
@@ -608,6 +649,7 @@ class RelionItGui(object):
                 self.topaz_model_entry.delete(0,tk.END)
                 self.topaz_model_entry.insert(0, str(options['proc__topaz_model']))
                 self.topaz_model_entry.config(state=tk.NORMAL)
+                self.topaz_model_button.config(state=tk.NORMAL)
 
 
         def update_box_sizes(*args_ignored, **kwargs_ignored):
@@ -648,6 +690,7 @@ class RelionItGui(object):
         auto_boxsize_button.config(command=update_box_sizes)
       
         self.retrain_topaz_button.config(command=update_logpick_status)
+        self.do_prep_button.config(command=update_prep_status)
         self.do_2d_button.config(command=update_2d_status)
         self.do_3d_button.config(command=update_3d_status)
 
@@ -664,6 +707,8 @@ class RelionItGui(object):
         update_box_sizes()
         # Show initial logpick status
         update_logpick_status()
+        # Show initial prep status
+        update_prep_status()
         # Show initial 2d status
         update_2d_status()
         # Show initial 3d status
@@ -687,6 +732,8 @@ class RelionItGui(object):
         opts = self.options
         warnings = []
 
+        opts['proc__do_prep'] = self.get_var_as_bool(self.do_prep_var)
+        opts['proc__ctffind_mics'] = self.mics_entry.get()
         opts['proc__do_2d'] = self.get_var_as_bool(self.do_2d_var)
         opts['proc__do_3d'] = self.get_var_as_bool(self.do_3d_var)
         opts['proc__do_retrain_topaz'] = self.get_var_as_bool(self.do_retrain_topaz_var)
@@ -913,9 +960,11 @@ def run_scheduler(options, do_gui):
     print(' RELION_IT: excuting: ', command)
     os.system(command)
 
-    command = 'relion_scheduler --schedule prep --run --pipeline_control Schedules/prep/ >> Schedules/prep/run.out 2>> Schedules/prep/run.err &'
-    print(' RELION_IT: excuting: ', command)
-    os.system(command)
+    if options['proc__do_prep']:
+        
+        command = 'relion_scheduler --schedule prep --run --pipeline_control Schedules/prep/ >> Schedules/prep/run.out 2>> Schedules/prep/run.err &'
+        print(' RELION_IT: excuting: ', command)
+        os.system(command)
 
     if options['proc__do_2d']:
 
