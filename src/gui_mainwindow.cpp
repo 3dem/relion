@@ -2729,6 +2729,8 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 			long int overwrite_job_nr =  (pipeline.processList[current_job]).getJobNumber();
 			cb_delete_i(false, false);
 			pipeline.setJobCounter(overwrite_job_nr);
+			// Make sure this is not a continue job anymore
+			is_main_continue = false;
 		}
 	}
 
@@ -2743,6 +2745,9 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 	std::string error_message;
 	if (!pipeline.runJob(gui_jobwindows[iwin]->myjob, current_job, only_schedule, is_main_continue, false, error_message))
 	{
+		// Still revert back to the correct job_counter for overwrite jobs!
+		if (do_overwrite_continue) pipeline.setJobCounter(my_overwrite_job_counter);
+		// Show the error
 		fl_message("%s", error_message.c_str());
 		// Allow the user to fix the error and submit this job again
 		run_button->activate();
