@@ -1063,7 +1063,6 @@ const BufferedImage<RFLOAT>& ObservationModel::getMtfImage(int optGroup, int s)
 					REPORT_ERROR("ERROR: zero or negative values encountered in MTF curve: " + fnMtfs[optGroup]);
 				}
 
-				i++;
 			}
 
 			// Calculate slope of resolution (in 1/A) per element in the MTF array, in order to interpolate below
