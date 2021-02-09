@@ -263,12 +263,12 @@ void MotionParamEstimator::run()
 
     prepAlignment();
 
-    RCTOC(paramTimer, timeSetup);
+	RCTOC(paramTimer, timeSetup);
 
     d4Vector opt;
 
-    std::cout.setf(std::ios::fixed, std::ios::floatfield);
-    std::cout.precision(5);
+	std::cout.setf(std::ios::fixed, std::ios::floatfield);
+	std::cout.precision(5);
 
     if (estim2)
     {
@@ -278,9 +278,7 @@ void MotionParamEstimator::run()
     if (estim3)
     {
         opt = estimateThreeParamsNM(sV, sD, sA, iniStep, conv, maxIters);
-    }
-
-    std::cout.setf(std::ios::floatfield);
+	}
 
     d3Vector nrm(
         opt[0] * velScale,
@@ -301,7 +299,7 @@ void MotionParamEstimator::run()
     if (opt[2] <= 0.0)
     {
         rnd[2] = -1;
-    }
+	}
 
     std::cout << "\ngood parameters:"
               << " --s_vel " << rnd[0]
@@ -355,7 +353,7 @@ d4Vector MotionParamEstimator::estimateTwoParamsNM(
 
     std::vector<double> final = NelderMead::optimize(
             initial, thpp, inStep, conv, maxIters,
-            1.0, 2.0, 0.5, 0.5, false, &minTsc);
+			1.0, 2.0, 0.5, 0.5, true, &minTsc);
 
     d2Vector vd = TwoHyperParameterProblem::problemToMotion(final);
 
@@ -376,7 +374,7 @@ d4Vector MotionParamEstimator::estimateThreeParamsNM(
 
     std::vector<double> final = NelderMead::optimize(
             initial, thpp, inStep, conv, maxIters,
-            1.0, 2.0, 0.5, 0.5, false, &minTsc);
+			1.0, 2.0, 0.5, 0.5, true, &minTsc);
 
     d3Vector vd = ThreeHyperParameterProblem::problemToMotion(final);
 

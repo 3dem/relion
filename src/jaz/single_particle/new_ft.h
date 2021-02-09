@@ -148,7 +148,7 @@ class NewFFT
 		template<class T>
 		static bool areSizesCompatible(
 				const MultidimArray<T>& real,
-				const MultidimArray<tComplex<T>>& complex)
+				const MultidimArray<tComplex<T> >& complex)
 		{
 			return real.xdim == 2 * (complex.xdim - 1)
 			    && real.ydim == complex.ydim
@@ -159,7 +159,7 @@ class NewFFT
 		template<class T>
 		static void resizeRealToMatch(
 				MultidimArray<T>& real,
-				const MultidimArray<tComplex<T>>& complex)
+				const MultidimArray<tComplex<T> >& complex)
 		{
 			real.resizeNoCp(complex.ndim, complex.zdim, complex.ydim, 2 * (complex.xdim - 1));
 		}
@@ -167,7 +167,7 @@ class NewFFT
 		template<class T>
 		static void resizeComplexToMatch(
 				const MultidimArray<T>& real,
-				MultidimArray<tComplex<T>>& complex)
+				MultidimArray<tComplex<T> >& complex)
 		{
 			complex.resizeNoCp(real.ndim, real.zdim, real.ydim, real.xdim/2 + 1);
 		}
