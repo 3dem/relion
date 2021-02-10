@@ -3224,7 +3224,8 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 	if (error_message != "") return false;
 	fn_ref.compose(outputname+"run_it", iter, "", 3);
 	fn_ref.compose(fn_ref+"_class", 1, "mrc", 3);
-	if (joboptions["sym_name"].getString() != "C1" || joboptions["sym_name"].getString() != "c1")
+	FileName fn_sym = joboptions["sym_name"].getString();
+	if ( !(fn_sym.contains("C1") || fn_sym.contains("c1")) )
 	{
 		// Align with symmetry axes and apply symmetry
 		std::string command2 = "`which relion_align_symmetry`";
