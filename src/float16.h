@@ -73,8 +73,8 @@ inline float16 float2half(float f32)
 	f.f = f32;
 
 	unsigned int sign = (f.i & 0x80000000u) >> 31; // 1 bit
-	unsigned int exponent = (f.i & 0x7f800000) >> 23; // 10 bits
-	unsigned int fractional = (f.i & 0x007fffff); // 23 bits
+	unsigned int exponent = (f.i & 0x7f800000u) >> 23; // 10 bits
+	unsigned int fractional = (f.i & 0x007fffffu); // 23 bits
 
 	unsigned short ret = sign << 15; // first make a signed zero
 
