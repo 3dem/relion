@@ -158,7 +158,7 @@ RelionItOptions = {
     'proc__logpicker__log_diam_min' : 150,
     'proc__logpicker__log_diam_max' : 180,
     # Use positive values (0-1) to pick fewer particles; use negative values (-1-0) to pick more particles
-    'proc__logpicker__log_adjust_thr' : 0.0,
+    'proc__logpicker__log_adjust_thr' : 0,
     # Use this to remove false positives from carbon edges (useful range: 1.0-1.2, -1 to switch off)
     'proc__logpicker__maxstddevnoise_autopick' : -1,
     # Use this to remove false positives from carbon edges (useful range: -0.5-0.0; -999 to switch off)
@@ -173,7 +173,7 @@ RelionItOptions = {
     # Box size of the down-scaled particles (in pixels)
     'proc__extract_logpick__rescale' : 64,
     ### Split parameters after logpick (this will be the maximum number of particles in the first batch)
-    'proc__split_logpick__split_size' : 5000,
+    'proc__split_logpick__split_size' : 10000,
 
     ### Extract parameters for Topaz job, leave empty for using general topaz model
     # Model for topaz picking (this will be automatically set to Schedules/proc/train_topaz/model_epoch10.sav for retraining)
@@ -185,7 +185,7 @@ RelionItOptions = {
     # Box size of the down-scaled particles (in pixels)
     'proc__extract_topazpick__rescale' : 64,
     # Minimum FOM for topaz extraction
-    'proc__extract_topazpick__minimum_pick_fom' : -3,
+    'proc__extract_topazpick__minimum_pick_fom' : 0,
     
     ### Parameters for Topaz picking
     # Expected number of particles per micrograph
@@ -197,9 +197,9 @@ RelionItOptions = {
 
     ### Parameters for automated 2D class selection
     # Minimum rank score for particles after LoG picking
-    'proc__select_logbatch__rank_threshold' : 0.35,
+    'proc__select_logbatch__rank_threshold' : 0.5,
     # Minimum rank score for particles after Topaz picking
-    'proc__select_rest__rank_threshold' : 0.35,
+    'proc__select_rest__rank_threshold' : 0.5,
 
     ### Parameters for 2D classification (logbatch and rest)
     # Which (single) GPU to run on for logbatch and rest
@@ -207,7 +207,7 @@ RelionItOptions = {
     'proc__class2d_logbatch__gpu_ids' : '0,1',
 
     # Minimum number of particles in the first batch of logpicked particles to perform 2D classification on (this should be <= 'proc__split_logpick__split_size' above)
-    'proc__logbatch_size' : 5000,
+    'proc__logbatch_size' : 10000,
     # Diameter of the mask used for 2D classification (in Angstrom)
     'proc__class2d_logbatch__particle_diameter' : 200,
 
@@ -235,6 +235,16 @@ class RelionItGui(object):
         self.main_window = main_window
         self.options = options
 
+        ### Create GUI
+
+        # Colour definitions
+        # Yellowish background for entries
+        entry_bg = '#ffffe6'
+        # reddish colour for Browse buttons
+        button_bg = '#c8506e'
+        # Derker red for run buttons
+        runbutton_bg = '#a01e3c'
+
         # Convenience function for making file browser buttons
         def new_browse_button(master, var_to_set, filetypes=(('MRC file', '*.mrc'), ('All files', '*'))):
             def browse_command():
@@ -244,9 +254,7 @@ class RelionItGui(object):
                     if chosen_file.startswith(os.getcwd()):
                         chosen_file = os.path.relpath(chosen_file)
                     var_to_set.set(chosen_file)
-            return tk.Button(master, text="Browse", command=browse_command, bg='#c8506e')
-
-        ### Create GUI
+            return tk.Button(master, text="Browse", command=browse_command, bg=button_bg)
 
         main_frame = tk.Frame(main_window)
         main_frame.pack(fill=tk.BOTH, expand=1)
@@ -276,7 +284,7 @@ class RelionItGui(object):
         
         tk.Label(compute_frame, text="micrographs_ctf.star:").grid(row=row, sticky=tk.W)
         self.mics_var = tk.StringVar()  # for data binding
-        self.mics_entry = tk.Entry(compute_frame, textvariable=self.mics_var, bg='#ffffe6')
+        self.mics_entry = tk.Entry(compute_frame, textvariable=self.mics_var, bg=entry_bg)
         self.mics_entry.grid(row=row, column=1, sticky=tk.W)
         self.mics_entry.insert(0, str(options['proc__ctffind_mics']))
 
@@ -305,7 +313,7 @@ class RelionItGui(object):
 
         tk.Label(compute_frame, text="3D reference:").grid(row=row, sticky=tk.W)
         self.iniref_var = tk.StringVar()  # for data binding
-        self.iniref_entry = tk.Entry(compute_frame, textvariable=self.iniref_var, bg='#ffffe6')
+        self.iniref_entry = tk.Entry(compute_frame, textvariable=self.iniref_var, bg=entry_bg)
         self.iniref_entry.grid(row=row, column=1, sticky=tk.W)
         self.iniref_entry.insert(0, str(options['proc__iniref']))
 
@@ -316,7 +324,7 @@ class RelionItGui(object):
         
         tk.Label(compute_frame, text="GPUs (comma-separated):").grid(row=row, sticky=tk.W)
         self.gpu_var = tk.StringVar()  # for data binding
-        self.gpu_entry = tk.Entry(compute_frame, textvariable=self.gpu_var, bg='#ffffe6')
+        self.gpu_entry = tk.Entry(compute_frame, textvariable=self.gpu_var, bg=entry_bg)
         self.gpu_entry.grid(row=row, column=1, sticky=tk.W)
         self.gpu_entry.insert(0, str(options['proc__class2d_rest__gpu_ids']))
 
@@ -330,7 +338,7 @@ class RelionItGui(object):
 
         tk.Label(self.project_frame, text="Pattern for movies:").grid(row=row, sticky=tk.W)
         self.import_images_var = tk.StringVar()  # for data binding
-        self.import_images_entry = tk.Entry(self.project_frame, textvariable=self.import_images_var, bg='#ffffe6')
+        self.import_images_entry = tk.Entry(self.project_frame, textvariable=self.import_images_var, bg=entry_bg)
         self.import_images_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
         self.import_images_entry.insert(0, self.options['prep__importmovies__fn_in_raw'])
 
@@ -342,7 +350,7 @@ class RelionItGui(object):
         
         tk.Label(self.project_frame, text="Gain reference (optional):").grid(row=row, sticky=tk.W)
         self.gainref_var = tk.StringVar()  # for data binding
-        self.gainref_entry = tk.Entry(self.project_frame, textvariable=self.gainref_var, bg='#ffffe6')
+        self.gainref_entry = tk.Entry(self.project_frame, textvariable=self.gainref_var, bg=entry_bg)
         self.gainref_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
         self.gainref_entry.insert(0, self.options['prep__motioncorr__fn_gain_ref'])
 
@@ -366,14 +374,14 @@ class RelionItGui(object):
         row = 0
 
         tk.Label(self.expt_frame, text="Voltage (kV):").grid(row=row, sticky=tk.W)
-        self.voltage_entry = tk.Entry(self.expt_frame, bg='#ffffe6')
+        self.voltage_entry = tk.Entry(self.expt_frame, bg=entry_bg)
         self.voltage_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
         self.voltage_entry.insert(0, str(options['prep__importmovies__kV']))
 
         row += 1
         
         tk.Label(self.expt_frame, text="Cs (mm):").grid(row=row, sticky=tk.W)
-        self.cs_entry = tk.Entry(self.expt_frame, bg='#ffffe6')
+        self.cs_entry = tk.Entry(self.expt_frame, bg=entry_bg)
         self.cs_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
         self.cs_entry.insert(0, str(options['prep__importmovies__Cs']))
 
@@ -390,14 +398,14 @@ class RelionItGui(object):
 
         tk.Label(self.expt_frame, text=u"(Super-res) pixel size (\u212B):").grid(row=row, sticky=tk.W)
         self.angpix_var = tk.StringVar()  # for data binding
-        self.angpix_entry = tk.Entry(self.expt_frame, textvariable=self.angpix_var, bg='#ffffe6')
+        self.angpix_entry = tk.Entry(self.expt_frame, textvariable=self.angpix_var, bg=entry_bg)
         self.angpix_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
         self.angpix_entry.insert(0, str(options['prep__importmovies__angpix']))
 
         row += 1
         
         tk.Label(self.expt_frame, text=u"Exposure rate (e\u207B / \u212B\u00B2 / frame):").grid(row=row, sticky=tk.W)
-        self.exposure_entry = tk.Entry(self.expt_frame, bg='#ffffe6')
+        self.exposure_entry = tk.Entry(self.expt_frame, bg=entry_bg)
         self.exposure_entry.grid(row=row, column=1, sticky=tk.W + tk.E)
         self.exposure_entry.insert(0, str(options['prep__motioncorr__dose_per_frame']))
 
@@ -411,7 +419,7 @@ class RelionItGui(object):
 
         tk.Label(self.particle_frame, text="Symmetry:").grid(row=row, sticky=tk.W)
         self.symmetry_var = tk.StringVar()  # for data binding
-        self.symmetry_entry = tk.Entry(self.particle_frame, textvariable=self.symmetry_var, bg='#ffffe6')
+        self.symmetry_entry = tk.Entry(self.particle_frame, textvariable=self.symmetry_var, bg=entry_bg)
         self.symmetry_entry.grid(row=row, column=1, sticky=tk.W)
         self.symmetry_entry.insert(0, str(options['proc__inimodel3d__sym_name']))
 
@@ -419,14 +427,14 @@ class RelionItGui(object):
 
         tk.Label(self.particle_frame, text=u"Longest diameter (\u212B):").grid(row=row, sticky=tk.W)
         self.particle_max_diam_var = tk.StringVar()  # for data binding
-        self.particle_max_diam_entry = tk.Entry(self.particle_frame, textvariable=self.particle_max_diam_var, bg='#ffffe6')
+        self.particle_max_diam_entry = tk.Entry(self.particle_frame, textvariable=self.particle_max_diam_var, bg=entry_bg)
         self.particle_max_diam_entry.grid(row=row, column=1, sticky=tk.W+tk.E, columnspan=2)
         self.particle_max_diam_entry.insert(0, str(options['proc__logpicker__log_diam_max']))
 
         row += 1
 
         tk.Label(self.particle_frame, text=u"Shortest diameter (\u212B):").grid(row=row, sticky=tk.W)
-        self.particle_min_diam_entry = tk.Entry(self.particle_frame, bg='#ffffe6')
+        self.particle_min_diam_entry = tk.Entry(self.particle_frame, bg=entry_bg)
         self.particle_min_diam_entry.grid(row=row, column=1, sticky=tk.W+tk.E, columnspan=2)
         self.particle_min_diam_entry.insert(0, str(options['proc__logpicker__log_diam_min']))
 
@@ -434,7 +442,7 @@ class RelionItGui(object):
         
         tk.Label(self.particle_frame, text=u"Mask diameter (\u212B):").grid(row=row, sticky=tk.W)
         self.mask_diameter_var = tk.StringVar()  # for data binding
-        self.mask_diameter_entry = tk.Entry(self.particle_frame, textvariable=self.mask_diameter_var, bg='#ffffe6')
+        self.mask_diameter_entry = tk.Entry(self.particle_frame, textvariable=self.mask_diameter_var, bg=entry_bg)
         self.mask_diameter_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
         self.mask_diameter_entry.insert(0, str(options['proc__class2d_logbatch__particle_diameter']))
         self.mask_diameter_px = tk.Label(self.particle_frame, text="= NNN px")
@@ -444,7 +452,7 @@ class RelionItGui(object):
 
         tk.Label(self.particle_frame, text="Box size (px):").grid(row=row, sticky=tk.W)
         self.box_size_var = tk.StringVar()  # for data binding
-        self.box_size_entry = tk.Entry(self.particle_frame, textvariable=self.box_size_var, bg='#ffffe6')
+        self.box_size_entry = tk.Entry(self.particle_frame, textvariable=self.box_size_var, bg=entry_bg)
         self.box_size_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
         self.box_size_entry.insert(0, str(options['proc__extract_logpick__extract_size']))
         self.box_size_in_angstrom = tk.Label(self.particle_frame, text=u"= NNN \u212B")
@@ -454,7 +462,7 @@ class RelionItGui(object):
 
         tk.Label(self.particle_frame, text="Down-sample to (px):").grid(row=row, sticky=tk.W)
         self.extract_small_boxsize_var = tk.StringVar()  # for data binding
-        self.extract_small_boxsize_entry = tk.Entry(self.particle_frame, textvariable=self.extract_small_boxsize_var, bg='#ffffe6')
+        self.extract_small_boxsize_entry = tk.Entry(self.particle_frame, textvariable=self.extract_small_boxsize_var, bg=entry_bg)
         self.extract_small_boxsize_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
         self.extract_small_boxsize_entry.insert(0, str(options['proc__extract_logpick__rescale']))
         self.extract_angpix = tk.Label(self.particle_frame, text=u"= NNN \u212B/px")
@@ -487,7 +495,7 @@ class RelionItGui(object):
 
         tk.Label(self.picking_frame, text="Nr particles for LoG picking:").grid(row=row, sticky=tk.W)
         self.logbatch_var = tk.StringVar()  # for data binding
-        self.logbatch_entry = tk.Entry(self.picking_frame, textvariable=self.logbatch_var, bg='#ffffe6')
+        self.logbatch_entry = tk.Entry(self.picking_frame, textvariable=self.logbatch_var, bg=entry_bg)
         self.logbatch_entry.grid(row=row, column=1, sticky=tk.W)
         self.logbatch_entry.insert(0, str(options['proc__split_logpick__split_size']))
 
@@ -495,7 +503,7 @@ class RelionItGui(object):
 
         tk.Label(self.picking_frame, text="LoG picking threshold:").grid(row=row, sticky=tk.W)
         self.log_thresh_var = tk.StringVar()  # for data binding
-        self.log_thresh_entry = tk.Entry(self.picking_frame, textvariable=self.log_thresh_var, bg='#ffffe6')
+        self.log_thresh_entry = tk.Entry(self.picking_frame, textvariable=self.log_thresh_var, bg=entry_bg)
         self.log_thresh_entry.grid(row=row, column=1, sticky=tk.W)
         self.log_thresh_entry.insert(0, str(options['proc__logpicker__log_adjust_thr']))
 
@@ -503,7 +511,7 @@ class RelionItGui(object):
 
         tk.Label(self.picking_frame, text="LoG class2d score:").grid(row=row, sticky=tk.W)
         self.log_classscore_var = tk.StringVar()  # for data binding
-        self.log_classscore_entry = tk.Entry(self.picking_frame, textvariable=self.log_classscore_var, bg='#ffffe6')
+        self.log_classscore_entry = tk.Entry(self.picking_frame, textvariable=self.log_classscore_var, bg=entry_bg)
         self.log_classscore_entry.grid(row=row, column=1, sticky=tk.W)
         self.log_classscore_entry.insert(0, str(options['proc__select_logbatch__rank_threshold']))
 
@@ -511,7 +519,7 @@ class RelionItGui(object):
 
         tk.Label(self.picking_frame, text="Topaz model:").grid(row=row, sticky=tk.W)
         self.topaz_model_var = tk.StringVar()  # for data binding
-        self.topaz_model_entry = tk.Entry(self.picking_frame, textvariable=self.topaz_model_var, bg='#ffffe6')
+        self.topaz_model_entry = tk.Entry(self.picking_frame, textvariable=self.topaz_model_var, bg=entry_bg)
         self.topaz_model_entry.grid(row=row, column=1, sticky=tk.W)
         self.topaz_model_entry.insert(0, str(options['proc__topaz_model']))
 
@@ -522,7 +530,7 @@ class RelionItGui(object):
 
         tk.Label(self.picking_frame, text="Nr particles per micrograph:").grid(row=row, sticky=tk.W)
         self.partspermic_var = tk.StringVar()  # for data binding
-        self.partspermic_entry = tk.Entry(self.picking_frame, textvariable=self.partspermic_var, bg='#ffffe6')
+        self.partspermic_entry = tk.Entry(self.picking_frame, textvariable=self.partspermic_var, bg=entry_bg)
         self.partspermic_entry.grid(row=row, column=1, sticky=tk.W)
         self.partspermic_entry.insert(0, str(options['proc__train_topaz__topaz_nr_particles']))
 
@@ -530,7 +538,7 @@ class RelionItGui(object):
 
         tk.Label(self.picking_frame, text="Topaz picking threshold:").grid(row=row, sticky=tk.W)
         self.topaz_thresh_var = tk.StringVar()  # for data binding
-        self.topaz_thresh_entry = tk.Entry(self.picking_frame, textvariable=self.topaz_thresh_var, bg='#ffffe6')
+        self.topaz_thresh_entry = tk.Entry(self.picking_frame, textvariable=self.topaz_thresh_var, bg=entry_bg)
         self.topaz_thresh_entry.grid(row=row, column=1, sticky=tk.W)
         self.topaz_thresh_entry.insert(0, str(options['proc__extract_topazpick__minimum_pick_fom']))
 
@@ -538,7 +546,7 @@ class RelionItGui(object):
 
         tk.Label(self.picking_frame, text="Topaz class2d score:").grid(row=row, sticky=tk.W)
         self.topaz_classscore_var = tk.StringVar()  # for data binding
-        self.topaz_classscore_entry = tk.Entry(self.picking_frame, textvariable=self.topaz_classscore_var, bg='#ffffe6')
+        self.topaz_classscore_entry = tk.Entry(self.picking_frame, textvariable=self.topaz_classscore_var, bg=entry_bg)
         self.topaz_classscore_entry.grid(row=row, column=1, sticky=tk.W)
         self.topaz_classscore_entry.insert(0, str(options['proc__select_rest__rank_threshold']))
 
@@ -705,10 +713,10 @@ class RelionItGui(object):
         button_frame = tk.Frame(right_frame)
         button_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
 
-        self.save_button = tk.Button(button_frame, text="Save options", command=self.save_options, bg='#a01e3c')
+        self.save_button = tk.Button(button_frame, text="Save options", command=self.save_options, bg=runbutton_bg)
         self.save_button.pack(padx=5, pady=5, side=tk.RIGHT)
 
-        self.run_button = tk.Button(button_frame, text="Save & run", command=self.run_pipeline, bg='#a01e3c')
+        self.run_button = tk.Button(button_frame, text="Save & run", command=self.run_pipeline, bg=runbutton_bg)
         self.run_button.pack(padx=5, pady=5, side=tk.RIGHT)
 
         # Show initial pixel sizes
