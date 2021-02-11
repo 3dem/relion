@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
 			true,   false,  // tomograms
 			true,   false,  // trajectories
 			true,   false,  // manifolds
-			true,  false); // reference
+			false,  false); // reference
 
 		if (parser.checkForErrors())
 		{
