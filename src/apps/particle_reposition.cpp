@@ -190,7 +190,7 @@ public:
 					}
 
 
-					RFLOAT rot, tilt, psi, xcoord=0., ycoord=0., zcoord=0.;
+					RFLOAT rot=0., tilt=0., psi, xcoord=0., ycoord=0., zcoord=0.;
 					int iclass;
 					Matrix2D<RFLOAT> A;
 					Matrix1D<RFLOAT> offsets(3);
@@ -202,8 +202,11 @@ public:
 
 					optimiser.mydata.MDimg.getValue(EMDL_IMAGE_COORD_X,  xcoord, ori_img_id);
 					optimiser.mydata.MDimg.getValue(EMDL_IMAGE_COORD_Y,  ycoord, ori_img_id);
-					optimiser.mydata.MDimg.getValue(EMDL_ORIENT_ROT,  rot, ori_img_id);
-					optimiser.mydata.MDimg.getValue(EMDL_ORIENT_TILT, tilt, ori_img_id);
+					if (optimiser.mymodel.ref_dim == 3)
+					{
+						optimiser.mydata.MDimg.getValue(EMDL_ORIENT_ROT,  rot, ori_img_id);
+						optimiser.mydata.MDimg.getValue(EMDL_ORIENT_TILT, tilt, ori_img_id);
+					}
 					optimiser.mydata.MDimg.getValue(EMDL_ORIENT_PSI,  psi, ori_img_id);
 					optimiser.mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, XX(offsets), ori_img_id);
 					optimiser.mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, YY(offsets), ori_img_id);
@@ -322,11 +325,6 @@ public:
 						resizeMap(Mpart_mic, mic_image_size);
 						Mpart_mic.setXmippOrigin();
 					}
-
-					//Image<RFLOAT> It;
-					//It()=Mpart_mic;
-					//It.write("It.spi");
-					//exit(1);
 
 					// To keep raw micrograph and reference projections on the same scale, need to re-obtain
 					// the multiplicative normalisation of the background area (outside circle) again
