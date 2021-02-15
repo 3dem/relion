@@ -1,9 +1,9 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 """
 relion_it.py
 ============
 
-Simple GUI to set up RELION-3.2 scheduler.
+Simple GUI to set up RELION-4.0 scheduler.
 
 Authors: Sjors H.W. Scheres & Colin M. Palmer
 
@@ -30,7 +30,7 @@ The options are named descriptively so you can probably understand what most of 
 any particular option, look at the comment above its definition in this script, or search the script's code to see
 how it is used.
 
-Use double underscores to separate SCHEDULENAME__JOBNAME_JOBOPTION
+Use double underscores to separate SCHEDULENAME__JOBNAME__JOBOPTION
  E.g. for SCHEDULENAME=prep, JOBNAME=importmovies and JOBOPTION=angpix
 'prep__importmovies__angpix' defines the value for the 'angpix' option in the file 'Schedules/prep/importmovies/job.star'
 
@@ -330,7 +330,7 @@ class RelionItGui(object):
 
         ###
 
-        self.project_frame = tk.LabelFrame(left_frame, text="Movie details", padx=5, pady=5)
+        self.project_frame = tk.LabelFrame(left_frame, text="Experimental details", padx=5, pady=5)
         self.project_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
         tk.Grid.columnconfigure(self.project_frame, 1, weight=1)
 
@@ -365,47 +365,41 @@ class RelionItGui(object):
         if options['prep__motioncorr__bin_factor'] == '2':
             superres_button.select()
 
-        ###
-        
-        self.expt_frame = tk.LabelFrame(left_frame, text="Experimental details", padx=5, pady=5)
-        self.expt_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
-        tk.Grid.columnconfigure(self.expt_frame, 1, weight=1)
+        row += 1
 
-        row = 0
-
-        tk.Label(self.expt_frame, text="Voltage (kV):").grid(row=row, sticky=tk.W)
-        self.voltage_entry = tk.Entry(self.expt_frame, bg=entry_bg)
+        tk.Label(self.project_frame, text="Voltage (kV):").grid(row=row, sticky=tk.W)
+        self.voltage_entry = tk.Entry(self.project_frame, bg=entry_bg)
         self.voltage_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
         self.voltage_entry.insert(0, str(options['prep__importmovies__kV']))
 
         row += 1
         
-        tk.Label(self.expt_frame, text="Cs (mm):").grid(row=row, sticky=tk.W)
-        self.cs_entry = tk.Entry(self.expt_frame, bg=entry_bg)
+        tk.Label(self.project_frame, text="Cs (mm):").grid(row=row, sticky=tk.W)
+        self.cs_entry = tk.Entry(self.project_frame, bg=entry_bg)
         self.cs_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
         self.cs_entry.insert(0, str(options['prep__importmovies__Cs']))
 
         row += 1
         
-        tk.Label(self.expt_frame, text="Phase plate?").grid(row=row, sticky=tk.W)
+        tk.Label(self.project_frame, text="Phase plate?").grid(row=row, sticky=tk.W)
         self.phaseplate_var = tk.IntVar()
-        phaseplate_button = tk.Checkbutton(self.expt_frame, var=self.phaseplate_var)
+        phaseplate_button = tk.Checkbutton(self.project_frame, var=self.phaseplate_var)
         phaseplate_button.grid(row=row, column=1, sticky=tk.W)
         if options['prep__ctffind__do_phaseshift']:
             phaseplate_button.select()
 
         row += 1
 
-        tk.Label(self.expt_frame, text=u"(Super-res) pixel size (\u212B):").grid(row=row, sticky=tk.W)
+        tk.Label(self.project_frame, text=u"(Super-res) pixel size (\u212B):").grid(row=row, sticky=tk.W)
         self.angpix_var = tk.StringVar()  # for data binding
-        self.angpix_entry = tk.Entry(self.expt_frame, textvariable=self.angpix_var, bg=entry_bg)
+        self.angpix_entry = tk.Entry(self.project_frame, textvariable=self.angpix_var, bg=entry_bg)
         self.angpix_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
         self.angpix_entry.insert(0, str(options['prep__importmovies__angpix']))
 
         row += 1
         
-        tk.Label(self.expt_frame, text=u"Exposure rate (e\u207B / \u212B\u00B2 / frame):").grid(row=row, sticky=tk.W)
-        self.exposure_entry = tk.Entry(self.expt_frame, bg=entry_bg)
+        tk.Label(self.project_frame, text=u"Exposure rate (e\u207B / \u212B\u00B2 / frame):").grid(row=row, sticky=tk.W)
+        self.exposure_entry = tk.Entry(self.project_frame, bg=entry_bg)
         self.exposure_entry.grid(row=row, column=1, sticky=tk.W + tk.E)
         self.exposure_entry.insert(0, str(options['prep__motioncorr__dose_per_frame']))
 
@@ -613,15 +607,11 @@ class RelionItGui(object):
             if self.get_var_as_bool(self.do_prep_var):
                 for child in self.project_frame.winfo_children():
                     child.configure(state=tk.NORMAL)
-                for child in self.expt_frame.winfo_children():
-                    child.configure(state=tk.NORMAL)
                 self.mics_entry.delete(0,tk.END)
                 self.mics_entry.insert(0, 'Schedules/prep/ctffind/micrographs_ctf.star')
                 self.mics_entry.configure(state=tk.DISABLED)
             else:
                 for child in self.project_frame.winfo_children():
-                    child.configure(state=tk.DISABLED)
-                for child in self.expt_frame.winfo_children():
                     child.configure(state=tk.DISABLED)
                 self.mics_entry.configure(state=tk.NORMAL)
 
@@ -633,6 +623,7 @@ class RelionItGui(object):
                     child.configure(state=tk.NORMAL)
                 self.do_3d_button.configure(state=tk.NORMAL)
                 self.iniref_entry.configure(state=tk.NORMAL)
+                self.gpu_entry.configure(state=tk.NORMAL)
                 update_box_sizes()
                 update_logpick_status()
             else:
@@ -642,6 +633,7 @@ class RelionItGui(object):
                     child.configure(state=tk.DISABLED)
                 self.do_3d_button.configure(state=tk.DISABLED)
                 self.iniref_entry.configure(state=tk.DISABLED)
+                self.gpu_entry.configure(state=tk.DISABLED)
 
         def update_3d_status(*args_ignored, **kwargs_ignored):
             if self.get_var_as_bool(self.do_3d_var):
@@ -713,7 +705,7 @@ class RelionItGui(object):
         button_frame = tk.Frame(right_frame)
         button_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
 
-        self.save_button = tk.Button(button_frame, text="Save options", command=self.save_options, bg=runbutton_bg)
+        self.save_button = tk.Button(button_frame, text="Save options", command=self.save_options_from_gui, bg=runbutton_bg)
         self.save_button.pack(padx=5, pady=5, side=tk.RIGHT)
 
         self.run_button = tk.Button(button_frame, text="Save & run", command=self.run_pipeline, bg=runbutton_bg)
@@ -895,7 +887,7 @@ class RelionItGui(object):
 
         return warnings
 
-    def save_options(self):
+    def save_options_from_gui(self):
         """
         Update the full set of options from the values in the GUI, and save them to a file.
 
@@ -907,54 +899,8 @@ class RelionItGui(object):
             if len(warnings) == 0 or tkMessageBox.askokcancel("Warning", "\n".join(warnings), icon='warning',
                                                               default=tkMessageBox.CANCEL):
 
-                # Write the current options to a .py file
-                with open(OPTIONS_FILE, 'w') as file:
-                    file.write("{\n") 
-                    for k,v in self.options.items():
-                        file.write("'%s' : '%s', \n" % (k, v))
-                    file.write("}\n")                  
+                save_options(self.options)
 
-                print(" RELION_IT: Written all options to {}".format(OPTIONS_FILE))
-                
-                # loop over all options and change the scheduler STAR files
-                for option, value in self.options.items():
-                    
-                    if (value == ''):
-                        value = '\\"\\"'
-                    
-                    # Set variables in schedule.star
-                    if option.count('__') == 1:
-                        splits = option.split('__')
-                        schedulename = splits[0]
-                        varname = splits[1]
-                        schedulestar = 'Schedules/' + schedulename + '/schedule.star'
-                        if not os.path.isfile(schedulestar):
-                            message = 'Error: ' + schedulestar + ' does not exist'
-                            print(message)
-                            tkMessageBox.showerror(message)
-                            return False
-                    
-                        command = 'relion_scheduler --schedule ' + schedulename + ' --set_var ' + varname + ' --value \"' + str(value) + '\"' + ' --original_value \"' + str(value) + '\"'
-                        print(' RELION_IT: excuting: ', command)
-                        os.system(command)
-                        
-                    # Set joboptions in job.star
-                    elif option.count('__') == 2:
-                        splits = option.split('__')
-                        schedulename = splits[0]
-                        jobname = splits[1]
-                        joboption = splits[2]
-                        jobstar = 'Schedules/' + schedulename + '/' + jobname + '/job.star'
-                        if not os.path.isfile(jobstar):
-                            message = 'Error: ' + jobstar + 'does not exist'
-                            print(message)
-                            tkMessageBox.showerror(message)
-                        
-                        command = 'relion_pipeliner --editJob ' + jobstar + ' --editOption ' + joboption + ' --editValue \"' + str(value) + '\"'
-                        print(' RELION_IT: excuting: ', command)
-                        os.system(command)
-
-                print(' RELION_IT: done saving all options in the Schedules.') 
                 return True
 
         except Exception as ex:
@@ -970,6 +916,57 @@ class RelionItGui(object):
             self.main_window.destroy()
             run_scheduler(self.options, True) #True means launch the RELION GUI
  
+def save_options(options):
+
+    # Write the current options to a .py file
+    with open(OPTIONS_FILE, 'w') as file:
+        file.write("{\n") 
+        for k,v in options.items():
+            file.write("'%s' : '%s', \n" % (k, v))
+        file.write("}\n")                  
+
+    print(" RELION_IT: Written all options to {}".format(OPTIONS_FILE))
+                
+    # loop over all options and change the scheduler STAR files
+    for option, value in options.items():
+                    
+        if (value == ''):
+            value = '\\"\\"'
+                    
+        # Set variables in schedule.star
+        if option.count('__') == 1:
+            splits = option.split('__')
+            schedulename = splits[0]
+            varname = splits[1]
+            schedulestar = 'Schedules/' + schedulename + '/schedule.star'
+            if not os.path.isfile(schedulestar):
+                message = 'Error: ' + schedulestar + ' does not exist'
+                print(message)
+                tkMessageBox.showerror(message)
+                return False
+                    
+            command = 'relion_scheduler --schedule ' + schedulename + ' --set_var ' + varname + ' --value \"' + str(value) + '\"' + ' --original_value \"' + str(value) + '\"'
+            print(' RELION_IT: excuting: ', command)
+            os.system(command)
+                        
+        # Set joboptions in job.star
+        elif option.count('__') == 2:
+            splits = option.split('__')
+            schedulename = splits[0]
+            jobname = splits[1]
+            joboption = splits[2]
+            jobstar = 'Schedules/' + schedulename + '/' + jobname + '/job.star'
+            if not os.path.isfile(jobstar):
+                message = 'Error: ' + jobstar + 'does not exist'
+                print(message)
+                tkMessageBox.showerror(message)
+                        
+            command = 'relion_pipeliner --editJob ' + jobstar + ' --editOption ' + joboption + ' --editValue \"' + str(value) + '\"'
+            print(' RELION_IT: excuting: ', command)
+            os.system(command)
+            
+    print(' RELION_IT: done saving all options in the Schedules.') 
+
 def run_scheduler(options, do_gui):
 
     command = 'relion_scheduler --schedule prep --reset &'
@@ -1024,7 +1021,7 @@ def main():
     args = parser.parse_args()
 
     print(' RELION_IT: -------------------------------------------------------------------------------------------------------------------')
-    print(' RELION_IT: script for automated, on-the-fly single-particle analysis in RELION (>= 3.2)')
+    print(' RELION_IT: script for automated, on-the-fly single-particle analysis in RELION (>= 4.0)')
     print(' RELION_IT: authors: Sjors H.W. Scheres, Takanori Nakane & Colin M. Palmer')
     print(' RELION_IT: ')
     print(' RELION_IT: usage: ./relion_it.py [extra_options.py [extra_options2.py ....] ] [--nogui]')
@@ -1057,7 +1054,8 @@ def main():
     copy_schedule('proc')
 
     if args.nogui:
-        run_scheduler(opts, False)
+        save_options(opts)
+        run_scheduler(opts, False) #False means don't launch RELION GUI after launching the Schedules
     else:
         print(' RELION_IT: launching GUI...')
         tk_root = tk.Tk()
