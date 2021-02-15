@@ -1018,6 +1018,7 @@ def main():
     parser.add_argument("extra_options", nargs="*", metavar="extra_options.py",
                         help="Python files containing options for relion_it.py")
     parser.add_argument("--nogui", action="store_true", help="don't launch GUI to set options, execute non-interactively")
+    parser.add_argument("--onlysave", action="store_true", help="don't launch GUI, nor execute Schedules, only save options")
     args = parser.parse_args()
 
     print(' RELION_IT: -------------------------------------------------------------------------------------------------------------------')
@@ -1053,7 +1054,9 @@ def main():
     copy_schedule('prep')
     copy_schedule('proc')
 
-    if args.nogui:
+    if args.onlysave:
+        save_options(opts)
+    elif args.nogui:
         save_options(opts)
         run_scheduler(opts, False) #False means don't launch RELION GUI after launching the Schedules
     else:
