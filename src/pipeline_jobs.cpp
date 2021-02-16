@@ -844,7 +844,8 @@ void RelionJob::initialise(int _job_type)
 	}
 	else if (type == PROC_RESMAP)
 	{
-		has_mpi = has_thread = true;
+            has_mpi = true;
+            has_thread = false;
 		initialiseLocalresJob();
 	}
 	else if (type == PROC_MOTIONREFINE)
