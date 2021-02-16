@@ -2466,7 +2466,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		YY(shifts) = YY(op.old_offset[img_id]) + oversampled_translations_y[op.max_index[img_id].iovertrans];
 		if (accMLO->dataIs3D)
 		{
-			ZZ(shifts) = oversampled_translations_z[op.max_index[img_id].iovertrans];
+			ZZ(shifts) = ZZ(op.old_offset[img_id]) + oversampled_translations_z[op.max_index[img_id].iovertrans];
 		}
 
 		// Use oldpsi-angle to rotate back the XX(exp_old_offset[img_id]) + oversampled_translations_x[iover_trans] and
