@@ -27,9 +27,9 @@ class scheduler_parameters
 public:
 	FileName mydir, newname;
 	float myconstant;
-	bool do_reset, do_run, do_abort, has_ori_value;
+    bool do_reset, do_run, do_abort, has_ori_value;
 	int verb;
-	std::string add, set_var, set_mode, start_node, current_node, email, type, name, opname, value, ori_value, mode, input, input2, output, output2, boolvar;
+    std::string add, set_var, set_mode, set_has_started, start_node, current_node, email, type, name, opname, value, ori_value, mode, input, input2, output, output2, boolvar;
 	std::string run_pipeline;
 
 	// The actual pipeline
@@ -92,6 +92,7 @@ public:
 		do_abort = parser.checkOption("--abort", "Abort a schedule that is running");
 		set_var = parser.getOption("--set_var", "Name of a variable to set (using also the --value argument)", "");
 		set_mode = parser.getOption("--set_job_mode", "Name of a job whose mode to set (using also the --value argument)", "");
+		set_has_started = parser.getOption("--set_has_started", "Name of a job whose has_started variable to set (using also the --value argument)", "");
 		current_node = parser.getOption("--set_current_node", "Name of a node to which to set current_node", "");
 		int run_section = parser.addSection("Run the scheduler within a pipeline");
 		do_run = parser.checkOption("--run", "Run the scheduler");
@@ -250,11 +251,26 @@ public:
 			if (schedule.isJob(set_mode))
 			{
 				if (!(value == SCHEDULE_NODE_JOB_MODE_NEW || value == SCHEDULE_NODE_JOB_MODE_CONTINUE))
-					REPORT_ERROR("ERROR: unvalid option for job mode: " + value);
+					REPORT_ERROR("ERROR: unvalid value for setting job mode: " + value);
 				schedule.jobs[set_mode].mode = value;
 			}
 			else
 				REPORT_ERROR("ERROR: invalid jobname to set mode: " + set_mode);
+
+		}
+		else if (set_has_started != "")
+		{
+			if (schedule.isJob(set_has_started))
+			{
+                            if (value == "True" || value == "true" || value == "1")
+                                schedule.jobs[set_has_started].job_has_started = true;
+                            else if (value == "False" || value == "false" || value == "0")
+                                schedule.jobs[set_has_started].job_has_started = false;
+                            else
+                                REPORT_ERROR("ERROR: unvalid value for setting has_started of a job: " + value);
+			}
+			else
+				REPORT_ERROR("ERROR: invalid jobname to set has_started: " + set_has_started);
 
 		}
 		else if (current_node != "")
