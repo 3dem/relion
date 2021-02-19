@@ -62,6 +62,7 @@
 #include "src/transformations.h"
 #include "src/metadata_table.h"
 #include "src/fftw.h"
+#include "src/float16.h"
 
 /// @defgroup Images Images
 //@{
@@ -75,7 +76,7 @@ typedef enum
 	UChar = 1,        // Unsigned character or byte type
 	SChar = 2,        // Signed character (for CCP4)
 	UShort = 3,       // Unsigned integer (2-byte)
-	Short = 4,        // Signed integer (2-byte)
+	SShort = 4,        // Signed integer (2-byte)
 	UInt = 5,         // Unsigned integer (4-byte)
 	Int = 6,          // Signed integer (4-byte)
 	Long = 7,         // Signed integer (4 or 8 byte, depending on system)
@@ -83,6 +84,7 @@ typedef enum
 	Double = 9,       // Double precision floating point (8-byte)
 	Boolean = 10,     // Boolean (1-byte?)
 	UHalf = 11,       // Signed 4-bit integer (SerialEM extension)
+	Float16 = 12,     // Half precision floating point (2-byte)
 	LastEntry = 15    // This must be the last entry
 } DataType;
 
@@ -518,13 +520,14 @@ public:
 	void write(FileName name="",
 	           long int select_img=-1,
 	           bool isStack=false,
-	           int mode=WRITE_OVERWRITE)
+	           const WriteMode mode=WRITE_OVERWRITE,
+	           const DataType datatype=Unknown_Type)
 	{
 
 		const FileName &fname = (name == "") ? filename : name;
 		fImageHandler hFile;
 		hFile.openFile(name, mode);
-		_write(fname, hFile, select_img, isStack, mode);
+		_write(fname, hFile, select_img, isStack, mode, datatype);
 		// the destructor of fImageHandler will close the file
 
 	}
@@ -578,7 +581,7 @@ public:
 				}
 				break;
 			}
-		case Short:
+		case SShort:
 			{
 				if (typeid(T) == typeid(short))
 				{
@@ -662,6 +665,13 @@ public:
 				}
 				break;
 			}
+		case Float16:
+			{
+				float16 *ptr = (float16 *)page;
+				for(size_t i = 0; i < pageSize; i++)
+					ptrDest[i] = (T)half2float(ptr[i]);
+				break;
+			}
 		case UHalf:
 			{
 				if (pageSize % 2 != 0) REPORT_ERROR("Logic error in castPage2T; for UHalf, pageSize must be even.");
@@ -722,7 +732,14 @@ public:
 				}
 				break;
 			}
-		case Short: 
+		case Float16:
+			{
+				float16 *ptr = (float16 *)page;
+				for (size_t i = 0; i < pageSize; i++)
+					ptr[i] = float2half((float)srcPtr[i]);
+				break;
+			}
+		case SShort: 
 			{
 				if (typeid(T) == typeid(short))
 				{
@@ -802,7 +819,7 @@ public:
 				else
 					return 0;
 			}
-		case Short:
+		case SShort:
 			{
 				if (typeid(T) == typeid(short))
 					return 1;
@@ -839,7 +856,7 @@ public:
 			}
 		case Double:
 			{
-				if (typeid(T) == typeid(RFLOAT))
+				if (typeid(T) == typeid(RFLOAT)) // TODO: CHECKME: Is this safe with single precision build?
 					return 1;
 				else
 					return 0;
@@ -1249,7 +1266,7 @@ public:
 		case UShort:
 			o << "Unsigned integer (2-byte)";
 			break;
-		case Short:
+		case SShort:
 			o << "Signed integer (2-byte)";
 			break;
 		case UInt:
@@ -1266,6 +1283,9 @@ public:
 			break;
 		case Double:
 			o << "Double precision floating point (8-byte)";
+			break;
+		case Float16:
+			o << "Half precision floating point (4-byte)";
 			break;
 		case Boolean:
 			o << "Boolean (1-byte?)";
@@ -1361,7 +1381,7 @@ private:
 		MDMainHeader.addObject();
 
 		if (ext_name.contains("spi") || ext_name.contains("xmp")  ||
-			ext_name.contains("stk") || ext_name.contains("vol"))//mrc stack MUST go BEFORE plain MRC
+			ext_name.contains("stk") || ext_name.contains("vol"))
 			err = readSPIDER(select_img);
 		else if (ext_name.contains("mrcs") || (is_2D && ext_name.contains("mrc")) )//mrc stack MUST go BEFORE plain MRC
 			err = readMRC(select_img, true, name);
@@ -1385,7 +1405,7 @@ private:
 	}
 
 	void _write(const FileName &name, fImageHandler &hFile, long int select_img=-1,
-				bool isStack=false, int mode=WRITE_OVERWRITE)
+	            bool isStack=false, const WriteMode mode=WRITE_OVERWRITE, const DataType datatype=Unknown_Type)
 	{
 		int err = 0;
 
@@ -1422,7 +1442,6 @@ private:
 
 //#define DEBUG
 #ifdef DEBUG
-
 		std::cerr << "write" <<std::endl;
 		std::cerr<<"extension for write= "<<ext_name<<std::endl;
 		std::cerr<<"filename= "<<filename<<std::endl;
@@ -1487,15 +1506,15 @@ private:
 		 */
 		if(ext_name.contains("spi") || ext_name.contains("xmp") ||
 		   ext_name.contains("stk") || ext_name.contains("vol"))
-			err = writeSPIDER(select_img,isStack,mode);
+			err = writeSPIDER(select_img, isStack, mode, datatype);
 		else if (ext_name.contains("mrcs"))
-			writeMRC(select_img,true,mode);
+			writeMRC(select_img, true, mode, datatype);
 		else if (ext_name.contains("mrc"))
-			writeMRC(select_img,false,mode);
+			writeMRC(select_img, false, mode, datatype);
 		else if (ext_name.contains("img") || ext_name.contains("hed"))
-			writeIMAGIC(select_img,mode);
+			writeIMAGIC(select_img, mode);
 		else
-			err = writeSPIDER(select_img,isStack,mode);
+			err = writeSPIDER(select_img, isStack, mode, datatype);
 		if ( err < 0 )
 		{
 			std::cerr << " Filename = " << filename << " Extension= " << ext_name << std::endl;
@@ -1507,8 +1526,6 @@ private:
 		if (!_exists)
 			hFile.exist = _exists = true;
 	}
-
-
 };
 
 // Some image-specific operations

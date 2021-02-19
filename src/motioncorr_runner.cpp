@@ -117,6 +117,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 
 	parser.addSection("Own motion correction options");
 	do_own = parser.checkOption("--use_own", "Use our own implementation of motion correction");
+	write_float16  = parser.checkOption("--float16", "Write in half-precision 16 bit floating point numbers (MRC mode 12), instead of 32 bit (MRC mode 0).");
 	skip_defect = parser.checkOption("--skip_defect", "Skip hot pixel detection");
 	save_noDW = parser.checkOption("--save_noDW", "Save aligned but non dose weighted micrograph");
 	max_iter = textToInteger(parser.getOption("--max_iter", "Maximum number of iterations for alignment. Only valid with --use_own", "5"));
@@ -1055,7 +1056,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	RCTIC(TIMING_READ_GAIN);
 	if (fn_gain_reference != "") {
 		if (isEER)
-			 EERRenderer::loadEERGain(fn_gain_reference, Igain(), eer_upsampling);
+			EERRenderer::loadEERGain(fn_gain_reference, Igain(), eer_upsampling);
 		else
 			Igain.read(fn_gain_reference);
 
@@ -1588,7 +1589,7 @@ skip_fitting:
 
 		// Final output
                 Iref.setSamplingRateInHeader(output_angpix, output_angpix);
-		Iref.write(!do_dose_weighting ? fn_avg : fn_avg_noDW);
+		Iref.write(!do_dose_weighting ? fn_avg : fn_avg_noDW, -1, false, WRITE_OVERWRITE, write_float16 ? Float16: Float);
 		logfile << "Written aligned but non-dose weighted sum to " << (!do_dose_weighting ? fn_avg : fn_avg_noDW) << std::endl;
 	}
 
@@ -1639,7 +1640,7 @@ skip_fitting:
 
 		// Final output
                 Iref.setSamplingRateInHeader(output_angpix, output_angpix);
-		Iref.write(fn_avg);
+		Iref.write(fn_avg, -1, false, WRITE_OVERWRITE, write_float16 ? Float16: Float);
 		logfile << "Written aligned and dose-weighted sum to " << fn_avg << std::endl;
 	}
 
