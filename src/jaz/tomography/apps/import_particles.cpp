@@ -239,12 +239,8 @@ int main(int argc, char *argv[])
 			}
 
 			outParticles.setValue(EMDL_TOMO_NAME, d.tomoName, p);
-			std::string partName;
-			if (!outParticles.getValue(EMDL_TOMO_PARTICLE_NAME,partName, p))
-			{
-				outParticles.setValue(EMDL_TOMO_PARTICLE_NAME, d.tomoName + "/"
+			outParticles.setValue(EMDL_TOMO_PARTICLE_NAME, d.tomoName + "/"
 															   + ZIO::itoa(particle_id), p);
-			}
 			int subset;
 			if (!inputTable.getValue(EMDL_PARTICLE_RANDOM_SUBSET, subset, p))
 			{
