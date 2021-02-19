@@ -49,6 +49,9 @@ public:
 	// Calculate average spectral SNRs?
 	bool do_ssnr;
 
+	// Write in half-precision 16 bit floating point numbers (MRC mode 12)
+	bool write_float16;
+
 	// Running sums of power of signal and noise for SSNR calculation (keep public for MPI access)
 	MultidimArray<RFLOAT> sum_count, sum_S2, sum_N2;
 
