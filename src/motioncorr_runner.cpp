@@ -1057,7 +1057,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	RCTIC(TIMING_READ_GAIN);
 	if (fn_gain_reference != "") {
 		if (isEER)
-			 EERRenderer::loadEERGain(fn_gain_reference, Igain(), eer_upsampling);
+			EERRenderer::loadEERGain(fn_gain_reference, Igain(), eer_upsampling);
 		else
 			Igain.read(fn_gain_reference);
 
