@@ -31,7 +31,7 @@ do_zero_mask        Yes
    fn_cont         "" 
     fn_img Schedules/proc/select_rest/particles.star
    fn_mask         "" 
-    fn_ref Schedules/proc/inimodel3d/initial_model.mrc 
+    fn_ref $$myref.mrc
    gpu_ids        0:1 
 helical_nr_asu          1 
 helical_range_distance         -1 

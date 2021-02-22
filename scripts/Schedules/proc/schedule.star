@@ -56,6 +56,8 @@ particles  particles  particles
 rest_batch Schedules/proc/extract_topazpick/particles.star Schedules/proc/extract_topazpick/particles.star 
 topaz_model Schedules/proc/train_topaz/model_epoch10.sav Schedules/proc/train_topaz/model_epoch10.sav 
 iniref None None
+myref undefined undefined
+inimodel_output Schedules/proc/inimodel3d/initial_model.mrc Schedules/proc/inimodel3d/initial_model.mrc
 
 # version 30001
 
@@ -76,6 +78,8 @@ EXIT_maxtime exit_maxtime  undefined    maxtime_hr  undefined
 HAS_rest_increased    bool=gt has_larger_rest_size current_rest_size prev_rest_size 
 HAS_topaz_model bool=file_exists has_topaz_model topaz_model  undefined 
 SET_prev_rest_size  float=set prev_rest_size current_rest_size  undefined 
+SET_myref_user string=set myref iniref undefined
+SET_myref_inimodel string=set myref inimodel_output undefined
 WAIT       wait  undefined   wait_sec  undefined 
  
 
@@ -88,6 +92,7 @@ _rlnScheduleJobNameOriginal #1
 _rlnScheduleJobName #2 
 _rlnScheduleJobMode #3 
 _rlnScheduleJobHasStarted #4 
+select_mics select_mics continue    0
 inipicker  inipicker   continue            0 
 extract_ini extract_ini   continue            0 
 split_ini split_ini   continue            0 
@@ -114,7 +119,8 @@ _rlnScheduleEdgeOutputNodeNameIfTrue #4
 _rlnScheduleEdgeBooleanVariable #5 
 WAIT HAS_ctffind              0  undefined  undefined 
 HAS_ctffind WAIT             1 EXIT_maxtime has_ctffind
-EXIT_maxtime topazpicker            1 HAS_topaz_model do_retrain_topaz
+EXIT_maxtime select_mics              0  undefined  undefined 
+select_mics topazpicker            1 HAS_topaz_model do_retrain_topaz
 HAS_topaz_model  inipicker            1 topazpicker has_topaz_model 
 inipicker extract_ini            0  undefined  undefined 
 extract_ini split_ini            0  undefined  undefined 
@@ -131,6 +137,8 @@ HAS_rest_increased       WAIT            1 class2d_rest has_larger_rest_size
 class2d_rest select_rest            0  undefined  undefined 
 select_rest   SET_prev_rest_size         0  undefined  undefined 
 SET_prev_rest_size  WAIT       1 CHECK_iniref  do_3d 
-CHECK_iniref inimodel3d 1 refine3d has_iniref
+CHECK_iniref SET_myref_inimode 1 SET_myref_user has_iniref
+SET_myref_inimodel inimodel3d           0  undefined  undefined 
 inimodel3d   refine3d            0  undefined  undefined 
+SET_myref_user refine3d            0  undefined  undefined 
 refine3d WAIT            0  undefined  undefined 

@@ -45,6 +45,6 @@ recenter_x          0
 recenter_y          0 
 recenter_z          0 
    rescale         48 
- star_mics $$ctffind_mics 
+ star_mics Schedules/proc/select_mics/micrographs.star 
 white_dust         -1 
  

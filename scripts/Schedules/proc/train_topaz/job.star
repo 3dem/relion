@@ -31,7 +31,7 @@ do_topaz_pick         No
 do_topaz_train        Yes 
 do_topaz_train_parts        Yes 
 do_write_fom_maps         No 
-fn_input_autopick $$ctffind_mics 
+fn_input_autopick Schedules/proc/select_mics/micrographs.star
 fn_ref3d_autopick         "" 
 fn_refs_autopick         "" 
    gpu_ids          0 
