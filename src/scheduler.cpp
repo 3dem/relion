@@ -68,6 +68,7 @@ std::string SchedulerOperator::initialise(std::string _type, std::string _input1
 		 type == SCHEDULE_BOOLEAN_OPERATOR_EQ ||
 		 type == SCHEDULE_BOOLEAN_OPERATOR_GE ||
 		 type == SCHEDULE_BOOLEAN_OPERATOR_LE ||
+		 type == SCHEDULE_BOOLEAN_OPERATOR_SET ||
 		 type == SCHEDULE_BOOLEAN_OPERATOR_AND ||
 		 type == SCHEDULE_BOOLEAN_OPERATOR_OR ||
 		 type == SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS ||
@@ -90,6 +91,7 @@ std::string SchedulerOperator::initialise(std::string _type, std::string _input1
 		 ) && !isFloatVariable(_output))
 		return "ERROR: float operator does not have valid float output: " + _output;
 	if ((type == SCHEDULE_STRING_OPERATOR_READ_STAR ||
+		 type == SCHEDULE_STRING_OPERATOR_SET ||
 		 type == SCHEDULE_STRING_OPERATOR_JOIN ||
 		 type == SCHEDULE_STRING_OPERATOR_BEFORE_FIRST ||
 		 type == SCHEDULE_STRING_OPERATOR_AFTER_FIRST ||
@@ -101,8 +103,9 @@ std::string SchedulerOperator::initialise(std::string _type, std::string _input1
 		return "ERROR: string operator does not have valid string output: " + _output;
 
 	// Check input1
-	if ((type == SCHEDULE_BOOLEAN_OPERATOR_AND ||
-		type == SCHEDULE_BOOLEAN_OPERATOR_OR )  && !isBooleanVariable(_input1))
+	if ((type == SCHEDULE_BOOLEAN_OPERATOR_SET ||
+		 type == SCHEDULE_BOOLEAN_OPERATOR_AND ||
+		 type == SCHEDULE_BOOLEAN_OPERATOR_OR )  && !isBooleanVariable(_input1))
 		return "ERROR: operator does not have valid boolean input1: " + _input1;
 	if ((type == SCHEDULE_FLOAT_OPERATOR_SET ||
 		 type == SCHEDULE_FLOAT_OPERATOR_PLUS ||
@@ -123,6 +126,7 @@ std::string SchedulerOperator::initialise(std::string _type, std::string _input1
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG ||
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX ||
 		 type == SCHEDULE_STRING_OPERATOR_READ_STAR ||
+		 type == SCHEDULE_STRING_OPERATOR_SET ||
 		 type == SCHEDULE_STRING_OPERATOR_JOIN ||
 		 type == SCHEDULE_STRING_OPERATOR_BEFORE_FIRST ||
 		 type == SCHEDULE_STRING_OPERATOR_AFTER_FIRST ||
@@ -292,7 +296,11 @@ bool SchedulerOperator::performOperation() const
 {
 	RFLOAT val2 = (isFloatVariable(input2)) ? scheduler_global_floats[input2].value : 0;
 
-	if (type == SCHEDULE_BOOLEAN_OPERATOR_AND)
+	if (type == SCHEDULE_BOOLEAN_OPERATOR_SET)
+	{
+		scheduler_global_bools[output].value = scheduler_global_bools[input1].value;
+	}
+	else if (type == SCHEDULE_BOOLEAN_OPERATOR_AND)
 	{
 		scheduler_global_bools[output].value = (scheduler_global_bools[input1].value && scheduler_global_bools[input2].value);
 	}
@@ -391,6 +399,10 @@ bool SchedulerOperator::performOperation() const
 			int nr_splits = splitString(scheduler_global_strings[input1].value, ",", splits);
 			scheduler_global_floats[output].value = splits.size();
 		}
+	}
+	else if (type == SCHEDULE_STRING_OPERATOR_SET)
+	{
+		scheduler_global_strings[output].value = scheduler_global_strings[input1].value;
 	}
 	else if (type == SCHEDULE_STRING_OPERATOR_JOIN)
 	{
