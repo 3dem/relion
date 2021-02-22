@@ -66,7 +66,7 @@ topaz_model         ""
 topaz_nr_particles        900 
 topaz_other_args         "" 
 topaz_particle_diameter      100.0 
-topaz_train_parts Schedules/proc/select_logbatch/particles.star 
+topaz_train_parts Schedules/proc/select_ini/particles.star 
 topaz_train_picks         "" 
    use_gpu        Yes 
  

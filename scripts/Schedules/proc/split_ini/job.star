@@ -27,7 +27,7 @@ do_select_values         No
   do_split        Yes 
 duplicate_threshold         30 
  fn_coords         "" 
-   fn_data Schedules/proc/extract_logpick/particles.star 
+   fn_data Schedules/proc/extract_ini/particles.star 
     fn_mic         "" 
   fn_model         "" 
 image_angpix         -1 

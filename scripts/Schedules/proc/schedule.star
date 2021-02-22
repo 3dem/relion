@@ -15,9 +15,9 @@ loop_
 _rlnScheduleFloatVariableName #1 
 _rlnScheduleFloatVariableValue #2 
 _rlnScheduleFloatVariableResetValue #3 
-current_logbatch_size     0.000000     0.000000 
+current_ini_size     0.000000     0.000000 
 current_rest_size     0.000000     0.000000 
-logbatch_size 10000.000000 10000.000000 
+inibatch_size 10000.000000 10000.000000 
 maxtime_hr    48.000000    48.000000 
 prev_rest_size     0.000000     0.000000 
 wait_sec   180.000000   180.000000 
@@ -38,7 +38,7 @@ do_3d 1 1
 has_larger_rest_size            0            0 
 do_retrain_topaz            1            1 
 has_topaz_model            0            0 
-logbatch_big_enough            0            0
+inibatch_big_enough            0            0
 has_iniref            0            0  
  
 
@@ -51,7 +51,7 @@ _rlnScheduleStringVariableName #1
 _rlnScheduleStringVariableValue #2 
 _rlnScheduleStringVariableResetValue #3 
 ctffind_mics Schedules/prep/ctffind/micrographs_ctf.star Schedules/prep/ctffind/micrographs_ctf.star 
-logbatch Schedules/proc/split_logpick/particles_split1.star Schedules/proc/split_logpick/particles_split1.star 
+ini_batch Schedules/proc/split_ini/particles_split1.star Schedules/proc/split_ini/particles_split1.star 
 particles  particles  particles 
 rest_batch Schedules/proc/extract_topazpick/particles.star Schedules/proc/extract_topazpick/particles.star 
 topaz_model Schedules/proc/train_topaz/model_epoch10.sav Schedules/proc/train_topaz/model_epoch10.sav 
@@ -68,9 +68,9 @@ _rlnScheduleOperatorOutput #3
 _rlnScheduleOperatorInput1 #4 
 _rlnScheduleOperatorInput2 #5 
 HAS_ctffind bool=file_exists has_ctffind ctffind_mics undefined
-CHECK_logbatch    bool=ge logbatch_big_enough current_logbatch_size logbatch_size
+CHECK_ini    bool=ge inibatch_big_enough current_ini_size inibatch_size
 CHECK_iniref  bool=file_exists has_iniref iniref  undefined 
-COUNT_logbatch float=count_images current_logbatch_size   logbatch  particles 
+COUNT_ini float=count_images current_ini_size   ini_batch  particles 
 COUNT_restbatch float=count_images current_rest_size rest_batch  particles 
 EXIT_maxtime exit_maxtime  undefined    maxtime_hr  undefined 
 HAS_rest_increased    bool=gt has_larger_rest_size current_rest_size prev_rest_size 
@@ -88,11 +88,11 @@ _rlnScheduleJobNameOriginal #1
 _rlnScheduleJobName #2 
 _rlnScheduleJobMode #3 
 _rlnScheduleJobHasStarted #4 
-logpicker  logpicker   continue            0 
-extract_logpick extract_logpick   continue            0 
-split_logpick split_logpick   continue            0 
-class2d_logbatch class2d_logbatch        new            0 
-select_logbatch select_logbatch        new            0 
+inipicker  inipicker   continue            0 
+extract_ini extract_ini   continue            0 
+split_ini split_ini   continue            0 
+class2d_ini class2d_ini        new            0 
+select_ini select_ini        new            0 
 train_topaz train_topaz        new            0 
 topazpicker topazpicker   continue            0 
 extract_topazpick extract_topazpick   continue            0 
@@ -115,14 +115,14 @@ _rlnScheduleEdgeBooleanVariable #5
 WAIT HAS_ctffind              0  undefined  undefined 
 HAS_ctffind WAIT             1 EXIT_maxtime has_ctffind
 EXIT_maxtime topazpicker            1 HAS_topaz_model do_retrain_topaz
-HAS_topaz_model  logpicker            1 topazpicker has_topaz_model 
-logpicker extract_logpick            0  undefined  undefined 
-extract_logpick split_logpick            0  undefined  undefined 
-split_logpick COUNT_logbatch            0  undefined  undefined 
-COUNT_logbatch CHECK_logbatch            0  undefined  undefined 
-CHECK_logbatch       WAIT            1 class2d_logbatch logbatch_big_enough 
-class2d_logbatch select_logbatch            0  undefined  undefined 
-select_logbatch train_topaz            0  undefined  undefined 
+HAS_topaz_model  inipicker            1 topazpicker has_topaz_model 
+inipicker extract_ini            0  undefined  undefined 
+extract_ini split_ini            0  undefined  undefined 
+split_ini COUNT_ini            0  undefined  undefined 
+COUNT_ini CHECK_ini            0  undefined  undefined 
+CHECK_ini       WAIT            1 class2d_ini inibatch_big_enough 
+class2d_ini select_ini            0  undefined  undefined 
+select_ini train_topaz            0  undefined  undefined 
 train_topaz       WAIT            0  undefined  undefined 
 topazpicker extract_topazpick            0  undefined  undefined 
 extract_topazpick COUNT_restbatch       0  undefined  undefined 
