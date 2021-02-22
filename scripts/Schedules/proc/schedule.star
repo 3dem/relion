@@ -53,7 +53,7 @@ _rlnScheduleStringVariableResetValue #3
 ctffind_mics Schedules/prep/ctffind/micrographs_ctf.star Schedules/prep/ctffind/micrographs_ctf.star 
 ini_batch Schedules/proc/split_ini/particles_split1.star Schedules/proc/split_ini/particles_split1.star 
 particles  particles  particles 
-rest_batch Schedules/proc/extract_topazpick/particles.star Schedules/proc/extract_topazpick/particles.star 
+rest_batch Schedules/proc/extract_rest/particles.star Schedules/proc/extract_rest/particles.star 
 topaz_model Schedules/proc/train_topaz/model_epoch10.sav Schedules/proc/train_topaz/model_epoch10.sav 
 iniref None None
 myref undefined undefined
@@ -99,8 +99,8 @@ split_ini split_ini   continue            0
 class2d_ini class2d_ini        new            0 
 select_ini select_ini        new            0 
 train_topaz train_topaz        new            0 
-topazpicker topazpicker   continue            0 
-extract_topazpick extract_topazpick   continue            0 
+restpicker restpicker   continue            0 
+extract_rest extract_rest   continue            0 
 class2d_rest class2d_rest        new            0 
 select_rest select_rest        new            0 
 inimodel3d inimodel3d        new            0 
@@ -120,8 +120,8 @@ _rlnScheduleEdgeBooleanVariable #5
 WAIT HAS_ctffind              0  undefined  undefined 
 HAS_ctffind WAIT             1 EXIT_maxtime has_ctffind
 EXIT_maxtime select_mics              0  undefined  undefined 
-select_mics topazpicker            1 HAS_topaz_model do_retrain_topaz
-HAS_topaz_model  inipicker            1 topazpicker has_topaz_model 
+select_mics restpicker            1 HAS_topaz_model do_retrain_topaz
+HAS_topaz_model  inipicker            1 restpicker has_topaz_model 
 inipicker extract_ini            0  undefined  undefined 
 extract_ini split_ini            0  undefined  undefined 
 split_ini COUNT_ini            0  undefined  undefined 
@@ -130,8 +130,8 @@ CHECK_ini       WAIT            1 class2d_ini inibatch_big_enough
 class2d_ini select_ini            0  undefined  undefined 
 select_ini train_topaz            0  undefined  undefined 
 train_topaz       WAIT            0  undefined  undefined 
-topazpicker extract_topazpick            0  undefined  undefined 
-extract_topazpick COUNT_restbatch       0  undefined  undefined 
+restpicker extract_rest           0  undefined  undefined 
+extract_rest COUNT_restbatch       0  undefined  undefined 
 COUNT_restbatch HAS_rest_increased            0  undefined  undefined 
 HAS_rest_increased       WAIT            1 class2d_rest has_larger_rest_size 
 class2d_rest select_rest            0  undefined  undefined 

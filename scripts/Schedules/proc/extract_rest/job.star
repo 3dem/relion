@@ -16,7 +16,7 @@ _rlnJobOptionVariable #1
 _rlnJobOptionValue #2 
 bg_diameter         -1 
 black_dust         -1 
-coords_suffix Schedules/proc/topazpicker/autopick.star 
+coords_suffix Schedules/proc/restpicker/autopick.star 
 do_cut_into_segments        Yes 
 do_extract_helical_tubes        Yes 
 do_extract_helix         No 
