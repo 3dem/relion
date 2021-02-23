@@ -27,8 +27,8 @@ void MotioncorrRunnerMpi::read(int argc, char **argv)
 	// First read in non-parallelisation-dependent variables
 	MotioncorrRunner::read(argc, argv);
 
-	// Don't put any output to screen for mpi slaves
-	verb = (node->isMaster()) ? 1 : 0;
+	// Don't put any output to screen for mpi followers
+	verb = (node->isLeader()) ? 1 : 0;
 
 	// Print out MPI info
 	printMpiNodesMachineNames(*node);
@@ -36,8 +36,8 @@ void MotioncorrRunnerMpi::read(int argc, char **argv)
 
 void MotioncorrRunnerMpi::run()
 {
-	prepareGainReference(node->isMaster());
-	MPI_Barrier(MPI_COMM_WORLD); // wait for the master to write the gain reference
+	prepareGainReference(node->isLeader());
+	MPI_Barrier(MPI_COMM_WORLD); // wait for the leader to write the gain reference
 
 	// Each node does part of the work
 	long int my_first_micrograph, my_last_micrograph, my_nr_micrographs;
@@ -91,9 +91,8 @@ void MotioncorrRunnerMpi::run()
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
-	// Only the master writes the joined result file
-	if (node->isMaster())
+	// Only the leader writes the joined result file
+	if (node->isLeader())
 		generateLogFilePDFAndWriteStarFiles();
 
 }
-

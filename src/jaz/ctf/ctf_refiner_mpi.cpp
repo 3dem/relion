@@ -28,8 +28,8 @@ void CtfRefinerMpi::read(int argc, char **argv)
     // First read in non-parallelisation-dependent variables
     CtfRefiner::read(argc, argv);
 
-    // Don't put any output to screen for mpi slaves
-    verb = (node->isMaster()) ? verb : 0;
+    // Don't put any output to screen for mpi followers
+    verb = (node->isLeader()) ? verb : 0;
 
     // Possibly also read parallelisation-dependent variables here
 	if (node->size < 2)
@@ -51,7 +51,7 @@ void CtfRefinerMpi::run()
 	// Each node does part of the work
 	long int my_first_micrograph, my_last_micrograph;
 	divide_equally(total_nr_micrographs, node->size, node->rank, my_first_micrograph, my_last_micrograph);
-	
+
 	if (do_defocus_fit || do_bfac_fit || do_tilt_fit || do_aberr_fit || do_mag_fit)
     {
     	processSubsetMicrographs(my_first_micrograph, my_last_micrograph);
@@ -59,7 +59,7 @@ void CtfRefinerMpi::run()
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-    if (node->isMaster())
+    if (node->isLeader())
     {
 		finalise();
     }
