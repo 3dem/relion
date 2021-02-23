@@ -36,15 +36,31 @@ const unsigned int EERRenderer::EER_LEN_FOOTER = 24;
 const uint16_t EERRenderer::TIFF_COMPRESSION_EER8bit = 65000;
 const uint16_t EERRenderer::TIFF_COMPRESSION_EER7bit = 65001;
 
-TIFFErrorHandler RELION_prevTIFFWarningHandler = NULL;
+TIFFErrorHandler EERRenderer::prevTIFFWarningHandler = NULL;
 
-void RELION_TIFFWarningHandler(const char* module, const char* fmt, va_list ap)
+void EERRenderer::TIFFWarningHandler(const char* module, const char* fmt, va_list ap)
 {
 	// Silence warnings for private tags
 	if (strcmp("Unknown field with tag %d (0x%x) encountered", fmt) == 0)
 		return;
 
-	RELION_prevTIFFWarningHandler(module, fmt, ap);
+	if (prevTIFFWarningHandler != NULL)
+		prevTIFFWarningHandler(module, fmt, ap);
+}
+
+void EERRenderer::silenceTIFFWarnings()
+{
+	if (prevTIFFWarningHandler == NULL)
+	{
+		// Thread safety issue:
+		// Calling this simultaneously is safe but
+		TIFFErrorHandler prev = TIFFSetWarningHandler(EERRenderer::TIFFWarningHandler);
+
+		// we have to make sure prevTIFFWarningHandler does NOT become our own TIFFWarningHandler
+		// to avoid an infinite loop.
+		if (prev != EERRenderer::TIFFWarningHandler)
+			prevTIFFWarningHandler = prev;
+	}
 }
 
 template <typename T>
@@ -115,8 +131,7 @@ void EERRenderer::read(FileName _fn_movie, int eer_upsampling)
 	file_size = ftell(fh);
 	fseek(fh, 0, SEEK_SET);
 
-	if (RELION_prevTIFFWarningHandler == NULL)
-		RELION_prevTIFFWarningHandler = TIFFSetWarningHandler(RELION_TIFFWarningHandler);
+	silenceTIFFWarnings();
 
 	// Try reading as TIFF; this handle is kept open
 	ftiff = TIFFOpen(fn_movie.c_str(), "r");

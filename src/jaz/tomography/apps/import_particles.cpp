@@ -98,8 +98,9 @@ int main(int argc, char *argv[])
 
 		std::vector<ParticleData> allParticleData;
 
-		MetaDataTable inputTable;
+		MetaDataTable inputTable, outParticles;
 		inputTable.read(inStarFn);
+		outParticles.setName("particles");
 
 		if (!inputTable.containsLabel(EMDL_TOMO_NAME))
 		{
@@ -114,6 +115,7 @@ int main(int argc, char *argv[])
 			bool hasAngles;
 
 			addParticles(inputTable, "", allParticleData, hasAngles);
+			outParticles.append(inputTable);
 		}
 		else if (inputTable.containsLabel(EMDL_TOMO_IMPORT_PARTICLE_FILE))
 		{
@@ -134,6 +136,7 @@ int main(int argc, char *argv[])
 				std::vector<ParticleData> particleData;
 
 				addParticles(inputSubTable, tomoName, particleData, hasAngles);
+				outParticles.append(inputSubTable);
 
 				if (hasAngles)
 				{
@@ -213,15 +216,12 @@ int main(int argc, char *argv[])
 		}
 
 
-		MetaDataTable outParticles;
-		outParticles.setName("particles");
 
 		int particle_id = 1;
 		std::string last_tomo_name = "";
 
 		for (int p = 0; p < allParticleData.size(); p++)
 		{
-			outParticles.addObject();
 
 			const ParticleData& d = allParticleData[p];
 
@@ -238,13 +238,16 @@ int main(int argc, char *argv[])
 				last_tomo_name = d.tomoName;
 			}
 
-			outParticles.setValue(EMDL_TOMO_PARTICLE_NAME,  d.tomoName + "/"
-								  + ZIO::itoa(particle_id), p);
-
 			outParticles.setValue(EMDL_TOMO_NAME, d.tomoName, p);
+			outParticles.setValue(EMDL_TOMO_PARTICLE_NAME, d.tomoName + "/"
+															   + ZIO::itoa(particle_id), p);
+			int subset;
+			if (!inputTable.getValue(EMDL_PARTICLE_RANDOM_SUBSET, subset, p))
+			{
+				outParticles.setValue(EMDL_PARTICLE_RANDOM_SUBSET, p%2 + 1, p);
+			}
+
 			outParticles.setValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup + 1, p);
-			outParticles.setValue(EMDL_PARTICLE_RANDOM_SUBSET, p%2 + 1, p);
-			outParticles.setValue(EMDL_PARTICLE_CLASS, 1, p);
 
 			outParticles.setValue(EMDL_IMAGE_COORD_X, d.coordinates.x, p);
 			outParticles.setValue(EMDL_IMAGE_COORD_Y, d.coordinates.y, p);

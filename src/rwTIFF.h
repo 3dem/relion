@@ -101,7 +101,7 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
 	}
 	else if (bitsPerSample == 16 && sampleFormat == SAMPLEFORMAT_INT)
 	{
-		datatype = Short;
+		datatype = SShort;
 	}
 	else if (bitsPerSample == 32 && sampleFormat == SAMPLEFORMAT_IEEEFP)
 	{

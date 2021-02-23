@@ -31,6 +31,7 @@ void ParticleSubtractor::read(int argc, char **argv)
 	ignore_class = parser.checkOption("--ignore_class", "Ignore the rlnClassNumber column in the particle STAR file.");
 	fn_revert = parser.getOption("--revert", "Name of particle STAR file to revert. When this is provided, all other options are ignored.", "");
 	do_ssnr = parser.checkOption("--ssnr", "Don't subtract, only calculate average spectral SNR in the images");
+	write_float16  = parser.checkOption("--float16", "Write in half-precision 16 bit floating point numbers (MRC mode 12), instead of 32 bit (MRC mode 0).");
 
 	int center_section = parser.addSection("Centering options");
 	do_recenter_on_mask = parser.checkOption("--recenter_on_mask", "Use this flag to center the subtracted particles on projections of the centre-of-mass of the input mask");
@@ -819,14 +820,14 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 		img.setSamplingRateInHeader(my_pixel_size);
 		if (opt.mymodel.data_dim == 3)
 		{
-			img.write(fn_img);
+			img.write(fn_img, -1, false, WRITE_OVERWRITE, write_float16 ? Float16: Float);
 		}
 		else
 		{
 			if (nr_particles_in_optics_group[optics_group] == 0)
-				img.write(fn_img, -1, false, WRITE_OVERWRITE);
+				img.write(fn_img, -1, false, WRITE_OVERWRITE, write_float16 ? Float16: Float);
 			else
-				img.write(fn_img, -1, false, WRITE_APPEND);
+				img.write(fn_img, -1, false, WRITE_APPEND, write_float16 ? Float16: Float);
 		}
 	}
 }
