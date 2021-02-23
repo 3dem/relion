@@ -137,7 +137,7 @@ HAS_rest_increased       WAIT            1 class2d_rest has_larger_rest_size
 class2d_rest select_rest            0  undefined  undefined 
 select_rest   SET_prev_rest_size         0  undefined  undefined 
 SET_prev_rest_size  WAIT       1 CHECK_iniref  do_3d 
-CHECK_iniref SET_myref_inimode 1 SET_myref_user has_iniref
+CHECK_iniref SET_myref_inimodel 1 SET_myref_user has_iniref
 SET_myref_inimodel inimodel3d           0  undefined  undefined 
 inimodel3d   refine3d            0  undefined  undefined 
 SET_myref_user refine3d            0  undefined  undefined 
