@@ -39,8 +39,8 @@ public:
     // For debugging: keep temporary/debug weight and data mrc files
     bool do_keep_debug_reconstruct_files;
 
-    // For debugging: halt all slaves except this one
-    int halt_all_slaves_except_this;
+    // For debugging: halt all followers except this one
+    int halt_all_followers_except_this;
 
     // Original verb
     int ori_verb;
@@ -120,8 +120,8 @@ public:
      */
     void joinTwoHalvesAtLowResolution();
 
-    /** When refining two random halves separately, the master receives both models, calculates FSC and the power of their difference
-     *  and sends these curves, together with new tau2_class estimates to all slaves...
+    /** When refining two random halves separately, the leader receives both models, calculates FSC and the power of their difference
+     *  and sends these curves, together with new tau2_class estimates to all followers...
      */
     void compareTwoHalves();
 

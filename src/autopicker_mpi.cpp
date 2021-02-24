@@ -25,17 +25,17 @@ void AutoPickerMpi::read(int argc, char **argv)
 	// Define a new MpiNode
 	node = new MpiNode(argc, argv);
 
-	if (node->isMaster())
+	if (node->isLeader())
 		PRINT_VERSION_INFO();
 
 	// First read in non-parallelisation-dependent variables
 	AutoPicker::read(argc, argv);
 
-	// Don't put any output to screen for mpi slaves
-	if (!node->isMaster())
+	// Don't put any output to screen for mpi followers
+	if (!node->isLeader())
 		verb = 0;
 
-	if (do_write_fom_maps && node->isMaster())
+	if (do_write_fom_maps && node->isLeader())
 		std::cerr << "WARNING : --write_fom_maps is very heavy on disc I/O and is not advised in parallel execution. If possible, using --shrink 0 and lowpass makes I/O less significant." << std::endl;
 
 	// Possibly also read parallelisation-dependent variables here
@@ -60,9 +60,9 @@ int AutoPickerMpi::deviceInitialise()
 	else
 		dev_id = textToInteger((allThreadIDs[node->rank][0]).c_str());
 
-	for (int slave = 0; slave < node->size; slave++)
+	for (int follower = 0; follower < node->size; follower++)
 	{
-		if (slave == node->rank)
+		if (follower == node->rank)
 		{
 			std::cout << " + Using GPU device: " << dev_id << " on MPI node: " << node->rank << std::endl;
 			std::cout.flush();
