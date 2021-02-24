@@ -8,3 +8,4 @@ external
 .cproject
 .project
 Debug
+*.pyc
