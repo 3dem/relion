@@ -1259,7 +1259,7 @@ void MlOptimiser::initialise()
 			int dev_id;
 			if (semiAutomaticMapping)
 			{
-				// Sjors: hack to make use of several cards; will only work if all MPI follower are on the same node!
+				// Sjors: hack to make use of several cards; will only work if all MPI followers are on the same node!
 				// Bjorn: Better hack
 				if (fullAutomaticMapping)
 					dev_id = devCount*i / nr_threads;
