@@ -260,7 +260,6 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel" OR "$ENV{I_MPI_CXX}" STREQUAL "ic
          else()	# Intel oneAPI compiler
              SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fiopenmp -mkl=parallel -limf ")
          endif()
-        SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fopenmp -mkl -limf ")
     endif(MKLFFT)
     if(ALTCPU)
         add_definitions(-DFAST_CENTERFFT)
