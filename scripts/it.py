@@ -931,7 +931,7 @@ class RelionItGui(object):
         """
         if self.save_options_from_gui():
             self.main_window.destroy()
-            run_scheduler(self.options, True) #True means launch the RELION GUI
+            run_scheduler(self.options, True) #True means launch the RELION GUI and the schedulegui.py GUIs
  
 def save_options(options):
 
@@ -995,7 +995,11 @@ def run_scheduler(options, do_gui):
         command = 'relion_scheduler --schedule prep --run --pipeline_control Schedules/prep/ >> Schedules/prep/run.out 2>> Schedules/prep/run.err &'
         print(' RELION_IT: excuting: ', command)
         os.system(command)
-
+        if do_gui:
+            command = 'relion_schedulegui.py prep &'
+            print(' RELION_IT: excuting: ', command)
+            os.system(command)
+          
     if options['proc__do_2d']:
 
         command = 'relion_scheduler --schedule proc --reset &'
@@ -1005,6 +1009,11 @@ def run_scheduler(options, do_gui):
         command = 'relion_scheduler --schedule proc --run  --pipeline_control Schedules/proc/ >> Schedules/proc/run.out 2>> Schedules/proc/run.err  &'
         print(' RELION_IT: excuting: ', command)
         os.system(command)
+        if do_gui:
+            command = 'relion_schedulegui.py proc &'
+            print(' RELION_IT: excuting: ', command)
+            os.system(command)
+
 
     print(' RELION_IT: Now monitor the prep (and proc) Schedules from the RELION GUI ...')
 
