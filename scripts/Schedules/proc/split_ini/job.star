@@ -16,7 +16,7 @@ _rlnJobOptionVariable #1
 _rlnJobOptionValue #2 
 discard_label rlnImageName 
 discard_sigma          4 
-do_class_ranker        Yes 
+do_class_ranker         No 
 do_discard         No 
   do_queue         No 
  do_random         No 
@@ -24,12 +24,12 @@ do_recenter         No
 do_regroup         No 
 do_remove_duplicates         No 
 do_select_values         No 
-  do_split         No 
+  do_split        Yes 
 duplicate_threshold         30 
  fn_coords         "" 
-   fn_data         "" 
+   fn_data Schedules/proc/extract_ini/particles.star 
     fn_mic         "" 
-  fn_model Schedules/proc/class2d_logbatch/run_it025_optimiser.star 
+  fn_model         "" 
 image_angpix         -1 
 min_dedicated         24 
  nr_groups          1 
@@ -38,9 +38,9 @@ other_args         ""
       qsub       qsub 
 qsubscript /public/EM/RELION/relion/bin/relion_qsub.csh 
  queuename    openmpi 
-rank_threshold       0.35 
-select_label rlnCtfMaxResolution 
+rank_threshold        0.5 
+select_label rlnCtfFigureOfMerit 
 select_maxval      9999. 
 select_minval     -9999. 
-split_size        100 
+split_size      10000 
  

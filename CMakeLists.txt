@@ -390,7 +390,8 @@ list(APPEND RELION_SCRIPT_FILES star_printtable
                                 star_datablock_singlefiles
                                 star_datablock_ctfdat
                                 qsub.csh
-				it.py)
+				it.py
+				schedulegui.py)
 
 add_custom_target(copy_scripts ALL)
 add_custom_target(copy_schedules ALL)
