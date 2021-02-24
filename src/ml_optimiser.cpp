@@ -433,7 +433,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	do_parallel_disc_io = !parser.checkOption("--no_parallel_disc_io", "Do NOT let parallel (MPI) processes access the disc simultaneously (use this option with NFS)");
 	combine_weights_thru_disc = !parser.checkOption("--dont_combine_weights_via_disc", "Send the large arrays of summed weights through the MPI network, instead of writing large files to disc");
 	do_shifts_onthefly = parser.checkOption("--onthefly_shifts", "Calculate shifted images on-the-fly, do not store precalculated ones in memory");
-	do_preread_images  = parser.checkOption("--preread_images", "Use this to let the master process read all particles into memory. Be careful you have enough RAM for large data sets!");
+	do_preread_images  = parser.checkOption("--preread_images", "Use this to let the leader process read all particles into memory. Be careful you have enough RAM for large data sets!");
 	fn_scratch = parser.getOption("--scratch_dir", "If provided, particle stacks will be copied to this local scratch disk prior to refinement.", "");
 	keep_free_scratch_Gb = textToFloat(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
 	do_reuse_scratch = parser.checkOption("--reuse_scratch", "Re-use data on scratchdir, instead of wiping it and re-copying all data. This works only when ALL particles have already been cached.");
@@ -765,7 +765,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	combine_weights_thru_disc = !parser.checkOption("--dont_combine_weights_via_disc", "Send the large arrays of summed weights through the MPI network, instead of writing large files to disc");
 	do_shifts_onthefly = parser.checkOption("--onthefly_shifts", "Calculate shifted images on-the-fly, do not store precalculated ones in memory");
 	do_parallel_disc_io = !parser.checkOption("--no_parallel_disc_io", "Do NOT let parallel (MPI) processes access the disc simultaneously (use this option with NFS)");
-	do_preread_images  = parser.checkOption("--preread_images", "Use this to let the master process read all particles into memory. Be careful you have enough RAM for large data sets!");
+	do_preread_images  = parser.checkOption("--preread_images", "Use this to let the leader process read all particles into memory. Be careful you have enough RAM for large data sets!");
 	fn_scratch = parser.getOption("--scratch_dir", "If provided, particle stacks will be copied to this local scratch disk prior to refinement.", "");
 	keep_free_scratch_Gb = textToFloat(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
 	do_reuse_scratch = parser.checkOption("--reuse_scratch", "Re-use data on scratchdir, instead of wiping it and re-copying all data.");
@@ -1067,7 +1067,7 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	debug1 = debug2 = debug3 = 0.;
 
 	// Then read in sampling, mydata and mymodel stuff
-	// If do_preread_images: when not do_parallel_disc_io: only the master reads all images into RAM; otherwise: everyone reads in images into RAM
+	// If do_preread_images: when not do_parallel_disc_io: only the leader reads all images into RAM; otherwise: everyone reads in images into RAM
 #ifdef DEBUG_READ
 	std::cerr<<"MlOptimiser::readStar before data."<<std::endl;
 #endif
@@ -1515,7 +1515,7 @@ void MlOptimiser::checkMask(FileName &_fn_mask, int solvent_nr, int rank)
 			std::cerr << " + WARNING: re-scaling the mask... " << std::endl;
 		}
 
-		if (rank == 0) // only master writes out the new mask
+		if (rank == 0) // only leader writes out the new mask
 		{
 			int rescale_size = ROUND(XSIZE(Isolvent()) * mask_pixel_size / mymodel.pixel_size);
 			rescale_size += rescale_size % 2; //make even in case it is not already
@@ -1535,7 +1535,7 @@ void MlOptimiser::checkMask(FileName &_fn_mask, int solvent_nr, int rank)
 			std::cerr << " + WARNING: re-windowing the mask... " << std::endl;
 		}
 
-		if (rank == 0) // only master writes out the new mask
+		if (rank == 0) // only leader writes out the new mask
 		{
 			Isolvent().setXmippOrigin();
 			Isolvent().window(FIRST_XMIPP_INDEX(ref_box_size), FIRST_XMIPP_INDEX(ref_box_size), FIRST_XMIPP_INDEX(ref_box_size),
@@ -1733,7 +1733,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 	if (iter == 0)
 	{
 		// Read in the experimental image metadata
-		// If do_preread_images: only the master reads all images into RAM
+		// If do_preread_images: only the leader reads all images into RAM
 		bool do_preread = (do_preread_images) ? (do_parallel_disc_io || rank == 0) : false;
 		bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
 		int myverb = (rank==0) ? 1 : 0;
@@ -2213,8 +2213,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 void MlOptimiser::initialiseWorkLoad()
 {
-
-	// Note, this function is overloaded in ml_optimiser_mpi (where random_seed is only set by the master and then send to all follwers!)
+	// Note, this function is overloaded in ml_optimiser_mpi (where random_seed is only set by the leader and then send to all followers!)
 
 	// Randomise the order of the particles
 	if (random_seed == -1) random_seed = time(NULL);
@@ -2343,7 +2342,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				else if (!do_parallel_disc_io)
 				{
 					// When not doing parallel disk IO,
-					// only those MPI processes running on the same node as the master have scratch.
+					// only those MPI processes running on the same node as the leader have scratch.
 					fn_img.decompose(dump, fn_stack);
 					if (!exists(fn_stack))
 						MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
@@ -2983,7 +2982,7 @@ void MlOptimiser::expectation()
 		calculateExpectedAngularErrors(0, n_trials_acc-1);
 	}
 
-	// D. Update the angular sampling (all nodes except master)
+	// D. Update the angular sampling (all nodes except leader)
 	if ( ( (do_auto_refine) && iter > 1) ||
 		 ( mymodel.nr_classes > 1 && allow_coarser_samplings) )
 	{

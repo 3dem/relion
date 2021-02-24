@@ -162,7 +162,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		if (baseMLO->do_parallel_disc_io)
 		{
 
-			// If all slaves had preread images into RAM: get those now
+			// If all followers had preread images into RAM: get those now
 			if (baseMLO->do_preread_images)
 			{
 

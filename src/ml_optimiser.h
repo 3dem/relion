@@ -441,7 +441,7 @@ public:
 	// Which GPU devices to use?
 	std::string gpu_ids;
 
-	// Or preread all images into RAM on the master node?
+	// Or preread all images into RAM on the leader node?
 	bool do_preread_images;
 
 	// Place on scratch disk to copy particle stacks temporarily

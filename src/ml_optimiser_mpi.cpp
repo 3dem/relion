@@ -906,7 +906,7 @@ void MlOptimiserMpi::expectation()
 	if (!node->isLeader() && ( do_auto_refine && iter > 1 || (mymodel.nr_classes > 1 && allow_coarser_samplings) ))
 		updateAngularSampling(node->rank == 1);
 
-	// The master needs to know about the updated parameters from updateAngularSampling
+	// The leader needs to know about the updated parameters from updateAngularSampling
 	node->relion_MPI_Bcast(&grad_suspended_local_searches_iter, 1, MPI_INT, first_follower, MPI_COMM_WORLD);
 	node->relion_MPI_Bcast(&has_fine_enough_angular_sampling, 1, MPI_INT, first_follower, MPI_COMM_WORLD);
 	node->relion_MPI_Bcast(&nr_iter_wo_resol_gain, 1, MPI_INT, first_follower, MPI_COMM_WORLD);
@@ -3114,7 +3114,7 @@ void MlOptimiserMpi::iterate()
 			nr_iter_wo_large_hidden_variable_changes = 0;
 		}
 
-		// Only first slave checks for convergence and prints stats to the stdout
+		// Only first follower checks for convergence and prints stats to the stdout
 		if (do_auto_refine)
 			checkConvergence(node->rank == 1);
 

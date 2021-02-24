@@ -28,7 +28,7 @@ void MotionRefinerMpi::read(int argc, char **argv)
 	// First read in non-parallelisation-dependent variables
 	MotionRefiner::read(argc, argv);
 	
-	// Don't put any output to screen for mpi slaves
+	// Don't put any output to screen for mpi followers!
 	verb = (node->isLeader()) ? verb : 0;
 	
 	// Possibly also read parallelisation-dependent variables here

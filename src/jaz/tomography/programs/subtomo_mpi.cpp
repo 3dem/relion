@@ -30,7 +30,7 @@ void SubtomoProgramMpi::readParameters(int argc, char *argv[])
 	rank = node->rank;
 	nodeCount = node->size;
 
-	// Don't put any output to screen for mpi slaves
+	// Don't put any output to screen for mpi followers
 	verb = (node->isLeader()) ? 1 : 0;
 
 	IOParser parser;
