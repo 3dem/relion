@@ -77,7 +77,7 @@ AutoPickerCuda::AutoPickerCuda(AutoPickerMpi *basePicker, int dev_id, const char
 
 {
 	node = basePicker->getNode();
-	basePicker->verb = (node->isMaster()) ? 1 : 0;
+	basePicker->verb = (node->isLeader()) ? 1 : 0;
 
 	projectors.resize(basePckr->Mrefs.size());
 	have_warned_batching=false;
