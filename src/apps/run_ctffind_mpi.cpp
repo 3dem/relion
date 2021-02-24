@@ -27,7 +27,7 @@ int main(int argc, char *argv[])
 	try
 	{
 		prm.read(argc, argv);
-		prm.initialise(prm.node->isMaster());
+		prm.initialise(prm.node->isLeader());
 		MPI_Barrier(MPI_COMM_WORLD);
 		prm.run();
 	}

@@ -161,7 +161,7 @@ public:
 	void usage();
 
 	// Initialise some stuff after reading
-	void initialise(bool is_master = true);
+	void initialise(bool is_leader = true);
 
 	// Execute all CTFFIND jobs to get CTF parameters
 	void run();

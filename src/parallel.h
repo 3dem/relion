@@ -344,7 +344,7 @@ public:
     bool getTasks(size_t &first, size_t &last); // False = no more jobs, true = more jobs
     /* This function set the number of completed tasks.
      * Usually this not need to be called. Its more useful
-     * for restarting work, when usually the master detect
+     * for restarting work, when usually the leader detects
      * the number of tasks already done.
      */
     bool setAssignedTasks(size_t tasks);

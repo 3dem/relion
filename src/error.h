@@ -188,11 +188,11 @@ Each MPI-rank running on a GPU increases the use of GPU-memory. Relion\n\
 tries to distribute load over multiple GPUs to increase performance,\n\
 but doing this in a general and memory-efficient way is difficult.\n\n\
 1. Check the device-mapping presented at the beginning of each run,\n\
-   and be particularly wary of 'device X is split between N slaves', which \n\
+   and be particularly wary of 'device X is split between N followers', which \n\
    will result in a higher memory cost on GPU X. In classifications, GPU-\n\
    sharing between MPI-ranks is typically fine, whereas it will usually \n\
    cause out-of-memory during the last iteration of high-resolution refinement.\n\n\
-2. If you are not GPU-sharing across MPI-slave ranks, then you might be using a\n\
+2. If you are not GPU-sharing across MPI-follower ranks, then you might be using a\n\
    too-big box-size for the GPU memory. Currently, N-pixel particle images\n\
    will require *roughly* \n\n\
 \t\t    (1.1e-8)*(N*2)^3  GB  \n\n\

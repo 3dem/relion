@@ -31,8 +31,8 @@ void ReconstructParticleProgramMpi::readParameters(int argc, char *argv[])
 	rank = node->rank;
 	nodeCount = node->size;
 
-	// Don't put any output to screen for mpi slaves
-	verb = (node->isMaster()) ? 1 : 0;
+	// Don't put any output to screen for mpi followers
+	verb = (node->isLeader()) ? 1 : 0;
 
 	readBasicParameters(argc, argv);
 
@@ -144,7 +144,7 @@ void ReconstructParticleProgramMpi::run()
 
 	size_t sizeData = sh*s*s;
 
-	if (node->isMaster())
+	if (node->isLeader())
 	{
 		for (int i = 0; i < 2; i++)
 		{
@@ -155,7 +155,7 @@ void ReconstructParticleProgramMpi::run()
 
 	for (int i = 0; i < 2; i++)
 	{
-		if (node->isMaster())
+		if (node->isLeader())
 		{
 			Log::print("Gathering half "+ZIO::itoa(i+1));
 		}
