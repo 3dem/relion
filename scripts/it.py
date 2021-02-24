@@ -270,7 +270,7 @@ class RelionItGui(object):
 
         ###
 
-        compute_frame = tk.LabelFrame(left_frame, text="Computation details", padx=5, pady=5)
+        compute_frame = tk.LabelFrame(left_frame, text="Computation settings", padx=5, pady=5)
         compute_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
         tk.Grid.columnconfigure(compute_frame, 1, weight=1)
 
@@ -333,7 +333,7 @@ class RelionItGui(object):
 
         ###
 
-        self.prep_frame = tk.LabelFrame(left_frame, text="Preprocessing details", padx=5, pady=5)
+        self.prep_frame = tk.LabelFrame(left_frame, text="Preprocessing settings", padx=5, pady=5)
         self.prep_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
         tk.Grid.columnconfigure(self.prep_frame, 1, weight=1)
 
@@ -408,7 +408,7 @@ class RelionItGui(object):
 
         ###
 
-        self.particle_frame = tk.LabelFrame(right_frame, text="Particle details", padx=5, pady=5)
+        self.particle_frame = tk.LabelFrame(right_frame, text="Particle settings", padx=5, pady=5)
         self.particle_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
         tk.Grid.columnconfigure(self.particle_frame, 1, weight=1)
 
@@ -475,13 +475,13 @@ class RelionItGui(object):
 
         ###
 
-        self.proc_frame = tk.LabelFrame(right_frame, text="Processing details", padx=5, pady=5)
+        self.proc_frame = tk.LabelFrame(right_frame, text="Processing settings", padx=5, pady=5)
         self.proc_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
         tk.Grid.columnconfigure(self.proc_frame, 1, weight=1)
 
         row = 0
 
-        tk.Label(self.proc_frame, text="Min resolution mics:").grid(row=row, sticky=tk.W)
+        tk.Label(self.proc_frame, text="Min resolution micrographs:").grid(row=row, sticky=tk.W)
         self.minres_var = tk.StringVar()  # for data binding
         self.minres_entry = tk.Entry(self.proc_frame, textvariable=self.minres_var, bg=entry_bg)
         self.minres_entry.grid(row=row, column=1, sticky=tk.W)
