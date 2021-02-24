@@ -18,8 +18,6 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#include <FL/Fl.H>
-#include <FL/Fl_Window.H>
 #include "src/pipeliner.h"
 #include <src/args.h>
 

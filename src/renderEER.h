@@ -7,17 +7,13 @@
 
 #include <src/image.h>
 
-#ifdef HAVE_TIFF
 #include <tiffio.h>
-#endif
 
 class EERRenderer {
 	private:
 
 	FileName fn_movie;
-#ifdef HAVE_TIFF
 	TIFF *ftiff;
-#endif
 
 	bool ready;
 	bool is_legacy;
@@ -49,6 +45,8 @@ class EERRenderer {
 	template <typename T>
 	void render4K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons);
 
+	static TIFFErrorHandler prevTIFFWarningHandler;
+
 	public:
 
 	EERRenderer();
@@ -64,6 +62,10 @@ class EERRenderer {
 	{
 		REPORT_ERROR("Copy assignment operator for EERRenderer not implemented yet.");
 	}
+
+	// Wrapper to the default TIFF warning handler to suppress EER private tag warnings
+	static void TIFFWarningHandler(const char* module, const char* fmt, va_list ap);
+	static void silenceTIFFWarnings();
 
 	// 1-indexed
 	void setFramesOfInterest(int start, int end)
@@ -97,7 +99,10 @@ class EERRenderer {
 	{
 		const bool is_multiplicative = (fn_gain.getExtension() == "gain");
 		if (is_multiplicative)
+		{
+			silenceTIFFWarnings();
 			fn_gain += ":tif";
+		}
 
 		Image<T> original;
 		original.read(fn_gain, true, 0, false, true); // explicitly use the first page

@@ -14,14 +14,14 @@
 
 //#define TIMING
 #ifdef TIMING
-	#define RCTIC(label) (timer.tic(label))
-	#define RCTOC(label) (timer.toc(label))
+	#define RCTIC(label) (EERtimer.tic(label))
+	#define RCTOC(label) (EERtimer.toc(label))
 
-	Timer timer;
-	int TIMING_READ_EER = timer.setNew("read EER");
-	int TIMING_BUILD_INDEX = timer.setNew("build index");
-	int TIMING_UNPACK_RLE = timer.setNew("unpack RLE");
-	int TIMING_RENDER_ELECTRONS = timer.setNew("render electrons");
+	Timer EERtimer;
+	int TIMING_READ_EER = EERtimer.setNew("read EER");
+	int TIMING_BUILD_INDEX = EERtimer.setNew("build index");
+	int TIMING_UNPACK_RLE = EERtimer.setNew("unpack RLE");
+	int TIMING_RENDER_ELECTRONS = EERtimer.setNew("render electrons");
 #else
 	#define RCTIC(label)
 	#define RCTOC(label)
@@ -36,18 +36,32 @@ const unsigned int EERRenderer::EER_LEN_FOOTER = 24;
 const uint16_t EERRenderer::TIFF_COMPRESSION_EER8bit = 65000;
 const uint16_t EERRenderer::TIFF_COMPRESSION_EER7bit = 65001;
 
-#ifdef HAVE_TIFF
-TIFFErrorHandler RELION_prevTIFFWarningHandler = NULL;
+TIFFErrorHandler EERRenderer::prevTIFFWarningHandler = NULL;
 
-void RELION_TIFFWarningHandler(const char* module, const char* fmt, va_list ap)
+void EERRenderer::TIFFWarningHandler(const char* module, const char* fmt, va_list ap)
 {
 	// Silence warnings for private tags
 	if (strcmp("Unknown field with tag %d (0x%x) encountered", fmt) == 0)
 		return;
 
-	RELION_prevTIFFWarningHandler(module, fmt, ap);
+	if (prevTIFFWarningHandler != NULL)
+		prevTIFFWarningHandler(module, fmt, ap);
 }
-#endif
+
+void EERRenderer::silenceTIFFWarnings()
+{
+	if (prevTIFFWarningHandler == NULL)
+	{
+		// Thread safety issue:
+		// Calling this simultaneously is safe but
+		TIFFErrorHandler prev = TIFFSetWarningHandler(EERRenderer::TIFFWarningHandler);
+
+		// we have to make sure prevTIFFWarningHandler does NOT become our own TIFFWarningHandler
+		// to avoid an infinite loop.
+		if (prev != EERRenderer::TIFFWarningHandler)
+			prevTIFFWarningHandler = prev;
+	}
+}
 
 template <typename T>
 void EERRenderer::render16K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons)
@@ -106,9 +120,6 @@ void EERRenderer::read(FileName _fn_movie, int eer_upsampling)
 		REPORT_ERROR("EERRenderer::read: eer_upsampling must be 1, 2 or 3.");
 	}
 
-#ifndef HAVE_TIFF
-	REPORT_ERROR("To use EER, you have to re-compile RELION with libtiff.");
-#else
 	fn_movie = _fn_movie;
 
 	// First of all, check the file size
@@ -120,8 +131,7 @@ void EERRenderer::read(FileName _fn_movie, int eer_upsampling)
 	file_size = ftell(fh);
 	fseek(fh, 0, SEEK_SET);
 
-	if (RELION_prevTIFFWarningHandler == NULL)
-		RELION_prevTIFFWarningHandler = TIFFSetWarningHandler(RELION_TIFFWarningHandler);
+	silenceTIFFWarnings();
 
 	// Try reading as TIFF; this handle is kept open
 	ftiff = TIFFOpen(fn_movie.c_str(), "r");
@@ -169,7 +179,6 @@ void EERRenderer::read(FileName _fn_movie, int eer_upsampling)
 
 	fclose(fh);
 	ready = true;
-#endif
 }
 
 void EERRenderer::readLegacy(FILE *fh)
@@ -446,7 +455,7 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 #endif
 
 #ifdef TIMING
-	timer.printTimes(false);
+	EERtimer.printTimes(false);
 #endif
 
 	return total_n_electron;

@@ -32,41 +32,41 @@
 
 //#define TIMING
 #ifdef TIMING
-	#define RCTIC(label) (timer.tic(label))
-	#define RCTOC(label) (timer.toc(label))
+	#define RCTIC(label) (MCtimer.tic(label))
+	#define RCTOC(label) (MCtimer.toc(label))
 
-	Timer timer;
-	int TIMING_READ_GAIN = timer.setNew("read gain");
-	int TIMING_READ_MOVIE = timer.setNew("read movie");
-	int TIMING_APPLY_GAIN = timer.setNew("apply gain");
-	int TIMING_INITIAL_SUM = timer.setNew("initial sum");
-	int TIMING_DETECT_HOT = timer.setNew("detect hot pixels");
-	int TIMING_FIX_DEFECT = timer.setNew("fix defects");
-	int TIMING_GLOBAL_FFT = timer.setNew("global FFT");
-	int TIMING_POWER_SPECTRUM = timer.setNew("power spectrum");
-	int TIMING_POWER_SPECTRUM_SUM = timer.setNew("power - sum");
-	int TIMING_POWER_SPECTRUM_SQUARE = timer.setNew("power - square");
-	int TIMING_POWER_SPECTRUM_CROP = timer.setNew("power - crop");
-	int TIMING_POWER_SPECTRUM_RESIZE = timer.setNew("power - resize");
-	int TIMING_GLOBAL_ALIGNMENT = timer.setNew("global alignment");
-	int TIMING_GLOBAL_IFFT = timer.setNew("global iFFT");
-	int TIMING_PREP_PATCH = timer.setNew("prepare patch");
-	int TIMING_CLIP_PATCH = timer.setNew("prep patch - clip (in thread)");
-	int TIMING_PATCH_FFT = timer.setNew("prep patch - FFT (in thread)");
-	int TIMING_PATCH_ALIGN = timer.setNew("patch alignment");
-	int TIMING_PREP_WEIGHT = timer.setNew("align - prep weight");
-	int TIMING_MAKE_REF = timer.setNew("align - make reference");
-	int TIMING_CCF_CALC = timer.setNew("align - calc CCF (in thread)");
-	int TIMING_CCF_IFFT = timer.setNew("align - iFFT CCF (in thread)");
-	int TIMING_CCF_FIND_MAX = timer.setNew("align - argmax CCF (in thread)");
-	int TIMING_FOURIER_SHIFT = timer.setNew("align - shift in Fourier space");
-	int TIMING_FIT_POLYNOMIAL = timer.setNew("fit polynomial");
-	int TIMING_DOSE_WEIGHTING = timer.setNew("dose weighting");
-	int TIMING_DW_WEIGHT = timer.setNew("dw - calc weight");
-	int TIMING_DW_IFFT = timer.setNew("dw - iFFT");
-	int TIMING_REAL_SPACE_INTERPOLATION = timer.setNew("real space interpolation");
-	int TIMING_BINNING = timer.setNew("binning");
-//	int TIMING_ = timer.setNew("");
+	Timer MCtimer;
+	int TIMING_READ_GAIN = MCtimer.setNew("read gain");
+	int TIMING_READ_MOVIE = MCtimer.setNew("read movie");
+	int TIMING_APPLY_GAIN = MCtimer.setNew("apply gain");
+	int TIMING_INITIAL_SUM = MCtimer.setNew("initial sum");
+	int TIMING_DETECT_HOT = MCtimer.setNew("detect hot pixels");
+	int TIMING_FIX_DEFECT = MCtimer.setNew("fix defects");
+	int TIMING_GLOBAL_FFT = MCtimer.setNew("global FFT");
+	int TIMING_POWER_SPECTRUM = MCtimer.setNew("power spectrum");
+	int TIMING_POWER_SPECTRUM_SUM = MCtimer.setNew("power - sum");
+	int TIMING_POWER_SPECTRUM_SQUARE = MCtimer.setNew("power - square");
+	int TIMING_POWER_SPECTRUM_CROP = MCtimer.setNew("power - crop");
+	int TIMING_POWER_SPECTRUM_RESIZE = MCtimer.setNew("power - resize");
+	int TIMING_GLOBAL_ALIGNMENT = MCtimer.setNew("global alignment");
+	int TIMING_GLOBAL_IFFT = MCtimer.setNew("global iFFT");
+	int TIMING_PREP_PATCH = MCtimer.setNew("prepare patch");
+	int TIMING_CLIP_PATCH = MCtimer.setNew("prep patch - clip (in thread)");
+	int TIMING_PATCH_FFT = MCtimer.setNew("prep patch - FFT (in thread)");
+	int TIMING_PATCH_ALIGN = MCtimer.setNew("patch alignment");
+	int TIMING_PREP_WEIGHT = MCtimer.setNew("align - prep weight");
+	int TIMING_MAKE_REF = MCtimer.setNew("align - make reference");
+	int TIMING_CCF_CALC = MCtimer.setNew("align - calc CCF (in thread)");
+	int TIMING_CCF_IFFT = MCtimer.setNew("align - iFFT CCF (in thread)");
+	int TIMING_CCF_FIND_MAX = MCtimer.setNew("align - argmax CCF (in thread)");
+	int TIMING_FOURIER_SHIFT = MCtimer.setNew("align - shift in Fourier space");
+	int TIMING_FIT_POLYNOMIAL = MCtimer.setNew("fit polynomial");
+	int TIMING_DOSE_WEIGHTING = MCtimer.setNew("dose weighting");
+	int TIMING_DW_WEIGHT = MCtimer.setNew("dw - calc weight");
+	int TIMING_DW_IFFT = MCtimer.setNew("dw - iFFT");
+	int TIMING_REAL_SPACE_INTERPOLATION = MCtimer.setNew("real space interpolation");
+	int TIMING_BINNING = MCtimer.setNew("binning");
+//	int TIMING_ = MCtimer.setNew("");
 
 #else
 	#define RCTIC(label)
@@ -481,10 +481,10 @@ void MotioncorrRunner::run()
 	generateLogFilePDFAndWriteStarFiles();
 
 #ifdef TIMING
-        timer.printTimes(false);
+        MCtimer.printTimes(false);
 #endif
 #ifdef TIMING_FFTW
-	timer_fftw.printTimes(false);
+	MCtimer_fftw.printTimes(false);
 #endif
 }
 
@@ -1056,7 +1056,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	RCTIC(TIMING_READ_GAIN);
 	if (fn_gain_reference != "") {
 		if (isEER)
-			 EERRenderer::loadEERGain(fn_gain_reference, Igain(), eer_upsampling);
+			EERRenderer::loadEERGain(fn_gain_reference, Igain(), eer_upsampling);
 		else
 			Igain.read(fn_gain_reference);
 

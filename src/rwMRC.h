@@ -208,7 +208,11 @@ int readMRC(long int img_select, bool isStack=false, const FileName &name="")
 	data.setDimensions(_xDim, _yDim, _zDim, _nDim);
 
 	DataType datatype;
-	if (header-> mode == 101)
+
+	if (header->mode == 12)
+		REPORT_ERROR("RELION 3.1 does not support half-precision floating point numbers (MRC mode 12). Please use later versions.");
+
+	if (header->mode == 101)
 	{
 		// This is SerialEM's non-standard extension.
 		// https://bio3d.colorado.edu/imod/doc/mrc_format.txt

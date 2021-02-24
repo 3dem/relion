@@ -27,8 +27,8 @@ void CtffindRunnerMpi::read(int argc, char **argv)
 	// First read in non-parallelisation-dependent variables
 	CtffindRunner::read(argc, argv);
 
-	// Don't put any output to screen for mpi slaves
-	verb = (node->isMaster()) ? 1 : 0;
+	// Don't put any output to screen for mpi followers
+	verb = (node->isLeader()) ? 1 : 0;
 
 	// Possibly also read parallelisation-dependent variables here
 
@@ -98,8 +98,8 @@ void CtffindRunnerMpi::run()
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
-	// Only the master writes the joined result file
-	if (node->isMaster())
+	// Only the leader writes the joined result file
+	if (node->isLeader())
 	{
 		joinCtffindResults();
 	}
