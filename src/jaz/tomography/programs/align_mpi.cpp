@@ -30,8 +30,8 @@ AlignProgramMpi::AlignProgramMpi(int argc, char *argv[])
 	rank = node->rank;
 	nodeCount = node->size;
 
-	// Don't put any output to screen for mpi slaves
-	verbosity = (node->isMaster()) ? 1 : 0;
+	// Don't put any output to screen for mpi followers
+	verbosity = (node->isLeader()) ? 1 : 0;
 }
 
 void AlignProgramMpi::run()
@@ -58,7 +58,7 @@ void AlignProgramMpi::run()
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
-	if (node->isMaster())
+	if (node->isLeader())
 	{
 		finalise();
 	}

@@ -922,7 +922,7 @@ public:
 	 */
 	void expectation();
 
-	/* Setup expectation step. We divide the heavy steps over mpi-slaves,
+	/* Setup expectation step. We divide the heavy steps over mpi followers,
 	 * so each call needs a list of which to skip heavy setup for. For
 	 * these classes, only some formatting is done. Data is copied
 	 * explicitly later.*/

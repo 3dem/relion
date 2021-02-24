@@ -56,18 +56,18 @@ MpiNode::MpiNode(int &argc, char ** argv)
 	// Handle errors
 	MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
 
-	// Set up Slave communicator -----------------------------------------
+	// Set up Follower communicator -----------------------------------------
 	MPI_Comm_group(MPI_COMM_WORLD, &worldG);
 	int mstr[1] = {0};
-	MPI_Group_excl(worldG, 1, mstr, &slaveG); // exclude master
-	MPI_Comm_create(MPI_COMM_WORLD, slaveG, &slaveC);
+	MPI_Group_excl(worldG, 1, mstr, &followerG); // exclude leader
+	MPI_Comm_create(MPI_COMM_WORLD, followerG, &followerC);
 	if (rank != 0)
 	{
-		MPI_Group_rank(slaveG, &slaveRank);
+		MPI_Group_rank(followerG, &followerRank);
 	}
 	else
 	{
-		slaveRank = -1;
+		followerRank = -1;
 	}
 }
 
@@ -76,7 +76,7 @@ MpiNode::~MpiNode()
 	MPI_Finalize();
 }
 
-bool MpiNode::isMaster() const
+bool MpiNode::isLeader() const
 {
 	return rank == 0;
 }
@@ -298,7 +298,7 @@ void MpiNode::report_MPI_ERROR(int error_code)
 
 void printMpiNodesMachineNames(MpiNode &node, int nthreads)
 {
-	if (node.isMaster())
+	if (node.isLeader())
 	{
 		std::cout << " === RELION MPI setup ===" << std::endl;
 		std::cout << " + Number of MPI processes             = " << node.size << std::endl;
@@ -307,25 +307,25 @@ void printMpiNodesMachineNames(MpiNode &node, int nthreads)
 			std::cout << " + Number of threads per MPI process   = " << nthreads << std::endl;
 		std::cout << " + Total number of threads therefore   = " << nthreads * node.size << std::endl;
 		}
-		std::cout << " + Master  (0) runs on host            = " << node.getHostName() << std::endl;
+		std::cout << " + Leader  (0) runs on host            = " << node.getHostName() << std::endl;
 		std::cout.flush();
 	}
 	node.barrierWait();
 
-	for (int slave = 1; slave < node.size; slave++)
+	for (int follower = 1; follower < node.size; follower++)
 	{
-		if (slave == node.rank)
+		if (follower == node.rank)
 		{
-			std::cout << " + Slave ";
+			std::cout << " + Follower ";
 			std::cout.width(5);
-			std::cout << slave;
+			std::cout << follower;
 			std::cout << " runs on host            = " << node.getHostName() << std::endl;
 			std::cout.flush();
 		}
 		node.barrierWait();
 	}
 
-	if (node.isMaster())
+	if (node.isLeader())
 	{
 		std::cout << " =================" << std::endl;
 	}

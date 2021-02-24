@@ -21,8 +21,8 @@ CtfRefinementProgramMpi::CtfRefinementProgramMpi(int argc, char *argv[])
 	rank = node->rank;
 	nodeCount = node->size;
 
-	// Don't put any output to screen for mpi slaves
-	verbosity = (node->isMaster()) ? 1 : 0;
+	// Don't put any output to screen for mpi followers
+	verbosity = (node->isLeader()) ? 1 : 0;
 }
 
 void CtfRefinementProgramMpi::run()
@@ -36,7 +36,7 @@ void CtfRefinementProgramMpi::run()
 
 	RefinementProgram::init();
 
-	if (node->isMaster())
+	if (node->isLeader())
 	{
 		initTempDirectories();
 	}
@@ -54,7 +54,7 @@ void CtfRefinementProgramMpi::run()
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
-	if (node->isMaster())
+	if (node->isLeader())
 	{
 		finalise();
 	}

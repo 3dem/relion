@@ -31,7 +31,7 @@ void SubtomoProgramMpi::readParameters(int argc, char *argv[])
 	nodeCount = node->size;
 
 	// Don't put any output to screen for mpi slaves
-	verb = (node->isMaster()) ? 1 : 0;
+	verb = (node->isLeader()) ? 1 : 0;
 
 	IOParser parser;
 
@@ -62,7 +62,7 @@ void SubtomoProgramMpi::readParameters(int argc, char *argv[])
 
 	outDir = ZIO::prepareTomoOutputDirectory(outDir, argc, argv);
 
-	if (node->isMaster())
+	if (node->isLeader())
 	{
 		ZIO::makeDir(outDir + "/Subtomograms");
 	}
@@ -89,7 +89,7 @@ void SubtomoProgramMpi::run()
 
 	const double relative_box_scale = cropSize / (double) boxSize;
 
-	if (node->isMaster())
+	if (node->isLeader())
 	{
 		initialise(particleSet, particles, tomogramSet);
 	}

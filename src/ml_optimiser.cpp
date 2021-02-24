@@ -1304,7 +1304,7 @@ void MlOptimiser::initialise()
 
 		cudaDeviceProp deviceProp;
 		int compatibleDevices(0);
-		// Send device count seen by this slave
+		// Send device count seen by this follower
 		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 		for(int i=0; i<devCount; i++ )
                 {
@@ -1354,7 +1354,7 @@ void MlOptimiser::initialise()
 			int dev_id;
 			if (semiAutomaticMapping)
 			{
-				// Sjors: hack to make use of several cards; will only work if all MPI slaves are on the same node!
+				// Sjors: hack to make use of several cards; will only work if all MPI followers are on the same node!
 				// Bjorn: Better hack
 				if (fullAutomaticMapping)
 					dev_id = devCount*i / nr_threads;
@@ -2214,7 +2214,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 void MlOptimiser::initialiseWorkLoad()
 {
 
-	// Note, this function is overloaded in ml_optimiser_mpi (where random_seed is only set by the master and then send to all slaves!)
+	// Note, this function is overloaded in ml_optimiser_mpi (where random_seed is only set by the master and then send to all follwers!)
 
 	// Randomise the order of the particles
 	if (random_seed == -1) random_seed = time(NULL);
@@ -5352,7 +5352,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		// Get the image and recimg data
 		if (do_parallel_disc_io)
 		{
-			// If all slaves had preread images into RAM: get those now
+			// If all followers had preread images into RAM: get those now
 			if (do_preread_images)
 			{
 				img().reshape(mydata.particles[part_id].images[img_id].img);

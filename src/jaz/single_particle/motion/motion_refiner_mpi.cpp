@@ -29,7 +29,7 @@ void MotionRefinerMpi::read(int argc, char **argv)
 	MotionRefiner::read(argc, argv);
 	
 	// Don't put any output to screen for mpi slaves
-	verb = (node->isMaster()) ? verb : 0;
+	verb = (node->isLeader()) ? verb : 0;
 	
 	// Possibly also read parallelisation-dependent variables here
 	if (node->size < 2)
@@ -37,7 +37,7 @@ void MotionRefinerMpi::read(int argc, char **argv)
 		REPORT_ERROR("ERROR: this program needs to be run with at least two MPI processes!");
 	}
 	
-	if (node->isMaster() && (motionParamEstimator.anythingToDo()))
+	if (node->isLeader() && (motionParamEstimator.anythingToDo()))
 	{
 		REPORT_ERROR("Parameter estimation is not supported in MPI mode.");
 		return;
@@ -152,7 +152,7 @@ void MotionRefinerMpi::runWithRecombination()
 	
 	MPI_Barrier(MPI_COMM_WORLD);
 	
-	if (generateStar && node->isMaster())
+	if (generateStar && node->isLeader())
 	{
 		combineEPSAndSTARfiles();
 	}
