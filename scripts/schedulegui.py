@@ -26,6 +26,7 @@ from shutil import copytree
 
 try:
     import Tkinter as tk
+    from tkinter import scrolledtext 
     import tkMessageBox
     import tkFileDialog
 except ImportError:
@@ -145,6 +146,28 @@ class ScheduleGui(object):
 
         self.unlock_schedule_button = tk.Button(self.restart_frame, text="Unlock", command=self.unlock_schedule, bg=runbutton_bg)
         self.unlock_schedule_button.grid(row=0, column=2)
+
+        #### Output frame
+        
+        self.output_frame = tk.LabelFrame(right_frame, text='Schedules/'+self.schedulename+'/run.out')
+        self.output_frame.pack(padx=5, pady=5, fill=tk.X, expand=0)
+        
+        scroll = tk.Scrollbar(self.output_frame)
+        scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.stdout_entry = tk.Text(self.output_frame, wrap=tk.WORD, yscrollcommand=scroll.set, bg="white", height=13)
+        self.stdout_entry.pack()
+        self.stdout_entry.yview_moveto('1.0')
+
+        #### Error frame
+        
+        self.error_frame = tk.LabelFrame(right_frame, text='Schedules/'+self.schedulename+'/run.err', height=30)
+        self.error_frame.pack(padx=5, pady=2, fill=tk.X, expand=0)
+        
+        scroll2 = tk.Scrollbar(self.error_frame)
+        scroll2.pack(side=tk.RIGHT, fill=tk.Y)
+        self.stderr_entry = tk.Text(self.error_frame, wrap=tk.WORD, yscrollcommand=scroll2.set, fg="red", bg="white", height=5)
+        self.stderr_entry.pack()
+        self.stderr_entry.yview_moveto('1.0')
         
         # Check whether the Schedule is running every 3 seconds
         self.main_frame.after(0, self.check_running())
@@ -225,6 +248,21 @@ class ScheduleGui(object):
     
     def check_running(self):
         lockname = ".relion_lock_schedule_" + self.schedulename
+        # read run,out and run.err
+        fn = 'Schedules/' + self.schedulename + '/run.'
+        if path.exists(fn+'out'):
+            with open(fn+'out', 'r') as f:
+                self.stdout_entry.configure(state=tk.NORMAL)
+                self.stdout_entry.delete('1.0', tk.END)
+                self.stdout_entry.insert(tk.END, f.read())
+                self.stdout_entry.yview_moveto('1.0') 
+                self.stdout_entry.configure(state=tk.DISABLED)
+        if path.exists(fn+'err'):
+            with open(fn+'err', 'r') as f:
+                self.stderr_entry.delete('1.0', tk.END)
+                self.stderr_entry.insert(tk.END, f.read())
+                self.stderr_entry.yview_moveto('1.0')
+                self.stderr_entry.configure(state=tk.DISABLED)
         if path.exists(lockname):
             self.set_current_node()
             self.status_frame.configure(text="Currently running", fg="dark green")
