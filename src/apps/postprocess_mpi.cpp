@@ -35,7 +35,7 @@ int main(int argc, char *argv[])
 
 		prm.read(argc, argv);
 
-		// Don't put any output to screen for mpi slaves
+		// Don't put any output to screen for mpi followers
 		prm.verb = (rank == 0) ? 1 : 0;
 
 		if (prm.do_locres)
