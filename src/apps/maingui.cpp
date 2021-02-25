@@ -86,14 +86,12 @@ int main(int argc, char *argv[])
 			exit(0);
 		}
 		FileName fn_pipe = getParameter(argc, argv, "--pipeline", "default");
-		FileName fn_sched = getParameter(argc, argv, "--schedule", "");
-		if (fn_sched != "") fn_sched = "Schedules/" + fn_sched;
 		int _update_every_sec = textToInteger(getParameter(argc, argv, "--refresh", "2"));
 		int _exit_after_sec = textToInteger(getParameter(argc, argv, "--idle", "3600"));
 		bool _do_read_only = checkParameter(argc, argv, "--readonly");
 		bool _do_tomo = checkParameter(argc, argv, "--tomo");
 		bool _do_projdir = checkParameter(argc, argv, "--do_projdir");
-		GuiMainWindow window(GUIWIDTH, GUIHEIGHT_EXT, titletext, fn_pipe, fn_sched, _update_every_sec, _exit_after_sec, _do_read_only, _do_tomo, _do_projdir);
+		GuiMainWindow window(GUIWIDTH, GUIHEIGHT_EXT, titletext, fn_pipe, _update_every_sec, _exit_after_sec, _do_read_only, _do_tomo, _do_projdir);
 
 		// Show and run the window
 		window.show();
