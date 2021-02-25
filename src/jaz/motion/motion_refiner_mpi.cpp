@@ -28,8 +28,8 @@ void MotionRefinerMpi::read(int argc, char **argv)
 	// First read in non-parallelisation-dependent variables
 	MotionRefiner::read(argc, argv);
 
-	// Don't put any output to screen for mpi slaves
-	verb = (node->isMaster()) ? verb : 0;
+	// Don't put any output to screen for mpi followers
+	verb = (node->isLeader()) ? verb : 0;
 
 	// Possibly also read parallelisation-dependent variables here
 	if (node->size < 2)
@@ -37,7 +37,7 @@ void MotionRefinerMpi::read(int argc, char **argv)
         REPORT_ERROR("ERROR: this program needs to be run with at least two MPI processes!");
 	}
 
-    if (node->isMaster() && (motionParamEstimator.anythingToDo()))
+    if (node->isLeader() && (motionParamEstimator.anythingToDo()))
 	{
         REPORT_ERROR("Parameter estimation is not supported in MPI mode.");
 		return;
@@ -80,11 +80,11 @@ void MotionRefinerMpi::run()
         divide_equally(total_nr_micrographs, node->size, node->rank,
                        my_first_micrograph, my_last_micrograph);
         my_nr_micrographs = my_last_micrograph - my_first_micrograph + 1;
-		
+
 		double k_out_A = reference.pixToAng(reference.k_out);
-		
+
         frameRecombiner.init(
-            allMdts, 
+            allMdts,
 			verb, reference.s, fc, k_out_A, reference.angpix,
 			nr_omp_threads, outPath, debug,
             &reference, &obsModel, &micrographHandler);
@@ -94,7 +94,7 @@ void MotionRefinerMpi::run()
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
-    if (generateStar && node->isMaster())
+    if (generateStar && node->isLeader())
 	{
 		combineEPSAndSTARfiles();
 	}

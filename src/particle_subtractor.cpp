@@ -336,7 +336,7 @@ void ParticleSubtractor::saveStarFile(int myrank)
 	if (do_ssnr)
 	{
 
-		// Only master writes out the STAR file
+		// Only leader writes out the STAR file
 		if (myrank==0)
 		{
 			MetaDataTable MD;
@@ -404,7 +404,7 @@ void ParticleSubtractor::combineStarFile(int myrank)
 
 	if (do_ssnr) return;
 
-	if (myrank != 0) REPORT_ERROR("BUG: this function should only be called by master!");
+	if (myrank != 0) REPORT_ERROR("BUG: this function should only be called by leader!");
 
 	MetaDataTable MD;
 	for (int i = 1; i < size; i++)

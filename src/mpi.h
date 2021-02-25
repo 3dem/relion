@@ -73,16 +73,16 @@ class MpiNode
 public:
 	int rank, size;
 
-	MPI_Group worldG, slaveG; // groups of ranks (in practice only used to create communicators)
-	MPI_Comm worldC, slaveC; // communicators
-	int slaveRank; // index of slave within the slave-group (and communicator)
+	MPI_Group worldG, followerG; // groups of ranks (in practice only used to create communicators)
+	MPI_Comm worldC, followerC; // communicators
+	int followerRank; // index of follower within the follower-group (and communicator)
 
 	MpiNode(int &argc, char ** argv);
 
 	~MpiNode();
 
 	// Only true if rank == 0
-	bool isMaster() const;
+	bool isLeader() const;
 
 	// Prints the random subset for this rank
 	int myRandomSubset() const;

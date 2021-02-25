@@ -49,4 +49,3 @@ public:
 
 
 #endif /* RECONSTRUCTOR_MPI_H_ */
-
