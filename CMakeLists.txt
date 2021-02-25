@@ -253,7 +253,7 @@ if(MKLFFT)
     add_definitions(-DMKLFFT)
 endif(MKLFFT)
 
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel" OR "$ENV{I_MPI_CXX}" STREQUAL "icpx" OR "$ENV{CXX}" STREQUAL "icpx")
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel" OR "${CMAKE_CXX_COMPILER}" MATCHES "icpx")
     if(MKLFFT)
          if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
             SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -qopenmp -mkl=parallel -limf ")
