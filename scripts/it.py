@@ -1023,10 +1023,13 @@ def run_scheduler(options, do_gui):
 
 
 def copy_schedule(schedulename):
-
+  
     ## Only copy the Schedule directory structure from the RELION installation directory if it doesn't exist yet
     if not os.path.isdir('Schedules/'+schedulename):
-        mydir = os.path.dirname(os.path.realpath(__file__))
+        try:
+            mydir = os.environ['RELION_SCRIPT_DIRECTORY']
+        except KeyError:
+            raise KeyError("Environment variable $RELION_SCRIPT_DIRECTORY has not been set. This is required to copy the prep and proc schedules from.")
         print(' RELION_IT: copying Schedules/' + schedulename + ' from: ' + mydir)
         copytree(mydir+'/Schedules/'+schedulename, 'Schedules/'+schedulename)
 

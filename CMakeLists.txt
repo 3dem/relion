@@ -394,7 +394,6 @@ list(APPEND RELION_SCRIPT_FILES star_printtable
 				schedulegui.py)
 
 add_custom_target(copy_scripts ALL)
-add_custom_target(copy_schedules ALL)
                                 
 foreach (SCRIPT_FILE ${RELION_SCRIPT_FILES})
     add_custom_command(TARGET copy_scripts POST_BUILD
@@ -402,12 +401,6 @@ foreach (SCRIPT_FILE ${RELION_SCRIPT_FILES})
                      copy ${CMAKE_SOURCE_DIR}/scripts/${SCRIPT_FILE} 
                      ${CMAKE_BINARY_DIR}/bin/relion_${SCRIPT_FILE} )
 endforeach()
-
-add_custom_command(TARGET copy_schedules POST_BUILD
-                   COMMAND ${CMAKE_COMMAND} -E 
-		   copy_directory ${CMAKE_SOURCE_DIR}/scripts/Schedules
-		   ${CMAKE_BINARY_DIR}/bin/Schedules/. )
-
 
 install( DIRECTORY ${CMAKE_BINARY_DIR}/bin
 	 DESTINATION ${CMAKE_INSTALL_PREFIX}
