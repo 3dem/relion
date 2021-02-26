@@ -269,11 +269,6 @@ else()
     endif(MKLFFT)
 endif()
 
-message(STATUS "CMAKE_C_COMPILER : ${CMAKE_C_COMPILER}")
-message(STATUS "CMAKE_CXX_COMPILER : ${CMAKE_CXX_COMPILER}")
-message(STATUS "MPI_C_COMPILER : ${MPI_C_COMPILER}")
-message(STATUS "MPI_CXX_COMPILER : ${MPI_CXX_COMPILER}")
-
 if(ALTCPU)
     add_definitions(-DALTCPU)
 endif()
