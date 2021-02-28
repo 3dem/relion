@@ -9297,7 +9297,7 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 
 		if (!do_grad ||
 			nr_iter - iter < grad_em_iters ||
-			nr_iter == iter ||
+			(nr_iter == iter && mymodel.nr_classes > 1) || // If initial model with single class, then skip all particles in final iter
 			subset_size >= nr_particles ||
 			grad_suspended_local_searches_iter == 1 ||
 			has_converged)
