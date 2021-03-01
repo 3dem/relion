@@ -216,6 +216,7 @@ class ScheduleGui(object):
         command = 'relion_scheduler --schedule ' + self.schedulename + ' --reset'
         print(' RELION_IT: excuting: ', command)
         os.system(command)
+        self.set_current_node()
 
     def unlock_schedule(self, *args_ignored, **kwargs_ignored):
         print(' RELION_IT: use the following command to ensure the relion_scheduler process is no longer running:') 
