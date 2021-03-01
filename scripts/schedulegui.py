@@ -259,6 +259,7 @@ class ScheduleGui(object):
                 self.stdout_entry.configure(state=tk.DISABLED)
         if path.exists(fn+'err'):
             with open(fn+'err', 'r') as f:
+                self.stderr_entry.configure(state=tk.NORMAL)
                 self.stderr_entry.delete('1.0', tk.END)
                 self.stderr_entry.insert(tk.END, f.read())
                 self.stderr_entry.yview_moveto('1.0')
