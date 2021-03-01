@@ -2758,7 +2758,7 @@ Therefore, the calculations will need to be stopped by the user if further itera
 Also note that upon restarting, the iteration number continues to be increased, starting from the final iteration in the previous run. \
 The number given here is the TOTAL number of iterations. For example, if 10 iterations have been performed previously and one restarts to perform \
 an additional 5 iterations (for example with a finer angular sampling), then the number given here should be 10+5=15.");
-	joboptions["do_grad"] = JobOption("Use gradient-driven algorithm?", false, "If set to Yes, use the (faster&better?) NGrad algorithm instead of the defautl Expectation Maximization? If used, increase number of iterations to 200-250!");
+	joboptions["do_grad"] = JobOption("Use gradient-driven algorithm?", false, "If set to Yes, use the (faster&better?) NGrad algorithm instead of the defautl Expectation Maximization? If used, increase number of iterations to ~100!");
 
 
 	joboptions["particle_diameter"] = JobOption("Mask diameter (A):", 200, 0, 1000, 10, "The experimental images will be masked with a soft \
