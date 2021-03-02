@@ -13,6 +13,9 @@ message(STATUS "CMAKE_BINARY_DIR:" ${CMAKE_BINARY_DIR})
 
 file(GLOB REL_GUI_SRC "${CMAKE_SOURCE_DIR}/src/manualpicker.cpp" "${CMAKE_SOURCE_DIR}/src/gui_*.cpp" "${CMAKE_SOURCE_DIR}/src/displayer.cpp")
 
+file(GLOB REL_TORCH_SRC "${CMAKE_SOURCE_DIR}/src/class_ranker.cpp")
+file(GLOB REL_TORCH_SRC_H "${CMAKE_SOURCE_DIR}/src/class_ranker.h")
+
 # AUTOMATIC VERSIONING
 # Reference: https://stackoverflow.com/questions/1435953/how-can-i-pass-git-sha1-to-compiler-as-definition-using-cmake
 
@@ -40,6 +43,14 @@ endif(ALTCPU)
 # Remove GUI files from relion_lib
 foreach(GUI_SRC_FILE ${REL_GUI_SRC})
 	list(REMOVE_ITEM REL_SRC "${GUI_SRC_FILE}")
+endforeach()
+
+# Remove torch invoking files from relion_lib
+foreach(TORCH_SRC_FILE ${REL_TORCH_SRC})
+	list(REMOVE_ITEM REL_SRC "${TORCH_SRC_FILE}")
+endforeach()
+foreach(TORCH_SRC_FILE ${REL_TORCH_SRC_H})
+	list(REMOVE_ITEM REL_SRC_H "${TORCH_SRC_FILE}")
 endforeach()
 
 
@@ -114,12 +125,21 @@ file(GLOB RELION_JAZ_EXPERIMENTAL_TARGETS "${CMAKE_SOURCE_DIR}/src/jaz/scripts/*
 
 set(GUI_TARGETS maingui display manualpick)
 
+set(TORCH_TARGETS class_ranker)
+
 #--Remove apps using X11 if no GUI--
 if(NOT GUI)
 	foreach(TARGET ${GUI_TARGETS})
 		list(REMOVE_ITEM RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/${TARGET}.cpp")
 	endforeach()
 endif(NOT GUI)
+
+#--Remove apps using Libtorch if not Torch--
+if(NOT TORCH)
+	foreach(TARGET ${TORCH_TARGETS})
+		list(REMOVE_ITEM RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/${TARGET}.cpp")
+	endforeach()
+endif(NOT TORCH)
 
 #--Remove apps for testing--
 SET(RELION_TEST TRUE)
@@ -172,6 +192,11 @@ if(BUILD_SHARED_LIBS)
 		add_library(relion_gui_lib SHARED ${REL_GUI_SRC} ${REL_SRC_H} ${REL_HP})
 		install(TARGETS relion_gui_lib LIBRARY DESTINATION lib)
 	endif(GUI)
+
+	if(TORCH)
+		add_library(relion_torch_lib SHARED ${REL_TORCH_SRC} ${REL_TORCH_SRC_H})
+		install(TARGETS relion_torch_lib LIBRARY DESTINATION lib)
+	endif(TORCH)
 else()
 	add_library(relion_lib STATIC
 		${REL_SRC} ${REL_SRC_H} ${REL_HP}
@@ -209,6 +234,10 @@ else()
 	if(GUI)
 		add_library(relion_gui_lib STATIC ${REL_GUI_SRC} ${REL_SRC_H} ${REL_HP})
 	endif(GUI)
+
+	if(TORCH)
+		add_library(relion_torch_lib STATIC ${REL_TORCH_SRC} ${REL_TORCH_SRC_H})
+	endif(TORCH)
 endif()
 
 if(NOT MKLFFT)
@@ -228,6 +257,14 @@ if(GUI)
 		add_dependencies(relion_gui_lib OWN_FLTK)
 	endif()
 endif(GUI)
+
+if(TORCH)
+	target_link_libraries(relion_torch_lib ${TORCH_LIBRARIES})
+	set_property(TARGET relion_torch_lib PROPERTY CXX_STANDARD 14)
+	if(BUILD_OWN_Torch)
+		add_dependencies(relion_torch_lib OWN_Torch)
+	endif()
+endif(TORCH)
 
 if (CUDA_FOUND)
 	file(GLOB REL_CUDA_SRC "${CMAKE_SOURCE_DIR}/src/acc/cuda/*.cu" "${CMAKE_SOURCE_DIR}/src/acc/cuda/cuda_kernels/*.cu" )
@@ -316,14 +353,6 @@ if(BUILD_OWN_TBB)
 	add_dependencies(relion_lib OWN_TBB)
 endif()
 
-if(TORCH)
-	target_link_libraries(relion_lib ${TORCH_LIBRARIES})
-	set_property(TARGET relion_lib PROPERTY CXX_STANDARD 14)
-	if(BUILD_OWN_Torch)
-		add_dependencies(relion_lib OWN_Torch)
-	endif()
-endif(TORCH)
-
 foreach (_target ${RELION_TARGETS})
 	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)  #specify target name WE=WithoutExtension
 
@@ -363,6 +392,12 @@ foreach (_target ${RELION_TARGETS})
 	if((NOT ${IS_GUI_TARGET} LESS 0) OR (${_target} STREQUAL "relion"))
 		add_dependencies(${_target} relion_gui_lib)
 		target_link_libraries(${_target} relion_gui_lib ${FLTK_LIBRARIES} ${X11})
+	endif()
+
+	list(FIND TORCH_TARGETS ${_target} IS_TORCH_TARGET)
+	if((NOT ${IS_TORCH_TARGET} LESS 0) OR (${_target} STREQUAL "relion"))
+		add_dependencies(${_target} relion_torch_lib)
+		target_link_libraries(${_target} relion_torch_lib ${FLTK_LIBRARIES} ${X11})
 	endif()
 
 	if(TIFF_FOUND)
