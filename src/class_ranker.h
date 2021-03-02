@@ -270,13 +270,32 @@ public:
 		out[19] = (granulo[4] - feature_normalization_global_granulo_mean[4]) / feature_normalization_global_granulo_stddev[4];
 		out[20] = (granulo[5] - feature_normalization_global_granulo_mean[5]) / feature_normalization_global_granulo_stddev[5];
 
-                if (feature_normalization_local_ps_stddev < 1e-10 || feature_normalization_local_ss_stddev < 1e-10 || feature_normalization_local_rsi_stddev < 1e-10)
-                {
-                    REPORT_ERROR("BUG: local normalisation stddev values are zero. Call localNormalization before toNormalizedVector!");
-                }
-		out[21] = (protein_moments.sum - feature_normalization_local_ps_mean) / feature_normalization_local_ps_stddev;
-		out[22] = (solvent_moments.sum - feature_normalization_local_ss_mean) / feature_normalization_local_ss_stddev;
-		out[23] = (relative_signal_intensity - feature_normalization_local_rsi_mean) / feature_normalization_local_rsi_stddev;
+		if (feature_normalization_local_ps_stddev < 1e-10)
+		{
+			out[21] = 0.;
+		}
+		else
+		{
+			out[21] = (protein_moments.sum - feature_normalization_local_ps_mean) / feature_normalization_local_ps_stddev;
+		}
+
+		if (feature_normalization_local_ss_stddev < 1e-10)
+		{
+			out[22] = 0.;
+		}
+		else
+		{
+			out[22] = (solvent_moments.sum - feature_normalization_local_ss_mean) / feature_normalization_local_ss_stddev;
+		}
+
+		if (feature_normalization_local_rsi_stddev < 1e-10)
+		{
+			out[23] = 0.;
+		}
+		else
+		{
+			out[23] = (relative_signal_intensity - feature_normalization_local_rsi_mean) / feature_normalization_local_rsi_stddev;
+		}
 
 		return out;
 
