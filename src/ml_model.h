@@ -59,14 +59,20 @@ public:
 	// Number of independent bodies for multi-body refinement
 	int nr_bodies;
 
-	// Number of image groups with separate sigma2_noise spectra
+	// Number of image groups with separate scale corrections
 	int nr_groups;
+
+	// Number of optics groups for separate sigma2_noise spectra
+	int nr_optics_groups;
 
 	// Keep track of the first and/or second moment of the gradient
 	bool do_grad;
 
-	// Number of particles in each group
+	// Number of particles in each (micrograph) group
 	std::vector<long int> nr_particles_per_group;
+
+	// Number of particles in each optics group
+	std::vector<long int> nr_particles_per_optics_group;
 
 	// Number of directions (size of pdf_direction);
 	long long int nr_directions;
@@ -346,6 +352,7 @@ public:
 			pdf_direction = MD.pdf_direction;
 			prior_offset_class = MD.prior_offset_class;
 			nr_particles_per_group = MD.nr_particles_per_group;
+			nr_particles_per_optics_group = MD.nr_particles_per_optics_group;
 			acc_rot = MD.acc_rot;
 			acc_trans = MD.acc_trans;
 			estimated_resolution = MD.estimated_resolution;
@@ -389,6 +396,7 @@ public:
 		class_age.clear();
 		pdf_direction.clear();
 		nr_particles_per_group.clear();
+		nr_particles_per_optics_group.clear();
 		ref_dim = data_dim = ori_size = nr_classes = nr_bodies = nr_groups = nr_directions = interpolator = r_min_nn;
 		padding_factor = 0.;
 		ave_Pmax = avg_norm_correction = LL = sigma2_offset = tau2_fudge_factor = 0.;

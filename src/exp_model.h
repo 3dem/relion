@@ -279,6 +279,9 @@ public:
 	// Get the vector of number of images per group_id
 	void getNumberOfImagesPerGroup(std::vector<long int> &nr_particles_per_group);
 
+	// Get the vector of number of images per group_id
+	void getNumberOfImagesPerOpticsGroup(std::vector<long int> &nr_particles_per_group);
+
 	// Get the metadata-row for this image in a separate MetaDataTable
 	MetaDataTable getMetaDataImage(long int part_id, int img_id);
 

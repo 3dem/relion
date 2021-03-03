@@ -281,8 +281,8 @@ enum EMDLabel
 	EMDL_MLMODEL_FOURIER_COVERAGE_TOTAL_REF,
 	EMDL_MLMODEL_FSC_HALVES_REF,
 	EMDL_MLMODEL_GROUP_NAME,
-	EMDL_MLMODEL_GROUP_NO,
 	EMDL_MLMODEL_GROUP_NR_PARTICLES,
+	EMDL_MLMODEL_GROUP_NO,
 	EMDL_MLMODEL_GROUP_SCALE_CORRECTION,
 	EMDL_MLMODEL_HELICAL_NR_ASU,
 	EMDL_MLMODEL_HELICAL_TWIST,
@@ -301,6 +301,9 @@ enum EMDLabel
 	EMDL_MLMODEL_NR_BODIES,
 	EMDL_MLMODEL_NR_CLASSES,
 	EMDL_MLMODEL_NR_GROUPS,
+	EMDL_MLMODEL_NR_OPTICS_GROUPS,
+	EMDL_MLMODEL_OPTICS_GROUP_NO,
+	EMDL_MLMODEL_OPTICS_GROUP_NR_PARTICLES,
 	EMDL_MLMODEL_ORIGINAL_SIZE,
 	EMDL_MLMODEL_ORIENTABILITY_CONTRIBUTION,
 	EMDL_MLMODEL_PADDING_FACTOR,
@@ -963,7 +966,10 @@ private:
 		EMDL::addLabel(EMDL_MLMODEL_NORM_CORRECTION_AVG, EMDL_DOUBLE, "rlnNormCorrectionAverage", "Average value (over all images) of the normalisation correction values");
 		EMDL::addLabel(EMDL_MLMODEL_NR_CLASSES, EMDL_INT, "rlnNrClasses", "The number of references (i.e. classes) to be used in refinement");
 		EMDL::addLabel(EMDL_MLMODEL_NR_BODIES, EMDL_INT, "rlnNrBodies", "The number of independent rigid bodies to be refined in multi-body refinement");
-		EMDL::addLabel(EMDL_MLMODEL_NR_GROUPS, EMDL_INT, "rlnNrGroups", "The number of different groups of images (each group has its own noise spectrum, and intensity-scale correction)");
+		EMDL::addLabel(EMDL_MLMODEL_NR_GROUPS, EMDL_INT, "rlnNrGroups", "The number of different groups of images (each group has its own intensity-scale correction)");
+		EMDL::addLabel(EMDL_MLMODEL_NR_OPTICS_GROUPS, EMDL_INT, "rlnNrOpticsGroups", "The number of different optics groups (each optics group has its own noise spectrum)");
+		EMDL::addLabel(EMDL_MLMODEL_OPTICS_GROUP_NO, EMDL_INT, "rlnOpticsGroupNumber", "The number of an optics group");
+		EMDL::addLabel(EMDL_MLMODEL_OPTICS_GROUP_NR_PARTICLES, EMDL_INT, "rlnOpticsGroupNrParticles", "Number particles in an optics group");
 		EMDL::addLabel(EMDL_MLMODEL_ORIENTABILITY_CONTRIBUTION, EMDL_DOUBLE, "rlnSpectralOrientabilityContribution", "Spectral SNR contribution to the orientability of individual particles");
 		EMDL::addLabel(EMDL_MLMODEL_ORIGINAL_SIZE, EMDL_INT, "rlnOriginalImageSize", "Original size of the images (in pixels)");
 		EMDL::addLabel(EMDL_MLMODEL_PADDING_FACTOR, EMDL_DOUBLE, "rlnPaddingFactor", "Oversampling factor for Fourier transforms of the references");
@@ -1254,14 +1260,14 @@ private:
 		EMDL::addLabel(EMDL_TOMO_SIZE_X, EMDL_INT, "rlnTomoSizeX", "Width of a bin-1 tomogram in pixels");
 		EMDL::addLabel(EMDL_TOMO_SIZE_Y, EMDL_INT, "rlnTomoSizeY", "Height of a bin-1 tomogram in pixels");
 		EMDL::addLabel(EMDL_TOMO_SIZE_Z, EMDL_INT, "rlnTomoSizeZ", "Depth of a bin-1 tomogram in pixels");
-		
+
 		EMDL::addLabel(EMDL_TOMO_PROJECTION_X, EMDL_DOUBLE_VECTOR, "rlnTomoProjX", "First row of the projection matrix");
 		EMDL::addLabel(EMDL_TOMO_PROJECTION_Y, EMDL_DOUBLE_VECTOR, "rlnTomoProjY", "Second row of the projection matrix");
 		EMDL::addLabel(EMDL_TOMO_PROJECTION_Z, EMDL_DOUBLE_VECTOR, "rlnTomoProjZ", "Third row of the projection matrix");
 		EMDL::addLabel(EMDL_TOMO_PROJECTION_W, EMDL_DOUBLE_VECTOR, "rlnTomoProjW", "Fourth row of the projection matrix");
-		
+
 		EMDL::addLabel(EMDL_TOMO_HANDEDNESS, EMDL_DOUBLE, "rlnTomoHand", "Handedness of a tomogram (i.e. slope of defocus over the image-space z coordinate)");
-				
+
 		EMDL::addLabel(EMDL_TOMO_FIDUCIALS_STARFILE, EMDL_STRING, "rlnTomoFiducialsStarFile", "STAR file containing the 3D locations of fiducial markers");
 		EMDL::addLabel(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, EMDL_DOUBLE, "rlnTomoTiltSeriesPixelSize", "Pixel size of the original tilt series");
 		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_ROT, EMDL_DOUBLE, "rlnTomoSubtomogramRot", "First Euler angle of a subtomogram (rot, in degrees)");

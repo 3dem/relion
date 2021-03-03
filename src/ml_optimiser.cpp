@@ -1416,7 +1416,7 @@ void MlOptimiser::initialise()
 
 	if (fn_sigma != "")
 	{
-		// Read in sigma_noise spetrum from file DEVELOPMENTAL!!! FOR DEBUGGING ONLY....
+		// Read in sigma_noise spectrum from file DEVELOPMENTAL!!! FOR DEBUGGING ONLY....
 		MetaDataTable MDsigma;
 		RFLOAT val;
 		int idx;
@@ -1434,12 +1434,13 @@ void MlOptimiser::initialise()
 		}
 
 		mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
-		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
+		mydata.getNumberOfImagesPerOpticsGroup(mymodel.nr_particles_per_optics_group);
+		for (int igroup = 0; igroup< mymodel.nr_optics_groups; igroup++)
         {
 		    // Use the same spectrum for all classes
 			mymodel.sigma2_noise[igroup] =  mymodel.sigma2_noise[0];
 			// We set wsum_model.sumw_group as in calculateSumOfPowerSpectraAndAverageImage
-            wsum_model.sumw_group[igroup] = mymodel.nr_particles_per_group[igroup];
+            wsum_model.sumw_group[igroup] = mymodel.nr_particles_per_optics_group[igroup];
         }
 	}
 	else if (do_calculate_initial_sigma_noise || do_average_unaligned)
@@ -1468,19 +1469,12 @@ void MlOptimiser::initialise()
 	// Check minimum group size of 10 particles
 	if (verb > 0)
 	{
-		bool do_warn = false;
-		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
+		for (int igroup = 0; igroup< mymodel.nr_optics_groups; igroup++)
 		{
-			if (mymodel.nr_particles_per_group[igroup] < 10)
+			if (mymodel.nr_particles_per_optics_group[igroup] < 10)
 			{
-				std:: cout << "WARNING: There are only " << mymodel.nr_particles_per_group[igroup] << " particles in group " << igroup + 1 << std::endl;
-				do_warn = true;
+				std:: cout << "WARNING: There are only " << mymodel.nr_particles_per_optics_group[igroup] << " particles in optics group " << igroup + 1 << std::endl;
 			}
-		}
-		if (do_warn)
-		{
-			std:: cout << "WARNING: You may want to consider joining some micrographs into larger groups to obtain more robust noise estimates. " << std::endl;
-			std:: cout << "         You can do so by using the same rlnMicrographName label for particles from multiple different micrographs in the input STAR file. " << std::endl;
 		}
 	}
 
@@ -2309,14 +2303,15 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 		for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++)
 		{
 			long int group_id = mydata.getGroupId(part_id, img_id);
+			long int optics_group = mydata.getOpticsGroup(part_id, img_id);
 
-			if (gradient_refine && !doing_subsets) {
-				mymodel.nr_particles_per_group[group_id] ++;
-				if (gradient_refine && mymodel.nr_particles_per_group[group_id] > grad_ini_subset_size)
+			if (gradient_refine && !doing_subsets)
+			{
+				mymodel.nr_particles_per_optics_group[optics_group] ++;
+				if (gradient_refine && mymodel.nr_particles_per_optics_group[optics_group] > grad_ini_subset_size)
 					continue;
 			}
 
-			int optics_group = mydata.getOpticsGroup(part_id, img_id);
 			RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
 			int my_image_size = mydata.getOpticsImageSize(optics_group);
 
@@ -2467,8 +2462,8 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			ind_spectrum /= count;
 
 			// Resize the power_class spectrum to the correct size and keep sum
-			wsum_model.sigma2_noise[group_id] += ind_spectrum;
-			wsum_model.sumw_group[group_id] += 1.;
+			wsum_model.sigma2_noise[optics_group] += ind_spectrum;
+			wsum_model.sumw_group[optics_group] += 1.;
 
 			// When doing SGD, only take the first grad_ini_subset_size*mymodel.nr_classes images to calculate the initial reconstruction
 			if (fn_ref == "None" && !(gradient_refine && part_id > grad_ini_subset_size*mymodel.nr_classes) )
@@ -2563,10 +2558,10 @@ void MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(MultidimArray<RFLOAT>
 
 	// First calculate average image
 	RFLOAT total_sum = 0.;
-	for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
+	for (int igroup = 0; igroup < mymodel.nr_optics_groups; igroup++)
 	{
 		if (doing_subsets || !gradient_refine)
-			mymodel.nr_particles_per_group[igroup] = ROUND(wsum_model.sumw_group[igroup]);
+			mymodel.nr_particles_per_optics_group[igroup] = ROUND(wsum_model.sumw_group[igroup]);
 		total_sum += wsum_model.sumw_group[igroup];
 	}
 	Mavg /= total_sum;
@@ -2592,7 +2587,7 @@ void MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(MultidimArray<RFLOAT>
 		spect.resize(mymodel.sigma2_noise[0]);
 
 	    // Set noise spectra, once for each group
-		for (int igroup = 0; igroup < wsum_model.nr_groups; igroup++)
+		for (int igroup = 0; igroup < wsum_model.nr_optics_groups; igroup++)
 		{
 			// Factor 2 because of 2-dimensionality of the complex plane
 			if (wsum_model.sumw_group[igroup] > 0.)
@@ -4597,7 +4592,7 @@ void MlOptimiser::maximizationOtherParameters()
 	// Also refrain from updating sigma_noise after the first iteration with first_iter_cc!
 	if (!fix_sigma_noise && !((iter == 1 && do_firstiter_cc) || do_always_cc) )
 	{
-		for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
+		for (int igroup = 0; igroup < mymodel.nr_optics_groups; igroup++)
 		{
 			RFLOAT tsum = wsum_model.sigma2_noise[igroup].sum();
 			if(tsum!=0)
@@ -5488,8 +5483,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 				std::cerr << " ** normcorr= " << normcorr << std::endl;
 				std::cerr << " ** mymodel.avg_norm_correction= " << mymodel.avg_norm_correction << std::endl;
 				std::cerr << " ** fn_img= " << fn_img << " part_id= " << part_id << " img_id= " << img_id << std::endl;
-				int group_id = mydata.getGroupId(part_id);
-				std::cerr << " ml_model.sigma2_noise[group_id]= " << mymodel.sigma2_noise[group_id] << " group_id= " << group_id <<std::endl;
+				std::cerr << " ml_model.sigma2_noise[optics_group]= " << mymodel.sigma2_noise[optics_group] << " optics_group= " << optics_group <<std::endl;
 				std::cerr << " img_id= " << img_id << std::endl;
 				REPORT_ERROR("Very small or very big (avg) normcorr!");
 			}
@@ -5653,15 +5647,15 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 			transformer.setReal(Mnoise);
 			transformer.getFourierAlias(Fnoise);
 
-			// Remap mymodel.sigma2_noise[group_id] onto remapped_sigma2_noise for this images's size and angpix
+			// Remap mymodel.sigma2_noise[optics_group] onto remapped_sigma2_noise for this images's size and angpix
 			MultidimArray<RFLOAT > remapped_sigma2_noise;
 			remapped_sigma2_noise.initZeros(XSIZE(Mnoise)/2+1);
 			RFLOAT remap_image_sizes = (my_image_size * my_pixel_size) / (mymodel.ori_size * mymodel.pixel_size);
-			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(mymodel.sigma2_noise[group_id])
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(mymodel.sigma2_noise[optics_group])
 			{
 				int i_remap = ROUND(remap_image_sizes * i);
 				if (i_remap < XSIZE(remapped_sigma2_noise))
-					DIRECT_A1D_ELEM(remapped_sigma2_noise, i_remap) = DIRECT_A1D_ELEM(mymodel.sigma2_noise[group_id], i);
+					DIRECT_A1D_ELEM(remapped_sigma2_noise, i_remap) = DIRECT_A1D_ELEM(mymodel.sigma2_noise[optics_group], i);
 			}
 
 			// Fill Fnoise with random numbers, use power spectrum of the noise for its variance
@@ -6175,15 +6169,15 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 			else
 				exp_local_Minvsigma2[img_id].initZeros(YSIZE(Fimg), XSIZE(Fimg));
 
-			// With group_id and relevant size of Fimg, calculate inverse of sigma^2 for relevant parts of Mresol
+			// With optics_group and relevant size of Fimg, calculate inverse of sigma^2 for relevant parts of Mresol
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Minvsigma2[img_id])
 			{
 				int ires = *(myMresol + n);
 				int ires_remapped = ROUND(remap_image_sizes * ires);
 				// Exclude origin (ires==0) from the Probability-calculation
 				// This way we are invariant to additive factors
-				if (ires > 0 && ires_remapped < XSIZE(mymodel.sigma2_noise[group_id]))
-					DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2[img_id], n) = 1. / (sigma2_fudge * DIRECT_A1D_ELEM(mymodel.sigma2_noise[group_id], ires_remapped));
+				if (ires > 0 && ires_remapped < XSIZE(mymodel.sigma2_noise[optics_group]))
+					DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2[img_id], n) = 1. / (sigma2_fudge * DIRECT_A1D_ELEM(mymodel.sigma2_noise[optics_group], ires_remapped));
 			}
 		}
 
@@ -6198,7 +6192,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 				int ires_remapped = ROUND(remap_image_sizes * ires);
 				// Exclude origin (ires==0) from the Probability-calculation
 				// This way we are invariant to additive factors
-				if (ires > 0 && ires_remapped < XSIZE(mymodel.sigma2_noise[group_id]))
+				if (ires > 0 && ires_remapped < XSIZE(mymodel.sigma2_noise[optics_group]))
 					DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2[img_id], n) *= sqrt(DIRECT_MULTIDIM_ELEM(exp_local_STMulti[img_id], n));
 			}
 		}
@@ -7322,14 +7316,14 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
 			std::cerr << "written exp_Fimgs.spi " << std::endl;
 			*/
 			int group_id = mydata.getGroupId(part_id, img_id);
+			int optics_group = mydata.getOpticsGroup(part_id, img_id);
 			std::cerr << " group_id= " << group_id << " mymodel.scale_correction[group_id]= " << mymodel.scale_correction[group_id] << std::endl;
 			std::cerr << " exp_ipass= " << exp_ipass << std::endl;
 			std::cerr << " sampling.NrDirections(0, true)= " << sampling.NrDirections()
 					<< " sampling.NrDirections(0, false)= " << sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior) << std::endl;
 			std::cerr << " sampling.NrPsiSamplings(0, true)= " << sampling.NrPsiSamplings()
 					<< " sampling.NrPsiSamplings(0, false)= " << sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior) << std::endl;
-			std::cerr << " mymodel.sigma2_noise[group_id]= " << mymodel.sigma2_noise[group_id] << std::endl;
-			//std::cerr << " wsum_model.sigma2_noise[group_id]= " << wsum_model.sigma2_noise[group_id] << std::endl;
+			std::cerr << " mymodel.sigma2_noise[optics_group]= " << mymodel.sigma2_noise[optics_group] << std::endl;
 			if (do_norm_correction)
 			{
 				std::cerr << " mymodel.avg_norm_correction= " << mymodel.avg_norm_correction << std::endl;
@@ -7535,8 +7529,8 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 	// Set those back here
 	for (int img_id = 0; img_id < exp_nr_images; img_id++)
 	{
-		int group_id = mydata.getGroupId(part_id, img_id);
-		DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2[img_id], 0) = 1. / (sigma2_fudge * DIRECT_A1D_ELEM(mymodel.sigma2_noise[group_id], 0));
+		int optics_group = mydata.getOpticsGroup(part_id, img_id);
+		DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2[img_id], 0) = 1. / (sigma2_fudge * DIRECT_A1D_ELEM(mymodel.sigma2_noise[optics_group], 0));
 	}
 
 	// Initialise the maximum of all weights to a negative value
@@ -8330,8 +8324,8 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 			int ires_remapped = ROUND(remap_image_sizes * ires);
 			// Note there is no sqrt in the normalisation term because of the 2-dimensionality of the complex-plane
 			// Also exclude origin from logsigma2, as this will not be considered in the P-calculations
-			if (ires > 0 && ires_remapped < XSIZE(mymodel.sigma2_noise[group_id]))
-				logsigma2 += log( 2. * PI * DIRECT_A1D_ELEM(mymodel.sigma2_noise[group_id], ires_remapped));
+			if (ires > 0 && ires_remapped < XSIZE(mymodel.sigma2_noise[optics_group]))
+				logsigma2 += log( 2. * PI * DIRECT_A1D_ELEM(mymodel.sigma2_noise[optics_group], ires_remapped));
 		}
 		if (exp_sum_weight[img_id]==0)
 		{
@@ -8344,7 +8338,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 			std::cerr << " ml_model.scale_correction[group_id]= " << mymodel.scale_correction[group_id] << std::endl;
 			std::cerr << " exp_significant_weight[img_id]= " << exp_significant_weight[img_id] << std::endl;
 			std::cerr << " exp_max_weight[img_id]= " << exp_max_weight[img_id] << std::endl;
-			std::cerr << " ml_model.sigma2_noise[group_id]= " << mymodel.sigma2_noise[group_id] << std::endl;
+			std::cerr << " ml_model.sigma2_noise[optics_group]= " << mymodel.sigma2_noise[optics_group] << std::endl;
 			REPORT_ERROR("ERROR: exp_sum_weight[img_id]==0");
 		}
 		RFLOAT dLL;
@@ -8878,9 +8872,9 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 						{
 							int ires = DIRECT_MULTIDIM_ELEM(*myMresol, n);
 							int ires_remapped = ROUND(remap_image_sizes * ires);
-							if (ires > 0 && ires_remapped < XSIZE(mymodel.sigma2_noise[group_id]))
+							if (ires > 0 && ires_remapped < XSIZE(mymodel.sigma2_noise[optics_group]))
 							{
-								my_snr += norm(DIRECT_MULTIDIM_ELEM(F1, n) - DIRECT_MULTIDIM_ELEM(F2, n)) / (2 * sigma2_fudge * mymodel.sigma2_noise[group_id](ires_remapped) );
+								my_snr += norm(DIRECT_MULTIDIM_ELEM(F1, n) - DIRECT_MULTIDIM_ELEM(F2, n)) / (2 * sigma2_fudge * mymodel.sigma2_noise[optics_group](ires_remapped) );
 							}
 						}
 
@@ -8891,9 +8885,9 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 							{
 								int ires = DIRECT_MULTIDIM_ELEM(*myMresol, n);
 								int ires_remapped = ROUND(remap_image_sizes * ires);
-								if (ires > 0 && ires_remapped < XSIZE(mymodel.sigma2_noise[group_id]))
+								if (ires > 0 && ires_remapped < XSIZE(mymodel.sigma2_noise[optics_group]))
 									mymodel.orientability_contrib[iclass](ires_remapped) +=
-											norm(DIRECT_MULTIDIM_ELEM(F1, n) - DIRECT_MULTIDIM_ELEM(F2, n)) / ( (2 * sigma2_fudge * mymodel.sigma2_noise[group_id](ires_remapped) ) );
+											norm(DIRECT_MULTIDIM_ELEM(F1, n) - DIRECT_MULTIDIM_ELEM(F2, n)) / ( (2 * sigma2_fudge * mymodel.sigma2_noise[optics_group](ires_remapped) ) );
 							}
 						}
 

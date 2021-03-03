@@ -518,12 +518,13 @@ will still yield good performance and possibly a more stable execution. \n" << s
 		}
 
 		mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
-		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
+		mydata.getNumberOfImagesPerOpticsGroup(mymodel.nr_particles_per_optics_group);
+		for (int igroup = 0; igroup< mymodel.nr_optics_groups; igroup++)
 		{
 			// Use the same spectrum for all classes
 			mymodel.sigma2_noise[igroup] =  mymodel.sigma2_noise[0];
 			// We set wsum_model.sumw_group as in calculateSumOfPowerSpectraAndAverageImage
-			wsum_model.sumw_group[igroup] = mymodel.nr_particles_per_group[igroup];
+			wsum_model.sumw_group[igroup] = mymodel.nr_particles_per_optics_group[igroup];
 		}
 	}
 	else if (do_calculate_initial_sigma_noise || do_average_unaligned)
@@ -559,23 +560,15 @@ will still yield good performance and possibly a more stable execution. \n" << s
 		//Only the first_follower of each subset writes model to disc
 		MlOptimiser::write(DO_WRITE_SAMPLING, DONT_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, node->rank);
 
-		bool do_warn = false;
-		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
+		for (int igroup = 0; igroup< mymodel.nr_optics_groups; igroup++)
 		{
-			if (mymodel.nr_particles_per_group[igroup] < 5 && node->rank == 1) // only warn for half1 to avoid messy output
+			if (mymodel.nr_particles_per_optics_group[igroup] < 5 && node->rank == 1) // only warn for half1 to avoid messy output
 			{
 				if (my_nr_subsets == 1)
-					std:: cout << "WARNING: There are only " << mymodel.nr_particles_per_group[igroup] << " particles in group " << igroup + 1 << std::endl;
+					std:: cout << "WARNING: There are only " << mymodel.nr_particles_per_optics_group[igroup] << " particles in optics group " << igroup + 1 << std::endl;
 				else
-					std:: cout << "WARNING: There are only " << mymodel.nr_particles_per_group[igroup] << " particles in group " << igroup + 1 << " of half-set " << node->rank << std::endl;
-				do_warn = true;
+					std:: cout << "WARNING: There are only " << mymodel.nr_particles_per_optics_group[igroup] << " particles in optics group " << igroup + 1 << " of half-set " << node->rank << std::endl;
 			}
-		}
-		if (do_warn)
-		{
-			std:: cout << "WARNING: You may want to consider joining some micrographs into larger groups to obtain more robust noise estimates. " << std::endl;
-			std:: cout << "         You can do so by using the same rlnMicrographName for particles from multiple different micrographs in the input STAR file. " << std::endl;
-            std:: cout << "         It is then best to join micrographs with similar defocus values and similar apparent signal-to-noise ratios. " << std::endl;
 		}
 	}
 
