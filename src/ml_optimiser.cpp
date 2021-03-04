@@ -2253,9 +2253,18 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 	std::cerr<<"MlOptimiser::calculateSumOfPowerSpectraAndAverageImage Entering"<<std::endl;
 #endif
 
-	int barstep, my_nr_particles = my_last_particle_id - my_first_particle_id + 1;
+	// As pre relion-4.0, this is only done per optics group, and only for 1000 particles per optics group.
+	// It is therefore no longer done in parallel over MPI
+	int MIN_NR_PARTS_PER_OPTICS_GROUP = 1000;
+	int total_nr_particles_todo = MIN_NR_PARTS_PER_OPTICS_GROUP * mymodel.nr_optics_groups;
+	int barstep;
 
-	bool doing_subsets = my_nr_particles < mydata.numberOfParticles();
+	if (myverb > 0)
+	{
+		std::cout << " Estimating initial noise spectra " << std::endl;
+		init_progress_bar(total_nr_particles_todo);
+		barstep = XMIPP_MAX(1, total_nr_particles_todo / 60);
+	}
 
 	// Initialise Mavg
 	if (mydata.is_3D)
@@ -2268,27 +2277,14 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 	}
 	Mavg.setXmippOrigin();
 
-	if (my_nr_particles < 1)
-	{
-	    	// Master doesn't do anything here...
-	    	// But still set Mavg the right size for AllReduce later on
-    		return;
-	}
-
-	if (myverb > 0)
-	{
-		std::cout << " Estimating initial noise spectra " << std::endl;
-		init_progress_bar(my_nr_particles);
-		barstep = XMIPP_MAX(1, my_nr_particles / 60);
-	}
-
 	// Only open stacks once and then read multiple images
 	fImageHandler hFile;
 	long int dump;
 	FileName fn_open_stack="";
 
 	// Note the loop over the particles (part_id) is MPI-parallelized
-	int nr_particles_done = 0;
+	long nr_particles_done = 0;
+	std::vector<long> nr_particles_done_per_optics_group(mymodel.nr_optics_groups, 0);
 	FileName fn_img, fn_stack;
 	// For spectrum calculation: recycle the transformer (so do not call getSpectrum all the time)
 	MultidimArray<Complex > Faux;
@@ -2297,25 +2293,32 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 
 	// Start reconstructions at ini_high or 0.07 digital frequencies....
 	if (ini_high <= 0.)
+	{
 		wsum_model.current_size = 1./mymodel.getResolution(ROUND(0.07 * mymodel.ori_size));
+	}
 	else
+	{
 		wsum_model.current_size  = mymodel.getPixelFromResolution(1./ini_high);
+	}
 	wsum_model.initZeros();
 
-	for (long int part_id_sorted = my_first_particle_id; part_id_sorted <= my_last_particle_id; part_id_sorted++, nr_particles_done++)
+	bool is_done_all_optics_groups = false;
+	for (long int part_id_sorted = 0; part_id_sorted <= mydata.numberOfParticles(); part_id_sorted++)
 	{
 
 		long int part_id = mydata.sorted_idx[part_id_sorted];
 		for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++)
 		{
-			long int group_id = mydata.getGroupId(part_id, img_id);
 			long int optics_group = mydata.getOpticsGroup(part_id, img_id);
 
-			if (gradient_refine && !doing_subsets)
+			if (nr_particles_done_per_optics_group[optics_group] >= MIN_NR_PARTS_PER_OPTICS_GROUP)
 			{
-				mymodel.nr_particles_per_optics_group[optics_group] ++;
-				if (gradient_refine && mymodel.nr_particles_per_optics_group[optics_group] > grad_ini_subset_size)
-					continue;
+				continue;
+			}
+			else
+			{
+				nr_particles_done++;
+				nr_particles_done_per_optics_group[optics_group]++;
 			}
 
 			RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
@@ -2471,8 +2474,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			wsum_model.sigma2_noise[optics_group] += ind_spectrum;
 			wsum_model.sumw_group[optics_group] += 1.;
 
-			// When doing SGD, only take the first grad_ini_subset_size*mymodel.nr_classes images to calculate the initial reconstruction
-			if (fn_ref == "None" && !(gradient_refine && part_id > grad_ini_subset_size*mymodel.nr_classes) )
+			if (fn_ref == "None")
 			{
 
 				MultidimArray<RFLOAT> Fctf, Fweight;
@@ -2486,8 +2488,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				RFLOAT tilt = (mymodel.ref_dim == 2) ? 0. : rnd_unif() * 180.;
 				RFLOAT psi  = rnd_unif() * 360.;
 				int iclass  = rnd_unif() * mymodel.nr_classes;
-				if (iclass == mymodel.nr_classes)
-					iclass = mymodel.nr_classes - 1;
+				if (iclass == mymodel.nr_classes) iclass = mymodel.nr_classes - 1;
 				if (iclass >= mymodel.nr_classes)
 				{
 					// Should not happen but without this some people get errors in Set2DFourierTransform
@@ -2527,7 +2528,19 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				wsum_model.BPref[iclass].set2DFourierTransform(Fimg, A, &Fctf);
 			}
 
+			// If we now reach a full optics_group, check whether all optics groups are full, and if so, exit)
+			if (nr_particles_done_per_optics_group[optics_group] >= MIN_NR_PARTS_PER_OPTICS_GROUP)
+			{
+				is_done_all_optics_groups = true;
+				for (int i = 0; i < nr_particles_done_per_optics_group.size(); i++)
+				{
+					if (nr_particles_done_per_optics_group[optics_group] < MIN_NR_PARTS_PER_OPTICS_GROUP) is_done_all_optics_groups = false;
+				}
+			}
+
 		} // end loop img_id
+
+		if (is_done_all_optics_groups) break;
 
 		if (myverb > 0 && nr_particles_done % barstep == 0)
 		{
@@ -2545,7 +2558,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 	transformer.cleanup();
 
 	if (myverb > 0)
-		progress_bar(my_nr_particles);
+		progress_bar(total_nr_particles_todo);
 
 #ifdef DEBUG_INI
 	std::cerr<<"MlOptimiser::calculateSumOfPowerSpectraAndAverageImage Leaving"<<std::endl;
@@ -2560,14 +2573,10 @@ void MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(MultidimArray<RFLOAT>
 	std::cerr<<"MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage Entering"<<std::endl;
 #endif
 
-	bool doing_subsets = my_last_particle_id - my_first_particle_id + 1 < mydata.numberOfParticles();
-
 	// First calculate average image
 	RFLOAT total_sum = 0.;
 	for (int igroup = 0; igroup < mymodel.nr_optics_groups; igroup++)
 	{
-		if (doing_subsets || !gradient_refine)
-			mymodel.nr_particles_per_optics_group[igroup] = ROUND(wsum_model.sumw_group[igroup]);
 		total_sum += wsum_model.sumw_group[igroup];
 	}
 	Mavg /= total_sum;

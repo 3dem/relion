@@ -530,17 +530,30 @@ will still yield good performance and possibly a more stable execution. \n" << s
 	else if (do_calculate_initial_sigma_noise || do_average_unaligned)
 	{
 		MultidimArray<RFLOAT> Mavg;
+
 		// Calculate initial sigma noise model from power_class spectra of the individual images
-		// This is done in parallel
-		//std::cout << " Hello world1! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
+		// Since relion-4.0, this is done for only 1000 particles per optics group, and this is no longer done in parallel
 
-		calculateSumOfPowerSpectraAndAverageImage(Mavg);
+		if (node->rank == 1) MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(Mavg);
 
-		// Set sigma2_noise and Iref from averaged poser spectra and Mavg
-		if (!node->isLeader())
-			MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(Mavg);
-		//std::cout << " Hello world3! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
+		if (pipeline_control_check_abort_job())
+			MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
 
+		if (node->rank == 1) MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(Mavg);
+
+		//Now rank=1 braodcasts resulting Iref and sigma2_noise to everyone else
+		for (int i = 0; i < mymodel.sigma2_noise.size(); i++)
+		{
+			node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.sigma2_noise[i]),
+			                       MULTIDIM_SIZE(mymodel.sigma2_noise[i]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
+		}
+		for (int i = 0; i < mymodel.Iref.size(); i++)
+		{
+			node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Iref[i]),
+			                       MULTIDIM_SIZE(mymodel.Iref[i]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
+		}
+
+		// And everyone set the number of particles per group and per optics group
 		mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
 		mydata.getNumberOfImagesPerOpticsGroup(mymodel.nr_particles_per_optics_group);
 	}
