@@ -3097,7 +3097,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					DIRECT_A1D_ELEM(baseMLO->wsum_model.sigma2_noise[optics_group], i_resam) += DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[img_id], i);
 				}
 			}
-			baseMLO->wsum_model.sumw_group[igroup] += thr_sumw_group[img_id];
+			baseMLO->wsum_model.sumw_group[optics_group] += thr_sumw_group[img_id];
 			if (baseMLO->do_scale_correction)
 			{
 				baseMLO->wsum_model.wsum_signal_product[igroup] += thr_wsum_signal_product_spectra[img_id];

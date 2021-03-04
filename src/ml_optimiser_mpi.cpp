@@ -540,6 +540,9 @@ will still yield good performance and possibly a more stable execution. \n" << s
 		if (!node->isLeader())
 			MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(Mavg);
 		//std::cout << " Hello world3! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
+
+		mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
+		mydata.getNumberOfImagesPerOpticsGroup(mymodel.nr_particles_per_optics_group);
 	}
 
 

@@ -98,7 +98,7 @@ void MlModel::initialise(bool _do_grad)
 }
 
 // Reading from a file
-void MlModel::read(FileName fn_in, bool read_only_one_group)
+void MlModel::read(FileName fn_in, int nr_optics_groups_from_mydata)
 {
 
 	// Clear current model
@@ -144,9 +144,20 @@ void MlModel::read(FileName fn_in, bool read_only_one_group)
 			REPORT_ERROR("MlModel::readStar: incorrect model_general table: cannot find sigma_offset");
 		}
 	}
+
+	bool is_pre4 = false;
 	if (!MDlog.getValue(EMDL_MLMODEL_NR_OPTICS_GROUPS, nr_optics_groups))
 	{
-		nr_optics_groups = 1;
+		// Just set to one here, and then confirm later in ml_optimiser where also mydata is available whether this was correct
+		nr_optics_groups = nr_optics_groups_from_mydata;
+		is_pre4 = true;
+	}
+	else
+	{
+		if (nr_optics_groups != nr_optics_groups_from_mydata)
+		{
+			REPORT_ERROR("ERROR: nr_optics_group from data.star does not match that in model.star!");
+		}
 	}
 
 	// Retain compability with model files written by Relion prior to 1.4
@@ -288,6 +299,7 @@ void MlModel::read(FileName fn_in, bool read_only_one_group)
 	// Read group stuff
 	MDgroup.readStar(in, "model_groups");
 	long int igroup;
+	long long nr_particles = 0;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDgroup)
 	{
 		if (!MDgroup.getValue(EMDL_MLMODEL_GROUP_NO, igroup))
@@ -296,22 +308,36 @@ void MlModel::read(FileName fn_in, bool read_only_one_group)
 		}
 		//Start counting of groups at 1, not at 0....
 		if (!MDgroup.getValue(EMDL_MLMODEL_GROUP_SCALE_CORRECTION, scale_correction[igroup - 1]) ||
-			!MDopticsgroup.getValue(EMDL_MLMODEL_GROUP_NR_PARTICLES, nr_particles_per_group[igroup - 1]) ||
+			!MDgroup.getValue(EMDL_MLMODEL_GROUP_NR_PARTICLES, nr_particles_per_group[igroup - 1]) ||
 		    !MDgroup.getValue(EMDL_MLMODEL_GROUP_NAME, group_names[igroup-1]))
 			REPORT_ERROR("MlModel::readStar: incorrect model_groups table");
+		nr_particles += nr_particles_per_group[igroup - 1];
 	}
 
-	// Read optics group stuff
-	MDopticsgroup.readStar(in, "model_optics_groups");
-	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDopticsgroup)
+	// Get the number of particles per optics group
+	if (is_pre4)
 	{
-		if (!MDopticsgroup.getValue(EMDL_MLMODEL_OPTICS_GROUP_NO, igroup))
+		// Pre relion-4.0 the sigma2_noise spectra and number of particles were stored per (micrograph) group, not per optics group.
+		// Just set nr_particles_per_optics_group to the total number of particles divided by nr_optics_groups
+		for (int igroup = 0; igroup < nr_optics_groups; igroup++)
 		{
-			REPORT_ERROR("MlModel::readStar: incorrect model_groups table");
+			nr_particles_per_optics_group[igroup] = ROUND((float)nr_particles/(float)nr_optics_groups);
 		}
-		//Start counting of groups at 1, not at 0....
-		if (!MDopticsgroup.getValue(EMDL_MLMODEL_OPTICS_GROUP_NR_PARTICLES, nr_particles_per_optics_group[igroup - 1]))
-			REPORT_ERROR("MlModel::readStar: incorrect model_optics_groups table");
+	}
+	else
+	{
+		// Read optics group stuff
+		MDopticsgroup.readStar(in, "model_optics_groups");
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDopticsgroup)
+		{
+			if (!MDopticsgroup.getValue(EMDL_MLMODEL_OPTICS_GROUP_NO, igroup))
+			{
+				REPORT_ERROR("MlModel::readStar: incorrect model_optics_groups table");
+			}
+			//Start counting of groups at 1, not at 0....
+			if (!MDopticsgroup.getValue(EMDL_MLMODEL_OPTICS_GROUP_NR_PARTICLES, nr_particles_per_optics_group[igroup - 1]))
+				REPORT_ERROR("MlModel::readStar: incorrect model_optics_groups table");
+		}
 	}
 
 	// Read SSNR, noise reduction, tau2_class spectra for each class
@@ -337,16 +363,23 @@ void MlModel::read(FileName fn_in, bool read_only_one_group)
 		}
 	}
 
-	// Read sigma models for each optics group
-	long read_this_many_groups = (read_only_one_group) ? 1 : nr_optics_groups;
-	for (int igroup = 0; igroup < read_this_many_groups; igroup++)
+	// Read sigma2_noise models for each optics group
+	for (int igroup = 0; igroup < nr_optics_groups; igroup++)
 	{
 		// Allow sigma2_noise with different sizes!
 		sigma2_noise[igroup].resize(ori_size/2 + 1);
 
 		if (nr_particles_per_optics_group[igroup] > 0)
 		{
-			MDsigma.readStar(in, "model_optics_group_" + integerToString(igroup + 1));
+			if (is_pre4)
+			{
+				// If this is a pre-relion-4.0 model.star file, then just read the first sigma2_noise spectrum into all optics_groups
+				MDsigma.readStar(in, "model_group_1");
+			}
+			else
+			{
+				MDsigma.readStar(in, "model_optics_group_" + integerToString(igroup + 1));
+			}
 			int idx;
 			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsigma)
 			{
@@ -698,7 +731,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 		//Start counting of groups at 1, not at 0....
 		MDgroup.setValue(EMDL_MLMODEL_GROUP_NO, igroup+1);
 		MDgroup.setValue(EMDL_MLMODEL_GROUP_NAME, group_names[igroup]);
-		MDopticsgroup.setValue(EMDL_MLMODEL_GROUP_NR_PARTICLES, nr_particles_per_group[igroup]);
+		MDgroup.setValue(EMDL_MLMODEL_GROUP_NR_PARTICLES, nr_particles_per_group[igroup]);
 		MDgroup.setValue(EMDL_MLMODEL_GROUP_SCALE_CORRECTION, scale_correction[igroup]);
 	}
 	MDgroup.write(fh);
@@ -989,14 +1022,14 @@ void MlModel::initialiseFromImages(
 
 
 	// Set some group stuff
-	nr_groups = _mydata.groups.size();
+	nr_optics_groups = _mydata.numberOfOpticsGroups();
 	MultidimArray<RFLOAT> aux;
 	aux.initZeros(ori_size/2 + 1);
 	sigma2_noise.resize(nr_optics_groups, aux);
+	nr_groups = _mydata.groups.size();
 
 	initialise(_do_grad);
 
-	// Now set the group names from the Experiment groups list
 	for (int i=0; i< nr_groups; i++)
 		group_names[i] = _mydata.groups[i].name;
 
@@ -1557,6 +1590,7 @@ void MlWsumModel::initialise(MlModel &_model, FileName fn_sym, bool asymmetric_p
 	nr_classes = _model.nr_classes;
 	nr_bodies = _model.nr_bodies;
 	nr_groups = _model.nr_groups;
+	nr_optics_groups = _model.nr_optics_groups;
 	nr_directions = _model.nr_directions;
 	ref_dim = _model.ref_dim;
 	data_dim = _model.data_dim;
@@ -1620,7 +1654,7 @@ void MlWsumModel::initialise(MlModel &_model, FileName fn_sym, bool asymmetric_p
 					 ML_BLOB_ORDER, ML_BLOB_RADIUS, ML_BLOB_ALPHA, data_dim, _skip_gridding);
 	BPref.clear();
 	BPref.resize(nr_classes * nr_bodies, BP); // also set multiple bodies
-	sumw_group.resize(nr_groups);
+	sumw_group.resize(nr_optics_groups);
 
 }
 
@@ -1853,10 +1887,7 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed, int &piece, int &nr_pieces
 
 
 	// Determine size of the packed array
-	unsigned long long nr_optics_groups = sigma2_noise.size();
-	unsigned long long nr_groups = scale_correction.size();
 	unsigned long long nr_classes_bodies = BPref.size();
-	unsigned long long nr_classes = pdf_class.size();
 	unsigned long long spectral_size = (ori_size / 2) + 1;
 	unsigned long long packed_size = 0;
 	unsigned long long idx_start, idx_stop;
@@ -2019,11 +2050,7 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed, int &piece, int &nr_pieces
 void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed, int piece, bool do_clear)
 {
 
-
-	int nr_optics_groups = sigma2_noise.size();
-	int nr_groups = scale_correction.size();
 	int nr_classes_bodies = BPref.size();
-	int nr_classes = pdf_class.size();
 	int spectral_size = (ori_size / 2) + 1;
 	unsigned long long idx_start;
 	unsigned long long idx_stop;

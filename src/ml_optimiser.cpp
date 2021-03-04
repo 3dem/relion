@@ -521,7 +521,9 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	FileName fn_model = getParameter(argc, argv, "--model", "None");
 	if (fn_model != "None")
 	{
-		mymodel.read(fn_model);
+		// passing the number of optics_groups is only for backwards compatibility with pre-relion-4.0 model.star files.
+		// As this option isn't used anyway, just use 1 here
+		mymodel.read(fn_model, 1);
 	}
 	// Read in the sampling information from a _sampling.star file
 	FileName fn_sampling = getParameter(argc, argv, "--sampling", "None");
@@ -1083,24 +1085,24 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	{
 		if (debug_split_random_half == 1)
 		{
-			mymodel.read(fn_model);
+			mymodel.read(fn_model, mydata.obsModel.numberOfOpticsGroups());
 		}
 		else if (debug_split_random_half == 2)
 		{
-			mymodel.read(fn_model2);
+			mymodel.read(fn_model2, mydata.obsModel.numberOfOpticsGroups());
 		}
 		else if (rank % 2 == 1)
 		{
-			mymodel.read(fn_model);
+			mymodel.read(fn_model, mydata.obsModel.numberOfOpticsGroups());
 		}
 		else
 		{
-			mymodel.read(fn_model2);
+			mymodel.read(fn_model2, mydata.obsModel.numberOfOpticsGroups());
 		}
 	}
 	else
 	{
-		mymodel.read(fn_model);
+		mymodel.read(fn_model, mydata.obsModel.numberOfOpticsGroups());
 	}
 	// Set up the bodies in the model, if this is a continuation of a multibody refinement (otherwise this is done in initialiseGeneral)
 	if (fn_body_masks != "None")
@@ -1456,6 +1458,10 @@ void MlOptimiser::initialise()
 
 		// Set sigma2_noise and Iref from averaged poser spectra and Mavg
 		setSigmaNoiseEstimatesAndSetAverageImage(Mavg);
+
+		mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
+		mydata.getNumberOfImagesPerOpticsGroup(mymodel.nr_particles_per_optics_group);
+
 	}
 
 	// First low-pass filter the initial references
@@ -4506,14 +4512,13 @@ void MlOptimiser::maximizationOtherParameters()
 			mymodel.scale_correction[igroup] /= avg_scale_correction;
 //#define DEBUG_UPDATE_SCALE
 #ifdef DEBUG_UPDATE_SCALE
-			if (verb > 0)
+			//if (verb > 0)
 			{
 				std::cerr<< "Group "<<igroup+1<<": scale_correction= "<<mymodel.scale_correction[igroup]<<std::endl;
-				for (int i = 0; i < XSIZE(wsum_model.wsum_reference_power[igroup]); i++)
-					if (wsum_model.wsum_reference_power[igroup](i)> 0.)
-						std::cerr << " i= " << i << " XA= " << wsum_model.wsum_signal_product[igroup](i)
-											<< " A2= " << wsum_model.wsum_reference_power[igroup](i)
-											<< " XA/A2= " << wsum_model.wsum_signal_product[igroup](i)/wsum_model.wsum_reference_power[igroup](i) << std::endl;
+				if (wsum_model.wsum_reference_power[igroup]> 0.)
+					std::cerr << " XA= " << wsum_model.wsum_signal_product[igroup]
+						      << " A2= " << wsum_model.wsum_reference_power[igroup]
+							  << " XA/A2= " << wsum_model.wsum_signal_product[igroup]/wsum_model.wsum_reference_power[igroup] << std::endl;
 
 			}
 #endif
@@ -8370,12 +8375,12 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(thr_wsum_sigma2_noise[img_id])
 			{
 				int i_resam = ROUND(i * remap_image_sizes);
-				if (i_resam < XSIZE(wsum_model.sigma2_noise[igroup]))
+				if (i_resam < XSIZE(wsum_model.sigma2_noise[optics_group]))
 				{
-					DIRECT_A1D_ELEM(wsum_model.sigma2_noise[igroup], i_resam) += DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[img_id], i);
+					DIRECT_A1D_ELEM(wsum_model.sigma2_noise[optics_group], i_resam) += DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[img_id], i);
 				}
 			}
-			wsum_model.sumw_group[igroup] += thr_sumw_group[img_id];
+			wsum_model.sumw_group[optics_group] += thr_sumw_group[img_id];
 			if (do_scale_correction)
 			{
 				wsum_model.wsum_signal_product[igroup] += thr_wsum_signal_product_spectra[img_id];

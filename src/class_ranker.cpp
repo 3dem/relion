@@ -479,8 +479,13 @@ void ClassRanker::initialise()
 			exit(1);
 		}
 
+		//Sjors 04032021: read number of optics groups from data.star file for backwards compatibility with reading pre-relion-4.0 files
+		MetaDataTable MDoptics;
+		MDoptics.read(fn_data, "optics");
+		int nr_optics_groups = XMIPP_MAX(1, MDoptics.numberOfObjects());
+
 		//Sjors 06022020: go back to just reading MD_optimiser for speed
-		mymodel.read(fn_model, true); // true means: read only one group!
+		mymodel.read(fn_model, nr_optics_groups);
 		if (debug>0) std::cerr << "Done with reading model.star ..." << std::endl;
 
 		//myopt.read(fn_optimiser); // true means skip_groups_and_pdf_direction from mlmodel; only read 1000 particles...
