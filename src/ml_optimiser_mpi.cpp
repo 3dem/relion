@@ -478,6 +478,8 @@ will still yield good performance and possibly a more stable execution. \n" << s
 	MlOptimiser::initialiseGeneral(node->rank);
 
 	initialiseWorkLoad();
+	
+	initialiseGeneralFinalize();
 
 #ifdef ALTCPU
 	// Don't start threading until after most I/O is over
@@ -578,9 +580,6 @@ will still yield good performance and possibly a more stable execution. \n" << s
             std:: cout << "         It is then best to join micrographs with similar defocus values and similar apparent signal-to-noise ratios. " << std::endl;
 		}
 	}
-
-
-	initialiseGeneralFinalize();
 
 #ifdef DEBUG
     std::cerr<<"MlOptimiserMpi::initialise Done"<<std::endl;
