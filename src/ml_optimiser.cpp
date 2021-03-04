@@ -2108,6 +2108,66 @@ void MlOptimiser::initialiseGeneral(int rank)
 	// For new thread-parallelization: each thread does 1 particle, so nr_pool=nr_threads
 	nr_pool = x_pool*nr_threads;
 
+	if (do_fast_subsets)
+	{
+		if (nr_iter < 20)
+			REPORT_ERROR("ERROR: when using --fast_subsets you have to perform at least 20 iterations!");
+		if (do_auto_refine)
+			REPORT_ERROR("ERROR: you cannot use --fast_subsets together with --auto_refine");
+	}
+
+	// Check mask angpix, boxsize and [0,1] compliance right away.
+	if (fn_mask != "None") checkMask(fn_mask, 1, rank);
+	if (fn_mask2 != "None") checkMask(fn_mask2, 2, rank);
+
+	// Write out unmasked 2D class averages
+	do_write_unmasked_refs = (mymodel.ref_dim == 2 && !gradient_refine);
+
+	initialiseGeneralFinalize();
+
+#ifdef DEBUG
+	std::cerr << "Leaving initialiseGeneral" << std::endl;
+#endif
+
+}
+
+void MlOptimiser::initialiseWorkLoad()
+{
+	// Note, this function is overloaded in ml_optimiser_mpi (where random_seed is only set by the leader and then send to all followers!)
+
+	// Randomise the order of the particles
+	if (random_seed == -1) random_seed = time(NULL);
+	// Also randomize random-number-generator for perturbations on the angles
+	init_random_generator(random_seed);
+
+	if (do_split_random_halves && debug_split_random_half > 0)
+	{
+
+		// Split the data into two random halves
+		mydata.divideParticlesInRandomHalves(random_seed, do_helical_refine);
+		// rank=0 will work on subset 2, because rank%2==0
+		my_halfset = debug_split_random_half;
+	}
+
+	divide_equally(mydata.numberOfParticles(), 1, 0, my_first_particle_id, my_last_particle_id);
+
+	// Now copy particle stacks to scratch if needed
+	if (fn_scratch != "" && !do_preread_images)
+	{
+    		mydata.setScratchDirectory(fn_scratch, do_reuse_scratch, 1);
+
+		if (!do_reuse_scratch)
+		{
+			mydata.prepareScratchDirectory(fn_scratch);
+			bool also_do_ctfimage = (mymodel.data_dim == 3 && do_ctf_correction);
+			mydata.copyParticlesToScratch(1, true, also_do_ctfimage, keep_free_scratch_Gb);
+		}
+	}
+
+}
+
+
+void MlOptimiser::initialiseGeneralFinalize(int rank) {
 	if (do_som)
 	{
 		mymodel.som.set_max_node_count(mymodel.nr_classes);
@@ -2186,64 +2246,9 @@ void MlOptimiser::initialiseGeneral(int rank)
 	}
 	else
 	{
-	    subset_size = -1;
+		subset_size = -1;
 		mu = 0.;
 	}
-
-	if (do_fast_subsets)
-	{
-		if (nr_iter < 20)
-			REPORT_ERROR("ERROR: when using --fast_subsets you have to perform at least 20 iterations!");
-		if (do_auto_refine)
-			REPORT_ERROR("ERROR: you cannot use --fast_subsets together with --auto_refine");
-	}
-
-	// Check mask angpix, boxsize and [0,1] compliance right away.
-	if (fn_mask != "None") checkMask(fn_mask, 1, rank);
-	if (fn_mask2 != "None") checkMask(fn_mask2, 2, rank);
-
-	// Write out unmasked 2D class averages
-	do_write_unmasked_refs = (mymodel.ref_dim == 2 && !gradient_refine);
-
-#ifdef DEBUG
-	std::cerr << "Leaving initialiseGeneral" << std::endl;
-#endif
-
-}
-
-void MlOptimiser::initialiseWorkLoad()
-{
-	// Note, this function is overloaded in ml_optimiser_mpi (where random_seed is only set by the leader and then send to all followers!)
-
-	// Randomise the order of the particles
-	if (random_seed == -1) random_seed = time(NULL);
-	// Also randomize random-number-generator for perturbations on the angles
-	init_random_generator(random_seed);
-
-	if (do_split_random_halves && debug_split_random_half > 0)
-	{
-
-		// Split the data into two random halves
-		mydata.divideParticlesInRandomHalves(random_seed, do_helical_refine);
-		// rank=0 will work on subset 2, because rank%2==0
-		my_halfset = debug_split_random_half;
-	}
-
-	divide_equally(mydata.numberOfParticles(), 1, 0, my_first_particle_id, my_last_particle_id);
-
-	// Now copy particle stacks to scratch if needed
-	if (fn_scratch != "" && !do_preread_images)
-	{
-    		mydata.setScratchDirectory(fn_scratch, do_reuse_scratch, 1);
-
-		if (!do_reuse_scratch)
-		{
-			mydata.prepareScratchDirectory(fn_scratch);
-			bool also_do_ctfimage = (mymodel.data_dim == 3 && do_ctf_correction);
-			mydata.copyParticlesToScratch(1, true, also_do_ctfimage, keep_free_scratch_Gb);
-		}
-	}
-
 }
 
 void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT> &Mavg, bool myverb)
