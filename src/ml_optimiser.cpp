@@ -2167,7 +2167,9 @@ void MlOptimiser::initialiseWorkLoad()
 }
 
 
-void MlOptimiser::initialiseGeneralFinalize(int rank) {
+void MlOptimiser::initialiseGeneralFinalize(int rank)
+{
+
 	if (do_som)
 	{
 		mymodel.som.set_max_node_count(mymodel.nr_classes);
@@ -2197,21 +2199,37 @@ void MlOptimiser::initialiseGeneralFinalize(int rank) {
 		}
 	}
 
-	if (do_init_blobs) {
-		for (unsigned i = 0; i < mymodel.nr_classes; i ++) {
-			if (mymodel.pdf_class[i] > 0.) {
-				MultidimArray<RFLOAT> blobs_pos(mymodel.Iref[i]), blobs_neg(mymodel.Iref[i]);
-				if (mymodel.ref_dim == 2) {
+	if (do_init_blobs)
+	{
+
+		// Sjors 04032021: insert average of all classes into make_blobs functions,
+		// as in new initial calculation of Iref, much fewer particles are used than before
+		MultidimArray<RFLOAT> Iavg(mymodel.Iref[0]);
+		Iavg.initZeros();
+		for (unsigned i = 0; i < mymodel.nr_classes; i ++)
+		{
+			Iavg += mymodel.Iref[i];
+		}
+		Iavg /= (float)mymodel.nr_classes;
+
+		for (unsigned i = 0; i < mymodel.nr_classes; i ++)
+		{
+			if (mymodel.pdf_class[i] > 0.)
+			{
+				MultidimArray<RFLOAT> blobs_pos(Iavg), blobs_neg(Iavg);
+				if (mymodel.ref_dim == 2)
+				{
 					SomGraph::make_blobs_2d(
-							blobs_pos, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
+							blobs_pos, Iavg, 40, particle_diameter / mymodel.pixel_size);
 					SomGraph::make_blobs_2d(
-							blobs_neg, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
+							blobs_neg, Iavg, 40, particle_diameter / mymodel.pixel_size);
 				}
-				else {
+				else
+				{
 					SomGraph::make_blobs_3d(
-							blobs_pos, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
+							blobs_pos, Iavg, 40, particle_diameter / mymodel.pixel_size);
 					SomGraph::make_blobs_3d(
-							blobs_neg, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
+							blobs_neg, Iavg, 40, particle_diameter / mymodel.pixel_size);
 				}
 				mymodel.Iref[i] = blobs_pos/40 * 0.6 - blobs_neg/40 * 0.4;
 			}
@@ -2220,7 +2238,8 @@ void MlOptimiser::initialiseGeneralFinalize(int rank) {
 
 	if (gradient_refine)
 	{
-		if (do_auto_refine) {
+		if (do_auto_refine)
+		{
 			auto_resolution_based_angles = true;
 			auto_ignore_angle_changes = true;
 		}
@@ -2230,7 +2249,8 @@ void MlOptimiser::initialiseGeneralFinalize(int rank) {
 		updateStepSize();
 
 		// determine default subset sizes
-		if (grad_ini_subset_size == -1 || grad_fin_subset_size == -1) {
+		if (grad_ini_subset_size == -1 || grad_fin_subset_size == -1)
+		{
 			if (grad_ini_subset_size != -1 || grad_fin_subset_size != -1)
 				std::cout << " WARNING: Since both --grad_ini_subset and --grad_fin_subset were not set, " <<
 				          "both will instead be determined automatically." << std::endl;
@@ -2238,7 +2258,8 @@ void MlOptimiser::initialiseGeneralFinalize(int rank) {
 			unsigned long dataset_size = mydata.numberOfParticles();
 			grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.001, 500), 200);
 			grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.05,  50000), 1000);
-			if (rank==0) {
+			if (verb >  0)
+			{
 				std::cout << " Initial subset size set to " << grad_ini_subset_size << std::endl;
 				std::cout << " Final subset size set to " << grad_fin_subset_size << std::endl;
 			}
