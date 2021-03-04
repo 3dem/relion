@@ -885,14 +885,18 @@ public:
 	// Check the mask is thr ight size
 	void checkMask(FileName &_fn_mask, int solvent_nr, int rank);
 
-	// Some general stuff that is shared between MPI and sequential code in the early stages of initialization
+	// Some general stuff that is shared between MPI and sequential code in the early stages of initialisation
 	void initialiseGeneral(int rank = 0);
 
 	// Randomise particle processing order and resize metadata array
 	void initialiseWorkLoad();
 
-	// Some general stuff that is shared between MPI and sequential code in the final stages of initialization
-	void initialiseGeneralFinalize(int rank = 0);
+	// Fetch initial noise spectra, from input file or calculate from subset of input images,
+	// also calculate initial Iref images if fn_ref == "None"
+	void initialiseSigma2Noise();
+
+	// Some general stuff that is shared between MPI and sequential code in the final stages of initialisation
+	void initialiseGeneral2(bool do_ini_data_vs_prior = true);
 
 	/* Calculates the sum of all individual power spectra and the average of all images for initial sigma_noise estimation
 	 * The rank is passed so that if one splits the data into random halves one can know which random half to treat

@@ -498,76 +498,22 @@ will still yield good performance and possibly a more stable execution. \n" << s
 	fftw_plan_with_nthreads(nr_threads);
 #endif
 
-	if (fn_sigma != "")
-	{
-		// Read in sigma_noise spetrum from file DEVELOPMENTAL!!! FOR DEBUGGING ONLY....
-		MetaDataTable MDsigma;
-		RFLOAT val;
-		int idx;
-		MDsigma.read(fn_sigma);
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsigma)
-		{
-			MDsigma.getValue(EMDL_SPECTRAL_IDX, idx);
-			MDsigma.getValue(EMDL_MLMODEL_SIGMA2_NOISE, val);
-			if (idx < XSIZE(mymodel.sigma2_noise[0]))
-				mymodel.sigma2_noise[0](idx) = val;
-		}
-		if (idx < XSIZE(mymodel.sigma2_noise[0]) - 1)
-		{
-			if (verb > 0) std::cout<< " WARNING: provided sigma2_noise-spectrum has fewer entries ("<<idx+1<<") than needed ("<<XSIZE(mymodel.sigma2_noise[0])<<"). Set rest to zero..."<<std::endl;
-		}
+	// Only the first follower calculates the sigma2_noise spectra and sets initial guesses for Iref
+	if (node->rank == 1) MlOptimiser::initialiseSigma2Noise();
 
-		mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
-		mydata.getNumberOfImagesPerOpticsGroup(mymodel.nr_particles_per_optics_group);
-		for (int igroup = 0; igroup< mymodel.nr_optics_groups; igroup++)
-		{
-			// Use the same spectrum for all classes
-			mymodel.sigma2_noise[igroup] =  mymodel.sigma2_noise[0];
-			// We set wsum_model.sumw_group as in calculateSumOfPowerSpectraAndAverageImage
-			wsum_model.sumw_group[igroup] = mymodel.nr_particles_per_optics_group[igroup];
-		}
+	//Now the first follower1 broadcasts resulting Iref and sigma2_noise to everyone else
+	for (int i = 0; i < mymodel.sigma2_noise.size(); i++)
+	{
+		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.sigma2_noise[i]),
+							   MULTIDIM_SIZE(mymodel.sigma2_noise[i]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
 	}
-	else if (do_calculate_initial_sigma_noise || do_average_unaligned)
+	for (int i = 0; i < mymodel.Iref.size(); i++)
 	{
-		MultidimArray<RFLOAT> Mavg;
-
-		// Calculate initial sigma noise model from power_class spectra of the individual images
-		// Since relion-4.0, this is done for only 1000 particles per optics group, and this is no longer done in parallel
-
-		if (node->rank == 1) MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(Mavg);
-
-		if (pipeline_control_check_abort_job())
-			MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
-
-		if (node->rank == 1) MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(Mavg);
-
-		//Now rank=1 braodcasts resulting Iref and sigma2_noise to everyone else
-		for (int i = 0; i < mymodel.sigma2_noise.size(); i++)
-		{
-			node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.sigma2_noise[i]),
-			                       MULTIDIM_SIZE(mymodel.sigma2_noise[i]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
-		}
-		for (int i = 0; i < mymodel.Iref.size(); i++)
-		{
-			node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Iref[i]),
-			                       MULTIDIM_SIZE(mymodel.Iref[i]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
-		}
-
-		// And everyone set the number of particles per group and per optics group
-		mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
-		mydata.getNumberOfImagesPerOpticsGroup(mymodel.nr_particles_per_optics_group);
+		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Iref[i]),
+							   MULTIDIM_SIZE(mymodel.Iref[i]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
 	}
 
-
-	MlOptimiser::initialLowPassFilterReferences();
-
-	// Initialise the data_versus_prior ratio to get the initial current_size right
-	if (iter == 0 && !do_initialise_bodies && !node->isLeader())
-		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
-
-	//std::cout << " Hello world! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
-
-	initialiseGeneralFinalize();
+	MlOptimiser::initialiseGeneral2(!node->isLeader());
 
 	// Only leader writes out initial mymodel (do not gather metadata yet)
 	int my_nr_subsets = (do_split_random_halves) ? 2 : 1;
@@ -577,19 +523,7 @@ will still yield good performance and possibly a more stable execution. \n" << s
 	{
 		//Only the first_follower of each subset writes model to disc
 		MlOptimiser::write(DO_WRITE_SAMPLING, DONT_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, node->rank);
-
-		for (int igroup = 0; igroup< mymodel.nr_optics_groups; igroup++)
-		{
-			if (mymodel.nr_particles_per_optics_group[igroup] < 5 && node->rank == 1) // only warn for half1 to avoid messy output
-			{
-				if (my_nr_subsets == 1)
-					std:: cout << "WARNING: There are only " << mymodel.nr_particles_per_optics_group[igroup] << " particles in optics group " << igroup + 1 << std::endl;
-				else
-					std:: cout << "WARNING: There are only " << mymodel.nr_particles_per_optics_group[igroup] << " particles in optics group " << igroup + 1 << " of half-set " << node->rank << std::endl;
-			}
-		}
 	}
-
 
 
 #ifdef DEBUG

@@ -732,7 +732,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 			"Gradient step size updates scheme. Valid values are plain, <a>-2step or <a>-3step-<b>. Where <a> is the initial inflate and <b> is the final deflate factor.","");
 
 	write_every_grad_iter = textToInteger(parser.getOption("--grad_write_iter", "Write out model every so many iterations in SGD (default is writing out all iters)", "10"));
-	do_init_blobs = parser.checkOption("--init_blobs", "Initialize models with random Gaussians.");
+	do_init_blobs = !parser.checkOption("--no_init_blobs", "Use this to switch off initializing models with random Gaussians.");
 	do_som = parser.checkOption("--som", "Calculate self-organizing map instead of classification.");
 	som_starting_nodes = textToInteger(parser.getOption("--som_ini_nodes", "Number of initial SOM nodes.", "2"));
 	som_connectivity = textToFloat(parser.getOption("--som_connectivity", "Number of average active neighbour connections.", "5.0"));
@@ -1393,10 +1393,6 @@ void MlOptimiser::initialise()
 #endif
 	}
 
-	initialiseGeneral();
-
-	initialiseWorkLoad();
-
 #ifdef ALTCPU
 	// Don't start threading until after most I/O is over
 	if (do_cpu)
@@ -1416,75 +1412,17 @@ void MlOptimiser::initialise()
 	fftw_plan_with_nthreads(nr_threads);
 #endif
 
-	if (fn_sigma != "")
-	{
-		// Read in sigma_noise spectrum from file DEVELOPMENTAL!!! FOR DEBUGGING ONLY....
-		MetaDataTable MDsigma;
-		RFLOAT val;
-		int idx;
-		MDsigma.read(fn_sigma);
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsigma)
-		{
-			MDsigma.getValue(EMDL_SPECTRAL_IDX, idx);
-			MDsigma.getValue(EMDL_MLMODEL_SIGMA2_NOISE, val);
-			if (idx < XSIZE(mymodel.sigma2_noise[0]))
-				mymodel.sigma2_noise[0](idx) = val;
-		}
-		if (idx < XSIZE(mymodel.sigma2_noise[0]) - 1)
-		{
-			if (verb > 0) std::cout<< " WARNING: provided sigma2_noise-spectrum has fewer entries ("<<idx+1<<") than needed ("<<XSIZE(mymodel.sigma2_noise[0])<<"). Set rest to zero..."<<std::endl;
-		}
+	initialiseGeneral();
 
-		mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
-		mydata.getNumberOfImagesPerOpticsGroup(mymodel.nr_particles_per_optics_group);
-		for (int igroup = 0; igroup< mymodel.nr_optics_groups; igroup++)
-        {
-		    // Use the same spectrum for all classes
-			mymodel.sigma2_noise[igroup] =  mymodel.sigma2_noise[0];
-			// We set wsum_model.sumw_group as in calculateSumOfPowerSpectraAndAverageImage
-            wsum_model.sumw_group[igroup] = mymodel.nr_particles_per_optics_group[igroup];
-        }
-	}
-	else if (do_calculate_initial_sigma_noise || do_average_unaligned)
-	{
-		MultidimArray<RFLOAT> Mavg;
+	initialiseWorkLoad();
 
-		// Calculate initial sigma noise model from power_class spectra of the individual images
-		calculateSumOfPowerSpectraAndAverageImage(Mavg);
+	initialiseSigma2Noise();
 
-		// Abort through the pipeline_control system
-		if (pipeline_control_check_abort_job())
-			exit(RELION_EXIT_ABORTED);
-
-		// Set sigma2_noise and Iref from averaged poser spectra and Mavg
-		setSigmaNoiseEstimatesAndSetAverageImage(Mavg);
-
-		mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
-		mydata.getNumberOfImagesPerOpticsGroup(mymodel.nr_particles_per_optics_group);
-
-	}
-
-	// First low-pass filter the initial references
-	if (iter == 0)
-		initialLowPassFilterReferences();
+	initialiseGeneral2();
 
 	// Initialise the data_versus_prior ratio to get the initial current_size right
 	if (iter == 0 && !do_initialise_bodies)
 		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
-
-	// Check minimum group size of 10 particles
-	if (verb > 0)
-	{
-		for (int igroup = 0; igroup< mymodel.nr_optics_groups; igroup++)
-		{
-			if (mymodel.nr_particles_per_optics_group[igroup] < 10)
-			{
-				std:: cout << "WARNING: There are only " << mymodel.nr_particles_per_optics_group[igroup] << " particles in optics group " << igroup + 1 << std::endl;
-			}
-		}
-	}
-
-	initialiseGeneralFinalize();
 
 	// Write out initial mymodel
 	write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
@@ -2124,6 +2062,15 @@ void MlOptimiser::initialiseGeneral(int rank)
 	// Write out unmasked 2D class averages
 	do_write_unmasked_refs = (mymodel.ref_dim == 2 && !gradient_refine);
 
+	// Set the number of particles per group and per optics_group
+	mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
+	mydata.getNumberOfImagesPerOpticsGroup(mymodel.nr_particles_per_optics_group);
+
+
+	initialiseGeneral2();
+
+
+
 #ifdef DEBUG
 	std::cerr << "Leaving initialiseGeneral" << std::endl;
 #endif
@@ -2153,7 +2100,7 @@ void MlOptimiser::initialiseWorkLoad()
 	// Now copy particle stacks to scratch if needed
 	if (fn_scratch != "" && !do_preread_images)
 	{
-    		mydata.setScratchDirectory(fn_scratch, do_reuse_scratch, 1);
+		mydata.setScratchDirectory(fn_scratch, do_reuse_scratch, 1);
 
 		if (!do_reuse_scratch)
 		{
@@ -2165,9 +2112,62 @@ void MlOptimiser::initialiseWorkLoad()
 
 }
 
-
-void MlOptimiser::initialiseGeneralFinalize(int rank)
+void MlOptimiser::initialiseSigma2Noise()
 {
+
+	// Get noise spectra
+	if (fn_sigma != "")
+	{
+		// Read in sigma_noise spectrum from file DEVELOPMENTAL!!! FOR DEBUGGING ONLY....
+		MetaDataTable MDsigma;
+		RFLOAT val;
+		int idx;
+		MDsigma.read(fn_sigma);
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsigma)
+		{
+			MDsigma.getValue(EMDL_SPECTRAL_IDX, idx);
+			MDsigma.getValue(EMDL_MLMODEL_SIGMA2_NOISE, val);
+			if (idx < XSIZE(mymodel.sigma2_noise[0]))
+				mymodel.sigma2_noise[0](idx) = val;
+		}
+		if (idx < XSIZE(mymodel.sigma2_noise[0]) - 1)
+		{
+			if (verb > 0) std::cout<< " WARNING: provided sigma2_noise-spectrum has fewer entries ("<<idx+1<<") than needed ("<<XSIZE(mymodel.sigma2_noise[0])<<"). Set rest to zero..."<<std::endl;
+		}
+
+	    // Use the same spectrum for all optics groups
+		for (int igroup = 0; igroup< mymodel.nr_optics_groups; igroup++)
+        {
+			mymodel.sigma2_noise[igroup] =  mymodel.sigma2_noise[0];
+        }
+	}
+	else if (do_calculate_initial_sigma_noise || do_average_unaligned)
+	{
+		MultidimArray<RFLOAT> Mavg;
+
+		// Calculate initial sigma noise model from power_class spectra of the individual images
+		calculateSumOfPowerSpectraAndAverageImage(Mavg);
+
+		// Set sigma2_noise and Iref from averaged poser spectra and Mavg
+		setSigmaNoiseEstimatesAndSetAverageImage(Mavg);
+	}
+
+}
+
+void MlOptimiser::initialiseGeneral2(bool do_ini_data_vs_prior)
+{
+
+	// Check minimum group size of 10 particles
+	if (verb > 0)
+	{
+		for (int igroup = 0; igroup< mymodel.nr_optics_groups; igroup++)
+		{
+			if (mymodel.nr_particles_per_optics_group[igroup] < 10)
+			{
+				std:: cout << "WARNING: There are only " << mymodel.nr_particles_per_optics_group[igroup] << " particles in optics group " << igroup + 1 << std::endl;
+			}
+		}
+	}
 
 	if (do_som)
 	{
@@ -2269,6 +2269,14 @@ void MlOptimiser::initialiseGeneralFinalize(int rank)
 		subset_size = -1;
 		mu = 0.;
 	}
+
+	// First low-pass filter the initial references
+	if (iter == 0) initialLowPassFilterReferences();
+
+	// Initialise the data_versus_prior ratio to get the initial current_size right
+	if (iter == 0 && !do_initialise_bodies && do_ini_data_vs_prior)
+		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
+
 }
 
 void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT> &Mavg, bool myverb)
