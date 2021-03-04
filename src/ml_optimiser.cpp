@@ -1486,7 +1486,8 @@ void MlOptimiser::initialise()
 
 	// Write out initial mymodel
 	write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
-
+	
+	initialiseGeneralFinalize();
 
 #ifdef DEBUG
     std::cerr<<"MlOptimiser::initialise Done"<<std::endl;
@@ -2122,8 +2123,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 	// Write out unmasked 2D class averages
 	do_write_unmasked_refs = (mymodel.ref_dim == 2 && !gradient_refine);
-
-	initialiseGeneralFinalize();
 
 #ifdef DEBUG
 	std::cerr << "Leaving initialiseGeneral" << std::endl;
