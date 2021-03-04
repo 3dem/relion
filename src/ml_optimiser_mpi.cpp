@@ -550,6 +550,8 @@ will still yield good performance and possibly a more stable execution. \n" << s
 
 	//std::cout << " Hello world! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
 
+	initialiseGeneralFinalize();
+
 	// Only leader writes out initial mymodel (do not gather metadata yet)
 	int my_nr_subsets = (do_split_random_halves) ? 2 : 1;
 	if (node->isLeader())
@@ -580,7 +582,6 @@ will still yield good performance and possibly a more stable execution. \n" << s
 	}
 
 
-	initialiseGeneralFinalize();
 
 #ifdef DEBUG
     std::cerr<<"MlOptimiserMpi::initialise Done"<<std::endl;

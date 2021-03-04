@@ -1484,10 +1484,10 @@ void MlOptimiser::initialise()
 		}
 	}
 
+	initialiseGeneralFinalize();
+
 	// Write out initial mymodel
 	write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
-	
-	initialiseGeneralFinalize();
 
 #ifdef DEBUG
     std::cerr<<"MlOptimiser::initialise Done"<<std::endl;
