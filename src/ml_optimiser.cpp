@@ -2380,18 +2380,18 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			}
 
 			// May24,2015 - Shaoda & Sjors, Helical refinement
-			RFLOAT psi_deg = 0., tilt_deg = 0.;
+			RFLOAT psi_prior = 0., tilt_prior = 0.;
 			bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
 			if (is_helical_segment)
 			{
-				if (!MDimg.getValue(EMDL_ORIENT_PSI_PRIOR, psi_deg))
+				if (!MDimg.getValue(EMDL_ORIENT_PSI_PRIOR, psi_prior))
 				{
-					if (!MDimg.getValue(EMDL_ORIENT_PSI, psi_deg))
+					if (!MDimg.getValue(EMDL_ORIENT_PSI, psi_prior))
 						REPORT_ERROR("ml_optimiser.cpp::calculateSumOfPowerSpectraAndAverageImage: Psi priors of helical segments are missing!");
 				}
-				if (!MDimg.getValue(EMDL_ORIENT_TILT_PRIOR, tilt_deg))
+				if (!MDimg.getValue(EMDL_ORIENT_TILT_PRIOR, tilt_prior))
 				{
-					if (!MDimg.getValue(EMDL_ORIENT_TILT, tilt_deg))
+					if (!MDimg.getValue(EMDL_ORIENT_TILT, tilt_prior))
 						REPORT_ERROR("ml_optimiser.cpp::calculateSumOfPowerSpectraAndAverageImage: Tilt priors of helical segments are missing!");
 				}
 			}
@@ -2403,7 +2403,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				RFLOAT sum, sum2, sphere_radius_pix, cyl_radius_pix;
 				cyl_radius_pix = helical_tube_outer_diameter / (2. * my_pixel_size);
 				sphere_radius_pix = particle_diameter / (2. * my_pixel_size);
-				calculateBackgroundAvgStddev(img, sum, sum2, (int)(ROUND(sphere_radius_pix)), is_helical_segment, cyl_radius_pix, tilt_deg, psi_deg);
+				calculateBackgroundAvgStddev(img, sum, sum2, (int)(ROUND(sphere_radius_pix)), is_helical_segment, cyl_radius_pix, tilt_prior, psi_prior);
 
 				// Average should be close to zero, i.e. max +/-50% of stddev...
 				// Stddev should be close to one, i.e. larger than 0.5 and smaller than 2)
@@ -2411,7 +2411,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				{
 					std::cerr << " fn_img= " << fn_img << " bg_avg= " << sum << " bg_stddev= " << sum2 << std::flush;
 					if (is_helical_segment)
-						std::cerr << " tube_bg_radius= " << cyl_radius_pix << " psi_deg= " << psi_deg << " tilt_deg= " << tilt_deg << " (this is a particle from a helix)" << std::flush;
+						std::cerr << " tube_bg_radius= " << cyl_radius_pix << " psi_deg= " << psi_prior << " tilt_deg= " << tilt_prior << " (this is a particle from a helix)" << std::flush;
 					else
 						std::cerr << " bg_radius= " << sphere_radius_pix << std::flush;
 					std::cerr << std::endl;
@@ -2432,7 +2432,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				// May24,2015 - Shaoda & Sjors, Helical refinement
 				if (is_helical_segment)
 				{
-					softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, (particle_diameter / (2. * my_pixel_size)),
+					softMaskOutsideMapForHelix(img(), psi_prior, tilt_prior, (particle_diameter / (2. * my_pixel_size)),
 							(helical_tube_outer_diameter / (2. * my_pixel_size)), width_mask_edge);
 				}
 				else
@@ -2501,9 +2501,18 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				init_random_generator(random_seed + part_id);
 				// Randomize the initial orientations for initial reference generation at this step....
 				// TODO: this is not an even angular distribution....
-				RFLOAT rot  = (mymodel.ref_dim == 2) ? 0. : rnd_unif() * 360.;
-				RFLOAT tilt = (mymodel.ref_dim == 2) ? 0. : rnd_unif() * 180.;
-				RFLOAT psi  = rnd_unif() * 360.;
+				RFLOAT rot, tilt, psi;
+				rot  = (mymodel.ref_dim == 2) ? 0. : rnd_unif() * 360.;
+				if (is_helical_segment)
+				{
+					tilt = (mymodel.ref_dim == 2) ? 0. : tilt_prior;
+					psi = psi_prior;
+				}
+				else
+				{
+					tilt = (mymodel.ref_dim == 2) ? 0. : rnd_unif() * 180.;
+					psi  = rnd_unif() * 360.;
+				}
 				int iclass  = rnd_unif() * mymodel.nr_classes;
 				if (iclass == mymodel.nr_classes) iclass = mymodel.nr_classes - 1;
 				if (iclass >= mymodel.nr_classes)
