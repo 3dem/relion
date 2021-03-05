@@ -699,7 +699,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	grad_em_iters = textToInteger(parser.getOption("--grad_em_iters", "Number of iterations at the end of a gradient refinement using Expectation-Maximization", "1"));
 	// Stochastic EM is implemented as a variant of SGD, though it is really a different algorithm!
 
-	grad_ini_frac = textToFloat(parser.getOption("--grad_ini_frac", "Fraction of iterations in the initial phase of refinement", "0.2"));
+	grad_ini_frac = textToFloat(parser.getOption("--grad_ini_frac", "Fraction of iterations in the initial phase of refinement", "0.1"));
 	grad_fin_frac = textToFloat(parser.getOption("--grad_fin_frac", "Fraction of iterations in the final phase of refinement", "0.2"));
 
 	if (grad_ini_frac <= 0 || 1 <= grad_ini_frac)
@@ -1003,7 +1003,7 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 		grad_ini_iter = nr_iter * grad_ini_frac;
 	}
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_FIN_FRAC, grad_fin_frac)) {
-		grad_fin_frac = 0.2;
+		grad_fin_frac = 0.1;
 		grad_ini_iter = nr_iter * grad_fin_frac;
 	}
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_MIN_RESOL, grad_min_resol))
@@ -1414,8 +1414,6 @@ void MlOptimiser::initialise()
 	fftw_plan_with_nthreads(nr_threads);
 #endif
 
-	initialiseGeneralFinalize();
-
 	if (fn_sigma != "")
 	{
 		// Read in sigma_noise spetrum from file DEVELOPMENTAL!!! FOR DEBUGGING ONLY....
@@ -1459,9 +1457,7 @@ void MlOptimiser::initialise()
 		setSigmaNoiseEstimatesAndSetAverageImage(Mavg);
 	}
 
-	// First low-pass filter the initial references
-	if (iter == 0)
-		initialLowPassFilterReferences();
+	initialiseGeneralFinalize();
 
 	// Initialise the data_versus_prior ratio to get the initial current_size right
 	if (iter == 0 && !do_initialise_bodies)
@@ -2124,6 +2120,38 @@ void MlOptimiser::initialiseGeneral(int rank)
 	// Write out unmasked 2D class averages
 	do_write_unmasked_refs = (mymodel.ref_dim == 2 && !gradient_refine);
 
+	if (gradient_refine)
+	{
+		if (do_auto_refine) {
+			auto_resolution_based_angles = true;
+			auto_ignore_angle_changes = true;
+		}
+
+		// for continuation jobs (iter>0): could do some more iterations as specified by nr_iter
+		nr_iter = grad_ini_iter + grad_fin_iter + grad_inbetween_iter;
+		updateStepSize();
+
+		// determine default subset sizes
+		if (grad_ini_subset_size == -1 || grad_fin_subset_size == -1) {
+			if (grad_ini_subset_size != -1 || grad_fin_subset_size != -1)
+				std::cout << " WARNING: Since both --grad_ini_subset and --grad_fin_subset were not set, " <<
+				          "both will instead be determined automatically." << std::endl;
+
+			unsigned long dataset_size = mydata.numberOfParticles();
+			grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.001, 500), 200);
+			grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.05,  50000), 1000);
+			if (rank==0) {
+				std::cout << " Initial subset size set to " << grad_ini_subset_size << std::endl;
+				std::cout << " Final subset size set to " << grad_fin_subset_size << std::endl;
+			}
+		}
+	}
+	else
+	{
+		subset_size = -1;
+		mu = 0.;
+	}
+
 #ifdef DEBUG
 	std::cerr << "Leaving initialiseGeneral" << std::endl;
 #endif
@@ -2204,50 +2232,22 @@ void MlOptimiser::initialiseGeneralFinalize(int rank) {
 					SomGraph::make_blobs_2d(
 							blobs_pos, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
 					SomGraph::make_blobs_2d(
-							blobs_neg, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
+							blobs_neg, mymodel.Iref[i], 20, particle_diameter / mymodel.pixel_size);
 				}
 				else {
 					SomGraph::make_blobs_3d(
 							blobs_pos, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
 					SomGraph::make_blobs_3d(
-							blobs_neg, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
+							blobs_neg, mymodel.Iref[i], 20, particle_diameter / mymodel.pixel_size);
 				}
-				mymodel.Iref[i] = blobs_pos/40 * 0.6 - blobs_neg/40 * 0.4;
+				mymodel.Iref[i] = (blobs_pos - blobs_neg * 0.5) / 5.; // Dampen large peaks a bit
 			}
 		}
 	}
 
-	if (gradient_refine)
-	{
-		if (do_auto_refine) {
-			auto_resolution_based_angles = true;
-			auto_ignore_angle_changes = true;
-		}
-
-		// for continuation jobs (iter>0): could do some more iterations as specified by nr_iter
-		nr_iter = grad_ini_iter + grad_fin_iter + grad_inbetween_iter;
-		updateStepSize();
-
-		// determine default subset sizes
-		if (grad_ini_subset_size == -1 || grad_fin_subset_size == -1) {
-			if (grad_ini_subset_size != -1 || grad_fin_subset_size != -1)
-				std::cout << " WARNING: Since both --grad_ini_subset and --grad_fin_subset were not set, " <<
-				          "both will instead be determined automatically." << std::endl;
-
-			unsigned long dataset_size = mydata.numberOfParticles();
-			grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.001, 500), 200);
-			grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.05,  50000), 1000);
-			if (rank==0) {
-				std::cout << " Initial subset size set to " << grad_ini_subset_size << std::endl;
-				std::cout << " Final subset size set to " << grad_fin_subset_size << std::endl;
-			}
-		}
-	}
-	else
-	{
-		subset_size = -1;
-		mu = 0.;
-	}
+	// Low-pass filter the initial references
+	if (iter == 0)
+		initialLowPassFilterReferences();
 }
 
 void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT> &Mavg, bool myverb)
@@ -4389,8 +4389,8 @@ void MlOptimiser::maximization()
 	if (verb > 0)
 		progress_bar(mymodel.nr_classes);
 
-	if (skip_class >= 0)
-		std::cerr << " Class " << skip_class << " replaced due to inactivity." << std::endl;
+//	if (skip_class >= 0)
+//		std::cerr << " Class " << skip_class << " replaced due to inactivity." << std::endl;
 }
 
 void MlOptimiser::centerClasses()

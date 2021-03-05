@@ -478,8 +478,6 @@ will still yield good performance and possibly a more stable execution. \n" << s
 	MlOptimiser::initialiseGeneral(node->rank);
 
 	initialiseWorkLoad();
-	
-	initialiseGeneralFinalize();
 
 #ifdef ALTCPU
 	// Don't start threading until after most I/O is over
@@ -543,8 +541,7 @@ will still yield good performance and possibly a more stable execution. \n" << s
 		//std::cout << " Hello world3! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
 	}
 
-
-	MlOptimiser::initialLowPassFilterReferences();
+	initialiseGeneralFinalize();
 
 	// Initialise the data_versus_prior ratio to get the initial current_size right
 	if (iter == 0 && !do_initialise_bodies && !node->isLeader())
