@@ -732,7 +732,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 			"Gradient step size updates scheme. Valid values are plain, <a>-2step or <a>-3step-<b>. Where <a> is the initial inflate and <b> is the final deflate factor.","");
 
 	write_every_grad_iter = textToInteger(parser.getOption("--grad_write_iter", "Write out model every so many iterations in SGD (default is writing out all iters)", "10"));
-	do_init_blobs = !parser.checkOption("--no_init_blobs", "Use this to switch off initializing models with random Gaussians.");
+	do_init_blobs = !parser.checkOption("--no_init_blobs", "Use this to switch off initializing models with random Gaussians (which is new in relion-4.0).");
 	do_som = parser.checkOption("--som", "Calculate self-organizing map instead of classification.");
 	som_starting_nodes = textToInteger(parser.getOption("--som_ini_nodes", "Number of initial SOM nodes.", "2"));
 	som_connectivity = textToFloat(parser.getOption("--som_connectivity", "Number of average active neighbour connections.", "5.0"));
@@ -829,6 +829,7 @@ if(do_gpu)
 	auto_resolution_based_angles= parser.checkOption("--auto_resol_angles", "In auto-refinement, update angular sampling based on resolution-based required sampling. This makes convergence faster.");
 	allow_coarser_samplings = parser.checkOption("--allow_coarser_sampling", "In 2D/3D classification, allow coarser angular and translational samplings if accuracies are bad (typically in earlier iterations.");
 	do_trust_ref_size = parser.checkOption("--trust_ref_size", "Trust the pixel and box size of the input reference; by default the program will die if these are different from the first optics group of the data");
+	minimum_nr_particles_sigma2_noise = textToInteger(parser.getOption("--nr_parts_sigma2noise", "Number of particles (per optics group) for initial noise spectra estimation.", "1000"));
 	///////////////// Special stuff for first iteration (only accessible via CL, not through readSTAR ////////////////////
 
 	// When reading from the CL: always start at iteration 1 and subset 1
@@ -2285,8 +2286,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 
 	// As pre relion-4.0, this is only done per optics group, and only for 1000 particles per optics group.
 	// It is therefore no longer done in parallel over MPI
-	int MIN_NR_PARTS_PER_OPTICS_GROUP = 1000;
-	int total_nr_particles_todo = MIN_NR_PARTS_PER_OPTICS_GROUP * mymodel.nr_optics_groups;
+	int total_nr_particles_todo = minimum_nr_particles_sigma2_noise * mymodel.nr_optics_groups;
 	int barstep;
 
 	if (myverb > 0)
@@ -2341,7 +2341,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 		{
 			long int optics_group = mydata.getOpticsGroup(part_id, img_id);
 
-			if (nr_particles_done_per_optics_group[optics_group] >= MIN_NR_PARTS_PER_OPTICS_GROUP)
+			if (nr_particles_done_per_optics_group[optics_group] >= minimum_nr_particles_sigma2_noise)
 			{
 				continue;
 			}
@@ -2559,12 +2559,12 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			}
 
 			// If we now reach a full optics_group, check whether all optics groups are full, and if so, exit)
-			if (nr_particles_done_per_optics_group[optics_group] >= MIN_NR_PARTS_PER_OPTICS_GROUP)
+			if (nr_particles_done_per_optics_group[optics_group] >= minimum_nr_particles_sigma2_noise)
 			{
 				is_done_all_optics_groups = true;
 				for (int i = 0; i < nr_particles_done_per_optics_group.size(); i++)
 				{
-					if (nr_particles_done_per_optics_group[optics_group] < MIN_NR_PARTS_PER_OPTICS_GROUP) is_done_all_optics_groups = false;
+					if (nr_particles_done_per_optics_group[optics_group] < minimum_nr_particles_sigma2_noise) is_done_all_optics_groups = false;
 				}
 			}
 

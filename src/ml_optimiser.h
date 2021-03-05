@@ -683,6 +683,9 @@ public:
 	// Trust box size and angpix for the input reference
 	bool do_trust_ref_size;
 
+	// Number of particles for initial sigma2_noise estimation per optics group
+	int minimum_nr_particles_sigma2_noise;
+
 #ifdef TIMING
 	Timer timer;
 	int TIMING_DIFF_PROJ, TIMING_DIFF_SHIFT, TIMING_DIFF_DIFF2;
@@ -850,7 +853,8 @@ public:
 		mdlClassComplex(NULL),
 #endif
 		failsafe_threshold(40),
-		do_trust_ref_size(0)
+		do_trust_ref_size(0),
+		minimum_nr_particles_sigma2_noise(1000)
 	{
 #ifdef ALTCPU
 		tbbCpuOptimiser = CpuOptimiserType((void*)NULL);
