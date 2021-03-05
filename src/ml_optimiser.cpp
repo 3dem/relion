@@ -2226,7 +2226,7 @@ void MlOptimiser::initialiseGeneralFinalize(int rank) {
 		}
 	}
 
-	if (do_init_blobs) {
+	if (do_init_blobs && fn_ref == "None ") {
 		for (unsigned i = 0; i < mymodel.nr_classes; i ++) {
 			if (mymodel.pdf_class[i] > 0.) {
 				MultidimArray<RFLOAT> blobs_pos(mymodel.Iref[i]), blobs_neg(mymodel.Iref[i]);
