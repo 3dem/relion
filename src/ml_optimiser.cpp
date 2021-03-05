@@ -701,7 +701,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	grad_em_iters = textToInteger(parser.getOption("--grad_em_iters", "Number of iterations at the end of a gradient refinement using Expectation-Maximization", "1"));
 	// Stochastic EM is implemented as a variant of SGD, though it is really a different algorithm!
 
-	grad_ini_frac = textToFloat(parser.getOption("--grad_ini_frac", "Fraction of iterations in the initial phase of refinement", "0.2"));
+	grad_ini_frac = textToFloat(parser.getOption("--grad_ini_frac", "Fraction of iterations in the initial phase of refinement", "0.1"));
 	grad_fin_frac = textToFloat(parser.getOption("--grad_fin_frac", "Fraction of iterations in the final phase of refinement", "0.2"));
 
 	if (grad_ini_frac <= 0 || 1 <= grad_ini_frac)
@@ -1005,7 +1005,7 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 		grad_ini_iter = nr_iter * grad_ini_frac;
 	}
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_FIN_FRAC, grad_fin_frac)) {
-		grad_fin_frac = 0.2;
+		grad_fin_frac = 0.1;
 		grad_ini_iter = nr_iter * grad_fin_frac;
 	}
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_MIN_RESOL, grad_min_resol))
@@ -2066,10 +2066,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 	mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
 	mydata.getNumberOfImagesPerOpticsGroup(mymodel.nr_particles_per_optics_group);
 
-
 	initialiseGeneral2();
-
-
 
 #ifdef DEBUG
 	std::cerr << "Leaving initialiseGeneral" << std::endl;
@@ -2230,7 +2227,7 @@ void MlOptimiser::initialiseGeneral2(bool do_ini_data_vs_prior)
 					SomGraph::make_blobs_3d(
 							blobs_neg, Iavg, 40, particle_diameter / mymodel.pixel_size);
 				}
-				mymodel.Iref[i] = blobs_pos/40 * 0.6 - blobs_neg/40 * 0.4;
+				mymodel.Iref[i] = (blobs_pos - blobs_neg * 0.5) / 5.; // Dampen large peaks a bit
 			}
 		}
 	}
@@ -4428,8 +4425,8 @@ void MlOptimiser::maximization()
 	if (verb > 0)
 		progress_bar(mymodel.nr_classes);
 
-	if (skip_class >= 0)
-		std::cerr << " Class " << skip_class << " replaced due to inactivity." << std::endl;
+//	if (skip_class >= 0)
+//		std::cerr << " Class " << skip_class << " replaced due to inactivity." << std::endl;
 }
 
 void MlOptimiser::centerClasses()
