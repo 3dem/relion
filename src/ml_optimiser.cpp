@@ -2797,6 +2797,7 @@ void MlOptimiser::iterate()
 			do_grad_next_iter = !(has_converged || iter_next > nr_iter - grad_em_iters) &&
 			                    !(do_firstiter_cc && iter_next == 1) &&
 			                    !grad_has_converged;
+			do_skip_maximization = do_grad && iter == nr_iter && mymodel.nr_classes > 1;
 		}
 
 		if(do_som) {
@@ -2866,8 +2867,10 @@ void MlOptimiser::iterate()
 
 		if (do_skip_maximization)
 		{
-			// Only write data.star file and break from the iteration loop
-			write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, 0);
+			if (do_grad)
+				write(DO_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
+			else // Only write data.star file and break from the iteration loop
+				write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, 0);
 			break;
 		}
 
