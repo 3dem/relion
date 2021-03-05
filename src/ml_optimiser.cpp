@@ -2065,7 +2065,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 	// Set the number of particles per group and per optics_group
 	mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
-	mydata.getNumberOfImagesPerOpticsGroup(mymodel.nr_particles_per_optics_group);
 
 	initialiseGeneral2();
 
@@ -2155,18 +2154,6 @@ void MlOptimiser::initialiseSigma2Noise()
 void MlOptimiser::initialiseGeneral2(bool do_ini_data_vs_prior)
 {
 
-	// Check minimum group size of 10 particles
-	if (verb > 0)
-	{
-		for (int igroup = 0; igroup< mymodel.nr_optics_groups; igroup++)
-		{
-			if (mymodel.nr_particles_per_optics_group[igroup] < 10)
-			{
-				std:: cout << "WARNING: There are only " << mymodel.nr_particles_per_optics_group[igroup] << " particles in optics group " << igroup + 1 << std::endl;
-			}
-		}
-	}
-
 	if (do_som)
 	{
 		mymodel.som.set_max_node_count(mymodel.nr_classes);
@@ -2196,7 +2183,7 @@ void MlOptimiser::initialiseGeneral2(bool do_ini_data_vs_prior)
 		}
 	}
 
-	if (do_init_blobs)
+	if (do_init_blobs && fn_ref == "None ")
 	{
 
 		// Sjors 04032021: insert average of all classes into make_blobs functions,

@@ -54,7 +54,6 @@ void MlModel::initialise(bool _do_grad)
 	group_names.resize(nr_groups, "");
 	sigma2_noise.resize(nr_optics_groups);
 	nr_particles_per_group.resize(nr_groups);
-	nr_particles_per_optics_group.resize(nr_optics_groups);
 	tau2_class.resize(nr_classes * nr_bodies, aux);
 	fsc_halves_class.resize(nr_classes * nr_bodies, aux);
 	sigma2_class.resize(nr_classes * nr_bodies, aux);
@@ -314,32 +313,6 @@ void MlModel::read(FileName fn_in, int nr_optics_groups_from_mydata)
 		nr_particles += nr_particles_per_group[igroup - 1];
 	}
 
-	// Get the number of particles per optics group
-	if (is_pre4)
-	{
-		// Pre relion-4.0 the sigma2_noise spectra and number of particles were stored per (micrograph) group, not per optics group.
-		// Just set nr_particles_per_optics_group to the total number of particles divided by nr_optics_groups
-		for (int igroup = 0; igroup < nr_optics_groups; igroup++)
-		{
-			nr_particles_per_optics_group[igroup] = ROUND((float)nr_particles/(float)nr_optics_groups);
-		}
-	}
-	else
-	{
-		// Read optics group stuff
-		MDopticsgroup.readStar(in, "model_optics_groups");
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDopticsgroup)
-		{
-			if (!MDopticsgroup.getValue(EMDL_MLMODEL_OPTICS_GROUP_NO, igroup))
-			{
-				REPORT_ERROR("MlModel::readStar: incorrect model_optics_groups table");
-			}
-			//Start counting of groups at 1, not at 0....
-			if (!MDopticsgroup.getValue(EMDL_MLMODEL_OPTICS_GROUP_NR_PARTICLES, nr_particles_per_optics_group[igroup - 1]))
-				REPORT_ERROR("MlModel::readStar: incorrect model_optics_groups table");
-		}
-	}
-
 	// Read SSNR, noise reduction, tau2_class spectra for each class
 	for (int iclass = 0; iclass < nr_classes_bodies; iclass++)
 	{
@@ -369,33 +342,33 @@ void MlModel::read(FileName fn_in, int nr_optics_groups_from_mydata)
 		// Allow sigma2_noise with different sizes!
 		sigma2_noise[igroup].resize(ori_size/2 + 1);
 
-		if (nr_particles_per_optics_group[igroup] > 0)
+		if (is_pre4)
 		{
-			if (is_pre4)
-			{
-				// If this is a pre-relion-4.0 model.star file, then just read the first sigma2_noise spectrum into all optics_groups
-				MDsigma.readStar(in, "model_group_1");
-			}
-			else
-			{
-				MDsigma.readStar(in, "model_optics_group_" + integerToString(igroup + 1));
-			}
-			int idx;
-			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsigma)
-			{
-				if (!MDsigma.getValue(EMDL_SPECTRAL_IDX, idx))
-					REPORT_ERROR("MlModel::readStar: incorrect table model_group_" + integerToString(igroup + 1));
-				if (!MDsigma.getValue(EMDL_MLMODEL_SIGMA2_NOISE, sigma2_noise[igroup](idx)))
-					REPORT_ERROR("MlModel::readStar: incorrect table model_group_" + integerToString(igroup + 1));
-			}
+			// If this is a pre-relion-4.0 model.star file, then just read the first sigma2_noise spectrum into all optics_groups
+			MDsigma.readStar(in, "model_group_1");
 		}
 		else
+		{
+			MDsigma.readStar(in, "model_optics_group_" + integerToString(igroup + 1));
+		}
+		int idx;
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsigma)
+		{
+			if (!MDsigma.getValue(EMDL_SPECTRAL_IDX, idx))
+				REPORT_ERROR("MlModel::readStar: incorrect table model_group_" + integerToString(igroup + 1));
+			if (!MDsigma.getValue(EMDL_MLMODEL_SIGMA2_NOISE, sigma2_noise[igroup](idx)))
+				REPORT_ERROR("MlModel::readStar: incorrect table model_group_" + integerToString(igroup + 1));
+		}
+
+		// For empty optics groups (not so likely, but who knows...)
+		if (MDsigma.numberOfObjects() == 0)
 		{
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sigma2_noise[igroup])
 			{
 				DIRECT_MULTIDIM_ELEM(sigma2_noise[igroup], n) = 0.;
 			}
 		}
+
 	}
 
 	// Read pdf_direction models for each class
@@ -736,38 +709,24 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 	}
 	MDgroup.write(fh);
 
-	// Write scale-correction for all groups
-	MDopticsgroup.setName("model_optics_groups");
-	for (long int igroup = 0; igroup < nr_optics_groups; igroup++)
-	{
-		MDopticsgroup.addObject();
-		//Start counting of groups at 1, not at 0....
-		MDopticsgroup.setValue(EMDL_MLMODEL_OPTICS_GROUP_NO, igroup+1);
-		MDopticsgroup.setValue(EMDL_MLMODEL_OPTICS_GROUP_NR_PARTICLES, nr_particles_per_optics_group[igroup]);
-	}
-	MDopticsgroup.write(fh);
-
 	// Write sigma models for each optics group
 	for (int igroup = 0; igroup < nr_optics_groups; igroup++)
 	{
-		if (nr_particles_per_optics_group[igroup] > 0)
+		MDsigma.clear();
+		MDsigma.setName("model_optics_group_"+integerToString(igroup+1));
+		for (int ii = 0; ii < XSIZE(sigma2_noise[igroup]); ii++)
 		{
-			MDsigma.clear();
-			MDsigma.setName("model_optics_group_"+integerToString(igroup+1));
-			for (int ii = 0; ii < XSIZE(sigma2_noise[igroup]); ii++)
+			MDsigma.addObject();
+			// Some points in sigma2_noise arrays are never used...
+			aux = sigma2_noise[igroup](ii);
+			if (aux > 0.)
 			{
-				MDsigma.addObject();
-				// Some points in sigma2_noise arrays are never used...
-				aux = sigma2_noise[igroup](ii);
-				if (aux > 0.)
-				{
-					MDsigma.setValue(EMDL_SPECTRAL_IDX, ii);
-					MDsigma.setValue(EMDL_RESOLUTION, getResolution(ii));
-					MDsigma.setValue(EMDL_MLMODEL_SIGMA2_NOISE, aux);
-				}
+				MDsigma.setValue(EMDL_SPECTRAL_IDX, ii);
+				MDsigma.setValue(EMDL_RESOLUTION, getResolution(ii));
+				MDsigma.setValue(EMDL_MLMODEL_SIGMA2_NOISE, aux);
 			}
-			MDsigma.write(fh);
 		}
+		MDsigma.write(fh);
 	}
 
 	// Write pdf_direction models for each class
@@ -1445,22 +1404,14 @@ void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads, 
 void MlModel::initialiseDataVersusPrior(bool fix_tau)
 {
 
-	// Get total number of particles
-	RFLOAT nr_particles = 0.;
-	for (int igroup = 0; igroup < nr_particles_per_optics_group.size(); igroup++)
-	{
-		nr_particles += (RFLOAT)nr_particles_per_optics_group[igroup];
-	}
-
-	// Calculate average sigma2_noise over all optics groups
+	// Calculate straightforward (i.e. don't weight by number of particles) average sigma2_noise over all optics groups
 	MultidimArray<RFLOAT> avg_sigma2_noise, sum_parts;
 	avg_sigma2_noise.initZeros(ori_size /2 + 1);
 	sum_parts.initZeros(ori_size /2 + 1);
-	for (int igroup = 0; igroup < nr_particles_per_optics_group.size(); igroup++)
-	{
-		avg_sigma2_noise += (RFLOAT)(nr_particles_per_optics_group[igroup]) * sigma2_noise[igroup];
+	for (int igroup = 0; igroup < sigma2_noise.size(); igroup++)	{
+		avg_sigma2_noise += sigma2_noise[igroup];
 	}
-	avg_sigma2_noise /= nr_particles;
+	avg_sigma2_noise /= (float)sigma2_noise.size();
 
 	// Get the FT of all reference structures
 	// The Fourier Transforms are all "normalised" for 2D transforms of size = ori_size x ori_size
@@ -1495,6 +1446,12 @@ void MlModel::initialiseDataVersusPrior(bool fix_tau)
 		if (nr_bodies > 1)
 		{
 			fsc_halves_class[iclass].initZeros(ori_size /2 + 1);
+		}
+
+		long long int nr_particles = 0;
+		for (long int igroup = 0; igroup < nr_particles_per_group.size(); igroup++)
+		{
+			nr_particles += nr_particles_per_group[igroup];
 		}
 
 		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(tau2_class[iclass])
