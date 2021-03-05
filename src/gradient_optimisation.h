@@ -387,7 +387,7 @@ public:
 	template<typename T>
 	static void make_blobs_2d(MultidimArray<T> &box, MultidimArray<T> &amp_box, unsigned nr_blobs, T diameter)
 	{
-		std::vector<T> blobs_x(nr_blobs), blobs_y(nr_blobs), blobs_amp(nr_blobs);
+		std::vector<T> blobs_x(nr_blobs), blobs_y(nr_blobs), blobs_amp(nr_blobs, 0);
 		box.resize(amp_box);
 		box.initZeros();
 
@@ -411,7 +411,9 @@ public:
 					count ++;
 				}
 			if (count > 0)
-				blobs_amp[i] = XMIPP_MAX(avg / count, 0.5);
+				blobs_amp[i] = avg / count;
+			blobs_amp[i] = XMIPP_MAX(blobs_amp[i], 0.5);
+
 		}
 
 		T sigma_inv = 10./diameter;
@@ -455,7 +457,8 @@ public:
 						count ++;
 					}
 			if (count > 0)
-				blobs_amp[i] = XMIPP_MAX(avg / count, 0.5);
+				blobs_amp[i] = avg / count;
+			blobs_amp[i] = XMIPP_MAX(blobs_amp[i], 0.5);
 		}
 
 		T span = diameter/3.;
