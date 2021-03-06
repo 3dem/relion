@@ -360,7 +360,7 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 				p = (unsigned char)(chunk & 127); // 127 = 01111111
 				bit_pos += 7; // TODO: we can remove this for further speed.
 				n_pix += p;
-				if (n_pix == EER_IMAGE_PIXELS) break;
+				if (n_pix >= EER_IMAGE_PIXELS) break;
 				if (p == 127) continue; // this should be rare.
 				
 				s = (unsigned char)((chunk >> 7) & 15) ^ 0x0A; // 15 = 00001111; See below for 0x0A
@@ -373,7 +373,7 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 				p = (unsigned char)((chunk >> 11) & 127); // 127 = 01111111
 				bit_pos += 7;
 				n_pix += p;
-				if (n_pix == EER_IMAGE_PIXELS) break;
+				if (n_pix >= EER_IMAGE_PIXELS) break;
 				if (p == 127) continue;
 				
 				s = (unsigned char)((chunk >> 18) & 15) ^ 0x0A; // 15 = 00001111; See below for 0x0A
@@ -404,7 +404,7 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 
 				// Note the order. Add p before checking the size and placing a new electron.
 				n_pix += p1;
-				if (n_pix == EER_IMAGE_PIXELS) break;
+				if (n_pix >= EER_IMAGE_PIXELS) break;
 				if (p1 < 255)
 				{
 					positions[n_electron] = n_pix;
@@ -414,7 +414,7 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 				}
 
 				n_pix += p2;
-				if (n_pix == EER_IMAGE_PIXELS) break;
+				if (n_pix >= EER_IMAGE_PIXELS) break;
 				if (p2 < 255)
 				{
 					positions[n_electron] = n_pix;
@@ -430,7 +430,10 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 		}
 
 		if (n_pix != EER_IMAGE_PIXELS)
-			REPORT_ERROR("Number of pixels is not right.");
+		{
+			std::cerr << "WARNING: The number of pixels is not right in " + fn_movie + " frame " + integerToString(iframe + 1) + ". Probably this frame is corrupted. This frame is skipped." << std::endl;
+			continue;
+		}
 
 		RCTOC(TIMING_UNPACK_RLE);
 
