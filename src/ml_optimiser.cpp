@@ -2226,23 +2226,31 @@ void MlOptimiser::initialiseGeneralFinalize(int rank) {
 		}
 	}
 
-	if (do_init_blobs && fn_ref == "None ") {
+	if (do_init_blobs && fn_ref == "None") {
+
+		bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
+		RFLOAT diameter = particle_diameter / mymodel.pixel_size;
 		for (unsigned i = 0; i < mymodel.nr_classes; i ++) {
 			if (mymodel.pdf_class[i] > 0.) {
 				MultidimArray<RFLOAT> blobs_pos(mymodel.Iref[i]), blobs_neg(mymodel.Iref[i]);
 				if (mymodel.ref_dim == 2) {
 					SomGraph::make_blobs_2d(
-							blobs_pos, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
+							blobs_pos, mymodel.Iref[i], 40,
+							diameter, is_helical_segment);
 					SomGraph::make_blobs_2d(
-							blobs_neg, mymodel.Iref[i], 20, particle_diameter / mymodel.pixel_size);
+							blobs_neg, mymodel.Iref[i], 20,
+							diameter, is_helical_segment);
 				}
 				else {
 					SomGraph::make_blobs_3d(
-							blobs_pos, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
+							blobs_pos, mymodel.Iref[i], 40,
+							diameter, is_helical_segment);
 					SomGraph::make_blobs_3d(
-							blobs_neg, mymodel.Iref[i], 20, particle_diameter / mymodel.pixel_size);
+							blobs_neg, mymodel.Iref[i], 20,
+							diameter, is_helical_segment);
 				}
 				mymodel.Iref[i] = (blobs_pos - blobs_neg * 0.5) / 5.; // Dampen large peaks a bit
+				softMaskOutsideMap(mymodel.Iref[i], diameter/2., (RFLOAT)width_mask_edge);
 			}
 		}
 	}
