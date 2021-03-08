@@ -2299,7 +2299,6 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 	long int dump;
 	FileName fn_open_stack="";
 
-	// Note the loop over the particles (part_id) is MPI-parallelized
 	long nr_particles_done = 0;
 	std::vector<long> nr_particles_done_per_optics_group(mymodel.nr_optics_groups, 0);
 	FileName fn_img, fn_stack;
@@ -2560,10 +2559,9 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				is_done_all_optics_groups = true;
 				for (int i = 0; i < nr_particles_done_per_optics_group.size(); i++)
 				{
-					if (nr_particles_done_per_optics_group[optics_group] < minimum_nr_particles_sigma2_noise) is_done_all_optics_groups = false;
+					if (nr_particles_done_per_optics_group[i] < minimum_nr_particles_sigma2_noise) is_done_all_optics_groups = false;
 				}
 			}
-
 		} // end loop img_id
 
 		if (is_done_all_optics_groups) break;
