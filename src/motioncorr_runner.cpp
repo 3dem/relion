@@ -484,7 +484,7 @@ void MotioncorrRunner::run()
         MCtimer.printTimes(false);
 #endif
 #ifdef TIMING_FFTW
-	MCtimer_fftw.printTimes(false);
+	timer_fftw.printTimes(false);
 #endif
 }
 

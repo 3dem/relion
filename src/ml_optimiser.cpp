@@ -51,7 +51,8 @@
 	#include <atomic>
 	#include <tbb/tbb.h>
 	#include <tbb/parallel_for.h>
-	#include <tbb/task_scheduler_init.h>
+	#define TBB_PREVIEW_GLOBAL_CONTROL 1
+	#include <tbb/global_control.h>
 	#include "src/acc/cpu/cpu_ml_optimiser.h"
 #endif
 
@@ -1300,14 +1301,6 @@ void MlOptimiser::initialise()
 
 	initialiseWorkLoad();
 
-#ifdef ALTCPU
-	// Don't start threading until after most I/O is over
-	if (do_cpu)
-	{
-		// Set the size of the TBB thread pool for the entire run
-		tbbSchedulerInit.initialize(nr_threads);
-	}
-#endif
 #ifdef MKLFFT
 	// Enable multi-threaded FFTW
 	int success = fftw_init_threads();
@@ -3505,6 +3498,8 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
 		// (roughly equivalent to GPU "threads").
 		std::atomic<int> tCount(0);
 
+		// Set the size of the TBB thread pool for these particles
+		tbb::global_control gc(tbb::global_control::max_allowed_parallelism, nr_threads);
 		// process all passed particles in parallel
 		//for(unsigned long i=my_first_part_id; i<=my_last_part_id; i++) {
 		tbb::parallel_for(my_first_part_id, my_last_part_id+1, [&](long int i) {
