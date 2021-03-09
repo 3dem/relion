@@ -25,7 +25,6 @@
 
 #ifdef ALTCPU
 	#include <tbb/enumerable_thread_specific.h>
-	#include <tbb/task_scheduler_init.h>
 	#include <complex>
 #endif
 
@@ -115,7 +114,6 @@ public:
 	typedef tbb::enumerable_thread_specific< void * > CpuOptimiserType;
 
 	CpuOptimiserType   tbbCpuOptimiser;
-	tbb::task_scheduler_init tbbSchedulerInit;
 
 	std::complex<XFLOAT> **mdlClassComplex __attribute__((aligned(64)));
 #endif
@@ -846,7 +844,6 @@ public:
 		grad_has_converged(false),
 		grad_suspended_local_searches_iter(-1),
 #ifdef ALTCPU
-		tbbSchedulerInit(tbb::task_scheduler_init::deferred ),
 		mdlClassComplex(NULL),
 #endif
 		failsafe_threshold(40),
