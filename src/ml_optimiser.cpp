@@ -2198,19 +2198,22 @@ void MlOptimiser::initialiseGeneralFinalize(int rank) {
 			mymodel.som.add_node();
 
 		std::vector<unsigned> nodes = mymodel.som.get_all_nodes();
-		for (unsigned i = 0; i < nodes.size(); i ++) {
+		for (unsigned i = 0; i < nodes.size(); i ++)
+		{
 			mymodel.pdf_class[nodes[i]] = 1./nodes.size();
 			mymodel.som.set_node_activity(nodes[i], 1);
 		}
 
 		// Clear all non-node
-		for (unsigned i = 0; i < mymodel.nr_classes; i ++) {
+		for (unsigned i = 0; i < mymodel.nr_classes; i ++)
+		{
 			bool clear = true;
 			for (unsigned j = 0; j < nodes.size(); j++)
 				if (i == nodes[j])
 					clear = false;
 
-			if (clear) {
+			if (clear)
+			{
 				mymodel.pdf_class[i] = 0.;
 				mymodel.Iref[i] *= 0.;
 				mymodel.Igrad1[i].initZeros();
@@ -2219,38 +2222,39 @@ void MlOptimiser::initialiseGeneralFinalize(int rank) {
 		}
 	}
 
-	if (do_init_blobs && fn_ref == "None") {
-
-		bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
-		RFLOAT diameter = particle_diameter / mymodel.pixel_size;
-		for (unsigned i = 0; i < mymodel.nr_classes; i ++) {
-			if (mymodel.pdf_class[i] > 0.) {
-				MultidimArray<RFLOAT> blobs_pos(mymodel.Iref[i]), blobs_neg(mymodel.Iref[i]);
-				if (mymodel.ref_dim == 2) {
-					SomGraph::make_blobs_2d(
-							blobs_pos, mymodel.Iref[i], 40,
-							diameter, is_helical_segment);
-					SomGraph::make_blobs_2d(
-							blobs_neg, mymodel.Iref[i], 20,
-							diameter, is_helical_segment);
-				}
-				else {
-					SomGraph::make_blobs_3d(
-							blobs_pos, mymodel.Iref[i], 40,
-							diameter, is_helical_segment);
-					SomGraph::make_blobs_3d(
-							blobs_neg, mymodel.Iref[i], 20,
-							diameter, is_helical_segment);
-				}
-				mymodel.Iref[i] = (blobs_pos - blobs_neg * 0.5) / 5.; // Dampen large peaks a bit
-				softMaskOutsideMap(mymodel.Iref[i], diameter/2., (RFLOAT)width_mask_edge);
-			}
-		}
-	}
-
 	// Low-pass filter the initial references
 	if (iter == 0)
 		initialLowPassFilterReferences();
+
+	if (do_init_blobs && fn_ref == "None")
+	{
+		bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
+		RFLOAT diameter = particle_diameter / mymodel.pixel_size;
+		for (unsigned i = 0; i < mymodel.nr_classes; i ++)
+		{
+			if (mymodel.pdf_class[i] > 0.)
+			{
+				MultidimArray<RFLOAT> blobs(mymodel.Iref[i]);
+				if (mymodel.ref_dim == 2)
+				{
+					SomGraph::make_blobs_2d(
+							blobs, mymodel.Iref[i], 40,
+							diameter, is_helical_segment);
+				}
+				else
+					{
+					SomGraph::make_blobs_3d(
+							blobs, mymodel.Iref[i], 40,
+							diameter, is_helical_segment);
+				}
+				mymodel.Iref[i] = blobs / 5.;
+			}
+		}
+
+		initialLowPassFilterReferences();
+		for (unsigned i = 0; i < mymodel.nr_classes; i ++)
+			softMaskOutsideMap(mymodel.Iref[i], diameter/2., (RFLOAT)width_mask_edge);
+	}
 }
 
 void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT> &Mavg, bool myverb)
