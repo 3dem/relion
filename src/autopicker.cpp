@@ -19,6 +19,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/autopicker.h"
+#include <src/jaz/single_particle/new_ft.h>
 
 //#define DEBUG
 //#define DEBUG_HELIX
