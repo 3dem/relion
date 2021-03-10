@@ -479,14 +479,6 @@ will still yield good performance and possibly a more stable execution. \n" << s
 
 	initialiseWorkLoad();
 
-#ifdef ALTCPU
-	// Don't start threading until after most I/O is over
-	if (do_cpu)
-	{
-		// Set the size of the TBB thread pool for the entire run
-		tbbSchedulerInit.initialize(nr_threads);
-	}
-#endif
 #ifdef MKLFFT
 	// Enable multi-threaded FFTW
 	int success = fftw_init_threads();

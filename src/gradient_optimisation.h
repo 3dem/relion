@@ -385,7 +385,7 @@ public:
 	}
 
 	template<typename T>
-	static void make_blobs_2d(MultidimArray<T> &box, MultidimArray<T> &amp_box, unsigned nr_blobs, T diameter)
+	static void make_blobs_2d(MultidimArray<T> &box, MultidimArray<T> &amp_box, unsigned nr_blobs, T diameter, bool helical)
 	{
 		std::vector<T> blobs_x(nr_blobs), blobs_y(nr_blobs), blobs_amp(nr_blobs, 0);
 		box.resize(amp_box);
@@ -394,12 +394,17 @@ public:
 		T v1, v2;
 		for (int i = 0; i < nr_blobs; i ++) {
 			// Generate normal distributed random value
+			if (helical)
+				blobs_x[i] = (T) (rand() % box.xdim);
+			else
+			{
+				v1 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
+				v2 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
+				blobs_x[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter / 4. + box.xdim / 2.;
+			}
 			v1 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
 			v2 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
-			blobs_x[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter/7. + box.xdim/2.;
-			v1 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
-			v2 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
-			blobs_y[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter/7. + box.ydim/2.;
+			blobs_y[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter / 4. + box.ydim / 2.;
 		}
 
 		for (int i = 0; i < nr_blobs; i ++) {
@@ -412,11 +417,10 @@ public:
 				}
 			if (count > 0)
 				blobs_amp[i] = avg / count;
-			blobs_amp[i] = XMIPP_MAX(blobs_amp[i], 0.5);
 
 		}
 
-		T sigma_inv = 10./diameter;
+		T sigma_inv = 8. / diameter;
 		for (int y = 0; y < box.ydim; y ++)
 			for (int x = 0; x < box.xdim; x ++)
 				for (int i = 0; i < nr_blobs; i ++) {
@@ -427,7 +431,7 @@ public:
 	}
 
 	template<typename T>
-	static void make_blobs_3d(MultidimArray<T> &box, MultidimArray<T> &amp_box, unsigned nr_blobs, T diameter)
+	static void make_blobs_3d(MultidimArray<T> &box, MultidimArray<T> &amp_box, unsigned nr_blobs, T diameter, bool helical)
 	{
 		std::vector<T> blobs_x(nr_blobs), blobs_y(nr_blobs), blobs_z(nr_blobs), blobs_amp(nr_blobs);
 		box.resize(amp_box);
@@ -438,13 +442,19 @@ public:
 			// Generate normal distributed random value
 			v1 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
 			v2 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
-			blobs_x[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter/7. + box.xdim/2.;
+			blobs_x[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter / 4. + box.xdim / 2.;
 			v1 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
 			v2 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
-			blobs_y[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter/7. + box.ydim/2.;
-			v1 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
-			v2 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
-			blobs_z[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter/7. + box.zdim/2.;
+			blobs_y[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter / 4. + box.ydim / 2.;
+
+			if (helical)
+				blobs_z[i] = ((T) rand() / (T) RAND_MAX) * box.zdim;
+			else
+			{
+				v1 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
+				v2 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
+				blobs_z[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter / 4. + box.zdim / 2.;
+			}
 		}
 
 		for (int i = 0; i < nr_blobs; i ++) {
@@ -458,11 +468,10 @@ public:
 					}
 			if (count > 0)
 				blobs_amp[i] = avg / count;
-			blobs_amp[i] = XMIPP_MAX(blobs_amp[i], 0.5);
 		}
 
-		T span = diameter/3.;
-		T sigma_inv = 10./diameter;
+		T span = diameter/2.;
+		T sigma_inv = 8./diameter;
 		for (int i = 0; i < nr_blobs; i ++)
 			for (int z = XMIPP_MAX(0, blobs_z[i]-span);
 				z < XMIPP_MIN(box.zdim, blobs_z[i]+span); z ++)

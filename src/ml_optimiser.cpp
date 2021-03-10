@@ -51,7 +51,8 @@
 	#include <atomic>
 	#include <tbb/tbb.h>
 	#include <tbb/parallel_for.h>
-	#include <tbb/task_scheduler_init.h>
+	#define TBB_PREVIEW_GLOBAL_CONTROL 1
+	#include <tbb/global_control.h>
 	#include "src/acc/cpu/cpu_ml_optimiser.h"
 #endif
 
@@ -1395,14 +1396,6 @@ void MlOptimiser::initialise()
 
 	initialiseWorkLoad();
 
-#ifdef ALTCPU
-	// Don't start threading until after most I/O is over
-	if (do_cpu)
-	{
-		// Set the size of the TBB thread pool for the entire run
-		tbbSchedulerInit.initialize(nr_threads);
-	}
-#endif
 #ifdef MKLFFT
 	// Enable multi-threaded FFTW
 	int success = fftw_init_threads();
@@ -2205,19 +2198,22 @@ void MlOptimiser::initialiseGeneralFinalize(int rank) {
 			mymodel.som.add_node();
 
 		std::vector<unsigned> nodes = mymodel.som.get_all_nodes();
-		for (unsigned i = 0; i < nodes.size(); i ++) {
+		for (unsigned i = 0; i < nodes.size(); i ++)
+		{
 			mymodel.pdf_class[nodes[i]] = 1./nodes.size();
 			mymodel.som.set_node_activity(nodes[i], 1);
 		}
 
 		// Clear all non-node
-		for (unsigned i = 0; i < mymodel.nr_classes; i ++) {
+		for (unsigned i = 0; i < mymodel.nr_classes; i ++)
+		{
 			bool clear = true;
 			for (unsigned j = 0; j < nodes.size(); j++)
 				if (i == nodes[j])
 					clear = false;
 
-			if (clear) {
+			if (clear)
+			{
 				mymodel.pdf_class[i] = 0.;
 				mymodel.Iref[i] *= 0.;
 				mymodel.Igrad1[i].initZeros();
@@ -2226,30 +2222,39 @@ void MlOptimiser::initialiseGeneralFinalize(int rank) {
 		}
 	}
 
-	if (do_init_blobs && fn_ref == "None ") {
-		for (unsigned i = 0; i < mymodel.nr_classes; i ++) {
-			if (mymodel.pdf_class[i] > 0.) {
-				MultidimArray<RFLOAT> blobs_pos(mymodel.Iref[i]), blobs_neg(mymodel.Iref[i]);
-				if (mymodel.ref_dim == 2) {
-					SomGraph::make_blobs_2d(
-							blobs_pos, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
-					SomGraph::make_blobs_2d(
-							blobs_neg, mymodel.Iref[i], 20, particle_diameter / mymodel.pixel_size);
-				}
-				else {
-					SomGraph::make_blobs_3d(
-							blobs_pos, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
-					SomGraph::make_blobs_3d(
-							blobs_neg, mymodel.Iref[i], 20, particle_diameter / mymodel.pixel_size);
-				}
-				mymodel.Iref[i] = (blobs_pos - blobs_neg * 0.5) / 5.; // Dampen large peaks a bit
-			}
-		}
-	}
-
 	// Low-pass filter the initial references
 	if (iter == 0)
 		initialLowPassFilterReferences();
+
+	if (do_init_blobs && fn_ref == "None")
+	{
+		bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
+		RFLOAT diameter = particle_diameter / mymodel.pixel_size;
+		for (unsigned i = 0; i < mymodel.nr_classes; i ++)
+		{
+			if (mymodel.pdf_class[i] > 0.)
+			{
+				MultidimArray<RFLOAT> blobs(mymodel.Iref[i]);
+				if (mymodel.ref_dim == 2)
+				{
+					SomGraph::make_blobs_2d(
+							blobs, mymodel.Iref[i], 40,
+							diameter, is_helical_segment);
+				}
+				else
+					{
+					SomGraph::make_blobs_3d(
+							blobs, mymodel.Iref[i], 40,
+							diameter, is_helical_segment);
+				}
+				mymodel.Iref[i] = blobs / 5.;
+			}
+		}
+
+		initialLowPassFilterReferences();
+		for (unsigned i = 0; i < mymodel.nr_classes; i ++)
+			softMaskOutsideMap(mymodel.Iref[i], diameter/2., (RFLOAT)width_mask_edge);
+	}
 }
 
 void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT> &Mavg, bool myverb)
@@ -2797,6 +2802,7 @@ void MlOptimiser::iterate()
 			do_grad_next_iter = !(has_converged || iter_next > nr_iter - grad_em_iters) &&
 			                    !(do_firstiter_cc && iter_next == 1) &&
 			                    !grad_has_converged;
+			do_skip_maximization = do_grad && iter == nr_iter && mymodel.nr_classes > 1;
 		}
 
 		if(do_som) {
@@ -2866,8 +2872,10 @@ void MlOptimiser::iterate()
 
 		if (do_skip_maximization)
 		{
-			// Only write data.star file and break from the iteration loop
-			write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, 0);
+			if (do_grad)
+				write(DO_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
+			else // Only write data.star file and break from the iteration loop
+				write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, 0);
 			break;
 		}
 
@@ -3738,6 +3746,8 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
 		// (roughly equivalent to GPU "threads").
 		std::atomic<int> tCount(0);
 
+		// Set the size of the TBB thread pool for these particles
+		tbb::global_control gc(tbb::global_control::max_allowed_parallelism, nr_threads);
 		// process all passed particles in parallel
 		//for(unsigned long i=my_first_part_id; i<=my_last_part_id; i++) {
 		tbb::parallel_for(my_first_part_id, my_last_part_id+1, [&](long int i) {
