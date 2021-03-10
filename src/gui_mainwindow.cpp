@@ -329,7 +329,6 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 	if (!maingui_do_read_only)
 		menubar->add("File/Remake .Nodes\\/",  FL_ALT+'n', cb_remake_nodesdir, this);
 	menubar->add("File/Display",  FL_ALT+'d', cb_display, this);
-	menubar->add("File/_Overwrite continue",  FL_ALT+'o', cb_toggle_overwrite_continue, this);
 	menubar->add("File/_Show initial screen",  FL_ALT+'z', cb_show_initial_screen, this);
 	if (!maingui_do_read_only)
 		menubar->add("File/_Empty trash",  FL_ALT+'t', cb_empty_trash, this);
@@ -589,6 +588,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 	if (!maingui_do_read_only)
 	{
 		menubar2->add("Job actions/Alias", 0, cb_set_alias, this);
+		menubar2->add("Job actions/Overwrite", 0, cb_toggle_overwrite_continue, this);
 		menubar2->add("Job actions/Abort running", 0, cb_abort, this);
 		menubar2->add("Job actions/Mark as finished", 0, cb_mark_as_finished, this);
 		menubar2->add("Job actions/Mark as failed", 0, cb_mark_as_failed, this);
@@ -1388,16 +1388,29 @@ void GuiMainWindow::cb_toggle_continue_i()
 	{
 		if (do_overwrite_continue)
 		{
+			if (current_job < 0) return;
 			run_button->label("Overwrite!");
+			if (pipeline.processList[current_job].alias != "None")
+			{
+				FileName fn_alias = pipeline.processList[current_job].alias;
+				fn_alias = (fn_alias.afterFirstOf("/")).beforeLastOf("/");
+				alias_current_job->value(fn_alias.c_str());
+			}
+			else
+			{
+				alias_current_job->value("Give_alias_here");
+			}
+			alias_current_job->position(0); //left-centered text in box
+			alias_current_job->activate();
 		}
 		else
 		{
 			run_button->label("Continue!");
+			alias_current_job->deactivate();
 		}
 		run_button->color(GUI_BUTTON_COLOR);
 		run_button->labelfont(FL_ITALIC);
 		run_button->labelsize(13);
-		alias_current_job->deactivate();
 	}
 	else
 	{
@@ -1525,7 +1538,7 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 	}
 
 	// Also set alias from the alias_current_job input
-	if (!(is_main_continue || do_overwrite_continue))
+	if (!is_main_continue)
 	{
 		std::string alias= (std::string)alias_current_job->value();
 		if (alias != "Give_alias_here" && alias != pipeline.processList[current_job].name)
