@@ -25,7 +25,6 @@
 
 #ifdef ALTCPU
 	#include <tbb/enumerable_thread_specific.h>
-	#include <tbb/task_scheduler_init.h>
 	#include <complex>
 #endif
 
@@ -115,7 +114,6 @@ public:
 	typedef tbb::enumerable_thread_specific< void * > CpuOptimiserType;
 
 	CpuOptimiserType   tbbCpuOptimiser;
-	tbb::task_scheduler_init tbbSchedulerInit;
 
 	std::complex<XFLOAT> **mdlClassComplex __attribute__((aligned(64)));
 #endif
@@ -441,7 +439,7 @@ public:
 	// Which GPU devices to use?
 	std::string gpu_ids;
 
-	// Or preread all images into RAM on the master node?
+	// Or preread all images into RAM on the leader node?
 	bool do_preread_images;
 
 	// Place on scratch disk to copy particle stacks temporarily
@@ -846,7 +844,6 @@ public:
 		grad_has_converged(false),
 		grad_suspended_local_searches_iter(-1),
 #ifdef ALTCPU
-		tbbSchedulerInit(tbb::task_scheduler_init::deferred ),
 		mdlClassComplex(NULL),
 #endif
 		failsafe_threshold(40),
@@ -885,11 +882,14 @@ public:
 	// Check the mask is thr ight size
 	void checkMask(FileName &_fn_mask, int solvent_nr, int rank);
 
-	// Some general stuff that is shared between MPI and sequential code
+	// Some general stuff that is shared between MPI and sequential code in the early stages of initialization
 	void initialiseGeneral(int rank = 0);
 
 	// Randomise particle processing order and resize metadata array
 	void initialiseWorkLoad();
+
+	// Some general stuff that is shared between MPI and sequential code in the final stages of initialization
+	void initialiseGeneralFinalize(int rank = 0);
 
 	/* Calculates the sum of all individual power spectra and the average of all images for initial sigma_noise estimation
 	 * The rank is passed so that if one splits the data into random halves one can know which random half to treat
@@ -922,7 +922,7 @@ public:
 	 */
 	void expectation();
 
-	/* Setup expectation step. We divide the heavy steps over mpi-slaves,
+	/* Setup expectation step. We divide the heavy steps over mpi followers,
 	 * so each call needs a list of which to skip heavy setup for. For
 	 * these classes, only some formatting is done. Data is copied
 	 * explicitly later.*/

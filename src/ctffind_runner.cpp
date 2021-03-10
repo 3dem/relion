@@ -93,7 +93,7 @@ void CtffindRunner::usage()
 	parser.writeUsage(std::cout);
 }
 
-void CtffindRunner::initialise(bool is_master)
+void CtffindRunner::initialise(bool is_leader)
 {
 	// Get the CTFFIND executable
 	if (fn_ctffind_exe == "")
@@ -290,14 +290,14 @@ void CtffindRunner::initialise(bool is_master)
 		}
 	}
 
-	if (is_master)
+	if (is_leader)
 	{
 		std::cout << fn_mic_given_all.size() << " micrographs were given but we process only ";
 		std::cout  << do_at_most << " micrographs as specified in --do_at_most." << std::endl;
 	}
 
 	// Make symbolic links of the input micrographs in the output directory because ctffind and gctf write output files alongside the input micropgraph
-	if (is_master)
+	if (is_leader)
 	{
 		char temp [180];
 		char *cwd = getcwd(temp, 180);

@@ -155,7 +155,7 @@ int  readIMAGIC(long int img_select)
     if ( strstr(header->type,"PACK") )
         datatype = UChar;
     else if ( strstr(header->type,"INTG") )
-        datatype = Short;
+        datatype = SShort;
     else if ( strstr(header->type,"REAL") )
         datatype = Float;
     else if ( strstr(header->type,"RECO") || strstr(header->type,"COMP") )
@@ -204,125 +204,10 @@ int  readIMAGIC(long int img_select)
 
 }
 
-/************************************************************************
-@Function: writeIMAGIC
-@Description:
- Writing an IMAGIC image format.
-@Algorithm:
- A file format for the IMAGIC package.
-@Arguments:
- Bimage*    the image structure.
-@Returns:
- int     error code (<0 means failure).
-**************************************************************************/
-/** Imagic Writer
-  * @ingroup Imagic
-*/
-void  writeIMAGIC(long int img_select=-1, int mode=WRITE_OVERWRITE)
+// The function remained unfinished and broken since 2015. So Takanori removed it in 2021.
+void  writeIMAGIC(long int img_select=-1, int mode=WRITE_OVERWRITE, const DataType datatype=Unknown_Type)
 {
-    //    if ( p->transform != NoTransform )
-    //        img_convert_fourier(p, Centered);
-
-    IMAGIChead* header = new IMAGIChead;
-    long int Xdim = XSIZE(data);
-    long int Ydim = YSIZE(data);
-    long int Zdim = ZSIZE(data);
-    long int Ndim = NSIZE(data);
-
-    // fill in the file header
-    header->nhfr = 1;
-    header->npix2 = Xdim*Ydim;
-    header->npixel = header->npix2;
-    header->iylp = Xdim;
-    header->ixlp = Ydim;
-    header->ifn = Ndim - 1 ;
-
-    time_t timer;
-    time ( &timer );
-    tm* t = localtime(&timer);
-
-    header->ndate = t->tm_mday;
-    header->nmonth = t->tm_mon + 1;
-    header->nyear = t->tm_year;
-    header->nhour = t->tm_hour;
-    header->nminut = t->tm_min;
-    header->nsec = t->tm_sec;
-
-    // Convert T to datatype
-    if ( typeid(T) == typeid(RFLOAT) ||
-         typeid(T) == typeid(float) ||
-         typeid(T) == typeid(int) )
-        strncpy(header->type,"REAL",4);
-    else if ( typeid(T) == typeid(unsigned char) ||
-              typeid(T) == typeid(signed char) )
-        strncpy(header->type,"PACK",4);
-    else
-        REPORT_ERROR("ERROR write IMAGIC image: invalid typeid(T)");
-
-    size_t datasize, datasize_n;
-    datasize_n = Xdim*Ydim*Zdim;
-    datasize = datasize_n * gettypesize(Float);
-    RFLOAT aux;
-
-    if (!MDMainHeader.isEmpty())
-    {
-
-        if(MDMainHeader.getValue(EMDL_IMAGE_STATS_MIN,   aux))
-            header->densmin = (float)aux;
-        if(MDMainHeader.getValue(EMDL_IMAGE_STATS_MAX,   aux))
-            header->densmax = (float)aux;
-        if(MDMainHeader.getValue(EMDL_IMAGE_STATS_AVG,   aux))
-            header->avdens   = (float)aux;
-        if(MDMainHeader.getValue(EMDL_IMAGE_STATS_STDDEV,aux))
-        {
-            header->sigma  = (float)aux;
-            header->varian = (float)(aux*aux);
-        }
-    }
-
-    memcpy(header->lastpr, "Xmipp", 5);
-    memcpy(header->name, filename.c_str(), 80);
-
-    /*
-     * BLOCK HEADER IF NEEDED
-     */
-    struct flock fl;
-
-    fl.l_type   = F_WRLCK;  /* F_RDLCK, F_WRLCK, F_UNLCK    */
-    fl.l_whence = SEEK_SET; /* SEEK_SET, SEEK_CUR, SEEK_END */
-    fl.l_start  = 0;        /* Offset from l_whence         */
-    fl.l_len    = 0;        /* length, 0 = to EOF           */
-    fl.l_pid    = getpid(); /* our PID                      */
-    fcntl(fileno(fimg),       F_SETLKW, &fl); /* locked */
-    fcntl(fileno(fhed), F_SETLKW, &fl); /* locked */
-
-
-    if(mode==WRITE_APPEND)
-    {
-        fseek( fimg, 0, SEEK_END);
-        fseek( fhed, 0, SEEK_END);
-    }
-    else if(mode==WRITE_REPLACE)
-    {
-        fseek( fimg, datasize   * img_select, SEEK_SET);
-        fseek( fhed, IMAGICSIZE * img_select, SEEK_SET);
-    }
-    else //mode==WRITE_OVERWRITE
-    {
-        fseek( fimg, 0, SEEK_SET);
-        fseek( fhed, 0, SEEK_SET);
-    }
-    char* fdata = (char *) askMemory(datasize);
-
-    //Unlock
-    fl.l_type   = F_UNLCK;
-    fcntl(fileno(fimg), F_SETLK, &fl); /* unlocked */
-    fcntl(fileno(fhed), F_SETLK, &fl); /* unlocked */
-
-    freeMemory(fdata, datasize);
-
-    delete header;
-
+    REPORT_ERROR("writeIMAGIC() is not implemented.");
 }
 
 #endif /* RWIMAGIC_H_ */

@@ -73,6 +73,7 @@ bool isFloatVariable(std::string name);
 bool isStringVariable(std::string name);
 bool isScheduleOperator(std::string name);
 
+#define SCHEDULE_BOOLEAN_OPERATOR_SET "bool=set"
 #define SCHEDULE_BOOLEAN_OPERATOR_AND "bool=and"
 #define SCHEDULE_BOOLEAN_OPERATOR_OR  "bool=or"
 #define SCHEDULE_BOOLEAN_OPERATOR_NOT "bool=not"
@@ -98,6 +99,7 @@ bool isScheduleOperator(std::string name);
 #define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX "float=star_table_max_idx"
 #define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX "float=star_table_min_idx"
 #define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX "float=star_table_sort_idx"
+#define SCHEDULE_STRING_OPERATOR_SET "string=set"
 #define SCHEDULE_STRING_OPERATOR_JOIN "string=join"
 #define SCHEDULE_STRING_OPERATOR_BEFORE_FIRST "string=before_first"
 #define SCHEDULE_STRING_OPERATOR_AFTER_FIRST "string=after_first"

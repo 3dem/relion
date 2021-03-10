@@ -9,8 +9,8 @@ void local_symmetry_parameters_mpi::read(int argc, char **argv)
     // First read in non-parallelisation-dependent variables
     local_symmetry_parameters::read(argc, argv);
 
-    // Don't put any output to screen for mpi slaves
-    verb = (node->isMaster()) ? 1 : 0;
+    // Don't put any output to screen for mpi followers
+    verb = (node->isLeader()) ? 1 : 0;
 
     // Possibly also read parallelisation-dependent variables here
 
@@ -54,14 +54,14 @@ void local_symmetry_parameters_mpi::run()
 			|| (!do_local_search_local_symmetry_ops) )
 		REPORT_ERROR("ERROR: Please specify '--search' as the only option! For other options use non-parallel version (without '_mpi') instead!");
 
-	// Master writes out commands
-	if ( (!show_usage_for_an_option) && (!do_debug) && (node->isMaster()) )
+	// Leader writes out commands
+	if ( (!show_usage_for_an_option) && (!do_debug) && (node->isLeader()) )
 	{
 		local_symmetry_parameters::writeCommand("relion_localsym.log", "mpirun -n " + integerToString(node->size) + " `which relion_localsym_mpi`");
 	}
 	MPI_Barrier(MPI_COMM_WORLD);
 
-	if (node->isMaster())
+	if (node->isLeader())
 	{
 		displayEmptyLine();
 
@@ -69,7 +69,7 @@ void local_symmetry_parameters_mpi::run()
 		std::cout << " DEBUG: relion_localsym_mpi is running ..." << std::endl;
 #endif
 
-		// Master gets search ranges (in degrees and pixels), sets offset_step (in pixels).
+		// Leader gets search ranges (in degrees and pixels), sets offset_step (in pixels).
 		if (angpix_image < 0.001)
 			REPORT_ERROR("Invalid pixel size!");
 		if (fn_op_mask_info_in != "None")
@@ -101,7 +101,7 @@ void local_symmetry_parameters_mpi::run()
 		Localsym_scaleTranslations(op_search_ranges, 1. / angpix_image);
 		offset_step /= angpix_image;
 
-		// Master parses and reads mask info file
+		// Leader parses and reads mask info file
 		// Local searches
 		if (fn_op_mask_info_in == "None")
 		{
@@ -123,10 +123,10 @@ void local_symmetry_parameters_mpi::run()
 			readRelionFormatMasksWithoutOperators(fn_op_mask_info_in, fn_mask_list, op_list, op_mask_list, (ang_range > 179.99), true);
 		}
 
-		// Master set total number of masks
+		// Leader set total number of masks
 		nr_masks = fn_mask_list.size();
 
-		// Master reads input map
+		// Leader reads input map
 		std::cout << std::endl << " Pixel size = " << angpix_image << " Angstrom(s)" << std::endl;
 		std::cout << " Read input map " << fn_unsym << " ..." << std::endl;
 		map.read(fn_unsym);
@@ -134,12 +134,12 @@ void local_symmetry_parameters_mpi::run()
 		if (!isMultidimArray3DCubic(map()))
 			REPORT_ERROR("ERROR: Input map " + fn_unsym + " is not 3D cube!");
 #ifdef DEBUG
-		std::cout << " I am master. The nxyzdim of map() is " << map().nzyxdim << std::endl;
+		std::cout << " I am leader. The nxyzdim of map() is " << map().nzyxdim << std::endl;
 #endif
 	}
 	MPI_Barrier(MPI_COMM_WORLD);
 
-	// Master broadcasts total number of masks
+	// Leader broadcasts total number of masks
 	node->relion_MPI_Bcast(&nr_masks, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
 	// All nodes loop over all masks
@@ -147,11 +147,11 @@ void local_symmetry_parameters_mpi::run()
 	{
 		MPI_Barrier(MPI_COMM_WORLD);
 
-		if (node->isMaster())
+		if (node->isLeader())
 		{
 			displayEmptyLine();
 
-			// Master reads and checks the mask
+			// Leader reads and checks the mask
 			std::cout << " Read mask #" << imask + 1 << ": " << fn_mask_list[imask] << " ..." << std::endl;
 			mask.read(fn_mask_list[imask]);
 			mask().setXmippOrigin();
@@ -222,9 +222,9 @@ void local_symmetry_parameters_mpi::run()
 		node->relion_MPI_Bcast(&newdim, 1, MPI_LONG, 0, MPI_COMM_WORLD);
 		MPI_Barrier(MPI_COMM_WORLD);
 
-		// Slave allocate space for MultidimArray
+		// Follower allocate space for MultidimArray
 		// TODO: check whether the space is allocated and the map is read and successfully broadcast!!!
-		if (! node->isMaster())
+		if (! node->isLeader())
 		{
 			mask_cropped.clear();
 			mask_cropped.initZeros(1, newdim, newdim, newdim);
@@ -246,20 +246,20 @@ void local_symmetry_parameters_mpi::run()
 		}
 		MPI_Barrier(MPI_COMM_WORLD);
 
-		// Master broadcasts the mask to all nodes
+		// Leader broadcasts the mask to all nodes
 #ifdef DEBUG
-		if (node->isMaster())
-			std::cout << " Master is broadcasting cropped masked region #" << (imask + 1) << " ..." << std::endl;
+		if (node->isLeader())
+			std::cout << " Leader is broadcasting cropped masked region #" << (imask + 1) << " ..." << std::endl;
 #endif
 		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mask_cropped), MULTIDIM_SIZE(mask_cropped), MY_MPI_DOUBLE, 0, MPI_COMM_WORLD);
 		node->relion_MPI_Bcast(MULTIDIM_ARRAY(src_cropped), MULTIDIM_SIZE(src_cropped), MY_MPI_DOUBLE, 0, MPI_COMM_WORLD);
 #ifdef DEBUG
-		if (node->isMaster())
-			std::cout << " Master has completed broadcasting cropped masked region #" << (imask + 1) << "." << std::endl;
+		if (node->isLeader())
+			std::cout << " Leader has completed broadcasting cropped masked region #" << (imask + 1) << "." << std::endl;
 #endif
 
-		// Master reads total number of operators for this mask
-		if (node->isMaster())
+		// Leader reads total number of operators for this mask
+		if (node->isLeader())
 		{
 			nr_ops = op_list[imask].size();
 #ifdef DEBUG
@@ -268,7 +268,7 @@ void local_symmetry_parameters_mpi::run()
 		}
 		MPI_Barrier(MPI_COMM_WORLD);
 
-		// Master broadcasts total number of operators for this mask to all slaves
+		// Leader broadcasts total number of operators for this mask to all followers
 		node->relion_MPI_Bcast(&nr_ops, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
 		// All nodes loop over all operators of this mask
@@ -276,8 +276,8 @@ void local_symmetry_parameters_mpi::run()
 		{
 			MPI_Barrier(MPI_COMM_WORLD);
 
-			// Master gets sampling points
-			if (node->isMaster())
+			// Leader gets sampling points
+			if (node->isLeader())
 			{
 				std::cout << std::endl;
 
@@ -299,7 +299,7 @@ void local_symmetry_parameters_mpi::run()
 				else
 				{
 					// Global searches
-					// Master reads and checks the mask
+					// Leader reads and checks the mask
 					std::cout << " Read mask #" << imask + 1 << " operator #" << iop + 1 << " : " << op_mask_list[imask][iop] << " ..." << std::endl;
 					mask2.read(op_mask_list[imask][iop]);
 					mask2().setXmippOrigin();
@@ -345,7 +345,7 @@ void local_symmetry_parameters_mpi::run()
 					dest_cropped.setXmippOrigin();
 				}
 
-				// Master gets sampling points
+				// Leader gets sampling points
 				// Get sampling points - Rescale translational search ranges and steps
 				Localsym_composeOperator(op, aa, bb, gg, XX(com1_diff), YY(com1_diff), ZZ(com1_diff), cc);
 				if (newdim != cropdim)
@@ -383,10 +383,10 @@ void local_symmetry_parameters_mpi::run()
 			}
 			MPI_Barrier(MPI_COMM_WORLD);
 
-			// Master sends this 'dest' cropped region to all slaves
+			// Leader sends this 'dest' cropped region to all followers
 			node->relion_MPI_Bcast(MULTIDIM_ARRAY(dest_cropped), MULTIDIM_SIZE(dest_cropped), MY_MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-			// Master sends the number of total samplings to all slaves
+			// Leader sends the number of total samplings to all followers
 			node->relion_MPI_Bcast(&nr_total_samplings, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
 			MPI_Barrier(MPI_COMM_WORLD);
@@ -397,9 +397,9 @@ void local_symmetry_parameters_mpi::run()
 
 			MPI_Barrier(MPI_COMM_WORLD);
 
-			// Master distributes sampling points to all slaves
+			// Leader distributes sampling points to all followers
 			first = 0; last = 0;
-			if (node->isMaster())
+			if (node->isLeader())
 			{
 				for (int id_rank = (node->size) - 1; id_rank >= 0; id_rank--)
 				{
@@ -412,17 +412,17 @@ void local_symmetry_parameters_mpi::run()
 							DIRECT_A2D_ELEM(op_samplings_batch_packed, i, j) = VEC_ELEM(op_samplings[i + first], j);
 					}
 
-					// Master distributes sampling points to all slaves
+					// Leader distributes sampling points to all followers
 					if (id_rank > 0)
 						node->relion_MPI_Send(MULTIDIM_ARRAY(op_samplings_batch_packed), (last - first + 1) * NR_LOCALSYM_PARAMETERS, MY_MPI_DOUBLE, id_rank, MPITAG_LOCALSYM_SAMPLINGS_PACK, MPI_COMM_WORLD);
-					// If id_rank == 0 (master), just keep op_samplings_batch_packed to the master itself
+					// If id_rank == 0 (leader), just keep op_samplings_batch_packed to the leader itself
 				}
 			}
 			else
 			{
 				MPI_Status status;
-				// Slaves receive sampling points from master
-				// Important: Slaves calculate first and last subscripts!
+				// Followers receive sampling points from leader
+				// Important: Followers calculate first and last subscripts!
 				divide_equally(nr_total_samplings, node->size, node->rank, first, last);
 				node->relion_MPI_Recv(MULTIDIM_ARRAY(op_samplings_batch_packed), (last - first + 1) * NR_LOCALSYM_PARAMETERS, MY_MPI_DOUBLE, 0, MPITAG_LOCALSYM_SAMPLINGS_PACK, MPI_COMM_WORLD, status);
 			}
@@ -441,16 +441,16 @@ void local_symmetry_parameters_mpi::run()
 			}
 			MPI_Barrier(MPI_COMM_WORLD);
 
-			// All nodes calculate CC, with master profiling (DONT SORT!)
-			calculateOperatorCC(src_cropped, dest_cropped, mask_cropped, op_samplings_batch, false, node->isMaster());
+			// All nodes calculate CC, with leader profiling (DONT SORT!)
+			calculateOperatorCC(src_cropped, dest_cropped, mask_cropped, op_samplings_batch, false, node->isLeader());
 			for (int op_id = 0; op_id < op_samplings_batch.size(); op_id++)
 			{
 				DIRECT_A2D_ELEM(op_samplings_batch_packed, op_id, CC_POS) = VEC_ELEM(op_samplings_batch[op_id], CC_POS);
 			}
 			MPI_Barrier(MPI_COMM_WORLD);
 
-			// Slaves send their results back to master
-			if (! node->isMaster())
+			// Followers send their results back to leader
+			if (! node->isLeader())
 			{
 				node->relion_MPI_Send(MULTIDIM_ARRAY(op_samplings_batch_packed), (last - first + 1) * NR_LOCALSYM_PARAMETERS, MY_MPI_DOUBLE, 0, MPITAG_LOCALSYM_SAMPLINGS_PACK, MPI_COMM_WORLD);
 			}
@@ -462,11 +462,11 @@ void local_symmetry_parameters_mpi::run()
 				{
 					divide_equally(op_samplings.size(), node->size, id_rank, first, last);
 
-					// Master receives op_samplings_batch_packed from slaves
+					// Leader receives op_samplings_batch_packed from followers
 					if (id_rank > 0)
 						node->relion_MPI_Recv(MULTIDIM_ARRAY(op_samplings_batch_packed), (last - first + 1) * NR_LOCALSYM_PARAMETERS, MY_MPI_DOUBLE, id_rank, MPITAG_LOCALSYM_SAMPLINGS_PACK, MPI_COMM_WORLD, status);
 
-					// Master does something for itself if id_rank == 0
+					// Leader does something for itself if id_rank == 0
 					FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(op_samplings_batch_packed)
 					{
 						// Beware: YSIZE(op_samplings_batch_packed) is larger than (last - first + 1)
@@ -477,7 +477,7 @@ void local_symmetry_parameters_mpi::run()
 			}
 			MPI_Barrier(MPI_COMM_WORLD);
 
-			if (node->isMaster())
+			if (node->isLeader())
 			{
 				// TODO: For rescaled maps
 				if (newdim != cropdim)
@@ -502,17 +502,17 @@ void local_symmetry_parameters_mpi::run()
 					Localsym_composeOperator(op_samplings[isamp], aa, bb, gg, XX(vecR3), YY(vecR3), ZZ(vecR3), cc);
 				}
 
-				// Master sorts the results
+				// Leader sorts the results
 				std::stable_sort(op_samplings.begin(), op_samplings.end(), compareOperatorsByCC);
 
-				// Master outputs the local searches results
+				// Leader outputs the local searches results
 				fn_tmp.compose(fn_info_out.withoutExtension() + "_cc_mask", imask + 1, "tmp", 3);  // "*_cc_mask001.tmp"
 				fn_tmp = fn_tmp.withoutExtension(); // "*_cc_mask001"
 				fn_searched_op_samplings.compose(fn_tmp + "_op", iop + 1, "star", 3); // "*_cc_mask001_op001.star"
 				writeRelionFormatLocalSearchOperatorResults(fn_searched_op_samplings, op_samplings, angpix_image);
 				std::cout << " + List of sampling points for this local symmetry operator: " << fn_searched_op_samplings << std::endl;
 
-				// Master updates this operator and do screen output
+				// Leader updates this operator and do screen output
 				op_list[imask][iop] = op_samplings[0];
 				std::cout << " + Done! Refined operator: " << std::flush;
 				Localsym_outputOperator(op_samplings[0], &std::cout, angpix_image);
@@ -524,9 +524,9 @@ void local_symmetry_parameters_mpi::run()
 	}
 	MPI_Barrier(MPI_COMM_WORLD);
 
-	if (node->isMaster())
+	if (node->isLeader())
 	{
-		// Master writes out new mask info file
+		// Leader writes out new mask info file
 		if (fn_info_out.getExtension() == "star")
 			writeRelionFormatMasksAndOperators(fn_info_out, fn_mask_list, op_list, angpix_image);
 		else

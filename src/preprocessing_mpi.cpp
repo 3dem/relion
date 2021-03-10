@@ -30,8 +30,8 @@ void PreprocessingMpi::read(int argc, char **argv)
 	int mpi_section = parser.addSection("MPI options");
 	max_mpi_nodes =textToInteger(parser.getOption("--max_mpi_nodes", "Limit the number of effective MPI nodes to protect from too heavy disk I/O (thus ignoring larger values from mpirun)", "8"));
 
-	// Don't put any output to screen for mpi slaves
-	verb = (node->isMaster()) ? 1 : 0;
+	// Don't put any output to screen for mpi followers
+	verb = (node->isLeader()) ? 1 : 0;
 
 	// Possibly also read parallelisation-dependent variables here
 
@@ -106,7 +106,7 @@ void PreprocessingMpi::runExtractParticles()
 	// Wait until all nodes have finished to make final star file
 	MPI_Barrier(MPI_COMM_WORLD);
 
-	if (node->isMaster())
+	if (node->isLeader())
 	{
 		if (verb > 0)
 			progress_bar(my_nr_mics);
@@ -122,7 +122,7 @@ void PreprocessingMpi::run()
 		runExtractParticles();
 	}
 	// The following has not been parallelised....
-	else if (fn_operate_in != "" && node->isMaster())
+	else if (fn_operate_in != "" && node->isLeader())
 		Preprocessing::runOperateOnInputFile();
 
 	if (verb > 0)

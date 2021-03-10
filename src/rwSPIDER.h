@@ -120,7 +120,7 @@ struct SPIDERhead
   * @ingroup Spider
 */
 
-int  readSPIDER(long int img_select)
+int readSPIDER(long int img_select)
 {
 #undef DEBUG
     //#define DEBUG
@@ -242,9 +242,8 @@ int  readSPIDER(long int img_select)
 /** Spider Writer
   * @ingroup Spider
 */
-int  writeSPIDER(long int select_img=-1, bool isStack=false, int mode=WRITE_OVERWRITE)
+int  writeSPIDER(long int select_img=-1, bool isStack=false, int mode=WRITE_OVERWRITE, const DataType dtype=Unknown_Type)
 {
-    //return(1);
 #undef DEBUG
 //#define DEBUG
 #ifdef DEBUG
@@ -252,6 +251,9 @@ int  writeSPIDER(long int select_img=-1, bool isStack=false, int mode=WRITE_OVER
     printf("DEBUG writeSPIDER: File %s\n", filename.c_str());
 #endif
 //#undef DEBUG
+
+    if (dtype != Unknown_Type && dtype != Float)
+        REPORT_ERROR("writeSPIDER() can write only in Float.");
 
     //check if we are going to add or substitute an slice
     //in an existing stack
@@ -381,7 +383,7 @@ int  writeSPIDER(long int select_img=-1, bool isStack=false, int mode=WRITE_OVER
             fseek( fimg,offset + (offset+datasize)*select_img, SEEK_SET);
 
         // SJORS 30Oct12: I am completely unsure whether the code below will actually work....
-        // Let's just rais an error an go out...
+        // Let's just raise an error an go out...
         REPORT_ERROR("writeSPIDER append/replace writing of SPIDER stacks not implemented yet....");
     }
     //I guess I do not need to unlock since we are going to close the file

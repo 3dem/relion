@@ -2758,7 +2758,7 @@ Therefore, the calculations will need to be stopped by the user if further itera
 Also note that upon restarting, the iteration number continues to be increased, starting from the final iteration in the previous run. \
 The number given here is the TOTAL number of iterations. For example, if 10 iterations have been performed previously and one restarts to perform \
 an additional 5 iterations (for example with a finer angular sampling), then the number given here should be 10+5=15.");
-	joboptions["do_grad"] = JobOption("Use gradient-driven algorithm?", false, "If set to Yes, use the (faster&better?) NGrad algorithm instead of the defautl Expectation Maximization? If used, increase number of iterations to 200-250!");
+	joboptions["do_grad"] = JobOption("Use gradient-driven algorithm?", false, "If set to Yes, use the (faster&better?) NGrad algorithm instead of the default Expectation Maximization? If used, increase number of iterations to ~100!");
 
 
 	joboptions["particle_diameter"] = JobOption("Mask diameter (A):", 200, 0, 1000, 10, "The experimental images will be masked with a soft \
@@ -2806,14 +2806,14 @@ A range of 15 degrees is the same as sigma = 5 degrees. Note that the ranges of 
 	joboptions["helical_rise"] = JobOption("Helical rise (A):", 4.75, -1, 100, 1, "The helical rise (in Angstroms). Translational offsets along the helical axis will be limited from -rise/2 to +rise/2, with a flat prior.");
 
 
-	joboptions["nr_pool"] = JobOption("Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI slaves. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
+	joboptions["nr_pool"] = JobOption("Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI followers. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
 All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
 This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
-	joboptions["do_parallel_discio"] = JobOption("Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read images from disc. \
-Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel. If your datasets contain particles with different box sizes, you have to say Yes.");
+	joboptions["do_parallel_discio"] = JobOption("Use parallel disc I/O?", true, "If set to Yes, all MPI followers will read images from disc. \
+Otherwise, only the leader will read images and send them through the network to the followers. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many followers reading in parallel. If your datasets contain particles with different box sizes, you have to say Yes.");
 	joboptions["do_preread_images"] = JobOption("Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in float-precision, it will take ( N * box_size * box_size * 4 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 15Gb, or 60 Gb for the same number of 400x400 particles. \
-Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the master reads all particles into RAM and sends those particles through the network to the MPI slaves during the refinement iterations.");
+Remember that running a single MPI follower on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the leader reads all particles into RAM and sends those particles through the network to the MPI followers during the refinement iterations.");
 	const char *default_scratch = getenv("RELION_SCRATCH_DIR");
 	if (default_scratch == NULL)
 	{
@@ -2821,7 +2821,7 @@ Remember that running a single MPI slave on each node that runs as many threads 
 	}
 	joboptions["scratch_dir"] = JobOption("Copy particles to scratch directory:", std::string(default_scratch), "If a directory is provided here, then the job will create a sub-directory in it called relion_volatile. If that relion_volatile directory already exists, it will be wiped. Then, the program will copy all input particles into a large stack inside the relion_volatile subdirectory. \
 Provided this directory is on a fast local drive (e.g. an SSD drive), processing in all the iterations will be faster. If the job finishes correctly, the relion_volatile directory will be wiped. If the job crashes, you may want to remove it yourself.");
-	joboptions["do_combine_thru_disc"] = JobOption("Combine iterations through disc?", false, "If set to Yes, at the end of every iteration all MPI slaves will write out a large file with their accumulated results. The MPI master will read in all these files, combine them all, and write out a new file with the combined results. \
+	joboptions["do_combine_thru_disc"] = JobOption("Combine iterations through disc?", false, "If set to Yes, at the end of every iteration all MPI followers will write out a large file with their accumulated results. The MPI leader will read in all these files, combine them all, and write out a new file with the combined results. \
 All MPI salves will then read in the combined results. This reduces heavy load on the network, but increases load on the disc I/O. \
 This will affect the time it takes between the progress-bar in the expectation step reaching its end (the mouse gets to the cheese) and the start of the ensuing maximisation step. It will depend on your system setup which is most efficient.");
 
@@ -3067,15 +3067,15 @@ for each image in the previous iteration.\n\n");
 Translational sampling is also done using the adaptive approach. \
 Therefore, if adaptive=1, the translations will first be evaluated on a 2x coarser grid.\n\n ");
 
-	joboptions["do_parallel_discio"] = JobOption("Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read their own images from disc. \
-Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel. If your datasets contain particles with different box sizes, you have to say Yes.");
-	joboptions["nr_pool"] = JobOption("Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI slaves. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
+	joboptions["do_parallel_discio"] = JobOption("Use parallel disc I/O?", true, "If set to Yes, all MPI followers will read their own images from disc. \
+Otherwise, only the leader will read images and send them through the network to the followers. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many followers reading in parallel. If your datasets contain particles with different box sizes, you have to say Yes.");
+	joboptions["nr_pool"] = JobOption("Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI followers. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
 All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
 This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
 	joboptions["skip_gridding"] = JobOption("Skip gridding?", true, "If set to Yes, the calculations will skip gridding in the M step to save time, typically with just as good results.");
 	joboptions["do_preread_images"] = JobOption("Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in float-precision, it will take ( N * box_size * box_size * 4 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 15Gb, or 60 Gb for the same number of 400x400 particles. \
-Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the master reads all particles into RAM and sends those particles through the network to the MPI slaves during the refinement iterations.");
+Remember that running a single MPI follower on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the leader reads all particles into RAM and sends those particles through the network to the MPI followers during the refinement iterations.");
 	const char *default_scratch = getenv("RELION_SCRATCH_DIR");
 	if (default_scratch == NULL)
 	{
@@ -3083,7 +3083,7 @@ Remember that running a single MPI slave on each node that runs as many threads 
 	}
 	joboptions["scratch_dir"] = JobOption("Copy particles to scratch directory:", std::string(default_scratch), "If a directory is provided here, then the job will create a sub-directory in it called relion_volatile. If that relion_volatile directory already exists, it will be wiped. Then, the program will copy all input particles into a large stack inside the relion_volatile subdirectory. \
 Provided this directory is on a fast local drive (e.g. an SSD drive), processing in all the iterations will be faster. If the job finishes correctly, the relion_volatile directory will be wiped. If the job crashes, you may want to remove it yourself.");
-	joboptions["do_combine_thru_disc"] = JobOption("Combine iterations through disc?", false, "If set to Yes, at the end of every iteration all MPI slaves will write out a large file with their accumulated results. The MPI master will read in all these files, combine them all, and write out a new file with the combined results. \
+	joboptions["do_combine_thru_disc"] = JobOption("Combine iterations through disc?", false, "If set to Yes, at the end of every iteration all MPI followers will write out a large file with their accumulated results. The MPI leader will read in all these files, combine them all, and write out a new file with the combined results. \
 All MPI salves will then read in the combined results. This reduces heavy load on the network, but increases load on the disc I/O. \
 This will affect the time it takes between the progress-bar in the expectation step reaching its end (the mouse gets to the cheese) and the start of the ensuing maximisation step. It will depend on your system setup which is most efficient.");
 
@@ -3130,7 +3130,7 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 
 	int total_nr_iter = joboptions["nr_iter"].getNumber(error_message);
 	if (error_message != "") return false;
-        int nr_classes = joboptions["nr_classes"].getNumber(error_message);
+    int nr_classes = joboptions["nr_classes"].getNumber(error_message);
 	if (error_message != "") return false;
 
 	command += " --iter " + joboptions["nr_iter"].getString();
@@ -3215,47 +3215,79 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 
 	commands.push_back(command);
 
-	// Quickly remove RELION_JOB_EXIT_SUCCESS
-	std::string command0 = "rm -f " + outputname + RELION_JOB_EXIT_SUCCESS;
-	commands.push_back(command0);
-
-	// Now align&apply symmetry, or copy output from relion_refine to initial_model.mrc
-	FileName fn_ref;
-	int iter = (int)((joboptions["nr_iter"]).getNumber(error_message));
-	if (error_message != "") return false;
-	fn_ref.compose(outputname+"run_it", iter, "", 3);
-	fn_ref.compose(fn_ref+"_class", 1, "mrc", 3);
 	FileName fn_sym = joboptions["sym_name"].getString();
-	if ( !(fn_sym.contains("C1") || fn_sym.contains("c1")) )
+	if (nr_classes > 1)
 	{
-		// Align with symmetry axes and apply symmetry
-		std::string command2 = "`which relion_align_symmetry`";
-		command2 += " --i " + fn_ref;
-		command2 += " --o " + outputname + "symmetry_aligned.mrc";
-		command2 += " --sym " + joboptions["sym_name"].getString();
-		commands.push_back(command2);
 
-		std::string command3 = "`which relion_image_handler`";
-		command3 += " --i " + outputname + "symmetry_aligned.mrc";
-		command3 += " --o " + outputname + "initial_model.mrc";
-		command3 += " --sym " + joboptions["sym_name"].getString();
-		commands.push_back(command3);
+		// Only align symmetry for a single class!
+		if ( !(fn_sym.contains("C1") || fn_sym.contains("c1")) )
+		{
+			error_message = "non-C1 symmetry is only possible when using a single class!";
+			return false;
+		}
+        for (int iclass = 0; iclass < nr_classes; iclass++)
+        {
+        	FileName fn_tmp;
+        	fn_tmp.compose(outputname + fn_run + "_it", total_nr_iter, "", 3);
+        	fn_tmp.compose(fn_tmp + "_class", iclass+1, "mrc", 3);
+        	Node node3(fn_tmp, NODE_3DREF);
+        	outputNodes.push_back(node3);
+        }
+
 	}
 	else
 	{
-		// Just copy to expected output filename
-		std::string command2 = "`which relion_image_handler`";
-		command2 += " --i " + fn_ref;
-		command2 += " --o " + outputname + "initial_model.mrc";
-		commands.push_back(command2);
+
+		// Quickly remove RELION_JOB_EXIT_SUCCESS
+		std::string command0 = "rm -f " + outputname + RELION_JOB_EXIT_SUCCESS;
+		commands.push_back(command0);
+
+		// Now align&apply symmetry, or copy output from relion_refine to initial_model.mrc
+		FileName fn_ref;
+		int iter = (int)((joboptions["nr_iter"]).getNumber(error_message));
+		if (error_message != "") return false;
+		fn_ref.compose(outputname+"run_it", iter, "", 3);
+		fn_ref.compose(fn_ref+"_class", 1, "mrc", 3);
+
+		if ( !(fn_sym.contains("C1") || fn_sym.contains("c1")) )
+		{
+
+			if ( nr_classes > 1)
+			{
+				error_message = "non-C1 symmetry is only possible when using a single class!";
+				return false;
+			}
+
+			// Align with symmetry axes and apply symmetry
+			std::string command2 = "`which relion_align_symmetry`";
+			command2 += " --i " + fn_ref;
+			command2 += " --o " + outputname + "symmetry_aligned.mrc";
+			command2 += " --sym " + joboptions["sym_name"].getString();
+			commands.push_back(command2);
+
+			std::string command3 = "`which relion_image_handler`";
+			command3 += " --i " + outputname + "symmetry_aligned.mrc";
+			command3 += " --o " + outputname + "initial_model.mrc";
+			command3 += " --sym " + joboptions["sym_name"].getString();
+			commands.push_back(command3);
+
+		}
+		else
+		{
+			// Just copy to expected output filename
+			std::string command2 = "`which relion_image_handler`";
+			command2 += " --i " + fn_ref;
+			command2 += " --o " + outputname + "initial_model.mrc";
+			commands.push_back(command2);
+		}
+
+		// And re-introduce RELION_JOB_EXIT_SUCCESS
+		std::string commandF = "touch " + outputname + RELION_JOB_EXIT_SUCCESS;
+		commands.push_back(commandF);
+
+		Node node2(outputname + "initial_model.mrc", NODE_3DREF);
+		outputNodes.push_back(node2);
 	}
-
-	// And re-introduce RELION_JOB_EXIT_SUCCESS
-	std::string commandF = "touch " + outputname + RELION_JOB_EXIT_SUCCESS;
-	commands.push_back(commandF);
-
-	Node node2(outputname + "initial_model.mrc", NODE_3DREF);
-	outputNodes.push_back(node2);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
@@ -3436,16 +3468,16 @@ does not guarantee convergence. The program cannot find a reasonable symmetry if
 Values of ~ 2.0 are recommended for flexible structures such as MAVS-CARD filaments, ParM, MamK, etc. This option might not improve the reconstructions of helices formed from curled 2D lattices (TMV and VipA/VipB). Set to negative to disable this option.");
 	joboptions["keep_tilt_prior_fixed"] = JobOption("Keep tilt-prior fixed:", true, "If set to yes, the tilt prior will not change during the optimisation. If set to No, at each iteration the tilt prior will move to the optimal tilt value for that segment from the previous iteration.");
 
-	joboptions["do_parallel_discio"] = JobOption("Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read their own images from disc. \
-Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel. If your datasets contain particles with different box sizes, you have to say Yes.");
-	joboptions["nr_pool"] = JobOption("Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI slaves. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
+	joboptions["do_parallel_discio"] = JobOption("Use parallel disc I/O?", true, "If set to Yes, all MPI followers will read their own images from disc. \
+Otherwise, only the leader will read images and send them through the network to the followers. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many followers reading in parallel. If your datasets contain particles with different box sizes, you have to say Yes.");
+	joboptions["nr_pool"] = JobOption("Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI followers. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
 All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
 This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
 	joboptions["do_pad1"] = JobOption("Skip padding?", false, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
 	joboptions["skip_gridding"] = JobOption("Skip gridding?", true, "If set to Yes, the calculations will skip gridding in the M step to save time, typically with just as good results.");
 	joboptions["do_preread_images"] = JobOption("Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in float-precision, it will take ( N * box_size * box_size * 4 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 15Gb, or 60 Gb for the same number of 400x400 particles. \
-Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the master reads all particles into RAM and sends those particles through the network to the MPI slaves during the refinement iterations.");
+Remember that running a single MPI follower on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the leader reads all particles into RAM and sends those particles through the network to the MPI followers during the refinement iterations.");
 	const char *default_scratch = getenv("RELION_SCRATCH_DIR");
 	if (default_scratch == NULL)
 	{
@@ -3453,7 +3485,7 @@ Remember that running a single MPI slave on each node that runs as many threads 
 	}
 	joboptions["scratch_dir"] = JobOption("Copy particles to scratch directory:", std::string(default_scratch), "If a directory is provided here, then the job will create a sub-directory in it called relion_volatile. If that relion_volatile directory already exists, it will be wiped. Then, the program will copy all input particles into a large stack inside the relion_volatile subdirectory. \
 Provided this directory is on a fast local drive (e.g. an SSD drive), processing in all the iterations will be faster. If the job finishes correctly, the relion_volatile directory will be wiped. If the job crashes, you may want to remove it yourself.");
-	joboptions["do_combine_thru_disc"] = JobOption("Combine iterations through disc?", false, "If set to Yes, at the end of every iteration all MPI slaves will write out a large file with their accumulated results. The MPI master will read in all these files, combine them all, and write out a new file with the combined results. \
+	joboptions["do_combine_thru_disc"] = JobOption("Combine iterations through disc?", false, "If set to Yes, at the end of every iteration all MPI followers will write out a large file with their accumulated results. The MPI leader will read in all these files, combine them all, and write out a new file with the combined results. \
 All MPI salves will then read in the combined results. This reduces heavy load on the network, but increases load on the disc I/O. \
 This will affect the time it takes between the progress-bar in the expectation step reaching its end (the mouse gets to the cheese) and the start of the ensuing maximisation step. It will depend on your system setup which is most efficient.");
 
@@ -3889,16 +3921,16 @@ does not guarantee convergence. The program cannot find a reasonable symmetry if
 Values of ~ 2.0 are recommended for flexible structures such as MAVS-CARD filaments, ParM, MamK, etc. This option might not improve the reconstructions of helices formed from curled 2D lattices (TMV and VipA/VipB). Set to negative to disable this option.");
 	joboptions["keep_tilt_prior_fixed"] = JobOption("Keep tilt-prior fixed:", true, "If set to yes, the tilt prior will not change during the optimisation. If set to No, at each iteration the tilt prior will move to the optimal tilt value for that segment from the previous iteration.");
 
-	joboptions["do_parallel_discio"] = JobOption("Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read their own images from disc. \
-Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel. If your datasets contain particles with different box sizes, you have to say Yes.");
-	joboptions["nr_pool"] = JobOption("Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI slaves. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
+	joboptions["do_parallel_discio"] = JobOption("Use parallel disc I/O?", true, "If set to Yes, all MPI followers will read their own images from disc. \
+Otherwise, only the leader will read images and send them through the network to the followers. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many followers reading in parallel. If your datasets contain particles with different box sizes, you have to say Yes.");
+	joboptions["nr_pool"] = JobOption("Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI followers. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
 All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
 This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
 	joboptions["do_pad1"] = JobOption("Skip padding?", false, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
 	joboptions["skip_gridding"] = JobOption("Skip gridding?", true, "If set to Yes, the calculations will skip gridding in the M step to save time, typically with just as good results.");
 	joboptions["do_preread_images"] = JobOption("Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in float-precision, it will take ( N * box_size * box_size * 8 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 15Gb, or 60 Gb for the same number of 400x400 particles. \
-Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the master reads all particles into RAM and sends those particles through the network to the MPI slaves during the refinement iterations.");
+Remember that running a single MPI follower on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the leader reads all particles into RAM and sends those particles through the network to the MPI followers during the refinement iterations.");
 	const char *default_scratch = getenv("RELION_SCRATCH_DIR");
 	if (default_scratch == NULL)
 	{
@@ -3906,7 +3938,7 @@ Remember that running a single MPI slave on each node that runs as many threads 
 	}
 	joboptions["scratch_dir"] = JobOption("Copy particles to scratch directory:", std::string(default_scratch), "If a directory is provided here, then the job will create a sub-directory in it called relion_volatile. If that relion_volatile directory already exists, it will be wiped. Then, the program will copy all input particles into a large stack inside the relion_volatile subdirectory. \
 Provided this directory is on a fast local drive (e.g. an SSD drive), processing in all the iterations will be faster. If the job finishes correctly, the relion_volatile directory will be wiped. If the job crashes, you may want to remove it yourself.");
-	joboptions["do_combine_thru_disc"] = JobOption("Combine iterations through disc?", false, "If set to Yes, at the end of every iteration all MPI slaves will write out a large file with their accumulated results. The MPI master will read in all these files, combine them all, and write out a new file with the combined results. \
+	joboptions["do_combine_thru_disc"] = JobOption("Combine iterations through disc?", false, "If set to Yes, at the end of every iteration all MPI followers will write out a large file with their accumulated results. The MPI leader will read in all these files, combine them all, and write out a new file with the combined results. \
 All MPI salves will then read in the combined results. This reduces heavy load on the network, but increases load on the disc I/O. \
 This will affect the time it takes between the progress-bar in the expectation step reaching its end (the mouse gets to the cheese) and the start of the ensuing maximisation step. It will depend on your system setup which is most efficient.");
 	joboptions["use_gpu"] = JobOption("Use GPU acceleration?", false, "If set to Yes, the job will try to use GPU acceleration.");
@@ -4260,16 +4292,16 @@ Note that this will only be the value for the first few iteration(s): the sampli
 	joboptions["eigenval_min"] = JobOption("Minimum eigenvalue:", -999., -50, 50, 1, "This is the minimum value for the selected eigenvalue; only particles with the selected eigenvalue larger than this value will be included in the output particles.star file");
 	joboptions["eigenval_max"] = JobOption("Maximum eigenvalue:", 999., -50, 50, 1, "This is the maximum value for the selected eigenvalue; only particles with the selected eigenvalue less than this value will be included in the output particles.star file");
 
-	joboptions["do_parallel_discio"] = JobOption("Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read their own images from disc. \
-Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel. If your datasets contain particles with different box sizes, you have to say Yes.");
-	joboptions["nr_pool"] = JobOption("Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI slaves. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
+	joboptions["do_parallel_discio"] = JobOption("Use parallel disc I/O?", true, "If set to Yes, all MPI followers will read their own images from disc. \
+Otherwise, only the leader will read images and send them through the network to the followers. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many followers reading in parallel. If your datasets contain particles with different box sizes, you have to say Yes.");
+	joboptions["nr_pool"] = JobOption("Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI followers. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
 All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
 This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
 	joboptions["do_pad1"] = JobOption("Skip padding?", false, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
 	joboptions["skip_gridding"] = JobOption("Skip gridding?", true, "If set to Yes, the calculations will skip gridding in the M step to save time, typically with just as good results.");
 	joboptions["do_preread_images"] = JobOption("Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in float-precision, it will take ( N * box_size * box_size * 8 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 15Gb, or 60 Gb for the same number of 400x400 particles. \
-Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the master reads all particles into RAM and sends those particles through the network to the MPI slaves during the refinement iterations.");
+Remember that running a single MPI follower on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the leader reads all particles into RAM and sends those particles through the network to the MPI followers during the refinement iterations.");
 	const char *default_scratch = getenv("RELION_SCRATCH_DIR");
 	if (default_scratch == NULL)
 	{
@@ -4277,7 +4309,7 @@ Remember that running a single MPI slave on each node that runs as many threads 
 	}
 	joboptions["scratch_dir"] = JobOption("Copy particles to scratch directory:", std::string(default_scratch), "If a directory is provided here, then the job will create a sub-directory in it called relion_volatile. If that relion_volatile directory already exists, it will be wiped. Then, the program will copy all input particles into a large stack inside the relion_volatile subdirectory. \
 Provided this directory is on a fast local drive (e.g. an SSD drive), processing in all the iterations will be faster. If the job finishes correctly, the relion_volatile directory will be wiped. If the job crashes, you may want to remove it yourself.");
-	joboptions["do_combine_thru_disc"] = JobOption("Combine iterations through disc?", false, "If set to Yes, at the end of every iteration all MPI slaves will write out a large file with their accumulated results. The MPI master will read in all these files, combine them all, and write out a new file with the combined results. \
+	joboptions["do_combine_thru_disc"] = JobOption("Combine iterations through disc?", false, "If set to Yes, at the end of every iteration all MPI followers will write out a large file with their accumulated results. The MPI leader will read in all these files, combine them all, and write out a new file with the combined results. \
 All MPI salves will then read in the combined results. This reduces heavy load on the network, but increases load on the disc I/O. \
 This will affect the time it takes between the progress-bar in the expectation step reaching its end (the mouse gets to the cheese) and the start of the ensuing maximisation step. It will depend on your system setup which is most efficient.");
 	joboptions["use_gpu"] = JobOption("Use GPU acceleration?", false, "If set to Yes, the job will try to use GPU acceleration.");

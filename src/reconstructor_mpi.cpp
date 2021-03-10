@@ -27,8 +27,8 @@ void ReconstructorMpi::read(int argc, char **argv)
 	// First read in non-parallelisation-dependent variables
 	Reconstructor::read(argc, argv);
 
-	// Don't put any output to screen for mpi slaves
-	verb = (node->isMaster()) ? verb : 0;
+	// Don't put any output to screen for mpi followers
+	verb = (node->isLeader()) ? verb : 0;
 
 	// Possibly also read parallelisation-dependent variables here
 
@@ -58,7 +58,7 @@ void ReconstructorMpi::run()
 		MPI_Allreduce(MULTIDIM_ARRAY(backprojector.data), MULTIDIM_ARRAY(sumd), 2*MULTIDIM_SIZE(backprojector.data), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 		MPI_Allreduce(MULTIDIM_ARRAY(backprojector.weight), MULTIDIM_ARRAY(sumw), MULTIDIM_SIZE(backprojector.weight), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
-		if (node->isMaster())
+		if (node->isLeader())
 		{
 			backprojector.data = sumd;
 			backprojector.weight = sumw;
@@ -66,7 +66,7 @@ void ReconstructorMpi::run()
 
 	}
 
-	if (node->isMaster())
+	if (node->isLeader())
 		reconstruct();
 
 }

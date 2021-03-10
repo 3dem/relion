@@ -228,10 +228,6 @@ message(STATUS "CMAKE_CXX_COMPILER : ${CMAKE_CXX_COMPILER}")
 message(STATUS "MPI_C_COMPILER : ${MPI_C_COMPILER}")
 message(STATUS "MPI_CXX_COMPILER : ${MPI_CXX_COMPILER}")
 
-set(SAVE_CMAKE_C_COMPILER ${CMAKE_C_COMPILER})
-set(SAVE_CMAKE_CXX_COMPILER ${CMAKE_CXX_COMPILER})
-SET(CMAKE_C_COMPILER ${MPI_C_COMPILER})
-SET(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -251,29 +247,25 @@ if(MKLFFT)
     add_definitions(-DMKLFFT)
 endif(MKLFFT)
 
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
+if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Intel" OR "${CMAKE_CXX_COMPILER}" MATCHES "icpx")
+# "Intel" is for classic Intel compiler and "IntelLLVM" is for oneAPI compiler which is supported from CMake 3.20
     if(MKLFFT)
-        SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fopenmp -mkl -limf ")
+        if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
+            SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -qopenmp -mkl=parallel -limf ")
+        else()	# Intel oneAPI compiler
+            SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fiopenmp -mkl=parallel -limf ")
+        endif()
     endif(MKLFFT)
     if(ALTCPU)
         add_definitions(-DFAST_CENTERFFT)
     endif()
-    SET(CudaTexture OFF)
-    SET(CMAKE_C_COMPILER ${SAVE_CMAKE_C_COMPILER})
-    SET(CMAKE_CXX_COMPILER ${SAVE_CMAKE_CXX_COMPILER})
-    SET(MPI_C_COMPILER ${SAVE_CMAKE_C_COMPILER})
-    SET(MPI_CXX_COMPILER ${SAVE_CMAKE_CXX_COMPILER})
 else()
     if(MKLFFT)
         # For the time being, let's use the sequential version (as with FFTW)
-        SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lmkl_intel_ilp64 -lmkl_core -lmkl_sequential ")
+        link_directories("$ENV{MKLROOT}/lib/intel64")
+        SET(FFTW_LIBRARIES mkl_intel_lp64 mkl_sequential mkl_core)
     endif(MKLFFT)
 endif()
-
-message(STATUS "CMAKE_C_COMPILER : ${CMAKE_C_COMPILER}")
-message(STATUS "CMAKE_CXX_COMPILER : ${CMAKE_CXX_COMPILER}")
-message(STATUS "MPI_C_COMPILER : ${MPI_C_COMPILER}")
-message(STATUS "MPI_CXX_COMPILER : ${MPI_CXX_COMPILER}")
 
 if(ALTCPU)
     add_definitions(-DALTCPU)
@@ -390,10 +382,10 @@ list(APPEND RELION_SCRIPT_FILES star_printtable
                                 star_datablock_singlefiles
                                 star_datablock_ctfdat
                                 qsub.csh
-				it.py)
+				it.py
+				schedulegui.py)
 
 add_custom_target(copy_scripts ALL)
-add_custom_target(copy_schedules ALL)
                                 
 foreach (SCRIPT_FILE ${RELION_SCRIPT_FILES})
     add_custom_command(TARGET copy_scripts POST_BUILD
@@ -401,12 +393,6 @@ foreach (SCRIPT_FILE ${RELION_SCRIPT_FILES})
                      copy ${CMAKE_SOURCE_DIR}/scripts/${SCRIPT_FILE} 
                      ${CMAKE_BINARY_DIR}/bin/relion_${SCRIPT_FILE} )
 endforeach()
-
-add_custom_command(TARGET copy_schedules POST_BUILD
-                   COMMAND ${CMAKE_COMMAND} -E 
-		   copy_directory ${CMAKE_SOURCE_DIR}/scripts/Schedules
-		   ${CMAKE_BINARY_DIR}/bin/Schedules/. )
-
 
 install( DIRECTORY ${CMAKE_BINARY_DIR}/bin
 	 DESTINATION ${CMAKE_INSTALL_PREFIX}

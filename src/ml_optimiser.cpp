@@ -51,7 +51,8 @@
 	#include <atomic>
 	#include <tbb/tbb.h>
 	#include <tbb/parallel_for.h>
-	#include <tbb/task_scheduler_init.h>
+	#define TBB_PREVIEW_GLOBAL_CONTROL 1
+	#include <tbb/global_control.h>
 	#include "src/acc/cpu/cpu_ml_optimiser.h"
 #endif
 
@@ -433,7 +434,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	do_parallel_disc_io = !parser.checkOption("--no_parallel_disc_io", "Do NOT let parallel (MPI) processes access the disc simultaneously (use this option with NFS)");
 	combine_weights_thru_disc = !parser.checkOption("--dont_combine_weights_via_disc", "Send the large arrays of summed weights through the MPI network, instead of writing large files to disc");
 	do_shifts_onthefly = parser.checkOption("--onthefly_shifts", "Calculate shifted images on-the-fly, do not store precalculated ones in memory");
-	do_preread_images  = parser.checkOption("--preread_images", "Use this to let the master process read all particles into memory. Be careful you have enough RAM for large data sets!");
+	do_preread_images  = parser.checkOption("--preread_images", "Use this to let the leader process read all particles into memory. Be careful you have enough RAM for large data sets!");
 	fn_scratch = parser.getOption("--scratch_dir", "If provided, particle stacks will be copied to this local scratch disk prior to refinement.", "");
 	keep_free_scratch_Gb = textToFloat(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
 	do_reuse_scratch = parser.checkOption("--reuse_scratch", "Re-use data on scratchdir, instead of wiping it and re-copying all data. This works only when ALL particles have already been cached.");
@@ -699,7 +700,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	grad_em_iters = textToInteger(parser.getOption("--grad_em_iters", "Number of iterations at the end of a gradient refinement using Expectation-Maximization", "1"));
 	// Stochastic EM is implemented as a variant of SGD, though it is really a different algorithm!
 
-	grad_ini_frac = textToFloat(parser.getOption("--grad_ini_frac", "Fraction of iterations in the initial phase of refinement", "0.2"));
+	grad_ini_frac = textToFloat(parser.getOption("--grad_ini_frac", "Fraction of iterations in the initial phase of refinement", "0.1"));
 	grad_fin_frac = textToFloat(parser.getOption("--grad_fin_frac", "Fraction of iterations in the final phase of refinement", "0.2"));
 
 	if (grad_ini_frac <= 0 || 1 <= grad_ini_frac)
@@ -765,7 +766,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	combine_weights_thru_disc = !parser.checkOption("--dont_combine_weights_via_disc", "Send the large arrays of summed weights through the MPI network, instead of writing large files to disc");
 	do_shifts_onthefly = parser.checkOption("--onthefly_shifts", "Calculate shifted images on-the-fly, do not store precalculated ones in memory");
 	do_parallel_disc_io = !parser.checkOption("--no_parallel_disc_io", "Do NOT let parallel (MPI) processes access the disc simultaneously (use this option with NFS)");
-	do_preread_images  = parser.checkOption("--preread_images", "Use this to let the master process read all particles into memory. Be careful you have enough RAM for large data sets!");
+	do_preread_images  = parser.checkOption("--preread_images", "Use this to let the leader process read all particles into memory. Be careful you have enough RAM for large data sets!");
 	fn_scratch = parser.getOption("--scratch_dir", "If provided, particle stacks will be copied to this local scratch disk prior to refinement.", "");
 	keep_free_scratch_Gb = textToFloat(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
 	do_reuse_scratch = parser.checkOption("--reuse_scratch", "Re-use data on scratchdir, instead of wiping it and re-copying all data.");
@@ -1003,7 +1004,7 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 		grad_ini_iter = nr_iter * grad_ini_frac;
 	}
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_FIN_FRAC, grad_fin_frac)) {
-		grad_fin_frac = 0.2;
+		grad_fin_frac = 0.1;
 		grad_ini_iter = nr_iter * grad_fin_frac;
 	}
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_MIN_RESOL, grad_min_resol))
@@ -1067,7 +1068,7 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	debug1 = debug2 = debug3 = 0.;
 
 	// Then read in sampling, mydata and mymodel stuff
-	// If do_preread_images: when not do_parallel_disc_io: only the master reads all images into RAM; otherwise: everyone reads in images into RAM
+	// If do_preread_images: when not do_parallel_disc_io: only the leader reads all images into RAM; otherwise: everyone reads in images into RAM
 #ifdef DEBUG_READ
 	std::cerr<<"MlOptimiser::readStar before data."<<std::endl;
 #endif
@@ -1304,7 +1305,7 @@ void MlOptimiser::initialise()
 
 		cudaDeviceProp deviceProp;
 		int compatibleDevices(0);
-		// Send device count seen by this slave
+		// Send device count seen by this follower
 		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 		for(int i=0; i<devCount; i++ )
                 {
@@ -1354,7 +1355,7 @@ void MlOptimiser::initialise()
 			int dev_id;
 			if (semiAutomaticMapping)
 			{
-				// Sjors: hack to make use of several cards; will only work if all MPI slaves are on the same node!
+				// Sjors: hack to make use of several cards; will only work if all MPI followers are on the same node!
 				// Bjorn: Better hack
 				if (fullAutomaticMapping)
 					dev_id = devCount*i / nr_threads;
@@ -1395,14 +1396,6 @@ void MlOptimiser::initialise()
 
 	initialiseWorkLoad();
 
-#ifdef ALTCPU
-	// Don't start threading until after most I/O is over
-	if (do_cpu)
-	{
-		// Set the size of the TBB thread pool for the entire run
-		tbbSchedulerInit.initialize(nr_threads);
-	}
-#endif
 #ifdef MKLFFT
 	// Enable multi-threaded FFTW
 	int success = fftw_init_threads();
@@ -1457,9 +1450,7 @@ void MlOptimiser::initialise()
 		setSigmaNoiseEstimatesAndSetAverageImage(Mavg);
 	}
 
-	// First low-pass filter the initial references
-	if (iter == 0)
-		initialLowPassFilterReferences();
+	initialiseGeneralFinalize();
 
 	// Initialise the data_versus_prior ratio to get the initial current_size right
 	if (iter == 0 && !do_initialise_bodies)
@@ -1484,9 +1475,10 @@ void MlOptimiser::initialise()
 		}
 	}
 
+	initialiseGeneralFinalize();
+
 	// Write out initial mymodel
 	write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
-
 
 #ifdef DEBUG
     std::cerr<<"MlOptimiser::initialise Done"<<std::endl;
@@ -1515,7 +1507,7 @@ void MlOptimiser::checkMask(FileName &_fn_mask, int solvent_nr, int rank)
 			std::cerr << " + WARNING: re-scaling the mask... " << std::endl;
 		}
 
-		if (rank == 0) // only master writes out the new mask
+		if (rank == 0) // only leader writes out the new mask
 		{
 			int rescale_size = ROUND(XSIZE(Isolvent()) * mask_pixel_size / mymodel.pixel_size);
 			rescale_size += rescale_size % 2; //make even in case it is not already
@@ -1535,7 +1527,7 @@ void MlOptimiser::checkMask(FileName &_fn_mask, int solvent_nr, int rank)
 			std::cerr << " + WARNING: re-windowing the mask... " << std::endl;
 		}
 
-		if (rank == 0) // only master writes out the new mask
+		if (rank == 0) // only leader writes out the new mask
 		{
 			Isolvent().setXmippOrigin();
 			Isolvent().window(FIRST_XMIPP_INDEX(ref_box_size), FIRST_XMIPP_INDEX(ref_box_size), FIRST_XMIPP_INDEX(ref_box_size),
@@ -1733,7 +1725,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 	if (iter == 0)
 	{
 		// Read in the experimental image metadata
-		// If do_preread_images: only the master reads all images into RAM
+		// If do_preread_images: only the leader reads all images into RAM
 		bool do_preread = (do_preread_images) ? (do_parallel_disc_io || rank == 0) : false;
 		bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
 		int myverb = (rank==0) ? 1 : 0;
@@ -2108,55 +2100,20 @@ void MlOptimiser::initialiseGeneral(int rank)
 	// For new thread-parallelization: each thread does 1 particle, so nr_pool=nr_threads
 	nr_pool = x_pool*nr_threads;
 
-	if (do_som)
+	if (do_fast_subsets)
 	{
-		mymodel.som.set_max_node_count(mymodel.nr_classes);
-		// Add the initial nodes to the graph and connect them with an edge
-		for (unsigned i = 0; i < som_starting_nodes; i++)
-			mymodel.som.add_node();
-
-		std::vector<unsigned> nodes = mymodel.som.get_all_nodes();
-		for (unsigned i = 0; i < nodes.size(); i ++) {
-			mymodel.pdf_class[nodes[i]] = 1./nodes.size();
-			mymodel.som.set_node_activity(nodes[i], 1);
-		}
-
-		// Clear all non-node
-		for (unsigned i = 0; i < mymodel.nr_classes; i ++) {
-			bool clear = true;
-			for (unsigned j = 0; j < nodes.size(); j++)
-				if (i == nodes[j])
-					clear = false;
-
-			if (clear) {
-				mymodel.pdf_class[i] = 0.;
-				mymodel.Iref[i] *= 0.;
-				mymodel.Igrad1[i].initZeros();
-				mymodel.Igrad2[i].initZeros();
-			}
-		}
+		if (nr_iter < 20)
+			REPORT_ERROR("ERROR: when using --fast_subsets you have to perform at least 20 iterations!");
+		if (do_auto_refine)
+			REPORT_ERROR("ERROR: you cannot use --fast_subsets together with --auto_refine");
 	}
 
-	if (do_init_blobs) {
-		for (unsigned i = 0; i < mymodel.nr_classes; i ++) {
-			if (mymodel.pdf_class[i] > 0.) {
-				MultidimArray<RFLOAT> blobs_pos(mymodel.Iref[i]), blobs_neg(mymodel.Iref[i]);
-				if (mymodel.ref_dim == 2) {
-					SomGraph::make_blobs_2d(
-							blobs_pos, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
-					SomGraph::make_blobs_2d(
-							blobs_neg, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
-				}
-				else {
-					SomGraph::make_blobs_3d(
-							blobs_pos, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
-					SomGraph::make_blobs_3d(
-							blobs_neg, mymodel.Iref[i], 40, particle_diameter / mymodel.pixel_size);
-				}
-				mymodel.Iref[i] = blobs_pos/40 * 0.6 - blobs_neg/40 * 0.4;
-			}
-		}
-	}
+	// Check mask angpix, boxsize and [0,1] compliance right away.
+	if (fn_mask != "None") checkMask(fn_mask, 1, rank);
+	if (fn_mask2 != "None") checkMask(fn_mask2, 2, rank);
+
+	// Write out unmasked 2D class averages
+	do_write_unmasked_refs = (mymodel.ref_dim == 2 && !gradient_refine);
 
 	if (gradient_refine)
 	{
@@ -2186,24 +2143,9 @@ void MlOptimiser::initialiseGeneral(int rank)
 	}
 	else
 	{
-	    subset_size = -1;
+		subset_size = -1;
 		mu = 0.;
 	}
-
-	if (do_fast_subsets)
-	{
-		if (nr_iter < 20)
-			REPORT_ERROR("ERROR: when using --fast_subsets you have to perform at least 20 iterations!");
-		if (do_auto_refine)
-			REPORT_ERROR("ERROR: you cannot use --fast_subsets together with --auto_refine");
-	}
-
-	// Check mask angpix, boxsize and [0,1] compliance right away.
-	if (fn_mask != "None") checkMask(fn_mask, 1, rank);
-	if (fn_mask2 != "None") checkMask(fn_mask2, 2, rank);
-
-	// Write out unmasked 2D class averages
-	do_write_unmasked_refs = (mymodel.ref_dim == 2 && !gradient_refine);
 
 #ifdef DEBUG
 	std::cerr << "Leaving initialiseGeneral" << std::endl;
@@ -2213,8 +2155,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 void MlOptimiser::initialiseWorkLoad()
 {
-
-	// Note, this function is overloaded in ml_optimiser_mpi (where random_seed is only set by the master and then send to all slaves!)
+	// Note, this function is overloaded in ml_optimiser_mpi (where random_seed is only set by the leader and then send to all followers!)
 
 	// Randomise the order of the particles
 	if (random_seed == -1) random_seed = time(NULL);
@@ -2245,6 +2186,75 @@ void MlOptimiser::initialiseWorkLoad()
 		}
 	}
 
+}
+
+
+void MlOptimiser::initialiseGeneralFinalize(int rank) {
+	if (do_som)
+	{
+		mymodel.som.set_max_node_count(mymodel.nr_classes);
+		// Add the initial nodes to the graph and connect them with an edge
+		for (unsigned i = 0; i < som_starting_nodes; i++)
+			mymodel.som.add_node();
+
+		std::vector<unsigned> nodes = mymodel.som.get_all_nodes();
+		for (unsigned i = 0; i < nodes.size(); i ++)
+		{
+			mymodel.pdf_class[nodes[i]] = 1./nodes.size();
+			mymodel.som.set_node_activity(nodes[i], 1);
+		}
+
+		// Clear all non-node
+		for (unsigned i = 0; i < mymodel.nr_classes; i ++)
+		{
+			bool clear = true;
+			for (unsigned j = 0; j < nodes.size(); j++)
+				if (i == nodes[j])
+					clear = false;
+
+			if (clear)
+			{
+				mymodel.pdf_class[i] = 0.;
+				mymodel.Iref[i] *= 0.;
+				mymodel.Igrad1[i].initZeros();
+				mymodel.Igrad2[i].initZeros();
+			}
+		}
+	}
+
+	// Low-pass filter the initial references
+	if (iter == 0)
+		initialLowPassFilterReferences();
+
+	if (do_init_blobs && fn_ref == "None")
+	{
+		bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
+		RFLOAT diameter = particle_diameter / mymodel.pixel_size;
+		for (unsigned i = 0; i < mymodel.nr_classes; i ++)
+		{
+			if (mymodel.pdf_class[i] > 0.)
+			{
+				MultidimArray<RFLOAT> blobs(mymodel.Iref[i]);
+				if (mymodel.ref_dim == 2)
+				{
+					SomGraph::make_blobs_2d(
+							blobs, mymodel.Iref[i], 40,
+							diameter, is_helical_segment);
+				}
+				else
+					{
+					SomGraph::make_blobs_3d(
+							blobs, mymodel.Iref[i], 40,
+							diameter, is_helical_segment);
+				}
+				mymodel.Iref[i] = blobs / 5.;
+			}
+		}
+
+		initialLowPassFilterReferences();
+		for (unsigned i = 0; i < mymodel.nr_classes; i ++)
+			softMaskOutsideMap(mymodel.Iref[i], diameter/2., (RFLOAT)width_mask_edge);
+	}
 }
 
 void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT> &Mavg, bool myverb)
@@ -2343,7 +2353,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				else if (!do_parallel_disc_io)
 				{
 					// When not doing parallel disk IO,
-					// only those MPI processes running on the same node as the master have scratch.
+					// only those MPI processes running on the same node as the leader have scratch.
 					fn_img.decompose(dump, fn_stack);
 					if (!exists(fn_stack))
 						MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
@@ -2360,18 +2370,18 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			}
 
 			// May24,2015 - Shaoda & Sjors, Helical refinement
-			RFLOAT psi_deg = 0., tilt_deg = 0.;
+			RFLOAT psi_prior = 0., tilt_prior = 0.;
 			bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
 			if (is_helical_segment)
 			{
-				if (!MDimg.getValue(EMDL_ORIENT_PSI_PRIOR, psi_deg))
+				if (!MDimg.getValue(EMDL_ORIENT_PSI_PRIOR, psi_prior))
 				{
-					if (!MDimg.getValue(EMDL_ORIENT_PSI, psi_deg))
+					if (!MDimg.getValue(EMDL_ORIENT_PSI, psi_prior))
 						REPORT_ERROR("ml_optimiser.cpp::calculateSumOfPowerSpectraAndAverageImage: Psi priors of helical segments are missing!");
 				}
-				if (!MDimg.getValue(EMDL_ORIENT_TILT_PRIOR, tilt_deg))
+				if (!MDimg.getValue(EMDL_ORIENT_TILT_PRIOR, tilt_prior))
 				{
-					if (!MDimg.getValue(EMDL_ORIENT_TILT, tilt_deg))
+					if (!MDimg.getValue(EMDL_ORIENT_TILT, tilt_prior))
 						REPORT_ERROR("ml_optimiser.cpp::calculateSumOfPowerSpectraAndAverageImage: Tilt priors of helical segments are missing!");
 				}
 			}
@@ -2383,7 +2393,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				RFLOAT sum, sum2, sphere_radius_pix, cyl_radius_pix;
 				cyl_radius_pix = helical_tube_outer_diameter / (2. * my_pixel_size);
 				sphere_radius_pix = particle_diameter / (2. * my_pixel_size);
-				calculateBackgroundAvgStddev(img, sum, sum2, (int)(ROUND(sphere_radius_pix)), is_helical_segment, cyl_radius_pix, tilt_deg, psi_deg);
+				calculateBackgroundAvgStddev(img, sum, sum2, (int)(ROUND(sphere_radius_pix)), is_helical_segment, cyl_radius_pix, tilt_prior, psi_prior);
 
 				// Average should be close to zero, i.e. max +/-50% of stddev...
 				// Stddev should be close to one, i.e. larger than 0.5 and smaller than 2)
@@ -2391,7 +2401,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				{
 					std::cerr << " fn_img= " << fn_img << " bg_avg= " << sum << " bg_stddev= " << sum2 << std::flush;
 					if (is_helical_segment)
-						std::cerr << " tube_bg_radius= " << cyl_radius_pix << " psi_deg= " << psi_deg << " tilt_deg= " << tilt_deg << " (this is a particle from a helix)" << std::flush;
+						std::cerr << " tube_bg_radius= " << cyl_radius_pix << " psi_deg= " << psi_prior << " tilt_deg= " << tilt_prior << " (this is a particle from a helix)" << std::flush;
 					else
 						std::cerr << " bg_radius= " << sphere_radius_pix << std::flush;
 					std::cerr << std::endl;
@@ -2412,7 +2422,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				// May24,2015 - Shaoda & Sjors, Helical refinement
 				if (is_helical_segment)
 				{
-					softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, (particle_diameter / (2. * my_pixel_size)),
+					softMaskOutsideMapForHelix(img(), psi_prior, tilt_prior, (particle_diameter / (2. * my_pixel_size)),
 							(helical_tube_outer_diameter / (2. * my_pixel_size)), width_mask_edge);
 				}
 				else
@@ -2482,9 +2492,18 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				init_random_generator(random_seed + part_id);
 				// Randomize the initial orientations for initial reference generation at this step....
 				// TODO: this is not an even angular distribution....
-				RFLOAT rot  = (mymodel.ref_dim == 2) ? 0. : rnd_unif() * 360.;
-				RFLOAT tilt = (mymodel.ref_dim == 2) ? 0. : rnd_unif() * 180.;
-				RFLOAT psi  = rnd_unif() * 360.;
+				RFLOAT rot, tilt, psi;
+				rot  = (mymodel.ref_dim == 2) ? 0. : rnd_unif() * 360.;
+				if (is_helical_segment)
+				{
+					tilt = (mymodel.ref_dim == 2) ? 0. : tilt_prior;
+					psi = psi_prior;
+				}
+				else
+				{
+					tilt = (mymodel.ref_dim == 2) ? 0. : rnd_unif() * 180.;
+					psi  = rnd_unif() * 360.;
+				}
 				int iclass  = rnd_unif() * mymodel.nr_classes;
 				if (iclass == mymodel.nr_classes)
 					iclass = mymodel.nr_classes - 1;
@@ -2783,6 +2802,7 @@ void MlOptimiser::iterate()
 			do_grad_next_iter = !(has_converged || iter_next > nr_iter - grad_em_iters) &&
 			                    !(do_firstiter_cc && iter_next == 1) &&
 			                    !grad_has_converged;
+			do_skip_maximization = do_grad && iter == nr_iter && mymodel.nr_classes > 1;
 		}
 
 		if(do_som) {
@@ -2852,8 +2872,10 @@ void MlOptimiser::iterate()
 
 		if (do_skip_maximization)
 		{
-			// Only write data.star file and break from the iteration loop
-			write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, 0);
+			if (do_grad)
+				write(DO_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
+			else // Only write data.star file and break from the iteration loop
+				write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, 0);
 			break;
 		}
 
@@ -2983,7 +3005,7 @@ void MlOptimiser::expectation()
 		calculateExpectedAngularErrors(0, n_trials_acc-1);
 	}
 
-	// D. Update the angular sampling (all nodes except master)
+	// D. Update the angular sampling (all nodes except leader)
 	if ( ( (do_auto_refine) && iter > 1) ||
 		 ( mymodel.nr_classes > 1 && allow_coarser_samplings) )
 	{
@@ -3724,6 +3746,8 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
 		// (roughly equivalent to GPU "threads").
 		std::atomic<int> tCount(0);
 
+		// Set the size of the TBB thread pool for these particles
+		tbb::global_control gc(tbb::global_control::max_allowed_parallelism, nr_threads);
 		// process all passed particles in parallel
 		//for(unsigned long i=my_first_part_id; i<=my_last_part_id; i++) {
 		tbb::parallel_for(my_first_part_id, my_last_part_id+1, [&](long int i) {
@@ -4386,8 +4410,8 @@ void MlOptimiser::maximization()
 	if (verb > 0)
 		progress_bar(mymodel.nr_classes);
 
-	if (skip_class >= 0)
-		std::cerr << " Class " << skip_class << " replaced due to inactivity." << std::endl;
+//	if (skip_class >= 0)
+//		std::cerr << " Class " << skip_class << " replaced due to inactivity." << std::endl;
 }
 
 void MlOptimiser::centerClasses()
@@ -5352,7 +5376,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		// Get the image and recimg data
 		if (do_parallel_disc_io)
 		{
-			// If all slaves had preread images into RAM: get those now
+			// If all followers had preread images into RAM: get those now
 			if (do_preread_images)
 			{
 				img().reshape(mydata.particles[part_id].images[img_id].img);
@@ -9298,7 +9322,7 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 
 		if (!do_grad ||
 			nr_iter - iter < grad_em_iters ||
-			nr_iter == iter ||
+			(nr_iter == iter && mymodel.nr_classes > 1) || // If initial model with single class, then skip all particles in final iter
 			subset_size >= nr_particles ||
 			grad_suspended_local_searches_iter == 1 ||
 			has_converged)

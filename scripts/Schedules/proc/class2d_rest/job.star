@@ -28,7 +28,7 @@ do_restrict_xoff        Yes
 do_zero_mask        Yes 
 dont_skip_align        Yes 
    fn_cont         "" 
-    fn_img Schedules/proc/extract_topazpick/particles.star 
+    fn_img Schedules/proc/extract_rest/particles.star 
    gpu_ids        0,1 
 helical_rise       4.75 
 helical_tube_outer_diameter        200 
