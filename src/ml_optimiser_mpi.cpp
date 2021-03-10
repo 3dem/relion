@@ -567,6 +567,9 @@ void MlOptimiserMpi::initialiseWorkLoad()
 		mydata.divideParticlesInRandomHalves(random_seed, do_helical_refine);
 	}
 
+	// Set the number of particles per group
+	mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group, node->myRandomSubset());
+
 	if (node->isLeader())
 	{
 		// The leader never participates in any actual work

@@ -1409,10 +1409,16 @@ void MlModel::initialiseDataVersusPrior(bool fix_tau)
 	MultidimArray<RFLOAT> avg_sigma2_noise, sum_parts;
 	avg_sigma2_noise.initZeros(ori_size /2 + 1);
 	sum_parts.initZeros(ori_size /2 + 1);
-	for (int igroup = 0; igroup < sigma2_noise.size(); igroup++)	{
-		avg_sigma2_noise += sigma2_noise[igroup];
+	RFLOAT sum = 0.;
+	for (int igroup = 0; igroup < sigma2_noise.size(); igroup++)
+	{
+		if (sigma2_noise[igroup].sum() > 0.)
+		{
+			avg_sigma2_noise += sigma2_noise[igroup];
+			sum += 1.;
+		}
 	}
-	avg_sigma2_noise /= (float)sigma2_noise.size();
+	avg_sigma2_noise /= sum;
 
 	// Get the FT of all reference structures
 	// The Fourier Transforms are all "normalised" for 2D transforms of size = ori_size x ori_size

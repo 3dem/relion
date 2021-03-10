@@ -1421,10 +1421,6 @@ void MlOptimiser::initialise()
 
 	initialiseGeneral2();
 
-	// Initialise the data_versus_prior ratio to get the initial current_size right
-	if (iter == 0 && !do_initialise_bodies)
-		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
-
 	// Write out initial mymodel
 	write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
 
@@ -2063,11 +2059,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 	// Write out unmasked 2D class averages
 	do_write_unmasked_refs = (mymodel.ref_dim == 2 && !gradient_refine);
 
-	// Set the number of particles per group and per optics_group
-	mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
-
-	initialiseGeneral2();
-
 #ifdef DEBUG
 	std::cerr << "Leaving initialiseGeneral" << std::endl;
 #endif
@@ -2090,6 +2081,14 @@ void MlOptimiser::initialiseWorkLoad()
 		mydata.divideParticlesInRandomHalves(random_seed, do_helical_refine);
 		// rank=0 will work on subset 2, because rank%2==0
 		my_halfset = debug_split_random_half;
+
+		// Set the number of particles per group
+		mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group, my_halfset);
+	}
+	else
+	{
+		// Set the number of particles per group
+		mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
 	}
 
 	divide_equally(mydata.numberOfParticles(), 1, 0, my_first_particle_id, my_last_particle_id);
@@ -2319,7 +2318,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 	wsum_model.initZeros();
 
 	bool is_done_all_optics_groups = false;
-	for (long int part_id_sorted = 0; part_id_sorted <= mydata.numberOfParticles(); part_id_sorted++)
+	for (long int part_id_sorted = 0; part_id_sorted < mydata.numberOfParticles(); part_id_sorted++)
 	{
 
 		long int part_id = mydata.sorted_idx[part_id_sorted];
@@ -2631,7 +2630,7 @@ void MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(MultidimArray<RFLOAT>
 			// Factor 2 because of 2-dimensionality of the complex plane
 			if (wsum_model.sumw_group[igroup] > 0.)
 			{
-				//std::cerr << " igroup= " << igroup << " wsum_model.sigma2_noise[igroup].sum()= " << wsum_model.sigma2_noise[igroup].sum() << " wsum_model.sumw_group[igroup]= " << wsum_model.sumw_group[igroup] << std::endl;
+				std::cerr << " igroup= " << igroup << " wsum_model.sigma2_noise[igroup].sum()= " << wsum_model.sigma2_noise[igroup].sum() << " wsum_model.sumw_group[igroup]= " << wsum_model.sumw_group[igroup] << std::endl;
 				mymodel.sigma2_noise[igroup] = wsum_model.sigma2_noise[igroup] / ( 2. * wsum_model.sumw_group[igroup] );
 
 				// Now subtract power spectrum of the average image from the average power spectrum of the individual images
