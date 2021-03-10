@@ -51,7 +51,8 @@
 	#include <atomic>
 	#include <tbb/tbb.h>
 	#include <tbb/parallel_for.h>
-	#include <tbb/task_scheduler_init.h>
+	#define TBB_PREVIEW_GLOBAL_CONTROL 1
+	#include <tbb/global_control.h>
 	#include "src/acc/cpu/cpu_ml_optimiser.h"
 #endif
 
@@ -1394,14 +1395,10 @@ void MlOptimiser::initialise()
 #endif
 	}
 
-#ifdef ALTCPU
-	// Don't start threading until after most I/O is over
-	if (do_cpu)
-	{
-		// Set the size of the TBB thread pool for the entire run
-		tbbSchedulerInit.initialize(nr_threads);
-	}
-#endif
+	initialiseGeneral();
+
+	initialiseWorkLoad();
+
 #ifdef MKLFFT
 	// Enable multi-threaded FFTW
 	int success = fftw_init_threads();
@@ -1412,10 +1409,6 @@ void MlOptimiser::initialise()
 	// number of threads
 	fftw_plan_with_nthreads(nr_threads);
 #endif
-
-	initialiseGeneral();
-
-	initialiseWorkLoad();
 
 	initialiseSigma2Noise();
 
@@ -2059,6 +2052,41 @@ void MlOptimiser::initialiseGeneral(int rank)
 	// Write out unmasked 2D class averages
 	do_write_unmasked_refs = (mymodel.ref_dim == 2 && !gradient_refine);
 
+	if (gradient_refine)
+	{
+		if (do_auto_refine)
+		{
+			auto_resolution_based_angles = true;
+			auto_ignore_angle_changes = true;
+		}
+
+		// for continuation jobs (iter>0): could do some more iterations as specified by nr_iter
+		nr_iter = grad_ini_iter + grad_fin_iter + grad_inbetween_iter;
+		updateStepSize();
+
+		// determine default subset sizes
+		if (grad_ini_subset_size == -1 || grad_fin_subset_size == -1)
+		{
+			if (grad_ini_subset_size != -1 || grad_fin_subset_size != -1)
+				std::cout << " WARNING: Since both --grad_ini_subset and --grad_fin_subset were not set, " <<
+				          "both will instead be determined automatically." << std::endl;
+
+			unsigned long dataset_size = mydata.numberOfParticles();
+			grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.001, 500), 200);
+			grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.05,  50000), 1000);
+			if (rank == 0)
+			{
+				std::cout << " Initial subset size set to " << grad_ini_subset_size << std::endl;
+				std::cout << " Final subset size set to " << grad_fin_subset_size << std::endl;
+			}
+		}
+	}
+	else
+	{
+		subset_size = -1;
+		mu = 0.;
+	}
+
 #ifdef DEBUG
 	std::cerr << "Leaving initialiseGeneral" << std::endl;
 #endif
@@ -2161,19 +2189,22 @@ void MlOptimiser::initialiseGeneral2(bool do_ini_data_vs_prior)
 			mymodel.som.add_node();
 
 		std::vector<unsigned> nodes = mymodel.som.get_all_nodes();
-		for (unsigned i = 0; i < nodes.size(); i ++) {
+		for (unsigned i = 0; i < nodes.size(); i ++)
+		{
 			mymodel.pdf_class[nodes[i]] = 1./nodes.size();
 			mymodel.som.set_node_activity(nodes[i], 1);
 		}
 
 		// Clear all non-node
-		for (unsigned i = 0; i < mymodel.nr_classes; i ++) {
+		for (unsigned i = 0; i < mymodel.nr_classes; i ++)
+		{
 			bool clear = true;
 			for (unsigned j = 0; j < nodes.size(); j++)
 				if (i == nodes[j])
 					clear = false;
 
-			if (clear) {
+			if (clear)
+			{
 				mymodel.pdf_class[i] = 0.;
 				mymodel.Iref[i] *= 0.;
 				mymodel.Igrad1[i].initZeros();
@@ -2182,7 +2213,10 @@ void MlOptimiser::initialiseGeneral2(bool do_ini_data_vs_prior)
 		}
 	}
 
-	if (do_init_blobs && fn_ref == "None ")
+	// Low-pass filter the initial references
+	if (iter == 0) initialLowPassFilterReferences();
+
+	if (do_init_blobs && fn_ref == "None")
 	{
 
 		// Sjors 04032021: insert average of all classes into make_blobs functions,
@@ -2195,67 +2229,34 @@ void MlOptimiser::initialiseGeneral2(bool do_ini_data_vs_prior)
 		}
 		Iavg /= (float)mymodel.nr_classes;
 
+		bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
+		RFLOAT diameter = particle_diameter / mymodel.pixel_size;
+
 		for (unsigned i = 0; i < mymodel.nr_classes; i ++)
 		{
 			if (mymodel.pdf_class[i] > 0.)
 			{
-				MultidimArray<RFLOAT> blobs_pos(Iavg), blobs_neg(Iavg);
+				MultidimArray<RFLOAT> blobs(Iavg);
 				if (mymodel.ref_dim == 2)
 				{
 					SomGraph::make_blobs_2d(
-							blobs_pos, Iavg, 40, particle_diameter / mymodel.pixel_size);
-					SomGraph::make_blobs_2d(
-							blobs_neg, Iavg, 40, particle_diameter / mymodel.pixel_size);
+							blobs, Iavg, 40,
+							diameter, is_helical_segment);
 				}
 				else
 				{
 					SomGraph::make_blobs_3d(
-							blobs_pos, Iavg, 40, particle_diameter / mymodel.pixel_size);
-					SomGraph::make_blobs_3d(
-							blobs_neg, Iavg, 40, particle_diameter / mymodel.pixel_size);
+							blobs, Iavg, 40,
+							diameter, is_helical_segment);
 				}
-				mymodel.Iref[i] = (blobs_pos - blobs_neg * 0.5) / 5.; // Dampen large peaks a bit
+				mymodel.Iref[i] = blobs / 5.;
 			}
 		}
+
+		initialLowPassFilterReferences();
+		for (unsigned i = 0; i < mymodel.nr_classes; i ++)
+			softMaskOutsideMap(mymodel.Iref[i], diameter/2., (RFLOAT)width_mask_edge);
 	}
-
-	if (gradient_refine)
-	{
-		if (do_auto_refine)
-		{
-			auto_resolution_based_angles = true;
-			auto_ignore_angle_changes = true;
-		}
-
-		// for continuation jobs (iter>0): could do some more iterations as specified by nr_iter
-		nr_iter = grad_ini_iter + grad_fin_iter + grad_inbetween_iter;
-		updateStepSize();
-
-		// determine default subset sizes
-		if (grad_ini_subset_size == -1 || grad_fin_subset_size == -1)
-		{
-			if (grad_ini_subset_size != -1 || grad_fin_subset_size != -1)
-				std::cout << " WARNING: Since both --grad_ini_subset and --grad_fin_subset were not set, " <<
-				          "both will instead be determined automatically." << std::endl;
-
-			unsigned long dataset_size = mydata.numberOfParticles();
-			grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.001, 500), 200);
-			grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.05,  50000), 1000);
-			if (verb >  0)
-			{
-				std::cout << " Initial subset size set to " << grad_ini_subset_size << std::endl;
-				std::cout << " Final subset size set to " << grad_fin_subset_size << std::endl;
-			}
-		}
-	}
-	else
-	{
-		subset_size = -1;
-		mu = 0.;
-	}
-
-	// First low-pass filter the initial references
-	if (iter == 0) initialLowPassFilterReferences();
 
 	// Initialise the data_versus_prior ratio to get the initial current_size right
 	if (iter == 0 && !do_initialise_bodies && do_ini_data_vs_prior)
@@ -2630,7 +2631,7 @@ void MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(MultidimArray<RFLOAT>
 			// Factor 2 because of 2-dimensionality of the complex plane
 			if (wsum_model.sumw_group[igroup] > 0.)
 			{
-				std::cerr << " igroup= " << igroup << " wsum_model.sigma2_noise[igroup].sum()= " << wsum_model.sigma2_noise[igroup].sum() << " wsum_model.sumw_group[igroup]= " << wsum_model.sumw_group[igroup] << std::endl;
+				//std::cerr << " igroup= " << igroup << " wsum_model.sigma2_noise[igroup].sum()= " << wsum_model.sigma2_noise[igroup].sum() << " wsum_model.sumw_group[igroup]= " << wsum_model.sumw_group[igroup] << std::endl;
 				mymodel.sigma2_noise[igroup] = wsum_model.sigma2_noise[igroup] / ( 2. * wsum_model.sumw_group[igroup] );
 
 				// Now subtract power spectrum of the average image from the average power spectrum of the individual images
@@ -2815,6 +2816,7 @@ void MlOptimiser::iterate()
 			do_grad_next_iter = !(has_converged || iter_next > nr_iter - grad_em_iters) &&
 			                    !(do_firstiter_cc && iter_next == 1) &&
 			                    !grad_has_converged;
+			do_skip_maximization = do_grad && iter == nr_iter && mymodel.nr_classes > 1;
 		}
 
 		if(do_som) {
@@ -2884,8 +2886,10 @@ void MlOptimiser::iterate()
 
 		if (do_skip_maximization)
 		{
-			// Only write data.star file and break from the iteration loop
-			write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, 0);
+			if (do_grad)
+				write(DO_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
+			else // Only write data.star file and break from the iteration loop
+				write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, 0);
 			break;
 		}
 
@@ -3756,6 +3760,8 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
 		// (roughly equivalent to GPU "threads").
 		std::atomic<int> tCount(0);
 
+		// Set the size of the TBB thread pool for these particles
+		tbb::global_control gc(tbb::global_control::max_allowed_parallelism, nr_threads);
 		// process all passed particles in parallel
 		//for(unsigned long i=my_first_part_id; i<=my_last_part_id; i++) {
 		tbb::parallel_for(my_first_part_id, my_last_part_id+1, [&](long int i) {
