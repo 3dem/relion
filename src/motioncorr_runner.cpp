@@ -27,6 +27,7 @@
 #include "src/matrix2d.h"
 #include "src/matrix1d.h"
 #include <src/jaz/single_particle/img_proc/image_op.h>
+#include <src/jaz/single_particle/new_ft.h>
 #include "src/funcs.h"
 #include "src/renderEER.h"
 

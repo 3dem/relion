@@ -1811,7 +1811,7 @@ void Schedule::run(PipeLine &pipeline)
 		{
 
 			// Now add this job to the pipeline we will actually be running in
-			current_job = pipeline.addScheduledJob(myjob);
+			current_job = pipeline.addScheduledJob(myjob, "", false); // false means dont write hidden guifile
 
 			// Set the current_name of the current node now
 			jobs[current_node].current_name = pipeline.processList[current_job].name;
@@ -1869,7 +1869,8 @@ void Schedule::run(PipeLine &pipeline)
 		}
 		jobs[current_node].job_has_started = true;
 
-		if (!pipeline.runJob(myjob, current_job, false, is_continue, true, error_message))
+		// last false: don't write hidden GUI files, so defaults in Schedules don't mess up defaults for environment variables in later execution of RELION GUI
+		if (!pipeline.runJob(myjob, current_job, false, is_continue, true, error_message, false))
 			REPORT_ERROR(error_message);
 
 		// Write out current status, but maintain lock on the directory!

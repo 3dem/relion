@@ -502,7 +502,7 @@ long int PipeLine::addJob(RelionJob &thisjob, int as_status, bool do_write_minip
 }
 
 bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, bool is_main_continue,
-                      bool is_scheduled, std::string &error_message)
+                      bool is_scheduled, std::string &error_message, bool write_hidden_guifile)
 {
 	std::vector<std::string> commands;
 	std::string final_command;
@@ -518,7 +518,7 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 	read(DO_LOCK, lock_message);
 
 	// Save temporary hidden file with this jobs settings as default for a new job
-	_job.write("");
+	if (write_hidden_guifile) _job.write("");
 
 	// Also save a copy of the GUI settings with the current output name
 	_job.write(_job.outputName);
@@ -605,15 +605,15 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 }
 
 // Adds a scheduled job to the pipeline from the command line
-int PipeLine::addScheduledJob(std::string typestring, std::string fn_options)
+int PipeLine::addScheduledJob(std::string typestring, std::string fn_options, bool write_hidden_guifile)
 {
 
-	return addScheduledJob(proc_label2type.at(typestring), fn_options);
+	return addScheduledJob(proc_label2type.at(typestring), fn_options, write_hidden_guifile);
 
 }
 
 // Adds a scheduled job to the pipeline from the command line
-int PipeLine::addScheduledJob(int job_type, std::string fn_options)
+int PipeLine::addScheduledJob(int job_type, std::string fn_options, bool write_hidden_guifile)
 {
 	// Make sure we have the very latest version of the pipeline
 	read(DO_LOCK, "lock from addScheduledJob");
@@ -632,14 +632,14 @@ int PipeLine::addScheduledJob(int job_type, std::string fn_options)
 
 	std::string error_message;
 	int current_job = processList.size();
-	if (!runJob(job, current_job, true, job.is_continue, false, error_message)) // true is only_schedule, false means !is_scheduled
+	if (!runJob(job, current_job, true, job.is_continue, false, error_message, write_hidden_guifile)) // true is only_schedule, false means !is_scheduled
 		REPORT_ERROR(error_message.c_str());
 
 	return current_job;
 }
 
 // Adds a scheduled job to the pipeline from the command line
-int PipeLine::addScheduledJob(RelionJob &job, std::string fn_options)
+int PipeLine::addScheduledJob(RelionJob &job, std::string fn_options, bool write_hidden_guifile)
 {
 	// Make sure we have the very latest version of the pipeline
 	read(DO_LOCK, "lock from addScheduledJob");
@@ -655,7 +655,7 @@ int PipeLine::addScheduledJob(RelionJob &job, std::string fn_options)
 
 	std::string error_message;
 	int current_job = processList.size();
-	if (!runJob(job, current_job, true, job.is_continue, false, error_message)) // true is only_schedule, false means !is_scheduled
+	if (!runJob(job, current_job, true, job.is_continue, false, error_message, write_hidden_guifile)) // true is only_schedule, false means !is_scheduled
 		REPORT_ERROR(error_message.c_str());
 
 	return current_job;

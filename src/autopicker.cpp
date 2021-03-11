@@ -19,6 +19,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/autopicker.h"
+#include <src/jaz/single_particle/new_ft.h>
 
 //#define DEBUG
 //#define DEBUG_HELIX
@@ -3033,7 +3034,7 @@ void AutoPicker::autoPickTopazOneMicrograph(FileName &fn_mic, int rank)
 	//  http://heirloom.sourceforge.net/sh/sh.1.html
 	//  https://unix.stackexchange.com/questions/590694/posix-compliant-way-to-redirect-stdout-and-stderr-to-a-file
 	std::string command = fn_shell + " " + fn_script + " > " + fn_log + " 2>&1";
-	if (system(command.c_str())) std::cerr << "WARNING: there was an error in executing: " << command << std::endl;
+	if (system(command.c_str())) std::cerr << "WARNING: there was an error in picking: " << fn_mic << std::endl;
 
 	// Now convert output .txt into Relion-style .star files!
 	// No need to pass downscale factor, as picks are already up-scaled using -x in topaz extract command above!

@@ -1352,6 +1352,7 @@ void RelionJob::initialiseMotioncorrJob()
 	joboptions["first_frame_sum"] = JobOption("First frame for corrected sum:", 1, 1, 32, 1, "First frame to use in corrected average (starts counting at 1). ");
 	joboptions["last_frame_sum"] = JobOption("Last frame for corrected sum:", -1, 0, 32, 1, "Last frame to use in corrected average. Values equal to or smaller than 0 mean 'use all frames'.");
 	joboptions["eer_grouping"] = JobOption("EER fractionation:", 32, 1, 100, 1, "The number of hardware frames to group into one fraction. This option is relevant only for Falcon4 movies in the EER format. Note that all 'frames' in the GUI (e.g. first and last frame for corrected sum, dose per frame) refer to fractions, not raw detector frames. See https://www3.mrc-lmb.cam.ac.uk/relion/index.php/Image_compression#Falcon4_EER for detailed guidance on EER processing.");
+	joboptions["do_float16"] = JobOption("Write output in float16?", true ,"If set to Yes, RelionCor2 will write output images in float16 MRC format. This will save a factor of two in disk space compared to the default of writing in float32. Note that RELION and CCPEM will read float16 images, but other programs may not (yet) do so. For example, Gctf will not work with float16 images. Also note that this option does not work with UCSF MotionCor2.");
 
 	// Motioncor2
 	char *default_location = getenv ("RELION_MOTIONCOR2_EXECUTABLE");
@@ -1430,11 +1431,21 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 	{
 		command += " --use_own ";
 		command += " --j " + joboptions["nr_threads"].getString();
+		if (joboptions["do_float16"].getBoolean())
+		{
+			command +=" --float16";
+		}
 	}
 	else
 	{
 		command += " --use_motioncor2 ";
 		command += " --motioncor2_exe " + joboptions["fn_motioncor2_exe"].getString();
+
+		if (joboptions["do_float16"].getBoolean())
+		{
+			error_message = "ERROR: MotionCor2 cannot write float16 files.";
+			return false;
+		}
 
 		if ((joboptions["other_motioncor2_args"].getString()).length() > 0)
 			command += " --other_motioncor2_args \" " + joboptions["other_motioncor2_args"].getString() + " \"";
@@ -2161,6 +2172,7 @@ void RelionJob::initialiseExtractJob()
 	joboptions["recenter_z"] = JobOption("Re-center on Z-coordinate (in pix): ", std::string("0"), "Re-extract particles centered on this Z-coordinate (in pixels in the reference)");
 	joboptions["extract_size"] = JobOption("Particle box size (pix):", 128, 64, 512, 8, "Size of the extracted particles (in pixels). This should be an even number!");
 	joboptions["do_invert"] = JobOption("Invert contrast?", true, "If set to Yes, the contrast in the particles will be inverted.");
+	joboptions["do_float16"] = JobOption("Write output in float16?", true ,"If set to Yes, this program will write output images in float16 MRC format. This will save a factor of two in disk space compared to the default of writing in float32. Note that RELION and CCPEM will read float16 images, but other programs may not (yet) do so.");
 
 	joboptions["do_norm"] = JobOption("Normalize particles?", true, "If set to Yes, particles will be normalized in the way RELION prefers it.");
 	joboptions["bg_diameter"] = JobOption("Diameter background circle (pix): ", -1, -1, 600, 10, "Particles will be normalized to a mean value of zero and a standard-deviation of one for all pixels in the background area.\
@@ -2275,6 +2287,11 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 	if (joboptions["do_fom_threshold"].getBoolean())
 	{
 		command += " --minimum_pick_fom " + joboptions["minimum_pick_fom"].getString();
+	}
+
+	if (joboptions["do_float16"].getBoolean())
+	{
+		command += " --float16 ";
 	}
 
 	// Operate stuff
@@ -4771,6 +4788,7 @@ which you want to use for subtraction. It will use the maps from this run for th
 	joboptions["fn_mask"] = JobOption("Mask of the signal to keep:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a soft mask where the protein density you wish to subtract from the experimental particles is black (0) and the density you wish to keep is white (1).");
 	joboptions["do_data"] = JobOption("Use different particles?", false, "If set to Yes, subtraction will be performed on the particles in the STAR file below, instead of on all the particles of the 3D refinement/classification from the optimiser.star file.");
 	joboptions["fn_data"] = JobOption("Input particle star file:", NODE_PART_DATA, "", "particle STAR file (*.star)", "The particle STAR files with particles that will be used in the subtraction. Leave this field empty if all particles from the input refinement/classification run are to be used.");
+	joboptions["do_float16"] = JobOption("Write output in float16?", true ,"If set to Yes, this program will write output images in float16 MRC format. This will save a factor of two in disk space compared to the default of writing in float32. Note that RELION and CCPEM will read float16 images, but other programs may not (yet) do so.");
 
 	joboptions["do_fliplabel"] = JobOption("OR revert to original particles?", false, "If set to Yes, no signal subtraction is performed. Instead, the labels of rlnImageName and rlnImageOriginalName are flipped in the input STAR file given in the field below. This will make the STAR file point back to the original, non-subtracted images.");
 	joboptions["fn_fliplabel"] = JobOption("revert this particle star file:", NODE_PART_DATA, "", "particle STAR file (*.star)", "The particle STAR files with particles that will be used for label reversion.");
@@ -4857,6 +4875,11 @@ bool RelionJob::getCommandsSubtractJob(std::string &outputname, std::vector<std:
 			command += " --center_x " + joboptions["center_x"].getString();
 			command += " --center_y " + joboptions["center_y"].getString();
 			command += " --center_z " + joboptions["center_z"].getString();
+		}
+
+		if (joboptions["do_float16"].getBoolean())
+		{
+			command += " --float16 ";
 		}
 
 		if (joboptions["new_box"].getNumber(error_message) > 0)
@@ -5170,6 +5193,7 @@ void RelionJob::initialiseMotionrefineJob()
 	joboptions["fn_data"] = JobOption("Particles (from Refine3D or CtfRefine):", NODE_PART_DATA,  "", "STAR files (*.star)", "The input STAR file with the metadata of all particles.");
 	joboptions["fn_post"] = JobOption("Postprocess STAR file:", NODE_POST,  "", "STAR files (postprocess.star)", "The STAR file generated by a PostProcess job. \
 The mask used for this postprocessing will be applied to the unfiltered half-maps and should encompass the entire complex. The resulting FSC curve will be used for weighting the different frequencies.");
+	joboptions["do_float16"] = JobOption("Write output in float16?", true ,"If set to Yes, this program will write output images in float16 MRC format. This will save a factor of two in disk space compared to the default of writing in float32. Note that RELION and CCPEM will read float16 images, but other programs may not (yet) do so.");
 
 	// Frame range
 	joboptions["first_frame"] = JobOption("First movie frame: ", 1., 1., 10., 1, "First movie frame to take into account in motion fit and combination step");
@@ -5257,6 +5281,11 @@ bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<
 	command += " --first_frame " + joboptions["first_frame"].getString();
 	command += " --last_frame " + joboptions["last_frame"].getString();
 	command += " --o " + outputname;
+
+	if (joboptions["do_float16"].getBoolean())
+	{
+		command += " --float16 ";
+	}
 
 	if (joboptions["do_param_optim"].getBoolean())
 	{

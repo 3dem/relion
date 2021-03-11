@@ -163,16 +163,16 @@ public:
 
 	// Runs a job and adds it to the pipeline
 	bool runJob(RelionJob &_job, int &current_job, bool only_schedule, bool is_main_continue,
-			bool is_scheduled, std::string &error_message);
+			bool is_scheduled, std::string &error_message, bool write_hidden_guifile = true);
 
 	// Adds a scheduled job to the pipeline from the command line (with a name for job type)
-	int addScheduledJob(std::string job_type, std::string fn_options);
+	int addScheduledJob(std::string job_type, std::string fn_options, bool write_hidden_guifile = true);
 
 	// Adds a scheduled job to the pipeline from the command line (with integer job type)
-	int addScheduledJob(int job_type, std::string fn_options);
+	int addScheduledJob(int job_type, std::string fn_options, bool write_hidden_guifile = true);
 
 	// Add this RelionJob as scheduled to the pipeline
-	int addScheduledJob(RelionJob &job, std::string fn_options="");
+	int addScheduledJob(RelionJob &job, std::string fn_options="", bool write_hidden_guifile = true);
 
 	void waitForJobToFinish(int current_job, bool &is_failure, bool &is_abort);
 

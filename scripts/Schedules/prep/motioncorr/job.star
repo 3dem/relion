@@ -23,6 +23,7 @@ do_save_noDW        Yes
 do_save_ps        Yes 
 dose_per_frame       1.55 
 eer_grouping         20 
+do_float16   Yes
 first_frame_sum          1 
  fn_defect         "" 
 fn_gain_ref Micrographs/norm-gatandata-0.mrc 

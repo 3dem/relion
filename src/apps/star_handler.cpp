@@ -1021,7 +1021,8 @@ class star_handler_parameters
 
 		EMDLabel mic_label;
 		if (MD.containsLabel(EMDL_MICROGRAPH_NAME)) mic_label = EMDL_MICROGRAPH_NAME;
-		else REPORT_ERROR("The input STAR file does not contain rlnMicrographName column.");
+		else if (MD.containsLabel(EMDL_TOMO_NAME)) mic_label = EMDL_TOMO_NAME;
+		else REPORT_ERROR("The input STAR file does not contain rlnMicrographName or rlnTomoName column.");
 
 		RFLOAT particle_angpix = 1.0; // rlnOriginX/YAngst is always 1 A/px.
 
