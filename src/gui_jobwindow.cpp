@@ -752,6 +752,7 @@ void JobWindow::initialiseAutopickWindow()
 	place("do_refs", TOGGLE_DEACTIVATE);
 	place("do_log", TOGGLE_DEACTIVATE);
 	place("do_topaz", TOGGLE_DEACTIVATE);
+	place("continue_manual", TOGGLE_REACTIVATE);
 
 	tab1->end();
 	tab2->begin();
@@ -1061,7 +1062,6 @@ void JobWindow::initialiseSelectWindow()
 	place("fn_model", TOGGLE_DEACTIVATE);
 	place("fn_mic", TOGGLE_DEACTIVATE);
 	place("fn_data", TOGGLE_DEACTIVATE);
-	place("fn_coords", TOGGLE_DEACTIVATE);
 
 	tab1->end();
 
