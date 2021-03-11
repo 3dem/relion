@@ -3060,8 +3060,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				int ires_remapped = ROUND(remap_image_sizes * ires);
 				// Note there is no sqrt in the normalisation term because of the 2-dimensionality of the complex-plane
 				// Also exclude origin from logsigma2, as this will not be considered in the P-calculations
-				if (ires > 0 && ires_remapped < XSIZE(baseMLO->mymodel.sigma2_noise[group_id]))
-					logsigma2 += log( 2. * PI * DIRECT_A1D_ELEM(baseMLO->mymodel.sigma2_noise[group_id], ires_remapped));
+				if (ires > 0 && ires_remapped < XSIZE(baseMLO->mymodel.sigma2_noise[optics_group]))
+					logsigma2 += log( 2. * PI * DIRECT_A1D_ELEM(baseMLO->mymodel.sigma2_noise[optics_group], ires_remapped));
 			}
 			RFLOAT dLL;
 
