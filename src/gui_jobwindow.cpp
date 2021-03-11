@@ -531,6 +531,7 @@ void JobWindow::initialiseMotioncorrWindow()
 	place("dose_per_frame", TOGGLE_DEACTIVATE);
 	place("pre_exposure", TOGGLE_DEACTIVATE);
 	place("eer_grouping", TOGGLE_DEACTIVATE);
+	place("do_float16", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -951,6 +952,11 @@ void JobWindow::initialiseExtractWindow()
 
 	group1->end();
 	guientries["do_reextract"].cb_menu_i();
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	place("do_float16", TOGGLE_DEACTIVATE);
 
 	tab1->end();
 
@@ -1940,6 +1946,7 @@ void JobWindow::initialiseSubtractWindow()
 	place("fn_data", TOGGLE_DEACTIVATE);
 	group1->end();
 	guientries["do_data"].cb_menu_i(); // make default active
+	place("do_float16", TOGGLE_DEACTIVATE);
 
 	current_y += STEPY/2;
 
@@ -2137,6 +2144,11 @@ void JobWindow::initialiseMotionrefineWindow()
 
 	place("extract_size", TOGGLE_DEACTIVATE);
 	place("rescale", TOGGLE_DEACTIVATE);
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	place("do_float16", TOGGLE_DEACTIVATE);
 
 	tab1->end();
 
