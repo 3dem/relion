@@ -1395,10 +1395,6 @@ void MlOptimiser::initialise()
 #endif
 	}
 
-	initialiseGeneral();
-
-	initialiseWorkLoad();
-
 #ifdef MKLFFT
 	// Enable multi-threaded FFTW
 	int success = fftw_init_threads();
@@ -1409,6 +1405,10 @@ void MlOptimiser::initialise()
 	// number of threads
 	fftw_plan_with_nthreads(nr_threads);
 #endif
+
+	initialiseGeneral();
+
+	initialiseWorkLoad();
 
 	initialiseSigma2Noise();
 
