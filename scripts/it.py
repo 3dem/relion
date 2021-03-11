@@ -897,6 +897,7 @@ class RelionItGui(object):
 
         # Set GPU IDs in all jobs
         opts['proc__train_topaz__gpu_ids'] = (self.gpu_entry.get()).split(',')[0]
+        opts['proc__restpicker__gpu_ids'] = (self.gpu_entry.get()).split(',')[0]
         opts['proc__class2d_ini__gpu_ids'] = self.gpu_entry.get()
         opts['proc__class2d_rest__gpu_ids'] = self.gpu_entry.get()
         opts['proc__inimodel3d__gpu_ids'] = self.gpu_entry.get()
