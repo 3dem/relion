@@ -29,6 +29,7 @@ do_reextract         No
 do_rescale        Yes 
 do_reset_offsets         No 
 extract_size        166 
+do_float16    Yes
 fndata_reextract         "" 
 helical_bimodal_angular_priors        Yes 
 helical_nr_asu          1 
