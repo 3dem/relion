@@ -1321,7 +1321,7 @@ void ClassRanker::makeSolventMasks(classFeatures cf, MultidimArray<RFLOAT> img, 
 	{
 		for (long int j= STARTINGX(lpf) ; j <= FINISHINGX(lpf); j++)
 		{
-			if (i*i+j*j <= 0.49*circular_mask_radius*circular_mask_radius)
+			if (i*i+j*j <= 0.36*circular_mask_radius*circular_mask_radius)
 			{
 				if (A2D_ELEM(visited, i, j) == false)
 				{
@@ -1353,7 +1353,7 @@ void ClassRanker::makeSolventMasks(classFeatures cf, MultidimArray<RFLOAT> img, 
 										{    // White neighbours
 											white_stack.push(std::make_pair(y, x));
 											island.push_back(std::make_pair(y, x));
-											if (y*y+x*x <= 0.49*circular_mask_radius*circular_mask_radius)
+											if (y*y+x*x <= 0.36*circular_mask_radius*circular_mask_radius)
 											{
 												inside++;                               // Count white pixel number inside the central area
 											}
@@ -1366,7 +1366,7 @@ void ClassRanker::makeSolventMasks(classFeatures cf, MultidimArray<RFLOAT> img, 
 						//  Debug
 //						std::cerr << "Class " << cf.class_index << " inside: " << inside << std::endl;
 
-						if (inside > 0.4*3.14*0.49*circular_mask_radius*circular_mask_radius)
+						if (inside > 0.1*3.14*0.36*circular_mask_radius*circular_mask_radius)
 						{
 							all_islands.push_back(island);
 							protein_area += island.size();
