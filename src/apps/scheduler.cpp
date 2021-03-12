@@ -211,16 +211,18 @@ public:
 		{
 			if (isBooleanVariable(set_var))
 			{
-				if (!(value == "true" || value == "True" || value == "false" || value == "False"))
+				if (!(value == "true" || value == "True" || value == "1" ||
+					  value == "false" || value == "False" || value == "0"))
 					REPORT_ERROR("ERROR: invalid value for Boolean variable for --value: " + value);
-				bool myval = (value == "true" || value == "True");
+				bool myval = (value == "true" || value == "True" || value == "1");
 				schedule.setBooleanVariableValue(set_var, myval);
 
 				if (has_ori_value)
 				{
-					if (!(ori_value == "true" || ori_value == "True" || ori_value == "false" || ori_value == "False"))
+					if (!(ori_value == "true" || ori_value == "True"  || ori_value == "1" ||
+						  ori_value == "false" || ori_value == "False" || ori_value == "0"))
 						REPORT_ERROR("ERROR: invalid value for Boolean variable for --original_value: " + ori_value);
-					myval = (ori_value == "true" || ori_value == "True");
+					myval = (ori_value == "true" || ori_value == "True" || ori_value == "1" );
 					schedule.setBooleanOriginalVariableValue(set_var, myval);
 				}
 			}
