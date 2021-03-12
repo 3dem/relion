@@ -23,16 +23,9 @@ import traceback
 import ast 
 import collections
 from shutil import copytree
-
-try:
-    import Tkinter as tk
-    from tkinter import scrolledtext 
-    import tkMessageBox
-    import tkFileDialog
-except ImportError:
-    # The GUI is optional. If the user requests it, it will fail when it tries
-    # to open so we can ignore the error for now.
-    pass  
+import Tkinter as tk
+#from Tkinter import scrolledtext 
+import tkMessageBox
 
 OPTIONS_FILE = 'relion_it_options.py'
 IS_RUNNING = False
@@ -44,6 +37,59 @@ entry_bg = '#ffffe6'
 button_bg = '#c8506e'
 # Darker red for run buttons
 runbutton_bg = '#a01e3c'
+
+def load_star(filename):
+    from collections import OrderedDict
+    import shlex  
+    datasets = OrderedDict()
+    current_data = None
+    current_colnames = None
+    
+    in_loop = 0 # 0: outside 1: reading colnames 2: reading data
+
+    for line in open(filename):
+        line = line.strip()
+
+        # remove comments
+        comment_pos = line.find('#')
+        if comment_pos > 0:
+            line = line[:comment_pos]
+
+        if line == "":
+            if in_loop == 2:
+                in_loop = 0
+            continue
+
+        if line.startswith("data_"):
+            in_loop = 0
+
+            data_name = line[5:]
+            current_data = OrderedDict()
+            datasets[data_name] = current_data
+
+        elif line.startswith("loop_"):
+            current_colnames = []
+            in_loop = 1
+
+        elif line.startswith("_"):
+            if in_loop == 2:
+                in_loop = 0
+
+            elems = line[1:].split()
+            if in_loop == 1:
+                current_colnames.append(elems[0])
+                current_data[elems[0]] = []
+            else:
+                current_data[elems[0]] = elems[1]
+
+        elif in_loop > 0:
+            in_loop = 2
+            elems = shlex.split(line)
+            assert len(elems) == len(current_colnames)
+            for idx, e in enumerate(elems):
+                current_data[current_colnames[idx]].append(e)
+
+    return datasets
 
 class ScheduleGui(object):
 
@@ -87,18 +133,24 @@ class ScheduleGui(object):
 
         row = 0
 
+        ### Fill the jobnames and schedule variables pull-down menus
+        schedule = load_star('Schedules/'+self.schedulename+'/schedule.star')
+        self.jobnames = schedule['schedule_jobs']['rlnScheduleJobNameOriginal']
         tk.Label(self.joboption_frame, text="Job name:").grid(row=row, sticky=tk.W)
         self.jobname_var = tk.StringVar()
-        self.jobname_entry = tk.Entry(self.joboption_frame, textvariable=self.jobname_var, bg=entry_bg)
+        self.jobname_entry = tk.OptionMenu(self.joboption_frame, self.jobname_var, *self.jobnames)
         self.jobname_entry.grid(row=row, column=1, sticky=tk.W)
+        self.jobname_var.trace('w', self.change_jobname)
 
         row += 1
 
         tk.Label(self.joboption_frame, text="Job option:").grid(row=row, sticky=tk.W)
         self.joboption_var = tk.StringVar()
-        self.joboption_entry = tk.Entry(self.joboption_frame, textvariable=self.joboption_var, bg=entry_bg)
+        self.joboptions = ["undefined"] 
+        self.joboption_entry = tk.OptionMenu(self.joboption_frame, self.joboption_var, *self.joboptions)
         self.joboption_entry.grid(row=row, column=1, sticky=tk.W)
-
+        self.joboption_var.trace('w', self.change_joboption)
+        
         row += 1
 
         tk.Label(self.joboption_frame, text="New value:").grid(row=row, sticky=tk.W)
@@ -117,10 +169,19 @@ class ScheduleGui(object):
 
         row = 0
 
+        self.schedulevars = []
+        try:
+            self.schedulevars += schedule['schedule_floats']['rlnScheduleFloatVariableName']
+            self.schedulevars += schedule['schedule_bools']['rlnScheduleBooleanVariableName']
+            self.schedulevars += schedule['schedule_strings']['rlnScheduleStringVariableName']
+        except KeyError:
+            pass
+            
         tk.Label(self.schedulevar_frame, text="Variable:").grid(row=row, sticky=tk.W)
         self.schedulevar_var = tk.StringVar()
-        self.schedulevar_entry = tk.Entry(self.schedulevar_frame, textvariable=self.schedulevar_var, bg=entry_bg)
+        self.schedulevar_entry = tk.OptionMenu(self.schedulevar_frame, self.schedulevar_var, *self.schedulevars)
         self.schedulevar_entry.grid(row=row, column=1, sticky=tk.W)
+        self.schedulevar_var.trace('w', self.change_schedulevar)
 
         row += 1
 
@@ -172,6 +233,41 @@ class ScheduleGui(object):
         # Check whether the Schedule is running every 3 seconds
         self.main_frame.after(0, self.check_running())
         
+    def change_jobname(self, *args):
+        job = load_star('Schedules/'+self.schedulename+'/'+self.jobname_var.get()+'/job.star')
+        self.joboptions = job['joboptions_values']['rlnJobOptionVariable']
+        self.joboption_entry['menu'].delete(0, 'end')
+        for opt in self.joboptions:
+            self.joboption_entry['menu'].add_command(label=opt, command=tk._setit(self.joboption_var, opt))
+        self.joboption_value_var.set("")
+
+    def change_joboption(self, *args):
+        job = load_star('Schedules/'+self.schedulename+'/'+self.jobname_var.get()+'/job.star')
+        myopt = self.joboption_var.get()
+        myval = ""
+        for i in range(0,len(job['joboptions_values']['rlnJobOptionVariable'])):
+            if job['joboptions_values']['rlnJobOptionVariable'][i] == myopt:
+                myval += job['joboptions_values']['rlnJobOptionValue'][i]
+        self.joboption_value_var.set(myval)
+
+    def change_schedulevar(self, *args):
+        schedule = load_star('Schedules/'+self.schedulename+'/schedule.star')
+        myvar = self.schedulevar_var.get()
+        myval = ""
+        try:
+            ifloat = ibool = istring = -1
+            for i in range(0,len(schedule['schedule_floats']['rlnScheduleFloatVariableName'])):
+                if schedule['schedule_floats']['rlnScheduleFloatVariableName'][i] == myvar:
+                    myval += schedule['schedule_floats']['rlnScheduleFloatVariableValue'][i]
+            for i in range(0,len(schedule['schedule_bools']['rlnScheduleBooleanVariableName'])):
+                if schedule['schedule_bools']['rlnScheduleBooleanVariableName'][i] == myvar:
+                    myval += schedule['schedule_bools']['rlnScheduleBooleanVariableValue'][i]
+            for i in range(0,len(schedule['schedule_strings']['rlnScheduleStringVariableName'])):
+                if schedule['schedule_strings']['rlnScheduleStringVariableName'][i] == myvar:
+                    myval += schedule['schedule_strings']['rlnScheduleStringVariableValue'][i]
+        except KeyError:
+            pass
+        self.schedulevar_value_var.set(myval)
 
     def update_relion_it_options(self, myoption):
         with open(OPTIONS_FILE) as file: 
@@ -185,24 +281,24 @@ class ScheduleGui(object):
         print(' RELION_IT: updated ', OPTIONS_FILE)
 
     def set_joboption(self, *args_ignored, **kwargs_ignored):
-        jobstar = 'Schedules/' + self.schedulename + '/' + self.jobname_entry.get() + '/job.star'
-        command = 'relion_pipeliner --editJob ' + jobstar + ' --editOption ' + self.joboption_entry.get() + ' --editValue \"' + str(self.joboption_value_entry.get()) + '\"'
+        jobstar = 'Schedules/' + self.schedulename + '/' + self.jobname_var.get() + '/job.star'
+        command = 'relion_pipeliner --editJob ' + jobstar + ' --editOption ' + self.joboption_var.get() + ' --editValue \"' + str(self.joboption_value_entry.get()) + '\"'
         print(' RELION_IT: excuting: ', command)
         os.system(command)
         # Also set has_started to false for this job in the scheduler
-        command2 = 'relion_scheduler --schedule ' + self.schedulename + ' --set_has_started ' + self.jobname_entry.get() + ' --value False'
+        command2 = 'relion_scheduler --schedule ' + self.schedulename + ' --set_has_started ' + self.jobname_var.get() + ' --value False'
         print(' RELION_IT: excuting: ', command2)
         os.system(command2)
-        myoption = self.schedulename + '__' + self.jobname_entry.get() + '__' + self.joboption_entry.get()
+        myoption = self.schedulename + '__' + self.jobname_var.get() + '__' + self.joboption_var.get()
         mydic = {myoption : self.joboption_value_entry.get()}
         self.update_relion_it_options(mydic)
             
     def set_schedulevar(self, *args_ignored, **kwargs_ignored):
-        command = 'relion_scheduler --schedule ' + self.schedulename + ' --set_var ' + self.schedulevar_entry.get() + ' --value \"' + self.schedulevar_value_entry.get() + '\"' + ' --original_value \"' + self.schedulevar_value_entry.get() + '\"'
+        command = 'relion_scheduler --schedule ' + self.schedulename + ' --set_var ' + self.schedulevar_var.get() + ' --value \"' + self.schedulevar_value_var.get() + '\"' + ' --original_value \"' + self.schedulevar_value_var.get() + '\"'
         print(' RELION_IT: excuting: ', command)
         os.system(command)
-        myoption = self.schedulename + '__' + self.schedulevar_entry.get()
-        mydic = {myoption : self.schedulevar_value_entry.get()}
+        myoption = self.schedulename + '__' + self.schedulevar_var.get()
+        mydic = {myoption : self.schedulevar_value_var.get()}
         self.update_relion_it_options(mydic)
 
     def abort_schedule(self, *args_ignored, **kwargs_ignored):
@@ -219,12 +315,12 @@ class ScheduleGui(object):
         self.set_current_node()
 
     def unlock_schedule(self, *args_ignored, **kwargs_ignored):
-        print(' RELION_IT: use the following command to ensure the relion_scheduler process is no longer running:') 
-        print('   ps -ef | grep relion_scheduler')
-        print(' RELION_IT: if you see the relion_scheduler process, use the Abort button instead!')
-        print(' RELION_IT: otherwise, you can unlock the Schedule by typing:')
-        lockname = ".relion_lock_schedule_" + self.schedulename
-        print('   rm -rf ', lockname)
+        if tkMessageBox.askokcancel("Confirm unlock", 'Use:\n\nps -ef | grep relion_scheduler \n\nto confirm this scheduler is no longer running. \n\nOK to unlock?', 
+                                    icon='warning', default=tkMessageBox.CANCEL):
+            lockname = ".relion_lock_schedule_" + self.schedulename
+            command = 'rm -rf ' + lockname
+            print(' RELION_IT: excuting: ', command)
+            os.system(command)
 
     def restart_schedule(self, *args_ignored, **kwargs_ignored):
         # Set the current node, as per the GUI
