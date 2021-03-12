@@ -23,16 +23,9 @@ import traceback
 import ast 
 import collections
 from shutil import copytree
-
-try:
-    import Tkinter as tk
-    from tkinter import scrolledtext 
-    import tkMessageBox
-    import tkFileDialog
-except ImportError:
-    # The GUI is optional. If the user requests it, it will fail when it tries
-    # to open so we can ignore the error for now.
-    pass  
+import Tkinter as tk
+#from Tkinter import scrolledtext 
+import tkMessageBox
 
 OPTIONS_FILE = 'relion_it_options.py'
 IS_RUNNING = False
@@ -322,12 +315,12 @@ class ScheduleGui(object):
         self.set_current_node()
 
     def unlock_schedule(self, *args_ignored, **kwargs_ignored):
-        print(' RELION_IT: use the following command to ensure the relion_scheduler process is no longer running:') 
-        print('   ps -ef | grep relion_scheduler')
-        print(' RELION_IT: if you see the relion_scheduler process, use the Abort button instead!')
-        print(' RELION_IT: otherwise, you can unlock the Schedule by typing:')
-        lockname = ".relion_lock_schedule_" + self.schedulename
-        print('   rm -rf ', lockname)
+        if tkMessageBox.askokcancel("Confirm unlock", 'Use:\n\nps -ef | grep relion_scheduler \n\nto confirm this scheduler is no longer running. \n\nOK to unlock?', 
+                                    icon='warning', default=tkMessageBox.CANCEL):
+            lockname = ".relion_lock_schedule_" + self.schedulename
+            command = 'rm -rf ' + lockname
+            print(' RELION_IT: excuting: ', command)
+            os.system(command)
 
     def restart_schedule(self, *args_ignored, **kwargs_ignored):
         # Set the current node, as per the GUI
