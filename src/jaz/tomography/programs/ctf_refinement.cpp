@@ -70,7 +70,7 @@ void CtfRefinementProgram::parseInput()
 	int defocus_section = parser.addSection("Defocus refinement options");
 
 	do_refine_defocus = parser.checkOption("--do_defocus", "Refine the (astigmatic) defocus.");
-	lambda_reg = textToDouble(parser.getOption("--lambda", "Defocus regularisation scale", "0.1"));
+	lambda_reg = textToDouble(parser.getOption("--lambda", "Defocus regularisation scale", "0.001"));
 
 	minDelta = textToDouble(parser.getOption("--d0", "Min. defocus offset to test [Å]", "-3000"));
 	maxDelta = textToDouble(parser.getOption("--d1", "Max. defocus offset to test [Å]", "3000"));
