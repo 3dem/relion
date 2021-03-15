@@ -70,11 +70,13 @@ void CtfRefinementProgram::parseInput()
 	int defocus_section = parser.addSection("Defocus refinement options");
 
 	do_refine_defocus = parser.checkOption("--do_defocus", "Refine the (astigmatic) defocus.");
-	lambda_reg = textToDouble(parser.getOption("--lambda", "Defocus regularisation scale", "0.1"));
+	lambda_reg = textToDouble(parser.getOption("--lambda", "Defocus regularisation scale", "0.001"));
 
 	minDelta = textToDouble(parser.getOption("--d0", "Min. defocus offset to test [Å]", "-3000"));
 	maxDelta = textToDouble(parser.getOption("--d1", "Max. defocus offset to test [Å]", "3000"));
 	deltaSteps = textToInteger(parser.getOption("--ds", "Number of defocus steps in-between", "100"));
+
+	k_min_Ang = textToDouble(parser.getOption("--kmin", "Lowest spatial frequency to consider [Å]", "30"));
 
 
 	int scale_section = parser.addSection("Scale estimation options");
@@ -114,12 +116,12 @@ void CtfRefinementProgram::initTempDirectories()
 {
 	if (do_refine_defocus)
 	{
-		ZIO::ensureParentDir(getDefocusTempFilename(""));
+		ZIO::ensureParentDir(getDefocusTempFilenameRoot(""));
 	}
 
 	if (do_refine_scale)
 	{
-		ZIO::ensureParentDir(getScaleTempFilename(""));
+		ZIO::ensureParentDir(getScaleTempFilenameRoot(""));
 	}
 
 	if (do_refine_aberrations)
@@ -155,18 +157,7 @@ void CtfRefinementProgram::processTomograms(
 			Log::updateProgress(tt);
 		}
 
-		if (run_from_GUI && pipeline_control_check_abort_job())
-		{
-			if (run_from_MPI)
-			{
-				MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
-				exit(RELION_EXIT_ABORTED);
-			}
-			else
-			{
-				exit(RELION_EXIT_ABORTED);
-			}
-		}
+		abortIfNeeded();
 
 		const int t = tomoIndices[tt];
 
@@ -196,6 +187,8 @@ void CtfRefinementProgram::processTomograms(
 
 		const int fc = tomogram.frameCount;
 
+		const double k_min_px = boxSize * tomogram.optics.pixelSize / k_min_Ang;
+
 
 		particleSet.checkTrajectoryLengths(
 				particles[t][0], pc, fc, "CtfRefinementProgram::run");
@@ -208,37 +201,15 @@ void CtfRefinementProgram::processTomograms(
 
 		const int item_verbosity = per_tomogram_progress? verbosity : 0;
 
-		if (run_from_GUI && pipeline_control_check_abort_job())
-		{
-			if (run_from_MPI)
-			{
-				MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
-				exit(RELION_EXIT_ABORTED);
-			}
-			else
-			{
-				exit(RELION_EXIT_ABORTED);
-			}
-		}
+		abortIfNeeded();
 
 		if (do_refine_defocus)
 		{
 			refineDefocus(
 				t, tomogram, aberrationsCache, freqWeights, doseWeights,
-				item_verbosity);
+				k_min_px, item_verbosity);
 
-			if (run_from_GUI && pipeline_control_check_abort_job())
-			{
-				if (run_from_MPI)
-				{
-					MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
-					exit(RELION_EXIT_ABORTED);
-				}
-				else
-				{
-					exit(RELION_EXIT_ABORTED);
-				}
-			}
+			abortIfNeeded();
 		}
 
 
@@ -248,18 +219,7 @@ void CtfRefinementProgram::processTomograms(
 				t, tomogram, aberrationsCache, freqWeights, doseWeights,
 				item_verbosity);
 
-			if (run_from_GUI && pipeline_control_check_abort_job())
-			{
-				if (run_from_MPI)
-				{
-					MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
-					exit(RELION_EXIT_ABORTED);
-				}
-				else
-				{
-					exit(RELION_EXIT_ABORTED);
-				}
-			}
+			abortIfNeeded();
 		}
 
 
@@ -269,18 +229,7 @@ void CtfRefinementProgram::processTomograms(
 				t, tomogram, aberrationsCache, freqWeights, doseWeights,
 				item_verbosity);
 
-			if (run_from_GUI && pipeline_control_check_abort_job())
-			{
-				if (run_from_MPI)
-				{
-					MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
-					exit(RELION_EXIT_ABORTED);
-				}
-				else
-				{
-					exit(RELION_EXIT_ABORTED);
-				}
-			}
+			abortIfNeeded();
 		}
 
 
@@ -346,6 +295,8 @@ void CtfRefinementProgram::finalise()
 
 	optimisationSet.write(outDir + "optimisation_set.star");
 
+	mergeLogFiles();
+
 	std::cout << std::endl;
 }
 
@@ -357,6 +308,7 @@ void CtfRefinementProgram::refineDefocus(
 		const AberrationsCache& aberrationsCache,
 		const BufferedImage<float>& freqWeights,
 		const BufferedImage<float>& doseWeights,
+		double k_min_px,
 		int verbosity)
 {
 	const int s = boxSize;
@@ -446,7 +398,7 @@ void CtfRefinementProgram::refineDefocus(
 
 	const BufferedImage<double> dataTerm = evaluateDefocusRange(
 			evenData, tomogram.optics.pixelSize, tomogram.centralCTFs,
-			minDelta, maxDelta, deltaSteps);
+			minDelta, maxDelta, deltaSteps, k_min_px);
 
 	if (diag)
 	{
@@ -485,7 +437,8 @@ void CtfRefinementProgram::refineDefocus(
 	EvenSolution solution = AberrationFit::solveEven(evenData);
 
 	std::vector<d3Vector> astig = findMultiAstigmatism(
-		solution, tomogram.centralCTFs, bestDeltaZ, tomogram.optics.pixelSize, lambda_reg);
+		solution, tomogram.centralCTFs, bestDeltaZ, tomogram.optics.pixelSize,
+		lambda_reg, k_min_px);
 
 	MetaDataTable tempTable;
 
@@ -516,19 +469,9 @@ void CtfRefinementProgram::refineDefocus(
 		tomogram.centralCTFs[f] = ctf1;
 	}
 
-	tempTable.write(getDefocusTempFilename(tomogram.name));
+	tempTable.write(getDefocusTempFilenameRoot(tomogram.name) + ".star");
 
-	if (diag)
-	{
-		std::ofstream meanDefocus(outDir + tomogram.name + "_mean_defocus.dat");
-
-		for (int f = 0; f < fc; f++)
-		{
-			meanDefocus << f << ' ' << (astig[f][0] + astig[f][1]) / 2.0 << '\n';
-		}
-
-		meanDefocus.flush();
-	}
+	writeDefocusEps(tempTable, tomogram.name);
 
 	if (verbosity > 0)
 	{
@@ -658,7 +601,7 @@ void CtfRefinementProgram::updateScale(
 			tempFile.setValue(EMDL_TOMO_TEMP_PRED_SQUARED, sum_prdSqr_f[f], f);
 		}
 
-		const std::string tempFilename = getScaleTempFilename(tomogram.name);
+		const std::string tempFilename = getScaleTempFilenameRoot(tomogram.name) + ".star";
 		tempFile.write(tempFilename);
 	}
 	else if (do_fit_Lambert_per_tomo)
@@ -726,7 +669,7 @@ void CtfRefinementProgram::updateScale(
 		tempGlobalTable.setValue(EMDL_TOMO_ICE_NORMAL_Z, ice_normal.z, 0);
 
 		{
-			const std::string tempFilename = getScaleTempFilename(tomogram.name);
+			const std::string tempFilename = getScaleTempFilenameRoot(tomogram.name) + ".star";
 			std::ofstream ofs(tempFilename);
 
 			if (!ofs)
@@ -783,7 +726,7 @@ void CtfRefinementProgram::updateScale(
 			tomogram.centralCTFs[f] = ctf;
 		}
 
-		tempPerFrameTable.write(getScaleTempFilename(tomogram.name));
+		tempPerFrameTable.write(getScaleTempFilenameRoot(tomogram.name) + ".star");
 	}
 
 	if (verbosity > 0)
@@ -917,7 +860,10 @@ void CtfRefinementProgram::collectDefocus()
 	{
 		Tomogram tomogram = tomogramSet.loadTomogram(t, false);
 
-		const std::string tempFilename = getDefocusTempFilename(tomogram.name);
+		const std::string tempFilename = getDefocusTempFilenameRoot(tomogram.name) + ".star";
+
+		if (!ZIO::fileExists(tempFilename)) continue;
+
 		MetaDataTable tempTable;
 		tempTable.read(tempFilename);
 
@@ -946,12 +892,21 @@ void CtfRefinementProgram::fitGlobalScale()
 	std::vector<std::vector<d4Matrix>> all_proj_matrices(tc);
 	std::vector<double> all_fract_doses(tc);
 
+	std::vector<bool> tomo_good(tc, false);
+
+
 	for (int t = 0; t < tc; t++)
 	{
 		Tomogram tomogram = tomogramSet.loadTomogram(t, false);
 
-		const std::string tempFilename = getScaleTempFilename(tomogram.name);
+		const std::string tempFilename = getScaleTempFilenameRoot(tomogram.name) + ".star";
 		MetaDataTable tempFile;
+
+		if (!ZIO::fileExists(tempFilename))
+		{
+			continue;
+		}
+
 		tempFile.read(tempFilename);
 
 		const int fc = tomogram.frameCount;
@@ -972,6 +927,8 @@ void CtfRefinementProgram::fitGlobalScale()
 
 		all_proj_matrices[t] = tomogram.projectionMatrices;
 		all_fract_doses[t] = tomogram.getFrameDose();
+
+		tomo_good[t] = true;
 	}
 
 	std::vector<double> initial(2*tc + 1);
@@ -1042,6 +999,8 @@ void CtfRefinementProgram::fitGlobalScale()
 
 	for (int t = 0; t < tc; t++)
 	{
+		if (!tomo_good[t]) continue;
+
 		Tomogram tomogram = tomogramSet.loadTomogram(t, false);
 
 		const int fc = tomogram.frameCount;
@@ -1095,10 +1054,12 @@ void CtfRefinementProgram::collectScale()
 	for (int t = 0; t < tc; t++)
 	{
 		Tomogram tomogram = tomogramSet.loadTomogram(t, false);
-		std::string tempFilename = getScaleTempFilename(tomogram.name);
+		std::string tempFilename = getScaleTempFilenameRoot(tomogram.name) + ".star";
 
-		const int fc = tomogram.frameCount;
-
+		if (!ZIO::fileExists(tempFilename))
+		{
+			continue;
+		}
 
 		std::ifstream ifs(tempFilename);
 
@@ -1107,6 +1068,7 @@ void CtfRefinementProgram::collectScale()
 			REPORT_ERROR_STR("CtfRefinementProgram::collectScale: Unable to read " << tempFilename);
 		}
 
+		const int fc = tomogram.frameCount;
 
 		if (do_fit_Lambert_per_tomo)
 		{
@@ -1143,7 +1105,7 @@ void CtfRefinementProgram::collectScale()
 		else
 		{
 			MetaDataTable tempPerFrameTable;
-			tempPerFrameTable.read(getScaleTempFilename(tomogram.name));
+			tempPerFrameTable.read(getScaleTempFilenameRoot(tomogram.name) + ".star");
 
 			for (int f = 0; f < fc; f++)
 			{
@@ -1177,12 +1139,13 @@ void CtfRefinementProgram::fitAberrations()
 
 			for (int t = 0; t < tc; t++)
 			{
-				Tomogram tomogram = tomogramSet.loadTomogram(t, false);
+				const std::string fn = getEvenAberrationsTempFilename(tomogramSet.getTomogramName(t), g);
 
-				BufferedImage<EvenData> even = EvenData::read(
-						getEvenAberrationsTempFilename(tomogram.name, g));
-
-				even_data_sum += even;
+				if (ZIO::fileExists(fn))
+				{
+					BufferedImage<EvenData> even = EvenData::read(fn);
+					even_data_sum += even;
+				}
 			}
 
 			std::vector<double> initialEven(Zernike::numberOfEvenCoeffs(n_even), 0.0);
@@ -1217,12 +1180,13 @@ void CtfRefinementProgram::fitAberrations()
 
 			for (int t = 0; t < tc; t++)
 			{
-				Tomogram tomogram = tomogramSet.loadTomogram(t, false);
+				const std::string fn = getOddAberrationsTempFilename(tomogramSet.getTomogramName(t), g);
 
-				BufferedImage<OddData> odd = OddData::read(
-						getOddAberrationsTempFilename(tomogram.name, g));
-
-				odd_data_sum += odd;
+				if (ZIO::fileExists(fn))
+				{
+					BufferedImage<OddData> odd = OddData::read(fn);
+					odd_data_sum += odd;
+				}
 			}
 
 			std::vector<double> initialOdd(Zernike::numberOfOddCoeffs(n_odd), 0.0);
@@ -1259,7 +1223,8 @@ BufferedImage<double> CtfRefinementProgram::evaluateDefocusRange(
 		const std::vector<CTF>& ctfs,
 		double minDefocus,
 		double maxDefocus,
-		int steps)
+		int steps,
+		double k_min_px)
 {
 	const int s  = evenData.ydim;
 	const int sh = evenData.xdim;
@@ -1268,6 +1233,8 @@ BufferedImage<double> CtfRefinementProgram::evaluateDefocusRange(
 	const double as = s * pixelSize;
 	const double eps = 1e-30;
 	const double deltaStep = (maxDefocus - minDefocus) / (double) (steps - 1);
+
+	const double k_min_sq = k_min_px * k_min_px;
 
 
 	BufferedImage<double> out(fc,steps);
@@ -1295,7 +1262,7 @@ BufferedImage<double> CtfRefinementProgram::evaluateDefocusRange(
 				const double yy = y < s/2? y : y - s;
 				const double r2 = xx * xx + yy * yy;
 
-				if (r2 < s*s/4)
+				if (r2 < s*s/4 && r2 >= k_min_sq)
 				{
 					EvenData d = evenData(x,y,f);
 
@@ -1395,7 +1362,8 @@ std::vector<d3Vector> CtfRefinementProgram::findMultiAstigmatism(
 		const std::vector<CTF>& referenceCtfs,
 		double initialDeltaZ,
 		double pixelSize,
-		double lambda_reg)
+		double lambda_reg,
+		double k_min_px)
 {
 	const int s  = solution.optimum.ydim;
 	const int sh = solution.optimum.xdim;
@@ -1408,16 +1376,30 @@ std::vector<d3Vector> CtfRefinementProgram::findMultiAstigmatism(
 	for (int yi = 0; yi < s;  yi++)
 	for (int xi = 0; xi < sh; xi++)
 	{
-		const double xx = xi/as;
-		const double yy = (yi < s/2)? yi/as : (yi - s)/as;
+		const double xf = xi;
+		const double yf = (yi < s/2)? yi : yi - s;
 
-		astigBasis(xi,yi,0) = xx * xx + yy * yy;
-		astigBasis(xi,yi,1) = xx * xx - yy * yy;
-		astigBasis(xi,yi,2) = 2.0 * xx * yy;
+		const double r2 = xf * xf + yf * yf;
+
+		if (r2 > k_min_px * k_min_px)
+		{
+			const double xx = yf / as;
+			const double yy = xf / as;
+
+			astigBasis(xi,yi,0) = xx * xx + yy * yy;
+			astigBasis(xi,yi,1) = xx * xx - yy * yy;
+			astigBasis(xi,yi,2) = 2.0 * xx * yy;
+		}
+		else
+		{
+			astigBasis(xi,yi,0) = 0.0;
+			astigBasis(xi,yi,1) = 0.0;
+			astigBasis(xi,yi,2) = 0.0;
+		}
 	}
 
 	ZernikeHelper::MultiAnisoBasisOptimisation problem(
-				solution.optimum, solution.weight, astigBasis, lambda_reg, false);
+			solution.optimum, solution.weight, astigBasis, lambda_reg, false);
 
 	std::vector<double> initial(3 * fc + 3, 0.0);
 
@@ -1459,14 +1441,14 @@ std::vector<d3Vector> CtfRefinementProgram::findMultiAstigmatism(
 
 
 
-std::string CtfRefinementProgram::getDefocusTempFilename(const std::string &tomogram_name)
+std::string CtfRefinementProgram::getDefocusTempFilenameRoot(const std::string &tomogram_name)
 {
-	return outDir + "temp/defocus/" + tomogram_name + ".star";
+	return outDir + "temp/defocus/" + tomogram_name;
 }
 
-std::string CtfRefinementProgram::getScaleTempFilename(const std::string& tomogram_name)
+std::string CtfRefinementProgram::getScaleTempFilenameRoot(const std::string& tomogram_name)
 {
-	return outDir + "temp/scale/" + tomogram_name + ".star";
+	return outDir + "temp/scale/" + tomogram_name;
 }
 
 std::string CtfRefinementProgram::getEvenAberrationsTempFilename(
@@ -1486,12 +1468,12 @@ std::string CtfRefinementProgram::getOddAberrationsTempFilename(
 
 bool CtfRefinementProgram::defocusAlreadyDone(const std::string &tomogram_name)
 {
-	return !do_refine_defocus || ZIO::fileExists(getDefocusTempFilename(tomogram_name));
+	return !do_refine_defocus || ZIO::fileExists(getDefocusTempFilenameRoot(tomogram_name) + ".star");
 }
 
 bool CtfRefinementProgram::scaleAlreadyDone(const std::string &tomogram_name)
 {
-	return !do_refine_scale || ZIO::fileExists(getScaleTempFilename(tomogram_name));
+	return !do_refine_scale || ZIO::fileExists(getScaleTempFilenameRoot(tomogram_name) + ".star");
 }
 
 bool CtfRefinementProgram::aberrationsAlreadyDone(
@@ -1503,7 +1485,109 @@ bool CtfRefinementProgram::aberrationsAlreadyDone(
 					tomogram_name, group_count-1) + "_by.mrc") ) &&
 		(!do_odd_aberrations  ||
 			ZIO::fileExists(getOddAberrationsTempFilename(
-					tomogram_name, group_count-1) + "_b_imag.mrc") );
+								tomogram_name, group_count-1) + "_b_imag.mrc") );
+}
+
+void CtfRefinementProgram::writeDefocusEps(const MetaDataTable& table, const std::string& tomo_name)
+{
+	const std::string root_name = getDefocusTempFilenameRoot(tomo_name);
+
+	CPlot2D plot2D(tomo_name + " Defocus");
+
+	plot2D.SetXAxisSize(600);
+	plot2D.SetYAxisSize(600);
+	plot2D.SetDrawLegend(true);
+	plot2D.SetFlipY(true);
+
+	const int fc = table.numberOfObjects();
+
+	for (int dim = 0; dim < 2; dim++)
+	{
+		CDataSet dataSet;
+
+		dataSet.SetDrawMarker(false);
+		dataSet.SetDrawLine(true);
+		dataSet.SetLineWidth(1.0);
+		dataSet.SetMarkerSize(10);
+		dataSet.SetDatasetColor(0.1, 0.1, 0.1);
+
+		for (int f = 0; f < fc; f++)
+		{
+			double delta_Z = 0.0;
+
+			if (dim == 0)
+			{
+				table.getValue(EMDL_CTF_DEFOCUSU, delta_Z, f);
+			}
+			else
+			{
+				table.getValue(EMDL_CTF_DEFOCUSV, delta_Z, f);
+			}
+
+			dataSet.AddDataPoint(CDataPoint(f, delta_Z));
+		}
+
+		plot2D.AddDataSet(dataSet);
+	}
+
+	plot2D.SetXAxisTitle("frame");
+	plot2D.SetYAxisTitle("defocus");
+	plot2D.OutputPostScriptPlot(root_name + ".eps");
+
+
+	std::ofstream defocusFile(root_name + ".dat");
+
+	for (int f = 0; f < fc; f++)
+	{
+		defocusFile << f << ' ' << table.getDouble(EMDL_CTF_DEFOCUSU, f) << '\n';
+	}
+
+	defocusFile << '\n';
+
+	for (int f = 0; f < fc; f++)
+	{
+		defocusFile << f << ' ' << table.getDouble(EMDL_CTF_DEFOCUSV, f) << '\n';
+	}
+
+	defocusFile.flush();
+}
+
+void CtfRefinementProgram::mergeLogFiles()
+{
+	const int tc = tomogramSet.size();
+
+	std::vector<FileName> fn_eps(0);
+
+	for (int t = 0; t < tc; t++)
+	{
+		const std::string filename = getDefocusTempFilenameRoot(tomogramSet.getTomogramName(t)) + ".eps";
+
+		if (ZIO::fileExists(filename))
+		{
+			fn_eps.push_back(filename);
+		}
+	}
+
+	if (fn_eps.size() > 0)
+	{
+		joinMultipleEPSIntoSinglePDF(outDir + "logfile.pdf", fn_eps);
+	}
+}
+
+void CtfRefinementProgram::abortIfNeeded()
+{
+	if (run_from_GUI && pipeline_control_check_abort_job())
+	{
+		if (run_from_MPI)
+		{
+			MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
+			exit(RELION_EXIT_ABORTED);
+		}
+		else
+		{
+			exit(RELION_EXIT_ABORTED);
+		}
+	}
 }
 
 
