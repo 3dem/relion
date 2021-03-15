@@ -103,8 +103,8 @@ class ScheduleGui(object):
 
         ### Status frame
 
-        self.status_frame = tk.LabelFrame(self.main_frame, text="Current status", padx=5, pady=5)
-        self.status_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
+        self.status_frame = tk.LabelFrame(self.main_frame, text="Current status", padx=3, pady=3)
+        self.status_frame.pack(padx=3, pady=3, fill=tk.X, expand=1)
         tk.Grid.columnconfigure(self.main_frame, 1, weight=1)
 
         tk.Label(self.status_frame, text="Current:").grid(row=0, column=0, sticky=tk.W)
@@ -141,8 +141,8 @@ class ScheduleGui(object):
 
         ### Joboption frame
         
-        self.joboption_frame = tk.LabelFrame(left_frame, text="Set Job option", padx=5, pady=5)
-        self.joboption_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
+        self.joboption_frame = tk.LabelFrame(left_frame, text="Set Job option", padx=3, pady=3)
+        self.joboption_frame.pack(padx=3, pady=3, fill=tk.X, expand=1)
         tk.Grid.columnconfigure(self.main_frame, 1, weight=1)
 
         row = 0
@@ -176,8 +176,8 @@ class ScheduleGui(object):
 
         ### Schedulevar frame
 
-        self.schedulevar_frame = tk.LabelFrame(left_frame, text="Set Schedule variable", padx=5, pady=5)
-        self.schedulevar_frame.pack(padx=2, pady=2, fill=tk.X, expand=1)
+        self.schedulevar_frame = tk.LabelFrame(left_frame, text="Set Schedule variable", padx=3, pady=3)
+        self.schedulevar_frame.pack(padx=3, pady=3, fill=tk.X, expand=1)
         tk.Grid.columnconfigure(self.main_frame, 1, weight=1)
 
         row = 0
@@ -208,8 +208,8 @@ class ScheduleGui(object):
 
         #### Output frame
         
-        self.output_frame = tk.LabelFrame(right_frame, text='Schedules/'+self.schedulename+'/run.out')
-        self.output_frame.pack(padx=2, pady=2, fill=tk.X, expand=0)
+        self.output_frame = tk.LabelFrame(right_frame, text='Schedules/'+self.schedulename+'/run.out', padx=3, pady=1)
+        self.output_frame.pack(padx=3, pady=1, fill=tk.X, expand=0)
         
         scroll = tk.Scrollbar(self.output_frame)
         scroll.pack(side=tk.RIGHT, fill=tk.Y)
@@ -219,8 +219,8 @@ class ScheduleGui(object):
 
         #### Error frame
         
-        self.error_frame = tk.LabelFrame(right_frame, text='Schedules/'+self.schedulename+'/run.err')
-        self.error_frame.pack(padx=2, pady=2, fill=tk.X, expand=0)
+        self.error_frame = tk.LabelFrame(right_frame, text='Schedules/'+self.schedulename+'/run.err', padx=3, pady=1)
+        self.error_frame.pack(padx=3, pady=1, fill=tk.X, expand=0)
         
         scroll2 = tk.Scrollbar(self.error_frame)
         scroll2.pack(side=tk.RIGHT, fill=tk.Y)
