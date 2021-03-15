@@ -100,45 +100,59 @@ class ScheduleGui(object):
         self.main_frame = tk.Frame(self.main_window)
         self.main_frame.pack(fill=tk.BOTH, expand=1)
 
+        ### Status frame
+
+        self.status_frame = tk.LabelFrame(self.main_frame, text="Current status", padx=3, pady=3)
+        self.status_frame.pack(padx=3, pady=3, fill=tk.X, expand=1)
+        tk.Grid.columnconfigure(self.main_frame, 1, weight=1)
+
+        tk.Label(self.status_frame, text="Current:").grid(row=0, column=0, sticky=tk.W)
+        self.current_node_var = tk.StringVar()
+        self.current_node_entry = tk.Entry(self.status_frame, textvariable=self.current_node_var, bg=entry_bg)
+        self.current_node_entry.grid(row=0, column=1, sticky=tk.W)
+        self.set_current_node()
+
+        self.abort_button = tk.Button(self.status_frame, text="Abort", command=self.abort_schedule, bg=runbutton_bg)
+        self.abort_button.grid(row=0, column=2, sticky=tk.W+tk.E)
+
+        self.unlock_schedule_button = tk.Button(self.status_frame, text="Unlock", command=self.unlock_schedule, bg=runbutton_bg)
+        self.unlock_schedule_button.grid(row=0, column=3, sticky=tk.W)
+
+        self.reset_schedule_button = tk.Button(self.status_frame, text="Reset", command=self.reset_schedule, bg=runbutton_bg)
+        self.reset_schedule_button.grid(row=0, column=4, sticky=tk.W)
+
+        self.restart_schedule_button = tk.Button(self.status_frame, text="Restart", command=self.restart_schedule, bg=runbutton_bg)
+        self.restart_schedule_button.grid(row=0, column=5)
+        tk.Label(self.status_frame, text="at:").grid(row=0, column=6, sticky=tk.W)
+
+        schedule = load_star('Schedules/'+self.schedulename+'/schedule.star')
+        jobnames = schedule['schedule_jobs']['rlnScheduleJobNameOriginal']
+        operators = schedule['schedule_operators']['rlnScheduleOperatorName']
+        restartvars = jobnames + operators
+        self.restart_var = tk.StringVar()
+        self.restart_entry = tk.OptionMenu(self.status_frame, self.restart_var, *restartvars)
+        self.restart_entry.grid(row=0, column=7, sticky=tk.W)
+
         left_frame = tk.Frame(self.main_frame)
         left_frame.pack(side=tk.LEFT, anchor=tk.N, fill=tk.X, expand=1)
 
         right_frame = tk.Frame(self.main_frame)
         right_frame.pack(side=tk.LEFT, anchor=tk.N, fill=tk.X, expand=1)
         
-        ### Status frame
-
-        self.status_frame = tk.LabelFrame(left_frame, text="Current status", padx=5, pady=5)
-        self.status_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
-        tk.Grid.columnconfigure(self.main_frame, 1, weight=1)
-
-        row = 0
-
-        tk.Label(self.status_frame, text="Current:").grid(row=row, sticky=tk.W)
-        self.current_node_var = tk.StringVar()
-        self.current_node_entry = tk.Entry(self.status_frame, textvariable=self.current_node_var, bg=entry_bg)
-        self.current_node_entry.grid(row=row, column=1, sticky=tk.W)
-        self.set_current_node()
-
-        self.abort_button = tk.Button(self.status_frame, text="Abort", command=self.abort_schedule, bg=button_bg)
-        self.abort_button.grid(row=row, column=2, sticky=tk.W)
-
-        row += 1
 
         ### Joboption frame
         
-        self.joboption_frame = tk.LabelFrame(left_frame, text="Set Job option", padx=5, pady=5)
-        self.joboption_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
+        self.joboption_frame = tk.LabelFrame(left_frame, text="Set Job option", padx=3, pady=3)
+        self.joboption_frame.pack(padx=3, pady=3, fill=tk.X, expand=1)
         tk.Grid.columnconfigure(self.main_frame, 1, weight=1)
 
         row = 0
 
         ### Fill the jobnames and schedule variables pull-down menus
-        schedule = load_star('Schedules/'+self.schedulename+'/schedule.star')
-        self.jobnames = schedule['schedule_jobs']['rlnScheduleJobNameOriginal']
+        
         tk.Label(self.joboption_frame, text="Job name:").grid(row=row, sticky=tk.W)
         self.jobname_var = tk.StringVar()
-        self.jobname_entry = tk.OptionMenu(self.joboption_frame, self.jobname_var, *self.jobnames)
+        self.jobname_entry = tk.OptionMenu(self.joboption_frame, self.jobname_var, *jobnames)
         self.jobname_entry.grid(row=row, column=1, sticky=tk.W)
         self.jobname_var.trace('w', self.change_jobname)
 
@@ -163,8 +177,8 @@ class ScheduleGui(object):
 
         ### Schedulevar frame
 
-        self.schedulevar_frame = tk.LabelFrame(left_frame, text="Set Schedule variable", padx=5, pady=5)
-        self.schedulevar_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
+        self.schedulevar_frame = tk.LabelFrame(left_frame, text="Set Schedule variable", padx=3, pady=3)
+        self.schedulevar_frame.pack(padx=3, pady=3, fill=tk.X, expand=1)
         tk.Grid.columnconfigure(self.main_frame, 1, weight=1)
 
         row = 0
@@ -193,40 +207,25 @@ class ScheduleGui(object):
         set_schedulevar_button = tk.Button(self.schedulevar_frame, text="Set", command=self.set_schedulevar, bg=button_bg)
         set_schedulevar_button.grid(row=row, column=2)
 
-        #### Restart frame
-        
-        self.restart_frame = tk.LabelFrame(left_frame, text="Restart Schedule", padx=5, pady=5)
-        self.restart_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
-        tk.Grid.columnconfigure(self.main_frame, 1, weight=1)
-
-        self.restart_schedule_button = tk.Button(self.restart_frame, text="Restart", command=self.restart_schedule, bg=runbutton_bg)
-        self.restart_schedule_button.grid(row=0, column=0)
-
-        self.reset_schedule_button = tk.Button(self.restart_frame, text="Reset", command=self.reset_schedule, bg=runbutton_bg)
-        self.reset_schedule_button.grid(row=0, column=1)
-
-        self.unlock_schedule_button = tk.Button(self.restart_frame, text="Unlock", command=self.unlock_schedule, bg=runbutton_bg)
-        self.unlock_schedule_button.grid(row=0, column=2)
-
         #### Output frame
         
-        self.output_frame = tk.LabelFrame(right_frame, text='Schedules/'+self.schedulename+'/run.out')
-        self.output_frame.pack(padx=5, pady=5, fill=tk.X, expand=0)
+        self.output_frame = tk.LabelFrame(right_frame, text='Schedules/'+self.schedulename+'/run.out', padx=3, pady=1)
+        self.output_frame.pack(padx=3, pady=1, fill=tk.X, expand=0)
         
         scroll = tk.Scrollbar(self.output_frame)
         scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.stdout_entry = tk.Text(self.output_frame, wrap=tk.WORD, yscrollcommand=scroll.set, bg="white", height=13)
+        self.stdout_entry = tk.Text(self.output_frame, wrap=tk.WORD, yscrollcommand=scroll.set, bg="white", height=8, font=("TkDefaultFont", 9))
         self.stdout_entry.pack()
         self.stdout_entry.yview_moveto('1.0')
 
         #### Error frame
         
-        self.error_frame = tk.LabelFrame(right_frame, text='Schedules/'+self.schedulename+'/run.err', height=30)
-        self.error_frame.pack(padx=5, pady=2, fill=tk.X, expand=0)
+        self.error_frame = tk.LabelFrame(right_frame, text='Schedules/'+self.schedulename+'/run.err', padx=3, pady=1)
+        self.error_frame.pack(padx=3, pady=1, fill=tk.X, expand=0)
         
         scroll2 = tk.Scrollbar(self.error_frame)
         scroll2.pack(side=tk.RIGHT, fill=tk.Y)
-        self.stderr_entry = tk.Text(self.error_frame, wrap=tk.WORD, yscrollcommand=scroll2.set, fg="red", bg="white", height=5)
+        self.stderr_entry = tk.Text(self.error_frame, wrap=tk.WORD, yscrollcommand=scroll2.set, fg="red", bg="white", height=3, font=("TkDefaultFont", 9))
         self.stderr_entry.pack()
         self.stderr_entry.yview_moveto('1.0')
         
@@ -324,7 +323,7 @@ class ScheduleGui(object):
 
     def restart_schedule(self, *args_ignored, **kwargs_ignored):
         # Set the current node, as per the GUI
-        command = 'relion_scheduler --schedule ' + self.schedulename + ' --set_current_node ' + self.current_node_entry.get()
+        command = 'relion_scheduler --schedule ' + self.schedulename + ' --set_current_node ' + self.restart_var.get()
         print(' RELION_IT: excuting: ', command)
         os.system(command)
         # And then run the Schedule again
@@ -342,7 +341,7 @@ class ScheduleGui(object):
         self.current_node_entry.configure(state=tk.NORMAL)
         self.current_node_entry.delete(0,tk.END)
         self.current_node_entry.insert(0, current_node)
-    
+
     def check_running(self):
         lockname = ".relion_lock_schedule_" + self.schedulename
         # read run,out and run.err
@@ -372,6 +371,7 @@ class ScheduleGui(object):
                 child.configure(state=tk.DISABLED)
             self.unlock_schedule_button.configure(state=tk.NORMAL)
             self.restart_schedule_button.configure(state=tk.DISABLED)
+            self.restart_entry.configure(state=tk.DISABLED)
             self.reset_schedule_button.configure(state=tk.DISABLED)
         else:
             self.status_frame.configure(text="Currently stopped", fg="dark red")
@@ -383,6 +383,7 @@ class ScheduleGui(object):
                 child.configure(state=tk.NORMAL)
             self.unlock_schedule_button.configure(state=tk.DISABLED)
             self.restart_schedule_button.configure(state=tk.NORMAL)
+            self.restart_entry.configure(state=tk.NORMAL)
             self.reset_schedule_button.configure(state=tk.NORMAL)
         self.main_frame.after(3000, self.check_running)
         
