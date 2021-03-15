@@ -97,7 +97,6 @@ class ScheduleGui(object):
         self.main_window = main_window
         self.schedulename = schedulename
 
-        schedule = load_star('Schedules/'+self.schedulename+'/schedule.star')
         self.main_frame = tk.Frame(self.main_window)
         self.main_frame.pack(fill=tk.BOTH, expand=1)
 
@@ -126,10 +125,12 @@ class ScheduleGui(object):
         self.restart_schedule_button.grid(row=0, column=5)
         tk.Label(self.status_frame, text="at:").grid(row=0, column=6, sticky=tk.W)
 
-        self.restartvars = schedule['schedule_jobs']['rlnScheduleJobNameOriginal']
-        self.restartvars += schedule['schedule_operators']['rlnScheduleOperatorName']
+        schedule = load_star('Schedules/'+self.schedulename+'/schedule.star')
+        jobnames = schedule['schedule_jobs']['rlnScheduleJobNameOriginal']
+        operators = schedule['schedule_operators']['rlnScheduleOperatorName']
+        restartvars = jobnames + operators
         self.restart_var = tk.StringVar()
-        self.restart_entry = tk.OptionMenu(self.status_frame, self.restart_var, *self.restartvars)
+        self.restart_entry = tk.OptionMenu(self.status_frame, self.restart_var, *restartvars)
         self.restart_entry.grid(row=0, column=7, sticky=tk.W)
 
         left_frame = tk.Frame(self.main_frame)
@@ -148,10 +149,10 @@ class ScheduleGui(object):
         row = 0
 
         ### Fill the jobnames and schedule variables pull-down menus
-        self.jobnames = schedule['schedule_jobs']['rlnScheduleJobNameOriginal']
+        
         tk.Label(self.joboption_frame, text="Job name:").grid(row=row, sticky=tk.W)
         self.jobname_var = tk.StringVar()
-        self.jobname_entry = tk.OptionMenu(self.joboption_frame, self.jobname_var, *self.jobnames)
+        self.jobname_entry = tk.OptionMenu(self.joboption_frame, self.jobname_var, *jobnames)
         self.jobname_entry.grid(row=row, column=1, sticky=tk.W)
         self.jobname_var.trace('w', self.change_jobname)
 
