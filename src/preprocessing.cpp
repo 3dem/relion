@@ -176,12 +176,15 @@ void Preprocessing::initialise()
 
 			if (do_recenter && verb > 0)
 			{
-				std::cout << " + And re-centering particles based on refined coordinates in the _data.star file" << std::endl;
-				if (ref_angpix > 0)
-					std::cout << "   using " << ref_angpix << " A/px to convert the recentering coordinate from pixels to Angstrom." << std::endl;
-				else
+				std::cout << " + And re-centering particles based on refined coordinates in the _data.star file." << std::endl;
+				if (fabs(recenter_x) > 0. || fabs(recenter_y) > 0. || fabs(recenter_z) > 0.)
 				{
-					std::cout << "   assuming the particle pixel size is the same as the reference pixel size.\n   If this is not the case, please specify --ref_angpix." << std::endl;
+					if (ref_angpix > 0)
+						std::cout << "   This uses " << ref_angpix << " A/px to convert the recentering coordinate from pixels to Angstrom." << std::endl;
+					else
+					{
+						std::cout << "   This assumes the particle pixel size is the same as the reference pixel size.\n   If this is not the case, please specify --ref_angpix." << std::endl;
+					}
 				}
 			}
 
