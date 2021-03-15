@@ -26,7 +26,7 @@ class CtfRefinementProgram : public RefinementProgram
 				do_even_aberrations, do_odd_aberrations;
 
 			int deltaSteps, n_even, n_odd;
-			double minDelta, maxDelta, lambda_reg;
+			double minDelta, maxDelta, lambda_reg, k_min_Ang;
 			
 		void run();
 		
@@ -52,6 +52,7 @@ class CtfRefinementProgram : public RefinementProgram
 				const AberrationsCache& aberrationsCache,
 				const BufferedImage<float>& freqWeights,
 				const BufferedImage<float>& doseWeights,
+				double k_min_px,
 				int verbosity);
 
 		void updateScale(
@@ -86,7 +87,8 @@ class CtfRefinementProgram : public RefinementProgram
 				const std::vector<CTF>& ctfs,
 				double minDefocus,
 				double maxDefocus,
-				int steps);
+				int steps,
+				double k_min_px);
 
 		static gravis::d3Vector findAstigmatism(
 				const aberration::EvenSolution& solution,
@@ -100,7 +102,8 @@ class CtfRefinementProgram : public RefinementProgram
 				const std::vector<CTF>& referenceCtfs,
 				double initialDeltaZ,
 				double pixelSize,
-				double lambda_reg);
+				double lambda_reg,
+				double k_min_px);
 
 		static BufferedImage<double> plotAstigmatism(
 				const aberration::EvenSolution& solution,
@@ -111,10 +114,10 @@ class CtfRefinementProgram : public RefinementProgram
 				int size);
 
 
-		std::string getDefocusTempFilename(
+		std::string getDefocusTempFilenameRoot(
 				const std::string& tomogram_name);
 
-		std::string getScaleTempFilename(
+		std::string getScaleTempFilenameRoot(
 				const std::string& tomogram_name);
 
 		std::string getEvenAberrationsTempFilename(
@@ -127,7 +130,14 @@ class CtfRefinementProgram : public RefinementProgram
 		bool defocusAlreadyDone(const std::string& tomogram_name);
 		bool scaleAlreadyDone(const std::string& tomogram_name);
 		bool aberrationsAlreadyDone(const std::string& tomogram_name, int group_count);
+
+
+		void writeDefocusEps(const MetaDataTable& table, const std::string& tomo_name);
+		void mergeLogFiles();
+
+		void abortIfNeeded();
 };
+
 
 class LambertFit : public Optimization
 {
