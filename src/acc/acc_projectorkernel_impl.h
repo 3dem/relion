@@ -73,6 +73,9 @@ public:
 #ifdef CUDA
 	__device__ __forceinline__
 #else
+	#ifndef __INTEL_COMPILER
+	__attribute__((always_inline))
+	#endif
 	inline
 #endif
 	void project3Dmodel(
@@ -154,6 +157,9 @@ public:
 #ifdef CUDA
 	__device__ __forceinline__
 #else
+	#ifndef __INTEL_COMPILER
+	__attribute__((always_inline))
+	#endif
 	inline
 #endif
 	void project3Dmodel(
@@ -229,6 +235,9 @@ public:
 #ifdef CUDA
 	__device__ __forceinline__
 #else
+	#ifndef __INTEL_COMPILER
+	__attribute__((always_inline))
+	#endif
 	inline
 #endif
 	void project2Dmodel(
