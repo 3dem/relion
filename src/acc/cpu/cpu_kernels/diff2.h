@@ -329,9 +329,8 @@ void diff2_coarse_3D(
 template<bool REF3D, bool DATA3D, int block_sz, int eulers_per_block, int prefetch_fraction>
 #ifndef __INTEL_COMPILER
 __attribute__((always_inline))
-inline
 #endif
-void diff2_coarse(
+inline void diff2_coarse(
 		unsigned long     grid_size,
 		XFLOAT *g_eulers,
 		XFLOAT *trans_x,
@@ -600,9 +599,8 @@ void diff2_coarse(
 template<bool REF3D>
 #ifndef __INTEL_COMPILER
 __attribute__((always_inline))
-inline
 #endif
-void diff2_fine_2D(
+inline void diff2_fine_2D(
 		unsigned long     grid_size,
 		XFLOAT *g_eulers,
 #ifdef DEBUG_CUDA
@@ -750,9 +748,8 @@ void diff2_fine_2D(
 
 #ifndef __INTEL_COMPILER
 __attribute__((always_inline))
-inline
 #endif
-void diff2_fine_3D(
+inline void diff2_fine_3D(
 		unsigned long  grid_size,
 		XFLOAT *g_eulers,
 #ifdef DEBUG_CUDA
@@ -935,9 +932,8 @@ void diff2_fine_3D(
 template<bool REF3D>
 #ifndef __INTEL_COMPILER
 __attribute__((always_inline))
-inline
 #endif
-void diff2_CC_coarse_2D(
+inline void diff2_CC_coarse_2D(
 		unsigned long     grid_size,
 		XFLOAT *g_eulers,
 #ifdef DEBUG_CUDA
@@ -1075,9 +1071,8 @@ void diff2_CC_coarse_2D(
 
 #ifndef __INTEL_COMPILER
 __attribute__((always_inline))
-inline
 #endif
-void diff2_CC_coarse_3D(
+inline void diff2_CC_coarse_3D(
 		unsigned long     grid_size,
 		XFLOAT *g_eulers,
 #ifdef DEBUG_CUDA
@@ -1244,9 +1239,8 @@ void diff2_CC_coarse_3D(
 template<bool REF3D>
 #ifndef __INTEL_COMPILER
 __attribute__((always_inline))
-inline
 #endif
-void diff2_CC_fine_2D(
+inline void diff2_CC_fine_2D(
 		unsigned long     grid_size,
 		XFLOAT *g_eulers,
 #ifdef DEBUG_CUDA
@@ -1399,9 +1393,8 @@ void diff2_CC_fine_2D(
 
 #ifndef __INTEL_COMPILER
 __attribute__((always_inline))
-inline
 #endif
-void diff2_CC_fine_3D(
+inline void diff2_CC_fine_3D(
 		unsigned long     grid_size,
 		XFLOAT *g_eulers,
 #ifdef DEBUG_CUDA
