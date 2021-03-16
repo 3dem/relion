@@ -582,7 +582,7 @@ void kernel_wavg(
 #else
 	if (DATA3D)
 	{
-		CpuKernels::wavg_3D<CTFPREMULTIPLIED, REFCTF>(
+		CpuKernels::wavg_3D<REFCTF>(
 			g_eulers,
 			projector,
 			image_size,
@@ -604,7 +604,7 @@ void kernel_wavg(
 	}
 	else
 	{
-		CpuKernels::wavg_ref3D<CTFPREMULTIPLIED, REFCTF,REF3D>(
+		CpuKernels::wavg_ref3D<REFCTF,REF3D>(
 			g_eulers,
 			projector,
 			image_size,
