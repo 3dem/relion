@@ -71,7 +71,12 @@ std::complex<XFLOAT> *pData = mdlComplex;
 			};
 
 #ifdef _CUDA_ENABLED
-__device__ __forceinline__
+	__device__ __forceinline__
+#else
+	#ifndef __INTEL_COMPILER
+	__attribute__((always_inline))
+	#endif
+	inline
 #endif
 	void project3Dmodel(
 			int x,
@@ -152,6 +157,9 @@ real =   no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 #ifdef _CUDA_ENABLED
 	__device__ __forceinline__
 #else
+	#ifndef __INTEL_COMPILER
+	__attribute__((always_inline))
+	#endif
 	inline
 #endif
 	void project3Dmodel(
@@ -227,6 +235,9 @@ real = no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 #ifdef _CUDA_ENABLED
 __device__ __forceinline__
 #else
+	#ifndef __INTEL_COMPILER
+	__attribute__((always_inline))
+	#endif
 	inline
 #endif
 	void project2Dmodel(

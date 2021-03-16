@@ -110,6 +110,9 @@ size_t ceilfracf(size_t a, size_t b)
         return (size_t)(a/b + (size_t)1);
 }
 
+#ifndef __INTEL_COMPILER
+__attribute__((always_inline))
+#endif
 static inline
 XFLOAT no_tex2D(XFLOAT* mdl, XFLOAT xp, XFLOAT yp, int mdlX, int mdlInitY)
 {
@@ -137,7 +140,12 @@ XFLOAT no_tex2D(XFLOAT* mdl, XFLOAT xp, XFLOAT yp, int mdlX, int mdlInitY)
 
 // 2D linear interpolation for complex data that interleaves real and
 // imaginary data, rather than storing them in a separate array
+#ifdef __INTEL_COMPILER
 #pragma omp declare simd uniform(mdlX,mdlInitY)
+#else
+__attribute__((always_inline))
+inline
+#endif
 static void complex2D(std::complex<XFLOAT> *mdlComplex, XFLOAT &real, XFLOAT &imag,
                XFLOAT xp, XFLOAT yp, int mdlX, int mdlInitY)
 {
@@ -175,6 +183,9 @@ static void complex2D(std::complex<XFLOAT> *mdlComplex, XFLOAT &real, XFLOAT &im
 	imag = dx0[1] + (dx1[1] - dx0[1])*fy;
 }
 
+#ifndef __INTEL_COMPILER
+__attribute__((always_inline))
+#endif
 static inline
 XFLOAT no_tex3D(
 #ifdef DEBUG_CUDA
@@ -225,7 +236,12 @@ XFLOAT no_tex3D(
 
 // 3D linear interpolation for complex data that interleaves real and
 // imaginary data, rather than storing them in a separate array
+#ifdef __INTEL_COMPILER
 #pragma omp declare simd uniform(mdlX,mdlXY,mdlInitY,mdlInitZ)
+#else
+__attribute__((always_inline))
+inline
+#endif
 static void complex3D(
 				std::complex<XFLOAT> * mdlComplex, 
 				XFLOAT &real, XFLOAT &imag,
