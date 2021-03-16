@@ -254,6 +254,10 @@ void cosineFilter(	int      block_dim,
 }
 
 template <typename T>
+#ifndef __INTEL_COMPILER
+__attribute__((always_inline))
+inline
+#endif
 void cpu_translate2D(T *	g_image_in,
 					T *		g_image_out,
 					size_t	image_size,
@@ -287,6 +291,10 @@ void cpu_translate2D(T *	g_image_in,
 }
 
 template <typename T>
+#ifndef __INTEL_COMPILER
+__attribute__((always_inline))
+inline
+#endif
 void cpu_translate3D(T *	g_image_in,
 					T*		g_image_out,
 					size_t	image_size,
@@ -328,6 +336,10 @@ void cpu_translate3D(T *	g_image_in,
 }
 
 template <typename T>
+#ifndef __INTEL_COMPILER
+__attribute__((always_inline))
+inline
+#endif
 void centerFFT_2D(	int     batch_size,
 			size_t	pixel_start,
 			size_t	pixel_end,
@@ -390,6 +402,10 @@ template void centerFFT_2D<double>(  	int		batch_size,
 
 
 template <typename T>
+#ifndef __INTEL_COMPILER
+__attribute__((always_inline))
+inline
+#endif
 void centerFFT_3D(	int     batch_size,
 			size_t	pixel_start,
 			size_t	pixel_end,
@@ -835,6 +851,10 @@ void square(int     blockIdx_x,
 }
 */
 template<bool invert>
+#ifndef __INTEL_COMPILER
+__attribute__((always_inline))
+inline
+#endif
 void cpu_kernel_make_eulers_2D(int grid_size, int block_size,
 		XFLOAT *alphas,
 		XFLOAT *eulers,
@@ -889,6 +909,10 @@ void cpu_kernel_make_eulers_2D(int grid_size, int block_size,
 }
 
 template<bool invert,bool doL, bool doR>
+#ifndef __INTEL_COMPILER
+__attribute__((always_inline))
+inline
+#endif
 void cpu_kernel_make_eulers_3D(int grid_size, int block_size,
 		XFLOAT *alphas,
 		XFLOAT *betas,

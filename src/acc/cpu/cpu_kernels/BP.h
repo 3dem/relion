@@ -9,6 +9,10 @@
 namespace CpuKernels
 {
 template < bool CTF_PREMULTIPLIED >
+#ifndef __INTEL_COMPILER
+__attribute__((always_inline))
+#endif
+inline
 void backproject2D(
 		unsigned long imageCount,
 		int     block_size,
@@ -217,6 +221,10 @@ void backproject2D(
 }
 
 template < bool DATA3D, bool CTF_PREMULTIPLIED >
+#ifndef __INTEL_COMPILER
+__attribute__((always_inline))
+#endif
+inline
 void backproject3D(
 		unsigned long imageCount,
 		int     block_size,
@@ -497,6 +505,10 @@ void backproject3D(
 // cos(A+B) = cos(A) * cos(B) - sin(A) * sin(B), we can use lookup table to
 // compute sin(x*tx + y*ty) and cos(x*tx + y*ty).
 template < bool CTF_PREMULTIPLIED >
+#ifndef __INTEL_COMPILER
+__attribute__((always_inline))
+#endif
+inline
 void backprojectRef3D(
 		unsigned long imageCount,
 		XFLOAT *g_img_real,
@@ -750,6 +762,10 @@ void backprojectRef3D(
 }
 
 template < bool DATA3D, bool CTF_PREMULTIPLIED >
+#ifndef __INTEL_COMPILER
+__attribute__((always_inline))
+#endif
+inline
 void backprojectSGD(
 		unsigned long imageCount,
 		int     block_size,
