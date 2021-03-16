@@ -560,3 +560,33 @@ std::vector<int> ParticleSet::enumerate(
 
 	return indices;
 }
+
+std::vector<int> ParticleSet::enumerateNonEmpty(const std::vector<std::vector<ParticleIndex> > &particlesByTomogram)
+{
+	const int tc0 = particlesByTomogram.size();
+	int count = 0;
+
+	for (int t = 0; t < tc0; t++)
+	{
+		if (particlesByTomogram[t].size() > 0)
+		{
+			count++;
+		}
+	}
+
+	std::vector<int> out(count);
+	int index = 0;
+
+	for (int t = 0; t < tc0; t++)
+	{
+		if (particlesByTomogram[t].size() > 0)
+		{
+			out[t] = index;
+			index++;
+		}
+	}
+
+	return out;
+}
+
+

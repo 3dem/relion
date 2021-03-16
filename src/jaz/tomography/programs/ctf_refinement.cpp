@@ -683,7 +683,7 @@ void CtfRefinementProgram::updateScale(
 		}
 
 		// Also store the new scale in the tomogram set, so it can be
-		// used for consecutive fits on the same node.
+		// used for consecutive fits on the same MPI node.
 		// Note: this does not work when a run has been resumed.
 
 		tomogramSet.globalTable.setValue(EMDL_TOMO_RELATIVE_LUMINANCE, opt[0], t);
@@ -720,7 +720,7 @@ void CtfRefinementProgram::updateScale(
 			tempPerFrameTable.setValue(EMDL_CTF_SCALEFACTOR, ctf.scale, f);
 
 			// Also store the new scale in the tomogram set, so it can be
-			// used for consecutive fits on the same node.
+			// used for consecutive fits on the same MPI node.
 			// Note: this does not work when a run has been resumed.
 
 			tomogramSet.setCtf(t, f, ctf);
@@ -887,7 +887,8 @@ void CtfRefinementProgram::collectDefocus()
 
 void CtfRefinementProgram::fitGlobalScale()
 {
-	const int tc = tomogramSet.size();
+	std::vector<int> tomoIndices = ParticleSet::enumerateNonEmpty(particles);
+	const int tc = tomoIndices.size();
 
 	std::vector<std::vector<double>> all_sum_prdObs(tc), all_sum_prdSqr(tc);
 	std::vector<std::vector<d4Matrix>> all_proj_matrices(tc);
@@ -898,7 +899,7 @@ void CtfRefinementProgram::fitGlobalScale()
 
 	for (int t = 0; t < tc; t++)
 	{
-		Tomogram tomogram = tomogramSet.loadTomogram(t, false);
+		Tomogram tomogram = tomogramSet.loadTomogram(tomoIndices[t], false);
 
 		const std::string tempFilename = getScaleTempFilenameRoot(tomogram.name) + ".star";
 		MetaDataTable tempFile;
@@ -991,18 +992,21 @@ void CtfRefinementProgram::fitGlobalScale()
 
 	initial[0] = 2.0 * avg_max_scale;
 
-	MultiLambertFit mblf(
+	MultiLambertFit mlf(
 			all_proj_matrices, all_sum_prdObs,
 			all_sum_prdSqr,
 			all_fract_doses);
 
-	std::vector<double> opt = LBFGS::optimize(initial, mblf, 0, 1000, 1e-5, 1e-4);
+	std::vector<double> opt = LBFGS::optimize(initial, mlf, 0, 1000, 1e-5, 1e-4);
+
 
 	for (int t = 0; t < tc; t++)
 	{
 		if (!tomo_good[t]) continue;
 
-		Tomogram tomogram = tomogramSet.loadTomogram(t, false);
+		const int tt = tomoIndices[t];
+
+		Tomogram tomogram = tomogramSet.loadTomogram(tt, false);
 
 		const int fc = tomogram.frameCount;
 
@@ -1010,40 +1014,37 @@ void CtfRefinementProgram::fitGlobalScale()
 		const double kappa  = opt[2*t + 1];
 		const double phi    = opt[2*t + 2];
 
-		for (int f = 0; f < fc; f++)
+		const bool failed = kappa <= 0.0;
+
+		if (failed)
 		{
-			const double est = mblf.getScale(t, f, opt);
-
-			CTF ctf = tomogram.centralCTFs[f];
-
-			ctf.scale = est;
-
-			tomogramSet.setCtf(t, f, ctf);
-			tomogram.centralCTFs[f] = ctf;
-
-			const double rel_thickness = -log(kappa);
-			d3Vector ice_normal = sin(phi) * mblf.tilt_p[t] + cos(phi) * mblf.tilt_q[t];
-			ice_normal.normalize();
-
-			tomogramSet.globalTable.setValue(EMDL_TOMO_RELATIVE_LUMINANCE, lum, t);
-			tomogramSet.globalTable.setValue(EMDL_TOMO_RELATIVE_ICE_THICKNESS, rel_thickness, t);
-			tomogramSet.globalTable.setValue(EMDL_TOMO_ICE_NORMAL_X, ice_normal.x, t);
-			tomogramSet.globalTable.setValue(EMDL_TOMO_ICE_NORMAL_Y, ice_normal.y, t);
-			tomogramSet.globalTable.setValue(EMDL_TOMO_ICE_NORMAL_Z, ice_normal.z, t);
+			Log::warn("Scale estimation for "+tomogram.name+" has failed.");
 		}
-
-		if (diag)
+		else
 		{
-			std::ofstream scaleFile(outDir + tomogram.name + "_multifitted_scale.dat");
-
 			for (int f = 0; f < fc; f++)
 			{
-				const double est = mblf.getScale(t, f, opt);
+				const double est = mlf.getScale(t, f, opt);
 
-				scaleFile << f << ' ' << est << '\n';
+				CTF ctf = tomogram.centralCTFs[f];
+
+				ctf.scale = est;
+
+				tomogramSet.setCtf(tt, f, ctf);
+				tomogram.centralCTFs[f] = ctf;
+
+				const double rel_thickness = -log(kappa);
+				d3Vector ice_normal = sin(phi) * mlf.tilt_p[t] + cos(phi) * mlf.tilt_q[t];
+				ice_normal.normalize();
+
+				tomogramSet.globalTable.setValue(EMDL_TOMO_RELATIVE_LUMINANCE, lum, tt);
+				tomogramSet.globalTable.setValue(EMDL_TOMO_RELATIVE_ICE_THICKNESS, rel_thickness, tt);
+				tomogramSet.globalTable.setValue(EMDL_TOMO_ICE_NORMAL_X, ice_normal.x, tt);
+				tomogramSet.globalTable.setValue(EMDL_TOMO_ICE_NORMAL_Y, ice_normal.y, tt);
+				tomogramSet.globalTable.setValue(EMDL_TOMO_ICE_NORMAL_Z, ice_normal.z, tt);
 			}
 
-			scaleFile.flush();
+			writeScaleEps(tomogramSet.tomogramTables[tt], tomogram.name);
 		}
 	}
 }
@@ -1117,6 +1118,8 @@ void CtfRefinementProgram::collectScale()
 				tomogramSet.setCtf(t, f, ctf);
 			}
 		}
+
+		writeScaleEps(tomogramSet.tomogramTables[t], tomogram.name);
 	}
 }
 
@@ -1553,6 +1556,51 @@ void CtfRefinementProgram::writeDefocusEps(const MetaDataTable& table, const std
 	defocusFile.flush();
 }
 
+void CtfRefinementProgram::writeScaleEps(
+		const MetaDataTable& table,
+		const std::string& tomo_name)
+{
+	const std::string root_name = getScaleTempFilenameRoot(tomo_name);
+
+	CPlot2D plot2D(tomo_name + " Contrast Scale");
+
+	plot2D.SetXAxisSize(600);
+	plot2D.SetYAxisSize(600);
+	plot2D.SetDrawLegend(true);
+	plot2D.SetFlipY(true);
+
+	const int fc = table.numberOfObjects();
+
+	CDataSet dataSet;
+
+	dataSet.SetDrawMarker(false);
+	dataSet.SetDrawLine(true);
+	dataSet.SetLineWidth(1.0);
+	dataSet.SetMarkerSize(10);
+	dataSet.SetDatasetColor(0.1, 0.1, 0.1);
+
+	for (int f = 0; f < fc; f++)
+	{
+		dataSet.AddDataPoint(CDataPoint(f, table.getDouble(EMDL_CTF_SCALEFACTOR, f)));
+	}
+
+	plot2D.AddDataSet(dataSet);
+
+	plot2D.SetXAxisTitle("frame");
+	plot2D.SetYAxisTitle("scale");
+	plot2D.OutputPostScriptPlot(root_name + ".eps");
+
+
+	std::ofstream scaleFile(root_name + ".dat");
+
+	for (int f = 0; f < fc; f++)
+	{
+		scaleFile << f << ' ' << table.getDouble(EMDL_CTF_SCALEFACTOR, f) << '\n';
+	}
+
+	scaleFile.flush();
+}
+
 void CtfRefinementProgram::mergeLogFiles()
 {
 	const int tc = tomogramSet.size();
@@ -1561,11 +1609,20 @@ void CtfRefinementProgram::mergeLogFiles()
 
 	for (int t = 0; t < tc; t++)
 	{
-		const std::string filename = getDefocusTempFilenameRoot(tomogramSet.getTomogramName(t)) + ".eps";
+		const std::string tomo_name = tomogramSet.getTomogramName(t);
 
-		if (ZIO::fileExists(filename))
+		const std::string fn_defocus = getDefocusTempFilenameRoot(tomo_name) + ".eps";
+
+		if (do_refine_defocus && ZIO::fileExists(fn_defocus))
 		{
-			fn_eps.push_back(filename);
+			fn_eps.push_back(fn_defocus);
+		}
+
+		const std::string fn_scale = getScaleTempFilenameRoot(tomo_name) + ".eps";
+
+		if (do_refine_scale && ZIO::fileExists(fn_scale))
+		{
+			fn_eps.push_back(fn_scale);
 		}
 	}
 

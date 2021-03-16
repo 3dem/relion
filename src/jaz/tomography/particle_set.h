@@ -80,6 +80,9 @@ class ParticleSet
 		// Simplified version of above for single-MPI-node versions.
 		static std::vector<int> enumerate(
 				const std::vector<std::vector<ParticleIndex>>& particlesByTomogram);
+
+		static std::vector<int> enumerateNonEmpty(
+				const std::vector<std::vector<ParticleIndex>>& particlesByTomogram);
 };
 
 #endif
