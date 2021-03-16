@@ -336,8 +336,8 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 	menubar->add("File/Quit", FL_ALT+'q', cb_quit, this);
 	if (!maingui_do_read_only)
 	{
-		menubar->add("Jobs/Save job",  FL_ALT+'s', cb_save, this);
-		menubar->add("Jobs/_Load job",  FL_ALT+'l', cb_load, this);
+		menubar->add("Jobs/Save job.star",  FL_ALT+'s', cb_save, this);
+		menubar->add("Jobs/_Load job.star",  FL_ALT+'l', cb_load, this);
 	}
 	menubar->add("Jobs/Order alphabetically",  FL_ALT+'a', cb_order_jobs_alphabetically, this);
 	menubar->add("Jobs/_Order chronologically",  FL_ALT+'c', cb_order_jobs_chronologically, this);
