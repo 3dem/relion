@@ -335,8 +335,9 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 	menubar->add("File/About", 0, cb_about, this);
 	menubar->add("File/Quit", FL_ALT+'q', cb_quit, this);
 	if (!maingui_do_read_only)
-	{	menubar->add("Jobs/Save job settings",  FL_ALT+'s', cb_save, this);
-		menubar->add("Jobs/_Load job settings",  FL_ALT+'l', cb_load, this);
+	{
+		menubar->add("Jobs/Save job.star",  FL_ALT+'s', cb_save, this);
+		menubar->add("Jobs/_Load job.star",  FL_ALT+'l', cb_load, this);
 	}
 	menubar->add("Jobs/Order alphabetically",  FL_ALT+'a', cb_order_jobs_alphabetically, this);
 	menubar->add("Jobs/_Order chronologically",  FL_ALT+'c', cb_order_jobs_chronologically, this);
@@ -1870,13 +1871,18 @@ void GuiMainWindow::cb_save_i()
 	int iwin = browser->value() - 1;
 	gui_jobwindows[iwin]->updateMyJob();
 
-	// For scheduled jobs, also allow saving the .job file in the output directory
-	if (current_job >= 0 && (pipeline.processList[current_job].status == PROC_SCHEDULED))
-	{
-		gui_jobwindows[iwin]->myjob.write(pipeline.processList[current_job].name);
-	}
-	// Write the hidden file
-	gui_jobwindows[iwin]->myjob.write("");
+	Fl::scheme("gtk+");
+	Fl_File_Chooser * G_chooser = new Fl_File_Chooser(".", "job.star", Fl_File_Chooser::DIRECTORY, "Choose directory to save job.star file");
+	G_chooser->color(GUI_BACKGROUND_COLOR);
+	G_chooser->show();
+	while(G_chooser->shown()) Fl::wait();
+	if ( G_chooser->value() == NULL ) return;
+
+	char relname[FL_PATH_MAX];
+	fl_filename_relative(relname,sizeof(relname),G_chooser->value());
+	FileName fn_dir = (std::string)relname;
+	gui_jobwindows[iwin]->myjob.write(fn_dir + "/job.star");
+
 }
 
 // Load button call-back function
@@ -1888,10 +1894,31 @@ void GuiMainWindow::cb_load(Fl_Widget* o, void* v)
 
 void GuiMainWindow::cb_load_i()
 {
-	int iwin = browser->value() - 1;
-	gui_jobwindows[iwin]->myjob.read("", is_main_continue);
-	alias_current_job->value("Give_alias_here");
-	gui_jobwindows[iwin]->updateMyGui();
+	Fl::scheme("gtk+");
+	Fl_File_Chooser * G_chooser = new Fl_File_Chooser(".", "job.star", Fl_File_Chooser::SINGLE, "Choose job.star file");
+	G_chooser->color(GUI_BACKGROUND_COLOR);
+	G_chooser->show();
+	while(G_chooser->shown()) Fl::wait();
+	if ( G_chooser->value() == NULL ) return;
+
+	char relname[FL_PATH_MAX];
+	fl_filename_relative(relname,sizeof(relname),G_chooser->value());
+	FileName fn_job = relname;
+	RelionJob thisjob;
+	thisjob.read(fn_job, is_main_continue, true); // true means initialise
+
+	// What type of job is this?
+	for ( int t=0; t<nr_browse_tabs; t++ )
+	{
+		if ( gui_jobwindows[t]->myjob.type == thisjob.type )
+		{
+			browser->value(t+1);
+			gui_jobwindows[t]->myjob = thisjob;
+			gui_jobwindows[t]->updateMyGui();
+			break;
+		}
+	}
+	cb_select_browsegroup_i();
 
 	// Make the current continue-setting active
 	cb_toggle_continue_i();
