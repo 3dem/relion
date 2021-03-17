@@ -133,6 +133,7 @@ class CtfRefinementProgram : public RefinementProgram
 
 
 		void writeDefocusEps(const MetaDataTable& table, const std::string& tomo_name);
+		void writeScaleEps(const MetaDataTable& table, const std::string& tomo_name);
 		void mergeLogFiles();
 
 		void abortIfNeeded();
