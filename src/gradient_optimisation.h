@@ -400,11 +400,11 @@ public:
 			{
 				v1 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
 				v2 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
-				blobs_x[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter / 4. + box.xdim / 2.;
+				blobs_x[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter / 6. + box.xdim / 2.;
 			}
 			v1 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
 			v2 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
-			blobs_y[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter / 4. + box.ydim / 2.;
+			blobs_y[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter / 6. + box.ydim / 2.;
 		}
 
 		for (int i = 0; i < nr_blobs; i ++) {
@@ -420,7 +420,7 @@ public:
 
 		}
 
-		T sigma_inv = 8. / diameter;
+		T sigma_inv = 10. / diameter;
 		for (int y = 0; y < box.ydim; y ++)
 			for (int x = 0; x < box.xdim; x ++)
 				for (int i = 0; i < nr_blobs; i ++) {
@@ -442,10 +442,10 @@ public:
 			// Generate normal distributed random value
 			v1 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
 			v2 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
-			blobs_x[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter / 4. + box.xdim / 2.;
+			blobs_x[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter / 6. + box.xdim / 2.;
 			v1 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
 			v2 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
-			blobs_y[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter / 4. + box.ydim / 2.;
+			blobs_y[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter / 6. + box.ydim / 2.;
 
 			if (helical)
 				blobs_z[i] = ((T) rand() / (T) RAND_MAX) * box.zdim;
@@ -453,7 +453,7 @@ public:
 			{
 				v1 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
 				v2 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
-				blobs_z[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter / 4. + box.zdim / 2.;
+				blobs_z[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter / 6. + box.zdim / 2.;
 			}
 		}
 

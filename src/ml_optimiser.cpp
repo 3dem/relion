@@ -2234,20 +2234,26 @@ void MlOptimiser::initialiseGeneralFinalize(int rank) {
 		{
 			if (mymodel.pdf_class[i] > 0.)
 			{
-				MultidimArray<RFLOAT> blobs(mymodel.Iref[i]);
+				MultidimArray<RFLOAT> blobs_pos(mymodel.Iref[i]), blobs_neg(mymodel.Iref[i]);
 				if (mymodel.ref_dim == 2)
 				{
 					SomGraph::make_blobs_2d(
-							blobs, mymodel.Iref[i], 40,
+							blobs_pos, mymodel.Iref[i], 40,
+							diameter, is_helical_segment);
+					SomGraph::make_blobs_2d(
+							blobs_neg, mymodel.Iref[i], 40,
 							diameter, is_helical_segment);
 				}
 				else
 					{
 					SomGraph::make_blobs_3d(
-							blobs, mymodel.Iref[i], 40,
+							blobs_pos, mymodel.Iref[i], 40,
+							diameter, is_helical_segment);
+					SomGraph::make_blobs_3d(
+							blobs_neg, mymodel.Iref[i], 40,
 							diameter, is_helical_segment);
 				}
-				mymodel.Iref[i] = blobs / 5.;
+				mymodel.Iref[i] = (blobs_pos - blobs_neg/2) / 5.;
 			}
 		}
 
