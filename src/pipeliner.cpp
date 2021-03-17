@@ -1600,8 +1600,6 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 			fn_pattern.globFiles(fns_del, false);
 			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_aberr-Axx_optics-group_*.mrc";
 			fn_pattern.globFiles(fns_del, false);
-			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_aberr-Axx_optics-group_*.mrc";
-			fn_pattern.globFiles(fns_del, false);
 			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_aberr-Axy_optics-group_*.mrc";
 			fn_pattern.globFiles(fns_del, false);
 			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_aberr-Ayy_optics-group_*.mrc";
