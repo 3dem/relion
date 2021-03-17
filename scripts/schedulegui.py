@@ -323,7 +323,10 @@ class ScheduleGui(object):
 
     def restart_schedule(self, *args_ignored, **kwargs_ignored):
         # Set the current node, as per the GUI
-        command = 'relion_scheduler --schedule ' + self.schedulename + ' --set_current_node ' + self.restart_var.get()
+        myrestartpoint = self.restart_var.get()
+        if myrestartpoint == "":
+            myrestartpoint = self.current_node_var.get() 
+        command = 'relion_scheduler --schedule ' + self.schedulename + ' --set_current_node ' + myrestartpoint
         print(' RELION_IT: excuting: ', command)
         os.system(command)
         # And then run the Schedule again
