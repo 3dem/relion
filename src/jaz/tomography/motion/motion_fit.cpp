@@ -132,9 +132,9 @@ MotionFit::MotionFit(
 /*
 	Parameter Layout:
 	
-	0:                   [phi, theta, psi], [dx, dy] * fc            frame alignment: fs * fc
+	0:                  ([phi, theta, psi], [dx, dy]) * fc           frame alignment: fs * fc
 	fs * fc:             [dx0, dy0, dz0]  *  pc;                     static part. shifts: 3 * pc
-	fs * fc + 3 * pc:    [b0x, b0y, b0z][b1x, ..., bBz] * (fc-1);    deformations: 3 * bc * (fc - 1)
+	fs * fc + 3 * pc:    [b0x, b0y, b0z][b1x, ..., bBz] * (fc-1);    motion: 3 * bc * (fc - 1)
 	
 	fs * fc  +  3 * pc  +  3 * bc * (fc - 1)   total
 */
