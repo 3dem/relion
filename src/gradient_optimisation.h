@@ -400,11 +400,11 @@ public:
 			{
 				v1 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
 				v2 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
-				blobs_x[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter / 6. + box.xdim / 2.;
+				blobs_x[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter / 7. + box.xdim / 2.;
 			}
 			v1 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
 			v2 = ((T) (rand()) + 1.) / ((T) (RAND_MAX) + 1.);
-			blobs_y[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter / 6. + box.ydim / 2.;
+			blobs_y[i] = cos(2 * 3.14 * v2) * sqrt(-2. * log(v1)) * diameter / 7. + box.ydim / 2.;
 		}
 
 		for (int i = 0; i < nr_blobs; i ++) {
@@ -471,7 +471,7 @@ public:
 		}
 
 		T span = diameter/2.;
-		T sigma_inv = 8./diameter;
+		T sigma_inv = 10./diameter;
 		for (int i = 0; i < nr_blobs; i ++)
 			for (int z = XMIPP_MAX(0, blobs_z[i]-span);
 				z < XMIPP_MIN(box.zdim, blobs_z[i]+span); z ++)
