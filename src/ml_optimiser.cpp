@@ -2187,77 +2187,81 @@ void MlOptimiser::initialiseWorkLoad()
 }
 
 
-void MlOptimiser::initialiseGeneralFinalize(int rank) {
-	if (do_som)
-	{
-		mymodel.som.set_max_node_count(mymodel.nr_classes);
-		// Add the initial nodes to the graph and connect them with an edge
-		for (unsigned i = 0; i < som_starting_nodes; i++)
-			mymodel.som.add_node();
-
-		std::vector<unsigned> nodes = mymodel.som.get_all_nodes();
-		for (unsigned i = 0; i < nodes.size(); i ++)
-		{
-			mymodel.pdf_class[nodes[i]] = 1./nodes.size();
-			mymodel.som.set_node_activity(nodes[i], 1);
-		}
-
-		// Clear all non-node
-		for (unsigned i = 0; i < mymodel.nr_classes; i ++)
-		{
-			bool clear = true;
-			for (unsigned j = 0; j < nodes.size(); j++)
-				if (i == nodes[j])
-					clear = false;
-
-			if (clear)
-			{
-				mymodel.pdf_class[i] = 0.;
-				mymodel.Iref[i] *= 0.;
-				mymodel.Igrad1[i].initZeros();
-				mymodel.Igrad2[i].initZeros();
-			}
-		}
-	}
-
-	// Low-pass filter the initial references
+void MlOptimiser::initialiseGeneralFinalize(int rank)
+{
 	if (iter == 0)
-		initialLowPassFilterReferences();
-
-	if (do_init_blobs && fn_ref == "None")
 	{
-		bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
-		RFLOAT diameter = particle_diameter / mymodel.pixel_size;
-		for (unsigned i = 0; i < mymodel.nr_classes; i ++)
+		if (do_som)
 		{
-			if (mymodel.pdf_class[i] > 0.)
+			mymodel.som.set_max_node_count(mymodel.nr_classes);
+			// Add the initial nodes to the graph and connect them with an edge
+			for (unsigned i = 0; i < som_starting_nodes; i++)
+				mymodel.som.add_node();
+
+			std::vector<unsigned> nodes = mymodel.som.get_all_nodes();
+			for (unsigned i = 0; i < nodes.size(); i++)
 			{
-				MultidimArray<RFLOAT> blobs_pos(mymodel.Iref[i]), blobs_neg(mymodel.Iref[i]);
-				if (mymodel.ref_dim == 2)
+				mymodel.pdf_class[nodes[i]] = 1. / nodes.size();
+				mymodel.som.set_node_activity(nodes[i], 1);
+			}
+
+			// Clear all non-node
+			for (unsigned i = 0; i < mymodel.nr_classes; i++)
+			{
+				bool clear = true;
+				for (unsigned j = 0; j < nodes.size(); j++)
+					if (i == nodes[j])
+						clear = false;
+
+				if (clear)
 				{
-					SomGraph::make_blobs_2d(
-							blobs_pos, mymodel.Iref[i], 40,
-							diameter, is_helical_segment);
-					SomGraph::make_blobs_2d(
-							blobs_neg, mymodel.Iref[i], 40,
-							diameter, is_helical_segment);
+					mymodel.pdf_class[i] = 0.;
+					mymodel.Iref[i] *= 0.;
+					mymodel.Igrad1[i].initZeros();
+					mymodel.Igrad2[i].initZeros();
 				}
-				else
-					{
-					SomGraph::make_blobs_3d(
-							blobs_pos, mymodel.Iref[i], 40,
-							diameter, is_helical_segment);
-					SomGraph::make_blobs_3d(
-							blobs_neg, mymodel.Iref[i], 40,
-							diameter, is_helical_segment);
-				}
-				mymodel.Iref[i] = (blobs_pos - blobs_neg/2) / 5.;
 			}
 		}
 
+		// Low-pass filter the initial references
 		initialLowPassFilterReferences();
-		for (unsigned i = 0; i < mymodel.nr_classes; i ++)
-			softMaskOutsideMap(mymodel.Iref[i], diameter/2., (RFLOAT)width_mask_edge);
+
+		if (do_init_blobs && fn_ref == "None")
+		{
+			bool is_helical_segment =
+					(do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
+			RFLOAT diameter = particle_diameter / mymodel.pixel_size;
+			for (unsigned i = 0; i < mymodel.nr_classes; i++)
+			{
+				if (mymodel.pdf_class[i] > 0.)
+				{
+					MultidimArray<RFLOAT> blobs_pos(mymodel.Iref[i]), blobs_neg(mymodel.Iref[i]);
+					if (mymodel.ref_dim == 2)
+					{
+						SomGraph::make_blobs_2d(
+								blobs_pos, mymodel.Iref[i], 40,
+								diameter, is_helical_segment);
+						SomGraph::make_blobs_2d(
+								blobs_neg, mymodel.Iref[i], 40,
+								diameter, is_helical_segment);
+					} 
+					else
+					{
+						SomGraph::make_blobs_3d(
+								blobs_pos, mymodel.Iref[i], 40,
+								diameter, is_helical_segment);
+						SomGraph::make_blobs_3d(
+								blobs_neg, mymodel.Iref[i], 40,
+								diameter, is_helical_segment);
+					}
+					mymodel.Iref[i] = (blobs_pos - blobs_neg / 2) / 5.;
+				}
+			}
+
+			initialLowPassFilterReferences();
+			for (unsigned i = 0; i < mymodel.nr_classes; i++)
+				softMaskOutsideMap(mymodel.Iref[i], diameter / 2., (RFLOAT) width_mask_edge);
+		}
 	}
 }
 
