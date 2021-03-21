@@ -1829,17 +1829,12 @@ void BackProjector::reweightGrad() {
 	}
 }
 
-void BackProjector::applyMomenta(
-		MultidimArray<Complex> &mom1, RFLOAT lambda1,
-		MultidimArray<Complex> &mom2, RFLOAT lambda2,
-		bool init_mom)
+void BackProjector::applyFristMoment(MultidimArray<Complex> &mom, bool init_mom, RFLOAT lambda)
 {
 	const int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
 
-	mom1.setXmippOrigin();
-	mom1.xinit = 0;
-	mom2.setXmippOrigin();
-	mom2.xinit = 0;
+	mom.setXmippOrigin();
+	mom.xinit = 0;
 
 	RFLOAT eps = 1e-12;
 
@@ -1850,107 +1845,124 @@ void BackProjector::applyMomenta(
 		{
 			if (init_mom)
 			{
-				if (lambda1 > 0.)
-				{
-					A3D_ELEM(mom1, k, i, j).real = 0;
-					A3D_ELEM(mom1, k, i, j).imag = 0;
-				}
-				if (lambda2 > 0.)
-				{
-					A3D_ELEM(mom2, k, i, j).real = eps;
-					A3D_ELEM(mom2, k, i, j).imag = eps;
-				}
+				A3D_ELEM(mom, k, i, j).real = 0;
+				A3D_ELEM(mom, k, i, j).imag = 0;
+			}
+
+			Complex m = lambda * A3D_ELEM(mom, k, i, j) + (1-lambda) * A3D_ELEM(data, k, i, j);
+			A3D_ELEM(mom, k, i, j) = m;
+			A3D_ELEM(data, k, i, j) = m;
+		}
+	}
+}
+
+void BackProjector::mergeWithGradient(MultidimArray<Complex> &grad)
+{
+	const int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
+
+	// COMMENT OUT THIS PART OUT TO SKIP FSC ESTIMATE -------------------------------------
+	MultidimArray<RFLOAT> counter;
+	mom1_power.initZeros(ori_size / 2 + 1);
+	counter.initZeros(ori_size / 2 + 1);
+
+	FOR_ALL_ELEMENTS_IN_ARRAY3D(data) {
+		const int r2 = k * k + i * i + j * j;
+		if (r2 < max_r2) {
+			int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
+			Complex diff = A3D_ELEM(grad, k, i, j) - A3D_ELEM(data, k, i, j);
+			DIRECT_A1D_ELEM(mom1_power, ires) += sqrt(norm(diff));
+			DIRECT_A1D_ELEM(counter, ires) += 1;
+		}
+	}
+	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(counter) {
+		if (DIRECT_A1D_ELEM(counter, i) > 0.) {
+			DIRECT_A1D_ELEM(mom1_power, i) /= DIRECT_A1D_ELEM(counter, i);
+		}
+	}
+	// -----------------------------------------------------------------------------------
+
+	FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
+	{
+		const int r2 = k * k + i * i + j * j;
+		if (r2 < max_r2)
+		{
+			A3D_ELEM(data, k, i, j) = (A3D_ELEM(grad, k, i, j) + A3D_ELEM(data, k, i, j)) / 2.;
+		}
+	}
+}
+
+void BackProjector::applySecondMoment(MultidimArray<Complex> &mom, bool init_mom, RFLOAT lambda)
+{
+	const int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
+
+	mom.setXmippOrigin();
+	mom.xinit = 0;
+
+	RFLOAT eps = 1e-12;
+
+	FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
+	{
+		const int r2 = k * k + i * i + j * j;
+		if (r2 < max_r2)
+		{
+			if (init_mom)
+			{
+				A3D_ELEM(mom, k, i, j).real = eps;
+				A3D_ELEM(mom, k, i, j).imag = eps;
 			}
 
 			Complex g = A3D_ELEM(data, k, i, j);
 
-			if (lambda1 > 0.)
-			{
-				Complex m = lambda1 * A3D_ELEM(mom1, k, i, j) + (1-lambda1) * g;
-				A3D_ELEM(mom1, k, i, j) = m;
-				A3D_ELEM(data, k, i, j) = m;
-			}
-			else
-				A3D_ELEM(data, k, i, j) = g;
-
-			if (lambda2 > 0.) {
-				A3D_ELEM(mom2, k, i, j).real = lambda2 * A3D_ELEM(mom2, k, i, j).real +
-				                                      (1 - lambda2) * sqrt(g.real * g.real);
-				A3D_ELEM(mom2, k, i, j).imag = lambda2 * A3D_ELEM(mom2, k, i, j).imag +
-				                                      (1 - lambda2) * sqrt(g.imag * g.imag);
-			}
+			A3D_ELEM(mom, k, i, j).real = lambda * A3D_ELEM(mom, k, i, j).real +
+			                               (1 - lambda) * sqrt(g.real * g.real);
+			A3D_ELEM(mom, k, i, j).imag = lambda * A3D_ELEM(mom, k, i, j).imag +
+			                               (1 - lambda) * sqrt(g.imag * g.imag);
 		}
 	}
 
 	// Mom2 shell-wise normalisation
-	if (lambda2 > 0.)
+	MultidimArray<Complex> power_a;
+	MultidimArray<Complex> power_b;
+	power_a.initZeros(ori_size / 2 + 1);
+	power_b.initZeros(ori_size / 2 + 1);
+
+	FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
 	{
-		MultidimArray<Complex> power_a;
-		MultidimArray<Complex> power_b;
-		power_a.initZeros(ori_size / 2 + 1);
-		power_b.initZeros(ori_size / 2 + 1);
-
-		FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
+		const int r2 = k * k + i * i + j * j;
+		if (r2 < max_r2)
 		{
-			const int r2 = k * k + i * i + j * j;
-			if (r2 < max_r2)
-			{
-				int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
-				Complex x = A3D_ELEM(data, k, i, j);
-				DIRECT_A1D_ELEM(power_a, ires) += (x.real * x.real) + (x.imag * x.imag);
-			}
-		}
-
-		FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
-		{
-			const int r2 = k * k + i * i + j * j;
-			if (r2 < max_r2)
-			{
-				int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
-
-				Complex x = A3D_ELEM(mom2, k, i, j);
-
-				A3D_ELEM(data, k, i, j).real /= sqrt(x.real) + eps;
-				A3D_ELEM(data, k, i, j).imag /= sqrt(x.imag) + eps;
-
-				x = A3D_ELEM(data, k, i, j);
-				DIRECT_A1D_ELEM(power_b, ires) += (x.real * x.real) + (x.imag * x.imag);
-			}
-		}
-
-		FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
-		{
-			const int r2 = k * k + i * i + j * j;
-			if (r2 < max_r2)
-			{
-				int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
-				RFLOAT a = DIRECT_A1D_ELEM(power_a, ires);
-				RFLOAT b = DIRECT_A1D_ELEM(power_b, ires);
-				A3D_ELEM(data, k, i, j) *= sqrt(a / (b + eps));
-			}
+			int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
+			Complex x = A3D_ELEM(data, k, i, j);
+			DIRECT_A1D_ELEM(power_a, ires) += (x.real * x.real) + (x.imag * x.imag);
 		}
 	}
 
-	// Store powers of both momenta
-	MultidimArray<RFLOAT> counter;
-	mom1_power.initZeros(ori_size / 2 + 1);
-	mom2_power.initZeros(ori_size / 2 + 1);
-	counter.initZeros(ori_size / 2 + 1);
+	FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
+	{
+		const int r2 = k * k + i * i + j * j;
+		if (r2 < max_r2)
+		{
+			int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
 
-	FOR_ALL_ELEMENTS_IN_ARRAY3D(data) {
-				const int r2 = k * k + i * i + j * j;
-				if (r2 < max_r2) {
-					int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
-					DIRECT_A1D_ELEM(mom1_power, ires) += sqrt(norm(A3D_ELEM(mom1, k, i, j)));
-					DIRECT_A1D_ELEM(mom2_power, ires) += sqrt(norm(A3D_ELEM(mom2, k, i, j)));
-					DIRECT_A1D_ELEM(counter, ires) += 1;
-				}
-			}
+			Complex x = A3D_ELEM(mom, k, i, j);
 
-	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(counter) {
-		if (DIRECT_A1D_ELEM(counter, i) > 0.) {
-			DIRECT_A1D_ELEM(mom1_power, i) /= DIRECT_A1D_ELEM(counter, i);
-			DIRECT_A1D_ELEM(mom2_power, i) /= DIRECT_A1D_ELEM(counter, i);
+			A3D_ELEM(data, k, i, j).real /= sqrt(x.real) + eps;
+			A3D_ELEM(data, k, i, j).imag /= sqrt(x.imag) + eps;
+
+			x = A3D_ELEM(data, k, i, j);
+			DIRECT_A1D_ELEM(power_b, ires) += (x.real * x.real) + (x.imag * x.imag);
+		}
+	}
+
+	FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
+	{
+		const int r2 = k * k + i * i + j * j;
+		if (r2 < max_r2)
+		{
+			int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
+			RFLOAT a = DIRECT_A1D_ELEM(power_a, ires);
+			RFLOAT b = DIRECT_A1D_ELEM(power_b, ires);
+			A3D_ELEM(data, k, i, j) *= sqrt(a / (b + eps));
 		}
 	}
 }
@@ -2014,31 +2026,29 @@ void BackProjector::reconstructGrad(
 
 		RFLOAT threshold(0);
 
-		//Average power spectra and calculate FSC estimate
-		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(counter) {
-			RFLOAT prev = 0.;
-			RFLOAT f = 0.;
+		if (mom1_power.nzyxdim > 0)
+		{
+			//Average power spectra and calculate FSC estimate
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(counter)
+			{
+				RFLOAT prev = 0.;
+				RFLOAT snr = 0.;
 
-			if (DIRECT_A1D_ELEM(counter, i) > 0.) {
-				prev = DIRECT_A1D_ELEM(prev_power, i) / DIRECT_A1D_ELEM(counter, i);
-				DIRECT_A1D_ELEM(prev_power, i) = prev;
+				if (DIRECT_A1D_ELEM(counter, i) > 0.)
+				{
+					prev = DIRECT_A1D_ELEM(prev_power, i) / DIRECT_A1D_ELEM(counter, i);
+					DIRECT_A1D_ELEM(prev_power, i) = prev;
 
-				if(prev > 0.)
-					f = 1 - (DIRECT_A1D_ELEM(mom1_power, i) + DIRECT_A1D_ELEM(mom2_power, i)) / prev;
+					if (prev > 0.)
+						snr = tau2_fudge * DIRECT_A1D_ELEM(mom1_power, i) / prev;
 
-				threshold += XMIPP_MIN(XMIPP_MAX(f, DIRECT_A1D_ELEM(fsc_spectrum, i)), 1);
+					RFLOAT f = snr / (1 + snr);
+					DIRECT_A1D_ELEM(fsc_estimate, i) = XMIPP_MIN(XMIPP_MAX(f, DIRECT_A1D_ELEM(fsc_spectrum, i)), 1);
+				}
 			}
 		}
-
-		threshold = threshold * tau2_fudge;
-
-		fsc_estimate.initZeros(ori_size / 2 + 1);
-		RFLOAT a = XMIPP_MAX(min_resol_shell, threshold); //Sigmoid end
-		RFLOAT b = min_resol_shell; // Sigmoid start
-
-		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_estimate) {
-			DIRECT_A1D_ELEM(fsc_estimate, i) = 1. / (pow(10, (i - b - a / 2.) / (a / 4.)) + 1.);
-		}
+		else
+			fsc_estimate += 1;
 
 		tau2_fudge = 1;
 	}

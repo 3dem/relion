@@ -1653,6 +1653,8 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 #endif
 
+	grad_pseudo_halfsets = gradient_refine;
+
 	if (nr_iter < 0) {
 		if (gradient_refine)
 			nr_iter = 200;
@@ -1734,7 +1736,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		mymodel.initialiseFromImages(
 				fn_ref, is_3d_model, mydata,
 				do_average_unaligned, do_generate_seeds,refs_are_ctf_corrected,
-				ref_angpix, gradient_refine, do_trust_ref_size, (rank==0));
+				ref_angpix, gradient_refine, grad_pseudo_halfsets, do_trust_ref_size, (rank==0));
 	}
 
 	if (mymodel.nr_classes > 1 && do_split_random_halves)
@@ -2054,7 +2056,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		mymodel.initialisePdfDirection(sampling.NrDirections());
 
 	// Initialise the wsum_model according to the mymodel
-	wsum_model.initialise(mymodel, sampling.symmetryGroup(), asymmetric_padding, skip_gridding);
+	wsum_model.initialise(mymodel, sampling.symmetryGroup(), asymmetric_padding, skip_gridding, grad_pseudo_halfsets);
 
 	// Initialise sums of hidden variable changes
 	// In later iterations, this will be done in updateOverallChangesInHiddenVariables
@@ -3246,6 +3248,10 @@ void MlOptimiser::expectation()
 			MlDeviceBundle* b = ((MlDeviceBundle*)accDataBundles[i]);
 			b->syncAllBackprojects();
 
+
+			for (int j = 0; j < b->projectors.size(); j++)
+				b->projectors[j].clear();
+
 			for (int j = 0; j < b->backprojectors.size(); j++)
 			{
 				unsigned long s = wsum_model.BPref[j].data.nzyxdim;
@@ -3266,7 +3272,6 @@ void MlOptimiser::expectation()
 				delete [] imags;
 				delete [] weights;
 
-				b->projectors[j].clear();
 				b->backprojectors[j].clear();
 			}
 
@@ -4742,20 +4747,36 @@ int MlOptimiser::maximizationGradientParameters() {
 			nr_active_classes ++;
 	}
 
-	if(do_grad && !do_split_random_halves) {
+	if(do_grad && !do_split_random_halves)
+	{
 		std::vector<float> avg_class_errors(mymodel.nr_classes * mymodel.nr_bodies, 0);
-		for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++) {
+		for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
+		{
 			mymodel.class_age[iclass] += wsum_model.pdf_class[iclass]/wsum_mode_pdf_class_sum;
 
-			if (mymodel.pdf_class[iclass] > 0. || mymodel.nr_bodies > 1) {
-				if ((wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY) {
-
+			if (mymodel.pdf_class[iclass] > 0. || mymodel.nr_bodies > 1)
+			{
+				if ((wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY)
+				{
 					wsum_model.BPref[iclass].reweightGrad();
-					(wsum_model.BPref[iclass]).applyMomenta(
+					wsum_model.BPref[iclass].applyFristMoment(
 							mymodel.Igrad1[iclass],
-							0.9,
+							iter == 1);
+
+					if (grad_pseudo_halfsets)
+					{
+						int iclass_half = iclass + mymodel.nr_classes;
+
+						wsum_model.BPref[iclass_half].reweightGrad();
+						wsum_model.BPref[iclass_half].applyFristMoment(
+								mymodel.Igrad1[iclass_half],
+								iter == 1);
+						wsum_model.BPref[iclass].mergeWithGradient(
+								wsum_model.BPref[iclass_half].data);
+					}
+
+					wsum_model.BPref[iclass].applySecondMoment(
 							mymodel.Igrad2[iclass],
-							0.999,
 							iter == 1);
 
 					RFLOAT avg_grad(0);

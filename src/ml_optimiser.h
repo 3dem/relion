@@ -337,6 +337,9 @@ public:
 	bool do_grad;
 	bool do_grad_next_iter;
 
+	// Do pseudo half-sets to estimate noise
+	bool grad_pseudo_halfsets;
+
 	// Number of iterations at the end of a gradient refinement using Expectation-Maximization
 	int grad_em_iters;
 

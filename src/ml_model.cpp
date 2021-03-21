@@ -29,7 +29,7 @@
 #define TIMING_TOC(id)
 #endif
 
-void MlModel::initialise(bool _do_grad)
+void MlModel::initialise(bool _do_grad, bool _pseudo_halfsets)
 {
 
 	// Auxiliary vector with relevant size in Fourier space
@@ -88,8 +88,12 @@ void MlModel::initialise(bool _do_grad)
 	PPref.resize(nr_classes * nr_bodies, ref);
 
 	do_grad = _do_grad;
+	pseudo_halfsets = _pseudo_halfsets;
 	if (_do_grad) {
-		Igrad1.resize(nr_classes);
+		if (_pseudo_halfsets)
+			Igrad1.resize(2 * nr_classes);
+		else
+			Igrad1.resize(nr_classes);
 		Igrad2.resize(nr_classes);
 	}
 
@@ -253,13 +257,36 @@ void MlModel::read(FileName fn_in, bool read_only_one_group)
 			Image<RFLOAT> img;
 			do_grad = true;
 			if (iclass == 0)
-				Igrad1.resize(nr_classes);
+			{
+				if (pseudo_halfsets)
+					Igrad1.resize(2 * nr_classes);
+				else
+					Igrad1.resize(nr_classes);
+			}
 			img.read(fn_tmp);
 
 			Igrad1[iclass].resize(Iref[0].zdim, Iref[0].ydim, Iref[0].xdim/2+1);
+
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Igrad1[iclass]) {
 				DIRECT_MULTIDIM_ELEM(Igrad1[iclass], n).real = DIRECT_MULTIDIM_ELEM(img(), n * 2 + 0);
 				DIRECT_MULTIDIM_ELEM(Igrad1[iclass], n).imag = DIRECT_MULTIDIM_ELEM(img(), n * 2 + 1);
+			}
+
+			if (pseudo_halfsets)
+			{
+
+				long int img_idx;
+				FileName fileName;
+				fn_tmp.decompose(img_idx, fileName);
+				fileName.compose(img_idx + nr_classes, fileName);
+				img.read(fileName);
+
+				Igrad1[iclass + nr_classes].resize(Iref[0].zdim, Iref[0].ydim, Iref[0].xdim/2+1);
+
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Igrad1[iclass + nr_classes]) {
+					DIRECT_MULTIDIM_ELEM(Igrad1[iclass + nr_classes], n).real = DIRECT_MULTIDIM_ELEM(img(), n * 2 + 0);
+					DIRECT_MULTIDIM_ELEM(Igrad1[iclass + nr_classes], n).imag = DIRECT_MULTIDIM_ELEM(img(), n * 2 + 1);
+				}
 			}
 		}
 
@@ -422,13 +449,23 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 
 		if (do_grad)
 		{
-			Image<RFLOAT> img(XSIZE(Igrad1[0])*2, YSIZE(Igrad1[0]), 1, nr_classes_bodies);
+			int nr_grads = pseudo_halfsets ? nr_classes_bodies * 2 : nr_classes_bodies;
+			Image<RFLOAT> img(XSIZE(Igrad1[0])*2, YSIZE(Igrad1[0]), 1, nr_grads);
 			for (int iclass = 0; iclass < nr_classes; iclass++)
 			{
 				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(Igrad1[iclass])
 				{
 					DIRECT_NZYX_ELEM(img(), iclass, 0, i, j*2+0) = DIRECT_A2D_ELEM(Igrad1[iclass], i, j).real;
 					DIRECT_NZYX_ELEM(img(), iclass, 0, i, j*2+1) = DIRECT_A2D_ELEM(Igrad1[iclass], i, j).imag;
+
+				}
+				if (pseudo_halfsets)
+				{
+					FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(Igrad1[iclass])
+					{
+						DIRECT_NZYX_ELEM(img(), iclass + nr_classes, 0, i, j*2+0) = DIRECT_A2D_ELEM(Igrad1[iclass + nr_classes], i, j).real;
+						DIRECT_NZYX_ELEM(img(), iclass + nr_classes, 0, i, j*2+1) = DIRECT_A2D_ELEM(Igrad1[iclass + nr_classes], i, j).imag;
+					}
 				}
 			}
 			img.write(fn_out + "_1moment.mrcs");
@@ -479,8 +516,20 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 				}
 				img.write(fn_tmp);
 
-				fn_tmp.compose(fn_out+"_2moment", iclass+1, "mrc", 3);
 
+				if (pseudo_halfsets)
+				{
+					fn_tmp.compose(fn_out+"_1moment", iclass+1+nr_classes, "mrc", 3);
+
+					Image<RFLOAT> img(XSIZE(Igrad1[0])*2, YSIZE(Igrad1[0]), ZSIZE(Igrad1[0]));
+					FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Igrad1[iclass+nr_classes]) {
+								DIRECT_A3D_ELEM(img(), k, i, j*2+0) = DIRECT_A3D_ELEM(Igrad1[iclass+nr_classes], k, i, j).real;
+								DIRECT_A3D_ELEM(img(), k, i, j*2+1) = DIRECT_A3D_ELEM(Igrad1[iclass+nr_classes], k, i, j).imag;
+							}
+					img.write(fn_tmp);
+				}
+
+				fn_tmp.compose(fn_out+"_2moment", iclass+1, "mrc", 3);
 				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Igrad2[iclass]) {
 							DIRECT_A3D_ELEM(img(), k, i, j*2+0) = DIRECT_A3D_ELEM(Igrad2[iclass], k, i, j).real;
 							DIRECT_A3D_ELEM(img(), k, i, j*2+1) = DIRECT_A3D_ELEM(Igrad2[iclass], k, i, j).imag;
@@ -757,7 +806,7 @@ void  MlModel::readTauSpectrum(FileName fn_tau, int verb)
 void MlModel::initialiseFromImages(
 	FileName fn_ref, bool _is_3d_model, Experiment &_mydata,
 	bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected,
-	RFLOAT _ref_angpix, bool _do_grad, bool _do_trust_ref_size, bool verb)
+	RFLOAT _ref_angpix, bool _do_grad, bool _pseudo_halfsets, bool _do_trust_ref_size, bool verb)
 {
 
 
@@ -828,6 +877,9 @@ void MlModel::initialiseFromImages(
 				MultidimArray<Complex> zeros(img().zdim, img().ydim, img().xdim/2+1);
 				if (_do_grad) {
 					Igrad1.push_back(zeros);
+					if (_pseudo_halfsets)
+						Igrad1.push_back(zeros);
+
 					Igrad2.push_back(zeros);
 				}
 				nr_classes++;
@@ -880,6 +932,9 @@ void MlModel::initialiseFromImages(
 					MultidimArray<Complex> zeros(img().zdim, img().ydim, img().xdim/2+1);
 					if (_do_grad) {
 						Igrad1.push_back(zeros);
+						if (_pseudo_halfsets)
+							Igrad1.push_back(zeros);
+
 						Igrad2.push_back(zeros);
 					}
 				}
@@ -954,6 +1009,9 @@ void MlModel::initialiseFromImages(
 			MultidimArray<Complex> zeros(img().zdim, img().ydim, img().xdim/2+1);
 			if (_do_grad) {
 				Igrad1.push_back(zeros);
+				if (_pseudo_halfsets)
+					Igrad1.push_back(zeros);
+
 				Igrad2.push_back(zeros);
 			}
 		}
@@ -966,7 +1024,7 @@ void MlModel::initialiseFromImages(
 	aux.initZeros(ori_size/2 + 1);
 	sigma2_noise.resize(nr_groups, aux);
 
-	initialise(_do_grad);
+	initialise(_do_grad, _pseudo_halfsets);
 
 	// Now set the group names from the Experiment groups list
 	for (int i=0; i< nr_groups; i++)
@@ -1502,6 +1560,9 @@ void MlModel::reset_class(int class_idx, int to_class_idx) {
 	if (to_class_idx == -1) {
 		Iref[class_idx] *= 0;
 		Igrad1[class_idx].initZeros();
+		if (pseudo_halfsets)
+			Igrad1[class_idx+nr_classes].initZeros();
+
 		Igrad2[class_idx].initZeros();
 		pdf_class[class_idx] = 0;
 		tau2_class[class_idx] *= 0.;
@@ -1511,6 +1572,8 @@ void MlModel::reset_class(int class_idx, int to_class_idx) {
 	} else {
 		Iref[class_idx] = Iref[to_class_idx];
 		Igrad1[class_idx] = Igrad1[to_class_idx];
+		if (pseudo_halfsets)
+			Igrad1[class_idx+nr_classes] = Igrad1[to_class_idx+nr_classes];
 		Igrad2[class_idx] = Igrad2[to_class_idx];
 		pdf_class[class_idx] = pdf_class[to_class_idx];
 		tau2_class[class_idx] = tau2_class[to_class_idx];
@@ -1523,7 +1586,7 @@ void MlModel::reset_class(int class_idx, int to_class_idx) {
 
 
 /////////// MlWsumModel
-void MlWsumModel::initialise(MlModel &_model, FileName fn_sym, bool asymmetric_padding, bool _skip_gridding)
+void MlWsumModel::initialise(MlModel &_model, FileName fn_sym, bool asymmetric_padding, bool _skip_gridding, bool _pseudo_halfsets)
 {
 	pixel_size = _model.pixel_size;
 	nr_classes = _model.nr_classes;
@@ -1591,7 +1654,12 @@ void MlWsumModel::initialise(MlModel &_model, FileName fn_sym, bool asymmetric_p
 	BackProjector BP(ori_size, ref_dim, fn_sym, interpolator, padding_factor, r_min_nn,
 					 ML_BLOB_ORDER, ML_BLOB_RADIUS, ML_BLOB_ALPHA, data_dim, _skip_gridding);
 	BPref.clear();
-	BPref.resize(nr_classes * nr_bodies, BP); // also set multiple bodies
+
+	pseudo_halfsets = _pseudo_halfsets;
+	if (_pseudo_halfsets)
+		BPref.resize(2 * nr_classes * nr_bodies, BP); // also set multiple bodies
+	else
+		BPref.resize(nr_classes * nr_bodies, BP); // also set multiple bodies
 	sumw_group.resize(nr_groups);
 
 }
@@ -1612,6 +1680,9 @@ void MlWsumModel::initZeros()
 	for (int iclass = 0; iclass < nr_classes * nr_bodies; iclass++)
 	{
 		BPref[iclass].initZeros(current_size);
+		if (pseudo_halfsets)
+			BPref[iclass + nr_classes].initZeros(current_size);
+
 		// Assume pdf_direction is already of the right size...
 		pdf_direction[iclass].initZeros();
 	}

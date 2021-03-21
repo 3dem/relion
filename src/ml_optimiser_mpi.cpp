@@ -2098,12 +2098,12 @@ void MlOptimiserMpi::maximization()
 							if(do_grad)
 							{
 								if (do_split_random_halves) {
-									(wsum_model.BPref[ith_recons]).reweightGrad();
-									(wsum_model.BPref[ith_recons]).applyMomenta(
+									wsum_model.BPref[ith_recons].reweightGrad();
+									wsum_model.BPref[ith_recons].applyFristMoment(
 											mymodel.Igrad1[ith_recons],
-											0.9,
+											iter == 1);
+									wsum_model.BPref[ith_recons].applySecondMoment(
 											mymodel.Igrad2[ith_recons],
-											0.999,
 											iter == 1);
 								}
 
@@ -2241,12 +2241,12 @@ void MlOptimiserMpi::maximization()
 								if(do_grad)
 								{
 									if (do_split_random_halves) {
-										(wsum_model.BPref[ith_recons]).reweightGrad();
-										(wsum_model.BPref[ith_recons]).applyMomenta(
+										wsum_model.BPref[ith_recons].reweightGrad();
+										wsum_model.BPref[ith_recons].applyFristMoment(
 												mymodel.Igrad1[ith_recons],
-												0.9,
+												iter == 1);
+										wsum_model.BPref[ith_recons].applySecondMoment(
 												mymodel.Igrad2[ith_recons],
-												0.999,
 												iter == 1);
 									}
 

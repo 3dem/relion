@@ -2886,9 +2886,14 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					baseMLO->timer.tic(baseMLO->TIMING_WSUM_BACKPROJ);
 	#endif
 
+				int iproj_offset = 0;
+				if (baseMLO->grad_pseudo_halfsets)
+					// Backproject every other particle into separate volumes
+					iproj_offset = (op.part_id % 2) * baseMLO->mymodel.nr_classes
+
 				CTIC(accMLO->timer,"backproject");
 				runBackProjectKernel(
-					accMLO->bundle->backprojectors[iproj],
+					accMLO->bundle->backprojectors[iproj + iproj_offset],
 					projKernel,
 					&(~Fimgs)[re_nomask_offset], //~Fimgs_nomask_real,
 					&(~Fimgs)[im_nomask_offset], //~Fimgs_nomask_imag,
