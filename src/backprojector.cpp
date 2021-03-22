@@ -2040,7 +2040,7 @@ void BackProjector::reconstructGrad(
 					DIRECT_A1D_ELEM(prev_power, i) = prev;
 
 					if (prev > 0.)
-						snr = tau2_fudge * DIRECT_A1D_ELEM(mom1_power, i) / prev;
+						snr = 4 * tau2_fudge * prev / DIRECT_A1D_ELEM(mom1_power, i);
 
 					RFLOAT f = snr / (1 + snr);
 					DIRECT_A1D_ELEM(fsc_estimate, i) = XMIPP_MIN(XMIPP_MAX(f, DIRECT_A1D_ELEM(fsc_spectrum, i)), 1);
