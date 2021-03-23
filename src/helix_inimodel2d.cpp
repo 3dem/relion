@@ -213,7 +213,8 @@ void HelixAligner::initialise()
 		float deg_per_pixel = 180. * angpix / (crossover_distance);
 		Image<RFLOAT> vol;
 		vol().resize(ori_size, ori_size, ori_size);
-		for (int k = 0; k < ZSIZE(vol()); k++)
+		vol().setXmippOrigin();
+		for (long int k=STARTINGZ(vol()); k<=FINISHINGZ(vol()); k++)
 		{
 			float ang = deg_per_pixel * k;
 			Matrix2D<RFLOAT> Arot;
@@ -221,9 +222,10 @@ void HelixAligner::initialise()
 
 			MultidimArray<RFLOAT> Mrot;
 			Mrot.initZeros(img());
+			Mrot.setXmippOrigin();
 			applyGeometry(img(), Mrot, Arot, true, false);
-			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(Mrot)
-				DIRECT_A3D_ELEM(vol(), k, i, j) = DIRECT_A2D_ELEM(Mrot, i, j);
+			FOR_ALL_ELEMENTS_IN_ARRAY2D(Mrot)
+				A3D_ELEM(vol(), k, i, j) = A2D_ELEM(Mrot, i, j);
 		}
 		vol.setSamplingRateInHeader(angpix);
 		vol.write(fn_out + ".mrc");
