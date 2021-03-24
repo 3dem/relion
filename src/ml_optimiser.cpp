@@ -4463,6 +4463,10 @@ void MlOptimiser::centerClasses()
 			shiftImageInContinuousFourierTransform(aux, mymodel.Igrad1[iclass],
 			                                       mymodel.ori_size, x, y, z);
 
+			if (grad_pseudo_halfsets)
+				shiftImageInContinuousFourierTransform(aux, mymodel.Igrad1[iclass + mymodel.nr_classes],
+				                                       mymodel.ori_size, x, y, z);
+
 			// Reset mom2 but preserve its power
 			MultidimArray<RFLOAT> counter, power;
 			power.initZeros(mymodel.Igrad2[iclass].xdim*3);
