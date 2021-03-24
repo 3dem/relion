@@ -1992,7 +1992,7 @@ void JobWindow::initialiseSubtractWindow()
 
 void JobWindow::initialisePostprocessWindow()
 {
-	setupTabs(3);
+	setupTabs(2);
 
 	tab1->begin();
 	tab1->label("I/O");
@@ -2037,13 +2037,6 @@ void JobWindow::initialisePostprocessWindow()
 
 	current_y += STEPY/2;
 
-	place("fn_mtf");
-	place("mtf_angpix");
-
-	tab2->end();
-	tab3->begin();
-	tab3->label("Filter");
-	resetHeight();
 	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group3->end();
 
@@ -2054,7 +2047,12 @@ void JobWindow::initialisePostprocessWindow()
 	group3->end();
 	guientries["do_skip_fsc_weighting"].cb_menu_i();
 
-	tab3->end();
+	current_y += STEPY/2;
+
+	place("fn_mtf");
+	place("mtf_angpix");
+
+	tab2->end();
 }
 
 void JobWindow::initialiseLocresWindow()

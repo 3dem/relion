@@ -672,7 +672,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 		SWAP(mymodel.helical_rise_min, mymodel.helical_rise_max, tmp_RFLOAT);
 	if (mymodel.helical_twist_min > mymodel.helical_twist_max)
 		SWAP(mymodel.helical_twist_min, mymodel.helical_twist_max, tmp_RFLOAT);
-	helical_fourier_mask_resols = parser.getOption("--helical_exclude_resols", "Resolutions (in A) along helical axis to exclude from refinement (comma-separated pairs, e.g. 50-5)", "");
+	helical_fourier_mask_resols = parser.getOption("--helical_exclude_resols", "Resolutions (in A) along helical axis to exclude from refinement (comma-separated pairs, e.g. 50,5)", "");
 	fn_fourier_mask = parser.getOption("--fourier_mask", "Originally-sized, FFTW-centred image with Fourier mask for Projector", "None");
 
 	// CTF, norm, scale, bfactor correction etc.
@@ -801,8 +801,8 @@ if(do_gpu)
 	// Expert options
 	int expert_section = parser.addSection("Expert options");
 	mymodel.padding_factor = textToFloat(parser.getOption("--pad", "Oversampling factor for the Fourier transforms of the references", "2"));
-	if (gradient_refine)
-		mymodel.padding_factor = 1;
+	//if (gradient_refine)
+	//	mymodel.padding_factor = 1;
 
 	ref_angpix = textToFloat(parser.getOption("--ref_angpix", "Pixel size (in A) for the input reference (default is to read from header)", "-1."));
 	mymodel.interpolator = (parser.checkOption("--NN", "Perform nearest-neighbour instead of linear Fourier-space interpolation?")) ? NEAREST_NEIGHBOUR : TRILINEAR;
@@ -2181,86 +2181,96 @@ void MlOptimiser::initialiseSigma2Noise()
 void MlOptimiser::initialiseGeneral2(bool do_ini_data_vs_prior)
 {
 
-	if (do_som)
+	if (iter == 0)
 	{
-		mymodel.som.set_max_node_count(mymodel.nr_classes);
-		// Add the initial nodes to the graph and connect them with an edge
-		for (unsigned i = 0; i < som_starting_nodes; i++)
-			mymodel.som.add_node();
-
-		std::vector<unsigned> nodes = mymodel.som.get_all_nodes();
-		for (unsigned i = 0; i < nodes.size(); i ++)
+		if (do_som)
 		{
-			mymodel.pdf_class[nodes[i]] = 1./nodes.size();
-			mymodel.som.set_node_activity(nodes[i], 1);
-		}
+			mymodel.som.set_max_node_count(mymodel.nr_classes);
+			// Add the initial nodes to the graph and connect them with an edge
+			for (unsigned i = 0; i < som_starting_nodes; i++)
+				mymodel.som.add_node();
 
-		// Clear all non-node
-		for (unsigned i = 0; i < mymodel.nr_classes; i ++)
-		{
-			bool clear = true;
-			for (unsigned j = 0; j < nodes.size(); j++)
-				if (i == nodes[j])
-					clear = false;
-
-			if (clear)
+			std::vector<unsigned> nodes = mymodel.som.get_all_nodes();
+			for (unsigned i = 0; i < nodes.size(); i++)
 			{
-				mymodel.pdf_class[i] = 0.;
-				mymodel.Iref[i] *= 0.;
-				mymodel.Igrad1[i].initZeros();
-				mymodel.Igrad2[i].initZeros();
+				mymodel.pdf_class[nodes[i]] = 1. / nodes.size();
+				mymodel.som.set_node_activity(nodes[i], 1);
 			}
-		}
-	}
 
-	// Low-pass filter the initial references
-	if (iter == 0) initialLowPassFilterReferences();
-
-	if (do_init_blobs && fn_ref == "None")
-	{
-
-		// Sjors 04032021: insert average of all classes into make_blobs functions,
-		// as in new initial calculation of Iref, much fewer particles are used than before
-		MultidimArray<RFLOAT> Iavg(mymodel.Iref[0]);
-		Iavg.initZeros();
-		for (unsigned i = 0; i < mymodel.nr_classes; i ++)
-		{
-			Iavg += mymodel.Iref[i];
-		}
-		Iavg /= (float)mymodel.nr_classes;
-
-		bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
-		RFLOAT diameter = particle_diameter / mymodel.pixel_size;
-
-		for (unsigned i = 0; i < mymodel.nr_classes; i ++)
-		{
-			if (mymodel.pdf_class[i] > 0.)
+			// Clear all non-node
+			for (unsigned i = 0; i < mymodel.nr_classes; i++)
 			{
-				MultidimArray<RFLOAT> blobs(Iavg);
-				if (mymodel.ref_dim == 2)
+				bool clear = true;
+				for (unsigned j = 0; j < nodes.size(); j++)
+					if (i == nodes[j])
+						clear = false;
+
+				if (clear)
 				{
-					SomGraph::make_blobs_2d(
-							blobs, Iavg, 40,
-							diameter, is_helical_segment);
+					mymodel.pdf_class[i] = 0.;
+					mymodel.Iref[i] *= 0.;
+					mymodel.Igrad1[i].initZeros();
+					mymodel.Igrad2[i].initZeros();
 				}
-				else
-				{
-					SomGraph::make_blobs_3d(
-							blobs, Iavg, 40,
-							diameter, is_helical_segment);
-				}
-				mymodel.Iref[i] = blobs / 5.;
 			}
 		}
 
+		// Low-pass filter the initial references
 		initialLowPassFilterReferences();
-		for (unsigned i = 0; i < mymodel.nr_classes; i ++)
-			softMaskOutsideMap(mymodel.Iref[i], diameter/2., (RFLOAT)width_mask_edge);
-	}
 
-	// Initialise the data_versus_prior ratio to get the initial current_size right
-	if (iter == 0 && !do_initialise_bodies && do_ini_data_vs_prior)
-		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
+		if (do_init_blobs && fn_ref == "None")
+		{
+
+			// Sjors 04032021: insert average of all classes into make_blobs functions,
+			// as in new initial calculation of Iref, much fewer particles are used than before
+			MultidimArray<RFLOAT> Iavg(mymodel.Iref[0]);
+			Iavg.initZeros();
+			for (unsigned i = 0; i < mymodel.nr_classes; i ++)
+			{
+				Iavg += mymodel.Iref[i];
+			}
+			Iavg /= (float)mymodel.nr_classes;
+
+			bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
+			RFLOAT diameter = particle_diameter / mymodel.pixel_size;
+
+			for (unsigned i = 0; i < mymodel.nr_classes; i++)
+			{
+				if (mymodel.pdf_class[i] > 0.)
+				{
+					MultidimArray<RFLOAT> blobs_pos(Iavg), blobs_neg(Iavg);
+					if (mymodel.ref_dim == 2)
+					{
+						SomGraph::make_blobs_2d(
+								blobs_pos, Iavg, 40,
+								diameter, is_helical_segment);
+						SomGraph::make_blobs_2d(
+								blobs_neg, Iavg, 40,
+								diameter, is_helical_segment);
+					}
+					else
+					{
+						SomGraph::make_blobs_3d(
+								blobs_pos, Iavg, 40,
+								diameter, is_helical_segment);
+						SomGraph::make_blobs_3d(
+								blobs_neg, Iavg, 40,
+								diameter, is_helical_segment);
+					}
+					mymodel.Iref[i] = (blobs_pos - blobs_neg / 2) / 5.;
+				}
+
+				initialLowPassFilterReferences();
+				for (unsigned i = 0; i < mymodel.nr_classes; i++)
+					softMaskOutsideMap(mymodel.Iref[i], diameter / 2., (RFLOAT) width_mask_edge);
+			}
+		}
+
+		// Initialise the data_versus_prior ratio to get the initial current_size right
+		if (!do_initialise_bodies && do_ini_data_vs_prior)
+			mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
+
+	}
 
 }
 

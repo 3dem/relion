@@ -99,6 +99,8 @@ class ScheduleGui(object):
 
         self.main_frame = tk.Frame(self.main_window)
         self.main_frame.pack(fill=tk.BOTH, expand=1)
+        self.runoutsize = 0
+        self.runerrsize = 0
 
         ### Status frame
 
@@ -323,7 +325,10 @@ class ScheduleGui(object):
 
     def restart_schedule(self, *args_ignored, **kwargs_ignored):
         # Set the current node, as per the GUI
-        command = 'relion_scheduler --schedule ' + self.schedulename + ' --set_current_node ' + self.restart_var.get()
+        myrestartpoint = self.restart_var.get()
+        if myrestartpoint == "":
+            myrestartpoint = self.current_node_var.get() 
+        command = 'relion_scheduler --schedule ' + self.schedulename + ' --set_current_node ' + myrestartpoint
         print(' RELION_IT: excuting: ', command)
         os.system(command)
         # And then run the Schedule again
@@ -347,19 +352,25 @@ class ScheduleGui(object):
         # read run,out and run.err
         fn = 'Schedules/' + self.schedulename + '/run.'
         if path.exists(fn+'out'):
-            with open(fn+'out', 'r') as f:
-                self.stdout_entry.configure(state=tk.NORMAL)
-                self.stdout_entry.delete('1.0', tk.END)
-                self.stdout_entry.insert(tk.END, f.read())
-                self.stdout_entry.yview_moveto('1.0') 
-                self.stdout_entry.configure(state=tk.DISABLED)
+            mysize = os.path.getsize(fn+'out')
+            if mysize > self.runoutsize:
+                self.runoutsize = mysize
+                with open(fn+'out', 'r') as f:
+                    self.stdout_entry.configure(state=tk.NORMAL)
+                    self.stdout_entry.delete('1.0', tk.END)
+                    self.stdout_entry.insert(tk.END, f.read())
+                    self.stdout_entry.yview_moveto('1.0') 
+                    self.stdout_entry.configure(state=tk.DISABLED)
         if path.exists(fn+'err'):
-            with open(fn+'err', 'r') as f:
-                self.stderr_entry.configure(state=tk.NORMAL)
-                self.stderr_entry.delete('1.0', tk.END)
-                self.stderr_entry.insert(tk.END, f.read())
-                self.stderr_entry.yview_moveto('1.0')
-                self.stderr_entry.configure(state=tk.DISABLED)
+            mysize = os.path.getsize(fn+'err')
+            if mysize > self.runerrsize:
+                self.runerrsize = mysize
+                with open(fn+'err', 'r') as f:
+                    self.stderr_entry.configure(state=tk.NORMAL)
+                    self.stderr_entry.delete('1.0', tk.END)
+                    self.stderr_entry.insert(tk.END, f.read())
+                    self.stderr_entry.yview_moveto('1.0')
+                    self.stderr_entry.configure(state=tk.DISABLED)
         if path.exists(lockname):
             self.set_current_node()
             self.status_frame.configure(text="Currently running", fg="dark green")
