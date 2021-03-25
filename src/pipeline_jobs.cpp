@@ -1724,6 +1724,14 @@ to the average PLUS this value times the standard deviation. Use zero to set the
 	joboptions["lowpass"] = JobOption("Lowpass filter (A)", 20, 10, 100, 5, "Lowpass filter that will be applied to the micrographs. Give a negative value to skip the lowpass filter.");
 	joboptions["highpass"] = JobOption("Highpass filter (A)", -1, 100, 1000, 100, "Highpass filter that will be applied to the micrographs. This may be useful to get rid of background ramps due to uneven ice distributions. Give a negative value to skip the highpass filter. Useful values are often in the range of 200-400 Angstroms.");
 	joboptions["angpix"] = JobOption("Pixel size (A)", -1, 0.3, 5, 0.1, "Pixel size in Angstroms. This will be used to calculate the filters and the particle diameter in pixels. If a CTF-containing STAR file is input, then the value given here will be ignored, and the pixel size will be calculated from the values in the STAR file. A negative value can then be given here.");
+	joboptions["do_topaz_denoise"] = JobOption("OR: use Topaz denoiing?", false, "If set to true, Topaz denoising will be performed instead of lowpass filtering.");
+	char *default_location = getenv ("RELION_TOPAZ_EXECUTABLE");
+	char default_topaz[] = DEFAULTTOPAZLOCATION;
+	if (default_location == NULL)
+	{
+		default_location = default_topaz;
+	}
+	joboptions["fn_topaz_exec"] = JobOption("Topaz executable", std::string(default_location), "The location of the Topaz executable. If you need to activate conda environment, please make a wrapper shell script to do so and specify it. You can control the default of this field by setting environment variable RELION_TOPAZ_EXECUTABLE.");
 
 	joboptions["do_startend"] = JobOption("Pick start-end coordinates helices?", false, "If set to true, start and end coordinates are picked subsequently and a line will be drawn between each pair");
 
@@ -1777,17 +1785,25 @@ bool RelionJob::getCommandsManualpickJob(std::string &outputname, std::vector<st
 	command += " --black " + joboptions["black_val"].getString();
 	command += " --white " + joboptions["white_val"].getString();
 
-	if (joboptions["lowpass"].getNumber(error_message) > 0.)
-		command += " --lowpass " + joboptions["lowpass"].getString();
-	if (error_message != "") return false;
+	if (joboptions["do_topaz_denoise"].getBoolean())
+	{
+		command += " --topaz_denoise";
+		command += " --topaz_exe " + joboptions["fn_topaz_exec"].getString();
+	}
+	else
+	{
+		if (joboptions["lowpass"].getNumber(error_message) > 0.)
+			command += " --lowpass " + joboptions["lowpass"].getString();
+		if (error_message != "") return false;
 
-	if (joboptions["highpass"].getNumber(error_message) > 0.)
-		command += " --highpass " + joboptions["highpass"].getString();
-	if (error_message != "") return false;
+		if (joboptions["highpass"].getNumber(error_message) > 0.)
+			command += " --highpass " + joboptions["highpass"].getString();
+		if (error_message != "") return false;
 
-	if (joboptions["angpix"].getNumber(error_message) > 0.)
-		command += " --angpix " + joboptions["angpix"].getString();
-	if (error_message != "") return false;
+		if (joboptions["angpix"].getNumber(error_message) > 0.)
+			command += " --angpix " + joboptions["angpix"].getString();
+		if (error_message != "") return false;
+	}
 
 	if (joboptions["do_fom_threshold"].getBoolean())
 	{

@@ -506,6 +506,7 @@ private:
 
 };
 
+
 class Displayer
 {
 public:
@@ -631,6 +632,9 @@ public:
 	// Highpass filter for picker images
 	RFLOAT highpass;
 
+	// Or denoise using Topaz?
+	bool do_topaz_denoise;
+
 	// Pixel size to calculate lowpass filter in Angstroms and translations in apply_orient
 	RFLOAT angpix;
 
@@ -643,6 +647,12 @@ public:
 	// Only show a limited number of images
 	long int max_nr_images;
 
+	// Topaz executable (for denoising of micrographs in picking mode)
+	FileName fn_topaz_exe;
+
+	// Shell for calling Topaz
+	FileName fn_shell;
+
 public:
 	// Read command line arguments
 	void read(int argc, char **argv);
@@ -652,6 +662,9 @@ public:
 
 	// Initialise some general stuff after reading
 	void initialise();
+
+	// On-the-fly topaz denoising for picking micrographs
+	void topazDenoiseMap(FileName fn_in, FileName fn_coords, Image<RFLOAT> &img);
 
 	// Decide what to do
 	void run();
