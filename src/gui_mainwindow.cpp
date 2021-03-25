@@ -1884,6 +1884,9 @@ void GuiMainWindow::cb_save_i()
 	if (fn_dir == "") fn_dir = ".";
 	gui_jobwindows[iwin]->myjob.write(fn_dir + "/job.star");
 
+	// Also save hidden job.star file
+	gui_jobwindows[iwin]->myjob.write("");
+
 }
 
 // Load button call-back function

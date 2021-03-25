@@ -1958,18 +1958,25 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 			command += " --black " + manualpickjob.joboptions["black_val"].getString();
 			command += " --white " + manualpickjob.joboptions["white_val"].getString();
 
-			std::string error_message = "";
-			float mylowpass = manualpickjob.joboptions["lowpass"].getNumber(error_message);
-			if (mylowpass > 0.)
-				command += " --lowpass " + manualpickjob.joboptions["lowpass"].getString();
+			if (manualpickjob.joboptions["do_topaz_denoise"].getBoolean())
+			{
+				command += " --topaz_denoise --topaz_exe " + manualpickjob.joboptions["fn_topaz_exec"].getString();
+			}
+			else
+			{
+				std::string error_message = "";
+				float mylowpass = manualpickjob.joboptions["lowpass"].getNumber(error_message);
+				if (mylowpass > 0.)
+					command += " --lowpass " + manualpickjob.joboptions["lowpass"].getString();
 
-			float myhighpass = manualpickjob.joboptions["highpass"].getNumber(error_message);
-			if (myhighpass > 0.)
-				command += " --highpass " + manualpickjob.joboptions["highpass"].getString();
+				float myhighpass = manualpickjob.joboptions["highpass"].getNumber(error_message);
+				if (myhighpass > 0.)
+					command += " --highpass " + manualpickjob.joboptions["highpass"].getString();
 
-			float myangpix = manualpickjob.joboptions["angpix"].getNumber(error_message);
-			if (myangpix > 0.)
-				command += " --angpix " + manualpickjob.joboptions["angpix"].getString();
+				float myangpix = manualpickjob.joboptions["angpix"].getNumber(error_message);
+				if (myangpix > 0.)
+					command += " --angpix " + manualpickjob.joboptions["angpix"].getString();
+			}
 
 			command += " --particle_diameter " + manualpickjob.joboptions["diameter"].getString();
 			if (manualpickjob.joboptions["do_fom_threshold"].getBoolean())
