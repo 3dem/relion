@@ -265,7 +265,11 @@ void MlModel::read(FileName fn_in, bool read_only_one_group)
 			}
 			img.read(fn_tmp);
 
-			Igrad1[iclass].resize(Iref[0].zdim, Iref[0].ydim, Iref[0].xdim/2+1);
+			Igrad1[iclass].resize(
+					Iref[0].zdim == 1 ? 1: Iref[0].zdim * padding_factor,
+					Iref[0].ydim * padding_factor,
+					Iref[0].xdim * padding_factor/2+1
+			);
 
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Igrad1[iclass]) {
 				DIRECT_MULTIDIM_ELEM(Igrad1[iclass], n).real = DIRECT_MULTIDIM_ELEM(img(), n * 2 + 0);
@@ -281,7 +285,11 @@ void MlModel::read(FileName fn_in, bool read_only_one_group)
 				fileName.compose(img_idx + nr_classes, fileName);
 				img.read(fileName);
 
-				Igrad1[iclass + nr_classes].resize(Iref[0].zdim, Iref[0].ydim, Iref[0].xdim/2+1);
+				Igrad1[iclass + nr_classes].resize(
+						Iref[0].zdim == 1 ? 1: Iref[0].zdim * padding_factor,
+						Iref[0].ydim * padding_factor,
+						Iref[0].xdim * padding_factor/2+1
+				);
 
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Igrad1[iclass + nr_classes]) {
 					DIRECT_MULTIDIM_ELEM(Igrad1[iclass + nr_classes], n).real = DIRECT_MULTIDIM_ELEM(img(), n * 2 + 0);
@@ -298,7 +306,11 @@ void MlModel::read(FileName fn_in, bool read_only_one_group)
 				Igrad2.resize(nr_classes);
 			img.read(fn_tmp);
 
-			Igrad2[iclass].resize(Iref[0].zdim, Iref[0].ydim, Iref[0].xdim/2+1);
+			Igrad2[iclass].resize(
+					Iref[0].zdim == 1 ? 1: Iref[0].zdim * padding_factor,
+					Iref[0].ydim * padding_factor,
+					Iref[0].xdim * padding_factor/2+1
+			);
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Igrad2[iclass]) {
 				DIRECT_MULTIDIM_ELEM(Igrad2[iclass], n).real = DIRECT_MULTIDIM_ELEM(img(), n * 2 + 0);
 				DIRECT_MULTIDIM_ELEM(Igrad2[iclass], n).imag = DIRECT_MULTIDIM_ELEM(img(), n * 2 + 1);
@@ -874,7 +886,12 @@ void MlModel::initialiseFromImages(
 				ori_size = XSIZE(img());
 				ref_dim = img().getDim();
 				Iref.push_back(img());
-				MultidimArray<Complex> zeros(img().zdim, img().ydim, img().xdim/2+1);
+				MultidimArray<Complex> zeros(
+						Iref[0].zdim == 1 ? 1: Iref[0].zdim * padding_factor,
+						img().ydim * padding_factor,
+						img().xdim  * padding_factor / 2 + 1
+				);
+
 				if (_do_grad) {
 					Igrad1.push_back(zeros);
 					if (_pseudo_halfsets)
@@ -929,7 +946,12 @@ void MlModel::initialiseFromImages(
 				for (int iclass = 0; iclass < nr_classes; iclass++)
 				{
 					Iref.push_back(img());
-					MultidimArray<Complex> zeros(img().zdim, img().ydim, img().xdim/2+1);
+					MultidimArray<Complex> zeros(
+							img().zdim * padding_factor,
+							img().ydim * padding_factor,
+							img().xdim  * padding_factor / 2 + 1
+					);
+
 					if (_do_grad) {
 						Igrad1.push_back(zeros);
 						if (_pseudo_halfsets)
@@ -1006,7 +1028,12 @@ void MlModel::initialiseFromImages(
 		{
 			Iref.push_back(img());
 
-			MultidimArray<Complex> zeros(img().zdim, img().ydim, img().xdim/2+1);
+			MultidimArray<Complex> zeros(
+					Iref[0].zdim == 1 ? 1: Iref[0].zdim * padding_factor,
+					img().ydim * padding_factor,
+					img().xdim  * padding_factor / 2 + 1
+			);
+
 			if (_do_grad) {
 				Igrad1.push_back(zeros);
 				if (_pseudo_halfsets)
