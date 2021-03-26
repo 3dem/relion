@@ -692,13 +692,13 @@ __global__ void cuda_kernel_backproject2D_SGD(
 	XFLOAT minvsigma2, ctf, img_real, img_imag, Fweight, real, imag, weight;
 
 	if (tid == 0)
-		s_eulers[0] = g_eulers[img*9+0] * padding_factor;
+		s_eulers[0] = g_eulers[img*9+0];
 	else if (tid == 1)
-		s_eulers[1] = g_eulers[img*9+1] * padding_factor;
+		s_eulers[1] = g_eulers[img*9+1];
 	else if (tid == 2)
-		s_eulers[2] = g_eulers[img*9+3] * padding_factor;
+		s_eulers[2] = g_eulers[img*9+3];
 	else if (tid == 3)
-		s_eulers[3] = g_eulers[img*9+4] * padding_factor;
+		s_eulers[3] = g_eulers[img*9+4];
 
 	__syncthreads();
 
@@ -769,8 +769,8 @@ __global__ void cuda_kernel_backproject2D_SGD(
 	    if (Fweight > (XFLOAT) 0.0)
 	    {
 		    // Get logical coordinates in the 3D map
-		    XFLOAT xp = (s_eulers[0] * x + s_eulers[1] * y );
-		    XFLOAT yp = (s_eulers[2] * x + s_eulers[3] * y );
+		    XFLOAT xp = (s_eulers[0] * x + s_eulers[1] * y ) * padding_factor;
+		    XFLOAT yp = (s_eulers[2] * x + s_eulers[3] * y ) * padding_factor;
 
 		    if ( ( xp * xp + yp * yp ) > max_r2_out)
 			    continue;

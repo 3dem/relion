@@ -1653,7 +1653,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 #endif
 
-//	grad_pseudo_halfsets = gradient_refine;
+	grad_pseudo_halfsets = gradient_refine;
 
 	if (nr_iter < 0) {
 		if (gradient_refine)
@@ -9370,13 +9370,13 @@ void MlOptimiser::updateStepSize() {
 	RFLOAT _stepsize = grad_stepsize;
 
 	if (_stepsize <= 0)
-			_stepsize = 0.2;
+		_stepsize = 0.5;
 
 	std::string _scheme = grad_stepsize_scheme;
 
 	if (_scheme == "") {
 		if (mymodel.ref_dim == 2)
-			_scheme = "4-2step";
+			_scheme = "2-2step";
 		else {
 			if (do_auto_refine)
 				_scheme = "3-2step";
