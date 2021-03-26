@@ -462,36 +462,37 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 		if (do_grad)
 		{
 			int nr_grads = pseudo_halfsets ? nr_classes_bodies * 2 : nr_classes_bodies;
-			Image<RFLOAT> img(XSIZE(Igrad1[0])*2, YSIZE(Igrad1[0]), 1, nr_grads);
+			Image<RFLOAT> img1(XSIZE(Igrad1[0])*2, YSIZE(Igrad1[0]), 1, nr_grads);
 			for (int iclass = 0; iclass < nr_classes; iclass++)
 			{
 				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(Igrad1[iclass])
 				{
-					DIRECT_NZYX_ELEM(img(), iclass, 0, i, j*2+0) = DIRECT_A2D_ELEM(Igrad1[iclass], i, j).real;
-					DIRECT_NZYX_ELEM(img(), iclass, 0, i, j*2+1) = DIRECT_A2D_ELEM(Igrad1[iclass], i, j).imag;
+					DIRECT_NZYX_ELEM(img1(), iclass, 0, i, j*2+0) = DIRECT_A2D_ELEM(Igrad1[iclass], i, j).real;
+					DIRECT_NZYX_ELEM(img1(), iclass, 0, i, j*2+1) = DIRECT_A2D_ELEM(Igrad1[iclass], i, j).imag;
 
 				}
 				if (pseudo_halfsets)
 				{
 					FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(Igrad1[iclass])
 					{
-						DIRECT_NZYX_ELEM(img(), iclass + nr_classes, 0, i, j*2+0) = DIRECT_A2D_ELEM(Igrad1[iclass + nr_classes], i, j).real;
-						DIRECT_NZYX_ELEM(img(), iclass + nr_classes, 0, i, j*2+1) = DIRECT_A2D_ELEM(Igrad1[iclass + nr_classes], i, j).imag;
+						DIRECT_NZYX_ELEM(img1(), iclass + nr_classes, 0, i, j*2+0) = DIRECT_A2D_ELEM(Igrad1[iclass + nr_classes], i, j).real;
+						DIRECT_NZYX_ELEM(img1(), iclass + nr_classes, 0, i, j*2+1) = DIRECT_A2D_ELEM(Igrad1[iclass + nr_classes], i, j).imag;
 					}
 				}
 			}
-			img.write(fn_out + "_1moment.mrcs");
+			img1.write(fn_out + "_1moment.mrcs");
 
+			Image<RFLOAT> img2(XSIZE(Igrad1[0])*2, YSIZE(Igrad1[0]), 1, nr_classes_bodies);
 			for (int iclass = 0; iclass < nr_classes; iclass++)
 			{
 				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(Igrad2[iclass])
 					{
-						DIRECT_NZYX_ELEM(img(), iclass, 0, i, j*2+0) = DIRECT_A2D_ELEM(Igrad2[iclass], i, j).real;
-						DIRECT_NZYX_ELEM(img(), iclass, 0, i, j*2+1) = DIRECT_A2D_ELEM(Igrad2[iclass], i, j).imag;
+						DIRECT_NZYX_ELEM(img2(), iclass, 0, i, j*2+0) = DIRECT_A2D_ELEM(Igrad2[iclass], i, j).real;
+						DIRECT_NZYX_ELEM(img2(), iclass, 0, i, j*2+1) = DIRECT_A2D_ELEM(Igrad2[iclass], i, j).imag;
 					}
 
 			}
-			img.write(fn_out + "_2moment.mrcs");
+			img2.write(fn_out + "_2moment.mrcs");
 		}
 	}
 	else
@@ -669,7 +670,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 				fn_tmp.compose(fn_out+"_class",iclass+1,"mrc", 3); // class number from 1 to K!
 
 			fn_mom1.compose(fn_out + "_1moment", iclass + 1, "mrc", 3);
-			fn_mom2.compose(fn_out + "_1moment", iclass + 1, "mrc", 3);
+			fn_mom2.compose(fn_out + "_2moment", iclass + 1, "mrc", 3);
 		}
 		MDclass.setValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp);
 

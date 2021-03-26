@@ -318,19 +318,29 @@ public:
 	void reweightGrad();
 
 	/*
-	 * Calculate and apply the first moment of the gradient
+	 * Calculate the first moment of the gradient
 	 */
-	void applyFristMoment(MultidimArray<Complex> &mom, bool init_mom, RFLOAT lambda1=0.9);
+	void getFristMoment(
+			MultidimArray<Complex> &mom,
+			bool init_mom,
+			RFLOAT lambda=0.9);
 
 	/*
-	 * Combine statistics from two half-set gradients
+	 * Calculate the second moment of the gradient
 	 */
-	void mergeWithGradient(MultidimArray<Complex> &grad);
+	void getSecondMoment(
+			MultidimArray<Complex> &mom,
+			MultidimArray<Complex> &grad2,
+			bool init_mom,
+			RFLOAT lambda=0.999);
 
 	/*
-	 * Calculate and apply the second moment of the gradient
+	 * Combine statistics from two half-set gradients with first and second moment
 	 */
-	void applySecondMoment(MultidimArray<Complex> &mom, bool init_mom, RFLOAT lambda1=0.999);
+	void applyMomenta(
+			MultidimArray<Complex> &mom1_half1,
+			MultidimArray<Complex> &mom1_half2,
+			MultidimArray<Complex> &mom2);
 
 	void reconstructGrad(
 			MultidimArray<RFLOAT> &vol_out,

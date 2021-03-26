@@ -4763,7 +4763,7 @@ int MlOptimiser::maximizationGradientParameters() {
 				if ((wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY)
 				{
 					wsum_model.BPref[iclass].reweightGrad();
-					wsum_model.BPref[iclass].applyFristMoment(
+					wsum_model.BPref[iclass].getFristMoment(
 							mymodel.Igrad1[iclass],
 							iter == 1);
 
@@ -4772,16 +4772,30 @@ int MlOptimiser::maximizationGradientParameters() {
 						int iclass_half = iclass + mymodel.nr_classes;
 
 						wsum_model.BPref[iclass_half].reweightGrad();
-						wsum_model.BPref[iclass_half].applyFristMoment(
+						wsum_model.BPref[iclass_half].getFristMoment(
 								mymodel.Igrad1[iclass_half],
 								iter == 1);
-						wsum_model.BPref[iclass].mergeWithGradient(
-								wsum_model.BPref[iclass_half].data);
+						wsum_model.BPref[iclass].getSecondMoment(
+								mymodel.Igrad2[iclass],
+								wsum_model.BPref[iclass_half].data,
+								iter == 1);
+						wsum_model.BPref[iclass].applyMomenta(
+								mymodel.Igrad1[iclass],
+								mymodel.Igrad1[iclass_half],
+								mymodel.Igrad2[iclass]);
 					}
-
-					wsum_model.BPref[iclass].applySecondMoment(
-							mymodel.Igrad2[iclass],
-							iter == 1);
+					else
+					{
+						MultidimArray<Complex> dummy;
+						wsum_model.BPref[iclass].getSecondMoment(
+								mymodel.Igrad2[iclass],
+								dummy,
+								iter == 1);
+						wsum_model.BPref[iclass].applyMomenta(
+								mymodel.Igrad1[iclass],
+								dummy,
+								mymodel.Igrad2[iclass]);
+					}
 
 					RFLOAT avg_grad(0);
 					for (unsigned i = 0; i < wsum_model.BPref[iclass].data.nzyxdim; i++)

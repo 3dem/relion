@@ -2098,13 +2098,15 @@ void MlOptimiserMpi::maximization()
 							if(do_grad)
 							{
 								if (do_split_random_halves) {
-									wsum_model.BPref[ith_recons].reweightGrad();
-									wsum_model.BPref[ith_recons].applyFristMoment(
-											mymodel.Igrad1[ith_recons],
-											iter == 1);
-									wsum_model.BPref[ith_recons].applySecondMoment(
+									MultidimArray<Complex> dummy;
+									wsum_model.BPref[ith_recons].getSecondMoment(
 											mymodel.Igrad2[ith_recons],
+											dummy,
 											iter == 1);
+									wsum_model.BPref[ith_recons].applyMomenta(
+											mymodel.Igrad1[ith_recons],
+											dummy,
+											mymodel.Igrad2[ith_recons]);
 								}
 
 								(wsum_model.BPref[ith_recons]).reconstructGrad(
@@ -2241,13 +2243,15 @@ void MlOptimiserMpi::maximization()
 								if(do_grad)
 								{
 									if (do_split_random_halves) {
-										wsum_model.BPref[ith_recons].reweightGrad();
-										wsum_model.BPref[ith_recons].applyFristMoment(
-												mymodel.Igrad1[ith_recons],
-												iter == 1);
-										wsum_model.BPref[ith_recons].applySecondMoment(
+										MultidimArray<Complex> dummy;
+										wsum_model.BPref[ith_recons].getSecondMoment(
 												mymodel.Igrad2[ith_recons],
+												dummy,
 												iter == 1);
+										wsum_model.BPref[ith_recons].applyMomenta(
+												mymodel.Igrad1[ith_recons],
+												dummy,
+												mymodel.Igrad2[ith_recons]);
 									}
 
 									(wsum_model.BPref[ith_recons]).reconstructGrad(
