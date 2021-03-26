@@ -2532,10 +2532,12 @@ void displayerGuiWindow::cb_display_i()
 }
 
 
-void Displayer::topazDenoiseMap(FileName fn_in, FileName fn_coords, Image<RFLOAT> &img)
+void Displayer::topazDenoiseMap(FileName fn_in, FileName fn_odir, Image<RFLOAT> &img)
 {
 
-	FileName fn_odir = fn_coords.beforeLastOf("/") +"/";
+    if (fn_odir[fn_odir.length()-1] != '/')
+             fn_odir += "/";
+
 	if (!(exists(fn_odir)))
 	{
 		std::string command = "mkdir -p " + fn_odir;
@@ -2909,7 +2911,7 @@ void Displayer::run()
 
 		if (do_topaz_denoise)
 		{
-			topazDenoiseMap(fn_in, fn_coords, img);
+			topazDenoiseMap(fn_in, fn_coords.beforeLastOf("/"), img);
 		}
 		else
 		{

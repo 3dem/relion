@@ -664,7 +664,7 @@ public:
 	void initialise();
 
 	// On-the-fly topaz denoising for picking micrographs
-	void topazDenoiseMap(FileName fn_in, FileName fn_coords, Image<RFLOAT> &img);
+	void topazDenoiseMap(FileName fn_in, FileName fn_odir, Image<RFLOAT> &img);
 
 	// Decide what to do
 	void run();
