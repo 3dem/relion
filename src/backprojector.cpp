@@ -1861,7 +1861,7 @@ void BackProjector::mergeWithGradient(MultidimArray<Complex> &grad)
 	const int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
 
 	MultidimArray<RFLOAT> counter;
-	mom1_power.initZeros(ori_size / 2 + 1);
+	pseudo_halfset_fsc.initZeros(ori_size / 2 + 1);
 	counter.initZeros(ori_size / 2 + 1);
 
 	FOR_ALL_ELEMENTS_IN_ARRAY3D(data) {
@@ -1869,13 +1869,13 @@ void BackProjector::mergeWithGradient(MultidimArray<Complex> &grad)
 		if (r2 < max_r2) {
 			int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
 			Complex diff = A3D_ELEM(grad, k, i, j) - A3D_ELEM(data, k, i, j);
-			DIRECT_A1D_ELEM(mom1_power, ires) += sqrt(norm(diff));
+			DIRECT_A1D_ELEM(pseudo_halfset_fsc, ires) += sqrt(norm(diff));
 			DIRECT_A1D_ELEM(counter, ires) += 1;
 		}
 	}
 	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(counter) {
 		if (DIRECT_A1D_ELEM(counter, i) > 0.) {
-			DIRECT_A1D_ELEM(mom1_power, i) /= DIRECT_A1D_ELEM(counter, i);
+			DIRECT_A1D_ELEM(pseudo_halfset_fsc, i) /= DIRECT_A1D_ELEM(counter, i);
 		}
 	}
 
@@ -2004,11 +2004,11 @@ void BackProjector::reconstructGrad(
 	MultidimArray<RFLOAT> fsc_estimate;
 
 	if (!use_fsc) {
-		fsc_estimate.initZeros(ori_size / 2 + 1);
 		MultidimArray<RFLOAT> prev_power;
 		MultidimArray<RFLOAT> counter;
 		prev_power.initZeros(ori_size / 2 + 1);
 		counter.initZeros(ori_size / 2 + 1);
+		fsc_estimate.initZeros(ori_size / 2 + 1);
 
 		// First get average Delta^2 from the accumulated gradient in data and weight
 		FOR_ALL_ELEMENTS_IN_ARRAY3D(data) {
@@ -2022,7 +2022,7 @@ void BackProjector::reconstructGrad(
 
 		RFLOAT threshold(0);
 
-		if (mom1_power.nzyxdim > 0)
+		if (pseudo_halfset_fsc.nzyxdim > 0)
 		{
 			//Average power spectra and calculate FSC estimate
 			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(counter)
@@ -2036,7 +2036,7 @@ void BackProjector::reconstructGrad(
 					DIRECT_A1D_ELEM(prev_power, i) = prev;
 
 					if (prev > 0.)
-						snr = 2 * tau2_fudge * prev / DIRECT_A1D_ELEM(mom1_power, i);
+						snr = 2 * tau2_fudge * prev / DIRECT_A1D_ELEM(pseudo_halfset_fsc, i);
 
 					RFLOAT f = snr / (1 + snr);
 					DIRECT_A1D_ELEM(fsc_estimate, i) = XMIPP_MIN(XMIPP_MAX(f, DIRECT_A1D_ELEM(fsc_spectrum, i)), 1);
@@ -2061,8 +2061,7 @@ void BackProjector::reconstructGrad(
 			int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
 			RFLOAT fsc = DIRECT_A1D_ELEM(fsc_estimate, ires);
 
-//			Complex Fgrad = fsc * A3D_ELEM(data, k, i, j) - (1. - fsc) / tau2_fudge * A3D_ELEM(PPref.data, k, i, j);
-			Complex Fgrad = A3D_ELEM(data, k, i, j);
+			Complex Fgrad = fsc * A3D_ELEM(data, k, i, j) - (1. - fsc) / tau2_fudge * A3D_ELEM(PPref.data, k, i, j);
 			A3D_ELEM(PPref.data, k, i, j) += grad_stepsize * Fgrad;
 		}
 	}

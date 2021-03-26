@@ -60,8 +60,7 @@ public:
 	// Skip the iterative gridding part of the reconstruction
 	bool skip_gridding;
 
-	MultidimArray<RFLOAT> mom1_power;
-	MultidimArray<RFLOAT> mom2_power;
+	MultidimArray<RFLOAT> pseudo_halfset_fsc;
 
 public:
 

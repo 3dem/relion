@@ -700,7 +700,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	grad_em_iters = textToInteger(parser.getOption("--grad_em_iters", "Number of iterations at the end of a gradient refinement using Expectation-Maximization", "1"));
 	// Stochastic EM is implemented as a variant of SGD, though it is really a different algorithm!
 
-	grad_ini_frac = textToFloat(parser.getOption("--grad_ini_frac", "Fraction of iterations in the initial phase of refinement", "0.1"));
+	grad_ini_frac = textToFloat(parser.getOption("--grad_ini_frac", "Fraction of iterations in the initial phase of refinement", "0.3"));
 	grad_fin_frac = textToFloat(parser.getOption("--grad_fin_frac", "Fraction of iterations in the final phase of refinement", "0.2"));
 
 	if (grad_ini_frac <= 0 || 1 <= grad_ini_frac)
@@ -1000,11 +1000,11 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_STEPSIZE_SCHEME, grad_stepsize_scheme))
 		grad_stepsize_scheme = "";
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_INI_FRAC, grad_ini_frac)) {
-		grad_ini_frac = 0.2;
+		grad_ini_frac = 0.3;
 		grad_ini_iter = nr_iter * grad_ini_frac;
 	}
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_FIN_FRAC, grad_fin_frac)) {
-		grad_fin_frac = 0.1;
+		grad_fin_frac = 0.2;
 		grad_ini_iter = nr_iter * grad_fin_frac;
 	}
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_MIN_RESOL, grad_min_resol))
@@ -9370,13 +9370,13 @@ void MlOptimiser::updateStepSize() {
 	RFLOAT _stepsize = grad_stepsize;
 
 	if (_stepsize <= 0)
-		_stepsize = 0.5;
+		_stepsize = 0.3;
 
 	std::string _scheme = grad_stepsize_scheme;
 
 	if (_scheme == "") {
 		if (mymodel.ref_dim == 2)
-			_scheme = "2-2step";
+			_scheme = "3.3-2step";
 		else {
 			if (do_auto_refine)
 				_scheme = "3-2step";
