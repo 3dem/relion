@@ -2567,8 +2567,8 @@ void Displayer::topazDenoiseMap(FileName fn_in, FileName fn_coords, Image<RFLOAT
 	std::string command = fn_shell + " " + fn_script + " >> " + fn_log + " 2>&1";
 	if (system(command.c_str()))
 	{
-		std::cerr << "WARNING: there was an error in executing: " << command << std::endl;
-		std::cerr << "WARNING: skipping topaz denoising..." << std::endl;
+		std::string warning = "WARNING: there was an error in executing: " + fn_script + "\nWARNING: skipping topaz denoising...";
+		fl_message(warning.c_str());
 		img.read(fn_in);
 	}
 	else
