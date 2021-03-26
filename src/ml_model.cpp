@@ -857,6 +857,7 @@ void MlModel::initialiseFromImages(
 			Iref.clear();
 			Igrad1.clear();
 			Igrad2.clear();
+
 			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDref)
 			{
 				MDref.getValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp);
@@ -887,18 +888,23 @@ void MlModel::initialiseFromImages(
 				ori_size = XSIZE(img());
 				ref_dim = img().getDim();
 				Iref.push_back(img());
-				MultidimArray<Complex> zeros(
-						Iref[0].zdim == 1 ? 1: Iref[0].zdim * padding_factor,
-						img().ydim * padding_factor,
-						img().xdim  * padding_factor / 2 + 1
-				);
 
-				if (_do_grad) {
+				if (_do_grad)
+				{
+					MultidimArray<Complex> zeros(
+							Iref[0].zdim == 1 ? 1: Iref[0].zdim * padding_factor,
+							img().ydim * padding_factor,
+							img().xdim  * padding_factor / 2 + 1
+					);
+					zeros.initZeros();
+					MultidimArray<Complex> ones(zeros);
+					ones.initConstant(Complex(1., 1.));
+
 					Igrad1.push_back(zeros);
 					if (_pseudo_halfsets)
 						Igrad1.push_back(zeros);
 
-					Igrad2.push_back(zeros);
+					Igrad2.push_back(ones);
 				}
 				nr_classes++;
 			}
@@ -944,21 +950,25 @@ void MlModel::initialiseFromImages(
 			}
 			else
 			{
+				MultidimArray<Complex> zeros(
+						img().zdim * padding_factor,
+						img().ydim * padding_factor,
+						img().xdim  * padding_factor / 2 + 1
+				);
+				zeros.initZeros();
+				MultidimArray<Complex> ones(zeros);
+				ones.initConstant(Complex(1., 1.));
+
 				for (int iclass = 0; iclass < nr_classes; iclass++)
 				{
 					Iref.push_back(img());
-					MultidimArray<Complex> zeros(
-							img().zdim * padding_factor,
-							img().ydim * padding_factor,
-							img().xdim  * padding_factor / 2 + 1
-					);
 
 					if (_do_grad) {
 						Igrad1.push_back(zeros);
 						if (_pseudo_halfsets)
 							Igrad1.push_back(zeros);
 
-						Igrad2.push_back(zeros);
+						Igrad2.push_back(ones);
 					}
 				}
 			}
@@ -1029,18 +1039,22 @@ void MlModel::initialiseFromImages(
 		{
 			Iref.push_back(img());
 
-			MultidimArray<Complex> zeros(
-					Iref[0].zdim == 1 ? 1: Iref[0].zdim * padding_factor,
-					img().ydim * padding_factor,
-					img().xdim  * padding_factor / 2 + 1
-			);
-
 			if (_do_grad) {
+
+				MultidimArray<Complex> zeros(
+						Iref[0].zdim == 1 ? 1: Iref[0].zdim * padding_factor,
+						img().ydim * padding_factor,
+						img().xdim  * padding_factor / 2 + 1
+				);
+				zeros.initZeros();
+				MultidimArray<Complex> ones(zeros);
+				ones.initConstant(Complex(1., 1.));
+
 				Igrad1.push_back(zeros);
 				if (_pseudo_halfsets)
 					Igrad1.push_back(zeros);
 
-				Igrad2.push_back(zeros);
+				Igrad2.push_back(ones);
 			}
 		}
 	}
@@ -1590,8 +1604,7 @@ void MlModel::reset_class(int class_idx, int to_class_idx) {
 		Igrad1[class_idx].initZeros();
 		if (pseudo_halfsets)
 			Igrad1[class_idx+nr_classes].initZeros();
-
-		Igrad2[class_idx].initZeros();
+		Igrad2[class_idx].initConstant(Complex(1., 1.));
 		pdf_class[class_idx] = 0;
 		tau2_class[class_idx] *= 0.;
 		data_vs_prior_class[class_idx] *= 0.;

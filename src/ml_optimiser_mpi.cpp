@@ -2101,8 +2101,7 @@ void MlOptimiserMpi::maximization()
 									MultidimArray<Complex> dummy;
 									wsum_model.BPref[ith_recons].getSecondMoment(
 											mymodel.Igrad2[ith_recons],
-											dummy,
-											iter == 1);
+											dummy);
 									wsum_model.BPref[ith_recons].applyMomenta(
 											mymodel.Igrad1[ith_recons],
 											dummy,
@@ -2246,8 +2245,7 @@ void MlOptimiserMpi::maximization()
 										MultidimArray<Complex> dummy;
 										wsum_model.BPref[ith_recons].getSecondMoment(
 												mymodel.Igrad2[ith_recons],
-												dummy,
-												iter == 1);
+												dummy);
 										wsum_model.BPref[ith_recons].applyMomenta(
 												mymodel.Igrad1[ith_recons],
 												dummy,

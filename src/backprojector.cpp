@@ -1831,7 +1831,6 @@ void BackProjector::reweightGrad() {
 
 void BackProjector::getFristMoment(
 		MultidimArray<Complex> &mom,
-		bool init_mom,
 		RFLOAT lambda)
 {
 	const int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
@@ -1839,14 +1838,6 @@ void BackProjector::getFristMoment(
 	mom.setXmippOrigin();
 	mom.xinit = 0;
 
-	if (init_mom)
-	{
-		FOR_ALL_ELEMENTS_IN_ARRAY3D(mom)
-		{
-			A3D_ELEM(mom, k, i, j).real = 0;
-			A3D_ELEM(mom, k, i, j).imag = 0;
-		}
-	}
 
     FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
 	{
@@ -1862,7 +1853,6 @@ void BackProjector::getFristMoment(
 void BackProjector::getSecondMoment(
 		MultidimArray<Complex> &mom,
 		MultidimArray<Complex> &grad2,
-		bool init_mom,
 		RFLOAT lambda)
 {
 	bool do_half = grad2.nzyxdim == data.nzyxdim;
@@ -1871,16 +1861,6 @@ void BackProjector::getSecondMoment(
 	mom.setXmippOrigin();
 	mom.xinit = 0;
 
-	RFLOAT eps = 1e-1;
-
-	if (init_mom)
-	{
-		FOR_ALL_ELEMENTS_IN_ARRAY3D(mom)
-		{
-			A3D_ELEM(mom, k, i, j).real = eps;
-			A3D_ELEM(mom, k, i, j).imag = eps;
-		}
-	}
 
 	if (do_half)
 	{
@@ -1908,9 +1888,9 @@ void BackProjector::getSecondMoment(
 				Complex g = A3D_ELEM(data, k, i, j);
 
 				A3D_ELEM(mom, k, i, j).real = lambda * A3D_ELEM(mom, k, i, j).real +
-				                              (1 - lambda) * sqrt(g.real * g.real);
+				                              (1 - lambda) * (g.real * g.real);
 				A3D_ELEM(mom, k, i, j).imag = lambda * A3D_ELEM(mom, k, i, j).imag +
-				                              (1 - lambda) * sqrt(g.imag * g.imag);
+				                              (1 - lambda) * (g.imag * g.imag);
 			}
 		}
 	}
@@ -1943,8 +1923,8 @@ void BackProjector::getSecondMoment(
 
 				Complex x = A3D_ELEM(mom, k, i, j);
 
-				A3D_ELEM(data, k, i, j).real /= sqrt(x.real) + eps;
-				A3D_ELEM(data, k, i, j).imag /= sqrt(x.imag) + eps;
+				A3D_ELEM(data, k, i, j).real /= sqrt(x.real) + 1e-12;
+				A3D_ELEM(data, k, i, j).imag /= sqrt(x.imag) + 1e-12;
 
 				x = A3D_ELEM(data, k, i, j);
 				DIRECT_A1D_ELEM(power_b, ires) += (x.real * x.real) + (x.imag * x.imag);
@@ -1959,7 +1939,7 @@ void BackProjector::getSecondMoment(
 				int ires = ROUND(sqrt((RFLOAT) r2) / padding_factor);
 				RFLOAT a = DIRECT_A1D_ELEM(power_a, ires);
 				RFLOAT b = DIRECT_A1D_ELEM(power_b, ires);
-				A3D_ELEM(data, k, i, j) *= sqrt(a / (b + eps));
+				A3D_ELEM(data, k, i, j) *= sqrt(a / (b + 1e-12));
 			}
 		}
 	}
@@ -1972,8 +1952,6 @@ void BackProjector::applyMomenta(
 {
 	bool do_half = mom1_half2.nzyxdim == mom1_half1.nzyxdim;
 	const int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
-
-	RFLOAT eps = 1e-1;
 
 	MultidimArray<RFLOAT> counter;
 	pseudo_halfset_fsc.initZeros(ori_size / 2 + 1);
@@ -1999,6 +1977,8 @@ void BackProjector::applyMomenta(
 		}
 	}
 
+	RFLOAT eps = 1e-1;
+
 	FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
 	{
 		const int r2 = k * k + i * i + j * j;
@@ -2007,8 +1987,7 @@ void BackProjector::applyMomenta(
 			Complex g = A3D_ELEM(mom1_half1, k, i, j);
 			if (do_half)
 				g = (g + A3D_ELEM(mom1_half2, k, i, j)) / 2.;
-			if (A3D_ELEM(mom2, k, i, j) > eps)
-				g /= A3D_ELEM(mom2, k, i, j);
+			g /= sqrt(A3D_ELEM(mom2, k, i, j)) + eps;
 			A3D_ELEM(data, k, i, j) = g;
 		}
 	}

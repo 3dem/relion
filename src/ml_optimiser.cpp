@@ -4764,8 +4764,7 @@ int MlOptimiser::maximizationGradientParameters() {
 				{
 					wsum_model.BPref[iclass].reweightGrad();
 					wsum_model.BPref[iclass].getFristMoment(
-							mymodel.Igrad1[iclass],
-							iter == 1);
+							mymodel.Igrad1[iclass]);
 
 					if (grad_pseudo_halfsets)
 					{
@@ -4773,12 +4772,10 @@ int MlOptimiser::maximizationGradientParameters() {
 
 						wsum_model.BPref[iclass_half].reweightGrad();
 						wsum_model.BPref[iclass_half].getFristMoment(
-								mymodel.Igrad1[iclass_half],
-								iter == 1);
+								mymodel.Igrad1[iclass_half]);
 						wsum_model.BPref[iclass].getSecondMoment(
 								mymodel.Igrad2[iclass],
-								wsum_model.BPref[iclass_half].data,
-								iter == 1);
+								wsum_model.BPref[iclass_half].data);
 						wsum_model.BPref[iclass].applyMomenta(
 								mymodel.Igrad1[iclass],
 								mymodel.Igrad1[iclass_half],
@@ -4789,8 +4786,7 @@ int MlOptimiser::maximizationGradientParameters() {
 						MultidimArray<Complex> dummy;
 						wsum_model.BPref[iclass].getSecondMoment(
 								mymodel.Igrad2[iclass],
-								dummy,
-								iter == 1);
+								dummy);
 						wsum_model.BPref[iclass].applyMomenta(
 								mymodel.Igrad1[iclass],
 								dummy,

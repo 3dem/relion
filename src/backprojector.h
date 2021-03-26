@@ -322,7 +322,6 @@ public:
 	 */
 	void getFristMoment(
 			MultidimArray<Complex> &mom,
-			bool init_mom,
 			RFLOAT lambda=0.9);
 
 	/*
@@ -331,7 +330,6 @@ public:
 	void getSecondMoment(
 			MultidimArray<Complex> &mom,
 			MultidimArray<Complex> &grad2,
-			bool init_mom,
 			RFLOAT lambda=0.999);
 
 	/*
