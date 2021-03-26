@@ -1352,7 +1352,7 @@ void RelionJob::initialiseMotioncorrJob()
 	joboptions["first_frame_sum"] = JobOption("First frame for corrected sum:", 1, 1, 32, 1, "First frame to use in corrected average (starts counting at 1). ");
 	joboptions["last_frame_sum"] = JobOption("Last frame for corrected sum:", -1, 0, 32, 1, "Last frame to use in corrected average. Values equal to or smaller than 0 mean 'use all frames'.");
 	joboptions["eer_grouping"] = JobOption("EER fractionation:", 32, 1, 100, 1, "The number of hardware frames to group into one fraction. This option is relevant only for Falcon4 movies in the EER format. Note that all 'frames' in the GUI (e.g. first and last frame for corrected sum, dose per frame) refer to fractions, not raw detector frames. See https://www3.mrc-lmb.cam.ac.uk/relion/index.php/Image_compression#Falcon4_EER for detailed guidance on EER processing.");
-	joboptions["do_float16"] = JobOption("Write output in float16?", true ,"If set to Yes, RelionCor2 will write output images in float16 MRC format. This will save a factor of two in disk space compared to the default of writing in float32. Note that RELION and CCPEM will read float16 images, but other programs may not (yet) do so. For example, Gctf will not work with float16 images. Also note that this option does not work with UCSF MotionCor2.");
+	joboptions["do_float16"] = JobOption("Write output in float16?", true ,"If set to Yes, RelionCor2 will write output images in float16 MRC format. This will save a factor of two in disk space compared to the default of writing in float32. Note that RELION and CCPEM will read float16 images, but other programs may not (yet) do so. For example, Gctf will not work with float16 images. Also note that this option does not work with UCSF MotionCor2. For CTF estimation, use CTFFIND-4.1 with pre-calculated power spectra (activate the 'Save sum of power spectra' option).");
 
 	// Motioncor2
 	char *default_location = getenv ("RELION_MOTIONCOR2_EXECUTABLE");
@@ -1388,7 +1388,7 @@ Note that multiple MotionCor2 processes should not share a GPU; otherwise, it ca
 	joboptions["dose_per_frame"] = JobOption("Dose per frame (e/A2):", 1, 0, 5, 0.2, "Dose per movie frame (in electrons per squared Angstrom).");
 	joboptions["pre_exposure"] = JobOption("Pre-exposure (e/A2):", 0, 0, 5, 0.5, "Pre-exposure dose (in electrons per squared Angstrom).");
 
-	joboptions["do_save_ps"] = JobOption("Save sum of power spectra?", false, "Sum of non-dose weighted power spectra provides better signal for CTF estimation. The power spectra can be used by CTFFIND4 but not by GCTF. This option is not available for UCSF MotionCor2.");
+	joboptions["do_save_ps"] = JobOption("Save sum of power spectra?", false, "Sum of non-dose weighted power spectra provides better signal for CTF estimation. The power spectra can be used by CTFFIND4 but not by GCTF. This option is not available for UCSF MotionCor2. You must use this option when writing in float16.");
 	joboptions["group_for_ps"] = JobOption("Sum power spectra every e/A2:", 4, 0, 10, 0.5, "McMullan et al (Ultramicroscopy, 2015) sugggest summing power spectra every 4.0 e/A2 gives optimal Thon rings");
 }
 
@@ -1433,6 +1433,12 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 		command += " --j " + joboptions["nr_threads"].getString();
 		if (joboptions["do_float16"].getBoolean())
 		{
+			if (!joboptions["do_save_ps"].getBoolean())
+			{
+				error_message = "When writing to float16, you have to write power spectra for CTFFIND-4.1.";
+				return false;
+			}
+
 			command +=" --float16";
 		}
 	}
@@ -1569,7 +1575,7 @@ void RelionJob::initialiseCtffindJob()
 
 	// Check for environment variable RELION_CTFFIND_EXECUTABLE
 	joboptions["use_ctffind4"] = JobOption("Use CTFFIND-4.1?", false, "If set to Yes, the wrapper will use CTFFIND4 (version 4.1) for CTF estimation. This includes thread-support, calculation of Thon rings from movie frames and phase-shift estimation for phase-plate data.");
-	joboptions["use_given_ps"] = JobOption("Use power spectra from MotionCorr job?", false, "If set to Yes, the CTF estimation will be done using power spectra calculated during motion correction.");
+	joboptions["use_given_ps"] = JobOption("Use power spectra from MotionCorr job?", false, "If set to Yes, the CTF estimation will be done using power spectra calculated during motion correction. You must use this option if you used float16 in motion correction.");
 	default_location = getenv ("RELION_CTFFIND_EXECUTABLE");
 	char default_ctffind[] = DEFAULTCTFFINDLOCATION;
 	if (default_location == NULL)
