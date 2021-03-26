@@ -2757,11 +2757,11 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 	}
 
 	// Re-grouping
-	if (joboptions["do_regroup"].getBoolean() && joboptions["fn_coords"].getString() == "")
+	if (joboptions["do_regroup"].getBoolean())
 	{
 		if (joboptions["fn_model"].getString() == "")
 		{
-			error_message = "Re-grouping only works for model.star files...";
+			error_message = "Re-grouping only works for model.star/optimiser.star files...";
 			return false;
     	}
         command += " --regroup " + joboptions["nr_groups"].getString();
