@@ -670,7 +670,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 		SWAP(mymodel.helical_rise_min, mymodel.helical_rise_max, tmp_RFLOAT);
 	if (mymodel.helical_twist_min > mymodel.helical_twist_max)
 		SWAP(mymodel.helical_twist_min, mymodel.helical_twist_max, tmp_RFLOAT);
-	helical_fourier_mask_resols = parser.getOption("--helical_exclude_resols", "Resolutions (in A) along helical axis to exclude from refinement (comma-separated pairs, e.g. 50-5)", "");
+	helical_fourier_mask_resols = parser.getOption("--helical_exclude_resols", "Resolutions (in A) along helical axis to exclude from refinement (comma-separated pairs, e.g. 50,5)", "");
 	fn_fourier_mask = parser.getOption("--fourier_mask", "Originally-sized, FFTW-centred image with Fourier mask for Projector", "None");
 
 	// CTF, norm, scale, bfactor correction etc.
@@ -799,8 +799,8 @@ if(do_gpu)
 	// Expert options
 	int expert_section = parser.addSection("Expert options");
 	mymodel.padding_factor = textToFloat(parser.getOption("--pad", "Oversampling factor for the Fourier transforms of the references", "2"));
-	if (gradient_refine)
-		mymodel.padding_factor = 1;
+	//if (gradient_refine)
+	//	mymodel.padding_factor = 1;
 
 	ref_angpix = textToFloat(parser.getOption("--ref_angpix", "Pixel size (in A) for the input reference (default is to read from header)", "-1."));
 	mymodel.interpolator = (parser.checkOption("--NN", "Perform nearest-neighbour instead of linear Fourier-space interpolation?")) ? NEAREST_NEIGHBOUR : TRILINEAR;
@@ -2244,7 +2244,7 @@ void MlOptimiser::initialiseGeneralFinalize(int rank)
 						SomGraph::make_blobs_2d(
 								blobs_neg, mymodel.Iref[i], 40,
 								diameter, is_helical_segment);
-					} 
+					}
 					else
 					{
 						SomGraph::make_blobs_3d(

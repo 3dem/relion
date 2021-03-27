@@ -2531,6 +2531,61 @@ void displayerGuiWindow::cb_display_i()
 	int res = system(cl.c_str());
 }
 
+
+void Displayer::topazDenoiseMap(FileName fn_in, FileName fn_odir, Image<RFLOAT> &img)
+{
+
+    if (fn_odir[fn_odir.length()-1] != '/')
+             fn_odir += "/";
+
+	if (!(exists(fn_odir)))
+	{
+		std::string command = "mkdir -p " + fn_odir;
+		int res = system(command.c_str());
+	}
+
+	// Now generate the topaz bash script
+	FileName fn_script = fn_odir+"topaz_denoise.bash";
+	FileName fn_log    = fn_odir+"topaz_denoise.out";
+	FileName fn_out = fn_odir + fn_in.afterLastOf("/");
+	std::ofstream  fh;
+	fh.open((fn_script).c_str(), std::ios::out);
+	if (!fh)
+	 REPORT_ERROR( (std::string)"AutoPicker::trainTopaz cannot create file: " + fn_script);
+
+	fh << "#!" << fn_shell  << std::endl;
+
+	// Call Topaz to train the network
+	fh << fn_topaz_exe << " denoise ";
+	fh << fn_in;
+	fh << " --output " << fn_odir;
+	fh << " --device 0"; // pyTorch threads
+	fh << " --patch-size 1536";
+	fh << " --patch-padding 384";
+	fh << " --normalize";
+	fh << std::endl;
+	fh.close();
+
+	std::string command = fn_shell + " " + fn_script + " >> " + fn_log + " 2>&1";
+	if (system(command.c_str()))
+	{
+		std::string warning = "WARNING: there was an error in executing: " + fn_script + "\nWARNING: skipping topaz denoising...";
+		fl_message(warning.c_str());
+		img.read(fn_in);
+	}
+	else
+	{
+
+		// Now read the denoise micrograph back in
+		img.read(fn_out);
+		std::remove(fn_out.c_str());
+		std::remove(fn_script.c_str());
+		std::remove(fn_log.c_str());
+	}
+
+}
+
+
 void Displayer::read(int argc, char **argv)
 {
 	parser.setCommandLine(argc, argv);
@@ -2582,6 +2637,8 @@ void Displayer::read(int argc, char **argv)
 	coord_scale = textToFloat(parser.getOption("--coord_scale", "Scale particle coordinates before display", "1.0"));
 	particle_radius = textToFloat(parser.getOption("--particle_radius", "Particle radius in pixels", "100"));
 	particle_radius *= coord_scale;
+	do_topaz_denoise = parser.checkOption("--topaz_denoise", "Use Topaz denoising before picking (on GPU 0)");
+	fn_topaz_exe = parser.getOption("--topaz_exe", "Name of topaz executable", "topaz");
 	lowpass = textToFloat(parser.getOption("--lowpass", "Lowpass filter (in A) to filter micrograph before displaying", "0"));
 	highpass = textToFloat(parser.getOption("--highpass", "Highpass filter (in A) to filter micrograph before displaying", "0"));
 	minimum_pick_fom = textToFloat(parser.getOption("--minimum_pick_fom", "Minimum value for rlnAutopickFigureOfMerit to display picks", "-9999."));
@@ -2595,6 +2652,12 @@ void Displayer::read(int argc, char **argv)
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())
 		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
+
+	fn_shell = "/bin/sh";
+	char *shell_name;
+	shell_name = getenv("RELION_SHELL");
+	if (shell_name != NULL)
+		fn_shell = (std::string)shell_name;
 
 }
 
@@ -2845,12 +2908,21 @@ void Displayer::run()
 	else if (do_pick || do_pick_startend)
 	{
 		Image<RFLOAT> img;
-		img.read(fn_in); // dont read data yet: only header to get size
+
+		if (do_topaz_denoise)
+		{
+			topazDenoiseMap(fn_in, fn_coords.beforeLastOf("/"), img);
+		}
+		else
+		{
+			img.read(fn_in); // dont read data yet: only header to get size
+		}
 
 		if (lowpass > 0.)
 			lowPassFilterMap(img(), lowpass, angpix);
 		if (highpass > 0.)
 			highPassFilterMap(img(), highpass, angpix, 25); // use a rather soft high-pass edge of 25 pixels wide
+
 		basisViewerWindow win(CEIL(scale*XSIZE(img())), CEIL(scale*YSIZE(img())), fn_in.c_str());
 		if (fn_coords=="")
 			fn_coords = fn_in.withoutExtension()+"_coords.star";

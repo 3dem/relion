@@ -1881,7 +1881,11 @@ void GuiMainWindow::cb_save_i()
 	char relname[FL_PATH_MAX];
 	fl_filename_relative(relname,sizeof(relname),G_chooser->value());
 	FileName fn_dir = (std::string)relname;
+	if (fn_dir == "") fn_dir = ".";
 	gui_jobwindows[iwin]->myjob.write(fn_dir + "/job.star");
+
+	// Also save hidden job.star file
+	gui_jobwindows[iwin]->myjob.write("");
 
 }
 
