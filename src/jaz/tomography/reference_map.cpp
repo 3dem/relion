@@ -10,7 +10,7 @@
 using namespace gravis;
 
 
-TomoReferenceMap::TomoReferenceMap(){}
+TomoReferenceMap::TomoReferenceMap() : lastShell(0) {}
 
 void TomoReferenceMap::read(IOParser &parser)
 {
@@ -144,7 +144,9 @@ void TomoReferenceMap::load(int boxSize, int verbosity)
 			}
 		}
 
-		double scale = sh_fsc / (double) sh;
+		double scale = 2 * (sh_fsc - 1) / (double) s;
+
+		lastShell = (firstBad - 1) / scale;
 
 		freqWeight = BufferedImage<float>(sh,s);
 
@@ -154,7 +156,7 @@ void TomoReferenceMap::load(int boxSize, int verbosity)
 			double xx = x;
 			double yy = y < s/2? y : y - s;
 
-			double r = sqrt(xx*xx + yy*yy) * sh_fsc / (double) sh;
+			double r = sqrt(xx*xx + yy*yy) * scale;
 
 			if (useFscThreshold)
 			{
@@ -185,6 +187,8 @@ void TomoReferenceMap::load(int boxSize, int verbosity)
 	{
 		freqWeight = BufferedImage<float>(sh,s);
 		freqWeight.fill(1.f);
+
+		lastShell = sh - 1;
 	}
 }
 
