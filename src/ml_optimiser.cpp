@@ -158,8 +158,6 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 			if (mymodel.nr_bodies > 1)
 				REPORT_ERROR("ERROR: cannot change padding factor in a continuation of a multi-body refinement...");
 			mymodel.padding_factor = textToInteger(fnt);
-//			if (gradient_refine)
-//				mymodel.padding_factor = 1;
 			// Re-initialise the model to get the right padding factors in the PPref vectors
 			mymodel.initialise();
 		}
@@ -799,8 +797,6 @@ if(do_gpu)
 	// Expert options
 	int expert_section = parser.addSection("Expert options");
 	mymodel.padding_factor = textToFloat(parser.getOption("--pad", "Oversampling factor for the Fourier transforms of the references", "2"));
-//	if (gradient_refine)
-//		mymodel.padding_factor = 1;
 
 	ref_angpix = textToFloat(parser.getOption("--ref_angpix", "Pixel size (in A) for the input reference (default is to read from header)", "-1."));
 	mymodel.interpolator = (parser.checkOption("--NN", "Perform nearest-neighbour instead of linear Fourier-space interpolation?")) ? NEAREST_NEIGHBOUR : TRILINEAR;
@@ -2256,7 +2252,10 @@ void MlOptimiser::initialiseGeneralFinalize(int rank)
 								blobs_neg, mymodel.Iref[i], 40,
 								diameter, is_helical_segment);
 					}
-					mymodel.Iref[i] = (blobs_pos - blobs_neg / 2) / 5.;
+					//Maintain standard deviation
+					RFLOAT std = SomGraph::std(mymodel.Iref[i]);
+					mymodel.Iref[i] = blobs_pos - blobs_neg / 2;
+					mymodel.Iref[i] *= std / SomGraph::std(mymodel.Iref[i]);
 				}
 			}
 
@@ -9378,21 +9377,15 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 
 void MlOptimiser::updateStepSize() {
 	RFLOAT _stepsize = grad_stepsize;
+	std::string _scheme = grad_stepsize_scheme;
 
 	if (_stepsize <= 0)
 		_stepsize = 0.3;
 
-	std::string _scheme = grad_stepsize_scheme;
-
-	if (_scheme == "") {
-		if (mymodel.ref_dim == 2)
-			_scheme = "3.3-2step";
-		else {
-			if (do_auto_refine)
-				_scheme = "3-2step";
-			else
-				_scheme = "2-2step";
-		}
+	if (_scheme.empty())
+	{
+		RFLOAT boost_factor = 0.99 / _stepsize;
+		_scheme = std::to_string(boost_factor) + "-2step";
 	}
 
 	if (_scheme == "plain") {
