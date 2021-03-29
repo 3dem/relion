@@ -2560,8 +2560,8 @@ void Displayer::topazDenoiseMap(FileName fn_in, FileName fn_odir, Image<RFLOAT> 
 	fh << fn_in;
 	fh << " --output " << fn_odir;
 	fh << " --device 0"; // pyTorch threads
-	fh << " --patch-size 1536";
-	fh << " --patch-padding 384";
+	fh << " --patch-size 1024";
+	fh << " --patch-padding 256";
 	fh << " --normalize";
 	fh << std::endl;
 	fh.close();
