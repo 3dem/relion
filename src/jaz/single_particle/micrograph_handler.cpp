@@ -377,7 +377,8 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 	std::string gainFn = micrograph.getGainFilename();
 	MultidimArray<bool> defectMask;
 
-	bool hasDefect = (micrograph.fnDefect != "" || micrograph.hotpixelX.size() != 0);
+	const bool mgHasGain = (gainFn != "");
+	const bool hasDefect = (mgHasGain || micrograph.fnDefect != "" || micrograph.hotpixelX.size() != 0);
 	
 	if (hasDefect)
 	{
@@ -406,9 +407,7 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 
 	const bool isEER = EERRenderer::isEER(movieFn);
 
-	bool mgHasGain = false;
-
-	if (gainFn != "")
+	if (mgHasGain)
 	{
 		if (gainFn != last_gainFn)
 		{
@@ -426,7 +425,10 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 			}
 		}
 
-		mgHasGain = true;
+		// Mask pixels with zero gain
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(defectMask)
+			if (DIRECT_MULTIDIM_ELEM(lastGainRef(), n) == 0)
+				DIRECT_MULTIDIM_ELEM(defectMask, n) = true;
 	}
 	
 	BufferedImage<float> muGraph;
@@ -459,13 +461,12 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 		{
 			eer_grouping = micrograph.getEERGrouping();
 		}
-		
+
 		muGraph = MovieLoader::readEER<float>(
 			movieFn, gainRefToUse, defectMaskToUse,
 			frame0, fc,
 			eer_upsampling, eer_grouping,
 			nr_omp_threads);
-
 	}
 	else
 	{
