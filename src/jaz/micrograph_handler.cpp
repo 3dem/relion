@@ -594,6 +594,7 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 								int x = j + dx;
 								if (x < 0 || x >= XSIZE(defectMask)) continue;
 								if (DIRECT_A2D_ELEM(defectMask, y, x)) continue;
+								if (mgHasGain && DIRECT_A2D_ELEM(lastGainRef(), y, x) == 0) continue;
 
 								pbuf[n_ok] = DIRECT_A2D_ELEM(Iframes[iframe], y, x);
 								n_ok++;
