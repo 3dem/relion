@@ -48,6 +48,11 @@ int main(int argc, char *argv[])
 
 		if (reconstructionPath.length() > 0)
 		{
+			if (reconstructionPath[reconstructionPath.length()-1] != '/')
+			{
+				reconstructionPath = reconstructionPath + "/";
+			}
+
 			os.refMap1 = reconstructionPath + "half1.mrc";
 			os.refMap2 = reconstructionPath + "half2.mrc";
 		}

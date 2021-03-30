@@ -48,7 +48,7 @@ LocalParticleRefinement::LocalParticleRefinement(
 
 	TomoExtraction::extractAt3D_Fourier(
 			tomogram.stack, s, 1.0, tomogram.projectionMatrices,
-			trajectory, observations, tomo_to_image, 1, true);
+			trajectory, observations, tomo_to_image, 1, false);
 
 	const d4Matrix particle_to_tomo = particleSet.getMatrix4x4(
 			particle_id, s, s, s);
@@ -80,6 +80,11 @@ LocalParticleRefinement::LocalParticleRefinement(
 				max_radius[f] = x;
 				break;
 			}
+		}
+
+		if (max_radius[f] > reference.lastShell)
+		{
+			max_radius[f] = reference.lastShell;
 		}
 
 		const int rad = max_radius[f];
