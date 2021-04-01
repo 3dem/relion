@@ -55,6 +55,7 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 	cone_sig0 = textToDouble(parser.getOption("--cone_sig0", "Cone width at Z = 0", "2"));
 
 	do_circle_crop = !parser.checkOption("--no_circle_crop", "Do not crop 2D images to a circle");
+	do_circle_precrop = parser.checkOption("--circle_precrop", "Crop 2D images to the large circle (--b) prior to CTF modulation");
 	do_narrow_circle_crop = true;
 	do_gridding_precorrection = parser.checkOption("--grid_precorr", "Perform gridding pre-correction on 2D images");
 
@@ -423,11 +424,9 @@ void SubtomoProgram::processTomograms(
 			BufferedImage<fComplex> particleStack = BufferedImage<fComplex>(sh2D,s2D,fc);
 			BufferedImage<float> weightStack(sh2D,s2D,fc);
 
-			const bool circleCrop = true;
-
 			TomoExtraction::extractAt3D_Fourier(
 					tomogram.stack, s02D, binning, tomogram.projectionMatrices, traj,
-					particleStack, projCut, inner_thread_num, circleCrop);
+					particleStack, projCut, inner_thread_num, do_circle_precrop);
 
 			if (!do_ctf) weightStack.fill(1.f);
 

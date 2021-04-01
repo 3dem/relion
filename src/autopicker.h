@@ -176,6 +176,12 @@ public:
 	// Use topaz train or topaz extract instead of template-based picking
 	bool do_topaz_train, do_topaz_extract;
 
+	// Topaz threshold for picking
+	RFLOAT topaz_threshold;
+
+	// Write out intermediate plots for topaz helical picking
+	bool do_topaz_plot;
+
 	// Expected number of particles per micrograph
 	int topaz_nr_particles;
 

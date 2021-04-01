@@ -41,6 +41,8 @@ RFLOAT global_angpix;
 RFLOAT global_coord_scale;
 RFLOAT global_lowpass;
 RFLOAT global_highpass;
+bool global_do_topaz_denoise;
+FileName global_topaz_exe;
 RFLOAT global_particle_diameter;
 RFLOAT global_sigma_contrast;
 RFLOAT global_black_val;
@@ -133,6 +135,10 @@ void cb_viewmic(Fl_Widget* w, void* data)
 		command += " --white "  + floatToString(global_white_val);
 		command += " --sigma_contrast "  + floatToString(global_sigma_contrast);
 		command += " --particle_radius " + floatToString(rad);
+		if (global_do_topaz_denoise)
+		{
+			command += " --topaz_denoise --topaz_exe " + global_topaz_exe;
+		}
 		command += " --lowpass " + floatToString(global_lowpass);
 		command += " --highpass " + floatToString(global_highpass);
 		command += " --angpix " + floatToString(global_angpix);
@@ -153,6 +159,7 @@ void cb_viewmic(Fl_Widget* w, void* data)
 		}
 
 		command += " &";
+		std::cerr << " command= " << command << std::endl;
 		int res = system(command.c_str());
 	}
 
@@ -644,6 +651,8 @@ void ManualPicker::read(int argc, char **argv)
 	global_sigma_contrast  = textToFloat(parser.getOption("--sigma_contrast", "Set white and black pixel values this many times the image stddev from the mean (default is auto-contrast)", "0"));
 	global_lowpass = textToFloat(parser.getOption("--lowpass", "Lowpass filter in Angstroms for the micrograph (0 for no filtering)","0"));
 	global_highpass = textToFloat(parser.getOption("--highpass", "Highpass filter in Angstroms for the micrograph (0 for no filtering)","0"));
+	global_do_topaz_denoise = parser.checkOption("--topaz_denoise", "Or instead of filtering, use Topaz denoising before picking (on GPU 0)");
+	global_topaz_exe = parser.getOption("--topaz_exe", "Name of topaz executable", "topaz");
 	global_ctfscale = textToFloat(parser.getOption("--ctf_scale", "Relative scale for the CTF-image display", "1"));
 	global_ctfsigma = textToFloat(parser.getOption("--ctf_sigma_contrast", "Sigma-contrast for the CTF-image display", "3"));
 	global_minimum_fom = textToFloat(parser.getOption("--minimum_pick_fom", "Minimum value for rlnAutopickFigureOfMerit to display picks", "-9999."));
