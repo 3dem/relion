@@ -2886,6 +2886,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					baseMLO->timer.tic(baseMLO->TIMING_WSUM_BACKPROJ);
 	#endif
 
+				// If doing pseudo gold standard select random half-model
 				int iproj_offset = 0;
 				if (baseMLO->grad_pseudo_halfsets)
 					// Backproject every other particle into separate volumes

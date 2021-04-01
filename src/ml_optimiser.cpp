@@ -8310,13 +8310,20 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 #endif
 								// Perform the actual back-projection.
 								// This is done with the sum of all (in-plane) shifted Fimg's
+
+								// If doing pseudo gold standard select random half-model
+								int iproj_offset = 0;
+								if (grad_pseudo_halfsets)
+									// Backproject every other particle into separate volumes
+									iproj_offset = (part_id % 2) * mymodel.nr_classes;
+
 								// Perform this inside a mutex
 								int my_mutex = exp_iclass % NR_CLASS_MUTEXES;
 								pthread_mutex_lock(&global_mutex2[my_mutex]);
 								if (mymodel.nr_bodies > 1)
-									(wsum_model.BPref[ibody]).set2DFourierTransform(Fimg, Abody, &Fweight);
+									(wsum_model.BPref[ibody + iproj_offset]).set2DFourierTransform(Fimg, Abody, &Fweight);
 								else
-									(wsum_model.BPref[exp_iclass]).set2DFourierTransform(Fimg, A, &Fweight);
+									(wsum_model.BPref[exp_iclass + iproj_offset]).set2DFourierTransform(Fimg, A, &Fweight);
 								pthread_mutex_unlock(&global_mutex2[my_mutex]);
 	#ifdef TIMING
 								// Only time one thread, as I also only time one MPI process
