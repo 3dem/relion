@@ -9384,7 +9384,7 @@ void MlOptimiser::updateStepSize() {
 
 	if (_scheme.empty())
 	{
-		RFLOAT boost_factor = 0.99 / _stepsize;
+		RFLOAT boost_factor = 0.9 / _stepsize;
 		_scheme = std::to_string(boost_factor) + "-2step";
 	}
 

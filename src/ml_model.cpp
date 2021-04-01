@@ -20,6 +20,8 @@
 
 #include "src/ml_model.h"
 
+#define MOM2_INIT_CONSTANT 1
+
 #ifdef MDL_TIMING
 	Timer mdl_timer;
 	int TIMING_MDL_1 = proj_timer.setNew("MDL_1");
@@ -897,14 +899,14 @@ void MlModel::initialiseFromImages(
 							img().xdim  * padding_factor / 2 + 1
 					);
 					zeros.initZeros();
-					MultidimArray<Complex> ones(zeros);
-					ones.initConstant(Complex(1., 1.));
+					MultidimArray<Complex> constv(zeros);
+					constv.initConstant(Complex(MOM2_INIT_CONSTANT, MOM2_INIT_CONSTANT));
 
 					Igrad1.push_back(zeros);
 					if (_pseudo_halfsets)
 						Igrad1.push_back(zeros);
 
-					Igrad2.push_back(ones);
+					Igrad2.push_back(constv); // Mom2 init value
 				}
 				nr_classes++;
 			}
@@ -956,8 +958,8 @@ void MlModel::initialiseFromImages(
 						img().xdim  * padding_factor / 2 + 1
 				);
 				zeros.initZeros();
-				MultidimArray<Complex> ones(zeros);
-				ones.initConstant(Complex(1., 1.));
+				MultidimArray<Complex> constv(zeros);
+				constv.initConstant(Complex(MOM2_INIT_CONSTANT, MOM2_INIT_CONSTANT));
 
 				for (int iclass = 0; iclass < nr_classes; iclass++)
 				{
@@ -968,7 +970,7 @@ void MlModel::initialiseFromImages(
 						if (_pseudo_halfsets)
 							Igrad1.push_back(zeros);
 
-						Igrad2.push_back(ones);
+						Igrad2.push_back(constv); // Mom2 init value
 					}
 				}
 			}
@@ -1047,14 +1049,14 @@ void MlModel::initialiseFromImages(
 						img().xdim  * padding_factor / 2 + 1
 				);
 				zeros.initZeros();
-				MultidimArray<Complex> ones(zeros);
-				ones.initConstant(Complex(1., 1.));
+				MultidimArray<Complex> constv(zeros);
+				constv.initConstant(Complex(MOM2_INIT_CONSTANT, MOM2_INIT_CONSTANT));
 
 				Igrad1.push_back(zeros);
 				if (_pseudo_halfsets)
 					Igrad1.push_back(zeros);
 
-				Igrad2.push_back(ones);
+				Igrad2.push_back(constv); // Mom2 init value
 			}
 		}
 	}

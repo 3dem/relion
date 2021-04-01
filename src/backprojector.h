@@ -329,7 +329,7 @@ public:
 	 */
 	void getSecondMoment(
 			MultidimArray<Complex> &mom,
-			MultidimArray<Complex> &grad2,
+			MultidimArray<Complex> &data_other,
 			RFLOAT lambda=0.999);
 
 	/*
