@@ -52,6 +52,7 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	fn_coord_list = parser.getOption("--coord_list", "Alternative to coord_suffix&dir: provide a 2-column STAR file with micrographs and coordinate files","");
 	fn_part_dir = parser.getOption("--part_dir", "Output directory for particle stacks", "Particles/");
 	fn_part_star = parser.getOption("--part_star", "Output STAR file with all particles metadata", "");
+	fn_pick_star = parser.getOption("--pick_star", "Output STAR file with 2 columns for micrographs and coordinate files", "");
 	fn_data = parser.getOption("--reextract_data_star", "A _data.star file from a refinement to re-extract, e.g. with different binning or re-centered (instead of --coord_suffix)", "");
 	write_float16  = parser.checkOption("--float16", "Write in half-precision 16 bit floating point numbers (MRC mode 12), instead of 32 bit (MRC mode 0).");
 	keep_ctf_from_micrographs  = parser.checkOption("--keep_ctfs_micrographs", "By default, CTFs from fn_data will be kept. Use this flag to keep CTFs from input micrographs STAR file");
@@ -319,7 +320,7 @@ void Preprocessing::joinAllStarFiles()
 	std::cout <<std::endl << " Joining metadata of all particles from " << MDmics.numberOfObjects() << " micrographs in one STAR file..." << std::endl;
 
 	long int imic = 0, ibatch = 0;
-	MetaDataTable MDout, MDmicnames, MDbatch;
+	MetaDataTable MDout, MDmicnames, MDbatch, MDpick;
 	for (long int current_object1 = MDmics.firstObject();
 	              current_object1 != MetaDataTable::NO_MORE_OBJECTS && current_object1 != MetaDataTable::NO_OBJECTS_STORED;
 	              current_object1 = MDmics.nextObject())
@@ -330,6 +331,13 @@ void Preprocessing::joinAllStarFiles()
 
 		// Get the filename of the STAR file for just this micrograph
 		FileName fn_star = getOutputFileNameRoot(fn_mic) + "_extract.star";
+
+		if (fn_pick_star != "" && exists(fn_star))
+		{
+			MDpick.addObject();
+			MDpick.setValue(EMDL_MICROGRAPH_NAME, fn_mic);
+			MDpick.setValue(EMDL_MICROGRAPH_COORDINATES, fn_star);
+		}
 
 		if (fn_part_star != "")
 		{
@@ -351,9 +359,17 @@ void Preprocessing::joinAllStarFiles()
 		imic++;
 	} // end loop over all micrographs
 
+	// Write out the pick.star file
+	if (fn_pick_star != "")
+	{
+		MDpick.setName("coordinate_files");
+		MDpick.write(fn_pick_star);
+	}
+
 	// Write out the joined star files
 	if (fn_part_star != "")
 	{
+
 		// Get pixel size in original micrograph from obsModelMic, as this may no longer be present in obsModelPart
 		std::map<std::string, RFLOAT> optics_group_mic_angpix;
 		if (fn_data != "")
@@ -506,7 +522,9 @@ void Preprocessing::runExtractParticles()
 		TIMING_TOC(TIMING_TOP);
 
 		if(micIsUsed)
+		{
 			MDoutMics.addObject(MDmics.getObject(current_object));
+		}
 
 		imic++;
 	}

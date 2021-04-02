@@ -231,8 +231,6 @@ class stack_create_parameters
 
 					if (!do_one_by_one)
 					{
-						out().printShape();
-						in().printShape();
 						out().setImage(n, in());
 					}
 					else

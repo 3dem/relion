@@ -1964,6 +1964,10 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 			command += " --black " + manualpickjob.joboptions["black_val"].getString();
 			command += " --white " + manualpickjob.joboptions["white_val"].getString();
 
+			if (manualpickjob.joboptions["do_startend"].getBoolean())
+			{
+				command += " --pick_start_end ";
+			}
 			if (manualpickjob.joboptions["do_topaz_denoise"].getBoolean())
 			{
 				command += " --topaz_denoise --topaz_exe " + manualpickjob.joboptions["fn_topaz_exec"].getString();
@@ -2106,6 +2110,16 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 				command += " --topaz_extract";
 				if (joboptions["topaz_model"].getString() != "")
 					command += " --topaz_model " + joboptions["topaz_model"].getString();
+
+
+				// Helix-picking in Topaz
+				if (joboptions["do_pick_helical_segments"].getBoolean())
+				{
+					command += " --helix";
+					command += " --helical_tube_outer_diameter " + joboptions["helical_tube_outer_diameter"].getString();
+					command += " --helical_tube_length_min " + joboptions["helical_tube_length_min"].getString();
+				}
+
 			}
 
 			if ((joboptions["topaz_other_args"].getString()).length() > 0)
@@ -2388,6 +2402,14 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 	outputNodes.push_back(node3);
 	command += " --part_star " + fn_ostar;
 
+	if (joboptions["do_reextract"].getBoolean() || (joboptions["do_extract_helix"].getBoolean() && joboptions["do_extract_helical_tubes"].getBoolean()) )
+	{
+		FileName fn_pickstar = outputname + "extractpick.star";
+		Node node(fn_pickstar, NODE_MIC_COORDS);
+		outputNodes.push_back(node);
+		command += " --pick_star " + fn_pickstar;
+	}
+
 	command += " --part_dir " + outputname;
 	command += " --extract";
 	command += " --extract_size " + joboptions["extract_size"].getString();
@@ -2457,6 +2479,7 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 	command += " " + joboptions["other_args"].getString();
 	commands.push_back(command);
 
+	/* TODO: write out 2-column pick.star in relion_preprocess, as of relion-4 coord_suffix is deprecated
 	if (joboptions["do_reextract"].getBoolean() || (joboptions["do_extract_helix"].getBoolean() && joboptions["do_extract_helical_tubes"].getBoolean()) )
 	{
 		// Also touch the suffix file. Do this after the first command had completed
@@ -2467,6 +2490,7 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 		outputNodes.push_back(node);
 
 	}
+	*/
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }

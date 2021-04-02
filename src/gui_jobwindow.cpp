@@ -908,8 +908,9 @@ void JobWindow::initialiseAutopickWindow()
 
 	group4->begin();
 
-	place("do_amyloid");
 	place("helical_tube_outer_diameter");
+	place("helical_tube_length_min");
+	place("helical_tube_kappa_max");
 
 	current_y += STEPY/2;
 
@@ -918,8 +919,7 @@ void JobWindow::initialiseAutopickWindow()
 
 	current_y += STEPY/2;
 
-	place("helical_tube_kappa_max");
-	place("helical_tube_length_min");
+	place("do_amyloid");
 
 	group4->end();
 

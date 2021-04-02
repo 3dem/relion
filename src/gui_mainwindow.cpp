@@ -1301,6 +1301,10 @@ void GuiMainWindow::cb_display_io_node_i()
 			command += " --black " + manualpickjob.joboptions["black_val"].getString();
 			command += " --white " + manualpickjob.joboptions["white_val"].getString();
 
+			if (manualpickjob.joboptions["do_startend"].getBoolean())
+			{
+				command += " --pick_start_end ";
+			}
 			std::string error_message = "";
 			float mylowpass = manualpickjob.joboptions["lowpass"].getNumber(error_message);
 			if (error_message != "") {fl_message("joboption['lowpass'] %s", error_message.c_str()); return;}
