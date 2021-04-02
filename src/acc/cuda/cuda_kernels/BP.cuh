@@ -42,10 +42,10 @@ __global__ void cuda_kernel_backproject2D(
 {
 	unsigned tid = threadIdx.x;
 	unsigned img = blockIdx.x;
-	
+
 	int img_y_half = img_y / 2;
 	int max_r2_out = max_r2 * padding_factor * padding_factor;
-	
+
 	__shared__ XFLOAT s_eulers[4];
 
 	XFLOAT minvsigma2, ctf, img_real, img_imag, Fweight, real, imag, weight;
@@ -64,7 +64,7 @@ __global__ void cuda_kernel_backproject2D(
 	int pixel_pass_num(ceilf((float)img_xy/(float)BP_2D_BLOCK_SIZE));
 
 	for (unsigned pass = 0; pass < pixel_pass_num; pass++)
-    {
+	{
 		unsigned pixel = (pass * BP_2D_BLOCK_SIZE) + tid;
 
 		if (pixel >= img_xy)
@@ -120,12 +120,12 @@ __global__ void cuda_kernel_backproject2D(
 			// Get logical coordinates in the 3D map
 			XFLOAT xp = (s_eulers[0] * x + s_eulers[1] * y );
 			XFLOAT yp = (s_eulers[2] * x + s_eulers[3] * y );
-			
+
 			// Only consider pixels that are projected inside the allowed circle in output coordinates.
-			//     --JZ, Nov. 26th 2018			
+			//     --JZ, Nov. 26th 2018
 			if ( ( xp * xp + yp * yp ) > max_r2_out )
 				continue;
-			
+
 			// Only asymmetric half is stored
 			if (xp < 0)
 			{
@@ -657,29 +657,29 @@ __global__ void cuda_kernel_backproject3D_SGD(
 
 template < bool CTF_PREMULTIPLIED >
 __global__ void cuda_kernel_backproject2D_SGD(
-        AccProjectorKernel projector,
-        XFLOAT *g_img_real,
-        XFLOAT *g_img_imag,
-        XFLOAT *g_trans_x,
-        XFLOAT *g_trans_y,
-        XFLOAT* g_weights,
-        XFLOAT* g_Minvsigma2s,
-        XFLOAT* g_ctfs,
-        unsigned long translation_num,
-        XFLOAT significant_weight,
-        XFLOAT weight_norm,
-        XFLOAT *g_eulers,
-        XFLOAT *g_model_real,
-        XFLOAT *g_model_imag,
-        XFLOAT *g_model_weight,
-        int max_r,
-        int max_r2,
-        XFLOAT padding_factor,
-        unsigned img_x,
-        unsigned img_y,
-        unsigned img_xy,
-        unsigned mdl_x,
-        int mdl_inity)
+		AccProjectorKernel projector,
+		XFLOAT *g_img_real,
+		XFLOAT *g_img_imag,
+		XFLOAT *g_trans_x,
+		XFLOAT *g_trans_y,
+		XFLOAT* g_weights,
+		XFLOAT* g_Minvsigma2s,
+		XFLOAT* g_ctfs,
+		unsigned long translation_num,
+		XFLOAT significant_weight,
+		XFLOAT weight_norm,
+		XFLOAT *g_eulers,
+		XFLOAT *g_model_real,
+		XFLOAT *g_model_imag,
+		XFLOAT *g_model_weight,
+		int max_r,
+		int max_r2,
+		XFLOAT padding_factor,
+		unsigned img_x,
+		unsigned img_y,
+		unsigned img_xy,
+		unsigned mdl_x,
+		int mdl_inity)
 {
 	unsigned tid = threadIdx.x;
 	unsigned img = blockIdx.x;
@@ -737,7 +737,8 @@ __global__ void cuda_kernel_backproject2D_SGD(
 			x,y,
 			s_eulers[0], s_eulers[1],
 			s_eulers[2], s_eulers[3],
-			ref_real, ref_imag);
+			ref_real, ref_imag
+		);
 		ref_real *= ctf;
 		ref_imag *= ctf;
 
@@ -750,7 +751,7 @@ __global__ void cuda_kernel_backproject2D_SGD(
 				if(CTF_PREMULTIPLIED)
 				{
 					weight = (weight / weight_norm) * minvsigma2;
-					Fweight += weight * ctf * ctf;
+					Fweight += weight * ctf; // SHWS 13feb2020: from now on when ctf_premultiplied, the ctf array actually contains ctf^2!
 				}
 				else
 				{
@@ -760,65 +761,66 @@ __global__ void cuda_kernel_backproject2D_SGD(
 
 				translatePixel(x, y, g_trans_x[itrans], g_trans_y[itrans], img_real, img_imag, temp_real, temp_imag);
 
-                real += (temp_real-ref_real) * weight;
-                imag += (temp_imag-ref_imag) * weight;
-            }
-        }
+				real += (temp_real-ref_real) * weight;
+				imag += (temp_imag-ref_imag) * weight;
+			}
+		}
 
-        //BP
-	    if (Fweight > (XFLOAT) 0.0)
-	    {
-		    // Get logical coordinates in the 3D map
-		    XFLOAT xp = (s_eulers[0] * x + s_eulers[1] * y ) * padding_factor;
-		    XFLOAT yp = (s_eulers[2] * x + s_eulers[3] * y ) * padding_factor;
+		if (Fweight > (XFLOAT) 0.0)
+		{
 
-		    if ( ( xp * xp + yp * yp ) > max_r2_out)
-			    continue;
+			// Get logical coordinates in the 3D map
+			XFLOAT xp = (s_eulers[0] * x + s_eulers[1] * y ) * padding_factor;
+			XFLOAT yp = (s_eulers[2] * x + s_eulers[3] * y ) * padding_factor;
 
-		    // Only asymmetric half is stored
-		    if (xp < 0)
-		    {
-			    // Get complex conjugated hermitian symmetry pair
-			    xp = -xp;
-			    yp = -yp;
-			    imag = -imag;
-		    }
+			// Only consider pixels that are projected inside the allowed circle in output coordinates.
+			//     --JZ, Nov. 26th 2018
+			if ( ( xp * xp + yp * yp ) > max_r2_out )
+				continue;
 
-		    int x0 = floorf(xp);
-		    XFLOAT fx = xp - x0;
-		    int x1 = x0 + 1;
+			// Only asymmetric half is stored
+			if (xp < 0)
+			{
+				// Get complex conjugated hermitian symmetry pair
+				xp = -xp;
+				yp = -yp;
+				imag = -imag;
+			}
 
-		    int y0 = floorf(yp);
-		    XFLOAT fy = yp - y0;
-		    y0 -= mdl_inity;
-		    int y1 = y0 + 1;
+			int x0 = floorf(xp);
+			XFLOAT fx = xp - x0;
+			int x1 = x0 + 1;
 
-		    XFLOAT mfx = (XFLOAT) 1.0 - fx;
-		    XFLOAT mfy = (XFLOAT) 1.0 - fy;
+			int y0 = floorf(yp);
+			XFLOAT fy = yp - y0;
+			y0 -= mdl_inity;
+			int y1 = y0 + 1;
 
-		    XFLOAT dd00 = mfy * mfx;
-		    XFLOAT dd01 = mfy *  fx;
-		    XFLOAT dd10 =  fy * mfx;
-		    XFLOAT dd11 =  fy *  fx;
+			XFLOAT mfx = (XFLOAT) 1.0 - fx;
+			XFLOAT mfy = (XFLOAT) 1.0 - fy;
 
-		    cuda_atomic_add(&g_model_real  [y0 * mdl_x + x0], dd00 * real);
-		    cuda_atomic_add(&g_model_imag  [y0 * mdl_x + x0], dd00 * imag);
-		    cuda_atomic_add(&g_model_weight[y0 * mdl_x + x0], dd00 * Fweight);
+			XFLOAT dd00 = mfy * mfx;
+			XFLOAT dd01 = mfy *  fx;
+			XFLOAT dd10 =  fy * mfx;
+			XFLOAT dd11 =  fy *  fx;
 
-		    cuda_atomic_add(&g_model_real  [y0 * mdl_x + x1], dd01 * real);
-		    cuda_atomic_add(&g_model_imag  [y0 * mdl_x + x1], dd01 * imag);
-		    cuda_atomic_add(&g_model_weight[y0 * mdl_x + x1], dd01 * Fweight);
+			cuda_atomic_add(&g_model_real  [y0 * mdl_x + x0], dd00 * real);
+			cuda_atomic_add(&g_model_imag  [y0 * mdl_x + x0], dd00 * imag);
+			cuda_atomic_add(&g_model_weight[y0 * mdl_x + x0], dd00 * Fweight);
 
-		    cuda_atomic_add(&g_model_real  [y1 * mdl_x + x0], dd10 * real);
-		    cuda_atomic_add(&g_model_imag  [y1 * mdl_x + x0], dd10 * imag);
-		    cuda_atomic_add(&g_model_weight[y1 * mdl_x + x0], dd10 * Fweight);
+			cuda_atomic_add(&g_model_real  [y0 * mdl_x + x1], dd01 * real);
+			cuda_atomic_add(&g_model_imag  [y0 * mdl_x + x1], dd01 * imag);
+			cuda_atomic_add(&g_model_weight[y0 * mdl_x + x1], dd01 * Fweight);
 
-		    cuda_atomic_add(&g_model_real  [y1 * mdl_x + x1], dd11 * real);
-		    cuda_atomic_add(&g_model_imag  [y1 * mdl_x + x1], dd11 * imag);
-		    cuda_atomic_add(&g_model_weight[y1 * mdl_x + x1], dd11 * Fweight);
-	    }
-    }
+			cuda_atomic_add(&g_model_real  [y1 * mdl_x + x0], dd10 * real);
+			cuda_atomic_add(&g_model_imag  [y1 * mdl_x + x0], dd10 * imag);
+			cuda_atomic_add(&g_model_weight[y1 * mdl_x + x0], dd10 * Fweight);
+
+			cuda_atomic_add(&g_model_real  [y1 * mdl_x + x1], dd11 * real);
+			cuda_atomic_add(&g_model_imag  [y1 * mdl_x + x1], dd11 * imag);
+			cuda_atomic_add(&g_model_weight[y1 * mdl_x + x1], dd11 * Fweight);
+		}
+	}
 }
-
 
 #endif /* CUDA_PB_KERNELS_CUH_ */
