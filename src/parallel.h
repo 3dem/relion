@@ -47,6 +47,7 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <omp.h>
 #include "src/error.h"
 
 // This code was copied from a developmental version of Xmipp-3.0
@@ -406,14 +407,14 @@ int divide_equally_which_group(long int N, int size, long int myself);
 class Lock
 {
 public:
-    explicit Lock(pthread_mutex_t *pm)
+    explicit Lock(omp_lock_t *pm)
     : mutexPtr(pm)
-    { pthread_mutex_lock(mutexPtr); }
+    { omp_set_lock(mutexPtr); }
 
-    ~Lock() { pthread_mutex_unlock(mutexPtr); }
+    ~Lock() { omp_unset_lock(mutexPtr); }
 
 private:
-    pthread_mutex_t *mutexPtr;
+    omp_lock_t *mutexPtr;
 };
 
 #endif

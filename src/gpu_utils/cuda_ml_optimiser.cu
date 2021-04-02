@@ -30,8 +30,6 @@
 #include "src/gpu_utils/cuda_utils_cub.cuh"
 #endif
 
-static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
-
 void getFourierTransformsAndCtfs(long int my_ori_particle,
 		OptimisationParamters &op,
 		SamplingParameters &sp,
@@ -2796,35 +2794,36 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	// Now, inside a global_mutex, update the other weighted sums among all threads
 	if (!baseMLO->do_skip_maximization)
 	{
-		pthread_mutex_lock(&global_mutex);
-		for (int n = 0; n < baseMLO->mymodel.nr_groups; n++)
+		#pragma omp critical (CudaMLO_global)
 		{
-			baseMLO->wsum_model.sigma2_noise[n] += thr_wsum_sigma2_noise[n];
-			baseMLO->wsum_model.sumw_group[n] += thr_sumw_group[n];
-			if (baseMLO->do_scale_correction)
+			for (int n = 0; n < baseMLO->mymodel.nr_groups; n++)
 			{
-				baseMLO->wsum_model.wsum_signal_product_spectra[n] += thr_wsum_signal_product_spectra[n];
-				baseMLO->wsum_model.wsum_reference_power_spectra[n] += thr_wsum_reference_power_spectra[n];
+				baseMLO->wsum_model.sigma2_noise[n] += thr_wsum_sigma2_noise[n];
+				baseMLO->wsum_model.sumw_group[n] += thr_sumw_group[n];
+				if (baseMLO->do_scale_correction)
+				{
+					baseMLO->wsum_model.wsum_signal_product_spectra[n] += thr_wsum_signal_product_spectra[n];
+					baseMLO->wsum_model.wsum_reference_power_spectra[n] += thr_wsum_reference_power_spectra[n];
+				}
 			}
-		}
-		for (int n = 0; n < baseMLO->mymodel.nr_classes; n++)
-		{
-			baseMLO->wsum_model.pdf_class[n] += thr_wsum_pdf_class[n];
-			if (baseMLO->mymodel.ref_dim == 2)
+			for (int n = 0; n < baseMLO->mymodel.nr_classes; n++)
 			{
-				XX(baseMLO->wsum_model.prior_offset_class[n]) += thr_wsum_prior_offsetx_class[n];
-				YY(baseMLO->wsum_model.prior_offset_class[n]) += thr_wsum_prior_offsety_class[n];
-			}
+				baseMLO->wsum_model.pdf_class[n] += thr_wsum_pdf_class[n];
+				if (baseMLO->mymodel.ref_dim == 2)
+				{
+					XX(baseMLO->wsum_model.prior_offset_class[n]) += thr_wsum_prior_offsetx_class[n];
+					YY(baseMLO->wsum_model.prior_offset_class[n]) += thr_wsum_prior_offsety_class[n];
+				}
 
-			if (!(baseMLO->do_skip_align || baseMLO->do_skip_rotate) )
-				baseMLO->wsum_model.pdf_direction[n] += thr_wsum_pdf_direction[n];
+				if (!(baseMLO->do_skip_align || baseMLO->do_skip_rotate) )
+					baseMLO->wsum_model.pdf_direction[n] += thr_wsum_pdf_direction[n];
+			}
+			baseMLO->wsum_model.sigma2_offset += thr_wsum_sigma2_offset;
+			if (baseMLO->do_norm_correction)
+				baseMLO->wsum_model.avg_norm_correction += thr_avg_norm_correction;
+			baseMLO->wsum_model.LL += thr_sum_dLL;
+			baseMLO->wsum_model.ave_Pmax += thr_sum_Pmax;
 		}
-		baseMLO->wsum_model.sigma2_offset += thr_wsum_sigma2_offset;
-		if (baseMLO->do_norm_correction)
-			baseMLO->wsum_model.avg_norm_correction += thr_avg_norm_correction;
-		baseMLO->wsum_model.LL += thr_sum_dLL;
-		baseMLO->wsum_model.ave_Pmax += thr_sum_Pmax;
-		pthread_mutex_unlock(&global_mutex);
 	} // end if !do_skip_maximization
 
 	CTOC(cudaMLO->timer,"store_post_gpu");

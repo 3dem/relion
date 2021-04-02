@@ -1,5 +1,3 @@
-static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
-
 #include "src/ml_optimiser_mpi.h"
 
 // ----------------------------------------------------------------------------
@@ -3078,53 +3076,54 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		}
 
 		// Now, inside a global_mutex, update the other weighted sums among all threads
-		pthread_mutex_lock(&global_mutex);
-		for (int img_id = 0; img_id < sp.nr_images; img_id++)
+		#pragma omp critical(AccMLO_global)
 		{
-			long int igroup = baseMLO->mydata.getGroupId(op.part_id, img_id);
-			int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
-			int my_image_size = baseMLO->mydata.getOpticsImageSize(optics_group);
-			RFLOAT my_pixel_size = baseMLO->mydata.getOpticsPixelSize(optics_group);
-			RFLOAT remap_image_sizes = (baseMLO->mymodel.ori_size * baseMLO->mymodel.pixel_size) / (my_image_size * my_pixel_size);
-			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(thr_wsum_sigma2_noise[img_id])
+			for (int img_id = 0; img_id < sp.nr_images; img_id++)
 			{
-				int i_resam = ROUND(i * remap_image_sizes);
-				if (i_resam < XSIZE(baseMLO->wsum_model.sigma2_noise[igroup]))
+				long int igroup = baseMLO->mydata.getGroupId(op.part_id, img_id);
+				int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
+				int my_image_size = baseMLO->mydata.getOpticsImageSize(optics_group);
+				RFLOAT my_pixel_size = baseMLO->mydata.getOpticsPixelSize(optics_group);
+				RFLOAT remap_image_sizes = (baseMLO->mymodel.ori_size * baseMLO->mymodel.pixel_size) / (my_image_size * my_pixel_size);
+				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(thr_wsum_sigma2_noise[img_id])
 				{
-					DIRECT_A1D_ELEM(baseMLO->wsum_model.sigma2_noise[igroup], i_resam) += DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[img_id], i);
+					int i_resam = ROUND(i * remap_image_sizes);
+					if (i_resam < XSIZE(baseMLO->wsum_model.sigma2_noise[igroup]))
+					{
+						DIRECT_A1D_ELEM(baseMLO->wsum_model.sigma2_noise[igroup], i_resam) += DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[img_id], i);
+					}
+				}
+				baseMLO->wsum_model.sumw_group[igroup] += thr_sumw_group[img_id];
+				if (baseMLO->do_scale_correction)
+				{
+					baseMLO->wsum_model.wsum_signal_product[igroup] += thr_wsum_signal_product_spectra[img_id];
+					baseMLO->wsum_model.wsum_reference_power[igroup] += thr_wsum_reference_power_spectra[img_id];
 				}
 			}
-			baseMLO->wsum_model.sumw_group[igroup] += thr_sumw_group[img_id];
-			if (baseMLO->do_scale_correction)
+			for (int n = 0; n < baseMLO->mymodel.nr_classes; n++)
 			{
-				baseMLO->wsum_model.wsum_signal_product[igroup] += thr_wsum_signal_product_spectra[img_id];
-				baseMLO->wsum_model.wsum_reference_power[igroup] += thr_wsum_reference_power_spectra[img_id];
+				baseMLO->wsum_model.pdf_class[n] += thr_wsum_pdf_class[n];
+				if (baseMLO->mymodel.ref_dim == 2)
+				{
+					XX(baseMLO->wsum_model.prior_offset_class[n]) += thr_wsum_prior_offsetx_class[n];
+					YY(baseMLO->wsum_model.prior_offset_class[n]) += thr_wsum_prior_offsety_class[n];
+				}
 			}
-		}
-		for (int n = 0; n < baseMLO->mymodel.nr_classes; n++)
-		{
-			baseMLO->wsum_model.pdf_class[n] += thr_wsum_pdf_class[n];
-			if (baseMLO->mymodel.ref_dim == 2)
+
+			for (int n = 0; n < baseMLO->mymodel.nr_classes * baseMLO->mymodel.nr_bodies; n++)
 			{
-				XX(baseMLO->wsum_model.prior_offset_class[n]) += thr_wsum_prior_offsetx_class[n];
-				YY(baseMLO->wsum_model.prior_offset_class[n]) += thr_wsum_prior_offsety_class[n];
+				if (!(baseMLO->do_skip_align || baseMLO->do_skip_rotate) )
+					baseMLO->wsum_model.pdf_direction[n] += thr_wsum_pdf_direction[n];
 			}
+
+			baseMLO->wsum_model.sigma2_offset += thr_wsum_sigma2_offset;
+
+			if (baseMLO->do_norm_correction && baseMLO->mymodel.nr_bodies == 1)
+				baseMLO->wsum_model.avg_norm_correction += thr_avg_norm_correction;
+
+			baseMLO->wsum_model.LL += thr_sum_dLL;
+			baseMLO->wsum_model.ave_Pmax += thr_sum_Pmax;
 		}
-
-		for (int n = 0; n < baseMLO->mymodel.nr_classes * baseMLO->mymodel.nr_bodies; n++)
-		{
-			if (!(baseMLO->do_skip_align || baseMLO->do_skip_rotate) )
-				baseMLO->wsum_model.pdf_direction[n] += thr_wsum_pdf_direction[n];
-		}
-
-		baseMLO->wsum_model.sigma2_offset += thr_wsum_sigma2_offset;
-
-		if (baseMLO->do_norm_correction && baseMLO->mymodel.nr_bodies == 1)
-			baseMLO->wsum_model.avg_norm_correction += thr_avg_norm_correction;
-
-		baseMLO->wsum_model.LL += thr_sum_dLL;
-		baseMLO->wsum_model.ave_Pmax += thr_sum_Pmax;
-		pthread_mutex_unlock(&global_mutex);
 	} // end if !do_skip_maximization
 
 	CTOC(accMLO->timer,"store_post_gpu");

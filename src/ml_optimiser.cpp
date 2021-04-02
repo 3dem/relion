@@ -39,6 +39,7 @@
 #include <iostream>
 #include <string>
 #include <fstream>
+#include <omp.h>
 #include "src/macros.h"
 #include "src/error.h"
 #include "src/ml_optimiser.h"
@@ -59,25 +60,23 @@
 #define NR_CLASS_MUTEXES 5
 
 //Some global threads management variables
-static pthread_mutex_t global_mutex2[NR_CLASS_MUTEXES] = { PTHREAD_MUTEX_INITIALIZER };
-static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
-Barrier * global_barrier;
-ThreadManager * global_ThreadManager;
+static omp_lock_t global_mutex2[NR_CLASS_MUTEXES] = {};
+static omp_lock_t global_mutex;
 
 /** ========================== Threaded parallelization of expectation === */
 
-void globalThreadExpectationSomeParticles(ThreadArgument &thArg)
+void globalThreadExpectationSomeParticles(void *self, int thread_id)
 {
-	MlOptimiser *MLO = (MlOptimiser*) thArg.workClass;
+	MlOptimiser *MLO = (MlOptimiser*)self; 
 
 	try
 	{
 #ifdef _CUDA_ENABLED
 		if (MLO->do_gpu)
-			((MlOptimiserCuda*) MLO->cudaOptimisers[thArg.thread_id])->doThreadExpectationSomeParticles(thArg.thread_id);
+			((MlOptimiserCuda*) MLO->cudaOptimisers[thread_id])->doThreadExpectationSomeParticles(thread_id);
 		else
 #endif
-		MLO->doThreadExpectationSomeParticles(thArg.thread_id);
+		MLO->doThreadExpectationSomeParticles(thread_id);
 	}
 	catch (RelionError XE)
 	{
@@ -2715,24 +2714,22 @@ void MlOptimiser::initialLowPassFilterReferences()
 
 void MlOptimiser::iterateSetup()
 {
-
-	// Make a barrier where all working threads wait
-	global_barrier = new Barrier(nr_threads - 1);
-
-	// Create threads to start working
-	global_ThreadManager = new ThreadManager(nr_threads, this);
-
 	// Set up the thread task distributors for the particles and the orientations (will be resized later on)
 	exp_ipart_ThreadTaskDistributor = new ThreadTaskDistributor(nr_threads, 1);
 
+	omp_init_lock(&global_mutex);
+	for (int i = 0; i < NR_CLASS_MUTEXES; i++)
+		omp_init_lock(global_mutex2 + i);
 }
 void MlOptimiser::iterateWrapUp()
 {
 
 	// delete barrier, threads and task distributors
-	delete global_barrier;
-	delete global_ThreadManager;
 	delete exp_ipart_ThreadTaskDistributor;
+
+	omp_destroy_lock(&global_mutex);
+	for (int i = 0; i < NR_CLASS_MUTEXES; i++)
+		omp_destroy_lock(global_mutex2 + i);
 
 	// Delete volatile space on scratch
 	if (!keep_scratch)
@@ -3743,7 +3740,9 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
 		// process multiple particles at once
 		exp_ipart_ThreadTaskDistributor->resize(my_last_part_id - my_first_part_id + 1, 1);
 		exp_ipart_ThreadTaskDistributor->reset();
-		global_ThreadManager->run(globalThreadExpectationSomeParticles);
+		#pragma omp prallel for num_threads(nr_threads)
+		for (int thread_id = 0; thread_id < nr_threads; thread_id++)
+			globalThreadExpectationSomeParticles(this, thread_id);
 	}
 #ifdef ALTCPU
 	else
@@ -3800,10 +3799,10 @@ void MlOptimiser::doThreadExpectationSomeParticles(int thread_id)
 	{
 //#define DEBUG_EXPSOMETHR
 #ifdef DEBUG_EXPSOMETHR
-		pthread_mutex_lock(&global_mutex);
+		omp_set_lock(&global_mutex);
 		std::cerr << " thread_id= " << thread_id << " first_ipart= " << first_ipart << " last_ipart= " << last_ipart << std::endl;
 		std::cerr << " exp_my_first_part_id= " << exp_my_first_part_id << " exp_my_last_part_id= " << exp_my_last_part_id << std::endl;
-		pthread_mutex_unlock(&global_mutex);
+		omp_unset_lock(&global_mutex);
 #endif
 
 		for (long int ipart = first_ipart; ipart <= last_ipart; ipart++)
@@ -3888,7 +3887,7 @@ void MlOptimiser::expectationOneParticle(long int part_id_sorted, int thread_id)
 		std::cerr << "Before getFourierTransformsAndCtfs, press any key to continue... " << std::endl;
 		std::cin >> c;
 	}
-	global_barrier->wait();
+	#pragma omp barrier	
 #endif
 
 
@@ -3967,7 +3966,7 @@ void MlOptimiser::expectationOneParticle(long int part_id_sorted, int thread_id)
 			std::cerr << "After getFourierTransformsAndCtfs, press any key to continue... " << std::endl;
 			std::cin >> c;
 		}
-		global_barrier->wait();
+		#pragma omp barrier
 #endif
 
 		// To deal with skipped alignments/rotations
@@ -4023,7 +4022,7 @@ void MlOptimiser::expectationOneParticle(long int part_id_sorted, int thread_id)
 				std::cerr << "Before getAllSquaredDifferences, use top to see memory usage and then press any key to continue... " << std::endl;
 				std::cin >> c;
 			}
-			global_barrier->wait();
+			#pragma omp barrier
 #endif
 
 			// Calculate the squared difference terms inside the Gaussian kernel for all hidden variables
@@ -4042,7 +4041,7 @@ void MlOptimiser::expectationOneParticle(long int part_id_sorted, int thread_id)
 				std::cerr << "After getAllSquaredDifferences, use top to see memory usage and then press any key to continue... " << std::endl;
 				std::cin >> c;
 			}
-			global_barrier->wait();
+			#pragma omp barrier
 #endif
 
 			// Now convert the squared difference terms to weights,
@@ -4061,7 +4060,7 @@ void MlOptimiser::expectationOneParticle(long int part_id_sorted, int thread_id)
 			std::cerr << "After convertAllSquaredDifferencesToWeights, press any key to continue... " << std::endl;
 			std::cin >> c;
 		}
-		global_barrier->wait();
+		#pragma omp barrier
 #endif
 
 		}// end loop over 2 exp_ipass iterations
@@ -4132,7 +4131,7 @@ void MlOptimiser::expectationOneParticle(long int part_id_sorted, int thread_id)
 			std::cerr << "Before storeWeightedSums, press any key to continue... " << std::endl;
 			std::cin >> c;
 		}
-		global_barrier->wait();
+		#pragma omp barrier
 #endif
 
 		storeWeightedSums(part_id, ibody, exp_current_oversampling, metadata_offset,
@@ -4179,7 +4178,7 @@ void MlOptimiser::expectationOneParticle(long int part_id_sorted, int thread_id)
 			std::cerr << "After storeWeightedSums, press any key to continue... " << std::endl;
 			std::cin >> c;
 		}
-		global_barrier->wait();
+		#pragma omp barrier
 #endif
 
     } // end for ibody
@@ -6762,7 +6761,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 																											iover_rot, iover_trans);
 //#define DEBUG_GETALLDIFF2
 #ifdef DEBUG_GETALLDIFF2
-											pthread_mutex_lock(&global_mutex);
+											omp_set_lock(&global_mutex);
 											if (itrans == exp_itrans_min && iover_trans == 0 && ipsi == exp_ipsi_min)
 											//if (ibody==1 && part_id == 0 && exp_ipass==0 && ihidden_over == 40217)
 											{
@@ -6833,14 +6832,14 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 												std::cin >> c;
 												//exit(0);
 											}
-											pthread_mutex_unlock(&global_mutex);
+											omp_unset_lock(&global_mutex);
 
 #endif
 //#define DEBUG_DIFF2_ISNAN
 #ifdef DEBUG_DIFF2_ISNAN
 											if (std::isnan(diff2))
 											{
-												pthread_mutex_lock(&global_mutex);
+												omp_set_lock(&global_mutex);
 												std::cerr <<" img_id= "<<img_id<<" name= "<< mydata.particles[part_id].images[img_id].name << std::endl;
 												std::cerr << " exp_iclass= " << exp_iclass << std::endl;
 												std::cerr << " diff2= " << diff2 << std::endl;
@@ -6917,16 +6916,16 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 												}
 												Itt.write("PPref_data.spi");
 												REPORT_ERROR("diff2 is not a number");
-												pthread_mutex_unlock(&global_mutex);
+												omp_unset_lock(&global_mutex);
 												exit(0);
 											}
 #endif
 //#define DEBUG_VERBOSE
 #ifdef DEBUG_VERBOSE
-											pthread_mutex_lock(&global_mutex);
+											omp_set_lock(&global_mutex);
 											std::cout <<" name= "<< mydata.particles[part_id].images[img_id].name << " rot= " << oversampled_rot[iover_rot] << " tilt= "<< oversampled_tilt[iover_rot] << " psi= " << oversampled_psi[iover_rot] << std::endl;
 											std::cout <<" name= "<< mydata.particles[part_id].images[img_id].name << " ihidden_over= " << ihidden_over << " diff2= " << diff2 << " exp_min_diff2= " << exp_min_diff2 << std::endl;
-											pthread_mutex_unlock(&global_mutex);
+											omp_unset_lock(&global_mutex);
 #endif
 #ifdef DEBUG_CHECKSIZES
 											if (ihidden_over >= XSIZE(exp_Mweight) )
@@ -7289,13 +7288,13 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
 #ifdef DEBUG_CHECKSIZES
 										if (std::isnan(weight))
 										{
-											pthread_mutex_lock(&global_mutex);
+											omp_set_lock(&global_mutex);
 											std::cerr<< "weight= "<<weight<<" is not a number! " <<std::endl;
 											std::cerr << " exp_min_diff2= " << exp_min_diff2 << std::endl;
 											std::cerr << " part_id= " << part_id << " img_id= "<< img_id << std::endl;
 											std::cerr << " DIRECT_A2D_ELEM(exp_Mweight, img_id, ihidden_over)= " << DIRECT_A2D_ELEM(exp_Mweight, img_id, ihidden_over) << std::endl;
 											REPORT_ERROR("weight is not a number");
-											pthread_mutex_unlock(&global_mutex);
+											omp_unset_lock(&global_mutex);
 										}
 #endif
 										// Keep track of sum and maximum of all weights for this particle
@@ -8278,12 +8277,12 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 								// This is done with the sum of all (in-plane) shifted Fimg's
 								// Perform this inside a mutex
 								int my_mutex = exp_iclass % NR_CLASS_MUTEXES;
-								pthread_mutex_lock(&global_mutex2[my_mutex]);
+								omp_set_lock(&global_mutex2[my_mutex]);
 								if (mymodel.nr_bodies > 1)
 									(wsum_model.BPref[ibody]).set2DFourierTransform(Fimg, Abody, &Fweight);
 								else
 									(wsum_model.BPref[exp_iclass]).set2DFourierTransform(Fimg, A, &Fweight);
-								pthread_mutex_unlock(&global_mutex2[my_mutex]);
+								omp_unset_lock(&global_mutex2[my_mutex]);
 	#ifdef TIMING
 								// Only time one thread, as I also only time one MPI process
 								if (part_id == mydata.sorted_idx[exp_my_first_part_id])
@@ -8398,7 +8397,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 	// Now, inside a global_mutex, update the other weighted sums among all threads
 	if (!do_skip_maximization)
 	{
-		pthread_mutex_lock(&global_mutex);
+		omp_set_lock(&global_mutex);
 		for (int img_id = 0; img_id < exp_nr_images; img_id++)
 		{
 			long int igroup = mydata.getGroupId(part_id, img_id);
@@ -8447,7 +8446,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 			wsum_model.avg_norm_correction += thr_avg_norm_correction;
 		wsum_model.LL += thr_sum_dLL;
 		wsum_model.ave_Pmax += thr_sum_Pmax;
-		pthread_mutex_unlock(&global_mutex);
+		omp_unset_lock(&global_mutex);
 	} // end if !do_skip_maximization
 
 #ifdef TIMING

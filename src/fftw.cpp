@@ -49,8 +49,6 @@
 #include <string.h>
 #include <math.h>
 
-static pthread_mutex_t fftw_plan_mutex = PTHREAD_MUTEX_INITIALIZER;
-
 //#define TIMING_FFTW
 #ifdef TIMING_FFTW
 	#define RCTIC(label) (timer_fftw.tic(label))
@@ -137,22 +135,20 @@ void FourierTransformer::cleanup()
 void FourierTransformer::destroyPlans()
 {
 	// Anything to do with plans has to be protected for threads!
-	pthread_mutex_lock(&fftw_plan_mutex);
-
-	if (plans_are_set)
+	#pragma omp critical(FourierTransformer_fftw_plan)
 	{
+		if (plans_are_set)
+		{
 #ifdef RELION_SINGLE_PRECISION
-		fftwf_destroy_plan(fPlanForward);
-		fftwf_destroy_plan(fPlanBackward);
+			fftwf_destroy_plan(fPlanForward);
+			fftwf_destroy_plan(fPlanBackward);
 #else
-		fftw_destroy_plan(fPlanForward);
-		fftw_destroy_plan(fPlanBackward);
+			fftw_destroy_plan(fPlanForward);
+			fftw_destroy_plan(fPlanBackward);
 #endif
-		plans_are_set = false;
+			plans_are_set = false;
+		}
 	}
-
-	pthread_mutex_unlock(&fftw_plan_mutex);
-
 }
 
 // Initialization ----------------------------------------------------------
@@ -216,21 +212,23 @@ void FourierTransformer::setReal(MultidimArray<RFLOAT> &input, bool force_new_pl
 		plans_are_set = true;
 
 		RCTIC(TIMING_FFTW_PLAN);
-		pthread_mutex_lock(&fftw_plan_mutex);
+
+		#pragma omp critical(FourierTransformer_fftw_plan)
+		{
 #ifdef RELION_SINGLE_PRECISION
-		fPlanForward = fftwf_plan_dft_r2c(ndim, N, MULTIDIM_ARRAY(*fReal),
-		                                  (fftwf_complex*) MULTIDIM_ARRAY(fFourier), FFTW_ESTIMATE);
-		fPlanBackward = fftwf_plan_dft_c2r(ndim, N,
-		                                   (fftwf_complex*) MULTIDIM_ARRAY(fFourier), MULTIDIM_ARRAY(*fReal),
-		                                   FFTW_ESTIMATE);
+			fPlanForward = fftwf_plan_dft_r2c(ndim, N, MULTIDIM_ARRAY(*fReal),
+							  (fftwf_complex*) MULTIDIM_ARRAY(fFourier), FFTW_ESTIMATE);
+			fPlanBackward = fftwf_plan_dft_c2r(ndim, N,
+							   (fftwf_complex*) MULTIDIM_ARRAY(fFourier), MULTIDIM_ARRAY(*fReal),
+							   FFTW_ESTIMATE);
 #else
-		fPlanForward = fftw_plan_dft_r2c(ndim, N, MULTIDIM_ARRAY(*fReal),
-		                                 (fftw_complex*) MULTIDIM_ARRAY(fFourier), FFTW_ESTIMATE);
-		fPlanBackward = fftw_plan_dft_c2r(ndim, N,
-		                                  (fftw_complex*) MULTIDIM_ARRAY(fFourier), MULTIDIM_ARRAY(*fReal),
-		                                  FFTW_ESTIMATE);
+			fPlanForward = fftw_plan_dft_r2c(ndim, N, MULTIDIM_ARRAY(*fReal),
+							 (fftw_complex*) MULTIDIM_ARRAY(fFourier), FFTW_ESTIMATE);
+			fPlanBackward = fftw_plan_dft_c2r(ndim, N,
+							  (fftw_complex*) MULTIDIM_ARRAY(fFourier), MULTIDIM_ARRAY(*fReal),
+							  FFTW_ESTIMATE);
 #endif
-		pthread_mutex_unlock(&fftw_plan_mutex);
+		}	
 		RCTOC(TIMING_FFTW_PLAN);
 
 		if (fPlanForward == NULL || fPlanBackward == NULL)
@@ -292,19 +290,20 @@ void FourierTransformer::setReal(MultidimArray<Complex > &input, bool force_new_
 		plans_are_set = true;
 
 		RCTIC(TIMING_FFTW_PLAN);
-		pthread_mutex_lock(&fftw_plan_mutex);
+		#pragma omp critical(FourierTransformer_fftw_plan)
+		{
 #ifdef RELION_SINGLE_PRECISION
-		fPlanForward = fftwf_plan_dft(ndim, N, (fftwf_complex*) MULTIDIM_ARRAY(*fComplex),
-		                              (fftwf_complex*) MULTIDIM_ARRAY(fFourier), FFTW_FORWARD, FFTW_ESTIMATE);
-		fPlanBackward = fftwf_plan_dft(ndim, N, (fftwf_complex*) MULTIDIM_ARRAY(fFourier),
-		                               (fftwf_complex*) MULTIDIM_ARRAY(*fComplex), FFTW_BACKWARD, FFTW_ESTIMATE);
+			fPlanForward = fftwf_plan_dft(ndim, N, (fftwf_complex*) MULTIDIM_ARRAY(*fComplex),
+						      (fftwf_complex*) MULTIDIM_ARRAY(fFourier), FFTW_FORWARD, FFTW_ESTIMATE);
+			fPlanBackward = fftwf_plan_dft(ndim, N, (fftwf_complex*) MULTIDIM_ARRAY(fFourier),
+						       (fftwf_complex*) MULTIDIM_ARRAY(*fComplex), FFTW_BACKWARD, FFTW_ESTIMATE);
 #else
-		fPlanForward = fftw_plan_dft(ndim, N, (fftw_complex*) MULTIDIM_ARRAY(*fComplex),
-		                             (fftw_complex*) MULTIDIM_ARRAY(fFourier), FFTW_FORWARD, FFTW_ESTIMATE);
-		fPlanBackward = fftw_plan_dft(ndim, N, (fftw_complex*) MULTIDIM_ARRAY(fFourier),
-		                              (fftw_complex*) MULTIDIM_ARRAY(*fComplex), FFTW_BACKWARD, FFTW_ESTIMATE);
+			fPlanForward = fftw_plan_dft(ndim, N, (fftw_complex*) MULTIDIM_ARRAY(*fComplex),
+						     (fftw_complex*) MULTIDIM_ARRAY(fFourier), FFTW_FORWARD, FFTW_ESTIMATE);
+			fPlanBackward = fftw_plan_dft(ndim, N, (fftw_complex*) MULTIDIM_ARRAY(fFourier),
+						      (fftw_complex*) MULTIDIM_ARRAY(*fComplex), FFTW_BACKWARD, FFTW_ESTIMATE);
 #endif
-		pthread_mutex_unlock(&fftw_plan_mutex);
+		}		
 		RCTOC(TIMING_FFTW_PLAN);
 
 		if (fPlanForward == NULL || fPlanBackward == NULL)

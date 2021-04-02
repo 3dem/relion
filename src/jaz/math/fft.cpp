@@ -26,9 +26,6 @@
 #include <string.h>
 #include <math.h>
 
-pthread_mutex_t FFT::fftw_plan_mutex_new = PTHREAD_MUTEX_INITIALIZER;
-
-
 void FFT::FourierTransform(
 		BufferedImage<double>& src,
 		BufferedImage<dComplex>& dest,
@@ -398,22 +395,22 @@ FFT::DoublePlan::DoublePlan(int w, int h, int d, unsigned int flags)
 	           N.push_back(w);
 	
 	const int ndim = N.size();
-	
-	pthread_mutex_lock(&fftw_plan_mutex_new);
-	
-	fftw_plan planForward = fftw_plan_dft_r2c(
-			ndim, &N[0],
-			realDummy.getData(),
-			(fftw_complex*) complexDummy.getData(),
-			FFTW_UNALIGNED | flags);
-	
-	fftw_plan planBackward = fftw_plan_dft_c2r(
-			ndim, &N[0],
-			(fftw_complex*) complexDummy.getData(),
-			realDummy.getData(),
-			FFTW_UNALIGNED | flags);
-	
-	pthread_mutex_unlock(&fftw_plan_mutex_new);
+
+	fftw_plan planForward, planBackward;	
+	#pragma omp critical(FourierTransformer_fftw_plan)
+	{
+		planForward = fftw_plan_dft_r2c(
+				ndim, &N[0],
+				realDummy.getData(),
+				(fftw_complex*) complexDummy.getData(),
+				FFTW_UNALIGNED | flags);
+		
+		planBackward = fftw_plan_dft_c2r(
+				ndim, &N[0],
+				(fftw_complex*) complexDummy.getData(),
+				realDummy.getData(),
+				FFTW_UNALIGNED | flags);
+	}
 	
 	if (planForward == NULL || planBackward == NULL)
 	{
@@ -439,22 +436,22 @@ FFT::DoublePlan::DoublePlan(
 	           N.push_back(w);
 	
 	const int ndim = N.size();
-	
-	pthread_mutex_lock(&fftw_plan_mutex_new);
-	
-	fftw_plan planForward = fftw_plan_dft_r2c(
-			ndim, &N[0],
-			real.getData(),
-			(fftw_complex*) complex.getData(),
-			flags);
-	
-	fftw_plan planBackward = fftw_plan_dft_c2r(
-			ndim, &N[0],
-			(fftw_complex*) complex.getData(),
-			real.getData(),
-			flags);
-	
-	pthread_mutex_unlock(&fftw_plan_mutex_new);
+
+	fftw_plan planForward, planBackward;	
+	#pragma omp critical(FourierTransformer_fftw_plan)
+	{	
+		planForward = fftw_plan_dft_r2c(
+				ndim, &N[0],
+				real.getData(),
+				(fftw_complex*) complex.getData(),
+				flags);
+		
+		planBackward = fftw_plan_dft_c2r(
+				ndim, &N[0],
+				(fftw_complex*) complex.getData(),
+				real.getData(),
+				flags);
+	}
 	
 	if (planForward == NULL || planBackward == NULL)
 	{
@@ -479,22 +476,22 @@ FFT::FloatPlan::FloatPlan(int w, int h, int d, unsigned int flags)
 	           N.push_back(w);
 	
 	const int ndim = N.size();
-	
-	pthread_mutex_lock(&fftw_plan_mutex_new);
-	
-	fftwf_plan planForward = fftwf_plan_dft_r2c(
-			ndim, &N[0],
-			realDummy.getData(),
-			(fftwf_complex*) complexDummy.getData(),
-			FFTW_UNALIGNED | flags);
-	
-	fftwf_plan planBackward = fftwf_plan_dft_c2r(
-			ndim, &N[0],
-			(fftwf_complex*) complexDummy.getData(),
-			realDummy.getData(),
-			FFTW_UNALIGNED | flags);
-	
-	pthread_mutex_unlock(&fftw_plan_mutex_new);
+
+	fftwf_plan planForward, planBackward;	
+	#pragma omp critical(FourierTransformer_fftw_plan)
+	{	
+		planForward = fftwf_plan_dft_r2c(
+				ndim, &N[0],
+				realDummy.getData(),
+				(fftwf_complex*) complexDummy.getData(),
+				FFTW_UNALIGNED | flags);
+		
+		planBackward = fftwf_plan_dft_c2r(
+				ndim, &N[0],
+				(fftwf_complex*) complexDummy.getData(),
+				realDummy.getData(),
+				FFTW_UNALIGNED | flags);
+	}
 	
 	if (planForward == NULL || planBackward == NULL)
 	{
@@ -520,22 +517,22 @@ FFT::FloatPlan::FloatPlan(
 	           N.push_back(w);
 	
 	const int ndim = N.size();
-	
-	pthread_mutex_lock(&fftw_plan_mutex_new);
-	
-	fftwf_plan planForward = fftwf_plan_dft_r2c(
-			ndim, &N[0],
-			real.getData(),
-			(fftwf_complex*) complex.getData(),
-			flags);
-	
-	fftwf_plan planBackward = fftwf_plan_dft_c2r(
-			ndim, &N[0],
-			(fftwf_complex*) complex.getData(),
-			real.getData(),
-			flags);
-	
-	pthread_mutex_unlock(&fftw_plan_mutex_new);
+
+	fftwf_plan planForward, planBackward;	
+	#pragma omp critical(FourierTransformer_fftw_plan)
+	{	
+		planForward = fftwf_plan_dft_r2c(
+				ndim, &N[0],
+				real.getData(),
+				(fftwf_complex*) complex.getData(),
+				flags);
+		
+		planBackward = fftwf_plan_dft_c2r(
+				ndim, &N[0],
+				(fftwf_complex*) complex.getData(),
+				real.getData(),
+				flags);
+	}	
 	
 	if (planForward == NULL || planBackward == NULL)
 	{

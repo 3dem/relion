@@ -21,8 +21,6 @@
 #include "lbfgs.h"
 #include <src/error.h>
 
-static pthread_mutex_t lib_lbfgs_mutex = PTHREAD_MUTEX_INITIALIZER;
-
 std::vector<double> LBFGS::optimize(
 		const std::vector<double> &initial,
 		const DifferentiableOptimization &opt,
@@ -58,11 +56,10 @@ std::vector<double> LBFGS::optimize(
 	param.epsilon = epsilon;
 	param.xtol = xtol;
 
-	pthread_mutex_lock(&lib_lbfgs_mutex);
+	#pragma omp critical(LBGFS)
 	{
 		ret = lbfgs(N, m_x, &fx, evaluate, progress, &adapter, &param);
 	}
-	pthread_mutex_unlock(&lib_lbfgs_mutex);
 
 	if (verbosity > 1)
 	{
@@ -118,11 +115,10 @@ std::vector<double> LBFGS::optimize(
 	param.epsilon = epsilon;
 	param.xtol = xtol;
 
-	//pthread_mutex_lock(&lib_lbfgs_mutex);
+	//#pragma omp critical(LBGFS)
 	{
 		ret = lbfgs(N, m_x, &fx, evaluate_fast, progress_fast, &adapter, &param);
 	}
-	//pthread_mutex_unlock(&lib_lbfgs_mutex);
 
 	if (verbosity > 1)
 	{
