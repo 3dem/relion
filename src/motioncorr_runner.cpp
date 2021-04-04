@@ -133,6 +133,13 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	if (fabs(bin_factor - 1) < 0.01)
 		early_binning = false;
 
+	if ((!do_motioncor2 && !do_own) || (do_motioncor2 && do_own))
+		REPORT_ERROR("You have to choose either UCSF MotionCor2 or RELION's own implementation.");
+	if (write_float16 && do_motioncor2)
+		REPORT_ERROR("UCSF MotionCor2 cannot write in float16.");
+	if (write_float16 && grouping_for_ps <= 0)
+		REPORT_ERROR("When writing in float16, you have to write power spectra for CTFFIND.");
+
 	dose_motionstats_cutoff = textToFloat(parser.getOption("--dose_motionstats_cutoff", "Electron dose (in electrons/A2) at which to distinguish early/late global accumulated motion in output statistics", "4."));
 	if (ccf_downsample > 1) REPORT_ERROR("--ccf_downsample cannot exceed 1.");
 	if (skip_defect && !do_own) REPORT_ERROR("--skip_decet is valid only for --use_own");
@@ -440,7 +447,7 @@ void MotioncorrRunner::run()
 		else if (do_motioncor2)
 			std::cout << " Correcting beam-induced motions using Shawn Zheng's MOTIONCOR2 ..." << std::endl;
 		else
-			REPORT_ERROR("Bug: by now it should be clear whether to use MotionCor2 or Unblur...");
+			REPORT_ERROR("Bug: by now it should be clear whether to use UCSF MotionCor2 or RELION's own implementation...");
 
 		init_progress_bar(fn_micrographs.size());
 		barstep = XMIPP_MAX(1, fn_micrographs.size() / 60);
@@ -1135,19 +1142,15 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 #endif
 		}
 
-		// TODO: This should be done earlier and merged with badmap
-		if (isEER && fn_gain_reference != "")
+		if (fn_gain_reference != "")
 		{
-			int n_bad_eer = 0;
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Igain())
 			{
-				if (DIRECT_MULTIDIM_ELEM(Igain(), n) == 0) // || DIRECT_MULTIDIM_ELEM(Igain(), n) > 2.0)
+				if (DIRECT_MULTIDIM_ELEM(Igain(), n) == 0)
 				{
-//					n_bad_eer++;
 					DIRECT_MULTIDIM_ELEM(bBad, n) = true;
 				}
 			}
-//			std::cout << "n_bad_eer = " << n_bad_eer << std::endl;
 		}
 
 		int n_bad = 0;

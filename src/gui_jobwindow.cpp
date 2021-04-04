@@ -681,6 +681,20 @@ void JobWindow::initialiseManualpickWindow()
 	resetHeight();
 
 	place("fn_in", TOGGLE_DEACTIVATE);
+
+	current_y += STEPY/2;
+	place ("do_startend");
+
+	current_y += STEPY/2;
+
+	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group1->end();
+	place("do_fom_threshold", TOGGLE_DEACTIVATE, group1);
+	group1->begin();
+	place("minimum_pick_fom", TOGGLE_DEACTIVATE);
+	group1->end();
+	guientries["do_fom_threshold"].cb_menu_i();
+
 	tab1->end();
 
 	tab2->begin();
@@ -698,35 +712,30 @@ void JobWindow::initialiseManualpickWindow()
 	place("highpass");
 	place("angpix");
 
-	current_y += STEPY/2;
-	place ("do_startend");
-
-	current_y += STEPY/2;
-
-	group7 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group7->end();
-	place("do_fom_threshold", TOGGLE_DEACTIVATE, group7);
-	group7->begin();
-	place("minimum_pick_fom", TOGGLE_DEACTIVATE);
-	group7->end();
-	guientries["do_fom_threshold"].cb_menu_i();
-
+	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group2->end();
+	place("do_topaz_denoise", TOGGLE_DEACTIVATE, group2);
+	group2->begin();
+	place("fn_topaz_exec", TOGGLE_DEACTIVATE);
+	group2->end();
+	guientries["do_topaz_denoise"].cb_menu_i();
 
 	tab2->end();
 	tab3->begin();
 	tab3->label("Colors");
-	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group1->end();
+
+	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group3->end();
 
 	resetHeight();
-	place("do_color", TOGGLE_LEAVE_ACTIVE, group1);
+	place("do_color", TOGGLE_LEAVE_ACTIVE, group3);
 
-	group1->begin();
+	group3->begin();
 	place("color_label");
 	place("fn_color");
 	place("blue_value");
 	place("red_value");
-	group1->end();
+	group3->end();
 	guientries["do_color"].cb_menu_i(); // make default active
 
 	tab3->end();
@@ -899,8 +908,9 @@ void JobWindow::initialiseAutopickWindow()
 
 	group4->begin();
 
-	place("do_amyloid");
 	place("helical_tube_outer_diameter");
+	place("helical_tube_length_min");
+	place("helical_tube_kappa_max");
 
 	current_y += STEPY/2;
 
@@ -909,8 +919,7 @@ void JobWindow::initialiseAutopickWindow()
 
 	current_y += STEPY/2;
 
-	place("helical_tube_kappa_max");
-	place("helical_tube_length_min");
+	place("do_amyloid");
 
 	group4->end();
 
@@ -1992,7 +2001,7 @@ void JobWindow::initialiseSubtractWindow()
 
 void JobWindow::initialisePostprocessWindow()
 {
-	setupTabs(3);
+	setupTabs(2);
 
 	tab1->begin();
 	tab1->label("I/O");
@@ -2037,13 +2046,6 @@ void JobWindow::initialisePostprocessWindow()
 
 	current_y += STEPY/2;
 
-	place("fn_mtf");
-	place("mtf_angpix");
-
-	tab2->end();
-	tab3->begin();
-	tab3->label("Filter");
-	resetHeight();
 	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group3->end();
 
@@ -2054,7 +2056,12 @@ void JobWindow::initialisePostprocessWindow()
 	group3->end();
 	guientries["do_skip_fsc_weighting"].cb_menu_i();
 
-	tab3->end();
+	current_y += STEPY/2;
+
+	place("fn_mtf");
+	place("mtf_angpix");
+
+	tab2->end();
 }
 
 void JobWindow::initialiseLocresWindow()

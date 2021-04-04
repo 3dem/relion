@@ -1145,7 +1145,7 @@ void CtfRefinementProgram::fitAberrations()
 			{
 				const std::string fn = getEvenAberrationsTempFilename(tomogramSet.getTomogramName(t), g);
 
-				if (ZIO::fileExists(fn))
+				if (ZIO::fileExists(fn + "_by.mrc"))
 				{
 					BufferedImage<EvenData> even = EvenData::read(fn);
 					even_data_sum += even;
@@ -1186,7 +1186,7 @@ void CtfRefinementProgram::fitAberrations()
 			{
 				const std::string fn = getOddAberrationsTempFilename(tomogramSet.getTomogramName(t), g);
 
-				if (ZIO::fileExists(fn))
+				if (ZIO::fileExists(fn + "_b_real.mrc"))
 				{
 					BufferedImage<OddData> odd = OddData::read(fn);
 					odd_data_sum += odd;

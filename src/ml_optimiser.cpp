@@ -668,7 +668,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 		SWAP(mymodel.helical_rise_min, mymodel.helical_rise_max, tmp_RFLOAT);
 	if (mymodel.helical_twist_min > mymodel.helical_twist_max)
 		SWAP(mymodel.helical_twist_min, mymodel.helical_twist_max, tmp_RFLOAT);
-	helical_fourier_mask_resols = parser.getOption("--helical_exclude_resols", "Resolutions (in A) along helical axis to exclude from refinement (comma-separated pairs, e.g. 50-5)", "");
+	helical_fourier_mask_resols = parser.getOption("--helical_exclude_resols", "Resolutions (in A) along helical axis to exclude from refinement (comma-separated pairs, e.g. 50,5)", "");
 	fn_fourier_mask = parser.getOption("--fourier_mask", "Originally-sized, FFTW-centred image with Fourier mask for Projector", "None");
 
 	// CTF, norm, scale, bfactor correction etc.
@@ -2113,13 +2113,16 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 	if (gradient_refine)
 	{
-		if (do_auto_refine) {
+		if (do_auto_refine)
+		{
 			auto_resolution_based_angles = true;
 			auto_ignore_angle_changes = true;
 		}
-
-		// for continuation jobs (iter>0): could do some more iterations as specified by nr_iter
-		nr_iter = grad_ini_iter + grad_fin_iter + grad_inbetween_iter;
+		else
+		{
+			// for continuation jobs (iter>0): could do some more iterations as specified by nr_iter
+			nr_iter = grad_ini_iter + grad_fin_iter + grad_inbetween_iter;
+		}
 		updateStepSize();
 
 		// determine default subset sizes
@@ -2242,7 +2245,7 @@ void MlOptimiser::initialiseGeneralFinalize(int rank)
 						SomGraph::make_blobs_2d(
 								blobs_neg, mymodel.Iref[i], 40,
 								diameter, is_helical_segment);
-					} 
+					}
 					else
 					{
 						SomGraph::make_blobs_3d(

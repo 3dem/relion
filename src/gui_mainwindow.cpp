@@ -1301,6 +1301,10 @@ void GuiMainWindow::cb_display_io_node_i()
 			command += " --black " + manualpickjob.joboptions["black_val"].getString();
 			command += " --white " + manualpickjob.joboptions["white_val"].getString();
 
+			if (manualpickjob.joboptions["do_startend"].getBoolean())
+			{
+				command += " --pick_start_end ";
+			}
 			std::string error_message = "";
 			float mylowpass = manualpickjob.joboptions["lowpass"].getNumber(error_message);
 			if (error_message != "") {fl_message("joboption['lowpass'] %s", error_message.c_str()); return;}
@@ -1881,7 +1885,11 @@ void GuiMainWindow::cb_save_i()
 	char relname[FL_PATH_MAX];
 	fl_filename_relative(relname,sizeof(relname),G_chooser->value());
 	FileName fn_dir = (std::string)relname;
+	if (fn_dir == "") fn_dir = ".";
 	gui_jobwindows[iwin]->myjob.write(fn_dir + "/job.star");
+
+	// Also save hidden job.star file
+	gui_jobwindows[iwin]->myjob.write("");
 
 }
 

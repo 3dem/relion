@@ -47,7 +47,7 @@ public:
 	int verb;
 
 	// Name for directory of output Particle stacks and Particle STAR file
-	FileName fn_part_dir, fn_part_star;
+	FileName fn_part_dir, fn_part_star, fn_pick_star;
 
 	// Write in float16 (MRC mode 12)?
 	bool write_float16;
