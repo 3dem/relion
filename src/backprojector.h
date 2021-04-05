@@ -60,7 +60,7 @@ public:
 	// Skip the iterative gridding part of the reconstruction
 	bool skip_gridding;
 
-	MultidimArray<RFLOAT> pseudo_halfset_fsc;
+	MultidimArray<RFLOAT> mom1_noise_power;
 
 public:
 
@@ -334,6 +334,7 @@ public:
 
 	/*
 	 * Combine statistics from two half-set gradients with first and second moment
+	 * and calculate the FSC estimate
 	 */
 	void applyMomenta(
 			MultidimArray<Complex> &mom1_half1,

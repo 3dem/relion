@@ -99,6 +99,8 @@ public:
      */
     void maximization();
 
+    void maximizationGradientParameters();
+
     /** Perform unregularized reconstruction
       * With the aim of performing solvent mask corrected FSC inside the auto-refine
       */

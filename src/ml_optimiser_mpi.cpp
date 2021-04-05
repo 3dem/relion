@@ -2026,11 +2026,12 @@ void MlOptimiserMpi::maximization()
 		init_progress_bar(mymodel.nr_classes);
 	}
 
-	int skip_class = maximizationGradientParameters();
-
 	RFLOAT helical_twist_half1, helical_rise_half1, helical_twist_half2, helical_rise_half2;
 	helical_twist_half1 = helical_twist_half2 = helical_twist_initial;
 	helical_rise_half1 = helical_rise_half2 = helical_rise_initial;
+
+	if (do_grad)
+		maximizationGradientParameters();
 
 	// First reconstruct all classes in parallel
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
@@ -2041,10 +2042,6 @@ void MlOptimiserMpi::maximization()
 
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 		{
-
-			if (iclass == skip_class)
-				continue;
-
 			RCTIC(timer,RCT_1);
 			// either ibody or iclass can be larger than 0, never 2 at the same time!
 			int ith_recons = (mymodel.nr_bodies > 1) ? ibody : iclass;
@@ -2097,17 +2094,6 @@ void MlOptimiserMpi::maximization()
 						{
 							if(do_grad)
 							{
-								if (do_split_random_halves) {
-									MultidimArray<Complex> dummy;
-									wsum_model.BPref[ith_recons].getSecondMoment(
-											mymodel.Igrad2[ith_recons],
-											dummy);
-									wsum_model.BPref[ith_recons].applyMomenta(
-											mymodel.Igrad1[ith_recons],
-											dummy,
-											mymodel.Igrad2[ith_recons]);
-								}
-
 								(wsum_model.BPref[ith_recons]).reconstructGrad(
 										mymodel.Iref[ith_recons],
 										mymodel.fsc_halves_class[ith_recons],
@@ -2241,17 +2227,6 @@ void MlOptimiserMpi::maximization()
 							{
 								if(do_grad)
 								{
-									if (do_split_random_halves) {
-										MultidimArray<Complex> dummy;
-										wsum_model.BPref[ith_recons].getSecondMoment(
-												mymodel.Igrad2[ith_recons],
-												dummy);
-										wsum_model.BPref[ith_recons].applyMomenta(
-												mymodel.Igrad1[ith_recons],
-												dummy,
-												mymodel.Igrad2[ith_recons]);
-									}
-
 									(wsum_model.BPref[ith_recons]).reconstructGrad(
 											mymodel.Iref[ith_recons],
 											mymodel.fsc_halves_class[ith_recons],
@@ -2561,6 +2536,84 @@ void MlOptimiserMpi::maximization()
 #ifdef DEBUG
 	std::cerr << "MlOptimiserMpi::maximization: done" << std::endl;
 #endif
+}
+
+void MlOptimiserMpi::maximizationGradientParameters()
+{
+	if (!do_split_random_halves)
+		REPORT_ERROR("ERROR: Gradient optimization with MPI is only supported with --split_random_halves");
+
+	MPI_Status status;
+	for (int ibody = 0; ibody< mymodel.nr_bodies; ibody++ )
+	{
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
+			continue;
+
+		int reconstruct_rank1 = 2 * (ibody % ( (node->size - 1)/2 ) ) + 1;
+		int reconstruct_rank2 = 2 * (ibody % ( (node->size - 1)/2 ) ) + 2;
+
+		if (node->rank == reconstruct_rank1 || node->rank == reconstruct_rank2)
+		{
+			MultidimArray< Complex > Igrad1_half(wsum_model.BPref[ibody].data);
+
+			wsum_model.BPref[ibody].reweightGrad();
+			wsum_model.BPref[ibody].getFristMoment(
+					mymodel.Igrad1[ibody]);
+
+			// Fetch the back-projetcion from the other half
+			if (node->rank == reconstruct_rank2)
+			{
+				node->relion_MPI_Send(
+						MULTIDIM_ARRAY(wsum_model.BPref[ibody].data),
+						2*MULTIDIM_SIZE(wsum_model.BPref[ibody].data),
+						MY_MPI_DOUBLE,
+						reconstruct_rank1,
+						MPITAG_IMAGE,
+						MPI_COMM_WORLD
+				);
+				node->relion_MPI_Recv(
+						MULTIDIM_ARRAY(Igrad1_half),
+						2*MULTIDIM_SIZE(Igrad1_half),
+						MY_MPI_DOUBLE,
+						reconstruct_rank1,
+						MPITAG_IMAGE,
+						MPI_COMM_WORLD,
+						status
+				);
+			}
+			else if (node->rank == reconstruct_rank1)
+			{
+				node->relion_MPI_Recv(
+						MULTIDIM_ARRAY(Igrad1_half),
+						2*MULTIDIM_SIZE(Igrad1_half),
+						MY_MPI_DOUBLE,
+						reconstruct_rank2,
+						MPITAG_IMAGE,
+						MPI_COMM_WORLD,
+						status
+				);
+				node->relion_MPI_Send(
+						MULTIDIM_ARRAY(wsum_model.BPref[ibody].data),
+						2*MULTIDIM_SIZE(wsum_model.BPref[ibody].data),
+						MY_MPI_DOUBLE,
+						reconstruct_rank2,
+						MPITAG_IMAGE,
+						MPI_COMM_WORLD
+				);
+			}
+
+			wsum_model.BPref[ibody].getSecondMoment(
+					mymodel.Igrad2[ibody],
+					Igrad1_half,
+					0.999);
+
+			MultidimArray< Complex > dummy;
+			wsum_model.BPref[ibody].applyMomenta(
+					mymodel.Igrad1[ibody],
+					dummy,
+					mymodel.Igrad2[ibody]);
+		}
+	}
 }
 
 void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
@@ -3012,7 +3065,8 @@ void MlOptimiserMpi::compareTwoHalves()
 		if (node->rank == 1 || node->rank == 2)
 		{
 			MultidimArray<Complex > avg1;
-			if (do_grad) {
+			if (do_grad)
+			{
 				MultidimArray<RFLOAT> dummy;
 				Projector PPref(mymodel.ori_size, mymodel.interpolator, 1, mymodel.r_min_nn, mymodel.data_dim);
 				PPref.computeFourierTransformMap(mymodel.Iref[ibody], dummy, wsum_model.BPref[ibody].r_max*2, 1, false);

@@ -1388,6 +1388,8 @@ void MlOptimiser::initialise()
 #endif
 	}
 
+	grad_pseudo_halfsets = gradient_refine;
+
 	initialiseGeneral();
 
 	initialiseWorkLoad();
@@ -1648,8 +1650,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 	RCT_8 = timer.setNew(" RcT8_initials ");
 
 #endif
-
-	grad_pseudo_halfsets = gradient_refine;
 
 	if (nr_iter < 0) {
 		if (gradient_refine)
@@ -2815,6 +2815,7 @@ void MlOptimiser::iterate()
 			                    !(do_firstiter_cc && iter_next == 1) &&
 			                    !grad_has_converged;
 			do_skip_maximization = do_grad && iter == nr_iter && mymodel.nr_classes > 1;
+			grad_pseudo_halfsets = do_grad;
 		}
 
 		if(do_som) {
@@ -2850,6 +2851,9 @@ void MlOptimiser::iterate()
 		}
 		else if (do_grad)
 			REPORT_ERROR("ERROR: Random seed must be set for gradient optimisation.");
+
+		if (grad_pseudo_halfsets)
+			std::cerr << "DEBUG: doing pseudo gold standard" << std::endl;
 
 		expectation();
 
@@ -4333,7 +4337,9 @@ void MlOptimiser::makeGoodHelixForEachRef()
 
 void MlOptimiser::maximization()
 {
-	int skip_class = maximizationGradientParameters();
+	int skip_class(-1);
+	if (do_grad)
+		skip_class = maximizationGradientParameters();
 
 	if (verb > 0)
 	{
@@ -4465,7 +4471,7 @@ void MlOptimiser::centerClasses()
 			shiftImageInContinuousFourierTransform(aux, mymodel.Igrad1[iclass],
 			                                       mymodel.ori_size * mymodel.padding_factor, x, y, z);
 
-			if (grad_pseudo_halfsets)
+			if (mymodel.pseudo_halfsets)
 				shiftImageInContinuousFourierTransform(aux, mymodel.Igrad1[iclass + mymodel.nr_classes],
 				                                       mymodel.ori_size * mymodel.padding_factor, x, y, z);
 
@@ -4753,99 +4759,96 @@ int MlOptimiser::maximizationGradientParameters() {
 			nr_active_classes ++;
 	}
 
-	if(do_grad && !do_split_random_halves)
+	std::vector<float> avg_class_errors(mymodel.nr_classes * mymodel.nr_bodies, 0);
+	for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
 	{
-		std::vector<float> avg_class_errors(mymodel.nr_classes * mymodel.nr_bodies, 0);
-		for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
+		mymodel.class_age[iclass] += wsum_model.pdf_class[iclass]/wsum_mode_pdf_class_sum;
+
+		if (mymodel.pdf_class[iclass] > 0. || mymodel.nr_bodies > 1)
 		{
-			mymodel.class_age[iclass] += wsum_model.pdf_class[iclass]/wsum_mode_pdf_class_sum;
-
-			if (mymodel.pdf_class[iclass] > 0. || mymodel.nr_bodies > 1)
+			if ((wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY)
 			{
-				if ((wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY)
+				wsum_model.BPref[iclass].reweightGrad();
+				wsum_model.BPref[iclass].getFristMoment(
+						mymodel.Igrad1[iclass]);
+
+				if (grad_pseudo_halfsets)
 				{
-					wsum_model.BPref[iclass].reweightGrad();
-					wsum_model.BPref[iclass].getFristMoment(
-							mymodel.Igrad1[iclass]);
+					int iclass_half = iclass + mymodel.nr_classes;
 
-					if (grad_pseudo_halfsets)
-					{
-						int iclass_half = iclass + mymodel.nr_classes;
-
-						wsum_model.BPref[iclass_half].reweightGrad();
-						wsum_model.BPref[iclass_half].getFristMoment(
-								mymodel.Igrad1[iclass_half]);
-						wsum_model.BPref[iclass].getSecondMoment(
-								mymodel.Igrad2[iclass],
-								wsum_model.BPref[iclass_half].data);
-						wsum_model.BPref[iclass].applyMomenta(
-								mymodel.Igrad1[iclass],
-								mymodel.Igrad1[iclass_half],
-								mymodel.Igrad2[iclass]);
-					}
-					else
-					{
-						MultidimArray<Complex> dummy;
-						wsum_model.BPref[iclass].getSecondMoment(
-								mymodel.Igrad2[iclass],
-								dummy);
-						wsum_model.BPref[iclass].applyMomenta(
-								mymodel.Igrad1[iclass],
-								dummy,
-								mymodel.Igrad2[iclass]);
-					}
-
-					RFLOAT avg_grad(0);
-					for (unsigned i = 0; i < wsum_model.BPref[iclass].data.nzyxdim; i++)
-						avg_grad += norm(wsum_model.BPref[iclass].data.data[i]);
-					avg_grad /= (RFLOAT) wsum_model.BPref[iclass].data.nzyxdim;
-
-					avg_class_errors[iclass] = avg_grad * mymodel.pdf_class[iclass];
+					wsum_model.BPref[iclass_half].reweightGrad();
+					wsum_model.BPref[iclass_half].getFristMoment(
+							mymodel.Igrad1[iclass_half]);
+					wsum_model.BPref[iclass].getSecondMoment(
+							mymodel.Igrad2[iclass],
+							wsum_model.BPref[iclass_half].data);
+					wsum_model.BPref[iclass].applyMomenta(
+							mymodel.Igrad1[iclass],
+							mymodel.Igrad1[iclass_half],
+							mymodel.Igrad2[iclass]);
 				}
+				else
+				{
+					MultidimArray<Complex> dummy;
+					wsum_model.BPref[iclass].getSecondMoment(
+							mymodel.Igrad2[iclass],
+							dummy);
+					wsum_model.BPref[iclass].applyMomenta(
+							mymodel.Igrad1[iclass],
+							dummy,
+							mymodel.Igrad2[iclass]);
+				}
+
+				RFLOAT avg_grad(0);
+				for (unsigned i = 0; i < wsum_model.BPref[iclass].data.nzyxdim; i++)
+					avg_grad += norm(wsum_model.BPref[iclass].data.data[i]);
+				avg_grad /= (RFLOAT) wsum_model.BPref[iclass].data.nzyxdim;
+
+				avg_class_errors[iclass] = avg_grad * mymodel.pdf_class[iclass];
 			}
 		}
+	}
 
-		if (grad_ini_iter < iter && iter < grad_ini_iter + grad_inbetween_iter) {
-			int drop_class_idx = -1, expand_class_idx = -1;
+	if (grad_ini_iter < iter && iter < grad_ini_iter + grad_inbetween_iter) {
+		int drop_class_idx = -1, expand_class_idx = -1;
 
-			// Determine the class with the largest average error to expand
-			std::vector<unsigned> s = SomGraph::arg_sort(avg_class_errors, false);
-			expand_class_idx = s[0];
+		// Determine the class with the largest average error to expand
+		std::vector<unsigned> s = SomGraph::arg_sort(avg_class_errors, false);
+		expand_class_idx = s[0];
 
-			// Determine if a class should be dropped
-			if (class_inactivity_threshold > 0) {
-				std::vector<unsigned> idx = SomGraph::arg_sort(mymodel.pdf_class);
-				int most_inactive = idx[0];
-				if (mymodel.pdf_class[most_inactive] < class_inactivity_threshold/(float) nr_active_classes)
-					drop_class_idx = most_inactive;
+		// Determine if a class should be dropped
+		if (class_inactivity_threshold > 0) {
+			std::vector<unsigned> idx = SomGraph::arg_sort(mymodel.pdf_class);
+			int most_inactive = idx[0];
+			if (mymodel.pdf_class[most_inactive] < class_inactivity_threshold/(float) nr_active_classes)
+				drop_class_idx = most_inactive;
+		}
+
+		// If both drop and expand are set, replace drop with expand
+		if (drop_class_idx != -1 && expand_class_idx != -1) {
+			mymodel.reset_class(drop_class_idx, expand_class_idx);
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(mymodel.Igrad1[drop_class_idx]) { // Dampen momentum
+				mymodel.Igrad1[drop_class_idx].data[i].real *= 0.9;
+				mymodel.Igrad1[drop_class_idx].data[i].imag *= 0.9;
 			}
+			mymodel.class_age[drop_class_idx] = mymodel.class_age[expand_class_idx] * 0.9;
+			skip_class = drop_class_idx;
+		}
 
-			// If both drop and expand are set, replace drop with expand
-			if (drop_class_idx != -1 && expand_class_idx != -1) {
-				mymodel.reset_class(drop_class_idx, expand_class_idx);
-				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(mymodel.Igrad1[drop_class_idx]) { // Dampen momentum
-					mymodel.Igrad1[drop_class_idx].data[i].real *= 0.9;
-					mymodel.Igrad1[drop_class_idx].data[i].imag *= 0.9;
-				}
-				mymodel.class_age[drop_class_idx] = mymodel.class_age[expand_class_idx] * 0.9;
-				skip_class = drop_class_idx;
+		// If SOM, sometimes expand without a drop
+		if (do_som && expand_class_idx != -1 &&
+		    mymodel.som.get_node_count() < mymodel.nr_classes &&
+		    iter - mymodel.last_som_add_iter > 3) {
+			unsigned nn = mymodel.som.add_node(expand_class_idx, 0); //TODO Should be a parameter
+			mymodel.reset_class(nn, expand_class_idx);
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(mymodel.Igrad1[drop_class_idx]) { // Dampen momentum
+				mymodel.Igrad1[nn].data[i].real *= 0.9;
+				mymodel.Igrad1[nn].data[i].imag *= 0.9;
 			}
-
-			// If SOM, sometimes expand without a drop
-			if (do_som && expand_class_idx != -1 &&
-			    mymodel.som.get_node_count() < mymodel.nr_classes &&
-			    iter - mymodel.last_som_add_iter > 3) {
-				unsigned nn = mymodel.som.add_node(expand_class_idx, 0); //TODO Should be a parameter
-				mymodel.reset_class(nn, expand_class_idx);
-				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(mymodel.Igrad1[drop_class_idx]) { // Dampen momentum
-					mymodel.Igrad1[nn].data[i].real *= 0.9;
-					mymodel.Igrad1[nn].data[i].imag *= 0.9;
-				}
-				mymodel.class_age[nn] = mymodel.class_age[expand_class_idx] * 0.5;
-				skip_class = nn;
-				mymodel.last_som_add_iter = iter;
-				std::cerr << "Expanding class " << expand_class_idx << std::endl;
-			}
+			mymodel.class_age[nn] = mymodel.class_age[expand_class_idx] * 0.5;
+			skip_class = nn;
+			mymodel.last_som_add_iter = iter;
+			std::cerr << "Expanding class " << expand_class_idx << std::endl;
 		}
 	}
 
@@ -9119,9 +9122,12 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 		bool do_proceed_resolution = (auto_resolution_based_angles &&
 									  myresol_angstep < old_rottilt_step &&
 						 		      sampling.healpix_order + 1 != autosampling_hporder_local_searches);
-		do_proceed_resolution = (do_proceed_resolution || nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN);
+		do_proceed_resolution = (do_proceed_resolution ||
+				(!do_grad && nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN) ||
+				( do_grad && nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN_GRAD - 2));
 
-		const bool do_proceed_hidden_variables = (auto_ignore_angle_changes || nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES);
+		const bool do_proceed_hidden_variables = (auto_ignore_angle_changes ||
+				(!do_grad && nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES));
 
 		// Only use a finer angular sampling if the angular accuracy is still above 75% of the estimated accuracy
 		// If it is already below, nothing will change and eventually nr_iter_wo_resol_gain or nr_iter_wo_large_hidden_variable_changes will go above MAX_NR_ITER_WO_RESOL_GAIN
@@ -9418,37 +9424,38 @@ void MlOptimiser::updateStepSize() {
 		deflate = textToFloat(_scheme.substr(pos + 7, _scheme.size()));
 	}
 
-	if (do_auto_refine) {
+	if (do_auto_refine)
+	{
 		if (grad_current_stepsize == 0)
-			grad_current_stepsize = _stepsize * 2;
+			grad_current_stepsize = 0.99;
 
-		if (nr_iter_wo_resol_gain == 3)
-			grad_current_stepsize *= 0.75;
-
-		grad_current_stepsize = XMIPP_MAX(grad_current_stepsize, grad_stepsize/deflate);
+//		if (nr_iter_wo_resol_gain == MAX_NR_ITER_WO_RESOL_GAIN_GRAD - 1)
+//			grad_current_stepsize *= 0.75;
+//
+//		grad_current_stepsize = XMIPP_MAX(grad_current_stepsize, _stepsize);
+		return;
 	}
-	else {
-		if (is_2step or is_3step) {
-			if (inflate < 0 or 10 < inflate)
-				REPORT_ERROR("Invalid inflate value in --grad_stepsize_scheme");
-			if (deflate <= 0 or 10 < deflate)
-				REPORT_ERROR("Invalid deflate value in --grad_stepsize_scheme");
 
-			float x = iter;
-			float a1 = grad_inbetween_iter / 5.; //Sigmoid length
-			float b1 = grad_ini_iter; //Sigmoid start
-			float a2 = grad_fin_iter; //Sigmoid length
-			float b2 = grad_ini_iter + grad_inbetween_iter;//Sigmoid start
-			float scale1 = 1. / (pow(10, (x - b1 - a1 / 2.) / (a1 / 4.)) + 1.); //Sigmoid function
-			float scale2 = 1. / (pow(10, (x - b2 - a2 / 2.) / (a2 / 4.)) + 1.); //Sigmoid function
-			float c1 = _stepsize; //Baseline
-			float c = _stepsize / deflate; //Baseline
-			grad_current_stepsize = (_stepsize * inflate - c1) * scale1 + (_stepsize - c) * scale2 + c;
-			return;
-		}
+	if (is_2step or is_3step) {
+		if (inflate < 0 or 10 < inflate)
+			REPORT_ERROR("Invalid inflate value in --grad_stepsize_scheme");
+		if (deflate <= 0 or 10 < deflate)
+			REPORT_ERROR("Invalid deflate value in --grad_stepsize_scheme");
 
-		REPORT_ERROR("Invalid value in --grad_stepsize_scheme");
+		float x = iter;
+		float a1 = grad_inbetween_iter / 5.; //Sigmoid length
+		float b1 = grad_ini_iter; //Sigmoid start
+		float a2 = grad_fin_iter; //Sigmoid length
+		float b2 = grad_ini_iter + grad_inbetween_iter;//Sigmoid start
+		float scale1 = 1. / (pow(10, (x - b1 - a1 / 2.) / (a1 / 4.)) + 1.); //Sigmoid function
+		float scale2 = 1. / (pow(10, (x - b2 - a2 / 2.) / (a2 / 4.)) + 1.); //Sigmoid function
+		float c1 = _stepsize; //Baseline
+		float c = _stepsize / deflate; //Baseline
+		grad_current_stepsize = (_stepsize * inflate - c1) * scale1 + (_stepsize - c) * scale2 + c;
+		return;
 	}
+
+	REPORT_ERROR("Invalid value in --grad_stepsize_scheme");
 }
 
 void MlOptimiser::checkConvergence(bool myverb)
