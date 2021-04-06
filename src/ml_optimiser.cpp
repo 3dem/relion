@@ -2115,13 +2115,16 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 	if (gradient_refine)
 	{
-		if (do_auto_refine) {
+		if (do_auto_refine)
+		{
 			auto_resolution_based_angles = true;
 			auto_ignore_angle_changes = true;
 		}
-
-		// for continuation jobs (iter>0): could do some more iterations as specified by nr_iter
-		nr_iter = grad_ini_iter + grad_fin_iter + grad_inbetween_iter;
+		else
+		{
+			// for continuation jobs (iter>0): could do some more iterations as specified by nr_iter
+			nr_iter = grad_ini_iter + grad_fin_iter + grad_inbetween_iter;
+		}
 		updateStepSize();
 
 		// determine default subset sizes

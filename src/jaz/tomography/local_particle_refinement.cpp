@@ -459,7 +459,7 @@ double LocalParticleRefinement::gradAndValue(const std::vector<double> &x, std::
 
 					const fComplex pred = dPred_dP3D.w;
 
-					const fComplex dPred_dphi   = (
+					const fComplex dPred_dPhi   = (
 						dPred_dP3D.x * dP3D_dphi.x   +
 						dPred_dP3D.y * dP3D_dphi.y   +
 						dPred_dP3D.z * dP3D_dphi.z );
@@ -499,7 +499,7 @@ double LocalParticleRefinement::gradAndValue(const std::vector<double> &x, std::
 
 					const fComplex dF = c * shift * pred - obs;
 
-					const fComplex ddF_dPhi   = c * shift * dPred_dphi;
+					const fComplex ddF_dPhi   = c * shift * dPred_dPhi;
 					const fComplex ddF_dTheta = c * shift * dPred_dTheta;
 					const fComplex ddF_dChi   = c * shift * dPred_dChi;
 
