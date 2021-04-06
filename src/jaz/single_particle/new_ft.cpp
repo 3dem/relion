@@ -369,7 +369,7 @@ NewFFT::DoublePlan::DoublePlan(int w, int h, int d, unsigned int flags)
 				(fftw_complex*) MULTIDIM_ARRAY(complexDummy),
 				FFTW_UNALIGNED | flags);
 		
-		fftw_plan planBackward = fftw_plan_dft_c2r(
+		planBackward = fftw_plan_dft_c2r(
 				ndim, &N[0],
 				(fftw_complex*) MULTIDIM_ARRAY(complexDummy),
 				MULTIDIM_ARRAY(realDummy),
