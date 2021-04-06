@@ -541,7 +541,10 @@ void CtfRefinementProgram::updateScale(
 				ctf, tomogram.optics.pixelSize, aberrationsCache,
 				referenceMap.image_FS,
 				Prediction::OwnHalf,
-				Prediction::AmplitudeModulated);
+				Prediction::AmplitudeModulated,
+				Prediction::NotDoseWeighted,
+				0.0,
+				Prediction::CtfUnscaled);
 
 			for (int y = 0; y < sh; y++)
 			for (int x = 0; x < s;  x++)
