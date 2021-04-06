@@ -2402,6 +2402,14 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 	outputNodes.push_back(node3);
 	command += " --part_star " + fn_ostar;
 
+	if (joboptions["do_reextract"].getBoolean() || (joboptions["do_extract_helix"].getBoolean() && joboptions["do_extract_helical_tubes"].getBoolean()) )
+	{
+		FileName fn_pickstar = outputname + "extractpick.star";
+		Node node(fn_pickstar, NODE_MIC_COORDS);
+		outputNodes.push_back(node);
+		command += " --pick_star " + fn_pickstar;
+	}
+
 	command += " --part_dir " + outputname;
 	command += " --extract";
 	command += " --extract_size " + joboptions["extract_size"].getString();
@@ -2471,6 +2479,7 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 	command += " " + joboptions["other_args"].getString();
 	commands.push_back(command);
 
+	/* TODO: write out 2-column pick.star in relion_preprocess, as of relion-4 coord_suffix is deprecated
 	if (joboptions["do_reextract"].getBoolean() || (joboptions["do_extract_helix"].getBoolean() && joboptions["do_extract_helical_tubes"].getBoolean()) )
 	{
 		// Also touch the suffix file. Do this after the first command had completed
@@ -2481,6 +2490,7 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 		outputNodes.push_back(node);
 
 	}
+	*/
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
