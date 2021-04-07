@@ -344,7 +344,7 @@ RFLOAT MetaDataTable::getDouble(EMDLabel label, long objectID) const
 	return (double) getRfloat(label, objectID);
 }
 
-double MetaDataTable::getAngleInRad(EMDLabel label, long objectID) const
+RFLOAT MetaDataTable::getAngleInRad(EMDLabel label, long objectID) const
 {
 	return DEG2RAD(getDouble(label, objectID));
 }
