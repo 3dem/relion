@@ -7,11 +7,12 @@ assignees: ''
 
 ---
 
-This is a template for asking questions and reporting bugs. Please fill in as much information as you can.
+This is a template for reporting bugs. Please fill in as much information as you can.
 
 **Describe your problem**
 
 Please write a clear description of what the problem is.
+Data processing questions should be posted to [the CCPEM mailing list](https://www.jiscmail.ac.uk/cgi-bin/webadmin?A0=CCPEM), not here.
 **DO NOT** cross post a same question to multiple issues and/or many mailing lists (CCPEM, 3DEM, etc).
 
 **Environment:**
