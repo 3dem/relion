@@ -2110,16 +2110,6 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 				command += " --topaz_extract";
 				if (joboptions["topaz_model"].getString() != "")
 					command += " --topaz_model " + joboptions["topaz_model"].getString();
-
-
-				// Helix-picking in Topaz
-				if (joboptions["do_pick_helical_segments"].getBoolean())
-				{
-					command += " --helix";
-					command += " --helical_tube_outer_diameter " + joboptions["helical_tube_outer_diameter"].getString();
-					command += " --helical_tube_length_min " + joboptions["helical_tube_length_min"].getString();
-				}
-
 			}
 
 			if ((joboptions["topaz_other_args"].getString()).length() > 0)
