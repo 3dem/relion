@@ -9122,12 +9122,9 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 		bool do_proceed_resolution = (auto_resolution_based_angles &&
 									  myresol_angstep < old_rottilt_step &&
 						 		      sampling.healpix_order + 1 != autosampling_hporder_local_searches);
-		do_proceed_resolution = (do_proceed_resolution ||
-				(!do_grad && nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN) ||
-				( do_grad && nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN_GRAD - 2));
+		do_proceed_resolution = (do_proceed_resolution || nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN);
 
-		const bool do_proceed_hidden_variables = (auto_ignore_angle_changes ||
-				(!do_grad && nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES));
+		const bool do_proceed_hidden_variables = (auto_ignore_angle_changes || nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES);
 
 		// Only use a finer angular sampling if the angular accuracy is still above 75% of the estimated accuracy
 		// If it is already below, nothing will change and eventually nr_iter_wo_resol_gain or nr_iter_wo_large_hidden_variable_changes will go above MAX_NR_ITER_WO_RESOL_GAIN
@@ -9215,29 +9212,6 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 				if (mymodel.ref_dim == 3)
 				{
 					new_hp_order = sampling.healpix_order + 1;
-
-					if (do_grad) {
-						if (grad_suspended_local_searches_iter < 0) {
-							if (new_hp_order >= autosampling_hporder_local_searches &&
-							    mymodel.orientational_prior_mode == NOPRIOR) {
-								grad_suspended_local_searches_iter = 2;
-								nr_iter_wo_resol_gain = 0;
-								nr_iter_wo_large_hidden_variable_changes = 0;
-								if (myverb)
-									std::cout << " Auto-refine: Switch to local searches suspended for two iteration. "
-									          << std::endl;
-							}
-						}
-
-						if (grad_suspended_local_searches_iter >= 0) {
-							if (grad_suspended_local_searches_iter > 0)
-								new_hp_order = autosampling_hporder_local_searches - 1;
-							else if (grad_suspended_local_searches_iter == 0)
-								new_hp_order = autosampling_hporder_local_searches;
-							grad_suspended_local_searches_iter -= 1;
-						}
-					}
-
 					new_rottilt_step = new_psi_step = 360. / (6 * ROUND(std::pow(2., new_hp_order + adaptive_oversampling)));
 
 					// Set the new sampling in the sampling-object
@@ -9353,13 +9327,13 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 	}
 	else if (gradient_refine)
 	{
-		if (do_auto_refine) {
-			if (nr_iter_wo_resol_gain == 3)
-				auto_subset_size_order += 1;
+		if (do_auto_refine)
+		{
 			subset_size = grad_ini_subset_size * std::pow(2, auto_subset_size_order);
 			subset_size = XMIPP_MIN(subset_size, grad_fin_subset_size);
 		}
-		else {
+		else
+		{
 			// Do grad_ini_iter iterations with completely identical K references, sigd_ini_subset_size, enforce non-negativity and grad_ini_resol resolution limit
 			if (iter < grad_ini_iter) {
 				subset_size = grad_ini_subset_size;
@@ -9382,8 +9356,8 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 			nr_iter - iter < grad_em_iters ||
 			(nr_iter == iter && mymodel.nr_classes > 1) || // If initial model with single class, then skip all particles in final iter
 			subset_size >= nr_particles ||
-			grad_suspended_local_searches_iter == 1 ||
-			has_converged)
+			grad_suspended_local_searches_iter > 0 ||
+			has_converged || grad_has_converged)
 			subset_size = -1;
 	}
 
@@ -9391,7 +9365,8 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 		std::cout << " Setting subset size to " << subset_size << " particles" << std::endl;
 }
 
-void MlOptimiser::updateStepSize() {
+void MlOptimiser::updateStepSize()
+{
 	RFLOAT _stepsize = grad_stepsize;
 	std::string _scheme = grad_stepsize_scheme;
 
@@ -9424,18 +9399,6 @@ void MlOptimiser::updateStepSize() {
 		deflate = textToFloat(_scheme.substr(pos + 7, _scheme.size()));
 	}
 
-	if (do_auto_refine)
-	{
-		if (grad_current_stepsize == 0)
-			grad_current_stepsize = 0.99;
-
-//		if (nr_iter_wo_resol_gain == MAX_NR_ITER_WO_RESOL_GAIN_GRAD - 1)
-//			grad_current_stepsize *= 0.75;
-//
-//		grad_current_stepsize = XMIPP_MAX(grad_current_stepsize, _stepsize);
-		return;
-	}
-
 	if (is_2step or is_3step) {
 		if (inflate < 0 or 10 < inflate)
 			REPORT_ERROR("Invalid inflate value in --grad_stepsize_scheme");
@@ -9463,8 +9426,7 @@ void MlOptimiser::checkConvergence(bool myverb)
 	bool em_converged = nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN &&
 	                    (auto_ignore_angle_changes || nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES);
 
-    bool gd_converged = nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN_GRAD &&
-    		            (auto_ignore_angle_changes || nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES_GRAD);
+    bool gd_converged = nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN_GRAD;
 
 	if (!grad_has_converged && gd_converged) {
 		if (myverb)
@@ -9474,7 +9436,6 @@ void MlOptimiser::checkConvergence(bool myverb)
 		nr_iter_wo_large_hidden_variable_changes = 0;
 		em_converged = false;
 		gd_converged = false;
-		do_grad = false;
 	}
 
 	if (
@@ -9506,9 +9467,21 @@ void MlOptimiser::checkConvergence(bool myverb)
 	if (myverb)
 	{
 		std::cout << " Auto-refine: Iteration= "<< iter<< std::endl;
-		std::cout << " Auto-refine: Resolution= "<< 1./mymodel.current_resolution<< " (no gain for " << nr_iter_wo_resol_gain << " iter) "<< std::endl;
-		std::cout << " Auto-refine: Changes in angles= " << current_changes_optimal_orientations << " degrees; and in offsets= " << current_changes_optimal_offsets
-		<< " Angstroms (no gain for " << nr_iter_wo_large_hidden_variable_changes << " iter) "<< std::endl;
+		if (do_grad)
+		{
+			if (iter > 10 && nr_iter_wo_resol_gain >= 0)
+				std::cout << " Auto-refine: Resolution= "<< 1./mymodel.current_resolution<< " (no gain for " << nr_iter_wo_resol_gain << " iter) " << std::endl;
+			else
+				std::cout << " Auto-refine: Convergence check suspended" << std::endl;
+		}
+		else
+		{
+			std::cout << " Auto-refine: Resolution= "<< 1./mymodel.current_resolution<< " (no gain for " << nr_iter_wo_resol_gain << " iter) "<< std::endl;
+			std::cout << " Auto-refine: Changes in angles= " << current_changes_optimal_orientations
+			          << " degrees; and in offsets= " << current_changes_optimal_offsets
+			          << " Angstroms (no gain for " << nr_iter_wo_large_hidden_variable_changes << " iter) "
+			          << std::endl;
+		}
 
 		if (has_converged)
 		{
