@@ -35,7 +35,14 @@ class Prediction
 			NotDoseWeighted = 0,
 			DoseWeighted = 1
 		};
+
+		enum CtfScale
+		{
+			CtfUnscaled = 0,
+			CtfScaled = 1
+		};
 		
+
 		static BufferedImage<fComplex> predictModulated(
 				ParticleIndex particle_id,
 				const ParticleSet& dataSet,
@@ -46,7 +53,8 @@ class Prediction
 				HalfSet halfSet = OwnHalf,
 				Modulation modulation = AmplitudeAndPhaseModulated,
 				DoseWeight doseWeight = NotDoseWeighted,
-				double cumulativeDose = 0.0);
+				double cumulativeDose = 0.0,
+				CtfScale ctfScale = CtfScaled);
 		
 		static BufferedImage<fComplex> predictFS(
 				ParticleIndex particle_id,

@@ -231,7 +231,10 @@ int main(int argc, char *argv[])
 					ctf, tomogram.optics.pixelSize, aberrationsCache,
 					referenceMap.image_FS,
 					Prediction::OwnHalf,
-					Prediction::AmplitudeModulated);
+					Prediction::AmplitudeModulated,
+					Prediction::NotDoseWeighted,
+					0.0,
+					Prediction::CtfUnscaled);
 
 
 				const double cos_f = tomogram.projectionMatrices[f](2,2);

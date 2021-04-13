@@ -930,7 +930,8 @@ void FourierBackprojection::backprojectSlice_forward_with_multiplicity(
 	const double scale = u.length() * v.length();
 	
 	for (long int y = 0; y < h2;  y++)
-	for (long int x = (y > 0 && y < h2/2? 0 : 1); x < wh2; x++)
+	for (long int x = (y < h2/2? 0 : 1); x < wh2; x++)
+	//for (long int x = (y > 0 && y < h2/2? 0 : 1); x < wh2; x++)  // exclude the origin pixel
 	{
 		const double xx = x;
 		const double yy = y < h2/2? y : y - h2;

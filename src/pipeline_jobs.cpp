@@ -1730,7 +1730,7 @@ to the average PLUS this value times the standard deviation. Use zero to set the
 	joboptions["lowpass"] = JobOption("Lowpass filter (A)", 20, 10, 100, 5, "Lowpass filter that will be applied to the micrographs. Give a negative value to skip the lowpass filter.");
 	joboptions["highpass"] = JobOption("Highpass filter (A)", -1, 100, 1000, 100, "Highpass filter that will be applied to the micrographs. This may be useful to get rid of background ramps due to uneven ice distributions. Give a negative value to skip the highpass filter. Useful values are often in the range of 200-400 Angstroms.");
 	joboptions["angpix"] = JobOption("Pixel size (A)", -1, 0.3, 5, 0.1, "Pixel size in Angstroms. This will be used to calculate the filters and the particle diameter in pixels. If a CTF-containing STAR file is input, then the value given here will be ignored, and the pixel size will be calculated from the values in the STAR file. A negative value can then be given here.");
-	joboptions["do_topaz_denoise"] = JobOption("OR: use Topaz denoiing?", false, "If set to true, Topaz denoising will be performed instead of lowpass filtering.");
+	joboptions["do_topaz_denoise"] = JobOption("OR: use Topaz denoising?", false, "If set to true, Topaz denoising will be performed instead of lowpass filtering.");
 	char *default_location = getenv ("RELION_TOPAZ_EXECUTABLE");
 	char default_topaz[] = DEFAULTTOPAZLOCATION;
 	if (default_location == NULL)
@@ -2110,16 +2110,6 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 				command += " --topaz_extract";
 				if (joboptions["topaz_model"].getString() != "")
 					command += " --topaz_model " + joboptions["topaz_model"].getString();
-
-
-				// Helix-picking in Topaz
-				if (joboptions["do_pick_helical_segments"].getBoolean())
-				{
-					command += " --helix";
-					command += " --helical_tube_outer_diameter " + joboptions["helical_tube_outer_diameter"].getString();
-					command += " --helical_tube_length_min " + joboptions["helical_tube_length_min"].getString();
-				}
-
 			}
 
 			if ((joboptions["topaz_other_args"].getString()).length() > 0)

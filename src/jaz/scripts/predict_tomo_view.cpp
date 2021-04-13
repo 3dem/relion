@@ -151,7 +151,10 @@ int main(int argc, char *argv[])
 				ctf, tomogram.optics.pixelSize, aberrationsCache,
 				referenceMap.image_FS,
 				oppositeHalf? Prediction::OppositeHalf : Prediction::OwnHalf,
-				predictCTF?   Prediction::AmplitudeModulated : Prediction::Unmodulated);
+				predictCTF?   Prediction::AmplitudeModulated : Prediction::Unmodulated,
+				Prediction::NotDoseWeighted,
+				0.0,
+				Prediction::CtfScaled);
 
 			Centering::shiftInSitu(prediction);
 

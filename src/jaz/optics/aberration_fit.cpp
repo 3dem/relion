@@ -166,7 +166,10 @@ void AberrationFit :: considerParticle(
 				aberrationsCache,
 				referenceMap.image_FS,
 				Prediction::OwnHalf,
-				Prediction::Unmodulated);
+				Prediction::Unmodulated,
+				Prediction::NotDoseWeighted,
+				0.0,
+				Prediction::CtfScaled);
 
 		const float scale = flip_value? -1.f : 1.f;
 

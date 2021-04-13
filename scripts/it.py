@@ -166,7 +166,8 @@ RelionItOptions = {
     'proc__inipicker__maxstddevnoise_autopick' : -1,
     # Use this to remove false positives from carbon edges (useful range: -0.5-0.0; -999 to switch off)
     'proc__inipicker__minavgnoise_autopick' : -999,
-
+    # Calculate boxsize automatically for me?
+    'do_auto_boxsize' : True,
 
     ### Extract parameters for inipicker job
     # Box size of particles in the averaged micrographs (in pixels)
@@ -469,9 +470,10 @@ class RelionItGui(object):
 
         tk.Label(self.particle_frame, text="Calculate for me:").grid(row=row, sticky=tk.W)
         self.auto_boxsize_var = tk.IntVar()
-        auto_boxsize_button = tk.Checkbutton(self.particle_frame, var=self.auto_boxsize_var)
-        auto_boxsize_button.grid(row=row, column=1, sticky=tk.W)
-        auto_boxsize_button.select()
+        self.auto_boxsize_button = tk.Checkbutton(self.particle_frame, var=self.auto_boxsize_var)
+        self.auto_boxsize_button.grid(row=row, column=1, sticky=tk.W)
+        if options['do_auto_boxsize']:
+            self.auto_boxsize_button.select()
 
         ###
 
@@ -705,7 +707,7 @@ class RelionItGui(object):
 
         self.angpix_var.trace('w', update_box_sizes)
         self.particle_max_diam_var.trace('w', update_box_sizes)
-        auto_boxsize_button.config(command=update_box_sizes)
+        self.auto_boxsize_button.config(command=update_box_sizes)
       
         self.retrain_topaz_button.config(command=update_inipick_status)
         self.do_prep_button.config(command=update_prep_status)
@@ -754,9 +756,9 @@ class RelionItGui(object):
         opts['proc__ctffind_mics'] = self.mics_entry.get()
         opts['proc__do_2d'] = self.get_var_as_bool(self.do_2d_var)
         opts['proc__do_3d'] = self.get_var_as_bool(self.do_3d_var)
+        opts['do_auto_boxsize'] =  self.get_var_as_bool(self.auto_boxsize_var)
         opts['proc__do_retrain_topaz'] = self.get_var_as_bool(self.do_retrain_topaz_var)
         opts['proc__topaz_model'] = self.topaz_model_entry.get()
-
         opts['prep__ctffind__do_phaseshift'] = self.get_var_as_bool(self.phaseplate_var)
 
         try:
@@ -964,7 +966,7 @@ def save_options(options):
                 return False
                     
             command = 'relion_scheduler --schedule ' + schedulename + ' --set_var ' + varname + ' --value \"' + str(value) + '\"' + ' --original_value \"' + str(value) + '\"'
-            print(' RELION_IT: excuting: ', command)
+            print(' RELION_IT: executing: ', command)
             os.system(command)
                         
         # Set joboptions in job.star
@@ -980,7 +982,7 @@ def save_options(options):
                 tkMessageBox.showerror(message)
                         
             command = 'relion_pipeliner --editJob ' + jobstar + ' --editOption ' + joboption + ' --editValue \"' + str(value) + '\"'
-            print(' RELION_IT: excuting: ', command)
+            print(' RELION_IT: executing: ', command)
             os.system(command)
             
     print(' RELION_IT: done saving all options in the Schedules.') 
@@ -988,31 +990,31 @@ def save_options(options):
 def run_scheduler(options, do_gui):
 
     command = 'relion_scheduler --schedule prep --reset &'
-    print(' RELION_IT: excuting: ', command)
+    print(' RELION_IT: executing: ', command)
     os.system(command)
 
     if options['proc__do_prep']:
         
         command = 'relion_scheduler --schedule prep --run --pipeline_control Schedules/prep/ >> Schedules/prep/run.out 2>> Schedules/prep/run.err &'
-        print(' RELION_IT: excuting: ', command)
+        print(' RELION_IT: executing: ', command)
         os.system(command)
         if do_gui:
             command = 'relion_schedulegui.py prep &'
-            print(' RELION_IT: excuting: ', command)
+            print(' RELION_IT: executing: ', command)
             os.system(command)
           
     if options['proc__do_2d']:
 
         command = 'relion_scheduler --schedule proc --reset &'
-        print(' RELION_IT: excuting: ', command)
+        print(' RELION_IT: executing: ', command)
         os.system(command)
 
         command = 'relion_scheduler --schedule proc --run  --pipeline_control Schedules/proc/ >> Schedules/proc/run.out 2>> Schedules/proc/run.err  &'
-        print(' RELION_IT: excuting: ', command)
+        print(' RELION_IT: executing: ', command)
         os.system(command)
         if do_gui:
             command = 'relion_schedulegui.py proc &'
-            print(' RELION_IT: excuting: ', command)
+            print(' RELION_IT: executing: ', command)
             os.system(command)
 
 

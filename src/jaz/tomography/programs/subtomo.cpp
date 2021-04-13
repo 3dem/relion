@@ -553,7 +553,7 @@ void SubtomoProgram::processTomograms(
 			}
 
 			// What if we didn't? The 2D image is already tapered.
-			Reconstruction::taper(dataImgRS, taper, do_center, inner_thread_num);
+			//Reconstruction::taper(dataImgRS, taper, do_center, inner_thread_num);
 
 			if (do_sum_all)
 			{
