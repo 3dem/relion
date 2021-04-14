@@ -3336,9 +3336,11 @@ void MlOptimiser::expectation()
 				wsum_model.BPref[j].weight.data[n] += (RFLOAT) weights[n];
 			}
 
-			b->projectors[j].clear();
 			b->backprojectors[j].clear();
 		}
+
+		for (int j = 0; j < b->projectors.size(); j++)
+			b->projectors[j].clear();
 
 		for (int j = 0; j < b->coarseProjectionPlans.size(); j++)
 			b->coarseProjectionPlans[j].clear();
