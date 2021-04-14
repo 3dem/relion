@@ -2070,9 +2070,9 @@ void BackProjector::reconstructGrad(
 	// Pass the transformer to prevent making and clearing a new one before clearing the one declared above....
 	// The latter may give memory problems as detected by electric fence....
 	Projector::decenter(PPref.data, Fconv, max_r2);
-	RCTIC(ReconTimer,ReconS_17);
+//	RCTIC(ReconTimer,ReconS_17);
 	windowToOridimRealSpace(transformer, vol_out, printTimes);
-	RCTOC(ReconTimer,ReconS_17);
+//	RCTOC(ReconTimer,ReconS_17);
 
 #ifdef DEBUG_NGD
 	Image<RFLOAT> Itmp;
