@@ -142,6 +142,12 @@ public:
 	// Filename for input reference images (stack, star or image)
 	FileName fn_ref;
 
+	// Filename for the subtomo optimiser set. Used to set fn_data, fn_ref and fn_mask
+	FileName fn_OS;
+
+	// Optimiser set table for subtomo
+	MetaDataTable optimisationSet;
+
 	// Generate a 3D model from 2D particles de novo?
 	bool is_3d_model;
 

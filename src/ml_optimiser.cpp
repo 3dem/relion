@@ -502,6 +502,13 @@ if(do_gpu)
 	nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
 	debug_split_random_half = textToInteger(getParameter(argc, argv, "--debug_split_random_half", "0"));
 
+	// We read input optimiser set to create the output one
+	fn_OS = parser.getOption("--ios", "Input tomo optimiser set file. It is used to set --i, --ref or --solvent_mask if they are not provided. Updated output optimiser set is created.", "");
+	if (fn_OS != "")
+	{
+		optimisationSet.read(fn_OS);
+	}
+
 	do_print_metadata_labels = false;
 	do_print_symmetry_ops = false;
 #ifdef DEBUG
@@ -532,6 +539,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	// General optimiser I/O stuff
 	int general_section = parser.addSection("General options");
 	fn_data = parser.getOption("--i", "Input images (in a star-file)", "");
+	fn_OS = parser.getOption("--ios", "Input tomo optimiser set file. It is used to set --i, --ref or --solvent_mask if they are not provided. Updated output optimiser set is created.", "");
 	fn_out = parser.getOption("--o", "Output rootname", "");
 	nr_iter = textToInteger(parser.getOption("--iter", "Maximum number of iterations to perform", "-1"));
 	mymodel.tau2_fudge_factor = textToFloat(parser.getOption("--tau2_fudge", "Regularisation parameter (values higher than 1 give more weight to the data)", "1"));
@@ -555,6 +563,28 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	is_3d_model = parser.checkOption("--denovo_3dref", "Make an initial 3D model from randomly oriented 2D particles");
 	mymodel.sigma2_offset = textToFloat(parser.getOption("--offset", "Initial estimated stddev for the origin offsets (in Angstroms)", "10"));
 	mymodel.sigma2_offset *= mymodel.sigma2_offset;
+
+	// If tomo optimiser set is passed, we use it to initialise data, reference and mask
+	if (fn_OS != "")
+	{
+		optimisationSet.read(fn_OS);
+
+		if (fn_data == "")
+		{
+			if (!optimisationSet.getValue(EMDL_TOMO_PARTICLES_FILE_NAME, fn_data))
+				REPORT_ERROR("No particles filename was found in file " + fn_OS);
+		}
+		if (fn_ref == "None")
+		{
+			if (!optimisationSet.getValue(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, fn_ref))
+				REPORT_ERROR("No reference half map filenames were found in file " + fn_OS);
+		}
+		if (fn_mask == "None")
+		{
+			if (!optimisationSet.getValue(EMDL_TOMO_REFERENCE_MASK_FILE_NAME, fn_mask))
+				REPORT_ERROR("No reference mask filename was found in file " + fn_OS);
+		}
+	}
 
 	// Perform cross-product comparison at first iteration
 	do_firstiter_cc = parser.checkOption("--firstiter_cc", "Perform CC-calculation in the first iteration (use this if references are not on the absolute intensity scale)");
@@ -1282,6 +1312,17 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 	if (do_som) {
 		FileName som_fn = fn_root + "_som.txt";
 		mymodel.som.print_to_file(som_fn);
+	}
+
+	// Creating output tomo optimiser set, if required
+	if (do_join_random_halves && !optimisationSet.isEmpty())
+	{
+		optimisationSet.setValue(EMDL_TOMO_PARTICLES_FILE_NAME, fn_root + "_data.star");
+		optimisationSet.setValue(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, fn_root2 + "_half1_unfil.mrc");
+		optimisationSet.setValue(EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME, fn_root2 + "_half2_unfil.mrc");
+		optimisationSet.setValue(EMDL_TOMO_REFERENCE_MASK_FILE_NAME, fn_mask);
+
+		optimisationSet.write(fn_root + "_optimisation_set.star");
 	}
 }
 

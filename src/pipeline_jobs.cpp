@@ -4060,40 +4060,49 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 
 	if (!is_continue)
 	{
+		command += " --auto_refine --split_random_halves";
+
+		// If tomo optimiser set is passed, fn_img and fn_ref can be empty
 		if (do_tomo && joboptions["in_optimisation"].getString() != "")
 		{
-			MetaDataTable MD;
-			MD.read(joboptions["in_optimisation"].getString());
-			FileName fn_tmp;
-			if(joboptions["fn_img"].getString() == "" && MD.getValue(EMDL_TOMO_PARTICLES_FILE_NAME, fn_tmp))
-				joboptions["fn_img"].setString(fn_tmp);
-			// If half maps are present we set as fn_ref one of them. relion_refine auto detects both halves
-			if(joboptions["fn_ref"].getString() == "" && MD.getValue(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, fn_tmp))
-				joboptions["fn_ref"].setString(fn_tmp);
-			if(joboptions["fn_mask"].getString() == "" && MD.getValue(EMDL_TOMO_REFERENCE_MASK_FILE_NAME, fn_tmp))
-				joboptions["fn_mask"].setString(fn_tmp);
-
-			Node node(joboptions["in_optimisation"].getString(), joboptions["in_optimisation"].node_type);
+			// Optimiser set should contain particles, halfmap and refmask or they should be set especifically
+			// If Optimiset set is passed without halfmaps or refmask, they cannot be set as "None" in the GUI.
+			FileName fn_OS = joboptions["in_optimisation"].getString();
+			Node node(fn_OS, joboptions["in_optimisation"].node_type);
 			inputNodes.push_back(node);
-		}
+			command += " --ios " + fn_OS;
 
-		command += " --auto_refine --split_random_halves --i " + joboptions["fn_img"].getString();
-		if (joboptions["fn_img"].getString() == "")
+			Node node1( outputname + fn_run + "_optimisation_set.star", NODE_TOMO_OPTIMISATION);
+			outputNodes.push_back(node1);
+
+			if (joboptions["fn_mask"].getString() == "" && joboptions["do_solvent_fsc"].getBoolean())
+				command += " --solvent_correct_fsc ";
+			if (joboptions["fn_ref"].getString() == "" && !joboptions["ref_correct_greyscale"].getBoolean())
+				command += " --firstiter_cc";
+		}
+		else if (joboptions["fn_img"].getString() == "")
 		{
 			error_message = "ERROR: empty field for input STAR file...";
 			return false;
 		}
-		Node node(joboptions["fn_img"].getString(), joboptions["fn_img"].node_type);
-		inputNodes.push_back(node);
-		if (joboptions["fn_ref"].getString() == "")
+		else if (joboptions["fn_ref"].getString() == "")
 		{
 			error_message = "ERROR: empty field for input reference...";
 			return false;
 		}
-		if (joboptions["fn_ref"].getString() != "None")
+
+		if (joboptions["fn_img"].getString() != "")
 		{
-			command += " --ref " + joboptions["fn_ref"].getString();
-			Node node(joboptions["fn_ref"].getString(), joboptions["fn_ref"].node_type);
+			command += " --i " + joboptions["fn_img"].getString();
+			Node node(joboptions["fn_img"].getString(), joboptions["fn_img"].node_type);
+			inputNodes.push_back(node);
+		}
+
+		FileName fn_ref = joboptions["fn_ref"].getString();
+		if (fn_ref != "" && fn_ref != "None")
+		{
+			command += " --ref " + fn_ref;
+			Node node(fn_ref, joboptions["fn_ref"].node_type);
 			inputNodes.push_back(node);
 
 			if (!joboptions["ref_correct_greyscale"].getBoolean())
@@ -4287,21 +4296,6 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 	command += " " + joboptions["other_args"].getString();
 
 	commands.push_back(command);
-
-	// Create output optimisation set
-	if (do_tomo)
-	{
-		std::string command2;
-		std::string outputname_run = outputname + fn_run;
-
-		setTomoOutputCommand(command2, joboptions["in_optimisation"].getString(), "",
-							 outputname_run + "_data.star", "", "",
-							 outputname_run + "_half1_class001_unfil.mrc", "",
-							 joboptions["fn_mask"].getString(),
-							 outputname + "optimisation_set.star");
-
-		commands.push_back(command2);
-	}
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
