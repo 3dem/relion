@@ -48,6 +48,7 @@ class SubtomoProgram
 				do_gridding_precorrection,
 				do_circle_crop,
 				do_narrow_circle_crop,
+				do_circle_precrop,
 				do_sum_all,
 				write_combined,
 				write_ctf,

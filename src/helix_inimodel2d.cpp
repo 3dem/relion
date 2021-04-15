@@ -164,7 +164,7 @@ void HelixAligner::initialise()
 	else if (fn_mics != "")
 	{
 		// Read in the micrographs STAR file
-		MDmics.read(fn_mics);
+		MDmics.read(fn_mics,"micrographs");
 
 		// Get the pixel size
 		if (MDmics.containsLabel(EMDL_CTF_MAGNIFICATION) && MDmics.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))

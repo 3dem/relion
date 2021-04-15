@@ -28,6 +28,11 @@ std::vector<Trajectory> Trajectory::read(std::string filename, ParticleSet& part
 		REPORT_ERROR("Trajectory::read: missing particle number in "+filename+".");
 	}
 
+	if (pc != particleSet.partTable.numberOfObjects())
+	{
+		REPORT_ERROR("Trajectory::read: incorrect number of particles in "+filename+".");
+	}
+
 	std::vector<Trajectory> out(pc);
 	
 	

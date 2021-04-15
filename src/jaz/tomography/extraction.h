@@ -335,8 +335,8 @@ void TomoExtraction::cropCircle(
 	#pragma omp parallel for num_threads(num_threads)
 	for (int f = 0; f < fc; f++)
 	{
-		double meanInside = 0.0;
-		double sumInside = 0.0;
+		double meanOutside = 0.0;
+		double sumOutside = 0.0;
 		
 		for (int y = 0; y < h; y++)
 		for (int x = 0; x < w; x++)
@@ -347,15 +347,14 @@ void TomoExtraction::cropCircle(
 			
 			double c;
 			
-			if (r < crop_rad - falloff) c = 1.0;
-			else if (r < crop_rad) c = 0.5 - 0.5 * cos(PI * (crop_rad - r) / falloff);
+			if (r > crop_rad) c = 1.0;
 			else c = 0.0;
-			
-			meanInside += c * stack(x,y,f);
-			sumInside  += c;
+
+			meanOutside += c * stack(x,y,f);
+			sumOutside  += c;
 		}
 		
-		if (sumInside > 0.0) meanInside /= sumInside;
+		if (sumOutside > 0.0) meanOutside /= sumOutside;
 		
 		for (int y = 0; y < h; y++)
 		for (int x = 0; x < w; x++)
@@ -370,7 +369,7 @@ void TomoExtraction::cropCircle(
 			else if (r < crop_rad) c = 0.5 - 0.5 * cos(PI * (crop_rad - r) / falloff);
 			else c = 0.0;
 						
-			stack(x,y,f) = c * (stack(x,y,f) - meanInside);
+			stack(x,y,f) = c * (stack(x,y,f) - meanOutside);
 		}
 	}
 }

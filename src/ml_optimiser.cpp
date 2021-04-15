@@ -158,8 +158,6 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 			if (mymodel.nr_bodies > 1)
 				REPORT_ERROR("ERROR: cannot change padding factor in a continuation of a multi-body refinement...");
 			mymodel.padding_factor = textToInteger(fnt);
-			if (gradient_refine)
-				mymodel.padding_factor = 1;
 			// Re-initialise the model to get the right padding factors in the PPref vectors
 			mymodel.initialise();
 		}
@@ -700,7 +698,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	grad_em_iters = textToInteger(parser.getOption("--grad_em_iters", "Number of iterations at the end of a gradient refinement using Expectation-Maximization", "1"));
 	// Stochastic EM is implemented as a variant of SGD, though it is really a different algorithm!
 
-	grad_ini_frac = textToFloat(parser.getOption("--grad_ini_frac", "Fraction of iterations in the initial phase of refinement", "0.1"));
+	grad_ini_frac = textToFloat(parser.getOption("--grad_ini_frac", "Fraction of iterations in the initial phase of refinement", "0.3"));
 	grad_fin_frac = textToFloat(parser.getOption("--grad_fin_frac", "Fraction of iterations in the final phase of refinement", "0.2"));
 
 	if (grad_ini_frac <= 0 || 1 <= grad_ini_frac)
@@ -799,8 +797,6 @@ if(do_gpu)
 	// Expert options
 	int expert_section = parser.addSection("Expert options");
 	mymodel.padding_factor = textToFloat(parser.getOption("--pad", "Oversampling factor for the Fourier transforms of the references", "2"));
-	//if (gradient_refine)
-	//	mymodel.padding_factor = 1;
 
 	ref_angpix = textToFloat(parser.getOption("--ref_angpix", "Pixel size (in A) for the input reference (default is to read from header)", "-1."));
 	mymodel.interpolator = (parser.checkOption("--NN", "Perform nearest-neighbour instead of linear Fourier-space interpolation?")) ? NEAREST_NEIGHBOUR : TRILINEAR;
@@ -1000,11 +996,11 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_STEPSIZE_SCHEME, grad_stepsize_scheme))
 		grad_stepsize_scheme = "";
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_INI_FRAC, grad_ini_frac)) {
-		grad_ini_frac = 0.2;
+		grad_ini_frac = 0.3;
 		grad_ini_iter = nr_iter * grad_ini_frac;
 	}
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_FIN_FRAC, grad_fin_frac)) {
-		grad_fin_frac = 0.1;
+		grad_fin_frac = 0.2;
 		grad_ini_iter = nr_iter * grad_fin_frac;
 	}
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_MIN_RESOL, grad_min_resol))
@@ -1392,6 +1388,8 @@ void MlOptimiser::initialise()
 #endif
 	}
 
+	grad_pseudo_halfsets = gradient_refine;
+
 	initialiseGeneral();
 
 	initialiseWorkLoad();
@@ -1734,7 +1732,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		mymodel.initialiseFromImages(
 				fn_ref, is_3d_model, mydata,
 				do_average_unaligned, do_generate_seeds,refs_are_ctf_corrected,
-				ref_angpix, gradient_refine, do_trust_ref_size, (rank==0));
+				ref_angpix, gradient_refine, grad_pseudo_halfsets, do_trust_ref_size, (rank==0));
 	}
 
 	if (mymodel.nr_classes > 1 && do_split_random_halves)
@@ -2054,7 +2052,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		mymodel.initialisePdfDirection(sampling.NrDirections());
 
 	// Initialise the wsum_model according to the mymodel
-	wsum_model.initialise(mymodel, sampling.symmetryGroup(), asymmetric_padding, skip_gridding);
+	wsum_model.initialise(mymodel, sampling.symmetryGroup(), asymmetric_padding, skip_gridding, grad_pseudo_halfsets);
 
 	// Initialise sums of hidden variable changes
 	// In later iterations, this will be done in updateOverallChangesInHiddenVariables
@@ -2115,13 +2113,16 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 	if (gradient_refine)
 	{
-		if (do_auto_refine) {
+		if (do_auto_refine)
+		{
 			auto_resolution_based_angles = true;
 			auto_ignore_angle_changes = true;
 		}
-
-		// for continuation jobs (iter>0): could do some more iterations as specified by nr_iter
-		nr_iter = grad_ini_iter + grad_fin_iter + grad_inbetween_iter;
+		else
+		{
+			// for continuation jobs (iter>0): could do some more iterations as specified by nr_iter
+			nr_iter = grad_ini_iter + grad_fin_iter + grad_inbetween_iter;
+		}
 		updateStepSize();
 
 		// determine default subset sizes
@@ -2254,7 +2255,10 @@ void MlOptimiser::initialiseGeneralFinalize(int rank)
 								blobs_neg, mymodel.Iref[i], 40,
 								diameter, is_helical_segment);
 					}
-					mymodel.Iref[i] = (blobs_pos - blobs_neg / 2) / 5.;
+					//Maintain standard deviation
+					RFLOAT std = SomGraph::std(mymodel.Iref[i]);
+					mymodel.Iref[i] = blobs_pos - blobs_neg / 2;
+					mymodel.Iref[i] *= std / SomGraph::std(mymodel.Iref[i]);
 				}
 			}
 
@@ -2811,6 +2815,7 @@ void MlOptimiser::iterate()
 			                    !(do_firstiter_cc && iter_next == 1) &&
 			                    !grad_has_converged;
 			do_skip_maximization = do_grad && iter == nr_iter && mymodel.nr_classes > 1;
+			grad_pseudo_halfsets = do_grad;
 		}
 
 		if(do_som) {
@@ -2846,6 +2851,9 @@ void MlOptimiser::iterate()
 		}
 		else if (do_grad)
 			REPORT_ERROR("ERROR: Random seed must be set for gradient optimisation.");
+
+		if (grad_pseudo_halfsets)
+			std::cerr << "DEBUG: doing pseudo gold standard" << std::endl;
 
 		expectation();
 
@@ -3246,6 +3254,10 @@ void MlOptimiser::expectation()
 			MlDeviceBundle* b = ((MlDeviceBundle*)accDataBundles[i]);
 			b->syncAllBackprojects();
 
+
+			for (int j = 0; j < b->projectors.size(); j++)
+				b->projectors[j].clear();
+
 			for (int j = 0; j < b->backprojectors.size(); j++)
 			{
 				unsigned long s = wsum_model.BPref[j].data.nzyxdim;
@@ -3266,7 +3278,6 @@ void MlOptimiser::expectation()
 				delete [] imags;
 				delete [] weights;
 
-				b->projectors[j].clear();
 				b->backprojectors[j].clear();
 			}
 
@@ -3325,9 +3336,11 @@ void MlOptimiser::expectation()
 				wsum_model.BPref[j].weight.data[n] += (RFLOAT) weights[n];
 			}
 
-			b->projectors[j].clear();
 			b->backprojectors[j].clear();
 		}
+
+		for (int j = 0; j < b->projectors.size(); j++)
+			b->projectors[j].clear();
 
 		for (int j = 0; j < b->coarseProjectionPlans.size(); j++)
 			b->coarseProjectionPlans[j].clear();
@@ -4326,7 +4339,9 @@ void MlOptimiser::makeGoodHelixForEachRef()
 
 void MlOptimiser::maximization()
 {
-	int skip_class = maximizationGradientParameters();
+	int skip_class(-1);
+	if (do_grad)
+		skip_class = maximizationGradientParameters();
 
 	if (verb > 0)
 	{
@@ -4456,7 +4471,11 @@ void MlOptimiser::centerClasses()
 			if (mymodel.Iref[iclass].getDim() == 2)
 				z = ZZ(my_com);
 			shiftImageInContinuousFourierTransform(aux, mymodel.Igrad1[iclass],
-			                                       mymodel.ori_size, x, y, z);
+			                                       mymodel.ori_size * mymodel.padding_factor, x, y, z);
+
+			if (mymodel.pseudo_halfsets)
+				shiftImageInContinuousFourierTransform(aux, mymodel.Igrad1[iclass + mymodel.nr_classes],
+				                                       mymodel.ori_size * mymodel.padding_factor, x, y, z);
 
 			// Reset mom2 but preserve its power
 			MultidimArray<RFLOAT> counter, power;
@@ -4742,73 +4761,96 @@ int MlOptimiser::maximizationGradientParameters() {
 			nr_active_classes ++;
 	}
 
-	if(do_grad && !do_split_random_halves) {
-		std::vector<float> avg_class_errors(mymodel.nr_classes * mymodel.nr_bodies, 0);
-		for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++) {
-			mymodel.class_age[iclass] += wsum_model.pdf_class[iclass]/wsum_mode_pdf_class_sum;
+	std::vector<float> avg_class_errors(mymodel.nr_classes * mymodel.nr_bodies, 0);
+	for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
+	{
+		mymodel.class_age[iclass] += wsum_model.pdf_class[iclass]/wsum_mode_pdf_class_sum;
 
-			if (mymodel.pdf_class[iclass] > 0. || mymodel.nr_bodies > 1) {
-				if ((wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY) {
+		if (mymodel.pdf_class[iclass] > 0. || mymodel.nr_bodies > 1)
+		{
+			if ((wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY)
+			{
+				wsum_model.BPref[iclass].reweightGrad();
+				wsum_model.BPref[iclass].getFristMoment(
+						mymodel.Igrad1[iclass]);
 
-					wsum_model.BPref[iclass].reweightGrad();
-					(wsum_model.BPref[iclass]).applyMomenta(
-							mymodel.Igrad1[iclass],
-							0.9,
+				if (grad_pseudo_halfsets)
+				{
+					int iclass_half = iclass + mymodel.nr_classes;
+
+					wsum_model.BPref[iclass_half].reweightGrad();
+					wsum_model.BPref[iclass_half].getFristMoment(
+							mymodel.Igrad1[iclass_half]);
+					wsum_model.BPref[iclass].getSecondMoment(
 							mymodel.Igrad2[iclass],
-							0.999,
-							iter == 1);
-
-					RFLOAT avg_grad(0);
-					for (unsigned i = 0; i < wsum_model.BPref[iclass].data.nzyxdim; i++)
-						avg_grad += norm(wsum_model.BPref[iclass].data.data[i]);
-					avg_grad /= (RFLOAT) wsum_model.BPref[iclass].data.nzyxdim;
-
-					avg_class_errors[iclass] = avg_grad * mymodel.pdf_class[iclass];
+							wsum_model.BPref[iclass_half].data);
+					wsum_model.BPref[iclass].applyMomenta(
+							mymodel.Igrad1[iclass],
+							mymodel.Igrad1[iclass_half],
+							mymodel.Igrad2[iclass]);
 				}
+				else
+				{
+					MultidimArray<Complex> dummy;
+					wsum_model.BPref[iclass].getSecondMoment(
+							mymodel.Igrad2[iclass],
+							dummy);
+					wsum_model.BPref[iclass].applyMomenta(
+							mymodel.Igrad1[iclass],
+							dummy,
+							mymodel.Igrad2[iclass]);
+				}
+
+				RFLOAT avg_grad(0);
+				for (unsigned i = 0; i < wsum_model.BPref[iclass].data.nzyxdim; i++)
+					avg_grad += norm(wsum_model.BPref[iclass].data.data[i]);
+				avg_grad /= (RFLOAT) wsum_model.BPref[iclass].data.nzyxdim;
+
+				avg_class_errors[iclass] = avg_grad * mymodel.pdf_class[iclass];
 			}
 		}
+	}
 
-		if (grad_ini_iter < iter && iter < grad_ini_iter + grad_inbetween_iter) {
-			int drop_class_idx = -1, expand_class_idx = -1;
+	if (grad_ini_iter < iter && iter < grad_ini_iter + grad_inbetween_iter) {
+		int drop_class_idx = -1, expand_class_idx = -1;
 
-			// Determine the class with the largest average error to expand
-			std::vector<unsigned> s = SomGraph::arg_sort(avg_class_errors, false);
-			expand_class_idx = s[0];
+		// Determine the class with the largest average error to expand
+		std::vector<unsigned> s = SomGraph::arg_sort(avg_class_errors, false);
+		expand_class_idx = s[0];
 
-			// Determine if a class should be dropped
-			if (class_inactivity_threshold > 0) {
-				std::vector<unsigned> idx = SomGraph::arg_sort(mymodel.pdf_class);
-				int most_inactive = idx[0];
-				if (mymodel.pdf_class[most_inactive] < class_inactivity_threshold/(float) nr_active_classes)
-					drop_class_idx = most_inactive;
+		// Determine if a class should be dropped
+		if (class_inactivity_threshold > 0) {
+			std::vector<unsigned> idx = SomGraph::arg_sort(mymodel.pdf_class);
+			int most_inactive = idx[0];
+			if (mymodel.pdf_class[most_inactive] < class_inactivity_threshold/(float) nr_active_classes)
+				drop_class_idx = most_inactive;
+		}
+
+		// If both drop and expand are set, replace drop with expand
+		if (drop_class_idx != -1 && expand_class_idx != -1) {
+			mymodel.reset_class(drop_class_idx, expand_class_idx);
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(mymodel.Igrad1[drop_class_idx]) { // Dampen momentum
+				mymodel.Igrad1[drop_class_idx].data[i].real *= 0.9;
+				mymodel.Igrad1[drop_class_idx].data[i].imag *= 0.9;
 			}
+			mymodel.class_age[drop_class_idx] = mymodel.class_age[expand_class_idx] * 0.9;
+			skip_class = drop_class_idx;
+		}
 
-			// If both drop and expand are set, replace drop with expand
-			if (drop_class_idx != -1 && expand_class_idx != -1) {
-				mymodel.reset_class(drop_class_idx, expand_class_idx);
-				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(mymodel.Igrad1[drop_class_idx]) { // Dampen momentum
-					mymodel.Igrad1[drop_class_idx].data[i].real *= 0.9;
-					mymodel.Igrad1[drop_class_idx].data[i].imag *= 0.9;
-				}
-				mymodel.class_age[drop_class_idx] = mymodel.class_age[expand_class_idx] * 0.9;
-				skip_class = drop_class_idx;
+		// If SOM, sometimes expand without a drop
+		if (do_som && expand_class_idx != -1 &&
+		    mymodel.som.get_node_count() < mymodel.nr_classes &&
+		    iter - mymodel.last_som_add_iter > 3) {
+			unsigned nn = mymodel.som.add_node(expand_class_idx, 0); //TODO Should be a parameter
+			mymodel.reset_class(nn, expand_class_idx);
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(mymodel.Igrad1[drop_class_idx]) { // Dampen momentum
+				mymodel.Igrad1[nn].data[i].real *= 0.9;
+				mymodel.Igrad1[nn].data[i].imag *= 0.9;
 			}
-
-			// If SOM, sometimes expand without a drop
-			if (do_som && expand_class_idx != -1 &&
-			    mymodel.som.get_node_count() < mymodel.nr_classes &&
-			    iter - mymodel.last_som_add_iter > 3) {
-				unsigned nn = mymodel.som.add_node(expand_class_idx, 0); //TODO Should be a parameter
-				mymodel.reset_class(nn, expand_class_idx);
-				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(mymodel.Igrad1[drop_class_idx]) { // Dampen momentum
-					mymodel.Igrad1[nn].data[i].real *= 0.9;
-					mymodel.Igrad1[nn].data[i].imag *= 0.9;
-				}
-				mymodel.class_age[nn] = mymodel.class_age[expand_class_idx] * 0.5;
-				skip_class = nn;
-				mymodel.last_som_add_iter = iter;
-				std::cerr << "Expanding class " << expand_class_idx << std::endl;
-			}
+			mymodel.class_age[nn] = mymodel.class_age[expand_class_idx] * 0.5;
+			skip_class = nn;
+			mymodel.last_som_add_iter = iter;
+			std::cerr << "Expanding class " << expand_class_idx << std::endl;
 		}
 	}
 
@@ -8276,13 +8318,20 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 #endif
 								// Perform the actual back-projection.
 								// This is done with the sum of all (in-plane) shifted Fimg's
+
+								// If doing pseudo gold standard select random half-model
+								int iproj_offset = 0;
+								if (grad_pseudo_halfsets)
+									// Backproject every other particle into separate volumes
+									iproj_offset = (part_id % 2) * mymodel.nr_classes;
+
 								// Perform this inside a mutex
 								int my_mutex = exp_iclass % NR_CLASS_MUTEXES;
 								pthread_mutex_lock(&global_mutex2[my_mutex]);
 								if (mymodel.nr_bodies > 1)
-									(wsum_model.BPref[ibody]).set2DFourierTransform(Fimg, Abody, &Fweight);
+									(wsum_model.BPref[ibody + iproj_offset]).set2DFourierTransform(Fimg, Abody, &Fweight);
 								else
-									(wsum_model.BPref[exp_iclass]).set2DFourierTransform(Fimg, A, &Fweight);
+									(wsum_model.BPref[exp_iclass + iproj_offset]).set2DFourierTransform(Fimg, A, &Fweight);
 								pthread_mutex_unlock(&global_mutex2[my_mutex]);
 	#ifdef TIMING
 								// Only time one thread, as I also only time one MPI process
@@ -9165,29 +9214,6 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 				if (mymodel.ref_dim == 3)
 				{
 					new_hp_order = sampling.healpix_order + 1;
-
-					if (do_grad) {
-						if (grad_suspended_local_searches_iter < 0) {
-							if (new_hp_order >= autosampling_hporder_local_searches &&
-							    mymodel.orientational_prior_mode == NOPRIOR) {
-								grad_suspended_local_searches_iter = 2;
-								nr_iter_wo_resol_gain = 0;
-								nr_iter_wo_large_hidden_variable_changes = 0;
-								if (myverb)
-									std::cout << " Auto-refine: Switch to local searches suspended for two iteration. "
-									          << std::endl;
-							}
-						}
-
-						if (grad_suspended_local_searches_iter >= 0) {
-							if (grad_suspended_local_searches_iter > 0)
-								new_hp_order = autosampling_hporder_local_searches - 1;
-							else if (grad_suspended_local_searches_iter == 0)
-								new_hp_order = autosampling_hporder_local_searches;
-							grad_suspended_local_searches_iter -= 1;
-						}
-					}
-
 					new_rottilt_step = new_psi_step = 360. / (6 * ROUND(std::pow(2., new_hp_order + adaptive_oversampling)));
 
 					// Set the new sampling in the sampling-object
@@ -9303,13 +9329,13 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 	}
 	else if (gradient_refine)
 	{
-		if (do_auto_refine) {
-			if (nr_iter_wo_resol_gain == 3)
-				auto_subset_size_order += 1;
+		if (do_auto_refine)
+		{
 			subset_size = grad_ini_subset_size * std::pow(2, auto_subset_size_order);
 			subset_size = XMIPP_MIN(subset_size, grad_fin_subset_size);
 		}
-		else {
+		else
+		{
 			// Do grad_ini_iter iterations with completely identical K references, sigd_ini_subset_size, enforce non-negativity and grad_ini_resol resolution limit
 			if (iter < grad_ini_iter) {
 				subset_size = grad_ini_subset_size;
@@ -9332,8 +9358,8 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 			nr_iter - iter < grad_em_iters ||
 			(nr_iter == iter && mymodel.nr_classes > 1) || // If initial model with single class, then skip all particles in final iter
 			subset_size >= nr_particles ||
-			grad_suspended_local_searches_iter == 1 ||
-			has_converged)
+			grad_suspended_local_searches_iter > 0 ||
+			has_converged || grad_has_converged)
 			subset_size = -1;
 	}
 
@@ -9341,23 +9367,18 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 		std::cout << " Setting subset size to " << subset_size << " particles" << std::endl;
 }
 
-void MlOptimiser::updateStepSize() {
+void MlOptimiser::updateStepSize()
+{
 	RFLOAT _stepsize = grad_stepsize;
-
-	if (_stepsize <= 0)
-			_stepsize = 0.2;
-
 	std::string _scheme = grad_stepsize_scheme;
 
-	if (_scheme == "") {
-		if (mymodel.ref_dim == 2)
-			_scheme = "4-2step";
-		else {
-			if (do_auto_refine)
-				_scheme = "3-2step";
-			else
-				_scheme = "2-2step";
-		}
+	if (_stepsize <= 0)
+		_stepsize = 0.3;
+
+	if (_scheme.empty())
+	{
+		RFLOAT boost_factor = 0.9 / _stepsize;
+		_scheme = std::to_string(boost_factor) + "-2step";
 	}
 
 	if (_scheme == "plain") {
@@ -9380,37 +9401,26 @@ void MlOptimiser::updateStepSize() {
 		deflate = textToFloat(_scheme.substr(pos + 7, _scheme.size()));
 	}
 
-	if (do_auto_refine) {
-		if (grad_current_stepsize == 0)
-			grad_current_stepsize = _stepsize * 2;
+	if (is_2step or is_3step) {
+		if (inflate < 0 or 10 < inflate)
+			REPORT_ERROR("Invalid inflate value in --grad_stepsize_scheme");
+		if (deflate <= 0 or 10 < deflate)
+			REPORT_ERROR("Invalid deflate value in --grad_stepsize_scheme");
 
-		if (nr_iter_wo_resol_gain == 3)
-			grad_current_stepsize *= 0.75;
-
-		grad_current_stepsize = XMIPP_MAX(grad_current_stepsize, grad_stepsize/deflate);
+		float x = iter;
+		float a1 = grad_inbetween_iter / 5.; //Sigmoid length
+		float b1 = grad_ini_iter; //Sigmoid start
+		float a2 = grad_fin_iter; //Sigmoid length
+		float b2 = grad_ini_iter + grad_inbetween_iter;//Sigmoid start
+		float scale1 = 1. / (pow(10, (x - b1 - a1 / 2.) / (a1 / 4.)) + 1.); //Sigmoid function
+		float scale2 = 1. / (pow(10, (x - b2 - a2 / 2.) / (a2 / 4.)) + 1.); //Sigmoid function
+		float c1 = _stepsize; //Baseline
+		float c = _stepsize / deflate; //Baseline
+		grad_current_stepsize = (_stepsize * inflate - c1) * scale1 + (_stepsize - c) * scale2 + c;
+		return;
 	}
-	else {
-		if (is_2step or is_3step) {
-			if (inflate < 0 or 10 < inflate)
-				REPORT_ERROR("Invalid inflate value in --grad_stepsize_scheme");
-			if (deflate <= 0 or 10 < deflate)
-				REPORT_ERROR("Invalid deflate value in --grad_stepsize_scheme");
 
-			float x = iter;
-			float a1 = grad_inbetween_iter / 5.; //Sigmoid length
-			float b1 = grad_ini_iter; //Sigmoid start
-			float a2 = grad_fin_iter; //Sigmoid length
-			float b2 = grad_ini_iter + grad_inbetween_iter;//Sigmoid start
-			float scale1 = 1. / (pow(10, (x - b1 - a1 / 2.) / (a1 / 4.)) + 1.); //Sigmoid function
-			float scale2 = 1. / (pow(10, (x - b2 - a2 / 2.) / (a2 / 4.)) + 1.); //Sigmoid function
-			float c1 = _stepsize; //Baseline
-			float c = _stepsize / deflate; //Baseline
-			grad_current_stepsize = (_stepsize * inflate - c1) * scale1 + (_stepsize - c) * scale2 + c;
-			return;
-		}
-
-		REPORT_ERROR("Invalid value in --grad_stepsize_scheme");
-	}
+	REPORT_ERROR("Invalid value in --grad_stepsize_scheme");
 }
 
 void MlOptimiser::checkConvergence(bool myverb)
@@ -9418,8 +9428,7 @@ void MlOptimiser::checkConvergence(bool myverb)
 	bool em_converged = nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN &&
 	                    (auto_ignore_angle_changes || nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES);
 
-    bool gd_converged = nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN_GRAD &&
-    		            (auto_ignore_angle_changes || nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES_GRAD);
+    bool gd_converged = nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN_GRAD;
 
 	if (!grad_has_converged && gd_converged) {
 		if (myverb)
@@ -9429,7 +9438,6 @@ void MlOptimiser::checkConvergence(bool myverb)
 		nr_iter_wo_large_hidden_variable_changes = 0;
 		em_converged = false;
 		gd_converged = false;
-		do_grad = false;
 	}
 
 	if (
@@ -9461,9 +9469,21 @@ void MlOptimiser::checkConvergence(bool myverb)
 	if (myverb)
 	{
 		std::cout << " Auto-refine: Iteration= "<< iter<< std::endl;
-		std::cout << " Auto-refine: Resolution= "<< 1./mymodel.current_resolution<< " (no gain for " << nr_iter_wo_resol_gain << " iter) "<< std::endl;
-		std::cout << " Auto-refine: Changes in angles= " << current_changes_optimal_orientations << " degrees; and in offsets= " << current_changes_optimal_offsets
-		<< " Angstroms (no gain for " << nr_iter_wo_large_hidden_variable_changes << " iter) "<< std::endl;
+		if (do_grad)
+		{
+			if (iter > 10 && nr_iter_wo_resol_gain >= 0)
+				std::cout << " Auto-refine: Resolution= "<< 1./mymodel.current_resolution<< " (no gain for " << nr_iter_wo_resol_gain << " iter) " << std::endl;
+			else
+				std::cout << " Auto-refine: Convergence check suspended" << std::endl;
+		}
+		else
+		{
+			std::cout << " Auto-refine: Resolution= "<< 1./mymodel.current_resolution<< " (no gain for " << nr_iter_wo_resol_gain << " iter) "<< std::endl;
+			std::cout << " Auto-refine: Changes in angles= " << current_changes_optimal_orientations
+			          << " degrees; and in offsets= " << current_changes_optimal_offsets
+			          << " Angstroms (no gain for " << nr_iter_wo_large_hidden_variable_changes << " iter) "
+			          << std::endl;
+		}
 
 		if (has_converged)
 		{

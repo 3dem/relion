@@ -48,7 +48,7 @@ LocalParticleRefinement::LocalParticleRefinement(
 
 	TomoExtraction::extractAt3D_Fourier(
 			tomogram.stack, s, 1.0, tomogram.projectionMatrices,
-			trajectory, observations, tomo_to_image, 1, true);
+			trajectory, observations, tomo_to_image, 1, false);
 
 	const d4Matrix particle_to_tomo = particleSet.getMatrix4x4(
 			particle_id, s, s, s);
@@ -80,6 +80,11 @@ LocalParticleRefinement::LocalParticleRefinement(
 				max_radius[f] = x;
 				break;
 			}
+		}
+
+		if (max_radius[f] > reference.lastShell)
+		{
+			max_radius[f] = reference.lastShell;
 		}
 
 		const int rad = max_radius[f];
@@ -454,7 +459,7 @@ double LocalParticleRefinement::gradAndValue(const std::vector<double> &x, std::
 
 					const fComplex pred = dPred_dP3D.w;
 
-					const fComplex dPred_dphi   = (
+					const fComplex dPred_dPhi   = (
 						dPred_dP3D.x * dP3D_dphi.x   +
 						dPred_dP3D.y * dP3D_dphi.y   +
 						dPred_dP3D.z * dP3D_dphi.z );
@@ -494,7 +499,7 @@ double LocalParticleRefinement::gradAndValue(const std::vector<double> &x, std::
 
 					const fComplex dF = c * shift * pred - obs;
 
-					const fComplex ddF_dPhi   = c * shift * dPred_dphi;
+					const fComplex ddF_dPhi   = c * shift * dPred_dPhi;
 					const fComplex ddF_dTheta = c * shift * dPred_dTheta;
 					const fComplex ddF_dChi   = c * shift * dPred_dChi;
 

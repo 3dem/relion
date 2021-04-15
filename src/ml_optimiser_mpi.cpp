@@ -880,9 +880,8 @@ void MlOptimiserMpi::expectation()
 				exp_fn_ctf = rec_buf2;
 				free(rec_buf2);
 			}
-			if (!do_grad || iter > 10 ) {
+			if (!do_grad)
 				calculateExpectedAngularErrors(0, n_trials_acc - 1);
-			}
 		}
 
 		// The reconstructing follower Bcast acc_rottilt, acc_psi, acc_trans to all other nodes!
@@ -894,10 +893,16 @@ void MlOptimiserMpi::expectation()
 		timer.tic(TIMING_EXP_3);
 #endif
 	// D. Update the angular sampling (all nodes except leader)
-	if (!node->isLeader() && ( do_auto_refine && iter > 1 || (mymodel.nr_classes > 1 && allow_coarser_samplings) ))
+	if (!do_grad && !node->isLeader() && ( do_auto_refine && iter > 1 || (mymodel.nr_classes > 1 && allow_coarser_samplings) ))
 		updateAngularSampling(node->rank == 1);
 
+	// D. Update the angular sampling (all nodes except leader) for gradient refinement
+	if (do_grad && node->rank == first_follower && ( do_auto_refine && iter > 1 ))
+		updateAngularSamplingGrad(0, n_trials_acc - 1,node->rank == 1);
+
 	// The leader needs to know about the updated parameters from updateAngularSampling
+	node->relion_MPI_Bcast(&auto_subset_size_order, 1, MPI_INT, first_follower, MPI_COMM_WORLD);
+	node->relion_MPI_Bcast(&grad_suspended_finer_sampling_iter, 1, MPI_INT, first_follower, MPI_COMM_WORLD);
 	node->relion_MPI_Bcast(&grad_suspended_local_searches_iter, 1, MPI_INT, first_follower, MPI_COMM_WORLD);
 	node->relion_MPI_Bcast(&has_fine_enough_angular_sampling, 1, MPI_INT, first_follower, MPI_COMM_WORLD);
 	node->relion_MPI_Bcast(&nr_iter_wo_resol_gain, 1, MPI_INT, first_follower, MPI_COMM_WORLD);
@@ -2026,11 +2031,12 @@ void MlOptimiserMpi::maximization()
 		init_progress_bar(mymodel.nr_classes);
 	}
 
-	int skip_class = maximizationGradientParameters();
-
 	RFLOAT helical_twist_half1, helical_rise_half1, helical_twist_half2, helical_rise_half2;
 	helical_twist_half1 = helical_twist_half2 = helical_twist_initial;
 	helical_rise_half1 = helical_rise_half2 = helical_rise_initial;
+
+	if (do_grad)
+		maximizationGradientParameters();
 
 	// First reconstruct all classes in parallel
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
@@ -2041,10 +2047,6 @@ void MlOptimiserMpi::maximization()
 
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 		{
-
-			if (iclass == skip_class)
-				continue;
-
 			RCTIC(timer,RCT_1);
 			// either ibody or iclass can be larger than 0, never 2 at the same time!
 			int ith_recons = (mymodel.nr_bodies > 1) ? ibody : iclass;
@@ -2097,16 +2099,6 @@ void MlOptimiserMpi::maximization()
 						{
 							if(do_grad)
 							{
-								if (do_split_random_halves) {
-									(wsum_model.BPref[ith_recons]).reweightGrad();
-									(wsum_model.BPref[ith_recons]).applyMomenta(
-											mymodel.Igrad1[ith_recons],
-											0.9,
-											mymodel.Igrad2[ith_recons],
-											0.999,
-											iter == 1);
-								}
-
 								(wsum_model.BPref[ith_recons]).reconstructGrad(
 										mymodel.Iref[ith_recons],
 										mymodel.fsc_halves_class[ith_recons],
@@ -2240,16 +2232,6 @@ void MlOptimiserMpi::maximization()
 							{
 								if(do_grad)
 								{
-									if (do_split_random_halves) {
-										(wsum_model.BPref[ith_recons]).reweightGrad();
-										(wsum_model.BPref[ith_recons]).applyMomenta(
-												mymodel.Igrad1[ith_recons],
-												0.9,
-												mymodel.Igrad2[ith_recons],
-												0.999,
-												iter == 1);
-									}
-
 									(wsum_model.BPref[ith_recons]).reconstructGrad(
 											mymodel.Iref[ith_recons],
 											mymodel.fsc_halves_class[ith_recons],
@@ -2559,6 +2541,83 @@ void MlOptimiserMpi::maximization()
 #ifdef DEBUG
 	std::cerr << "MlOptimiserMpi::maximization: done" << std::endl;
 #endif
+}
+
+void MlOptimiserMpi::maximizationGradientParameters()
+{
+	if (!do_split_random_halves)
+		REPORT_ERROR("ERROR: Gradient optimization with MPI is only supported with --split_random_halves");
+
+	MPI_Status status;
+	for (int ibody = 0; ibody< mymodel.nr_bodies; ibody++ )
+	{
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
+			continue;
+
+		int reconstruct_rank1 = 2 * (ibody % ( (node->size - 1)/2 ) ) + 1;
+		int reconstruct_rank2 = 2 * (ibody % ( (node->size - 1)/2 ) ) + 2;
+
+		if (node->rank == reconstruct_rank1 || node->rank == reconstruct_rank2)
+		{
+			MultidimArray< Complex > Igrad1_half(wsum_model.BPref[ibody].data);
+
+			wsum_model.BPref[ibody].reweightGrad();
+			wsum_model.BPref[ibody].getFristMoment(
+					mymodel.Igrad1[ibody]);
+
+			// Fetch the back-projetcion from the other half
+			if (node->rank == reconstruct_rank2)
+			{
+				node->relion_MPI_Send(
+						MULTIDIM_ARRAY(wsum_model.BPref[ibody].data),
+						2*MULTIDIM_SIZE(wsum_model.BPref[ibody].data),
+						MY_MPI_DOUBLE,
+						reconstruct_rank1,
+						MPITAG_IMAGE,
+						MPI_COMM_WORLD
+				);
+				node->relion_MPI_Recv(
+						MULTIDIM_ARRAY(Igrad1_half),
+						2*MULTIDIM_SIZE(Igrad1_half),
+						MY_MPI_DOUBLE,
+						reconstruct_rank1,
+						MPITAG_IMAGE,
+						MPI_COMM_WORLD,
+						status
+				);
+			}
+			else if (node->rank == reconstruct_rank1)
+			{
+				node->relion_MPI_Recv(
+						MULTIDIM_ARRAY(Igrad1_half),
+						2*MULTIDIM_SIZE(Igrad1_half),
+						MY_MPI_DOUBLE,
+						reconstruct_rank2,
+						MPITAG_IMAGE,
+						MPI_COMM_WORLD,
+						status
+				);
+				node->relion_MPI_Send(
+						MULTIDIM_ARRAY(wsum_model.BPref[ibody].data),
+						2*MULTIDIM_SIZE(wsum_model.BPref[ibody].data),
+						MY_MPI_DOUBLE,
+						reconstruct_rank2,
+						MPITAG_IMAGE,
+						MPI_COMM_WORLD
+				);
+			}
+
+			wsum_model.BPref[ibody].getSecondMoment(
+					mymodel.Igrad2[ibody],
+					Igrad1_half);
+
+			MultidimArray< Complex > dummy;
+			wsum_model.BPref[ibody].applyMomenta(
+					mymodel.Igrad1[ibody],
+					dummy,
+					mymodel.Igrad2[ibody]);
+		}
+	}
 }
 
 void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
@@ -3010,7 +3069,8 @@ void MlOptimiserMpi::compareTwoHalves()
 		if (node->rank == 1 || node->rank == 2)
 		{
 			MultidimArray<Complex > avg1;
-			if (do_grad) {
+			if (do_grad)
+			{
 				MultidimArray<RFLOAT> dummy;
 				Projector PPref(mymodel.ori_size, mymodel.interpolator, 1, mymodel.r_min_nn, mymodel.data_dim);
 				PPref.computeFourierTransformMap(mymodel.Iref[ibody], dummy, wsum_model.BPref[ibody].r_max*2, 1, false);
@@ -3072,6 +3132,189 @@ void MlOptimiserMpi::compareTwoHalves()
 #endif
 }
 
+void MlOptimiserMpi::updateAngularSamplingGrad(long int my_first_part_id, long int my_last_part_id, bool myverb)
+{
+	if (mymodel.ref_dim != 3)
+		REPORT_ERROR("MlOptimiser::updateAngularSamplingGrad should only be called for 3D reconstruction");
+
+	if (grad_suspended_finer_sampling_iter > 0)
+		grad_suspended_finer_sampling_iter --;
+	else
+	{
+		int current_healpix_order, new_healpix_order;
+		current_healpix_order = new_healpix_order = sampling.healpix_order;
+
+		RFLOAT current_offset_step, new_offset_step;
+		current_offset_step = new_offset_step = sampling.offset_step;
+
+		if (iter == 1)
+		{
+			new_healpix_order = sampling.healpix_order_ori;
+			new_offset_step = sampling.offset_step_ori;
+		}
+
+		if (grad_suspended_local_searches_iter < 0) // If transition to local searches has not started
+		{
+			if (nr_iter_wo_resol_gain >= 2)
+			{
+				// DETERMINE ORIENTATIONAL SAMPLING -------------------------------------------------------------------
+
+				calculateExpectedAngularErrors(my_first_part_id, my_last_part_id - 1);
+
+				RFLOAT min_angle_step = (iter == 1 && do_firstiter_cc) ?
+				                        360. / CEIL(PI * particle_diameter * mymodel.current_resolution) : acc_rot;
+
+				current_healpix_order = sampling.healpix_order;
+				sampling.healpix_order++;
+				if (sampling.getAngularSampling(adaptive_oversampling) < 0.9 * min_angle_step)
+					sampling.healpix_order--;
+
+				new_healpix_order = sampling.healpix_order;
+				sampling.healpix_order = current_healpix_order;
+
+				// DETERMINE TRANSLATIONAL SAMPLING -------------------------------------------------------------------
+
+				// Stay a bit on the safe side: 90% of estimated accuracy
+				RFLOAT min_offset_step = 0.9 * acc_trans * std::pow(2., adaptive_oversampling);
+				// Don't go coarser than the 95% of the offset_range (so at least 5 samplings are done)
+				min_offset_step = XMIPP_MIN(min_offset_step, 0.95 * sampling.offset_range);
+				new_offset_step = XMIPP_MAX(current_offset_step * 0.75, min_offset_step);
+			}
+
+			if (mymodel.orientational_prior_mode == NOPRIOR &&  // If still doing global sampling
+			    grad_suspended_local_searches_iter < 0 && // If no transition to global searches has started
+			    new_healpix_order >= autosampling_hporder_local_searches) // If transition to local searches should start
+			{
+				if (myverb)
+					std::cout << "Auto-refine: Switch to local searches suspended for two iteration. " << std::endl;
+
+				new_healpix_order = current_healpix_order;
+				grad_suspended_local_searches_iter = 2;
+			}
+		}
+		else // If transition to local searches has started
+		{
+			grad_suspended_local_searches_iter--;
+
+			if (grad_suspended_local_searches_iter == 0)
+				new_healpix_order = autosampling_hporder_local_searches;
+
+			nr_iter_wo_resol_gain = 0;
+		}
+
+		// UPDATE SAMPLING -------------------------------------------------------------------------------------------
+
+		// Increase subset size with orientational sampling
+		if (current_healpix_order != new_healpix_order)
+			auto_subset_size_order ++;
+
+		if (current_healpix_order != new_healpix_order ||
+		    current_offset_step != new_offset_step)
+		{
+			has_fine_enough_angular_sampling = false;
+
+			// Jun08,2015 Shaoda & Sjors, Helical refinement
+			RFLOAT new_helical_offset_step = sampling.helical_offset_step;
+			if (mymodel.ref_dim == 3)
+			{
+				if (new_offset_step < new_helical_offset_step)
+					new_helical_offset_step /= 2.;
+			}
+
+			// B. Use twice as fine angular sampling
+			if (mymodel.ref_dim == 3)
+			{
+				RFLOAT new_psi_step = 360. / (6 * ROUND(std::pow(2., new_healpix_order + adaptive_oversampling)));
+
+				// Set the new sampling in the sampling-object
+				sampling.setOrientations(new_healpix_order, new_psi_step * std::pow(2., adaptive_oversampling));
+
+				// Resize the pdf_direction arrays to the correct size and fill with an even distribution
+				mymodel.initialisePdfDirection(sampling.NrDirections());
+
+				// Also reset the nr_directions in wsum_model
+				wsum_model.nr_directions = mymodel.nr_directions;
+
+				// Also resize and initialise wsum_model.pdf_direction for each class!
+				for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
+					wsum_model.pdf_direction[iclass].initZeros(mymodel.nr_directions);
+
+			} else if (mymodel.ref_dim == 2)
+			{
+				sampling.psi_step /= 2.;
+			} else
+				REPORT_ERROR("MlOptimiser::autoAdjustAngularSampling BUG: ref_dim should be two or three");
+
+			// Jun08,2015 Shaoda & Sjors, Helical refinement
+			bool do_local_searches_helical = ((do_auto_refine) && (do_helical_refine) &&
+			                                  (sampling.healpix_order >= autosampling_hporder_local_searches));
+
+			sampling.setTranslations(
+					new_offset_step,
+					sampling.offset_range,
+					do_local_searches_helical,
+					(do_helical_refine) && (!ignore_helical_symmetry),
+					new_helical_offset_step,
+					helical_rise_initial,
+					helical_twist_initial
+			);
+
+			// Reset smallest changes hidden variables
+			smallest_changes_optimal_classes = 9999999;
+			smallest_changes_optimal_offsets = 999.;
+			smallest_changes_optimal_orientations = 999.;
+
+			// If the angular sampling is smaller than autosampling_hporder_local_searches, then use local searches of +/- 6 times the angular sampling
+			if (mymodel.ref_dim == 3 && new_healpix_order >= autosampling_hporder_local_searches)
+			{
+				RFLOAT new_rottilt_step = 360. / (6 * ROUND(std::pow(2., new_healpix_order + adaptive_oversampling)));
+				// Switch ON local angular searches
+				mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
+				mymodel.sigma2_rot = mymodel.sigma2_psi = 2. * 2. * new_rottilt_step * new_rottilt_step;
+				if (!(do_helical_refine && helical_keep_tilt_prior_fixed))
+					mymodel.sigma2_tilt = mymodel.sigma2_rot;
+
+				// Aug20,2015 - Shaoda, Helical refinement
+				if ((do_helical_refine) && (!ignore_helical_symmetry))
+					mymodel.sigma2_rot = getHelicalSigma2Rot(helical_rise_initial, helical_twist_initial,
+					                                         sampling.helical_offset_step, new_rottilt_step,
+					                                         mymodel.sigma2_rot);
+			}
+
+			// Reset iteration counter
+			nr_iter_wo_resol_gain = 0;
+
+			// Suspend finer sampling for a few iterations if no transition to local searches has started
+			if (grad_suspended_local_searches_iter < 0)
+				grad_suspended_finer_sampling_iter = 5;
+		}
+	}
+
+	// PRINT OUT ---------------------------------------------------------------------------------------------
+
+	if (myverb)
+	{
+		std::cout << " Auto-refine: Angular step= " << sampling.getAngularSampling(adaptive_oversampling) << " degrees; local searches= ";
+		if (mymodel.orientational_prior_mode == NOPRIOR)
+			std:: cout << "false" << std::endl;
+		else
+			std:: cout << "true" << std::endl;
+		// Jun08,2015 Shaoda & Sjors, Helical refine
+		if ( (do_helical_refine) && (!ignore_helical_symmetry) )
+		{
+			std::cout << " Auto-refine: Helical refinement... Local translational searches along helical axis= ";
+			if ( (mymodel.ref_dim == 3) && (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches) )
+				std:: cout << "true" << std::endl;
+			else
+				std:: cout << "false" << std::endl;
+		}
+		std::cout << " Auto-refine: Offset search range= " << sampling.offset_range << " Angstroms; offset step= " << sampling.getTranslationalSampling(adaptive_oversampling) << " Angstroms";
+		if ( (do_helical_refine) && (!ignore_helical_symmetry) )
+			std::cout << "; offset step along helical axis= " << sampling.getHelicalTranslationalSampling(adaptive_oversampling) << " pixels";
+		std::cout << std::endl;
+	}
+}
+
 void MlOptimiserMpi::iterate()
 {
 #ifdef TIMING
@@ -3100,17 +3343,22 @@ void MlOptimiserMpi::iterate()
 		// Nobody can start the next iteration until everyone has finished
 		MPI_Barrier(MPI_COMM_WORLD);
 
-		if (gradient_refine && iter < 10) {
+		if (gradient_refine && iter < 10)
 			nr_iter_wo_resol_gain = 0;
-			nr_iter_wo_large_hidden_variable_changes = 0;
-		}
 
 		// Only first follower checks for convergence and prints stats to the stdout
 		if (do_auto_refine)
 			checkConvergence(node->rank == 1);
 
-		if (gradient_refine) {
-			updateStepSize();
+		if (gradient_refine)
+		{
+			if (do_auto_refine)
+			{
+				if (grad_stepsize <= 0)
+					grad_current_stepsize = 0.9;
+				else
+					grad_current_stepsize = grad_stepsize;
+			}
 			do_grad = !(has_converged || iter > nr_iter - grad_em_iters) &&
 			          !(do_firstiter_cc && iter == 1) &&
 			          !grad_has_converged;

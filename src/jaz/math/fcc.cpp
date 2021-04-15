@@ -88,7 +88,10 @@ BufferedImage<double> FCC::compute3(
 					aberrationsCache,
 					referenceFS,
 					Prediction::OppositeHalf,
-					Prediction::AmplitudeAndPhaseModulated);
+					Prediction::AmplitudeAndPhaseModulated,
+					Prediction::NotDoseWeighted,
+					0.0,
+					Prediction::CtfUnscaled);
 
 			const float scale = flip_value? -1.f : 1.f;
 			

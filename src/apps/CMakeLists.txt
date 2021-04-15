@@ -421,6 +421,10 @@ foreach (_target ${RELION_JAZ_SPA_TARGETS})
 	if(TIFF_FOUND)
 		target_link_libraries(${_target} ${TIFF_LIBRARIES})
 	endif()
+
+	if (ALTCPU)
+		target_link_libraries(${_target} ${TBB_LIBRARIES})
+	endif(ALTCPU)
 	
 	install (TARGETS ${_target} RUNTIME DESTINATION bin/spa)
 endforeach()
@@ -454,6 +458,10 @@ foreach (_target ${RELION_JAZ_EXPERIMENTAL_TARGETS})
 	if(TIFF_FOUND)
 		target_link_libraries(${_target} ${TIFF_LIBRARIES})
 	endif()
+
+	if (ALTCPU)
+		target_link_libraries(${_target} ${TBB_LIBRARIES})
+	endif(ALTCPU)
 	
 	install (TARGETS ${_target} RUNTIME DESTINATION bin/scripts)
 endforeach()

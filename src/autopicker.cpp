@@ -150,6 +150,7 @@ if(do_gpu)
 	do_topaz_train = parser.checkOption("--topaz_train", "Use wrapper to the topaz train command");
 	do_topaz_extract = parser.checkOption("--topaz_extract", "Use wrapper to the topaz extract command (i.e. predict particle positions)");
 	topaz_nr_particles = textToInteger(parser.getOption("--topaz_nr_particles", "Expected number of particles per micrograph for topaz", "200"));
+	topaz_threshold = textToFloat(parser.getOption("--topaz_threshold", "Minimum threshold for topaz picking", "-6"));
 	topaz_train_picks = parser.getOption("--topaz_train_picks", "Name of picking coordinates for topaz training", "");
 	topaz_train_parts = parser.getOption("--topaz_train_parts", "OR: name of particle star file for topaz training", "");
 	topaz_test_ratio = textToFloat(parser.getOption("--topaz_test_ratio", "Ratio of picks in the test set for cross-validation in topaz training", "0.2"));
@@ -159,6 +160,7 @@ if(do_gpu)
 	fn_topaz_exe = parser.getOption("--topaz_exe", "Name of topaz executable", "topaz");
 	topaz_additional_args = parser.getOption("--topaz_args", "Additional arguments to be passed to topaz", "");
 	topaz_workers = textToInteger(parser.getOption("--topaz_workers", "Number of topaz workers for parallelized training", "4"));
+	do_topaz_plot = parser.checkOption("--topaz_plot", "Plot intermediate information for helical picking in topaz (developmental)");
 
 	int helix_section = parser.addSection("Helix options");
 	autopick_helical_segments = parser.checkOption("--helix", "Are the references 2D helical segments? If so, in-plane rotation angles (psi) are estimated for the references.");
@@ -187,7 +189,7 @@ if(do_gpu)
 	if (parser.checkForErrors())
 		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 
-	if (autopick_helical_segments)
+	if (autopick_helical_segments && !do_topaz_extract)
 	{
 		if ( (helical_tube_curvature_factor_max < 0.0001) || (helical_tube_curvature_factor_max > 1.0001) )
 			REPORT_ERROR("Error: Maximum curvature factor should be 0~1!");
@@ -739,10 +741,26 @@ void AutoPicker::initialise(int rank)
 			}
 			else if (do_topaz_extract)
 			{
-				topaz_radius = ROUND((particle_diameter) / (2. * angpix * topaz_downscale)); // 100% of particle radius for picking!
-				if (verb > 0)
-					std::cout << " + Setting topaz radius to " << topaz_radius << " downscaled pixels (based on particle_diameter/2)" << std::endl;
+				if (autopick_helical_segments)
+				{
+					topaz_radius = ROUND((helical_tube_diameter) / (2. * angpix * topaz_downscale)); // 100% of particle radius for picking!
+					if (verb > 0)
+						std::cout << " + Setting topaz radius to " << topaz_radius << " downscaled pixels (based on helical_tube_diameter/2)" << std::endl;
+				}
+				else
+				{
+					topaz_radius = ROUND((particle_diameter) / (2. * angpix * topaz_downscale)); // 100% of particle radius for picking!
+					if (verb > 0)
+						std::cout << " + Setting topaz radius to " << topaz_radius << " downscaled pixels (based on particle_diameter/2)" << std::endl;
+				}
 			}
+		}
+
+		// If topaz helical picker: sert default threshold to 1
+		if (autopick_helical_segments && do_topaz_extract && topaz_threshold < -5.)
+		{
+			topaz_threshold = -1.;
+			std::cout << " + Setting default topaz threshold for helical picking to " << topaz_threshold << std::endl;
 		}
 
 	}
@@ -3014,6 +3032,21 @@ void AutoPicker::autoPickTopazOneMicrograph(FileName &fn_mic, int rank)
 
 	fh << "#!" << fn_shell  << std::endl;
 	fh << fn_topaz_exe << " extract ";
+	if (autopick_helical_segments)
+	{
+		fh << " --filaments ";
+		if (helical_tube_length_min > 0)
+		{
+			int length_min_pix = ROUND(helical_tube_length_min / (topaz_downscale *angpix ));
+			fh << " --filaments_length " << integerToString(length_min_pix);
+		}
+		if (do_topaz_plot)
+		{
+			fh << " --filaments_plot ";
+		}
+
+	}
+	fh << " -t " << floatToString(topaz_threshold);
 	fh << " -r " << integerToString(topaz_radius);
 	fh << " -d " << integerToString(topaz_device_id);
 	fh << " -x " << integerToString(topaz_downscale);

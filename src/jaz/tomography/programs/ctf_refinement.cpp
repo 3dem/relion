@@ -541,7 +541,10 @@ void CtfRefinementProgram::updateScale(
 				ctf, tomogram.optics.pixelSize, aberrationsCache,
 				referenceMap.image_FS,
 				Prediction::OwnHalf,
-				Prediction::AmplitudeModulated);
+				Prediction::AmplitudeModulated,
+				Prediction::NotDoseWeighted,
+				0.0,
+				Prediction::CtfUnscaled);
 
 			for (int y = 0; y < sh; y++)
 			for (int x = 0; x < s;  x++)
@@ -1145,7 +1148,7 @@ void CtfRefinementProgram::fitAberrations()
 			{
 				const std::string fn = getEvenAberrationsTempFilename(tomogramSet.getTomogramName(t), g);
 
-				if (ZIO::fileExists(fn))
+				if (ZIO::fileExists(fn + "_by.mrc"))
 				{
 					BufferedImage<EvenData> even = EvenData::read(fn);
 					even_data_sum += even;
@@ -1186,7 +1189,7 @@ void CtfRefinementProgram::fitAberrations()
 			{
 				const std::string fn = getOddAberrationsTempFilename(tomogramSet.getTomogramName(t), g);
 
-				if (ZIO::fileExists(fn))
+				if (ZIO::fileExists(fn + "_b_real.mrc"))
 				{
 					BufferedImage<OddData> odd = OddData::read(fn);
 					odd_data_sum += odd;

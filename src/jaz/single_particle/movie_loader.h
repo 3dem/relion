@@ -35,7 +35,7 @@ class MovieLoader
 		static void fixDefects(
 				RawImage<T>& muGraphFrame,
 				const RawImage<bool>* defectivePixels,
-				int num_threads);
+				int num_threads, bool isEER);
 };
 
 template <typename T>
@@ -107,7 +107,7 @@ BufferedImage<T> MovieLoader::readDense(
 
 		if (do_fixDefect)
 		{
-			fixDefects(muGraphFrame, defectivePixels, num_threads);
+			fixDefects(muGraphFrame, defectivePixels, num_threads, false);
 		}
 
 		out.getSliceRef(f).copyFrom(muGraphFrame);
@@ -155,11 +155,11 @@ BufferedImage<T> MovieLoader::readEER(
 
 
 	BufferedImage<T> out(w0, h0, fc);
-	MultidimArray<float> muGraphFrame_xmipp;
 
 	#pragma omp parallel for num_threads(num_threads)
 	for (int f = 0; f < fc; f++)
 	{
+		MultidimArray<float> muGraphFrame_xmipp;
 		// this takes 1-indexed frame numbers
 		renderer.renderFrames(
 					(frame0 + f) * eer_grouping + 1,
@@ -182,7 +182,7 @@ BufferedImage<T> MovieLoader::readEER(
 
 		if (do_fixDefect)
 		{
-			fixDefects(muGraphFrame, defectivePixels, num_threads);
+			fixDefects(muGraphFrame, defectivePixels, num_threads, true);
 		}
 
 		out.getSliceRef(f).copyFrom(muGraphFrame);
@@ -195,7 +195,7 @@ template <typename T>
 void MovieLoader::fixDefects(
 		RawImage<T>& muGraphFrame,
 		const RawImage<bool>* defectivePixels,
-		int num_threads)
+		int num_threads, bool isEER)
 {
 	const long int w0 = muGraphFrame.xdim;
 	const long int h0 = muGraphFrame.ydim;
@@ -230,10 +230,9 @@ void MovieLoader::fixDefects(
 
 	const RFLOAT frame_std = std::sqrt(frame_var / (n_valid - 1));
 
-
-	// 25 neighbours; should be enough even for super-resolution images.
 	const int min_num_ok = 6;
-	const int d_max = 2;
+	const int d_max = isEER ? 4: 2;
+	const int PBUF_SIZE = 100;
 
 	#pragma omp parallel for num_threads(num_threads)
 	for (long int y = 0; y < h0; y++)
@@ -242,7 +241,7 @@ void MovieLoader::fixDefects(
 		if (!(*defectivePixels)(x,y)) continue;
 
 		int n_ok = 0;
-		RFLOAT val = 0;
+		RFLOAT pbuf[PBUF_SIZE];
 
 		for (int dy = -d_max; dy <= d_max; dy++)
 		for (int dx = -d_max; dx <= d_max; dx++)
@@ -251,17 +250,15 @@ void MovieLoader::fixDefects(
 			const int xx = x + dx;
 
 			if (xx < 0 || xx >= w0 || yy < 0 || yy >= h0 || (*defectivePixels)(xx,yy))
-			{
 				continue;
-			}
 
+			pbuf[n_ok] = muGraphFrame(xx,yy);
 			n_ok++;
-			val += muGraphFrame(xx,yy);
 		}
-
+//						std::cout << "n_ok = " << n_ok << std::endl;
 		if (n_ok > min_num_ok)
 		{
-			muGraphFrame(x,y) = val / n_ok;
+			muGraphFrame(x,y) = pbuf[rand() % n_ok];
 		}
 		else
 		{
