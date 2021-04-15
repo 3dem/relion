@@ -6423,6 +6423,8 @@ bool RelionJob::getCommandsTomoReconPartJob(std::string &outputname, std::vector
 		outputNodes.push_back(node1);
 		Node node2(outputname+"half1.mrc", NODE_HALFMAP);
 		outputNodes.push_back(node2);
+		Node node3(outputname+"optimisation_set.star", NODE_TOMO_OPTIMISATION);
+		outputNodes.push_back(node3);
 
 		// Job-specific stuff goes here
 		command += " --b " + joboptions["box_size"].getString();
@@ -6447,7 +6449,7 @@ bool RelionJob::getCommandsTomoReconPartJob(std::string &outputname, std::vector
 			command += " --only_do_unfinished ";
 		}
 
-		// Estimate FSC anc create output optimiset set
+		// Estimate FSC
 		if (joboptions["fn_mask"].getString() != "")
 		{
 			command2 = "`which relion_tomo_make_reference`";
@@ -6457,8 +6459,6 @@ bool RelionJob::getCommandsTomoReconPartJob(std::string &outputname, std::vector
 			error_message = getTomoInputCommmand(command2, HAS_COMPULSORY, HAS_COMPULSORY, HAS_OPTIONAL, HAS_NOT,
 												 HAS_NOT,
 												 HAS_NOT);
-			Node node3(outputname+"optimisation_set.star", NODE_TOMO_OPTIMISATION);
-			outputNodes.push_back(node3);
 			Node node4(outputname+"PostProcess/logfile.pdf", NODE_PDF_LOGFILE);
 			outputNodes.push_back(node4);
 			Node node5(outputname+"PostProcess/postprocess.star", NODE_POST);
