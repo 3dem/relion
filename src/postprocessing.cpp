@@ -26,7 +26,7 @@ void Postprocessing::read(int argc, char **argv)
 	int gen_section = parser.addSection("General options");
 	fn_I1 = parser.getOption("--i", "Input name of half1, e.g. run_half1_class001_unfil.mrc", "");
 	fn_I2 = parser.getOption("--i2", "Input name of half2, (default replaces half1 from --i with half2)", "");
-	fn_OS = parser.getOption("--ios", "Input tomo optimiser set. Halfmap filenames are used if --i is empty. Output optimiser set is created.", "");
+	fn_OS = parser.getOption("--ios", "Input tomo optimiser set file. It is used to set --i if not provided. Updated output optimiser set is created.", "");
 	fn_out = parser.getOption("--o", "Output rootname", "postprocess");
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "-1"));
 	write_halfmaps = parser.checkOption("--half_maps", "Write post-processed half maps for validation");
