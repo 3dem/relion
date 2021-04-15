@@ -5006,34 +5006,37 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 
 	// Input half map (one of them)
 	FileName fn_half1 = joboptions["fn_in"].getString();
+	FileName fn_half2;
 
 	if (do_tomo && joboptions["in_optimisation"].getString() != "")
 	{
-		MetaDataTable MD;
-		MD.read(joboptions["in_optimisation"].getString());
-		FileName fn_tmp;
-		if(fn_half1 == "" && MD.getValue(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, fn_tmp))
-			fn_half1 = fn_tmp;
-
-		Node node(joboptions["in_optimisation"].getString(), joboptions["in_optimisation"].node_type);
+		FileName fn_OS = joboptions["in_optimisation"].getString();
+		Node node(fn_OS, joboptions["in_optimisation"].node_type);
 		inputNodes.push_back(node);
-	}
+		command += " --ios " + fn_OS;
 
-	if (fn_half1 == "")
+		Node node1(outputname + "postprocess_optimiser_set.star", NODE_TOMO_OPTIMISATION);
+		outputNodes.push_back(node1);
+	}
+	else if (fn_half1 == "")
 	{
 		error_message = "ERROR: empty field for input half-map...";
 		return false;
 	}
-	FileName fn_half2;
-	if (!fn_half1.getTheOtherHalf(fn_half2))
+
+	if (fn_half1 != "")
 	{
-		error_message = "ERROR: cannot find 'half' substring in the input filename...";
-		return false;
+		if (!fn_half1.getTheOtherHalf(fn_half2))
+		{
+			error_message = "ERROR: cannot find 'half' substring in the input filename...";
+			return false;
+		}
+
+		Node node(fn_half1, joboptions["fn_in"].node_type);
+		inputNodes.push_back(node);
+		command += " --i " + fn_half1;
 	}
 
-	Node node(fn_half1, joboptions["fn_in"].node_type);
-	inputNodes.push_back(node);
-	command += " --i " + fn_half1;
 	// The output name contains a directory: use it for output
 	command += " --o " + outputname + "postprocess";
 	command += "  --angpix " + joboptions["angpix"].getString();
@@ -5075,18 +5078,6 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 	command += " " + joboptions["other_args"].getString();
 
 	commands.push_back(command);
-
-	// Create output optimisation set
-	if (do_tomo)
-	{
-		std::string command2;
-		setTomoOutputCommand(command2, joboptions["in_optimisation"].getString(), "", "", "", "",
-							 fn_half1,
-							 outputname + "postprocess.star", "",
-							 outputname + "optimisation_set.star");
-
-		commands.push_back(command2);
-	}
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
 

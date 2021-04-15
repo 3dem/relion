@@ -24,8 +24,9 @@ void Postprocessing::read(int argc, char **argv)
 {
 	parser.setCommandLine(argc, argv);
 	int gen_section = parser.addSection("General options");
-	fn_I1 = parser.getOption("--i", "Input name of half1, e.g. run_half1_class001_unfil.mrc");
+	fn_I1 = parser.getOption("--i", "Input name of half1, e.g. run_half1_class001_unfil.mrc", "");
 	fn_I2 = parser.getOption("--i2", "Input name of half2, (default replaces half1 from --i with half2)", "");
+	fn_OS = parser.getOption("--ios", "Input tomo optimiser set. Halfmap filenames are used if --i is empty. Output optimiser set is created.", "");
 	fn_out = parser.getOption("--o", "Output rootname", "postprocess");
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "-1"));
 	write_halfmaps = parser.checkOption("--half_maps", "Write post-processed half maps for validation");
@@ -85,7 +86,7 @@ void Postprocessing::usage()
 
 void Postprocessing::clear()
 {
-	fn_I1 = fn_I2 = "";
+	fn_I1 = fn_I2 = fn_OS = "";
 	fn_out="postprocess";
 	angpix = 1.;
 	mtf_angpix = 1.;
@@ -109,13 +110,35 @@ void Postprocessing::clear()
 
 void Postprocessing::initialise()
 {
-	// Read in the input maps
-	if (fn_I2 == "")
+	// Check if input is a tomo optimiser set file
+	if (fn_OS != "")
 	{
-		if (!fn_I1.getTheOtherHalf(fn_I2))
+		optimisationSet.read(fn_OS);
+
+		if (fn_I1 == "")
+		{
+			if (!optimisationSet.getValue(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, fn_I1) ||
+				!optimisationSet.getValue(EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME, fn_I2))
+				REPORT_ERROR("No halfmap filenames were found in file " + fn_OS);
+		}
+		else
+		{
+			if (fn_I2 == "" && !fn_I1.getTheOtherHalf(fn_I2))
+				REPORT_ERROR("The input filename does not contain 'half1' or 'half2'");
+
+			optimisationSet.setValue(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, fn_I1);
+			optimisationSet.setValue(EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME, fn_I2);
+		}
+	}
+	else if (fn_I1 != "") // Read in the input maps
+	{
+		if (fn_I2 == "" && !fn_I1.getTheOtherHalf(fn_I2))
 			REPORT_ERROR("The input filename does not contain 'half1' or 'half2'");
 	}
-
+	else
+	{
+		REPORT_ERROR("Input file is missing. Provide, at least, --i or --ios input.");
+	}
 
 	if (verb > 0)
 	{
@@ -712,6 +735,13 @@ void Postprocessing::writeOutput()
 		MDlist.setValue(EMDL_POSTPROCESS_GUINIER_FIT_CORRELATION, global_corr_coeff);
 	}
 	MDlist.write(fh);
+
+	// If input optimiser set is provided, also crete it as output
+	if (!optimisationSet.isEmpty())
+	{
+		optimisationSet.setValue(EMDL_TOMO_REFERENCE_FSC_FILE_NAME, fn_tmp);
+		optimisationSet.write(fn_out + "_optimiser_set.star");
+	}
 
 	MDfsc.setName("fsc");
 	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_true)
