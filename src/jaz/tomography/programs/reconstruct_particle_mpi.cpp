@@ -189,6 +189,8 @@ void ReconstructParticleProgramMpi::run()
 	}
 
 	// Delete temporary files (or try to; no error checking intentional)
-	int res = system(("rm -rf "+ tmpOutRootBase + "*.mrc").c_str());
+	if (system(("rm -rf "+ tmpOutRootBase + "*.mrc").c_str()))
+		std::cerr << "WARNING: deleting temporary files in folder " << tmpOutRootBase <<
+		" failed." << std::endl;
 }
 

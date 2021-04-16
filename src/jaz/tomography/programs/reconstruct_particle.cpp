@@ -179,7 +179,9 @@ void ReconstructParticleProgram::run()
 
 	// Delete temporary files
 	// No error checking - do not bother the user if it fails
-	int res = system(("rm -rf "+ tmpOutRoot + "*.mrc").c_str());
+	if (system(("rm -rf "+ tmpOutRoot + "*.mrc").c_str()))
+		std::cerr << "WARNING: deleting temporary files in folder " << tmpOutRoot <<
+				  " failed." << std::endl;
 }
 
 void ReconstructParticleProgram::processTomograms(
@@ -444,7 +446,9 @@ void ReconstructParticleProgram::processTomograms(
 			// Intentionally no error checking
 			if (ttPrevious > -1)
 			{
-				int res = system(("rm -rf "+ tmpOutRoot  + ZIO::itoa(ttPrevious) + "*.mrc").c_str());
+				if (system(("rm -rf "+ tmpOutRoot  + ZIO::itoa(ttPrevious) + "*.mrc").c_str()))
+					std::cerr << "WARNING: deleting temporary files " <<
+					tmpOutRoot  + ZIO::itoa(ttPrevious) + "*.mrc failed." << std::endl;
 			}
 
 			ttPrevious = tt;
@@ -515,6 +519,10 @@ void ReconstructParticleProgram::finalise(
 		dataImgDivRS[0], dataImgRS[0], ctfImgFS[0],
 			"merged", binnedOutPixelSize);
 
+	optimisationSet.refMap1 = outDir + "half1.mrc";
+	optimisationSet.refMap2 = outDir + "half2.mrc";
+	optimisationSet.write(outDir + "optimisation_set.star");
+
 	Log::endSection();
 }
 
@@ -571,4 +579,5 @@ void ReconstructParticleProgram::writeOutput(
 
 		tapered.write(outDir+tag+".mrc", pixelSize);
 	}
+
 }

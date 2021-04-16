@@ -402,6 +402,7 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 
 		MDhead.getValue(EMDL_JOB_IS_CONTINUE, is_continue);
 		_is_continue = is_continue;
+		MDhead.getValue(EMDL_JOB_IS_TOMO, is_tomo);
 		if (do_initialise)
 			initialise(type);
 
@@ -511,6 +512,7 @@ void RelionJob::write(std::string fn)
 	// MDhead.setValue(EMDL_JOB_TYPE, type);
 	MDhead.setValue(EMDL_JOB_TYPE_LABEL, proc_type2label.at(type));
 	MDhead.setValue(EMDL_JOB_IS_CONTINUE, is_continue);
+	MDhead.setValue(EMDL_JOB_IS_TOMO, is_tomo);
 	// TODO: add name for output directories!!! make a std:;map between type and name for all options!
 	//MDhead.setValue(EMDL_JOB_TYPE_NAME, type);
 	MDhead.setName("job");
@@ -3843,7 +3845,7 @@ void RelionJob::initialiseAutorefineJob()
 
 	hidden_name = ".gui_auto3d";
 
-	if (do_tomo)
+	if (is_tomo)
 	{
 		joboptions["in_optimisation"] = JobOption("Input optimisation set: ", NODE_TOMO_OPTIMISATION, "", "Optimisation set STAR file (*.star)", "Input tomo optimisation set. Input images STAR file, reference halfmaps and reference mask files will be extracted. If input files are specified below, then they will override the components in this optimisation set.");
 	}
@@ -4060,40 +4062,49 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 
 	if (!is_continue)
 	{
-		if (do_tomo && joboptions["in_optimisation"].getString() != "")
+		command += " --auto_refine --split_random_halves";
+
+		// If tomo optimiser set is passed, fn_img and fn_ref can be empty
+		if (is_tomo && joboptions["in_optimisation"].getString() != "")
 		{
-			MetaDataTable MD;
-			MD.read(joboptions["in_optimisation"].getString());
-			FileName fn_tmp;
-			if(joboptions["fn_img"].getString() == "" && MD.getValue(EMDL_TOMO_PARTICLES_FILE_NAME, fn_tmp))
-				joboptions["fn_img"].setString(fn_tmp);
-			// If half maps are present we set as fn_ref one of them. relion_refine auto detects both halves
-			if(joboptions["fn_ref"].getString() == "" && MD.getValue(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, fn_tmp))
-				joboptions["fn_ref"].setString(fn_tmp);
-			if(joboptions["fn_mask"].getString() == "" && MD.getValue(EMDL_TOMO_REFERENCE_MASK_FILE_NAME, fn_tmp))
-				joboptions["fn_mask"].setString(fn_tmp);
-
-			Node node(joboptions["in_optimisation"].getString(), joboptions["in_optimisation"].node_type);
+			// Optimiser set should contain particles, halfmap and refmask or they should be set especifically
+			// If Optimiset set is passed without halfmaps or refmask, they cannot be set as "None" in the GUI.
+			FileName fn_OS = joboptions["in_optimisation"].getString();
+			Node node(fn_OS, joboptions["in_optimisation"].node_type);
 			inputNodes.push_back(node);
-		}
+			command += " --ios " + fn_OS;
 
-		command += " --auto_refine --split_random_halves --i " + joboptions["fn_img"].getString();
-		if (joboptions["fn_img"].getString() == "")
+			Node node1( outputname + fn_run + "_optimisation_set.star", NODE_TOMO_OPTIMISATION);
+			outputNodes.push_back(node1);
+
+			if (joboptions["fn_mask"].getString() == "" && joboptions["do_solvent_fsc"].getBoolean())
+				command += " --solvent_correct_fsc ";
+			if (joboptions["fn_ref"].getString() == "" && !joboptions["ref_correct_greyscale"].getBoolean())
+				command += " --firstiter_cc";
+		}
+		else if (joboptions["fn_img"].getString() == "")
 		{
 			error_message = "ERROR: empty field for input STAR file...";
 			return false;
 		}
-		Node node(joboptions["fn_img"].getString(), joboptions["fn_img"].node_type);
-		inputNodes.push_back(node);
-		if (joboptions["fn_ref"].getString() == "")
+		else if (joboptions["fn_ref"].getString() == "")
 		{
 			error_message = "ERROR: empty field for input reference...";
 			return false;
 		}
-		if (joboptions["fn_ref"].getString() != "None")
+
+		if (joboptions["fn_img"].getString() != "")
 		{
-			command += " --ref " + joboptions["fn_ref"].getString();
-			Node node(joboptions["fn_ref"].getString(), joboptions["fn_ref"].node_type);
+			command += " --i " + joboptions["fn_img"].getString();
+			Node node(joboptions["fn_img"].getString(), joboptions["fn_img"].node_type);
+			inputNodes.push_back(node);
+		}
+
+		FileName fn_ref = joboptions["fn_ref"].getString();
+		if (fn_ref != "" && fn_ref != "None")
+		{
+			command += " --ref " + fn_ref;
+			Node node(fn_ref, joboptions["fn_ref"].node_type);
 			inputNodes.push_back(node);
 
 			if (!joboptions["ref_correct_greyscale"].getBoolean())
@@ -4287,21 +4298,6 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 	command += " " + joboptions["other_args"].getString();
 
 	commands.push_back(command);
-
-	// Create output optimisation set
-	if (do_tomo)
-	{
-		std::string command2;
-		std::string outputname_run = outputname + fn_run;
-
-		setTomoOutputCommand(command2, joboptions["in_optimisation"].getString(), "",
-							 outputname_run + "_data.star", "", "",
-							 outputname_run + "_half1_class001_unfil.mrc", "",
-							 joboptions["fn_mask"].getString(),
-							 outputname + "optimisation_set.star");
-
-		commands.push_back(command2);
-	}
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
@@ -4959,7 +4955,7 @@ void RelionJob::initialisePostprocessJob()
 {
 	hidden_name = ".gui_post";
 
-	if (do_tomo)
+	if (is_tomo)
 	{
 		joboptions["in_optimisation"] = JobOption("Input optimisation set: ", NODE_TOMO_OPTIMISATION, "", "Optimisation set STAR file (*.star)", "Input tomo optimisation set. Half map files will be extracted. If half maps are specified below, then they will override the components in this optimisation set.");
 	}
@@ -5006,34 +5002,37 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 
 	// Input half map (one of them)
 	FileName fn_half1 = joboptions["fn_in"].getString();
+	FileName fn_half2;
 
-	if (do_tomo && joboptions["in_optimisation"].getString() != "")
+	if (is_tomo && joboptions["in_optimisation"].getString() != "")
 	{
-		MetaDataTable MD;
-		MD.read(joboptions["in_optimisation"].getString());
-		FileName fn_tmp;
-		if(fn_half1 == "" && MD.getValue(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, fn_tmp))
-			fn_half1 = fn_tmp;
-
-		Node node(joboptions["in_optimisation"].getString(), joboptions["in_optimisation"].node_type);
+		FileName fn_OS = joboptions["in_optimisation"].getString();
+		Node node(fn_OS, joboptions["in_optimisation"].node_type);
 		inputNodes.push_back(node);
-	}
+		command += " --ios " + fn_OS;
 
-	if (fn_half1 == "")
+		Node node1(outputname + "postprocess_optimiser_set.star", NODE_TOMO_OPTIMISATION);
+		outputNodes.push_back(node1);
+	}
+	else if (fn_half1 == "")
 	{
 		error_message = "ERROR: empty field for input half-map...";
 		return false;
 	}
-	FileName fn_half2;
-	if (!fn_half1.getTheOtherHalf(fn_half2))
+
+	if (fn_half1 != "")
 	{
-		error_message = "ERROR: cannot find 'half' substring in the input filename...";
-		return false;
+		if (!fn_half1.getTheOtherHalf(fn_half2))
+		{
+			error_message = "ERROR: cannot find 'half' substring in the input filename...";
+			return false;
+		}
+
+		Node node(fn_half1, joboptions["fn_in"].node_type);
+		inputNodes.push_back(node);
+		command += " --i " + fn_half1;
 	}
 
-	Node node(fn_half1, joboptions["fn_in"].node_type);
-	inputNodes.push_back(node);
-	command += " --i " + fn_half1;
 	// The output name contains a directory: use it for output
 	command += " --o " + outputname + "postprocess";
 	command += "  --angpix " + joboptions["angpix"].getString();
@@ -5075,18 +5074,6 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 	command += " " + joboptions["other_args"].getString();
 
 	commands.push_back(command);
-
-	// Create output optimisation set
-	if (do_tomo)
-	{
-		std::string command2;
-		setTomoOutputCommand(command2, joboptions["in_optimisation"].getString(), "", "", "", "",
-							 fn_half1,
-							 outputname + "postprocess.star", "",
-							 outputname + "optimisation_set.star");
-
-		commands.push_back(command2);
-	}
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
 
@@ -6423,6 +6410,8 @@ bool RelionJob::getCommandsTomoReconPartJob(std::string &outputname, std::vector
 		outputNodes.push_back(node1);
 		Node node2(outputname+"half1.mrc", NODE_HALFMAP);
 		outputNodes.push_back(node2);
+		Node node3(outputname+"optimisation_set.star", NODE_TOMO_OPTIMISATION);
+		outputNodes.push_back(node3);
 
 		// Job-specific stuff goes here
 		command += " --b " + joboptions["box_size"].getString();
@@ -6447,7 +6436,7 @@ bool RelionJob::getCommandsTomoReconPartJob(std::string &outputname, std::vector
 			command += " --only_do_unfinished ";
 		}
 
-		// Estimate FSC anc create output optimiset set
+		// Estimate FSC
 		if (joboptions["fn_mask"].getString() != "")
 		{
 			command2 = "`which relion_tomo_make_reference`";
@@ -6457,8 +6446,6 @@ bool RelionJob::getCommandsTomoReconPartJob(std::string &outputname, std::vector
 			error_message = getTomoInputCommmand(command2, HAS_COMPULSORY, HAS_COMPULSORY, HAS_OPTIONAL, HAS_NOT,
 												 HAS_NOT,
 												 HAS_NOT);
-			Node node3(outputname+"optimisation_set.star", NODE_TOMO_OPTIMISATION);
-			outputNodes.push_back(node3);
 			Node node4(outputname+"PostProcess/logfile.pdf", NODE_PDF_LOGFILE);
 			outputNodes.push_back(node4);
 			Node node5(outputname+"PostProcess/postprocess.star", NODE_POST);

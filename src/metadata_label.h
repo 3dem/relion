@@ -208,6 +208,7 @@ enum EMDLabel
 	EMDL_IMAGE_WEIGHT,
 
 	EMDL_JOB_IS_CONTINUE,
+	EMDL_JOB_IS_TOMO,
 	EMDL_JOB_TYPE,
 	EMDL_JOB_TYPE_LABEL,
 
@@ -872,7 +873,8 @@ private:
 
 		EMDL::addLabel(EMDL_MASK_NAME, EMDL_STRING, "rlnMaskName", "Name of an image that contains a [0,1] mask");
 
-		EMDL::addLabel(EMDL_JOB_IS_CONTINUE, EMDL_BOOL, "rlnJobIsContinue", "Is tthis a continuation job?");
+		EMDL::addLabel(EMDL_JOB_IS_CONTINUE, EMDL_BOOL, "rlnJobIsContinue", "Is this a continuation job?");
+		EMDL::addLabel(EMDL_JOB_IS_TOMO, EMDL_BOOL, "rlnJobIsTomo", "Is this a tomo job?");
 		EMDL::addLabel(EMDL_JOB_TYPE, EMDL_INT, "rlnJobType", "Which type of job is this?");
 		EMDL::addLabel(EMDL_JOB_TYPE_LABEL, EMDL_STRING, "rlnJobTypeLabel", "The name for this type of job (also name of main directory for output jobs)");
 
