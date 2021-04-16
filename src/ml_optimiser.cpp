@@ -1448,10 +1448,6 @@ void MlOptimiser::initialise()
 		setSigmaNoiseEstimatesAndSetAverageImage(Mavg);
 	}
 
-	// Initialise the data_versus_prior ratio to get the initial current_size right
-	if (iter == 0 && !do_initialise_bodies)
-		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
-
 	// Check minimum group size of 10 particles
 	if (verb > 0)
 	{
@@ -2226,6 +2222,10 @@ void MlOptimiser::initialiseGeneralFinalize(int rank)
 
 		// Low-pass filter the initial references
 		initialLowPassFilterReferences();
+
+		// Initialise the data_versus_prior ratio to get the initial current_size right
+		if (!do_initialise_bodies)
+			mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
 
 		if (do_init_blobs && fn_ref == "None")
 		{
