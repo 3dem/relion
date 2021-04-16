@@ -402,6 +402,7 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 
 		MDhead.getValue(EMDL_JOB_IS_CONTINUE, is_continue);
 		_is_continue = is_continue;
+		MDhead.getValue(EMDL_JOB_IS_TOMO, do_tomo);
 		if (do_initialise)
 			initialise(type);
 
@@ -511,6 +512,7 @@ void RelionJob::write(std::string fn)
 	// MDhead.setValue(EMDL_JOB_TYPE, type);
 	MDhead.setValue(EMDL_JOB_TYPE_LABEL, proc_type2label.at(type));
 	MDhead.setValue(EMDL_JOB_IS_CONTINUE, is_continue);
+	MDhead.setValue(EMDL_JOB_IS_TOMO, do_tomo);
 	// TODO: add name for output directories!!! make a std:;map between type and name for all options!
 	//MDhead.setValue(EMDL_JOB_TYPE_NAME, type);
 	MDhead.setName("job");
