@@ -309,10 +309,10 @@ void JobWindow::updateMyJob()
 	}
 }
 
-void JobWindow::initialise(int my_job_type, bool do_tomo)
+void JobWindow::initialise(int my_job_type, bool _is_tomo)
 {
-	is_tomo = do_tomo;
-	myjob.setTomo(do_tomo);
+	is_tomo = _is_tomo;
+	myjob.setTomo(_is_tomo);
 
 	if (my_job_type == PROC_IMPORT)
 	{

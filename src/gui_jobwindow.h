@@ -71,7 +71,7 @@ public:
 	// set up the tabs
 	void setupTabs(int nr_tabs);
 
-	void initialise(int my_job_type, bool do_tomo = false);
+	void initialise(int my_job_type, bool _is_tomo = false);
 
 	void resetHeight();
 

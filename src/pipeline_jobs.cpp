@@ -402,7 +402,7 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 
 		MDhead.getValue(EMDL_JOB_IS_CONTINUE, is_continue);
 		_is_continue = is_continue;
-		MDhead.getValue(EMDL_JOB_IS_TOMO, do_tomo);
+		MDhead.getValue(EMDL_JOB_IS_TOMO, is_tomo);
 		if (do_initialise)
 			initialise(type);
 
@@ -512,7 +512,7 @@ void RelionJob::write(std::string fn)
 	// MDhead.setValue(EMDL_JOB_TYPE, type);
 	MDhead.setValue(EMDL_JOB_TYPE_LABEL, proc_type2label.at(type));
 	MDhead.setValue(EMDL_JOB_IS_CONTINUE, is_continue);
-	MDhead.setValue(EMDL_JOB_IS_TOMO, do_tomo);
+	MDhead.setValue(EMDL_JOB_IS_TOMO, is_tomo);
 	// TODO: add name for output directories!!! make a std:;map between type and name for all options!
 	//MDhead.setValue(EMDL_JOB_TYPE_NAME, type);
 	MDhead.setName("job");
@@ -3845,7 +3845,7 @@ void RelionJob::initialiseAutorefineJob()
 
 	hidden_name = ".gui_auto3d";
 
-	if (do_tomo)
+	if (is_tomo)
 	{
 		joboptions["in_optimisation"] = JobOption("Input optimisation set: ", NODE_TOMO_OPTIMISATION, "", "Optimisation set STAR file (*.star)", "Input tomo optimisation set. Input images STAR file, reference halfmaps and reference mask files will be extracted. If input files are specified below, then they will override the components in this optimisation set.");
 	}
@@ -4065,7 +4065,7 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 		command += " --auto_refine --split_random_halves";
 
 		// If tomo optimiser set is passed, fn_img and fn_ref can be empty
-		if (do_tomo && joboptions["in_optimisation"].getString() != "")
+		if (is_tomo && joboptions["in_optimisation"].getString() != "")
 		{
 			// Optimiser set should contain particles, halfmap and refmask or they should be set especifically
 			// If Optimiset set is passed without halfmaps or refmask, they cannot be set as "None" in the GUI.
@@ -4955,7 +4955,7 @@ void RelionJob::initialisePostprocessJob()
 {
 	hidden_name = ".gui_post";
 
-	if (do_tomo)
+	if (is_tomo)
 	{
 		joboptions["in_optimisation"] = JobOption("Input optimisation set: ", NODE_TOMO_OPTIMISATION, "", "Optimisation set STAR file (*.star)", "Input tomo optimisation set. Half map files will be extracted. If half maps are specified below, then they will override the components in this optimisation set.");
 	}
@@ -5004,7 +5004,7 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 	FileName fn_half1 = joboptions["fn_in"].getString();
 	FileName fn_half2;
 
-	if (do_tomo && joboptions["in_optimisation"].getString() != "")
+	if (is_tomo && joboptions["in_optimisation"].getString() != "")
 	{
 		FileName fn_OS = joboptions["in_optimisation"].getString();
 		Node node(fn_OS, joboptions["in_optimisation"].node_type);

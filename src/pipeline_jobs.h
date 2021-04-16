@@ -513,7 +513,7 @@ public:
 	bool is_continue;
 
 	// Activate custom stuff for tomo
-	bool do_tomo;
+	bool is_tomo;
 
 	// List of Nodes of input to this process
 	std::vector<Node> inputNodes;
@@ -540,7 +540,7 @@ public:
 		outputNodes.clear();
 		joboptions.clear();
 		is_continue = false;
-		do_tomo = false;
+		is_tomo = false;
 	}
 
 	// Returns true if the option is present in joboptions
@@ -550,9 +550,9 @@ public:
 	void setOption(std::string setOptionLine);
 
 	// Activate specific options for tomo
-	void setTomo(bool _do_tomo)
+	void setTomo(bool _is_tomo)
 	{
-		do_tomo = _do_tomo;
+		is_tomo = _is_tomo;
 	}
 
 	// write/read settings to disc
