@@ -37,7 +37,7 @@ class star_handler_parameters
 
 	std::string remove_col_label, add_col_label, add_col_value, add_col_from, hist_col_label, select_include_str, select_exclude_str;
 	RFLOAT eps, select_minval, select_maxval, multiply_by, add_to, center_X, center_Y, center_Z, hist_min, hist_max;
-	bool do_ignore_optics, do_combine, do_split, do_center, do_random_order, show_frac, show_cumulative, do_discard;
+	bool do_ignore_optics, do_combine, do_combine_picks, do_split, do_center, do_random_order, show_frac, show_cumulative, do_discard;
 	long int nr_split, size_split, nr_bin, random_seed;
 	RFLOAT discard_sigma, duplicate_threshold, extract_angpix, cl_angpix;
 	ObservationModel obsModel;
@@ -55,7 +55,7 @@ class star_handler_parameters
 		parser.setCommandLine(argc, argv);
 
 		int general_section = parser.addSection("General options");
-		fn_in = parser.getOption("--i", "Input STAR file");
+		fn_in = parser.getOption("--i", "Input STAR file(s)");
 		fn_out = parser.getOption("--o", "Output STAR file", "out.star");
 		do_ignore_optics = parser.checkOption("--ignore_optics", "Provide this option for relion-3.0 functionality, without optics groups");
 		cl_angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstrom, for when ignoring the optics groups in the input star file", "1."));
@@ -83,6 +83,7 @@ class star_handler_parameters
 
 		int combine_section = parser.addSection("Combine options");
 		do_combine = parser.checkOption("--combine", "Combine input STAR files (multiple individual filenames, all within double-quotes after --i)");
+		do_combine_picks = parser.checkOption("--combine_picks", "Combine input manual/autopick STAR files (multiple individual filenames, all within double-quotes after --i)");
 		fn_check = parser.getOption("--check_duplicates", "MetaDataLabel (for a string only!) to check for duplicates, e.g. rlnImageName", "");
 
 		int split_section = parser.addSection("Split options");
@@ -135,6 +136,7 @@ class star_handler_parameters
 		if (select_str_label != "") c++;
 		if (do_discard) c++;
 		if (do_combine) c++;
+		if (do_combine_picks) c++;
 		if (do_split) c++;
 		if (fn_operate != "") c++;
 		if (do_center) c++;
@@ -158,6 +160,7 @@ class star_handler_parameters
 		if (select_str_label != "") select_by_str();
 		if (do_discard) discard_on_image_stats();
 		if (do_combine) combine();
+		if (do_combine_picks) combine_picks();
 		if (do_split) split();
 		if (fn_operate != "") operate();
 		if (do_center) center();
@@ -644,6 +647,118 @@ class star_handler_parameters
 		write_check_ignore_optics(MDout, fn_out, MDin0.getName());
 		std::cout << " Written: " << fn_out << std::endl;
 	}
+
+	void combine_picks()
+	{
+
+		FileName fn_odir = (fn_out.contains("/")) ? fn_out.beforeLastOf("/") + "/" : "./";
+
+		std::vector<FileName> fns_in;
+		std::vector<std::string> words;
+		tokenize(fn_in, words);
+		for (int iword = 0; iword < words.size(); iword++)
+		{
+			FileName fnt = words[iword];
+			fnt.globFiles(fns_in, false);
+		}
+
+		std::vector<MetaDataTable> MDsin;
+		// Read all the 2-column coordinate files, and
+		// get a list of all micrographs in all input pick files
+		std::vector<FileName> fn_mics;
+		for (int i = 0; i < fns_in.size(); i++)
+		{
+			MetaDataTable MDin; // define again, as reading from previous one may linger here...
+			MDin.read(fns_in[i], "coordinate_files");
+
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
+			{
+				FileName fn_mic;
+				MDin.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
+				if (std::find(fn_mics.begin(), fn_mics.end(), fn_mic) == fn_mics.end())
+				{
+					fn_mics.push_back(fn_mic);
+				}
+			}
+			MDsin.push_back(MDin);
+		}
+
+		std::cout << " Combining coordinate files for all micrographs ... " << std::endl;
+		time_config();
+		init_progress_bar(fn_mics.size());
+
+		MetaDataTable MDout;
+		std::vector<MetaDataTable> MDsoutpick;
+		for (size_t imic = 0; imic < fn_mics.size(); imic++)
+		{
+			MetaDataTable MDoutpick;
+			std::vector<RFLOAT> pick_x, pick_y;
+			for (int ipick = 0; ipick < fns_in.size(); ipick++)
+			{
+				FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsin[ipick])
+				{
+					FileName fn_mic, fn_coord;
+					MDsin[ipick].getValue(EMDL_MICROGRAPH_NAME, fn_mic);
+
+					if (fn_mics[imic] == fn_mic)
+					{
+						// Read in the coordinate file and add to MDoutpick
+						MetaDataTable MDcoord;
+						MDsin[ipick].getValue(EMDL_MICROGRAPH_COORDINATES, fn_coord);
+						MDcoord.read(fn_coord);
+
+						for ( long int current_object2 = (MDcoord).firstObject(); \
+						    current_object2 < (MDcoord).numberOfObjects() \
+						    && current_object2 >= 0; \
+							current_object2 = (MDcoord).nextObject())
+						{
+							RFLOAT x, y;
+							MDcoord.getValue(EMDL_IMAGE_COORD_X, x);
+							MDcoord.getValue(EMDL_IMAGE_COORD_Y, y);
+							bool found = false;
+							for (size_t ii = 0; ii < pick_x.size(); ii++)
+							{
+								if (fabs(pick_x[ii] - x) < 0.1 && fabs(pick_y[ii] - y))
+								{
+									found = true;
+									break;
+								}
+							}
+							if (!found)
+							{
+								pick_x.push_back(x);
+								pick_y.push_back(y);
+								MDoutpick.addObject(MDcoord.getObject());
+							}
+						}
+					} // end if (fn_mics[imic] == fn_mic)
+
+				} // end loop objects in MDsin[ipick]
+
+			} // end for (int ipick = 0; ipick < fns_in.size(); ipick++)
+
+			// Write out coordinate file for this micrograph
+			FileName fn_outcoord;
+			FileName fn_pre, fn_jobnr, fn_post, fn_coord;
+			decomposePipelineFileName(fn_mics[imic], fn_pre, fn_jobnr, fn_post);
+			fn_outcoord = fn_odir + fn_post.withoutExtension() + "_combined.star";
+			int res = mktree(fn_outcoord.beforeLastOf("/"));
+			MDoutpick.write(fn_outcoord);
+
+			MDout.addObject();
+			MDout.setValue(EMDL_MICROGRAPH_NAME, fn_mics[imic]);
+			MDout.setValue(EMDL_MICROGRAPH_COORDINATES, fn_outcoord);
+
+			progress_bar(imic);
+
+		} // end for (size_t imic = 0; imic < fn_mics.size(); imic++)
+		progress_bar(fn_mics.size());
+
+		MDout.write(fn_out);
+		std::cout << " Done! written out " << fn_out << std::endl;
+
+	}
+
 
 	void split()
 	{
