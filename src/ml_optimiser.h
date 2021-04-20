@@ -855,6 +855,7 @@ public:
 		grad_has_converged(false),
 		grad_suspended_local_searches_iter(-1),
 		grad_suspended_finer_sampling_iter(-1),
+		grad_pseudo_halfsets(false),
 #ifdef ALTCPU
 		mdlClassComplex(NULL),
 #endif
