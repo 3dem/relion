@@ -486,7 +486,7 @@ void TIFFConverter::processOneMovie(FileName fn_movie, FileName fn_tiff)
 	}
 	else if (mrc_mode == 0 || mrc_mode == 101)
 	{
-		only_compress<char>(fn_movie, fn_tiff);
+		only_compress<signed char>(fn_movie, fn_tiff);
 	}
 	else if (do_estimate)
 	{

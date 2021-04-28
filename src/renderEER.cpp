@@ -469,4 +469,5 @@ template long long EERRenderer::renderFrames<float>(int frame_start, int frame_e
 template long long EERRenderer::renderFrames<short>(int frame_start, int frame_end, MultidimArray<short> &image);
 template long long EERRenderer::renderFrames<unsigned short>(int frame_start, int frame_end, MultidimArray<unsigned short> &image);
 template long long EERRenderer::renderFrames<char>(int frame_start, int frame_end, MultidimArray<char> &image);
+template long long EERRenderer::renderFrames<signed char>(int frame_start, int frame_end, MultidimArray<signed char> &image);
 template long long EERRenderer::renderFrames<unsigned char>(int frame_start, int frame_end, MultidimArray<unsigned char> &image);
