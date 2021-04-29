@@ -1529,6 +1529,8 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 
 	if (use_ccpem_pipeliner)
 	{
+		std::string command = "python example for Matt";
+		int res = system(command.c_str());
 		REPORT_ERROR("TODO Matt Iadanza: implement system call to CCPEM pipeliner here");
 
 	}
