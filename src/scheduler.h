@@ -23,6 +23,7 @@
 
 #include "src/time.h"
 #include "src/pipeliner.h"
+#include "src/pipeline_jobs.h"
 #include <src/jaz/single_particle/obs_model.h>
 #define SCHEDULE_HAS_CHANGED ".schedule_has_changed";
 

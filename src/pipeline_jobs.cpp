@@ -390,9 +390,9 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 		MDhead.read(fn_star, "job");
 		if (MDhead.containsLabel(EMDL_JOB_TYPE_LABEL))
 		{
-			std::string label;
+			FileName label;
 			MDhead.getValue(EMDL_JOB_TYPE_LABEL, label);
-			type = proc_label2type.at(label);
+			type = get_proc_type(label);
 		}
 		else
 		{
@@ -510,7 +510,7 @@ void RelionJob::write(std::string fn)
 	MDhead.addObject();
 	// as of 3.1-beta do not write integer into the STAR files anymore....
 	// MDhead.setValue(EMDL_JOB_TYPE, type);
-	MDhead.setValue(EMDL_JOB_TYPE_LABEL, proc_type2label.at(type));
+	MDhead.setValue(EMDL_JOB_TYPE_LABEL, label);
 	MDhead.setValue(EMDL_JOB_IS_CONTINUE, is_continue);
 	MDhead.setValue(EMDL_JOB_IS_TOMO, is_tomo);
 	// TODO: add name for output directories!!! make a std:;map between type and name for all options!
@@ -651,19 +651,24 @@ bool RelionJob::saveJobSubmissionScript(std::string newfilename, std::string out
 	return true;
 }
 
-void RelionJob::initialisePipeline(std::string &outputname, std::string defaultname, int job_counter)
+void RelionJob::initialisePipeline(std::string &outputname, int job_counter)
 {
 	outputNodes.clear();
 	inputNodes.clear();
 
+	FileName dirname = proc_type2dirname.at(type);
+	// TODO: insert "relion." prefix to dirname when using the ccpem-pipeliner...
+
 	if (outputname == "") // for continue jobs, use the same outputname
 	{
 		if (job_counter < 1000)
-			outputname = defaultname + "/job" + integerToString(job_counter, 3) + "/";
+			outputname = dirname + "/job" + integerToString(job_counter, 3) + "/";
 		else
-			outputname = defaultname + "/job" + integerToString(job_counter) + "/";
+			outputname = dirname + "/job" + integerToString(job_counter) + "/";
 	}
 
+	// This is the default label, deeper levels can be added for specific jobs
+	label = get_proc_label(type);
 	outputName = outputname;
 }
 
@@ -1173,7 +1178,7 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
-	initialisePipeline(outputname, PROC_IMPORT_LABEL, job_counter);
+	initialisePipeline(outputname, job_counter);
 
 	std::string command;
 	FileName fn_out, fn_in;
@@ -1195,6 +1200,8 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 
 	if (do_raw)
 	{
+		label += ".movies";
+
 		fn_in = joboptions["fn_in_raw"].getString();
 
 		if (fn_in.rfind("../") != std::string::npos) // Forbid at any place
@@ -1252,6 +1259,8 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 	}
 	else if (do_other)
 	{
+		label += ".other";
+
 		fn_in = joboptions["fn_in_other"].getString();
 		std::string node_type = joboptions["node_type"].getString();
 		if (node_type == "Particle coordinates (*.box, *_pick.star)")
@@ -1398,7 +1407,7 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
-	initialisePipeline(outputname, PROC_MOTIONCORR_LABEL, job_counter);
+	initialisePipeline(outputname, job_counter);
 
 	std::string command;
 	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
@@ -1431,6 +1440,8 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 
 	if (joboptions["do_own_motioncor"].getBoolean())
 	{
+		label += ".own";
+
 		command += " --use_own ";
 		command += " --j " + joboptions["nr_threads"].getString();
 		if (joboptions["do_float16"].getBoolean())
@@ -1446,6 +1457,8 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 	}
 	else
 	{
+		label += ".motioncor2";
+
 		command += " --use_motioncor2 ";
 		command += " --motioncor2_exe " + joboptions["fn_motioncor2_exe"].getString();
 
@@ -1615,7 +1628,7 @@ bool RelionJob::getCommandsCtffindJob(std::string &outputname, std::vector<std::
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
-	initialisePipeline(outputname, PROC_CTFFIND_LABEL, job_counter);
+	initialisePipeline(outputname, job_counter);
 	std::string command;
 
 	FileName fn_outstar = outputname + "micrographs_ctf.star";
@@ -1665,6 +1678,8 @@ bool RelionJob::getCommandsCtffindJob(std::string &outputname, std::vector<std::
 
 	if (joboptions["use_gctf"].getBoolean())
 	{
+		label += ".gctf";
+
 		command += " --use_gctf --gctf_exe " + joboptions["fn_gctf_exe"].getString();
 		if (joboptions["do_ignore_ctffind_params"].getBoolean())
 			command += " --ignore_ctffind_params";
@@ -1688,6 +1703,8 @@ bool RelionJob::getCommandsCtffindJob(std::string &outputname, std::vector<std::
 	}
 	else if (joboptions["use_ctffind4"].getBoolean())
 	{
+		label += ".ctffind4";
+
 		command += " --ctffind_exe " + joboptions["fn_ctffind_exe"].getString();
 		command += " --ctfWin " + joboptions["ctf_win"].getString();
 		command += " --is_ctffind4 ";
@@ -1760,7 +1777,7 @@ bool RelionJob::getCommandsManualpickJob(std::string &outputname, std::vector<st
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
-	initialisePipeline(outputname, PROC_MANUALPICK_LABEL, job_counter);
+	initialisePipeline(outputname, job_counter);
 	std::string command;
 
 	command="`which relion_manualpick`";
@@ -1822,6 +1839,8 @@ bool RelionJob::getCommandsManualpickJob(std::string &outputname, std::vector<st
 
 	if (joboptions["do_startend"].getBoolean())
 	{
+		label += ".helical";
+
 		command += " --pick_start_end ";
 	}
 
@@ -1929,11 +1948,14 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
-	initialisePipeline(outputname, PROC_AUTOPICK_LABEL, job_counter);
+	initialisePipeline(outputname, job_counter);
 
 	std::string command;
 	if (is_continue && joboptions["continue_manual"].getBoolean())
 	{
+
+		label += ".continuemanual";
+
 		command="`which relion_manualpick`";
 
 		command += " --i " + joboptions["fn_input_autopick"].getString();
@@ -2064,6 +2086,8 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 		if (joboptions["do_topaz"].getBoolean())
 		{
 
+			label += ".topaz";
+
 			icheck = 0;
 			if (joboptions["do_topaz_train"].getBoolean()) icheck++;
 			if (joboptions["do_topaz_pick"].getBoolean()) icheck++;
@@ -2085,6 +2109,8 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 
 			if (joboptions["do_topaz_train"].getBoolean())
 			{
+
+				label += ".train";
 
 				if (!joboptions["use_gpu"].getBoolean())
 				{
@@ -2109,6 +2135,8 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 			}
 			else if (joboptions["do_topaz_pick"].getBoolean())
 			{
+				label += ".pick";
+
 				command += " --topaz_extract";
 				if (joboptions["topaz_model"].getString() != "")
 					command += " --topaz_model " + joboptions["topaz_model"].getString();
@@ -2131,6 +2159,8 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 				error_message ="ERROR: The Laplacian-of-Gaussian picker does not support GPU.";
 				return false;
 			}
+
+			label += ".log";
 
 			command += " --LoG ";
 			command += " --LoG_diam_min " + joboptions["log_diam_min"].getString();
@@ -2155,6 +2185,8 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 					return false;
 				}
 
+				label += ".ref3d";
+
 				command += " --ref " + joboptions["fn_ref3d_autopick"].getString();
 				Node node2(joboptions["fn_ref3d_autopick"].getString(), NODE_3DREF);
 				inputNodes.push_back(node2);
@@ -2177,6 +2209,8 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 					error_message ="ERROR: empty field for references...";
 					return false;
 				}
+
+				label += ".ref2d";
 
 				command += " --ref " + joboptions["fn_refs_autopick"].getString();
 				Node node2(joboptions["fn_refs_autopick"].getString(), NODE_REFS);
@@ -2319,7 +2353,7 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
-	initialisePipeline(outputname, PROC_EXTRACT_LABEL, job_counter);
+	initialisePipeline(outputname, job_counter);
 	std::string command;
 	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
 		command="`which relion_preprocess_mpi`";
@@ -2350,6 +2384,8 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 			error_message = "ERROR: you cannot both reset refined offsets and recenter on refined coordinates, choose one...";
 			return false;
 		}
+
+		label += ".reextract";
 
 		command += " --reextract_data_star " + joboptions["fndata_reextract"].getString();
 		Node node2(joboptions["fndata_reextract"].getString(), joboptions["fndata_reextract"].node_type);
@@ -2445,6 +2481,9 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 	// Helix
 	if (joboptions["do_extract_helix"].getBoolean())
 	{
+
+		label += ".helical";
+
 		command += " --helix";
 		command += " --helical_outer_diameter " + joboptions["helical_tube_outer_diameter"].getString();
 		if (joboptions["helical_bimodal_angular_priors"].getBoolean())
@@ -2525,7 +2564,7 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
-	initialisePipeline(outputname, PROC_CLASSSELECT_LABEL, job_counter);
+	initialisePipeline(outputname, job_counter);
 	std::string command;
 
 	if (joboptions["fn_model"].getString() == "" &&
@@ -2549,6 +2588,9 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 
 	if (joboptions["do_remove_duplicates"].getBoolean())
 	{
+
+		label += ".removeduplicates";
+
 		// Remove duplicates
 		command="`which relion_star_handler`";
 
@@ -2624,12 +2666,16 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 
 			if (joboptions["do_select_values"].getBoolean())
 			{
+				label += ".onvalue";
+
 				command += " --select " + joboptions["select_label"].getString();
 				command += " --minval " + joboptions["select_minval"].getString();
 				command += " --maxval " + joboptions["select_maxval"].getString();
 			}
 			else if (joboptions["do_discard"].getBoolean())
 			{
+				label += ".discard";
+
 				command += " --discard_on_stats ";
 				command += " --discard_label " + joboptions["discard_label"].getString();
 				command += " --discard_sigma " + joboptions["discard_sigma"].getString();
@@ -2638,6 +2684,9 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 		}
 		else if (joboptions["do_split"].getBoolean())
 		{
+
+			label += ".split";
+
 			int nr_split=0;
 			command += " --split ";
 			if (joboptions["do_random"].getBoolean())
@@ -2675,6 +2724,9 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 		// Automated 2D class selection through the class_ranker
 		if (joboptions["do_class_ranker"].getBoolean())
 		{
+
+			label += ".class2dauto";
+
 			if (joboptions["fn_model"].getString() == "")
 			{
 				error_message = "ERROR: When using automatically selecting 2D classes, one needs to provide an optimiser.star file";
@@ -2722,6 +2774,7 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 		{
 
 			// Interactive selection
+			label += ".interactive";
 
 			command="`which relion_display`";
 
@@ -2909,7 +2962,7 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
-	initialisePipeline(outputname, PROC_2DCLASS_LABEL, job_counter);
+	initialisePipeline(outputname, job_counter);
 	std::string command;
 
 	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
@@ -3049,6 +3102,8 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 	// Helix
 	if (joboptions["do_helix"].getBoolean())
 	{
+		label += ".helical";
+
 		command += " --helical_outer_diameter " + joboptions["helical_tube_outer_diameter"].getString();
 
 		if (joboptions["dont_skip_align"].getBoolean())
@@ -3172,7 +3227,7 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 {
 	commands.clear();
 
-	initialisePipeline(outputname, PROC_INIMODEL_LABEL, job_counter);
+	initialisePipeline(outputname, job_counter);
 
 	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
 	{
@@ -3573,7 +3628,7 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
-	initialisePipeline(outputname, PROC_3DCLASS_LABEL, job_counter);
+	initialisePipeline(outputname, job_counter);
 	std::string command;
 
 	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
@@ -3748,6 +3803,8 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 
 	if ( (!is_continue) && (joboptions["do_helix"].getBoolean()) )
 	{
+		label += ".helical";
+
 		command += " --helix";
 
 		float inner_diam = joboptions["helical_tube_inner_diameter"].getNumber(error_message);
@@ -4025,7 +4082,7 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
-	initialisePipeline(outputname, PROC_3DAUTO_LABEL, job_counter);
+	initialisePipeline(outputname, job_counter);
 	std::string command;
 
 	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
@@ -4059,6 +4116,8 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 	command += " --o " + outputname + fn_run;
 	// TODO: add bodies!! (probably in next version)
 	outputNodes = getOutputNodesRefine(outputname + fn_run, -1, 1, 3, 1);
+
+	if (is_tomo) label += ".tomo";
 
 	if (!is_continue)
 	{
@@ -4209,6 +4268,8 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 		// Helix
 		if (joboptions["do_helix"].getBoolean())
 		{
+			label += ".helical";
+
 			command += " --helix";
 
 			float inner_diam = joboptions["helical_tube_inner_diameter"].getNumber(error_message);
@@ -4390,7 +4451,7 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
-	initialisePipeline(outputname, PROC_MULTIBODY_LABEL, job_counter);
+	initialisePipeline(outputname, job_counter);
 	std::string command;
 
 	if (!exists(joboptions["fn_bodies"].getString()))
@@ -4618,7 +4679,7 @@ bool RelionJob::getCommandsMaskcreateJob(std::string &outputname, std::vector<st
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
-	initialisePipeline(outputname, PROC_MASKCREATE_LABEL, job_counter);
+	initialisePipeline(outputname, job_counter);
 	std::string command;
 
 	command="`which relion_mask_create`";
@@ -4697,17 +4758,26 @@ bool RelionJob::getCommandsJoinstarJob(std::string &outputname, std::vector<std:
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
-	initialisePipeline(outputname, PROC_JOINSTAR_LABEL, job_counter);
+	initialisePipeline(outputname, job_counter);
 	std::string command;
 	command="`which relion_star_handler`";
 
 	int ii = 0;
 	if (joboptions["do_part"].getBoolean())
+	{
 		ii++;
+		label += ".particles";
+	}
 	if (joboptions["do_mic"].getBoolean())
+	{
 		ii++;
+		label += ".micrographs";
+	}
 	if (joboptions["do_mov"].getBoolean())
+	{
 		ii++;
+		label += ".movies";
+	}
 
 	if (ii == 0)
 	{
@@ -4859,7 +4929,7 @@ bool RelionJob::getCommandsSubtractJob(std::string &outputname, std::vector<std:
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
-	initialisePipeline(outputname, PROC_SUBTRACT_LABEL, job_counter);
+	initialisePipeline(outputname, job_counter);
 	std::string command;
 
 	if (joboptions["do_fliplabel"].getBoolean())
@@ -4875,6 +4945,8 @@ bool RelionJob::getCommandsSubtractJob(std::string &outputname, std::vector<std:
 
 		Node node2(outputname + "original.star", NODE_PART_DATA);
 		outputNodes.push_back(node2);
+
+		label += ".revert";
 
 		command = "`which relion_particle_subtract`";
 		command += " --revert " + joboptions["fn_fliplabel"].getString() + " --o " + outputname;
@@ -4985,7 +5057,7 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
-	initialisePipeline(outputname, PROC_POST_LABEL, job_counter);
+	initialisePipeline(outputname, job_counter);
 	std::string command;
 
 	command="`which relion_postprocess`";
@@ -5114,7 +5186,7 @@ bool RelionJob::getCommandsLocalresJob(std::string &outputname, std::vector<std:
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
-	initialisePipeline(outputname, PROC_RESMAP_LABEL, job_counter);
+	initialisePipeline(outputname, job_counter);
 	std::string command;
 
 	if (joboptions["do_resmap_locres"].getBoolean() == joboptions["do_relion_locres"].getBoolean())
@@ -5142,6 +5214,8 @@ bool RelionJob::getCommandsLocalresJob(std::string &outputname, std::vector<std:
 
 	if (joboptions["do_resmap_locres"].getBoolean())
 	{
+
+		label += ".resmap";
 
 		// ResMap wrapper
 		if (joboptions["fn_resmap"].getString().length() == 0)
@@ -5192,6 +5266,7 @@ bool RelionJob::getCommandsLocalresJob(std::string &outputname, std::vector<std:
 	else if (joboptions["do_relion_locres"].getBoolean())
 	{
 		// Relion postprocessing
+		label += ".own";
 
 		if (joboptions["nr_mpi"].getNumber(error_message) > 1)
 			command="`which relion_postprocess_mpi`";
@@ -5268,7 +5343,7 @@ bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
-	initialisePipeline(outputname, PROC_MOTIONREFINE_LABEL, job_counter);
+	initialisePipeline(outputname, job_counter);
 	std::string command;
 
 	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
@@ -5333,6 +5408,9 @@ bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<
 
 	if (joboptions["do_param_optim"].getBoolean())
 	{
+
+		label += ".train";
+
 		// Estimate meta-parameters
 		RFLOAT align_frac = 1.0 - joboptions["eval_frac"].getNumber(error_message);
 		if (error_message != "") return false;
@@ -5467,7 +5545,7 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
-	initialisePipeline(outputname, PROC_CTFREFINE_LABEL, job_counter);
+	initialisePipeline(outputname, job_counter);
 	std::string command;
 
 
@@ -5523,6 +5601,8 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 	// Always either do anisotropic magnification, or CTF,tilt-odd,even
 	if (joboptions["do_aniso_mag"].getBoolean())
 	{
+		label += ".anisomag";
+
 		command += " --fit_aniso";
 		command += " --kmin_mag " + joboptions["minres"].getString();
 	}
@@ -5628,7 +5708,7 @@ bool RelionJob::getCommandsExternalJob(std::string &outputname, std::vector<std:
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
-	initialisePipeline(outputname, PROC_EXTERNAL_LABEL, job_counter);
+	initialisePipeline(outputname, job_counter);
 	std::string command;
 
 	if (joboptions["fn_exe"].getString() == "")
@@ -5937,7 +6017,7 @@ bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<st
 {
 
 	commands.clear();
-    initialisePipeline(outputname, PROC_TOMO_IMPORT_LABEL, job_counter);
+    initialisePipeline(outputname, job_counter);
     std::string command;
 
 	// Some code here was copied from the SPA import job...
@@ -6125,7 +6205,7 @@ bool RelionJob::getCommandsTomoSubtomoJob(std::string &outputname, std::vector<s
 				std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
-	initialisePipeline(outputname, PROC_TOMO_SUBTOMO_LABEL, job_counter);
+	initialisePipeline(outputname, job_counter);
 	std::string command;
 
 	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
@@ -6207,7 +6287,7 @@ bool RelionJob::getCommandsTomoCtfRefineJob(std::string &outputname, std::vector
 {
 
 	commands.clear();
-    initialisePipeline(outputname, PROC_TOMO_CTFREFINE_LABEL, job_counter);
+    initialisePipeline(outputname, job_counter);
     std::string command;
 
     if (joboptions["nr_mpi"].getNumber(error_message) > 1)
@@ -6300,7 +6380,7 @@ bool RelionJob::getCommandsTomoAlignJob(std::string &outputname, std::vector<std
 {
 
 	commands.clear();
-    initialisePipeline(outputname, PROC_TOMO_ALIGN_LABEL, job_counter);
+    initialisePipeline(outputname, job_counter);
     std::string command;
 
 	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
@@ -6388,7 +6468,7 @@ bool RelionJob::getCommandsTomoReconPartJob(std::string &outputname, std::vector
 {
 
 	commands.clear();
-    initialisePipeline(outputname, PROC_TOMO_RECONSTRUCT_LABEL, job_counter);
+    initialisePipeline(outputname, job_counter);
     std::string command, command2;
 
     if (joboptions["do_from2d"].getBoolean())

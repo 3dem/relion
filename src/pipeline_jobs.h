@@ -169,44 +169,62 @@ static bool do_allow_change_minimum_dedicated;
 #define NODE_TOMO_TRAJECTORIES 52 // Jasenko's definition of subtomogram motion trajectories
 #define NODE_TOMO_MANIFOLDS    53 // Jasenko's definition of 3D shapes (for picking of subtomograms)
 
-
-#define NODE_MOVIES_LABEL   	 "relion.MovieStar"
-#define NODE_MICS_LABEL			 "relion.MicrographStar"
-#define NODE_MIC_COORDS_LABEL	 "relion.CoordinateStar"
-#define NODE_PART_DATA_LABEL	 "relion.ParticleStar"
-#define NODE_REFS_LABEL          "relion.ReferenceStar"
-#define NODE_3DREF_LABEL       	 "relion.DensityMap"
-#define NODE_MASK_LABEL			 "relion.Mask"
-#define NODE_OPTIMISER_LABEL	 "relion.OptimiserStar"
-#define NODE_HALFMAP_LABEL		 "relion.HalfMap"
-#define NODE_RESMAP_LABEL		 "relion.LocalResolutionMap"
-#define NODE_PDF_LOGFILE_LABEL   "relion.PdfLogfile"
-#define NODE_POST_LABEL          "relion.PostprocessStar"
-#define NODE_POLISH_PARAMS_LABEL "relion.PolishParams"
+// These labels were temporarily in use during alpha-testing of relion-4.0. To be removed once relion-4 is stable
+#define NODE_MOVIES_LABEL   	     "relion.MovieStar"
+#define NODE_MICS_LABEL			     "relion.MicrographStar"
+#define NODE_MIC_COORDS_LABEL	     "relion.CoordinateStar"
+#define NODE_PART_DATA_LABEL	     "relion.ParticleStar"
+#define NODE_REFS_LABEL              "relion.ReferenceStar"
+#define NODE_3DREF_LABEL       	     "relion.DensityMap"
+#define NODE_MASK_LABEL			     "relion.Mask"
+#define NODE_OPTIMISER_LABEL	     "relion.OptimiserStar"
+#define NODE_HALFMAP_LABEL		     "relion.HalfMap"
+#define NODE_RESMAP_LABEL		     "relion.LocalResolutionMap"
+#define NODE_PDF_LOGFILE_LABEL       "relion.PdfLogfile"
+#define NODE_POST_LABEL              "relion.PostprocessStar"
+#define NODE_POLISH_PARAMS_LABEL     "relion.PolishParams"
 #define NODE_TOMO_OPTIMISATION_LABEL "relion.TomoOptimisationSet"
 #define NODE_TOMO_TOMOGRAMS_LABEL    "relion.TomoTomogramSet"
 #define NODE_TOMO_TRAJECTORIES_LABEL "relion.TomoTrajectorySet"
 #define NODE_TOMO_MANIFOLDS_LABEL    "relion.TomoManifoldSet"
 
-static std::map<int, std::string> node_type2label = {{NODE_MOVIES, NODE_MOVIES_LABEL},
-		{NODE_MICS, NODE_MICS_LABEL},
-		{NODE_MIC_COORDS, NODE_MIC_COORDS_LABEL},
-		{NODE_PART_DATA, NODE_PART_DATA_LABEL},
-		{NODE_REFS, NODE_REFS_LABEL},
-		{NODE_3DREF, NODE_3DREF_LABEL},
-		{NODE_MASK, NODE_MASK_LABEL},
-		{NODE_MODEL, NODE_OPTIMISER_LABEL}, // SHWS 27nov2019: no longer distinguish between MODEL and OPTIMISER nodes ... keep integer NODE for backwards compatibility
-		{NODE_OPTIMISER, NODE_OPTIMISER_LABEL},
-		{NODE_HALFMAP, NODE_HALFMAP_LABEL},
-		{NODE_FINALMAP, NODE_3DREF_LABEL}, // SHWS 27nov2019: no longer distinguish between 3DREF and FINAL maps ... keep integer NODE for backwards compatibility
-		{NODE_RESMAP, NODE_3DREF_LABEL},
-		{NODE_PDF_LOGFILE, NODE_PDF_LOGFILE_LABEL},
-		{NODE_POST, NODE_POST_LABEL},
-		{NODE_POLISH_PARAMS, NODE_POLISH_PARAMS_LABEL},
-		{NODE_TOMO_OPTIMISATION, NODE_TOMO_OPTIMISATION_LABEL},
-		{NODE_TOMO_TOMOGRAMS, NODE_TOMO_TOMOGRAMS_LABEL},
-		{NODE_TOMO_TRAJECTORIES, NODE_TOMO_TRAJECTORIES_LABEL},
-		{NODE_TOMO_MANIFOLDS, NODE_TOMO_MANIFOLDS_LABEL} };
+#define NODE_MOVIES_LABELNEW   	        "MicrographMoviesData.star.relion"
+#define NODE_MICS_LABELNEW			    "MicrographsData.star.relion"
+#define NODE_MIC_COORDS_LABELNEW	    "MicrographsCoords.star.relion"
+#define NODE_PART_DATA_LABELNEW	        "ParticlesData.star.relion"
+#define NODE_REFS_LABELNEW              "ImagesData.star.relion.2drefs"
+#define NODE_3DREF_LABELNEW          	"DensityMap.mrc.relion"
+#define NODE_MASK_LABELNEW			    "Mask3D.mrc.relion"
+#define NODE_OPTIMISER_LABELNEW	        "ProcessData.star.relion.optimiser"
+#define NODE_HALFMAP_LABELNEW		    "DensityMap.mrc.relion.halfmap"
+#define NODE_RESMAP_LABELNEW		    "Image3D.mrc.relion.localresolution"
+#define NODE_PDF_LOGFILE_LABELNEW       "LogFile.pdf.relion"
+#define NODE_POST_LABELNEW              "ProcessData.star.relion.postprocess"
+#define NODE_POLISH_PARAMS_LABELNEW     "ProcessData.txt.relion.polishparams"
+#define NODE_TOMO_OPTIMISATION_LABELNEW "ProcessData.star.relion.tomo.optimisation_set"
+#define NODE_TOMO_TOMOGRAMS_LABELNEW    "ProcessData.star.relion.tomo.relion.tomogram_set"
+#define NODE_TOMO_TRAJECTORIES_LABELNEW "ProcessData.star.relion.tomo.relion.trajectory_set"
+#define NODE_TOMO_MANIFOLDS_LABELNEW    "ProcessData.star.relion.tomo.manifoldset"
+
+static std::map<int, std::string> node_type2labelnew = {{NODE_MOVIES, NODE_MOVIES_LABELNEW},
+		{NODE_MICS, NODE_MICS_LABELNEW},
+		{NODE_MIC_COORDS, NODE_MIC_COORDS_LABELNEW},
+		{NODE_PART_DATA, NODE_PART_DATA_LABELNEW},
+		{NODE_REFS, NODE_REFS_LABELNEW},
+		{NODE_3DREF, NODE_3DREF_LABELNEW},
+		{NODE_MASK, NODE_MASK_LABELNEW},
+		{NODE_MODEL, NODE_OPTIMISER_LABELNEW}, // SHWS 27nov2019: no longer distinguish between MODEL and OPTIMISER nodes ... keep integer NODE for backwards compatibility
+		{NODE_OPTIMISER, NODE_OPTIMISER_LABELNEW},
+		{NODE_HALFMAP, NODE_HALFMAP_LABELNEW},
+		{NODE_FINALMAP, NODE_3DREF_LABELNEW}, // SHWS 27nov2019: no longer distinguish between 3DREF and FINAL maps ... keep integer NODE for backwards compatibility
+		{NODE_RESMAP, NODE_3DREF_LABELNEW},
+		{NODE_PDF_LOGFILE, NODE_PDF_LOGFILE_LABELNEW},
+		{NODE_POST, NODE_POST_LABELNEW},
+		{NODE_POLISH_PARAMS, NODE_POLISH_PARAMS_LABELNEW},
+		{NODE_TOMO_OPTIMISATION, NODE_TOMO_OPTIMISATION_LABELNEW},
+		{NODE_TOMO_TOMOGRAMS, NODE_TOMO_TOMOGRAMS_LABELNEW},
+		{NODE_TOMO_TRAJECTORIES, NODE_TOMO_TRAJECTORIES_LABELNEW},
+		{NODE_TOMO_MANIFOLDS, NODE_TOMO_MANIFOLDS_LABELNEW} };
 
 static std::map<std::string, int> node_label2type = {{NODE_MOVIES_LABEL, NODE_MOVIES},
 		{NODE_MICS_LABEL, NODE_MICS},
@@ -215,10 +233,8 @@ static std::map<std::string, int> node_label2type = {{NODE_MOVIES_LABEL, NODE_MO
 		{NODE_REFS_LABEL, NODE_REFS},
 		{NODE_3DREF_LABEL, NODE_3DREF},
 		{NODE_MASK_LABEL, NODE_MASK},
-//		{NODE_MODEL_LABEL, NODE_MODEL},
 		{NODE_OPTIMISER_LABEL, NODE_OPTIMISER},
 		{NODE_HALFMAP_LABEL, NODE_HALFMAP},
-//		{NODE_FINALMAP_LABEL, NODE_FINALMAP},
 		{NODE_RESMAP_LABEL, NODE_RESMAP},
 		{NODE_PDF_LOGFILE_LABEL, NODE_PDF_LOGFILE},
 		{NODE_POST_LABEL, NODE_POST},
@@ -228,36 +244,110 @@ static std::map<std::string, int> node_label2type = {{NODE_MOVIES_LABEL, NODE_MO
 		{NODE_TOMO_TRAJECTORIES_LABEL, NODE_TOMO_TRAJECTORIES},
 		{NODE_TOMO_MANIFOLDS_LABEL,    NODE_TOMO_MANIFOLDS} };
 
+static std::map<std::string, int> node_labelnew2type = {{NODE_MOVIES_LABELNEW, NODE_MOVIES},
+		{NODE_MICS_LABELNEW, NODE_MICS},
+		{NODE_MIC_COORDS_LABELNEW, NODE_MIC_COORDS},
+		{NODE_PART_DATA_LABELNEW, NODE_PART_DATA},
+		{NODE_REFS_LABELNEW, NODE_REFS},
+		{NODE_3DREF_LABELNEW, NODE_3DREF},
+		{NODE_MASK_LABELNEW, NODE_MASK},
+		{NODE_OPTIMISER_LABELNEW, NODE_OPTIMISER},
+		{NODE_HALFMAP_LABELNEW, NODE_HALFMAP},
+		{NODE_RESMAP_LABELNEW, NODE_RESMAP},
+		{NODE_PDF_LOGFILE_LABELNEW, NODE_PDF_LOGFILE},
+		{NODE_POST_LABELNEW, NODE_POST},
+		{NODE_POLISH_PARAMS_LABELNEW, NODE_POLISH_PARAMS},
+		{NODE_TOMO_OPTIMISATION_LABELNEW, NODE_TOMO_OPTIMISATION},
+		{NODE_TOMO_TOMOGRAMS_LABELNEW,    NODE_TOMO_TOMOGRAMS},
+		{NODE_TOMO_TRAJECTORIES_LABELNEW, NODE_TOMO_TRAJECTORIES},
+		{NODE_TOMO_MANIFOLDS_LABELNEW,    NODE_TOMO_MANIFOLDS} };
+
+static std::string get_node_label(int type)
+{
+	if (node_type2labelnew.find(type) != node_type2labelnew.end())
+	{
+		return node_type2labelnew.at(type);;
+	}
+	else
+	{
+		std::cerr << " WARNING: unrecognised node type: " << type << std::endl;
+	}
+	return "";
+}
+
+static int get_node_type(std::string label)
+{
+
+	if (node_labelnew2type.find(label) != node_labelnew2type.end())
+	{
+		return node_labelnew2type.at(label);;
+	}
+	else if (node_label2type.find(label) != node_label2type.end())
+	{
+		return node_label2type.at(label);
+	}
+	else
+	{
+		std::cerr << " WARNING: unrecognised node label: " << label << std::endl;
+	}
+	return -1;
+
+}
 
 
 // All the directory names of the different types of jobs defined inside the pipeline
-#define PROC_IMPORT_LABEL        "Import"       // Import any file as a Node of a given type
-#define PROC_MOTIONCORR_LABEL 	 "MotionCorr"   // Import any file as a Node of a given type
-#define PROC_CTFFIND_LABEL	     "CtfFind"  	   // Estimate CTF parameters from micrographs for either entire micrographs and/or particles
-#define PROC_MANUALPICK_LABEL    "ManualPick"   // Manually pick particle coordinates from micrographs
-#define PROC_AUTOPICK_LABEL		 "AutoPick"     // Automatically pick particle coordinates from micrographs, their CTF and 2D references
-#define PROC_EXTRACT_LABEL		 "Extract"      // Window particles, normalize, downsize etc from micrographs (also combine CTF into metadata file)
-#define PROC_CLASSSELECT_LABEL   "Select" 	   // Read in model.star file, and let user interactively select classes through the display (later: auto-selection as well)
-#define PROC_2DCLASS_LABEL 		 "Class2D"      // 2D classification (from input particles)
-#define PROC_3DCLASS_LABEL		 "Class3D"      // 3D classification (from input 2D/3D particles, an input 3D-reference, and possibly a 3D mask)
-#define PROC_3DAUTO_LABEL        "Refine3D"     // 3D auto-refine (from input particles, an input 3Dreference, and possibly a 3D mask)
-//#define PROC_POLISH_LABEL	     "Polish"       // Particle-polishing (from movie-particles)
-#define PROC_MASKCREATE_LABEL    "MaskCreate"   // Process to create masks from input maps
-#define PROC_JOINSTAR_LABEL      "JoinStar"     // Process to create masks from input maps
-#define PROC_SUBTRACT_LABEL      "Subtract"     // Process to subtract projections of parts of the reference from experimental images
-#define PROC_POST_LABEL			 "PostProcess"  // Post-processing (from unfiltered half-maps and a possibly a 3D mask)
-#define PROC_RESMAP_LABEL  	     "LocalRes"     // Local resolution estimation (from unfiltered half-maps and a 3D mask)
-//#define PROC_MOVIEREFINE_LABEL "MovieRefine"  // Movie-particle extraction and refinement combined
-#define PROC_INIMODEL_LABEL		 "InitialModel" // De-novo generation of 3D initial model (using SGD)
-#define PROC_MULTIBODY_LABEL	 "MultiBody"    // Multi-body refinement
-#define PROC_MOTIONREFINE_LABEL  "Polish"       // Jasenko's motion fitting program for Bayesian polishing (to replace MovieRefine?)
-#define PROC_CTFREFINE_LABEL     "CtfRefine"    // Jasenko's program for defocus and beamtilt optimisation
-#define PROC_TOMO_IMPORT_LABEL      "ImportTomo"              // Import for tomography GUI
-#define PROC_TOMO_SUBTOMO_LABEL     "PseudoSubtomo"           // Creation of pseudo-subtomograms from tilt series images
-#define PROC_TOMO_CTFREFINE_LABEL   "CtfRefineTomo"           // CTF refinement (defocus & aberrations) for tomography
-#define PROC_TOMO_ALIGN_LABEL       "FrameAlignTomo"          // Frame alignment and particle polishing for subtomography
-#define PROC_TOMO_RECONSTRUCT_LABEL "ReconstructParticleTomo" // Calculation of particle average from the individual tilt series images
-#define PROC_EXTERNAL_LABEL      "External"     // For running non-relion programs
+#define PROC_IMPORT_DIRNAME           "Import"       // Import any file as a Node of a given type
+#define PROC_MOTIONCORR_DIRNAME 	  "MotionCorr"   // Import any file as a Node of a given type
+#define PROC_CTFFIND_DIRNAME	      "CtfFind"  	   // Estimate CTF parameters from micrographs for either entire micrographs and/or particles
+#define PROC_MANUALPICK_DIRNAME       "ManualPick"   // Manually pick particle coordinates from micrographs
+#define PROC_AUTOPICK_DIRNAME		  "AutoPick"     // Automatically pick particle coordinates from micrographs, their CTF and 2D references
+#define PROC_EXTRACT_DIRNAME		  "Extract"      // Window particles, normalize, downsize etc from micrographs (also combine CTF into metadata file)
+#define PROC_CLASSSELECT_DIRNAME      "Select" 	   // Read in model.star file, and let user interactively select classes through the display (later: auto-selection as well)
+#define PROC_2DCLASS_DIRNAME 		  "Class2D"      // 2D classification (from input particles)
+#define PROC_3DCLASS_DIRNAME		  "Class3D"      // 3D classification (from input 2D/3D particles, an input 3D-reference, and possibly a 3D mask)
+#define PROC_3DAUTO_DIRNAME           "Refine3D"     // 3D auto-refine (from input particles, an input 3Dreference, and possibly a 3D mask)
+#define PROC_MASKCREATE_DIRNAME       "MaskCreate"   // Process to create masks from input maps
+#define PROC_JOINSTAR_DIRNAME         "JoinStar"     // Process to create masks from input maps
+#define PROC_SUBTRACT_DIRNAME         "Subtract"     // Process to subtract projections of parts of the reference from experimental images
+#define PROC_POST_DIRNAME			  "PostProcess"  // Post-processing (from unfiltered half-maps and a possibly a 3D mask)
+#define PROC_RESMAP_DIRNAME  	      "LocalRes"     // Local resolution estimation (from unfiltered half-maps and a 3D mask)
+#define PROC_INIMODEL_DIRNAME		  "InitialModel" // De-novo generation of 3D initial model (using SGD)
+#define PROC_MULTIBODY_DIRNAME	      "MultiBody"    // Multi-body refinement
+#define PROC_MOTIONREFINE_DIRNAME     "Polish"       // Jasenko's motion fitting program for Bayesian polishing (to replace MovieRefine?)
+#define PROC_CTFREFINE_DIRNAME        "CtfRefine"    // Jasenko's program for defocus and beamtilt optimisation
+#define PROC_TOMO_IMPORT_DIRNAME      "ImportTomo"              // Import for tomography GUI
+#define PROC_TOMO_SUBTOMO_DIRNAME     "PseudoSubtomo"           // Creation of pseudo-subtomograms from tilt series images
+#define PROC_TOMO_CTFREFINE_DIRNAME   "CtfRefineTomo"           // CTF refinement (defocus & aberrations) for tomography
+#define PROC_TOMO_ALIGN_DIRNAME       "FrameAlignTomo"          // Frame alignment and particle polishing for subtomography
+#define PROC_TOMO_RECONSTRUCT_DIRNAME "ReconstructParticleTomo" // Calculation of particle average from the individual tilt series images
+#define PROC_EXTERNAL_DIRNAME         "External"     // For running non-relion programs
+
+// All the directory names of the different types of jobs defined inside the pipeline
+#define PROC_IMPORT_LABELNEW           "relion.import"       // Import any file as a Node of a given type
+#define PROC_MOTIONCORR_LABELNEW 	   "relion.motioncorr"   // Import any file as a Node of a given type
+#define PROC_CTFFIND_LABELNEW	       "relion.ctffind"  	   // Estimate CTF parameters from micrographs for either entire micrographs and/or particles
+#define PROC_MANUALPICK_LABELNEW       "relion.manualpick"   // Manually pick particle coordinates from micrographs
+#define PROC_AUTOPICK_LABELNEW		   "relion.autopick"     // Automatically pick particle coordinates from micrographs, their CTF and 2D references
+#define PROC_EXTRACT_LABELNEW	       "relion.extract"      // Window particles, normalize, downsize etc from micrographs (also combine CTF into metadata file)
+#define PROC_CLASSSELECT_LABELNEW      "relion.select" 	   // Read in model.star file, and let user interactively select classes through the display (later: auto-selection as well)
+#define PROC_2DCLASS_LABELNEW 		   "relion.class2d"      // 2D classification (from input particles)
+#define PROC_3DCLASS_LABELNEW		   "relion.class3d"      // 3D classification (from input 2D/3D particles, an input 3D-reference, and possibly a 3D mask)
+#define PROC_3DAUTO_LABELNEW           "relion.refine3d"     // 3D auto-refine (from input particles, an input 3Dreference, and possibly a 3D mask)
+#define PROC_MASKCREATE_LABELNEW       "relion.maskcreate"   // Process to create masks from input maps
+#define PROC_JOINSTAR_LABELNEW         "relion.joinstar"     // Process to create masks from input maps
+#define PROC_SUBTRACT_LABELNEW         "relion.subtract"     // Process to subtract projections of parts of the reference from experimental images
+#define PROC_POST_LABELNEW			   "relion.postprocess"  // Post-processing (from unfiltered half-maps and a possibly a 3D mask)
+#define PROC_RESMAP_LABELNEW  	       "relion.localres"     // Local resolution estimation (from unfiltered half-maps and a 3D mask)
+#define PROC_INIMODEL_LABELNEW		   "relion.initialmodel" // De-novo generation of 3D initial model (using SGD)
+#define PROC_MULTIBODY_LABELNEW	       "relion.multibody"    // Multi-body refinement
+#define PROC_MOTIONREFINE_LABELNEW     "relion.polish"       // Jasenko's motion fitting program for Bayesian polishing (to replace MovieRefine?)
+#define PROC_CTFREFINE_LABELNEW        "relion.ctfrefine"    // Jasenko's program for defocus and beamtilt optimisation
+#define PROC_TOMO_IMPORT_LABELNEW      "relion.importtomo"              // Import for tomography GUI
+#define PROC_TOMO_SUBTOMO_LABELNEW     "relion.pseudosubtomo"           // Creation of pseudo-subtomograms from tilt series images
+#define PROC_TOMO_CTFREFINE_LABELNEW   "relion.ctfrefinetomo"           // CTF refinement (defocus & aberrations) for tomography
+#define PROC_TOMO_ALIGN_LABELNEW       "relion.framealigntomo"          // Frame alignment and particle polishing for subtomography
+#define PROC_TOMO_RECONSTRUCT_LABELNEW "relion.reconstructparticletomo" // Calculation of particle average from the individual tilt series images
+#define PROC_EXTERNAL_LABELNEW         "relion.external"     // For running non-relion programs
 
 
 #define PROC_IMPORT         0 // Import any file as a Node of a given type
@@ -290,57 +380,164 @@ static std::map<std::string, int> node_label2type = {{NODE_MOVIES_LABEL, NODE_MO
 #define PROC_EXTERNAL       99// External scripts
 
 
-static std::map<int, std::string> proc_type2label = {{PROC_IMPORT, PROC_IMPORT_LABEL},
-		{PROC_MOTIONCORR, PROC_MOTIONCORR_LABEL},
-		{PROC_CTFFIND, PROC_CTFFIND_LABEL},
-		{PROC_MANUALPICK, PROC_MANUALPICK_LABEL},
-		{PROC_AUTOPICK, PROC_AUTOPICK_LABEL},
-		{PROC_EXTRACT, PROC_EXTRACT_LABEL},
-		{PROC_CLASSSELECT, PROC_CLASSSELECT_LABEL},
-		{PROC_2DCLASS, PROC_2DCLASS_LABEL},
-		{PROC_3DCLASS, PROC_3DCLASS_LABEL},
-		{PROC_3DAUTO, PROC_3DAUTO_LABEL},
-		{PROC_MASKCREATE,        PROC_MASKCREATE_LABEL},
-		{PROC_JOINSTAR,        PROC_JOINSTAR_LABEL},
-		{PROC_SUBTRACT,        PROC_SUBTRACT_LABEL},
-		{PROC_POST,             PROC_POST_LABEL},
-		{PROC_RESMAP,           PROC_RESMAP_LABEL},
-		{PROC_INIMODEL,         PROC_INIMODEL_LABEL},
-		{PROC_MULTIBODY,        PROC_MULTIBODY_LABEL},
-		{PROC_MOTIONREFINE,     PROC_MOTIONREFINE_LABEL},
-		{PROC_CTFREFINE,        PROC_CTFREFINE_LABEL},
-		{PROC_TOMO_IMPORT,      PROC_TOMO_IMPORT_LABEL},
-		{PROC_TOMO_SUBTOMO,     PROC_TOMO_SUBTOMO_LABEL},
-		{PROC_TOMO_CTFREFINE,   PROC_TOMO_CTFREFINE_LABEL},
-		{PROC_TOMO_ALIGN,       PROC_TOMO_ALIGN_LABEL},
-		{PROC_TOMO_RECONSTRUCT, PROC_TOMO_RECONSTRUCT_LABEL},
-		{PROC_EXTERNAL,         PROC_EXTERNAL_LABEL}};
+static std::map<int, std::string> proc_type2dirname = {{PROC_IMPORT, PROC_IMPORT_DIRNAME},
+		{PROC_MOTIONCORR, PROC_MOTIONCORR_DIRNAME},
+		{PROC_CTFFIND, PROC_CTFFIND_DIRNAME},
+		{PROC_MANUALPICK, PROC_MANUALPICK_DIRNAME},
+		{PROC_AUTOPICK, PROC_AUTOPICK_DIRNAME},
+		{PROC_EXTRACT, PROC_EXTRACT_DIRNAME},
+		{PROC_CLASSSELECT, PROC_CLASSSELECT_DIRNAME},
+		{PROC_2DCLASS, PROC_2DCLASS_DIRNAME},
+		{PROC_3DCLASS, PROC_3DCLASS_DIRNAME},
+		{PROC_3DAUTO, PROC_3DAUTO_DIRNAME},
+		{PROC_MASKCREATE,        PROC_MASKCREATE_DIRNAME},
+		{PROC_JOINSTAR,        PROC_JOINSTAR_DIRNAME},
+		{PROC_SUBTRACT,        PROC_SUBTRACT_DIRNAME},
+		{PROC_POST,             PROC_POST_DIRNAME},
+		{PROC_RESMAP,           PROC_RESMAP_DIRNAME},
+		{PROC_INIMODEL,         PROC_INIMODEL_DIRNAME},
+		{PROC_MULTIBODY,        PROC_MULTIBODY_DIRNAME},
+		{PROC_MOTIONREFINE,     PROC_MOTIONREFINE_DIRNAME},
+		{PROC_CTFREFINE,        PROC_CTFREFINE_DIRNAME},
+		{PROC_TOMO_IMPORT,      PROC_TOMO_IMPORT_DIRNAME},
+		{PROC_TOMO_SUBTOMO,     PROC_TOMO_SUBTOMO_DIRNAME},
+		{PROC_TOMO_CTFREFINE,   PROC_TOMO_CTFREFINE_DIRNAME},
+		{PROC_TOMO_ALIGN,       PROC_TOMO_ALIGN_DIRNAME},
+		{PROC_TOMO_RECONSTRUCT, PROC_TOMO_RECONSTRUCT_DIRNAME},
+		{PROC_EXTERNAL,         PROC_EXTERNAL_DIRNAME}};
 
-static std::map<std::string, int> proc_label2type = {{PROC_IMPORT_LABEL, PROC_IMPORT},
-		{PROC_MOTIONCORR_LABEL, PROC_MOTIONCORR},
-		{PROC_CTFFIND_LABEL, PROC_CTFFIND},
-		{PROC_MANUALPICK_LABEL, PROC_MANUALPICK},
-		{PROC_AUTOPICK_LABEL, PROC_AUTOPICK},
-		{PROC_EXTRACT_LABEL, PROC_EXTRACT},
-		{PROC_CLASSSELECT_LABEL, PROC_CLASSSELECT},
-		{PROC_2DCLASS_LABEL, PROC_2DCLASS},
-		{PROC_3DCLASS_LABEL, PROC_3DCLASS},
-		{PROC_3DAUTO_LABEL,           PROC_3DAUTO},
-		{PROC_MASKCREATE_LABEL,       PROC_MASKCREATE},
-		{PROC_JOINSTAR_LABEL,         PROC_JOINSTAR},
-		{PROC_SUBTRACT_LABEL,         PROC_SUBTRACT},
-		{PROC_POST_LABEL,             PROC_POST},
-		{PROC_RESMAP_LABEL,           PROC_RESMAP},
-		{PROC_INIMODEL_LABEL,         PROC_INIMODEL},
-		{PROC_MULTIBODY_LABEL,        PROC_MULTIBODY},
-		{PROC_MOTIONREFINE_LABEL,     PROC_MOTIONREFINE},
-		{PROC_CTFREFINE_LABEL,        PROC_CTFREFINE},
-		{PROC_TOMO_IMPORT_LABEL,      PROC_TOMO_IMPORT},
-		{PROC_TOMO_SUBTOMO_LABEL,     PROC_TOMO_SUBTOMO},
-		{PROC_TOMO_CTFREFINE_LABEL,   PROC_TOMO_CTFREFINE},
-		{PROC_TOMO_ALIGN_LABEL,       PROC_TOMO_ALIGN},
-		{PROC_TOMO_RECONSTRUCT_LABEL, PROC_TOMO_RECONSTRUCT},
-		{PROC_EXTERNAL_LABEL,         PROC_EXTERNAL}};
+static std::map<int, std::string> proc_type2labelnew = {{PROC_IMPORT, PROC_IMPORT_LABELNEW},
+		{PROC_MOTIONCORR, PROC_MOTIONCORR_LABELNEW},
+		{PROC_CTFFIND, PROC_CTFFIND_LABELNEW},
+		{PROC_MANUALPICK, PROC_MANUALPICK_LABELNEW},
+		{PROC_AUTOPICK, PROC_AUTOPICK_LABELNEW},
+		{PROC_EXTRACT, PROC_EXTRACT_LABELNEW},
+		{PROC_CLASSSELECT, PROC_CLASSSELECT_LABELNEW},
+		{PROC_2DCLASS, PROC_2DCLASS_LABELNEW},
+		{PROC_3DCLASS, PROC_3DCLASS_LABELNEW},
+		{PROC_3DAUTO, PROC_3DAUTO_LABELNEW},
+		{PROC_MASKCREATE,        PROC_MASKCREATE_LABELNEW},
+		{PROC_JOINSTAR,        PROC_JOINSTAR_LABELNEW},
+		{PROC_SUBTRACT,        PROC_SUBTRACT_LABELNEW},
+		{PROC_POST,             PROC_POST_LABELNEW},
+		{PROC_RESMAP,           PROC_RESMAP_LABELNEW},
+		{PROC_INIMODEL,         PROC_INIMODEL_LABELNEW},
+		{PROC_MULTIBODY,        PROC_MULTIBODY_LABELNEW},
+		{PROC_MOTIONREFINE,     PROC_MOTIONREFINE_LABELNEW},
+		{PROC_CTFREFINE,        PROC_CTFREFINE_LABELNEW},
+		{PROC_TOMO_IMPORT,      PROC_TOMO_IMPORT_LABELNEW},
+		{PROC_TOMO_SUBTOMO,     PROC_TOMO_SUBTOMO_LABELNEW},
+		{PROC_TOMO_CTFREFINE,   PROC_TOMO_CTFREFINE_LABELNEW},
+		{PROC_TOMO_ALIGN,       PROC_TOMO_ALIGN_LABELNEW},
+		{PROC_TOMO_RECONSTRUCT, PROC_TOMO_RECONSTRUCT_LABELNEW},
+		{PROC_EXTERNAL,         PROC_EXTERNAL_LABELNEW}};
+
+static std::map<std::string, int> proc_dirname2type = {
+		{PROC_IMPORT_DIRNAME,           PROC_IMPORT},
+		{PROC_MOTIONCORR_DIRNAME,       PROC_MOTIONCORR},
+		{PROC_CTFFIND_DIRNAME,          PROC_CTFFIND},
+		{PROC_MANUALPICK_DIRNAME,       PROC_MANUALPICK},
+		{PROC_AUTOPICK_DIRNAME,         PROC_AUTOPICK},
+		{PROC_EXTRACT_DIRNAME,          PROC_EXTRACT},
+		{PROC_CLASSSELECT_DIRNAME,      PROC_CLASSSELECT},
+		{PROC_2DCLASS_DIRNAME,          PROC_2DCLASS},
+		{PROC_3DCLASS_DIRNAME,          PROC_3DCLASS},
+		{PROC_3DAUTO_DIRNAME,           PROC_3DAUTO},
+		{PROC_MASKCREATE_DIRNAME,       PROC_MASKCREATE},
+		{PROC_JOINSTAR_DIRNAME,         PROC_JOINSTAR},
+		{PROC_SUBTRACT_DIRNAME,         PROC_SUBTRACT},
+		{PROC_POST_DIRNAME,             PROC_POST},
+		{PROC_RESMAP_DIRNAME,           PROC_RESMAP},
+		{PROC_INIMODEL_DIRNAME,         PROC_INIMODEL},
+		{PROC_MULTIBODY_DIRNAME,        PROC_MULTIBODY},
+		{PROC_MOTIONREFINE_DIRNAME,     PROC_MOTIONREFINE},
+		{PROC_CTFREFINE_DIRNAME,        PROC_CTFREFINE},
+		{PROC_TOMO_IMPORT_DIRNAME,      PROC_TOMO_IMPORT},
+		{PROC_TOMO_SUBTOMO_DIRNAME,     PROC_TOMO_SUBTOMO},
+		{PROC_TOMO_CTFREFINE_DIRNAME,   PROC_TOMO_CTFREFINE},
+		{PROC_TOMO_ALIGN_DIRNAME,       PROC_TOMO_ALIGN},
+		{PROC_TOMO_RECONSTRUCT_DIRNAME, PROC_TOMO_RECONSTRUCT},
+		{PROC_EXTERNAL_DIRNAME,         PROC_EXTERNAL}};
+
+static std::map<std::string, int> proc_labelnew2type = {
+		{PROC_IMPORT_LABELNEW,           PROC_IMPORT},
+		{PROC_MOTIONCORR_LABELNEW,       PROC_MOTIONCORR},
+		{PROC_CTFFIND_LABELNEW,          PROC_CTFFIND},
+		{PROC_MANUALPICK_LABELNEW,       PROC_MANUALPICK},
+		{PROC_AUTOPICK_LABELNEW,         PROC_AUTOPICK},
+		{PROC_EXTRACT_LABELNEW,          PROC_EXTRACT},
+		{PROC_CLASSSELECT_LABELNEW,      PROC_CLASSSELECT},
+		{PROC_2DCLASS_LABELNEW,          PROC_2DCLASS},
+		{PROC_3DCLASS_LABELNEW,          PROC_3DCLASS},
+		{PROC_3DAUTO_LABELNEW,           PROC_3DAUTO},
+		{PROC_MASKCREATE_LABELNEW,       PROC_MASKCREATE},
+		{PROC_JOINSTAR_LABELNEW,         PROC_JOINSTAR},
+		{PROC_SUBTRACT_LABELNEW,         PROC_SUBTRACT},
+		{PROC_POST_LABELNEW,             PROC_POST},
+		{PROC_RESMAP_LABELNEW,           PROC_RESMAP},
+		{PROC_INIMODEL_LABELNEW,         PROC_INIMODEL},
+		{PROC_MULTIBODY_LABELNEW,        PROC_MULTIBODY},
+		{PROC_MOTIONREFINE_LABELNEW,     PROC_MOTIONREFINE},
+		{PROC_CTFREFINE_LABELNEW,        PROC_CTFREFINE},
+		{PROC_TOMO_IMPORT_LABELNEW,      PROC_TOMO_IMPORT},
+		{PROC_TOMO_SUBTOMO_LABELNEW,     PROC_TOMO_SUBTOMO},
+		{PROC_TOMO_CTFREFINE_LABELNEW,   PROC_TOMO_CTFREFINE},
+		{PROC_TOMO_ALIGN_LABELNEW,       PROC_TOMO_ALIGN},
+		{PROC_TOMO_RECONSTRUCT_LABELNEW, PROC_TOMO_RECONSTRUCT},
+		{PROC_EXTERNAL_LABELNEW,         PROC_EXTERNAL}};
+
+
+static std::string get_proc_label(int type)
+{
+	if (proc_type2labelnew.find(type) != proc_type2labelnew.end())
+	{
+		return proc_type2labelnew.at(type);;
+	}
+	else
+	{
+		std::cerr << " WARNING: unrecognised process type: " << type << std::endl;
+	}
+	return "";
+}
+
+static int get_proc_type(std::string label)
+{
+
+	FileName mylabel = label;
+	bool keep_trying = true;
+	while (keep_trying)
+	{
+		if (proc_labelnew2type.find(mylabel) != proc_labelnew2type.end())
+		{
+			return proc_labelnew2type.at(mylabel);;
+		}
+		else
+		{
+			// remove deepest layers of the process label, from ccpem-pipeliner
+			if (mylabel.contains("."))
+			{
+				mylabel = mylabel.beforeLastOf(".");
+			}
+			else
+			{
+				keep_trying = false;
+			}
+		}
+	}
+
+	// Backward compatibility with alpha-versions of relion-4.0
+	if (proc_dirname2type.find(label) != proc_dirname2type.end())
+	{
+		return proc_dirname2type.at(label);
+	}
+	else
+	{
+		std::cerr << " WARNING: unrecognised process label: " << label << std::endl;
+	}
+	return -1;
+
+}
+
 
 // Status a Process may have
 #define PROC_RUNNING          0 // (hopefully) running
@@ -378,11 +575,12 @@ struct gui_layout
     RFLOAT w;
 };
 
+
 class Node
 {
 	public:
 	std::string name; // what's my name?
-	int type; // which type of node am I?
+	int type; // which type of node am I
 	std::vector<long int> inputForProcessList; 	  //list of processes that use this Node as input
 	long int outputFromProcess;   //Which process made this Node
 
@@ -509,6 +707,9 @@ public:
 	// Which job type is this?
 	int type;
 
+	// Whats is my type-label? (can have deeper levels in ccpem-pipeliner)
+	FileName label;
+
 	// Is this a continuation job?
 	bool is_continue;
 
@@ -564,7 +765,7 @@ public:
 	bool saveJobSubmissionScript(std::string newfilename, std::string outputname, std::vector<std::string> commands, std::string &error_message);
 
 	// Initialise pipeline stuff for each job, return outputname
-	void initialisePipeline(std::string &outputname, std::string defaultname, int job_counter);
+	void initialisePipeline(std::string &outputname, int job_counter);
 
 	// Prepare the final (job submission or combined (mpi) command of possibly multiple lines)
 	// Returns true to go ahead, and false to cancel

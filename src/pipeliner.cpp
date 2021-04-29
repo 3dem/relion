@@ -232,7 +232,9 @@ bool PipeLine::touchTemporaryNodeFile(Node &node, bool touch_even_if_not_exist)
 	if (exists(node.name) || touch_even_if_not_exist)
 	{
 		// Make subdirectory for each type of node
-                FileName fn_type = node_type2label.at(node.type) + "/";
+		// Only at the highest level, so before the first "."
+        FileName fn_label = get_node_label(node.type);
+		FileName fn_type = fn_label.beforeFirstOf(".") + "/";
 		FileName mydir = fn_dir + fn_type + fnt.substr(0, fnt.rfind("/") + 1);
 		FileName mynode = fn_dir + fn_type + fnt;
 		std::string command;
@@ -285,7 +287,7 @@ void PipeLine::deleteTemporaryNodeFile(Node &node)
 	else
 		fnt = node.name;
 
-        FileName fn_type = node_type2label.at(node.type) + "/";
+    FileName fn_type = get_node_label(node.type) + "/";
 	FileName fn = fn_dir + fn_type + fnt;
 	int res = remove(fn.c_str());
 
@@ -608,7 +610,7 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 int PipeLine::addScheduledJob(std::string typestring, std::string fn_options, bool write_hidden_guifile)
 {
 
-	return addScheduledJob(proc_label2type.at(typestring), fn_options, write_hidden_guifile);
+	return addScheduledJob(get_proc_type(typestring), fn_options, write_hidden_guifile);
 
 }
 
@@ -1001,6 +1003,9 @@ void PipeLine::deleteNodesAndProcesses(std::vector<bool> &deleteNodes, std::vect
 	{
 		if (deleteProcesses[i])
 		{
+ 			//SHWS 28042021: TODO!!!!! Re-think this with ccpem-pipeliner, as processName is no longer necessarily the same as directory name!!!
+			// OR PERHAPS OK?
+
 			FileName alldirs = processList[i].name;
 			alldirs = alldirs.beforeLastOf("/");
 			// Move entire output directory (with subdirectory structure) to the Trash folder
@@ -1816,23 +1821,25 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 	MDnode.readStar(in, "pipeline_nodes");
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDnode)
 	{
-		std::string name;
+		std::string name, label;
 		int type;
 		if (!MDnode.getValue(EMDL_PIPELINE_NODE_NAME, name) )
 			REPORT_ERROR("PipeLine::read: cannot find name in pipeline_nodes table");
 
 		if (MDnode.containsLabel(EMDL_PIPELINE_NODE_TYPE_LABEL))
 		{
-			std::string label;
 			MDnode.getValue(EMDL_PIPELINE_NODE_TYPE_LABEL, label);
-			type = node_label2type.at(label);
 		}
-		else if (!MDnode.getValue(EMDL_PIPELINE_NODE_TYPE, type))
+		else if (MDnode.getValue(EMDL_PIPELINE_NODE_TYPE, type))
+		{
+			label = get_node_label(type);
+		}
+		else
 		{
 			REPORT_ERROR("PipeLine::read: cannot find type in pipeline_nodes table");
 		}
 
-		Node newNode(name, type);
+		Node newNode(name, get_node_type(label));
 		nodeList.push_back(newNode);
 	}
 
@@ -1850,7 +1857,7 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 		{
 			std::string label;
 			MDproc.getValue(EMDL_PIPELINE_PROCESS_TYPE_LABEL, label);
-			type = proc_label2type.at(label);
+			type = get_proc_type(label);
 			MDproc.getValue(EMDL_PIPELINE_PROCESS_STATUS_LABEL, label);
 			status = procstatus_label2type.at(label);
 		}
@@ -2033,9 +2040,7 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 			MDproc.addObject();
 			MDproc.setValue(EMDL_PIPELINE_PROCESS_NAME, processList[i].name);
 			MDproc.setValue(EMDL_PIPELINE_PROCESS_ALIAS, processList[i].alias);
-			//MDproc.setValue(EMDL_PIPELINE_PROCESS_TYPE, processList[i].type);
-			//MDproc.setValue(EMDL_PIPELINE_PROCESS_STATUS, processList[i].status);
-			MDproc.setValue(EMDL_PIPELINE_PROCESS_TYPE_LABEL, proc_type2label.at(processList[i].type));
+			MDproc.setValue(EMDL_PIPELINE_PROCESS_TYPE_LABEL, get_proc_label(processList[i].type));
 			MDproc.setValue(EMDL_PIPELINE_PROCESS_STATUS_LABEL, procstatus_type2label.at(processList[i].status));
 		}
 		else
@@ -2043,9 +2048,7 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 			MDproc_del.addObject();
 			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_NAME, processList[i].name);
 			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_ALIAS, processList[i].alias);
-			//MDproc_del.setValue(EMDL_PIPELINE_PROCESS_TYPE, processList[i].type);
-			//MDproc_del.setValue(EMDL_PIPELINE_PROCESS_STATUS, processList[i].status);
-			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_TYPE_LABEL, proc_type2label.at(processList[i].type));
+			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_TYPE_LABEL, get_proc_label(processList[i].type));
 			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_STATUS_LABEL, procstatus_type2label.at(processList[i].status));
 		}
 
@@ -2065,15 +2068,13 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 		{
 			MDnode.addObject();
 			MDnode.setValue(EMDL_PIPELINE_NODE_NAME, nodeList[i].name);
-			//MDnode.setValue(EMDL_PIPELINE_NODE_TYPE, nodeList[i].type);
-			MDnode.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, node_type2label.at(nodeList[i].type));
+			MDnode.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, get_node_label(nodeList[i].type));
 		}
 		else
 		{
 			MDnode_del.addObject();
 			MDnode_del.setValue(EMDL_PIPELINE_NODE_NAME, nodeList[i].name);
-			//MDnode_del.setValue(EMDL_PIPELINE_NODE_TYPE, nodeList[i].type);
-			MDnode_del.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, node_type2label.at(nodeList[i].type));
+			MDnode_del.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, get_node_label(nodeList[i].type));
 
 		}
 	}
