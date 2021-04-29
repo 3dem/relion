@@ -167,41 +167,48 @@ void SchedulerWindow::cb_execute(Fl_Widget*, void* v)
 
 void SchedulerWindow::cb_execute_i()
 {
-	FileName fn_sched(schedule_name->value());
-	FileName fn_check = "RUNNING_PIPELINER_" + pipeline_name + "_" + fn_sched;
-	if (exists(fn_check))
+	if (use_ccpem_pipeliner)
 	{
-		std::string msg =  "ERROR: a file called " + fn_check + " already exists. \n This implies another set of scheduled jobs with this name is already running. \n Cancelling job execution...";
-		fl_message("%s", msg.c_str());
+		REPORT_ERROR("TODO Matt Iadanza: implement system call to CCPEM pipeliner here");
 	}
 	else
 	{
-		// Make a string with all job-ids to process
-		std::string jobids="\"";
-		for (int ijob = 0; ijob < my_jobs.size(); ijob++)
+		FileName fn_sched(schedule_name->value());
+		FileName fn_check = "RUNNING_PIPELINER_" + pipeline_name + "_" + fn_sched;
+		if (exists(fn_check))
 		{
-			if (check_buttons[ijob]->value())
-				jobids += my_jobs[ijob] + " ";
+			std::string msg =  "ERROR: a file called " + fn_check + " already exists. \n This implies another set of scheduled jobs with this name is already running. \n Cancelling job execution...";
+			fl_message("%s", msg.c_str());
 		}
-		jobids += "\"";
+		else
+		{
+			// Make a string with all job-ids to process
+			std::string jobids="\"";
+			for (int ijob = 0; ijob < my_jobs.size(); ijob++)
+			{
+				if (check_buttons[ijob]->value())
+					jobids += my_jobs[ijob] + " ";
+			}
+			jobids += "\"";
 
-		std::string myrepeat(repeat->value());
-		std::string mywait(wait->value());
-		std::string mywait_before(wait_before->value());
-		std::string mywait_after(wait_after->value());
+			std::string myrepeat(repeat->value());
+			std::string mywait(wait->value());
+			std::string mywait_before(wait_before->value());
+			std::string mywait_after(wait_after->value());
 
-		std::string command = "relion_pipeliner --pipeline " + pipeline_name;
-		command += " --schedule " + fn_sched;
-		command += " --repeat " + myrepeat;
-		command += " --min_wait " + mywait;
-		command += " --min_wait_before " + mywait_before;
-		command += " --sec_wait_after " + mywait_after;
-		command += " --RunJobs " + jobids;
-		// Run this in the background, so control returns to the window
-		command += " &";
-		int res = system(command.c_str());
-		std::cout << " Launching: " << command << std::endl;
-		std::cout << " Stop execution of this set of scheduled jobs by deleting file: " << fn_check << std::endl;
+			std::string command = "relion_pipeliner --pipeline " + pipeline_name;
+			command += " --schedule " + fn_sched;
+			command += " --repeat " + myrepeat;
+			command += " --min_wait " + mywait;
+			command += " --min_wait_before " + mywait_before;
+			command += " --sec_wait_after " + mywait_after;
+			command += " --RunJobs " + jobids;
+			// Run this in the background, so control returns to the window
+			command += " &";
+			int res = system(command.c_str());
+			std::cout << " Launching: " << command << std::endl;
+			std::cout << " Stop execution of this set of scheduled jobs by deleting file: " << fn_check << std::endl;
+		}
 	}
 }
 
@@ -257,7 +264,8 @@ void NoteEditorWindow::cb_save_i()
 }
 
 GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
-		int _update_every_sec, int _exit_after_sec, bool _do_read_only, bool _do_tomo, bool _do_projdir):Fl_Window(w,h,title)
+		int _update_every_sec, int _exit_after_sec, bool _do_read_only, bool _do_tomo,
+		bool _use_ccpem_pipeliner, bool _do_projdir):Fl_Window(w,h,title)
 {
 	// Set initial Timer
 	tickTimeLastChanged();
@@ -268,6 +276,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 	maingui_do_read_only = _do_read_only;
 	pipeline.do_read_only = _do_read_only;
 	do_order_alphabetically = false;
+	use_ccpem_pipeliner = _use_ccpem_pipeliner;
 
 	FileName fn_lock=".gui_projectdir";
 	if (!exists(fn_lock))
@@ -1517,16 +1526,25 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 	// Update timer
 	tickTimeLastChanged();
 
-	std::string error_message;
-	if (!pipeline.runJob(gui_jobwindows[iwin]->myjob, current_job, only_schedule, is_main_continue, false, error_message))
+
+	if (use_ccpem_pipeliner)
 	{
-		// Still revert back to the correct job_counter for overwrite jobs!
-		if (do_overwrite_continue) pipeline.setJobCounter(my_overwrite_job_counter);
-		// Show the error
-		fl_message("%s", error_message.c_str());
-		// Allow the user to fix the error and submit this job again
-		run_button->activate();
-		return;
+		REPORT_ERROR("TODO Matt Iadanza: implement system call to CCPEM pipeliner here");
+
+	}
+	else
+	{
+		std::string error_message;
+		if (!pipeline.runJob(gui_jobwindows[iwin]->myjob, current_job, only_schedule, is_main_continue, false, error_message))
+		{
+			// Still revert back to the correct job_counter for overwrite jobs!
+			if (do_overwrite_continue) pipeline.setJobCounter(my_overwrite_job_counter);
+			// Show the error
+			fl_message("%s", error_message.c_str());
+			// Allow the user to fix the error and submit this job again
+			run_button->activate();
+			return;
+		}
 	}
 
 	// If do_overwrite, revert to the correct job_counter
@@ -1599,7 +1617,14 @@ void GuiMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 	if (proceed)
 	{
 
-		pipeline.deleteNodesAndProcesses(deleteNodes, deleteProcesses);
+		if (use_ccpem_pipeliner)
+		{
+			REPORT_ERROR("TODO Matt Iadanza: implement system call to CCPEM pipeliner here");
+		}
+		else
+		{
+			pipeline.deleteNodesAndProcesses(deleteNodes, deleteProcesses);
+		}
 
 		// Reset current_job
 		current_job = -1;
@@ -1660,9 +1685,16 @@ e.g. by using \"touch Polish/job045/NO_HARSH_CLEAN\". Below is a list of current
 		std::string how = (do_harsh) ? "Harshly" : "Gently";
 		std::cout << how << " cleaning all finished jobs ..." << std::endl;
 
-		std::string error_message;
-		if (!pipeline.cleanupAllJobs(do_harsh, error_message))
-			fl_message("%s",error_message.c_str());
+		if (use_ccpem_pipeliner)
+		{
+			REPORT_ERROR("TODO Matt Iadanza: implement system call to CCPEM pipeliner here");
+		}
+		else
+		{
+			std::string error_message;
+			if (!pipeline.cleanupAllJobs(do_harsh, error_message))
+				fl_message("%s",error_message.c_str());
+		}
 
 		fl_message("Done cleaning! Don't forget the files are all still in the Trash folder. Use the \"Empty Trash\" option from the File menu to permanently delete them.");
 	}
@@ -1756,6 +1788,8 @@ void GuiMainWindow::cb_set_alias_i(std::string alias)
 			alias = al2;
 		}
 
+		// Matt Iadanza: not sure whether you want to do this in the ccpem pipeliner too?
+
 		if (pipeline.setAliasJob(current_job, alias, error_message))
 			is_done = true;
 		else
@@ -1775,6 +1809,8 @@ void GuiMainWindow::cb_abort(Fl_Widget* o, void* v)
 
 void GuiMainWindow::cb_abort_i(std::string alias)
 {
+	// Matt Iadanza: not sure whether you want to do this in the ccpem pipeliner too?
+
 	if (current_job < 0)
 	{
 		fl_message("Please select a job.");
@@ -1818,6 +1854,8 @@ void GuiMainWindow::cb_mark_as_finished_i(bool is_failed)
 		fl_message("You can only mark existing jobs as finished!");
 		return;
 	}
+
+	// Matt Iadanza: not sure whether you want to do this in the ccpem pipeliner too?
 
 	std::string error_message;
 	if (!pipeline.markAsFinishedJob(current_job, error_message, is_failed))
@@ -1957,7 +1995,14 @@ void GuiMainWindow::cb_undelete_job_i()
 	fl_filename_relative(relname,sizeof(relname),chooser.value());
 	FileName fn_pipe(relname);
 
-	pipeline.undeleteJob(fn_pipe);
+	if (use_ccpem_pipeliner)
+	{
+		REPORT_ERROR("TODO Matt Iadanza: implement system call to CCPEM pipeliner here");
+	}
+	else
+	{
+		pipeline.undeleteJob(fn_pipe);
+	}
 }
 
 // Re-order running and finished job lists
