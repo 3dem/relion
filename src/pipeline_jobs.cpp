@@ -2510,18 +2510,25 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 	command += " " + joboptions["other_args"].getString();
 	commands.push_back(command);
 
+
 	/* TODO: write out 2-column pick.star in relion_preprocess, as of relion-4 coord_suffix is deprecated
-	if (joboptions["do_reextract"].getBoolean() || (joboptions["do_extract_helix"].getBoolean() && joboptions["do_extract_helical_tubes"].getBoolean()) )
+	/  When you do this update could you make the outputs look like this for the ccpem pipeliner?
+
+
+	if joboptions["do_reextract"].getBoolean()
 	{
-		// Also touch the suffix file. Do this after the first command had completed
-		command = "echo " + joboptions["star_mics"].getString() + " > " +  outputname + "coords_suffix_extract.star";
-		commands.push_back(command.c_str());
-
-		Node node(outputname + "coords_suffix_extract.star", NODE_MIC_COORDS);
+		Node node(outputname + "reextract.star", NODE_MIC_COORDS);
 		outputNodes.push_back(node);
-
 	}
+
+	if (joboptions["do_extract_helix"].getBoolean() && joboptions["do_extract_helical_tubes"].getBoolean())
+	{
+		Node node(outputname + "helix_segments.star", NODE_MIC_COORDS);
+		outputNodes.push_back(node);
+	}
+
 	*/
+
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
