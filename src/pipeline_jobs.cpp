@@ -2517,7 +2517,7 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 
 	if joboptions["do_reextract"].getBoolean()
 	{
-		Node node(outputname + "rextract.star", NODE_MIC_COORDS);
+		Node node(outputname + "reextract.star", NODE_MIC_COORDS);
 		outputNodes.push_back(node);
 	}
 
