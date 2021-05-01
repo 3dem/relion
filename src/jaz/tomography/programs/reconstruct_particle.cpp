@@ -521,6 +521,7 @@ void ReconstructParticleProgram::finalise(
 
 	optimisationSet.refMap1 = outDir + "half1.mrc";
 	optimisationSet.refMap2 = outDir + "half2.mrc";
+	optimisationSet.refFSC = "";
 	optimisationSet.write(outDir + "optimisation_set.star");
 
 	Log::endSection();
