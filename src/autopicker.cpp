@@ -159,7 +159,7 @@ if(do_gpu)
 	topaz_radius = textToInteger(parser.getOption("--topaz_radius", "Particle radius (in pix) for topaz extract (default is from particle diameter)", "-1"));
 	fn_topaz_exe = parser.getOption("--topaz_exe", "Name of topaz executable", "topaz");
 	topaz_additional_args = parser.getOption("--topaz_args", "Additional arguments to be passed to topaz", "");
-	topaz_workers = textToInteger(parser.getOption("--topaz_workers", "Number of topaz workers for parallelized training", "4"));
+	topaz_workers = textToInteger(parser.getOption("--topaz_workers", "Number of topaz workers for parallelized training", "1"));
 	do_topaz_plot = parser.checkOption("--topaz_plot", "Plot intermediate information for helical picking in topaz (developmental)");
 
 	int helix_section = parser.addSection("Helix options");
