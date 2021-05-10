@@ -2912,8 +2912,8 @@ void MlOptimiser::iterate()
 		else if (do_grad)
 			REPORT_ERROR("ERROR: Random seed must be set for gradient optimisation.");
 
-		if (grad_pseudo_halfsets)
-			std::cerr << "DEBUG: doing pseudo gold standard" << std::endl;
+		//if (grad_pseudo_halfsets)
+		//	std::cerr << "DEBUG: doing pseudo gold standard" << std::endl;
 
 		expectation();
 
