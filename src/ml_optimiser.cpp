@@ -3249,6 +3249,8 @@ void MlOptimiser::expectation()
 		init_progress_bar(my_nr_particles);
 	}
 
+	// SHWS10052021: reduce frequency of abort check 10-fold
+	long int icheck= 0;
 	while (nr_particles_done < my_nr_particles)
 	{
 
@@ -3267,8 +3269,11 @@ void MlOptimiser::expectation()
 #endif
 
 		// Abort through the pipeline_control system
-		if (pipeline_control_check_abort_job())
-			exit(RELION_EXIT_ABORTED);
+		if (icheck%10 == 0)
+		{
+			if (pipeline_control_check_abort_job()) exit(RELION_EXIT_ABORTED);
+		}
+		icheck++;
 
 		// perform the actual expectation step on several particles
 		expectationSomeParticles(my_pool_first_part_id, my_pool_last_part_id);
