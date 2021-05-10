@@ -2389,6 +2389,9 @@ void JobWindow::initialiseTomoImportWindow()
 
 	place("part_star", TOGGLE_DEACTIVATE);
 	place("part_tomos", TOGGLE_DEACTIVATE);
+	// Add a little spacer
+	current_y += STEPY/2;
+	place("do_coords_flipZ", TOGGLE_DEACTIVATE);
 
 	group2->end();
 	guientries["do_coords"].cb_menu_i(); // make default active

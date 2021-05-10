@@ -5915,6 +5915,7 @@ void RelionJob::initialiseTomoImportJob()
        	joboptions["do_coords"] = JobOption("Import coordinates?", false, "Set this to Yes for importing particle coordinates.");
         joboptions["part_star"] = JobOption("STAR file with coordinates: ", "", "Input file (*.star)", ".", "Provide a STAR file with the following information to input particles: \n \n TODO TODO TODO ");
         joboptions["part_tomos"] = JobOption("Tomograms set: ", NODE_TOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "The tomograms set from which these particles were picked.");
+        joboptions["do_coords_flipZ"] = JobOption("Flip Z coordinates?", false, "Set this to Yes if you want to flip particles Z coordinate. Use it in case imported tomograms Z axis are flipped compared to tomograms used for picking.");
 
     	joboptions["do_other"] = JobOption("Import other node types?", false, "Set this to Yes  if you plan to import anything else than movies or micrographs");
 
@@ -6006,7 +6007,12 @@ bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<st
 
 		command += " --i " + joboptions["part_star"].getString();
 		command += " --o " + outputname;
-                command += " --t " + joboptions["part_tomos"].getString();
+		command += " --t " + joboptions["part_tomos"].getString();
+
+		if (joboptions["do_coords_flipZ"].getString() != "")
+		{
+			command += " --flipZ";
+		}
 
 		Node node(outputname+"particles.star", NODE_PART_DATA);
 		outputNodes.push_back(node);
