@@ -127,8 +127,15 @@ public:
      */
     void compareTwoHalves();
 
-    // Adjust angular sampling based on the expected angular accuracies for gradient optimization
+    /**
+     * Adjust angular sampling based on the expected angular accuracies for gradient optimization
+     */
     void updateAngularSamplingGrad(long int my_first_part_id, long int my_last_part_id, bool verb = true);
+
+    /**
+     * MPI aware verison of MlOptimiser::calculateExpectedAngularErrors
+     */
+	void calculateExpectedAngularErrors(long int my_first_part_id, long int my_last_part_id);
 
     /** Do the real work
      * Expectation is split in image subsets over all nodes, each reconstruction is done on a separate node

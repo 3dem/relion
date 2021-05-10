@@ -1021,6 +1021,16 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 		gradient_refine = false;
 	if (!MD.getValue(EMDL_OPTIMISER_GRAD_EM_ITERS, grad_em_iters))
 		grad_em_iters = 1;
+	if (!MD.getValue(EMDL_OPTIMISER_GRAD_HAS_CONVERGED, grad_has_converged))
+		grad_has_converged = false;
+	if (!MD.getValue(EMDL_OPTIMISER_GRAD_CURRENT_STEPSIZE, grad_current_stepsize))
+		grad_current_stepsize = 0.9;
+	if (!MD.getValue(EMDL_OPTIMISER_AUTO_SUBSET_ORDER, auto_subset_size_order))
+		auto_subset_size_order = 0;
+	if (!MD.getValue(EMDL_OPTIMISER_GRAD_SUSPEND_FINER_SAMPLING_ITER, grad_suspended_finer_sampling_iter))
+		grad_suspended_finer_sampling_iter = 0;
+	if (!MD.getValue(EMDL_OPTIMISER_GRAD_SUSPEND_LOCAL_SAMPLING_ITER, grad_suspended_local_searches_iter))
+		grad_suspended_local_searches_iter = -1;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_STEPSIZE, grad_stepsize))
 		grad_stepsize = -1;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_STEPSIZE_SCHEME, grad_stepsize_scheme))
@@ -1231,6 +1241,13 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT, do_external_reconstruct);
 		MD.setValue(EMDL_OPTIMISER_DO_GRAD, gradient_refine);
 		MD.setValue(EMDL_OPTIMISER_GRAD_EM_ITERS, grad_em_iters);
+
+		MD.setValue(EMDL_OPTIMISER_GRAD_HAS_CONVERGED, grad_has_converged);
+		MD.setValue(EMDL_OPTIMISER_GRAD_CURRENT_STEPSIZE, grad_current_stepsize);
+		MD.setValue(EMDL_OPTIMISER_AUTO_SUBSET_ORDER, auto_subset_size_order);
+		MD.setValue(EMDL_OPTIMISER_GRAD_SUSPEND_FINER_SAMPLING_ITER, grad_suspended_finer_sampling_iter);
+		MD.setValue(EMDL_OPTIMISER_GRAD_SUSPEND_LOCAL_SAMPLING_ITER, grad_suspended_local_searches_iter);
+
 		MD.setValue(EMDL_OPTIMISER_SGD_INI_FRAC, grad_ini_frac);
 		MD.setValue(EMDL_OPTIMISER_SGD_FIN_FRAC, grad_fin_frac);
 		MD.setValue(EMDL_OPTIMISER_SGD_MIN_RESOL, grad_min_resol);
@@ -2175,8 +2192,8 @@ void MlOptimiser::initialiseGeneral(int rank)
 				          "both will instead be determined automatically." << std::endl;
 
 			unsigned long dataset_size = mydata.numberOfParticles();
-			grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.001, 500), 200);
-			grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.05,  50000), 1000);
+			grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.001, 500), 100);
+			grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.05,  50000), 500);
 			if (rank==0) {
 				std::cout << " Initial subset size set to " << grad_ini_subset_size << std::endl;
 				std::cout << " Final subset size set to " << grad_fin_subset_size << std::endl;
@@ -3234,6 +3251,8 @@ void MlOptimiser::expectation()
 		init_progress_bar(my_nr_particles);
 	}
 
+	// SHWS10052021: reduce frequency of abort check 10-fold
+	long int icheck= 0;
 	while (nr_particles_done < my_nr_particles)
 	{
 
@@ -3252,8 +3271,11 @@ void MlOptimiser::expectation()
 #endif
 
 		// Abort through the pipeline_control system
-		if (pipeline_control_check_abort_job())
-			exit(RELION_EXIT_ABORTED);
+		if (icheck%10 == 0)
+		{
+			if (pipeline_control_check_abort_job()) exit(RELION_EXIT_ABORTED);
+		}
+		icheck++;
 
 		// perform the actual expectation step on several particles
 		expectationSomeParticles(my_pool_first_part_id, my_pool_last_part_id);

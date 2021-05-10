@@ -844,46 +844,10 @@ void MlOptimiserMpi::expectation()
 	// C. Calculate expected angular errors
 	// Do not do this for maxCC
 	// Only the first (reconstructing) follower (i.e. from half1) calculates expected angular errors
-	if (!(iter==1 && do_firstiter_cc) && !(do_skip_align || do_skip_rotate) &&
-         (do_auto_refine || !do_grad || (iter % 10 == 0 && mymodel.nr_classes > 1 && allow_coarser_samplings)))
-	{
-		int my_nr_images, length_fn_ctf;
-		if (node->isLeader())
-		{
-			// Leader sends metadata (but not imagedata) for first 100 particles to first_follower (for calculateExpectedAngularErrors)
-			MlOptimiser::getMetaAndImageDataSubset(0, n_trials_acc-1, false);
-			my_nr_images = YSIZE(exp_metadata);
-			node->relion_MPI_Send(&my_nr_images, 1, MPI_INT, first_follower, MPITAG_JOB_REQUEST, MPI_COMM_WORLD);
-			node->relion_MPI_Send(MULTIDIM_ARRAY(exp_metadata), MULTIDIM_SIZE(exp_metadata), MY_MPI_DOUBLE, first_follower, MPITAG_METADATA, MPI_COMM_WORLD);
-			// Also send exp_fn_ctfs if necessary
-			length_fn_ctf = exp_fn_ctf.length() + 1; // +1 to include \0 at the end of the string
-			node->relion_MPI_Send(&length_fn_ctf, 1, MPI_INT, first_follower, MPITAG_JOB_REQUEST, MPI_COMM_WORLD);
-			if (length_fn_ctf > 1)
-				node->relion_MPI_Send((void*)exp_fn_ctf.c_str(), length_fn_ctf, MPI_CHAR, first_follower, MPITAG_METADATA, MPI_COMM_WORLD);
-		}
-		else if (node->rank == first_follower)
-		{
-			// Follower has to receive all metadata from the leader!
-			node->relion_MPI_Recv(&my_nr_images, 1, MPI_INT, 0, MPITAG_JOB_REQUEST, MPI_COMM_WORLD, status);
-			exp_metadata.resize(my_nr_images, METADATA_LINE_LENGTH_BEFORE_BODIES + (mymodel.nr_bodies) * METADATA_NR_BODY_PARAMS);
-			node->relion_MPI_Recv(MULTIDIM_ARRAY(exp_metadata), MULTIDIM_SIZE(exp_metadata), MY_MPI_DOUBLE, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
-			node->relion_MPI_Recv(&length_fn_ctf, 1, MPI_INT, 0, MPITAG_JOB_REQUEST, MPI_COMM_WORLD, status);
-			if (length_fn_ctf > 1)
-			{
-				char* rec_buf2;
-				rec_buf2 = (char *) malloc(length_fn_ctf);
-				node->relion_MPI_Recv(rec_buf2, length_fn_ctf, MPI_CHAR, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
-				exp_fn_ctf = rec_buf2;
-				free(rec_buf2);
-			}
-			if (!do_grad)
-				calculateExpectedAngularErrors(0, n_trials_acc - 1);
-		}
+	if (!do_grad && !(iter==1 && do_firstiter_cc) && !(do_skip_align || do_skip_rotate) &&
+         (do_auto_refine || (iter % 10 == 0 && mymodel.nr_classes > 1 && allow_coarser_samplings)))
+		calculateExpectedAngularErrors(0, n_trials_acc - 1);
 
-		// The reconstructing follower Bcast acc_rottilt, acc_psi, acc_trans to all other nodes!
-		node->relion_MPI_Bcast(&acc_rot, 1, MY_MPI_DOUBLE, first_follower, MPI_COMM_WORLD);
-		node->relion_MPI_Bcast(&acc_trans, 1, MY_MPI_DOUBLE, first_follower, MPI_COMM_WORLD);
-	}
 #ifdef TIMING
 		timer.toc(TIMING_EXP_2);
 		timer.tic(TIMING_EXP_3);
@@ -893,8 +857,8 @@ void MlOptimiserMpi::expectation()
 		updateAngularSampling(node->rank == 1);
 
 	// D. Update the angular sampling (all nodes except leader) for gradient refinement
-	if (do_grad && node->rank == first_follower && ( do_auto_refine && iter > 1 ))
-		updateAngularSamplingGrad(0, n_trials_acc - 1,node->rank == 1);
+	if (do_grad && ( do_auto_refine && iter > 1 ))
+		updateAngularSamplingGrad(0, n_trials_acc - 1, node->rank == 1);
 
 	// The leader needs to know about the updated parameters from updateAngularSampling
 	node->relion_MPI_Bcast(&auto_subset_size_order, 1, MPI_INT, first_follower, MPI_COMM_WORLD);
@@ -1165,10 +1129,16 @@ void MlOptimiserMpi::expectation()
 			long int my_nr_particles_done = 0;
 
 
+			// SHWS10052021: reduce frequency of abort check 10-fold
+			long int icheck= 0;
 			while (nr_followers_done < node->size - 1)
 			{
 
-				pipeline_control_check_abort_job();
+				if (icheck%10 == 0)
+				{
+					if (pipeline_control_check_abort_job()) MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
+				}
+				icheck++;
 
 				// Receive a job request from a follower
 				node->relion_MPI_Recv(MULTIDIM_ARRAY(first_last_nr_images), MULTIDIM_SIZE(first_last_nr_images), MPI_LONG, MPI_ANY_SOURCE, MPITAG_JOB_REQUEST, MPI_COMM_WORLD, status);
@@ -1426,9 +1396,6 @@ void MlOptimiserMpi::expectation()
 						}
 						node->relion_MPI_Recv(MULTIDIM_ARRAY(exp_imagedata), MULTIDIM_SIZE(exp_imagedata), MY_MPI_DOUBLE, 0, MPITAG_IMAGE, MPI_COMM_WORLD, status);
 					}
-
-					if (pipeline_control_check_abort_job())
-						MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
 
 					// Now process these images
 #ifdef DEBUG_MPIEXP
@@ -3128,6 +3095,48 @@ void MlOptimiserMpi::compareTwoHalves()
 #endif
 }
 
+void MlOptimiserMpi::calculateExpectedAngularErrors(long int my_first_part_id, long int my_last_part_id)
+{
+	MPI_Status status;
+	int first_follower = 1;
+	int my_nr_images, length_fn_ctf;
+
+	if (node->isLeader())
+	{
+		// Leader sends metadata (but not imagedata) for first 100 particles to first_follower (for calculateExpectedAngularErrors)
+		MlOptimiser::getMetaAndImageDataSubset(my_first_part_id, my_last_part_id, false);
+		my_nr_images = YSIZE(exp_metadata);
+		node->relion_MPI_Send(&my_nr_images, 1, MPI_INT, first_follower, MPITAG_JOB_REQUEST, MPI_COMM_WORLD);
+		node->relion_MPI_Send(MULTIDIM_ARRAY(exp_metadata), MULTIDIM_SIZE(exp_metadata), MY_MPI_DOUBLE, first_follower, MPITAG_METADATA, MPI_COMM_WORLD);
+		// Also send exp_fn_ctfs if necessary
+		length_fn_ctf = exp_fn_ctf.length() + 1; // +1 to include \0 at the end of the string
+		node->relion_MPI_Send(&length_fn_ctf, 1, MPI_INT, first_follower, MPITAG_JOB_REQUEST, MPI_COMM_WORLD);
+		if (length_fn_ctf > 1)
+			node->relion_MPI_Send((void*)exp_fn_ctf.c_str(), length_fn_ctf, MPI_CHAR, first_follower, MPITAG_METADATA, MPI_COMM_WORLD);
+	}
+	else if (node->rank == first_follower)
+	{
+		// Follower has to receive all metadata from the leader!
+		node->relion_MPI_Recv(&my_nr_images, 1, MPI_INT, 0, MPITAG_JOB_REQUEST, MPI_COMM_WORLD, status);
+		exp_metadata.resize(my_nr_images, METADATA_LINE_LENGTH_BEFORE_BODIES + (mymodel.nr_bodies) * METADATA_NR_BODY_PARAMS);
+		node->relion_MPI_Recv(MULTIDIM_ARRAY(exp_metadata), MULTIDIM_SIZE(exp_metadata), MY_MPI_DOUBLE, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
+		node->relion_MPI_Recv(&length_fn_ctf, 1, MPI_INT, 0, MPITAG_JOB_REQUEST, MPI_COMM_WORLD, status);
+		if (length_fn_ctf > 1)
+		{
+			char* rec_buf2;
+			rec_buf2 = (char *) malloc(length_fn_ctf);
+			node->relion_MPI_Recv(rec_buf2, length_fn_ctf, MPI_CHAR, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
+			exp_fn_ctf = rec_buf2;
+			free(rec_buf2);
+		}
+		MlOptimiser::calculateExpectedAngularErrors(my_first_part_id, my_last_part_id);
+	}
+
+	// The reconstructing follower Bcast acc_rottilt, acc_psi, acc_trans to all other nodes!
+	node->relion_MPI_Bcast(&acc_rot, 1, MY_MPI_DOUBLE, first_follower, MPI_COMM_WORLD);
+	node->relion_MPI_Bcast(&acc_trans, 1, MY_MPI_DOUBLE, first_follower, MPI_COMM_WORLD);
+}
+
 void MlOptimiserMpi::updateAngularSamplingGrad(long int my_first_part_id, long int my_last_part_id, bool myverb)
 {
 	if (mymodel.ref_dim != 3)
@@ -3155,7 +3164,7 @@ void MlOptimiserMpi::updateAngularSamplingGrad(long int my_first_part_id, long i
 			{
 				// DETERMINE ORIENTATIONAL SAMPLING -------------------------------------------------------------------
 
-				calculateExpectedAngularErrors(my_first_part_id, my_last_part_id - 1);
+				calculateExpectedAngularErrors(my_first_part_id, my_last_part_id);
 
 				RFLOAT min_angle_step = (iter == 1 && do_firstiter_cc) ?
 				                        360. / CEIL(PI * particle_diameter * mymodel.current_resolution) : acc_rot;

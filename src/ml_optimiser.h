@@ -89,7 +89,7 @@
 #define WIDTH_FMASK_EDGE 2.
 #define MAX_NR_ITER_WO_RESOL_GAIN 1
 #define MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES 1
-#define MAX_NR_ITER_WO_RESOL_GAIN_GRAD 5
+#define MAX_NR_ITER_WO_RESOL_GAIN_GRAD 4
 
 // for profiling
 //#define TIMING
@@ -855,6 +855,7 @@ public:
 		grad_has_converged(false),
 		grad_suspended_local_searches_iter(-1),
 		grad_suspended_finer_sampling_iter(-1),
+		grad_pseudo_halfsets(false),
 #ifdef ALTCPU
 		mdlClassComplex(NULL),
 #endif
