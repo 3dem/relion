@@ -1335,9 +1335,11 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 	if (do_join_random_halves && !optimisationSet.isEmpty())
 	{
 		optimisationSet.setValue(EMDL_TOMO_PARTICLES_FILE_NAME, fn_root + "_data.star");
-		optimisationSet.setValue(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, fn_root2 + "_half1_unfil.mrc");
-		optimisationSet.setValue(EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME, fn_root2 + "_half2_unfil.mrc");
+		optimisationSet.setValue(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, fn_root2 + "_half1_class001_unfil.mrc");
+		optimisationSet.setValue(EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME, fn_root2 + "_half2_class001_unfil.mrc");
 		optimisationSet.setValue(EMDL_TOMO_REFERENCE_MASK_FILE_NAME, fn_mask);
+		if (optimisationSet.containsLabel(EMDL_TOMO_REFERENCE_FSC_FILE_NAME))
+			optimisationSet.deactivateLabel(EMDL_TOMO_REFERENCE_FSC_FILE_NAME);
 
 		optimisationSet.write(fn_root + "_optimisation_set.star");
 	}
@@ -1505,6 +1507,10 @@ void MlOptimiser::initialise()
 		// Set sigma2_noise and Iref from averaged poser spectra and Mavg
 		setSigmaNoiseEstimatesAndSetAverageImage(Mavg);
 	}
+
+	// Initialise the data_versus_prior ratio to get the initial current_size right
+	if (iter == 0 && !do_initialise_bodies)
+		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
 
 	// Check minimum group size of 10 particles
 	if (verb > 0)
@@ -2280,10 +2286,6 @@ void MlOptimiser::initialiseGeneralFinalize(int rank)
 
 		// Low-pass filter the initial references
 		initialLowPassFilterReferences();
-
-		// Initialise the data_versus_prior ratio to get the initial current_size right
-		if (!do_initialise_bodies)
-			mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
 
 		if (do_init_blobs && fn_ref == "None")
 		{

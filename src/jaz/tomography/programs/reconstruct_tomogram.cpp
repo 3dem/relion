@@ -92,13 +92,7 @@ void TomoBackprojectProgram::run()
 	BufferedImage<float> stackAct;
 	std::vector<d4Matrix> projAct(fc);
 	double pixelSizeAct = tomogram.optics.pixelSize;
-	
-	
-	const int w1 = w > 0? w : w0 / spacing + 0.5;
-	const int h1 = h > 0? h : h0 / spacing + 0.5;
-	const int t1 = d > 0? d : d0 / spacing;
 
-		
 	if (std::abs(spacing - 1.0) < 1e-2)
 	{
 		projAct = tomogram.projectionMatrices;
@@ -126,11 +120,17 @@ void TomoBackprojectProgram::run()
 			stackAct = tomogram.stack;
 		}
 	}
-	
+
 	const int w_stackAct = stackAct.xdim;
 	const int h_stackAct = stackAct.ydim;
 	const int wh_stackAct = w_stackAct/2 + 1;
-	
+
+	bool flipxy = abs(projAct[0](0,0)) < abs(projAct[0](0,1));
+	const int wtmp = (flipxy? h0 : w0) / spacing + 0.5;
+	const int htmp = (flipxy? w0 : h0) / spacing + 0.5;
+	const int w1 = w > 0? w : wtmp;
+	const int h1 = h > 0? h : htmp;
+	const int t1 = d > 0? d : d0 / spacing;
 	
 	d3Vector orig(x0, y0, z0);
 	BufferedImage<float> out(w1, h1, t1);
