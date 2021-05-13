@@ -909,6 +909,7 @@ void CtfRefinementProgram::fitGlobalScale()
 
 		if (!ZIO::fileExists(tempFilename))
 		{
+			Log::warn("Temporary file "+tempFilename+" not found.");
 			continue;
 		}
 
@@ -1570,7 +1571,7 @@ void CtfRefinementProgram::writeScaleEps(
 	plot2D.SetXAxisSize(600);
 	plot2D.SetYAxisSize(600);
 	plot2D.SetDrawLegend(true);
-	plot2D.SetFlipY(true);
+	plot2D.SetFlipY(false);
 
 	const int fc = table.numberOfObjects();
 
