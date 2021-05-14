@@ -48,8 +48,8 @@ void DarkEraseProgram::run()
 	
 	std::cout << "highpass filtering images at " << minFreq << " px^-1..." << std::endl;
 	
-	stackBin = ImageFilter::highpassStack(stackBin, minFreq, 0.3*minFreq, true);
-	stackBin = ImageFilter::lowpassStack(stackBin, maxFreq, 0.3*maxFreq, true);
+	stackBin = ImageFilter::highpassStack(stackBin, minFreq, 10.0, true);
+	stackBin = ImageFilter::lowpassStack(stackBin, maxFreq, 10.0, true);
 	
 	std::cout << "normalizing images..." << std::endl;
 	

@@ -1,7 +1,7 @@
 #################################################################################
-# Description:  Cmake helper to download and configure LibTorch models.
+# Description:  Cmake helper to download and configure Torch models.
 # Author:       Dari Kimanius (github.com/dkimanius)
-# Date created: 2021-01-14
+# Date created: 2021-05-04
 #################################################################################
 
 include(ExternalProject)
