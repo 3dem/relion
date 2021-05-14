@@ -6191,15 +6191,20 @@ void RelionJob::initialiseTomoCtfRefineJob()
 
     	joboptions["box_size"] = JobOption("Box size for estimation (pix):", 128, 32, 512, 16, "Box size to be used for the estimation. Note that this can be larger than the box size of the reference map. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
     	joboptions["do_defocus"] = JobOption("Refine defocus?", true, "If set to Yes, then estimate the defoci of the individual tilt images.");
-    	joboptions["focus_range"] = JobOption("Defocus search range (A):", 3000, 0, 10000, 500, "Defocus search range (in A). This search range will be defualt be samples 100 times. Use the additional argument --ds to change the number of sampling points.");
-    	std::cerr << "TODO: finish help texts here!!" << std::endl;
-    	joboptions["lambda"] = JobOption("Defocus regularisation:", 0.1, 0, 1, 0.05, "Defocus regularisation scale.");
-
-    	//joboptions["do_astigmatism"] = JobOption("Refine astigmatism?", false, "If set to Yes, then refine the astigmatism. If set to No, then only a scalar defocus value will be estimated. The latter is useful if the number of particles is too small to allow for accurate astigmatism estimation. If defocus refinement is unstable in general (i.e. because of very few particles per tomogram), then do not use this program.");
-
-    	joboptions["do_scale"] = JobOption("Refine contrast scale?", true, "If set to Yes, then estimate contrast scale factor.");
-    	joboptions["do_frame_scale"] = JobOption("Refine scale per form?", true, "If set to Yes, then estimate contrast scale factor.");
-    	joboptions["do_tomo_scale"] = JobOption("Refine scale per tomogram?", false, "If set to Yes, then estimate contrast scale factor.");
+    	joboptions["focus_range"] = JobOption("Defocus search range (A):", 3000, 0, 10000, 500, "Defocus search range (in A). This search range will be, by default, sampled in 100 steps. Use the additional argument --ds to change the number of sampling points.");
+    	joboptions["lambda"] = JobOption("Defocus regularisation:", 0.1, 0, 1, 0.05, "Defocus regularisation scale. " \
+		"High-tilt images do not offer enough signal to recover the defocus value precisely. The regularisation " \
+		"forces the estimated defoci to assume similar values within a given tilt series, which prevents those " \
+		"high-tilt images from overfitting.");
+    	joboptions["do_scale"] = JobOption("Refine contrast scale?", true, "If set to Yes, then estimate the signal " \
+    	"scale or ice thickness.");
+    	joboptions["do_frame_scale"] = JobOption("Refine scale per frame?", true, "If set to Yes, then estimate the " \
+		"signal-scale parameter independently for each tilt. If not specified, the ice thickness, beam luminance and " \
+		"surface normal are estimated instead. Those three parameters then imply the signal intensity for each frame. "\
+		"Due to the smaller number of parameters, the ice thickness model is more robust to noise. By default, the "\
+		"ice thickness and surface normal will be estimated per tilt-series, and the beam luminance globally.");
+    	joboptions["do_tomo_scale"] = JobOption("Refine scale per tomogram?", false, "If set to Yes, then estimate "\
+    	"the beam luminance separately for each tilt series. This is not recommended.");
 
     	joboptions["do_even_aberr"] = JobOption("Refine even aberrations?", true, "If set to Yes, then estimates the even higher-order aberrations.");
     	joboptions["nr_even_aberr"] = JobOption("Order of even aberrations:", 4, 4, 8, 2, "The maximum order for the even aberrations to be estimated.");
