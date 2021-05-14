@@ -2,33 +2,16 @@ import os
 import argparse
 import sys
 
-
-def import_error(module_name):
-    print(
-        "PYTHON ERROR: The required python module '",
-        module_name,
-        "' was not found.",
-        sep=""
-    )
+try:
+    import torch
+except ImportError:
+    print("PYTHON ERROR: The required python module 'torch' was not found.")
     exit(1)
-
-
-if sys.version_info >= (3, 5):
-    import importlib
-    if not importlib.util.find_spec("torch"):
-        import_error('torch')
-    if not importlib.util.find_spec("numpy"):
-        import_error('numpy')
-else:
-    import imp
-    try:
-        imp.find_module('torch')
-    except ImportError:
-        import_error('torch')
-    try:
-        imp.find_module('numpy')
-    except ImportError:
-        import_error('numpy')
+try:
+    import numpy
+except ImportError:
+    print("PYTHON ERROR: The required python module 'numpy' was not found.")
+    exit(1)
 
 import torch
 import numpy as np
