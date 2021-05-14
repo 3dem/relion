@@ -5011,7 +5011,7 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 		inputNodes.push_back(node);
 		command += " --ios " + fn_OS;
 
-		Node node1(outputname + "postprocess_optimiser_set.star", NODE_TOMO_OPTIMISATION);
+		Node node1(outputname + "postprocess_optimisation_set.star", NODE_TOMO_OPTIMISATION);
 		outputNodes.push_back(node1);
 	}
 	else if (fn_half1 == "")
