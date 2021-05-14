@@ -581,7 +581,7 @@ std::vector<int> ParticleSet::enumerateNonEmpty(const std::vector<std::vector<Pa
 	{
 		if (particlesByTomogram[t].size() > 0)
 		{
-			out[t] = index;
+			out[index] = t;
 			index++;
 		}
 	}

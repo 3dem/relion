@@ -245,15 +245,15 @@ BufferedImage<T> Resampling::downsampleFiltStack_2D_full(
 		hout -= hout % 2;
 	}
 	
-	const double freqPx = 0.5 / factor;
-	const double widthPx = 0.3 * freqPx;
+	const double wavelengthPx = 2.0 * factor;
+	const double filterEdgeWidthPx = 10.0;
 	
 	BufferedImage<T> out(wout, hout, img.zdim);
 	
 	#pragma omp parallel for num_threads(num_threads)
 	for (int f = 0; f < img.zdim; f++)
 	{
-		BufferedImage<T> sliceFilt = ImageFilter::lowpass2D(img, f, freqPx, widthPx, true);				
+		BufferedImage<T> sliceFilt = ImageFilter::lowpass2D(img, f, wavelengthPx, filterEdgeWidthPx, true);
 		NewStackHelper::insertSliceZ(subsample_2D_full(sliceFilt, wout, hout, factor), out, f);
 	}
 			
@@ -413,7 +413,7 @@ BufferedImage<T> Resampling::FourierCrop_fullStack(
 	}
 	else
 	{
-		imgCp = img;	  
+		imgCp = img;
 	}
 	
 	const int wh_in = w_in/2 + 1;
@@ -423,17 +423,19 @@ BufferedImage<T> Resampling::FourierCrop_fullStack(
 	
 	NewStackHelper::FourierTransformStack(imgCp, imgFS, true, num_threads);
 	
-	BufferedImage<tComplex<T>> imgFS_cropped(wh_out, h_out, fc);	
+	BufferedImage<tComplex<T>> imgFS_cropped(wh_out, h_out, fc);
+
+	const double value_scale = 1.0 / factor;
 	
 	#pragma omp parallel for num_threads(num_threads)
-	for (int f = 0; f < fc; f++)		
+	for (int f = 0; f < fc; f++)
 	for (int y = 0; y < h_out; y++)
 	for (int x = 0; x < wh_out; x++)
 	{
 		int xx = x;
 		int yy = y < h_out/2? y : y - h_out + h_in;
 		
-		imgFS_cropped(x,y,f) = imgFS(xx,yy,f);		
+		imgFS_cropped(x,y,f) = value_scale * imgFS(xx,yy,f);
 	}
 	
 	BufferedImage<float> imgOut(w_out, h_out, fc);

@@ -36,6 +36,7 @@ void TomoBackprojectProgram::readParameters(int argc, char *argv[])
 
 	applyWeight = !parser.checkOption("--no_weight", "Do not perform weighting in Fourier space using a Wiener filter");
 	applyPreWeight = parser.checkOption("--pre_weight", "Pre-weight the 2D slices prior to backprojection");
+	FourierCrop = parser.checkOption("--Fc", "Downsample the 2D images by Fourier cropping");
 
 	SNR = textToDouble(parser.getOption("--SNR", "SNR assumed by the Wiener filter", "10"));
 
@@ -110,8 +111,16 @@ void TomoBackprojectProgram::run()
 		{
 			Log::print("Resampling image stack");
 			
-			stackAct = Resampling::downsampleFiltStack_2D_full(
+			if (FourierCrop)
+			{
+				stackAct = Resampling::FourierCrop_fullStack(
+						tomogram.stack, spacing, n_threads, true);
+			}
+			else
+			{
+				stackAct = Resampling::downsampleFiltStack_2D_full(
 						tomogram.stack, spacing, n_threads);
+			}
 			
 			pixelSizeAct *= spacing;
 		}

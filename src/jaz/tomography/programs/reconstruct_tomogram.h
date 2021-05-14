@@ -17,7 +17,7 @@ class TomoBackprojectProgram
 			int w, h, d;
 			double spacing, x0, y0, z0, taperDist, taperFalloff;
 			std::string tomoName, outFn;
-			bool applyPreWeight, applyWeight, applyCtf, zeroDC;
+			bool applyPreWeight, applyWeight, applyCtf, zeroDC, FourierCrop;
 			double SNR;
 
 			OptimisationSet optimisationSet;
