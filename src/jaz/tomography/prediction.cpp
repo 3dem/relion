@@ -200,9 +200,9 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 					aberrationsCache,
 					referenceMap.image_FS, halfSet,
 					AmplitudeAndPhaseModulated,
-					NotDoseWeighted,
+					DoseWeighted,
 					0.0,
-					CtfUnscaled);
+					CtfScaled);
 					
 			BufferedImage<fComplex> ccFS(sh,s);
 			

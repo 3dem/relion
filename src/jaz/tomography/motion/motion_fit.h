@@ -94,13 +94,24 @@ class MotionFit : public FastDifferentiableOptimization
 		
 		int getParamCount();
 			
-		std::vector<BufferedImage<double>> drawShiftedCCs(const std::vector<double>& x) const;
-		Mesh visualiseTrajectories(const std::vector<double>& x, double scale);
+		std::vector<BufferedImage<double>> drawShiftedCCs(
+				const std::vector<double>& x) const;
+
+		Mesh visualiseTrajectories3D(
+				const std::vector<double>& x,
+				double scale);
+
+		void visualiseTrajectories2D(
+				const std::vector<double>& x,
+				double scale,
+				const std::string& tomo_name,
+				const std::string& file_name_root);
 		
 		void report(int iteration, double cost, const std::vector<double>& x) const;
 		
 		void analyseGradient(const std::vector<double>& x, int particle, int frame, double epsilon);
 	
+
 	protected:
 	
 		inline int getFrameStride() const
