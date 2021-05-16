@@ -582,7 +582,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 		if (fn_mask == "None")
 		{
 			if (!optimisationSet.getValue(EMDL_TOMO_REFERENCE_MASK_FILE_NAME, fn_mask))
-				REPORT_ERROR("No reference mask filename was found in file " + fn_OS);
+				std::cout << " WARNING: No reference mask filename was found in file " + fn_OS + ". Continuing without mask." << std::endl;
 		}
 	}
 

@@ -5900,21 +5900,32 @@ void RelionJob::initialiseTomoImportJob()
 
        	joboptions["do_tomo"] = JobOption("Import tomograms?", true, "Set this to Yes for importing tomogram directories from IMOD.");
         joboptions["io_tomos"] = JobOption("Append to tomograms set: ", NODE_TOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "The imported tomograms will be output into this tomogram set. If any tomograms were already in this tomogram set, then the newly imported ones will be added to those.");
-        joboptions["tomo_star"] = JobOption("STAR file with tomograms description: ", "", "Input file (*.star)", ".", "Provide a STAR file with the following information to input tomograms: \n \n TODO TODO TODO ");
-    	joboptions["angpix"] = JobOption("Pixel size (Angstrom):", (std::string)"", "Pixel size in Angstroms. If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
-    	joboptions["kV"] = JobOption("Voltage (kV):", (std::string)"", "Voltage the microscope was operated on (in kV; default=300). If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
-    	joboptions["Cs"] = JobOption("Spherical aberration (mm):", (std::string)"", "Spherical aberration of the microscope used to collect these images (in mm; default=2.7). Typical values are 2.7 (FEI Titan & Talos, most JEOL CRYO-ARM), 2.0 (FEI Polara), 1.4 (some JEOL CRYO-ARM) and 0.01 (microscopes with a Cs corrector). If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
-    	joboptions["Q0"] = JobOption("Amplitude contrast:", (std::string)"", "Fraction of amplitude contrast (default=0.1). Often values around 10% work better than theoretically more accurate lower values.  If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
-    	joboptions["dose"] = JobOption("Frame dose:", (std::string)"", "Electron dose (in e/A^2) per frame (image) in the tilt series.  If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
-    	joboptions["order_list"] = JobOption("Ordered list:", (std::string)"", "", ".", "A 2-column, comma-separated file with the frame-order list of the tilt series, where the first column is the frame (image) number (starting at 1) and the second column is the tilt angle (in degrees). If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
-    	joboptions["do_flipYZ"] = JobOption("Flip YZ?", true, "Set this to Yes if you want to interchange the Y and Z coordinates.  If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
-    	joboptions["do_flipZ"] = JobOption("Flip Z?", true, "Set this to Yes if you want to change the sign of the Z coordinates.  If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
-    	joboptions["hand"] = JobOption("Tilt handedness:", (std::string)"", "Set this to indicate the handedness of the tilt geometry (default=-1). The value of this parameter is either +1 or -1, and it describes whether the focus increases or decreases as a function of Z distance. It has to be determined experimentally. In our experiments, it has always been -1. Y If this values varies among the input tomograms, then specify it using its own column in the input STAR file.");
+        joboptions["tomo_star"] = JobOption("STAR file with tomograms description: ", "", "Input file (*.star)", ".", "Provide a STAR file with the basic following information to import tomogsrams: \n\n"
+                  " - rlnTomoImportImodDir: path to the IMOD directory.\n"
+                  " - rlnTomoImportCtfFindFile or rlnTomoImportCtfPlotterFile: path to the initial CTF estimate from either CTFFind or CtfPlotter, respectively.\n"
+                  " - rlnTomoTiltSeriesName: path to the actual tilt series file. Note if the filename ends with .st, this needs to be specificed with an .st:mrc ending to tell RELION  to interpret it as an mrc file.\n\n"
+                  "The following additional columns may also be present:\n\n"
+                  " - rlnTomoName: The tomogram name. If not specified rlnTomoTiltSeriesName will be used instead.\n"
+                  " - rlnTomoImportFractionalDose: the electron dose corresponding to one tilt image. If omitted, the value of the --fd argument will be used.\n"
+                  " - rlnTomoImportOrderList: path to a two-column csv text file specifying the chronological order in which the images were acquired. The first number counts up from 1, while the second describes the sequence of tilt angles.\n"
+                  " - rlnOpticsGroupName: an arbitrary name for an optics group. This allows the set of tilt series to be separated into subsets that share the same optical aberrations. This is useful if the data have been collected in multiple sessions that might exhibit different aberrations. If omitted, all tilt series will be assigned to the same default optics group.\n"
+                  " - rlnTomoImportOffset<X/Y/Z>: an arbitrary offset to the 3D coordinate system. This is useful if particles have already been picked in tomograms that have been cropped after reconstruction by IMOD. If the IMOD-internal SHIFT command has been used to apply offsets, then this will be handled internally and does not need to be specified here. If omitted, then the values of the --off<x/y/z> command line arguments will be used instead (which default to 0).\n"
+                  " - rlnTomoImportCulledFile: output file name for a new tilt series with the excluded frames missing. This is only needed if tilt images have been excluded using IMOD’s EXCLUDE, EXCLUDELIST or EXCLUDELIST2 commands. In that case, this becomes a mandatory parameter.");
+    	joboptions["angpix"] = JobOption("Pixel size (Angstrom):", (std::string)"", "Pixel size in Angstroms. If this values varies among the input tomograms, then specify it using its own column (rlnTomoTiltSeriesPixelSize) in the input tomogram description STAR file.");
+    	joboptions["kV"] = JobOption("Voltage (kV):", (std::string)"", "Voltage the microscope was operated on (in kV; default=300). If this values varies among the input tomograms, then specify it using its own column (rlnVoltage) in the input tomogram description STAR file.");
+    	joboptions["Cs"] = JobOption("Spherical aberration (mm):", (std::string)"", "Spherical aberration of the microscope used to collect these images (in mm; default=2.7). Typical values are 2.7 (FEI Titan & Talos, most JEOL CRYO-ARM), 2.0 (FEI Polara), 1.4 (some JEOL CRYO-ARM) and 0.01 (microscopes with a Cs corrector). If this values varies among the input tomograms, then specify it using its own column (rlnSphericalAberration) in the input tomogram description STAR file.");
+    	joboptions["Q0"] = JobOption("Amplitude contrast:", (std::string)"", "Fraction of amplitude contrast (default=0.1). Often values around 10% work better than theoretically more accurate lower values.  If this values varies among the input tomograms, then specify it using its own column (rlnAmplitudeContrast) in the input tomogram description STAR file.");
+    	joboptions["dose"] = JobOption("Frame dose:", (std::string)"", "Electron dose (in e/A^2) per frame (image) in the tilt series.  If this values varies among the input tomograms, then specify it using its own column (rlnTomoImportFractionalDose) in the input tomogram description STAR file.");
+    	joboptions["order_list"] = JobOption("Ordered list:", (std::string)"", "", ".", "A 2-column, comma-separated file with the frame-order list of the tilt series, where the first column is the frame (image) number (starting at 1) and the second column is the tilt angle (in degrees). If this values varies among the input tomograms, then specify it using its own column (rlnTomoImportOrderList) in the input tomogram description STAR file.");
+    	joboptions["do_flipYZ"] = JobOption("Flip YZ?", true, "Set this to Yes if you want to interchange the Y and Z coordinates.  If this values varies among the input tomograms, then append opposite values to tomogram set using another Import tomo job.");
+    	joboptions["do_flipZ"] = JobOption("Flip Z?", true, "Set this to Yes if you want to change the sign of the Z coordinates.  If this values varies among the input tomograms, then append opposite values to tomogram set using another Import tomo job.");
+    	joboptions["hand"] = JobOption("Tilt handedness:", (std::string)"", "Set this to indicate the handedness of the tilt geometry (default=-1). The value of this parameter is either +1 or -1, and it describes whether the focus increases or decreases as a function of Z distance. It has to be determined experimentally. In our experiments, it has always been -1. Y If this values varies among the input tomograms, then append opposite values to tomogram set using another Import tomo job.");
 
 
        	joboptions["do_coords"] = JobOption("Import coordinates?", false, "Set this to Yes for importing particle coordinates.");
         joboptions["part_star"] = JobOption("STAR file with coordinates: ", "", "Input file (*.star)", ".", "Provide a STAR file with the following information to input particles: \n \n TODO TODO TODO ");
         joboptions["part_tomos"] = JobOption("Tomograms set: ", NODE_TOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "The tomograms set from which these particles were picked.");
+        joboptions["do_coords_flipZ"] = JobOption("Flip Z coordinates?", false, "Set this to Yes if you want to flip particles Z coordinate. Use it in case imported tomograms Z axis are flipped compared to tomograms used for picking.");
 
     	joboptions["do_other"] = JobOption("Import other node types?", false, "Set this to Yes  if you plan to import anything else than movies or micrographs");
 
@@ -6006,7 +6017,12 @@ bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<st
 
 		command += " --i " + joboptions["part_star"].getString();
 		command += " --o " + outputname;
-                command += " --t " + joboptions["part_tomos"].getString();
+		command += " --t " + joboptions["part_tomos"].getString();
+
+		if (joboptions["do_coords_flipZ"].getString() != "")
+		{
+			command += " --flipZ";
+		}
 
 		Node node(outputname+"particles.star", NODE_PART_DATA);
 		outputNodes.push_back(node);
@@ -6185,15 +6201,20 @@ void RelionJob::initialiseTomoCtfRefineJob()
 
     	joboptions["box_size"] = JobOption("Box size for estimation (pix):", 128, 32, 512, 16, "Box size to be used for the estimation. Note that this can be larger than the box size of the reference map. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
     	joboptions["do_defocus"] = JobOption("Refine defocus?", true, "If set to Yes, then estimate the defoci of the individual tilt images.");
-    	joboptions["focus_range"] = JobOption("Defocus search range (A):", 3000, 0, 10000, 500, "Defocus search range (in A). This search range will be defualt be samples 100 times. Use the additional argument --ds to change the number of sampling points.");
-    	std::cerr << "TODO: finish help texts here!!" << std::endl;
-    	joboptions["lambda"] = JobOption("Defocus regularisation:", 0.1, 0, 1, 0.05, "Defocus regularisation scale.");
-
-    	//joboptions["do_astigmatism"] = JobOption("Refine astigmatism?", false, "If set to Yes, then refine the astigmatism. If set to No, then only a scalar defocus value will be estimated. The latter is useful if the number of particles is too small to allow for accurate astigmatism estimation. If defocus refinement is unstable in general (i.e. because of very few particles per tomogram), then do not use this program.");
-
-    	joboptions["do_scale"] = JobOption("Refine contrast scale?", true, "If set to Yes, then estimate contrast scale factor.");
-    	joboptions["do_frame_scale"] = JobOption("Refine scale per form?", true, "If set to Yes, then estimate contrast scale factor.");
-    	joboptions["do_tomo_scale"] = JobOption("Refine scale per tomogram?", false, "If set to Yes, then estimate contrast scale factor.");
+    	joboptions["focus_range"] = JobOption("Defocus search range (A):", 3000, 0, 10000, 500, "Defocus search range (in A). This search range will be, by default, sampled in 100 steps. Use the additional argument --ds to change the number of sampling points.");
+    	joboptions["lambda"] = JobOption("Defocus regularisation:", 0.1, 0, 1, 0.05, "Defocus regularisation scale. " \
+		"High-tilt images do not offer enough signal to recover the defocus value precisely. The regularisation " \
+		"forces the estimated defoci to assume similar values within a given tilt series, which prevents those " \
+		"high-tilt images from overfitting.");
+    	joboptions["do_scale"] = JobOption("Refine contrast scale?", true, "If set to Yes, then estimate the signal " \
+    	"scale or ice thickness.");
+    	joboptions["do_frame_scale"] = JobOption("Refine scale per frame?", true, "If set to Yes, then estimate the " \
+		"signal-scale parameter independently for each tilt. If not specified, the ice thickness, beam luminance and " \
+		"surface normal are estimated instead. Those three parameters then imply the signal intensity for each frame. "\
+		"Due to the smaller number of parameters, the ice thickness model is more robust to noise. By default, the "\
+		"ice thickness and surface normal will be estimated per tilt-series, and the beam luminance globally.");
+    	joboptions["do_tomo_scale"] = JobOption("Refine scale per tomogram?", false, "If set to Yes, then estimate "\
+    	"the beam luminance separately for each tilt series. This is not recommended.");
 
     	joboptions["do_even_aberr"] = JobOption("Refine even aberrations?", true, "If set to Yes, then estimates the even higher-order aberrations.");
     	joboptions["nr_even_aberr"] = JobOption("Order of even aberrations:", 4, 4, 8, 2, "The maximum order for the even aberrations to be estimated.");
