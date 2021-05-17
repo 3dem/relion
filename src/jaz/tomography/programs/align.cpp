@@ -238,7 +238,7 @@ void AlignProgram::processTomograms(
 
 
 		BufferedImage<float> frqWeight = computeFrequencyWeights(
-			tomogram, whiten, sig2RampPower, hiPass_px, true, num_threads);
+			tomogram, whiten, sig2RampPower, hiPass_px, false, num_threads);
 
 		if (diag)
 		{

@@ -201,7 +201,7 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 					referenceMap.image_FS, halfSet,
 					AmplitudeAndPhaseModulated,
 					DoseWeighted,
-					0.0,
+					tomogram.cumulativeDose[f],
 					CtfScaled);
 					
 			BufferedImage<fComplex> ccFS(sh,s);
