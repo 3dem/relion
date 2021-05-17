@@ -105,14 +105,6 @@ class CtfRefinementProgram : public RefinementProgram
 				double lambda_reg,
 				double k_min_px);
 
-		static BufferedImage<double> plotAstigmatism(
-				const aberration::EvenSolution& solution,
-				const CTF& referenceCtf,
-				double initialDeltaZ,
-				double range,
-				double pixelSize,
-				int size);
-
 
 		std::string getDefocusTempFilenameRoot(
 				const std::string& tomogram_name);

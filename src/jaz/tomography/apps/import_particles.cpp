@@ -69,6 +69,7 @@ int main(int argc, char *argv[])
 		IOParser parser;
 
 		std::string inStarFn, tomoFn, outDir;
+		bool flipZ;
 
 		try
 		{
@@ -79,6 +80,8 @@ int main(int argc, char *argv[])
 			inStarFn = parser.getOption("--i", "Input STAR file containing either a set of particle coordinates or a set of names of files containing those");
 			tomoFn = parser.getOption("--t", "Input tomogram set");
 			outDir = parser.getOption("--o", "Output directory");
+			flipZ = parser.checkOption("--flipZ", "Flip the Z coordinate");
+
 			Log::readParams(parser);
 
 			if (parser.checkForErrors())
@@ -167,6 +170,7 @@ int main(int argc, char *argv[])
 		// split tomograms into optics groups
 
 		std::map<std::string,std::vector<std::string>> opticsGroupName_to_tomoName;
+		std::map<std::string, int> tomoSizeZ;
 
 		TomogramSet tomogramSet(tomoFn);
 
@@ -178,6 +182,13 @@ int main(int argc, char *argv[])
 			const std::string tomogramName = tomogramSet.getTomogramName(t);
 
 			opticsGroupName_to_tomoName[opticsGroupName].push_back(tomogramName);
+
+			if (flipZ)
+			{
+				int zSize;
+				tomogramSet.globalTable.getValueSafely(EMDL_TOMO_SIZE_Z, zSize, t);
+				tomoSizeZ[tomogramName] = zSize - 1;
+			}
 		}
 
 
@@ -251,7 +262,14 @@ int main(int argc, char *argv[])
 
 			outParticles.setValue(EMDL_IMAGE_COORD_X, d.coordinates.x, p);
 			outParticles.setValue(EMDL_IMAGE_COORD_Y, d.coordinates.y, p);
-			outParticles.setValue(EMDL_IMAGE_COORD_Z, d.coordinates.z, p);
+			if (flipZ)
+			{
+				outParticles.setValue(EMDL_IMAGE_COORD_Z, tomoSizeZ[d.tomoName] - d.coordinates.z, p);
+			}
+			else
+			{
+				outParticles.setValue(EMDL_IMAGE_COORD_Z, d.coordinates.z, p);
+			}
 
 			outParticles.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, 0.0, p);
 			outParticles.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, 0.0, p);

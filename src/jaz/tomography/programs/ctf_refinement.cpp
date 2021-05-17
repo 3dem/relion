@@ -554,7 +554,7 @@ void CtfRefinementProgram::updateScale(
 				const double r = sqrt(xx*xx + yy*yy);
 
 				const fComplex obs = -observation(x,y);
-				const fComplex prd =  doseWeights(x,y,f) * prediction(x,y) / ctf.scale;
+				const fComplex prd =  doseWeights(x,y,f) * prediction(x,y);
 
 				const int ri = (int) r;
 

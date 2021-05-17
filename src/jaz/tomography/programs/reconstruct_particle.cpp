@@ -180,8 +180,9 @@ void ReconstructParticleProgram::run()
 	// Delete temporary files
 	// No error checking - do not bother the user if it fails
 	if (system(("rm -rf "+ tmpOutRoot + "*.mrc").c_str()))
-		std::cerr << "WARNING: deleting temporary files in folder " << tmpOutRoot <<
-				  " failed." << std::endl;
+	{
+		Log::warn("Deleting temporary files in folder "+tmpOutRoot+" failed.");
+	}
 }
 
 void ReconstructParticleProgram::processTomograms(
