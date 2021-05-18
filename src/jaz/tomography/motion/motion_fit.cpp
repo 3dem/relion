@@ -602,8 +602,9 @@ std::vector<d3Vector> MotionFit::getParticlePositions(
 	return out;
 }
 
-Trajectory MotionFit::getTrajectory(const std::vector<double> &x, int p,
-									const std::vector<int>& frameSequence) const
+Trajectory MotionFit::getTrajectory(
+		const std::vector<double> &x, int p,
+		const std::vector<int>& frameSequence) const
 {
 	Trajectory out(fc);
 	

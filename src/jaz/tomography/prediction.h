@@ -78,6 +78,20 @@ class Prediction
 				double paddingFactor,
 				HalfSet halfSet = OwnHalf,
 				bool verbose = true);
+
+		static void predictMicrograph(
+				int frame_index,
+				const ParticleSet& dataSet,
+				const std::vector<ParticleIndex>& partIndices,
+				const Tomogram& tomogram,
+				const AberrationsCache& aberrationsCache,
+				const TomoReferenceMap& referenceMap,
+				RawImage<float>& target_slice,
+				HalfSet halfSet = OwnHalf,
+				Modulation modulation = AmplitudeAndPhaseModulated,
+				DoseWeight doseWeight = NotDoseWeighted,
+				CtfScale ctfScale = CtfScaled);
+
 				
 				
 };

@@ -386,5 +386,74 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 		
 	#endif	
 	
-	return CCs;
+		return CCs;
+}
+
+void Prediction::predictMicrograph(int frame_index,
+		const ParticleSet &dataSet,
+		const std::vector<ParticleIndex> &partIndices,
+		const Tomogram &tomogram,
+		const AberrationsCache &aberrationsCache,
+		const TomoReferenceMap &referenceMap,
+		RawImage<float> &target_slice,
+		HalfSet halfSet,
+		Modulation modulation,
+		DoseWeight doseWeight,
+		CtfScale ctfScale)
+{
+	const int s = referenceMap.getBoxSize();
+
+	const int pc = partIndices.size();
+	const int fc = tomogram.frameCount;
+
+	const int f = frame_index;
+	const int w = target_slice.xdim;
+	const int h = target_slice.ydim;
+
+	BufferedImage<float> prediction_RS(s,s);
+
+	target_slice.fill(0.f);
+
+
+	for (int p = 0; p < pc; p++)
+	{
+		const ParticleIndex part_id = partIndices[p];
+
+		const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(
+					part_id, fc, tomogram.optics.pixelSize);
+
+		d4Matrix projCut;
+
+		BufferedImage<fComplex> prediction_FS = Prediction::predictModulated(
+				part_id, dataSet, projCut, s,
+				tomogram.getCtf(f, dataSet.getPosition(part_id)),
+				tomogram.optics.pixelSize,
+				aberrationsCache,
+				referenceMap.image_FS,
+				halfSet,
+				modulation,
+				doseWeight,
+				tomogram.cumulativeDose[f],
+				ctfScale);
+
+		const d4Vector q = tomogram.projectionMatrices[f] * d4Vector(traj[f]);
+		const i2Vector c(round(q.x) - s/2, round(q.y) - s/2);
+		const d2Vector d(q.x - s/2 - c.x, q.y - s/2 - c.y);
+
+		NewStackHelper::shiftStack(prediction_FS, {-d}, prediction_FS, true, 1);
+
+		FFT::inverseFourierTransform(prediction_FS, prediction_RS, FFT::Both);
+
+		for (int y = 0; y < s; y++)
+		for (int x = 0; x < s; x++)
+		{
+			int xx = x + c.x;
+			int yy = y + c.y;
+
+			if (xx >= 0 && xx < w && yy >= 0 && yy < h)
+			{
+				target_slice(xx,yy,0) -= prediction_RS(x,y);
+			}
+		}
+	}
 }
