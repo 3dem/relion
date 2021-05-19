@@ -55,6 +55,8 @@ BufferedImage<double> FCC::compute3(
 	}
 
 	AberrationsCache aberrationsCache(dataSet.optTable, s);
+	BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s, 1.0);
+
 	
 	Log::beginProgress("Computing Fourier-cylinder correlations", pc/num_threads);
 		
@@ -81,6 +83,8 @@ BufferedImage<double> FCC::compute3(
 					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f], traj[f],
 					observation, projCut, 1, true);
 
+			RawImage<float> doseSlice = doseWeights.getSliceRef(f);
+
 			BufferedImage<fComplex> prediction = Prediction::predictModulated(
 					part_id, dataSet, projCut, s,
 					tomogram.getCtf(f, dataSet.getPosition(part_id)),
@@ -89,8 +93,7 @@ BufferedImage<double> FCC::compute3(
 					referenceFS,
 					Prediction::OppositeHalf,
 					Prediction::AmplitudeAndPhaseModulated,
-					Prediction::NotDoseWeighted,
-					0.0,
+					&doseSlice,
 					Prediction::CtfUnscaled);
 
 			const float scale = flip_value? -1.f : 1.f;
@@ -149,4 +152,27 @@ BufferedImage<double> FCC::divide(const BufferedImage<double>& fcc3)
 	}
 	
 	return out;
+}
+
+BufferedImage<double> FCC::sumOverTime(const RawImage<double>& fcc3)
+{
+	const int sh = fcc3.xdim;
+	const int fc = fcc3.ydim;
+
+	BufferedImage<double> sum(sh,1,3);
+
+	sum.fill(0.0);
+
+	for (int x = 0; x < sh; x++)
+	{
+		for (int f = 0; f < fc; f++)
+		{
+			for (int d = 0; d < 3; d++)
+			{
+				sum(x,0,d) += fcc3(x,f,d);
+			}
+		}
+	}
+
+	return sum;
 }

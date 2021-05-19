@@ -197,7 +197,7 @@ void CtfRefinementProgram::processTomograms(
 		BufferedImage<float> freqWeights = computeFrequencyWeights(
 			tomogram, true, 0.0, 0.0, false, num_threads);
 
-		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(boxSize,1);
+		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(boxSize, 1);
 
 
 		const int item_verbosity = per_tomogram_progress? verbosity : 0;
@@ -536,14 +536,15 @@ void CtfRefinementProgram::updateScale(
 
 			CTF ctf = tomogram.getCtf(f, particleSet.getPosition(part_id));
 
+			const RawImage<float> doseSlice = doseWeights.getConstSliceRef(f);
+
 			BufferedImage<fComplex> prediction = Prediction::predictModulated(
 				part_id, particleSet, tomogram.projectionMatrices[f], s,
 				ctf, tomogram.optics.pixelSize, aberrationsCache,
 				referenceMap.image_FS,
 				Prediction::OwnHalf,
 				Prediction::AmplitudeModulated,
-				Prediction::NotDoseWeighted,
-				0.0,
+				&doseSlice,
 				Prediction::CtfUnscaled);
 
 			for (int y = 0; y < sh; y++)
@@ -554,7 +555,7 @@ void CtfRefinementProgram::updateScale(
 				const double r = sqrt(xx*xx + yy*yy);
 
 				const fComplex obs = -observation(x,y);
-				const fComplex prd =  doseWeights(x,y,f) * prediction(x,y);
+				const fComplex prd =  prediction(x,y);
 
 				const int ri = (int) r;
 

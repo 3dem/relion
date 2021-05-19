@@ -345,7 +345,7 @@ void ReconstructParticleProgram::processTomograms(
 			std::vector<d4Matrix> projCut(fc), projPart(fc);
 
 
-			const bool circle_crop = true;
+			const bool circle_crop = false;
 
 			TomoExtraction::extractAt3D_Fourier(
 					tomogram.stack, s02D, binning, tomogram.projectionMatrices, traj,

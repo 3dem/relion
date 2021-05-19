@@ -52,8 +52,7 @@ class Prediction
 				const std::vector<BufferedImage<fComplex>>& referenceFS,
 				HalfSet halfSet = OwnHalf,
 				Modulation modulation = AmplitudeAndPhaseModulated,
-				DoseWeight doseWeight = NotDoseWeighted,
-				double cumulativeDose = 0.0,
+				const RawImage<float>* doseWeight = 0,
 				CtfScale ctfScale = CtfScaled);
 		
 		static BufferedImage<fComplex> predictFS(
@@ -70,7 +69,8 @@ class Prediction
 				const Tomogram& tomogram,
 				const AberrationsCache& aberrationsCache,
 				const TomoReferenceMap& referenceMap,
-				const BufferedImage<float>& frqWghts,
+				const BufferedImage<float>& freqWeights,
+				const BufferedImage<float>& doseWeights,
 				const std::vector<int>& sequence,
 				int maxRange,				
 				bool flip_value,
@@ -86,10 +86,10 @@ class Prediction
 				const Tomogram& tomogram,
 				const AberrationsCache& aberrationsCache,
 				const TomoReferenceMap& referenceMap,
+				const RawImage<float>* doseWeights,
 				RawImage<float>& target_slice,
 				HalfSet halfSet = OwnHalf,
 				Modulation modulation = AmplitudeAndPhaseModulated,
-				DoseWeight doseWeight = NotDoseWeighted,
 				CtfScale ctfScale = CtfScaled);
 
 				

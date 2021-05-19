@@ -85,6 +85,8 @@ void run(int argc, char *argv[])
 	std::vector<ParticleIndex> particles = all_particles[tomo_index];
 
 	AberrationsCache aberrations_cache(particle_set.optTable, box_size);
+	BufferedImage<float> doseWeights = tomogram.computeDoseWeight(box_size, 1);
+
 
 	TomoReferenceMap reference_map;
 	reference_map.read(optimisationSet);
@@ -104,13 +106,14 @@ void run(int argc, char *argv[])
 		}
 
 		RawImage<float> slice = new_stack.getSliceRef(f);
+		const RawImage<float> doseSlice = doseWeights.getConstSliceRef(f);
 
 		Prediction::predictMicrograph(
 			f, particle_set, particles, tomogram,
-			aberrations_cache, reference_map, slice,
+			aberrations_cache, reference_map, &doseSlice,
+			slice,
 			Prediction::OwnHalf,
 			Prediction::AmplitudeAndPhaseModulated,
-			Prediction::DoseWeighted,
 			Prediction::CtfScaled);
 	}
 

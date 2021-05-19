@@ -53,10 +53,8 @@ void MagFitProgram::run()
 		RefinementProgram::init();
 
 		const int s = boxSize;
-		const int sh = s/2 + 1;
 		const int tc = particles.size();
 		const int gc = particleSet.numberOfOpticsGroups();
-		const bool flip_value = true;
 
 	Log::endSection();
 
@@ -73,7 +71,9 @@ void MagFitProgram::run()
 		const int fc = tomogram.frameCount;
 
 		BufferedImage<float> freqWeights = computeFrequencyWeights(
-			tomogram, true, 0.0, 0.0, true, num_threads);
+			tomogram, true, 0.0, 0.0, false, num_threads);
+
+		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s, 1.0);
 
 		particleSet.checkTrajectoryLengths(
 				particles[t][0], pc, fc, "MagFitProgram::run");
@@ -84,6 +84,7 @@ void MagFitProgram::run()
 			particleSet,
 			referenceMap,
 			freqWeights,
+			doseWeights,
 			boxSize,
 			0,
 			fc-1,

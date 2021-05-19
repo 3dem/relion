@@ -60,7 +60,7 @@ void AlignProgram::parseInput()
 	mfSettings.constParticles = parser.checkOption("--const_p", "Keep the particle positions constant");
 	mfSettings.constAngles = parser.checkOption("--const_a", "Keep the frame angles constant");
 	mfSettings.constShifts = parser.checkOption("--const_s", "Keep the frame shifts constant");
-	num_iters = textToInteger(parser.getOption("--it", "Max. number of iterations", "1000"));
+	num_iters = textToInteger(parser.getOption("--it", "Max. number of iterations", "5000"));
 
 
 	int motion_section = parser.addSection("Motion estimation options");
@@ -237,12 +237,16 @@ void AlignProgram::processTomograms(
 		std::string diagPrefix = outDir + "diag_" + tag;
 
 
-		BufferedImage<float> frqWeight = computeFrequencyWeights(
+		BufferedImage<float> freqWeight = computeFrequencyWeights(
 			tomogram, whiten, sig2RampPower, hiPass_px, false, num_threads);
+
+		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(boxSize, 1);
+
+
 
 		if (diag)
 		{
-			frqWeight.write(diagPrefix + "_frq_weight.mrc");
+			freqWeight.write(diagPrefix + "_frq_weight.mrc");
 		}
 
 
@@ -271,7 +275,7 @@ void AlignProgram::processTomograms(
 
 		std::vector<BufferedImage<double>> CCs = Prediction::computeCroppedCCs(
 				particleSet, particles[t], tomogram, aberrationsCache,
-				referenceMap, frqWeight, frameSequence,
+				referenceMap, freqWeight, doseWeights, frameSequence,
 				range, true, num_threads, padding, Prediction::OwnHalf,
 				per_tomogram_progress && verbosity > 0);
 
@@ -321,8 +325,9 @@ void AlignProgram::processTomograms(
 				Log::beginProgress("Performing optimisation", num_iters);
 			}
 
+
 			std::vector<double> opt = LBFGS::optimize(
-				initial, motionFit, 1, num_iters, 1e-3, 1e-4);
+				initial, motionFit, 1, num_iters, 1e-4, 1e-5);
 
 
 			if (verbosity > 0 && per_tomogram_progress)
