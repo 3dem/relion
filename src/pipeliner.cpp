@@ -237,9 +237,10 @@ bool PipeLine::touchTemporaryNodeFile(Node &node, bool touch_even_if_not_exist)
         // PIPELINER
 		FileName fn_label = node.type;
 		FileName fn_type = fn_label.beforeFirstOf(".") + "/";
+
 		FileName mydir = fn_dir + fn_type + fnt.substr(0, fnt.rfind("/") + 1);
 		FileName mynode = fn_dir + fn_type + fnt;
-		std::string command;
+
 		mktree(mydir);
 		touch(mynode);
 		return true;
@@ -1099,12 +1100,12 @@ bool PipeLine::markAsFinishedJob(int this_job, std::string &error_message, bool 
 		{
 
 			fn_opt = fn_opts[fn_opts.size()-1]; // the last one
-			Node node3(fn_opt, NODE_OPTIMISER_CPIPE);
+			Node node3(fn_opt, LABEL_OPTIMISER_CPIPE);
 			addNewOutputEdge(this_job, node3);
 
 			// Also get data.star
 			FileName fn_data = fn_opt.without("_optimiser.star") + "_data.star";
-			Node node2(fn_data, NODE_PARTS_CPIPE);
+			Node node2(fn_data, LABEL_PARTS_CPIPE);
 			addNewOutputEdge(this_job, node2);
 
 			FileName fn_root = fn_opt.without("_optimiser.star");
@@ -1116,7 +1117,7 @@ bool PipeLine::markAsFinishedJob(int this_job, std::string &error_message, bool 
 			fn_map.globFiles(fn_maps);
 			for (int i = 0; i < fn_maps.size(); i++)
 			{
-				Node node4(fn_maps[i], NODE_MAP_CPIPE);
+				Node node4(fn_maps[i], LABEL_MAP_CPIPE);
 				addNewOutputEdge(this_job, node4);
 			}
 		}
@@ -1826,6 +1827,7 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDnode)
 	{
 		std::string name, label;
+		// PIPELINER
 		int type;
 		if (!MDnode.getValue(EMDL_PIPELINE_NODE_NAME, name) )
 			REPORT_ERROR("PipeLine::read: cannot find name in pipeline_nodes table");

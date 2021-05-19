@@ -46,7 +46,7 @@ std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, 
 		{
 			fn_tmp.compose(fn_out+"_half1_body", ibody+1, "", 3);
 			fn_tmp += "_unfil.mrc";
-			Node node4(fn_tmp, OUTNODE_MULTIBODY_HALFMAP);
+			Node node4(fn_tmp, LABEL_MULTIBODY_HALFMAP);
 			result.push_back(node4);
 		}
 	}
@@ -54,22 +54,22 @@ std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, 
 	{
 		if (jobtype == "Refine3D")
 		{
-			Node node1(fn_out + "_data.star", OUTNODE_REFINE3D_PARTS);
-            Node node2(fn_out + "_optimiser.star", OUTNODE_REFINE3D_OPT);
+			Node node1(fn_out + "_data.star", LABEL_REFINE3D_PARTS);
+            Node node2(fn_out + "_optimiser.star", LABEL_REFINE3D_OPT);
     		result.push_back(node1);
             result.push_back(node2);
 		}
 		if (jobtype == "Class3D")
 		{
-			Node node1(fn_out + "_data.star", OUTNODE_CLASS3D_PARTS);
-            Node node2(fn_out + "_optimiser.star", OUTNODE_CLASS3D_OPT);
+			Node node1(fn_out + "_data.star", LABEL_CLASS3D_PARTS);
+            Node node2(fn_out + "_optimiser.star", LABEL_CLASS3D_OPT);
     		result.push_back(node1);
             result.push_back(node2);
 		}
 		if (jobtype == "Class2D")
 		{
-			Node node1(fn_out + "_data.star", OUTNODE_CLASS2D_PARTS);
-            Node node2(fn_out + "_optimiser.star", OUTNODE_CLASS2D_OPT);
+			Node node1(fn_out + "_data.star", LABEL_CLASS2D_PARTS);
+            Node node2(fn_out + "_optimiser.star", LABEL_CLASS2D_OPT);
     		result.push_back(node1);
             result.push_back(node2);
 		}
@@ -80,12 +80,12 @@ std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, 
 		{
 			if (jobtype == "Refine3D")
 			{
-				Node node4(fn_out+"_half1_class001_unfil.mrc", OUTNODE_REFINE3D_HALFMAP);
+				Node node4(fn_out+"_half1_class001_unfil.mrc", LABEL_REFINE3D_HALFMAP);
 				result.push_back(node4);
 			}
 			if (jobtype == "MultiBody")
 			{
-				Node node4(fn_out+"_half1_class001_unfil.mrc", OUTNODE_MULTIBODY_HALFMAP);
+				Node node4(fn_out+"_half1_class001_unfil.mrc", LABEL_MULTIBODY_HALFMAP);
 				result.push_back(node4);
 			}
 		}
@@ -99,12 +99,12 @@ std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, 
 				fn_tmp.compose(fn_out+"_class", iclass+1, "mrc", 3);
 				if (jobtype == "Refine3D")
 				{
-					Node node3(fn_tmp, OUTNODE_REFINE3D_MAP);
+					Node node3(fn_tmp, LABEL_REFINE3D_MAP);
 					result.push_back(node3);
 				}
 				if (jobtype == "Class3D")
 				{
-					Node node3(fn_tmp, OUTNODE_CLASS3D_MAP);
+					Node node3(fn_tmp, LABEL_CLASS3D_MAP);
 					result.push_back(node3);
 				}
 			}
@@ -139,7 +139,7 @@ JobOption::JobOption(std::string _label, int _nodetype, std::string _default_val
 	initialise(_label, _default_value, _helptext);
 	joboption_type = JOBOPTION_INPUTNODE;
 	pattern = _pattern;
-	node_type = _nodetype;
+	node_type = get_node_label(_nodetype);
 }
 
 // Radio constructor
@@ -1251,14 +1251,14 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 		if (joboptions["is_multiframe"].getBoolean())
 		{
 			fn_out = "movies.star";
-			Node node(outputname + fn_out, OUTNODE_IMPORT_MOVIES);
+			Node node(outputname + fn_out, LABEL_IMPORT_MOVIES);
 			outputNodes.push_back(node);
 			command += " --do_movies ";
 		}
 		else
 		{
 			fn_out = "micrographs.star";
-			Node node(outputname + fn_out, OUTNODE_IMPORT_MICS);
+			Node node(outputname + fn_out, LABEL_IMPORT_MICS);
 			outputNodes.push_back(node);
 			command += " --do_micrographs ";
 		}
@@ -1300,7 +1300,7 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 			// Make a suffix file, which contains the actual suffix as a suffix
 			// Get the coordinate-file suffix
 			fn_out = "coords_suffix" + fn_in.afterLastOf("*");
-			Node node(outputname + fn_out, OUTNODE_IMPORT_COORDS);
+			Node node(outputname + fn_out, LABEL_IMPORT_COORDS);
 			outputNodes.push_back(node);
 			command += " --do_coordinates ";
 		}
@@ -1311,17 +1311,17 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 
 			std::string mynodetype;
 			if (node_type == "Particles STAR file (.star)")
-				mynodetype = OUTNODE_IMPORT_PARTS;
+				mynodetype = LABEL_IMPORT_PARTS;
 			else if (node_type == "Multiple (2D or 3D) references (.star or .mrcs)")
-				mynodetype = OUTNODE_IMPORT_2DIMG;
+				mynodetype = LABEL_IMPORT_2DIMG;
 			else if (node_type == "3D reference (.mrc)")
-				mynodetype = OUTNODE_IMPORT_MAP;
+				mynodetype = LABEL_IMPORT_MAP;
 			else if (node_type == "3D mask (.mrc)")
-				mynodetype = OUTNODE_IMPORT_MASK;
+				mynodetype = LABEL_IMPORT_MASK;
 			else if (node_type == "Micrographs STAR file (.star)")
-				mynodetype = OUTNODE_IMPORT_MICS;
+				mynodetype = LABEL_IMPORT_MICS;
 			else if (node_type == "Unfiltered half-map (unfil.mrc)")
-				mynodetype = OUTNODE_IMPORT_HALFMAP;
+				mynodetype = LABEL_IMPORT_HALFMAP;
 			else
 			{
 				error_message = "Unrecognized menu option for node_type = " + node_type;
@@ -1332,7 +1332,7 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 			outputNodes.push_back(node);
 
 			// Also get the other half-map
-			if (mynodetype == NODE_HALFMAP_CPIPE)
+			if (mynodetype == LABEL_HALFMAP_CPIPE)
 			{
 				FileName fn_inb = "/" + fn_in;
 				size_t pos = fn_inb.find("half1");
@@ -1353,7 +1353,7 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 				outputNodes.push_back(node2);
 				command += " --do_halfmaps";
 			}
-			else if (mynodetype == NODE_PARTS_CPIPE)
+			else if (mynodetype == LABEL_PARTS_CPIPE)
 			{
 				command += " --do_particles";
 				FileName optics_group = joboptions["optics_group_particles"].getString();
@@ -1462,9 +1462,9 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 
 	command += " --o " + outputname;
 	outputName = outputname;
-	Node node2(outputname + "corrected_micrographs.star", OUTNODE_MOCORR_MICS);
+	Node node2(outputname + "corrected_micrographs.star", LABEL_MOCORR_MICS);
 	outputNodes.push_back(node2);
-	Node node4(outputname + "logfile.pdf", OUTNODE_MOCORR_LOG);
+	Node node4(outputname + "logfile.pdf", LABEL_MOCORR_LOG);
 	outputNodes.push_back(node4);
 
 	command += " --first_frame_sum " + joboptions["first_frame_sum"].getString();
@@ -1664,12 +1664,12 @@ bool RelionJob::getCommandsCtffindJob(std::string &outputname, std::vector<std::
 	std::string command;
 
 	FileName fn_outstar = outputname + "micrographs_ctf.star";
-	Node node(fn_outstar, OUTNODE_CTFFIND_MICS);
+	Node node(fn_outstar, LABEL_CTFFIND_MICS);
 	outputNodes.push_back(node);
 	outputName = outputname;
 
 	// PDF with histograms of the eigenvalues
-	Node node3(outputname + "logfile.pdf", OUTNODE_CTFFIND_LOG);
+	Node node3(outputname + "logfile.pdf", LABEL_CTFFIND_LOG);
 	outputNodes.push_back(node3);
 
 	if (joboptions["input_star_mics"].getString() == "")
@@ -1829,7 +1829,7 @@ bool RelionJob::getCommandsManualpickJob(std::string &outputname, std::vector<st
 
 	// Allow saving, and always save default selection file upon launching the program
 	FileName fn_outstar = outputname + "micrographs_selected.star";
-	Node node3(fn_outstar, OUTNODE_MANPICK_MICS);
+	Node node3(fn_outstar, LABEL_MANPICK_MICS);
 	outputNodes.push_back(node3);
 	command += " --allow_save   --fast_save --selection " + fn_outstar;
 
@@ -1872,14 +1872,14 @@ bool RelionJob::getCommandsManualpickJob(std::string &outputname, std::vector<st
 		command += " --pick_start_end ";
 
 		// new version: no longer save coords_suffix nodetype, but 2-column list of micrographs and coordinate files
-		Node node2(outputname + "manualpick.star", OUTNODE_MANPICK_COORDS_HELIX);
+		Node node2(outputname + "manualpick.star", LABEL_MANPICK_COORDS_HELIX);
 		outputNodes.push_back(node2);
 	}
 
 	else
 	{
 		// new version: no longer save coords_suffix nodetype, but 2-column list of micrographs and coordinate files
-		Node node2(outputname + "manualpick.star", OUTNODE_MANPICK_COORDS);
+		Node node2(outputname + "manualpick.star", LABEL_MANPICK_COORDS);
 		outputNodes.push_back(node2);
 	}
 
@@ -2005,12 +2005,12 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 		inputNodes.push_back(node);
 
 		// Output new version: no longer save coords_suffix nodetype, but 2-column list of micrographs and coordinate files
-		Node node2(outputname + "autopick.star", OUTNODE_AUTOPICK_COORDS);
+		Node node2(outputname + "autopick.star", LABEL_AUTOPICK_COORDS);
 		outputNodes.push_back(node2);
 
 		// The output micrographs selection
 		FileName fn_outstar = outputname + "micrographs_selected.star";
-		Node node3(fn_outstar, OUTNODE_AUTOPICK_MICS);
+		Node node3(fn_outstar, LABEL_AUTOPICK_MICS);
 		outputNodes.push_back(node3);
 		command += " --allow_save  --selection " + fn_outstar;
 
@@ -2111,11 +2111,11 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 		if (!(joboptions["do_topaz"].getBoolean() && joboptions["do_topaz_train"].getBoolean()))
 		{
 			// Output new version: no longer save coords_suffix nodetype, but 2-column list of micrographs and coordinate files
-			Node node3(outputname + "autopick.star", OUTNODE_AUTOPICK_COORDS);
+			Node node3(outputname + "autopick.star", LABEL_AUTOPICK_COORDS);
 			outputNodes.push_back(node3);
 
 			// PDF with histograms of the eigenvalues
-			Node node3b(outputname + "logfile.pdf", OUTNODE_AUTOPICK_LOG);
+			Node node3b(outputname + "logfile.pdf", LABEL_AUTOPICK_LOG);
 			outputNodes.push_back(node3b);
 		}
 
@@ -2162,7 +2162,7 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 				{
 					command += " --topaz_train_parts " + joboptions["topaz_train_parts"].getString();
 					// Output new version: no longer save coords_suffix nodetype, but 2-column list of micrographs and coordinate files
-					Node nodet(outputname + "input_training_coords.star", NODE_COORDS_CPIPE);
+					Node nodet(outputname + "input_training_coords.star", LABEL_COORDS_CPIPE);
 					outputNodes.push_back(nodet);
 
 				}
@@ -2227,7 +2227,7 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 				label += ".ref3d";
 
 				command += " --ref " + joboptions["fn_ref3d_autopick"].getString();
-				Node node2(joboptions["fn_ref3d_autopick"].getString(), NODE_MAP_CPIPE);
+				Node node2(joboptions["fn_ref3d_autopick"].getString(), LABEL_MAP_CPIPE);
 				inputNodes.push_back(node2);
 				command += " --sym " + joboptions["ref3d_symmetry"].getString();
 
@@ -2252,7 +2252,7 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 				label += ".ref2d";
 
 				command += " --ref " + joboptions["fn_refs_autopick"].getString();
-				Node node2(joboptions["fn_refs_autopick"].getString(), NODE_2DIMGS_CPIPE);
+				Node node2(joboptions["fn_refs_autopick"].getString(), LABEL_2DIMGS_CPIPE);
 				inputNodes.push_back(node2);
 			}
 
@@ -2472,7 +2472,7 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 	if (joboptions["do_reextract"].getBoolean())
 	{
 		FileName fn_pickstar = outputname + "extractpick.star";
-		Node node(fn_pickstar, OUTNODE_EXTRACT_COORDS_REEX);
+		Node node(fn_pickstar, LABEL_EXTRACT_COORDS_REEX);
 		outputNodes.push_back(node);
 		command += " --pick_star " + fn_pickstar;
 	}
@@ -2480,7 +2480,7 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 	if (joboptions["do_extract_helix"].getBoolean() && joboptions["do_extract_helical_tubes"].getBoolean())
 	{
 		FileName fn_pickstar = outputname + "extractpick.star";
-		Node node(fn_pickstar, OUTNODE_EXTRACT_COORDS_HELIX);
+		Node node(fn_pickstar, LABEL_EXTRACT_COORDS_HELIX);
 		outputNodes.push_back(node);
 		command += " --pick_star " + fn_pickstar;
 	}
@@ -2529,7 +2529,7 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 	// Helix
 	if (joboptions["do_extract_helix"].getBoolean())
 	{
-		Node node3(fn_ostar, OUTNODE_EXTRACT_PARTS_HELIX);
+		Node node3(fn_ostar, LABEL_EXTRACT_PARTS_HELIX);
 		outputNodes.push_back(node3);
 
 		label += ".helical";
@@ -2554,7 +2554,7 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 
 	if (!joboptions["do_reextract"].getBoolean() && !joboptions["do_extract_helix"].getBoolean())
 	{
-		Node node3(fn_ostar, OUTNODE_EXTRACT_PARTS);
+		Node node3(fn_ostar, LABEL_EXTRACT_PARTS);
 		outputNodes.push_back(node3);
 	}
 
@@ -2570,13 +2570,13 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 
 	if (joboptions["do_reextract"].getBoolean())
 	{
-		Node node(outputname + "reextract.star", OUTNODE_EXTRACT_COORDS_REEX);
+		Node node(outputname + "reextract.star", LABEL_EXTRACT_COORDS_REEX);
 		outputNodes.push_back(node);
 	}
 
 	if (joboptions["do_extract_helix"].getBoolean() && joboptions["do_extract_helical_tubes"].getBoolean())
 	{
-		Node node(outputname + "helix_segments.star", OUTNODE_EXTRACT_COORDS_HELIX);
+		Node node(outputname + "helix_segments.star", LABEL_EXTRACT_COORDS_HELIX);
 		outputNodes.push_back(node);
 	}
 
@@ -2669,7 +2669,7 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 		command += " --i " + joboptions["fn_data"].getString();
 
 		FileName fn_out = outputname+"particles.star";
-		Node node2(fn_out, OUTNODE_SELECT_PARTS);
+		Node node2(fn_out, LABEL_SELECT_PARTS);
 		outputNodes.push_back(node2);
 		command += " --o " + fn_out;
 
@@ -2713,12 +2713,12 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 
 			if (joboptions["fn_mic"].getString() != "")
 			{
-				Node node2(fn_out, OUTNODE_SELECT_MICS);
+				Node node2(fn_out, LABEL_SELECT_MICS);
 				outputNodes.push_back(node2);
 			}
 			else if (joboptions["fn_data"].getString() != "")
 			{
-				Node node2(fn_out, OUTNODE_SELECT_PARTS);
+				Node node2(fn_out, LABEL_SELECT_PARTS);
 				outputNodes.push_back(node2);
 			}
 
@@ -2808,11 +2808,11 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 			command += " --o " + outputname + " --fn_sel_parts particles.star --fn_sel_classavgs class_averages.star";
 
 			FileName fn_parts = outputname+"particles.star";
-			Node node2(fn_parts, OUTNODE_SELECT_PARTS);
+			Node node2(fn_parts, LABEL_SELECT_PARTS);
 			outputNodes.push_back(node2);
 
 			FileName fn_imgs = outputname+"class_averages.star";
-			Node node3(fn_imgs, OUTNODE_SELECT_CLAVS);
+			Node node3(fn_imgs, LABEL_SELECT_CLAVS);
 			outputNodes.push_back(node3);
 
 			// Also save optimiser.star, which could be used for next manual selection (but ordered for examples on the new scores)
@@ -2820,7 +2820,7 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 
 			// Only save the 2D class averages for 2D jobs
 			FileName fn_opt = outputname+"rank_optimiser.star";
-			Node node4(fn_opt, OUTNODE_SELECT_OPT);
+			Node node4(fn_opt, LABEL_SELECT_OPT);
 			outputNodes.push_back(node4);
 
 			// perform the actual prediction and selection
@@ -2846,7 +2846,7 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 
 				FileName fn_parts = outputname+"particles.star";
 				command += " --allow_save --fn_parts " + fn_parts;
-				Node node2(fn_parts, OUTNODE_SELECT_PARTS);
+				Node node2(fn_parts, LABEL_SELECT_PARTS);
 				outputNodes.push_back(node2);
 
 				// Only save the 2D class averages for 2D jobs
@@ -2855,7 +2855,7 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 				{
 					FileName fn_imgs = outputname+"class_averages.star";
 					command += " --fn_imgs " + fn_imgs;
-					Node node3(fn_imgs, OUTNODE_SELECT_CLAVS);
+					Node node3(fn_imgs, LABEL_SELECT_CLAVS);
 					outputNodes.push_back(node3);
 
 					if (joboptions["do_recenter"].getBoolean())
@@ -2872,7 +2872,7 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 
 				FileName fn_mics = outputname+"micrographs.star";
 				command += " --allow_save --fn_imgs " + fn_mics;
-				Node node2(fn_mics, OUTNODE_SELECT_MICS);
+				Node node2(fn_mics, LABEL_SELECT_MICS);
 				outputNodes.push_back(node2);
 			}
 			else if (joboptions["fn_data"].getString() != "")
@@ -2883,7 +2883,7 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 
 				FileName fn_parts = outputname+"particles.star";
 				command += " --allow_save --fn_imgs " + fn_parts;
-				Node node2(fn_parts, OUTNODE_SELECT_PARTS);
+				Node node2(fn_parts, LABEL_SELECT_PARTS);
 				outputNodes.push_back(node2);
 			}
 		}
@@ -3419,7 +3419,7 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
         	FileName fn_tmp;
         	fn_tmp.compose(outputname + fn_run + "_it", total_nr_iter, "", 3);
         	fn_tmp.compose(fn_tmp + "_class", iclass+1, "mrc", 3);
-        	Node node3(fn_tmp, OUTNODE_INIMOD_MAP);
+        	Node node3(fn_tmp, LABEL_INIMOD_MAP);
         	outputNodes.push_back(node3);
         }
 
@@ -3474,7 +3474,7 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 		std::string commandF = "touch " + outputname + RELION_JOB_EXIT_SUCCESS;
 		commands.push_back(commandF);
 
-		Node node2(outputname + "initial_model.mrc", OUTNODE_INIMOD_MAP);
+		Node node2(outputname + "initial_model.mrc", LABEL_INIMOD_MAP);
 		outputNodes.push_back(node2);
 	}
 
@@ -4191,7 +4191,7 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 			inputNodes.push_back(node);
 			command += " --ios " + fn_OS;
 
-			Node node1( outputname + fn_run + "_optimisation_set.star", OUTNODE_TOMO_OPTIMISATION);
+			Node node1( outputname + fn_run + "_optimisation_set.star", LABEL_TOMO_OPTIMISATION);
 			outputNodes.push_back(node1);
 
 			if (joboptions["fn_mask"].getString() == "" && joboptions["do_solvent_fsc"].getBoolean())
@@ -4699,13 +4699,13 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 			if (max < 99998)
 				fnt += "_max"+integerToString(max);
 			fnt += ".star";
-			Node node2(fnt, OUTNODE_MULTIBODY_SEL_PARTS);
+			Node node2(fnt, LABEL_MULTIBODY_SEL_PARTS);
 			outputNodes.push_back(node2);
 
 		}
 
 		// PDF with histograms of the eigenvalues
-		Node node3(outputname + "analyse_logfile.pdf", OUTNODE_MULTIBODY_FLEXLOG);
+		Node node3(outputname + "analyse_logfile.pdf", LABEL_MULTIBODY_FLEXLOG);
 		outputNodes.push_back(node3);
 
 		commands.push_back(command);
@@ -4753,7 +4753,7 @@ bool RelionJob::getCommandsMaskcreateJob(std::string &outputname, std::vector<st
 	inputNodes.push_back(node);
 
 	command += " --o " + outputname + "mask.mrc";
-	Node node2(outputname + "mask.mrc", OUTNODE_MASK3D_MASK);
+	Node node2(outputname + "mask.mrc", LABEL_MASK3D_MASK);
 	outputNodes.push_back(node2);
 
 	if (joboptions["lowpass_filter"].getNumber(error_message) > 0)
@@ -5001,7 +5001,7 @@ bool RelionJob::getCommandsSubtractJob(std::string &outputname, std::vector<std:
 		Node node(joboptions["fn_fliplabel"].getString(), joboptions["fn_fliplabel"].node_type);
 		inputNodes.push_back(node);
 
-		Node node2(outputname + "original.star", OUTNODE_SUBTRACT_REVERTED);
+		Node node2(outputname + "original.star", LABEL_SUBTRACT_REVERTED);
 		outputNodes.push_back(node2);
 
 		label += ".revert";
@@ -5024,7 +5024,7 @@ bool RelionJob::getCommandsSubtractJob(std::string &outputname, std::vector<std:
 			return false;
 		}
 		command += " --i " + joboptions["fn_opt"].getString();
-		Node node(joboptions["fn_opt"].getString(), NODE_OPTIMISER_CPIPE);
+		Node node(joboptions["fn_opt"].getString(), LABEL_OPTIMISER_CPIPE);
 		inputNodes.push_back(node);
 
 		if (joboptions["fn_mask"].getString() != "")
@@ -5046,7 +5046,7 @@ bool RelionJob::getCommandsSubtractJob(std::string &outputname, std::vector<std:
 		}
 
 		command += " --o " + outputname;
-		Node node4(outputname + "particles_subtracted.star", OUTNODE_SUBTRACT_SUBTRACTED);
+		Node node4(outputname + "particles_subtracted.star", LABEL_SUBTRACT_SUBTRACTED);
 		outputNodes.push_back(node4);
 
 		if (joboptions["do_center_mask"].getBoolean())
@@ -5141,7 +5141,7 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 		inputNodes.push_back(node);
 		command += " --ios " + fn_OS;
 
-		Node node1(outputname + "postprocess_optimiser_set.star", OUTNODE_TOMO_OPTIMISATION);
+		Node node1(outputname + "postprocess_optimiser_set.star", LABEL_TOMO_OPTIMISATION);
 		outputNodes.push_back(node1);
 	}
 	else if (fn_half1 == "")
@@ -5166,15 +5166,15 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 	// The output name contains a directory: use it for output
 	command += " --o " + outputname + "postprocess";
 	command += "  --angpix " + joboptions["angpix"].getString();
-	Node node1(outputname+"postprocess.mrc", OUTNODE_POST_MAP);
+	Node node1(outputname+"postprocess.mrc", LABEL_POST_MAP);
 	outputNodes.push_back(node1);
-	Node node2(outputname+"postprocess_masked.mrc", OUTNODE_POST_MASKED);
+	Node node2(outputname+"postprocess_masked.mrc", LABEL_POST_MASKED);
 	outputNodes.push_back(node2);
 
-	Node node2b(outputname+"logfile.pdf", OUTNODE_POST_LOG);
+	Node node2b(outputname+"logfile.pdf", LABEL_POST_LOG);
 	outputNodes.push_back(node2b);
 
-	Node node2c(outputname+"postprocess.star", OUTNODE_POST);
+	Node node2c(outputname+"postprocess.star", LABEL_POST);
 	outputNodes.push_back(node2c);
 
 	// Sharpening
@@ -5308,7 +5308,7 @@ bool RelionJob::getCommandsLocalresJob(std::string &outputname, std::vector<std:
 		Node node2(joboptions["fn_mask"].getString(), joboptions["fn_mask"].node_type);
 		inputNodes.push_back(node2);
 
-		Node node3(outputname + "half1_resmap.mrc", OUTNODE_LOCRES_RESMAP);
+		Node node3(outputname + "half1_resmap.mrc", LABEL_LOCRES_RESMAP);
 		outputNodes.push_back(node3);
 
 		command = joboptions["fn_resmap"].getString();
@@ -5344,13 +5344,13 @@ bool RelionJob::getCommandsLocalresJob(std::string &outputname, std::vector<std:
 		if (joboptions["fn_mask"].getString() != "")
 		{
 			command += " --mask " + joboptions["fn_mask"].getString();
-			Node node0(outputname+"histogram.pdf", OUTNODE_LOCRES_LOG);
+			Node node0(outputname+"histogram.pdf", LABEL_LOCRES_LOG);
 			outputNodes.push_back(node0);
 		}
 
-		Node node1(outputname+"relion_locres_filtered.mrc", OUTNODE_LOCRES_FILTMAP);
+		Node node1(outputname+"relion_locres_filtered.mrc", LABEL_LOCRES_FILTMAP);
 		outputNodes.push_back(node1);
-		Node node2(outputname+"relion_locres.mrc", OUTNODE_LOCRES_RESMAP);
+		Node node2(outputname+"relion_locres.mrc", LABEL_LOCRES_RESMAP);
 		outputNodes.push_back(node2);
 	}
 
@@ -5486,7 +5486,7 @@ bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<
 		}
 		if (error_message != "") return false;
 
-		Node node5(outputname+"opt_params_all_groups.txt", OUTNODE_POLISH_PARAMS);
+		Node node5(outputname+"opt_params_all_groups.txt", LABEL_POLISH_PARAMS);
 		outputNodes.push_back(node5);
 	}
 	else if (joboptions["do_polish"].getBoolean())
@@ -5547,10 +5547,10 @@ bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<
 			command += " --scale " + joboptions["rescale"].getString();
 		}
 
-		Node node6(outputname+"logfile.pdf", OUTNODE_POLISH_LOG);
+		Node node6(outputname+"logfile.pdf", LABEL_POLISH_LOG);
 		outputNodes.push_back(node6);
 
-		Node node7(outputname+"shiny.star", OUTNODE_POLISH_PARTS);
+		Node node7(outputname+"shiny.star", LABEL_POLISH_PARTS);
 		outputNodes.push_back(node7);
 	}
 
@@ -5649,7 +5649,7 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 	Node node2(joboptions["fn_post"].getString(), joboptions["fn_post"].node_type);
 	inputNodes.push_back(node);
 
-	Node node6(outputname+"logfile.pdf", OUTNODE_CTFREFINE_LOG);
+	Node node6(outputname+"logfile.pdf", LABEL_CTFREFINE_LOG);
 	outputNodes.push_back(node6);
 
 	command += " --i " + joboptions["fn_data"].getString();
@@ -5664,13 +5664,13 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 		command += " --fit_aniso";
 		command += " --kmin_mag " + joboptions["minres"].getString();
 
-		Node node5(outputname+"particles_ctf_refine.star", OUTNODE_CTFREFINE_ANISOPARTS);
+		Node node5(outputname+"particles_ctf_refine.star", LABEL_CTFREFINE_ANISOPARTS);
 		outputNodes.push_back(node5);
 
 	}
 	else
 	{
-		Node node5(outputname+"particles_ctf_refine.star", OUTNODE_CTFREFINE_REFINEPARTS);
+		Node node5(outputname+"particles_ctf_refine.star", LABEL_CTFREFINE_REFINEPARTS);
 		outputNodes.push_back(node5);
 
 		if (joboptions["do_ctf"].getBoolean())
@@ -6029,7 +6029,7 @@ std::string RelionJob::setTomoOutputCommand(std::string &command, std::string op
 	if (postprocess != "") command += " --fsc " + postprocess;
 	if (refmask != "") command += " --mask " + refmask;
 
-	Node node1(optimisationSetOut, OUTNODE_TOMO_OPTIMISATION);
+	Node node1(optimisationSetOut, LABEL_TOMO_OPTIMISATION);
 	outputNodes.push_back(node1);
 
 	return error_message;
@@ -6114,7 +6114,7 @@ bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<st
 		command += " --o " + outputname+"tomograms.star";
                 if (joboptions["io_tomos"].getString() != "") command += " --t " + joboptions["io_tomos"].getString();
 
-		Node node(outputname+"tomograms.star", OUTNODE_TOMO_TOMOGRAMS);
+		Node node(outputname+"tomograms.star", LABEL_TOMO_TOMOGRAMS);
 		outputNodes.push_back(node);
 
 		if (joboptions["angpix"].getString() != "") command += " --angpix " + joboptions["angpix"].getString();
@@ -6150,9 +6150,9 @@ bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<st
 		command += " --o " + outputname;
                 command += " --t " + joboptions["part_tomos"].getString();
 
-		Node node(outputname+"particles.star", OUTNODE_TOMO_PARTS);
+		Node node(outputname+"particles.star", LABEL_TOMO_PARTS);
 		outputNodes.push_back(node);
-		Node node2(outputname+"optimisation_set.star", OUTNODE_TOMO_OPTIMISATION);
+		Node node2(outputname+"optimisation_set.star", LABEL_TOMO_OPTIMISATION);
 		outputNodes.push_back(node2);
 	}
 	else if (do_other)
@@ -6168,17 +6168,17 @@ bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<st
 
 		std::string mynodetype;
 		if (node_type == "Particles STAR file (.star)")
-			mynodetype = OUTNODE_TOMO_PARTS;
+			mynodetype = LABEL_TOMO_PARTS;
 		else if (node_type == "Set of tomograms STAR file (.star)")
-			mynodetype = OUTNODE_TOMO_TOMOGRAMS;
+			mynodetype = LABEL_TOMO_TOMOGRAMS;
 		else if (node_type == "Multiple (2D or 3D) references (.star or .mrcs)")
-			mynodetype = NODE_2DIMGS_CPIPE;
+			mynodetype = LABEL_2DIMGS_CPIPE;
 		else if (node_type == "3D reference (.mrc)")
-			mynodetype = NODE_MAP_CPIPE;
+			mynodetype = LABEL_MAP_CPIPE;
 		else if (node_type == "3D mask (.mrc)")
-			mynodetype = NODE_MASK_CPIPE;
+			mynodetype = LABEL_MASK_CPIPE;
 		else if (node_type == "Unfiltered half-map (unfil.mrc)")
-			mynodetype = OUTNODE_TOMO_HALFMAP;
+			mynodetype = LABEL_TOMO_HALFMAP;
 		else
 		{
 			error_message = "Unrecognized menu option for node_type = " + node_type;
@@ -6189,7 +6189,7 @@ bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<st
 		outputNodes.push_back(node);
 
 		// Also get the other half-map
-		if (mynodetype == OUTNODE_TOMO_HALFMAP)
+		if (mynodetype == LABEL_TOMO_HALFMAP)
 		{
 			FileName fn_inb = "/" + fn_in;
 			size_t pos = fn_inb.find("half1");
@@ -6210,7 +6210,7 @@ bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<st
 			outputNodes.push_back(node2);
 			command += " --do_halfmaps";
 		}
-		else if (mynodetype == OUTNODE_TOMO_PARTS)
+		else if (mynodetype == LABEL_TOMO_PARTS)
 		{
 			command += " --do_particles";
 			FileName optics_group = joboptions["optics_group_particles"].getString();
@@ -6283,9 +6283,9 @@ bool RelionJob::getCommandsTomoSubtomoJob(std::string &outputname, std::vector<s
 
 	command += " --o " + outputname;
 
-	Node node1(outputname+"optimisation_set.star", OUTNODE_TOMO_OPTIMISATION);
+	Node node1(outputname+"optimisation_set.star", LABEL_TOMO_OPTIMISATION);
 	outputNodes.push_back(node1);
-	Node node2(outputname+"particles.star", OUTNODE_TOMO_PARTS);
+	Node node2(outputname+"particles.star", LABEL_TOMO_PARTS);
 	outputNodes.push_back(node2);
 
 	// Job-specific stuff goes here
@@ -6365,9 +6365,9 @@ bool RelionJob::getCommandsTomoCtfRefineJob(std::string &outputname, std::vector
 
 	command += " --o " + outputname;
 
-	Node node1(outputname+"optimisation_set.star", OUTNODE_TOMO_OPTIMISATION);
+	Node node1(outputname+"optimisation_set.star", LABEL_TOMO_OPTIMISATION);
 	outputNodes.push_back(node1);
-	Node node2(outputname+"tomograms.star", OUTNODE_TOMO_TOMOGRAMS);
+	Node node2(outputname+"tomograms.star", LABEL_TOMO_TOMOGRAMS);
 	outputNodes.push_back(node2);
 
 	// Job-specific stuff goes here
@@ -6458,15 +6458,15 @@ bool RelionJob::getCommandsTomoAlignJob(std::string &outputname, std::vector<std
 
 	command += " --o " + outputname;
 
-	Node node1(outputname+"optimisation_set.star", OUTNODE_TOMO_OPTIMISATION);
+	Node node1(outputname+"optimisation_set.star", LABEL_TOMO_OPTIMISATION);
 	outputNodes.push_back(node1);
-	Node node2(outputname+"tomograms.star", OUTNODE_TOMO_TOMOGRAMS);
+	Node node2(outputname+"tomograms.star", LABEL_TOMO_TOMOGRAMS);
 	outputNodes.push_back(node2);
-	Node node3(outputname+"particles.star", OUTNODE_TOMO_PARTS);
+	Node node3(outputname+"particles.star", LABEL_TOMO_PARTS);
 	outputNodes.push_back(node3);
     if (joboptions["do_polish"].getBoolean())
 	{
-		Node node4(outputname+"motion.star", OUTNODE_TOMO_TRAJECTORIES);
+		Node node4(outputname+"motion.star", LABEL_TOMO_TRAJECTORIES);
 		outputNodes.push_back(node4);
 	}
 
@@ -6548,11 +6548,11 @@ bool RelionJob::getCommandsTomoReconPartJob(std::string &outputname, std::vector
 
 		command += " --o " + outputname;
 
-		Node node1(outputname+"merged.mrc", OUTNODE_TOMO_MAP);
+		Node node1(outputname+"merged.mrc", LABEL_TOMO_MAP);
 		outputNodes.push_back(node1);
-		Node node2(outputname+"half1.mrc", OUTNODE_TOMO_HALFMAP);
+		Node node2(outputname+"half1.mrc", LABEL_TOMO_HALFMAP);
 		outputNodes.push_back(node2);
-		Node node3(outputname+"optimisation_set.star", OUTNODE_TOMO_OPTIMISATION);
+		Node node3(outputname+"optimisation_set.star", LABEL_TOMO_OPTIMISATION);
 		outputNodes.push_back(node3);
 
 		// Job-specific stuff goes here
@@ -6588,9 +6588,9 @@ bool RelionJob::getCommandsTomoReconPartJob(std::string &outputname, std::vector
 			error_message = getTomoInputCommmand(command2, HAS_COMPULSORY, HAS_COMPULSORY, HAS_OPTIONAL, HAS_NOT,
 												 HAS_NOT,
 												 HAS_NOT);
-			Node node4(outputname+"PostProcess/logfile.pdf", OUTNODE_TOMO_POST_LOG);
+			Node node4(outputname+"PostProcess/logfile.pdf", LABEL_TOMO_POST_LOG);
 			outputNodes.push_back(node4);
-			Node node5(outputname+"PostProcess/postprocess.star", OUTNODE_TOMO_POST);
+			Node node5(outputname+"PostProcess/postprocess.star", LABEL_TOMO_POST);
 			outputNodes.push_back(node5);
 		}
 	}
@@ -6612,7 +6612,7 @@ bool RelionJob::getCommandsTomoReconPartJob(std::string &outputname, std::vector
 		inputNodes.push_back(node);
     	command += " --i " + joboptions["in_particles"].getString();
 
-		Node node1(outputname+"reconstruct.mrc", OUTNODE_TOMO_MAP);
+		Node node1(outputname+"reconstruct.mrc", LABEL_TOMO_MAP);
 		outputNodes.push_back(node1);
     	command += " --o " + outputname + "reconstruct.mrc";
     	command += " --ctf --skip_gridding";
