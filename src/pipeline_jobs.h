@@ -347,7 +347,7 @@ static bool do_allow_change_minimum_dedicated;
 #define LABEL_IMPORT_HALFMAP           "DensityMap.mrc.halfmap"
 #define LABEL_MOCORR_MICS              "MicrographsData.star.relion.motioncorr"
 #define LABEL_MOCORR_LOG               "LogFile.pdf.relion.motioncorr"
-#define LABEL_CTFFIND_MICS             "MicrograhsData.star.relion.ctf"
+#define LABEL_CTFFIND_MICS             "MicrographsData.star.relion.ctf"
 #define LABEL_CTFFIND_LOG              "LogFile.pdf.relion.ctffind"
 #define LABEL_MANPICK_MICS             "MicrographsData.star.relion"
 #define LABEL_MANPICK_COORDS           "MicrographsCoords.star.relion.manualpick"
