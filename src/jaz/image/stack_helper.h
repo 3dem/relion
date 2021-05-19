@@ -24,11 +24,17 @@ class NewStackHelper
 		template <typename T>
 		static void writeAsStack(const std::vector<BufferedImage<T>>& vec, std::string fn);
 		
-		
+
 		template <typename T>
 		static void FourierTransformStack(
-				const RawImage<T>& stack, 
-				RawImage<tComplex<T>>& stackOut, 
+				const RawImage<T>& stack,
+				RawImage<tComplex<T>>& stackOut,
+				bool center = true,
+				int num_threads = 1);
+
+		static void FourierTransformStack_fast(
+				const RawImage<float>& stack,
+				RawImage<fComplex>& stackOut,
 				bool center = true,
 				int num_threads = 1);
 		
@@ -159,40 +165,40 @@ void NewStackHelper::writeAsStack(const std::vector<BufferedImage<T>>& vec, std:
 
 template <typename T>
 void NewStackHelper::FourierTransformStack(
-		const RawImage<T>& stack, 
-		RawImage<tComplex<T>>& stackOut, 
+		const RawImage<T>& stack,
+		RawImage<tComplex<T>>& stackOut,
 		bool center,
 		int num_threads)
 {
 	const int w = stack.xdim;
 	const int h = stack.ydim;
 	const int fc = stack.zdim;
-	
+
 	const int wh = w/2 + 1;
-	
-	
+
+
 	std::vector<BufferedImage<T>> tempRS(num_threads);
 	std::vector<BufferedImage<tComplex<T>>> tempFS(num_threads);
-	
+
 	for (int t = 0; t < num_threads; t++)
 	{
 		tempRS[t] = BufferedImage<T>(w,h);
 		tempFS[t] = BufferedImage<tComplex<T>>(wh,h);
 	}
-	
+
 	#pragma omp parallel for num_threads(num_threads)
 	for (int f = 0; f < fc; f++)
 	{
 		const int t = omp_get_thread_num();
-		
+
 		for (long int y = 0; y < h; y++)
 		for (long int x = 0; x < w; x++)
 		{
 			tempRS[t](x,y) = center? stack((x+w/2)%w, (y+h/2)%h, f) : stack(x,y,f);
 		}
-				
+
 		FFT::FourierTransform(tempRS[t], tempFS[t], FFT::Both);
-		
+
 		for (long int y = 0; y < h; y++)
 		for (long int x = 0; x < wh; x++)
 		{
