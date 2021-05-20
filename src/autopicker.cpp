@@ -725,7 +725,7 @@ void AutoPicker::initialise(int rank)
 		{
 			// Perceptive window of default resnet8 is 71 pixels, which should encapsulate particle_diameter*2
 			RFLOAT particle_box_pix = 2 * particle_diameter / angpix;
-			topaz_downscale = ROUND(particle_box_pix/71);
+			topaz_downscale = XMIPP_MAX(4, ROUND(particle_box_pix/71));
 			if (verb > 0)
 				std::cout << " + Setting topaz downscale factor to " << topaz_downscale << " (assuming resnet8 model and 2*particle_diameter receptive box)" << std::endl;
 		}

@@ -1887,7 +1887,9 @@ float ClassRanker::deployTorchModel(FileName &model_path, std::vector<float> &fe
 	// Open pipe to file
 	FILE* pipe = popen(command.c_str(), "r");
 	if (!pipe)
-		REPORT_ERROR("Failed to run external python script");
+	{
+		REPORT_ERROR("Failed to run external python script with the following command:\n " + command);
+	}
 
 	// read till end of process:
 	while (!feof(pipe))
@@ -1902,7 +1904,7 @@ float ClassRanker::deployTorchModel(FileName &model_path, std::vector<float> &fe
 	}
 	catch (const std::invalid_argument& ia) {
 		std::cerr << result << std::endl;
-		REPORT_ERROR("Failed to run external python script");
+		REPORT_ERROR("Failed to run external python script with the following command:\n " + command);
 	}
 
 	return score;
@@ -1915,6 +1917,12 @@ void ClassRanker::performRanking()
 		// Read in particles if we haven't done this already
 		mydata.read(fn_data, true, true); // true true means: ignore particle_name and group name!
 		if (debug>0) std::cerr << "Done with reading data.star ..." << std::endl;
+	}
+
+	if (verb > 0)
+	{
+		std::cout << " Deploying torch model for each class ..." << std::endl;
+		init_progress_bar(features_all_classes.size());
 	}
 
 	// Initialise all scores to -999 (including empty classes!)
@@ -1953,7 +1961,12 @@ void ClassRanker::performRanking()
 		feature_vector = features_all_classes[i].toNormalizedVector();
 		scores[i] = (RFLOAT) deployTorchModel(fn_pytorch_model, feature_vector, image_vector);
 		if (scores[i] > max_score) max_score = scores[i];
+
+		if (verb > 0) progress_bar(i);
+
 	}
+
+	if (verb > 0) progress_bar(features_all_classes.size());
 
 	RFLOAT my_min = select_min_score;
 	RFLOAT my_max = select_max_score;

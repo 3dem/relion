@@ -361,12 +361,12 @@ endif()
 
 # -----------------------------------------------------------------------------Torch--
 
-option(TORCH "Enable support for LibTorch" OFF)
-if(TORCH)
-    message(STATUS "Torch support requested by user.")
-    include(${CMAKE_SOURCE_DIR}/cmake/BuildTorch.cmake)
-    add_definitions(-D_TORCH_ENABLED)
-endif(TORCH)
+#option(TORCH "Enable support for LibTorch" OFF)
+#if(TORCH)
+#    message(STATUS "Torch support requested by user.")
+#    include(${CMAKE_SOURCE_DIR}/cmake/BuildTorch.cmake)
+#    add_definitions(-D_TORCH_ENABLED)
+#endif(TORCH)
 
 option(SKIP_TORCH_MODELS "Do not download pre-trained torch models" OFF)
 if (NOT SKIP_TORCH_MODELS)
