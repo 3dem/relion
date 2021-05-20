@@ -104,10 +104,12 @@ void FccProgram::run()
 			}
 		}
 
-		for (int f = 0; f < fc_max; f++)
+		for (int x = 0; x < sh; x++)
 		{
-			ofs0 << f << ' ' << FCCs(f,0,0) << '\n';
+			ofs0 << x << ' ' << FCCs(x,0,0) << '\n';
 		}
+
+		ofs0 << '\n';
 
 		{
 			const int fc = tomogram.frameCount;
@@ -136,13 +138,13 @@ void FccProgram::run()
 	all_FCCs.write(outDir + "FCC_by_frame_by_tomo.mrc");
 
 
-	BufferedImage<double> FCC3_1D = FCC::divide(FCC::sumOverTime(FCC_sum));
+	BufferedImage<double> FCC3_1D = FCC::divide(FCC::sumOverTime(FCC3_sum));
 
 	std::ofstream ofs(outDir + "FCC.dat");
 
-	for (int f = 0; f < fc_max; f++)
+	for (int x = 0; x < sh; x++)
 	{
-		ofs << f << ' ' << FCC3_1D(f,0,0) << '\n';
+		ofs << x << ' ' << FCC3_1D(x,0,0) << '\n';
 	}
 
 	ofs.close();
