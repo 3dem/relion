@@ -60,7 +60,7 @@ void AlignProgram::parseInput()
 	mfSettings.constParticles = parser.checkOption("--const_p", "Keep the particle positions constant");
 	mfSettings.constAngles = parser.checkOption("--const_a", "Keep the frame angles constant");
 	mfSettings.constShifts = parser.checkOption("--const_s", "Keep the frame shifts constant");
-	num_iters = textToInteger(parser.getOption("--it", "Max. number of iterations", "1000"));
+	num_iters = textToInteger(parser.getOption("--it", "Max. number of iterations", "5000"));
 
 
 	int motion_section = parser.addSection("Motion estimation options");
@@ -158,6 +158,8 @@ void AlignProgram::finalise()
 		readTempData(t);
 	}
 
+	mergeLogFiles();
+
 	if (do_motion)
 	{
 		Trajectory::write(
@@ -235,12 +237,16 @@ void AlignProgram::processTomograms(
 		std::string diagPrefix = outDir + "diag_" + tag;
 
 
-		BufferedImage<float> frqWeight = computeFrequencyWeights(
-			tomogram, whiten, sig2RampPower, hiPass_px, true, num_threads);
+		BufferedImage<float> freqWeight = computeFrequencyWeights(
+			tomogram, whiten, sig2RampPower, hiPass_px, false, num_threads);
+
+		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(boxSize, 1);
+
+
 
 		if (diag)
 		{
-			frqWeight.write(diagPrefix + "_frq_weight.mrc");
+			freqWeight.write(diagPrefix + "_frq_weight.mrc");
 		}
 
 
@@ -269,7 +275,7 @@ void AlignProgram::processTomograms(
 
 		std::vector<BufferedImage<double>> CCs = Prediction::computeCroppedCCs(
 				particleSet, particles[t], tomogram, aberrationsCache,
-				referenceMap, frqWeight, frameSequence,
+				referenceMap, freqWeight, doseWeights, frameSequence,
 				range, true, num_threads, padding, Prediction::OwnHalf,
 				per_tomogram_progress && verbosity > 0);
 
@@ -319,8 +325,9 @@ void AlignProgram::processTomograms(
 				Log::beginProgress("Performing optimisation", num_iters);
 			}
 
+
 			std::vector<double> opt = LBFGS::optimize(
-				initial, motionFit, 1, num_iters, 1e-3, 1e-4);
+				initial, motionFit, 1, num_iters, 1e-4, 1e-5);
 
 
 			if (verbosity > 0 && per_tomogram_progress)
@@ -337,11 +344,15 @@ void AlignProgram::processTomograms(
 			writeTempData(&trajectories, projections, positions, t);
 
 
-			Mesh mesh8 = motionFit.visualiseTrajectories(opt, 8.0);
+			Mesh mesh8 = motionFit.visualiseTrajectories3D(opt, 8.0);
 			mesh8.writePly(outDir + "Trajectories/" + tomogram.name + "_x8.ply");
 
-			Mesh mesh1 = motionFit.visualiseTrajectories(opt, 1.0);
+			Mesh mesh1 = motionFit.visualiseTrajectories3D(opt, 1.0);
 			mesh1.writePly(outDir + "Trajectories/" + tomogram.name + "_x1.ply");
+
+			motionFit.visualiseTrajectories2D(
+					opt, 8.0, tomogram.name,
+					getTempFilenameRoot(tomogram.name) + "_tracks");
 
 
 			// Update the particle set in case an FCC is to be evaluated
@@ -616,5 +627,37 @@ void AlignProgram::readTempData(int t)
 				W[0], W[1], W[2], W[3] );
 
 		tomogramSet.setProjection(t, f, P);
+	}
+}
+
+void AlignProgram::mergeLogFiles()
+{
+	const int tc = tomogramSet.size();
+
+	std::vector<FileName> eps_files;
+	const std::vector<std::string> plot_names {"XY", "XZ", "YZ"};
+
+	for (int t = 0; t < tc; t++)
+	{
+		const std::string tomo_name = tomogramSet.getTomogramName(t);
+
+		if (do_motion)
+		{
+			for (int dim = 0; dim < 3; dim++)
+			{
+				const std::string fn = getTempFilenameRoot(tomo_name)
+						+ "_tracks_" + plot_names[dim] + ".eps";
+
+				if (ZIO::fileExists(fn))
+				{
+					eps_files.push_back(fn);
+				}
+			}
+		}
+	}
+
+	if (eps_files.size() > 0)
+	{
+		joinMultipleEPSIntoSinglePDF(outDir + "logfile.pdf", eps_files);
 	}
 }

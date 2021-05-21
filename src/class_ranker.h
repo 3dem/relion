@@ -27,11 +27,6 @@
 #include <fstream>
 #include "src/ml_optimiser.h"
 
-#ifdef _TORCH_ENABLED
-#include <torch/script.h> // One-stop header.
-#endif //_TORCH_ENABLED
-
-
 static float feature_normalization_local_ps_mean=0., feature_normalization_local_ps_stddev=0.;
 static float feature_normalization_local_ss_mean=0., feature_normalization_local_ss_stddev=0.;
 static float feature_normalization_local_rsi_mean=0., feature_normalization_local_rsi_stddev=0.;

@@ -17,8 +17,8 @@ LocalParticleRefinement::LocalParticleRefinement(
 		const ParticleSet& particleSet,
 		const Tomogram& tomogram,
 		const TomoReferenceMap& reference,
-		const BufferedImage<float>& frqWeight,
-		const BufferedImage<float>& frqEnvelope,
+		const BufferedImage<float>& freqWeight,
+		const BufferedImage<float>& doseWeight,
 		const AberrationsCache& aberrationsCache,
 		double dose_cutoff)
 :
@@ -26,8 +26,8 @@ LocalParticleRefinement::LocalParticleRefinement(
 	particleSet(particleSet),
 	tomogram(tomogram),
 	reference(reference),
-	frqWeight(frqWeight),
-	frqEnvelope(frqEnvelope),
+	freqWeight(freqWeight),
+	doseWeight(doseWeight),
 	aberrationsCache(aberrationsCache)
 {
 	const int s = reference.getBoxSize();
@@ -107,7 +107,7 @@ LocalParticleRefinement::LocalParticleRefinement(
 					const double gamma_offset = aberrationsCache.hasSymmetrical?
 						aberrationsCache.symmetrical[og](xi,yi) : 0.0;
 
-					precomputedCTFs(xi,yi,f) = -frqEnvelope(xi,yi,f) * CTFs[f].getCTF(
+					precomputedCTFs(xi,yi,f) = -doseWeight(xi,yi,f) * CTFs[f].getCTF(
 						xA, yA, false, false, false, true, gamma_offset);
 
 				}
@@ -184,7 +184,7 @@ double LocalParticleRefinement::f(const std::vector<double>& x, void* tempStorag
 					/*const double gamma_offset = aberrationsCache.hasSymmetrical?
 						aberrationsCache.symmetrical[og](xi,yi) : 0.0;
 
-					const float c = -frqEnvelope(xi,yi,f) * CTFs[f].getCTF(
+					const float c = -doseWeight(xi,yi,f) * CTFs[f].getCTF(
 						xA, yA, false, false, false, true, gamma_offset);*/
 
 					const float c = precomputedCTFs(xi,yi,f);
@@ -195,7 +195,7 @@ double LocalParticleRefinement::f(const std::vector<double>& x, void* tempStorag
 
 					const fComplex dF = c * shift * pred - obs;
 
-					L2 += frqWeight(xi,yi,f) * dF.norm();
+					L2 += freqWeight(xi,yi,f) * dF.norm();
 				}
 			}
 		}
@@ -309,7 +309,7 @@ void LocalParticleRefinement::grad(const std::vector<double> &x, std::vector<dou
 					/*const double gamma_offset = aberrationsCache.hasSymmetrical?
 						aberrationsCache.symmetrical[og](xi,yi) : 0.0;
 
-					const float c = -frqEnvelope(xi,yi,f) * CTFs[f].getCTF(
+					const float c = -doseWeight(xi,yi,f) * CTFs[f].getCTF(
 						xA, yA, false, false, false, true, gamma_offset);*/
 
 					const float c = precomputedCTFs(xi,yi,f);
@@ -339,9 +339,9 @@ void LocalParticleRefinement::grad(const std::vector<double> &x, std::vector<dou
 					const fComplex ddF_dtZ = ddF_dShift * dShift_dtZ;
 
 
-					// L2 += frqWeight(xi,yi,f) * dF.norm();
+					// L2 += freqWeight(xi,yi,f) * dF.norm();
 
-					const fComplex dL2_ddF = 2.f * frqWeight(xi,yi,f) * dF;
+					const fComplex dL2_ddF = 2.f * freqWeight(xi,yi,f) * dF;
 
 
 					gradDest[0] += ANGLE_SCALE *
@@ -480,7 +480,7 @@ double LocalParticleRefinement::gradAndValue(const std::vector<double> &x, std::
 					/*const double gamma_offset = aberrationsCache.hasSymmetrical?
 						aberrationsCache.symmetrical[og](xi,yi) : 0.0;
 
-					const float c = -frqEnvelope(xi,yi,f) * CTFs[f].getCTF(
+					const float c = -doseWeight(xi,yi,f) * CTFs[f].getCTF(
 						xA, yA, false, false, false, true, gamma_offset);*/
 
 					const float c = precomputedCTFs(xi,yi,f);
@@ -510,9 +510,9 @@ double LocalParticleRefinement::gradAndValue(const std::vector<double> &x, std::
 					const fComplex ddF_dtZ = ddF_dShift * dShift_dtZ;
 
 
-					L2 += frqWeight(xi,yi,f) * dF.norm();
+					L2 += freqWeight(xi,yi,f) * dF.norm();
 
-					const fComplex dL2_ddF = 2.f * frqWeight(xi,yi,f) * dF;
+					const fComplex dL2_ddF = 2.f * freqWeight(xi,yi,f) * dF;
 
 
 					gradDest[0] += ANGLE_SCALE *

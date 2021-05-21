@@ -225,6 +225,7 @@ int main(int argc, char *argv[])
 					observation, projCut, 1, true);
 
 				CTF ctf = tomogram.getCtf(f, dataSet.getPosition(part_id));
+				RawImage<float> doseSlice = doseWeights.getSliceRef(f);
 
 				BufferedImage<fComplex> prediction = Prediction::predictModulated(
 					part_id, dataSet, tomogram.projectionMatrices[f], s,
@@ -232,8 +233,7 @@ int main(int argc, char *argv[])
 					referenceMap.image_FS,
 					Prediction::OwnHalf,
 					Prediction::AmplitudeModulated,
-					Prediction::NotDoseWeighted,
-					0.0,
+					&doseSlice,
 					Prediction::CtfUnscaled);
 
 
@@ -249,7 +249,7 @@ int main(int argc, char *argv[])
 					const double r = sqrt(xx*xx + yy*yy);
 
 					const fComplex obs = -observation(x,y);
-					const fComplex prd =  doseWeights(x,y,f) * prediction(x,y);
+					const fComplex prd =  prediction(x,y);
 
 					const int ri = (int) r;
 

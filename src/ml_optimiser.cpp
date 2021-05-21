@@ -9438,11 +9438,22 @@ void MlOptimiser::updateStepSize()
 	std::string _scheme = grad_stepsize_scheme;
 
 	if (_stepsize <= 0)
-		_stepsize = 0.3;
+	{
+		if (mymodel.ref_dim == 3)
+			_stepsize = 0.1;
+		else
+			_stepsize = 0.3;
+	}
 
 	if (_scheme.empty())
 	{
-		RFLOAT boost_factor = 0.9 / _stepsize;
+		RFLOAT boost_factor;
+
+		if (mymodel.ref_dim == 3)
+			boost_factor = 3.;
+		else
+			boost_factor = 0.9 / _stepsize;
+
 		_scheme = std::to_string(boost_factor) + "-2step";
 	}
 

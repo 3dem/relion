@@ -13,6 +13,7 @@ TomoMagFit::TomoMagFit(
 		const ParticleSet& particleSet,
 		const TomoReferenceMap& referenceMap,
 		const BufferedImage<float>& freqWeights,
+		const BufferedImage<float>& doseWeights,
 		int boxSize,
 		int first_frame,
 		int last_frame,
@@ -23,12 +24,12 @@ TomoMagFit::TomoMagFit(
 	particleSet(particleSet),
 	referenceMap(referenceMap),
 	freqWeights(freqWeights),
+	doseWeights(doseWeights),
 	boxSize(boxSize),
 	first_frame(first_frame),
 	last_frame(last_frame),
 	num_threads(num_threads)
 {
-
 }
 
 TomoIsoMagFit::TomoIsoMagFit(
@@ -37,16 +38,17 @@ TomoIsoMagFit::TomoIsoMagFit(
 		const ParticleSet& particleSet,
 		const TomoReferenceMap& referenceMap,
 		const BufferedImage<float>& freqWeights,
+		const BufferedImage<float>& doseWeights,
 		int boxSize,
 		int first_frame,
 		int last_frame,
 		int num_threads)
 :
 	TomoMagFit(
-		particle_indices, tomogram, particleSet, referenceMap, freqWeights,
+		particle_indices, tomogram, particleSet, referenceMap,
+		freqWeights, doseWeights,
 		boxSize, first_frame, last_frame, num_threads)
 {
-
 }
 
 d2Vector TomoIsoMagFit::computeErrorAndSlope(
@@ -182,7 +184,7 @@ d2Vector TomoIsoMagFit::computeErrorAndSlope(
 
 				const double gamma = ctf_part.getLowOrderGamma(xa,ya);
 
-				const float c = -scale * sin(gamma);
+				const float c = -scale * sin(gamma) * doseWeights(x,y,f);
 
 				const float wg = freqWeights(x,y,f);
 
@@ -237,13 +239,15 @@ TomoAnisoMagFit::TomoAnisoMagFit(
 		const ParticleSet& particleSet,
 		const TomoReferenceMap& referenceMap,
 		const BufferedImage<float>& freqWeights,
+		const BufferedImage<float>& doseWeights,
 		int boxSize,
 		int first_frame,
 		int last_frame,
 		int num_threads)
 :
 	TomoMagFit(
-		particle_indices, tomogram, particleSet, referenceMap, freqWeights,
+		particle_indices, tomogram, particleSet, referenceMap,
+		freqWeights, doseWeights,
 		boxSize, first_frame, last_frame, num_threads)
 {
 
@@ -317,7 +321,9 @@ BufferedImage<Equation2x2> TomoAnisoMagFit::computeEquations()
 
 
 			MagnificationHelper::updateScale(
-					prediction, predGradient, observation, freqWeights.getConstSliceRef(f),
+					prediction, predGradient, observation,
+					freqWeights.getConstSliceRef(f),
+					doseWeights.getConstSliceRef(f),
 					ctf_part, pixelSize, equations_per_thread[data_pad * th]);
 		}
 	}
@@ -400,19 +406,25 @@ std::vector<BufferedImage<Equation2x2>> TomoAnisoMagFit::computeEquations_even_o
 
 
 			MagnificationHelper::updateScale(
-					prediction, predGradient, observation, freqWeights.getConstSliceRef(f),
+					prediction, predGradient, observation,
+					freqWeights.getConstSliceRef(f),
+					doseWeights.getConstSliceRef(f),
 					ctf_part, pixelSize, equations_per_thread[0][data_pad * th]);
 
 			if (f%2 == 0)
 			{
 				MagnificationHelper::updateScale(
-						prediction, predGradient, observation, freqWeights.getConstSliceRef(f),
+						prediction, predGradient, observation,
+						freqWeights.getConstSliceRef(f),
+						doseWeights.getConstSliceRef(f),
 						ctf_part, pixelSize, equations_per_thread[1][data_pad * th]);
 			}
 			else
 			{
 				MagnificationHelper::updateScale(
-						prediction, predGradient, observation, freqWeights.getConstSliceRef(f),
+						prediction, predGradient, observation,
+						freqWeights.getConstSliceRef(f),
+						doseWeights.getConstSliceRef(f),
 						ctf_part, pixelSize, equations_per_thread[2][data_pad * th]);
 			}
 		}
@@ -513,7 +525,7 @@ double TomoAnisoMagFit::evaluateMag(const d2Matrix& M)
 
 				const double gamma = ctf_part.getLowOrderGamma(xa,ya);
 
-				const float c = -scale * sin(gamma);
+				const float c = -scale * sin(gamma) * doseWeights(x,y,f);
 
 				const float wg = freqWeights(x,y,f);
 

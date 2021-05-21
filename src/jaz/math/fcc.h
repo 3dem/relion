@@ -28,6 +28,9 @@ class FCC
 		
 		static BufferedImage<double> divide(
 				const BufferedImage<double>& fcc3);
+
+		static BufferedImage<double> sumOverTime(
+				const RawImage<double>& fcc3);
 };
 
 #endif

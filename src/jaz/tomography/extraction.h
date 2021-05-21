@@ -182,7 +182,7 @@ void TomoExtraction::extractAt2D_Fourier(
 	
 	BufferedImage<tComplex<T>> smallStackFS(sh,s,fc);
 
-	NewStackHelper::FourierTransformStack(smallStack, smallStackFS, true, num_threads);
+	NewStackHelper::FourierTransformStack_fast(smallStack, smallStackFS, true, num_threads);
 
 	if (bin != 1.0)
 	{

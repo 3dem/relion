@@ -144,10 +144,13 @@ public:
 	// Shell for randomisation of phases
 	int randomize_at;
 
+	// Allow the user to interpolate the FSC to obtain a fractional-shell resolution estimate (needed to evaluate new methods)
+	bool do_interpolate;
+
 	// Arrays to store FSC, Guinier curves etc
 	MultidimArray<RFLOAT> fsc_unmasked, acorr_unmasked, acorr_masked, dpr_unmasked, dpr_masked;
 	MultidimArray<RFLOAT> fsc_masked, fsc_random_masked, fsc_true, fsc_part_molweight, fsc_part_fracmask;
-	RFLOAT global_intercept, global_slope, global_corr_coeff, global_bfactor, global_resol;
+	RFLOAT global_intercept, global_slope, global_corr_coeff, global_bfactor, global_resol, fract_resol;
 	// The Guinier plots
 	std::vector<fit_point2D>  guinierin, guinierinvmtf, guinierweighted, guiniersharpen;
 

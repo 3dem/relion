@@ -35,7 +35,7 @@ int main(int argc, char *argv[])
 {
 	std::string particleFn, tomoSetFn, outPath;
 	double minFreqPx, lowPass;
-	bool oppositeHalf, predictCTF, writeObs;
+	bool oppositeHalf, predictCTF, applyDose, writeObs;
 	int threads, tomoIndex, particleIndex, boxSize;
 
 	//ReferenceMap reference;
@@ -61,6 +61,7 @@ int main(int argc, char *argv[])
 
 		predictCTF = parser.checkOption("--predict_CTF", "Modulate prediction by CTF");
 		oppositeHalf = parser.checkOption("--opposite_half", "Make prediction from the opposite subset");
+		applyDose = !parser.checkOption("--no_dose", "Do not apply dose weighting");
 		writeObs = parser.checkOption("--write_obs", "Write out the observed images as well");
 
 		lowPass = textToDouble(parser.getOption("--lowpass", "Blur by a Gaussian with this sigma [px]", "-1"));
@@ -110,6 +111,7 @@ int main(int argc, char *argv[])
 		const ParticleIndex part_id(particleIndex);
 
 		Tomogram tomogram = tomogramSet.loadTomogram(tomoIndex, true);
+		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s, 1.0);
 
 		const int fc = tomogram.frameCount;
 
@@ -145,6 +147,7 @@ int main(int argc, char *argv[])
 		for (int f = 0; f < fc; f++)
 		{
 			CTF ctf = tomogram.getCtf(f, dataSet.getPosition(part_id));
+			RawImage<float> doseSlice = doseWeights.getSliceRef(f);
 
 			BufferedImage<fComplex> prediction = Prediction::predictModulated(
 				part_id, dataSet, tomogram.projectionMatrices[f], s,
@@ -152,8 +155,7 @@ int main(int argc, char *argv[])
 				referenceMap.image_FS,
 				oppositeHalf? Prediction::OppositeHalf : Prediction::OwnHalf,
 				predictCTF?   Prediction::AmplitudeModulated : Prediction::Unmodulated,
-				Prediction::NotDoseWeighted,
-				0.0,
+				applyDose? &doseSlice : 0,
 				Prediction::CtfScaled);
 
 			Centering::shiftInSitu(prediction);

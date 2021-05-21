@@ -73,6 +73,8 @@ void ReconstructParticleProgram::readBasicParameters(int argc, char *argv[])
 	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Only process undone subtomograms");
 	no_backup = parser.checkOption("--no_backup", "Do not make backups (makes it impossible to use --only_do_unfinished)");
 
+	do_circle_crop = !parser.checkOption("--no_circle_crop", "Do not crop 2D images to a circle prior to insertion");
+
 	num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 	inner_threads = textToInteger(parser.getOption("--j_in", "Number of inner threads (slower, needs less memory)", "3"));
 	outer_threads = textToInteger(parser.getOption("--j_out", "Number of outer threads (faster, needs more memory)", "2"));
@@ -180,8 +182,9 @@ void ReconstructParticleProgram::run()
 	// Delete temporary files
 	// No error checking - do not bother the user if it fails
 	if (system(("rm -rf "+ tmpOutRoot + "*.mrc").c_str()))
-		std::cerr << "WARNING: deleting temporary files in folder " << tmpOutRoot <<
-				  " failed." << std::endl;
+	{
+		Log::warn("Deleting temporary files in folder "+tmpOutRoot+" failed.");
+	}
 }
 
 void ReconstructParticleProgram::processTomograms(
@@ -344,7 +347,7 @@ void ReconstructParticleProgram::processTomograms(
 			std::vector<d4Matrix> projCut(fc), projPart(fc);
 
 
-			const bool circle_crop = true;
+			const bool circle_crop = do_circle_crop;
 
 			TomoExtraction::extractAt3D_Fourier(
 					tomogram.stack, s02D, binning, tomogram.projectionMatrices, traj,

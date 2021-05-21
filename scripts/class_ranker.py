@@ -8,20 +8,15 @@ except ImportError:
     print("PYTHON ERROR: The required python module 'torch' was not found.")
     exit(1)
 try:
-    import numpy
+    import numpy as np
 except ImportError:
     print("PYTHON ERROR: The required python module 'numpy' was not found.")
     exit(1)
-
-import torch
-import numpy as np
 
 parser = argparse.ArgumentParser()
 
 parser.add_argument('model_path', type=str)
 parser.add_argument('project_dir', type=str)
-parser.add_argument('--features', type=str, default=None)
-parser.add_argument('--images', type=str, default="images.npy")
 args = parser.parse_args()
 
 project_dir = args.project_dir

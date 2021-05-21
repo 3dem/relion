@@ -70,6 +70,7 @@ void CtfRefinementProgram::parseInput()
 	int defocus_section = parser.addSection("Defocus refinement options");
 
 	do_refine_defocus = parser.checkOption("--do_defocus", "Refine the (astigmatic) defocus.");
+	do_regularise_defocus = parser.checkOption("--do_reg_defocus", "Regularise defocus estimation (i.e. require tilts to have similar defoci).");
 	lambda_reg = textToDouble(parser.getOption("--lambda", "Defocus regularisation scale", "0.001"));
 	if (lambda_reg < 0.0) lambda_reg = 0.0;
 
@@ -78,6 +79,7 @@ void CtfRefinementProgram::parseInput()
 	deltaSteps = textToInteger(parser.getOption("--ds", "Number of defocus steps in-between", "100"));
 
 	k_min_Ang = textToDouble(parser.getOption("--kmin", "Lowest spatial frequency to consider [Å]", "30"));
+	do_reset_to_common = parser.checkOption("--reset_to_common", "Reset the CTFs of all tilts to a common one prior to local refinement.");
 
 
 	int scale_section = parser.addSection("Scale estimation options");
@@ -197,7 +199,7 @@ void CtfRefinementProgram::processTomograms(
 		BufferedImage<float> freqWeights = computeFrequencyWeights(
 			tomogram, true, 0.0, 0.0, false, num_threads);
 
-		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(boxSize,1);
+		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(boxSize, 1);
 
 
 		const int item_verbosity = per_tomogram_progress? verbosity : 0;
@@ -336,15 +338,17 @@ void CtfRefinementProgram::refineDefocus(
 	BufferedImage<OddData> oddData(sh,s,fc);
 	oddData.fill(oddZero);
 
-	// temporarily set all CTFs to that of the (chronologically) first frame:
-
-	std::vector<int> chronoOrder = IndexSort<double>::sortIndices(tomogram.cumulativeDose);
-
-	for (int f = 1; f < fc; f++)
+	if (do_regularise_defocus && do_reset_to_common)
 	{
-		tomogram.centralCTFs[chronoOrder[f]] = tomogram.centralCTFs[chronoOrder[0]];
-	}
+		// temporarily set all CTFs to that of the (chronologically) first frame:
 
+		std::vector<int> chronoOrder = IndexSort<double>::sortIndices(tomogram.cumulativeDose);
+
+		for (int f = 1; f < fc; f++)
+		{
+			tomogram.centralCTFs[chronoOrder[f]] = tomogram.centralCTFs[chronoOrder[0]];
+		}
+	}
 
 	if (verbosity > 0)
 	{
@@ -396,7 +400,6 @@ void CtfRefinementProgram::refineDefocus(
 		Log::print("Fitting");
 	}
 
-
 	const BufferedImage<double> dataTerm = evaluateDefocusRange(
 			evenData, tomogram.optics.pixelSize, tomogram.centralCTFs,
 			minDelta, maxDelta, deltaSteps, k_min_px);
@@ -407,67 +410,93 @@ void CtfRefinementProgram::refineDefocus(
 	}
 
 
-	int best_di = deltaSteps / 2;
-	double minCost = std::numeric_limits<double>::max();
+	std::vector<d3Vector> astigmatism(fc);
 
-	for (int di = 0; di < deltaSteps; di++)
+	if (do_regularise_defocus)
 	{
-		double dataTermSum = 0.0;
+		int best_di = deltaSteps / 2;
+		double minCost = std::numeric_limits<double>::max();
 
+		for (int di = 0; di < deltaSteps; di++)
+		{
+			double dataTermSum = 0.0;
+
+			for (int f = 0; f < fc; f++)
+			{
+				dataTermSum += dataTerm(f,di);
+			}
+
+			if (dataTermSum < minCost)
+			{
+				minCost = dataTermSum;
+				best_di = di;
+			}
+		}
+
+		const double deltaStep = (maxDelta - minDelta) / (double) (deltaSteps - 1);
+		const double bestDeltaZ = minDelta + best_di * deltaStep;
+
+		if (verbosity > 0)
+		{
+			Log::print("Refining astigmatic defocus");
+		}
+
+		EvenSolution solution = AberrationFit::solveEven(evenData);
+
+		astigmatism = findMultiAstigmatism(
+			solution, tomogram.centralCTFs, bestDeltaZ, tomogram.optics.pixelSize,
+			lambda_reg, k_min_px);
+	}
+	else
+	{
 		for (int f = 0; f < fc; f++)
 		{
-			dataTermSum += dataTerm(f,di);
-		}
+			int best_di = deltaSteps / 2;
+			double minCost = std::numeric_limits<double>::max();
 
-		if (dataTermSum < minCost)
-		{
-			minCost = dataTermSum;
-			best_di = di;
+			for (int di = 0; di < deltaSteps; di++)
+			{
+				if (dataTerm(f,di) < minCost)
+				{
+					minCost = dataTerm(f,di);
+					best_di = di;
+				}
+			}
+
+			const double deltaStep = (maxDelta - minDelta) / (double) (deltaSteps - 1);
+			const double bestDeltaZ = minDelta + best_di * deltaStep;
+
+			RawImage<EvenData> evenDataSlice = evenData.getSliceRef(f);
+			EvenSolution solutionSlice = AberrationFit::solveEven(evenDataSlice);
+
+			astigmatism[f] = findAstigmatism(
+				solutionSlice, tomogram.centralCTFs[f], bestDeltaZ,
+				tomogram.optics.pixelSize,
+				0.02, k_min_px);
 		}
 	}
-
-	const double deltaStep = (maxDelta - minDelta) / (double) (deltaSteps - 1);
-
-	const double bestDeltaZ = minDelta + best_di * deltaStep;
-
-	if (verbosity > 0)
-	{
-		Log::print("Refining astigmatic defocus");
-	}
-
-	EvenSolution solution = AberrationFit::solveEven(evenData);
-
-	std::vector<d3Vector> astig = findMultiAstigmatism(
-		solution, tomogram.centralCTFs, bestDeltaZ, tomogram.optics.pixelSize,
-		lambda_reg, k_min_px);
 
 	MetaDataTable tempTable;
 
 	for (int f = 0; f < fc; f++)
 	{
-		CTF ctf0 = tomogram.centralCTFs[f];
-		CTF ctf_dz = ctf0;
+		CTF ctf = tomogram.centralCTFs[f];
 
-		ctf_dz.DeltafU = ctf0.DeltafU + bestDeltaZ;
-		ctf_dz.DeltafV = ctf0.DeltafV + bestDeltaZ;
-
-		CTF ctf1 = ctf_dz;
-
-		ctf1.DeltafU = astig[f][0];
-		ctf1.DeltafV = astig[f][1];
-		ctf1.azimuthal_angle = astig[f][2];
+		ctf.DeltafU = astigmatism[f][0];
+		ctf.DeltafV = astigmatism[f][1];
+		ctf.azimuthal_angle = astigmatism[f][2];
 
 		tempTable.addObject();
-		tempTable.setValue(EMDL_CTF_DEFOCUSU, ctf1.DeltafU, f);
-		tempTable.setValue(EMDL_CTF_DEFOCUSV, ctf1.DeltafV, f);
-		tempTable.setValue(EMDL_CTF_DEFOCUS_ANGLE, ctf1.azimuthal_angle, f);
+		tempTable.setValue(EMDL_CTF_DEFOCUSU, ctf.DeltafU, f);
+		tempTable.setValue(EMDL_CTF_DEFOCUSV, ctf.DeltafV, f);
+		tempTable.setValue(EMDL_CTF_DEFOCUS_ANGLE, ctf.azimuthal_angle, f);
 
 		// Also store the new defoci in the tomogram set, so they can be
 		// used for consecutive fits on the same node.
 		// Note: this does not work when a run has been resumed.
 
-		tomogramSet.setCtf(t, f, ctf1);
-		tomogram.centralCTFs[f] = ctf1;
+		tomogramSet.setCtf(t, f, ctf);
+		tomogram.centralCTFs[f] = ctf;
 	}
 
 	tempTable.write(getDefocusTempFilenameRoot(tomogram.name) + ".star");
@@ -536,14 +565,15 @@ void CtfRefinementProgram::updateScale(
 
 			CTF ctf = tomogram.getCtf(f, particleSet.getPosition(part_id));
 
+			const RawImage<float> doseSlice = doseWeights.getConstSliceRef(f);
+
 			BufferedImage<fComplex> prediction = Prediction::predictModulated(
 				part_id, particleSet, tomogram.projectionMatrices[f], s,
 				ctf, tomogram.optics.pixelSize, aberrationsCache,
 				referenceMap.image_FS,
 				Prediction::OwnHalf,
 				Prediction::AmplitudeModulated,
-				Prediction::NotDoseWeighted,
-				0.0,
+				&doseSlice,
 				Prediction::CtfUnscaled);
 
 			for (int y = 0; y < sh; y++)
@@ -554,7 +584,7 @@ void CtfRefinementProgram::updateScale(
 				const double r = sqrt(xx*xx + yy*yy);
 
 				const fComplex obs = -observation(x,y);
-				const fComplex prd =  doseWeights(x,y,f) * prediction(x,y) / ctf.scale;
+				const fComplex prd =  prediction(x,y);
 
 				const int ri = (int) r;
 
@@ -1309,7 +1339,8 @@ gravis::d3Vector CtfRefinementProgram::findAstigmatism(
 		const CTF& referenceCtf,
 		double initialDeltaZ,
 		double pixelSize,
-		double initialStep)
+		double initialStep,
+		double k_min_px)
 {
 	const int s = solution.optimum.ydim;
 	const int sh = solution.optimum.xdim;
@@ -1322,12 +1353,26 @@ gravis::d3Vector CtfRefinementProgram::findAstigmatism(
 	for (int yi = 0; yi < s;  yi++)
 	for (int xi = 0; xi < sh; xi++)
 	{
-		const double xx = xi/as;
-		const double yy = (yi < s/2)? yi/as : (yi - s)/as;
+		const double xf = xi;
+		const double yf = (yi < s/2)? yi : yi - s;
 
-		astigBasis(xi,yi,0) = xx * xx + yy * yy;
-		astigBasis(xi,yi,1) = xx * xx - yy * yy;
-		astigBasis(xi,yi,2) = 2.0 * xx * yy;
+		const double r2 = xf * xf + yf * yf;
+
+		if (r2 > k_min_px * k_min_px)
+		{
+			const double xx = yf / as;
+			const double yy = xf / as;
+
+			astigBasis(xi,yi,0) = xx * xx + yy * yy;
+			astigBasis(xi,yi,1) = xx * xx - yy * yy;
+			astigBasis(xi,yi,2) = 2.0 * xx * yy;
+		}
+		else
+		{
+			astigBasis(xi,yi,0) = 0.0;
+			astigBasis(xi,yi,1) = 0.0;
+			astigBasis(xi,yi,2) = 0.0;
+		}
 	}
 
 	ZernikeHelper::AnisoBasisOptimisation problem(
@@ -1336,15 +1381,6 @@ gravis::d3Vector CtfRefinementProgram::findAstigmatism(
 	std::vector<double> nmOpt = NelderMead::optimize(
 		{-initialDeltaZ * K1, 0.0, 0.0},
 		problem, initialStep, 0.000001, 2000, 1.0, 2.0, 0.5, 0.5, false);
-
-	std::cout.precision(16);
-
-	for (int i = 0; i < nmOpt.size(); i++)
-	{
-		std::cout << nmOpt[i] << "  ";
-	}
-
-	std::cout << "\n";
 
 	const double dz = nmOpt[0];
 	const double a1 = nmOpt[1];
