@@ -313,9 +313,6 @@ void Prediction::predictMicrograph(
 
 	target_slice.fill(0.f);
 
-	const RawImage<float> doseSlice = (doseWeights != 0)? doseWeights->getConstSliceRef(f) : RawImage<float>();
-	const RawImage<float>* doseSlicePtr = (doseWeights != 0)? &doseSlice : 0;
-
 
 	for (int p = 0; p < pc; p++)
 	{
@@ -334,7 +331,7 @@ void Prediction::predictMicrograph(
 				referenceMap.image_FS,
 				halfSet,
 				modulation,
-				doseSlicePtr,
+				doseWeights,
 				ctfScale);
 
 		const d4Vector q = tomogram.projectionMatrices[f] * d4Vector(traj[f]);

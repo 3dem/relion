@@ -60,6 +60,8 @@ void AlignProgram::parseInput()
 	mfSettings.constParticles = parser.checkOption("--const_p", "Keep the particle positions constant");
 	mfSettings.constAngles = parser.checkOption("--const_a", "Keep the frame angles constant");
 	mfSettings.constShifts = parser.checkOption("--const_s", "Keep the frame shifts constant");
+	do_anisotropy = !parser.checkOption("--iso", "Assume an isotropic projection model");
+	per_tilt_anisotropy = parser.checkOption("--per_tilt_aniso", "Fit independent view anisotropy for each tilt image");
 	num_iters = textToInteger(parser.getOption("--it", "Max. number of iterations", "5000"));
 
 
@@ -432,13 +434,19 @@ void AlignProgram::processTomograms(
 					mfSettings.constParticles,
 					mfSettings.constAngles,
 					mfSettings.constShifts,
+					do_anisotropy,
+					per_tilt_anisotropy,
 					range,
 					tomogram.centre, progress_bar_offset,
 					num_threads, padding);
 
-				std::vector<double> initial(protoAlignment.getParamCount(), 0.0);
+				const bool debugging = true;
 
-				if (verbosity > 0 && per_tomogram_progress)
+				protoAlignment.devMode = debugging;
+
+				std::vector<double> initial = protoAlignment.createInitial();
+
+				if (!debugging && verbosity > 0 && per_tomogram_progress)
 				{
 					Log::beginProgress("Performing optimisation", num_iters);
 				}
@@ -446,10 +454,13 @@ void AlignProgram::processTomograms(
 				std::vector<double> opt = LBFGS::optimize(
 					initial, protoAlignment, 1, num_iters, 1e-6, 1e-4);
 
-				if (verbosity > 0 && per_tomogram_progress)
+				if (!debugging && verbosity > 0 && per_tomogram_progress)
 				{
 					Log::endProgress();
 				}
+
+				std::cout << '[' << opt[0] << ']' << '\n';
+				std::cout << '[' << opt[1] << ']' << std::endl;
 
 				projections = protoAlignment.getProjections(opt);
 				positions = protoAlignment.getParticlePositions(opt);
