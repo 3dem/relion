@@ -303,7 +303,7 @@ void AlignProgram::processTomograms(
 		{
 
 			MotionFit motionFit(
-				CCs, projByTime, particleSet, particles[t], referenceMap.image_FS,
+				CCs, projByTime, particleSet, particles[t], 
 				motParams, mfSettings, tomogram.centre,
 				tomogram.getFrameDose(), tomogram.optics.pixelSize, padding,
 				progress_bar_offset, num_threads,
