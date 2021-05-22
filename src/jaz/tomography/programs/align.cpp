@@ -60,7 +60,7 @@ void AlignProgram::parseInput()
 	mfSettings.constParticles = parser.checkOption("--const_p", "Keep the particle positions constant");
 	mfSettings.constAngles = parser.checkOption("--const_a", "Keep the frame angles constant");
 	mfSettings.constShifts = parser.checkOption("--const_s", "Keep the frame shifts constant");
-	do_anisotropy = !parser.checkOption("--iso", "Assume an isotropic projection model");
+	do_anisotropy = parser.checkOption("--aniso", "Assume an anisotropic projection model");
 	per_tilt_anisotropy = parser.checkOption("--per_tilt_aniso", "Fit independent view anisotropy for each tilt image");
 	num_iters = textToInteger(parser.getOption("--it", "Max. number of iterations", "5000"));
 
