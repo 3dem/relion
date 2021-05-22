@@ -547,7 +547,10 @@ double MotionFit::gradAndValue(const std::vector<double> &x, std::vector<double>
 			{
 				const int i0 = fs*fc + 3*(pc + m*bc + b);
 
-				gradDest[i0] += 2.0 * (x[i0] + x[i0+1] + x[i0+2]);
+				gradDest[i0  ] += 2.0 * x[i0  ];
+				gradDest[i0+1] += 2.0 * x[i0+1];
+				gradDest[i0+2] += 2.0 * x[i0+2];
+
 				cost += x[i0]*x[i0] + x[i0+1]*x[i0+1] + x[i0+2]*x[i0+2];
 			}
 		}
