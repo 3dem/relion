@@ -6,7 +6,9 @@
 #include <src/jaz/tomography/motion/trajectory_set.h>
 #include <src/jaz/tomography/motion/modular_alignment/modular_alignment.h>
 #include <src/jaz/tomography/motion/modular_alignment/GP_motion_model.h>
+#include <src/jaz/tomography/motion/modular_alignment/no_motion_model.h>
 #include <src/jaz/tomography/motion/modular_alignment/no_2D_deformation_model.h>
+#include <src/jaz/tomography/motion/modular_alignment/spline_2D_deformation_model.h>
 #include <src/jaz/tomography/projection_IO.h>
 #include <src/jaz/tomography/prediction.h>
 #include <src/jaz/tomography/extraction.h>
@@ -299,7 +301,17 @@ void AlignProgram::processTomograms(
 			FCC = FCC::divide(FCC3);
 			FCC.write(diagPrefix + "_FCC_initial.mrc");
 		}
+		
+		ModularAlignmentSettings alignmentSettings;
 
+		alignmentSettings.constParticles = mfSettings.constParticles;
+		alignmentSettings.constAngles = mfSettings.constAngles;
+		alignmentSettings.constShifts = mfSettings.constShifts;
+		alignmentSettings.perFrame2DDeformation = true;
+		
+		
+		const bool debugging = true;
+		
 
 		const int progress_bar_offset = per_tomogram_progress? 0 : tt * num_iters;
 
@@ -329,24 +341,17 @@ void AlignProgram::processTomograms(
 				}
 			}
 
-			ModularAlignmentSettings alignmentSettings;
+			No2DDeformationModel noDeformationModel;
 
-			alignmentSettings.constParticles = mfSettings.constParticles;
-			alignmentSettings.constAngles = mfSettings.constAngles;
-			alignmentSettings.constShifts = mfSettings.constShifts;
-			alignmentSettings.perFrame2DDeformation = true;
-
-			No2DDeformationModel deformationModel;
-
-			ModularAlignment<GPMotionModel, No2DDeformationModel> motionFit(
+			ModularAlignment<GPMotionModel, No2DDeformationModel> alignment(
 				CCs, projByTime, particleSet, particles[t],
-				motionModel, deformationModel,
+				motionModel, noDeformationModel,
 				alignmentSettings, tomogram,
 				padding,
 				progress_bar_offset, num_threads,
 				per_tomogram_progress && verbosity > 0);
 
-			std::vector<double> initial(motionFit.getParamCount(), 0.0);
+			std::vector<double> initial(alignment.getParamCount(), 0.0);
 
 
 			if (verbosity > 0 && per_tomogram_progress)
@@ -356,7 +361,7 @@ void AlignProgram::processTomograms(
 
 
 			std::vector<double> opt = LBFGS::optimize(
-				initial, motionFit, 1, num_iters, 1e-4, 1e-5);
+				initial, alignment, 1, num_iters, 1e-4, 1e-5);
 
 
 			if (verbosity > 0 && per_tomogram_progress)
@@ -365,15 +370,15 @@ void AlignProgram::processTomograms(
 			}
 
 
-			std::vector<d4Matrix> projections = motionFit.getProjections(opt, tomogram.frameSequence);
-			std::vector<d3Vector> positions = motionFit.getParticlePositions(opt);
-			std::vector<Trajectory> trajectories = motionFit.exportTrajectories(
+			std::vector<d4Matrix> projections = alignment.getProjections(opt, tomogram.frameSequence);
+			std::vector<d3Vector> positions = alignment.getParticlePositions(opt);
+			std::vector<Trajectory> trajectories = alignment.exportTrajectories(
 						opt, particleSet, tomogram.frameSequence);
 
 
 			writeTempData(&trajectories, projections, positions, t);
 
-			motionFit.visualiseTrajectories2D(
+			alignment.visualiseTrajectories2D(
 					opt, 8.0, tomogram.name,
 					getTempFilenameRoot(tomogram.name) + "_tracks");
 
@@ -449,42 +454,76 @@ void AlignProgram::processTomograms(
 			}
 			else
 			{
-				ProtoAlignment protoAlignment(
-					CCs, tomogram.projectionMatrices, particleSet, particles[t],
-					referenceMap.image_FS,
-					mfSettings.constParticles,
-					mfSettings.constAngles,
-					mfSettings.constShifts,
-					do_anisotropy,
-					per_tilt_anisotropy,
-					range,
-					tomogram.centre, progress_bar_offset,
-					num_threads, padding);
-
-				const bool debugging = true;
-
-				protoAlignment.devMode = debugging;
-
-				std::vector<double> initial = protoAlignment.createInitial();
-
-				if (!debugging && verbosity > 0 && per_tomogram_progress)
+				const bool new_implementation = false;
+				
+				if (new_implementation)
 				{
-					Log::beginProgress("Performing optimisation", num_iters);
+					No2DDeformationModel noDeformationModel;
+					NoMotionModel noMotionModel;
+		
+					ModularAlignment<NoMotionModel, No2DDeformationModel> alignment(
+						CCs, projByTime, particleSet, particles[t],
+						noMotionModel, noDeformationModel,
+						alignmentSettings, tomogram,
+						padding,
+						progress_bar_offset, num_threads,
+						per_tomogram_progress && verbosity > 0);
+		
+					std::vector<double> initial(alignment.getParamCount(), 0.0);
+					
+					if (!debugging && verbosity > 0 && per_tomogram_progress)
+					{
+						Log::beginProgress("Performing optimisation", num_iters);
+					}
+	
+					std::vector<double> opt = LBFGS::optimize(
+						initial, alignment, 1, num_iters, 1e-6, 1e-4);
+	
+					if (!debugging && verbosity > 0 && per_tomogram_progress)
+					{
+						Log::endProgress();
+					}
+	
+					projections = alignment.getProjections(opt, tomogram.frameSequence);
+					positions = alignment.getParticlePositions(opt);
 				}
-
-				std::vector<double> opt = LBFGS::optimize(
-					initial, protoAlignment, 1, num_iters, 1e-6, 1e-4);
-
-				if (!debugging && verbosity > 0 && per_tomogram_progress)
+				else
 				{
-					Log::endProgress();
+					ProtoAlignment protoAlignment(
+						CCs, tomogram.projectionMatrices, particleSet, particles[t],
+						referenceMap.image_FS,
+						mfSettings.constParticles,
+						mfSettings.constAngles,
+						mfSettings.constShifts,
+						do_anisotropy,
+						per_tilt_anisotropy,
+						range,
+						tomogram.centre, progress_bar_offset,
+						num_threads, padding);
+	
+					protoAlignment.devMode = debugging;
+	
+					std::vector<double> initial = protoAlignment.createInitial();
+	
+					if (!debugging && verbosity > 0 && per_tomogram_progress)
+					{
+						Log::beginProgress("Performing optimisation", num_iters);
+					}
+	
+					std::vector<double> opt = LBFGS::optimize(
+						initial, protoAlignment, 1, num_iters, 1e-6, 1e-4);
+	
+					if (!debugging && verbosity > 0 && per_tomogram_progress)
+					{
+						Log::endProgress();
+					}
+	
+					std::cout << '[' << opt[0] << ']' << '\n';
+					std::cout << '[' << opt[1] << ']' << std::endl;
+	
+					projections = protoAlignment.getProjections(opt);
+					positions = protoAlignment.getParticlePositions(opt);
 				}
-
-				std::cout << '[' << opt[0] << ']' << '\n';
-				std::cout << '[' << opt[1] << ']' << std::endl;
-
-				projections = protoAlignment.getProjections(opt);
-				positions = protoAlignment.getParticlePositions(opt);
 			}
 
 			writeTempData(0, projections, positions, t);
