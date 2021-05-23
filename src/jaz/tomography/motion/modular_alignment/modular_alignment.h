@@ -10,6 +10,7 @@
 #include <src/jaz/tomography/particle_set.h>
 #include <src/jaz/tomography/extraction.h>
 #include <src/jaz/tomography/prediction.h>
+#include <src/jaz/tomography/tomogram.h>
 #include <src/ctf.h>
 #include <src/jaz/image/centering.h>
 #include <src/jaz/math/Tait_Bryan_angles.h>
@@ -21,7 +22,7 @@ class CTF;
 
 struct ModularAlignmentSettings
 {
-	bool constParticles, constAngles, constShifts,
+	bool constParticles, constAngles, constShifts, perFrame2DDeformation,
 		 params_scaled_by_dose, sqExpKernel;
 
 	int maxEDs;
@@ -42,19 +43,19 @@ class ModularAlignment : public FastDifferentiableOptimization
 				const std::vector<gravis::d4Matrix>& frameProj,
 				ParticleSet& dataSet,
 				const std::vector<ParticleIndex>& partIndices,
+		        const MotionModel& motionModel,
+		        const DeformationModel2D& deformationModel2D,
 				ModularAlignmentMotionParameters motionParameters,
 				ModularAlignmentSettings settings,
-				gravis::d3Vector tomoCentre,
-				double frameDose,
-				double pixelSize,
+				const Tomogram& tomogram,
 				double paddingFactor,
 				int progressBarOffset,
 				int num_threads,
 				bool verbose);
 		
 
-			MotionModel motionModel;
-			DeformationModel2D deformationModel2D;
+			const MotionModel& motionModel;
+			const DeformationModel2D& deformationModel2D;
 
 			const std::vector<BufferedImage<double>>& CCs;  // one frame stack for each particle
 			const std::vector<gravis::d4Matrix>& frameProj; // initial projection matrices
@@ -70,7 +71,7 @@ class ModularAlignment : public FastDifferentiableOptimization
 
 			bool verbose;
 
-			int fc, pc, bc, maxRange;
+			int fc, pc, mpc, dc, maxRange;
 
 
 			std::vector<gravis::d3Vector> initialPos;
@@ -97,13 +98,23 @@ class ModularAlignment : public FastDifferentiableOptimization
 				const std::vector<double>& x,
 				const ParticleSet& dataSet,
 				const std::vector<int>& frameSequence) const;
-
-		int getParamCount();
-
-		std::vector<BufferedImage<double>> drawShiftedCCs(const std::vector<double>& x) const;
-		Mesh visualiseTrajectories(const std::vector<double>& x, double scale);
-
+		
+		void visualiseTrajectories2D(
+				const std::vector<double>& x,
+				double scale,
+				const std::string& tomo_name,
+				const std::string& file_name_root);
+		
 		void report(int iteration, double cost, const std::vector<double>& x) const;
+		
+
+		int getParamCount() const
+		{
+			const int fs = getFrameStride();
+			const int ds = settings.perFrame2DDeformation? dc * fc : dc;
+			
+			return fs * fc + 3 * pc + mpc * (fc - 1) + ds;
+		}
 
 
 	protected:
@@ -116,6 +127,26 @@ class ModularAlignment : public FastDifferentiableOptimization
 			if (!settings.constShifts) out += 2;
 
 			return out;
+		}
+		
+		inline int getAlignmentBlockOffset() const
+		{
+			return 0;
+		}
+		
+		inline int getPositionsBlockOffset(int fs) const
+		{
+			return fs * fc;
+		}
+		
+		inline int getMotionBlockOffset(int fs) const
+		{
+			return fs * fc + 3 * pc;
+		}
+		
+		inline int get2DDeformationsBlockOffset(int fs) const
+		{
+			return fs * fc + 3 * pc + mpc * (fc - 1);
 		}
 
 		inline void readViewParams(
@@ -130,31 +161,35 @@ ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 		const std::vector<gravis::d4Matrix>& frameProj,
 		ParticleSet& dataSet,
 		const std::vector<ParticleIndex>& partIndices,
+        const MotionModel& motionModel,
+        const DeformationModel2D& deformationModel2D,
 		ModularAlignmentMotionParameters motionParameters,
 		ModularAlignmentSettings settings,
-		gravis::d3Vector tomoCentre,
-		double frameDose,
-		double pixelSize,
+		const Tomogram& tomogram,
 		double paddingFactor,
 		int progressBarOffset,
 		int num_threads,
 		bool verbose)
 :	
-	CCs(CCs),
+	motionModel(motionModel),
+    deformationModel2D(deformationModel2D),
+    CCs(CCs),
 	frameProj(frameProj),
 	dataSet(dataSet),
 	partIndices(partIndices),
 	motionParameters(motionParameters),
 	settings(settings),
-	tomoCentre(tomoCentre),
-	frameDose(frameDose),
-	pixelSize(pixelSize),
+	tomoCentre(tomogram.centre),
+	frameDose(tomogram.getFrameDose()),
+	pixelSize(tomogram.optics.pixelSize),
 	paddingFactor(paddingFactor),
 	progressBarOffset(progressBarOffset),
 	num_threads(num_threads),
 	verbose(verbose),
 	fc(frameProj.size()),
 	pc(partIndices.size()),
+    mpc(motionModel.getParameterCount()),
+    dc(deformationModel2D.getParameterCount()),
 	maxRange(CCs[0].xdim / (2 * paddingFactor))
 {	
 	initialPos.resize(pc);
@@ -177,6 +212,16 @@ ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 			0, 0, 0, 1 );
 }
 
+/*
+	Parameter Layout:
+	
+	0:                  ([phi, theta, psi], [dx, dy]) * fc           frame alignment: fs * fc
+	fs * fc:             [dx0, dy0, dz0]  *  pc;                     static part. shifts: 3 * pc
+	fs * fc + 3 * pc:    [b0x, b0y, b0z][b1x, ..., bBz] * (fc-1);    motion: mpc * (fc - 1)
+	
+	fs * fc  +  3 * pc  +  mpc * (fc - 1)   total
+*/
+
 template<class MotionModel, class DeformationModel2D>
 double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
         const std::vector<double>& x, std::vector<double>& gradDest) const
@@ -186,6 +231,8 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 	const int data_pad = 512;
 	const int step_grad = xs + data_pad;
 	const int step_frame = fc + data_pad;
+	const int pos_block = getPositionsBlockOffset(fs);
+	const int mot_block = getMotionBlockOffset(fs);
 
 	std::vector<gravis::d4Matrix> P(fc), P_phi(fc), P_theta(fc), P_psi(fc);
 
@@ -234,7 +281,7 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 
 		gravis::d3Vector shift = settings.constParticles?
 			gravis::d3Vector(0.0, 0.0, 0.0) :
-			gravis::d3Vector(x[fs*fc + 3*p], x[fs*fc + 3*p+1], x[fs*fc + 3*p+2]);
+			gravis::d3Vector(x[pos_block + 3*p], x[pos_block + 3*p+1], x[pos_block + 3*p+2]);
 
 		for (int f = 0; f < fc; f++)
 		{
@@ -292,13 +339,13 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 
 				dC_dPos[th*step_frame + f] = dC_dPos_f;
 
-				grad_par[th*step_grad + fs*fc + 3*p    ]  +=  dC_dPos_f.x;
-				grad_par[th*step_grad + fs*fc + 3*p + 1]  +=  dC_dPos_f.y;
-				grad_par[th*step_grad + fs*fc + 3*p + 2]  +=  dC_dPos_f.z;
+				grad_par[th*step_grad + pos_block + 3*p    ]  +=  dC_dPos_f.x;
+				grad_par[th*step_grad + pos_block + 3*p + 1]  +=  dC_dPos_f.y;
+				grad_par[th*step_grad + pos_block + 3*p + 2]  +=  dC_dPos_f.z;
 
 				if (f < fc-1)
 				{
-					shift += motionModel.getPosChange(x, p, f, fs * fc + 3 * pc);
+					motionModel.updatePosition(&x[mot_block + f*mpc], p, shift);
 				}
 			}
 		}
@@ -306,8 +353,8 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 		if (!settings.constParticles)
 		{
 			motionModel.updateCostGradient(
-				dC_dPos, th*step_frame, p, 
-				grad_par, th*step_grad + fs*fc + 3*pc);
+				&dC_dPos[th*step_frame], p, fc, 
+				&grad_par[th*step_grad + mot_block]);
 		}
 	}
 
@@ -331,13 +378,185 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 
 	if (!settings.constParticles)
 	{
-		const int offset = fs*fc + 3*pc;
-		
-		cost += deformationModel2D.computePriorCostAndGradient(
-			x, offset, fc, gradDest);
+		cost += motionModel.computePriorCostAndGradient(
+			&x[mot_block], fc, &gradDest[mot_block]);
 	}
 
 	return cost;
+}
+
+template<class MotionModel, class DeformationModel2D>
+std::vector<gravis::d4Matrix> ModularAlignment<MotionModel, DeformationModel2D>::getProjections(
+		const std::vector<double> &x,
+		const std::vector<int>& frameSequence) const
+{
+	std::vector<gravis::d4Matrix> out(fc);
+		
+	for (int f = 0; f < fc; f++)
+	{	
+		double phi, theta, psi, dx, dy;		
+		readViewParams(x, f, phi, theta, psi, dx, dy);
+		
+		const gravis::d4Matrix Q = TaitBryan::anglesToMatrix4(phi, theta, psi);		
+		
+		const int fa = frameSequence[f];
+		
+		out[fa] = plusCentre * Q * minusCentre * frameProj[f];
+		
+		out[fa](0,3) += dx;
+		out[fa](1,3) += dy;
+	}
+		
+	return out;
+}
+
+template<class MotionModel, class DeformationModel2D>
+std::vector<gravis::d3Vector> ModularAlignment<MotionModel, DeformationModel2D>::getParticlePositions(
+		const std::vector<double>& x) const
+{
+	std::vector<gravis::d3Vector> out(pc);
+	
+	const int fs = getFrameStride();
+	const int pos_block = getPositionsBlockOffset(fs);
+	
+	for (int p = 0; p < pc; p++)
+	{
+		out[p] = initialPos[p] + gravis::d3Vector(
+				x[pos_block + 3*p    ],
+				x[pos_block + 3*p + 1],
+				x[pos_block + 3*p + 2]);
+	}
+
+	return out;
+}
+
+template<class MotionModel, class DeformationModel2D>
+Trajectory ModularAlignment<MotionModel, DeformationModel2D>::getTrajectory(
+		const std::vector<double> &x, int p,
+		const std::vector<int>& frameSequence) const
+{
+	Trajectory out(fc);
+	
+	if (settings.constParticles) return out;
+	
+	const int fs = getFrameStride();
+	const int mot_block = getMotionBlockOffset(fs);
+
+	gravis::d3Vector shift(0.0, 0.0, 0.0);
+	
+	for (int f = 0; f < fc; f++)
+	{
+		const int fa = frameSequence[f];
+		
+		out.shifts_Ang[fa] = pixelSize * shift;
+		
+		if (f < fc-1)
+		{
+			motionModel.updatePosition(&x[mot_block + f*mpc], p, shift);
+		}
+	}
+	
+	return out;
+}
+
+template<class MotionModel, class DeformationModel2D>
+std::vector<Trajectory> ModularAlignment<MotionModel, DeformationModel2D>::exportTrajectories(
+		const std::vector<double>& x, 
+		const ParticleSet& dataSet,
+		const std::vector<int>& frameSequence) const
+{
+	std::vector<Trajectory> out(pc);
+
+	for (int p = 0; p < pc; p++)
+	{
+		const int pp = partIndices[p].value;
+
+		out[p] = dataSet.motionTrajectories[pp] + getTrajectory(x, p, frameSequence);
+	}
+
+	return out;
+}
+
+template<class MotionModel, class DeformationModel2D>
+void ModularAlignment<MotionModel, DeformationModel2D>::visualiseTrajectories2D(
+        const std::vector<double> &x, 
+        double scale, 
+        const std::string& tomo_name, 
+        const std::string& file_name_root)
+{
+	std::vector<int> timeSeq(fc);
+
+	for (int f = 0; f < fc; f++)
+	{
+		timeSeq[f] = f;
+	}
+
+	std::vector<std::string> plot_names {"XY", "XZ", "YZ"};
+	std::vector<gravis::i2Vector> dim_indices{
+		gravis::i2Vector(0,1), 
+		gravis::i2Vector(0,2), 
+		gravis::i2Vector(1,2)};
+
+	for (int dim = 0; dim < 3; dim++)
+	{
+		CPlot2D plot2D(tomo_name + " Motion " + plot_names[dim]);
+		plot2D.SetXAxisSize(600);
+		plot2D.SetYAxisSize(600);
+		plot2D.SetDrawLegend(false);
+		plot2D.SetFlipY(true);
+
+		for (int p = 0; p < pc; p++)
+		{
+			Trajectory track = getTrajectory(x, p, timeSeq);
+
+			// Mark start of each track
+			CDataSet start;
+			start.SetDrawMarker(true);
+			start.SetMarkerSize(8);
+			start.SetDatasetColor(0.2,0.5,1.0);
+
+			const gravis::d3Vector a = initialPos[p] + scale * track.shifts_Ang[0] / pixelSize;
+			const gravis::i2Vector di = dim_indices[dim];
+
+			CDataPoint point3(a[di[0]],a[di[1]]);
+			start.AddDataPoint(point3);
+			plot2D.AddDataSet(start);
+		}
+
+		for (int p = 0; p < pc; p++)
+		{
+			Trajectory track = getTrajectory(x, p, timeSeq);
+
+			CDataSet curve;
+			curve.SetDrawMarker(false);
+			curve.SetDatasetColor(0.0,0.0,0.0);
+			curve.SetLineWidth(0.5);
+
+			for (int f = 0; f < fc; f++)
+			{
+				const gravis::d3Vector a = initialPos[p] + scale * track.shifts_Ang[f] / pixelSize;
+				const gravis::i2Vector di = dim_indices[dim];
+
+				CDataPoint point(a[di[0]],a[di[1]]);
+
+				curve.AddDataPoint(point);
+			}
+
+			plot2D.AddDataSet(curve);
+		}
+
+		std::string label_x = plot_names[dim].substr(0,1) +
+				" (in pixels; trajectory scaled by " + ZIO::itoa(scale) + ")";
+
+		std::string label_y = plot_names[dim].substr(1,1);
+
+		plot2D.SetXAxisTitle(label_x);
+		plot2D.SetYAxisTitle(label_y);
+
+		FileName fn_eps = file_name_root + "_" + plot_names[dim] + ".eps";
+
+		plot2D.OutputPostScriptPlot(fn_eps);
+	}
 }
 
 template<class MotionModel, class DeformationModel2D>

@@ -34,62 +34,53 @@ class GPMotionModel
 			int pc, bc;
 
 
-		inline gravis::d3Vector getPosChange(
-			const std::vector<double>& x,
-			int particle,
-			int mode,
-			int offset) const;
+		inline void updatePosition(
+			const double* x,
+			int particle_index,
+			gravis::d3Vector& position) const;
 		
 		inline void updateCostGradient(
-			const std::vector<gravis::d3Vector>& dC_dPos,
-			int offset_in,
+			const gravis::d3Vector *dC_dPos,
 			int particle_index,
-			std::vector<double>& target,
-			int offset_out) const;
+			int fc,
+			double *target) const;
 		
 		inline double computePriorCostAndGradient(
-		    const std::vector<double>& x,
-			int offset,
+		    const double *x,
 			int fc,
-			std::vector<double>& gradDest) const;
-		        
+			double* gradDest) const;
+		
+		inline int getParameterCount() const;
 		        
 
 };
 
-
-inline gravis::d3Vector GPMotionModel::getPosChange(
-	const std::vector<double>& x,
-	int particle,
-	int mode,
-	int offset) const
+inline void GPMotionModel::updatePosition(
+    const double* x,
+	int particle_index,
+	gravis::d3Vector& position) const
 {
-	gravis::d3Vector out(0.0, 0.0, 0.0);
+	gravis::d3Vector d(0.0, 0.0, 0.0);
 
 	for (int b = 0; b < bc; b++)
 	{
-		const int i0 = offset + 3*(mode*bc + b);
-		const double def = deformationBasis[particle*bc + b];
-
-		for (int i = 0; i < 3; i++)
-		{
-			out[i] += x[i0+i] * def;
-		}
+		const double def = deformationBasis[particle_index*bc + b];
+		
+		d.x += x[3*b    ] * def;
+		d.y += x[3*b + 1] * def;
+		d.z += x[3*b + 2] * def;
 	}
 
-	return out;
+	position += d;
 }
 
 inline void GPMotionModel::updateCostGradient(
-	const std::vector<gravis::d3Vector>& dC_dPos,
-	int offset_in,
+	const gravis::d3Vector* dC_dPos,
 	int particle_index,
-	std::vector<double>& target,
-	int offset_out) const
+	int fc,
+	double* target) const
 {
-	const int fc = dC_dPos.size();
-	
-	for (int m = 0; m < fc-1; m++)
+	for (int m = 0; m < fc - 1; m++)
 	{
 		for (int b = 0; b < bc; b++)
 		{
@@ -98,10 +89,10 @@ inline void GPMotionModel::updateCostGradient(
 
 			for (int f = m+1; f < fc; f++)
 			{
-				dC_dXm += def * dC_dPos[offset_in + f];
+				dC_dXm += def * dC_dPos[f];
 			}
 
-			const int i0 = offset_out + 3*(m*bc + b);
+			const int i0 = 3*(m*bc + b);
 
 			target[i0    ] += dC_dXm.x;
 			target[i0 + 1] += dC_dXm.y;
@@ -111,10 +102,9 @@ inline void GPMotionModel::updateCostGradient(
 }
 
 inline double GPMotionModel::computePriorCostAndGradient(
-    const std::vector<double>& x,
-	int offset, 
+    const double* x,
 	int fc,
-	std::vector<double>& gradDest) const
+	double* gradDest) const
 {
 	double cost = 0.0;
 	
@@ -122,7 +112,7 @@ inline double GPMotionModel::computePriorCostAndGradient(
 	{
 		for (int b = 0; b < bc; b++)
 		{
-			const int i0 = offset + 3*(m*bc + b);
+			const int i0 = 3*(m*bc + b);
 			
 			gradDest[i0  ] += 2.0 * x[i0  ];
 			gradDest[i0+1] += 2.0 * x[i0+1];
@@ -133,4 +123,9 @@ inline double GPMotionModel::computePriorCostAndGradient(
 	}
 	
 	return cost;
+}
+
+inline int GPMotionModel::getParameterCount() const
+{
+	return 3 * bc;
 }
