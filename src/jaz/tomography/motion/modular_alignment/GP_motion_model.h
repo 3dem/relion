@@ -9,9 +9,7 @@ class GPMotionModel
 		
 			struct Settings
 			{
-				bool constParticles, constAngles, constShifts,
-					 params_scaled_by_dose, sqExpKernel;
-				
+				bool params_scaled_by_dose, sqExpKernel;
 				int maxEDs;
 			};
 			
@@ -21,12 +19,13 @@ class GPMotionModel
 			};
 
 			
-		GPMotionModel(const ParticleSet& dataSet,
-			const std::vector<ParticleIndex>& partIndices,
-		    const Tomogram& tomogram,
-		    MotionParameters motionParameters,    
-			Settings settings, 
-		    bool verbose);
+		GPMotionModel(
+				const ParticleSet& dataSet,
+				const std::vector<ParticleIndex>& partIndices,
+				const Tomogram& tomogram,
+				MotionParameters motionParameters,
+				Settings settings,
+				bool verbose);
 
 		
 			std::vector<gravis::d3Vector> initialPos;
@@ -35,23 +34,23 @@ class GPMotionModel
 
 
 		inline void updatePosition(
-			const double* x,
-			int particle_index,
-			gravis::d3Vector& position) const;
-		
+				const double* x,
+				int particle_index,
+				gravis::d3Vector& position) const;
+
 		inline void updateCostGradient(
-			const gravis::d3Vector *dC_dPos,
-			int particle_index,
-			int fc,
-			double *target) const;
-		
+				const gravis::d3Vector *dC_dPos,
+				int particle_index,
+				int fc,
+				double *target) const;
+
 		inline double computePriorCostAndGradient(
-		    const double *x,
-			int fc,
-			double* gradDest) const;
-		
+				const double *x,
+				int fc,
+				double* gradDest) const;
+
 		inline int getParameterCount() const;
-		        
+
 
 };
 
@@ -102,7 +101,7 @@ inline void GPMotionModel::updateCostGradient(
 }
 
 inline double GPMotionModel::computePriorCostAndGradient(
-    const double* x,
+	const double* x,
 	int fc,
 	double* gradDest) const
 {

@@ -437,6 +437,7 @@ double MotionFit::gradAndValue(const std::vector<double> &x, std::vector<double>
 
 			const d4Vector dp  = P[f] * pos4 - frameProj[f] * d4Vector(initialPos[p]);
 
+
 			const double dx_img = (dp.x + maxRange) * paddingFactor;
 			const double dy_img = (dp.y + maxRange) * paddingFactor;
 
@@ -541,6 +542,8 @@ double MotionFit::gradAndValue(const std::vector<double> &x, std::vector<double>
 
 	if (!settings.constParticles)
 	{
+		double reg_cost = 0.0;
+
 		for (int m = 0; m < fc-1; m++)
 		{
 			for (int b = 0; b < bc; b++)
@@ -551,9 +554,11 @@ double MotionFit::gradAndValue(const std::vector<double> &x, std::vector<double>
 				gradDest[i0+1] += 2.0 * x[i0+1];
 				gradDest[i0+2] += 2.0 * x[i0+2];
 
-				cost += x[i0]*x[i0] + x[i0+1]*x[i0+1] + x[i0+2]*x[i0+2];
+				reg_cost += x[i0]*x[i0] + x[i0+1]*x[i0+1] + x[i0+2]*x[i0+2];
 			}
 		}
+
+		cost += reg_cost;
 	}
 
 	return cost;

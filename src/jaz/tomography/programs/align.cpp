@@ -4,6 +4,9 @@
 #include <src/jaz/tomography/motion/motion_fit.h>
 #include <src/jaz/tomography/motion/proto_alignment.h>
 #include <src/jaz/tomography/motion/trajectory_set.h>
+#include <src/jaz/tomography/motion/modular_alignment/modular_alignment.h>
+#include <src/jaz/tomography/motion/modular_alignment/GP_motion_model.h>
+#include <src/jaz/tomography/motion/modular_alignment/no_2D_deformation_model.h>
 #include <src/jaz/tomography/projection_IO.h>
 #include <src/jaz/tomography/prediction.h>
 #include <src/jaz/tomography/extraction.h>
@@ -15,6 +18,7 @@
 #include <src/jaz/optimization/lbfgs.h>
 #include <src/jaz/math/fcc.h>
 #include <src/jaz/util/log.h>
+#include <iomanip>
 #include <mpi.h>
 #include <omp.h>
 
@@ -301,23 +305,46 @@ void AlignProgram::processTomograms(
 
 		if (do_motion)
 		{
+			GPMotionModel::Settings motionSettings;
+			motionSettings.params_scaled_by_dose = mfSettings.params_scaled_by_dose;
+			motionSettings.sqExpKernel = mfSettings.sqExpKernel;
+			motionSettings.maxEDs = mfSettings.maxEDs;
 
-			MotionFit motionFit(
-				CCs, projByTime, particleSet, particles[t], 
-				motParams, mfSettings, tomogram.centre,
-				tomogram.getFrameDose(), tomogram.optics.pixelSize, padding,
-				progress_bar_offset, num_threads,
+			GPMotionModel::MotionParameters motionParameters;
+			motionParameters.sig_vel = motParams.sig_vel;
+			motionParameters.sig_div = motParams.sig_div;
+
+			GPMotionModel motionModel(
+				particleSet, particles[t], tomogram,
+				motionParameters, motionSettings,
 				per_tomogram_progress && verbosity > 0);
 
 			if (diag)
 			{
 				std::ofstream evDat(diagPrefix + "_deformation_eigenvalues.dat");
 
-				for (int i = 0; i < motionFit.deformationLambda.size(); i++)
+				for (int i = 0; i < motionModel.deformationLambda.size(); i++)
 				{
-					evDat << i << ' ' << motionFit.deformationLambda[i] << '\n';
+					evDat << i << ' ' << motionModel.deformationLambda[i] << '\n';
 				}
 			}
+
+			ModularAlignmentSettings alignmentSettings;
+
+			alignmentSettings.constParticles = mfSettings.constParticles;
+			alignmentSettings.constAngles = mfSettings.constAngles;
+			alignmentSettings.constShifts = mfSettings.constShifts;
+			alignmentSettings.perFrame2DDeformation = true;
+
+			No2DDeformationModel deformationModel;
+
+			ModularAlignment<GPMotionModel, No2DDeformationModel> motionFit(
+				CCs, projByTime, particleSet, particles[t],
+				motionModel, deformationModel,
+				alignmentSettings, tomogram,
+				padding,
+				progress_bar_offset, num_threads,
+				per_tomogram_progress && verbosity > 0);
 
 			std::vector<double> initial(motionFit.getParamCount(), 0.0);
 
@@ -337,6 +364,7 @@ void AlignProgram::processTomograms(
 				Log::endProgress();
 			}
 
+
 			std::vector<d4Matrix> projections = motionFit.getProjections(opt, tomogram.frameSequence);
 			std::vector<d3Vector> positions = motionFit.getParticlePositions(opt);
 			std::vector<Trajectory> trajectories = motionFit.exportTrajectories(
@@ -344,13 +372,6 @@ void AlignProgram::processTomograms(
 
 
 			writeTempData(&trajectories, projections, positions, t);
-
-
-			Mesh mesh8 = motionFit.visualiseTrajectories3D(opt, 8.0);
-			mesh8.writePly(outDir + "Trajectories/" + tomogram.name + "_x8.ply");
-
-			Mesh mesh1 = motionFit.visualiseTrajectories3D(opt, 1.0);
-			mesh1.writePly(outDir + "Trajectories/" + tomogram.name + "_x1.ply");
 
 			motionFit.visualiseTrajectories2D(
 					opt, 8.0, tomogram.name,

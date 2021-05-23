@@ -22,15 +22,7 @@ class CTF;
 
 struct ModularAlignmentSettings
 {
-	bool constParticles, constAngles, constShifts, perFrame2DDeformation,
-		 params_scaled_by_dose, sqExpKernel;
-
-	int maxEDs;
-};
-
-struct ModularAlignmentMotionParameters
-{
-	double sig_vel, sig_div;
+	bool constParticles, constAngles, constShifts, perFrame2DDeformation;
 };
 
 template<class MotionModel, class DeformationModel2D>
@@ -43,9 +35,8 @@ class ModularAlignment : public FastDifferentiableOptimization
 				const std::vector<gravis::d4Matrix>& frameProj,
 				ParticleSet& dataSet,
 				const std::vector<ParticleIndex>& partIndices,
-		        const MotionModel& motionModel,
-		        const DeformationModel2D& deformationModel2D,
-				ModularAlignmentMotionParameters motionParameters,
+				const MotionModel& motionModel,
+				const DeformationModel2D& deformationModel2D,
 				ModularAlignmentSettings settings,
 				const Tomogram& tomogram,
 				double paddingFactor,
@@ -62,14 +53,13 @@ class ModularAlignment : public FastDifferentiableOptimization
 			ParticleSet& dataSet;
 			const std::vector<ParticleIndex>& partIndices;
 
-			ModularAlignmentMotionParameters motionParameters;
 			ModularAlignmentSettings settings;
 
 			gravis::d3Vector tomoCentre;
 			double frameDose, pixelSize, paddingFactor;
 			int progressBarOffset, num_threads;
 
-			bool verbose;
+			bool verbose, devMode;
 
 			int fc, pc, mpc, dc, maxRange;
 
@@ -161,9 +151,8 @@ ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 		const std::vector<gravis::d4Matrix>& frameProj,
 		ParticleSet& dataSet,
 		const std::vector<ParticleIndex>& partIndices,
-        const MotionModel& motionModel,
-        const DeformationModel2D& deformationModel2D,
-		ModularAlignmentMotionParameters motionParameters,
+		const MotionModel& motionModel,
+		const DeformationModel2D& deformationModel2D,
 		ModularAlignmentSettings settings,
 		const Tomogram& tomogram,
 		double paddingFactor,
@@ -172,12 +161,11 @@ ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 		bool verbose)
 :	
 	motionModel(motionModel),
-    deformationModel2D(deformationModel2D),
-    CCs(CCs),
+	deformationModel2D(deformationModel2D),
+	CCs(CCs),
 	frameProj(frameProj),
 	dataSet(dataSet),
 	partIndices(partIndices),
-	motionParameters(motionParameters),
 	settings(settings),
 	tomoCentre(tomogram.centre),
 	frameDose(tomogram.getFrameDose()),
@@ -186,6 +174,7 @@ ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 	progressBarOffset(progressBarOffset),
 	num_threads(num_threads),
 	verbose(verbose),
+	devMode(false),
 	fc(frameProj.size()),
 	pc(partIndices.size()),
     mpc(motionModel.getParameterCount()),
@@ -242,10 +231,10 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 		readViewParams(x, f, phi, theta, psi, dx, dy);
 
 		const gravis::d4Matrix Q = 
-		        TaitBryan::anglesToMatrix4(phi, theta, psi);
+				TaitBryan::anglesToMatrix4(phi, theta, psi);
 		
-		gravis::t4Vector<gravis::d3Matrix> dQ = 
-		        TaitBryan::anglesToMatrixAndDerivatives(phi, theta, psi);
+		gravis::t4Vector<gravis::d3Matrix> dQ =
+				TaitBryan::anglesToMatrixAndDerivatives(phi, theta, psi);
 
 		gravis::d4Matrix Q_phi(dQ[0]);
 		gravis::d4Matrix Q_theta(dQ[1]);
@@ -287,8 +276,9 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 		{
 			const gravis::d4Vector pos4(initialPos[p] + shift);
 
-			const gravis::d4Vector dp  = P[f] * pos4 
-			        - frameProj[f] * gravis::d4Vector(initialPos[p]);
+			const gravis::d4Vector dp  = P[f] * pos4
+					- frameProj[f] * gravis::d4Vector(initialPos[p]);
+
 
 			const double dx_img = (dp.x + maxRange) * paddingFactor;
 			const double dy_img = (dp.y + maxRange) * paddingFactor;
@@ -556,6 +546,26 @@ void ModularAlignment<MotionModel, DeformationModel2D>::visualiseTrajectories2D(
 		FileName fn_eps = file_name_root + "_" + plot_names[dim] + ".eps";
 
 		plot2D.OutputPostScriptPlot(fn_eps);
+	}
+}
+
+template<class MotionModel, class DeformationModel2D>
+void ModularAlignment<MotionModel, DeformationModel2D>::report(
+		int iteration, double cost, const std::vector<double> &x) const
+{
+	if (devMode)
+	{
+		int prec = (int)(log(iteration) / log(10));
+		int step = pow(10, prec);
+
+		if (prec == 0 || iteration % step == 0)
+		{
+			std::cout << iteration << " \t " << std::setw(11) << std::setprecision(10) << cost << std::endl;
+		}
+	}
+	else
+	{
+		Log::updateProgress(progressBarOffset + iteration);
 	}
 }
 
