@@ -282,8 +282,8 @@ void AlignProgram::processTomograms(
 				per_tomogram_progress && verbosity > 0);
 
 			performAlignment(
-			        motionModel, CCs, projByTime, tomogram,
-			        t, progress_bar_offset, per_tomogram_progress);
+				motionModel, CCs, projByTime, tomogram,
+				t, progress_bar_offset, per_tomogram_progress);
 		}
 		else
 		{

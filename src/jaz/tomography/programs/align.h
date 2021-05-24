@@ -73,25 +73,25 @@ class AlignProgram : public RefinementProgram
 		
 		template<class MotionModel>
 		void performAlignment(
-		        MotionModel& motionModel,
-		        const std::vector<BufferedImage<double>>& CCs,
-		        const std::vector<gravis::d4Matrix>& projByTime,
-		        const Tomogram& tomogram,
-		        int tomo_index,
-		        int progress_bar_offset,
-		        bool per_tomogram_progress);
+				MotionModel& motionModel,
+				const std::vector<BufferedImage<double>>& CCs,
+				const std::vector<gravis::d4Matrix>& projByTime,
+				const Tomogram& tomogram,
+				int tomo_index,
+				int progress_bar_offset,
+				bool per_tomogram_progress);
 		
 };
 
 template<class MotionModel>
 void AlignProgram::performAlignment(
-        MotionModel& motionModel,
-        const std::vector<BufferedImage<double>>& CCs,
-        const std::vector<gravis::d4Matrix>& projByTime,
-        const Tomogram& tomogram,
-        int tomo_index,
-        int progress_bar_offset,
-        bool per_tomogram_progress)
+		MotionModel& motionModel,
+		const std::vector<BufferedImage<double>>& CCs,
+		const std::vector<gravis::d4Matrix>& projByTime,
+		const Tomogram& tomogram,
+		int tomo_index,
+		int progress_bar_offset,
+		bool per_tomogram_progress)
 {
 	No2DDeformationModel noDeformationModel;
 

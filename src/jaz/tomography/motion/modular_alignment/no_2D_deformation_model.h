@@ -10,22 +10,22 @@ class No2DDeformationModel
 		inline int getParameterCount() const;
 		
 		inline void computeShiftAndGradient(
-		        const gravis::d2Vector& pl, 
-		        const double* parameters, 
-		        gravis::d2Vector& def, 
-		        gravis::d2Vector& def_x, 
-		        gravis::d2Vector& def_y) const;
+				const gravis::d2Vector& pl,
+				const double* parameters,
+				gravis::d2Vector& def,
+				gravis::d2Vector& def_x,
+				gravis::d2Vector& def_y) const;
 		
 		inline gravis::d2Vector transformImageGradient(
-		        const gravis::d2Vector& g0,
-		        const gravis::d2Vector& mx,
-		        const gravis::d2Vector& my) const;
+				const gravis::d2Vector& g0,
+				const gravis::d2Vector& mx,
+				const gravis::d2Vector& my) const;
 		
 		inline void updateCostGradient(
-		        const gravis::d2Vector& pl,
-		        const gravis::d2Vector& g0,
-		        const double* parameters, 
-		        double* target) const;
+				const gravis::d2Vector& pl,
+				const gravis::d2Vector& g0,
+				const double* parameters,
+				double* target) const;
 		
 };
 
@@ -35,11 +35,11 @@ inline int No2DDeformationModel::getParameterCount() const
 }
 
 inline void No2DDeformationModel::computeShiftAndGradient(
-        const gravis::d2Vector &pl, 
-        const double* parameters, 
-        gravis::d2Vector &def, 
-        gravis::d2Vector &def_x, 
-        gravis::d2Vector &def_y) const
+		const gravis::d2Vector &pl,
+		const double* parameters,
+		gravis::d2Vector &def,
+		gravis::d2Vector &def_x,
+		gravis::d2Vector &def_y) const
 {
 	def = gravis::d2Vector(0.0, 0.0);
 	def_x = gravis::d2Vector(0.0, 0.0);
@@ -47,18 +47,18 @@ inline void No2DDeformationModel::computeShiftAndGradient(
 }
 
 inline gravis::d2Vector No2DDeformationModel::transformImageGradient(
-        const gravis::d2Vector &g0, 
-        const gravis::d2Vector &mx, 
-        const gravis::d2Vector &my) const
+		const gravis::d2Vector &g0,
+		const gravis::d2Vector &mx,
+		const gravis::d2Vector &my) const
 {
 	return g0;
 }
 
 inline void No2DDeformationModel::updateCostGradient(
-        const gravis::d2Vector &pl, 
-        const gravis::d2Vector &g0, 
-        const double *parameters, 
-        double *target) const
+		const gravis::d2Vector &pl,
+		const gravis::d2Vector &g0,
+		const double *parameters,
+		double *target) const
 {
 	
 }
