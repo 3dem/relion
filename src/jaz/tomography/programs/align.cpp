@@ -267,9 +267,11 @@ void AlignProgram::processTomograms(
 
 		// motion estimation requires the CCs to be given in chronological order
 
+		const bool new_implementation = true;
+
 		std::vector<int> frameSequence(fc);
 
-		if (do_motion)
+		if (do_motion || new_implementation)
 		{
 			frameSequence = tomogram.frameSequence;
 		}
@@ -454,12 +456,11 @@ void AlignProgram::processTomograms(
 			}
 			else
 			{
-				const bool new_implementation = false;
 				
 				if (new_implementation)
 				{
-					No2DDeformationModel noDeformationModel;
 					NoMotionModel noMotionModel;
+					No2DDeformationModel noDeformationModel;
 		
 					ModularAlignment<NoMotionModel, No2DDeformationModel> alignment(
 						CCs, projByTime, particleSet, particles[t],
@@ -471,7 +472,7 @@ void AlignProgram::processTomograms(
 		
 					std::vector<double> initial(alignment.getParamCount(), 0.0);
 					
-					if (!debugging && verbosity > 0 && per_tomogram_progress)
+					if (verbosity > 0 && per_tomogram_progress)
 					{
 						Log::beginProgress("Performing optimisation", num_iters);
 					}
@@ -479,7 +480,7 @@ void AlignProgram::processTomograms(
 					std::vector<double> opt = LBFGS::optimize(
 						initial, alignment, 1, num_iters, 1e-6, 1e-4);
 	
-					if (!debugging && verbosity > 0 && per_tomogram_progress)
+					if (verbosity > 0 && per_tomogram_progress)
 					{
 						Log::endProgress();
 					}

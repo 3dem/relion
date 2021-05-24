@@ -222,7 +222,7 @@ void TomoExtraction::extractAt3D_real(
 
 template <typename T>
 void TomoExtraction::extractAt2D_real(
-        const RawImage<T>& stack, int s, double bin,
+		const RawImage<T>& stack, int s, double bin,
 		const std::vector<gravis::d4Matrix>& projIn,
 		const std::vector<gravis::d2Vector>& centers,
 		RawImage<T>& out,
@@ -233,24 +233,24 @@ void TomoExtraction::extractAt2D_real(
 	const int sh = s/2 + 1;
 	const int fc = stack.zdim;
 
-    const int sb = (int)(s / bin + 0.5);
-    const int sbh = sb/2 + 1;
+	const int sb = (int)(s / bin + 0.5);
+	const int sbh = sb/2 + 1;
 	
-    BufferedImage<T> smallStack(s,s,fc);
+	BufferedImage<T> smallStack(s,s,fc);
 	projOut.resize(fc);
 			
 	std::vector<gravis::d2Vector> integralShift(fc);
-			
+
 	for (int f = 0; f < fc; f++)
 	{
 		integralShift[f] = gravis::d2Vector(
-                round(centers[f].x) - s/2,
-                round(centers[f].y) - s/2);
+					round(centers[f].x) - s/2,
+					round(centers[f].y) - s/2);
 	}
 	
 	extractSquares(stack, s, s, integralShift, smallStack, false, num_threads);
 	
-	if (circle_crop) 
+	if (circle_crop)
 	{
 		cropCircle(smallStack, 0, EDGE_FALLOFF, num_threads);
 	}

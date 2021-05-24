@@ -26,24 +26,24 @@ class NoMotionModel
 };
 
 void NoMotionModel::updatePosition(
-        const double *x, 
-        int particle_index, 
-        gravis::d3Vector &position) const
+		const double *x,
+		int particle_index,
+		gravis::d3Vector &position) const
 {	
 }
 
 void NoMotionModel::updateCostGradient(
-        const gravis::d3Vector *dC_dPos, 
-        int particle_index, 
-        int fc, 
-        double *target) const
+		const gravis::d3Vector *dC_dPos,
+		int particle_index,
+		int fc,
+		double *target) const
 {	
 }
 
 double NoMotionModel::computePriorCostAndGradient(
-        const double *x, 
-        int fc, 
-        double *gradDest) const
+		const double *x,
+		int fc,
+		double *gradDest) const
 {
 	return 0.0;
 }

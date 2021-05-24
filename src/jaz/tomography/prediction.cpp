@@ -166,6 +166,8 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 			const int f = sequence[ft];
 
 			const RawImage<float> doseSlice = doseWeights.getConstSliceRef(f);
+
+			// @TODO: test whether the particle is visible
 			
 			TomoExtraction::extractFrameAt3D_Fourier(
 					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f],
