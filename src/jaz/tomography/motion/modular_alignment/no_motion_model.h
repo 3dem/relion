@@ -1,3 +1,6 @@
+#ifndef NO_MOTION_MODEL_H
+#define NO_MOTION_MODEL_H
+
 #include <src/jaz/gravis/t3Vector.h>
 
 class NoMotionModel
@@ -52,3 +55,5 @@ int NoMotionModel::getParameterCount() const
 {
 	return 0;
 }
+
+#endif

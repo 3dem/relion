@@ -170,6 +170,11 @@ namespace gravis
       {
         return x * a + y * b + z * c;
       }
+      
+      t2Vector<T> xy() const
+	  {
+		return t2Vector<T>(x, y);
+	  }
 
       const T& operator[] (int idx) const
       {

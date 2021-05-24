@@ -1,3 +1,6 @@
+#ifndef GP_MOTION_MODEL_H
+#define GP_MOTION_MODEL_H
+
 #include <src/jaz/gravis/t3Vector.h>
 #include <src/jaz/tomography/particle_set.h>
 
@@ -128,3 +131,5 @@ inline int GPMotionModel::getParameterCount() const
 {
 	return 3 * bc;
 }
+
+#endif

@@ -222,6 +222,7 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 	const int step_frame = fc + data_pad;
 	const int pos_block = getPositionsBlockOffset(fs);
 	const int mot_block = getMotionBlockOffset(fs);
+	const int def_block = get2DDeformationsBlockOffset(fs);
 
 	std::vector<gravis::d4Matrix> P(fc), P_phi(fc), P_theta(fc), P_psi(fc);
 
@@ -265,7 +266,6 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 	#pragma omp parallel for num_threads(num_threads)
 	for (int p = 0; p < pc; p++)
 	{
-
 		const int th = omp_get_thread_num();
 
 		gravis::d3Vector shift = settings.constParticles?
@@ -276,22 +276,46 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 		{
 			const gravis::d4Vector pos4(initialPos[p] + shift);
 
-			const gravis::d4Vector dp  = P[f] * pos4
-					- frameProj[f] * gravis::d4Vector(initialPos[p]);
-
+			const gravis::d2Vector p0 = (frameProj[f] * gravis::d4Vector(initialPos[p])).xy();
+			const gravis::d2Vector pl = (P[f] * pos4).xy();
+						
+			const int def_block_f = def_block + (settings.perFrame2DDeformation? f * dc : 0);
+			
+			gravis::d2Vector def, def_x, def_y;			
+			deformationModel2D.computeShiftAndGradient(pl, &x[def_block_f], def, def_x, def_y);
+			        
+			const gravis::d2Vector p1 = pl + def;
+			
+			const gravis::d2Vector dp = p1 - p0;
 
 			const double dx_img = (dp.x + maxRange) * paddingFactor;
 			const double dy_img = (dp.y + maxRange) * paddingFactor;
 
-			const gravis::d4Vector dp_phi   = P_phi[f]   * pos4;
-			const gravis::d4Vector dp_theta = P_theta[f] * pos4;
-			const gravis::d4Vector dp_psi   = P_psi[f]   * pos4;
+			const gravis::d2Vector pl_phi   = (P_phi[f]   * pos4).xy();
+			const gravis::d2Vector pl_theta = (P_theta[f] * pos4).xy();
+			const gravis::d2Vector pl_psi   = (P_psi[f]   * pos4).xy();
+			
 
-
-			const gravis::d3Vector g = -((double)paddingFactor) *
+			const gravis::d3Vector g0 = -((double)paddingFactor) *
 				Interpolation::cubicXYGradAndValue_clip(CCs[p], dx_img, dy_img, f);
 
-			val_par[th*data_pad] += g.z;
+			val_par[th*data_pad] += g0.z;
+			
+			/*
+				dp_phi = [U,V] pl_phi
+				
+				g0^T dp_phi = g0^T [U,V] pl_phi = g^T pl_phi
+				
+				=> 
+				
+				g^T = g0^T [U,V] = [<g0,U>, <g0,V>]
+			*/
+			// alternatively: deformationModel2D.transformImageGradient
+			const gravis::d2Vector g(
+			            (def_x.x + 1.0) * g0.x + def_x.y * g0.y,
+			            def_y.x * g0.x + (def_y.y + 1.0) * g0.y);
+			
+			deformationModel2D.updateCostGradient(pl, g0.xy(), &x[def_block_f], &gradDest[def_block_f]);
 
 
 			if (settings.constAngles)
@@ -306,15 +330,15 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 			{
 				if (settings.constShifts)
 				{
-					grad_par[th*step_grad + fs*f    ]  +=  dp_phi.x   * g.x  +  dp_phi.y   * g.y;
-					grad_par[th*step_grad + fs*f + 1]  +=  dp_theta.x * g.x  +  dp_theta.y * g.y;
-					grad_par[th*step_grad + fs*f + 2]  +=  dp_psi.x   * g.x  +  dp_psi.y   * g.y;
+					grad_par[th*step_grad + fs*f    ]  +=  pl_phi.x   * g.x  +  pl_phi.y   * g.y;
+					grad_par[th*step_grad + fs*f + 1]  +=  pl_theta.x * g.x  +  pl_theta.y * g.y;
+					grad_par[th*step_grad + fs*f + 2]  +=  pl_psi.x   * g.x  +  pl_psi.y   * g.y;
 				}
 				else
 				{
-					grad_par[th*step_grad + fs*f    ]  +=  dp_phi.x   * g.x  +  dp_phi.y   * g.y;
-					grad_par[th*step_grad + fs*f + 1]  +=  dp_theta.x * g.x  +  dp_theta.y * g.y;
-					grad_par[th*step_grad + fs*f + 2]  +=  dp_psi.x   * g.x  +  dp_psi.y   * g.y;
+					grad_par[th*step_grad + fs*f    ]  +=  pl_phi.x   * g.x  +  pl_phi.y   * g.y;
+					grad_par[th*step_grad + fs*f + 1]  +=  pl_theta.x * g.x  +  pl_theta.y * g.y;
+					grad_par[th*step_grad + fs*f + 2]  +=  pl_psi.x   * g.x  +  pl_psi.y   * g.y;
 					grad_par[th*step_grad + fs*f + 3]  +=  g.x;
 					grad_par[th*step_grad + fs*f + 4]  +=  g.y;
 				}
@@ -568,6 +592,8 @@ void ModularAlignment<MotionModel, DeformationModel2D>::report(
 		Log::updateProgress(progressBarOffset + iteration);
 	}
 }
+
+
 
 template<class MotionModel, class DeformationModel2D>
 inline void ModularAlignment<MotionModel, DeformationModel2D>::readViewParams(
