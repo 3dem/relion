@@ -21,7 +21,10 @@ class AlignProgram : public RefinementProgram
 		AlignProgram(int argc, char *argv[]);
 		
 		
-			bool do_motion, shiftOnly, whiten, whiten_abs, outputShiftedCCs;
+			bool
+				do_motion, shiftOnly, whiten, whiten_abs, outputShiftedCCs,
+				do_anisotropy, per_tilt_anisotropy;
+
 			double padding, hiPass_px, sig2RampPower;
 			int range, num_iters;
 			

@@ -17,7 +17,6 @@ MotionFit::MotionFit(
 	const std::vector<gravis::d4Matrix>& frameProj, 
 	ParticleSet& dataSet,
 	const std::vector<ParticleIndex>& partIndices,
-	const std::vector<BufferedImage<fComplex>>& referenceFS,
 	MotionParameters motionParameters,
 	Settings settings,
 	gravis::d3Vector tomoCentre,
@@ -32,7 +31,6 @@ MotionFit::MotionFit(
 	  frameProj(frameProj),
 	  dataSet(dataSet),
 	  partIndices(partIndices),
-	  referenceFS(referenceFS),
 	  motionParameters(motionParameters),
 	  settings(settings),
 	  tomoCentre(tomoCentre),
@@ -439,6 +437,7 @@ double MotionFit::gradAndValue(const std::vector<double> &x, std::vector<double>
 
 			const d4Vector dp  = P[f] * pos4 - frameProj[f] * d4Vector(initialPos[p]);
 
+
 			const double dx_img = (dp.x + maxRange) * paddingFactor;
 			const double dy_img = (dp.y + maxRange) * paddingFactor;
 
@@ -543,16 +542,23 @@ double MotionFit::gradAndValue(const std::vector<double> &x, std::vector<double>
 
 	if (!settings.constParticles)
 	{
+		double reg_cost = 0.0;
+
 		for (int m = 0; m < fc-1; m++)
 		{
 			for (int b = 0; b < bc; b++)
 			{
 				const int i0 = fs*fc + 3*(pc + m*bc + b);
 
-				gradDest[i0] += 2.0 * (x[i0] + x[i0+1] + x[i0+2]);
-				cost += x[i0]*x[i0] + x[i0+1]*x[i0+1] + x[i0+2]*x[i0+2];
+				gradDest[i0  ] += 2.0 * x[i0  ];
+				gradDest[i0+1] += 2.0 * x[i0+1];
+				gradDest[i0+2] += 2.0 * x[i0+2];
+
+				reg_cost += x[i0]*x[i0] + x[i0+1]*x[i0+1] + x[i0+2]*x[i0+2];
 			}
 		}
+
+		cost += reg_cost;
 	}
 
 	return cost;

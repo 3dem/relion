@@ -20,6 +20,8 @@ class ProtoAlignment : public DifferentiableOptimization
 				bool constParticles,
 				bool constAngles,
 				bool constShifts,
+				bool doAnisotropy,
+				bool perTiltAnisotropy,
 				int maxRange, 
 				gravis::d3Vector tomoCentre,
 				int progressBarOffset,
@@ -32,8 +34,11 @@ class ProtoAlignment : public DifferentiableOptimization
 			const std::vector<ParticleIndex>& partIndices;
 			const std::vector<BufferedImage<fComplex>>& referenceFS;
 			
-			bool constParticles, constAngles, constShifts;
-			int fc, pc, maxRange;	
+			bool	constParticles, constAngles, constShifts,
+					doAnisotropy, perTiltAnisotropy,
+					devMode;
+
+			int fc, pc, maxRange;
 			gravis::d3Vector tomoCentre;
 			int progressBarOffset, num_threads;
 			double paddingFactor;
@@ -66,6 +71,8 @@ class ProtoAlignment : public DifferentiableOptimization
 		std::vector<BufferedImage<double>> drawShiftedCCs(const std::vector<double>& x) const;
 		
 		void report(int iteration, double cost, const std::vector<double>& x) const;
+
+		std::vector<double> createInitial();
 	
 		
 	protected:
@@ -76,55 +83,81 @@ class ProtoAlignment : public DifferentiableOptimization
 			
 			if (!constAngles) out += 3;
 			if (!constShifts) out += 2;
+			if (doAnisotropy && perTiltAnisotropy) out += 2;
 			
 			return out;
 		}
-		
-		inline void readParams(
-				const std::vector<double>& x, int offset,
-				double& phi, double& theta, double& psi,
-				double& dx, double& dy) const
+
+		inline int getTiltDataOffset(int f) const
 		{
+			if (!doAnisotropy || perTiltAnisotropy)
+			{
+				return f * getFrameStride();
+			}
+			else
+			{
+				return f * getFrameStride() + 2;
+			}
+		}
+
+		inline int getParticleDataOffset() const
+		{
+			return getTiltDataOffset(fc);
+		}
+		
+		inline void readTiltParameters(
+				const std::vector<double>& x, int f,
+				double& phi, double& theta, double& psi,
+				double& dx, double& dy,
+				double& skew, double& y_scale) const
+		{
+			int offset = getTiltDataOffset(f);
+
 			if (constAngles)
 			{
-				if (constShifts)
+				phi   = 0.0;
+				theta = 0.0;
+				psi   = 0.0;
+			}
+			else
+			{
+				phi   = x[offset  ];
+				theta = x[offset+1];
+				psi   = x[offset+2];
+
+				offset += 3;
+			}
+
+			if (constShifts)
+			{
+				dx    = 0.0;
+				dy    = 0.0;
+			}
+			else
+			{
+				dx    = x[offset  ];
+				dy    = x[offset+1];
+
+				offset += 2;
+			}
+
+			if (doAnisotropy)
+			{
+				if (perTiltAnisotropy)
 				{
-					phi   = 0.0;
-					theta = 0.0;
-					psi   = 0.0;
-					
-					dx    = 0.0;
-					dy    = 0.0;
+					skew    = x[offset  ];
+					y_scale = x[offset+1];
 				}
 				else
 				{
-					phi   = 0.0;
-					theta = 0.0;
-					psi   = 0.0;
-					
-					dx    = x[offset  ];
-					dy    = x[offset+1];
+					skew    = x[0];
+					y_scale = x[1];
 				}
 			}
 			else
 			{
-				if (constShifts)
-				{
-					phi   = x[offset  ];
-					theta = x[offset+1];
-					psi   = x[offset+2];
-					
-					dx    = 0.0;
-					dy    = 0.0;
-				}
-				else
-				{
-					phi   = x[offset  ];
-					theta = x[offset+1];
-					psi   = x[offset+2];
-					dx    = x[offset+3];
-					dy    = x[offset+4];
-				}
+				skew    = 0.0;
+				y_scale = 1.0;
 			}
 		}
 			   

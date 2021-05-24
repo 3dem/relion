@@ -72,6 +72,12 @@ void run(int argc, char *argv[])
 
 	TomogramSet tomogram_set(optimisationSet.tomograms);
 	const int tomo_index = tomogram_set.getTomogramIndex(tomo_name);
+
+	if (tomo_index < 0)
+	{
+		REPORT_ERROR("There is no tomogram named " + tomo_name);
+	}
+
 	Tomogram tomogram = tomogram_set.loadTomogram(tomo_index, true);
 
 	const int w  = tomogram.stack.xdim;

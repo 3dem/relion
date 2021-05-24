@@ -166,6 +166,8 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 			const int f = sequence[ft];
 
 			const RawImage<float> doseSlice = doseWeights.getConstSliceRef(f);
+
+			// @TODO: test whether the particle is visible
 			
 			TomoExtraction::extractFrameAt3D_Fourier(
 					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f],
@@ -313,9 +315,6 @@ void Prediction::predictMicrograph(
 
 	target_slice.fill(0.f);
 
-	const RawImage<float> doseSlice = (doseWeights != 0)? doseWeights->getConstSliceRef(f) : RawImage<float>();
-	const RawImage<float>* doseSlicePtr = (doseWeights != 0)? &doseSlice : 0;
-
 
 	for (int p = 0; p < pc; p++)
 	{
@@ -334,7 +333,7 @@ void Prediction::predictMicrograph(
 				referenceMap.image_FS,
 				halfSet,
 				modulation,
-				doseSlicePtr,
+				doseWeights,
 				ctfScale);
 
 		const d4Vector q = tomogram.projectionMatrices[f] * d4Vector(traj[f]);
