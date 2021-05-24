@@ -6205,10 +6205,11 @@ void RelionJob::initialiseTomoCtfRefineJob()
     	joboptions["box_size"] = JobOption("Box size for estimation (pix):", 128, 32, 512, 16, "Box size to be used for the estimation. Note that this can be larger than the box size of the reference map. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
     	joboptions["do_defocus"] = JobOption("Refine defocus?", true, "If set to Yes, then estimate the defoci of the individual tilt images.");
     	joboptions["focus_range"] = JobOption("Defocus search range (A):", 3000, 0, 10000, 500, "Defocus search range (in A). This search range will be, by default, sampled in 100 steps. Use the additional argument --ds to change the number of sampling points.");
-    	joboptions["lambda"] = JobOption("Defocus regularisation:", 0.1, 0, 1, 0.05, "Defocus regularisation scale. " \
+     	joboptions["do_reg_def"] = JobOption("Do defocus regularisation?", false, "Apply defocus regularisation. " \
 		"High-tilt images do not offer enough signal to recover the defocus value precisely. The regularisation " \
 		"forces the estimated defoci to assume similar values within a given tilt series, which prevents those " \
 		"high-tilt images from overfitting.");
+    	joboptions["lambda"] = JobOption("Defocus regularisation lambda:", 0.1, 0, 1, 0.05, "Defocus regularisation scale. ");
     	joboptions["do_scale"] = JobOption("Refine contrast scale?", true, "If set to Yes, then estimate the signal " \
     	"scale or ice thickness.");
     	joboptions["do_frame_scale"] = JobOption("Refine scale per frame?", true, "If set to Yes, then estimate the " \
@@ -6261,7 +6262,9 @@ bool RelionJob::getCommandsTomoCtfRefineJob(std::string &outputname, std::vector
 		command += " --do_defocus";
 		command += " --d0 -" + joboptions["focus_range"].getString();
 		command += " --d1 " + joboptions["focus_range"].getString();
-		command += " --lambda " + joboptions["lambda"].getString();
+
+		if (joboptions["do_reg_def"].getBoolean())
+			command += " --do_reg_defocus --lambda " + joboptions["lambda"].getString();
 	}
 
 	if (joboptions["do_scale"].getBoolean())
