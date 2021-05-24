@@ -2459,23 +2459,32 @@ void JobWindow::initialiseTomoCtfRefineWindow()
 	group1->begin();
 
 	place("focus_range", TOGGLE_DEACTIVATE);
+
+	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group2->end();
+	place("do_reg_def", TOGGLE_DEACTIVATE, group2);
+
+	group2->begin();
 	place("lambda", TOGGLE_DEACTIVATE);
+	group2->end();
+	guientries["do_reg_def"].cb_menu_i();
 
 	group1->end();
 	guientries["do_defocus"].cb_menu_i();
 
+
 	current_y += STEPY /2 ;
 
-	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group2->end();
-	place("do_scale", TOGGLE_DEACTIVATE, group2);
+	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group3->end();
+	place("do_scale", TOGGLE_DEACTIVATE, group3);
 
-	group2->begin();
+	group3->begin();
 
 	place("do_frame_scale", TOGGLE_DEACTIVATE);
 	place("do_tomo_scale", TOGGLE_DEACTIVATE);
 
-	group2->end();
+	group3->end();
 	guientries["do_scale"].cb_menu_i();
 
 	tab2->end();
@@ -2527,16 +2536,27 @@ void JobWindow::initialiseTomoAlignWindow()
 
 	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group1->end();
-	place("do_polish", TOGGLE_DEACTIVATE, group1);
+	place("do_flex_align", TOGGLE_DEACTIVATE, group1);
 
 	group1->begin();
+
+	current_y += STEPY /2 ;
+
+	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group2->end();
+	place("do_polish", TOGGLE_DEACTIVATE, group2);
+
+	group2->begin();
 
 	place("sigma_vel", TOGGLE_DEACTIVATE);
 	place("sigma_div", TOGGLE_DEACTIVATE);
 	place("do_sq_exp_ker", TOGGLE_DEACTIVATE);
 
-	group1->end();
+	group2->end();
 	guientries["do_polish"].cb_menu_i();
+
+	group1->end();
+	guientries["do_flex_align"].cb_menu_i();
 
 	tab2->end();
 }

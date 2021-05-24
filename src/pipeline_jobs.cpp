@@ -5014,7 +5014,7 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 		inputNodes.push_back(node);
 		command += " --ios " + fn_OS;
 
-		Node node1(outputname + "postprocess_optimiser_set.star", NODE_TOMO_OPTIMISATION);
+		Node node1(outputname + "postprocess_optimisation_set.star", NODE_TOMO_OPTIMISATION);
 		outputNodes.push_back(node1);
 	}
 	else if (fn_half1 == "")
@@ -6205,10 +6205,11 @@ void RelionJob::initialiseTomoCtfRefineJob()
     	joboptions["box_size"] = JobOption("Box size for estimation (pix):", 128, 32, 512, 16, "Box size to be used for the estimation. Note that this can be larger than the box size of the reference map. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
     	joboptions["do_defocus"] = JobOption("Refine defocus?", true, "If set to Yes, then estimate the defoci of the individual tilt images.");
     	joboptions["focus_range"] = JobOption("Defocus search range (A):", 3000, 0, 10000, 500, "Defocus search range (in A). This search range will be, by default, sampled in 100 steps. Use the additional argument --ds to change the number of sampling points.");
-    	joboptions["lambda"] = JobOption("Defocus regularisation:", 0.1, 0, 1, 0.05, "Defocus regularisation scale. " \
+     	joboptions["do_reg_def"] = JobOption("Do defocus regularisation?", false, "Apply defocus regularisation. " \
 		"High-tilt images do not offer enough signal to recover the defocus value precisely. The regularisation " \
 		"forces the estimated defoci to assume similar values within a given tilt series, which prevents those " \
 		"high-tilt images from overfitting.");
+    	joboptions["lambda"] = JobOption("Defocus regularisation lambda:", 0.1, 0, 1, 0.05, "Defocus regularisation scale. ");
     	joboptions["do_scale"] = JobOption("Refine contrast scale?", true, "If set to Yes, then estimate the signal " \
     	"scale or ice thickness.");
     	joboptions["do_frame_scale"] = JobOption("Refine scale per frame?", true, "If set to Yes, then estimate the " \
@@ -6261,7 +6262,9 @@ bool RelionJob::getCommandsTomoCtfRefineJob(std::string &outputname, std::vector
 		command += " --do_defocus";
 		command += " --d0 -" + joboptions["focus_range"].getString();
 		command += " --d1 " + joboptions["focus_range"].getString();
-		command += " --lambda " + joboptions["lambda"].getString();
+
+		if (joboptions["do_reg_def"].getBoolean())
+			command += " --do_reg_defocus --lambda " + joboptions["lambda"].getString();
 	}
 
 	if (joboptions["do_scale"].getBoolean())
@@ -6312,6 +6315,7 @@ void RelionJob::initialiseTomoAlignJob()
     	joboptions["box_size"] = JobOption("Box size for estimation (pix):", 128, 32, 512, 16, "Box size to be used for the estimation. Note that this can be larger than the box size of the reference map. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
     	joboptions["max_error"] = JobOption("Max position error (pix):", 5, 0, 64, 1, "maximal assumed error in the initial 2D particle-positions (distances between the projected 3D positions and their true positions in the images), given in pixels.");
 
+    	joboptions["do_flex_align"] = JobOption("Allow flexible alignment?", false, "If set to No, only applies an optimal rigid shift to each frame (no iterative optimisation).");
     	joboptions["do_polish"] = JobOption("Fit per-particle motion?", false, "If set to Yes, then the subtomogram version of Bayesian polishing will be used to fit per-particle (3D) motion tracks, besides the rigid part of the motion in the tilt series.");
     	joboptions["sigma_vel"] = JobOption("Sigma for velocity (A/dose): ", 0.2, 1., 10., 0.1, "The expected amount of motion (i.e. the std. deviation of particle positions in Angstroms after 1 electron per A^2 of radiation)");
     	joboptions["sigma_div"] = JobOption("Sigma for divergence (A): ", 5000, 0, 10000, 10000, "The expected spatial smoothness of the particle trajectories in A (a greater value means spatially smoother motion");
@@ -6356,7 +6360,11 @@ bool RelionJob::getCommandsTomoAlignJob(std::string &outputname, std::vector<std
 	command += " --b " + joboptions["box_size"].getString();
 	command += " --r " + joboptions["max_error"].getString();
 
-    if (joboptions["do_polish"].getBoolean())
+	if (!joboptions["do_flex_align"].getBoolean())
+	{
+		command += " --shift_only ";
+	}
+    else if (joboptions["do_polish"].getBoolean())
 	{
     	command += " --motion ";
     	command += " --s_vel " + joboptions["sigma_vel"].getString();

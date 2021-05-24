@@ -111,7 +111,7 @@ void Postprocessing::clear()
 
 void Postprocessing::initialise()
 {
-	// Check if input is a tomo optimiser set file
+	// Check if input is a tomo optimisation set file
 	if (fn_OS != "")
 	{
 		optimisationSet.read(fn_OS);
@@ -737,11 +737,11 @@ void Postprocessing::writeOutput()
 	}
 	MDlist.write(fh);
 
-	// If input optimiser set is provided, also crete it as output
+	// If input optimisation set is provided, also crete it as output
 	if (!optimisationSet.isEmpty())
 	{
 		optimisationSet.setValue(EMDL_TOMO_REFERENCE_FSC_FILE_NAME, fn_tmp);
-		optimisationSet.write(fn_out + "_optimiser_set.star");
+		optimisationSet.write(fn_out + "_optimisation_set.star");
 	}
 
 	MDfsc.setName("fsc");
