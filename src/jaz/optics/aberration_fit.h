@@ -124,8 +124,8 @@ class AberrationFit
 				const ParticleSet& dataSet,
 				const AberrationsCache& aberrationsCache,
 				bool flip_value,
-				const BufferedImage<float>& frqWeight,
-				const BufferedImage<float>& frqEnvelope,
+				const BufferedImage<float>& freqWeights,
+				const BufferedImage<float>& doseWeights,
 				int f0, int f1,
 				BufferedImage<aberration::EvenData>& even_out,
 				BufferedImage<aberration::OddData>& odd_out);

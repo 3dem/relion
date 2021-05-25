@@ -304,7 +304,7 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 
 	if (globalTable.containsLabel(EMDL_IMAGE_OPTICS_GROUP_NAME))
 	{
-		out.opticsGroupName = globalTable.getDouble(EMDL_IMAGE_OPTICS_GROUP_NAME, index);
+		out.opticsGroupName = globalTable.getString(EMDL_IMAGE_OPTICS_GROUP_NAME, index);
 	}
 	else
 	{
@@ -378,6 +378,23 @@ int TomogramSet::getTomogramIndexSafely(std::string tomogramName) const
 int TomogramSet::getFrameCount(int index) const
 {
 	return tomogramTables[index].numberOfObjects();
+}
+
+int TomogramSet::getMaxFrameCount() const
+{
+	int max_val = 0;
+
+	for (int t = 0; t < tomogramTables.size(); t++)
+	{
+		const int fc = tomogramTables[t].numberOfObjects();
+
+		if (fc > max_val)
+		{
+			max_val = fc;
+		}
+	}
+
+	return max_val;
 }
 
 double TomogramSet::getPixelSize(int index) const

@@ -13,9 +13,6 @@ message(STATUS "CMAKE_BINARY_DIR:" ${CMAKE_BINARY_DIR})
 
 file(GLOB REL_GUI_SRC "${CMAKE_SOURCE_DIR}/src/manualpicker.cpp" "${CMAKE_SOURCE_DIR}/src/gui_*.cpp" "${CMAKE_SOURCE_DIR}/src/displayer.cpp")
 
-file(GLOB REL_TORCH_SRC "${CMAKE_SOURCE_DIR}/src/class_ranker.cpp")
-file(GLOB REL_TORCH_SRC_H "${CMAKE_SOURCE_DIR}/src/class_ranker.h")
-
 # AUTOMATIC VERSIONING
 # Reference: https://stackoverflow.com/questions/1435953/how-can-i-pass-git-sha1-to-compiler-as-definition-using-cmake
 
@@ -45,15 +42,6 @@ foreach(GUI_SRC_FILE ${REL_GUI_SRC})
 	list(REMOVE_ITEM REL_SRC "${GUI_SRC_FILE}")
 endforeach()
 
-# Remove torch invoking files from relion_lib
-foreach(TORCH_SRC_FILE ${REL_TORCH_SRC})
-	list(REMOVE_ITEM REL_SRC "${TORCH_SRC_FILE}")
-endforeach()
-foreach(TORCH_SRC_FILE ${REL_TORCH_SRC_H})
-	list(REMOVE_ITEM REL_SRC_H "${TORCH_SRC_FILE}")
-endforeach()
-
-
 file(GLOB REL_JAZ_MATH_SRC "${CMAKE_SOURCE_DIR}/src/jaz/math/*.cpp")
 file(GLOB REL_JAZ_MATH_H "${CMAKE_SOURCE_DIR}/src/jaz/math/*.h")
 file(GLOB REL_JAZ_IMG_PROC_SRC "${CMAKE_SOURCE_DIR}/src/jaz/image/*.cpp")
@@ -74,6 +62,8 @@ file(GLOB REL_JAZ_TOMO_FILAMENT_SRC "${CMAKE_SOURCE_DIR}/src/jaz/tomography/fila
 file(GLOB REL_JAZ_TOMO_FILAMENT_H "${CMAKE_SOURCE_DIR}/src/jaz/tomography/filament/*.h")
 file(GLOB REL_JAZ_TOMO_MOTION_SRC "${CMAKE_SOURCE_DIR}/src/jaz/tomography/motion/*.cpp")
 file(GLOB REL_JAZ_TOMO_MOTION_H "${CMAKE_SOURCE_DIR}/src/jaz/tomography/motion/*.h")
+file(GLOB REL_JAZ_TOMO_MOTION_MODULAR_ALIGNMENT_SRC "${CMAKE_SOURCE_DIR}/src/jaz/tomography/motion/modular_alignment/*.cpp")
+file(GLOB REL_JAZ_TOMO_MOTION_MODULAR_ALIGNMENT_H "${CMAKE_SOURCE_DIR}/src/jaz/tomography/motion/modular_alignment/*.h")
 file(GLOB REL_JAZ_TOMO_MANIFOLD_SRC "${CMAKE_SOURCE_DIR}/src/jaz/tomography/manifold/*.cpp")
 file(GLOB REL_JAZ_TOMO_MANIFOLD_H "${CMAKE_SOURCE_DIR}/src/jaz/tomography/manifold/*.h")
 file(GLOB REL_JAZ_OPTIM_SRC "${CMAKE_SOURCE_DIR}/src/jaz/optimization/*.cpp")
@@ -134,13 +124,6 @@ if(NOT GUI)
 	endforeach()
 endif(NOT GUI)
 
-#--Remove apps using Libtorch if not Torch--
-if(NOT TORCH)
-	foreach(TARGET ${TORCH_TARGETS})
-		list(REMOVE_ITEM RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/${TARGET}.cpp")
-	endforeach()
-endif(NOT TORCH)
-
 #--Remove apps for testing--
 SET(RELION_TEST TRUE)
 set(TEST_TARGETS movie_reconstruct double_reconstruct_openmp cs_fit ctf_nyquist_test free_aberration_plot split_stack defocus_stats double_bfac_fit interpolation_test motion_diff paper_data_synth Zernike_test vis_delocalisation vis_Ewald_weight)
@@ -164,7 +147,8 @@ if(BUILD_SHARED_LIBS)
 	    ${REL_JAZ_TOMO_PROJ_SRC} ${REL_JAZ_TOMO_PROJ_H}
 	    ${REL_JAZ_TOMO_MEMBRANE_SRC} ${REL_JAZ_TOMO_MEMBRANE_H}
 	    ${REL_JAZ_TOMO_FILAMENT_SRC} ${REL_JAZ_TOMO_FILAMENT_H}
-	    ${REL_JAZ_TOMO_MOTION_SRC} ${REL_JAZ_TOMO_MOTION_H}
+		${REL_JAZ_TOMO_MOTION_SRC} ${REL_JAZ_TOMO_MOTION_H}
+		${REL_JAZ_TOMO_MOTION_MODULAR_ALIGNMENT_SRC} ${REL_JAZ_TOMO_MOTION_MODULAR_ALIGNMENT_H}
 		${REL_JAZ_TOMO_MANIFOLD_SRC} ${REL_JAZ_TOMO_MANIFOLD_H}
 	    ${REL_JAZ_TOMO_LATTICE_SRC} ${REL_JAZ_TOMO_LATTICE_H}
 	    ${REL_JAZ_OPTIM_SRC} ${REL_JAZ_OPTIM_H}
@@ -192,11 +176,6 @@ if(BUILD_SHARED_LIBS)
 		add_library(relion_gui_lib SHARED ${REL_GUI_SRC} ${REL_SRC_H} ${REL_HP})
 		install(TARGETS relion_gui_lib LIBRARY DESTINATION lib)
 	endif(GUI)
-
-	if(TORCH)
-		add_library(relion_torch_lib SHARED ${REL_TORCH_SRC} ${REL_TORCH_SRC_H})
-		install(TARGETS relion_torch_lib LIBRARY DESTINATION lib)
-	endif(TORCH)
 else()
 	add_library(relion_lib STATIC
 		${REL_SRC} ${REL_SRC_H} ${REL_HP}
@@ -209,6 +188,7 @@ else()
 		${REL_JAZ_TOMO_MEMBRANE_SRC} ${REL_JAZ_TOMO_MEMBRANE_H}
 		${REL_JAZ_TOMO_FILAMENT_SRC} ${REL_JAZ_TOMO_FILAMENT_H}
 		${REL_JAZ_TOMO_MOTION_SRC} ${REL_JAZ_TOMO_MOTION_H}
+		${REL_JAZ_TOMO_MOTION_MODULAR_ALIGNMENT_SRC} ${REL_JAZ_TOMO_MOTION_MODULAR_ALIGNMENT_H}
 		${REL_JAZ_TOMO_MANIFOLD_SRC} ${REL_JAZ_TOMO_MANIFOLD_H}
 		${REL_JAZ_TOMO_LATTICE_SRC} ${REL_JAZ_TOMO_LATTICE_H}    
 		${REL_JAZ_OPTIM_SRC} ${REL_JAZ_OPTIM_H}
@@ -234,10 +214,6 @@ else()
 	if(GUI)
 		add_library(relion_gui_lib STATIC ${REL_GUI_SRC} ${REL_SRC_H} ${REL_HP})
 	endif(GUI)
-
-	if(TORCH)
-		add_library(relion_torch_lib STATIC ${REL_TORCH_SRC} ${REL_TORCH_SRC_H})
-	endif(TORCH)
 endif()
 
 if(NOT MKLFFT)
@@ -257,14 +233,6 @@ if(GUI)
 		add_dependencies(relion_gui_lib OWN_FLTK)
 	endif()
 endif(GUI)
-
-if(TORCH)
-	target_link_libraries(relion_torch_lib ${TORCH_LIBRARIES})
-	set_property(TARGET relion_torch_lib PROPERTY CXX_STANDARD 14)
-	if(BUILD_OWN_Torch)
-		add_dependencies(relion_torch_lib OWN_Torch)
-	endif()
-endif(TORCH)
 
 if (CUDA_FOUND)
 	file(GLOB REL_CUDA_SRC "${CMAKE_SOURCE_DIR}/src/acc/cuda/*.cu" "${CMAKE_SOURCE_DIR}/src/acc/cuda/cuda_kernels/*.cu" )
@@ -394,20 +362,16 @@ foreach (_target ${RELION_TARGETS})
 		target_link_libraries(${_target} relion_gui_lib ${FLTK_LIBRARIES} ${X11})
 	endif()
 
-	if(TORCH)
-		list(FIND TORCH_TARGETS ${_target} IS_TORCH_TARGET)
-		if((NOT ${IS_TORCH_TARGET} LESS 0) OR (${_target} STREQUAL "relion"))
-			add_dependencies(${_target} relion_torch_lib)
-			target_link_libraries(${_target} relion_torch_lib ${FLTK_LIBRARIES} ${X11})
-		endif()
-	endif(TORCH)
-
 	if(TIFF_FOUND)
 		target_link_libraries(${_target} ${TIFF_LIBRARIES})
 	endif()
     
 	install (TARGETS ${_target} RUNTIME DESTINATION bin)
+
 endforeach()
+
+# Python script for running pytorch is required for class_ranker along with torch model
+add_dependencies(class_ranker copy_scripts class_ranker_model_file)
 
 foreach (_target ${RELION_JAZ_SPA_TARGETS})
 	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)	
@@ -477,14 +441,8 @@ endif()
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
 
-if(TORCH)
-	add_dependencies(class_ranker class_ranker_model_file)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
-	set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}  -std=c++14")
-else(TORCH)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-	set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}  -std=c++11")
-endif(TORCH)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}  -std=c++11")
 
 # Set this flag to activate bounds checking in stl-vectors (incl. strings)
 # It is useful to do this periodically, as it catches 

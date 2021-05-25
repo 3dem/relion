@@ -52,7 +52,17 @@ void FccProgram::run()
 
 	
 	std::vector<double> pixelSizes(tc, 0.0);
-			
+
+	int fc_max = tomogramSet.getMaxFrameCount();
+
+	BufferedImage<double> FCC3_sum(sh, fc_max, 3);
+	FCC3_sum.fill(0.0);
+
+	BufferedImage<double> FCC_by_t(sh, tc, 1);
+	BufferedImage<double> all_FCCs(sh, fc_max, tc);
+
+	std::ofstream ofs0(outDir + "all_FCCs.dat");
+
 	
 	for (int t = 0; t < tc; t++)
 	{
@@ -69,7 +79,37 @@ void FccProgram::run()
 				flip_value, num_threads);
 			
 		FCC3.write(tag + "_FCC3.mrc");
-		FCC::divide(FCC3).write(tag + "_FCC.mrc");
+		BufferedImage<double> fcc = FCC::divide(FCC3);
+		fcc.write(tag + "_FCC.mrc");
+
+		FCC3_sum += FCC3;
+
+		BufferedImage<double> FCC3s = FCC::sumOverTime(FCC3);
+		BufferedImage<double> FCCs = FCC::divide(FCC3s);
+
+		const int fc = tomogram.frameCount;
+
+		for (int x = 0; x < sh; x++)
+		{
+			FCC_by_t(x,t) = FCCs(x,0);
+
+			for (int f = 0; f < fc; f++)
+			{
+				all_FCCs(x,f,t) = fcc(x,f);
+
+				for (int d = 0; d < 3; d++)
+				{
+					FCC3_sum(x,f,d) = FCC3(x,f,d);
+				}
+			}
+		}
+
+		for (int x = 0; x < sh; x++)
+		{
+			ofs0 << x << ' ' << FCCs(x,0,0) << '\n';
+		}
+
+		ofs0 << '\n';
 
 		{
 			const int fc = tomogram.frameCount;
@@ -88,4 +128,25 @@ void FccProgram::run()
 			scaleFactor.write(tag + "_scaleFactor.mrc");
 		}
 	}
+
+	ofs0.close();
+
+	BufferedImage<double> FCC_sum = FCC::divide(FCC3_sum);
+
+	FCC_sum.write(outDir + "FCC_by_frame.mrc");
+	FCC_by_t.write(outDir + "FCC_by_tomo.mrc");
+	all_FCCs.write(outDir + "FCC_by_frame_by_tomo.mrc");
+
+
+	BufferedImage<double> FCC3_1D = FCC::divide(FCC::sumOverTime(FCC3_sum));
+
+	std::ofstream ofs(outDir + "FCC.dat");
+
+	for (int x = 0; x < sh; x++)
+	{
+		ofs << x << ' ' << FCC3_1D(x,0,0) << '\n';
+	}
+
+	ofs.close();
 }
+

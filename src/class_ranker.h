@@ -22,15 +22,10 @@
 #define CLASS_RANKER_H_
 
 #include <stack>
-#include "src/ml_optimiser.h"
 #include <unistd.h>
 #include <limits.h>
 #include <fstream>
-
-#ifdef _TORCH_ENABLED
-#include <torch/script.h> // One-stop header.
-#endif //_TORCH_ENABLED
-
+#include "src/ml_optimiser.h"
 
 static float feature_normalization_local_ps_mean=0., feature_normalization_local_ps_stddev=0.;
 static float feature_normalization_local_ss_mean=0., feature_normalization_local_ss_stddev=0.;
@@ -389,7 +384,9 @@ public:
 	MetaDataTable MD_optimiser, MD_select;
 	std::vector<classFeatures> features_all_classes, preread_features_all_classes;
 
-	FileName fn_torch_model;
+	FileName fn_pytorch_model;
+	FileName fn_pytorch_script;
+	FileName python_interpreter;
 
 public:
 
@@ -416,9 +413,15 @@ public:
 	// Execute the program
 	void run();
 
-	// Get path to the default torch model [LINUX ONLY]
-	// Check if file exists, return empty string otherwise
-	static std::string get_default_torch_model_path();
+	/* Get path to the default pytorch model [LINUX ONLY]
+	 * Check if file exists, return empty string otherwise
+	 */
+	static std::string get_default_pytorch_model_path();
+
+	/* Get path to the python script for executing pytorch model [LINUX ONLY]
+	 * Check if file exists, return empty string otherwise
+	 */
+	static std::string get_python_script_path();
 
 private:
 

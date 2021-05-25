@@ -17,6 +17,7 @@ class TomoMagFit
 				const ParticleSet& particleSet,
 				const TomoReferenceMap& referenceMap,
 				const BufferedImage<float>& freqWeights,
+				const BufferedImage<float>& doseWeights,
 				int boxSize,
 				int first_frame,
 				int last_frame,
@@ -28,7 +29,7 @@ class TomoMagFit
 			const Tomogram& tomogram;
 			const ParticleSet& particleSet;
 			const TomoReferenceMap& referenceMap;
-			const BufferedImage<float>& freqWeights;
+			const BufferedImage<float>& freqWeights, doseWeights;
 
 };
 
@@ -42,6 +43,7 @@ class TomoIsoMagFit : public TomoMagFit
 				const ParticleSet& particleSet,
 				const TomoReferenceMap& referenceMap,
 				const BufferedImage<float>& freqWeights,
+				const BufferedImage<float>& doseWeights,
 				int boxSize,
 				int first_frame,
 				int last_frame,
@@ -63,6 +65,7 @@ class TomoAnisoMagFit : public TomoMagFit
 				const ParticleSet& particleSet,
 				const TomoReferenceMap& referenceMap,
 				const BufferedImage<float>& freqWeights,
+				const BufferedImage<float>& doseWeights,
 				int boxSize,
 				int first_frame,
 				int last_frame,

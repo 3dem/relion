@@ -1129,10 +1129,16 @@ void MlOptimiserMpi::expectation()
 			long int my_nr_particles_done = 0;
 
 
+			// SHWS10052021: reduce frequency of abort check 10-fold
+			long int icheck= 0;
 			while (nr_followers_done < node->size - 1)
 			{
 
-				pipeline_control_check_abort_job();
+				if (icheck%10 == 0)
+				{
+					if (pipeline_control_check_abort_job()) MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
+				}
+				icheck++;
 
 				// Receive a job request from a follower
 				node->relion_MPI_Recv(MULTIDIM_ARRAY(first_last_nr_images), MULTIDIM_SIZE(first_last_nr_images), MPI_LONG, MPI_ANY_SOURCE, MPITAG_JOB_REQUEST, MPI_COMM_WORLD, status);
@@ -1390,9 +1396,6 @@ void MlOptimiserMpi::expectation()
 						}
 						node->relion_MPI_Recv(MULTIDIM_ARRAY(exp_imagedata), MULTIDIM_SIZE(exp_imagedata), MY_MPI_DOUBLE, 0, MPITAG_IMAGE, MPI_COMM_WORLD, status);
 					}
-
-					if (pipeline_control_check_abort_job())
-						MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
 
 					// Now process these images
 #ifdef DEBUG_MPIEXP

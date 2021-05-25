@@ -582,7 +582,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 		if (fn_mask == "None")
 		{
 			if (!optimisationSet.getValue(EMDL_TOMO_REFERENCE_MASK_FILE_NAME, fn_mask))
-				REPORT_ERROR("No reference mask filename was found in file " + fn_OS);
+				std::cout << " WARNING: No reference mask filename was found in file " + fn_OS + ". Continuing without mask." << std::endl;
 		}
 	}
 
@@ -725,7 +725,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	// SGD stuff
 	int grad_section = parser.addSection("Stochastic Gradient Descent");
 	gradient_refine = parser.checkOption("--grad", "Perform gradient based optimisation (instead of default expectation-maximization)");
-	grad_em_iters = textToInteger(parser.getOption("--grad_em_iters", "Number of iterations at the end of a gradient refinement using Expectation-Maximization", "1"));
+	grad_em_iters = textToInteger(parser.getOption("--grad_em_iters", "Number of iterations at the end of a gradient refinement using Expectation-Maximization", "0"));
 	// Stochastic EM is implemented as a variant of SGD, though it is really a different algorithm!
 
 	grad_ini_frac = textToFloat(parser.getOption("--grad_ini_frac", "Fraction of iterations in the initial phase of refinement", "0.3"));
@@ -1335,9 +1335,11 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 	if (do_join_random_halves && !optimisationSet.isEmpty())
 	{
 		optimisationSet.setValue(EMDL_TOMO_PARTICLES_FILE_NAME, fn_root + "_data.star");
-		optimisationSet.setValue(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, fn_root2 + "_half1_unfil.mrc");
-		optimisationSet.setValue(EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME, fn_root2 + "_half2_unfil.mrc");
+		optimisationSet.setValue(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, fn_root2 + "_half1_class001_unfil.mrc");
+		optimisationSet.setValue(EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME, fn_root2 + "_half2_class001_unfil.mrc");
 		optimisationSet.setValue(EMDL_TOMO_REFERENCE_MASK_FILE_NAME, fn_mask);
+		if (optimisationSet.containsLabel(EMDL_TOMO_REFERENCE_FSC_FILE_NAME))
+			optimisationSet.deactivateLabel(EMDL_TOMO_REFERENCE_FSC_FILE_NAME);
 
 		optimisationSet.write(fn_root + "_optimisation_set.star");
 	}
@@ -1505,6 +1507,10 @@ void MlOptimiser::initialise()
 		// Set sigma2_noise and Iref from averaged poser spectra and Mavg
 		setSigmaNoiseEstimatesAndSetAverageImage(Mavg);
 	}
+
+	// Initialise the data_versus_prior ratio to get the initial current_size right
+	if (iter == 0 && !do_initialise_bodies)
+		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
 
 	// Check minimum group size of 10 particles
 	if (verb > 0)
@@ -2186,7 +2192,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 				          "both will instead be determined automatically." << std::endl;
 
 			unsigned long dataset_size = mydata.numberOfParticles();
-			grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.001, 500), 100);
+			grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.005, 5000), 100);
 			grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.05,  50000), 500);
 			if (rank==0) {
 				std::cout << " Initial subset size set to " << grad_ini_subset_size << std::endl;
@@ -2280,10 +2286,6 @@ void MlOptimiser::initialiseGeneralFinalize(int rank)
 
 		// Low-pass filter the initial references
 		initialLowPassFilterReferences();
-
-		// Initialise the data_versus_prior ratio to get the initial current_size right
-		if (!do_initialise_bodies)
-			mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
 
 		if (do_init_blobs && fn_ref == "None")
 		{
@@ -2872,7 +2874,7 @@ void MlOptimiser::iterate()
 			do_grad_next_iter = !(has_converged || iter_next > nr_iter - grad_em_iters) &&
 			                    !(do_firstiter_cc && iter_next == 1) &&
 			                    !grad_has_converged;
-			do_skip_maximization = do_grad && iter == nr_iter && mymodel.nr_classes > 1;
+			do_skip_maximization = do_grad && iter == nr_iter;
 			grad_pseudo_halfsets = do_grad;
 		}
 
@@ -2910,8 +2912,8 @@ void MlOptimiser::iterate()
 		else if (do_grad)
 			REPORT_ERROR("ERROR: Random seed must be set for gradient optimisation.");
 
-		if (grad_pseudo_halfsets)
-			std::cerr << "DEBUG: doing pseudo gold standard" << std::endl;
+		//if (grad_pseudo_halfsets)
+		//	std::cerr << "DEBUG: doing pseudo gold standard" << std::endl;
 
 		expectation();
 
@@ -3249,6 +3251,8 @@ void MlOptimiser::expectation()
 		init_progress_bar(my_nr_particles);
 	}
 
+	// SHWS10052021: reduce frequency of abort check 10-fold
+	long int icheck= 0;
 	while (nr_particles_done < my_nr_particles)
 	{
 
@@ -3267,8 +3271,11 @@ void MlOptimiser::expectation()
 #endif
 
 		// Abort through the pipeline_control system
-		if (pipeline_control_check_abort_job())
-			exit(RELION_EXIT_ABORTED);
+		if (icheck%10 == 0)
+		{
+			if (pipeline_control_check_abort_job()) exit(RELION_EXIT_ABORTED);
+		}
+		icheck++;
 
 		// perform the actual expectation step on several particles
 		expectationSomeParticles(my_pool_first_part_id, my_pool_last_part_id);
@@ -9431,11 +9438,22 @@ void MlOptimiser::updateStepSize()
 	std::string _scheme = grad_stepsize_scheme;
 
 	if (_stepsize <= 0)
-		_stepsize = 0.3;
+	{
+		if (mymodel.ref_dim == 3)
+			_stepsize = 0.1;
+		else
+			_stepsize = 0.3;
+	}
 
 	if (_scheme.empty())
 	{
-		RFLOAT boost_factor = 0.9 / _stepsize;
+		RFLOAT boost_factor;
+
+		if (mymodel.ref_dim == 3)
+			boost_factor = 3.;
+		else
+			boost_factor = 0.9 / _stepsize;
+
 		_scheme = std::to_string(boost_factor) + "-2step";
 	}
 

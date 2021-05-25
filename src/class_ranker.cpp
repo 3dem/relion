@@ -19,8 +19,9 @@
  ***************************************************************************/
 
 
+#include "src/npy.hpp"
 #include "src/class_ranker.h"
-static int IMGSIZE = 64;
+const static int IMGSIZE = 64;
 
 //
 // Calculates n! (uses double arithmetic to avoid overflow)
@@ -396,7 +397,8 @@ void ClassRanker::read(int argc, char **argv, int rank)
 	fn_sel_parts = parser.getOption("--fn_sel_parts", "Filename for output star file with selected particles", "particles.star");
 	fn_sel_classavgs = parser.getOption("--fn_sel_classavgs", "Filename for output star file with selected class averages", "class_averages.star");
 	fn_root = parser.getOption("--fn_root", "rootname for output model.star and optimiser.star files", "rank");
-	fn_torch_model = parser.getOption("--fn_torch_model", "Filename for the serialized Torch model.", ""); // Default should be compile-time defined
+	fn_pytorch_model = parser.getOption("--fn_pytorch_model", "Filename for the serialized Torch model.", ""); // Default should be compile-time defined
+	python_interpreter = parser.getOption("--python", "Command or path to python interpreter with pytorch.", "python");
 
 	int part_section = parser.addSection("Network training options (only used in development!)");
 	do_ranking  = !parser.checkOption("--train", "Only write output files for training purposes (don't rank classes)");
@@ -604,13 +606,19 @@ void ClassRanker::initialise()
 		std::cout << "WARNING: Should not provide radius ratio and radius at the same time. Ignoring the radius ratio..." << std::endl;
 	}
 
-#ifdef _TORCH_ENABLED
-	if (fn_torch_model == "") {
-		fn_torch_model = get_default_torch_model_path();
-		if (fn_torch_model != "")
-			std::cout << "Using default pytorch model: " << fn_torch_model << std::endl;
+	if (fn_pytorch_model == "") {
+		fn_pytorch_model = get_default_pytorch_model_path();
+		if (fn_pytorch_model != "")
+			std::cout << "Using default pytorch model: " << fn_pytorch_model << std::endl;
 	}
-#endif
+
+	if (fn_pytorch_script == "") {
+		fn_pytorch_script = get_python_script_path();
+		if (fn_pytorch_script != "")
+			std::cout << "Using python script: " << fn_pytorch_script << std::endl;
+		else
+			REPORT_ERROR("Python script file is missing.");
+	}
 }
 
 
@@ -1862,35 +1870,44 @@ void ClassRanker::readFeatures()
 }
 
 
-float ClassRanker::deployTorchModel(FileName &model_path, std::vector<float> &features, std::vector<float> &subimages) {
+float ClassRanker::deployTorchModel(FileName &model_path, std::vector<float> &features, std::vector<float> &subimages)
+{
+	const long unsigned featues_shape [] = {features.size()};
+	npy::SaveArrayAsNumpy(fn_out + "features.npy", false, 1, featues_shape, features);
 
-#ifdef _TORCH_ENABLED
-	torch::jit::script::Module module;
+	const long unsigned image_shape [] = {IMGSIZE, IMGSIZE};
+	npy::SaveArrayAsNumpy(fn_out + "images.npy", false, 2, image_shape, subimages);
 
-	// Deserialize model
+	char buffer[128];
+	std::string result = "";
+	float score;
+
+	std::string command = python_interpreter + " " + fn_pytorch_script + " " + fn_pytorch_model + " " + fn_out;
+
+	// Open pipe to file
+	FILE* pipe = popen(command.c_str(), "r");
+	if (!pipe)
+	{
+		REPORT_ERROR("Failed to run external python script with the following command:\n " + command);
+	}
+
+	// read till end of process:
+	while (!feof(pipe))
+		if (fgets(buffer, 128, pipe) != NULL)
+			result += buffer;
+
+	pclose(pipe);
+
 	try {
-		module = torch::jit::load(model_path);
+		std::string::size_type sz;
+		score = std::stof(result, &sz);
 	}
-	catch (const c10::Error& e) {
-		REPORT_ERROR("Error loading Torch model.");
+	catch (const std::invalid_argument& ia) {
+		std::cerr << result << std::endl;
+		REPORT_ERROR("Failed to run external python script with the following command:\n " + command);
 	}
 
-	// Create an inputs with batch size=1.
-	torch::Tensor imagestensor = torch::from_blob(subimages.data(), {1, 1, IMGSIZE, IMGSIZE});
-	torch::Tensor featuretensor = torch::from_blob(features.data(), {1, (int)features.size()});
-	std::vector<torch::jit::IValue> inputs;
-	inputs.push_back(imagestensor);
-	inputs.push_back(featuretensor);
-
-	// Execute the model and turn its output into a tensor.
-	at::Tensor output = module.forward(inputs).toTensor();
-
-	// Extract score value from tensor and return
-	return output[0][0].item<float>();
-
-#else //_TORCH_ENABLED
-	REPORT_ERROR("RELION was not compiled with Torch support.\nConfigure with -DTORCH=ON and re-compile.");
-#endif //_TORCH_ENABLED
+	return score;
 }
 
 void ClassRanker::performRanking()
@@ -1900,6 +1917,12 @@ void ClassRanker::performRanking()
 		// Read in particles if we haven't done this already
 		mydata.read(fn_data, true, true); // true true means: ignore particle_name and group name!
 		if (debug>0) std::cerr << "Done with reading data.star ..." << std::endl;
+	}
+
+	if (verb > 0)
+	{
+		std::cout << " Deploying torch model for each class ..." << std::endl;
+		init_progress_bar(features_all_classes.size());
 	}
 
 	// Initialise all scores to -999 (including empty classes!)
@@ -1936,9 +1959,14 @@ void ClassRanker::performRanking()
 			image_vector[n] = DIRECT_MULTIDIM_ELEM(myimg, n);
 		}
 		feature_vector = features_all_classes[i].toNormalizedVector();
-		scores[i] = (RFLOAT) deployTorchModel(fn_torch_model, feature_vector, image_vector);
+		scores[i] = (RFLOAT) deployTorchModel(fn_pytorch_model, feature_vector, image_vector);
 		if (scores[i] > max_score) max_score = scores[i];
+
+		if (verb > 0) progress_bar(i);
+
 	}
+
+	if (verb > 0) progress_bar(features_all_classes.size());
 
 	RFLOAT my_min = select_min_score;
 	RFLOAT my_max = select_max_score;
@@ -2170,10 +2198,9 @@ void ClassRanker::writeFeatures()
 }
 
 
-std::string ClassRanker::get_default_torch_model_path()
+std::string ClassRanker::get_default_pytorch_model_path()
 {
 
-#ifdef _TORCH_ENABLED
 	std::vector<char> buff(512);
 	ssize_t len;
 
@@ -2194,6 +2221,33 @@ std::string ClassRanker::get_default_torch_model_path()
 			return path;
 		}
 	}
-#endif
+
 	return "";
 }
+
+ std::string ClassRanker::get_python_script_path()
+ {
+
+	 std::vector<char> buff(512);
+	 ssize_t len;
+
+	 //Read path string into buffer
+	 do {
+		 buff.resize(buff.size() + 128);
+		 len = ::readlink("/proc/self/exe", &(buff[0]), buff.size());
+	 } while (buff.size() == len);
+
+	 // Convert to string and return
+	 if (len > 0) {
+		 buff[len] = '\0'; //Mark end of string
+		 std::string path = std::string(&(buff[0]));
+		 std::size_t found = path.find_last_of("/\\");
+		 path = path.substr(0,found) + "/relion_class_ranker.py";
+		 if (FILE *file = fopen(path.c_str(), "r")) { //Check if file can be opened
+			 fclose(file);
+			 return path;
+		 }
+	 }
+
+	 return "";
+ }

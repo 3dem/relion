@@ -1081,28 +1081,11 @@ void JobWindow::initialiseSelectWindow()
 	group6 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group6->end();
 
-#ifdef _TORCH_ENABLED
 
 	place("do_class_ranker", TOGGLE_DEACTIVATE, group6);
 	group6->begin();
 	place("rank_threshold", TOGGLE_DEACTIVATE);
-
-#else
-
-	Fl_Text_Buffer *textbuff1 = new Fl_Text_Buffer();
-        textbuff1->text("For auto-selection build with pyTorch, using -DTORCH=ON in cmake.");
-        Fl_Text_Display* textdisp1 = new Fl_Text_Display(XCOL1, current_y, WCOL1+WCOL2+WCOL3+10, STEPY*1.2);
-        textdisp1->textsize(12);
-        textdisp1->color(GUI_BACKGROUND_COLOR);
-        textdisp1->buffer(textbuff1);
-
-        current_y += STEPY*1.5;
-
-	place("do_class_ranker", TOGGLE_ALWAYS_DEACTIVATE, group6);
-	group6->begin();
-	place("rank_threshold", TOGGLE_ALWAYS_DEACTIVATE);
-
-#endif
+	place("python_exe", TOGGLE_DEACTIVATE);
 
 	group6->end();
 	guientries["do_class_ranker"].cb_menu_i();
@@ -2389,6 +2372,9 @@ void JobWindow::initialiseTomoImportWindow()
 
 	place("part_star", TOGGLE_DEACTIVATE);
 	place("part_tomos", TOGGLE_DEACTIVATE);
+	// Add a little spacer
+	current_y += STEPY/2;
+	place("do_coords_flipZ", TOGGLE_DEACTIVATE);
 
 	group2->end();
 	guientries["do_coords"].cb_menu_i(); // make default active
@@ -2473,23 +2459,32 @@ void JobWindow::initialiseTomoCtfRefineWindow()
 	group1->begin();
 
 	place("focus_range", TOGGLE_DEACTIVATE);
+
+	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group2->end();
+	place("do_reg_def", TOGGLE_DEACTIVATE, group2);
+
+	group2->begin();
 	place("lambda", TOGGLE_DEACTIVATE);
+	group2->end();
+	guientries["do_reg_def"].cb_menu_i();
 
 	group1->end();
 	guientries["do_defocus"].cb_menu_i();
 
+
 	current_y += STEPY /2 ;
 
-	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group2->end();
-	place("do_scale", TOGGLE_DEACTIVATE, group2);
+	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group3->end();
+	place("do_scale", TOGGLE_DEACTIVATE, group3);
 
-	group2->begin();
+	group3->begin();
 
 	place("do_frame_scale", TOGGLE_DEACTIVATE);
 	place("do_tomo_scale", TOGGLE_DEACTIVATE);
 
-	group2->end();
+	group3->end();
 	guientries["do_scale"].cb_menu_i();
 
 	tab2->end();
@@ -2541,16 +2536,27 @@ void JobWindow::initialiseTomoAlignWindow()
 
 	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group1->end();
-	place("do_polish", TOGGLE_DEACTIVATE, group1);
+	place("do_flex_align", TOGGLE_DEACTIVATE, group1);
 
 	group1->begin();
+
+	current_y += STEPY /2 ;
+
+	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group2->end();
+	place("do_polish", TOGGLE_DEACTIVATE, group2);
+
+	group2->begin();
 
 	place("sigma_vel", TOGGLE_DEACTIVATE);
 	place("sigma_div", TOGGLE_DEACTIVATE);
 	place("do_sq_exp_ker", TOGGLE_DEACTIVATE);
 
-	group1->end();
+	group2->end();
 	guientries["do_polish"].cb_menu_i();
+
+	group1->end();
+	guientries["do_flex_align"].cb_menu_i();
 
 	tab2->end();
 }

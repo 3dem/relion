@@ -13,16 +13,16 @@ class ImageFilter
 		
 		template<class T>
 		static BufferedImage<T> bandpass(
-				const RawImage<T>& img, double freqPx, double widthPx, int numOvertones = 0);
+				const RawImage<T>& img, double wavelengthPx, double widthPx, int numOvertones = 0);
 
 
 		template<class T>
 		static BufferedImage<T> highpass2D(
-				const RawImage<T>& img, int z, double freqPx, double widthPx, bool pad);
+				const RawImage<T>& img, int z, double wavelengthPx, double edgeWidthPx, bool pad);
 
 		template<class T>
 		static BufferedImage<tComplex<T>> highpass3D(
-				const RawImage<tComplex<T>>& img, double freqPx, double widthPx);
+				const RawImage<tComplex<T>>& img, double wavelengthPx, double edgeWidthPx);
 
 		template<class T>
 		static BufferedImage<tComplex<T>> highpassGauss3D(
@@ -30,11 +30,11 @@ class ImageFilter
 		
 		template<class T>
 		static BufferedImage<T> lowpass2D(
-				const RawImage<T>& img, int z, double freqPx, double widthPx, bool pad);
+				const RawImage<T>& img, int z, double wavelengthPx, double edgeWidthPx, bool pad);
 
 		template<class T>
 		static BufferedImage<tComplex<T>> lowpass3D(
-				const RawImage<tComplex<T>>& img, double freqPx, double widthPx);
+				const RawImage<tComplex<T>>& img, double wavelengthPx, double edgeWidthPx);
 		
 		template<class T>
 		static BufferedImage<T> Gauss2D(
@@ -50,7 +50,7 @@ class ImageFilter
 		
 		template<class T>
 		static BufferedImage<T> highpassStack(
-				const RawImage<T>& stack, double freqPx, double widthPx, bool pad);
+				const RawImage<T>& stack, double wavelengthPx, double edgeWidthPx, bool pad);
 		
 		template<class T>
 		static BufferedImage<T> highpassStackGaussPadded(
@@ -58,7 +58,7 @@ class ImageFilter
 		
 		template<class T>
 		static BufferedImage<T> lowpassStack(
-				const RawImage<T>& stack, double freqPx, double widthPx, bool pad);
+				const RawImage<T>& stack, double wavelengthPx, double edgeWidthPx, bool pad);
 		
 		template<class T>
 		static BufferedImage<T> GaussStack(
@@ -80,7 +80,7 @@ class ImageFilter
 };
 
 template<class T>
-BufferedImage<T> ImageFilter::bandpass(const RawImage<T>& img, double freqPx, double widthPx, int numOvertones)
+BufferedImage<T> ImageFilter::bandpass(const RawImage<T>& img, double wavelengthPx, double widthPx, int numOvertones)
 {
 	const int w = img.xdim;
 	const int wh = w/2 + 1;
@@ -102,25 +102,25 @@ BufferedImage<T> ImageFilter::bandpass(const RawImage<T>& img, double freqPx, do
 
 		const double f = sqrt(xx * xx + yy * yy + zz * zz);
 
-		double freqPxAct;
+		double f0;
 
-		if (numOvertones > 0 && f > 1.0 / freqPx)
+		if (numOvertones > 0 && f > 1.0 / wavelengthPx)
 		{
-			int nearestMultiple = (int) (f * freqPx + 0.5);
+			int nearestMultiple = (int) (f * wavelengthPx + 0.5);
 
 			if (nearestMultiple > numOvertones + 1)
 			{
 				nearestMultiple = numOvertones + 1;
 			}
 
-			freqPxAct = nearestMultiple / freqPx;
+			f0 = nearestMultiple / wavelengthPx;
 		}
 		else
 		{
-			freqPxAct = 1.0 / freqPx;
+			f0 = 1.0 / wavelengthPx;
 		}
 
-		const double df = std::abs(widthPx * (f - freqPxAct));
+		const double df = std::abs((w / widthPx) * (f - f0));
 
 		if (df > 1.0)
 		{
@@ -140,13 +140,13 @@ BufferedImage<T> ImageFilter::bandpass(const RawImage<T>& img, double freqPx, do
 }
 
 template<class T>
-BufferedImage<T> ImageFilter::highpass2D(const RawImage<T>& img, int z, double freqPx, double widthPx, bool pad)
+BufferedImage<T> ImageFilter::highpass2D(const RawImage<T>& img, int z, double wavelengthPx, double edgeWidthPx, bool pad)
 {
 	const int w = img.xdim;
 	const int h = img.ydim;
 	const int wh = w/2 + 1;
 	
-	int padding = pad? (int) (freqPx + 0.5) : 0;
+	int padding = pad? (int) (wavelengthPx + 0.5) : 0;
 	
 	const int wp = w + 2 * padding;
 	const int hp = h + 2 * padding;
@@ -172,6 +172,9 @@ BufferedImage<T> ImageFilter::highpass2D(const RawImage<T>& img, int z, double f
 	BufferedImage<tComplex<T>> imgFS;
 	
 	FFT::FourierTransform(imgPadded, imgFS, FFT::Both);
+
+	const double f0 = 1.0 / wavelengthPx;
+	const double a = wp / edgeWidthPx;
 			
 	for (int y = 0; y < hp; y++)
 	for (int x = 0; x < wph; x++)
@@ -181,7 +184,7 @@ BufferedImage<T> ImageFilter::highpass2D(const RawImage<T>& img, int z, double f
 		
 		const double f = sqrt(xx * xx + yy * yy);
 				
-		const double df = widthPx * (f - 1.0/freqPx) + 0.5;
+		const double df = a * (f - f0) + 0.5;
 		
 		if (df < 0.0) 
 		{
@@ -208,7 +211,7 @@ BufferedImage<T> ImageFilter::highpass2D(const RawImage<T>& img, int z, double f
 
 template<class T>
 BufferedImage<tComplex<T>> ImageFilter::highpass3D(
-	const RawImage<tComplex<T>>& img, double freqPx, double widthPx)
+	const RawImage<tComplex<T>>& img, double wavelengthPx, double edgeWidthPx)
 {
 	const int wh = img.xdim;
 	const int w = (wh - 1) * 2;
@@ -217,17 +220,20 @@ BufferedImage<tComplex<T>> ImageFilter::highpass3D(
 
 	BufferedImage<tComplex<T>> out(wh, h, d);
 
+	const double f0 = 1.0 / wavelengthPx;
+	const double a = w / edgeWidthPx;
+
 	for (int z = 0; z < d;  z++)
 	for (int y = 0; y < h;  y++)
 	for (int x = 0; x < wh; x++)
 	{
-		const double xx = x;
-		const double yy = (((y + h/2) % h) - h/2);
-		const double zz = (((z + d/2) % d) - d/2);
+		const double xx = x / (double) w;
+		const double yy = (((y + h/2) % h) - h/2) / (double) h;
+		const double zz = (((z + d/2) % d) - d/2) / (double) d;
 
 		const double f = sqrt(xx * xx + yy * yy + zz * zz);
 
-		const double df = widthPx * (f - 1.0/freqPx)  + 0.5;
+		const double df = a * (f - f0)  + 0.5;
 
 		if (df < 0.0)
 		{
@@ -275,12 +281,12 @@ BufferedImage<tComplex<T>> ImageFilter::highpassGauss3D(
 }
 
 template<class T>
-BufferedImage<T> ImageFilter::lowpass2D(const RawImage<T>& img, int z, double freqPx, double widthPx, bool pad)
+BufferedImage<T> ImageFilter::lowpass2D(const RawImage<T>& img, int z, double wavelengthPx, double edgeWidthPx, bool pad)
 {
 	const int w = img.xdim;
 	const int h = img.ydim;
 	
-	int padding = pad? (int) (freqPx + 0.5) : 0;
+	int padding = pad? (int) (wavelengthPx + 0.5) : 0;
 	
 	const int wp = w + 2 * padding;
 	const int hp = h + 2 * padding;
@@ -306,6 +312,9 @@ BufferedImage<T> ImageFilter::lowpass2D(const RawImage<T>& img, int z, double fr
 	BufferedImage<tComplex<T>> imgFS;
 	
 	FFT::FourierTransform(imgPadded, imgFS, FFT::Both);
+
+	const double f0 = 1.0 / wavelengthPx;
+	const double a = wp / edgeWidthPx;
 		
 	for (int y = 0; y < hp; y++)
 	for (int x = 0; x < wph; x++)
@@ -315,7 +324,7 @@ BufferedImage<T> ImageFilter::lowpass2D(const RawImage<T>& img, int z, double fr
 		
 		const double f = sqrt(xx * xx + yy * yy);
 				
-		const double df = widthPx * (f - 1.0 / freqPx)  + 0.5;
+		const double df = a * (f - f0) + 0.5;
 		
 		if (df > 1.0) 
 		{
@@ -342,7 +351,7 @@ BufferedImage<T> ImageFilter::lowpass2D(const RawImage<T>& img, int z, double fr
 
 template<class T>
 BufferedImage<tComplex<T>> ImageFilter::lowpass3D(
-	const RawImage<tComplex<T>>& img, double freqPx, double widthPx)
+	const RawImage<tComplex<T>>& img, double wavelengthPx, double edgeWidthPx)
 {
 	const int wh = img.xdim;
 	const int w = (wh - 1) * 2;
@@ -351,17 +360,20 @@ BufferedImage<tComplex<T>> ImageFilter::lowpass3D(
 
 	BufferedImage<tComplex<T>> out(wh, h, d);
 
+	const double f0 = 1.0 / wavelengthPx;
+	const double a = w / edgeWidthPx;
+
 	for (int z = 0; z < d;  z++)
 	for (int y = 0; y < h;  y++)
 	for (int x = 0; x < wh; x++)
 	{
-		const double xx = x;
-		const double yy = (((y + h/2) % h) - h/2);
-		const double zz = (((z + d/2) % d) - d/2);
+		const double xx = x / (double) w;
+		const double yy = (((y + h/2) % h) - h/2) / (double) h;
+		const double zz = (((z + d/2) % d) - d/2) / (double) d;
 
 		const double f = sqrt(xx * xx + yy * yy + zz * zz);
 
-		const double df = widthPx * (f - 1.0/freqPx) + 0.5;
+		const double df = a * (f - f0) + 0.5;
 
 		if (df < 0.0)
 		{
@@ -490,7 +502,7 @@ BufferedImage<T> ImageFilter::thresholdAbove(const RawImage<T>& img, T value)
 
 template<class T>
 BufferedImage<T> ImageFilter::highpassStack(
-		const RawImage<T>& stack, double freqPx, double widthPx, bool pad)
+		const RawImage<T>& stack, double wavelengthPx, double edgeWidthPx, bool pad)
 {
 	BufferedImage<T> out(stack);
 	
@@ -498,7 +510,7 @@ BufferedImage<T> ImageFilter::highpassStack(
 	
 	for (int f = 0; f < fc; f++)
 	{
-		BufferedImage<T> sliceFilt = highpass2D(stack, f, freqPx, widthPx, pad);
+		BufferedImage<T> sliceFilt = highpass2D(stack, f, wavelengthPx, edgeWidthPx, pad);
 		NewStackHelper::insertSliceZ(sliceFilt, out, f);
 	}
 	
@@ -539,7 +551,7 @@ BufferedImage<T> ImageFilter::highpassStackGaussPadded(
 
 template<class T>
 BufferedImage<T> ImageFilter::lowpassStack(
-		const RawImage<T>& stack, double freqPx, double widthPx, bool pad)
+		const RawImage<T>& stack, double wavelengthPx, double edgeWidthPx, bool pad)
 {
 	BufferedImage<T> out(stack);
 	
@@ -547,7 +559,7 @@ BufferedImage<T> ImageFilter::lowpassStack(
 	
 	for (int f = 0; f < fc; f++)
 	{		
-		BufferedImage<T> sliceFilt = lowpass2D(stack, f, freqPx, widthPx, pad);		
+		BufferedImage<T> sliceFilt = lowpass2D(stack, f, wavelengthPx, edgeWidthPx, pad);
 		NewStackHelper::insertSliceZ(sliceFilt, out, f);
 	}
 	
