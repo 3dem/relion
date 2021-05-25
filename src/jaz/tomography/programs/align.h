@@ -174,7 +174,7 @@ void AlignProgram::performAlignment(
 
 
 	std::vector<double> opt = LBFGS::optimize(
-		initial, alignment, 1, num_iters, 1e-4, 1e-5);
+		initial, alignment, 1, num_iters, 1e-5, 1e-5);
 
 
 	if (verbosity > 0 && per_tomogram_progress)

@@ -68,9 +68,8 @@ void AlignProgram::parseInput()
 	alignmentSettings.constShifts = parser.checkOption("--const_s", "Keep the frame shifts constant");
 	do_anisotropy = parser.checkOption("--aniso", "Assume an anisotropic projection model");
 	per_tilt_anisotropy = parser.checkOption("--per_tilt_aniso", "Fit independent view anisotropy for each tilt image");
-	num_iters = textToInteger(parser.getOption("--it", "Max. number of iterations", "5000"));
-	
-	alignmentSettings.perFrame2DDeformation = true;
+	num_iters = textToInteger(parser.getOption("--it", "Max. number of iterations", "50000"));
+
 
 	int motion_section = parser.addSection("Motion estimation options");
 
@@ -87,10 +86,11 @@ void AlignProgram::parseInput()
 
 	int deformation_section = parser.addSection("Deformation estimation options");
 
-	do_deformation = parser.checkOption("--do_deformation", "Estimate 2D deformations");
+	do_deformation = parser.checkOption("--deformation", "Estimate 2D deformations");
 	deformationParameters.grid_width = textToInteger(parser.getOption("--def_w", "Number of horizontal sampling points for the deformation grid", "3"));
 	deformationParameters.grid_height = textToInteger(parser.getOption("--def_h", "Number of vertical sampling points for the deformation grid", "3"));
 
+	alignmentSettings.perFrame2DDeformation = parser.checkOption("--per_frame_deformation", "Model separate 2D deformations for all tilts");
 
 	int expert_section = parser.addSection("Expert options");
 

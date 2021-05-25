@@ -3,6 +3,7 @@
 
 #include <src/jaz/gravis/t2Vector.h>
 #include <src/jaz/image/raw_image.h>
+#include <src/jaz/image/buffered_image.h>
 
 
 class Spline2DDeformationModel
@@ -154,7 +155,7 @@ inline void Spline2DDeformationModel::updateCostGradient(
 		const double *parameters,
 		double *target) const
 {
-	gravis::d2Vector pl_grid(pl.x / gridSpacing.x, pl.y / gridSpacing.x);
+	gravis::d2Vector pl_grid(pl.x / gridSpacing.x, pl.y / gridSpacing.y);
 	
 	const double eps = 1e-10;
 	
@@ -197,7 +198,7 @@ inline void Spline2DDeformationModel::updateCostGradient(
 						- y2  +        y3);
 	
 	RawImage<DataPoint> grad(gridSize.x, gridSize.y, 2, (DataPoint*)target);
-	
+
 	for (int dim = 0; dim < 2; dim++)
 	{
 		grad(cell.x,     cell.y,     dim).value   += vx[0] * vy[0] * g0[dim];
@@ -219,7 +220,7 @@ inline void Spline2DDeformationModel::updateCostGradient(
 		grad(cell.x + 1, cell.y + 1, dim).slope_x += vx[3] * vy[1] * g0[dim];
 		grad(cell.x + 1, cell.y + 1, dim).slope_y += vx[1] * vy[3] * g0[dim];
 		grad(cell.x + 1, cell.y + 1, dim).twist   += vx[3] * vy[3] * g0[dim];
-	}	
+	}
 }
 
 #endif

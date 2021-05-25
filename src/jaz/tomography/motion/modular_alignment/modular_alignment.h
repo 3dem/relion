@@ -184,8 +184,8 @@ ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 	devMode(false),
 	fc(frameProj.size()),
 	pc(partIndices.size()),
-    mpc(motionModel.getParameterCount()),
-    dc(deformationModel2D.getParameterCount()),
+	mpc(motionModel.getParameterCount()),
+	dc(deformationModel2D.getParameterCount()),
 	maxRange(CCs[0].xdim / (2 * paddingFactor))
 {	
 	initialPos.resize(pc);
@@ -213,11 +213,12 @@ ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 /*
 	Parameter Layout:
 	
-	0:                  ([phi, theta, psi], [dx, dy]) * fc           frame alignment: fs * fc
-	fs * fc:             [dx0, dy0, dz0]  *  pc;                     static part. shifts: 3 * pc
-	fs * fc + 3 * pc:    [b0x, b0y, b0z][b1x, ..., bBz] * (fc-1);    motion: mpc * (fc - 1)
+	0:                                  ([phi, theta, psi], [dx, dy]) * fc           frame alignment: fs * fc
+	fs * fc:                             [dx0, dy0, dz0]  *  pc;                     static part. shifts: 3 * pc
+	fs * fc + 3 * pc:                    [b0x, b0y, b0z][b1x, ..., bBz] * (fc-1);    motion: mpc * (fc - 1)
+	fs * fc + 3 * pc + (fc - 1) * dc:    [def.x, def.y];                             deformation: dc or dc * fc
 	
-	fs * fc  +  3 * pc  +  mpc * (fc - 1)   total
+	fs * fc  +  3 * pc  +  mpc * (fc - 1)  +  dc * (fc||1)           total
 */
 
 template<class MotionModel, class DeformationModel2D>
@@ -324,7 +325,7 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 						g0.xy(), def_x, def_y);
 			
 			deformationModel2D.updateCostGradient(
-						pl, g0.xy(), &x[def_block_f], &gradDest[def_block_f]);
+						pl, g0.xy(), &x[def_block_f], &grad_par[th*step_grad + def_block_f]);
 
 
 			if (settings.constAngles)
@@ -522,7 +523,7 @@ void ModularAlignment<MotionModel, DeformationModel2D>::visualiseTrajectories(
 
 	for (int dim = 0; dim < 3; dim++)
 	{
-		CPlot2D plot2D(tomo_name + " Motion " + plot_names[dim]);
+		CPlot2D plot2D(tomo_name + ": Motion " + plot_names[dim]);
 		plot2D.SetXAxisSize(600);
 		plot2D.SetYAxisSize(600);
 		plot2D.SetDrawLegend(false);
@@ -634,6 +635,7 @@ void ModularAlignment<MotionModel, DeformationModel2D>::visualise2DDeformations(
 	
 	const int subdiv = 5;
 	const int substeps = 20;
+	const double delta_scale = 8.0;
 	
 	const gravis::d2Vector gridSpacing(
 		imageSize.x / (double) (gridSize.x - 1),
@@ -645,21 +647,23 @@ void ModularAlignment<MotionModel, DeformationModel2D>::visualise2DDeformations(
 	{
 		const int def_block_f = def_block + (settings.perFrame2DDeformation? f * dc : 0);
 		
-		CPlot2D plot2D(tomo_name + " 2D-Deformation");
+		CPlot2D plot2D(tomo_name + ": 2D-Deformation (scaled up by a factor of "+ZIO::itoa((int)delta_scale)+")");
 		plot2D.SetXAxisSize(600);
 		plot2D.SetYAxisSize(600);
 		plot2D.SetDrawLegend(false);
 		plot2D.SetFlipY(true);
+		plot2D.SetDrawXAxisGridLines(false);
+		plot2D.SetDrawYAxisGridLines(false);
 		
 		CDataSet original_main;
 		original_main.SetDrawMarker(false);
-		original_main.SetDatasetColor(0.5,0.5,0.3);
+		original_main.SetDatasetColor(0.6,0.6,1.0);
 		original_main.SetLineWidth(0.5);
 		
 		CDataSet original_aux;
 		original_aux.SetDrawMarker(false);
-		original_aux.SetDatasetColor(0.8,0.8,0.4);
-		original_aux.SetLineWidth(0.5);
+		original_aux.SetDatasetColor(0.8,0.8,1.0);
+		original_aux.SetLineWidth(0.25);
 		
 		CDataSet warped_main;
 		warped_main.SetDrawMarker(false);
@@ -669,7 +673,7 @@ void ModularAlignment<MotionModel, DeformationModel2D>::visualise2DDeformations(
 		CDataSet warped_aux;
 		warped_aux.SetDrawMarker(false);
 		warped_aux.SetDatasetColor(0.4,0.4,0.4);
-		warped_aux.SetLineWidth(0.5);
+		warped_aux.SetLineWidth(0.25);
 		
 		std::vector<CDataSet> 
 			original_main_lines,
@@ -738,7 +742,7 @@ void ModularAlignment<MotionModel, DeformationModel2D>::visualise2DDeformations(
 				
 				deformationModel2D.computeShiftAndGradient(pl, &x[def_block_f], def, def_x, def_y);
 				
-				points[j] = pl + def;
+				points[j] = pl + delta_scale * def;
 			}
 			
 			for (int j = 0; j < substeps; j++)
@@ -778,11 +782,11 @@ void ModularAlignment<MotionModel, DeformationModel2D>::visualise2DDeformations(
 		
 		if (settings.perFrame2DDeformation)
 		{
-			fn_eps += "_frame_" + ZIO::itoa(f) + ".mrc";
+			fn_eps += "_frame_" + ZIO::itoa(f) + ".eps";
 		}
 		else
 		{
-			fn_eps += ".mrc";
+			fn_eps += ".eps";
 		}
 		
 		plot2D.OutputPostScriptPlot(FileName(fn_eps));
