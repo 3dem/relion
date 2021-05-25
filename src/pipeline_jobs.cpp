@@ -499,37 +499,12 @@ void RelionJob::write(std::string fn)
 	// If fn is empty, use the hidden name
 	FileName myfilename = (fn=="") ? hidden_name : fn;
 
-	/* In 3.1, no longer write run.job, just keep reading run,job for backwards compatibility
-	 *
-	std::ofstream fh;
-	fh.open((myfilename+"run.job").c_str(), std::ios::out);
-	if (!fh)
-		REPORT_ERROR("ERROR: Cannot write to file: " + myfilename + "run.job");
-
-	// Write the job type
-	fh << "job_type == " << type << std::endl;
-
-	// is_continue flag
-	if (is_continue)
-		fh << "is_continue == true" << std::endl;
-	else
-		fh << "is_continue == false" << std::endl;
-
-	for (std::map<std::string,JobOption>::iterator it=joboptions.begin(); it!=joboptions.end(); ++it)
-	{
-		(it->second).writeValue(fh);
-	}
-
-	fh.close();
-	 */
-
 	FileName fn_star = myfilename;
 	if (fn_star.getExtension() != "star") // full name was given
 	{
 		fn_star += "job.star"; // "Refine3D/job123" OR ".gui_auto3d"
 	}
 
-	// Also write 3.1-style STAR file
 	std::ofstream fh;
 	fh.open((fn_star).c_str(), std::ios::out);
 	if (!fh)
@@ -542,7 +517,7 @@ void RelionJob::write(std::string fn)
 	MDhead.addObject();
 	// as of 3.1-beta do not write integer into the STAR files anymore....
 	// MDhead.setValue(EMDL_JOB_TYPE, type);
-	MDhead.setValue(EMDL_JOB_TYPE_LABEL, label);
+	MDhead.setValue(EMDL_JOB_TYPE_LABEL, get_proc_label(type));
 	MDhead.setValue(EMDL_JOB_IS_CONTINUE, is_continue);
 	MDhead.setValue(EMDL_JOB_IS_TOMO, is_tomo);
 	// TODO: add name for output directories!!! make a std:;map between type and name for all options!
