@@ -1,13 +1,13 @@
 #include "spline_2D_deformation_model.h"
 
 Spline2DDeformationModel::Spline2DDeformationModel(
-		const gravis::i2Vector& imageSize, 
-		const gravis::i2Vector& gridSize)
+		const Parameters& parameters,
+		const gravis::i2Vector& imageSize)
 	:
 	  imageSize(imageSize),
-	  gridSize(gridSize),
+	  gridSize(parameters.grid_width, parameters.grid_height),
 	  gridSpacing(
-		imageSize.x / (double)(gridSize.x - 1), 
-		imageSize.y / (double)(gridSize.y - 1))
+		imageSize.x / (double)(parameters.grid_width - 1),
+		imageSize.y / (double)(parameters.grid_height - 1))
 {
 }

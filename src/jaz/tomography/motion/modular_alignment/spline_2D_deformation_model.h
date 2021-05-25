@@ -13,10 +13,15 @@ class Spline2DDeformationModel
 		{
 			double value, slope_x, slope_y, twist;
 		};
+
+		struct Parameters
+		{
+			int grid_width, grid_height;
+		};
 		
 		Spline2DDeformationModel(
-				const gravis::i2Vector& imageSize, 
-				const gravis::i2Vector& gridSize);
+				const Parameters& parameters,
+				const gravis::i2Vector& imageSize);
 		
 		
 			gravis::i2Vector imageSize, gridSize;

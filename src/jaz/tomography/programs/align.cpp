@@ -79,10 +79,17 @@ void AlignProgram::parseInput()
 	motionParameters.sig_vel = textToDouble(parser.getOption("--s_vel", "Velocity sigma [Å/dose]", "0.5"));
 	motionParameters.sig_div = textToDouble(parser.getOption("--s_div", "Divergence sigma [Å]", "5000.0"));
 
-	motionSettings.params_scaled_by_dose = !parser.checkOption("--abs_params", "Do not scale the sigmas by the dose");
+	motionParameters.params_scaled_by_dose = !parser.checkOption("--abs_params", "Do not scale the sigmas by the dose");
 
-	motionSettings.sqExpKernel = parser.checkOption("--sq_exp_ker", "Use a square-exponential kernel instead of an exponential one");
-	motionSettings.maxEDs = textToInteger(parser.getOption("--max_ed", "Maximum number of eigendeformations", "-1"));
+	motionParameters.sqExpKernel = parser.checkOption("--sq_exp_ker", "Use a square-exponential kernel instead of an exponential one");
+	motionParameters.maxEDs = textToInteger(parser.getOption("--max_ed", "Maximum number of eigendeformations", "-1"));
+
+
+	int deformation_section = parser.addSection("Deformation estimation options");
+
+	do_deformation = parser.checkOption("--do_deformation", "Estimate 2D deformations");
+	deformationParameters.grid_width = textToInteger(parser.getOption("--def_w", "Number of horizontal sampling points for the deformation grid", "3"));
+	deformationParameters.grid_height = textToInteger(parser.getOption("--def_h", "Number of vertical sampling points for the deformation grid", "3"));
 
 
 	int expert_section = parser.addSection("Expert options");
@@ -278,7 +285,7 @@ void AlignProgram::processTomograms(
 		{
 			GPMotionModel motionModel(
 				particleSet, particles[t], tomogram,
-				motionParameters, motionSettings,
+				motionParameters,
 				per_tomogram_progress && verbosity > 0);
 
 			performAlignment(

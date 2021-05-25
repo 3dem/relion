@@ -28,15 +28,17 @@ class AlignProgram : public RefinementProgram
 		
 		
 			bool
-				do_motion, shiftOnly, whiten, whiten_abs, outputShiftedCCs,
-				do_anisotropy, per_tilt_anisotropy;
+				do_motion, shiftOnly,
+				whiten, whiten_abs, outputShiftedCCs,
+				do_anisotropy, per_tilt_anisotropy,
+				do_deformation;
 
 			double padding, hiPass_px, sig2RampPower;
 			int range, num_iters;
-						
+
 			ModularAlignmentSettings alignmentSettings;
-			GPMotionModel::Settings motionSettings;
-			GPMotionModel::MotionParameters motionParameters;
+			GPMotionModel::Parameters motionParameters;
+			Spline2DDeformationModel::Parameters deformationParameters;
 			
 
 		void run();
@@ -70,10 +72,21 @@ class AlignProgram : public RefinementProgram
 		void readTempData(int t);
 
 		void mergeLogFiles();
-		
+
 		template<class MotionModel>
 		void performAlignment(
 				MotionModel& motionModel,
+				const std::vector<BufferedImage<double>>& CCs,
+				const std::vector<gravis::d4Matrix>& projByTime,
+				const Tomogram& tomogram,
+				int tomo_index,
+				int progress_bar_offset,
+				bool per_tomogram_progress);
+
+		template<class MotionModel, class DeformationModel>
+		void performAlignment(
+				MotionModel& motionModel,
+				DeformationModel& deformationModel,
 				const std::vector<BufferedImage<double>>& CCs,
 				const std::vector<gravis::d4Matrix>& projByTime,
 				const Tomogram& tomogram,
@@ -93,11 +106,52 @@ void AlignProgram::performAlignment(
 		int progress_bar_offset,
 		bool per_tomogram_progress)
 {
-	No2DDeformationModel noDeformationModel;
+	if (do_deformation)
+	{
+		Spline2DDeformationModel deformationModel(
+			deformationParameters,
+			gravis::i2Vector(tomogram.stack.xdim, tomogram.stack.ydim));
 
-	ModularAlignment<MotionModel, No2DDeformationModel> alignment(
+		performAlignment(
+			motionModel,
+			deformationModel,
+			CCs,
+			projByTime,
+			tomogram,
+			tomo_index,
+			progress_bar_offset,
+			per_tomogram_progress);
+	}
+	else
+	{
+		No2DDeformationModel noDeformationModel;
+
+		performAlignment(
+			motionModel,
+			noDeformationModel,
+			CCs,
+			projByTime,
+			tomogram,
+			tomo_index,
+			progress_bar_offset,
+			per_tomogram_progress);
+	}
+}
+
+template<class MotionModel, class DeformationModel>
+void AlignProgram::performAlignment(
+		MotionModel& motionModel,
+		DeformationModel& deformationModel,
+		const std::vector<BufferedImage<double>>& CCs,
+		const std::vector<gravis::d4Matrix>& projByTime,
+		const Tomogram& tomogram,
+		int tomo_index,
+		int progress_bar_offset,
+		bool per_tomogram_progress)
+{
+	ModularAlignment<MotionModel, DeformationModel> alignment(
 		CCs, projByTime, particleSet, particles[tomo_index],
-		motionModel, noDeformationModel,
+		motionModel, deformationModel,
 		alignmentSettings, tomogram,
 		padding,
 		progress_bar_offset, num_threads,

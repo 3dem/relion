@@ -23,9 +23,11 @@ int main(int argc, char *argv[])
 	const int ww = 1024;
 	const int hh = 768;
 	
-	Spline2DDeformationModel model(
-		i2Vector(ww, hh),
-		i2Vector(w, h));
+	Spline2DDeformationModel::Parameters parameters;
+	parameters.grid_width  = w;
+	parameters.grid_height = h;
+
+	Spline2DDeformationModel model(parameters, i2Vector(ww, hh));
 	
 	/*BufferedImage<double> test0(ww,hh), test1(ww,hh);
 	
