@@ -310,12 +310,16 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 				
 				g^T = g0^T [U,V] = [<g0,U>, <g0,V>]
 			*/
-			// alternatively: deformationModel2D.transformImageGradient
-			const gravis::d2Vector g(
+			// alternatively: 
+			/*const gravis::d2Vector g(
 			            (def_x.x + 1.0) * g0.x + def_x.y * g0.y,
-			            def_y.x * g0.x + (def_y.y + 1.0) * g0.y);
+			            def_y.x * g0.x + (def_y.y + 1.0) * g0.y);*/
 			
-			deformationModel2D.updateCostGradient(pl, g0.xy(), &x[def_block_f], &gradDest[def_block_f]);
+			const gravis::d2Vector g = deformationModel2D.transformImageGradient(
+						g0.xy(), def_x, def_y);
+			
+			deformationModel2D.updateCostGradient(
+						pl, g0.xy(), &x[def_block_f], &gradDest[def_block_f]);
 
 
 			if (settings.constAngles)
