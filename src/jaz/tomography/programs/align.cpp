@@ -300,8 +300,8 @@ void AlignProgram::processTomograms(
 				NoMotionModel noMotionModel;
 				
 				performAlignment(
-				        noMotionModel, CCs, projByTime, tomogram,
-				        t, progress_bar_offset, per_tomogram_progress);
+					noMotionModel, CCs, projByTime, tomogram,
+					t, progress_bar_offset, per_tomogram_progress);
 			}
 			else
 			{
@@ -359,7 +359,7 @@ void AlignProgram::processTomograms(
 					positions[p] = particleSet.getPosition(particles[t][p]);
 				}
 				
-				writeTempData(0, projections, positions, t);
+				writeTempAlignmentData(projections, positions, t);
 			}
 			
 		}
@@ -382,18 +382,15 @@ std::string AlignProgram::getTempFilenameRoot(const std::string& tomogram_name)
 	return outDir + "temp/" + tomogram_name;
 }
 
-void AlignProgram::writeTempData(
-		const std::vector<Trajectory>* traj,
-		const std::vector<d4Matrix>& proj,
-		const std::vector<d3Vector>& pos,
-		int t)
-{
+void AlignProgram::writeTempAlignmentData(
+		const std::vector<d4Matrix>& proj, 
+		const std::vector<d3Vector>& pos, int t)
+{	
 	const int pc = particles[t].size();
 	const int fc = tomogramSet.getFrameCount(t);
 
 	const std::string tomoName = tomogramSet.getTomogramName(t);
 	const std::string temp_filename_root = getTempFilenameRoot(tomoName);
-
 
 	MetaDataTable temp_positions;
 
@@ -407,14 +404,7 @@ void AlignProgram::writeTempData(
 	}
 
 	temp_positions.write(temp_filename_root + "_positions.star");
-
-
-	if (do_motion && traj != 0)
-	{
-		Trajectory::write(*traj, particleSet, {particles[t]}, temp_filename_root + "_motion.star");
-	}
-
-
+	
 	MetaDataTable temp_projections;
 
 	for (int f = 0; f < fc; f++)
@@ -430,6 +420,36 @@ void AlignProgram::writeTempData(
 	}
 
 	temp_projections.write(temp_filename_root + "_projections.star");
+}
+
+void AlignProgram::writeTempMotionData(
+		const std::vector<Trajectory>& traj, 
+		int t)
+{
+	const std::string tomoName = tomogramSet.getTomogramName(t);
+	const std::string temp_filename_root = getTempFilenameRoot(tomoName);
+
+	Trajectory::write(traj, particleSet, {particles[t]}, temp_filename_root + "_motion.star");
+}
+
+void AlignProgram::writeTempDeformationData(
+		const std::vector<std::vector<double>>& def, 
+		int t)
+{
+	const std::string tomoName = tomogramSet.getTomogramName(t);
+	const std::string temp_filename_root = getTempFilenameRoot(tomoName);
+	
+	MetaDataTable temp_deformations;
+		
+	const int fc = def.size();
+
+	for (int f = 0; f < fc; f++)
+	{
+		temp_deformations.addObject();
+		temp_deformations.setValue(EMDL_TOMO_DEFORMATION_COEFFICIENTS, def[f], f);
+	}
+
+	temp_deformations.write(temp_filename_root + "_deformations.star");
 }
 
 void AlignProgram::readTempData(int t)
@@ -488,6 +508,24 @@ void AlignProgram::readTempData(int t)
 				particleSet.motionTrajectories[particles[t][p].value].shifts_Ang[f] = shift;
 			}
 		}
+	}
+	
+	
+	if (do_deformation)
+	{
+		MetaDataTable temp_deformations;
+		temp_deformations.read(temp_filename_root + "_deformations.star");
+		
+		const i2Vector gridSize(deformationParameters.grid_width, deformationParameters.grid_height);
+		
+		std::vector<std::vector<double>> coeffs(fc);
+		
+		for (int f = 0; f < fc; f++)
+		{
+			coeffs[f] = temp_deformations.getDoubleVector(EMDL_TOMO_DEFORMATION_COEFFICIENTS, f);
+		}
+		
+		tomogramSet.setDeformationCoefficients(t, gridSize, coeffs);
 	}
 
 

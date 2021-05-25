@@ -206,6 +206,24 @@ void TomogramSet::setDefocusSlope(int tomogramIndex, double slope)
 	globalTable.setValue(EMDL_TOMO_DEFOCUS_SLOPE, slope, tomogramIndex);
 }
 
+void TomogramSet::setDeformationCoefficients(
+	int tomogramIndex, 
+	gravis::i2Vector gridSize,
+	const std::vector<std::vector<double>>& coeffs)
+{
+	globalTable.setValue(EMDL_TOMO_DEFORMATION_GRID_SIZE_X, gridSize.x, tomogramIndex);
+	globalTable.setValue(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y, gridSize.y, tomogramIndex);
+	
+	MetaDataTable mdt = tomogramTables[tomogramIndex];
+	
+	const int fc = coeffs.size();
+	
+	for (int f = 0; f < fc; f++)
+	{
+		mdt.setValue(EMDL_TOMO_DEFORMATION_COEFFICIENTS, coeffs[f], f);
+	}
+}
+
 Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 {
 	Tomogram out;

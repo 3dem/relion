@@ -62,11 +62,18 @@ class AlignProgram : public RefinementProgram
 				const std::string& tomogram_name);
 
 	private:
-
-		void writeTempData(
-				const std::vector<Trajectory>* traj,
+		
+		void writeTempAlignmentData(
 				const std::vector<gravis::d4Matrix>& proj,
 				const std::vector<gravis::d3Vector>& pos,
+				int t);
+		
+		void writeTempMotionData(
+				const std::vector<Trajectory>& traj,
+				int t);
+		
+		void writeTempDeformationData(
+				const std::vector<std::vector<double>>& def,
 				int t);
 
 		void readTempData(int t);
@@ -179,20 +186,38 @@ void AlignProgram::performAlignment(
 	std::vector<gravis::d4Matrix> projections = alignment.getProjections(opt, tomogram.frameSequence);
 	std::vector<gravis::d3Vector> positions = alignment.getParticlePositions(opt);
 	
+	writeTempAlignmentData(projections, positions, tomo_index);
+	
 	if (do_motion)
 	{
 		std::vector<Trajectory> trajectories = alignment.exportTrajectories(
 					opt, particleSet, tomogram.frameSequence);
 	
-		writeTempData(&trajectories, projections, positions, tomo_index);
+		writeTempMotionData(trajectories, tomo_index);
 	
-		alignment.visualiseTrajectories2D(
+		alignment.visualiseTrajectories(
 			opt, 8.0, tomogram.name,
 			getTempFilenameRoot(tomogram.name) + "_tracks");
 	}
-	else
+	
+	if (do_deformation)
 	{
-		writeTempData(0, projections, positions, tomo_index);
+		std::vector<std::vector<double>> deformations = alignment.get2DDeformations(
+					opt, tomogram.frameSequence);
+		
+		writeTempDeformationData(deformations, tomo_index);
+		
+		const gravis::i2Vector image_size(
+					tomogram.stack.xdim, 
+					tomogram.stack.ydim);
+		
+		const gravis::i2Vector grid_size(
+					deformationParameters.grid_width, 
+					deformationParameters.grid_height);
+		
+		alignment.visualise2DDeformations(
+					opt, image_size, grid_size, tomogram.name,
+					getTempFilenameRoot(tomogram.name) + "_deformations");
 	}
 }
 

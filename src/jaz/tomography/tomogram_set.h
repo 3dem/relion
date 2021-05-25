@@ -43,7 +43,13 @@ class TomogramSet
 		void setTiltSeriesFile(int tomogramIndex, const std::string& filename);
 		void setFiducialsFile(int tomogramIndex, const std::string& filename);
 		void setDefocusSlope(int tomogramIndex, double slope);
+		
+		void setDeformationCoefficients(
+				int tomogramIndex,
+				gravis::i2Vector gridSize,
+				const std::vector<std::vector<double>>& coeffs);
 
+		
 		Tomogram loadTomogram(int index, bool loadImageData) const;
 
 		int getTomogramIndex(std::string tomogramName) const;

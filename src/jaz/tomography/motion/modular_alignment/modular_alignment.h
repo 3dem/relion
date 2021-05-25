@@ -55,17 +55,14 @@ class ModularAlignment : public FastDifferentiableOptimization
 
 			ModularAlignmentSettings settings;
 
-			gravis::d3Vector tomoCentre;
-			double frameDose, pixelSize, paddingFactor;
+			double pixelSize, paddingFactor;
 			int progressBarOffset, num_threads;
 
 			bool verbose, devMode;
-
 			int fc, pc, mpc, dc, maxRange;
 
-
 			std::vector<gravis::d3Vector> initialPos;
-
+			
 			gravis::d4Matrix minusCentre, plusCentre;
 			
 			
@@ -89,11 +86,23 @@ class ModularAlignment : public FastDifferentiableOptimization
 				const ParticleSet& dataSet,
 				const std::vector<int>& frameSequence) const;
 		
-		void visualiseTrajectories2D(
+		void visualiseTrajectories(
 				const std::vector<double>& x,
 				double scale,
 				const std::string& tomo_name,
 				const std::string& file_name_root);
+		
+		std::vector<std::vector<double>> get2DDeformations(
+				const std::vector<double>& x,
+				const std::vector<int>& frameSequence) const;
+		
+		void visualise2DDeformations(
+				const std::vector<double>& x,
+				const gravis::i2Vector& imageSize,
+				const gravis::i2Vector& gridSize,
+				const std::string& tomo_name,
+				const std::string& file_name_root);
+				
 		
 		void report(int iteration, double cost, const std::vector<double>& x) const;
 		
@@ -167,8 +176,6 @@ ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 	dataSet(dataSet),
 	partIndices(partIndices),
 	settings(settings),
-	tomoCentre(tomogram.centre),
-	frameDose(tomogram.getFrameDose()),
 	pixelSize(tomogram.optics.pixelSize),
 	paddingFactor(paddingFactor),
 	progressBarOffset(progressBarOffset),
@@ -187,6 +194,8 @@ ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 	{
 		initialPos[p] = dataSet.getPosition(partIndices[p]);
 	}
+	
+	const gravis::d3Vector tomoCentre = tomogram.centre;
 	
 	minusCentre = gravis::d4Matrix(
 			1, 0, 0, -tomoCentre.x, 
@@ -492,11 +501,11 @@ std::vector<Trajectory> ModularAlignment<MotionModel, DeformationModel2D>::expor
 }
 
 template<class MotionModel, class DeformationModel2D>
-void ModularAlignment<MotionModel, DeformationModel2D>::visualiseTrajectories2D(
-        const std::vector<double> &x, 
-        double scale, 
-        const std::string& tomo_name, 
-        const std::string& file_name_root)
+void ModularAlignment<MotionModel, DeformationModel2D>::visualiseTrajectories(
+		const std::vector<double> &x, 
+		double scale, 
+		const std::string& tomo_name, 
+		const std::string& file_name_root)
 {
 	std::vector<int> timeSeq(fc);
 
@@ -570,6 +579,213 @@ void ModularAlignment<MotionModel, DeformationModel2D>::visualiseTrajectories2D(
 		FileName fn_eps = file_name_root + "_" + plot_names[dim] + ".eps";
 
 		plot2D.OutputPostScriptPlot(fn_eps);
+	}
+}
+
+template<class MotionModel, class DeformationModel2D>
+std::vector<std::vector<double> > ModularAlignment<MotionModel, DeformationModel2D>::get2DDeformations(
+		const std::vector<double>& x, 
+		const std::vector<int>& frameSequence) const
+{
+	if (deformationModel2D.getParameterCount() == 0)
+	{
+		return std::vector<std::vector<double>>(0);
+	}
+	
+	const int fs = getFrameStride();
+	const int def_off = get2DDeformationsBlockOffset(fs);
+	
+	std::vector<std::vector<double>> out(fc);
+	
+	int dcs = settings.perFrame2DDeformation? 1 : 0;
+	
+	out.resize(fc);
+	
+	for (int f = 0; f < fc; f++)
+	{
+		const int ff = frameSequence[f];
+		
+		out[ff].resize(dc);
+		
+		for (int i = 0; i < dc; i++)
+		{
+			out[ff][i] = x[def_off + f*dcs*dc + i];
+		}
+	}
+
+	return out;
+}
+
+template<class MotionModel, class DeformationModel2D>
+void ModularAlignment<MotionModel, DeformationModel2D>::visualise2DDeformations(
+		const std::vector<double>& x, 
+		const gravis::i2Vector& imageSize,
+		const gravis::i2Vector& gridSize,
+		const std::string& tomo_name, 
+		const std::string& file_name_root)
+{
+	if (deformationModel2D.getParameterCount() == 0)
+	{
+		return;
+	}
+	
+	const int fs = getFrameStride();
+	const int def_block = get2DDeformationsBlockOffset(fs);
+	
+	const int subdiv = 5;
+	const int substeps = 20;
+	
+	const gravis::d2Vector gridSpacing(
+		imageSize.x / (double) (gridSize.x - 1),
+		imageSize.y / (double) (gridSize.y - 1) );
+	
+	const int efc = settings.perFrame2DDeformation? fc : 1;
+	
+	for (int f = 0; f < efc; f++)
+	{
+		const int def_block_f = def_block + (settings.perFrame2DDeformation? f * dc : 0);
+		
+		CPlot2D plot2D(tomo_name + " 2D-Deformation");
+		plot2D.SetXAxisSize(600);
+		plot2D.SetYAxisSize(600);
+		plot2D.SetDrawLegend(false);
+		plot2D.SetFlipY(true);
+		
+		CDataSet original_main;
+		original_main.SetDrawMarker(false);
+		original_main.SetDatasetColor(0.5,0.5,0.3);
+		original_main.SetLineWidth(0.5);
+		
+		CDataSet original_aux;
+		original_aux.SetDrawMarker(false);
+		original_aux.SetDatasetColor(0.8,0.8,0.4);
+		original_aux.SetLineWidth(0.5);
+		
+		CDataSet warped_main;
+		warped_main.SetDrawMarker(false);
+		warped_main.SetDatasetColor(0.0,0.0,0.0);
+		warped_main.SetLineWidth(0.5);
+		
+		CDataSet warped_aux;
+		warped_aux.SetDrawMarker(false);
+		warped_aux.SetDatasetColor(0.4,0.4,0.4);
+		warped_aux.SetLineWidth(0.5);
+		
+		std::vector<CDataSet> 
+			original_main_lines,
+			original_aux_lines,
+			warped_main_lines,
+			warped_aux_lines;
+		
+		std::vector<int> lines_per_dim{
+			(gridSize.x - 1) * subdiv + 1,
+			(gridSize.y - 1) * subdiv + 1};
+		
+		for (int dim = 0; dim < 2; dim++)
+		for (int i = 0; i < lines_per_dim[dim]; i++)
+		{
+			CDataSet data_original, data_warped;
+			std::vector<CDataSet>* target_original;
+			std::vector<CDataSet>* target_warped;
+			
+			if (i % subdiv == 0)
+			{
+				data_original = original_main;
+				data_warped = warped_main;
+				target_original = &original_main_lines;
+				target_warped = &warped_main_lines;
+			}
+			else
+			{
+				data_original = original_aux;
+				data_warped = warped_aux;
+				target_original = &original_aux_lines;
+				target_warped = &warped_aux_lines;
+			}
+			
+			gravis::d2Vector p0, p1;
+			
+			if (dim == 0)
+			{
+				const double gx = (i / (double) subdiv) * gridSpacing.x;
+				
+				p0 = gravis::d2Vector(gx, 0);
+				p1 = gravis::d2Vector(gx, imageSize.y);
+			}
+			else
+			{
+				const double gy = (i / (double) subdiv) * gridSpacing.y;
+				
+				p0 = gravis::d2Vector(0, gy);
+				p1 = gravis::d2Vector(imageSize.x, gy);
+			}
+			
+			data_original.AddDataPoint(CDataPoint(p0.x, p0.y));
+			data_original.AddDataPoint(CDataPoint(p1.x, p1.y));
+			
+			(*target_original).push_back(data_original);
+			
+			
+			const gravis::d2Vector d = p1 - p0;
+			
+			std::vector<gravis::d2Vector> points(substeps+1);
+			
+			for (int j = 0; j < substeps+1; j++)
+			{
+				const gravis::d2Vector pl = p0 + (j / (double)substeps) * d;
+				
+				gravis::d2Vector def, def_x, def_y;
+				
+				deformationModel2D.computeShiftAndGradient(pl, &x[def_block_f], def, def_x, def_y);
+				
+				points[j] = pl + def;
+			}
+			
+			for (int j = 0; j < substeps; j++)
+			{
+				const gravis::d2Vector q0 = points[j];
+				const gravis::d2Vector q1 = points[j+1];
+				
+				data_warped.AddDataPoint(CDataPoint(q0.x, q0.y));
+				data_warped.AddDataPoint(CDataPoint(q1.x, q1.y));
+			}
+			
+			(*target_warped).push_back(data_warped);
+		}
+		
+		
+		for (int i = 0; i < original_aux_lines.size(); i++)
+		{
+			plot2D.AddDataSet(original_aux_lines[i]);
+		}
+		
+		for (int i = 0; i < original_main_lines.size(); i++)
+		{
+			plot2D.AddDataSet(original_main_lines[i]);
+		}
+		
+		for (int i = 0; i < warped_aux_lines.size(); i++)
+		{
+			plot2D.AddDataSet(warped_aux_lines[i]);
+		}
+		
+		for (int i = 0; i < warped_main_lines.size(); i++)
+		{
+			plot2D.AddDataSet(warped_main_lines[i]);
+		}
+		
+		std::string fn_eps = file_name_root;
+		
+		if (settings.perFrame2DDeformation)
+		{
+			fn_eps += "_frame_" + ZIO::itoa(f) + ".mrc";
+		}
+		else
+		{
+			fn_eps += ".mrc";
+		}
+		
+		plot2D.OutputPostScriptPlot(FileName(fn_eps));
 	}
 }
 
