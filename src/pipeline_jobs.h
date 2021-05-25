@@ -170,6 +170,8 @@ static bool do_allow_change_minimum_dedicated;
 #define NODE_TOMO_MANIFOLDS    53 // Jasenko's definition of 3D shapes (for picking of subtomograms)
 
 // These labels were temporarily in use during alpha-testing of relion-4.0. To be removed once relion-4 is stable
+// Now replaced with the CCPEM-pipeliner compatble node names
+
 #define NODE_MOVIES_LABEL   	     "relion.MovieStar"
 #define NODE_MICS_LABEL			     "relion.MicrographStar"
 #define NODE_MIC_COORDS_LABEL	     "relion.CoordinateStar"
@@ -188,85 +190,423 @@ static bool do_allow_change_minimum_dedicated;
 #define NODE_TOMO_TRAJECTORIES_LABEL "relion.TomoTrajectorySet"
 #define NODE_TOMO_MANIFOLDS_LABEL    "relion.TomoManifoldSet"
 
-#define NODE_MOVIES_LABELNEW   	        "MicrographMoviesData.star.relion"
-#define NODE_MICS_LABELNEW			    "MicrographsData.star.relion"
-#define NODE_MIC_COORDS_LABELNEW	    "MicrographsCoords.star.relion"
-#define NODE_PART_DATA_LABELNEW	        "ParticlesData.star.relion"
-#define NODE_REFS_LABELNEW              "ImagesData.star.relion.2drefs"
-#define NODE_3DREF_LABELNEW          	"DensityMap.mrc.relion"
-#define NODE_MASK_LABELNEW			    "Mask3D.mrc.relion"
-#define NODE_OPTIMISER_LABELNEW	        "ProcessData.star.relion.optimiser"
-#define NODE_HALFMAP_LABELNEW		    "DensityMap.mrc.relion.halfmap"
-#define NODE_RESMAP_LABELNEW		    "Image3D.mrc.relion.localresolution"
-#define NODE_PDF_LOGFILE_LABELNEW       "LogFile.pdf.relion"
-#define NODE_POST_LABELNEW              "ProcessData.star.relion.postprocess"
-#define NODE_POLISH_PARAMS_LABELNEW     "ProcessData.txt.relion.polishparams"
-#define NODE_TOMO_OPTIMISATION_LABELNEW "ProcessData.star.relion.tomo.optimisation_set"
-#define NODE_TOMO_TOMOGRAMS_LABELNEW    "ProcessData.star.relion.tomo.relion.tomogram_set"
-#define NODE_TOMO_TRAJECTORIES_LABELNEW "ProcessData.star.relion.tomo.relion.trajectory_set"
-#define NODE_TOMO_MANIFOLDS_LABELNEW    "ProcessData.star.relion.tomo.manifoldset"
 
-static std::map<int, std::string> node_type2labelnew = {{NODE_MOVIES, NODE_MOVIES_LABELNEW},
-		{NODE_MICS, NODE_MICS_LABELNEW},
-		{NODE_MIC_COORDS, NODE_MIC_COORDS_LABELNEW},
-		{NODE_PART_DATA, NODE_PART_DATA_LABELNEW},
-		{NODE_REFS, NODE_REFS_LABELNEW},
-		{NODE_3DREF, NODE_3DREF_LABELNEW},
-		{NODE_MASK, NODE_MASK_LABELNEW},
-		{NODE_MODEL, NODE_OPTIMISER_LABELNEW}, // SHWS 27nov2019: no longer distinguish between MODEL and OPTIMISER nodes ... keep integer NODE for backwards compatibility
-		{NODE_OPTIMISER, NODE_OPTIMISER_LABELNEW},
-		{NODE_HALFMAP, NODE_HALFMAP_LABELNEW},
-		{NODE_FINALMAP, NODE_3DREF_LABELNEW}, // SHWS 27nov2019: no longer distinguish between 3DREF and FINAL maps ... keep integer NODE for backwards compatibility
-		{NODE_RESMAP, NODE_3DREF_LABELNEW},
-		{NODE_PDF_LOGFILE, NODE_PDF_LOGFILE_LABELNEW},
-		{NODE_POST, NODE_POST_LABELNEW},
-		{NODE_POLISH_PARAMS, NODE_POLISH_PARAMS_LABELNEW},
-		{NODE_TOMO_OPTIMISATION, NODE_TOMO_OPTIMISATION_LABELNEW},
-		{NODE_TOMO_TOMOGRAMS, NODE_TOMO_TOMOGRAMS_LABELNEW},
-		{NODE_TOMO_TRAJECTORIES, NODE_TOMO_TRAJECTORIES_LABELNEW},
-		{NODE_TOMO_MANIFOLDS, NODE_TOMO_MANIFOLDS_LABELNEW} };
+// nodes compatible with the CCPEM pipeliner
+// General types that are used as input nodes in the pipeliner
+#define NODE_MOVIES_CPIPE				1
+#define NODE_MICS_CPIPE					2
+#define NODE_2DIMGS_CPIPE				3
+#define NODE_MAP_CPIPE					4
+#define NODE_PARTS_CPIPE				5
+#define NODE_COORDS_CPIPE				6
+#define NODE_COORDS_HELIX_CPIPE			7
+#define NODE_PARTS_HELIX_CPIPE			8
+#define NODE_OPTIMISER_CPIPE			9
+#define NODE_MASK_CPIPE					10
+#define NODE_HALFMAP_CPIPE				11
+#define NODE_RESMAP_CPIPE				12
+#define NODE_LOGFILE_CPIPE				13
 
+// Job-specific output nodes
+// Import
+#define OUTNODE_IMPORT_MOVIES				21
+#define OUTNODE_IMPORT_MICS 				22
+#define OUTNODE_IMPORT_COORDS				23
+#define OUTNODE_IMPORT_PARTS				24
+#define OUTNODE_IMPORT_2DIMG				25
+#define OUTNODE_IMPORT_MAP					26
+#define OUTNODE_IMPORT_MASK					27
+#define OUTNODE_IMPORT_HALFMAP				28
+
+// MotionCorr
+#define OUTNODE_MOCORR_MICS					31
+#define OUTNODE_MOCORR_LOG					32
+
+// CtfFind
+#define OUTNODE_CTFFIND_MICS				41
+#define OUTNODE_CTFFIND_LOG 				42
+
+// ManualPick
+#define OUTNODE_MANPICK_MICS				51
+#define OUTNODE_MANPICK_COORDS				52
+#define OUTNODE_MANPICK_COORDS_HELIX		53
+
+// AutoPick
+#define OUTNODE_AUTOPICK_COORDS				61
+#define OUTNODE_AUTOPICK_LOG				62
+#define OUTNODE_AUTOPICK_TOPAZMODEL			63
+#define OUTNODE_AUTOPICK_MICS				64
+
+// Extract
+#define OUTNODE_EXTRACT_PARTS				71
+#define OUTNODE_EXTRACT_PARTS_HELIX			72
+#define OUTNODE_EXTRACT_COORDS_HELIX		73
+#define OUTNODE_EXTRACT_PARTS_REEX			74
+#define OUTNODE_EXTRACT_COORDS_REEX			75
+
+// Class2D
+
+#define OUTNODE_CLASS2D_PARTS				81
+#define OUTNODE_CLASS2D_OPT					82
+#define OUTNODE_CLASS2D_PARTS_HELIX			83
+
+// Select
+#define OUTNODE_SELECT_MICS				 	91
+#define OUTNODE_SELECT_PARTS				92
+#define OUTNODE_SELECT_OPT					93
+#define OUTNODE_SELECT_CLAVS				94
+
+// Initial model
+#define OUTNODE_INIMOD_MAP					101
+
+// Class3D
+#define OUTNODE_CLASS3D_OPT					111
+#define OUTNODE_CLASS3D_MAP					112
+#define OUTNODE_CLASS3D_PARTS				113
+#define OUTNODE_CLASS3D_PARTS_HELIX			114
+
+// Refine3D
+#define OUTNODE_REFINE3D_HALFMAP			121
+#define OUTNODE_REFINE3D_OPT				122
+#define OUTNODE_REFINE3D_MAP				123
+#define OUTNODE_REFINE3D_PARTS				124
+#define OUTNODE_REFINE3D_PARTS_HELIX		125
+
+// MultiBody
+#define OUTNODE_MULTIBODY_HALFMAP			131
+#define OUTNODE_MULTIBODY_PARTS				132
+#define OUTNODE_MULTIBODY_OPT				133
+#define OUTNODE_MULTIBODY_FLEXLOG			134
+#define OUTNODE_MULTIBODY_SEL_PARTS			135
+
+// MaskCreate
+#define OUTNODE_MASK3D_MASK					141
+
+//JoinStar
+// input nodetypes are used as output node types
+// so none needed
+
+// Subtract
+#define OUTNODE_SUBTRACT_SUBTRACTED			151
+#define OUTNODE_SUBTRACT_REVERTED			152
+
+//Local Ref
+#define OUTNODE_LOCRES_OWN				161
+#define OUTNODE_LOCRES_RESMAP			162
+#define OUTNODE_LOCRES_FILTMAP			163
+#define OUTNODE_LOCRES_LOG				164
+
+// CtfRefine
+#define OUTNODE_CTFREFINE_REFINEPARTS	171
+#define OUTNODE_CTFREFINE_LOG			172
+#define OUTNODE_CTFREFINE_ANISOPARTS	173
+
+// Polish
+#define OUTNODE_POLISH_PARTS			181
+#define OUTNODE_POLISH_LOG				182
+#define OUTNODE_POLISH_PARAMS			183
+
+// PostProcess
+#define OUTNODE_POST					191
+#define OUTNODE_POST_MAP				192
+#define OUTNODE_POST_MASKED				193
+#define OUTNODE_POST_LOG				194
+
+// Tomo
+#define OUTNODE_TOMO_OPTIMISATION		201
+#define OUTNODE_TOMO_TOMOGRAMS   		202
+#define OUTNODE_TOMO_TRAJECTORIES 		203
+#define OUTNODE_TOMO_MANIFOLDS    		204
+#define OUTNODE_TOMO_PARTS				205
+#define OUTNODE_TOMO_MAP				206
+#define OUTNODE_TOMO_HALFMAP			207
+#define OUTNODE_TOMO_POST				208
+#define OUTNODE_TOMO_POST_LOG			209
+
+
+#define LABEL_MOVIES_CPIPE             "MicrographMoviesData.star.relion"
+#define LABEL_MICS_CPIPE               "MicrographsData.star.relion"
+#define LABEL_2DIMGS_CPIPE             "ImagesData.star.relion"
+#define LABEL_MAP_CPIPE                "DensityMap.mrc"
+#define LABEL_PARTS_CPIPE              "ParticlesData.star.relion"
+#define LABEL_COORDS_CPIPE             "MicrographsCoords.star.relion"
+#define LABEL_COORDS_HELIX_CPIPE       "MicrographsCoords.star.relion.helixstartend"
+#define LABEL_PARTS_HELIX_CPIPE        "ParticlesData.star.relion.helicalsegments"
+#define LABEL_OPTIMISER_CPIPE          "ProcessData.star.relion.optimiser"
+#define LABEL_MASK_CPIPE               "Mask3D.mrc"
+#define LABEL_HALFMAP_CPIPE	           "DensityMap.mrc.halfmap"
+#define LABEL_RESMAP_CPIPE             "Image3D.mrc.localresmap"
+#define LABEL_LOGFILE_CPIPE            "LogFile.pdf.relion"
+#define LABEL_IMPORT_MOVIES            "MicrographMoviesData.star.relion"
+#define LABEL_IMPORT_MICS              "MicrographsData.star.relion"
+#define LABEL_IMPORT_COORDS            "MicrographsCoords.star.relion"
+#define LABEL_IMPORT_PARTS             "ParticlesData.star.relion"
+#define LABEL_IMPORT_2DIMG             "ImagesData.star.relion"
+#define LABEL_IMPORT_MAP               "DensityMap.mrc"
+#define LABEL_IMPORT_MASK              "Mask3D.mrc"
+#define LABEL_IMPORT_HALFMAP           "DensityMap.mrc.halfmap"
+#define LABEL_MOCORR_MICS              "MicrographsData.star.relion.motioncorr"
+#define LABEL_MOCORR_LOG               "LogFile.pdf.relion.motioncorr"
+#define LABEL_CTFFIND_MICS             "MicrographsData.star.relion.ctf"
+#define LABEL_CTFFIND_LOG              "LogFile.pdf.relion.ctffind"
+#define LABEL_MANPICK_MICS             "MicrographsData.star.relion"
+#define LABEL_MANPICK_COORDS           "MicrographsCoords.star.relion.manualpick"
+#define LABEL_MANPICK_COORDS_HELIX     "MicrographsCoords.star.relion.manualpick.helixstartend"
+#define LABEL_AUTOPICK_COORDS          "MicrographsCoords.star.relion.autopick"
+#define LABEL_AUTOPICK_LOG             "LogFile.pdf.relion.autopick"
+#define LABEL_AUTOPICK_TOPAZMODEL      "ProcessData.sav.topaz.model"	// to be added?
+#define LABEL_AUTOPICK_MICS            "MicrographsData.star.relion"
+#define LABEL_EXTRACT_PARTS            "ParticlesData.star.relion"
+#define LABEL_EXTRACT_PARTS_HELIX      "ParticlesData.star.relion.helicalsegments"
+#define LABEL_EXTRACT_COORDS_HELIX     "MicrographsCoords.star.relion.helixstartend"
+#define LABEL_EXTRACT_PARTS_REEX       "ParticlesData.star.relion.reextract"
+#define LABEL_EXTRACT_COORDS_REEX      "MicrographsCoords.star.relion.reextract"
+#define LABEL_CLASS2D_PARTS            "ParticlesData.star.relion.class2d"
+#define LABEL_CLASS2D_OPT              "ProcessData.star.relion.optimiser.class2d"
+#define LABEL_CLASS2D_PARTS_HELIX      "ParticlesData.star.relion.class2d.helicalsegments"
+#define LABEL_SELECT_MICS              "MicrographsData.star.relion"
+#define LABEL_SELECT_PARTS             "ParticlesData.star.relion"
+#define LABEL_SELECT_OPT               "ProcessData.star.relion.optimiser.autoselect"
+#define LABEL_SELECT_CLAVS             "ImagesData.star.relion.classaverages"
+#define LABEL_INIMOD_MAP               "DensityMap.mrc.relion.initialmodel"
+#define LABEL_CLASS3D_OPT              "ProcessData.star.relion.optimiser.class3d"
+#define LABEL_CLASS3D_MAP              "DensityMap.mrc.relion.class3d"
+#define LABEL_CLASS3D_PARTS            "ParticlesData.star.relion.class3d"
+#define LABEL_CLASS3D_PARTS_HELIX      "ParticlesData.star.relion.class3d.helicalsegments"
+#define LABEL_REFINE3D_HALFMAP         "DensityMap.mrc.relion.halfmap.refine3d"
+#define LABEL_REFINE3D_OPT             "ProcessData.star.relion.optimiser.refine3d"
+#define LABEL_REFINE3D_MAP             "DensityMap.mrc.relion.refine3d"
+#define LABEL_REFINE3D_PARTS           "ParticlesData.star.relion.refine3d"
+#define LABEL_REFINE3D_PARTS_HELIX     "ParticlesData.star.relion.refine3d.helicalsegements"
+#define LABEL_MULTIBODY_HALFMAP        "DensityMap.mrc.relion.halfmap.multibody"
+#define LABEL_MULTIBODY_PARTS          "ParticlesData.star.relion.multibody"
+#define LABEL_MULTIBODY_OPT            "ProcessData.star.relion.optimiser.multibody"
+#define LABEL_MULTIBODY_FLEXLOG        "LogFile.pdf.relion.flexanalysis"
+#define LABEL_MULTIBODY_SEL_PARTS      "ParticlesData.star.relion.flexanalysis.eigenselected"
+#define LABEL_MASK3D_MASK              "Mask3D.mrc.relion"
+#define LABEL_SUBTRACT_SUBTRACTED      "ParticlesData.star.relion.subtracted"
+#define LABEL_SUBTRACT_REVERTED        "ParticlesData.star.relion"
+#define LABEL_LOCRES_OWN               "Image3D.mrc.relion.localresmap"
+#define LABEL_LOCRES_RESMAP            "Image3D.mrc.resmap.localresmap"
+#define LABEL_LOCRES_FILTMAP           "DensityMap.mrc.relion.localresfiltered"
+#define LABEL_LOCRES_LOG               "LogFile.pdf.relion.localres"
+#define LABEL_CTFREFINE_REFINEPARTS    "ParticlesData.star.relion.ctfrefine"
+#define LABEL_CTFREFINE_LOG            "LogFile.pdf.relion.ctfrefine"
+#define LABEL_CTFREFINE_ANISOPARTS     "ParticlesData.star.relion.anisomagrefine"
+#define LABEL_POLISH_PARTS             "ParticlesData.star.relion.polished"
+#define LABEL_POLISH_LOG               "LogFile.pdf.relion.polish"
+#define LABEL_POLISH_PARAMS            "ProcessData.txt.relion.polish.params"
+#define LABEL_POST                     "ProcessData.star.relion.postprocess"
+#define LABEL_POST_MAP                 "DensityMap.mrc.relion.postprocess"
+#define LABEL_POST_MASKED              "DensityMap.mrc.relion.postprocess.masked"
+#define LABEL_POST_LOG                 "LogFile.pdf.relion.postprocess"
+#define LABEL_TOMO_OPTIMISATION        "ProcessData.star.relion.tomo.optimisation_set"
+#define LABEL_TOMO_TOMOGRAMS           "ProcessData.star.relion.tomo.relion.tomogram_set"
+#define LABEL_TOMO_TRAJECTORIES        "ProcessData.star.relion.tomo.relion.trajectory_set"
+#define LABEL_TOMO_MANIFOLDS           "ProcessData.star.relion.tomo.manifoldset"
+#define LABEL_TOMO_PARTS               "Particles.star.relion.tomo"
+#define LABEL_TOMO_MAP                 "DensityMap.mrc.relion.tomo.subvolume"
+#define LABEL_TOMO_HALFMAP             "DensityMap.mrc.relion.tomo.halfmap"
+#define LABEL_TOMO_POST                "ProcessData.star.relion.tomo.postprocess"
+#define LABEL_TOMO_POST_LOG            "LogFile.pdf.relion.tomo.postprocess"
+
+static std::map<int, std::string> node_type2pipeliner_label = {{NODE_MOVIES_CPIPE, LABEL_MOVIES_CPIPE},
+	{NODE_MICS_CPIPE, LABEL_MICS_CPIPE},
+	{NODE_2DIMGS_CPIPE, LABEL_2DIMGS_CPIPE},
+	{NODE_MAP_CPIPE, LABEL_MAP_CPIPE},
+	{NODE_PARTS_CPIPE, LABEL_PARTS_CPIPE},
+	{NODE_COORDS_CPIPE, LABEL_COORDS_CPIPE},
+	{NODE_COORDS_HELIX_CPIPE, LABEL_COORDS_HELIX_CPIPE},
+	{NODE_PARTS_HELIX_CPIPE, LABEL_PARTS_HELIX_CPIPE},
+	{NODE_OPTIMISER_CPIPE, LABEL_OPTIMISER_CPIPE},
+	{NODE_MASK_CPIPE, LABEL_MASK_CPIPE},
+	{NODE_HALFMAP_CPIPE	, LABEL_HALFMAP_CPIPE},
+	{NODE_RESMAP_CPIPE, LABEL_RESMAP_CPIPE},
+	{NODE_LOGFILE_CPIPE, LABEL_LOGFILE_CPIPE},
+	{OUTNODE_IMPORT_MOVIES, LABEL_IMPORT_MOVIES},
+	{OUTNODE_IMPORT_MICS, LABEL_IMPORT_MICS},
+	{OUTNODE_IMPORT_COORDS, LABEL_IMPORT_COORDS},
+	{OUTNODE_IMPORT_PARTS, LABEL_IMPORT_PARTS},
+	{OUTNODE_IMPORT_2DIMG, LABEL_IMPORT_2DIMG},
+	{OUTNODE_IMPORT_MAP, LABEL_IMPORT_MAP},
+	{OUTNODE_IMPORT_MASK, LABEL_IMPORT_MASK},
+	{OUTNODE_IMPORT_HALFMAP, LABEL_IMPORT_HALFMAP},
+	{OUTNODE_MOCORR_MICS, LABEL_MOCORR_MICS},
+	{OUTNODE_MOCORR_LOG, LABEL_MOCORR_LOG},
+	{OUTNODE_CTFFIND_MICS, LABEL_CTFFIND_MICS},
+	{OUTNODE_CTFFIND_LOG, LABEL_CTFFIND_LOG},
+	{OUTNODE_MANPICK_MICS, LABEL_MANPICK_MICS},
+	{OUTNODE_MANPICK_COORDS, LABEL_MANPICK_COORDS},
+	{OUTNODE_MANPICK_COORDS_HELIX, LABEL_MANPICK_COORDS_HELIX},
+	{OUTNODE_AUTOPICK_COORDS, LABEL_AUTOPICK_COORDS},
+	{OUTNODE_AUTOPICK_LOG, LABEL_AUTOPICK_LOG},
+	{OUTNODE_AUTOPICK_TOPAZMODEL, LABEL_AUTOPICK_TOPAZMODEL},	// to be added?
+	{OUTNODE_AUTOPICK_MICS, LABEL_AUTOPICK_MICS},
+	{OUTNODE_EXTRACT_PARTS, LABEL_EXTRACT_PARTS},
+	{OUTNODE_EXTRACT_PARTS_HELIX, LABEL_EXTRACT_PARTS_HELIX},
+	{OUTNODE_EXTRACT_COORDS_HELIX, LABEL_EXTRACT_COORDS_HELIX},
+	{OUTNODE_EXTRACT_PARTS_REEX, LABEL_EXTRACT_PARTS_REEX},
+	{OUTNODE_EXTRACT_COORDS_REEX, LABEL_EXTRACT_COORDS_REEX},
+	{OUTNODE_CLASS2D_PARTS, LABEL_CLASS2D_PARTS},
+	{OUTNODE_CLASS2D_OPT, LABEL_CLASS2D_OPT},
+	{OUTNODE_CLASS2D_PARTS_HELIX, LABEL_CLASS2D_PARTS_HELIX},
+	{OUTNODE_SELECT_MICS, LABEL_SELECT_MICS},
+	{OUTNODE_SELECT_PARTS, LABEL_SELECT_PARTS},
+	{OUTNODE_SELECT_OPT, LABEL_SELECT_OPT},
+	{OUTNODE_SELECT_CLAVS, LABEL_SELECT_CLAVS},
+	{OUTNODE_INIMOD_MAP, LABEL_INIMOD_MAP},
+	{OUTNODE_CLASS3D_OPT, LABEL_CLASS3D_OPT},
+	{OUTNODE_CLASS3D_MAP, LABEL_CLASS3D_MAP},
+	{OUTNODE_CLASS3D_PARTS, LABEL_CLASS3D_PARTS},
+	{OUTNODE_CLASS3D_PARTS_HELIX, LABEL_CLASS3D_PARTS_HELIX},
+	{OUTNODE_REFINE3D_HALFMAP, LABEL_REFINE3D_HALFMAP},
+	{OUTNODE_REFINE3D_OPT, LABEL_REFINE3D_OPT},
+	{OUTNODE_REFINE3D_MAP, LABEL_REFINE3D_MAP},
+	{OUTNODE_REFINE3D_PARTS, LABEL_REFINE3D_PARTS},
+	{OUTNODE_REFINE3D_PARTS_HELIX, LABEL_REFINE3D_PARTS_HELIX},
+	{OUTNODE_MULTIBODY_HALFMAP, LABEL_MULTIBODY_HALFMAP},
+	{OUTNODE_MULTIBODY_PARTS, LABEL_MULTIBODY_PARTS},
+	{OUTNODE_MULTIBODY_OPT, LABEL_MULTIBODY_OPT},
+	{OUTNODE_MULTIBODY_FLEXLOG, LABEL_MULTIBODY_FLEXLOG},
+	{OUTNODE_MULTIBODY_SEL_PARTS, LABEL_MULTIBODY_SEL_PARTS},
+	{OUTNODE_MASK3D_MASK, LABEL_MASK3D_MASK},
+	{OUTNODE_SUBTRACT_SUBTRACTED, LABEL_SUBTRACT_SUBTRACTED},
+	{OUTNODE_SUBTRACT_REVERTED, LABEL_SUBTRACT_REVERTED},
+	{OUTNODE_LOCRES_OWN, LABEL_LOCRES_OWN},
+	{OUTNODE_LOCRES_RESMAP, LABEL_LOCRES_RESMAP},
+	{OUTNODE_LOCRES_FILTMAP, LABEL_LOCRES_FILTMAP},
+	{OUTNODE_LOCRES_LOG, LABEL_LOCRES_LOG},
+	{OUTNODE_CTFREFINE_REFINEPARTS, LABEL_CTFREFINE_REFINEPARTS},
+	{OUTNODE_CTFREFINE_LOG, LABEL_CTFREFINE_LOG},
+	{OUTNODE_CTFREFINE_ANISOPARTS, LABEL_CTFREFINE_ANISOPARTS},
+	{OUTNODE_POLISH_PARTS, LABEL_POLISH_PARTS},
+	{OUTNODE_POLISH_LOG, LABEL_POLISH_LOG},
+	{OUTNODE_POLISH_PARAMS, LABEL_POLISH_PARAMS},
+	{OUTNODE_POST, LABEL_POST},
+	{OUTNODE_POST_MAP, LABEL_POST_MAP},
+	{OUTNODE_POST_MASKED, LABEL_POST_MASKED},
+	{OUTNODE_POST_LOG, LABEL_POST_LOG},
+	{OUTNODE_TOMO_OPTIMISATION, LABEL_TOMO_OPTIMISATION},
+	{OUTNODE_TOMO_TOMOGRAMS, LABEL_TOMO_TOMOGRAMS},
+	{OUTNODE_TOMO_TRAJECTORIES, LABEL_TOMO_TRAJECTORIES},
+	{OUTNODE_TOMO_MANIFOLDS, LABEL_TOMO_MANIFOLDS},
+	{OUTNODE_TOMO_PARTS, LABEL_TOMO_PARTS},
+	{OUTNODE_TOMO_MAP, LABEL_TOMO_MAP},
+	{OUTNODE_TOMO_HALFMAP, LABEL_TOMO_HALFMAP},
+	{OUTNODE_TOMO_POST, LABEL_TOMO_POST},
+	{OUTNODE_TOMO_POST_LOG, LABEL_TOMO_POST_LOG} };
+
+
+static std::map<std::string, int> pipeliner_label2type = {{LABEL_MOVIES_CPIPE, NODE_MOVIES_CPIPE},
+	{LABEL_MICS_CPIPE, NODE_MICS_CPIPE},
+	{LABEL_2DIMGS_CPIPE, NODE_2DIMGS_CPIPE},
+	{LABEL_MAP_CPIPE, NODE_MAP_CPIPE},
+	{LABEL_PARTS_CPIPE, NODE_PARTS_CPIPE},
+	{LABEL_COORDS_CPIPE, NODE_COORDS_CPIPE},
+	{LABEL_COORDS_HELIX_CPIPE, NODE_COORDS_HELIX_CPIPE},
+	{LABEL_PARTS_HELIX_CPIPE, NODE_PARTS_HELIX_CPIPE},
+	{LABEL_OPTIMISER_CPIPE, NODE_OPTIMISER_CPIPE},
+	{LABEL_MASK_CPIPE, NODE_MASK_CPIPE},
+	{LABEL_HALFMAP_CPIPE	, NODE_HALFMAP_CPIPE},
+	{LABEL_RESMAP_CPIPE, NODE_RESMAP_CPIPE},
+	{LABEL_LOGFILE_CPIPE, NODE_LOGFILE_CPIPE},
+	{LABEL_IMPORT_MOVIES, OUTNODE_IMPORT_MOVIES},
+	{LABEL_IMPORT_MICS, OUTNODE_IMPORT_MICS},
+	{LABEL_IMPORT_COORDS, OUTNODE_IMPORT_COORDS},
+	{LABEL_IMPORT_PARTS, OUTNODE_IMPORT_PARTS},
+	{LABEL_IMPORT_2DIMG, OUTNODE_IMPORT_2DIMG},
+	{LABEL_IMPORT_MAP, OUTNODE_IMPORT_MAP},
+	{LABEL_IMPORT_MASK, OUTNODE_IMPORT_MASK},
+	{LABEL_IMPORT_HALFMAP, OUTNODE_IMPORT_HALFMAP},
+	{LABEL_MOCORR_MICS, OUTNODE_MOCORR_MICS},
+	{LABEL_MOCORR_LOG, OUTNODE_MOCORR_LOG},
+	{LABEL_CTFFIND_MICS, OUTNODE_CTFFIND_MICS},
+	{LABEL_CTFFIND_LOG, OUTNODE_CTFFIND_LOG},
+	{LABEL_MANPICK_MICS, OUTNODE_MANPICK_MICS},
+	{LABEL_MANPICK_COORDS, OUTNODE_MANPICK_COORDS},
+	{LABEL_MANPICK_COORDS_HELIX, OUTNODE_MANPICK_COORDS_HELIX},
+	{LABEL_AUTOPICK_COORDS, OUTNODE_AUTOPICK_COORDS},
+	{LABEL_AUTOPICK_LOG, OUTNODE_AUTOPICK_LOG},
+	{LABEL_AUTOPICK_TOPAZMODEL, OUTNODE_AUTOPICK_TOPAZMODEL},	// to be added?
+	{LABEL_AUTOPICK_MICS, OUTNODE_AUTOPICK_MICS},
+	{LABEL_EXTRACT_PARTS, OUTNODE_EXTRACT_PARTS},
+	{LABEL_EXTRACT_PARTS_HELIX, OUTNODE_EXTRACT_PARTS_HELIX},
+	{LABEL_EXTRACT_COORDS_HELIX, OUTNODE_EXTRACT_COORDS_HELIX},
+	{LABEL_EXTRACT_PARTS_REEX, OUTNODE_EXTRACT_PARTS_REEX},
+	{LABEL_EXTRACT_COORDS_REEX, OUTNODE_EXTRACT_COORDS_REEX},
+	{LABEL_CLASS2D_PARTS, OUTNODE_CLASS2D_PARTS},
+	{LABEL_CLASS2D_OPT, OUTNODE_CLASS2D_OPT},
+	{LABEL_CLASS2D_PARTS_HELIX, OUTNODE_CLASS2D_PARTS_HELIX},
+	{LABEL_SELECT_MICS, OUTNODE_SELECT_MICS},
+	{LABEL_SELECT_PARTS, OUTNODE_SELECT_PARTS},
+	{LABEL_SELECT_OPT, OUTNODE_SELECT_OPT},
+	{LABEL_SELECT_CLAVS, OUTNODE_SELECT_CLAVS},
+	{LABEL_INIMOD_MAP, OUTNODE_INIMOD_MAP},
+	{LABEL_CLASS3D_OPT, OUTNODE_CLASS3D_OPT},
+	{LABEL_CLASS3D_MAP, OUTNODE_CLASS3D_MAP},
+	{LABEL_CLASS3D_PARTS, OUTNODE_CLASS3D_PARTS},
+	{LABEL_CLASS3D_PARTS_HELIX, OUTNODE_CLASS3D_PARTS_HELIX},
+	{LABEL_REFINE3D_HALFMAP, OUTNODE_REFINE3D_HALFMAP},
+	{LABEL_REFINE3D_OPT, OUTNODE_REFINE3D_OPT},
+	{LABEL_REFINE3D_MAP, OUTNODE_REFINE3D_MAP},
+	{LABEL_REFINE3D_PARTS, OUTNODE_REFINE3D_PARTS},
+	{LABEL_REFINE3D_PARTS_HELIX, OUTNODE_REFINE3D_PARTS_HELIX},
+	{LABEL_MULTIBODY_HALFMAP, OUTNODE_MULTIBODY_HALFMAP},
+	{LABEL_MULTIBODY_PARTS, OUTNODE_MULTIBODY_PARTS},
+	{LABEL_MULTIBODY_OPT, OUTNODE_MULTIBODY_OPT},
+	{LABEL_MULTIBODY_FLEXLOG, OUTNODE_MULTIBODY_FLEXLOG},
+	{LABEL_MULTIBODY_SEL_PARTS, OUTNODE_MULTIBODY_SEL_PARTS},
+	{LABEL_MASK3D_MASK, OUTNODE_MASK3D_MASK},
+	{LABEL_SUBTRACT_SUBTRACTED, OUTNODE_SUBTRACT_SUBTRACTED},
+	{LABEL_SUBTRACT_REVERTED, OUTNODE_SUBTRACT_REVERTED},
+	{LABEL_LOCRES_OWN, OUTNODE_LOCRES_OWN},
+	{LABEL_LOCRES_RESMAP, OUTNODE_LOCRES_RESMAP},
+	{LABEL_LOCRES_FILTMAP, OUTNODE_LOCRES_FILTMAP},
+	{LABEL_LOCRES_LOG, OUTNODE_LOCRES_LOG},
+	{LABEL_CTFREFINE_REFINEPARTS, OUTNODE_CTFREFINE_REFINEPARTS},
+	{LABEL_CTFREFINE_LOG, OUTNODE_CTFREFINE_LOG},
+	{LABEL_CTFREFINE_ANISOPARTS, OUTNODE_CTFREFINE_ANISOPARTS},
+	{LABEL_POLISH_PARTS, OUTNODE_POLISH_PARTS},
+	{LABEL_POLISH_LOG, OUTNODE_POLISH_LOG},
+	{LABEL_POLISH_PARAMS, OUTNODE_POLISH_PARAMS},
+	{LABEL_POST, OUTNODE_POST},
+	{LABEL_POST_MAP, OUTNODE_POST_MAP},
+	{LABEL_POST_MASKED, OUTNODE_POST_MASKED},
+	{LABEL_POST_LOG, OUTNODE_POST_LOG},
+	{LABEL_TOMO_OPTIMISATION, OUTNODE_TOMO_OPTIMISATION},
+	{LABEL_TOMO_TOMOGRAMS, OUTNODE_TOMO_TOMOGRAMS},
+	{LABEL_TOMO_TRAJECTORIES, OUTNODE_TOMO_TRAJECTORIES},
+	{LABEL_TOMO_MANIFOLDS, OUTNODE_TOMO_MANIFOLDS},
+	{LABEL_TOMO_PARTS, OUTNODE_TOMO_PARTS},
+	{LABEL_TOMO_MAP, OUTNODE_TOMO_MAP},
+	{LABEL_TOMO_HALFMAP, OUTNODE_TOMO_HALFMAP},
+	{LABEL_TOMO_POST, OUTNODE_TOMO_POST},
+	{LABEL_TOMO_POST_LOG, OUTNODE_TOMO_POST_LOG} };
+
+//// Conversion dict for CCPEM-pipeliner compatibility
 static std::map<std::string, int> node_label2type = {{NODE_MOVIES_LABEL, NODE_MOVIES},
-		{NODE_MICS_LABEL, NODE_MICS},
-		{NODE_MIC_COORDS_LABEL, NODE_MIC_COORDS},
-		{NODE_PART_DATA_LABEL, NODE_PART_DATA},
-		{NODE_REFS_LABEL, NODE_REFS},
-		{NODE_3DREF_LABEL, NODE_3DREF},
-		{NODE_MASK_LABEL, NODE_MASK},
-		{NODE_OPTIMISER_LABEL, NODE_OPTIMISER},
-		{NODE_HALFMAP_LABEL, NODE_HALFMAP},
-		{NODE_RESMAP_LABEL, NODE_RESMAP},
-		{NODE_PDF_LOGFILE_LABEL, NODE_PDF_LOGFILE},
-		{NODE_POST_LABEL, NODE_POST},
-		{NODE_POLISH_PARAMS_LABEL, NODE_POLISH_PARAMS},
-		{NODE_TOMO_OPTIMISATION_LABEL, NODE_TOMO_OPTIMISATION},
-		{NODE_TOMO_TOMOGRAMS_LABEL,    NODE_TOMO_TOMOGRAMS},
-		{NODE_TOMO_TRAJECTORIES_LABEL, NODE_TOMO_TRAJECTORIES},
-		{NODE_TOMO_MANIFOLDS_LABEL,    NODE_TOMO_MANIFOLDS} };
-
-static std::map<std::string, int> node_labelnew2type = {{NODE_MOVIES_LABELNEW, NODE_MOVIES},
-		{NODE_MICS_LABELNEW, NODE_MICS},
-		{NODE_MIC_COORDS_LABELNEW, NODE_MIC_COORDS},
-		{NODE_PART_DATA_LABELNEW, NODE_PART_DATA},
-		{NODE_REFS_LABELNEW, NODE_REFS},
-		{NODE_3DREF_LABELNEW, NODE_3DREF},
-		{NODE_MASK_LABELNEW, NODE_MASK},
-		{NODE_OPTIMISER_LABELNEW, NODE_OPTIMISER},
-		{NODE_HALFMAP_LABELNEW, NODE_HALFMAP},
-		{NODE_RESMAP_LABELNEW, NODE_RESMAP},
-		{NODE_PDF_LOGFILE_LABELNEW, NODE_PDF_LOGFILE},
-		{NODE_POST_LABELNEW, NODE_POST},
-		{NODE_POLISH_PARAMS_LABELNEW, NODE_POLISH_PARAMS},
-		{NODE_TOMO_OPTIMISATION_LABELNEW, NODE_TOMO_OPTIMISATION},
-		{NODE_TOMO_TOMOGRAMS_LABELNEW,    NODE_TOMO_TOMOGRAMS},
-		{NODE_TOMO_TRAJECTORIES_LABELNEW, NODE_TOMO_TRAJECTORIES},
-		{NODE_TOMO_MANIFOLDS_LABELNEW,    NODE_TOMO_MANIFOLDS} };
+		{NODE_MICS_LABEL, NODE_MICS_CPIPE},
+		{NODE_MIC_COORDS_LABEL, NODE_COORDS_CPIPE},
+		{NODE_PART_DATA_LABEL, NODE_PARTS_CPIPE},
+		{NODE_REFS_LABEL, NODE_2DIMGS_CPIPE},
+		{NODE_3DREF_LABEL, NODE_MAP_CPIPE},
+		{NODE_MASK_LABEL, NODE_MASK_CPIPE},
+		{NODE_OPTIMISER_LABEL, NODE_OPTIMISER_CPIPE},
+		{NODE_HALFMAP_LABEL, NODE_HALFMAP_CPIPE},
+		{NODE_RESMAP_LABEL, NODE_RESMAP_CPIPE},
+		{NODE_PDF_LOGFILE_LABEL, NODE_LOGFILE_CPIPE},
+		{NODE_POST_LABEL, OUTNODE_POST},
+		{NODE_POLISH_PARAMS_LABEL, OUTNODE_POLISH_PARAMS},
+		{NODE_TOMO_OPTIMISATION_LABEL, OUTNODE_TOMO_OPTIMISATION},
+		{NODE_TOMO_TOMOGRAMS_LABEL,    OUTNODE_TOMO_TOMOGRAMS},
+		{NODE_TOMO_TRAJECTORIES_LABEL, OUTNODE_TOMO_TRAJECTORIES},
+		{NODE_TOMO_MANIFOLDS_LABEL,    OUTNODE_TOMO_MANIFOLDS} };
 
 static std::string get_node_label(int type)
 {
-	if (node_type2labelnew.find(type) != node_type2labelnew.end())
+	if (node_type2pipeliner_label.find(type) != node_type2pipeliner_label.end())
 	{
-		return node_type2labelnew.at(type);;
+		return node_type2pipeliner_label.at(type);;
 	}
 	else
 	{
@@ -278,9 +618,9 @@ static std::string get_node_label(int type)
 static int get_node_type(std::string label)
 {
 
-	if (node_labelnew2type.find(label) != node_labelnew2type.end())
+	if (pipeliner_label2type.find(label) != pipeliner_label2type.end())
 	{
-		return node_labelnew2type.at(label);;
+		return pipeliner_label2type.at(label);;
 	}
 	else if (node_label2type.find(label) != node_label2type.end())
 	{
@@ -580,12 +920,12 @@ class Node
 {
 	public:
 	std::string name; // what's my name?
-	int type; // which type of node am I
+	std::string type; // which type of node am I
 	std::vector<long int> inputForProcessList; 	  //list of processes that use this Node as input
 	long int outputFromProcess;   //Which process made this Node
 
 	// Constructor
-	Node(std::string _name, int _type)
+	Node(std::string _name, std::string _type)
 	{
 		name = _name;
 		type = _type;
@@ -626,7 +966,7 @@ public:
 	float min_value;
 	float max_value;
 	float step_value;
-	int node_type;
+	std::string node_type;
 	std::string pattern;
 	std::string directory;
 	std::vector<std::string> radio_options;

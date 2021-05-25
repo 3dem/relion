@@ -233,11 +233,14 @@ bool PipeLine::touchTemporaryNodeFile(Node &node, bool touch_even_if_not_exist)
 	{
 		// Make subdirectory for each type of node
 		// Only at the highest level, so before the first "."
-        FileName fn_label = get_node_label(node.type);
+        //FileName fn_label = get_node_label(node.type);
+        // PIPELINER
+		FileName fn_label = node.type;
 		FileName fn_type = fn_label.beforeFirstOf(".") + "/";
+
 		FileName mydir = fn_dir + fn_type + fnt.substr(0, fnt.rfind("/") + 1);
 		FileName mynode = fn_dir + fn_type + fnt;
-		std::string command;
+
 		mktree(mydir);
 		touch(mynode);
 		return true;
@@ -287,7 +290,9 @@ void PipeLine::deleteTemporaryNodeFile(Node &node)
 	else
 		fnt = node.name;
 
-    FileName fn_type = get_node_label(node.type) + "/";
+    //FileName fn_type = get_node_label(node.type) + "/";
+	// PIPELINER
+    FileName fn_type = node.type + "/";
 	FileName fn = fn_dir + fn_type + fnt;
 	int res = remove(fn.c_str());
 
@@ -1045,7 +1050,7 @@ void PipeLine::getOutputNodesFromStarFile(int this_job)
 		MDnodes.read(outnodes, "output_nodes");
 
 		FileName nodename;
-		int nodetype;
+		std::string nodetype;
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDnodes)
 		{
 			MDnodes.getValue(EMDL_PIPELINE_NODE_NAME, nodename);
@@ -1095,12 +1100,12 @@ bool PipeLine::markAsFinishedJob(int this_job, std::string &error_message, bool 
 		{
 
 			fn_opt = fn_opts[fn_opts.size()-1]; // the last one
-			Node node3(fn_opt, NODE_OPTIMISER);
+			Node node3(fn_opt, LABEL_OPTIMISER_CPIPE);
 			addNewOutputEdge(this_job, node3);
 
 			// Also get data.star
 			FileName fn_data = fn_opt.without("_optimiser.star") + "_data.star";
-			Node node2(fn_data, NODE_PART_DATA);
+			Node node2(fn_data, LABEL_PARTS_CPIPE);
 			addNewOutputEdge(this_job, node2);
 
 			FileName fn_root = fn_opt.without("_optimiser.star");
@@ -1112,7 +1117,7 @@ bool PipeLine::markAsFinishedJob(int this_job, std::string &error_message, bool 
 			fn_map.globFiles(fn_maps);
 			for (int i = 0; i < fn_maps.size(); i++)
 			{
-				Node node4(fn_maps[i], NODE_3DREF);
+				Node node4(fn_maps[i], LABEL_MAP_CPIPE);
 				addNewOutputEdge(this_job, node4);
 			}
 		}
@@ -1822,6 +1827,7 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDnode)
 	{
 		std::string name, label;
+		// PIPELINER
 		int type;
 		if (!MDnode.getValue(EMDL_PIPELINE_NODE_NAME, name) )
 			REPORT_ERROR("PipeLine::read: cannot find name in pipeline_nodes table");
@@ -1839,7 +1845,9 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 			REPORT_ERROR("PipeLine::read: cannot find type in pipeline_nodes table");
 		}
 
-		Node newNode(name, get_node_type(label));
+		//Node newNode(name, get_node_type(label));
+		// PIPELINER
+		Node newNode(name, label);
 		nodeList.push_back(newNode);
 	}
 
@@ -2068,14 +2076,17 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 		{
 			MDnode.addObject();
 			MDnode.setValue(EMDL_PIPELINE_NODE_NAME, nodeList[i].name);
-			MDnode.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, get_node_label(nodeList[i].type));
+			//MDnode.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, get_node_label(nodeList[i].type));
+			// PIPELINER
+			MDnode.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, nodeList[i].type);
 		}
 		else
 		{
 			MDnode_del.addObject();
 			MDnode_del.setValue(EMDL_PIPELINE_NODE_NAME, nodeList[i].name);
-			MDnode_del.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, get_node_label(nodeList[i].type));
-
+			//MDnode_del.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, get_node_label(nodeList[i].type));
+			// PIPELINER
+			MDnode_del.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, nodeList[i].type);
 		}
 	}
 #ifdef DEBUG

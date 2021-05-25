@@ -349,7 +349,9 @@ void GuiEntry::cb_browse_node_i() {
 	Fl::scheme("gtk+");
 	Fl_File_Chooser * G_chooser = new Fl_File_Chooser("", joboption.pattern.c_str(), Fl_File_Chooser::SINGLE, "");
 
-	FileName mylabel = get_node_label(joboption.node_type);
+	//FileName mylabel = get_node_label(joboption.node_type);
+	// PIPELINER
+	FileName mylabel = joboption.node_type;
 	std::string fn_dir = ".Nodes/" + mylabel.beforeFirstOf(".");
 	G_chooser->directory(fn_dir.c_str());
 	G_chooser->color(GUI_BACKGROUND_COLOR);

@@ -908,7 +908,7 @@ void GuiMainWindow::fillToAndFromJobLists()
 		{
 			long int mynode = (pipeline.processList[current_job]).inputNodeList[inode];
 
-			if (pipeline.nodeList[mynode].type != NODE_MOVIES) // no display for movie rootname
+			if (pipeline.nodeList[mynode].type != LABEL_MOVIES_CPIPE) // no display for movie rootname
 			{
 				FileName fnt = pipeline.nodeList[mynode].name;
 				if (exists(fnt))
@@ -1264,7 +1264,7 @@ void GuiMainWindow::cb_display_io_node_i()
 	long int mynode = io_nodes[idx];
 	std::string command;
 
-	if (pipeline.nodeList[mynode].type == NODE_MIC_COORDS)
+	if (pipeline.nodeList[mynode].type == LABEL_COORDS_CPIPE)
 	{
 
 		// TODO: write error message saying this is no longer possible: use Continue to pick more/inspect results!
@@ -1358,7 +1358,7 @@ void GuiMainWindow::cb_display_io_node_i()
 		// Other arguments for extraction
 		command += " " + manualpickjob.joboptions["other_args"].getString() + " &";
 	}
-	else if (pipeline.nodeList[mynode].type == NODE_PDF_LOGFILE)
+	else if (pipeline.nodeList[mynode].type == LABEL_LOGFILE_CPIPE)
 	{
 		const char * default_pdf_viewer = getenv ("RELION_PDFVIEWER_EXECUTABLE");
 		char mydefault[]=DEFAULTPDFVIEWER;
@@ -1369,11 +1369,11 @@ void GuiMainWindow::cb_display_io_node_i()
 		std::string myviewer(default_pdf_viewer);
 		command = myviewer + " " + pipeline.nodeList[mynode].name + "&";
 	}
-	else if (pipeline.nodeList[mynode].type == NODE_POLISH_PARAMS)
+	else if (pipeline.nodeList[mynode].type == LABEL_POLISH_PARAMS)
 	{
 		command = "cat " + pipeline.nodeList[mynode].name;
 	}
-	else if (pipeline.nodeList[mynode].type != NODE_POST)
+	else if (pipeline.nodeList[mynode].type != LABEL_POST)
 	{
 		command = "relion_display --gui --i " + pipeline.nodeList[mynode].name + " &";
 	}
