@@ -125,11 +125,12 @@ inline void Spline2DDeformationModel::computeShiftAndGradient(
 		gravis::d2Vector& def_x,
 		gravis::d2Vector& def_y) const
 {
-	gravis::i2Vector cell; 
+	gravis::i2Vector cell;
 	double x, x2, x3, y, y2, y3;
 	
 	projectPoint(pl, cell, x, x2, x3, y, y2, y3);
-	
+
+
 	const gravis::d4Vector vx(
 		1.0      -  3.0 * x2  +  2.0 * x3,
 					3.0 * x2  -  2.0 * x3,
@@ -192,35 +193,10 @@ inline void Spline2DDeformationModel::updateCostGradient(
 		const double *parameters,
 		double *target) const
 {
-	gravis::d2Vector pl_grid(pl.x / gridSpacing.x, pl.y / gridSpacing.y);
-	
-	const double eps = 1e-10;
-	
-	for (int dim = 0; dim < 2; dim++)
-	{
-		if (pl_grid[dim] < 0.0)
-		{
-			pl_grid[dim] = 0.0;
-		}
-		else if (pl_grid[dim] > gridSize[dim] - 1 - eps)
-		{
-			pl_grid[dim] = gridSize[dim] - 1 - eps;
-		}
-	}
-	
-	const gravis::i2Vector cell((int)pl_grid.x, (int)pl_grid.y);
-	
-	const gravis::d2Vector frc(
-			pl_grid.x - cell.x,
-			pl_grid.y - cell.y);
-	
-	const double x  = frc.x;
-	const double x2 = x * x;
-	const double x3 = x2 * x;
-	
-	const double y  = frc.y;
-	const double y2 = y * y;
-	const double y3 = y2 * y;
+	gravis::i2Vector cell;
+	double x, x2, x3, y, y2, y3;
+
+	projectPoint(pl, cell, x, x2, x3, y, y2, y3);
 	
 	const gravis::d4Vector vx(
 		1.0      -  3.0 * x2  +  2.0 * x3,

@@ -215,7 +215,7 @@ void TomogramSet::setDeformation(
 	globalTable.setValue(EMDL_TOMO_DEFORMATION_GRID_SIZE_X, gridSize.x, tomogramIndex);
 	globalTable.setValue(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y, gridSize.y, tomogramIndex);
 	
-	MetaDataTable mdt = tomogramTables[tomogramIndex];
+	MetaDataTable& mdt = tomogramTables[tomogramIndex];
 	
 	const int fc = coeffs.size();
 	

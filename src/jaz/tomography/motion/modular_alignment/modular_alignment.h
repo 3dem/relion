@@ -61,6 +61,8 @@ class ModularAlignment : public FastDifferentiableOptimization
 			bool verbose, devMode;
 			int fc, pc, mpc, dc, maxRange;
 
+			mutable int lastIterationNumber;
+
 			std::vector<gravis::d3Vector> initialPos;
 			
 			gravis::d4Matrix minusCentre, plusCentre;
@@ -186,7 +188,8 @@ ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 	pc(partIndices.size()),
 	mpc(motionModel.getParameterCount()),
 	dc(deformationModel2D.getParameterCount()),
-	maxRange(CCs[0].xdim / (2 * paddingFactor))
+	maxRange(CCs[0].xdim / (2 * paddingFactor)),
+	lastIterationNumber(0)
 {	
 	initialPos.resize(pc);
 	
@@ -233,6 +236,14 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 	const int pos_block = getPositionsBlockOffset(fs);
 	const int mot_block = getMotionBlockOffset(fs);
 	const int def_block = get2DDeformationsBlockOffset(fs);
+
+	for (int i = 0; i < xs; i++)
+	{
+		if (!(x[i] == x[i])) // reject NaNs
+		{
+			return std::numeric_limits<double>::max();
+		}
+	}
 
 	std::vector<gravis::d4Matrix> P(fc), P_phi(fc), P_theta(fc), P_psi(fc);
 
@@ -634,7 +645,7 @@ void ModularAlignment<MotionModel, DeformationModel2D>::visualise2DDeformations(
 	const int def_block = get2DDeformationsBlockOffset(fs);
 	
 	const int subdiv = 5;
-	const int substeps = 20;
+	const int substeps = 200;
 	const double delta_scale = 8.0;
 	
 	const gravis::d2Vector gridSpacing(
@@ -811,6 +822,8 @@ void ModularAlignment<MotionModel, DeformationModel2D>::report(
 	{
 		Log::updateProgress(progressBarOffset + iteration);
 	}
+
+	lastIterationNumber = iteration;
 }
 
 

@@ -180,8 +180,18 @@ void AlignProgram::performAlignment(
 	if (verbosity > 0 && per_tomogram_progress)
 	{
 		Log::endProgress();
-	}
 
+		const int it = alignment.lastIterationNumber;
+
+		if (it >= num_iters)
+		{
+			Log::warn("Alignment did not converge after " + ZIO::itoa(it) + " iterations");
+		}
+		else
+		{
+			Log::print("Alignment converged after " + ZIO::itoa(it) + " iterations");
+		}
+	}
 
 	std::vector<gravis::d4Matrix> projections = alignment.getProjections(opt, tomogram.frameSequence);
 	std::vector<gravis::d3Vector> positions = alignment.getParticlePositions(opt);
