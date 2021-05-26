@@ -154,7 +154,7 @@ void AberrationFit :: considerParticle(
 	for (int f = f0; f <= f1; f++)
 	{
 		TomoExtraction::extractFrameAt3D_Fourier(
-				tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f], traj[f],
+				tomogram.stack, f, s, 1.0, tomogram, traj[f],
 				observation, projCut, 1, true);
 
 		CTF ctf = tomogram.getCtf(f, dataSet.getPosition(part_id));

@@ -350,7 +350,7 @@ void ReconstructParticleProgram::processTomograms(
 			const bool circle_crop = do_circle_crop;
 
 			TomoExtraction::extractAt3D_Fourier(
-					tomogram.stack, s02D, binning, tomogram.projectionMatrices, traj,
+					tomogram.stack, s02D, binning, tomogram, traj,
 					particleStack[th], projCut, inner_threads, circle_crop);
 
 

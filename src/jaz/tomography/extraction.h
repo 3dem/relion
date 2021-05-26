@@ -12,6 +12,8 @@
 #include <src/jaz/image/interpolation.h>
 #include <src/jaz/image/resampling.h>
 
+#include <src/jaz/tomography/tomogram.h>
+
 #define EDGE_FALLOFF 5
 
 class TomoExtraction
@@ -21,7 +23,7 @@ class TomoExtraction
 		template <typename T>
 		static void extractFrameAt3D_Fourier(
 				const RawImage<T>& stack, int f, int s, double bin,
-				const gravis::d4Matrix& projIn,
+				const Tomogram& tomogram,
 				gravis::d3Vector center,
 				RawImage<tComplex<T>>& out,
 				gravis::d4Matrix& projOut,
@@ -31,7 +33,7 @@ class TomoExtraction
 		template <typename T>
 		static void extractAt3D_Fourier(
 				const RawImage<T>& stack, int s, double bin,
-				const std::vector<gravis::d4Matrix>& projIn,
+				const Tomogram& tomogram,
 				const std::vector<gravis::d3Vector>& trajectory,
 				RawImage<tComplex<T>>& out,
 				std::vector<gravis::d4Matrix>& projOut,
@@ -94,7 +96,7 @@ class TomoExtraction
 template <typename T>
 void TomoExtraction::extractFrameAt3D_Fourier(
 		const RawImage<T>& stack, int f, int s, double bin,
-		const gravis::d4Matrix& projIn,
+		const Tomogram& tomogram,
 		gravis::d3Vector center,
 		RawImage<tComplex<T>>& out,
 		gravis::d4Matrix& projOut,
@@ -104,7 +106,7 @@ void TomoExtraction::extractFrameAt3D_Fourier(
 	std::vector<gravis::d4Matrix> projVec;
 	
 	extractAt3D_Fourier(
-		stack.getConstSliceRef(f), s, bin, {projIn}, {center}, out, projVec, 
+		stack.getConstSliceRef(f), s, bin, tomogram, {center}, out, projVec, 
 		num_threads, circle_crop);
 	
 	projOut = projVec[0];
@@ -112,30 +114,32 @@ void TomoExtraction::extractFrameAt3D_Fourier(
 
 template <typename T>
 void TomoExtraction::extractAt3D_Fourier(
-        const RawImage<T>& stack, int s, double bin,
-		const std::vector<gravis::d4Matrix>& projIn,
+		const RawImage<T>& stack, int s, double bin,
+		const Tomogram& tomogram,
 		const std::vector<gravis::d3Vector>& trajectory,
 		RawImage<tComplex<T>>& out,
 		std::vector<gravis::d4Matrix>& projOut,
 		int num_threads,
 		bool circle_crop)
 {
-	const int fc = projIn.size();
+	const int fc = tomogram.frameCount;
 	std::vector<gravis::d2Vector> centers(fc);
 	
 	for (int f = 0; f < fc; f++)
 	{
-		const gravis::d4Vector q = projIn[f] * gravis::d4Vector(trajectory[f]);
-		centers[f] = gravis::d2Vector(q.x, q.y);
+		//const gravis::d4Vector q = projIn[f] * gravis::d4Vector(trajectory[f]);
+		//centers[f] = gravis::d2Vector(q.x, q.y);
+		
+		centers[f] = tomogram.projectPoint(trajectory[f], f);
 	}
 	
 	extractAt2D_Fourier(
-		stack, s, bin, projIn, centers, out, projOut, num_threads, circle_crop);
+		stack, s, bin, tomogram.projectionMatrices, centers, out, projOut, num_threads, circle_crop);
 }
 
 template <typename T>
 void TomoExtraction::extractAt2D_Fourier(
-        const RawImage<T>& stack, int s, double bin,
+		const RawImage<T>& stack, int s, double bin,
 		const std::vector<gravis::d4Matrix>& projIn,
 		const std::vector<gravis::d2Vector>& centers,
 		RawImage<tComplex<T>>& out,
@@ -146,10 +150,10 @@ void TomoExtraction::extractAt2D_Fourier(
 	const int sh = s/2 + 1;
 	const int fc = stack.zdim;
 
-    const int sb = (int)(s / bin + 0.5);
-    const int sbh = sb/2 + 1;
+	const int sb = (int)(s / bin + 0.5);
+	const int sbh = sb/2 + 1;
 	
-    BufferedImage<T> smallStack(s,s,fc);
+	BufferedImage<T> smallStack(s,s,fc);
 	projOut.resize(fc);
 			
 	std::vector<gravis::d2Vector> integralShift(fc);

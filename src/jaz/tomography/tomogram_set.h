@@ -44,7 +44,7 @@ class TomogramSet
 		void setFiducialsFile(int tomogramIndex, const std::string& filename);
 		void setDefocusSlope(int tomogramIndex, double slope);
 		
-		void setDeformationCoefficients(
+		void setDeformation(
 				int tomogramIndex,
 				gravis::i2Vector gridSize,
 				const std::vector<std::vector<double>>& coeffs);

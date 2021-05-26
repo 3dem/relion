@@ -1,5 +1,10 @@
 #include "spline_2D_deformation_model.h"
 
+Spline2DDeformationModel::Spline2DDeformationModel()
+{
+	
+}
+
 Spline2DDeformationModel::Spline2DDeformationModel(
 		const Parameters& parameters,
 		const gravis::i2Vector& imageSize)

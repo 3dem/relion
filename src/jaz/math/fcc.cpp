@@ -80,7 +80,7 @@ BufferedImage<double> FCC::compute3(
 		for (int f = 0; f < fc; f++)
 		{
 			TomoExtraction::extractFrameAt3D_Fourier(
-					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f], traj[f],
+					tomogram.stack, f, s, 1.0, tomogram, traj[f],
 					observation, projCut, 1, true);
 
 			RawImage<float> doseSlice = doseWeights.getSliceRef(f);
