@@ -28,7 +28,7 @@ using namespace gravis;
 
 
 AlignProgram::AlignProgram(int argc, char *argv[])
-	: RefinementProgram(argc, argv)
+	: RefinementProgram(argc, argv), debug(true)
 {
 }
 

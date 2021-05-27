@@ -31,7 +31,7 @@ class AlignProgram : public RefinementProgram
 				do_motion, shiftOnly,
 				whiten, whiten_abs, outputShiftedCCs,
 				do_anisotropy, per_tilt_anisotropy,
-				do_deformation;
+				do_deformation, debug;
 
 			double padding, hiPass_px, sig2RampPower;
 			int range, num_iters;
@@ -166,8 +166,10 @@ void AlignProgram::performAlignment(
 
 	std::vector<double> initial(alignment.getParamCount(), 0.0);
 
+	alignment.devMode = debug;
 
-	if (verbosity > 0 && per_tomogram_progress)
+
+	if (!debug && verbosity > 0 && per_tomogram_progress)
 	{
 		Log::beginProgress("Performing optimisation", num_iters);
 	}
@@ -179,7 +181,7 @@ void AlignProgram::performAlignment(
 
 	if (verbosity > 0 && per_tomogram_progress)
 	{
-		Log::endProgress();
+		if (!debug) Log::endProgress();
 
 		const int it = alignment.lastIterationNumber;
 

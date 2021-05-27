@@ -114,7 +114,7 @@ class ModularAlignment : public FastDifferentiableOptimization
 			const int fs = getFrameStride();
 			const int ds = settings.perFrame2DDeformation? dc * fc : dc;
 			
-			return fs * fc + 3 * pc + mpc * (fc - 1) + ds;
+			return fs * (fc - 1) + 3 * pc + mpc * (fc - 1) + ds;
 		}
 
 
@@ -137,17 +137,17 @@ class ModularAlignment : public FastDifferentiableOptimization
 		
 		inline int getPositionsBlockOffset(int fs) const
 		{
-			return fs * fc;
+			return fs * (fc - 1);
 		}
 		
 		inline int getMotionBlockOffset(int fs) const
 		{
-			return fs * fc + 3 * pc;
+			return fs * (fc - 1) + 3 * pc;
 		}
 		
 		inline int get2DDeformationsBlockOffset(int fs) const
 		{
-			return fs * fc + 3 * pc + mpc * (fc - 1);
+			return fs * (fc - 1) + 3 * pc + mpc * (fc - 1);
 		}
 
 		inline void readViewParams(
@@ -250,7 +250,15 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 	for (int f = 0; f < fc; f++)
 	{
 		double phi, theta, psi, dx, dy;
-		readViewParams(x, f, phi, theta, psi, dx, dy);
+
+		if (f > 0)
+		{
+			readViewParams(x, f, phi, theta, psi, dx, dy);
+		}
+		else
+		{
+			phi = theta = psi = dx = dy = 0.0;
+		}
 
 		const gravis::d4Matrix Q = 
 				TaitBryan::anglesToMatrix4(phi, theta, psi);
@@ -339,29 +347,32 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 						pl, g0.xy(), &x[def_block_f], &grad_par[th*step_grad + def_block_f]);
 
 
-			if (settings.constAngles)
+			if (f > 0)
 			{
-				if (!settings.constShifts)
+				if (settings.constAngles)
 				{
-					grad_par[th*step_grad + fs*f    ]  +=  g.x;
-					grad_par[th*step_grad + fs*f + 1]  +=  g.y;
-				}
-			}
-			else
-			{
-				if (settings.constShifts)
-				{
-					grad_par[th*step_grad + fs*f    ]  +=  pl_phi.x   * g.x  +  pl_phi.y   * g.y;
-					grad_par[th*step_grad + fs*f + 1]  +=  pl_theta.x * g.x  +  pl_theta.y * g.y;
-					grad_par[th*step_grad + fs*f + 2]  +=  pl_psi.x   * g.x  +  pl_psi.y   * g.y;
+					if (!settings.constShifts)
+					{
+						grad_par[th*step_grad + fs*(f-1)    ]  +=  g.x;
+						grad_par[th*step_grad + fs*(f-1) + 1]  +=  g.y;
+					}
 				}
 				else
 				{
-					grad_par[th*step_grad + fs*f    ]  +=  pl_phi.x   * g.x  +  pl_phi.y   * g.y;
-					grad_par[th*step_grad + fs*f + 1]  +=  pl_theta.x * g.x  +  pl_theta.y * g.y;
-					grad_par[th*step_grad + fs*f + 2]  +=  pl_psi.x   * g.x  +  pl_psi.y   * g.y;
-					grad_par[th*step_grad + fs*f + 3]  +=  g.x;
-					grad_par[th*step_grad + fs*f + 4]  +=  g.y;
+					if (settings.constShifts)
+					{
+						grad_par[th*step_grad + fs*(f-1)    ]  +=  pl_phi.x   * g.x  +  pl_phi.y   * g.y;
+						grad_par[th*step_grad + fs*(f-1) + 1]  +=  pl_theta.x * g.x  +  pl_theta.y * g.y;
+						grad_par[th*step_grad + fs*(f-1) + 2]  +=  pl_psi.x   * g.x  +  pl_psi.y   * g.y;
+					}
+					else
+					{
+						grad_par[th*step_grad + fs*(f-1)    ]  +=  pl_phi.x   * g.x  +  pl_phi.y   * g.y;
+						grad_par[th*step_grad + fs*(f-1) + 1]  +=  pl_theta.x * g.x  +  pl_theta.y * g.y;
+						grad_par[th*step_grad + fs*(f-1) + 2]  +=  pl_psi.x   * g.x  +  pl_psi.y   * g.y;
+						grad_par[th*step_grad + fs*(f-1) + 3]  +=  g.x;
+						grad_par[th*step_grad + fs*(f-1) + 4]  +=  g.y;
+					}
 				}
 			}
 
@@ -427,9 +438,11 @@ std::vector<gravis::d4Matrix> ModularAlignment<MotionModel, DeformationModel2D>:
 {
 	std::vector<gravis::d4Matrix> out(fc);
 		
-	for (int f = 0; f < fc; f++)
+	out[frameSequence[0]] = frameProj[0];
+
+	for (int f = 1; f < fc; f++)
 	{	
-		double phi, theta, psi, dx, dy;		
+		double phi, theta, psi, dx, dy;
 		readViewParams(x, f, phi, theta, psi, dx, dy);
 		
 		const gravis::d4Matrix Q = TaitBryan::anglesToMatrix4(phi, theta, psi);		
@@ -835,7 +848,7 @@ inline void ModularAlignment<MotionModel, DeformationModel2D>::readViewParams(
 		double& dx, double& dy) const
 {
 	const int fs = getFrameStride();
-	int offset = f * fs;
+	int offset = (f-1) * fs;
 	
 	if (settings.constAngles)
 	{
