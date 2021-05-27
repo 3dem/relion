@@ -28,15 +28,17 @@ class AlignProgram : public RefinementProgram
 		
 		
 			bool
-				do_motion, shiftOnly, whiten, whiten_abs, outputShiftedCCs,
-				do_anisotropy, per_tilt_anisotropy;
+				do_motion, shiftOnly,
+				whiten, whiten_abs, outputShiftedCCs,
+				do_anisotropy, per_tilt_anisotropy,
+				do_deformation, debug;
 
 			double padding, hiPass_px, sig2RampPower;
 			int range, num_iters;
-						
+
 			ModularAlignmentSettings alignmentSettings;
-			GPMotionModel::Settings motionSettings;
-			GPMotionModel::MotionParameters motionParameters;
+			GPMotionModel::Parameters motionParameters;
+			Spline2DDeformationModel::Parameters deformationParameters;
 			
 
 		void run();
@@ -60,20 +62,38 @@ class AlignProgram : public RefinementProgram
 				const std::string& tomogram_name);
 
 	private:
-
-		void writeTempData(
-				const std::vector<Trajectory>* traj,
+		
+		void writeTempAlignmentData(
 				const std::vector<gravis::d4Matrix>& proj,
 				const std::vector<gravis::d3Vector>& pos,
+				int t);
+		
+		void writeTempMotionData(
+				const std::vector<Trajectory>& traj,
+				int t);
+		
+		void writeTempDeformationData(
+				const std::vector<std::vector<double>>& def,
 				int t);
 
 		void readTempData(int t);
 
 		void mergeLogFiles();
-		
+
 		template<class MotionModel>
 		void performAlignment(
 				MotionModel& motionModel,
+				const std::vector<BufferedImage<double>>& CCs,
+				const std::vector<gravis::d4Matrix>& projByTime,
+				const Tomogram& tomogram,
+				int tomo_index,
+				int progress_bar_offset,
+				bool per_tomogram_progress);
+
+		template<class MotionModel, class DeformationModel>
+		void performAlignment(
+				MotionModel& motionModel,
+				DeformationModel& deformationModel,
 				const std::vector<BufferedImage<double>>& CCs,
 				const std::vector<gravis::d4Matrix>& projByTime,
 				const Tomogram& tomogram,
@@ -93,11 +113,52 @@ void AlignProgram::performAlignment(
 		int progress_bar_offset,
 		bool per_tomogram_progress)
 {
-	No2DDeformationModel noDeformationModel;
+	if (do_deformation)
+	{
+		Spline2DDeformationModel deformationModel(
+			deformationParameters,
+			gravis::i2Vector(tomogram.stack.xdim, tomogram.stack.ydim));
 
-	ModularAlignment<MotionModel, No2DDeformationModel> alignment(
+		performAlignment(
+			motionModel,
+			deformationModel,
+			CCs,
+			projByTime,
+			tomogram,
+			tomo_index,
+			progress_bar_offset,
+			per_tomogram_progress);
+	}
+	else
+	{
+		No2DDeformationModel noDeformationModel;
+
+		performAlignment(
+			motionModel,
+			noDeformationModel,
+			CCs,
+			projByTime,
+			tomogram,
+			tomo_index,
+			progress_bar_offset,
+			per_tomogram_progress);
+	}
+}
+
+template<class MotionModel, class DeformationModel>
+void AlignProgram::performAlignment(
+		MotionModel& motionModel,
+		DeformationModel& deformationModel,
+		const std::vector<BufferedImage<double>>& CCs,
+		const std::vector<gravis::d4Matrix>& projByTime,
+		const Tomogram& tomogram,
+		int tomo_index,
+		int progress_bar_offset,
+		bool per_tomogram_progress)
+{
+	ModularAlignment<MotionModel, DeformationModel> alignment(
 		CCs, projByTime, particleSet, particles[tomo_index],
-		motionModel, noDeformationModel,
+		motionModel, deformationModel,
 		alignmentSettings, tomogram,
 		padding,
 		progress_bar_offset, num_threads,
@@ -105,41 +166,75 @@ void AlignProgram::performAlignment(
 
 	std::vector<double> initial(alignment.getParamCount(), 0.0);
 
+	alignment.devMode = debug;
 
-	if (verbosity > 0 && per_tomogram_progress)
+
+	if (!debug && verbosity > 0 && per_tomogram_progress)
 	{
 		Log::beginProgress("Performing optimisation", num_iters);
 	}
 
 
 	std::vector<double> opt = LBFGS::optimize(
-		initial, alignment, 1, num_iters, 1e-4, 1e-5);
+		initial, alignment, 1, num_iters, 1e-5, 1e-5);
 
 
 	if (verbosity > 0 && per_tomogram_progress)
 	{
-		Log::endProgress();
-	}
+		if (!debug) Log::endProgress();
 
+		const int it = alignment.lastIterationNumber;
+
+		if (it >= num_iters)
+		{
+			Log::warn("Alignment did not converge after " + ZIO::itoa(it) + " iterations");
+		}
+		else
+		{
+			Log::print("Alignment converged after " + ZIO::itoa(it) + " iterations");
+		}
+	}
 
 	std::vector<gravis::d4Matrix> projections = alignment.getProjections(opt, tomogram.frameSequence);
 	std::vector<gravis::d3Vector> positions = alignment.getParticlePositions(opt);
+	
+	writeTempAlignmentData(projections, positions, tomo_index);
 	
 	if (do_motion)
 	{
 		std::vector<Trajectory> trajectories = alignment.exportTrajectories(
 					opt, particleSet, tomogram.frameSequence);
 	
-		writeTempData(&trajectories, projections, positions, tomo_index);
+		writeTempMotionData(trajectories, tomo_index);
 	
-		alignment.visualiseTrajectories2D(
+		alignment.visualiseTrajectories(
 			opt, 8.0, tomogram.name,
 			getTempFilenameRoot(tomogram.name) + "_tracks");
 	}
-	else
+	
+	if (do_deformation)
 	{
-		writeTempData(0, projections, positions, tomo_index);
+		std::vector<std::vector<double>> deformations = alignment.get2DDeformations(
+					opt, tomogram.frameSequence);
+		
+		writeTempDeformationData(deformations, tomo_index);
+		
+		const gravis::i2Vector image_size(
+					tomogram.stack.xdim, 
+					tomogram.stack.ydim);
+		
+		const gravis::i2Vector grid_size(
+					deformationParameters.grid_width, 
+					deformationParameters.grid_height);
+		
+		alignment.visualise2DDeformations(
+					opt, image_size, grid_size, tomogram.name,
+					getTempFilenameRoot(tomogram.name) + "_deformations");
 	}
+
+	alignment.visualiseShifts(
+				opt, tomogram.name,
+				getTempFilenameRoot(tomogram.name) + "_shifts");
 }
 
 

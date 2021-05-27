@@ -170,7 +170,7 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 			// @TODO: test whether the particle is visible
 			
 			TomoExtraction::extractFrameAt3D_Fourier(
-					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f],
+					tomogram.stack, f, s, 1.0, tomogram,
 					traj[f], observation, projCut, 1, true);
 						
 			BufferedImage<fComplex> prediction = Prediction::predictModulated(

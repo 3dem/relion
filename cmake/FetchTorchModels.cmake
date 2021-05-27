@@ -24,7 +24,6 @@ externalproject_add(class_ranker_model_file
 		SOURCE_DIR "${MODELS_DIR}"
 		BUILD_COMMAND ""
 		INSTALL_COMMAND ""
-		DOWNLOAD_NO_PROGRESS 1
 		CONFIGURE_COMMAND ""
 		#	LOG_CONFIGURE
 		#	LOG_BUILD

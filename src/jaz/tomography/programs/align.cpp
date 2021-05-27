@@ -28,7 +28,7 @@ using namespace gravis;
 
 
 AlignProgram::AlignProgram(int argc, char *argv[])
-	: RefinementProgram(argc, argv)
+	: RefinementProgram(argc, argv), debug(true)
 {
 }
 
@@ -68,9 +68,8 @@ void AlignProgram::parseInput()
 	alignmentSettings.constShifts = parser.checkOption("--const_s", "Keep the frame shifts constant");
 	do_anisotropy = parser.checkOption("--aniso", "Assume an anisotropic projection model");
 	per_tilt_anisotropy = parser.checkOption("--per_tilt_aniso", "Fit independent view anisotropy for each tilt image");
-	num_iters = textToInteger(parser.getOption("--it", "Max. number of iterations", "5000"));
-	
-	alignmentSettings.perFrame2DDeformation = true;
+	num_iters = textToInteger(parser.getOption("--it", "Max. number of iterations", "50000"));
+
 
 	int motion_section = parser.addSection("Motion estimation options");
 
@@ -79,11 +78,19 @@ void AlignProgram::parseInput()
 	motionParameters.sig_vel = textToDouble(parser.getOption("--s_vel", "Velocity sigma [Å/dose]", "0.5"));
 	motionParameters.sig_div = textToDouble(parser.getOption("--s_div", "Divergence sigma [Å]", "5000.0"));
 
-	motionSettings.params_scaled_by_dose = !parser.checkOption("--abs_params", "Do not scale the sigmas by the dose");
+	motionParameters.params_scaled_by_dose = !parser.checkOption("--abs_params", "Do not scale the sigmas by the dose");
 
-	motionSettings.sqExpKernel = parser.checkOption("--sq_exp_ker", "Use a square-exponential kernel instead of an exponential one");
-	motionSettings.maxEDs = textToInteger(parser.getOption("--max_ed", "Maximum number of eigendeformations", "-1"));
+	motionParameters.sqExpKernel = parser.checkOption("--sq_exp_ker", "Use a square-exponential kernel instead of an exponential one");
+	motionParameters.maxEDs = textToInteger(parser.getOption("--max_ed", "Maximum number of eigendeformations", "-1"));
 
+
+	int deformation_section = parser.addSection("Deformation estimation options");
+
+	do_deformation = parser.checkOption("--deformation", "Estimate 2D deformations");
+	deformationParameters.grid_width = textToInteger(parser.getOption("--def_w", "Number of horizontal sampling points for the deformation grid", "3"));
+	deformationParameters.grid_height = textToInteger(parser.getOption("--def_h", "Number of vertical sampling points for the deformation grid", "3"));
+
+	alignmentSettings.perFrame2DDeformation = parser.checkOption("--per_frame_deformation", "Model separate 2D deformations for all tilts");
 
 	int expert_section = parser.addSection("Expert options");
 
@@ -278,7 +285,7 @@ void AlignProgram::processTomograms(
 		{
 			GPMotionModel motionModel(
 				particleSet, particles[t], tomogram,
-				motionParameters, motionSettings,
+				motionParameters,
 				per_tomogram_progress && verbosity > 0);
 
 			performAlignment(
@@ -293,8 +300,8 @@ void AlignProgram::processTomograms(
 				NoMotionModel noMotionModel;
 				
 				performAlignment(
-				        noMotionModel, CCs, projByTime, tomogram,
-				        t, progress_bar_offset, per_tomogram_progress);
+					noMotionModel, CCs, projByTime, tomogram,
+					t, progress_bar_offset, per_tomogram_progress);
 			}
 			else
 			{
@@ -352,7 +359,7 @@ void AlignProgram::processTomograms(
 					positions[p] = particleSet.getPosition(particles[t][p]);
 				}
 				
-				writeTempData(0, projections, positions, t);
+				writeTempAlignmentData(projections, positions, t);
 			}
 			
 		}
@@ -375,18 +382,15 @@ std::string AlignProgram::getTempFilenameRoot(const std::string& tomogram_name)
 	return outDir + "temp/" + tomogram_name;
 }
 
-void AlignProgram::writeTempData(
-		const std::vector<Trajectory>* traj,
-		const std::vector<d4Matrix>& proj,
-		const std::vector<d3Vector>& pos,
-		int t)
-{
+void AlignProgram::writeTempAlignmentData(
+		const std::vector<d4Matrix>& proj, 
+		const std::vector<d3Vector>& pos, int t)
+{	
 	const int pc = particles[t].size();
 	const int fc = tomogramSet.getFrameCount(t);
 
 	const std::string tomoName = tomogramSet.getTomogramName(t);
 	const std::string temp_filename_root = getTempFilenameRoot(tomoName);
-
 
 	MetaDataTable temp_positions;
 
@@ -400,14 +404,7 @@ void AlignProgram::writeTempData(
 	}
 
 	temp_positions.write(temp_filename_root + "_positions.star");
-
-
-	if (do_motion && traj != 0)
-	{
-		Trajectory::write(*traj, particleSet, {particles[t]}, temp_filename_root + "_motion.star");
-	}
-
-
+	
 	MetaDataTable temp_projections;
 
 	for (int f = 0; f < fc; f++)
@@ -423,6 +420,36 @@ void AlignProgram::writeTempData(
 	}
 
 	temp_projections.write(temp_filename_root + "_projections.star");
+}
+
+void AlignProgram::writeTempMotionData(
+		const std::vector<Trajectory>& traj, 
+		int t)
+{
+	const std::string tomoName = tomogramSet.getTomogramName(t);
+	const std::string temp_filename_root = getTempFilenameRoot(tomoName);
+
+	Trajectory::write(traj, particleSet, {particles[t]}, temp_filename_root + "_motion.star");
+}
+
+void AlignProgram::writeTempDeformationData(
+		const std::vector<std::vector<double>>& def, 
+		int t)
+{
+	const std::string tomoName = tomogramSet.getTomogramName(t);
+	const std::string temp_filename_root = getTempFilenameRoot(tomoName);
+	
+	MetaDataTable temp_deformations;
+		
+	const int fc = def.size();
+
+	for (int f = 0; f < fc; f++)
+	{
+		temp_deformations.addObject();
+		temp_deformations.setValue(EMDL_TOMO_DEFORMATION_COEFFICIENTS, def[f], f);
+	}
+
+	temp_deformations.write(temp_filename_root + "_deformations.star");
 }
 
 void AlignProgram::readTempData(int t)
@@ -481,6 +508,24 @@ void AlignProgram::readTempData(int t)
 				particleSet.motionTrajectories[particles[t][p].value].shifts_Ang[f] = shift;
 			}
 		}
+	}
+	
+	
+	if (do_deformation)
+	{
+		MetaDataTable temp_deformations;
+		temp_deformations.read(temp_filename_root + "_deformations.star");
+		
+		const i2Vector gridSize(deformationParameters.grid_width, deformationParameters.grid_height);
+		
+		std::vector<std::vector<double>> coeffs(fc);
+		
+		for (int f = 0; f < fc; f++)
+		{
+			coeffs[f] = temp_deformations.getDoubleVector(EMDL_TOMO_DEFORMATION_COEFFICIENTS, f);
+		}
+		
+		tomogramSet.setDeformation(t, gridSize, coeffs);
 	}
 
 

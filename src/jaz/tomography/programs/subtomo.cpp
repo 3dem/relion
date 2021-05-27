@@ -425,7 +425,7 @@ void SubtomoProgram::processTomograms(
 			BufferedImage<float> weightStack(sh2D,s2D,fc);
 
 			TomoExtraction::extractAt3D_Fourier(
-					tomogram.stack, s02D, binning, tomogram.projectionMatrices, traj,
+					tomogram.stack, s02D, binning, tomogram, traj,
 					particleStack, projCut, inner_thread_num, do_circle_precrop);
 
 			if (!do_ctf) weightStack.fill(1.f);

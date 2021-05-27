@@ -14,6 +14,20 @@ Tomogram::Tomogram()
 	
 }
 
+d2Vector Tomogram::projectPoint(const d3Vector& p, int frame) const
+{
+	const d2Vector pl = (projectionMatrices[frame] * gravis::d4Vector(p)).xy();
+	
+	if (hasDeformations)
+	{
+		return imageDeformations[frame].apply(pl);
+	}
+	else
+	{
+		return pl;
+	}
+}
+
 double Tomogram::getFrameDose() const
 {
 	return fractionalDose;

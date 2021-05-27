@@ -170,7 +170,7 @@ void BufferedImage<T>::read(std::string fn, int slice)
 	{
 		gravis::tImage<T> img;
 		img.read(fn);
-		copyDataAndSizeFrom(img);		
+		copyDataAndSizeFrom(img);
 	}
 	else
 	{

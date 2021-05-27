@@ -47,7 +47,7 @@ LocalParticleRefinement::LocalParticleRefinement(
 	std::vector<d4Matrix> tomo_to_image;
 
 	TomoExtraction::extractAt3D_Fourier(
-			tomogram.stack, s, 1.0, tomogram.projectionMatrices,
+			tomogram.stack, s, 1.0, tomogram,
 			trajectory, observations, tomo_to_image, 1, false);
 
 	const d4Matrix particle_to_tomo = particleSet.getMatrix4x4(

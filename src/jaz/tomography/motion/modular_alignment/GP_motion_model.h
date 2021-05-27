@@ -10,15 +10,11 @@ class GPMotionModel
 {
 	public:
 		
-			struct Settings
-			{
-				bool params_scaled_by_dose, sqExpKernel;
-				int maxEDs;
-			};
-			
-			struct MotionParameters
+			struct Parameters
 			{
 				double sig_vel, sig_div;
+				bool params_scaled_by_dose, sqExpKernel;
+				int maxEDs;
 			};
 
 			
@@ -26,8 +22,7 @@ class GPMotionModel
 				const ParticleSet& dataSet,
 				const std::vector<ParticleIndex>& partIndices,
 				const Tomogram& tomogram,
-				MotionParameters motionParameters,
-				Settings settings,
+				Parameters parameters,
 				bool verbose);
 
 		
