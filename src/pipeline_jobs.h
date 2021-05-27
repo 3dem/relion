@@ -365,6 +365,7 @@ static bool do_allow_change_minimum_dedicated;
 #define LABEL_CLASS2D_OPT              "ProcessData.star.relion.optimiser.class2d"
 #define LABEL_CLASS2D_PARTS_HELIX      "ParticlesData.star.relion.class2d.helicalsegments"
 #define LABEL_SELECT_MICS              "MicrographsData.star.relion"
+#define LABEL_SELECT_MOVS              "MicrographMoviesData.star.relion"
 #define LABEL_SELECT_PARTS             "ParticlesData.star.relion"
 #define LABEL_SELECT_OPT               "ProcessData.star.relion.optimiser.autoselect"
 #define LABEL_SELECT_CLAVS             "ImagesData.star.relion.classaverages"

@@ -1263,8 +1263,7 @@ void GuiMainWindow::cb_display_io_node_i()
 	int idx = display_io_node->value();
 	long int mynode = io_nodes[idx];
 	std::string command;
-
-	if (pipeline.nodeList[mynode].type == LABEL_COORDS_CPIPE)
+	if (pipeline.nodeList[mynode].type.find(LABEL_COORDS_CPIPE) == 0)
 	{
 
 		// TODO: write error message saying this is no longer possible: use Continue to pick more/inspect results!
@@ -1358,7 +1357,7 @@ void GuiMainWindow::cb_display_io_node_i()
 		// Other arguments for extraction
 		command += " " + manualpickjob.joboptions["other_args"].getString() + " &";
 	}
-	else if (pipeline.nodeList[mynode].type == LABEL_LOGFILE_CPIPE)
+	else if (pipeline.nodeList[mynode].type.find(LABEL_LOGFILE_CPIPE) == 0)
 	{
 		const char * default_pdf_viewer = getenv ("RELION_PDFVIEWER_EXECUTABLE");
 		char mydefault[]=DEFAULTPDFVIEWER;
@@ -1369,11 +1368,11 @@ void GuiMainWindow::cb_display_io_node_i()
 		std::string myviewer(default_pdf_viewer);
 		command = myviewer + " " + pipeline.nodeList[mynode].name + "&";
 	}
-	else if (pipeline.nodeList[mynode].type == LABEL_POLISH_PARAMS)
+	else if (pipeline.nodeList[mynode].type.find(LABEL_POLISH_PARAMS) == 0)
 	{
 		command = "cat " + pipeline.nodeList[mynode].name;
 	}
-	else if (pipeline.nodeList[mynode].type != LABEL_POST)
+	else if (pipeline.nodeList[mynode].type.find(LABEL_POST) != 0)
 	{
 		command = "relion_display --gui --i " + pipeline.nodeList[mynode].name + " &";
 	}
@@ -1926,6 +1925,7 @@ void GuiMainWindow::cb_save_i()
 	fl_filename_relative(relname,sizeof(relname),G_chooser->value());
 	FileName fn_dir = (std::string)relname;
 	if (fn_dir == "") fn_dir = ".";
+	gui_jobwindows[iwin]->myjob.label = get_proc_label(gui_jobwindows[iwin]->myjob.type);
 	gui_jobwindows[iwin]->myjob.write(fn_dir + "/job.star");
 
 	// Also save hidden job.star file

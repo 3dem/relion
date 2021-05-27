@@ -1050,16 +1050,16 @@ void PipeLine::getOutputNodesFromStarFile(int this_job)
 		MDnodes.read(outnodes, "output_nodes");
 
 		FileName nodename;
-		std::string nodetype;
+		std::string nodetypelabel;
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDnodes)
 		{
 			MDnodes.getValue(EMDL_PIPELINE_NODE_NAME, nodename);
-			MDnodes.getValue(EMDL_PIPELINE_NODE_TYPE, nodetype);
+			MDnodes.getValue(EMDL_PIPELINE_NODE_TYPE_LABEL, nodetypelabel);
 
 			// if this node does not exist yet, then add it to the pipeline
 			if (findNodeByName(nodename) < 0 )
 			{
-				Node node(nodename, nodetype);
+				Node node(nodename, nodetypelabel);
 				addNewOutputEdge(this_job, node);
 			}
 		}

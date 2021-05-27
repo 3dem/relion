@@ -517,7 +517,7 @@ void RelionJob::write(std::string fn)
 	MDhead.addObject();
 	// as of 3.1-beta do not write integer into the STAR files anymore....
 	// MDhead.setValue(EMDL_JOB_TYPE, type);
-	MDhead.setValue(EMDL_JOB_TYPE_LABEL, get_proc_label(type));
+	MDhead.setValue(EMDL_JOB_TYPE_LABEL, label);
 	MDhead.setValue(EMDL_JOB_IS_CONTINUE, is_continue);
 	MDhead.setValue(EMDL_JOB_IS_TOMO, is_tomo);
 	// TODO: add name for output directories!!! make a std:;map between type and name for all options!
