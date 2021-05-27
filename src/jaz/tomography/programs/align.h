@@ -231,6 +231,10 @@ void AlignProgram::performAlignment(
 					opt, image_size, grid_size, tomogram.name,
 					getTempFilenameRoot(tomogram.name) + "_deformations");
 	}
+
+	alignment.visualiseShifts(
+				opt, tomogram.name,
+				getTempFilenameRoot(tomogram.name) + "_shifts");
 }
 
 

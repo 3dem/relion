@@ -16,6 +16,7 @@
 #include <src/jaz/math/Tait_Bryan_angles.h>
 #include <src/jaz/math/Gaussian_process.h>
 #include <src/jaz/util/zio.h>
+#include <src/jaz/image/color_helper.h>
 #include <omp.h>
 
 class CTF;
@@ -92,18 +93,23 @@ class ModularAlignment : public FastDifferentiableOptimization
 				const std::vector<double>& x,
 				double scale,
 				const std::string& tomo_name,
-				const std::string& file_name_root);
+				const std::string& file_name_root) const;
 		
 		std::vector<std::vector<double>> get2DDeformations(
 				const std::vector<double>& x,
 				const std::vector<int>& frameSequence) const;
-		
+
 		void visualise2DDeformations(
 				const std::vector<double>& x,
 				const gravis::i2Vector& imageSize,
 				const gravis::i2Vector& gridSize,
 				const std::string& tomo_name,
-				const std::string& file_name_root);
+				const std::string& file_name_root) const;
+
+		void visualiseShifts(
+				const std::vector<double>& x,
+				const std::string& tomo_name,
+				const std::string& file_name_root) const;
 				
 		
 		void report(int iteration, double cost, const std::vector<double>& x) const;
@@ -530,7 +536,7 @@ void ModularAlignment<MotionModel, DeformationModel2D>::visualiseTrajectories(
 		const std::vector<double> &x, 
 		double scale, 
 		const std::string& tomo_name, 
-		const std::string& file_name_root)
+		const std::string& file_name_root) const
 {
 	std::vector<int> timeSeq(fc);
 
@@ -647,7 +653,7 @@ void ModularAlignment<MotionModel, DeformationModel2D>::visualise2DDeformations(
 		const gravis::i2Vector& imageSize,
 		const gravis::i2Vector& gridSize,
 		const std::string& tomo_name, 
-		const std::string& file_name_root)
+		const std::string& file_name_root) const
 {
 	if (deformationModel2D.getParameterCount() == 0)
 	{
@@ -815,6 +821,155 @@ void ModularAlignment<MotionModel, DeformationModel2D>::visualise2DDeformations(
 		
 		plot2D.OutputPostScriptPlot(FileName(fn_eps));
 	}
+}
+
+template<class MotionModel, class DeformationModel2D>
+void ModularAlignment<MotionModel, DeformationModel2D>::visualiseShifts(
+		const std::vector<double> &x,
+		const std::string &tomo_name,
+		const std::string &file_name_root) const
+{
+	const int fs = getFrameStride();
+	const int xs = x.size();
+	const int pos_block = getPositionsBlockOffset(fs);
+	const int mot_block = getMotionBlockOffset(fs);
+	const int def_block = get2DDeformationsBlockOffset(fs);
+
+	for (int i = 0; i < xs; i++)
+	{
+		if (!(x[i] == x[i])) // reject NaNs
+		{
+			return;
+		}
+	}
+
+	std::vector<gravis::d4Matrix> P(fc);
+
+	for (int f = 0; f < fc; f++)
+	{
+		double phi, theta, psi, dx, dy;
+
+		if (f > 0)
+		{
+			readViewParams(x, f, phi, theta, psi, dx, dy);
+		}
+		else
+		{
+			phi = theta = psi = dx = dy = 0.0;
+		}
+
+		const gravis::d4Matrix Q =
+				TaitBryan::anglesToMatrix4(phi, theta, psi);
+
+		const gravis::d4Matrix centProj = minusCentre * frameProj[f];
+
+		P[f] = plusCentre * Q * centProj;
+
+		P[f](0,3) += dx;
+		P[f](1,3) += dy;
+	}
+
+
+	CPlot2D plot2D(tomo_name + ": 2D position changes");
+	plot2D.SetXAxisSize(600);
+	plot2D.SetYAxisSize(600);
+	plot2D.SetDrawLegend(false);
+	plot2D.SetFlipY(true);
+	plot2D.SetDrawXAxisGridLines(false);
+	plot2D.SetDrawYAxisGridLines(false);
+
+	const double diam = CCs[0].xdim;
+
+	{
+		CDataSet boundary;
+		boundary.SetDrawMarker(false);
+		boundary.SetDatasetColor(0.5,0.5,0.5);
+		boundary.SetLineWidth(1);
+
+		boundary.AddDataPoint(CDataPoint(0.0,  0.0));
+		boundary.AddDataPoint(CDataPoint(diam, 0.0));
+		boundary.AddDataPoint(CDataPoint(diam, diam));
+		boundary.AddDataPoint(CDataPoint(0.0,  diam));
+
+		plot2D.AddDataSet(boundary);
+	}
+
+	for (int dim = 0; dim < 2; dim++)
+	{
+		CDataSet crosshair;
+		crosshair.SetDrawMarker(false);
+		crosshair.SetDatasetColor(0.5,0.5,0.5);
+		crosshair.SetLineWidth(0.25);
+
+		gravis::d2Vector m0(0.0, 0.0);
+		gravis::d2Vector m1(diam, diam);
+
+		m0[dim] = m1[dim] = maxRange * paddingFactor;
+
+		crosshair.AddDataPoint(CDataPoint(m0.x, m0.y));
+		crosshair.AddDataPoint(CDataPoint(m1.x, m1.y));
+
+		plot2D.AddDataSet(crosshair);
+	}
+
+
+	std::vector<CDataSet> points_by_frame(fc);
+
+	for (int f = 0; f < fc; f++)
+	{
+		gravis::dRGB c = ColorHelper::signedToRedBlue(f/(double)fc);
+
+		points_by_frame[f].SetDrawMarker(true);
+		points_by_frame[f].SetDrawLine(false);
+		points_by_frame[f].SetDatasetColor(c.r,c.g,c.b);
+		points_by_frame[f].SetMarkerSize(1);
+	}
+
+	for (int p = 0; p < pc; p++)
+	{
+		gravis::d3Vector shift = settings.constParticles?
+			gravis::d3Vector(0.0, 0.0, 0.0) :
+			gravis::d3Vector(x[pos_block + 3*p], x[pos_block + 3*p+1], x[pos_block + 3*p+2]);
+
+		for (int f = 0; f < fc; f++)
+		{
+			const gravis::d4Vector pos4(initialPos[p] + shift);
+
+			const gravis::d2Vector p0 = (frameProj[f] * gravis::d4Vector(initialPos[p])).xy();
+			const gravis::d2Vector pl = (P[f] * pos4).xy();
+
+			const int def_block_f = def_block + (settings.perFrame2DDeformation? f * dc : 0);
+
+			gravis::d2Vector def, def_x, def_y;
+			deformationModel2D.computeShiftAndGradient(pl, &x[def_block_f], def, def_x, def_y);
+
+			const gravis::d2Vector p1 = pl + def;
+
+			const gravis::d2Vector dp = p1 - p0;
+
+			const double dx_img = (dp.x + maxRange) * paddingFactor;
+			const double dy_img = (dp.y + maxRange) * paddingFactor;
+
+			points_by_frame[f].AddDataPoint(CDataPoint(dx_img,dy_img));
+
+			if (!settings.constParticles)
+			{
+				if (f < fc-1)
+				{
+					motionModel.updatePosition(&x[mot_block + f*mpc], p, shift);
+				}
+			}
+		}
+	}
+
+	for (int f = fc-1; f >= 0; f--)
+	{
+		plot2D.AddDataSet(points_by_frame[f]);
+	}
+
+	FileName fn_eps = file_name_root + ".eps";
+
+	plot2D.OutputPostScriptPlot(fn_eps);
 }
 
 template<class MotionModel, class DeformationModel2D>
