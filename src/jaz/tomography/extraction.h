@@ -105,9 +105,11 @@ void TomoExtraction::extractFrameAt3D_Fourier(
 {
 	std::vector<gravis::d4Matrix> projVec;
 	
-	extractAt3D_Fourier(
-		stack.getConstSliceRef(f), s, bin, tomogram, {center}, out, projVec, 
-		num_threads, circle_crop);
+	const gravis::d2Vector center2D = tomogram.projectPoint(center, f);
+
+	extractAt2D_Fourier(
+		stack.getConstSliceRef(f), s, bin, {tomogram.projectionMatrices[f]},
+		{center2D}, out, projVec, num_threads, circle_crop);
 	
 	projOut = projVec[0];
 }
@@ -127,9 +129,6 @@ void TomoExtraction::extractAt3D_Fourier(
 	
 	for (int f = 0; f < fc; f++)
 	{
-		//const gravis::d4Vector q = projIn[f] * gravis::d4Vector(trajectory[f]);
-		//centers[f] = gravis::d2Vector(q.x, q.y);
-		
 		centers[f] = tomogram.projectPoint(trajectory[f], f);
 	}
 	

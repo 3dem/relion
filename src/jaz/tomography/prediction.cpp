@@ -124,10 +124,12 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 	
 	const int s_act = s * paddingFactor;
 	const int sh_act = s_act / 2 + 1;
+
+	const bool pad_by_3 = true;
 	
 	const int pc = partIndices.size();
 	const int fc = tomogram.frameCount;
-	const int diam = (int)(2 * maxRange * paddingFactor);
+	const int diam = (int)(2 * maxRange * paddingFactor) + (pad_by_3? 6 : 0);
 	const int border = (int)(s * paddingFactor - diam) / 2;
 	
 	std::vector<BufferedImage<double>> CCs(pc);
@@ -207,8 +209,39 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 			CCs[p].copySliceFrom(ft, 
 				Centering::fftwFullToHumanFull(
 					Padding::unpadCorner2D_full(ccRS_full, border)));
-			
-			
+
+			if (pad_by_3)
+			{
+				for (int y = 0; y < 3; y++)
+				{
+					for (int x = 0; x < diam; x++)
+					{
+						CCs[p](x,y) = 0.0;
+					}
+				}
+
+				for (int y = 3; y < diam - 3; y++)
+				{
+					for (int x = 0; x < 3; x++)
+					{
+						CCs[p](x,y) = 0.0;
+					}
+
+					for (int x = diam - 3; x < diam; x++)
+					{
+						CCs[p](x,y) = 0.0;
+					}
+				}
+
+				for (int y = diam - 3; y < diam; y++)
+				{
+					for (int x = 0; x < diam; x++)
+					{
+						CCs[p](x,y) = 0.0;
+					}
+				}
+			}
+
 			#if TEST_CC_SCALE
 			
 			if (th == 0)

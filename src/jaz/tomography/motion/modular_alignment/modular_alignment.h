@@ -19,11 +19,15 @@
 #include <src/jaz/image/color_helper.h>
 #include <omp.h>
 
+#define ANGLE_SCALE 0.01
+#define ALIGN_FIRST_FRAME 1
+
 class CTF;
 
 struct ModularAlignmentSettings
 {
 	bool constParticles, constAngles, constShifts, perFrame2DDeformation;
+	double rangeRegulariser;
 };
 
 template<class MotionModel, class DeformationModel2D>
@@ -120,8 +124,16 @@ class ModularAlignment : public FastDifferentiableOptimization
 			const int fs = getFrameStride();
 			const int ds = settings.perFrame2DDeformation? dc * fc : dc;
 			
-			return fs * (fc - 1) + 3 * pc + mpc * (fc - 1) + ds;
+			#if ALIGN_FIRST_FRAME
+				return fs * fc + 3 * pc + mpc * (fc - 1) + ds;
+			#else
+				return fs * (fc - 1) + 3 * pc + mpc * (fc - 1) + ds;
+			#endif
 		}
+
+		void printParameters(
+				const std::vector<double>& x,
+				std::ofstream& stream);
 
 
 	protected:
@@ -143,17 +155,29 @@ class ModularAlignment : public FastDifferentiableOptimization
 		
 		inline int getPositionsBlockOffset(int fs) const
 		{
-			return fs * (fc - 1);
+			#if ALIGN_FIRST_FRAME
+				return fs * fc;
+			#else
+				return fs * (fc - 1);
+			#endif
 		}
 		
 		inline int getMotionBlockOffset(int fs) const
 		{
-			return fs * (fc - 1) + 3 * pc;
+			#if ALIGN_FIRST_FRAME
+				return fs * fc + 3 * pc;
+			#else
+				return fs * (fc - 1) + 3 * pc;
+			#endif
 		}
 		
 		inline int get2DDeformationsBlockOffset(int fs) const
 		{
-			return fs * (fc - 1) + 3 * pc + mpc * (fc - 1);
+			#if ALIGN_FIRST_FRAME
+				return fs * fc + 3 * pc + mpc * (fc - 1);
+			#else
+				return fs * (fc - 1) + 3 * pc + mpc * (fc - 1);
+			#endif
 		}
 
 		inline void readViewParams(
@@ -194,7 +218,7 @@ ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 	pc(partIndices.size()),
 	mpc(motionModel.getParameterCount()),
 	dc(deformationModel2D.getParameterCount()),
-	maxRange(CCs[0].xdim / (2 * paddingFactor)),
+	maxRange(CCs[0].xdim / (2 * paddingFactor) - 3),
 	lastIterationNumber(0)
 {	
 	initialPos.resize(pc);
@@ -257,14 +281,7 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 	{
 		double phi, theta, psi, dx, dy;
 
-		if (f > 0)
-		{
-			readViewParams(x, f, phi, theta, psi, dx, dy);
-		}
-		else
-		{
-			phi = theta = psi = dx = dy = 0.0;
-		}
+		readViewParams(x, f, phi, theta, psi, dx, dy);
 
 		const gravis::d4Matrix Q = 
 				TaitBryan::anglesToMatrix4(phi, theta, psi);
@@ -323,16 +340,33 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 			
 			const gravis::d2Vector dp = p1 - p0;
 
-			const double dx_img = (dp.x + maxRange) * paddingFactor;
-			const double dy_img = (dp.y + maxRange) * paddingFactor;
+			const bool pad_by_3 = true;
 
-			const gravis::d2Vector pl_phi   = (P_phi[f]   * pos4).xy();
-			const gravis::d2Vector pl_theta = (P_theta[f] * pos4).xy();
-			const gravis::d2Vector pl_psi   = (P_psi[f]   * pos4).xy();
+			const double dx_img = (dp.x + maxRange) * paddingFactor + (pad_by_3? 3 : 0);
+			const double dy_img = (dp.y + maxRange) * paddingFactor + (pad_by_3? 3 : 0);
 			
 
-			const gravis::d3Vector g0 = -((double)paddingFactor) *
-				Interpolation::cubicXYGradAndValue_clip(CCs[p], dx_img, dy_img, f);
+			gravis::d3Vector g0(0.0, 0.0, 0.0);
+
+			if (   dx_img > 1 && dx_img < CCs[p].xdim - 2
+				&& dy_img > 1 && dy_img < CCs[p].ydim - 2 )
+			{
+				g0 -= ((double)paddingFactor) *
+					Interpolation::cubicXYGradAndValue_raw(CCs[p], dx_img, dy_img, f);
+			}
+
+			const double dpl = dp.length();
+
+			if (dpl > maxRange)
+			{
+				const double lambda = settings.rangeRegulariser;
+				const double d = dpl - maxRange;
+
+				g0.z += lambda * d * d;
+
+				g0.x += 2.0 * lambda * d * dp.x / dpl;
+				g0.y += 2.0 * lambda * d * dp.y / dpl;
+			}
 
 			val_par[th*data_pad] += g0.z;
 			
@@ -353,32 +387,27 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 						pl, g0.xy(), &x[def_block_f], &grad_par[th*step_grad + def_block_f]);
 
 
-			if (f > 0)
+			const gravis::d2Vector pl_phi   = (P_phi[f]   * pos4).xy();
+			const gravis::d2Vector pl_theta = (P_theta[f] * pos4).xy();
+			const gravis::d2Vector pl_psi   = (P_psi[f]   * pos4).xy();
+
+			if (ALIGN_FIRST_FRAME || f > 0)
 			{
-				if (settings.constAngles)
+				int offset = ALIGN_FIRST_FRAME? fs * f : fs * (f - 1);
+
+				if (!settings.constAngles)
 				{
-					if (!settings.constShifts)
-					{
-						grad_par[th*step_grad + fs*(f-1)    ]  +=  g.x;
-						grad_par[th*step_grad + fs*(f-1) + 1]  +=  g.y;
-					}
+					grad_par[th*step_grad + offset    ]  +=  ANGLE_SCALE * (pl_phi.x   * g.x  +  pl_phi.y   * g.y);
+					grad_par[th*step_grad + offset + 1]  +=  ANGLE_SCALE * (pl_theta.x * g.x  +  pl_theta.y * g.y);
+					grad_par[th*step_grad + offset + 2]  +=  ANGLE_SCALE * (pl_psi.x   * g.x  +  pl_psi.y   * g.y);
+
+					offset += 3;
 				}
-				else
+
+				if (!settings.constShifts)
 				{
-					if (settings.constShifts)
-					{
-						grad_par[th*step_grad + fs*(f-1)    ]  +=  pl_phi.x   * g.x  +  pl_phi.y   * g.y;
-						grad_par[th*step_grad + fs*(f-1) + 1]  +=  pl_theta.x * g.x  +  pl_theta.y * g.y;
-						grad_par[th*step_grad + fs*(f-1) + 2]  +=  pl_psi.x   * g.x  +  pl_psi.y   * g.y;
-					}
-					else
-					{
-						grad_par[th*step_grad + fs*(f-1)    ]  +=  pl_phi.x   * g.x  +  pl_phi.y   * g.y;
-						grad_par[th*step_grad + fs*(f-1) + 1]  +=  pl_theta.x * g.x  +  pl_theta.y * g.y;
-						grad_par[th*step_grad + fs*(f-1) + 2]  +=  pl_psi.x   * g.x  +  pl_psi.y   * g.y;
-						grad_par[th*step_grad + fs*(f-1) + 3]  +=  g.x;
-						grad_par[th*step_grad + fs*(f-1) + 4]  +=  g.y;
-					}
+					grad_par[th*step_grad + offset    ]  +=  g.x;
+					grad_par[th*step_grad + offset + 1]  +=  g.y;
 				}
 			}
 
@@ -410,16 +439,16 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 		}
 	}
 
-	for (int i = 0; i < xs; i++)
-	{
-		gradDest[i] = 0.0;
-	}
-
 	double cost = 0.0;
 
 	for (int th = 0; th < num_threads; th++)
 	{
 		cost += val_par[th*data_pad];
+	}
+
+	for (int i = 0; i < xs; i++)
+	{
+		gradDest[i] = 0.0;
 	}
 
 	for (int th = 0; th < num_threads; th++)
@@ -444,9 +473,7 @@ std::vector<gravis::d4Matrix> ModularAlignment<MotionModel, DeformationModel2D>:
 {
 	std::vector<gravis::d4Matrix> out(fc);
 		
-	out[frameSequence[0]] = frameProj[0];
-
-	for (int f = 1; f < fc; f++)
+	for (int f = 0; f < fc; f++)
 	{	
 		double phi, theta, psi, dx, dy;
 		readViewParams(x, f, phi, theta, psi, dx, dy);
@@ -849,14 +876,7 @@ void ModularAlignment<MotionModel, DeformationModel2D>::visualiseShifts(
 	{
 		double phi, theta, psi, dx, dy;
 
-		if (f > 0)
-		{
-			readViewParams(x, f, phi, theta, psi, dx, dy);
-		}
-		else
-		{
-			phi = theta = psi = dx = dy = 0.0;
-		}
+		readViewParams(x, f, phi, theta, psi, dx, dy);
 
 		const gravis::d4Matrix Q =
 				TaitBryan::anglesToMatrix4(phi, theta, psi);
@@ -870,6 +890,9 @@ void ModularAlignment<MotionModel, DeformationModel2D>::visualiseShifts(
 	}
 
 
+	const double diam = CCs[0].xdim - 8;
+	const double m = maxRange * paddingFactor;
+
 	CPlot2D plot2D(tomo_name + ": 2D position changes");
 	plot2D.SetXAxisSize(600);
 	plot2D.SetYAxisSize(600);
@@ -878,18 +901,17 @@ void ModularAlignment<MotionModel, DeformationModel2D>::visualiseShifts(
 	plot2D.SetDrawXAxisGridLines(false);
 	plot2D.SetDrawYAxisGridLines(false);
 
-	const double diam = CCs[0].xdim;
-
 	{
 		CDataSet boundary;
 		boundary.SetDrawMarker(false);
 		boundary.SetDatasetColor(0.5,0.5,0.5);
 		boundary.SetLineWidth(1);
 
-		boundary.AddDataPoint(CDataPoint(0.0,  0.0));
-		boundary.AddDataPoint(CDataPoint(diam, 0.0));
-		boundary.AddDataPoint(CDataPoint(diam, diam));
-		boundary.AddDataPoint(CDataPoint(0.0,  diam));
+		boundary.AddDataPoint(CDataPoint(-m,       -m));
+		boundary.AddDataPoint(CDataPoint(diam - m, -m));
+		boundary.AddDataPoint(CDataPoint(diam - m, diam - m));
+		boundary.AddDataPoint(CDataPoint(-m,       diam - m));
+		boundary.AddDataPoint(CDataPoint(-m,       -m));
 
 		plot2D.AddDataSet(boundary);
 	}
@@ -906,8 +928,8 @@ void ModularAlignment<MotionModel, DeformationModel2D>::visualiseShifts(
 
 		m0[dim] = m1[dim] = maxRange * paddingFactor;
 
-		crosshair.AddDataPoint(CDataPoint(m0.x, m0.y));
-		crosshair.AddDataPoint(CDataPoint(m1.x, m1.y));
+		crosshair.AddDataPoint(CDataPoint(m0.x - m, m0.y - m));
+		crosshair.AddDataPoint(CDataPoint(m1.x - m, m1.y - m));
 
 		plot2D.AddDataSet(crosshair);
 	}
@@ -947,10 +969,7 @@ void ModularAlignment<MotionModel, DeformationModel2D>::visualiseShifts(
 
 			const gravis::d2Vector dp = p1 - p0;
 
-			const double dx_img = (dp.x + maxRange) * paddingFactor;
-			const double dy_img = (dp.y + maxRange) * paddingFactor;
-
-			points_by_frame[f].AddDataPoint(CDataPoint(dx_img,dy_img));
+			points_by_frame[f].AddDataPoint(CDataPoint(dp.x,dp.y));
 
 			if (!settings.constParticles)
 			{
@@ -994,6 +1013,32 @@ void ModularAlignment<MotionModel, DeformationModel2D>::report(
 	lastIterationNumber = iteration;
 }
 
+template<class MotionModel, class DeformationModel2D>
+void ModularAlignment<MotionModel, DeformationModel2D>::printParameters(const std::vector<double> &x, std::ofstream &stream)
+{
+	const int fs = getFrameStride();
+
+	for (int f = 1; f < fc; f++)
+	{
+		int offset = (f-1)*fs;
+
+		if (!settings.constAngles)
+		{
+			stream << '[' << x[offset] << ", " << x[offset+1] << ", " << x[offset+2] << "] ";
+
+			offset += 3;
+		}
+
+		if (!settings.constShifts)
+		{
+			stream << '[' << x[offset] << ", " << x[offset+1] << "] ";
+
+			offset += 2;
+		}
+		stream << '\n';
+	}
+}
+
 
 
 template<class MotionModel, class DeformationModel2D>
@@ -1003,7 +1048,28 @@ inline void ModularAlignment<MotionModel, DeformationModel2D>::readViewParams(
 		double& dx, double& dy) const
 {
 	const int fs = getFrameStride();
+
+	#if ALIGN_FIRST_FRAME
+
+	int offset = f * fs;
+
+	#else
+
+	if (f == 0)
+	{
+		phi = 0.0;
+		theta = 0.0;
+		psi = 0.0;
+		dx = 0.0;
+		dy = 0.0;
+
+		return;
+	}
+
 	int offset = (f-1) * fs;
+
+	#endif
+
 	
 	if (settings.constAngles)
 	{
@@ -1013,9 +1079,9 @@ inline void ModularAlignment<MotionModel, DeformationModel2D>::readViewParams(
 	}
 	else
 	{
-		phi   = x[offset  ];
-		theta = x[offset+1];
-		psi   = x[offset+2];
+		phi   = ANGLE_SCALE * x[offset  ];
+		theta = ANGLE_SCALE * x[offset+1];
+		psi   = ANGLE_SCALE * x[offset+2];
 
 		offset += 3;
 	}
