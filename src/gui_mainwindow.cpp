@@ -1479,23 +1479,33 @@ void GuiMainWindow::cb_print_cl_i()
 	// And update the job inside it
 	gui_jobwindows[iwin]->updateMyJob();
 
-	std::string error_message;
-	if (!pipeline.getCommandLineJob(gui_jobwindows[iwin]->myjob, current_job, is_main_continue, false,
-	                                DONT_MKDIR, commands, final_command, error_message))
+	if (use_ccpem_pipeliner)
 	{
-		fl_message("%s",error_message.c_str());
+		std::string error_message;
+		pipeline.PrintComCpipe(gui_jobwindows[iwin]->myjob, current_job, is_main_continue, false,
+			DONT_MKDIR, commands, final_command, error_message);
 	}
+
 	else
 	{
-		std::string command= "", mesg = " The command is: ";
-		for (int icom = 0; icom < commands.size(); icom++)
+		std::string error_message;
+		if (!pipeline.getCommandLineJob(gui_jobwindows[iwin]->myjob, current_job, is_main_continue, false,
+				DONT_MKDIR, commands, final_command, error_message))
 		{
-			if (icom > 0) command += " && ";
-			command += commands[icom];
+			fl_message("%s",error_message.c_str());
 		}
-		fl_input("%s", command.c_str(), mesg.c_str());
-		// Don't free the returned string! It comes from Fl_Input::value(), which returns
-		// "pointer to an internal buffer - do not free() this".
+		else
+		{
+			std::string command= "", mesg = " The command is: ";
+			for (int icom = 0; icom < commands.size(); icom++)
+			{
+				if (icom > 0) command += " && ";
+				command += commands[icom];
+			}
+			fl_input("%s", command.c_str(), mesg.c_str());
+			// Don't free the returned string! It comes from Fl_Input::value(), which returns
+			// "pointer to an internal buffer - do not free() this".
+		}
 	}
 }
 
