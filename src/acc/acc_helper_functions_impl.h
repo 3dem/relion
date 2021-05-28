@@ -538,26 +538,54 @@ void runBackProjectKernel(
 					BP.mdlX, BP.mdlInitY);
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 #else
-	if(ctf_premultiplied)
-		CpuKernels::backproject2D<true>(imageCount, BP_2D_BLOCK_SIZE,
-				d_img_real, d_img_imag,
-				trans_x, trans_y,
-				d_weights, d_Minvsigma2s, d_ctfs,
-				translation_num, significant_weight, weight_norm, d_eulers,
-				BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
-				BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
-				(unsigned)imgX, (unsigned)imgY, (unsigned)imgX*imgY,
-				(unsigned)BP.mdlX, BP.mdlInitY, BP.mutexes);
-	else
-		CpuKernels::backproject2D<false>(imageCount, BP_2D_BLOCK_SIZE,
-				d_img_real, d_img_imag,
-				trans_x, trans_y,
-				d_weights, d_Minvsigma2s, d_ctfs,
-				translation_num, significant_weight, weight_norm, d_eulers,
-				BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
-				BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
-				(unsigned)imgX, (unsigned)imgY, (unsigned)imgX*imgY,
-				(unsigned)BP.mdlX, BP.mdlInitY, BP.mutexes);
+		if(do_grad)
+			if(ctf_premultiplied)
+				CpuKernels::backproject2D_SGD<true>(
+						imageCount, BP_2D_BLOCK_SIZE,
+						projector,
+                        d_img_real, d_img_imag,
+                        trans_x, trans_y,
+                        d_weights, d_Minvsigma2s, d_ctfs,
+                        translation_num, significant_weight, weight_norm, d_eulers,
+                        BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+                        BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
+                        (unsigned)imgX, (unsigned)imgY, (unsigned)imgX*imgY,
+                        (unsigned)BP.mdlX, BP.mdlInitY, BP.mutexes);
+			else
+				CpuKernels::backproject2D_SGD<false>(
+						imageCount, BP_2D_BLOCK_SIZE,
+						projector,
+						d_img_real, d_img_imag,
+						trans_x, trans_y,
+						d_weights, d_Minvsigma2s, d_ctfs,
+						translation_num, significant_weight, weight_norm, d_eulers,
+						BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+						BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
+						(unsigned)imgX, (unsigned)imgY, (unsigned)imgX*imgY,
+						(unsigned)BP.mdlX, BP.mdlInitY, BP.mutexes);
+		else
+			if(ctf_premultiplied)
+				CpuKernels::backproject2D<true>(
+						imageCount, BP_2D_BLOCK_SIZE,
+						d_img_real, d_img_imag,
+						trans_x, trans_y,
+						d_weights, d_Minvsigma2s, d_ctfs,
+						translation_num, significant_weight, weight_norm, d_eulers,
+						BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+						BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
+						(unsigned)imgX, (unsigned)imgY, (unsigned)imgX*imgY,
+						(unsigned)BP.mdlX, BP.mdlInitY, BP.mutexes);
+			else
+				CpuKernels::backproject2D<false>(
+						imageCount, BP_2D_BLOCK_SIZE,
+						d_img_real, d_img_imag,
+						trans_x, trans_y,
+						d_weights, d_Minvsigma2s, d_ctfs,
+						translation_num, significant_weight, weight_norm, d_eulers,
+						BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+						BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
+						(unsigned)imgX, (unsigned)imgY, (unsigned)imgX*imgY,
+						(unsigned)BP.mdlX, BP.mdlInitY, BP.mutexes);
 #endif
 	}
 	else
@@ -588,7 +616,7 @@ void runBackProjectKernel(
                             BP.mdlX, BP.mdlY, BP.mdlInitY, BP.mdlInitZ);
 #else
 				if(ctf_premultiplied)
-					CpuKernels::backprojectSGD<true, true>(imageCount, BP_DATA3D_BLOCK_SIZE,
+					CpuKernels::backproject3D_SGD<true, true>(imageCount, BP_DATA3D_BLOCK_SIZE,
 						projector, d_img_real, d_img_imag,
 						trans_x, trans_y, trans_z,
 						d_weights, d_Minvsigma2s, d_ctfs,
@@ -598,7 +626,7 @@ void runBackProjectKernel(
 						imgX, imgY, imgZ, (size_t)imgX*(size_t)imgY*(size_t)imgZ,
 						BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, BP.mutexes);
 				else
-					CpuKernels::backprojectSGD<true, false>(imageCount, BP_DATA3D_BLOCK_SIZE,
+					CpuKernels::backproject3D_SGD<true, false>(imageCount, BP_DATA3D_BLOCK_SIZE,
 						projector, d_img_real, d_img_imag,
 						trans_x, trans_y, trans_z,
 						d_weights, d_Minvsigma2s, d_ctfs,
@@ -634,7 +662,7 @@ void runBackProjectKernel(
 
 #else
 				if(ctf_premultiplied)
-					CpuKernels::backprojectSGD<false, true>(imageCount, BP_REF3D_BLOCK_SIZE,
+					CpuKernels::backproject3D_SGD<false, true>(imageCount, BP_REF3D_BLOCK_SIZE,
 						projector, d_img_real, d_img_imag,
 						trans_x, trans_y, trans_z,
 						d_weights, d_Minvsigma2s, d_ctfs,
@@ -644,7 +672,7 @@ void runBackProjectKernel(
 						(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (size_t)imgX*(size_t)imgY*(size_t)imgZ,
 						(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, BP.mutexes);
 				else
-					CpuKernels::backprojectSGD<false, false>(imageCount, BP_REF3D_BLOCK_SIZE,
+					CpuKernels::backproject3D_SGD<false, false>(imageCount, BP_REF3D_BLOCK_SIZE,
 						projector, d_img_real, d_img_imag,
 						trans_x, trans_y, trans_z,
 						d_weights, d_Minvsigma2s, d_ctfs,

@@ -304,7 +304,7 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 
 	if (globalTable.containsLabel(EMDL_IMAGE_OPTICS_GROUP_NAME))
 	{
-		out.opticsGroupName = globalTable.getDouble(EMDL_IMAGE_OPTICS_GROUP_NAME, index);
+		out.opticsGroupName = globalTable.getString(EMDL_IMAGE_OPTICS_GROUP_NAME, index);
 	}
 	else
 	{

@@ -89,8 +89,7 @@
 #define WIDTH_FMASK_EDGE 2.
 #define MAX_NR_ITER_WO_RESOL_GAIN 1
 #define MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES 1
-#define MAX_NR_ITER_WO_RESOL_GAIN_GRAD 5
-#define MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES_GRAD 5
+#define MAX_NR_ITER_WO_RESOL_GAIN_GRAD 4
 
 // for profiling
 //#define TIMING
@@ -142,6 +141,12 @@ public:
 
 	// Filename for input reference images (stack, star or image)
 	FileName fn_ref;
+
+	// Filename for the subtomo optimiser set. Used to set fn_data, fn_ref and fn_mask
+	FileName fn_OS;
+
+	// Optimiser set table for subtomo
+	MetaDataTable optimisationSet;
 
 	// Generate a 3D model from 2D particles de novo?
 	bool is_3d_model;
@@ -337,6 +342,9 @@ public:
 	bool do_grad;
 	bool do_grad_next_iter;
 
+	// Do pseudo half-sets to estimate noise
+	bool grad_pseudo_halfsets;
+
 	// Number of iterations at the end of a gradient refinement using Expectation-Maximization
 	int grad_em_iters;
 
@@ -407,7 +415,10 @@ public:
 	// Gradient auto refinement has converged
 	bool grad_has_converged;
 
-	// Suspended finer sampling order with local searches for one iteration
+	// Suspended finer sampling for this many iteration
+	int grad_suspended_finer_sampling_iter;
+
+	// Suspended finer sampling with local searches for this many iteration
 	int grad_suspended_local_searches_iter;
 
 	// Every how many iterations should be written to disk when using subsets
@@ -846,6 +857,8 @@ public:
 		auto_subset_size_order(0),
 		grad_has_converged(false),
 		grad_suspended_local_searches_iter(-1),
+		grad_suspended_finer_sampling_iter(-1),
+		grad_pseudo_halfsets(false),
 #ifdef ALTCPU
 		mdlClassComplex(NULL),
 #endif

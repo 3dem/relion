@@ -233,6 +233,8 @@ public:
 	// Process data on GPU
 	bool do_gpu;
 
+	bool pseudo_halfsets;
+
 	// Store filenames of references for Liyi's class feature program
 	std::vector<FileName> ref_names;
 
@@ -274,7 +276,8 @@ public:
 		norm_body_mask_overlap(false),
 		som(),
 		last_som_add_iter(0),
-		do_gpu(false)
+		do_gpu(false),
+		pseudo_halfsets(false)
 	{
 		clear();
 	}
@@ -303,6 +306,7 @@ public:
 			nr_groups = MD.nr_groups;
 			nr_optics_groups = MD.nr_optics_groups;
 			do_grad = MD.do_grad;
+			pseudo_halfsets = MD.pseudo_halfsets;
 			nr_directions = MD.nr_directions;
 			LL = MD.LL;
 			padding_factor = MD.padding_factor;
@@ -359,6 +363,7 @@ public:
 			helical_twist = MD.helical_twist;
 			helical_rise = MD.helical_rise;
 			do_gpu = MD.do_gpu;
+			pseudo_halfsets = MD.pseudo_halfsets;
 			ref_names = MD.ref_names;
 	        }
         	return *this;
@@ -407,10 +412,11 @@ public:
 		helical_rise.clear();
 		ref_names.clear();
 		do_grad=false;
+		pseudo_halfsets=false;
 	}
 
 	// Initialise vectors with the right size
-	void initialise(bool _do_grad = false);
+	void initialise(bool _do_grad = false, bool _pseudo_halfsets = false);
 
 	//Read a model from a file
 	void read(FileName fn_in, int nr_optics_groups_from_mydata);
@@ -426,7 +432,7 @@ public:
 	// Also set do_average_unaligned and do_generate_seeds flags
 	void initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experiment &_mydata,
 			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected,
-			RFLOAT ref_angpix = -1., bool _do_grad = false, bool do_trust_ref = false, bool verb = false);
+			RFLOAT ref_angpix = -1., bool _do_grad = false, bool _pseudo_halfsets = false, bool do_trust_ref = false, bool verb = false);
 
 	RFLOAT getResolution(int ipix)	{ return (RFLOAT)ipix/(pixel_size * ori_size); }
 
@@ -504,7 +510,7 @@ public:
 	}
 
 	// Initialise all weighted sums (according to size of corresponding model
-	void initialise(MlModel &_model, FileName fn_sym = "c1", bool asymmetric_padding = false, bool _skip_gridding = false);
+	void initialise(MlModel &_model, FileName fn_sym = "c1", bool asymmetric_padding = false, bool _skip_gridding = false, bool _pseudo_halfsets = false);
 
 	// Initialize all weighted sums to zero (with resizing the BPrefs to current_size)
 	void initZeros();

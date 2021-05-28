@@ -34,7 +34,7 @@ void FindLatticeProgram::run()
 	
 	const double spacing_px = spacing_ang / angpix;
 		
-	BufferedImage<float> tomoBP = ImageFilter::bandpass(tomo, spacing_px, tomo.xdim / filter_width, overtones);
+	BufferedImage<float> tomoBP = ImageFilter::bandpass(tomo, spacing_px, filter_width, overtones);
 	
 	tomoBP.write(outFn+"_bandpass.mrc");
 	
@@ -42,10 +42,10 @@ void FindLatticeProgram::run()
 	
 	{
 		BufferedImage<float> tomoBP_pos = ImageFilter::bandpass(
-					tomo, spacing_px + 2, filter_width / tomo.xdim, overtones);
+					tomo, spacing_px + 2, filter_width, overtones);
 		
 		BufferedImage<float> tomoBP_neg = ImageFilter::bandpass(
-					tomo, spacing_px - 2, filter_width / tomo.xdim, overtones);
+					tomo, spacing_px - 2, filter_width, overtones);
 		
 		BufferedImage<float> tomoBP_env = tomoBP_pos + tomoBP_neg;
 		

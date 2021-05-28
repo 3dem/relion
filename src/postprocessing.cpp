@@ -24,8 +24,9 @@ void Postprocessing::read(int argc, char **argv)
 {
 	parser.setCommandLine(argc, argv);
 	int gen_section = parser.addSection("General options");
-	fn_I1 = parser.getOption("--i", "Input name of half1, e.g. run_half1_class001_unfil.mrc");
+	fn_I1 = parser.getOption("--i", "Input name of half1, e.g. run_half1_class001_unfil.mrc", "");
 	fn_I2 = parser.getOption("--i2", "Input name of half2, (default replaces half1 from --i with half2)", "");
+	fn_OS = parser.getOption("--ios", "Input tomo optimiser set file. It is used to set --i if not provided. Updated output optimiser set is created.", "");
 	fn_out = parser.getOption("--o", "Output rootname", "postprocess");
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "-1"));
 	write_halfmaps = parser.checkOption("--half_maps", "Write post-processed half maps for validation");
@@ -65,6 +66,7 @@ void Postprocessing::read(int argc, char **argv)
 	randomize_fsc_at = textToFloat(parser.getOption("--randomize_at_fsc", "Randomize phases from the resolution where FSC drops below this value", "0.8"));
 	randomize_at_A  = textToFloat(parser.getOption("--randomize_at_A", "Randomize phases from this resolution (in A) onwards (if positive)", "-1"));
 	filter_edge_width = textToInteger(parser.getOption("--filter_edge_width", "Width of the raised cosine on the low-pass filter edge (in resolution shells)", "2"));
+	do_interpolate = parser.checkOption("--interpolate", "Interpolate the FSC to obtain an additional, more precise resolution estimate");
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
 	int random_seed = textToInteger(parser.getOption("--random_seed", "Seed for random number generator (negative value for truly random)", "0"));
 
@@ -85,7 +87,7 @@ void Postprocessing::usage()
 
 void Postprocessing::clear()
 {
-	fn_I1 = fn_I2 = "";
+	fn_I1 = fn_I2 = fn_OS = "";
 	fn_out="postprocess";
 	angpix = 1.;
 	mtf_angpix = 1.;
@@ -109,13 +111,35 @@ void Postprocessing::clear()
 
 void Postprocessing::initialise()
 {
-	// Read in the input maps
-	if (fn_I2 == "")
+	// Check if input is a tomo optimiser set file
+	if (fn_OS != "")
 	{
-		if (!fn_I1.getTheOtherHalf(fn_I2))
+		optimisationSet.read(fn_OS);
+
+		if (fn_I1 == "")
+		{
+			if (!optimisationSet.getValue(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, fn_I1) ||
+				!optimisationSet.getValue(EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME, fn_I2))
+				REPORT_ERROR("No halfmap filenames were found in file " + fn_OS);
+		}
+		else
+		{
+			if (fn_I2 == "" && !fn_I1.getTheOtherHalf(fn_I2))
+				REPORT_ERROR("The input filename does not contain 'half1' or 'half2'");
+
+			optimisationSet.setValue(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, fn_I1);
+			optimisationSet.setValue(EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME, fn_I2);
+		}
+	}
+	else if (fn_I1 != "") // Read in the input maps
+	{
+		if (fn_I2 == "" && !fn_I1.getTheOtherHalf(fn_I2))
 			REPORT_ERROR("The input filename does not contain 'half1' or 'half2'");
 	}
-
+	else
+	{
+		REPORT_ERROR("Input file is missing. Provide, at least, --i or --ios input.");
+	}
 
 	if (verb > 0)
 	{
@@ -713,6 +737,13 @@ void Postprocessing::writeOutput()
 	}
 	MDlist.write(fh);
 
+	// If input optimiser set is provided, also crete it as output
+	if (!optimisationSet.isEmpty())
+	{
+		optimisationSet.setValue(EMDL_TOMO_REFERENCE_FSC_FILE_NAME, fn_tmp);
+		optimisationSet.write(fn_out + "_optimiser_set.star");
+	}
+
 	MDfsc.setName("fsc");
 	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_true)
 	{
@@ -855,7 +886,16 @@ void Postprocessing::writeOutput()
 
 	if (verb > 0)
 	{
-		std::cout.width(35); std::cout << std::left   <<"  + FINAL RESOLUTION: "; std::cout << global_resol<< std::endl;
+		if (do_interpolate)
+		{
+			std::cout.width(35);
+			std::cout << std::left   <<"  + FINAL RESOLUTION: ";
+			std::cout << global_resol << " (" << fract_resol << ')' << std::endl;
+		}
+		else
+		{
+			std::cout.width(35); std::cout << std::left   <<"  + FINAL RESOLUTION: "; std::cout << global_resol<< std::endl;
+		}
 	}
 }
 
@@ -1286,6 +1326,20 @@ void Postprocessing::run()
 			break;
 		global_resol = XSIZE(I1())*angpix/(RFLOAT)i;
 		global_resol_i = i;
+	}
+
+	// Determine the fractional resolution (needed for development purposes)
+	if (do_interpolate && global_resol_i < fsc_true.xdim - 1)
+	{
+		const double v0 = DIRECT_A1D_ELEM(fsc_true, global_resol_i) - 0.143;
+		const double v1 = DIRECT_A1D_ELEM(fsc_true, global_resol_i + 1) - 0.143;
+		const double r = v0 / (v0 - v1);
+
+		fract_resol = XSIZE(I1()) * angpix / (global_resol_i + r);
+	}
+	else
+	{
+		fract_resol = global_resol;
 	}
 
 	// Perform some checks on phase-randomisation..

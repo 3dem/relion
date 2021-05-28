@@ -541,7 +541,10 @@ void CtfRefinementProgram::updateScale(
 				ctf, tomogram.optics.pixelSize, aberrationsCache,
 				referenceMap.image_FS,
 				Prediction::OwnHalf,
-				Prediction::AmplitudeModulated);
+				Prediction::AmplitudeModulated,
+				Prediction::NotDoseWeighted,
+				0.0,
+				Prediction::CtfUnscaled);
 
 			for (int y = 0; y < sh; y++)
 			for (int x = 0; x < s;  x++)
@@ -551,7 +554,7 @@ void CtfRefinementProgram::updateScale(
 				const double r = sqrt(xx*xx + yy*yy);
 
 				const fComplex obs = -observation(x,y);
-				const fComplex prd =  doseWeights(x,y,f) * prediction(x,y) / ctf.scale;
+				const fComplex prd =  doseWeights(x,y,f) * prediction(x,y);
 
 				const int ri = (int) r;
 
@@ -906,6 +909,7 @@ void CtfRefinementProgram::fitGlobalScale()
 
 		if (!ZIO::fileExists(tempFilename))
 		{
+			Log::warn("Temporary file "+tempFilename+" not found.");
 			continue;
 		}
 
@@ -1145,7 +1149,7 @@ void CtfRefinementProgram::fitAberrations()
 			{
 				const std::string fn = getEvenAberrationsTempFilename(tomogramSet.getTomogramName(t), g);
 
-				if (ZIO::fileExists(fn))
+				if (ZIO::fileExists(fn + "_by.mrc"))
 				{
 					BufferedImage<EvenData> even = EvenData::read(fn);
 					even_data_sum += even;
@@ -1186,7 +1190,7 @@ void CtfRefinementProgram::fitAberrations()
 			{
 				const std::string fn = getOddAberrationsTempFilename(tomogramSet.getTomogramName(t), g);
 
-				if (ZIO::fileExists(fn))
+				if (ZIO::fileExists(fn + "_b_real.mrc"))
 				{
 					BufferedImage<OddData> odd = OddData::read(fn);
 					odd_data_sum += odd;
@@ -1567,7 +1571,7 @@ void CtfRefinementProgram::writeScaleEps(
 	plot2D.SetXAxisSize(600);
 	plot2D.SetYAxisSize(600);
 	plot2D.SetDrawLegend(true);
-	plot2D.SetFlipY(true);
+	plot2D.SetFlipY(false);
 
 	const int fc = table.numberOfObjects();
 

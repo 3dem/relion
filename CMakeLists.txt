@@ -361,16 +361,17 @@ endif()
 
 # -----------------------------------------------------------------------------Torch--
 
-option(TORCH "Enable support for Torch" OFF)
+#option(TORCH "Enable support for LibTorch" OFF)
+#if(TORCH)
+#    message(STATUS "Torch support requested by user.")
+#    include(${CMAKE_SOURCE_DIR}/cmake/BuildTorch.cmake)
+#    add_definitions(-D_TORCH_ENABLED)
+#endif(TORCH)
+
 option(SKIP_TORCH_MODELS "Do not download pre-trained torch models" OFF)
-if(TORCH)
-    message(STATUS "Torch support requested by user.")
-    include(${CMAKE_SOURCE_DIR}/cmake/BuildTorch.cmake)
-    if (NOT SKIP_TORCH_MODELS)
-        include(${CMAKE_SOURCE_DIR}/cmake/FetchTorchModels.cmake)
-    endif()
-    add_definitions(-D_TORCH_ENABLED)
-endif(TORCH)
+if (NOT SKIP_TORCH_MODELS)
+    include(${CMAKE_SOURCE_DIR}/cmake/FetchTorchModels.cmake)
+endif()
 
 # ----------------------------------------------------------------------COPY SCRIPTS--
 
@@ -378,15 +379,18 @@ if(FORCE_OWN_FFTW)
     install(DIRECTORY external/fftw/lib/ DESTINATION lib FILES_MATCHING PATTERN "*")
 endif()
 
-list(APPEND RELION_SCRIPT_FILES star_printtable 
-                                star_plottable
-                                star_loopheader
-                                star_datablock_stack
-                                star_datablock_singlefiles
-                                star_datablock_ctfdat
-                                qsub.csh
-				it.py
-				schedulegui.py)
+list(APPEND RELION_SCRIPT_FILES
+        star_printtable
+        star_plottable
+        star_loopheader
+        star_datablock_stack
+        star_datablock_singlefiles
+        star_datablock_ctfdat
+        qsub.csh
+        it.py
+        schedulegui.py
+        class_ranker.py
+)
 
 add_custom_target(copy_scripts ALL)
                                 

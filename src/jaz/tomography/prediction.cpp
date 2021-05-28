@@ -31,7 +31,8 @@ BufferedImage<fComplex> Prediction::predictModulated(
 		HalfSet halfSet,
 		Modulation modulation,
 		DoseWeight doseWeight,
-		double cumulativeDose)
+		double cumulativeDose,
+		CtfScale ctfScale)
 {
 	BufferedImage<fComplex> prediction = predictFS(
 				particle_id, dataSet, proj, s, referenceFS, halfSet);
@@ -47,7 +48,16 @@ BufferedImage<fComplex> Prediction::predictModulated(
 		const BufferedImage<double>* gammaOffset =
 			aberrationsCache.hasSymmetrical? &aberrationsCache.symmetrical[og] : 0;
 
-		ctf.draw(s, s, pixelSize, gammaOffset, &ctfImg[0]);
+		if (ctfScale == CtfUnscaled)
+		{
+			CTF ctf0 = ctf;
+			ctf0.scale = 1.0;
+			ctf0.draw(s, s, pixelSize, gammaOffset, &ctfImg[0]);
+		}
+		else
+		{
+			ctf.draw(s, s, pixelSize, gammaOffset, &ctfImg[0]);
+		}
 		
 		prediction *= ctfImg;
 	}
@@ -188,7 +198,11 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 					tomogram.getCtf(f, dataSet.getPosition(part_id)),
 					tomogram.optics.pixelSize,
 					aberrationsCache,
-					referenceMap.image_FS, halfSet);
+					referenceMap.image_FS, halfSet,
+					AmplitudeAndPhaseModulated,
+					DoseWeighted,
+					tomogram.cumulativeDose[f],
+					CtfScaled);
 					
 			BufferedImage<fComplex> ccFS(sh,s);
 			

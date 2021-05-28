@@ -344,7 +344,7 @@ RFLOAT MetaDataTable::getDouble(EMDLabel label, long objectID) const
 	return (double) getRfloat(label, objectID);
 }
 
-double MetaDataTable::getAngleInRad(EMDLabel label, long objectID) const
+RFLOAT MetaDataTable::getAngleInRad(EMDLabel label, long objectID) const
 {
 	return DEG2RAD(getDouble(label, objectID));
 }
@@ -755,7 +755,7 @@ void MetaDataTable::addMissingLabels(const MetaDataTable* mdt)
 	for (long i = 0; i < mdt->activeLabels.size(); i++)
 	{
 		EMDLabel l = mdt->activeLabels[i];
-		
+
 		if (l == EMDL_UNKNOWN_LABEL)
 		{
 			std::string unknownLabel = mdt->getUnknownLabelNameAt(i);
@@ -883,7 +883,7 @@ void MetaDataTable::setObjectUnsafe(MetaDataContainer* data, long objectID)
 			}
 
 			if (myOff < 0)
-				REPORT_ERROR("MetaDataTable::setObjectUnsafe: logic error. cannot find srcOff."); 
+				REPORT_ERROR("MetaDataTable::setObjectUnsafe: logic error. cannot find srcOff.");
 
 			obj->unknowns[myOff] = data->unknowns[srcOff];
 		}
@@ -1065,7 +1065,7 @@ bool MetaDataTable::readStarList(std::ifstream& in)
 	// Read data and fill structures accordingly
 	int labelPosition = 0;
 	int lastGoodPos = in.tellg();
-	
+
 	while (getline(in, line, '\n'))
 	{
 		int pos = 0;
@@ -1094,7 +1094,7 @@ bool MetaDataTable::readStarList(std::ifstream& in)
 				setValueFromString(label, value, objectID);
 			}
 			labelPosition++;
-			
+
 			lastGoodPos = in.tellg();
 		}
 		// Check whether there is a comment or an empty line
@@ -1112,9 +1112,9 @@ bool MetaDataTable::readStarList(std::ifstream& in)
 		// Check whether this data blocks ends (because a next one is there)
 		else if (firstword.find("data_") == 0)
 		{
-			// Should I reverse the pointer one line? 
+			// Should I reverse the pointer one line?
 			// - Yes, please!!   -- JZ
-			
+
 			in.seekg(lastGoodPos);
 			return also_has_loop;
 		}
@@ -1141,7 +1141,11 @@ long int MetaDataTable::readStar(std::ifstream& in, const std::string &name, boo
 	while (getline(in, line, '\n'))
 	{
 		if (line.size() >= 2 && line[line.size() - 1] == '\r')
+		{
+			if (name != "") std::cerr << " table name= " << name << std::endl;
+			std::cerr << " line= " << line << std::endl;
 			REPORT_ERROR("RELION does not support CR+LF as a new line code. Didn't you edit a STAR file in Windows? Convert it to the UNIX style (LF only) by for example `dos2unix` command.");
+		}
 
 		trim(line);
 		if (line.find("# version ") != std::string::npos)
@@ -1188,13 +1192,13 @@ long int MetaDataTable::readStar(std::ifstream& in, const std::string &name, boo
 }
 
 std::vector<MetaDataTable> MetaDataTable::readAll(
-		std::ifstream &in, 
-		int expectedNumber, 
+		std::ifstream &in,
+		int expectedNumber,
 		bool do_only_count)
 {
 	std::vector<MetaDataTable> out(0);
 	out.reserve(expectedNumber);
-	
+
 	std::string line;
 
 	// Start reading the ifstream at the top
@@ -1209,7 +1213,7 @@ std::vector<MetaDataTable> MetaDataTable::readAll(
 	while (getline(in, line, '\n'))
 	{
 		trim(line);
-		
+
 		if (line.find("# version ") != std::string::npos)
 		{
 			std::string versionStr = line.substr(line.find("# version ") + std::string("# version ").length());
@@ -1222,14 +1226,14 @@ std::vector<MetaDataTable> MetaDataTable::readAll(
 		if (line.find("data_") != std::string::npos)
 		{
 			std::string nameStr = line.substr(line.find("data_") + 5);
-			
+
 			out.push_back(MetaDataTable());
 			MetaDataTable& mdt = out[out.size()-1];
-			
+
 			mdt.setName(nameStr);
-							
+
 			int current_pos = in.tellg();
-				
+
 			while (getline(in, line, '\n'))
 			{
 				if (line.find("loop_") != std::string::npos)
@@ -1248,7 +1252,7 @@ std::vector<MetaDataTable> MetaDataTable::readAll(
 		}
 	}
 
-	return out;	
+	return out;
 }
 long int MetaDataTable::read(const FileName &filename, const std::string &name, bool do_only_count)
 {

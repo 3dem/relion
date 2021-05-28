@@ -57,6 +57,8 @@ class AlignProgram : public RefinementProgram
 				int t);
 
 		void readTempData(int t);
+
+		void mergeLogFiles();
 };
 
 

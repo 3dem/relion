@@ -208,6 +208,7 @@ enum EMDLabel
 	EMDL_IMAGE_WEIGHT,
 
 	EMDL_JOB_IS_CONTINUE,
+	EMDL_JOB_IS_TOMO,
 	EMDL_JOB_TYPE,
 	EMDL_JOB_TYPE_LABEL,
 
@@ -354,6 +355,11 @@ enum EMDLabel
 	EMDL_OPTIMISER_DO_MAP,
 	EMDL_OPTIMISER_DO_GRAD,
 	EMDL_OPTIMISER_GRAD_EM_ITERS,
+	EMDL_OPTIMISER_GRAD_HAS_CONVERGED,
+	EMDL_OPTIMISER_GRAD_CURRENT_STEPSIZE,
+	EMDL_OPTIMISER_AUTO_SUBSET_ORDER,
+	EMDL_OPTIMISER_GRAD_SUSPEND_FINER_SAMPLING_ITER,
+	EMDL_OPTIMISER_GRAD_SUSPEND_LOCAL_SAMPLING_ITER,
 	EMDL_OPTIMISER_DO_STOCHASTIC_EM,
 	EMDL_OPTIMISER_EXTERNAL_RECONS_DATA_REAL,
 	EMDL_OPTIMISER_EXTERNAL_RECONS_DATA_IMAG,
@@ -875,7 +881,8 @@ private:
 
 		EMDL::addLabel(EMDL_MASK_NAME, EMDL_STRING, "rlnMaskName", "Name of an image that contains a [0,1] mask");
 
-		EMDL::addLabel(EMDL_JOB_IS_CONTINUE, EMDL_BOOL, "rlnJobIsContinue", "Is tthis a continuation job?");
+		EMDL::addLabel(EMDL_JOB_IS_CONTINUE, EMDL_BOOL, "rlnJobIsContinue", "Is this a continuation job?");
+		EMDL::addLabel(EMDL_JOB_IS_TOMO, EMDL_BOOL, "rlnJobIsTomo", "Is this a tomo job?");
 		EMDL::addLabel(EMDL_JOB_TYPE, EMDL_INT, "rlnJobType", "Which type of job is this?");
 		EMDL::addLabel(EMDL_JOB_TYPE_LABEL, EMDL_STRING, "rlnJobTypeLabel", "The name for this type of job (also name of main directory for output jobs)");
 
@@ -1018,6 +1025,11 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_DO_MAP, EMDL_BOOL, "rlnDoMapEstimation", "Flag to indicate that MAP estimation should be performed (otherwise ML estimation)");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_GRAD, EMDL_BOOL, "rlnDoStochasticGradientDescent", "Flag to indicate that SGD-optimisation should be performed (otherwise expectation maximisation)");
 		EMDL::addLabel(EMDL_OPTIMISER_GRAD_EM_ITERS, EMDL_INT, "rlnGradEmIters", "Finish gradient optimization with this many iterations of Expectation-Maximization.");
+		EMDL::addLabel(EMDL_OPTIMISER_GRAD_HAS_CONVERGED, EMDL_BOOL, "rlnGradHasConverged", "Has gradient refinement converged.");
+		EMDL::addLabel(EMDL_OPTIMISER_GRAD_CURRENT_STEPSIZE, EMDL_DOUBLE, "rlnGradCurrentStepsize", "The current step size.");
+		EMDL::addLabel(EMDL_OPTIMISER_AUTO_SUBSET_ORDER, EMDL_INT, "rlnGradSubsetOrder", "The initial subset size multiplied with two (2) to the power of this number.");
+		EMDL::addLabel(EMDL_OPTIMISER_GRAD_SUSPEND_FINER_SAMPLING_ITER, EMDL_INT, "rlnGradSuspendFinerSamplingIter", "Suspend finer sampling this many iterations");
+		EMDL::addLabel(EMDL_OPTIMISER_GRAD_SUSPEND_LOCAL_SAMPLING_ITER, EMDL_INT, "rlnGradSuspendLocalSamplingIter", "Suspend local sampling this many iterations");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_STOCHASTIC_EM,EMDL_BOOL, "rlnDoStochasticEM", "Flag to indicate that stochastic EM-optimisation should be performed (an alternative to SGD)");
 		EMDL::addLabel(EMDL_OPTIMISER_EXTERNAL_RECONS_DATA_REAL, EMDL_STRING, "rlnExtReconsDataReal", "Name of the map with the real components of the input data array for the external reconstruction program");
 		EMDL::addLabel(EMDL_OPTIMISER_EXTERNAL_RECONS_DATA_IMAG, EMDL_STRING, "rlnExtReconsDataImag", "Name of the map with the imaginary components of the input data array for the external reconstruction program");

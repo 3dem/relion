@@ -4599,8 +4599,10 @@ std::ostream& operator<< (std::ostream& ostrm, const MultidimArray<T>& v)
     if (YSIZE(v)==1 && ZSIZE(v)==1)
     {
         for (long int j = STARTINGX(v); j <= FINISHINGX(v); j++)
-            ostrm << floatToString((RFLOAT) A3D_ELEM(v, 0, 0, j), 10, prec)
-            << std::endl;
+        {
+        	ostrm << floatToString((RFLOAT) A3D_ELEM(v, 0, 0, j), 10, prec)<<" ";
+        }
+        ostrm << std::endl;
     }
     else
     {

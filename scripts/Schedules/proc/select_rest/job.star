@@ -35,6 +35,7 @@ min_dedicated         24
  nr_groups          1 
   nr_split         -1 
 other_args         "" 
+python_exe /public/EM/anaconda3/envs/topaz/bin/python 
       qsub       qsub 
 qsubscript /public/EM/RELION/relion/bin/relion_qsub.csh 
  queuename    openmpi 
