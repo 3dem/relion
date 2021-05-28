@@ -26,6 +26,15 @@
 #define STR(x) STR_HELPER(x)
 bool show_expand_stdout;
 
+std::string cpipe_get_job_name(int jobnumber)
+{
+	char buffer[256]; sprintf(buffer, "%03d", jobnumber+1);
+	std::string job_num_string;
+	job_num_string =  buffer;
+	std::string job_name_string = "job" + job_num_string;
+	return job_name_string;
+}
+
 // The StdOutDisplay allows looking at the entire stdout or stderr file
 int StdOutDisplay::handle(int ev)
 {
@@ -1263,7 +1272,8 @@ void GuiMainWindow::cb_display_io_node_i()
 	int idx = display_io_node->value();
 	long int mynode = io_nodes[idx];
 	std::string command;
-	if (pipeline.nodeList[mynode].type.find(LABEL_COORDS_CPIPE) == 0)
+
+	if (pipeline.nodeList[mynode].type == LABEL_COORDS_CPIPE)
 	{
 
 		// TODO: write error message saying this is no longer possible: use Continue to pick more/inspect results!
@@ -1357,7 +1367,7 @@ void GuiMainWindow::cb_display_io_node_i()
 		// Other arguments for extraction
 		command += " " + manualpickjob.joboptions["other_args"].getString() + " &";
 	}
-	else if (pipeline.nodeList[mynode].type.find(LABEL_LOGFILE_CPIPE) == 0)
+	else if (pipeline.nodeList[mynode].type == LABEL_LOGFILE_CPIPE)
 	{
 		const char * default_pdf_viewer = getenv ("RELION_PDFVIEWER_EXECUTABLE");
 		char mydefault[]=DEFAULTPDFVIEWER;
@@ -1368,11 +1378,11 @@ void GuiMainWindow::cb_display_io_node_i()
 		std::string myviewer(default_pdf_viewer);
 		command = myviewer + " " + pipeline.nodeList[mynode].name + "&";
 	}
-	else if (pipeline.nodeList[mynode].type.find(LABEL_POLISH_PARAMS) == 0)
+	else if (pipeline.nodeList[mynode].type == LABEL_POLISH_PARAMS)
 	{
 		command = "cat " + pipeline.nodeList[mynode].name;
 	}
-	else if (pipeline.nodeList[mynode].type.find(LABEL_POST) != 0)
+	else if (pipeline.nodeList[mynode].type != LABEL_POST)
 	{
 		command = "relion_display --gui --i " + pipeline.nodeList[mynode].name + " &";
 	}
@@ -1620,7 +1630,16 @@ void GuiMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 
 		if (use_ccpem_pipeliner)
 		{
-			REPORT_ERROR("TODO Matt Iadanza: implement system call to CCPEM pipeliner here");
+			std::string thejob = cpipe_get_job_name(current_job);
+			std::string command = "reSPYon --delete_job " + thejob;
+			system(command.c_str());
+
+			// Reset current_job
+			current_job = -1;
+			fillStdOutAndErr();
+
+			// Update all job lists in the main GUI
+			updateJobLists();
 		}
 		else
 		{
@@ -1688,7 +1707,9 @@ e.g. by using \"touch Polish/job045/NO_HARSH_CLEAN\". Below is a list of current
 
 		if (use_ccpem_pipeliner)
 		{
-			REPORT_ERROR("TODO Matt Iadanza: implement system call to CCPEM pipeliner here");
+			std::string isharsh = (do_harsh) ? "--harsh" : "";
+			std::string command  = "reSPYon --cleanup ALL " + isharsh;
+			system(command.c_str());
 		}
 		else
 		{
@@ -1737,9 +1758,19 @@ void GuiMainWindow::cb_cleanup_i(int myjob, bool do_verb, bool do_harsh)
 
 	if (proceed)
 	{
-		std::string error_message;
-		if (!pipeline.cleanupJob(myjob, do_harsh, error_message))
-			fl_message("%s",error_message.c_str());
+		if (use_ccpem_pipeliner)
+		{
+			std::string isharsh = (do_harsh) ? "--harsh" : "";
+			std::string jobname  = cpipe_get_job_name(current_job);
+			std::string command  = "reSPYon --cleanup " + jobname + " " + isharsh;
+			int res = system(command.c_str());
+		}
+		else
+		{
+			std::string error_message;
+			if (!pipeline.cleanupJob(myjob, do_harsh, error_message))
+				fl_message("%s",error_message.c_str());
+		}
 	}
 }
 
@@ -1789,14 +1820,22 @@ void GuiMainWindow::cb_set_alias_i(std::string alias)
 			alias = al2;
 		}
 
-		// Matt Iadanza: not sure whether you want to do this in the ccpem pipeliner too?
-
-		if (pipeline.setAliasJob(current_job, alias, error_message))
+		if (use_ccpem_pipeliner)
+		{
+			std::string jobname  = cpipe_get_job_name(current_job);
+			std::string command  = "reSPYon --set_alias " + jobname + " " + alias;
+			int res = system(command.c_str());
 			is_done = true;
+		}
 		else
 		{
-			alias = "";
-			fl_message("%s",error_message.c_str());
+			if (pipeline.setAliasJob(current_job, alias, error_message))
+				is_done = true;
+			else
+			{
+				alias = "";
+				fl_message("%s",error_message.c_str());
+			}
 		}
 	}
 }
@@ -1810,8 +1849,6 @@ void GuiMainWindow::cb_abort(Fl_Widget* o, void* v)
 
 void GuiMainWindow::cb_abort_i(std::string alias)
 {
-	// Matt Iadanza: not sure whether you want to do this in the ccpem pipeliner too?
-
 	if (current_job < 0)
 	{
 		fl_message("Please select a job.");
@@ -1829,8 +1866,18 @@ void GuiMainWindow::cb_abort_i(std::string alias)
 		int proceed =  fl_choice("%s", "Cancel", "Abort!", NULL, ask.c_str());
 		if (proceed)
 		{
-			touch(pipeline.processList[current_job].name + RELION_JOB_ABORT_NOW);
+			if (use_ccpem_pipeliner)
+			{
+					std::string jobname = cpipe_get_job_name(current_job);
+					std::string command = "reSPYon --set_status " + jobname + " aborted";
+					int res = system(command.c_str());
+			}
+			else
+			{
+				touch(pipeline.processList[current_job].name + RELION_JOB_ABORT_NOW);
+			}
 		}
+
 	}
 }
 
@@ -1856,14 +1903,30 @@ void GuiMainWindow::cb_mark_as_finished_i(bool is_failed)
 		return;
 	}
 
-	// Matt Iadanza: not sure whether you want to do this in the ccpem pipeliner too?
+	if (use_ccpem_pipeliner)
+	{
+		if (is_failed)
+		{
+			std::string jobname = cpipe_get_job_name(current_job);
+			std::string command = "reSPYon --set_status " + jobname + " failed";
+			int res = system(command.c_str());
+		}
 
-	std::string error_message;
-	if (!pipeline.markAsFinishedJob(current_job, error_message, is_failed))
-		fl_message("%s",error_message.c_str());
+		else
+		{
+			std::string jobname = cpipe_get_job_name(current_job);
+			std::string command = "reSPYon --set_status " + jobname + " finished";
+			int res = system(command.c_str());
+		}
+	}
 	else
-		updateJobLists();
-
+	{
+		std::string error_message;
+		if (!pipeline.markAsFinishedJob(current_job, error_message, is_failed))
+			fl_message("%s",error_message.c_str());
+		else
+			updateJobLists();
+	}
 }
 
 void GuiMainWindow::cb_edit_note(Fl_Widget*, void* v)
@@ -1925,7 +1988,6 @@ void GuiMainWindow::cb_save_i()
 	fl_filename_relative(relname,sizeof(relname),G_chooser->value());
 	FileName fn_dir = (std::string)relname;
 	if (fn_dir == "") fn_dir = ".";
-	gui_jobwindows[iwin]->myjob.label = get_proc_label(gui_jobwindows[iwin]->myjob.type);
 	gui_jobwindows[iwin]->myjob.write(fn_dir + "/job.star");
 
 	// Also save hidden job.star file
@@ -1999,7 +2061,15 @@ void GuiMainWindow::cb_undelete_job_i()
 
 	if (use_ccpem_pipeliner)
 	{
-		REPORT_ERROR("TODO Matt Iadanza: implement system call to CCPEM pipeliner here");
+		// needed an adaptor to get the job name from the pipeline file that was selected
+		size_t splitit;
+		std::string trashfile = relname;
+		splitit=trashfile.find_last_of("/\\");
+		std::string trashdir = trashfile.substr(0,splitit);
+		splitit = trashdir.find_first_of("/\\");
+		std::string projdir = trashdir.substr(splitit+1);
+		std::string undelcom = "reSPYon --undelete_job " + projdir;
+		system(undelcom.c_str());
 	}
 	else
 	{
@@ -2035,11 +2105,18 @@ void GuiMainWindow::cb_empty_trash_i()
 	std::string ask = "Are you sure you want to remove the entire Trash folder?";
 	int proceed =  fl_choice("%s", "Cancel", "Empty Trash", NULL, ask.c_str());
 	if (proceed)
+	if (use_ccpem_pipeliner)
+	{
+		std::string command = "reSPYon --empty_trash";
+		int res = system(command.c_str());
+	}
+	else
 	{
 		std::string command = "rm -rf Trash";
 		std::cout << " Executing: " << command << std::endl;
 		int res = system(command.c_str());
 	}
+
 }
 
 void GuiMainWindow::cb_print_notes(Fl_Widget*, void* v)
