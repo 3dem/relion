@@ -176,18 +176,42 @@ void SchedulerWindow::cb_execute(Fl_Widget*, void* v)
 
 void SchedulerWindow::cb_execute_i()
 {
-	if (use_ccpem_pipeliner)
+	FileName fn_sched(schedule_name->value());
+	FileName fn_check = "RUNNING_PIPELINER_" + pipeline_name + "_" + fn_sched;
+	if (exists(fn_check))
 	{
-		REPORT_ERROR("TODO Matt Iadanza: implement system call to CCPEM pipeliner here");
+		std::string msg =  "ERROR: a file called " + fn_check + " already exists. \n This implies another set of scheduled jobs with this name is already running. \n Cancelling job execution...";
+		fl_message("%s", msg.c_str());
 	}
 	else
 	{
-		FileName fn_sched(schedule_name->value());
-		FileName fn_check = "RUNNING_PIPELINER_" + pipeline_name + "_" + fn_sched;
-		if (exists(fn_check))
+		std::string myrepeat(repeat->value());
+		std::string mywait(wait->value());
+		std::string mywait_before(wait_before->value());
+		std::string mywait_after(wait_after->value());
+
+		if (use_ccpem_pipeliner)
 		{
-			std::string msg =  "ERROR: a file called " + fn_check + " already exists. \n This implies another set of scheduled jobs with this name is already running. \n Cancelling job execution...";
-			fl_message("%s", msg.c_str());
+			std::string command = "reSPYon --run_schedule ";
+			command += " --name " + fn_sched;
+			command += " --nr_repeats " + myrepeat;
+			command += " --min_between " + mywait;
+			command += " --wait_min_before " + mywait_before;
+			command += " --wait_sec_after " + mywait_after;
+			command += " --jobs ";
+
+			for (int ijob = 0; ijob < my_jobs.size(); ijob++)
+			{
+				if (check_buttons[ijob]->value())
+					command += my_jobs[ijob] + " ";
+			}
+
+			// Run this in the background, so control returns to the window
+			command += " &";
+			int res = system(command.c_str());
+			std::string message = "Running schedule " +  fn_sched + " with " + myrepeat + " repeats";
+			std::cout << message << std::endl;
+			std::cout << " Stop execution of this set of scheduled jobs with the command: CL_pipeline --stop_schedule " << fn_sched << std::endl;
 		}
 		else
 		{
@@ -199,11 +223,6 @@ void SchedulerWindow::cb_execute_i()
 					jobids += my_jobs[ijob] + " ";
 			}
 			jobids += "\"";
-
-			std::string myrepeat(repeat->value());
-			std::string mywait(wait->value());
-			std::string mywait_before(wait_before->value());
-			std::string mywait_after(wait_after->value());
 
 			std::string command = "relion_pipeliner --pipeline " + pipeline_name;
 			command += " --schedule " + fn_sched;
@@ -1537,10 +1556,20 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 
 
 	if (use_ccpem_pipeliner)
+	// switch this to pipeline.runJobCCPEM
 	{
-		std::string command = "python example for Matt";
-		int res = system(command.c_str());
-		REPORT_ERROR("TODO Matt Iadanza: implement system call to CCPEM pipeliner here");
+		std::string error_message;
+		if (!pipeline.runJob(gui_jobwindows[iwin]->myjob, current_job, only_schedule, is_main_continue, false, error_message))
+		{
+			std::cout << " CURRENTLY NOT RUNNING PIPELINER FOR THIS FUNCTION " << std::endl;
+			// Still revert back to the correct job_counter for overwrite jobs!
+			if (do_overwrite_continue) pipeline.setJobCounter(my_overwrite_job_counter);
+			// Show the error
+			fl_message("%s", error_message.c_str());
+			// Allow the user to fix the error and submit this job again
+			run_button->activate();
+			return;
+		}
 
 	}
 	else
