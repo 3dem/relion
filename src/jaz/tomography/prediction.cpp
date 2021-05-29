@@ -125,6 +125,8 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 	const int s_act = s * paddingFactor;
 	const int sh_act = s_act / 2 + 1;
 
+	/* pad the CCs by 3 pixels of zeros on each side, so that under cubic interpolation,
+	   the gradient vanishes at the boundary (1 pixel away from the edge): */
 	const bool pad_by_3 = true;
 	
 	const int pc = partIndices.size();

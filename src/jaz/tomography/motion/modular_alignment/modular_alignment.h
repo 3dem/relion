@@ -19,8 +19,8 @@
 #include <src/jaz/image/color_helper.h>
 #include <omp.h>
 
-#define ANGLE_SCALE 0.01
-#define ALIGN_FIRST_FRAME 1
+#define ANGLE_SCALE 0.001
+#define ALIGN_FIRST_FRAME 0
 
 class CTF;
 
@@ -218,7 +218,7 @@ ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 	pc(partIndices.size()),
 	mpc(motionModel.getParameterCount()),
 	dc(deformationModel2D.getParameterCount()),
-	maxRange(CCs[0].xdim / (2 * paddingFactor) - 3),
+	maxRange(CCs[0].xdim / (2 * paddingFactor) - 3), // CCs are padded by 3 pixels
 	lastIterationNumber(0)
 {	
 	initialPos.resize(pc);
