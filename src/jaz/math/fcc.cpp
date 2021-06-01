@@ -73,12 +73,16 @@ BufferedImage<double> FCC::compute3(
 		const ParticleIndex part_id = partIndices[p];
 		
 		const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(part_id, fc, tomogram.optics.pixelSize);
+		const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s/2.0);
+		
 		d4Matrix projCut;
 				
 		BufferedImage<fComplex> observation(sh,s);
 		
 		for (int f = 0; f < fc; f++)
 		{
+			if (!isVisible[f]) continue;
+			
 			TomoExtraction::extractFrameAt3D_Fourier(
 					tomogram.stack, f, s, 1.0, tomogram, traj[f],
 					observation, projCut, 1, true);

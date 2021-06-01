@@ -416,8 +416,11 @@ void SubtomoProgram::processTomograms(
 			}
 
 			const d3Vector pos = particleSet.getPosition(part_id);
+			
 			const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
 						part_id, fc, tomogram.optics.pixelSize);
+			
+			const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s2D/2.0);
 
 			std::vector<d4Matrix> projCut(fc), projPart(fc);
 
@@ -425,7 +428,7 @@ void SubtomoProgram::processTomograms(
 			BufferedImage<float> weightStack(sh2D,s2D,fc);
 
 			TomoExtraction::extractAt3D_Fourier(
-					tomogram.stack, s02D, binning, tomogram, traj,
+					tomogram.stack, s02D, binning, tomogram, traj, isVisible,
 					particleStack, projCut, inner_thread_num, do_circle_precrop);
 
 			if (!do_ctf) weightStack.fill(1.f);
@@ -438,6 +441,8 @@ void SubtomoProgram::processTomograms(
 
 			for (int f = 0; f < fc; f++)
 			{
+				if (!isVisible[f]) continue;
+				
 				projPart[f] = projCut[f] * d4Matrix(particleSet.getSubtomogramMatrix(part_id));
 
 				if (do_ctf)
@@ -502,13 +507,16 @@ void SubtomoProgram::processTomograms(
 
 			for (int f = 0; f < fc; f++)
 			{
-				FourierBackprojection::backprojectSlice_forward_with_multiplicity(
-					particleStack.getSliceRef(f),
-					weightStack.getSliceRef(f),
-					projPart[f] * relative_box_scale,
-					dataImgFS,
-					ctfImgFS,
-					multiImageFS);
+				if (isVisible[f])
+				{
+					FourierBackprojection::backprojectSlice_forward_with_multiplicity(
+						particleStack.getSliceRef(f),
+						weightStack.getSliceRef(f),
+						projPart[f] * relative_box_scale,
+						dataImgFS,
+						ctfImgFS,
+						multiImageFS);
+				}
 			}
 
 			Centering::shiftInSitu(dataImgFS);

@@ -66,6 +66,7 @@ void AlignProgram::parseInput()
 	alignmentSettings.constParticles = parser.checkOption("--const_p", "Keep the particle positions constant");
 	alignmentSettings.constAngles = parser.checkOption("--const_a", "Keep the frame angles constant");
 	alignmentSettings.constShifts = parser.checkOption("--const_s", "Keep the frame shifts constant");
+	alignmentSettings.rangeRegulariser = textToDouble(parser.getOption("--range_reg", "Value of the range regulariser", "0.01"));
 	do_anisotropy = parser.checkOption("--aniso", "Assume an anisotropic projection model");
 	per_tilt_anisotropy = parser.checkOption("--per_tilt_aniso", "Fit independent view anisotropy for each tilt image");
 	num_iters = textToInteger(parser.getOption("--it", "Max. number of iterations", "50000"));
@@ -333,7 +334,7 @@ void AlignProgram::processTomograms(
 
 				if (diag) CCsum.write(outDir + "CCsum_" + tag + ".mrc");
 
-				d2Vector origin(padding*range, padding*range);
+				d2Vector origin(padding*range + 4, padding*range + 4);
 				
 				std::vector<d4Matrix> projections = tomogram.projectionMatrices;
 				

@@ -11,6 +11,7 @@
 #include <src/jaz/tomography/motion/modular_alignment/no_motion_model.h>
 #include <src/jaz/tomography/motion/modular_alignment/no_2D_deformation_model.h>
 #include <src/jaz/tomography/motion/modular_alignment/spline_2D_deformation_model.h>
+#include <src/jaz/tomography/motion/proto_alignment.h>
 #include <src/jaz/optimization/lbfgs.h>
 #include <vector>
 
@@ -176,7 +177,7 @@ void AlignProgram::performAlignment(
 
 
 	std::vector<double> opt = LBFGS::optimize(
-		initial, alignment, 1, num_iters, 1e-5, 1e-5);
+			initial, alignment, 1, num_iters, 1e-6, 1e-4);
 
 
 	if (verbosity > 0 && per_tomogram_progress)

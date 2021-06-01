@@ -124,10 +124,14 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 	
 	const int s_act = s * paddingFactor;
 	const int sh_act = s_act / 2 + 1;
+
+	/* pad the CCs by 3 pixels of zeros on each side, so that under cubic interpolation,
+	   the gradient vanishes at the boundary (1 pixel away from the edge): */
+	const bool pad_by_3 = true;
 	
 	const int pc = partIndices.size();
 	const int fc = tomogram.frameCount;
-	const int diam = (int)(2 * maxRange * paddingFactor);
+	const int diam = (int)(2 * maxRange * paddingFactor) + (pad_by_3? 6 : 0);
 	const int border = (int)(s * paddingFactor - diam) / 2;
 	
 	std::vector<BufferedImage<double>> CCs(pc);
@@ -168,6 +172,10 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 			const RawImage<float> doseSlice = doseWeights.getConstSliceRef(f);
 
 			// @TODO: test whether the particle is visible
+			if (!tomogram.isVisible(traj[f], f, s/2.0))
+			{
+				CCs[p].getSliceRef(f).fill(0.0);
+			}
 			
 			TomoExtraction::extractFrameAt3D_Fourier(
 					tomogram.stack, f, s, 1.0, tomogram,
@@ -207,8 +215,39 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 			CCs[p].copySliceFrom(ft, 
 				Centering::fftwFullToHumanFull(
 					Padding::unpadCorner2D_full(ccRS_full, border)));
-			
-			
+
+			if (pad_by_3)
+			{
+				for (int y = 0; y < 3; y++)
+				{
+					for (int x = 0; x < diam; x++)
+					{
+						CCs[p](x,y) = 0.0;
+					}
+				}
+
+				for (int y = 3; y < diam - 3; y++)
+				{
+					for (int x = 0; x < 3; x++)
+					{
+						CCs[p](x,y) = 0.0;
+					}
+
+					for (int x = diam - 3; x < diam; x++)
+					{
+						CCs[p](x,y) = 0.0;
+					}
+				}
+
+				for (int y = diam - 3; y < diam; y++)
+				{
+					for (int x = 0; x < diam; x++)
+					{
+						CCs[p](x,y) = 0.0;
+					}
+				}
+			}
+
 			#if TEST_CC_SCALE
 			
 			if (th == 0)

@@ -346,11 +346,12 @@ void ReconstructParticleProgram::processTomograms(
 						part_id, fc, tomogram.optics.pixelSize);
 			std::vector<d4Matrix> projCut(fc), projPart(fc);
 
+			const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s/2.0);
 
 			const bool circle_crop = do_circle_crop;
 
 			TomoExtraction::extractAt3D_Fourier(
-					tomogram.stack, s02D, binning, tomogram, traj,
+					tomogram.stack, s02D, binning, tomogram, traj, isVisible,
 					particleStack[th], projCut, inner_threads, circle_crop);
 
 
@@ -365,6 +366,8 @@ void ReconstructParticleProgram::processTomograms(
 
 			for (int f = 0; f < fc; f++)
 			{
+				if (!isVisible[f]) continue;
+				
 				const double scaleRatio = binnedOutPixelSize / binnedPixelSize;
 				projPart[f] = scaleRatio * projCut[f] * particleToTomo;
 
@@ -400,13 +403,16 @@ void ReconstructParticleProgram::processTomograms(
 
 			for (int f = 0; f < fc; f++)
 			{
-				FourierBackprojection::backprojectSlice_backward(
-					particleStack[th].getSliceRef(f),
-					weightStack[th].getSliceRef(f),
-					projPart[f],
-					dataImgFS[2*th + halfSet],
-					ctfImgFS[2*th + halfSet],
-					inner_threads);
+				if (isVisible[f])
+				{
+					FourierBackprojection::backprojectSlice_backward(
+						particleStack[th].getSliceRef(f),
+						weightStack[th].getSliceRef(f),
+						projPart[f],
+						dataImgFS[2*th + halfSet],
+						ctfImgFS[2*th + halfSet],
+						inner_threads);
+				}
 			}
 
 		} // particles

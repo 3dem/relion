@@ -551,10 +551,14 @@ void CtfRefinementProgram::updateScale(
 
 		const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
 					part_id, fc, tomogram.optics.pixelSize);
+		
+		const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s/2.0);
 
 		#pragma omp parallel for num_threads(num_threads)
 		for (int f = 0; f < fc; f++)
 		{
+			if (!isVisible[f]) continue;
+			
 			d4Matrix projCut;
 
 			BufferedImage<tComplex<float>> observation(sh,s);
