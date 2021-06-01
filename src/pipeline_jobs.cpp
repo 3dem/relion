@@ -2447,7 +2447,7 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 	if (joboptions["do_reextract"].getBoolean())
 	{
 		FileName fn_pickstar = outputname + "extractpick.star";
-		Node node(fn_pickstar, LABEL_EXTRACT_COORDS_REEX);
+		Node node(fn_pickstar, LABEL_EXTRACT_PARTS_REEX);
 		outputNodes.push_back(node);
 		command += " --pick_star " + fn_pickstar;
 	}
@@ -2455,7 +2455,7 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 	if (joboptions["do_extract_helix"].getBoolean() && joboptions["do_extract_helical_tubes"].getBoolean())
 	{
 		FileName fn_pickstar = outputname + "extractpick.star";
-		Node node(fn_pickstar, LABEL_EXTRACT_COORDS_HELIX);
+		Node node(fn_pickstar, LABEL_EXTRACT_PARTS_HELIX);
 		outputNodes.push_back(node);
 		command += " --pick_star " + fn_pickstar;
 	}
