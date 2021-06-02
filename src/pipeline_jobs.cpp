@@ -422,7 +422,6 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 		MDhead.read(fn_star, "job");
 		if (MDhead.containsLabel(EMDL_JOB_TYPE_LABEL))
 		{
-			FileName label;
 			MDhead.getValue(EMDL_JOB_TYPE_LABEL, label);
 			type = get_proc_type(label);
 		}
