@@ -145,6 +145,8 @@ void AberrationFit :: considerParticle(
 
 	const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(
 				part_id, fc, tomogram.optics.pixelSize);
+	
+	const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s/2.0);
 
 	d4Matrix projCut;
 
@@ -153,6 +155,8 @@ void AberrationFit :: considerParticle(
 
 	for (int f = f0; f <= f1; f++)
 	{
+		if (!isVisible[f]) continue;
+		
 		TomoExtraction::extractFrameAt3D_Fourier(
 				tomogram.stack, f, s, 1.0, tomogram, traj[f],
 				observation, projCut, 1, true);

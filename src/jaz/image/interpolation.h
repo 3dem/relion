@@ -48,7 +48,7 @@ class Interpolation
 		static gravis::t3Vector<T> cubicXYGradAndValue_clip(const RawImage<T>& img, double x, double y, int z = 0);
 
 		template<typename T> inline
-		static gravis::t3Vector<T> cubicXYGradAndValue_zeroPad(const RawImage<T>& img, double x, double y, int z = 0);
+		static gravis::t3Vector<T> cubicXYGradAndValue_raw(const RawImage<T>& img, double x, double y, int z = 0);
 		
 		template<typename T> inline
 		static T cubicXY_wrap(const RawImage<T>& img, double x, double y, int z = 0);
@@ -443,8 +443,8 @@ gravis::t3Vector<T> Interpolation::cubicXYGradAndValue_clip(const RawImage<T>& i
 	return gravis::t3Vector<T>(xxd.dot(AVA * yy), xx.dot(AVA * yyd), xx.dot(AVA * yy));
 }
 
-/*template<typename T> inline
-gravis::t3Vector<T> Interpolation::cubicXYGradAndValue_zeroPad(const RawImage<T>& img, double x, double y, int z)
+template<typename T> inline
+gravis::t3Vector<T> Interpolation::cubicXYGradAndValue_raw(const RawImage<T>& img, double x, double y, int z)
 {
 	int xi    = (int)std::floor(x);
 	int yi    = (int)std::floor(y);
@@ -457,15 +457,6 @@ gravis::t3Vector<T> Interpolation::cubicXYGradAndValue_zeroPad(const RawImage<T>
 
 	const double xf = x - xi;
 	const double yf = y - yi;
-
-	xi    = XMIPP_MAX(0, XMIPP_MIN(img.xdim - 1, xi));
-	yi    = XMIPP_MAX(0, XMIPP_MIN(img.ydim - 1, yi));
-	xi_n1 = XMIPP_MAX(0, XMIPP_MIN(img.xdim - 1, xi_n1));
-	yi_n1 = XMIPP_MAX(0, XMIPP_MIN(img.ydim - 1, yi_n1));
-	xi_p1 = XMIPP_MAX(0, XMIPP_MIN(img.xdim - 1, xi_p1));
-	yi_p1 = XMIPP_MAX(0, XMIPP_MIN(img.ydim - 1, yi_p1));
-	xi_p2 = XMIPP_MAX(0, XMIPP_MIN(img.xdim - 1, xi_p2));
-	yi_p2 = XMIPP_MAX(0, XMIPP_MIN(img.ydim - 1, yi_p2));
 
 	const T f00 = img(xi_n1, yi_n1, z);
 	const T f01 = img(xi,    yi_n1, z);
@@ -510,7 +501,7 @@ gravis::t3Vector<T> Interpolation::cubicXYGradAndValue_zeroPad(const RawImage<T>
 	const gravis::d4Vector yyd(3.0*yf*yf, 2.0*yf, 1.0, 0.0);
 
 	return gravis::t3Vector<T>(xxd.dot(AVA * yy), xx.dot(AVA * yyd), xx.dot(AVA * yy));
-}*/
+}
 
 
 

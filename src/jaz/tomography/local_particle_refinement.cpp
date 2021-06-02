@@ -41,14 +41,16 @@ LocalParticleRefinement::LocalParticleRefinement(
 
 	const std::vector<d3Vector> trajectory = particleSet.getTrajectoryInPixels(
 				particle_id, fc, pixelSize);
+	
+	isVisible = tomogram.determineVisiblity(trajectory, s/2.0);
 
 	observations = BufferedImage<fComplex>(sh,s,fc);
 
 	std::vector<d4Matrix> tomo_to_image;
 
 	TomoExtraction::extractAt3D_Fourier(
-			tomogram.stack, s, 1.0, tomogram,
-			trajectory, observations, tomo_to_image, 1, false);
+			tomogram.stack, s, 1.0, tomogram, trajectory, isVisible,
+			observations, tomo_to_image, 1, false);
 
 	const d4Matrix particle_to_tomo = particleSet.getMatrix4x4(
 			particle_id, s, s, s);
@@ -61,6 +63,8 @@ LocalParticleRefinement::LocalParticleRefinement(
 
 	for (int f = 0; f < fc; f++)
 	{
+		if (!isVisible[f]) continue;
+		
 		const d4Matrix A = tomo_to_image[f] * particle_to_tomo;
 
 		Pt[f] = d3Matrix(
@@ -149,6 +153,8 @@ double LocalParticleRefinement::f(const std::vector<double>& x, void* tempStorag
 
 	for (int f = 0; f < fc; f++)
 	{
+		if (!isVisible[f]) continue;
+		
 		const d3Matrix PAt = At * Pt[f];
 
 		const d4Matrix& P = tomogram.projectionMatrices[f];
@@ -239,6 +245,8 @@ void LocalParticleRefinement::grad(const std::vector<double> &x, std::vector<dou
 
 	for (int f = 0; f < fc; f++)
 	{
+		if (!isVisible[f]) continue;
+		
 		const d3Matrix PAt = At * Pt[f];
 
 		const d3Matrix dPAt_dphi   = dAt_dx[0] * Pt[f];
@@ -410,6 +418,8 @@ double LocalParticleRefinement::gradAndValue(const std::vector<double> &x, std::
 
 	for (int f = 0; f < fc; f++)
 	{
+		if (!isVisible[f]) continue;
+		
 		const d3Matrix PAt = At * Pt[f];
 
 		const d3Matrix dPAt_dphi   = dAt_dx[0] * Pt[f];

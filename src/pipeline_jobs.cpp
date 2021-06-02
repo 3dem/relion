@@ -2526,8 +2526,7 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 				command += " --helical_nr_asu 1 --helical_rise 1";
 		}
 	}
-
-	if (!joboptions["do_reextract"].getBoolean() && !joboptions["do_extract_helix"].getBoolean())
+	else
 	{
 		Node node3(fn_ostar, LABEL_EXTRACT_PARTS);
 		outputNodes.push_back(node3);

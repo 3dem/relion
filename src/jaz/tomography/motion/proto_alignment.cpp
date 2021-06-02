@@ -6,6 +6,7 @@
 #include <src/jaz/image/centering.h>
 #include <src/jaz/util/log.h>
 #include <src/jaz/math/Tait_Bryan_angles.h>
+#include <src/jaz/image/color_helper.h>
 #include <omp.h>
 #include <iomanip>
 
@@ -219,8 +220,17 @@ void ProtoAlignment::grad(const std::vector<double> &x, std::vector<double> &gra
 			const d4Vector dp_skew    = A_skew    * p1_0;
 			const d4Vector dp_y_scale = A_y_scale * p1_0;
 			
-			d2Vector g = -((double)paddingFactor) * Interpolation::cubicXYGrad_clip(
-						CCs[p], dx_img, dy_img, f);
+			/*d2Vector g = -((double)paddingFactor) * Interpolation::cubicXYGrad_clip(
+						CCs[p], dx_img, dy_img, f);*/
+
+							gravis::d3Vector g(0.0, 0.0, 0.0);
+
+							if (   dx_img > 1 && dx_img < CCs[p].xdim - 2
+								&& dy_img > 1 && dy_img < CCs[p].ydim - 2 )
+							{
+								g -= ((double)paddingFactor) *
+									Interpolation::cubicXYGradAndValue_raw(CCs[p], dx_img, dy_img, f);
+							}
 
 			int offset = getTiltDataOffset(f);
 			const int t0 = t * thread_stride;
@@ -426,6 +436,8 @@ void ProtoAlignment::report(int iteration, double cost, const std::vector<double
 	{
 		Log::updateProgress(progressBarOffset + iteration);
 	}
+
+	lastIterationNumber = iteration;
 }
 
 std::vector<double> ProtoAlignment::createInitial()
@@ -453,4 +465,125 @@ std::vector<double> ProtoAlignment::createInitial()
 	}
 
 	return out;
+}
+
+void ProtoAlignment::visualiseShifts(
+		const std::vector<double> &x,
+		const std::string &tomo_name,
+		const std::string &file_name_root) const
+{
+	const int fs = getFrameStride();
+	const int xs = x.size();
+	const int pos_block = fs * fc;
+
+	for (int i = 0; i < xs; i++)
+	{
+		if (!(x[i] == x[i])) // reject NaNs
+		{
+			return;
+		}
+	}
+
+	std::vector<gravis::d4Matrix> P(fc);
+
+	for (int f = 0; f < fc; f++)
+	{
+		double phi, theta, psi, dx, dy, s, q;
+
+		readTiltParameters(x, f, phi, theta, psi, dx, dy, s, q);
+
+		const gravis::d4Matrix Q =
+				TaitBryan::anglesToMatrix4(phi, theta, psi);
+
+		const gravis::d4Matrix centProj = minusCentre * frameProj[f];
+
+		P[f] = plusCentre * Q * centProj;
+
+		P[f](0,3) += dx;
+		P[f](1,3) += dy;
+	}
+
+
+	const double diam = CCs[0].xdim;
+	const double m = maxRange * paddingFactor;
+
+	CPlot2D plot2D(tomo_name + ": 2D position changes");
+	plot2D.SetXAxisSize(600);
+	plot2D.SetYAxisSize(600);
+	plot2D.SetDrawLegend(false);
+	plot2D.SetFlipY(true);
+	plot2D.SetDrawXAxisGridLines(false);
+	plot2D.SetDrawYAxisGridLines(false);
+
+	{
+		CDataSet boundary;
+		boundary.SetDrawMarker(false);
+		boundary.SetDatasetColor(0.5,0.5,0.5);
+		boundary.SetLineWidth(1);
+
+		boundary.AddDataPoint(CDataPoint(-m,       -m));
+		boundary.AddDataPoint(CDataPoint(diam - m, -m));
+		boundary.AddDataPoint(CDataPoint(diam - m, diam - m));
+		boundary.AddDataPoint(CDataPoint(-m,       diam - m));
+		boundary.AddDataPoint(CDataPoint(-m,       -m));
+
+		plot2D.AddDataSet(boundary);
+	}
+
+	for (int dim = 0; dim < 2; dim++)
+	{
+		CDataSet crosshair;
+		crosshair.SetDrawMarker(false);
+		crosshair.SetDatasetColor(0.5,0.5,0.5);
+		crosshair.SetLineWidth(0.25);
+
+		gravis::d2Vector m0(0.0, 0.0);
+		gravis::d2Vector m1(diam, diam);
+
+		m0[dim] = m1[dim] = maxRange * paddingFactor;
+
+		crosshair.AddDataPoint(CDataPoint(m0.x - m, m0.y - m));
+		crosshair.AddDataPoint(CDataPoint(m1.x - m, m1.y - m));
+
+		plot2D.AddDataSet(crosshair);
+	}
+
+
+	std::vector<CDataSet> points_by_frame(fc);
+
+	for (int f = 0; f < fc; f++)
+	{
+		gravis::dRGB c = ColorHelper::signedToRedBlue(f/(double)fc);
+
+		points_by_frame[f].SetDrawMarker(true);
+		points_by_frame[f].SetDrawLine(false);
+		points_by_frame[f].SetDatasetColor(c.r,c.g,c.b);
+		points_by_frame[f].SetMarkerSize(1);
+	}
+
+	for (int p = 0; p < pc; p++)
+	{
+		gravis::d3Vector shift =
+			gravis::d3Vector(x[pos_block + 3*p], x[pos_block + 3*p+1], x[pos_block + 3*p+2]);
+
+		for (int f = 0; f < fc; f++)
+		{
+			const gravis::d4Vector pos4(initialPos[p] + shift);
+
+			const gravis::d2Vector p0 = (frameProj[f] * gravis::d4Vector(initialPos[p])).xy();
+			const gravis::d2Vector p1 = (P[f] * pos4).xy();
+			const gravis::d2Vector dp = p1 - p0;
+
+			points_by_frame[f].AddDataPoint(CDataPoint(dp.x,dp.y));
+		}
+	}
+
+	for (int f = fc-1; f >= 0; f--)
+	{
+		plot2D.AddDataSet(points_by_frame[f]);
+	}
+
+	FileName fn_eps = file_name_root + ".eps";
+
+	plot2D.OutputPostScriptPlot(fn_eps);
 }
