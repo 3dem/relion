@@ -826,22 +826,22 @@ class star_handler_parameters
 
 			MDnodes.addObject();
 			MDnodes.setValue(EMDL_PIPELINE_NODE_NAME, fnt);
-			int type;
+			std::string type_label;
 			if (MD.getName() == "micrographs")
 			{
-				type = NODE_MICS;
+				type_label = LABEL_SELECT_MICS;
 			}
 			else if (MD.getName() == "movies")
 			{
-				type = NODE_MOVIES;
+				type_label = LABEL_SELECT_MOVS;
 			}
 			else
 			{
 				// just assume these are particles
-				type = NODE_PART_DATA;
+				type_label = LABEL_SELECT_PARTS;
 			}
 
-			MDnodes.setValue(EMDL_PIPELINE_NODE_TYPE, type);
+			MDnodes.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, type_label);
 		}
 
 		// write out the star file with the output nodes
