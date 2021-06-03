@@ -193,14 +193,10 @@ bool PipeLine::checkDependency(long int process)
 	for (size_t inode = 0; inode < (processList[process]).outputNodeList.size(); inode++)
 	{
 		long int mynode = (processList[process]).outputNodeList[inode];
-		for (size_t iproc = 0; iproc < nodeList[mynode].inputForProcessList.size(); iproc++)
+		if (nodeList[mynode].inputForProcessList.size() > 0)
 		{
-			long int myproc = nodeList[mynode].inputForProcessList[iproc];
-			if (processList[myproc].status == PROC_RUNNING || processList[myproc].status == PROC_FINISHED_SUCCESS)
-			{
-				has_dependecies = true;
-				break;
-			}
+			has_dependecies = true;
+			break;
 		}
 	}
 
