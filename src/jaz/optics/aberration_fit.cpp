@@ -128,8 +128,8 @@ void AberrationFit :: considerParticle(
 		const ParticleSet& dataSet,
 		const AberrationsCache& aberrationsCache,
 		bool flip_value,
-		const BufferedImage<float>& frqWeight,
-		const BufferedImage<float>& frqEnvelope,
+		const BufferedImage<float>& freqWeights,
+		const BufferedImage<float>& doseWeights,
 		int f0, int f1,
 		BufferedImage<EvenData>& even_out,
 		BufferedImage<OddData>& odd_out)
@@ -145,6 +145,8 @@ void AberrationFit :: considerParticle(
 
 	const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(
 				part_id, fc, tomogram.optics.pixelSize);
+	
+	const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s/2.0);
 
 	d4Matrix projCut;
 
@@ -153,11 +155,14 @@ void AberrationFit :: considerParticle(
 
 	for (int f = f0; f <= f1; f++)
 	{
+		if (!isVisible[f]) continue;
+		
 		TomoExtraction::extractFrameAt3D_Fourier(
-				tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f], traj[f],
+				tomogram.stack, f, s, 1.0, tomogram, traj[f],
 				observation, projCut, 1, true);
 
 		CTF ctf = tomogram.getCtf(f, dataSet.getPosition(part_id));
+		const RawImage<float> doseSlice = doseWeights.getConstSliceRef(f);
 
 		BufferedImage<fComplex> prediction = Prediction::predictModulated(
 				part_id, dataSet, projCut, s,
@@ -167,8 +172,7 @@ void AberrationFit :: considerParticle(
 				referenceMap.image_FS,
 				Prediction::OwnHalf,
 				Prediction::Unmodulated,
-				Prediction::NotDoseWeighted,
-				0.0,
+				&doseSlice,
 				Prediction::CtfScaled);
 
 		const float scale = flip_value? -1.f : 1.f;
@@ -194,7 +198,7 @@ void AberrationFit :: considerParticle(
 			const double c = -sg;
 
 			fComplex zobs = observation(x,y);
-			fComplex zprd = scale * ctf.scale * frqEnvelope(x,y,f) * prediction(x,y);
+			fComplex zprd = scale * ctf.scale * prediction(x,y);
 
 			if (aberrationsCache.hasAntisymmetrical)
 			{
@@ -208,7 +212,7 @@ void AberrationFit :: considerParticle(
 			const double zz = zobs.real * zprd.real + zobs.imag * zprd.imag;
 			const double zq = zobs.imag * zprd.real - zobs.real * zprd.imag;
 			const double nr = zprd.norm();
-			const double wg = frqWeight(x,y,f);
+			const double wg = freqWeights(x,y,f);
 
 
 			EvenData& ed = even_out(x,y);

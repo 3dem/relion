@@ -73,6 +73,8 @@ void ReconstructParticleProgram::readBasicParameters(int argc, char *argv[])
 	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Only process undone subtomograms");
 	no_backup = parser.checkOption("--no_backup", "Do not make backups (makes it impossible to use --only_do_unfinished)");
 
+	do_circle_crop = !parser.checkOption("--no_circle_crop", "Do not crop 2D images to a circle prior to insertion");
+
 	num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 	inner_threads = textToInteger(parser.getOption("--j_in", "Number of inner threads (slower, needs less memory)", "3"));
 	outer_threads = textToInteger(parser.getOption("--j_out", "Number of outer threads (faster, needs more memory)", "2"));
@@ -344,11 +346,12 @@ void ReconstructParticleProgram::processTomograms(
 						part_id, fc, tomogram.optics.pixelSize);
 			std::vector<d4Matrix> projCut(fc), projPart(fc);
 
+			const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s/2.0);
 
-			const bool circle_crop = true;
+			const bool circle_crop = do_circle_crop;
 
 			TomoExtraction::extractAt3D_Fourier(
-					tomogram.stack, s02D, binning, tomogram.projectionMatrices, traj,
+					tomogram.stack, s02D, binning, tomogram, traj, isVisible,
 					particleStack[th], projCut, inner_threads, circle_crop);
 
 
@@ -363,6 +366,8 @@ void ReconstructParticleProgram::processTomograms(
 
 			for (int f = 0; f < fc; f++)
 			{
+				if (!isVisible[f]) continue;
+				
 				const double scaleRatio = binnedOutPixelSize / binnedPixelSize;
 				projPart[f] = scaleRatio * projCut[f] * particleToTomo;
 
@@ -398,13 +403,16 @@ void ReconstructParticleProgram::processTomograms(
 
 			for (int f = 0; f < fc; f++)
 			{
-				FourierBackprojection::backprojectSlice_backward(
-					particleStack[th].getSliceRef(f),
-					weightStack[th].getSliceRef(f),
-					projPart[f],
-					dataImgFS[2*th + halfSet],
-					ctfImgFS[2*th + halfSet],
-					inner_threads);
+				if (isVisible[f])
+				{
+					FourierBackprojection::backprojectSlice_backward(
+						particleStack[th].getSliceRef(f),
+						weightStack[th].getSliceRef(f),
+						projPart[f],
+						dataImgFS[2*th + halfSet],
+						ctfImgFS[2*th + halfSet],
+						inner_threads);
+				}
 			}
 
 		} // particles

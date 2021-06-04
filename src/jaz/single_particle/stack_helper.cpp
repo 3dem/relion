@@ -36,6 +36,7 @@
 
 using namespace gravis;
 
+
 std::vector<MetaDataTable> StackHelper::splitByMicrographName(const MetaDataTable& mdt)
 {
 	std::vector<MetaDataTable> out(0);

@@ -21,7 +21,9 @@ class CtfRefinementProgram : public RefinementProgram
 		
 		CtfRefinementProgram(int argc, char *argv[]);
 			
-			bool do_refine_defocus, do_refine_scale, do_refine_aberrations,
+			bool do_refine_defocus,
+				do_reset_to_common, do_regularise_defocus,
+				do_refine_scale, do_refine_aberrations,
 				do_fit_Lambert_per_tomo, do_fit_Lambert_globally,
 				do_even_aberrations, do_odd_aberrations;
 
@@ -95,7 +97,8 @@ class CtfRefinementProgram : public RefinementProgram
 				const CTF& referenceCtf,
 				double initialDeltaZ,
 				double pixelSize,
-				double initialStep);
+				double initialStep,
+				double k_min_px);
 
 		static std::vector<gravis::d3Vector> findMultiAstigmatism(
 				const aberration::EvenSolution& solution,

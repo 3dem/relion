@@ -909,8 +909,8 @@ public:
 	// also calculate initial Iref images if fn_ref == "None"
 	void initialiseSigma2Noise();
 
-	// Some general stuff that is shared between MPI and sequential code in the final stages of initialisation
-	void initialiseGeneral2(bool do_ini_data_vs_prior = true);
+	// Initialise initial reference images 
+	void initialiseReferences();
 
 	/* Calculates the sum of all individual power spectra and the average of all images for initial sigma_noise estimation
 	 * The rank is passed so that if one splits the data into random halves one can know which random half to treat

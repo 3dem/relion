@@ -137,6 +137,7 @@ void MagnificationHelper::updateScale(
 		const RawImage<t2Vector<fComplex>>& predGradient,
 		const RawImage<fComplex>& observation,
 		const RawImage<float>& freqWeights,
+		const RawImage<float>& doseWeights,
 		CTF& ctf, double angpix,
 		RawImage<Equation2x2>& eqs)
 {
@@ -151,7 +152,7 @@ void MagnificationHelper::updateScale(
 	{
 		const fComplex vx = prediction(x,y);
 		const fComplex vy = observation(x,y);
-		const double c = ctfImg(x,y);
+		const double c = ctfImg(x,y) * doseWeights(x,y);
 		const double g = freqWeights(x,y) * freqWeights(x,y);
 
 		d2Vector gr(predGradient(x,y,0).x.real, predGradient(x,y,0).y.real);

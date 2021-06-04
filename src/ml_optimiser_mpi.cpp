@@ -475,10 +475,6 @@ will still yield good performance and possibly a more stable execution. \n" << s
 		fn_ref.getHalf(fn_ref, my_halfset);
 	}
 
-	MlOptimiser::initialiseGeneral(node->rank);
-
-	initialiseWorkLoad();
-
 #ifdef MKLFFT
 	// Enable multi-threaded FFTW
 	int success = fftw_init_threads();
@@ -490,10 +486,18 @@ will still yield good performance and possibly a more stable execution. \n" << s
 	fftw_plan_with_nthreads(nr_threads);
 #endif
 
-	// Only the first follower calculates the sigma2_noise spectra and sets initial guesses for Iref
-	if (node->rank == 1) MlOptimiser::initialiseSigma2Noise();
+	MlOptimiser::initialiseGeneral(node->rank);
 
-	//Now the first follower1 broadcasts resulting Iref and sigma2_noise to everyone else
+	initialiseWorkLoad();
+
+	// Only the first follower calculates the sigma2_noise spectra and sets initial guesses for Iref
+	if (node->rank == 1) 
+        {
+            MlOptimiser::initialiseSigma2Noise();
+            MlOptimiser::initialiseReferences();
+        }
+
+	//Now the first follower broadcasts resulting Iref and sigma2_noise to everyone else
 	for (int i = 0; i < mymodel.sigma2_noise.size(); i++)
 	{
 		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.sigma2_noise[i]),
@@ -504,13 +508,17 @@ will still yield good performance and possibly a more stable execution. \n" << s
 		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Iref[i]),
 							   MULTIDIM_SIZE(mymodel.Iref[i]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
 	}
-
-	MlOptimiser::initialiseGeneral2(!node->isLeader());
+        
+        // Initialise the data_versus_prior ratio to get the initial current_size right
+        if (!do_initialise_bodies && !node->isLeader())
+            mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
 
 	// Only leader writes out initial mymodel (do not gather metadata yet)
 	int my_nr_subsets = (do_split_random_halves) ? 2 : 1;
 	if (node->isLeader())
+        {
 		MlOptimiser::write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, node->rank);
+        }
 	else if (node->rank <= my_nr_subsets)
 	{
 		//Only the first_follower of each subset writes model to disc
@@ -559,8 +567,35 @@ void MlOptimiserMpi::initialiseWorkLoad()
 		mydata.divideParticlesInRandomHalves(random_seed, do_helical_refine);
 	}
 
-	// Set the number of particles per group
-	mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group, node->myRandomSubset());
+	// Set the number of particles per group, but only Leader has full data.star in memory!
+        // Pre-relion-4-onesigma-branch, mymodel.nr_particles_per_group was set in initial noise estimation, but this is no longer the case...
+        if (do_split_random_halves)
+        {
+            // First do half-set 1
+            if (node->isLeader()) mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group, 1);
+            for (int follower = 1; follower < node->size; follower+=2)
+            {
+                MPI_Status status;
+                if (node->isLeader()) node->relion_MPI_Send(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, follower, MPITAG_METADATA, MPI_COMM_WORLD);
+                else if (node->rank == follower) node->relion_MPI_Recv(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
+            }		
+
+
+            // Then do half-set 2
+            if (node->isLeader()) mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group, 2);
+            for (int follower = 2; follower < node->size; follower+=2)
+            {
+                MPI_Status status;
+                if (node->isLeader()) node->relion_MPI_Send(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, follower, MPITAG_METADATA, MPI_COMM_WORLD);
+                else if (node->rank == follower) node->relion_MPI_Recv(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
+            }		
+      
+        }
+        else
+        {
+            if (node->isLeader()) mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
+            node->relion_MPI_Bcast(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, MPI_COMM_WORLD);
+        }
 
 	if (node->isLeader())
 	{

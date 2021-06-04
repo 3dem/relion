@@ -428,7 +428,7 @@ class helix_analyse_classes_parameters
         for (long int idx = 0; idx < helices.size(); idx++)
         {
         	long int igr;
-        	if (helices[idx].count_classes.maxIndex(igr) >= voting_threshold && group_names[igr] != "notgrouped")
+        	if (helices[idx].count_classes.maxIndex(igr) >= voting_threshold && group_names[igr] != "notgrouped" && helices[idx].count_classes.sum() > 0.)
         	{
         		if (verb > 2)
         		{

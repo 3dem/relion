@@ -554,7 +554,6 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 				}
 				img.write(fn_tmp);
 
-
 				if (pseudo_halfsets)
 				{
 					fn_tmp.compose(fn_out+"_1moment", iclass+1+nr_classes, "mrc", 3);
@@ -568,7 +567,6 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 				}
 
 				fn_tmp.compose(fn_out+"_2moment", iclass+1, "mrc", 3);
-
 				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Igrad2[iclass]) {
 							DIRECT_A3D_ELEM(img(), k, i, j*2+0) = DIRECT_A3D_ELEM(Igrad2[iclass], k, i, j).real;
 							DIRECT_A3D_ELEM(img(), k, i, j*2+1) = DIRECT_A3D_ELEM(Igrad2[iclass], k, i, j).imag;
@@ -881,6 +879,7 @@ void MlModel::initialiseFromImages(
 			Iref.clear();
 			Igrad1.clear();
 			Igrad2.clear();
+
 			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDref)
 			{
 				MDref.getValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp);
@@ -1562,7 +1561,6 @@ void MlModel::initialiseDataVersusPrior(bool fix_tau)
 		{
 			nr_particles += nr_particles_per_group[igroup];
 		}
-
 		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(tau2_class[iclass])
 		{
 			RFLOAT evidence = nr_particles * pdf_class[iclass] / DIRECT_A1D_ELEM(avg_sigma2_noise, i);
@@ -1729,6 +1727,7 @@ void MlWsumModel::initialise(MlModel &_model, FileName fn_sym, bool asymmetric_p
 		BPref.resize(2 * nr_classes * nr_bodies, BP); // also set multiple bodies
 	else
 		BPref.resize(nr_classes * nr_bodies, BP); // also set multiple bodies
+
 	sumw_group.resize(nr_optics_groups);
 
 }

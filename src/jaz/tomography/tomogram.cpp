@@ -14,6 +14,42 @@ Tomogram::Tomogram()
 	
 }
 
+d2Vector Tomogram::projectPoint(const d3Vector& p, int frame) const
+{
+	const d2Vector pl = (projectionMatrices[frame] * gravis::d4Vector(p)).xy();
+	
+	if (hasDeformations)
+	{
+		return imageDeformations[frame].apply(pl);
+	}
+	else
+	{
+		return pl;
+	}
+}
+
+bool Tomogram::isVisible(const d3Vector& p, int frame, double radius) const
+{
+	const d2Vector q = projectPoint(p, frame);
+	
+	return     q.x > radius && q.x < stack.xdim - radius
+			&& q.y > radius && q.y < stack.ydim - radius;
+}
+
+std::vector<bool> Tomogram::determineVisiblity(const std::vector<d3Vector>& trajectory, double radius) const
+{
+	const int fc = trajectory.size();
+	
+	std::vector<bool> out(fc);
+	
+	for (int f = 0; f < fc; f++)
+	{
+		out[f] = isVisible(trajectory[f], f, radius);
+	}
+	
+	return out;
+}
+
 double Tomogram::getFrameDose() const
 {
 	return fractionalDose;

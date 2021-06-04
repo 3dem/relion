@@ -727,7 +727,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	// SGD stuff
 	int grad_section = parser.addSection("Stochastic Gradient Descent");
 	gradient_refine = parser.checkOption("--grad", "Perform gradient based optimisation (instead of default expectation-maximization)");
-	grad_em_iters = textToInteger(parser.getOption("--grad_em_iters", "Number of iterations at the end of a gradient refinement using Expectation-Maximization", "1"));
+	grad_em_iters = textToInteger(parser.getOption("--grad_em_iters", "Number of iterations at the end of a gradient refinement using Expectation-Maximization", "0"));
 	// Stochastic EM is implemented as a variant of SGD, though it is really a different algorithm!
 
 	grad_ini_frac = textToFloat(parser.getOption("--grad_ini_frac", "Fraction of iterations in the initial phase of refinement", "0.3"));
@@ -1470,8 +1470,11 @@ void MlOptimiser::initialise()
 
 	initialiseSigma2Noise();
 
-	initialiseGeneral2();
+	initialiseReferences();
 
+        // Initialise the data_versus_prior ratio to get the initial current_size right
+        if (!do_initialise_bodies)
+            mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
 
 	// Write out initial mymodel
 	write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
@@ -2132,8 +2135,8 @@ void MlOptimiser::initialiseGeneral(int rank)
 				          "both will instead be determined automatically." << std::endl;
 
 			unsigned long dataset_size = mydata.numberOfParticles();
-			grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.001, 500), 100);
-			grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.05,  50000), 500);
+			grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.005, 5000), 100);
+			grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.05,  50000), 1000);
 			if (rank==0) {
 				std::cout << " Initial subset size set to " << grad_ini_subset_size << std::endl;
 				std::cout << " Final subset size set to " << grad_fin_subset_size << std::endl;
@@ -2237,7 +2240,7 @@ void MlOptimiser::initialiseSigma2Noise()
 
 }
 
-void MlOptimiser::initialiseGeneral2(bool do_ini_data_vs_prior)
+void MlOptimiser::initialiseReferences()
 {
 
 	if (iter == 0)
@@ -2316,6 +2319,7 @@ void MlOptimiser::initialiseGeneral2(bool do_ini_data_vs_prior)
 								blobs_neg, Iavg, 40,
 								diameter, is_helical_segment);
 					}
+
 					//Maintain standard deviation
 					RFLOAT std = SomGraph::std(mymodel.Iref[i]);
 					mymodel.Iref[i] = blobs_pos - blobs_neg / 2;
@@ -2327,10 +2331,6 @@ void MlOptimiser::initialiseGeneral2(bool do_ini_data_vs_prior)
 			for (unsigned i = 0; i < mymodel.nr_classes; i++)
 				softMaskOutsideMap(mymodel.Iref[i], diameter / 2., (RFLOAT) width_mask_edge);
 		}
-		// Initialise the data_versus_prior ratio to get the initial current_size right
-		if (!do_initialise_bodies && do_ini_data_vs_prior)
-			mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
-
 
 	}
 }
@@ -2887,7 +2887,7 @@ void MlOptimiser::iterate()
 			do_grad_next_iter = !(has_converged || iter_next > nr_iter - grad_em_iters) &&
 			                    !(do_firstiter_cc && iter_next == 1) &&
 			                    !grad_has_converged;
-			do_skip_maximization = do_grad && iter == nr_iter && mymodel.nr_classes > 1;
+			do_skip_maximization = do_grad && iter == nr_iter;
 			grad_pseudo_halfsets = do_grad;
 		}
 
@@ -4855,7 +4855,6 @@ int MlOptimiser::maximizationGradientParameters() {
 				if (grad_pseudo_halfsets)
 				{
 					int iclass_half = iclass + mymodel.nr_classes;
-
 					wsum_model.BPref[iclass_half].reweightGrad();
 					wsum_model.BPref[iclass_half].getFristMoment(
 							mymodel.Igrad1[iclass_half]);
@@ -9450,11 +9449,21 @@ void MlOptimiser::updateStepSize()
 	std::string _scheme = grad_stepsize_scheme;
 
 	if (_stepsize <= 0)
-		_stepsize = 0.3;
+	{
+		if (mymodel.ref_dim == 3)
+			_stepsize = 0.1;
+		else
+			_stepsize = 0.3;
+	}
 
 	if (_scheme.empty())
 	{
-		RFLOAT boost_factor = 0.9 / _stepsize;
+		RFLOAT boost_factor;
+
+		if (mymodel.ref_dim == 3)
+			boost_factor = 3.;
+		else
+			boost_factor = 0.9 / _stepsize;
 		_scheme = std::to_string(boost_factor) + "-2step";
 	}
 

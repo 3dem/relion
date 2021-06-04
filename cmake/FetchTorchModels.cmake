@@ -12,18 +12,18 @@ if(NOT EXISTS ${MODELS_DIR})
 	file(MAKE_DIRECTORY ${MODELS_DIR})
 endif()
 
+set(CLASS_RANKER_MODEL_FILE_NAME_TAR class_ranker_0.1_batch32_rate5e-05_drop0.3_epoch50_model.pt.tar.gz)
 set(CLASS_RANKER_MODEL_FILE_NAME class_ranker_0.1_batch32_rate5e-05_drop0.3_epoch50_model.pt)
-set(CLASS_RANKER_MODEL_URL "ftp://ftp.mrc-lmb.cam.ac.uk/pub/dari/${CLASS_RANKER_MODEL_FILE_NAME}")
-set(CLASS_RANKER_MODEL_MD5 87199591caa461b484534b7eba16a157)
+set(CLASS_RANKER_MODEL_URL "ftp://ftp.mrc-lmb.cam.ac.uk/pub/dari/${CLASS_RANKER_MODEL_FILE_NAME_TAR}")
+set(CLASS_RANKER_MODEL_MD5 3bd73613178e34673e087a6099b74156)
 
 externalproject_add(class_ranker_model_file
 		URL ${CLASS_RANKER_MODEL_URL}
 		URL_MD5 ${CLASS_RANKER_MODEL_MD5}
 		DOWNLOAD_DIR ${MODELS_DIR}
+		SOURCE_DIR "${MODELS_DIR}"
 		BUILD_COMMAND ""
 		INSTALL_COMMAND ""
-		DOWNLOAD_NO_EXTRACT 1 # Pytorch PT files are tar archives
-		DOWNLOAD_NO_PROGRESS 1
 		CONFIGURE_COMMAND ""
 		#	LOG_CONFIGURE
 		#	LOG_BUILD

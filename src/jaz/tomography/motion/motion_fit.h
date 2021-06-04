@@ -33,7 +33,6 @@ class MotionFit : public FastDifferentiableOptimization
 				const std::vector<gravis::d4Matrix>& frameProj, 
 				ParticleSet& dataSet,
 				const std::vector<ParticleIndex>& partIndices,
-				const std::vector<BufferedImage<fComplex>>& referenceFS,
 				MotionParameters motionParameters,
 				Settings settings,
 				gravis::d3Vector tomoCentre,
@@ -49,7 +48,6 @@ class MotionFit : public FastDifferentiableOptimization
 			const std::vector<gravis::d4Matrix>& frameProj;			
 			ParticleSet& dataSet;
 			const std::vector<ParticleIndex>& partIndices;
-			const std::vector<BufferedImage<fComplex>>& referenceFS;
 			
 			MotionParameters motionParameters;
 			Settings settings;

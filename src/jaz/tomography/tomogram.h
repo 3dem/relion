@@ -6,7 +6,7 @@
 #include <src/jaz/gravis/t4Matrix.h>
 #include <src/jaz/optics/optics_data.h>
 #include <src/ctf.h>
-#include "tomolist.h"
+#include "motion/spline_2D_deformation.h"
 
 class ParticleIndex;
 class ParticleSet;
@@ -18,13 +18,14 @@ class Tomogram
 		Tomogram();
 			
 			
-			bool hasOptics, hasImage;
+			bool hasOptics, hasImage, hasDeformations;
 			OpticsData optics;
 			int frameCount;
 			double handedness, fractionalDose;
 			
 			BufferedImage<float> stack;
 			std::vector<gravis::d4Matrix> projectionMatrices;
+			std::vector<Spline2DDeformation> imageDeformations;
 			
 			std::vector<CTF> centralCTFs;
 			std::vector<double> cumulativeDose;
@@ -35,14 +36,19 @@ class Tomogram
 			double defocusSlope;
 		
 			
+		gravis::d2Vector projectPoint(
+				const gravis::d3Vector& p, int frame) const;
+		
+		bool isVisible(
+				const gravis::d3Vector& p, int frame, double radius) const;
+		
+		std::vector<bool> determineVisiblity(
+				const std::vector<gravis::d3Vector>& trajectory, double radius) const;
+		
+		
 		double getFrameDose() const;
 
-		// - Dissolve OpticsData?
 		
-		// gravis::d2Vector project(gravis::d3Vector pos, int frame);
-		// Image<float> drawCtf(gravis::d3Vector pos, int size);
-		// Image<float> drawDoseWeights(int size);
-
 		BufferedImage<float> computeDoseWeight(int boxSize, double binning) const;
 		BufferedImage<float> computeNoiseWeight(int boxSize, double binning, double overlap = 2.0) const;
 

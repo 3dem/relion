@@ -17,8 +17,8 @@ class LocalParticleRefinement : public FastDifferentiableOptimization
 				const ParticleSet& particleSet,
 				const Tomogram& tomogram,
 				const TomoReferenceMap& reference,
-				const BufferedImage<float>& frqWeight,
-				const BufferedImage<float>& frqEnvelope,
+				const BufferedImage<float>& freqWeight,
+				const BufferedImage<float>& doseWeight,
 				const AberrationsCache& aberrationsCache,
 				double dose_cutoff = 0.01);
 
@@ -27,8 +27,8 @@ class LocalParticleRefinement : public FastDifferentiableOptimization
 			const ParticleSet& particleSet;
 			const Tomogram& tomogram;
 			const TomoReferenceMap& reference;
-			const BufferedImage<float>& frqWeight;
-			const BufferedImage<float>& frqEnvelope;
+			const BufferedImage<float>& freqWeight;
+			const BufferedImage<float>& doseWeight;
 			const AberrationsCache& aberrationsCache;
 
 			BufferedImage<fComplex> observations;
@@ -37,6 +37,7 @@ class LocalParticleRefinement : public FastDifferentiableOptimization
 			gravis::d3Vector position;
 			std::vector<int> max_radius;
 			BufferedImage<float> precomputedCTFs;
+			std::vector<bool> isVisible;
 
 
 		double f(const std::vector<double>& x, void* tempStorage) const;
