@@ -208,20 +208,66 @@ void TomogramSet::setDefocusSlope(int tomogramIndex, double slope)
 }
 
 void TomogramSet::setDeformation(
-	int tomogramIndex, 
+	int tomogramIndex,
 	gravis::i2Vector gridSize,
 	const std::vector<std::vector<double>>& coeffs)
 {
 	globalTable.setValue(EMDL_TOMO_DEFORMATION_GRID_SIZE_X, gridSize.x, tomogramIndex);
 	globalTable.setValue(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y, gridSize.y, tomogramIndex);
-	
+
 	MetaDataTable& mdt = tomogramTables[tomogramIndex];
-	
+
 	const int fc = coeffs.size();
-	
+
 	for (int f = 0; f < fc; f++)
 	{
 		mdt.setValue(EMDL_TOMO_DEFORMATION_COEFFICIENTS, coeffs[f], f);
+	}
+}
+
+void TomogramSet::addDeformation(
+	int tomogramIndex,
+	gravis::i2Vector gridSize,
+	const std::vector<std::vector<double>>& coeffs)
+{
+	if (globalTable.getInt(EMDL_TOMO_DEFORMATION_GRID_SIZE_X) == gridSize.x &&
+		globalTable.getInt(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y) == gridSize.y)
+	{
+		const int fc = coeffs.size();
+		MetaDataTable& mdt = tomogramTables[tomogramIndex];
+
+		if (mdt.numberOfObjects() != fc)
+		{
+			REPORT_ERROR_STR("TomogramSet::addDeformation: wrong number of frames");
+		}
+
+		for (int f = 0; f < fc; f++)
+		{
+			std::vector<double> old_coeffs = mdt.getDoubleVector(EMDL_TOMO_DEFORMATION_COEFFICIENTS, f);
+			std::vector<double> new_coeffs(coeffs[f].size());
+
+			for (int i = 0; i < coeffs[f].size(); i++)
+			{
+				new_coeffs[i] = old_coeffs[i] + coeffs[f][i];
+			}
+
+			mdt.setValue(EMDL_TOMO_DEFORMATION_COEFFICIENTS, new_coeffs[f], f);
+		}
+	}
+	else
+	{
+		setDeformation(tomogramIndex, gridSize, coeffs);
+	}
+}
+
+void TomogramSet::clearDeformation()
+{
+	globalTable.deactivateLabel(EMDL_TOMO_DEFORMATION_GRID_SIZE_X);
+	globalTable.deactivateLabel(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y);
+
+	for (int t = 0; t < tomogramTables.size(); t++)
+	{
+		tomogramTables[t].deactivateLabel(EMDL_TOMO_DEFORMATION_COEFFICIENTS);
 	}
 }
 

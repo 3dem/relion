@@ -75,6 +75,8 @@ class ModularAlignment : public FastDifferentiableOptimization
 			
 
 		double gradAndValue(const std::vector<double>& x, std::vector<double>& gradDest) const;
+
+		void printDebuggingInfo(const std::vector<double>& x) const;
 			
 		std::vector<gravis::d4Matrix> getProjections(
 				const std::vector<double>& x,
@@ -464,6 +466,85 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 	}
 
 	return cost;
+}
+
+template<class MotionModel, class DeformationModel2D>
+void ModularAlignment<MotionModel, DeformationModel2D>::printDebuggingInfo(const std::vector<double> &x) const
+{
+	const int fs = getFrameStride();
+	const int xs = x.size();
+	const int pos_block = getPositionsBlockOffset(fs);
+	const int def_block = get2DDeformationsBlockOffset(fs);
+
+	for (int i = 0; i < xs; i++)
+	{
+		if (!(x[i] == x[i])) // reject NaNs
+		{
+			return;
+		}
+	}
+
+	std::vector<gravis::d4Matrix> P(fc), P_phi(fc), P_theta(fc), P_psi(fc);
+
+	for (int f = 0; f < fc; f++)
+	{
+		double phi, theta, psi, dx, dy;
+
+		readViewParams(x, f, phi, theta, psi, dx, dy);
+
+		const gravis::d4Matrix Q =
+				TaitBryan::anglesToMatrix4(phi, theta, psi);
+
+		gravis::t4Vector<gravis::d3Matrix> dQ =
+				TaitBryan::anglesToMatrixAndDerivatives(phi, theta, psi);
+
+		gravis::d4Matrix Q_phi(dQ[0]);
+		gravis::d4Matrix Q_theta(dQ[1]);
+		gravis::d4Matrix Q_psi(dQ[2]);
+
+		Q_phi(3,3) = 0.0;
+		Q_theta(3,3) = 0.0;
+		Q_psi(3,3) = 0.0;
+
+		const gravis::d4Matrix centProj = minusCentre * frameProj[f];
+
+		P[f] = plusCentre * Q * centProj;
+
+		P_phi[f]   = plusCentre * Q_phi   * centProj;
+		P_theta[f] = plusCentre * Q_theta * centProj;
+		P_psi[f]   = plusCentre * Q_psi   * centProj;
+
+		P[f](0,3) += dx;
+		P[f](1,3) += dy;
+	}
+
+	for (int p = 0; p < 5; p++)
+	{
+		std::cout << "particle " << p << ":\n";
+
+		gravis::d3Vector shift = settings.constParticles?
+			gravis::d3Vector(0.0, 0.0, 0.0) :
+			gravis::d3Vector(x[pos_block + 3*p], x[pos_block + 3*p+1], x[pos_block + 3*p+2]);
+
+		for (int f = 0; f < fc; f++)
+		{
+			const gravis::d4Vector pos4(initialPos[p] + shift);
+
+			const gravis::d2Vector p0 = (frameProj[f] * gravis::d4Vector(initialPos[p])).xy();
+			const gravis::d2Vector pl = (P[f] * pos4).xy();
+
+			const int def_block_f = def_block + (settings.perFrame2DDeformation? f * dc : 0);
+
+			gravis::d2Vector def, def_x, def_y;
+			deformationModel2D.computeShiftAndGradient(pl, &x[def_block_f], def, def_x, def_y);
+
+			const gravis::d2Vector p1 = pl + def;
+
+			std::cout << f << ": " << p0 << " -> " << pl << " -[" << def << "]-> " << p1 << '\n';
+		}
+
+		std::cout << '\n';
+	}
 }
 
 template<class MotionModel, class DeformationModel2D>

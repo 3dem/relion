@@ -160,6 +160,26 @@ void AlignProgram::initialise()
 		particleSet.hasMotion = true;
 	}
 
+	if (do_deformation && tomogramSet.globalTable.labelExists(EMDL_TOMO_DEFORMATION_GRID_SIZE_X))
+	{
+		Log::warn("Previous 2D image deformation found in data set - resetting.");
+
+		tomogramSet.clearDeformation();
+
+		/*const i2Vector old_grid(
+			tomogramSet.globalTable.getInt(EMDL_TOMO_DEFORMATION_GRID_SIZE_X),
+			tomogramSet.globalTable.getInt(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y));
+
+		if ( old_grid.x != deformationParameters.grid_width ||
+			 old_grid.y != deformationParameters.grid_height )
+		{
+			Log::warn("2D image deformation with different grid size found in data set - resetting.");
+
+			tomogramSet.clearDeformation();
+		}*/
+	}
+
+
 	ZIO::ensureParentDir(getTempFilenameRoot(""));
 }
 
@@ -273,12 +293,35 @@ void AlignProgram::processTomograms(
 			projByTime[f] = tomogram.projectionMatrices[tomogram.frameSequence[f]];
 		}
 
+
+		/*for (int p = 0; p < 5; p++)
+		{
+			const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
+					ParticleIndex(p), fc, tomogram.optics.pixelSize);
+
+			std::cout << "particle " << p << ":\n";
+
+			for (int ff = 0; ff < fc; ff++)
+			{
+				const int f = tomogram.frameSequence[ff];
+
+				const d2Vector pl = (tomogram.projectionMatrices[f] * gravis::d4Vector(traj[f])).xy();
+				const d2Vector p1 = tomogram.imageDeformations[f].apply(pl);
+
+				std::cout << f << ": " << pl << " -[" << (p1 - pl) << "]-> " << p1 << '\n';
+			}
+
+			std::cout << '\n';
+		}
+
+		std::exit(0);*/
+
+
 		std::vector<BufferedImage<double>> CCs = Prediction::computeCroppedCCs(
 				particleSet, particles[t], tomogram, aberrationsCache,
 				referenceMap, freqWeight, doseWeights, tomogram.frameSequence,
 				range, true, num_threads, padding, Prediction::OwnHalf,
 				per_tomogram_progress && verbosity > 0);
-
 		
 		const int progress_bar_offset = per_tomogram_progress? 0 : tt * num_iters;
 
@@ -526,7 +569,7 @@ void AlignProgram::readTempData(int t)
 			coeffs[f] = temp_deformations.getDoubleVector(EMDL_TOMO_DEFORMATION_COEFFICIENTS, f);
 		}
 		
-		tomogramSet.setDeformation(t, gridSize, coeffs);
+		tomogramSet.addDeformation(t, gridSize, coeffs);
 	}
 
 

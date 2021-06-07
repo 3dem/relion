@@ -180,6 +180,8 @@ void AlignProgram::performAlignment(
 			initial, alignment, 1, num_iters, 1e-6, 1e-4);
 
 
+	//alignment.printDebuggingInfo(opt);
+
 	if (verbosity > 0 && per_tomogram_progress)
 	{
 		if (!debug) Log::endProgress();

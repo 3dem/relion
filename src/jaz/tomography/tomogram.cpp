@@ -199,7 +199,7 @@ Tomogram Tomogram::FourierCrop(double factor, int num_threads, bool downsampleDa
 	return out;
 }
 
-bool Tomogram::hasFiducials()
+bool Tomogram::hasFiducials() const
 {
 	return fiducialsFilename.length() > 0 && fiducialsFilename != "empty";
 }
