@@ -341,8 +341,14 @@ class star_handler_parameters
                 for (int iword = 0; iword < words.size(); iword++)
 		{
 			FileName fnt = words[iword];
+			const int n_files = fns_in.size();
 			fnt.globFiles(fns_in, false);
+			if (n_files == fns_in.size())
+				std::cerr << "WARNING: " << words[iword] << " does not match to any existing file(s)." << std::endl;
 		}
+
+		if (fns_in.size() == 0)
+			REPORT_ERROR("No STAR files to combine.");
 
 		MetaDataTable MDin0, MDout;
 		std::vector<MetaDataTable> MDsin, MDoptics;
