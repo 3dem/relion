@@ -230,9 +230,14 @@ void TomogramSet::addDeformation(
 	gravis::i2Vector gridSize,
 	const std::vector<std::vector<double>>& coeffs)
 {
-	if (globalTable.getInt(EMDL_TOMO_DEFORMATION_GRID_SIZE_X) == gridSize.x &&
-		globalTable.getInt(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y) == gridSize.y)
+	if (globalTable.labelExists(EMDL_TOMO_DEFORMATION_GRID_SIZE_X) &&
+		globalTable.labelExists(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y) &&
+		globalTable.getInt(EMDL_TOMO_DEFORMATION_GRID_SIZE_X, tomogramIndex) == gridSize.x &&
+		globalTable.getInt(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y, tomogramIndex) == gridSize.y)
 	{
+		globalTable.setValue(EMDL_TOMO_DEFORMATION_GRID_SIZE_X, gridSize.x, tomogramIndex);
+		globalTable.setValue(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y, gridSize.y, tomogramIndex);
+
 		const int fc = coeffs.size();
 		MetaDataTable& mdt = tomogramTables[tomogramIndex];
 
@@ -244,14 +249,22 @@ void TomogramSet::addDeformation(
 		for (int f = 0; f < fc; f++)
 		{
 			std::vector<double> old_coeffs = mdt.getDoubleVector(EMDL_TOMO_DEFORMATION_COEFFICIENTS, f);
-			std::vector<double> new_coeffs(coeffs[f].size());
 
-			for (int i = 0; i < coeffs[f].size(); i++)
+			if (old_coeffs.size() == coeffs[f].size())
 			{
-				new_coeffs[i] = old_coeffs[i] + coeffs[f][i];
-			}
+				std::vector<double> new_coeffs(coeffs[f].size());
 
-			mdt.setValue(EMDL_TOMO_DEFORMATION_COEFFICIENTS, new_coeffs[f], f);
+				for (int i = 0; i < coeffs[f].size(); i++)
+				{
+					new_coeffs[i] = old_coeffs[i] + coeffs[f][i];
+				}
+
+				mdt.setValue(EMDL_TOMO_DEFORMATION_COEFFICIENTS, new_coeffs, f);
+			}
+			else
+			{
+				mdt.setValue(EMDL_TOMO_DEFORMATION_COEFFICIENTS, coeffs[f], f);
+			}
 		}
 	}
 	else
@@ -385,6 +398,14 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 		{
 			const std::vector<double> coeffs = m.getDoubleVector(
 					EMDL_TOMO_DEFORMATION_COEFFICIENTS, f);
+
+			const int expected_coeffs = 8 * deformationGridSize.x * deformationGridSize.y;
+
+			if (coeffs.size() != expected_coeffs)
+			{
+				REPORT_ERROR_STR("TomogramSet::loadTomogram: wrong number of deformation coefficients (expected: "
+								 << expected_coeffs << ", found: " << coeffs.size() << ")");
+			}
 			
 			out.imageDeformations[f] = Spline2DDeformation(
 					stackSize.xy(), deformationGridSize, &coeffs[0]);

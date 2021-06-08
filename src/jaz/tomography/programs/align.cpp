@@ -162,11 +162,11 @@ void AlignProgram::initialise()
 
 	if (do_deformation && tomogramSet.globalTable.labelExists(EMDL_TOMO_DEFORMATION_GRID_SIZE_X))
 	{
-		Log::warn("Previous 2D image deformation found in data set - resetting.");
+		/*Log::warn("Previous 2D image deformation found in data set - resetting.");
 
-		tomogramSet.clearDeformation();
+		tomogramSet.clearDeformation();*/
 
-		/*const i2Vector old_grid(
+		const i2Vector old_grid(
 			tomogramSet.globalTable.getInt(EMDL_TOMO_DEFORMATION_GRID_SIZE_X),
 			tomogramSet.globalTable.getInt(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y));
 
@@ -176,7 +176,7 @@ void AlignProgram::initialise()
 			Log::warn("2D image deformation with different grid size found in data set - resetting.");
 
 			tomogramSet.clearDeformation();
-		}*/
+		}
 	}
 
 
