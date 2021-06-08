@@ -294,29 +294,6 @@ void AlignProgram::processTomograms(
 		}
 
 
-		/*for (int p = 0; p < 5; p++)
-		{
-			const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
-					ParticleIndex(p), fc, tomogram.optics.pixelSize);
-
-			std::cout << "particle " << p << ":\n";
-
-			for (int ff = 0; ff < fc; ff++)
-			{
-				const int f = tomogram.frameSequence[ff];
-
-				const d2Vector pl = (tomogram.projectionMatrices[f] * gravis::d4Vector(traj[f])).xy();
-				const d2Vector p1 = tomogram.imageDeformations[f].apply(pl);
-
-				std::cout << f << ": " << pl << " -[" << (p1 - pl) << "]-> " << p1 << '\n';
-			}
-
-			std::cout << '\n';
-		}
-
-		std::exit(0);*/
-
-
 		std::vector<BufferedImage<double>> CCs = Prediction::computeCroppedCCs(
 				particleSet, particles[t], tomogram, aberrationsCache,
 				referenceMap, freqWeight, doseWeights, tomogram.frameSequence,

@@ -253,7 +253,7 @@ ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 	for (int p = 0; p < pc; p++)
 	{
 		const std::vector<gravis::d3Vector> traj = particleSet.getTrajectoryInPixels(
-			ParticleIndex(p), fc, tomogram.optics.pixelSize);
+			partIndices[p], fc, tomogram.optics.pixelSize);
 
 		for (int ft = 0; ft < fc; ft++)
 		{
@@ -1111,7 +1111,7 @@ void ModularAlignment<MotionModel, DeformationModel2D>::visualiseShifts(
 		points_by_frame[f].SetDrawMarker(true);
 		points_by_frame[f].SetDrawLine(false);
 		points_by_frame[f].SetDatasetColor(c.r,c.g,c.b);
-		points_by_frame[f].SetMarkerSize(1);
+		points_by_frame[f].SetMarkerSize(3);
 	}
 
 	for (int p = 0; p < pc; p++)

@@ -175,12 +175,14 @@ void AlignProgram::performAlignment(
 		Log::beginProgress("Performing optimisation", num_iters);
 	}
 
+	/*std::cout << "initial info: \n";
+	alignment.printDebuggingInfo(initial);*/
 
 	std::vector<double> opt = LBFGS::optimize(
 			initial, alignment, 1, num_iters, 1e-6, 1e-4);
 
-
-	//alignment.printDebuggingInfo(opt);
+	/*std::cout << "final info: \n";
+	alignment.printDebuggingInfo(opt);*/
 
 	if (verbosity > 0 && per_tomogram_progress)
 	{
