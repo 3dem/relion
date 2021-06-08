@@ -38,7 +38,7 @@ class ModularAlignment : public FastDifferentiableOptimization
 		ModularAlignment(
 				const std::vector<BufferedImage<double>>& CCs,
 				const std::vector<gravis::d4Matrix>& frameProj,
-				ParticleSet& dataSet,
+				ParticleSet& particleSet,
 				const std::vector<ParticleIndex>& partIndices,
 				const MotionModel& motionModel,
 				const DeformationModel2D& deformationModel2D,
@@ -55,7 +55,7 @@ class ModularAlignment : public FastDifferentiableOptimization
 
 			const std::vector<BufferedImage<double>>& CCs;  // one frame stack for each particle
 			const std::vector<gravis::d4Matrix>& frameProj; // initial projection matrices
-			ParticleSet& dataSet;
+			ParticleSet& particleSet;
 			const std::vector<ParticleIndex>& partIndices;
 
 			ModularAlignmentSettings settings;
@@ -69,6 +69,10 @@ class ModularAlignment : public FastDifferentiableOptimization
 			mutable int lastIterationNumber;
 
 			std::vector<gravis::d3Vector> initialPos;
+
+			std::vector<gravis::d3Vector> originalTrajectory;
+			std::vector<gravis::d2Vector> original2DPos;
+			std::vector<double> originalCoefficients;
 			
 			gravis::d4Matrix minusCentre, plusCentre;
 			
@@ -92,7 +96,7 @@ class ModularAlignment : public FastDifferentiableOptimization
 
 		std::vector<Trajectory> exportTrajectories(
 				const std::vector<double>& x,
-				const ParticleSet& dataSet,
+				const ParticleSet& particleSet,
 				const std::vector<int>& frameSequence) const;
 		
 		void visualiseTrajectories(
@@ -192,7 +196,7 @@ template<class MotionModel, class DeformationModel2D>
 ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 		const std::vector<BufferedImage<double>>& CCs,
 		const std::vector<gravis::d4Matrix>& frameProj,
-		ParticleSet& dataSet,
+		ParticleSet& particleSet,
 		const std::vector<ParticleIndex>& partIndices,
 		const MotionModel& motionModel,
 		const DeformationModel2D& deformationModel2D,
@@ -207,7 +211,7 @@ ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 	deformationModel2D(deformationModel2D),
 	CCs(CCs),
 	frameProj(frameProj),
-	dataSet(dataSet),
+	particleSet(particleSet),
 	partIndices(partIndices),
 	settings(settings),
 	pixelSize(tomogram.optics.pixelSize),
@@ -227,7 +231,7 @@ ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 	
 	for (int p = 0; p < pc; p++)
 	{
-		initialPos[p] = dataSet.getPosition(partIndices[p]);
+		initialPos[p] = particleSet.getPosition(partIndices[p]);
 	}
 	
 	const gravis::d3Vector tomoCentre = tomogram.centre;
@@ -243,6 +247,82 @@ ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 			0, 1, 0, tomoCentre.y, 
 			0, 0, 1, tomoCentre.z, 
 			0, 0, 0, 1 );
+
+	originalTrajectory.resize(pc*fc);
+	original2DPos.resize(pc*fc);
+
+	for (int p = 0; p < pc; p++)
+	{
+		const std::vector<gravis::d3Vector> traj = particleSet.getTrajectoryInPixels(
+			ParticleIndex(p), fc, tomogram.optics.pixelSize);
+
+		for (int ft = 0; ft < fc; ft++)
+		{
+			const int ff = tomogram.frameSequence[ft];
+
+			originalTrajectory[fc*p + ft] = traj[ff];
+			original2DPos[fc*p + ft] = tomogram.projectPoint(traj[ff], ff);
+
+			/*if (p==0 && ft<5)
+			{
+				std::cout << std::setw(11) << std::setprecision(10);
+				tomogram.projectPointDebug(traj[ff], ff);
+			}*/
+		}
+
+	}
+
+	originalCoefficients.resize(getParamCount(), 0.0);
+
+	const bool do_motion = mpc > 0;
+	const bool do_deformation = dc > 0;
+
+	const int fs = getFrameStride();
+	const int pos_block = getPositionsBlockOffset(fs);
+	const int mot_block = getMotionBlockOffset(fs);
+	const int def_block = get2DDeformationsBlockOffset(fs);
+
+	if (do_motion)
+	{}
+
+	if (do_deformation && tomogram.hasDeformations)
+	{
+		if (settings.perFrame2DDeformation)
+		{
+			for (int ft = 0; ft < fc; ft++)
+			{
+				const int ff = tomogram.frameSequence[ft];
+				const int def_block_f = def_block + ft * dc;
+
+				const Spline2DDeformation& def = tomogram.imageDeformations[ff];
+
+				for (int i = 0; i < dc; i++)
+				{
+					originalCoefficients[def_block_f + i] = def.coefficients[i/4][i%4];
+				}
+			}
+		}
+		else // average the previous deformations over all frames (this will compromise the early frames)
+		{
+			std::vector<double> average_coefficients(dc, 0.0);
+
+			for (int ft = 0; ft < fc; ft++)
+			{
+				const int ff = tomogram.frameSequence[ft];
+				const Spline2DDeformation& def = tomogram.imageDeformations[ff];
+
+				for (int i = 0; i < dc; i++)
+				{
+					average_coefficients[i] += def.coefficients[i/4][i%4];
+				}
+			}
+
+			for (int i = 0; i < dc; i++)
+			{
+				originalCoefficients[def_block + i] = average_coefficients[i] / fc;
+			}
+		}
+	}
 }
 
 /*
@@ -330,7 +410,8 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 		{
 			const gravis::d4Vector pos4(initialPos[p] + shift);
 
-			const gravis::d2Vector p0 = (frameProj[f] * gravis::d4Vector(initialPos[p])).xy();
+			//const gravis::d2Vector p0 = (frameProj[f] * gravis::d4Vector(initialPos[p])).xy();
+			const gravis::d2Vector p0 = original2DPos[p*fc + f];
 			const gravis::d2Vector pl = (P[f] * pos4).xy();
 						
 			const int def_block_f = def_block + (settings.perFrame2DDeformation? f * dc : 0);
@@ -474,6 +555,7 @@ void ModularAlignment<MotionModel, DeformationModel2D>::printDebuggingInfo(const
 	const int fs = getFrameStride();
 	const int xs = x.size();
 	const int pos_block = getPositionsBlockOffset(fs);
+	const int mot_block = getMotionBlockOffset(fs);
 	const int def_block = get2DDeformationsBlockOffset(fs);
 
 	for (int i = 0; i < xs; i++)
@@ -518,7 +600,7 @@ void ModularAlignment<MotionModel, DeformationModel2D>::printDebuggingInfo(const
 		P[f](1,3) += dy;
 	}
 
-	for (int p = 0; p < 5; p++)
+	for (int p = 0; p < 1; p++)
 	{
 		std::cout << "particle " << p << ":\n";
 
@@ -526,11 +608,12 @@ void ModularAlignment<MotionModel, DeformationModel2D>::printDebuggingInfo(const
 			gravis::d3Vector(0.0, 0.0, 0.0) :
 			gravis::d3Vector(x[pos_block + 3*p], x[pos_block + 3*p+1], x[pos_block + 3*p+2]);
 
-		for (int f = 0; f < fc; f++)
+		for (int f = 0; f < 4; f++)
 		{
 			const gravis::d4Vector pos4(initialPos[p] + shift);
 
-			const gravis::d2Vector p0 = (frameProj[f] * gravis::d4Vector(initialPos[p])).xy();
+			//const gravis::d2Vector p0 = (frameProj[f] * gravis::d4Vector(initialPos[p])).xy();
+			const gravis::d2Vector p0 = original2DPos[p*fc + f];
 			const gravis::d2Vector pl = (P[f] * pos4).xy();
 
 			const int def_block_f = def_block + (settings.perFrame2DDeformation? f * dc : 0);
@@ -540,7 +623,14 @@ void ModularAlignment<MotionModel, DeformationModel2D>::printDebuggingInfo(const
 
 			const gravis::d2Vector p1 = pl + def;
 
-			std::cout << f << ": " << p0 << " -> " << pl << " -[" << def << "]-> " << p1 << '\n';
+			std::cout << f << ": " << p0 << " vs. \n"
+					  << pos4.xyz() << " -> " << pl << " -> " << p1 << " (" << def << ")\n"
+					  << " (" << P[f] << ")\n";
+
+			if (!settings.constParticles && f < fc-1)
+			{
+				motionModel.updatePosition(&x[mot_block + f*mpc], p, shift);
+			}
 		}
 
 		std::cout << '\n';
@@ -624,7 +714,7 @@ Trajectory ModularAlignment<MotionModel, DeformationModel2D>::getTrajectory(
 template<class MotionModel, class DeformationModel2D>
 std::vector<Trajectory> ModularAlignment<MotionModel, DeformationModel2D>::exportTrajectories(
 		const std::vector<double>& x, 
-		const ParticleSet& dataSet,
+		const ParticleSet& particleSet,
 		const std::vector<int>& frameSequence) const
 {
 	std::vector<Trajectory> out(pc);
@@ -633,7 +723,7 @@ std::vector<Trajectory> ModularAlignment<MotionModel, DeformationModel2D>::expor
 	{
 		const int pp = partIndices[p].value;
 
-		out[p] = dataSet.motionTrajectories[pp] + getTrajectory(x, p, frameSequence);
+		out[p] = particleSet.motionTrajectories[pp] + getTrajectory(x, p, frameSequence);
 	}
 
 	return out;
@@ -1038,7 +1128,8 @@ void ModularAlignment<MotionModel, DeformationModel2D>::visualiseShifts(
 		{
 			const gravis::d4Vector pos4(initialPos[p] + shift);
 
-			const gravis::d2Vector p0 = (frameProj[f] * gravis::d4Vector(initialPos[p])).xy();
+			//const gravis::d2Vector p0 = (frameProj[f] * gravis::d4Vector(initialPos[p])).xy();
+			const gravis::d2Vector p0 = original2DPos[p*fc + f];
 			const gravis::d2Vector pl = (P[f] * pos4).xy();
 
 			const int def_block_f = def_block + (settings.perFrame2DDeformation? f * dc : 0);

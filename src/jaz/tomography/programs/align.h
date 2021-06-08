@@ -165,7 +165,7 @@ void AlignProgram::performAlignment(
 		progress_bar_offset, num_threads,
 		per_tomogram_progress && verbosity > 0);
 
-	std::vector<double> initial(alignment.getParamCount(), 0.0);
+	std::vector<double> initial = alignment.originalCoefficients;
 
 	alignment.devMode = debug;
 

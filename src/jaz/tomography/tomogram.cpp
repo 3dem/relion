@@ -28,6 +28,28 @@ d2Vector Tomogram::projectPoint(const d3Vector& p, int frame) const
 	}
 }
 
+d2Vector Tomogram::projectPointDebug(const d3Vector &p, int frame) const
+{
+	const d2Vector pl = (projectionMatrices[frame] * gravis::d4Vector(p)).xy();
+
+	std::cout << p << " -> " << pl << '\n';
+	std::cout << projectionMatrices[frame] << '\n';
+
+	if (hasDeformations)
+	{
+		d2Vector p1 = imageDeformations[frame].apply(pl);
+		std::cout << " -> " << p1 << "(" << (p1 - pl) << ")\n";
+
+		return p1;
+	}
+	else
+	{
+		std::cout << "\n";
+
+		return pl;
+	}
+}
+
 bool Tomogram::isVisible(const d3Vector& p, int frame, double radius) const
 {
 	const d2Vector q = projectPoint(p, frame);

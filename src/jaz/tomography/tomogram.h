@@ -35,8 +35,11 @@ class Tomogram
 			std::string name, tiltSeriesFilename, opticsGroupName, fiducialsFilename;
 			double defocusSlope;
 		
-			
+
 		gravis::d2Vector projectPoint(
+				const gravis::d3Vector& p, int frame) const;
+
+		gravis::d2Vector projectPointDebug(
 				const gravis::d3Vector& p, int frame) const;
 		
 		bool isVisible(
