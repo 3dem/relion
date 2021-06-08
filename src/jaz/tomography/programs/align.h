@@ -206,7 +206,7 @@ void AlignProgram::performAlignment(
 	if (do_motion)
 	{
 		std::vector<Trajectory> trajectories = alignment.exportTrajectories(
-					opt, particleSet, tomogram.frameSequence);
+					opt, tomogram.frameSequence);
 	
 		writeTempMotionData(trajectories, tomo_index);
 	

@@ -96,7 +96,6 @@ class ModularAlignment : public FastDifferentiableOptimization
 
 		std::vector<Trajectory> exportTrajectories(
 				const std::vector<double>& x,
-				const ParticleSet& particleSet,
 				const std::vector<int>& frameSequence) const;
 		
 		void visualiseTrajectories(
@@ -713,17 +712,14 @@ Trajectory ModularAlignment<MotionModel, DeformationModel2D>::getTrajectory(
 
 template<class MotionModel, class DeformationModel2D>
 std::vector<Trajectory> ModularAlignment<MotionModel, DeformationModel2D>::exportTrajectories(
-		const std::vector<double>& x, 
-		const ParticleSet& particleSet,
+		const std::vector<double>& x,
 		const std::vector<int>& frameSequence) const
 {
 	std::vector<Trajectory> out(pc);
 
 	for (int p = 0; p < pc; p++)
 	{
-		const int pp = partIndices[p].value;
-
-		out[p] = particleSet.motionTrajectories[pp] + getTrajectory(x, p, frameSequence);
+		out[p] = getTrajectory(x, p, frameSequence);
 	}
 
 	return out;
