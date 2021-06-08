@@ -3,7 +3,7 @@
 relion_it.py
 ============
 
-Simple GUI to set up RELION-4.0 scheduler.
+Simple GUI to set up RELION-4.0 schemer.
 
 Authors: Sjors H.W. Scheres & Colin M. Palmer
 
@@ -30,15 +30,15 @@ The options are named descriptively so you can probably understand what most of 
 any particular option, look at the comment above its definition in this script, or search the script's code to see
 how it is used.
 
-Use double underscores to separate SCHEDULENAME__JOBNAME__JOBOPTION
- E.g. for SCHEDULENAME=prep, JOBNAME=importmovies and JOBOPTION=angpix
-'prep__importmovies__angpix' defines the value for the 'angpix' option in the file 'Schedules/prep/importmovies/job.star'
+Use double underscores to separate SCHEMENAME__JOBNAME__JOBOPTION
+ E.g. for SCHEMENAME=prep, JOBNAME=importmovies and JOBOPTION=angpix
+'prep__importmovies__angpix' defines the value for the 'angpix' option in the file 'Schemes/prep/importmovies/job.star'
 
-Likewise, use SCHEDULENAME__VARIABLENAME for Schedule variables
- E.g. 'proc__inibatch_size' refers to the variablename 'inibatch_size' in the file 'Schedules/proc/schedule.star'
+Likewise, use SCHEMENAME__VARIABLENAME for Scheme variables
+ E.g. 'proc__inibatch_size' refers to the variablename 'inibatch_size' in the file 'Schemes/proc/scheme.star'
 
-This python script will set the corresponding values of these joboption and schedule-variable values in the Schedule STAR files. 
-The RELION scheduler can then be used to run the scheduler.
+This python script will set the corresponding values of these joboption and scheme-variable values in the Scheme STAR files. 
+The RELION schemer can then be used to run the schemer.
 
 Using the GUI
 -------------
@@ -59,7 +59,7 @@ Using this script in a non-interactive manner
 -------------
 
 When the --nogui option is provided, the options from this script, or any addition option files are used to modify the STAR files 
-and the schedulers are launched from this python script. This will allow a non-interactive use of this script.
+and the schemers are launched from this python script. This will allow a non-interactive use of this script.
 
 
 
@@ -95,26 +95,26 @@ RelionItOptions = {
     #############################################################################
     #
     # Change the parameters below to reflect your experiment
-    # Use double underscores to separate SCHEDULENAME__JOBNAME__JOBOPTION
+    # Use double underscores to separate SCHEMENAME__JOBNAME__JOBOPTION
     #
-    # E.g. for SCHEDULENAME=prep, JOBNAME=importmovies and JOBOPTION=angpix
-    #  'prep__importmovies__angpix' defines the value for the 'angpix' option in the file 'Schedules/prep/importmovies/job.star'
+    # E.g. for SCHEMENAME=prep, JOBNAME=importmovies and JOBOPTION=angpix
+    #  'prep__importmovies__angpix' defines the value for the 'angpix' option in the file 'Schemes/prep/importmovies/job.star'
     #
-    # Likewise, use SCHEDULENAME__VARIABLENAME for Schedule variables
+    # Likewise, use SCHEMENAME__VARIABLENAME for Scheme variables
     #
-    # E.g. 'proc__inibatch_size' refers to the variablename 'inibatch_size' in the file 'Schedules/proc/schedule.star'
+    # E.g. 'proc__inibatch_size' refers to the variablename 'inibatch_size' in the file 'Schemes/proc/scheme.star'
     #
-    #  This python script will modify the joboption and schedule-variable values in these files
+    #  This python script will modify the joboption and scheme-variable values in these files
     #
     #############################################################################
 
     # Perform Import, Motion correction and CTF estimation?
-    # This option isn't really used in the schedule, it only serves to store the checkbox selected from the relion_it.py GUI....
+    # This option isn't really used in the scheme, it only serves to store the checkbox selected from the relion_it.py GUI....
     'proc__do_prep' : True,
     # If the above option is false, then use this to provide a specific star file to the micrographs instead
-    'proc__ctffind_mics' : 'Schedules/prep/ctffind/micrographs_ctf.star',
+    'proc__ctffind_mics' : 'Schemes/prep/ctffind/micrographs_ctf.star',
 
-    ### How many micrograph movies to do in each iteration of the prep Schedule
+    ### How many micrograph movies to do in each iteration of the prep Scheme
     'prep__do_at_most' : 50,
 
     ### General parameters
@@ -150,7 +150,7 @@ RelionItOptions = {
     'proc__select_mics__select_maxval' : 6,
 
     # Perform any picking and processing of particles?
-    # This option isn't really used in the schedule, it only serves to store the checkbox selected from the relion_it.py GUI....
+    # This option isn't really used in the scheme, it only serves to store the checkbox selected from the relion_it.py GUI....
     'proc__do_2d' : True,
 
     ### Perform Topaz retraining of network, based on selected LoG-picked particles?
@@ -180,7 +180,7 @@ RelionItOptions = {
     'proc__split_ini__split_size' : 10000,
 
     ### Extract parameters for Topaz job, leave empty for using general topaz model
-    # Model for topaz picking (this will be automatically set to Schedules/proc/train_topaz/model_epoch10.sav for retraining)
+    # Model for topaz picking (this will be automatically set to Schemes/proc/train_topaz/model_epoch10.sav for retraining)
     'proc__topaz_model' : '',
     # Box size of particles in the averaged micrographs (in pixels)
     'proc__extract_rest__extract_size' : 256,
@@ -620,7 +620,7 @@ class RelionItGui(object):
                 for child in self.prep_frame.winfo_children():
                     child.configure(state=tk.NORMAL)
                 self.mics_entry.delete(0,tk.END)
-                self.mics_entry.insert(0, 'Schedules/prep/ctffind/micrographs_ctf.star')
+                self.mics_entry.insert(0, 'Schemes/prep/ctffind/micrographs_ctf.star')
                 self.mics_entry.configure(state=tk.DISABLED)
             else:
                 for child in self.prep_frame.winfo_children():
@@ -659,7 +659,7 @@ class RelionItGui(object):
                 self.log_thresh_entry.config(state=tk.NORMAL)
                 self.log_classscore_entry.config(state=tk.NORMAL)
                 self.topaz_model_entry.delete(0,tk.END)
-                self.topaz_model_entry.insert(0, 'Schedules/proc/train_topaz/model_epoch10.sav')
+                self.topaz_model_entry.insert(0, 'Schemes/proc/train_topaz/model_epoch10.sav')
                 self.topaz_model_entry.config(state=tk.DISABLED)
                 self.topaz_model_button.config(state=tk.DISABLED)
             else:
@@ -934,7 +934,7 @@ class RelionItGui(object):
         """
         if self.save_options_from_gui():
             self.main_window.destroy()
-            run_scheduler(self.options, True) #True means launch the RELION GUI and the schedulegui.py GUIs
+            run_schemer(self.options, True) #True means launch the RELION GUI and the schemegui.py GUIs
  
 def save_options(options):
 
@@ -947,35 +947,35 @@ def save_options(options):
 
     print(" RELION_IT: Written all options to {}".format(OPTIONS_FILE))
                 
-    # loop over all options and change the scheduler STAR files
+    # loop over all options and change the schemer STAR files
     for option, value in options.items():
                     
         if (value == ''):
             value = '\\"\\"'
                     
-        # Set variables in schedule.star
+        # Set variables in scheme.star
         if option.count('__') == 1:
             splits = option.split('__')
-            schedulename = splits[0]
+            schemename = splits[0]
             varname = splits[1]
-            schedulestar = 'Schedules/' + schedulename + '/schedule.star'
-            if not os.path.isfile(schedulestar):
-                message = 'Error: ' + schedulestar + ' does not exist'
+            schemestar = 'Schemes/' + schemename + '/scheme.star'
+            if not os.path.isfile(schemestar):
+                message = 'Error: ' + schemestar + ' does not exist'
                 print(message)
                 tkMessageBox.showerror(message)
                 return False
                     
-            command = 'relion_scheduler --schedule ' + schedulename + ' --set_var ' + varname + ' --value \"' + str(value) + '\"' + ' --original_value \"' + str(value) + '\"'
+            command = 'relion_schemer --scheme ' + schemename + ' --set_var ' + varname + ' --value \"' + str(value) + '\"' + ' --original_value \"' + str(value) + '\"'
             print(' RELION_IT: executing: ', command)
             os.system(command)
                         
         # Set joboptions in job.star
         elif option.count('__') == 2:
             splits = option.split('__')
-            schedulename = splits[0]
+            schemename = splits[0]
             jobname = splits[1]
             joboption = splits[2]
-            jobstar = 'Schedules/' + schedulename + '/' + jobname + '/job.star'
+            jobstar = 'Schemes/' + schemename + '/' + jobname + '/job.star'
             if not os.path.isfile(jobstar):
                 message = 'Error: ' + jobstar + 'does not exist'
                 print(message)
@@ -985,61 +985,61 @@ def save_options(options):
             print(' RELION_IT: executing: ', command)
             os.system(command)
             
-    print(' RELION_IT: done saving all options in the Schedules.') 
+    print(' RELION_IT: done saving all options in the Schemes.') 
 
-def run_scheduler(options, do_gui):
+def run_schemer(options, do_gui):
 
-    command = 'relion_scheduler --schedule prep --reset &'
+    command = 'relion_schemer --scheme prep --reset &'
     print(' RELION_IT: executing: ', command)
     os.system(command)
 
     if options['proc__do_prep']:
         
-        command = 'relion_scheduler --schedule prep --run --pipeline_control Schedules/prep/ >> Schedules/prep/run.out 2>> Schedules/prep/run.err &'
+        command = 'relion_schemer --scheme prep --run --pipeline_control Schemes/prep/ >> Schemes/prep/run.out 2>> Schemes/prep/run.err &'
         print(' RELION_IT: executing: ', command)
         os.system(command)
         if do_gui:
-            command = 'relion_schedulegui.py prep &'
+            command = 'relion_schemegui.py prep &'
             print(' RELION_IT: executing: ', command)
             os.system(command)
           
     if options['proc__do_2d']:
 
-        command = 'relion_scheduler --schedule proc --reset &'
+        command = 'relion_schemer --scheme proc --reset &'
         print(' RELION_IT: executing: ', command)
         os.system(command)
 
-        command = 'relion_scheduler --schedule proc --run  --pipeline_control Schedules/proc/ >> Schedules/proc/run.out 2>> Schedules/proc/run.err  &'
+        command = 'relion_schemer --scheme proc --run  --pipeline_control Schemes/proc/ >> Schemes/proc/run.out 2>> Schemes/proc/run.err  &'
         print(' RELION_IT: executing: ', command)
         os.system(command)
         if do_gui:
-            command = 'relion_schedulegui.py proc &'
+            command = 'relion_schemegui.py proc &'
             print(' RELION_IT: executing: ', command)
             os.system(command)
 
 
-    print(' RELION_IT: Now monitor the prep (and proc) Schedules from the RELION GUI ...')
+    print(' RELION_IT: Now monitor the prep (and proc) Schemes from the RELION GUI ...')
 
     if do_gui:
         command = 'relion --do_projdir &'
         os.system(command)
 
 
-def copy_schedule(schedulename):
+def copy_scheme(schemename):
   
-    ## Only copy the Schedule directory structure from the RELION installation directory if it doesn't exist yet
-    if not os.path.isdir('Schedules/'+schedulename):
+    ## Only copy the Scheme directory structure from the RELION installation directory if it doesn't exist yet
+    if not os.path.isdir('Schemes/'+schemename):
         try:
             mydir = os.environ['RELION_SCRIPT_DIRECTORY']
         except KeyError:
-            raise KeyError("Environment variable $RELION_SCRIPT_DIRECTORY has not been set. This is required to copy the prep and proc schedules from.")
-        print(' RELION_IT: copying Schedules/' + schedulename + ' from: ' + mydir)
-        copytree(mydir+'/Schedules/'+schedulename, 'Schedules/'+schedulename)
+            raise KeyError("Environment variable $RELION_SCRIPT_DIRECTORY has not been set. This is required to copy the prep and proc schemes from.")
+        print(' RELION_IT: copying Schemes/' + schemename + ' from: ' + mydir)
+        copytree(mydir+'/Schemes/'+schemename, 'Schemes/'+schemename)
 
 
 def main():
     """
-    Run the RELION 3.2 Scheduler.
+    Run the RELION 3.2 Schemer.
     
     Options files given as command line arguments will be opened in order and
     used to update the default options.
@@ -1050,7 +1050,7 @@ def main():
     parser.add_argument("extra_options", nargs="*", metavar="extra_options.py",
                         help="Python files containing options for relion_it.py")
     parser.add_argument("--nogui", action="store_true", help="don't launch GUI to set options, execute non-interactively")
-    parser.add_argument("--onlysave", action="store_true", help="don't launch GUI, nor execute Schedules, only save options")
+    parser.add_argument("--onlysave", action="store_true", help="don't launch GUI, nor execute Schemes, only save options")
     args = parser.parse_args()
 
     print(' RELION_IT: -------------------------------------------------------------------------------------------------------------------')
@@ -1082,15 +1082,15 @@ def main():
                     user_opts[k] = False
             opts.update(user_opts)
 
-    # Copy Schedules over from RELION directory if they dont exit
-    copy_schedule('prep')
-    copy_schedule('proc')
+    # Copy Schemes over from RELION directory if they dont exit
+    copy_scheme('prep')
+    copy_scheme('proc')
 
     if args.onlysave:
         save_options(opts)
     elif args.nogui:
         save_options(opts)
-        run_scheduler(opts, False) #False means don't launch RELION GUI after launching the Schedules
+        run_schemer(opts, False) #False means don't launch RELION GUI after launching the Schemes
     else:
         print(' RELION_IT: launching GUI...')
         tk_root = tk.Tk()

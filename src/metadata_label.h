@@ -552,34 +552,34 @@ enum EMDLabel
 	EMDL_SAMPLING_SIGMA_PSI,
 	EMDL_SAMPLING_SYMMETRY,
 
-	EMDL_SCHEDULE_EDGE_NUMBER,
-	EMDL_SCHEDULE_EDGE_INPUT,
-	EMDL_SCHEDULE_EDGE_OUTPUT,
-	EMDL_SCHEDULE_EDGE_IS_FORK,
-	EMDL_SCHEDULE_EDGE_OUTPUT_TRUE,
-	EMDL_SCHEDULE_EDGE_BOOLEAN,
-	EMDL_SCHEDULE_GENERAL_CURRENT_NODE,
-	EMDL_SCHEDULE_GENERAL_ORIGINAL_START_NODE,
-	EMDL_SCHEDULE_GENERAL_EMAIL,
-	EMDL_SCHEDULE_GENERAL_NAME,
-	EMDL_SCHEDULE_JOB_NAME,
-	EMDL_SCHEDULE_JOB_ORI_NAME,
-	EMDL_SCHEDULE_JOB_MODE,
-	EMDL_SCHEDULE_JOB_HAS_STARTED,
-	EMDL_SCHEDULE_OPERATOR_NAME,
-	EMDL_SCHEDULE_OPERATOR_TYPE,
-	EMDL_SCHEDULE_OPERATOR_INPUT1,
-	EMDL_SCHEDULE_OPERATOR_INPUT2,
-	EMDL_SCHEDULE_OPERATOR_OUTPUT,
-	EMDL_SCHEDULE_VAR_BOOL_NAME,
-	EMDL_SCHEDULE_VAR_BOOL_VALUE,
-	EMDL_SCHEDULE_VAR_BOOL_ORI_VALUE,
-	EMDL_SCHEDULE_VAR_FLOAT_NAME,
-	EMDL_SCHEDULE_VAR_FLOAT_VALUE,
-	EMDL_SCHEDULE_VAR_FLOAT_ORI_VALUE,
-	EMDL_SCHEDULE_VAR_STRING_NAME,
-	EMDL_SCHEDULE_VAR_STRING_VALUE,
-	EMDL_SCHEDULE_VAR_STRING_ORI_VALUE,
+	EMDL_SCHEME_EDGE_NUMBER,
+	EMDL_SCHEME_EDGE_INPUT,
+	EMDL_SCHEME_EDGE_OUTPUT,
+	EMDL_SCHEME_EDGE_IS_FORK,
+	EMDL_SCHEME_EDGE_OUTPUT_TRUE,
+	EMDL_SCHEME_EDGE_BOOLEAN,
+	EMDL_SCHEME_GENERAL_CURRENT_NODE,
+	EMDL_SCHEME_GENERAL_ORIGINAL_START_NODE,
+	EMDL_SCHEME_GENERAL_EMAIL,
+	EMDL_SCHEME_GENERAL_NAME,
+	EMDL_SCHEME_JOB_NAME,
+	EMDL_SCHEME_JOB_ORI_NAME,
+	EMDL_SCHEME_JOB_MODE,
+	EMDL_SCHEME_JOB_HAS_STARTED,
+	EMDL_SCHEME_OPERATOR_NAME,
+	EMDL_SCHEME_OPERATOR_TYPE,
+	EMDL_SCHEME_OPERATOR_INPUT1,
+	EMDL_SCHEME_OPERATOR_INPUT2,
+	EMDL_SCHEME_OPERATOR_OUTPUT,
+	EMDL_SCHEME_VAR_BOOL_NAME,
+	EMDL_SCHEME_VAR_BOOL_VALUE,
+	EMDL_SCHEME_VAR_BOOL_ORI_VALUE,
+	EMDL_SCHEME_VAR_FLOAT_NAME,
+	EMDL_SCHEME_VAR_FLOAT_VALUE,
+	EMDL_SCHEME_VAR_FLOAT_ORI_VALUE,
+	EMDL_SCHEME_VAR_STRING_NAME,
+	EMDL_SCHEME_VAR_STRING_VALUE,
+	EMDL_SCHEME_VAR_STRING_ORI_VALUE,
 
 
 	EMDL_SELECTED,
@@ -643,7 +643,7 @@ enum EMDLabel
 	EMDL_TOMO_ICE_NORMAL_X,
 	EMDL_TOMO_ICE_NORMAL_Y,
 	EMDL_TOMO_ICE_NORMAL_Z,
-	
+
 	EMDL_TOMO_DEFORMATION_GRID_SIZE_X,
 	EMDL_TOMO_DEFORMATION_GRID_SIZE_Y,
 	EMDL_TOMO_DEFORMATION_COEFFICIENTS,
@@ -1223,34 +1223,34 @@ private:
 		EMDL::addLabel(EMDL_SAMPLING_PSI_STEP_ORI, EMDL_DOUBLE, "rlnPsiStepOriginal", "Original step size (in degrees) for the sampling of the in-plane rotation angle (psi)");
 		EMDL::addLabel(EMDL_SAMPLING_SYMMETRY, EMDL_STRING, "rlnSymmetryGroup", "Symmetry group (e.g., C1, D7, I2, I5, etc.)");
 
-		EMDL::addLabel(EMDL_SCHEDULE_EDGE_NUMBER, EMDL_INT, "rlnScheduleEdgeNumber", "Numbered index of an edge inside a Schedule");
-		EMDL::addLabel(EMDL_SCHEDULE_EDGE_INPUT, EMDL_STRING, "rlnScheduleEdgeInputNodeName" , "Name of the input Node for a schedule Edge");
-		EMDL::addLabel(EMDL_SCHEDULE_EDGE_OUTPUT, EMDL_STRING, "rlnScheduleEdgeOutputNodeName", "Name of the output Node for a schedule Edge");
-		EMDL::addLabel(EMDL_SCHEDULE_EDGE_IS_FORK, EMDL_BOOL, "rlnScheduleEdgeIsFork", "Flag to indicate that this Edge is a Fork, dependent on a Boolean Schedule variable");
-		EMDL::addLabel(EMDL_SCHEDULE_EDGE_OUTPUT_TRUE, EMDL_STRING, "rlnScheduleEdgeOutputNodeNameIfTrue", "Name of the output Node for a schedule Fork if the associated Boolean is True");
-		EMDL::addLabel(EMDL_SCHEDULE_EDGE_BOOLEAN, EMDL_STRING, "rlnScheduleEdgeBooleanVariable", "Name of the associated Boolean variable if this Edge is a Fork");
-		EMDL::addLabel(EMDL_SCHEDULE_GENERAL_CURRENT_NODE, EMDL_STRING, "rlnScheduleCurrentNodeName", "Name of the current Node for this Schedule");
-		EMDL::addLabel(EMDL_SCHEDULE_GENERAL_ORIGINAL_START_NODE, EMDL_STRING, "rlnScheduleOriginalStartNodeName", "Name of the original starting Node for this Schedule");
-		EMDL::addLabel(EMDL_SCHEDULE_GENERAL_EMAIL, EMDL_STRING, "rlnScheduleEmailAddress", "Email address to send message when Schedule finishes");
-		EMDL::addLabel(EMDL_SCHEDULE_GENERAL_NAME, EMDL_STRING, "rlnScheduleName", "Name for this Schedule");
-		EMDL::addLabel(EMDL_SCHEDULE_JOB_NAME, EMDL_STRING, "rlnScheduleJobName", "Name of a Job in a Schedule");
-		EMDL::addLabel(EMDL_SCHEDULE_JOB_ORI_NAME, EMDL_STRING, "rlnScheduleJobNameOriginal", "Original name of a Job in a Schedule");
-		EMDL::addLabel(EMDL_SCHEDULE_JOB_MODE, EMDL_STRING, "rlnScheduleJobMode", "Mode on how to execute a Job");
-		EMDL::addLabel(EMDL_SCHEDULE_JOB_HAS_STARTED, EMDL_BOOL, "rlnScheduleJobHasStarted", "Flag to indicate whether a Job has started already in the execution of the Schedule");
-		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_NAME, EMDL_STRING, "rlnScheduleOperatorName", "Name of a Boolean operator in the Schedule");
-		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_TYPE, EMDL_STRING, "rlnScheduleOperatorType", "Type of an operator in the Schedule");
-		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_INPUT1, EMDL_STRING, "rlnScheduleOperatorInput1", "Name of the 1st input to the operator");
-		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_INPUT2, EMDL_STRING, "rlnScheduleOperatorInput2", "Name of the 2nd input to the operator");
-		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_OUTPUT, EMDL_STRING, "rlnScheduleOperatorOutput", "Name of the output variable on which this operator acts");
-		EMDL::addLabel(EMDL_SCHEDULE_VAR_BOOL_NAME, EMDL_STRING, "rlnScheduleBooleanVariableName", "Name of a Boolean variable in the Schedule");
-		EMDL::addLabel(EMDL_SCHEDULE_VAR_BOOL_VALUE, EMDL_BOOL, "rlnScheduleBooleanVariableValue", "Value of a Boolean variable in the Schedule");
-		EMDL::addLabel(EMDL_SCHEDULE_VAR_BOOL_ORI_VALUE, EMDL_BOOL, "rlnScheduleBooleanVariableResetValue", "Value which a Boolean variable will take upon a reset");
-		EMDL::addLabel(EMDL_SCHEDULE_VAR_FLOAT_NAME, EMDL_STRING, "rlnScheduleFloatVariableName", "Name of a Float variable in the Schedule");
-		EMDL::addLabel(EMDL_SCHEDULE_VAR_FLOAT_VALUE, EMDL_DOUBLE, "rlnScheduleFloatVariableValue", "Value of a Float variable in the Schedule");
-		EMDL::addLabel(EMDL_SCHEDULE_VAR_FLOAT_ORI_VALUE, EMDL_DOUBLE, "rlnScheduleFloatVariableResetValue", "Value which a Float variable will take upon a reset");
-		EMDL::addLabel(EMDL_SCHEDULE_VAR_STRING_NAME, EMDL_STRING, "rlnScheduleStringVariableName", "Name of a String variable in the Schedule");
-		EMDL::addLabel(EMDL_SCHEDULE_VAR_STRING_VALUE, EMDL_STRING, "rlnScheduleStringVariableValue", "Value of a String variable in the Schedule");
-		EMDL::addLabel(EMDL_SCHEDULE_VAR_STRING_ORI_VALUE, EMDL_STRING, "rlnScheduleStringVariableResetValue", "Value which a String variable will take upon a reset");
+		EMDL::addLabel(EMDL_SCHEME_EDGE_NUMBER, EMDL_INT, "rlnSchemeEdgeNumber", "Numbered index of an edge inside a Scheme");
+		EMDL::addLabel(EMDL_SCHEME_EDGE_INPUT, EMDL_STRING, "rlnSchemeEdgeInputNodeName" , "Name of the input Node for a schedule Edge");
+		EMDL::addLabel(EMDL_SCHEME_EDGE_OUTPUT, EMDL_STRING, "rlnSchemeEdgeOutputNodeName", "Name of the output Node for a schedule Edge");
+		EMDL::addLabel(EMDL_SCHEME_EDGE_IS_FORK, EMDL_BOOL, "rlnSchemeEdgeIsFork", "Flag to indicate that this Edge is a Fork, dependent on a Boolean Scheme variable");
+		EMDL::addLabel(EMDL_SCHEME_EDGE_OUTPUT_TRUE, EMDL_STRING, "rlnSchemeEdgeOutputNodeNameIfTrue", "Name of the output Node for a schedule Fork if the associated Boolean is True");
+		EMDL::addLabel(EMDL_SCHEME_EDGE_BOOLEAN, EMDL_STRING, "rlnSchemeEdgeBooleanVariable", "Name of the associated Boolean variable if this Edge is a Fork");
+		EMDL::addLabel(EMDL_SCHEME_GENERAL_CURRENT_NODE, EMDL_STRING, "rlnSchemeCurrentNodeName", "Name of the current Node for this Scheme");
+		EMDL::addLabel(EMDL_SCHEME_GENERAL_ORIGINAL_START_NODE, EMDL_STRING, "rlnSchemeOriginalStartNodeName", "Name of the original starting Node for this Scheme");
+		EMDL::addLabel(EMDL_SCHEME_GENERAL_EMAIL, EMDL_STRING, "rlnSchemeEmailAddress", "Email address to send message when Scheme finishes");
+		EMDL::addLabel(EMDL_SCHEME_GENERAL_NAME, EMDL_STRING, "rlnSchemeName", "Name for this Scheme");
+		EMDL::addLabel(EMDL_SCHEME_JOB_NAME, EMDL_STRING, "rlnSchemeJobName", "Name of a Job in a Scheme");
+		EMDL::addLabel(EMDL_SCHEME_JOB_ORI_NAME, EMDL_STRING, "rlnSchemeJobNameOriginal", "Original name of a Job in a Scheme");
+		EMDL::addLabel(EMDL_SCHEME_JOB_MODE, EMDL_STRING, "rlnSchemeJobMode", "Mode on how to execute a Job");
+		EMDL::addLabel(EMDL_SCHEME_JOB_HAS_STARTED, EMDL_BOOL, "rlnSchemeJobHasStarted", "Flag to indicate whether a Job has started already in the execution of the Scheme");
+		EMDL::addLabel(EMDL_SCHEME_OPERATOR_NAME, EMDL_STRING, "rlnSchemeOperatorName", "Name of a Boolean operator in the Scheme");
+		EMDL::addLabel(EMDL_SCHEME_OPERATOR_TYPE, EMDL_STRING, "rlnSchemeOperatorType", "Type of an operator in the Scheme");
+		EMDL::addLabel(EMDL_SCHEME_OPERATOR_INPUT1, EMDL_STRING, "rlnSchemeOperatorInput1", "Name of the 1st input to the operator");
+		EMDL::addLabel(EMDL_SCHEME_OPERATOR_INPUT2, EMDL_STRING, "rlnSchemeOperatorInput2", "Name of the 2nd input to the operator");
+		EMDL::addLabel(EMDL_SCHEME_OPERATOR_OUTPUT, EMDL_STRING, "rlnSchemeOperatorOutput", "Name of the output variable on which this operator acts");
+		EMDL::addLabel(EMDL_SCHEME_VAR_BOOL_NAME, EMDL_STRING, "rlnSchemeBooleanVariableName", "Name of a Boolean variable in the Scheme");
+		EMDL::addLabel(EMDL_SCHEME_VAR_BOOL_VALUE, EMDL_BOOL, "rlnSchemeBooleanVariableValue", "Value of a Boolean variable in the Scheme");
+		EMDL::addLabel(EMDL_SCHEME_VAR_BOOL_ORI_VALUE, EMDL_BOOL, "rlnSchemeBooleanVariableResetValue", "Value which a Boolean variable will take upon a reset");
+		EMDL::addLabel(EMDL_SCHEME_VAR_FLOAT_NAME, EMDL_STRING, "rlnSchemeFloatVariableName", "Name of a Float variable in the Scheme");
+		EMDL::addLabel(EMDL_SCHEME_VAR_FLOAT_VALUE, EMDL_DOUBLE, "rlnSchemeFloatVariableValue", "Value of a Float variable in the Scheme");
+		EMDL::addLabel(EMDL_SCHEME_VAR_FLOAT_ORI_VALUE, EMDL_DOUBLE, "rlnSchemeFloatVariableResetValue", "Value which a Float variable will take upon a reset");
+		EMDL::addLabel(EMDL_SCHEME_VAR_STRING_NAME, EMDL_STRING, "rlnSchemeStringVariableName", "Name of a String variable in the Scheme");
+		EMDL::addLabel(EMDL_SCHEME_VAR_STRING_VALUE, EMDL_STRING, "rlnSchemeStringVariableValue", "Value of a String variable in the Scheme");
+		EMDL::addLabel(EMDL_SCHEME_VAR_STRING_ORI_VALUE, EMDL_STRING, "rlnSchemeStringVariableResetValue", "Value which a String variable will take upon a reset");
 
 		EMDL::addLabel(EMDL_SELECTED, EMDL_INT, "rlnSelected", "Flag whether an entry in a metadatatable is selected (1) in the viewer or not (0)");
 		EMDL::addLabel(EMDL_SELECT_PARTICLES_ZSCORE, EMDL_DOUBLE, "rlnParticleSelectZScore", "Sum of Z-scores from particle_select. High Z-scores are likely to be outliers.");
@@ -1270,14 +1270,14 @@ private:
 		EMDL::addLabel(EMDL_TOMO_SIZE_X, EMDL_INT, "rlnTomoSizeX", "Width of a bin-1 tomogram in pixels");
 		EMDL::addLabel(EMDL_TOMO_SIZE_Y, EMDL_INT, "rlnTomoSizeY", "Height of a bin-1 tomogram in pixels");
 		EMDL::addLabel(EMDL_TOMO_SIZE_Z, EMDL_INT, "rlnTomoSizeZ", "Depth of a bin-1 tomogram in pixels");
-		
+
 		EMDL::addLabel(EMDL_TOMO_PROJECTION_X, EMDL_DOUBLE_VECTOR, "rlnTomoProjX", "First row of the projection matrix");
 		EMDL::addLabel(EMDL_TOMO_PROJECTION_Y, EMDL_DOUBLE_VECTOR, "rlnTomoProjY", "Second row of the projection matrix");
 		EMDL::addLabel(EMDL_TOMO_PROJECTION_Z, EMDL_DOUBLE_VECTOR, "rlnTomoProjZ", "Third row of the projection matrix");
 		EMDL::addLabel(EMDL_TOMO_PROJECTION_W, EMDL_DOUBLE_VECTOR, "rlnTomoProjW", "Fourth row of the projection matrix");
-		
+
 		EMDL::addLabel(EMDL_TOMO_HANDEDNESS, EMDL_DOUBLE, "rlnTomoHand", "Handedness of a tomogram (i.e. slope of defocus over the image-space z coordinate)");
-				
+
 		EMDL::addLabel(EMDL_TOMO_FIDUCIALS_STARFILE, EMDL_STRING, "rlnTomoFiducialsStarFile", "STAR file containing the 3D locations of fiducial markers");
 		EMDL::addLabel(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, EMDL_DOUBLE, "rlnTomoTiltSeriesPixelSize", "Pixel size of the original tilt series");
 		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_ROT, EMDL_DOUBLE, "rlnTomoSubtomogramRot", "First Euler angle of a subtomogram (rot, in degrees)");
@@ -1321,7 +1321,7 @@ private:
 		EMDL::addLabel(EMDL_TOMO_DEFORMATION_GRID_SIZE_X, EMDL_INT, "rlnTomoDeformationGridSizeX", "Width of the 2D-deformation grid");
 		EMDL::addLabel(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y, EMDL_INT, "rlnTomoDeformationGridSizeY", "Height of the 2D-deformation grid");
 		EMDL::addLabel(EMDL_TOMO_DEFORMATION_COEFFICIENTS, EMDL_DOUBLE_VECTOR, "rlnTomoDeformationCoefficients", "Coefficients describing a 2D deformation of a micrograph");
-		
+
 		EMDL::addLabel(EMDL_TOMO_TEMP_PRED_TIMES_OBS, EMDL_DOUBLE, "rlnTomoTempPredTimesObs", "Sum over products of predicted and observed values");
 		EMDL::addLabel(EMDL_TOMO_TEMP_PRED_SQUARED, EMDL_DOUBLE, "rlnTomoTempPredSquared", "Sum over squares of predicted values");
 

@@ -93,7 +93,6 @@ public:
 		{
 			if (edit_job_out == "") edit_job_out = edit_job_in;
 			if (edit_label == "") REPORT_ERROR("ERROR: no --editOption argument was found for --editJob.");
-			if (edit_value == "") REPORT_ERROR("ERROR: no --editValue argument was found for --editJob.");
 
 			RelionJob myjob;
 			bool dummy;
