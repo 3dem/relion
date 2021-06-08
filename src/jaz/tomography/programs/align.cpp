@@ -569,7 +569,7 @@ void AlignProgram::readTempData(int t)
 			coeffs[f] = temp_deformations.getDoubleVector(EMDL_TOMO_DEFORMATION_COEFFICIENTS, f);
 		}
 		
-		tomogramSet.addDeformation(t, gridSize, coeffs);
+		tomogramSet.setDeformation(t, gridSize, coeffs);
 	}
 
 
