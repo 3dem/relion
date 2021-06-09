@@ -47,11 +47,7 @@ class TomogramSet
 		void setDeformation(
 				int tomogramIndex,
 				gravis::i2Vector gridSize,
-				const std::vector<std::vector<double>>& coeffs);
-
-		void addDeformation(
-				int tomogramIndex,
-				gravis::i2Vector gridSize,
+				const std::string& deformationType,
 				const std::vector<std::vector<double>>& coeffs);
 
 		void clearDeformation();

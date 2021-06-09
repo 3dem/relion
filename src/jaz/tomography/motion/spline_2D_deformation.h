@@ -3,8 +3,9 @@
 
 #include <src/jaz/gravis/t2Vector.h>
 #include "modular_alignment/spline_2D_deformation_model.h"
+#include "2D_deformation.h"
 
-class Spline2DDeformation
+class Spline2DDeformation : public Deformation2D
 {
 	public:
 		
@@ -21,6 +22,7 @@ class Spline2DDeformation
 			
 		
 		gravis::d2Vector apply(const gravis::d2Vector pl) const;
+		const double* getCoefficients() const;
 };
 
 #endif

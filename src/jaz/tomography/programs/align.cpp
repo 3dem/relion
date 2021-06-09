@@ -90,6 +90,7 @@ void AlignProgram::parseInput()
 	do_deformation = parser.checkOption("--deformation", "Estimate 2D deformations");
 	deformationParameters.grid_width = textToInteger(parser.getOption("--def_w", "Number of horizontal sampling points for the deformation grid", "3"));
 	deformationParameters.grid_height = textToInteger(parser.getOption("--def_h", "Number of vertical sampling points for the deformation grid", "3"));
+	deformationType = parser.getOption("--def_model", "Type of model to use (spline or Fourier)", "spline");
 
 	alignmentSettings.perFrame2DDeformation = parser.checkOption("--per_frame_deformation", "Model separate 2D deformations for all tilts");
 
@@ -102,6 +103,11 @@ void AlignProgram::parseInput()
 	sig2RampPower = textToDouble(parser.getOption("--srp", "Noise variance is divided by k^this during whitening", "0"));
 
 	Log::readParams(parser);
+	
+	if (deformationType != "Fourier" && deformationType != "spline")
+	{
+		parser.reportError("ERROR: The deformation model (--def_model) must be either 'Fourier' or 'spline'");
+	}
 
 	if (shiftOnly && do_motion)
 	{
@@ -546,7 +552,7 @@ void AlignProgram::readTempData(int t)
 			coeffs[f] = temp_deformations.getDoubleVector(EMDL_TOMO_DEFORMATION_COEFFICIENTS, f);
 		}
 		
-		tomogramSet.setDeformation(t, gridSize, coeffs);
+		tomogramSet.setDeformation(t, gridSize, deformationType, coeffs);
 	}
 
 

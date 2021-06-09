@@ -647,6 +647,7 @@ enum EMDLabel
 
 	EMDL_TOMO_DEFORMATION_GRID_SIZE_X,
 	EMDL_TOMO_DEFORMATION_GRID_SIZE_Y,
+	EMDL_TOMO_DEFORMATION_TYPE,
 	EMDL_TOMO_DEFORMATION_COEFFICIENTS,
 
 	EMDL_TOMO_TEMP_PRED_TIMES_OBS,
@@ -1322,6 +1323,7 @@ private:
 
 		EMDL::addLabel(EMDL_TOMO_DEFORMATION_GRID_SIZE_X, EMDL_INT, "rlnTomoDeformationGridSizeX", "Width of the 2D-deformation grid");
 		EMDL::addLabel(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y, EMDL_INT, "rlnTomoDeformationGridSizeY", "Height of the 2D-deformation grid");
+		EMDL::addLabel(EMDL_TOMO_DEFORMATION_TYPE, EMDL_STRING, "rlnTomoDeformationType", "Model used to express 2D deformations");
 		EMDL::addLabel(EMDL_TOMO_DEFORMATION_COEFFICIENTS, EMDL_DOUBLE_VECTOR, "rlnTomoDeformationCoefficients", "Coefficients describing a 2D deformation of a micrograph");
 
 		EMDL::addLabel(EMDL_TOMO_TEMP_PRED_TIMES_OBS, EMDL_DOUBLE, "rlnTomoTempPredTimesObs", "Sum over products of predicted and observed values");

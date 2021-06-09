@@ -36,10 +36,12 @@ class AlignProgram : public RefinementProgram
 
 			double padding, hiPass_px, sig2RampPower;
 			int range, num_iters;
+			
+			std::string deformationType;
 
 			ModularAlignmentSettings alignmentSettings;
 			GPMotionModel::Parameters motionParameters;
-			Spline2DDeformationModel::Parameters deformationParameters;
+			Deformation2D::Parameters deformationParameters;
 			
 
 		void run();
@@ -116,19 +118,38 @@ void AlignProgram::performAlignment(
 {
 	if (do_deformation)
 	{
-		Spline2DDeformationModel deformationModel(
-			deformationParameters,
-			gravis::i2Vector(tomogram.stack.xdim, tomogram.stack.ydim));
-
-		performAlignment(
-			motionModel,
-			deformationModel,
-			CCs,
-			projByTime,
-			tomogram,
-			tomo_index,
-			progress_bar_offset,
-			per_tomogram_progress);
+		if (deformationType == "spline")
+		{
+			Spline2DDeformationModel deformationModel(
+				deformationParameters,
+				gravis::i2Vector(tomogram.stack.xdim, tomogram.stack.ydim));
+	
+			performAlignment(
+				motionModel,
+				deformationModel,
+				CCs,
+				projByTime,
+				tomogram,
+				tomo_index,
+				progress_bar_offset,
+				per_tomogram_progress);
+		}
+		else if (deformationType == "Fourier")
+		{
+			Fourier2DDeformationModel deformationModel(
+				deformationParameters,
+				gravis::i2Vector(tomogram.stack.xdim, tomogram.stack.ydim));
+	
+			performAlignment(
+				motionModel,
+				deformationModel,
+				CCs,
+				projByTime,
+				tomogram,
+				tomo_index,
+				progress_bar_offset,
+				per_tomogram_progress);
+		}
 	}
 	else
 	{

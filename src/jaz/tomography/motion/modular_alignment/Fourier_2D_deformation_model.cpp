@@ -1,11 +1,11 @@
-#include "spline_2D_deformation_model.h"
+#include "Fourier_2D_deformation_model.h"
 
-Spline2DDeformationModel::Spline2DDeformationModel()
+Fourier2DDeformationModel::Fourier2DDeformationModel()
 {
 	
 }
 
-Spline2DDeformationModel::Spline2DDeformationModel(
+Fourier2DDeformationModel::Fourier2DDeformationModel(
 		const Deformation2D::Parameters& parameters,
 		const gravis::i2Vector& imageSize)
 	:

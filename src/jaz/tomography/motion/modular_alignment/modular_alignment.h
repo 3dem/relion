@@ -293,11 +293,11 @@ ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 				const int ff = tomogram.frameSequence[ft];
 				const int def_block_f = def_block + ft * dc;
 
-				const Spline2DDeformation& def = tomogram.imageDeformations[ff];
+				const double* coeffs = tomogram.imageDeformations[ff]->getCoefficients();
 
 				for (int i = 0; i < dc; i++)
 				{
-					originalCoefficients[def_block_f + i] = def.coefficients[i/4][i%4];
+					originalCoefficients[def_block_f + i] = coeffs[i];
 				}
 			}
 		}
@@ -308,11 +308,11 @@ ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 			for (int ft = 0; ft < fc; ft++)
 			{
 				const int ff = tomogram.frameSequence[ft];
-				const Spline2DDeformation& def = tomogram.imageDeformations[ff];
+				const double* coeffs = tomogram.imageDeformations[ff]->getCoefficients();
 
 				for (int i = 0; i < dc; i++)
 				{
-					average_coefficients[i] += def.coefficients[i/4][i%4];
+					average_coefficients[i] += coeffs[i];
 				}
 			}
 

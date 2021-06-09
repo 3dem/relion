@@ -20,7 +20,7 @@ d2Vector Tomogram::projectPoint(const d3Vector& p, int frame) const
 	
 	if (hasDeformations)
 	{
-		return imageDeformations[frame].apply(pl);
+		return imageDeformations[frame]->apply(pl);
 	}
 	else
 	{
@@ -37,7 +37,7 @@ d2Vector Tomogram::projectPointDebug(const d3Vector &p, int frame) const
 
 	if (hasDeformations)
 	{
-		d2Vector p1 = imageDeformations[frame].apply(pl);
+		d2Vector p1 = imageDeformations[frame]->apply(pl);
 		std::cout << " -> " << p1 << "(" << (p1 - pl) << ")\n";
 
 		return p1;
