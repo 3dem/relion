@@ -298,7 +298,7 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 	{
 		deformationGridSize.x = globalTable.getInt(EMDL_TOMO_DEFORMATION_GRID_SIZE_X, index);
 		deformationGridSize.y = globalTable.getInt(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y, index);
-		deformationType = globalTable.getString(EMDL_TOMO_DEFORMATION_TYPE);
+		deformationType = globalTable.getString(EMDL_TOMO_DEFORMATION_TYPE, index);
 		
 		out.imageDeformations.resize(out.frameCount);
 		
@@ -312,8 +312,9 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 		}
 		else
 		{
-			REPORT_ERROR_STR("TomogramSet::loadTomogram: illegal deformation type '"
-							 << deformationType << "'");
+			REPORT_ERROR_STR(
+				"TomogramSet::loadTomogram: illegal deformation type '"
+				<< deformationType << "'");
 		}
 	}
 	
