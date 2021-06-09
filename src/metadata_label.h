@@ -381,6 +381,7 @@ enum EMDLabel
 	EMDL_OPTIMISER_SGD_MAX_SUBSETS,
 	EMDL_OPTIMISER_SGD_STEPSIZE,
 	EMDL_OPTIMISER_SGD_STEPSIZE_SCHEME,
+	EMDL_MAX_SIGNIFICANTS,
 	EMDL_OPTIMISER_DO_CENTER_CLASSES,
 	EMDL_OPTIMISER_DO_SOLVENT_FLATTEN,
 	EMDL_OPTIMISER_DO_SOLVENT_FSC,
@@ -1021,14 +1022,14 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT, EMDL_BOOL, "rlnDoExternalReconstruct", "Flag to indicate that the reconstruction will be performed outside relion_refine, e.g. for learned priors");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_REALIGN_MOVIES, EMDL_BOOL, "rlnDoRealignMovies", "Flag to indicate that individual frames of movies are being re-aligned");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_MAP, EMDL_BOOL, "rlnDoMapEstimation", "Flag to indicate that MAP estimation should be performed (otherwise ML estimation)");
-		EMDL::addLabel(EMDL_OPTIMISER_DO_GRAD, EMDL_BOOL, "rlnDoStochasticGradientDescent", "Flag to indicate that SGD-optimisation should be performed (otherwise expectation maximisation)");
+		EMDL::addLabel(EMDL_OPTIMISER_DO_GRAD, EMDL_BOOL, "rlnDoStochasticGradientDescent", "Flag to indicate that gradient refinement should be performed (otherwise expectation maximisation)");
 		EMDL::addLabel(EMDL_OPTIMISER_GRAD_EM_ITERS, EMDL_INT, "rlnGradEmIters", "Finish gradient optimization with this many iterations of Expectation-Maximization.");
 		EMDL::addLabel(EMDL_OPTIMISER_GRAD_HAS_CONVERGED, EMDL_BOOL, "rlnGradHasConverged", "Has gradient refinement converged.");
 		EMDL::addLabel(EMDL_OPTIMISER_GRAD_CURRENT_STEPSIZE, EMDL_DOUBLE, "rlnGradCurrentStepsize", "The current step size.");
 		EMDL::addLabel(EMDL_OPTIMISER_AUTO_SUBSET_ORDER, EMDL_INT, "rlnGradSubsetOrder", "The initial subset size multiplied with two (2) to the power of this number.");
 		EMDL::addLabel(EMDL_OPTIMISER_GRAD_SUSPEND_FINER_SAMPLING_ITER, EMDL_INT, "rlnGradSuspendFinerSamplingIter", "Suspend finer sampling this many iterations");
 		EMDL::addLabel(EMDL_OPTIMISER_GRAD_SUSPEND_LOCAL_SAMPLING_ITER, EMDL_INT, "rlnGradSuspendLocalSamplingIter", "Suspend local sampling this many iterations");
-		EMDL::addLabel(EMDL_OPTIMISER_DO_STOCHASTIC_EM,EMDL_BOOL, "rlnDoStochasticEM", "Flag to indicate that stochastic EM-optimisation should be performed (an alternative to SGD)");
+		EMDL::addLabel(EMDL_OPTIMISER_DO_STOCHASTIC_EM,EMDL_BOOL, "rlnDoStochasticEM", "Flag to indicate that stochastic EM-optimisation should be performed (an alternative to gradient refinement)");
 		EMDL::addLabel(EMDL_OPTIMISER_EXTERNAL_RECONS_DATA_REAL, EMDL_STRING, "rlnExtReconsDataReal", "Name of the map with the real components of the input data array for the external reconstruction program");
 		EMDL::addLabel(EMDL_OPTIMISER_EXTERNAL_RECONS_DATA_IMAG, EMDL_STRING, "rlnExtReconsDataImag", "Name of the map with the imaginary components of the input data array for the external reconstruction program");
 		EMDL::addLabel(EMDL_OPTIMISER_EXTERNAL_RECONS_WEIGHT, EMDL_STRING, "rlnExtReconsWeight", "Name of the map with the input weight array for the external reconstruction program");
@@ -1038,20 +1039,21 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_INI_FRAC, EMDL_DOUBLE, "rlnSgdInitialIterationsFraction", "Fraction of initial gradient iterations (at rlnSgdInitialResolution and with rlnSgdInitialSubsetSize)");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_FIN_FRAC, EMDL_DOUBLE, "rlnSgdFinalIterationsFraction", "fraction of final gradient iterations (at rlnSgdFinalResolution and with rlnSgdFinalSubsetSize)");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_MIN_RESOL, EMDL_DOUBLE, "rlnSgdMinimumResolution", "Adjust under-estimated signal power in gradient optimization to this resolution.");
-		EMDL::addLabel(EMDL_OPTIMISER_SGD_INI_RESOL, EMDL_DOUBLE, "rlnSgdInitialResolution", "Resolution (in A) to use during the initial SGD iterations");
-		EMDL::addLabel(EMDL_OPTIMISER_SGD_FIN_RESOL, EMDL_DOUBLE, "rlnSgdFinalResolution", "Resolution (in A) to use during the final SGD iterations");
-		EMDL::addLabel(EMDL_OPTIMISER_SGD_INI_SUBSET_SIZE, EMDL_INT, "rlnSgdInitialSubsetSize", "Number of particles in a mini-batch (subset) during the initial SGD iterations");
-		EMDL::addLabel(EMDL_OPTIMISER_SGD_FIN_SUBSET_SIZE, EMDL_INT, "rlnSgdFinalSubsetSize", "Number of particles in a mini-batch (subset) during the final SGD iteration");
+		EMDL::addLabel(EMDL_OPTIMISER_SGD_INI_RESOL, EMDL_DOUBLE, "rlnSgdInitialResolution", "Resolution (in A) to use during the initial gradient refinement iterations");
+		EMDL::addLabel(EMDL_OPTIMISER_SGD_FIN_RESOL, EMDL_DOUBLE, "rlnSgdFinalResolution", "Resolution (in A) to use during the final gradient refinement iterations");
+		EMDL::addLabel(EMDL_OPTIMISER_SGD_INI_SUBSET_SIZE, EMDL_INT, "rlnSgdInitialSubsetSize", "Number of particles in a mini-batch (subset) during the initial gradient refinement iterations");
+		EMDL::addLabel(EMDL_OPTIMISER_SGD_FIN_SUBSET_SIZE, EMDL_INT, "rlnSgdFinalSubsetSize", "Number of particles in a mini-batch (subset) during the final gradient refinement iteration");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_MU, EMDL_DOUBLE, "rlnSgdMuFactor", "The mu-parameter that controls the momentum of the SGD gradients");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_SIGMA2FUDGE_INI, EMDL_DOUBLE, "rlnSgdSigma2FudgeInitial", "The variance of the noise will initially be multiplied with this value (larger than 1)");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_SIGMA2FUDGE_HALFLIFE, EMDL_INT, "rlnSgdSigma2FudgeHalflife", "After processing this many particles the multiplicative factor for the noise variance will have halved");
-		EMDL::addLabel(EMDL_OPTIMISER_SGD_SKIP_ANNNEAL, EMDL_BOOL, "rlnSgdSkipAnneal", "Option to switch off annealing of multiple references in SGD");
+		EMDL::addLabel(EMDL_OPTIMISER_SGD_SKIP_ANNNEAL, EMDL_BOOL, "rlnSgdSkipAnneal", "Option to switch off annealing of multiple references in gradient refinement");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_CLASS_INACTIVITY_THRESHOLD, EMDL_DOUBLE, "rlnSgdClassInactivityThreshold", "Threshold for dropping classes with low activity during gradient optimisation.");
-		EMDL::addLabel(EMDL_OPTIMISER_SGD_SUBSET_SIZE, EMDL_INT, "rlnSgdSubsetSize", "The number of particles in the random subsets for SGD");
-		EMDL::addLabel(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, EMDL_INT, "rlnSgdWriteEverySubset", "Every this many iterations the model is written to disk in SGD");
+		EMDL::addLabel(EMDL_OPTIMISER_SGD_SUBSET_SIZE, EMDL_INT, "rlnSgdSubsetSize", "The number of particles in the random subsets for gradient refinement");
+		EMDL::addLabel(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, EMDL_INT, "rlnSgdWriteEverySubset", "Every this many iterations the model is written to disk in gradient refinement");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_MAX_SUBSETS, EMDL_INT, "rlnSgdMaxSubsets", "Stop SGD after doing this many subsets (possibly spanning more than 1 iteration)");
-		EMDL::addLabel(EMDL_OPTIMISER_SGD_STEPSIZE, EMDL_DOUBLE, "rlnSgdStepsize", "Stepsize in SGD updates)");
-		EMDL::addLabel(EMDL_OPTIMISER_SGD_STEPSIZE_SCHEME, EMDL_STRING, "rlnSgdStepsizeScheme", "Stepsize scheme used in SGD updates)");
+		EMDL::addLabel(EMDL_OPTIMISER_SGD_STEPSIZE, EMDL_DOUBLE, "rlnSgdStepsize", "Stepsize in gradient refinement updates");
+		EMDL::addLabel(EMDL_OPTIMISER_SGD_STEPSIZE_SCHEME, EMDL_STRING, "rlnSgdStepsizeScheme", "Stepsize scheme used in gradient refinement");
+		EMDL::addLabel(EMDL_MAX_SIGNIFICANTS, EMDL_INT, "rlnSgdStepsizeScheme", "Maximum number of most significant poses & translations to consider");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_AUTO_REFINE, EMDL_BOOL, "rlnDoAutoRefine", "Flag to indicate that 3D auto-refine procedure is being used");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_ONLY_FLIP_CTF_PHASES, EMDL_BOOL, "rlnDoOnlyFlipCtfPhases", "Flag to indicate that CTF-correction should only comprise phase-flipping");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_CENTER_CLASSES, EMDL_BOOL, "rlnDoCenterClasses", "Flag to indicate that the class averages or reconstructions should be centered based on their center-of-mass during every iteration.");
