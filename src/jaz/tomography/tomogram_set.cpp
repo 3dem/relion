@@ -210,10 +210,12 @@ void TomogramSet::setDefocusSlope(int tomogramIndex, double slope)
 void TomogramSet::setDeformation(
 	int tomogramIndex,
 	gravis::i2Vector gridSize,
+	const std::string& deformationType,
 	const std::vector<std::vector<double>>& coeffs)
 {
 	globalTable.setValue(EMDL_TOMO_DEFORMATION_GRID_SIZE_X, gridSize.x, tomogramIndex);
 	globalTable.setValue(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y, gridSize.y, tomogramIndex);
+	globalTable.setValue(EMDL_TOMO_DEFORMATION_TYPE, deformationType, tomogramIndex);
 
 	MetaDataTable& mdt = tomogramTables[tomogramIndex];
 
@@ -222,54 +224,6 @@ void TomogramSet::setDeformation(
 	for (int f = 0; f < fc; f++)
 	{
 		mdt.setValue(EMDL_TOMO_DEFORMATION_COEFFICIENTS, coeffs[f], f);
-	}
-}
-
-void TomogramSet::addDeformation(
-	int tomogramIndex,
-	gravis::i2Vector gridSize,
-	const std::vector<std::vector<double>>& coeffs)
-{
-	if (globalTable.labelExists(EMDL_TOMO_DEFORMATION_GRID_SIZE_X) &&
-		globalTable.labelExists(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y) &&
-		globalTable.getInt(EMDL_TOMO_DEFORMATION_GRID_SIZE_X, tomogramIndex) == gridSize.x &&
-		globalTable.getInt(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y, tomogramIndex) == gridSize.y)
-	{
-		globalTable.setValue(EMDL_TOMO_DEFORMATION_GRID_SIZE_X, gridSize.x, tomogramIndex);
-		globalTable.setValue(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y, gridSize.y, tomogramIndex);
-
-		const int fc = coeffs.size();
-		MetaDataTable& mdt = tomogramTables[tomogramIndex];
-
-		if (mdt.numberOfObjects() != fc)
-		{
-			REPORT_ERROR_STR("TomogramSet::addDeformation: wrong number of frames");
-		}
-
-		for (int f = 0; f < fc; f++)
-		{
-			std::vector<double> old_coeffs = mdt.getDoubleVector(EMDL_TOMO_DEFORMATION_COEFFICIENTS, f);
-
-			if (old_coeffs.size() == coeffs[f].size())
-			{
-				std::vector<double> new_coeffs(coeffs[f].size());
-
-				for (int i = 0; i < coeffs[f].size(); i++)
-				{
-					new_coeffs[i] = old_coeffs[i] + coeffs[f][i];
-				}
-
-				mdt.setValue(EMDL_TOMO_DEFORMATION_COEFFICIENTS, new_coeffs, f);
-			}
-			else
-			{
-				mdt.setValue(EMDL_TOMO_DEFORMATION_COEFFICIENTS, coeffs[f], f);
-			}
-		}
-	}
-	else
-	{
-		setDeformation(tomogramIndex, gridSize, coeffs);
 	}
 }
 
@@ -338,13 +292,29 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 		globalTable.containsLabel(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y) );
 	
 	i2Vector deformationGridSize;
+	std::string deformationType = "";
 	
 	if (out.hasDeformations)
 	{
 		deformationGridSize.x = globalTable.getInt(EMDL_TOMO_DEFORMATION_GRID_SIZE_X, index);
 		deformationGridSize.y = globalTable.getInt(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y, index);
+		deformationType = globalTable.getString(EMDL_TOMO_DEFORMATION_TYPE);
 		
 		out.imageDeformations.resize(out.frameCount);
+		
+		if (deformationType == "spline")
+		{
+			out.splineDeformations.resize(out.frameCount);
+		}
+		else if (deformationType == "Fourier")
+		{
+			out.FourierDeformations.resize(out.frameCount);
+		}
+		else
+		{
+			REPORT_ERROR_STR("TomogramSet::loadTomogram: illegal deformation type '"
+							 << deformationType << "'");
+		}
 	}
 	
 	const MetaDataTable& m = tomogramTables[index];
@@ -399,16 +369,20 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 			const std::vector<double> coeffs = m.getDoubleVector(
 					EMDL_TOMO_DEFORMATION_COEFFICIENTS, f);
 
-			const int expected_coeffs = 8 * deformationGridSize.x * deformationGridSize.y;
-
-			if (coeffs.size() != expected_coeffs)
+			if (deformationType == "spline")
 			{
-				REPORT_ERROR_STR("TomogramSet::loadTomogram: wrong number of deformation coefficients (expected: "
-								 << expected_coeffs << ", found: " << coeffs.size() << ")");
-			}
-			
-			out.imageDeformations[f] = Spline2DDeformation(
+				out.splineDeformations[f] = Spline2DDeformation(
 					stackSize.xy(), deformationGridSize, &coeffs[0]);
+				
+				out.imageDeformations[f] = &out.splineDeformations[f];
+			}
+			else if (deformationType == "Fourier")
+			{
+				out.FourierDeformations[f] = Fourier2DDeformation(
+					stackSize.xy(), deformationGridSize, &coeffs[0]);
+				
+				out.imageDeformations[f] = &out.FourierDeformations[f];
+			}
 		}
 	}
 	

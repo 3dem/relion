@@ -4,6 +4,7 @@
 #include <src/jaz/gravis/t2Vector.h>
 #include <src/jaz/image/raw_image.h>
 #include <src/jaz/image/buffered_image.h>
+#include <src/jaz/tomography/motion/2D_deformation.h>
 
 
 class Spline2DDeformationModel
@@ -14,16 +15,11 @@ class Spline2DDeformationModel
 		{
 			double value, slope_x, slope_y, twist;
 		};
-
-		struct Parameters
-		{
-			int grid_width, grid_height;
-		};
 		
 		Spline2DDeformationModel();
 		
 		Spline2DDeformationModel(
-				const Parameters& parameters,
+				const Deformation2D::Parameters& parameters,
 				const gravis::i2Vector& imageSize);
 		
 		

@@ -7,6 +7,7 @@
 #include <src/jaz/optics/optics_data.h>
 #include <src/ctf.h>
 #include "motion/spline_2D_deformation.h"
+#include "motion/Fourier_2D_deformation.h"
 
 class ParticleIndex;
 class ParticleSet;
@@ -25,7 +26,10 @@ class Tomogram
 			
 			BufferedImage<float> stack;
 			std::vector<gravis::d4Matrix> projectionMatrices;
-			std::vector<Spline2DDeformation> imageDeformations;
+			
+			std::vector<Deformation2D*> imageDeformations;
+			std::vector<Spline2DDeformation> splineDeformations;
+			std::vector<Fourier2DDeformation> FourierDeformations;
 			
 			std::vector<CTF> centralCTFs;
 			std::vector<double> cumulativeDose;

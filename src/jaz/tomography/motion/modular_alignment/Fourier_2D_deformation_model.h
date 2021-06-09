@@ -4,21 +4,17 @@
 #include <src/jaz/gravis/t2Vector.h>
 #include <src/jaz/image/raw_image.h>
 #include <src/jaz/image/buffered_image.h>
+#include <src/jaz/tomography/motion/2D_deformation.h>
 
 
 class Fourier2DDeformationModel
 {
 	public:
 		
-		struct Parameters
-		{
-			int grid_width, grid_height;
-		};
-		
 		Fourier2DDeformationModel();
 		
 		Fourier2DDeformationModel(
-				const Parameters& parameters,
+				const Deformation2D::Parameters& parameters,
 				const gravis::i2Vector& imageSize);
 		
 		

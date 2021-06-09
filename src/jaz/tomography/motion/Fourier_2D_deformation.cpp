@@ -12,7 +12,7 @@ Fourier2DDeformation::Fourier2DDeformation(
 		i2Vector gridSize, 
 		const double* coefficients)
 {
-	Fourier2DDeformationModel::Parameters parameters;
+	Deformation2D::Parameters parameters;
 	
 	parameters.grid_width  = gridSize.x;
 	parameters.grid_height = gridSize.y;
@@ -26,4 +26,9 @@ Fourier2DDeformation::Fourier2DDeformation(
 d2Vector Fourier2DDeformation::apply(const d2Vector pl) const
 {
 	return pl + deformationModel.computeShift(pl, (double*)coefficients.data);
+}
+
+const double* Fourier2DDeformation::getCoefficients() const
+{
+	return (double*) &coefficients[0].real;
 }
