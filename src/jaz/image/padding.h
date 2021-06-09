@@ -196,11 +196,11 @@ void Padding::copyUnpaddedCenter2D_full(
 		const RawImage<T>& src, 
 		RawImage<T>& dest)
 {
-	const int w_src  = src.xdim;
-	const int h_src  = src.ydim;
+	const int w_src = src.xdim;
+	const int h_src = src.ydim;
 	
-	const int w_dest  = dest.xdim;
-	const int h_dest  = dest.ydim;
+	const int w_dest = dest.xdim;
+	const int h_dest = dest.ydim;
 	
 	const int bx = (w_src - w_dest) / 2;
 	const int by = (h_src - h_dest) / 2;
@@ -208,7 +208,7 @@ void Padding::copyUnpaddedCenter2D_full(
 	for (int y = 0; y < h_dest; y++)
 	for (int x = 0; x < w_dest; x++)
 	{
-		dest(x,y) = src(x+bx, y+by);
+		dest(x,y) = src(x + bx, y + by);
 	}
 }
 
