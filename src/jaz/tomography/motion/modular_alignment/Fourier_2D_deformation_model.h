@@ -19,7 +19,6 @@ class Fourier2DDeformationModel
 		
 		
 			gravis::i2Vector imageSize, gridSize;
-			gravis::d2Vector gridSpacing;
 		
 		
 		inline int getParameterCount() const;
