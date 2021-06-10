@@ -3106,10 +3106,12 @@ void MlOptimiser::expectation()
 	std::cerr << "Expectation: done setup" << std::endl;
 #endif
 
-	// C. Calculate expected minimum angular errors (only for 3D refinements)
-	// And possibly update orientational sampling automatically
-	if (!((iter==1 && do_firstiter_cc) || do_always_cc) && !(do_skip_align || do_only_sample_tilt) &&
-		(do_auto_refine || !do_grad || (iter % 10 == 0 && mymodel.nr_classes > 1 && allow_coarser_samplings)))
+	// C. Calculate expected angular errors
+	// Skip for maxCC
+	// Skip if not doing alignment
+	// During gradient refinement only do this every 10 iterations
+	if (!((iter==1 && do_firstiter_cc) || do_always_cc) && !(do_skip_align && do_skip_rotate || do_only_sample_tilt) &&
+	    (do_auto_refine || !do_grad || iter % 10 == 0 || iter <= 1))
 	{
 		// Set the exp_metadata (but not the exp_imagedata which is not needed for calculateExpectedAngularErrors)
 		int n_trials_acc = (mymodel.ref_dim==3 && mymodel.data_dim != 3) ? 100 : 10;
