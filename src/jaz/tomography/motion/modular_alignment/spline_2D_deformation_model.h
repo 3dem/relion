@@ -45,11 +45,16 @@ class Spline2DDeformationModel
 				const gravis::d2Vector& mx,
 				const gravis::d2Vector& my) const;
 		
-		inline void updateCostGradient(
+		inline void updateDataTermGradient(
 				const gravis::d2Vector& pl,
 				const gravis::d2Vector& g0,
 				const double* parameters,
 				double* target) const;
+		
+		inline double computePriorValueAndGradient(
+				double lambda,
+				const double* parameters,
+				double* gradDest) const;
 		
 		
 	private:
@@ -183,7 +188,7 @@ inline gravis::d2Vector Spline2DDeformationModel::transformImageGradient(
 				       my.x  * g0.x  + (my.y + 1.0) * g0.y );
 }
 
-inline void Spline2DDeformationModel::updateCostGradient(
+inline void Spline2DDeformationModel::updateDataTermGradient(
 		const gravis::d2Vector &pl,
 		const gravis::d2Vector &g0,
 		const double *parameters,
@@ -230,6 +235,38 @@ inline void Spline2DDeformationModel::updateCostGradient(
 		grad(cell.x + 1, cell.y + 1, dim).slope_y += vx[1] * vy[3] * g0[dim];
 		grad(cell.x + 1, cell.y + 1, dim).twist   += vx[3] * vy[3] * g0[dim];
 	}
+}
+
+double Spline2DDeformationModel::computePriorValueAndGradient(
+		double lambda, 
+		const double* parameters, 
+		double* gradDest) const
+{
+	const RawImage<DataPoint> data(gridSize.x, gridSize.y, 2, (DataPoint*)parameters);
+	RawImage<DataPoint> grad(gridSize.x, gridSize.y, 2, (DataPoint*)gradDest);
+
+	double out = 0.0;
+	
+	for (int dim = 0; dim < 2; dim++)
+	{
+		for (int y = 0; y < gridSize.y; y++)
+		for (int x = 0; x < gridSize.x; x++)
+		{	
+			DataPoint d = data(x,y,dim);
+			
+			out += lambda * d.value   * d.value;
+			out += lambda * d.slope_x * d.slope_x;
+			out += lambda * d.slope_y * d.slope_y;
+			out += lambda * d.twist   * d.twist;
+			
+			grad(x,y,dim).value   += 2.0 * lambda * d.value;
+			grad(x,y,dim).slope_x += 2.0 * lambda * d.slope_x;
+			grad(x,y,dim).slope_y += 2.0 * lambda * d.slope_y;
+			grad(x,y,dim).twist   += 2.0 * lambda * d.twist;
+		}
+	}
+	
+	return out;
 }
 
 inline void Spline2DDeformationModel::projectPoint(

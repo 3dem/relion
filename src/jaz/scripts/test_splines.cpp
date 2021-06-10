@@ -95,7 +95,7 @@ int main(int argc, char *argv[])
 		BufferedImage<d4Vector> grad(w,h,2);
 		grad.fill(d4Vector(0.0,0.0,0.0,0.0));
 		
-		model.updateCostGradient(pl, g0, 0, (double*)grad.data);
+		model.updateDataTermGradient(pl, g0, 0, (double*)grad.data);
 		
 		std::cout << std::setprecision(12) << std::scientific
 				  << grad(1+dx, 1+dy, dim)[i] << " \t vs \t " << m << " \t ("

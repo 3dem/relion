@@ -39,11 +39,16 @@ class Fourier2DDeformationModel
 				const gravis::d2Vector& mx,
 				const gravis::d2Vector& my) const;
 		
-		inline void updateCostGradient(
+		inline void updateDataTermGradient(
 				const gravis::d2Vector& pl,
 				const gravis::d2Vector& g0,
 				const double* parameters,
 				double* target) const;
+		
+		inline double computePriorValueAndGradient(
+				double lambda,
+				const double* parameters,
+				double* gradDest) const;
 };
 
 
@@ -59,7 +64,7 @@ inline gravis::d2Vector Fourier2DDeformationModel::computeShift(
 {
 	const RawImage<dComplex> data((gridSize.x/2 + 1), gridSize.y, 2, (dComplex*)parameters);
 	
-	gravis::d2Vector def;
+	gravis::d2Vector def(0.0, 0.0);
 		
 	for (int dim = 0; dim < 2; dim++)
 	{	
@@ -87,9 +92,13 @@ inline void Fourier2DDeformationModel::computeShiftAndGradient(
 		gravis::d2Vector& def_y) const
 {	
 	const RawImage<dComplex> data((gridSize.x/2 + 1), gridSize.y, 2, (dComplex*)parameters);
-		
+	
 	for (int dim = 0; dim < 2; dim++)
 	{	
+		def[dim]   = 0.0;
+		def_x[dim] = 0.0;
+		def_y[dim] = 0.0;
+		
 		for (int y = 0; y < gridSize.y; y++)
 		for (int x = (y < gridSize.y && y > 0? 0 : 1); x < (gridSize.x/2 + 1); x++)
 		{
@@ -121,7 +130,7 @@ inline gravis::d2Vector Fourier2DDeformationModel::transformImageGradient(
 				       my.x  * g0.x  + (my.y + 1.0) * g0.y );
 }
 
-inline void Fourier2DDeformationModel::updateCostGradient(
+inline void Fourier2DDeformationModel::updateDataTermGradient(
 		const gravis::d2Vector &pl,
 		const gravis::d2Vector &g0,
 		const double *parameters,
@@ -144,6 +153,37 @@ inline void Fourier2DDeformationModel::updateCostGradient(
 			grad(x,y,dim).imag += sin(t) * g0[dim];
 		}
 	}
+}
+
+inline double Fourier2DDeformationModel::computePriorValueAndGradient(
+		double lambda,
+		const double* parameters,
+		double* gradDest) const
+{
+	const RawImage<dComplex> data((gridSize.x/2 + 1), gridSize.y, 2, (dComplex*)parameters);
+	RawImage<dComplex> grad((gridSize.x/2 + 1), gridSize.y, 2, (dComplex*)gradDest);
+	
+	double out = 0.0;
+	
+	for (int dim = 0; dim < 2; dim++)
+	{
+		for (int y = 0; y < gridSize.y; y++)
+		for (int x = (y < gridSize.y && y > 0? 0 : 1); x < (gridSize.x/2 + 1); x++)
+		{
+			const gravis::d2Vector d(
+				x * PI / imageSize.x,
+				y * PI / imageSize.y);
+			
+			const double e = lambda * d.norm2();
+			
+			out += e * data(x,y,dim).norm();
+			
+			grad(x,y,dim).real += 2.0 * e * data(x,y,dim).real;
+			grad(x,y,dim).imag += 2.0 * e * data(x,y,dim).imag;
+		}
+	}
+	
+	return out;
 }
 
 #endif

@@ -36,13 +36,13 @@ class GPMotionModel
 				int particle_index,
 				gravis::d3Vector& position) const;
 
-		inline void updateCostGradient(
+		inline void updateDataTermGradient(
 				const gravis::d3Vector *dC_dPos,
 				int particle_index,
 				int fc,
 				double *target) const;
 
-		inline double computePriorCostAndGradient(
+		inline double computePriorValueAndGradient(
 				const double *x,
 				int fc,
 				double* gradDest) const;
@@ -71,7 +71,7 @@ inline void GPMotionModel::updatePosition(
 	position += d;
 }
 
-inline void GPMotionModel::updateCostGradient(
+inline void GPMotionModel::updateDataTermGradient(
 	const gravis::d3Vector* dC_dPos,
 	int particle_index,
 	int fc,
@@ -98,7 +98,7 @@ inline void GPMotionModel::updateCostGradient(
 	}
 }
 
-inline double GPMotionModel::computePriorCostAndGradient(
+inline double GPMotionModel::computePriorValueAndGradient(
 	const double* x,
 	int fc,
 	double* gradDest) const

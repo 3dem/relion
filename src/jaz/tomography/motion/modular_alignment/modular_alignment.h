@@ -27,7 +27,7 @@ class CTF;
 struct ModularAlignmentSettings
 {
 	bool constParticles, constAngles, constShifts, perFrame2DDeformation;
-	double rangeRegulariser;
+	double deformationRegulariser, rangeRegulariser;
 };
 
 template<class MotionModel, class DeformationModel2D>
@@ -415,10 +415,9 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 		{
 			const gravis::d4Vector pos4(initialPos[p] + shift);
 
-			//const gravis::d2Vector p0 = (frameProj[f] * gravis::d4Vector(initialPos[p])).xy();
 			const gravis::d2Vector p0 = original2DPos[p*fc + f];
 			const gravis::d2Vector pl = (P[f] * pos4).xy();
-						
+			
 			const int def_block_f = def_block + (settings.perFrame2DDeformation? f * dc : 0);
 			
 			gravis::d2Vector def, def_x, def_y;
@@ -471,7 +470,7 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 			const gravis::d2Vector g = deformationModel2D.transformImageGradient(
 						g0.xy(), def_x, def_y);
 			
-			deformationModel2D.updateCostGradient(
+			deformationModel2D.updateDataTermGradient(
 						pl, g0.xy(), &x[def_block_f], &grad_par[th*step_grad + def_block_f]);
 
 
@@ -521,7 +520,7 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 
 		if (!settings.constParticles)
 		{
-			motionModel.updateCostGradient(
+			motionModel.updateDataTermGradient(
 				&dC_dPos[th*step_frame], p, fc, 
 				&grad_par[th*step_grad + mot_block]);
 		}
@@ -547,8 +546,31 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 
 	if (!settings.constParticles)
 	{
-		cost += motionModel.computePriorCostAndGradient(
+		cost += motionModel.computePriorValueAndGradient(
 			&x[mot_block], fc, &gradDest[mot_block]);
+	}
+	
+	if (settings.deformationRegulariser > 0.0)
+	{
+		if (settings.perFrame2DDeformation)
+		{
+			for (int f = 0; f < fc; f++)
+			{
+				const int def_block_f = def_block + f * dc;
+				
+				cost += deformationModel2D.computePriorValueAndGradient(
+					settings.deformationRegulariser,
+					&x[def_block_f],
+					&gradDest[def_block_f]);
+			}
+		}
+		else
+		{
+			cost += deformationModel2D.computePriorValueAndGradient(
+				settings.deformationRegulariser,
+				&x[def_block],
+				&gradDest[def_block]);
+		}
 	}
 
 	return cost;

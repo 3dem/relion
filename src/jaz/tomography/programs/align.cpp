@@ -91,7 +91,7 @@ void AlignProgram::parseInput()
 	deformationParameters.grid_width = textToInteger(parser.getOption("--def_w", "Number of horizontal sampling points for the deformation grid", "3"));
 	deformationParameters.grid_height = textToInteger(parser.getOption("--def_h", "Number of vertical sampling points for the deformation grid", "3"));
 	deformationType = parser.getOption("--def_model", "Type of model to use (spline or Fourier)", "spline");
-
+	alignmentSettings.deformationRegulariser = textToDouble(parser.getOption("--def_reg", "Value of the deformation regulariser", "0.0"));
 	alignmentSettings.perFrame2DDeformation = parser.checkOption("--per_frame_deformation", "Model separate 2D deformations for all tilts");
 
 	int expert_section = parser.addSection("Expert options");
