@@ -291,15 +291,7 @@ void AlignProgram::processTomograms(
 			freqWeight.write(diagPrefix + "_frq_weight.mrc");
 		}
 
-
-		std::vector<d4Matrix> projByTime(fc);
-
-		for (int f = 0; f < fc; f++)
-		{
-			projByTime[f] = tomogram.projectionMatrices[tomogram.frameSequence[f]];
-		}
-
-
+		
 		std::vector<BufferedImage<double>> CCs = Prediction::computeCroppedCCs(
 				particleSet, particles[t], tomogram, aberrationsCache,
 				referenceMap, freqWeight, doseWeights, tomogram.frameSequence,
@@ -316,7 +308,7 @@ void AlignProgram::processTomograms(
 				per_tomogram_progress && verbosity > 0);
 
 			performAlignment(
-				motionModel, CCs, projByTime, tomogram,
+				motionModel, CCs, tomogram,
 				t, progress_bar_offset, per_tomogram_progress);
 		}
 		else
@@ -327,7 +319,7 @@ void AlignProgram::processTomograms(
 				NoMotionModel noMotionModel;
 				
 				performAlignment(
-					noMotionModel, CCs, projByTime, tomogram,
+					noMotionModel, CCs, tomogram,
 					t, progress_bar_offset, per_tomogram_progress);
 			}
 			else

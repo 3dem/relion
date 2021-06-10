@@ -87,7 +87,6 @@ class AlignProgram : public RefinementProgram
 		void performAlignment(
 				MotionModel& motionModel,
 				const std::vector<BufferedImage<double>>& CCs,
-				const std::vector<gravis::d4Matrix>& projByTime,
 				const Tomogram& tomogram,
 				int tomo_index,
 				int progress_bar_offset,
@@ -98,7 +97,6 @@ class AlignProgram : public RefinementProgram
 				MotionModel& motionModel,
 				DeformationModel& deformationModel,
 				const std::vector<BufferedImage<double>>& CCs,
-				const std::vector<gravis::d4Matrix>& projByTime,
 				const Tomogram& tomogram,
 				int tomo_index,
 				int progress_bar_offset,
@@ -110,7 +108,6 @@ template<class MotionModel>
 void AlignProgram::performAlignment(
 		MotionModel& motionModel,
 		const std::vector<BufferedImage<double>>& CCs,
-		const std::vector<gravis::d4Matrix>& projByTime,
 		const Tomogram& tomogram,
 		int tomo_index,
 		int progress_bar_offset,
@@ -128,7 +125,6 @@ void AlignProgram::performAlignment(
 				motionModel,
 				deformationModel,
 				CCs,
-				projByTime,
 				tomogram,
 				tomo_index,
 				progress_bar_offset,
@@ -144,7 +140,6 @@ void AlignProgram::performAlignment(
 				motionModel,
 				deformationModel,
 				CCs,
-				projByTime,
 				tomogram,
 				tomo_index,
 				progress_bar_offset,
@@ -159,7 +154,6 @@ void AlignProgram::performAlignment(
 			motionModel,
 			noDeformationModel,
 			CCs,
-			projByTime,
 			tomogram,
 			tomo_index,
 			progress_bar_offset,
@@ -172,14 +166,13 @@ void AlignProgram::performAlignment(
 		MotionModel& motionModel,
 		DeformationModel& deformationModel,
 		const std::vector<BufferedImage<double>>& CCs,
-		const std::vector<gravis::d4Matrix>& projByTime,
 		const Tomogram& tomogram,
 		int tomo_index,
 		int progress_bar_offset,
 		bool per_tomogram_progress)
 {
 	ModularAlignment<MotionModel, DeformationModel> alignment(
-		CCs, projByTime, particleSet, particles[tomo_index],
+		CCs, particleSet, particles[tomo_index],
 		motionModel, deformationModel,
 		alignmentSettings, tomogram,
 		padding,

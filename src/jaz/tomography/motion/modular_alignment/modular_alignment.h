@@ -37,7 +37,6 @@ class ModularAlignment : public FastDifferentiableOptimization
 
 		ModularAlignment(
 				const std::vector<BufferedImage<double>>& CCs,
-				const std::vector<gravis::d4Matrix>& frameProj,
 				ParticleSet& particleSet,
 				const std::vector<ParticleIndex>& partIndices,
 				const MotionModel& motionModel,
@@ -54,7 +53,8 @@ class ModularAlignment : public FastDifferentiableOptimization
 			const DeformationModel2D& deformationModel2D;
 
 			const std::vector<BufferedImage<double>>& CCs;  // one frame stack for each particle
-			const std::vector<gravis::d4Matrix>& frameProj; // initial projection matrices
+			
+			std::vector<gravis::d4Matrix> frameProj;        // initial projection matrices
 			ParticleSet& particleSet;
 			const std::vector<ParticleIndex>& partIndices;
 
@@ -194,7 +194,6 @@ class ModularAlignment : public FastDifferentiableOptimization
 template<class MotionModel, class DeformationModel2D>
 ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 		const std::vector<BufferedImage<double>>& CCs,
-		const std::vector<gravis::d4Matrix>& frameProj,
 		ParticleSet& particleSet,
 		const std::vector<ParticleIndex>& partIndices,
 		const MotionModel& motionModel,
@@ -209,7 +208,6 @@ ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 	motionModel(motionModel),
 	deformationModel2D(deformationModel2D),
 	CCs(CCs),
-	frameProj(frameProj),
 	particleSet(particleSet),
 	partIndices(partIndices),
 	settings(settings),
@@ -219,13 +217,21 @@ ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 	num_threads(num_threads),
 	verbose(verbose),
 	devMode(false),
-	fc(frameProj.size()),
+	fc(tomogram.frameCount),
 	pc(partIndices.size()),
 	mpc(motionModel.getParameterCount()),
 	dc(deformationModel2D.getParameterCount()),
 	maxRange(CCs[0].xdim / (2 * paddingFactor) - 3), // CCs are padded by 3 pixels
 	lastIterationNumber(0)
 {	
+	frameProj.resize(fc);
+	
+	for (int ft = 0; ft < fc; ft++)
+	{
+		const int ff = tomogram.frameSequence[ft];
+		frameProj[ft] = tomogram.projectionMatrices[ff];
+	}
+	
 	initialPos.resize(pc);
 	
 	for (int p = 0; p < pc; p++)
