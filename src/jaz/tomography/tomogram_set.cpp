@@ -302,15 +302,7 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 		
 		out.imageDeformations.resize(out.frameCount);
 		
-		if (deformationType == "spline")
-		{
-			out.splineDeformations.resize(out.frameCount);
-		}
-		else if (deformationType == "Fourier")
-		{
-			out.FourierDeformations.resize(out.frameCount);
-		}
-		else
+		if (deformationType != "spline" && deformationType != "Fourier")
 		{
 			REPORT_ERROR_STR(
 				"TomogramSet::loadTomogram: illegal deformation type '"
@@ -372,17 +364,13 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 
 			if (deformationType == "spline")
 			{
-				out.splineDeformations[f] = Spline2DDeformation(
-					stackSize.xy(), deformationGridSize, &coeffs[0]);
-				
-				out.imageDeformations[f] = &out.splineDeformations[f];
+				out.imageDeformations[f] = std::make_shared<Spline2DDeformation>(
+							stackSize.xy(), deformationGridSize, &coeffs[0]);
 			}
 			else if (deformationType == "Fourier")
 			{
-				out.FourierDeformations[f] = Fourier2DDeformation(
-					stackSize.xy(), deformationGridSize, &coeffs[0]);
-				
-				out.imageDeformations[f] = &out.FourierDeformations[f];
+				out.imageDeformations[f] = std::make_shared<Fourier2DDeformation>(
+							stackSize.xy(), deformationGridSize, &coeffs[0]);
 			}
 		}
 	}

@@ -8,6 +8,7 @@
 #include <src/ctf.h>
 #include "motion/spline_2D_deformation.h"
 #include "motion/Fourier_2D_deformation.h"
+#include <memory>
 
 class ParticleIndex;
 class ParticleSet;
@@ -27,9 +28,7 @@ class Tomogram
 			BufferedImage<float> stack;
 			std::vector<gravis::d4Matrix> projectionMatrices;
 			
-			std::vector<Deformation2D*> imageDeformations;
-			std::vector<Spline2DDeformation> splineDeformations;
-			std::vector<Fourier2DDeformation> FourierDeformations;
+			std::vector<std::shared_ptr<Deformation2D>> imageDeformations;
 			
 			std::vector<CTF> centralCTFs;
 			std::vector<double> cumulativeDose;

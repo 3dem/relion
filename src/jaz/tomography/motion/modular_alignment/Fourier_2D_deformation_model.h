@@ -64,7 +64,7 @@ inline gravis::d2Vector Fourier2DDeformationModel::computeShift(
 	for (int dim = 0; dim < 2; dim++)
 	{	
 		for (int y = 0; y < gridSize.y; y++)
-		for (int x = (y < gridSize.y && y > 0? 0 : 1); x < gridSize.x; x++)
+		for (int x = (y < gridSize.y && y > 0? 0 : 1); x < (gridSize.x/2 + 1); x++)
 		{
 			const gravis::d2Vector d(
 				x * PI / imageSize.x,
@@ -91,7 +91,7 @@ inline void Fourier2DDeformationModel::computeShiftAndGradient(
 	for (int dim = 0; dim < 2; dim++)
 	{	
 		for (int y = 0; y < gridSize.y; y++)
-		for (int x = (y < gridSize.y && y > 0? 0 : 1); x < gridSize.x; x++)
+		for (int x = (y < gridSize.y && y > 0? 0 : 1); x < (gridSize.x/2 + 1); x++)
 		{
 			const gravis::d2Vector d(
 				x * PI / imageSize.x,
@@ -132,7 +132,7 @@ inline void Fourier2DDeformationModel::updateCostGradient(
 	for (int dim = 0; dim < 2; dim++)
 	{	
 		for (int y = 0; y < gridSize.y; y++)
-		for (int x = (y < gridSize.y && y > 0? 0 : 1); x < gridSize.x; x++)
+		for (int x = (y < gridSize.y && y > 0? 0 : 1); x < (gridSize.x/2 + 1); x++)
 		{
 			const gravis::d2Vector d(
 				x * PI / imageSize.x,
