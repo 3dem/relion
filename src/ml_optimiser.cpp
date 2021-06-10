@@ -2321,9 +2321,19 @@ void MlOptimiser::initialiseReferences()
 					}
 
 					//Maintain standard deviation
-					RFLOAT std = SomGraph::std(mymodel.Iref[i]);
-					mymodel.Iref[i] = blobs_pos - blobs_neg / 2;
-					mymodel.Iref[i] *= std / SomGraph::std(mymodel.Iref[i]);
+					if (is_helical_segment)
+					{
+						mymodel.Iref[i] = Iavg;
+						RFLOAT std = SomGraph::std(mymodel.Iref[i]);
+						mymodel.Iref[i] += blobs_pos;// - blobs_neg / 2;
+						mymodel.Iref[i] *= std / SomGraph::std(mymodel.Iref[i]);
+					}
+					else
+					{
+						RFLOAT std = SomGraph::std(mymodel.Iref[i]);
+						mymodel.Iref[i] = blobs_pos - blobs_neg / 2;
+						mymodel.Iref[i] *= std / SomGraph::std(mymodel.Iref[i]);
+					}
 				}
 			}
 
@@ -2401,11 +2411,6 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			if (nr_particles_done_per_optics_group[optics_group] >= minimum_nr_particles_sigma2_noise)
 			{
 				continue;
-			}
-			else
-			{
-				nr_particles_done++;
-				nr_particles_done_per_optics_group[optics_group]++;
 			}
 
 			RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
@@ -2624,6 +2629,10 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				wsum_model.BPref[iclass].set2DFourierTransform(Fimg, A, &Fctf);
 			}
 
+			// Keep track how many particles have been done
+			nr_particles_done++;
+			nr_particles_done_per_optics_group[optics_group]++;
+
 			// If we now reach a full optics_group, check whether all optics groups are full, and if so, exit)
 			if (nr_particles_done_per_optics_group[optics_group] >= minimum_nr_particles_sigma2_noise)
 			{
@@ -2633,9 +2642,13 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 					if (nr_particles_done_per_optics_group[i] < minimum_nr_particles_sigma2_noise) is_done_all_optics_groups = false;
 				}
 			}
+
 		} // end loop img_id
 
-		if (is_done_all_optics_groups) break;
+		if (is_done_all_optics_groups)
+		{
+			break;
+		}
 
 		if (myverb > 0 && nr_particles_done % barstep == 0)
 		{
@@ -2646,7 +2659,6 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 		}
 
 	} // end loop part_id
-
 
 	// Clean up the fftw object completely
 	// This is something that needs to be done manually, as among multiple threads only one of them may actually do this
@@ -2673,7 +2685,7 @@ void MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(MultidimArray<RFLOAT>
 	RFLOAT total_sum = 0.;
 	for (int igroup = 0; igroup < mymodel.nr_optics_groups; igroup++)
 		total_sum += wsum_model.sumw_group[igroup];
-	
+
 	Mavg /= total_sum;
 
 	if (fn_ref == "None")

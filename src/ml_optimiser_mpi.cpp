@@ -491,11 +491,11 @@ will still yield good performance and possibly a more stable execution. \n" << s
 	initialiseWorkLoad();
 
 	// Only the first follower calculates the sigma2_noise spectra and sets initial guesses for Iref
-	if (node->rank == 1) 
-        {
-            MlOptimiser::initialiseSigma2Noise();
-            MlOptimiser::initialiseReferences();
-        }
+	if (node->rank == 1)
+	{
+		MlOptimiser::initialiseSigma2Noise();
+		MlOptimiser::initialiseReferences();
+    }
 
 	//Now the first follower broadcasts resulting Iref and sigma2_noise to everyone else
 	for (int i = 0; i < mymodel.sigma2_noise.size(); i++)
@@ -508,17 +508,17 @@ will still yield good performance and possibly a more stable execution. \n" << s
 		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Iref[i]),
 							   MULTIDIM_SIZE(mymodel.Iref[i]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
 	}
-        
-        // Initialise the data_versus_prior ratio to get the initial current_size right
-        if (!do_initialise_bodies && !node->isLeader())
-            mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
+
+	// Initialise the data_versus_prior ratio to get the initial current_size right
+	if (!do_initialise_bodies && !node->isLeader())
+		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
 
 	// Only leader writes out initial mymodel (do not gather metadata yet)
 	int my_nr_subsets = (do_split_random_halves) ? 2 : 1;
 	if (node->isLeader())
-        {
+	{
 		MlOptimiser::write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, node->rank);
-        }
+    }
 	else if (node->rank <= my_nr_subsets)
 	{
 		//Only the first_follower of each subset writes model to disc
@@ -578,7 +578,7 @@ void MlOptimiserMpi::initialiseWorkLoad()
                 MPI_Status status;
                 if (node->isLeader()) node->relion_MPI_Send(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, follower, MPITAG_METADATA, MPI_COMM_WORLD);
                 else if (node->rank == follower) node->relion_MPI_Recv(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
-            }		
+            }
 
 
             // Then do half-set 2
@@ -588,8 +588,8 @@ void MlOptimiserMpi::initialiseWorkLoad()
                 MPI_Status status;
                 if (node->isLeader()) node->relion_MPI_Send(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, follower, MPITAG_METADATA, MPI_COMM_WORLD);
                 else if (node->rank == follower) node->relion_MPI_Recv(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
-            }		
-      
+            }
+
         }
         else
         {
