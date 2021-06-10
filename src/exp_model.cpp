@@ -99,12 +99,13 @@ void Experiment::getNumberOfImagesPerGroup(std::vector<long int> &nr_particles_p
 
 	for (long int part_id = 0; part_id < particles.size(); part_id++)
 	{
-		if (particles[part_id].random_subset == random_subset)
+		if (random_subset == 0 || particles[part_id].random_subset == random_subset)
 		{
 			for (int img_id = 0; img_id < particles[part_id].images.size(); img_id++)
 				nr_particles_per_group[particles[part_id].images[img_id].group_id] += 1;
 		}
 	}
+
 }
 
 void Experiment::getNumberOfImagesPerOpticsGroup(std::vector<long int> &nr_particles_per_optics_group, int random_subset)
@@ -115,7 +116,7 @@ void Experiment::getNumberOfImagesPerOpticsGroup(std::vector<long int> &nr_parti
 
 	for (long int part_id = 0; part_id < particles.size(); part_id++)
 	{
-		if (particles[part_id].random_subset == random_subset)
+		if (random_subset == 0 || particles[part_id].random_subset == random_subset)
 		{
 			for (int img_id = 0; img_id < particles[part_id].images.size(); img_id++)
 				nr_particles_per_optics_group[particles[part_id].images[img_id].optics_group] += 1;
