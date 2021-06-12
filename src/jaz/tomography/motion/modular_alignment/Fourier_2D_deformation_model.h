@@ -19,6 +19,7 @@ class Fourier2DDeformationModel
 		
 		
 			gravis::i2Vector imageSize, gridSize;
+			std::vector<gravis::d2Vector> spatialFrequencies;
 		
 		
 		inline int getParameterCount() const;
@@ -55,29 +56,24 @@ class Fourier2DDeformationModel
 
 inline int Fourier2DDeformationModel::getParameterCount() const
 {
-	return 4 * (gridSize.x/2 + 1) * gridSize.y;
+	return 4 * spatialFrequencies.size();
 }
 
 inline gravis::d2Vector Fourier2DDeformationModel::computeShift(
 		const gravis::d2Vector& pl,
 		const double* parameters) const
 {
-	const RawImage<dComplex> data((gridSize.x/2 + 1), gridSize.y, 2, (dComplex*)parameters);
+	const RawImage<dComplex> P(spatialFrequencies.size(), 2, 1, (dComplex*)parameters);
 	
 	gravis::d2Vector def(0.0, 0.0);
 		
 	for (int dim = 0; dim < 2; dim++)
 	{	
-		for (int y = 0; y < gridSize.y; y++)
-		for (int x = (y < gridSize.y && y > 0? 0 : 1); x < (gridSize.x/2 + 1); x++)
+		for (int i = 0; i < spatialFrequencies.size(); i++)
 		{
-			const gravis::d2Vector d(
-				x * PI / imageSize.x,
-				y * PI / imageSize.y);
+			const double t = spatialFrequencies[i].dot(pl);
 			
-			const double t = d.dot(pl);
-			
-			def[dim] += data(x,y,dim).real * cos(t) + data(x,y,dim).imag * sin(t);
+			def[dim] += P(i,dim).real * cos(t) + P(i,dim).imag * sin(t);
 		}
 	}
 	
@@ -90,32 +86,27 @@ inline void Fourier2DDeformationModel::computeShiftAndGradient(
 		gravis::d2Vector& def,
 		gravis::d2Vector& def_x,
 		gravis::d2Vector& def_y) const
-{	
-	const RawImage<dComplex> data((gridSize.x/2 + 1), gridSize.y, 2, (dComplex*)parameters);
+{
+	const RawImage<dComplex> P(spatialFrequencies.size(), 2, 1, (dComplex*)parameters);
 	
 	for (int dim = 0; dim < 2; dim++)
 	{	
 		def[dim]   = 0.0;
 		def_x[dim] = 0.0;
 		def_y[dim] = 0.0;
-		
-		for (int y = 0; y < gridSize.y; y++)
-		for (int x = (y < gridSize.y && y > 0? 0 : 1); x < (gridSize.x/2 + 1); x++)
+
+		for (int i = 0; i < spatialFrequencies.size(); i++)
 		{
-			const gravis::d2Vector d(
-				x * PI / imageSize.x,
-				y * PI / imageSize.y);
+			const double t = spatialFrequencies[i].dot(pl);
 			
-			const double t = d.dot(pl);
-			
-			const dComplex z = data(x,y,dim);
+			const dComplex z = P(i,dim);
 			
 			def[dim] += z.real * cos(t) + z.imag * sin(t);
 			
 			const double def_t = z.real * (-sin(t)) + z.imag * cos(t);
 			
-			def_x[dim] += def_t * d.x;
-			def_y[dim] += def_t * d.y;
+			def_x[dim] += def_t * spatialFrequencies[i].x;
+			def_y[dim] += def_t * spatialFrequencies[i].y;
 		}
 	}
 }
@@ -136,21 +127,16 @@ inline void Fourier2DDeformationModel::updateDataTermGradient(
 		const double *parameters,
 		double *target) const
 {
-	RawImage<dComplex> grad((gridSize.x/2 + 1), gridSize.y, 2, (dComplex*)target);
+	RawImage<dComplex> grad(spatialFrequencies.size(), 2, 1, (dComplex*)target);
 	
 	for (int dim = 0; dim < 2; dim++)
-	{	
-		for (int y = 0; y < gridSize.y; y++)
-		for (int x = (y < gridSize.y && y > 0? 0 : 1); x < (gridSize.x/2 + 1); x++)
+	{
+		for (int i = 0; i < spatialFrequencies.size(); i++)
 		{
-			const gravis::d2Vector d(
-				x * PI / imageSize.x,
-				y * PI / imageSize.y);
+			const double t = spatialFrequencies[i].dot(pl);
 			
-			const double t = d.dot(pl);
-			
-			grad(x,y,dim).real += cos(t) * g0[dim];
-			grad(x,y,dim).imag += sin(t) * g0[dim];
+			grad(i,dim).real += cos(t) * g0[dim];
+			grad(i,dim).imag += sin(t) * g0[dim];
 		}
 	}
 }
@@ -160,26 +146,21 @@ inline double Fourier2DDeformationModel::computePriorValueAndGradient(
 		const double* parameters,
 		double* gradDest) const
 {
-	const RawImage<dComplex> data((gridSize.x/2 + 1), gridSize.y, 2, (dComplex*)parameters);
-	RawImage<dComplex> grad((gridSize.x/2 + 1), gridSize.y, 2, (dComplex*)gradDest);
+	const RawImage<dComplex> data(spatialFrequencies.size(), 2, 1, (dComplex*)parameters);
+	RawImage<dComplex> grad(spatialFrequencies.size(), 2, 1, (dComplex*)gradDest);
 	
 	double out = 0.0;
 	
 	for (int dim = 0; dim < 2; dim++)
 	{
-		for (int y = 0; y < gridSize.y; y++)
-		for (int x = (y < gridSize.y && y > 0? 0 : 1); x < (gridSize.x/2 + 1); x++)
+		for (int i = 0; i < spatialFrequencies.size(); i++)
 		{
-			const gravis::d2Vector d(
-				x * PI / imageSize.x,
-				y * PI / imageSize.y);
+			const double e = lambda * spatialFrequencies[i].norm2();
 			
-			const double e = lambda * d.norm2();
+			out += e * data(i,dim).norm();
 			
-			out += e * data(x,y,dim).norm();
-			
-			grad(x,y,dim).real += 2.0 * e * data(x,y,dim).real;
-			grad(x,y,dim).imag += 2.0 * e * data(x,y,dim).imag;
+			grad(i,dim).real += 2.0 * e * data(i,dim).real;
+			grad(i,dim).imag += 2.0 * e * data(i,dim).imag;
 		}
 	}
 	
