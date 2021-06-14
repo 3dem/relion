@@ -1516,6 +1516,10 @@ void GuiMainWindow::cb_print_cl_i()
 void GuiMainWindow::cb_run(Fl_Widget* o, void* v)
 {
 	GuiMainWindow* T=(GuiMainWindow*)v;
+	if (use_ccpem_pipeliner)
+	{
+		T->cb_print_cl_i();
+	}
 	// Deactivate Run button to prevent the user from accidentally submitting many jobs
 	run_button->deactivate();
 	// Run the job
@@ -1526,6 +1530,10 @@ void GuiMainWindow::cb_run(Fl_Widget* o, void* v)
 void GuiMainWindow::cb_schedule(Fl_Widget* o, void* v)
 {
 	GuiMainWindow* T=(GuiMainWindow*)v;
+	if (use_ccpem_pipeliner)
+	{
+		T->cb_print_cl_i();
+	}
 	T->cb_run_i(true, false); // 1st true means only_schedule, do not run, 2nd false means dont open the note editor window
 }
 
