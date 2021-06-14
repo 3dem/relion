@@ -128,11 +128,18 @@ class ModularAlignment : public FastDifferentiableOptimization
 		{
 			const int fs = getFrameStride();
 			const int ds = settings.perFrame2DDeformation? dc * fc : dc;
+			const int ps = settings.constParticles? 0 : 3 * pc;
 			
 			#if ALIGN_FIRST_FRAME
-				return fs * fc + 3 * pc + mpc * (fc - 1) + ds;
+				return fs * fc
+						+ ps
+						+ mpc * (fc - 1)
+						+ ds;
 			#else
-				return fs * (fc - 1) + 3 * pc + mpc * (fc - 1) + ds;
+				return fs * (fc - 1)
+						+ ps
+						+ mpc * (fc - 1)
+						+ ds;
 			#endif
 		}
 
@@ -170,18 +177,18 @@ class ModularAlignment : public FastDifferentiableOptimization
 		inline int getMotionBlockOffset(int fs) const
 		{
 			#if ALIGN_FIRST_FRAME
-				return fs * fc + 3 * pc;
+				return fs * fc + (settings.constParticles? 0 : 3 * pc);
 			#else
-				return fs * (fc - 1) + 3 * pc;
+				return fs * (fc - 1) + (settings.constParticles? 0 : 3 * pc);
 			#endif
 		}
 		
 		inline int get2DDeformationsBlockOffset(int fs) const
 		{
 			#if ALIGN_FIRST_FRAME
-				return fs * fc + 3 * pc + mpc * (fc - 1);
+				return fs * fc + (settings.constParticles? 0 : 3 * pc) + mpc * (fc - 1);
 			#else
-				return fs * (fc - 1) + 3 * pc + mpc * (fc - 1);
+				return fs * (fc - 1) + (settings.constParticles? 0 : 3 * pc) + mpc * (fc - 1);
 			#endif
 		}
 
@@ -693,20 +700,28 @@ template<class MotionModel, class DeformationModel2D>
 std::vector<gravis::d3Vector> ModularAlignment<MotionModel, DeformationModel2D>::getParticlePositions(
 		const std::vector<double>& x) const
 {
-	std::vector<gravis::d3Vector> out(pc);
-	
-	const int fs = getFrameStride();
-	const int pos_block = getPositionsBlockOffset(fs);
-	
-	for (int p = 0; p < pc; p++)
+	if (settings.constParticles)
 	{
-		out[p] = initialPos[p] + gravis::d3Vector(
-				x[pos_block + 3*p    ],
-				x[pos_block + 3*p + 1],
-				x[pos_block + 3*p + 2]);
+		return initialPos;
+	}
+	else
+	{
+		std::vector<gravis::d3Vector> out(pc);
+
+		const int fs = getFrameStride();
+		const int pos_block = getPositionsBlockOffset(fs);
+
+		for (int p = 0; p < pc; p++)
+		{
+			out[p] = initialPos[p] + gravis::d3Vector(
+					x[pos_block + 3*p    ],
+					x[pos_block + 3*p + 1],
+					x[pos_block + 3*p + 2]);
+		}
+
+		return out;
 	}
 
-	return out;
 }
 
 template<class MotionModel, class DeformationModel2D>
