@@ -19,7 +19,10 @@ class TomogramSet
 		
 			MetaDataTable globalTable;
 			std::vector<MetaDataTable> tomogramTables;
-			
+
+
+
+		Tomogram loadTomogram(int index, bool loadImageData) const;
 			
 		int addTomogram(
 			std::string tomoName, std::string stackFilename,
@@ -51,9 +54,6 @@ class TomogramSet
 				const std::vector<std::vector<double>>& coeffs);
 
 		void clearDeformation();
-
-		
-		Tomogram loadTomogram(int index, bool loadImageData) const;
 
 		int getTomogramIndex(std::string tomogramName) const;
 		std::string getTomogramName(int index) const;
