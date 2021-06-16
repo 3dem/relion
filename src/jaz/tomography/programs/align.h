@@ -11,6 +11,8 @@
 #include <src/jaz/tomography/motion/modular_alignment/no_motion_model.h>
 #include <src/jaz/tomography/motion/modular_alignment/no_2D_deformation_model.h>
 #include <src/jaz/tomography/motion/modular_alignment/spline_2D_deformation_model.h>
+#include <src/jaz/tomography/motion/modular_alignment/Fourier_2D_deformation_model.h>
+#include <src/jaz/tomography/motion/modular_alignment/linear_2D_deformation_model.h>
 #include <src/jaz/tomography/motion/proto_alignment.h>
 #include <src/jaz/optimization/lbfgs.h>
 #include <vector>
@@ -133,6 +135,21 @@ void AlignProgram::performAlignment(
 		else if (deformationType == "Fourier")
 		{
 			Fourier2DDeformationModel deformationModel(
+				deformationParameters,
+				gravis::i2Vector(tomogram.stack.xdim, tomogram.stack.ydim));
+	
+			performAlignment(
+				motionModel,
+				deformationModel,
+				CCs,
+				tomogram,
+				tomo_index,
+				progress_bar_offset,
+				per_tomogram_progress);
+		}
+		else if (deformationType == "linear")
+		{
+			Linear2DDeformationModel deformationModel(
 				deformationParameters,
 				gravis::i2Vector(tomogram.stack.xdim, tomogram.stack.ydim));
 	

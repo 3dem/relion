@@ -90,7 +90,7 @@ void AlignProgram::parseInput()
 	do_deformation = parser.checkOption("--deformation", "Estimate 2D deformations");
 	deformationParameters.grid_width = textToInteger(parser.getOption("--def_w", "Number of horizontal sampling points for the deformation grid", "3"));
 	deformationParameters.grid_height = textToInteger(parser.getOption("--def_h", "Number of vertical sampling points for the deformation grid", "3"));
-	deformationType = parser.getOption("--def_model", "Type of model to use (spline or Fourier)", "spline");
+	deformationType = parser.getOption("--def_model", "Type of model to use (linear, spline or Fourier)", "spline");
 	alignmentSettings.deformationRegulariser = textToDouble(parser.getOption("--def_reg", "Value of the deformation regulariser", "0.0"));
 	alignmentSettings.perFrame2DDeformation = parser.checkOption("--per_frame_deformation", "Model separate 2D deformations for all tilts");
 
@@ -104,9 +104,9 @@ void AlignProgram::parseInput()
 
 	Log::readParams(parser);
 	
-	if (deformationType != "Fourier" && deformationType != "spline")
+	if (deformationType != "Fourier" && deformationType != "spline" && deformationType != "linear")
 	{
-		parser.reportError("ERROR: The deformation model (--def_model) must be either 'Fourier' or 'spline'");
+		parser.reportError("ERROR: The deformation model (--def_model) must be either 'linear', 'Fourier' or 'spline'");
 	}
 
 	if (shiftOnly && do_motion)

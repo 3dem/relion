@@ -6,8 +6,7 @@
 #include <src/jaz/gravis/t4Matrix.h>
 #include <src/jaz/optics/optics_data.h>
 #include <src/ctf.h>
-#include "motion/spline_2D_deformation.h"
-#include "motion/Fourier_2D_deformation.h"
+#include "motion/2D_deformation.h"
 #include <memory>
 
 class ParticleIndex;

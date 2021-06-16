@@ -1,4 +1,7 @@
 #include "tomogram_set.h"
+#include "motion/Fourier_2D_deformation.h"
+#include "motion/spline_2D_deformation.h"
+#include "motion/linear_2D_deformation.h"
 #include <fstream>
 #include <sstream>
 #include <src/error.h>
@@ -371,6 +374,11 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 			{
 				out.imageDeformations[f] = std::make_shared<Fourier2DDeformation>(
 							stackSize.xy(), deformationGridSize, &coeffs[0]);
+			}
+			else if (deformationType == "linear")
+			{
+				out.imageDeformations[f] = std::make_shared<Linear2DDeformation>(
+							stackSize.xy(), &coeffs[0]);
 			}
 		}
 	}
