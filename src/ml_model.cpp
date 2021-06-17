@@ -1753,7 +1753,7 @@ void MlWsumModel::initZeros()
 #define MAX_PACK_SIZE	  100000
 #else
 // Approximately 1024*1024*1024/8/2 ~ 0.5 Gb
-#define MAX_PACK_SIZE 671010000
+#define MAX_PACK_SIZE 67101000
 #endif
 
 void MlWsumModel::pack(MultidimArray<RFLOAT> &packed)
