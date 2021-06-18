@@ -90,7 +90,8 @@ void AlignProgram::parseInput()
 	do_deformation = parser.checkOption("--deformation", "Estimate 2D deformations");
 	deformationParameters.grid_width = textToInteger(parser.getOption("--def_w", "Number of horizontal sampling points for the deformation grid", "3"));
 	deformationParameters.grid_height = textToInteger(parser.getOption("--def_h", "Number of vertical sampling points for the deformation grid", "3"));
-
+	deformationType = parser.getOption("--def_model", "Type of model to use (linear, spline or Fourier)", "spline");
+	alignmentSettings.deformationRegulariser = textToDouble(parser.getOption("--def_reg", "Value of the deformation regulariser", "0.0"));
 	alignmentSettings.perFrame2DDeformation = parser.checkOption("--per_frame_deformation", "Model separate 2D deformations for all tilts");
 
 	int expert_section = parser.addSection("Expert options");
@@ -102,6 +103,11 @@ void AlignProgram::parseInput()
 	sig2RampPower = textToDouble(parser.getOption("--srp", "Noise variance is divided by k^this during whitening", "0"));
 
 	Log::readParams(parser);
+	
+	if (deformationType != "Fourier" && deformationType != "spline" && deformationType != "linear")
+	{
+		parser.reportError("ERROR: The deformation model (--def_model) must be either 'linear', 'Fourier' or 'spline'");
+	}
 
 	if (shiftOnly && do_motion)
 	{
@@ -159,6 +165,26 @@ void AlignProgram::initialise()
 
 		particleSet.hasMotion = true;
 	}
+
+	if (do_deformation && tomogramSet.globalTable.labelExists(EMDL_TOMO_DEFORMATION_GRID_SIZE_X))
+	{
+		/*Log::warn("Previous 2D image deformation found in data set - resetting.");
+
+		tomogramSet.clearDeformation();*/
+
+		const i2Vector old_grid(
+			tomogramSet.globalTable.getInt(EMDL_TOMO_DEFORMATION_GRID_SIZE_X),
+			tomogramSet.globalTable.getInt(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y));
+
+		if ( old_grid.x != deformationParameters.grid_width ||
+			 old_grid.y != deformationParameters.grid_height )
+		{
+			Log::warn("2D image deformation with different grid size found in data set - resetting.");
+
+			tomogramSet.clearDeformation();
+		}
+	}
+
 
 	ZIO::ensureParentDir(getTempFilenameRoot(""));
 }
@@ -264,20 +290,12 @@ void AlignProgram::processTomograms(
 			freqWeight.write(diagPrefix + "_frq_weight.mrc");
 		}
 
-
-		std::vector<d4Matrix> projByTime(fc);
-
-		for (int f = 0; f < fc; f++)
-		{
-			projByTime[f] = tomogram.projectionMatrices[tomogram.frameSequence[f]];
-		}
-
+		
 		std::vector<BufferedImage<double>> CCs = Prediction::computeCroppedCCs(
 				particleSet, particles[t], tomogram, aberrationsCache,
 				referenceMap, freqWeight, doseWeights, tomogram.frameSequence,
 				range, true, num_threads, padding, Prediction::OwnHalf,
 				per_tomogram_progress && verbosity > 0);
-
 		
 		const int progress_bar_offset = per_tomogram_progress? 0 : tt * num_iters;
 
@@ -289,7 +307,7 @@ void AlignProgram::processTomograms(
 				per_tomogram_progress && verbosity > 0);
 
 			performAlignment(
-				motionModel, CCs, projByTime, tomogram,
+				motionModel, CCs, tomogram,
 				t, progress_bar_offset, per_tomogram_progress);
 		}
 		else
@@ -300,7 +318,7 @@ void AlignProgram::processTomograms(
 				NoMotionModel noMotionModel;
 				
 				performAlignment(
-					noMotionModel, CCs, projByTime, tomogram,
+					noMotionModel, CCs, tomogram,
 					t, progress_bar_offset, per_tomogram_progress);
 			}
 			else
@@ -525,7 +543,7 @@ void AlignProgram::readTempData(int t)
 			coeffs[f] = temp_deformations.getDoubleVector(EMDL_TOMO_DEFORMATION_COEFFICIENTS, f);
 		}
 		
-		tomogramSet.setDeformation(t, gridSize, coeffs);
+		tomogramSet.setDeformation(t, gridSize, deformationType, coeffs);
 	}
 
 

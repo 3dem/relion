@@ -279,9 +279,13 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	if (fnt != "OLD")
 		write_every_grad_iter = textToInteger(fnt);
 
-        fnt = parser.getOption("--class_inactivity_threshold", "Replace classes with little activity during gradient based classification.", "OLD");
-        if (fnt != "OLD")
-            class_inactivity_threshold = textToFloat(fnt);
+    fnt = parser.getOption("--class_inactivity_threshold", "Replace classes with little activity during gradient based classification.", "OLD");
+    if (fnt != "OLD")
+        class_inactivity_threshold = textToFloat(fnt);
+
+	fnt = parser.getOption("--maxsig", "Maximum number of poses & translations to consider", "OLD");
+	if (fnt != "OLD")
+		maximum_significants_arg = textToInteger(fnt);
 
 	do_join_random_halves = parser.checkOption("--join_random_halves", "Join previously split random halves again (typically to perform a final reconstruction).");
 
@@ -497,7 +501,6 @@ if(do_gpu)
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
 	maximum_angular_sampling = textToFloat(getParameter(argc, argv, "--maximum_angular_sampling", "0"));
 	asymmetric_padding = parser.checkOption("--asymmetric_padding", "", "false", true);
-	maximum_significants = textToInteger(parser.getOption("--maxsig", "Maximum number of poses & translations to consider", "-1"));
 	skip_gridding = parser.checkOption("--skip_gridding", "Skip gridding in the M step");
 	nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
 	debug_split_random_half = textToInteger(getParameter(argc, argv, "--debug_split_random_half", "0"));
@@ -750,18 +753,24 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 		grad_inbetween_iter = 0;
 
 	grad_min_resol = textToInteger(parser.getOption("--grad_min_resol", "Adjusting the signal under-estimation during gradient optimization to this resolution.", "20"));
-	grad_ini_resol = textToInteger(parser.getOption("--grad_ini_resol", "Resolution cutoff during the initial SGD iterations (A)", "-1"));
-	grad_fin_resol = textToInteger(parser.getOption("--grad_fin_resol", "Resolution cutoff during the final SGD iterations (A)", "-1"));
-	grad_ini_subset_size = textToInteger(parser.getOption("--grad_ini_subset", "Mini-batch size during the initial SGD iterations", "-1"));
-	grad_fin_subset_size = textToInteger(parser.getOption("--grad_fin_subset", "Mini-batch size during the final SGD iterations", "-1"));
-	mu = textToFloat(parser.getOption("--mu", "Momentum parameter for SGD updates", "0.9"));
+	grad_ini_resol = textToInteger(parser.getOption("--grad_ini_resol", "Resolution cutoff during the initial gradient refinement iterations (A)", "-1"));
+	grad_fin_resol = textToInteger(parser.getOption("--grad_fin_resol", "Resolution cutoff during the final gradient refinement iterations (A)", "-1"));
+	grad_ini_subset_size = textToInteger(parser.getOption("--grad_ini_subset", "Mini-batch size during the initial gradient refinement iterations", "-1"));
+	grad_fin_subset_size = textToInteger(parser.getOption("--grad_fin_subset", "Mini-batch size during the final gradient refinement iterations", "-1"));
+	mu = textToFloat(parser.getOption("--mu", "Momentum parameter for gradient refinement updates", "0.9"));
 
 	grad_stepsize = textToFloat(parser.getOption("--grad_stepsize", "Step size parameter for gradient optimisation.", "-1"));
 	grad_stepsize_scheme = parser.getOption("--grad_stepsize_scheme",
 			"Gradient step size updates scheme. Valid values are plain, <a>-2step or <a>-3step-<b>. Where <a> is the initial inflate and <b> is the final deflate factor.","");
 
+<<<<<<< HEAD
 	write_every_grad_iter = textToInteger(parser.getOption("--grad_write_iter", "Write out model every so many iterations in SGD (default is writing out all iters)", "10"));
 	do_init_blobs = !parser.checkOption("--no_init_blobs", "Use this to switch off initializing models with random Gaussians (which is new in relion-4.0).");
+=======
+	write_every_grad_iter = textToInteger(parser.getOption("--grad_write_iter", "Write out model every so many iterations during gradient refinement (default is writing out all iters)", "10"));
+	maximum_significants_arg = textToInteger(parser.getOption("--maxsig", "Maximum number of most significant poses & translations to consider", "-1"));
+	do_init_blobs = parser.checkOption("--init_blobs", "Initialize models with random Gaussians.");
+>>>>>>> 482e6c8b9ee3bf188198b5e4721851329cf4981d
 	do_som = parser.checkOption("--som", "Calculate self-organizing map instead of classification.");
 	som_starting_nodes = textToInteger(parser.getOption("--som_ini_nodes", "Number of initial SOM nodes.", "2"));
 	som_connectivity = textToFloat(parser.getOption("--som_connectivity", "Number of average active neighbour connections.", "5.0"));
@@ -914,7 +923,6 @@ if(do_gpu)
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
 	maximum_angular_sampling = textToFloat(getParameter(argc, argv, "--maximum_angular_sampling", "0"));
 	asymmetric_padding = parser.checkOption("--asymmetric_padding", "", "false", true);
-	maximum_significants = textToInteger(parser.getOption("--maxsig", "Maximum number of poses & translations to consider", "-1"));
 	skip_gridding = parser.checkOption("--skip_gridding", "Skip gridding in the M step");
 	debug_split_random_half = textToInteger(getParameter(argc, argv, "--debug_split_random_half", "0"));
 
@@ -1068,6 +1076,8 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 		subset_size = -1;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, write_every_grad_iter))
 		write_every_grad_iter = 1;
+	if (!MD.getValue(EMDL_MAX_SIGNIFICANTS, maximum_significants_arg))
+		maximum_significants_arg = -1;
 	if (!MD.getValue(EMDL_BODY_STAR_FILE, fn_body_masks))
 		fn_body_masks = "None";
 	if (!MD.getValue(EMDL_OPTIMISER_DO_SOLVENT_FSC, do_phase_random_fsc))
@@ -1267,6 +1277,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, write_every_grad_iter);
 		MD.setValue(EMDL_OPTIMISER_SGD_STEPSIZE, grad_stepsize);
 		MD.setValue(EMDL_OPTIMISER_SGD_STEPSIZE_SCHEME, grad_stepsize_scheme);
+		MD.setValue(EMDL_MAX_SIGNIFICANTS, maximum_significants_arg);
 		MD.setValue(EMDL_OPTIMISER_DO_AUTO_REFINE, do_auto_refine);
 		MD.setValue(EMDL_OPTIMISER_AUTO_LOCAL_HP_ORDER, autosampling_hporder_local_searches);
 		MD.setValue(EMDL_OPTIMISER_NR_ITER_WO_RESOL_GAIN, nr_iter_wo_resol_gain);
@@ -2131,15 +2142,34 @@ void MlOptimiser::initialiseGeneral(int rank)
 		updateStepSize();
 
 		// determine default subset sizes
-		if (grad_ini_subset_size == -1 || grad_fin_subset_size == -1) {
-			if (grad_ini_subset_size != -1 || grad_fin_subset_size != -1)
-				std::cout << " WARNING: Since both --grad_ini_subset and --grad_fin_subset were not set, " <<
-				          "both will instead be determined automatically." << std::endl;
-
+		if (grad_ini_subset_size == -1 || grad_fin_subset_size == -1)
+		{
 			unsigned long dataset_size = mydata.numberOfParticles();
-			grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.005, 5000), 100);
-			grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.05,  50000), 1000);
-			if (rank==0) {
+			if (mymodel.ref_dim == 2)
+			{
+				grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.005, 5000), 100);
+				grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.05, 50000), 1000);
+			}
+			else
+			{
+				if (is_3d_model)
+				{
+					grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.01, 10000), 100);
+					grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.1, 100000), 1000);
+				}
+				else
+				{
+					grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.1, 100000), 100);
+					grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.1, 100000), 1000);
+				}
+			}
+
+			if (rank==0)
+			{
+				if (grad_ini_subset_size != -1 || grad_fin_subset_size != -1)
+					std::cout << " WARNING: Since both --grad_ini_subset and --grad_fin_subset were not set, " <<
+					          "both will instead be determined automatically." << std::endl;
+
 				std::cout << " Initial subset size set to " << grad_ini_subset_size << std::endl;
 				std::cout << " Final subset size set to " << grad_fin_subset_size << std::endl;
 			}
@@ -2892,7 +2922,8 @@ void MlOptimiser::iterate()
 			checkConvergence();
 		}
 
-		if (gradient_refine) {
+		if (gradient_refine)
+		{
 			updateStepSize();
 			do_grad = !(has_converged || iter > nr_iter - grad_em_iters) &&
 			          !(do_firstiter_cc && iter == 1) &&
@@ -2905,7 +2936,18 @@ void MlOptimiser::iterate()
 			grad_pseudo_halfsets = do_grad;
 		}
 
-		if(do_som) {
+		if (maximum_significants_arg != -1)
+			maximum_significants = maximum_significants_arg;
+		else if (do_grad)
+		{
+			if (mymodel.ref_dim == 2)
+				maximum_significants = 5 * mymodel.nr_classes;
+			else
+				maximum_significants = 100 * mymodel.nr_classes;
+		}
+
+		if(do_som)
+		{
 			if (do_generate_seeds && !do_firstiter_cc && iter == 1)
 				is_som_iter = false;
 			else
@@ -3096,10 +3138,12 @@ void MlOptimiser::expectation()
 	std::cerr << "Expectation: done setup" << std::endl;
 #endif
 
-	// C. Calculate expected minimum angular errors (only for 3D refinements)
-	// And possibly update orientational sampling automatically
-	if (!((iter==1 && do_firstiter_cc) || do_always_cc) && !(do_skip_align || do_only_sample_tilt) &&
-		(do_auto_refine || !do_grad || (iter % 10 == 0 && mymodel.nr_classes > 1 && allow_coarser_samplings)))
+	// C. Calculate expected angular errors
+	// Skip for maxCC
+	// Skip if not doing alignment
+	// During gradient refinement only do this every 10 iterations
+	if (!((iter==1 && do_firstiter_cc) || do_always_cc) && !(do_skip_align && do_skip_rotate || do_only_sample_tilt) &&
+	    (do_auto_refine || !do_grad || iter % 10 == 0 || iter <= 1))
 	{
 		// Set the exp_metadata (but not the exp_imagedata which is not needed for calculateExpectedAngularErrors)
 		int n_trials_acc = (mymodel.ref_dim==3 && mymodel.data_dim != 3) ? 100 : 10;
@@ -9465,20 +9509,17 @@ void MlOptimiser::updateStepSize()
 	if (_stepsize <= 0)
 	{
 		if (mymodel.ref_dim == 3)
-			_stepsize = 0.1;
+			_stepsize = 0.3;
 		else
 			_stepsize = 0.3;
 	}
 
 	if (_scheme.empty())
 	{
-		RFLOAT boost_factor;
-
 		if (mymodel.ref_dim == 3)
-			boost_factor = 3.;
+			_scheme = "plain";
 		else
-			boost_factor = 0.9 / _stepsize;
-		_scheme = std::to_string(boost_factor) + "-2step";
+			_scheme = std::to_string(0.9 / _stepsize) + "-2step";
 	}
 
 	if (_scheme == "plain") {
@@ -9530,7 +9571,7 @@ void MlOptimiser::checkConvergence(bool myverb)
 
     bool gd_converged = nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN_GRAD;
 
-	if (!grad_has_converged && gd_converged) {
+	if (gradient_refine && !grad_has_converged && gd_converged) {
 		if (myverb)
 			std::cout << " Auto-refine: Switching to Expectation Maximization " << std::endl;
 		grad_has_converged = true;

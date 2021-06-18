@@ -19,7 +19,10 @@ class TomogramSet
 		
 			MetaDataTable globalTable;
 			std::vector<MetaDataTable> tomogramTables;
-			
+
+
+
+		Tomogram loadTomogram(int index, bool loadImageData) const;
 			
 		int addTomogram(
 			std::string tomoName, std::string stackFilename,
@@ -43,14 +46,14 @@ class TomogramSet
 		void setTiltSeriesFile(int tomogramIndex, const std::string& filename);
 		void setFiducialsFile(int tomogramIndex, const std::string& filename);
 		void setDefocusSlope(int tomogramIndex, double slope);
-		
+
 		void setDeformation(
 				int tomogramIndex,
 				gravis::i2Vector gridSize,
+				const std::string& deformationType,
 				const std::vector<std::vector<double>>& coeffs);
 
-		
-		Tomogram loadTomogram(int index, bool loadImageData) const;
+		void clearDeformation();
 
 		int getTomogramIndex(std::string tomogramName) const;
 		std::string getTomogramName(int index) const;

@@ -20,10 +20,32 @@ d2Vector Tomogram::projectPoint(const d3Vector& p, int frame) const
 	
 	if (hasDeformations)
 	{
-		return imageDeformations[frame].apply(pl);
+		return imageDeformations[frame]->apply(pl);
 	}
 	else
 	{
+		return pl;
+	}
+}
+
+d2Vector Tomogram::projectPointDebug(const d3Vector &p, int frame) const
+{
+	const d2Vector pl = (projectionMatrices[frame] * gravis::d4Vector(p)).xy();
+
+	std::cout << p << " -> " << pl << '\n';
+	std::cout << projectionMatrices[frame] << '\n';
+
+	if (hasDeformations)
+	{
+		d2Vector p1 = imageDeformations[frame]->apply(pl);
+		std::cout << " -> " << p1 << "(" << (p1 - pl) << ")\n";
+
+		return p1;
+	}
+	else
+	{
+		std::cout << "\n";
+
 		return pl;
 	}
 }
@@ -199,7 +221,7 @@ Tomogram Tomogram::FourierCrop(double factor, int num_threads, bool downsampleDa
 	return out;
 }
 
-bool Tomogram::hasFiducials()
+bool Tomogram::hasFiducials() const
 {
 	return fiducialsFilename.length() > 0 && fiducialsFilename != "empty";
 }

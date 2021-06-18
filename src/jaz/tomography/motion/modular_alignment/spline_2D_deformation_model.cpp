@@ -6,7 +6,7 @@ Spline2DDeformationModel::Spline2DDeformationModel()
 }
 
 Spline2DDeformationModel::Spline2DDeformationModel(
-		const Parameters& parameters,
+		const Deformation2D::Parameters& parameters,
 		const gravis::i2Vector& imageSize)
 	:
 	  imageSize(imageSize),

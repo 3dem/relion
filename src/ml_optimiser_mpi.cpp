@@ -804,10 +804,11 @@ void MlOptimiserMpi::expectation()
 	timer.tic(TIMING_EXP_2);
 #endif
 	// C. Calculate expected angular errors
-	// Do not do this for maxCC
-	// Only the first (reconstructing) follower (i.e. from half1) calculates expected angular errors
-	if (!do_grad && !(iter==1 && do_firstiter_cc) && !(do_skip_align || do_skip_rotate) &&
-         (do_auto_refine || (iter % 10 == 0 && mymodel.nr_classes > 1 && allow_coarser_samplings)))
+	// Skip for maxCC
+	// Skip if not doing alignment
+	// During gradient refinement only do this every 10 iterations
+	if (!((iter==1 && do_firstiter_cc) || do_always_cc) && !(do_skip_align && do_skip_rotate || do_only_sample_tilt) &&
+	    (do_auto_refine || !do_grad || iter % 10 == 0 || iter <= 1))
 		calculateExpectedAngularErrors(0, n_trials_acc - 1);
 
 #ifdef TIMING
@@ -3333,6 +3334,16 @@ void MlOptimiserMpi::iterate()
 			do_grad_next_iter = !(has_converged || iter_next > nr_iter - grad_em_iters) &&
 			                    !(do_firstiter_cc && iter_next == 1) &&
 			                    !grad_has_converged;
+		}
+
+		if (maximum_significants_arg != -1)
+			maximum_significants = maximum_significants_arg;
+		else if (do_grad)
+		{
+			if (mymodel.ref_dim == 2)
+				maximum_significants = 5 * mymodel.nr_classes;
+			else
+				maximum_significants = 100 * mymodel.nr_classes;
 		}
 
 		// Update subset_size

@@ -12,7 +12,7 @@ Spline2DDeformation::Spline2DDeformation(
 		i2Vector gridSize, 
 		const double* coefficients)
 {
-	Spline2DDeformationModel::Parameters parameters;
+	Deformation2D::Parameters parameters;
 	
 	parameters.grid_width  = gridSize.x;
 	parameters.grid_height = gridSize.y;
@@ -27,4 +27,9 @@ Spline2DDeformation::Spline2DDeformation(
 d2Vector Spline2DDeformation::apply(const d2Vector pl) const
 {
 	return pl + deformationModel.computeShift(pl, (double*)coefficients.data);
+}
+
+const double* Spline2DDeformation::getCoefficients() const
+{
+	return (double*) &coefficients[0][0];
 }

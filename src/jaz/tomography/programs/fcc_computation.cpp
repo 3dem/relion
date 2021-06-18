@@ -74,11 +74,23 @@ void FccProgram::run()
 
 		std::string tag = outDir + tomogram.name;
 
-		BufferedImage<double> FCC3 = FCC::compute3(
+
+		BufferedImage<double> FCC3;
+		const std::string tempFile = tag + "_FCC3.mrc";
+
+		if (only_do_unfinished && ZIO::fileExists(tempFile))
+		{
+			FCC3.read(tag + "_FCC3.mrc");
+		}
+		else
+		{
+			FCC3 = FCC::compute3(
 				particleSet, particles[t], tomogram, referenceMap.image_FS,
 				flip_value, num_threads);
 			
-		FCC3.write(tag + "_FCC3.mrc");
+			FCC3.write(tag + "_FCC3.mrc");
+		}
+
 		BufferedImage<double> fcc = FCC::divide(FCC3);
 		fcc.write(tag + "_FCC.mrc");
 
@@ -99,7 +111,7 @@ void FccProgram::run()
 
 				for (int d = 0; d < 3; d++)
 				{
-					FCC3_sum(x,f,d) = FCC3(x,f,d);
+					FCC3_sum(x,f,d) += FCC3(x,f,d);
 				}
 			}
 		}

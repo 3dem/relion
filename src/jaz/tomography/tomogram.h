@@ -6,7 +6,8 @@
 #include <src/jaz/gravis/t4Matrix.h>
 #include <src/jaz/optics/optics_data.h>
 #include <src/ctf.h>
-#include "motion/spline_2D_deformation.h"
+#include "motion/2D_deformation.h"
+#include <memory>
 
 class ParticleIndex;
 class ParticleSet;
@@ -25,7 +26,8 @@ class Tomogram
 			
 			BufferedImage<float> stack;
 			std::vector<gravis::d4Matrix> projectionMatrices;
-			std::vector<Spline2DDeformation> imageDeformations;
+			
+			std::vector<std::shared_ptr<Deformation2D>> imageDeformations;
 			
 			std::vector<CTF> centralCTFs;
 			std::vector<double> cumulativeDose;
@@ -35,8 +37,11 @@ class Tomogram
 			std::string name, tiltSeriesFilename, opticsGroupName, fiducialsFilename;
 			double defocusSlope;
 		
-			
+
 		gravis::d2Vector projectPoint(
+				const gravis::d3Vector& p, int frame) const;
+
+		gravis::d2Vector projectPointDebug(
 				const gravis::d3Vector& p, int frame) const;
 		
 		bool isVisible(
@@ -63,7 +68,7 @@ class Tomogram
 		Tomogram extractSubstack(gravis::d3Vector position, int width, int height) const;
 		Tomogram FourierCrop(double factor, int num_threads, bool downsampleData = true) const;
 
-		bool hasFiducials();
+		bool hasFiducials() const;
 };
 
 

@@ -26,15 +26,6 @@
 #define STR(x) STR_HELPER(x)
 bool show_expand_stdout;
 
-std::string cpipe_get_job_name(int jobnumber)
-{
-	char buffer[256]; sprintf(buffer, "%03d", jobnumber+1);
-	std::string job_num_string;
-	job_num_string =  buffer;
-	std::string job_name_string = "job" + job_num_string;
-	return job_name_string;
-}
-
 // The StdOutDisplay allows looking at the entire stdout or stderr file
 int StdOutDisplay::handle(int ev)
 {
@@ -357,8 +348,15 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 		pipeline.write();
 	}
 
- 	color(GUI_BACKGROUND_COLOR);
-	menubar = new Fl_Menu_Bar(-3, 0, WCOL0-7, MENUHEIGHT);
+ 	if (use_ccpem_pipeliner)
+ 	{
+ 		color((fl_rgb_color(255,240,240)));
+ 	}
+ 	else
+ 	{
+ 		color(GUI_BACKGROUND_COLOR);
+ 	}
+ 	menubar = new Fl_Menu_Bar(-3, 0, WCOL0-7, MENUHEIGHT);
 	menubar->add("File/Re-read pipeline",  FL_ALT+'r', cb_reread_pipeline, this);
 	menubar->add("File/Edit project note",  FL_ALT+'e', cb_edit_project_note, this);
 	if (!maingui_do_read_only)
@@ -1518,6 +1516,10 @@ void GuiMainWindow::cb_print_cl_i()
 void GuiMainWindow::cb_run(Fl_Widget* o, void* v)
 {
 	GuiMainWindow* T=(GuiMainWindow*)v;
+	if (use_ccpem_pipeliner)
+	{
+		T->cb_print_cl_i();
+	}
 	// Deactivate Run button to prevent the user from accidentally submitting many jobs
 	run_button->deactivate();
 	// Run the job
@@ -1528,6 +1530,10 @@ void GuiMainWindow::cb_run(Fl_Widget* o, void* v)
 void GuiMainWindow::cb_schedule(Fl_Widget* o, void* v)
 {
 	GuiMainWindow* T=(GuiMainWindow*)v;
+	if (use_ccpem_pipeliner)
+	{
+		T->cb_print_cl_i();
+	}
 	T->cb_run_i(true, false); // 1st true means only_schedule, do not run, 2nd false means dont open the note editor window
 }
 
@@ -1571,12 +1577,10 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 
 
 	if (use_ccpem_pipeliner)
-	// switch this to pipeline.runJobCCPEM
 	{
-		std::string error_message;
-		if (!pipeline.runJob(gui_jobwindows[iwin]->myjob, current_job, only_schedule, is_main_continue, false, error_message))
+		std::string error_message = "An error was encountered with the job parameters";
+		if (!pipeline.runJobCpipe(gui_jobwindows[iwin]->myjob, current_job, only_schedule, is_main_continue, false, error_message))
 		{
-			std::cout << " CURRENTLY NOT RUNNING PIPELINER FOR THIS FUNCTION " << std::endl;
 			// Still revert back to the correct job_counter for overwrite jobs!
 			if (do_overwrite_continue) pipeline.setJobCounter(my_overwrite_job_counter);
 			// Show the error
@@ -1626,7 +1630,17 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 	do_overwrite_continue = false;
 
 	// Select this job now
-	loadJobFromPipeline(current_job);
+	if (use_ccpem_pipeliner)
+	{
+		sleep(10);
+		cb_reread_pipeline_i();
+		//loadJobFromPipeline(current_job);
+	}
+	else
+	{
+		loadJobFromPipeline(current_job);
+	}
+
 }
 
 
@@ -1674,7 +1688,7 @@ void GuiMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 
 		if (use_ccpem_pipeliner)
 		{
-			std::string thejob = cpipe_get_job_name(current_job);
+			std::string thejob = pipeline.processList[current_job].name;
 			std::string command = "reSPYon --delete_job " + thejob;
 			system(command.c_str());
 
@@ -1683,7 +1697,7 @@ void GuiMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 			fillStdOutAndErr();
 
 			// Update all job lists in the main GUI
-			updateJobLists();
+			cb_reread_pipeline_i();
 		}
 		else
 		{
@@ -1805,7 +1819,7 @@ void GuiMainWindow::cb_cleanup_i(int myjob, bool do_verb, bool do_harsh)
 		if (use_ccpem_pipeliner)
 		{
 			std::string isharsh = (do_harsh) ? "--harsh" : "";
-			std::string jobname  = cpipe_get_job_name(current_job);
+			std::string jobname  = pipeline.processList[current_job].name;
 			std::string command  = "reSPYon --cleanup " + jobname + " " + isharsh;
 			int res = system(command.c_str());
 		}
@@ -1866,10 +1880,12 @@ void GuiMainWindow::cb_set_alias_i(std::string alias)
 
 		if (use_ccpem_pipeliner)
 		{
-			std::string jobname  = cpipe_get_job_name(current_job);
+			std::string jobname  = pipeline.processList[current_job].name;
 			std::string command  = "reSPYon --set_alias " + jobname + " " + alias;
 			int res = system(command.c_str());
 			is_done = true;
+			cb_reread_pipeline_i();
+
 		}
 		else
 		{
@@ -1912,9 +1928,10 @@ void GuiMainWindow::cb_abort_i(std::string alias)
 		{
 			if (use_ccpem_pipeliner)
 			{
-					std::string jobname = cpipe_get_job_name(current_job);
+					std::string jobname = pipeline.processList[current_job].name;
 					std::string command = "reSPYon --set_status " + jobname + " aborted";
 					int res = system(command.c_str());
+					cb_reread_pipeline_i();
 			}
 			else
 			{
@@ -1951,17 +1968,18 @@ void GuiMainWindow::cb_mark_as_finished_i(bool is_failed)
 	{
 		if (is_failed)
 		{
-			std::string jobname = cpipe_get_job_name(current_job);
+			std::string jobname = pipeline.processList[current_job].name;
 			std::string command = "reSPYon --set_status " + jobname + " failed";
 			int res = system(command.c_str());
 		}
 
 		else
 		{
-			std::string jobname = cpipe_get_job_name(current_job);
+			std::string jobname = pipeline.processList[current_job].name;
 			std::string command = "reSPYon --set_status " + jobname + " finished";
 			int res = system(command.c_str());
 		}
+		cb_reread_pipeline_i();
 	}
 	else
 	{
@@ -2114,6 +2132,7 @@ void GuiMainWindow::cb_undelete_job_i()
 		std::string projdir = trashdir.substr(splitit+1);
 		std::string undelcom = "reSPYon --undelete_job " + projdir;
 		system(undelcom.c_str());
+		cb_reread_pipeline_i();
 	}
 	else
 	{

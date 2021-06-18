@@ -30,6 +30,7 @@
 #include <src/jaz/single_particle/image_log.h>
 #include <src/jaz/single_particle/img_proc/filter_helper.h>
 #include <src/jaz/image/translation.h>
+#include <src/jaz/image/padding.h>
 #include <src/jaz/math/fft.h>
 #include <src/jaz/util/zio.h>
 #include <src/filename.h>
@@ -555,7 +556,7 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 			}
 		}
 		
-		Image<RFLOAT> outStack_xmipp(out_size, out_size, 1, pc);	
+		Image<RFLOAT> outStack_xmipp(out_size, out_size, 1, pc);
 		RawImage<RFLOAT> outStack(outStack_xmipp);
 
 		#pragma omp parallel for num_threads(nr_omp_threads)
@@ -571,25 +572,28 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 				
 				MultidimArray<RFLOAT> ctfImg_xmipp;
 				ctfImg_xmipp.resize(s_out[og], sh_out[og]);
-				ctf.getFftwImage(ctfImg_xmipp, s_out[og], s_out[og], angpix_out[og], 
-								 false,  // do_abs
-								 false,  // do_only_flip_phases
-								 false,  // do_intact_until_first_peak
-								 true,   // do_damping
-								 false );// do_ctf_padding								
+				
+				ctf.getFftwImage(
+						ctfImg_xmipp, s_out[og], s_out[og], angpix_out[og], 
+						false,  // do_abs
+						false,  // do_only_flip_phases
+						false,  // do_intact_until_first_peak
+						true,   // do_damping
+						false );// do_ctf_padding
 				
 				RawImage<RFLOAT> ctfImg(ctfImg_xmipp);
 				
 				sumCopy *= ctfImg;
 			}
 			
-			RFLOAT scale2 = StackHelper::computePower(sumCopy, false);			
+			RFLOAT scale2 = StackHelper::computePower(sumCopy, false);
 			sumCopy /= out_size * sqrt(scale2);
 			
-			BufferedImage<RFLOAT> real(s_out[ogmg], s_out[ogmg]);			
+			BufferedImage<RFLOAT> real(s_out[ogmg], s_out[ogmg]);
 			FFT::inverseFourierTransform(sumCopy, real);
 			
-			outStack.getSliceRef(p).copyFrom(real);
+			RawImage<RFLOAT> outSlice = outStack.getSliceRef(p);
+			Padding::copyUnpaddedCenter2D_full(real, outSlice);
 		}
 		
 		std::string stackFn = fn_root + "_shiny" + suffix + ".mrcs";

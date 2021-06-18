@@ -21,11 +21,16 @@ class No2DDeformationModel
 				const gravis::d2Vector& mx,
 				const gravis::d2Vector& my) const;
 		
-		inline void updateCostGradient(
+		inline void updateDataTermGradient(
 				const gravis::d2Vector& pl,
 				const gravis::d2Vector& g0,
 				const double* parameters,
 				double* target) const;
+		
+		inline double computePriorValueAndGradient(
+				double lambda,
+				const double* parameters,
+				double* gradDest) const;
 		
 };
 
@@ -54,13 +59,21 @@ inline gravis::d2Vector No2DDeformationModel::transformImageGradient(
 	return g0;
 }
 
-inline void No2DDeformationModel::updateCostGradient(
+inline void No2DDeformationModel::updateDataTermGradient(
 		const gravis::d2Vector &pl,
 		const gravis::d2Vector &g0,
 		const double *parameters,
 		double *target) const
 {
 	
+}
+
+double No2DDeformationModel::computePriorValueAndGradient(
+		double lambda, 
+		const double* parameters, 
+		double* gradDest) const
+{
+	return 0.0;
 }
 
 #endif

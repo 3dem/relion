@@ -11,6 +11,8 @@
 #include <src/jaz/tomography/motion/modular_alignment/no_motion_model.h>
 #include <src/jaz/tomography/motion/modular_alignment/no_2D_deformation_model.h>
 #include <src/jaz/tomography/motion/modular_alignment/spline_2D_deformation_model.h>
+#include <src/jaz/tomography/motion/modular_alignment/Fourier_2D_deformation_model.h>
+#include <src/jaz/tomography/motion/modular_alignment/linear_2D_deformation_model.h>
 #include <src/jaz/tomography/motion/proto_alignment.h>
 #include <src/jaz/optimization/lbfgs.h>
 #include <vector>
@@ -36,10 +38,12 @@ class AlignProgram : public RefinementProgram
 
 			double padding, hiPass_px, sig2RampPower;
 			int range, num_iters;
+			
+			std::string deformationType;
 
 			ModularAlignmentSettings alignmentSettings;
 			GPMotionModel::Parameters motionParameters;
-			Spline2DDeformationModel::Parameters deformationParameters;
+			Deformation2D::Parameters deformationParameters;
 			
 
 		void run();
@@ -85,7 +89,6 @@ class AlignProgram : public RefinementProgram
 		void performAlignment(
 				MotionModel& motionModel,
 				const std::vector<BufferedImage<double>>& CCs,
-				const std::vector<gravis::d4Matrix>& projByTime,
 				const Tomogram& tomogram,
 				int tomo_index,
 				int progress_bar_offset,
@@ -96,7 +99,6 @@ class AlignProgram : public RefinementProgram
 				MotionModel& motionModel,
 				DeformationModel& deformationModel,
 				const std::vector<BufferedImage<double>>& CCs,
-				const std::vector<gravis::d4Matrix>& projByTime,
 				const Tomogram& tomogram,
 				int tomo_index,
 				int progress_bar_offset,
@@ -108,7 +110,6 @@ template<class MotionModel>
 void AlignProgram::performAlignment(
 		MotionModel& motionModel,
 		const std::vector<BufferedImage<double>>& CCs,
-		const std::vector<gravis::d4Matrix>& projByTime,
 		const Tomogram& tomogram,
 		int tomo_index,
 		int progress_bar_offset,
@@ -116,19 +117,51 @@ void AlignProgram::performAlignment(
 {
 	if (do_deformation)
 	{
-		Spline2DDeformationModel deformationModel(
-			deformationParameters,
-			gravis::i2Vector(tomogram.stack.xdim, tomogram.stack.ydim));
-
-		performAlignment(
-			motionModel,
-			deformationModel,
-			CCs,
-			projByTime,
-			tomogram,
-			tomo_index,
-			progress_bar_offset,
-			per_tomogram_progress);
+		if (deformationType == "spline")
+		{
+			Spline2DDeformationModel deformationModel(
+				deformationParameters,
+				gravis::i2Vector(tomogram.stack.xdim, tomogram.stack.ydim));
+	
+			performAlignment(
+				motionModel,
+				deformationModel,
+				CCs,
+				tomogram,
+				tomo_index,
+				progress_bar_offset,
+				per_tomogram_progress);
+		}
+		else if (deformationType == "Fourier")
+		{
+			Fourier2DDeformationModel deformationModel(
+				deformationParameters,
+				gravis::i2Vector(tomogram.stack.xdim, tomogram.stack.ydim));
+	
+			performAlignment(
+				motionModel,
+				deformationModel,
+				CCs,
+				tomogram,
+				tomo_index,
+				progress_bar_offset,
+				per_tomogram_progress);
+		}
+		else if (deformationType == "linear")
+		{
+			Linear2DDeformationModel deformationModel(
+				deformationParameters,
+				gravis::i2Vector(tomogram.stack.xdim, tomogram.stack.ydim));
+	
+			performAlignment(
+				motionModel,
+				deformationModel,
+				CCs,
+				tomogram,
+				tomo_index,
+				progress_bar_offset,
+				per_tomogram_progress);
+		}
 	}
 	else
 	{
@@ -138,7 +171,6 @@ void AlignProgram::performAlignment(
 			motionModel,
 			noDeformationModel,
 			CCs,
-			projByTime,
 			tomogram,
 			tomo_index,
 			progress_bar_offset,
@@ -151,21 +183,20 @@ void AlignProgram::performAlignment(
 		MotionModel& motionModel,
 		DeformationModel& deformationModel,
 		const std::vector<BufferedImage<double>>& CCs,
-		const std::vector<gravis::d4Matrix>& projByTime,
 		const Tomogram& tomogram,
 		int tomo_index,
 		int progress_bar_offset,
 		bool per_tomogram_progress)
 {
 	ModularAlignment<MotionModel, DeformationModel> alignment(
-		CCs, projByTime, particleSet, particles[tomo_index],
+		CCs, particleSet, particles[tomo_index],
 		motionModel, deformationModel,
 		alignmentSettings, tomogram,
 		padding,
 		progress_bar_offset, num_threads,
 		per_tomogram_progress && verbosity > 0);
 
-	std::vector<double> initial(alignment.getParamCount(), 0.0);
+	std::vector<double> initial = alignment.originalCoefficients;
 
 	alignment.devMode = debug;
 
@@ -175,10 +206,14 @@ void AlignProgram::performAlignment(
 		Log::beginProgress("Performing optimisation", num_iters);
 	}
 
+	/*std::cout << "initial info: \n";
+	alignment.printDebuggingInfo(initial);*/
 
 	std::vector<double> opt = LBFGS::optimize(
 			initial, alignment, 1, num_iters, 1e-6, 1e-4);
 
+	/*std::cout << "final info: \n";
+	alignment.printDebuggingInfo(opt);*/
 
 	if (verbosity > 0 && per_tomogram_progress)
 	{
@@ -204,7 +239,7 @@ void AlignProgram::performAlignment(
 	if (do_motion)
 	{
 		std::vector<Trajectory> trajectories = alignment.exportTrajectories(
-					opt, particleSet, tomogram.frameSequence);
+					opt, tomogram.frameSequence);
 	
 		writeTempMotionData(trajectories, tomo_index);
 	

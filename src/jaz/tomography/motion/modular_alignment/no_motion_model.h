@@ -14,13 +14,13 @@ class NoMotionModel
 				int particle_index,
 				gravis::d3Vector& position) const;
 
-		inline void updateCostGradient(
+		inline void updateDataTermGradient(
 				const gravis::d3Vector *dC_dPos,
 				int particle_index,
 				int fc,
 				double *target) const;
 
-		inline double computePriorCostAndGradient(
+		inline double computePriorValueAndGradient(
 				const double *x,
 				int fc,
 				double* gradDest) const;
@@ -35,7 +35,7 @@ void NoMotionModel::updatePosition(
 {	
 }
 
-void NoMotionModel::updateCostGradient(
+void NoMotionModel::updateDataTermGradient(
 		const gravis::d3Vector *dC_dPos,
 		int particle_index,
 		int fc,
@@ -43,7 +43,7 @@ void NoMotionModel::updateCostGradient(
 {	
 }
 
-double NoMotionModel::computePriorCostAndGradient(
+double NoMotionModel::computePriorValueAndGradient(
 		const double *x,
 		int fc,
 		double *gradDest) const
