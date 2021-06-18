@@ -2194,6 +2194,11 @@ void MlOptimiser::initialiseGeneral(int rank)
 		// determine default subset sizes
 		if (grad_ini_subset_size == -1 || grad_fin_subset_size == -1)
 		{
+			if (rank==0)
+				if (grad_ini_subset_size != -1 || grad_fin_subset_size != -1)
+					std::cout << " WARNING: Since both --grad_ini_subset and --grad_fin_subset were not set, " <<
+					          "both will instead be determined automatically." << std::endl;
+				
 			unsigned long dataset_size = mydata.numberOfParticles();
 			if (mymodel.ref_dim == 2)
 			{
@@ -2216,10 +2221,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 			if (rank==0)
 			{
-				if (grad_ini_subset_size != -1 || grad_fin_subset_size != -1)
-					std::cout << " WARNING: Since both --grad_ini_subset and --grad_fin_subset were not set, " <<
-					          "both will instead be determined automatically." << std::endl;
-
 				std::cout << " Initial subset size set to " << grad_ini_subset_size << std::endl;
 				std::cout << " Final subset size set to " << grad_fin_subset_size << std::endl;
 			}
@@ -3111,7 +3112,7 @@ void MlOptimiser::expectation()
 	// Skip if not doing alignment
 	// During gradient refinement only do this every 10 iterations
 	if (!((iter==1 && do_firstiter_cc) || do_always_cc) && !(do_skip_align && do_skip_rotate || do_only_sample_tilt) &&
-	    (do_auto_refine || !do_grad || iter % 10 == 0 || iter <= 1))
+	    (do_auto_refine || !do_grad || iter % 10 == 0 || iter == nr_iter || iter <= 1))
 	{
 		// Set the exp_metadata (but not the exp_imagedata which is not needed for calculateExpectedAngularErrors)
 		int n_trials_acc = (mymodel.ref_dim==3 && mymodel.data_dim != 3) ? 100 : 10;
