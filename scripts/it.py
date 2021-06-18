@@ -143,6 +143,8 @@ RelionItOptions = {
     'prep__motioncorr__nr_threads' : 16,
 
     ### CTF estimation parameters
+    # Name of the ctffind executable
+    'prep__ctffind__fn_ctffind_exe' : '/public/EM/ctffind/ctffind.exe',
     # Most cases won't need changes here...
     'prep__ctffind__do_phaseshift' : False,
 
@@ -194,6 +196,10 @@ RelionItOptions = {
     ### Parameters for Topaz picking
     # Expected number of particles per micrograph
     'proc__train_topaz__topaz_nr_particles' : 300,
+    # Name of the topaz executable
+    'proc__restpicker__fn_topaz_exec' : '/public/EM/RELION/topaz',
+    # Additional arguments to be passed onto topaz
+    'proc__restpicker__topaz_other_args' : '',
     # Which (single) GPU to run training on 
     'proc__train_topaz__gpu_ids' : 0,
     # How many MPI processes to use in parallel for picking

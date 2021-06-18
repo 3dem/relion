@@ -808,7 +808,7 @@ void MlOptimiserMpi::expectation()
 	// Skip if not doing alignment
 	// During gradient refinement only do this every 10 iterations
 	if (!((iter==1 && do_firstiter_cc) || do_always_cc) && !(do_skip_align && do_skip_rotate || do_only_sample_tilt) &&
-	    (do_auto_refine || !do_grad || iter % 10 == 0 || iter <= 1))
+       (do_auto_refine || !do_grad || iter % 10 == 0 || iter == nr_iter || iter <= 1))
 		calculateExpectedAngularErrors(0, n_trials_acc - 1);
 
 #ifdef TIMING
