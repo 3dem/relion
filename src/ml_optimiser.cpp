@@ -763,14 +763,9 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	grad_stepsize_scheme = parser.getOption("--grad_stepsize_scheme",
 			"Gradient step size updates scheme. Valid values are plain, <a>-2step or <a>-3step-<b>. Where <a> is the initial inflate and <b> is the final deflate factor.","");
 
-<<<<<<< HEAD
 	write_every_grad_iter = textToInteger(parser.getOption("--grad_write_iter", "Write out model every so many iterations in SGD (default is writing out all iters)", "10"));
-	do_init_blobs = !parser.checkOption("--no_init_blobs", "Use this to switch off initializing models with random Gaussians (which is new in relion-4.0).");
-=======
-	write_every_grad_iter = textToInteger(parser.getOption("--grad_write_iter", "Write out model every so many iterations during gradient refinement (default is writing out all iters)", "10"));
 	maximum_significants_arg = textToInteger(parser.getOption("--maxsig", "Maximum number of most significant poses & translations to consider", "-1"));
-	do_init_blobs = parser.checkOption("--init_blobs", "Initialize models with random Gaussians.");
->>>>>>> 482e6c8b9ee3bf188198b5e4721851329cf4981d
+	do_init_blobs = !parser.checkOption("--no_init_blobs", "Use this to switch off initializing models with random Gaussians (which is new in relion-4.0).");
 	do_som = parser.checkOption("--som", "Calculate self-organizing map instead of classification.");
 	som_starting_nodes = textToInteger(parser.getOption("--som_ini_nodes", "Number of initial SOM nodes.", "2"));
 	som_connectivity = textToFloat(parser.getOption("--som_connectivity", "Number of average active neighbour connections.", "5.0"));
