@@ -147,7 +147,7 @@ class star_handler_parameters
 		if (c != 1)
 		{
 			MetaDataTable MD;
-			read_check_ignore_optics(MD, fn_in);
+			read_check_ignore_optics(MD, fn_in, tablename_in);
 			write_check_ignore_optics(MD, fn_out, MD.getName());
 			//REPORT_ERROR("ERROR: specify (only and at least) one of the following options: --compare, --select, --select_by_str, --combine, --split, --operate, --center, --remove_column, --add_column, --hist_column or --remove_duplicates.");
 		}
@@ -202,11 +202,11 @@ class star_handler_parameters
 		EMDLabel label1, label2, label3;
 
 		// Read in the observationModel
-		read_check_ignore_optics(MD2, fn_compare);
+		read_check_ignore_optics(MD2, fn_compare, tablename_in);
 		// read_check_ignore_optics() overwrites the member variable obsModel (BAD DESIGN!)
 		// so we have to back up.
 		ObservationModel obsModelCompare = obsModel;
-		read_check_ignore_optics(MD1, fn_in);
+		read_check_ignore_optics(MD1, fn_in, tablename_in);
 
 		label1 = EMDL::str2Label(fn_label1);
 		label2 = (fn_label2 == "") ? EMDL_UNDEFINED : EMDL::str2Label(fn_label2);
@@ -232,7 +232,7 @@ class star_handler_parameters
 	{
 		MetaDataTable MDin, MDout;
 
-		read_check_ignore_optics(MDin, fn_in);
+		read_check_ignore_optics(MDin, fn_in, tablename_in);
 
 		MDout = subsetMetaDataTable(MDin, EMDL::str2Label(select_label), select_minval, select_maxval);
 
@@ -250,7 +250,7 @@ class star_handler_parameters
 
 		MetaDataTable MDin, MDout;
 
-		read_check_ignore_optics(MDin, fn_in);
+		read_check_ignore_optics(MDin, fn_in, tablename_in);
 
 		if (select_include_str != "")
 			MDout = subsetMetaDataTable(MDin, EMDL::str2Label(select_str_label), select_include_str, false);
@@ -265,7 +265,7 @@ class star_handler_parameters
 	void discard_on_image_stats()
 	{
 		MetaDataTable MDin, MDout;
-		read_check_ignore_optics(MDin, fn_in);
+		read_check_ignore_optics(MDin, fn_in, tablename_in);
 
 		std::cout << " Calculating average and stddev for all images ... " << std::endl;
 		time_config();
@@ -763,7 +763,7 @@ class star_handler_parameters
 	void split()
 	{
 		MetaDataTable MD;
-		read_check_ignore_optics(MD, fn_in);
+		read_check_ignore_optics(MD, fn_in, tablename_in);
 
 		// Randomise if neccesary
 		if (do_random_order)
@@ -865,7 +865,7 @@ class star_handler_parameters
 		}
 
 		MetaDataTable MD;
-		read_check_ignore_optics(MD, fn_in);
+		read_check_ignore_optics(MD, fn_in, tablename_in);
 
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 		{
@@ -1029,7 +1029,7 @@ class star_handler_parameters
 	void remove_column()
 	{
 		MetaDataTable MD;
-		read_check_ignore_optics(MD, fn_in);
+		read_check_ignore_optics(MD, fn_in, tablename_in);
 		MD.deactivateLabel(EMDL::str2Label(remove_col_label));
 		write_check_ignore_optics(MD, fn_out, MD.getName());
 		std::cout << " Written: " << fn_out << std::endl;
@@ -1047,7 +1047,7 @@ class star_handler_parameters
 		EMDLabel label = EMDL::str2Label(add_col_label);
 		EMDLabel source_label;
 
-		read_check_ignore_optics(MD, fn_in);
+		read_check_ignore_optics(MD, fn_in, tablename_in);
 		MD.addLabel(label);
 
 		if (add_col_from != "")
@@ -1112,7 +1112,7 @@ class star_handler_parameters
 
 		std::vector<RFLOAT> values;
 
-		read_check_ignore_optics(MD, fn_in);
+		read_check_ignore_optics(MD, fn_in, tablename_in);
 		if (!MD.containsLabel(label))
 			REPORT_ERROR("ERROR: The column specified in --hist_column is not present in the input STAR file.");
 
