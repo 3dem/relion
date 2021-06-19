@@ -4,6 +4,7 @@
 #include <src/jaz/math/fft.h>
 #include <src/jaz/util/log.h>
 #include <src/jaz/util/zio.h>
+#include <src/jaz/util/image_file_helper.h>
 #include <src/jaz/tomography/reconstruction.h>
 #include <src/jaz/tomography/optimisation_set.h>
 
@@ -19,8 +20,8 @@ void TomoReferenceMap::read(IOParser &parser)
 	maskFilename = parser.getOption("--mask", "Reference mask", "");
 	fscFilename = parser.getOption("--fsc", "Star file containing the FSC of the reference", "");
 
-	useFscThreshold = !parser.checkOption("--fsc_act", "Use the actual FSC as the frq. weight");
 	fscThresholdWidth = textToDouble(parser.getOption("--fsc_thresh_width", "Width of the frq. weight flank", "5"));
+	freqCutoff_A =  textToDouble(parser.getOption("--freq_cutoff", "Explicit cutoff frequency (in Å; negative to turn off)", "-1"));
 }
 
 void TomoReferenceMap::read(const OptimisationSet &optimisationSet)
@@ -30,8 +31,8 @@ void TomoReferenceMap::read(const OptimisationSet &optimisationSet)
 	maskFilename = optimisationSet.refMask;
 	fscFilename = optimisationSet.refFSC;
 
-	useFscThreshold = optimisationSet.useFscThreshold;
 	fscThresholdWidth = optimisationSet.fscThresholdWidth;
+	freqCutoff_A = optimisationSet.freqCutoff_A;
 }
 
 void TomoReferenceMap::load(int boxSize, int verbosity)
@@ -39,6 +40,7 @@ void TomoReferenceMap::load(int boxSize, int verbosity)
 	image_real.resize(2);
 	image_real[0].read(mapFilenames[0]);
 	image_real[1].read(mapFilenames[1]);
+
 
 	if (!image_real[0].hasEqualSize(image_real[1]))
 	{
@@ -66,6 +68,14 @@ void TomoReferenceMap::load(int boxSize, int verbosity)
 
 	const int s = boxSize < 0? image_real[0].xdim : boxSize;
 	const int sh = s/2 + 1;
+
+	int manual_cutoff_px = -1;
+
+	if (freqCutoff_A > 0)
+	{
+		const double pixelSize = ImageFileHelper::getSamplingRate(mapFilenames[0]);
+		manual_cutoff_px = s * pixelSize / freqCutoff_A;
+	}
 
 	if (image_real[0].xdim < s)
 	{
@@ -103,6 +113,8 @@ void TomoReferenceMap::load(int boxSize, int verbosity)
 		FFT::FourierTransform(image_real[i], image_FS[i], FFT::Both);
 		Centering::shiftInSitu(image_FS[i]);
 	}
+
+	int cutoff_px = -1;
 
 	if (fscFilename != "")
 	{
@@ -145,9 +157,24 @@ void TomoReferenceMap::load(int boxSize, int verbosity)
 		}
 
 		double scale = 2 * (sh_fsc - 1) / (double) s;
-
 		lastShell = (firstBad - 1) / scale;
 
+		if (manual_cutoff_px > 0 && manual_cutoff_px < lastShell)
+		{
+			cutoff_px = manual_cutoff_px;
+		}
+		else
+		{
+			cutoff_px = lastShell;
+		}
+	}
+	else
+	{
+		cutoff_px = manual_cutoff_px;
+	}
+
+	if (cutoff_px > 0)
+	{
 		freqWeight = BufferedImage<float>(sh,s);
 
 		for (int y = 0; y < s; y++)
@@ -156,30 +183,20 @@ void TomoReferenceMap::load(int boxSize, int verbosity)
 			double xx = x;
 			double yy = y < s/2? y : y - s;
 
-			double r = sqrt(xx*xx + yy*yy) * scale;
+			double r = sqrt(xx*xx + yy*yy);
 
-			if (useFscThreshold)
+			if (r < cutoff_px - fscThresholdWidth/2.0)
 			{
-				if (r < firstBad - fscThresholdWidth/2.0)
-				{
-					freqWeight(x,y) = 1.f;
-				}
-				else if (r < firstBad + fscThresholdWidth/2.0)
-				{
-					double t = (r - firstBad)/fscThresholdWidth + 0.5;
-					freqWeight(x,y) = 0.5 * (cos(PI*t) + 1);
-				}
-				else
-				{
-					freqWeight(x,y) = 0.f;
-				}
+				freqWeight(x,y) = 1.f;
+			}
+			else if (r < cutoff_px + fscThresholdWidth/2.0)
+			{
+				double t = (r - cutoff_px)/fscThresholdWidth + 0.5;
+				freqWeight(x,y) = 0.5 * (cos(PI*t) + 1);
 			}
 			else
 			{
-				int ri = (int)(scale*r+0.5);
-				if (ri >= sh_fsc) ri = sh_fsc-1;
-
-				freqWeight(x,y) = fsc[ri];
+				freqWeight(x,y) = 0.f;
 			}
 		}
 	}

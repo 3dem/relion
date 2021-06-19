@@ -50,7 +50,7 @@ void OptimisationSet::read(
 		refMask = parser.getOption("--mask", "Reference mask", "");
 		refFSC = parser.getOption("--fsc", "Star file containing the FSC of the reference", "");
 
-		useFscThreshold = !parser.checkOption("--fsc_act", "Use the actual FSC as the frq. weight");
+		freqCutoff_A =  textToDouble(parser.getOption("--freq_cutoff", "Explicit cutoff frequency (in Å; negative to turn off)", "-1"));
 		fscThresholdWidth = textToDouble(parser.getOption("--fsc_thresh_width", "Width of the frq. weight flank", "5"));
 	}
 

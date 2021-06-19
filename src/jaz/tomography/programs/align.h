@@ -31,7 +31,7 @@ class AlignProgram : public RefinementProgram
 		
 		
 			bool
-				do_motion, shiftOnly,
+				do_motion, shiftOnly, globalShift,
 				whiten, whiten_abs, outputShiftedCCs,
 				do_anisotropy, per_tilt_anisotropy,
 				do_deformation, debug;
