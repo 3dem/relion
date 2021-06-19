@@ -51,6 +51,8 @@ class AlignProgram : public RefinementProgram
 
 	protected:
 
+			std::vector<std::vector<Trajectory>> allTrajectories;
+
 		void parseInput();
 
 		void initialise();

@@ -71,19 +71,14 @@ void AlignProgram::parseInput()
 	per_tilt_anisotropy = parser.checkOption("--per_tilt_aniso", "Fit independent view anisotropy for each tilt image");
 	num_iters = textToInteger(parser.getOption("--it", "Max. number of iterations", "50000"));
 
-
 	int motion_section = parser.addSection("Motion estimation options");
 
 	do_motion = parser.checkOption("--motion", "Estimate particle motion (expensive)");
-
 	motionParameters.sig_vel = textToDouble(parser.getOption("--s_vel", "Velocity sigma [Å/dose]", "0.5"));
 	motionParameters.sig_div = textToDouble(parser.getOption("--s_div", "Divergence sigma [Å]", "5000.0"));
-
 	motionParameters.params_scaled_by_dose = !parser.checkOption("--abs_params", "Do not scale the sigmas by the dose");
-
 	motionParameters.sqExpKernel = parser.checkOption("--sq_exp_ker", "Use a square-exponential kernel instead of an exponential one");
 	motionParameters.maxEDs = textToInteger(parser.getOption("--max_ed", "Maximum number of eigendeformations", "-1"));
-
 
 	int deformation_section = parser.addSection("Deformation estimation options");
 
@@ -138,16 +133,16 @@ void AlignProgram::initialise()
 
 	if (do_motion)
 	{
-		ZIO::makeDir(outDir + "/Trajectories");
+		/*ZIO::makeDir(outDir + "/Trajectories");
 
 		int tpc = particleSet.getTotalParticleNumber();
 
 		if (particleSet.motionTrajectories.size() != tpc)
 		{
 			particleSet.motionTrajectories.resize(tpc);
-		}
+		}*/
 
-		for (int t = 0; t < tc; t++)
+		/*for (int t = 0; t < tc; t++)
 		{
 			int pc = particles[t].size();
 			if (pc == 0) continue;
@@ -163,7 +158,7 @@ void AlignProgram::initialise()
 			}
 		}
 
-		particleSet.hasMotion = true;
+		particleSet.hasMotion = true;*/
 	}
 
 	if (do_deformation && tomogramSet.globalTable.labelExists(EMDL_TOMO_DEFORMATION_GRID_SIZE_X))
@@ -193,6 +188,11 @@ void AlignProgram::finalise()
 {
 	const int tc = particles.size();
 
+	if (do_motion)
+	{
+		allTrajectories.resize(tc);
+	}
+
 	for (int t = 0; t < tc; t++)
 	{
 		int pc = particles[t].size();
@@ -206,7 +206,7 @@ void AlignProgram::finalise()
 	if (do_motion)
 	{
 		Trajectory::write(
-			particleSet.motionTrajectories, particleSet,
+			allTrajectories, particleSet,
 			particles, outDir + "motion.star");
 
 		optimisationSet.trajectories = outDir+"motion.star";
@@ -448,7 +448,7 @@ void AlignProgram::writeTempMotionData(
 	const std::string tomoName = tomogramSet.getTomogramName(t);
 	const std::string temp_filename_root = getTempFilenameRoot(tomoName);
 
-	Trajectory::write(traj, particleSet, {particles[t]}, temp_filename_root + "_motion.star");
+	Trajectory::write({traj}, particleSet, {particles[t]}, temp_filename_root + "_motion.star");
 }
 
 void AlignProgram::writeTempDeformationData(
@@ -510,21 +510,24 @@ void AlignProgram::readTempData(int t)
 
 		std::vector<MetaDataTable> mdts = MetaDataTable::readAll(ifs, pc+1);
 
+		allTrajectories[t].resize(pc);
+
 		for (int p = 0; p < pc; p++)
 		{
 			MetaDataTable& mdt = mdts[p+1];
 
 			int fc = mdt.numberOfObjects();
 
-			d3Vector shift;
+			allTrajectories[t][p].shifts_Ang.resize(fc);
 
 			for (int f = 0; f < fc; f++)
-			{
+			{				
+				d3Vector shift;
 				mdt.getValueSafely(EMDL_ORIENT_ORIGIN_X_ANGSTROM, shift.x, f);
 				mdt.getValueSafely(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, shift.y, f);
 				mdt.getValueSafely(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, shift.z, f);
 
-				particleSet.motionTrajectories[particles[t][p].value].shifts_Ang[f] = shift;
+				allTrajectories[t][p].shifts_Ang[f] = shift;
 			}
 		}
 	}
