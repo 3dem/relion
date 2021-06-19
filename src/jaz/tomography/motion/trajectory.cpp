@@ -106,7 +106,13 @@ void Trajectory::write(
 		const std::vector<std::vector<ParticleIndex>>& particles,
 		std::string filename)
 {
-	const int pc = shifts.size();
+	const int tc = particles.size();
+	int pc = 0;
+
+	for (int t = 0; t < tc; t++)
+	{
+		pc += shifts[t].size();
+	}
 
 	std::string path = filename.substr(0, filename.find_last_of('/'));
 	mktree(path);
@@ -121,9 +127,6 @@ void Trajectory::write(
 
 	mdt.write(ofs);
 	mdt.clear();
-
-	const int tc = particles.size();
-
 
 	for (int t = 0; t < tc; t++)
 	for (int pp = 0; pp < particles[t].size(); pp++)
