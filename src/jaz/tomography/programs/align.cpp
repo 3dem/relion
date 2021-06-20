@@ -61,8 +61,8 @@ void AlignProgram::parseInput()
 
 	int alignment_section = parser.addSection("General alignment options");
 
-	shiftOnly = parser.checkOption("--shift_only", "Only apply an optimal rigid shift to each frame (no iterative optimisation)");
-	globalShift = parser.checkOption("--glob_shift", "Estimate shift globally by predicting an entire micrograph");
+	shiftOnly = parser.checkOption("--shift_only", "Only apply an optimal rigid shift to each frame (no iterative optimisation; useful for very badly aligned frames)");
+	globalShift = !parser.checkOption("--shift_only_by_particles", "Estimate rigid shift by aligning only the particles instead of by predicting entire micrographs");
 	range = textToInteger(parser.getOption("--r", "Max. particle shift allowed [Pixels]", "20"));
 	alignmentSettings.constParticles = parser.checkOption("--const_p", "Keep the particle positions constant");
 	alignmentSettings.constAngles = parser.checkOption("--const_a", "Keep the frame angles constant");
@@ -70,7 +70,7 @@ void AlignProgram::parseInput()
 	alignmentSettings.rangeRegulariser = textToDouble(parser.getOption("--range_reg", "Value of the range regulariser", "0.0"));
 	do_anisotropy = parser.checkOption("--aniso", "Assume an anisotropic projection model");
 	per_tilt_anisotropy = parser.checkOption("--per_tilt_aniso", "Fit independent view anisotropy for each tilt image");
-	num_iters = textToInteger(parser.getOption("--it", "Max. number of iterations", "50000"));
+	num_iters = textToInteger(parser.getOption("--it", "Max. number of iterations", "10000"));
 
 	int motion_section = parser.addSection("Motion estimation options");
 
@@ -119,8 +119,6 @@ void AlignProgram::parseInput()
 void AlignProgram::initialise()
 {
 	RefinementProgram::init();
-
-	const int tc = particles.size();
 
 	if (verbosity > 0)
 	{
@@ -310,11 +308,11 @@ void AlignProgram::processTomograms(
 						allCCs = BufferedImage<float>(w0,h0,fc);
 					}
 
+					#pragma omp parallel for num_threads(num_threads)
 					for (int f = 0; f < fc; f++)
 					{
 						RawImage<float> obs_slice = tomogram.stack.getSliceRef(f);
 						const RawImage<float> dose_slice = doseWeights.getConstSliceRef(f);
-
 
 						BufferedImage<float> pred_slice(w0,h0);
 
@@ -342,17 +340,14 @@ void AlignProgram::processTomograms(
 						BufferedImage<float> CC;
 						FFT::inverseFourierTransform(CC_hat, CC);
 
+						CC = Centering::fftwFullToHumanFull(CC);
+
 						if (diag)
 						{
 							allCCs.getSliceRef(f).copyFrom(CC);
 						}
 
-						d2Vector opt = Interpolation::quadraticMaxXY(CC);
-
-						if (opt.x > w0 / 2) opt.x -= w0;
-						if (opt.y > h0 / 2) opt.y -= h0;
-
-						std::cout << f << ": " << opt << std::endl;
+						d2Vector opt = Interpolation::quadraticMaxXY(CC) - d2Vector(w0/2, h0/2);
 
 						shifts[f] = opt;
 					}
