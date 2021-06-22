@@ -311,6 +311,9 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 			if (ret == 1)
 			{
 				touch(fn_lock);
+				// make the runfile temp dir for the ccpem pipeliner
+				std::string dircom = "mkdir -p .TMP_runfiles";
+				system(dircom.c_str());
 			}
 			else
 			{
@@ -1632,7 +1635,7 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 	// Select this job now
 	if (use_ccpem_pipeliner)
 	{
-		sleep(10);
+		sleep(5); // make sure the pipeline has started running before updating
 		cb_reread_pipeline_i();
 		//loadJobFromPipeline(current_job);
 	}
