@@ -571,7 +571,11 @@ bool PipeLine::runJobCpipe(RelionJob &_job, int &current_job, bool only_schedule
                       bool is_scheduled, std::string &error_message)
 {
 	makeJobFilesCpipe(_job, current_job, only_schedule, is_main_continue, is_scheduled, error_message);
-
+	int mynewstatus;
+	if (only_schedule)
+		mynewstatus = PROC_SCHEDULED;
+	else
+		mynewstatus = PROC_RUNNING;	current_job = addJob(_job, mynewstatus);
 	if (only_schedule)
 	{
 		if (!is_main_continue)
