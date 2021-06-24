@@ -1125,7 +1125,7 @@ void PipeLine::deleteNodesAndProcesses(std::vector<bool> &deleteNodes, std::vect
 			FileName fn_tree="Trash/" + firstdirs;
 			int res = mktree(fn_tree);
 			// Remove existing Trash directory if it exists, otherwise mv will fail
-			std::string command = "rm -rf Trash/" + firstdirs + "; mv -f " + alldirs + " " + "Trash/" + firstdirs + "/. ; rm -rf " + alldirs;
+			std::string command = "rm -rf Trash/" + alldirs + "; mv -f " + alldirs + " " + "Trash/" + firstdirs + "/. ; rm -rf " + alldirs;
 			res = system(command.c_str());
 			// Also remove the symlink if it exists
 			FileName fn_alias = (processList[i]).alias;
@@ -2284,3 +2284,4 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 	// Touch a file to indicate to the GUI that the pipeline has just changed
 	touch(PIPELINE_HAS_CHANGED);
 }
+                                                      
