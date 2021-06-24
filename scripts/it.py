@@ -437,10 +437,10 @@ class RelionItGui(object):
 
         row += 1
 
-        tk.Label(self.particle_frame, text=u"Shortest diameter (\u212B):").grid(row=row, sticky=tk.W)
-        self.particle_min_diam_entry = tk.Entry(self.particle_frame, bg=entry_bg)
-        self.particle_min_diam_entry.grid(row=row, column=1, sticky=tk.W+tk.E, columnspan=2)
-        self.particle_min_diam_entry.insert(0, str(options['proc__inipicker__log_diam_min']))
+        tk.Label(self.particle_frame, text=u"Circularity:").grid(row=row, sticky=tk.W)
+        self.particle_circularity_entry = tk.Entry(self.particle_frame, bg=entry_bg)
+        self.particle_circularity_entry.grid(row=row, column=1, sticky=tk.W+tk.E, columnspan=2)
+        self.particle_circularity_entry.insert(0, str(float(options['proc__inipicker__log_diam_min'])/float(options['proc__inipicker__log_diam_max'])))
 
         row += 1
         
@@ -810,13 +810,15 @@ class RelionItGui(object):
                 raise ValueError("Particle longest diameter must be a number")
 
         try:
-            opts['proc__inipicker__log_diam_min'] = float(self.particle_min_diam_entry.get())
+            opts['proc__inipicker__log_diam_min'] = float(self.particle_circularity_entry.get()) * float(self.particle_max_diam_entry.get())
         except ValueError:
-            if len(self.particle_min_diam_entry.get()) == 0 and (not self.get_var_as_bool(self.do_2d_var) or not self.get_var_as_bool(self.do_retrain_topaz_var)):
+            if len(self.particle_circularity_entry.get()) == 0 and (not self.get_var_as_bool(self.do_2d_var) or not self.get_var_as_bool(self.do_retrain_topaz_var)):
                 # This was left blank and won't be used, set to zero to avoid errors in calculations later
                 opts['proc__inipicker__log_diam_min'] = 0.0
             else:
-                raise ValueError("Particle shortest diameter must be a number")
+                raise ValueError("Circularity must be a number from 0 to 1")
+        if (opts['proc__inipicker__log_diam_min']  < 0. or opts['proc__inipicker__log_diam_min'] > opts['proc__inipicker__log_diam_max']):
+            warnings.append("- Circularity should be positive between 0 and 1 (thin -> circular particles)")
 
         try:
             opts['proc__class2d_ini__particle_diameter'] = float(self.mask_diameter_entry.get())
