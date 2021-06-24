@@ -374,7 +374,7 @@ public:
 
 	// Automatically select classes
     RFLOAT select_min_score, select_max_score;
-    int select_min_classes;
+    int select_min_classes, select_min_parts;
 
     // Save some time by limiting calculations
 	int only_use_this_class;

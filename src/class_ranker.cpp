@@ -393,7 +393,8 @@ void ClassRanker::read(int argc, char **argv, int rank)
 	do_select = parser.checkOption("--auto_select", "Perform auto-selection of particles based on below thresholds for the score");
 	select_min_score = textToFloat(parser.getOption("--min_score", "Minimum selected score to be included in class selection", "0.5"));
 	select_max_score = textToFloat(parser.getOption("--max_score", "Maximum selected score to be included in class selection", "999."));
-	select_min_classes = textToInteger(parser.getOption("--select_min_nr_classes", "Select at least this many classes, regardless of their score", "1"));
+	select_min_parts = textToInteger(parser.getOption("--select_min_nr_particles", "select at least this many particles, regardless of their class score", "-1"));
+	select_min_classes = textToInteger(parser.getOption("--select_min_nr_classes", "OR: Select at least this many classes, regardless of their score", "-1"));
 	do_relative_threshold = parser.checkOption("--relative_thresholds", "If true, interpret the above min and max_scores as fractions of the maximum score of all predicted classes in the input");
 	fn_sel_parts = parser.getOption("--fn_sel_parts", "Filename for output star file with selected particles", "particles.star");
 	fn_sel_classavgs = parser.getOption("--fn_sel_classavgs", "Filename for output star file with selected class averages", "class_averages.star");
@@ -1957,8 +1958,6 @@ void ClassRanker::performRanking()
 
 	MetaDataTable MDselected_particles, MDselected_classavgs;
 
-	long int nr_sel_parts = 0;
-	long int nr_sel_classavgs = 0;
 	RFLOAT highscore = 0.0;
 	std::vector<int> selected_classes;
 	std::vector<float> scores(features_all_classes.size());
@@ -2000,11 +1999,15 @@ void ClassRanker::performRanking()
 		MDbackup.setValue(EMDL_SELECTED, 0);
 	}
 
+	long int nr_sel_parts = 0;
+	long int nr_sel_classavgs = 0;
 	for (int i = 0; i < features_all_classes.size(); i++)
 	{
 		if (do_select && scores[i] >= my_min && scores[i] <= my_max)
 		{
 			nr_sel_classavgs++;
+			nr_sel_parts+= features_all_classes[i].particle_nr;
+
 			selected_classes.push_back(features_all_classes[i].class_index);
 
 			MDselected_classavgs.addObject();
@@ -2023,36 +2026,70 @@ void ClassRanker::performRanking()
 		predicted_scores.at(iclass) = scores[i];
 	}
 
-	if (nr_sel_classavgs < select_min_classes)
+	// Select a minimum number of particles or classes
+	if (do_select && (nr_sel_parts < select_min_parts || nr_sel_classavgs < select_min_classes) )
 	{
-		// Just take the select_min_classes number of classes with the largest score...
-		MultidimArray<RFLOAT> Mscores(scores.size());
-		MultidimArray<long> Msorted_index(scores.size());
-		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(Mscores)
-		{
-			DIRECT_A1D_ELEM(Mscores, i) = scores[i];
-		}
-		Mscores.sorted_index(Msorted_index);
-		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(Msorted_index)
-		{
-			if (scores.size() - DIRECT_A1D_ELEM(Msorted_index, i) <= select_min_classes)
-			{
-				nr_sel_classavgs++;
-				selected_classes.push_back(features_all_classes[i].class_index);
+		std::vector<std::pair<float, int> > vp;
 
-				MDselected_classavgs.addObject();
-				MDselected_classavgs.setValue(EMDL_MLMODEL_REF_IMAGE, features_all_classes[i].name);
-				MDselected_classavgs.setValue(EMDL_CLASS_PREDICTED_SCORE, scores[i]);
-				MDselected_classavgs.setValue(EMDL_MLMODEL_PDF_CLASS, features_all_classes[i].class_distribution);
-				MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_ROT, features_all_classes[i].accuracy_rotation);
-				MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, features_all_classes[i].accuracy_translation);
-				MDselected_classavgs.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, features_all_classes[i].estimated_resolution);
+	    for (int i = 0; i < scores.size(); i++)
+	    {
+	        vp.push_back(std::make_pair(scores[i], i));
+	    }
+	    std::sort(vp.begin(), vp.end());
 
-				MDbackup.setValue(EMDL_SELECTED, 1, features_all_classes[i].class_index - 1 );
-			}
-		}
+	    // Go from best classes down to worst
+	    for (int idx = scores.size() - 1; idx >=0 ; idx--)
+	    {
+	    	int i = vp[idx].second;
+    		float myscore = scores[i];
+    		// only consider classes that we haven't considered yet
+    		if (!(scores[i] >= my_min && scores[i] <= my_max))
+    		{
+    			if (nr_sel_parts < select_min_parts)
+				{
+
+    				nr_sel_classavgs++;
+    				nr_sel_parts+= features_all_classes[i].particle_nr;
+
+    				selected_classes.push_back(features_all_classes[i].class_index);
+
+    				MDselected_classavgs.addObject();
+    				MDselected_classavgs.setValue(EMDL_MLMODEL_REF_IMAGE, features_all_classes[i].name);
+    				MDselected_classavgs.setValue(EMDL_CLASS_PREDICTED_SCORE, scores[i]);
+    				MDselected_classavgs.setValue(EMDL_MLMODEL_PDF_CLASS, features_all_classes[i].class_distribution);
+    				MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_ROT, features_all_classes[i].accuracy_rotation);
+    				MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, features_all_classes[i].accuracy_translation);
+    				MDselected_classavgs.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, features_all_classes[i].estimated_resolution);
+
+    				MDbackup.setValue(EMDL_SELECTED, 1, features_all_classes[i].class_index - 1 );
+
+					if (nr_sel_parts >= select_min_parts) break;
+				}
+				else if (nr_sel_classavgs < select_min_classes)
+				{
+
+					nr_sel_classavgs++;
+					nr_sel_parts+= features_all_classes[i].particle_nr;
+
+					selected_classes.push_back(features_all_classes[i].class_index);
+
+					MDselected_classavgs.addObject();
+					MDselected_classavgs.setValue(EMDL_MLMODEL_REF_IMAGE, features_all_classes[i].name);
+					MDselected_classavgs.setValue(EMDL_CLASS_PREDICTED_SCORE, scores[i]);
+					MDselected_classavgs.setValue(EMDL_MLMODEL_PDF_CLASS, features_all_classes[i].class_distribution);
+					MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_ROT, features_all_classes[i].accuracy_rotation);
+					MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, features_all_classes[i].accuracy_translation);
+					MDselected_classavgs.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, features_all_classes[i].estimated_resolution);
+
+					MDbackup.setValue(EMDL_SELECTED, 1, features_all_classes[i].class_index - 1 );
+
+					if (nr_sel_classavgs >= select_min_classes) break;
+				}
+    		}
+	    }
 
 	}
+
 
 	// Write optimiser.star and model.star in the output directory.
 	FileName fn_opt_out, fn_model_out, fn_data_out;
@@ -2093,6 +2130,7 @@ void ClassRanker::performRanking()
 	{
 
 		// Select all particles in the data.star that have classes inside the selected_classes vector
+		nr_sel_parts = 0;
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(mydata.MDimg)
 		{
 			int classnr;

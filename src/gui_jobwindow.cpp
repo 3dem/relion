@@ -1085,6 +1085,8 @@ void JobWindow::initialiseSelectWindow()
 	place("do_class_ranker", TOGGLE_DEACTIVATE, group6);
 	group6->begin();
 	place("rank_threshold", TOGGLE_DEACTIVATE);
+	place("select_nr_parts", TOGGLE_DEACTIVATE);
+	place("select_nr_classes", TOGGLE_DEACTIVATE);
 	place("python_exe", TOGGLE_DEACTIVATE);
 
 	group6->end();

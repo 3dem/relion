@@ -2567,6 +2567,9 @@ void RelionJob::initialiseSelectJob()
 
 	joboptions["do_class_ranker"] = JobOption("Automatically select 2D classes?", false, "If set to True, the class_ranker program will be used to make an automated class selection, based on the parameters below. This option only works when selecting classes from a relion_refine job (input optimiser.star on the I.O tab)");
 	joboptions["rank_threshold"] = JobOption("Minimum threshold for auto-selection: ", 0.5, 0, 1, 0.05, "Only classes with a pre dicted threshold above this value will be selected.");
+	joboptions["select_nr_parts"] = JobOption("Select at least this many particles: ", -1, -1, 10000, 500, "Even if they have scores below the minimum threshold, select at least this many particles with the best scores.");
+	joboptions["select_nr_classes"] = JobOption("OR: select at lest this many classes: ", -1, -1, 24, 1, "Even if they have scores below the minimum threshold, select at least this many classes with the best scores.");
+
 	joboptions["python_exe"] = JobOption("Python executable: ", (std::string)"python", "This version of python should include torch and numpy. We have found that the one from topaz (which is also used for auto-picking) works well. At the LMB, it is here: /public/EM/anaconda3/envs/topaz/bin/python");
 
 	joboptions["do_recenter"] = JobOption("Re-center the class averages?", true, "This option is only used when selecting particles from 2D classes. The selected class averages will all re-centered on their center-of-mass. This is useful when you plane to use these class averages as templates for auto-picking.");
@@ -2782,6 +2785,15 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 			command += " --o " + outputname + " --fn_sel_parts particles.star --fn_sel_classavgs class_averages.star";
 
 			command += " --python " + joboptions["python_exe"].getString();
+
+			if (joboptions["select_nr_parts"].getNumber(error_message) > 0)
+			{
+				command += " --select_min_nr_particles " + joboptions["select_nr_parts"].getString();
+			}
+			else if (joboptions["select_nr_classes"].getNumber(error_message) > 0)
+			{
+				command += " --select_min_nr_classes " + joboptions["select_nr_classes"].getString();
+			}
 
 			FileName fn_parts = outputname+"particles.star";
 			Node node2(fn_parts, LABEL_SELECT_PARTS);
