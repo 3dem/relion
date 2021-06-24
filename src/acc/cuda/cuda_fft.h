@@ -57,6 +57,8 @@ public:
 	    odist(0),
 	    istride(1),
 	    ostride(1),
+		inembed(),
+		onembed(),
 		planSet(false),
 		xSize(0), ySize(0), zSize(0),
 		xFSize(0), yFSize(0), zFSize(0),
@@ -76,7 +78,7 @@ public:
 	{
 		size_t needed(0);
 
-	    size_t biggness;
+	    size_t biggness(0);
 
 #ifdef ACC_DOUBLE_PRECISION
 	    if(direction<=0)
