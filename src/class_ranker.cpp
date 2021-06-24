@@ -393,6 +393,7 @@ void ClassRanker::read(int argc, char **argv, int rank)
 	do_select = parser.checkOption("--auto_select", "Perform auto-selection of particles based on below thresholds for the score");
 	select_min_score = textToFloat(parser.getOption("--min_score", "Minimum selected score to be included in class selection", "0.5"));
 	select_max_score = textToFloat(parser.getOption("--max_score", "Maximum selected score to be included in class selection", "999."));
+	select_min_classes = textToInteger(parser.getOption("--select_min_nr_classes", "Select at least this many classes, regardless of their score", "1"));
 	do_relative_threshold = parser.checkOption("--relative_thresholds", "If true, interpret the above min and max_scores as fractions of the maximum score of all predicted classes in the input");
 	fn_sel_parts = parser.getOption("--fn_sel_parts", "Filename for output star file with selected particles", "particles.star");
 	fn_sel_classavgs = parser.getOption("--fn_sel_classavgs", "Filename for output star file with selected class averages", "class_averages.star");
@@ -533,14 +534,19 @@ void ClassRanker::initialise()
 			// Read in particles (otherwise wait until haveAllAccuracies or performRanking, as Liyi sometimes doesn't need mydata)
 			mydata.read(fn_data, true, true); // true true means: ignore particle_name and group name!
 			total_nr_particles = mydata.numberOfParticles(0);
-			if (debug>0) std::cerr << "Done with reading data.star ..." << std::endl;
 
 		}
 		else
 		{
 			MetaDataTable MDtmp;
 			total_nr_particles = MDtmp.read(fn_data, "particles", true); // true means do_only_count
+			if (total_nr_particles == 0)
+			{
+				// Try again with old-style data.star file
+				total_nr_particles = MDtmp.read(fn_data, "", true); // true means do_only_count
+			}
 		}
+		if (debug>0) std::cerr << "Done with reading data.star ... total_nr_particles= " << total_nr_particles << std::endl;
 
 		if (intact_ctf_first_peak && !only_do_subimages)
 		{
@@ -685,6 +691,10 @@ MultidimArray<RFLOAT> ClassRanker::getSubimages(MultidimArray<RFLOAT> &img, int 
 	newimg.setXmippOrigin();
 
 	// Data augmentation: rotate and flip
+	MultidimArray<RFLOAT> subimages;
+	subimages = newimg;
+
+	/* Do data augmentation in pytorch
 	MultidimArray<RFLOAT> subimages(8, 1, IMGSIZE, IMGSIZE);
 	subimages.setImage(0, newimg);
 	rotation2DMatrix(90., A);
@@ -712,6 +722,7 @@ MultidimArray<RFLOAT> ClassRanker::getSubimages(MultidimArray<RFLOAT> &img, int 
 	rotation2DMatrix(270., A);
 	applyGeometry(newimg2, newimg, A, false, false);
 	subimages.setImage(7, newimg);
+	*/
 
 	/*
 	// TODO: make the if statement for only making subimages for classes with non-zero protein area inside this function
@@ -2010,6 +2021,37 @@ void ClassRanker::performRanking()
 		// Set myscore in the vector that now runs over ALL classes (including empty ones)
 		int iclass = features_all_classes[i].class_index - 1; // class counting in STAR files starts at 1!
 		predicted_scores.at(iclass) = scores[i];
+	}
+
+	if (nr_sel_classavgs < select_min_classes)
+	{
+		// Just take the select_min_classes number of classes with the largest score...
+		MultidimArray<RFLOAT> Mscores(scores.size());
+		MultidimArray<long> Msorted_index(scores.size());
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(Mscores)
+		{
+			DIRECT_A1D_ELEM(Mscores, i) = scores[i];
+		}
+		Mscores.sorted_index(Msorted_index);
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(Msorted_index)
+		{
+			if (scores.size() - DIRECT_A1D_ELEM(Msorted_index, i) <= select_min_classes)
+			{
+				nr_sel_classavgs++;
+				selected_classes.push_back(features_all_classes[i].class_index);
+
+				MDselected_classavgs.addObject();
+				MDselected_classavgs.setValue(EMDL_MLMODEL_REF_IMAGE, features_all_classes[i].name);
+				MDselected_classavgs.setValue(EMDL_CLASS_PREDICTED_SCORE, scores[i]);
+				MDselected_classavgs.setValue(EMDL_MLMODEL_PDF_CLASS, features_all_classes[i].class_distribution);
+				MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_ROT, features_all_classes[i].accuracy_rotation);
+				MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, features_all_classes[i].accuracy_translation);
+				MDselected_classavgs.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, features_all_classes[i].estimated_resolution);
+
+				MDbackup.setValue(EMDL_SELECTED, 1, features_all_classes[i].class_index - 1 );
+			}
+		}
+
 	}
 
 	// Write optimiser.star and model.star in the output directory.
