@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
 		}
 
 
-		int nfc  = 0;
+		int new_frame_count = 0;
 		i2Vector movie_size(-1,-1);
 		std::vector<int> frames_by_tilt(fc);
 
@@ -116,7 +116,7 @@ int main(int argc, char *argv[])
 				pixel_size = ImageFileHelper::getSamplingRate(movie_file);
 			}
 
-			nfc += size.z;
+			new_frame_count += size.z;
 
 			if (movie_size.x < 0)
 			{
@@ -153,7 +153,7 @@ int main(int argc, char *argv[])
 
 
 
-		BufferedImage<short int> new_stack(movie_size.x, movie_size.y, nfc);
+		BufferedImage<short int> new_stack(movie_size.x, movie_size.y, new_frame_count);
 		const std::string out_file = out_path + "TiltSeries/" + tomo_name + ".mrc";
 
 		if (write_stack)
@@ -195,12 +195,17 @@ int main(int argc, char *argv[])
 		}
 
 		new_tomogram_set.globalTable.setValue(EMDL_TOMO_TILT_SERIES_NAME, out_file, t);
+		new_tomogram_set.globalTable.setValue(EMDL_TOMO_FRAME_COUNT, new_frame_count, t);
+
+		const double fdose0 = tomogram_set.globalTable.getDouble(EMDL_TOMO_IMPORT_FRACT_DOSE, t);
+		new_tomogram_set.globalTable.setValue(EMDL_TOMO_IMPORT_FRACT_DOSE, fdose0 / frames_by_tilt[0], t);
 
 
 		MetaDataTable& new_table = new_tomogram_set.tomogramTables[t];
 		MetaDataTable& old_table = tomogram_set.tomogramTables[t];
 
 		new_table.clear();
+		new_table.setName(old_table.getName());
 
 		for (int f = 0; f < fc; f++)
 		{
