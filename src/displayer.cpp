@@ -2253,8 +2253,8 @@ int displayerGuiWindow::fill(FileName &_fn_in)
 		reverse_sort_button->color(GUI_INPUT_COLOR);
 		apply_orient_button  = new Fl_Check_Button(x, y, inputwidth, height, "Apply orientations?");
 		apply_orient_button->color(GUI_INPUT_COLOR);
-		read_whole_stack_button = new Fl_Check_Button(x+160, y, inputwidth, height, "Read whole stacks?");
-		read_whole_stack_button->color(GUI_INPUT_COLOR);
+		display_label_button = new Fl_Check_Button(x+160, y, inputwidth, height, "Display label?");
+		display_label_button->color(GUI_INPUT_COLOR);
 		y += ROUND(1.75*ystep);
 
 	}
@@ -2465,8 +2465,11 @@ void displayerGuiWindow::cb_display_i()
 			}
 		}
 
-		if (getValue(read_whole_stack_button))
-			cl += " --read_whole_stack ";
+		if (getValue(display_label_button))
+		{
+			const Fl_Menu_Item* m2 = sort_choice->mvalue();
+			cl += " --text_label " + (std::string)m2->label();
+		}
 
 		if (getValue(apply_orient_button))
 			cl += " --apply_orient ";
