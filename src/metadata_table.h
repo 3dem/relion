@@ -303,10 +303,15 @@ public:
 	 *
 	 * If no data block is found the function will return 0 and the MetaDataTable remains empty
 	 */
-	
+
 	static std::vector<MetaDataTable> readAll(
-			std::ifstream& in, 
-			int expectedNumber = 0, 
+			const std::string& in,
+			int expectedNumber = 0,
+			bool do_only_count = false);
+
+	static std::vector<MetaDataTable> readAll(
+			std::ifstream& in,
+			int expectedNumber = 0,
 			bool do_only_count = false);
 
 	long int readStar(std::ifstream& in, const std::string &name = "", bool do_only_count = false);
