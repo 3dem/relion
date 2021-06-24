@@ -97,6 +97,8 @@ d2Vector TomoIsoMagFit::computeErrorAndSlope(
 		const d3Vector pos = particleSet.getPosition(particle_id);
 		const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
 					particle_id, fc, pixelSize0);
+		
+		const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s/2.0);
 
 		d4Matrix projCut;
 
@@ -108,8 +110,10 @@ d2Vector TomoIsoMagFit::computeErrorAndSlope(
 
 		for (int f = first_frame; f <= last_frame; f++)
 		{
+			if (!isVisible[f]) continue;
+			
 			TomoExtraction::extractFrameAt3D_Fourier(
-					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f],
+					tomogram.stack, f, s, 1.0, tomogram,
 					traj[f], observation, projCut, 1, true);
 
 
@@ -279,6 +283,8 @@ BufferedImage<Equation2x2> TomoAnisoMagFit::computeEquations()
 		const d3Vector pos = particleSet.getPosition(particle_id);
 		const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
 					particle_id, fc, pixelSize);
+		
+		const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s/2.0);
 
 		d4Matrix projCut;
 
@@ -286,8 +292,10 @@ BufferedImage<Equation2x2> TomoAnisoMagFit::computeEquations()
 
 		for (int f = first_frame; f <= last_frame; f++)
 		{
+			if (!isVisible[f]) continue;
+			
 			TomoExtraction::extractFrameAt3D_Fourier(
-					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f],
+					tomogram.stack, f, s, 1.0, tomogram,
 					traj[f], observation, projCut, 1, true);
 
 			observation *= -1.f;
@@ -364,6 +372,8 @@ std::vector<BufferedImage<Equation2x2>> TomoAnisoMagFit::computeEquations_even_o
 		const d3Vector pos = particleSet.getPosition(particle_id);
 		const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
 					particle_id, fc, pixelSize);
+		
+		const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s/2.0);
 
 		d4Matrix projCut;
 
@@ -371,8 +381,10 @@ std::vector<BufferedImage<Equation2x2>> TomoAnisoMagFit::computeEquations_even_o
 
 		for (int f = first_frame; f <= last_frame; f++)
 		{
+			if (!isVisible[f]) continue;
+			
 			TomoExtraction::extractFrameAt3D_Fourier(
-					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f],
+					tomogram.stack, f, s, 1.0, tomogram,
 					traj[f], observation, projCut, 1, true);
 
 			observation *= -1.f;
@@ -481,6 +493,8 @@ double TomoAnisoMagFit::evaluateMag(const d2Matrix& M)
 		const d3Vector pos = particleSet.getPosition(particle_id);
 		const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
 					particle_id, fc, pixelSize);
+		
+		const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s/2.0);
 
 		d4Matrix projCut;
 
@@ -488,8 +502,10 @@ double TomoAnisoMagFit::evaluateMag(const d2Matrix& M)
 
 		for (int f = first_frame; f <= last_frame; f++)
 		{
+			if (!isVisible[f]) continue;
+			
 			TomoExtraction::extractFrameAt3D_Fourier(
-					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f],
+					tomogram.stack, f, s, 1.0, tomogram,
 					traj[f], observation, projCut, 1, true);
 
 			const d4Matrix particleToTomo = particleSet.getMatrix4x4(

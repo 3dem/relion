@@ -15,9 +15,8 @@
 GPMotionModel::GPMotionModel(
 	const ParticleSet& dataSet,
 	const std::vector<ParticleIndex>& partIndices,
-    const Tomogram& tomogram,  
-	MotionParameters motionParameters,   
-	Settings settings,
+	const Tomogram& tomogram,
+	Parameters parameters,
 	bool verbose)
 {	
 	pc = partIndices.size();
@@ -33,15 +32,15 @@ GPMotionModel::GPMotionModel(
 	
 	double sig_vel_px, sig_div_px;
 	
-	if (settings.params_scaled_by_dose)
+	if (parameters.params_scaled_by_dose)
 	{
-		sig_vel_px = frame_dose * motionParameters.sig_vel / pixel_size;
-		sig_div_px = frame_dose * motionParameters.sig_div / pixel_size;
+		sig_vel_px = frame_dose * parameters.sig_vel / pixel_size;
+		sig_div_px = frame_dose * parameters.sig_div / pixel_size;
 	}
 	else
 	{
-		sig_vel_px = motionParameters.sig_vel / pixel_size;		
-		sig_div_px = motionParameters.sig_div / pixel_size;
+		sig_vel_px = parameters.sig_vel / pixel_size;
+		sig_div_px = parameters.sig_div / pixel_size;
 	}
 	
 	if (verbose)
@@ -56,7 +55,7 @@ GPMotionModel::GPMotionModel(
 	
 	GpKernel* kernel(0);
 	
-	if (settings.sqExpKernel)
+	if (parameters.sqExpKernel)
 	{
 		kernel = new SquareExponentialKernel(sig_vel_px, sig_div_px);
 	}
@@ -74,7 +73,7 @@ GPMotionModel::GPMotionModel(
 		Log::print("Decomposing covariance matrix");
 	}
 	
-	GaussianProcess::Basis defBasis = GaussianProcess::getBasis(C, settings.maxEDs);
+	GaussianProcess::Basis defBasis = GaussianProcess::getBasis(C, parameters.maxEDs);
 	
 	deformationBasis = defBasis.eigenvectors;
 	deformationLambda = defBasis.eigenvalues;

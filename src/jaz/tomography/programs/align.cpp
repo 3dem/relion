@@ -28,7 +28,7 @@ using namespace gravis;
 
 
 AlignProgram::AlignProgram(int argc, char *argv[])
-	: RefinementProgram(argc, argv)
+	: RefinementProgram(argc, argv), debug(true)
 {
 }
 
@@ -61,28 +61,34 @@ void AlignProgram::parseInput()
 
 	int alignment_section = parser.addSection("General alignment options");
 
-	shiftOnly = parser.checkOption("--shift_only", "Only apply an optimal rigid shift to each frame (no iterative optimisation)");
+	shiftOnly = parser.checkOption("--shift_only", "Only apply an optimal rigid shift to each frame (no iterative optimisation; useful for very badly aligned frames)");
+	globalShift = !parser.checkOption("--shift_only_by_particles", "Estimate rigid shift by aligning only the particles instead of by predicting entire micrographs");
 	range = textToInteger(parser.getOption("--r", "Max. particle shift allowed [Pixels]", "20"));
-	mfSettings.constParticles = parser.checkOption("--const_p", "Keep the particle positions constant");
-	mfSettings.constAngles = parser.checkOption("--const_a", "Keep the frame angles constant");
-	mfSettings.constShifts = parser.checkOption("--const_s", "Keep the frame shifts constant");
+	alignmentSettings.constParticles = parser.checkOption("--const_p", "Keep the particle positions constant");
+	alignmentSettings.constAngles = parser.checkOption("--const_a", "Keep the frame angles constant");
+	alignmentSettings.constShifts = parser.checkOption("--const_s", "Keep the frame shifts constant");
+	alignmentSettings.rangeRegulariser = textToDouble(parser.getOption("--range_reg", "Value of the range regulariser", "0.0"));
 	do_anisotropy = parser.checkOption("--aniso", "Assume an anisotropic projection model");
 	per_tilt_anisotropy = parser.checkOption("--per_tilt_aniso", "Fit independent view anisotropy for each tilt image");
-	num_iters = textToInteger(parser.getOption("--it", "Max. number of iterations", "5000"));
-
+	num_iters = textToInteger(parser.getOption("--it", "Max. number of iterations", "10000"));
 
 	int motion_section = parser.addSection("Motion estimation options");
 
 	do_motion = parser.checkOption("--motion", "Estimate particle motion (expensive)");
+	motionParameters.sig_vel = textToDouble(parser.getOption("--s_vel", "Velocity sigma [Å/dose]", "0.5"));
+	motionParameters.sig_div = textToDouble(parser.getOption("--s_div", "Divergence sigma [Å]", "5000.0"));
+	motionParameters.params_scaled_by_dose = !parser.checkOption("--abs_params", "Do not scale the sigmas by the dose");
+	motionParameters.sqExpKernel = parser.checkOption("--sq_exp_ker", "Use a square-exponential kernel instead of an exponential one");
+	motionParameters.maxEDs = textToInteger(parser.getOption("--max_ed", "Maximum number of eigendeformations", "-1"));
 
-	motParams.sig_vel = textToDouble(parser.getOption("--s_vel", "Velocity sigma [Å/dose]", "0.5"));
-	motParams.sig_div = textToDouble(parser.getOption("--s_div", "Divergence sigma [Å]", "5000.0"));
+	int deformation_section = parser.addSection("Deformation estimation options");
 
-	mfSettings.params_scaled_by_dose = !parser.checkOption("--abs_params", "Do not scale the sigmas by the dose");
-
-	mfSettings.sqExpKernel = parser.checkOption("--sq_exp_ker", "Use a square-exponential kernel instead of an exponential one");
-	mfSettings.maxEDs = textToInteger(parser.getOption("--max_ed", "Maximum number of eigendeformations", "-1"));
-
+	do_deformation = parser.checkOption("--deformation", "Estimate 2D deformations");
+	deformationParameters.grid_width = textToInteger(parser.getOption("--def_w", "Number of horizontal sampling points for the deformation grid", "3"));
+	deformationParameters.grid_height = textToInteger(parser.getOption("--def_h", "Number of vertical sampling points for the deformation grid", "3"));
+	deformationType = parser.getOption("--def_model", "Type of model to use (linear, spline or Fourier)", "spline");
+	alignmentSettings.deformationRegulariser = textToDouble(parser.getOption("--def_reg", "Value of the deformation regulariser", "0.0"));
+	alignmentSettings.perFrame2DDeformation = parser.checkOption("--per_frame_deformation", "Model separate 2D deformations for all tilts");
 
 	int expert_section = parser.addSection("Expert options");
 
@@ -93,6 +99,11 @@ void AlignProgram::parseInput()
 	sig2RampPower = textToDouble(parser.getOption("--srp", "Noise variance is divided by k^this during whitening", "0"));
 
 	Log::readParams(parser);
+	
+	if (deformationType != "Fourier" && deformationType != "spline" && deformationType != "linear")
+	{
+		parser.reportError("ERROR: The deformation model (--def_model) must be either 'linear', 'Fourier' or 'spline'");
+	}
 
 	if (shiftOnly && do_motion)
 	{
@@ -109,47 +120,31 @@ void AlignProgram::initialise()
 {
 	RefinementProgram::init();
 
-	const int tc = particles.size();
-
 	if (verbosity > 0)
 	{
 		Log::beginSection("Configuration");
 		Log::printBinaryChoice("Particle motion: ", do_motion, "considered", "not considered");
-		Log::printBinaryChoice("Frame angles: ", mfSettings.constAngles, "constant", "variable");
-		Log::printBinaryChoice("Frame shifts: ", mfSettings.constShifts, "constant", "variable");
-		Log::printBinaryChoice("Particle positions: ", mfSettings.constParticles, "constant", "variable");
+		Log::printBinaryChoice("Frame angles: ", alignmentSettings.constAngles, "constant", "variable");
+		Log::printBinaryChoice("Frame shifts: ", alignmentSettings.constShifts, "constant", "variable");
+		Log::printBinaryChoice("Particle positions: ", alignmentSettings.constParticles, "constant", "variable");
 		Log::endSection();
 	}
 
-	if (do_motion)
+	if (do_deformation && tomogramSet.globalTable.labelExists(EMDL_TOMO_DEFORMATION_GRID_SIZE_X))
 	{
-		ZIO::makeDir(outDir + "/Trajectories");
+		const i2Vector old_grid(
+			tomogramSet.globalTable.getInt(EMDL_TOMO_DEFORMATION_GRID_SIZE_X),
+			tomogramSet.globalTable.getInt(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y));
 
-		int tpc = particleSet.getTotalParticleNumber();
-
-		if (particleSet.motionTrajectories.size() != tpc)
+		if ( old_grid.x != deformationParameters.grid_width ||
+			 old_grid.y != deformationParameters.grid_height )
 		{
-			particleSet.motionTrajectories.resize(tpc);
+			Log::warn("2D image deformation with different grid size found in data set - resetting.");
+
+			tomogramSet.clearDeformation();
 		}
-
-		for (int t = 0; t < tc; t++)
-		{
-			int pc = particles[t].size();
-			if (pc == 0) continue;
-
-			const int fc = tomogramSet.getFrameCount(t);
-
-			for (int p = 0; p < pc; p++)
-			{
-				if (particleSet.motionTrajectories[particles[t][p].value].shifts_Ang.size() != fc)
-				{
-					particleSet.motionTrajectories[particles[t][p].value] = Trajectory(fc);
-				}
-			}
-		}
-
-		particleSet.hasMotion = true;
 	}
+
 
 	ZIO::ensureParentDir(getTempFilenameRoot(""));
 }
@@ -157,6 +152,11 @@ void AlignProgram::initialise()
 void AlignProgram::finalise()
 {
 	const int tc = particles.size();
+
+	if (do_motion)
+	{
+		allTrajectories.resize(tc);
+	}
 
 	for (int t = 0; t < tc; t++)
 	{
@@ -171,7 +171,7 @@ void AlignProgram::finalise()
 	if (do_motion)
 	{
 		Trajectory::write(
-			particleSet.motionTrajectories, particleSet,
+			allTrajectories, particleSet,
 			particles, outDir + "motion.star");
 
 		optimisationSet.trajectories = outDir+"motion.star";
@@ -241,7 +241,7 @@ void AlignProgram::processTomograms(
 		const int fc = tomogram.frameCount;
 
 
-		std::string tag = ZIO::itoa(t);
+		std::string tag = tomogramSet.getTomogramName(t);
 		std::string diagPrefix = outDir + "diag_" + tag;
 
 
@@ -251,308 +251,197 @@ void AlignProgram::processTomograms(
 		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(boxSize, 1);
 
 
-
 		if (diag)
 		{
 			freqWeight.write(diagPrefix + "_frq_weight.mrc");
 		}
 
+		
+		std::vector<BufferedImage<double>> CCs;
 
-		std::vector<d4Matrix> projByTime(fc);
-
-		for (int f = 0; f < fc; f++)
+		if (do_motion || !shiftOnly || !globalShift)
 		{
-			projByTime[f] = tomogram.projectionMatrices[tomogram.frameSequence[f]];
-		}
-
-		// motion estimation requires the CCs to be given in chronological order
-
-		const bool new_implementation = true;
-
-		std::vector<int> frameSequence(fc);
-
-		if (do_motion || new_implementation)
-		{
-			frameSequence = tomogram.frameSequence;
-		}
-		else
-		{
-			for (int f = 0; f < fc; f++)
-			{
-				frameSequence[f] = f;
-			}
-		}
-
-		std::vector<BufferedImage<double>> CCs = Prediction::computeCroppedCCs(
-				particleSet, particles[t], tomogram, aberrationsCache,
-				referenceMap, freqWeight, doseWeights, frameSequence,
-				range, true, num_threads, padding, Prediction::OwnHalf,
-				per_tomogram_progress && verbosity > 0);
-
-
-		BufferedImage<double> FCC;
-
-		if (diag)
-		{
-			BufferedImage<double> FCC3 = FCC::compute3(
-				particleSet, particles[t], tomogram, referenceMap.image_FS,
-				true, num_threads);
-
-			FCC3.write(diagPrefix + "_FCC3_initial.mrc");
-
-			FCC = FCC::divide(FCC3);
-			FCC.write(diagPrefix + "_FCC_initial.mrc");
+			CCs = Prediction::computeCroppedCCs(
+					particleSet, particles[t], tomogram, aberrationsCache,
+					referenceMap, freqWeight, doseWeights, tomogram.frameSequence,
+					range, true, num_threads, padding, Prediction::OwnHalf,
+					per_tomogram_progress && verbosity > 0);
 		}
 		
-		ModularAlignmentSettings alignmentSettings;
-
-		alignmentSettings.constParticles = mfSettings.constParticles;
-		alignmentSettings.constAngles = mfSettings.constAngles;
-		alignmentSettings.constShifts = mfSettings.constShifts;
-		alignmentSettings.perFrame2DDeformation = true;
-		
-		
-		const bool debugging = true;
-		
-
 		const int progress_bar_offset = per_tomogram_progress? 0 : tt * num_iters;
 
 		if (do_motion)
 		{
-			GPMotionModel::Settings motionSettings;
-			motionSettings.params_scaled_by_dose = mfSettings.params_scaled_by_dose;
-			motionSettings.sqExpKernel = mfSettings.sqExpKernel;
-			motionSettings.maxEDs = mfSettings.maxEDs;
-
-			GPMotionModel::MotionParameters motionParameters;
-			motionParameters.sig_vel = motParams.sig_vel;
-			motionParameters.sig_div = motParams.sig_div;
-
 			GPMotionModel motionModel(
 				particleSet, particles[t], tomogram,
-				motionParameters, motionSettings,
+				motionParameters,
 				per_tomogram_progress && verbosity > 0);
 
-			if (diag)
-			{
-				std::ofstream evDat(diagPrefix + "_deformation_eigenvalues.dat");
-
-				for (int i = 0; i < motionModel.deformationLambda.size(); i++)
-				{
-					evDat << i << ' ' << motionModel.deformationLambda[i] << '\n';
-				}
-			}
-
-			No2DDeformationModel noDeformationModel;
-
-			ModularAlignment<GPMotionModel, No2DDeformationModel> alignment(
-				CCs, projByTime, particleSet, particles[t],
-				motionModel, noDeformationModel,
-				alignmentSettings, tomogram,
-				padding,
-				progress_bar_offset, num_threads,
-				per_tomogram_progress && verbosity > 0);
-
-			std::vector<double> initial(alignment.getParamCount(), 0.0);
-
-
-			if (verbosity > 0 && per_tomogram_progress)
-			{
-				Log::beginProgress("Performing optimisation", num_iters);
-			}
-
-
-			std::vector<double> opt = LBFGS::optimize(
-				initial, alignment, 1, num_iters, 1e-4, 1e-5);
-
-
-			if (verbosity > 0 && per_tomogram_progress)
-			{
-				Log::endProgress();
-			}
-
-
-			std::vector<d4Matrix> projections = alignment.getProjections(opt, tomogram.frameSequence);
-			std::vector<d3Vector> positions = alignment.getParticlePositions(opt);
-			std::vector<Trajectory> trajectories = alignment.exportTrajectories(
-						opt, particleSet, tomogram.frameSequence);
-
-
-			writeTempData(&trajectories, projections, positions, t);
-
-			alignment.visualiseTrajectories2D(
-					opt, 8.0, tomogram.name,
-					getTempFilenameRoot(tomogram.name) + "_tracks");
-
-
-			// Update the particle set in case an FCC is to be evaluated
-
-			for (int p = 0; p < pc; p++)
-			{
-				const ParticleIndex pp = particles[t][p];
-
-				particleSet.motionTrajectories[pp.value] = trajectories[p];
-				particleSet.moveParticleTo(pp, positions[p]);
-			}
-
-			tomogram.projectionMatrices = projections;
+			performAlignment(
+				motionModel, CCs, tomogram,
+				t, progress_bar_offset, per_tomogram_progress);
 		}
 		else
 		{
-			std::vector<d4Matrix> projections = tomogram.projectionMatrices;
-			std::vector<d3Vector> positions;
-
-			if (shiftOnly)
+			if (!shiftOnly)
 			{
-				const int diam = (int)(2*range*padding);
-
-				BufferedImage<float> CCsum(diam, diam, fc);
-
-				CCsum.fill(0.f);
-
-				if (verbosity > 0 && per_tomogram_progress)
-				{
-					Log::beginProgress("Adding up cross-correlations", pc);
-				}
-
-				for (int p = 0; p < pc; p++)
-				{
-					if (verbosity > 0 && per_tomogram_progress)
-					{
-						Log::updateProgress(p);
-					}
-
-					CCsum += CCs[p];
-				}
-
-				if (verbosity > 0 && per_tomogram_progress)
-				{
-					Log::endProgress();
-				}
-
-				if (diag) CCsum.write(outDir + "CCsum_" + tag + ".mrc");
-
-				d2Vector origin(padding*range, padding*range);
-
-				for (int f = 0; f < fc; f++)
-				{
-					d2Vector opt = (Interpolation::quadraticMaxXY(CCsum.getSliceRef(f)) - origin)/padding;
-
-					projections[f](0,3) += opt.x;
-					projections[f](1,3) += opt.y;
-				}
-
-				if (verbosity > 0 && !per_tomogram_progress)
-				{
-					Log::updateProgress(progress_bar_offset + num_iters);
-				}
-
-				positions.resize(pc);
-
-				for (int p = 0; p < pc; p++)
-				{
-					positions[p] = particleSet.getPosition(particles[t][p]);
-				}
+				NoMotionModel noMotionModel;
+				
+				performAlignment(
+					noMotionModel, CCs, tomogram,
+					t, progress_bar_offset, per_tomogram_progress);
 			}
 			else
 			{
-				
-				if (new_implementation)
+				if (globalShift)
 				{
-					NoMotionModel noMotionModel;
-					No2DDeformationModel noDeformationModel;
-		
-					ModularAlignment<NoMotionModel, No2DDeformationModel> alignment(
-						CCs, projByTime, particleSet, particles[t],
-						noMotionModel, noDeformationModel,
-						alignmentSettings, tomogram,
-						padding,
-						progress_bar_offset, num_threads,
-						per_tomogram_progress && verbosity > 0);
-		
-					std::vector<double> initial(alignment.getParamCount(), 0.0);
-					
-					if (verbosity > 0 && per_tomogram_progress)
+					std::vector<d2Vector> shifts(fc);
+
+					const int w0  = tomogram.stack.xdim;
+					const int wh0 = w0 / 2 + 1;
+					const int h0  = tomogram.stack.ydim;
+
+					BufferedImage<float> allCCs;
+
+					if (diag)
 					{
-						Log::beginProgress("Performing optimisation", num_iters);
+						allCCs = BufferedImage<float>(w0,h0,fc);
 					}
-	
-					std::vector<double> opt = LBFGS::optimize(
-						initial, alignment, 1, num_iters, 1e-6, 1e-4);
-	
-					if (verbosity > 0 && per_tomogram_progress)
+
+					#pragma omp parallel for num_threads(num_threads)
+					for (int f = 0; f < fc; f++)
 					{
-						Log::endProgress();
+						RawImage<float> obs_slice = tomogram.stack.getSliceRef(f);
+						const RawImage<float> dose_slice = doseWeights.getConstSliceRef(f);
+
+						BufferedImage<float> pred_slice(w0,h0);
+
+						Prediction::predictMicrograph(
+							f, particleSet, particles[t], tomogram,
+							aberrationsCache, referenceMap, &dose_slice,
+							pred_slice,
+							Prediction::OwnHalf,
+							Prediction::AmplitudeAndPhaseModulated,
+							Prediction::CtfScaled);
+
+						BufferedImage<fComplex> obs_slice_hat, pred_slice_hat;
+
+						FFT::FourierTransform(obs_slice, obs_slice_hat);
+						FFT::FourierTransform(pred_slice, pred_slice_hat);
+
+						BufferedImage<fComplex> CC_hat(wh0, h0);
+
+						for (int y = 0; y < h0;  y++)
+						for (int x = 0; x < wh0; x++)
+						{
+							CC_hat(x,y) = obs_slice_hat(x,y) * pred_slice_hat(x,y).conj();
+						}
+
+						BufferedImage<float> CC;
+						FFT::inverseFourierTransform(CC_hat, CC);
+
+						CC = Centering::fftwFullToHumanFull(CC);
+
+						if (diag)
+						{
+							allCCs.getSliceRef(f).copyFrom(CC);
+						}
+
+						d2Vector opt = Interpolation::quadraticMaxXY(CC) - d2Vector(w0/2, h0/2);
+
+						shifts[f] = opt;
 					}
-	
-					projections = alignment.getProjections(opt, tomogram.frameSequence);
-					positions = alignment.getParticlePositions(opt);
+
+					if (diag)
+					{
+						allCCs.write(outDir + "allCCs_" + tag + ".mrc");
+					}
+
+					std::vector<d4Matrix> projections = tomogram.projectionMatrices;
+
+					for (int f = 0; f < fc; f++)
+					{
+						projections[f](0,3) += shifts[f].x;
+						projections[f](1,3) += shifts[f].y;
+					}
+
+					std::vector<d3Vector> positions(pc);
+
+					for (int p = 0; p < pc; p++)
+					{
+						positions[p] = particleSet.getPosition(particles[t][p]);
+					}
+
+					writeTempAlignmentData(projections, positions, t);
 				}
 				else
 				{
-					ProtoAlignment protoAlignment(
-						CCs, tomogram.projectionMatrices, particleSet, particles[t],
-						referenceMap.image_FS,
-						mfSettings.constParticles,
-						mfSettings.constAngles,
-						mfSettings.constShifts,
-						do_anisotropy,
-						per_tilt_anisotropy,
-						range,
-						tomogram.centre, progress_bar_offset,
-						num_threads, padding);
-	
-					protoAlignment.devMode = debugging;
-	
-					std::vector<double> initial = protoAlignment.createInitial();
-	
-					if (!debugging && verbosity > 0 && per_tomogram_progress)
+					const int diam = CCs[0].xdim;
+
+					BufferedImage<float> CCsum(diam, diam, fc);
+
+					CCsum.fill(0.f);
+
+					if (verbosity > 0 && per_tomogram_progress)
 					{
-						Log::beginProgress("Performing optimisation", num_iters);
+						Log::beginProgress("Adding up cross-correlations", pc);
 					}
-	
-					std::vector<double> opt = LBFGS::optimize(
-						initial, protoAlignment, 1, num_iters, 1e-6, 1e-4);
-	
-					if (!debugging && verbosity > 0 && per_tomogram_progress)
+
+					for (int p = 0; p < pc; p++)
+					{
+						if (verbosity > 0 && per_tomogram_progress)
+						{
+							Log::updateProgress(p);
+						}
+
+						CCsum += CCs[p];
+					}
+
+					if (verbosity > 0 && per_tomogram_progress)
 					{
 						Log::endProgress();
 					}
-	
-					std::cout << '[' << opt[0] << ']' << '\n';
-					std::cout << '[' << opt[1] << ']' << std::endl;
-	
-					projections = protoAlignment.getProjections(opt);
-					positions = protoAlignment.getParticlePositions(opt);
+
+					if (diag)
+					{
+						CCsum.write(outDir + "CCsum_" + tag + ".mrc");
+
+						for (int p = 0; p < 12; p++)
+						{
+							CCs[p].write(outDir + "CC_particle_" + ZIO::itoa(p) + "_" + tag + ".mrc");
+						}
+					}
+
+					d2Vector origin(padding*range + 3, padding*range + 3);
+
+					std::vector<d4Matrix> projections = tomogram.projectionMatrices;
+
+					for (int f = 0; f < fc; f++)
+					{
+						d2Vector opt = (Interpolation::quadraticMaxXY(CCsum.getSliceRef(f)) - origin) / padding;
+
+						const int ff = tomogram.frameSequence[f];
+
+						projections[ff](0,3) += opt.x;
+						projections[ff](1,3) += opt.y;
+					}
+
+					if (verbosity > 0 && !per_tomogram_progress)
+					{
+						Log::updateProgress(progress_bar_offset + num_iters);
+					}
+
+					std::vector<d3Vector> positions(pc);
+
+					for (int p = 0; p < pc; p++)
+					{
+						positions[p] = particleSet.getPosition(particles[t][p]);
+					}
+
+					writeTempAlignmentData(projections, positions, t);
 				}
 			}
-
-			writeTempData(0, projections, positions, t);
-
-
-			// Update the particle set in case an FCC is to be evaluated
-
-			for (int p = 0; p < pc; p++)
-			{
-				const ParticleIndex pp = particles[t][p];
-				particleSet.moveParticleTo(pp, positions[p]);
-			}
-
-			tomogram.projectionMatrices = projections;
-		}
-
-		if (diag)
-		{
-
-			BufferedImage<double> FCC3 = FCC::compute3(
-				particleSet, particles[t], tomogram, referenceMap.image_FS,
-				true, num_threads);
-
-			FCC3.write(diagPrefix + "_FCC3_final.mrc");
-			BufferedImage<double> FCC_new = FCC::divide(FCC3);
-			FCC_new.write(diagPrefix + "_FCC_final.mrc");
-
-			(FCC_new - FCC).write(diagPrefix + "_FCC_delta.mrc");
+			
 		}
 
 		if (verbosity > 0 && per_tomogram_progress)
@@ -573,18 +462,15 @@ std::string AlignProgram::getTempFilenameRoot(const std::string& tomogram_name)
 	return outDir + "temp/" + tomogram_name;
 }
 
-void AlignProgram::writeTempData(
-		const std::vector<Trajectory>* traj,
-		const std::vector<d4Matrix>& proj,
-		const std::vector<d3Vector>& pos,
-		int t)
-{
+void AlignProgram::writeTempAlignmentData(
+		const std::vector<d4Matrix>& proj, 
+		const std::vector<d3Vector>& pos, int t)
+{	
 	const int pc = particles[t].size();
 	const int fc = tomogramSet.getFrameCount(t);
 
 	const std::string tomoName = tomogramSet.getTomogramName(t);
 	const std::string temp_filename_root = getTempFilenameRoot(tomoName);
-
 
 	MetaDataTable temp_positions;
 
@@ -598,14 +484,7 @@ void AlignProgram::writeTempData(
 	}
 
 	temp_positions.write(temp_filename_root + "_positions.star");
-
-
-	if (do_motion && traj != 0)
-	{
-		Trajectory::write(*traj, particleSet, {particles[t]}, temp_filename_root + "_motion.star");
-	}
-
-
+	
 	MetaDataTable temp_projections;
 
 	for (int f = 0; f < fc; f++)
@@ -621,6 +500,36 @@ void AlignProgram::writeTempData(
 	}
 
 	temp_projections.write(temp_filename_root + "_projections.star");
+}
+
+void AlignProgram::writeTempMotionData(
+		const std::vector<Trajectory>& traj, 
+		int t)
+{
+	const std::string tomoName = tomogramSet.getTomogramName(t);
+	const std::string temp_filename_root = getTempFilenameRoot(tomoName);
+
+	Trajectory::write({traj}, particleSet, {particles[t]}, temp_filename_root + "_motion.star");
+}
+
+void AlignProgram::writeTempDeformationData(
+		const std::vector<std::vector<double>>& def, 
+		int t)
+{
+	const std::string tomoName = tomogramSet.getTomogramName(t);
+	const std::string temp_filename_root = getTempFilenameRoot(tomoName);
+	
+	MetaDataTable temp_deformations;
+		
+	const int fc = def.size();
+
+	for (int f = 0; f < fc; f++)
+	{
+		temp_deformations.addObject();
+		temp_deformations.setValue(EMDL_TOMO_DEFORMATION_COEFFICIENTS, def[f], f);
+	}
+
+	temp_deformations.write(temp_filename_root + "_deformations.star");
 }
 
 void AlignProgram::readTempData(int t)
@@ -662,23 +571,44 @@ void AlignProgram::readTempData(int t)
 
 		std::vector<MetaDataTable> mdts = MetaDataTable::readAll(ifs, pc+1);
 
+		allTrajectories[t].resize(pc);
+
 		for (int p = 0; p < pc; p++)
 		{
 			MetaDataTable& mdt = mdts[p+1];
 
 			int fc = mdt.numberOfObjects();
 
-			d3Vector shift;
+			allTrajectories[t][p].shifts_Ang.resize(fc);
 
 			for (int f = 0; f < fc; f++)
-			{
+			{				
+				d3Vector shift;
 				mdt.getValueSafely(EMDL_ORIENT_ORIGIN_X_ANGSTROM, shift.x, f);
 				mdt.getValueSafely(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, shift.y, f);
 				mdt.getValueSafely(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, shift.z, f);
 
-				particleSet.motionTrajectories[particles[t][p].value].shifts_Ang[f] = shift;
+				allTrajectories[t][p].shifts_Ang[f] = shift;
 			}
 		}
+	}
+	
+	
+	if (do_deformation)
+	{
+		MetaDataTable temp_deformations;
+		temp_deformations.read(temp_filename_root + "_deformations.star");
+		
+		const i2Vector gridSize(deformationParameters.grid_width, deformationParameters.grid_height);
+		
+		std::vector<std::vector<double>> coeffs(fc);
+		
+		for (int f = 0; f < fc; f++)
+		{
+			coeffs[f] = temp_deformations.getDoubleVector(EMDL_TOMO_DEFORMATION_COEFFICIENTS, f);
+		}
+		
+		tomogramSet.setDeformation(t, gridSize, deformationType, coeffs);
 	}
 
 

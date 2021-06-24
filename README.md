@@ -1,4 +1,4 @@
-RELION 3.2 alpha
+RELION 4.0 alpha
 =================
 
 RELION (for REgularised LIkelihood OptimisatioN) is a stand-alone computer

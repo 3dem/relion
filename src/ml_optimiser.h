@@ -670,7 +670,11 @@ public:
 	//Use different padding factors for the projector (PF+0) and backprojector (PF+1)
 	bool asymmetric_padding;
 
-	//Maximum number of significant weights in coarse pass of expectation
+	//Maximum number of significant weights in coarse pass of expectation specified by user
+	int maximum_significants_arg;
+
+	//Maximum number of significant weights in coarse pass of expectation used in refinement
+	// This can be set by user or automatically
 	int maximum_significants;
 
 	// Tabulated sine and cosine values (for 3D helical sub-tomogram averaging with on-the-fly shifts)
@@ -842,6 +846,7 @@ public:
 		grad_fin_iter(0),
 		grad_fin_frac(0),
 		grad_inbetween_iter(0),
+		subset_size(0),
 		grad_ini_subset_size(0),
 		grad_fin_subset_size(0),
 		grad_min_resol(0),

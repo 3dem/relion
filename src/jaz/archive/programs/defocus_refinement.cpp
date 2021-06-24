@@ -494,7 +494,7 @@ BufferedImage<double> DefocusRefinementProgram::computeOffsetCost(
 		BufferedImage<fComplex> observation(sh,s);
 
 		TomoExtraction::extractFrameAt3D_Fourier(
-				tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f], traj[f],
+				tomogram.stack, f, s, 1.0, tomogram, traj[f],
 				observation, projCut, 1, true);
 
 		#if TIMING
@@ -672,7 +672,7 @@ std::vector<d3Vector> DefocusRefinementProgram::computeSlopeCost(
 
 			TomoExtraction::extractFrameAt3D_Fourier(
 					tomogram.stack, f, s, 1.0,
-					tomogram.projectionMatrices[f], traj[f],
+					tomogram, traj[f],
 					observation, projCut, 1, true);
 
 			BufferedImage<fComplex> prediction = Prediction::predictFS(

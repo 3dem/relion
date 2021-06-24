@@ -341,8 +341,14 @@ class star_handler_parameters
                 for (int iword = 0; iword < words.size(); iword++)
 		{
 			FileName fnt = words[iword];
+			const int n_files = fns_in.size();
 			fnt.globFiles(fns_in, false);
+			if (n_files == fns_in.size())
+				std::cerr << "WARNING: " << words[iword] << " does not match to any existing file(s)." << std::endl;
 		}
+
+		if (fns_in.size() == 0)
+			REPORT_ERROR("No STAR files to combine.");
 
 		MetaDataTable MDin0, MDout;
 		std::vector<MetaDataTable> MDsin, MDoptics;
@@ -826,22 +832,22 @@ class star_handler_parameters
 
 			MDnodes.addObject();
 			MDnodes.setValue(EMDL_PIPELINE_NODE_NAME, fnt);
-			int type;
+			std::string type_label;
 			if (MD.getName() == "micrographs")
 			{
-				type = NODE_MICS;
+				type_label = LABEL_SELECT_MICS;
 			}
 			else if (MD.getName() == "movies")
 			{
-				type = NODE_MOVIES;
+				type_label = LABEL_SELECT_MOVS;
 			}
 			else
 			{
 				// just assume these are particles
-				type = NODE_PART_DATA;
+				type_label = LABEL_SELECT_PARTS;
 			}
 
-			MDnodes.setValue(EMDL_PIPELINE_NODE_TYPE, type);
+			MDnodes.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, type_label);
 		}
 
 		// write out the star file with the output nodes

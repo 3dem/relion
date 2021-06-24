@@ -17,6 +17,7 @@
 namespace gravis
 {
 
+  template <class T> class t2Vector;
   template <class T> class t3Vector;
 
   template <class T>
@@ -122,10 +123,15 @@ namespace gravis
         if (w == 0) return t3Vector<T>(x, y, z);
         else return t3Vector<T>(x/w, y/w, z/w);
       }
-
-	  t3Vector<T> xyz() const
+      
+      t3Vector<T> xyz() const
 	  {
 		return t3Vector<T>(x, y, z);
+	  }
+	  
+	  t2Vector<T> xy() const
+	  {
+		return t2Vector<T>(x, y);
 	  }
 
       /*! \brief Return the euclidian norm of this 4D vector.

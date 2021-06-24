@@ -42,6 +42,8 @@ class ProtoAlignment : public DifferentiableOptimization
 			gravis::d3Vector tomoCentre;
 			int progressBarOffset, num_threads;
 			double paddingFactor;
+
+			mutable int lastIterationNumber;
 			
 			const std::vector<BufferedImage<double>>& CCs; // one frame stack for each particle
 			std::vector<gravis::d3Vector> initialPos;
@@ -73,7 +75,11 @@ class ProtoAlignment : public DifferentiableOptimization
 		void report(int iteration, double cost, const std::vector<double>& x) const;
 
 		std::vector<double> createInitial();
-	
+
+		void visualiseShifts(
+				const std::vector<double> &x,
+				const std::string &tomo_name,
+				const std::string &file_name_root) const;
 		
 	protected:
 	

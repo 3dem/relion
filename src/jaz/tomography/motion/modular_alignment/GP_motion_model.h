@@ -1,3 +1,6 @@
+#ifndef GP_MOTION_MODEL_H
+#define GP_MOTION_MODEL_H
+
 #include <src/jaz/gravis/t3Vector.h>
 #include <src/jaz/tomography/particle_set.h>
 
@@ -7,15 +10,11 @@ class GPMotionModel
 {
 	public:
 		
-			struct Settings
-			{
-				bool params_scaled_by_dose, sqExpKernel;
-				int maxEDs;
-			};
-			
-			struct MotionParameters
+			struct Parameters
 			{
 				double sig_vel, sig_div;
+				bool params_scaled_by_dose, sqExpKernel;
+				int maxEDs;
 			};
 
 			
@@ -23,8 +22,7 @@ class GPMotionModel
 				const ParticleSet& dataSet,
 				const std::vector<ParticleIndex>& partIndices,
 				const Tomogram& tomogram,
-				MotionParameters motionParameters,
-				Settings settings,
+				Parameters parameters,
 				bool verbose);
 
 		
@@ -38,13 +36,13 @@ class GPMotionModel
 				int particle_index,
 				gravis::d3Vector& position) const;
 
-		inline void updateCostGradient(
+		inline void updateDataTermGradient(
 				const gravis::d3Vector *dC_dPos,
 				int particle_index,
 				int fc,
 				double *target) const;
 
-		inline double computePriorCostAndGradient(
+		inline double computePriorValueAndGradient(
 				const double *x,
 				int fc,
 				double* gradDest) const;
@@ -73,7 +71,7 @@ inline void GPMotionModel::updatePosition(
 	position += d;
 }
 
-inline void GPMotionModel::updateCostGradient(
+inline void GPMotionModel::updateDataTermGradient(
 	const gravis::d3Vector* dC_dPos,
 	int particle_index,
 	int fc,
@@ -100,7 +98,7 @@ inline void GPMotionModel::updateCostGradient(
 	}
 }
 
-inline double GPMotionModel::computePriorCostAndGradient(
+inline double GPMotionModel::computePriorValueAndGradient(
 	const double* x,
 	int fc,
 	double* gradDest) const
@@ -128,3 +126,5 @@ inline int GPMotionModel::getParameterCount() const
 {
 	return 3 * bc;
 }
+
+#endif

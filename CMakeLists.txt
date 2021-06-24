@@ -388,7 +388,7 @@ list(APPEND RELION_SCRIPT_FILES
         star_datablock_ctfdat
         qsub.csh
         it.py
-        schedulegui.py
+        schemegui.py
         class_ranker.py
 )
 

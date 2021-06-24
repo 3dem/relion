@@ -19,8 +19,7 @@ class TomoReferenceMap
 		void read(const OptimisationSet& optimisationSet);
 		
 			std::string mapFilenames[2], maskFilename, fscFilename;
-			bool useFscThreshold;
-			double fscThresholdWidth;
+			double fscThresholdWidth, freqCutoff_A;
 			int lastShell;
 
 			std::vector<BufferedImage<float>> image_real;

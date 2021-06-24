@@ -1844,7 +1844,7 @@ MetaDataTable MetaDataTable::combineMetaDataTables(std::vector<MetaDataTable> &M
 		// Find which taTable combineMetaDataTables
 		MetaDataTable commonLabels;
 
-		// Loop over all labels in first
+		// Loop over all labels in the first STAR files.
 		// activeLabels is private but accessible from other instances of the same class in C++.
 		for (size_t i = 0; i < MDin[0].activeLabels.size(); i++)
 		{
@@ -1861,10 +1861,7 @@ MetaDataTable MetaDataTable::combineMetaDataTables(std::vector<MetaDataTable> &M
 				is_present = MDin[j].containsLabel(thisLabel, unknownLabel);
 
 				if (!is_present)
-				{
-					std::cerr << " + WARNING: ignoring label " << (unknownLabel == "" ? EMDL::label2Str(thisLabel): unknownLabel) << " in " << j+1 << "th STAR file because it is not present in all STAR files to be combined." << std::endl;
 					break;
-				}
 			}
 
 			if (is_present)
@@ -1873,20 +1870,27 @@ MetaDataTable MetaDataTable::combineMetaDataTables(std::vector<MetaDataTable> &M
 			}
 		}
 
-		// Also disable any labels of any of the input tables that do not occur in all input tables
+		// Disable any labels of any of the input tables that do not occur in all input tables
 		for (int i = 0; i < MDin.size(); i++)
 		{
-			for (int j = 0; j < MDin[i].activeLabels.size(); j++)
+			bool changed = true;
+			while (changed)
 			{
-				EMDLabel thisLabel = MDin[i].activeLabels[j];
-				std::string unknownLabel = "";
-				if (thisLabel == EMDL_UNKNOWN_LABEL)
-					unknownLabel = MDin[i].getUnknownLabelNameAt(j);
-
-				if (!commonLabels.containsLabel(thisLabel, unknownLabel))
+				changed = false;
+				for (int j = 0; j < MDin[i].activeLabels.size(); j++)
 				{
-					MDin[i].deactivateLabel(thisLabel, unknownLabel);
-					std::cerr << " + WARNING: ignoring label " << (unknownLabel == "" ? EMDL::label2Str(thisLabel) : unknownLabel) << " in " << i+1 << "th STAR file because it is not present in all STAR files to be combined." << std::endl;
+					EMDLabel thisLabel = MDin[i].activeLabels[j];
+					std::string unknownLabel = "";
+					if (thisLabel == EMDL_UNKNOWN_LABEL)
+						unknownLabel = MDin[i].getUnknownLabelNameAt(j);
+
+					if (!commonLabels.containsLabel(thisLabel, unknownLabel))
+					{
+						MDin[i].deactivateLabel(thisLabel, unknownLabel);
+						std::cerr << " + WARNING: ignoring label " << (unknownLabel == "" ? EMDL::label2Str(thisLabel) : unknownLabel) << " in " << i+1 << "th STAR file because it is not present in all STAR files to be combined." << std::endl;
+						changed = true;
+						break;
+					}
 				}
 			}
 		}
