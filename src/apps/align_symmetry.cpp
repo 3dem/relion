@@ -142,7 +142,10 @@ public:
 		if (orig_size % 2 != 0)
 			REPORT_ERROR("The input box size must be an even number.");
 		if (orig_size < boxsize)
-			REPORT_ERROR("There is no point using the working box size (--box_size) larger than the input volume.");
+		{
+			std::cerr << "WARNING: There is no point using the working box size (--box_size) larger than the input volume, using original box size." << std::endl;
+			boxsize = orig_size;
+		}
 
 		if (angpix < 0.)
 		{
