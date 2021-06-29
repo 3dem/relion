@@ -2143,7 +2143,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 				if (grad_ini_subset_size != -1 || grad_fin_subset_size != -1)
 					std::cout << " WARNING: Since both --grad_ini_subset and --grad_fin_subset were not set, " <<
 					          "both will instead be determined automatically." << std::endl;
-				
+
 			unsigned long dataset_size = mydata.numberOfParticles();
 			if (mymodel.ref_dim == 2)
 			{
@@ -4374,6 +4374,32 @@ void MlOptimiser::symmetriseReconstructions()
 
 
 				wsum_model.BPref[ith_recons].applyPointGroupSymmetry();
+
+
+				if (grad_pseudo_halfsets)
+				{
+					int iclass_half = iclass + mymodel.nr_classes;
+
+					wsum_model.BPref[iclass_half].enforceHermitianSymmetry();
+
+					// Then apply helical and point group symmetry (order irrelevant?)
+					if (mymodel.nr_bodies == 1)
+						wsum_model.BPref[iclass_half].applyHelicalSymmetry(
+								mymodel.helical_nr_asu,
+								mymodel.helical_twist[ith_recons],
+								mymodel.helical_rise[ith_recons] / mymodel.pixel_size);
+
+					if (fn_multi_sym.size() > ith_recons) // Always false if size=0
+					{
+						//Modify symmetry settings
+						wsum_model.BPref[iclass_half].SL.read_sym_file(fn_multi_sym[ith_recons]);
+					}
+
+
+					wsum_model.BPref[iclass_half].applyPointGroupSymmetry();
+
+				}
+
 			}
 		}
 	}
