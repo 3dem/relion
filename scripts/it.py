@@ -208,6 +208,8 @@ RelionItOptions = {
     ### Parameters for automated 2D class selection
     # Minimum rank score for particles after LoG picking
     'proc__select_ini__rank_threshold' : 0.5,
+    # Minimum number of classes to select after LoG picking
+    'proc__select_ini__select_nr_classes' : 0,
     # Minimum rank score for particles after Topaz picking
     'proc__select_rest__rank_threshold' : 0.5,
 
@@ -521,7 +523,7 @@ class RelionItGui(object):
 
         row += 1
 
-        tk.Label(self.proc_frame, text="LoG class2d score:").grid(row=row, sticky=tk.W)
+        tk.Label(self.proc_frame, text="LoG-pick class2d score:").grid(row=row, sticky=tk.W)
         self.log_classscore_var = tk.StringVar()  # for data binding
         self.log_classscore_entry = tk.Entry(self.proc_frame, textvariable=self.log_classscore_var, bg=entry_bg)
         self.log_classscore_entry.grid(row=row, column=1, sticky=tk.W)
@@ -529,6 +531,13 @@ class RelionItGui(object):
 
         row += 1
 
+        tk.Label(self.proc_frame, text="LoG-pick min nr classes:").grid(row=row, sticky=tk.W)
+        self.log_min_nr_classes_var = tk.StringVar()  # for data binding
+        self.log_min_nr_classes_entry = tk.Entry(self.proc_frame, textvariable=self.log_min_nr_classes_var, bg=entry_bg)
+        self.log_min_nr_classes_entry.grid(row=row, column=1, sticky=tk.W)
+        self.log_min_nr_classes_entry.insert(0, str(options['proc__select_ini__select_nr_classes']))
+
+        row += 1
         tk.Label(self.proc_frame, text="Topaz model:").grid(row=row, sticky=tk.W)
         self.topaz_model_var = tk.StringVar()  # for data binding
         self.topaz_model_entry = tk.Entry(self.proc_frame, textvariable=self.topaz_model_var, bg=entry_bg)
@@ -664,6 +673,7 @@ class RelionItGui(object):
                 self.inibatch_entry.config(state=tk.NORMAL)
                 self.log_thresh_entry.config(state=tk.NORMAL)
                 self.log_classscore_entry.config(state=tk.NORMAL)
+                self.log_min_nr_classes_entry.config(state=tk.NORMAL)
                 self.topaz_model_entry.delete(0,tk.END)
                 self.topaz_model_entry.insert(0, 'Schemes/proc/train_topaz/model_epoch10.sav')
                 self.topaz_model_entry.config(state=tk.DISABLED)
@@ -672,6 +682,7 @@ class RelionItGui(object):
                 self.inibatch_entry.config(state=tk.DISABLED)
                 self.log_thresh_entry.config(state=tk.DISABLED)
                 self.log_classscore_entry.config(state=tk.DISABLED)
+                self.log_min_nr_classes_entry.config(state=tk.DISABLED)
                 self.topaz_model_entry.delete(0,tk.END)
                 self.topaz_model_entry.insert(0, str(options['proc__topaz_model']))
                 self.topaz_model_entry.config(state=tk.NORMAL)
@@ -881,7 +892,12 @@ class RelionItGui(object):
         try:
             opts['proc__select_ini__rank_threshold'] = float(self.log_classscore_var.get())
         except ValueError:
-            raise ValueError("LoG class2d score must be a number")
+            raise ValueError("LoG-pick: class2d score must be a number")
+
+        try:
+            opts['proc__select_ini__select_nr_classes'] = int(self.log_min_nr_classes_var.get())
+        except ValueError:
+            raise ValueError("LoG-pick: min nr classes must be a number")
 
         try:
             opts['proc__extract_rest__minimum_pick_fom'] = float(self.topaz_thresh_var.get())
