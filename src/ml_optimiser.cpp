@@ -2200,19 +2200,19 @@ void MlOptimiser::initialiseGeneral(int rank)
 					          "both will instead be determined automatically." << std::endl;
 				
 			unsigned long dataset_size = mydata.numberOfParticles();
-			if (mymodel.ref_dim == 2)
+			if (mymodel.ref_dim == 2) // 2D Classification
 			{
 				grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.005, 5000), 100);
 				grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.05, 50000), 1000);
 			}
 			else
 			{
-				if (is_3d_model)
+				if (is_3d_model) // 3D Initial mode
 				{
-					grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.01, 10000), 100);
-					grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.1, 100000), 1000);
+					grad_ini_subset_size = 200 * mymodel.nr_classes;
+					grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.01, 10000), 1000);
 				}
-				else
+				else // 3D Classification
 				{
 					grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.1, 100000), 100);
 					grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.1, 100000), 1000);
@@ -9479,21 +9479,26 @@ void MlOptimiser::updateStepSize()
 
 	if (_stepsize <= 0)
 	{
-		if (mymodel.ref_dim == 3)
+		if (mymodel.ref_dim == 3 && !is_3d_model) // 3D classification
 			_stepsize = 0.3;
-		else
+		else if (mymodel.ref_dim == 3 && is_3d_model) // 3D initial model
+			_stepsize = 0.5;
+		else //2D classification
 			_stepsize = 0.3;
 	}
 
 	if (_scheme.empty())
 	{
-		if (mymodel.ref_dim == 3)
+		if (mymodel.ref_dim == 3 && !is_3d_model) // 3D classification
 			_scheme = "plain";
-		else
+		else if (mymodel.ref_dim == 3 && is_3d_model) // 3D initial model
+			_scheme = std::to_string(0.9 / _stepsize) + "-2step";
+		else //2D classification
 			_scheme = std::to_string(0.9 / _stepsize) + "-2step";
 	}
 
-	if (_scheme == "plain") {
+	if (_scheme == "plain")
+	{
 		grad_current_stepsize = _stepsize;
 		return;
 	}
@@ -9507,13 +9512,15 @@ void MlOptimiser::updateStepSize()
 	if (is_2step)
 		inflate = textToFloat(_scheme.substr(0, _scheme.find("-2step")));
 
-	if (is_3step) {
+	if (is_3step)
+	{
 		int pos = _scheme.find("-3step-");
 		inflate = textToFloat(_scheme.substr(0, pos));
 		deflate = textToFloat(_scheme.substr(pos + 7, _scheme.size()));
 	}
 
-	if (is_2step or is_3step) {
+	if (is_2step or is_3step)
+	{
 		if (inflate < 0 or 10 < inflate)
 			REPORT_ERROR("Invalid inflate value in --grad_stepsize_scheme");
 		if (deflate <= 0 or 10 < deflate)
