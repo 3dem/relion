@@ -227,7 +227,15 @@ public:
 
 	void openFile(const FileName &name, int mode = WRITE_READONLY)
 	{
-
+		static bool buffSet=false;
+		static size_t buffSize=SIZE_MAX;
+		if(!buffSet){
+			char * buffStr = getenv("RELION_STACK_BUFFER");
+			if(buffStr!=NULL){
+				buffSize=std::atoi(buffStr);
+			}
+			buffSet=true;
+		}
 		// Close any file that was left open in this handler
 		if (!(fimg ==NULL && fhed == NULL))
 			closeFile();
@@ -295,11 +303,24 @@ public:
 			REPORT_ERROR((std::string)"TIFF is supported only for reading");
 
 		// Open image file
-		if ((!isTiff && ((fimg  = fopen(fileName.c_str(), wmChar.c_str())) == NULL))
-		    || (isTiff && ((ftiff = TIFFOpen(fileName.c_str(), "r")) == NULL))
-		   )
-			REPORT_ERROR((std::string)"Image::openFile cannot open: " + name);
-
+		if(isTiff){
+			if((ftiff = TIFFOpen(fileName.c_str(), "r")) == NULL)
+				REPORT_ERROR((std::string)"Image::openFile cannot open: " + name);
+		}else{
+			if ((fimg  = fopen(fileName.c_str(), wmChar.c_str())) == NULL)
+				REPORT_ERROR((std::string)"Image::openFile cannot open: " + name);
+			if(ext_name=="mrcs" && wmChar=="r") {
+				if(buffSize<SIZE_MAX){
+					if(buffSize==0){
+						//disabling buffered IO for mrcs stacks to improve random IO behavior
+						setvbuf(fimg, NULL, _IONBF, 0);
+					} else {
+						//set custom buffer size
+						setvbuf(fimg, NULL, _IOFBF, buffSize);
+					}
+				}
+			}
+		}
 		if (headName != "")
 		{
 			if ((fhed = fopen(headName.c_str(), wmChar.c_str())) == NULL)
