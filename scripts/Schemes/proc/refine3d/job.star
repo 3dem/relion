@@ -29,7 +29,7 @@ do_preread_images         No
 do_solvent_fsc         No 
 do_zero_mask        Yes 
    fn_cont         "" 
-    fn_img Schemes/proc/select_rest/particles.star
+    fn_img Schemes/proc/select_parts/particles.star
    fn_mask         "" 
     fn_ref $$myref
    gpu_ids        0:1 
