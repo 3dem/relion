@@ -376,7 +376,9 @@ foreach (_target ${RELION_TARGETS})
 endforeach()
 
 # Python script for running pytorch is required for class_ranker along with torch model
-add_dependencies(class_ranker copy_scripts class_ranker_model_file)
+if(FETCH_TORCH_MODELS)
+	add_dependencies(class_ranker copy_scripts class_ranker_model_file)
+endif()
 
 foreach (_target ${RELION_JAZ_SPA_TARGETS})
 	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)	
