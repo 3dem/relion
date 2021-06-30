@@ -22,6 +22,7 @@
 #include "src/npy.hpp"
 #include "src/class_ranker.h"
 const static int IMGSIZE = 64;
+const static int NR_FEAT = 24;
 
 //
 // Calculates n! (uses double arithmetic to avoid overflow)
@@ -1870,17 +1871,17 @@ void ClassRanker::readFeatures()
 }
 
 
-float ClassRanker::deployTorchModel(FileName &model_path, std::vector<float> &features, std::vector<float> &subimages)
+void ClassRanker::deployTorchModel(FileName &model_path, std::vector<float> &features, std::vector<float> &subimages, std::vector<float> &scores)
 {
-	const long unsigned featues_shape [] = {features.size()};
-	npy::SaveArrayAsNumpy(fn_out + "features.npy", false, 1, featues_shape, features);
+	const long unsigned count = features.size() / NR_FEAT;
+	const long unsigned featues_shape [] = {count, NR_FEAT};
+	npy::SaveArrayAsNumpy(fn_out + "features.npy", false, 2, featues_shape, features);
 
-	const long unsigned image_shape [] = {IMGSIZE, IMGSIZE};
-	npy::SaveArrayAsNumpy(fn_out + "images.npy", false, 2, image_shape, subimages);
+	const long unsigned image_shape [] = {count, IMGSIZE, IMGSIZE};
+	npy::SaveArrayAsNumpy(fn_out + "images.npy", false, 3, image_shape, subimages);
 
 	char buffer[128];
 	std::string result = "";
-	float score;
 
 	std::string command = python_interpreter + " " + fn_pytorch_script + " " + fn_pytorch_model + " " + fn_out;
 
@@ -1898,16 +1899,28 @@ float ClassRanker::deployTorchModel(FileName &model_path, std::vector<float> &fe
 
 	pclose(pipe);
 
-	try {
+	try
+	{
+		std::string s = result;
+		std::string delimiter = " ";
 		std::string::size_type sz;
-		score = std::stof(result, &sz);
+		scores.resize(0);
+		size_t pos = 0;
+		std::string token;
+		while ((pos = s.find(delimiter)) != std::string::npos) {
+			token = s.substr(0, pos);
+			scores.push_back(std::stof(token, &sz));
+			s.erase(0, pos + delimiter.length());
+		}
+		if (scores.size() != count){
+			std::cerr << result << std::endl;
+			REPORT_ERROR("Failed to run external python script with the following command:\n " + command);
+		}
 	}
 	catch (const std::invalid_argument& ia) {
 		std::cerr << result << std::endl;
 		REPORT_ERROR("Failed to run external python script with the following command:\n " + command);
 	}
-
-	return score;
 }
 
 void ClassRanker::performRanking()
@@ -1922,7 +1935,6 @@ void ClassRanker::performRanking()
 	if (verb > 0)
 	{
 		std::cout << " Deploying torch model for each class ..." << std::endl;
-		init_progress_bar(features_all_classes.size());
 	}
 
 	// Initialise all scores to -999 (including empty classes!)
@@ -1945,28 +1957,42 @@ void ClassRanker::performRanking()
 	long int nr_sel_classavgs = 0;
 	RFLOAT highscore = 0.0;
 	std::vector<int> selected_classes;
-	std::vector<float> scores(features_all_classes.size());
+	std::vector<float> scores;
 	float max_score = -999.;
+//	for (int i = 0; i < features_all_classes.size(); i++)
+//	{
+//		std::vector<float> image_vector, feature_vector;
+//
+//		MultidimArray<RFLOAT> myimg;
+//		features_all_classes[i].subimages.getSlice(0, myimg);
+//		image_vector.resize(NZYXSIZE(myimg));
+//		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(myimg)
+//		{
+//			image_vector[n] = DIRECT_MULTIDIM_ELEM(myimg, n);
+//		}
+//		feature_vector = features_all_classes[i].toNormalizedVector();
+//		scores[i] = (RFLOAT) deployTorchModel(fn_pytorch_model, feature_vector, image_vector);
+//		if (scores[i] > max_score) max_score = scores[i];
+//	}
+
+	std::vector<float> image_vector(features_all_classes.size() * IMGSIZE * IMGSIZE);
+	std::vector<float> feature_vector(features_all_classes.size() * NR_FEAT);
 	for (int i = 0; i < features_all_classes.size(); i++)
 	{
-		std::vector<float> image_vector, feature_vector;
+		std::vector<float> f = features_all_classes[i].toNormalizedVector();
+		for (int j = 0; j < NR_FEAT; j++)
+			feature_vector[i*NR_FEAT + j] = f[j];
 
-		MultidimArray<RFLOAT> myimg;
-		features_all_classes[i].subimages.getSlice(0, myimg);
-		image_vector.resize(NZYXSIZE(myimg));
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(myimg)
+		MultidimArray<RFLOAT> img;
+		features_all_classes[i].subimages.getSlice(0, img);
+		image_vector.resize(NZYXSIZE(img));
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img)
 		{
-			image_vector[n] = DIRECT_MULTIDIM_ELEM(myimg, n);
+			image_vector[i * IMGSIZE * IMGSIZE + n] = DIRECT_MULTIDIM_ELEM(img, n);
 		}
-		feature_vector = features_all_classes[i].toNormalizedVector();
-		scores[i] = (RFLOAT) deployTorchModel(fn_pytorch_model, feature_vector, image_vector);
-		if (scores[i] > max_score) max_score = scores[i];
-
-		if (verb > 0) progress_bar(i);
-
 	}
 
-	if (verb > 0) progress_bar(features_all_classes.size());
+	deployTorchModel(fn_pytorch_model, feature_vector, image_vector, scores);
 
 	RFLOAT my_min = select_min_score;
 	RFLOAT my_max = select_max_score;
