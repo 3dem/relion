@@ -656,6 +656,9 @@ enum EMDLabel
 	EMDL_TOMO_TEMP_PRED_TIMES_OBS,
 	EMDL_TOMO_TEMP_PRED_SQUARED,
 
+	EMDL_TOMO_TILT_MOVIE_INDEX,
+	EMDL_TOMO_TILT_MOVIE_FILE_NAME,
+
 	EMDL_UNKNOWN_LABEL,
 
 	EMDL_LAST_LABEL // **** NOTE ****: Do keep this label always at the end
@@ -1335,6 +1338,8 @@ private:
 		EMDL::addLabel(EMDL_TOMO_TEMP_PRED_TIMES_OBS, EMDL_DOUBLE, "rlnTomoTempPredTimesObs", "Sum over products of predicted and observed values");
 		EMDL::addLabel(EMDL_TOMO_TEMP_PRED_SQUARED, EMDL_DOUBLE, "rlnTomoTempPredSquared", "Sum over squares of predicted values");
 
+		EMDL::addLabel(EMDL_TOMO_TILT_MOVIE_INDEX, EMDL_INT, "rlnTomoTiltMovieIndex", "Chronological index of a tilt movie");
+		EMDL::addLabel(EMDL_TOMO_TILT_MOVIE_FILE_NAME, EMDL_STRING, "rlnTomoTiltMovieFile", "Movie containing the frames of a tilt");
 
 		EMDL::addLabel(EMDL_UNKNOWN_LABEL, EMDL_UNKNOWN, "rlnUnknownLabel", "NON-RELION label: values will be ignored, yet maintained in the STAR file.");
 	 }

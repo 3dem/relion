@@ -143,7 +143,7 @@ public:
 			REPORT_ERROR("The input box size must be an even number.");
 		if (orig_size < boxsize)
 		{
-			std::cerr << "WARNING: There is no point using the working box size (--box_size) larger than the input volume, using original box size." << std::endl;
+			std::cerr << "The working box size (--box_size) is larger (" << boxsize << ") than the input box size (" << orig_size << "). The working box size is increased to the input box size." << std::endl;
 			boxsize = orig_size;
 		}
 

@@ -4,6 +4,7 @@
 #include <src/jaz/tomography/motion/motion_fit.h>
 #include <src/jaz/tomography/motion/proto_alignment.h>
 #include <src/jaz/tomography/motion/trajectory_set.h>
+#include <src/jaz/tomography/motion/shift_alignment.h>
 #include <src/jaz/tomography/motion/modular_alignment/modular_alignment.h>
 #include <src/jaz/tomography/motion/modular_alignment/GP_motion_model.h>
 #include <src/jaz/tomography/motion/modular_alignment/no_motion_model.h>
@@ -61,7 +62,8 @@ void AlignProgram::parseInput()
 
 	int alignment_section = parser.addSection("General alignment options");
 
-	shiftOnly = parser.checkOption("--shift_only", "Only apply an optimal rigid shift to each frame (no iterative optimisation)");
+	shiftOnly = parser.checkOption("--shift_only", "Only apply an optimal rigid shift to each frame (no iterative optimisation; useful for very badly aligned frames)");
+	globalShift = !parser.checkOption("--shift_only_by_particles", "Estimate rigid shift by aligning only the particles instead of by predicting entire micrographs");
 	range = textToInteger(parser.getOption("--r", "Max. particle shift allowed [Pixels]", "20"));
 	alignmentSettings.constParticles = parser.checkOption("--const_p", "Keep the particle positions constant");
 	alignmentSettings.constAngles = parser.checkOption("--const_a", "Keep the frame angles constant");
@@ -69,21 +71,16 @@ void AlignProgram::parseInput()
 	alignmentSettings.rangeRegulariser = textToDouble(parser.getOption("--range_reg", "Value of the range regulariser", "0.0"));
 	do_anisotropy = parser.checkOption("--aniso", "Assume an anisotropic projection model");
 	per_tilt_anisotropy = parser.checkOption("--per_tilt_aniso", "Fit independent view anisotropy for each tilt image");
-	num_iters = textToInteger(parser.getOption("--it", "Max. number of iterations", "50000"));
-
+	num_iters = textToInteger(parser.getOption("--it", "Max. number of iterations", "10000"));
 
 	int motion_section = parser.addSection("Motion estimation options");
 
 	do_motion = parser.checkOption("--motion", "Estimate particle motion (expensive)");
-
 	motionParameters.sig_vel = textToDouble(parser.getOption("--s_vel", "Velocity sigma [Å/dose]", "0.5"));
 	motionParameters.sig_div = textToDouble(parser.getOption("--s_div", "Divergence sigma [Å]", "5000.0"));
-
 	motionParameters.params_scaled_by_dose = !parser.checkOption("--abs_params", "Do not scale the sigmas by the dose");
-
 	motionParameters.sqExpKernel = parser.checkOption("--sq_exp_ker", "Use a square-exponential kernel instead of an exponential one");
 	motionParameters.maxEDs = textToInteger(parser.getOption("--max_ed", "Maximum number of eigendeformations", "-1"));
-
 
 	int deformation_section = parser.addSection("Deformation estimation options");
 
@@ -124,8 +121,6 @@ void AlignProgram::initialise()
 {
 	RefinementProgram::init();
 
-	const int tc = particles.size();
-
 	if (verbosity > 0)
 	{
 		Log::beginSection("Configuration");
@@ -136,42 +131,8 @@ void AlignProgram::initialise()
 		Log::endSection();
 	}
 
-	if (do_motion)
-	{
-		ZIO::makeDir(outDir + "/Trajectories");
-
-		int tpc = particleSet.getTotalParticleNumber();
-
-		if (particleSet.motionTrajectories.size() != tpc)
-		{
-			particleSet.motionTrajectories.resize(tpc);
-		}
-
-		for (int t = 0; t < tc; t++)
-		{
-			int pc = particles[t].size();
-			if (pc == 0) continue;
-
-			const int fc = tomogramSet.getFrameCount(t);
-
-			for (int p = 0; p < pc; p++)
-			{
-				if (particleSet.motionTrajectories[particles[t][p].value].shifts_Ang.size() != fc)
-				{
-					particleSet.motionTrajectories[particles[t][p].value] = Trajectory(fc);
-				}
-			}
-		}
-
-		particleSet.hasMotion = true;
-	}
-
 	if (do_deformation && tomogramSet.globalTable.labelExists(EMDL_TOMO_DEFORMATION_GRID_SIZE_X))
 	{
-		/*Log::warn("Previous 2D image deformation found in data set - resetting.");
-
-		tomogramSet.clearDeformation();*/
-
 		const i2Vector old_grid(
 			tomogramSet.globalTable.getInt(EMDL_TOMO_DEFORMATION_GRID_SIZE_X),
 			tomogramSet.globalTable.getInt(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y));
@@ -193,6 +154,11 @@ void AlignProgram::finalise()
 {
 	const int tc = particles.size();
 
+	if (do_motion)
+	{
+		allTrajectories.resize(tc);
+	}
+
 	for (int t = 0; t < tc; t++)
 	{
 		int pc = particles[t].size();
@@ -206,7 +172,7 @@ void AlignProgram::finalise()
 	if (do_motion)
 	{
 		Trajectory::write(
-			particleSet.motionTrajectories, particleSet,
+			allTrajectories, particleSet,
 			particles, outDir + "motion.star");
 
 		optimisationSet.trajectories = outDir+"motion.star";
@@ -276,7 +242,7 @@ void AlignProgram::processTomograms(
 		const int fc = tomogram.frameCount;
 
 
-		std::string tag = ZIO::itoa(t);
+		std::string tag = tomogramSet.getTomogramName(t);
 		std::string diagPrefix = outDir + "diag_" + tag;
 
 
@@ -291,11 +257,16 @@ void AlignProgram::processTomograms(
 		}
 
 		
-		std::vector<BufferedImage<double>> CCs = Prediction::computeCroppedCCs(
-				particleSet, particles[t], tomogram, aberrationsCache,
-				referenceMap, freqWeight, doseWeights, tomogram.frameSequence,
-				range, true, num_threads, padding, Prediction::OwnHalf,
-				per_tomogram_progress && verbosity > 0);
+		std::vector<BufferedImage<double>> CCs;
+
+		if (do_motion || !shiftOnly || !globalShift)
+		{
+			CCs = Prediction::computeCroppedCCs(
+					particleSet, particles[t], tomogram, aberrationsCache,
+					referenceMap, freqWeight, doseWeights, tomogram.frameSequence,
+					range, true, num_threads, padding, Prediction::OwnHalf,
+					per_tomogram_progress && verbosity > 0);
+		}
 		
 		const int progress_bar_offset = per_tomogram_progress? 0 : tt * num_iters;
 
@@ -312,7 +283,6 @@ void AlignProgram::processTomograms(
 		}
 		else
 		{
-
 			if (!shiftOnly)
 			{
 				NoMotionModel noMotionModel;
@@ -323,60 +293,38 @@ void AlignProgram::processTomograms(
 			}
 			else
 			{
-				const int diam = (int)(2*range*padding);
+				std::vector<d2Vector> shifts;
 
-				BufferedImage<float> CCsum(diam, diam, fc);
-
-				CCsum.fill(0.f);
-
-				if (verbosity > 0 && per_tomogram_progress)
+				if (globalShift)
 				{
-					Log::beginProgress("Adding up cross-correlations", pc);
+					shifts = ShiftAlignment::alignGlobally(
+							tomogram, particles[t], particleSet, referenceMap,
+							doseWeights, aberrationsCache,
+							num_threads, diag, tag, outDir);
+				}
+				else
+				{
+					shifts = ShiftAlignment::alignPerParticle(
+							tomogram, CCs, padding, range,
+							verbosity, diag, per_tomogram_progress,
+							tag, outDir);
 				}
 
-				for (int p = 0; p < pc; p++)
-				{
-					if (verbosity > 0 && per_tomogram_progress)
-					{
-						Log::updateProgress(p);
-					}
-
-					CCsum += CCs[p];
-				}
-
-				if (verbosity > 0 && per_tomogram_progress)
-				{
-					Log::endProgress();
-				}
-
-				if (diag) CCsum.write(outDir + "CCsum_" + tag + ".mrc");
-
-				d2Vector origin(padding*range + 4, padding*range + 4);
-				
 				std::vector<d4Matrix> projections = tomogram.projectionMatrices;
-				
+
 				for (int f = 0; f < fc; f++)
 				{
-					d2Vector opt = (Interpolation::quadraticMaxXY(CCsum.getSliceRef(f)) - origin)/padding;
-					
-					const int ff = tomogram.frameSequence[f];
-
-					projections[ff](0,3) += opt.x;
-					projections[ff](1,3) += opt.y;
+					projections[f](0,3) += shifts[f].x;
+					projections[f](1,3) += shifts[f].y;
 				}
 
-				if (verbosity > 0 && !per_tomogram_progress)
-				{
-					Log::updateProgress(progress_bar_offset + num_iters);
-				}
-				
 				std::vector<d3Vector> positions(pc);
-				
+
 				for (int p = 0; p < pc; p++)
 				{
 					positions[p] = particleSet.getPosition(particles[t][p]);
 				}
-				
+
 				writeTempAlignmentData(projections, positions, t);
 			}
 			
@@ -447,7 +395,7 @@ void AlignProgram::writeTempMotionData(
 	const std::string tomoName = tomogramSet.getTomogramName(t);
 	const std::string temp_filename_root = getTempFilenameRoot(tomoName);
 
-	Trajectory::write(traj, particleSet, {particles[t]}, temp_filename_root + "_motion.star");
+	Trajectory::write({traj}, particleSet, {particles[t]}, temp_filename_root + "_motion.star");
 }
 
 void AlignProgram::writeTempDeformationData(
@@ -509,21 +457,24 @@ void AlignProgram::readTempData(int t)
 
 		std::vector<MetaDataTable> mdts = MetaDataTable::readAll(ifs, pc+1);
 
+		allTrajectories[t].resize(pc);
+
 		for (int p = 0; p < pc; p++)
 		{
 			MetaDataTable& mdt = mdts[p+1];
 
 			int fc = mdt.numberOfObjects();
 
-			d3Vector shift;
+			allTrajectories[t][p].shifts_Ang.resize(fc);
 
 			for (int f = 0; f < fc; f++)
-			{
+			{				
+				d3Vector shift;
 				mdt.getValueSafely(EMDL_ORIENT_ORIGIN_X_ANGSTROM, shift.x, f);
 				mdt.getValueSafely(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, shift.y, f);
 				mdt.getValueSafely(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, shift.z, f);
 
-				particleSet.motionTrajectories[particles[t][p].value].shifts_Ang[f] = shift;
+				allTrajectories[t][p].shifts_Ang[f] = shift;
 			}
 		}
 	}
