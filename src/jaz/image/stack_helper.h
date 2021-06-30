@@ -176,7 +176,6 @@ void NewStackHelper::FourierTransformStack(
 
 	const int wh = w/2 + 1;
 
-
 	std::vector<BufferedImage<T>> tempRS(num_threads);
 	std::vector<BufferedImage<tComplex<T>>> tempFS(num_threads);
 

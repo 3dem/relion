@@ -78,13 +78,21 @@ void run(int argc, char *argv[])
 		REPORT_ERROR("There is no tomogram named " + tomo_name);
 	}
 
-	Tomogram tomogram = tomogram_set.loadTomogram(tomo_index, true);
 
-	const int w  = tomogram.stack.xdim;
-	const int h  = tomogram.stack.ydim;
+	const bool load_image_data = do_subtract;
+
+	Tomogram tomogram = tomogram_set.loadTomogram(tomo_index, load_image_data);
+
+	const int w0 = tomogram.imageSize.x;
+	const int h0 = tomogram.imageSize.y;
 	const int fc = tomogram.frameCount;
 
-	BufferedImage<float> new_stack(w,h,fc);
+	i2Vector binned_size = Resampling::getFourierCroppedSize2D(w0, h0, spacing, true);
+	const int w1 = binned_size.x;
+	const int h1 = binned_size.y;
+
+
+	BufferedImage<float> new_stack(w1,h1,fc);
 
 	ParticleSet particle_set(optimisationSet.particles, optimisationSet.trajectories, true);
 	std::vector<std::vector<ParticleIndex>> all_particles = particle_set.splitByTomogram(tomogram_set, true);
@@ -111,33 +119,38 @@ void run(int argc, char *argv[])
 			Log::updateProgress(f);
 		}
 
-		RawImage<float> slice = new_stack.getSliceRef(f);
+		BufferedImage<float> full_slice(w0,h0);
+
 		const RawImage<float> doseSlice = doseWeights.getConstSliceRef(f);
 
 		Prediction::predictMicrograph(
 			f, particle_set, particles, tomogram,
 			aberrations_cache, reference_map, &doseSlice,
-			slice,
+			full_slice,
 			Prediction::OwnHalf,
 			Prediction::AmplitudeAndPhaseModulated,
 			Prediction::CtfScaled);
+
+		if (do_subtract)
+		{
+			full_slice -= tomogram.stack.getConstSliceRef(f);
+			full_slice *= -1.f;
+		}
+
+		if (spacing != 1.0)
+		{
+			BufferedImage<float> binned_slice = Resampling::FourierCrop_fullStack(
+						full_slice, spacing, n_threads, true);
+
+			new_stack.getSliceRef(f).copyFrom(binned_slice);
+		}
+		else
+		{
+			new_stack.getSliceRef(f).copyFrom(full_slice);
+		}
 	}
 
 	Log::endProgress();
-
-
-	if (do_subtract)
-	{
-		new_stack -= tomogram.stack;
-		new_stack *= -1.f;
-	}
-
-
-	if (spacing != 1.0)
-	{
-		new_stack = Resampling::FourierCrop_fullStack(new_stack, spacing, n_threads, true);
-	}
-
 
 	new_stack.write(outFn);
 }

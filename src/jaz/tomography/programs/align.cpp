@@ -327,6 +327,10 @@ void AlignProgram::processTomograms(
 				}
 
 				writeTempAlignmentData(projections, positions, t);
+
+				ShiftAlignment::visualiseShifts(
+					shifts, tomogram.frameSequence, tomogram.name,
+					getTempFilenameRoot(tomogram.name) + "_shifts");
 			}
 			
 		}
