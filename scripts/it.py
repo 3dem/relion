@@ -701,6 +701,7 @@ class RelionItGui(object):
         opts['do_auto_boxsize'] =  self.get_var_as_bool(self.auto_boxsize_var)
         opts['proc__topaz_model'] = self.topaz_model_entry.get()
         opts['prep__ctffind__do_phaseshift'] = self.get_var_as_bool(self.phaseplate_var)
+        opts['proc__do_log'] = self.get_var_as_bool(self.do_log_var)
 
         try:
             opts['prep__importmovies__kV'] = float(self.voltage_entry.get())
@@ -803,6 +804,8 @@ class RelionItGui(object):
         else:
             opts['proc__autopick__use_gpu'] = True
             opts['proc__extract__do_fom_threshold'] = True 
+            # dont want multiple topaz runs bumping into each other!
+            opts['proc__autopick__nr_mpi'] = 1
 
         try:
             opts['proc__select_parts__rank_threshold'] = float(self.min_class_score_var.get())
