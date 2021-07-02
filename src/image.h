@@ -49,6 +49,7 @@
 #ifndef IMAGE_H
 #define IMAGE_H
 
+#include <cstdint>
 #include <typeinfo>
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -229,6 +230,15 @@ public:
 
 	void openFile(const FileName &name, int mode = WRITE_READONLY)
 	{
+		// This is thread-safe in C++11.
+		// https://stackoverflow.com/questions/8102125/is-local-static-variable-initialization-thread-safe-in-c11
+		static const size_t bufferSize = []() -> size_t {
+			char * bufferString = getenv("RELION_STACK_BUFFER");
+			if (bufferString != NULL)
+				return std::atoi(bufferString);
+    			else
+				return SIZE_MAX;
+		}();
 
 		// Close any file that was left open in this handler
 		if (!(fimg ==NULL && fhed == NULL))
@@ -293,14 +303,38 @@ public:
 		}
 
 		isTiff = ext_name.contains("tif");
-		if (isTiff && mode != WRITE_READONLY)
-			REPORT_ERROR((std::string)"TIFF is supported only for reading");
 
 		// Open image file
-		if ((!isTiff && ((fimg  = fopen(fileName.c_str(), wmChar.c_str())) == NULL))
-		    || (isTiff && ((ftiff = TIFFOpen(fileName.c_str(), "r")) == NULL))
-		   )
-			REPORT_ERROR((std::string)"Image::openFile cannot open: " + name);
+		if (isTiff) 
+		{
+			if (mode != WRITE_READONLY)
+				REPORT_ERROR((std::string)"TIFF is supported only for reading");
+
+			if ((ftiff = TIFFOpen(fileName.c_str(), "r")) == NULL)
+				REPORT_ERROR((std::string)"Image::openFile cannot open: " + name);
+		}
+		else
+		{
+			if ((fimg  = fopen(fileName.c_str(), wmChar.c_str())) == NULL)
+				REPORT_ERROR((std::string)"Image::openFile cannot open: " + name);
+
+			if (ext_name=="mrcs" && wmChar=="r")
+			{
+				if (bufferSize < SIZE_MAX)
+				{
+					if (bufferSize == 0)
+					{
+						//disabling buffered IO for mrcs stacks to improve random IO behavior
+						setvbuf(fimg, NULL, _IONBF, 0);
+					}
+					else
+					{
+						//set custom buffer size
+						setvbuf(fimg, NULL, _IOFBF, bufferSize);
+					}
+				}
+			}
+		}
 
 		if (headName != "")
 		{
