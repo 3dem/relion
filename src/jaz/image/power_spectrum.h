@@ -133,13 +133,25 @@ std::vector<double> PowerSpectrum::fromFftwHalf(const RawImage<tComplex<T>>& com
 }
 
 template <class T>
-static T interpolate(double x, double y, int w, int h, const std::vector<T>& spectrum)
+T PowerSpectrum::interpolate(double x, double y, int w, int h, const std::vector<T>& spectrum)
 {
 	const double xd = x;
 	const double yd = (y < h/2.0? y : y - h) * (w/(double)h);
 	const double rd = sqrt(xd*xd + yd*yd);
 
-	const int r = (int)(rd+0.5);
+	const int r0 = (int)rd;
+	const int r1 = r0 + 1;
+
+	if (r1 >= spectrum.size())
+	{
+		return spectrum[spectrum.size() - 1];
+	}
+	else
+	{
+		const double f = rd - r0;
+
+		return f * spectrum[r1] + (1.0 - f) * spectrum[r0];
+	}
 }
 
 template <class T>

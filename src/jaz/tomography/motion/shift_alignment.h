@@ -19,6 +19,7 @@ class ShiftAlignment
 				const TomoReferenceMap& referenceMap,
 				const RawImage<float>& doseWeights,
 				const AberrationsCache& aberrationsCache,
+				bool do_whiten,
 				int num_threads,
 				bool diag,
 				const std::string& tag,

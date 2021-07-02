@@ -300,7 +300,7 @@ void AlignProgram::processTomograms(
 				{
 					shifts = ShiftAlignment::alignGlobally(
 							tomogram, particles[t], particleSet, referenceMap,
-							doseWeights, aberrationsCache,
+							doseWeights, aberrationsCache, whiten,
 							num_threads, diag, tag, outDir);
 				}
 				else

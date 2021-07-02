@@ -20,6 +20,7 @@ std::vector<gravis::d2Vector> ShiftAlignment::alignGlobally(
 		const TomoReferenceMap& referenceMap,
 		const RawImage<float>& doseWeights,
 		const AberrationsCache& aberrationsCache,
+		bool do_whiten,
 		int num_threads,
 		bool diag,
 		const std::string& tag,
@@ -62,8 +63,6 @@ std::vector<gravis::d2Vector> ShiftAlignment::alignGlobally(
 
 		BufferedImage<fComplex> CC_hat(wh0, h0);
 
-		const bool do_whiten = true;
-
 		if (do_whiten)
 		{
 			std::vector<double> pow_spec = PowerSpectrum::fromFftwHalf(obs_slice_hat);
@@ -71,8 +70,9 @@ std::vector<gravis::d2Vector> ShiftAlignment::alignGlobally(
 			for (int y = 0; y < h0;  y++)
 			for (int x = 0; x < wh0; x++)
 			{
+				const double sp = PowerSpectrum::interpolate(x, y, w0, h0, pow_spec);
 
-				CC_hat(x,y) = obs_slice_hat(x,y) * pred_slice_hat(x,y).conj();
+				CC_hat(x,y) = obs_slice_hat(x,y) * pred_slice_hat(x,y).conj() / sp;
 			}
 		}
 		else
