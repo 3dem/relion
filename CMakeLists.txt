@@ -368,8 +368,8 @@ endif()
 #    add_definitions(-D_TORCH_ENABLED)
 #endif(TORCH)
 
-option(SKIP_TORCH_MODELS "Do not download pre-trained torch models" OFF)
-if (NOT SKIP_TORCH_MODELS)
+option(FETCH_TORCH_MODELS "Do download pre-trained torch models" ON)
+if (FETCH_TORCH_MODELS)
     include(${CMAKE_SOURCE_DIR}/cmake/FetchTorchModels.cmake)
 endif()
 
