@@ -21,6 +21,7 @@ class Tomogram
 			
 			bool hasOptics, hasImage, hasDeformations;
 			OpticsData optics;
+			gravis::i2Vector imageSize;
 			int frameCount;
 			double handedness, fractionalDose;
 			

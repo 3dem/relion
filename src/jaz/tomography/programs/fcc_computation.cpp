@@ -124,7 +124,6 @@ void FccProgram::run()
 		ofs0 << '\n';
 
 		{
-			const int fc = tomogram.frameCount;
 			BufferedImage<double> scaleFactor(sh,fc);
 
 			for (int f = 0; f < fc; f++)

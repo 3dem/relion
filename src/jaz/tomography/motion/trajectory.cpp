@@ -21,20 +21,23 @@ std::vector<Trajectory> Trajectory::read(std::string filename, ParticleSet& part
 
 	mdt0.readStar(ifs, "general");
 
-	int pc;
+	const int pc = particleSet.getTotalParticleNumber();
 
-	if (!mdt0.getValue(EMDL_PARTICLE_NUMBER, pc))
 	{
-		REPORT_ERROR("Trajectory::read: missing particle number in "+filename+".");
-	}
+		int trc;
 
-	if (pc != particleSet.partTable.numberOfObjects())
-	{
-		REPORT_ERROR("Trajectory::read: incorrect number of particles in "+filename+".");
+		if (!mdt0.getValue(EMDL_PARTICLE_NUMBER, trc))
+		{
+			REPORT_ERROR("Trajectory::read: missing particle number in "+filename+".");
+		}
+
+		if (trc < pc)
+		{
+			REPORT_ERROR("Trajectory::read: insufficient number of particles in "+filename+".");
+		}
 	}
 
 	std::vector<Trajectory> out(pc);
-	
 	
 	std::vector<MetaDataTable> mdts = MetaDataTable::readAll(ifs, pc+1);
 
