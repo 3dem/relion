@@ -451,6 +451,26 @@ class RelionItGui(object):
         self.minres_entry.insert(0, str(options['proc__select_mics__select_maxval']))
 
         row += 1
+
+        tk.Label(self.proc_frame, text="Topaz model:").grid(row=row, sticky=tk.W)
+        self.topaz_model_var = tk.StringVar()  # for data binding
+        self.topaz_model_entry = tk.Entry(self.proc_frame, textvariable=self.topaz_model_var, bg=entry_bg)
+        self.topaz_model_entry.grid(row=row, column=1, sticky=tk.W)
+        self.topaz_model_entry.insert(0, str(options['proc__topaz_model']))
+
+        self.topaz_model_button = new_browse_button(self.proc_frame, self.topaz_model_var, filetypes=(('Topaz model file', '{*.sav}'), ('All files', '*')))
+        self.topaz_model_button.grid(row=row, column=2)
+
+        row += 1
+
+        tk.Label(self.proc_frame, text="Min. FOM for topaz extract:").grid(row=row, sticky=tk.W)
+        self.extract_topaz_thresh_var = tk.StringVar()  # for data binding
+        self.extract_topaz_thresh_entry = tk.Entry(self.proc_frame, textvariable=self.extract_topaz_thresh_var, bg=entry_bg)
+        self.extract_topaz_thresh_entry.grid(row=row, column=1, sticky=tk.W)
+        self.extract_topaz_thresh_entry.insert(0, str(options['proc__extract__minimum_pick_fom']))
+
+        row += 1
+
         tk.Label(self.proc_frame, text="LoG-pick instead of topaz?").grid(row=row, sticky=tk.W)
         self.do_log_var = tk.IntVar()
         self.do_log_button = tk.Checkbutton(self.proc_frame, var=self.do_log_var)
@@ -472,25 +492,6 @@ class RelionItGui(object):
         self.autopick_log_thresh_entry = tk.Entry(self.proc_frame, textvariable=self.autopick_log_thresh_var, bg=entry_bg)
         self.autopick_log_thresh_entry.grid(row=row, column=1, sticky=tk.W)
         self.autopick_log_thresh_entry.insert(0, str(options['proc__autopick__log_adjust_thr']))
-
-        row += 1
-
-        tk.Label(self.proc_frame, text="Topaz model:").grid(row=row, sticky=tk.W)
-        self.topaz_model_var = tk.StringVar()  # for data binding
-        self.topaz_model_entry = tk.Entry(self.proc_frame, textvariable=self.topaz_model_var, bg=entry_bg)
-        self.topaz_model_entry.grid(row=row, column=1, sticky=tk.W)
-        self.topaz_model_entry.insert(0, str(options['proc__topaz_model']))
-
-        self.topaz_model_button = new_browse_button(self.proc_frame, self.topaz_model_var, filetypes=(('Topaz model file', '{*.sav}'), ('All files', '*')))
-        self.topaz_model_button.grid(row=row, column=2)
-
-        row += 1
-
-        tk.Label(self.proc_frame, text="Min. FOM for topaz extract:").grid(row=row, sticky=tk.W)
-        self.extract_topaz_thresh_var = tk.StringVar()  # for data binding
-        self.extract_topaz_thresh_entry = tk.Entry(self.proc_frame, textvariable=self.extract_topaz_thresh_var, bg=entry_bg)
-        self.extract_topaz_thresh_entry.grid(row=row, column=1, sticky=tk.W)
-        self.extract_topaz_thresh_entry.insert(0, str(options['proc__extract__minimum_pick_fom']))
 
         row += 1
 
@@ -778,7 +779,7 @@ class RelionItGui(object):
             warnings.append("- Pattern for input movies should normally contain a '*' to select more than one file")
 
         opts['prep__motioncorr__fn_gain_ref'] = self.gainref_entry.get()
-        if len(opts['prep__motioncorr__fn_gain_ref']) > 0 and not os.path.isfile(opts['prep__motioncorr__fn_gain_ref']):
+        if len(opts['prep__motioncorr__fn_gain_ref']) > 0 and not os.path.isfile(opts['prep__motioncorr__fn_gain_ref']) and opts['do_prep']:
             warnings.append("- Gain reference file '{}' does not exist".format(opts['prep__motioncorr__fn_gain_ref']))
 
         try:
