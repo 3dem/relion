@@ -19,6 +19,7 @@ class ShiftAlignment
 				const TomoReferenceMap& referenceMap,
 				const RawImage<float>& doseWeights,
 				const AberrationsCache& aberrationsCache,
+				bool do_whiten,
 				int num_threads,
 				bool diag,
 				const std::string& tag,
@@ -34,6 +35,13 @@ class ShiftAlignment
 				bool per_tomogram_progress,
 				const std::string& tag,
 				const std::string& outDir);
+
+		static void visualiseShifts(
+				const std::vector<gravis::d2Vector>& shifts,
+				const std::vector<int>& sequence,
+				const std::string& tomo_name,
+				const std::string& file_name_root);
+
 };
 
 #endif

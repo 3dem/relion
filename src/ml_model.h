@@ -419,7 +419,7 @@ public:
 	void initialise(bool _do_grad = false, bool _pseudo_halfsets = false);
 
 	//Read a model from a file
-	void read(FileName fn_in, int nr_optics_groups_from_mydata);
+	void read(FileName fn_in, int nr_optics_groups_from_mydata, bool _do_grad=false, bool _pseudo_halfsets=false);
 
 	// Write a model to disc
 	void write(FileName fn_out, HealpixSampling &sampling,

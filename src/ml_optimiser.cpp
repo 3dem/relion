@@ -504,6 +504,7 @@ if(do_gpu)
 	skip_gridding = parser.checkOption("--skip_gridding", "Skip gridding in the M step");
 	nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
 	debug_split_random_half = textToInteger(getParameter(argc, argv, "--debug_split_random_half", "0"));
+    do_red = parser.checkOption("--do_red", "", "false", true);
 
 	// We read input optimiser set to create the output one
 	fn_OS = parser.getOption("--ios", "Input tomo optimiser set file. It is used to set --i, --ref or --solvent_mask if they are not provided. Updated output optimiser set is created.", "");
@@ -1025,8 +1026,11 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_KEEP_TILT_PRIOR_FIXED, helical_keep_tilt_prior_fixed))
     		helical_keep_tilt_prior_fixed = false;
 	// New SGD (13Feb2018)
-	if (!MD.getValue(EMDL_OPTIMISER_DO_GRAD, gradient_refine))
+	if (!MD.getValue(EMDL_OPTIMISER_GRAD_REFINE, gradient_refine))
 		gradient_refine = false;
+	if (!MD.getValue(EMDL_OPTIMISER_DO_GRAD, do_grad))
+		do_grad = false;
+	grad_pseudo_halfsets = do_grad;
 	if (!MD.getValue(EMDL_OPTIMISER_GRAD_EM_ITERS, grad_em_iters))
 		grad_em_iters = 1;
 	if (!MD.getValue(EMDL_OPTIMISER_GRAD_HAS_CONVERGED, grad_has_converged))
@@ -1147,7 +1151,7 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	}
 	else
 	{
-		mymodel.read(fn_model, mydata.obsModel.numberOfOpticsGroups());
+		mymodel.read(fn_model, mydata.obsModel.numberOfOpticsGroups(), do_grad, grad_pseudo_halfsets);
 	}
 	// Set up the bodies in the model, if this is a continuation of a multibody refinement (otherwise this is done in initialiseGeneral)
 	if (fn_body_masks != "None")
@@ -1249,7 +1253,8 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_DO_MAP, do_map);
 		MD.setValue(EMDL_OPTIMISER_FAST_SUBSETS, do_fast_subsets);
 		MD.setValue(EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT, do_external_reconstruct);
-		MD.setValue(EMDL_OPTIMISER_DO_GRAD, gradient_refine);
+		MD.setValue(EMDL_OPTIMISER_GRAD_REFINE, gradient_refine);
+		MD.setValue(EMDL_OPTIMISER_DO_GRAD, do_grad);
 		MD.setValue(EMDL_OPTIMISER_GRAD_EM_ITERS, grad_em_iters);
 
 		MD.setValue(EMDL_OPTIMISER_GRAD_HAS_CONVERGED, grad_has_converged);
@@ -2270,7 +2275,6 @@ void MlOptimiser::initialiseSigma2Noise()
 
 void MlOptimiser::initialiseReferences()
 {
-
 	if (iter == 0)
 	{
 		if (do_som)
@@ -2310,58 +2314,36 @@ void MlOptimiser::initialiseReferences()
 
 		if (do_init_blobs && fn_ref == "None")
 		{
-
-			// Sjors 04032021: insert average of all classes into make_blobs functions,
-			// as in new initial calculation of Iref, much fewer particles are used than before
-			MultidimArray<RFLOAT> Iavg(mymodel.Iref[0]);
-			Iavg.initZeros();
-			for (unsigned i = 0; i < mymodel.nr_classes; i ++)
-			{
-				Iavg += mymodel.Iref[i];
-			}
-			Iavg /= (float)mymodel.nr_classes;
-
-			bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
+			bool is_helical_segment =
+					(do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
 			RFLOAT diameter = particle_diameter / mymodel.pixel_size;
-
 			for (unsigned i = 0; i < mymodel.nr_classes; i++)
 			{
 				if (mymodel.pdf_class[i] > 0.)
 				{
-					MultidimArray<RFLOAT> blobs_pos(Iavg), blobs_neg(Iavg);
+					MultidimArray<RFLOAT> blobs_pos(mymodel.Iref[i]), blobs_neg(mymodel.Iref[i]);
 					if (mymodel.ref_dim == 2)
 					{
 						SomGraph::make_blobs_2d(
-								blobs_pos, Iavg, 40,
+								blobs_pos, mymodel.Iref[i], 40,
 								diameter, is_helical_segment);
 						SomGraph::make_blobs_2d(
-								blobs_neg, Iavg, 40,
+								blobs_neg, mymodel.Iref[i], 40,
 								diameter, is_helical_segment);
 					}
 					else
 					{
 						SomGraph::make_blobs_3d(
-								blobs_pos, Iavg, 40,
+								blobs_pos, mymodel.Iref[i], 40,
 								diameter, is_helical_segment);
 						SomGraph::make_blobs_3d(
-								blobs_neg, Iavg, 40,
+								blobs_neg, mymodel.Iref[i], 40,
 								diameter, is_helical_segment);
 					}
-
 					//Maintain standard deviation
-					if (is_helical_segment)
-					{
-						mymodel.Iref[i] = Iavg;
-						RFLOAT std = SomGraph::std(mymodel.Iref[i]);
-						mymodel.Iref[i] += blobs_pos;// - blobs_neg / 2;
-						mymodel.Iref[i] *= std / SomGraph::std(mymodel.Iref[i]);
-					}
-					else
-					{
-						RFLOAT std = SomGraph::std(mymodel.Iref[i]);
-						mymodel.Iref[i] = blobs_pos - blobs_neg / 2;
-						mymodel.Iref[i] *= std / SomGraph::std(mymodel.Iref[i]);
-					}
+					RFLOAT std = SomGraph::std(mymodel.Iref[i]);
+					mymodel.Iref[i] = blobs_pos - blobs_neg / 2;
+					mymodel.Iref[i] *= std / SomGraph::std(mymodel.Iref[i]);
 				}
 			}
 
@@ -2369,7 +2351,6 @@ void MlOptimiser::initialiseReferences()
 			for (unsigned i = 0; i < mymodel.nr_classes; i++)
 				softMaskOutsideMap(mymodel.Iref[i], diameter / 2., (RFLOAT) width_mask_edge);
 		}
-
 	}
 }
 
@@ -4516,7 +4497,6 @@ void MlOptimiser::maximization()
 		RCTIC(timer,RCT_1);
 		if (mymodel.pdf_class[iclass] > 0. || mymodel.nr_bodies > 1 )
 		{
-
 			if ((wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY)
 			{
 				(wsum_model.BPref[iclass]).updateSSNRarrays(mymodel.tau2_fudge_factor,

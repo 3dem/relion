@@ -2,10 +2,13 @@
 #include <src/jaz/image/buffered_image.h>
 #include <src/jaz/image/centering.h>
 #include <src/jaz/image/interpolation.h>
+#include <src/jaz/image/color_helper.h>
+#include <src/jaz/image/power_spectrum.h>
 #include <src/jaz/tomography/prediction.h>
 #include <src/jaz/math/fft.h>
 #include <src/jaz/util/log.h>
 #include <src/jaz/util/zio.h>
+#include <src/CPlot2D.h>
 
 using namespace gravis;
 
@@ -17,6 +20,7 @@ std::vector<gravis::d2Vector> ShiftAlignment::alignGlobally(
 		const TomoReferenceMap& referenceMap,
 		const RawImage<float>& doseWeights,
 		const AberrationsCache& aberrationsCache,
+		bool do_whiten,
 		int num_threads,
 		bool diag,
 		const std::string& tag,
@@ -50,7 +54,7 @@ std::vector<gravis::d2Vector> ShiftAlignment::alignGlobally(
 			pred_slice,
 			Prediction::OwnHalf,
 			Prediction::AmplitudeAndPhaseModulated,
-			Prediction::CtfScaled);
+			Prediction::CtfUnscaled);
 
 		BufferedImage<fComplex> obs_slice_hat, pred_slice_hat;
 
@@ -59,11 +63,25 @@ std::vector<gravis::d2Vector> ShiftAlignment::alignGlobally(
 
 		BufferedImage<fComplex> CC_hat(wh0, h0);
 
-		for (int y = 0; y < h0;  y++)
-		for (int x = 0; x < wh0; x++)
+		if (do_whiten)
 		{
-			// @TODO: add whitening
-			CC_hat(x,y) = obs_slice_hat(x,y) * pred_slice_hat(x,y).conj();
+			std::vector<double> pow_spec = PowerSpectrum::fromFftwHalf(obs_slice_hat);
+
+			for (int y = 0; y < h0;  y++)
+			for (int x = 0; x < wh0; x++)
+			{
+				const double sp = PowerSpectrum::interpolate(x, y, w0, h0, pow_spec);
+
+				CC_hat(x,y) = obs_slice_hat(x,y) * pred_slice_hat(x,y).conj() / sp;
+			}
+		}
+		else
+		{
+			for (int y = 0; y < h0;  y++)
+			for (int x = 0; x < wh0; x++)
+			{
+				CC_hat(x,y) = obs_slice_hat(x,y) * pred_slice_hat(x,y).conj();
+			}
 		}
 
 		BufferedImage<float> CC;
@@ -158,3 +176,47 @@ std::vector<d2Vector> ShiftAlignment::alignPerParticle(
 	return out;
 }
 
+void ShiftAlignment::visualiseShifts(
+	const std::vector<d2Vector> &shifts,
+	const std::vector<int> &sequence,
+	const std::string &tomo_name,
+	const std::string &file_name_root)
+{
+	const int fc = shifts.size();
+
+	CPlot2D plot2D(tomo_name + ": frame shifts");
+	plot2D.SetXAxisSize(600);
+	plot2D.SetYAxisSize(600);
+	plot2D.SetDrawLegend(false);
+	plot2D.SetFlipY(true);
+	plot2D.SetDrawXAxisGridLines(false);
+	plot2D.SetDrawYAxisGridLines(false);
+
+	std::vector<CDataSet> points_by_frame(fc);
+
+	for (int ft = 0; ft < fc; ft++)
+	{
+		gravis::dRGB c = ColorHelper::signedToRedBlue(ft/(double)fc);
+
+		const int f = sequence[ft];
+
+		points_by_frame[f].SetDrawMarker(true);
+		points_by_frame[f].SetDrawLine(false);
+		points_by_frame[f].SetDatasetColor(c.r,c.g,c.b);
+		points_by_frame[f].SetMarkerSize(3);
+
+		const d2Vector d = shifts[f];
+
+		points_by_frame[f].AddDataPoint(CDataPoint(d.x,d.y));
+	}
+
+	for (int ft = fc-1; ft >= 0; ft--)
+	{
+		const int f = sequence[ft];
+		plot2D.AddDataSet(points_by_frame[f]);
+	}
+
+	FileName fn_eps = file_name_root + ".eps";
+
+	plot2D.OutputPostScriptPlot(fn_eps);
+}
