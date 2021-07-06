@@ -4574,10 +4574,11 @@ void MlOptimiser::centerClasses()
 
 //		std::cout << "CENTER CLASS " << iclass << " " << XX(my_com) << " " << YY(my_com) << " " << ZZ(my_com) << std::endl;
 
-		if (do_grad) {
+		if (do_grad)
+		{
 			MultidimArray<Complex > aux = mymodel.Igrad1[iclass];
 			RFLOAT x(XX(my_com)), y(YY(my_com)), z(0);
-			if (mymodel.Iref[iclass].getDim() == 2)
+			if (mymodel.Iref[iclass].getDim() == 3)
 				z = ZZ(my_com);
 			shiftImageInContinuousFourierTransform(aux, mymodel.Igrad1[iclass],
 			                                       mymodel.ori_size * mymodel.padding_factor, x, y, z);
