@@ -2325,7 +2325,7 @@ void MlOptimiser::initialiseGeneralFinalize(int rank)
 			RFLOAT diameter = particle_diameter / mymodel.pixel_size;
 			for (unsigned i = 0; i < mymodel.nr_classes; i++)
 			{
-				if (mymodel.pdf_class[i] > 0.)
+				if (mymodel.pdf_class[i] > 0. || !do_som)
 				{
 					MultidimArray<RFLOAT> blobs_pos(mymodel.Iref[i]), blobs_neg(mymodel.Iref[i]);
 					if (mymodel.ref_dim == 2)
