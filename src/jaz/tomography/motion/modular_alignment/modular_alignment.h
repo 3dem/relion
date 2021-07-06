@@ -20,7 +20,7 @@
 #include <omp.h>
 
 #define ANGLE_SCALE 0.001
-#define ALIGN_FIRST_FRAME 0
+#define ALIGN_FIRST_FRAME 1
 
 class CTF;
 
@@ -834,6 +834,29 @@ void ModularAlignment<MotionModel, DeformationModel2D>::visualiseTrajectories(
 			}
 
 			plot2D.AddDataSet(curve);
+		}
+
+		for (int p = 0; p < pc; p++)
+		{
+			Trajectory track = getTrajectory(x, p, timeSeq);
+
+			CDataSet dots;
+			dots.SetDrawMarker(true);
+			dots.SetDrawLine(false);
+			dots.SetMarkerSize(2);
+			dots.SetDatasetColor(0.5,0.5,0.5);
+
+			for (int f = 0; f < fc; f++)
+			{
+				const gravis::d3Vector a = initialPos[p] + scale * track.shifts_Ang[f] / pixelSize;
+				const gravis::i2Vector di = dim_indices[dim];
+
+				CDataPoint point(a[di[0]],a[di[1]]);
+
+				dots.AddDataPoint(point);
+			}
+
+			plot2D.AddDataSet(dots);
 		}
 
 		std::string label_x = plot_names[dim].substr(0,1) +

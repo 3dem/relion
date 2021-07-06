@@ -300,7 +300,7 @@ void AlignProgram::processTomograms(
 				{
 					shifts = ShiftAlignment::alignGlobally(
 							tomogram, particles[t], particleSet, referenceMap,
-							doseWeights, aberrationsCache,
+							doseWeights, aberrationsCache, whiten,
 							num_threads, diag, tag, outDir);
 				}
 				else
@@ -327,6 +327,10 @@ void AlignProgram::processTomograms(
 				}
 
 				writeTempAlignmentData(projections, positions, t);
+
+				ShiftAlignment::visualiseShifts(
+					shifts, tomogram.frameSequence, tomogram.name,
+					getTempFilenameRoot(tomogram.name) + "_shifts");
 			}
 			
 		}
