@@ -2112,10 +2112,6 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 
 			command += " --topaz_exe " + joboptions["fn_topaz_exec"].getString();
 
-			if (joboptions["topaz_nr_particles"].getNumber(error_message) > 0.)
-				command += " --topaz_nr_particles " + joboptions["topaz_nr_particles"].getString();
-			if (error_message != "") return false;
-
 			if (joboptions["topaz_particle_diameter"].getNumber(error_message) > 0.)
 				command += " --particle_diameter " + joboptions["topaz_particle_diameter"].getString();
 			if (error_message != "") return false;
@@ -2132,6 +2128,11 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 				}
 
 				command += " --topaz_train";
+
+				if (joboptions["topaz_nr_particles"].getNumber(error_message) > 0.)
+					command += " --topaz_nr_particles " + joboptions["topaz_nr_particles"].getString();
+				if (error_message != "") return false;
+
 				if (joboptions["do_topaz_train_parts"].getBoolean())
 				{
 					command += " --topaz_train_parts " + joboptions["topaz_train_parts"].getString();

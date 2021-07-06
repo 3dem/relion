@@ -784,27 +784,7 @@ void JobWindow::initialiseAutopickWindow()
 	resetHeight();
 
 	place("fn_topaz_exec");
-
-	group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group5->end();
-	place("do_topaz_train", TOGGLE_DEACTIVATE, group5);
-
-	group5->begin();
-	place("topaz_train_picks", TOGGLE_DEACTIVATE);
-
-	group6 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group6->end();
-
-	place("do_topaz_train_parts", TOGGLE_DEACTIVATE, group6);
-	group6->end();
-
-	group6->begin();
-	place("topaz_train_parts", TOGGLE_DEACTIVATE);
-	group6->end();
-	guientries["do_topaz_train_parts"].cb_menu_i();
-
-	group5->end();
-	guientries["do_topaz_train"].cb_menu_i();
+	place("topaz_particle_diameter", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -823,8 +803,30 @@ void JobWindow::initialiseAutopickWindow()
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	place("topaz_particle_diameter", TOGGLE_DEACTIVATE);
+	group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group5->end();
+	place("do_topaz_train", TOGGLE_DEACTIVATE, group5);
+	group5->begin();
+
 	place("topaz_nr_particles", TOGGLE_DEACTIVATE);
+	place("topaz_train_picks", TOGGLE_DEACTIVATE);
+
+	group6 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group6->end();
+
+	place("do_topaz_train_parts", TOGGLE_DEACTIVATE, group6);
+
+	group6->begin();
+	place("topaz_train_parts", TOGGLE_DEACTIVATE);
+	group6->end();
+	guientries["do_topaz_train_parts"].cb_menu_i();
+
+	group5->end();
+	guientries["do_topaz_train"].cb_menu_i();
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
 	place("topaz_other_args", TOGGLE_DEACTIVATE);
 
 	tab3->end();
