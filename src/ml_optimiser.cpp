@@ -2319,7 +2319,7 @@ void MlOptimiser::initialiseReferences()
 			RFLOAT diameter = particle_diameter / mymodel.pixel_size;
 			for (unsigned i = 0; i < mymodel.nr_classes; i++)
 			{
-				if (mymodel.pdf_class[i] > 0.)
+				if (mymodel.pdf_class[i] > 0. || !do_som)
 				{
 					MultidimArray<RFLOAT> blobs_pos(mymodel.Iref[i]), blobs_neg(mymodel.Iref[i]);
 					if (mymodel.ref_dim == 2)
@@ -4603,10 +4603,11 @@ void MlOptimiser::centerClasses()
 
 //		std::cout << "CENTER CLASS " << iclass << " " << XX(my_com) << " " << YY(my_com) << " " << ZZ(my_com) << std::endl;
 
-		if (do_grad) {
+		if (do_grad)
+		{
 			MultidimArray<Complex > aux = mymodel.Igrad1[iclass];
 			RFLOAT x(XX(my_com)), y(YY(my_com)), z(0);
-			if (mymodel.Iref[iclass].getDim() == 2)
+			if (mymodel.Iref[iclass].getDim() == 3)
 				z = ZZ(my_com);
 			shiftImageInContinuousFourierTransform(aux, mymodel.Igrad1[iclass],
 			                                       mymodel.ori_size * mymodel.padding_factor, x, y, z);

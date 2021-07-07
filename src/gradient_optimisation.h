@@ -436,7 +436,7 @@ public:
 		}
 
 		for (int i = 0; i < nr_blobs; i ++)
-			blobs_amp[i] = abs(amp_box.data[(long) blobs_y[i] * amp_box.xdim + (long) blobs_x[i]]);
+			blobs_amp[i] = fabs(amp_box.data[(long) blobs_y[i] * amp_box.xdim + (long) blobs_x[i]]);
 
 		T sigma_inv = 10. / diameter;
 		for (int y = 0; y < box.ydim; y ++)
@@ -469,7 +469,7 @@ public:
 		}
 
 		for (int i = 0; i < nr_blobs; i ++)
-			blobs_amp[i] = abs(amp_box.data[
+			blobs_amp[i] = fabs(amp_box.data[
 				(long) blobs_z[i] * amp_box.yxdim +
 				(long) blobs_y[i] * amp_box.xdim +
 				(long) blobs_x[i]
