@@ -232,6 +232,9 @@ public:
 	// Flag whether to use the auto-refine procedure
 	bool do_auto_refine;
 
+	// Flag whether to use auto-sampling (outside auto_refine)
+	bool do_auto_sampling;
+
 	// Flag whether to ignore changes in hidden variables in auto-refine (which makes it faster)
 	bool auto_ignore_angle_changes;
 
@@ -746,6 +749,7 @@ public:
 		do_acc_currentsize_despite_highres_exp(0),
 		low_resol_join_halves(0),
 		do_auto_refine(0),
+		do_auto_sampling(0),
 		has_converged(0),
 		only_flip_phases(0),
 		gridding_nr_iter(0),
@@ -917,7 +921,7 @@ public:
 	// also calculate initial Iref images if fn_ref == "None"
 	void initialiseSigma2Noise();
 
-	// Initialise initial reference images 
+	// Initialise initial reference images
 	void initialiseReferences();
 
 	/* Calculates the sum of all individual power spectra and the average of all images for initial sigma_noise estimation

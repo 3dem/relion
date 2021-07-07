@@ -298,7 +298,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 
 	// Check whether angular sampling has changed
 	// Do not do this for auto_refine, but make sure to do this when initialising multi-body refinement!
-	if (!do_auto_refine || do_initialise_bodies)
+	if (!(do_auto_refine || do_auto_sampling) || do_initialise_bodies)
 	{
 		directions_have_changed = false;
 		fnt = parser.getOption("--healpix_order", "Healpix order for the angular sampling rate on the sphere (before oversampling): hp2=15deg, hp3=7.5deg, etc", "OLD");
@@ -627,6 +627,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	sampling.helical_offset_step = textToFloat(parser.getOption("--helical_offset_step", "Sampling rate (before oversampling) for offsets along helical axis (in Angstroms)", "-1"));
 	sampling.perturbation_factor = textToFloat(parser.getOption("--perturb", "Perturbation factor for the angular sampling (0=no perturb; 0.5=perturb)", "0.5"));
 	do_auto_refine = parser.checkOption("--auto_refine", "Perform 3D auto-refine procedure?");
+	do_auto_sampling = parser.checkOption("--auto_sampling", "Perform auto-sampling (outside the 3D auto-refine procedure)?");
 	autosampling_hporder_local_searches = textToInteger(parser.getOption("--auto_local_healpix_order", "Minimum healpix order (before oversampling) from which autosampling procedure will use local searches", "4"));
 	parser.setSection(orientations_section);
 	RFLOAT _sigma_ang = textToFloat(parser.getOption("--sigma_ang", "Stddev on all three Euler angles for local angular searches (of +/- 3 stddev)", "-1"));
@@ -1103,6 +1104,8 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 		strict_lowres_exp = -1.;
 	if (!MD.getValue(EMDL_OPTIMISER_DO_CENTER_CLASSES, do_center_classes))
 		do_center_classes = false;
+    if (!MD.getValue(EMDL_OPTIMISER_DO_AUTO_SAMPLING, do_auto_sampling))
+    	do_auto_sampling = false;
 
 	// Initialise some stuff for first-iteration only (not relevant here...)
 	do_calculate_initial_sigma_noise = false;
@@ -1279,6 +1282,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_SGD_STEPSIZE_SCHEME, grad_stepsize_scheme);
 		MD.setValue(EMDL_MAX_SIGNIFICANTS, maximum_significants_arg);
 		MD.setValue(EMDL_OPTIMISER_DO_AUTO_REFINE, do_auto_refine);
+		MD.setValue(EMDL_OPTIMISER_DO_AUTO_SAMPLING, do_auto_sampling);
 		MD.setValue(EMDL_OPTIMISER_AUTO_LOCAL_HP_ORDER, autosampling_hporder_local_searches);
 		MD.setValue(EMDL_OPTIMISER_NR_ITER_WO_RESOL_GAIN, nr_iter_wo_resol_gain);
 		MD.setValue(EMDL_OPTIMISER_BEST_RESOL_THUS_FAR,best_resol_thus_far);
@@ -1951,6 +1955,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		nr_iter = nr_iter_max;
 		has_fine_enough_angular_sampling = false;
 		has_converged = false;
+		do_auto_sampling = true;
 
 		if (mymodel.tau2_fudge_factor > 1. && verb > 0)
 		{
@@ -1984,7 +1989,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 	// Initialise the sampling object (sets prior mode and fills translations and rotations inside sampling object)
 	// May06,2015 - Shaoda & Sjors, initialise for helical translations
-	bool do_local_searches_helical = ((do_auto_refine) && (do_helical_refine) &&
+	bool do_local_searches_helical = ((do_auto_refine || do_auto_sampling) && (do_helical_refine) &&
 			(sampling.healpix_order >= autosampling_hporder_local_searches));
 
 	if (iter == 0)
@@ -2000,7 +2005,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 			helical_rise_initial, helical_twist_initial);
 
 	// Now that sampling is initialised, also modify sigma2_rot for the helical refinement
-	if (do_auto_refine && do_helical_refine && !ignore_helical_symmetry && iter == 0 && sampling.healpix_order >= autosampling_hporder_local_searches)
+	if ((do_auto_refine || do_auto_sampling) && do_helical_refine && !ignore_helical_symmetry && iter == 0 && sampling.healpix_order >= autosampling_hporder_local_searches)
 	{
 		// Aug20,2015 - Shaoda, Helical refinement
 		RFLOAT rottilt_step = sampling.getAngularSampling(adaptive_oversampling);
@@ -2129,10 +2134,11 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 	if (gradient_refine)
 	{
+		auto_ignore_angle_changes = true;
 		if (do_auto_refine)
 		{
 			auto_resolution_based_angles = true;
-			auto_ignore_angle_changes = true;
+			do_auto_sampling = true;
 		}
 		else
 		{
@@ -2142,39 +2148,52 @@ void MlOptimiser::initialiseGeneral(int rank)
 		updateStepSize();
 
 		// determine default subset sizes
-		if (grad_ini_subset_size == -1 || grad_fin_subset_size == -1)
-		{
-			if (rank==0)
-				if (grad_ini_subset_size != -1 || grad_fin_subset_size != -1)
-					std::cout << " WARNING: Since both --grad_ini_subset and --grad_fin_subset were not set, " <<
-					          "both will instead be determined automatically." << std::endl;
 
+
+		if (grad_ini_subset_size == -1)
+		{
 			unsigned long dataset_size = mydata.numberOfParticles();
 			if (mymodel.ref_dim == 2) // 2D Classification
 			{
 				grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.005, 5000), 100);
+			}
+			else
+			{
+				if (is_3d_model) // 3D Initial model
+				{
+					grad_ini_subset_size = 200 * mymodel.nr_classes;
+				}
+				else // 3D Classification / Auto-refine
+				{
+					grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.1, 100000), 100);
+				}
+			}
+
+			if (rank==0) std::cout << " Initial subset size set to " << grad_ini_subset_size << std::endl;
+		}
+
+		if (grad_fin_subset_size == -1)
+		{
+			unsigned long dataset_size = mydata.numberOfParticles();
+			if (mymodel.ref_dim == 2) // 2D Classification
+			{
 				grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.05, 50000), 1000);
 			}
 			else
 			{
-				if (is_3d_model) // 3D Initial mode
+				if (is_3d_model) // 3D Initial model
 				{
-					grad_ini_subset_size = 200 * mymodel.nr_classes;
 					grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.01, 10000), 1000);
 				}
-				else // 3D Classification
+				else // 3D Classification / Auto-refine
 				{
-					grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.1, 100000), 100);
 					grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.1, 100000), 1000);
 				}
 			}
 
-			if (rank==0)
-			{
-				std::cout << " Initial subset size set to " << grad_ini_subset_size << std::endl;
-				std::cout << " Final subset size set to " << grad_fin_subset_size << std::endl;
-			}
+			if (rank==0) std::cout << " Final subset size set to " << grad_fin_subset_size << std::endl;
 		}
+
 	}
 	else
 	{
@@ -3033,7 +3052,7 @@ void MlOptimiser::iterate()
 						mymodel.helical_twist,
 						helical_nstart,
 						(mymodel.data_dim == 3),
-						do_auto_refine,
+						(do_auto_refine || do_auto_sampling),
 						mymodel.sigma2_rot,
 						mymodel.sigma2_tilt,
 						mymodel.sigma2_psi,
@@ -3130,10 +3149,15 @@ void MlOptimiser::expectation()
 	}
 
 	// D. Update the angular sampling (all nodes except leader)
-	if ( ( (do_auto_refine) && iter > 1) ||
+	if ( ( (do_auto_refine || do_auto_sampling) && iter > 1) ||
 		 ( mymodel.nr_classes > 1 && allow_coarser_samplings) )
 	{
-		updateAngularSampling();
+
+		// Only do this once every 10 iterations for gradient refinement
+		if (!(do_grad && iter % 10 != 0))
+		{
+			updateAngularSampling();
+		}
 	}
 
 	// E. Check whether everything fits into memory
@@ -3536,7 +3560,7 @@ void MlOptimiser::expectationSetupCheckMemory(int myverb)
 		// Jun04,2015 - Shaoda & Sjors, bimodal psi searches for helices
 		if (do_helical_refine && mymodel.ref_dim == 3)
 		{
-			bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
+			bool do_auto_refine_local_searches = (do_auto_refine || do_auto_sampling) && (sampling.healpix_order >= autosampling_hporder_local_searches);
 			bool do_classification_local_searches = (!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
 					&& (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.);
 			bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
@@ -5517,7 +5541,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 			RFLOAT prior_psi_flip_ratio = DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_PSI_PRIOR_FLIP_RATIO);
 			RFLOAT prior_rot_flip_ratio = DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_ROT_PRIOR_FLIP_RATIO);  // Kthurber
 
-			bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
+			bool do_auto_refine_local_searches = (do_auto_refine || do_auto_sampling) && (sampling.healpix_order >= autosampling_hporder_local_searches);
 			bool do_classification_local_searches = (!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
 					&& (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.);
 			bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
@@ -5743,7 +5767,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 			if ( (!do_skip_align) && (!do_skip_rotate) )
 			{
 				// TODO: check whether the following lines make sense
-				bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
+				bool do_auto_refine_local_searches = (do_auto_refine || do_auto_sampling) && (sampling.healpix_order >= autosampling_hporder_local_searches);
 				bool do_classification_local_searches = (!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
 						&& (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.);
 				bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
@@ -9156,7 +9180,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 	// Warn for inflated resolution estimates
 	if (acc_rot > 10. && do_auto_refine)
 	{
-		std::cout << " Auto-refine: WARNING: The angular accuracy is worse than 10 degrees, so basically you cannot align your particles (yet)!" << std::endl;
+		std::cout << " Auto-refine: WARNING: Iter = " << iter << " The angular accuracy is worse than 10 degrees, so basically you cannot align your particles (yet)!" << std::endl;
 		std::cout << " Auto-refine: WARNING: You probably need not worry if the accuracy improves during the next few iterations." << std::endl;
 		std::cout << " Auto-refine: WARNING: However, if the problem persists it may lead to spurious FSC curves, so be wary of inflated resolution estimates..." << std::endl;
 		std::cout << " Auto-refine: WARNING: Sometimes it is better to tune resolution yourself by adjusting T in a 3D-classification with a single class." << std::endl;
@@ -9243,7 +9267,7 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 	else
 	{
 
-		if (!do_split_random_halves)
+		if (!(do_split_random_halves || do_auto_sampling))
 			REPORT_ERROR("MlOptimiser::updateAngularSampling: BUG! updating of angular sampling should only happen for gold-standard (auto-) refinements.");
 
 		if (do_skip_rotate)
@@ -9348,23 +9372,28 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 				// B. Use twice as fine angular sampling
 				int new_hp_order;
 				RFLOAT new_rottilt_step, new_psi_step;
+				// For gradient-driven classifications/initial model calculations: don't go to samplings that require local searches!
 				if (mymodel.ref_dim == 3)
 				{
-					new_hp_order = sampling.healpix_order + 1;
-					new_rottilt_step = new_psi_step = 360. / (6 * ROUND(std::pow(2., new_hp_order + adaptive_oversampling)));
 
-					// Set the new sampling in the sampling-object
-					sampling.setOrientations(new_hp_order, new_psi_step * std::pow(2., adaptive_oversampling));
+					if (!(do_grad && !do_auto_refine && sampling.healpix_order + 1 >= autosampling_hporder_local_searches) )
+					{
+						new_hp_order = sampling.healpix_order + 1;
+						new_rottilt_step = new_psi_step = 360. / (6 * ROUND(std::pow(2., new_hp_order + adaptive_oversampling)));
 
-					// Resize the pdf_direction arrays to the correct size and fill with an even distribution
-					mymodel.initialisePdfDirection(sampling.NrDirections());
+						// Set the new sampling in the sampling-object
+						sampling.setOrientations(new_hp_order, new_psi_step * std::pow(2., adaptive_oversampling));
 
-					// Also reset the nr_directions in wsum_model
-					wsum_model.nr_directions = mymodel.nr_directions;
+						// Resize the pdf_direction arrays to the correct size and fill with an even distribution
+						mymodel.initialisePdfDirection(sampling.NrDirections());
 
-					// Also resize and initialise wsum_model.pdf_direction for each class!
-					for (int iclass=0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
-						wsum_model.pdf_direction[iclass].initZeros(mymodel.nr_directions);
+						// Also reset the nr_directions in wsum_model
+						wsum_model.nr_directions = mymodel.nr_directions;
+
+						// Also resize and initialise wsum_model.pdf_direction for each class!
+						for (int iclass=0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
+							wsum_model.pdf_direction[iclass].initZeros(mymodel.nr_directions);
+					}
 
 				}
 				else if (mymodel.ref_dim == 2)
@@ -9375,7 +9404,7 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 					REPORT_ERROR("MlOptimiser::autoAdjustAngularSampling BUG: ref_dim should be two or three");
 
 				// Jun08,2015 Shaoda & Sjors, Helical refinement
-				bool do_local_searches_helical = ((do_auto_refine) && (do_helical_refine) &&
+				bool do_local_searches_helical = ((do_auto_refine || do_auto_sampling) && (do_helical_refine) &&
 						(sampling.healpix_order >= autosampling_hporder_local_searches));
 
 				// Don't go to coarse angular samplings. Then just keep doing as it was
@@ -9424,7 +9453,7 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 			if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 			{
 				std::cout << " Auto-refine: Helical refinement... Local translational searches along helical axis= ";
-				if ( (mymodel.ref_dim == 3) && (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches) )
+				if ( (mymodel.ref_dim == 3) && (do_auto_refine || do_auto_sampling) && (sampling.healpix_order >= autosampling_hporder_local_searches) )
 					std:: cout << "true" << std::endl;
 				else
 					std:: cout << "false" << std::endl;

@@ -816,11 +816,11 @@ void MlOptimiserMpi::expectation()
 		timer.tic(TIMING_EXP_3);
 #endif
 	// D. Update the angular sampling (all nodes except leader)
-	if (!do_grad && !node->isLeader() && ( do_auto_refine && iter > 1 || (mymodel.nr_classes > 1 && allow_coarser_samplings) ))
+	if (!do_grad && !node->isLeader() && ( (do_auto_refine || do_auto_sampling) && iter > 1 || (mymodel.nr_classes > 1 && allow_coarser_samplings) ))
 		updateAngularSampling(node->rank == 1);
 
-	// D. Update the angular sampling (all nodes except leader) for gradient refinement
-	if (do_grad && ( do_auto_refine && iter > 1 ))
+	// D. Update the angular sampling (all nodes except leader) for gradient refinement, only once every 10 iters
+	if (do_grad && ( (do_auto_refine || do_auto_sampling) && iter > 1 && iter % 10 == 0 ))
 		updateAngularSamplingGrad(0, n_trials_acc - 1, node->rank == 1);
 
 	// The leader needs to know about the updated parameters from updateAngularSampling
@@ -3214,7 +3214,7 @@ void MlOptimiserMpi::updateAngularSamplingGrad(long int my_first_part_id, long i
 				REPORT_ERROR("MlOptimiser::autoAdjustAngularSampling BUG: ref_dim should be two or three");
 
 			// Jun08,2015 Shaoda & Sjors, Helical refinement
-			bool do_local_searches_helical = ((do_auto_refine) && (do_helical_refine) &&
+			bool do_local_searches_helical = ((do_auto_refine || do_auto_sampling) && (do_helical_refine) &&
 			                                  (sampling.healpix_order >= autosampling_hporder_local_searches));
 
 			sampling.setTranslations(
@@ -3271,7 +3271,7 @@ void MlOptimiserMpi::updateAngularSamplingGrad(long int my_first_part_id, long i
 		if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 		{
 			std::cout << " Auto-refine: Helical refinement... Local translational searches along helical axis= ";
-			if ( (mymodel.ref_dim == 3) && (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches) )
+			if ( (mymodel.ref_dim == 3) && (do_auto_refine || do_auto_sampling) && (sampling.healpix_order >= autosampling_hporder_local_searches) )
 				std:: cout << "true" << std::endl;
 			else
 				std:: cout << "false" << std::endl;
@@ -3569,7 +3569,7 @@ void MlOptimiserMpi::iterate()
 							mymodel.helical_twist,
 							helical_nstart,
 							(mymodel.data_dim == 3),
-							do_auto_refine,
+							(do_auto_refine || do_auto_sampling),
 							mymodel.sigma2_rot,
 							mymodel.sigma2_tilt,
 							mymodel.sigma2_psi,
