@@ -1363,13 +1363,7 @@ void JobWindow::initialiseInimodelWindow()
 	place("particle_diameter");
 	place("do_solvent", TOGGLE_DEACTIVATE);
 	place("sym_name", TOGGLE_DEACTIVATE);
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	place("sampling");
-	place("offset_range");
-	place("offset_step");
+	place("do_run_C1", TOGGLE_DEACTIVATE);
 
 	tab3->end();
 

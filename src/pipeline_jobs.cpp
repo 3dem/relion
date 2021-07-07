@@ -3211,6 +3211,7 @@ with X being the iteration from which one continues the previous run.");
 	joboptions["nr_classes"] = JobOption("Number of classes:", 1, 1, 50, 1, "The number of classes (K) for a multi-reference ab initio SGD refinement. \
 These classes will be made in an unsupervised manner, starting from a single reference in the initial iterations of the SGD, and the references will become increasingly dissimilar during the inbetween iterations.");
 	joboptions["sym_name"] = JobOption("Symmetry:", std::string("C1"), "The initial model is always generated in C1 and then aligned to and symmetrized with the specified point group. If the automatic alignment fails, please manually rotate run_itNNN_class001.mrc (NNN is the number of iterations) so that it conforms the symmetry convention.");
+	joboptions["do_run_C1"] = JobOption("Run in C1 and apply symmetry later? ", true, "If set to Yes, the gradient-driven optimisation is run in C1 and the symmetry orientation is searched and applied later. If set to No, the entire optimisation is run in the symmetry point group indicated above.");
 	joboptions["particle_diameter"] = JobOption("Mask diameter (A):", 200, 0, 1000, 10, "The experimental images will be masked with a soft \
 circular mask with this diameter. Make sure this radius is not set too small because that may mask away part of the signal! \
 If set to a value larger than the image size no masking will be performed.\n\n\
@@ -3232,17 +3233,6 @@ See the RELION Wiki for more details.\n\n Also make sure that the correct pixel 
 only be performed from the first peak of each CTF onward. This can be useful if the CTF model is inadequate at the lowest resolution. \
 Still, in general using higher amplitude contrast on the CTFs (e.g. 10-20%) often yields better results. \
 Therefore, this option is not generally recommended: try increasing amplitude contrast (in your input STAR file) first!");
-
-
-	joboptions["sampling"] = JobOption("Initial angular sampling:", job_sampling_options, 1, "There are only a few discrete \
-angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
-The samplings are approximate numbers and vary slightly over the sphere.\n\n For initial model generation at low resolutions, coarser angular samplings can often be used than in normal 3D classifications/refinements, e.g. 15 degrees. During the inbetween and final SGD iterations, the sampling will be adjusted to the resolution, given the particle size.");
-	joboptions["offset_range"] = JobOption("Offset search range (pix):", 6, 0, 30, 1, "Probabilities will be calculated only for translations \
-in a circle with this radius (in pixels). The center of this circle changes at every iteration and is placed at the optimal translation \
-for each image in the previous iteration.\n\n");
-	joboptions["offset_step"] = JobOption("Offset search step (pix):", 2, 0.1, 5, 0.1, "Translations will be sampled with this step-size (in pixels).\
-Translational sampling is also done using the adaptive approach. \
-Therefore, if adaptive=1, the translations will first be evaluated on a 2x coarser grid.\n\n ");
 
 	joboptions["do_parallel_discio"] = JobOption("Use parallel disc I/O?", true, "If set to Yes, all MPI followers will read their own images from disc. \
 Otherwise, only the leader will read images and send them through the network to the followers. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many followers reading in parallel. If your datasets contain particles with different box sizes, you have to say Yes.");
@@ -3284,6 +3274,8 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 
 	std::string command;
 	command="`which relion_refine`";
+
+	FileName fn_sym = joboptions["sym_name"].getString();
 
 	FileName fn_run = "run";
 	if (is_continue)
@@ -3335,7 +3327,14 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 		}
 
 		command += " --K " + joboptions["nr_classes"].getString();
-		command += " --sym C1 ";
+		if (joboptions["do_run_C1"].getBoolean())
+		{
+			command += " --sym C1 ";
+		}
+		else
+		{
+			command += " --sym " + fn_sym;
+		}
 
 		if (joboptions["do_solvent"].getBoolean())
 			command += " --flatten_solvent ";
@@ -3358,25 +3357,7 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 
 	// Optimisation
 	command += " --particle_diameter " + joboptions["particle_diameter"].getString();
-
-	// Sampling
-	int iover = 1;
-	command += " --oversampling " + floatToString((float)iover);
-
-	int sampling = JobOption::getHealPixOrder(joboptions["sampling"].getString());
-	if (sampling <= 0)
-	{
-		error_message = "Wrong choice for sampling";
-		return false;
-	}
-	// The sampling given in the GUI will be the oversampled one!
-	command += " --healpix_order " + floatToString(sampling - iover);
-
-	// Offset range
-	command += " --offset_range " + joboptions["offset_range"].getString();
-	// The sampling given in the GUI will be the oversampled one!
-	command += " --offset_step " + floatToString(joboptions["offset_step"].getNumber(error_message) * pow(2., iover));
-	if (error_message != "") return false;
+	command += " --oversampling 1  --healpix_order 1  --offset_range 6  --offset_step 2 --auto_sampling ";
 
 	// Running stuff
 	command += " --j " + joboptions["nr_threads"].getString();
@@ -3392,14 +3373,14 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 
 	commands.push_back(command);
 
-	FileName fn_sym = joboptions["sym_name"].getString();
+	// Generate output nodes
 	if (nr_classes > 1)
 	{
 
 		// Only align symmetry for a single class!
-		if ( !(fn_sym.contains("C1") || fn_sym.contains("c1")) )
+		if ( joboptions["do_run_C1"].getBoolean() && !(fn_sym.contains("C1") || fn_sym.contains("c1")) )
 		{
-			error_message = "non-C1 symmetry is only possible when using a single class!";
+			error_message = "non-C1 symmetry with multiple classes is only possible when running in that point group symmetry!";
 			return false;
 		}
         for (int iclass = 0; iclass < nr_classes; iclass++)
@@ -3426,7 +3407,7 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 		fn_ref.compose(outputname+"run_it", iter, "", 3);
 		fn_ref.compose(fn_ref+"_class", 1, "mrc", 3);
 
-		if ( !(fn_sym.contains("C1") || fn_sym.contains("c1")) )
+		if ( joboptions["do_run_C1"].getBoolean() && !(fn_sym.contains("C1") || fn_sym.contains("c1")) )
 		{
 
 			if ( nr_classes > 1)
@@ -3445,7 +3426,7 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 			std::string command3 = "`which relion_image_handler`";
 			command3 += " --i " + outputname + "symmetry_aligned.mrc";
 			command3 += " --o " + outputname + "initial_model.mrc";
-			command3 += " --sym " + joboptions["sym_name"].getString();
+			command3 += " --sym " + fn_sym;
 			commands.push_back(command3);
 
 		}
