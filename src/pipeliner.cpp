@@ -516,11 +516,11 @@ bool PipeLine::PrintComCpipe(RelionJob &thisjob, int current_job, bool is_main_c
 	if (!makeJobFilesCpipe(thisjob, current_job, false, is_main_continue, is_scheduled, error_message))
 	{
 		std::string error_com = "echo " + error_message;
-		system(error_com.c_str());
+		int res = system(error_com.c_str());
 		return false;
 	}
 	std::string command  = "reSPYon --print_command .TMP_runfiles/job.star ";
-	system(command.c_str());
+	int res = system(command.c_str());
 	return true;
 
 }
@@ -544,7 +544,7 @@ bool PipeLine::makeJobFilesCpipe(RelionJob &_job, int &current_job, bool only_sc
 	{
 		fclose(file);
 		std::string removecom = "rm .TMP_runfiles/job.star";
-		system(removecom.c_str());
+		int res = system(removecom.c_str());
 	}
 
 	// Save temporary hidden file with this jobs settings as default for a new job
@@ -560,7 +560,7 @@ bool PipeLine::makeJobFilesCpipe(RelionJob &_job, int &current_job, bool only_sc
 	{
 		//make the new job.star file to the job dir as continue_job.star
 		std::string movecom = "cp .TMP_runfiles/job.star " + _job.outputName + "continue_job.star";
-		system(movecom.c_str());
+		int res = system(movecom.c_str());
 	}
 
 	return true;
@@ -581,7 +581,7 @@ bool PipeLine::runJobCpipe(RelionJob &_job, int &current_job, bool only_schedule
 		if (!is_main_continue)
 		{
 			std::string command  = "reSPYon --schedule_job .TMP_runfiles/job.star";
-			system(command.c_str());
+			int res = system(command.c_str());
 			return true;
 		}
 		else if (is_main_continue)
@@ -591,7 +591,7 @@ bool PipeLine::runJobCpipe(RelionJob &_job, int &current_job, bool only_schedule
 			job_num_string =  buffer;
 			std::string jobname = "job" + job_num_string;
 			std::string command  = "reSPYon --schedule_job " + jobname;
-			system(command.c_str());
+			int res = system(command.c_str());
 			return true;
 		}
 	}
@@ -600,9 +600,9 @@ bool PipeLine::runJobCpipe(RelionJob &_job, int &current_job, bool only_schedule
 	{
 		//run in pipeliner
 		std::string command  = "reSPYon --run_job .TMP_runfiles/job.star &";
-		system(command.c_str());
+		int res = system(command.c_str());
 		std::string message = "echo 'Running job as: " + _job.outputName + "'";
-		system(message.c_str());
+		res = system(message.c_str());
 		return true;
 	}
 
@@ -610,9 +610,9 @@ bool PipeLine::runJobCpipe(RelionJob &_job, int &current_job, bool only_schedule
 	{
 		// run in the pipeliner
 		std::string command  = "reSPYon --continue_job " + _job.outputName + " &";
-		system(command.c_str());
+		int res = system(command.c_str());
 		std::string message = "echo 'Continuing job " + _job.outputName + "'";
-		system(message.c_str());
+		res = system(message.c_str());
 		return true;
 	}
 
