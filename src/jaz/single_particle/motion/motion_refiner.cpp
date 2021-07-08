@@ -599,8 +599,6 @@ int MotionRefiner::lastMicrographForFCC()
 			}
 		}
 	}
-	else
-	{
-		return motionMdts.size()-1;
-	}
+
+	return motionMdts.size()-1;
 }

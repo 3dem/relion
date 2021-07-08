@@ -90,4 +90,7 @@ std::vector<d4Matrix> ImodHelper::readAffineTransforms(std::string fn)
     }
 
     return vol2img;*/
+
+    std::vector<d4Matrix> vol2img;
+    return vol2img;
 }

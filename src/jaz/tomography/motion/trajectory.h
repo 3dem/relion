@@ -45,7 +45,9 @@ class Trajectory
 				{
 					shifts_Ang[f] += t.shifts_Ang[f];
 				}
-			}		
+			}
+
+			return *this;	
 		}
 		
 };
