@@ -3373,79 +3373,36 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 
 	commands.push_back(command);
 
-	// Generate output nodes
-	if (nr_classes > 1)
+	// Quickly remove RELION_JOB_EXIT_SUCCESS
+	std::string command0 = "rm -f " + outputname + RELION_JOB_EXIT_SUCCESS;
+	commands.push_back(command0);
+
+
+	FileName fn_model;
+	fn_model.compose(outputname + fn_run + "_it", total_nr_iter, "_model.star", 3);
+
+	// Align with symmetry axes and apply symmetry
+	std::string command2 = "`which relion_align_symmetry`";
+	command2 += " --i " + fn_model;
+	command2 += " --o " + outputname + "initial_model.mrc";
+
+	if ( joboptions["do_run_C1"].getBoolean() && !(fn_sym.contains("C1") || fn_sym.contains("c1")) )
 	{
-
-		// Only align symmetry for a single class!
-		if ( joboptions["do_run_C1"].getBoolean() && !(fn_sym.contains("C1") || fn_sym.contains("c1")) )
-		{
-			error_message = "non-C1 symmetry with multiple classes is only possible when running in that point group symmetry!";
-			return false;
-		}
-        for (int iclass = 0; iclass < nr_classes; iclass++)
-        {
-        	FileName fn_tmp;
-        	fn_tmp.compose(outputname + fn_run + "_it", total_nr_iter, "", 3);
-        	fn_tmp.compose(fn_tmp + "_class", iclass+1, "mrc", 3);
-        	Node node3(fn_tmp, LABEL_INIMOD_MAP);
-        	outputNodes.push_back(node3);
-        }
-
+		command2 += " --sym " + joboptions["sym_name"].getString();
 	}
 	else
 	{
-
-		// Quickly remove RELION_JOB_EXIT_SUCCESS
-		std::string command0 = "rm -f " + outputname + RELION_JOB_EXIT_SUCCESS;
-		commands.push_back(command0);
-
-		// Now align&apply symmetry, or copy output from relion_refine to initial_model.mrc
-		FileName fn_ref;
-		int iter = (int)((joboptions["nr_iter"]).getNumber(error_message));
-		if (error_message != "") return false;
-		fn_ref.compose(outputname+"run_it", iter, "", 3);
-		fn_ref.compose(fn_ref+"_class", 1, "mrc", 3);
-
-		if ( joboptions["do_run_C1"].getBoolean() && !(fn_sym.contains("C1") || fn_sym.contains("c1")) )
-		{
-
-			if ( nr_classes > 1)
-			{
-				error_message = "non-C1 symmetry is only possible when using a single class!";
-				return false;
-			}
-
-			// Align with symmetry axes and apply symmetry
-			std::string command2 = "`which relion_align_symmetry`";
-			command2 += " --i " + fn_ref;
-			command2 += " --o " + outputname + "symmetry_aligned.mrc";
-			command2 += " --sym " + joboptions["sym_name"].getString();
-			commands.push_back(command2);
-
-			std::string command3 = "`which relion_image_handler`";
-			command3 += " --i " + outputname + "symmetry_aligned.mrc";
-			command3 += " --o " + outputname + "initial_model.mrc";
-			command3 += " --sym " + fn_sym;
-			commands.push_back(command3);
-
-		}
-		else
-		{
-			// Just copy to expected output filename
-			std::string command2 = "`which relion_image_handler`";
-			command2 += " --i " + fn_ref;
-			command2 += " --o " + outputname + "initial_model.mrc";
-			commands.push_back(command2);
-		}
-
-		// And re-introduce RELION_JOB_EXIT_SUCCESS
-		std::string commandF = "touch " + outputname + RELION_JOB_EXIT_SUCCESS;
-		commands.push_back(commandF);
-
-		Node node2(outputname + "initial_model.mrc", LABEL_INIMOD_MAP);
-		outputNodes.push_back(node2);
+		command2 += " --sym C1 ";
 	}
+	command2 += " --apply_sym --select_largest_class ";
+	commands.push_back(command2);
+
+	// And re-introduce RELION_JOB_EXIT_SUCCESS
+	std::string commandF = "touch " + outputname + RELION_JOB_EXIT_SUCCESS;
+	commands.push_back(commandF);
+
+    Node node2(outputname + "initial_model.mrc", LABEL_INIMOD_MAP);
+    outputNodes.push_back(node2);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
