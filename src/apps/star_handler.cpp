@@ -212,6 +212,9 @@ class star_handler_parameters
 		label2 = (fn_label2 == "") ? EMDL_UNDEFINED : EMDL::str2Label(fn_label2);
 		label3 = (fn_label3 == "") ? EMDL_UNDEFINED : EMDL::str2Label(fn_label3);
 
+		std::cout <<  MD1.numberOfObjects() << " entries are in the 1st input STAR file." << std::endl;
+		std::cout <<  MD2.numberOfObjects() << " entries are in the 2nd input STAR file." << std::endl;
+
 		compareMetaDataTable(MD1, MD2, MDboth, MDonly1, MDonly2, label1, eps, label2, label3);
 
 		std::cout << MDboth.numberOfObjects()  << " entries occur in both input STAR files." << std::endl;
