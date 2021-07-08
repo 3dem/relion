@@ -3401,8 +3401,22 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 	std::string commandF = "touch " + outputname + RELION_JOB_EXIT_SUCCESS;
 	commands.push_back(commandF);
 
-    Node node2(outputname + "initial_model.mrc", LABEL_INIMOD_MAP);
+	// Output nodes
+	Node node2(outputname + "initial_model.mrc", LABEL_INIMOD_MAP);
     outputNodes.push_back(node2);
+
+    // If doing more than 1 class, make them all available (one of them will be the same as initial_model.mrc)
+    if (nr_classes > 1)
+    {
+        for (int iclass = 0; iclass < nr_classes; iclass++)
+        {
+			FileName fn_tmp;
+			fn_tmp.compose(outputname + fn_run + "_it", total_nr_iter, "", 3);
+			fn_tmp.compose(fn_tmp + "_class", iclass+1, "mrc", 3);
+			Node node3(fn_tmp, LABEL_INIMOD_MAP);
+			outputNodes.push_back(node3);
+        }
+    }
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
