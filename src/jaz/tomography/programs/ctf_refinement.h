@@ -27,7 +27,7 @@ class CtfRefinementProgram : public RefinementProgram
 				do_fit_Lambert_per_tomo, do_fit_Lambert_globally,
 				do_even_aberrations, do_odd_aberrations;
 
-			int deltaSteps, n_even, n_odd;
+			int deltaSteps, n_even, n_odd, min_frame, max_frame;
 			double minDelta, maxDelta, lambda_reg, k_min_Ang;
 			
 		void run();

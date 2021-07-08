@@ -223,7 +223,7 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 				{
 					for (int x = 0; x < diam; x++)
 					{
-						CCs[p](x,y) = 0.0;
+						CCs[p](x,y,ft) = 0.0;
 					}
 				}
 
@@ -231,12 +231,12 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 				{
 					for (int x = 0; x < 3; x++)
 					{
-						CCs[p](x,y) = 0.0;
+						CCs[p](x,y,ft) = 0.0;
 					}
 
 					for (int x = diam - 3; x < diam; x++)
 					{
-						CCs[p](x,y) = 0.0;
+						CCs[p](x,y,ft) = 0.0;
 					}
 				}
 
@@ -244,7 +244,7 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 				{
 					for (int x = 0; x < diam; x++)
 					{
-						CCs[p](x,y) = 0.0;
+						CCs[p](x,y,ft) = 0.0;
 					}
 				}
 			}

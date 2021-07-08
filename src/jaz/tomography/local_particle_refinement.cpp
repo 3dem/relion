@@ -41,7 +41,7 @@ LocalParticleRefinement::LocalParticleRefinement(
 	const double ba = s * pixelSize;
 	const int og = particleSet.getOpticsGroup(particle_id);
 
-	if (maxFrame < 0) maxFrame = fc-1;
+	if (this->maxFrame < 0) this->maxFrame = fc-1;
 
 	position = particleSet.getPosition(particle_id);
 

@@ -96,7 +96,7 @@ void LocalParticleRefineProgram::run()
 		std::vector<double> results(pc * data_pad);
 
 
-		Log::beginProgress("Aligning particles", pc/num_threads);
+		if (!verbose_opt) Log::beginProgress("Aligning particles", pc/num_threads);
 
 		#pragma omp parallel for num_threads(num_threads)
 		for (int p = 0; p < pc; p++)
@@ -127,7 +127,7 @@ void LocalParticleRefineProgram::run()
 			}
 		}
 
-		Log::endProgress();
+		if (!verbose_opt) Log::endProgress();
 
 		for (int p = 0; p < pc; p++)
 		{
