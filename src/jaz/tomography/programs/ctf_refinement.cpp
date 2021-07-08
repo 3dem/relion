@@ -283,7 +283,10 @@ void CtfRefinementProgram::finalise()
 
 	if (do_refine_aberrations)
 	{
-		fitAberrations();
+		Tomogram tomogram = tomogramSet.loadTomogram(0, false);
+		const double k_min_px = boxSize * tomogram.optics.pixelSize / k_min_Ang;
+
+		fitAberrations(k_min_px);
 	}
 
 	Log::print("Writing output data");
@@ -1181,7 +1184,7 @@ void CtfRefinementProgram::collectScale()
 	}
 }
 
-void CtfRefinementProgram::fitAberrations()
+void CtfRefinementProgram::fitAberrations(int k_min_px)
 {
 	const int s  = boxSize;
 	const int sh = s/2 + 1;
@@ -1207,6 +1210,19 @@ void CtfRefinementProgram::fitAberrations()
 				{
 					BufferedImage<EvenData> even = EvenData::read(fn);
 					even_data_sum += even;
+				}
+			}
+
+			for (int yy = 0; yy < s;  yy++)
+			for (int xx = 0; xx < sh; xx++)
+			{
+				const double x = xx;
+				const double y = yy < s/2? yy : yy - s;
+				const double r = sqrt(x*x + y*y);
+
+				if (r < k_min_px)
+				{
+					even_data_sum(xx,yy) *= 0.0;
 				}
 			}
 
@@ -1248,6 +1264,19 @@ void CtfRefinementProgram::fitAberrations()
 				{
 					BufferedImage<OddData> odd = OddData::read(fn);
 					odd_data_sum += odd;
+				}
+			}
+
+			for (int yy = 0; yy < s;  yy++)
+			for (int xx = 0; xx < sh; xx++)
+			{
+				const double x = xx;
+				const double y = yy < s/2? yy : yy - s;
+				const double r = sqrt(x*x + y*y);
+
+				if (r < k_min_px)
+				{
+					odd_data_sum(xx,yy) *= 0.0;
 				}
 			}
 

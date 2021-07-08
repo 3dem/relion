@@ -79,7 +79,7 @@ class CtfRefinementProgram : public RefinementProgram
 		void fitGlobalScale();
 		void collectScale();
 
-		void fitAberrations();
+		void fitAberrations(int k_min_px);
 
 
 
