@@ -254,7 +254,7 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 	return out;
 }
 
-int TomogramSet::addTomogram(
+void TomogramSet::addTomogram(
 		std::string tomoName, std::string stackFilename,
 		const std::vector<gravis::d4Matrix>& projections, 
 		int w, int h, int d, 

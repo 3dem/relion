@@ -34,9 +34,6 @@ class ImodHelper
 			gravis::d4Matrix vol2world, 
 			double cix, 
 			double ciy);
-	
-    static std::vector<gravis::d4Matrix> readAffineTransforms(
-			std::string fn);
 };
 
 #endif
