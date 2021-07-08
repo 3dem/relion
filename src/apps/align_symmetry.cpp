@@ -53,8 +53,8 @@ public:
 		parser.setCommandLine(argc, argv);
 
 		int general_section = parser.addSection("Options");
-		fn_in = parser.getOption("--i", "Input map to be projected");
-		fn_out = parser.getOption("--o", "Rootname for output projections", "aligned.mrc");
+		fn_in = parser.getOption("--i", "Input map to be aligned (or model.star file pointing to multiple maps)");
+		fn_out = parser.getOption("--o", "Rootname for output aligned map (to be inserted before extension of input map)", "aligned");
 		fn_sym = parser.getOption("--sym", "Target point group symmetry");
 		boxsize = textToInteger(parser.getOption("--box_size", "Working box size in pixels. Very small box (such that Nyquist is aroud 20 A) is usually sufficient.", "64"));
 		if (boxsize % 2 != 0)
@@ -135,137 +135,162 @@ public:
 		int orig_size;
 		RFLOAT work_angpix, r_max, rot, tilt, psi;
 
-		std::cout << " Reading map: " << fn_in << std::endl;
-		vol_in.read(fn_in);
-		orig_size = XSIZE(vol_in());
-		std:: cout << " The input box size: " << orig_size << std::endl;
-		if (orig_size % 2 != 0)
-			REPORT_ERROR("The input box size must be an even number.");
-		if (orig_size < boxsize)
+		std::vector<FileName> fn_ins;
+		if (fn_in.contains("model.star"))
 		{
-			std::cerr << "The working box size (--box_size) is larger (" << boxsize << ") than the input box size (" << orig_size << "). The working box size is increased to the input box size." << std::endl;
-			boxsize = orig_size;
-		}
-
-		if (angpix < 0.)
-		{
-			angpix = vol_in.samplingRateX();
-			std::cout << " Using the pixel size in the input image header: " << angpix << " A/px" << std::endl;
-		}
-
-		if (!keep_centre)
-		{
-			selfTranslateCenterOfMassToCenter(vol_in(), DONT_WRAP, true);
-			std::cout << " Re-centred to the centre of the mass" << std::endl;
-		}
-
-		vol_work = vol_in;
-		resizeMap(vol_work(), boxsize);
-		work_angpix = angpix * orig_size / boxsize;
-		std::cout << " Downsampled to the working box size " << boxsize << " px. This corresponds to " << work_angpix << " A/px." << std::endl;
-
-		if (nr_uniform > 0)
-		{
-			std::cout << " Generating " << nr_uniform << " projections taken randomly from a uniform angular distribution." << std::endl;
-			MDang.clear();
-			randomize_random_generator();
-			tilt = 0;
-			psi = 0;
-			for (long int i = 0; i < nr_uniform; i++)
+			MetaDataTable MDclasses;
+			MDclasses.read(fn_in, "model_classes");
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDclasses)
 			{
-				rot = rnd_unif() * 360.;
-
-				if (!only_rot)
-				{
-					bool ok_tilt = false;
-					while (!ok_tilt)
-					{
-						tilt = rnd_unif() * 180.;
-						if (rnd_unif() < fabs(SIND(tilt)))
-							ok_tilt = true;
-					}
-					psi = rnd_unif() * 360.;
-				}
-
-				MDang.addObject();
-				MDang.setValue(EMDL_ORIENT_ROT, rot);
-				MDang.setValue(EMDL_ORIENT_TILT, tilt);
-				MDang.setValue(EMDL_ORIENT_PSI, psi);
+				FileName fnt;
+				MDclasses.getValue(EMDL_MLMODEL_REF_IMAGE, fnt);
+				fn_ins.push_back(fnt);
 			}
 		}
-
-		// Now that we have the size of the volume, check r_max
-		if (maxres < 0.)
-			r_max = boxsize;
 		else
-			r_max = CEIL(boxsize * work_angpix / maxres);
-
-		// Set right size of F2D and initialize to zero
-		rotated.reshape(vol_work());
-		symmetrised.reshape(vol_work());
-		transformer.setReal(rotated);
-		transformer.getFourierAlias(F2D);
-
-		// Set up the projector
-		int data_dim = 3;
-		Projector projector(boxsize, interpolator, padding_factor, r_min_nn, data_dim);
-		projector.computeFourierTransformMap(vol_work(), dummy, 2* r_max);
-
-		// Global search
-		std::cout << " Searching globally ..." << std::endl;
-		int best_at;
-		best_at = search(MDang, projector);
-
-		MDang.getValue(EMDL_ORIENT_ROT, rot, best_at);
-		MDang.getValue(EMDL_ORIENT_TILT, tilt, best_at);
-		MDang.getValue(EMDL_ORIENT_PSI, psi, best_at);
-		std::cout << " The best solution is ROT = " << rot << " TILT = " << tilt << " PSI = " << psi << std::endl << std::endl;
-
-		// Local refinement
-		std::cout << " Refining locally ..." << std::endl;
-		MDang.clear();
-
-		for (int i = -search_range; i <= search_range; i++)
 		{
-			for (int j = -search_range; j <= search_range; j++)
-			{
-				if (only_rot && j != 0) continue;
+			fn_ins.push_back(fn_in);
 
-				for (int k = -search_range; k <= search_range; k++)
+		}
+
+		for (int imap = 0; imap < fn_ins.size(); imap++)
+		{
+
+			std::cout << " Reading map: " << fn_ins[imap] << std::endl;
+			vol_in.read(fn_ins[imap]);
+			orig_size = XSIZE(vol_in());
+			std:: cout << " The input box size: " << orig_size << std::endl;
+			if (orig_size % 2 != 0)
+				REPORT_ERROR("The input box size must be an even number.");
+			if (orig_size < boxsize)
+			{
+				std::cerr << "The working box size (--box_size) is larger (" << boxsize << ") than the input box size (" << orig_size << "). The working box size is increased to the input box size." << std::endl;
+				boxsize = orig_size;
+			}
+
+			if (angpix < 0.)
+			{
+				angpix = vol_in.samplingRateX();
+				std::cout << " Using the pixel size in the input image header: " << angpix << " A/px" << std::endl;
+			}
+
+			if (!keep_centre)
+			{
+				selfTranslateCenterOfMassToCenter(vol_in(), DONT_WRAP, true);
+				std::cout << " Re-centred to the centre of the mass" << std::endl;
+			}
+
+			vol_work = vol_in;
+			resizeMap(vol_work(), boxsize);
+			work_angpix = angpix * orig_size / boxsize;
+			std::cout << " Downsampled to the working box size " << boxsize << " px. This corresponds to " << work_angpix << " A/px." << std::endl;
+
+			if (nr_uniform > 0)
+			{
+				std::cout << " Generating " << nr_uniform << " projections taken randomly from a uniform angular distribution." << std::endl;
+				MDang.clear();
+				randomize_random_generator();
+				tilt = 0;
+				psi = 0;
+				for (long int i = 0; i < nr_uniform; i++)
 				{
-					if (only_rot && k != 0) continue;
+					rot = rnd_unif() * 360.;
+
+					if (!only_rot)
+					{
+						bool ok_tilt = false;
+						while (!ok_tilt)
+						{
+							tilt = rnd_unif() * 180.;
+							if (rnd_unif() < fabs(SIND(tilt)))
+								ok_tilt = true;
+						}
+						psi = rnd_unif() * 360.;
+					}
 
 					MDang.addObject();
-					MDang.setValue(EMDL_ORIENT_ROT, rot + i * search_step);
-					MDang.setValue(EMDL_ORIENT_TILT, tilt + j * search_step);
-					MDang.setValue(EMDL_ORIENT_PSI, psi + k * search_range);
+					MDang.setValue(EMDL_ORIENT_ROT, rot);
+					MDang.setValue(EMDL_ORIENT_TILT, tilt);
+					MDang.setValue(EMDL_ORIENT_PSI, psi);
 				}
 			}
-		}
-		best_at = search(MDang, projector);
 
-		MDang.getValue(EMDL_ORIENT_ROT, rot, best_at);
-		MDang.getValue(EMDL_ORIENT_TILT, tilt, best_at);
-		MDang.getValue(EMDL_ORIENT_PSI, psi, best_at);
-		std::cout << " The refined solution is ROT = " << rot << " TILT = " << tilt << " PSI = " << psi << std::endl << std::endl;
+			// Now that we have the size of the volume, check r_max
+			if (maxres < 0.)
+				r_max = boxsize;
+			else
+				r_max = CEIL(boxsize * work_angpix / maxres);
 
-		std::cout << " Now rotating the original (full size) volume ..." << std::endl << std::endl;
-		Projector full_projector(orig_size, interpolator, padding_factor, r_min_nn, data_dim);
-		Image<RFLOAT> vol_out;
-		FourierTransformer final_transformer;
+			// Set right size of F2D and initialize to zero
+			rotated.reshape(vol_work());
+			symmetrised.reshape(vol_work());
+			transformer.setReal(rotated);
+			transformer.getFourierAlias(F2D);
 
-		full_projector.computeFourierTransformMap(vol_in(), dummy, 2 * orig_size);
-		Euler_rotation3DMatrix(rot, tilt, psi, A3D);
-		F2D.initZeros(orig_size, orig_size, orig_size / 2 + 1);
-		vol_out().reshape(vol_in());
-		full_projector.get2DFourierTransform(F2D, A3D);
+			// Set up the projector
+			int data_dim = 3;
+			Projector projector(boxsize, interpolator, padding_factor, r_min_nn, data_dim);
+			projector.computeFourierTransformMap(vol_work(), dummy, 2* r_max);
 
-		transformer.inverseFourierTransform(F2D, vol_out());
-		CenterFFT(vol_out(), false);
-		vol_out.setSamplingRateInHeader(angpix);
-		vol_out.write(fn_out);
-		std::cout << " The aligned map has been written to " << fn_out << std::endl;
+			// Global search
+			std::cout << " Searching globally ..." << std::endl;
+			int best_at;
+			best_at = search(MDang, projector);
 
+			MDang.getValue(EMDL_ORIENT_ROT, rot, best_at);
+			MDang.getValue(EMDL_ORIENT_TILT, tilt, best_at);
+			MDang.getValue(EMDL_ORIENT_PSI, psi, best_at);
+			std::cout << " The best solution is ROT = " << rot << " TILT = " << tilt << " PSI = " << psi << std::endl << std::endl;
+
+			// Local refinement
+			std::cout << " Refining locally ..." << std::endl;
+			MDang.clear();
+
+			for (int i = -search_range; i <= search_range; i++)
+			{
+				for (int j = -search_range; j <= search_range; j++)
+				{
+					if (only_rot && j != 0) continue;
+
+					for (int k = -search_range; k <= search_range; k++)
+					{
+						if (only_rot && k != 0) continue;
+
+						MDang.addObject();
+						MDang.setValue(EMDL_ORIENT_ROT, rot + i * search_step);
+						MDang.setValue(EMDL_ORIENT_TILT, tilt + j * search_step);
+						MDang.setValue(EMDL_ORIENT_PSI, psi + k * search_range);
+					}
+				}
+			}
+			best_at = search(MDang, projector);
+
+			MDang.getValue(EMDL_ORIENT_ROT, rot, best_at);
+			MDang.getValue(EMDL_ORIENT_TILT, tilt, best_at);
+			MDang.getValue(EMDL_ORIENT_PSI, psi, best_at);
+			std::cout << " The refined solution is ROT = " << rot << " TILT = " << tilt << " PSI = " << psi << std::endl << std::endl;
+
+			std::cout << " Now rotating the original (full size) volume ..." << std::endl << std::endl;
+			Projector full_projector(orig_size, interpolator, padding_factor, r_min_nn, data_dim);
+			Image<RFLOAT> vol_out;
+			FourierTransformer final_transformer;
+
+			full_projector.computeFourierTransformMap(vol_in(), dummy, 2 * orig_size);
+			Euler_rotation3DMatrix(rot, tilt, psi, A3D);
+			F2D.initZeros(orig_size, orig_size, orig_size / 2 + 1);
+			vol_out().reshape(vol_in());
+			full_projector.get2DFourierTransform(F2D, A3D);
+
+			transformer.inverseFourierTransform(F2D, vol_out());
+			CenterFFT(vol_out(), false);
+			vol_out.setSamplingRateInHeader(angpix);
+			FileName fno = fn_ins[imap].insertBeforeExtension("_"+fn_out);
+			vol_out.write(fno);
+			std::cout << " The aligned map has been written to " << fno << std::endl;
+
+		} // end loop over fn_ins
+
+		std::cout << " done!" << std::endl;
 	} // end project function
 };
 
