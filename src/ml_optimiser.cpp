@@ -504,6 +504,7 @@ if(do_gpu)
 	skip_gridding = parser.checkOption("--skip_gridding", "Skip gridding in the M step");
 	nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
 	debug_split_random_half = textToInteger(getParameter(argc, argv, "--debug_split_random_half", "0"));
+    do_red = parser.checkOption("--do_red", "", "false", true);
 
 	// We read input optimiser set to create the output one
 	fn_OS = parser.getOption("--ios", "Input tomo optimiser set file. It is used to set --i, --ref or --solvent_mask if they are not provided. Updated output optimiser set is created.", "");
@@ -1020,8 +1021,11 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_KEEP_TILT_PRIOR_FIXED, helical_keep_tilt_prior_fixed))
     		helical_keep_tilt_prior_fixed = false;
 	// New SGD (13Feb2018)
-	if (!MD.getValue(EMDL_OPTIMISER_DO_GRAD, gradient_refine))
+	if (!MD.getValue(EMDL_OPTIMISER_GRAD_REFINE, gradient_refine))
 		gradient_refine = false;
+	if (!MD.getValue(EMDL_OPTIMISER_DO_GRAD, do_grad))
+		do_grad = false;
+	grad_pseudo_halfsets = do_grad;
 	if (!MD.getValue(EMDL_OPTIMISER_GRAD_EM_ITERS, grad_em_iters))
 		grad_em_iters = 1;
 	if (!MD.getValue(EMDL_OPTIMISER_GRAD_HAS_CONVERGED, grad_has_converged))
@@ -1142,7 +1146,7 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	}
 	else
 	{
-		mymodel.read(fn_model);
+		mymodel.read(fn_model, false, do_grad, grad_pseudo_halfsets);
 	}
 	// Set up the bodies in the model, if this is a continuation of a multibody refinement (otherwise this is done in initialiseGeneral)
 	if (fn_body_masks != "None")
@@ -1244,7 +1248,8 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_DO_MAP, do_map);
 		MD.setValue(EMDL_OPTIMISER_FAST_SUBSETS, do_fast_subsets);
 		MD.setValue(EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT, do_external_reconstruct);
-		MD.setValue(EMDL_OPTIMISER_DO_GRAD, gradient_refine);
+		MD.setValue(EMDL_OPTIMISER_GRAD_REFINE, gradient_refine);
+		MD.setValue(EMDL_OPTIMISER_DO_GRAD, do_grad);
 		MD.setValue(EMDL_OPTIMISER_GRAD_EM_ITERS, grad_em_iters);
 
 		MD.setValue(EMDL_OPTIMISER_GRAD_HAS_CONVERGED, grad_has_converged);
@@ -2320,7 +2325,7 @@ void MlOptimiser::initialiseGeneralFinalize(int rank)
 			RFLOAT diameter = particle_diameter / mymodel.pixel_size;
 			for (unsigned i = 0; i < mymodel.nr_classes; i++)
 			{
-				if (mymodel.pdf_class[i] > 0.)
+				if (mymodel.pdf_class[i] > 0. || !do_som)
 				{
 					MultidimArray<RFLOAT> blobs_pos(mymodel.Iref[i]), blobs_neg(mymodel.Iref[i]);
 					if (mymodel.ref_dim == 2)
@@ -4463,7 +4468,6 @@ void MlOptimiser::maximization()
 		RCTIC(timer,RCT_1);
 		if (mymodel.pdf_class[iclass] > 0. || mymodel.nr_bodies > 1 )
 		{
-
 			if ((wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY)
 			{
 				(wsum_model.BPref[iclass]).updateSSNRarrays(mymodel.tau2_fudge_factor,
@@ -4570,10 +4574,11 @@ void MlOptimiser::centerClasses()
 
 //		std::cout << "CENTER CLASS " << iclass << " " << XX(my_com) << " " << YY(my_com) << " " << ZZ(my_com) << std::endl;
 
-		if (do_grad) {
+		if (do_grad)
+		{
 			MultidimArray<Complex > aux = mymodel.Igrad1[iclass];
 			RFLOAT x(XX(my_com)), y(YY(my_com)), z(0);
-			if (mymodel.Iref[iclass].getDim() == 2)
+			if (mymodel.Iref[iclass].getDim() == 3)
 				z = ZZ(my_com);
 			shiftImageInContinuousFourierTransform(aux, mymodel.Igrad1[iclass],
 			                                       mymodel.ori_size * mymodel.padding_factor, x, y, z);
