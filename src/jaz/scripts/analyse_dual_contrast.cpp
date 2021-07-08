@@ -318,6 +318,8 @@ std::map<std::string, std::vector<d2Vector>> mergeElementClouds(
 			coords.insert(coords.begin(), coords0.begin(), coords0.end());
 		}
 	}
+
+	return element_to_cloud;
 }
 
 Ellipse fitEllipse(const std::vector<d2Vector>& cloud)
