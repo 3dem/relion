@@ -3379,7 +3379,8 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 
 
 	FileName fn_model;
-	fn_model.compose(outputname + fn_run + "_it", total_nr_iter, "_model.star", 3);
+	fn_model.compose(outputname + fn_run + "_it", total_nr_iter,"",3);
+	fn_model+="_model.star";
 
 	// Align with symmetry axes and apply symmetry
 	std::string command2 = "`which relion_align_symmetry`";
