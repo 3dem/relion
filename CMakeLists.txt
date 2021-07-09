@@ -73,8 +73,8 @@ endif()
 # ------------------OPTIONS WHICH ARE NEEDED TO SET BUILD-TYPES (COMPILATION FLAGS)--
 # ------------------------------------------------------------------------CUDA-ARCH--
 if(NOT DEFINED CUDA_ARCH)
-    message(STATUS "Setting fallback CUDA_ARCH=35")
-    set(CUDARCH "-arch=sm_35")
+    message(STATUS "Setting fallback CUDA_ARCH=50")
+    set(CUDARCH "-arch=sm_50")
 else(NOT DEFINED CUDA_ARCH)
     message(STATUS "Using provided CUDA_ARCH=${CUDA_ARCH}")
     set(CUDARCH "-arch=sm_${CUDA_ARCH}")
