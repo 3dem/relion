@@ -505,6 +505,7 @@ if(do_gpu)
 	nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
 	debug_split_random_half = textToInteger(getParameter(argc, argv, "--debug_split_random_half", "0"));
     do_red = parser.checkOption("--do_red", "", "false", true);
+    skip_realspace_helical_sym = parser.checkOption("--skip_realspace_helical_sym", "", "false", true);
 
 	// We read input optimiser set to create the output one
 	fn_OS = parser.getOption("--ios", "Input tomo optimiser set file. It is used to set --i, --ref or --solvent_mask if they are not provided. Updated output optimiser set is created.", "");
@@ -922,6 +923,7 @@ if(do_gpu)
 	asymmetric_padding = parser.checkOption("--asymmetric_padding", "", "false", true);
 	skip_gridding = parser.checkOption("--skip_gridding", "Skip gridding in the M step");
 	debug_split_random_half = textToInteger(getParameter(argc, argv, "--debug_split_random_half", "0"));
+    skip_realspace_helical_sym = parser.checkOption("--skip_realspace_helical_sym", "", "false", true);
 
 #ifdef DEBUG_READ
 	std::cerr<<"MlOptimiser::parseInitial Done"<<std::endl;
@@ -3038,7 +3040,7 @@ void MlOptimiser::iterate()
 		// Helical symmetry refinement and imposition of real space helical symmetry.
 		if (do_helical_refine && mymodel.ref_dim == 3)
 		{
-			if (!ignore_helical_symmetry)
+			if (!ignore_helical_symmetry && !skip_realspace_helical_sym)
 			{
 				makeGoodHelixForEachRef();
 			}
