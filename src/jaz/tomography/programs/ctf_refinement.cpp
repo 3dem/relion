@@ -191,6 +191,7 @@ void CtfRefinementProgram::processTomograms(
 		}
 
 		Tomogram tomogram = tomogramSet.loadTomogram(t, true);
+		tomogram.validateParticleOptics(particles[t], particleSet);
 
 		const int fc = tomogram.frameCount;
 
@@ -1413,8 +1414,8 @@ gravis::d3Vector CtfRefinementProgram::findAstigmatism(
 
 		if (r2 > k_min_px * k_min_px)
 		{
-			const double xx = yf / as;
-			const double yy = xf / as;
+			const double xx = xf / as;
+			const double yy = yf / as;
 
 			astigBasis(xi,yi,0) = xx * xx + yy * yy;
 			astigBasis(xi,yi,1) = xx * xx - yy * yy;
@@ -1480,8 +1481,8 @@ std::vector<d3Vector> CtfRefinementProgram::findMultiAstigmatism(
 
 		if (r2 > k_min_px * k_min_px)
 		{
-			const double xx = yf / as;
-			const double yy = xf / as;
+			const double xx = xf / as;
+			const double yy = yf / as;
 
 			astigBasis(xi,yi,0) = xx * xx + yy * yy;
 			astigBasis(xi,yi,1) = xx * xx - yy * yy;

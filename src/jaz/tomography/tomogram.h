@@ -70,6 +70,10 @@ class Tomogram
 		Tomogram FourierCrop(double factor, int num_threads, bool downsampleData = true) const;
 
 		bool hasFiducials() const;
+
+		bool validateParticleOptics(
+				const std::vector<ParticleIndex>& particleIds,
+				const ParticleSet& particleSet);
 };
 
 

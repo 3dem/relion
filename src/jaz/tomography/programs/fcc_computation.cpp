@@ -70,6 +70,8 @@ void FccProgram::run()
 		if (pc == 0) continue;
 		
 		Tomogram tomogram = tomogramSet.loadTomogram(t, true);
+		tomogram.validateParticleOptics(particles[t], particleSet);
+
 		pixelSizes[t] = tomogram.optics.pixelSize;
 
 		std::string tag = outDir + tomogram.name;

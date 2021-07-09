@@ -72,6 +72,8 @@ void BfactorFitProgram::run()
 
 		
 		Tomogram tomogram = tomogramSet.loadTomogram(t, true);
+		tomogram.validateParticleOptics(particles[t], particleSet);
+
 		pixelSizes[t] = tomogram.optics.pixelSize;
 
 		std::string tag = outDir + tomogram.name;

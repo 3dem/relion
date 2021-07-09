@@ -291,6 +291,7 @@ void ReconstructParticleProgram::processTomograms(
 		}
 
 		Tomogram tomogram = tomoSet.loadTomogram(t, true);
+		tomogram.validateParticleOptics(particles[t], particleSet);
 
 		const int fc = tomogram.frameCount;
 

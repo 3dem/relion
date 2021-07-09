@@ -225,3 +225,63 @@ bool Tomogram::hasFiducials() const
 {
 	return fiducialsFilename.length() > 0 && fiducialsFilename != "empty";
 }
+
+bool Tomogram::validateParticleOptics(
+		const std::vector<ParticleIndex>& particleIds,
+		const ParticleSet& particleSet)
+{
+	const int gc = particleSet.numberOfOpticsGroups();
+
+	std::vector<bool> valid(gc, false);
+
+	for (int p = 0; p < particleIds.size(); p++)
+	{
+		const int g = particleSet.getOpticsGroup(particleIds[p]);
+
+		if (!valid[g])
+		{
+			const double eps = 1e-3;
+
+			bool Cs_good = true;
+
+			if (particleSet.optTable.labelExists(EMDL_CTF_CS))
+			{
+				const double Cs_particles = particleSet.optTable.getDouble(EMDL_CTF_CS, g);
+				const double Cs_tomogram = optics.Cs;
+
+				Cs_good = std::abs(Cs_tomogram - Cs_particles) < eps;
+			}
+
+			bool u_good = true;
+
+			if (particleSet.optTable.labelExists(EMDL_CTF_VOLTAGE))
+			{
+				const double u_particles = particleSet.optTable.getDouble(EMDL_CTF_VOLTAGE, g);
+				const double u_tomogram = optics.voltage;
+
+				u_good = std::abs(u_particles - u_tomogram) < eps;
+			}
+
+			bool s_good = true;
+
+			if (particleSet.optTable.labelExists(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE))
+			{
+				const double s_particles = particleSet.optTable.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, g);
+				const double s_tomogram = optics.pixelSize;
+
+				s_good = std::abs(s_particles - s_tomogram) < eps;
+			}
+
+			if (Cs_good && u_good && s_good)
+			{
+				valid[g] = true;
+			}
+			else
+			{
+				REPORT_ERROR_STR("Tomogram::validateParticleOptics: inconsistent values between optics and tomograms tables.");
+			}
+		}
+	}
+
+	return true;
+}

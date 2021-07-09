@@ -183,6 +183,7 @@ int main(int argc, char *argv[])
 	for (int tomoIndex = 0; tomoIndex < tomogramSet.size(); tomoIndex++)
 	{
 		Tomogram tomogram = tomogramSet.loadTomogram(tomoIndex, true);
+		tomogram.validateParticleOptics(particles[tomoIndex], dataSet);
 
 		std::string outDirTomo = outDir + tomogram.name + "/";
 		ZIO::ensureParentDir(outDirTomo);
