@@ -330,7 +330,7 @@ void FourierBackprojection::backprojectSlice_backward(
 		
 		for (long int x = x0; x <= x1; x++)
 		{
-			gravis::d3Vector pw(x,yy,zz);		
+			gravis::d3Vector pw(x,yy,zz);
 			gravis::d3Vector pi = projInvTransp * pw;
 			
 			if (pi.z > -1.0 && pi.z < 1.0 &&
@@ -340,7 +340,7 @@ void FourierBackprojection::backprojectSlice_backward(
 				
 				tComplex<SrcType> z0 = Interpolation::linearXY_complex_FftwHalf_clip(dataFS, pi.x, pi.y, 0);
 				const DestType wgh = Interpolation::linearXY_symmetric_FftwHalf_clip(weight, pi.x, pi.y, 0);
-								
+
 				destFS(x,y,z) += tComplex<DestType>(c * z0.real, c * z0.imag);
 				destCTF(x,y,z) += c * wgh;
 			}

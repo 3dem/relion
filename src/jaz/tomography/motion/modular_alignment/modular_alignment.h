@@ -46,7 +46,9 @@ class ModularAlignment : public FastDifferentiableOptimization
 				double paddingFactor,
 				int progressBarOffset,
 				int num_threads,
-				bool verbose);
+				bool verbose,
+				int firstFrame,
+				int lastFrame);
 		
 
 			const MotionModel& motionModel;
@@ -64,7 +66,7 @@ class ModularAlignment : public FastDifferentiableOptimization
 			int progressBarOffset, num_threads;
 
 			bool verbose, devMode;
-			int fc, pc, mpc, dc, maxRange;
+			int fc, pc, mpc, dc, maxRange, firstFrame, lastFrame;
 
 			mutable int lastIterationNumber;
 
@@ -210,7 +212,9 @@ ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 		double paddingFactor,
 		int progressBarOffset,
 		int num_threads,
-		bool verbose)
+		bool verbose,
+		int firstFrame,
+		int lastFrame)
 :	
 	motionModel(motionModel),
 	deformationModel2D(deformationModel2D),
@@ -229,6 +233,8 @@ ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 	mpc(motionModel.getParameterCount()),
 	dc(deformationModel2D.getParameterCount()),
 	maxRange(CCs[0].xdim / (2 * paddingFactor) - 3), // CCs are padded by 3 pixels
+	firstFrame(firstFrame),
+	lastFrame(lastFrame),
 	lastIterationNumber(0)
 {	
 	frameProj.resize(fc);
@@ -335,6 +341,8 @@ ModularAlignment<MotionModel, DeformationModel2D>::ModularAlignment(
 			}
 		}
 	}
+
+	if (this->lastFrame < 0) this->lastFrame = fc - 1;
 }
 
 /*
@@ -418,7 +426,7 @@ double ModularAlignment<MotionModel, DeformationModel2D>::gradAndValue(
 			gravis::d3Vector(0.0, 0.0, 0.0) :
 			gravis::d3Vector(x[pos_block + 3*p], x[pos_block + 3*p+1], x[pos_block + 3*p+2]);
 
-		for (int f = 0; f < fc; f++)
+		for (int f = firstFrame; f <= lastFrame; f++)
 		{
 			const gravis::d4Vector pos4(initialPos[p] + shift);
 

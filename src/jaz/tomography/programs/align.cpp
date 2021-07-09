@@ -98,6 +98,8 @@ void AlignProgram::parseInput()
 	whiten_abs = parser.checkOption("--whiten_abs", "Divide by the square root of the power spectrum");
 	hiPass_px = textToDouble(parser.getOption("--hp", "High-pass filter the cross-correlation images by this sigma", "-1"));
 	sig2RampPower = textToDouble(parser.getOption("--srp", "Noise variance is divided by k^this during whitening", "0"));
+	min_frame = textToInteger(parser.getOption("--min_frame", "First frame to consider", "0"));
+	max_frame = textToInteger(parser.getOption("--max_frame", "Last frame to consider", "-1"));
 
 	Log::readParams(parser);
 	

@@ -313,7 +313,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 				touch(fn_lock);
 				// make the runfile temp dir for the ccpem pipeliner
 				std::string dircom = "mkdir -p .TMP_runfiles";
-				system(dircom.c_str());
+				int res = system(dircom.c_str());
 			}
 			else
 			{
@@ -1693,7 +1693,7 @@ void GuiMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 		{
 			std::string thejob = pipeline.processList[current_job].name;
 			std::string command = "reSPYon --delete_job " + thejob;
-			system(command.c_str());
+			int res = system(command.c_str());
 
 			// Reset current_job
 			current_job = -1;
@@ -1770,7 +1770,7 @@ e.g. by using \"touch Polish/job045/NO_HARSH_CLEAN\". Below is a list of current
 		{
 			std::string isharsh = (do_harsh) ? "--harsh" : "";
 			std::string command  = "reSPYon --cleanup ALL " + isharsh;
-			system(command.c_str());
+			int res = system(command.c_str());
 		}
 		else
 		{
@@ -2134,7 +2134,7 @@ void GuiMainWindow::cb_undelete_job_i()
 		splitit = trashdir.find_first_of("/\\");
 		std::string projdir = trashdir.substr(splitit+1);
 		std::string undelcom = "reSPYon --undelete_job " + projdir;
-		system(undelcom.c_str());
+		int res = system(undelcom.c_str());
 		cb_reread_pipeline_i();
 	}
 	else

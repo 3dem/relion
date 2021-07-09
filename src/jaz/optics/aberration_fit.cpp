@@ -425,7 +425,6 @@ std::vector<double> AberrationFit::solveAndFitOdd(
 		const std::string& prefix,
 		bool writeImages)
 {
-
 	OddSolution solution = solveOdd(data);
 	return fitOdd(solution, n_bands, initialCoeffs, pixelSize, prefix, writeImages);
 }
@@ -594,6 +593,17 @@ EvenData &EvenData::operator+=(const EvenData& d)
 	Ayy += d.Ayy;
 	bx += d.bx;
 	by += d.by;
+
+	return *this;
+}
+
+EvenData &EvenData::operator*=(double d)
+{
+	Axx *= d;
+	Axy *= d;
+	Ayy *= d;
+	bx *= d;
+	by *= d;
 }
 
 void EvenData::write(const RawImage<EvenData> &data, std::string filename)
@@ -666,6 +676,14 @@ OddData &OddData::operator+=(const OddData& d)
 {
 	a += d.a;
 	b += d.b;
+
+	return *this;
+}
+
+OddData &OddData::operator*=(double d)
+{
+	a *= d;
+	b *= d;
 }
 
 void OddData::write(const RawImage<OddData> &data, std::string filename)

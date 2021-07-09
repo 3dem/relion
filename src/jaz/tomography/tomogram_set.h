@@ -24,7 +24,7 @@ class TomogramSet
 
 		Tomogram loadTomogram(int index, bool loadImageData) const;
 			
-		int addTomogram(
+		void addTomogram(
 			std::string tomoName, std::string stackFilename,
 			const std::vector<gravis::d4Matrix>& projections,
 			int w, int h, int d,

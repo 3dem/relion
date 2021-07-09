@@ -156,7 +156,7 @@ class FFT
 		}
 		
 		template<class T>
-		static bool resizeRealToMatch(
+		static void resizeRealToMatch(
 				BufferedImage<T>& real,
 				const BufferedImage<tComplex<T>>& complex)
 		{
@@ -164,7 +164,7 @@ class FFT
 		}
 		
 		template<class T>
-		static bool resizeComplexToMatch(
+		static void resizeComplexToMatch(
 				const BufferedImage<T>& real,
 				BufferedImage<tComplex<T>>& complex)
 		{
