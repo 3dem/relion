@@ -153,12 +153,10 @@ BufferedImage<float> RefinementProgram::computeFrequencyWeights(
 		}
 	}
 
-	frqWghts.write("debug_frqWghts_0.mrc");
 	for (int f = 0; f < fc; f++)
 	{
 		referenceMap.contributeWeight(frqWghts.getSliceRef(f), tomogram.centralCTFs[f].scale);
 	}
-	frqWghts.write("debug_frqWghts_1.mrc");
 
 	if (applyDoseWeight)
 	{
