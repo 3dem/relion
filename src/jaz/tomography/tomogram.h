@@ -74,6 +74,12 @@ class Tomogram
 		bool validateParticleOptics(
 				const std::vector<ParticleIndex>& particleIds,
 				const ParticleSet& particleSet);
+
+
+
+		static BufferedImage<int> findDoseXRanges(
+				const RawImage<float>& doseWeights,
+				double cutoffFraction);
 };
 
 

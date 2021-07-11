@@ -128,6 +128,7 @@ class AberrationFit
 				bool flip_value,
 				const BufferedImage<float>& freqWeights,
 				const BufferedImage<float>& doseWeights,
+				const BufferedImage<int>& xRanges,
 				int f0, int f1,
 				BufferedImage<aberration::EvenData>& even_out,
 				BufferedImage<aberration::OddData>& odd_out);

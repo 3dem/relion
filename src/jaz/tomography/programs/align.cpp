@@ -100,6 +100,7 @@ void AlignProgram::parseInput()
 	sig2RampPower = textToDouble(parser.getOption("--srp", "Noise variance is divided by k^this during whitening", "0"));
 	min_frame = textToInteger(parser.getOption("--min_frame", "First frame to consider", "0"));
 	max_frame = textToInteger(parser.getOption("--max_frame", "Last frame to consider", "-1"));
+	freqCutoffFract = textToDouble(parser.getOption("--cutoff_fract", "Ignore shells for which the relative dose or frequency weight falls below this fraction of the average", "0.02"));
 
 	Log::readParams(parser);
 	
@@ -254,6 +255,8 @@ void AlignProgram::processTomograms(
 
 		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(boxSize, 1);
 
+		BufferedImage<int> xRanges = findXRanges(freqWeight, doseWeights, freqCutoffFract);
+
 
 		if (diag)
 		{
@@ -267,7 +270,7 @@ void AlignProgram::processTomograms(
 		{
 			CCs = Prediction::computeCroppedCCs(
 					particleSet, particles[t], tomogram, aberrationsCache,
-					referenceMap, freqWeight, doseWeights, tomogram.frameSequence,
+					referenceMap, freqWeight, doseWeights, tomogram.frameSequence, xRanges,
 					range, true, num_threads, padding, Prediction::OwnHalf,
 					per_tomogram_progress && verbosity > 0);
 		}

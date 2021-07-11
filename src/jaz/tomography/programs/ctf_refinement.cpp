@@ -110,6 +110,7 @@ void CtfRefinementProgram::parseInput()
 
 	min_frame = textToInteger(parser.getOption("--min_frame", "First frame to consider", "0"));
 	max_frame = textToInteger(parser.getOption("--max_frame", "Last frame to consider", "-1"));
+	freqCutoffFract = textToDouble(parser.getOption("--cutoff_fract", "Ignore shells for which the relative dose or frequency weight falls below this fraction of the average", "0.02"));
 
 	Log::readParams(parser);
 
@@ -207,6 +208,8 @@ void CtfRefinementProgram::processTomograms(
 		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(boxSize, 1);
 
 
+		BufferedImage<int> xRanges = findXRanges(freqWeights, doseWeights, freqCutoffFract);
+
 		const int item_verbosity = per_tomogram_progress? verbosity : 0;
 
 		abortIfNeeded();
@@ -214,7 +217,7 @@ void CtfRefinementProgram::processTomograms(
 		if (do_refine_defocus)
 		{
 			refineDefocus(
-				t, tomogram, aberrationsCache, freqWeights, doseWeights,
+				t, tomogram, aberrationsCache, freqWeights, doseWeights, xRanges,
 				k_min_px, item_verbosity);
 
 			abortIfNeeded();
@@ -234,7 +237,7 @@ void CtfRefinementProgram::processTomograms(
 		if (do_refine_aberrations)
 		{
 			updateAberrations(
-				t, tomogram, aberrationsCache, freqWeights, doseWeights,
+				t, tomogram, aberrationsCache, freqWeights, doseWeights, xRanges,
 				item_verbosity);
 
 			abortIfNeeded();
@@ -319,6 +322,7 @@ void CtfRefinementProgram::refineDefocus(
 		const AberrationsCache& aberrationsCache,
 		const BufferedImage<float>& freqWeights,
 		const BufferedImage<float>& doseWeights,
+		const BufferedImage<int>& xRanges,
 		double k_min_px,
 		int verbosity)
 {
@@ -392,7 +396,7 @@ void CtfRefinementProgram::refineDefocus(
 
 			AberrationFit::considerParticle(
 				particles[t][p], tomogram, referenceMap, particleSet,
-				aberrationsCache, true, freqWeights, doseWeights,
+				aberrationsCache, true, freqWeights, doseWeights, xRanges,
 				f, f,
 				evenData_thread[th], oddData_thread[th]);
 		}
@@ -800,6 +804,7 @@ void CtfRefinementProgram::updateAberrations(
 		const AberrationsCache& aberrationsCache,
 		const BufferedImage<float>& freqWeights,
 		const BufferedImage<float>& doseWeights,
+		const BufferedImage<int>& xRanges,
 		int verbosity)
 {
 	const int s = boxSize;
@@ -877,7 +882,7 @@ void CtfRefinementProgram::updateAberrations(
 
 		AberrationFit::considerParticle(
 			particles[t][p], tomogram, referenceMap, particleSet,
-			aberrationsCache, true, freqWeights, doseWeights,
+			aberrationsCache, true, freqWeights, doseWeights, xRanges,
 			f0, f1,
 			evenData_perGroup_perThread[g][th],
 			oddData_perGroup_perThread[g][th]);

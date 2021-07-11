@@ -80,6 +80,7 @@ void ReconstructParticleProgram::readBasicParameters(int argc, char *argv[])
 	outer_threads = textToInteger(parser.getOption("--j_out", "Number of outer threads (faster, needs more memory)", "2"));
 
 	no_reconstruction = parser.checkOption("--no_recon", "Do not reconstruct the volume, only backproject (for benchmarking purposes)");
+	freqCutoffFract = textToDouble(parser.getOption("--cutoff_fract", "Ignore shells for which the dose weight falls below this value", "0.01"));
 
 	outDir = parser.getOption("--o", "Output directory");
 
@@ -298,6 +299,9 @@ void ReconstructParticleProgram::processTomograms(
 		particleSet.checkTrajectoryLengths(particles[t][0], pc, fc, "reconstruct_particle");
 
 		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s, binning);
+
+		BufferedImage<int> xRanges = tomogram.findDoseXRanges(doseWeights, freqCutoffFract);
+
 		BufferedImage<float> noiseWeights;
 
 		if (do_whiten)
@@ -381,12 +385,20 @@ void ReconstructParticleProgram::processTomograms(
 					const float scale = flip_value? -1.f : 1.f;
 
 					for (int y = 0; y < s;  y++)
-					for (int x = 0; x < sh; x++)
 					{
-						const float c = scale * ctfImg(x,y) * doseWeights(x,y,f);
+						for (int x = 0; x < xRanges(y,f); x++)
+						{
+							const float c = scale * ctfImg(x,y) * doseWeights(x,y,f);
 
-						particleStack[th](x,y,f) *= c;
-						weightStack[th](x,y,f) = c * c;
+							particleStack[th](x,y,f) *= c;
+							weightStack[th](x,y,f) = c * c;
+						}
+						for (int x = xRanges(y,f); x < sh; x++)
+						{
+
+							particleStack[th](x,y,f) = fComplex(0.f, 0.f);
+							weightStack[th](x,y,f) = 0.f;
+						}
 					}
 				}
 			}
@@ -407,6 +419,7 @@ void ReconstructParticleProgram::processTomograms(
 				if (isVisible[f])
 				{
 					FourierBackprojection::backprojectSlice_backward(
+						xRanges(0,f),
 						particleStack[th].getSliceRef(f),
 						weightStack[th].getSliceRef(f),
 						projPart[f],

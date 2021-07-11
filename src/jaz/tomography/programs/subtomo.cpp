@@ -77,6 +77,9 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 	diag = parser.checkOption("--diag", "Write out diagnostic information");
 
 	num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
+
+	freqCutoffFract = textToDouble(parser.getOption("--cutoff_fract", "Ignore shells for which the dose weight falls below this value", "0.01"));
+
 	outDir = parser.getOption("--o", "Output filename pattern");
 
 	run_from_GUI = is_under_pipeline_control();
@@ -371,6 +374,8 @@ void SubtomoProgram::processTomograms(
 			noiseWeights = tomogram.computeNoiseWeight(s2D, binning);
 		}
 
+		BufferedImage<int> xRanges = tomogram.findDoseXRanges(doseWeights, freqCutoffFract);
+
 		const int inner_thread_num = 1;
 		const int outer_thread_num = num_threads / inner_thread_num;
 
@@ -455,7 +460,7 @@ void SubtomoProgram::processTomograms(
 					const float sign = flip_value? -1.f : 1.f;
 
 					for (int y = 0; y < s2D;  y++)
-					for (int x = 0; x < sh2D; x++)
+					for (int x = 0; x < xRanges(y,f); x++)
 					{
 						const double c = ctfImg(x,y) * doseWeights(x,y,f);
 
@@ -511,6 +516,7 @@ void SubtomoProgram::processTomograms(
 				if (isVisible[f])
 				{
 					FourierBackprojection::backprojectSlice_forward_with_multiplicity(
+						&xRanges(0,f),
 						particleStack.getSliceRef(f),
 						weightStack.getSliceRef(f),
 						projPart[f] * relative_box_scale,

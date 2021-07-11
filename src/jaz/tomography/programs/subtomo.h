@@ -36,7 +36,8 @@ class SubtomoProgram
 				taper, 
 				env_sigma,
 				cone_slope,
-				cone_sig0;
+				cone_sig0,
+				freqCutoffFract;
 			
 			bool 
 				flip_value, 

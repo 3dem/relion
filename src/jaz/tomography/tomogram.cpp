@@ -285,3 +285,35 @@ bool Tomogram::validateParticleOptics(
 
 	return true;
 }
+
+BufferedImage<int> Tomogram::findDoseXRanges(const RawImage<float> &doseWeights, double cutoffFraction)
+{
+	const int sh = doseWeights.xdim;
+	const int s = doseWeights.ydim;
+	const int fc = doseWeights.zdim;
+
+	BufferedImage<int> out(s,fc);
+
+	for (int f = 0; f < fc; f++)
+	{
+		for (int y = 0; y < s; y++)
+		{
+			out(y,f) = 0;
+
+			const double yy = y < s/2? y : y - s;
+			const double xmax = sqrt(s*s/4 - yy*yy);
+
+			for (int x = 0; x < sh && x <= xmax; x++)
+			{
+				const float dw = doseWeights(x,y,f);
+
+				if (dw > cutoffFraction)
+				{
+					out(y,f) = x+1;
+				}
+			}
+		}
+	}
+
+	return out;
+}
