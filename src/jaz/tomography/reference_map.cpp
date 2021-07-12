@@ -22,7 +22,7 @@ void TomoReferenceMap::read(IOParser &parser)
 
 	fscThresholdWidth = textToDouble(parser.getOption("--fsc_thresh_width", "Width of the frq. weight flank", "5"));
 	freqCutoff_A =  textToDouble(parser.getOption("--freq_cutoff", "Explicit cutoff frequency (in Å; negative to turn off)", "-1"));
-	flatWeight = parser.checkOption("--flat_weight", "Do not consider the spectral confidence of the reference map");
+	flatWeight = !parser.checkOption("--use_SNR_weight", "Weight each shell proportionally to its reference-map confidence");
 }
 
 void TomoReferenceMap::read(const OptimisationSet &optimisationSet)
