@@ -22,6 +22,7 @@ void TomoReferenceMap::read(IOParser &parser)
 
 	fscThresholdWidth = textToDouble(parser.getOption("--fsc_thresh_width", "Width of the frq. weight flank", "5"));
 	freqCutoff_A =  textToDouble(parser.getOption("--freq_cutoff", "Explicit cutoff frequency (in Å; negative to turn off)", "-1"));
+	flatWeight = parser.checkOption("--flat_weight", "Do not consider the spectral confidence of the reference map");
 }
 
 void TomoReferenceMap::read(const OptimisationSet &optimisationSet)
@@ -33,6 +34,8 @@ void TomoReferenceMap::read(const OptimisationSet &optimisationSet)
 
 	fscThresholdWidth = optimisationSet.fscThresholdWidth;
 	freqCutoff_A = optimisationSet.freqCutoff_A;
+
+	flatWeight = optimisationSet.flatWeight;
 }
 
 void TomoReferenceMap::load(int boxSize, int verbosity)
@@ -243,6 +246,14 @@ void TomoReferenceMap::load(int boxSize, int verbosity)
 	{
 		lastShell = manual_cutoff_px;
 	}
+
+	if (flatWeight)
+	{
+		for (int r = 0; r < sh; r++)
+		{
+			SNR_weight[r] = 1.0;
+		}
+	}
 }
 
 void TomoReferenceMap::contributeWeight(RawImage<float> freqWeights, double ctfScale)
@@ -261,7 +272,7 @@ void TomoReferenceMap::contributeWeight(RawImage<float> freqWeights, double ctfS
 		int r0 = (int) r;
 		int r1 = r0 + 1;
 
-		if (r1 >= sh || r1 > lastShell + fscThresholdWidth/2.0)
+		if (r1 >= sh || r1 > lastShell + fscThresholdWidth)
 		{
 			freqWeights(x,y) = 0.0;
 		}
@@ -276,10 +287,10 @@ void TomoReferenceMap::contributeWeight(RawImage<float> freqWeights, double ctfS
 
 			double env = 1.0;
 
-			if (r > lastShell - fscThresholdWidth/2.0 &&
-				r < lastShell + fscThresholdWidth/2.0)
+			if (r > lastShell &&
+				r < lastShell + fscThresholdWidth)
 			{
-				const double t = (r - lastShell + fscThresholdWidth/2.0) / fscThresholdWidth;
+				const double t = (r - lastShell) / fscThresholdWidth;
 
 				env = (cos(PI * t) + 1.0) / 2.0;
 			}

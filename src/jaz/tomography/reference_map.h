@@ -21,6 +21,7 @@ class TomoReferenceMap
 			std::string mapFilenames[2], maskFilename, fscFilename;
 			double fscThresholdWidth, freqCutoff_A, pixelSize;
 			int lastShell;
+			bool flatWeight;
 
 			std::vector<BufferedImage<float>> image_real;
 			BufferedImage<float> mask;
