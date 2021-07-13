@@ -831,8 +831,8 @@ void CtfRefinementProgram::updateAberrations(
 	std::vector<BufferedImage<EvenData>> evenData_perGroup(gc);
 	std::vector<BufferedImage<OddData>>  oddData_perGroup(gc);
 
-	std::vector<std::vector<BufferedImage<EvenData>>> evenData_perGroup_perThread(num_threads);
-	std::vector<std::vector<BufferedImage<OddData>>> oddData_perGroup_perThread(num_threads);
+	std::vector<std::vector<BufferedImage<EvenData>>> evenData_perGroup_perThread(gc);
+	std::vector<std::vector<BufferedImage<OddData>>> oddData_perGroup_perThread(gc);
 
 	EvenData evenZero({0.0, 0.0, 0.0, 0.0, 0.0});
 	OddData oddZero({0.0, dComplex(0.0, 0.0)});

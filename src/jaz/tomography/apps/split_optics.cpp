@@ -52,6 +52,7 @@ int main(int argc, char *argv[])
 		MetaDataTable old_optics_table = particle_set.optTable;
 
 		particle_set.optTable.clear();
+		particle_set.optTable.setName(old_optics_table.getName());
 
 		const int tc = particles.size();
 
