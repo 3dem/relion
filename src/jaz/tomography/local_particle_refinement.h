@@ -20,7 +20,9 @@ class LocalParticleRefinement : public FastDifferentiableOptimization
 				const BufferedImage<float>& freqWeight,
 				const BufferedImage<float>& doseWeight,
 				const AberrationsCache& aberrationsCache,
-				double dose_cutoff = 0.01);
+				double dose_cutoff,
+				int minFrame,
+				int maxFrame);
 
 
 			const ParticleIndex particle_id;
@@ -30,6 +32,8 @@ class LocalParticleRefinement : public FastDifferentiableOptimization
 			const BufferedImage<float>& freqWeight;
 			const BufferedImage<float>& doseWeight;
 			const AberrationsCache& aberrationsCache;
+
+			int minFrame, maxFrame;
 
 			BufferedImage<fComplex> observations;
 			std::vector<gravis::d3Matrix> Pt;

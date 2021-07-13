@@ -52,6 +52,11 @@ class RefinementProgram
 						const Tomogram& tomogram,
 						bool whiten, double sig2RampPower, double hiPass_px,
 						bool applyDoseWeight, int num_threads);
+
+		BufferedImage<int> findXRanges(
+				const RawImage<float>& freqWeights,
+				const RawImage<float>& doseWeights,
+				double cutoffFraction);
 };
 
 

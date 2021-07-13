@@ -414,7 +414,7 @@ public:
 	void initialise(bool _do_grad = false, bool _pseudo_halfsets = false);
 
 	//Read a model from a file
-	void read(FileName fn_in, bool read_only_one_group = false);
+	void read(FileName fn_in, bool read_only_one_group = false, bool _do_grad=false, bool _pseudo_halfsets=false);
 
 	// Write a model to disc
 	void write(FileName fn_out, HealpixSampling &sampling,

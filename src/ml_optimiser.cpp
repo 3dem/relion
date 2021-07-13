@@ -504,6 +504,7 @@ if(do_gpu)
 	skip_gridding = parser.checkOption("--skip_gridding", "Skip gridding in the M step");
 	nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
 	debug_split_random_half = textToInteger(getParameter(argc, argv, "--debug_split_random_half", "0"));
+    do_red = parser.checkOption("--do_red", "", "false", true);
 
 	// We read input optimiser set to create the output one
 	fn_OS = parser.getOption("--ios", "Input tomo optimiser set file. It is used to set --i, --ref or --solvent_mask if they are not provided. Updated output optimiser set is created.", "");
@@ -1020,8 +1021,11 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_KEEP_TILT_PRIOR_FIXED, helical_keep_tilt_prior_fixed))
     		helical_keep_tilt_prior_fixed = false;
 	// New SGD (13Feb2018)
-	if (!MD.getValue(EMDL_OPTIMISER_DO_GRAD, gradient_refine))
+	if (!MD.getValue(EMDL_OPTIMISER_GRAD_REFINE, gradient_refine))
 		gradient_refine = false;
+	if (!MD.getValue(EMDL_OPTIMISER_DO_GRAD, do_grad))
+		do_grad = false;
+	grad_pseudo_halfsets = do_grad;
 	if (!MD.getValue(EMDL_OPTIMISER_GRAD_EM_ITERS, grad_em_iters))
 		grad_em_iters = 1;
 	if (!MD.getValue(EMDL_OPTIMISER_GRAD_HAS_CONVERGED, grad_has_converged))
@@ -1142,7 +1146,7 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	}
 	else
 	{
-		mymodel.read(fn_model);
+		mymodel.read(fn_model, false, do_grad, grad_pseudo_halfsets);
 	}
 	// Set up the bodies in the model, if this is a continuation of a multibody refinement (otherwise this is done in initialiseGeneral)
 	if (fn_body_masks != "None")
@@ -1244,7 +1248,8 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_DO_MAP, do_map);
 		MD.setValue(EMDL_OPTIMISER_FAST_SUBSETS, do_fast_subsets);
 		MD.setValue(EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT, do_external_reconstruct);
-		MD.setValue(EMDL_OPTIMISER_DO_GRAD, gradient_refine);
+		MD.setValue(EMDL_OPTIMISER_GRAD_REFINE, gradient_refine);
+		MD.setValue(EMDL_OPTIMISER_DO_GRAD, do_grad);
 		MD.setValue(EMDL_OPTIMISER_GRAD_EM_ITERS, grad_em_iters);
 
 		MD.setValue(EMDL_OPTIMISER_GRAD_HAS_CONVERGED, grad_has_converged);
@@ -2194,20 +2199,25 @@ void MlOptimiser::initialiseGeneral(int rank)
 		// determine default subset sizes
 		if (grad_ini_subset_size == -1 || grad_fin_subset_size == -1)
 		{
+			if (rank==0)
+				if (grad_ini_subset_size != -1 || grad_fin_subset_size != -1)
+					std::cout << " WARNING: Since both --grad_ini_subset and --grad_fin_subset were not set, " <<
+					          "both will instead be determined automatically." << std::endl;
+				
 			unsigned long dataset_size = mydata.numberOfParticles();
-			if (mymodel.ref_dim == 2)
+			if (mymodel.ref_dim == 2) // 2D Classification
 			{
 				grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.005, 5000), 100);
 				grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.05, 50000), 1000);
 			}
 			else
 			{
-				if (is_3d_model)
+				if (is_3d_model) // 3D Initial mode
 				{
-					grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.01, 10000), 100);
-					grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.1, 100000), 1000);
+					grad_ini_subset_size = 200 * mymodel.nr_classes;
+					grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.01, 10000), 1000);
 				}
-				else
+				else // 3D Classification
 				{
 					grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.1, 100000), 100);
 					grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.1, 100000), 1000);
@@ -2216,10 +2226,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 			if (rank==0)
 			{
-				if (grad_ini_subset_size != -1 || grad_fin_subset_size != -1)
-					std::cout << " WARNING: Since both --grad_ini_subset and --grad_fin_subset were not set, " <<
-					          "both will instead be determined automatically." << std::endl;
-
 				std::cout << " Initial subset size set to " << grad_ini_subset_size << std::endl;
 				std::cout << " Final subset size set to " << grad_fin_subset_size << std::endl;
 			}
@@ -2319,7 +2325,7 @@ void MlOptimiser::initialiseGeneralFinalize(int rank)
 			RFLOAT diameter = particle_diameter / mymodel.pixel_size;
 			for (unsigned i = 0; i < mymodel.nr_classes; i++)
 			{
-				if (mymodel.pdf_class[i] > 0.)
+				if (mymodel.pdf_class[i] > 0. || !do_som)
 				{
 					MultidimArray<RFLOAT> blobs_pos(mymodel.Iref[i]), blobs_neg(mymodel.Iref[i]);
 					if (mymodel.ref_dim == 2)
@@ -3111,7 +3117,7 @@ void MlOptimiser::expectation()
 	// Skip if not doing alignment
 	// During gradient refinement only do this every 10 iterations
 	if (!((iter==1 && do_firstiter_cc) || do_always_cc) && !(do_skip_align && do_skip_rotate || do_only_sample_tilt) &&
-	    (do_auto_refine || !do_grad || iter % 10 == 0 || iter <= 1))
+	    (do_auto_refine || !do_grad || iter % 10 == 0 || iter == nr_iter || iter <= 1))
 	{
 		// Set the exp_metadata (but not the exp_imagedata which is not needed for calculateExpectedAngularErrors)
 		int n_trials_acc = (mymodel.ref_dim==3 && mymodel.data_dim != 3) ? 100 : 10;
@@ -4462,7 +4468,6 @@ void MlOptimiser::maximization()
 		RCTIC(timer,RCT_1);
 		if (mymodel.pdf_class[iclass] > 0. || mymodel.nr_bodies > 1 )
 		{
-
 			if ((wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY)
 			{
 				(wsum_model.BPref[iclass]).updateSSNRarrays(mymodel.tau2_fudge_factor,
@@ -4569,10 +4574,11 @@ void MlOptimiser::centerClasses()
 
 //		std::cout << "CENTER CLASS " << iclass << " " << XX(my_com) << " " << YY(my_com) << " " << ZZ(my_com) << std::endl;
 
-		if (do_grad) {
+		if (do_grad)
+		{
 			MultidimArray<Complex > aux = mymodel.Igrad1[iclass];
 			RFLOAT x(XX(my_com)), y(YY(my_com)), z(0);
-			if (mymodel.Iref[iclass].getDim() == 2)
+			if (mymodel.Iref[iclass].getDim() == 3)
 				z = ZZ(my_com);
 			shiftImageInContinuousFourierTransform(aux, mymodel.Igrad1[iclass],
 			                                       mymodel.ori_size * mymodel.padding_factor, x, y, z);
@@ -9478,21 +9484,26 @@ void MlOptimiser::updateStepSize()
 
 	if (_stepsize <= 0)
 	{
-		if (mymodel.ref_dim == 3)
+		if (mymodel.ref_dim == 3 && !is_3d_model) // 3D classification
 			_stepsize = 0.3;
-		else
+		else if (mymodel.ref_dim == 3 && is_3d_model) // 3D initial model
+			_stepsize = 0.5;
+		else //2D classification
 			_stepsize = 0.3;
 	}
 
 	if (_scheme.empty())
 	{
-		if (mymodel.ref_dim == 3)
+		if (mymodel.ref_dim == 3 && !is_3d_model) // 3D classification
 			_scheme = "plain";
-		else
+		else if (mymodel.ref_dim == 3 && is_3d_model) // 3D initial model
+			_scheme = std::to_string(0.9 / _stepsize) + "-2step";
+		else //2D classification
 			_scheme = std::to_string(0.9 / _stepsize) + "-2step";
 	}
 
-	if (_scheme == "plain") {
+	if (_scheme == "plain")
+	{
 		grad_current_stepsize = _stepsize;
 		return;
 	}
@@ -9506,13 +9517,15 @@ void MlOptimiser::updateStepSize()
 	if (is_2step)
 		inflate = textToFloat(_scheme.substr(0, _scheme.find("-2step")));
 
-	if (is_3step) {
+	if (is_3step)
+	{
 		int pos = _scheme.find("-3step-");
 		inflate = textToFloat(_scheme.substr(0, pos));
 		deflate = textToFloat(_scheme.substr(pos + 7, _scheme.size()));
 	}
 
-	if (is_2step or is_3step) {
+	if (is_2step or is_3step)
+	{
 		if (inflate < 0 or 10 < inflate)
 			REPORT_ERROR("Invalid inflate value in --grad_stepsize_scheme");
 		if (deflate <= 0 or 10 < deflate)

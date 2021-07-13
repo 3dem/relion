@@ -28,6 +28,11 @@ AberrationsCache::AberrationsCache(const MetaDataTable &opticsTable, const int s
 		phaseShift.resize(gc);
 	}
 
+	if (!opticsTable.labelExists(EMDL_IMAGE_PIXEL_SIZE))
+	{
+		REPORT_ERROR("AberrationsCache::c'tor: image pixel size missing from optics table.");
+	}
+
 	for (int g = 0; g < gc; g++)
 	{
 		const double pixelSize = opticsTable.getDouble(EMDL_IMAGE_PIXEL_SIZE, g);

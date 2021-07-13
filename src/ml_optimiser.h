@@ -677,6 +677,9 @@ public:
 	// This can be set by user or automatically
 	int maximum_significants;
 
+	//Do regularization by denoising
+	bool do_red;
+
 	// Tabulated sine and cosine values (for 3D helical sub-tomogram averaging with on-the-fly shifts)
 	TabSine tab_sin;
 	TabCosine tab_cos;
@@ -846,6 +849,7 @@ public:
 		grad_fin_iter(0),
 		grad_fin_frac(0),
 		grad_inbetween_iter(0),
+		subset_size(0),
 		grad_ini_subset_size(0),
 		grad_fin_subset_size(0),
 		grad_min_resol(0),

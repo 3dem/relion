@@ -12,26 +12,51 @@ if(NOT EXISTS ${MODELS_DIR})
 	file(MAKE_DIRECTORY ${MODELS_DIR})
 endif()
 
-set(CLASS_RANKER_MODEL_FILE_NAME_TAR class_ranker_0.1_batch32_rate5e-05_drop0.3_epoch50_model.pt.tar.gz)
-set(CLASS_RANKER_MODEL_FILE_NAME class_ranker_0.1_batch32_rate5e-05_drop0.3_epoch50_model.pt)
+set(CLASS_RANKER_MODEL_FILE_NAME_TAR class_ranker_0.1.2_default_torch_model.pt.tar.gz)
+set(CLASS_RANKER_MODEL_FILE_NAME class_ranker_0.1.2_default_torch_model.pt)
 set(CLASS_RANKER_MODEL_URL "ftp://ftp.mrc-lmb.cam.ac.uk/pub/dari/${CLASS_RANKER_MODEL_FILE_NAME_TAR}")
-set(CLASS_RANKER_MODEL_MD5 3bd73613178e34673e087a6099b74156)
+set(CLASS_RANKER_MODEL_MD5 0e13e712cbd05e6f5492fc21d88821d7)
 
-externalproject_add(class_ranker_model_file
-		URL ${CLASS_RANKER_MODEL_URL}
-		URL_MD5 ${CLASS_RANKER_MODEL_MD5}
-		DOWNLOAD_DIR ${MODELS_DIR}
-		SOURCE_DIR "${MODELS_DIR}"
-		BUILD_COMMAND ""
-		INSTALL_COMMAND ""
-		CONFIGURE_COMMAND ""
-		#	LOG_CONFIGURE
-		#	LOG_BUILD
-		LOG_INSTALL)
+set(CLASS_RANKER_MODEL_FOUND 0)
+
+message(STATUS "Checking class ranker model file...")
+if(EXISTS ${MODELS_DIR}/${CLASS_RANKER_MODEL_FILE_NAME_TAR})
+	file(MD5 ${MODELS_DIR}/${CLASS_RANKER_MODEL_FILE_NAME_TAR} CHECKSUM)
+	if (${CHECKSUM} STREQUAL ${CLASS_RANKER_MODEL_MD5})
+		set(CLASS_RANKER_MODEL_FOUND 1)
+		message(STATUS "Found local copy of class ranker model")
+	else()
+		message(STATUS "Checksum of local class ranker model did not match...")
+	endif()
+endif()
+
+if(NOT CLASS_RANKER_MODEL_FOUND)
+	externalproject_add(class_ranker_model_file
+			URL ${CLASS_RANKER_MODEL_URL}
+			URL_MD5 ${CLASS_RANKER_MODEL_MD5}
+			DOWNLOAD_DIR ${MODELS_DIR}
+			SOURCE_DIR "${MODELS_DIR}/class_ranker"
+			BUILD_COMMAND ""
+			INSTALL_COMMAND ""
+			CONFIGURE_COMMAND ""
+			#	LOG_CONFIGURE
+			#	LOG_BUILD
+			LOG_INSTALL)
+
+	message(STATUS "--------------------------------------------------------")
+	message(STATUS "--------- FOUND NO LOCAL COPY OF TORCH MODELS. ---------")
+	message(STATUS "------- WILL BE DOWNLOADED DURING COMPILE-TIME. --------")
+	message(STATUS "--------------------------------------------------------")
+	message(STATUS "---- A WORKING INTERNET CONNECTION WILL BE REQUIRED. ---")
+	message(STATUS "-- TO SKIP, RECONFIGURE WITH -DFETCH_TORCH_MODELS=OFF --")
+	message(STATUS "--------------------------------------------------------")
+else()
+	add_custom_target(class_ranker_model_file ALL)
+endif()
 
 add_custom_command(TARGET class_ranker_model_file POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy
-		${MODELS_DIR}/${CLASS_RANKER_MODEL_FILE_NAME}
+		${MODELS_DIR}/class_ranker/${CLASS_RANKER_MODEL_FILE_NAME}
 		${CMAKE_BINARY_DIR}/bin/${CLASS_RANKER_DEFAULT_MODEL_FILE_NAME})
 
 #add_definitions(-DCLASS_RANKER_DEFAULT_MODEL_FILE_NAME="${CLASS_RANKER_DEFAULT_MODEL_FILE_NAME}")

@@ -73,8 +73,8 @@ endif()
 # ------------------OPTIONS WHICH ARE NEEDED TO SET BUILD-TYPES (COMPILATION FLAGS)--
 # ------------------------------------------------------------------------CUDA-ARCH--
 if(NOT DEFINED CUDA_ARCH)
-    message(STATUS "Setting fallback CUDA_ARCH=35")
-    set(CUDARCH "-arch=sm_35")
+    message(STATUS "Setting fallback CUDA_ARCH=50")
+    set(CUDARCH "-arch=sm_50")
 else(NOT DEFINED CUDA_ARCH)
     message(STATUS "Using provided CUDA_ARCH=${CUDA_ARCH}")
     set(CUDARCH "-arch=sm_${CUDA_ARCH}")
@@ -368,8 +368,8 @@ endif()
 #    add_definitions(-D_TORCH_ENABLED)
 #endif(TORCH)
 
-option(SKIP_TORCH_MODELS "Do not download pre-trained torch models" OFF)
-if (NOT SKIP_TORCH_MODELS)
+option(FETCH_TORCH_MODELS "Do download pre-trained torch models" ON)
+if (FETCH_TORCH_MODELS)
     include(${CMAKE_SOURCE_DIR}/cmake/FetchTorchModels.cmake)
 endif()
 

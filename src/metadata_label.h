@@ -350,6 +350,7 @@ enum EMDLabel
 	EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT,
 	EMDL_OPTIMISER_DO_REALIGN_MOVIES,
 	EMDL_OPTIMISER_DO_MAP,
+	EMDL_OPTIMISER_GRAD_REFINE,
 	EMDL_OPTIMISER_DO_GRAD,
 	EMDL_OPTIMISER_GRAD_EM_ITERS,
 	EMDL_OPTIMISER_GRAD_HAS_CONVERGED,
@@ -652,6 +653,9 @@ enum EMDLabel
 
 	EMDL_TOMO_TEMP_PRED_TIMES_OBS,
 	EMDL_TOMO_TEMP_PRED_SQUARED,
+
+	EMDL_TOMO_TILT_MOVIE_INDEX,
+	EMDL_TOMO_TILT_MOVIE_FILE_NAME,
 
 	EMDL_UNKNOWN_LABEL,
 
@@ -1023,6 +1027,7 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT, EMDL_BOOL, "rlnDoExternalReconstruct", "Flag to indicate that the reconstruction will be performed outside relion_refine, e.g. for learned priors");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_REALIGN_MOVIES, EMDL_BOOL, "rlnDoRealignMovies", "Flag to indicate that individual frames of movies are being re-aligned");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_MAP, EMDL_BOOL, "rlnDoMapEstimation", "Flag to indicate that MAP estimation should be performed (otherwise ML estimation)");
+        EMDL::addLabel(EMDL_OPTIMISER_GRAD_REFINE, EMDL_BOOL, "rlnDoGradientRefine", "Perform gradient refine.");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_GRAD, EMDL_BOOL, "rlnDoStochasticGradientDescent", "Flag to indicate that gradient refinement should be performed (otherwise expectation maximisation)");
 		EMDL::addLabel(EMDL_OPTIMISER_GRAD_EM_ITERS, EMDL_INT, "rlnGradEmIters", "Finish gradient optimization with this many iterations of Expectation-Maximization.");
 		EMDL::addLabel(EMDL_OPTIMISER_GRAD_HAS_CONVERGED, EMDL_BOOL, "rlnGradHasConverged", "Has gradient refinement converged.");
@@ -1329,6 +1334,8 @@ private:
 		EMDL::addLabel(EMDL_TOMO_TEMP_PRED_TIMES_OBS, EMDL_DOUBLE, "rlnTomoTempPredTimesObs", "Sum over products of predicted and observed values");
 		EMDL::addLabel(EMDL_TOMO_TEMP_PRED_SQUARED, EMDL_DOUBLE, "rlnTomoTempPredSquared", "Sum over squares of predicted values");
 
+		EMDL::addLabel(EMDL_TOMO_TILT_MOVIE_INDEX, EMDL_INT, "rlnTomoTiltMovieIndex", "Chronological index of a tilt movie");
+		EMDL::addLabel(EMDL_TOMO_TILT_MOVIE_FILE_NAME, EMDL_STRING, "rlnTomoTiltMovieFile", "Movie containing the frames of a tilt");
 
 		EMDL::addLabel(EMDL_UNKNOWN_LABEL, EMDL_UNKNOWN, "rlnUnknownLabel", "NON-RELION label: values will be ignored, yet maintained in the STAR file.");
 	 }

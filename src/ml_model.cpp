@@ -103,7 +103,7 @@ void MlModel::initialise(bool _do_grad, bool _pseudo_halfsets)
 }
 
 // Reading from a file
-void MlModel::read(FileName fn_in, bool read_only_one_group)
+void MlModel::read(FileName fn_in, bool read_only_one_group, bool _do_grad, bool _pseudo_halfsets)
 {
 
 	// Clear current model
@@ -193,7 +193,7 @@ void MlModel::read(FileName fn_in, bool read_only_one_group)
 	sigma2_psi *= sigma2_psi;
 
 	// Resize vectors
-	initialise();
+	initialise(_do_grad, _pseudo_halfsets);
 
 	// Read classes
 	Image<RFLOAT> img;

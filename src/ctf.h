@@ -484,7 +484,7 @@ public:
 		}
 	}
 	
-	double setDefocusMatrix(double axx, double axy, double ayy);
+	void setDefocusMatrix(double axx, double axy, double ayy);
 			
 };
 #endif

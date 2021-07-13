@@ -76,6 +76,7 @@ class RawImage
 				std::string fn,
 				gravis::d3Vector origin = gravis::d3Vector(0,0,0),
 				gravis::d3Vector step = gravis::d3Vector(1,1,1)) const;
+		void writeNoVTK(std::string fn, double pixelSize) const;
 		
 		template <class T2>
 		void copyTo(gravis::tImage<T2>& img, int z = 0) const;
@@ -212,8 +213,10 @@ class RawImage
 			
 			return *this;
 		}
-		
+
 		void addMultiple(T scale, const RawImage<T>& image);
+
+		void addMultiple(const RawImage<T>& scale, const RawImage<T>& image);
 };
 
 template <class T>
@@ -523,6 +526,34 @@ void RawImage<T>::writeVtk(std::string fn, gravis::d3Vector origin, gravis::d3Ve
 				step.x, step.y, step.z);
 }
 
+template<class T>
+void RawImage<T>::writeNoVTK(std::string fn, double pixelSize) const
+{
+	std::string::size_type dot = fn.find_last_of('.');
+
+	if (dot == std::string::npos)
+	{
+		REPORT_ERROR_STR("RawImage<T>::write: filename has no ending (" << fn << ").");
+	}
+
+	std::string end = fn.substr(dot+1);
+
+	if (end == "mrcs")
+	{
+		Image<T> img;
+		copyToN(img);
+		img.setSamplingRateInHeader(pixelSize);
+		img.write(fn);
+	}
+	else
+	{
+		Image<T> img;
+		copyTo(img);
+		img.setSamplingRateInHeader(pixelSize);
+		img.write(fn);
+	}
+}
+
 template <class T> template <class T2>
 inline void RawImage<T>::copyTo(gravis::tImage<T2>& img, int z) const
 {
@@ -680,6 +711,17 @@ void RawImage<T>::addMultiple(T scale, const RawImage<T>& image)
 	for (size_t x = 0; x < xdim; x++)
 	{
 		data[(z*ydim + y)*xdim + x] += T(scale * image(x,y,z));
+	}
+}
+
+template <class T>
+void RawImage<T>::addMultiple(const RawImage<T>& scale, const RawImage<T>& image)
+{
+	for (size_t z = 0; z < zdim; z++)
+	for (size_t y = 0; y < ydim; y++)
+	for (size_t x = 0; x < xdim; x++)
+	{
+		data[(z*ydim + y)*xdim + x] += T(scale(x,y,z) * image(x,y,z));
 	}
 }
 

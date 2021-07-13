@@ -376,7 +376,9 @@ foreach (_target ${RELION_TARGETS})
 endforeach()
 
 # Python script for running pytorch is required for class_ranker along with torch model
-add_dependencies(class_ranker copy_scripts class_ranker_model_file)
+if(FETCH_TORCH_MODELS)
+	add_dependencies(class_ranker copy_scripts class_ranker_model_file)
+endif()
 
 foreach (_target ${RELION_JAZ_SPA_TARGETS})
 	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)	
@@ -445,15 +447,9 @@ if(OPENMP_FOUND)
 endif()
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
-
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}  -std=c++11")
 
 # Set this flag to activate bounds checking in stl-vectors (incl. strings)
 # It is useful to do this periodically, as it catches 
 # difficult-to-see and rare-to-manifest bugs
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GLIBCXX_DEBUG")
-
-message(CUDA_NVCC_FLAGS: ${CUDA_NVCC_FLAGS})
-
-

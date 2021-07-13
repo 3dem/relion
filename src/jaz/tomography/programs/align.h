@@ -31,13 +31,13 @@ class AlignProgram : public RefinementProgram
 		
 		
 			bool
-				do_motion, shiftOnly,
+				do_motion, shiftOnly, globalShift,
 				whiten, whiten_abs, outputShiftedCCs,
 				do_anisotropy, per_tilt_anisotropy,
 				do_deformation, debug;
 
-			double padding, hiPass_px, sig2RampPower;
-			int range, num_iters;
+			double padding, hiPass_px, sig2RampPower, freqCutoffFract;
+			int range, num_iters, min_frame, max_frame;
 			
 			std::string deformationType;
 
@@ -50,6 +50,8 @@ class AlignProgram : public RefinementProgram
 
 
 	protected:
+
+			std::vector<std::vector<Trajectory>> allTrajectories;
 
 		void parseInput();
 
@@ -194,7 +196,8 @@ void AlignProgram::performAlignment(
 		alignmentSettings, tomogram,
 		padding,
 		progress_bar_offset, num_threads,
-		per_tomogram_progress && verbosity > 0);
+		per_tomogram_progress && verbosity > 0,
+		min_frame, max_frame);
 
 	std::vector<double> initial = alignment.originalCoefficients;
 

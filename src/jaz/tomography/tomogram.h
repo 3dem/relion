@@ -21,6 +21,7 @@ class Tomogram
 			
 			bool hasOptics, hasImage, hasDeformations;
 			OpticsData optics;
+			gravis::i2Vector imageSize;
 			int frameCount;
 			double handedness, fractionalDose;
 			
@@ -69,6 +70,16 @@ class Tomogram
 		Tomogram FourierCrop(double factor, int num_threads, bool downsampleData = true) const;
 
 		bool hasFiducials() const;
+
+		bool validateParticleOptics(
+				const std::vector<ParticleIndex>& particleIds,
+				const ParticleSet& particleSet);
+
+
+
+		static BufferedImage<int> findDoseXRanges(
+				const RawImage<float>& doseWeights,
+				double cutoffFraction);
 };
 
 

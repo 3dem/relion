@@ -28,12 +28,14 @@ model = torch.jit.load(model_fn)
 features = np.load(feature_fn)
 images = np.load(images_fn)
 
+count = features.shape[0]
+
 model = model.to("cpu")
 
-features_tensor = torch.Tensor(features).reshape(1, features.shape[0])
-images_tensor = torch.Tensor(images).reshape(1, 1, images.shape[0], images.shape[1])
+features_tensor = torch.Tensor(features)
+images_tensor = torch.unsqueeze(torch.Tensor(images), 1)
 score = model(images_tensor, features_tensor).detach().cpu().numpy()
 
-print(score[0, 0])
-
+for i in range(count):
+    print(score[i, 0], end=" ")
 

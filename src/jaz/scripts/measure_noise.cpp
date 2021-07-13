@@ -101,6 +101,8 @@ int main(int argc, char *argv[])
 
 
 	Tomogram tomogram = tomogramSet.loadTomogram(tomoIndex, true);
+	tomogram.validateParticleOptics(particles[tomoIndex], dataSet);
+
 	BufferedImage<float> doseWeights = tomogram.computeDoseWeight(boxSize, 1.0);
 
 	const int s = referenceMap.getBoxSize();

@@ -27,8 +27,8 @@ class CtfRefinementProgram : public RefinementProgram
 				do_fit_Lambert_per_tomo, do_fit_Lambert_globally,
 				do_even_aberrations, do_odd_aberrations;
 
-			int deltaSteps, n_even, n_odd;
-			double minDelta, maxDelta, lambda_reg, k_min_Ang;
+			int deltaSteps, n_even, n_odd, min_frame, max_frame;
+			double minDelta, maxDelta, lambda_reg, k_min_Ang, freqCutoffFract;
 			
 		void run();
 		
@@ -54,6 +54,7 @@ class CtfRefinementProgram : public RefinementProgram
 				const AberrationsCache& aberrationsCache,
 				const BufferedImage<float>& freqWeights,
 				const BufferedImage<float>& doseWeights,
+				const BufferedImage<int>& xRanges,
 				double k_min_px,
 				int verbosity);
 
@@ -71,6 +72,7 @@ class CtfRefinementProgram : public RefinementProgram
 				const AberrationsCache& aberrationsCache,
 				const BufferedImage<float>& freqWeights,
 				const BufferedImage<float>& doseWeights,
+				const BufferedImage<int>& xRanges,
 				int verbosity);
 
 
@@ -79,7 +81,7 @@ class CtfRefinementProgram : public RefinementProgram
 		void fitGlobalScale();
 		void collectScale();
 
-		void fitAberrations();
+		void fitAberrations(int k_min_px);
 
 
 
