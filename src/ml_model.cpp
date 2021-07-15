@@ -1753,7 +1753,7 @@ void MlWsumModel::initZeros()
 #define MAX_PACK_SIZE	  100000
 #else
 // Approximately 1024*1024*1024/8/2 ~ 0.5 Gb
-#define MAX_PACK_SIZE 671010000
+#define MAX_PACK_SIZE 67101000
 #endif
 
 void MlWsumModel::pack(MultidimArray<RFLOAT> &packed)
@@ -1825,11 +1825,10 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed)
 		{
 			DIRECT_MULTIDIM_ELEM(packed, idx++) = DIRECT_MULTIDIM_ELEM(pdf_direction[iclass], n);
 		}
+		pdf_direction[iclass].clear();
 	}
 	for (int iclass = 0; iclass < nr_classes; iclass++)
 	{
-		pdf_direction[iclass].clear();
-
 		DIRECT_MULTIDIM_ELEM(packed, idx++) = pdf_class[iclass];
 
 		if (ref_dim==2)
