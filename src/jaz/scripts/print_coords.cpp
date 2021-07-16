@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
 		const int pc = particles[t].size();
 		
 		if (pc == 0) continue;
-						
+
 		Tomogram tomogram = tomogramSet.loadTomogram(t, false);
 		output << "ts_" << t << ": \n";
 		

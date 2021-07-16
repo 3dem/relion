@@ -386,6 +386,8 @@ enum EMDLabel
 	EMDL_OPTIMISER_SGD_MAX_SUBSETS,
 	EMDL_OPTIMISER_SGD_STEPSIZE,
 	EMDL_OPTIMISER_SGD_STEPSIZE_SCHEME,
+	EMDL_OPTIMISER_TAU2_FUDGE_SCHEME,
+	EMDL_OPTIMISER_TAU2_FUDGE_ARG,
 	EMDL_MAX_SIGNIFICANTS,
 	EMDL_OPTIMISER_DO_CENTER_CLASSES,
 	EMDL_OPTIMISER_DO_SOLVENT_FLATTEN,
@@ -1066,6 +1068,8 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_MAX_SUBSETS, EMDL_INT, "rlnSgdMaxSubsets", "Stop SGD after doing this many subsets (possibly spanning more than 1 iteration)");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_STEPSIZE, EMDL_DOUBLE, "rlnSgdStepsize", "Stepsize in gradient refinement updates");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_STEPSIZE_SCHEME, EMDL_STRING, "rlnSgdStepsizeScheme", "Stepsize scheme used in gradient refinement");
+		EMDL::addLabel(EMDL_OPTIMISER_TAU2_FUDGE_SCHEME, EMDL_STRING, "rlnTau2FudgeScheme", "Tau2 fudge scheme for updating the tau2 fudge");
+		EMDL::addLabel(EMDL_OPTIMISER_TAU2_FUDGE_ARG, EMDL_DOUBLE, "rlnTau2FudgeArg", "Tau2 fudge chosen by user");
 		EMDL::addLabel(EMDL_MAX_SIGNIFICANTS, EMDL_INT, "rlnSgdStepsizeScheme", "Maximum number of most significant poses & translations to consider");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_AUTO_REFINE, EMDL_BOOL, "rlnDoAutoRefine", "Flag to indicate that 3D auto-refine procedure is being used");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_AUTO_SAMPLING, EMDL_BOOL, "rlnDoAutoSampling", "Flag to indicate that auto-sampling is to be used (outside the auto-refine procedure)");

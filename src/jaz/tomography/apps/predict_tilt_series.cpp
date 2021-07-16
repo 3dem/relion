@@ -98,6 +98,9 @@ void run(int argc, char *argv[])
 	std::vector<std::vector<ParticleIndex>> all_particles = particle_set.splitByTomogram(tomogram_set, true);
 	std::vector<ParticleIndex> particles = all_particles[tomo_index];
 
+
+	tomogram.validateParticleOptics(particles, particle_set);
+
 	AberrationsCache aberrations_cache(particle_set.optTable, box_size);
 	BufferedImage<float> doseWeights = tomogram.computeDoseWeight(box_size, 1);
 

@@ -789,7 +789,7 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 				{
 					if (compute_multiplicity)
 					{
-						FourierBackprojection::backprojectSlice_backward(
+						FourierBackprojection::backprojectSlice_backward_withMultiplicity(
 							dataImage, ctfImage, proj,
 							accumulation_volume->data,
 							accumulation_volume->weight,

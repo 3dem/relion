@@ -36,7 +36,7 @@ class AlignProgram : public RefinementProgram
 				do_anisotropy, per_tilt_anisotropy,
 				do_deformation, debug;
 
-			double padding, hiPass_px, sig2RampPower;
+			double padding, hiPass_px, sig2RampPower, freqCutoffFract;
 			int range, num_iters, min_frame, max_frame;
 			
 			std::string deformationType;

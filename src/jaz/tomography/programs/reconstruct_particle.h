@@ -28,7 +28,7 @@ class ReconstructParticleProgram
 
 			int boxSize, cropSize, num_threads, outer_threads, inner_threads, max_mem_GB;
 
-			double SNR, taper, binning;
+			double SNR, taper, binning, freqCutoffFract;
 
 		void readBasicParameters(int argc, char *argv[]);
 		virtual void readParameters(int argc, char *argv[]);

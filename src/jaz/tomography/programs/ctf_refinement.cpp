@@ -110,6 +110,7 @@ void CtfRefinementProgram::parseInput()
 
 	min_frame = textToInteger(parser.getOption("--min_frame", "First frame to consider", "0"));
 	max_frame = textToInteger(parser.getOption("--max_frame", "Last frame to consider", "-1"));
+	freqCutoffFract = textToDouble(parser.getOption("--cutoff_fract", "Ignore shells for which the relative dose or frequency weight falls below this fraction of the average", "0.02"));
 
 	Log::readParams(parser);
 
@@ -191,6 +192,7 @@ void CtfRefinementProgram::processTomograms(
 		}
 
 		Tomogram tomogram = tomogramSet.loadTomogram(t, true);
+		tomogram.validateParticleOptics(particles[t], particleSet);
 
 		const int fc = tomogram.frameCount;
 
@@ -206,6 +208,8 @@ void CtfRefinementProgram::processTomograms(
 		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(boxSize, 1);
 
 
+		BufferedImage<int> xRanges = findXRanges(freqWeights, doseWeights, freqCutoffFract);
+
 		const int item_verbosity = per_tomogram_progress? verbosity : 0;
 
 		abortIfNeeded();
@@ -213,7 +217,7 @@ void CtfRefinementProgram::processTomograms(
 		if (do_refine_defocus)
 		{
 			refineDefocus(
-				t, tomogram, aberrationsCache, freqWeights, doseWeights,
+				t, tomogram, aberrationsCache, freqWeights, doseWeights, xRanges,
 				k_min_px, item_verbosity);
 
 			abortIfNeeded();
@@ -233,7 +237,7 @@ void CtfRefinementProgram::processTomograms(
 		if (do_refine_aberrations)
 		{
 			updateAberrations(
-				t, tomogram, aberrationsCache, freqWeights, doseWeights,
+				t, tomogram, aberrationsCache, freqWeights, doseWeights, xRanges,
 				item_verbosity);
 
 			abortIfNeeded();
@@ -318,6 +322,7 @@ void CtfRefinementProgram::refineDefocus(
 		const AberrationsCache& aberrationsCache,
 		const BufferedImage<float>& freqWeights,
 		const BufferedImage<float>& doseWeights,
+		const BufferedImage<int>& xRanges,
 		double k_min_px,
 		int verbosity)
 {
@@ -391,7 +396,7 @@ void CtfRefinementProgram::refineDefocus(
 
 			AberrationFit::considerParticle(
 				particles[t][p], tomogram, referenceMap, particleSet,
-				aberrationsCache, true, freqWeights, doseWeights,
+				aberrationsCache, true, freqWeights, doseWeights, xRanges,
 				f, f,
 				evenData_thread[th], oddData_thread[th]);
 		}
@@ -799,6 +804,7 @@ void CtfRefinementProgram::updateAberrations(
 		const AberrationsCache& aberrationsCache,
 		const BufferedImage<float>& freqWeights,
 		const BufferedImage<float>& doseWeights,
+		const BufferedImage<int>& xRanges,
 		int verbosity)
 {
 	const int s = boxSize;
@@ -825,8 +831,8 @@ void CtfRefinementProgram::updateAberrations(
 	std::vector<BufferedImage<EvenData>> evenData_perGroup(gc);
 	std::vector<BufferedImage<OddData>>  oddData_perGroup(gc);
 
-	std::vector<std::vector<BufferedImage<EvenData>>> evenData_perGroup_perThread(num_threads);
-	std::vector<std::vector<BufferedImage<OddData>>> oddData_perGroup_perThread(num_threads);
+	std::vector<std::vector<BufferedImage<EvenData>>> evenData_perGroup_perThread(gc);
+	std::vector<std::vector<BufferedImage<OddData>>> oddData_perGroup_perThread(gc);
 
 	EvenData evenZero({0.0, 0.0, 0.0, 0.0, 0.0});
 	OddData oddZero({0.0, dComplex(0.0, 0.0)});
@@ -876,7 +882,7 @@ void CtfRefinementProgram::updateAberrations(
 
 		AberrationFit::considerParticle(
 			particles[t][p], tomogram, referenceMap, particleSet,
-			aberrationsCache, true, freqWeights, doseWeights,
+			aberrationsCache, true, freqWeights, doseWeights, xRanges,
 			f0, f1,
 			evenData_perGroup_perThread[g][th],
 			oddData_perGroup_perThread[g][th]);
@@ -1413,8 +1419,8 @@ gravis::d3Vector CtfRefinementProgram::findAstigmatism(
 
 		if (r2 > k_min_px * k_min_px)
 		{
-			const double xx = yf / as;
-			const double yy = xf / as;
+			const double xx = xf / as;
+			const double yy = yf / as;
 
 			astigBasis(xi,yi,0) = xx * xx + yy * yy;
 			astigBasis(xi,yi,1) = xx * xx - yy * yy;
@@ -1480,8 +1486,8 @@ std::vector<d3Vector> CtfRefinementProgram::findMultiAstigmatism(
 
 		if (r2 > k_min_px * k_min_px)
 		{
-			const double xx = yf / as;
-			const double yy = xf / as;
+			const double xx = xf / as;
+			const double yy = yf / as;
 
 			astigBasis(xi,yi,0) = xx * xx + yy * yy;
 			astigBasis(xi,yi,1) = xx * xx - yy * yy;
