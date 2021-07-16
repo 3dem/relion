@@ -188,7 +188,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 		tau2_fudge_arg = mymodel.tau2_fudge_factor;
 	}
 
-	fnt = parser.getOption("--tau2_fudge_scheme", "Tau2 fudge factor updates scheme. Valid values are plain, <a>-2step or <a>-3step-<b>. Where <a> is the deflate inflate and <b> is the final inflate factor.", "OLD");
+	fnt = parser.getOption("--tau2_fudge_scheme", "Tau2 fudge factor updates scheme. Valid values are plain or <deflate>-step. Where <deflate> is the deflate factor during initial stage.", "OLD");
 	if (fnt != "OLD")
 		tau2_fudge_scheme = fnt;
 
@@ -233,7 +233,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	if (fnt != "OLD")
 		grad_stepsize = textToFloat(fnt);
 
-	fnt = parser.getOption("--grad_stepsize_scheme", "Gradient step size updates scheme. Valid values are plain, <a>-2step or <a>-3step-<b>. Where <a> is the initial inflate and <b> is the final deflate factor.", "OLD");
+	fnt = parser.getOption("--grad_stepsize_scheme", "Gradient step size updates scheme. Valid values are plain or <initial>-step. Where <initial> is the initial factor during initial stage.", "OLD");
 	if (fnt != "OLD")
 		grad_stepsize_scheme = fnt;
 
@@ -554,9 +554,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	fn_out = parser.getOption("--o", "Output rootname", "");
 	nr_iter = textToInteger(parser.getOption("--iter", "Maximum number of iterations to perform", "-1"));
 	tau2_fudge_arg = textToFloat(parser.getOption("--tau2_fudge", "Regularisation parameter (values higher than 1 give more weight to the data)", "-1"));
-	if (tau2_fudge_arg > 0)
-		mymodel.tau2_fudge_factor = 1.;
-	tau2_fudge_scheme = parser.getOption("--tau2_fudge_scheme", "Tau2 fudge factor updates scheme. Valid values are plain, <a>-2step or <a>-3step-<b>. Where <a> is the deflate inflate and <b> is the final inflate factor.","");
+    mymodel.tau2_fudge_factor = tau2_fudge_arg > 0 ? tau2_fudge_arg : 1;
+	tau2_fudge_scheme = parser.getOption("--tau2_fudge_scheme", "Tau2 fudge factor updates scheme. Valid values are plain or <deflate>-step. Where <deflate> is the deflate factor during initial stage.","");
 	mymodel.nr_classes = textToInteger(parser.getOption("--K", "Number of references to be refined", "1"));
 	particle_diameter = textToFloat(parser.getOption("--particle_diameter", "Diameter of the circular mask that will be applied to the experimental images (in Angstroms)", "-1"));
 	do_zero_mask = parser.checkOption("--zero_mask","Mask surrounding background in particles to zero (by default the solvent area is filled with random noise)");
@@ -770,7 +769,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 
 	grad_stepsize = textToFloat(parser.getOption("--grad_stepsize", "Step size parameter for gradient optimisation.", "-1"));
 	grad_stepsize_scheme = parser.getOption("--grad_stepsize_scheme",
-			"Gradient step size updates scheme. Valid values are plain, <a>-2step or <a>-3step-<b>. Where <a> is the initial inflate and <b> is the final deflate factor.","");
+			"Gradient step size updates scheme. Valid values are plain or <inflate>-step . Where <inflate> is the initial inflate.","");
 
 	write_every_grad_iter = textToInteger(parser.getOption("--grad_write_iter", "Write out model every so many iterations during gradient refinement (default is writing out all iters)", "10"));
 	maximum_significants_arg = textToInteger(parser.getOption("--maxsig", "Maximum number of most significant poses & translations to consider", "-1"));
@@ -2211,6 +2210,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 			nr_iter = grad_ini_iter + grad_fin_iter + grad_inbetween_iter;
 		}
 		updateStepSize();
+		updateTau2Fudge();
 
 		// determine default subset sizes
 		if (grad_ini_subset_size == -1 || grad_fin_subset_size == -1)
@@ -2915,6 +2915,7 @@ void MlOptimiser::iterate()
 		if (gradient_refine)
 		{
 			updateStepSize();
+			updateTau2Fudge();
 			do_grad = !(has_converged || iter > nr_iter - grad_em_iters) &&
 			          !(do_firstiter_cc && iter == 1) &&
 			          !grad_has_converged;
@@ -9513,9 +9514,9 @@ void MlOptimiser::updateStepSize()
 		if (mymodel.ref_dim == 3 && !is_3d_model) // 3D classification
 			_scheme = "plain";
 		else if (mymodel.ref_dim == 3 && is_3d_model) // 3D initial model
-			_scheme = std::to_string(0.9 / _stepsize) + "-2step";
+			_scheme = std::to_string(0.9 / _stepsize) + "-step";
 		else //2D classification
-			_scheme = std::to_string(0.9 / _stepsize) + "-2step";
+			_scheme = std::to_string(0.9 / _stepsize) + "-step";
 	}
 
 	if (_scheme == "plain")
@@ -9524,43 +9525,22 @@ void MlOptimiser::updateStepSize()
 		return;
 	}
 
-	// If not plain scheme, parse the scheme description
-
-	float inflate(0), deflate(1);
-	bool is_2step = _scheme.find("-2step") != std::string::npos;
-	bool is_3step = _scheme.find("-3step-") != std::string::npos;
-
-	if (is_2step)
-		inflate = textToFloat(_scheme.substr(0, _scheme.find("-2step")));
-
-	if (is_3step)
+	// If not plain scheme
+	if (_scheme.find("-step") != std::string::npos)
 	{
-		int pos = _scheme.find("-3step-");
-		inflate = textToFloat(_scheme.substr(0, pos));
-		deflate = textToFloat(_scheme.substr(pos + 7, _scheme.size()));
-	}
-
-	if (is_2step or is_3step)
-	{
-		if (inflate < 0 or 10 < inflate)
-			REPORT_ERROR("Invalid inflate value in --grad_stepsize_scheme");
-		if (deflate <= 0 or 10 < deflate)
-			REPORT_ERROR("Invalid deflate value in --grad_stepsize_scheme");
+        float inflate = textToFloat(_scheme.substr(0, _scheme.find("-step")));
+		if (inflate <= 1.)
+			REPORT_ERROR("Invalid inflate value for --grad_stepsize_scheme <inflate>-step (inflate > 1)");
 
 		float x = iter;
-		float a1 = grad_inbetween_iter / 5.; //Sigmoid length
-		float b1 = grad_ini_iter; //Sigmoid start
-		float a2 = grad_fin_iter; //Sigmoid length
-		float b2 = grad_ini_iter + grad_inbetween_iter;//Sigmoid start
-		float scale1 = 1. / (pow(10, (x - b1 - a1 / 2.) / (a1 / 4.)) + 1.); //Sigmoid function
-		float scale2 = 1. / (pow(10, (x - b2 - a2 / 2.) / (a2 / 4.)) + 1.); //Sigmoid function
-		float c1 = _stepsize; //Baseline
-		float c = _stepsize / deflate; //Baseline
-		grad_current_stepsize = (_stepsize * inflate - c1) * scale1 + (_stepsize - c) * scale2 + c;
+		float a = grad_inbetween_iter / 5.; //Sigmoid length
+		float b = grad_ini_iter; //Sigmoid start
+		float scale = 1. / (pow(10, (x - b - a / 2.) / (a / 4.)) + 1.); //Sigmoid function
+		grad_current_stepsize = (_stepsize * inflate) * scale + _stepsize * (1-scale);
 		return;
 	}
 
-	REPORT_ERROR("Invalid value in --grad_stepsize_scheme");
+	REPORT_ERROR("Invalid value for --grad_stepsize_scheme");
 }
 
 void MlOptimiser::updateTau2Fudge()
@@ -9583,7 +9563,7 @@ void MlOptimiser::updateTau2Fudge()
 		if (mymodel.ref_dim == 3 && !is_3d_model) // 3D classification
 			_scheme = "plain";
 		else if (mymodel.ref_dim == 3 && is_3d_model) // 3D initial model
-			_scheme = std::to_string(_fudge / 1.) + "-2step";
+			_scheme = std::to_string(_fudge / 1.) + "-step";
 		else //2D classification
 			_scheme = "plain";
 	}
@@ -9594,43 +9574,23 @@ void MlOptimiser::updateTau2Fudge()
 		return;
 	}
 
-	// If not plain scheme, parse the scheme description
-
-	float inflate(0), deflate(1);
-	bool is_2step = _scheme.find("-2step") != std::string::npos;
-	bool is_3step = _scheme.find("-3step-") != std::string::npos;
-
-	if (is_2step)
-		inflate = textToFloat(_scheme.substr(0, _scheme.find("-2step")));
-
-	if (is_3step)
+	// If not plain scheme
+	if (_scheme.find("-step") != std::string::npos)
 	{
-		int pos = _scheme.find("-3step-");
-		inflate = textToFloat(_scheme.substr(0, pos));
-		deflate = textToFloat(_scheme.substr(pos + 7, _scheme.size()));
-	}
-
-	if (is_2step or is_3step)
-	{
-		if (inflate < 0 or 10 < inflate)
-			REPORT_ERROR("Invalid inflate value in --tau2_fudge_scheme");
-		if (deflate <= 0 or 10 < deflate)
-			REPORT_ERROR("Invalid deflate value in --tau2_fudge_scheme");
+        float deflate = textToFloat(_scheme.substr(0, _scheme.find("-step")));
+		if (deflate <= 1.)
+			REPORT_ERROR("Invalid deflate value for --tau2_fudge_scheme <deflate>-step (deflate > 1)");
 
 		float x = iter;
-		float a1 = grad_inbetween_iter / 5.; //Sigmoid length
-		float b1 = grad_ini_iter; //Sigmoid start
-		float a2 = grad_fin_iter; //Sigmoid length
-		float b2 = grad_ini_iter + grad_inbetween_iter;//Sigmoid start
-		float scale1 = 1. / (pow(10, (x - b1 - a1 / 2.) / (a1 / 4.)) + 1.); //Sigmoid function
-		float scale2 = 1. / (pow(10, (x - b2 - a2 / 2.) / (a2 / 4.)) + 1.); //Sigmoid function
-		float c1 = _fudge; //Baseline
-		float c = _fudge / deflate; //Baseline
-		mymodel.tau2_fudge_factor = (_fudge * inflate - c1) * scale1 + (_fudge - c) * scale2 + c;
+		float a = grad_inbetween_iter / 5.; //Sigmoid length
+		float b = grad_ini_iter; //Sigmoid start
+		float scale = 1. / (pow(10, (x - b - a / 2.) / (a / 4.)) + 1.); //Sigmoid function
+		mymodel.tau2_fudge_factor = (_fudge / deflate) * scale + _fudge * (1-scale);
+        std::cerr << "TAU2 FUDGE=" << mymodel.tau2_fudge_factor << std::endl;
 		return;
 	}
 
-	REPORT_ERROR("Invalid value in --tau2_fudge_scheme");
+	REPORT_ERROR("Invalid value for --tau2_fudge_scheme");
 }
 
 void MlOptimiser::checkConvergence(bool myverb)
