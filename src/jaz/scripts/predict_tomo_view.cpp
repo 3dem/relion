@@ -111,6 +111,8 @@ int main(int argc, char *argv[])
 		const ParticleIndex part_id(particleIndex);
 
 		Tomogram tomogram = tomogramSet.loadTomogram(tomoIndex, true);
+		tomogram.validateParticleOptics({part_id}, dataSet);
+
 		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s, 1.0);
 
 		const int fc = tomogram.frameCount;

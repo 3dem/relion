@@ -71,6 +71,7 @@ namespace aberration
 			double Axx, Axy, Ayy, bx, by;
 
 			EvenData& operator+=(const EvenData& d);
+			EvenData& operator*=(double d);
 
 			static void write(const RawImage<EvenData>& evenData, std::string filename);
 			static BufferedImage<EvenData> read(std::string filename);
@@ -85,6 +86,7 @@ namespace aberration
 			dComplex b;
 
 			OddData& operator+=(const OddData& d);
+			OddData& operator*=(double d);
 
 			static void write(const RawImage<OddData>& evenData, std::string filename);
 			static BufferedImage<OddData> read(std::string filename);
@@ -126,6 +128,7 @@ class AberrationFit
 				bool flip_value,
 				const BufferedImage<float>& freqWeights,
 				const BufferedImage<float>& doseWeights,
+				const BufferedImage<int>& xRanges,
 				int f0, int f1,
 				BufferedImage<aberration::EvenData>& even_out,
 				BufferedImage<aberration::OddData>& odd_out);

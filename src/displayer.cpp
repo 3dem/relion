@@ -2573,7 +2573,7 @@ void Displayer::topazDenoiseMap(FileName fn_in, FileName fn_odir, Image<RFLOAT> 
 	if (system(command.c_str()))
 	{
 		std::string warning = "WARNING: there was an error in executing: " + fn_script + "\nWARNING: skipping topaz denoising...";
-		fl_message(warning.c_str());
+		fl_message("%s", warning.c_str());
 		img.read(fn_in);
 	}
 	else

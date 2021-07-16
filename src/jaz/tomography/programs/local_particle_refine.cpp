@@ -46,6 +46,8 @@ void LocalParticleRefineProgram::readParams()
 	eps = textToDouble(parser.getOption("--eps", "Optimisation change threshold", "1e-5"));
 	xtol = textToDouble(parser.getOption("--xtol", "Optimisation gradient threshold", "1e-4"));
 	verbose_opt = parser.checkOption("--verbose_opt", "Print out the cost function after each iteration (for the first thread)");
+	min_frame = textToInteger(parser.getOption("--min_frame", "First frame to consider", "0"));
+	max_frame = textToInteger(parser.getOption("--max_frame", "Last frame to consider", "-1"));
 
 	Log::readParams(parser);
 
@@ -78,6 +80,7 @@ void LocalParticleRefineProgram::run()
 		Log::print("Loading");
 
 		Tomogram tomogram = tomogramSet.loadTomogram(t, true);
+		tomogram.validateParticleOptics(particles[t], particleSet);
 
 		const int fc = tomogram.frameCount;
 
@@ -94,7 +97,7 @@ void LocalParticleRefineProgram::run()
 		std::vector<double> results(pc * data_pad);
 
 
-		Log::beginProgress("Aligning particles", pc/num_threads);
+		if (!verbose_opt) Log::beginProgress("Aligning particles", pc/num_threads);
 
 		#pragma omp parallel for num_threads(num_threads)
 		for (int p = 0; p < pc; p++)
@@ -108,7 +111,8 @@ void LocalParticleRefineProgram::run()
 
 			LocalParticleRefinement refinement(
 					particles[t][p], particleSet, tomogram, referenceMap,
-					freqWeights, doseWeights, aberrationsCache, dose_cutoff);
+					freqWeights, doseWeights, aberrationsCache, dose_cutoff,
+					min_frame, max_frame);
 
 			const std::vector<double> initial {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
@@ -124,7 +128,7 @@ void LocalParticleRefineProgram::run()
 			}
 		}
 
-		Log::endProgress();
+		if (!verbose_opt) Log::endProgress();
 
 		for (int p = 0; p < pc; p++)
 		{

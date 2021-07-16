@@ -31,10 +31,11 @@ BufferedImage<fComplex> Prediction::predictModulated(
 		HalfSet halfSet,
 		Modulation modulation,
 		const RawImage<float>* doseWeight,
-		CtfScale ctfScale)
+		CtfScale ctfScale,
+		const int* xRanges)
 {
 	BufferedImage<fComplex> prediction = predictFS(
-				particle_id, dataSet, proj, s, referenceFS, halfSet);
+				particle_id, dataSet, proj, s, referenceFS, halfSet, xRanges);
 
 	const int og = dataSet.getOpticsGroup(particle_id);
 	
@@ -85,7 +86,8 @@ BufferedImage<fComplex> Prediction::predictModulated(
 BufferedImage<fComplex> Prediction::predictFS(
 		ParticleIndex particle_id, const ParticleSet& dataSet, d4Matrix proj, int s,
 		const std::vector<BufferedImage<fComplex>>& referenceFS,
-		HalfSet halfSet)
+		HalfSet halfSet,
+		const int* xRanges)
 {
 	const int sh = s/2 + 1;
 
@@ -97,8 +99,17 @@ BufferedImage<fComplex> Prediction::predictFS(
 
 	BufferedImage<fComplex> prediction(sh,s);
 
-	ForwardProjection::forwardProject(
+	if (xRanges != 0)
+	{
+		ForwardProjection::forwardProjectWithinRange(
+			xRanges,
 			referenceFS[hs], {projPart}, prediction, 1);
+	}
+	else
+	{
+		ForwardProjection::forwardProject(
+			referenceFS[hs], {projPart}, prediction, 1);
+	}
 
 	return prediction;
 }
@@ -112,6 +123,7 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 		const BufferedImage<float>& freqWeights,
 		const BufferedImage<float>& doseWeights,
 		const std::vector<int>& sequence,
+		const BufferedImage<int>& xRanges,
 		int maxRange,
 		bool flip_value,
 		int num_threads,
@@ -190,7 +202,8 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 					referenceMap.image_FS, halfSet,
 					AmplitudeAndPhaseModulated,
 					&doseSlice,
-					CtfScaled);
+					CtfScaled,
+					&xRanges(0,f));
 					
 			BufferedImage<fComplex> ccFS(sh,s);
 			
@@ -200,9 +213,15 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 			prediction(0,0) = fComplex(0.f, 0.f);
 			
 			for (int y = 0; y < s;  y++)
-			for (int x = 0; x < sh; x++)
 			{
-				ccFS(x,y) = scale * freqWeights(x,y,f) * observation(x,y) * prediction(x,y).conj();
+				for (int x = 0; x < xRanges(y,f); x++)
+				{
+					ccFS(x,y) = scale * freqWeights(x,y,f) * observation(x,y) * prediction(x,y).conj();
+				}
+				for (int x = xRanges(y,f); x < sh; x++)
+				{
+					ccFS(x,y) = fComplex(0.f, 0.f);
+				}
 			}
 			
 			BufferedImage<fComplex> ccFS_padded = Padding::padCorner2D_half(ccFS, sh_act, s_act);
@@ -223,7 +242,7 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 				{
 					for (int x = 0; x < diam; x++)
 					{
-						CCs[p](x,y) = 0.0;
+						CCs[p](x,y,ft) = 0.0;
 					}
 				}
 
@@ -231,12 +250,12 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 				{
 					for (int x = 0; x < 3; x++)
 					{
-						CCs[p](x,y) = 0.0;
+						CCs[p](x,y,ft) = 0.0;
 					}
 
 					for (int x = diam - 3; x < diam; x++)
 					{
-						CCs[p](x,y) = 0.0;
+						CCs[p](x,y,ft) = 0.0;
 					}
 				}
 
@@ -244,7 +263,7 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 				{
 					for (int x = 0; x < diam; x++)
 					{
-						CCs[p](x,y) = 0.0;
+						CCs[p](x,y,ft) = 0.0;
 					}
 				}
 			}

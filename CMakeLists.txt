@@ -73,8 +73,8 @@ endif()
 # ------------------OPTIONS WHICH ARE NEEDED TO SET BUILD-TYPES (COMPILATION FLAGS)--
 # ------------------------------------------------------------------------CUDA-ARCH--
 if(NOT DEFINED CUDA_ARCH)
-    message(STATUS "Setting fallback CUDA_ARCH=35")
-    set(CUDARCH "-arch=sm_35")
+    message(STATUS "Setting fallback CUDA_ARCH=50")
+    set(CUDARCH "-arch=sm_50")
 else(NOT DEFINED CUDA_ARCH)
     message(STATUS "Using provided CUDA_ARCH=${CUDA_ARCH}")
     set(CUDARCH "-arch=sm_${CUDA_ARCH}")
@@ -256,7 +256,7 @@ if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Intel" OR "${CMAKE_CXX_COMPILER}" MATCHES
         if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
             SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -qopenmp -mkl=parallel -limf ")
         else()	# Intel oneAPI compiler
-            SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fiopenmp -mkl=parallel -limf ")
+            SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fiopenmp -qmkl=parallel -limf ")
         endif()
     endif(MKLFFT)
     if(ALTCPU)

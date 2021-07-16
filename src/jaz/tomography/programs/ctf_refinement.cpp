@@ -106,6 +106,11 @@ void CtfRefinementProgram::parseInput()
 	n_even = textToInteger(parser.getOption("--ne", "Maximal N for even aberrations", "4"));
 	n_odd = textToInteger(parser.getOption("--no", "Maximal N for odd aberrations", "3"));
 
+	int expert_section = parser.addSection("Expert options");
+
+	min_frame = textToInteger(parser.getOption("--min_frame", "First frame to consider", "0"));
+	max_frame = textToInteger(parser.getOption("--max_frame", "Last frame to consider", "-1"));
+	freqCutoffFract = textToDouble(parser.getOption("--cutoff_fract", "Ignore shells for which the relative dose or frequency weight falls below this fraction of the average", "0.02"));
 
 	Log::readParams(parser);
 
@@ -187,6 +192,7 @@ void CtfRefinementProgram::processTomograms(
 		}
 
 		Tomogram tomogram = tomogramSet.loadTomogram(t, true);
+		tomogram.validateParticleOptics(particles[t], particleSet);
 
 		const int fc = tomogram.frameCount;
 
@@ -202,6 +208,8 @@ void CtfRefinementProgram::processTomograms(
 		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(boxSize, 1);
 
 
+		BufferedImage<int> xRanges = findXRanges(freqWeights, doseWeights, freqCutoffFract);
+
 		const int item_verbosity = per_tomogram_progress? verbosity : 0;
 
 		abortIfNeeded();
@@ -209,7 +217,7 @@ void CtfRefinementProgram::processTomograms(
 		if (do_refine_defocus)
 		{
 			refineDefocus(
-				t, tomogram, aberrationsCache, freqWeights, doseWeights,
+				t, tomogram, aberrationsCache, freqWeights, doseWeights, xRanges,
 				k_min_px, item_verbosity);
 
 			abortIfNeeded();
@@ -229,7 +237,7 @@ void CtfRefinementProgram::processTomograms(
 		if (do_refine_aberrations)
 		{
 			updateAberrations(
-				t, tomogram, aberrationsCache, freqWeights, doseWeights,
+				t, tomogram, aberrationsCache, freqWeights, doseWeights, xRanges,
 				item_verbosity);
 
 			abortIfNeeded();
@@ -279,7 +287,10 @@ void CtfRefinementProgram::finalise()
 
 	if (do_refine_aberrations)
 	{
-		fitAberrations();
+		Tomogram tomogram = tomogramSet.loadTomogram(0, false);
+		const double k_min_px = boxSize * tomogram.optics.pixelSize / k_min_Ang;
+
+		fitAberrations(k_min_px);
 	}
 
 	Log::print("Writing output data");
@@ -311,6 +322,7 @@ void CtfRefinementProgram::refineDefocus(
 		const AberrationsCache& aberrationsCache,
 		const BufferedImage<float>& freqWeights,
 		const BufferedImage<float>& doseWeights,
+		const BufferedImage<int>& xRanges,
 		double k_min_px,
 		int verbosity)
 {
@@ -355,7 +367,10 @@ void CtfRefinementProgram::refineDefocus(
 		Log::beginProgress("Accumulating defocus evidence", fc);
 	}
 
-	for (int f = 0; f < fc; f++)
+	const int f0 = min_frame;
+	const int f1 = max_frame > 0? max_frame : fc - 1;
+
+	for (int f = f0; f <= f1; f++)
 	{
 		if (verbosity > 0)
 		{
@@ -381,7 +396,7 @@ void CtfRefinementProgram::refineDefocus(
 
 			AberrationFit::considerParticle(
 				particles[t][p], tomogram, referenceMap, particleSet,
-				aberrationsCache, true, freqWeights, doseWeights,
+				aberrationsCache, true, freqWeights, doseWeights, xRanges,
 				f, f,
 				evenData_thread[th], oddData_thread[th]);
 		}
@@ -449,7 +464,7 @@ void CtfRefinementProgram::refineDefocus(
 	}
 	else
 	{
-		for (int f = 0; f < fc; f++)
+		for (int f = f0; f <= f1; f++)
 		{
 			int best_di = deltaSteps / 2;
 			double minCost = std::numeric_limits<double>::max();
@@ -482,9 +497,12 @@ void CtfRefinementProgram::refineDefocus(
 	{
 		CTF ctf = tomogram.centralCTFs[f];
 
-		ctf.DeltafU = astigmatism[f][0];
-		ctf.DeltafV = astigmatism[f][1];
-		ctf.azimuthal_angle = astigmatism[f][2];
+		if (f >= f0 && f <= f1)
+		{
+			ctf.DeltafU = astigmatism[f][0];
+			ctf.DeltafV = astigmatism[f][1];
+			ctf.azimuthal_angle = astigmatism[f][2];
+		}
 
 		tempTable.addObject();
 		tempTable.setValue(EMDL_CTF_DEFOCUSU, ctf.DeltafU, f);
@@ -522,6 +540,9 @@ void CtfRefinementProgram::updateScale(
 	const int fc = tomogram.frameCount;
 	const int pc = particles[t].size();
 
+	const int f0 = min_frame;
+	const int f1 = max_frame > 0? max_frame : fc - 1;
+
 	if (only_do_unfinished && scaleAlreadyDone(tomogram.name))
 	{
 		return;
@@ -555,7 +576,7 @@ void CtfRefinementProgram::updateScale(
 		const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s/2.0);
 
 		#pragma omp parallel for num_threads(num_threads)
-		for (int f = 0; f < fc; f++)
+		for (int f = f0; f <= f1; f++)
 		{
 			if (!isVisible[f]) continue;
 			
@@ -611,7 +632,7 @@ void CtfRefinementProgram::updateScale(
 
 	std::vector<double> per_frame_scale(fc);
 
-	for (int f = 0; f < fc; f++)
+	for (int f = f0; f <= f1; f++)
 	{
 		per_frame_scale[f] = sum_prdObs_f[f] / sum_prdSqr_f[f];
 	}
@@ -620,7 +641,7 @@ void CtfRefinementProgram::updateScale(
 	{
 		std::ofstream scaleFile(outDir + tomogram.name + "_raw_scale.dat");
 
-		for (int f = 0; f < fc; f++)
+		for (int f = f0; f <= f1; f++)
 		{
 			scaleFile << f << ' ' << per_frame_scale[f] << '\n';
 		}
@@ -647,7 +668,7 @@ void CtfRefinementProgram::updateScale(
 		double max_scale = 0.0;
 		int max_scale_f = 0;
 
-		for (int f = 0; f < fc; f++)
+		for (int f = f0; f <= f1; f++)
 		{
 			if (per_frame_scale[f] > max_scale)
 			{
@@ -676,16 +697,16 @@ void CtfRefinementProgram::updateScale(
 		std::vector<double> opt = NelderMead::optimize(initial, blf, 0.01, 0.0001, 10000);
 
 
-
 		MetaDataTable tempGlobalTable, tempPerFrameTable;
 
 		for (int f = 0; f < fc; f++)
 		{
-			const double est = blf.getScale(f, opt);
-
 			CTF ctf = tomogram.centralCTFs[f];
 
-			ctf.scale = est;
+			if (f >= f0 && f <= f1)
+			{
+				ctf.scale = blf.getScale(f, opt);
+			}
 
 			tempPerFrameTable.addObject();
 			tempPerFrameTable.setValue(EMDL_CTF_SCALEFACTOR, ctf.scale, f);
@@ -734,7 +755,7 @@ void CtfRefinementProgram::updateScale(
 		{
 			std::ofstream scaleFile(outDir + tomogram.name + "_fitted_scale.dat");
 
-			for (int f = 0; f < fc; f++)
+			for (int f = f0; f <= f1; f++)
 			{
 				const double est = blf.getScale(f, opt);
 
@@ -751,7 +772,11 @@ void CtfRefinementProgram::updateScale(
 		for (int f = 0; f < fc; f++)
 		{
 			CTF ctf = tomogram.centralCTFs[f];
-			ctf.scale = per_frame_scale[f];
+
+			if (f >= f0 && f <= f1)
+			{
+				ctf.scale = per_frame_scale[f];
+			}
 
 			tempPerFrameTable.addObject();
 			tempPerFrameTable.setValue(EMDL_CTF_SCALEFACTOR, ctf.scale, f);
@@ -779,6 +804,7 @@ void CtfRefinementProgram::updateAberrations(
 		const AberrationsCache& aberrationsCache,
 		const BufferedImage<float>& freqWeights,
 		const BufferedImage<float>& doseWeights,
+		const BufferedImage<int>& xRanges,
 		int verbosity)
 {
 	const int s = boxSize;
@@ -786,6 +812,9 @@ void CtfRefinementProgram::updateAberrations(
 	const int fc = tomogram.frameCount;
 	const int pc = particles[t].size();
 	const int gc = particleSet.numberOfOpticsGroups();
+
+	const int f0 = min_frame;
+	const int f1 = max_frame > 0? max_frame : fc - 1;
 
 
 	if (only_do_unfinished && aberrationsAlreadyDone(tomogram.name, gc))
@@ -802,8 +831,8 @@ void CtfRefinementProgram::updateAberrations(
 	std::vector<BufferedImage<EvenData>> evenData_perGroup(gc);
 	std::vector<BufferedImage<OddData>>  oddData_perGroup(gc);
 
-	std::vector<std::vector<BufferedImage<EvenData>>> evenData_perGroup_perThread(num_threads);
-	std::vector<std::vector<BufferedImage<OddData>>> oddData_perGroup_perThread(num_threads);
+	std::vector<std::vector<BufferedImage<EvenData>>> evenData_perGroup_perThread(gc);
+	std::vector<std::vector<BufferedImage<OddData>>> oddData_perGroup_perThread(gc);
 
 	EvenData evenZero({0.0, 0.0, 0.0, 0.0, 0.0});
 	OddData oddZero({0.0, dComplex(0.0, 0.0)});
@@ -846,15 +875,15 @@ void CtfRefinementProgram::updateAberrations(
 
 		if (th == 0 && verbosity > 0)
 		{
-			Log::updateProgress(p/num_threads);
+			Log::updateProgress(p);
 		}
 
 		const int g = particleSet.getOpticsGroup(particles[t][p]);
 
 		AberrationFit::considerParticle(
 			particles[t][p], tomogram, referenceMap, particleSet,
-			aberrationsCache, true, freqWeights, doseWeights,
-			0, fc - 1,
+			aberrationsCache, true, freqWeights, doseWeights, xRanges,
+			f0, f1,
 			evenData_perGroup_perThread[g][th],
 			oddData_perGroup_perThread[g][th]);
 	}
@@ -1161,7 +1190,7 @@ void CtfRefinementProgram::collectScale()
 	}
 }
 
-void CtfRefinementProgram::fitAberrations()
+void CtfRefinementProgram::fitAberrations(int k_min_px)
 {
 	const int s  = boxSize;
 	const int sh = s/2 + 1;
@@ -1187,6 +1216,19 @@ void CtfRefinementProgram::fitAberrations()
 				{
 					BufferedImage<EvenData> even = EvenData::read(fn);
 					even_data_sum += even;
+				}
+			}
+
+			for (int yy = 0; yy < s;  yy++)
+			for (int xx = 0; xx < sh; xx++)
+			{
+				const double x = xx;
+				const double y = yy < s/2? yy : yy - s;
+				const double r = sqrt(x*x + y*y);
+
+				if (r < k_min_px)
+				{
+					even_data_sum(xx,yy) *= 0.0;
 				}
 			}
 
@@ -1228,6 +1270,19 @@ void CtfRefinementProgram::fitAberrations()
 				{
 					BufferedImage<OddData> odd = OddData::read(fn);
 					odd_data_sum += odd;
+				}
+			}
+
+			for (int yy = 0; yy < s;  yy++)
+			for (int xx = 0; xx < sh; xx++)
+			{
+				const double x = xx;
+				const double y = yy < s/2? yy : yy - s;
+				const double r = sqrt(x*x + y*y);
+
+				if (r < k_min_px)
+				{
+					odd_data_sum(xx,yy) *= 0.0;
 				}
 			}
 
@@ -1364,8 +1419,8 @@ gravis::d3Vector CtfRefinementProgram::findAstigmatism(
 
 		if (r2 > k_min_px * k_min_px)
 		{
-			const double xx = yf / as;
-			const double yy = xf / as;
+			const double xx = xf / as;
+			const double yy = yf / as;
 
 			astigBasis(xi,yi,0) = xx * xx + yy * yy;
 			astigBasis(xi,yi,1) = xx * xx - yy * yy;
@@ -1431,8 +1486,8 @@ std::vector<d3Vector> CtfRefinementProgram::findMultiAstigmatism(
 
 		if (r2 > k_min_px * k_min_px)
 		{
-			const double xx = yf / as;
-			const double yy = xf / as;
+			const double xx = xf / as;
+			const double yy = yf / as;
 
 			astigBasis(xi,yi,0) = xx * xx + yy * yy;
 			astigBasis(xi,yi,1) = xx * xx - yy * yy;

@@ -130,6 +130,7 @@ void AberrationFit :: considerParticle(
 		bool flip_value,
 		const BufferedImage<float>& freqWeights,
 		const BufferedImage<float>& doseWeights,
+		const BufferedImage<int>& xRanges,
 		int f0, int f1,
 		BufferedImage<EvenData>& even_out,
 		BufferedImage<OddData>& odd_out)
@@ -173,15 +174,16 @@ void AberrationFit :: considerParticle(
 				Prediction::OwnHalf,
 				Prediction::Unmodulated,
 				&doseSlice,
-				Prediction::CtfScaled);
+				Prediction::CtfScaled,
+				&xRanges(0,f));
 
 		const float scale = flip_value? -1.f : 1.f;
 
 		observation(0,0) = fComplex(0.f, 0.f);
 		prediction(0,0) = fComplex(0.f, 0.f);
 
-		for (int y = 0; y < s;  y++)
-		for (int x = 0; x < sh; x++)
+		for (int y = 0; y < s; y++)
+		for (int x = 0; x < xRanges(y,f); x++)
 		{
 			const double x_ang = pix2ang * x;
 			const double y_ang = pix2ang * (y < s/2? y : y - s);
@@ -425,7 +427,6 @@ std::vector<double> AberrationFit::solveAndFitOdd(
 		const std::string& prefix,
 		bool writeImages)
 {
-
 	OddSolution solution = solveOdd(data);
 	return fitOdd(solution, n_bands, initialCoeffs, pixelSize, prefix, writeImages);
 }
@@ -594,6 +595,17 @@ EvenData &EvenData::operator+=(const EvenData& d)
 	Ayy += d.Ayy;
 	bx += d.bx;
 	by += d.by;
+
+	return *this;
+}
+
+EvenData &EvenData::operator*=(double d)
+{
+	Axx *= d;
+	Axy *= d;
+	Ayy *= d;
+	bx *= d;
+	by *= d;
 }
 
 void EvenData::write(const RawImage<EvenData> &data, std::string filename)
@@ -666,6 +678,14 @@ OddData &OddData::operator+=(const OddData& d)
 {
 	a += d.a;
 	b += d.b;
+
+	return *this;
+}
+
+OddData &OddData::operator*=(double d)
+{
+	a *= d;
+	b *= d;
 }
 
 void OddData::write(const RawImage<OddData> &data, std::string filename)

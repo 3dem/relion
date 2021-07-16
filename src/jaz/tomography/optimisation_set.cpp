@@ -52,6 +52,7 @@ void OptimisationSet::read(
 
 		freqCutoff_A =  textToDouble(parser.getOption("--freq_cutoff", "Explicit cutoff frequency (in Å; negative to turn off)", "-1"));
 		fscThresholdWidth = textToDouble(parser.getOption("--fsc_thresh_width", "Width of the frq. weight flank", "5"));
+		flatWeight = !parser.checkOption("--use_SNR_weight", "Weight each shell proportionally to its reference-map confidence");
 	}
 
 	if (optimisationSet != "")

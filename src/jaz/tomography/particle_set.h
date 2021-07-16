@@ -62,6 +62,7 @@ class ParticleSet
 		void setParticleCoord(ParticleIndex particle_id, const gravis::d3Vector& v);
 
 		int getOpticsGroup(ParticleIndex particle_id) const;
+		void setOpticsGroup(ParticleIndex particle_id, int zeroBasedId);
 		int numberOfOpticsGroups() const;
 		
 		double getBinnedPixelSize(int opticsGroup) const;

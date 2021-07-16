@@ -397,6 +397,10 @@ public:
 	RFLOAT grad_current_stepsize;
 	std::string grad_stepsize_scheme;
 
+	// For automated adjusting of tau2 fudge
+	std::string tau2_fudge_scheme;
+	RFLOAT tau2_fudge_arg;
+
 	// Self-organizing map
 	bool do_init_blobs;
 	bool do_som;
@@ -1147,6 +1151,9 @@ public:
 
 	// Adjust step size for the gradient algorithms
 	void updateStepSize();
+
+	// Adjust tau2 fudge factor
+	void updateTau2Fudge();
 
 	// Check convergence for auto-refine procedure
 	// Also print convergence information to screen for auto-refine procedure

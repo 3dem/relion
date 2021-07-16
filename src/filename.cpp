@@ -560,7 +560,7 @@ FileName realpath(const FileName &fn, bool allow_nonexisting_path)
 
 	if (allow_nonexisting_path)
 	{
-		realpath(fn.c_str(), retval);
+		char *dont_care = realpath(fn.c_str(), retval);
 		if (retval == NULL)
 		{
 			REPORT_ERROR(std::string("Failed to resolve realpath of ") + fn);

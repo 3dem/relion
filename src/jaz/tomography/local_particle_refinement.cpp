@@ -20,7 +20,9 @@ LocalParticleRefinement::LocalParticleRefinement(
 		const BufferedImage<float>& freqWeight,
 		const BufferedImage<float>& doseWeight,
 		const AberrationsCache& aberrationsCache,
-		double dose_cutoff)
+		double dose_cutoff,
+		int minFrame,
+		int maxFrame)
 :
 	particle_id(particle_id),
 	particleSet(particleSet),
@@ -28,7 +30,9 @@ LocalParticleRefinement::LocalParticleRefinement(
 	reference(reference),
 	freqWeight(freqWeight),
 	doseWeight(doseWeight),
-	aberrationsCache(aberrationsCache)
+	aberrationsCache(aberrationsCache),
+	minFrame(minFrame),
+	maxFrame(maxFrame)
 {
 	const int s = reference.getBoxSize();
 	const int sh = s/2 + 1;
@@ -36,6 +40,8 @@ LocalParticleRefinement::LocalParticleRefinement(
 	const double pixelSize = tomogram.optics.pixelSize;
 	const double ba = s * pixelSize;
 	const int og = particleSet.getOpticsGroup(particle_id);
+
+	if (this->maxFrame < 0) this->maxFrame = fc-1;
 
 	position = particleSet.getPosition(particle_id);
 
@@ -416,7 +422,7 @@ double LocalParticleRefinement::gradAndValue(const std::vector<double> &x, std::
 
 	double L2 = 0.0;
 
-	for (int f = 0; f < fc; f++)
+	for (int f = minFrame; f <= maxFrame; f++)
 	{
 		if (!isVisible[f]) continue;
 		
