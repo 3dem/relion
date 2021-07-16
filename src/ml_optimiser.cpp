@@ -183,7 +183,14 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 
 	fnt = parser.getOption("--tau2_fudge", "Regularisation parameter (values higher than 1 give more weight to the data)", "OLD");
 	if (fnt != "OLD")
+	{
 		mymodel.tau2_fudge_factor = textToFloat(fnt);
+		tau2_fudge_arg = mymodel.tau2_fudge_factor;
+	}
+
+	fnt = parser.getOption("--tau2_fudge_scheme", "Tau2 fudge factor updates scheme. Valid values are plain, <a>-2step or <a>-3step-<b>. Where <a> is the deflate inflate and <b> is the final inflate factor.", "OLD");
+	if (fnt != "OLD")
+		tau2_fudge_scheme = fnt;
 
 	auto_ignore_angle_changes = parser.checkOption("--auto_ignore_angles", "In auto-refinement, update angular sampling regardless of changes in orientations for convergence. This makes convergence faster.");
 	auto_resolution_based_angles= parser.checkOption("--auto_resol_angles", "In auto-refinement, update angular sampling based on resolution-based required sampling. This makes convergence faster.");
@@ -546,7 +553,10 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	fn_OS = parser.getOption("--ios", "Input tomo optimiser set file. It is used to set --i, --ref or --solvent_mask if they are not provided. Updated output optimiser set is created.", "");
 	fn_out = parser.getOption("--o", "Output rootname", "");
 	nr_iter = textToInteger(parser.getOption("--iter", "Maximum number of iterations to perform", "-1"));
-	mymodel.tau2_fudge_factor = textToFloat(parser.getOption("--tau2_fudge", "Regularisation parameter (values higher than 1 give more weight to the data)", "1"));
+	tau2_fudge_arg = textToFloat(parser.getOption("--tau2_fudge", "Regularisation parameter (values higher than 1 give more weight to the data)", "-1"));
+	if (tau2_fudge_arg > 0)
+		mymodel.tau2_fudge_factor = 1.;
+	tau2_fudge_scheme = parser.getOption("--tau2_fudge_scheme", "Tau2 fudge factor updates scheme. Valid values are plain, <a>-2step or <a>-3step-<b>. Where <a> is the deflate inflate and <b> is the final inflate factor.","");
 	mymodel.nr_classes = textToInteger(parser.getOption("--K", "Number of references to be refined", "1"));
 	particle_diameter = textToFloat(parser.getOption("--particle_diameter", "Diameter of the circular mask that will be applied to the experimental images (in Angstroms)", "-1"));
 	do_zero_mask = parser.checkOption("--zero_mask","Mask surrounding background in particles to zero (by default the solvent area is filled with random noise)");
@@ -1042,6 +1052,10 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 		grad_stepsize = -1;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_STEPSIZE_SCHEME, grad_stepsize_scheme))
 		grad_stepsize_scheme = "";
+	if (!MD.getValue(EMDL_OPTIMISER_TAU2_FUDGE_SCHEME, tau2_fudge_scheme))
+		tau2_fudge_scheme = "";
+	if (!MD.getValue(EMDL_OPTIMISER_TAU2_FUDGE_ARG, tau2_fudge_arg))
+		tau2_fudge_arg = -1.;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_INI_FRAC, grad_ini_frac)) {
 		grad_ini_frac = 0.3;
 		grad_ini_iter = nr_iter * grad_ini_frac;
@@ -1272,6 +1286,8 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, write_every_grad_iter);
 		MD.setValue(EMDL_OPTIMISER_SGD_STEPSIZE, grad_stepsize);
 		MD.setValue(EMDL_OPTIMISER_SGD_STEPSIZE_SCHEME, grad_stepsize_scheme);
+		MD.setValue(EMDL_OPTIMISER_TAU2_FUDGE_SCHEME, tau2_fudge_scheme);
+		MD.setValue(EMDL_OPTIMISER_TAU2_FUDGE_ARG, tau2_fudge_arg);
 		MD.setValue(EMDL_MAX_SIGNIFICANTS, maximum_significants_arg);
 		MD.setValue(EMDL_OPTIMISER_DO_AUTO_REFINE, do_auto_refine);
 		MD.setValue(EMDL_OPTIMISER_AUTO_LOCAL_HP_ORDER, autosampling_hporder_local_searches);
@@ -9545,6 +9561,76 @@ void MlOptimiser::updateStepSize()
 	}
 
 	REPORT_ERROR("Invalid value in --grad_stepsize_scheme");
+}
+
+void MlOptimiser::updateTau2Fudge()
+{
+	RFLOAT _fudge = tau2_fudge_arg;
+	std::string _scheme = tau2_fudge_scheme;
+
+	if (_fudge <= 0)
+	{
+		if (mymodel.ref_dim == 3 && !is_3d_model) // 3D classification
+			_fudge = 4;
+		else if (mymodel.ref_dim == 3 && is_3d_model) // 3D initial model
+			_fudge = 4;
+		else //2D classification
+			_fudge = 2;
+	}
+
+	if (_scheme.empty())
+	{
+		if (mymodel.ref_dim == 3 && !is_3d_model) // 3D classification
+			_scheme = "plain";
+		else if (mymodel.ref_dim == 3 && is_3d_model) // 3D initial model
+			_scheme = std::to_string(_fudge / 1.) + "-2step";
+		else //2D classification
+			_scheme = "plain";
+	}
+
+	if (_scheme == "plain")
+	{
+		mymodel.tau2_fudge_factor = _fudge;
+		return;
+	}
+
+	// If not plain scheme, parse the scheme description
+
+	float inflate(0), deflate(1);
+	bool is_2step = _scheme.find("-2step") != std::string::npos;
+	bool is_3step = _scheme.find("-3step-") != std::string::npos;
+
+	if (is_2step)
+		inflate = textToFloat(_scheme.substr(0, _scheme.find("-2step")));
+
+	if (is_3step)
+	{
+		int pos = _scheme.find("-3step-");
+		inflate = textToFloat(_scheme.substr(0, pos));
+		deflate = textToFloat(_scheme.substr(pos + 7, _scheme.size()));
+	}
+
+	if (is_2step or is_3step)
+	{
+		if (inflate < 0 or 10 < inflate)
+			REPORT_ERROR("Invalid inflate value in --tau2_fudge_scheme");
+		if (deflate <= 0 or 10 < deflate)
+			REPORT_ERROR("Invalid deflate value in --tau2_fudge_scheme");
+
+		float x = iter;
+		float a1 = grad_inbetween_iter / 5.; //Sigmoid length
+		float b1 = grad_ini_iter; //Sigmoid start
+		float a2 = grad_fin_iter; //Sigmoid length
+		float b2 = grad_ini_iter + grad_inbetween_iter;//Sigmoid start
+		float scale1 = 1. / (pow(10, (x - b1 - a1 / 2.) / (a1 / 4.)) + 1.); //Sigmoid function
+		float scale2 = 1. / (pow(10, (x - b2 - a2 / 2.) / (a2 / 4.)) + 1.); //Sigmoid function
+		float c1 = _fudge; //Baseline
+		float c = _fudge / deflate; //Baseline
+		mymodel.tau2_fudge_factor = (_fudge * inflate - c1) * scale1 + (_fudge - c) * scale2 + c;
+		return;
+	}
+
+	REPORT_ERROR("Invalid value in --tau2_fudge_scheme");
 }
 
 void MlOptimiser::checkConvergence(bool myverb)
