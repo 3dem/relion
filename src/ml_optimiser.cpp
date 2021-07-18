@@ -2173,17 +2173,17 @@ void MlOptimiser::initialiseGeneral(int rank)
 			unsigned long dataset_size = mydata.numberOfParticles();
 			if (mymodel.ref_dim == 2) // 2D Classification
 			{
-				grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.005, 5000), 100);
+				grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.01, 10000), 200);
 			}
 			else
 			{
 				if (is_3d_model) // 3D Initial model
 				{
-					grad_ini_subset_size = 200 * mymodel.nr_classes;
+					grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.005, 5000), 200);
 				}
 				else // 3D Classification / Auto-refine
 				{
-					grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.1, 100000), 100);
+					grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.1, 100000), 200);
 				}
 			}
 
@@ -2201,7 +2201,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 			{
 				if (is_3d_model) // 3D Initial model
 				{
-					grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.01, 10000), 1000);
+					grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.1, 50000), 1000);
 				}
 				else // 3D Classification / Auto-refine
 				{
@@ -9587,7 +9587,7 @@ void MlOptimiser::updateStepSize()
 	if (_scheme.find("-step") != std::string::npos)
 	{
         float inflate = textToFloat(_scheme.substr(0, _scheme.find("-step")));
-		if (inflate <= 1.)
+		if (inflate <= 0.)
 			REPORT_ERROR("Invalid inflate value for --grad_stepsize_scheme <inflate>-step (inflate > 1)");
 
 		float x = iter;
@@ -9613,7 +9613,7 @@ void MlOptimiser::updateTau2Fudge()
 		else if (mymodel.ref_dim == 3 && is_3d_model) // 3D initial model
 			_fudge = 4;
 		else //2D classification
-			_fudge = 2;
+			_fudge = 4;
 	}
 
 	if (_scheme.empty())
@@ -9623,7 +9623,7 @@ void MlOptimiser::updateTau2Fudge()
 		else if (mymodel.ref_dim == 3 && is_3d_model) // 3D initial model
 			_scheme = std::to_string(_fudge / 1.) + "-step";
 		else //2D classification
-			_scheme = "plain";
+			_scheme = std::to_string(_fudge / 2.) + "-step";
 	}
 
 	if (_scheme == "plain")
@@ -9636,11 +9636,11 @@ void MlOptimiser::updateTau2Fudge()
 	if (_scheme.find("-step") != std::string::npos)
 	{
         float deflate = textToFloat(_scheme.substr(0, _scheme.find("-step")));
-		if (deflate <= 1.)
+		if (deflate <= 0.)
 			REPORT_ERROR("Invalid deflate value for --tau2_fudge_scheme <deflate>-step (deflate > 1)");
 
 		float x = iter;
-		float a = grad_inbetween_iter / 5.; //Sigmoid length
+		float a = grad_inbetween_iter/2; //Sigmoid length
 		float b = grad_ini_iter; //Sigmoid start
 		float scale = 1. / (pow(10, (x - b - a / 2.) / (a / 4.)) + 1.); //Sigmoid function
 		mymodel.tau2_fudge_factor = (_fudge / deflate) * scale + _fudge * (1-scale);
