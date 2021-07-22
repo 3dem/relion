@@ -2173,7 +2173,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 			unsigned long dataset_size = mydata.numberOfParticles();
 			if (mymodel.ref_dim == 2) // 2D Classification
 			{
-				grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.01, 10000), 200);
+				grad_ini_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.005, 5000), 200);
 			}
 			else
 			{
@@ -4658,25 +4658,6 @@ void MlOptimiser::centerClasses()
 			if (mymodel.pseudo_halfsets)
 				shiftImageInContinuousFourierTransform(aux, mymodel.Igrad1[iclass + mymodel.nr_classes],
 				                                       mymodel.ori_size * mymodel.padding_factor, x, y, z);
-
-			// Reset mom2 but preserve its power
-			MultidimArray<RFLOAT> counter, power;
-			power.initZeros(mymodel.Igrad2[iclass].xdim*3);
-			counter.initZeros(mymodel.Igrad2[iclass].xdim*3);
-
-			FOR_ALL_ELEMENTS_IN_ARRAY3D(mymodel.Igrad2[iclass]) {
-				int ires = ROUND(sqrt((RFLOAT) (k * k + i * i + j * j)));
-				DIRECT_A1D_ELEM(power, ires) += sqrt(norm(A3D_ELEM(mymodel.Igrad2[iclass], k, i, j)));
-				DIRECT_A1D_ELEM(counter, ires) += 1;
-			}
-
-			mymodel.Igrad2[iclass].initZeros();
-
-			FOR_ALL_ELEMENTS_IN_ARRAY3D(mymodel.Igrad2[iclass]) {
-				int ires = ROUND(sqrt((RFLOAT) (k * k + i * i + j * j)));
-				RFLOAT v =  DIRECT_A1D_ELEM(power, ires)/ DIRECT_A1D_ELEM(counter, ires);
-				A3D_ELEM(mymodel.Igrad2[iclass], k, i, j) = v;
-			}
 		}
 	}
 }
@@ -9591,7 +9572,7 @@ void MlOptimiser::updateStepSize()
 			REPORT_ERROR("Invalid inflate value for --grad_stepsize_scheme <inflate>-step (inflate > 1)");
 
 		float x = iter;
-		float a = grad_inbetween_iter / 5.; //Sigmoid length
+		float a = grad_inbetween_iter/4; //Sigmoid length
 		float b = grad_ini_iter; //Sigmoid start
 		float scale = 1. / (pow(10, (x - b - a / 2.) / (a / 4.)) + 1.); //Sigmoid function
 		grad_current_stepsize = (_stepsize * inflate) * scale + _stepsize * (1-scale);
@@ -9623,7 +9604,7 @@ void MlOptimiser::updateTau2Fudge()
 		else if (mymodel.ref_dim == 3 && is_3d_model) // 3D initial model
 			_scheme = std::to_string(_fudge / 1.) + "-step";
 		else //2D classification
-			_scheme = std::to_string(_fudge / 2.) + "-step";
+			_scheme = std::to_string(_fudge / 1.) + "-step";
 	}
 
 	if (_scheme == "plain")
@@ -9640,7 +9621,7 @@ void MlOptimiser::updateTau2Fudge()
 			REPORT_ERROR("Invalid deflate value for --tau2_fudge_scheme <deflate>-step (deflate > 1)");
 
 		float x = iter;
-		float a = grad_inbetween_iter/2; //Sigmoid length
+		float a = grad_inbetween_iter/4; //Sigmoid length
 		float b = grad_ini_iter; //Sigmoid start
 		float scale = 1. / (pow(10, (x - b - a / 2.) / (a / 4.)) + 1.); //Sigmoid function
 		mymodel.tau2_fudge_factor = (_fudge / deflate) * scale + _fudge * (1-scale);
