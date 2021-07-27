@@ -4573,7 +4573,7 @@ void MlOptimiser::maximization()
 						(wsum_model.BPref[iclass]).reconstructGrad(
 								mymodel.Iref[iclass],
 								mymodel.fsc_halves_class[iclass],
-								grad_current_stepsize,
+								grad_current_stepsize * std::pow(mymodel.pdf_class[iclass], 1./8.),
 								mymodel.tau2_fudge_factor,
 								mymodel.getPixelFromResolution(1./grad_min_resol),
 								do_split_random_halves,
@@ -9545,7 +9545,7 @@ void MlOptimiser::updateStepSize()
 		else if (mymodel.ref_dim == 3 && is_3d_model) // 3D initial model
 			_stepsize = 0.5;
 		else //2D classification
-			_stepsize = 0.3;
+			_stepsize = 0.5;
 	}
 
 	if (_scheme.empty())
