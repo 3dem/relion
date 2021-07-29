@@ -4573,7 +4573,7 @@ void MlOptimiser::maximization()
 						(wsum_model.BPref[iclass]).reconstructGrad(
 								mymodel.Iref[iclass],
 								mymodel.fsc_halves_class[iclass],
-								grad_current_stepsize * std::pow(mymodel.pdf_class[iclass], 1./8.),
+								grad_current_stepsize * (1-std::exp(-(3*mymodel.nr_classes+10)*mymodel.pdf_class[iclass])),
 								mymodel.tau2_fudge_factor,
 								mymodel.getPixelFromResolution(1./grad_min_resol),
 								do_split_random_halves,
@@ -9545,7 +9545,7 @@ void MlOptimiser::updateStepSize()
 		else if (mymodel.ref_dim == 3 && is_3d_model) // 3D initial model
 			_stepsize = 0.5;
 		else //2D classification
-			_stepsize = 0.5;
+			_stepsize = 0.3;
 	}
 
 	if (_scheme.empty())
@@ -9572,7 +9572,7 @@ void MlOptimiser::updateStepSize()
 			REPORT_ERROR("Invalid inflate value for --grad_stepsize_scheme <inflate>-step (inflate > 1)");
 
 		float x = iter;
-		float a = grad_inbetween_iter/4; //Sigmoid length
+		float a = grad_inbetween_iter/2; //Sigmoid length
 		float b = grad_ini_iter; //Sigmoid start
 		float scale = 1. / (pow(10, (x - b - a / 2.) / (a / 4.)) + 1.); //Sigmoid function
 		grad_current_stepsize = (_stepsize * inflate) * scale + _stepsize * (1-scale);
