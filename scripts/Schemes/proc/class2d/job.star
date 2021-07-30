@@ -35,7 +35,10 @@ helical_tube_outer_diameter        200
 highres_limit         -1 
 min_dedicated         24 
 nr_classes        100 
-   nr_iter        100 
+do_em		  No
+   nr_iter_em        25 
+do_grad		     Yes
+   nr_iter_grad        200 
     nr_mpi          1 
    nr_pool         30 
 nr_threads         12 

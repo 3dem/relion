@@ -9625,7 +9625,6 @@ void MlOptimiser::updateTau2Fudge()
 		float b = grad_ini_iter; //Sigmoid start
 		float scale = 1. / (pow(10, (x - b - a / 2.) / (a / 4.)) + 1.); //Sigmoid function
 		mymodel.tau2_fudge_factor = (_fudge / deflate) * scale + _fudge * (1-scale);
-        std::cerr << "TAU2 FUDGE=" << mymodel.tau2_fudge_factor << std::endl;
 		return;
 	}
 

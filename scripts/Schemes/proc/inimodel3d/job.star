@@ -26,7 +26,7 @@ do_solvent        Yes
    gpu_ids        0,1 
 min_dedicated         24 
 nr_classes          1 
-   nr_iter        100 
+   nr_iter        200 
     nr_mpi          1 
    nr_pool         30 
 nr_threads         12 
@@ -41,5 +41,6 @@ qsubscript /public/EM/RELION/relion/bin/relion_qsub.csh
 scratch_dir       "" 
 skip_gridding        Yes 
   sym_name         C1
+ tau_fudge          4 
    use_gpu        Yes 
  

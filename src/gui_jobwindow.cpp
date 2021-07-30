@@ -1203,18 +1203,41 @@ void JobWindow::initialiseClass2DWindow()
 	tab3->label("Optimisation");
 	resetHeight();
 
-	//set up groups
-	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group2->end();
-
 	place("nr_classes", TOGGLE_DEACTIVATE);
 	place("tau_fudge");
 
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	place("nr_iter");
-	place("do_grad", TOGGLE_DEACTIVATE);
+	//set up groups
+	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group2->end();
+
+	place("do_em", TOGGLE_DEACTIVATE, group2);
+
+	group2->begin();
+
+	place("nr_iter_em");
+
+	group2->end();
+
+	guientries["do_em"].cb_menu_i(); // to make default effective
+
+
+	//set up groups
+	group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group5->end();
+
+	place("do_grad", TOGGLE_DEACTIVATE, group5);
+
+	group5->begin();
+
+	place("nr_iter_grad");
+
+	group5->end();
+
+	guientries["do_grad"].cb_menu_i(); // to make default effective
+
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -1355,6 +1378,7 @@ void JobWindow::initialiseInimodelWindow()
 	resetHeight();
 
 	place("nr_iter");
+	place("tau_fudge");
 	place("nr_classes", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer

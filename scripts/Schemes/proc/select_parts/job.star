@@ -28,7 +28,7 @@ do_select_values         No
 duplicate_threshold         30 
    fn_data         "" 
     fn_mic         "" 
-  fn_model Schemes/proc/class2d/run_it100_optimiser.star 
+  fn_model Schemes/proc/class2d/run_it200_optimiser.star 
 image_angpix         -1 
 min_dedicated         24 
  nr_groups          1 
