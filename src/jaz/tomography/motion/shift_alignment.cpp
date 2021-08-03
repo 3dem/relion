@@ -84,6 +84,8 @@ std::vector<gravis::d2Vector> ShiftAlignment::alignGlobally(
 			}
 		}
 
+		referenceMap.contributeWeight<fComplex>(CC_hat);
+
 		BufferedImage<float> CC;
 		FFT::inverseFourierTransform(CC_hat, CC);
 
@@ -155,11 +157,6 @@ std::vector<d2Vector> ShiftAlignment::alignPerParticle(
 	if (diag)
 	{
 		CCsum.write(outDir + "CCsum_" + tag + ".mrc");
-
-		for (int p = 0; p < 12; p++)
-		{
-			CCs[p].write(outDir + "CC_particle_" + ZIO::itoa(p) + "_" + tag + ".mrc");
-		}
 	}
 
 	d2Vector origin(padding*range + 3, padding*range + 3);

@@ -155,7 +155,7 @@ BufferedImage<float> RefinementProgram::computeFrequencyWeights(
 
 	for (int f = 0; f < fc; f++)
 	{
-		referenceMap.contributeWeight(frqWghts.getSliceRef(f), tomogram.centralCTFs[f].scale);
+		referenceMap.contributeWeight<float>(frqWghts.getSliceRef(f));
 	}
 
 	if (applyDoseWeight)

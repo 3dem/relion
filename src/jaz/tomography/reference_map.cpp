@@ -256,50 +256,6 @@ void TomoReferenceMap::load(int boxSize, int verbosity)
 	}
 }
 
-void TomoReferenceMap::contributeWeight(RawImage<float> freqWeights, double ctfScale)
-{
-	const int s = image_FS[0].ydim;
-	const int sh = image_FS[0].xdim;
-
-	for (int y = 0; y < s; y++)
-	for (int x = 0; x < sh; x++)
-	{
-		double xx = x;
-		double yy = y < s/2? y : y - s;
-
-		double r = sqrt(xx*xx + yy*yy);
-
-		int r0 = (int) r;
-		int r1 = r0 + 1;
-
-		if (r1 >= sh || r1 > lastShell + fscThresholdWidth)
-		{
-			freqWeights(x,y) = 0.0;
-		}
-		else
-		{
-			const double f = r - r0;
-
-			const double g0 = SNR_weight[r0];
-			const double g1 = SNR_weight[r1];
-
-			const double g = (1 - f) * g0 + f * g1;
-
-			double env = 1.0;
-
-			if (r > lastShell &&
-				r < lastShell + fscThresholdWidth)
-			{
-				const double t = (r - lastShell) / fscThresholdWidth;
-
-				env = (cos(PI * t) + 1.0) / 2.0;
-			}
-
-			freqWeights(x,y) *= env * g;
-		}
-	}
-}
-
 int TomoReferenceMap::getBoxSize() const
 {
 	return image_real[0].xdim;

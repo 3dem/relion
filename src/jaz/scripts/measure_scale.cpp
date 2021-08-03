@@ -101,7 +101,7 @@ BufferedImage<float> computeFrequencyWeights(
 
 	for (int f = 0; f < fc; f++)
 	{
-		referenceMap.contributeWeight(frqWghts.getSliceRef(f), 1.0);
+		referenceMap.contributeWeight<float>(frqWghts.getSliceRef(f));
 	}
 
 	BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s, 1.0);

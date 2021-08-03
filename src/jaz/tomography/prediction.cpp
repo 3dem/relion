@@ -411,7 +411,7 @@ void Prediction::predictMicrograph(
 
 			if (xx >= 0 && xx < w && yy >= 0 && yy < h)
 			{
-				target_slice(xx,yy,0) -= prediction_RS(x,y);
+				target_slice(xx,yy) -= prediction_RS(x,y);
 			}
 		}
 	}
