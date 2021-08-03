@@ -109,9 +109,9 @@ _rlnSchemeEdgeOutputNodeName #2
 _rlnSchemeEdgeIsFork #3 
 _rlnSchemeEdgeOutputNodeNameIfTrue #4 
 _rlnSchemeEdgeBooleanVariable #5 
-WAIT HAS_ctffind              0  undefined  undefined 
-HAS_ctffind WAIT             1 EXIT_maxtime has_ctffind
-EXIT_maxtime select_mics              0  undefined  undefined 
+WAIT EXIT_maxtime             0  undefined  undefined 
+EXIT_maxtime HAS_ctffind      0  undefined  undefined 
+HAS_ctffind WAIT             1 select_mics has_ctffind
 select_mics COUNT_mics              0  undefined  undefined
 COUNT_mics HAS_mics_increased              0  undefined  undefined 
 HAS_mics_increased WAIT             1 SET_prev_nr_mics has_larger_nr_mics

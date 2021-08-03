@@ -25,7 +25,7 @@ do_solvent        Yes
     fn_img Schemes/proc/select_parts/particles.star 
    gpu_ids        0,1 
 min_dedicated         24 
-nr_classes          1 
+nr_classes          3 
    nr_iter        200 
     nr_mpi          1 
    nr_pool         30 

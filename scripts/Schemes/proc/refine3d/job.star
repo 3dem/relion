@@ -14,7 +14,7 @@ data_joboptions_values
 loop_ 
 _rlnJobOptionVariable #1 
 _rlnJobOptionValue #2 
-auto_faster        Yes 
+auto_faster        No
 auto_local_sampling "1.8 degrees" 
 ctf_intact_first_peak         No 
 do_apply_helical_symmetry        Yes 
