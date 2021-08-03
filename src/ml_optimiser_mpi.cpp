@@ -666,7 +666,10 @@ void MlOptimiserMpi::initialiseWorkLoad()
 
 				MPI_Barrier(MPI_COMM_WORLD);
 				if (!need_to_copy) // This initialises nr_parts_on_scratch on non-first ranks by pretending --reuse_scratch
+				{
 					mydata.setScratchDirectory(fn_scratch, true, verb);
+					keep_scratch=true; // Setting keep_scratch for non-first ranks, to ensure that only first rank on each node deletes scratch during cleanup
+				}
 			}
 			else
 			{
