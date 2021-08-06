@@ -270,6 +270,7 @@ void MlModel::read(FileName fn_in, int nr_optics_groups_from_mydata, bool _do_gr
 		// Check to see whether there are gradient tracking entry as well
 		if (MDclass.getValue(EMDL_MLMODEL_GRADIENT_MOMENT1_IMAGE, fn_tmp))
 		{
+		    bool is_2d(Iref[0].zdim == 1);
 			Image<RFLOAT> img;
 			do_grad = true;
 			if (iclass == 0)
@@ -282,7 +283,7 @@ void MlModel::read(FileName fn_in, int nr_optics_groups_from_mydata, bool _do_gr
 			img.read(fn_tmp);
 
 			Igrad1[iclass].resize(
-					Iref[0].zdim == 1 ? 1: Iref[0].zdim * padding_factor,
+			        is_2d ? 1: Iref[0].zdim * padding_factor,
 					Iref[0].ydim * padding_factor,
 					Iref[0].xdim * padding_factor/2+1
 			);
@@ -294,17 +295,26 @@ void MlModel::read(FileName fn_in, int nr_optics_groups_from_mydata, bool _do_gr
 
 			if (pseudo_halfsets)
 			{
+				FileName fileName;
 
 				long int img_idx;
-				FileName fileName;
 				fn_tmp.decompose(img_idx, fileName);
-				fileName.compose(img_idx + nr_classes, fileName);
+
+				if (img_idx >= 0)
+					fileName.compose(img_idx + nr_classes, fileName);
+				else
+				{
+					fileName = fn_tmp.withoutExtension();
+					img_idx = atoi( fileName.substr(fileName.length() - 3, 3).c_str() );
+					fileName = fileName.substr(0, fileName.length() - 3);
+					fileName.compose(fileName, img_idx + nr_classes, "mrc", 3);
+				}
 				img.read(fileName);
 
 				Igrad1[iclass + nr_classes].resize(
-						Iref[0].zdim == 1 ? 1: Iref[0].zdim * padding_factor,
+						is_2d ? 1 : Iref[0].zdim * padding_factor,
 						Iref[0].ydim * padding_factor,
-						Iref[0].xdim * padding_factor/2+1
+						Iref[0].xdim * padding_factor / 2 + 1
 				);
 
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Igrad1[iclass + nr_classes]) {
