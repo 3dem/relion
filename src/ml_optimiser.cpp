@@ -913,6 +913,7 @@ if(do_gpu)
 	// Debugging/analysis/hidden stuff
 	do_map = !checkParameter(argc, argv, "--no_map");
 	minres_map = textToInteger(getParameter(argc, argv, "--minres_map", "5"));
+	abort_at_resolution = textToFloat(parser.getOption("--abort_at_resolution", "Abort when resolution reaches beyond this value", "-1", true));
 	do_bfactor = checkParameter(argc, argv, "--bfactor");
 	gridding_nr_iter = textToInteger(getParameter(argc, argv, "--gridding_iter", "10"));
 	debug1 = textToFloat(getParameter(argc, argv, "--debug1", "0"));
@@ -3121,6 +3122,11 @@ void MlOptimiser::iterate()
 			timer.printTimes(false);
 #endif
 
+		if (1. / mymodel.current_resolution < abort_at_resolution)
+		{
+			std::cout << "Current resolution " << 1. / mymodel.current_resolution << " exceeds --abort_at_resolution " << abort_at_resolution << std::endl;
+			break;
+		}
 
 	} // end loop iters
 
@@ -9589,12 +9595,17 @@ void MlOptimiser::updateTau2Fudge()
 
 	if (_fudge <= 0)
 	{
-		if (mymodel.ref_dim == 3 && !is_3d_model) // 3D classification
-			_fudge = 4;
-		else if (mymodel.ref_dim == 3 && is_3d_model) // 3D initial model
-			_fudge = 4;
-		else //2D classification
-			_fudge = 4;
+		if (do_auto_refine)
+			_fudge = 1;
+		else
+		{
+			if (mymodel.ref_dim == 3 && !is_3d_model) // 3D classification
+				_fudge = 4;
+			else if (mymodel.ref_dim == 3 && is_3d_model) // 3D initial model
+				_fudge = 4;
+			else //2D classification
+				_fudge = 4;
+		}
 	}
 
 	if (_scheme.empty())
