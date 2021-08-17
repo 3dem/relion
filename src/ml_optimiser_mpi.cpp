@@ -3687,6 +3687,13 @@ void MlOptimiserMpi::iterate()
 		if (do_auto_refine && has_converged)
 			break;
 
+		if (1. / mymodel.current_resolution < abort_at_resolution)
+		{
+			if (node->isLeader())
+				std::cout << "Current resolution " << 1. / mymodel.current_resolution << " exceeds --abort_at_resolution " << abort_at_resolution << std::endl;
+			break;
+		}
+
     } // end loop iters
 
 	// Hopefully this barrier will prevent some bus errors

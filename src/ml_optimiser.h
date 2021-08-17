@@ -314,6 +314,9 @@ public:
 	// Minimum resolution to perform Bayesian estimates of the model
 	int minres_map;
 
+	// Abort when resolution reaches beyond this value
+	float abort_at_resolution;
+
 	// Flag to flatten solvent
 	bool do_solvent;
 
