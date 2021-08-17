@@ -56,6 +56,7 @@ std::vector<gravis::d2Vector> ShiftAlignment::alignGlobally(
 			Prediction::AmplitudeAndPhaseModulated,
 			Prediction::CtfUnscaled);
 
+
 		BufferedImage<fComplex> obs_slice_hat, pred_slice_hat;
 
 		FFT::FourierTransform(obs_slice, obs_slice_hat);
