@@ -2196,7 +2196,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 			unsigned long dataset_size = mydata.numberOfParticles();
 			if (mymodel.ref_dim == 2) // 2D Classification
 			{
-				grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.05, 50000), 1000);
+				grad_fin_subset_size = XMIPP_MAX(XMIPP_MIN(dataset_size * 0.05, 100000), 1000);
 			}
 			else
 			{
