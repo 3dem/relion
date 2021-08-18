@@ -716,7 +716,7 @@ bool Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 	{
 		FileName fn_coord = micname2coordname[fn_mic];
 		if (!exists(fn_coord))
-			return(false);
+			return false;
 		if (do_extract_helix)
 			readHelicalCoordinates(fn_mic, fn_coord, MDin);
 		else
@@ -727,7 +727,7 @@ bool Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 	// If an extract_minimum_fom was given, remove
 	if (fabs(extract_minimum_fom + 999.) > 1e-6)
 	{
-		if (!MDin.containsLabel(EMDL_PARTICLE_AUTOPICK_FOM))
+		if (!MDin.containsLabel(EMDL_PARTICLE_AUTOPICK_FOM) && MDin.numberOfObjects() > 0)
 			REPORT_ERROR("ERROR: cannot apply minimum threshold for FOM, as input coordinate file does not contain rlnAutopickFigureOfMerit label.");
 		MetaDataTable MDcopy;
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
@@ -741,7 +741,6 @@ bool Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 		}
 		MDin = MDcopy;
 	}
-
 
 	if (MDin.numberOfObjects() > 0)
 	{
