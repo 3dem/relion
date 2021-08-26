@@ -99,7 +99,7 @@ void MlModel::initialise(bool _do_grad, bool _pseudo_halfsets)
 		Igrad2.resize(nr_classes);
 	}
 
-	ref_names.resize(nr_classes);
+	ref_names.resize(nr_classes * nr_bodies);
 }
 
 // Reading from a file
