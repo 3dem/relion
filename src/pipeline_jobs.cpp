@@ -3323,7 +3323,7 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 	}
 
 	command += " --o " + outputname + fn_run;
-        command += " --iter " + joboptions["nr_iter"].getString(); 
+        command += " --iter " + joboptions["nr_iter"].getString();
 
 	int total_nr_iter = joboptions["nr_iter"].getNumber(error_message);
 	if (error_message != "") return false;
@@ -4395,7 +4395,7 @@ void RelionJob::initialiseMultiBodyJob()
 
 	hidden_name = ".gui_multibody";
 
-	joboptions["fn_in"] = JobOption("Consensus refinement optimiser.star: ", OUTNODE_REFINE3D_OPT, "", "STAR Files (*_optimiser.star)", "Select the *_optimiser.star file for the iteration of the consensus refinement \
+	joboptions["fn_in"] = JobOption("Consensus refinement optimiser.star: ", std::string(""), "STAR Files (run_it*_optimiser.star)", "Refine3D/.", "Select the *_optimiser.star file for the iteration of the consensus refinement \
 from which you want to start multi-body refinement.");
 
 	joboptions["fn_cont"] = JobOption("Continue from here: ", std::string(""), "STAR Files (*_optimiser.star)", "CURRENT_ODIR", "Select the *_optimiser.star file for the iteration \
@@ -4527,7 +4527,7 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 			outputNodes = getOutputNodesRefine(outputname + "run", -1, 1, 3, nr_bodies, "MultiBody");
 			command += " --solvent_correct_fsc --multibody_masks " + joboptions["fn_bodies"].getString();
 
-			Node node(joboptions["fn_in"].getString(), joboptions["fn_in"].node_type);
+			Node node(joboptions["fn_in"].getString(), LABEL_REFINE3D_OPT);
 			inputNodes.push_back(node);
 
 			// Sampling
