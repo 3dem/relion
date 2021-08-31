@@ -66,7 +66,7 @@ void MotionRefinerMpi::runWithFccUpdate()
 		long int my_first_motion_micrograph_FCC, my_last_motion_micrograph_FCC;
 		
 		divide_equally(
-			lastMotionMgForFCC, node->size, node->rank,
+			lastMotionMgForFCC+1, node->size, node->rank,
 			my_first_motion_micrograph_FCC, my_last_motion_micrograph_FCC);
 		
 		motionEstimator.process(motionMdts, my_first_motion_micrograph_FCC, my_last_motion_micrograph_FCC, true);
@@ -98,7 +98,7 @@ void MotionRefinerMpi::runWithRecombination()
 		long int my_first_recomb_micrograph_FCC, my_last_recomb_micrograph_FCC;
 
 		divide_equally(
-			lastRecombMgForFCC, node->size, node->rank,
+			lastRecombMgForFCC+1, node->size, node->rank,
 			my_first_recomb_micrograph_FCC, my_last_recomb_micrograph_FCC);
 
 
