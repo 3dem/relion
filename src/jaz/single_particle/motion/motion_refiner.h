@@ -104,6 +104,8 @@ class MotionRefiner
 				allMdts, // all micrographs (used for B-factor computation)
 				chosenMdts, // micrographs between minMG and maxMG
 				motionMdts, recombMdts; // unfinished micrographs
+
+			std::vector<bool> motionUnfinished, recombUnfinished; // refers to the entries in chosenMicrographs
 			
 		
 		// combine all EPS files into one logfile.pdf
@@ -113,7 +115,16 @@ class MotionRefiner
 		// movie_path, movie_ending and movie_toReplace/replaceBy
 		void adaptMovieNames();
 		
-		int lastMicrographForFCC();
+		int lastTotalMicrographForFCC();
+		int subtractFinishedMicrographs(int lastTotal, const std::vector<bool>& selection);
+
+		std::vector<MetaDataTable> selectMicrographs(
+				const std::vector<MetaDataTable>& mdts,
+				const std::vector<bool>& selection) const;
+
+		std::vector<int> getForwardIndices(
+				const std::vector<bool>& selection) const;
+
 };
 
 #endif

@@ -57,7 +57,7 @@ class FrameRecombiner
 		// has a max. freq. parameter been supplied?
 		bool outerFreqKnown();
 
-		std::vector<MetaDataTable> findUnfinishedJobs(const std::vector<MetaDataTable>& mdts,
+		std::vector<bool> findUnfinishedJobs(const std::vector<MetaDataTable>& mdts,
 		                                              std::string path);
 		
 		double getOutputPixelSize(int opticsGroup);

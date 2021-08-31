@@ -947,21 +947,18 @@ bool FrameRecombiner::outerFreqKnown()
 	return k1a > 0.0;
 }
 
-std::vector<MetaDataTable> FrameRecombiner::findUnfinishedJobs(
+std::vector<bool> FrameRecombiner::findUnfinishedJobs(
 		const std::vector<MetaDataTable> &mdts, std::string path)
 {
-	std::vector<MetaDataTable> out(0);
-
 	const int gc = mdts.size();
+
+	std::vector<bool> out(gc);
 
 	for (int g = 0; g < gc; g++)
 	{
 		std::string fn_root = MotionRefiner::getOutputFileNameRoot(path, mdts[g]);
 
-		if (!isJobFinished(fn_root))
-		{
-			out.push_back(mdts[g]);
-		}
+		out[g] = !isJobFinished(fn_root);
 	}
 
 	return out;
