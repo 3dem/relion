@@ -125,6 +125,9 @@ class MotionRefiner
 		std::vector<int> getForwardIndices(
 				const std::vector<bool>& selection) const;
 
+		std::vector<int> getBackwardIndices(
+				const std::vector<bool>& selection) const;
+
 };
 
 #endif

@@ -285,6 +285,18 @@ void MotionRefiner::init()
 							  << "a new STAR file will be generated" << std::endl;
 				}
 			}
+
+			if (debug)
+			{
+				std::cout << "index \t motion unfinished \t recombination unfinished:\n";
+
+				for (int i = 0; i < chosenMdts.size(); i++)
+				{
+					std::cout << i << " \t " << motionUnfinished[i] << " \t " << recombUnfinished[i] << '\n';
+				}
+
+				std::cout << '\n';
+			}
 		}
 	}
 	else
@@ -680,3 +692,22 @@ std::vector<int> MotionRefiner::getForwardIndices(const std::vector<bool>& selec
 
 	return total_to_selection;
 }
+
+std::vector<int> MotionRefiner::getBackwardIndices(const std::vector<bool>& selection) const
+{
+	const int mgc = selection.size();
+	std::vector<int> selection_to_total(0);
+	selection_to_total.reserve(mgc);
+
+	for (int m = 0; m < mgc; m++)
+	{
+		if (selection[m])
+		{
+			selection_to_total.push_back(m);
+		}
+	}
+
+	return selection_to_total;
+}
+
+

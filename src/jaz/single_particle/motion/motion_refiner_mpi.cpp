@@ -59,6 +59,12 @@ void MotionRefinerMpi::runWithFccUpdate()
 	int lastMotionMgForFCC = subtractFinishedMicrographs(lastTotalMgForFCC, motionUnfinished);
 	
 	// Parallel loop over micrographs
+
+	if (debug)
+	{
+		std::cout << "Node " << node->rank << ": "
+				  << "begin FCC batch \n";
+	}
 	
 	if (estimateMotion)
 	{
@@ -68,8 +74,23 @@ void MotionRefinerMpi::runWithFccUpdate()
 		divide_equally(
 			lastMotionMgForFCC+1, node->size, node->rank,
 			my_first_motion_micrograph_FCC, my_last_motion_micrograph_FCC);
+
+		if (debug)
+		{
+			std::vector<int> motion2total = getBackwardIndices(motionUnfinished);
+
+			std::cout << "Node " << node->rank << ": "
+					  << "motion: " << my_first_motion_micrograph_FCC << '(' << motion2total[my_first_motion_micrograph_FCC] << ')' <<
+						 " ... " << my_last_motion_micrograph_FCC << '(' << motion2total[my_last_motion_micrograph_FCC] << ')' << "\n";
+		}
 		
 		motionEstimator.process(motionMdts, my_first_motion_micrograph_FCC, my_last_motion_micrograph_FCC, true);
+	}
+
+	if (debug)
+	{
+		std::cout << "Node " << node->rank << ": "
+				  << "end FCC batch \n";
 	}
 }
 
@@ -88,6 +109,11 @@ void MotionRefinerMpi::runWithRecombination()
 	const int firstMotionMgWithoutFCC = lastMotionMgForFCC + 1;
 	const int firstTotalMgWithoutFCC = lastTotalMgForFCC + 1;
 
+	if (debug)
+	{
+		std::cout << "Node " << node->rank << ": "
+				  << "begin post-FCC batch \n";
+	}
 	
 	if (recombineFrames)
 	{
@@ -119,6 +145,15 @@ void MotionRefinerMpi::runWithRecombination()
 			verb, reference.s, fc, k_out_A, reference.angpix,
 			nr_omp_threads, outPath, debug,
 			&reference, &obsModel, &micrographHandler);
+
+		if (debug)
+		{
+			std::vector<int> recomb2total = getBackwardIndices(recombUnfinished);
+
+			std::cout << "Node " << node->rank << ": "
+					  << "motion: " << my_first_recomb_micrograph_FCC << '(' << recomb2total[my_first_recomb_micrograph_FCC] << ')' <<
+						 " ... " << my_last_recomb_micrograph_FCC << '(' << recomb2total[my_last_recomb_micrograph_FCC] << ')' << "\n";
+		}
 		
 		frameRecombiner.process(recombMdts, my_first_recomb_micrograph_FCC, my_last_recomb_micrograph_FCC);
 		
@@ -141,11 +176,23 @@ void MotionRefinerMpi::runWithRecombination()
 		{
 			if (estimateMotion && motionUnfinished[m])
 			{
+				if (debug)
+				{
+					std::cout << "Node " << node->rank << ": "
+							  << "motion: " << total2motion[m] << '(' << m << ')' << "\n";
+				}
+
 				motionEstimator.process(motionMdts, total2motion[m], total2motion[m], false);
 			}
 
 			if (recombUnfinished[m])
 			{
+				if (debug)
+				{
+					std::cout << "Node " << node->rank << ": "
+							  << "recomb: " << total2recomb[m] << '(' << m << ')' << "\n";
+				}
+
 				frameRecombiner.process(recombMdts, total2recomb[m], total2recomb[m]);
 			}
 
@@ -175,8 +222,23 @@ void MotionRefinerMpi::runWithRecombination()
 
 		// no recombination: just align the remaining movies
 
+		if (debug)
+		{
+			std::vector<int> motion2total = getBackwardIndices(motionUnfinished);
+
+			std::cout << "Node " << node->rank << ": "
+					  << "motion: " << my_first_motion_micrograph_no_FCC << '(' << motion2total[my_first_motion_micrograph_no_FCC] << ')' <<
+						 " ... " << my_last_motion_micrograph_no_FCC << '(' << motion2total[my_last_motion_micrograph_no_FCC] << ')' << "\n";
+		}
+
 		motionEstimator.process(
 				motionMdts, my_first_motion_micrograph_no_FCC, my_last_motion_micrograph_no_FCC, false);
+	}
+
+	if (debug)
+	{
+		std::cout << "Node " << node->rank << ": "
+				  << "end post-FCC batch \n";
 	}
 	
 	MPI_Barrier(MPI_COMM_WORLD);
