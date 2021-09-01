@@ -646,7 +646,7 @@ int MotionRefiner::subtractFinishedMicrographs(
 {
 	int lastSelected = lastTotal;
 
-	for (int m = 0; m < lastTotal; m++)
+	for (int m = 0; m <= lastTotal; m++)
 	{
 		if (!selection[m])
 		{
