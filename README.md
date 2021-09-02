@@ -1,4 +1,4 @@
-RELION 3.1.1
+RELION 3.1.3
 =============
 
 RELION (for REgularised LIkelihood OptimisatioN) is a stand-alone computer
