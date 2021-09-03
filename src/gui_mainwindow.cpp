@@ -22,6 +22,15 @@
 #include "src/gui_mainwindow.h"
 #include "src/gui_background.xpm"
 
+/*
+ gui_background.xpm is the header image.
+ To make this, prepare an image of size 598 x 332 px in 8-bit indexed color mode.
+ Convert it to the XPM format by GIMP.
+ Change the variable name to:
+    static const char *gui_background[]
+ Don't forget to update the image description in the [About] dialog box.
+ */
+
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
 bool show_expand_stdout;
@@ -2423,9 +2432,11 @@ Please also cite relevant papers when you used external programs or their algori
 \
 About the start up screen:\n\n\
 The map shown is the cryo-EM map of mouse heavy-chain apoferritin\n\
-at 1.54 A (EMDB-9865). This is the highest resolution single particle\n\
-reconstruction map deposited to EMDB as of August 2019. The raw dataset\n\
-is also available at EMPIAR-10248.\
+at 1.22 A (EMDB-11638) collected on a new Titan Krios microscope with\n\
+cold FEG, Selectris X energy filter and Falcon4 direct electron detector.\n\
+Densities for hydrogen atoms are visible in the hydrogen difference map\n\
+(orange mesh). See Nakane et al, Nature (2020) (doi:10.1038/s41586-020-2829-0)\n\
+for details. The raw dataset is available at EMPIAR-10424.\
 ")
 
 	ShowHelpText *help = new ShowHelpText(HELPTEXT);
