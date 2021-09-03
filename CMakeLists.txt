@@ -291,6 +291,7 @@ option(FORCE_OWN_FLTK "FORCE_OWN_FLTK" OFF)
 FIND_PACKAGE(X11)
 if(GUI)
     if(X11_FOUND)
+        set(FLTK_SKIP_FLUID TRUE) #FLUID is not required for relion
         set(FLTK_SKIP_OPENGL TRUE) #OpenGL is not required for relion
         if(NOT FORCE_OWN_FLTK)
             FIND_PACKAGE(FLTK)
