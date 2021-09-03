@@ -22,11 +22,11 @@ do_preread_images         No
   do_queue         No 
 do_solvent        Yes 
    fn_cont         "" 
-    fn_img Schemes/proc/select_rest/particles.star 
+    fn_img Schemes/proc/select_parts/particles.star 
    gpu_ids        0,1 
 min_dedicated         24 
-nr_classes          1 
-   nr_iter        100 
+nr_classes          3 
+   nr_iter        200 
     nr_mpi          1 
    nr_pool         30 
 nr_threads         12 
@@ -41,5 +41,6 @@ qsubscript /public/EM/RELION/relion/bin/relion_qsub.csh
 scratch_dir       "" 
 skip_gridding        Yes 
   sym_name         C1
+ tau_fudge          4 
    use_gpu        Yes 
  

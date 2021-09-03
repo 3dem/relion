@@ -22,6 +22,7 @@
 #include "src/npy.hpp"
 #include "src/class_ranker.h"
 const static int IMGSIZE = 64;
+const static int NR_FEAT = 24;
 
 //
 // Calculates n! (uses double arithmetic to avoid overflow)
@@ -393,6 +394,8 @@ void ClassRanker::read(int argc, char **argv, int rank)
 	do_select = parser.checkOption("--auto_select", "Perform auto-selection of particles based on below thresholds for the score");
 	select_min_score = textToFloat(parser.getOption("--min_score", "Minimum selected score to be included in class selection", "0.5"));
 	select_max_score = textToFloat(parser.getOption("--max_score", "Maximum selected score to be included in class selection", "999."));
+	select_min_parts = textToInteger(parser.getOption("--select_min_nr_particles", "select at least this many particles, regardless of their class score", "-1"));
+	select_min_classes = textToInteger(parser.getOption("--select_min_nr_classes", "OR: Select at least this many classes, regardless of their score", "-1"));
 	do_relative_threshold = parser.checkOption("--relative_thresholds", "If true, interpret the above min and max_scores as fractions of the maximum score of all predicted classes in the input");
 	fn_sel_parts = parser.getOption("--fn_sel_parts", "Filename for output star file with selected particles", "particles.star");
 	fn_sel_classavgs = parser.getOption("--fn_sel_classavgs", "Filename for output star file with selected class averages", "class_averages.star");
@@ -481,8 +484,13 @@ void ClassRanker::initialise()
 			exit(1);
 		}
 
+		//Sjors 04032021: read number of optics groups from data.star file for backwards compatibility with reading pre-relion-4.0 files
+		MetaDataTable MDoptics;
+		MDoptics.read(fn_data, "optics");
+		int nr_optics_groups = XMIPP_MAX(1, MDoptics.numberOfObjects());
+
 		//Sjors 06022020: go back to just reading MD_optimiser for speed
-		mymodel.read(fn_model, true); // true means: read only one group!
+		mymodel.read(fn_model, nr_optics_groups);
 		if (debug>0) std::cerr << "Done with reading model.star ..." << std::endl;
 
 		//myopt.read(fn_optimiser); // true means skip_groups_and_pdf_direction from mlmodel; only read 1000 particles...
@@ -528,14 +536,19 @@ void ClassRanker::initialise()
 			// Read in particles (otherwise wait until haveAllAccuracies or performRanking, as Liyi sometimes doesn't need mydata)
 			mydata.read(fn_data, true, true); // true true means: ignore particle_name and group name!
 			total_nr_particles = mydata.numberOfParticles(0);
-			if (debug>0) std::cerr << "Done with reading data.star ..." << std::endl;
 
 		}
 		else
 		{
 			MetaDataTable MDtmp;
 			total_nr_particles = MDtmp.read(fn_data, "particles", true); // true means do_only_count
+			if (total_nr_particles == 0)
+			{
+				// Try again with old-style data.star file
+				total_nr_particles = MDtmp.read(fn_data, "", true); // true means do_only_count
+			}
 		}
+		if (debug>0) std::cerr << "Done with reading data.star ... total_nr_particles= " << total_nr_particles << std::endl;
 
 		if (intact_ctf_first_peak && !only_do_subimages)
 		{
@@ -680,6 +693,10 @@ MultidimArray<RFLOAT> ClassRanker::getSubimages(MultidimArray<RFLOAT> &img, int 
 	newimg.setXmippOrigin();
 
 	// Data augmentation: rotate and flip
+	MultidimArray<RFLOAT> subimages;
+	subimages = newimg;
+
+	/* Do data augmentation in pytorch
 	MultidimArray<RFLOAT> subimages(8, 1, IMGSIZE, IMGSIZE);
 	subimages.setImage(0, newimg);
 	rotation2DMatrix(90., A);
@@ -707,6 +724,7 @@ MultidimArray<RFLOAT> ClassRanker::getSubimages(MultidimArray<RFLOAT> &img, int 
 	rotation2DMatrix(270., A);
 	applyGeometry(newimg2, newimg, A, false, false);
 	subimages.setImage(7, newimg);
+	*/
 
 	/*
 	// TODO: make the if statement for only making subimages for classes with non-zero protein area inside this function
@@ -1870,17 +1888,17 @@ void ClassRanker::readFeatures()
 }
 
 
-float ClassRanker::deployTorchModel(FileName &model_path, std::vector<float> &features, std::vector<float> &subimages)
+void ClassRanker::deployTorchModel(FileName &model_path, std::vector<float> &features, std::vector<float> &subimages, std::vector<float> &scores)
 {
-	const long unsigned featues_shape [] = {features.size()};
-	npy::SaveArrayAsNumpy(fn_out + "features.npy", false, 1, featues_shape, features);
+	const long unsigned count = features.size() / NR_FEAT;
+	const long unsigned featues_shape [] = {count, NR_FEAT};
+	npy::SaveArrayAsNumpy(fn_out + "features.npy", false, 2, featues_shape, features);
 
-	const long unsigned image_shape [] = {IMGSIZE, IMGSIZE};
-	npy::SaveArrayAsNumpy(fn_out + "images.npy", false, 2, image_shape, subimages);
+	const long unsigned image_shape [] = {count, IMGSIZE, IMGSIZE};
+	npy::SaveArrayAsNumpy(fn_out + "images.npy", false, 3, image_shape, subimages);
 
 	char buffer[128];
 	std::string result = "";
-	float score;
 
 	std::string command = python_interpreter + " " + fn_pytorch_script + " " + fn_pytorch_model + " " + fn_out;
 
@@ -1898,16 +1916,28 @@ float ClassRanker::deployTorchModel(FileName &model_path, std::vector<float> &fe
 
 	pclose(pipe);
 
-	try {
+	try
+	{
+		std::string s = result;
+		std::string delimiter = " ";
 		std::string::size_type sz;
-		score = std::stof(result, &sz);
+		scores.resize(0);
+		size_t pos = 0;
+		std::string token;
+		while ((pos = s.find(delimiter)) != std::string::npos) {
+			token = s.substr(0, pos);
+			scores.push_back(std::stof(token, &sz));
+			s.erase(0, pos + delimiter.length());
+		}
+		if (scores.size() != count){
+			std::cerr << result << std::endl;
+			REPORT_ERROR("Failed to run external python script with the following command:\n " + command);
+		}
 	}
 	catch (const std::invalid_argument& ia) {
 		std::cerr << result << std::endl;
 		REPORT_ERROR("Failed to run external python script with the following command:\n " + command);
 	}
-
-	return score;
 }
 
 void ClassRanker::performRanking()
@@ -1922,7 +1952,6 @@ void ClassRanker::performRanking()
 	if (verb > 0)
 	{
 		std::cout << " Deploying torch model for each class ..." << std::endl;
-		init_progress_bar(features_all_classes.size());
 	}
 
 	// Initialise all scores to -999 (including empty classes!)
@@ -1941,32 +1970,44 @@ void ClassRanker::performRanking()
 
 	MetaDataTable MDselected_particles, MDselected_classavgs;
 
-	long int nr_sel_parts = 0;
-	long int nr_sel_classavgs = 0;
 	RFLOAT highscore = 0.0;
 	std::vector<int> selected_classes;
-	std::vector<float> scores(features_all_classes.size());
+	std::vector<float> scores;
 	float max_score = -999.;
+//	for (int i = 0; i < features_all_classes.size(); i++)
+//	{
+//		std::vector<float> image_vector, feature_vector;
+//
+//		MultidimArray<RFLOAT> myimg;
+//		features_all_classes[i].subimages.getSlice(0, myimg);
+//		image_vector.resize(NZYXSIZE(myimg));
+//		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(myimg)
+//		{
+//			image_vector[n] = DIRECT_MULTIDIM_ELEM(myimg, n);
+//		}
+//		feature_vector = features_all_classes[i].toNormalizedVector();
+//		scores[i] = (RFLOAT) deployTorchModel(fn_pytorch_model, feature_vector, image_vector);
+//		if (scores[i] > max_score) max_score = scores[i];
+//	}
+
+	std::vector<float> image_vector(features_all_classes.size() * IMGSIZE * IMGSIZE);
+	std::vector<float> feature_vector(features_all_classes.size() * NR_FEAT);
 	for (int i = 0; i < features_all_classes.size(); i++)
 	{
-		std::vector<float> image_vector, feature_vector;
+		std::vector<float> f = features_all_classes[i].toNormalizedVector();
+		for (int j = 0; j < NR_FEAT; j++)
+			feature_vector[i*NR_FEAT + j] = f[j];
 
-		MultidimArray<RFLOAT> myimg;
-		features_all_classes[i].subimages.getSlice(0, myimg);
-		image_vector.resize(NZYXSIZE(myimg));
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(myimg)
+		MultidimArray<RFLOAT> img;
+		features_all_classes[i].subimages.getSlice(0, img);
+		image_vector.resize(NZYXSIZE(img));
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img)
 		{
-			image_vector[n] = DIRECT_MULTIDIM_ELEM(myimg, n);
+			image_vector[i * IMGSIZE * IMGSIZE + n] = DIRECT_MULTIDIM_ELEM(img, n);
 		}
-		feature_vector = features_all_classes[i].toNormalizedVector();
-		scores[i] = (RFLOAT) deployTorchModel(fn_pytorch_model, feature_vector, image_vector);
-		if (scores[i] > max_score) max_score = scores[i];
-
-		if (verb > 0) progress_bar(i);
-
 	}
 
-	if (verb > 0) progress_bar(features_all_classes.size());
+	deployTorchModel(fn_pytorch_model, feature_vector, image_vector, scores);
 
 	RFLOAT my_min = select_min_score;
 	RFLOAT my_max = select_max_score;
@@ -1984,11 +2025,15 @@ void ClassRanker::performRanking()
 		MDbackup.setValue(EMDL_SELECTED, 0);
 	}
 
+	long int nr_sel_parts = 0;
+	long int nr_sel_classavgs = 0;
 	for (int i = 0; i < features_all_classes.size(); i++)
 	{
 		if (do_select && scores[i] >= my_min && scores[i] <= my_max)
 		{
 			nr_sel_classavgs++;
+			nr_sel_parts+= features_all_classes[i].particle_nr;
+
 			selected_classes.push_back(features_all_classes[i].class_index);
 
 			MDselected_classavgs.addObject();
@@ -2006,6 +2051,71 @@ void ClassRanker::performRanking()
 		int iclass = features_all_classes[i].class_index - 1; // class counting in STAR files starts at 1!
 		predicted_scores.at(iclass) = scores[i];
 	}
+
+	// Select a minimum number of particles or classes
+	if (do_select && (nr_sel_parts < select_min_parts || nr_sel_classavgs < select_min_classes) )
+	{
+		std::vector<std::pair<float, int> > vp;
+
+	    for (int i = 0; i < scores.size(); i++)
+	    {
+	        vp.push_back(std::make_pair(scores[i], i));
+	    }
+	    std::sort(vp.begin(), vp.end());
+
+	    // Go from best classes down to worst
+	    for (int idx = scores.size() - 1; idx >=0 ; idx--)
+	    {
+	    	int i = vp[idx].second;
+    		float myscore = scores[i];
+    		// only consider classes that we haven't considered yet
+    		if (!(scores[i] >= my_min && scores[i] <= my_max))
+    		{
+    			if (nr_sel_parts < select_min_parts)
+				{
+
+    				nr_sel_classavgs++;
+    				nr_sel_parts+= features_all_classes[i].particle_nr;
+
+    				selected_classes.push_back(features_all_classes[i].class_index);
+
+    				MDselected_classavgs.addObject();
+    				MDselected_classavgs.setValue(EMDL_MLMODEL_REF_IMAGE, features_all_classes[i].name);
+    				MDselected_classavgs.setValue(EMDL_CLASS_PREDICTED_SCORE, scores[i]);
+    				MDselected_classavgs.setValue(EMDL_MLMODEL_PDF_CLASS, features_all_classes[i].class_distribution);
+    				MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_ROT, features_all_classes[i].accuracy_rotation);
+    				MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, features_all_classes[i].accuracy_translation);
+    				MDselected_classavgs.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, features_all_classes[i].estimated_resolution);
+
+    				MDbackup.setValue(EMDL_SELECTED, 1, features_all_classes[i].class_index - 1 );
+
+					if (nr_sel_parts >= select_min_parts) break;
+				}
+				else if (nr_sel_classavgs < select_min_classes)
+				{
+
+					nr_sel_classavgs++;
+					nr_sel_parts+= features_all_classes[i].particle_nr;
+
+					selected_classes.push_back(features_all_classes[i].class_index);
+
+					MDselected_classavgs.addObject();
+					MDselected_classavgs.setValue(EMDL_MLMODEL_REF_IMAGE, features_all_classes[i].name);
+					MDselected_classavgs.setValue(EMDL_CLASS_PREDICTED_SCORE, scores[i]);
+					MDselected_classavgs.setValue(EMDL_MLMODEL_PDF_CLASS, features_all_classes[i].class_distribution);
+					MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_ROT, features_all_classes[i].accuracy_rotation);
+					MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, features_all_classes[i].accuracy_translation);
+					MDselected_classavgs.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, features_all_classes[i].estimated_resolution);
+
+					MDbackup.setValue(EMDL_SELECTED, 1, features_all_classes[i].class_index - 1 );
+
+					if (nr_sel_classavgs >= select_min_classes) break;
+				}
+    		}
+	    }
+
+	}
+
 
 	// Write optimiser.star and model.star in the output directory.
 	FileName fn_opt_out, fn_model_out, fn_data_out;
@@ -2046,6 +2156,7 @@ void ClassRanker::performRanking()
 	{
 
 		// Select all particles in the data.star that have classes inside the selected_classes vector
+		nr_sel_parts = 0;
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(mydata.MDimg)
 		{
 			int classnr;

@@ -152,12 +152,12 @@ BufferedImage<float> RefinementProgram::computeFrequencyWeights(
 			frqWghts(x,y,f) *= 1.0 - exp(b*r2);
 		}
 	}
-	
+
 	for (int f = 0; f < fc; f++)
 	{
-		frqWghts.getSliceRef(f) *= referenceMap.freqWeight;
+		referenceMap.contributeWeight<float>(frqWghts.getSliceRef(f));
 	}
-	
+
 	if (applyDoseWeight)
 	{
 		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s, 1.0);
@@ -165,5 +165,51 @@ BufferedImage<float> RefinementProgram::computeFrequencyWeights(
 	}
 		
 	return frqWghts;
+}
+
+BufferedImage<int> RefinementProgram::findXRanges(
+		const RawImage<float>& freqWeights,
+		const RawImage<float>& doseWeights,
+		double cutoffFraction)
+{
+	const int sh = freqWeights.xdim;
+	const int s = freqWeights.ydim;
+	const int fc = doseWeights.zdim;
+
+	BufferedImage<int> out(s,fc);
+
+	for (int f = 0; f < fc; f++)
+	{
+		double avg_freq = 0.0;
+
+		for (int y = 0; y < s;  y++)
+		for (int x = 0; x < sh; x++)
+		{
+			avg_freq += freqWeights(x,y,f);
+		}
+
+		avg_freq /= (s*sh);
+
+		for (int y = 0; y < s; y++)
+		{
+			out(y,f) = 0;
+
+			const double yy = y < s/2? y : y - s;
+			const double xmax = sqrt(s*s/4 - yy*yy);
+
+			for (int x = 0; x < sh && x <= xmax; x++)
+			{
+				const float fw = freqWeights(x,y,f) / avg_freq;
+				const float dw = doseWeights(x,y,f);
+
+				if (fw > cutoffFraction && dw > cutoffFraction)
+				{
+					out(y,f) = x+1;
+				}
+			}
+		}
+	}
+
+	return out;
 }
 

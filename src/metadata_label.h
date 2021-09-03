@@ -282,8 +282,8 @@ enum EMDLabel
 	EMDL_MLMODEL_FOURIER_COVERAGE_TOTAL_REF,
 	EMDL_MLMODEL_FSC_HALVES_REF,
 	EMDL_MLMODEL_GROUP_NAME,
-	EMDL_MLMODEL_GROUP_NO,
 	EMDL_MLMODEL_GROUP_NR_PARTICLES,
+	EMDL_MLMODEL_GROUP_NO,
 	EMDL_MLMODEL_GROUP_SCALE_CORRECTION,
 	EMDL_MLMODEL_HELICAL_NR_ASU,
 	EMDL_MLMODEL_HELICAL_TWIST,
@@ -302,6 +302,9 @@ enum EMDLabel
 	EMDL_MLMODEL_NR_BODIES,
 	EMDL_MLMODEL_NR_CLASSES,
 	EMDL_MLMODEL_NR_GROUPS,
+	EMDL_MLMODEL_NR_OPTICS_GROUPS,
+	EMDL_MLMODEL_OPTICS_GROUP_NO,
+	EMDL_MLMODEL_OPTICS_GROUP_NR_PARTICLES,
 	EMDL_MLMODEL_ORIGINAL_SIZE,
 	EMDL_MLMODEL_ORIENTABILITY_CONTRIBUTION,
 	EMDL_MLMODEL_PADDING_FACTOR,
@@ -342,6 +345,7 @@ enum EMDLabel
 	EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED,
 	EMDL_OPTIMISER_DATA_STARFILE,
 	EMDL_OPTIMISER_DO_AUTO_REFINE,
+	EMDL_OPTIMISER_DO_AUTO_SAMPLING,
 	EMDL_OPTIMISER_DO_ONLY_FLIP_CTF_PHASES,
 	EMDL_OPTIMISER_DO_CORRECT_CTF,
 	EMDL_OPTIMISER_DO_CORRECT_MAGNIFICATION,
@@ -350,6 +354,7 @@ enum EMDLabel
 	EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT,
 	EMDL_OPTIMISER_DO_REALIGN_MOVIES,
 	EMDL_OPTIMISER_DO_MAP,
+	EMDL_OPTIMISER_GRAD_REFINE,
 	EMDL_OPTIMISER_DO_GRAD,
 	EMDL_OPTIMISER_GRAD_EM_ITERS,
 	EMDL_OPTIMISER_GRAD_HAS_CONVERGED,
@@ -381,6 +386,8 @@ enum EMDLabel
 	EMDL_OPTIMISER_SGD_MAX_SUBSETS,
 	EMDL_OPTIMISER_SGD_STEPSIZE,
 	EMDL_OPTIMISER_SGD_STEPSIZE_SCHEME,
+	EMDL_OPTIMISER_TAU2_FUDGE_SCHEME,
+	EMDL_OPTIMISER_TAU2_FUDGE_ARG,
 	EMDL_MAX_SIGNIFICANTS,
 	EMDL_OPTIMISER_DO_CENTER_CLASSES,
 	EMDL_OPTIMISER_DO_SOLVENT_FLATTEN,
@@ -652,6 +659,9 @@ enum EMDLabel
 
 	EMDL_TOMO_TEMP_PRED_TIMES_OBS,
 	EMDL_TOMO_TEMP_PRED_SQUARED,
+
+	EMDL_TOMO_TILT_MOVIE_INDEX,
+	EMDL_TOMO_TILT_MOVIE_FILE_NAME,
 
 	EMDL_UNKNOWN_LABEL,
 
@@ -976,7 +986,10 @@ private:
 		EMDL::addLabel(EMDL_MLMODEL_NORM_CORRECTION_AVG, EMDL_DOUBLE, "rlnNormCorrectionAverage", "Average value (over all images) of the normalisation correction values");
 		EMDL::addLabel(EMDL_MLMODEL_NR_CLASSES, EMDL_INT, "rlnNrClasses", "The number of references (i.e. classes) to be used in refinement");
 		EMDL::addLabel(EMDL_MLMODEL_NR_BODIES, EMDL_INT, "rlnNrBodies", "The number of independent rigid bodies to be refined in multi-body refinement");
-		EMDL::addLabel(EMDL_MLMODEL_NR_GROUPS, EMDL_INT, "rlnNrGroups", "The number of different groups of images (each group has its own noise spectrum, and intensity-scale correction)");
+		EMDL::addLabel(EMDL_MLMODEL_NR_GROUPS, EMDL_INT, "rlnNrGroups", "The number of different groups of images (each group has its own intensity-scale correction)");
+		EMDL::addLabel(EMDL_MLMODEL_NR_OPTICS_GROUPS, EMDL_INT, "rlnNrOpticsGroups", "The number of different optics groups (each optics group has its own noise spectrum)");
+		EMDL::addLabel(EMDL_MLMODEL_OPTICS_GROUP_NO, EMDL_INT, "rlnOpticsGroupNumber", "The number of an optics group");
+		EMDL::addLabel(EMDL_MLMODEL_OPTICS_GROUP_NR_PARTICLES, EMDL_INT, "rlnOpticsGroupNrParticles", "Number particles in an optics group");
 		EMDL::addLabel(EMDL_MLMODEL_ORIENTABILITY_CONTRIBUTION, EMDL_DOUBLE, "rlnSpectralOrientabilityContribution", "Spectral SNR contribution to the orientability of individual particles");
 		EMDL::addLabel(EMDL_MLMODEL_ORIGINAL_SIZE, EMDL_INT, "rlnOriginalImageSize", "Original size of the images (in pixels)");
 		EMDL::addLabel(EMDL_MLMODEL_PADDING_FACTOR, EMDL_DOUBLE, "rlnPaddingFactor", "Oversampling factor for Fourier transforms of the references");
@@ -1023,6 +1036,7 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT, EMDL_BOOL, "rlnDoExternalReconstruct", "Flag to indicate that the reconstruction will be performed outside relion_refine, e.g. for learned priors");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_REALIGN_MOVIES, EMDL_BOOL, "rlnDoRealignMovies", "Flag to indicate that individual frames of movies are being re-aligned");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_MAP, EMDL_BOOL, "rlnDoMapEstimation", "Flag to indicate that MAP estimation should be performed (otherwise ML estimation)");
+        EMDL::addLabel(EMDL_OPTIMISER_GRAD_REFINE, EMDL_BOOL, "rlnDoGradientRefine", "Perform gradient refine.");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_GRAD, EMDL_BOOL, "rlnDoStochasticGradientDescent", "Flag to indicate that gradient refinement should be performed (otherwise expectation maximisation)");
 		EMDL::addLabel(EMDL_OPTIMISER_GRAD_EM_ITERS, EMDL_INT, "rlnGradEmIters", "Finish gradient optimization with this many iterations of Expectation-Maximization.");
 		EMDL::addLabel(EMDL_OPTIMISER_GRAD_HAS_CONVERGED, EMDL_BOOL, "rlnGradHasConverged", "Has gradient refinement converged.");
@@ -1054,8 +1068,11 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_MAX_SUBSETS, EMDL_INT, "rlnSgdMaxSubsets", "Stop SGD after doing this many subsets (possibly spanning more than 1 iteration)");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_STEPSIZE, EMDL_DOUBLE, "rlnSgdStepsize", "Stepsize in gradient refinement updates");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_STEPSIZE_SCHEME, EMDL_STRING, "rlnSgdStepsizeScheme", "Stepsize scheme used in gradient refinement");
+		EMDL::addLabel(EMDL_OPTIMISER_TAU2_FUDGE_SCHEME, EMDL_STRING, "rlnTau2FudgeScheme", "Tau2 fudge scheme for updating the tau2 fudge");
+		EMDL::addLabel(EMDL_OPTIMISER_TAU2_FUDGE_ARG, EMDL_DOUBLE, "rlnTau2FudgeArg", "Tau2 fudge chosen by user");
 		EMDL::addLabel(EMDL_MAX_SIGNIFICANTS, EMDL_INT, "rlnSgdStepsizeScheme", "Maximum number of most significant poses & translations to consider");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_AUTO_REFINE, EMDL_BOOL, "rlnDoAutoRefine", "Flag to indicate that 3D auto-refine procedure is being used");
+		EMDL::addLabel(EMDL_OPTIMISER_DO_AUTO_SAMPLING, EMDL_BOOL, "rlnDoAutoSampling", "Flag to indicate that auto-sampling is to be used (outside the auto-refine procedure)");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_ONLY_FLIP_CTF_PHASES, EMDL_BOOL, "rlnDoOnlyFlipCtfPhases", "Flag to indicate that CTF-correction should only comprise phase-flipping");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_CENTER_CLASSES, EMDL_BOOL, "rlnDoCenterClasses", "Flag to indicate that the class averages or reconstructions should be centered based on their center-of-mass during every iteration.");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_SOLVENT_FLATTEN, EMDL_BOOL, "rlnDoSolventFlattening", "Flag to indicate that the references should be masked to set their solvent areas to a constant density");
@@ -1329,6 +1346,8 @@ private:
 		EMDL::addLabel(EMDL_TOMO_TEMP_PRED_TIMES_OBS, EMDL_DOUBLE, "rlnTomoTempPredTimesObs", "Sum over products of predicted and observed values");
 		EMDL::addLabel(EMDL_TOMO_TEMP_PRED_SQUARED, EMDL_DOUBLE, "rlnTomoTempPredSquared", "Sum over squares of predicted values");
 
+		EMDL::addLabel(EMDL_TOMO_TILT_MOVIE_INDEX, EMDL_INT, "rlnTomoTiltMovieIndex", "Chronological index of a tilt movie");
+		EMDL::addLabel(EMDL_TOMO_TILT_MOVIE_FILE_NAME, EMDL_STRING, "rlnTomoTiltMovieFile", "Movie containing the frames of a tilt");
 
 		EMDL::addLabel(EMDL_UNKNOWN_LABEL, EMDL_UNKNOWN, "rlnUnknownLabel", "NON-RELION label: values will be ignored, yet maintained in the STAR file.");
 	 }

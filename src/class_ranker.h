@@ -365,14 +365,16 @@ public:
 	bool do_ranking;
 	// Perform selection of classes based on predicted scores
 	bool do_select;
-        // Also write out normalized feature vector
-        bool do_write_normalized_features;
+	// Also write out normalized feature vector
+	bool do_write_normalized_features;
 
 	// Make subimages out of class averages at standardized pixel size
 	bool do_subimages, only_do_subimages;
     int nr_subimages, subimage_boxsize;
 
-	RFLOAT select_min_score, select_max_score;
+	// Automatically select classes
+    RFLOAT select_min_score, select_max_score;
+    int select_min_classes, select_min_parts;
 
     // Save some time by limiting calculations
 	int only_use_this_class;
@@ -463,7 +465,7 @@ private:
 
 	void writeFeatures();
 
-	float deployTorchModel(FileName &model_path, std::vector<float> &features, std::vector<float> &subimages);
+	void deployTorchModel(FileName &model_path, std::vector<float> &features, std::vector<float> &subimages, std::vector<float> &score);
 
 	void performRanking();
 };

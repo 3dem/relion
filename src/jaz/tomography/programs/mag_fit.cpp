@@ -67,6 +67,7 @@ void MagFitProgram::run()
 		Log::print("Loading");
 
 		Tomogram tomogram = tomogramSet.loadTomogram(t, true);
+		tomogram.validateParticleOptics(particles[t], particleSet);
 
 		const int fc = tomogram.frameCount;
 

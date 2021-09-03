@@ -14,7 +14,7 @@ data_joboptions_values
 loop_ 
 _rlnJobOptionVariable #1 
 _rlnJobOptionValue #2 
-auto_faster        Yes 
+auto_faster        No
 auto_local_sampling "1.8 degrees" 
 ctf_intact_first_peak         No 
 do_apply_helical_symmetry        Yes 
@@ -29,7 +29,7 @@ do_preread_images         No
 do_solvent_fsc         No 
 do_zero_mask        Yes 
    fn_cont         "" 
-    fn_img Schemes/proc/select_rest/particles.star
+    fn_img Schemes/proc/select_parts/particles.star
    fn_mask         "" 
     fn_ref $$myref
    gpu_ids        0:1 

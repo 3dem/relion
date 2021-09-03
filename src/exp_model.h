@@ -277,7 +277,10 @@ public:
 	RFLOAT getImagePixelSize(long int part_id, int img_id);
 
 	// Get the vector of number of images per group_id
-	void getNumberOfImagesPerGroup(std::vector<long int> &nr_particles_per_group);
+	void getNumberOfImagesPerGroup(std::vector<long int> &nr_particles_per_group, int random_subset = 0);
+
+	// Get the vector of number of images per group_id
+	void getNumberOfImagesPerOpticsGroup(std::vector<long int> &nr_particles_per_group, int random_subset = 0);
 
 	// Get the metadata-row for this image in a separate MetaDataTable
 	MetaDataTable getMetaDataImage(long int part_id, int img_id);

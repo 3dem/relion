@@ -59,13 +59,16 @@ public:
 	// Number of independent bodies for multi-body refinement
 	int nr_bodies;
 
-	// Number of image groups with separate sigma2_noise spectra
+	// Number of image groups with separate scale corrections
 	int nr_groups;
+
+	// Number of optics groups for separate sigma2_noise spectra
+	int nr_optics_groups;
 
 	// Keep track of the first and/or second moment of the gradient
 	bool do_grad;
 
-	// Number of particles in each group
+	// Number of particles in each (micrograph) group
 	std::vector<long int> nr_particles_per_group;
 
 	// Number of directions (size of pdf_direction);
@@ -248,6 +251,7 @@ public:
 		nr_classes(0),
 		nr_bodies(0),
 		nr_groups(0),
+		nr_optics_groups(0),
 		nr_directions(0),
 		LL(0),
 		padding_factor(0.),
@@ -300,6 +304,7 @@ public:
 			nr_classes = MD.nr_classes;
 			nr_bodies = MD.nr_bodies;
 			nr_groups = MD.nr_groups;
+			nr_optics_groups = MD.nr_optics_groups;
 			do_grad = MD.do_grad;
 			pseudo_halfsets = MD.pseudo_halfsets;
 			nr_directions = MD.nr_directions;
@@ -414,7 +419,7 @@ public:
 	void initialise(bool _do_grad = false, bool _pseudo_halfsets = false);
 
 	//Read a model from a file
-	void read(FileName fn_in, bool read_only_one_group = false);
+	void read(FileName fn_in, int nr_optics_groups_from_mydata, bool _do_grad=false, bool _pseudo_halfsets=false);
 
 	// Write a model to disc
 	void write(FileName fn_out, HealpixSampling &sampling,
@@ -473,8 +478,8 @@ public:
 	// One backprojector for CTF-corrected estimate of each class;
 	std::vector<BackProjector > BPref;
 
-	// Store the sum of the weights inside each group
-	// That is the number of particles inside each group
+	// Store the sum of the weights inside each optics group
+	// That is the number of particles inside each optics group
 	std::vector<RFLOAT> sumw_group;
 
 	// For the refinement of group intensity scales and bfactors

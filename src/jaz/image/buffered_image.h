@@ -67,6 +67,8 @@ BufferedImage<T>& BufferedImage<T>::operator = (const BufferedImage<T>& other)
 	
 	dataVec = other.dataVec;
 	RawImage<T>::data = &(dataVec[0]);
+
+	return *this;
 }
 
 template <class T>

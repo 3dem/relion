@@ -23,6 +23,8 @@ class OptimisationSet
 
 			double fscThresholdWidth, freqCutoff_A;
 
+			bool flatWeight;
+
 
 		void write(std::string filename);
 

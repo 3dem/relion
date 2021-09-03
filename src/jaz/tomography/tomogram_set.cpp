@@ -98,6 +98,8 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 		stackSize.z = isl.z;
 	}
 
+	out.imageSize = stackSize.xy();
+
 	out.tiltSeriesFilename = stackFn;
 
 	globalTable.getValueSafely(EMDL_TOMO_SIZE_X, out.w0, index);
@@ -252,7 +254,7 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 	return out;
 }
 
-int TomogramSet::addTomogram(
+void TomogramSet::addTomogram(
 		std::string tomoName, std::string stackFilename,
 		const std::vector<gravis::d4Matrix>& projections, 
 		int w, int h, int d, 

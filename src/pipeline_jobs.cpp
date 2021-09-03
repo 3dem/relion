@@ -2112,10 +2112,6 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 
 			command += " --topaz_exe " + joboptions["fn_topaz_exec"].getString();
 
-			if (joboptions["topaz_nr_particles"].getNumber(error_message) > 0.)
-				command += " --topaz_nr_particles " + joboptions["topaz_nr_particles"].getString();
-			if (error_message != "") return false;
-
 			if (joboptions["topaz_particle_diameter"].getNumber(error_message) > 0.)
 				command += " --particle_diameter " + joboptions["topaz_particle_diameter"].getString();
 			if (error_message != "") return false;
@@ -2132,6 +2128,11 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 				}
 
 				command += " --topaz_train";
+
+				if (joboptions["topaz_nr_particles"].getNumber(error_message) > 0.)
+					command += " --topaz_nr_particles " + joboptions["topaz_nr_particles"].getString();
+				if (error_message != "") return false;
+
 				if (joboptions["do_topaz_train_parts"].getBoolean())
 				{
 					command += " --topaz_train_parts " + joboptions["topaz_train_parts"].getString();
@@ -2567,6 +2568,9 @@ void RelionJob::initialiseSelectJob()
 
 	joboptions["do_class_ranker"] = JobOption("Automatically select 2D classes?", false, "If set to True, the class_ranker program will be used to make an automated class selection, based on the parameters below. This option only works when selecting classes from a relion_refine job (input optimiser.star on the I.O tab)");
 	joboptions["rank_threshold"] = JobOption("Minimum threshold for auto-selection: ", 0.5, 0, 1, 0.05, "Only classes with a pre dicted threshold above this value will be selected.");
+	joboptions["select_nr_parts"] = JobOption("Select at least this many particles: ", -1, -1, 10000, 500, "Even if they have scores below the minimum threshold, select at least this many particles with the best scores.");
+	joboptions["select_nr_classes"] = JobOption("OR: select at least this many classes: ", -1, -1, 24, 1, "Even if they have scores below the minimum threshold, select at least this many classes with the best scores.");
+
 	joboptions["python_exe"] = JobOption("Python executable: ", (std::string)"python", "This version of python should include torch and numpy. We have found that the one from topaz (which is also used for auto-picking) works well. At the LMB, it is here: /public/EM/anaconda3/envs/topaz/bin/python");
 
 	joboptions["do_recenter"] = JobOption("Re-center the class averages?", true, "This option is only used when selecting particles from 2D classes. The selected class averages will all re-centered on their center-of-mass. This is useful when you plane to use these class averages as templates for auto-picking.");
@@ -2783,6 +2787,15 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 
 			command += " --python " + joboptions["python_exe"].getString();
 
+			if (joboptions["select_nr_parts"].getNumber(error_message) > 0)
+			{
+				command += " --select_min_nr_particles " + joboptions["select_nr_parts"].getString();
+			}
+			else if (joboptions["select_nr_classes"].getNumber(error_message) > 0)
+			{
+				command += " --select_min_nr_classes " + joboptions["select_nr_classes"].getString();
+			}
+
 			FileName fn_parts = outputname+"particles.star";
 			Node node2(fn_parts, LABEL_SELECT_PARTS);
 			outputNodes.push_back(node2);
@@ -2915,14 +2928,17 @@ weight on the experimental data. Values around 2-4 have been observed to be usef
 Too small values yield too-low resolution structures; too high values result in over-estimated resolutions, mostly notable by the apparition of high-frequency noise in the references.");
 
 
-	joboptions["nr_iter"] = JobOption("Number of iterations:", 25, 1, 50, 1, "Number of iterations to be performed. \
+	joboptions["do_em"] = JobOption("Use EM algorithm?", false, "If set to Yes, the slower expectation-maximization algorithm will be used. This was the default option in releases prior to 4.0-beta. If set to No, then one needs to use the (faster) VDAM (variable metric gradient descent with adaptive moments) algorithm below. will be used.");
+	joboptions["nr_iter_em"] = JobOption("Number of EM iterations:", 25, 1, 50, 1, "Number of EM iterations to be performed. \
 Note that the current implementation of 2D class averaging and 3D classification does NOT comprise a convergence criterium. \
 Therefore, the calculations will need to be stopped by the user if further iterations do not yield improvements in resolution or classes. \n\n \
 Also note that upon restarting, the iteration number continues to be increased, starting from the final iteration in the previous run. \
 The number given here is the TOTAL number of iterations. For example, if 10 iterations have been performed previously and one restarts to perform \
 an additional 5 iterations (for example with a finer angular sampling), then the number given here should be 10+5=15.");
-	joboptions["do_grad"] = JobOption("Use gradient-driven algorithm?", false, "If set to Yes, use the (faster&better?) NGrad algorithm instead of the default Expectation Maximization? If used, increase number of iterations to ~100!");
 
+
+	joboptions["do_grad"] = JobOption("Use VDAM algorithm?", true, "If set to Yes, the faster VDAM algorithm will be used. This algorithm was introduced with relion-4.0. If set to No, then the slower EM algorithm needs to be used.");
+	joboptions["nr_iter_grad"] = JobOption("Number of VDAM mini-batches:", 200, 50, 500, 10, "Number of mini-batches to be processed using the VDAM algorithm. Using 200 has given good results for many data sets. Using 100 will run faster, at the expense of some quality in the results.");
 
 	joboptions["particle_diameter"] = JobOption("Mask diameter (A):", 200, 0, 1000, 10, "The experimental images will be masked with a soft \
 circular mask with this diameter. Make sure this radius is not set too small because that may mask away part of the signal! \
@@ -3027,11 +3043,45 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 	}
 
 	command += " --o " + outputname + fn_run;
-	int my_iter = (int)joboptions["nr_iter"].getNumber(error_message);
-	if (error_message != "") return false;
 
 	int my_classes = (int)joboptions["nr_classes"].getNumber(error_message);
 	if (error_message != "") return false;
+
+	// Optimisation
+	int my_iter;
+	if (joboptions["do_em"].getBoolean())
+        {
+
+            if (joboptions["do_grad"].getBoolean())
+            {
+                error_message = "You cannot specify to use both the EM and the VDAM algorithm!";
+                return false;
+            }
+
+            command += " --iter " + joboptions["nr_iter_em"].getString();
+
+            my_iter = (int)joboptions["nr_iter_em"].getNumber(error_message);
+            if (error_message != "") return false;
+        }
+        else if (joboptions["do_grad"].getBoolean())
+	{
+            if (joboptions["nr_mpi"].getNumber(error_message) > 1)
+            {
+                error_message = "Gradient refinement (running the VDAM algorithm) is not supported together with MPI.";
+                return false;
+	    }
+
+            command += " --grad --class_inactivity_threshold 0.1 --grad_write_iter 10";
+            command += " --iter " + joboptions["nr_iter_grad"].getString();
+
+            my_iter = (int)joboptions["nr_iter_grad"].getNumber(error_message);
+            if (error_message != "") return false;
+	}
+        else
+        {
+            error_message = "You need to specify to use either the EM or the VDAM algorithm";
+            return false;
+        }
 
 	outputNodes = getOutputNodesRefine(outputname + fn_run, my_iter, my_classes, 2, 1, "Class2D");
 
@@ -3069,21 +3119,6 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 			if (joboptions["ctf_intact_first_peak"].getBoolean())
 				command += " --ctf_intact_first_peak ";
 		}
-	}
-
-	// Optimisation
-	command += " --iter " + joboptions["nr_iter"].getString();
-
-	if (joboptions["do_grad"].getBoolean())
-	{
-		if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-		{
-			error_message = "Gradient refinement is not supported together with MPI.";
-			return false;
-		}
-
-		command += " --grad --class_inactivity_threshold 0.1 ";
-		if (!is_continue) command += " --init_blobs";
 	}
 
 	command += " --tau2_fudge " + joboptions["tau_fudge"].getString();
@@ -3194,11 +3229,16 @@ Note that the Output rootname of the continued run and the rootname of the previ
 If they are the same, the program will automatically add a '_ctX' to the output rootname, \
 with X being the iteration from which one continues the previous run.");
 
-	joboptions["nr_iter"] = JobOption("Number of iterations:", 100, 50, 500, 10, "How many iterations (i.e. mini-batches) to perform?");
+	joboptions["nr_iter"] = JobOption("Number of VDAM mini-batches:", 200, 50, 500, 10, "How many iterations (i.e. mini-batches) to perform with the VDAM algorithm?");
+	joboptions["tau_fudge"] = JobOption("Regularisation parameter T:", 4 , 0.1, 10, 0.1, "Bayes law strictly determines the relative weight between \
+the contribution of the experimental data and the prior. However, in practice one may need to adjust this weight to put slightly more weight on \
+the experimental data to allow optimal results. Values greater than 1 for this regularisation parameter (T in the JMB2011 paper) put more \
+weight on the experimental data. Values around 2-4 have been observed to be useful for 3D initial model calculations");
 
 	joboptions["nr_classes"] = JobOption("Number of classes:", 1, 1, 50, 1, "The number of classes (K) for a multi-reference ab initio SGD refinement. \
 These classes will be made in an unsupervised manner, starting from a single reference in the initial iterations of the SGD, and the references will become increasingly dissimilar during the inbetween iterations.");
 	joboptions["sym_name"] = JobOption("Symmetry:", std::string("C1"), "The initial model is always generated in C1 and then aligned to and symmetrized with the specified point group. If the automatic alignment fails, please manually rotate run_itNNN_class001.mrc (NNN is the number of iterations) so that it conforms the symmetry convention.");
+	joboptions["do_run_C1"] = JobOption("Run in C1 and apply symmetry later? ", true, "If set to Yes, the gradient-driven optimisation is run in C1 and the symmetry orientation is searched and applied later. If set to No, the entire optimisation is run in the symmetry point group indicated above.");
 	joboptions["particle_diameter"] = JobOption("Mask diameter (A):", 200, 0, 1000, 10, "The experimental images will be masked with a soft \
 circular mask with this diameter. Make sure this radius is not set too small because that may mask away part of the signal! \
 If set to a value larger than the image size no masking will be performed.\n\n\
@@ -3220,17 +3260,6 @@ See the RELION Wiki for more details.\n\n Also make sure that the correct pixel 
 only be performed from the first peak of each CTF onward. This can be useful if the CTF model is inadequate at the lowest resolution. \
 Still, in general using higher amplitude contrast on the CTFs (e.g. 10-20%) often yields better results. \
 Therefore, this option is not generally recommended: try increasing amplitude contrast (in your input STAR file) first!");
-
-
-	joboptions["sampling"] = JobOption("Initial angular sampling:", job_sampling_options, 1, "There are only a few discrete \
-angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
-The samplings are approximate numbers and vary slightly over the sphere.\n\n For initial model generation at low resolutions, coarser angular samplings can often be used than in normal 3D classifications/refinements, e.g. 15 degrees. During the inbetween and final SGD iterations, the sampling will be adjusted to the resolution, given the particle size.");
-	joboptions["offset_range"] = JobOption("Offset search range (pix):", 6, 0, 30, 1, "Probabilities will be calculated only for translations \
-in a circle with this radius (in pixels). The center of this circle changes at every iteration and is placed at the optimal translation \
-for each image in the previous iteration.\n\n");
-	joboptions["offset_step"] = JobOption("Offset search step (pix):", 2, 0.1, 5, 0.1, "Translations will be sampled with this step-size (in pixels).\
-Translational sampling is also done using the adaptive approach. \
-Therefore, if adaptive=1, the translations will first be evaluated on a 2x coarser grid.\n\n ");
 
 	joboptions["do_parallel_discio"] = JobOption("Use parallel disc I/O?", true, "If set to Yes, all MPI followers will read their own images from disc. \
 Otherwise, only the leader will read images and send them through the network to the followers. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many followers reading in parallel. If your datasets contain particles with different box sizes, you have to say Yes.");
@@ -3273,6 +3302,8 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 	std::string command;
 	command="`which relion_refine`";
 
+	FileName fn_sym = joboptions["sym_name"].getString();
+
 	FileName fn_run = "run";
 	if (is_continue)
 	{
@@ -3292,18 +3323,17 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 	}
 
 	command += " --o " + outputname + fn_run;
+        command += " --iter " + joboptions["nr_iter"].getString();
 
 	int total_nr_iter = joboptions["nr_iter"].getNumber(error_message);
 	if (error_message != "") return false;
     int nr_classes = joboptions["nr_classes"].getNumber(error_message);
 	if (error_message != "") return false;
 
-	command += " --iter " + joboptions["nr_iter"].getString();
-	command += " --grad_write_iter 10 ";
 
 	if (!is_continue)
 	{
-		command += " --grad --init_blobs --denovo_3dref ";
+		command += " --grad --denovo_3dref ";
 
 		if (joboptions["fn_img"].getString() == "")
 		{
@@ -3323,7 +3353,14 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 		}
 
 		command += " --K " + joboptions["nr_classes"].getString();
-		command += " --sym C1 ";
+		if (joboptions["do_run_C1"].getBoolean())
+		{
+			command += " --sym C1 ";
+		}
+		else
+		{
+			command += " --sym " + fn_sym;
+		}
 
 		if (joboptions["do_solvent"].getBoolean())
 			command += " --flatten_solvent ";
@@ -3346,25 +3383,8 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 
 	// Optimisation
 	command += " --particle_diameter " + joboptions["particle_diameter"].getString();
-
-	// Sampling
-	int iover = 1;
-	command += " --oversampling " + floatToString((float)iover);
-
-	int sampling = JobOption::getHealPixOrder(joboptions["sampling"].getString());
-	if (sampling <= 0)
-	{
-		error_message = "Wrong choice for sampling";
-		return false;
-	}
-	// The sampling given in the GUI will be the oversampled one!
-	command += " --healpix_order " + floatToString(sampling - iover);
-
-	// Offset range
-	command += " --offset_range " + joboptions["offset_range"].getString();
-	// The sampling given in the GUI will be the oversampled one!
-	command += " --offset_step " + floatToString(joboptions["offset_step"].getNumber(error_message) * pow(2., iover));
-	if (error_message != "") return false;
+	command += " --oversampling 1  --healpix_order 1  --offset_range 6  --offset_step 2 --auto_sampling ";
+	command += " --tau2_fudge " + joboptions["tau_fudge"].getString();
 
 	// Running stuff
 	command += " --j " + joboptions["nr_threads"].getString();
@@ -3380,79 +3400,51 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 
 	commands.push_back(command);
 
-	FileName fn_sym = joboptions["sym_name"].getString();
-	if (nr_classes > 1)
+	// Quickly remove RELION_JOB_EXIT_SUCCESS
+	std::string command0 = "rm -f " + outputname + RELION_JOB_EXIT_SUCCESS;
+	commands.push_back(command0);
+
+
+	FileName fn_model;
+	fn_model.compose(outputname + fn_run + "_it", total_nr_iter,"",3);
+	fn_model+="_model.star";
+
+	// Align with symmetry axes and apply symmetry
+	std::string command2 = "`which relion_align_symmetry`";
+	command2 += " --i " + fn_model;
+	command2 += " --o " + outputname + "initial_model.mrc";
+
+	if ( joboptions["do_run_C1"].getBoolean() && !(fn_sym.contains("C1") || fn_sym.contains("c1")) )
 	{
-
-		// Only align symmetry for a single class!
-		if ( !(fn_sym.contains("C1") || fn_sym.contains("c1")) )
-		{
-			error_message = "non-C1 symmetry is only possible when using a single class!";
-			return false;
-		}
-        for (int iclass = 0; iclass < nr_classes; iclass++)
-        {
-        	FileName fn_tmp;
-        	fn_tmp.compose(outputname + fn_run + "_it", total_nr_iter, "", 3);
-        	fn_tmp.compose(fn_tmp + "_class", iclass+1, "mrc", 3);
-        	Node node3(fn_tmp, LABEL_INIMOD_MAP);
-        	outputNodes.push_back(node3);
-        }
-
+		command2 += " --sym " + joboptions["sym_name"].getString();
 	}
 	else
 	{
-
-		// Quickly remove RELION_JOB_EXIT_SUCCESS
-		std::string command0 = "rm -f " + outputname + RELION_JOB_EXIT_SUCCESS;
-		commands.push_back(command0);
-
-		// Now align&apply symmetry, or copy output from relion_refine to initial_model.mrc
-		FileName fn_ref;
-		int iter = (int)((joboptions["nr_iter"]).getNumber(error_message));
-		if (error_message != "") return false;
-		fn_ref.compose(outputname+"run_it", iter, "", 3);
-		fn_ref.compose(fn_ref+"_class", 1, "mrc", 3);
-
-		if ( !(fn_sym.contains("C1") || fn_sym.contains("c1")) )
-		{
-
-			if ( nr_classes > 1)
-			{
-				error_message = "non-C1 symmetry is only possible when using a single class!";
-				return false;
-			}
-
-			// Align with symmetry axes and apply symmetry
-			std::string command2 = "`which relion_align_symmetry`";
-			command2 += " --i " + fn_ref;
-			command2 += " --o " + outputname + "symmetry_aligned.mrc";
-			command2 += " --sym " + joboptions["sym_name"].getString();
-			commands.push_back(command2);
-
-			std::string command3 = "`which relion_image_handler`";
-			command3 += " --i " + outputname + "symmetry_aligned.mrc";
-			command3 += " --o " + outputname + "initial_model.mrc";
-			command3 += " --sym " + joboptions["sym_name"].getString();
-			commands.push_back(command3);
-
-		}
-		else
-		{
-			// Just copy to expected output filename
-			std::string command2 = "`which relion_image_handler`";
-			command2 += " --i " + fn_ref;
-			command2 += " --o " + outputname + "initial_model.mrc";
-			commands.push_back(command2);
-		}
-
-		// And re-introduce RELION_JOB_EXIT_SUCCESS
-		std::string commandF = "touch " + outputname + RELION_JOB_EXIT_SUCCESS;
-		commands.push_back(commandF);
-
-		Node node2(outputname + "initial_model.mrc", LABEL_INIMOD_MAP);
-		outputNodes.push_back(node2);
+		command2 += " --sym C1 ";
 	}
+	command2 += " --apply_sym --select_largest_class ";
+	commands.push_back(command2);
+
+	// And re-introduce RELION_JOB_EXIT_SUCCESS
+	std::string commandF = "touch " + outputname + RELION_JOB_EXIT_SUCCESS;
+	commands.push_back(commandF);
+
+	// Output nodes
+	Node node2(outputname + "initial_model.mrc", LABEL_INIMOD_MAP);
+    outputNodes.push_back(node2);
+
+    // If doing more than 1 class, make them all available (one of them will be the same as initial_model.mrc)
+    if (nr_classes > 1)
+    {
+        for (int iclass = 0; iclass < nr_classes; iclass++)
+        {
+			FileName fn_tmp;
+			fn_tmp.compose(outputname + fn_run + "_it", total_nr_iter, "", 3);
+			fn_tmp.compose(fn_tmp + "_class", iclass+1, "mrc", 3);
+			Node node3(fn_tmp, LABEL_INIMOD_MAP);
+			outputNodes.push_back(node3);
+        }
+    }
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
@@ -4412,7 +4404,7 @@ void RelionJob::initialiseMultiBodyJob()
 
 	hidden_name = ".gui_multibody";
 
-	joboptions["fn_in"] = JobOption("Consensus refinement optimiser.star: ", OUTNODE_REFINE3D_OPT, "", "STAR Files (*_optimiser.star)", "Select the *_optimiser.star file for the iteration of the consensus refinement \
+	joboptions["fn_in"] = JobOption("Consensus refinement optimiser.star: ", std::string(""), "STAR Files (run_it*_optimiser.star)", "Refine3D/.", "Select the *_optimiser.star file for the iteration of the consensus refinement \
 from which you want to start multi-body refinement.");
 
 	joboptions["fn_cont"] = JobOption("Continue from here: ", std::string(""), "STAR Files (*_optimiser.star)", "CURRENT_ODIR", "Select the *_optimiser.star file for the iteration \
@@ -4544,7 +4536,7 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 			outputNodes = getOutputNodesRefine(outputname + "run", -1, 1, 3, nr_bodies, "MultiBody");
 			command += " --solvent_correct_fsc --multibody_masks " + joboptions["fn_bodies"].getString();
 
-			Node node(joboptions["fn_in"].getString(), joboptions["fn_in"].node_type);
+			Node node(joboptions["fn_in"].getString(), LABEL_REFINE3D_OPT);
 			inputNodes.push_back(node);
 
 			// Sampling

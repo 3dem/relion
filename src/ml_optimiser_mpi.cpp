@@ -475,10 +475,6 @@ will still yield good performance and possibly a more stable execution. \n" << s
 		fn_ref.getHalf(fn_ref, my_halfset);
 	}
 
-	MlOptimiser::initialiseGeneral(node->rank);
-
-	initialiseWorkLoad();
-
 #ifdef MKLFFT
 	// Enable multi-threaded FFTW
 	int success = fftw_init_threads();
@@ -490,80 +486,43 @@ will still yield good performance and possibly a more stable execution. \n" << s
 	fftw_plan_with_nthreads(nr_threads);
 #endif
 
-	if (fn_sigma != "")
-	{
-		// Read in sigma_noise spetrum from file DEVELOPMENTAL!!! FOR DEBUGGING ONLY....
-		MetaDataTable MDsigma;
-		RFLOAT val;
-		int idx;
-		MDsigma.read(fn_sigma);
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsigma)
-		{
-			MDsigma.getValue(EMDL_SPECTRAL_IDX, idx);
-			MDsigma.getValue(EMDL_MLMODEL_SIGMA2_NOISE, val);
-			if (idx < XSIZE(mymodel.sigma2_noise[0]))
-				mymodel.sigma2_noise[0](idx) = val;
-		}
-		if (idx < XSIZE(mymodel.sigma2_noise[0]) - 1)
-		{
-			if (verb > 0) std::cout<< " WARNING: provided sigma2_noise-spectrum has fewer entries ("<<idx+1<<") than needed ("<<XSIZE(mymodel.sigma2_noise[0])<<"). Set rest to zero..."<<std::endl;
-		}
+	MlOptimiser::initialiseGeneral(node->rank);
 
-		mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
-		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
-		{
-			// Use the same spectrum for all classes
-			mymodel.sigma2_noise[igroup] =  mymodel.sigma2_noise[0];
-			// We set wsum_model.sumw_group as in calculateSumOfPowerSpectraAndAverageImage
-			wsum_model.sumw_group[igroup] = mymodel.nr_particles_per_group[igroup];
-		}
+	initialiseWorkLoad();
+
+	// Only the first follower calculates the sigma2_noise spectra and sets initial guesses for Iref
+	if (node->rank == 1)
+	{
+		MlOptimiser::initialiseSigma2Noise();
+		MlOptimiser::initialiseReferences();
+    }
+
+	//Now the first follower broadcasts resulting Iref and sigma2_noise to everyone else
+	for (int i = 0; i < mymodel.sigma2_noise.size(); i++)
+	{
+		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.sigma2_noise[i]),
+							   MULTIDIM_SIZE(mymodel.sigma2_noise[i]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
 	}
-	else if (do_calculate_initial_sigma_noise || do_average_unaligned)
+	for (int i = 0; i < mymodel.Iref.size(); i++)
 	{
-		MultidimArray<RFLOAT> Mavg;
-		// Calculate initial sigma noise model from power_class spectra of the individual images
-		// This is done in parallel
-		//std::cout << " Hello world1! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
-
-		calculateSumOfPowerSpectraAndAverageImage(Mavg);
-
-		// Set sigma2_noise and Iref from averaged poser spectra and Mavg
-		if (!node->isLeader())
-			MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(Mavg);
-		//std::cout << " Hello world3! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
+		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Iref[i]),
+							   MULTIDIM_SIZE(mymodel.Iref[i]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
 	}
 
-	//std::cout << " Hello world! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
-
-	initialiseGeneralFinalize();
+	// Initialise the data_versus_prior ratio to get the initial current_size right
+	if (!do_initialise_bodies && !node->isLeader())
+		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
 
 	// Only leader writes out initial mymodel (do not gather metadata yet)
 	int my_nr_subsets = (do_split_random_halves) ? 2 : 1;
 	if (node->isLeader())
+	{
 		MlOptimiser::write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, node->rank);
+    }
 	else if (node->rank <= my_nr_subsets)
 	{
 		//Only the first_follower of each subset writes model to disc
 		MlOptimiser::write(DO_WRITE_SAMPLING, DONT_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, node->rank);
-
-		bool do_warn = false;
-		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
-		{
-			if (mymodel.nr_particles_per_group[igroup] < 5 && node->rank == 1) // only warn for half1 to avoid messy output
-			{
-				if (my_nr_subsets == 1)
-					std:: cout << "WARNING: There are only " << mymodel.nr_particles_per_group[igroup] << " particles in group " << igroup + 1 << std::endl;
-				else
-					std:: cout << "WARNING: There are only " << mymodel.nr_particles_per_group[igroup] << " particles in group " << igroup + 1 << " of half-set " << node->rank << std::endl;
-				do_warn = true;
-			}
-		}
-		if (do_warn)
-		{
-			std:: cout << "WARNING: You may want to consider joining some micrographs into larger groups to obtain more robust noise estimates. " << std::endl;
-			std:: cout << "         You can do so by using the same rlnMicrographName for particles from multiple different micrographs in the input STAR file. " << std::endl;
-            std:: cout << "         It is then best to join micrographs with similar defocus values and similar apparent signal-to-noise ratios. " << std::endl;
-		}
 	}
 
 #ifdef DEBUG
@@ -607,6 +566,36 @@ void MlOptimiserMpi::initialiseWorkLoad()
 	{
 		mydata.divideParticlesInRandomHalves(random_seed, do_helical_refine);
 	}
+
+	// Set the number of particles per group, but only Leader has full data.star in memory!
+        // Pre-relion-4-onesigma-branch, mymodel.nr_particles_per_group was set in initial noise estimation, but this is no longer the case...
+        if (do_split_random_halves)
+        {
+            // First do half-set 1
+            if (node->isLeader()) mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group, 1);
+            for (int follower = 1; follower < node->size; follower+=2)
+            {
+                MPI_Status status;
+                if (node->isLeader()) node->relion_MPI_Send(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, follower, MPITAG_METADATA, MPI_COMM_WORLD);
+                else if (node->rank == follower) node->relion_MPI_Recv(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
+            }
+
+
+            // Then do half-set 2
+            if (node->isLeader()) mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group, 2);
+            for (int follower = 2; follower < node->size; follower+=2)
+            {
+                MPI_Status status;
+                if (node->isLeader()) node->relion_MPI_Send(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, follower, MPITAG_METADATA, MPI_COMM_WORLD);
+                else if (node->rank == follower) node->relion_MPI_Recv(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
+            }
+
+        }
+        else
+        {
+            if (node->isLeader()) mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
+            node->relion_MPI_Bcast(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, MPI_COMM_WORLD);
+        }
 
 	if (node->isLeader())
 	{
@@ -677,7 +666,10 @@ void MlOptimiserMpi::initialiseWorkLoad()
 
 				MPI_Barrier(MPI_COMM_WORLD);
 				if (!need_to_copy) // This initialises nr_parts_on_scratch on non-first ranks by pretending --reuse_scratch
+				{
 					mydata.setScratchDirectory(fn_scratch, true, verb);
+					keep_scratch=true; // Setting keep_scratch for non-first ranks, to ensure that only first rank on each node deletes scratch during cleanup
+				}
 			}
 			else
 			{
@@ -718,33 +710,6 @@ void MlOptimiserMpi::initialiseWorkLoad()
 #ifdef DEBUG_WORKLOAD
 	std::cerr << " node->rank= " << node->rank << " my_first_particle_id= " << my_first_particle_id << " my_last_particle_id= " << my_last_particle_id << std::endl;
 #endif
-}
-
-void MlOptimiserMpi::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT> &Mavg)
-{
-
-	// First calculate the sum of all individual power spectra on each subset
-	MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(Mavg, node->rank == 1);
-
-	if (pipeline_control_check_abort_job())
-		MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
-
-	// Now combine all weighted sums
-	// Leave the option of both for a while. Then, if there are no problems with the system via files keep that one and remove the MPI version from the code
-	if (combine_weights_thru_disc)
-		combineAllWeightedSumsViaFile();
-	else
-		combineAllWeightedSums();
-
-	// After introducing SGD code in Dec 2016: no longer calculate Mavg for the 2 halves separately...
-	// Just calculate Mavg from AllReduce, and divide by 2 * the accumulated wsum_group
-	MultidimArray<RFLOAT> Msum;
-	Msum.initZeros(Mavg);
-	MPI_Allreduce(MULTIDIM_ARRAY(Mavg), MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-	Mavg = Msum;
-	// When doing random halves, the wsum_model.sumw_group[igroup], which will be used to divide Mavg by is only calculated over half the particles!
-	if (do_split_random_halves)
-		Mavg /= 2.;
 }
 
 void MlOptimiserMpi::expectation()
@@ -854,11 +819,11 @@ void MlOptimiserMpi::expectation()
 		timer.tic(TIMING_EXP_3);
 #endif
 	// D. Update the angular sampling (all nodes except leader)
-	if (!do_grad && !node->isLeader() && ( do_auto_refine && iter > 1 || (mymodel.nr_classes > 1 && allow_coarser_samplings) ))
+	if (!do_grad && !node->isLeader() && ( (do_auto_refine || do_auto_sampling) && iter > 1 || (mymodel.nr_classes > 1 && allow_coarser_samplings) ))
 		updateAngularSampling(node->rank == 1);
 
-	// D. Update the angular sampling (all nodes except leader) for gradient refinement
-	if (do_grad && ( do_auto_refine && iter > 1 ))
+	// D. Update the angular sampling (all nodes except leader) for gradient refinement, only once every 10 iters
+	if (do_grad && ( (do_auto_refine || do_auto_sampling) && iter > 1 && iter % 10 == 0 ))
 		updateAngularSamplingGrad(0, n_trials_acc - 1, node->rank == 1);
 
 	// The leader needs to know about the updated parameters from updateAngularSampling
@@ -3252,7 +3217,7 @@ void MlOptimiserMpi::updateAngularSamplingGrad(long int my_first_part_id, long i
 				REPORT_ERROR("MlOptimiser::autoAdjustAngularSampling BUG: ref_dim should be two or three");
 
 			// Jun08,2015 Shaoda & Sjors, Helical refinement
-			bool do_local_searches_helical = ((do_auto_refine) && (do_helical_refine) &&
+			bool do_local_searches_helical = ((do_auto_refine || do_auto_sampling) && (do_helical_refine) &&
 			                                  (sampling.healpix_order >= autosampling_hporder_local_searches));
 
 			sampling.setTranslations(
@@ -3309,7 +3274,7 @@ void MlOptimiserMpi::updateAngularSamplingGrad(long int my_first_part_id, long i
 		if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 		{
 			std::cout << " Auto-refine: Helical refinement... Local translational searches along helical axis= ";
-			if ( (mymodel.ref_dim == 3) && (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches) )
+			if ( (mymodel.ref_dim == 3) && (do_auto_refine || do_auto_sampling) && (sampling.healpix_order >= autosampling_hporder_local_searches) )
 				std:: cout << "true" << std::endl;
 			else
 				std:: cout << "false" << std::endl;
@@ -3607,7 +3572,7 @@ void MlOptimiserMpi::iterate()
 							mymodel.helical_twist,
 							helical_nstart,
 							(mymodel.data_dim == 3),
-							do_auto_refine,
+							(do_auto_refine || do_auto_sampling),
 							mymodel.sigma2_rot,
 							mymodel.sigma2_tilt,
 							mymodel.sigma2_psi,
@@ -3721,6 +3686,13 @@ void MlOptimiserMpi::iterate()
 
 		if (do_auto_refine && has_converged)
 			break;
+
+		if (1. / mymodel.current_resolution < abort_at_resolution)
+		{
+			if (node->isLeader())
+				std::cout << "Current resolution " << 1. / mymodel.current_resolution << " exceeds --abort_at_resolution " << abort_at_resolution << std::endl;
+			break;
+		}
 
     } // end loop iters
 

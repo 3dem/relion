@@ -53,7 +53,8 @@ class Prediction
 				HalfSet halfSet = OwnHalf,
 				Modulation modulation = AmplitudeAndPhaseModulated,
 				const RawImage<float>* doseWeight = 0,
-				CtfScale ctfScale = CtfScaled);
+				CtfScale ctfScale = CtfScaled,
+				const int* xRanges = 0);
 		
 		static BufferedImage<fComplex> predictFS(
 				ParticleIndex particle_id,
@@ -61,7 +62,8 @@ class Prediction
 				gravis::d4Matrix proj,
 				int s, 
 				const std::vector<BufferedImage<fComplex>>& referenceFS,
-				HalfSet halfSet = OwnHalf);
+				HalfSet halfSet = OwnHalf,
+				const int* xRanges = 0);
 
 		static std::vector<BufferedImage<double>> computeCroppedCCs(
 				const ParticleSet& dataSet,
@@ -72,7 +74,8 @@ class Prediction
 				const BufferedImage<float>& freqWeights,
 				const BufferedImage<float>& doseWeights,
 				const std::vector<int>& sequence,
-				int maxRange,				
+				const BufferedImage<int>& xRanges,
+				int maxRange,
 				bool flip_value,
 				int num_threads,
 				double paddingFactor,

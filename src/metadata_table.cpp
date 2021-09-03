@@ -1191,6 +1191,12 @@ long int MetaDataTable::readStar(std::ifstream& in, const std::string &name, boo
 	return 0;
 }
 
+std::vector<MetaDataTable> MetaDataTable::readAll(const std::string &in, int expectedNumber, bool do_only_count)
+{
+	std::ifstream ifs(in);
+	return readAll(ifs, expectedNumber, do_only_count);
+}
+
 std::vector<MetaDataTable> MetaDataTable::readAll(
 		std::ifstream &in,
 		int expectedNumber,

@@ -102,28 +102,29 @@ RelionItOptions = {
     #
     # Likewise, use SCHEMENAME__VARIABLENAME for Scheme variables
     #
-    # E.g. 'proc__inibatch_size' refers to the variablename 'inibatch_size' in the file 'Schemes/proc/scheme.star'
+    # E.g. 'proc__do_log' refers to the variablename 'do_log' in the file 'Schemes/proc/scheme.star'
     #
     #  This python script will modify the joboption and scheme-variable values in these files
     #
     #############################################################################
 
     # Perform Import, Motion correction and CTF estimation?
-    # This option isn't really used in the scheme, it only serves to store the checkbox selected from the relion_it.py GUI....
-    'proc__do_prep' : True,
+    'do_prep' : True,
     # If the above option is false, then use this to provide a specific star file to the micrographs instead
     'proc__ctffind_mics' : 'Schemes/prep/ctffind/micrographs_ctf.star',
+    # Perform autopicking and processing of particles?
+    'do_proc' : True,
 
     ### How many micrograph movies to do in each iteration of the prep Scheme
     'prep__do_at_most' : 50,
 
     ### General parameters
     # Pixel size in Angstroms in the input movies
-    'prep__importmovies__angpix' : 1.1,
+    'prep__importmovies__angpix' : 0.885,
     # Acceleration voltage (in kV)
-    'prep__importmovies__kV' : 300,
+    'prep__importmovies__kV' : 200,
     # Polara = 2.0; Talos/Krios = 2.7; some Cryo-ARM = 1.4 
-    'prep__importmovies__Cs' : 2.7,
+    'prep__importmovies__Cs' : 1.4,
 
     ### Import images (Linux wild card; movies as *.mrc, *.mrcs, *.tiff or *.tif; single-frame micrographs as *.mrc)
     'prep__importmovies__fn_in_raw' : 'Movies/*.tiff',
@@ -132,7 +133,7 @@ RelionItOptions = {
 
     ### MotionCorrection parameters
     # Dose in electrons per squared Angstrom per fraction
-    'prep__motioncorr__dose_per_frame' : 1.2,
+    'prep__motioncorr__dose_per_frame' : 1.277,
     # Gain-reference image in MRC format (only necessary if input movies are not yet gain-corrected, e.g. compressed TIFFs from K2)
     'prep__motioncorr__fn_gain_ref' : 'Movies/gain.mrc',
     # EER fractionation. The dose rate (motioncor_doseperframe) is e/A2/fraction after this fractionation.
@@ -151,86 +152,67 @@ RelionItOptions = {
     ### Selection of micrographs based on CTF resolution 
     'proc__select_mics__select_maxval' : 6,
 
-    # Perform any picking and processing of particles?
-    # This option isn't really used in the scheme, it only serves to store the checkbox selected from the relion_it.py GUI....
-    'proc__do_2d' : True,
-
-    ### Perform Topaz retraining of network, based on selected LoG-picked particles?
-    'proc__do_retrain_topaz' : True,
-
-    ### Autopick parameters
-    # Minimum and maximum diameter in Angstrom for the LoG filter
-    'proc__inipicker__log_diam_min' : 150,
-    'proc__inipicker__log_diam_max' : 180,
-    # Use positive values (0-1) to pick fewer particles; use negative values (-1-0) to pick more particles
-    'proc__inipicker__log_adjust_thr' : 0,
-    # Use this to remove false positives from carbon edges (useful range: 1.0-1.2, -1 to switch off)
-    'proc__inipicker__maxstddevnoise_autopick' : -1,
-    # Use this to remove false positives from carbon edges (useful range: -0.5-0.0; -999 to switch off)
-    'proc__inipicker__minavgnoise_autopick' : -999,
     # Calculate boxsize automatically for me?
     'do_auto_boxsize' : True,
 
-    ### Extract parameters for inipicker job
-    # Box size of particles in the averaged micrographs (in pixels)
-    'proc__extract_ini__extract_size' : 256,
-    # Down-scale the particles upon extraction?
-    'proc__extract_ini__do_rescale' : True,
-    # Box size of the down-scaled particles (in pixels)
-    'proc__extract_ini__rescale' : 64,
-    ### Split parameters after inipick (this will be the maximum number of particles in the first batch)
-    'proc__split_ini__split_size' : 10000,
-
-    ### Extract parameters for Topaz job, leave empty for using general topaz model
-    # Model for topaz picking (this will be automatically set to Schemes/proc/train_topaz/model_epoch10.sav for retraining)
+    ### Parameters for autopicking
+    ## Shortest diameter for LoG picking
+    'proc__autopick__log_diam_min' : 150.0,
+    ## Longest diameter for LoG picking
+    'proc__autopick__log_diam_max' : 180.0,
+    # Adjust threshold for LoG picking
+    'proc__autopick__log_adjust_thr' : 0.0,
+    # Model for topaz picking (leave empty for default model)
     'proc__topaz_model' : '',
-    # Box size of particles in the averaged micrographs (in pixels)
-    'proc__extract_rest__extract_size' : 256,
-    # Down-scale the particles upon extraction?
-    'proc__extract_rest__do_rescale' : True,
-    # Box size of the down-scaled particles (in pixels)
-    'proc__extract_rest__rescale' : 64,
-    # Minimum FOM for topaz extraction
-    'proc__extract_rest__minimum_pick_fom' : 0,
-    
-    ### Parameters for Topaz picking
-    # Expected number of particles per micrograph
-    'proc__train_topaz__topaz_nr_particles' : 300,
     # Name of the topaz executable
-    'proc__restpicker__fn_topaz_exec' : '/public/EM/RELION/topaz',
+    'proc__autopick__fn_topaz_exec' : '/public/EM/RELION/topaz',
     # Additional arguments to be passed onto topaz
-    'proc__restpicker__topaz_other_args' : '',
-    # Which (single) GPU to run training on 
-    'proc__train_topaz__gpu_ids' : 0,
+    'proc__autopick__topaz_other_args' : '',
+    # Use GPUs for autopicking? (True for topaz, False for LoG)
+    'proc__autopick__use_gpu' : False,
+    # Which (single) GPU to run topaz on 
+    'proc__autopick__gpu_ids' : 0,
     # How many MPI processes to use in parallel for picking
-    'proc__restpicker__nr_mpi' : 4,
+    'proc__autopick__nr_mpi' : 4,
+
+    ### Extract particles
+    # Box size of particles in the averaged micrographs (in pixels)
+    'proc__extract__extract_size' : 256,
+    # Down-scale the particles upon extraction?
+    'proc__extract__do_rescale' : True,
+    # Box size of the down-scaled particles (in pixels)
+    'proc__extract__rescale' : 64,
+    # Use FOM threshold for extraction (will be set for True for topaz, False for LoG picking)
+    'proc__extract__do_fom_threshold' : False,
+    # Minimum FOM for topaz extraction
+    'proc__extract__minimum_pick_fom' : 0,
+
+    ### Perform LoG picking instead of topaz 
+    'proc__do_log' : True,
+
 
     ### Parameters for automated 2D class selection
-    # Minimum rank score for particles after LoG picking
-    'proc__select_ini__rank_threshold' : 0.5,
-    # Minimum rank score for particles after Topaz picking
-    'proc__select_rest__rank_threshold' : 0.5,
+    # Minimum rank score for selected classes
+    'proc__select_parts__rank_threshold' : 0.25,
+    # Minimum number of selected classes (not used on GUI)
+    'proc__select_parts__select_nr_classes' : 0,
 
-    ### Parameters for 2D classification (ini and rest)
-    # Which (single) GPU to run on for ini and rest
-    'proc__class2d_rest__gpu_ids' : '0,1',
-    'proc__class2d_ini__gpu_ids' : '0,1',
-
-    # Minimum number of particles in the first batch of inipicked particles to perform 2D classification on (this should be <= 'proc__split_ini__split_size' above)
-    'proc__inibatch_size' : 10000,
+    ### Parameters for 2D classification
+    # Which (comma-separated) GPUs to run on 
+    'proc__class2d__gpu_ids' : '0,1',
     # Diameter of the mask used for 2D classification (in Angstrom)
-    'proc__class2d_ini__particle_diameter' : 200,
+    'proc__class2d__particle_diameter' : 200,
 
-    # Continue with Inimodel3D and Refine3D after Class2D?
-    'proc__do_3d' : True,
+    # Minimum number of particles to continue with Inimodel3D and Refine3D after Class2D?
+    'proc__min_nr_parts_3d' : 5000,
 
     # Name for initial 3D reference for Refine3D. If this file does not exist, a 3D Initial Model job will be run
     'proc__iniref' : 'None',
 
     # Options for inimodel3d and refine3d
     # Symmetry
-    'proc__inimodel3d__sym_name' : 'C1',
-    'proc__refine3d__sym_name' : 'C1',
+    'proc__inimodel3d__sym_name' : 'D2',
+    'proc__refine3d__sym_name' : 'D2',
     # Diameter of the mask used for inimodel3d and refine3d (in Angstrom)
     'proc__inimodel3d__particle_diameter' : 200,
     'proc__refine3d__particle_diameter' : 200,
@@ -283,11 +265,11 @@ class RelionItGui(object):
 
         row = 0
 
-        tk.Label(compute_frame, text="Do MotionCorr & CTF?").grid(row=row, sticky=tk.W)
+        tk.Label(compute_frame, text="Do micrograph preprocessing?").grid(row=row, sticky=tk.W)
         self.do_prep_var = tk.IntVar()
         self.do_prep_button = tk.Checkbutton(compute_frame, var=self.do_prep_var)
         self.do_prep_button.grid(row=row, column=1, sticky=tk.W)
-        if options['proc__do_prep']:
+        if options['do_prep']:
             self.do_prep_button.select()
 
         row += 1
@@ -303,32 +285,12 @@ class RelionItGui(object):
 
         row += 1
  
-        tk.Label(compute_frame, text="Do Autopick & Class2D?").grid(row=row, sticky=tk.W)
-        self.do_2d_var = tk.IntVar()
-        self.do_2d_button = tk.Checkbutton(compute_frame, var=self.do_2d_var)
-        self.do_2d_button.grid(row=row, column=1, sticky=tk.W)
-        if options['proc__do_2d']:
-            self.do_2d_button.select()
-
-        row += 1
-        
-        tk.Label(compute_frame, text="Do Refine3D?").grid(row=row, sticky=tk.W)
-        self.do_3d_var = tk.IntVar()
-        self.do_3d_button = tk.Checkbutton(compute_frame, var=self.do_3d_var)
-        self.do_3d_button.grid(row=row, column=1, sticky=tk.W)
-        if options['proc__do_3d']:
-            self.do_3d_button.select()
-
-        row += 1
-
-        tk.Label(compute_frame, text="3D reference:").grid(row=row, sticky=tk.W)
-        self.iniref_var = tk.StringVar()  # for data binding
-        self.iniref_entry = tk.Entry(compute_frame, textvariable=self.iniref_var, bg=entry_bg)
-        self.iniref_entry.grid(row=row, column=1, sticky=tk.W)
-        self.iniref_entry.insert(0, str(options['proc__iniref']))
-
-        ref_button = new_browse_button(compute_frame, self.iniref_var, filetypes=(('MRC file', '{*.mrc}'), ('All files', '*')))
-        ref_button.grid(row=row, column=2)
+        tk.Label(compute_frame, text="Do particle processsing?").grid(row=row, sticky=tk.W)
+        self.do_proc_var = tk.IntVar()
+        self.do_proc_button = tk.Checkbutton(compute_frame, var=self.do_proc_var)
+        self.do_proc_button.grid(row=row, column=1, sticky=tk.W)
+        if options['do_proc']:
+            self.do_proc_button.select()
 
         row += 1
         
@@ -336,7 +298,7 @@ class RelionItGui(object):
         self.gpu_var = tk.StringVar()  # for data binding
         self.gpu_entry = tk.Entry(compute_frame, textvariable=self.gpu_var, bg=entry_bg)
         self.gpu_entry.grid(row=row, column=1, sticky=tk.W)
-        self.gpu_entry.insert(0, str(options['proc__class2d_rest__gpu_ids']))
+        self.gpu_entry.insert(0, str(options['proc__class2d__gpu_ids']))
 
         ###
 
@@ -429,18 +391,11 @@ class RelionItGui(object):
 
         row += 1
 
-        tk.Label(self.particle_frame, text=u"Longest diameter (\u212B):").grid(row=row, sticky=tk.W)
+        tk.Label(self.particle_frame, text=u"Particle diameter (\u212B):").grid(row=row, sticky=tk.W)
         self.particle_max_diam_var = tk.StringVar()  # for data binding
         self.particle_max_diam_entry = tk.Entry(self.particle_frame, textvariable=self.particle_max_diam_var, bg=entry_bg)
         self.particle_max_diam_entry.grid(row=row, column=1, sticky=tk.W+tk.E, columnspan=2)
-        self.particle_max_diam_entry.insert(0, str(options['proc__inipicker__log_diam_max']))
-
-        row += 1
-
-        tk.Label(self.particle_frame, text=u"Shortest diameter (\u212B):").grid(row=row, sticky=tk.W)
-        self.particle_min_diam_entry = tk.Entry(self.particle_frame, bg=entry_bg)
-        self.particle_min_diam_entry.grid(row=row, column=1, sticky=tk.W+tk.E, columnspan=2)
-        self.particle_min_diam_entry.insert(0, str(options['proc__inipicker__log_diam_min']))
+        self.particle_max_diam_entry.insert(0, str(options['proc__autopick__log_diam_max']))
 
         row += 1
         
@@ -448,7 +403,7 @@ class RelionItGui(object):
         self.mask_diameter_var = tk.StringVar()  # for data binding
         self.mask_diameter_entry = tk.Entry(self.particle_frame, textvariable=self.mask_diameter_var, bg=entry_bg)
         self.mask_diameter_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
-        self.mask_diameter_entry.insert(0, str(options['proc__class2d_ini__particle_diameter']))
+        self.mask_diameter_entry.insert(0, str(options['proc__class2d__particle_diameter']))
         self.mask_diameter_px = tk.Label(self.particle_frame, text="= NNN px")
         self.mask_diameter_px.grid(row=row, column=2,sticky=tk.W)
 
@@ -458,7 +413,7 @@ class RelionItGui(object):
         self.box_size_var = tk.StringVar()  # for data binding
         self.box_size_entry = tk.Entry(self.particle_frame, textvariable=self.box_size_var, bg=entry_bg)
         self.box_size_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
-        self.box_size_entry.insert(0, str(options['proc__extract_ini__extract_size']))
+        self.box_size_entry.insert(0, str(options['proc__extract__extract_size']))
         self.box_size_in_angstrom = tk.Label(self.particle_frame, text=u"= NNN \u212B")
         self.box_size_in_angstrom.grid(row=row, column=2,sticky=tk.W)
 
@@ -468,7 +423,7 @@ class RelionItGui(object):
         self.extract_small_boxsize_var = tk.StringVar()  # for data binding
         self.extract_small_boxsize_entry = tk.Entry(self.particle_frame, textvariable=self.extract_small_boxsize_var, bg=entry_bg)
         self.extract_small_boxsize_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
-        self.extract_small_boxsize_entry.insert(0, str(options['proc__extract_ini__rescale']))
+        self.extract_small_boxsize_entry.insert(0, str(options['proc__extract__rescale']))
         self.extract_angpix = tk.Label(self.particle_frame, text=u"= NNN \u212B/px")
         self.extract_angpix.grid(row=row, column=2,sticky=tk.W)
 
@@ -489,43 +444,11 @@ class RelionItGui(object):
 
         row = 0
 
-        tk.Label(self.proc_frame, text="Min resolution micrographs:").grid(row=row, sticky=tk.W)
+        tk.Label(self.proc_frame, text="Min. resol. micrographs (A):").grid(row=row, sticky=tk.W)
         self.minres_var = tk.StringVar()  # for data binding
         self.minres_entry = tk.Entry(self.proc_frame, textvariable=self.minres_var, bg=entry_bg)
         self.minres_entry.grid(row=row, column=1, sticky=tk.W)
         self.minres_entry.insert(0, str(options['proc__select_mics__select_maxval']))
-
-        row += 1
-        tk.Label(self.proc_frame, text="Retrain topaz network?").grid(row=row, sticky=tk.W)
-        self.do_retrain_topaz_var = tk.IntVar()
-        self.retrain_topaz_button = tk.Checkbutton(self.proc_frame, var=self.do_retrain_topaz_var)
-        self.retrain_topaz_button.grid(row=row, column=1, sticky=tk.W)
-        if options['proc__do_retrain_topaz']:
-            self.retrain_topaz_button.select()
-
-        row += 1
-
-        tk.Label(self.proc_frame, text="Nr particles for LoG picking:").grid(row=row, sticky=tk.W)
-        self.inibatch_var = tk.StringVar()  # for data binding
-        self.inibatch_entry = tk.Entry(self.proc_frame, textvariable=self.inibatch_var, bg=entry_bg)
-        self.inibatch_entry.grid(row=row, column=1, sticky=tk.W)
-        self.inibatch_entry.insert(0, str(options['proc__split_ini__split_size']))
-
-        row += 1
-
-        tk.Label(self.proc_frame, text="LoG picking threshold:").grid(row=row, sticky=tk.W)
-        self.log_thresh_var = tk.StringVar()  # for data binding
-        self.log_thresh_entry = tk.Entry(self.proc_frame, textvariable=self.log_thresh_var, bg=entry_bg)
-        self.log_thresh_entry.grid(row=row, column=1, sticky=tk.W)
-        self.log_thresh_entry.insert(0, str(options['proc__inipicker__log_adjust_thr']))
-
-        row += 1
-
-        tk.Label(self.proc_frame, text="LoG class2d score:").grid(row=row, sticky=tk.W)
-        self.log_classscore_var = tk.StringVar()  # for data binding
-        self.log_classscore_entry = tk.Entry(self.proc_frame, textvariable=self.log_classscore_var, bg=entry_bg)
-        self.log_classscore_entry.grid(row=row, column=1, sticky=tk.W)
-        self.log_classscore_entry.insert(0, str(options['proc__select_ini__rank_threshold']))
 
         row += 1
 
@@ -540,28 +463,62 @@ class RelionItGui(object):
 
         row += 1
 
-        tk.Label(self.proc_frame, text="Nr particles per micrograph:").grid(row=row, sticky=tk.W)
-        self.partspermic_var = tk.StringVar()  # for data binding
-        self.partspermic_entry = tk.Entry(self.proc_frame, textvariable=self.partspermic_var, bg=entry_bg)
-        self.partspermic_entry.grid(row=row, column=1, sticky=tk.W)
-        self.partspermic_entry.insert(0, str(options['proc__train_topaz__topaz_nr_particles']))
+        tk.Label(self.proc_frame, text="Min. FOM for topaz extract:").grid(row=row, sticky=tk.W)
+        self.extract_topaz_thresh_var = tk.StringVar()  # for data binding
+        self.extract_topaz_thresh_entry = tk.Entry(self.proc_frame, textvariable=self.extract_topaz_thresh_var, bg=entry_bg)
+        self.extract_topaz_thresh_entry.grid(row=row, column=1, sticky=tk.W)
+        self.extract_topaz_thresh_entry.insert(0, str(options['proc__extract__minimum_pick_fom']))
 
         row += 1
 
-        tk.Label(self.proc_frame, text="Topaz picking threshold:").grid(row=row, sticky=tk.W)
-        self.topaz_thresh_var = tk.StringVar()  # for data binding
-        self.topaz_thresh_entry = tk.Entry(self.proc_frame, textvariable=self.topaz_thresh_var, bg=entry_bg)
-        self.topaz_thresh_entry.grid(row=row, column=1, sticky=tk.W)
-        self.topaz_thresh_entry.insert(0, str(options['proc__extract_rest__minimum_pick_fom']))
+        tk.Label(self.proc_frame, text="LoG-pick instead of topaz?").grid(row=row, sticky=tk.W)
+        self.do_log_var = tk.IntVar()
+        self.do_log_button = tk.Checkbutton(self.proc_frame, var=self.do_log_var)
+        self.do_log_button.grid(row=row, column=1, sticky=tk.W)
+        if options['proc__do_log']:
+            self.do_log_button.select()
 
         row += 1
 
-        tk.Label(self.proc_frame, text="Topaz class2d score:").grid(row=row, sticky=tk.W)
-        self.topaz_classscore_var = tk.StringVar()  # for data binding
-        self.topaz_classscore_entry = tk.Entry(self.proc_frame, textvariable=self.topaz_classscore_var, bg=entry_bg)
-        self.topaz_classscore_entry.grid(row=row, column=1, sticky=tk.W)
-        self.topaz_classscore_entry.insert(0, str(options['proc__select_rest__rank_threshold']))
+        tk.Label(self.proc_frame, text=u"Ratio short/long diameter:").grid(row=row, sticky=tk.W)
+        self.particle_circularity_entry = tk.Entry(self.proc_frame, bg=entry_bg)
+        self.particle_circularity_entry.grid(row=row, column=1, sticky=tk.W+tk.E, columnspan=2)
+        self.particle_circularity_entry.insert(0, str(float(options['proc__autopick__log_diam_min'])/float(options['proc__autopick__log_diam_max'])))
 
+        row += 1
+
+        tk.Label(self.proc_frame, text="Adjust LoG threshold:").grid(row=row, sticky=tk.W)
+        self.autopick_log_thresh_var = tk.StringVar()  # for data binding
+        self.autopick_log_thresh_entry = tk.Entry(self.proc_frame, textvariable=self.autopick_log_thresh_var, bg=entry_bg)
+        self.autopick_log_thresh_entry.grid(row=row, column=1, sticky=tk.W)
+        self.autopick_log_thresh_entry.insert(0, str(options['proc__autopick__log_adjust_thr']))
+
+        row += 1
+
+        tk.Label(self.proc_frame, text="Min. score for class2d select:").grid(row=row, sticky=tk.W)
+        self.min_class_score_var = tk.StringVar()  # for data binding
+        self.min_class_score_entry = tk.Entry(self.proc_frame, textvariable=self.min_class_score_var, bg=entry_bg)
+        self.min_class_score_entry.grid(row=row, column=1, sticky=tk.W)
+        self.min_class_score_entry.insert(0, str(options['proc__select_parts__rank_threshold']))
+
+        row += 1
+        
+        tk.Label(self.proc_frame, text="Min. nr. parts. for 3D?").grid(row=row, sticky=tk.W)
+        self.min_parts_3d_var = tk.StringVar()
+        self.min_parts_3d_entry = tk.Entry(self.proc_frame, textvariable=self.min_parts_3d_var, bg=entry_bg)
+        self.min_parts_3d_entry.grid(row=row, column=1, sticky=tk.W)
+        self.min_parts_3d_entry.insert(0, str(options['proc__min_nr_parts_3d']))
+
+        row += 1
+
+        tk.Label(self.proc_frame, text="3D reference:").grid(row=row, sticky=tk.W)
+        self.iniref_var = tk.StringVar()  # for data binding
+        self.iniref_entry = tk.Entry(self.proc_frame, textvariable=self.iniref_var, bg=entry_bg)
+        self.iniref_entry.grid(row=row, column=1, sticky=tk.W)
+        self.iniref_entry.insert(0, str(options['proc__iniref']))
+
+        ref_button = new_browse_button(self.proc_frame, self.iniref_var, filetypes=(('MRC file', '{*.mrc}'), ('All files', '*')))
+        ref_button.grid(row=row, column=2)
         ###
 
 
@@ -579,9 +536,9 @@ class RelionItGui(object):
                 # Don't go larger than the original box
                 if small_box_pix > box_size_pix:
                     return box_size_pix
-                # If Nyquist freq. is better than 8.5 A, use this downscaled box, otherwise continue to next size up
+                # If Nyquist freq. is better than 7.5 A, use this downscaled box, otherwise continue to next size up
                 small_box_angpix = angpix * box_size_pix / small_box_pix
-                if small_box_angpix < 4.25:
+                if small_box_angpix < 3.75:
                     return small_box_pix
             # Fall back to a warning message
             return "Box size is too large!"
@@ -633,50 +590,34 @@ class RelionItGui(object):
                     child.configure(state=tk.DISABLED)
                 self.mics_entry.configure(state=tk.NORMAL)
 
-        def update_2d_status(*args_ignored, **kwargs_ignored):
-            if self.get_var_as_bool(self.do_2d_var):
+        def update_proc_status(*args_ignored, **kwargs_ignored):
+            if self.get_var_as_bool(self.do_proc_var):
                 for child in self.particle_frame.winfo_children():
                     child.configure(state=tk.NORMAL)
                 for child in self.proc_frame.winfo_children():
                     child.configure(state=tk.NORMAL)
-                self.do_3d_button.configure(state=tk.NORMAL)
                 self.iniref_entry.configure(state=tk.NORMAL)
                 self.gpu_entry.configure(state=tk.NORMAL)
                 update_box_sizes()
-                update_inipick_status()
             else:
                 for child in self.particle_frame.winfo_children():
                     child.configure(state=tk.DISABLED)
                 for child in self.proc_frame.winfo_children():
                     child.configure(state=tk.DISABLED)
-                self.do_3d_button.configure(state=tk.DISABLED)
                 self.iniref_entry.configure(state=tk.DISABLED)
                 self.gpu_entry.configure(state=tk.DISABLED)
 
-        def update_3d_status(*args_ignored, **kwargs_ignored):
-            if self.get_var_as_bool(self.do_3d_var):
-                self.iniref_entry.configure(state=tk.NORMAL)
+        def update_autopick_status(*args_ignored, **kwargs_ignored):
+            if self.get_var_as_bool(self.do_log_var):
+                self.particle_circularity_entry.configure(state=tk.NORMAL)
+                self.autopick_log_thresh_entry.configure(state=tk.NORMAL)
+                self.extract_topaz_thresh_entry.configure(state=tk.DISABLED)
+                self.topaz_model_entry.configure(state=tk.DISABLED)
             else:
-                self.iniref_entry.configure(state=tk.DISABLED)
-
-        def update_inipick_status(*args_ignored, **kwargs_ignored):
-            if self.get_var_as_bool(self.do_retrain_topaz_var):
-                self.inibatch_entry.config(state=tk.NORMAL)
-                self.log_thresh_entry.config(state=tk.NORMAL)
-                self.log_classscore_entry.config(state=tk.NORMAL)
-                self.topaz_model_entry.delete(0,tk.END)
-                self.topaz_model_entry.insert(0, 'Schemes/proc/train_topaz/model_epoch10.sav')
-                self.topaz_model_entry.config(state=tk.DISABLED)
-                self.topaz_model_button.config(state=tk.DISABLED)
-            else:
-                self.inibatch_entry.config(state=tk.DISABLED)
-                self.log_thresh_entry.config(state=tk.DISABLED)
-                self.log_classscore_entry.config(state=tk.DISABLED)
-                self.topaz_model_entry.delete(0,tk.END)
-                self.topaz_model_entry.insert(0, str(options['proc__topaz_model']))
-                self.topaz_model_entry.config(state=tk.NORMAL)
-                self.topaz_model_button.config(state=tk.NORMAL)
-
+                self.particle_circularity_entry.configure(state=tk.DISABLED)
+                self.autopick_log_thresh_entry.configure(state=tk.DISABLED)
+                self.extract_topaz_thresh_entry.configure(state=tk.NORMAL)
+                self.topaz_model_entry.configure(state=tk.NORMAL)
 
         def update_box_sizes(*args_ignored, **kwargs_ignored):
             # Always activate entry boxes - either we're activating them anyway, or we need to edit the text.
@@ -715,10 +656,9 @@ class RelionItGui(object):
         self.particle_max_diam_var.trace('w', update_box_sizes)
         self.auto_boxsize_button.config(command=update_box_sizes)
       
-        self.retrain_topaz_button.config(command=update_inipick_status)
         self.do_prep_button.config(command=update_prep_status)
-        self.do_2d_button.config(command=update_2d_status)
-        self.do_3d_button.config(command=update_3d_status)
+        self.do_proc_button.config(command=update_proc_status)
+        self.do_log_button.config(command=update_autopick_status)
 
         button_frame = tk.Frame(left_frame)
         button_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
@@ -731,14 +671,12 @@ class RelionItGui(object):
 
         # Show initial pixel sizes
         update_box_sizes()
-        # Show initial logpick status
-        update_inipick_status()
         # Show initial prep status
         update_prep_status()
-        # Show initial 2d status
-        update_2d_status()
-        # Show initial 3d status
-        update_3d_status()
+        # Show initial proc status
+        update_proc_status()
+        # Show initial autopick status
+        update_autopick_status()
 
     def get_var_as_bool(self, var):
         """Helper function to convert a Tk IntVar (linked to a checkbox) to a boolean value"""
@@ -758,14 +696,13 @@ class RelionItGui(object):
         opts = self.options
         warnings = []
 
-        opts['proc__do_prep'] = self.get_var_as_bool(self.do_prep_var)
+        opts['do_prep'] = self.get_var_as_bool(self.do_prep_var)
         opts['proc__ctffind_mics'] = self.mics_entry.get()
-        opts['proc__do_2d'] = self.get_var_as_bool(self.do_2d_var)
-        opts['proc__do_3d'] = self.get_var_as_bool(self.do_3d_var)
+        opts['do_proc'] = self.get_var_as_bool(self.do_proc_var)
         opts['do_auto_boxsize'] =  self.get_var_as_bool(self.auto_boxsize_var)
-        opts['proc__do_retrain_topaz'] = self.get_var_as_bool(self.do_retrain_topaz_var)
         opts['proc__topaz_model'] = self.topaz_model_entry.get()
         opts['prep__ctffind__do_phaseshift'] = self.get_var_as_bool(self.phaseplate_var)
+        opts['proc__do_log'] = self.get_var_as_bool(self.do_log_var)
 
         try:
             opts['prep__importmovies__kV'] = float(self.voltage_entry.get())
@@ -799,51 +736,40 @@ class RelionItGui(object):
             opts['prep__motioncorr__bin_factor'] = 1;
 
         try:
-            opts['proc__inipicker__log_diam_max'] = float(self.particle_max_diam_entry.get())
-            opts['proc__train_topaz__topaz_particle_diameter'] = float(self.particle_max_diam_entry.get())
-            opts['proc__restpicker__topaz_particle_diameter'] = float(self.particle_max_diam_entry.get())
+            opts['proc__autopick__log_diam_max'] = float(self.particle_max_diam_entry.get())
+            opts['proc__autopick__topaz_particle_diameter'] = float(self.particle_max_diam_entry.get())
         except ValueError:
-            if len(self.particle_max_diam_entry.get()) == 0 and (not self.get_var_as_bool(self.do_2d_var) or not self.get_var_as_bool(self.do_retrain_topaz_var)):
-                # This was left blank and won't be used, set to zero to avoid errors in calculations later
-                opts['proc__inipicker__log_diam_max'] = 0.0
-            else:
-                raise ValueError("Particle longest diameter must be a number")
+            raise ValueError("Particle longest diameter must be a number")
 
         try:
-            opts['proc__inipicker__log_diam_min'] = float(self.particle_min_diam_entry.get())
+            opts['proc__autopick__log_diam_min'] = float(self.particle_circularity_entry.get()) * float(self.particle_max_diam_entry.get())
         except ValueError:
-            if len(self.particle_min_diam_entry.get()) == 0 and (not self.get_var_as_bool(self.do_2d_var) or not self.get_var_as_bool(self.do_retrain_topaz_var)):
-                # This was left blank and won't be used, set to zero to avoid errors in calculations later
-                opts['proc__inipicker__log_diam_min'] = 0.0
-            else:
-                raise ValueError("Particle shortest diameter must be a number")
+            raise ValueError("Ratio short/long diameter must be a number from 0 to 1")
+        if (opts['proc__autopick__log_diam_min']  < 0. or opts['proc__autopick__log_diam_min'] > opts['proc__autopick__log_diam_max']):
+            warnings.append("- Ratio short/long diameter should be between 0 and 1 (thin -> circular particles)")
 
         try:
-            opts['proc__class2d_ini__particle_diameter'] = float(self.mask_diameter_entry.get())
-            opts['proc__class2d_rest__particle_diameter'] = float(self.mask_diameter_entry.get())
+            opts['proc__class2d__particle_diameter'] = float(self.mask_diameter_entry.get())
             opts['proc__inimodel3d__particle_diameter'] = float(self.mask_diameter_entry.get())
             opts['proc__refine3d__particle_diameter'] = float(self.mask_diameter_entry.get())
         except ValueError:
             raise ValueError("Mask diameter must be a number")
-        if opts['proc__class2d_ini__particle_diameter'] <= 0:
+        if opts['proc__class2d__particle_diameter'] <= 0:
             warnings.append("- Mask diameter should be a positive number")
 
         try:
-            opts['proc__extract_ini__extract_size'] = int(self.box_size_entry.get())
-            opts['proc__extract_rest__extract_size'] = int(self.box_size_entry.get())
+            opts['proc__extract__extract_size'] = int(self.box_size_entry.get())
         except ValueError:
             raise ValueError("Box size must be a number")
-        if opts['proc__extract_ini__extract_size'] <= 0:
+        if opts['proc__extract__extract_size'] <= 0:
             warnings.append("- Box size should be a positive number")
 
         try:
-            opts['proc__extract_ini__rescale'] = int(self.extract_small_boxsize_entry.get())
-            opts['proc__extract_ini__do_rescale'] = True
-            opts['proc__extract_rest__rescale'] = int(self.extract_small_boxsize_entry.get())
-            opts['proc__extract_rest__do_rescale'] = True
+            opts['proc__extract__rescale'] = int(self.extract_small_boxsize_entry.get())
+            opts['proc__extract__do_rescale'] = True
         except ValueError:
             raise ValueError("Down-sampled box size must be a number")
-        if opts['proc__extract_ini__rescale'] <= 0:
+        if opts['proc__extract__rescale'] <= 0:
             warnings.append("- Down-sampled box size should be a positive number")
 
         opts['prep__importmovies__fn_in_raw'] = self.import_images_entry.get()
@@ -853,7 +779,7 @@ class RelionItGui(object):
             warnings.append("- Pattern for input movies should normally contain a '*' to select more than one file")
 
         opts['prep__motioncorr__fn_gain_ref'] = self.gainref_entry.get()
-        if len(opts['prep__motioncorr__fn_gain_ref']) > 0 and not os.path.isfile(opts['prep__motioncorr__fn_gain_ref']):
+        if len(opts['prep__motioncorr__fn_gain_ref']) > 0 and not os.path.isfile(opts['prep__motioncorr__fn_gain_ref']) and opts['do_prep']:
             warnings.append("- Gain reference file '{}' does not exist".format(opts['prep__motioncorr__fn_gain_ref']))
 
         try:
@@ -864,50 +790,41 @@ class RelionItGui(object):
             warnings.append("- Minimum resolution for micrographs should be a positive number")
 
         try:
-            opts['proc__split_ini__split_size'] = int(self.inibatch_entry.get())
-            opts['proc__inibatch_size'] = int(self.inibatch_entry.get())
+            opts['proc__autopick__log_adjust_thr'] = float(self.autopick_log_thresh_var.get())
         except ValueError:
-            raise ValueError("Nr particles for topaz training must be a number")
-        if opts['proc__split_ini__split_size'] <= 0:
-            warnings.append("- Nr particles for topaz training should be a positive number")
+            raise ValueError("Adjust LoG threshold must be a number")
 
         try:
-            opts['proc__inipicker__log_adjust_thr'] = float(self.log_thresh_var.get())
+            opts['proc__extract__minimum_pick_fom'] = float(self.extract_topaz_thresh_var.get())
         except ValueError:
-            raise ValueError("LoG picking threshold must be a number")
+            raise ValueError("Minimum FOM for topaz must be a number")
+
+        if opts['proc__do_log']:
+            opts['proc__autopick__use_gpu'] = False
+            opts['proc__extract__do_fom_threshold'] = False
+        else:
+            opts['proc__autopick__use_gpu'] = True
+            opts['proc__extract__do_fom_threshold'] = True 
+            # dont want multiple topaz runs bumping into each other!
+            opts['proc__autopick__nr_mpi'] = 1
 
         try:
-            opts['proc__select_ini__rank_threshold'] = float(self.log_classscore_var.get())
+            opts['proc__select_parts__rank_threshold'] = float(self.min_class_score_var.get())
         except ValueError:
-            raise ValueError("LoG class2d score must be a number")
+            raise ValueError("Min. class2d score must be a number")
 
         try:
-            opts['proc__extract_rest__minimum_pick_fom'] = float(self.topaz_thresh_var.get())
+            opts['proc__min_nr_parts_3d'] = float(self.min_parts_3d_var.get())
         except ValueError:
-            raise ValueError("Topaz picking threshold must be a number")
-
-        try:
-            opts['proc__select_rest__rank_threshold'] = float(self.topaz_classscore_var.get())
-        except ValueError:
-            raise ValueError("Topaz class2d score must be a number")
-
-        try:
-            opts['proc__train_topaz__topaz_nr_particles'] = int(self.partspermic_entry.get())
-            opts['proc__restpicker__topaz_nr_particles'] = int(self.partspermic_entry.get())
-        except ValueError:
-            raise ValueError("Nr particles per micrograph must be a number")
-        if opts['proc__train_topaz__topaz_nr_particles'] <= 0:
-            warnings.append("- Nr particles per micrograph should be a positive number")
+            raise ValueError("Min. nr. parts for 3D must be a number")
 
         opts['proc__inimodel3d__sym_name'] = self.symmetry_entry.get()
         opts['proc__iniref'] = self.iniref_entry.get()
         opts['proc__refine3d__sym_name'] = self.symmetry_entry.get()
 
         # Set GPU IDs in all jobs
-        opts['proc__train_topaz__gpu_ids'] = (self.gpu_entry.get()).split(',')[0]
-        opts['proc__restpicker__gpu_ids'] = (self.gpu_entry.get()).split(',')[0]
-        opts['proc__class2d_ini__gpu_ids'] = self.gpu_entry.get()
-        opts['proc__class2d_rest__gpu_ids'] = self.gpu_entry.get()
+        opts['proc__autopick__gpu_ids'] = (self.gpu_entry.get()).split(',')[0]
+        opts['proc__class2d__gpu_ids'] = self.gpu_entry.get()
         opts['proc__inimodel3d__gpu_ids'] = self.gpu_entry.get()
         opts['proc__refine3d__gpu_ids'] = (self.gpu_entry.get()).replace(',',':')
 
@@ -999,7 +916,7 @@ def run_schemer(options, do_gui):
     print(' RELION_IT: executing: ', command)
     os.system(command)
 
-    if options['proc__do_prep']:
+    if options['do_prep']:
         
         command = 'relion_schemer --scheme prep --run --pipeline_control Schemes/prep/ >> Schemes/prep/run.out 2>> Schemes/prep/run.err &'
         print(' RELION_IT: executing: ', command)
@@ -1009,7 +926,7 @@ def run_schemer(options, do_gui):
             print(' RELION_IT: executing: ', command)
             os.system(command)
           
-    if options['proc__do_2d']:
+    if options['do_proc']:
 
         command = 'relion_schemer --scheme proc --reset &'
         print(' RELION_IT: executing: ', command)

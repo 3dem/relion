@@ -89,7 +89,7 @@ class MotionEstimator
 
 		double getCCPad();
 
-        static std::vector<MetaDataTable> findUnfinishedJobs(
+		static std::vector<bool> findUnfinishedJobs(
                 const std::vector<MetaDataTable>& mdts, std::string path);
 
         // translates the given parameters (in A or A/dose) into pixels

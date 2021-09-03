@@ -22,6 +22,7 @@ void TomoReferenceMap::read(IOParser &parser)
 
 	fscThresholdWidth = textToDouble(parser.getOption("--fsc_thresh_width", "Width of the frq. weight flank", "5"));
 	freqCutoff_A =  textToDouble(parser.getOption("--freq_cutoff", "Explicit cutoff frequency (in Å; negative to turn off)", "-1"));
+	flatWeight = !parser.checkOption("--use_SNR_weight", "Weight each shell proportionally to its reference-map confidence");
 }
 
 void TomoReferenceMap::read(const OptimisationSet &optimisationSet)
@@ -33,6 +34,8 @@ void TomoReferenceMap::read(const OptimisationSet &optimisationSet)
 
 	fscThresholdWidth = optimisationSet.fscThresholdWidth;
 	freqCutoff_A = optimisationSet.freqCutoff_A;
+
+	flatWeight = optimisationSet.flatWeight;
 }
 
 void TomoReferenceMap::load(int boxSize, int verbosity)
@@ -69,11 +72,12 @@ void TomoReferenceMap::load(int boxSize, int verbosity)
 	const int s = boxSize < 0? image_real[0].xdim : boxSize;
 	const int sh = s/2 + 1;
 
+	pixelSize = ImageFileHelper::getSamplingRate(mapFilenames[0]);
+
 	int manual_cutoff_px = -1;
 
 	if (freqCutoff_A > 0)
 	{
-		const double pixelSize = ImageFileHelper::getSamplingRate(mapFilenames[0]);
 		manual_cutoff_px = s * pixelSize / freqCutoff_A;
 	}
 
@@ -114,7 +118,8 @@ void TomoReferenceMap::load(int boxSize, int verbosity)
 		Centering::shiftInSitu(image_FS[i]);
 	}
 
-	int cutoff_px = -1;
+
+	SNR_weight = std::vector<double>(sh, 0.0);
 
 	if (fscFilename != "")
 	{
@@ -157,55 +162,97 @@ void TomoReferenceMap::load(int boxSize, int verbosity)
 		}
 
 		double scale = 2 * (sh_fsc - 1) / (double) s;
-		lastShell = (firstBad - 1) / scale;
 
-		if (manual_cutoff_px > 0 && manual_cutoff_px < lastShell)
+		for (int r = 0; r < sh; r++)
 		{
-			cutoff_px = manual_cutoff_px;
-		}
-		else
-		{
-			cutoff_px = lastShell;
-		}
-	}
-	else
-	{
-		cutoff_px = manual_cutoff_px;
-	}
+			const double r_fsc = scale * r;
+			const int r0 = (int) r_fsc;
+			const int r1 = r0 + 1;
 
-	if (cutoff_px > 0)
-	{
-		freqWeight = BufferedImage<float>(sh,s);
-
-		for (int y = 0; y < s; y++)
-		for (int x = 0; x < sh; x++)
-		{
-			double xx = x;
-			double yy = y < s/2? y : y - s;
-
-			double r = sqrt(xx*xx + yy*yy);
-
-			if (r < cutoff_px - fscThresholdWidth/2.0)
+			if (r1 >= sh_fsc)
 			{
-				freqWeight(x,y) = 1.f;
-			}
-			else if (r < cutoff_px + fscThresholdWidth/2.0)
-			{
-				double t = (r - cutoff_px)/fscThresholdWidth + 0.5;
-				freqWeight(x,y) = 0.5 * (cos(PI*t) + 1);
+				SNR_weight[r] = 0.0;
 			}
 			else
 			{
-				freqWeight(x,y) = 0.f;
+				const double f = r_fsc - r0;
+				const double fsc_r = (1 - f) * fsc[r0] + f * fsc[r1];
+
+				SNR_weight[r] = 2.0 * fsc_r / (fsc_r + 1);
 			}
 		}
+
+		lastShell = (firstBad - 1) / scale;
 	}
 	else
 	{
-		freqWeight = BufferedImage<float>(sh,s);
-		freqWeight.fill(1.f);
+		std::vector<double> sigma2 = std::vector<double>(sh,0.0);
+		std::vector<double> tau2 = std::vector<double>(sh,0.0);
 
-		lastShell = sh - 1;
+		std::vector<int> count = std::vector<int>(sh,0);
+
+		for (int z = 0; z < s;  z++)
+		for (int y = 0; y < s;  y++)
+		for (int x = 0; x < sh; x++)
+		{
+			const double xx = x;
+			const double yy = y < s/2? y : y - s;
+			const double zz = z < s/2? z : z - s;
+
+			const double rd = sqrt(xx*xx + yy*yy + zz*zz);
+
+			const int r = (int)(rd + 0.5);
+
+			if (r < sh)
+			{
+				const fComplex z0 = image_FS[0](x,y,z);
+				const fComplex z1 = image_FS[1](x,y,z);
+
+				sigma2[r] += (z1 - z0).norm() / 2;
+				tau2[r] += (z0.norm() + z1.norm()) / 2;
+
+				count[r]++;
+			}
+		}
+
+		for (int r = 0; r < sh; r++)
+		{
+			if (count[r] > 0)
+			{
+				tau2[r] /= count[r];
+				sigma2[r] /= count[r];
+			}
+
+			SNR_weight[r] = (tau2[r] > 0.0 && tau2[r] > sigma2[r])?
+						(tau2[r] - sigma2[r]) / tau2[r] : 0.0;
+		}
+
+		lastShell = -1;
+		const double threshold = 0.05;
+
+		for (int r = 0; r < sh; r++)
+		{
+			if (SNR_weight[r] < threshold)
+			{
+				lastShell = r - 1;
+				break;
+			}
+		}
+
+		if (lastShell < 0) lastShell = sh - 1;
+	}
+
+	if (manual_cutoff_px > 0 && manual_cutoff_px < lastShell)
+	{
+		lastShell = manual_cutoff_px;
+	}
+
+	if (flatWeight)
+	{
+		for (int r = 0; r < sh; r++)
+		{
+			SNR_weight[r] = 1.0;
+		}
 	}
 }
 

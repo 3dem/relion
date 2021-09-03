@@ -28,14 +28,17 @@ do_restrict_xoff        Yes
 do_zero_mask        Yes 
 dont_skip_align        Yes 
    fn_cont         "" 
-    fn_img Schemes/proc/extract_rest/particles.star 
+    fn_img Schemes/proc/extract/particles.star 
    gpu_ids        0,1 
 helical_rise       4.75 
 helical_tube_outer_diameter        200 
 highres_limit         -1 
 min_dedicated         24 
 nr_classes        100 
-   nr_iter        100 
+do_em		  No
+   nr_iter_em        25 
+do_grad		     Yes
+   nr_iter_grad        200 
     nr_mpi          1 
    nr_pool         30 
 nr_threads         12 

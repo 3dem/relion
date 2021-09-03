@@ -14,7 +14,7 @@ class LocalParticleRefineProgram : public RefinementProgram
 
 		LocalParticleRefineProgram(int argc, char *argv[]);
 
-			int max_iterations;
+			int max_iterations, min_frame, max_frame;
 			double eps, xtol, dose_cutoff;
 			bool verbose_opt;
 

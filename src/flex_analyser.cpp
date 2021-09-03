@@ -72,7 +72,7 @@ void FlexAnalyser::initialise()
 	if (fn_model == "")
 		REPORT_ERROR("ERROR: please provide the --model argument!");
 	else
-		model.read(fn_model);
+		model.read(fn_model, data.obsModel.numberOfOpticsGroups());
 
 	if (fn_bodies != "")
 	{

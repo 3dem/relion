@@ -91,15 +91,37 @@ RFLOAT Experiment::getImagePixelSize(long int part_id, int img_id)
 	return obsModel.getPixelSize(optics_group);
 }
 
-void Experiment::getNumberOfImagesPerGroup(std::vector<long int> &nr_particles_per_group)
+void Experiment::getNumberOfImagesPerGroup(std::vector<long int> &nr_particles_per_group, int random_subset)
 {
 	nr_particles_per_group.resize(groups.size());
 	for (long int i = 0; i < nr_particles_per_group.size(); i++)
 		nr_particles_per_group[i] = 0.;
 
 	for (long int part_id = 0; part_id < particles.size(); part_id++)
-		for (int img_id = 0; img_id < particles[part_id].images.size(); img_id++)
-			nr_particles_per_group[particles[part_id].images[img_id].group_id] += 1;
+	{
+		if (random_subset == 0 || particles[part_id].random_subset == random_subset)
+		{
+			for (int img_id = 0; img_id < particles[part_id].images.size(); img_id++)
+				nr_particles_per_group[particles[part_id].images[img_id].group_id] += 1;
+		}
+	}
+
+}
+
+void Experiment::getNumberOfImagesPerOpticsGroup(std::vector<long int> &nr_particles_per_optics_group, int random_subset)
+{
+	nr_particles_per_optics_group.resize(obsModel.numberOfOpticsGroups());
+	for (long int i = 0; i < nr_particles_per_optics_group.size(); i++)
+		nr_particles_per_optics_group[i] = 0.;
+
+	for (long int part_id = 0; part_id < particles.size(); part_id++)
+	{
+		if (random_subset == 0 || particles[part_id].random_subset == random_subset)
+		{
+			for (int img_id = 0; img_id < particles[part_id].images.size(); img_id++)
+				nr_particles_per_optics_group[particles[part_id].images[img_id].optics_group] += 1;
+		}
+	}
 }
 
 MetaDataTable Experiment::getMetaDataImage(long int part_id, int img_id)

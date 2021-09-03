@@ -70,6 +70,8 @@ void FccProgram::run()
 		if (pc == 0) continue;
 		
 		Tomogram tomogram = tomogramSet.loadTomogram(t, true);
+		tomogram.validateParticleOptics(particles[t], particleSet);
+
 		pixelSizes[t] = tomogram.optics.pixelSize;
 
 		std::string tag = outDir + tomogram.name;
@@ -124,7 +126,6 @@ void FccProgram::run()
 		ofs0 << '\n';
 
 		{
-			const int fc = tomogram.frameCount;
 			BufferedImage<double> scaleFactor(sh,fc);
 
 			for (int f = 0; f < fc; f++)
