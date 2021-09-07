@@ -54,7 +54,7 @@ BufferedImage<double> FCC::compute3(
 		FCC_by_thread[th].fill(0.0);
 	}
 
-	AberrationsCache aberrationsCache(dataSet.optTable, s);
+	AberrationsCache aberrationsCache(dataSet.optTable, s, dataSet.getOriginalPixelSize(0));
 	BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s, 1.0);
 
 	

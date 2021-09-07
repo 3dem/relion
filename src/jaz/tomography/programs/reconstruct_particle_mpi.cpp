@@ -125,7 +125,7 @@ void ReconstructParticleProgramMpi::run()
 		ctfImgFS[i].fill(0.0);
 	}
 
-	AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
+	AberrationsCache aberrationsCache(particleSet.optTable, boxSize, binnedOutPixelSize);
 
 	if (verb > 0)
 	{

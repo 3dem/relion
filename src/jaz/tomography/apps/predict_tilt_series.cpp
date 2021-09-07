@@ -101,7 +101,7 @@ void run(int argc, char *argv[])
 
 	tomogram.validateParticleOptics(particles, particle_set);
 
-	AberrationsCache aberrations_cache(particle_set.optTable, box_size);
+	AberrationsCache aberrations_cache(particle_set.optTable, box_size, particle_set.getOriginalPixelSize(0));
 	BufferedImage<float> doseWeights = tomogram.computeDoseWeight(box_size, 1);
 
 

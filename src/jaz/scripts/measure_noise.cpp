@@ -95,7 +95,7 @@ int main(int argc, char *argv[])
 	ParticleSet dataSet(optimisationSet.particles);
 	std::vector<std::vector<ParticleIndex>> particles = dataSet.splitByTomogram(tomogramSet);
 
-	AberrationsCache aberrationsCache(dataSet.optTable, boxSize);
+	AberrationsCache aberrationsCache(dataSet.optTable, boxSize, dataSet.getOriginalPixelSize(0));
 
 	referenceMap.load(boxSize);
 

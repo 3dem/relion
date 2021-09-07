@@ -121,8 +121,7 @@ void SubtomoProgram::run()
 	if (cropSize < 0) cropSize = boxSize;
 	
 	bool do_ctf = true;
-	
-	const long int tc = particles.size();
+
 	const long int s2D = boxSize;
 	
 	const long int s3D = cropSize;
@@ -131,6 +130,7 @@ void SubtomoProgram::run()
 	const long int s02D = (int)(binning * s2D + 0.5);
 	
 	const double relative_box_scale = cropSize / (double) boxSize;
+	const double binned_pixel_size = binning * particleSet.getOriginalPixelSize(0);
 
 
 	initialise(particleSet, particles, tomogramSet);
@@ -147,7 +147,7 @@ void SubtomoProgram::run()
 		sum_weights.fill(0.0);
 	}
 
-	AberrationsCache aberrationsCache(particleSet.optTable, s2D);
+	AberrationsCache aberrationsCache(particleSet.optTable, s2D, binned_pixel_size);
 
 
 	std::vector<int> tomoIndices = ParticleSet::enumerate(particles);

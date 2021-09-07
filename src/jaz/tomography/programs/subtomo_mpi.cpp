@@ -88,6 +88,7 @@ void SubtomoProgramMpi::run()
 	const long int s02D = (int)(binning * s2D + 0.5);
 
 	const double relative_box_scale = cropSize / (double) boxSize;
+	const double binned_pixel_size = binning * particleSet.getOriginalPixelSize(0);
 
 	if (node->isLeader())
 	{
@@ -99,7 +100,7 @@ void SubtomoProgramMpi::run()
 
 	BufferedImage<float> dummy;
 
-	AberrationsCache aberrationsCache(particleSet.optTable, s2D);
+	AberrationsCache aberrationsCache(particleSet.optTable, s2D, binned_pixel_size);
 
 
 	std::vector<std::vector<int>> tomoIndices = ParticleSet::splitEvenly(particles, nodeCount);
