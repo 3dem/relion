@@ -41,7 +41,7 @@ void AlignProgram::run()
 
 		initialise();
 
-		AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
+		AberrationsCache aberrationsCache(particleSet.optTable, boxSize, particleSet.getOriginalPixelSize(0));
 	
 	Log::endSection();
 

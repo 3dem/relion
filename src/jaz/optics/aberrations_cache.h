@@ -9,9 +9,9 @@ class AberrationsCache
 {
 	public:
 
-		AberrationsCache(const MetaDataTable& opticsTable, const int size);
+		AberrationsCache(const MetaDataTable& opticsTable, const int size, const int pixelSize);
 
-			int size;
+			int size, pixelSize;
 			bool hasSymmetrical, hasAntisymmetrical;
 			std::vector<BufferedImage<double>> symmetrical, antisymmetrical;
 			std::vector<BufferedImage<fComplex>> phaseShift;

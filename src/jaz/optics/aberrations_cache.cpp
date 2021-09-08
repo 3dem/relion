@@ -4,8 +4,8 @@
 using namespace gravis;
 
 
-AberrationsCache::AberrationsCache(const MetaDataTable &opticsTable, const int size)
-:	size(size)
+AberrationsCache::AberrationsCache(const MetaDataTable &opticsTable, const int size, const int pixelSize)
+:	size(size), pixelSize(pixelSize)
 {
 	const int s = size;
 	const int sh = s/2 + 1;
@@ -28,14 +28,8 @@ AberrationsCache::AberrationsCache(const MetaDataTable &opticsTable, const int s
 		phaseShift.resize(gc);
 	}
 
-	if (!opticsTable.labelExists(EMDL_IMAGE_PIXEL_SIZE))
-	{
-		REPORT_ERROR("AberrationsCache::c'tor: image pixel size missing from optics table.");
-	}
-
 	for (int g = 0; g < gc; g++)
 	{
-		const double pixelSize = opticsTable.getDouble(EMDL_IMAGE_PIXEL_SIZE, g);
 		const double as = pixelSize * s;
 
 		if (hasSymmetrical)
