@@ -203,7 +203,6 @@ void AccProjector::clear()
 {
 	mdlX = 0;
 	mdlY = 0;
-	mdlZ = 0;
 	mdlXYZ = 0;
 	mdlInitY = 0;
 	mdlInitZ = 0;
@@ -249,4 +248,6 @@ void AccProjector::clear()
 		mdlComplex = NULL;
 	}
 #endif  // ifdef CUDA
+
+	mdlZ = 0;
 }
