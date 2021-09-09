@@ -178,9 +178,11 @@ void FlexAnalyser::run(int rank, int size)
 	// Loop through all particles
 	loopThroughParticles(rank, size);
 
+	#ifdef USE_MPI
 	if (size > 1) {
 		MPI_Barrier(MPI_COMM_WORLD);
 	}
+	#endif
 }
 
 void FlexAnalyser::setup3DModels()

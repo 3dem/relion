@@ -1080,6 +1080,7 @@ void Postprocessing::run_locres(int rank, int size)
 		init_progress_bar(nr_samplings);
 
 
+#ifdef USE_MPI
 	if (size > 1)
 	{
 		I1m.initZeros();
@@ -1092,6 +1093,7 @@ void Postprocessing::run_locres(int rank, int size)
 		MPI_Allreduce(MULTIDIM_ARRAY(Isumw), MULTIDIM_ARRAY(I1m), MULTIDIM_SIZE(Isumw), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 		Isumw = I1m;
 	}
+#endif
 
 	if (rank == 0)
 	{
@@ -1154,8 +1156,10 @@ void Postprocessing::run_locres(int rank, int size)
 	if (verb > 0)
 		std::cout << " done! " << std::endl;
 
+#ifdef USE_MPI
 	if (size > 1)
 		MPI_Barrier(MPI_COMM_WORLD);
+#endif
 }
 
 void Postprocessing::run()

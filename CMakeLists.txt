@@ -99,6 +99,11 @@ option(DoublePrec_ACC "Accelerated Code use double-precision" OFF)
 option(MKLFFT "Use MKL rather than FFTW for FFT" OFF)
 option(CudaTexture "CudaTexture" ON)
 option(ALLOW_CTF_IN_SAGD "Allow CTF-modulation in SAGD, as specified in Claim 1 of patent US10,282,513B2" ON)
+option(USE_MPI "Use MPI compiler" ON)
+
+if(USE_MPI)
+    add_definitions(-DUSE_MPI)
+endif()
 
 if(ALLOW_CTF_IN_SAGD)
     message(STATUS "ALLOW_CTF_IN_SAGD enabled - This build of RELION allows modulation of particle images by a contrast transfer function inside stochastic average gradient descent, as specified in Claim 1 of patent US10,282,513B2")
@@ -212,30 +217,33 @@ if (ALTCPU)
 endif(ALTCPU)
 
 # -------------------------------------------------------------------------------MPI--
-find_package(MPI REQUIRED)
+if(USE_MPI)
+    find_package(MPI REQUIRED)
 
-if ("${MPI_CXX_INCLUDE_DIRS}" STREQUAL "")
-	include_directories("${MPI_CXX_INCLUDE_PATH}")
-else()
-	include_directories("${MPI_CXX_INCLUDE_DIRS}")
-endif()
+    if ("${MPI_CXX_INCLUDE_DIRS}" STREQUAL "")
+        include_directories("${MPI_CXX_INCLUDE_PATH}")
+    else()
+        include_directories("${MPI_CXX_INCLUDE_DIRS}")
+    endif()
 
-message(STATUS "MPI_INCLUDE_PATH : ${MPI_INCLUDE_PATH}")
-message(STATUS "MPI_LIBRARIES : ${MPI_LIBRARIES}")
-message(STATUS "MPI_CXX_INCLUDE_PATH : ${MPI_CXX_INCLUDE_PATH}")
-message(STATUS "MPI_CXX_LIBRARIES : ${MPI_CXX_LIBRARIES}")
+    message(STATUS "MPI_INCLUDE_PATH : ${MPI_INCLUDE_PATH}")
+    message(STATUS "MPI_LIBRARIES : ${MPI_LIBRARIES}")
+    message(STATUS "MPI_CXX_INCLUDE_PATH : ${MPI_CXX_INCLUDE_PATH}")
+    message(STATUS "MPI_CXX_LIBRARIES : ${MPI_CXX_LIBRARIES}")
 
-message(STATUS "CMAKE_C_COMPILER : ${CMAKE_C_COMPILER}")
-message(STATUS "CMAKE_CXX_COMPILER : ${CMAKE_CXX_COMPILER}")
-message(STATUS "MPI_C_COMPILER : ${MPI_C_COMPILER}")
-message(STATUS "MPI_CXX_COMPILER : ${MPI_CXX_COMPILER}")
+    message(STATUS "CMAKE_C_COMPILER : ${CMAKE_C_COMPILER}")
+    message(STATUS "CMAKE_CXX_COMPILER : ${CMAKE_CXX_COMPILER}")
+    message(STATUS "MPI_C_COMPILER : ${MPI_C_COMPILER}")
+    message(STATUS "MPI_CXX_COMPILER : ${MPI_CXX_COMPILER}")
 
-SET(CMAKE_C_COMPILER ${MPI_C_COMPILER})
-SET(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
+    SET(CMAKE_C_COMPILER ${MPI_C_COMPILER})
+    SET(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
 
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)    
+endif(USE_MPI)
+
 
 # ----------------------------------------------------------Intel Compiler support --
 # ----------------------------------  and build flags including MKL and TBB ---------

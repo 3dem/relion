@@ -26,7 +26,10 @@
 #include "src/ctf.h"
 #include "src/time.h"
 #include "src/parallel.h"
+
+#ifdef USE_MPI
 #include "src/mpi.h"
+#endif
 
 class FlexAnalyser
 {

@@ -30,8 +30,10 @@
 #include "src/mask.h"
 #include "src/funcs.h"
 #include "src/CPlot2D.h"
-#include "src/mpi.h"
 
+#ifdef USE_MPI
+#include "src/mpi.h"
+#endif
 
 class Postprocessing
 {
