@@ -4137,6 +4137,15 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 		//int it = (int)textToFloat((joboptions["fn_cont"].getString().substr(pos_it+3, 6)).c_str());
 		//fn_run += "_ct" + floatToString(it);
 		command += " --continue " + joboptions["fn_cont"].getString();
+
+		// If is_continue we still need tomo optimisation set to create output optimisation set
+		if (is_tomo && joboptions["in_optimisation"].getString() != "")
+		{
+			FileName fn_OS = joboptions["in_optimisation"].getString();
+			Node node(fn_OS, joboptions["in_optimisation"].node_type);
+			inputNodes.push_back(node);
+			command += " --ios " + fn_OS;
+		}
 	}
 
 	command += " --o " + outputname + fn_run;
