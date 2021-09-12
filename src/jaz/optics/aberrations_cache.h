@@ -9,7 +9,7 @@ class AberrationsCache
 {
 	public:
 
-		AberrationsCache(const MetaDataTable& opticsTable, const int size, const int pixelSize);
+		AberrationsCache(const MetaDataTable& opticsTable, const int size, const double pixelSize);
 
 			int size, pixelSize;
 			bool hasSymmetrical, hasAntisymmetrical;
