@@ -4422,7 +4422,7 @@ void updatePriorsForHelicalReconstruction(
 		{
 			helical_rise[iclass] *= helical_nstart;
 			RFLOAT aux = helical_twist[iclass] * helical_nstart;
-			helical_twist[iclass] = (aux > 360.) ? aux + 360. : aux - 360.;
+			helical_twist[iclass] = (aux > 360.) ? aux - 360. : aux + 360.;
 			if (verb > 0) std::cout << " + for rotational priors go back to " << helical_nstart
 					<< "-start helical twist= " << helical_twist[iclass] << " and rise= " << helical_rise[iclass] << std::endl;
 		}
