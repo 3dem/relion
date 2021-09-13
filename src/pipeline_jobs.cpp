@@ -6134,7 +6134,7 @@ bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<st
 		command += " --o " + outputname;
 		command += " --t " + joboptions["part_tomos"].getString();
 
-		if (joboptions["do_coords_flipZ"].getString() != "")
+		if (joboptions["do_coords_flipZ"].getBoolean())
 		{
 			command += " --flipZ";
 		}
