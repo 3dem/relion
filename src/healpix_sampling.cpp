@@ -92,6 +92,8 @@ void HealpixSampling::initialise(
 		// Set up symmetry matrices for symmetry relax
 		if (fn_sym_relax != "")
 		{
+			if (fn_sym_relax[0] != 'C' && fn_sym_relax[0] != 'c')
+				REPORT_ERROR("Sorry, symmetry relaxation is currently available only for cyclic (Cn) point groups. For other symmetries, please see https://github.com/3dem/relion/issues/796.");
 			R_repository_relax.clear();
 			L_repository_relax.clear();
 			initialiseSymMats(fn_sym_relax, pgGroupRelaxSym, pgOrderRelaxSym, R_repository_relax, L_repository_relax);
