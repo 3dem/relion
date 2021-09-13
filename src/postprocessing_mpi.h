@@ -31,6 +31,8 @@
 #include "src/funcs.h"
 #include "src/CPlot2D.h"
 
+#include "src/mpi.h"
+
 class Postprocessing
 {
 public:

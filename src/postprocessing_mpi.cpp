@@ -1079,6 +1079,19 @@ void Postprocessing::run_locres(int rank, int size)
 	if (verb > 0)
 		init_progress_bar(nr_samplings);
 
+	if (size > 1)
+	{
+		I1m.initZeros();
+		MPI_Allreduce(MULTIDIM_ARRAY(Ifil), MULTIDIM_ARRAY(I1m), MULTIDIM_SIZE(Ifil), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+		Ifil = I1m;
+		I1m.initZeros();
+		MPI_Allreduce(MULTIDIM_ARRAY(Ilocres), MULTIDIM_ARRAY(I1m), MULTIDIM_SIZE(Ilocres), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+		Ilocres = I1m;
+		I1m.initZeros();
+		MPI_Allreduce(MULTIDIM_ARRAY(Isumw), MULTIDIM_ARRAY(I1m), MULTIDIM_SIZE(Isumw), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+		Isumw = I1m;
+	}
+
 	if (rank == 0)
 	{
 		// Now write out the local-resolution map and
@@ -1139,6 +1152,11 @@ void Postprocessing::run_locres(int rank, int size)
 
 	if (verb > 0)
 		std::cout << " done! " << std::endl;
+
+#ifdef USE_MPI
+	if (size > 1)
+		MPI_Barrier(MPI_COMM_WORLD);
+#endif
 }
 
 void Postprocessing::run()
