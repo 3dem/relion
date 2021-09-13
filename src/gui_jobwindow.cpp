@@ -2559,6 +2559,7 @@ void JobWindow::initialiseTomoAlignWindow()
 	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group1->end();
 	place("do_flex_align", TOGGLE_DEACTIVATE, group1);
+	place("do_glob_shift", TOGGLE_DEACTIVATE);
 
 	group1->begin();
 

@@ -6428,6 +6428,7 @@ void RelionJob::initialiseTomoAlignJob()
     	joboptions["max_error"] = JobOption("Max position error (pix):", 5, 0, 64, 1, "maximal assumed error in the initial 2D particle-positions (distances between the projected 3D positions and their true positions in the images), given in pixels.");
 
     	joboptions["do_flex_align"] = JobOption("Allow flexible alignment?", false, "If set to No, only applies an optimal rigid shift to each frame (no iterative optimisation).");
+    	joboptions["do_glob_shift"] = JobOption("Do global rigid shift alignment?", false, "If set to Yes, estimates rigid shift by aligning only the particles instead of by predicting entire micrographs. \"Allow flexible alignment?\" must be set \"No\" (no iterative optimisation).");
     	joboptions["do_polish"] = JobOption("Fit per-particle motion?", false, "If set to Yes, then the subtomogram version of Bayesian polishing will be used to fit per-particle (3D) motion tracks, besides the rigid part of the motion in the tilt series.");
     	joboptions["sigma_vel"] = JobOption("Sigma for velocity (A/dose): ", 0.2, 1., 10., 0.1, "The expected amount of motion (i.e. the std. deviation of particle positions in Angstroms after 1 electron per A^2 of radiation)");
     	joboptions["sigma_div"] = JobOption("Sigma for divergence (A): ", 5000, 0, 10000, 10000, "The expected spatial smoothness of the particle trajectories in A (a greater value means spatially smoother motion");
@@ -6475,6 +6476,11 @@ bool RelionJob::getCommandsTomoAlignJob(std::string &outputname, std::vector<std
 	if (!joboptions["do_flex_align"].getBoolean())
 	{
 		command += " --shift_only ";
+
+		if (joboptions["do_glob_shift"].getBoolean())
+		{
+			command += " --shift_only_by_particles ";
+		}
 	}
     else if (joboptions["do_polish"].getBoolean())
 	{
