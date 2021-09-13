@@ -111,7 +111,7 @@ void backproject2D(
 					
 					if(CTF_PREMULTIPLIED) {
 						my_weight = weight * weight_norm_inverse * minvsigma2;
-						Fweight[x] += my_weight  * ctf * ctf;
+						Fweight[x] += my_weight  * ctf;
 					}
 					else {
 						my_weight = weight * weight_norm_inverse * ctf * minvsigma2;
@@ -373,10 +373,7 @@ void backproject3D(
 						if (weight >= significant_weight)
 						{
 							weight = weight * inv_minsigma_ctf;
-							if(CTF_PREMULTIPLIED)
-								Fweight[tid] += weight * ctf * ctf;
-							else
-								Fweight[tid] += weight * ctf;
+                                                        Fweight[tid] += weight * ctf;
 
 							if(DATA3D)
 								CpuKernels::translatePixel(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, temp_real, temp_imag);
@@ -610,7 +607,7 @@ void backprojectRef3D(
 					{
 						inv_minsigma_ctf = weight_norm_inverse * minvsigma2;
 						my_weight = weight * inv_minsigma_ctf;
-						Fweight[x] += my_weight  * ctf * ctf;
+						Fweight[x] += my_weight  * ctf;
 					}
 					else
 					{
@@ -936,10 +933,7 @@ void backproject3D_SGD(
 						if (weight >= significant_weight)
 						{
 							weight = weight * inv_minsigma_ctf;
-							if(CTF_PREMULTIPLIED)
-								Fweight[tid] += weight * ctf * ctf;
-							else
-								Fweight[tid] += weight * ctf;
+                                                        Fweight[tid] += weight * ctf;
 
 							if(DATA3D)
 								CpuKernels::translatePixel(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, temp_real, temp_imag);
@@ -1175,7 +1169,7 @@ void backproject2D_SGD(
 
 					if(CTF_PREMULTIPLIED) {
 						my_weight = weight * weight_norm_inverse * minvsigma2;
-						Fweight[x] += my_weight  * ctf * ctf;
+						Fweight[x] += my_weight  * ctf;
 					}
 					else {
 						my_weight = weight * weight_norm_inverse * ctf * minvsigma2;
