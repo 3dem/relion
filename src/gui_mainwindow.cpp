@@ -2051,21 +2051,34 @@ void GuiMainWindow::cb_save_i()
 	int iwin = browser->value() - 1;
 	gui_jobwindows[iwin]->updateMyJob();
 
-	Fl::scheme("gtk+");
-	Fl_File_Chooser * G_chooser = new Fl_File_Chooser(".", "job.star", Fl_File_Chooser::DIRECTORY, "Choose directory to save job.star file");
-	G_chooser->color(GUI_BACKGROUND_COLOR);
-	G_chooser->show();
-	while(G_chooser->shown()) Fl::wait();
-	if ( G_chooser->value() == NULL ) return;
+	// SHWS 16092021: to prevent empty labels when saving a job.star from the GUI, go through getCommandLineJob, which also sets deeper levels of labels
+	std::string error_message;
+    std::string _final_command;
+    std::vector<std::string> _commands;
+	if (!pipeline.getCommandLineJob(gui_jobwindows[iwin]->myjob, current_job, is_main_continue, false,
+			DONT_MKDIR, _commands, _final_command, error_message))
+	{
+		fl_message("%s",error_message.c_str());
+	}
+	else
+	{
 
-	char relname[FL_PATH_MAX];
-	fl_filename_relative(relname,sizeof(relname),G_chooser->value());
-	FileName fn_dir = (std::string)relname;
-	if (fn_dir == "") fn_dir = ".";
-	gui_jobwindows[iwin]->myjob.write(fn_dir + "/job.star");
+		Fl::scheme("gtk+");
+		Fl_File_Chooser * G_chooser = new Fl_File_Chooser(".", "job.star", Fl_File_Chooser::DIRECTORY, "Choose directory to save job.star file");
+		G_chooser->color(GUI_BACKGROUND_COLOR);
+		G_chooser->show();
+		while(G_chooser->shown()) Fl::wait();
+		if ( G_chooser->value() == NULL ) return;
 
-	// Also save hidden job.star file
-	gui_jobwindows[iwin]->myjob.write("");
+		char relname[FL_PATH_MAX];
+		fl_filename_relative(relname,sizeof(relname),G_chooser->value());
+		FileName fn_dir = (std::string)relname;
+		if (fn_dir == "") fn_dir = ".";
+		gui_jobwindows[iwin]->myjob.write(fn_dir + "/job.star");
+
+		// Also save hidden job.star file
+		gui_jobwindows[iwin]->myjob.write("");
+	}
 
 }
 
