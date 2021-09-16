@@ -1,18 +1,18 @@
-This program is developed in the group of Sjors H.W. Scheres at the MRC Laboratory of Molecular Biology,
+This program is developed in the group of Sjors H.W. Scheres at the MRC Laboratory of Molecular Biology, with contributions from the following people to RELION-4.0:
 
 - Sjors H.W. Scheres
-- Shaoda He
+- Dari Kimanius
 - Takanori Nakane
 - Jasenko Zivanov
+- Joaquin Oton (from the Briggs group at MRC-LMB)
 - Liyi Dong
 
-and Erik Lindahl at Stockholm University.
+RELION-4.0 also contains contributions from the CCP-EM team at STFC, in particlar Matt Iadanza, Colin Palmer and Tom Burnley.
 
-- Erik Lindahl
-- Björn O. Forsberg
-- Dari Kimanius
+Previous releases also included major contributions from the group of Erik Lindahl at SciLifeLabs, Stockholm University.
 
-However, it does also contain pieces of code from the following packages:
+
+RELION also contain pieces of code from the following packages:
 
 - XMIPP by COS Sorzano et al: http:/xmipp.cnb.csic.es
 - BSOFT by Heymann JB et al: http://lsbr.niams.nih.gov/bsoft/
