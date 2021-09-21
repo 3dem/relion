@@ -12,10 +12,10 @@ if(NOT EXISTS ${MODELS_DIR})
 	file(MAKE_DIRECTORY ${MODELS_DIR})
 endif()
 
-set(CLASS_RANKER_MODEL_FILE_NAME_TAR class_ranker_0.1.2_default_torch_model.pt.tar.gz)
-set(CLASS_RANKER_MODEL_FILE_NAME class_ranker_0.1.2_default_torch_model.pt)
+set(CLASS_RANKER_MODEL_FILE_NAME_TAR class_ranker_0.1.2_torch_1.0.1.pt.tar.gz)
+set(CLASS_RANKER_MODEL_FILE_NAME class_ranker_0.1.2_torch_1.0.1.pt)
 set(CLASS_RANKER_MODEL_URL "ftp://ftp.mrc-lmb.cam.ac.uk/pub/dari/${CLASS_RANKER_MODEL_FILE_NAME_TAR}")
-set(CLASS_RANKER_MODEL_MD5 0e13e712cbd05e6f5492fc21d88821d7)
+set(CLASS_RANKER_MODEL_MD5 21f38e59d908613ceadd1db900731f36)
 
 set(CLASS_RANKER_MODEL_FOUND 0)
 
