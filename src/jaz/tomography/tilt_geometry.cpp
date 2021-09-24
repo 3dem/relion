@@ -1,3 +1,5 @@
+#include <stdexcept>
+#include <limits>
 
 #include "tilt_geometry.h"
 #include <src/jaz/util/index_sort.h>

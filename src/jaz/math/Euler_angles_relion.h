@@ -1,6 +1,9 @@
 #ifndef RELION_JAZ_EULER_ANGLES_H
 #define RELION_JAZ_EULER_ANGLES_H
 
+#include <stdexcept>
+#include <limits>
+
 #include <src/jaz/gravis/t4Matrix.h>
 #include <src/euler.h>
 #include <iostream>
