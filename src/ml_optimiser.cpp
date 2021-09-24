@@ -1743,8 +1743,8 @@ void MlOptimiser::initialiseGeneral(int rank)
 		REPORT_ERROR("ERROR: output directory does not exist!");
 
 	// Just die if trying to use accelerators and skipping alignments
-	if (do_skip_align && (do_gpu || do_cpu))
-		REPORT_ERROR("ERROR: you cannot use accelerators when skipping alignments");
+	if ((do_skip_align || do_skip_rotate) && (do_gpu || do_cpu))
+		REPORT_ERROR("ERROR: you cannot use accelerators when skipping alignments.");
 
 	if (do_always_cc)
 		do_calculate_initial_sigma_noise = false;
