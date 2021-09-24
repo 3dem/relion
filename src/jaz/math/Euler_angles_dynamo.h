@@ -1,6 +1,9 @@
 #ifndef DYN_EULER_ANGLES_H
 #define DYN_EULER_ANGLES_H
 
+#include <stdexcept>
+#include <limits>
+
 #include <src/jaz/gravis/t4Matrix.h>
 
 class EulerDynamo
