@@ -270,7 +270,7 @@ void MlModel::read(FileName fn_in, int nr_optics_groups_from_mydata, bool _do_gr
 		// Check to see whether there are gradient tracking entry as well
 		if (MDclass.getValue(EMDL_MLMODEL_GRADIENT_MOMENT1_IMAGE, fn_tmp))
 		{
-		    bool is_2d(Iref[0].zdim == 1);
+			bool is_2d(Iref[0].zdim == 1);
 			Image<RFLOAT> img;
 			do_grad = true;
 			if (iclass == 0)
@@ -690,8 +690,8 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 			}
 			fn_tmp.compose(iclass+1, fn_tmp); // fn_tmp = integerToString(iclass) + "@" + fn_tmp;
 
-			fn_mom1 = fn_out + "_1moment.mrcs";
-			fn_mom2 = fn_out + "_2moment.mrcs";
+			fn_mom1.compose(iclass + 1, fn_out + "_1moment.mrcs");
+			fn_mom2.compose(iclass + 1, fn_out + "_2moment.mrcs");
 		}
 		else
 		{
