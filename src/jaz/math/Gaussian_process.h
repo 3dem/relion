@@ -19,7 +19,7 @@ class GaussianProcess
 				const std::vector<gravis::d3Vector>& points,
 				GpKernel* kernel);
 		
-		static Basis getBasis(const Matrix2D<double>& C, int maxDims);
+		static Basis getBasis(const Matrix2D<double>& C, int maxDims, double eps = 1e-10);
 };
 
 class GpKernel

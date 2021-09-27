@@ -99,7 +99,7 @@ void SampleManifoldProgram::run()
 			{
 				RigidAlignment ra = locations[i];
 
-				Matrix2D<double> A;
+				Matrix2D<RFLOAT> A;
 				Euler_angles2matrix(ra.rot, ra.tilt, ra.psi, A, false);
 				const d3Vector n(A(0,2), A(1,2), A(2,2));
 

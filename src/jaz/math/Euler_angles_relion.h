@@ -160,7 +160,7 @@ void Euler::test()
 
 		const gravis::d3Matrix A = anglesToMatrix3(phi, theta, chi);
 
-		Matrix2D<double> A0(3,3);
+		Matrix2D<RFLOAT> A0(3,3);
 		Euler_angles2matrix(RAD2DEG(phi), RAD2DEG(theta), RAD2DEG(chi), A0);
 
 		for (int r = 0; r < 3; r++)
@@ -175,7 +175,7 @@ void Euler::test()
 
 		const gravis::d3Vector ang = matrixToAngles(A);
 
-		double phi0_deg, theta0_deg, chi0_deg;
+		RFLOAT phi0_deg, theta0_deg, chi0_deg;
 
 		Euler_matrix2angles(A0, phi0_deg, theta0_deg, chi0_deg);
 
