@@ -1092,17 +1092,18 @@ void SpaBackproject::reconstructNew()
 		dataImgFS[half] *= s / (6.0 * padding_factor);
 	}
 
-	std::vector<BufferedImage<double>> dataImgRS(2), dataImgDivRS(2);
+	std::vector<BufferedImage<RFLOAT>> dataImgRS(2), dataImgDivRS(2);
 
-	BufferedImage<dComplex> dataImgFS_both = dataImgFS[0] + dataImgFS[1];
-	BufferedImage<double> psfImgFS_both;
+	BufferedImage<Complex> dataImgFS_both = dataImgFS[0] + dataImgFS[1];
+	BufferedImage<RFLOAT> psfImgFS_both;
 
 	if (explicit_spreading_function)
 	{
 		psfImgFS_both = psfImgFS[0] + psfImgFS[1];
 	}
 
-	BufferedImage<double> ctfImgFS_both = ctfImgFS[0] + ctfImgFS[1];
+	BufferedImage<RFLOAT> ctfImgFS_both = ctfImgFS[0] + ctfImgFS[1];
+
 
 	Log::beginSection("Reconstructing");
 
@@ -1110,19 +1111,12 @@ void SpaBackproject::reconstructNew()
 	const int margin = (s - cropSize) / 2;
 	const bool needs_cropping = margin > 0;
 
-	/*{
-		dataImgFS[0].writeVtk("data_fwd_new.vtk");
-		std::exit(0);
-	}*/
-
 	for (int half = 0; half < 2; half++)
 	{
 		Log::print("Half " + ZIO::itoa(half));
 
-		dataImgRS[half] = BufferedImage<double>(s,s,s);
-		dataImgDivRS[half] = BufferedImage<double>(s,s,s);
-
-
+		dataImgRS[half] = BufferedImage<RFLOAT>(s,s,s);
+		dataImgDivRS[half] = BufferedImage<RFLOAT>(s,s,s);
 
 		if (explicit_spreading_function)
 		{
@@ -1253,7 +1247,7 @@ void SpaBackproject::reconstructDualContrast()
 	BufferedImage<DualContrastVoxel<RFLOAT>> accumulation_volume_both =
 			dual_contrast_accumulation_volumes[0] + dual_contrast_accumulation_volumes[1];
 
-	BufferedImage<double> psfImgFS_both;
+	BufferedImage<RFLOAT> psfImgFS_both;
 
 	if (explicit_spreading_function)
 	{
