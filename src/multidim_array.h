@@ -4072,7 +4072,7 @@ public:
     	if (mask != NULL)
     		if (!sameShape(*mask)) REPORT_ERROR("ERROR: mask is of incorrect size");
 
-    	double minval, maxval;
+    	RFLOAT minval, maxval;
     	computeDoubleMinMax(minval, maxval, mask);
     	double range = maxval - minval;
 

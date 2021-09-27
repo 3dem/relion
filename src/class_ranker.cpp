@@ -66,7 +66,7 @@ double ZernikeMomentsExtractor::zernikeR(int n, int l, double r)
 	return(sum) ;
 }
 
-Complex ZernikeMomentsExtractor::zernikeZ(MultidimArray<double> img, int n, int l, double r_max)
+Complex ZernikeMomentsExtractor::zernikeZ(MultidimArray<RFLOAT> img, int n, int l, double r_max)
 {
   double rho ;		// radius of pixel from COM
   double theta ;    // angle of pixel
@@ -94,16 +94,15 @@ Complex ZernikeMomentsExtractor::zernikeZ(MultidimArray<double> img, int n, int 
 }
 
 
-std::vector<double> ZernikeMomentsExtractor::getZernikeMoments(MultidimArray<double> img, long z_order, double radius, bool verb)
+std::vector<RFLOAT> ZernikeMomentsExtractor::getZernikeMoments(MultidimArray<RFLOAT> img, long z_order, double radius, bool verb)
 {
 	if (z_order > 20 || z_order < 0)
 		REPORT_ERROR("BUG: zernike(): You choice of z_order is invalid; choose a value between 0 and 20");
 
-
-	std::vector<double> zfeatures;
+	std::vector<RFLOAT> zfeatures;
 
 	// Normalise images to be intensity from [0,1]
-	double minval, maxval, range;
+	RFLOAT minval, maxval, range;
 	MultidimArray<int> mask;
 	mask.resize(img);
 	mask.setXmippOrigin();
@@ -154,7 +153,7 @@ std::vector<double> ZernikeMomentsExtractor::getZernikeMoments(MultidimArray<dou
 }
 
 
-double HaralickExtractor::Entropy(MultidimArray<double> arr)
+RFLOAT HaralickExtractor::Entropy(MultidimArray<RFLOAT> arr)
 {
 	double result = 0.0;
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(arr)
@@ -194,9 +193,9 @@ void HaralickExtractor::fast_init()
 
 /*0 => energy, 1 => entropy, 2=> inverse difference */
 /*3 => correlation, 4=> info measure 1, 5 => info measure 2*/
-std::vector<double> HaralickExtractor::cooc_feats()
+std::vector<RFLOAT> HaralickExtractor::cooc_feats()
 {
-	std::vector<double> ans(7, 0.0);
+	std::vector<RFLOAT> ans(7, 0.0);
 	double hxy1 = 0.0;
 	double hxy2 = 0.0;
 	double local, xy;
@@ -228,9 +227,9 @@ std::vector<double> HaralickExtractor::cooc_feats()
 
 /*0 => contrast, 1 => diff entropy, 2 => diffvariance */
 /*3 => sum average, 4 => sum entropy, 5 => sum variance */
-std::vector<double> HaralickExtractor::margprobs_feats()
+std::vector<RFLOAT> HaralickExtractor::margprobs_feats()
 {
-	std::vector<double> ans(6, 0.0);
+	std::vector<RFLOAT> ans(6, 0.0);
 	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(probdiff)
 	{
 		ans[0] += i * i * DIRECT_A1D_ELEM(probdiff, i);
@@ -254,14 +253,14 @@ std::vector<double> HaralickExtractor::margprobs_feats()
 }
 
 
-MultidimArray<double> HaralickExtractor::fast_feats(bool verbose)
+MultidimArray<RFLOAT> HaralickExtractor::fast_feats(bool verbose)
 {
-	MultidimArray<double> result;
+	MultidimArray<RFLOAT> result;
 	result.initZeros(13);
 	if (NZYXSIZE(matcooc) ==0) return result;
 	if (!initial) fast_init();
-	std::vector<double> margfeats = margprobs_feats();
-	std::vector<double> coocfeats = cooc_feats();
+	std::vector<RFLOAT> margfeats = margprobs_feats();
+	std::vector<RFLOAT> coocfeats = cooc_feats();
 	for (int i = 0; i < 7; i++)
 	{
 		result(i) = coocfeats[i];
@@ -308,13 +307,13 @@ MultidimArray<RFLOAT> HaralickExtractor::MatCooc(MultidimArray<int> img, int N,
 	return ans;
 }
 
-std::vector<double> HaralickExtractor::getHaralickFeatures(MultidimArray<RFLOAT> img,
+std::vector<RFLOAT> HaralickExtractor::getHaralickFeatures(MultidimArray<RFLOAT> img,
 		MultidimArray<int> *mask, bool verbose)
 {
-	std::vector<double> ans;
+	std::vector<RFLOAT> ans;
 	ans.resize(13, 0.);
 
-	MultidimArray<double> avg;
+	MultidimArray<RFLOAT> avg;
 	avg.initZeros(13);
 
 	// Check there are non-zero elements in the mask
@@ -323,7 +322,7 @@ std::vector<double> HaralickExtractor::getHaralickFeatures(MultidimArray<RFLOAT>
 	// Convert greyscale image to integer image with much fewer (32) grey-scale values
 	MultidimArray<int> imgint;
 	imgint.resize(img);
-	double minval, maxval, range;
+	RFLOAT minval, maxval, range;
 	img.computeDoubleMinMax(minval, maxval, mask);
 	range = maxval -minval;
 	if (range > 0.)
@@ -896,14 +895,14 @@ void ClassRanker::calculatePvsLBP(MultidimArray<RFLOAT> I, MultidimArray<int> &p
 	}
 }
 
-std::vector<RFLOAT> ClassRanker::calculateGranulo(const MultidimArray<double> &I)
+std::vector<RFLOAT> ClassRanker::calculateGranulo(const MultidimArray<RFLOAT> &I)
 {
 
-	std::vector<RFLOAT> result;
+    std::vector<RFLOAT> result;
 
-	Image<double> G;
+    Image<RFLOAT> G;
     G().resize(I);
-    double m, M;
+    RFLOAT m, M;
     I.computeDoubleMinMax(m, M);
 
     if (XSIZE(I) < 15 || YSIZE(I) < 15)
@@ -1686,7 +1685,7 @@ void ClassRanker::getFeatures()
 
 			// Determining radius to use
 			circular_mask_radius = particle_diameter / (uniform_angpix * 2.);
-			circular_mask_radius = std::min( (XSIZE(img())/2.) , circular_mask_radius);
+			circular_mask_radius = std::min(RFLOAT(XSIZE(img())/2.) , circular_mask_radius);
 			if (radius_ratio > 0 && radius <= 0) radius = radius_ratio * circular_mask_radius;
 			// Calculate moments in ring area
 			if (radius > 0)

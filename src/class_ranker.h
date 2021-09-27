@@ -117,7 +117,7 @@ public:
 
     // Granularity features only for historical development reasons
     std::vector<RFLOAT> lbp, lbp_p, lbp_s, haralick_p, haralick_s, zernike_moments, granulo;
-    double total_entropy, protein_entropy, solvent_entropy;
+    RFLOAT total_entropy, protein_entropy, solvent_entropy;
 
     classFeatures(): name(""),
 			class_index(0),
@@ -301,12 +301,12 @@ public:
 class ZernikeMomentsExtractor
 {
 public:
-	std::vector<double> getZernikeMoments(MultidimArray<double> img, long z_order, double radius, bool verb);
+	std::vector<RFLOAT> getZernikeMoments(MultidimArray<RFLOAT> img, long z_order, double radius, bool verb);
 
 private:
 	double factorial(long n);
 	double zernikeR(int n, int l, double r);
-	Complex zernikeZ(MultidimArray<double> img, int n, int l, double r_max);
+	Complex zernikeZ(MultidimArray<RFLOAT> img, int n, int l, double r_max);
 };
 
 #define HARALICK_EPS 1e-6
@@ -315,25 +315,25 @@ class HaralickExtractor
 
 private:
 
-	MultidimArray<double> matcooc; //GLCM
-    MultidimArray<double> margprobx;
-    MultidimArray<double> margproby;
-    MultidimArray<double> probsum; //sum probability
-    MultidimArray<double> probdiff; //diff probability
-    double hx, hy; //entropy of margprobx and y
-    double meanx, meany, stddevx, stddevy;
+    MultidimArray<RFLOAT> matcooc; //GLCM
+    MultidimArray<RFLOAT> margprobx;
+    MultidimArray<RFLOAT> margproby;
+    MultidimArray<RFLOAT> probsum; //sum probability
+    MultidimArray<RFLOAT> probdiff; //diff probability
+    RFLOAT hx, hy; //entropy of margprobx and y
+    RFLOAT meanx, meany, stddevx, stddevy;
     bool initial=false; //marks if above variables are set
 
-    double Entropy(MultidimArray<double> arr);
+    RFLOAT Entropy(MultidimArray<RFLOAT> arr);
     void fast_init();
-    std::vector<double> cooc_feats();
-    std::vector<double> margprobs_feats();
-    MultidimArray<double> fast_feats(bool verbose=false);
+    std::vector<RFLOAT> cooc_feats();
+    std::vector<RFLOAT> margprobs_feats();
+    MultidimArray<RFLOAT> fast_feats(bool verbose=false);
     MultidimArray<RFLOAT> MatCooc(MultidimArray<int> img, int N, int deltax, int deltay, MultidimArray<int> *mask=NULL);
 
 public:
 
-    std::vector<double> getHaralickFeatures(MultidimArray<RFLOAT> img, MultidimArray<int> *mask=NULL, bool verbose=false);
+    std::vector<RFLOAT> getHaralickFeatures(MultidimArray<RFLOAT> img, MultidimArray<int> *mask=NULL, bool verbose=false);
 
 };
 
@@ -437,7 +437,7 @@ private:
 
 	void calculatePvsLBP(MultidimArray<RFLOAT> I, MultidimArray<int> &p_mask, MultidimArray<int> &s_mask, classFeatures &cf);
 
-	std::vector<RFLOAT> calculateGranulo(const MultidimArray<double> &I);
+	std::vector<RFLOAT> calculateGranulo(const MultidimArray<RFLOAT> &I);
 
 	RFLOAT findResolution(classFeatures &cf);
 
