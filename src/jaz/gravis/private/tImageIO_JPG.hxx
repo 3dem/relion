@@ -8,6 +8,8 @@
  ******************************************************************************/
 #ifndef __GRAVIS__TIMAGE_IO_JPG__
 #define __GRAVIS__TIMAGE_IO_JPG__
+#ifdef JPEG_FOUND
+
 #include <iostream>
 #include <fstream>
 
@@ -408,4 +410,5 @@ namespace gravis
 
   } /* Close Namespace "priv" */
 } /* Close Namespace "gravis" */
+#endif
 #endif
