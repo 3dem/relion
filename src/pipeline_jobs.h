@@ -1233,6 +1233,10 @@ public:
 	bool getCommandsTomoReconPartJob(std::string &outputname, std::vector<std::string> &commands,
 									 std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
+private:
+
+	std::string obtainFullPathForCommand(const std::string &cmd);
+
 };
 
 #endif /* SRC_PIPELINE_JOBS_H_ */

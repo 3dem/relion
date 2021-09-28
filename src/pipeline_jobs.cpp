@@ -1417,9 +1417,9 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 
 	std::string command;
 	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-		command="`which relion_run_motioncorr_mpi`";
+		command = obtainFullPathForCommand("relion_run_motioncorr_mpi");
 	else
-		command="`which relion_run_motioncorr`";
+		command = obtainFullPathForCommand("relion_run_motioncorr");
 	if (error_message != "") return false;
 
 	// I/O
@@ -1656,9 +1656,9 @@ bool RelionJob::getCommandsCtffindJob(std::string &outputname, std::vector<std::
 	inputNodes.push_back(node2);
 
 	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-		command="`which relion_run_ctffind_mpi`";
+		command = obtainFullPathForCommand("relion_run_ctffind_mpi");
 	else
-		command="`which relion_run_ctffind`";
+		command = obtainFullPathForCommand("relion_run_ctffind");
 	if (error_message != "") return false;
 
 	command += " --i " + joboptions["input_star_mics"].getString();
@@ -1786,7 +1786,7 @@ bool RelionJob::getCommandsManualpickJob(std::string &outputname, std::vector<st
 	initialisePipeline(outputname, job_counter);
 	std::string command;
 
-	command="`which relion_manualpick`";
+	command = obtainFullPathForCommand("relion_manualpick");
 
 	if (joboptions["fn_in"].getString() == "")
 	{
@@ -1969,7 +1969,7 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 
 		label += ".continuemanual";
 
-		command="`which relion_manualpick`";
+		command = obtainFullPathForCommand("relion_manualpick");
 
 		command += " --i " + joboptions["fn_input_autopick"].getString();
 		command += " --odir " + outputname;
@@ -2055,9 +2055,9 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 	{
 		// Run autopicking
 		if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-			command="`which relion_autopick_mpi`";
+			command = obtainFullPathForCommand("relion_autopick_mpi");
 		else
-			command="`which relion_autopick`";
+			command = obtainFullPathForCommand("relion_autopick");
 		if (error_message != "") return false;
 
 		// Input
@@ -2371,9 +2371,9 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 	initialisePipeline(outputname, job_counter);
 	std::string command;
 	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-		command="`which relion_preprocess_mpi`";
+		command = obtainFullPathForCommand("relion_preprocess_mpi");
 	else
-		command="`which relion_preprocess`";
+		command = obtainFullPathForCommand("relion_preprocess");
 	if (error_message != "") return false;
 
 	// Input
@@ -2628,7 +2628,7 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 		label += ".removeduplicates";
 
 		// Remove duplicates
-		command="`which relion_star_handler`";
+		command = obtainFullPathForCommand("relion_star_handler");
 
 		if (joboptions["fn_mic"].getString() != "" || joboptions["fn_model"].getString() != "")
 		{
@@ -2660,7 +2660,7 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 	else if (joboptions["do_select_values"].getBoolean() || joboptions["do_discard"].getBoolean() || joboptions["do_split"].getBoolean())
 	{
 		// Value-based selection
-		command="`which relion_star_handler`";
+		command = obtainFullPathForCommand("relion_star_handler");
 
 		if (joboptions["fn_model"].getString() != "")
 		{
@@ -2775,7 +2775,7 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 				return false;
 			}
 
-			command = "`which relion_class_ranker`";
+			command = obtainFullPathForCommand("relion_class_ranker");
 
 			// input
 			command += " --opt " + joboptions["fn_model"].getString();
@@ -2823,7 +2823,7 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 			// Interactive selection
 			label += ".interactive";
 
-			command="`which relion_display`";
+			command = obtainFullPathForCommand("relion_display");
 
 			// I/O
 			if (joboptions["fn_model"].getString() != "")
@@ -3016,9 +3016,9 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 	std::string command;
 
 	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-		command="`which relion_refine_mpi`";
+		command = obtainFullPathForCommand("relion_refine_mpi");
 	else
-		command="`which relion_refine`";
+		command = obtainFullPathForCommand("relion_refine");
 	if (error_message != "") return false;
 
 	FileName fn_run = "run";
@@ -3300,7 +3300,7 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 	if (error_message != "") return false;
 
 	std::string command;
-	command="`which relion_refine`";
+	command = obtainFullPathForCommand("relion_refine");
 
 	FileName fn_sym = joboptions["sym_name"].getString();
 
@@ -3410,7 +3410,7 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 	fn_model+="_model.star";
 
 	// Align with symmetry axes and apply symmetry
-	std::string command2 = "`which relion_align_symmetry`";
+	std::string command2 = obtainFullPathForCommand("relion_align_symmetry");
 	command2 += " --i " + fn_model;
 	command2 += " --o " + outputname + "initial_model.mrc";
 
@@ -3658,9 +3658,9 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 	std::string command;
 
 	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-		command="`which relion_refine_mpi`";
+		command = obtainFullPathForCommand("relion_refine_mpi");
 	else
-		command="`which relion_refine`";
+		command = obtainFullPathForCommand("relion_refine");
 	if (error_message != "") return false;
 
 	FileName fn_run = "run";
@@ -4112,9 +4112,9 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 	std::string command;
 
 	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-		command="`which relion_refine_mpi`";
+		command = obtainFullPathForCommand("relion_refine_mpi");
 	else
-		command="`which relion_refine`";
+		command = obtainFullPathForCommand("relion_refine");
 	if (error_message != "") return false;
 
 	FileName fn_run = "run";
@@ -4506,9 +4506,9 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 	{
 
 		if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-			command="`which relion_refine_mpi`";
+			command = obtainFullPathForCommand("relion_refine_mpi");
 		else
-			command="`which relion_refine`";
+			command = obtainFullPathForCommand("relion_refine");
 		if (error_message != "") return false;
 
 		MetaDataTable MD;
@@ -4597,7 +4597,7 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 
 	if (joboptions["do_analyse"].getBoolean())
 	{
-		command = "`which relion_flex_analyse`";
+		command = obtainFullPathForCommand("relion_flex_analyse");
 
 		// If we had performed relion_refine command, then fn_run would be set now
 		// Otherwise, we have to search for _model.star files that do NOT have a _it??? specifier
@@ -4717,7 +4717,7 @@ bool RelionJob::getCommandsMaskcreateJob(std::string &outputname, std::vector<st
 	initialisePipeline(outputname, job_counter);
 	std::string command;
 
-	command="`which relion_mask_create`";
+	command = obtainFullPathForCommand("relion_mask_create");
 
 	// I/O
 	if (joboptions["fn_in"].getString() == "")
@@ -4795,7 +4795,7 @@ bool RelionJob::getCommandsJoinstarJob(std::string &outputname, std::vector<std:
 	commands.clear();
 	initialisePipeline(outputname, job_counter);
 	std::string command;
-	command="`which relion_star_handler`";
+	command = obtainFullPathForCommand("relion_star_handler");
 
 	int ii = 0;
 	if (joboptions["do_part"].getBoolean())
@@ -4983,15 +4983,15 @@ bool RelionJob::getCommandsSubtractJob(std::string &outputname, std::vector<std:
 
 		label += ".revert";
 
-		command = "`which relion_particle_subtract`";
+		command = obtainFullPathForCommand("relion_particle_subtract");
 		command += " --revert " + joboptions["fn_fliplabel"].getString() + " --o " + outputname;
 	}
 	else
 	{
 		if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-			command="`which relion_particle_subtract_mpi`";
+			command = obtainFullPathForCommand("relion_particle_subtract_mpi");
 		else
-			command="`which relion_particle_subtract`";
+			command = obtainFullPathForCommand("relion_particle_subtract");
 		if (error_message != "") return false;
 
 		// I/O
@@ -5095,7 +5095,7 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 	initialisePipeline(outputname, job_counter);
 	std::string command;
 
-	command="`which relion_postprocess`";
+	command = obtainFullPathForCommand("relion_postprocess");
 
 	// Input mask
 	if (joboptions["fn_mask"].getString() == "")
@@ -5304,9 +5304,9 @@ bool RelionJob::getCommandsLocalresJob(std::string &outputname, std::vector<std:
 		label += ".own";
 
 		if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-			command="`which relion_postprocess_mpi`";
+			command = obtainFullPathForCommand("relion_postprocess_mpi");
 		else
-			command="`which relion_postprocess`";
+			command = obtainFullPathForCommand("relion_postprocess");
 		if (error_message != "") return false;
 
 		command += " --locres --i " + joboptions["fn_in"].getString();
@@ -5382,9 +5382,9 @@ bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<
 	std::string command;
 
 	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-		command="`which relion_motion_refine_mpi`";
+		command = obtainFullPathForCommand("relion_motion_refine_mpi");
 	else
-		command="`which relion_motion_refine`";
+		command = obtainFullPathForCommand("relion_motion_refine");
 	if (error_message != "") return false;
 
 	if (joboptions["fn_data"].getString() == "")
@@ -5585,9 +5585,9 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 
 
 	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-		command="`which relion_ctf_refine_mpi`";
+		command = obtainFullPathForCommand("relion_ctf_refine_mpi");
 	else
-		command="`which relion_ctf_refine`";
+		command = obtainFullPathForCommand("relion_ctf_refine");
 	if (error_message != "") return false;
 
 	if (joboptions["fn_data"].getString() == "")
@@ -5983,7 +5983,7 @@ std::string RelionJob::setTomoOutputCommand(std::string &command, std::string op
 	std::string error_message = "";
 
 	// Create output optimisation set
-	command = "`which relion_tomo_make_optimisation_set`";
+	command = obtainFullPathForCommand("relion_tomo_make_optimisation_set");
 	command += " --o " + optimisationSetOut;
 
 	if (optimisationSet != "") command += " --i " + optimisationSet;
@@ -6260,9 +6260,9 @@ bool RelionJob::getCommandsTomoSubtomoJob(std::string &outputname, std::vector<s
 	std::string command;
 
 	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-		command="`which relion_tomo_subtomo_mpi`";
+		command = obtainFullPathForCommand("relion_tomo_subtomo_mpi");
 	else
-		command="`which relion_tomo_subtomo`";
+		command = obtainFullPathForCommand("relion_tomo_subtomo");
 	if (error_message != "") return false;
 
 	// I/O
@@ -6348,9 +6348,9 @@ bool RelionJob::getCommandsTomoCtfRefineJob(std::string &outputname, std::vector
     std::string command;
 
     if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-            command="`which relion_tomo_refine_ctf_mpi`";
+            command = obtainFullPathForCommand("relion_tomo_refine_ctf_mpi");
     else
-            command="`which relion_tomo_refine_ctf`";
+            command = obtainFullPathForCommand("relion_tomo_refine_ctf");
     if (error_message != "") return false;
 
     // I/O
@@ -6445,9 +6445,9 @@ bool RelionJob::getCommandsTomoAlignJob(std::string &outputname, std::vector<std
     std::string command;
 
 	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-		command="`which relion_tomo_align_mpi`";
+		command = obtainFullPathForCommand("relion_tomo_align_mpi");
 	else
-		command="`which relion_tomo_align`";
+		command = obtainFullPathForCommand("relion_tomo_align");
 	if (error_message != "") return false;
 
 	// I/O
@@ -6544,9 +6544,9 @@ bool RelionJob::getCommandsTomoReconPartJob(std::string &outputname, std::vector
     if (joboptions["do_from2d"].getBoolean())
     {
 		if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-			command="`which relion_tomo_reconstruct_particle_mpi`";
+			command = obtainFullPathForCommand("relion_tomo_reconstruct_particle_mpi");
 		else
-			command="`which relion_tomo_reconstruct_particle`";
+			command = obtainFullPathForCommand("relion_tomo_reconstruct_particle");
 		if (error_message != "") return false;
 
 		// I/O
@@ -6589,7 +6589,7 @@ bool RelionJob::getCommandsTomoReconPartJob(std::string &outputname, std::vector
 		// Estimate FSC
 		if (joboptions["fn_mask"].getString() != "")
 		{
-			command2 = "`which relion_tomo_make_reference`";
+			command2 = obtainFullPathForCommand("relion_tomo_make_reference");
 			command2 += " --rec "+ outputname;
 			command2 += " --o "+ outputname;
 			command2 += " --mask "+ joboptions["fn_mask"].getString();
@@ -6611,9 +6611,9 @@ bool RelionJob::getCommandsTomoReconPartJob(std::string &outputname, std::vector
 		}
 
 		if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-			command="`which relion_reconstruct_mpi`";
+			command = obtainFullPathForCommand("relion_reconstruct_mpi");
 		else
-			command="`which relion_reconstruct`";
+			command = obtainFullPathForCommand("relion_reconstruct");
 		if (error_message != "") return false;
 
 		Node node(joboptions["in_particles"].getString(), joboptions["in_particles"].node_type);
@@ -6641,3 +6641,7 @@ bool RelionJob::getCommandsTomoReconPartJob(std::string &outputname, std::vector
 
 }
 
+std::string RelionJob::obtainFullPathForCommand(const std::string &cmd)
+{
+	return "`which "+ cmd +"`";
+}
