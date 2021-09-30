@@ -397,7 +397,7 @@ foreach (_target ${RELION_JAZ_SPA_TARGETS})
 		target_link_libraries(${_target} ${TBB_LIBRARIES})
 	endif(ALTCPU)
 	
-	install (TARGETS ${_target} RUNTIME DESTINATION bin/spa)
+	install (TARGETS ${_target} RUNTIME DESTINATION bin)
 endforeach()
 
 # former Dynamite programs:
@@ -414,7 +414,7 @@ foreach (_target ${RELION_JAZ_TOMO_TARGETS})
 		target_link_libraries(${_target} ${TIFF_LIBRARIES})
 	endif()
 	
-	install (TARGETS ${_target} RUNTIME DESTINATION bin/tomo)
+	install (TARGETS ${_target} RUNTIME DESTINATION bin)
 endforeach()
 
 foreach (_target ${RELION_JAZ_EXPERIMENTAL_TARGETS})
@@ -434,7 +434,7 @@ foreach (_target ${RELION_JAZ_EXPERIMENTAL_TARGETS})
 		target_link_libraries(${_target} ${TBB_LIBRARIES})
 	endif(ALTCPU)
 	
-	install (TARGETS ${_target} RUNTIME DESTINATION bin/scripts)
+	install (TARGETS ${_target} RUNTIME DESTINATION bin)
 endforeach()
 
 FIND_PACKAGE( OpenMP REQUIRED)
