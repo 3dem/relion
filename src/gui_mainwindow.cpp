@@ -1558,7 +1558,7 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 
 		if (pipeline.checkDependency(current_job))
 		{
-			ask += "\nWARNING: This jobs output nodes are used as inputs for other jobs,\nso overwriting this job may lead to inconsistent job history.";
+			ask += "\nWARNING: This job's output nodes are used as inputs for other jobs,\nso overwriting this job may lead to inconsistent job history.";
 		}
 
 		int proceed =  fl_choice("%s", "Cancel", "Overwrite!", NULL, ask.c_str());

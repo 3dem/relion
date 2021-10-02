@@ -1766,6 +1766,13 @@ void MlOptimiser::initialiseGeneral(int rank)
 		int myverb = (rank==0) ? 1 : 0;
 		mydata.read(fn_data, true, false, do_preread, is_helical_segment, myverb); // true means ignore original particle name
 
+		// Without this check, the program crashes later.
+		if (mydata.numberOfParticles() == 0)
+		{
+			std::cerr << "The input STAR file " << fn_data << " does not contain any particles! Exiting..." << std::endl;
+			exit(RELION_EXIT_SUCCESS);
+		}
+
 		// Read in the reference(s) and initialise mymodel
 		int refdim = (fn_ref == "denovo") ? 3 : 2;
 		mymodel.initialiseFromImages(
