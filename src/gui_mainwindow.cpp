@@ -1555,18 +1555,16 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 	if (do_overwrite_continue)
 	{
 		std::string ask = "Are you sure you want to overwrite this job?";
+
+		if (pipeline.checkDependency(current_job))
+		{
+			ask += "\nWARNING: This jobs output nodes are used as inputs for other jobs,\nso overwriting this job may lead to inconsistent job history.";
+		}
+
 		int proceed =  fl_choice("%s", "Cancel", "Overwrite!", NULL, ask.c_str());
 		if (!proceed)
 		{
 			do_overwrite_continue = false;
-			return;
-		}
-
-		if (pipeline.checkDependency(current_job))
-		{
-			std::string error_message = "This jobs output nodes are used as inputs for other jobs, so you cannot overwrite this job.";
-			fl_message("%s", error_message.c_str());
-			run_button->activate();
 			return;
 		}
 		else
