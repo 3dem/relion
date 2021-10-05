@@ -367,7 +367,7 @@ void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, 
 {
 	//This static flag is for only randomize once
 	static bool randomised = false;
-	static bool doing_subset = subsets_size < numberOfParticles();
+	static bool doing_subset = 0 < subsets_size && subsets_size < numberOfParticles() ;
 	if (!randomised || doing_subset)
 	{
 		srand(seed);
