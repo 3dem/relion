@@ -2956,7 +2956,6 @@ void MlOptimiser::iterate()
 			do_grad_next_iter = !(has_converged || iter_next > nr_iter - grad_em_iters) &&
 			                    !(do_firstiter_cc && iter_next == 1) &&
 			                    !grad_has_converged;
-			do_skip_maximization = do_grad && iter == nr_iter;
 			grad_pseudo_halfsets = do_grad;
 		}
 
@@ -4694,11 +4693,15 @@ void MlOptimiser::maximizationOtherParameters()
 	if (sum_weight < XMIPP_EQUAL_ACCURACY)
 		return;
 
+	RFLOAT my_mu = mu;
+	if (!do_grad || subset_size == -1)
+		my_mu = 0.;
+
 	// Update average norm_correction, don't update norm corrections anymore for multi-body refinements!
 	if (do_norm_correction  && mymodel.nr_bodies == 1)
 	{
-		mymodel.avg_norm_correction *= mu;
-		mymodel.avg_norm_correction += (1. - mu) * wsum_model.avg_norm_correction / sum_weight;
+		mymodel.avg_norm_correction *= my_mu;
+		mymodel.avg_norm_correction += (1. - my_mu) * wsum_model.avg_norm_correction / sum_weight;
 	}
 
 	// Don't update scales in maxCC or in multi-body refinement
@@ -4706,11 +4709,11 @@ void MlOptimiser::maximizationOtherParameters()
 	{
 		for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
 		{
-			mymodel.scale_correction[igroup] *= mu;
+			mymodel.scale_correction[igroup] *= my_mu;
 			if (wsum_model.wsum_reference_power[igroup] > 0.)
-				mymodel.scale_correction[igroup] += (1. - mu) * wsum_model.wsum_signal_product[igroup] / wsum_model.wsum_reference_power[igroup];
+				mymodel.scale_correction[igroup] += (1. - my_mu) * wsum_model.wsum_signal_product[igroup] / wsum_model.wsum_reference_power[igroup];
 			else
-				mymodel.scale_correction[igroup] += (1. - mu);
+				mymodel.scale_correction[igroup] += (1. - my_mu);
 		}
 
 		// TODO! Avoid extremities in scale estimates, because they lead to catastrophic events and instabilities in refinement
@@ -4761,16 +4764,16 @@ void MlOptimiser::maximizationOtherParameters()
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 	{
 		// Update pdf_class (for SGD: update with taking mu into account! For non-SGD: mu equals zero)
-		mymodel.pdf_class[iclass] *= mu;
-		mymodel.pdf_class[iclass] += (1. - mu) * wsum_model.pdf_class[iclass] / sum_weight;
+		mymodel.pdf_class[iclass] *= my_mu;
+		mymodel.pdf_class[iclass] += (1. - my_mu) * wsum_model.pdf_class[iclass] / sum_weight;
 
 		// for 2D also update priors of translations for each class!
 		if (mymodel.ref_dim == 2)
 		{
 			if (wsum_model.pdf_class[iclass] > 0.)
 			{
-				mymodel.prior_offset_class[iclass] *= mu;
-				mymodel.prior_offset_class[iclass] += (1. - mu) * wsum_model.prior_offset_class[iclass] / sum_weight;
+				mymodel.prior_offset_class[iclass] *= my_mu;
+				mymodel.prior_offset_class[iclass] += (1. - my_mu) * wsum_model.prior_offset_class[iclass] / sum_weight;
 			}
 			else
 				mymodel.prior_offset_class[iclass].initZeros();
@@ -4791,9 +4794,9 @@ void MlOptimiser::maximizationOtherParameters()
 				if (do_som)
 					mymodel.pdf_direction[iclass](idir) = 1;
 				else {
-					mymodel.pdf_direction[iclass](idir) *= mu;
+					mymodel.pdf_direction[iclass](idir) *= my_mu;
 					mymodel.pdf_direction[iclass](idir) +=
-							(1. - mu) * wsum_model.pdf_direction[iclass](idir) / sum_weight;
+							(1. - my_mu) * wsum_model.pdf_direction[iclass](idir) / sum_weight;
 				}
 			}
 		}
@@ -4803,20 +4806,20 @@ void MlOptimiser::maximizationOtherParameters()
 	// Factor 2 because of the 2-dimensionality of the xy-plane
 	if (!fix_sigma_offset && mymodel.nr_bodies == 1)
 	{
-		mymodel.sigma2_offset *= mu;
+		mymodel.sigma2_offset *= my_mu;
 		if (mymodel.data_dim == 3)
 		{
 			if ( (do_helical_refine) && (!ignore_helical_symmetry) )
-				mymodel.sigma2_offset += (1. - mu) * (wsum_model.sigma2_offset) / (2. * sum_weight);
+				mymodel.sigma2_offset += (1. - my_mu) * (wsum_model.sigma2_offset) / (2. * sum_weight);
 			else
-				mymodel.sigma2_offset += (1. - mu) * (wsum_model.sigma2_offset) / (3. * sum_weight);
+				mymodel.sigma2_offset += (1. - my_mu) * (wsum_model.sigma2_offset) / (3. * sum_weight);
 		}
 		else
 		{
 			if ( (do_helical_refine) && (!ignore_helical_symmetry) )
-				mymodel.sigma2_offset += (1. - mu) * (wsum_model.sigma2_offset) / (1. * sum_weight);
+				mymodel.sigma2_offset += (1. - my_mu) * (wsum_model.sigma2_offset) / (1. * sum_weight);
 			else
-				mymodel.sigma2_offset += (1. - mu) * (wsum_model.sigma2_offset) / (2. * sum_weight);
+				mymodel.sigma2_offset += (1. - my_mu) * (wsum_model.sigma2_offset) / (2. * sum_weight);
 		}
 	}
 
@@ -4834,9 +4837,9 @@ void MlOptimiser::maximizationOtherParameters()
 				// Factor 2 because of the 2-dimensionality of the complex-plane
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.sigma2_noise[igroup])
 				{
-					DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) *= mu;
+					DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) *= my_mu;
 					DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) +=
-							(1. - mu) * DIRECT_MULTIDIM_ELEM(wsum_model.sigma2_noise[igroup], n ) /
+							(1. - my_mu) * DIRECT_MULTIDIM_ELEM(wsum_model.sigma2_noise[igroup], n ) /
 								(2. * wsum_model.sumw_group[igroup] * DIRECT_MULTIDIM_ELEM(Npix_per_shell, n));
 					// Watch out for all-zero sigma2 in case of CTF-premultiplication!
 					if (mydata.hasCtfPremultiplied())
