@@ -363,11 +363,12 @@ void Experiment::divideParticlesInRandomHalves(int seed, bool do_helical_refine)
 
 }
 
-void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, bool do_subsets)
+void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, int subsets_size)
 {
 	//This static flag is for only randomize once
 	static bool randomised = false;
-	if (!randomised || do_subsets)
+	static bool doing_subset = subsets_size < numberOfParticles();
+	if (!randomised || doing_subset)
 	{
 		srand(seed);
 
@@ -399,9 +400,10 @@ void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, 
 
 			// Make sure the particles are sorted on their optics_group.
 			// Otherwise CudaFFT re-calculation of plans every time image size changes slows down things a lot!
-			std::stable_sort(sorted_idx.begin(), sorted_idx.begin() + nr_half1, compareOpticsGroupsParticles(particles));
-			std::stable_sort(sorted_idx.begin() + nr_half1, sorted_idx.end(), compareOpticsGroupsParticles(particles));
-
+			long max_nr1 = doing_subset ? subsets_size : nr_half1;
+			long max_nr2 = doing_subset ? subsets_size : nr_half2;
+			std::stable_sort(sorted_idx.begin(), sorted_idx.begin() + max_nr1, compareOpticsGroupsParticles(particles));
+			std::stable_sort(sorted_idx.begin() + nr_half1, sorted_idx.begin() + nr_half1 + max_nr2, compareOpticsGroupsParticles(particles));
 		}
 		else
 		{
@@ -410,7 +412,8 @@ void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, 
 
 			// Make sure the particles are sorted on their optics_group.
 			// Otherwise CudaFFT re-calculation of plans every time image size changes slows down things a lot!
- 			std::stable_sort(sorted_idx.begin(), sorted_idx.end(), compareOpticsGroupsParticles(particles));
+			long max_nr = doing_subset ? subsets_size : numberOfParticles();
+ 			std::stable_sort(sorted_idx.begin(), sorted_idx.begin() + max_nr, compareOpticsGroupsParticles(particles));
 		}
 
 		randomised = true;

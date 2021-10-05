@@ -3355,7 +3355,7 @@ void MlOptimiserMpi::iterate()
 		// Randomly take different subset of the particles each time we do a new "iteration" in SGD
 		if (random_seed != 0)
 		{
-			mydata.randomiseParticlesOrder(random_seed+iter, do_split_random_halves,  subset_size < mydata.numberOfParticles() );
+			mydata.randomiseParticlesOrder(random_seed+iter, do_split_random_halves,  subset_size);
 		}
 		else if (verb > 0)
 		{

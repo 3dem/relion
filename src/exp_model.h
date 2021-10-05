@@ -303,7 +303,7 @@ public:
 	void divideParticlesInRandomHalves(int seed, bool do_helical_refine = false);
 
 	// Randomise the order of the particles
-	void randomiseParticlesOrder(int seed, bool do_split_random_halves = false, bool do_subsets = false);
+	void randomiseParticlesOrder(int seed, bool do_split_random_halves = false, int subsets_size = -1);
 
 	// Make sure the images inside each particle are in the right order
 	void orderImagesInParticles();
