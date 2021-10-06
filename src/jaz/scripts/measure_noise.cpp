@@ -95,12 +95,15 @@ int main(int argc, char *argv[])
 	ParticleSet dataSet(optimisationSet.particles);
 	std::vector<std::vector<ParticleIndex>> particles = dataSet.splitByTomogram(tomogramSet);
 
-	AberrationsCache aberrationsCache(dataSet.optTable, boxSize);
+	AberrationsCache aberrationsCache(dataSet.optTable, boxSize, dataSet.getOriginalPixelSize(0));
 
 	referenceMap.load(boxSize);
 
 
 	Tomogram tomogram = tomogramSet.loadTomogram(tomoIndex, true);
+	tomogram.validateParticleOptics(particles[tomoIndex], dataSet);
+
+	BufferedImage<float> doseWeights = tomogram.computeDoseWeight(boxSize, 1.0);
 
 	const int s = referenceMap.getBoxSize();
 	const int sh = s/2 + 1;
@@ -131,17 +134,20 @@ int main(int argc, char *argv[])
 			BufferedImage<tComplex<float>> observation(sh,s);
 
 			TomoExtraction::extractFrameAt3D_Fourier(
-				tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f], traj[f],
+				tomogram.stack, f, s, 1.0, tomogram, traj[f],
 				observation, projCut, 1, true);
 
 			CTF ctf = tomogram.getCtf(f, dataSet.getPosition(part_id));
+			RawImage<float> doseSlice = doseWeights.getSliceRef(f);
 
 			BufferedImage<fComplex> prediction = Prediction::predictModulated(
 				part_id, dataSet, tomogram.projectionMatrices[f], s,
 				ctf, tomogram.optics.pixelSize, aberrationsCache,
 				referenceMap.image_FS,
 				Prediction::OwnHalf,
-				Prediction::AmplitudeModulated);
+				Prediction::AmplitudeModulated,
+				&doseSlice,
+				Prediction::CtfScaled);
 
 			for (int y = 0; y < sh; y++)
 			for (int x = 0; x < s;  x++)

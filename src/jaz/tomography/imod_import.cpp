@@ -120,7 +120,7 @@ ImodImport::Mapping ImodImport::import()
 	
 	int w_out, h_out, d_out;
 	
-	w_out = aliSize? w_ali : w_ts;
+	w_out = w_ali;
 	
 	d4Matrix toImodOrigin3D = d4Matrix
 	(
@@ -154,13 +154,13 @@ ImodImport::Mapping ImodImport::import()
 				0, 0, 0, 1  );
 		}
 		
-		h_out = aliSize? h_ali : h_ts;
+		h_out = h_ali;
 		d_out = thickness;
 	}
 	else
 	{
 		h_out = thickness;
-		d_out = aliSize? h_ali : h_ts;
+		d_out = h_ali;
 	}
 	
 	d4Matrix Off;

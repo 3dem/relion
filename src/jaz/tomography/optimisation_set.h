@@ -21,8 +21,9 @@ class OptimisationSet
 				particles, tomograms, trajectories, manifolds,
 				refMap1, refMap2, refMask, refFSC;
 
-			bool useFscThreshold;
-			double fscThresholdWidth;
+			double fscThresholdWidth, freqCutoff_A;
+
+			bool flatWeight;
 
 
 		void write(std::string filename);

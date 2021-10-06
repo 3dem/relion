@@ -54,7 +54,9 @@ BufferedImage<double> FCC::compute3(
 		FCC_by_thread[th].fill(0.0);
 	}
 
-	AberrationsCache aberrationsCache(dataSet.optTable, s);
+	AberrationsCache aberrationsCache(dataSet.optTable, s, dataSet.getOriginalPixelSize(0));
+	BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s, 1.0);
+
 	
 	Log::beginProgress("Computing Fourier-cylinder correlations", pc/num_threads);
 		
@@ -71,15 +73,21 @@ BufferedImage<double> FCC::compute3(
 		const ParticleIndex part_id = partIndices[p];
 		
 		const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(part_id, fc, tomogram.optics.pixelSize);
+		const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s/2.0);
+		
 		d4Matrix projCut;
 				
 		BufferedImage<fComplex> observation(sh,s);
 		
 		for (int f = 0; f < fc; f++)
 		{
+			if (!isVisible[f]) continue;
+			
 			TomoExtraction::extractFrameAt3D_Fourier(
-					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f], traj[f],
+					tomogram.stack, f, s, 1.0, tomogram, traj[f],
 					observation, projCut, 1, true);
+
+			RawImage<float> doseSlice = doseWeights.getSliceRef(f);
 
 			BufferedImage<fComplex> prediction = Prediction::predictModulated(
 					part_id, dataSet, projCut, s,
@@ -88,7 +96,9 @@ BufferedImage<double> FCC::compute3(
 					aberrationsCache,
 					referenceFS,
 					Prediction::OppositeHalf,
-					Prediction::AmplitudeAndPhaseModulated);
+					Prediction::AmplitudeAndPhaseModulated,
+					&doseSlice,
+					Prediction::CtfUnscaled);
 
 			const float scale = flip_value? -1.f : 1.f;
 			
@@ -146,4 +156,27 @@ BufferedImage<double> FCC::divide(const BufferedImage<double>& fcc3)
 	}
 	
 	return out;
+}
+
+BufferedImage<double> FCC::sumOverTime(const RawImage<double>& fcc3)
+{
+	const int sh = fcc3.xdim;
+	const int fc = fcc3.ydim;
+
+	BufferedImage<double> sum(sh,1,3);
+
+	sum.fill(0.0);
+
+	for (int x = 0; x < sh; x++)
+	{
+		for (int f = 0; f < fc; f++)
+		{
+			for (int d = 0; d < 3; d++)
+			{
+				sum(x,0,d) += fcc3(x,f,d);
+			}
+		}
+	}
+
+	return sum;
 }

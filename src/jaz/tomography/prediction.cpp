@@ -30,11 +30,12 @@ BufferedImage<fComplex> Prediction::predictModulated(
 		const std::vector<BufferedImage<fComplex>>& referenceFS,
 		HalfSet halfSet,
 		Modulation modulation,
-		DoseWeight doseWeight,
-		double cumulativeDose)
+		const RawImage<float>* doseWeight,
+		CtfScale ctfScale,
+		const int* xRanges)
 {
 	BufferedImage<fComplex> prediction = predictFS(
-				particle_id, dataSet, proj, s, referenceFS, halfSet);
+				particle_id, dataSet, proj, s, referenceFS, halfSet, xRanges);
 
 	const int og = dataSet.getOpticsGroup(particle_id);
 	
@@ -47,7 +48,16 @@ BufferedImage<fComplex> Prediction::predictModulated(
 		const BufferedImage<double>* gammaOffset =
 			aberrationsCache.hasSymmetrical? &aberrationsCache.symmetrical[og] : 0;
 
-		ctf.draw(s, s, pixelSize, gammaOffset, &ctfImg[0]);
+		if (ctfScale == CtfUnscaled)
+		{
+			CTF ctf0 = ctf;
+			ctf0.scale = 1.0;
+			ctf0.draw(s, s, pixelSize, gammaOffset, &ctfImg[0]);
+		}
+		else
+		{
+			ctf.draw(s, s, pixelSize, gammaOffset, &ctfImg[0]);
+		}
 		
 		prediction *= ctfImg;
 	}
@@ -65,9 +75,9 @@ BufferedImage<fComplex> Prediction::predictModulated(
 		prediction *= aberrationsCache.phaseShift[og];
 	}
 
-	if (doseWeight == DoseWeighted && cumulativeDose > 0.0)
+	if (doseWeight != 0)
 	{
-		Damage::applyWeight(prediction, pixelSize, {cumulativeDose}, 1);
+		prediction *= (*doseWeight);
 	}
 	
 	return prediction;
@@ -76,7 +86,8 @@ BufferedImage<fComplex> Prediction::predictModulated(
 BufferedImage<fComplex> Prediction::predictFS(
 		ParticleIndex particle_id, const ParticleSet& dataSet, d4Matrix proj, int s,
 		const std::vector<BufferedImage<fComplex>>& referenceFS,
-		HalfSet halfSet)
+		HalfSet halfSet,
+		const int* xRanges)
 {
 	const int sh = s/2 + 1;
 
@@ -88,8 +99,17 @@ BufferedImage<fComplex> Prediction::predictFS(
 
 	BufferedImage<fComplex> prediction(sh,s);
 
-	ForwardProjection::forwardProject(
+	if (xRanges != 0)
+	{
+		ForwardProjection::forwardProjectWithinRange(
+			xRanges,
 			referenceFS[hs], {projPart}, prediction, 1);
+	}
+	else
+	{
+		ForwardProjection::forwardProject(
+			referenceFS[hs], {projPart}, prediction, 1);
+	}
 
 	return prediction;
 }
@@ -100,8 +120,10 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 		const Tomogram& tomogram,
 		const AberrationsCache& aberrationsCache,
 		const TomoReferenceMap& referenceMap,
-		const BufferedImage<float>& frqWghts,
+		const BufferedImage<float>& freqWeights,
+		const BufferedImage<float>& doseWeights,
 		const std::vector<int>& sequence,
+		const BufferedImage<int>& xRanges,
 		int maxRange,
 		bool flip_value,
 		int num_threads,
@@ -114,10 +136,14 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 	
 	const int s_act = s * paddingFactor;
 	const int sh_act = s_act / 2 + 1;
+
+	/* pad the CCs by 3 pixels of zeros on each side, so that under cubic interpolation,
+	   the gradient vanishes at the boundary (1 pixel away from the edge): */
+	const bool pad_by_3 = true;
 	
 	const int pc = partIndices.size();
 	const int fc = tomogram.frameCount;
-	const int diam = (int)(2 * maxRange * paddingFactor);
+	const int diam = (int)(2 * maxRange * paddingFactor) + (pad_by_3? 6 : 0);
 	const int border = (int)(s * paddingFactor - diam) / 2;
 	
 	std::vector<BufferedImage<double>> CCs(pc);
@@ -126,38 +152,13 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 	{
 		CCs[p] = BufferedImage<double>(diam, diam, fc);
 	}
-	
-	
-	#if TEST_SPECTRAL_POWER
-	
-		const int data_str = sh + 2048;
-		const int buf_size = data_str * num_threads;
-		
-		std::vector<double> 
-				sumPowObs(buf_size,0.0), 
-				sumPowPred(buf_size,0.0), 
-				sumPowCCunw(buf_size,0.0), 
-				sumPowCC(buf_size,0.0), 
-				sumWgh(buf_size,0.0);
-		
-		Image<float> 
-				predSumFS(sh,s,num_threads),
-				obsSumFS(sh,s,num_threads),
-				ccSumFS(sh,s,num_threads);
-		
-		predSumFS.fill(0.f);
-		obsSumFS.fill(0.f);
-		ccSumFS.fill(0.f);
-		
-	#endif	
-		
 
 	if (verbose)
 	{
 		Log::beginProgress("Computing cross correlations", pc/num_threads);
 	}
 	
-	#pragma omp parallel for num_threads(num_threads)		
+	#pragma omp parallel for num_threads(num_threads)
 	for (int p = 0; p < pc; p++)
 	{
 		const int th = omp_get_thread_num();
@@ -169,26 +170,41 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 		
 		const ParticleIndex part_id = partIndices[p];
 		
-		const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(part_id, fc, tomogram.optics.pixelSize);
+		const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(
+					part_id, fc, tomogram.optics.pixelSize);
 		
-		d4Matrix projCut;	
+		d4Matrix projCut;
 		
 		BufferedImage<fComplex> observation(sh,s);
-		
+
+
 		for (int ft = 0; ft < fc; ft++)
 		{
 			const int f = sequence[ft];
+
+			const RawImage<float> doseSlice = doseWeights.getConstSliceRef(f);
+
+			if (!tomogram.isVisible(traj[f], f, s/2.0))
+			{
+				CCs[p].getSliceRef(f).fill(0.0);
+
+				continue;
+			}
 			
 			TomoExtraction::extractFrameAt3D_Fourier(
-					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f], traj[f],
-					observation, projCut, 1, true);
-						
+					tomogram.stack, f, s, 1.0, tomogram,
+					traj[f], observation, projCut, 1, true);
+
 			BufferedImage<fComplex> prediction = Prediction::predictModulated(
 					part_id, dataSet, projCut, s, 
 					tomogram.getCtf(f, dataSet.getPosition(part_id)),
 					tomogram.optics.pixelSize,
 					aberrationsCache,
-					referenceMap.image_FS, halfSet);
+					referenceMap.image_FS, halfSet,
+					AmplitudeAndPhaseModulated,
+					&doseSlice,
+					CtfScaled,
+					&xRanges(0,f));
 					
 			BufferedImage<fComplex> ccFS(sh,s);
 			
@@ -198,38 +214,15 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 			prediction(0,0) = fComplex(0.f, 0.f);
 			
 			for (int y = 0; y < s;  y++)
-			for (int x = 0; x < sh; x++)
 			{
-				ccFS(x,y) = scale * frqWghts(x,y,f) * observation(x,y) * prediction(x,y).conj();
-				
-				#if TEST_SPECTRAL_POWER
-				
-				if (ft == 0)
+				for (int x = 0; x < xRanges(y,f); x++)
 				{
-					const double yy = y < s/2? y : y - s;
-					const int ri = (int)sqrt(x*x + yy*yy);
-					
-					const double nobs = observation(x,y).norm();
-					const double npred = prediction(x,y).norm();
-					const double ncc = ccFS(x,y).norm() / (scale*scale);
-					
-					obsSumFS(x,y,th) += nobs;
-					predSumFS(x,y,th) += npred;
-					ccSumFS(x,y,th) += ncc;
-					
-					if (ri < sh)
-					{	
-						const int idx = th * data_str + ri;
-						
-						sumPowObs[idx] += nobs;
-						sumPowPred[idx] += npred;
-						sumPowCCunw[idx] += npred*nobs;
-						sumPowCC[idx] += ncc;
-						sumWgh[idx] += 1.0;
-					}
+					ccFS(x,y) = scale * freqWeights(x,y,f) * observation(x,y) * prediction(x,y).conj();
 				}
-					
-				#endif
+				for (int x = xRanges(y,f); x < sh; x++)
+				{
+					ccFS(x,y) = fComplex(0.f, 0.f);
+				}
 			}
 			
 			BufferedImage<fComplex> ccFS_padded = Padding::padCorner2D_half(ccFS, sh_act, s_act);
@@ -243,8 +236,39 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 			CCs[p].copySliceFrom(ft, 
 				Centering::fftwFullToHumanFull(
 					Padding::unpadCorner2D_full(ccRS_full, border)));
-			
-			
+
+			if (pad_by_3)
+			{
+				for (int y = 0; y < 3; y++)
+				{
+					for (int x = 0; x < diam; x++)
+					{
+						CCs[p](x,y,ft) = 0.0;
+					}
+				}
+
+				for (int y = 3; y < diam - 3; y++)
+				{
+					for (int x = 0; x < 3; x++)
+					{
+						CCs[p](x,y,ft) = 0.0;
+					}
+
+					for (int x = diam - 3; x < diam; x++)
+					{
+						CCs[p](x,y,ft) = 0.0;
+					}
+				}
+
+				for (int y = diam - 3; y < diam; y++)
+				{
+					for (int x = 0; x < diam; x++)
+					{
+						CCs[p](x,y,ft) = 0.0;
+					}
+				}
+			}
+
 			#if TEST_CC_SCALE
 			
 			if (th == 0)
@@ -255,7 +279,7 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 					for (int y = 0; y < s;  y++)
 					for (int x = 0; x < sh; x++)
 					{
-						prediction2(x,y) = scale * frqWghts(x,y,f) * prediction(x,y);
+						prediction2(x,y) = scale * freqWeights(x,y,f) * prediction(x,y);
 					}
 					
 					Image<float> predRS, obsRS;
@@ -322,55 +346,72 @@ std::vector<BufferedImage<double> > Prediction::computeCroppedCCs(
 		Log::endProgress();
 	}
 	
-	#if TEST_SPECTRAL_POWER
-			
-		std::ofstream 
-				ofsObs("debug/spec_obs.dat"),
-				ofsPred("debug/spec_pred.dat"),
-				ofsCCunw("debug/spec_CCunw.dat"),
-				ofsCC("debug/spec_CC.dat");
-							 
-		for (int i = 0; i < sh; i++)
-		{
-			for (int th = 1; th < num_threads; th++)
-			{
-				sumPowObs[i] += sumPowObs[i + th * data_str];
-				sumPowPred[i] += sumPowPred[i + th * data_str];
-				sumPowCCunw[i] += sumPowCCunw[i + th * data_str];
-				sumPowCC[i] += sumPowCC[i + th * data_str];
-				sumWgh[i] += sumWgh[i + th * data_str];
-			}
-			
-			const double wg = sumWgh[i];
-			
-			if (wg > 0.0)
-			{
-				sumPowObs[i] /= wg;
-				sumPowPred[i] /= wg;
-				sumPowCCunw[i] /= wg;
-				sumPowCC[i] /= wg;
-			}
-			
-			const double toA = 1.0 / (s * tomogram.optics.pixelSize);
-			
-			ofsObs << toA * i << ' ' << sumPowObs[i] << '\n';
-			ofsPred << toA * i << ' ' << sumPowPred[i] << '\n';
-			ofsCCunw << toA * i << ' ' << sumPowCCunw[i] << '\n';
-			ofsCC << toA * i << ' ' << sumPowCC[i] << '\n';
-		}
-		
-		for (int th = 1; th < num_threads; th++)
-		{
-			obsSumFS.getSliceRef(0) += obsSumFS.getSliceRef(th);
-			predSumFS.getSliceRef(0) += predSumFS.getSliceRef(th);
-			ccSumFS.getSliceRef(0) += ccSumFS.getSliceRef(th);
-		}
-		
-		obsSumFS.getSliceRef(0).write("debug/obsSumFS.mrc");
-		predSumFS.getSliceRef(0).write("debug/predSumFS.mrc");
-		ccSumFS.getSliceRef(0).write("debug/ccSumFS.mrc");
-		
-	#endif	
-	
 	return CCs;
+}
+
+void Prediction::predictMicrograph(
+		int frame_index,
+		const ParticleSet &dataSet,
+		const std::vector<ParticleIndex> &partIndices,
+		const Tomogram &tomogram,
+		const AberrationsCache &aberrationsCache,
+		const TomoReferenceMap &referenceMap,
+		const RawImage<float>* doseWeights,
+		RawImage<float> &target_slice,
+		HalfSet halfSet,
+		Modulation modulation,
+		CtfScale ctfScale)
+{
+	const int s = referenceMap.getBoxSize();
+
+	const int pc = partIndices.size();
+	const int fc = tomogram.frameCount;
+
+	const int f = frame_index;
+	const int w = target_slice.xdim;
+	const int h = target_slice.ydim;
+
+	BufferedImage<float> prediction_RS(s,s);
+
+	target_slice.fill(0.f);
+
+
+	for (int p = 0; p < pc; p++)
+	{
+		const ParticleIndex part_id = partIndices[p];
+
+		const std::vector<d3Vector> traj = dataSet.getTrajectoryInPixels(
+					part_id, fc, tomogram.optics.pixelSize);
+
+		BufferedImage<fComplex> prediction_FS = Prediction::predictModulated(
+				part_id, dataSet, tomogram.projectionMatrices[f], s,
+				tomogram.getCtf(f, dataSet.getPosition(part_id)),
+				tomogram.optics.pixelSize,
+				aberrationsCache,
+				referenceMap.image_FS,
+				halfSet,
+				modulation,
+				doseWeights,
+				ctfScale);
+
+		const d2Vector q = tomogram.projectPoint(traj[f], f);
+		const i2Vector c(round(q.x) - s/2, round(q.y) - s/2);
+		const d2Vector d(q.x - s/2 - c.x, q.y - s/2 - c.y);
+
+		NewStackHelper::shiftStack(prediction_FS, {-d}, prediction_FS, true, 1);
+
+		FFT::inverseFourierTransform(prediction_FS, prediction_RS, FFT::Both);
+
+		for (int y = 0; y < s; y++)
+		for (int x = 0; x < s; x++)
+		{
+			int xx = x + c.x;
+			int yy = y + c.y;
+
+			if (xx >= 0 && xx < w && yy >= 0 && yy < h)
+			{
+				target_slice(xx,yy) -= prediction_RS(x,y);
+			}
+		}
+	}
 }

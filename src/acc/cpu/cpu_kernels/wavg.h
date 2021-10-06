@@ -19,7 +19,7 @@ namespace CpuKernels
 // translation index. Since sin(a+B) = sin(A) * cos(B) + cos(A) * sin(B), and
 // cos(A+B) = cos(A) * cos(B) - sin(A) * sin(B), we can use lookup table to
 // compute sin(x*tx + y*ty) and cos(x*tx + y*ty).
-template<bool CTFPREMULTIPLIED, bool REFCTF, bool REF3D>
+template<bool REFCTF, bool REF3D>
 #ifndef __INTEL_COMPILER
 __attribute__((always_inline))
 inline
@@ -128,16 +128,8 @@ void wavg_ref3D(
 											ref_real[x], ref_imag[x]);
 				if (REFCTF)
 				{
-					if(CTFPREMULTIPLIED)
-					{
-						ref_real[x] *= ctfs[x] * ctfs[x];
-						ref_imag[x] *= ctfs[x] * ctfs[x];
-					}
-					else
-					{
-						ref_real[x] *= ctfs[x];
-						ref_imag[x] *= ctfs[x];
-					}
+					ref_real[x] *= ctfs[x];
+					ref_imag[x] *= ctfs[x];
 				}
 				else {
 					ref_real[x] *= part_scale;
@@ -211,7 +203,7 @@ void wavg_ref3D(
 	} // bid
 }
 
-template<bool CTFPREMULTIPLIED, bool REFCTF>
+template<bool REFCTF>
 #ifndef __INTEL_COMPILER
 __attribute__((always_inline))
 inline
@@ -304,16 +296,8 @@ void wavg_3D(
 											 ref_real[x], ref_imag[x]);
 					if (REFCTF)
 					{
-						if(CTFPREMULTIPLIED)
-						{
-							ref_real[x] *= g_ctfs[pixel + x] * g_ctfs[pixel + x];
-							ref_imag[x] *= g_ctfs[pixel + x] * g_ctfs[pixel + x];
-						}
-						else
-						{
-							ref_real[x] *= g_ctfs[pixel + x];
-							ref_imag[x] *= g_ctfs[pixel + x];
-						}
+						ref_real[x] *= g_ctfs[pixel + x];
+						ref_imag[x] *= g_ctfs[pixel + x];
 					}
 					else {
 						ref_real[x] *= part_scale;

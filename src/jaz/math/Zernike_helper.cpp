@@ -255,7 +255,7 @@ std::vector<double> ZernikeHelper::fitBasisLin(
 	}
 
 	const double tol = 1e-20;
-	Matrix1D<double> x(cc);
+	Matrix1D<RFLOAT> x(cc);
 	solve(A, b, x, tol);
 
 	std::vector<double> out(cc);

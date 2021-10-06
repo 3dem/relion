@@ -4,15 +4,14 @@
 using namespace gravis;
 
 
-AberrationsCache::AberrationsCache(const MetaDataTable &opticsTable, const int size)
-:	size(size)
+AberrationsCache::AberrationsCache(const MetaDataTable &opticsTable, const int size, const double pixelSize)
+:	size(size), pixelSize(pixelSize)
 {
 	const int s = size;
 	const int sh = s/2 + 1;
 	const int gc = opticsTable.numberOfObjects();
 
 	const d2Matrix M(1.0, 0.0, 0.0, 1.0);
-
 
 	hasSymmetrical = opticsTable.containsLabel(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS);
 	hasAntisymmetrical = opticsTable.containsLabel(EMDL_IMAGE_ODD_ZERNIKE_COEFFS);
@@ -30,7 +29,6 @@ AberrationsCache::AberrationsCache(const MetaDataTable &opticsTable, const int s
 
 	for (int g = 0; g < gc; g++)
 	{
-		const double pixelSize = opticsTable.getDouble(EMDL_IMAGE_PIXEL_SIZE, g);
 		const double as = pixelSize * s;
 
 		if (hasSymmetrical)

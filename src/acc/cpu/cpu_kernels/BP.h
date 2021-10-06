@@ -111,7 +111,7 @@ void backproject2D(
 					
 					if(CTF_PREMULTIPLIED) {
 						my_weight = weight * weight_norm_inverse * minvsigma2;
-						Fweight[x] += my_weight  * ctf * ctf;
+						Fweight[x] += my_weight  * ctf;
 					}
 					else {
 						my_weight = weight * weight_norm_inverse * ctf * minvsigma2;
@@ -373,10 +373,7 @@ void backproject3D(
 						if (weight >= significant_weight)
 						{
 							weight = weight * inv_minsigma_ctf;
-							if(CTF_PREMULTIPLIED)
-								Fweight[tid] += weight * ctf * ctf;
-							else
-								Fweight[tid] += weight * ctf;
+                                                        Fweight[tid] += weight * ctf;
 
 							if(DATA3D)
 								CpuKernels::translatePixel(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, temp_real, temp_imag);
@@ -610,7 +607,7 @@ void backprojectRef3D(
 					{
 						inv_minsigma_ctf = weight_norm_inverse * minvsigma2;
 						my_weight = weight * inv_minsigma_ctf;
-						Fweight[x] += my_weight  * ctf * ctf;
+						Fweight[x] += my_weight  * ctf;
 					}
 					else
 					{
@@ -766,7 +763,7 @@ template < bool DATA3D, bool CTF_PREMULTIPLIED >
 __attribute__((always_inline))
 #endif
 inline
-void backprojectSGD(
+void backproject3D_SGD(
 		unsigned long imageCount,
 		int     block_size,
 		AccProjectorKernel projector,
@@ -936,10 +933,7 @@ void backprojectSGD(
 						if (weight >= significant_weight)
 						{
 							weight = weight * inv_minsigma_ctf;
-							if(CTF_PREMULTIPLIED)
-								Fweight[tid] += weight * ctf * ctf;
-							else
-								Fweight[tid] += weight * ctf;
+                                                        Fweight[tid] += weight * ctf;
 
 							if(DATA3D)
 								CpuKernels::translatePixel(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, temp_real, temp_imag);
@@ -1059,5 +1053,230 @@ void backprojectSGD(
 		} // for pass
 	} // for img
 }
+
+template < bool CTF_PREMULTIPLIED >
+#ifndef __INTEL_COMPILER
+__attribute__((always_inline))
+#endif
+inline
+void backproject2D_SGD(
+		unsigned long imageCount,
+		int     block_size,
+		AccProjectorKernel projector,
+		XFLOAT *g_img_real,
+		XFLOAT *g_img_imag,
+		XFLOAT *g_trans_x,
+		XFLOAT *g_trans_y,
+		XFLOAT* g_weights,
+		XFLOAT* g_Minvsigma2s,
+		XFLOAT* g_ctfs,
+		unsigned long translation_num,
+		XFLOAT significant_weight,
+		XFLOAT weight_norm,
+		XFLOAT *g_eulers,
+		XFLOAT *g_model_real,
+		XFLOAT *g_model_imag,
+		XFLOAT *g_model_weight,
+		int max_r,
+		int max_r2,
+		XFLOAT padding_factor,
+		unsigned img_x,
+		unsigned img_y,
+		unsigned img_xy,
+		unsigned mdl_x,
+		int mdl_inity,
+		tbb::spin_mutex *mutexes)
+{
+	int img_y_half = img_y / 2;
+
+	int max_r2_out = max_r2 * padding_factor * padding_factor;
+
+	// pre-compute sin and cos for x and y direction
+	XFLOAT sin_x[translation_num][img_x], cos_x[translation_num][img_x];
+	XFLOAT sin_y[translation_num][img_y], cos_y[translation_num][img_y];
+
+	computeSincosLookupTable2D(translation_num, g_trans_x, g_trans_y,
+	                           img_x, img_y,
+	                           &sin_x[0][0], &cos_x[0][0],
+	                           &sin_y[0][0], &cos_y[0][0]);
+
+	// Set up some other variables
+	XFLOAT s_eulers[4];
+
+	XFLOAT weight_norm_inverse = (XFLOAT) 1.0 / weight_norm;
+
+	XFLOAT xp[img_x], yp[img_x];
+	XFLOAT real[img_x], imag[img_x], Fweight[img_x];
+
+	for (unsigned long img=0; img<imageCount; img++) {
+
+		// Copy the rotation matrix to local variables
+		s_eulers[0] = g_eulers[img*9+0];
+		s_eulers[1] = g_eulers[img*9+1];
+		s_eulers[2] = g_eulers[img*9+3];
+		s_eulers[3] = g_eulers[img*9+4];
+
+		size_t pixel = 0;
+
+		for(int iy = 0; iy < img_y; iy++) {
+			int y = iy;
+			if (iy > img_y_half) {
+				y = iy - img_y;
+			}
+
+			int xmax = img_x;
+
+			memset(Fweight,0,sizeof(XFLOAT)*img_x);
+			memset(real,   0,sizeof(XFLOAT)*img_x);
+			memset(imag,   0,sizeof(XFLOAT)*img_x);
+
+			for(int x=0; x<xmax; x++) {
+				//WAVG
+				XFLOAT minvsigma2 = g_Minvsigma2s[pixel + x];
+				XFLOAT ctf = g_ctfs[pixel + x];
+				XFLOAT my_weight;
+
+				XFLOAT ref_real = (XFLOAT) 0.0;
+				XFLOAT ref_imag = (XFLOAT) 0.0;
+
+				projector.project2Dmodel(
+						x,y,
+						s_eulers[0], s_eulers[1],
+						s_eulers[2], s_eulers[3],
+						ref_real, ref_imag);
+				ref_real *= ctf;
+				ref_imag *= ctf;
+
+				for (unsigned long itrans = 0; itrans < translation_num; itrans++)
+				{
+					XFLOAT weight = g_weights[img * translation_num + itrans];
+
+					if (weight < significant_weight)
+						continue;
+
+					XFLOAT trans_cos_y, trans_sin_y;
+					if ( y < 0) {
+						trans_cos_y =  cos_y[itrans][-y];
+						trans_sin_y = -sin_y[itrans][-y];
+					}
+					else {
+						trans_cos_y = cos_y[itrans][y];
+						trans_sin_y = sin_y[itrans][y];
+					}
+
+					XFLOAT *trans_cos_x = &cos_x[itrans][0];
+					XFLOAT *trans_sin_x = &sin_x[itrans][0];
+
+					if(CTF_PREMULTIPLIED) {
+						my_weight = weight * weight_norm_inverse * minvsigma2;
+						Fweight[x] += my_weight  * ctf;
+					}
+					else {
+						my_weight = weight * weight_norm_inverse * ctf * minvsigma2;
+						Fweight[x] += my_weight  * ctf;
+					}
+					/*
+					CpuKernels::translatePixel(x, y,
+					 * g_trans_x[itrans], g_trans_y[itrans],
+					 * img_real, img_imag, temp_real, temp_imag);
+					 */
+					XFLOAT img_real = g_img_real[pixel + x];
+					XFLOAT img_imag = g_img_imag[pixel + x];
+
+					XFLOAT ss = trans_sin_x[x] * trans_cos_y + trans_cos_x[x] * trans_sin_y;
+					XFLOAT cc = trans_cos_x[x] * trans_cos_y - trans_sin_x[x] * trans_sin_y;
+
+					XFLOAT temp_real = cc * img_real - ss * img_imag;
+					XFLOAT temp_imag = cc * img_imag + ss * img_real;
+
+					real[x] += (temp_real-ref_real) * my_weight;
+					imag[x] += (temp_imag-ref_imag) * my_weight;
+				}  // for x
+			}  // for itrans
+
+			for(int x=0; x<xmax; x++) {
+				if (Fweight[x] <= (XFLOAT) 0.0)
+					continue;
+
+				// Get logical coordinates in the 3D map
+				xp[x] = (s_eulers[0] * x + s_eulers[1] * y ) * padding_factor;
+				yp[x] = (s_eulers[2] * x + s_eulers[3] * y ) * padding_factor;
+
+				// Only consider pixels that are projected inside the allowed circle in output coordinates.
+				//     --JZ, Nov. 26th 2018
+				if ( ( xp[x] * xp[x] + yp[x] * yp[x] ) > max_r2_out)
+				{
+					Fweight[x]= (XFLOAT) 0.0;
+					continue;
+				}
+
+				// Only asymmetric half is stored
+				if (xp[x] < (XFLOAT) 0.0)
+				{
+					// Get complex conjugated hermitian symmetry pair
+					xp[x] = -xp[x];
+					yp[x] = -yp[x];
+					imag[x] = -imag[x];
+				}
+			}  // for x
+
+			for(int x=0; x<xmax; x++) {
+				if (Fweight[x] <= (XFLOAT) 0.0)
+					continue;
+
+				int x0 = floorf(xp[x]);
+				XFLOAT fx = xp[x] - x0;
+
+				int y0 = floorf(yp[x]);
+				XFLOAT fy = yp[x] - y0;
+				y0 -= mdl_inity;
+				int y1 = y0 + 1;
+
+				XFLOAT mfx = (XFLOAT) 1.0 - fx;
+				XFLOAT mfy = (XFLOAT) 1.0 - fy;
+
+				XFLOAT dd00 = mfy * mfx;
+				XFLOAT dd01 = mfy *  fx;
+				XFLOAT dd10 =  fy * mfx;
+				XFLOAT dd11 =  fy *  fx;
+
+				size_t idx_tmp;
+
+				// Locking necessary since all threads share the same back projector
+				{
+					idx_tmp = (size_t)y0 * (size_t)mdl_x + (size_t)x0;
+
+					tbb::spin_mutex::scoped_lock lock(mutexes[y0]);
+					g_model_real  [idx_tmp] += dd00 * real[x];
+					g_model_imag  [idx_tmp] += dd00 * imag[x];
+					g_model_weight[idx_tmp] += dd00 * Fweight[x];
+
+					idx_tmp = idx_tmp + 1;  // x1 = x0 + 1
+
+					g_model_real  [idx_tmp] += dd01 * real[x];
+					g_model_imag  [idx_tmp] += dd01 * imag[x];
+					g_model_weight[idx_tmp] += dd01 * Fweight[x];
+				}  // scoping for first lock
+
+				{
+					idx_tmp = (size_t)y1 * (size_t)mdl_x + (size_t)x0;
+
+					tbb::spin_mutex::scoped_lock lock(mutexes[y1]);
+					g_model_real  [idx_tmp] += dd10 * real[x];
+					g_model_imag  [idx_tmp] += dd10 * imag[x];
+					g_model_weight[idx_tmp] += dd10 * Fweight[x];
+
+					idx_tmp = idx_tmp + 1;  // x1 = x0 + 1
+					g_model_real  [idx_tmp] += dd11 * real[x];
+					g_model_imag  [idx_tmp] += dd11 * imag[x];
+					g_model_weight[idx_tmp] += dd11 * Fweight[x];
+				}  // scoping for second lock
+			}  // for x
+
+			pixel += (size_t)img_x;
+		} // for y
+	} // for img
+}
+
 
 } // namespace

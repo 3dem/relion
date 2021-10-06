@@ -161,6 +161,20 @@ public:
 	// Adds _job to the pipeline and return the id of the newprocess
 	long int addJob(RelionJob &_job, int as_status, bool do_write_minipipeline = true);
 
+	// Runs a job and adds it to the pipeline with ccpem-pipeliner
+	bool runJobCpipe(RelionJob &_job, int &current_job, bool only_schedule, bool is_main_continue,
+			bool is_scheduled, std::string &error_message);
+
+	// ADDED FOR CCPEM PIPELINER - makes the job.star files to run a job
+	bool makeJobFilesCpipe(RelionJob &_job, int &current_job, bool only_schedule, bool is_main_continue,
+			bool is_scheduled, std::string &error_message);
+
+	//ADDED FOR CCPEM PIPELINER - prints the command
+	bool PrintComCpipe(RelionJob &thisjob, int current_job, bool is_main_continue,
+			bool is_scheduled, bool do_makedir, std::vector<std::string> &commands,
+			std::string &final_command, std::string &error_message);
+
+
 	// Runs a job and adds it to the pipeline
 	bool runJob(RelionJob &_job, int &current_job, bool only_schedule, bool is_main_continue,
 			bool is_scheduled, std::string &error_message, bool write_hidden_guifile = true);

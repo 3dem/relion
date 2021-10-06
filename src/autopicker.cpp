@@ -159,7 +159,7 @@ if(do_gpu)
 	topaz_radius = textToInteger(parser.getOption("--topaz_radius", "Particle radius (in pix) for topaz extract (default is from particle diameter)", "-1"));
 	fn_topaz_exe = parser.getOption("--topaz_exe", "Name of topaz executable", "topaz");
 	topaz_additional_args = parser.getOption("--topaz_args", "Additional arguments to be passed to topaz", "");
-	topaz_workers = textToInteger(parser.getOption("--topaz_workers", "Number of topaz workers for parallelized training", "4"));
+	topaz_workers = textToInteger(parser.getOption("--topaz_workers", "Number of topaz workers for parallelized training", "1"));
 	do_topaz_plot = parser.checkOption("--topaz_plot", "Plot intermediate information for helical picking in topaz (developmental)");
 
 	int helix_section = parser.addSection("Helix options");
@@ -725,7 +725,7 @@ void AutoPicker::initialise(int rank)
 		{
 			// Perceptive window of default resnet8 is 71 pixels, which should encapsulate particle_diameter*2
 			RFLOAT particle_box_pix = 2 * particle_diameter / angpix;
-			topaz_downscale = ROUND(particle_box_pix/71);
+			topaz_downscale = XMIPP_MAX(4, ROUND(particle_box_pix/71));
 			if (verb > 0)
 				std::cout << " + Setting topaz downscale factor to " << topaz_downscale << " (assuming resnet8 model and 2*particle_diameter receptive box)" << std::endl;
 		}

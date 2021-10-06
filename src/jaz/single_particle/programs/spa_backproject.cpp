@@ -38,7 +38,7 @@ void SpaBackproject::read(int argc, char **argv)
 	parser.setCommandLine(argc, argv);
 
 	int general_section = parser.addSection("General options");
-	
+
 	fn_sel = parser.getOption("--i", "Input STAR file with the projection images and their orientations", "");
 	fn_out = parser.getOption("--o", "Name prefix for output reconstructions");
 	fn_sym = parser.getOption("--sym", "Symmetry group", "c1");
@@ -50,7 +50,7 @@ void SpaBackproject::read(int argc, char **argv)
 	angpix  = textToFloat(parser.getOption("--angpix", "Pixel size in the reconstruction (take from first optics group by default)", "-1"));
 
 	int ctf_section = parser.addSection("CTF options");
-	
+
 	do_ctf = parser.checkOption("--ctf", "Apply CTF correction");
 	intact_ctf_first_peak = parser.checkOption("--ctf_intact_first_peak", "Leave CTFs intact until first peak");
 	ctf_phase_flipped = parser.checkOption("--ctf_phase_flipped", "Images have been phase flipped");
@@ -59,7 +59,7 @@ void SpaBackproject::read(int argc, char **argv)
 	dual_contrast_lambda = textToDouble(parser.getOption("--DC_lambda", "Regularisation constant keeping the phase and amplitude maps similar", "0"));
 
 	int ewald_section = parser.addSection("Ewald-sphere correction options");
-	
+
 	do_ewald = parser.checkOption("--ewald", "Correct for Ewald-sphere curvature");
 	mask_diameter  = textToFloat(parser.getOption("--mask_diameter", "Diameter (in A) of mask for Ewald-sphere curvature correction", "-1."));
 	width_mask_edge = textToInteger(parser.getOption("--width_mask_edge", "Width (in pixels) of the soft edge on the mask", "3"));
@@ -76,13 +76,13 @@ void SpaBackproject::read(int argc, char **argv)
 	}
 
 	int helical_section = parser.addSection("Helical options");
-	
+
 	nr_helical_asu = textToInteger(parser.getOption("--nr_helical_asu", "Number of helical asymmetrical units", "1"));
 	helical_rise = textToFloat(parser.getOption("--helical_rise", "Helical rise (in Angstroms)", "0."));
 	helical_twist = textToFloat(parser.getOption("--helical_twist", "Helical twist (in degrees, + for right-handedness)", "0."));
 
 	int expert_section = parser.addSection("Expert options");
-	
+
 	fn_sub = parser.getOption("--subtract","Subtract projections of this map from the images used for reconstruction", "");
 	if (parser.checkOption("--NN", "Use nearest-neighbour instead of linear interpolation before gridding correction"))
 	{
@@ -92,7 +92,7 @@ void SpaBackproject::read(int argc, char **argv)
 	{
 		interpolator = TRILINEAR;
 	}
-	
+
 	blob_radius = textToFloat(parser.getOption("--blob_r", "Radius of blob for gridding interpolation", "1.9"));
 	blob_order = textToInteger(parser.getOption("--blob_m", "Order of blob for gridding interpolation", "0"));
 	blob_alpha = textToFloat(parser.getOption("--blob_a", "Alpha-value of blob for gridding interpolation", "15"));
@@ -109,23 +109,23 @@ void SpaBackproject::read(int argc, char **argv)
 	read_weights = parser.checkOption("--read_weights", "Developmental: read freq. weight files");
 	do_debug = parser.checkOption("--write_debug_output", "Write out arrays with data and weight terms prior to reconstruct");
 	do_external_reconstruct = parser.checkOption("--external_reconstruct", "Write out BP denominator and numerator for external_reconstruct program");
-	
-	
+
+
 	num_threads_in = textToInteger(parser.getOption("--j_in", "Number of inner threads", "1"));
 	num_threads_out = textToInteger(parser.getOption("--j_out", "Number of outer threads", "1"));
 	num_threads_total = num_threads_in * num_threads_out;
-	
+
 	use_legacy_fwd_mapping = parser.checkOption("--fwd_old", "Use the legacy forward-mapping algorithm");
 	use_new_fwd_mapping = parser.checkOption("--fwd_new", "Use the new forward-mapping algorithm");
 	do_dual_contrast = parser.checkOption("--dual_contrast", "Perform a dual-contrast reconstruction (backward-mapping only)");
 	do_isotropic_Wiener = !parser.checkOption("--aniso_Wiener", "Use scale-appropriate Wiener constants for phase and amplitude maps (dual contrast only)");
 	compute_multiplicity = parser.checkOption("--mult", "Compute multiplicity map (backward-mapping only)");
-	
+
 	explicit_spreading_function = parser.checkOption("--xsf", "Compute an explicit spreading function to deconvolve by");
-	        
+
 	// Hidden
 	r_min_nn = textToInteger(getParameter(argc, argv, "--r_min_nn", "10"));
-		
+
 	Log::readParams(parser);
 
 	// Check for errors in the command-line option
@@ -143,7 +143,7 @@ void SpaBackproject::usage()
 void SpaBackproject::initialise()
 {
 	do_reconstruct_ctf = (ctf_dim > 0);
-	
+
 	if (do_reconstruct_ctf)
 	{
 		do_ctf = false;
@@ -151,7 +151,7 @@ void SpaBackproject::initialise()
 	}
 
 	ObservationModel::loadSafely(fn_sel, obsModel, DF, "particles", 0, false);
-	
+
 	if (obsModel.opticsMdt.numberOfObjects() == 0)
 	{
 		REPORT_ERROR("Optics table has zero entries");
@@ -181,7 +181,7 @@ void SpaBackproject::initialise()
 
 	if (fn_noise != "")
 	{
-		model.read(fn_noise);
+		model.read(fn_noise, obsModel.opticsMdt.numberOfObjects());
 	}
 
 	determineOutputBoxSize();
@@ -241,7 +241,7 @@ void SpaBackproject::run()
 {
 	initialise();
 	backprojectAllParticles();
-	
+
 	if (use_legacy_fwd_mapping)
 	{
 		reconstructLegacy();
@@ -269,18 +269,18 @@ void SpaBackproject::backprojectAllParticles()
 		MultidimArray<RFLOAT> dummy;
 		projector.computeFourierTransformMap(sub(), dummy, 2 * r_max);
 	}
-	
+
 	padded_box_size = (int)(padding_factor * output_boxsize);
 
 	if (use_legacy_fwd_mapping)
 	{
 		backprojectors = std::vector<BackProjector>(
-					2 * num_threads_out, 
+					2 * num_threads_out,
 					BackProjector(
 						output_boxsize, ref_dim, fn_sym, interpolator,
 						padding_factor, r_min_nn, blob_order,
 						blob_radius, blob_alpha, 2, skip_gridding));
-		
+
 		for (int i = 0; i < backprojectors.size(); i++)
 		{
 			backprojectors[i].initZeros(2 * r_max);
@@ -291,7 +291,7 @@ void SpaBackproject::backprojectAllParticles()
 		const int s = padded_box_size;
 		const int sh = s/2 + 1;
 		const int ic = 2 * num_threads_out;
-		
+
 		if (do_dual_contrast)
 		{
 			dual_contrast_accumulation_volumes =
@@ -346,18 +346,18 @@ void SpaBackproject::backprojectAllParticles()
 	}
 
 	long int nr_parts = DF.numberOfObjects();
-	
+
 	if (verb > 0)
 	{
 		time_config();
 		Log::beginProgress("Back-projecting all images", nr_parts / num_threads_out);
 	}
-	
+
 	#pragma omp parallel for num_threads(num_threads_out)
 	for (long int p = 0; p < nr_parts; p++)
 	{
 		const int th = omp_get_thread_num();
-		
+
 		backprojectOneParticle(p, th);
 
 		if (th == 0 && verb > 0)
@@ -380,7 +380,7 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 	}
 
 	Matrix2D<RFLOAT> A3D;
-	
+
 	// Rotations
 	{
 		RFLOAT rot, tilt, psi;
@@ -394,43 +394,43 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 			DF.getValue(EMDL_ORIENT_ROT, rot, p);
 			DF.getValue(EMDL_ORIENT_TILT, tilt, p);
 		}
-	
+
 		psi = 0.;
 		DF.getValue(EMDL_ORIENT_PSI, psi, p);
-	
+
 		if (angular_error > 0.)
 		{
 			rot += rnd_gaus(0., angular_error);
 			tilt += rnd_gaus(0., angular_error);
 			psi += rnd_gaus(0., angular_error);
 		}
-	
+
 		Euler_angles2matrix(rot, tilt, psi, A3D);
 	}
 
 	// If we are considering Ewald sphere curvature, the mag. matrix
 	// has to be provided to the backprojector explicitly
-	// (to avoid creating an Ewald ellipsoid)	
-	
+	// (to avoid creating an Ewald ellipsoid)
+
 	const int opticsGroup = obsModel.getOpticsGroup(DF, p);
 	const int myBoxSize = obsModel.getBoxSize(opticsGroup);
 	const RFLOAT myPixelSize = obsModel.getPixelSize(opticsGroup);
 	const bool ctf_premultiplied = obsModel.getCtfPremultiplied(opticsGroup);
-	
+
 	if (do_ewald && ctf_premultiplied)
 	{
 		REPORT_ERROR("We cannot perform Ewald sphere correction on CTF premultiplied particles.");
 	}
-	
+
 	if (!do_ewald)
 	{
 		A3D = obsModel.applyAnisoMag(A3D, opticsGroup);
 	}
-	
+
 	A3D = obsModel.applyScaleDifference(A3D, opticsGroup, output_boxsize, angpix);
-	
-	
-	
+
+
+
 	MultidimArray<Complex> F2D, F2DP, F2DQ;
 	FileName fn_img;
 	Image<RFLOAT> img;
@@ -440,17 +440,17 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 	{
 		RFLOAT tx = DF.getRfloat(EMDL_ORIENT_ORIGIN_X_ANGSTROM, p);
 		RFLOAT ty = DF.getRfloat(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, p);
-		
+
 		if (shift_error > 0.)
 		{
 			tx += rnd_gaus(0., shift_error);
 			ty += rnd_gaus(0., shift_error);
 		}
-	
+
 		// As of v3.1, shifts are in Angstroms in the STAR files, convert back to pixels here
 		tx /= myPixelSize;
 		ty /= myPixelSize;
-		
+
 		DF.getValue(EMDL_IMAGE_NAME, fn_img, p);
 		img.read(fn_img);
 		img().setXmippOrigin();
@@ -466,43 +466,9 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 
 	if (fn_noise != "")
 	{
-		FileName fn_group;
-		
-		if (DF.containsLabel(EMDL_MLMODEL_GROUP_NAME))
-		{
-			DF.getValue(EMDL_MLMODEL_GROUP_NAME, fn_group);
-		}
-		else if (DF.containsLabel(EMDL_MICROGRAPH_NAME))
-		{
-			DF.getValue(EMDL_MICROGRAPH_NAME, fn_group);
-		}
-		else
-		{
-			REPORT_ERROR("ERROR: cannot find rlnGroupName or rlnMicrographName in the input --i file.");
-		}
 
-		int my_mic_id = -1;
-		
-		for (int mic_id = 0; mic_id < model.group_names.size(); mic_id++)
-		{
-			if (fn_group == model.group_names[mic_id])
-			{
-				my_mic_id = mic_id;
-				break;
-			}
-		}
-
-		if (my_mic_id < 0) 
-		{
-			REPORT_ERROR("ERROR: cannot find " + fn_group + " in the input model file.");
-		}
-
-		RFLOAT normcorr = 1.;
-		
-		if (DF.containsLabel(EMDL_IMAGE_NORM_CORRECTION)) 
-		{
-			DF.getValue(EMDL_IMAGE_NORM_CORRECTION, normcorr);
-		}
+		int optics_group = 0;
+		DF.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group);
 
 		// Make coloured-noise image
 		for (long int k = 0, kp = 0; k<ZSIZE(F2D); k++, kp = (k < XSIZE(F2D)) ? k : k - ZSIZE(F2D))
@@ -512,16 +478,16 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 			int ires = ROUND(sqrt((RFLOAT)(kp*kp + ip*ip + jp*jp)));
 			ires = XMIPP_MIN(ires, myBoxSize/2); // at freqs higher than Nyquist: use last sigma2 value
 
-			RFLOAT sigma = sqrt(DIRECT_A1D_ELEM(model.sigma2_noise[my_mic_id], ires));
+			RFLOAT sigma = sqrt(DIRECT_A1D_ELEM(model.sigma2_noise[optics_group], ires));
 			DIRECT_A3D_ELEM(F2D, k, i, j).real += rnd_gaus(0., sigma);
 			DIRECT_A3D_ELEM(F2D, k, i, j).imag += rnd_gaus(0., sigma);
 		}
 	}
-	
+
 	MultidimArray<RFLOAT> Fctf;
 	Fctf.resize(F2D);
 	Fctf.initConstant(1.);
-	
+
 	RawImage<RFLOAT> ctfImage(Fctf);
 	RawImage<Complex> dataImage(F2D);
 
@@ -531,9 +497,9 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 	BufferedImage<Complex> sin_gamma_data, cos_gamma_data;
 	BufferedImage<RFLOAT> sin2_weight, sin_cos_weight, cos2_weight;
 
-		
+
 	RFLOAT r_ewald_sphere = std::numeric_limits<RFLOAT>::max();
-	
+
 	// Apply CTF if necessary
 	if (do_ctf || do_reconstruct_ctf)
 	{
@@ -550,13 +516,13 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 
 			CTF ctf;
 			ctf.readByGroup(DF, &obsModel, p);
-			
+
 			const BufferedImage<RFLOAT>& aberration = obsModel.getGammaOffset(opticsGroup, s);
 			ctf.Q0 = 0.0;
 			ctf.phase_shift = RAD2DEG(aberration(0,0));
-			
+
 			ctf.initialise();
-			
+
 			BufferedImage<RFLOAT> gamma_img(sh,s);
 
 			ctf.drawGamma(s, s, angpix, &gamma_img[0]);
@@ -629,7 +595,7 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 		}
 
 		multiplicity = &multiplicities[data_id];
-		
+
 		if (explicit_spreading_function)
 		{
 			spreading_function = &spreading_functions[data_id];
@@ -642,16 +608,16 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 		MultidimArray<Complex> Fsub;
 		Fsub.resize(F2D);
 		projector.get2DFourierTransform(Fsub, A3D);
-		
+
 		RawImage<Complex> clutterImage(Fsub);
-		
+
 		if (do_ctf)
 		{
 			clutterImage *= ctfImage;
 		}
 
 		dataImage -= clutterImage;
-		
+
 		if (use_legacy_fwd_mapping)
 		{
 			backprojector->set2DFourierTransform(F2D, A3D);
@@ -666,12 +632,12 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 		if (do_reconstruct_ctf)
 		{
 			dataImage.copyFrom(ctfImage);
-			
+
 			if (do_reconstruct_ctf2)
 			{
 				dataImage *= ctfImage;
 			}
-				
+
 			ctfImage.fill(1.f);
 		}
 		else if (do_ewald)
@@ -685,7 +651,7 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 			{
 				dataImage *= ctfImage;
 			}
-			
+
 			ctfImage *= ctfImage;
 		}
 
@@ -693,7 +659,7 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 		if (do_fom_weighting)
 		{
 			const RFLOAT fom = DF.getRfloat(EMDL_PARTICLE_FOM, p);
-			
+
 			dataImage *= fom;
 			ctfImage *= fom;
 		}
@@ -724,13 +690,13 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 
 			ctfImage *= weightImage;
 		}
-		
+
 		const d4Matrix proj = (double)padding_factor * d4Matrix(
 				A3D(0,0), A3D(0,1), A3D(0,2), 0,
 				A3D(1,0), A3D(1,1), A3D(1,2), 0,
 				A3D(2,0), A3D(2,1), A3D(2,2), 0,
 				       0,        0,        0, 1 );
-		
+
 		dataImage(0,0) = 0.0;
 
 		if (do_ewald)
@@ -739,7 +705,7 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 			{
 				REPORT_ERROR("Dual contrast does not work with Ewald sphere curvature");
 			}
-			
+
 			Matrix2D<RFLOAT> magMat;
 
 			if (obsModel.hasMagMatrices)
@@ -761,14 +727,14 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 			{
 				RawImage<Complex> dataImageP(F2DP);
 				RawImage<Complex> dataImageQ(F2DQ);
-				
+
 				ClippedPointInsertion<RFLOAT,RFLOAT> clippedInsertion;
-				
+
 				FourierBackprojection::backprojectSphere_forward(
 						clippedInsertion,
 						dataImageP, ctfImage, proj, r_ewald_sphere,
 						accumulation_volume->data, accumulation_volume->weight);
-					
+
 				FourierBackprojection::backprojectSphere_forward(
 						clippedInsertion,
 						dataImageQ, ctfImage, proj, -r_ewald_sphere,
@@ -778,15 +744,15 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 			{
 				RawImage<Complex> dataImageP(F2DP);
 				RawImage<Complex> dataImageQ(F2DQ);
-				
-				CtfHelper::CTFP_CTFQ_Pair<RFLOAT> dataImagePQ = 
+
+				CtfHelper::CTFP_CTFQ_Pair<RFLOAT> dataImagePQ =
 						CtfHelper::stitchHalves(dataImageP, dataImageQ);
-				
+
 				FourierBackprojection::backprojectSphere_backward(
 					dataImagePQ.pq, ctfImage, proj, r_ewald_sphere,
 					accumulation_volume->data, accumulation_volume->weight,
 					num_threads_in);
-				
+
 				FourierBackprojection::backprojectSphere_backward(
 					dataImagePQ.qp, ctfImage, proj, -r_ewald_sphere,
 					accumulation_volume->data, accumulation_volume->weight,
@@ -802,10 +768,10 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 			else if (use_new_fwd_mapping)
 			{
 				ClippedPointInsertion<RFLOAT,RFLOAT> clippedInsertion;
-				
+
 				FourierBackprojection::backprojectSlice_forward
 					(clippedInsertion, dataImage, ctfImage, proj,
-					 accumulation_volume->data, 
+					 accumulation_volume->data,
 				     accumulation_volume->weight);
 			}
 			else
@@ -823,7 +789,7 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 				{
 					if (compute_multiplicity)
 					{
-						FourierBackprojection::backprojectSlice_backward(
+						FourierBackprojection::backprojectSlice_backward_withMultiplicity(
 							dataImage, ctfImage, proj,
 							accumulation_volume->data,
 							accumulation_volume->weight,
@@ -839,7 +805,7 @@ void SpaBackproject::backprojectOneParticle(long int p, int thread_id)
 							num_threads_in);
 					}
 				}
-						
+
 				if (explicit_spreading_function)
 				{
 					FourierBackprojection::backprojectSpreadingFunction(
@@ -854,98 +820,98 @@ void SpaBackproject::reconstructLegacy()
 {
 	const bool do_use_fsc = fn_fsc != "";
 	bool do_MAP = do_use_fsc;
-	
+
 	Image<RFLOAT> vol_xmipp;
-		
+
 	if (verb > 0)
 	{
 		Log::print("Merging volumes");
 	}
-	
-	for (int subset = 0; subset < 2; subset++)	
+
+	for (int subset = 0; subset < 2; subset++)
 	for (int th = 1; th < num_threads_out; th++)
 	{
 		backprojectors[subset].data += backprojectors[2*th + subset].data;
 		backprojectors[subset].weight += backprojectors[2*th + subset].weight;
 	}
-	
-	
+
+
 	for (int subset = 0; subset < 2; subset++)
 	{
 		if (verb > 0)
 		{
 			Log::beginSection("Subset " + ZIO::itoa(subset+1));
 		}
-		
+
 		BackProjector& backprojector = backprojectors[subset];
-		
+
 		if (verb > 0)
 		{
 			Log::print("Applying symmetries");
 		}
-		
+
 		backprojector.symmetrise(
-					nr_helical_asu, helical_twist, helical_rise/angpix, 
+					nr_helical_asu, helical_twist, helical_rise/angpix,
 					num_threads_total);
-	
+
 		const long int s = ctf_dim;
-		
+
 		if (do_reconstruct_ctf)
 		{
 			if (verb > 0)
 			{
 				Log::print("Dividing CTF volume");
 			}
-			
+
 			vol_xmipp().initZeros(s, s, s);
 			vol_xmipp().setXmippOrigin();
-			
+
 			RawImage<RFLOAT> vol(vol_xmipp);
 			RawImage<Complex> backproj_data(backprojector.data);
 			RawImage<RFLOAT> backproj_weight(backprojector.weight);
-					
+
 			const long int mid_out = s/2;
 			const long int mid_in = backprojector.data.ydim / 2;
-			
-			
+
+
 			for (long int z = 0; z < s; z++)
 			for (long int y = 0; y < s; y++)
 			for (long int x = 0; x < s; x++)
 			{
 				int xp, yp, zp;
-	
+
 				if (x < mid_out)
 				{
 					xp = mid_out - x;
-					
+
 					yp = mid_in - (y - mid_out);
 					zp = mid_in - (z - mid_out);
 				}
 				else
 				{
 					xp = x - mid_out;
-					
+
 					yp = mid_in + (y - mid_out);
 					zp = mid_in + (z - mid_out);
 				}
-				
+
 				if ( xp >= 0 && xp < backproj_data.xdim &&
 					 yp >= 0 && yp < backproj_data.ydim &&
 					 zp >= 0 && zp < backproj_data.zdim)
 				{
 					const RFLOAT wg = backproj_weight(xp,yp,zp);
 					RFLOAT val = 0.f;
-					
+
 					if (wg > 0.)
 					{
 						val = backproj_data(xp,yp,zp) / wg;
 					}
-					
+
 					if (do_reconstruct_ctf2)
 					{
 						val = sqrt(val);
 					}
-					
+
 					vol(x,y,z) = val;
 				}
 			}
@@ -958,67 +924,67 @@ void SpaBackproject::reconstructLegacy()
 				{
 					Log::print("Writing debugging data");
 				}
-				
+
 				Image<RFLOAT> It;
 				FileName fn_tmp = fn_out.withoutExtension() + "_half_" + ZIO::itoa(subset+1);
 				It().resize(backprojector.data);
-				
+
 				for (long int n = 0; n < It().nzyxdim; n++)
 				{
 					It().data[n] = backprojector.data.data[n].real;
 				}
-				
+
 				It.write(fn_tmp+"_data_real.mrc");
-				
+
 				for (long int n = 0; n < It().nzyxdim; n++)
 				{
 					It().data[n] = backprojector.data.data[n].imag;
 				}
-				
+
 				It.write(fn_tmp+"_data_imag.mrc");
 				It() = backprojector.weight;
 				It.write(fn_tmp+"_weight.mrc");
 			}
-	
+
 			MultidimArray<RFLOAT> tau2;
-			
-			if (do_use_fsc) 
+
+			if (do_use_fsc)
 			{
 				if (verb > 0)
 				{
 					Log::print("Reading FSC");
 				}
-				
+
 				do_MAP = true;
 				MetaDataTable MDfsc;
 				MDfsc.read(fn_fsc);
-				
+
 				MultidimArray<RFLOAT> fsc;
 				fsc.resize(output_boxsize/2+1);
-				
+
 				for (int i = 0; i < MDfsc.numberOfObjects(); i++)
 				{
 					int idx = MDfsc.getInt(EMDL_SPECTRAL_IDX, i);
 					RFLOAT val = MDfsc.getRfloat(EMDL_MLMODEL_FSC_HALVES_REF, i);
-					
+
 					fsc(idx) = val;
 				}
-				
+
 				MultidimArray<RFLOAT> dummy;
-				
+
 				backprojector.updateSSNRarrays(1., tau2, dummy, dummy, dummy, fsc, do_use_fsc, true);
 			}
-	
+
 			if (do_external_reconstruct)
 			{
 				if (verb > 0)
 				{
 					Log::print("Preparing for external reconstruction");
 				}
-				
-				FileName fn_root = fn_out.withoutExtension() + "_half_" + ZIO::itoa(subset+1);			
+
+				FileName fn_root = fn_out.withoutExtension() + "_half_" + ZIO::itoa(subset+1);
 				MultidimArray<RFLOAT> dummy;
-				
+
 				backprojector.externalReconstruct(vol_xmipp(),
 					fn_root, tau2, dummy, dummy, dummy, false, 1., 1);
 			}
@@ -1028,21 +994,21 @@ void SpaBackproject::reconstructLegacy()
 				{
 					Log::print("Reconstructing");
 				}
-				
+
 				backprojector.reconstruct(vol_xmipp(), iter, do_MAP, tau2);
 			}
 		}
-		
+
 		std::string my_fn_out = fn_out + "_half_" + ZIO::itoa(subset+1) + ".mrc";
-		
+
 		vol_xmipp.setSamplingRateInHeader(angpix);
 		vol_xmipp.write(my_fn_out);
-		
+
 		if (verb > 0)
 		{
 			Log::print("Done! Written output map in: " + my_fn_out);
 		}
-		
+
 		Log::endSection();
 	}
 }
@@ -1080,7 +1046,7 @@ void SpaBackproject::reconstructNew()
 		accumulation_volumes[1].data};
 
 	std::vector<BufferedImage<RFLOAT>> psfImgFS;
-	
+
 	if (explicit_spreading_function)
 	{
 		psfImgFS = {
@@ -1126,17 +1092,18 @@ void SpaBackproject::reconstructNew()
 		dataImgFS[half] *= s / (6.0 * padding_factor);
 	}
 
-	std::vector<BufferedImage<double>> dataImgRS(2), dataImgDivRS(2);
+	std::vector<BufferedImage<RFLOAT>> dataImgRS(2), dataImgDivRS(2);
 
-	BufferedImage<dComplex> dataImgFS_both = dataImgFS[0] + dataImgFS[1];
-	BufferedImage<double> psfImgFS_both;
-	
+	BufferedImage<Complex> dataImgFS_both = dataImgFS[0] + dataImgFS[1];
+	BufferedImage<RFLOAT> psfImgFS_both;
+
 	if (explicit_spreading_function)
 	{
 		psfImgFS_both = psfImgFS[0] + psfImgFS[1];
 	}
-	
-	BufferedImage<double> ctfImgFS_both = ctfImgFS[0] + ctfImgFS[1];
+
+	BufferedImage<RFLOAT> ctfImgFS_both = ctfImgFS[0] + ctfImgFS[1];
+
 
 	Log::beginSection("Reconstructing");
 
@@ -1144,20 +1111,13 @@ void SpaBackproject::reconstructNew()
 	const int margin = (s - cropSize) / 2;
 	const bool needs_cropping = margin > 0;
 
-	/*{
-		dataImgFS[0].writeVtk("data_fwd_new.vtk");
-		std::exit(0);
-	}*/
-	
 	for (int half = 0; half < 2; half++)
 	{
 		Log::print("Half " + ZIO::itoa(half));
 
-		dataImgRS[half] = BufferedImage<double>(s,s,s);
-		dataImgDivRS[half] = BufferedImage<double>(s,s,s);
+		dataImgRS[half] = BufferedImage<RFLOAT>(s,s,s);
+		dataImgDivRS[half] = BufferedImage<RFLOAT>(s,s,s);
 
-		
-		
 		if (explicit_spreading_function)
 		{
 			Reconstruction::griddingCorrect3D(
@@ -1211,7 +1171,7 @@ void SpaBackproject::reconstructNew()
 	else
 	{
 		Reconstruction::griddingCorrect3D_sinc2(
-			dataImgFS_both, dataImgRS[0], 
+			dataImgFS_both, dataImgRS[0],
 			true, num_threads_total);
 	}
 
@@ -1287,15 +1247,15 @@ void SpaBackproject::reconstructDualContrast()
 	BufferedImage<DualContrastVoxel<RFLOAT>> accumulation_volume_both =
 			dual_contrast_accumulation_volumes[0] + dual_contrast_accumulation_volumes[1];
 
-	BufferedImage<double> psfImgFS_both;
-	
+	BufferedImage<RFLOAT> psfImgFS_both;
+
 	if (explicit_spreading_function)
 	{
 		psfImgFS_both = spreading_functions[0] + spreading_functions[1];
 	}
 
 
-	Log::beginSection("Reconstructing");	
+	Log::beginSection("Reconstructing");
 
 	const int s = dual_contrast_accumulation_volumes[0].ydim;
 	const int cropSize = s / padding_factor;
@@ -1437,12 +1397,12 @@ void SpaBackproject::applyCTFPandCTFQ(
 	outP.resize(Fin);
 	outQ.resize(Fin);
 	float angle_step = 180./nr_sectors;
-	
+
 	for (float angle = 0.; angle < 180.;  angle +=angle_step)
 	{
 		MultidimArray<Complex> CTFP(Fin), Fapp(Fin);
 		MultidimArray<RFLOAT> Iapp(YSIZE(Fin), YSIZE(Fin));
-		
+
 		// Two passes: one for CTFP, one for CTFQ
 		for (int ipass = 0; ipass < 2; ipass++)
 		{
@@ -1468,7 +1428,7 @@ void SpaBackproject::applyCTFPandCTFQ(
 					Iapp.window(FIRST_XMIPP_INDEX(newbox), FIRST_XMIPP_INDEX(newbox),
 					            LAST_XMIPP_INDEX(newbox),  LAST_XMIPP_INDEX(newbox));
 				}
-				
+
 				// Back into Fourier-space
 				transformer.FourierTransform(Iapp, Fapp, false); // false means: leave Fapp in the transformer
 				CenterFFTbySign(Fapp);
@@ -1487,16 +1447,16 @@ void SpaBackproject::applyCTFPandCTFQ(
 
 			// angles larger than 180
 			bool is_sector_reverse = false;
-			
+
 			if (anglemin >= 180.)
 			{
 				anglemin -= 180.;
 				anglemax -= 180.;
 				is_sector_reverse = true;
 			}
-			
+
 			MultidimArray<Complex> *myCTFPorQ, *myCTFPorQb;
-			
+
 			if (is_sector_reverse)
 			{
 				myCTFPorQ  = (ipass == 0) ? &outQ : &outP;
@@ -1524,7 +1484,7 @@ void SpaBackproject::applyCTFPandCTFQ(
 				RFLOAT x = (RFLOAT)jp;
 				RFLOAT y = (RFLOAT)ip;
 				RFLOAT myangle = (x*x+y*y > 0) ? acos(y/sqrt(x*x+y*y)) : 0; // dot-product with Y-axis: (0,1)
-				
+
 				// Only take the relevant sector now...
 				if (do_wrap_max)
 				{

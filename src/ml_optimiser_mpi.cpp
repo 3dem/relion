@@ -475,10 +475,6 @@ will still yield good performance and possibly a more stable execution. \n" << s
 		fn_ref.getHalf(fn_ref, my_halfset);
 	}
 
-	MlOptimiser::initialiseGeneral(node->rank);
-
-	initialiseWorkLoad();
-
 #ifdef MKLFFT
 	// Enable multi-threaded FFTW
 	int success = fftw_init_threads();
@@ -490,84 +486,43 @@ will still yield good performance and possibly a more stable execution. \n" << s
 	fftw_plan_with_nthreads(nr_threads);
 #endif
 
-	if (fn_sigma != "")
-	{
-		// Read in sigma_noise spetrum from file DEVELOPMENTAL!!! FOR DEBUGGING ONLY....
-		MetaDataTable MDsigma;
-		RFLOAT val;
-		int idx;
-		MDsigma.read(fn_sigma);
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsigma)
-		{
-			MDsigma.getValue(EMDL_SPECTRAL_IDX, idx);
-			MDsigma.getValue(EMDL_MLMODEL_SIGMA2_NOISE, val);
-			if (idx < XSIZE(mymodel.sigma2_noise[0]))
-				mymodel.sigma2_noise[0](idx) = val;
-		}
-		if (idx < XSIZE(mymodel.sigma2_noise[0]) - 1)
-		{
-			if (verb > 0) std::cout<< " WARNING: provided sigma2_noise-spectrum has fewer entries ("<<idx+1<<") than needed ("<<XSIZE(mymodel.sigma2_noise[0])<<"). Set rest to zero..."<<std::endl;
-		}
+	MlOptimiser::initialiseGeneral(node->rank);
 
-		mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
-		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
-		{
-			// Use the same spectrum for all classes
-			mymodel.sigma2_noise[igroup] =  mymodel.sigma2_noise[0];
-			// We set wsum_model.sumw_group as in calculateSumOfPowerSpectraAndAverageImage
-			wsum_model.sumw_group[igroup] = mymodel.nr_particles_per_group[igroup];
-		}
+	initialiseWorkLoad();
+
+	// Only the first follower calculates the sigma2_noise spectra and sets initial guesses for Iref
+	if (node->rank == 1)
+	{
+		MlOptimiser::initialiseSigma2Noise();
+		MlOptimiser::initialiseReferences();
+    }
+
+	//Now the first follower broadcasts resulting Iref and sigma2_noise to everyone else
+	for (int i = 0; i < mymodel.sigma2_noise.size(); i++)
+	{
+		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.sigma2_noise[i]),
+							   MULTIDIM_SIZE(mymodel.sigma2_noise[i]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
 	}
-	else if (do_calculate_initial_sigma_noise || do_average_unaligned)
+	for (int i = 0; i < mymodel.Iref.size(); i++)
 	{
-		MultidimArray<RFLOAT> Mavg;
-		// Calculate initial sigma noise model from power_class spectra of the individual images
-		// This is done in parallel
-		//std::cout << " Hello world1! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
-
-		calculateSumOfPowerSpectraAndAverageImage(Mavg);
-
-		// Set sigma2_noise and Iref from averaged poser spectra and Mavg
-		if (!node->isLeader())
-			MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(Mavg);
-		//std::cout << " Hello world3! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
+		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Iref[i]),
+							   MULTIDIM_SIZE(mymodel.Iref[i]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
 	}
 
 	// Initialise the data_versus_prior ratio to get the initial current_size right
-	if (iter == 0 && !do_initialise_bodies && !node->isLeader())
+	if (!do_initialise_bodies && !node->isLeader())
 		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
-
-	//std::cout << " Hello world! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
-
-	initialiseGeneralFinalize();
 
 	// Only leader writes out initial mymodel (do not gather metadata yet)
 	int my_nr_subsets = (do_split_random_halves) ? 2 : 1;
 	if (node->isLeader())
+	{
 		MlOptimiser::write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, node->rank);
+    }
 	else if (node->rank <= my_nr_subsets)
 	{
 		//Only the first_follower of each subset writes model to disc
 		MlOptimiser::write(DO_WRITE_SAMPLING, DONT_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, node->rank);
-
-		bool do_warn = false;
-		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
-		{
-			if (mymodel.nr_particles_per_group[igroup] < 5 && node->rank == 1) // only warn for half1 to avoid messy output
-			{
-				if (my_nr_subsets == 1)
-					std:: cout << "WARNING: There are only " << mymodel.nr_particles_per_group[igroup] << " particles in group " << igroup + 1 << std::endl;
-				else
-					std:: cout << "WARNING: There are only " << mymodel.nr_particles_per_group[igroup] << " particles in group " << igroup + 1 << " of half-set " << node->rank << std::endl;
-				do_warn = true;
-			}
-		}
-		if (do_warn)
-		{
-			std:: cout << "WARNING: You may want to consider joining some micrographs into larger groups to obtain more robust noise estimates. " << std::endl;
-			std:: cout << "         You can do so by using the same rlnMicrographName for particles from multiple different micrographs in the input STAR file. " << std::endl;
-            std:: cout << "         It is then best to join micrographs with similar defocus values and similar apparent signal-to-noise ratios. " << std::endl;
-		}
 	}
 
 #ifdef DEBUG
@@ -611,6 +566,36 @@ void MlOptimiserMpi::initialiseWorkLoad()
 	{
 		mydata.divideParticlesInRandomHalves(random_seed, do_helical_refine);
 	}
+
+	// Set the number of particles per group, but only Leader has full data.star in memory!
+        // Pre-relion-4-onesigma-branch, mymodel.nr_particles_per_group was set in initial noise estimation, but this is no longer the case...
+        if (do_split_random_halves)
+        {
+            // First do half-set 1
+            if (node->isLeader()) mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group, 1);
+            for (int follower = 1; follower < node->size; follower+=2)
+            {
+                MPI_Status status;
+                if (node->isLeader()) node->relion_MPI_Send(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, follower, MPITAG_METADATA, MPI_COMM_WORLD);
+                else if (node->rank == follower) node->relion_MPI_Recv(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
+            }
+
+
+            // Then do half-set 2
+            if (node->isLeader()) mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group, 2);
+            for (int follower = 2; follower < node->size; follower+=2)
+            {
+                MPI_Status status;
+                if (node->isLeader()) node->relion_MPI_Send(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, follower, MPITAG_METADATA, MPI_COMM_WORLD);
+                else if (node->rank == follower) node->relion_MPI_Recv(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
+            }
+
+        }
+        else
+        {
+            if (node->isLeader()) mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
+            node->relion_MPI_Bcast(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, MPI_COMM_WORLD);
+        }
 
 	if (node->isLeader())
 	{
@@ -681,7 +666,10 @@ void MlOptimiserMpi::initialiseWorkLoad()
 
 				MPI_Barrier(MPI_COMM_WORLD);
 				if (!need_to_copy) // This initialises nr_parts_on_scratch on non-first ranks by pretending --reuse_scratch
+				{
 					mydata.setScratchDirectory(fn_scratch, true, verb);
+					keep_scratch=true; // Setting keep_scratch for non-first ranks, to ensure that only first rank on each node deletes scratch during cleanup
+				}
 			}
 			else
 			{
@@ -722,33 +710,6 @@ void MlOptimiserMpi::initialiseWorkLoad()
 #ifdef DEBUG_WORKLOAD
 	std::cerr << " node->rank= " << node->rank << " my_first_particle_id= " << my_first_particle_id << " my_last_particle_id= " << my_last_particle_id << std::endl;
 #endif
-}
-
-void MlOptimiserMpi::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT> &Mavg)
-{
-
-	// First calculate the sum of all individual power spectra on each subset
-	MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(Mavg, node->rank == 1);
-
-	if (pipeline_control_check_abort_job())
-		MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
-
-	// Now combine all weighted sums
-	// Leave the option of both for a while. Then, if there are no problems with the system via files keep that one and remove the MPI version from the code
-	if (combine_weights_thru_disc)
-		combineAllWeightedSumsViaFile();
-	else
-		combineAllWeightedSums();
-
-	// After introducing SGD code in Dec 2016: no longer calculate Mavg for the 2 halves separately...
-	// Just calculate Mavg from AllReduce, and divide by 2 * the accumulated wsum_group
-	MultidimArray<RFLOAT> Msum;
-	Msum.initZeros(Mavg);
-	MPI_Allreduce(MULTIDIM_ARRAY(Mavg), MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-	Mavg = Msum;
-	// When doing random halves, the wsum_model.sumw_group[igroup], which will be used to divide Mavg by is only calculated over half the particles!
-	if (do_split_random_halves)
-		Mavg /= 2.;
 }
 
 void MlOptimiserMpi::expectation()
@@ -846,58 +807,28 @@ void MlOptimiserMpi::expectation()
 	timer.tic(TIMING_EXP_2);
 #endif
 	// C. Calculate expected angular errors
-	// Do not do this for maxCC
-	// Only the first (reconstructing) follower (i.e. from half1) calculates expected angular errors
-	if (!(iter==1 && do_firstiter_cc) && !(do_skip_align || do_skip_rotate) &&
-         (do_auto_refine || !do_grad || (iter % 10 == 0 && mymodel.nr_classes > 1 && allow_coarser_samplings)))
-	{
-		int my_nr_images, length_fn_ctf;
-		if (node->isLeader())
-		{
-			// Leader sends metadata (but not imagedata) for first 100 particles to first_follower (for calculateExpectedAngularErrors)
-			MlOptimiser::getMetaAndImageDataSubset(0, n_trials_acc-1, false);
-			my_nr_images = YSIZE(exp_metadata);
-			node->relion_MPI_Send(&my_nr_images, 1, MPI_INT, first_follower, MPITAG_JOB_REQUEST, MPI_COMM_WORLD);
-			node->relion_MPI_Send(MULTIDIM_ARRAY(exp_metadata), MULTIDIM_SIZE(exp_metadata), MY_MPI_DOUBLE, first_follower, MPITAG_METADATA, MPI_COMM_WORLD);
-			// Also send exp_fn_ctfs if necessary
-			length_fn_ctf = exp_fn_ctf.length() + 1; // +1 to include \0 at the end of the string
-			node->relion_MPI_Send(&length_fn_ctf, 1, MPI_INT, first_follower, MPITAG_JOB_REQUEST, MPI_COMM_WORLD);
-			if (length_fn_ctf > 1)
-				node->relion_MPI_Send((void*)exp_fn_ctf.c_str(), length_fn_ctf, MPI_CHAR, first_follower, MPITAG_METADATA, MPI_COMM_WORLD);
-		}
-		else if (node->rank == first_follower)
-		{
-			// Follower has to receive all metadata from the leader!
-			node->relion_MPI_Recv(&my_nr_images, 1, MPI_INT, 0, MPITAG_JOB_REQUEST, MPI_COMM_WORLD, status);
-			exp_metadata.resize(my_nr_images, METADATA_LINE_LENGTH_BEFORE_BODIES + (mymodel.nr_bodies) * METADATA_NR_BODY_PARAMS);
-			node->relion_MPI_Recv(MULTIDIM_ARRAY(exp_metadata), MULTIDIM_SIZE(exp_metadata), MY_MPI_DOUBLE, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
-			node->relion_MPI_Recv(&length_fn_ctf, 1, MPI_INT, 0, MPITAG_JOB_REQUEST, MPI_COMM_WORLD, status);
-			if (length_fn_ctf > 1)
-			{
-				char* rec_buf2;
-				rec_buf2 = (char *) malloc(length_fn_ctf);
-				node->relion_MPI_Recv(rec_buf2, length_fn_ctf, MPI_CHAR, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
-				exp_fn_ctf = rec_buf2;
-				free(rec_buf2);
-			}
-			if (!do_grad || iter > 10 ) {
-				calculateExpectedAngularErrors(0, n_trials_acc - 1);
-			}
-		}
+	// Skip for maxCC
+	// Skip if not doing alignment
+	// During gradient refinement only do this every 10 iterations
+	if (!((iter==1 && do_firstiter_cc) || do_always_cc) && !(do_skip_align && do_skip_rotate || do_only_sample_tilt) &&
+       (do_auto_refine || !do_grad || iter % 10 == 0 || iter == nr_iter || iter <= 1))
+		calculateExpectedAngularErrors(0, n_trials_acc - 1);
 
-		// The reconstructing follower Bcast acc_rottilt, acc_psi, acc_trans to all other nodes!
-		node->relion_MPI_Bcast(&acc_rot, 1, MY_MPI_DOUBLE, first_follower, MPI_COMM_WORLD);
-		node->relion_MPI_Bcast(&acc_trans, 1, MY_MPI_DOUBLE, first_follower, MPI_COMM_WORLD);
-	}
 #ifdef TIMING
 		timer.toc(TIMING_EXP_2);
 		timer.tic(TIMING_EXP_3);
 #endif
 	// D. Update the angular sampling (all nodes except leader)
-	if (!node->isLeader() && ( do_auto_refine && iter > 1 || (mymodel.nr_classes > 1 && allow_coarser_samplings) ))
+	if (!do_grad && !node->isLeader() && ( (do_auto_refine || do_auto_sampling) && iter > 1 || (mymodel.nr_classes > 1 && allow_coarser_samplings) ))
 		updateAngularSampling(node->rank == 1);
 
+	// D. Update the angular sampling (all nodes except leader) for gradient refinement, only once every 10 iters
+	if (do_grad && ( (do_auto_refine || do_auto_sampling) && iter > 1 && iter % 10 == 0 ))
+		updateAngularSamplingGrad(0, n_trials_acc - 1, node->rank == 1);
+
 	// The leader needs to know about the updated parameters from updateAngularSampling
+	node->relion_MPI_Bcast(&auto_subset_size_order, 1, MPI_INT, first_follower, MPI_COMM_WORLD);
+	node->relion_MPI_Bcast(&grad_suspended_finer_sampling_iter, 1, MPI_INT, first_follower, MPI_COMM_WORLD);
 	node->relion_MPI_Bcast(&grad_suspended_local_searches_iter, 1, MPI_INT, first_follower, MPI_COMM_WORLD);
 	node->relion_MPI_Bcast(&has_fine_enough_angular_sampling, 1, MPI_INT, first_follower, MPI_COMM_WORLD);
 	node->relion_MPI_Bcast(&nr_iter_wo_resol_gain, 1, MPI_INT, first_follower, MPI_COMM_WORLD);
@@ -1164,10 +1095,16 @@ void MlOptimiserMpi::expectation()
 			long int my_nr_particles_done = 0;
 
 
+			// SHWS10052021: reduce frequency of abort check 10-fold
+			long int icheck= 0;
 			while (nr_followers_done < node->size - 1)
 			{
 
-				pipeline_control_check_abort_job();
+				if (icheck%10 == 0)
+				{
+					if (pipeline_control_check_abort_job()) MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
+				}
+				icheck++;
 
 				// Receive a job request from a follower
 				node->relion_MPI_Recv(MULTIDIM_ARRAY(first_last_nr_images), MULTIDIM_SIZE(first_last_nr_images), MPI_LONG, MPI_ANY_SOURCE, MPITAG_JOB_REQUEST, MPI_COMM_WORLD, status);
@@ -1425,9 +1362,6 @@ void MlOptimiserMpi::expectation()
 						}
 						node->relion_MPI_Recv(MULTIDIM_ARRAY(exp_imagedata), MULTIDIM_SIZE(exp_imagedata), MY_MPI_DOUBLE, 0, MPITAG_IMAGE, MPI_COMM_WORLD, status);
 					}
-
-					if (pipeline_control_check_abort_job())
-						MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
 
 					// Now process these images
 #ifdef DEBUG_MPIEXP
@@ -2026,11 +1960,12 @@ void MlOptimiserMpi::maximization()
 		init_progress_bar(mymodel.nr_classes);
 	}
 
-	int skip_class = maximizationGradientParameters();
-
 	RFLOAT helical_twist_half1, helical_rise_half1, helical_twist_half2, helical_rise_half2;
 	helical_twist_half1 = helical_twist_half2 = helical_twist_initial;
 	helical_rise_half1 = helical_rise_half2 = helical_rise_initial;
+
+	if (do_grad)
+		maximizationGradientParameters();
 
 	// First reconstruct all classes in parallel
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
@@ -2041,10 +1976,6 @@ void MlOptimiserMpi::maximization()
 
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 		{
-
-			if (iclass == skip_class)
-				continue;
-
 			RCTIC(timer,RCT_1);
 			// either ibody or iclass can be larger than 0, never 2 at the same time!
 			int ith_recons = (mymodel.nr_bodies > 1) ? ibody : iclass;
@@ -2097,16 +2028,6 @@ void MlOptimiserMpi::maximization()
 						{
 							if(do_grad)
 							{
-								if (do_split_random_halves) {
-									(wsum_model.BPref[ith_recons]).reweightGrad();
-									(wsum_model.BPref[ith_recons]).applyMomenta(
-											mymodel.Igrad1[ith_recons],
-											0.9,
-											mymodel.Igrad2[ith_recons],
-											0.999,
-											iter == 1);
-								}
-
 								(wsum_model.BPref[ith_recons]).reconstructGrad(
 										mymodel.Iref[ith_recons],
 										mymodel.fsc_halves_class[ith_recons],
@@ -2240,16 +2161,6 @@ void MlOptimiserMpi::maximization()
 							{
 								if(do_grad)
 								{
-									if (do_split_random_halves) {
-										(wsum_model.BPref[ith_recons]).reweightGrad();
-										(wsum_model.BPref[ith_recons]).applyMomenta(
-												mymodel.Igrad1[ith_recons],
-												0.9,
-												mymodel.Igrad2[ith_recons],
-												0.999,
-												iter == 1);
-									}
-
 									(wsum_model.BPref[ith_recons]).reconstructGrad(
 											mymodel.Iref[ith_recons],
 											mymodel.fsc_halves_class[ith_recons],
@@ -2559,6 +2470,83 @@ void MlOptimiserMpi::maximization()
 #ifdef DEBUG
 	std::cerr << "MlOptimiserMpi::maximization: done" << std::endl;
 #endif
+}
+
+void MlOptimiserMpi::maximizationGradientParameters()
+{
+	if (!do_split_random_halves)
+		REPORT_ERROR("ERROR: Gradient optimization with MPI is only supported with --split_random_halves");
+
+	MPI_Status status;
+	for (int ibody = 0; ibody< mymodel.nr_bodies; ibody++ )
+	{
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
+			continue;
+
+		int reconstruct_rank1 = 2 * (ibody % ( (node->size - 1)/2 ) ) + 1;
+		int reconstruct_rank2 = 2 * (ibody % ( (node->size - 1)/2 ) ) + 2;
+
+		if (node->rank == reconstruct_rank1 || node->rank == reconstruct_rank2)
+		{
+			MultidimArray< Complex > Igrad1_half(wsum_model.BPref[ibody].data);
+
+			wsum_model.BPref[ibody].reweightGrad();
+			wsum_model.BPref[ibody].getFristMoment(
+					mymodel.Igrad1[ibody]);
+
+			// Fetch the back-projetcion from the other half
+			if (node->rank == reconstruct_rank2)
+			{
+				node->relion_MPI_Send(
+						MULTIDIM_ARRAY(wsum_model.BPref[ibody].data),
+						2*MULTIDIM_SIZE(wsum_model.BPref[ibody].data),
+						MY_MPI_DOUBLE,
+						reconstruct_rank1,
+						MPITAG_IMAGE,
+						MPI_COMM_WORLD
+				);
+				node->relion_MPI_Recv(
+						MULTIDIM_ARRAY(Igrad1_half),
+						2*MULTIDIM_SIZE(Igrad1_half),
+						MY_MPI_DOUBLE,
+						reconstruct_rank1,
+						MPITAG_IMAGE,
+						MPI_COMM_WORLD,
+						status
+				);
+			}
+			else if (node->rank == reconstruct_rank1)
+			{
+				node->relion_MPI_Recv(
+						MULTIDIM_ARRAY(Igrad1_half),
+						2*MULTIDIM_SIZE(Igrad1_half),
+						MY_MPI_DOUBLE,
+						reconstruct_rank2,
+						MPITAG_IMAGE,
+						MPI_COMM_WORLD,
+						status
+				);
+				node->relion_MPI_Send(
+						MULTIDIM_ARRAY(wsum_model.BPref[ibody].data),
+						2*MULTIDIM_SIZE(wsum_model.BPref[ibody].data),
+						MY_MPI_DOUBLE,
+						reconstruct_rank2,
+						MPITAG_IMAGE,
+						MPI_COMM_WORLD
+				);
+			}
+
+			wsum_model.BPref[ibody].getSecondMoment(
+					mymodel.Igrad2[ibody],
+					Igrad1_half);
+
+			MultidimArray< Complex > dummy;
+			wsum_model.BPref[ibody].applyMomenta(
+					mymodel.Igrad1[ibody],
+					dummy,
+					mymodel.Igrad2[ibody]);
+		}
+	}
 }
 
 void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
@@ -3010,7 +2998,8 @@ void MlOptimiserMpi::compareTwoHalves()
 		if (node->rank == 1 || node->rank == 2)
 		{
 			MultidimArray<Complex > avg1;
-			if (do_grad) {
+			if (do_grad)
+			{
 				MultidimArray<RFLOAT> dummy;
 				Projector PPref(mymodel.ori_size, mymodel.interpolator, 1, mymodel.r_min_nn, mymodel.data_dim);
 				PPref.computeFourierTransformMap(mymodel.Iref[ibody], dummy, wsum_model.BPref[ibody].r_max*2, 1, false);
@@ -3072,6 +3061,231 @@ void MlOptimiserMpi::compareTwoHalves()
 #endif
 }
 
+void MlOptimiserMpi::calculateExpectedAngularErrors(long int my_first_part_id, long int my_last_part_id)
+{
+	MPI_Status status;
+	int first_follower = 1;
+	int my_nr_images, length_fn_ctf;
+
+	if (node->isLeader())
+	{
+		// Leader sends metadata (but not imagedata) for first 100 particles to first_follower (for calculateExpectedAngularErrors)
+		MlOptimiser::getMetaAndImageDataSubset(my_first_part_id, my_last_part_id, false);
+		my_nr_images = YSIZE(exp_metadata);
+		node->relion_MPI_Send(&my_nr_images, 1, MPI_INT, first_follower, MPITAG_JOB_REQUEST, MPI_COMM_WORLD);
+		node->relion_MPI_Send(MULTIDIM_ARRAY(exp_metadata), MULTIDIM_SIZE(exp_metadata), MY_MPI_DOUBLE, first_follower, MPITAG_METADATA, MPI_COMM_WORLD);
+		// Also send exp_fn_ctfs if necessary
+		length_fn_ctf = exp_fn_ctf.length() + 1; // +1 to include \0 at the end of the string
+		node->relion_MPI_Send(&length_fn_ctf, 1, MPI_INT, first_follower, MPITAG_JOB_REQUEST, MPI_COMM_WORLD);
+		if (length_fn_ctf > 1)
+			node->relion_MPI_Send((void*)exp_fn_ctf.c_str(), length_fn_ctf, MPI_CHAR, first_follower, MPITAG_METADATA, MPI_COMM_WORLD);
+	}
+	else if (node->rank == first_follower)
+	{
+		// Follower has to receive all metadata from the leader!
+		node->relion_MPI_Recv(&my_nr_images, 1, MPI_INT, 0, MPITAG_JOB_REQUEST, MPI_COMM_WORLD, status);
+		exp_metadata.resize(my_nr_images, METADATA_LINE_LENGTH_BEFORE_BODIES + (mymodel.nr_bodies) * METADATA_NR_BODY_PARAMS);
+		node->relion_MPI_Recv(MULTIDIM_ARRAY(exp_metadata), MULTIDIM_SIZE(exp_metadata), MY_MPI_DOUBLE, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
+		node->relion_MPI_Recv(&length_fn_ctf, 1, MPI_INT, 0, MPITAG_JOB_REQUEST, MPI_COMM_WORLD, status);
+		if (length_fn_ctf > 1)
+		{
+			char* rec_buf2;
+			rec_buf2 = (char *) malloc(length_fn_ctf);
+			node->relion_MPI_Recv(rec_buf2, length_fn_ctf, MPI_CHAR, 0, MPITAG_METADATA, MPI_COMM_WORLD, status);
+			exp_fn_ctf = rec_buf2;
+			free(rec_buf2);
+		}
+		MlOptimiser::calculateExpectedAngularErrors(my_first_part_id, my_last_part_id);
+	}
+
+	// The reconstructing follower Bcast acc_rottilt, acc_psi, acc_trans to all other nodes!
+	node->relion_MPI_Bcast(&acc_rot, 1, MY_MPI_DOUBLE, first_follower, MPI_COMM_WORLD);
+	node->relion_MPI_Bcast(&acc_trans, 1, MY_MPI_DOUBLE, first_follower, MPI_COMM_WORLD);
+}
+
+void MlOptimiserMpi::updateAngularSamplingGrad(long int my_first_part_id, long int my_last_part_id, bool myverb)
+{
+	if (mymodel.ref_dim != 3)
+		REPORT_ERROR("MlOptimiser::updateAngularSamplingGrad should only be called for 3D reconstruction");
+
+	if (grad_suspended_finer_sampling_iter > 0)
+		grad_suspended_finer_sampling_iter --;
+	else
+	{
+		int current_healpix_order, new_healpix_order;
+		current_healpix_order = new_healpix_order = sampling.healpix_order;
+
+		RFLOAT current_offset_step, new_offset_step;
+		current_offset_step = new_offset_step = sampling.offset_step;
+
+		if (iter == 1)
+		{
+			new_healpix_order = sampling.healpix_order_ori;
+			new_offset_step = sampling.offset_step_ori;
+		}
+
+		if (grad_suspended_local_searches_iter < 0) // If transition to local searches has not started
+		{
+			if (nr_iter_wo_resol_gain >= 2)
+			{
+				// DETERMINE ORIENTATIONAL SAMPLING -------------------------------------------------------------------
+
+				calculateExpectedAngularErrors(my_first_part_id, my_last_part_id);
+
+				RFLOAT min_angle_step = (iter == 1 && do_firstiter_cc) ?
+				                        360. / CEIL(PI * particle_diameter * mymodel.current_resolution) : acc_rot;
+
+				current_healpix_order = sampling.healpix_order;
+				sampling.healpix_order++;
+				if (sampling.getAngularSampling(adaptive_oversampling) < 0.9 * min_angle_step)
+					sampling.healpix_order--;
+
+				new_healpix_order = sampling.healpix_order;
+				sampling.healpix_order = current_healpix_order;
+
+				// DETERMINE TRANSLATIONAL SAMPLING -------------------------------------------------------------------
+
+				// Stay a bit on the safe side: 90% of estimated accuracy
+				RFLOAT min_offset_step = 0.9 * acc_trans * std::pow(2., adaptive_oversampling);
+				// Don't go coarser than the 95% of the offset_range (so at least 5 samplings are done)
+				min_offset_step = XMIPP_MIN(min_offset_step, 0.95 * sampling.offset_range);
+				new_offset_step = XMIPP_MAX(current_offset_step * 0.75, min_offset_step);
+			}
+
+			if (mymodel.orientational_prior_mode == NOPRIOR &&  // If still doing global sampling
+			    grad_suspended_local_searches_iter < 0 && // If no transition to global searches has started
+			    new_healpix_order >= autosampling_hporder_local_searches) // If transition to local searches should start
+			{
+				if (myverb)
+					std::cout << "Auto-refine: Switch to local searches suspended for two iteration. " << std::endl;
+
+				new_healpix_order = current_healpix_order;
+				grad_suspended_local_searches_iter = 2;
+			}
+		}
+		else // If transition to local searches has started
+		{
+			grad_suspended_local_searches_iter--;
+
+			if (grad_suspended_local_searches_iter == 0)
+				new_healpix_order = autosampling_hporder_local_searches;
+
+			nr_iter_wo_resol_gain = 0;
+		}
+
+		// UPDATE SAMPLING -------------------------------------------------------------------------------------------
+
+		// Increase subset size with orientational sampling
+		if (current_healpix_order != new_healpix_order)
+			auto_subset_size_order ++;
+
+		if (current_healpix_order != new_healpix_order ||
+		    current_offset_step != new_offset_step)
+		{
+			has_fine_enough_angular_sampling = false;
+
+			// Jun08,2015 Shaoda & Sjors, Helical refinement
+			RFLOAT new_helical_offset_step = sampling.helical_offset_step;
+			if (mymodel.ref_dim == 3)
+			{
+				if (new_offset_step < new_helical_offset_step)
+					new_helical_offset_step /= 2.;
+			}
+
+			// B. Use twice as fine angular sampling
+			if (mymodel.ref_dim == 3)
+			{
+				RFLOAT new_psi_step = 360. / (6 * ROUND(std::pow(2., new_healpix_order + adaptive_oversampling)));
+
+				// Set the new sampling in the sampling-object
+				sampling.setOrientations(new_healpix_order, new_psi_step * std::pow(2., adaptive_oversampling));
+
+				// Resize the pdf_direction arrays to the correct size and fill with an even distribution
+				mymodel.initialisePdfDirection(sampling.NrDirections());
+
+				// Also reset the nr_directions in wsum_model
+				wsum_model.nr_directions = mymodel.nr_directions;
+
+				// Also resize and initialise wsum_model.pdf_direction for each class!
+				for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
+					wsum_model.pdf_direction[iclass].initZeros(mymodel.nr_directions);
+
+			} else if (mymodel.ref_dim == 2)
+			{
+				sampling.psi_step /= 2.;
+			} else
+				REPORT_ERROR("MlOptimiser::autoAdjustAngularSampling BUG: ref_dim should be two or three");
+
+			// Jun08,2015 Shaoda & Sjors, Helical refinement
+			bool do_local_searches_helical = ((do_auto_refine || do_auto_sampling) && (do_helical_refine) &&
+			                                  (sampling.healpix_order >= autosampling_hporder_local_searches));
+
+			sampling.setTranslations(
+					new_offset_step,
+					sampling.offset_range,
+					do_local_searches_helical,
+					(do_helical_refine) && (!ignore_helical_symmetry),
+					new_helical_offset_step,
+					helical_rise_initial,
+					helical_twist_initial
+			);
+
+			// Reset smallest changes hidden variables
+			smallest_changes_optimal_classes = 9999999;
+			smallest_changes_optimal_offsets = 999.;
+			smallest_changes_optimal_orientations = 999.;
+
+			// If the angular sampling is smaller than autosampling_hporder_local_searches, then use local searches of +/- 6 times the angular sampling
+			if (mymodel.ref_dim == 3 && new_healpix_order >= autosampling_hporder_local_searches)
+			{
+				RFLOAT new_rottilt_step = 360. / (6 * ROUND(std::pow(2., new_healpix_order + adaptive_oversampling)));
+				// Switch ON local angular searches
+				mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
+				mymodel.sigma2_rot = mymodel.sigma2_psi = 2. * 2. * new_rottilt_step * new_rottilt_step;
+				if (!(do_helical_refine && helical_keep_tilt_prior_fixed))
+					mymodel.sigma2_tilt = mymodel.sigma2_rot;
+
+				// Aug20,2015 - Shaoda, Helical refinement
+				if ((do_helical_refine) && (!ignore_helical_symmetry))
+					mymodel.sigma2_rot = getHelicalSigma2Rot(helical_rise_initial, helical_twist_initial,
+					                                         sampling.helical_offset_step, new_rottilt_step,
+					                                         mymodel.sigma2_rot);
+			}
+
+			// Reset iteration counter
+			nr_iter_wo_resol_gain = 0;
+
+			// Suspend finer sampling for a few iterations if no transition to local searches has started
+			if (grad_suspended_local_searches_iter < 0)
+				grad_suspended_finer_sampling_iter = 5;
+		}
+	}
+
+	// PRINT OUT ---------------------------------------------------------------------------------------------
+
+	if (myverb)
+	{
+		std::cout << " Auto-refine: Angular step= " << sampling.getAngularSampling(adaptive_oversampling) << " degrees; local searches= ";
+		if (mymodel.orientational_prior_mode == NOPRIOR)
+			std:: cout << "false" << std::endl;
+		else
+			std:: cout << "true" << std::endl;
+		// Jun08,2015 Shaoda & Sjors, Helical refine
+		if ( (do_helical_refine) && (!ignore_helical_symmetry) )
+		{
+			std::cout << " Auto-refine: Helical refinement... Local translational searches along helical axis= ";
+			if ( (mymodel.ref_dim == 3) && (do_auto_refine || do_auto_sampling) && (sampling.healpix_order >= autosampling_hporder_local_searches) )
+				std:: cout << "true" << std::endl;
+			else
+				std:: cout << "false" << std::endl;
+		}
+		std::cout << " Auto-refine: Offset search range= " << sampling.offset_range << " Angstroms; offset step= " << sampling.getTranslationalSampling(adaptive_oversampling) << " Angstroms";
+		if ( (do_helical_refine) && (!ignore_helical_symmetry) )
+			std::cout << "; offset step along helical axis= " << sampling.getHelicalTranslationalSampling(adaptive_oversampling) << " pixels";
+		std::cout << std::endl;
+	}
+}
+
 void MlOptimiserMpi::iterate()
 {
 #ifdef TIMING
@@ -3100,17 +3314,22 @@ void MlOptimiserMpi::iterate()
 		// Nobody can start the next iteration until everyone has finished
 		MPI_Barrier(MPI_COMM_WORLD);
 
-		if (gradient_refine && iter < 10) {
+		if (gradient_refine && iter < 10)
 			nr_iter_wo_resol_gain = 0;
-			nr_iter_wo_large_hidden_variable_changes = 0;
-		}
 
 		// Only first follower checks for convergence and prints stats to the stdout
 		if (do_auto_refine)
 			checkConvergence(node->rank == 1);
 
-		if (gradient_refine) {
-			updateStepSize();
+		if (gradient_refine)
+		{
+			if (do_auto_refine)
+			{
+				if (grad_stepsize <= 0)
+					grad_current_stepsize = 0.9;
+				else
+					grad_current_stepsize = grad_stepsize;
+			}
 			do_grad = !(has_converged || iter > nr_iter - grad_em_iters) &&
 			          !(do_firstiter_cc && iter == 1) &&
 			          !grad_has_converged;
@@ -3120,13 +3339,23 @@ void MlOptimiserMpi::iterate()
 			                    !grad_has_converged;
 		}
 
+		if (maximum_significants_arg != -1)
+			maximum_significants = maximum_significants_arg;
+		else if (do_grad)
+		{
+			if (mymodel.ref_dim == 2)
+				maximum_significants = 5 * mymodel.nr_classes;
+			else
+				maximum_significants = 100 * mymodel.nr_classes;
+		}
+
 		// Update subset_size
 		updateSubsetSize(node->isLeader());
 
 		// Randomly take different subset of the particles each time we do a new "iteration" in SGD
 		if (random_seed != 0)
 		{
-			mydata.randomiseParticlesOrder(random_seed+iter, do_split_random_halves,  subset_size < mydata.numberOfParticles() );
+			mydata.randomiseParticlesOrder(random_seed+iter, do_split_random_halves,  subset_size);
 		}
 		else if (verb > 0)
 		{
@@ -3343,7 +3572,7 @@ void MlOptimiserMpi::iterate()
 							mymodel.helical_twist,
 							helical_nstart,
 							(mymodel.data_dim == 3),
-							do_auto_refine,
+							(do_auto_refine || do_auto_sampling),
 							mymodel.sigma2_rot,
 							mymodel.sigma2_tilt,
 							mymodel.sigma2_psi,
@@ -3457,6 +3686,13 @@ void MlOptimiserMpi::iterate()
 
 		if (do_auto_refine && has_converged)
 			break;
+
+		if (1. / mymodel.current_resolution < abort_at_resolution)
+		{
+			if (node->isLeader())
+				std::cout << "Current resolution " << 1. / mymodel.current_resolution << " exceeds --abort_at_resolution " << abort_at_resolution << std::endl;
+			break;
+		}
 
     } // end loop iters
 

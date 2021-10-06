@@ -21,9 +21,14 @@ class ReconstructParticleProgram
 			OptimisationSet optimisationSet;
 			std::string outDir, symmName, tmpOutRoot;
 			
-			bool do_whiten, no_reconstruction, only_do_unfinished, run_from_GUI, run_from_MPI, no_backup;
+			bool
+				do_whiten, no_reconstruction, only_do_unfinished,
+				run_from_GUI, run_from_MPI,
+				no_backup, do_circle_crop;
+
 			int boxSize, cropSize, num_threads, outer_threads, inner_threads, max_mem_GB;
-			double SNR, taper, binning;
+
+			double SNR, taper, binning, freqCutoffFract;
 
 		void readBasicParameters(int argc, char *argv[]);
 		virtual void readParameters(int argc, char *argv[]);

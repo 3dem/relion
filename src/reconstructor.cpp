@@ -143,7 +143,9 @@ void Reconstructor::initialise()
 	data_dim = 2; // Initial default value
 
 	if (fn_noise != "")
-		model.read(fn_noise);
+	{
+		model.read(fn_noise, obsModel.numberOfOpticsGroups());
+	}
 
 	// Get dimension of the images
 	if (do_reconstruct_ctf)
@@ -446,29 +448,9 @@ void Reconstructor::backprojectOneParticle(long int p)
 
 	if (fn_noise != "")
 	{
-		// TODO: Refactor code duplication from relion_project!
-		FileName fn_group;
-		if (DF.containsLabel(EMDL_MLMODEL_GROUP_NAME))
-			DF.getValue(EMDL_MLMODEL_GROUP_NAME, fn_group);
-		else if (DF.containsLabel(EMDL_MICROGRAPH_NAME))
-			DF.getValue(EMDL_MICROGRAPH_NAME, fn_group);
-		else
-			REPORT_ERROR("ERROR: cannot find rlnGroupName or rlnMicrographName in the input --i file...");
 
-		int my_mic_id = -1;
-		for (int mic_id = 0; mic_id < model.group_names.size(); mic_id++)
-		{
-			if (fn_group == model.group_names[mic_id])
-			{
-				my_mic_id = mic_id;
-				break;
-			}
-		}
-
-		if (my_mic_id < 0) REPORT_ERROR("ERROR: cannot find " + fn_group + " in the input model file...");
-
-		RFLOAT normcorr = 1.;
-		if (DF.containsLabel(EMDL_IMAGE_NORM_CORRECTION)) DF.getValue(EMDL_IMAGE_NORM_CORRECTION, normcorr);
+		int optics_group = 0;
+		DF.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group);
 
 		// Make coloured noise image
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(F2D)
@@ -476,7 +458,7 @@ void Reconstructor::backprojectOneParticle(long int p)
 			int ires = ROUND(sqrt((RFLOAT)(kp*kp + ip*ip + jp*jp)));
 			ires = XMIPP_MIN(ires, myBoxSize/2); // at freqs higher than Nyquist: use last sigma2 value
 
-			RFLOAT sigma = sqrt(DIRECT_A1D_ELEM(model.sigma2_noise[my_mic_id], ires));
+			RFLOAT sigma = sqrt(DIRECT_A1D_ELEM(model.sigma2_noise[optics_group], ires));
 			DIRECT_A3D_ELEM(F2D, k, i, j).real += rnd_gaus(0., sigma);
 			DIRECT_A3D_ELEM(F2D, k, i, j).imag += rnd_gaus(0., sigma);
 		}

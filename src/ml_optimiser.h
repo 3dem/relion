@@ -87,8 +87,7 @@
 #define WIDTH_FMASK_EDGE 2.
 #define MAX_NR_ITER_WO_RESOL_GAIN 1
 #define MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES 1
-#define MAX_NR_ITER_WO_RESOL_GAIN_GRAD 5
-#define MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES_GRAD 5
+#define MAX_NR_ITER_WO_RESOL_GAIN_GRAD 4
 
 // for profiling
 //#define TIMING
@@ -140,6 +139,12 @@ public:
 
 	// Filename for input reference images (stack, star or image)
 	FileName fn_ref;
+
+	// Filename for the subtomo optimiser set. Used to set fn_data, fn_ref and fn_mask
+	FileName fn_OS;
+
+	// Optimiser set table for subtomo
+	MetaDataTable optimisationSet;
 
 	// Generate a 3D model from 2D particles de novo?
 	bool is_3d_model;
@@ -225,6 +230,9 @@ public:
 	// Flag whether to use the auto-refine procedure
 	bool do_auto_refine;
 
+	// Flag whether to use auto-sampling (outside auto_refine)
+	bool do_auto_sampling;
+
 	// Flag whether to ignore changes in hidden variables in auto-refine (which makes it faster)
 	bool auto_ignore_angle_changes;
 
@@ -304,6 +312,9 @@ public:
 	// Minimum resolution to perform Bayesian estimates of the model
 	int minres_map;
 
+	// Abort when resolution reaches beyond this value
+	float abort_at_resolution;
+
 	// Flag to flatten solvent
 	bool do_solvent;
 
@@ -334,6 +345,9 @@ public:
 	// Id current iteration is gradient based
 	bool do_grad;
 	bool do_grad_next_iter;
+
+	// Do pseudo half-sets to estimate noise
+	bool grad_pseudo_halfsets;
 
 	// Number of iterations at the end of a gradient refinement using Expectation-Maximization
 	int grad_em_iters;
@@ -384,6 +398,10 @@ public:
 	RFLOAT grad_current_stepsize;
 	std::string grad_stepsize_scheme;
 
+	// For automated adjusting of tau2 fudge
+	std::string tau2_fudge_scheme;
+	RFLOAT tau2_fudge_arg;
+
 	// Self-organizing map
 	bool do_init_blobs;
 	bool do_som;
@@ -405,7 +423,10 @@ public:
 	// Gradient auto refinement has converged
 	bool grad_has_converged;
 
-	// Suspended finer sampling order with local searches for one iteration
+	// Suspended finer sampling for this many iteration
+	int grad_suspended_finer_sampling_iter;
+
+	// Suspended finer sampling with local searches for this many iteration
 	int grad_suspended_local_searches_iter;
 
 	// Every how many iterations should be written to disk when using subsets
@@ -657,8 +678,15 @@ public:
 	//Use different padding factors for the projector (PF+0) and backprojector (PF+1)
 	bool asymmetric_padding;
 
-	//Maximum number of significant weights in coarse pass of expectation
+	//Maximum number of significant weights in coarse pass of expectation specified by user
+	int maximum_significants_arg;
+
+	//Maximum number of significant weights in coarse pass of expectation used in refinement
+	// This can be set by user or automatically
 	int maximum_significants;
+
+	//Do regularization by denoising
+	bool do_red;
 
 	// Tabulated sine and cosine values (for 3D helical sub-tomogram averaging with on-the-fly shifts)
 	TabSine tab_sin;
@@ -678,6 +706,12 @@ public:
 
 	// Trust box size and angpix for the input reference
 	bool do_trust_ref_size;
+
+	// Number of particles for initial sigma2_noise estimation per optics group
+	int minimum_nr_particles_sigma2_noise;
+
+	// Do not call makeGoodHelixForEachRef
+    bool skip_realspace_helical_sym;
 
 #ifdef TIMING
 	Timer timer;
@@ -704,148 +738,154 @@ public:
 public:
 
 	MlOptimiser():
-		do_zero_mask(0),
-		do_write_unmasked_refs(0),
-		do_generate_seeds(0),
-		sum_changes_count(0),
-		current_changes_optimal_orientations(0),
-		do_average_unaligned(0),
-		sigma2_fudge(0),
-		do_always_cc(0),
-		best_resol_thus_far(0),
-		debug1(0),
-		incr_size(0),
-		has_large_incr_size_iter_ago(0),
-		nr_iter_wo_resol_gain(0),
-		nr_pool(0),
-		refs_are_ctf_corrected(0),
-		has_high_fsc_at_limit(0),
-		do_acc_currentsize_despite_highres_exp(0),
-		low_resol_join_halves(0),
-		do_auto_refine(0),
-		has_converged(0),
-		only_flip_phases(0),
-		gridding_nr_iter(0),
-		do_use_reconstruct_images(0),
-		fix_sigma_noise(0),
-		current_changes_optimal_offsets(0),
-		smallest_changes_optimal_classes(0),
-		do_print_metadata_labels(0),
-		adaptive_fraction(0),
-		do_print_symmetry_ops(0),
-		do_bfactor(0),
-		do_use_all_data(0),
-		minres_map(0),
-		debug2(0),
-		do_always_join_random_halves(0),
-		my_first_particle_id(0),
-		x_pool(1),
-		nr_threads(0),
-		do_shifts_onthefly(0),
-		exp_ipart_ThreadTaskDistributor(0),
-		do_parallel_disc_io(0),
-		sum_changes_optimal_orientations(0),
-		do_solvent(0),
-		strict_highres_exp(0),
-		sum_changes_optimal_classes(0),
-		acc_trans(0),
-		width_mask_edge(0),
-		has_fine_enough_angular_sampling(0),
-		sum_changes_optimal_offsets(0),
-		do_scale_correction(0),
-		ctf_phase_flipped(0),
-		nr_iter_wo_large_hidden_variable_changes(0),
-		adaptive_oversampling(0),
-		nr_iter(0),
-		intact_ctf_first_peak(0),
-		do_join_random_halves(0),
-		do_skip_align(0),
-		do_calculate_initial_sigma_noise(0),
-		fix_sigma_offset(0),
-		do_firstiter_cc(0),
-		do_bimodal_psi(0),
-		do_center_classes(0),
-		exp_my_last_part_id(0),
-		particle_diameter(0),
-		smallest_changes_optimal_orientations(0),
-		verb(0),
-		do_norm_correction(0),
-		fix_tau(0),
-		directions_have_changed(0),
-		acc_rot(0),
-		do_sequential_halves_recons(0),
-		do_skip_rotate(0),
-		current_changes_optimal_classes(0),
-		do_skip_maximization(0),
-		dont_raise_norm_error(0),
-		do_map(0),
-		combine_weights_thru_disc(0),
-		smallest_changes_optimal_offsets(0),
-		exp_my_first_part_id(0),
-		iter(0),
-		my_last_particle_id(0),
-		ini_high(0),
-		do_ctf_correction(0),
-		max_coarse_size(0),
-		autosampling_hporder_local_searches(0),
-		do_split_random_halves(0),
-		my_halfset(-1),
-		debug_split_random_half(0),
-		random_seed(0),
-		do_gpu(0),
-		anticipate_oom(0),
-		do_helical_refine(0),
-		do_preread_images(0),
-		ignore_helical_symmetry(0),
-		helical_twist_initial(0),
-		helical_rise_initial(0),
-		helical_z_percentage(0),
-		helical_tube_inner_diameter(0),
-		helical_tube_outer_diameter(0),
-		do_helical_symmetry_local_refinement(0),
-		helical_sigma_distance(0),
-		helical_keep_tilt_prior_fixed(0),
-		ctf3d_squared(0),
-		do_skip_subtomo_correction(0),
-		normalised_subtomos(0),
-		subtomo_multi_thr(0),
+            do_zero_mask(0),
+            do_write_unmasked_refs(0),
+            do_generate_seeds(0),
+            sum_changes_count(0),
+            current_changes_optimal_orientations(0),
+            do_average_unaligned(0),
+            sigma2_fudge(0),
+            do_always_cc(0),
+            best_resol_thus_far(0),
+            debug1(0),
+            incr_size(0),
+            has_large_incr_size_iter_ago(0),
+            nr_iter_wo_resol_gain(0),
+            nr_pool(0),
+            refs_are_ctf_corrected(0),
+            has_high_fsc_at_limit(0),
+            do_acc_currentsize_despite_highres_exp(0),
+            low_resol_join_halves(0),
+            do_auto_refine(0),
+            do_auto_sampling(0),
+            has_converged(0),
+            only_flip_phases(0),
+            gridding_nr_iter(0),
+            do_use_reconstruct_images(0),
+            fix_sigma_noise(0),
+            current_changes_optimal_offsets(0),
+            smallest_changes_optimal_classes(0),
+            do_print_metadata_labels(0),
+            adaptive_fraction(0),
+            do_print_symmetry_ops(0),
+            do_bfactor(0),
+            do_use_all_data(0),
+            minres_map(0),
+            debug2(0),
+            do_always_join_random_halves(0),
+            my_first_particle_id(0),
+            x_pool(1),
+            nr_threads(0),
+            do_shifts_onthefly(0),
+            exp_ipart_ThreadTaskDistributor(0),
+            do_parallel_disc_io(0),
+            sum_changes_optimal_orientations(0),
+            do_solvent(0),
+            strict_highres_exp(0),
+            sum_changes_optimal_classes(0),
+            acc_trans(0),
+            width_mask_edge(0),
+            has_fine_enough_angular_sampling(0),
+            sum_changes_optimal_offsets(0),
+            do_scale_correction(0),
+            ctf_phase_flipped(0),
+            nr_iter_wo_large_hidden_variable_changes(0),
+            adaptive_oversampling(0),
+            nr_iter(0),
+            intact_ctf_first_peak(0),
+            do_join_random_halves(0),
+            do_skip_align(0),
+            do_calculate_initial_sigma_noise(0),
+            fix_sigma_offset(0),
+            do_firstiter_cc(0),
+            do_bimodal_psi(0),
+            do_center_classes(0),
+            exp_my_last_part_id(0),
+            particle_diameter(0),
+            smallest_changes_optimal_orientations(0),
+            verb(0),
+            do_norm_correction(0),
+            fix_tau(0),
+            directions_have_changed(0),
+            acc_rot(0),
+            do_sequential_halves_recons(0),
+            do_skip_rotate(0),
+            current_changes_optimal_classes(0),
+            do_skip_maximization(0),
+            dont_raise_norm_error(0),
+            do_map(0),
+            combine_weights_thru_disc(0),
+            smallest_changes_optimal_offsets(0),
+            exp_my_first_part_id(0),
+            iter(0),
+            my_last_particle_id(0),
+            ini_high(0),
+            do_ctf_correction(0),
+            max_coarse_size(0),
+            autosampling_hporder_local_searches(0),
+            do_split_random_halves(0),
+            my_halfset(-1),
+            debug_split_random_half(0),
+            random_seed(0),
+            do_gpu(0),
+            anticipate_oom(0),
+            do_helical_refine(0),
+            do_preread_images(0),
+            ignore_helical_symmetry(0),
+            helical_twist_initial(0),
+            helical_rise_initial(0),
+            helical_z_percentage(0),
+            helical_tube_inner_diameter(0),
+            helical_tube_outer_diameter(0),
+            do_helical_symmetry_local_refinement(0),
+            helical_sigma_distance(0),
+            helical_keep_tilt_prior_fixed(0),
+            ctf3d_squared(0),
+            do_skip_subtomo_correction(0),
+            normalised_subtomos(0),
+            subtomo_multi_thr(0),
 		//directional_lowpass(0),
 		asymmetric_padding(false),
-		maximum_significants(-1),
-		threadException(NULL),
-		do_init_blobs(false),
-		do_som(false),
-		is_som_iter(false),
-		som_starting_nodes(0),
-		som_connectivity(0),
-		som_inactivity_threshold(0),
-		som_neighbour_pull(0),
-		class_inactivity_threshold(0),
-		gradient_refine(false),
-		do_grad(false),
-		grad_em_iters(0),
-		grad_ini_iter(0),
-		grad_ini_frac(0),
-		grad_fin_iter(0),
-		grad_fin_frac(0),
-		grad_inbetween_iter(0),
-		grad_ini_subset_size(0),
-		grad_fin_subset_size(0),
-		grad_min_resol(0),
-		grad_ini_resol(0),
-		grad_fin_resol(0),
-		do_grad_skip_anneal(false),
-		mu(0),
-		grad_stepsize(-1),
-		grad_current_stepsize(0),
-		auto_subset_size_order(0),
-		grad_has_converged(false),
-		grad_suspended_local_searches_iter(-1),
+            maximum_significants(-1),
+            threadException(NULL),
+            do_init_blobs(false),
+            do_som(false),
+            is_som_iter(false),
+            som_starting_nodes(0),
+            som_connectivity(0),
+            som_inactivity_threshold(0),
+            som_neighbour_pull(0),
+            class_inactivity_threshold(0),
+            gradient_refine(false),
+            do_grad(false),
+            grad_em_iters(0),
+            grad_ini_iter(0),
+            grad_ini_frac(0),
+            grad_fin_iter(0),
+            grad_fin_frac(0),
+            grad_inbetween_iter(0),
+            subset_size(0),
+            grad_ini_subset_size(0),
+            grad_fin_subset_size(0),
+            grad_min_resol(0),
+            grad_ini_resol(0),
+            grad_fin_resol(0),
+            do_grad_skip_anneal(false),
+            mu(0),
+            grad_stepsize(-1),
+            grad_current_stepsize(0),
+            auto_subset_size_order(0),
+            grad_has_converged(false),
+            grad_suspended_local_searches_iter(-1),
+            grad_suspended_finer_sampling_iter(-1),
+            grad_pseudo_halfsets(false),
+            skip_realspace_helical_sym(false),
 #ifdef ALTCPU
 		mdlClassComplex(NULL),
 #endif
-		failsafe_threshold(40),
-		do_trust_ref_size(0)
+            failsafe_threshold(40),
+            do_trust_ref_size(0),
+            minimum_nr_particles_sigma2_noise(1000)
 	{
 #ifdef ALTCPU
 		tbbCpuOptimiser = CpuOptimiserType((void*)NULL);
@@ -880,14 +920,18 @@ public:
 	// Check the mask is thr ight size
 	void checkMask(FileName &_fn_mask, int solvent_nr, int rank);
 
-	// Some general stuff that is shared between MPI and sequential code in the early stages of initialization
+	// Some general stuff that is shared between MPI and sequential code in the early stages of initialisation
 	void initialiseGeneral(int rank = 0);
 
 	// Randomise particle processing order and resize metadata array
 	void initialiseWorkLoad();
 
-	// Some general stuff that is shared between MPI and sequential code in the final stages of initialization
-	void initialiseGeneralFinalize(int rank = 0);
+	// Fetch initial noise spectra, from input file or calculate from subset of input images,
+	// also calculate initial Iref images if fn_ref == "None"
+	void initialiseSigma2Noise();
+
+	// Initialise initial reference images
+	void initialiseReferences();
 
 	/* Calculates the sum of all individual power spectra and the average of all images for initial sigma_noise estimation
 	 * The rank is passed so that if one splits the data into random halves one can know which random half to treat
@@ -1112,6 +1156,9 @@ public:
 
 	// Adjust step size for the gradient algorithms
 	void updateStepSize();
+
+	// Adjust tau2 fudge factor
+	void updateTau2Fudge();
 
 	// Check convergence for auto-refine procedure
 	// Also print convergence information to screen for auto-refine procedure

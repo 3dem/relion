@@ -96,6 +96,8 @@ static void Gui_Timer_CB(void *userdata);
 static bool maingui_do_read_only;
 // Show expand stdout view
 extern bool show_expand_stdout;
+// Use ccpem-pipeliner?
+static bool use_ccpem_pipeliner;
 
 // The pipeline this GUI is acting on
 static PipeLine pipeline;
@@ -199,7 +201,7 @@ public:
     // Constructor with w x h size of the window and a title
 	GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 			int _update_every_sec, int _exit_after_sec, bool _do_read_only = false,
-			bool _do_tomo = false, bool _do_projdir = false);
+			bool _do_tomo = false, bool _use_ccpem_pipeliner = false, bool _do_projdir = false);
 
     // Destructor
     ~GuiMainWindow(){ clear(); };

@@ -66,6 +66,7 @@ class MagnificationHelper
 						const RawImage<gravis::t2Vector<fComplex>>& predGradient,
 						const RawImage<fComplex>& observation,
 						const RawImage<float>& freqWeights,
+						const RawImage<float>& doseWeights,
 						CTF& ctf, double angpix,
 						RawImage<Equation2x2>& eqs);
 

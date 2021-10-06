@@ -1,29 +1,29 @@
-This program is developed in the group of Sjors H.W. Scheres at the MRC Laboratory of Molecular Biology,
+This program is developed in the group of Sjors Scheres at the MRC Laboratory of Molecular Biology, with contributions from the following people (in alphabetical order):
 
-- Sjors H.W. Scheres
-- Shaoda He
-- Takanori Nakane
-- Jasenko Zivanov
+- Tom Burnley (from the CCP-EM team at STFC)
 - Liyi Dong
-
-and Erik Lindahl at Stockholm University.
-
-- Erik Lindahl
-- Björn O. Forsberg
+- Bjoern Forsberg (from the Lindahl group at SciLifeLabs)
+- Shaoda He
+- Matt Iadanza (from the CCP-EM team at STFC)
 - Dari Kimanius
+- Erik Lindahl
+- Takanori Nakane
+- Joaquin Oton (from the Briggs group at MRC-LMB)
+- Colin Palmer (from the CCP-EM team at STFC)
+- Sjors Scheres
+- Jasenko Zivanov
 
-However, it does also contain pieces of code from the following packages:
+RELION also contain pieces of code from the following packages:
 
 - XMIPP by COS Sorzano et al: http:/xmipp.cnb.csic.es
-- BSOFT by Heymann JB et al: http://lsbr.niams.nih.gov/bsoft/
+- BSOFT by JB Heymann et al: http://lsbr.niams.nih.gov/bsoft/
 - HEALPIX by NASA Jet Propulsion Laboratory: http://healpix.jpl.nasa.gov/
-- libLBFGS by Naoaki Okazaki: http://www.chokkan.org/software/liblbfgs/
-- Numerical diagonalization of 3x3 matrices by Joachim Kopp: https://www.mpi-hd.mpg.de/personalhomes/globes/3x3/index.html
+- libLBFGS by N Okazaki: http://www.chokkan.org/software/liblbfgs/
+- Numerical diagonalization of 3x3 matrices by J Kopp: https://www.mpi-hd.mpg.de/personalhomes/globes/3x3/index.html
 - Gravis by Graphics and Vision Research Group at University of Basel: https://gravis.dmi.unibas.ch/index.html
-- CPlot2D by Attila Michael Zsaki: http://www.amzsaki.com/?page_id=2073
-- cmake-modules by Ryan A. Pavlik: https://github.com/rpavlik/cmake-modules
-- Many contributions (especially RelionIt GUI) from Colin Palmer
-- Symmetry relaxation patch by Vahid Abrishami 
+- CPlot2D by AM Zsaki: http://www.amzsaki.com/?page_id=2073
+- cmake-modules by RA Pavlik: https://github.com/rpavlik/cmake-modules
+- Symmetry relaxation patch by V Abrishami 
 
 Original disclaimers in the code of these external packages have been maintained as much as possible.
 Please contact Sjors Scheres (scheres@mrc-lmb.cam.ac.uk) if you feel this has not been done correctly.

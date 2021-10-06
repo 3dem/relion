@@ -101,7 +101,7 @@ BufferedImage<float> computeFrequencyWeights(
 
 	for (int f = 0; f < fc; f++)
 	{
-		frqWghts.getSliceRef(f) *= referenceMap.freqWeight;
+		referenceMap.contributeWeight<float>(frqWghts.getSliceRef(f));
 	}
 
 	BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s, 1.0);
@@ -172,7 +172,7 @@ int main(int argc, char *argv[])
 	ParticleSet dataSet(optimisationSet.particles);
 	std::vector<std::vector<ParticleIndex>> particles = dataSet.splitByTomogram(tomogramSet);
 
-	AberrationsCache aberrationsCache(dataSet.optTable, boxSize);
+	AberrationsCache aberrationsCache(dataSet.optTable, boxSize, dataSet.getOriginalPixelSize(0));
 
 	referenceMap.load(boxSize);
 
@@ -183,6 +183,7 @@ int main(int argc, char *argv[])
 	for (int tomoIndex = 0; tomoIndex < tomogramSet.size(); tomoIndex++)
 	{
 		Tomogram tomogram = tomogramSet.loadTomogram(tomoIndex, true);
+		tomogram.validateParticleOptics(particles[tomoIndex], dataSet);
 
 		std::string outDirTomo = outDir + tomogram.name + "/";
 		ZIO::ensureParentDir(outDirTomo);
@@ -221,17 +222,20 @@ int main(int argc, char *argv[])
 				BufferedImage<tComplex<float>> observation(sh,s);
 
 				TomoExtraction::extractFrameAt3D_Fourier(
-					tomogram.stack, f, s, 1.0, tomogram.projectionMatrices[f], traj[f],
+					tomogram.stack, f, s, 1.0, tomogram, traj[f],
 					observation, projCut, 1, true);
 
 				CTF ctf = tomogram.getCtf(f, dataSet.getPosition(part_id));
+				RawImage<float> doseSlice = doseWeights.getSliceRef(f);
 
 				BufferedImage<fComplex> prediction = Prediction::predictModulated(
 					part_id, dataSet, tomogram.projectionMatrices[f], s,
 					ctf, tomogram.optics.pixelSize, aberrationsCache,
 					referenceMap.image_FS,
 					Prediction::OwnHalf,
-					Prediction::AmplitudeModulated);
+					Prediction::AmplitudeModulated,
+					&doseSlice,
+					Prediction::CtfUnscaled);
 
 
 				const double cos_f = tomogram.projectionMatrices[f](2,2);
@@ -246,7 +250,7 @@ int main(int argc, char *argv[])
 					const double r = sqrt(xx*xx + yy*yy);
 
 					const fComplex obs = -observation(x,y);
-					const fComplex prd =  doseWeights(x,y,f) * prediction(x,y);
+					const fComplex prd =  prediction(x,y);
 
 					const int ri = (int) r;
 

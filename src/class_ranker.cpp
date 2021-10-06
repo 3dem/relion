@@ -19,8 +19,10 @@
  ***************************************************************************/
 
 
+#include "src/npy.hpp"
 #include "src/class_ranker.h"
-static int IMGSIZE = 64;
+const static int IMGSIZE = 64;
+const static int NR_FEAT = 24;
 
 //
 // Calculates n! (uses double arithmetic to avoid overflow)
@@ -64,7 +66,7 @@ double ZernikeMomentsExtractor::zernikeR(int n, int l, double r)
 	return(sum) ;
 }
 
-Complex ZernikeMomentsExtractor::zernikeZ(MultidimArray<double> img, int n, int l, double r_max)
+Complex ZernikeMomentsExtractor::zernikeZ(MultidimArray<RFLOAT> img, int n, int l, double r_max)
 {
   double rho ;		// radius of pixel from COM
   double theta ;    // angle of pixel
@@ -92,16 +94,15 @@ Complex ZernikeMomentsExtractor::zernikeZ(MultidimArray<double> img, int n, int 
 }
 
 
-std::vector<double> ZernikeMomentsExtractor::getZernikeMoments(MultidimArray<double> img, long z_order, double radius, bool verb)
+std::vector<RFLOAT> ZernikeMomentsExtractor::getZernikeMoments(MultidimArray<RFLOAT> img, long z_order, double radius, bool verb)
 {
 	if (z_order > 20 || z_order < 0)
 		REPORT_ERROR("BUG: zernike(): You choice of z_order is invalid; choose a value between 0 and 20");
 
-
-	std::vector<double> zfeatures;
+	std::vector<RFLOAT> zfeatures;
 
 	// Normalise images to be intensity from [0,1]
-	double minval, maxval, range;
+	RFLOAT minval, maxval, range;
 	MultidimArray<int> mask;
 	mask.resize(img);
 	mask.setXmippOrigin();
@@ -152,7 +153,7 @@ std::vector<double> ZernikeMomentsExtractor::getZernikeMoments(MultidimArray<dou
 }
 
 
-double HaralickExtractor::Entropy(MultidimArray<double> arr)
+RFLOAT HaralickExtractor::Entropy(MultidimArray<RFLOAT> arr)
 {
 	double result = 0.0;
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(arr)
@@ -192,9 +193,9 @@ void HaralickExtractor::fast_init()
 
 /*0 => energy, 1 => entropy, 2=> inverse difference */
 /*3 => correlation, 4=> info measure 1, 5 => info measure 2*/
-std::vector<double> HaralickExtractor::cooc_feats()
+std::vector<RFLOAT> HaralickExtractor::cooc_feats()
 {
-	std::vector<double> ans(7, 0.0);
+	std::vector<RFLOAT> ans(7, 0.0);
 	double hxy1 = 0.0;
 	double hxy2 = 0.0;
 	double local, xy;
@@ -226,9 +227,9 @@ std::vector<double> HaralickExtractor::cooc_feats()
 
 /*0 => contrast, 1 => diff entropy, 2 => diffvariance */
 /*3 => sum average, 4 => sum entropy, 5 => sum variance */
-std::vector<double> HaralickExtractor::margprobs_feats()
+std::vector<RFLOAT> HaralickExtractor::margprobs_feats()
 {
-	std::vector<double> ans(6, 0.0);
+	std::vector<RFLOAT> ans(6, 0.0);
 	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(probdiff)
 	{
 		ans[0] += i * i * DIRECT_A1D_ELEM(probdiff, i);
@@ -252,14 +253,14 @@ std::vector<double> HaralickExtractor::margprobs_feats()
 }
 
 
-MultidimArray<double> HaralickExtractor::fast_feats(bool verbose)
+MultidimArray<RFLOAT> HaralickExtractor::fast_feats(bool verbose)
 {
-	MultidimArray<double> result;
+	MultidimArray<RFLOAT> result;
 	result.initZeros(13);
 	if (NZYXSIZE(matcooc) ==0) return result;
 	if (!initial) fast_init();
-	std::vector<double> margfeats = margprobs_feats();
-	std::vector<double> coocfeats = cooc_feats();
+	std::vector<RFLOAT> margfeats = margprobs_feats();
+	std::vector<RFLOAT> coocfeats = cooc_feats();
 	for (int i = 0; i < 7; i++)
 	{
 		result(i) = coocfeats[i];
@@ -306,13 +307,13 @@ MultidimArray<RFLOAT> HaralickExtractor::MatCooc(MultidimArray<int> img, int N,
 	return ans;
 }
 
-std::vector<double> HaralickExtractor::getHaralickFeatures(MultidimArray<RFLOAT> img,
+std::vector<RFLOAT> HaralickExtractor::getHaralickFeatures(MultidimArray<RFLOAT> img,
 		MultidimArray<int> *mask, bool verbose)
 {
-	std::vector<double> ans;
+	std::vector<RFLOAT> ans;
 	ans.resize(13, 0.);
 
-	MultidimArray<double> avg;
+	MultidimArray<RFLOAT> avg;
 	avg.initZeros(13);
 
 	// Check there are non-zero elements in the mask
@@ -321,7 +322,7 @@ std::vector<double> HaralickExtractor::getHaralickFeatures(MultidimArray<RFLOAT>
 	// Convert greyscale image to integer image with much fewer (32) grey-scale values
 	MultidimArray<int> imgint;
 	imgint.resize(img);
-	double minval, maxval, range;
+	RFLOAT minval, maxval, range;
 	img.computeDoubleMinMax(minval, maxval, mask);
 	range = maxval -minval;
 	if (range > 0.)
@@ -392,11 +393,14 @@ void ClassRanker::read(int argc, char **argv, int rank)
 	do_select = parser.checkOption("--auto_select", "Perform auto-selection of particles based on below thresholds for the score");
 	select_min_score = textToFloat(parser.getOption("--min_score", "Minimum selected score to be included in class selection", "0.5"));
 	select_max_score = textToFloat(parser.getOption("--max_score", "Maximum selected score to be included in class selection", "999."));
+	select_min_parts = textToInteger(parser.getOption("--select_min_nr_particles", "select at least this many particles, regardless of their class score", "-1"));
+	select_min_classes = textToInteger(parser.getOption("--select_min_nr_classes", "OR: Select at least this many classes, regardless of their score", "-1"));
 	do_relative_threshold = parser.checkOption("--relative_thresholds", "If true, interpret the above min and max_scores as fractions of the maximum score of all predicted classes in the input");
 	fn_sel_parts = parser.getOption("--fn_sel_parts", "Filename for output star file with selected particles", "particles.star");
 	fn_sel_classavgs = parser.getOption("--fn_sel_classavgs", "Filename for output star file with selected class averages", "class_averages.star");
 	fn_root = parser.getOption("--fn_root", "rootname for output model.star and optimiser.star files", "rank");
-	fn_torch_model = parser.getOption("--fn_torch_model", "Filename for the serialized Torch model.", ""); // Default should be compile-time defined
+	fn_pytorch_model = parser.getOption("--fn_pytorch_model", "Filename for the serialized Torch model.", ""); // Default should be compile-time defined
+	python_interpreter = parser.getOption("--python", "Command or path to python interpreter with pytorch.", "python");
 
 	int part_section = parser.addSection("Network training options (only used in development!)");
 	do_ranking  = !parser.checkOption("--train", "Only write output files for training purposes (don't rank classes)");
@@ -479,8 +483,13 @@ void ClassRanker::initialise()
 			exit(1);
 		}
 
+		//Sjors 04032021: read number of optics groups from data.star file for backwards compatibility with reading pre-relion-4.0 files
+		MetaDataTable MDoptics;
+		MDoptics.read(fn_data, "optics");
+		int nr_optics_groups = XMIPP_MAX(1, MDoptics.numberOfObjects());
+
 		//Sjors 06022020: go back to just reading MD_optimiser for speed
-		mymodel.read(fn_model, true); // true means: read only one group!
+		mymodel.read(fn_model, nr_optics_groups);
 		if (debug>0) std::cerr << "Done with reading model.star ..." << std::endl;
 
 		//myopt.read(fn_optimiser); // true means skip_groups_and_pdf_direction from mlmodel; only read 1000 particles...
@@ -526,14 +535,19 @@ void ClassRanker::initialise()
 			// Read in particles (otherwise wait until haveAllAccuracies or performRanking, as Liyi sometimes doesn't need mydata)
 			mydata.read(fn_data, true, true); // true true means: ignore particle_name and group name!
 			total_nr_particles = mydata.numberOfParticles(0);
-			if (debug>0) std::cerr << "Done with reading data.star ..." << std::endl;
 
 		}
 		else
 		{
 			MetaDataTable MDtmp;
 			total_nr_particles = MDtmp.read(fn_data, "particles", true); // true means do_only_count
+			if (total_nr_particles == 0)
+			{
+				// Try again with old-style data.star file
+				total_nr_particles = MDtmp.read(fn_data, "", true); // true means do_only_count
+			}
 		}
+		if (debug>0) std::cerr << "Done with reading data.star ... total_nr_particles= " << total_nr_particles << std::endl;
 
 		if (intact_ctf_first_peak && !only_do_subimages)
 		{
@@ -604,13 +618,19 @@ void ClassRanker::initialise()
 		std::cout << "WARNING: Should not provide radius ratio and radius at the same time. Ignoring the radius ratio..." << std::endl;
 	}
 
-#ifdef _TORCH_ENABLED
-	if (fn_torch_model == "") {
-		fn_torch_model = get_default_torch_model_path();
-		if (fn_torch_model != "")
-			std::cout << "Using default pytorch model: " << fn_torch_model << std::endl;
+	if (fn_pytorch_model == "") {
+		fn_pytorch_model = get_default_pytorch_model_path();
+		if (fn_pytorch_model != "")
+			std::cout << "Using default pytorch model: " << fn_pytorch_model << std::endl;
 	}
-#endif
+
+	if (fn_pytorch_script == "") {
+		fn_pytorch_script = get_python_script_path();
+		if (fn_pytorch_script != "")
+			std::cout << "Using python script: " << fn_pytorch_script << std::endl;
+		else
+			REPORT_ERROR("Python script file is missing.");
+	}
 }
 
 
@@ -672,6 +692,10 @@ MultidimArray<RFLOAT> ClassRanker::getSubimages(MultidimArray<RFLOAT> &img, int 
 	newimg.setXmippOrigin();
 
 	// Data augmentation: rotate and flip
+	MultidimArray<RFLOAT> subimages;
+	subimages = newimg;
+
+	/* Do data augmentation in pytorch
 	MultidimArray<RFLOAT> subimages(8, 1, IMGSIZE, IMGSIZE);
 	subimages.setImage(0, newimg);
 	rotation2DMatrix(90., A);
@@ -699,6 +723,7 @@ MultidimArray<RFLOAT> ClassRanker::getSubimages(MultidimArray<RFLOAT> &img, int 
 	rotation2DMatrix(270., A);
 	applyGeometry(newimg2, newimg, A, false, false);
 	subimages.setImage(7, newimg);
+	*/
 
 	/*
 	// TODO: make the if statement for only making subimages for classes with non-zero protein area inside this function
@@ -870,14 +895,14 @@ void ClassRanker::calculatePvsLBP(MultidimArray<RFLOAT> I, MultidimArray<int> &p
 	}
 }
 
-std::vector<RFLOAT> ClassRanker::calculateGranulo(const MultidimArray<double> &I)
+std::vector<RFLOAT> ClassRanker::calculateGranulo(const MultidimArray<RFLOAT> &I)
 {
 
-	std::vector<RFLOAT> result;
+    std::vector<RFLOAT> result;
 
-	Image<double> G;
+    Image<RFLOAT> G;
     G().resize(I);
-    double m, M;
+    RFLOAT m, M;
     I.computeDoubleMinMax(m, M);
 
     if (XSIZE(I) < 15 || YSIZE(I) < 15)
@@ -1660,7 +1685,7 @@ void ClassRanker::getFeatures()
 
 			// Determining radius to use
 			circular_mask_radius = particle_diameter / (uniform_angpix * 2.);
-			circular_mask_radius = std::min( (XSIZE(img())/2.) , circular_mask_radius);
+			circular_mask_radius = std::min(RFLOAT(XSIZE(img())/2.) , circular_mask_radius);
 			if (radius_ratio > 0 && radius <= 0) radius = radius_ratio * circular_mask_radius;
 			// Calculate moments in ring area
 			if (radius > 0)
@@ -1862,35 +1887,56 @@ void ClassRanker::readFeatures()
 }
 
 
-float ClassRanker::deployTorchModel(FileName &model_path, std::vector<float> &features, std::vector<float> &subimages) {
+void ClassRanker::deployTorchModel(FileName &model_path, std::vector<float> &features, std::vector<float> &subimages, std::vector<float> &scores)
+{
+	const long unsigned count = features.size() / NR_FEAT;
+	const long unsigned featues_shape [] = {count, NR_FEAT};
+	npy::SaveArrayAsNumpy(fn_out + "features.npy", false, 2, featues_shape, features);
 
-#ifdef _TORCH_ENABLED
-	torch::jit::script::Module module;
+	const long unsigned image_shape [] = {count, IMGSIZE, IMGSIZE};
+	npy::SaveArrayAsNumpy(fn_out + "images.npy", false, 3, image_shape, subimages);
 
-	// Deserialize model
-	try {
-		module = torch::jit::load(model_path);
+	char buffer[128];
+	std::string result = "";
+
+	std::string command = python_interpreter + " " + fn_pytorch_script + " " + fn_pytorch_model + " " + fn_out;
+
+	// Open pipe to file
+	FILE* pipe = popen(command.c_str(), "r");
+	if (!pipe)
+	{
+		REPORT_ERROR("Failed to run external python script with the following command:\n " + command);
 	}
-	catch (const c10::Error& e) {
-		REPORT_ERROR("Error loading Torch model.");
+
+	// read till end of process:
+	while (!feof(pipe))
+		if (fgets(buffer, 128, pipe) != NULL)
+			result += buffer;
+
+	pclose(pipe);
+
+	try
+	{
+		std::string s = result;
+		std::string delimiter = " ";
+		std::string::size_type sz;
+		scores.resize(0);
+		size_t pos = 0;
+		std::string token;
+		while ((pos = s.find(delimiter)) != std::string::npos) {
+			token = s.substr(0, pos);
+			scores.push_back(std::stof(token, &sz));
+			s.erase(0, pos + delimiter.length());
+		}
+		if (scores.size() != count){
+			std::cerr << result << std::endl;
+			REPORT_ERROR("Failed to run external python script with the following command:\n " + command);
+		}
 	}
-
-	// Create an inputs with batch size=1.
-	torch::Tensor imagestensor = torch::from_blob(subimages.data(), {1, 1, IMGSIZE, IMGSIZE});
-	torch::Tensor featuretensor = torch::from_blob(features.data(), {1, (int)features.size()});
-	std::vector<torch::jit::IValue> inputs;
-	inputs.push_back(imagestensor);
-	inputs.push_back(featuretensor);
-
-	// Execute the model and turn its output into a tensor.
-	at::Tensor output = module.forward(inputs).toTensor();
-
-	// Extract score value from tensor and return
-	return output[0][0].item<float>();
-
-#else //_TORCH_ENABLED
-	REPORT_ERROR("RELION was not compiled with Torch support.\nConfigure with -DTORCH=ON and re-compile.");
-#endif //_TORCH_ENABLED
+	catch (const std::invalid_argument& ia) {
+		std::cerr << result << std::endl;
+		REPORT_ERROR("Failed to run external python script with the following command:\n " + command);
+	}
 }
 
 void ClassRanker::performRanking()
@@ -1900,6 +1946,11 @@ void ClassRanker::performRanking()
 		// Read in particles if we haven't done this already
 		mydata.read(fn_data, true, true); // true true means: ignore particle_name and group name!
 		if (debug>0) std::cerr << "Done with reading data.star ..." << std::endl;
+	}
+
+	if (verb > 0)
+	{
+		std::cout << " Deploying torch model for each class ..." << std::endl;
 	}
 
 	// Initialise all scores to -999 (including empty classes!)
@@ -1918,27 +1969,44 @@ void ClassRanker::performRanking()
 
 	MetaDataTable MDselected_particles, MDselected_classavgs;
 
-	long int nr_sel_parts = 0;
-	long int nr_sel_classavgs = 0;
 	RFLOAT highscore = 0.0;
 	std::vector<int> selected_classes;
-	std::vector<float> scores(features_all_classes.size());
+	std::vector<float> scores;
 	float max_score = -999.;
+//	for (int i = 0; i < features_all_classes.size(); i++)
+//	{
+//		std::vector<float> image_vector, feature_vector;
+//
+//		MultidimArray<RFLOAT> myimg;
+//		features_all_classes[i].subimages.getSlice(0, myimg);
+//		image_vector.resize(NZYXSIZE(myimg));
+//		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(myimg)
+//		{
+//			image_vector[n] = DIRECT_MULTIDIM_ELEM(myimg, n);
+//		}
+//		feature_vector = features_all_classes[i].toNormalizedVector();
+//		scores[i] = (RFLOAT) deployTorchModel(fn_pytorch_model, feature_vector, image_vector);
+//		if (scores[i] > max_score) max_score = scores[i];
+//	}
+
+	std::vector<float> image_vector(features_all_classes.size() * IMGSIZE * IMGSIZE);
+	std::vector<float> feature_vector(features_all_classes.size() * NR_FEAT);
 	for (int i = 0; i < features_all_classes.size(); i++)
 	{
-		std::vector<float> image_vector, feature_vector;
+		std::vector<float> f = features_all_classes[i].toNormalizedVector();
+		for (int j = 0; j < NR_FEAT; j++)
+			feature_vector[i*NR_FEAT + j] = f[j];
 
-		MultidimArray<RFLOAT> myimg;
-		features_all_classes[i].subimages.getSlice(0, myimg);
-		image_vector.resize(NZYXSIZE(myimg));
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(myimg)
+		MultidimArray<RFLOAT> img;
+		features_all_classes[i].subimages.getSlice(0, img);
+		image_vector.resize(NZYXSIZE(img));
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img)
 		{
-			image_vector[n] = DIRECT_MULTIDIM_ELEM(myimg, n);
+			image_vector[i * IMGSIZE * IMGSIZE + n] = DIRECT_MULTIDIM_ELEM(img, n);
 		}
-		feature_vector = features_all_classes[i].toNormalizedVector();
-		scores[i] = (RFLOAT) deployTorchModel(fn_torch_model, feature_vector, image_vector);
-		if (scores[i] > max_score) max_score = scores[i];
 	}
+
+	deployTorchModel(fn_pytorch_model, feature_vector, image_vector, scores);
 
 	RFLOAT my_min = select_min_score;
 	RFLOAT my_max = select_max_score;
@@ -1956,11 +2024,15 @@ void ClassRanker::performRanking()
 		MDbackup.setValue(EMDL_SELECTED, 0);
 	}
 
+	long int nr_sel_parts = 0;
+	long int nr_sel_classavgs = 0;
 	for (int i = 0; i < features_all_classes.size(); i++)
 	{
 		if (do_select && scores[i] >= my_min && scores[i] <= my_max)
 		{
 			nr_sel_classavgs++;
+			nr_sel_parts+= features_all_classes[i].particle_nr;
+
 			selected_classes.push_back(features_all_classes[i].class_index);
 
 			MDselected_classavgs.addObject();
@@ -1978,6 +2050,71 @@ void ClassRanker::performRanking()
 		int iclass = features_all_classes[i].class_index - 1; // class counting in STAR files starts at 1!
 		predicted_scores.at(iclass) = scores[i];
 	}
+
+	// Select a minimum number of particles or classes
+	if (do_select && (nr_sel_parts < select_min_parts || nr_sel_classavgs < select_min_classes) )
+	{
+		std::vector<std::pair<float, int> > vp;
+
+	    for (int i = 0; i < scores.size(); i++)
+	    {
+	        vp.push_back(std::make_pair(scores[i], i));
+	    }
+	    std::sort(vp.begin(), vp.end());
+
+	    // Go from best classes down to worst
+	    for (int idx = scores.size() - 1; idx >=0 ; idx--)
+	    {
+	    	int i = vp[idx].second;
+    		float myscore = scores[i];
+    		// only consider classes that we haven't considered yet
+    		if (!(scores[i] >= my_min && scores[i] <= my_max))
+    		{
+    			if (nr_sel_parts < select_min_parts)
+				{
+
+    				nr_sel_classavgs++;
+    				nr_sel_parts+= features_all_classes[i].particle_nr;
+
+    				selected_classes.push_back(features_all_classes[i].class_index);
+
+    				MDselected_classavgs.addObject();
+    				MDselected_classavgs.setValue(EMDL_MLMODEL_REF_IMAGE, features_all_classes[i].name);
+    				MDselected_classavgs.setValue(EMDL_CLASS_PREDICTED_SCORE, scores[i]);
+    				MDselected_classavgs.setValue(EMDL_MLMODEL_PDF_CLASS, features_all_classes[i].class_distribution);
+    				MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_ROT, features_all_classes[i].accuracy_rotation);
+    				MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, features_all_classes[i].accuracy_translation);
+    				MDselected_classavgs.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, features_all_classes[i].estimated_resolution);
+
+    				MDbackup.setValue(EMDL_SELECTED, 1, features_all_classes[i].class_index - 1 );
+
+					if (nr_sel_parts >= select_min_parts) break;
+				}
+				else if (nr_sel_classavgs < select_min_classes)
+				{
+
+					nr_sel_classavgs++;
+					nr_sel_parts+= features_all_classes[i].particle_nr;
+
+					selected_classes.push_back(features_all_classes[i].class_index);
+
+					MDselected_classavgs.addObject();
+					MDselected_classavgs.setValue(EMDL_MLMODEL_REF_IMAGE, features_all_classes[i].name);
+					MDselected_classavgs.setValue(EMDL_CLASS_PREDICTED_SCORE, scores[i]);
+					MDselected_classavgs.setValue(EMDL_MLMODEL_PDF_CLASS, features_all_classes[i].class_distribution);
+					MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_ROT, features_all_classes[i].accuracy_rotation);
+					MDselected_classavgs.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, features_all_classes[i].accuracy_translation);
+					MDselected_classavgs.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, features_all_classes[i].estimated_resolution);
+
+					MDbackup.setValue(EMDL_SELECTED, 1, features_all_classes[i].class_index - 1 );
+
+					if (nr_sel_classavgs >= select_min_classes) break;
+				}
+    		}
+	    }
+
+	}
+
 
 	// Write optimiser.star and model.star in the output directory.
 	FileName fn_opt_out, fn_model_out, fn_data_out;
@@ -2018,6 +2155,7 @@ void ClassRanker::performRanking()
 	{
 
 		// Select all particles in the data.star that have classes inside the selected_classes vector
+		nr_sel_parts = 0;
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(mydata.MDimg)
 		{
 			int classnr;
@@ -2170,10 +2308,9 @@ void ClassRanker::writeFeatures()
 }
 
 
-std::string ClassRanker::get_default_torch_model_path()
+std::string ClassRanker::get_default_pytorch_model_path()
 {
 
-#ifdef _TORCH_ENABLED
 	std::vector<char> buff(512);
 	ssize_t len;
 
@@ -2194,6 +2331,33 @@ std::string ClassRanker::get_default_torch_model_path()
 			return path;
 		}
 	}
-#endif
+
 	return "";
 }
+
+ std::string ClassRanker::get_python_script_path()
+ {
+
+	 std::vector<char> buff(512);
+	 ssize_t len;
+
+	 //Read path string into buffer
+	 do {
+		 buff.resize(buff.size() + 128);
+		 len = ::readlink("/proc/self/exe", &(buff[0]), buff.size());
+	 } while (buff.size() == len);
+
+	 // Convert to string and return
+	 if (len > 0) {
+		 buff[len] = '\0'; //Mark end of string
+		 std::string path = std::string(&(buff[0]));
+		 std::size_t found = path.find_last_of("/\\");
+		 path = path.substr(0,found) + "/relion_class_ranker.py";
+		 if (FILE *file = fopen(path.c_str(), "r")) { //Check if file can be opened
+			 fclose(file);
+			 return path;
+		 }
+	 }
+
+	 return "";
+ }

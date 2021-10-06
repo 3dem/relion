@@ -264,7 +264,7 @@ public:
 		RFLOAT u2 = X * X + Y * Y;
 		RFLOAT u4 = u2 * u2;
 
-		RFLOAT gamma = K1 * (Axx*X*X + 2.0*Axy*X*Y + Ayy*Y*Y) + K2 * u4 - K5 - K3 + gammaOffset + PI/2.;
+		RFLOAT gamma = K1 * (Axx*X*X + 2.0*Axy*X*Y + Ayy*Y*Y) + K2 * u4 - K5 - K3 + gammaOffset;
 
 		RFLOAT sinx, cosx;
 #ifdef RELION_SINGLE_PRECISION
@@ -484,7 +484,7 @@ public:
 		}
 	}
 	
-	double setDefocusMatrix(double axx, double axy, double ayy);
+	void setDefocusMatrix(double axx, double axy, double ayy);
 			
 };
 #endif

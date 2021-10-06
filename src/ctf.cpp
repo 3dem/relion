@@ -657,7 +657,7 @@ void CTF::applyWeightEwaldSphereCurvature_noAniso(MultidimArray <RFLOAT> &result
 	}
 }
 
-void CTF::applyEwaldMask(RawImage<RFLOAT>& weight, int orixdim, int oriydim, double angpix, double particle_diameter)
+void CTF::applyEwaldMask(RawImage<RFLOAT>& weight, int orixdim, int oriydim, RFLOAT angpix, RFLOAT particle_diameter)
 {
 	const double xs = orixdim * angpix;
 	const double ys = oriydim * angpix;
@@ -703,7 +703,7 @@ double CTF::getAyy() const
 	return Ayy;
 }
 
-double CTF::setDefocusMatrix(double axx, double axy, double ayy)
+void CTF::setDefocusMatrix(double axx, double axy, double ayy)
 {
 	Axx = axx;
 	Axy = axy;

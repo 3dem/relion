@@ -608,7 +608,8 @@ bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, int rank)
 			{
 				if (std::rename(fn_avg.c_str(), fn_tmp.c_str()))
 				{
-					std::cerr << "ERROR in renaming: " << fn_avg << " to " << fn_tmp << std::endl;
+					std::cerr << "ERROR in renaming " << fn_avg << " to " << fn_tmp << ".\n";
+					std::cerr << std::strerror(errno) << std::endl;
 					return false;
 				}
 			}
@@ -616,20 +617,22 @@ bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, int rank)
 			{
 				if (std::remove(fn_avg.c_str()))
 				{
-					std::cerr << "ERROR in removing non-dose weighted image: " << fn_avg << std::endl;
+					std::cerr << "ERROR in removing non-dose weighted image " << fn_avg << ".\n";
+					std::cerr << std::strerror(errno) << std::endl;
 					return false;
 				}
 			}
 
 			fn_tmp = fn_avg.withoutExtension() + "_DWS.mrc";
 			if (exists(fn_tmp))
-				std::remove(fn_tmp.c_str());
+				std::remove(fn_tmp.c_str()); // failure does not matter
 
 			// Move _DW.mrc to .mrc filename
 			fn_tmp = fn_avg.withoutExtension() + "_DW.mrc";
 			if (std::rename(fn_tmp.c_str(), fn_avg.c_str()))
 			{
-				std::cerr << "ERROR in renaming: " << fn_tmp << " to " << fn_avg <<std::endl;
+				std::cerr << "ERROR in renaming " << fn_tmp << " to " << fn_avg << ".\n";
+				std::cerr << std::strerror(errno) << std::endl;
 				return false;
 			}
 		}

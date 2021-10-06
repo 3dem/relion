@@ -238,11 +238,11 @@ void MotionRefiner::init()
 	
 	if (only_do_unfinished)
 	{
-		motionMdts.clear();
-		recombMdts.clear();
-		
-		motionMdts = MotionEstimator::findUnfinishedJobs(chosenMdts, outPath);
-		recombMdts = frameRecombiner.findUnfinishedJobs(chosenMdts, outPath);
+		motionUnfinished = MotionEstimator::findUnfinishedJobs(chosenMdts, outPath);
+		recombUnfinished = frameRecombiner.findUnfinishedJobs(chosenMdts, outPath);
+
+		motionMdts = selectMicrographs(chosenMdts, motionUnfinished);
+		recombMdts = selectMicrographs(chosenMdts, recombUnfinished);
 		
 		if (verb > 0)
 		{
@@ -285,12 +285,27 @@ void MotionRefiner::init()
 							  << "a new STAR file will be generated" << std::endl;
 				}
 			}
+
+			if (debug)
+			{
+				std::cout << "index \t motion unfinished \t recombination unfinished:\n";
+
+				for (int i = 0; i < chosenMdts.size(); i++)
+				{
+					std::cout << i << " \t " << motionUnfinished[i] << " \t " << recombUnfinished[i] << '\n';
+				}
+
+				std::cout << '\n';
+			}
 		}
 	}
 	else
 	{
 		motionMdts = chosenMdts;
 		recombMdts = chosenMdts;
+
+		motionUnfinished = std::vector<bool>(chosenMdts.size(), true);
+		recombUnfinished = std::vector<bool>(recombMdts.size(), true);
 	}
 	
 	estimateParams = motionParamEstimator.anythingToDo();
@@ -344,66 +359,85 @@ void MotionRefiner::run()
 		return;
 		// @TODO: apply the optimized parameters, then continue with motion estimation
 	}
+
+	const int mgc = chosenMdts.size();
 	
-	const int lastMgForFCC = lastMicrographForFCC();
-	const int firstMgWithoutFCC = lastMgForFCC + 1;
-	const bool anyWithoutFCC = firstMgWithoutFCC < motionMdts.size();
+	const int lastTotalMgForFCC = lastTotalMicrographForFCC();
+
+	int lastMotionMgForFCC = subtractFinishedMicrographs(lastTotalMgForFCC, motionUnfinished);
+	int lastRecombMgForFCC = subtractFinishedMicrographs(lastTotalMgForFCC, recombUnfinished);
+
+	const int firstMotionMgWithoutFCC = lastMotionMgForFCC + 1;
+	const int firstTotalMgWithoutFCC = lastTotalMgForFCC + 1;
+
+	std::vector<int> total2motion = getForwardIndices(motionUnfinished);
+	std::vector<int> total2recomb = getForwardIndices(recombUnfinished);
 	
 	if (estimateMotion)
 	{
-		motionEstimator.process(motionMdts, 0, lastMgForFCC, true);
+		motionEstimator.process(motionMdts, 0, lastMotionMgForFCC, true);
 	}
 	
 	if (recombineFrames)
 	{
 		double k_out_A = reference.pixToAng(reference.k_out);
+
+
+		// Recombine movies that have already been aligned:
 		
 		frameRecombiner.init(
 			allMdts, verb, reference.s, fc, k_out_A, reference.angpix,
 			nr_omp_threads, outPath, debug,
 			&reference, &obsModel, &micrographHandler);
 		
-		frameRecombiner.process(recombMdts, 0, lastMgForFCC);
-		
-		if (anyWithoutFCC)
+		frameRecombiner.process(recombMdts, 0, lastRecombMgForFCC);
+
+
+		// Then, align and recombine in an alternating pattern to minimize disk I/O:
+
+		motionEstimator.setVerbosity(0);
+		frameRecombiner.setVerbosity(0);
+
+		const int left = chosenMdts.size() - firstTotalMgWithoutFCC;
+		const int barstep = XMIPP_MAX(1, left/ 60);
+
+		if (verb > 0)
 		{
-			motionEstimator.setVerbosity(0);
-			frameRecombiner.setVerbosity(0);
-			
-			const int left = motionMdts.size() - lastMgForFCC - 1;
-			const int barstep = XMIPP_MAX(1, left/ 60);
-			
-			if (verb > 0)
+			std::cout << " + Aligning and combining frames for micrographs ... " << std::endl;
+			init_progress_bar(mgc - firstTotalMgWithoutFCC);
+		}
+
+		for (int m = firstTotalMgWithoutFCC; m < mgc; m++)
+		{
+			// TODO: TAKANORI: micrograph handler can cache movie frames to avoid reading movies twice.
+			//                 (if --sbs, don't cache to save memory)
+
+			if (estimateMotion && motionUnfinished[m])
 			{
-				std::cout << " + Aligning and combining frames for micrographs ... " << std::endl;
-				init_progress_bar(left);
+				motionEstimator.process(motionMdts, total2motion[m], total2motion[m], false);
 			}
-			
-			for (int m = firstMgWithoutFCC; m < motionMdts.size(); m++)
+
+			if (recombUnfinished[m])
 			{
-				// TODO: TAKANORI: micrograph handler can cache movie frames to avoid reading movies twice.
-				//                 (if --sbs, don't cache to save memory)
-				
-				motionEstimator.process(motionMdts, m, m, false);
-				frameRecombiner.process(recombMdts, m, m);
-				
-				const int nr_done = m - firstMgWithoutFCC + 1;
-				
-				if (verb > 0 && nr_done % barstep == 0)
-				{
-					progress_bar(nr_done);
-				}
+				frameRecombiner.process(recombMdts, total2recomb[m], total2recomb[m]);
 			}
-			
-			if (verb > 0)
+
+			const int nr_done = m - firstTotalMgWithoutFCC;
+
+			if (verb > 0 && nr_done % barstep == 0)
 			{
-				progress_bar(left);
+				progress_bar(nr_done);
 			}
 		}
+
+		if (verb > 0)
+		{
+			progress_bar(left);
+		}
 	}
-	else if (anyWithoutFCC)
+	else
 	{
-		motionEstimator.process(motionMdts, firstMgWithoutFCC, motionMdts.size()-1, true);
+		motionEstimator.process(motionMdts, firstMotionMgWithoutFCC, motionMdts.size()-1, true);
 	}
 	
 	if (generateStar)
@@ -583,24 +617,97 @@ void MotionRefiner::adaptMovieNames()
 	}
 }
 
-int MotionRefiner::lastMicrographForFCC()
+int MotionRefiner::lastTotalMicrographForFCC()
 {
+	int total = chosenMdts.size() - 1;
+
 	if (particlesForFcc > 0)
 	{
 		int partSoFar = 0;
 		
-		for (int m = 0; m < motionMdts.size(); m++)
+		for (int m = 0; m < chosenMdts.size(); m++)
 		{
-			partSoFar += motionMdts[m].numberOfObjects();
+			partSoFar += chosenMdts[m].numberOfObjects();
 			
 			if (partSoFar > particlesForFcc)
 			{
-				return m;
+				total = m;
+				break;
 			}
 		}
 	}
-	else
-	{
-		return motionMdts.size()-1;
-	}
+
+	return total;
 }
+
+int MotionRefiner::subtractFinishedMicrographs(
+		int lastTotal,
+		const std::vector<bool> &selection)
+{
+	int lastSelected = lastTotal;
+
+	for (int m = 0; m <= lastTotal; m++)
+	{
+		if (!selection[m])
+		{
+			lastSelected--;
+		}
+	}
+
+	return lastSelected;
+}
+
+std::vector<MetaDataTable> MotionRefiner::selectMicrographs(
+		const std::vector<MetaDataTable> &mdts,
+		const std::vector<bool> &selection) const
+{
+	std::vector<MetaDataTable> out(0);
+
+	for (int i = 0; i < mdts.size(); i++)
+	{
+		if (selection[i])
+		{
+			out.push_back(mdts[i]);
+		}
+	}
+
+	return out;
+}
+
+std::vector<int> MotionRefiner::getForwardIndices(const std::vector<bool>& selection) const
+{
+	const int mgc = selection.size();
+	std::vector<int> total_to_selection(mgc, -1);
+
+	int index = 0;
+
+	for (int m = 0; m < mgc; m++)
+	{
+		if (selection[m])
+		{
+			total_to_selection[m] = index;
+			index++;
+		}
+	}
+
+	return total_to_selection;
+}
+
+std::vector<int> MotionRefiner::getBackwardIndices(const std::vector<bool>& selection) const
+{
+	const int mgc = selection.size();
+	std::vector<int> selection_to_total(0);
+	selection_to_total.reserve(mgc);
+
+	for (int m = 0; m < mgc; m++)
+	{
+		if (selection[m])
+		{
+			selection_to_total.push_back(m);
+		}
+	}
+
+	return selection_to_total;
+}
+
+

@@ -77,6 +77,9 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 	diag = parser.checkOption("--diag", "Write out diagnostic information");
 
 	num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
+
+	freqCutoffFract = textToDouble(parser.getOption("--cutoff_fract", "Ignore shells for which the dose weight falls below this value", "0.01"));
+
 	outDir = parser.getOption("--o", "Output filename pattern");
 
 	run_from_GUI = is_under_pipeline_control();
@@ -118,8 +121,7 @@ void SubtomoProgram::run()
 	if (cropSize < 0) cropSize = boxSize;
 	
 	bool do_ctf = true;
-	
-	const long int tc = particles.size();
+
 	const long int s2D = boxSize;
 	
 	const long int s3D = cropSize;
@@ -128,6 +130,7 @@ void SubtomoProgram::run()
 	const long int s02D = (int)(binning * s2D + 0.5);
 	
 	const double relative_box_scale = cropSize / (double) boxSize;
+	const double binned_pixel_size = binning * particleSet.getOriginalPixelSize(0);
 
 
 	initialise(particleSet, particles, tomogramSet);
@@ -144,7 +147,7 @@ void SubtomoProgram::run()
 		sum_weights.fill(0.0);
 	}
 
-	AberrationsCache aberrationsCache(particleSet.optTable, s2D);
+	AberrationsCache aberrationsCache(particleSet.optTable, s2D, binned_pixel_size);
 
 
 	std::vector<int> tomoIndices = ParticleSet::enumerate(particles);
@@ -357,6 +360,7 @@ void SubtomoProgram::processTomograms(
 		}
 
 		Tomogram tomogram = tomogramSet.loadTomogram(t, true);
+		tomogram.validateParticleOptics(particles[t], particleSet);
 
 		const int fc = tomogram.frameCount;
 
@@ -369,6 +373,8 @@ void SubtomoProgram::processTomograms(
 		{
 			noiseWeights = tomogram.computeNoiseWeight(s2D, binning);
 		}
+
+		BufferedImage<int> xRanges = tomogram.findDoseXRanges(doseWeights, freqCutoffFract);
 
 		const int inner_thread_num = 1;
 		const int outer_thread_num = num_threads / inner_thread_num;
@@ -416,8 +422,11 @@ void SubtomoProgram::processTomograms(
 			}
 
 			const d3Vector pos = particleSet.getPosition(part_id);
+			
 			const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
 						part_id, fc, tomogram.optics.pixelSize);
+			
+			const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s2D/2.0);
 
 			std::vector<d4Matrix> projCut(fc), projPart(fc);
 
@@ -425,7 +434,7 @@ void SubtomoProgram::processTomograms(
 			BufferedImage<float> weightStack(sh2D,s2D,fc);
 
 			TomoExtraction::extractAt3D_Fourier(
-					tomogram.stack, s02D, binning, tomogram.projectionMatrices, traj,
+					tomogram.stack, s02D, binning, tomogram, traj, isVisible,
 					particleStack, projCut, inner_thread_num, do_circle_precrop);
 
 			if (!do_ctf) weightStack.fill(1.f);
@@ -438,6 +447,8 @@ void SubtomoProgram::processTomograms(
 
 			for (int f = 0; f < fc; f++)
 			{
+				if (!isVisible[f]) continue;
+				
 				projPart[f] = projCut[f] * d4Matrix(particleSet.getSubtomogramMatrix(part_id));
 
 				if (do_ctf)
@@ -449,7 +460,7 @@ void SubtomoProgram::processTomograms(
 					const float sign = flip_value? -1.f : 1.f;
 
 					for (int y = 0; y < s2D;  y++)
-					for (int x = 0; x < sh2D; x++)
+					for (int x = 0; x < xRanges(y,f); x++)
 					{
 						const double c = ctfImg(x,y) * doseWeights(x,y,f);
 
@@ -502,13 +513,17 @@ void SubtomoProgram::processTomograms(
 
 			for (int f = 0; f < fc; f++)
 			{
-				FourierBackprojection::backprojectSlice_forward_with_multiplicity(
-					particleStack.getSliceRef(f),
-					weightStack.getSliceRef(f),
-					projPart[f] * relative_box_scale,
-					dataImgFS,
-					ctfImgFS,
-					multiImageFS);
+				if (isVisible[f])
+				{
+					FourierBackprojection::backprojectSlice_forward_with_multiplicity(
+						&xRanges(0,f),
+						particleStack.getSliceRef(f),
+						weightStack.getSliceRef(f),
+						projPart[f] * relative_box_scale,
+						dataImgFS,
+						ctfImgFS,
+						multiImageFS);
+				}
 			}
 
 			Centering::shiftInSitu(dataImgFS);
@@ -553,7 +568,7 @@ void SubtomoProgram::processTomograms(
 			}
 
 			// What if we didn't? The 2D image is already tapered.
-			Reconstruction::taper(dataImgRS, taper, do_center, inner_thread_num);
+			//Reconstruction::taper(dataImgRS, taper, do_center, inner_thread_num);
 
 			if (do_sum_all)
 			{

@@ -309,10 +309,10 @@ void JobWindow::updateMyJob()
 	}
 }
 
-void JobWindow::initialise(int my_job_type, bool do_tomo)
+void JobWindow::initialise(int my_job_type, bool _is_tomo)
 {
-	is_tomo = do_tomo;
-	myjob.setTomo(do_tomo);
+	is_tomo = _is_tomo;
+	myjob.setTomo(_is_tomo);
 
 	if (my_job_type == PROC_IMPORT)
 	{
@@ -784,27 +784,7 @@ void JobWindow::initialiseAutopickWindow()
 	resetHeight();
 
 	place("fn_topaz_exec");
-
-	group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group5->end();
-	place("do_topaz_train", TOGGLE_DEACTIVATE, group5);
-
-	group5->begin();
-	place("topaz_train_picks", TOGGLE_DEACTIVATE);
-
-	group6 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group6->end();
-
-	place("do_topaz_train_parts", TOGGLE_DEACTIVATE, group6);
-	group6->end();
-
-	group6->begin();
-	place("topaz_train_parts", TOGGLE_DEACTIVATE);
-	group6->end();
-	guientries["do_topaz_train_parts"].cb_menu_i();
-
-	group5->end();
-	guientries["do_topaz_train"].cb_menu_i();
+	place("topaz_particle_diameter", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -823,8 +803,30 @@ void JobWindow::initialiseAutopickWindow()
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	place("topaz_particle_diameter", TOGGLE_DEACTIVATE);
+	group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group5->end();
+	place("do_topaz_train", TOGGLE_DEACTIVATE, group5);
+	group5->begin();
+
 	place("topaz_nr_particles", TOGGLE_DEACTIVATE);
+	place("topaz_train_picks", TOGGLE_DEACTIVATE);
+
+	group6 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group6->end();
+
+	place("do_topaz_train_parts", TOGGLE_DEACTIVATE, group6);
+
+	group6->begin();
+	place("topaz_train_parts", TOGGLE_DEACTIVATE);
+	group6->end();
+	guientries["do_topaz_train_parts"].cb_menu_i();
+
+	group5->end();
+	guientries["do_topaz_train"].cb_menu_i();
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
 	place("topaz_other_args", TOGGLE_DEACTIVATE);
 
 	tab3->end();
@@ -1081,28 +1083,13 @@ void JobWindow::initialiseSelectWindow()
 	group6 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group6->end();
 
-#ifdef _TORCH_ENABLED
 
 	place("do_class_ranker", TOGGLE_DEACTIVATE, group6);
 	group6->begin();
 	place("rank_threshold", TOGGLE_DEACTIVATE);
-
-#else
-
-	Fl_Text_Buffer *textbuff1 = new Fl_Text_Buffer();
-        textbuff1->text("For auto-selection build with pyTorch, using -DTORCH=ON in cmake.");
-        Fl_Text_Display* textdisp1 = new Fl_Text_Display(XCOL1, current_y, WCOL1+WCOL2+WCOL3+10, STEPY*1.2);
-        textdisp1->textsize(12);
-        textdisp1->color(GUI_BACKGROUND_COLOR);
-        textdisp1->buffer(textbuff1);
-
-        current_y += STEPY*1.5;
-
-	place("do_class_ranker", TOGGLE_ALWAYS_DEACTIVATE, group6);
-	group6->begin();
-	place("rank_threshold", TOGGLE_ALWAYS_DEACTIVATE);
-
-#endif
+	place("select_nr_parts", TOGGLE_DEACTIVATE);
+	place("select_nr_classes", TOGGLE_DEACTIVATE);
+	place("python_exe", TOGGLE_DEACTIVATE);
 
 	group6->end();
 	guientries["do_class_ranker"].cb_menu_i();
@@ -1216,18 +1203,41 @@ void JobWindow::initialiseClass2DWindow()
 	tab3->label("Optimisation");
 	resetHeight();
 
-	//set up groups
-	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group2->end();
-
 	place("nr_classes", TOGGLE_DEACTIVATE);
 	place("tau_fudge");
 
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	place("nr_iter");
-	place("do_grad", TOGGLE_DEACTIVATE);
+	//set up groups
+	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group2->end();
+
+	place("do_em", TOGGLE_DEACTIVATE, group2);
+
+	group2->begin();
+
+	place("nr_iter_em");
+
+	group2->end();
+
+	guientries["do_em"].cb_menu_i(); // to make default effective
+
+
+	//set up groups
+	group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group5->end();
+
+	place("do_grad", TOGGLE_DEACTIVATE, group5);
+
+	group5->begin();
+
+	place("nr_iter_grad");
+
+	group5->end();
+
+	guientries["do_grad"].cb_menu_i(); // to make default effective
+
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -1368,6 +1378,7 @@ void JobWindow::initialiseInimodelWindow()
 	resetHeight();
 
 	place("nr_iter");
+	place("tau_fudge");
 	place("nr_classes", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
@@ -1376,13 +1387,7 @@ void JobWindow::initialiseInimodelWindow()
 	place("particle_diameter");
 	place("do_solvent", TOGGLE_DEACTIVATE);
 	place("sym_name", TOGGLE_DEACTIVATE);
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	place("sampling");
-	place("offset_range");
-	place("offset_step");
+	place("do_run_C1", TOGGLE_DEACTIVATE);
 
 	tab3->end();
 
@@ -2389,6 +2394,9 @@ void JobWindow::initialiseTomoImportWindow()
 
 	place("part_star", TOGGLE_DEACTIVATE);
 	place("part_tomos", TOGGLE_DEACTIVATE);
+	// Add a little spacer
+	current_y += STEPY/2;
+	place("do_coords_flipZ", TOGGLE_DEACTIVATE);
 
 	group2->end();
 	guientries["do_coords"].cb_menu_i(); // make default active
@@ -2473,23 +2481,32 @@ void JobWindow::initialiseTomoCtfRefineWindow()
 	group1->begin();
 
 	place("focus_range", TOGGLE_DEACTIVATE);
+
+	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group2->end();
+	place("do_reg_def", TOGGLE_DEACTIVATE, group2);
+
+	group2->begin();
 	place("lambda", TOGGLE_DEACTIVATE);
+	group2->end();
+	guientries["do_reg_def"].cb_menu_i();
 
 	group1->end();
 	guientries["do_defocus"].cb_menu_i();
 
+
 	current_y += STEPY /2 ;
 
-	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group2->end();
-	place("do_scale", TOGGLE_DEACTIVATE, group2);
+	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group3->end();
+	place("do_scale", TOGGLE_DEACTIVATE, group3);
 
-	group2->begin();
+	group3->begin();
 
 	place("do_frame_scale", TOGGLE_DEACTIVATE);
 	place("do_tomo_scale", TOGGLE_DEACTIVATE);
 
-	group2->end();
+	group3->end();
 	guientries["do_scale"].cb_menu_i();
 
 	tab2->end();
@@ -2541,16 +2558,28 @@ void JobWindow::initialiseTomoAlignWindow()
 
 	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group1->end();
-	place("do_polish", TOGGLE_DEACTIVATE, group1);
+	place("do_flex_align", TOGGLE_DEACTIVATE, group1);
+	place("do_glob_shift", TOGGLE_DEACTIVATE);
 
 	group1->begin();
+
+	current_y += STEPY /2 ;
+
+	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group2->end();
+	place("do_polish", TOGGLE_DEACTIVATE, group2);
+
+	group2->begin();
 
 	place("sigma_vel", TOGGLE_DEACTIVATE);
 	place("sigma_div", TOGGLE_DEACTIVATE);
 	place("do_sq_exp_ker", TOGGLE_DEACTIVATE);
 
-	group1->end();
+	group2->end();
 	guientries["do_polish"].cb_menu_i();
+
+	group1->end();
+	guientries["do_flex_align"].cb_menu_i();
 
 	tab2->end();
 }

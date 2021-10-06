@@ -1,3 +1,5 @@
+static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 #include "src/ml_optimiser_mpi.h"
 
 // ----------------------------------------------------------------------------
@@ -332,15 +334,15 @@ void getFourierTransformsAndCtfs(long int part_id,
                 int seed(baseMLO->random_seed + part_id);
 
 
-    			// Remap mymodel.sigma2_noise[group_id] onto remapped_sigma2_noise for this images's size and angpix
+    			// Remap mymodel.sigma2_noise[optics_group] onto remapped_sigma2_noise for this images's size and angpix
     			MultidimArray<RFLOAT > remapped_sigma2_noise;
     			remapped_sigma2_noise.initZeros(XSIZE(img())/2+1);
     			RFLOAT remap_image_sizes = (baseMLO->image_full_size[optics_group] * my_pixel_size) / (baseMLO->mymodel.ori_size * baseMLO->mymodel.pixel_size);
-    			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(baseMLO->mymodel.sigma2_noise[group_id])
+    			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(baseMLO->mymodel.sigma2_noise[optics_group])
     			{
     				int i_remap = ROUND(remap_image_sizes * i);
     				if (i_remap < XSIZE(remapped_sigma2_noise))
-    					DIRECT_A1D_ELEM(remapped_sigma2_noise, i_remap) = DIRECT_A1D_ELEM(baseMLO->mymodel.sigma2_noise[group_id], i);
+    					DIRECT_A1D_ELEM(remapped_sigma2_noise, i_remap) = DIRECT_A1D_ELEM(baseMLO->mymodel.sigma2_noise[optics_group], i);
     			}
 
 
@@ -2058,10 +2060,12 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 						std::cerr << " op.min_diff2[img_id]= " << op.min_diff2[img_id] << std::endl;
 						int group_id = baseMLO->mydata.getGroupId(op.part_id, img_id);
 						std::cerr << " group_id= " << group_id << std::endl;
+						int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
+						std::cerr << " optics_group= " << optics_group << std::endl;
 						std::cerr << " ml_model.scale_correction[group_id]= " << baseMLO->mymodel.scale_correction[group_id] << std::endl;
 						std::cerr << " exp_significant_weight[img_id]= " << op.significant_weight[img_id] << std::endl;
 						std::cerr << " exp_max_weight[img_id]= " << op.max_weight[img_id] << std::endl;
-						std::cerr << " ml_model.sigma2_noise[group_id]= " << baseMLO->mymodel.sigma2_noise[group_id] << std::endl;
+						std::cerr << " ml_model.sigma2_noise[optics_group]= " << baseMLO->mymodel.sigma2_noise[optics_group] << std::endl;
 						CRITICAL(ERRSUMWEIGHTZERO); //"op.sum_weight[img_id]==0"
 					}
 
@@ -2131,8 +2135,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	// Set those back here
 	for (int img_id = 0; img_id < sp.nr_images; img_id++)
 	{
-		int group_id = baseMLO->mydata.getGroupId(op.part_id, img_id);
-		DIRECT_MULTIDIM_ELEM(op.local_Minvsigma2[img_id], 0) = 1. / (baseMLO->sigma2_fudge * DIRECT_A1D_ELEM(baseMLO->mymodel.sigma2_noise[group_id], 0));
+		int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
+		DIRECT_MULTIDIM_ELEM(op.local_Minvsigma2[img_id], 0) = 1. / (baseMLO->sigma2_fudge * DIRECT_A1D_ELEM(baseMLO->mymodel.sigma2_noise[optics_group], 0));
 	}
 
 	// For norm_correction and scale_correction of all images of this particle
@@ -2884,9 +2888,15 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					baseMLO->timer.tic(baseMLO->TIMING_WSUM_BACKPROJ);
 	#endif
 
+				// If doing pseudo gold standard select random half-model
+				int iproj_offset = 0;
+				if (baseMLO->grad_pseudo_halfsets)
+					// Backproject every other particle into separate volumes
+					iproj_offset = (op.part_id % 2) * baseMLO->mymodel.nr_classes
+
 				CTIC(accMLO->timer,"backproject");
 				runBackProjectKernel(
-					accMLO->bundle->backprojectors[iproj],
+					accMLO->bundle->backprojectors[iproj + iproj_offset],
 					projKernel,
 					&(~Fimgs)[re_nomask_offset], //~Fimgs_nomask_real,
 					&(~Fimgs)[im_nomask_offset], //~Fimgs_nomask_imag,
@@ -3056,8 +3066,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				int ires_remapped = ROUND(remap_image_sizes * ires);
 				// Note there is no sqrt in the normalisation term because of the 2-dimensionality of the complex-plane
 				// Also exclude origin from logsigma2, as this will not be considered in the P-calculations
-				if (ires > 0 && ires_remapped < XSIZE(baseMLO->mymodel.sigma2_noise[group_id]))
-					logsigma2 += log( 2. * PI * DIRECT_A1D_ELEM(baseMLO->mymodel.sigma2_noise[group_id], ires_remapped));
+				if (ires > 0 && ires_remapped < XSIZE(baseMLO->mymodel.sigma2_noise[optics_group]))
+					logsigma2 += log( 2. * PI * DIRECT_A1D_ELEM(baseMLO->mymodel.sigma2_noise[optics_group], ires_remapped));
 			}
 			RFLOAT dLL;
 
@@ -3088,12 +3098,12 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(thr_wsum_sigma2_noise[img_id])
 				{
 					int i_resam = ROUND(i * remap_image_sizes);
-					if (i_resam < XSIZE(baseMLO->wsum_model.sigma2_noise[igroup]))
+					if (i_resam < XSIZE(baseMLO->wsum_model.sigma2_noise[optics_group]))
 					{
-						DIRECT_A1D_ELEM(baseMLO->wsum_model.sigma2_noise[igroup], i_resam) += DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[img_id], i);
+						DIRECT_A1D_ELEM(baseMLO->wsum_model.sigma2_noise[optics_group], i_resam) += DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[img_id], i);
 					}
 				}
-				baseMLO->wsum_model.sumw_group[igroup] += thr_sumw_group[img_id];
+				baseMLO->wsum_model.sumw_group[optics_group] += thr_sumw_group[img_id];
 				if (baseMLO->do_scale_correction)
 				{
 					baseMLO->wsum_model.wsum_signal_product[igroup] += thr_wsum_signal_product_spectra[img_id];
@@ -3123,7 +3133,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			baseMLO->wsum_model.LL += thr_sum_dLL;
 			baseMLO->wsum_model.ave_Pmax += thr_sum_Pmax;
-		}
+		}	
 	} // end if !do_skip_maximization
 
 	CTOC(accMLO->timer,"store_post_gpu");

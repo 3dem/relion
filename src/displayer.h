@@ -480,11 +480,12 @@ public:
 	// Input for the display parameters
 	Fl_Input *black_input, *white_input, *sigma_contrast_input, *scale_input, *lowpass_input, *highpass_input, *angpix_input;
 	Fl_Input *col_input, *ori_scale_input, *max_nr_images_input, *max_parts_per_class_input;
-	Fl_Check_Button *sort_button, *reverse_sort_button, *apply_orient_button, *read_whole_stack_button;
+	Fl_Check_Button *sort_button, *reverse_sort_button, *apply_orient_button, *display_label_button;
 	Fl_Choice *display_choice, *sort_choice, *colour_scheme_choice;
 
 	// Constructor with w x h size of the window and a title
-	displayerGuiWindow(int W, int H, const char* title=0): Fl_Window(W, H, title),	sort_button(NULL), reverse_sort_button(NULL), apply_orient_button(NULL), read_whole_stack_button(NULL) {}
+	displayerGuiWindow(int W, int H, const char* title=0): Fl_Window(W, H, title),	sort_button(NULL),
+			reverse_sort_button(NULL), apply_orient_button(NULL), display_label_button(NULL){}
 
 	// Fill all except for the browser
 	int fill(FileName &fn_in);

@@ -2253,8 +2253,8 @@ int displayerGuiWindow::fill(FileName &_fn_in)
 		reverse_sort_button->color(GUI_INPUT_COLOR);
 		apply_orient_button  = new Fl_Check_Button(x, y, inputwidth, height, "Apply orientations?");
 		apply_orient_button->color(GUI_INPUT_COLOR);
-		read_whole_stack_button = new Fl_Check_Button(x+160, y, inputwidth, height, "Read whole stacks?");
-		read_whole_stack_button->color(GUI_INPUT_COLOR);
+		display_label_button = new Fl_Check_Button(x+160, y, inputwidth, height, "Display label?");
+		display_label_button->color(GUI_INPUT_COLOR);
 		y += ROUND(1.75*ystep);
 
 	}
@@ -2465,8 +2465,11 @@ void displayerGuiWindow::cb_display_i()
 			}
 		}
 
-		if (getValue(read_whole_stack_button))
-			cl += " --read_whole_stack ";
+		if (getValue(display_label_button))
+		{
+			const Fl_Menu_Item* m2 = sort_choice->mvalue();
+			cl += " --text_label " + (std::string)m2->label();
+		}
 
 		if (getValue(apply_orient_button))
 			cl += " --apply_orient ";
@@ -2570,7 +2573,7 @@ void Displayer::topazDenoiseMap(FileName fn_in, FileName fn_odir, Image<RFLOAT> 
 	if (system(command.c_str()))
 	{
 		std::string warning = "WARNING: there was an error in executing: " + fn_script + "\nWARNING: skipping topaz denoising...";
-		fl_message(warning.c_str());
+		fl_message("%s", warning.c_str());
 		img.read(fn_in);
 	}
 	else
@@ -2639,6 +2642,7 @@ void Displayer::read(int argc, char **argv)
 	particle_radius *= coord_scale;
 	do_topaz_denoise = parser.checkOption("--topaz_denoise", "Use Topaz denoising before picking (on GPU 0)");
 	fn_topaz_exe = parser.getOption("--topaz_exe", "Name of topaz executable", "topaz");
+        fn_shell = parser.getOption("--bash_exe", "Name of bash shell executable", "/bin/bash");
 	lowpass = textToFloat(parser.getOption("--lowpass", "Lowpass filter (in A) to filter micrograph before displaying", "0"));
 	highpass = textToFloat(parser.getOption("--highpass", "Highpass filter (in A) to filter micrograph before displaying", "0"));
 	minimum_pick_fom = textToFloat(parser.getOption("--minimum_pick_fom", "Minimum value for rlnAutopickFigureOfMerit to display picks", "-9999."));
@@ -2652,12 +2656,6 @@ void Displayer::read(int argc, char **argv)
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())
 		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
-
-	fn_shell = "/bin/sh";
-	char *shell_name;
-	shell_name = getenv("RELION_SHELL");
-	if (shell_name != NULL)
-		fn_shell = (std::string)shell_name;
 
 }
 

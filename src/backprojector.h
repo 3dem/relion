@@ -60,8 +60,7 @@ public:
 	// Skip the iterative gridding part of the reconstruction
 	bool skip_gridding;
 
-	MultidimArray<RFLOAT> mom1_power;
-	MultidimArray<RFLOAT> mom2_power;
+	MultidimArray<RFLOAT> mom1_noise_power;
 
 public:
 
@@ -319,12 +318,28 @@ public:
 	void reweightGrad();
 
 	/*
-	 * Calculate the first or second moment of the gradient
+	 * Calculate the first moment of the gradient
+	 */
+	void getFristMoment(
+			MultidimArray<Complex> &mom,
+			RFLOAT lambda=0.9);
+
+	/*
+	 * Calculate the second moment of the gradient
+	 */
+	void getSecondMoment(
+			MultidimArray<Complex> &mom,
+			MultidimArray<Complex> &data_other,
+			RFLOAT lambda=0.999);
+
+	/*
+	 * Combine statistics from two half-set gradients with first and second moment
+	 * and calculate the FSC estimate
 	 */
 	void applyMomenta(
-			MultidimArray<Complex> &mom1, RFLOAT lambda1,
-			MultidimArray<Complex> &mom2, RFLOAT lambda2,
-			bool init_mom);
+			MultidimArray<Complex> &mom1_half1,
+			MultidimArray<Complex> &mom1_half2,
+			MultidimArray<Complex> &mom2);
 
 	void reconstructGrad(
 			MultidimArray<RFLOAT> &vol_out,

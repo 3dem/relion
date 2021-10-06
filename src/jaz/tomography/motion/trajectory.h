@@ -16,7 +16,7 @@ class Trajectory
 				ParticleSet& particleSet);
 
 		static void write(
-				const std::vector<Trajectory>& shifts,
+				const std::vector<std::vector<Trajectory>>& shifts,
 				const ParticleSet& particleSet,
 				const std::vector<std::vector<ParticleIndex>>& particles,
 				std::string filename);
@@ -45,7 +45,9 @@ class Trajectory
 				{
 					shifts_Ang[f] += t.shifts_Ang[f];
 				}
-			}		
+			}
+
+			return *this;	
 		}
 		
 };

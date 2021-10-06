@@ -17,7 +17,6 @@ MotionFit::MotionFit(
 	const std::vector<gravis::d4Matrix>& frameProj, 
 	ParticleSet& dataSet,
 	const std::vector<ParticleIndex>& partIndices,
-	const std::vector<BufferedImage<fComplex>>& referenceFS,
 	MotionParameters motionParameters,
 	Settings settings,
 	gravis::d3Vector tomoCentre,
@@ -32,7 +31,6 @@ MotionFit::MotionFit(
 	  frameProj(frameProj),
 	  dataSet(dataSet),
 	  partIndices(partIndices),
-	  referenceFS(referenceFS),
 	  motionParameters(motionParameters),
 	  settings(settings),
 	  tomoCentre(tomoCentre),
@@ -439,6 +437,7 @@ double MotionFit::gradAndValue(const std::vector<double> &x, std::vector<double>
 
 			const d4Vector dp  = P[f] * pos4 - frameProj[f] * d4Vector(initialPos[p]);
 
+
 			const double dx_img = (dp.x + maxRange) * paddingFactor;
 			const double dy_img = (dp.y + maxRange) * paddingFactor;
 
@@ -543,16 +542,23 @@ double MotionFit::gradAndValue(const std::vector<double> &x, std::vector<double>
 
 	if (!settings.constParticles)
 	{
+		double reg_cost = 0.0;
+
 		for (int m = 0; m < fc-1; m++)
 		{
 			for (int b = 0; b < bc; b++)
 			{
 				const int i0 = fs*fc + 3*(pc + m*bc + b);
 
-				gradDest[i0] += 2.0 * (x[i0] + x[i0+1] + x[i0+2]);
-				cost += x[i0]*x[i0] + x[i0+1]*x[i0+1] + x[i0+2]*x[i0+2];
+				gradDest[i0  ] += 2.0 * x[i0  ];
+				gradDest[i0+1] += 2.0 * x[i0+1];
+				gradDest[i0+2] += 2.0 * x[i0+2];
+
+				reg_cost += x[i0]*x[i0] + x[i0+1]*x[i0+1] + x[i0+2]*x[i0+2];
 			}
 		}
+
+		cost += reg_cost;
 	}
 
 	return cost;
@@ -602,8 +608,9 @@ std::vector<d3Vector> MotionFit::getParticlePositions(
 	return out;
 }
 
-Trajectory MotionFit::getTrajectory(const std::vector<double> &x, int p,
-									const std::vector<int>& frameSequence) const
+Trajectory MotionFit::getTrajectory(
+		const std::vector<double> &x, int p,
+		const std::vector<int>& frameSequence) const
 {
 	Trajectory out(fc);
 	
@@ -715,7 +722,7 @@ std::vector<BufferedImage<double>> MotionFit::drawShiftedCCs(const std::vector<d
 	return out;
 }
 
-Mesh MotionFit::visualiseTrajectories(const std::vector<double> &x, double scale)
+Mesh MotionFit::visualiseTrajectories3D(const std::vector<double> &x, double scale)
 {
 	Mesh out;
 	
@@ -742,6 +749,84 @@ Mesh MotionFit::visualiseTrajectories(const std::vector<double> &x, double scale
 	}
 	
 	return out;
+}
+
+void MotionFit::visualiseTrajectories2D(
+		const std::vector<double>& x,
+		double scale,
+		const std::string& tomo_name,
+		const std::string& file_name_root)
+{
+	std::vector<int> timeSeq(fc);
+
+	for (int f = 0; f < fc; f++)
+	{
+		timeSeq[f] = f;
+	}
+
+	std::vector<std::string> plot_names {"XY", "XZ", "YZ"};
+	std::vector<i2Vector> dim_indices{i2Vector(0,1), i2Vector(0,2), i2Vector(1,2)};
+
+	for (int dim = 0; dim < 3; dim++)
+	{
+		CPlot2D plot2D(tomo_name + " Motion " + plot_names[dim]);
+		plot2D.SetXAxisSize(600);
+		plot2D.SetYAxisSize(600);
+		plot2D.SetDrawLegend(false);
+		plot2D.SetFlipY(true);
+
+		for (int p = 0; p < pc; p++)
+		{
+			Trajectory track = getTrajectory(x, p, timeSeq);
+
+			// Mark start of each track
+			CDataSet start;
+			start.SetDrawMarker(true);
+			start.SetMarkerSize(8);
+			start.SetDatasetColor(0.2,0.5,1.0);
+
+			const d3Vector a = initialPos[p] + scale * track.shifts_Ang[0] / pixelSize;
+			const i2Vector di = dim_indices[dim];
+
+			CDataPoint point3(a[di[0]],a[di[1]]);
+			start.AddDataPoint(point3);
+			plot2D.AddDataSet(start);
+		}
+
+		for (int p = 0; p < pc; p++)
+		{
+			Trajectory track = getTrajectory(x, p, timeSeq);
+
+			CDataSet curve;
+			curve.SetDrawMarker(false);
+			curve.SetDatasetColor(0.0,0.0,0.0);
+			curve.SetLineWidth(0.5);
+
+			for (int f = 0; f < fc; f++)
+			{
+				const d3Vector a = initialPos[p] + scale * track.shifts_Ang[f] / pixelSize;
+				const i2Vector di = dim_indices[dim];
+
+				CDataPoint point(a[di[0]],a[di[1]]);
+
+				curve.AddDataPoint(point);
+			}
+
+			plot2D.AddDataSet(curve);
+		}
+
+		std::string label_x = plot_names[dim].substr(0,1) +
+				" (in pixels; trajectory scaled by " + ZIO::itoa(scale) + ")";
+
+		std::string label_y = plot_names[dim].substr(1,1);
+
+		plot2D.SetXAxisTitle(label_x);
+		plot2D.SetYAxisTitle(label_y);
+
+		FileName fn_eps = file_name_root + "_" + plot_names[dim] + ".eps";
+
+		plot2D.OutputPostScriptPlot(fn_eps);
+	}
 }
 
 void MotionFit::report(int iteration, double cost, const std::vector<double> &x) const

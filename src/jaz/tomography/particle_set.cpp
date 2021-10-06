@@ -408,6 +408,11 @@ int ParticleSet::getOpticsGroup(ParticleIndex particle_id) const
 	return out - 1;
 }
 
+void ParticleSet::setOpticsGroup(ParticleIndex particle_id, int zeroBasedId)
+{
+	partTable.setValue(EMDL_IMAGE_OPTICS_GROUP, zeroBasedId+1, particle_id.value);
+}
+
 int ParticleSet::numberOfOpticsGroups() const
 {
 	return optTable.numberOfObjects();
@@ -581,7 +586,7 @@ std::vector<int> ParticleSet::enumerateNonEmpty(const std::vector<std::vector<Pa
 	{
 		if (particlesByTomogram[t].size() > 0)
 		{
-			out[t] = index;
+			out[index] = t;
 			index++;
 		}
 	}

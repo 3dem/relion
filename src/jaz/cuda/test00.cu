@@ -25,7 +25,10 @@ void CudaTest00 :: run()
   // Check for errors (all values should be 3.0f)
   float maxError = 0.0f;
   for (int i = 0; i < N; i++)
+  {
 	maxError = fmax(maxError, fabs(y[i]-3.0f));
+  }
+
   std::cout << "Max error: " << maxError << std::endl;
 
   // Free memory

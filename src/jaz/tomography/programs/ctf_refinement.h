@@ -21,12 +21,14 @@ class CtfRefinementProgram : public RefinementProgram
 		
 		CtfRefinementProgram(int argc, char *argv[]);
 			
-			bool do_refine_defocus, do_refine_scale, do_refine_aberrations,
+			bool do_refine_defocus,
+				do_reset_to_common, do_regularise_defocus,
+				do_refine_scale, do_refine_aberrations,
 				do_fit_Lambert_per_tomo, do_fit_Lambert_globally,
 				do_even_aberrations, do_odd_aberrations;
 
-			int deltaSteps, n_even, n_odd;
-			double minDelta, maxDelta, lambda_reg, k_min_Ang;
+			int deltaSteps, n_even, n_odd, min_frame, max_frame;
+			double minDelta, maxDelta, lambda_reg, k_min_Ang, freqCutoffFract;
 			
 		void run();
 		
@@ -52,6 +54,7 @@ class CtfRefinementProgram : public RefinementProgram
 				const AberrationsCache& aberrationsCache,
 				const BufferedImage<float>& freqWeights,
 				const BufferedImage<float>& doseWeights,
+				const BufferedImage<int>& xRanges,
 				double k_min_px,
 				int verbosity);
 
@@ -69,6 +72,7 @@ class CtfRefinementProgram : public RefinementProgram
 				const AberrationsCache& aberrationsCache,
 				const BufferedImage<float>& freqWeights,
 				const BufferedImage<float>& doseWeights,
+				const BufferedImage<int>& xRanges,
 				int verbosity);
 
 
@@ -77,7 +81,7 @@ class CtfRefinementProgram : public RefinementProgram
 		void fitGlobalScale();
 		void collectScale();
 
-		void fitAberrations();
+		void fitAberrations(int k_min_px);
 
 
 
@@ -95,7 +99,8 @@ class CtfRefinementProgram : public RefinementProgram
 				const CTF& referenceCtf,
 				double initialDeltaZ,
 				double pixelSize,
-				double initialStep);
+				double initialStep,
+				double k_min_px);
 
 		static std::vector<gravis::d3Vector> findMultiAstigmatism(
 				const aberration::EvenSolution& solution,
@@ -104,14 +109,6 @@ class CtfRefinementProgram : public RefinementProgram
 				double pixelSize,
 				double lambda_reg,
 				double k_min_px);
-
-		static BufferedImage<double> plotAstigmatism(
-				const aberration::EvenSolution& solution,
-				const CTF& referenceCtf,
-				double initialDeltaZ,
-				double range,
-				double pixelSize,
-				int size);
 
 
 		std::string getDefocusTempFilenameRoot(

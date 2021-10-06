@@ -73,7 +73,7 @@ void FileName::compose(long int no , const std::string &str, int numberlength)
 	if (no != -1)
 	{
 
-		char aux_str[numberlength+1];
+		char aux_str[numberlength+2];
 		std::string tmp_fileformat;
 		tmp_fileformat = (std::string) "%0" +
 		                 integerToString(numberlength)+
@@ -560,7 +560,7 @@ FileName realpath(const FileName &fn, bool allow_nonexisting_path)
 
 	if (allow_nonexisting_path)
 	{
-		realpath(fn.c_str(), retval);
+		char *dont_care = realpath(fn.c_str(), retval);
 		if (retval == NULL)
 		{
 			REPORT_ERROR(std::string("Failed to resolve realpath of ") + fn);

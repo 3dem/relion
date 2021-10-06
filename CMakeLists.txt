@@ -73,8 +73,8 @@ endif()
 # ------------------OPTIONS WHICH ARE NEEDED TO SET BUILD-TYPES (COMPILATION FLAGS)--
 # ------------------------------------------------------------------------CUDA-ARCH--
 if(NOT DEFINED CUDA_ARCH)
-    message(STATUS "Setting fallback CUDA_ARCH=35")
-    set(CUDARCH "-arch=sm_35")
+    message(STATUS "Setting fallback CUDA_ARCH=50")
+    set(CUDARCH "-arch=sm_50")
 else(NOT DEFINED CUDA_ARCH)
     message(STATUS "Using provided CUDA_ARCH=${CUDA_ARCH}")
     set(CUDARCH "-arch=sm_${CUDA_ARCH}")
@@ -256,7 +256,7 @@ if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Intel" OR "${CMAKE_CXX_COMPILER}" MATCHES
         if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
             SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -qopenmp -mkl=parallel -limf ")
         else()	# Intel oneAPI compiler
-            SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fiopenmp -mkl=parallel -limf ")
+            SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fiopenmp -qmkl=parallel -limf ")
         endif()
     endif(MKLFFT)
     if(ALTCPU)
@@ -285,6 +285,7 @@ option(FORCE_OWN_FLTK "FORCE_OWN_FLTK" OFF)
 FIND_PACKAGE(X11)
 if(GUI)
     if(X11_FOUND)
+        set(FLTK_SKIP_FLUID TRUE) #FLUID is not required for relion
         set(FLTK_SKIP_OPENGL TRUE) #OpenGL is not required for relion
         if(NOT FORCE_OWN_FLTK)
             FIND_PACKAGE(FLTK)
@@ -361,16 +362,17 @@ endif()
 
 # -----------------------------------------------------------------------------Torch--
 
-option(TORCH "Enable support for Torch" OFF)
-option(SKIP_TORCH_MODELS "Do not download pre-trained torch models" OFF)
-if(TORCH)
-    message(STATUS "Torch support requested by user.")
-    include(${CMAKE_SOURCE_DIR}/cmake/BuildTorch.cmake)
-    if (NOT SKIP_TORCH_MODELS)
-        include(${CMAKE_SOURCE_DIR}/cmake/FetchTorchModels.cmake)
-    endif()
-    add_definitions(-D_TORCH_ENABLED)
-endif(TORCH)
+#option(TORCH "Enable support for LibTorch" OFF)
+#if(TORCH)
+#    message(STATUS "Torch support requested by user.")
+#    include(${CMAKE_SOURCE_DIR}/cmake/BuildTorch.cmake)
+#    add_definitions(-D_TORCH_ENABLED)
+#endif(TORCH)
+
+option(FETCH_TORCH_MODELS "Do download pre-trained torch models" ON)
+if (FETCH_TORCH_MODELS)
+    include(${CMAKE_SOURCE_DIR}/cmake/FetchTorchModels.cmake)
+endif()
 
 # ----------------------------------------------------------------------COPY SCRIPTS--
 
@@ -378,15 +380,18 @@ if(FORCE_OWN_FFTW)
     install(DIRECTORY external/fftw/lib/ DESTINATION lib FILES_MATCHING PATTERN "*")
 endif()
 
-list(APPEND RELION_SCRIPT_FILES star_printtable 
-                                star_plottable
-                                star_loopheader
-                                star_datablock_stack
-                                star_datablock_singlefiles
-                                star_datablock_ctfdat
-                                qsub.csh
-				it.py
-				schedulegui.py)
+list(APPEND RELION_SCRIPT_FILES
+        star_printtable
+        star_plottable
+        star_loopheader
+        star_datablock_stack
+        star_datablock_singlefiles
+        star_datablock_ctfdat
+        qsub.csh
+        it.py
+        schemegui.py
+        class_ranker.py
+)
 
 add_custom_target(copy_scripts ALL)
                                 

@@ -22,6 +22,15 @@
 #include "src/gui_mainwindow.h"
 #include "src/gui_background.xpm"
 
+/*
+ gui_background.xpm is the header image.
+ To make this, prepare an image of size 598 x 332 px in 8-bit indexed color mode.
+ Convert it to the XPM format by GIMP.
+ Change the variable name to:
+    static const char *gui_background[]
+ Don't forget to update the image description in the [About] dialog box.
+ */
+
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
 bool show_expand_stdout;
@@ -176,32 +185,58 @@ void SchedulerWindow::cb_execute_i()
 	}
 	else
 	{
-		// Make a string with all job-ids to process
-		std::string jobids="\"";
-		for (int ijob = 0; ijob < my_jobs.size(); ijob++)
-		{
-			if (check_buttons[ijob]->value())
-				jobids += my_jobs[ijob] + " ";
-		}
-		jobids += "\"";
-
 		std::string myrepeat(repeat->value());
 		std::string mywait(wait->value());
 		std::string mywait_before(wait_before->value());
 		std::string mywait_after(wait_after->value());
 
-		std::string command = "relion_pipeliner --pipeline " + pipeline_name;
-		command += " --schedule " + fn_sched;
-		command += " --repeat " + myrepeat;
-		command += " --min_wait " + mywait;
-		command += " --min_wait_before " + mywait_before;
-		command += " --sec_wait_after " + mywait_after;
-		command += " --RunJobs " + jobids;
-		// Run this in the background, so control returns to the window
-		command += " &";
-		int res = system(command.c_str());
-		std::cout << " Launching: " << command << std::endl;
-		std::cout << " Stop execution of this set of scheduled jobs by deleting file: " << fn_check << std::endl;
+		if (use_ccpem_pipeliner)
+		{
+			std::string command = "reSPYon --run_schedule ";
+			command += " --name " + fn_sched;
+			command += " --nr_repeats " + myrepeat;
+			command += " --min_between " + mywait;
+			command += " --wait_min_before " + mywait_before;
+			command += " --wait_sec_after " + mywait_after;
+			command += " --jobs ";
+
+			for (int ijob = 0; ijob < my_jobs.size(); ijob++)
+			{
+				if (check_buttons[ijob]->value())
+					command += my_jobs[ijob] + " ";
+			}
+
+			// Run this in the background, so control returns to the window
+			command += " &";
+			int res = system(command.c_str());
+			std::string message = "Running schedule " +  fn_sched + " with " + myrepeat + " repeats";
+			std::cout << message << std::endl;
+			std::cout << " Stop execution of this set of scheduled jobs with the command: CL_pipeline --stop_schedule " << fn_sched << std::endl;
+		}
+		else
+		{
+			// Make a string with all job-ids to process
+			std::string jobids="\"";
+			for (int ijob = 0; ijob < my_jobs.size(); ijob++)
+			{
+				if (check_buttons[ijob]->value())
+					jobids += my_jobs[ijob] + " ";
+			}
+			jobids += "\"";
+
+			std::string command = "relion_pipeliner --pipeline " + pipeline_name;
+			command += " --schedule " + fn_sched;
+			command += " --repeat " + myrepeat;
+			command += " --min_wait " + mywait;
+			command += " --min_wait_before " + mywait_before;
+			command += " --sec_wait_after " + mywait_after;
+			command += " --RunJobs " + jobids;
+			// Run this in the background, so control returns to the window
+			command += " &";
+			int res = system(command.c_str());
+			std::cout << " Launching: " << command << std::endl;
+			std::cout << " Stop execution of this set of scheduled jobs by deleting file: " << fn_check << std::endl;
+		}
 	}
 }
 
@@ -257,7 +292,8 @@ void NoteEditorWindow::cb_save_i()
 }
 
 GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
-		int _update_every_sec, int _exit_after_sec, bool _do_read_only, bool _do_tomo, bool _do_projdir):Fl_Window(w,h,title)
+		int _update_every_sec, int _exit_after_sec, bool _do_read_only, bool _do_tomo,
+		bool _use_ccpem_pipeliner, bool _do_projdir):Fl_Window(w,h,title)
 {
 	// Set initial Timer
 	tickTimeLastChanged();
@@ -268,6 +304,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 	maingui_do_read_only = _do_read_only;
 	pipeline.do_read_only = _do_read_only;
 	do_order_alphabetically = false;
+	use_ccpem_pipeliner = _use_ccpem_pipeliner;
 
 	FileName fn_lock=".gui_projectdir";
 	if (!exists(fn_lock))
@@ -283,6 +320,9 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 			if (ret == 1)
 			{
 				touch(fn_lock);
+				// make the runfile temp dir for the ccpem pipeliner
+				std::string dircom = "mkdir -p .TMP_runfiles";
+				int res = system(dircom.c_str());
 			}
 			else
 			{
@@ -320,8 +360,15 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 		pipeline.write();
 	}
 
- 	color(GUI_BACKGROUND_COLOR);
-	menubar = new Fl_Menu_Bar(-3, 0, WCOL0-7, MENUHEIGHT);
+ 	if (use_ccpem_pipeliner)
+ 	{
+ 		color((fl_rgb_color(255,240,240)));
+ 	}
+ 	else
+ 	{
+ 		color(GUI_BACKGROUND_COLOR);
+ 	}
+ 	menubar = new Fl_Menu_Bar(-3, 0, WCOL0-7, MENUHEIGHT);
 	menubar->add("File/Re-read pipeline",  FL_ALT+'r', cb_reread_pipeline, this);
 	menubar->add("File/Edit project note",  FL_ALT+'e', cb_edit_project_note, this);
 	if (!maingui_do_read_only)
@@ -899,7 +946,7 @@ void GuiMainWindow::fillToAndFromJobLists()
 		{
 			long int mynode = (pipeline.processList[current_job]).inputNodeList[inode];
 
-			if (pipeline.nodeList[mynode].type != NODE_MOVIES) // no display for movie rootname
+			if (pipeline.nodeList[mynode].type.find(LABEL_MOVIES_CPIPE) == std::string::npos) // no display for movie rootname
 			{
 				FileName fnt = pipeline.nodeList[mynode].name;
 				if (exists(fnt))
@@ -1255,7 +1302,9 @@ void GuiMainWindow::cb_display_io_node_i()
 	long int mynode = io_nodes[idx];
 	std::string command;
 
-	if (pipeline.nodeList[mynode].type == NODE_MIC_COORDS)
+	// Second line for backward compatibility with earlier alpha versions of relion-4.0....
+	if (pipeline.nodeList[mynode].type.find(LABEL_COORDS_CPIPE) != std::string::npos ||
+		pipeline.nodeList[mynode].type.find(NODE_MIC_COORDS_LABEL) != std::string::npos )
 	{
 
 		// TODO: write error message saying this is no longer possible: use Continue to pick more/inspect results!
@@ -1349,7 +1398,8 @@ void GuiMainWindow::cb_display_io_node_i()
 		// Other arguments for extraction
 		command += " " + manualpickjob.joboptions["other_args"].getString() + " &";
 	}
-	else if (pipeline.nodeList[mynode].type == NODE_PDF_LOGFILE)
+	else if (pipeline.nodeList[mynode].type.find(LABEL_LOGFILE_CPIPE) != std::string::npos ||
+			 pipeline.nodeList[mynode].type.find(NODE_PDF_LOGFILE_LABEL) != std::string::npos )
 	{
 		const char * default_pdf_viewer = getenv ("RELION_PDFVIEWER_EXECUTABLE");
 		char mydefault[]=DEFAULTPDFVIEWER;
@@ -1360,11 +1410,13 @@ void GuiMainWindow::cb_display_io_node_i()
 		std::string myviewer(default_pdf_viewer);
 		command = myviewer + " " + pipeline.nodeList[mynode].name + "&";
 	}
-	else if (pipeline.nodeList[mynode].type == NODE_POLISH_PARAMS)
+	else if (pipeline.nodeList[mynode].type.find(LABEL_POLISH_PARAMS) != std::string::npos ||
+			 pipeline.nodeList[mynode].type.find(NODE_POLISH_PARAMS_LABEL) != std::string::npos )
 	{
 		command = "cat " + pipeline.nodeList[mynode].name;
 	}
-	else if (pipeline.nodeList[mynode].type != NODE_POST)
+	else if (pipeline.nodeList[mynode].type.find(LABEL_POST) == std::string::npos &&
+			 pipeline.nodeList[mynode].type.find(NODE_POST_LABEL) == std::string::npos)
 	{
 		command = "relion_display --gui --i " + pipeline.nodeList[mynode].name + " &";
 	}
@@ -1442,23 +1494,33 @@ void GuiMainWindow::cb_print_cl_i()
 	// And update the job inside it
 	gui_jobwindows[iwin]->updateMyJob();
 
-	std::string error_message;
-	if (!pipeline.getCommandLineJob(gui_jobwindows[iwin]->myjob, current_job, is_main_continue, false,
-	                                DONT_MKDIR, commands, final_command, error_message))
+	if (use_ccpem_pipeliner)
 	{
-		fl_message("%s",error_message.c_str());
+		std::string error_message;
+		pipeline.PrintComCpipe(gui_jobwindows[iwin]->myjob, current_job, is_main_continue, false,
+			DONT_MKDIR, commands, final_command, error_message);
 	}
+
 	else
 	{
-		std::string command= "", mesg = " The command is: ";
-		for (int icom = 0; icom < commands.size(); icom++)
+		std::string error_message;
+		if (!pipeline.getCommandLineJob(gui_jobwindows[iwin]->myjob, current_job, is_main_continue, false,
+				DONT_MKDIR, commands, final_command, error_message))
 		{
-			if (icom > 0) command += " && ";
-			command += commands[icom];
+			fl_message("%s",error_message.c_str());
 		}
-		fl_input("%s", command.c_str(), mesg.c_str());
-		// Don't free the returned string! It comes from Fl_Input::value(), which returns
-		// "pointer to an internal buffer - do not free() this".
+		else
+		{
+			std::string command= "", mesg = " The command is: ";
+			for (int icom = 0; icom < commands.size(); icom++)
+			{
+				if (icom > 0) command += " && ";
+				command += commands[icom];
+			}
+			fl_input("%s", command.c_str(), mesg.c_str());
+			// Don't free the returned string! It comes from Fl_Input::value(), which returns
+			// "pointer to an internal buffer - do not free() this".
+		}
 	}
 }
 
@@ -1466,6 +1528,10 @@ void GuiMainWindow::cb_print_cl_i()
 void GuiMainWindow::cb_run(Fl_Widget* o, void* v)
 {
 	GuiMainWindow* T=(GuiMainWindow*)v;
+	if (use_ccpem_pipeliner)
+	{
+		T->cb_print_cl_i();
+	}
 	// Deactivate Run button to prevent the user from accidentally submitting many jobs
 	run_button->deactivate();
 	// Run the job
@@ -1476,6 +1542,10 @@ void GuiMainWindow::cb_run(Fl_Widget* o, void* v)
 void GuiMainWindow::cb_schedule(Fl_Widget* o, void* v)
 {
 	GuiMainWindow* T=(GuiMainWindow*)v;
+	if (use_ccpem_pipeliner)
+	{
+		T->cb_print_cl_i();
+	}
 	T->cb_run_i(true, false); // 1st true means only_schedule, do not run, 2nd false means dont open the note editor window
 }
 
@@ -1485,18 +1555,16 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 	if (do_overwrite_continue)
 	{
 		std::string ask = "Are you sure you want to overwrite this job?";
+
+		if (pipeline.checkDependency(current_job))
+		{
+			ask += "\nWARNING: This job's output nodes are used as inputs for other jobs,\nso overwriting this job may lead to inconsistent job history.";
+		}
+
 		int proceed =  fl_choice("%s", "Cancel", "Overwrite!", NULL, ask.c_str());
 		if (!proceed)
 		{
 			do_overwrite_continue = false;
-			return;
-		}
-
-		if (pipeline.checkDependency(current_job))
-		{
-			std::string error_message = "This jobs output nodes are used as inputs for other jobs, so you cannot overwrite this job.";
-			fl_message("%s", error_message.c_str());
-			run_button->activate();
 			return;
 		}
 		else
@@ -1517,16 +1585,35 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 	// Update timer
 	tickTimeLastChanged();
 
-	std::string error_message;
-	if (!pipeline.runJob(gui_jobwindows[iwin]->myjob, current_job, only_schedule, is_main_continue, false, error_message))
+
+	if (use_ccpem_pipeliner)
 	{
-		// Still revert back to the correct job_counter for overwrite jobs!
-		if (do_overwrite_continue) pipeline.setJobCounter(my_overwrite_job_counter);
-		// Show the error
-		fl_message("%s", error_message.c_str());
-		// Allow the user to fix the error and submit this job again
-		run_button->activate();
-		return;
+		std::string error_message = "An error was encountered with the job parameters";
+		if (!pipeline.runJobCpipe(gui_jobwindows[iwin]->myjob, current_job, only_schedule, is_main_continue, false, error_message))
+		{
+			// Still revert back to the correct job_counter for overwrite jobs!
+			if (do_overwrite_continue) pipeline.setJobCounter(my_overwrite_job_counter);
+			// Show the error
+			fl_message("%s", error_message.c_str());
+			// Allow the user to fix the error and submit this job again
+			run_button->activate();
+			return;
+		}
+
+	}
+	else
+	{
+		std::string error_message;
+		if (!pipeline.runJob(gui_jobwindows[iwin]->myjob, current_job, only_schedule, is_main_continue, false, error_message))
+		{
+			// Still revert back to the correct job_counter for overwrite jobs!
+			if (do_overwrite_continue) pipeline.setJobCounter(my_overwrite_job_counter);
+			// Show the error
+			fl_message("%s", error_message.c_str());
+			// Allow the user to fix the error and submit this job again
+			run_button->activate();
+			return;
+		}
 	}
 
 	// If do_overwrite, revert to the correct job_counter
@@ -1553,7 +1640,17 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 	do_overwrite_continue = false;
 
 	// Select this job now
-	loadJobFromPipeline(current_job);
+	if (use_ccpem_pipeliner)
+	{
+		sleep(5); // make sure the pipeline has started running before updating
+		cb_reread_pipeline_i();
+		//loadJobFromPipeline(current_job);
+	}
+	else
+	{
+		loadJobFromPipeline(current_job);
+	}
+
 }
 
 
@@ -1599,7 +1696,23 @@ void GuiMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 	if (proceed)
 	{
 
-		pipeline.deleteNodesAndProcesses(deleteNodes, deleteProcesses);
+		if (use_ccpem_pipeliner)
+		{
+			std::string thejob = pipeline.processList[current_job].name;
+			std::string command = "reSPYon --delete_job " + thejob;
+			int res = system(command.c_str());
+
+			// Reset current_job
+			current_job = -1;
+			fillStdOutAndErr();
+
+			// Update all job lists in the main GUI
+			cb_reread_pipeline_i();
+		}
+		else
+		{
+			pipeline.deleteNodesAndProcesses(deleteNodes, deleteProcesses);
+		}
 
 		// Reset current_job
 		current_job = -1;
@@ -1660,9 +1773,18 @@ e.g. by using \"touch Polish/job045/NO_HARSH_CLEAN\". Below is a list of current
 		std::string how = (do_harsh) ? "Harshly" : "Gently";
 		std::cout << how << " cleaning all finished jobs ..." << std::endl;
 
-		std::string error_message;
-		if (!pipeline.cleanupAllJobs(do_harsh, error_message))
-			fl_message("%s",error_message.c_str());
+		if (use_ccpem_pipeliner)
+		{
+			std::string isharsh = (do_harsh) ? "--harsh" : "";
+			std::string command  = "reSPYon --cleanup ALL " + isharsh;
+			int res = system(command.c_str());
+		}
+		else
+		{
+			std::string error_message;
+			if (!pipeline.cleanupAllJobs(do_harsh, error_message))
+				fl_message("%s",error_message.c_str());
+		}
 
 		fl_message("Done cleaning! Don't forget the files are all still in the Trash folder. Use the \"Empty Trash\" option from the File menu to permanently delete them.");
 	}
@@ -1704,9 +1826,19 @@ void GuiMainWindow::cb_cleanup_i(int myjob, bool do_verb, bool do_harsh)
 
 	if (proceed)
 	{
-		std::string error_message;
-		if (!pipeline.cleanupJob(myjob, do_harsh, error_message))
-			fl_message("%s",error_message.c_str());
+		if (use_ccpem_pipeliner)
+		{
+			std::string isharsh = (do_harsh) ? "--harsh" : "";
+			std::string jobname  = pipeline.processList[current_job].name;
+			std::string command  = "reSPYon --cleanup " + jobname + " " + isharsh;
+			int res = system(command.c_str());
+		}
+		else
+		{
+			std::string error_message;
+			if (!pipeline.cleanupJob(myjob, do_harsh, error_message))
+				fl_message("%s",error_message.c_str());
+		}
 	}
 }
 
@@ -1756,12 +1888,24 @@ void GuiMainWindow::cb_set_alias_i(std::string alias)
 			alias = al2;
 		}
 
-		if (pipeline.setAliasJob(current_job, alias, error_message))
+		if (use_ccpem_pipeliner)
+		{
+			std::string jobname  = pipeline.processList[current_job].name;
+			std::string command  = "reSPYon --set_alias " + jobname + " " + alias;
+			int res = system(command.c_str());
 			is_done = true;
+			cb_reread_pipeline_i();
+
+		}
 		else
 		{
-			alias = "";
-			fl_message("%s",error_message.c_str());
+			if (pipeline.setAliasJob(current_job, alias, error_message))
+				is_done = true;
+			else
+			{
+				alias = "";
+				fl_message("%s",error_message.c_str());
+			}
 		}
 	}
 }
@@ -1792,8 +1936,19 @@ void GuiMainWindow::cb_abort_i(std::string alias)
 		int proceed =  fl_choice("%s", "Cancel", "Abort!", NULL, ask.c_str());
 		if (proceed)
 		{
-			touch(pipeline.processList[current_job].name + RELION_JOB_ABORT_NOW);
+			if (use_ccpem_pipeliner)
+			{
+					std::string jobname = pipeline.processList[current_job].name;
+					std::string command = "reSPYon --set_status " + jobname + " aborted";
+					int res = system(command.c_str());
+					cb_reread_pipeline_i();
+			}
+			else
+			{
+				touch(pipeline.processList[current_job].name + RELION_JOB_ABORT_NOW);
+			}
 		}
+
 	}
 }
 
@@ -1819,12 +1974,31 @@ void GuiMainWindow::cb_mark_as_finished_i(bool is_failed)
 		return;
 	}
 
-	std::string error_message;
-	if (!pipeline.markAsFinishedJob(current_job, error_message, is_failed))
-		fl_message("%s",error_message.c_str());
-	else
-		updateJobLists();
+	if (use_ccpem_pipeliner)
+	{
+		if (is_failed)
+		{
+			std::string jobname = pipeline.processList[current_job].name;
+			std::string command = "reSPYon --set_status " + jobname + " failed";
+			int res = system(command.c_str());
+		}
 
+		else
+		{
+			std::string jobname = pipeline.processList[current_job].name;
+			std::string command = "reSPYon --set_status " + jobname + " finished";
+			int res = system(command.c_str());
+		}
+		cb_reread_pipeline_i();
+	}
+	else
+	{
+		std::string error_message;
+		if (!pipeline.markAsFinishedJob(current_job, error_message, is_failed))
+			fl_message("%s",error_message.c_str());
+		else
+			updateJobLists();
+	}
 }
 
 void GuiMainWindow::cb_edit_note(Fl_Widget*, void* v)
@@ -1875,21 +2049,34 @@ void GuiMainWindow::cb_save_i()
 	int iwin = browser->value() - 1;
 	gui_jobwindows[iwin]->updateMyJob();
 
-	Fl::scheme("gtk+");
-	Fl_File_Chooser * G_chooser = new Fl_File_Chooser(".", "job.star", Fl_File_Chooser::DIRECTORY, "Choose directory to save job.star file");
-	G_chooser->color(GUI_BACKGROUND_COLOR);
-	G_chooser->show();
-	while(G_chooser->shown()) Fl::wait();
-	if ( G_chooser->value() == NULL ) return;
+	// SHWS 16092021: to prevent empty labels when saving a job.star from the GUI, go through getCommandLineJob, which also sets deeper levels of labels
+	std::string error_message;
+    std::string _final_command;
+    std::vector<std::string> _commands;
+	if (!pipeline.getCommandLineJob(gui_jobwindows[iwin]->myjob, current_job, is_main_continue, false,
+			DONT_MKDIR, _commands, _final_command, error_message))
+	{
+		fl_message("%s",error_message.c_str());
+	}
+	else
+	{
 
-	char relname[FL_PATH_MAX];
-	fl_filename_relative(relname,sizeof(relname),G_chooser->value());
-	FileName fn_dir = (std::string)relname;
-	if (fn_dir == "") fn_dir = ".";
-	gui_jobwindows[iwin]->myjob.write(fn_dir + "/job.star");
+		Fl::scheme("gtk+");
+		Fl_File_Chooser * G_chooser = new Fl_File_Chooser(".", "job.star", Fl_File_Chooser::DIRECTORY, "Choose directory to save job.star file");
+		G_chooser->color(GUI_BACKGROUND_COLOR);
+		G_chooser->show();
+		while(G_chooser->shown()) Fl::wait();
+		if ( G_chooser->value() == NULL ) return;
 
-	// Also save hidden job.star file
-	gui_jobwindows[iwin]->myjob.write("");
+		char relname[FL_PATH_MAX];
+		fl_filename_relative(relname,sizeof(relname),G_chooser->value());
+		FileName fn_dir = (std::string)relname;
+		if (fn_dir == "") fn_dir = ".";
+		gui_jobwindows[iwin]->myjob.write(fn_dir + "/job.star");
+
+		// Also save hidden job.star file
+		gui_jobwindows[iwin]->myjob.write("");
+	}
 
 }
 
@@ -1957,7 +2144,23 @@ void GuiMainWindow::cb_undelete_job_i()
 	fl_filename_relative(relname,sizeof(relname),chooser.value());
 	FileName fn_pipe(relname);
 
-	pipeline.undeleteJob(fn_pipe);
+	if (use_ccpem_pipeliner)
+	{
+		// needed an adaptor to get the job name from the pipeline file that was selected
+		size_t splitit;
+		std::string trashfile = relname;
+		splitit=trashfile.find_last_of("/\\");
+		std::string trashdir = trashfile.substr(0,splitit);
+		splitit = trashdir.find_first_of("/\\");
+		std::string projdir = trashdir.substr(splitit+1);
+		std::string undelcom = "reSPYon --undelete_job " + projdir;
+		int res = system(undelcom.c_str());
+		cb_reread_pipeline_i();
+	}
+	else
+	{
+		pipeline.undeleteJob(fn_pipe);
+	}
 }
 
 // Re-order running and finished job lists
@@ -1988,11 +2191,18 @@ void GuiMainWindow::cb_empty_trash_i()
 	std::string ask = "Are you sure you want to remove the entire Trash folder?";
 	int proceed =  fl_choice("%s", "Cancel", "Empty Trash", NULL, ask.c_str());
 	if (proceed)
+	if (use_ccpem_pipeliner)
+	{
+		std::string command = "reSPYon --empty_trash";
+		int res = system(command.c_str());
+	}
+	else
 	{
 		std::string command = "rm -rf Trash";
 		std::cout << " Executing: " << command << std::endl;
 		int res = system(command.c_str());
 	}
+
 }
 
 void GuiMainWindow::cb_print_notes(Fl_Widget*, void* v)
@@ -2233,9 +2443,11 @@ Please also cite relevant papers when you used external programs or their algori
 \
 About the start up screen:\n\n\
 The map shown is the cryo-EM map of mouse heavy-chain apoferritin\n\
-at 1.54 A (EMDB-9865). This is the highest resolution single particle\n\
-reconstruction map deposited to EMDB as of August 2019. The raw dataset\n\
-is also available at EMPIAR-10248.\
+at 1.22 A (EMDB-11638) collected on a new Titan Krios microscope with\n\
+cold FEG, Selectris X energy filter and Falcon4 direct electron detector.\n\
+Densities for hydrogen atoms are visible in the hydrogen difference map\n\
+(orange mesh). See Nakane et al, Nature (2020) (doi:10.1038/s41586-020-2829-0)\n\
+for details. The raw dataset is available at EMPIAR-10424.\
 ")
 
 	ShowHelpText *help = new ShowHelpText(HELPTEXT);

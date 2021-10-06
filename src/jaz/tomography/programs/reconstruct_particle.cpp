@@ -73,11 +73,14 @@ void ReconstructParticleProgram::readBasicParameters(int argc, char *argv[])
 	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Only process undone subtomograms");
 	no_backup = parser.checkOption("--no_backup", "Do not make backups (makes it impossible to use --only_do_unfinished)");
 
+	do_circle_crop = !parser.checkOption("--no_circle_crop", "Do not crop 2D images to a circle prior to insertion");
+
 	num_threads = textToInteger(parser.getOption("--j", "Number of OMP threads", "6"));
 	inner_threads = textToInteger(parser.getOption("--j_in", "Number of inner threads (slower, needs less memory)", "3"));
 	outer_threads = textToInteger(parser.getOption("--j_out", "Number of outer threads (faster, needs more memory)", "2"));
 
 	no_reconstruction = parser.checkOption("--no_recon", "Do not reconstruct the volume, only backproject (for benchmarking purposes)");
+	freqCutoffFract = textToDouble(parser.getOption("--cutoff_fract", "Ignore shells for which the dose weight falls below this value", "0.01"));
 
 	outDir = parser.getOption("--o", "Output directory");
 
@@ -147,7 +150,7 @@ void ReconstructParticleProgram::run()
 		ctfImgFS[i].fill(0.0);
 	}
 
-	AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
+	AberrationsCache aberrationsCache(particleSet.optTable, boxSize, binnedOutPixelSize);
 
 	Log::endSection();
 	
@@ -179,7 +182,10 @@ void ReconstructParticleProgram::run()
 
 	// Delete temporary files
 	// No error checking - do not bother the user if it fails
-	int res = system(("rm -rf "+ tmpOutRoot + "*.mrc").c_str());
+	if (system(("rm -rf "+ tmpOutRoot + "*.mrc").c_str()))
+	{
+		Log::warn("Deleting temporary files in folder "+tmpOutRoot+" failed.");
+	}
 }
 
 void ReconstructParticleProgram::processTomograms(
@@ -286,12 +292,16 @@ void ReconstructParticleProgram::processTomograms(
 		}
 
 		Tomogram tomogram = tomoSet.loadTomogram(t, true);
+		tomogram.validateParticleOptics(particles[t], particleSet);
 
 		const int fc = tomogram.frameCount;
 
 		particleSet.checkTrajectoryLengths(particles[t][0], pc, fc, "reconstruct_particle");
 
 		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s, binning);
+
+		BufferedImage<int> xRanges = tomogram.findDoseXRanges(doseWeights, freqCutoffFract);
+
 		BufferedImage<float> noiseWeights;
 
 		if (do_whiten)
@@ -341,11 +351,12 @@ void ReconstructParticleProgram::processTomograms(
 						part_id, fc, tomogram.optics.pixelSize);
 			std::vector<d4Matrix> projCut(fc), projPart(fc);
 
+			const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s/2.0);
 
-			const bool circle_crop = true;
+			const bool circle_crop = do_circle_crop;
 
 			TomoExtraction::extractAt3D_Fourier(
-					tomogram.stack, s02D, binning, tomogram.projectionMatrices, traj,
+					tomogram.stack, s02D, binning, tomogram, traj, isVisible,
 					particleStack[th], projCut, inner_threads, circle_crop);
 
 
@@ -360,6 +371,8 @@ void ReconstructParticleProgram::processTomograms(
 
 			for (int f = 0; f < fc; f++)
 			{
+				if (!isVisible[f]) continue;
+				
 				const double scaleRatio = binnedOutPixelSize / binnedPixelSize;
 				projPart[f] = scaleRatio * projCut[f] * particleToTomo;
 
@@ -372,12 +385,20 @@ void ReconstructParticleProgram::processTomograms(
 					const float scale = flip_value? -1.f : 1.f;
 
 					for (int y = 0; y < s;  y++)
-					for (int x = 0; x < sh; x++)
 					{
-						const float c = scale * ctfImg(x,y) * doseWeights(x,y,f);
+						for (int x = 0; x < xRanges(y,f); x++)
+						{
+							const float c = scale * ctfImg(x,y) * doseWeights(x,y,f);
 
-						particleStack[th](x,y,f) *= c;
-						weightStack[th](x,y,f) = c * c;
+							particleStack[th](x,y,f) *= c;
+							weightStack[th](x,y,f) = c * c;
+						}
+						for (int x = xRanges(y,f); x < sh; x++)
+						{
+
+							particleStack[th](x,y,f) = fComplex(0.f, 0.f);
+							weightStack[th](x,y,f) = 0.f;
+						}
 					}
 				}
 			}
@@ -395,13 +416,17 @@ void ReconstructParticleProgram::processTomograms(
 
 			for (int f = 0; f < fc; f++)
 			{
-				FourierBackprojection::backprojectSlice_backward(
-					particleStack[th].getSliceRef(f),
-					weightStack[th].getSliceRef(f),
-					projPart[f],
-					dataImgFS[2*th + halfSet],
-					ctfImgFS[2*th + halfSet],
-					inner_threads);
+				if (isVisible[f])
+				{
+					FourierBackprojection::backprojectSlice_backward(
+						xRanges(0,f),
+						particleStack[th].getSliceRef(f),
+						weightStack[th].getSliceRef(f),
+						projPart[f],
+						dataImgFS[2*th + halfSet],
+						ctfImgFS[2*th + halfSet],
+						inner_threads);
+				}
 			}
 
 		} // particles
@@ -444,7 +469,9 @@ void ReconstructParticleProgram::processTomograms(
 			// Intentionally no error checking
 			if (ttPrevious > -1)
 			{
-				int res = system(("rm -rf "+ tmpOutRoot  + ZIO::itoa(ttPrevious) + "*.mrc").c_str());
+				if (system(("rm -rf "+ tmpOutRoot  + ZIO::itoa(ttPrevious) + "*.mrc").c_str()))
+					std::cerr << "WARNING: deleting temporary files " <<
+					tmpOutRoot  + ZIO::itoa(ttPrevious) + "*.mrc failed." << std::endl;
 			}
 
 			ttPrevious = tt;
@@ -515,6 +542,11 @@ void ReconstructParticleProgram::finalise(
 		dataImgDivRS[0], dataImgRS[0], ctfImgFS[0],
 			"merged", binnedOutPixelSize);
 
+	optimisationSet.refMap1 = outDir + "half1.mrc";
+	optimisationSet.refMap2 = outDir + "half2.mrc";
+	optimisationSet.refFSC = "";
+	optimisationSet.write(outDir + "optimisation_set.star");
+
 	Log::endSection();
 }
 
@@ -571,4 +603,5 @@ void ReconstructParticleProgram::writeOutput(
 
 		tapered.write(outDir+tag+".mrc", pixelSize);
 	}
+
 }

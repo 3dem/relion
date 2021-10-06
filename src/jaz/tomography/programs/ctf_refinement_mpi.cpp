@@ -41,7 +41,7 @@ void CtfRefinementProgramMpi::run()
 		initTempDirectories();
 	}
 
-	AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
+	AberrationsCache aberrationsCache(particleSet.optTable, boxSize, particleSet.getOriginalPixelSize(0));
 
 	if (verbosity > 0)
 	{

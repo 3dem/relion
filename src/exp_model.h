@@ -277,7 +277,10 @@ public:
 	RFLOAT getImagePixelSize(long int part_id, int img_id);
 
 	// Get the vector of number of images per group_id
-	void getNumberOfImagesPerGroup(std::vector<long int> &nr_particles_per_group);
+	void getNumberOfImagesPerGroup(std::vector<long int> &nr_particles_per_group, int random_subset = 0);
+
+	// Get the vector of number of images per group_id
+	void getNumberOfImagesPerOpticsGroup(std::vector<long int> &nr_particles_per_group, int random_subset = 0);
 
 	// Get the metadata-row for this image in a separate MetaDataTable
 	MetaDataTable getMetaDataImage(long int part_id, int img_id);
@@ -300,7 +303,7 @@ public:
 	void divideParticlesInRandomHalves(int seed, bool do_helical_refine = false);
 
 	// Randomise the order of the particles
-	void randomiseParticlesOrder(int seed, bool do_split_random_halves = false, bool do_subsets = false);
+	void randomiseParticlesOrder(int seed, bool do_split_random_halves = false, int subsets_size = -1);
 
 	// Make sure the images inside each particle are in the right order
 	void orderImagesInParticles();

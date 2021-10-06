@@ -125,7 +125,7 @@ void ReconstructParticleProgramMpi::run()
 		ctfImgFS[i].fill(0.0);
 	}
 
-	AberrationsCache aberrationsCache(particleSet.optTable, boxSize);
+	AberrationsCache aberrationsCache(particleSet.optTable, boxSize, binnedOutPixelSize);
 
 	if (verb > 0)
 	{
@@ -189,6 +189,8 @@ void ReconstructParticleProgramMpi::run()
 	}
 
 	// Delete temporary files (or try to; no error checking intentional)
-	int res = system(("rm -rf "+ tmpOutRootBase + "*.mrc").c_str());
+	if (system(("rm -rf "+ tmpOutRootBase + "*.mrc").c_str()))
+		std::cerr << "WARNING: deleting temporary files in folder " << tmpOutRootBase <<
+		" failed." << std::endl;
 }
 

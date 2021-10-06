@@ -12,6 +12,8 @@
 #include <src/jaz/image/interpolation.h>
 #include <src/jaz/image/resampling.h>
 
+#include <src/jaz/tomography/tomogram.h>
+
 #define EDGE_FALLOFF 5
 
 class TomoExtraction
@@ -21,7 +23,7 @@ class TomoExtraction
 		template <typename T>
 		static void extractFrameAt3D_Fourier(
 				const RawImage<T>& stack, int f, int s, double bin,
-				const gravis::d4Matrix& projIn,
+				const Tomogram& tomogram,
 				gravis::d3Vector center,
 				RawImage<tComplex<T>>& out,
 				gravis::d4Matrix& projOut,
@@ -31,8 +33,9 @@ class TomoExtraction
 		template <typename T>
 		static void extractAt3D_Fourier(
 				const RawImage<T>& stack, int s, double bin,
-				const std::vector<gravis::d4Matrix>& projIn,
+				const Tomogram& tomogram,
 				const std::vector<gravis::d3Vector>& trajectory,
+				const std::vector<bool>& isVisible,
 				RawImage<tComplex<T>>& out,
 				std::vector<gravis::d4Matrix>& projOut,
 				int num_threads = 1,
@@ -43,6 +46,7 @@ class TomoExtraction
 				const RawImage<T>& stack, int s, double bin,
 				const std::vector<gravis::d4Matrix>& projIn,
 				const std::vector<gravis::d2Vector>& centers,
+				const std::vector<bool>& isVisible,
 				RawImage<tComplex<T>>& out,
 				std::vector<gravis::d4Matrix>& projOut,
 				int num_threads = 1,
@@ -52,6 +56,7 @@ class TomoExtraction
 		static void extractAt3D_real(
 				const RawImage<T>& stack, int s, double bin,
 				const std::vector<gravis::d4Matrix>& projIn,
+				const std::vector<bool>& isVisible,
 				gravis::d3Vector center,
 				RawImage<T>& out,
 				std::vector<gravis::d4Matrix>& projOut,
@@ -63,6 +68,7 @@ class TomoExtraction
 				const RawImage<T>& stack, int s, double bin,
 				const std::vector<gravis::d4Matrix>& projIn,
 				const std::vector<gravis::d2Vector>& centers,
+				const std::vector<bool>& isVisible,
 				RawImage<T>& out,
 				std::vector<gravis::d4Matrix>& projOut,
 				int num_threads = 1,
@@ -73,6 +79,7 @@ class TomoExtraction
 				const RawImage<T>& stack, 
 				int w, int h, 
 				const std::vector<gravis::d2Vector>& origins,
+				const std::vector<bool>& isVisible,
 				RawImage<T>& out,
 				bool center,
 				int num_threads = 1);
@@ -94,7 +101,7 @@ class TomoExtraction
 template <typename T>
 void TomoExtraction::extractFrameAt3D_Fourier(
 		const RawImage<T>& stack, int f, int s, double bin,
-		const gravis::d4Matrix& projIn,
+		const Tomogram& tomogram,
 		gravis::d3Vector center,
 		RawImage<tComplex<T>>& out,
 		gravis::d4Matrix& projOut,
@@ -103,41 +110,45 @@ void TomoExtraction::extractFrameAt3D_Fourier(
 {
 	std::vector<gravis::d4Matrix> projVec;
 	
-	extractAt3D_Fourier(
-		stack.getConstSliceRef(f), s, bin, {projIn}, {center}, out, projVec, 
-		num_threads, circle_crop);
+	const gravis::d2Vector center2D = tomogram.projectPoint(center, f);
+
+	extractAt2D_Fourier(
+		stack.getConstSliceRef(f), s, bin, {tomogram.projectionMatrices[f]},
+		{center2D}, {true}, out, projVec, num_threads, circle_crop);
 	
 	projOut = projVec[0];
 }
 
 template <typename T>
 void TomoExtraction::extractAt3D_Fourier(
-        const RawImage<T>& stack, int s, double bin,
-		const std::vector<gravis::d4Matrix>& projIn,
+		const RawImage<T>& stack, int s, double bin,
+		const Tomogram& tomogram,
 		const std::vector<gravis::d3Vector>& trajectory,
+		const std::vector<bool>& isVisible,
 		RawImage<tComplex<T>>& out,
 		std::vector<gravis::d4Matrix>& projOut,
 		int num_threads,
 		bool circle_crop)
 {
-	const int fc = projIn.size();
+	const int fc = tomogram.frameCount;
 	std::vector<gravis::d2Vector> centers(fc);
 	
 	for (int f = 0; f < fc; f++)
 	{
-		const gravis::d4Vector q = projIn[f] * gravis::d4Vector(trajectory[f]);
-		centers[f] = gravis::d2Vector(q.x, q.y);
+		centers[f] = tomogram.projectPoint(trajectory[f], f);
 	}
 	
 	extractAt2D_Fourier(
-		stack, s, bin, projIn, centers, out, projOut, num_threads, circle_crop);
+		stack, s, bin, tomogram.projectionMatrices, centers, isVisible,
+		out, projOut, num_threads, circle_crop);
 }
 
 template <typename T>
 void TomoExtraction::extractAt2D_Fourier(
-        const RawImage<T>& stack, int s, double bin,
+		const RawImage<T>& stack, int s, double bin,
 		const std::vector<gravis::d4Matrix>& projIn,
 		const std::vector<gravis::d2Vector>& centers,
+		const std::vector<bool>& isVisible,
 		RawImage<tComplex<T>>& out,
 		std::vector<gravis::d4Matrix>& projOut,
 		int num_threads,
@@ -146,10 +157,10 @@ void TomoExtraction::extractAt2D_Fourier(
 	const int sh = s/2 + 1;
 	const int fc = stack.zdim;
 
-    const int sb = (int)(s / bin + 0.5);
-    const int sbh = sb/2 + 1;
+	const int sb = (int)(s / bin + 0.5);
+	const int sbh = sb/2 + 1;
 	
-    BufferedImage<T> smallStack(s,s,fc);
+	BufferedImage<T> smallStack(s,s,fc);
 	projOut.resize(fc);
 			
 	std::vector<gravis::d2Vector> integralShift(fc);
@@ -161,7 +172,7 @@ void TomoExtraction::extractAt2D_Fourier(
 				round(centers[f].y) - s/2);
 	}
 	
-	extractSquares(stack, s, s, integralShift, smallStack, false, num_threads);
+	extractSquares(stack, s, s, integralShift, isVisible, smallStack, false, num_threads);
 	
 	if (circle_crop) 
 	{
@@ -182,7 +193,7 @@ void TomoExtraction::extractAt2D_Fourier(
 	
 	BufferedImage<tComplex<T>> smallStackFS(sh,s,fc);
 
-	NewStackHelper::FourierTransformStack(smallStack, smallStackFS, true, num_threads);
+	NewStackHelper::FourierTransformStack_fast(smallStack, smallStackFS, true, num_threads);
 
 	if (bin != 1.0)
 	{
@@ -199,6 +210,7 @@ template <typename T>
 void TomoExtraction::extractAt3D_real(
         const RawImage<T>& stack, int s, double bin,
 		const std::vector<gravis::d4Matrix>& projIn,
+		const std::vector<bool>& isVisible,
 		gravis::d3Vector center,
 		RawImage<T>& out,
 		std::vector<gravis::d4Matrix>& projOut,
@@ -217,14 +229,15 @@ void TomoExtraction::extractAt3D_real(
 	}
 	
 	extractAt2D_real(
-		stack, s, bin, projIn, centers, out, projOut, num_threads, circle_crop);
+		stack, s, bin, projIn, centers, isVisible, out, projOut, num_threads, circle_crop);
 }
 
 template <typename T>
 void TomoExtraction::extractAt2D_real(
-        const RawImage<T>& stack, int s, double bin,
+		const RawImage<T>& stack, int s, double bin,
 		const std::vector<gravis::d4Matrix>& projIn,
 		const std::vector<gravis::d2Vector>& centers,
+		const std::vector<bool>& isVisible,
 		RawImage<T>& out,
 		std::vector<gravis::d4Matrix>& projOut,
 		int num_threads,
@@ -233,24 +246,24 @@ void TomoExtraction::extractAt2D_real(
 	const int sh = s/2 + 1;
 	const int fc = stack.zdim;
 
-    const int sb = (int)(s / bin + 0.5);
-    const int sbh = sb/2 + 1;
+	const int sb = (int)(s / bin + 0.5);
+	const int sbh = sb/2 + 1;
 	
-    BufferedImage<T> smallStack(s,s,fc);
+	BufferedImage<T> smallStack(s,s,fc);
 	projOut.resize(fc);
 			
 	std::vector<gravis::d2Vector> integralShift(fc);
-			
+
 	for (int f = 0; f < fc; f++)
 	{
 		integralShift[f] = gravis::d2Vector(
-                round(centers[f].x) - s/2,
-                round(centers[f].y) - s/2);
+					round(centers[f].x) - s/2,
+					round(centers[f].y) - s/2);
 	}
 	
-	extractSquares(stack, s, s, integralShift, smallStack, false, num_threads);
+	extractSquares(stack, s, s, integralShift, isVisible, smallStack, false, num_threads);
 	
-	if (circle_crop) 
+	if (circle_crop)
 	{
 		cropCircle(smallStack, 0, EDGE_FALLOFF, num_threads);
 	}
@@ -288,6 +301,7 @@ void TomoExtraction::extractSquares(
 		const RawImage<T>& stack, 
 		int w, int h, 
 		const std::vector<gravis::d2Vector>& origins,
+		const std::vector<bool>& isVisible,
 		RawImage<T>& out,
 		bool center,
 		int num_threads)
@@ -299,19 +313,30 @@ void TomoExtraction::extractSquares(
 	#pragma omp parallel for num_threads(num_threads)
 	for (int f = 0; f < fc; f++)
 	{
-		for (int y = 0; y < h; y++)
-		for (int x = 0; x < w; x++)
+		if (isVisible[f])
 		{
-			int xx = (center? (x + w/2) % w : x) + origins[f].x;
-			int yy = (center? (y + h/2) % h : y) + origins[f].y;
-			
-			if (xx < 0) xx = 0;
-			else if (xx >= w0) xx = w0 - 1;
-			
-			if (yy < 0) yy = 0;
-			else if (yy >= h0) yy = h0 - 1;
-			
-			out(x,y,f) = stack(xx,yy,f);
+			for (int y = 0; y < h; y++)
+			for (int x = 0; x < w; x++)
+			{
+				int xx = (center? (x + w/2) % w : x) + origins[f].x;
+				int yy = (center? (y + h/2) % h : y) + origins[f].y;
+				
+				if (xx < 0) xx = 0;
+				else if (xx >= w0) xx = w0 - 1;
+				
+				if (yy < 0) yy = 0;
+				else if (yy >= h0) yy = h0 - 1;
+				
+				out(x,y,f) = stack(xx,yy,f);
+			}
+		}
+		else
+		{
+			for (int y = 0; y < h; y++)
+			for (int x = 0; x < w; x++)
+			{
+				out(x,y,f) = T(0);
+			}
 		}
 	}
 }

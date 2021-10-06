@@ -68,9 +68,6 @@ public:
      */
     void initialiseWorkLoad();
 
-    /** Perform individual power spectra calculation in parallel */
-    void calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT> &Mavg);
-
     /** Expectation
      *  This cares care of gathering all weighted sums after the expectation
      */
@@ -99,6 +96,8 @@ public:
      */
     void maximization();
 
+    void maximizationGradientParameters();
+
     /** Perform unregularized reconstruction
       * With the aim of performing solvent mask corrected FSC inside the auto-refine
       */
@@ -124,6 +123,16 @@ public:
      *  and sends these curves, together with new tau2_class estimates to all followers...
      */
     void compareTwoHalves();
+
+    /**
+     * Adjust angular sampling based on the expected angular accuracies for gradient optimization
+     */
+    void updateAngularSamplingGrad(long int my_first_part_id, long int my_last_part_id, bool verb = true);
+
+    /**
+     * MPI aware verison of MlOptimiser::calculateExpectedAngularErrors
+     */
+	void calculateExpectedAngularErrors(long int my_first_part_id, long int my_last_part_id);
 
     /** Do the real work
      * Expectation is split in image subsets over all nodes, each reconstruction is done on a separate node

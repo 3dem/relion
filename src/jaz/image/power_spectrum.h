@@ -9,15 +9,21 @@
 class PowerSpectrum
 {
 	public:
+
+		template <class T>
+		static std::vector<double> fromFftwHalf(const RawImage<tComplex<T>>& complex);
+
+		template <class T>
+		static T interpolate(double x, double y, int w, int h, const std::vector<T>& spectrum);
+
+		/*template <class T>
+		static BufferedImage<T> halfReal(const RawImage<T>& real);
 		
 		template <class T>
-		static BufferedImage<T> halfReal(BufferedImage<T>& real);
+		static BufferedImage<T> halfComplex(const RawImage<tComplex<T>>& complex);
 		
 		template <class T>
-		static BufferedImage<T> halfComplex(BufferedImage<tComplex<T>>& complex);
-		
-		template <class T>
-		static BufferedImage<T> halfComplexSqrt(BufferedImage<tComplex<T>>& complex);
+		static BufferedImage<T> halfComplexSqrt(const RawImage<tComplex<T>>& complex);*/
 		
 		template <class T>
 		static std::vector<double> periodogramAverage1D(
@@ -40,8 +46,8 @@ class PowerSpectrum
 				double eps = 1e-12);
 };
 
-template <class T>
-BufferedImage<T> PowerSpectrum::halfReal(BufferedImage<T>& real)
+/*template <class T>
+BufferedImage<T> PowerSpectrum::halfReal(const RawImage<T>& real)
 {
 	BufferedImage<tComplex<T>> complex;
 	FFT::FourierTransform(real, complex, FFT::Both);
@@ -50,7 +56,7 @@ BufferedImage<T> PowerSpectrum::halfReal(BufferedImage<T>& real)
 }
 
 template <class T>
-BufferedImage<T> PowerSpectrum::halfComplex(BufferedImage<tComplex<T>>& complex)
+BufferedImage<T> PowerSpectrum::halfComplex(const RawImage<tComplex<T>>& complex)
 {
 	const int wh = complex.xdim;
 	const int h  = complex.ydim;
@@ -69,7 +75,7 @@ BufferedImage<T> PowerSpectrum::halfComplex(BufferedImage<tComplex<T>>& complex)
 }
 
 template <class T>
-BufferedImage<T> PowerSpectrum::halfComplexSqrt(BufferedImage<tComplex<T>>& complex)
+BufferedImage<T> PowerSpectrum::halfComplexSqrt(const RawImage<tComplex<T>>& complex)
 {
 	const int wh = complex.xdim;
 	const int h  = complex.ydim;
@@ -85,6 +91,67 @@ BufferedImage<T> PowerSpectrum::halfComplexSqrt(BufferedImage<tComplex<T>>& comp
 	}
 	
 	return out;
+}*/
+
+
+template <class T>
+std::vector<double> PowerSpectrum::fromFftwHalf(const RawImage<tComplex<T>>& complex)
+{
+	const int wh = complex.xdim;
+	const int w  = 2 * (w - 1);
+	const int h  = complex.ydim;
+	const int b  = wh;
+
+	std::vector<double> avg(b, 0.0);
+	std::vector<double> wgh(b, 0.0);
+
+	for (int yi = 0; yi < h;  yi++)
+	for (int xi = 0; xi < wh; xi++)
+	{
+		const double xd = xi;
+		const double yd = (yi < h/2.0? yi : yi - h) * (w/(double)h);
+		const double rd = sqrt(xd*xd + yd*yd);
+
+		const int r = (int)(rd+0.5);
+
+		if (r < b)
+		{
+			avg[r] += (double) complex(xi,yi).norm();
+			wgh[r] += 1.0;
+		}
+	}
+
+	for (int i = 0; i < b; i++)
+	{
+		if (wgh[i] > 0.0)
+		{
+			avg[i] /= wgh[i];
+		}
+	}
+
+	return avg;
+}
+
+template <class T>
+T PowerSpectrum::interpolate(double x, double y, int w, int h, const std::vector<T>& spectrum)
+{
+	const double xd = x;
+	const double yd = (y < h/2.0? y : y - h) * (w/(double)h);
+	const double rd = sqrt(xd*xd + yd*yd);
+
+	const int r0 = (int)rd;
+	const int r1 = r0 + 1;
+
+	if (r1 >= spectrum.size())
+	{
+		return spectrum[spectrum.size() - 1];
+	}
+	else
+	{
+		const double f = rd - r0;
+
+		return f * spectrum[r1] + (1.0 - f) * spectrum[r0];
+	}
 }
 
 template <class T>

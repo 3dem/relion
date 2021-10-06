@@ -1,5 +1,5 @@
 
-set(TBB_PREFIX tbb2018U3)
+set(TBB_PREFIX tbb2020U3)
 set(TBB_EXTERNAL_PATH "${CMAKE_SOURCE_DIR}/external/tbb")
 
 ## ------------------------------------------------------------- PREVIOUS EXT LIBS? --
@@ -30,9 +30,9 @@ if(NOT TBB_FOUND)
     
     include(ExternalProject)
 
-    set(TBB_URL https://github.com/oneapi-src/oneTBB/archive/2018_U3.tar.gz)   # TBB 2018 U3
-    set(TBB_URL_MD5 6a5b327fc86e2cd259f43af9322fdf42)
-    set(TBB_TAR_NAME tbb-2018_U3.tar.gz)
+    set(TBB_URL https://github.com/oneapi-src/oneTBB/archive/v2020.3.tar.gz)   # TBB 2020 U3
+    set(TBB_URL_MD5 ea8fa4332f4bad10a75a361cba025380)
+    set(TBB_TAR_NAME tbb-2020_U3.tar.gz)
    
     ExternalProject_Add(OWN_TBB
 		URL ${TBB_URL}

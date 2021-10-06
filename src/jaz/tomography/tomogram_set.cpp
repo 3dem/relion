@@ -1,10 +1,14 @@
 #include "tomogram_set.h"
+#include "motion/Fourier_2D_deformation.h"
+#include "motion/spline_2D_deformation.h"
+#include "motion/linear_2D_deformation.h"
 #include <fstream>
 #include <sstream>
 #include <src/error.h>
 #include <src/jaz/optics/damage.h>
 #include <src/jaz/util/zio.h>
 #include <src/jaz/util/log.h>
+#include <src/jaz/util/image_file_helper.h>
 
 using namespace gravis;
 
@@ -62,7 +66,195 @@ TomogramSet::TomogramSet(std::string filename, bool verbose)
 	}
 }
 
-int TomogramSet::addTomogram(
+Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
+{
+	Tomogram out;
+
+	std::string tomoName, stackFn;
+
+	globalTable.getValueSafely(EMDL_TOMO_NAME, tomoName, index);
+	globalTable.getValueSafely(EMDL_TOMO_TILT_SERIES_NAME, stackFn, index);
+	globalTable.getValueSafely(EMDL_TOMO_FRAME_COUNT, out.frameCount, index);
+
+	i3Vector stackSize;
+
+	if (loadImageData)
+	{
+		out.stack.read(stackFn);
+		out.hasImage = true;
+
+		stackSize.x = out.stack.xdim;
+		stackSize.y = out.stack.ydim;
+		stackSize.z = out.stack.zdim;
+	}
+	else
+	{
+		out.hasImage = false;
+
+		t3Vector<long int> isl = ImageFileHelper::getSize(stackFn);
+
+		stackSize.x = isl.x;
+		stackSize.y = isl.y;
+		stackSize.z = isl.z;
+	}
+
+	out.imageSize = stackSize.xy();
+
+	out.tiltSeriesFilename = stackFn;
+
+	globalTable.getValueSafely(EMDL_TOMO_SIZE_X, out.w0, index);
+	globalTable.getValueSafely(EMDL_TOMO_SIZE_Y, out.h0, index);
+	globalTable.getValueSafely(EMDL_TOMO_SIZE_Z, out.d0, index);
+
+	out.centre = d3Vector(out.w0/2.0, out.h0/2.0, out.d0/2.0);
+
+	globalTable.getValueSafely(EMDL_TOMO_HANDEDNESS, out.handedness, index);
+
+	double Q0;
+
+	globalTable.getValueSafely(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, out.optics.pixelSize, index);
+	globalTable.getValueSafely(EMDL_CTF_VOLTAGE, out.optics.voltage, index);
+	globalTable.getValueSafely(EMDL_CTF_CS, out.optics.Cs, index);
+	globalTable.getValueSafely(EMDL_CTF_Q0, Q0, index);
+
+	out.hasDeformations = (
+		globalTable.containsLabel(EMDL_TOMO_DEFORMATION_GRID_SIZE_X) &&
+		globalTable.containsLabel(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y) );
+
+	i2Vector deformationGridSize;
+	std::string deformationType = "";
+
+	if (out.hasDeformations)
+	{
+		deformationGridSize.x = globalTable.getInt(EMDL_TOMO_DEFORMATION_GRID_SIZE_X, index);
+		deformationGridSize.y = globalTable.getInt(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y, index);
+		deformationType = globalTable.getString(EMDL_TOMO_DEFORMATION_TYPE, index);
+
+		out.imageDeformations.resize(out.frameCount);
+
+		if (deformationType != "spline" && deformationType != "Fourier" && deformationType != "linear")
+		{
+			REPORT_ERROR_STR(
+				"TomogramSet::loadTomogram: illegal deformation type '"
+				<< deformationType << "'");
+		}
+	}
+
+	const MetaDataTable& m = tomogramTables[index];
+
+	out.cumulativeDose.resize(out.frameCount);
+	out.centralCTFs.resize(out.frameCount);
+	out.projectionMatrices.resize(out.frameCount);
+
+	for (int f = 0; f < out.frameCount; f++)
+	{
+		d4Matrix& P = out.projectionMatrices[f];
+
+		std::vector<EMDLabel> rows({
+			EMDL_TOMO_PROJECTION_X,
+			EMDL_TOMO_PROJECTION_Y,
+			EMDL_TOMO_PROJECTION_Z,
+			EMDL_TOMO_PROJECTION_W });
+
+		for (int i = 0; i < 4; i++)
+		{
+			std::vector<double> vals;
+			m.getValueSafely(rows[i], vals, f);
+
+			for (int j = 0; j < 4; j++)
+			{
+				P(i,j) = vals[j];
+			}
+		}
+
+		CTF& ctf = out.centralCTFs[f];
+
+		m.getValueSafely(EMDL_CTF_DEFOCUSU, ctf.DeltafU, f);
+		m.getValueSafely(EMDL_CTF_DEFOCUSV, ctf.DeltafV, f);
+		m.getValueSafely(EMDL_CTF_DEFOCUS_ANGLE, ctf.azimuthal_angle, f);
+
+		ctf.Q0 = Q0;
+		ctf.Cs = out.optics.Cs;
+		ctf.kV = out.optics.voltage;
+
+		if (m.containsLabel(EMDL_CTF_SCALEFACTOR))
+		{
+			ctf.scale = m.getDouble(EMDL_CTF_SCALEFACTOR, f);
+		}
+
+		ctf.initialise();
+
+		m.getValueSafely(EMDL_MICROGRAPH_PRE_EXPOSURE, out.cumulativeDose[f], f);
+
+		if (out.hasDeformations &&
+			m.containsLabel(EMDL_TOMO_DEFORMATION_COEFFICIENTS))
+		{
+			const std::vector<double> coeffs = m.getDoubleVector(
+					EMDL_TOMO_DEFORMATION_COEFFICIENTS, f);
+
+			if (deformationType == "spline")
+			{
+				out.imageDeformations[f] = std::make_shared<Spline2DDeformation>(
+							stackSize.xy(), deformationGridSize, &coeffs[0]);
+			}
+			else if (deformationType == "Fourier")
+			{
+				out.imageDeformations[f] = std::make_shared<Fourier2DDeformation>(
+							stackSize.xy(), deformationGridSize, &coeffs[0]);
+			}
+			else if (deformationType == "linear")
+			{
+				out.imageDeformations[f] = std::make_shared<Linear2DDeformation>(
+							stackSize.xy(), &coeffs[0]);
+			}
+		}
+	}
+
+	out.frameSequence = IndexSort<double>::sortIndices(out.cumulativeDose);
+
+	if (globalTable.containsLabel(EMDL_TOMO_IMPORT_FRACT_DOSE))
+	{
+		out.fractionalDose = globalTable.getDouble(EMDL_TOMO_IMPORT_FRACT_DOSE, index);
+	}
+	else
+	{
+		out.fractionalDose = out.cumulativeDose[out.frameSequence[1]] - out.cumulativeDose[out.frameSequence[0]];
+	}
+
+	if (globalTable.containsLabel(EMDL_IMAGE_OPTICS_GROUP_NAME))
+	{
+		out.opticsGroupName = globalTable.getString(EMDL_IMAGE_OPTICS_GROUP_NAME, index);
+	}
+	else
+	{
+		out.opticsGroupName = "opticsGroup1";
+	}
+
+
+	out.name = tomoName;
+
+	if (globalTable.containsLabel(EMDL_TOMO_FIDUCIALS_STARFILE))
+	{
+		 globalTable.getValue(EMDL_TOMO_FIDUCIALS_STARFILE, out.fiducialsFilename, index);
+	}
+	else
+	{
+		out.fiducialsFilename = "";
+	}
+
+	if (globalTable.containsLabel(EMDL_TOMO_DEFOCUS_SLOPE))
+	{
+		 globalTable.getValue(EMDL_TOMO_DEFOCUS_SLOPE, out.defocusSlope, index);
+	}
+	else
+	{
+		out.defocusSlope = 1.0;
+	}
+
+	return out;
+}
+
+void TomogramSet::addTomogram(
 		std::string tomoName, std::string stackFilename,
 		const std::vector<gravis::d4Matrix>& projections, 
 		int w, int h, int d, 
@@ -206,133 +398,35 @@ void TomogramSet::setDefocusSlope(int tomogramIndex, double slope)
 	globalTable.setValue(EMDL_TOMO_DEFOCUS_SLOPE, slope, tomogramIndex);
 }
 
-Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
+void TomogramSet::setDeformation(
+	int tomogramIndex,
+	gravis::i2Vector gridSize,
+	const std::string& deformationType,
+	const std::vector<std::vector<double>>& coeffs)
 {
-	Tomogram out;
-	
-	std::string tomoName, stackFn;
-	
-	globalTable.getValueSafely(EMDL_TOMO_NAME, tomoName, index);
-	globalTable.getValueSafely(EMDL_TOMO_TILT_SERIES_NAME, stackFn, index);
-	globalTable.getValueSafely(EMDL_TOMO_FRAME_COUNT, out.frameCount, index);
-		
-	if (loadImageData)
-	{
-		out.stack.read(stackFn);
-		out.hasImage = true;
-	}
-	else
-	{
-		out.hasImage = false;
-	}
+	globalTable.setValue(EMDL_TOMO_DEFORMATION_GRID_SIZE_X, gridSize.x, tomogramIndex);
+	globalTable.setValue(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y, gridSize.y, tomogramIndex);
+	globalTable.setValue(EMDL_TOMO_DEFORMATION_TYPE, deformationType, tomogramIndex);
 
-	out.tiltSeriesFilename = stackFn;
-		
-	globalTable.getValueSafely(EMDL_TOMO_SIZE_X, out.w0, index);
-	globalTable.getValueSafely(EMDL_TOMO_SIZE_Y, out.h0, index);
-	globalTable.getValueSafely(EMDL_TOMO_SIZE_Z, out.d0, index);
-	
-	out.centre = d3Vector(out.w0/2.0, out.h0/2.0, out.d0/2.0);
-		
-	globalTable.getValueSafely(EMDL_TOMO_HANDEDNESS, out.handedness, index);
-	
-	double Q0;
-	
-	globalTable.getValueSafely(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, out.optics.pixelSize, index);
-	globalTable.getValueSafely(EMDL_CTF_VOLTAGE, out.optics.voltage, index);
-	globalTable.getValueSafely(EMDL_CTF_CS, out.optics.Cs, index);
-	globalTable.getValueSafely(EMDL_CTF_Q0, Q0, index);
-	
-	
-	const MetaDataTable& m = tomogramTables[index];
-	
-	out.cumulativeDose.resize(out.frameCount);
-	out.centralCTFs.resize(out.frameCount);
-	out.projectionMatrices.resize(out.frameCount);
-	
-	for (int f = 0; f < out.frameCount; f++)
-	{
-		d4Matrix& P = out.projectionMatrices[f];
-		
-		std::vector<EMDLabel> rows({
-			EMDL_TOMO_PROJECTION_X, 
-			EMDL_TOMO_PROJECTION_Y, 
-			EMDL_TOMO_PROJECTION_Z, 
-			EMDL_TOMO_PROJECTION_W });
-		
-		for (int i = 0; i < 4; i++)
-		{
-			std::vector<double> vals;
-			m.getValueSafely(rows[i], vals, f);
-			
-			for (int j = 0; j < 4; j++)
-			{
-				P(i,j) = vals[j];
-			}
-		}
-		
-		CTF& ctf = out.centralCTFs[f];
-		
-		m.getValueSafely(EMDL_CTF_DEFOCUSU, ctf.DeltafU, f);
-		m.getValueSafely(EMDL_CTF_DEFOCUSV, ctf.DeltafV, f);
-		m.getValueSafely(EMDL_CTF_DEFOCUS_ANGLE, ctf.azimuthal_angle, f);
+	MetaDataTable& mdt = tomogramTables[tomogramIndex];
 
-		ctf.Q0 = Q0;
-		ctf.Cs = out.optics.Cs;
-		ctf.kV = out.optics.voltage;
+	const int fc = coeffs.size();
 
-		if (m.containsLabel(EMDL_CTF_SCALEFACTOR))
-		{
-			ctf.scale = m.getDouble(EMDL_CTF_SCALEFACTOR, f);
-		}
-		
-		ctf.initialise();
-		
-		m.getValueSafely(EMDL_MICROGRAPH_PRE_EXPOSURE, out.cumulativeDose[f], f);
+	for (int f = 0; f < fc; f++)
+	{
+		mdt.setValue(EMDL_TOMO_DEFORMATION_COEFFICIENTS, coeffs[f], f);
 	}
-	
-	out.frameSequence = IndexSort<double>::sortIndices(out.cumulativeDose);
+}
 
-	if (globalTable.containsLabel(EMDL_TOMO_IMPORT_FRACT_DOSE))
-	{
-		out.fractionalDose = globalTable.getDouble(EMDL_TOMO_IMPORT_FRACT_DOSE, index);
-	}
-	else
-	{
-		out.fractionalDose = out.cumulativeDose[out.frameSequence[1]] - out.cumulativeDose[out.frameSequence[0]];
-	}
+void TomogramSet::clearDeformation()
+{
+	globalTable.deactivateLabel(EMDL_TOMO_DEFORMATION_GRID_SIZE_X);
+	globalTable.deactivateLabel(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y);
 
-	if (globalTable.containsLabel(EMDL_IMAGE_OPTICS_GROUP_NAME))
+	for (int t = 0; t < tomogramTables.size(); t++)
 	{
-		out.opticsGroupName = globalTable.getDouble(EMDL_IMAGE_OPTICS_GROUP_NAME, index);
+		tomogramTables[t].deactivateLabel(EMDL_TOMO_DEFORMATION_COEFFICIENTS);
 	}
-	else
-	{
-		out.opticsGroupName = "opticsGroup1";
-	}
-
-
-	out.name = tomoName;
-	
-	if (globalTable.containsLabel(EMDL_TOMO_FIDUCIALS_STARFILE))
-	{
-		 globalTable.getValue(EMDL_TOMO_FIDUCIALS_STARFILE, out.fiducialsFilename, index);
-	}
-	else
-	{
-		out.fiducialsFilename = "";
-	}
-
-	if (globalTable.containsLabel(EMDL_TOMO_DEFOCUS_SLOPE))
-	{
-		 globalTable.getValue(EMDL_TOMO_DEFOCUS_SLOPE, out.defocusSlope, index);
-	}
-	else
-	{
-		out.defocusSlope = 1.0;
-	}
-	
-	return out;
 }
 
 int TomogramSet::getTomogramIndex(std::string tomogramName) const
@@ -378,6 +472,23 @@ int TomogramSet::getTomogramIndexSafely(std::string tomogramName) const
 int TomogramSet::getFrameCount(int index) const
 {
 	return tomogramTables[index].numberOfObjects();
+}
+
+int TomogramSet::getMaxFrameCount() const
+{
+	int max_val = 0;
+
+	for (int t = 0; t < tomogramTables.size(); t++)
+	{
+		const int fc = tomogramTables[t].numberOfObjects();
+
+		if (fc > max_val)
+		{
+			max_val = fc;
+		}
+	}
+
+	return max_val;
 }
 
 double TomogramSet::getPixelSize(int index) const

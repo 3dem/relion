@@ -91,15 +91,37 @@ RFLOAT Experiment::getImagePixelSize(long int part_id, int img_id)
 	return obsModel.getPixelSize(optics_group);
 }
 
-void Experiment::getNumberOfImagesPerGroup(std::vector<long int> &nr_particles_per_group)
+void Experiment::getNumberOfImagesPerGroup(std::vector<long int> &nr_particles_per_group, int random_subset)
 {
 	nr_particles_per_group.resize(groups.size());
 	for (long int i = 0; i < nr_particles_per_group.size(); i++)
 		nr_particles_per_group[i] = 0.;
 
 	for (long int part_id = 0; part_id < particles.size(); part_id++)
-		for (int img_id = 0; img_id < particles[part_id].images.size(); img_id++)
-			nr_particles_per_group[particles[part_id].images[img_id].group_id] += 1;
+	{
+		if (random_subset == 0 || particles[part_id].random_subset == random_subset)
+		{
+			for (int img_id = 0; img_id < particles[part_id].images.size(); img_id++)
+				nr_particles_per_group[particles[part_id].images[img_id].group_id] += 1;
+		}
+	}
+
+}
+
+void Experiment::getNumberOfImagesPerOpticsGroup(std::vector<long int> &nr_particles_per_optics_group, int random_subset)
+{
+	nr_particles_per_optics_group.resize(obsModel.numberOfOpticsGroups());
+	for (long int i = 0; i < nr_particles_per_optics_group.size(); i++)
+		nr_particles_per_optics_group[i] = 0.;
+
+	for (long int part_id = 0; part_id < particles.size(); part_id++)
+	{
+		if (random_subset == 0 || particles[part_id].random_subset == random_subset)
+		{
+			for (int img_id = 0; img_id < particles[part_id].images.size(); img_id++)
+				nr_particles_per_optics_group[particles[part_id].images[img_id].optics_group] += 1;
+		}
+	}
 }
 
 MetaDataTable Experiment::getMetaDataImage(long int part_id, int img_id)
@@ -341,11 +363,12 @@ void Experiment::divideParticlesInRandomHalves(int seed, bool do_helical_refine)
 
 }
 
-void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, bool do_subsets)
+void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, int subsets_size)
 {
 	//This static flag is for only randomize once
 	static bool randomised = false;
-	if (!randomised || do_subsets)
+	const bool doing_subset = 0 < subsets_size && subsets_size < numberOfParticles() ;
+	if (!randomised || doing_subset)
 	{
 		srand(seed);
 
@@ -377,9 +400,10 @@ void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, 
 
 			// Make sure the particles are sorted on their optics_group.
 			// Otherwise CudaFFT re-calculation of plans every time image size changes slows down things a lot!
-			std::stable_sort(sorted_idx.begin(), sorted_idx.begin() + nr_half1, compareOpticsGroupsParticles(particles));
-			std::stable_sort(sorted_idx.begin() + nr_half1, sorted_idx.end(), compareOpticsGroupsParticles(particles));
-
+			long max_nr1 = doing_subset ? subsets_size : nr_half1;
+			long max_nr2 = doing_subset ? subsets_size : nr_half2;
+			std::stable_sort(sorted_idx.begin(), sorted_idx.begin() + max_nr1, compareOpticsGroupsParticles(particles));
+			std::stable_sort(sorted_idx.begin() + nr_half1, sorted_idx.begin() + nr_half1 + max_nr2, compareOpticsGroupsParticles(particles));
 		}
 		else
 		{
@@ -388,7 +412,8 @@ void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, 
 
 			// Make sure the particles are sorted on their optics_group.
 			// Otherwise CudaFFT re-calculation of plans every time image size changes slows down things a lot!
- 			std::stable_sort(sorted_idx.begin(), sorted_idx.end(), compareOpticsGroupsParticles(particles));
+			long max_nr = doing_subset ? subsets_size : numberOfParticles();
+ 			std::stable_sort(sorted_idx.begin(), sorted_idx.begin() + max_nr, compareOpticsGroupsParticles(particles));
 		}
 
 		randomised = true;

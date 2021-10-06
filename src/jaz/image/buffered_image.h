@@ -67,6 +67,8 @@ BufferedImage<T>& BufferedImage<T>::operator = (const BufferedImage<T>& other)
 	
 	dataVec = other.dataVec;
 	RawImage<T>::data = &(dataVec[0]);
+
+	return *this;
 }
 
 template <class T>
@@ -170,7 +172,7 @@ void BufferedImage<T>::read(std::string fn, int slice)
 	{
 		gravis::tImage<T> img;
 		img.read(fn);
-		copyDataAndSizeFrom(img);		
+		copyDataAndSizeFrom(img);
 	}
 	else
 	{
