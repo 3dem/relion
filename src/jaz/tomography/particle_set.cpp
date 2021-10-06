@@ -91,6 +91,7 @@ ParticleIndex ParticleSet::addParticle(const ParticleSet &particleSet, ParticleI
 void ParticleSet::clearParticles()
 {
 	partTable.clear();
+	partTable.setName("particles");
 	motionTrajectories.clear();
 }
 
