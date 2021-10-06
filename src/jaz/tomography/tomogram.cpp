@@ -54,8 +54,26 @@ bool Tomogram::isVisible(const d3Vector& p, int frame, double radius) const
 {
 	const d2Vector q = projectPoint(p, frame);
 	
-	return     q.x > radius && q.x < stack.xdim - radius
-			&& q.y > radius && q.y < stack.ydim - radius;
+	return     q.x > radius && q.x < imageSize.x - radius
+			&& q.y > radius && q.y < imageSize.y - radius;
+}
+
+bool Tomogram::isVisibleAtAll(const std::vector<d3Vector> &trajectory, double radius) const
+{
+	std::vector<bool> vis = determineVisiblity(trajectory, radius);
+
+	bool all_outside = true;
+
+	for (int i = 0; i < vis.size(); i++)
+	{
+		if (vis[i])
+		{
+			all_outside = false;
+			break;
+		}
+	}
+
+	return !all_outside;
 }
 
 std::vector<bool> Tomogram::determineVisiblity(const std::vector<d3Vector>& trajectory, double radius) const
@@ -63,7 +81,7 @@ std::vector<bool> Tomogram::determineVisiblity(const std::vector<d3Vector>& traj
 	const int fc = trajectory.size();
 	
 	std::vector<bool> out(fc);
-	
+
 	for (int f = 0; f < fc; f++)
 	{
 		out[f] = isVisible(trajectory[f], f, radius);

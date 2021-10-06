@@ -47,6 +47,9 @@ class Tomogram
 		
 		bool isVisible(
 				const gravis::d3Vector& p, int frame, double radius) const;
+
+		bool isVisibleAtAll(
+				const std::vector<gravis::d3Vector>& trajectory, double radius) const;
 		
 		std::vector<bool> determineVisiblity(
 				const std::vector<gravis::d3Vector>& trajectory, double radius) const;

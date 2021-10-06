@@ -32,6 +32,10 @@ class ParticleSet
 			bool hasMotion;
 			std::vector<Trajectory> motionTrajectories;
 
+
+		void reserve(int particleNumber);
+		ParticleIndex addParticle(const ParticleSet& particleSet, ParticleIndex index);
+		void clearParticles();
 		
 		std::vector<std::vector<ParticleIndex>> splitByTomogram(const TomogramSet& tomogramSet, bool verbose = true) const;
 		int getTotalParticleNumber() const;

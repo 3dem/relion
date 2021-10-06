@@ -59,6 +59,41 @@ ParticleSet::ParticleSet(std::string filename, std::string motionFilename, bool 
 	}
 }
 
+void ParticleSet::reserve(int particleNumber)
+{
+	motionTrajectories.reserve(particleNumber);
+}
+
+ParticleIndex ParticleSet::addParticle(const ParticleSet &particleSet, ParticleIndex index)
+{
+	partTable.addObject(particleSet.partTable.getObject(index.value));
+
+	if (particleSet.hasMotion)
+	{
+		if (!hasMotion && partTable.numberOfObjects() > 0)
+		{
+			REPORT_ERROR("ParticleSet::addParticle: trying to add a particle with motion to a particle set without.");
+		}
+
+		hasMotion = true;
+
+		if (partTable.numberOfObjects() != motionTrajectories.size())
+		{
+			REPORT_ERROR("ParticleSet::addParticle: number of particles is not the same as the number of trajectories.");
+		}
+
+		motionTrajectories.push_back(particleSet.motionTrajectories[index.value]);
+	}
+
+	return ParticleIndex(partTable.numberOfObjects() - 1);
+}
+
+void ParticleSet::clearParticles()
+{
+	partTable.clear();
+	motionTrajectories.clear();
+}
+
 std::vector<std::vector<ParticleIndex> > ParticleSet::splitByTomogram(const TomogramSet& tomogramSet, bool verbose) const
 {
 	std::vector<std::vector<ParticleIndex>> out(0);
