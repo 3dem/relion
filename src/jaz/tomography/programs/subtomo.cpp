@@ -264,6 +264,9 @@ void SubtomoProgram::writeParticleSet(
 	const int tc = particles.size();
 
 	ParticleSet copy = particleSet;
+	copy.clearParticles();
+
+	int particles_removed = 0;
 
 	for (int t = 0; t < tc; t++)
 	{
@@ -275,25 +278,48 @@ void SubtomoProgram::writeParticleSet(
 		{
 			const ParticleIndex part_id = particles[t][p];
 
-			const int opticsGroup = copy.getOpticsGroup(part_id);
-			const double originalPixelSize = copy.getOriginalPixelSize(opticsGroup);
+			Tomogram tomogram = tomogramSet.loadTomogram(t, false);
 
-			const std::string filenameRoot = getOutputFilename(
-				part_id, t, particleSet, tomogramSet);
+			const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
+						part_id, tomogram.frameCount, tomogram.optics.pixelSize);
 
-			std::string outData = filenameRoot + "_data.mrc";
-			std::string outWeight = filenameRoot + "_weights.mrc";
+			if (tomogram.isVisibleAtAll(traj, boxSize / 2.0))
+			{
+				const ParticleIndex new_id = copy.addParticle(particleSet, part_id);
 
-			copy.setImageFileNames(outData, outWeight, part_id);
+				const int opticsGroup = particleSet.getOpticsGroup(part_id);
+				const double originalPixelSize = particleSet.getOriginalPixelSize(opticsGroup);
 
-			const d3Vector offset_A = copy.getParticleOffset(part_id);
-			const d3Vector coord_0 = copy.getParticleCoord(part_id);
+				const std::string filenameRoot = getOutputFilename(
+					part_id, t, particleSet, tomogramSet);
 
-			const d3Vector coord_1 = coord_0 - offset_A / originalPixelSize;
+				std::string outData = filenameRoot + "_data.mrc";
+				std::string outWeight = filenameRoot + "_weights.mrc";
 
-			copy.setParticleOffset(part_id, d3Vector(0,0,0));
-			copy.setParticleCoord(part_id, coord_1);
+				copy.setImageFileNames(outData, outWeight, new_id);
+
+				const d3Vector offset_A = particleSet.getParticleOffset(part_id);
+				const d3Vector coord_0 = particleSet.getParticleCoord(part_id);
+
+				const d3Vector coord_1 = coord_0 - offset_A / originalPixelSize;
+
+				copy.setParticleOffset(new_id, d3Vector(0,0,0));
+				copy.setParticleCoord(new_id, coord_1);
+			}
+			else
+			{
+				particles_removed++;
+			}
 		}
+	}
+
+	if (particles_removed == 1)
+	{
+		Log::warn("One particle was removed because it was too close to the edge in all images.");
+	}
+	else if (particles_removed > 1)
+	{
+		Log::warn(ZIO::itoa(particles_removed)+" particles were removed because they were too close to the edge in all images.");
 	}
 
 	for (int og = 0; og < copy.numberOfOpticsGroups(); og++)
@@ -425,8 +451,13 @@ void SubtomoProgram::processTomograms(
 			
 			const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
 						part_id, fc, tomogram.optics.pixelSize);
-			
-			const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s2D/2.0);
+
+			if (!tomogram.isVisibleAtAll(traj, s2D / 2.0))
+			{
+				continue;
+			}
+
+			const std::vector<bool> isVisible = tomogram.determineVisiblity(traj, s2D / 2.0);
 
 			std::vector<d4Matrix> projCut(fc), projPart(fc);
 
