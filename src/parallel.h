@@ -44,7 +44,6 @@
 #ifndef __PARALLEL_H
 #define __PARALLEL_H
 
-#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <omp.h>
@@ -54,14 +53,7 @@
 // which is developed at the Biocomputing Unit of the National Center for Biotechnology - CSIC
 // in Madrid , Spain
 
-
-class ThreadManager;
-class ThreadArgument;
-
-/* Prototype of functions for threads works. */
-typedef void (*ThreadFunction) (ThreadArgument &arg);
-
-/** Class wrapping around the pthreads mutex.
+/** Class wrapping around the OpenMPI mutex.
  * This class will provide a more object oriented implementation
  * of a mutex, to ensure the unique access to critical regions of
  * code and other syncronization problems.
@@ -69,11 +61,11 @@ typedef void (*ThreadFunction) (ThreadArgument &arg);
 class Mutex
 {
 private:
-    omp_lock_t mutex; //our pthread mutex
+    omp_lock_t mutex; //our OpenMPI mutex
 
 public:
     /** Default constructor.
-     * This constructor just initialize the pthread_mutex_t structure
+     * This constructor just initialize the OpenMPI mutex structure
      * with its defaults values, just like static initialization with PTHREAD_MUTEX_INITIALIZER
      */
     Mutex();
@@ -94,29 +86,6 @@ public:
      */
     virtual void unlock();
 };//end of class Mutex
-
-/** Class to pass arguments to threads functions.
- * The argument passed can be obtained casting
- * the void * data received in the function.
- * @see ThreadManager
- */
-class ThreadArgument
-{
-private:
-    ThreadManager * manager;
-public:
-    int thread_id; ///< The thread id
-    void * workClass; ///< The class in which threads will be working
-    void * data;
-
-    ThreadArgument();
-    ThreadArgument(int id, ThreadManager * manager = NULL, void * data = NULL);
-
-    friend class ThreadManager;
-    friend void * _threadMain(void * data);
-};
-
-void * _threadMain(void * data);
 
 /** This class distributes dynamically N tasks between parallel workers.
  * @ingroup ParallelLibrary
@@ -201,7 +170,6 @@ public:
      */
     bool setAssignedTasks(size_t tasks);
 
-
 protected:
     //Virtual functions that should be implemented in
     //subclasses, providing a mechanism of lock and
@@ -218,10 +186,8 @@ protected:
  */
 class ThreadTaskDistributor: public ParallelTaskDistributor
 {
-
 public:
-
-	ThreadTaskDistributor(size_t nTasks, size_t bSize):ParallelTaskDistributor(nTasks, bSize) {}
+    ThreadTaskDistributor(size_t nTasks, size_t bSize):ParallelTaskDistributor(nTasks, bSize) {}
     virtual ~ThreadTaskDistributor(){};
 
 protected:
@@ -230,7 +196,6 @@ protected:
     virtual void unlock();
     virtual bool distribute(size_t &first, size_t &last);
 };//end of class ThreadTaskDistributor
-
 
 /// @name Miscellaneous functions
 //@{

@@ -43,7 +43,6 @@
  ***************************************************************************/
 #include "src/parallel.h"
 
-
 // ================= MUTEX ==========================
 Mutex::Mutex()
 {
@@ -152,7 +151,6 @@ bool ThreadTaskDistributor::distribute(size_t &first, size_t &last)
     }
     return result;
 }
-
 
 /** Divides a number into most equally groups */
 long int divide_equally(long int N, int size, int rank, long int &first, long int &last)

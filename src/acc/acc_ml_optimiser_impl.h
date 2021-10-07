@@ -1,4 +1,4 @@
-static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
+static omp_lock_t global_mutex;
 
 #include "src/ml_optimiser_mpi.h"
 
