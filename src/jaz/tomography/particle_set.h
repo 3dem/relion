@@ -55,7 +55,8 @@ class ParticleSet
 		void moveParticleTo(ParticleIndex particle_id, gravis::d3Vector pos);
 		void shiftParticleBy(ParticleIndex particle_id, gravis::d3Vector shift);
 				
-		void write(std::string fn) const;
+		void write(const std::string& filename) const;
+		void writeTrajectories(const std::string& filename) const;
 		
 		void setImageFileNames(std::string data, std::string weight, ParticleIndex particle_id);
 		
