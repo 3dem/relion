@@ -3922,7 +3922,7 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
 		// process multiple particles at once
 		exp_ipart_ThreadTaskDistributor->resize(my_last_part_id - my_first_part_id + 1, 1);
 		exp_ipart_ThreadTaskDistributor->reset();
-		#pragma omp prallel for num_threads(nr_threads)
+		#pragma omp parallel for num_threads(nr_threads)
 		for (int thread_id = 0; thread_id < nr_threads; thread_id++)
 			globalThreadExpectationSomeParticles(this, thread_id);
 	}
