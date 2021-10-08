@@ -13,26 +13,27 @@ class Symmetry
 		
 		template <typename T>
 		static BufferedImage<T> symmetrise_FS_real(
-				const RawImage<T>& img, std::string symmGroup, int num_threads);
+				const RawImage<T>& img, const std::vector<gravis::d4Matrix>& R, int num_threads);
 
 		template <typename T>
 		static BufferedImage<tComplex<T>> symmetrise_FS_complex(
-				const RawImage<tComplex<T>>& img, std::string symmGroup, int num_threads);
+				const RawImage<tComplex<T>>& img, const std::vector<gravis::d4Matrix>& R, int num_threads);
 
 		template <typename T>
 		static BufferedImage<DualContrastVoxel<T>> symmetrise_dualContrast(
-				const RawImage<DualContrastVoxel<T>>& img, std::string symmGroup, int num_threads);
+				const RawImage<DualContrastVoxel<T>>& img, const std::vector<gravis::d4Matrix>& R, int num_threads);
 
-		static std::vector<gravis::d4Matrix> getMatrices(
+		static std::vector<gravis::d4Matrix> getPointGroupMatrices(
 				std::string symmGroup);
+
+		static std::vector<gravis::d4Matrix> getHelicalSymmetryMatrices(
+				int units, double twist, double rise);
 };
 
 template <typename T>
 BufferedImage<T> Symmetry::symmetrise_FS_real(
-		const RawImage<T>& img, std::string symmGroup, int num_threads)
+		const RawImage<T>& img, const std::vector<gravis::d4Matrix>& R, int num_threads)
 {
-	std::vector<gravis::d4Matrix> R = getMatrices(symmGroup);
-	
 	const int wh = img.xdim;
 	const int h  = img.ydim;
 	const int d  = img.zdim;
@@ -66,10 +67,8 @@ BufferedImage<T> Symmetry::symmetrise_FS_real(
 
 template <typename T>
 BufferedImage<tComplex<T>> Symmetry::symmetrise_FS_complex(
-		const RawImage<tComplex<T>>& img, std::string symmGroup, int num_threads)
+		const RawImage<tComplex<T>>& img, const std::vector<gravis::d4Matrix>& R, int num_threads)
 {
-	std::vector<gravis::d4Matrix> R = getMatrices(symmGroup);
-
 	const int wh = img.xdim;
 	const int h  = img.ydim;
 	const int d  = img.zdim;
@@ -103,10 +102,8 @@ BufferedImage<tComplex<T>> Symmetry::symmetrise_FS_complex(
 
 template <typename T>
 BufferedImage<DualContrastVoxel<T>> Symmetry::symmetrise_dualContrast(
-		const RawImage<DualContrastVoxel<T>>& img, std::string symmGroup, int num_threads)
+		const RawImage<DualContrastVoxel<T>>& img, const std::vector<gravis::d4Matrix>& R, int num_threads)
 {
-	std::vector<gravis::d4Matrix> R = getMatrices(symmGroup);
-
 	const int wh = img.xdim;
 	const int h  = img.ydim;
 	const int d  = img.zdim;

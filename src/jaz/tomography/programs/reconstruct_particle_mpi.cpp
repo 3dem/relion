@@ -171,20 +171,6 @@ void ReconstructParticleProgramMpi::run()
 	{
 		if (no_reconstruction) return;
 
-		if (symmName != "C1")
-		{
-			Log::print("Applying symmetry");
-
-			for (int half = 0; half < 2; half++)
-			{
-				sumDataImgFS[half] = Symmetry::symmetrise_FS_complex(
-							sumDataImgFS[half], symmName, num_threads);
-
-				sumCtfImgFS[half] = Symmetry::symmetrise_FS_real(
-							sumCtfImgFS[half], symmName, num_threads);
-			}
-		}
-
 		finalise(sumDataImgFS, sumCtfImgFS, binnedOutPixelSize);
 	}
 
