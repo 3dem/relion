@@ -1058,11 +1058,11 @@ void SpaBackproject::reconstructNew()
 		accumulation_volumes[0].weight,
 		accumulation_volumes[1].weight};
 
-	if (fn_sym != "C1" || nr_helical_asu > 1)
+	if (fn_sym != "c1" || nr_helical_asu > 1)
 	{
 		std::vector<gravis::d4Matrix> symmetryMatrices;
 
-		if (fn_sym != "C1")
+		if (fn_sym != "c1")
 		{
 			Log::print("Applying point-group symmetries");
 
@@ -1240,11 +1240,11 @@ void SpaBackproject::reconstructDualContrast()
 		}
 	}
 
-	if (fn_sym != "C1")
+	if (fn_sym != "c1" || nr_helical_asu > 1)
 	{
 		std::vector<gravis::d4Matrix> symmetryMatrices;
 
-		if (fn_sym != "C1")
+		if (fn_sym != "c1")
 		{
 			Log::print("Applying point-group symmetries");
 
