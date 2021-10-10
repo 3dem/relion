@@ -16,10 +16,10 @@ std::vector<gravis::d4Matrix> Symmetry::getPointGroupMatrices(
 		SL.get_matrices(isym, L0, R0);
 		
 		R[isym] = gravis::d4Matrix(
-					R0(0,0), R0(0,1), R0(0,2), R0(0,3),
-					R0(1,0), R0(1,1), R0(1,2), R0(1,3),
-					R0(2,0), R0(2,1), R0(2,2), R0(2,3),
-					R0(3,0), R0(3,1), R0(3,2), R0(3,3) );
+					R0(0,0), R0(0,1), R0(0,2), 0,
+					R0(1,0), R0(1,1), R0(1,2), 0,
+					R0(2,0), R0(2,1), R0(2,2), 0,
+					R0(3,0), R0(3,1), R0(3,2), 0 );
 	}
 	
 	return R;
@@ -46,10 +46,10 @@ std::vector<gravis::d4Matrix> Symmetry::getHelicalSymmetryMatrices(
 			rotation3DMatrix(rot_ang, 'Z', R0);
 
 			R[index] = gravis::d4Matrix(
-						R0(0,0), R0(0,1), R0(0,2), R0(0,3),
-						R0(1,0), R0(1,1), R0(1,2), R0(1,3),
-						R0(2,0), R0(2,1), R0(2,2), R0(2,3),
-						R0(3,0), R0(3,1), R0(3,2), R0(3,3) );
+						R0(0,0), R0(0,1), R0(0,2), 0,
+						R0(1,0), R0(1,1), R0(1,2), 0,
+						R0(2,0), R0(2,1), R0(2,2), hh * rise,
+						R0(3,0), R0(3,1), R0(3,2), 0 );
 
 		}
 	}
