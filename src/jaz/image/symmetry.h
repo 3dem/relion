@@ -92,7 +92,6 @@ BufferedImage<tComplex<T>> Symmetry::symmetrise_FS_complex(
 			gravis::d4Vector p = R[sym] * gravis::d4Vector(xx,yy,zz, 0.0);
 			tComplex<T> val = Interpolation::linearXYZ_FftwHalf_complex(img, p.x, p.y, p.z);
 
-			const gravis::d3Vector t(R[sym](0,3),R[sym](1,3),R[sym](2,3));
 			const T dotp = 2 * PI * gravis::d3Vector(xx,yy,zz).dot(
 						gravis::d3Vector(R[sym](0,3),R[sym](1,3),R[sym](2,3)));
 			val *= tComplex<T>(cos(dotp), sin(dotp));
@@ -133,7 +132,6 @@ BufferedImage<DualContrastVoxel<T>> Symmetry::symmetrise_dualContrast(
 			gravis::d4Vector p = R[sym] * gravis::d4Vector(xx,yy,zz, 0.0);
 			DualContrastVoxel<T> val = Interpolation::linearXYZ_FftwHalf_generic(img, p.x, p.y, p.z);
 
-			const gravis::d3Vector t(R[sym](0,3),R[sym](1,3),R[sym](2,3));
 			const T dotp = 2 * PI * gravis::d3Vector(xx,yy,zz).dot(
 						gravis::d3Vector(R[sym](0,3),R[sym](1,3),R[sym](2,3)));
 			const tComplex<T> shift(cos(dotp), sin(dotp));
