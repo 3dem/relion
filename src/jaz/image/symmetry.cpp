@@ -48,7 +48,7 @@ std::vector<gravis::d4Matrix> Symmetry::getHelicalSymmetryMatrices(
 			R[index] = gravis::d4Matrix(
 						R0(0,0), R0(0,1), R0(0,2), 0,
 						R0(1,0), R0(1,1), R0(1,2), 0,
-						R0(2,0), R0(2,1), R0(2,2), hh * rise,
+						R0(2,0), R0(2,1), R0(2,2), -hh * rise,
 						R0(3,0), R0(3,1), R0(3,2), 0 );
 
 		}
