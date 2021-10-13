@@ -21,8 +21,6 @@
 #ifndef ML_OPTIMISER_H_
 #define ML_OPTIMISER_H_
 
-#include <pthread.h>
-
 #ifdef ALTCPU
 	#include <tbb/enumerable_thread_specific.h>
 	#include <complex>
@@ -1183,6 +1181,6 @@ public:
 };
 
 // Global call to threaded core of doThreadExpectationSomeParticles
-void globalThreadExpectationSomeParticles(ThreadArgument &thArg);
+void globalThreadExpectationSomeParticles(void *self, int thread_id);
 
 #endif /* MAXLIK_H_ */

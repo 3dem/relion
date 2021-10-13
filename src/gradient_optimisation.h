@@ -48,7 +48,7 @@ private:
 	std::vector<Node> _nodes;
 	std::vector<float> _edges_activity;
 	float neighbour_threshold;
-	pthread_mutex_t mutex;
+	omp_lock_t mutex;
 
 	/*
 	 * Non-thread-safe add node.
@@ -119,16 +119,17 @@ private:
 	}
 
 	void _init_mutex() {
-		int mutex_error = pthread_mutex_init(&mutex, NULL);
-
-		if (mutex_error != 0)
-			throw std::runtime_error("failed to initialize mutex");
+		omp_init_lock(&mutex);
 	}
 public:
 
 	SomGraph() {
 		_init_mutex();
 		neighbour_threshold = 0;
+	}
+
+	~SomGraph() {
+		omp_destroy_lock(&mutex);
 	}
 
 	/**

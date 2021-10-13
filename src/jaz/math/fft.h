@@ -22,7 +22,7 @@
 #define VERY_NEW_FFTW_H
 
 #include <fftw3.h>
-#include <pthread.h>
+#include <omp.h>
 #include <memory>
 #include <src/jaz/image/buffered_image.h>
 #include "t_complex.h"
@@ -341,19 +341,16 @@ class FFT
 							:   forward(forward), backward(backward)
 						{}
 
-						Plan(){}
+                        ~Plan()
+                        {
+                            #pragma omp critical(FourierTransformer_fftw_plan) 
+                            {
+                                fftw_destroy_plan(forward);
+                                fftw_destroy_plan(backward);
+                            }
+                        }
 
-						~Plan()
-						{
-							pthread_mutex_lock(&fftw_plan_mutex_new);
-
-							fftw_destroy_plan(forward);
-							fftw_destroy_plan(backward);
-
-							pthread_mutex_unlock(&fftw_plan_mutex_new);
-						}
-
-						fftw_plan forward, backward;
+				fftw_plan forward, backward;
 				};
 
 				bool reusable;
@@ -415,17 +412,15 @@ class FFT
 							:   forward(forward), backward(backward)
 						{}
 
-						~Plan()
-						{
-							pthread_mutex_lock(&fftw_plan_mutex_new);
-
-							fftwf_destroy_plan(forward);
-							fftwf_destroy_plan(backward);
-
-							pthread_mutex_unlock(&fftw_plan_mutex_new);
-						}
-
-						fftwf_plan forward, backward;
+                        ~Plan()
+                        {
+                            #pragma omp critical(FourierTransformer_fftw_plan)
+                            {
+                                fftwf_destroy_plan(forward);
+                                fftwf_destroy_plan(backward);
+                            }
+                        }
+				fftwf_plan forward, backward;
 				};
 				
 				bool reusable;
@@ -434,7 +429,6 @@ class FFT
 				std::shared_ptr<Plan> plan;
 		};
 
-		static pthread_mutex_t fftw_plan_mutex_new;
 };
 
 #endif

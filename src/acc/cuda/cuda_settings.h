@@ -5,14 +5,12 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
-#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 #include "src/macros.h"
 #include "src/error.h"
-
 
 #include <curand.h>
 

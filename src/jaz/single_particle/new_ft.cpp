@@ -26,8 +26,6 @@
 #include <string.h>
 #include <math.h>
 
-pthread_mutex_t NewFFT::fftw_plan_mutex_new = PTHREAD_MUTEX_INITIALIZER;
-
 
 void NewFFT::FourierTransform(
 		MultidimArray<double>& src,
@@ -361,22 +359,22 @@ NewFFT::DoublePlan::DoublePlan(int w, int h, int d, unsigned int flags)
 	           N.push_back(w);
 	
 	const int ndim = N.size();
-	
-	pthread_mutex_lock(&fftw_plan_mutex_new);
-	
-	fftw_plan planForward = fftw_plan_dft_r2c(
-			ndim, &N[0],
-			MULTIDIM_ARRAY(realDummy),
-			(fftw_complex*) MULTIDIM_ARRAY(complexDummy),
-			FFTW_UNALIGNED | flags);
-	
-	fftw_plan planBackward = fftw_plan_dft_c2r(
-			ndim, &N[0],
-			(fftw_complex*) MULTIDIM_ARRAY(complexDummy),
-			MULTIDIM_ARRAY(realDummy),
-			FFTW_UNALIGNED | flags);
-	
-	pthread_mutex_unlock(&fftw_plan_mutex_new);
+
+	fftw_plan planForward, planBackward;	
+	#pragma omp critical(FourierTransformer_fftw_plan)
+	{
+		planForward = fftw_plan_dft_r2c(
+				ndim, &N[0],
+				MULTIDIM_ARRAY(realDummy),
+				(fftw_complex*) MULTIDIM_ARRAY(complexDummy),
+				FFTW_UNALIGNED | flags);
+		
+		planBackward = fftw_plan_dft_c2r(
+				ndim, &N[0],
+				(fftw_complex*) MULTIDIM_ARRAY(complexDummy),
+				MULTIDIM_ARRAY(realDummy),
+				FFTW_UNALIGNED | flags);
+	}	
 	
 	if (planForward == NULL || planBackward == NULL)
 	{
@@ -403,21 +401,21 @@ NewFFT::DoublePlan::DoublePlan(
 	
 	const int ndim = N.size();
 	
-	pthread_mutex_lock(&fftw_plan_mutex_new);
-	
-	fftw_plan planForward = fftw_plan_dft_r2c(
-			ndim, &N[0],
-			MULTIDIM_ARRAY(real),
-			(fftw_complex*) MULTIDIM_ARRAY(complex),
-			flags);
-	
-	fftw_plan planBackward = fftw_plan_dft_c2r(
-			ndim, &N[0],
-			(fftw_complex*) MULTIDIM_ARRAY(complex),
-			MULTIDIM_ARRAY(real),
-			flags);
-	
-	pthread_mutex_unlock(&fftw_plan_mutex_new);
+	fftw_plan planForward, planBackward;	
+	#pragma omp critical(FourierTransformer_fftw_plan)
+	{
+		planForward = fftw_plan_dft_r2c(
+				ndim, &N[0],
+				MULTIDIM_ARRAY(real),
+				(fftw_complex*) MULTIDIM_ARRAY(complex),
+				flags);
+		
+		planBackward = fftw_plan_dft_c2r(
+				ndim, &N[0],
+				(fftw_complex*) MULTIDIM_ARRAY(complex),
+				MULTIDIM_ARRAY(real),
+				flags);
+	}	
 	
 	if (planForward == NULL || planBackward == NULL)
 	{
@@ -443,22 +441,23 @@ NewFFT::FloatPlan::FloatPlan(int w, int h, int d, unsigned int flags)
 	
 	const int ndim = N.size();
 	
-	pthread_mutex_lock(&fftw_plan_mutex_new);
 	
-	fftwf_plan planForward = fftwf_plan_dft_r2c(
-			ndim, &N[0],
-			MULTIDIM_ARRAY(realDummy),
-			(fftwf_complex*) MULTIDIM_ARRAY(complexDummy),
-			FFTW_UNALIGNED | flags);
-	
-	fftwf_plan planBackward = fftwf_plan_dft_c2r(
-			ndim, &N[0],
-			(fftwf_complex*) MULTIDIM_ARRAY(complexDummy),
-			MULTIDIM_ARRAY(realDummy),
-			FFTW_UNALIGNED | flags);
-	
-	pthread_mutex_unlock(&fftw_plan_mutex_new);
-	
+	fftwf_plan planForward, planBackward;	
+	#pragma omp critical(FourierTransformer_fftw_plan)
+	{
+		planForward = fftwf_plan_dft_r2c(
+				ndim, &N[0],
+				MULTIDIM_ARRAY(realDummy),
+				(fftwf_complex*) MULTIDIM_ARRAY(complexDummy),
+				FFTW_UNALIGNED | flags);
+		
+		planBackward = fftwf_plan_dft_c2r(
+				ndim, &N[0],
+				(fftwf_complex*) MULTIDIM_ARRAY(complexDummy),
+				MULTIDIM_ARRAY(realDummy),
+				FFTW_UNALIGNED | flags);
+	}
+
 	if (planForward == NULL || planBackward == NULL)
 	{
 		REPORT_ERROR("FFTW plans cannot be created");
@@ -484,21 +483,22 @@ NewFFT::FloatPlan::FloatPlan(
 	
 	const int ndim = N.size();
 	
-	pthread_mutex_lock(&fftw_plan_mutex_new);
 	
-	fftwf_plan planForward = fftwf_plan_dft_r2c(
-			ndim, &N[0],
-			MULTIDIM_ARRAY(real),
-			(fftwf_complex*) MULTIDIM_ARRAY(complex),
-			flags);
-	
-	fftwf_plan planBackward = fftwf_plan_dft_c2r(
-			ndim, &N[0],
-			(fftwf_complex*) MULTIDIM_ARRAY(complex),
-			MULTIDIM_ARRAY(real),
-			flags);
-	
-	pthread_mutex_unlock(&fftw_plan_mutex_new);
+	fftwf_plan planForward, planBackward;	
+	#pragma omp critical(FourierTransformer_fftw_plan)
+	{
+		planForward = fftwf_plan_dft_r2c(
+				ndim, &N[0],
+				MULTIDIM_ARRAY(real),
+				(fftwf_complex*) MULTIDIM_ARRAY(complex),
+				flags);
+		
+		planBackward = fftwf_plan_dft_c2r(
+				ndim, &N[0],
+				(fftwf_complex*) MULTIDIM_ARRAY(complex),
+				MULTIDIM_ARRAY(real),
+				flags);
+	}
 	
 	if (planForward == NULL || planBackward == NULL)
 	{

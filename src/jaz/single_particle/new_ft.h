@@ -22,7 +22,6 @@
 #define NEW_FFTW_H
 
 #include <fftw3.h>
-#include <pthread.h>
 #include <memory>
 #include <src/multidim_array.h>
 #include "t_complex.h"
@@ -273,12 +272,11 @@ class NewFFT
 
                         ~Plan()
                         {
-                            pthread_mutex_lock(&fftw_plan_mutex_new);
-
-                            fftw_destroy_plan(forward);
-                            fftw_destroy_plan(backward);
-
-                            pthread_mutex_unlock(&fftw_plan_mutex_new);
+                            #pragma omp critical(FourierTransformer_fftw_plan) 
+                            {
+                                fftw_destroy_plan(forward);
+                                fftw_destroy_plan(backward);
+                            }
                         }
 
                         fftw_plan forward, backward;
@@ -340,12 +338,11 @@ class NewFFT
 
                         ~Plan()
                         {
-                            pthread_mutex_lock(&fftw_plan_mutex_new);
-
-                            fftwf_destroy_plan(forward);
-                            fftwf_destroy_plan(backward);
-
-                            pthread_mutex_unlock(&fftw_plan_mutex_new);
+                            #pragma omp critical(FourierTransformer_fftw_plan)
+                            {
+                                fftwf_destroy_plan(forward);
+                                fftwf_destroy_plan(backward);
+                            }
                         }
 
                         fftwf_plan forward, backward;
@@ -357,7 +354,6 @@ class NewFFT
                 std::shared_ptr<Plan> plan;
         };
 
-        static pthread_mutex_t fftw_plan_mutex_new;
 };
 
 // This is to get NewFFTPlan::Plan<RFLOAT>

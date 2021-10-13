@@ -10,7 +10,7 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
-#include <pthread.h>
+#include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -245,9 +245,6 @@ private:
 	size_t alignmentSize;
 
 	bool cache;
-
-	pthread_mutex_t mutex;
-
 
 	//Look for the first suited space
 	inline
@@ -603,150 +600,143 @@ public:
 		totalSize(size), alignmentSize(alignmentSize), first(0), cache(true)
 	{
 		_setup();
-
-		int mutex_error = pthread_mutex_init(&mutex, NULL);
-
-		if (mutex_error != 0)
-		{
-			printf("ERROR: Mutex could not be created for alloactor. CODE: %d.\n", mutex_error);
-			fflush(stdout);
-			CRITICAL(ERR_CAMUX);
-		}
 	}
 
 	void resize(size_t size)
 	{
-		Lock ml(&mutex);
-		_clear();
-		totalSize = size;
-		_setup();
+		#pragma omp critical(CudaCustomAllocator)
+		{
+			_clear();
+			totalSize = size;
+			_setup();
+		}
 	}
 
 
 	inline
 	Alloc* alloc(size_t requestedSize)
 	{
-		Lock ml(&mutex);
-
-		_freeReadyAllocs();
-
-//		printf("alloc: %u ", size);
-//		_printState();
-
-		size_t size = requestedSize;
-
-#ifdef CUSTOM_ALLOCATOR_MEMGUARD
-		//Ad byte-guards
-		size += alignmentSize * GUARD_SIZE; //Ad an integer multiple of alignment size as byte guard size
-#endif
-
-#ifdef DUMP_CUSTOM_ALLOCATOR_ACTIVITY
-		fprintf(stderr, " %.4f", 100.*(float)size/(float)totalSize);
-#endif
-
-		Alloc *newAlloc(NULL);
-
-		if (cache)
+		#pragma omp critical(CudaCustomAllocator)
 		{
-			size = alignmentSize*ceilf( (float)size / (float)alignmentSize) ; //To prevent miss-aligned memory
+			_freeReadyAllocs();
 
-			Alloc *curAlloc = _getFirstSuitedFree(size);
+	//		printf("alloc: %u ", size);
+	//		_printState();
 
-			//If out of memory
-			if (curAlloc == NULL)
+			size_t size = requestedSize;
+
+	#ifdef CUSTOM_ALLOCATOR_MEMGUARD
+			//Ad byte-guards
+			size += alignmentSize * GUARD_SIZE; //Ad an integer multiple of alignment size as byte guard size
+	#endif
+
+	#ifdef DUMP_CUSTOM_ALLOCATOR_ACTIVITY
+			fprintf(stderr, " %.4f", 100.*(float)size/(float)totalSize);
+	#endif
+
+			Alloc *newAlloc(NULL);
+
+			if (cache)
 			{
-	#ifdef DEBUG_CUDA
-				size_t spaceDiff = _getTotalFreeSpace();
-	#endif
-				//Try to recover before throwing error
-				for (int i = 0; i <= ALLOC_RETRY; i ++)
-				{
-					if (_syncReadyEvents() && _freeReadyAllocs())
-					{
-						curAlloc = _getFirstSuitedFree(size); //Is there space now?
-						if (curAlloc != NULL)
-							break; //Success
-					}
-					else
-						usleep(10000); // 10 ms, Order of magnitude of largest kernels
-				}
-	#ifdef DEBUG_CUDA
-				spaceDiff =  _getTotalFreeSpace() - spaceDiff;
-				printf("DEBUG_INFO: Out of memory handled by waiting for unfinished tasks, which freed %lu B.\n", spaceDiff);
-	#endif
+				size = alignmentSize*ceilf( (float)size / (float)alignmentSize) ; //To prevent miss-aligned memory
 
-				//Did we manage to recover?
+				Alloc *curAlloc = _getFirstSuitedFree(size);
+
+				//If out of memory
 				if (curAlloc == NULL)
 				{
-					printf("ERROR: CudaCustomAllocator out of memory\n [requestedSpace:             %lu B]\n [largestContinuousFreeSpace: %lu B]\n [totalFreeSpace:             %lu B]\n",
-							(unsigned long) size, (unsigned long) _getLargestContinuousFreeSpace(), (unsigned long) _getTotalFreeSpace());
+		#ifdef DEBUG_CUDA
+					size_t spaceDiff = _getTotalFreeSpace();
+		#endif
+					//Try to recover before throwing error
+					for (int i = 0; i <= ALLOC_RETRY; i ++)
+					{
+						if (_syncReadyEvents() && _freeReadyAllocs())
+						{
+							curAlloc = _getFirstSuitedFree(size); //Is there space now?
+							if (curAlloc != NULL)
+								break; //Success
+						}
+						else
+							usleep(10000); // 10 ms, Order of magnitude of largest kernels
+					}
+		#ifdef DEBUG_CUDA
+					spaceDiff =  _getTotalFreeSpace() - spaceDiff;
+					printf("DEBUG_INFO: Out of memory handled by waiting for unfinished tasks, which freed %lu B.\n", spaceDiff);
+		#endif
 
-					_printState();
+					//Did we manage to recover?
+					if (curAlloc == NULL)
+					{
+						printf("ERROR: CudaCustomAllocator out of memory\n [requestedSpace:             %lu B]\n [largestContinuousFreeSpace: %lu B]\n [totalFreeSpace:             %lu B]\n",
+								(unsigned long) size, (unsigned long) _getLargestContinuousFreeSpace(), (unsigned long) _getTotalFreeSpace());
 
-					fflush(stdout);
-					CRITICAL(ERRCUDACAOOM);
+						_printState();
+
+						fflush(stdout);
+						CRITICAL(ERRCUDACAOOM);
+					}
+				}
+
+				if (curAlloc->size == size)
+				{
+					curAlloc->free = false;
+					newAlloc = curAlloc;
+				}
+				else //Or curAlloc->size is smaller than size
+				{
+					//Setup new pointer
+					newAlloc = new Alloc();
+					newAlloc->next = curAlloc;
+					newAlloc->ptr = curAlloc->ptr;
+					newAlloc->size = size;
+					newAlloc->free = false;
+
+					//Modify old pointer
+					curAlloc->ptr = &(curAlloc->ptr[size]);
+					curAlloc->size -= size;
+
+					//Insert new allocation region into chain
+					if(curAlloc->prev == NULL) //If the first allocation region
+						first = newAlloc;
+					else
+						curAlloc->prev->next = newAlloc;
+					newAlloc->prev = curAlloc->prev;
+					newAlloc->next = curAlloc;
+					curAlloc->prev = newAlloc;
 				}
 			}
-
-			if (curAlloc->size == size)
+			else
 			{
-				curAlloc->free = false;
-				newAlloc = curAlloc;
-			}
-			else //Or curAlloc->size is smaller than size
-			{
-				//Setup new pointer
 				newAlloc = new Alloc();
-				newAlloc->next = curAlloc;
-				newAlloc->ptr = curAlloc->ptr;
 				newAlloc->size = size;
 				newAlloc->free = false;
+				DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &(newAlloc->ptr), size));
 
-				//Modify old pointer
-				curAlloc->ptr = &(curAlloc->ptr[size]);
-				curAlloc->size -= size;
-
-				//Insert new allocation region into chain
-				if(curAlloc->prev == NULL) //If the first allocation region
-					first = newAlloc;
-				else
-					curAlloc->prev->next = newAlloc;
-				newAlloc->prev = curAlloc->prev;
-				newAlloc->next = curAlloc;
-				curAlloc->prev = newAlloc;
+				//Just add to start by replacing first
+				newAlloc->next = first;
+				first->prev = newAlloc;
+				first = newAlloc;
 			}
-		}
-		else
-		{
-			newAlloc = new Alloc();
-			newAlloc->size = size;
-			newAlloc->free = false;
-			DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &(newAlloc->ptr), size));
 
-			//Just add to start by replacing first
-			newAlloc->next = first;
-			first->prev = newAlloc;
-			first = newAlloc;
+	#ifdef CUSTOM_ALLOCATOR_MEMGUARD
+			newAlloc->backtraceSize = backtrace(newAlloc->backtrace, 20);
+			newAlloc->guardPtr = newAlloc->ptr + requestedSize;
+			cudaStream_t stream = 0;
+			cudaMemInit<BYTE>( newAlloc->guardPtr, GUARD_VALUE, size - requestedSize, stream); //TODO switch to specialized stream
+			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(stream));
+	#endif
 		}
-
-#ifdef CUSTOM_ALLOCATOR_MEMGUARD
-		newAlloc->backtraceSize = backtrace(newAlloc->backtrace, 20);
-		newAlloc->guardPtr = newAlloc->ptr + requestedSize;
-		cudaStream_t stream = 0;
-		cudaMemInit<BYTE>( newAlloc->guardPtr, GUARD_VALUE, size - requestedSize, stream); //TODO switch to specialized stream
-		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(stream));
-#endif
 
 		return newAlloc;
 	};
 
 	~CudaCustomAllocator()
 	{
+		#pragma omp critical(CudaCustomAllocator)
 		{
-			Lock ml(&mutex);
 			_clear();
 		}
-		pthread_mutex_destroy(&mutex);
 	}
 
 	//Thread-safe wrapper functions
@@ -754,56 +744,76 @@ public:
 	inline
 	void free(Alloc* a)
 	{
-		Lock ml(&mutex);
-		_free(a);
+		#pragma omp critical(CudaCustomAllocator)
+		{
+			_free(a);
+		}
 	}
 
 	inline
 	void syncReadyEvents()
 	{
-		Lock ml(&mutex);
-		_syncReadyEvents();
+		#pragma omp critical(CudaCustomAllocator)
+		{
+			_syncReadyEvents();
+		}
 	}
 
 	inline
 	void freeReadyAllocs()
 	{
-		Lock ml(&mutex);
-		_freeReadyAllocs();
+		#pragma omp critical(CudaCustomAllocator)
+		{
+			_freeReadyAllocs();
+		}
 	}
 
 	size_t getTotalFreeSpace()
 	{
-		Lock ml(&mutex);
-		size_t size = _getTotalFreeSpace();
+		size_t size;
+		#pragma omp critical(CudaCustomAllocator)
+		{
+			size = _getTotalFreeSpace();
+		}
 		return size;
 	}
 
 	size_t getTotalUsedSpace()
 	{
-		Lock ml(&mutex);
-		size_t size = _getTotalUsedSpace();
+		size_t size;
+		#pragma omp critical(CudaCustomAllocator)
+		{
+			size = _getTotalUsedSpace();
+		}
 		return size;
 	}
 
 	size_t getNumberOfAllocs()
 	{
-		Lock ml(&mutex);
-		size_t size = _getNumberOfAllocs();
+		size_t size;
+		#pragma omp critical(CudaCustomAllocator)
+		{
+			size = _getNumberOfAllocs();
+		}
 		return size;
 	}
 
 	size_t getLargestContinuousFreeSpace()
 	{
-		Lock ml(&mutex);
-		size_t size = _getLargestContinuousFreeSpace();
+		size_t size;
+		#pragma omp critical(CudaCustomAllocator)
+		{
+			size = _getLargestContinuousFreeSpace();
+		}
 		return size;
 	}
 
 	void printState()
 	{
-		Lock ml(&mutex);
-		_printState();
+		#pragma omp critical(CudaCustomAllocator)
+		{	
+			_printState();
+		}
 	}
 };
 
