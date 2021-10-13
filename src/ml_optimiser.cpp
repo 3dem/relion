@@ -2148,7 +2148,9 @@ void MlOptimiser::initialiseGeneral(int rank)
 		if (nr_iter < 20)
 			REPORT_ERROR("ERROR: when using --fast_subsets you have to perform at least 20 iterations!");
 		if (do_auto_refine)
-			REPORT_ERROR("ERROR: you cannot use --fast_subsets together with --auto_refine");
+			REPORT_ERROR("ERROR: you cannot use --fast_subsets together with --auto_refine.");
+		if (gradient_refine)
+			REPORT_ERROR("ERROR: you cannot use --fast_subsets together with --grad.");
 	}
 
 	// Check mask angpix, boxsize and [0,1] compliance right away.
