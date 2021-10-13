@@ -77,7 +77,7 @@ ParticleIndex ParticleSet::addParticle(const ParticleSet &particleSet, ParticleI
 
 		hasMotion = true;
 
-		if (partTable.numberOfObjects() != motionTrajectories.size())
+		if (partTable.numberOfObjects() != motionTrajectories.size() + 1)
 		{
 			REPORT_ERROR("ParticleSet::addParticle: number of particles is not the same as the number of trajectories.");
 		}
@@ -382,12 +382,51 @@ void ParticleSet::shiftParticleBy(ParticleIndex particle_id, gravis::d3Vector sh
 	partTable.setValue(EMDL_IMAGE_COORD_Z, z + shift.z, particle_id.value);
 }
 
-void ParticleSet::write(std::string fn) const
+void ParticleSet::write(const std::string& filename) const
 {
-	std::ofstream ofs(fn);
-	
+	std::ofstream ofs(filename);
+
 	optTable.write(ofs);
 	partTable.write(ofs);
+}
+
+void ParticleSet::writeTrajectories(const std::string &filename) const
+{
+	const int pc = motionTrajectories.size();
+
+	std::string path = filename.substr(0, filename.find_last_of('/'));
+	mktree(path);
+
+	std::ofstream ofs(filename);
+	MetaDataTable mdt;
+
+	mdt.setName("general");
+	mdt.setIsList(true);
+	mdt.addObject();
+
+	mdt.setValue(EMDL_PARTICLE_NUMBER, pc);
+
+	mdt.write(ofs);
+	mdt.clear();
+
+	for (int pp = 0; pp < pc; pp++)
+	{
+		mdt.setName(getName(ParticleIndex(pp)));
+
+		const int fc = motionTrajectories[pp].shifts_Ang.size();
+
+		for (int f = 0; f < fc; f++)
+		{
+			mdt.addObject();
+
+			mdt.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, motionTrajectories[pp].shifts_Ang[f].x);
+			mdt.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, motionTrajectories[pp].shifts_Ang[f].y);
+			mdt.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, motionTrajectories[pp].shifts_Ang[f].z);
+		}
+
+		mdt.write(ofs);
+		mdt.clear();
+	}
 }
 
 void ParticleSet::setImageFileNames(std::string data, std::string weight, ParticleIndex particle_id)

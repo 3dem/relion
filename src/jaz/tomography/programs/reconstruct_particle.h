@@ -20,6 +20,7 @@ class ReconstructParticleProgram
 
 			OptimisationSet optimisationSet;
 			std::string outDir, symmName, tmpOutRoot;
+
 			
 			bool
 				do_whiten, no_reconstruction, only_do_unfinished,
@@ -29,6 +30,10 @@ class ReconstructParticleProgram
 			int boxSize, cropSize, num_threads, outer_threads, inner_threads, max_mem_GB;
 
 			double SNR, taper, binning, freqCutoffFract;
+
+			int nr_helical_asu;
+			double helical_rise, helical_twist;
+
 
 		void readBasicParameters(int argc, char *argv[]);
 		virtual void readParameters(int argc, char *argv[]);
@@ -56,6 +61,11 @@ class ReconstructParticleProgram
 				std::vector<BufferedImage<dComplex>>& dataImgFS,
 				std::vector<BufferedImage<double>>& ctfImgFS,
 				const double binnedOutPixelSize);
+
+		void symmetrise(
+				std::vector<BufferedImage<dComplex>>& dataImgFS,
+				std::vector<BufferedImage<double>>& ctfImgFS,
+				double binnedOutPixelSize);
 
 		void reconstruct(
 				BufferedImage<double>& dataImgRS,

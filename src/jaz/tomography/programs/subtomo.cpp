@@ -336,6 +336,12 @@ void SubtomoProgram::writeParticleSet(
 
 	copy.write(outDir + "particles.star");
 
+	if (copy.hasMotion && particles_removed > 0)
+	{
+		copy.writeTrajectories(outDir + "motion.star");
+		optimisationSet.trajectories = outDir + "motion.star";
+	}
+
 	optimisationSet.particles = outDir + "particles.star";
 	optimisationSet.write(outDir + "optimisation_set.star");
 }

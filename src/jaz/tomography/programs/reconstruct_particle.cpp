@@ -68,6 +68,10 @@ void ReconstructParticleProgram::readBasicParameters(int argc, char *argv[])
 	SNR = textToDouble(parser.getOption("--SNR", "Assumed signal-to-noise ratio (negative means use a heuristic)", "-1"));
 	symmName = parser.getOption("--sym", "Symmetry group", "C1");
 
+	nr_helical_asu = textToInteger(parser.getOption("--nr_helical_asu", "Number of helical asymmetrical units", "1"));
+	helical_rise = textToFloat(parser.getOption("--helical_rise", "Helical rise (in Angstroms)", "0."));
+	helical_twist = textToFloat(parser.getOption("--helical_twist", "Helical twist (in degrees, + for right-handedness)", "0."));
+
 	max_mem_GB = textToInteger(parser.getOption("--mem", "Max. amount of memory (in GB) to use for accumulation (--j_out will be reduced)", "-1"));
 
 	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Only process undone subtomograms");
@@ -163,20 +167,6 @@ void ReconstructParticleProgram::run()
 		s02D, do_ctf, flip_value, 1, true);
 
 	if (no_reconstruction) return;
-
-	if (symmName != "C1")
-	{
-		Log::print("Applying symmetry");
-		
-		for (int half = 0; half < 2; half++)
-		{
-			dataImgFS[half] = Symmetry::symmetrise_FS_complex(
-						dataImgFS[half], symmName, num_threads);
-			
-			ctfImgFS[half] = Symmetry::symmetrise_FS_real(
-						ctfImgFS[half], symmName, num_threads);
-		}
-	}
 
 	finalise(dataImgFS, ctfImgFS, binnedOutPixelSize);
 
@@ -510,6 +500,8 @@ void ReconstructParticleProgram::finalise(
 {
 	const int s = dataImgFS[0].ydim;
 
+	symmetrise(dataImgFS, ctfImgFS, binnedOutPixelSize);
+
 	std::vector<BufferedImage<double>> dataImgRS(2), dataImgDivRS(2);
 
 	BufferedImage<dComplex> dataImgFS_both = dataImgFS[0] + dataImgFS[1];
@@ -548,6 +540,40 @@ void ReconstructParticleProgram::finalise(
 	optimisationSet.write(outDir + "optimisation_set.star");
 
 	Log::endSection();
+}
+
+void ReconstructParticleProgram::symmetrise(
+		std::vector<BufferedImage<dComplex> >& dataImgFS,
+		std::vector<BufferedImage<double> >& ctfImgFS,
+		double binnedOutPixelSize)
+{
+	if (symmName != "C1")
+	{
+		std::vector<gravis::d4Matrix> symmetryMatrices;
+
+		if (symmName != "C1")
+		{
+			Log::print("Applying point-group symmetries");
+
+			symmetryMatrices = Symmetry::getPointGroupMatrices(symmName);
+		}
+		else if (nr_helical_asu > 1)
+		{
+			Log::print("Applying helical symmetries");
+
+			symmetryMatrices = Symmetry::getHelicalSymmetryMatrices(
+						nr_helical_asu, helical_twist, helical_rise/binnedOutPixelSize);
+		}
+
+		for (int half = 0; half < 2; half++)
+		{
+			dataImgFS[half] = Symmetry::symmetrise_FS_complex(
+						dataImgFS[half], symmetryMatrices, num_threads);
+
+			ctfImgFS[half] = Symmetry::symmetrise_FS_real(
+						ctfImgFS[half], symmetryMatrices, num_threads);
+		}
+	}
 }
 
 void ReconstructParticleProgram::reconstruct(

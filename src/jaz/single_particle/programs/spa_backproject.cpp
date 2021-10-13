@@ -1058,28 +1058,43 @@ void SpaBackproject::reconstructNew()
 		accumulation_volumes[0].weight,
 		accumulation_volumes[1].weight};
 
-	if (fn_sym != "C1")
+	if (fn_sym != "c1" || nr_helical_asu > 1)
 	{
-		Log::print("Applying symmetries");
+		std::vector<gravis::d4Matrix> symmetryMatrices;
+
+		if (fn_sym != "c1")
+		{
+			Log::print("Applying point-group symmetries");
+
+			symmetryMatrices = Symmetry::getPointGroupMatrices(fn_sym);
+		}
+		else if (nr_helical_asu > 1)
+		{
+			Log::print("Applying helical symmetries");
+
+			symmetryMatrices = Symmetry::getHelicalSymmetryMatrices(
+						nr_helical_asu, helical_twist, helical_rise/angpix);
+		}
+		// else logic is broken
 
 		for (int half = 0; half < 2; half++)
 		{
 			dataImgFS[half] = Symmetry::symmetrise_FS_complex(
-				dataImgFS[half], fn_sym, num_threads_total);
+				dataImgFS[half], symmetryMatrices, num_threads_total);
 
 			if (explicit_spreading_function)
 			{
 				psfImgFS[half] = Symmetry::symmetrise_FS_real(
-					psfImgFS[half], fn_sym, num_threads_total);
+					psfImgFS[half], symmetryMatrices, num_threads_total);
 			}
 
 			ctfImgFS[half] = Symmetry::symmetrise_FS_real(
-				ctfImgFS[half], fn_sym, num_threads_total);
+				ctfImgFS[half], symmetryMatrices, num_threads_total);
 
 			if (compute_multiplicity)
 			{
 				multiplicities[half] = Symmetry::symmetrise_FS_real(
-					multiplicities[half], fn_sym, num_threads_total);
+					multiplicities[half], symmetryMatrices, num_threads_total);
 			}
 		}
 	}
@@ -1225,21 +1240,35 @@ void SpaBackproject::reconstructDualContrast()
 		}
 	}
 
-	if (fn_sym != "C1")
+	if (fn_sym != "c1" || nr_helical_asu > 1)
 	{
-		Log::print("Applying symmetries");
+		std::vector<gravis::d4Matrix> symmetryMatrices;
+
+		if (fn_sym != "c1")
+		{
+			Log::print("Applying point-group symmetries");
+
+			symmetryMatrices = Symmetry::getPointGroupMatrices(fn_sym);
+		}
+		else if (nr_helical_asu > 1)
+		{
+			Log::print("Applying helical symmetries");
+
+			symmetryMatrices = Symmetry::getHelicalSymmetryMatrices(
+						nr_helical_asu, helical_twist, helical_rise/angpix);
+		}
 
 		for (int half = 0; half < 2; half++)
 		{
 			dual_contrast_accumulation_volumes[half] =
 				Symmetry::symmetrise_dualContrast(
 					dual_contrast_accumulation_volumes[half],
-					fn_sym, num_threads_total);
+					symmetryMatrices, num_threads_total);
 
 			if (explicit_spreading_function)
 			{
 				spreading_functions[half] = Symmetry::symmetrise_FS_real(
-					spreading_functions[half], fn_sym, num_threads_total);
+					spreading_functions[half], symmetryMatrices, num_threads_total);
 			}
 		}
 	}

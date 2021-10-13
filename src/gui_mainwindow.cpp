@@ -389,7 +389,8 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 	menubar->add("Jobs/Order alphabetically",  FL_ALT+'a', cb_order_jobs_alphabetically, this);
 	menubar->add("Jobs/_Order chronologically",  FL_ALT+'c', cb_order_jobs_chronologically, this);
 	if (!maingui_do_read_only)
-	{	menubar->add("Jobs/_Undelete job(s)",  FL_ALT+'u', cb_undelete_job, this);
+	{	menubar->add("Jobs/Undelete job(s)",  FL_ALT+'u', cb_undelete_job, this);
+                menubar->add("Jobs/_Toggle overwrite button", FL_ALT+'o', cb_toggle_overwrite_continue, this);
 		menubar->add("Jobs/Run scheduled jobs", 0, cb_start_pipeliner, this);
 		menubar->add("Jobs/_Stop running scheduled jobs", 0, cb_stop_pipeliner, this);
 		menubar->add("Jobs/Gently clean all jobs",  FL_ALT+'g', cb_gently_clean_all_jobs, this);
