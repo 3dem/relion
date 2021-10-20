@@ -1062,13 +1062,13 @@ void SpaBackproject::reconstructNew()
 	{
 		std::vector<gravis::d4Matrix> symmetryMatrices;
 
-		if (fn_sym != "c1")
+		if (nr_helical_asu == 1)
 		{
 			Log::print("Applying point-group symmetries");
 
 			symmetryMatrices = Symmetry::getPointGroupMatrices(fn_sym);
 		}
-		else if (nr_helical_asu > 1)
+		else
 		{
 			Log::print("Applying helical symmetries");
 
@@ -1244,13 +1244,13 @@ void SpaBackproject::reconstructDualContrast()
 	{
 		std::vector<gravis::d4Matrix> symmetryMatrices;
 
-		if (fn_sym != "c1")
+		if (nr_helical_asu == 1)
 		{
 			Log::print("Applying point-group symmetries");
 
 			symmetryMatrices = Symmetry::getPointGroupMatrices(fn_sym);
 		}
-		else if (nr_helical_asu > 1)
+		else
 		{
 			Log::print("Applying helical symmetries");
 

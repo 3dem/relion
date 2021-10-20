@@ -90,10 +90,10 @@ BufferedImage<tComplex<T>> Symmetry::symmetrise_FS_complex(
 
 		for (int sym = 0; sym < sc; sym++)
 		{
-			gravis::d4Vector p = R[sym] * gravis::d4Vector(xx/w, yy/h, zz/d, 0.0);
+			gravis::d4Vector p = R[sym] * gravis::d4Vector(xx,yy,zz, 0.0);
 			tComplex<T> val = Interpolation::linearXYZ_FftwHalf_complex(img, p.x, p.y, p.z);
 
-			const T dotp = 2 * PI * gravis::d3Vector(xx,yy,zz).dot(
+			const T dotp = 2 * PI * gravis::d3Vector(xx/w, yy/h, zz/d).dot(
 						gravis::d3Vector(R[sym](0,3),R[sym](1,3),R[sym](2,3)));
 
 			val *= tComplex<T>(cos(dotp), sin(dotp));
