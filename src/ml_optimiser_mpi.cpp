@@ -110,6 +110,7 @@ void MlOptimiserMpi::initialise()
 			exit(1);
 	}
 
+	grad_pseudo_halfsets = gradient_refine && !do_split_random_halves;
 
 	if (do_gpu)
 	{
@@ -1400,6 +1401,9 @@ void MlOptimiserMpi::expectation()
 					MlDeviceBundle* b = ((MlDeviceBundle*)accDataBundles[i]);
 					b->syncAllBackprojects();
 
+					for (int j = 0; j < b->projectors.size(); j++)
+						b->projectors[j].clear();
+
 					for (int j = 0; j < b->backprojectors.size(); j++)
 					{
 						unsigned long s = wsum_model.BPref[j].data.nzyxdim;
@@ -1420,7 +1424,6 @@ void MlOptimiserMpi::expectation()
 						delete [] imags;
 						delete [] weights;
 
-						b->projectors[j].clear();
 						b->backprojectors[j].clear();
 					}
 
@@ -1965,7 +1968,15 @@ void MlOptimiserMpi::maximization()
 	helical_rise_half1 = helical_rise_half2 = helical_rise_initial;
 
 	if (do_grad)
-		maximizationGradientParameters();
+	{
+		if (do_split_random_halves)
+			maximizationGradientParametersRandomHalves();
+		else
+		{
+			maximizationSyncGradientParameters();
+			maximizationGradientParameters();
+		}
+	}
 
 	// First reconstruct all classes in parallel
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
@@ -2472,11 +2483,107 @@ void MlOptimiserMpi::maximization()
 #endif
 }
 
-void MlOptimiserMpi::maximizationGradientParameters()
+void MlOptimiserMpi::maximizationSyncGradientParameters()
 {
-	if (!do_split_random_halves)
-		REPORT_ERROR("ERROR: Gradient optimization with MPI is only supported with --split_random_halves");
+	MPI_Status status;
+	for (int ibody = 0; ibody < wsum_model.BPref.size(); ibody++ )
+	{
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
+			continue;
 
+		int reconstruct_rank1 = 2 * (ibody % ( (node->size - 1)/2 ) ) + 1;
+		int reconstruct_rank2 = 2 * (ibody % ( (node->size - 1)/2 ) ) + 2;
+
+		if (node->rank == reconstruct_rank1 || node->rank == reconstruct_rank2)
+		{
+			MultidimArray< Complex > data_other_half(wsum_model.BPref[ibody].data);
+			MultidimArray< RFLOAT > weight_other_half(wsum_model.BPref[ibody].weight);
+
+			// Fetch the back-projetcion from the other half
+			if (node->rank == reconstruct_rank2)
+			{
+				node->relion_MPI_Send(
+						MULTIDIM_ARRAY(wsum_model.BPref[ibody].data),
+						2*MULTIDIM_SIZE(wsum_model.BPref[ibody].data),
+						MY_MPI_DOUBLE,
+						reconstruct_rank1,
+						MPITAG_IMAGE,
+						MPI_COMM_WORLD
+				);
+				node->relion_MPI_Recv(
+						MULTIDIM_ARRAY(data_other_half),
+						2*MULTIDIM_SIZE(data_other_half),
+						MY_MPI_DOUBLE,
+						reconstruct_rank1,
+						MPITAG_IMAGE,
+						MPI_COMM_WORLD,
+						status
+				);
+				node->relion_MPI_Send(
+						MULTIDIM_ARRAY(wsum_model.BPref[ibody].weight),
+						MULTIDIM_SIZE(wsum_model.BPref[ibody].weight),
+						MY_MPI_DOUBLE,
+						reconstruct_rank1,
+						MPITAG_IMAGE,
+						MPI_COMM_WORLD
+				);
+				node->relion_MPI_Recv(
+						MULTIDIM_ARRAY(weight_other_half),
+						MULTIDIM_SIZE(weight_other_half),
+						MY_MPI_DOUBLE,
+						reconstruct_rank1,
+						MPITAG_IMAGE,
+						MPI_COMM_WORLD,
+						status
+				);
+			}
+			else if (node->rank == reconstruct_rank1)
+			{
+				node->relion_MPI_Recv(
+						MULTIDIM_ARRAY(data_other_half),
+						2*MULTIDIM_SIZE(data_other_half),
+						MY_MPI_DOUBLE,
+						reconstruct_rank2,
+						MPITAG_IMAGE,
+						MPI_COMM_WORLD,
+						status
+				);
+				node->relion_MPI_Send(
+						MULTIDIM_ARRAY(wsum_model.BPref[ibody].data),
+						2*MULTIDIM_SIZE(wsum_model.BPref[ibody].data),
+						MY_MPI_DOUBLE,
+						reconstruct_rank2,
+						MPITAG_IMAGE,
+						MPI_COMM_WORLD
+				);
+				node->relion_MPI_Recv(
+						MULTIDIM_ARRAY(weight_other_half),
+						MULTIDIM_SIZE(weight_other_half),
+						MY_MPI_DOUBLE,
+						reconstruct_rank2,
+						MPITAG_IMAGE,
+						MPI_COMM_WORLD,
+						status
+				);
+				node->relion_MPI_Send(
+						MULTIDIM_ARRAY(wsum_model.BPref[ibody].weight),
+						MULTIDIM_SIZE(wsum_model.BPref[ibody].weight),
+						MY_MPI_DOUBLE,
+						reconstruct_rank2,
+						MPITAG_IMAGE,
+						MPI_COMM_WORLD
+				);
+			}
+			FOR_ALL_ELEMENTS_IN_ARRAY1D(data_other_half)
+				DIRECT_A1D_ELEM(wsum_model.BPref[ibody].data, i) =
+						DIRECT_A1D_ELEM(wsum_model.BPref[ibody].data, i) + DIRECT_A1D_ELEM(data_other_half, i);
+			wsum_model.BPref[ibody].weight = wsum_model.BPref[ibody].weight + weight_other_half;
+		}
+	}
+}
+
+void MlOptimiserMpi::maximizationGradientParametersRandomHalves()
+{
 	MPI_Status status;
 	for (int ibody = 0; ibody< mymodel.nr_bodies; ibody++ )
 	{
@@ -2488,7 +2595,7 @@ void MlOptimiserMpi::maximizationGradientParameters()
 
 		if (node->rank == reconstruct_rank1 || node->rank == reconstruct_rank2)
 		{
-			MultidimArray< Complex > Igrad1_half(wsum_model.BPref[ibody].data);
+			MultidimArray< Complex > other_half(wsum_model.BPref[ibody].data);
 
 			wsum_model.BPref[ibody].reweightGrad();
 			wsum_model.BPref[ibody].getFristMoment(
@@ -2506,8 +2613,8 @@ void MlOptimiserMpi::maximizationGradientParameters()
 						MPI_COMM_WORLD
 				);
 				node->relion_MPI_Recv(
-						MULTIDIM_ARRAY(Igrad1_half),
-						2*MULTIDIM_SIZE(Igrad1_half),
+						MULTIDIM_ARRAY(other_half),
+						2*MULTIDIM_SIZE(other_half),
 						MY_MPI_DOUBLE,
 						reconstruct_rank1,
 						MPITAG_IMAGE,
@@ -2518,8 +2625,8 @@ void MlOptimiserMpi::maximizationGradientParameters()
 			else if (node->rank == reconstruct_rank1)
 			{
 				node->relion_MPI_Recv(
-						MULTIDIM_ARRAY(Igrad1_half),
-						2*MULTIDIM_SIZE(Igrad1_half),
+						MULTIDIM_ARRAY(other_half),
+						2*MULTIDIM_SIZE(other_half),
 						MY_MPI_DOUBLE,
 						reconstruct_rank2,
 						MPITAG_IMAGE,
@@ -2538,7 +2645,7 @@ void MlOptimiserMpi::maximizationGradientParameters()
 
 			wsum_model.BPref[ibody].getSecondMoment(
 					mymodel.Igrad2[ibody],
-					Igrad1_half);
+					other_half);
 
 			MultidimArray< Complex > dummy;
 			wsum_model.BPref[ibody].applyMomenta(

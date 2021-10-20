@@ -1974,7 +1974,6 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed, int &piece, int &nr_pieces
 
 	// Determine size of the packed array
 	unsigned long long nr_groups = sigma2_noise.size();
-	unsigned long long nr_classes_bodies = BPref.size();
 	unsigned long long nr_classes = pdf_class.size();
 	unsigned long long spectral_size = (ori_size / 2) + 1;
 	unsigned long long packed_size = 0;
@@ -1989,9 +1988,9 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed, int &piece, int &nr_pieces
 	packed_size += 2 * nr_groups; // wsum_signal_product, wsum_reference_power
 	// for all class-related stuff
 	// data is complex: multiply by two!
-	packed_size += nr_classes_bodies * 2 * (unsigned long long) BPref[0].getSize(); // BPref.data
-	packed_size += nr_classes_bodies * (unsigned long long) BPref[0].getSize(); // BPref.weight
-	packed_size += nr_classes_bodies * (unsigned long long) nr_directions; // pdf_directions
+	packed_size += BPref.size() * 2 * (unsigned long long) BPref[0].getSize(); // BPref.data
+	packed_size += BPref.size() * (unsigned long long) BPref[0].getSize(); // BPref.weight
+	packed_size += pdf_direction.size() * (unsigned long long) nr_directions; // pdf_directions
 	// for pdf_class
 	packed_size += nr_classes;
 	// for priors for each class
@@ -2075,27 +2074,31 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed, int &piece, int &nr_pieces
 
 	}
 
-	for (int iclass = 0; iclass < nr_classes_bodies; iclass++)
+	for (int iclass = 0; iclass < BPref.size(); iclass++)
 	{
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(BPref[iclass].data)
-		{
-			if (ori_idx >= idx_start && ori_idx < idx_stop) DIRECT_MULTIDIM_ELEM(packed, idx++) = (DIRECT_MULTIDIM_ELEM(BPref[iclass].data, n)).real;
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(BPref[iclass].data) {
+			if (ori_idx >= idx_start && ori_idx < idx_stop)
+				DIRECT_MULTIDIM_ELEM(packed, idx++) = (DIRECT_MULTIDIM_ELEM(BPref[iclass].data, n)).real;
 			ori_idx++;
-			if (ori_idx >= idx_start && ori_idx < idx_stop) DIRECT_MULTIDIM_ELEM(packed, idx++) = (DIRECT_MULTIDIM_ELEM(BPref[iclass].data, n)).imag;
+			if (ori_idx >= idx_start && ori_idx < idx_stop)
+				DIRECT_MULTIDIM_ELEM(packed, idx++) = (DIRECT_MULTIDIM_ELEM(BPref[iclass].data, n)).imag;
 			ori_idx++;
 		}
 		// Only clear after the whole array has been packed... i.e. not when we reached the pack_size halfway through
 		if (idx == ori_idx && do_clear)
 			BPref[iclass].data.clear();
 
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(BPref[iclass].weight)
-		{
-			if (ori_idx >= idx_start && ori_idx < idx_stop) DIRECT_MULTIDIM_ELEM(packed, idx++) = DIRECT_MULTIDIM_ELEM(BPref[iclass].weight, n);
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(BPref[iclass].weight) {
+			if (ori_idx >= idx_start && ori_idx < idx_stop)
+				DIRECT_MULTIDIM_ELEM(packed, idx++) = DIRECT_MULTIDIM_ELEM(BPref[iclass].weight, n);
 			ori_idx++;
 		}
 		if (idx == ori_idx && do_clear)
 			BPref[iclass].weight.clear();
+	}
 
+	for (int iclass = 0; iclass < pdf_direction.size(); iclass++)
+	{
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pdf_direction[iclass])
 		{
 			if (ori_idx >= idx_start && ori_idx < idx_stop) DIRECT_MULTIDIM_ELEM(packed, idx++) = DIRECT_MULTIDIM_ELEM(pdf_direction[iclass], n);
@@ -2140,7 +2143,6 @@ void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed, int piece, bool do_clear
 
 
 	int nr_groups = sigma2_noise.size();
-	int nr_classes_bodies = BPref.size();
 	int nr_classes = pdf_class.size();
 	int spectral_size = (ori_size / 2) + 1;
 	unsigned long long idx_start;
@@ -2205,12 +2207,10 @@ void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed, int piece, bool do_clear
 
 	}
 
-	for (int iclass = 0; iclass < nr_classes_bodies; iclass++)
-	{
+	for (int iclass = 0; iclass < BPref.size(); iclass++) {
 		if (idx == ori_idx)
 			BPref[iclass].initialiseDataAndWeight(current_size);
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(BPref[iclass].data)
-		{
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(BPref[iclass].data) {
 			if (ori_idx >= idx_start && ori_idx < idx_stop)
 				(DIRECT_MULTIDIM_ELEM(BPref[iclass].data, n)).real = DIRECT_MULTIDIM_ELEM(packed, idx++);
 			ori_idx++;
@@ -2221,13 +2221,15 @@ void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed, int piece, bool do_clear
 			//DIRECT_MULTIDIM_ELEM(BPref[iclass].data, n) = Complex(re, im);
 		}
 
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(BPref[iclass].weight)
-		{
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(BPref[iclass].weight) {
 			if (ori_idx >= idx_start && ori_idx < idx_stop)
 				DIRECT_MULTIDIM_ELEM(BPref[iclass].weight, n) = DIRECT_MULTIDIM_ELEM(packed, idx++);
 			ori_idx++;
 		}
+	}
 
+	for (int iclass = 0; iclass < pdf_direction.size(); iclass++)
+	{
 		if (idx == ori_idx)
 			pdf_direction[iclass].resize(nr_directions);
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pdf_direction[iclass])

@@ -1486,7 +1486,7 @@ void MlOptimiser::initialise()
 #endif
 	}
 
-	grad_pseudo_halfsets = gradient_refine;
+	grad_pseudo_halfsets = gradient_refine && !do_split_random_halves;
 
 #ifdef MKLFFT
 	// Enable multi-threaded FFTW
