@@ -1417,7 +1417,8 @@ private:
 		if (ext_name.contains("spi") || ext_name.contains("xmp")  ||
 			ext_name.contains("stk") || ext_name.contains("vol"))
 			err = readSPIDER(select_img);
-		else if (ext_name.contains("mrcs") || (is_2D && ext_name.contains("mrc")) )//mrc stack MUST go BEFORE plain MRC
+		else if (ext_name.contains("mrcs") || (is_2D && ext_name.contains("mrc")) || //mrc stack MUST go BEFORE plain MRC
+				ext_name.contains("st")) //stk stack MUST go BEFORE plain st
 			err = readMRC(select_img, true, name);
 		else if (ext_name.contains("tif"))
 			err = readTIFF(hFile.ftiff, select_img, readdata, true, name);
