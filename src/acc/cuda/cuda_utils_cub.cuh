@@ -13,7 +13,7 @@
 	#undef CubLog
 #endif
 
-#define CUB_NS_QUALIFIER ::cub # for compatibility with CUDA 11.5
+#define CUB_NS_QUALIFIER ::cub // for compatibility with CUDA 11.5
 #include "src/acc/cuda/cub/device/device_radix_sort.cuh"
 #include "src/acc/cuda/cub/device/device_reduce.cuh"
 #include "src/acc/cuda/cub/device/device_scan.cuh"
