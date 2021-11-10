@@ -131,6 +131,17 @@ static const std::vector<std::string> job_ctffit_options{
 	"Per-particle"
 };
 
+static const std::vector<std::string> job_tomo_align_shiftonly_options{
+		"Entire micrographs",
+		"Only particles"
+};
+
+static const std::vector<std::string> job_tomo_align_def_model{
+"linear",
+"spline",
+"Fourier"
+};
+
 // To have a line on the GUI to change the minimum number of dedicated in a job
 static bool do_allow_change_minimum_dedicated;
 

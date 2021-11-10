@@ -2543,7 +2543,7 @@ void JobWindow::initialiseTomoCtfRefineWindow()
 
 void JobWindow::initialiseTomoAlignWindow()
 {
-	setupTabs(2);
+	setupTabs(4);
 
 	placeTomoInput(true, true, true, false, true, true);
 
@@ -2556,18 +2556,25 @@ void JobWindow::initialiseTomoAlignWindow()
 
 	current_y += STEPY /2 ;
 
-	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group1->end();
-	place("do_flex_align", TOGGLE_DEACTIVATE, group1);
-	place("do_glob_shift", TOGGLE_DEACTIVATE);
+	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group3->end();
+	place("do_shift_align", TOGGLE_DEACTIVATE, group3);
+	group3->begin();
 
-	group1->begin();
+	place("shift_align_type", TOGGLE_DEACTIVATE);
+	group3->end();
+	guientries["do_shift_align"].cb_menu_i();
 
-	current_y += STEPY /2 ;
+	tab2->end();
+	tab3->begin();
+	tab3->label("Motion");
+	resetHeight();
 
 	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group2->end();
-	place("do_polish", TOGGLE_DEACTIVATE, group2);
+	place("do_motion", TOGGLE_DEACTIVATE, group2);
+
+	current_y += STEPY /2 ;
 
 	group2->begin();
 
@@ -2576,12 +2583,33 @@ void JobWindow::initialiseTomoAlignWindow()
 	place("do_sq_exp_ker", TOGGLE_DEACTIVATE);
 
 	group2->end();
-	guientries["do_polish"].cb_menu_i();
+	guientries["do_motion"].cb_menu_i();
 
-	group1->end();
-	guientries["do_flex_align"].cb_menu_i();
+	tab3->end();
+	tab4->begin();
+	tab4->label("Deformations");
+	resetHeight();
 
-	tab2->end();
+	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group4->end();
+	place("do_deform", TOGGLE_DEACTIVATE, group4);
+
+	current_y += STEPY /2 ;
+
+	group4->begin();
+
+	place("def_w", TOGGLE_DEACTIVATE);
+	place("def_h", TOGGLE_DEACTIVATE);
+	place("def_model", TOGGLE_DEACTIVATE);
+	place("lambda", TOGGLE_DEACTIVATE);
+
+	current_y += STEPY /2 ;
+
+	place("do_frame_def", TOGGLE_DEACTIVATE);
+
+	group4->end();
+	guientries["do_deform"].cb_menu_i();
+	tab4->end();
 }
 
 void JobWindow::initialiseTomoReconParWindow()

@@ -6420,19 +6420,27 @@ bool RelionJob::getCommandsTomoCtfRefineJob(std::string &outputname, std::vector
 
 void RelionJob::initialiseTomoAlignJob()
 {
-        hidden_name = ".gui_tomo_align";
+	hidden_name = ".gui_tomo_align";
 
 	addTomoInputOptions(true, true, true, false, true, true);
 
-    	joboptions["box_size"] = JobOption("Box size for estimation (pix):", 128, 32, 512, 16, "Box size to be used for the estimation. Note that this can be larger than the box size of the reference map. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
-    	joboptions["max_error"] = JobOption("Max position error (pix):", 5, 0, 64, 1, "maximal assumed error in the initial 2D particle-positions (distances between the projected 3D positions and their true positions in the images), given in pixels.");
+	joboptions["box_size"] = JobOption("Box size for estimation (pix):", 128, 32, 512, 16, "Box size to be used for the estimation. Note that this can be larger than the box size of the reference map. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
+	joboptions["max_error"] = JobOption("Max position error (pix):", 5, 0, 64, 1, "maximal assumed error in the initial 2D particle-positions (distances between the projected 3D positions and their true positions in the images), given in pixels.");
 
-    	joboptions["do_flex_align"] = JobOption("Allow flexible alignment?", false, "If set to No, only applies an optimal rigid shift to each frame (no iterative optimisation).");
-    	joboptions["do_glob_shift"] = JobOption("Do global rigid shift alignment?", false, "If set to Yes, estimates rigid shift by aligning only the particles instead of by predicting entire micrographs. \"Allow flexible alignment?\" must be set \"No\" (no iterative optimisation).");
-    	joboptions["do_polish"] = JobOption("Fit per-particle motion?", false, "If set to Yes, then the subtomogram version of Bayesian polishing will be used to fit per-particle (3D) motion tracks, besides the rigid part of the motion in the tilt series.");
-    	joboptions["sigma_vel"] = JobOption("Sigma for velocity (A/dose): ", 0.2, 1., 10., 0.1, "The expected amount of motion (i.e. the std. deviation of particle positions in Angstroms after 1 electron per A^2 of radiation)");
-    	joboptions["sigma_div"] = JobOption("Sigma for divergence (A): ", 5000, 0, 10000, 10000, "The expected spatial smoothness of the particle trajectories in A (a greater value means spatially smoother motion");
-    	joboptions["do_sq_exp_ker"] = JobOption("Use Gaussian decay?", false, "If set to Yes, then assume that the correlation of the velocities of two particles decays as a Gaussian over their distance, instead of as an exponential. This will produce spatially smoother motion and result in a shorter program runtime.");
+	joboptions["do_shift_align"] = JobOption("Align by shift only?", false, "If set to Yes, tilt series projection shifts are refined based on cross-correlation. Useful for very badly aligned frames. No iterative optimisation.");
+	joboptions["shift_align_type"] = JobOption("Alignment model: ", job_tomo_align_shiftonly_options, 0, "If set to \"Only particles\", it estimates rigid shift by aligning only the particles instead of by predicting entire micrographs. In this case, only misalignments smaller than half the box size of the particle can be corrected.");
+
+	joboptions["do_motion"] = JobOption("Fit per-particle motion?", false, "If set to Yes, then the subtomogram version of Bayesian polishing will be used to fit per-particle (3D) motion tracks, besides the rigid part of the motion in the tilt series.");
+	joboptions["sigma_vel"] = JobOption("Sigma for velocity (A/dose): ", 0.2, 1., 10., 0.1, "The expected amount of motion (i.e. the std. deviation of particle positions in Angstroms after 1 electron per A^2 of radiation)");
+	joboptions["sigma_div"] = JobOption("Sigma for divergence (A): ", 5000, 0, 10000, 10000, "The expected spatial smoothness of the particle trajectories in A (a greater value means spatially smoother motion");
+	joboptions["do_sq_exp_ker"] = JobOption("Use Gaussian decay?", false, "If set to Yes, then assume that the correlation of the velocities of two particles decays as a Gaussian over their distance, instead of as an exponential. This will produce spatially smoother motion and result in a shorter program runtime.");
+
+	joboptions["do_deform"] = JobOption("Estimate 2D deformations?", false, "If set to Yes, then the subtomogram version of Bayesian polishing will be used to fit per-particle (3D) motion tracks, besides the rigid part of the motion in the tilt series.");
+	joboptions["def_w"] = JobOption("Horizontal sampling points: ", 3, 0, 10, 1, "Number of horizontal sampling points for the deformation grid.");
+	joboptions["def_h"] = JobOption("Vertical sampling points: ", 3, 0, 10, 1, "Number of vertical sampling points for the deformation grid.");
+	joboptions["def_model"] = JobOption("Deformation Model:", job_tomo_align_def_model, 1, "Type of model to use (linear, spline or Fourier).");
+	joboptions["lambda"] = JobOption("Deformation regularisation lambda:", 0., 0, 1, 0.05, "Deformation regularisation scale.");
+	joboptions["do_frame_def"] = JobOption("Refine deformations per frame?", false, "If set to Yes, it models deformations per tilt frame instead of per tilt series.");
 
 }
 
@@ -6463,7 +6471,7 @@ bool RelionJob::getCommandsTomoAlignJob(std::string &outputname, std::vector<std
 	outputNodes.push_back(node2);
 	Node node3(outputname+"particles.star", LABEL_TOMO_PARTS);
 	outputNodes.push_back(node3);
-    if (joboptions["do_polish"].getBoolean())
+	if (joboptions["do_motion"].getBoolean())
 	{
 		Node node4(outputname+"motion.star", LABEL_TOMO_TRAJECTORIES);
 		outputNodes.push_back(node4);
@@ -6473,24 +6481,48 @@ bool RelionJob::getCommandsTomoAlignJob(std::string &outputname, std::vector<std
 	command += " --b " + joboptions["box_size"].getString();
 	command += " --r " + joboptions["max_error"].getString();
 
-	if (!joboptions["do_flex_align"].getBoolean())
+	bool do_shift_align = joboptions["do_shift_align"].getBoolean();
+	bool do_motion = joboptions["do_motion"].getBoolean();
+
+	int i = 0;
+	if (do_shift_align) i++;
+	if (do_motion) i++;
+
+	if (i > 1)
+	{
+		error_message = "ERROR: Per-particle motion and shift only corrections cannot be applied simultaneously.";
+		return false;
+	}
+
+	if (do_shift_align)
 	{
 		command += " --shift_only ";
-
-		if (joboptions["do_glob_shift"].getBoolean())
-		{
-			command += " --shift_only_by_particles ";
-		}
+		if (joboptions["shift_align_type"].getString() == "Only particles")
+		command += " --shift_only_by_particles ";
 	}
-    else if (joboptions["do_polish"].getBoolean())
+
+    if (do_motion)
 	{
     	command += " --motion ";
     	command += " --s_vel " + joboptions["sigma_vel"].getString();
     	command += " --s_div " + joboptions["sigma_div"].getString();
     	if (joboptions["do_sq_exp_ker"].getBoolean())
     	{
-    		command += " --sq_exp_ker";
+    		command += " --sq_exp_ker ";
     	}
+	}
+	if (joboptions["do_deform"].getBoolean())
+	{
+		command += " --deformation ";
+		command += " --def_w " + joboptions["def_w"].getString();
+		command += " --def_h " + joboptions["def_h"].getString();
+		command += " --def_model " + joboptions["def_model"].getString();
+		command += " --def_reg " + joboptions["lambda"].getString();
+
+		if (joboptions["do_frame_def"].getBoolean())
+		{
+			command += " --per_frame_deformation ";
+		}
 	}
 
 	if (is_continue)
