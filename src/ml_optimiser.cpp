@@ -8187,7 +8187,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 												{
 													int ires = DIRECT_MULTIDIM_ELEM(Mresol_fine[optics_group], n);
 													if (DIRECT_MULTIDIM_ELEM(MySTMulti, n) > 0 && ires > -1)
-														DIRECT_MULTIDIM_ELEM(thr_wsum_stMulti[img_id], ires) += 1;
+														DIRECT_MULTIDIM_ELEM(thr_wsum_stMulti[img_id], ires) += DIRECT_MULTIDIM_ELEM(MySTMulti, n);
 												}
 
 												long int igroup = mydata.getGroupId(part_id, img_id);
