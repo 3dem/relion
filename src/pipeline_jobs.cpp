@@ -6248,6 +6248,8 @@ void RelionJob::initialiseTomoSubtomoJob()
 	joboptions["do_cone_weight"] = JobOption("Use cone weight?", false, "If set to Yes, then downweight a cone in Fourier space along the Z axis (as defined by the coordinate system of the particle). This is useful for particles embedded in a membrane, as it can prevent the alignment from being driven by the membrane signal (the signal of a planar membrane is localised within one line in 3D Fourier space). Note that the coordinate system of a particle is given by both the subtomogram orientation (if defined) and the particle orientation (see particle set). This allows the user to first obtain a membrane-driven alignment, and to then specifically suppress the signal in that direction.");
 	joboptions["cone_angle"] = JobOption("Cone angle:", 10, 1, 50, 1, "The (full) opening angle of the cone to be suppressed, given in degrees. This angle should include both the uncertainty about the membrane orientation and its variation across the region represented in the subtomogram.");
 
+	joboptions["do_float16"] = JobOption("Write output in float16?", true ,"If set to Yes, this program will write output images in float16 MRC format. This will save a factor of two in disk space compared to the default of writing in float32. Note that RELION and CCPEM will read float16 images, but other programs may not (yet) do so.");
+
 }
 
 
@@ -6291,6 +6293,11 @@ bool RelionJob::getCommandsTomoSubtomoJob(std::string &outputname, std::vector<s
     {
     	command += " --cone_weight --cone_angle " + joboptions["cone_angle"].getString();
     }
+
+	if (joboptions["do_float16"].getBoolean())
+	{
+		command += " --float16 ";
+	}
 
 	if (is_continue)
 	{

@@ -2457,6 +2457,10 @@ void JobWindow::initialiseTomoSubtomoWindow()
 	group1->end();
 	guientries["do_cone_weight"].cb_menu_i();
 
+	current_y += STEPY /2 ;
+
+	place("do_float16", TOGGLE_DEACTIVATE);
+
 	tab2->end();
 }
 

@@ -73,6 +73,8 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 
 	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Only process undone subtomograms");
 
+	write_float16  = parser.checkOption("--float16", "Write in half-precision 16 bit floating point numbers (MRC mode 12), instead of 32 bit (MRC mode 0).");
+
 
 	diag = parser.checkOption("--diag", "Write out diagnostic information");
 
@@ -620,7 +622,7 @@ void SubtomoProgram::processTomograms(
 			if (do_not_write_any) continue;
 
 
-			dataImgRS.write(outData, binnedPixelSize);
+			dataImgRS.write(outData, binnedPixelSize, write_float16);
 
 			if (write_combined)
 			{
@@ -628,17 +630,17 @@ void SubtomoProgram::processTomograms(
 				ctfAndMultiplicity.getSlabRef(0,s3D).copyFrom(ctfImgFS);
 				ctfAndMultiplicity.getSlabRef(s3D,s3D).copyFrom(multiImageFS);
 
-				ctfAndMultiplicity.write(outWeight, 1.0 / binnedPixelSize);
+				ctfAndMultiplicity.write(outWeight, 1.0 / binnedPixelSize, write_float16);
 			}
 
 			if (write_ctf)
 			{
-				Centering::fftwHalfToHumanFull(ctfImgFS).write(outCTF, 1.0 / binnedPixelSize);
+				Centering::fftwHalfToHumanFull(ctfImgFS).write(outCTF, 1.0 / binnedPixelSize, write_float16);
 			}
 
 			if (write_multiplicity)
 			{
-				Centering::fftwHalfToHumanFull(multiImageFS).write(outMulti, 1.0 / binnedPixelSize);
+				Centering::fftwHalfToHumanFull(multiImageFS).write(outMulti, 1.0 / binnedPixelSize, write_float16);
 			}
 
 			if (write_normalised)
@@ -657,8 +659,8 @@ void SubtomoProgram::processTomograms(
 
 				FFT::inverseFourierTransform(dataImgCorrFS, dataImgDivRS, FFT::Both);
 
-				dataImgDivRS.write(outNrm, binnedPixelSize);
-				Centering::fftwHalfToHumanFull(ctfImgFSnrm).write(outWeightNrm, 1.0 / binnedPixelSize);
+				dataImgDivRS.write(outNrm, binnedPixelSize, write_float16);
+				Centering::fftwHalfToHumanFull(ctfImgFSnrm).write(outWeightNrm, 1.0 / binnedPixelSize, write_float16);
 			}
 
 			if (write_divided)
@@ -677,7 +679,7 @@ void SubtomoProgram::processTomograms(
 				}
 
 				Reconstruction::taper(dataImgDivRS, taper, do_center, inner_thread_num);
-				dataImgDivRS.write(outDiv, binnedPixelSize);
+				dataImgDivRS.write(outDiv, binnedPixelSize, write_float16);
 			}
 		}
 

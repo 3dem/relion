@@ -70,7 +70,7 @@ class RawImage
 		void swapWith(RawImage<T>& img);
 		
 		void write(std::string fn) const;
-		void write(std::string fn, double pixelSize) const;
+		void write(std::string fn, double pixelSize, bool writeFloat16 = false) const;
 		void writePng(std::string fn) const;
 		void writeVtk(
 				std::string fn,
@@ -467,7 +467,7 @@ void RawImage<T>::write(std::string fn) const
 }
 
 template <class T>
-void RawImage<T>::write(std::string fn, double pixelSize) const
+void RawImage<T>::write(std::string fn, double pixelSize, bool writeFloat16) const
 {
 	std::string::size_type dot = fn.find_last_of('.');
 	
@@ -480,6 +480,10 @@ void RawImage<T>::write(std::string fn, double pixelSize) const
 	
 	if (end == "vtk")
 	{
+		if (writeFloat16)
+		{
+			REPORT_ERROR_STR("RawImage<T>::write: Float16 type not implemented for VTK format.");
+		}
 		Image<T> img;
 		copyTo(img);
 		VtkHelper::writeVTK(img, fn, 0, 0, 0, pixelSize, pixelSize, pixelSize);
@@ -490,13 +494,15 @@ void RawImage<T>::write(std::string fn, double pixelSize) const
 		copyToN(img);
 		img.setSamplingRateInHeader(pixelSize);
 		img.write(fn);
+		img.write(fn, -1, false, WRITE_OVERWRITE, writeFloat16 ? Float16: Float);
+
 	}
 	else
 	{
 		Image<T> img;
 		copyTo(img);
 		img.setSamplingRateInHeader(pixelSize);
-		img.write(fn);
+		img.write(fn, -1, false, WRITE_OVERWRITE, writeFloat16 ? Float16: Float);
 	}
 }
 
