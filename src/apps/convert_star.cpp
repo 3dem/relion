@@ -49,7 +49,7 @@ public:
 		if (fn_in == "None" || fn_out == "None")
 		{
 			usage();
-			REPORT_ERROR("Please specify input and output file names");
+			REPORT_ERROR("Please specify input and output file names.");
 		}
 	}
 
@@ -63,7 +63,7 @@ public:
 
 		if (mdt.containsLabel(EMDL_IMAGE_NAME))
 		{
-			std::cout << "The input is a particle STAR file" << std::endl;
+			std::cout << "The input is a particle STAR file." << std::endl;
 			mdtOut.setName("particles");
 		}
 		else if (isMotionCorrSTAR)
@@ -72,7 +72,7 @@ public:
 			std::cout << "The (binned) pixel size and the voltage are taken from the first metadata STAR file." << std::endl;
 			FileName fn_meta;
 			if (!mdtOut.getValue(EMDL_MICROGRAPH_METADATA_NAME, fn_meta, 0))
-				REPORT_ERROR("Failed to find the metadata STAR file");
+				REPORT_ERROR("Failed to find the metadata STAR file.");
 
 			Micrograph mic(fn_meta);
 			std::cout << "- voltage: " << mic.voltage << std::endl;
@@ -90,7 +90,7 @@ public:
 			std::cout << "- spherical aberration: " << Cs << std::endl;
 			optOut.setValue(EMDL_CTF_CS, Cs);
 			if (Q0 < 0)
-				REPORT_ERROR("Please specify the amplitude contrast in the --Q0 option");
+				REPORT_ERROR("Please specify the amplitude contrast in the --Q0 option.");
 			std::cout << "- amplitude contrast: " << Q0 << std::endl;
 			optOut.setValue(EMDL_CTF_Q0, Q0);
 

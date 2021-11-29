@@ -19,13 +19,13 @@ but the outlines to clone and install relion for typical use are made easy throu
 On Debian or Ubuntu machines, installing cmake, the compiler, and additional dependencies (mpi, fftw) is as easy as:
 
 ```
-sudo apt install cmake git build-essential mpi-default-bin mpi-default-dev libfftw3-dev libtiff-dev libpng-dev
+sudo apt install cmake git build-essential mpi-default-bin mpi-default-dev libfftw3-dev libtiff-dev libpng-dev ghostscript libxft-dev
 ```
 
 RedHat-like systems (CentOS, RHEL, Scientific Linux etc) use `yum` package manager:
 
 ```
-sudo yum install cmake git gcc gcc-c++ openmpi-devel fftw-devel libtiff-devel libpng-devel
+sudo yum install cmake git gcc gcc-c++ openmpi-devel fftw-devel libtiff-devel libpng-devel ghostscript libXft-devel libX11-devel
 ```
 
 Once git and cmake are installed, relion can be easily installed through:
