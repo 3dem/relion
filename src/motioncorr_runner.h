@@ -47,6 +47,9 @@ public:
 	int n_threads;
 	int max_io_threads;
 
+	// Skip generation of logfile
+	bool do_skip_logfile;
+
 	// Output rootname
 	FileName fn_in, fn_out, fn_movie;
 

@@ -84,6 +84,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	max_io_threads = textToInteger(parser.getOption("--max_io_threads", "Limit the number of IO threads.", "-1"));
 	continue_old = parser.checkOption("--only_do_unfinished", "Only run motion correction for those micrographs for which there is not yet an output micrograph.");
 	do_at_most = textToInteger(parser.getOption("--do_at_most", "Only process at most this number of (unprocessed) micrographs.", "-1"));
+	do_skip_logfile = parser.checkOption("--skip_logfile", "Skip generation of logfile.pdf");
 	grouping_for_ps = textToInteger(parser.getOption("--grouping_for_ps", "Group this number of frames and write summed power spectrum. -1 == do not write", "-1"));
 	ps_size = textToInteger(parser.getOption("--ps_size", "Output size of power spectrum", "512"));
 	if (ps_size % 2 != 0) REPORT_ERROR("--ps_size must be an even number.");
@@ -161,7 +162,7 @@ void MotioncorrRunner::initialise()
 	if (fn_defect.getExtension() == "txt" && detectSerialEMDefectText(fn_defect))
 	{
 		std::cerr << "ERROR: The defect file seems to be a SerialEM's defect file. This format is different from the MotionCor2's format (x y w h)." << std::endl;
-		std::cerr << "       You can convert it to a defect map by IMOD utilities e.g. \"clip defect -D defect.txt -f tif movie.mrc defect_map.tif\"." << std::endl; 
+		std::cerr << "       You can convert it to a defect map by IMOD utilities e.g. \"clip defect -D defect.txt -f tif movie.mrc defect_map.tif\"." << std::endl;
 		std::cerr << "       See explanations in the SerialEM manual." << std::endl;
 		REPORT_ERROR("The defect file is in the SerialEM format, not MotionCor2's format (x y w h). See above for details.");
 	}
@@ -825,7 +826,7 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 	long int barstep = XMIPP_MAX(1, fn_ori_micrographs.size() / 60);
 	if (verb > 0)
 	{
-		std::cout << " Generating logfile.pdf ... " << std::endl;
+		std::cout << " Generating joint STAR file ... " << std::endl;
 		init_progress_bar(fn_ori_micrographs.size());
 	}
 
@@ -905,59 +906,69 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 	}
 	obsModel.save(MDavg, fn_out + "corrected_micrographs.star", "micrographs");
 
-	// Now generate EPS plot with histograms and combine all EPS into a logfile.pdf
-	std::vector<EMDLabel> plot_labels;
-	plot_labels.push_back(EMDL_MICROGRAPH_ACCUM_MOTION_TOTAL);
-	plot_labels.push_back(EMDL_MICROGRAPH_ACCUM_MOTION_EARLY);
-	plot_labels.push_back(EMDL_MICROGRAPH_ACCUM_MOTION_LATE);
-	FileName fn_eps, fn_eps_root = fn_out + "corrected_micrographs";
-	std::vector<FileName> all_fn_eps;
-	for (int i = 0; i < plot_labels.size(); i++)
-	{
-		EMDLabel label = plot_labels[i];
-		if (MDavg.containsLabel(label))
-		{
-			// Values for all micrographs
-			CPlot2D *plot2Db=new CPlot2D(EMDL::label2Str(label) + " for all micrographs");
-			MDavg.addToCPlot2D(plot2Db, EMDL_UNDEFINED, label, 1.);
-			plot2Db->SetDrawLegend(false);
-			fn_eps = fn_eps_root + "_all_" + EMDL::label2Str(label) + ".eps";
-			plot2Db->OutputPostScriptPlot(fn_eps);
-			all_fn_eps.push_back(fn_eps);
-			delete plot2Db;
-			if (MDavg.numberOfObjects() > 3)
-			{
-				// Histogram
-				std::vector<RFLOAT> histX, histY;
-				CPlot2D *plot2D=new CPlot2D("");
-				MDavg.columnHistogram(label,histX,histY, 0, plot2D);
-				fn_eps = fn_eps_root + "_hist_" + EMDL::label2Str(label) + ".eps";
-				plot2D->OutputPostScriptPlot(fn_eps);
-				all_fn_eps.push_back(fn_eps);
-				delete plot2D;
-			}
-		}
-	}
-
-
-	// Combine all EPS into a single logfile.pdf
-	FileName fn_prev="";
-	for (long int i = 0; i < fn_ori_micrographs.size(); i++)
-	{
-		if (fn_prev != fn_ori_micrographs[i].beforeLastOf("/"))
-		{
-			fn_prev = fn_ori_micrographs[i].beforeLastOf("/");
-			all_fn_eps.push_back(fn_out + fn_prev+"/*.eps");
-		}
-	}
-
-	joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf", all_fn_eps);
-
 	if (verb > 0 )
 	{
 		progress_bar(fn_ori_micrographs.size());
 
-		std::cout << " Done! Written: " << fn_out << "logfile.pdf" << " and " << fn_out << "corrected_micrographs.star" << std::endl;
+		std::cout << " Done! Written: " << fn_out << "corrected_micrographs.star" << std::endl;
+	}
+
+	if (!do_skip_logfile)
+	{
+		if (verb > 0) std::cout << " Now generating logfile.pdf ... " << std::endl;
+
+		// Now generate EPS plot with histograms and combine all EPS into a logfile.pdf
+		std::vector<EMDLabel> plot_labels;
+		plot_labels.push_back(EMDL_MICROGRAPH_ACCUM_MOTION_TOTAL);
+		plot_labels.push_back(EMDL_MICROGRAPH_ACCUM_MOTION_EARLY);
+		plot_labels.push_back(EMDL_MICROGRAPH_ACCUM_MOTION_LATE);
+		FileName fn_eps, fn_eps_root = fn_out + "corrected_micrographs";
+		std::vector<FileName> all_fn_eps;
+		for (int i = 0; i < plot_labels.size(); i++)
+		{
+			EMDLabel label = plot_labels[i];
+			if (MDavg.containsLabel(label))
+			{
+				// Values for all micrographs
+				CPlot2D *plot2Db=new CPlot2D(EMDL::label2Str(label) + " for all micrographs");
+				MDavg.addToCPlot2D(plot2Db, EMDL_UNDEFINED, label, 1.);
+				plot2Db->SetDrawLegend(false);
+				fn_eps = fn_eps_root + "_all_" + EMDL::label2Str(label) + ".eps";
+				plot2Db->OutputPostScriptPlot(fn_eps);
+				all_fn_eps.push_back(fn_eps);
+				delete plot2Db;
+				if (MDavg.numberOfObjects() > 3)
+				{
+					// Histogram
+					std::vector<RFLOAT> histX, histY;
+					CPlot2D *plot2D=new CPlot2D("");
+					MDavg.columnHistogram(label,histX,histY, 0, plot2D);
+					fn_eps = fn_eps_root + "_hist_" + EMDL::label2Str(label) + ".eps";
+					plot2D->OutputPostScriptPlot(fn_eps);
+					all_fn_eps.push_back(fn_eps);
+					delete plot2D;
+				}
+			}
+		}
+
+
+		// Combine all EPS into a single logfile.pdf
+		FileName fn_prev="";
+		for (long int i = 0; i < fn_ori_micrographs.size(); i++)
+		{
+			if (fn_prev != fn_ori_micrographs[i].beforeLastOf("/"))
+			{
+				fn_prev = fn_ori_micrographs[i].beforeLastOf("/");
+				all_fn_eps.push_back(fn_out + fn_prev+"/*.eps");
+			}
+		}
+
+		joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf", all_fn_eps);
+
+		if (verb > 0 )
+		{
+			std::cout << " Done! Written: " << fn_out << "logfile.pdf" << std::endl;
+		}
 	}
 }
 
@@ -1030,7 +1041,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	// Setup grouping
 	logfile << "Frame grouping: n_frames = " << n_frames << ", requested group size = " << group << std::endl;
 	const int n_groups = n_frames / group;
-	if (n_groups < 3) 
+	if (n_groups < 3)
 	{
 		std::cerr << "Skipped " << fn_mic << ": too few frames (" << n_groups << " < 3) after grouping . Probably the movie is truncated or you made a mistake in frame grouping." << std::endl;
 		return false;
@@ -1203,7 +1214,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 //					std::cout << std::endl;
 				}
 //				std::cout << "n_ok = " << n_ok;
-				if (n_ok > NUM_MIN_OK) 
+				if (n_ok > NUM_MIN_OK)
 					DIRECT_A2D_ELEM(Iframes[iframe](), i, j) = pbuf[rand() % n_ok];
 				else
 					DIRECT_A2D_ELEM(Iframes[iframe](), i, j) = rnd_gaus(frame_mean, frame_std);
@@ -1219,7 +1230,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	// Debug output
 	for (int iframe = 0; iframe < n_frames; iframe++)
 	{
-		Iframes[iframe].write(fn_avg.withoutExtension() + "_frames.mrcs", iframe, 
+		Iframes[iframe].write(fn_avg.withoutExtension() + "_frames.mrcs", iframe,
 		                      true, (iframe == 0) ? WRITE_OVERWRITE : WRITE_APPEND);
 	}
 #endif

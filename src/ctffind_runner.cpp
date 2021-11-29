@@ -35,6 +35,7 @@ void CtffindRunner::read(int argc, char **argv, int rank)
 	do_only_join_results = parser.checkOption("--only_make_star", "Don't estimate any CTFs, only join all logfile results in a STAR file");
 	continue_old = parser.checkOption("--only_do_unfinished", "Only estimate CTFs for those micrographs for which there is not yet a logfile with Final values.");
 	do_at_most = textToInteger(parser.getOption("--do_at_most", "Only process up to this number of (unprocessed) micrographs.", "-1"));
+	do_skip_logfile = parser.checkOption("--skip_logfile", "Skip generation of logfile.pdf");
 	// Use a smaller squared part of the micrograph to estimate CTF (e.g. to avoid film labels...)
 	ctf_win =  textToInteger(parser.getOption("--ctfWin", "Size (in pixels) of a centered, squared window to use for CTF-estimation", "-1"));
 
@@ -426,7 +427,7 @@ void CtffindRunner::joinCtffindResults()
 	long int barstep = XMIPP_MAX(1, fn_micrographs_all.size() / 60);
 	if (verb > 0)
 	{
-		std::cout << " Generating logfile.pdf ... " << std::endl;
+		std::cout << " Generating joint STAR file ... " << std::endl;
 		init_progress_bar(fn_micrographs_all.size());
 	}
 
@@ -476,48 +477,62 @@ void CtffindRunner::joinCtffindResults()
 
 	obsModel.save(MDctf, fn_out+"micrographs_ctf.star", "micrographs");
 
-	std::vector<EMDLabel> plot_labels;
-	plot_labels.push_back(EMDL_CTF_DEFOCUSU);
-	plot_labels.push_back(EMDL_CTF_DEFOCUS_ANGLE);
-	plot_labels.push_back(EMDL_CTF_ASTIGMATISM);
-	plot_labels.push_back(EMDL_CTF_MAXRES);
-	plot_labels.push_back(EMDL_CTF_PHASESHIFT);
-	plot_labels.push_back(EMDL_CTF_FOM);
-	plot_labels.push_back(EMDL_CTF_VALIDATIONSCORE);
-	FileName fn_eps, fn_eps_root = fn_out+"micrographs_ctf";
-	std::vector<FileName> all_fn_eps;
-	for (int i = 0; i < plot_labels.size(); i++)
-	{
-		EMDLabel label = plot_labels[i];
-		if (MDctf.containsLabel(label))
-		{
-			// Values for all micrographs
-			CPlot2D *plot2Db=new CPlot2D(EMDL::label2Str(label) + " for all micrographs");
-			MDctf.addToCPlot2D(plot2Db, EMDL_UNDEFINED, label, 1.);
-			plot2Db->SetDrawLegend(false);
-			fn_eps = fn_eps_root + "_all_" + EMDL::label2Str(label) + ".eps";
-			plot2Db->OutputPostScriptPlot(fn_eps);
-			all_fn_eps.push_back(fn_eps);
-			delete plot2Db;
-			if (MDctf.numberOfObjects() > 3)
-			{
-				// Histogram
-				std::vector<RFLOAT> histX, histY;
-				CPlot2D *plot2D=new CPlot2D("");
-				MDctf.columnHistogram(label,histX,histY,0, plot2D);
-				fn_eps = fn_eps_root + "_hist_" + EMDL::label2Str(label) + ".eps";
-				plot2D->OutputPostScriptPlot(fn_eps);
-				all_fn_eps.push_back(fn_eps);
-				delete plot2D;
-			}
-		}
-	}
-	joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf", all_fn_eps);
-
-	if (verb > 0 )
+	if (verb > 0)
 	{
 		progress_bar(fn_micrographs_all.size());
-		std::cout << " Done! Written out: " << fn_out <<  "micrographs_ctf.star and " << fn_out << "logfile.pdf" << std::endl;
+		std::cout << " Done! Written out: " << fn_out <<  "micrographs_ctf.star" << std::endl;
+	}
+
+	if (!do_skip_logfile)
+	{
+
+		if (verb > 0)
+		{
+			std::cout << " Now generating logfile.pdf ... " << std::endl;
+		}
+
+		std::vector<EMDLabel> plot_labels;
+		plot_labels.push_back(EMDL_CTF_DEFOCUSU);
+		plot_labels.push_back(EMDL_CTF_DEFOCUS_ANGLE);
+		plot_labels.push_back(EMDL_CTF_ASTIGMATISM);
+		plot_labels.push_back(EMDL_CTF_MAXRES);
+		plot_labels.push_back(EMDL_CTF_PHASESHIFT);
+		plot_labels.push_back(EMDL_CTF_FOM);
+		plot_labels.push_back(EMDL_CTF_VALIDATIONSCORE);
+		FileName fn_eps, fn_eps_root = fn_out+"micrographs_ctf";
+		std::vector<FileName> all_fn_eps;
+		for (int i = 0; i < plot_labels.size(); i++)
+		{
+			EMDLabel label = plot_labels[i];
+			if (MDctf.containsLabel(label))
+			{
+				// Values for all micrographs
+				CPlot2D *plot2Db=new CPlot2D(EMDL::label2Str(label) + " for all micrographs");
+				MDctf.addToCPlot2D(plot2Db, EMDL_UNDEFINED, label, 1.);
+				plot2Db->SetDrawLegend(false);
+				fn_eps = fn_eps_root + "_all_" + EMDL::label2Str(label) + ".eps";
+				plot2Db->OutputPostScriptPlot(fn_eps);
+				all_fn_eps.push_back(fn_eps);
+				delete plot2Db;
+				if (MDctf.numberOfObjects() > 3)
+				{
+					// Histogram
+					std::vector<RFLOAT> histX, histY;
+					CPlot2D *plot2D=new CPlot2D("");
+					MDctf.columnHistogram(label,histX,histY,0, plot2D);
+					fn_eps = fn_eps_root + "_hist_" + EMDL::label2Str(label) + ".eps";
+					plot2D->OutputPostScriptPlot(fn_eps);
+					all_fn_eps.push_back(fn_eps);
+					delete plot2D;
+				}
+			}
+		}
+		joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf", all_fn_eps);
+
+		if (verb > 0 )
+		{
+			std::cout << " Done! Written out: " << fn_out << "logfile.pdf" << std::endl;
+		}
 	}
 
 	if (do_use_gctf)
