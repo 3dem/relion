@@ -280,11 +280,21 @@ d3Matrix ParticleSet::getSubtomogramMatrix(ParticleIndex particle_id) const
 
 d3Matrix ParticleSet::getParticleMatrix(ParticleIndex particle_id) const
 {
-	const double phi  =  partTable.getAngleInRad(EMDL_ORIENT_ROT,  particle_id.value);
-	const double theta = partTable.getAngleInRad(EMDL_ORIENT_TILT, particle_id.value);
-	const double psi  =  partTable.getAngleInRad(EMDL_ORIENT_PSI,  particle_id.value);
+	if (partTable.containsLabel(EMDL_ORIENT_ROT))
+	{
+		const double phi  =  partTable.getAngleInRad(EMDL_ORIENT_ROT,  particle_id.value);
+		const double theta = partTable.getAngleInRad(EMDL_ORIENT_TILT, particle_id.value);
+		const double psi  =  partTable.getAngleInRad(EMDL_ORIENT_PSI,  particle_id.value);
 
-	return Euler::anglesToMatrix3(phi, theta, psi);
+		return Euler::anglesToMatrix3(phi, theta, psi);
+	}
+	else
+	{
+		return d3Matrix(
+				1, 0, 0,
+				0, 1, 0,
+				0, 0, 1 );
+	}
 }
 
 d3Matrix ParticleSet::getMatrix3x3(ParticleIndex particle_id) const
