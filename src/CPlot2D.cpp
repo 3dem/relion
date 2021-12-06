@@ -75,6 +75,58 @@ void joinMultipleEPSIntoSinglePDF(FileName fn_pdf, std::vector<FileName> fn_eps)
     }
 
 }
+bool concatenatePDFfiles(FileName fn_pdf_out, FileName pdf1, FileName pdf2)
+{
+	std::vector<FileName> fn_pdfs;
+	fn_pdfs.push_back(pdf1);
+	fn_pdfs.push_back(pdf2);
+	return concatenatePDFfiles(fn_pdf_out, fn_pdfs);
+
+}
+
+bool concatenatePDFfiles(FileName fn_pdf_out, std::vector<FileName> fn_pdfs)
+{
+
+	FileName fn_comb=fn_pdf_out;
+	// check if fn_pdf_out occurs in fn_pdfs
+	if (std::find(fn_pdfs.begin(), fn_pdfs.end(), fn_pdf_out) != fn_pdfs.end())
+	{
+	  // Element in vector.
+		fn_comb.withoutExtension() + "_tmp_combine.pdf";
+	}
+
+	std::string command="gs -dNOPAUSE -sDEVICE=pdfwrite -sOUTPUTFILE=";
+	command += fn_comb;
+	command += " -dBATCH ";
+	for (int i = 0; i < fn_pdfs.size(); i++)
+		command += fn_pdfs[i] + " ";
+
+	command += " > /dev/null";
+
+	if (system(command.c_str()))
+	{
+		std::cerr << " ERROR in executing: " << command << "\n";
+		return false;
+	}
+
+	if (fn_comb != fn_pdf_out)
+	{
+		// First remove fn_pdf_out
+		if (std::remove(fn_pdf_out.c_str()))
+		{
+			std::cerr << "ERROR in removing pre-existing " << fn_pdf_out << ".\n";
+			return false;
+		}
+		// Then move fn_comb to fn_pdf_out
+		if (std::rename(fn_comb.c_str(), fn_pdf_out.c_str()))
+		{
+			std::cerr << "ERROR in renaming " << fn_comb << " to " << fn_pdf_out << ".\n";
+			return false;
+		}
+	}
+
+	return true;
+}
 
 CPlot2D::CPlot2D(std::string title)
 {
@@ -933,7 +985,7 @@ void CPlot2D::DrawLegendPostScript()
 
         double r,g,b;
         m_dataSets[i].GetDatasetColor(&r,&g,&b);
-		
+
 		if (m_dataSets[i].GetDatasetTitle() == "") continue;
 
         if (m_dataSets[i].GetDrawLine()) {
