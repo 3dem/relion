@@ -80,6 +80,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	int gen_section = parser.addSection("General options");
 	fn_in = parser.getOption("--i", "STAR file with all input micrographs, or a Linux wildcard with all micrographs to operate on");
 	fn_out = parser.getOption("--o", "Name for the output directory", "MotionCorr");
+	do_skip_logfile = parser.checkOption("--skip_logfile", "Skip generation of tracks-part of the logfile.pdf");
 	n_threads = textToInteger(parser.getOption("--j", "Number of threads per movie (= process)", "1"));
 	max_io_threads = textToInteger(parser.getOption("--max_io_threads", "Limit the number of IO threads.", "-1"));
 	continue_old = parser.checkOption("--only_do_unfinished", "Only run motion correction for those micrographs for which there is not yet an output micrograph.");
@@ -947,32 +948,44 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 			}
 		}
 	}
-	// Always calculate the new overall headers at the top of the PDF file
-	joinMultipleEPSIntoSinglePDF(fn_out + "header.pdf", all_fn_eps);
-
-	// Combine all EPS into a single logfile.pdf
-	// Only loop over fn_micrographs, not fn_ori_micrographs, so only the new ones for do_at_most or only_do_unfinished
-	all_fn_eps.clear();
-	FileName fn_prev="";
-	for (long int i = 0; i < fn_micrographs.size(); i++)
+	if (do_skip_logfile)
 	{
-		if (fn_prev != fn_micrographs[i].beforeLastOf("/"))
-		{
-			fn_prev = fn_micrographs[i].beforeLastOf("/");
-			all_fn_eps.push_back(fn_out + fn_prev+"/*.eps");
-		}
+
+		// Just have the overall headers only in the output PDF file
+		joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf", all_fn_eps);
+
 	}
+	else
+	{
 
-	joinMultipleEPSIntoSinglePDF(fn_out + "batch.pdf", all_fn_eps);
+		// Always calculate the new overall headers at the top of the PDF file
+		joinMultipleEPSIntoSinglePDF(fn_out + "header.pdf", all_fn_eps);
 
-	// Concatenate all PDFs of the batches
-	std::vector<FileName> fn_pdfs;
-	if (exists(fn_out + "all_batches.pdf")) fn_pdfs.push_back(fn_out + "all_batches.pdf");
-	fn_pdfs.push_back(fn_out + "batch.pdf");
-	concatenatePDFfiles(fn_out + "all_batches.pdf", fn_pdfs);
+		// Combine all EPS into a single logfile.pdf
+		// Only loop over fn_micrographs, not fn_ori_micrographs, so only the new ones for do_at_most or only_do_unfinished
+		all_fn_eps.clear();
+		FileName fn_prev="";
+		for (long int i = 0; i < fn_micrographs.size(); i++)
+		{
+			if (fn_prev != fn_micrographs[i].beforeLastOf("/"))
+			{
+				fn_prev = fn_micrographs[i].beforeLastOf("/");
+				all_fn_eps.push_back(fn_out + fn_prev+"/*.eps");
+			}
+		}
 
-	// Put header in front of comabined batches
-	concatenatePDFfiles(fn_out + "logfile.pdf", fn_out + "header.pdf", fn_out + "all_batches.pdf");
+		joinMultipleEPSIntoSinglePDF(fn_out + "batch.pdf", all_fn_eps);
+
+		// Concatenate all PDFs of the batches
+		std::vector<FileName> fn_pdfs;
+		if (exists(fn_out + "all_batches.pdf")) fn_pdfs.push_back(fn_out + "all_batches.pdf");
+		fn_pdfs.push_back(fn_out + "batch.pdf");
+		concatenatePDFfiles(fn_out + "all_batches.pdf", fn_pdfs);
+
+		// Put header in front of comabined batches
+		concatenatePDFfiles(fn_out + "logfile.pdf", fn_out + "header.pdf", fn_out + "all_batches.pdf");
+
+	}
 
 
 	if (verb > 0 )

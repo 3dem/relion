@@ -59,6 +59,9 @@ public:
 	// Information about the optics groups
 	ObservationModel obsModel;
 
+	// Skip generation of logfile
+	bool do_skip_logfile;
+
 	// Use our own implementation
 	bool do_own;
 	bool interpolate_shifts;
