@@ -148,9 +148,6 @@ public:
 	// Disable "Slower, more exhaustive search?" in CTFFIND 4.1.5-
 	bool do_fast_search;
 
-	// Skip generation of logfile
-	bool do_skip_logfile;
-
 	// Which GPU devices to use?
 	std::string gpu_ids;
 	std::vector < std::vector < std::string > > allThreadIDs;

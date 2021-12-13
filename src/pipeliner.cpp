@@ -783,7 +783,7 @@ void PipeLine::waitForJobToFinish(int current_job, bool &is_failure, bool &is_ab
 {
 	while (true)
 	{
-		sleep(10);
+		sleep(1);
 		checkProcessCompletion();
 		if (processList[current_job].status == PROC_FINISHED_SUCCESS ||
 		    processList[current_job].status == PROC_FINISHED_ABORTED ||

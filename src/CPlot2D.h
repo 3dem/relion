@@ -35,8 +35,13 @@
 /* SHWS: join multiple eps files into a single pdf
  *
  */
-
 void joinMultipleEPSIntoSinglePDF(FileName fn_pdf, std::vector<FileName> fn_eps);
+
+/* SHWS: concatenate multiple PDF files into a single one
+ *
+ */
+bool concatenatePDFfiles(FileName fn_pdf_out, FileName pdf1, FileName pdf2);
+bool concatenatePDFfiles(FileName fn_pdf_out, std::vector<FileName> fn_pdfs);
 
 /* EL: Including all of the std namespace on the global level both in this and
  *     every single file that includes this header will lead to ambiguous
@@ -862,7 +867,7 @@ void joinMultipleEPSIntoSinglePDF(FileName fn_pdf, std::vector<FileName> fn_eps)
       */
      bool GetDrawLegend();
 
-     /*! 
+     /*!
       Get and Set a flag that flips the orientation of the Y axis.
      */
      bool GetFlipY();

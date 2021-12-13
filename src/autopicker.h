@@ -117,9 +117,6 @@ public:
 	// Metadata of the micrographs
 	MetaDataTable MDmic;
 
-	// Skip generation of logfile
-	bool do_skip_logfile;
-
 	// Optics group information
 	ObservationModel obsModel;
 

@@ -47,9 +47,6 @@ public:
 	int n_threads;
 	int max_io_threads;
 
-	// Skip generation of logfile
-	bool do_skip_logfile;
-
 	// Output rootname
 	FileName fn_in, fn_out, fn_movie;
 
@@ -61,6 +58,9 @@ public:
 
 	// Information about the optics groups
 	ObservationModel obsModel;
+
+	// Skip generation of logfile
+	bool do_skip_logfile;
 
 	// Use our own implementation
 	bool do_own;
