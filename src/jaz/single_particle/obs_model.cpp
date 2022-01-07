@@ -59,7 +59,7 @@ ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt, bool do_die_
 		if (do_die_upon_error)
 		{
 			REPORT_ERROR_STR("ERROR: not all necessary variables defined in _optics.star file: "
-			              << "rlnPixelSize, rlnVoltage and rlnSphericalAberration. Make sure to convert older STAR files anew in version-3.1, "
+			              << "rlnVoltage, rlnSphericalAberration and one of rlnImagePixelSize, rlnMicrographPixelSize or rlnOriginalMicrographPixelSize. Make sure to convert older STAR files anew in version-3.1, "
 			              << "with relion_convert_star.");
 		}
 		else
