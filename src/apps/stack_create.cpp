@@ -32,11 +32,11 @@
 class stack_create_parameters
 {
 	public:
-   	FileName fn_star, fn_root, fn_ext;
+   	FileName fn_star, fn_root;
 	MetaDataTable MD;
 	// I/O Parser
 	IOParser parser;
-	bool do_spider, do_split_per_micrograph, do_apply_trans, do_apply_trans_only, do_ignore_optics, do_one_by_one;
+	bool do_split_per_micrograph, do_apply_trans, do_apply_trans_only, do_ignore_optics, do_one_by_one;
 	ObservationModel obsModel;
 
 	void usage()
@@ -51,7 +51,6 @@ class stack_create_parameters
 		int general_section = parser.addSection("General options");
 		fn_star = parser.getOption("--i", "Input STAR file with the images (as rlnImageName) to be saved in a stack");
 		fn_root = parser.getOption("--o", "Output rootname","output");
-		do_spider  = parser.checkOption("--spider_format", "Write out in SPIDER stack format (by default MRC stack format)");
 		do_split_per_micrograph = parser.checkOption("--split_per_micrograph", "Write out separate stacks for each micrograph (needs rlnMicrographName in STAR file)");
 		do_apply_trans = parser.checkOption("--apply_transformation", "Apply the inplane-transformations (needs _rlnOriginX/Y and _rlnAnglePsi in STAR file) by real space interpolation");
 		do_apply_trans_only = parser.checkOption("--apply_rounded_offsets_only", "Apply the rounded translations only (so-recentering without interpolation; needs _rlnOriginX/Y in STAR file)");
@@ -60,8 +59,6 @@ class stack_create_parameters
 
 		if (do_apply_trans)
 			std::cerr << "WARNING: --apply_transformation uses real space interpolation. It also invalidates CTF parameters (e.g. beam tilt & astigmatism). This can degrade the resolution. USE WITH CARE!!" << std::endl;
-
-		fn_ext = (do_spider) ? ".spi" : ".mrcs";
 
 		// Check for errors in the command-line option
 		if (parser.checkForErrors())
@@ -156,10 +153,10 @@ class stack_create_parameters
 			if (do_split_per_micrograph)
 			{
 				// Remove any extensions from micrograph names....
-				fn_out = fn_root + "_" + fn_mic.withoutExtension() + fn_ext;
+				fn_out = fn_root + "_" + fn_mic.withoutExtension() + ".mrcs";
 			}
 			else
-				fn_out = fn_root + fn_ext;
+				fn_out = fn_root + ".mrcs";
 
 			// Make all output directories if necessary
 			if (fn_out.contains("/"))

@@ -1508,7 +1508,7 @@ void MlOptimiser::initialise()
 	initialiseReferences();
 
         // Initialise the data_versus_prior ratio to get the initial current_size right
-        if (!do_initialise_bodies)
+        if (iter == 0 && !do_initialise_bodies)
             mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
 
 	// Write out initial mymodel

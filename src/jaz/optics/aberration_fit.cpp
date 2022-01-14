@@ -606,6 +606,8 @@ EvenData &EvenData::operator*=(double d)
 	Ayy *= d;
 	bx *= d;
 	by *= d;
+
+	return *this;
 }
 
 void EvenData::write(const RawImage<EvenData> &data, std::string filename)
@@ -686,6 +688,8 @@ OddData &OddData::operator*=(double d)
 {
 	a *= d;
 	b *= d;
+
+	return *this;
 }
 
 void OddData::write(const RawImage<OddData> &data, std::string filename)

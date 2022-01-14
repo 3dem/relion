@@ -790,11 +790,11 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 		MDsigma.setName("model_optics_group_"+integerToString(igroup+1));
 		for (int ii = 0; ii < XSIZE(sigma2_noise[igroup]); ii++)
 		{
-			MDsigma.addObject();
 			// Some points in sigma2_noise arrays are never used...
 			aux = sigma2_noise[igroup](ii);
 			if (aux > 0.)
 			{
+				MDsigma.addObject();
 				MDsigma.setValue(EMDL_SPECTRAL_IDX, ii);
 				MDsigma.setValue(EMDL_RESOLUTION, getResolution(ii));
 				MDsigma.setValue(EMDL_MLMODEL_SIGMA2_NOISE, aux);
