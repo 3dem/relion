@@ -6251,7 +6251,7 @@ void RelionJob::initialiseTomoSubtomoJob()
 	joboptions["cone_angle"] = JobOption("Cone angle:", 10, 1, 50, 1, "The (full) opening angle of the cone to be suppressed, given in degrees. This angle should include both the uncertainty about the membrane orientation and its variation across the region represented in the subtomogram.");
 
 	joboptions["do_float16"] = JobOption("Write output in float16?", true ,"If set to Yes, this program will write output images in float16 MRC format. This will save a factor of two in disk space compared to the default of writing in float32. Note that RELION and CCPEM will read float16 images, but other programs may not (yet) do so.");
-	joboptions["apply_angles"] = JobOption("Rotate volumes?", false ,"If set to Yes, rlnAngle<Rot/Tilt/Psi> orientations are added to rlnTomoSubtomogram<Rot/Tilt/Psi> to construct rotated volumes.");
+	joboptions["apply_angles"] = JobOption("Apply orientations?", false ,"If set to Yes, rlnAngle<Rot/Tilt/Psi> orientations are combined with rlnTomoSubtomogram<Rot/Tilt/Psi> to construct reference-oriented subtomos.");
 
 }
 

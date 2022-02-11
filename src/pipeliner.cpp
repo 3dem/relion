@@ -1884,6 +1884,10 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 		{
 			if (errno == EACCES) // interestingly, not EACCESS!
 				REPORT_ERROR("ERROR: PipeLine::read cannot create a lock directory " + dir_lock + ". You don't have write permission to this project. If you want to look at other's project directory (but run nothing there), please start RELION with --readonly.");
+			else if (errno == ENOSPC)
+				REPORT_ERROR("ERROR: PipeLine::read cannot create a lock directory " + dir_lock + ". There is not enough space on the disk to do so.");
+			else if (errno == EROFS)
+				REPORT_ERROR("ERROR: PipeLine::read cannot create a lock directory " + dir_lock + ". You are on a read-only file system.");
 
 			// If the lock exists: wait 3 seconds and try again
 			// Third time round, print a warning message; after 40 tries abort
