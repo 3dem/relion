@@ -730,7 +730,7 @@ void CPlot2D::ComputeLabelTickSpacing(double dataMin, double dataMax, double *pl
 
 
     if (axis=="x") {
-        sprintf(m_cXAxisLabelFormat,"%%.%df",nfrac);
+        snprintf(m_cXAxisLabelFormat, 20, "%%.%df",nfrac);
         char temp[20];
         m_iXAxisNumberOfLabels=0;
         for (double x=*plotMin; x<*plotMax+.5*d; x+=d) {
@@ -740,7 +740,7 @@ void CPlot2D::ComputeLabelTickSpacing(double dataMin, double dataMax, double *pl
         }
     }
     else if (axis=="y") {
-        sprintf(m_cYAxisLabelFormat,"%%.%df",nfrac);
+        snprintf(m_cYAxisLabelFormat, 20, "%%.%df",nfrac);
         char temp[20];
         m_iYAxisNumberOfLabels=0;
         for (double x=*plotMin; x<*plotMax+.5*d; x+=d) {

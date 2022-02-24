@@ -998,8 +998,8 @@ void joinMultipleEPSIntoSinglePDF(FileName fn_pdf, std::vector<FileName> fn_eps)
      int m_iYAxisNumberOfTicks; /*!< Number of tick marks along the y axis. */
      double m_dXAxisNumbersSpacing; /*!< Spacing between tick marks along the x axis. */
      double m_dYAxisNumbersSpacing; /*!< Spacing between tick marks along the y axis. */
-     char m_cXAxisLabelFormat[10]; /*!< Format of labels along the x axis. */
-     char m_cYAxisLabelFormat[10]; /*!< Format of labels along the y axis. */
+     char m_cXAxisLabelFormat[20]; /*!< Format of labels along the x axis. */
+     char m_cYAxisLabelFormat[20]; /*!< Format of labels along the y axis. */
      std::vector<std::string> m_strXAxisLabels; /*!< Labels along the x axis. */
      std::vector<std::string> m_strYAxisLabels; /*!< Labels along the y axis. */
      //Sjors Scheres 22mar2016: insert PlotTitle
