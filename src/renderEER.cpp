@@ -133,8 +133,8 @@ void EERRenderer::read(FileName _fn_movie, int eer_upsampling)
 
 	silenceTIFFWarnings();
 
-	// Try reading as TIFF; this handle is kept open
-	ftiff = TIFFOpen(fn_movie.c_str(), "r");
+	// Try reading as TIFF
+	TIFF *ftiff = TIFFOpen(fn_movie.c_str(), "r");
 
 	if (ftiff == NULL)
 	{
@@ -171,7 +171,7 @@ void EERRenderer::read(FileName _fn_movie, int eer_upsampling)
 
 		// Find the number of frames
 		nframes = TIFFNumberOfDirectories(ftiff);
-
+		TIFFClose(ftiff);
 #ifdef DEBUG_EER
 		printf("EER in TIFF: %s nframes = %d\n", fn_movie.c_str(), nframes);
 #endif
@@ -189,7 +189,7 @@ void EERRenderer::readLegacy(FILE *fh)
 	if (buf == NULL)
 		REPORT_ERROR("Failed to allocate the buffer.");
 	if (fread(buf, sizeof(char), file_size, fh) != file_size)
-		REPORT_ERROR("Failed to read the EER file.");
+		REPORT_ERROR("EERRenderer::readLegacy: Failed to read the expected size from " + fn_movie);
 	RCTOC(TIMING_READ_EER);
 
 	/* Build frame index */
@@ -228,6 +228,8 @@ void EERRenderer::lazyReadFrames()
 	{
 		if (!read_data) // cannot return from within omp critical
 		{	
+			TIFF *ftiff = TIFFOpen(fn_movie.c_str(), "r");
+
 			frame_starts.resize(nframes, 0);
 			frame_sizes.resize(nframes, 0);
 			buf = (unsigned char*)malloc(file_size); // This is big enough
