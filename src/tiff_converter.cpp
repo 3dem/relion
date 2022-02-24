@@ -138,7 +138,7 @@ void TIFFConverter::estimate(FileName fn_movie)
 				stable++;
 		}
 
-		printf(" %s Frame %03d #Changed %10d #Mismatch %10d, #Negative %10d, #Unreliable %10ld / %10ld\n",
+		printf(" %s Frame %03d #Changed %10d #Mismatch %10d, #Negative %10d, #Unreliable %10d / %10d\n",
 		       fn_movie.c_str(), iframe + 1, changed, error, negative, YXSIZE(defects()) - stable, YXSIZE(defects()));
 	}
 }
@@ -306,8 +306,7 @@ int TIFFConverter::checkMRCtype(FileName fn_movie)
 	// Check data type; Unfortunately I cannot do this through Image object.
 	FILE *mrcin = fopen(fn_movie.c_str(), "r");
 	int headers[25];
-	if (fread(headers, sizeof(int), 24, mrcin) != sizeof(int) * 24)
-		REPORT_ERROR("Failed to read the header of " + fn_movie);
+	fread(headers, sizeof(int), 24, mrcin);
 	fclose(mrcin);
 
 	return headers[3];
@@ -365,7 +364,7 @@ void TIFFConverter::initialise(int _rank, int _total_ranks)
 		REPORT_ERROR(fn_first + ": the input must be MRC, MRCS or EER files");
 
 	if (fn_out.contains("/"))
-		mktree(fn_out.beforeLastOf("/"));
+		system(("mkdir -p " + fn_out.beforeLastOf("/")).c_str());
 
 	if (EERRenderer::isEER(fn_first))
 	{
@@ -528,7 +527,7 @@ void TIFFConverter::run()
 		std::cout << std::endl;
 
 		if (fn_tiff.contains("/"))
-			mktree(fn_tiff.beforeLastOf("/"));
+			system(("mkdir -p " + fn_tiff.beforeLastOf("/")).c_str());
 
 		processOneMovie(fn_movie, fn_tiff);
 	}
