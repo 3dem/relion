@@ -13,7 +13,6 @@ class EERRenderer {
 	private:
 
 	FileName fn_movie;
-	TIFF *ftiff;
 
 	bool ready;
 	bool is_legacy;
