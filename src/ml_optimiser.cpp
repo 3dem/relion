@@ -3789,16 +3789,17 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
 	{
 		// calculate the random class for these SomeParticles
 		exp_random_class_some_particles.clear();
-		init_random_generator(random_seed);
 		if (!do_som) {
 			for (long int part_id = my_first_part_id; part_id <= my_last_part_id; part_id++) {
-				int random_class = rand() % mymodel.nr_classes;
+                                init_random_generator(random_seed + part_id);
+                                int random_class = rand() % mymodel.nr_classes;
 				exp_random_class_some_particles.push_back(random_class);
 			}
 		}
 		else {
 			std::vector<unsigned> nodes = mymodel.som.get_all_nodes();
 			for (long int part_id = my_first_part_id; part_id <= my_last_part_id; part_id++) {
+                                init_random_generator(random_seed + part_id);
 				int random_node = rand() % nodes.size();
 				exp_random_class_some_particles.push_back(nodes[random_node]);
 			}
