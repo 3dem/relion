@@ -66,7 +66,7 @@ public:
 		fn_mask = parser.getOption("--mask", "Mask that will be applied to the input map prior to making projections", "");
 		fn_ang = parser.getOption("--ang", "Particle STAR file with orientations and CTF for multiple projections (if None, assume single projection)", "None");
 		nr_uniform = textToInteger(parser.getOption("--nr_uniform", " OR get this many random samples from a uniform angular distribution", "-1"));
-		sigma_offset = textToFloat(parser.getOption("--sigma_offset", "Apply Gaussian errors with this stddev to the XY-offsets", "0"));
+		sigma_offset = textToFloat(parser.getOption("--sigma_offset", "Apply Gaussian errors (A) with this stddev to the XY-offsets", "0"));
 		rot = textToFloat(parser.getOption("--rot", "First Euler angle (for a single projection)", "0"));
 		tilt = textToFloat(parser.getOption("--tilt", "Second Euler angle (for a single projection)", "0"));
 		psi = textToFloat(parser.getOption("--psi", "Third Euler angle (for a single projection)", "0"));
@@ -157,8 +157,8 @@ public:
 				MDang.setValue(EMDL_ORIENT_ROT, rot);
 				MDang.setValue(EMDL_ORIENT_TILT, tilt);
 				MDang.setValue(EMDL_ORIENT_PSI, psi);
-				MDang.setValue(EMDL_ORIENT_ORIGIN_X, xoff);
-				MDang.setValue(EMDL_ORIENT_ORIGIN_Y, yoff);
+				MDang.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff);
+				MDang.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff);
 				MDang.setValue(EMDL_IMAGE_OPTICS_GROUP, 1);
 			}
 
