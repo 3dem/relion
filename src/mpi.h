@@ -63,6 +63,8 @@
 #define MPITAG_INT 7
 #define MPITAG_IDENTIFIER 8
 #define MPITAG_BCAST 9
+#define MPITAG_WAIT 10
+#define MPITAG_STOP 11
 
 /** Class to wrapp some MPI common calls in an work node.
 *
