@@ -146,8 +146,10 @@ void SubtomoProgram::run()
 
 	initialise(particleSet, particles, tomogramSet);
 
-	if (restore_angles)
+	if (restore_angles)		
+	{
 		exit(RELION_EXIT_SUCCESS);
+	}
 
 
 	BufferedImage<float> sum_data, sum_weights;
@@ -537,10 +539,15 @@ void SubtomoProgram::processTomograms(
 				if (!isVisible[f]) continue;
 
 				d3Matrix A;
+
 				if (apply_angles)
+				{
 					A = particleSet.getMatrix3x3(part_id);
+				}
 				else
+				{
 					A = particleSet.getSubtomogramMatrix(part_id);
+				}
 
 				projPart[f] = projCut[f] * d4Matrix(A);
 

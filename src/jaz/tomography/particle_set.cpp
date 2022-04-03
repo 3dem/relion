@@ -249,8 +249,10 @@ d3Vector ParticleSet::getPosition(ParticleIndex particle_id) const
 	const int og = getOpticsGroup(particle_id);
 	
 	const double originalPixelSize = optTable.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, og);
-	
-	d3Vector out = pos - off / originalPixelSize;
+
+	const d3Matrix A_subtomogram = getSubtomogramMatrix(particle_id);
+
+	d3Vector out = pos - (A_subtomogram * off) / originalPixelSize;
 	
 	out.x += 1.0;
 	out.y += 1.0;
@@ -305,6 +307,8 @@ d3Matrix ParticleSet::getMatrix3x3(ParticleIndex particle_id) const
 	return A_subtomogram * A_particle;
 }
 
+
+// This maps coordinates from particle space to tomogram space.
 d4Matrix ParticleSet::getMatrix4x4(ParticleIndex particle_id, double w, double h, double d) const
 {
 	d3Matrix A = getMatrix3x3(particle_id);
@@ -321,9 +325,9 @@ d4Matrix ParticleSet::getMatrix4x4(ParticleIndex particle_id, double w, double h
 		0, 0, 0, 1);
 	
 	d4Matrix R(
-		A(0,0), A(0,1), A(0,2), pos.x, 
-		A(1,0), A(1,1), A(1,2), pos.y, 
-		A(2,0), A(2,1), A(2,2), pos.z, 
+		A(0,0), A(0,1), A(0,2), 0.0,
+		A(1,0), A(1,1), A(1,2), 0.0,
+		A(2,0), A(2,1), A(2,2), 0.0,
 		0.0,    0.0,    0.0,    1.0   );
 	
 	d4Matrix Ts(
