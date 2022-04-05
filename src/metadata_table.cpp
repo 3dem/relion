@@ -1978,6 +1978,7 @@ MetaDataTable subsetMetaDataTable(MetaDataTable &MDin, EMDLabel label, std::stri
 		REPORT_ERROR("subsetMetadataTable ERROR: input MetaDataTable does not contain label: " +  EMDL::label2Str(label));
 
 	MetaDataTable MDout;
+    MDout.setName(MDin.getName());
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
 	{
 		std::string val;
@@ -2096,3 +2097,5 @@ MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label,
 
 	return MDout;
 }
+
+

@@ -604,6 +604,7 @@ enum EMDLabel
 
 	EMDL_TOMO_NAME,
 	EMDL_TOMO_TILT_SERIES_NAME,
+    EMDL_TOMO_TILT_SERIES_STARFILE,
 	EMDL_TOMO_FRAME_COUNT,
 	EMDL_TOMO_SIZE_X,
 	EMDL_TOMO_SIZE_Y,
@@ -1286,6 +1287,7 @@ private:
 
 		EMDL::addLabel(EMDL_TOMO_NAME, EMDL_STRING, "rlnTomoName", "Arbitrary name for a tomogram");
 		EMDL::addLabel(EMDL_TOMO_TILT_SERIES_NAME, EMDL_STRING, "rlnTomoTiltSeriesName", "Tilt series file name");
+        EMDL::addLabel(EMDL_TOMO_TILT_SERIES_STARFILE, EMDL_STRING, "rlnTomoTiltSeriesStarFile", "Tilt series starfile");
 		EMDL::addLabel(EMDL_TOMO_FRAME_COUNT, EMDL_INT, "rlnTomoFrameCount", "Number of tilts in a tilt series");
 		EMDL::addLabel(EMDL_TOMO_SIZE_X, EMDL_INT, "rlnTomoSizeX", "Width of a bin-1 tomogram in pixels");
 		EMDL::addLabel(EMDL_TOMO_SIZE_Y, EMDL_INT, "rlnTomoSizeY", "Height of a bin-1 tomogram in pixels");

@@ -931,6 +931,52 @@ void ObservationModel::sortOpticsGroups(MetaDataTable& partMdt)
 	}
 }
 
+void ObservationModel::removeUnusedOpticsGroups(MetaDataTable& partMdt)
+{
+    std::set<int> usedGroups;
+	for (long int i = 0; i < partMdt.numberOfObjects(); i++)
+	{
+		int og;
+		partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, i);
+        if (usedGroups.find(og) == usedGroups.end())
+		{
+			usedGroups.insert(og);
+		}
+	}
+
+    // Now renumber the remaining optics groups
+	std::map<int,int> old2new;
+    int found = 0;
+    for (int i = 0; i < opticsMdt.numberOfObjects(); i++)
+	{
+		int og;
+		opticsMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, i);
+        if (usedGroups.find(og) == usedGroups.end())
+        {
+            old2new[og] = -1;
+        }
+        else
+        {
+            old2new[og] = found + 1;
+            found++;
+        }
+
+		opticsMdt.setValue(EMDL_IMAGE_OPTICS_GROUP, old2new[og], i);
+	}
+
+    // Remove all unused optics groups from the opticsMdt
+    opticsMdt = subsetMetaDataTable(opticsMdt, EMDL_IMAGE_OPTICS_GROUP, 1, 99999);
+
+    // Change all optics_groups entries in the particle table
+	for (long int i = 0; i < partMdt.numberOfObjects(); i++)
+	{
+		int og;
+		partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, i);
+		partMdt.setValue(EMDL_IMAGE_OPTICS_GROUP, old2new[og], i);
+	}
+
+}
+
 std::vector<int> ObservationModel::getOptGroupsPresent_oneBased(const MetaDataTable& partMdt) const
 {
 	const int gc = opticsMdt.numberOfObjects();

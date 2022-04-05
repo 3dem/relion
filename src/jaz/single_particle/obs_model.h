@@ -219,6 +219,10 @@ class ObservationModel
 		   (Merely changing the order in opticsMdt would fail if groups were missing.) */
 		void sortOpticsGroups(MetaDataTable& partMdt);
 
+        /* Remove unused optics groups, e.g. after a subset of the particles have been selected
+           and also renumber the groups in the particle table partMdt */
+        void removeUnusedOpticsGroups(MetaDataTable& partMdt);
+
 		/* Return the set of optics groups present in partMdt */
 		std::vector<int> getOptGroupsPresent_oneBased(const MetaDataTable& partMdt) const;
 

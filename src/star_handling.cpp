@@ -328,4 +328,3 @@ void combineStarfiles(std::vector<FileName> &fns_in,
     MDout.setName(MDin0.getName());
 
 }
-
