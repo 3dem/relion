@@ -22,16 +22,120 @@
 #define RELION_TOMO_MODEL_H
 
 #include "src/metadata_table.h"
+#include "src/star_handling.h"
 #include <src/jaz/single_particle/obs_model.h>
+
+class ExpTiltImage
+{
+public:
+
+    // ID of this tiltimage inside its own tiltserie
+	long int id;
+
+    // ID of the tiltserie that this tiltimage came from
+	long int tiltseries_id;
+
+    // Optics group of the image
+    int optics_group;
+
+    // Empty Constructor
+	ExpTiltImage() {}
+
+	// Destructor needed for work with vectors
+	~ExpTiltImage() {}
+
+	// Copy constructor needed for work with vectors
+	ExpTiltImage(ExpTiltImage const& copy)
+	{
+		id = copy.id;
+        tiltseries_id = copy.tiltseries_id;
+        optics_group = copy.optics_group;
+	}
+
+	// Define assignment operator in terms of the copy constructor
+	ExpTiltImage& operator=(ExpTiltImage const& copy)
+	{
+		id = copy.id;
+		tiltseries_id = copy.tiltseries_id;
+        optics_group = copy.optics_group;
+		return *this;
+	}
+
+};
+
+class ExpTiltSerie
+{
+public:
+    // All tiltimages in the tiltserie
+    std::vector<ExpTiltImage> tiltimages;
+
+	// ID of the tiltserie
+	long int id;
+
+    // Name of the tiltserie (by this name it will be recognised upon reading)
+	std::string name;
+
+    // Observation model holding the data for all optics groups
+    ObservationModel obsModel;
+
+    // table with all the metadata
+    MetaDataTable MDtiltimages;
+
+	// Empty Constructor
+	ExpTiltSerie() {}
+
+	// Destructor needed for work with vectors
+	~ExpTiltSerie() {}
+
+	// Copy constructor needed for work with vectors
+	ExpTiltSerie(ExpTiltSerie const& copy)
+	{
+		tiltimages = copy.tiltimages;
+        id = copy.id;
+		name = copy.name;
+        obsModel = copy.obsModel;
+        MDtiltimages = copy.MDtiltimages;
+	}
+
+	// Define assignment operator in terms of the copy constructor
+	ExpTiltSerie& operator=(ExpTiltSerie const& copy)
+	{
+        tiltimages = copy.tiltimages;
+        id = copy.id;
+		name = copy.name;
+        obsModel = copy.obsModel;
+        MDtiltimages = copy.MDtiltimages;
+		return *this;
+	}
+    long int numberOfTiltImages()
+    {
+        return MDtiltimages.numberOfObjects();
+    }
+
+    // Calculate the total number of optics groups in this tiltserie
+    int numberOfOpticsGroups()
+    {
+        return obsModel.numberOfOpticsGroups();
+    }
+
+    // Get the pixel size for this optics group
+    RFLOAT getOpticsPixelSize(int optics_group);
+
+    // Get the original image size for this optics group
+    int getOpticsImageSize(int optics_group);
+
+
+};
+
 
 class TomographyExperiment
 {
 public:
-    // All groups in the experiment
-    std::vector<Tomogram> tomograms;
+    // All tiltseries in the experiment
+    std::vector<ExpTiltSerie> tiltseries;
 
-    // Observation model holding the data for all optics groups
-    ObservationModel obsModel;
+    // Metadata table with information about all tiltseries
+    MetaDataTable MDtiltseries;
 
     // Empty Constructor
     TomographyExperiment()
@@ -46,74 +150,30 @@ public:
 
     void clear()
     {
-        tomograms.clear();
+        tiltseries.clear();
+        MDtiltseries.clear();
     }
 
-    // Calculate the total number of tomograms in this tomography experiment
-    long int numberOfTomograms()
-    {
-        return tomograms.size();
-    }
-
-    // Calculate the total number of tilt series images in this tomography experiment
-    long int numberOfTiltSeriesImages();
-
-    // Calculate the total number of optics groups in this experiment
-    int numberOfOpticsGroups()
-    {
-        return obsModel.numberOfOpticsGroups();
-    }
-
-    // Get the pixel size for this optics group
-    RFLOAT getOpticsPixelSize(int optics_group);
-
-    // Get the original image size for this optics group
-    int getOpticsImageSize(int optics_group);
-
-    // Get the random_subset for this particle
-    int getRandomSubset(long int part_id);
-
-    // Get the group_id for the N'th image for this particle
-    long int getGroupId(long int part_id, int img_id);
-
-    // Get the optics group to which the N'th image for this particle belongs
-    int getOpticsGroup(long int part_id, int img_id);
-
-    // Get the original position in the input STAR file for the N'th image for this particle
-    int getOriginalImageId(long int part_id, int img_id);
-
-    // Get the pixel size for the N-th image of this particle
-    RFLOAT getImagePixelSize(long int part_id, int img_id);
-
-    // Get the vector of number of images per group_id
-    void getNumberOfImagesPerGroup(std::vector<long int> &nr_particles_per_group, int random_subset = 0);
-
-    // Get the vector of number of images per group_id
-    void getNumberOfImagesPerOpticsGroup(std::vector<long int> &nr_particles_per_group, int random_subset = 0);
-
-    // Get the metadata-row for this image in a separate MetaDataTable
-    MetaDataTable getMetaDataImage(long int part_id, int img_id);
-
-    // Which micrograph (or tomogram) doe this particle image comes from?
-    FileName getMicrographName(long int ori_img_id);
-    FileName getMicrographName(long int part_id, int img_id);
-
-    // Add a particle
-    long int addParticle(std::string part_name, int random_subset = 0);
-
-    // Add an image to the given particle
-    int addImageToParticle(long int part_id, std::string img_name, long int ori_img_id, long int group_id,
-                           int optics_group, bool unique);
-
-    // Add a group
-    long int addGroup(std::string mic_name, int optics_group);
-
-    // Read from file
-    void read(FileName fn_in, int verb = 0);
+    // Read from file, return false if this is not a TomographyExperiment
+    bool read(FileName fn_in, int verb = 0);
 
     // Write to file
     void write(FileName fn_root);
 
+    // Calculate the total number of tiltseries in this tomography experiment
+    long int numberOfTiltseries()
+    {
+        return tiltseries.size();
+    }
+
+    // Calculate the total number of tilt series images in this tomography experiment
+    long int numberOfTiltImages();
+
+    // Make one big metadatatable with all movies/micrographs (to be used for motioncorr and ctffind runners)
+    void generateSingleMetaDataTable(MetaDataTable &MDout, ObservationModel &obsModel);
+
+    // Convert back from one big metadatatable into separate STAR files for each tilt serie
+    void convertBackFromSingleMetaDataTable(MetaDataTable &MDin, ObservationModel &obsModel);
 };
 
 #endif //RELION_TOMO_MODEL_H
