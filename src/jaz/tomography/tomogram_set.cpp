@@ -20,50 +20,128 @@ TomogramSet::TomogramSet()
 
 TomogramSet::TomogramSet(std::string filename, bool verbose)
 {
-	std::ifstream ifs(filename);
+    if (!read(filename, verbose))
+    {
+        // This may be a tomograms.star file in the old, original relion-4.0 format. Try to convert
+        // TODO: make conversion from old tomograms.star to new tilt_series.star!
 
-	bool namesAreOld = false;
+        std::ifstream ifs(filename);
+        if (!ifs)
+        {
+            REPORT_ERROR_STR("TomogramSet::TomogramSet: Unable to read " << filename);
+        }
+        else
+        {
+            globalTable.readStar(ifs, "global");
 
-	if (!ifs)
-	{
-		REPORT_ERROR_STR("TomogramSet::TomogramSet: Unable to read " << filename);
-	}
-	else
-	{
-		globalTable.readStar(ifs, "global");
-		
-		const int tc = globalTable.numberOfObjects();
-		
-		tomogramTables.resize(tc);
-		
-		std::vector<MetaDataTable> allTables = MetaDataTable::readAll(ifs, tc+1);
-		
-		for (int t = 0; t < tc; t++)
-		{
-			const std::string expectedOldName = "tomo_" + ZIO::itoa(t);
-			const std::string expectedNewName = globalTable.getString(EMDL_TOMO_NAME, t);
-			const std::string name = allTables[t+1].getName();
+            if (!globalTable.containsLabel(EMDL_TOMO_NAME))
+            {
+                REPORT_ERROR("ERROR: input starfile for TomogramSet " + filename + " does not contain rlnTomoName label ");
+            }
 
-			if (name == expectedOldName)
-			{
-				namesAreOld = true;
-			}
-			else if (name != expectedNewName)
-			{
-				REPORT_ERROR_STR("TomogramSet::TomogramSet: file is corrupted " << filename);
-			}
+            // remove information from optics groups and move into globalObsModel
+            ObservationModel globalObsModel(globalTable);
+            globalTable.deactivateLabel(EMDL_IMAGE_OPTICS_GROUP_NAME);
+            globalTable.deactivateLabel(EMDL_IMAGE_OPTICS_GROUP);
+            globalTable.deactivateLabel(EMDL_CTF_CS);
+            globalTable.deactivateLabel(EMDL_CTF_VOLTAGE);
+            globalTable.deactivateLabel(EMDL_CTF_Q0);
 
-			tomogramTables[t] = allTables[t+1];
-			tomogramTables[t].setName(expectedNewName);
-		}	
-	}
-	
-	globalTable.setName("global");
+            const int tc = globalTable.numberOfObjects();
 
-	if (verbose && namesAreOld)
-	{
-		Log::warn("Tomogram set " + filename + " is out of date. You are recommended to run relion_exp_update_tomogram_set on it.");
-	}
+            tomogramTables.resize(tc);
+            tomogramObsModels.resize(tc);
+            tomogramNames.resize(tc);
+
+            std::vector<MetaDataTable> allTables = MetaDataTable::readAll(ifs, tc+1);
+
+            for (int t = 0; t < tc; t++)
+            {
+                const std::string expectedNewName = globalTable.getString(EMDL_TOMO_NAME, t);
+                const std::string name = allTables[t+1].getName();
+
+                if (name != expectedNewName)
+                {
+                    REPORT_ERROR_STR("TomogramSet::TomogramSet: file is corrupted " << filename);
+                }
+
+                tomogramTables[t] = allTables[t+1];
+                tomogramTables[t].setName("tilt_images");
+                tomogramObsModels[t] = globalObsModel;
+                tomogramNames[t] = expectedNewName;
+            }
+        }
+
+    }
+
+    globalTable.setName("global");
+
+}
+
+bool TomogramSet::read(std::string filename, bool verbose)
+{
+
+    globalTable.read(filename, "global");
+
+    const int tc = globalTable.numberOfObjects();
+
+    if (tc == 0) return false;
+
+    if (!globalTable.containsLabel(EMDL_TOMO_TILT_SERIES_STARFILE))
+    {
+        std::cerr << "Warning: " << filename
+                  << " does not have rlnTomoTiltSeriesStarFile labels. It may be written in an old format. If so, will try to convert ..."
+                  << std::endl;
+        return false;
+    }
+
+    if (!globalTable.containsLabel(EMDL_TOMO_NAME))
+    {
+        REPORT_ERROR("ERROR: input starfile for TomogramSet " + filename + " does not contain rlnTomoName label ");
+    }
+
+    tomogramTables.resize(tc);
+    tomogramObsModels.resize(tc);
+    tomogramNames.resize(tc);
+
+    for (int t = 0; t < tc; t++)
+    {
+        tomogramNames[t] = globalTable.getString(EMDL_TOMO_NAME, t);
+        std::string fn_star = globalTable.getString(EMDL_TOMO_TILT_SERIES_STARFILE, t);
+        ObservationModel::loadSafely(fn_star, tomogramObsModels[t], tomogramTables[t], "tilt_images", verbose);
+        // Make sure tilt images are sorted on their index (used to convert back from single large metadatatable)
+        tomogramTables[t].newSort(EMDL_TOMO_TILT_MOVIE_INDEX);
+    }
+
+    return true;
+
+}
+
+void TomogramSet::write(FileName filename)
+{
+    FileName fn_outdir = filename.beforeLastOf("/") + "/";
+
+    const int tc = tomogramTables.size();
+
+    // Change all the filenames in tomograms.star
+    for (int t = 0; t < tc; t++)
+    {
+        FileName fn_star;
+        globalTable.getValue(EMDL_TOMO_TILT_SERIES_STARFILE, fn_star, t);
+        FileName fn_newstar = getOutputFileWithNewUniqueDate(fn_star, fn_outdir);
+        globalTable.setValue(EMDL_TOMO_TILT_SERIES_STARFILE, fn_newstar, t);
+
+        // Create output directory if necessary
+        FileName newdir = fn_newstar.beforeLastOf("/");
+        if (!exists(newdir)) mktree(newdir);
+
+        // Write the individual tomogram starfile
+        tomogramObsModels[t].save(tomogramTables[t], fn_newstar, "tilt_images");
+    }
+
+    // Also write the (now modified with fn_newstars) tilt_series.star file in the root directory
+    globalTable.write(filename);
+
 }
 
 Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
@@ -314,31 +392,6 @@ int TomogramSet::size() const
 	return tomogramTables.size();
 }
 
-void TomogramSet::write(std::string filename) const
-{
-	const int tc = tomogramTables.size();
-
-	if (filename.find_last_of('/') != std::string::npos)
-	{
-		std::string path = filename.substr(0, filename.find_last_of('/'));
-		mktree(path);
-	}
-
-	std::ofstream ofs(filename);
-	
-	if (!ofs)
-	{
-		REPORT_ERROR("TomogramSet::write: unable to write to "+filename);
-	}
-	
-	globalTable.write(ofs);
-
-	for (int t = 0; t < tc; t++)
-	{
-		tomogramTables[t].write(ofs);
-	}
-}
-
 void TomogramSet::setProjections(int tomogramIndex, const std::vector<d4Matrix>& proj)
 {
 	MetaDataTable& m = tomogramTables[tomogramIndex];
@@ -506,4 +559,46 @@ std::string TomogramSet::getOpticsGroupName(int index) const
 	{
 		return globalTable.getString(EMDL_IMAGE_OPTICS_GROUP_NAME, index);
 	}
+}
+
+void TomogramSet::generateSingleMetaDataTable(MetaDataTable &MDout, ObservationModel &obsModel)
+{
+    std::vector<FileName> fn_stars;
+    for (long int t = 0; t < globalTable.numberOfObjects(); t++)
+    {
+        FileName fn_star = globalTable.getString(EMDL_TOMO_TILT_SERIES_STARFILE, t);
+        fn_stars.push_back(fn_star);
+    }
+
+    combineStarfiles(fn_stars, MDout, obsModel);
+
+}
+
+void TomogramSet::convertBackFromSingleMetaDataTable(MetaDataTable &MDin, ObservationModel &obsModel)
+{
+    if (!MDin.containsLabel(EMDL_TOMO_TILT_MOVIE_INDEX))
+    {
+        REPORT_ERROR("BUG: the MDin that is passed to TomogramSet::convertBackFromSingleMetaDataTable should contain a rlnTomoTiltMovieIndex label");
+    }
+
+    for (long int t = 0; t < globalTable.numberOfObjects(); t++)
+    {
+        tomogramObsModels[t] = obsModel;
+        MetaDataTable MDjoin = subsetMetaDataTable(MDin, EMDL_TOMO_NAME, tomogramNames[t], false);
+
+        MDjoin.newSort(EMDL_TOMO_TILT_MOVIE_INDEX);
+
+        if (MDjoin.numberOfObjects() != tomogramTables[t].numberOfObjects())
+        {
+            REPORT_ERROR("ERROR: unequal number of Objects in tiltserie starfiles");
+        }
+
+        FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDjoin)
+        {
+            tomogramTables[t].setObject(MDjoin.getObject(), current_object);
+        }
+
+        tomogramObsModels[t].removeUnusedOpticsGroups(tomogramTables[t]);
+
+    }
 }

@@ -521,7 +521,7 @@ void JobWindow::initialiseMotioncorrWindow()
 	tab1->label("I/O");
 	resetHeight();
 
-    if (is_tomo) place("input_tilt_series", TOGGLE_DEACTIVATE);
+    if (is_tomo) place("input_tomograms", TOGGLE_DEACTIVATE);
 	else place("input_star_mics", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
@@ -590,7 +590,7 @@ void JobWindow::initialiseCtffindWindow()
 	tab1->label("I/O");
 	resetHeight();
 
-    if (is_tomo) place("input_tilt_series", TOGGLE_DEACTIVATE);
+    if (is_tomo) place("input_tomograms", TOGGLE_DEACTIVATE);
 	else place("input_star_mics", TOGGLE_DEACTIVATE);
 	place("use_noDW", TOGGLE_DEACTIVATE);
 

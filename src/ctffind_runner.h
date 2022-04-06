@@ -28,10 +28,10 @@
 #include  <unistd.h>
 #include  <stdio.h>
 #include <src/metadata_table.h>
-#include <src/tomo_model.h>
 #include <src/image.h>
 #include <src/time.h>
 #include <src/jaz/single_particle/obs_model.h>
+#include "src/jaz/tomography/tomogram_set.h"
 
 class CtffindRunner
 {
@@ -68,7 +68,7 @@ public:
     bool is_tomo;
 
     // Information about tomography experiment
-    TomographyExperiment tomo_model;
+    TomogramSet tomogramSet;
 
 	// Dimension of squared area of the micrograph to use for CTF estimation
 	int ctf_win;

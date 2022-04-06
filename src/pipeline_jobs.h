@@ -333,8 +333,6 @@ static bool do_allow_change_minimum_dedicated;
 #define OUTNODE_TOMO_HALFMAP			207
 #define OUTNODE_TOMO_POST				208
 #define OUTNODE_TOMO_POST_LOG			209
-#define OUTNODE_TOMO_TILT_SERIES		210
-
 
 #define LABEL_MOVIES_CPIPE             "MicrographMoviesData.star.relion"
 #define LABEL_MICS_CPIPE               "MicrographsData.star.relion"
@@ -422,7 +420,6 @@ static bool do_allow_change_minimum_dedicated;
 #define LABEL_TOMO_HALFMAP             "DensityMap.mrc.relion.tomo.halfmap"
 #define LABEL_TOMO_POST                "ProcessData.star.relion.tomo.postprocess"
 #define LABEL_TOMO_POST_LOG            "LogFile.pdf.relion.tomo.postprocess"
-#define LABEL_TOMO_TILT_SERIES         "ProcessData.star.relion.tomo.tiltseries_set"
 
 static std::map<int, std::string> node_type2pipeliner_label = {{NODE_MOVIES_CPIPE, LABEL_MOVIES_CPIPE},
 	{NODE_MICS_CPIPE, LABEL_MICS_CPIPE},
@@ -508,8 +505,7 @@ static std::map<int, std::string> node_type2pipeliner_label = {{NODE_MOVIES_CPIP
 	{OUTNODE_TOMO_MAP, LABEL_TOMO_MAP},
 	{OUTNODE_TOMO_HALFMAP, LABEL_TOMO_HALFMAP},
 	{OUTNODE_TOMO_POST, LABEL_TOMO_POST},
-	{OUTNODE_TOMO_POST_LOG, LABEL_TOMO_POST_LOG},
-    {OUTNODE_TOMO_TILT_SERIES, LABEL_TOMO_TILT_SERIES}};
+	{OUTNODE_TOMO_POST_LOG, LABEL_TOMO_POST_LOG}};
 
 
 static std::map<std::string, int> pipeliner_label2type = {{LABEL_MOVIES_CPIPE, NODE_MOVIES_CPIPE},
@@ -596,8 +592,7 @@ static std::map<std::string, int> pipeliner_label2type = {{LABEL_MOVIES_CPIPE, N
 	{LABEL_TOMO_MAP, OUTNODE_TOMO_MAP},
 	{LABEL_TOMO_HALFMAP, OUTNODE_TOMO_HALFMAP},
 	{LABEL_TOMO_POST, OUTNODE_TOMO_POST},
-	{LABEL_TOMO_POST_LOG, OUTNODE_TOMO_POST_LOG},
-    {LABEL_TOMO_TILT_SERIES, OUTNODE_TOMO_TILT_SERIES}};
+	{LABEL_TOMO_POST_LOG, OUTNODE_TOMO_POST_LOG}};
 
 //// Conversion dict for CCPEM-pipeliner compatibility
 static std::map<std::string, int> node_label2type = {{NODE_MOVIES_LABEL, NODE_MOVIES},

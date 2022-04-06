@@ -146,10 +146,10 @@ void CtffindRunner::initialise(bool is_leader)
 		MetaDataTable MDin;
 
         // Check if this is a TomographyExperiment starfile, and if so, unpack into one large metadatatable
-        if (tomo_model.read(fn_in, 1))
+        if (tomogramSet.read(fn_in, 1))
         {
             is_tomo = true;
-            tomo_model.generateSingleMetaDataTable(MDin, obsModel);
+            tomogramSet.generateSingleMetaDataTable(MDin, obsModel);
         }
         else
         {
@@ -509,8 +509,8 @@ void CtffindRunner::joinCtffindResults()
 
     if (is_tomo)
     {
-        tomo_model.convertBackFromSingleMetaDataTable(MDctf, obsModel);
-        tomo_model.write(fn_out);
+        tomogramSet.convertBackFromSingleMetaDataTable(MDctf, obsModel);
+        tomogramSet.write(fn_out);
     }
     else
     {

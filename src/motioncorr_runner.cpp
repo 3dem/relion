@@ -239,11 +239,11 @@ void MotioncorrRunner::initialise()
         MetaDataTable MDin;
 
         // Check if this is a TomographyExperiment starfile, and if so, unpack into one large metadatatable
-        if (tomo_model.read(fn_in, 1))
+        if (tomogramSet.read(fn_in, 1))
         {
             std::cerr <<"is_tomo"<<std::endl;
             is_tomo = true;
-            tomo_model.generateSingleMetaDataTable(MDin, obsModel);
+            tomogramSet.generateSingleMetaDataTable(MDin, obsModel);
         }
         else
         {
@@ -952,8 +952,8 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 	}
 	if (is_tomo)
     {
-        tomo_model.convertBackFromSingleMetaDataTable(MDavg, obsModel);
-        tomo_model.write(fn_out);
+        tomogramSet.convertBackFromSingleMetaDataTable(MDavg, obsModel);
+        tomogramSet.write(fn_out+"corrected_tomograms.star");
     }
     else
     {
@@ -964,7 +964,7 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 	{
 		progress_bar(fn_ori_micrographs.size());
 
-		if (is_tomo) std::cout << " Done! Written: " << fn_out << "tilt_series.star" << std::endl;
+		if (is_tomo) std::cout << " Done! Written: " << fn_out << "corrected_tomograms.star" << std::endl;
         else std::cout << " Done! Written: " << fn_out << "corrected_micrographs.star" << std::endl;
 	}
 

@@ -31,8 +31,8 @@
 #include "src/metadata_table.h"
 #include "src/image.h"
 #include "src/micrograph_model.h"
-#include "src/tomo_model.h"
 #include <src/jaz/single_particle/obs_model.h>
+#include "src/jaz/tomography/tomogram_set.h"
 
 class MotioncorrRunner
 {
@@ -70,7 +70,7 @@ public:
     bool is_tomo;
 
     // Information about tomography experiment
-    TomographyExperiment tomo_model;
+    TomogramSet tomogramSet;
 
     // Skip generation of logfile
 	bool do_skip_logfile;

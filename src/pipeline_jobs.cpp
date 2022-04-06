@@ -1367,7 +1367,7 @@ void RelionJob::initialiseMotioncorrJob()
 
     if (is_tomo)
     {
-        joboptions["input_tilt_series"] = JobOption("Input tilt series set: ", OUTNODE_TOMO_TILT_SERIES, "", "Tilt series set STAR file (tilt_series.star)", "Input tomo tilt series set. Generated from CCPEM Import functionality...");
+        joboptions["input_tomograms"] = JobOption("Input tilt series set: ", OUTNODE_TOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "Input tomogram set.");
     }
     else
     {
@@ -1432,13 +1432,13 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 	// I/O
     if (is_tomo)
     {
-        if (joboptions["input_tilt_series"].getString() == "")
+        if (joboptions["input_tomograms"].getString() == "")
         {
             error_message = "ERROR: empty field for input tilt series STAR file...";
             return false;
         }
-        command += " --i " + joboptions["input_tilt_series"].getString();
-        Node node(joboptions["input_tilt_series"].getString(), joboptions["input_tilt_series"].node_type);
+        command += " --i " + joboptions["input_tomograms"].getString();
+        Node node(joboptions["input_tomograms"].getString(), joboptions["input_tomograms"].node_type);
         inputNodes.push_back(node);
     }
     else
@@ -1457,7 +1457,7 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 	outputName = outputname;
 	if (is_tomo)
     {
-        Node node2(outputname + "tilt_series.star", LABEL_TOMO_TILT_SERIES);
+        Node node2(outputname + "corrected_tomograms.star", LABEL_TOMO_TOMOGRAMS);
         outputNodes.push_back(node2);
     }
     else
@@ -1611,7 +1611,7 @@ void RelionJob::initialiseCtffindJob()
 
     if (is_tomo)
     {
-        joboptions["input_tilt_series"] = JobOption("Input tilt series set: ", OUTNODE_TOMO_TILT_SERIES, "", "Tilt series set STAR file (tilt_series.star)", "Input tomo tilt series set. Generated from CCPEM Import functionality...");
+        joboptions["input_tomograms"] = JobOption("Input tilt series set: ", OUTNODE_TOMO_TOMOGRAMS, "", "Tomograms set STAR file (*.star)", "Input tomograms set. ...");
     }
     else
     {
@@ -1675,7 +1675,7 @@ bool RelionJob::getCommandsCtffindJob(std::string &outputname, std::vector<std::
 	outputName = outputname;
 	if (is_tomo)
     {
-        Node node(outputname + "tilt_series.star", LABEL_TOMO_TILT_SERIES);
+        Node node(outputname + "tomograms_ctf.star", LABEL_TOMO_TOMOGRAMS);
         outputNodes.push_back(node);
     }
     else
@@ -1697,13 +1697,13 @@ bool RelionJob::getCommandsCtffindJob(std::string &outputname, std::vector<std::
     // I/O
     if (is_tomo)
     {
-        if (joboptions["input_tilt_series"].getString() == "")
+        if (joboptions["input_tomograms"].getString() == "")
         {
             error_message = "ERROR: empty field for input tilt series STAR file...";
             return false;
         }
-        command += " --i " + joboptions["input_tilt_series"].getString();
-        Node node(joboptions["input_tilt_series"].getString(), joboptions["input_tilt_series"].node_type);
+        command += " --i " + joboptions["input_tomograms"].getString();
+        Node node(joboptions["input_tomograms"].getString(), joboptions["input_tomograms"].node_type);
         inputNodes.push_back(node);
     }
     else

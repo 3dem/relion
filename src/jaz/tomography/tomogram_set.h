@@ -4,23 +4,29 @@
 #include <string>
 #include <vector>
 #include <src/metadata_table.h>
+#include <src/filename.h>
+#include <src/jaz/single_particle/obs_model.h>
 #include <src/jaz/tomography/tomogram.h>
 #include <src/jaz/gravis/t4Matrix.h>
 #include <src/ctf.h>
+#include "src/star_handling.h"
 
 
 class TomogramSet
 {
 	public:
-		
-		TomogramSet();
-		TomogramSet(std::string filename, bool verbose = true);
-		
-		
-			MetaDataTable globalTable;
-			std::vector<MetaDataTable> tomogramTables;
 
+        MetaDataTable globalTable;
+        std::vector<MetaDataTable> tomogramTables;
+        std::vector<ObservationModel> tomogramObsModels;
+        std::vector<std::string> tomogramNames;
 
+        TomogramSet();
+        TomogramSet(std::string filename, bool verbose = true);
+
+        // return false if this is not a TomogramSet
+        bool read(std::string filename, bool verbose = true);
+        void write(FileName filename);
 
 		Tomogram loadTomogram(int index, bool loadImageData) const;
 			
@@ -36,9 +42,7 @@ class TomogramSet
 			const std::string& opticsGroupName);
 		
 		int size() const;
-		
-		void write(std::string filename) const;
-		
+
 		void setProjections(int tomogramIndex, const std::vector<gravis::d4Matrix>& proj);
 		void setProjection(int tomogramIndex, int frame, const gravis::d4Matrix& P);
 		void setCtf(int tomogramIndex, int frame, const CTF& ctf);
@@ -62,6 +66,13 @@ class TomogramSet
 		int getMaxFrameCount() const;
 		double getPixelSize(int index) const;
 		std::string getOpticsGroupName(int index) const;
+
+        // Make one big metadatatable with all movies/micrographs (to be used for motioncorr and ctffind runners)
+        void generateSingleMetaDataTable(MetaDataTable &MDout, ObservationModel &obsModel);
+
+        // Convert back from one big metadatatable into separate STAR files for each tilt serie
+        void convertBackFromSingleMetaDataTable(MetaDataTable &MDin, ObservationModel &obsModel);
+
 };
 
 #endif
