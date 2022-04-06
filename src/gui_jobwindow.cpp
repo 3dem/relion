@@ -521,7 +521,8 @@ void JobWindow::initialiseMotioncorrWindow()
 	tab1->label("I/O");
 	resetHeight();
 
-	place("input_star_mics", TOGGLE_DEACTIVATE);
+    if (is_tomo) place("input_tilt_series", TOGGLE_DEACTIVATE);
+	else place("input_star_mics", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -589,7 +590,8 @@ void JobWindow::initialiseCtffindWindow()
 	tab1->label("I/O");
 	resetHeight();
 
-	place("input_star_mics", TOGGLE_DEACTIVATE);
+    if (is_tomo) place("input_tilt_series", TOGGLE_DEACTIVATE);
+	else place("input_star_mics", TOGGLE_DEACTIVATE);
 	place("use_noDW", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer

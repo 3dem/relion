@@ -1365,8 +1365,15 @@ void RelionJob::initialiseMotioncorrJob()
 {
 	hidden_name = ".gui_motioncorr";
 
-	joboptions["input_star_mics"] = JobOption("Input movies STAR file:", NODE_MOVIES_CPIPE, "", "STAR files (*.star)", "A STAR file with all micrographs to run MOTIONCORR on");
-	joboptions["first_frame_sum"] = JobOption("First frame for corrected sum:", 1, 1, 32, 1, "First frame to use in corrected average (starts counting at 1). ");
+    if (is_tomo)
+    {
+        joboptions["input_tilt_series"] = JobOption("Input tilt series set: ", OUTNODE_TOMO_TILT_SERIES, "", "Tilt series set STAR file (tilt_series.star)", "Input tomo tilt series set. Generated from CCPEM Import functionality...");
+    }
+    else
+    {
+	    joboptions["input_star_mics"] = JobOption("Input movies STAR file:", NODE_MOVIES_CPIPE, "", "STAR files (*.star)", "A STAR file with all micrographs to run MOTIONCORR on");
+	}
+    joboptions["first_frame_sum"] = JobOption("First frame for corrected sum:", 1, 1, 32, 1, "First frame to use in corrected average (starts counting at 1). ");
 	joboptions["last_frame_sum"] = JobOption("Last frame for corrected sum:", -1, 0, 32, 1, "Last frame to use in corrected average. Values equal to or smaller than 0 mean 'use all frames'.");
 	joboptions["eer_grouping"] = JobOption("EER fractionation:", 32, 1, 100, 1, "The number of hardware frames to group into one fraction. This option is relevant only for Falcon4 movies in the EER format. Note that all 'frames' in the GUI (e.g. first and last frame for corrected sum, dose per frame) refer to fractions, not raw detector frames. See https://www3.mrc-lmb.cam.ac.uk/relion/index.php/Image_compression#Falcon4_EER for detailed guidance on EER processing.");
 	joboptions["do_float16"] = JobOption("Write output in float16?", true ,"If set to Yes, RelionCor2 will write output images in float16 MRC format. This will save a factor of two in disk space compared to the default of writing in float32. Note that RELION and CCPEM will read float16 images, but other programs may not (yet) do so. For example, Gctf will not work with float16 images. Also note that this option does not work with UCSF MotionCor2. For CTF estimation, use CTFFIND-4.1 with pre-calculated power spectra (activate the 'Save sum of power spectra' option).");
@@ -1423,21 +1430,41 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 	if (error_message != "") return false;
 
 	// I/O
-
-	if (joboptions["input_star_mics"].getString() == "")
-	{
-		error_message = "ERROR: empty field for input STAR file...";
-		return false;
-	}
-
-	command += " --i " + joboptions["input_star_mics"].getString();
-	Node node(joboptions["input_star_mics"].getString(), joboptions["input_star_mics"].node_type);
-	inputNodes.push_back(node);
+    if (is_tomo)
+    {
+        if (joboptions["input_tilt_series"].getString() == "")
+        {
+            error_message = "ERROR: empty field for input tilt series STAR file...";
+            return false;
+        }
+        command += " --i " + joboptions["input_tilt_series"].getString();
+        Node node(joboptions["input_tilt_series"].getString(), joboptions["input_tilt_series"].node_type);
+        inputNodes.push_back(node);
+    }
+    else
+    {
+        if (joboptions["input_star_mics"].getString() == "")
+        {
+            error_message = "ERROR: empty field for input STAR file...";
+            return false;
+        }
+        command += " --i " + joboptions["input_star_mics"].getString();
+        Node node(joboptions["input_star_mics"].getString(), joboptions["input_star_mics"].node_type);
+        inputNodes.push_back(node);
+    }
 
 	command += " --o " + outputname;
 	outputName = outputname;
-	Node node2(outputname + "corrected_micrographs.star", LABEL_MOCORR_MICS);
-	outputNodes.push_back(node2);
+	if (is_tomo)
+    {
+        Node node2(outputname + "tilt_series.star", LABEL_TOMO_TILT_SERIES);
+        outputNodes.push_back(node2);
+    }
+    else
+    {
+        Node node2(outputname + "corrected_micrographs.star", LABEL_MOCORR_MICS);
+        outputNodes.push_back(node2);
+    }
 	Node node4(outputname + "logfile.pdf", LABEL_MOCORR_LOG);
 	outputNodes.push_back(node4);
 
@@ -1582,8 +1609,16 @@ void RelionJob::initialiseCtffindJob()
 
 	char *default_location;
 
-	joboptions["input_star_mics"] = JobOption("Input micrographs STAR file:", NODE_MICS_CPIPE, "", "STAR files (*.star)", "A STAR file with all micrographs to run CTFFIND or Gctf on");
-	joboptions["use_noDW"] = JobOption("Use micrograph without dose-weighting?", false, "If set to Yes, the CTF estimation will be done using the micrograph without dose-weighting as in rlnMicrographNameNoDW (_noDW.mrc from MotionCor2). If set to No, the normal rlnMicrographName will be used.");
+    if (is_tomo)
+    {
+        joboptions["input_tilt_series"] = JobOption("Input tilt series set: ", OUTNODE_TOMO_TILT_SERIES, "", "Tilt series set STAR file (tilt_series.star)", "Input tomo tilt series set. Generated from CCPEM Import functionality...");
+    }
+    else
+    {
+        joboptions["input_star_mics"] = JobOption("Input micrographs STAR file:", NODE_MICS_CPIPE, "", "STAR files (*.star)", "A STAR file with all micrographs to run CTFFIND or Gctf on");
+    }
+
+    joboptions["use_noDW"] = JobOption("Use micrograph without dose-weighting?", false, "If set to Yes, the CTF estimation will be done using the micrograph without dose-weighting as in rlnMicrographNameNoDW (_noDW.mrc from MotionCor2). If set to No, the normal rlnMicrographName will be used.");
 
 	joboptions["do_phaseshift"] = JobOption("Estimate phase shifts?", false, "If set to Yes, CTFFIND4 will estimate the phase shift, e.g. as introduced by a Volta phase-plate");
 	joboptions["phase_min"] = JobOption("Phase shift (deg) - Min:", std::string("0"), "Minimum, maximum and step size (in degrees) for the search of the phase shift");
@@ -1637,31 +1672,52 @@ bool RelionJob::getCommandsCtffindJob(std::string &outputname, std::vector<std::
 	initialisePipeline(outputname, job_counter);
 	std::string command;
 
-	FileName fn_outstar = outputname + "micrographs_ctf.star";
-	Node node(fn_outstar, LABEL_CTFFIND_MICS);
-	outputNodes.push_back(node);
 	outputName = outputname;
+	if (is_tomo)
+    {
+        Node node(outputname + "tilt_series.star", LABEL_TOMO_TILT_SERIES);
+        outputNodes.push_back(node);
+    }
+    else
+    {
+        Node node(outputname + "micrographs_ctf.star", LABEL_CTFFIND_MICS);
+        outputNodes.push_back(node);
+    }
 
 	// PDF with histograms of the eigenvalues
 	Node node3(outputname + "logfile.pdf", LABEL_CTFFIND_LOG);
 	outputNodes.push_back(node3);
 
-	if (joboptions["input_star_mics"].getString() == "")
-	{
-		error_message = "ERROR: empty field for input STAR file...";
-		return false;
-	}
+    if (joboptions["nr_mpi"].getNumber(error_message) > 1)
+        command="`which relion_run_ctffind_mpi`";
+    else
+        command="`which relion_run_ctffind`";
+    if (error_message != "") return false;
 
-	Node node2(joboptions["input_star_mics"].getString(), joboptions["input_star_mics"].node_type);
-	inputNodes.push_back(node2);
+    // I/O
+    if (is_tomo)
+    {
+        if (joboptions["input_tilt_series"].getString() == "")
+        {
+            error_message = "ERROR: empty field for input tilt series STAR file...";
+            return false;
+        }
+        command += " --i " + joboptions["input_tilt_series"].getString();
+        Node node(joboptions["input_tilt_series"].getString(), joboptions["input_tilt_series"].node_type);
+        inputNodes.push_back(node);
+    }
+    else
+    {
+        if (joboptions["input_star_mics"].getString() == "")
+        {
+            error_message = "ERROR: empty field for input STAR file...";
+            return false;
+        }
+        command += " --i " + joboptions["input_star_mics"].getString();
+        Node node(joboptions["input_star_mics"].getString(), joboptions["input_star_mics"].node_type);
+        inputNodes.push_back(node);
+    }
 
-	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-		command="`which relion_run_ctffind_mpi`";
-	else
-		command="`which relion_run_ctffind`";
-	if (error_message != "") return false;
-
-	command += " --i " + joboptions["input_star_mics"].getString();
 	command += " --o " + outputname;
 	command += " --Box " + joboptions["box"].getString();
 	command += " --ResMin " + joboptions["resmin"].getString();
