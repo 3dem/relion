@@ -241,6 +241,7 @@ void MotioncorrRunner::initialise()
         // Check if this is a TomographyExperiment starfile, and if so, unpack into one large metadatatable
         if (tomo_model.read(fn_in, 1))
         {
+            std::cerr <<"is_tomo"<<std::endl;
             is_tomo = true;
             tomo_model.generateSingleMetaDataTable(MDin, obsModel);
         }
@@ -248,7 +249,10 @@ void MotioncorrRunner::initialise()
         {
             ObservationModel::loadSafely(fn_in, obsModel, MDin, "movies", verb);
         }
-
+        if (MDin.numberOfObjects() == 0)
+        {
+            REPORT_ERROR("ERROR: no input movies to work on.");
+        }
 
         if (MDin.numberOfObjects() > 0 && !MDin.containsLabel(EMDL_MICROGRAPH_MOVIE_NAME))
 			REPORT_ERROR("The input STAR file does not contain the rlnMicrographMovieName column. Are you sure you imported files as movies, not single frame images?");

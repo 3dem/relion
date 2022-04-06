@@ -28,6 +28,7 @@
 #include  <unistd.h>
 #include  <stdio.h>
 #include <src/metadata_table.h>
+#include <src/tomo_model.h>
 #include <src/image.h>
 #include <src/time.h>
 #include <src/jaz/single_particle/obs_model.h>
@@ -56,6 +57,18 @@ public:
 
 	// Information about the optics groups
 	ObservationModel obsModel;
+
+    // Tilt movie index for each micrograph in a tilt serie (needed for converting back to tomographyExperiment)
+    std::vector<long> tomo_tilt_movie_index;
+
+	// Tomogram names of all the micrographs
+	std::vector<FileName> fn_tomogram_names;
+
+    // Is this a tomography experiment?
+    bool is_tomo;
+
+    // Information about tomography experiment
+    TomographyExperiment tomo_model;
 
 	// Dimension of squared area of the micrograph to use for CTF estimation
 	int ctf_win;

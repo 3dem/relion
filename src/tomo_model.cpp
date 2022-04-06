@@ -69,13 +69,14 @@ bool TomographyExperiment::read(FileName fn_in, int verb)
         MDtiltseries.getValue(EMDL_TOMO_TILT_SERIES_STARFILE, fn_star, ts_id);
         MDtiltseries.getValue(EMDL_TOMO_NAME, mytiltserie.name, ts_id);
 
-        ObservationModel::loadSafely(fn_star, mytiltserie.obsModel, mytiltserie.MDtiltimages, "movies", verb);
+        ObservationModel::loadSafely(fn_star, mytiltserie.obsModel, mytiltserie.MDtiltimages, "tilt_images", verb);
         if (mytiltserie.obsModel.opticsMdt.numberOfObjects() == 0)
         {
              REPORT_ERROR("ERROR: input starfile for tilt series " + fn_star + " does not contain any optics groups");
         }
         if (!mytiltserie.MDtiltimages.containsLabel(EMDL_TOMO_TILT_MOVIE_INDEX))
         {
+            std::cerr << "table= "; mytiltserie.MDtiltimages.write(std::cerr);
             REPORT_ERROR("ERROR: input starfile for tilt series " + fn_star + " does not contain rlnTomoTiltMovieIndex label ");
         }
 

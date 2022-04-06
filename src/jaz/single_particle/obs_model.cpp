@@ -1337,6 +1337,10 @@ void ObservationModel::loadSafely(std::string filename, ObservationModel& obsMod
 		{
 			mytablename = "movies";
 		}
+        else if (particlesMdt.read(filename, "tilt_images"))
+        {
+            mytablename = "tilt_images";
+        }
 	}
 	else
 	{
@@ -1365,6 +1369,8 @@ void ObservationModel::loadSafely(std::string filename, ObservationModel& obsMod
 				particlesMdt.setName("particles");
 			else if (particlesMdt.containsLabel(EMDL_MICROGRAPH_MOVIE_NAME))
 				particlesMdt.setName("movies");
+            else if (particlesMdt.containsLabel(EMDL_TOMO_TILT_MOVIE_INDEX))
+                particlesMdt.setName("tilt_images");
 			else
 				particlesMdt.setName("micrographs");
 		}

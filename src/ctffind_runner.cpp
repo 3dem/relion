@@ -140,10 +140,25 @@ void CtffindRunner::initialise(bool is_leader)
 		fn_out += "/";
 
 	// Set up which micrographs to estimate CTFs from
-	if (fn_in.isStarFile())
+	is_tomo = false;
+    if (fn_in.isStarFile())
 	{
 		MetaDataTable MDin;
-		ObservationModel::loadSafely(fn_in, obsModel, MDin, "micrographs", verb);
+
+        // Check if this is a TomographyExperiment starfile, and if so, unpack into one large metadatatable
+        if (tomo_model.read(fn_in, 1))
+        {
+            is_tomo = true;
+            tomo_model.generateSingleMetaDataTable(MDin, obsModel);
+        }
+        else
+        {
+            ObservationModel::loadSafely(fn_in, obsModel, MDin, "micrographs", verb);
+        }
+        if (MDin.numberOfObjects() == 0)
+        {
+            REPORT_ERROR("ERROR: no input micrographs to work on.");
+        }
 
 		if (MDin.numberOfObjects() > 0 && !MDin.containsLabel(EMDL_MICROGRAPH_NAME))
 			REPORT_ERROR("ERROR: There is no rlnMicrographName label in the input micrograph STAR file.");
@@ -173,6 +188,17 @@ void CtffindRunner::initialise(bool is_leader)
 			int optics_group;
 			MDin.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group);
 			optics_group_micrographs_all.push_back(optics_group);
+
+            if (is_tomo)
+            {
+                FileName fn_tomo;
+                MDin.getValue(EMDL_TOMO_NAME, fn_tomo);
+			    fn_tomogram_names.push_back(fn_tomo);
+                long index;
+                MDin.getValue(EMDL_TOMO_TILT_MOVIE_INDEX, index);
+                tomo_tilt_movie_index.push_back(index);
+            }
+
 		}
 	}
 	else
@@ -469,12 +495,27 @@ void CtffindRunner::joinCtffindResults()
 				MDctf.setValue(EMDL_CTF_PHASESHIFT, phaseshift);
 			if (fabs(valscore + 999.) > 0.)
 				MDctf.setValue(EMDL_CTF_VALIDATIONSCORE, valscore);
+
+            if (is_tomo)
+            {
+                MDctf.setValue(EMDL_TOMO_NAME, fn_tomogram_names[imic]);
+                MDctf.setValue(EMDL_TOMO_TILT_MOVIE_INDEX, tomo_tilt_movie_index[imic]);
+            }
+
 		}
 
 		if (verb > 0 && imic % 60 == 0) progress_bar(imic);
 	}
 
-	obsModel.save(MDctf, fn_out+"micrographs_ctf.star", "micrographs");
+    if (is_tomo)
+    {
+        tomo_model.convertBackFromSingleMetaDataTable(MDctf, obsModel);
+        tomo_model.write(fn_out);
+    }
+    else
+    {
+        obsModel.save(MDctf, fn_out + "micrographs_ctf.star", "micrographs");
+    }
 
 	if (verb > 0)
 	{
