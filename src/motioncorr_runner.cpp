@@ -78,7 +78,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 {
 	parser.setCommandLine(argc, argv);
 	int gen_section = parser.addSection("General options");
-	fn_in = parser.getOption("--i", "STAR file with all input micrographs, or a Linux wildcard with all micrographs to operate on");
+	fn_in = parser.getOption("--i", "STAR file with all input micrographs, the tomography tilt series, or a Linux wildcard with all micrographs to operate on");
 	fn_out = parser.getOption("--o", "Name for the output directory", "MotionCorr");
 	do_skip_logfile = parser.checkOption("--skip_logfile", "Skip generation of tracks-part of the logfile.pdf");
 	n_threads = textToInteger(parser.getOption("--j", "Number of threads per movie (= process)", "1"));
@@ -233,14 +233,29 @@ void MotioncorrRunner::initialise()
 #endif
 
 	// Set up which micrograph movies to process
+    is_tomo = false;
 	if (fn_in.isStarFile())
 	{
-		MetaDataTable MDin;
-		ObservationModel::loadSafely(fn_in, obsModel, MDin, "movies", verb);
-		if (MDin.numberOfObjects() > 0 && !MDin.containsLabel(EMDL_MICROGRAPH_MOVIE_NAME))
+        MetaDataTable MDin;
+
+        // Check if this is a TomographyExperiment starfile, and if so, unpack into one large metadatatable
+        if (tomo_model.read(fn_in, 1))
+        {
+            is_tomo = true;
+            tomo_model.generateSingleMetaDataTable(MDin, obsModel);
+        }
+        else
+        {
+            ObservationModel::loadSafely(fn_in, obsModel, MDin, "movies", verb);
+        }
+
+
+        if (MDin.numberOfObjects() > 0 && !MDin.containsLabel(EMDL_MICROGRAPH_MOVIE_NAME))
 			REPORT_ERROR("The input STAR file does not contain the rlnMicrographMovieName column. Are you sure you imported files as movies, not single frame images?");
 
 		fn_micrographs.clear();
+        fn_tomogram_names.clear();
+        pre_exposure_micrographs.clear();
 		optics_group_micrographs.clear();
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
 		{
@@ -251,6 +266,26 @@ void MotioncorrRunner::initialise()
 			int optics_group;
 			MDin.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group);
 			optics_group_micrographs.push_back(optics_group);
+
+            RFLOAT my_pre_exposure;
+            if (MDin.getValue(EMDL_MICROGRAPH_PRE_EXPOSURE, my_pre_exposure))
+            {
+                pre_exposure_micrographs.push_back(my_pre_exposure);
+            }
+            else
+            {
+                pre_exposure_micrographs.push_back(0.0);
+            }
+
+            if (is_tomo)
+            {
+                FileName fn_tomo;
+                MDin.getValue(EMDL_TOMO_NAME, fn_tomo);
+			    fn_tomogram_names.push_back(fn_tomo);
+                long index;
+                MDin.getValue(EMDL_TOMO_TILT_MOVIE_INDEX, index);
+                tomo_tilt_movie_index.push_back(index);
+            }
 		}
 	}
 	else
@@ -465,7 +500,10 @@ void MotioncorrRunner::run()
 
 		Micrograph mic(fn_micrographs[imic], fn_gain_reference, bin_factor, eer_upsampling, eer_grouping);
 
-		// Get angpix and voltage from the optics groups:
+        // Set per-micrograph pre_exposure
+        mic.pre_exposure = pre_exposure + pre_exposure_micrographs[imic];
+
+        // Get angpix and voltage from the optics groups:
 		obsModel.opticsMdt.getValue(EMDL_CTF_VOLTAGE, voltage, optics_group_micrographs[imic]-1);
 		obsModel.opticsMdt.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix, optics_group_micrographs[imic]-1);
 
@@ -555,7 +593,7 @@ bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, int rank)
 	{
 		command += " -Kv " + floatToString(voltage);
 		command += " -FmDose " + floatToString(dose_per_frame);
-		command += " -InitDose " + floatToString(pre_exposure);
+		command += " -InitDose " + floatToString(mic.pre_exposure);
 	}
 
 	if (fn_defect != "")
@@ -812,7 +850,6 @@ void MotioncorrRunner::saveModel(Micrograph &mic) {
 	mic.angpix = angpix;
 	mic.voltage = voltage;
 	mic.dose_per_frame = dose_per_frame;
-	mic.pre_exposure = pre_exposure;
 	mic.fnDefect = fn_defect;
 
 	FileName fn_avg = getOutputFileNames(mic.getMovieFilename());
@@ -850,7 +887,12 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 			{
 				MDavg.setValue(EMDL_CTF_POWER_SPECTRUM, fn_avg.withoutExtension() + "_PS.mrc");
 			}
-			MDavg.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
+			if (is_tomo)
+            {
+                MDavg.setValue(EMDL_TOMO_NAME, fn_tomogram_names[imic]);
+                MDavg.setValue(EMDL_TOMO_TILT_MOVIE_INDEX, tomo_tilt_movie_index[imic]);
+            }
+            MDavg.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
 			MDavg.setValue(EMDL_MICROGRAPH_METADATA_NAME, fn_avg.withoutExtension() + ".star");
 			MDavg.setValue(EMDL_IMAGE_OPTICS_GROUP, optics_group_ori_micrographs[imic]);
 			FileName fn_star = fn_avg.withoutExtension() + ".star";
@@ -904,13 +946,22 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 		my_angpix *= bin_factor;
 		obsModel.opticsMdt.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, my_angpix);
 	}
-	obsModel.save(MDavg, fn_out + "corrected_micrographs.star", "micrographs");
+	if (is_tomo)
+    {
+        tomo_model.convertBackFromSingleMetaDataTable(MDavg, obsModel);
+        tomo_model.write(fn_out);
+    }
+    else
+    {
+        obsModel.save(MDavg, fn_out + "corrected_micrographs.star", "micrographs");
+    }
 
 	if (verb > 0 )
 	{
 		progress_bar(fn_ori_micrographs.size());
 
-		std::cout << " Done! Written: " << fn_out << "corrected_micrographs.star" << std::endl;
+		if (is_tomo) std::cout << " Done! Written: " << fn_out << "tilt_series.star" << std::endl;
+        else std::cout << " Done! Written: " << fn_out << "corrected_micrographs.star" << std::endl;
 	}
 
 	if (verb > 0) std::cout << " Now generating logfile.pdf ... " << std::endl;
@@ -1640,10 +1691,12 @@ skip_fitting:
 			REPORT_ERROR("Sorry, dose weighting is supported only for 300, 200 or 100 kV");
 		}
 
+        logfile << "Pre-exposure: = " << pre_exposure << std::endl;
+
 		std::vector <RFLOAT> doses(n_frames);
 		for (int iframe = 0; iframe < n_frames; iframe++) {
 			// dose AFTER each frame.
-			doses[iframe] = pre_exposure + dose_per_frame * (frames[iframe] + 1);
+			doses[iframe] = mic.pre_exposure + dose_per_frame * (frames[iframe] + 1);
 			if (std::abs(voltage - 200) <= 2) {
 				doses[iframe] /= 0.8; // 200 kV electron is more damaging.
 			} else if (std::abs(voltage - 100) <= 2) {

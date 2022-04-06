@@ -31,6 +31,7 @@
 #include "src/metadata_table.h"
 #include "src/image.h"
 #include "src/micrograph_model.h"
+#include "src/tomo_model.h"
 #include <src/jaz/single_particle/obs_model.h>
 
 class MotioncorrRunner
@@ -51,15 +52,27 @@ public:
 	FileName fn_in, fn_out, fn_movie;
 
 	// Filenames of all the micrographs to run Motioncorr on
-	std::vector<FileName> fn_micrographs, fn_ori_micrographs;
+	std::vector<FileName> fn_micrographs, fn_ori_micrographs, fn_tomogram_names;
 
 	// Optics group number for all original micrographs
 	std::vector<int> optics_group_micrographs, optics_group_ori_micrographs;
 
+    // Pre-exposure for each micrograph (mainly used for tomography)
+    std::vector<RFLOAT> pre_exposure_micrographs;
+
+    // Tilt movie index for each micrograph in a tilt serie (needed for converting back to tomographyExperiment)
+    std::vector<long> tomo_tilt_movie_index;
+
 	// Information about the optics groups
 	ObservationModel obsModel;
 
-	// Skip generation of logfile
+    // Is this a tomography experiment?
+    bool is_tomo;
+
+    // Information about tomography experiment
+    TomographyExperiment tomo_model;
+
+    // Skip generation of logfile
 	bool do_skip_logfile;
 
 	// Use our own implementation

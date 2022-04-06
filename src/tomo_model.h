@@ -25,6 +25,7 @@
 #include "src/star_handling.h"
 #include <src/jaz/single_particle/obs_model.h>
 
+/*
 class ExpTiltImage
 {
 public:
@@ -62,12 +63,13 @@ public:
 	}
 
 };
+*/
 
 class ExpTiltSerie
 {
 public:
     // All tiltimages in the tiltserie
-    std::vector<ExpTiltImage> tiltimages;
+    //std::vector<ExpTiltImage> tiltimages;
 
 	// ID of the tiltserie
 	long int id;
@@ -90,7 +92,7 @@ public:
 	// Copy constructor needed for work with vectors
 	ExpTiltSerie(ExpTiltSerie const& copy)
 	{
-		tiltimages = copy.tiltimages;
+		//tiltimages = copy.tiltimages;
         id = copy.id;
 		name = copy.name;
         obsModel = copy.obsModel;
@@ -100,7 +102,7 @@ public:
 	// Define assignment operator in terms of the copy constructor
 	ExpTiltSerie& operator=(ExpTiltSerie const& copy)
 	{
-        tiltimages = copy.tiltimages;
+        //tiltimages = copy.tiltimages;
         id = copy.id;
 		name = copy.name;
         obsModel = copy.obsModel;

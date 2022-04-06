@@ -45,11 +45,19 @@ bool TomographyExperiment::read(FileName fn_in, int verb)
     }
 
     MDtiltseries.read(fn_in, "tilt_series");
-
     if (MDtiltseries.numberOfObjects() == 0)
     {
-         if (verb > 0) std::cerr << " ERROR: input starfile for TomographyExperiment " << fn_in << "  does not contain any entries in tilt_series table" << std::endl;
-         return false;
+        return false;
+    }
+
+    if (!MDtiltseries.containsLabel(EMDL_TOMO_TILT_SERIES_STARFILE))
+    {
+        REPORT_ERROR("ERROR: input starfile for TomographyExperiment " + fn_in + " does not contain rlnTomoTiltSeriesStarFile label ");
+    }
+
+    if (!MDtiltseries.containsLabel(EMDL_TOMO_NAME))
+    {
+        REPORT_ERROR("ERROR: input starfile for TomographyExperiment " + fn_in + " does not contain rlnTomoName label ");
     }
 
     for (long int ts_id = 0; ts_id < MDtiltseries.numberOfObjects(); ts_id++)
@@ -64,10 +72,17 @@ bool TomographyExperiment::read(FileName fn_in, int verb)
         ObservationModel::loadSafely(fn_star, mytiltserie.obsModel, mytiltserie.MDtiltimages, "movies", verb);
         if (mytiltserie.obsModel.opticsMdt.numberOfObjects() == 0)
         {
-           if (verb > 0) std::cerr << " ERROR: input starfile for tilt serie " << fn_star << " does not contain any optics groups" << std::endl;
-            return false;
+             REPORT_ERROR("ERROR: input starfile for tilt series " + fn_star + " does not contain any optics groups");
+        }
+        if (!mytiltserie.MDtiltimages.containsLabel(EMDL_TOMO_TILT_MOVIE_INDEX))
+        {
+            REPORT_ERROR("ERROR: input starfile for tilt series " + fn_star + " does not contain rlnTomoTiltMovieIndex label ");
         }
 
+        // Make sure tilt images are sorted on their index (used to convert back from single large metadatatable)
+        mytiltserie.MDtiltimages.newSort(EMDL_TOMO_TILT_MOVIE_INDEX);
+
+        /*
         // Get all the necessary information about this tiltseries
         for (long int timg_id = 0; timg_id < mytiltserie.MDtiltimages.numberOfObjects(); timg_id++)
         {
@@ -77,7 +92,7 @@ bool TomographyExperiment::read(FileName fn_in, int verb)
             mytiltimage.tiltseries_id = ts_id;
             mytiltserie.tiltimages.push_back(mytiltimage);
         }
-
+        */
         tiltseries.push_back(mytiltserie);
 
     }
@@ -125,7 +140,7 @@ long int TomographyExperiment::numberOfTiltImages()
     long int result = 0;
     for (long int i = 0; i < tiltseries.size(); i++)
     {
-        result += tiltseries[i].tiltimages.size();
+        result += tiltseries[i].numberOfTiltImages();
     }
     return result;
 
@@ -147,10 +162,27 @@ void TomographyExperiment::generateSingleMetaDataTable(MetaDataTable &MDout, Obs
 
 void TomographyExperiment::convertBackFromSingleMetaDataTable(MetaDataTable &MDin, ObservationModel &obsModel)
 {
-     for (long int ts_id = 0; ts_id < MDtiltseries.numberOfObjects(); ts_id++)
-     {
-         tiltseries[ts_id].obsModel = obsModel;
-         tiltseries[ts_id].MDtiltimages = subsetMetaDataTable(MDin, EMDL_TOMO_NAME, tiltseries[ts_id].name, false);
-         tiltseries[ts_id].obsModel.removeUnusedOpticsGroups(tiltseries[ts_id].MDtiltimages);
-     }
+    if (!MDin.containsLabel(EMDL_TOMO_TILT_MOVIE_INDEX))
+    {
+        REPORT_ERROR("BUG: the MDin that is passed to TomographyExperiment::convertBackFromSingleMetaDataTable should contain a rlnTomoTiltMovieIndex label");
+    }
+
+    for (long int ts_id = 0; ts_id < MDtiltseries.numberOfObjects(); ts_id++)
+    {
+        tiltseries[ts_id].obsModel = obsModel;
+        MetaDataTable MDjoin = subsetMetaDataTable(MDin, EMDL_TOMO_NAME, tiltseries[ts_id].name, false);
+        MDjoin.newSort(EMDL_TOMO_TILT_MOVIE_INDEX);
+        if (MDjoin.numberOfObjects() != tiltseries[ts_id].MDtiltimages.numberOfObjects())
+        {
+            std::cerr << "MDjoin= "; MDjoin.write(std::cerr);
+            std::cerr << "tiltseries[ts_id].MDtiltimages= "; tiltseries[ts_id].MDtiltimages.write(std::cerr);
+            REPORT_ERROR("ERROR: unequal number of Objects in tiltserie starfiles");
+        }
+        FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDjoin)
+        {
+            //MetaDataContainer* mine = MDjoin.getObject();
+            tiltseries[ts_id].MDtiltimages.setObject(MDjoin.getObject(), current_object);
+        }
+        tiltseries[ts_id].obsModel.removeUnusedOpticsGroups(tiltseries[ts_id].MDtiltimages);
+    }
 }
