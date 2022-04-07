@@ -18,11 +18,12 @@ TomogramSet::TomogramSet()
 	globalTable.setName("global");
 }
 
-TomogramSet::TomogramSet(std::string filename, bool verbose)
+TomogramSet::TomogramSet(FileName filename, bool verbose)
 {
     if (!read(filename, verbose))
     {
         // This may be a tomograms.star file in the old, original relion-4.0 format. Try to convert
+        FileName mydir = filename.beforeLastOf("/");
 
         std::ifstream ifs(filename);
         if (!ifs)
@@ -32,32 +33,22 @@ TomogramSet::TomogramSet(std::string filename, bool verbose)
         else
         {
             globalTable.readStar(ifs, "global");
+            globalTable.setName("global");
 
             if (!globalTable.containsLabel(EMDL_TOMO_NAME))
             {
                 REPORT_ERROR("ERROR: input starfile for TomogramSet " + filename + " does not contain rlnTomoName label ");
             }
 
-            // remove information from optics groups and move into globalObsModel
-            ObservationModel globalObsModel(globalTable);
-            globalTable.deactivateLabel(EMDL_IMAGE_OPTICS_GROUP_NAME);
-            globalTable.deactivateLabel(EMDL_IMAGE_OPTICS_GROUP);
-            globalTable.deactivateLabel(EMDL_CTF_CS);
-            globalTable.deactivateLabel(EMDL_CTF_VOLTAGE);
-            globalTable.deactivateLabel(EMDL_CTF_Q0);
-
             const int tc = globalTable.numberOfObjects();
 
             tomogramTables.resize(tc);
-            tomogramObsModels.resize(tc);
-            tomogramNames.resize(tc);
 
             std::vector<MetaDataTable> allTables = MetaDataTable::readAll(ifs, tc+1);
-
             for (int t = 0; t < tc; t++)
             {
-                const std::string expectedNewName = globalTable.getString(EMDL_TOMO_NAME, t);
-                const std::string name = allTables[t+1].getName();
+                FileName expectedNewName = globalTable.getString(EMDL_TOMO_NAME, t);
+                FileName name = allTables[t+1].getName();
 
                 if (name != expectedNewName)
                 {
@@ -65,15 +56,29 @@ TomogramSet::TomogramSet(std::string filename, bool verbose)
                 }
 
                 tomogramTables[t] = allTables[t+1];
-                tomogramTables[t].setName("tilt_images");
-                tomogramObsModels[t] = globalObsModel;
-                tomogramNames[t] = expectedNewName;
+                tomogramTables[t].setName(expectedNewName);
+
+                // Check there is a rlnTomoTiltMovieIndex label, otherwise add one
+                if (!tomogramTables[t].containsLabel(EMDL_MICROGRAPH_PRE_EXPOSURE) )
+                {
+                    REPORT_ERROR("ERROR: tilt series " + expectedNewName + " does not contain compulsory rlnMicrographPreExposure label");
+                }
+
+                // As this is a conversion, also save already all the tilt series starfiles in a new directory
+                // Create output directory if necessary
+                FileName fn_star = mydir + "/tilt_series/" + expectedNewName + ".star";
+                globalTable.setValue(EMDL_TOMO_TILT_SERIES_STARFILE, fn_star, t);
+                FileName newdir = fn_star.beforeLastOf("/");
+                if (!exists(newdir)) mktree(newdir);
+
+                // Write the individual tomogram starfile
+                tomogramTables[t].newSort(EMDL_MICROGRAPH_PRE_EXPOSURE);
+                tomogramTables[t].write(fn_star);
+
             }
         }
 
     }
-
-    globalTable.setName("global");
 
 }
 
@@ -81,6 +86,7 @@ bool TomogramSet::read(std::string filename, bool verbose)
 {
 
     globalTable.read(filename, "global");
+    globalTable.setName("global");
 
     const int tc = globalTable.numberOfObjects();
 
@@ -100,16 +106,17 @@ bool TomogramSet::read(std::string filename, bool verbose)
     }
 
     tomogramTables.resize(tc);
-    tomogramObsModels.resize(tc);
-    tomogramNames.resize(tc);
 
     for (int t = 0; t < tc; t++)
     {
-        tomogramNames[t] = globalTable.getString(EMDL_TOMO_NAME, t);
+        FileName name = globalTable.getString(EMDL_TOMO_NAME, t);
         std::string fn_star = globalTable.getString(EMDL_TOMO_TILT_SERIES_STARFILE, t);
-        ObservationModel::loadSafely(fn_star, tomogramObsModels[t], tomogramTables[t], "tilt_images", verbose);
-        // Make sure tilt images are sorted on their index (used to convert back from single large metadatatable)
-        tomogramTables[t].newSort(EMDL_TOMO_TILT_MOVIE_INDEX);
+        tomogramTables[t].read(fn_star, name);
+        // Make sure tilt images are sorted on their pre-exposure (used to convert back from single large metadatatable)
+        if (tomogramTables[t].containsLabel(EMDL_MICROGRAPH_PRE_EXPOSURE))
+            tomogramTables[t].newSort(EMDL_MICROGRAPH_PRE_EXPOSURE);
+        else
+            REPORT_ERROR("ERROR: tomogramTable does not contain compulsory rlnMicrographPreExposure label");
     }
 
     return true;
@@ -135,7 +142,7 @@ void TomogramSet::write(FileName filename)
         if (!exists(newdir)) mktree(newdir);
 
         // Write the individual tomogram starfile
-        tomogramObsModels[t].save(tomogramTables[t], fn_newstar, "tilt_images");
+        tomogramTables[t].write(fn_newstar);
     }
 
     // Also write the (now modified with fn_newstars) tilt_series.star file in the root directory
@@ -189,12 +196,10 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 
 	double Q0;
 
-    // pixelsize, voltage, cs and q0 all need to be the same for all optics groups of one tomogram!
-    // Use values from the first optics group
-	tomogramObsModels[index].opticsMdt.getValueSafely(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, out.optics.pixelSize, 0);
-    tomogramObsModels[index].opticsMdt.getValueSafely(EMDL_CTF_VOLTAGE, out.optics.voltage, 0);
-    tomogramObsModels[index].opticsMdt.getValueSafely(EMDL_CTF_CS, out.optics.Cs, 0);
-    tomogramObsModels[index].opticsMdt.getValueSafely(EMDL_CTF_Q0, Q0, 0);
+    globalTable.getValueSafely(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, out.optics.pixelSize, index);
+    globalTable.getValueSafely(EMDL_CTF_VOLTAGE, out.optics.voltage, index);
+    globalTable.getValueSafely(EMDL_CTF_CS, out.optics.Cs, index);
+    globalTable.getValueSafely(EMDL_CTF_Q0, Q0, index);
 
 	out.hasDeformations = (
 		globalTable.containsLabel(EMDL_TOMO_DEFORMATION_GRID_SIZE_X) &&
@@ -300,17 +305,6 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 		out.fractionalDose = out.cumulativeDose[out.frameSequence[1]] - out.cumulativeDose[out.frameSequence[0]];
 	}
 
-    // TODO: what to do about opticsGroups for a tomogram? This could be per frame now!!!
-	if (globalTable.containsLabel(EMDL_IMAGE_OPTICS_GROUP_NAME))
-	{
-		out.opticsGroupName = globalTable.getString(EMDL_IMAGE_OPTICS_GROUP_NAME, index);
-	}
-	else
-	{
-		out.opticsGroupName = "opticsGroup1";
-	}
-
-
 	out.name = tomoName;
 
 	if (globalTable.containsLabel(EMDL_TOMO_FIDUCIALS_STARFILE))
@@ -342,8 +336,7 @@ void TomogramSet::addTomogram(
 		double fractionalDose,
 		const std::vector<CTF>& ctfs, 
 		double handedness, 
-		double pixelSize,
-		const std::string& opticsGroupName)
+		double pixelSize)
 {
 	const int index = globalTable.numberOfObjects();
 	const int fc = projections.size();
@@ -358,21 +351,15 @@ void TomogramSet::addTomogram(
 	globalTable.setValue(EMDL_TOMO_SIZE_Y, h, index);
 	globalTable.setValue(EMDL_TOMO_SIZE_Z, d, index);	
 	globalTable.setValue(EMDL_TOMO_HANDEDNESS, handedness, index);
-    globalTable.setValue(EMDL_TOMO_IMPORT_FRACT_DOSE, fractionalDose, index);
 
     const CTF& ctf0 = ctfs[0];
 
-    // TODO: how to handle multiple optics groups here?
-    // Anyway: this function is only called by relion_tomo_import_tomograms.cpp, which will disappear anyway...
-    MetaDataTable opticsMdt;
-    opticsMdt.addObject();
-	opticsMdt.setValue(EMDL_IMAGE_OPTICS_GROUP_NAME, opticsGroupName);
-	opticsMdt.setValue(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, pixelSize);
-	opticsMdt.setValue(EMDL_CTF_VOLTAGE, ctf0.kV);
-	opticsMdt.setValue(EMDL_CTF_CS, ctf0.Cs);
-	opticsMdt.setValue(EMDL_CTF_Q0, ctf0.Q0);
-	ObservationModel obsModel(opticsMdt);
-    tomogramObsModels.push_back(obsModel);
+    globalTable.setValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, pixelSize, index);
+    globalTable.setValue(EMDL_CTF_VOLTAGE, ctf0.kV, index);
+    globalTable.setValue(EMDL_CTF_CS, ctf0.Cs, index);
+    globalTable.setValue(EMDL_CTF_Q0, ctf0.Q0, index);
+    globalTable.setValue(EMDL_TOMO_IMPORT_FRACT_DOSE, fractionalDose, index);
+
 
 	if (tomogramTables.size() != index)
 	{
@@ -554,60 +541,78 @@ int TomogramSet::getMaxFrameCount() const
 
 double TomogramSet::getPixelSize(int index) const
 {
-	// Get pixel size from the first optics group, as all optics group need the same pixel size
-    return tomogramObsModels[index].opticsMdt.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, 0);
+	return globalTable.getDouble(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, index);
 }
 
 std::string TomogramSet::getOpticsGroupName(int index) const
 {
-	if (!tomogramObsModels[index].opticsMdt.containsLabel(EMDL_IMAGE_OPTICS_GROUP_NAME))
+	if (!globalTable.containsLabel(EMDL_IMAGE_OPTICS_GROUP_NAME))
 	{
 		return "opticsGroup1";
 	}
 	else
 	{
-		return tomogramObsModels[index].opticsMdt.getString(EMDL_IMAGE_OPTICS_GROUP_NAME, 0);
+		return globalTable.getString(EMDL_IMAGE_OPTICS_GROUP_NAME, index);
 	}
 }
 
 void TomogramSet::generateSingleMetaDataTable(MetaDataTable &MDout, ObservationModel &obsModel)
 {
-    std::vector<FileName> fn_stars;
-    for (long int t = 0; t < globalTable.numberOfObjects(); t++)
+    MDout.clear();
+    for (long int t = 0; t < tomogramTables.size(); t++)
     {
-        FileName fn_star = globalTable.getString(EMDL_TOMO_TILT_SERIES_STARFILE, t);
-        fn_stars.push_back(fn_star);
+        // Store all the necessary optics stuff in an opticsGroup per tomogram
+        RFLOAT pixelSize, voltage, Cs, Q0;
+        std::string tomo_name = getTomogramName(t);
+        globalTable.getValueSafely(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, pixelSize, t);
+        globalTable.getValueSafely(EMDL_CTF_VOLTAGE, voltage, t);
+        globalTable.getValueSafely(EMDL_CTF_CS, Cs, t);
+        globalTable.getValueSafely(EMDL_CTF_Q0, Q0, t);
+        obsModel.opticsMdt.addObject();
+        obsModel.opticsMdt.setValue(EMDL_IMAGE_OPTICS_GROUP_NAME, tomo_name);
+        obsModel.opticsMdt.setValue(EMDL_IMAGE_OPTICS_GROUP, t+1);
+        obsModel.opticsMdt.setValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, pixelSize);
+        obsModel.opticsMdt.setValue(EMDL_CTF_VOLTAGE, voltage);
+        obsModel.opticsMdt.setValue(EMDL_CTF_CS, Cs);
+        obsModel.opticsMdt.setValue(EMDL_CTF_Q0, Q0);
+
+        FOR_ALL_OBJECTS_IN_METADATA_TABLE(tomogramTables[t])
+        {
+            tomogramTables[t].setValue(EMDL_IMAGE_OPTICS_GROUP, t+1);
+        }
+
+        MDout.append(tomogramTables[t]);
     }
-
-    combineStarfiles(fn_stars, MDout, obsModel);
-
 }
 
 void TomogramSet::convertBackFromSingleMetaDataTable(MetaDataTable &MDin, ObservationModel &obsModel)
 {
-    if (!MDin.containsLabel(EMDL_TOMO_TILT_MOVIE_INDEX))
+    if (!MDin.containsLabel(EMDL_MICROGRAPH_PRE_EXPOSURE))
     {
-        REPORT_ERROR("BUG: the MDin that is passed to TomogramSet::convertBackFromSingleMetaDataTable should contain a rlnTomoTiltMovieIndex label");
+        REPORT_ERROR("BUG: MDin should contain a rlnMicrographPreExposure label");
     }
 
-    for (long int t = 0; t < globalTable.numberOfObjects(); t++)
+    for (long int t = 0; t < tomogramTables.size(); t++)
     {
-        tomogramObsModels[t] = obsModel;
-        MetaDataTable MDjoin = subsetMetaDataTable(MDin, EMDL_TOMO_NAME, tomogramNames[t], false);
+        MetaDataTable MDsub = subsetMetaDataTable(MDin, EMDL_IMAGE_OPTICS_GROUP, t+1, t+1);
 
-        MDjoin.newSort(EMDL_TOMO_TILT_MOVIE_INDEX);
+        // Make sure no one unsorted the tilt images in each serie...
+        if (MDsub.containsLabel(EMDL_MICROGRAPH_PRE_EXPOSURE))
+            MDsub.newSort(EMDL_MICROGRAPH_PRE_EXPOSURE);
+        else
+            REPORT_ERROR("BUG: MDsub does no longer contain a rlnMicrographPreExposure label");
 
-        if (MDjoin.numberOfObjects() != tomogramTables[t].numberOfObjects())
+        if (MDsub.numberOfObjects() != tomogramTables[t].numberOfObjects())
         {
             REPORT_ERROR("ERROR: unequal number of Objects in tiltserie starfiles");
         }
 
-        FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDjoin)
+        FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsub)
         {
-            tomogramTables[t].setObject(MDjoin.getObject(), current_object);
+            tomogramTables[t].setObject(MDsub.getObject(), current_object);
         }
 
-        tomogramObsModels[t].removeUnusedOpticsGroups(tomogramTables[t]);
+       tomogramTables[t].deactivateLabel(EMDL_IMAGE_OPTICS_GROUP);
 
     }
 }

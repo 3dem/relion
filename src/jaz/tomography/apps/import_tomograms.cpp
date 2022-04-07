@@ -381,17 +381,12 @@ int main(int argc, char *argv[])
 					ctfs[i] = ctfs[mapping.oldFrameIndex[i]];
 			}
 
-			std::string opticsGroupName = "opticsGroup1";
-
-			perTomoArguments.getValue(EMDL_IMAGE_OPTICS_GROUP_NAME, opticsGroupName, tomo_index);
-
-
 			tomograms.addTomogram(
 				name, tsFn,
 				mapping.projections,
 				mapping.w, mapping.h, mapping.d,
 				cumulativeDose, fractionalDose,
-				ctfs, hand, pixelSize, opticsGroupName);
+				ctfs, hand, pixelSize);
 
 			Log::endSection();
 		}

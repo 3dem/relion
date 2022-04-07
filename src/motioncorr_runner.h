@@ -52,16 +52,13 @@ public:
 	FileName fn_in, fn_out, fn_movie;
 
 	// Filenames of all the micrographs to run Motioncorr on
-	std::vector<FileName> fn_micrographs, fn_ori_micrographs, fn_tomogram_names;
+	std::vector<FileName> fn_micrographs, fn_ori_micrographs;
 
 	// Optics group number for all original micrographs
 	std::vector<int> optics_group_micrographs, optics_group_ori_micrographs;
 
     // Pre-exposure for each micrograph (mainly used for tomography)
     std::vector<RFLOAT> pre_exposure_micrographs;
-
-    // Tilt movie index for each micrograph in a tilt serie (needed for converting back to tomographyExperiment)
-    std::vector<long> tomo_tilt_movie_index;
 
 	// Information about the optics groups
 	ObservationModel obsModel;

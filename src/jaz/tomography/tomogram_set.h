@@ -5,7 +5,6 @@
 #include <vector>
 #include <src/metadata_table.h>
 #include <src/filename.h>
-#include <src/jaz/single_particle/obs_model.h>
 #include <src/jaz/tomography/tomogram.h>
 #include <src/jaz/gravis/t4Matrix.h>
 #include <src/ctf.h>
@@ -18,11 +17,9 @@ class TomogramSet
 
         MetaDataTable globalTable;
         std::vector<MetaDataTable> tomogramTables;
-        std::vector<ObservationModel> tomogramObsModels;
-        std::vector<std::string> tomogramNames;
 
         TomogramSet();
-        TomogramSet(std::string filename, bool verbose = true);
+        TomogramSet(FileName filename, bool verbose = true);
 
         // return false if this is not a TomogramSet
         bool read(std::string filename, bool verbose = true);
@@ -38,8 +35,7 @@ class TomogramSet
 			double fractionalDose,
 			const std::vector<CTF>& ctfs,
 			double handedness, 
-			double pixelSize,
-			const std::string& opticsGroupName);
+			double pixelSize);
 		
 		int size() const;
 
@@ -60,7 +56,7 @@ class TomogramSet
 		void clearDeformation();
 
 		int getTomogramIndex(std::string tomogramName) const;
-		std::string getTomogramName(int index) const;
+        std::string getTomogramName(int index) const;
 		int getTomogramIndexSafely(std::string tomogramName) const;
 		int getFrameCount(int index) const;
 		int getMaxFrameCount() const;

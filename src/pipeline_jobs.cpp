@@ -1457,7 +1457,7 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 	outputName = outputname;
 	if (is_tomo)
     {
-        Node node2(outputname + "corrected_tomograms.star", LABEL_TOMO_TOMOGRAMS);
+        Node node2(outputname + "corrected_tilt_series.star", LABEL_TOMO_TOMOGRAMS);
         outputNodes.push_back(node2);
     }
     else
@@ -1675,7 +1675,7 @@ bool RelionJob::getCommandsCtffindJob(std::string &outputname, std::vector<std::
 	outputName = outputname;
 	if (is_tomo)
     {
-        Node node(outputname + "tomograms_ctf.star", LABEL_TOMO_TOMOGRAMS);
+        Node node(outputname + "tilt_series_ctf.star", LABEL_TOMO_TOMOGRAMS);
         outputNodes.push_back(node);
     }
     else

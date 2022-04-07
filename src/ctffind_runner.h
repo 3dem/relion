@@ -59,10 +59,7 @@ public:
 	ObservationModel obsModel;
 
     // Tilt movie index for each micrograph in a tilt serie (needed for converting back to tomographyExperiment)
-    std::vector<long> tomo_tilt_movie_index;
-
-	// Tomogram names of all the micrographs
-	std::vector<FileName> fn_tomogram_names;
+    std::vector<RFLOAT> pre_exposure_micrographs;
 
     // Is this a tomography experiment?
     bool is_tomo;

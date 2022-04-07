@@ -191,12 +191,9 @@ void CtffindRunner::initialise(bool is_leader)
 
             if (is_tomo)
             {
-                FileName fn_tomo;
-                MDin.getValue(EMDL_TOMO_NAME, fn_tomo);
-			    fn_tomogram_names.push_back(fn_tomo);
-                long index;
-                MDin.getValue(EMDL_TOMO_TILT_MOVIE_INDEX, index);
-                tomo_tilt_movie_index.push_back(index);
+                RFLOAT exposure;
+                MDin.getValue(EMDL_MICROGRAPH_PRE_EXPOSURE, exposure);
+                pre_exposure_micrographs.push_back(exposure);
             }
 
 		}
@@ -498,8 +495,8 @@ void CtffindRunner::joinCtffindResults()
 
             if (is_tomo)
             {
-                MDctf.setValue(EMDL_TOMO_NAME, fn_tomogram_names[imic]);
-                MDctf.setValue(EMDL_TOMO_TILT_MOVIE_INDEX, tomo_tilt_movie_index[imic]);
+                // Store pre-exposure to sort images on, just in case this program messed up the order...
+                MDctf.setValue(EMDL_MICROGRAPH_PRE_EXPOSURE, pre_exposure_micrographs[imic]);
             }
 
 		}
@@ -510,7 +507,7 @@ void CtffindRunner::joinCtffindResults()
     if (is_tomo)
     {
         tomogramSet.convertBackFromSingleMetaDataTable(MDctf, obsModel);
-        tomogramSet.write(fn_out+"tomograms_ctf.star");
+        tomogramSet.write(fn_out+"tilt_series_ctf.star");
     }
     else
     {

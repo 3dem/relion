@@ -241,7 +241,6 @@ void MotioncorrRunner::initialise()
         // Check if this is a TomographyExperiment starfile, and if so, unpack into one large metadatatable
         if (tomogramSet.read(fn_in, 1))
         {
-            std::cerr <<"is_tomo"<<std::endl;
             is_tomo = true;
             tomogramSet.generateSingleMetaDataTable(MDin, obsModel);
         }
@@ -258,7 +257,6 @@ void MotioncorrRunner::initialise()
 			REPORT_ERROR("The input STAR file does not contain the rlnMicrographMovieName column. Are you sure you imported files as movies, not single frame images?");
 
 		fn_micrographs.clear();
-        fn_tomogram_names.clear();
         pre_exposure_micrographs.clear();
 		optics_group_micrographs.clear();
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
@@ -281,15 +279,6 @@ void MotioncorrRunner::initialise()
                 pre_exposure_micrographs.push_back(0.0);
             }
 
-            if (is_tomo)
-            {
-                FileName fn_tomo;
-                MDin.getValue(EMDL_TOMO_NAME, fn_tomo);
-			    fn_tomogram_names.push_back(fn_tomo);
-                long index;
-                MDin.getValue(EMDL_TOMO_TILT_MOVIE_INDEX, index);
-                tomo_tilt_movie_index.push_back(index);
-            }
 		}
 	}
 	else
@@ -893,8 +882,7 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 			}
 			if (is_tomo)
             {
-                MDavg.setValue(EMDL_TOMO_NAME, fn_tomogram_names[imic]);
-                MDavg.setValue(EMDL_TOMO_TILT_MOVIE_INDEX, tomo_tilt_movie_index[imic]);
+                MDavg.setValue(EMDL_MICROGRAPH_PRE_EXPOSURE, pre_exposure_micrographs[imic]);
             }
             MDavg.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
 			MDavg.setValue(EMDL_MICROGRAPH_METADATA_NAME, fn_avg.withoutExtension() + ".star");
@@ -953,7 +941,7 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 	if (is_tomo)
     {
         tomogramSet.convertBackFromSingleMetaDataTable(MDavg, obsModel);
-        tomogramSet.write(fn_out+"corrected_tomograms.star");
+        tomogramSet.write(fn_out+"corrected_tilt_series.star");
     }
     else
     {
