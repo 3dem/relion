@@ -23,7 +23,6 @@ TomogramSet::TomogramSet(std::string filename, bool verbose)
     if (!read(filename, verbose))
     {
         // This may be a tomograms.star file in the old, original relion-4.0 format. Try to convert
-        // TODO: make conversion from old tomograms.star to new tilt_series.star!
 
         std::ifstream ifs(filename);
         if (!ifs)
@@ -190,10 +189,12 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 
 	double Q0;
 
-	globalTable.getValueSafely(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, out.optics.pixelSize, index);
-	globalTable.getValueSafely(EMDL_CTF_VOLTAGE, out.optics.voltage, index);
-	globalTable.getValueSafely(EMDL_CTF_CS, out.optics.Cs, index);
-	globalTable.getValueSafely(EMDL_CTF_Q0, Q0, index);
+    // pixelsize, voltage, cs and q0 all need to be the same for all optics groups of one tomogram!
+    // Use values from the first optics group
+	tomogramObsModels[index].opticsMdt.getValueSafely(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, out.optics.pixelSize, 0);
+    tomogramObsModels[index].opticsMdt.getValueSafely(EMDL_CTF_VOLTAGE, out.optics.voltage, 0);
+    tomogramObsModels[index].opticsMdt.getValueSafely(EMDL_CTF_CS, out.optics.Cs, 0);
+    tomogramObsModels[index].opticsMdt.getValueSafely(EMDL_CTF_Q0, Q0, 0);
 
 	out.hasDeformations = (
 		globalTable.containsLabel(EMDL_TOMO_DEFORMATION_GRID_SIZE_X) &&
@@ -299,6 +300,7 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 		out.fractionalDose = out.cumulativeDose[out.frameSequence[1]] - out.cumulativeDose[out.frameSequence[0]];
 	}
 
+    // TODO: what to do about opticsGroups for a tomogram? This could be per frame now!!!
 	if (globalTable.containsLabel(EMDL_IMAGE_OPTICS_GROUP_NAME))
 	{
 		out.opticsGroupName = globalTable.getString(EMDL_IMAGE_OPTICS_GROUP_NAME, index);
@@ -356,16 +358,22 @@ void TomogramSet::addTomogram(
 	globalTable.setValue(EMDL_TOMO_SIZE_Y, h, index);
 	globalTable.setValue(EMDL_TOMO_SIZE_Z, d, index);	
 	globalTable.setValue(EMDL_TOMO_HANDEDNESS, handedness, index);
-	
-	const CTF& ctf0 = ctfs[0];
-	
-	globalTable.setValue(EMDL_IMAGE_OPTICS_GROUP_NAME, opticsGroupName, index);
-	globalTable.setValue(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, pixelSize, index);
-	globalTable.setValue(EMDL_CTF_VOLTAGE, ctf0.kV, index);
-	globalTable.setValue(EMDL_CTF_CS, ctf0.Cs, index);
-	globalTable.setValue(EMDL_CTF_Q0, ctf0.Q0, index);
-	globalTable.setValue(EMDL_TOMO_IMPORT_FRACT_DOSE, fractionalDose, index);
-	
+    globalTable.setValue(EMDL_TOMO_IMPORT_FRACT_DOSE, fractionalDose, index);
+
+    const CTF& ctf0 = ctfs[0];
+
+    // TODO: how to handle multiple optics groups here?
+    // Anyway: this function is only called by relion_tomo_import_tomograms.cpp, which will disappear anyway...
+    MetaDataTable opticsMdt;
+    opticsMdt.addObject();
+	opticsMdt.setValue(EMDL_IMAGE_OPTICS_GROUP_NAME, opticsGroupName);
+	opticsMdt.setValue(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, pixelSize);
+	opticsMdt.setValue(EMDL_CTF_VOLTAGE, ctf0.kV);
+	opticsMdt.setValue(EMDL_CTF_CS, ctf0.Cs);
+	opticsMdt.setValue(EMDL_CTF_Q0, ctf0.Q0);
+	ObservationModel obsModel(opticsMdt);
+    tomogramObsModels.push_back(obsModel);
+
 	if (tomogramTables.size() != index)
 	{
 		REPORT_ERROR_STR("TomogramSet::add: corrupted tomogram set: tomogramTables.size() = "
@@ -546,18 +554,19 @@ int TomogramSet::getMaxFrameCount() const
 
 double TomogramSet::getPixelSize(int index) const
 {
-	return globalTable.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, index);
+	// Get pixel size from the first optics group, as all optics group need the same pixel size
+    return tomogramObsModels[index].opticsMdt.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, 0);
 }
 
 std::string TomogramSet::getOpticsGroupName(int index) const
 {
-	if (!globalTable.containsLabel(EMDL_IMAGE_OPTICS_GROUP_NAME))
+	if (!tomogramObsModels[index].opticsMdt.containsLabel(EMDL_IMAGE_OPTICS_GROUP_NAME))
 	{
 		return "opticsGroup1";
 	}
 	else
 	{
-		return globalTable.getString(EMDL_IMAGE_OPTICS_GROUP_NAME, index);
+		return tomogramObsModels[index].opticsMdt.getString(EMDL_IMAGE_OPTICS_GROUP_NAME, 0);
 	}
 }
 
