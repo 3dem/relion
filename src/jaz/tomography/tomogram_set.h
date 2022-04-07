@@ -8,8 +8,6 @@
 #include <src/jaz/tomography/tomogram.h>
 #include <src/jaz/gravis/t4Matrix.h>
 #include <src/ctf.h>
-#include "src/star_handling.h"
-
 
 class TomogramSet
 {
