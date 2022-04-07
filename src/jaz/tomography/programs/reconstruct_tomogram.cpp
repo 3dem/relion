@@ -3,12 +3,12 @@
 #include <src/jaz/tomography/extraction.h>
 #include <src/jaz/tomography/reconstruction.h>
 #include <src/jaz/tomography/tomogram.h>
-#include <src/jaz/tomography/tomogram_set.h>
 #include <src/jaz/image/normalization.h>
 #include <src/jaz/image/centering.h>
 #include <src/jaz/gravis/t4Matrix.h>
 #include <src/jaz/util/log.h>
 #include <src/args.h>
+#include <src/parallel.h>
 
 #include <omp.h>
 
@@ -32,13 +32,13 @@ void TomoBackprojectProgram::readParameters(int argc, char *argv[])
 
 	int gen_section = parser.addSection("General options");
 
-	tomoName = parser.getOption("--tn", "Tomogram name");
+	tomoName = parser.getOption("--tn", "Tomogram name", "*");
 
 	applyWeight = !parser.checkOption("--no_weight", "Do not perform weighting in Fourier space using a Wiener filter");
 	applyPreWeight = parser.checkOption("--pre_weight", "Pre-weight the 2D slices prior to backprojection");
 	FourierCrop = parser.checkOption("--Fc", "Downsample the 2D images by Fourier cropping");
-
-	SNR = textToDouble(parser.getOption("--SNR", "SNR assumed by the Wiener filter", "10"));
+    do_only_unfinished = parser.checkOption("--only_do_unfinished", "Only reconstruct those tomograms that haven't finished yet");
+    SNR = textToDouble(parser.getOption("--SNR", "SNR assumed by the Wiener filter", "10"));
 
 	applyCtf = !parser.checkOption("--noctf", "Ignore the CTF");
 
@@ -59,7 +59,7 @@ void TomoBackprojectProgram::readParameters(int argc, char *argv[])
 
 	n_threads = textToInteger(parser.getOption("--j", "Number of threads", "1"));
 
-	outFn = parser.getOption("--o", "Output filename");
+	outFn = parser.getOption("--o", "Output filename (or directory in case of reconstructing all tomograms)");
 
 	Log::readParams(parser);
 
@@ -75,14 +75,55 @@ void TomoBackprojectProgram::readParameters(int argc, char *argv[])
 
 	ZIO::ensureParentDir(outFn);
 }
-
-void TomoBackprojectProgram::run()
+void TomoBackprojectProgram::initialise()
 {
-	TomogramSet tomogramSet(optimisationSet.tomograms);
-	const int tomoIndex = tomogramSet.getTomogramIndex(tomoName);
-	Tomogram tomogram = tomogramSet.loadTomogram(tomoIndex, true);
-	
-	const int w0 = tomogram.w0;
+    if (!tomogramSet.read(optimisationSet.tomograms))
+        REPORT_ERROR("ERROR: there was a problem reading the tomogram set");
+
+    // Make sure output directory exists (this will work for one or all tomograms)
+    FileName fn_tmp = getOutputFileName(0);
+    if (!exists(fn_tmp.beforeLastOf("/"))) mktree(fn_tmp.beforeLastOf("/"));
+
+    tomoIndexTodo.clear();
+
+    if (tomoName == "*")
+    {
+        for (int idx = 0; idx < tomogramSet.size(); idx++)
+        {
+            if (do_only_unfinished && exists(getOutputFileName(idx)))
+                continue;
+            tomoIndexTodo.push_back(idx);
+        }
+    }
+    else
+    {
+        tomoIndexTodo.push_back(tomogramSet.getTomogramIndex(tomoName));
+    }
+
+    std::cout << " + Reconstructing " << tomoIndexTodo.size() << " tomograms ... " << std::endl;
+
+}
+
+void TomoBackprojectProgram::run(int rank, int size)
+{
+
+    long my_first_idx, my_last_idx;
+    divide_equally(tomoIndexTodo.size(), size, rank , my_first_idx, my_last_idx);
+    for (long idx = my_first_idx; idx <= my_last_idx; idx++)
+    {
+
+        reconstructOneTomogram(tomoIndexTodo[idx]);
+    }
+
+    std::cout << " Done!" << std::endl;
+
+}
+
+void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex)
+{
+    Tomogram tomogram = tomogramSet.loadTomogram(tomoIndex, true);
+
+    const int w0 = tomogram.w0;
 	const int h0 = tomogram.h0;
 	const int d0 = tomogram.d0;
 
@@ -225,8 +266,25 @@ void TomoBackprojectProgram::run()
 	}
 
 	Log::print("Writing output");
-	
-	const double samplingRate = tomogram.optics.pixelSize * spacing;
 
-	out.write(outFn, samplingRate);
+    const double samplingRate = tomogramSet.getPixelSize(tomoIndex) * spacing;
+    out.write(getOutputFileName(), samplingRate);
+
+}
+
+FileName TomoBackprojectProgram::getOutputFileName(int index)
+{
+    if (tomoName == "*")
+    {
+        FileName result = outFn;
+        if (result[result.size()-1] != '/') result += "/";
+        result += "tomograms/rec_" + tomogramSet.getTomogramName(index)+".mrc";
+        return result;
+    }
+    else
+    {
+        return outFn;
+    }
+
+
 }
