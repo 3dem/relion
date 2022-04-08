@@ -33,13 +33,16 @@ int main(int argc, char *argv[])
 		prm.initialise();
 
 #ifdef _CUDA_ENABLED
-		if (prm.do_gpu && !(prm.do_topaz_train || prm.do_topaz_extract) )
+		std::stringstream didSs;
+		if (prm.do_gpu)
 		{
-			std::stringstream didSs;
 			didSs << "AP";
-			int dev_id = prm.deviceInitialise();
-			prm.cudaPicker = (void*) new AutoPickerCuda((AutoPicker*)&prm, dev_id, didSs.str().c_str() );
+			prm.deviceInitialise();
+		}
 
+		if (prm.do_gpu && !(prm.do_topaz_train || prm.do_topaz_extract))
+		{
+			prm.cudaPicker = (void*) new AutoPickerCuda((AutoPicker*)&prm, didSs.str().c_str());
 			((AutoPickerCuda*)prm.cudaPicker)->run();
 		}
 		else

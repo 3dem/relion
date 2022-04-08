@@ -35,7 +35,7 @@
 #include "src/acc/cuda/cuda_autopicker.h"
 
 
-AutoPickerCuda::AutoPickerCuda(AutoPicker *basePicker, int dev_id, const char * timing_fnm) :
+AutoPickerCuda::AutoPickerCuda(AutoPicker *basePicker, const char * timing_fnm) :
 	node(NULL),
 	basePckr(basePicker),
 	allocator(new CudaCustomAllocator(0, 1)),
@@ -52,20 +52,20 @@ AutoPickerCuda::AutoPickerCuda(AutoPicker *basePicker, int dev_id, const char * 
 	/*======================================================
 	                    DEVICE SETTINGS
 	======================================================*/
-	device_id = dev_id;
+	device_id = basePicker->device_id;
 	int devCount;
 	HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 
-	if(dev_id >= devCount)
+	if(device_id >= devCount)
 	{
-		//std::cerr << " using device_id=" << dev_id << " (device no. " << dev_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
+		//std::cerr << " using device_id=" << device_id << " (device no. " << device_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
 		CRITICAL(ERR_GPUID);
 	}
 	else
-		HANDLE_ERROR(cudaSetDevice(dev_id));
+		HANDLE_ERROR(cudaSetDevice(device_id));
 };
 
-AutoPickerCuda::AutoPickerCuda(AutoPickerMpi *basePicker, int dev_id, const char * timing_fnm) :
+AutoPickerCuda::AutoPickerCuda(AutoPickerMpi *basePicker, const char * timing_fnm) :
 	basePckr(basePicker),
 	allocator(new CudaCustomAllocator(0, 1)),
 	micTransformer(0, allocator),
@@ -84,17 +84,17 @@ AutoPickerCuda::AutoPickerCuda(AutoPickerMpi *basePicker, int dev_id, const char
 	/*======================================================
 	                    DEVICE SETTINGS
 	======================================================*/
-	device_id = dev_id;
+	device_id = basePicker->device_id;
 	int devCount;
 	HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 
-	if(dev_id >= devCount)
+	if(device_id >= devCount)
 	{
-		//std::cerr << " using device_id=" << dev_id << " (device no. " << dev_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
+		//std::cerr << " using device_id=" << device_id << " (device no. " << device_id+1 << ") which is higher than the available number of devices=" << devCount << std::endl;
 		CRITICAL(ERR_GPUID);
 	}
 	else
-		HANDLE_ERROR(cudaSetDevice(dev_id));
+		HANDLE_ERROR(cudaSetDevice(device_id));
 };
 
 void AutoPickerCuda::run()

@@ -705,21 +705,6 @@ void AutoPicker::initialise(int rank)
 		// Make an proc directory inside the output directory
 		mktree(fn_odir + "/proc");
 
-		// Which is my GPU?
-		topaz_device_id = -1;
-		if (std::isdigit(*gpu_ids.begin()))
-		{
-			std::vector < std::vector < std::string > > allThreadIDs;
-			untangleDeviceIDs(gpu_ids, allThreadIDs);
-			if (allThreadIDs.size() > 0)
-			{
-				if (allThreadIDs.size() > rank)
-					topaz_device_id = textToInteger((allThreadIDs[rank][0]).c_str());
-				else
-					topaz_device_id = textToInteger((allThreadIDs[0][0]).c_str());
-			}
-		}
-
 		// Get topaz_downscale from particle_diameter and micrograph pixel size
 		if (topaz_downscale < 0)
 		{
@@ -987,7 +972,7 @@ void AutoPicker::initialise(int rank)
 }
 
 #ifdef _CUDA_ENABLED
-int AutoPicker::deviceInitialise()
+void AutoPicker::deviceInitialise()
 {
 	int devCount;
 	cudaGetDeviceCount(&devCount);
@@ -996,18 +981,15 @@ int AutoPicker::deviceInitialise()
 	untangleDeviceIDs(gpu_ids, allThreadIDs);
 
 	// Sequential initialisation of GPUs on all ranks
-	int dev_id;
 	if (!std::isdigit(*gpu_ids.begin()))
-		dev_id = 0;
+		device_id = 0;
 	else
-		dev_id = textToInteger((allThreadIDs[0][0]).c_str());
+		device_id = textToInteger((allThreadIDs[0][0]).c_str());
 
 	if (verb>0)
 	{
-		std::cout << " + Using GPU device " << dev_id << std::endl;
+		std::cout << " + Using GPU device " << device_id << std::endl;
 	}
-
-	return(dev_id);
 }
 #endif
 
@@ -2990,8 +2972,8 @@ void AutoPicker::trainTopaz()
 	fh << " -n " << integerToString(topaz_nr_particles);
 	// Let's use 25% of particle_radius (set in initialise()) for training...
 	fh << " -r " << integerToString(topaz_radius);
-	if (topaz_device_id >= 0)
-		fh << " -d " << integerToString(topaz_device_id);
+	if (device_id >= 0)
+		fh << " -d " << integerToString(device_id);
 	fh << " -o " << fn_odir << "model_training.txt";
 	fh << " --num-threads=" << integerToString(topaz_workers); // pyTorch threads
 	fh << " --num-workers=" << integerToString(topaz_workers); // parallelize data augmentation
@@ -3054,7 +3036,7 @@ void AutoPicker::autoPickTopazOneMicrograph(FileName &fn_mic, int rank)
 	}
 	fh << " -t " << floatToString(topaz_threshold);
 	fh << " -r " << integerToString(topaz_radius);
-	fh << " -d " << integerToString(topaz_device_id);
+	fh << " -d " << integerToString(device_id);
 	fh << " -x " << integerToString(topaz_downscale);
 	if (topaz_model != "")
 		fh << " -m " << topaz_model;
