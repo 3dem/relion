@@ -414,6 +414,16 @@ void JobWindow::initialise(int my_job_type, bool _is_tomo)
 		myjob.initialise(my_job_type);
 		initialiseTomoImportWindow();
 	}
+    else if (my_job_type == PROC_TOMO_RECONSTRUCT_TOMOGRAM)
+    {
+        myjob.initialise(my_job_type);
+        initialiseTomoReconstructTomogramsWindow();
+    }
+    else if (my_job_type == PROC_TOMO_ALIGN_TILTSERIES)
+    {
+        myjob.initialise(my_job_type);
+        initialiseTomoAlignTiltseriesWindow();
+    }
 	else if (my_job_type == PROC_TOMO_SUBTOMO)
 	{
 		myjob.initialise(my_job_type);
@@ -2353,10 +2363,42 @@ void JobWindow::placeTomoInput(bool has_tomograms, bool has_particles,
 
 void JobWindow::initialiseTomoImportWindow()
 {
-	setupTabs(3);
+	setupTabs(5);
 
-	tab1->begin();
-	tab1->label("Tomograms");
+    tab1->begin();
+	tab1->label("General");
+	resetHeight();
+
+    place("angpix", TOGGLE_DEACTIVATE);
+	place("kV", TOGGLE_DEACTIVATE);
+	place("Cs", TOGGLE_DEACTIVATE);
+	place("Q0", TOGGLE_DEACTIVATE);
+	place("dose", TOGGLE_DEACTIVATE);
+
+    tab1->end();
+
+    tab2->begin();
+	tab2->label("Tilt series");
+	resetHeight();
+
+    group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group4->end();
+	place("do_tiltseries", TOGGLE_DEACTIVATE, group4, false);
+	group4->begin();
+
+    place("movie_files", TOGGLE_DEACTIVATE);
+    place("mdoc_files", TOGGLE_DEACTIVATE);
+    place("prefix", TOGGLE_DEACTIVATE);
+
+    current_y += STEPY/2;
+    place("tilt_axis_angle", TOGGLE_DEACTIVATE);
+    place("mtf_file", TOGGLE_DEACTIVATE);
+
+    group4->end();
+    guientries["do_tiltseries"].cb_menu_i(); // make default active
+
+	tab3->begin();
+	tab3->label("Tomograms");
 	resetHeight();
 
 	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
@@ -2366,15 +2408,10 @@ void JobWindow::initialiseTomoImportWindow()
 
 	place("tomo_star", TOGGLE_DEACTIVATE);
 	place("io_tomos", TOGGLE_DEACTIVATE);
-	place("angpix", TOGGLE_DEACTIVATE);
-	place("kV", TOGGLE_DEACTIVATE);
-	place("Cs", TOGGLE_DEACTIVATE);
-	place("Q0", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	place("dose", TOGGLE_DEACTIVATE);
 	place("order_list", TOGGLE_DEACTIVATE);
 	place("do_flipYZ", TOGGLE_DEACTIVATE);
 	place("do_flipZ", TOGGLE_DEACTIVATE);
@@ -2383,10 +2420,10 @@ void JobWindow::initialiseTomoImportWindow()
 	group1->end();
 	guientries["do_tomo"].cb_menu_i(); // make default active
 
-	tab1->end();
+	tab3->end();
 
-	tab2->begin();
-	tab2->label("Coordinates");
+	tab4->begin();
+	tab4->label("Coordinates");
 	resetHeight();
 
 	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
@@ -2403,10 +2440,10 @@ void JobWindow::initialiseTomoImportWindow()
 	group2->end();
 	guientries["do_coords"].cb_menu_i(); // make default active
 
-	tab2->end();
+	tab4->end();
 
-	tab3->begin();
-	tab3->label("Others");
+	tab5->begin();
+	tab5->label("Others");
 	resetHeight();
 
 	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
@@ -2429,7 +2466,74 @@ void JobWindow::initialiseTomoImportWindow()
 	group3->end();
 	guientries["do_other"].cb_menu_i(); // make default active
 
-	tab3->end();
+	tab5->end();
+}
+
+void JobWindow::initialiseTomoAlignTiltseriesWindow()
+{
+    setupTabs(1);
+
+    tab1->begin();
+    tab1->label("I/O");
+    resetHeight();
+
+    place("in_tiltseries", TOGGLE_DEACTIVATE);
+
+ 	// Add a little spacer
+	current_y += STEPY/2;
+
+    group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group1->end();
+    place("do_imod_fiducials", TOGGLE_DEACTIVATE, group1, false);
+    group1->begin();
+
+    place("fiducial_diameter", TOGGLE_DEACTIVATE);
+    group1->end();
+    guientries["do_imod_fiducials"].cb_menu_i(); // make default active
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+    group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group2->end();
+    place("do_imod_patchtrack", TOGGLE_DEACTIVATE, group2, false);
+    group2->begin();
+
+    place("patch_size", TOGGLE_DEACTIVATE);
+    place("patch_overlap", TOGGLE_DEACTIVATE);
+    group2->end();
+    guientries["do_imod_patchtrack"].cb_menu_i(); // make default active
+
+    tab1->end();
+
+
+}
+
+void JobWindow::initialiseTomoReconstructTomogramsWindow()
+{
+    setupTabs(2);
+
+    placeTomoInput(true, false, false, false, false, false);
+
+	tab2->begin();
+	tab2->label("Reconstruct");
+	resetHeight();
+
+
+    place("binning", TOGGLE_DEACTIVATE);
+
+	current_y += STEPY /2 ;
+
+    place("xdim", TOGGLE_DEACTIVATE);
+    place("ydim", TOGGLE_DEACTIVATE);
+    place("zdim", TOGGLE_DEACTIVATE);
+
+    current_y += STEPY /2 ;
+
+    place("tomo_name");
+
+	tab2->end();
+
 }
 
 void JobWindow::initialiseTomoSubtomoWindow()

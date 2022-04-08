@@ -481,6 +481,8 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 			type != PROC_TOMO_SUBTOMO &&
 			type != PROC_TOMO_CTFREFINE &&
 			type != PROC_TOMO_ALIGN &&
+            type != PROC_TOMO_ALIGN_TILTSERIES &&
+            type != PROC_TOMO_RECONSTRUCT_TOMOGRAM &&
 			type != PROC_TOMO_RECONSTRUCT &&
 		    type != PROC_EXTERNAL)
 			REPORT_ERROR("ERROR: cannot find correct job type in " + myfilename + "run.job, with type= " + integerToString(type));
@@ -876,6 +878,16 @@ void RelionJob::initialise(int _job_type)
 		has_mpi = has_thread = false;
 		initialiseTomoImportJob();
 	}
+    else if (type == PROC_TOMO_ALIGN_TILTSERIES)
+    {
+        has_mpi = has_thread = true;
+        initialiseTomoAlignTiltSeriesJob();
+    }
+    else if (type == PROC_TOMO_RECONSTRUCT_TOMOGRAM)
+    {
+        has_mpi = has_thread = true;
+        initialiseTomoReconstructTomogramsJob();
+    }
 	else if (type == PROC_TOMO_SUBTOMO)
 	{
 		has_mpi = has_thread = true;
@@ -1127,6 +1139,10 @@ bool RelionJob::getCommands(std::string &outputname, std::vector<std::string> &c
 	{
 		result = getCommandsTomoAlignJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
+    else if (type == PROC_TOMO_ALIGN_TILTSERIES)
+    {
+        result = getCommandsTomoAlignTiltSeriesJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
+    }
 	else if (type == PROC_TOMO_RECONSTRUCT)
 	{
 		result = getCommandsTomoReconPartJob(outputname, commands, final_command, do_makedir, job_counter,
@@ -6077,6 +6093,19 @@ void RelionJob::initialiseTomoImportJob()
 {
         hidden_name = ".gui_tomo_import";
 
+        joboptions["angpix"] = JobOption("Pixel size (Angstrom):", 1.35, 0.5, 10.0, 0.1, "Pixel size in Angstroms. ");
+        joboptions["kV"] = JobOption("Voltage (kV):", 300, 80, 300, 10, "Voltage the microscope was operated on (in kV; default=300).");
+        joboptions["Cs"] = JobOption("Spherical aberration (mm):", 2.7, 0.01, 4, 0.1 , "Spherical aberration of the microscope used to collect these images (in mm). Typical values are 2.7 (FEI Titan & Talos, most JEOL CRYO-ARM), 2.0 (FEI Polara), 1.4 (some JEOL CRYO-ARM) and 0.01 (microscopes with a Cs corrector).");
+        joboptions["Q0"] = JobOption("Amplitude contrast:", 0.1, 0.05, 1, 0.01, "Fraction of amplitude contrast (default=0.1). Often values around 10% work better than theoretically more accurate lower values. ");
+        joboptions["dose"] = JobOption("Frame dose:", 3.0, 0.0, 10.0, 0.1 , "Electron dose (in e/A^2) per frame (image) in the tilt series.");
+
+        joboptions["do_tiltseries"]= JobOption("Import tiltseries?", true, "Set this to Yes for importing tilt series straight from serialEM.");
+        joboptions["movie_files"] = JobOption("Tilt image movie files:", (std::string)"frames/*mrc","File pattern pointing to the raw movie files for the tilt images");
+        joboptions["mdoc_files"] = JobOption("mdoc files:", (std::string)"mdoc/*.mdoc","File pattern pointing to the mdoc files from the data acquisition software");
+        joboptions["prefix"] = JobOption("Prefix:", (std::string)"","Prefix for XXX");
+        joboptions["tilt_axis_angle"] = JobOption("Tilt axis angle (deg):", 90.0, 0.0, 180.0, 1.0 , "Nominal value for the angle of the tilt axis");
+        joboptions["mtf_file"] = JobOption("MTF file:", (std::string)"","MTF file for the detector");
+
        	joboptions["do_tomo"] = JobOption("Import tomograms?", true, "Set this to Yes for importing tomogram directories from IMOD.");
         joboptions["io_tomos"] = JobOption("Append to tomograms set: ", OUTNODE_TOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "The imported tomograms will be output into this tomogram set. If any tomograms were already in this tomogram set, then the newly imported ones will be added to those.");
         joboptions["tomo_star"] = JobOption("STAR file with tomograms description: ", "", "Input file (*.star)", ".", "Provide a STAR file with the basic following information to import tomogsrams: \n\n"
@@ -6090,20 +6119,17 @@ void RelionJob::initialiseTomoImportJob()
                   " - rlnOpticsGroupName: an arbitrary name for an optics group. This allows the set of tilt series to be separated into subsets that share the same optical aberrations. This is useful if the data have been collected in multiple sessions that might exhibit different aberrations. If omitted, all tilt series will be assigned to the same default optics group.\n"
                   " - rlnTomoImportOffset<X/Y/Z>: an arbitrary offset to the 3D coordinate system. This is useful if particles have already been picked in tomograms that have been cropped after reconstruction by IMOD. If the IMOD-internal SHIFT command has been used to apply offsets, then this will be handled internally and does not need to be specified here. If omitted, then the values of the --off<x/y/z> command line arguments will be used instead (which default to 0).\n"
                   " - rlnTomoImportCulledFile: output file name for a new tilt series with the excluded frames missing. This is only needed if tilt images have been excluded using IMOD’s EXCLUDE, EXCLUDELIST or EXCLUDELIST2 commands. In that case, this becomes a mandatory parameter.");
-    	joboptions["angpix"] = JobOption("Pixel size (Angstrom):", (std::string)"", "Pixel size in Angstroms. If this values varies among the input tomograms, then specify it using its own column (rlnTomoTiltSeriesPixelSize) in the input tomogram description STAR file.");
-    	joboptions["kV"] = JobOption("Voltage (kV):", (std::string)"", "Voltage the microscope was operated on (in kV; default=300). If this values varies among the input tomograms, then specify it using its own column (rlnVoltage) in the input tomogram description STAR file.");
-    	joboptions["Cs"] = JobOption("Spherical aberration (mm):", (std::string)"", "Spherical aberration of the microscope used to collect these images (in mm; default=2.7). Typical values are 2.7 (FEI Titan & Talos, most JEOL CRYO-ARM), 2.0 (FEI Polara), 1.4 (some JEOL CRYO-ARM) and 0.01 (microscopes with a Cs corrector). If this values varies among the input tomograms, then specify it using its own column (rlnSphericalAberration) in the input tomogram description STAR file.");
-    	joboptions["Q0"] = JobOption("Amplitude contrast:", (std::string)"", "Fraction of amplitude contrast (default=0.1). Often values around 10% work better than theoretically more accurate lower values.  If this values varies among the input tomograms, then specify it using its own column (rlnAmplitudeContrast) in the input tomogram description STAR file.");
-    	joboptions["dose"] = JobOption("Frame dose:", (std::string)"", "Electron dose (in e/A^2) per frame (image) in the tilt series.  If this values varies among the input tomograms, then specify it using its own column (rlnTomoImportFractionalDose) in the input tomogram description STAR file.");
     	joboptions["order_list"] = JobOption("Ordered list:", (std::string)"", "", ".", "A 2-column, comma-separated file with the frame-order list of the tilt series, where the first column is the frame (image) number (starting at 1) and the second column is the tilt angle (in degrees). If this values varies among the input tomograms, then specify it using its own column (rlnTomoImportOrderList) in the input tomogram description STAR file.");
     	joboptions["do_flipYZ"] = JobOption("Flip YZ?", true, "Set this to Yes if you want to interchange the Y and Z coordinates.  If this values varies among the input tomograms, then append opposite values to tomogram set using another Import tomo job.");
     	joboptions["do_flipZ"] = JobOption("Flip Z?", true, "Set this to Yes if you want to change the sign of the Z coordinates.  If this values varies among the input tomograms, then append opposite values to tomogram set using another Import tomo job.");
     	joboptions["hand"] = JobOption("Tilt handedness:", (std::string)"", "Set this to indicate the handedness of the tilt geometry (default=-1). The value of this parameter is either +1 or -1, and it describes whether the focus increases or decreases as a function of Z distance. It has to be determined experimentally. In our experiments, it has always been -1. Y If this values varies among the input tomograms, then append opposite values to tomogram set using another Import tomo job.");
-       	joboptions["do_coords"] = JobOption("Import coordinates?", false, "Set this to Yes for importing particle coordinates.");
+
+        joboptions["do_coords"] = JobOption("Import coordinates?", false, "Set this to Yes for importing particle coordinates.");
         joboptions["part_star"] = JobOption("STAR file with coordinates: ", "", "Input file (*.star)", ".", "Provide a STAR file with the following information to input particles: \n \n TODO TODO TODO ");
         joboptions["part_tomos"] = JobOption("Tomograms set: ", OUTNODE_TOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "The tomograms set from which these particles were picked.");
         joboptions["do_coords_flipZ"] = JobOption("Flip Z coordinates?", false, "Set this to Yes if you want to flip particles Z coordinate. Use it in case imported tomograms Z axis are flipped compared to tomograms used for picking.");
-    	joboptions["do_other"] = JobOption("Import other node types?", false, "Set this to Yes  if you plan to import anything else than movies or micrographs");
+
+        joboptions["do_other"] = JobOption("Import other node types?", false, "Set this to Yes  if you plan to import anything else than movies or micrographs");
     	joboptions["fn_in_other"] = JobOption("Input file:", "ref.mrc", "Input file (*.*)", ".", "Select any file(s) to import. \n \n \
     Note that for importing coordinate files, one has to give a Linux wildcard, where the *-symbol is before the coordinate-file suffix, e.g. if the micrographs are called mic1.mrc and the coordinate files mic1.box or mic1_autopick.star, one HAS to give '*.box' or '*_autopick.star', respectively.\n \n \
     Also note that micrographs, movies and coordinate files all need to be in the same directory (with the same rootnames, e.g.mic1 in the example above) in order to be imported correctly. 3D masks or references can be imported from anywhere. \n \n \
@@ -6127,22 +6153,45 @@ bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<st
     std::string command;
 
 	// Some code here was copied from the SPA import job...
-	bool do_tomo = joboptions["do_tomo"].getBoolean();
+	bool do_tiltseries = joboptions["do_tiltseries"].getBoolean();
+    bool do_tomo = joboptions["do_tomo"].getBoolean();
 	bool do_coords = joboptions["do_coords"].getBoolean();
 	bool do_other = joboptions["do_other"].getBoolean();
 
 	int i = 0;
+    if (do_tiltseries) i++;
 	if (do_tomo) i++;
 	if (do_coords) i++;
 	if (do_other) i++;
 
 	if (i != 1)
 	{
-		error_message = "ERROR: you can only select to import tomograms, import particles, OR import other nodes.";
+		error_message = "ERROR: you can only select ONE of tilt series, tomograms, import particles, or import other nodes.";
 	return false;
 	}
 
-	if (do_tomo)
+    if (do_tiltseries)
+    {
+        // TODO: rename command to relion_tomo_import_tiltseries?
+        command = "relion_tomo_import SerialEM ";
+        command += " --tilt-image-movie-pattern \"" + joboptions["movie_files"].getString() + "\"";
+        command += " --mdoc-file-pattern \"" + joboptions["mdoc_files"].getString() + "\"";
+        command += " --nominal-tilt-axis-angle " + joboptions["tilt_axis_angle"].getString();
+        command += " --nominal-pixel-size " + joboptions["angpix"].getString();
+        command += " --voltage " + joboptions["kV"].getString();
+        command += " --spherical-aberration " + joboptions["Cs"].getString();
+        command += " --amplitude-contrast " + joboptions["Q0"].getString();
+        command += " --dose-per-tilt-image " + joboptions["dose"].getString();
+        if (joboptions["prefix"].getString() != "")
+            command += " --prefix " + joboptions["prefix"].getString();
+        if (joboptions["mtf_file"].getString() != "")
+            command += " --mtf-file " + joboptions["mtf_file"].getString();
+        command += " --output-directory " + outputname;
+        Node node(outputname+"tilt_series.star", LABEL_TOMO_TOMOGRAMS);
+		outputNodes.push_back(node);
+
+    }
+    else if (do_tomo)
 	{
 
 		if (joboptions["tomo_star"].getString() == "")
@@ -6293,6 +6342,132 @@ bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<st
     return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 
 }
+
+
+void RelionJob::initialiseTomoAlignTiltSeriesJob()
+{
+    hidden_name = ".gui_tomo_align_tiltseries";
+
+    joboptions["in_tiltseries"] = JobOption("Input tilt series:", OUTNODE_TOMO_TOMOGRAMS, "", "STAR files (*.star)",  "Input tomogram set starfile.");
+
+    joboptions["do_imod_fiducials"] = JobOption("Use IMOD:fiducials?", true, "Set to Yes to perform tilt series alignment using fiducials in IMOD.");
+    joboptions["fiducial_diameter"] = JobOption("Fiducial diameter (nm): ", 10, 1, 50, 1, "The diameter of the fiducials (in nm)");
+
+    joboptions["do_imod_patchtrack"] = JobOption("Use IMOD:patch-tracking?", false, "Set to Yes to perform tilt series alignment using patch-tracking in IMOD.");
+    // TODO: check defaults with the experts
+    joboptions["patch_size"] = JobOption("Patch size (in unbinned pixels): ", 10, 1, 50, 1, "The size of the patches in unbinned pixels.");
+    joboptions["patch_overlap"] = JobOption("Patch overlap (%): ", 10, 0, 100, 10, "The overlap (0-100%) between the patches.");
+
+}
+bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::vector<std::string> &commands,
+                                       std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
+{
+    commands.clear();
+    initialisePipeline(outputname, job_counter);
+    std::string command;
+
+    int i = 0;
+    if (joboptions["do_imod_fiducials"].getBoolean()) i++;
+    if (joboptions["do_imod_patchtrack"].getBoolean()) i++;
+
+    if (i != 1)
+    {
+        error_message = "ERROR: you should (only) select ONE of the alignment methods: IMOD:fiducials or IMOD:patchtracking.";
+        return false;
+    }
+
+    // TODO: rename command to relion_tomo_import_tiltseries?
+    command = "relion_tomo_align_tilt_series ";
+    // Make sure the methods are the first argument to the program!
+    if (joboptions["do_imod_fiducials"].getBoolean())
+    {
+        command += " IMOD:fiducials";
+        command += " --nominal-fiducial-diameter-nanometres " + joboptions["fiducial_diameter"].getString();
+    }
+    else if (joboptions["do_imod_patchtrack"].getBoolean())
+    {
+        command += " IMOD:patch-tracking";
+        command += " --unbinned-patch-size-pixels " + joboptions["patch_size"].getString();
+        command += " -- patch-overlap-percentage " + joboptions["patch_overlap"].getString();
+    }
+
+    command += " --tilt-series-star-file " + joboptions["in_tiltseries"].getString();
+    Node node(joboptions["in_tiltseries"].getString(), joboptions["in_tiltseries"].node_type);
+    inputNodes.push_back(node);
+
+    command += " --output-directory " + outputname;
+    Node node2(outputname+"tilt_series.star", LABEL_TOMO_TOMOGRAMS);
+    outputNodes.push_back(node2);
+
+    // Other arguments for extraction
+    command += " " + joboptions["other_args"].getString();
+    commands.push_back(command);
+
+    return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
+
+}
+
+void RelionJob::initialiseTomoReconstructTomogramsJob()
+{
+    hidden_name = ".gui_tomo_reconstruct_tomograms";
+
+    addTomoInputOptions(true, false, false, false, false, false);
+
+    joboptions["tomo_name"] = JobOption("Reconstruct only this tomogram:", std::string(""), "If not left empty, the program will only reconstruct this particular tomogram");
+
+    joboptions["binning"] = JobOption("Binning factor: ", 8, 1, 32, 1, "The tomogram will be downscaled to this factor. For particle picking, often binning to 4 or 8 gives good enough tomograms. Later subtomogram averaging will not use these binned tomograms.");
+
+    joboptions["xdim"] = JobOption("Tomogram width (Xdim): ", -1, -1, 6000, 100, "The tomogram X-dimension in pixels. If a negative value is given, this will be determined from the size of the tilt series images.");
+    joboptions["ydim"] = JobOption("Tomogram height (Ydim): ", -1, -1, 6000, 100, "The tomogram Y-dimension in pixels. If a negative value is given, this will be determined from the size of the tilt series images.");
+    joboptions["zdim"] = JobOption("Tomogram thickness (Zdim): ", 2000, -1, 6000, 100, "The tomogram Z-dimension in pixels. If a negative value is given, this will be determined from the size of the tilt series images.");
+
+
+}
+bool RelionJob::getCommandsTomoReconstructTomogramsJob(std::string &outputname, std::vector<std::string> &commands,
+                                            std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
+{
+    commands.clear();
+    initialisePipeline(outputname, job_counter);
+    std::string command;
+
+    if (joboptions["nr_mpi"].getNumber(error_message) > 1)
+        command="`which relion_tomo_reconstruct_tomogram_mpi`";
+    else
+        command="`which relion_tomo_reconstruct_tomogram`";
+    if (error_message != "") return false;
+
+    // I/O
+    error_message = getTomoInputCommmand(command, HAS_COMPULSORY, HAS_NOT, HAS_NOT, HAS_NOT, HAS_NOT,
+                                         HAS_NOT);
+    if (error_message != "") return false;
+
+    command += " --o " + outputname;
+    command += " --tn " + joboptions["tomo_name"].getString();
+
+    command += " --w " + joboptions["xdim"].getString();
+    command += " --h " + joboptions["ydim"].getString();
+    command += " --d " + joboptions["zdim"].getString();
+
+    Node node1(outputname+"tomograms.star", LABEL_TOMO_TOMOGRAMS);
+    outputNodes.push_back(node1);
+
+    if (is_continue)
+    {
+        command += " --only_do_unfinished ";
+    }
+
+    // Running stuff
+    command += " --j " + joboptions["nr_threads"].getString();
+
+    // Other arguments for extraction
+    command += " " + joboptions["other_args"].getString();
+    commands.push_back(command);
+
+    return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
+
+}
+
+
 
 void RelionJob::initialiseTomoSubtomoJob()
 {
