@@ -106,13 +106,34 @@ void TomoBackprojectProgram::initialise()
 
 void TomoBackprojectProgram::run(int rank, int size)
 {
-
     long my_first_idx, my_last_idx;
     divide_equally(tomoIndexTodo.size(), size, rank , my_first_idx, my_last_idx);
+
+
+    int barstep, nr_todo = my_last_idx-my_first_idx+1;
+    if (rank == 0)
+    {
+        init_progress_bar(nr_todo);
+        barstep = XMIPP_MAX(1, nr_todo / 60);
+    }
     for (long idx = my_first_idx; idx <= my_last_idx; idx++)
     {
+        // Abort through the pipeline_control system
+        if (pipeline_control_check_abort_job())
+            exit(RELION_EXIT_ABORTED);
 
         reconstructOneTomogram(tomoIndexTodo[idx]);
+
+        if (idx % barstep == 0)
+            progress_bar(idx);
+    }
+
+    progress_bar(nr_todo);
+
+    // If the output filename was a directory, then also write updated tomograms.star.
+    if (outFn[outFn.size()-1] == '/')
+    {
+        tomogramSet.write(outFn + "tomograms.star");
     }
 
     std::cout << " Done!" << std::endl;
@@ -270,11 +291,15 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex)
     const double samplingRate = tomogramSet.getPixelSize(tomoIndex) * spacing;
     out.write(getOutputFileName(), samplingRate);
 
+    // Also add the tomogram name to the tomogramSet
+    tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME, getOutputFileName(), tomoIndex);
+
 }
 
 FileName TomoBackprojectProgram::getOutputFileName(int index)
 {
-    if (tomoName == "*")
+    // If we're reconstructing many tomograms, or the output filename is a directory: use standardized output filenames
+    if (tomoName == "*" || outFn[outFn.size()-1] == '/')
     {
         FileName result = outFn;
         if (result[result.size()-1] != '/') result += "/";
