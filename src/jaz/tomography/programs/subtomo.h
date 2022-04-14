@@ -58,8 +58,7 @@ class SubtomoProgram
 				write_normalised,
 				do_not_write_any,
 				only_do_unfinished,
-				apply_angles,
-				restore_angles,
+				apply_orientations,
 				write_float16,
 				run_from_GUI,
 				run_from_MPI;

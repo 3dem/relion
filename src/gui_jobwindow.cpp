@@ -2444,10 +2444,6 @@ void JobWindow::initialiseTomoSubtomoWindow()
 	place("crop_size", TOGGLE_DEACTIVATE);
 	place("binning", TOGGLE_DEACTIVATE);
 
-	current_y += STEPY /2 ;
-	place("apply_angles", TOGGLE_DEACTIVATE);
-	current_y += STEPY /2 ;
-
 	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group1->end();
 	place("do_cone_weight", TOGGLE_DEACTIVATE, group1);
@@ -2462,8 +2458,6 @@ void JobWindow::initialiseTomoSubtomoWindow()
 	current_y += STEPY /2 ;
 
 	place("do_float16", TOGGLE_DEACTIVATE);
-	current_y += STEPY /2 ;
-	place("restore_angles", TOGGLE_DEACTIVATE);
 
 	tab2->end();
 }

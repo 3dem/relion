@@ -6241,8 +6241,6 @@ void RelionJob::initialiseTomoSubtomoJob()
 
 	addTomoInputOptions(true, true, true, false, false, false);
 
-	joboptions["restore_angles"] = JobOption("Restore orientations?", false ,"If set to Yes, rlnTomoSubtomogram<Rot/Tilt/Psi> orientations are added to rlnAngle<Rot/Tilt/Psi>. Particles are not constructed.");
-
 	joboptions["box_size"] = JobOption("Box size (pix):", 128, 32, 512, 16, "The initial box size of the reconstruction. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
 	joboptions["crop_size"] = JobOption("Cropped box size (pix):", -1, -1, 512, 16, "If set to a positive value, after construction, the resulting pseudo subtomograms are cropped to this size. A smaller box size allows the (generally expensive) refinement using relion_refine to proceed more rapidly.");
 	joboptions["binning"] = JobOption("Binning factor:", 1, 1, 16, 1, "The tilt series images will be binned by this (real-valued) factor and then reconstructed in the specified box size above. Note that thereby the reconstructed region becomes larger when specifying binning factors larger than one.");
@@ -6251,7 +6249,6 @@ void RelionJob::initialiseTomoSubtomoJob()
 	joboptions["cone_angle"] = JobOption("Cone angle:", 10, 1, 50, 1, "The (full) opening angle of the cone to be suppressed, given in degrees. This angle should include both the uncertainty about the membrane orientation and its variation across the region represented in the subtomogram.");
 
 	joboptions["do_float16"] = JobOption("Write output in float16?", true ,"If set to Yes, this program will write output images in float16 MRC format. This will save a factor of two in disk space compared to the default of writing in float32. Note that RELION and CCPEM will read float16 images, but other programs may not (yet) do so.");
-	joboptions["apply_angles"] = JobOption("Apply orientations?", false ,"If set to Yes, rlnAngle<Rot/Tilt/Psi> orientations are combined with rlnTomoSubtomogram<Rot/Tilt/Psi> to construct reference-oriented subtomos.");
 
 }
 
@@ -6300,20 +6297,6 @@ bool RelionJob::getCommandsTomoSubtomoJob(std::string &outputname, std::vector<s
 	if (joboptions["do_float16"].getBoolean())
 	{
 		command += " --float16 ";
-	}
-
-	if (joboptions["apply_angles"].getBoolean())
-	{
-		command += " --apply_angles ";
-	}
-	if (joboptions["restore_angles"].getBoolean())
-	{
-		if (joboptions["apply_angles"].getBoolean())
-		{
-			error_message = "ERROR: Restore angles and rotate p-subtomos cannot be applied simultaneously.";
-			return false;
-		}
-		command += " --restore ";
 	}
 
 	if (is_continue)
