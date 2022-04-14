@@ -6272,7 +6272,7 @@ bool RelionJob::getCommandsTomoSubtomoJob(std::string &outputname, std::vector<s
 										 HAS_NOT);
 	if (error_message != "") return false;
 
-	command += " --o " + outputname;
+	command += " --theme classic --o " + outputname;
 
 	Node node1(outputname+"optimisation_set.star", LABEL_TOMO_OPTIMISATION);
 	outputNodes.push_back(node1);
@@ -6365,7 +6365,7 @@ bool RelionJob::getCommandsTomoCtfRefineJob(std::string &outputname, std::vector
 										 HAS_OPTIONAL);
 	if (error_message != "") return false;
 
-	command += " --o " + outputname;
+	command += " --theme classic --o " + outputname;
 
 	Node node1(outputname+"optimisation_set.star", LABEL_TOMO_OPTIMISATION);
 	outputNodes.push_back(node1);
@@ -6470,7 +6470,7 @@ bool RelionJob::getCommandsTomoAlignJob(std::string &outputname, std::vector<std
 					HAS_OPTIONAL);
     if (error_message != "") return false;
 
-	command += " --o " + outputname;
+	command += " --theme classic --o " + outputname;
 
 	Node node1(outputname+"optimisation_set.star", LABEL_TOMO_OPTIMISATION);
 	outputNodes.push_back(node1);
@@ -6593,7 +6593,7 @@ bool RelionJob::getCommandsTomoReconPartJob(std::string &outputname, std::vector
 						HAS_NOT);
 		if (error_message != "") return false;
 
-		command += " --o " + outputname;
+		command += " --theme classic --o " + outputname;
 
 		Node node1(outputname+"merged.mrc", LABEL_TOMO_MAP);
 		outputNodes.push_back(node1);
