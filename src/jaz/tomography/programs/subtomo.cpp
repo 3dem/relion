@@ -317,13 +317,10 @@ void SubtomoProgram::writeParticleSet(
 					copy.setImageFileNames(outData, outWeight, new_id);
 				}
 
-				const d3Vector offset_A = particleSet.getParticleOffset(part_id);
-				const d3Vector coord_0 = particleSet.getParticleCoord(part_id);
+                const d3Vector pos = particleSet.getPosition(part_id);
 
-				const d3Vector coord_1 = coord_0 - offset_A / originalPixelSize;
-
-				copy.setParticleOffset(new_id, d3Vector(0,0,0));
-				copy.setParticleCoord(new_id, coord_1);
+                copy.setParticleOffset(new_id, d3Vector(0,0,0));
+				copy.setParticleCoord(new_id, pos);
 
 				if (apply_angles || restore_angles)
 				{
