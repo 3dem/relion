@@ -45,7 +45,7 @@ void AutoPickerMpi::read(int argc, char **argv)
 }
 
 #ifdef _CUDA_ENABLED
-int AutoPickerMpi::deviceInitialise()
+void AutoPickerMpi::deviceInitialise()
 {
 	int devCount;
 	cudaGetDeviceCount(&devCount);
@@ -54,23 +54,20 @@ int AutoPickerMpi::deviceInitialise()
 	untangleDeviceIDs(gpu_ids, allThreadIDs);
 
 	// Sequential initialisation of GPUs on all ranks
-	int dev_id;
 	if (!std::isdigit(*gpu_ids.begin()))
-		dev_id = node->rank%devCount;
+		device_id = node->rank%devCount;
 	else
-		dev_id = textToInteger((allThreadIDs[node->rank][0]).c_str());
+		device_id = textToInteger((allThreadIDs[node->rank][0]).c_str());
 
 	for (int follower = 0; follower < node->size; follower++)
 	{
 		if (follower == node->rank)
 		{
-			std::cout << " + Using GPU device: " << dev_id << " on MPI node: " << node->rank << std::endl;
+			std::cout << " + Using GPU device: " << device_id << " on MPI node: " << node->rank << std::endl;
 			std::cout.flush();
 		}
 		node->barrierWait();
 	}
-
-	return(dev_id);
 }
 #endif
 
