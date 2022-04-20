@@ -181,7 +181,14 @@ public:
 		else if (!do_only_one)
 		{
 			std::cout << " Reading STAR file with all angles " << fn_ang << std::endl;
-			ObservationModel::loadSafely(fn_ang, obsModel, MDang);
+			if (do_ignore_particle_name)
+            {
+                MDang.read(fn_ang);
+            }
+            else
+            {
+                ObservationModel::loadSafely(fn_ang, obsModel, MDang);
+            }
 			std::cout << " Done reading STAR file!" << std::endl;
 
 
