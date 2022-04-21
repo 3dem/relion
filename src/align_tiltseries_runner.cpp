@@ -178,10 +178,7 @@ void AlignTiltseriesRunner::executeImodWrapper(long idx_tomo)
 {
 
     std::string command = "relion_tomo_align_tilt_series ";
-    command += " --tilt-series-star-file " + fn_in;
-    command += " --tomogram-name " + tomogramSet.getTomogramName(idx_tomo);
-    command += " --output-directory " + fn_out;
-   // Make sure the methods are the first argument to the program!
+    // Make sure the methods are the first argument to the program!
     if (do_imod_fiducials)
     {
         command += " IMOD:fiducials";
@@ -193,6 +190,11 @@ void AlignTiltseriesRunner::executeImodWrapper(long idx_tomo)
         command += " --unbinned-patch-size-pixels " + integerToString(patch_size);
         command += " -- patch-overlap-percentage " + floatToString(patch_overlap);
     }
+
+    command += " --tilt-series-star-file " + fn_in;
+    command += " --tomogram-name " + tomogramSet.getTomogramName(idx_tomo);
+    command += " --output-directory " + fn_out;
+
     command += other_wrapper_args;
 
     if (system(command.c_str()))

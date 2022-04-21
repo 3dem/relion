@@ -6383,13 +6383,6 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
         command="`which relion_run_align_tiltseries`";
     if (error_message != "") return false;
 
-    command += " --i " + joboptions["in_tiltseries"].getString();
-    Node node(joboptions["in_tiltseries"].getString(), joboptions["in_tiltseries"].node_type);
-    inputNodes.push_back(node);
-
-    command += " --o " + outputname;
-    Node node2(outputname+"aligned_tilt_series.star", LABEL_TOMO_TOMOGRAMS);
-    outputNodes.push_back(node2);
 
     // Make sure the methods are the first argument to the program!
     if (joboptions["do_imod_fiducials"].getBoolean())
@@ -6403,6 +6396,14 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
         command += " --patch_size " + joboptions["patch_size"].getString();
         command += " -- patch_overlap " + joboptions["patch_overlap"].getString();
     }
+
+    command += " --i " + joboptions["in_tiltseries"].getString();
+    Node node(joboptions["in_tiltseries"].getString(), joboptions["in_tiltseries"].node_type);
+    inputNodes.push_back(node);
+
+    command += " --o " + outputname;
+    Node node2(outputname+"aligned_tilt_series.star", LABEL_TOMO_TOMOGRAMS);
+    outputNodes.push_back(node2);
 
     if ((joboptions["other_wrapper_args"].getString()).length() > 0)
         command += " --other_wrapper_args \" " + joboptions["other_wrapper_args"].getString() + " \"";

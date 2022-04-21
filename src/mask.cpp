@@ -138,8 +138,13 @@ void softMaskOutsideMapForHelix(
 	if ( (cosine_width < 0.)
 			|| (mask_sphere_radius_pix < 1.) || (mask_sphere_radius_pix > boxsize)
 			|| (mask_cyl_radius_pix < 1.) || (mask_cyl_radius_pix > boxsize)
-			|| (mask_sphere_radius_pix < mask_cyl_radius_pix) )
-		REPORT_ERROR("mask.cpp::softMaskOutsideMapForHelix(): Invalid radii of spherical and cylindrical masks or soft cosine widths!");
+			|| (mask_sphere_radius_pix < mask_cyl_radius_pix) ) {
+        std::cerr << " cosine_width= " << cosine_width << std::endl;
+        std::cerr << " boxsize= " << boxsize << std::endl;
+        std::cerr << " mask_sphere_radius_pix= " << mask_sphere_radius_pix << std::endl;
+        std::cerr << " mask_cyl_radius_pix= " << mask_cyl_radius_pix << std::endl;
+        REPORT_ERROR("mask.cpp::softMaskOutsideMapForHelix(): Invalid radii of spherical and cylindrical masks or soft cosine widths! Is boxsize > mask_sphere_radius > mask_cyl_radius?");
+    }
 
 	// Spherical mask: 0 < R1 < R2
 	R1 = mask_sphere_radius_pix;
