@@ -2504,6 +2504,10 @@ void JobWindow::initialiseTomoAlignTiltseriesWindow()
     group2->end();
     guientries["do_imod_patchtrack"].cb_menu_i(); // make default active
 
+	// Add a little spacer
+	current_y += STEPY/2;
+    place("other_wrapper_args", TOGGLE_DEACTIVATE);
+
     tab1->end();
 
 

@@ -6358,6 +6358,8 @@ void RelionJob::initialiseTomoAlignTiltSeriesJob()
     joboptions["patch_size"] = JobOption("Patch size (in unbinned pixels): ", 10, 1, 50, 1, "The size of the patches in unbinned pixels.");
     joboptions["patch_overlap"] = JobOption("Patch overlap (%): ", 10, 0, 100, 10, "The overlap (0-100%) between the patches.");
 
+    joboptions["other_wrapper_args"] = JobOption("Other wrapper arguments:", (std::string)"",  "Other arguments that will be passed straight onto the IMOD wrapper.");
+
 }
 bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::vector<std::string> &commands,
                                        std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
@@ -6369,35 +6371,41 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
     int i = 0;
     if (joboptions["do_imod_fiducials"].getBoolean()) i++;
     if (joboptions["do_imod_patchtrack"].getBoolean()) i++;
-
     if (i != 1)
     {
         error_message = "ERROR: you should (only) select ONE of the alignment methods: IMOD:fiducials or IMOD:patchtracking.";
         return false;
     }
 
-    // TODO: rename command to relion_tomo_import_tiltseries?
-    command = "relion_tomo_align_tilt_series ";
-    // Make sure the methods are the first argument to the program!
-    if (joboptions["do_imod_fiducials"].getBoolean())
-    {
-        command += " IMOD:fiducials";
-        command += " --nominal-fiducial-diameter-nanometres " + joboptions["fiducial_diameter"].getString();
-    }
-    else if (joboptions["do_imod_patchtrack"].getBoolean())
-    {
-        command += " IMOD:patch-tracking";
-        command += " --unbinned-patch-size-pixels " + joboptions["patch_size"].getString();
-        command += " -- patch-overlap-percentage " + joboptions["patch_overlap"].getString();
-    }
+    if (joboptions["nr_mpi"].getNumber(error_message) > 1)
+        command="`which relion_run_align_tiltseries_mpi`";
+    else
+        command="`which relion_run_align_tiltseries`";
+    if (error_message != "") return false;
 
-    command += " --tilt-series-star-file " + joboptions["in_tiltseries"].getString();
+    command += " --i " + joboptions["in_tiltseries"].getString();
     Node node(joboptions["in_tiltseries"].getString(), joboptions["in_tiltseries"].node_type);
     inputNodes.push_back(node);
 
-    command += " --output-directory " + outputname;
-    Node node2(outputname+"tilt_series.star", LABEL_TOMO_TOMOGRAMS);
+    command += " --o " + outputname;
+    Node node2(outputname+"aligned_tilt_series.star", LABEL_TOMO_TOMOGRAMS);
     outputNodes.push_back(node2);
+
+    // Make sure the methods are the first argument to the program!
+    if (joboptions["do_imod_fiducials"].getBoolean())
+    {
+        command += " --imod_fiducials";
+        command += " --fiducial_diameter " + joboptions["fiducial_diameter"].getString();
+    }
+    else if (joboptions["do_imod_patchtrack"].getBoolean())
+    {
+        command += " --imod_patchtrack";
+        command += " --patch_size " + joboptions["patch_size"].getString();
+        command += " -- patch_overlap " + joboptions["patch_overlap"].getString();
+    }
+
+    if ((joboptions["other_wrapper_args"].getString()).length() > 0)
+        command += " --other_wrapper_args \" " + joboptions["other_wrapper_args"].getString() + " \"";
 
     // Other arguments for extraction
     command += " " + joboptions["other_args"].getString();
