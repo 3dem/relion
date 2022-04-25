@@ -1,7 +1,5 @@
 include_directories("${CMAKE_SOURCE_DIR}")
 
-SET(RELION_TEST TRUE)
-
 message("Running apps/CMakeLists.txt...")
 
 if(NOT MKLFFT)
@@ -131,7 +129,7 @@ endif(NOT GUI)
 
 #--Remove apps for testing--
 
-set(TEST_TARGETS movie_reconstruct double_reconstruct_openmp cs_fit ctf_nyquist_test free_aberration_plot split_stack defocus_stats double_bfac_fit interpolation_test motion_diff paper_data_synth Zernike_test vis_delocalisation vis_Ewald_weight)
+set(TEST_TARGETS movie_reconstruct double_reconstruct_openmp cs_fit ctf_nyquist_test free_aberration_plot split_stack defocus_stats double_bfac_fit interpolation_test motion_diff paper_data_synth Zernike_test vis_delocalisation vis_Ewald_weight mpi_tester)
 if(NOT RELION_TEST)
 	foreach(TARGET ${TEST_TARGETS})
 		list(REMOVE_ITEM RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/${TARGET}.cpp")
