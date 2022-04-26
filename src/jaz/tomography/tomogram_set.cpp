@@ -200,6 +200,11 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
         out.frameCount = m.numberOfObjects();
 
         // Get image size from the first image in the tomogramTable
+        if (!m.containsLabel(EMDL_MICROGRAPH_NAME))
+        {
+            REPORT_ERROR("ERROR: tomogramTable for " + tomoName + " does not contain a rlnMicrographName label, yet the globalTable also does not contain a rlnTomoTiltSeriesName label!");
+        }
+        
         std::string fn_img;
         m.getValueSafely(EMDL_MICROGRAPH_NAME, fn_img, 0);
         Image<RFLOAT> I;
