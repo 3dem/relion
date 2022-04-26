@@ -381,12 +381,12 @@ int main(int argc, char *argv[])
 					ctfs[i] = ctfs[mapping.oldFrameIndex[i]];
 			}
 
-			tomograms.addTomogram(
-				name, tsFn,
-				mapping.projections,
-				mapping.w, mapping.h, mapping.d,
-				cumulativeDose, fractionalDose,
-				ctfs, hand, pixelSize);
+            tomograms.addTomogramFromIMODStack(
+                    name, tsFn,
+                    mapping.projections,
+                    mapping.w, mapping.h, mapping.d,
+                    cumulativeDose, fractionalDose,
+                    ctfs, hand, pixelSize);
 
 			Log::endSection();
 		}

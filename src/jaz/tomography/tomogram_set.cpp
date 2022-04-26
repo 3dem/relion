@@ -154,42 +154,86 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 {
 	Tomogram out;
 
-	std::string tomoName, stackFn;
+	std::string tomoName;
+    i3Vector stackSize;
 
 	globalTable.getValueSafely(EMDL_TOMO_NAME, tomoName, index);
-	globalTable.getValueSafely(EMDL_TOMO_TILT_SERIES_NAME, stackFn, index);
-	globalTable.getValueSafely(EMDL_TOMO_FRAME_COUNT, out.frameCount, index);
+    const MetaDataTable& m = tomogramTables[index];
 
-	i3Vector stackSize;
+    globalTable.getValueSafely(EMDL_TOMO_SIZE_X, out.w0, index);
+    globalTable.getValueSafely(EMDL_TOMO_SIZE_Y, out.h0, index);
+    globalTable.getValueSafely(EMDL_TOMO_SIZE_Z, out.d0, index);
 
-	if (loadImageData)
-	{
-		out.stack.read(stackFn);
-		out.hasImage = true;
+    if (globalTable.containsLabel(EMDL_TOMO_TILT_SERIES_NAME))
+    {
+        // option A: Kino's original IMOD import functionality
 
-		stackSize.x = out.stack.xdim;
-		stackSize.y = out.stack.ydim;
-		stackSize.z = out.stack.zdim;
-	}
-	else
-	{
-		out.hasImage = false;
+        globalTable.getValueSafely(EMDL_TOMO_TILT_SERIES_NAME, out.tiltSeriesFilename, index);
+        globalTable.getValueSafely(EMDL_TOMO_FRAME_COUNT, out.frameCount, index);
 
-		t3Vector<long int> isl = ImageFileHelper::getSize(stackFn);
+        if (loadImageData)
+        {
+            out.stack.read(out.tiltSeriesFilename);
+            out.hasImage = true;
 
-		stackSize.x = isl.x;
-		stackSize.y = isl.y;
-		stackSize.z = isl.z;
-	}
+            stackSize.x = out.stack.xdim;
+            stackSize.y = out.stack.ydim;
+            stackSize.z = out.stack.zdim;
+        }
+        else
+        {
+            out.hasImage = false;
+
+            t3Vector<long int> isl = ImageFileHelper::getSize(out.tiltSeriesFilename);
+
+            stackSize.x = isl.x;
+            stackSize.y = isl.y;
+            stackSize.z = isl.z;
+        }
+
+    }
+    else
+    {
+        // option B: new functionality to work directly with images from RELION's motioncorr runner
+
+        out.tiltSeriesFilename = "";
+        out.frameCount = m.numberOfObjects();
+
+        // Get image size from the first image in the tomogramTable
+        std::string fn_img;
+        m.getValueSafely(EMDL_MICROGRAPH_NAME, fn_img, 0);
+        Image<RFLOAT> I;
+        I.read(fn_img,false); // false means don't read the actual image data, only the header
+
+        stackSize.x = XSIZE(I());
+        stackSize.y = YSIZE(I());
+        stackSize.z = out.frameCount;
+
+        if (loadImageData)
+        {
+            Image<RFLOAT> myStack(stackSize.x, stackSize.y, stackSize.z);
+            for (int f = 0; f < out.frameCount; f++)
+            {
+                m.getValueSafely(EMDL_MICROGRAPH_NAME, fn_img, f);
+                Image<RFLOAT> I2;
+                I2.read(fn_img);
+
+                if (XSIZE(I2()) != stackSize.x || YSIZE(I2()) != stackSize.y)
+                {
+                    REPORT_ERROR("ERROR: unequal image dimensions in the individual tilt series images of tomogram: " + tomoName);
+                }
+                myStack().setSlice(f, I2());
+            }
+            out.stack.copyDataAndSizeFrom(myStack);
+        }
+        else
+        {
+            out.hasImage = false;
+        }
+
+    }
 
 	out.imageSize = stackSize.xy();
-
-	out.tiltSeriesFilename = stackFn;
-
-	globalTable.getValueSafely(EMDL_TOMO_SIZE_X, out.w0, index);
-	globalTable.getValueSafely(EMDL_TOMO_SIZE_Y, out.h0, index);
-	globalTable.getValueSafely(EMDL_TOMO_SIZE_Z, out.d0, index);
-
 	out.centre = d3Vector(out.w0/2.0, out.h0/2.0, out.d0/2.0);
 
 	globalTable.getValueSafely(EMDL_TOMO_HANDEDNESS, out.handedness, index);
@@ -223,8 +267,6 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 				<< deformationType << "'");
 		}
 	}
-
-	const MetaDataTable& m = tomogramTables[index];
 
 	out.cumulativeDose.resize(out.frameCount);
 	out.centralCTFs.resize(out.frameCount);
@@ -328,7 +370,7 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 	return out;
 }
 
-void TomogramSet::addTomogram(
+void TomogramSet::addTomogramFromIMODStack(
 		std::string tomoName, std::string stackFilename,
 		const std::vector<gravis::d4Matrix>& projections, 
 		int w, int h, int d, 
