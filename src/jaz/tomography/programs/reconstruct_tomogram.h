@@ -21,7 +21,7 @@ class TomoBackprojectProgram
 			double spacing, x0, y0, z0, taperDist, taperFalloff;
 			FileName tomoName, outFn;
 			bool applyPreWeight, applyWeight, applyCtf, zeroDC, FourierCrop;
-            bool do_only_unfinished;
+            bool do_multiple, do_only_unfinished;
 			double SNR;
 
             std::vector<long> tomoIndexTodo;

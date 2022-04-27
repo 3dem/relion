@@ -605,6 +605,7 @@ enum EMDLabel
 	EMDL_TOMO_NAME,
 	EMDL_TOMO_TILT_SERIES_NAME,
     EMDL_TOMO_TILT_SERIES_STARFILE,
+	EMDL_TOMO_TILT_MOVIE_FRAMECOUNT,
 	EMDL_TOMO_FRAME_COUNT,
 	EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME,
     EMDL_TOMO_SIZE_X,
@@ -627,6 +628,9 @@ enum EMDLabel
 	EMDL_TOMO_MANIFOLD_TYPE,
 	EMDL_TOMO_MANIFOLD_PARAMETERS,
 	EMDL_TOMO_DEFOCUS_SLOPE,
+	EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE,
+	EMDL_TOMO_NOMINAL_TILT_AXIS_ANGLE,
+	EMDL_TOMO_NOMINAL_DEFOCUS,
 
 	EMDL_TOMO_PARTICLES_FILE_NAME,
 	EMDL_TOMO_TOMOGRAMS_FILE_NAME,
@@ -1289,6 +1293,7 @@ private:
 		EMDL::addLabel(EMDL_TOMO_NAME, EMDL_STRING, "rlnTomoName", "Arbitrary name for a tomogram");
 		EMDL::addLabel(EMDL_TOMO_TILT_SERIES_NAME, EMDL_STRING, "rlnTomoTiltSeriesName", "Tilt series file name");
         EMDL::addLabel(EMDL_TOMO_TILT_SERIES_STARFILE, EMDL_STRING, "rlnTomoTiltSeriesStarFile", "Tilt series starfile");
+		EMDL::addLabel(EMDL_TOMO_TILT_MOVIE_FRAMECOUNT, EMDL_INT, "rlnTomoTiltMovieFrameCount", "Number of frames in the tilt series movies");
 		EMDL::addLabel(EMDL_TOMO_FRAME_COUNT, EMDL_INT, "rlnTomoFrameCount", "Number of tilts in a tilt series");
         EMDL::addLabel(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME, EMDL_STRING, "rlnTomoReconstructedTomogram", "File name of a reconstructed tomogram");
 		EMDL::addLabel(EMDL_TOMO_FRAME_COUNT, EMDL_INT, "rlnTomoFrameCount", "Number of tilts in a tilt series");
@@ -1325,6 +1330,10 @@ private:
 		EMDL::addLabel(EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME, EMDL_STRING, "rlnTomoReferenceMap2File", "Name of second reference map file");
 		EMDL::addLabel(EMDL_TOMO_REFERENCE_MASK_FILE_NAME, EMDL_STRING, "rlnTomoReferenceMaskFile", "Name of mask file corresponding to a pair of reference maps");
 		EMDL::addLabel(EMDL_TOMO_REFERENCE_FSC_FILE_NAME, EMDL_STRING, "rlnTomoReferenceFscFile", "Name of FSC STAR file corresponding to a pair of reference maps");
+		EMDL::addLabel(EMDL_TOMO_NOMINAL_TILT_STAGE_ANGLE, EMDL_DOUBLE, "rlnTomoNominalStageTiltAngle", "Nominal value for the stage tilt angle");
+		EMDL::addLabel(EMDL_TOMO_NOMINAL_TILT_AXIS_ANGLE, EMDL_DOUBLE, "rlnTomoNominalTiltAxisAngle", "Nominal value for the angle of the tilt axis");
+		EMDL::addLabel(EMDL_TOMO_NOMINAL_DEFOCUS, EMDL_DOUBLE, "rlnTomoNominalDefocus", "Nominal value for the defocus in the tilt series image");
+
 
 		EMDL::addLabel(EMDL_TOMO_IMPORT_OFFSET_X, EMDL_DOUBLE, "rlnTomoImportOffsetX", "X offset of a tomogram");
 		EMDL::addLabel(EMDL_TOMO_IMPORT_OFFSET_Y, EMDL_DOUBLE, "rlnTomoImportOffsetY", "Y offset of a tomogram");

@@ -160,9 +160,18 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 	globalTable.getValueSafely(EMDL_TOMO_NAME, tomoName, index);
     const MetaDataTable& m = tomogramTables[index];
 
-    globalTable.getValueSafely(EMDL_TOMO_SIZE_X, out.w0, index);
-    globalTable.getValueSafely(EMDL_TOMO_SIZE_Y, out.h0, index);
-    globalTable.getValueSafely(EMDL_TOMO_SIZE_Z, out.d0, index);
+    if (globalTable.containsLabel(EMDL_TOMO_SIZE_X) &&
+        globalTable.containsLabel(EMDL_TOMO_SIZE_Y) &&
+        globalTable.containsLabel(EMDL_TOMO_SIZE_Z))
+    {
+        globalTable.getValueSafely(EMDL_TOMO_SIZE_X, out.w0, index);
+        globalTable.getValueSafely(EMDL_TOMO_SIZE_Y, out.h0, index);
+        globalTable.getValueSafely(EMDL_TOMO_SIZE_Z, out.d0, index);
+    }
+    else
+    {
+        out.w0 = out.h0 = out.d0 = -999;
+    }
 
     if (globalTable.containsLabel(EMDL_TOMO_TILT_SERIES_NAME))
     {
@@ -204,7 +213,7 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
         {
             REPORT_ERROR("ERROR: tomogramTable for " + tomoName + " does not contain a rlnMicrographName label, yet the globalTable also does not contain a rlnTomoTiltSeriesName label!");
         }
-        
+
         std::string fn_img;
         m.getValueSafely(EMDL_MICROGRAPH_NAME, fn_img, 0);
         Image<RFLOAT> I;

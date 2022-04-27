@@ -33,6 +33,11 @@ void TomoBackprojectProgram::readParameters(int argc, char *argv[])
 	int gen_section = parser.addSection("General options");
 
 	tomoName = parser.getOption("--tn", "Tomogram name", "*");
+	outFn = parser.getOption("--o", "Output filename (or output directory in case of reconstructing multiple tomograms)");
+
+    w = textToInteger(parser.getOption("--w", "Width"));
+	h = textToInteger(parser.getOption("--h", "Height" ));
+	d = textToInteger(parser.getOption("--d", "Thickness"));
 
 	applyWeight = !parser.checkOption("--no_weight", "Do not perform weighting in Fourier space using a Wiener filter");
 	applyPreWeight = parser.checkOption("--pre_weight", "Pre-weight the 2D slices prior to backprojection");
@@ -51,15 +56,10 @@ void TomoBackprojectProgram::readParameters(int argc, char *argv[])
 	y0 = textToDouble(parser.getOption("--y0", "Y origin", "1.0"));
 	z0 = textToDouble(parser.getOption("--z0", "Z origin", "1.0"));
 
-	w = textToInteger(parser.getOption("--w", "Width",  "-1.0"));
-	h = textToInteger(parser.getOption("--h", "Height", "-1.0"));
-	d = textToInteger(parser.getOption("--d", "Thickness", "-1.0"));
-
 	spacing = textToDouble(parser.getOption("--bin", "Binning", "8.0"));
 
 	n_threads = textToInteger(parser.getOption("--j", "Number of threads", "1"));
 
-	outFn = parser.getOption("--o", "Output filename (or directory in case of reconstructing all tomograms)");
 
 	Log::readParams(parser);
 
@@ -88,19 +88,33 @@ void TomoBackprojectProgram::initialise()
 
     if (tomoName == "*")
     {
+        do_multiple = true;
+
         for (int idx = 0; idx < tomogramSet.size(); idx++)
         {
             if (do_only_unfinished && exists(getOutputFileName(idx)))
                 continue;
             tomoIndexTodo.push_back(idx);
         }
+
+        if (outFn[outFn.size()-1] != '/') outFn += '/';
+        FileName fn_dir = outFn + "tomograms/";
+        if (!exists(fn_dir)) mktree(fn_dir);
+
     }
     else
     {
         tomoIndexTodo.push_back(tomogramSet.getTomogramIndex(tomoName));
+        do_multiple = false;
+
+        if (!exists(outFn.beforeLastOf("/"))) mktree(outFn.beforeLastOf("/"));
     }
 
-    std::cout << " + Reconstructing " << tomoIndexTodo.size() << " tomograms ... " << std::endl;
+    std::cout << " + Reconstructing " << tomoIndexTodo.size() << " tomograms: " << std::endl;
+    for (int idx = 0; idx < tomoIndexTodo.size(); idx++)
+    {
+        std::cout << "  - " << tomogramSet.getTomogramName(tomoIndexTodo[idx]) << std::endl;
+    }
 
 }
 
@@ -109,7 +123,7 @@ void TomoBackprojectProgram::run(int rank, int size)
     long my_first_idx, my_last_idx;
     divide_equally(tomoIndexTodo.size(), size, rank , my_first_idx, my_last_idx);
 
-
+    std::cout << " + Reconstructing ... " << std::endl;
     int barstep, nr_todo = my_last_idx-my_first_idx+1;
     if (rank == 0)
     {
@@ -130,8 +144,8 @@ void TomoBackprojectProgram::run(int rank, int size)
 
     progress_bar(nr_todo);
 
-    // If the output filename was a directory, then also write updated tomograms.star.
-    if (outFn[outFn.size()-1] == '/')
+    // If we were doing multiple tomograms, then also write the updated tomograms.star.
+    if (do_multiple)
     {
         tomogramSet.write(outFn + "tomograms.star");
     }
@@ -144,10 +158,6 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex)
 {
     Tomogram tomogram = tomogramSet.loadTomogram(tomoIndex, true);
 
-    const int w0 = tomogram.w0;
-	const int h0 = tomogram.h0;
-	const int d0 = tomogram.d0;
-
 	if (zeroDC) Normalization::zeroDC_stack(tomogram.stack);
 	
 	const int fc = tomogram.frameCount;
@@ -155,13 +165,7 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex)
 	BufferedImage<float> stackAct;
 	std::vector<d4Matrix> projAct(fc);
 	double pixelSizeAct = tomogram.optics.pixelSize;
-	
-	
-	const int w1 = w > 0? w : w0 / spacing + 0.5;
-	const int h1 = h > 0? h : h0 / spacing + 0.5;
-	const int t1 = d > 0? d : d0 / spacing;
 
-		
 	if (std::abs(spacing - 1.0) < 1e-2)
 	{
 		projAct = tomogram.projectionMatrices;
@@ -177,7 +181,7 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex)
 		
 		if (std::abs(spacing - 1.0) > 1e-2)
 		{
-			Log::print("Resampling image stack");
+			if (!do_multiple) Log::print("Resampling image stack");
 			
 			if (FourierCrop)
 			{
@@ -204,7 +208,7 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex)
 	
 	
 	d3Vector orig(x0, y0, z0);
-	BufferedImage<float> out(w1, h1, t1);
+	BufferedImage<float> out(w, h, d);
 	out.fill(0.f);
 	
 	BufferedImage<float> psfStack;
@@ -259,7 +263,7 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex)
 		stackAct = RealSpaceBackprojection::preWeight(stackAct, projAct, n_threads);
 	}
 
-	Log::print("Backprojecting");
+    if (!do_multiple) Log::print("Backprojecting");
 	
 	RealSpaceBackprojection::backproject(
 		stackAct, projAct, out, n_threads,
@@ -268,7 +272,7 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex)
 	
 	if (applyWeight || applyCtf)
 	{
-		BufferedImage<float> psf(w1, h1, t1);
+		BufferedImage<float> psf(w, h, d);
 		psf.fill(0.f);
 		
 		if (applyCtf)
@@ -286,7 +290,7 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex)
 		Reconstruction::correct3D_RS(out, psf, out, 1.0 / SNR, n_threads);
 	}
 
-	Log::print("Writing output");
+    if (!do_multiple) Log::print("Writing output");
 
     const double samplingRate = tomogramSet.getPixelSize(tomoIndex) * spacing;
     out.write(getOutputFileName(), samplingRate);
@@ -299,12 +303,9 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex)
 FileName TomoBackprojectProgram::getOutputFileName(int index)
 {
     // If we're reconstructing many tomograms, or the output filename is a directory: use standardized output filenames
-    if (tomoName == "*" || outFn[outFn.size()-1] == '/')
+    if (do_multiple)
     {
-        FileName result = outFn;
-        if (result[result.size()-1] != '/') result += "/";
-        result += "tomograms/rec_" + tomogramSet.getTomogramName(index)+".mrc";
-        return result;
+        return outFn + "tomograms/rec_" + tomogramSet.getTomogramName(index)+".mrc";
     }
     else
     {
