@@ -297,10 +297,13 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex)
     if (!do_multiple) Log::print("Writing output");
 
     const double samplingRate = tomogramSet.getPixelSize(tomoIndex) * spacing;
-    out.write(getOutputFileName(), samplingRate);
+    out.write(getOutputFileName(tomoIndex), samplingRate);
 
-    // Also add the tomogram name to the tomogramSet
-    tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME, getOutputFileName(), tomoIndex);
+    // Also add the tomogram sizes and name to the tomogramSet
+    tomogramSet.globalTable.setValue(EMDL_TOMO_SIZE_X, w, tomoIndex);
+    tomogramSet.globalTable.setValue(EMDL_TOMO_SIZE_Y, h, tomoIndex);
+    tomogramSet.globalTable.setValue(EMDL_TOMO_SIZE_Z, d, tomoIndex);
+    tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME, getOutputFileName(tomoIndex), tomoIndex);
 
 }
 

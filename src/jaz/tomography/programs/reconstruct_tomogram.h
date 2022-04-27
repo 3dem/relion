@@ -34,7 +34,7 @@ class TomoBackprojectProgram
         void reconstructOneTomogram(int tomoIndex);
 
     private:
-        FileName getOutputFileName(int index = -1);
+        FileName getOutputFileName(int index);
 };
 
 #endif
