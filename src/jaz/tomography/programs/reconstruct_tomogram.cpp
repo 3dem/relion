@@ -166,6 +166,10 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex)
 	std::vector<d4Matrix> projAct(fc);
 	double pixelSizeAct = tomogram.optics.pixelSize;
 
+    const int w1 = w / spacing + 0.5;
+	const int h1 = h / spacing + 0.5;
+	const int t1 = d / spacing;
+
 	if (std::abs(spacing - 1.0) < 1e-2)
 	{
 		projAct = tomogram.projectionMatrices;
@@ -208,7 +212,7 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex)
 	
 	
 	d3Vector orig(x0, y0, z0);
-	BufferedImage<float> out(w, h, d);
+	BufferedImage<float> out(w1, h1, t1);
 	out.fill(0.f);
 	
 	BufferedImage<float> psfStack;
@@ -272,7 +276,7 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex)
 	
 	if (applyWeight || applyCtf)
 	{
-		BufferedImage<float> psf(w, h, d);
+		BufferedImage<float> psf(w1, h1, t1);
 		psf.fill(0.f);
 		
 		if (applyCtf)
