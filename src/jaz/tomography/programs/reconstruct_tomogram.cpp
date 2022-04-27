@@ -80,10 +80,6 @@ void TomoBackprojectProgram::initialise()
     if (!tomogramSet.read(optimisationSet.tomograms))
         REPORT_ERROR("ERROR: there was a problem reading the tomogram set");
 
-    // Make sure output directory exists (this will work for one or all tomograms)
-    FileName fn_tmp = getOutputFileName(0);
-    if (!exists(fn_tmp.beforeLastOf("/"))) mktree(fn_tmp.beforeLastOf("/"));
-
     tomoIndexTodo.clear();
 
     if (tomoName == "*")
