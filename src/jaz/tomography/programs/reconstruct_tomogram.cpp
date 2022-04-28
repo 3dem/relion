@@ -95,15 +95,12 @@ void TomoBackprojectProgram::initialise()
 
         if (outFn[outFn.size()-1] != '/') outFn += '/';
         FileName fn_dir = outFn + "tomograms/";
-        if (!exists(fn_dir)) mktree(fn_dir);
 
     }
     else
     {
         tomoIndexTodo.push_back(tomogramSet.getTomogramIndex(tomoName));
         do_multiple = false;
-
-        if (!exists(outFn.beforeLastOf("/"))) mktree(outFn.beforeLastOf("/"));
     }
 
     std::cout << " + Reconstructing " << tomoIndexTodo.size() << " tomograms: " << std::endl;
@@ -306,14 +303,12 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex)
 FileName TomoBackprojectProgram::getOutputFileName(int index)
 {
     // If we're reconstructing many tomograms, or the output filename is a directory: use standardized output filenames
-    if (do_multiple)
-    {
-        return outFn + "tomograms/rec_" + tomogramSet.getTomogramName(index)+".mrc";
-    }
-    else
-    {
-        return outFn;
-    }
+    FileName fn_result = outFn;
 
+    if (do_multiple) fn_result += "tomograms/rec_" + tomogramSet.getTomogramName(index)+".mrc";
+
+    if (!exists(fn_result.beforeLastOf("/"))) mktree(fn_result.beforeLastOf("/"));
+
+    return fn_result;
 
 }
