@@ -44,6 +44,12 @@
  ***************************************************************************/
 
 #include "src/mpi.h"
+
+// maximum amount of data that can be sent in MPI
+// 512 MB is already on a safe side. If this still causes OpenMPI crash,
+// please try "mpirun --mca pml ob1".
+const int RELION_MPI_MAX_SIZE = 512 * 1024 * 1024;
+
 //#define MPI_DEBUG
 
 //------------ MPI ---------------------------
@@ -113,7 +119,7 @@ int MpiNode::relion_MPI_Send(void *buf, std::ptrdiff_t count, MPI_Datatype datat
 //#ifdef ONLY_NORMAL_SEND
 	int unitsize(0);
 	MPI_Type_size(datatype, &unitsize);
-	const std::ptrdiff_t blocksize(512 * 1024 * 1024);
+	const std::ptrdiff_t blocksize(RELION_MPI_MAX_SIZE);
 	const std::ptrdiff_t totalsize(count * unitsize);
 	if (totalsize <= blocksize )
 	{
@@ -165,7 +171,7 @@ int MpiNode::relion_MPI_Recv(void *buf, std::ptrdiff_t count, MPI_Datatype datat
 
 	int unitsize(0);
 	MPI_Type_size(datatype, &unitsize);
-	const std::ptrdiff_t blocksize(512 * 1024 * 1024);
+	const std::ptrdiff_t blocksize(RELION_MPI_MAX_SIZE);
 	const std::ptrdiff_t totalsize(count * unitsize);
 	if (totalsize <= blocksize)
 	{
@@ -228,9 +234,7 @@ int MpiNode::relion_MPI_Bcast(void *buffer, long int count, MPI_Datatype datatyp
 	int unitsize(0);
 	MPI_Type_size(datatype, &unitsize);
 
-	// maximum amount of data can be sent by MPI_Bcast
-	// 2 * 1024 * 1024 * 1024 - 1 = 2^31 - 1 = 2147483647 bytes
-	const long blocksize(1 * 1024 * 1024 * 1024);
+	const long blocksize(RELION_MPI_MAX_SIZE);
 	const long totalsize(count * unitsize);
 
 #ifdef MPI_DEBUG
