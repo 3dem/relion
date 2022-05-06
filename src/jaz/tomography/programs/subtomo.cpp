@@ -47,6 +47,7 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 	boxSize = textToInteger(parser.getOption("--b", "Binned projection box size"));
 	cropSize = textToInteger(parser.getOption("--crop", "Output box size", "-1"));
 	binning = textToDouble(parser.getOption("--bin", "Binning factor", "1"));
+    rescale_coords = textToDouble(parser.getOption("--rescale_coords", "Rescale input particles by this factor", "1."));
 	write_multiplicity = parser.checkOption("--multi", "Write out multiplicity volumes");
 	SNR = textToDouble(parser.getOption("--SNR", "Assumed signal-to-noise ratio (negative means use a heuristic)", "-1"));
 
@@ -212,7 +213,7 @@ void SubtomoProgram::run()
 }
 
 void SubtomoProgram::initialise(
-		const ParticleSet& particleSet,
+		ParticleSet& particleSet,
 		const std::vector<std::vector<ParticleIndex>>& particles,
 		const TomogramSet& tomogramSet)
 {
@@ -250,6 +251,29 @@ void SubtomoProgram::initialise(
 				particles[t][0], t, particleSet, tomogramSet));
 		}
 	}
+
+    if (fabs(1. - rescale_coords) > 1e-3)
+    {
+        Log::print("Rescaling input coordinates ... ");
+
+        for (int t = 0; t < tc; t++)
+        {
+            const int pc = particles[t].size();
+    
+            if (pc == 0) continue;
+
+            for (int p = 0; p < pc; p++)
+            {
+                const ParticleIndex part_id = particles[t][p];
+
+                d3Vector pos = particleSet.getParticleCoord(part_id);
+
+                pos *= rescale_coords;
+
+                particleSet.setParticleCoord(part_id, pos);
+            }
+        }
+    }
 
 	writeParticleSet(particleSet, particles, tomogramSet);
 }

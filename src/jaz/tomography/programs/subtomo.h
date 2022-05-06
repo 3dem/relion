@@ -32,7 +32,8 @@ class SubtomoProgram
 			
 			double 
 				SNR,
-				binning, 
+				binning,
+                rescale_coords,
 				taper, 
 				env_sigma,
 				cone_slope,
@@ -72,7 +73,7 @@ class SubtomoProgram
 	protected:
 
 		void initialise(
-				const ParticleSet& particleSet,
+				ParticleSet& particleSet,
 				const std::vector<std::vector<ParticleIndex>>& particles,
 				const TomogramSet& tomogramSet);
 
