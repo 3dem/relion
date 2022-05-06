@@ -252,14 +252,14 @@ void SubtomoProgram::initialise(
 		}
 	}
 
-    if (fabs(1. - rescale_coords) > 1e-3)
+    if (std::abs(rescale_coords - 1.0) > 1e-2)
     {
         Log::print("Rescaling input coordinates ... ");
 
         for (int t = 0; t < tc; t++)
         {
             const int pc = particles[t].size();
-    
+
             if (pc == 0) continue;
 
             for (int p = 0; p < pc; p++)

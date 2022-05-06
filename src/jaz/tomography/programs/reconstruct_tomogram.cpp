@@ -192,6 +192,8 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex)
 			}
 			
 			pixelSizeAct *= spacing;
+
+            tomogramSet.globalTable.setValue(EMDL_TOMO_TOMOGRAM_BINNING, spacing, tomoIndex);
 		}
 		else
 		{
