@@ -72,9 +72,9 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 	write_divided = parser.checkOption("--div", "Write CTF-corrected subtomograms");
 	write_normalised = parser.checkOption("--nrm", "Write multiplicity-normalised subtomograms");
 
-	apply_translations = parser.checkOption("--apply_translations", "rlnOriginX/Y/ZAngst are combined with rlnCoordinateX/Y/Z to construct the particles in their refined translations.");
+    apply_offsets = parser.checkOption("--apply_offsets", "rlnOriginX/Y/ZAngst are combined with rlnCoordinateX/Y/Z to construct the particles in their refined translations.");
     apply_orientations = parser.checkOption("--apply_orientations", "rlnAngle<Rot/Tilt/Psi> are combined with rlnTomoSubtomogram<Rot/Tilt/Psi> to construct the particles in their refined orientations. This will also apply translations!");
-    if (apply_orientations) apply_translations = true;
+    if (apply_orientations) apply_offsets = true;
 
 	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Only process undone subtomograms");
 
@@ -286,7 +286,7 @@ void SubtomoProgram::writeParticleSet(
 			Tomogram tomogram = tomogramSet.loadTomogram(t, false);
 
 			const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
-						part_id, tomogram.frameCount, tomogram.optics.pixelSize, !apply_translations);
+						part_id, tomogram.frameCount, tomogram.optics.pixelSize, !apply_offsets);
 
 			if (tomogram.isVisibleAtAll(traj, boxSize / 2.0))
 			{
@@ -303,7 +303,7 @@ void SubtomoProgram::writeParticleSet(
 
                 copy.setImageFileNames(outData, outWeight, new_id);
 
-                if (apply_translations)
+                if (apply_offsets)
                 {
                     const d3Vector pos = particleSet.getPosition(part_id);
 
@@ -473,7 +473,7 @@ void SubtomoProgram::processTomograms(
 			}
 			
 			const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
-						part_id, fc, tomogram.optics.pixelSize, !apply_translations);
+						part_id, fc, tomogram.optics.pixelSize, !apply_offsets);
 
 			if (!tomogram.isVisibleAtAll(traj, s2D / 2.0))
 			{
@@ -518,7 +518,7 @@ void SubtomoProgram::processTomograms(
 
 				if (do_ctf)
 				{
-                    const d3Vector pos = (apply_translations) ? particleSet.getPosition(part_id) : particleSet.getParticleCoord(part_id);
+                    const d3Vector pos = (apply_offsets) ? particleSet.getPosition(part_id) : particleSet.getParticleCoord(part_id);
 
                     CTF ctf = tomogram.getCtf(f, pos);
 					BufferedImage<float> ctfImg(sh2D, s2D);

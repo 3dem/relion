@@ -2459,6 +2459,10 @@ void JobWindow::initialiseTomoSubtomoWindow()
 
 	place("do_float16", TOGGLE_DEACTIVATE);
 
+	current_y += STEPY /2 ;
+
+	place("apply_offsets", TOGGLE_DEACTIVATE);
+
 	tab2->end();
 }
 
