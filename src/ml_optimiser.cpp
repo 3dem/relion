@@ -1994,6 +1994,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 			mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
 			sampling.is_3D = (mymodel.ref_dim == 3);
 			RFLOAT rottilt_step = sampling.getAngularSampling(adaptive_oversampling);
+            //SHWS 9may2022: Briggs lab uses --sigma_ang together with sampling.healpix_order >= autosampling_hporder_local_searches...
             if (mymodel.sigma2_rot <= 0. || mymodel.sigma2_tilt <= 0. || mymodel.sigma2_psi <= 0.)
             {
                 mymodel.sigma2_rot = mymodel.sigma2_tilt = mymodel.sigma2_psi = 2. * 2. * rottilt_step * rottilt_step;
