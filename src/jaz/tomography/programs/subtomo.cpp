@@ -72,7 +72,9 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 	write_divided = parser.checkOption("--div", "Write CTF-corrected subtomograms");
 	write_normalised = parser.checkOption("--nrm", "Write multiplicity-normalised subtomograms");
 
-	apply_orientations = parser.checkOption("--apply_orientations", "rlnAngle<Rot/Tilt/Psi> and rlnOriginX/Y/ZAngst are combined with rlnTomoSubtomogram<Rot/Tilt/Psi> and rlnCoordinateX/Y/Z to construct the particles in their refined orientations.");
+	apply_translations = parser.checkOption("--apply_translations", "rlnOriginX/Y/ZAngst are combined with rlnCoordinateX/Y/Z to construct the particles in their refined translations.");
+    apply_orientations = parser.checkOption("--apply_orientations", "rlnAngle<Rot/Tilt/Psi> are combined with rlnTomoSubtomogram<Rot/Tilt/Psi> to construct the particles in their refined orientations. This will also apply translations!");
+    if (apply_orientations) apply_translations = true;
 
 	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Only process undone subtomograms");
 
@@ -284,7 +286,7 @@ void SubtomoProgram::writeParticleSet(
 			Tomogram tomogram = tomogramSet.loadTomogram(t, false);
 
 			const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
-						part_id, tomogram.frameCount, tomogram.optics.pixelSize, !apply_orientations);
+						part_id, tomogram.frameCount, tomogram.optics.pixelSize, !apply_translations);
 
 			if (tomogram.isVisibleAtAll(traj, boxSize / 2.0))
 			{
@@ -301,13 +303,16 @@ void SubtomoProgram::writeParticleSet(
 
                 copy.setImageFileNames(outData, outWeight, new_id);
 
-				if (apply_orientations)
-				{
+                if (apply_translations)
+                {
                     const d3Vector pos = particleSet.getPosition(part_id);
 
                     copy.setParticleOffset(new_id, d3Vector(0,0,0));
                     copy.setParticleCoord(new_id, pos);
+                }
 
+				if (apply_orientations)
+				{
                     d3Matrix A = particleSet.getMatrix3x3(part_id);
 					const gravis::d3Vector ang = Euler::matrixToAngles(A);
 
@@ -468,7 +473,7 @@ void SubtomoProgram::processTomograms(
 			}
 			
 			const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
-						part_id, fc, tomogram.optics.pixelSize, !apply_orientations);
+						part_id, fc, tomogram.optics.pixelSize, !apply_translations);
 
 			if (!tomogram.isVisibleAtAll(traj, s2D / 2.0))
 			{
@@ -513,7 +518,7 @@ void SubtomoProgram::processTomograms(
 
 				if (do_ctf)
 				{
-                    const d3Vector pos = (apply_orientations) ? particleSet.getPosition(part_id) : particleSet.getParticleCoord(part_id);
+                    const d3Vector pos = (apply_translations) ? particleSet.getPosition(part_id) : particleSet.getParticleCoord(part_id);
 
                     CTF ctf = tomogram.getCtf(f, pos);
 					BufferedImage<float> ctfImg(sh2D, s2D);
