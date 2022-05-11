@@ -4836,7 +4836,6 @@ void MlOptimiser::maximizationOtherParameters()
 	if (!fix_sigma_noise && !((iter == 1 && do_firstiter_cc) || do_always_cc) )
 	{
 		bool do_subtomo_correction = wsum_model.sumw_stMulti[0].sum() > 0.;
-        std::cerr << " in maxOtherParams: do_subtomo= " << do_subtomo_correction << std::endl;
         for (int igroup = 0; igroup < mymodel.nr_optics_groups; igroup++)
 		{
 			RFLOAT tsum = wsum_model.sigma2_noise[igroup].sum();
@@ -4851,7 +4850,7 @@ void MlOptimiser::maximizationOtherParameters()
                     {
                         DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) +=
                                 (1. - my_mu) * DIRECT_MULTIDIM_ELEM(wsum_model.sigma2_noise[igroup], n) /
-                                (2. * wsum_model.sumw_group[igroup] * DIRECT_MULTIDIM_ELEM(wsum_model.sumw_stMulti[igroup], n) );
+                                (2. * DIRECT_MULTIDIM_ELEM(wsum_model.sumw_stMulti[igroup], n) );
                     }
                     else
                     {
@@ -8191,15 +8190,6 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 													}
 												}
 											}
-											if (do_subtomo_correction)
-											{
-												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mresol_fine[optics_group])
-												{
-													int ires = DIRECT_MULTIDIM_ELEM(Mresol_fine[optics_group], n);
-													if (ires > -1)
-														DIRECT_MULTIDIM_ELEM(thr_wsum_stMulti[img_id], ires) += DIRECT_MULTIDIM_ELEM(exp_local_STMulti[img_id], n);
-												}
-                                            }
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
 											if (part_id == mydata.sorted_idx[exp_my_first_part_id])
@@ -8606,8 +8596,19 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 		omp_set_lock(&global_mutex);
 		for (int img_id = 0; img_id < exp_nr_images; img_id++)
 		{
-			long int igroup = mydata.getGroupId(part_id, img_id);
-			int optics_group = mydata.getOpticsGroup(part_id, img_id);
+
+            long int igroup = mydata.getGroupId(part_id, img_id);
+            int optics_group = mydata.getOpticsGroup(part_id, img_id);
+            if (do_subtomo_correction)
+            {
+                FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mresol_fine[optics_group])
+                {
+                    int ires = DIRECT_MULTIDIM_ELEM(Mresol_fine[optics_group], n);
+                    if (ires > -1)
+                        DIRECT_MULTIDIM_ELEM(thr_wsum_stMulti[img_id], ires) += DIRECT_MULTIDIM_ELEM(exp_local_STMulti[img_id], n);
+                }
+            }
+
 			int my_image_size = mydata.getOpticsImageSize(optics_group);
 			RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
 			RFLOAT remap_image_sizes = (mymodel.ori_size * mymodel.pixel_size) / (my_image_size * my_pixel_size);
