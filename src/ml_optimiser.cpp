@@ -6814,6 +6814,8 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 								// Apply CTF to reference projection
 								if (do_ctf_correction && refs_are_ctf_corrected)
 								{
+									// JO 5Mar2020: For both 2D and 3D data, CTF^2 will be provided if ctf_premultiplied!
+									// TODO: ignore CTF until first peak of premultiplied CTF?
 									FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fref)
 									{
 										DIRECT_MULTIDIM_ELEM(Frefctf, n) = DIRECT_MULTIDIM_ELEM(Fref, n) * DIRECT_MULTIDIM_ELEM(exp_local_Fctf[img_id], n);
@@ -8008,6 +8010,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 									Mctf = exp_local_Fctf[img_id];
 									if (refs_are_ctf_corrected)
 									{
+										// JO 5Mar2020: For both 2D and 3D data, CTF^2 will be provided if ctf_premultiplied!
 										FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fref)
 										{
 											DIRECT_MULTIDIM_ELEM(Frefctf, n) = DIRECT_MULTIDIM_ELEM(Fref, n) * DIRECT_MULTIDIM_ELEM(Mctf, n);
@@ -8304,9 +8307,9 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 											std::cerr << "written " << fnt <<std::endl;
 #endif
 
- 											// Store sum of weight*SSNR*Fimg in data and sum of weight*SSNR in weight
+											// Store sum of weight*SSNR*Fimg in data and sum of weight*SSNR in weight
 											// Use the FT of the unmasked image to back-project in order to prevent reconstruction artefacts! SS 25oct11
-                                            if (ctf_premultiplied)
+											if (ctf_premultiplied)
 											{
 												// JO 5Mar2020: For both 2D and 3D data, CTF^2 will be provided if ctf_premultiplied!
 												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fimg)
@@ -8637,7 +8640,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
                         DIRECT_A1D_ELEM(wsum_model.sumw_stMulti[optics_group], i_resam) += DIRECT_A1D_ELEM(thr_wsum_stMulti[img_id], i);
 				}
 			}
-            wsum_model.sumw_group[optics_group] += thr_sumw_group[img_id];
+			wsum_model.sumw_group[optics_group] += thr_sumw_group[img_id];
 			if (do_scale_correction)
 			{
 				wsum_model.wsum_signal_product[igroup] += thr_wsum_signal_product_spectra[img_id];
@@ -9119,6 +9122,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 								REPORT_ERROR("ERROR: Fctf has a different shape from F1 and F2");
 							}
 #endif
+							// JO 5Mar2020: For both 2D and 3D data, CTF^2 will be provided if ctf_premultiplied!
 							FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F1)
 							{
 								DIRECT_MULTIDIM_ELEM(F1, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
