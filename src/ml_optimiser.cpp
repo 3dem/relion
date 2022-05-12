@@ -10225,10 +10225,21 @@ void MlOptimiser::applySubtomoCorrection(MultidimArray<Complex > &Fimg, Multidim
 	}
 	else if (!do_skip_subtomo_correction)
 	{
-		// SHWS 11may2022: removed all pre-divisions!
-        // This is the default for subtomogram averaging in RELION4: just use the sums!
-
-	}
+		// This is the default for subtomogram averaging in RELION-4.0: just use the sums!
+        // SHWS 11may2022: removed all pre-divisions!
+        // Just enforce the images are zero when M is zero!
+        FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fimg)
+		{
+			RFLOAT mySTMulti = FFTW_ELEM(FstMulti, kp, ip, jp);
+			if (mySTMulti < subtomo_multi_thr)
+			{
+                FFTW_ELEM(Fimg, kp, ip, jp) = 0.;
+				FFTW_ELEM(Fimg_nomask, kp, ip, jp) = 0.;
+				FFTW_ELEM(Fctf, kp, ip, jp) = 0.;
+                FFTW_ELEM(FstMulti, kp, ip, jp) = 0.;
+			}
+        }
+    }
 	else // We apply the multiplicity normalisation to process in the old way, without the corrected algorithm
 	{
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fimg)
