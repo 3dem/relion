@@ -2918,7 +2918,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					orientation_num,
 					accMLO->dataIs3D,
 					(baseMLO->do_grad),
-					ctf_premultiplied,
+					false,//ctf_premultiplied,
 					accMLO->classStreams[iclass]);
 
 				CTOC(accMLO->timer,"backproject");
