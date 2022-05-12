@@ -6773,7 +6773,6 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 								int my_metadata_offset = metadata_offset + img_id;
 								RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, img_id);
 								int optics_group = mydata.getOpticsGroup(part_id, img_id);
-								bool ctf_premultiplied = mydata.obsModel.getCtfPremultiplied(optics_group);
 
 								// Get the Euler matrix
 								Euler_angles2matrix(oversampled_rot[iover_rot],
@@ -6815,8 +6814,6 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 								// Apply CTF to reference projection
 								if (do_ctf_correction && refs_are_ctf_corrected)
 								{
-									// JO 5Mar2020: For both 2D and 3D data, CTF^2 will be provided if ctf_premultiplied!
-									// TODO: ignore CTF until first peak of premultiplied CTF?
 									FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fref)
 									{
 										DIRECT_MULTIDIM_ELEM(Frefctf, n) = DIRECT_MULTIDIM_ELEM(Fref, n) * DIRECT_MULTIDIM_ELEM(exp_local_Fctf[img_id], n);
@@ -8011,7 +8008,6 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 									Mctf = exp_local_Fctf[img_id];
 									if (refs_are_ctf_corrected)
 									{
-										// JO 5Mar2020: For both 2D and 3D data, CTF^2 will be provided if ctf_premultiplied!
 										FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fref)
 										{
 											DIRECT_MULTIDIM_ELEM(Frefctf, n) = DIRECT_MULTIDIM_ELEM(Fref, n) * DIRECT_MULTIDIM_ELEM(Mctf, n);
@@ -8308,18 +8304,37 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 											std::cerr << "written " << fnt <<std::endl;
 #endif
 
-                                            FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fimg)
-                                            {
-                                                RFLOAT myctf = DIRECT_MULTIDIM_ELEM(Mctf, n);
-                                                RFLOAT weightxinvsigma2 = weight * myctf * DIRECT_MULTIDIM_ELEM(Minvsigma2, n);
-                                                // now Fimg stores sum of all shifted w*Fimg
-                                                (DIRECT_MULTIDIM_ELEM(Fimg, n)).real += (*(Fimg_store + n)).real * weightxinvsigma2;
-                                                (DIRECT_MULTIDIM_ELEM(Fimg, n)).imag += (*(Fimg_store + n)).imag * weightxinvsigma2;
-                                                // now Fweight stores sum of all w
-                                                // Note that CTF needs to be squared in Fweight, weightxinvsigma2 already contained one copy
-                                                DIRECT_MULTIDIM_ELEM(Fweight, n) += weightxinvsigma2 * myctf;
+ 											// Store sum of weight*SSNR*Fimg in data and sum of weight*SSNR in weight
+											// Use the FT of the unmasked image to back-project in order to prevent reconstruction artefacts! SS 25oct11
+                                            if (ctf_premultiplied)
+											{
+												// JO 5Mar2020: For both 2D and 3D data, CTF^2 will be provided if ctf_premultiplied!
+												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fimg)
+												{
+													RFLOAT myctf = DIRECT_MULTIDIM_ELEM(Mctf, n);
+													RFLOAT weightxinvsigma2 = weight * DIRECT_MULTIDIM_ELEM(Minvsigma2, n);
+													// now Fimg stores sum of all shifted w*Fimg
+													(DIRECT_MULTIDIM_ELEM(Fimg, n)).real += (*(Fimg_store + n)).real * weightxinvsigma2;
+													(DIRECT_MULTIDIM_ELEM(Fimg, n)).imag += (*(Fimg_store + n)).imag * weightxinvsigma2;
+													// now Fweight stores sum of all w and multiply by CTF^2
+													DIRECT_MULTIDIM_ELEM(Fweight, n) += weightxinvsigma2 * myctf;
+												}
+											}
+											else
+											{
+												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fimg)
+												{
+													RFLOAT myctf = DIRECT_MULTIDIM_ELEM(Mctf, n);
+													RFLOAT weightxinvsigma2 = weight * myctf * DIRECT_MULTIDIM_ELEM(Minvsigma2, n);
+													// now Fimg stores sum of all shifted w*Fimg
+													(DIRECT_MULTIDIM_ELEM(Fimg, n)).real += (*(Fimg_store + n)).real * weightxinvsigma2;
+													(DIRECT_MULTIDIM_ELEM(Fimg, n)).imag += (*(Fimg_store + n)).imag * weightxinvsigma2;
+													// now Fweight stores sum of all w
+													// Note that CTF needs to be squared in Fweight, weightxinvsigma2 already contained one copy
+													DIRECT_MULTIDIM_ELEM(Fweight, n) += weightxinvsigma2 * myctf;
 
-                                            }
+												}
+											}
 
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
@@ -9104,7 +9119,6 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 								REPORT_ERROR("ERROR: Fctf has a different shape from F1 and F2");
 							}
 #endif
-							// JO 5Mar2020: For both 2D and 3D data, CTF^2 will be provided if ctf_premultiplied!
 							FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F1)
 							{
 								DIRECT_MULTIDIM_ELEM(F1, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
