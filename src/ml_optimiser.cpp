@@ -4560,7 +4560,6 @@ bool MlOptimiser::setAverageCTF2(MultidimArray<RFLOAT> &avgctf2)
         {
             if (DIRECT_MULTIDIM_ELEM(sumw_multi, n) > 0.)
                 DIRECT_MULTIDIM_ELEM(avgctf2, n) /= DIRECT_MULTIDIM_ELEM(sumw_multi, n);
-            std::cerr << " n= " << n << " avgctf2= " << DIRECT_MULTIDIM_ELEM(avgctf2, n) << " sumw= " << DIRECT_MULTIDIM_ELEM(sumw_multi, n) << std::endl;
         }
     }
 
