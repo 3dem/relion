@@ -4538,6 +4538,36 @@ void MlOptimiser::makeGoodHelixForEachRef()
 	return;
 }
 
+bool MlOptimiser::setAverageCTF2(MultidimArray<RFLOAT> &avgctf2)
+{
+    // When doing ctf_premultiplied, correct the tau2 estimates for the average CTF^2
+    bool do_correct_tau2_by_avgctf2 = false;
+    if (mydata.hasCtfPremultiplied() && !fix_tau && !do_split_random_halves)
+    {
+        do_correct_tau2_by_avgctf2 = true;
+        MultidimArray<RFLOAT> sumw_multi;
+        avgctf2.initZeros(mymodel.sigma2_noise[0]);
+        sumw_multi.initZeros(mymodel.sigma2_noise[0]);
+        for (int igroup = 0; igroup < mymodel.nr_optics_groups; igroup++)
+        {
+            FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(avgctf2)
+            {
+                DIRECT_MULTIDIM_ELEM(avgctf2, n) += DIRECT_MULTIDIM_ELEM(wsum_model.sumw_ctf2[igroup], n);
+                DIRECT_MULTIDIM_ELEM(sumw_multi, n) += DIRECT_MULTIDIM_ELEM(wsum_model.sumw_stMulti[igroup], n);
+            }
+        }
+        FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(avgctf2)
+        {
+            if (DIRECT_MULTIDIM_ELEM(sumw_multi, n) > 0.)
+                DIRECT_MULTIDIM_ELEM(avgctf2, n) /= DIRECT_MULTIDIM_ELEM(sumw_multi, n);
+            std::cerr << " n= " << n << " avgctf2= " << DIRECT_MULTIDIM_ELEM(avgctf2, n) << " sumw= " << DIRECT_MULTIDIM_ELEM(sumw_multi, n) << std::endl;
+        }
+    }
+
+    return do_correct_tau2_by_avgctf2;
+
+}
+
 void MlOptimiser::maximization()
 {
 	int skip_class(-1);
@@ -4550,7 +4580,11 @@ void MlOptimiser::maximization()
 		init_progress_bar(mymodel.nr_classes);
 	}
 
-	// First reconstruct the images for each class
+    // When doing ctf_premultiplied, correct the tau2 estimates for the average CTF^2
+    MultidimArray<RFLOAT> avgctf2;
+    bool do_correct_tau2_by_avgctf2 = setAverageCTF2(avgctf2);
+
+    // First reconstruct the images for each class
 	// multi-body refinement will never get here, as it is only 3D auto-refine and that requires MPI!
 	for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
 	{
@@ -4567,8 +4601,10 @@ void MlOptimiser::maximization()
 						mymodel.data_vs_prior_class[iclass],
 						mymodel.fourier_coverage_class[iclass],
 						mymodel.fsc_halves_class[0],
+                        avgctf2,
 						false,
-						false);
+						false,
+                        do_correct_tau2_by_avgctf2);
 
 				if (do_external_reconstruct)
 				{
@@ -7821,10 +7857,11 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 	}
 
 	//Sigma2_noise estimation
-	std::vector<MultidimArray<RFLOAT> > thr_wsum_sigma2_noise;
+	std::vector<MultidimArray<RFLOAT> > thr_wsum_sigma2_noise, thr_wsum_ctf2;
 	std::vector<MultidimArray<RFLOAT> >  thr_wsum_stMulti;
 	// Wsum_sigma_noise2 is a 1D-spectrum for each img_id
 	thr_wsum_sigma2_noise.resize(exp_nr_images);
+    thr_wsum_ctf2.resize(exp_nr_images);
 	if (do_subtomo_correction)
 		thr_wsum_stMulti.resize(exp_nr_images);
 
@@ -7832,6 +7869,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 	{
 		int optics_group = mydata.getOpticsGroup(part_id, img_id);
 		thr_wsum_sigma2_noise[img_id].initZeros(image_full_size[optics_group]/2 + 1);
+        thr_wsum_ctf2[img_id].initZeros(image_full_size[optics_group]/2 + 1);
         if (do_subtomo_correction)
             thr_wsum_stMulti[img_id].initZeros(image_full_size[optics_group]/2 + 1);
 		if (do_scale_correction)
@@ -8627,6 +8665,17 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
                 }
             }
 
+            if (mydata.obsModel.getCtfPremultiplied(optics_group))
+            {
+                RFLOAT myscale = XMIPP_MAX(0.001, mymodel.scale_correction[igroup]);
+                FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mresol_fine[optics_group])
+                {
+                    int ires = DIRECT_MULTIDIM_ELEM(Mresol_fine[optics_group], n);
+                    if (ires > -1)
+                        DIRECT_MULTIDIM_ELEM(thr_wsum_ctf2[img_id], ires) += myscale * DIRECT_MULTIDIM_ELEM(exp_local_Fctf[img_id], n);
+                }
+            }
+
 			int my_image_size = mydata.getOpticsImageSize(optics_group);
 			RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
 			RFLOAT remap_image_sizes = (mymodel.ori_size * mymodel.pixel_size) / (my_image_size * my_pixel_size);
@@ -8636,6 +8685,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 				if (i_resam < XSIZE(wsum_model.sigma2_noise[optics_group]))
 				{
 					DIRECT_A1D_ELEM(wsum_model.sigma2_noise[optics_group], i_resam) += DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[img_id], i);
+                    DIRECT_A1D_ELEM(wsum_model.sumw_ctf2[optics_group], i_resam) += DIRECT_A1D_ELEM(thr_wsum_ctf2[img_id], i);
                     if (do_subtomo_correction)
                         DIRECT_A1D_ELEM(wsum_model.sumw_stMulti[optics_group], i_resam) += DIRECT_A1D_ELEM(thr_wsum_stMulti[img_id], i);
 				}

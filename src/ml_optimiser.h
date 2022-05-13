@@ -1003,6 +1003,14 @@ public:
 	 * */
 	void makeGoodHelixForEachRef();
 
+    /*
+     * Calculate the average CTF^2 from the summed weights in wsum_model and return boolean whether to
+     * correct tau2 estimates by the average CTF^2 (which is needed when using ctf_premultiplied image
+     * because the tau2 is estimated from the CTF-corrected map, whereas the sigma2_noise estimates are
+     * from the CTF-affected differences)
+     */
+    bool setAverageCTF2(MultidimArray<RFLOAT> &avgctf2);
+
 	/* Maximization step
 	 * Updates the current model: reconstructs and updates all other model parameter
 	 */

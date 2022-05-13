@@ -1740,9 +1740,12 @@ void MlWsumModel::initialise(MlModel &_model, FileName fn_sym, bool asymmetric_p
 
 	sumw_group.resize(nr_optics_groups);
 
+    // For ctf_premultiplied
+    MultidimArray<RFLOAT > aux;
+    aux.initZeros(ori_size / 2 + 1);
+    sumw_ctf2.resize(nr_optics_groups, aux);
+
     // For subtomogram averaging
-	MultidimArray<RFLOAT > aux;
-	aux.initZeros(ori_size / 2 + 1);
     sumw_stMulti.resize(nr_optics_groups, aux);
 
 }
@@ -1782,6 +1785,7 @@ void MlWsumModel::initZeros()
 	for (int igroup = 0; igroup < nr_optics_groups; igroup++)
 	{
 		sigma2_noise[igroup].initZeros();
+        sumw_ctf2[igroup].initZeros();
         sumw_stMulti[igroup].initZeros();
         sumw_group[igroup] = 0.;
 	}
@@ -1811,7 +1815,7 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed)
 	packed_size += 7 ;
 
 	// for all optics group-related stuff
-	packed_size += nr_optics_groups * 2 * spectral_size;
+	packed_size += nr_optics_groups * 3 * spectral_size;
 	packed_size += nr_optics_groups;
 
 	// for scale correction in groups
@@ -1850,6 +1854,11 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed)
 			DIRECT_MULTIDIM_ELEM(packed, idx++) = DIRECT_MULTIDIM_ELEM(sigma2_noise[igroup], n);
 		}
         sigma2_noise[igroup].clear();
+        FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sumw_ctf2[igroup])
+        {
+            DIRECT_MULTIDIM_ELEM(packed, idx++) = DIRECT_MULTIDIM_ELEM(sumw_ctf2[igroup], n);
+        }
+        sumw_ctf2[igroup].clear();
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sumw_stMulti[igroup])
         {
             DIRECT_MULTIDIM_ELEM(packed, idx++) = DIRECT_MULTIDIM_ELEM(sumw_stMulti[igroup], n);
@@ -1928,6 +1937,11 @@ void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed)
 		{
 			DIRECT_MULTIDIM_ELEM(sigma2_noise[igroup], n) = DIRECT_MULTIDIM_ELEM(packed, idx++);
 		}
+        sumw_ctf2[igroup].resize(spectral_size);
+        FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sumw_ctf2[igroup])
+        {
+            DIRECT_MULTIDIM_ELEM(sumw_ctf2[igroup], n) = DIRECT_MULTIDIM_ELEM(packed, idx++);
+        }
 		sumw_stMulti[igroup].resize(spectral_size);
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sumw_stMulti[igroup])
 		{
@@ -1998,7 +2012,7 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed, int &piece, int &nr_pieces
 	// for LL & avePmax & sigma2_offset & avg_norm_correction & sigma2_rot & sigma2_tilt & sigma2_psi
 	packed_size += 7 ;
 	// for group-related spectra
-	packed_size += nr_optics_groups * 2 * spectral_size; // sigma2_noise[spectral_size] and sumw_stMulti[spectral_size]
+	packed_size += nr_optics_groups * 3 * spectral_size; // sigma2_noise[spectral_size] and sumw_stMulti[spectral_size] and sumw_ctf2[spectral_size]
 	packed_size += nr_optics_groups; // sumw_group
 	// for scale correction in groups
 	packed_size += 2 * nr_groups; // wsum_signal_product, wsum_reference_power
@@ -2075,7 +2089,15 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed, int &piece, int &nr_pieces
 		if (idx == ori_idx && do_clear)
 			sigma2_noise[igroup].clear();
 
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sumw_stMulti[igroup])
+        FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sumw_ctf2[igroup])
+        {
+            if (ori_idx >= idx_start && ori_idx < idx_stop) DIRECT_MULTIDIM_ELEM(packed, idx++) =DIRECT_MULTIDIM_ELEM(sumw_ctf2[igroup], n);
+            ori_idx++;
+        }
+        if (idx == ori_idx && do_clear)
+            sumw_ctf2[igroup].clear();
+
+        FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sumw_stMulti[igroup])
 		{
 			if (ori_idx >= idx_start && ori_idx < idx_stop) DIRECT_MULTIDIM_ELEM(packed, idx++) =DIRECT_MULTIDIM_ELEM(sumw_stMulti[igroup], n);
 			ori_idx++;
@@ -2213,6 +2235,15 @@ void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed, int piece, bool do_clear
 				DIRECT_MULTIDIM_ELEM(sigma2_noise[igroup], n) = DIRECT_MULTIDIM_ELEM(packed, idx++);
 			ori_idx++;
 		}
+
+        if (idx == ori_idx)
+            sumw_ctf2[igroup].resize(spectral_size);
+        FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sumw_ctf2[igroup])
+        {
+            if (ori_idx >= idx_start && ori_idx < idx_stop)
+                DIRECT_MULTIDIM_ELEM(sumw_ctf2[igroup], n) = DIRECT_MULTIDIM_ELEM(packed, idx++);
+            ori_idx++;
+        }
 
         if (idx == ori_idx)
             sumw_stMulti[igroup].resize(spectral_size);
