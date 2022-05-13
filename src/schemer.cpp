@@ -1562,24 +1562,15 @@ bool Scheme::changeStringForJobnames(FileName &mystring, FileName current_node)
 		FileName my_scheme_star = "Schemes/"+my_scheme_name+"/scheme.star";
 		if (exists(my_scheme_star))
 		{
+            // Read/write cycle to obey lock from other Schemer!
+			Scheme myscheme;
+            myscheme.setName(my_scheme_name);
+            myscheme.read(true);
+            myscheme.write(true);
 
-			// Remove leading directory and tailing slash to get the process current_name in the pipeline_schemer
+            // Remove leading directory and tailing slash to get the process current_name in the pipeline_schemer
 			FileName my_ori_name = (mystring.afterFirstOf(my_scheme_name+"/")).beforeLastOf("/");
-
-			// Read only the jobs table from the other scheme;
-			// otherwise global variables like schemer_global_floats, strings etc get overwritten!
-			MetaDataTable MDjobs;
-			MDjobs.read(my_scheme_star, "scheme_jobs");
-			FileName job_current_name, job_ori_name, my_current_name = "undefined";
-			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDjobs)
-			{
-				MDjobs.getValue(EMDL_SCHEME_JOB_ORI_NAME, job_ori_name);
-				MDjobs.getValue(EMDL_SCHEME_JOB_NAME, job_current_name);
-				if (job_ori_name == my_ori_name)
-				{
-					my_current_name = job_current_name;
-				}
-			}
+            std::string my_current_name = myscheme.jobs[my_ori_name].current_name;
 
 			if (my_current_name[my_current_name.length()-1] != '/')
 				my_current_name += "/";
