@@ -1564,7 +1564,7 @@ bool Scheme::changeStringForJobnames(FileName &mystring, FileName current_node)
 		{
             // Read/write cycle to obey lock from other Schemer!
 			Scheme myscheme;
-            myscheme.setName(my_scheme_name);
+            myscheme.setName(my_scheme_name+'/');
             myscheme.read(true);
             myscheme.write(true);
 
