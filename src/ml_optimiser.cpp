@@ -4881,8 +4881,9 @@ void MlOptimiser::maximizationOtherParameters()
 				{
 					DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) *= my_mu;
 
-                    if (do_subtomo_correction)
+                    if (do_subtomo_correction && DIRECT_MULTIDIM_ELEM(wsum_model.sumw_stMulti[igroup], n) > 0.)
                     {
+                        // If wsum_model.sumw_stMulti is zero, just keep the old sigma2_noise
                         DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) +=
                                 (1. - my_mu) * DIRECT_MULTIDIM_ELEM(wsum_model.sigma2_noise[igroup], n) /
                                 (2. * DIRECT_MULTIDIM_ELEM(wsum_model.sumw_stMulti[igroup], n) );
@@ -6404,7 +6405,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 	exp_local_Fctf.resize(exp_nr_images);
 	exp_local_sqrtXi2.resize(exp_nr_images);
 
-	bool do_subtomo_correction = is_for_store_wsums && exp_STMulti.size() > 0 && NZYXSIZE(exp_STMulti[0]) > 0;
+	bool do_subtomo_correction = exp_STMulti.size() > 0 && NZYXSIZE(exp_STMulti[0]) > 0;
 
 	MultidimArray<Complex > Fimg, Fimg_nomask;
 	for (int img_id = 0, my_trans_image = 0; img_id < exp_nr_images; img_id++)
@@ -6477,8 +6478,8 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 
 			// Also prepare Minvsigma2
 			if (mymodel.data_dim == 3)
-				exp_local_Minvsigma2[img_id].initZeros(ZSIZE(Fimg), YSIZE(Fimg), XSIZE(Fimg));
-			else
+                exp_local_Minvsigma2[img_id].initZeros(ZSIZE(Fimg), YSIZE(Fimg), XSIZE(Fimg));
+            else
 				exp_local_Minvsigma2[img_id].initZeros(YSIZE(Fimg), XSIZE(Fimg));
 
 			// With optics_group and relevant size of Fimg, calculate inverse of sigma^2 for relevant parts of Mresol
@@ -6493,12 +6494,40 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 			}
 		}
 
-		if (do_subtomo_correction)
+        if (do_subtomo_correction)
 		{
-			// We store the downsized subtomogram Fourier Multiplicity weights
-			windowFourierTransform(exp_STMulti[img_id], exp_local_STMulti[img_id], exp_current_image_size);
+			MultidimArray<double> STmult;
+            windowFourierTransform(exp_STMulti[img_id], STmult, exp_current_image_size);
 
-			// SHWS11may2022: removed modification of invsigma2 introduced by Kino
+            if (is_for_store_wsums)
+            {
+                // We store the downsized subtomogram Fourier Multiplicity weights for updates of sigma2_noise in the storeWeightedSums function
+                exp_local_STMulti[img_id] = STmult;
+
+                // We also undo the division by STmult in the first pass for getAllSquareDifferences, if in this pass do_ctf_invsig is false
+                if (!do_ctf_invsig)
+                {
+                    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Minvsigma2[img_id])
+                    {
+                        if (DIRECT_MULTIDIM_ELEM(STmult, n) > 0.1)
+                        {
+                            DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2[img_id], n) *= DIRECT_MULTIDIM_ELEM(STmult, n);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // SHWS 23may2022: For getAllSquareDifferences: use ||CTF X- CTF^2*P*V||^2 / (sigma2_noise * M)
+                // For storedWeightedSums, the factor M should not be there anymore!
+                FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Minvsigma2[img_id])
+                {
+                    if (DIRECT_MULTIDIM_ELEM(STmult, n) > 0.1)
+                    {
+                        DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2[img_id], n) /= DIRECT_MULTIDIM_ELEM(STmult, n);
+                    }
+                }
+            }
 		}
 
 		//Shifts are done on the fly on the gpu, if do_gpu || do_cpu, do_shifts_onthefly is always false!
@@ -8358,7 +8387,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 													(DIRECT_MULTIDIM_ELEM(Fimg, n)).imag += (*(Fimg_store + n)).imag * weightxinvsigma2;
 													// now Fweight stores sum of all w and multiply by CTF^2
 													DIRECT_MULTIDIM_ELEM(Fweight, n) += weightxinvsigma2 * myctf;
-												}
+                                                }
 											}
 											else
 											{
@@ -8372,7 +8401,6 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 													// now Fweight stores sum of all w
 													// Note that CTF needs to be squared in Fweight, weightxinvsigma2 already contained one copy
 													DIRECT_MULTIDIM_ELEM(Fweight, n) += weightxinvsigma2 * myctf;
-
 												}
 											}
 
@@ -10297,8 +10325,7 @@ void MlOptimiser::applySubtomoCorrection(MultidimArray<Complex > &Fimg, Multidim
         // Just enforce the images are zero when M is zero!
         FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fimg)
 		{
-			RFLOAT mySTMulti = FFTW_ELEM(FstMulti, kp, ip, jp);
-			if (mySTMulti < subtomo_multi_thr)
+			if (FFTW_ELEM(FstMulti, kp, ip, jp) < subtomo_multi_thr)
 			{
                 FFTW_ELEM(Fimg, kp, ip, jp) = 0.;
 				FFTW_ELEM(Fimg_nomask, kp, ip, jp) = 0.;
