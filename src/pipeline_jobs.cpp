@@ -483,7 +483,7 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 			type != PROC_TOMO_ALIGN &&
 			type != PROC_TOMO_RECONSTRUCT &&
 		    type != PROC_EXTERNAL)
-			REPORT_ERROR("ERROR: cannot find correct job type in " + myfilename + "run.job, with type= " + integerToString(type));
+			return false;
 
 		return true;
 	}

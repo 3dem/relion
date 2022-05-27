@@ -1691,7 +1691,8 @@ RelionJob Scheme::prepareJob(FileName current_node)
 
 	// Always re-read from the original job.star from the Scheme directory,
 	// because $$ variables and input jobnames may have been replaced when continuing existing jobs
-	myjob.read(name + current_node + '/', dummy, true);
+	if (!myjob.read(name + current_node + '/', dummy, true))
+        REPORT_ERROR("ERROR: there was a problem reading job " + name + current_node);
 
     // Check whether there are any joboption values with a jobname from one of the processes in this Schemer
 	// And replace these by their corresponding 'current_name'
