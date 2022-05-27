@@ -508,7 +508,7 @@ if(do_gpu)
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
 	maximum_angular_sampling = textToFloat(getParameter(argc, argv, "--maximum_angular_sampling", "0"));
 	asymmetric_padding = parser.checkOption("--asymmetric_padding", "", "false", true);
-	skip_gridding = parser.checkOption("--skip_gridding", "Skip gridding in the M step");
+	skip_gridding = !parser.checkOption("--dont_skip_gridding", "Perform gridding in the reconstruction step (obsolete?)");
 	nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
 	debug_split_random_half = textToInteger(getParameter(argc, argv, "--debug_split_random_half", "0"));
     do_red = parser.checkOption("--do_red", "", "false", true);
@@ -931,7 +931,7 @@ if(do_gpu)
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
 	maximum_angular_sampling = textToFloat(getParameter(argc, argv, "--maximum_angular_sampling", "0"));
 	asymmetric_padding = parser.checkOption("--asymmetric_padding", "", "false", true);
-	skip_gridding = parser.checkOption("--skip_gridding", "Skip gridding in the M step");
+	skip_gridding = !parser.checkOption("--dont_skip_gridding", "Perform gridding in the reconstruction step (obsolete?)");
 	debug_split_random_half = textToInteger(getParameter(argc, argv, "--debug_split_random_half", "0"));
     skip_realspace_helical_sym = parser.checkOption("--skip_realspace_helical_sym", "", "false", true);
 

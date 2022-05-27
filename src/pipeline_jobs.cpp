@@ -3266,7 +3266,6 @@ Otherwise, only the leader will read images and send them through the network to
 	joboptions["nr_pool"] = JobOption("Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI followers. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
 All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
 This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
-	joboptions["skip_gridding"] = JobOption("Skip gridding?", true, "If set to Yes, the calculations will skip gridding in the M step to save time, typically with just as good results.");
 	joboptions["do_preread_images"] = JobOption("Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in float-precision, it will take ( N * box_size * box_size * 4 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 15Gb, or 60 Gb for the same number of 400x400 particles. \
 Remember that running a single MPI follower on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the leader reads all particles into RAM and sends those particles through the network to the MPI followers during the refinement iterations.");
@@ -3378,8 +3377,6 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 	command += " --scratch_dir " +  joboptions["scratch_dir"].getString();
 	command += " --pool " + joboptions["nr_pool"].getString();
 	command += " --pad 1 ";
-	if (joboptions["skip_gridding"].getBoolean())
-		command += " --skip_gridding ";
 
 	// Optimisation
 	command += " --particle_diameter " + joboptions["particle_diameter"].getString();
@@ -3631,7 +3628,6 @@ Otherwise, only the leader will read images and send them through the network to
 All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
 This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
 	joboptions["do_pad1"] = JobOption("Skip padding?", false, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
-	joboptions["skip_gridding"] = JobOption("Skip gridding?", true, "If set to Yes, the calculations will skip gridding in the M step to save time, typically with just as good results.");
 	joboptions["do_preread_images"] = JobOption("Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in float-precision, it will take ( N * box_size * box_size * 4 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 15Gb, or 60 Gb for the same number of 400x400 particles. \
 Remember that running a single MPI follower on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the leader reads all particles into RAM and sends those particles through the network to the MPI followers during the refinement iterations.");
@@ -3738,8 +3734,6 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 		command += " --pad 1 ";
 	else
 		command += " --pad 2 ";
-	if (joboptions["skip_gridding"].getBoolean())
-		command += " --skip_gridding ";
 
 	// CTF stuff
 	if (!is_continue)
@@ -4086,7 +4080,6 @@ Otherwise, only the leader will read images and send them through the network to
 All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
 This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
 	joboptions["do_pad1"] = JobOption("Skip padding?", false, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
-	joboptions["skip_gridding"] = JobOption("Skip gridding?", true, "If set to Yes, the calculations will skip gridding in the M step to save time, typically with just as good results.");
 	joboptions["do_preread_images"] = JobOption("Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in float-precision, it will take ( N * box_size * box_size * 8 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 15Gb, or 60 Gb for the same number of 400x400 particles. \
 Remember that running a single MPI follower on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the leader reads all particles into RAM and sends those particles through the network to the MPI followers during the refinement iterations.");
@@ -4226,8 +4219,6 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 		command += " --pad 1 ";
 	else
 		command += " --pad 2 ";
-	if (joboptions["skip_gridding"].getBoolean())
-		command += " --skip_gridding ";
 	if (joboptions["auto_faster"].getBoolean())
 	{
 		command += " --auto_ignore_angles --auto_resol_angles";
@@ -4464,7 +4455,6 @@ Otherwise, only the leader will read images and send them through the network to
 All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
 This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
 	joboptions["do_pad1"] = JobOption("Skip padding?", false, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
-	joboptions["skip_gridding"] = JobOption("Skip gridding?", true, "If set to Yes, the calculations will skip gridding in the M step to save time, typically with just as good results.");
 	joboptions["do_preread_images"] = JobOption("Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in float-precision, it will take ( N * box_size * box_size * 8 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 15Gb, or 60 Gb for the same number of 400x400 particles. \
 Remember that running a single MPI follower on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the leader reads all particles into RAM and sends those particles through the network to the MPI followers during the refinement iterations.");
@@ -4577,8 +4567,6 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 			command += " --pad 1 ";
 		else
 			command += " --pad 2 ";
-		if (joboptions["skip_gridding"].getBoolean())
-			command += " --skip_gridding ";
 
 		// Running stuff
 		command += " --j " + joboptions["nr_threads"].getString();
@@ -6667,7 +6655,7 @@ bool RelionJob::getCommandsTomoReconPartJob(std::string &outputname, std::vector
 		Node node1(outputname+"reconstruct.mrc", LABEL_TOMO_MAP);
 		outputNodes.push_back(node1);
     	command += " --o " + outputname + "reconstruct.mrc";
-    	command += " --ctf --skip_gridding";
+    	command += " --ctf ";
     }
 
 	command += " --sym " + joboptions["sym_name"].getString();

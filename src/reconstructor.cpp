@@ -81,7 +81,7 @@ void Reconstructor::read(int argc, char **argv)
 	do_3d_rot = parser.checkOption("--3d_rot", "Perform 3D rotations instead of backprojections from 2D images");
 	ctf_dim  = textToInteger(parser.getOption("--reconstruct_ctf", "Perform a 3D reconstruction from 2D CTF-images, with the given size in pixels", "-1"));
 	do_reconstruct_ctf2 = parser.checkOption("--ctf2", "Reconstruct CTF^2 and then take the sqrt of that");
-	skip_gridding = parser.checkOption("--skip_gridding", "Skip gridding part of the reconstruction");
+	skip_gridding = !parser.checkOption("--dont_skip_gridding", "Perform gridding in the reconstruction (obsolete?)");
 	fn_debug = parser.getOption("--debug", "Rootname for debug reconstruction files", "");
 	debug_ori_size =  textToInteger(parser.getOption("--debug_ori_size", "Rootname for debug reconstruction files", "1"));
 	debug_size =  textToInteger(parser.getOption("--debug_size", "Rootname for debug reconstruction files", "1"));
