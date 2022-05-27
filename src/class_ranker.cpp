@@ -400,7 +400,7 @@ void ClassRanker::read(int argc, char **argv, int rank)
 	fn_sel_classavgs = parser.getOption("--fn_sel_classavgs", "Filename for output star file with selected class averages", "class_averages.star");
 	fn_root = parser.getOption("--fn_root", "rootname for output model.star and optimiser.star files", "rank");
 	fn_pytorch_model = parser.getOption("--fn_pytorch_model", "Filename for the serialized Torch model.", ""); // Default should be compile-time defined
-	python_interpreter = parser.getOption("--python", "Command or path to python interpreter with pytorch.", "python");
+	python_interpreter = parser.getOption("--python", "Command or path to python interpreter with pytorch.", "");
 
 	int part_section = parser.addSection("Network training options (only used in development!)");
 	do_ranking  = !parser.checkOption("--train", "Only write output files for training purposes (don't rank classes)");
@@ -457,6 +457,22 @@ void ClassRanker::initialise()
 	// Make sure output rootname ends with a "/" and make directory
 	if (fn_out[fn_out.length()-1] != '/') fn_out += "/";
 	mktree(fn_out);
+
+
+    // Get the python executable
+	if (python_interpreter == "")
+	{
+		char *penv;
+		penv = getenv("RELION_PYTHON_EXECUTABLE");
+		if (penv != NULL) {
+            python_interpreter = (std::string) penv;
+            std::cout << " + Using python from RELION_PYTHON_EXECUTABLE environment variable: " << python_interpreter << std::endl;
+        }
+        else
+        {
+            REPORT_ERROR("ERROR: you need to specify the python executable through --python, or the RELION_PYTHON_EXECUTABLE environment variable");
+        }
+	}
 
 	if (do_skip_angular_errors)
 	{
