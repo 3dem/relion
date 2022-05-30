@@ -75,3 +75,8 @@ make install # Only when you have specified CMAKE_INSTALL_PREFIX in the cmake st
 ```
 
 If something went wrong, remove the `build` directory and try again from `cmake`.
+
+
+## Class Ranker
+The default model for the class ranker has been trained and tested in Python 3.9.12 with Pytorch 1.10.0 and Numpy 1.20.0.
+If you wish to retrain the class ranker model with your own data, please refer to [this repo](https://github.com/3dem/relion-classranker).
