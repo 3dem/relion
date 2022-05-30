@@ -37,16 +37,18 @@ public:
 
 	std::string name;
 	std::string alias;
-	int type;
+    int type;
+	std::string typeLabel;
 	int status;
 	std::vector<long int> inputNodeList;  // List of Nodes of input to this process
 	std::vector<long int> outputNodeList; // List of Nodes of output from this process
 
 	// Constructor
-	Process(std::string _name, int _type, int _status, std::string _alias="None")
+	Process(std::string _name, int _type, std::string _typeLabel, int _status, std::string _alias="None")
 	{
 		name = _name;
-		type = _type;
+        type = _type;
+		typeLabel = _typeLabel;
 		status = _status;
 		alias = _alias;
 	}
