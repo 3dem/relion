@@ -481,7 +481,7 @@ long int PipeLine::addJob(RelionJob &thisjob, int as_status, bool do_write_minip
 	mini_pipeline.setName(thisjob.outputName+"job");
 
 	// Add Process to the processList of the pipeline
-	Process process(thisjob.outputName, thisjob.type, thisjob.label, as_status);
+	Process process(thisjob.outputName, thisjob.label, thisjob.type, as_status);
 	long int myProcess = addNewProcess(process);
 	mini_pipeline.addNewProcess(process);
 
@@ -1994,7 +1994,7 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 			REPORT_ERROR("PipeLine::read: cannot find type or status in pipeline_processes table");
 		}
 
-		Process newProcess(name, type, typeLabel, status, alias);
+		Process newProcess(name, typeLabel, type, status, alias);
 		processList.push_back(newProcess);
 
 		// Make a symbolic link to the alias if it isn't there...

@@ -44,7 +44,7 @@ public:
 	std::vector<long int> outputNodeList; // List of Nodes of output from this process
 
 	// Constructor
-	Process(std::string _name, int _type, std::string _typeLabel, int _status, std::string _alias="None")
+	Process(std::string _name, std::string _typeLabel, int _type, int _status, std::string _alias="None")
 	{
 		name = _name;
         type = _type;
