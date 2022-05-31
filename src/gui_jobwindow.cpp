@@ -2471,7 +2471,7 @@ void JobWindow::initialiseTomoImportWindow()
 
 void JobWindow::initialiseTomoAlignTiltseriesWindow()
 {
-    setupTabs(1);
+    setupTabs(3);
 
     tab1->begin();
     tab1->label("I/O");
@@ -2479,8 +2479,17 @@ void JobWindow::initialiseTomoAlignTiltseriesWindow()
 
     place("in_tiltseries", TOGGLE_DEACTIVATE);
 
- 	// Add a little spacer
-	current_y += STEPY/2;
+    // Add a little spacer
+    current_y += STEPY/2;
+
+    place("imod_wrapper", TOGGLE_DEACTIVATE);
+    place("other_wrapper_args", TOGGLE_DEACTIVATE);
+
+
+    tab1->end();
+    tab2->begin();
+    tab2->label("IMOD");
+    resetHeight();
 
     group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
     group1->end();
@@ -2504,11 +2513,22 @@ void JobWindow::initialiseTomoAlignTiltseriesWindow()
     group2->end();
     guientries["do_imod_patchtrack"].cb_menu_i(); // make default active
 
-	// Add a little spacer
-	current_y += STEPY/2;
-    place("other_wrapper_args", TOGGLE_DEACTIVATE);
+    tab2->end();
+    tab3->begin();
+    tab3->label("IMOD");
+    resetHeight();
 
-    tab1->end();
+    group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group3->end();
+    place("do_aretomo", TOGGLE_DEACTIVATE, group3, false);
+    group3->begin();
+
+    place("aretomo_resolution", TOGGLE_DEACTIVATE);
+    place("aretomo_thickness", TOGGLE_DEACTIVATE);
+    group2->end();
+    guientries["do_aretomo"].cb_menu_i(); // make default active
+
+    tab3->end();
 
 
 }

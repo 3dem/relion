@@ -6350,6 +6350,11 @@ void RelionJob::initialiseTomoAlignTiltSeriesJob()
 
     joboptions["in_tiltseries"] = JobOption("Input tilt series:", OUTNODE_TOMO_TOMOGRAMS, "", "STAR files (*.star)",  "Input tomogram set starfile.");
 
+    char *default_location = getenv ("RELION_IMOD_WRAPPER_EXECUTABLE");
+    char default_wrapper[] = DEFAULTIMODWRAPPERLOCATION;
+    if (default_location == NULL) default_location = default_wrapper;
+    joboptions["imod_wrapper"] = JobOption("Alister Burt's IMOD/AreTomo wrapper:", std::string(default_location), "*", ".", "Location of Alister Burt's IMOD/Wrapper script; or just its executable name if in the path. You can control the default of this field by setting environment variable RELION_IMOD_WRAPPER_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code. Note that Alister's script should find the executables to IMOD and AreTomo on its own. See Alister's documentation on how to configure this.");
+
     joboptions["do_imod_fiducials"] = JobOption("Use IMOD:fiducials?", true, "Set to Yes to perform tilt series alignment using fiducials in IMOD.");
     joboptions["fiducial_diameter"] = JobOption("Fiducial diameter (nm): ", 10, 1, 50, 1, "The diameter of the fiducials (in nm)");
 
@@ -6357,6 +6362,10 @@ void RelionJob::initialiseTomoAlignTiltSeriesJob()
     // TODO: check defaults with the experts
     joboptions["patch_size"] = JobOption("Patch size (in unbinned pixels): ", 10, 1, 50, 1, "The size of the patches in unbinned pixels.");
     joboptions["patch_overlap"] = JobOption("Patch overlap (%): ", 10, 0, 100, 10, "The overlap (0-100%) between the patches.");
+
+    joboptions["do_aretomo"] = JobOption("Use AreTomo?", false, "Set to Yes to perform tilt series alignment using UCSF's AreTomo.");
+    joboptions["aretomo_resolution"] = JobOption("Resolution for AreTomo alignment (in A): ", 10, 1, 50, 1, "The maximum resolution (in A) used for AreTomo alignment. The images will be Fourier cropped to have their Nyquist frequency at this value.");
+    joboptions["aretomo_thickness"] = JobOption("Thickness for AreTomo alignment (in A): ", 2000, 100, 5000, 100, "The tomogram thickness (in A) used for AreTomo alignment. The images will be Fourier cropped to have their Nyquist frequency at this value.");
 
     joboptions["other_wrapper_args"] = JobOption("Other wrapper arguments:", (std::string)"",  "Other arguments that will be passed straight onto the IMOD wrapper.");
 
@@ -6371,9 +6380,10 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
     int i = 0;
     if (joboptions["do_imod_fiducials"].getBoolean()) i++;
     if (joboptions["do_imod_patchtrack"].getBoolean()) i++;
+    if (joboptions["do_aretomo"].getBoolean()) i++;
     if (i != 1)
     {
-        error_message = "ERROR: you should (only) select ONE of the alignment methods: IMOD:fiducials or IMOD:patchtracking.";
+        error_message = "ERROR: you should (only) select ONE of the alignment methods: IMOD:fiducials or IMOD:patchtracking or AreTomo.";
         return false;
     }
 
@@ -6394,9 +6404,14 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
     {
         command += " --imod_patchtrack";
         command += " --patch_size " + joboptions["patch_size"].getString();
-        command += " -- patch_overlap " + joboptions["patch_overlap"].getString();
+        command += " --patch_overlap " + joboptions["patch_overlap"].getString();
     }
-
+    else if (joboptions["do_aretomo"].getBoolean())
+    {
+        command += " --aretomo";
+        command += " --aretomo_resolution " + joboptions["aretomo_resolution"].getString();
+        command += " --aretomo_thickness " + joboptions["aretomo_thickness"].getString();
+    }
     command += " --i " + joboptions["in_tiltseries"].getString();
     Node node(joboptions["in_tiltseries"].getString(), joboptions["in_tiltseries"].node_type);
     inputNodes.push_back(node);
@@ -6404,6 +6419,9 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
     command += " --o " + outputname;
     Node node2(outputname+"aligned_tilt_series.star", LABEL_TOMO_TOMOGRAMS);
     outputNodes.push_back(node2);
+
+    if ((joboptions["imod_wrapper"].getString()).length() > 0)
+        command += " --wrapper_executable " + joboptions["imod_wrapper"].getString();
 
     if ((joboptions["other_wrapper_args"].getString()).length() > 0)
         command += " --other_wrapper_args \" " + joboptions["other_wrapper_args"].getString() + " \"";

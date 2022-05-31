@@ -53,22 +53,31 @@ public:
     TomogramSet tomogramSet;
 
     // CTFFIND and Gctf executables and shell
-    FileName fn_imodwrapper_exe, fn_shell;
+    FileName fn_imodwrapper_exe;
 
     // Use IMOD:fiducials
     bool do_imod_fiducials;
 
-    // Use IMOD:patch-tracking
-    bool do_imod_patchtrack;
-
     // Nominal fiducial diameter (nm)
     RFLOAT fiducial_diam;
+
+    // Use IMOD:patch-tracking
+    bool do_imod_patchtrack;
 
     // Unbinned patch size (pixels)
     int patch_size;
 
     // Patch overlap (percentage 0-100)
     RFLOAT patch_overlap;
+
+    // Use AreTomo
+    bool do_aretomo;
+
+    // Resolution used in AreTomo alignment
+    RFLOAT aretomo_resolution;
+
+    // Alignment thickness in AreTomo
+    RFLOAT aretomo_thickness;
 
     // Additional gctf command line options
     std::string other_wrapper_args;
