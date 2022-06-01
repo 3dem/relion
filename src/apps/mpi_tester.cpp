@@ -1,7 +1,6 @@
 /***************************************************************************
  *
- * Author: "Sjors H.W. Scheres"
- * MRC Laboratory of Molecular Biology
+ * Author: "Takanori Nakane"
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,57 +16,33 @@
  * source code. Additional authorship citations may be added, but existing
  * author citations must be preserved.
  ***************************************************************************/
-#include <src/autopicker.h>
-#ifdef _CUDA_ENABLED
-#include <src/acc/cuda/cuda_autopicker.h>
-#endif
+#include "src/mpi.h"
+#include "src/multidim_array.h"
+
+// This simple program tests MPI communication by sending
+// blocks of 1 MB to 600 MB.
 
 int main(int argc, char *argv[])
 {
-	AutoPicker prm;
+	MpiNode node(argc, argv);
 
-	try
+	const int max_mb = 600;
+
+	MultidimArray<RFLOAT> buf(max_mb * 1024 * 1024);
+	for (int i = 1; i < max_mb; i++)
 	{
-		prm.read(argc, argv);
-
-		prm.initialise();
-
-#ifdef _CUDA_ENABLED
-		std::stringstream didSs;
-		if (prm.do_gpu)
+		printf("i = %d\n", i);
+		if (node.rank == 1)
 		{
-			didSs << "AP";
-			prm.deviceInitialise();
+			node.relion_MPI_Send(MULTIDIM_ARRAY(buf), i * 1024 * 1024, MY_MPI_DOUBLE, 0, MPITAG_PACK, MPI_COMM_WORLD);
 		}
-
-		if (prm.do_gpu && !(prm.do_topaz_train || prm.do_topaz_extract))
+		else if (node.rank == 0)
 		{
-			prm.cudaPicker = (void*) new AutoPickerCuda((AutoPicker*)&prm, didSs.str().c_str());
-			((AutoPickerCuda*)prm.cudaPicker)->run();
+			MPI_Status status;
+			node.relion_MPI_Recv(MULTIDIM_ARRAY(buf), i * 1024 * 1024, MY_MPI_DOUBLE, 1, MPITAG_PACK, MPI_COMM_WORLD, status);
 		}
-		else
-#endif
-		{
-			if (prm.do_topaz_train) prm.trainTopaz();
-			else prm.run();
-		}
-
-		if (!prm.do_topaz_train)
-			prm.generatePDFLogfile();
-
-#ifdef TIMING
-		std::cout << "timings:" << std::endl;
-		prm.timer.printTimes(false);
-#endif
-	}
-	catch (RelionError XE)
-	{
-		//prm.usage();
-		std::cerr << XE;
-
-		return RELION_EXIT_FAILURE;
 	}
 
-	return RELION_EXIT_SUCCESS;
+	MPI_Barrier(MPI_COMM_WORLD);
+	return 0;
 }
-

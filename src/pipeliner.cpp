@@ -481,7 +481,7 @@ long int PipeLine::addJob(RelionJob &thisjob, int as_status, bool do_write_minip
 	mini_pipeline.setName(thisjob.outputName+"job");
 
 	// Add Process to the processList of the pipeline
-	Process process(thisjob.outputName, thisjob.type, as_status);
+	Process process(thisjob.outputName, thisjob.label, thisjob.type, as_status);
 	long int myProcess = addNewProcess(process);
 	mini_pipeline.addNewProcess(process);
 
@@ -1969,7 +1969,7 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 	MDproc.readStar(in, "pipeline_processes");
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDproc)
 	{
-		std::string name, alias;
+		std::string name, alias, typeLabel;
 		int type, status;
 		if (!MDproc.getValue(EMDL_PIPELINE_PROCESS_NAME, name) ||
 			!MDproc.getValue(EMDL_PIPELINE_PROCESS_ALIAS, alias) )
@@ -1978,19 +1978,23 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 		if (MDproc.containsLabel(EMDL_PIPELINE_PROCESS_TYPE_LABEL) &&
 				MDproc.containsLabel(EMDL_PIPELINE_PROCESS_STATUS_LABEL))
 		{
-			std::string label;
-			MDproc.getValue(EMDL_PIPELINE_PROCESS_TYPE_LABEL, label);
-			type = get_proc_type(label);
-			MDproc.getValue(EMDL_PIPELINE_PROCESS_STATUS_LABEL, label);
+			MDproc.getValue(EMDL_PIPELINE_PROCESS_TYPE_LABEL, typeLabel);
+			type = get_proc_type(typeLabel);
+            std::string label;
+            MDproc.getValue(EMDL_PIPELINE_PROCESS_STATUS_LABEL, label);
 			status = procstatus_label2type.at(label);
 		}
-		else if (!MDproc.getValue(EMDL_PIPELINE_PROCESS_TYPE, type) ||
-			!MDproc.getValue(EMDL_PIPELINE_PROCESS_STATUS, status)	)
+		else if (MDproc.getValue(EMDL_PIPELINE_PROCESS_TYPE, type) &&
+			MDproc.getValue(EMDL_PIPELINE_PROCESS_STATUS, status)	)
+        {
+            typeLabel = get_proc_label(type);
+        }
+        else
 		{
 			REPORT_ERROR("PipeLine::read: cannot find type or status in pipeline_processes table");
 		}
 
-		Process newProcess(name, type, status, alias);
+		Process newProcess(name, typeLabel, type, status, alias);
 		processList.push_back(newProcess);
 
 		// Make a symbolic link to the alias if it isn't there...
@@ -2158,12 +2162,14 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 	MDproc_del.setName("pipeline_processes");
 	for(long int i=0 ; i < processList.size() ; i++)
 	{
-		if (fn_del == "" || !deleteProcess[i])
+
+
+        if (fn_del == "" || !deleteProcess[i])
 		{
-			MDproc.addObject();
+            MDproc.addObject();
 			MDproc.setValue(EMDL_PIPELINE_PROCESS_NAME, processList[i].name);
 			MDproc.setValue(EMDL_PIPELINE_PROCESS_ALIAS, processList[i].alias);
-			MDproc.setValue(EMDL_PIPELINE_PROCESS_TYPE_LABEL, get_proc_label(processList[i].type));
+			MDproc.setValue(EMDL_PIPELINE_PROCESS_TYPE_LABEL, processList[i].typeLabel);
 			MDproc.setValue(EMDL_PIPELINE_PROCESS_STATUS_LABEL, procstatus_type2label.at(processList[i].status));
 		}
 		else
@@ -2171,7 +2177,7 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 			MDproc_del.addObject();
 			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_NAME, processList[i].name);
 			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_ALIAS, processList[i].alias);
-			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_TYPE_LABEL, get_proc_label(processList[i].type));
+			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_TYPE_LABEL, processList[i].typeLabel);
 			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_STATUS_LABEL, procstatus_type2label.at(processList[i].status));
 		}
 

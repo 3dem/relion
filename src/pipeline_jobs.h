@@ -59,6 +59,7 @@
 #define DEFAULTGCTFLOCATION "/public/EM/Gctf/bin/Gctf"
 #define DEFAULTTOPAZLOCATION "/public/EM/RELION/topaz"
 #define DEFAULTRESMAPLOCATION "/public/EM/ResMap/ResMap-1.1.4-linux64"
+#define DEFAULTPYTHONLOCATION "python"
 #define DEFAULTQSUBCOMMAND "qsub"
 #define DEFAULTQUEUENAME "openmpi"
 #define DEFAULTMININIMUMDEDICATED 1

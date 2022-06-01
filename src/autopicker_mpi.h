@@ -30,7 +30,7 @@ public:
 	void read(int argc, char **argv);
 
 	// Set device-affinity
-	int deviceInitialise();
+	void deviceInitialise();
 
 	// Parallelized run function
 	void run();

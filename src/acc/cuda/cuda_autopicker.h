@@ -52,8 +52,8 @@ public:
 	relion_timer timer;
 #endif
 
-	AutoPickerCuda(AutoPicker    *basePicker, int dev_id, const char * timing_fnm);
-	AutoPickerCuda(AutoPickerMpi *basePicker, int dev_id, const char * timing_fnm);
+	AutoPickerCuda(AutoPicker    *basePicker, const char * timing_fnm);
+	AutoPickerCuda(AutoPickerMpi *basePicker, const char * timing_fnm);
 
 	void setupProjectors();
 

@@ -74,7 +74,7 @@ class ParticleSet
 		double getOriginalPixelSize(int opticsGroup) const;
 
 
-		std::vector<gravis::d3Vector> getTrajectoryInPixels(ParticleIndex particle_id, int fc, double pixelSize) const;
+		std::vector<gravis::d3Vector> getTrajectoryInPixels(ParticleIndex particle_id, int fc, double pixelSize, bool from_original_coordinate = false) const;
 		void checkTrajectoryLengths(ParticleIndex p0, int np, int fc, std::string caller) const;
 
 		// Split tomograms into segments of similar total particle count to facilitate load balancing.

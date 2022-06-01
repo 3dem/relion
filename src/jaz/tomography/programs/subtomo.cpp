@@ -73,8 +73,9 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 	write_divided = parser.checkOption("--div", "Write CTF-corrected subtomograms");
 	write_normalised = parser.checkOption("--nrm", "Write multiplicity-normalised subtomograms");
 
-	apply_angles = parser.checkOption("--apply_angles", "rlnAngle<Rot/Tilt/Psi> are combined with rlnTomoSubtomogram<Rot/Tilt/Psi> to construct rotated particles.");
-	restore_angles = parser.checkOption("--restore", "rlnAngle<Rot/Tilt/Psi> are combined with rlnTomoSubtomogram<Rot/Tilt/Psi> and restored in rlnAngle<Rot/Tilt/Psi>. Particles are not constructed.");
+    apply_offsets = parser.checkOption("--apply_offsets", "rlnOriginX/Y/ZAngst are combined with rlnCoordinateX/Y/Z to construct the particles in their refined translations.");
+    apply_orientations = parser.checkOption("--apply_orientations", "rlnAngle<Rot/Tilt/Psi> are combined with rlnTomoSubtomogram<Rot/Tilt/Psi> to construct the particles in their refined orientations. This will also apply translations!");
+    if (apply_orientations) apply_offsets = true;
 
 	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Only process undone subtomograms");
 
@@ -139,19 +140,7 @@ void SubtomoProgram::run()
 	const double relative_box_scale = cropSize / (double) boxSize;
 	const double binned_pixel_size = binning * particleSet.getOriginalPixelSize(0);
 
-	if (apply_angles && restore_angles)
-	{
-		std::cerr << "apply_angles and restore_angles are mutually exclusive. Select just one.";
-		exit(RELION_EXIT_FAILURE);
-	}
-
 	initialise(particleSet, particles, tomogramSet);
-
-	if (restore_angles)		
-	{
-		exit(RELION_EXIT_SUCCESS);
-	}
-
 
 	BufferedImage<float> sum_data, sum_weights;
 
@@ -321,7 +310,7 @@ void SubtomoProgram::writeParticleSet(
 			Tomogram tomogram = tomogramSet.loadTomogram(t, false);
 
 			const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
-						part_id, tomogram.frameCount, tomogram.optics.pixelSize);
+						part_id, tomogram.frameCount, tomogram.optics.pixelSize, !apply_offsets);
 
 			if (tomogram.isVisibleAtAll(traj, boxSize / 2.0))
 			{
@@ -333,47 +322,31 @@ void SubtomoProgram::writeParticleSet(
 				const std::string filenameRoot = getOutputFilename(
 					part_id, t, particleSet, tomogramSet);
 
-				if (!restore_angles)
+                std::string outData = filenameRoot + "_data.mrc";
+                std::string outWeight = filenameRoot + "_weights.mrc";
+
+                copy.setImageFileNames(outData, outWeight, new_id);
+
+                if (apply_offsets)
+                {
+                    const d3Vector pos = particleSet.getPosition(part_id);
+
+                    copy.setParticleOffset(new_id, d3Vector(0,0,0));
+                    copy.setParticleCoord(new_id, pos);
+                }
+
+				if (apply_orientations)
 				{
-					std::string outData = filenameRoot + "_data.mrc";
-					std::string outWeight = filenameRoot + "_weights.mrc";
-
-					copy.setImageFileNames(outData, outWeight, new_id);
-				}
-
-				const d3Vector offset_A = particleSet.getParticleOffset(part_id);
-				const d3Vector coord_0 = particleSet.getParticleCoord(part_id);
-
-				const d3Vector coord_1 = coord_0 - offset_A / originalPixelSize;
-
-				copy.setParticleOffset(new_id, d3Vector(0,0,0));
-				copy.setParticleCoord(new_id, coord_1);
-
-				if (apply_angles || restore_angles)
-				{
-					d3Matrix A = particleSet.getMatrix3x3(part_id);
+                    d3Matrix A = particleSet.getMatrix3x3(part_id);
 					const gravis::d3Vector ang = Euler::matrixToAngles(A);
 
-					if (apply_angles)
-					{
-						copy.partTable.setValue(EMDL_TOMO_SUBTOMOGRAM_ROT, RAD2DEG(ang[0]), new_id.value);
-						copy.partTable.setValue(EMDL_TOMO_SUBTOMOGRAM_TILT, RAD2DEG(ang[1]), new_id.value);
-						copy.partTable.setValue(EMDL_TOMO_SUBTOMOGRAM_PSI, RAD2DEG(ang[2]), new_id.value);
+                    copy.partTable.setValue(EMDL_TOMO_SUBTOMOGRAM_ROT, RAD2DEG(ang[0]), new_id.value);
+                    copy.partTable.setValue(EMDL_TOMO_SUBTOMOGRAM_TILT, RAD2DEG(ang[1]), new_id.value);
+                    copy.partTable.setValue(EMDL_TOMO_SUBTOMOGRAM_PSI, RAD2DEG(ang[2]), new_id.value);
 
-						copy.partTable.setValue(EMDL_ORIENT_ROT, 0.0, new_id.value);
-						copy.partTable.setValue(EMDL_ORIENT_TILT, 0.0, new_id.value);
-						copy.partTable.setValue(EMDL_ORIENT_PSI, 0.0, new_id.value);
-					}
-					else
-					{
-						copy.partTable.setValue(EMDL_TOMO_SUBTOMOGRAM_ROT, 0.0, new_id.value);
-						copy.partTable.setValue(EMDL_TOMO_SUBTOMOGRAM_TILT, 0.0, new_id.value);
-						copy.partTable.setValue(EMDL_TOMO_SUBTOMOGRAM_PSI, 0.0, new_id.value);
-
-						copy.partTable.setValue(EMDL_ORIENT_ROT, RAD2DEG(ang[0]), new_id.value);
-						copy.partTable.setValue(EMDL_ORIENT_TILT, RAD2DEG(ang[1]), new_id.value);
-						copy.partTable.setValue(EMDL_ORIENT_PSI, RAD2DEG(ang[2]), new_id.value);
-					}
+                    copy.partTable.setValue(EMDL_ORIENT_ROT, 0.0, new_id.value);
+                    copy.partTable.setValue(EMDL_ORIENT_TILT, 0.0, new_id.value);
+                    copy.partTable.setValue(EMDL_ORIENT_PSI, 0.0, new_id.value);
 				}
 			}
 			else
@@ -381,12 +354,6 @@ void SubtomoProgram::writeParticleSet(
 				particles_removed++;
 			}
 		}
-	}
-
-	if (restore_angles)
-	{
-		copy.partTable.deactivateLabel(EMDL_IMAGE_NAME);
-		copy.partTable.deactivateLabel(EMDL_CTF_IMAGE);
 	}
 
 	if (particles_removed == 1)
@@ -528,11 +495,9 @@ void SubtomoProgram::processTomograms(
 			{
 				continue;
 			}
-
-			const d3Vector pos = particleSet.getPosition(part_id);
 			
 			const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
-						part_id, fc, tomogram.optics.pixelSize);
+						part_id, fc, tomogram.optics.pixelSize, !apply_offsets);
 
 			if (!tomogram.isVisibleAtAll(traj, s2D / 2.0))
 			{
@@ -564,7 +529,7 @@ void SubtomoProgram::processTomograms(
 
 				d3Matrix A;
 
-				if (apply_angles)
+				if (apply_orientations)
 				{
 					A = particleSet.getMatrix3x3(part_id);
 				}
@@ -577,7 +542,9 @@ void SubtomoProgram::processTomograms(
 
 				if (do_ctf)
 				{
-					CTF ctf = tomogram.getCtf(f, pos);
+                    const d3Vector pos = (apply_offsets) ? particleSet.getPosition(part_id) : particleSet.getParticleCoord(part_id);
+
+                    CTF ctf = tomogram.getCtf(f, pos);
 					BufferedImage<float> ctfImg(sh2D, s2D);
 					ctf.draw(s2D, s2D, binnedPixelSize, gammaOffset, &ctfImg(0,0,0));
 

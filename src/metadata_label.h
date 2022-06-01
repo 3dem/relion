@@ -239,6 +239,7 @@ enum EMDLabel
 	EMDL_MICROGRAPH_ACCUM_MOTION_EARLY,
 	EMDL_MICROGRAPH_ACCUM_MOTION_LATE,
 	EMDL_MICROGRAPH_COORDINATES,
+    EMDL_MICROGRAPH_ICE_THICKNESS,
 	EMDL_MICROGRAPH_ID,
 	EMDL_MICROGRAPH_NAME,
 	EMDL_MICROGRAPH_GAIN_NAME,
@@ -938,7 +939,8 @@ private:
 		EMDL::addLabel(EMDL_MICROGRAPH_ACCUM_MOTION_EARLY, EMDL_DOUBLE, "rlnAccumMotionEarly","Accumulated global motion during the first frames of the movie (in A)");
 		EMDL::addLabel(EMDL_MICROGRAPH_ACCUM_MOTION_LATE, EMDL_DOUBLE, "rlnAccumMotionLate","Accumulated global motion during the last frames of the movie (in A)");
 		EMDL::addLabel(EMDL_MICROGRAPH_COORDINATES, EMDL_STRING, "rlnMicrographCoordinates", "Filename of a file (in .star, .box or .txt format) with X,Y (Z) coordinates of picked particles in micrographs/tomograms");
-		EMDL::addLabel(EMDL_MICROGRAPH_ID, EMDL_INT, "rlnMicrographId", "ID (i.e. a unique number) of a micrograph");
+        EMDL::addLabel(EMDL_MICROGRAPH_ICE_THICKNESS, EMDL_DOUBLE, "rlnMicrographIceThickness", "Ice thickness (in Angstrom) of a micrograph");
+        EMDL::addLabel(EMDL_MICROGRAPH_ID, EMDL_INT, "rlnMicrographId", "ID (i.e. a unique number) of a micrograph");
 		EMDL::addLabel(EMDL_MICROGRAPH_NAME, EMDL_STRING, "rlnMicrographName", "Name of a micrograph");
 		EMDL::addLabel(EMDL_MICROGRAPH_GAIN_NAME, EMDL_STRING, "rlnMicrographGainName", "Name of a gain reference");
 		EMDL::addLabel(EMDL_MICROGRAPH_DEFECT_FILE, EMDL_STRING, "rlnMicrographDefectFile", "Name of a defect list file");

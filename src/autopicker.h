@@ -203,8 +203,8 @@ public:
 	// Topaz particle radius for use in extract
 	int topaz_radius;
 
-	// Device ID for topaz
-	int topaz_device_id;
+	// GPU Device ID
+	int device_id = -1;
 
 	// Filename for picks or particles star file to be used for topaz training
 	FileName topaz_train_picks, topaz_train_parts;
@@ -340,7 +340,7 @@ public:
 	void initialise(int rank = 0);
 
 	// Set device-affinity
-	int deviceInitialise();
+	void deviceInitialise();
 
 	// General function to decide what to do
 	void run();
