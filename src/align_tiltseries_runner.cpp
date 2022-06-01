@@ -76,7 +76,8 @@ void AlignTiltseriesRunner::initialise(bool is_leader)
     int i = 0;
     if (do_imod_fiducials) i++;
     if (do_imod_patchtrack) i++;
-    if (i != 1) REPORT_ERROR("ERROR: you need to specify one of these options: --imod_fiducials or --imod_patchtrack");
+    if (do_aretomo) i++;
+    if (i != 1) REPORT_ERROR("ERROR: you need to specify one of these options: --imod_fiducials or --imod_patchtrack or --aretomo");
 
 	// Make sure fn_out ends with a slash
 	if (fn_out[fn_out.length()-1] != '/')
