@@ -99,7 +99,9 @@ void TomoBackprojectProgram::initialise()
     }
     else
     {
-        tomoIndexTodo.push_back(tomogramSet.getTomogramIndex(tomoName));
+        int myidx = tomogramSet.getTomogramIndex(tomoName);
+        if (myidx < 0) REPORT_ERROR("ERROR: cannot find specific tomogram name \"" + tomoName + "\" in the input star file");
+        tomoIndexTodo.push_back(myidx);
         do_multiple = false;
     }
 
