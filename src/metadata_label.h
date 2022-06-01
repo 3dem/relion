@@ -615,6 +615,11 @@ enum EMDLabel
 	EMDL_TOMO_PROJECTION_Y,
 	EMDL_TOMO_PROJECTION_Z,
 	EMDL_TOMO_PROJECTION_W,
+    EMDL_TOMO_XTILT,
+    EMDL_TOMO_YTILT,
+    EMDL_TOMO_ZROT,
+    EMDL_TOMO_XSHIFT_ANGST,
+    EMDL_TOMO_YSHIFT_ANGST,
 	EMDL_TOMO_HANDEDNESS,
 	EMDL_TOMO_FIDUCIALS_STARFILE,
 	EMDL_TOMO_TILT_SERIES_PIXEL_SIZE,
@@ -1301,6 +1306,12 @@ private:
 		EMDL::addLabel(EMDL_TOMO_SIZE_X, EMDL_INT, "rlnTomoSizeX", "Width of a bin-1 tomogram in pixels");
 		EMDL::addLabel(EMDL_TOMO_SIZE_Y, EMDL_INT, "rlnTomoSizeY", "Height of a bin-1 tomogram in pixels");
 		EMDL::addLabel(EMDL_TOMO_SIZE_Z, EMDL_INT, "rlnTomoSizeZ", "Depth of a bin-1 tomogram in pixels");
+
+        EMDL::addLabel(EMDL_TOMO_XTILT, EMDL_DOUBLE, "rlnTomoXTilt", "Euler angle for rotation of tomogram around X-axis");
+		EMDL::addLabel(EMDL_TOMO_YTILT, EMDL_DOUBLE, "rlnTomoYTilt", "Euler angle for rotation of tomogram around Y-axis");
+        EMDL::addLabel(EMDL_TOMO_ZROT, EMDL_DOUBLE, "rlnTomoZRot", "Euler angle for rotation of tomogram around Z-axis");
+        EMDL::addLabel(EMDL_TOMO_XSHIFT_ANGST, EMDL_DOUBLE, "rlnTomoXShiftAngst", "X-translation (in A) to align the projection of a tomogram with the tilt series image");
+        EMDL::addLabel(EMDL_TOMO_YSHIFT_ANGST, EMDL_DOUBLE, "rlnTomoYShiftAngst", "Y-translation (in A) to align the projection of a tomogram with the tilt series image");
 
 		EMDL::addLabel(EMDL_TOMO_PROJECTION_X, EMDL_DOUBLE_VECTOR, "rlnTomoProjX", "First row of the projection matrix");
 		EMDL::addLabel(EMDL_TOMO_PROJECTION_Y, EMDL_DOUBLE_VECTOR, "rlnTomoProjY", "Second row of the projection matrix");
