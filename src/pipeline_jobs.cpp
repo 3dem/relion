@@ -1143,7 +1143,12 @@ bool RelionJob::getCommands(std::string &outputname, std::vector<std::string> &c
     {
         result = getCommandsTomoAlignTiltSeriesJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
     }
-	else if (type == PROC_TOMO_RECONSTRUCT)
+    else if (type == PROC_TOMO_RECONSTRUCT_TOMOGRAM)
+    {
+        result = getCommandsTomoReconstructTomogramsJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
+    }
+
+    else if (type == PROC_TOMO_RECONSTRUCT)
 	{
 		result = getCommandsTomoReconPartJob(outputname, commands, final_command, do_makedir, job_counter,
 											 error_message);
@@ -6476,7 +6481,8 @@ bool RelionJob::getCommandsTomoReconstructTomogramsJob(std::string &outputname, 
     if (error_message != "") return false;
 
     command += " --o " + outputname;
-    command += " --tn " + joboptions["tomo_name"].getString();
+    if (joboptions["tomo_name"].getString().length() > 0)
+        command += " --tn " + joboptions["tomo_name"].getString();
 
     command += " --w " + joboptions["xdim"].getString();
     command += " --h " + joboptions["ydim"].getString();
