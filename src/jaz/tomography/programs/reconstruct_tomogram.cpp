@@ -146,6 +146,100 @@ void TomoBackprojectProgram::run(int rank, int size)
     std::cout << " Done!" << std::endl;
 
 }
+void TomoBackprojectProgram::getProjectMatrices(Tomogram &tomogram, MetaDataTable &tomogramTable)
+{
+/* From Alister Burt
+ *
+ * tilt_image_center = tilt_image_dimensions / 2
+ * specimen_center = tomogram_dimensions / 2
+ *
+ * # Transformations, defined in order of application
+ * s0 = S(-specimen_center)  # put specimen center-of-rotation at the origin
+ * r0 = Rx(euler_angles['rlnTomoXTilt'])  # rotate specimen around X-axis
+ * r1 = Ry(euler_angles['rlnTomoYTilt'])  # rotate specimen around Y-axis
+ * r2 = Rz(euler_angles['rlnTomoZRot'])  # rotate specimen around Z-axis
+ * s1 = S(specimen_shifts)  # shift projected specimen in xy (camera) plane
+ * s2 = S(tilt_image_center)  # move specimen back into tilt-image coordinate system
+ *
+ * # compose matrices
+ * transformations = s2 @ s1 @ r2 @ r1 @ r0 @ s0
+ *
+ */
+
+    if (!(tomogramTable.containsLabel(EMDL_TOMO_XTILT) &&
+          tomogramTable.containsLabel(EMDL_TOMO_YTILT) &&
+          tomogramTable.containsLabel(EMDL_TOMO_ZROT) &&
+          tomogramTable.containsLabel(EMDL_TOMO_XSHIFT_ANGST) &&
+          tomogramTable.containsLabel(EMDL_TOMO_YSHIFT_ANGST)))
+        REPORT_ERROR("ERROR: input tomograms.star file does not contain projections matrices, NOR rlnTomoXTilt, rlnTomoYtilt, rlnTomoZRot, rlnTomoXShiftAngst or rlnTomoYShiftAng");
+
+    double pixelSizeAct = tomogram.optics.pixelSize;
+    const int fc = tomogram.frameCount;
+    for (int f = 0; f < fc; f++)
+    {
+        d4Matrix s0, s1, s2, r0, r1, r2, out;
+
+        // Get specimen center
+        t3Vector<double> specimen_center((double)int(w/2), (double)int(h/2), (double)int(d/2) );
+        s0 = s0. translation(-specimen_center);
+
+        // Get specimen shifts (in pixels)
+        double xshift, yshift;
+        tomogramTable.getValueSafely(EMDL_TOMO_XSHIFT_ANGST, xshift, f);
+        tomogramTable.getValueSafely(EMDL_TOMO_YSHIFT_ANGST, yshift, f);
+        t3Vector<double> specimen_shifts(xshift/pixelSizeAct, yshift/pixelSizeAct, 0.);
+        s1 = s1.translation(specimen_shifts);
+
+        // Get tilt image center
+        std::vector<long int> tilt_image_center_int = tomogram.stack.getSizeVector();
+        t3Vector<double> tilt_image_center((double)int(tilt_image_center_int[0]/2), (double)int(tilt_image_center_int[1]/2), 0.);
+        s2 = s2.translation(tilt_image_center);
+
+        // Get rotation matrices
+        t3Vector<double> xaxis(1., 0., 0.), yaxis(0., 1., 0.), zaxis(0., 0., 1.);
+        double xtilt, ytilt, zrot;
+        tomogramTable.getValueSafely(EMDL_TOMO_XTILT, xtilt, f);
+        tomogramTable.getValueSafely(EMDL_TOMO_YTILT, ytilt, f);
+        tomogramTable.getValueSafely(EMDL_TOMO_ZROT, zrot, f);
+
+        r0 = r0.rotation(xaxis, xtilt);
+        r1 = r1.rotation(yaxis, ytilt);
+        r2 = r2.rotation(zaxis, zrot);
+
+        tomogram.projectionMatrices[f] = s2 * s1 * r2 * r1 * r0 * s0;
+
+        /*
+        std::cerr << " f= " << f << " ==============================" << std::endl;
+        std::cerr << " xtilt= " << xtilt << " ytilt= " << ytilt << " zrot= " << zrot <<std::endl;
+        std::cerr << " xshift= " << xshift << " yshift= " << yshift << std::endl;
+        std::cerr << " s0= " << s0 << std::endl;
+        std::cerr << " s1= " << s1 << std::endl;
+        std::cerr << " s2= " << s2 << std::endl;
+        std::cerr << " r0= " << r0 << std::endl;
+        std::cerr << " r1= " << r1 << std::endl;
+        std::cerr << " r2= " << r2 << std::endl;
+        std::cerr << " matrix= " << tomogram.projectionMatrices[f]  << std::endl;
+        */
+
+        // Set the four rows of the projectionMatrix back into the metaDataTable
+        std::vector<EMDLabel> rows({
+            EMDL_TOMO_PROJECTION_X,
+            EMDL_TOMO_PROJECTION_Y,
+            EMDL_TOMO_PROJECTION_Z,
+            EMDL_TOMO_PROJECTION_W });
+        for (int i = 0; i < 4; i++)
+        {
+            std::vector<double> vals(4);
+            for (int j = 0; j < 4; j++)
+            {
+                vals[j] = tomogram.projectionMatrices[f](i,j);
+            }
+            tomogramTable.setValue(rows[i], vals, f);
+            //std::cerr << " row= " << i << " vals= " << vals[0] << " " << vals[1] << " "<<vals[2]<<" "<< vals[3] << std::endl;
+        }
+
+    }
+}
 
 void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex)
 {
@@ -158,6 +252,8 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex)
 	BufferedImage<float> stackAct;
 	std::vector<d4Matrix> projAct(fc);
 	double pixelSizeAct = tomogram.optics.pixelSize;
+
+    if (!tomogram.hasMatrices) getProjectMatrices(tomogram, tomogramSet.tomogramTables[tomoIndex]);
 
     const int w1 = w / spacing + 0.5;
 	const int h1 = h / spacing + 0.5;

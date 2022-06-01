@@ -285,27 +285,35 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 	out.cumulativeDose.resize(out.frameCount);
 	out.centralCTFs.resize(out.frameCount);
 	out.projectionMatrices.resize(out.frameCount);
+	out.hasMatrices = (m.containsLabel(EMDL_TOMO_PROJECTION_X) &&
+                       m.containsLabel(EMDL_TOMO_PROJECTION_Y) &&
+                       m.containsLabel(EMDL_TOMO_PROJECTION_Z) &&
+                       m.containsLabel(EMDL_TOMO_PROJECTION_W));
 
 	for (int f = 0; f < out.frameCount; f++)
 	{
 		d4Matrix& P = out.projectionMatrices[f];
 
-		std::vector<EMDLabel> rows({
-			EMDL_TOMO_PROJECTION_X,
-			EMDL_TOMO_PROJECTION_Y,
-			EMDL_TOMO_PROJECTION_Z,
-			EMDL_TOMO_PROJECTION_W });
+		if (out.hasMatrices)
+        {
+            // Old way of defining tilt series alignments, designed by Jasenko Zivanov
+            std::vector<EMDLabel> rows({
+                EMDL_TOMO_PROJECTION_X,
+                EMDL_TOMO_PROJECTION_Y,
+                EMDL_TOMO_PROJECTION_Z,
+                EMDL_TOMO_PROJECTION_W });
 
-		for (int i = 0; i < 4; i++)
-		{
-			std::vector<double> vals;
-			m.getValueSafely(rows[i], vals, f);
+            for (int i = 0; i < 4; i++)
+            {
+                std::vector<double> vals;
+                m.getValueSafely(rows[i], vals, f);
 
-			for (int j = 0; j < 4; j++)
-			{
-				P(i,j) = vals[j];
-			}
-		}
+                for (int j = 0; j < 4; j++)
+                {
+                    P(i,j) = vals[j];
+                }
+            }
+        }
 
 		CTF& ctf = out.centralCTFs[f];
 

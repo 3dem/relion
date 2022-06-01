@@ -19,7 +19,7 @@ class Tomogram
 		Tomogram();
 			
 			
-			bool hasOptics, hasImage, hasDeformations;
+			bool hasOptics, hasImage, hasDeformations, hasMatrices;
 			OpticsData optics;
 			gravis::i2Vector imageSize;
 			int frameCount;

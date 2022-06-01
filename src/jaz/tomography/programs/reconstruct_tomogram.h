@@ -31,6 +31,7 @@ class TomoBackprojectProgram
 		void readParameters(int argc, char *argv[]);
 		void initialise();
         void run(int rank = 0, int size = 1);
+        void getProjectMatrices(Tomogram &tomogram, MetaDataTable &tomogramTable);
         void reconstructOneTomogram(int tomoIndex);
 
     private:
