@@ -2144,10 +2144,12 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	std::vector<RFLOAT> exp_wsum_scale_correction_XA, exp_wsum_scale_correction_AA;
 	std::vector<RFLOAT> thr_wsum_signal_product_spectra, thr_wsum_reference_power_spectra;
 	exp_wsum_norm_correction.resize(sp.nr_images, 0.);
-	std::vector<MultidimArray<RFLOAT> > thr_wsum_sigma2_noise;
+	std::vector<MultidimArray<RFLOAT> > thr_wsum_sigma2_noise, thr_wsum_ctf2, thr_wsum_stMulti;
 
 	// for noise estimation (per image)
 	thr_wsum_sigma2_noise.resize(sp.nr_images);
+    thr_wsum_ctf2.resize(sp.nr_images);
+    thr_wsum_stMulti.resize(sp.nr_images);
 
 	// For scale_correction
 	if (baseMLO->do_scale_correction)
@@ -2163,6 +2165,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	{
 		int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
 		thr_wsum_sigma2_noise[img_id].initZeros(baseMLO->image_full_size[optics_group]/2 + 1);
+        thr_wsum_stMulti[img_id].initZeros(baseMLO->image_full_size[optics_group]/2 + 1);
+        thr_wsum_ctf2[img_id].initZeros(baseMLO->image_full_size[optics_group]/2 + 1);
 		if (baseMLO->do_scale_correction)
 		{
 			exp_wsum_scale_correction_AA[img_id] = 0.;
@@ -2972,28 +2976,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				}
 			}
 
-			if (do_subtomo_correction)
-			{	MultidimArray<RFLOAT> &MySTMulti = exp_local_STMulti[img_id];
-				MultidimArray<RFLOAT> thr_wsum_stMulti;
-				thr_wsum_stMulti.initZeros(baseMLO->image_full_size[optics_group]/2 + 1);
-
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(baseMLO->Mresol_fine[optics_group])
-				{
-					int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine[optics_group], n);
-					if (DIRECT_MULTIDIM_ELEM(MySTMulti, n) > 0 && ires > -1)
-						DIRECT_MULTIDIM_ELEM(thr_wsum_stMulti, ires) += 1;
-				}
-
-				int my_image_size = baseMLO->mydata.getOpticsImageSize(optics_group);
-				RFLOAT my_optics_pixel_size = baseMLO->mydata.getOpticsPixelSize(optics_group);
-				RFLOAT remap_image_sizes = (baseMLO->mymodel.ori_size * baseMLO->mymodel.pixel_size) / (my_image_size * my_optics_pixel_size);
-				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(thr_wsum_sigma2_noise[img_id])
-				{
-					int i_resam = ROUND(i * remap_image_sizes);
-					if (i_resam < XSIZE(baseMLO->Npix_per_shell))
-						DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[img_id], i) *= DIRECT_A1D_ELEM(baseMLO->Npix_per_shell, i_resam) / DIRECT_MULTIDIM_ELEM(thr_wsum_stMulti, i);
-				}
-			}
 		} // end loop img_id
 		CTOC(accMLO->timer,"maximization");
 
@@ -3092,7 +3074,30 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			{
 				long int igroup = baseMLO->mydata.getGroupId(op.part_id, img_id);
 				int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
-				int my_image_size = baseMLO->mydata.getOpticsImageSize(optics_group);
+
+
+                if (baseMLO->mydata.obsModel.getCtfPremultiplied(optics_group))
+                {
+                    RFLOAT myscale = XMIPP_MAX(0.001, baseMLO->mymodel.scale_correction[igroup]);
+                    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(baseMLO->Mresol_fine[optics_group])
+                    {
+                        int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine[optics_group], n);
+                        if (ires > -1)
+                            DIRECT_MULTIDIM_ELEM(thr_wsum_ctf2[img_id], ires) += myscale * DIRECT_MULTIDIM_ELEM(op.local_Fctf[img_id], n);
+                    }
+                }
+
+                if (do_subtomo_correction)
+                {
+                    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(baseMLO->Mresol_fine[optics_group])
+                    {
+                        int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine[optics_group], n);
+                        if (ires > -1)
+                            DIRECT_MULTIDIM_ELEM(thr_wsum_stMulti[img_id], ires) += DIRECT_MULTIDIM_ELEM(exp_local_STMulti[img_id], n);
+                    }
+                }
+
+                int my_image_size = baseMLO->mydata.getOpticsImageSize(optics_group);
 				RFLOAT my_pixel_size = baseMLO->mydata.getOpticsPixelSize(optics_group);
 				RFLOAT remap_image_sizes = (baseMLO->mymodel.ori_size * baseMLO->mymodel.pixel_size) / (my_image_size * my_pixel_size);
 				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(thr_wsum_sigma2_noise[img_id])
@@ -3101,7 +3106,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					if (i_resam < XSIZE(baseMLO->wsum_model.sigma2_noise[optics_group]))
 					{
 						DIRECT_A1D_ELEM(baseMLO->wsum_model.sigma2_noise[optics_group], i_resam) += DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[img_id], i);
-					}
+                        DIRECT_A1D_ELEM(baseMLO->wsum_model.sumw_ctf2[optics_group], i_resam) += DIRECT_A1D_ELEM(thr_wsum_ctf2[img_id], i);
+
+                        if (do_subtomo_correction)
+                           DIRECT_A1D_ELEM(baseMLO->wsum_model.sumw_stMulti[optics_group], i_resam) += DIRECT_A1D_ELEM(thr_wsum_stMulti[img_id], i);
+                    }
 				}
 				baseMLO->wsum_model.sumw_group[optics_group] += thr_sumw_group[img_id];
 				if (baseMLO->do_scale_correction)

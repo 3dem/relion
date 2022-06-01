@@ -1409,7 +1409,6 @@ void JobWindow::initialiseInimodelWindow()
 
 	place("do_parallel_discio");
 	place("nr_pool");
-	place("skip_gridding");
 	group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group5->end();
 	place("do_preread_images", TOGGLE_LEAVE_ACTIVE, group5, true);
@@ -1596,7 +1595,6 @@ void JobWindow::initialiseClass3DWindow()
 	place("do_parallel_discio");
 	place("nr_pool");
 	place("do_pad1");
-	place("skip_gridding");
 	group7 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group7->end();
 	place("do_preread_images", TOGGLE_LEAVE_ACTIVE, group7, true);
@@ -1743,7 +1741,6 @@ void JobWindow::initialiseAutorefineWindow()
 	place("do_parallel_discio");
 	place("nr_pool");
 	place("do_pad1");
-	place("skip_gridding");
 	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group4->end();
 	place("do_preread_images", TOGGLE_LEAVE_ACTIVE, group4, true);
@@ -1830,7 +1827,6 @@ void JobWindow::initialiseMultiBodyWindow()
 	place("do_parallel_discio");
 	place("nr_pool");
 	place("do_pad1");
-	place("skip_gridding");
 	group7 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group7->end();
 	place("do_preread_images", TOGGLE_LEAVE_ACTIVE, group7, true);

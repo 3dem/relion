@@ -482,6 +482,12 @@ public:
 	// That is the number of particles inside each optics group
 	std::vector<RFLOAT> sumw_group;
 
+    // Resolution-dependent sum of CTF^2 for ctf_premultiplied correction of tau2 estimates
+    std::vector<MultidimArray<RFLOAT> > sumw_ctf2;
+
+    // Resolution-dependent sum of multiplicities for subtomogram averaging
+    std::vector<MultidimArray<RFLOAT> > sumw_stMulti;
+
 	// For the refinement of group intensity scales and bfactors
 	// For each group store weighted sums of experimental image times reference image as a function of resolution
 	std::vector<RFLOAT > wsum_signal_product;
@@ -506,6 +512,10 @@ public:
 	{
 		BPref.clear();
 		sumw_group.clear();
+        sumw_stMulti.clear();
+        sumw_ctf2.clear();
+        wsum_signal_product.clear();
+        wsum_reference_power.clear();
 		MlModel::clear();
 	}
 

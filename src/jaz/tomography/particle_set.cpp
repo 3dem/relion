@@ -50,6 +50,14 @@ ParticleSet::ParticleSet(std::string filename, std::string motionFilename, bool 
 			partTable.setValue(EMDL_TOMO_PARTICLE_NAME, tomoName + "/" + ZIO::itoa(id), p);
 		}
 	}
+    else
+    {
+        // If we do have particle names, make sure the input particles are sorted on their name, as this is implicitly assumed for the motion trajectories
+        // This will sort 1, 11, 12, 2, 3, 4, 5, ...
+        // But that's OK. The important thing is that all particles from each tomogram are together
+        partTable.newSort(EMDL_TOMO_PARTICLE_NAME);
+
+    }
 
 	hasMotion = motionFilename != "";
 
@@ -541,9 +549,10 @@ void ParticleSet::checkTrajectoryLengths(ParticleIndex p0, int np, int fc, std::
 	{
 		for (int p = p0.value; p < p0.value + np; p++)
 		{
-			if (motionTrajectories[p].shifts_Ang.size() != fc)
+            if (motionTrajectories[p].shifts_Ang.size() != fc)
 			{
-				REPORT_ERROR_STR(caller << ": bad trajectory lengths; expected " << fc << " frames, found "
+				std::cerr << " p0= " << p0.value << " p= " << p << " np= " << np << " fc= " << fc << " name= " << getName(p0) << std::endl;
+                REPORT_ERROR_STR(caller << ": bad trajectory lengths; expected " << fc << " frames, found "
 								 << motionTrajectories[p].shifts_Ang.size());
 			}
 		}

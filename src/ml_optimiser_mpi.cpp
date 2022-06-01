@@ -1978,6 +1978,11 @@ void MlOptimiserMpi::maximization()
 		}
 	}
 
+    // When doing ctf_premultiplied, correct the tau2 estimates for the average CTF^2
+    // When doing ctf_premultiplied, correct the tau2 estimates for the average CTF^2
+    MultidimArray<RFLOAT> avgctf2;
+    bool do_correct_tau2_by_avgctf2 = setAverageCTF2(avgctf2);
+
 	// First reconstruct all classes in parallel
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
@@ -2014,8 +2019,10 @@ void MlOptimiserMpi::maximization()
 								mymodel.data_vs_prior_class[ith_recons],
 								mymodel.fourier_coverage_class[ith_recons],
 								mymodel.fsc_halves_class[ibody],
+                                avgctf2,
 								do_split_random_halves,
-								(do_join_random_halves || do_always_join_random_halves));
+								(do_join_random_halves || do_always_join_random_halves),
+                                do_correct_tau2_by_avgctf2);
 
 						if (do_external_reconstruct)
 						{
@@ -2148,8 +2155,10 @@ void MlOptimiserMpi::maximization()
 									mymodel.data_vs_prior_class[ith_recons],
 									mymodel.fourier_coverage_class[ith_recons],
 									mymodel.fsc_halves_class[ibody],
+                                    avgctf2,
 									do_split_random_halves,
-									(do_join_random_halves || do_always_join_random_halves));
+									(do_join_random_halves || do_always_join_random_halves),
+                                    do_correct_tau2_by_avgctf2);
 
 							if (do_external_reconstruct)
 							{
