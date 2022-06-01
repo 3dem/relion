@@ -6442,11 +6442,11 @@ void RelionJob::initialiseTomoReconstructTomogramsJob()
 
     joboptions["tomo_name"] = JobOption("Reconstruct only this tomogram:", std::string(""), "If not left empty, the program will only reconstruct this particular tomogram");
 
-    joboptions["binning"] = JobOption("Binning factor: ", 8, 1, 32, 1, "The tomogram will be downscaled to this factor. For particle picking, often binning to 4 or 8 gives good enough tomograms. Later subtomogram averaging will not use these binned tomograms.");
+    joboptions["binned_angpix"] = JobOption("Binned pixel size (A): ", 10., 1, 20, 1, "The tomogram will be downscaled to this pixel size. For particle picking, often binning to pixel sizes of 5-10 A gives good enough tomograms. Note that the downsized tomograms are only used for picking; subsequent subtomogram averaging will not use these.");
 
-    joboptions["xdim"] = JobOption("Tomogram width (Xdim): ", -1, -1, 6000, 100, "The tomogram X-dimension in pixels. If a negative value is given, this will be determined from the size of the tilt series images.");
-    joboptions["ydim"] = JobOption("Tomogram height (Ydim): ", -1, -1, 6000, 100, "The tomogram Y-dimension in pixels. If a negative value is given, this will be determined from the size of the tilt series images.");
-    joboptions["zdim"] = JobOption("Tomogram thickness (Zdim): ", 2000, -1, 6000, 100, "The tomogram Z-dimension in pixels. If a negative value is given, this will be determined from the size of the tilt series images.");
+    joboptions["xdim"] = JobOption("Unbinned tomogram width (Xdim): ", -1, -1, 6000, 100, "The tomogram X-dimension in pixels. If a negative value is given, this will be determined from the size of the tilt series images.");
+    joboptions["ydim"] = JobOption("Unbinned tomogram height (Ydim): ", -1, -1, 6000, 100, "The tomogram Y-dimension in pixels. If a negative value is given, this will be determined from the size of the tilt series images.");
+    joboptions["zdim"] = JobOption("Unbinned tomogram thickness (Zdim): ", 2000, -1, 6000, 100, "The tomogram Z-dimension in pixels. If a negative value is given, this will be determined from the size of the tilt series images.");
 
 
 }
@@ -6475,6 +6475,8 @@ bool RelionJob::getCommandsTomoReconstructTomogramsJob(std::string &outputname, 
     command += " --w " + joboptions["xdim"].getString();
     command += " --h " + joboptions["ydim"].getString();
     command += " --d " + joboptions["zdim"].getString();
+
+    command += " --binned_angpix " + joboptions["binned_angpix"].getString();
 
     // In new version of tilt series alignments by Alister Burt, the origin is again at normal 0,0,0 position
     command += " --x0 0 --y0 0 --z0 0 ";

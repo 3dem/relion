@@ -2540,13 +2540,13 @@ void JobWindow::initialiseTomoReconstructTomogramsWindow()
 	resetHeight();
 
 
-    place("binning", TOGGLE_DEACTIVATE);
-
-	current_y += STEPY /2 ;
-
     place("xdim", TOGGLE_DEACTIVATE);
     place("ydim", TOGGLE_DEACTIVATE);
     place("zdim", TOGGLE_DEACTIVATE);
+
+    current_y += STEPY /2 ;
+
+    place("binned_angpix", TOGGLE_DEACTIVATE);
 
     current_y += STEPY /2 ;
 

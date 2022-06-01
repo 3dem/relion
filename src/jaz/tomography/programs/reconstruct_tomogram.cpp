@@ -56,7 +56,8 @@ void TomoBackprojectProgram::readParameters(int argc, char *argv[])
 	y0 = textToDouble(parser.getOption("--y0", "Y origin", "1.0"));
 	z0 = textToDouble(parser.getOption("--z0", "Z origin", "1.0"));
 
-	spacing = textToDouble(parser.getOption("--bin", "Binning", "8.0"));
+	spacing = textToDouble(parser.getOption("--bin", "Binning", "1.0"));
+    angpix_spacing = textToDouble(parser.getOption("--binned_angpix", "OR: desired pixel size after binning", "-1"));
 
 	n_threads = textToInteger(parser.getOption("--j", "Number of threads", "1"));
 
@@ -210,25 +211,13 @@ void TomoBackprojectProgram::getProjectMatrices(Tomogram &tomogram, MetaDataTabl
 
         tomogram.projectionMatrices[f] = s2 * s1 * r2 * r1 * r0 * s0;
 
-        /*
-        std::cerr << " f= " << f << " ==============================" << std::endl;
-        std::cerr << " xtilt= " << xtilt << " ytilt= " << ytilt << " zrot= " << zrot <<std::endl;
-        std::cerr << " xshift= " << xshift << " yshift= " << yshift << std::endl;
-        std::cerr << " s0= " << s0 << std::endl;
-        std::cerr << " s1= " << s1 << std::endl;
-        std::cerr << " s2= " << s2 << std::endl;
-        std::cerr << " r0= " << r0 << std::endl;
-        std::cerr << " r1= " << r1 << std::endl;
-        std::cerr << " r2= " << r2 << std::endl;
-        std::cerr << " matrix= " << tomogram.projectionMatrices[f]  << std::endl;
-        */
-
         // Set the four rows of the projectionMatrix back into the metaDataTable
         std::vector<EMDLabel> rows({
             EMDL_TOMO_PROJECTION_X,
             EMDL_TOMO_PROJECTION_Y,
             EMDL_TOMO_PROJECTION_Z,
             EMDL_TOMO_PROJECTION_W });
+
         for (int i = 0; i < 4; i++)
         {
             std::vector<double> vals(4);
@@ -237,7 +226,6 @@ void TomoBackprojectProgram::getProjectMatrices(Tomogram &tomogram, MetaDataTabl
                 vals[j] = tomogram.projectionMatrices[f](i,j);
             }
             tomogramTable.setValue(rows[i], vals, f);
-            //std::cerr << " row= " << i << " vals= " << vals[0] << " " << vals[1] << " "<<vals[2]<<" "<< vals[3] << std::endl;
         }
 
     }
@@ -254,6 +242,11 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex)
 	BufferedImage<float> stackAct;
 	std::vector<d4Matrix> projAct(fc);
 	double pixelSizeAct = tomogram.optics.pixelSize;
+
+	if (angpix_spacing > 0.)
+    {
+        spacing = angpix_spacing / pixelSizeAct;
+    }
 
     if (!tomogram.hasMatrices) getProjectMatrices(tomogram, tomogramSet.tomogramTables[tomoIndex]);
 
