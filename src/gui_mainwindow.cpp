@@ -1112,29 +1112,36 @@ void GuiMainWindow::loadJobFromPipeline(int this_job)
 
 	// Re-read the settings for this job and update the values inside the GUI
 	int iwin = (browser->value() - 1);
-	gui_jobwindows[iwin]->myjob.read(pipeline.processList[current_job].name, is_main_continue);
-	gui_jobwindows[iwin]->updateMyGui();
+	if (gui_jobwindows[iwin]->myjob.read(pipeline.processList[current_job].name, is_main_continue))
+    {
+        gui_jobwindows[iwin]->updateMyGui();
 
-	// If a finished or running job was loaded from the pipeline: set this to be a continuation job
-	// If a scheduled job was loaded, only set is_main_continue to true when it is PROC_SCHEDULED
-	//if (pipeline.processList[current_job].status == PROC_SCHEDULED && !gui_jobwindows[iwin]->myjob.is_continue)
-	//	is_main_continue = false;
-	//else
-	//	is_main_continue = true;
+        // If a finished or running job was loaded from the pipeline: set this to be a continuation job
+        // If a scheduled job was loaded, only set is_main_continue to true when it is PROC_SCHEDULED
+        //if (pipeline.processList[current_job].status == PROC_SCHEDULED && !gui_jobwindows[iwin]->myjob.is_continue)
+        //	is_main_continue = false;
+        //else
+        //	is_main_continue = true;
 
-	// Any job loaded from the pipeline will initially be set as a continuation job
-	is_main_continue = true;
-	cb_toggle_continue_i();
+        // Any job loaded from the pipeline will initially be set as a continuation job
+        is_main_continue = true;
+        cb_toggle_continue_i();
+    }
+    else
+    {
+        fl_message("Warning: unrecognised job type, only updating lower half of the GUI...");
+    }
 
-	// Set the alias in the window
-	alias_current_job->value((getJobNameForDisplay(pipeline.processList[current_job])).c_str());
-	alias_current_job->position(0); //left-centered text in box
+    // Set the alias in the window
+    alias_current_job->value((getJobNameForDisplay(pipeline.processList[current_job])).c_str());
+    alias_current_job->position(0); //left-centered text in box
 
-	// Update all job lists in the main GUI
-	updateJobLists();
+    // Update all job lists in the main GUI
+    updateJobLists();
 
-	// File the out and err windows
-	fillStdOutAndErr();
+    // File the out and err windows
+    fillStdOutAndErr();
+
 }
 
 void GuiMainWindow::cb_select_browsegroup(Fl_Widget* o, void* v)
@@ -2101,23 +2108,26 @@ void GuiMainWindow::cb_load_i()
 	fl_filename_relative(relname,sizeof(relname),G_chooser->value());
 	FileName fn_job = relname;
 	RelionJob thisjob;
-	thisjob.read(fn_job, is_main_continue, true); // true means initialise
+	if (thisjob.read(fn_job, is_main_continue, true)) // true means initialise
+    {
+        // What type of job is this?
+        for (int t = 0; t < nr_browse_tabs; t++) {
+            if (gui_jobwindows[t]->myjob.type == thisjob.type) {
+                browser->value(t + 1);
+                gui_jobwindows[t]->myjob = thisjob;
+                gui_jobwindows[t]->updateMyGui();
+                break;
+            }
+        }
+        cb_select_browsegroup_i();
 
-	// What type of job is this?
-	for ( int t=0; t<nr_browse_tabs; t++ )
-	{
-		if ( gui_jobwindows[t]->myjob.type == thisjob.type )
-		{
-			browser->value(t+1);
-			gui_jobwindows[t]->myjob = thisjob;
-			gui_jobwindows[t]->updateMyGui();
-			break;
-		}
-	}
-	cb_select_browsegroup_i();
-
-	// Make the current continue-setting active
-	cb_toggle_continue_i();
+        // Make the current continue-setting active
+        cb_toggle_continue_i();
+    }
+    else
+    {
+        fl_message("Warning: unrecognised job type, ignoring load request ...");
+    }
 }
 
 // Load button call-back function
