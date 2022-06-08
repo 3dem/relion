@@ -6366,6 +6366,8 @@ bool RelionJob::getCommandsTomoCtfRefineJob(std::string &outputname, std::vector
 	outputNodes.push_back(node1);
 	Node node2(outputname+"tomograms.star", LABEL_TOMO_TOMOGRAMS);
 	outputNodes.push_back(node2);
+	Node node3(outputname + "logfile.pdf", LABEL_TOMO_CTFREFINE_LOG);
+	outputNodes.push_back(node3);
 
 	// Job-specific stuff goes here
 
@@ -6478,6 +6480,8 @@ bool RelionJob::getCommandsTomoAlignJob(std::string &outputname, std::vector<std
 		Node node4(outputname+"motion.star", LABEL_TOMO_TRAJECTORIES);
 		outputNodes.push_back(node4);
 	}
+	Node node5(outputname + "logfile.pdf", LABEL_TOMO_FRAMEALIGN_LOG);
+	outputNodes.push_back(node5);
 
 	// Job-specific stuff goes here
 	command += " --b " + joboptions["box_size"].getString();
