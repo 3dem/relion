@@ -55,7 +55,8 @@ ParticleSet::ParticleSet(std::string filename, std::string motionFilename, bool 
         // If we do have particle names, make sure the input particles are sorted on their name, as this is implicitly assumed for the motion trajectories
         // This will sort 1, 11, 12, 2, 3, 4, 5, ...
         // But that's OK. The important thing is that all particles from each tomogram are together
-        partTable.newSort(EMDL_TOMO_PARTICLE_NAME);
+        // SHWS 8jun2022: because checkTrajectories has now been repaired, I don't think this is necessary anymore....
+        //partTable.newSort(EMDL_TOMO_PARTICLE_NAME);
 
     }
 
