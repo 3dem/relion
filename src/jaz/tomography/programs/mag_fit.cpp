@@ -77,7 +77,7 @@ void MagFitProgram::run()
 		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s, 1.0);
 
 		particleSet.checkTrajectoryLengths(
-				particles[t][0], pc, fc, "MagFitProgram::run");
+				particles[t], fc, "MagFitProgram::run");
 
 		TomoAnisoMagFit anisoFit(
 			particles[t],

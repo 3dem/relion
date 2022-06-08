@@ -543,15 +543,16 @@ std::vector<d3Vector> ParticleSet::getTrajectoryInPixels(ParticleIndex particle_
 	}
 }
 
-void ParticleSet::checkTrajectoryLengths(ParticleIndex p0, int np, int fc, std::string caller) const
+void ParticleSet::checkTrajectoryLengths(const std::vector<ParticleIndex> &tomogram_particles, int fc, std::string caller) const
 {
 	if (hasMotion)
 	{
-		for (int p = p0.value; p < p0.value + np; p++)
+		for (int i = 0; i < tomogram_particles.size(); i++)
 		{
+            long int p = tomogram_particles[i].value;
             if (motionTrajectories[p].shifts_Ang.size() != fc)
 			{
-				std::cerr << " p0= " << p0.value << " p= " << p << " np= " << np << " fc= " << fc << " name= " << getName(p0) << std::endl;
+				std::cerr << " i= " << i << " p= " << p << " fc= " << fc << " name= " << getName(tomogram_particles[i]) << std::endl;
                 REPORT_ERROR_STR(caller << ": bad trajectory lengths; expected " << fc << " frames, found "
 								 << motionTrajectories[p].shifts_Ang.size());
 			}
