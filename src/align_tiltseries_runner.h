@@ -107,6 +107,9 @@ public:
     // Execute CTFFIND for a single tomogram
     void executeImodWrapper(long idx_tomo);
 
+    // Find the etomo directives file (.edf)
+    bool checkEtomoDirectiveFile(long idx_tomo, FileName &filename);
+
     // Harvest all IMOD results into the single tomograms set starfile, and write it out
     void joinImodWrapperResults();
 

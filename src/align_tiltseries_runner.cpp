@@ -236,19 +236,46 @@ bool AlignTiltseriesRunner::checkImodWrapperResults(long idx_tomo)
 
 }
 
+bool AlignTiltseriesRunner::checkEtomoDirectiveFile(long idx_tomo, FileName &filename)
+{
+    FileName fn_tomo = tomogramSet.getTomogramName(idx_tomo);
+    filename = fn_out + "external/" + fn_tomo + "/" + fn_tomo + ".edf";
+    return exists(filename);
+
+}
+
 void AlignTiltseriesRunner::joinImodWrapperResults()
 {
     // Check again the STAR file exists and has the right labels
+    // Also check for the presence of any eTomoDirective files
+
+    MetaDataTable MDout;
+    bool any_edf = false;
+
     for (long itomo = 0; itomo < tomogramSet.size(); itomo++)
     {
-        if (!checkImodWrapperResults(itomo))
+        if (checkImodWrapperResults(itomo))
         {
-            if (verb) std::cerr << "WARNING: cannot find tilt series alignment parameters in " << tomogramSet.getTomogramName(itomo) << std::endl;
+            MDout.addObject(tomogramSet.globalTable.getObject(itomo));
+            FileName fn_edf;
+            if (checkEtomoDirectiveFile(itomo, fn_edf))
+            {
+                any_edf = true;
+                MDout.setValue(EMDL_TOMO_ETOMO_DIRECTIVE_FILE, fn_edf, itomo);
+            }
+            else
+            {
+                MDout.setValue(EMDL_TOMO_ETOMO_DIRECTIVE_FILE, "undefined", itomo);
+            }
         }
-
+        else if (verb)
+        {
+            std::cerr << "WARNING: cannot find tilt series alignment parameters in " << tomogramSet.getTomogramName(itomo) << std::endl;
+        }
     }
+    if (!any_edf) MDout.deactivateLabel(EMDL_TOMO_ETOMO_DIRECTIVE_FILE);
 
-    tomogramSet.globalTable.write(fn_out + "aligned_tilt_series.star");
+    MDout.write(fn_out + "aligned_tilt_series.star");
 
     if (verb > 0)
     {

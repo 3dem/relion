@@ -607,6 +607,7 @@ enum EMDLabel
 	EMDL_TOMO_TILT_SERIES_NAME,
     EMDL_TOMO_TILT_SERIES_STARFILE,
 	EMDL_TOMO_TILT_MOVIE_FRAMECOUNT,
+    EMDL_TOMO_ETOMO_DIRECTIVE_FILE,
 	EMDL_TOMO_FRAME_COUNT,
 	EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME,
     EMDL_TOMO_SIZE_X,
@@ -1302,7 +1303,8 @@ private:
 		EMDL::addLabel(EMDL_TOMO_TILT_SERIES_NAME, EMDL_STRING, "rlnTomoTiltSeriesName", "Tilt series file name");
         EMDL::addLabel(EMDL_TOMO_TILT_SERIES_STARFILE, EMDL_STRING, "rlnTomoTiltSeriesStarFile", "Tilt series starfile");
 		EMDL::addLabel(EMDL_TOMO_TILT_MOVIE_FRAMECOUNT, EMDL_INT, "rlnTomoTiltMovieFrameCount", "Number of frames in the tilt series movies");
-		EMDL::addLabel(EMDL_TOMO_FRAME_COUNT, EMDL_INT, "rlnTomoFrameCount", "Number of tilts in a tilt series");
+		EMDL::addLabel(EMDL_TOMO_ETOMO_DIRECTIVE_FILE, EMDL_STRING, "rlnEtomoDirectiveFile", "Location of the etomo directive file (.edf) from tilt series alignment");
+        EMDL::addLabel(EMDL_TOMO_FRAME_COUNT, EMDL_INT, "rlnTomoFrameCount", "Number of tilts in a tilt series");
         EMDL::addLabel(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME, EMDL_STRING, "rlnTomoReconstructedTomogram", "File name of a reconstructed tomogram");
 		EMDL::addLabel(EMDL_TOMO_FRAME_COUNT, EMDL_INT, "rlnTomoFrameCount", "Number of tilts in a tilt series");
 		EMDL::addLabel(EMDL_TOMO_SIZE_X, EMDL_INT, "rlnTomoSizeX", "Width of a bin-1 tomogram in pixels");
