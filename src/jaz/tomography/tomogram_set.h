@@ -65,7 +65,7 @@ class TomogramSet
         void generateSingleMetaDataTable(MetaDataTable &MDout, ObservationModel &obsModel);
 
         // SHWS 6Apr2022: Convert back from one big metadatatable into separate STAR files for each tilt serie
-        void convertBackFromSingleMetaDataTable(MetaDataTable &MDin, ObservationModel &obsModel);
+        void convertBackFromSingleMetaDataTable(MetaDataTable &MDin);
 
 };
 

@@ -506,7 +506,7 @@ void CtffindRunner::joinCtffindResults()
 
     if (is_tomo)
     {
-        tomogramSet.convertBackFromSingleMetaDataTable(MDctf, obsModel);
+        tomogramSet.convertBackFromSingleMetaDataTable(MDctf);
         tomogramSet.write(fn_out+"tilt_series_ctf.star");
     }
     else

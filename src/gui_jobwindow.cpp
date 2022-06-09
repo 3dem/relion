@@ -2511,7 +2511,7 @@ void JobWindow::initialiseTomoAlignTiltseriesWindow()
 
     tab2->end();
     tab3->begin();
-    tab3->label("IMOD");
+    tab3->label("AreTomo");
     resetHeight();
 
     group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");

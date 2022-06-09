@@ -936,11 +936,14 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 		RFLOAT my_angpix;
 		obsModel.opticsMdt.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, my_angpix);
 		my_angpix *= bin_factor;
-		obsModel.opticsMdt.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, my_angpix);
+        if (is_tomo)
+            tomogramSet.globalTable.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, my_angpix);
+		else
+            obsModel.opticsMdt.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, my_angpix);
 	}
 	if (is_tomo)
     {
-        tomogramSet.convertBackFromSingleMetaDataTable(MDavg, obsModel);
+        tomogramSet.convertBackFromSingleMetaDataTable(MDavg);
         tomogramSet.write(fn_out+"corrected_tilt_series.star");
     }
     else

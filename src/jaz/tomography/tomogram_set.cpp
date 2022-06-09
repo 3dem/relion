@@ -649,7 +649,7 @@ void TomogramSet::generateSingleMetaDataTable(MetaDataTable &MDout, ObservationM
     }
 }
 
-void TomogramSet::convertBackFromSingleMetaDataTable(MetaDataTable &MDin, ObservationModel &obsModel)
+void TomogramSet::convertBackFromSingleMetaDataTable(MetaDataTable &MDin)
 {
     if (!MDin.containsLabel(EMDL_MICROGRAPH_PRE_EXPOSURE))
     {
