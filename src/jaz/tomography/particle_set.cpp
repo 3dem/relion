@@ -55,7 +55,8 @@ ParticleSet::ParticleSet(std::string filename, std::string motionFilename, bool 
         // If we do have particle names, make sure the input particles are sorted on their name, as this is implicitly assumed for the motion trajectories
         // This will sort 1, 11, 12, 2, 3, 4, 5, ...
         // But that's OK. The important thing is that all particles from each tomogram are together
-        partTable.newSort(EMDL_TOMO_PARTICLE_NAME);
+        // SHWS 8jun2022: because checkTrajectories has now been repaired, I don't think this is necessary anymore....
+        //partTable.newSort(EMDL_TOMO_PARTICLE_NAME);
 
     }
 
@@ -543,15 +544,16 @@ std::vector<d3Vector> ParticleSet::getTrajectoryInPixels(ParticleIndex particle_
 	}
 }
 
-void ParticleSet::checkTrajectoryLengths(ParticleIndex p0, int np, int fc, std::string caller) const
+void ParticleSet::checkTrajectoryLengths(const std::vector<ParticleIndex> &tomogram_particles, int fc, std::string caller) const
 {
 	if (hasMotion)
 	{
-		for (int p = p0.value; p < p0.value + np; p++)
+		for (int i = 0; i < tomogram_particles.size(); i++)
 		{
+            long int p = tomogram_particles[i].value;
             if (motionTrajectories[p].shifts_Ang.size() != fc)
 			{
-				std::cerr << " p0= " << p0.value << " p= " << p << " np= " << np << " fc= " << fc << " name= " << getName(p0) << std::endl;
+				std::cerr << " i= " << i << " p= " << p << " fc= " << fc << " name= " << getName(tomogram_particles[i]) << std::endl;
                 REPORT_ERROR_STR(caller << ": bad trajectory lengths; expected " << fc << " frames, found "
 								 << motionTrajectories[p].shifts_Ang.size());
 			}

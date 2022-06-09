@@ -286,7 +286,7 @@ void ReconstructParticleProgram::processTomograms(
 
 		const int fc = tomogram.frameCount;
 
-		particleSet.checkTrajectoryLengths(particles[t][0], pc, fc, "reconstruct_particle");
+		particleSet.checkTrajectoryLengths(particles[t], fc, "reconstruct_particle");
 
 		BufferedImage<float> doseWeights = tomogram.computeDoseWeight(s, binning);
 

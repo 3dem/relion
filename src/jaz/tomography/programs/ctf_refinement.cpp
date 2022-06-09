@@ -200,7 +200,7 @@ void CtfRefinementProgram::processTomograms(
 
 
 		particleSet.checkTrajectoryLengths(
-				particles[t][0], pc, fc, "CtfRefinementProgram::run");
+				particles[t], fc, "CtfRefinementProgram::run");
 
 		BufferedImage<float> freqWeights = computeFrequencyWeights(
 			tomogram, true, 0.0, 0.0, false, num_threads);
