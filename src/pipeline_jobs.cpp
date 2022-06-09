@@ -6360,7 +6360,7 @@ void RelionJob::initialiseTomoAlignTiltSeriesJob()
 
     joboptions["do_imod_patchtrack"] = JobOption("Use IMOD:patch-tracking?", false, "Set to Yes to perform tilt series alignment using patch-tracking in IMOD.");
     // TODO: check defaults with the experts
-    joboptions["patch_size"] = JobOption("Patch size (in unbinned pixels): ", 10, 1, 50, 1, "The size of the patches in unbinned pixels.");
+    joboptions["patch_size"] = JobOption("Patch size (in A): ", 10, 1, 50, 1, "The size of the patches in Angstrom.");
     joboptions["patch_overlap"] = JobOption("Patch overlap (%): ", 10, 0, 100, 10, "The overlap (0-100%) between the patches.");
 
     joboptions["do_aretomo"] = JobOption("Use AreTomo?", false, "Set to Yes to perform tilt series alignment using UCSF's AreTomo.");
