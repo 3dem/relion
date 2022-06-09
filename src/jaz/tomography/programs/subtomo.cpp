@@ -176,7 +176,7 @@ void SubtomoProgram::run()
 
 	if (do_sum_all)
 	{
-		const double pixel_size = binning * tomogramSet.getPixelSize(0);
+		const double pixel_size = binning * tomogramSet.getOriginalPixelSize(0);
 
 		sum_data.write(outDir + "sum_data.mrc", pixel_size);
 		Centering::fftwHalfToHumanFull(sum_weights).write(outDir + "sum_weight.mrc", pixel_size);

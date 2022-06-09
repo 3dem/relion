@@ -603,9 +603,14 @@ int TomogramSet::getMaxFrameCount() const
 	return max_val;
 }
 
-double TomogramSet::getPixelSize(int index) const
+double TomogramSet::getOriginalPixelSize(int index) const
 {
 	return globalTable.getDouble(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, index);
+}
+
+double TomogramSet::getPixelSize(int index) const
+{
+	return globalTable.getDouble(EMDL_MICROGRAPH_PIXEL_SIZE, index);
 }
 
 std::string TomogramSet::getOpticsGroupName(int index) const
