@@ -197,8 +197,8 @@ void AlignTiltseriesRunner::executeImodWrapper(long idx_tomo)
     else if (do_imod_patchtrack)
     {
         command += " IMOD:patch-tracking";
-        command += " --unbinned-patch-size-pixels " + integerToString(patch_size);
-        command += " -- patch-overlap-percentage " + floatToString(patch_overlap);
+        command += " --unbinned-patch-size-pixels " + integerToString(patch_size) + " " + integerToString(patch_size);
+        command += " --patch-overlap-percentage " + floatToString(patch_overlap);
     }
     else if (do_aretomo)
     {
