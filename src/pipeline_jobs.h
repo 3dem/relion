@@ -685,7 +685,7 @@ static int get_node_type(std::string label)
 #define PROC_TOMO_ALIGN_DIRNAME       "FrameAlignTomo"          // Frame alignment and particle polishing for subtomography
 #define PROC_TOMO_RECONSTRUCT_DIRNAME "ReconstructParticleTomo" // Calculation of particle average from the individual tilt series images
 #define PROC_EXTERNAL_DIRNAME         "External"     // For running non-relion programs
-#define PROC_TOMO_ALIGN_TILTSERIES_DIRNAME "TiltSeriesAlign" // Tilt series alignment for tomogram reconstruction
+#define PROC_TOMO_ALIGN_TILTSERIES_DIRNAME "AlignTiltSeries" // Tilt series alignment for tomogram reconstruction
 #define PROC_TOMO_RECONSTRUCT_TOMOGRAM_DIRNAME "ReconstructTomograms" // Reconstruction of tomograms for particle picking
 
 // All the directory names of the different types of jobs defined inside the pipeline
