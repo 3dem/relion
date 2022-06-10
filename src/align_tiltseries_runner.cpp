@@ -35,8 +35,8 @@ void AlignTiltseriesRunner::read(int argc, char **argv, int rank)
 
     int pat_section = parser.addSection("IMOD patch-tracking alignment options");
     do_imod_patchtrack = parser.checkOption("--imod_patchtrack", "OR: Use IMOD's patrick-tracking alignment method");
-    patch_overlap = textToFloat(parser.getOption("--patch_overlap", "Overlap between the patches (in %)", "10"));
-    patch_size = textToInteger(parser.getOption("--patch_size", "Patch size (in A)", "10"));
+    patch_overlap = textToFloat(parser.getOption("--patch_overlap", "Overlap between the patches (in %)", "10."));
+    patch_size = textToFloat(parser.getOption("--patch_size", "Patch size (in A)", "10."));
 
     int aretomo_section = parser.addSection("AreTomo alignment options");
     do_aretomo = parser.checkOption("--aretomo", "OR: Use AreTomo's alignment method");
@@ -187,9 +187,9 @@ void AlignTiltseriesRunner::run()
 void AlignTiltseriesRunner::executeImodWrapper(long idx_tomo)
 {
 
-    RFLOAT angpix, patch_size_pix;
+    RFLOAT angpix;
     tomogramSet.globalTable.getValueSafely(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix, idx_tomo);
-    patch_size_pix = patch_size / angpix;
+    int patch_size_pix = ROUND(patch_size / angpix);
 
     std::string command = fn_imodwrapper_exe + " ";
     // Make sure the methods are the first argument to the program!
@@ -201,7 +201,7 @@ void AlignTiltseriesRunner::executeImodWrapper(long idx_tomo)
     else if (do_imod_patchtrack)
     {
         command += " IMOD:patch-tracking";
-        command += " --unbinned-patch-size-pixels " + floatToString(patch_size_pix) + " " + floatToString(patch_size_pix);
+        command += " --unbinned-patch-size-pixels " + integerToString(patch_size_pix) + " " + integerToString(patch_size_pix);
         command += " --patch-overlap-percentage " + floatToString(patch_overlap);
     }
     else if (do_aretomo)

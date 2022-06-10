@@ -65,7 +65,7 @@ public:
     bool do_imod_patchtrack;
 
     // Unbinned patch size (pixels)
-    int patch_size;
+    RFLOAT patch_size;
 
     // Patch overlap (percentage 0-100)
     RFLOAT patch_overlap;
