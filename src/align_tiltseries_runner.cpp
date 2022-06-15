@@ -47,7 +47,7 @@ void AlignTiltseriesRunner::read(int argc, char **argv, int rank)
     patch_size = textToInteger(parser.getOption("--patch_size", "Patch size (in unbinned pixels)", "10"));
 
     int exp_section = parser.addSection("Expert options");
-    other_wrapper_args  = parser.checkOption("--other_wrapper_args", "Additional command-line arguments that will be passed onto the wrapper.");
+    other_wrapper_args  = parser.getOption("--other_wrapper_args", "Additional command-line arguments that will be passed onto the wrapper.", "");
 
     // Initialise verb for non-parallel execution
 	verb = 1;
