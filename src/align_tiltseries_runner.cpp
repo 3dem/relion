@@ -214,7 +214,8 @@ void AlignTiltseriesRunner::executeImodWrapper(long idx_tomo)
     command += " --tomogram-name " + tomogramSet.getTomogramName(idx_tomo);
     command += " --output-directory " + fn_out;
 
-    command += other_wrapper_args;
+    if (other_wrapper_args.length() > 0)
+        command += " " + other_wrapper_args;
 
     if (system(command.c_str()))
 		std::cerr << "WARNING: there was an error in executing: " << command << std::endl;
@@ -228,11 +229,11 @@ bool AlignTiltseriesRunner::checkImodWrapperResults(long idx_tomo)
 
     MetaDataTable MDtomo;
     MDtomo.read(fn_star);
-    return (MDtomo.containsLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM) &&
-            MDtomo.containsLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM) &&
-            MDtomo.containsLabel(EMDL_ORIENT_ROT)  &&
-            MDtomo.containsLabel(EMDL_ORIENT_TILT)  &&
-            MDtomo.containsLabel(EMDL_ORIENT_PSI) );
+    return (MDtomo.containsLabel(EMDL_TOMO_XSHIFT_ANGST) &&
+            MDtomo.containsLabel(EMDL_TOMO_YSHIFT_ANGST) &&
+            MDtomo.containsLabel(EMDL_TOMO_XTILT)  &&
+            MDtomo.containsLabel(EMDL_TOMO_YTILT)  &&
+            MDtomo.containsLabel(EMDL_TOMO_ZROT) );
 
 }
 
