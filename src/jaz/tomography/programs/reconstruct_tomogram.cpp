@@ -241,7 +241,8 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex)
 
 	BufferedImage<float> stackAct;
 	std::vector<d4Matrix> projAct(fc);
-	double pixelSizeAct = tomogram.optics.pixelSize;
+
+	double pixelSizeAct = tomogramSet.getPixelSize(tomoIndex);
 
 	if (angpix_spacing > 0.)
     {
