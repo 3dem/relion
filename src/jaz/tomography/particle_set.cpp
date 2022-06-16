@@ -247,7 +247,7 @@ d3Vector ParticleSet::getPosition(ParticleIndex particle_id) const
 {
 	const int og = getOpticsGroup(particle_id);
 	
-	const double originalPixelSize = optTable.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, og);
+	const double originalPixelSize = getOriginalPixelSize(og);
 
 	const d3Matrix A_subtomogram = getSubtomogramMatrix(particle_id);
 
