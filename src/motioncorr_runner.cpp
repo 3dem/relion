@@ -928,36 +928,36 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 
 	}
 
+    if (verb > 0) progress_bar(fn_ori_micrographs.size());
+
 	// Write out STAR files at the end
 	// In the opticsMdt, set EMDL_MICROGRAPH_PIXEL_SIZE (i.e. possibly binned pixel size).
 	// Keep EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE for MTF correction
-	FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
-	{
-		RFLOAT my_angpix;
-		obsModel.opticsMdt.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, my_angpix);
-		my_angpix *= bin_factor;
-        if (is_tomo)
-            tomogramSet.globalTable.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, my_angpix);
-		else
-            obsModel.opticsMdt.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, my_angpix);
-	}
 	if (is_tomo)
     {
+        FOR_ALL_OBJECTS_IN_METADATA_TABLE(tomogramSet.globalTable)
+        {
+            RFLOAT my_angpix;
+            tomogramSet.globalTable.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, my_angpix);
+            my_angpix *= bin_factor;
+            tomogramSet.globalTable.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, my_angpix);
+        }
         tomogramSet.convertBackFromSingleMetaDataTable(MDavg);
         tomogramSet.write(fn_out+"corrected_tilt_series.star");
+        if (verb > 0) std::cout << " Written: " << fn_out << "corrected_tilt_series.star" << std::endl;
     }
     else
     {
+        FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
+	    {
+            RFLOAT my_angpix;
+            obsModel.opticsMdt.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, my_angpix);
+            my_angpix *= bin_factor;
+            obsModel.opticsMdt.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, my_angpix);
+    	}
         obsModel.save(MDavg, fn_out + "corrected_micrographs.star", "micrographs");
+        if (verb > 0) std::cout << " Written: " << fn_out << "corrected_micrographs.star" << std::endl;
     }
-
-	if (verb > 0 )
-	{
-		progress_bar(fn_ori_micrographs.size());
-
-		if (is_tomo) std::cout << " Done! Written: " << fn_out << "corrected_tomograms.star" << std::endl;
-        else std::cout << " Done! Written: " << fn_out << "corrected_micrographs.star" << std::endl;
-	}
 
 	if (verb > 0) std::cout << " Now generating logfile.pdf ... " << std::endl;
 
