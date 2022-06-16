@@ -254,7 +254,7 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 
 	double Q0;
 
-    globalTable.getValueSafely(EMDL_MICROGRAPH_PIXEL_SIZE, out.optics.pixelSize, index);
+    globalTable.getValueSafely(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, out.optics.pixelSize, index);
     globalTable.getValueSafely(EMDL_CTF_VOLTAGE, out.optics.voltage, index);
     globalTable.getValueSafely(EMDL_CTF_CS, out.optics.Cs, index);
     globalTable.getValueSafely(EMDL_CTF_Q0, Q0, index);
