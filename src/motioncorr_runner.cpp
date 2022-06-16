@@ -940,8 +940,10 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
             RFLOAT my_angpix;
             tomogramSet.globalTable.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, my_angpix);
             my_angpix *= bin_factor;
-            tomogramSet.globalTable.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, my_angpix);
+            tomogramSet.globalTable.setValue(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, my_angpix);
         }
+        if (tomogramSet.globalTable.containsLabel(EMDL_MICROGRAPH_PIXEL_SIZE))
+            tomogramSet.globalTable.deactivateLabel(EMDL_MICROGRAPH_PIXEL_SIZE);
         tomogramSet.convertBackFromSingleMetaDataTable(MDavg);
         tomogramSet.write(fn_out+"corrected_tilt_series.star");
         if (verb > 0) std::cout << " Written: " << fn_out << "corrected_tilt_series.star" << std::endl;

@@ -187,8 +187,7 @@ void AlignTiltseriesRunner::run()
 void AlignTiltseriesRunner::executeImodWrapper(long idx_tomo)
 {
 
-    RFLOAT angpix;
-    tomogramSet.globalTable.getValueSafely(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix, idx_tomo);
+    RFLOAT angpix = tomogramSet.getPixelSize(idx_tomo);
     int patch_size_pix = ROUND(patch_size / angpix);
 
     std::string command = fn_imodwrapper_exe + " ";

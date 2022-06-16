@@ -610,7 +610,7 @@ double TomogramSet::getOriginalPixelSize(int index) const
 
 double TomogramSet::getPixelSize(int index) const
 {
-	return globalTable.getDouble(EMDL_MICROGRAPH_PIXEL_SIZE, index);
+	return globalTable.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, index);
 }
 
 std::string TomogramSet::getOpticsGroupName(int index) const
@@ -644,6 +644,13 @@ void TomogramSet::generateSingleMetaDataTable(MetaDataTable &MDout, ObservationM
         obsModel.opticsMdt.setValue(EMDL_CTF_VOLTAGE, voltage);
         obsModel.opticsMdt.setValue(EMDL_CTF_CS, Cs);
         obsModel.opticsMdt.setValue(EMDL_CTF_Q0, Q0);
+
+        if (globalTable.containsLabel(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE))
+        {
+            RFLOAT pixSize;
+            globalTable.getValueSafely(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, pixSize, t);
+            obsModel.opticsMdt.setValue(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, pixSize);
+        }
 
         FOR_ALL_OBJECTS_IN_METADATA_TABLE(tomogramTables[t])
         {
