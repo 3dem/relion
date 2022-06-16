@@ -49,7 +49,7 @@
 
 #define GUI_BACKGROUND_COLOR (fl_rgb_color(240,240,240))
 #define GUI_INPUT_COLOR (fl_rgb_color(255,255,230))
-#define GUI_RUNBUTTON_COLOR (fl_rgb_color(160, 30, 60))
+#define GUI_RUNBUTTON_COLOR (fl_rgb_color(100, 60, 255))
 
 
 
