@@ -251,6 +251,7 @@ void AlignTiltseriesRunner::joinImodWrapperResults()
     // Also check for the presence of any eTomoDirective files
 
     MetaDataTable MDout;
+    MDout.setName("global");
     bool any_edf = false;
 
     for (long itomo = 0; itomo < tomogramSet.size(); itomo++)
