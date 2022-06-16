@@ -1622,7 +1622,7 @@ void RelionJob::initialiseCtffindJob()
 
     if (is_tomo)
     {
-        joboptions["input_tomograms"] = JobOption("Input tilt series set: ", OUTNODE_TOMO_TOMOGRAMS, "", "Tomograms set STAR file (*.star)", "Input tomograms set. ...");
+        joboptions["input_star_mics"] = JobOption("Input tilt series set: ", OUTNODE_TOMO_TOMOGRAMS, "", "Tomograms set STAR file (*.star)", "Input tomograms set. ...");
     }
     else
     {
@@ -1706,28 +1706,14 @@ bool RelionJob::getCommandsCtffindJob(std::string &outputname, std::vector<std::
     if (error_message != "") return false;
 
     // I/O
-    if (is_tomo)
+    if (joboptions["input_star_mics"].getString() == "")
     {
-        if (joboptions["input_tomograms"].getString() == "")
-        {
-            error_message = "ERROR: empty field for input tilt series STAR file...";
-            return false;
-        }
-        command += " --i " + joboptions["input_tomograms"].getString();
-        Node node(joboptions["input_tomograms"].getString(), joboptions["input_tomograms"].node_type);
-        inputNodes.push_back(node);
+        error_message = "ERROR: empty field for input STAR file...";
+        return false;
     }
-    else
-    {
-        if (joboptions["input_star_mics"].getString() == "")
-        {
-            error_message = "ERROR: empty field for input STAR file...";
-            return false;
-        }
-        command += " --i " + joboptions["input_star_mics"].getString();
-        Node node(joboptions["input_star_mics"].getString(), joboptions["input_star_mics"].node_type);
-        inputNodes.push_back(node);
-    }
+    command += " --i " + joboptions["input_star_mics"].getString();
+    Node node(joboptions["input_star_mics"].getString(), joboptions["input_star_mics"].node_type);
+    inputNodes.push_back(node);
 
 	command += " --o " + outputname;
 	command += " --Box " + joboptions["box"].getString();

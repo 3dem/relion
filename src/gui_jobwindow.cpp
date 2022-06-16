@@ -599,8 +599,7 @@ void JobWindow::initialiseCtffindWindow()
 	tab1->label("I/O");
 	resetHeight();
 
-    if (is_tomo) place("input_tomograms", TOGGLE_DEACTIVATE);
-	else place("input_star_mics", TOGGLE_DEACTIVATE);
+    place("input_star_mics", TOGGLE_DEACTIVATE);
 	place("use_noDW", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
