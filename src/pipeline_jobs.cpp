@@ -6078,7 +6078,7 @@ void RelionJob::initialiseTomoImportJob()
         joboptions["tilt_axis_angle"] = JobOption("Tilt axis angle (deg):", 90.0, 0.0, 180.0, 1.0 , "Nominal value for the angle of the tilt axis");
         joboptions["mtf_file"] = JobOption("MTF file:", (std::string)"","MTF file for the detector");
 
-       	joboptions["do_tomo"] = JobOption("Import tomograms?", true, "Set this to Yes for importing tomogram directories from IMOD.");
+       	joboptions["do_tomo"] = JobOption("Import tomograms?", false, "Set this to Yes for importing tomogram directories from IMOD.");
         joboptions["io_tomos"] = JobOption("Append to tomograms set: ", OUTNODE_TOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "The imported tomograms will be output into this tomogram set. If any tomograms were already in this tomogram set, then the newly imported ones will be added to those.");
         joboptions["tomo_star"] = JobOption("STAR file with tomograms description: ", "", "Input file (*.star)", ".", "Provide a STAR file with the basic following information to import tomogsrams: \n\n"
                   " - rlnTomoImportImodDir: path to the IMOD directory.\n"
