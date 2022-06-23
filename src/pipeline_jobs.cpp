@@ -6327,10 +6327,10 @@ void RelionJob::initialiseTomoAlignTiltSeriesJob()
     if (default_location == NULL) default_location = default_wrapper;
     joboptions["imod_wrapper"] = JobOption("Alister Burt's IMOD/AreTomo wrapper:", std::string(default_location), "*", ".", "Location of Alister Burt's IMOD/Wrapper script; or just its executable name if in the path. You can control the default of this field by setting environment variable RELION_IMOD_WRAPPER_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code. Note that Alister's script should find the executables to IMOD and AreTomo on its own. See Alister's documentation on how to configure this.");
 
-    joboptions["do_imod_fiducials"] = JobOption("Use IMOD:fiducials?", true, "Set to Yes to perform tilt series alignment using fiducials in IMOD.");
-    joboptions["fiducial_diameter"] = JobOption("Fiducial diameter (nm): ", 10, 1, 50, 1, "The diameter of the fiducials (in nm)");
+    joboptions["do_imod_fiducials"] = JobOption("Use IMOD's fiducial based alignment?", true, "Set to Yes to perform tilt series alignment using fiducials in IMOD.");
+    joboptions["fiducial_diameter"] = JobOption("Fiducial diameter (nm): ", 10, 1, 20, 1, "The diameter of the fiducials (in nm)");
 
-    joboptions["do_imod_patchtrack"] = JobOption("Use IMOD:patch-tracking?", false, "Set to Yes to perform tilt series alignment using patch-tracking in IMOD.");
+    joboptions["do_imod_patchtrack"] = JobOption("Use IMOD's patch-tracking for alignment?", false, "Set to Yes to perform tilt series alignment using patch-tracking in IMOD.");
     // TODO: check defaults with the experts
     joboptions["patch_size"] = JobOption("Patch size (in A): ", 10, 1, 50, 1, "The size of the patches in Angstrom.");
     joboptions["patch_overlap"] = JobOption("Patch overlap (%): ", 10, 0, 100, 10, "The overlap (0-100%) between the patches.");
