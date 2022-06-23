@@ -6074,7 +6074,7 @@ void RelionJob::initialiseTomoImportJob()
         joboptions["do_tiltseries"]= JobOption("Import tilt-series?", true, "Set this to Yes for importing tilt movies from SerialEM  mdoc format metadata.");
         joboptions["movie_files"] = JobOption("Tilt image movie files:", (std::string)"frames/*.mrc","File pattern pointing to the raw movie files for the tilt images");
         joboptions["mdoc_files"] = JobOption("mdoc files:", (std::string)"mdoc/*.mdoc","File pattern pointing to the mdoc files.");
-        joboptions["prefix"] = JobOption("Prefix:", (std::string)"","Prefix for XXX");
+        joboptions["prefix"] = JobOption("Prefix:", (std::string)"","Optional prefix added to avoid tilt-series name collisions when dealing with multiple datasets.");
         joboptions["tilt_axis_angle"] = JobOption("Tilt axis angle (deg):", 85.0, 0.0, 180.0, 1.0 , "Nominal value for the tilt-axis rotation angle (positive is CCW from Y)");
         joboptions["mtf_file"] = JobOption("MTF file:", (std::string)"","MTF file for the detector");
 
