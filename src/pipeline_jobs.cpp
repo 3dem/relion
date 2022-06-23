@@ -6071,11 +6071,11 @@ void RelionJob::initialiseTomoImportJob()
         joboptions["Q0"] = JobOption("Amplitude contrast:", 0.1, 0.05, 1, 0.01, "Fraction of amplitude contrast (default=0.1). Often values around 10% work better than theoretically more accurate lower values. ");
         joboptions["dose"] = JobOption("Frame dose:", 3.0, 0.0, 10.0, 0.1 , "Electron dose (in e/A^2) per frame (image) in the tilt series.");
 
-        joboptions["do_tiltseries"]= JobOption("Import tiltseries?", true, "Set this to Yes for importing tilt series straight from serialEM.");
-        joboptions["movie_files"] = JobOption("Tilt image movie files:", (std::string)"frames/*mrc","File pattern pointing to the raw movie files for the tilt images");
-        joboptions["mdoc_files"] = JobOption("mdoc files:", (std::string)"mdoc/*.mdoc","File pattern pointing to the mdoc files from the data acquisition software");
+        joboptions["do_tiltseries"]= JobOption("Import tilt-series?", true, "Set this to Yes for importing tilt movies from SerialEM  mdoc format metadata.");
+        joboptions["movie_files"] = JobOption("Tilt image movie files:", (std::string)"frames/*.mrc","File pattern pointing to the raw movie files for the tilt images");
+        joboptions["mdoc_files"] = JobOption("mdoc files:", (std::string)"mdoc/*.mdoc","File pattern pointing to the mdoc files.");
         joboptions["prefix"] = JobOption("Prefix:", (std::string)"","Prefix for XXX");
-        joboptions["tilt_axis_angle"] = JobOption("Tilt axis angle (deg):", 90.0, 0.0, 180.0, 1.0 , "Nominal value for the angle of the tilt axis");
+        joboptions["tilt_axis_angle"] = JobOption("Tilt axis angle (deg):", 85.0, 0.0, 180.0, 1.0 , "Nominal value for the tilt-axis rotation angle (positive is CCW from Y)");
         joboptions["mtf_file"] = JobOption("MTF file:", (std::string)"","MTF file for the detector");
 
        	joboptions["do_tomo"] = JobOption("Import tomograms?", false, "Set this to Yes for importing tomogram directories from IMOD.");
