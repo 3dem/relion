@@ -516,7 +516,7 @@ if(do_gpu)
 
 	// We read input optimiser set to create the output one
 	fn_OS = parser.getOption("--ios", "Input tomo optimiser set file. It is used to set --i, --ref or --solvent_mask if they are not provided. Updated output optimiser set is created.", "");
-	if (fn_OS != "")
+    if (fn_OS != "")
 	{
 		optimisationSet.read(fn_OS);
 	}
@@ -552,7 +552,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 
 	// General optimiser I/O stuff
 	int general_section = parser.addSection("General options");
-	fn_data = parser.getOption("--i", "Input images (in a star-file)", "");
+	fn_data = parser.getOption("--i", "Input particles (in a star-file)", "");
+    fn_tomo = parser.getOption("--tomograms", "Star file with the tomograms (in a star-file)", "");
 	fn_OS = parser.getOption("--ios", "Input tomo optimiser set file. It is used to set --i, --ref or --solvent_mask if they are not provided. Updated output optimiser set is created.", "");
 	fn_out = parser.getOption("--o", "Output rootname", "");
 	nr_iter = textToInteger(parser.getOption("--iter", "Maximum number of iterations to perform", "-1"));
@@ -590,6 +591,11 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 			if (!optimisationSet.getValue(EMDL_TOMO_PARTICLES_FILE_NAME, fn_data))
 				REPORT_ERROR("No particles filename was found in file " + fn_OS);
 		}
+        if (fn_tomo == "")
+        {
+            if (!optimisationSet.getValue(EMDL_TOMO_TOMOGRAMS_FILE_NAME, fn_tomo))
+                REPORT_ERROR("No tomograms filename was found in file " + fn_OS);
+        }
 		if (fn_ref == "None")
 		{
 			if (!optimisationSet.getValue(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, fn_ref))
@@ -1122,6 +1128,8 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 		do_center_classes = false;
     if (!MD.getValue(EMDL_OPTIMISER_DO_AUTO_SAMPLING, do_auto_sampling))
     	do_auto_sampling = false;
+    if (!MD.getValue(EMDL_TOMO_TOMOGRAMS_FILE_NAME, fn_tomo))
+        fn_tomo = "";
 
 	// Initialise some stuff for first-iteration only (not relevant here...)
 	do_calculate_initial_sigma_noise = false;
@@ -1248,6 +1256,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 			MD.setValue(EMDL_OPTIMISER_MODEL_STARFILE, fn_model);
 		}
 		MD.setValue(EMDL_OPTIMISER_DATA_STARFILE, fn_data);
+        MD.setValue(EMDL_TOMO_TOMOGRAMS_FILE_NAME, fn_tomo);
 		MD.setValue(EMDL_OPTIMISER_SAMPLING_STARFILE, fn_sampling);
 		MD.setValue(EMDL_OPTIMISER_ITERATION_NO, iter);
 		MD.setValue(EMDL_OPTIMISER_NR_ITERATIONS, nr_iter);
@@ -1373,6 +1382,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 	if (do_join_random_halves && !optimisationSet.isEmpty())
 	{
 		optimisationSet.setValue(EMDL_TOMO_PARTICLES_FILE_NAME, fn_root + "_data.star");
+        optimisationSet.setValue(EMDL_TOMO_TOMOGRAMS_FILE_NAME, fn_tomo);
 		optimisationSet.setValue(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, fn_root2 + "_half1_class001_unfil.mrc");
 		optimisationSet.setValue(EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME, fn_root2 + "_half2_class001_unfil.mrc");
 		optimisationSet.setValue(EMDL_TOMO_REFERENCE_MASK_FILE_NAME, fn_mask);
