@@ -79,6 +79,14 @@ public:
     // Alignment thickness in AreTomo
     RFLOAT aretomo_thickness;
 
+    // Perform tilt angle correction in AreTomo
+    bool do_aretomo_tiltcorrect;
+
+    // Which GPU devices to use?
+    int devCount;
+    std::string gpu_ids;
+    std::vector < std::vector < std::string > > allThreadIDs;
+
     // Additional gctf command line options
     std::string other_wrapper_args;
 
@@ -105,7 +113,7 @@ public:
     bool checkImodWrapperResults(long idx_tomo);
 
     // Execute CTFFIND for a single tomogram
-    void executeImodWrapper(long idx_tomo);
+    void executeImodWrapper(long idx_tomo, int rank = 0);
 
     // Find the etomo directives file (.edf)
     bool checkEtomoDirectiveFile(long idx_tomo, FileName &filename);

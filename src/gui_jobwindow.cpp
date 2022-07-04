@@ -2387,6 +2387,7 @@ void JobWindow::initialiseTomoImportWindow()
     current_y += STEPY/2;
     place("tilt_axis_angle", TOGGLE_DEACTIVATE);
     place("mtf_file", TOGGLE_DEACTIVATE);
+    place("flip_tiltseries_hand", TOGGLE_DEACTIVATE);
 
     group4->end();
     guientries["do_tiltseries"].cb_menu_i(); // make default active
@@ -2519,6 +2520,9 @@ void JobWindow::initialiseTomoAlignTiltseriesWindow()
 
     place("aretomo_resolution", TOGGLE_DEACTIVATE);
     place("aretomo_thickness", TOGGLE_DEACTIVATE);
+    place("aretomo_tiltcorrect", TOGGLE_DEACTIVATE);
+
+    place("gpu_ids");
     group2->end();
     guientries["do_aretomo"].cb_menu_i(); // make default active
 

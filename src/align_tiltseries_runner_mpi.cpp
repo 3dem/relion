@@ -60,7 +60,7 @@ void AlignTiltseriesRunnerMpi::run()
         if (pipeline_control_check_abort_job())
             MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
 
-        executeImodWrapper(idx_tomograms[itomo]);
+        executeImodWrapper(idx_tomograms[itomo], node->rank);
 
         if (verb > 0 && itomo % barstep == 0) progress_bar(itomo);
 

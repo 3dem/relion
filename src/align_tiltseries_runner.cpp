@@ -42,6 +42,8 @@ void AlignTiltseriesRunner::read(int argc, char **argv, int rank)
     do_aretomo = parser.checkOption("--aretomo", "OR: Use AreTomo's alignment method");
     aretomo_resolution = textToFloat(parser.getOption("--aretomo_resolution", "Maximum resolution (in A) to use in AreTomo alignments", "10"));
     aretomo_thickness = textToFloat(parser.getOption("--aretomo_thickness", "Thickness (in A) for AreTomo alignment", "2000"));
+    do_aretomo_tiltcorrect = parser.checkOption("--aretomo_tiltcorrect", "Specify to correct the tilt angle offset in the tomogram (AreTomo -TiltCor option; default=false)");
+    gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread, e.g 0:1:2:3", "");
 
     patch_overlap = textToFloat(parser.getOption("--patch_overlap", "Overlap between the patches (in %)", "10"));
     patch_size = textToInteger(parser.getOption("--patch_size", "Patch size (in unbinned pixels)", "10"));
@@ -141,7 +143,15 @@ void AlignTiltseriesRunner::initialise(bool is_leader)
 		std::cout  << do_at_most << " tomograms as specified in --do_at_most." << std::endl;
 	}
 
-	if (verb > 0)
+    if (do_aretomo)
+    {
+        if (gpu_ids.length() > 0)
+            untangleDeviceIDs(gpu_ids, allThreadIDs);
+        else if (verb>0)
+            std::cout << "gpu-ids not specified, threads will automatically be mapped to devices."<< std::endl;
+    }
+
+    if (verb > 0)
 	{
         std::cout << " Using IMOD wrapper executable in: " << fn_imodwrapper_exe << std::endl;
 		std::cout << " to align tilt series for the following tomograms: " << std::endl;
@@ -184,7 +194,7 @@ void AlignTiltseriesRunner::run()
 }
 
 
-void AlignTiltseriesRunner::executeImodWrapper(long idx_tomo)
+void AlignTiltseriesRunner::executeImodWrapper(long idx_tomo, int rank)
 {
 
     RFLOAT angpix = tomogramSet.getPixelSize(idx_tomo);
@@ -212,6 +222,21 @@ void AlignTiltseriesRunner::executeImodWrapper(long idx_tomo)
     command += " --tilt-series-star-file " + fn_in;
     command += " --tomogram-name " + tomogramSet.getTomogramName(idx_tomo);
     command += " --output-directory " + fn_out;
+
+    if (do_aretomo_tiltcorrect) command += " --tilt-angle-offset-correction";
+
+    if (gpu_ids.length() > 0)
+    {
+        if (rank >= allThreadIDs.size())
+            REPORT_ERROR("ERROR: not enough MPI nodes specified for the GPU IDs.");
+
+        command += " --gpu_ids ";
+        for (int igpu = 0; igpu < allThreadIDs[rank].size(); igpu++)
+        {
+            command += allThreadIDs[rank][igpu];
+            if (igpu < allThreadIDs[rank].size()-1) command += ":";
+        }
+    }
 
     if (other_wrapper_args.length() > 0)
         command += " " + other_wrapper_args;

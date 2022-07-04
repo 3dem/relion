@@ -6077,6 +6077,7 @@ void RelionJob::initialiseTomoImportJob()
         joboptions["prefix"] = JobOption("Prefix:", (std::string)"","Prefix for XXX");
         joboptions["tilt_axis_angle"] = JobOption("Tilt axis angle (deg):", 90.0, 0.0, 180.0, 1.0 , "Nominal value for the angle of the tilt axis");
         joboptions["mtf_file"] = JobOption("MTF file:", (std::string)"","MTF file for the detector");
+        joboptions["flip_tiltseries_hand"] = JobOption("Invert Defocus Handedness?", false, "Specify Yes to flip the handedness of the defocus geometry (default = 1, the same as the tutorial dataset: EMPIAR-10164)");
 
        	joboptions["do_tomo"] = JobOption("Import tomograms?", true, "Set this to Yes for importing tomogram directories from IMOD.");
         joboptions["io_tomos"] = JobOption("Append to tomograms set: ", OUTNODE_TOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "The imported tomograms will be output into this tomogram set. If any tomograms were already in this tomogram set, then the newly imported ones will be added to those.");
@@ -6158,6 +6159,8 @@ bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<st
             command += " --prefix " + joboptions["prefix"].getString();
         if (joboptions["mtf_file"].getString() != "")
             command += " --mtf-file " + joboptions["mtf_file"].getString();
+        if (joboptions["flip_tiltseries_hand"].getBoolean())
+            command += " --invert-defocus-handedness";
         command += " --output-directory " + outputname;
         Node node(outputname+"tilt_series.star", LABEL_TOMO_TOMOGRAMS);
 		outputNodes.push_back(node);
@@ -6338,6 +6341,8 @@ void RelionJob::initialiseTomoAlignTiltSeriesJob()
     joboptions["do_aretomo"] = JobOption("Use AreTomo?", false, "Set to Yes to perform tilt series alignment using UCSF's AreTomo.");
     joboptions["aretomo_resolution"] = JobOption("Resolution for AreTomo alignment (in A): ", 10, 1, 50, 1, "The maximum resolution (in A) used for AreTomo alignment. The images will be Fourier cropped to have their Nyquist frequency at this value.");
     joboptions["aretomo_thickness"] = JobOption("Thickness for AreTomo alignment (in A): ", 2000, 100, 5000, 100, "The tomogram thickness (in A) used for AreTomo alignment. The images will be Fourier cropped to have their Nyquist frequency at this value.");
+	joboptions["aretomo_tiltcorrect"] = JobOption("Correct Tilt Angle Offset?", false, "Specify Yes to correct the tilt angle offset in the tomogram (applies the AreTomo -TiltCor option). This is useful for correcting slanting in tomograms which can arise due to sample mounting or milling angle. This can be useful for in situ data especially.");
+    joboptions["gpu_ids"] = JobOption("Which GPUs to use for AreTomo:", std::string(""), "Provide a list of which GPUs (e.g. 0:1:2:3) to use in AreTomo. MPI-processes are separated by ':'. For example, to place one rank on device 0 and one rank on device 1, provide '0:1'.");
 
     joboptions["other_wrapper_args"] = JobOption("Other wrapper arguments:", (std::string)"",  "Other arguments that will be passed straight onto the IMOD wrapper.");
 
@@ -6383,6 +6388,15 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
         command += " --aretomo";
         command += " --aretomo_resolution " + joboptions["aretomo_resolution"].getString();
         command += " --aretomo_thickness " + joboptions["aretomo_thickness"].getString();
+
+        if (joboptions["aretomo_tiltcorrect"].getBoolean())
+        {
+            command += " --aretomo_tiltcorrect";
+        }
+        if (joboptions["gpu_ids"].getString().length() > 0)
+        {
+            command += " --gpu-ids " + joboptions["gpu_ids"].getString();
+        }
     }
     command += " --i " + joboptions["in_tiltseries"].getString();
     Node node(joboptions["in_tiltseries"].getString(), joboptions["in_tiltseries"].node_type);
