@@ -6071,15 +6071,15 @@ void RelionJob::initialiseTomoImportJob()
         joboptions["Q0"] = JobOption("Amplitude contrast:", 0.1, 0.05, 1, 0.01, "Fraction of amplitude contrast (default=0.1). Often values around 10% work better than theoretically more accurate lower values. ");
         joboptions["dose"] = JobOption("Frame dose:", 3.0, 0.0, 10.0, 0.1 , "Electron dose (in e/A^2) per frame (image) in the tilt series.");
 
-        joboptions["do_tiltseries"]= JobOption("Import tiltseries?", true, "Set this to Yes for importing tilt series straight from serialEM.");
-        joboptions["movie_files"] = JobOption("Tilt image movie files:", (std::string)"frames/*mrc","File pattern pointing to the raw movie files for the tilt images");
-        joboptions["mdoc_files"] = JobOption("mdoc files:", (std::string)"mdoc/*.mdoc","File pattern pointing to the mdoc files from the data acquisition software");
-        joboptions["prefix"] = JobOption("Prefix:", (std::string)"","Prefix for XXX");
-        joboptions["tilt_axis_angle"] = JobOption("Tilt axis angle (deg):", 90.0, 0.0, 180.0, 1.0 , "Nominal value for the angle of the tilt axis");
+        joboptions["do_tiltseries"]= JobOption("Import tilt-series?", true, "Set this to Yes for importing tilt movies from SerialEM  mdoc format metadata.");
+        joboptions["movie_files"] = JobOption("Tilt image movie files:", (std::string)"frames/*.mrc","File pattern pointing to the raw movie files for the tilt images");
+        joboptions["mdoc_files"] = JobOption("mdoc files:", (std::string)"mdoc/*.mdoc","File pattern pointing to the mdoc files.");
+        joboptions["prefix"] = JobOption("Prefix:", (std::string)"","Optional prefix added to avoid tilt-series name collisions when dealing with multiple datasets.");
+        joboptions["tilt_axis_angle"] = JobOption("Tilt axis angle (deg):", 85.0, 0.0, 180.0, 1.0 , "Nominal value for the tilt-axis rotation angle (positive is CCW from Y)");
         joboptions["mtf_file"] = JobOption("MTF file:", (std::string)"","MTF file for the detector");
         joboptions["flip_tiltseries_hand"] = JobOption("Invert Defocus Handedness?", false, "Specify Yes to flip the handedness of the defocus geometry (default = 1, the same as the tutorial dataset: EMPIAR-10164)");
 
-       	joboptions["do_tomo"] = JobOption("Import tomograms?", true, "Set this to Yes for importing tomogram directories from IMOD.");
+       	joboptions["do_tomo"] = JobOption("Import tomograms?", false, "Set this to Yes for importing tomogram directories from IMOD.");
         joboptions["io_tomos"] = JobOption("Append to tomograms set: ", OUTNODE_TOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "The imported tomograms will be output into this tomogram set. If any tomograms were already in this tomogram set, then the newly imported ones will be added to those.");
         joboptions["tomo_star"] = JobOption("STAR file with tomograms description: ", "", "Input file (*.star)", ".", "Provide a STAR file with the basic following information to import tomogsrams: \n\n"
                   " - rlnTomoImportImodDir: path to the IMOD directory.\n"
@@ -6330,10 +6330,10 @@ void RelionJob::initialiseTomoAlignTiltSeriesJob()
     if (default_location == NULL) default_location = default_wrapper;
     joboptions["imod_wrapper"] = JobOption("Alister Burt's IMOD/AreTomo wrapper:", std::string(default_location), "*", ".", "Location of Alister Burt's IMOD/Wrapper script; or just its executable name if in the path. You can control the default of this field by setting environment variable RELION_IMOD_WRAPPER_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code. Note that Alister's script should find the executables to IMOD and AreTomo on its own. See Alister's documentation on how to configure this.");
 
-    joboptions["do_imod_fiducials"] = JobOption("Use IMOD:fiducials?", true, "Set to Yes to perform tilt series alignment using fiducials in IMOD.");
-    joboptions["fiducial_diameter"] = JobOption("Fiducial diameter (nm): ", 10, 1, 50, 1, "The diameter of the fiducials (in nm)");
+    joboptions["do_imod_fiducials"] = JobOption("Use IMOD's fiducial based alignment?", true, "Set to Yes to perform tilt series alignment using fiducials in IMOD.");
+    joboptions["fiducial_diameter"] = JobOption("Fiducial diameter (nm): ", 10, 1, 20, 1, "The diameter of the fiducials (in nm)");
 
-    joboptions["do_imod_patchtrack"] = JobOption("Use IMOD:patch-tracking?", false, "Set to Yes to perform tilt series alignment using patch-tracking in IMOD.");
+    joboptions["do_imod_patchtrack"] = JobOption("Use IMOD's patch-tracking for alignment?", false, "Set to Yes to perform tilt series alignment using patch-tracking in IMOD.");
     // TODO: check defaults with the experts
     joboptions["patch_size"] = JobOption("Patch size (in A): ", 10, 1, 50, 1, "The size of the patches in Angstrom.");
     joboptions["patch_overlap"] = JobOption("Patch overlap (%): ", 10, 0, 100, 10, "The overlap (0-100%) between the patches.");
@@ -6395,7 +6395,7 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
         }
         if (joboptions["gpu_ids"].getString().length() > 0)
         {
-            command += " --gpu-ids " + joboptions["gpu_ids"].getString();
+            command += " --gpu_ids " + joboptions["gpu_ids"].getString();
         }
     }
     command += " --i " + joboptions["in_tiltseries"].getString();

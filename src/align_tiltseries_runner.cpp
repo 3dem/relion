@@ -148,7 +148,7 @@ void AlignTiltseriesRunner::initialise(bool is_leader)
         if (gpu_ids.length() > 0)
             untangleDeviceIDs(gpu_ids, allThreadIDs);
         else if (verb>0)
-            std::cout << "gpu-ids not specified, threads will automatically be mapped to devices."<< std::endl;
+            std::cout << "--gpu_ids not specified, threads will automatically be mapped to devices."<< std::endl;
     }
 
     if (verb > 0)
@@ -230,7 +230,7 @@ void AlignTiltseriesRunner::executeImodWrapper(long idx_tomo, int rank)
         if (rank >= allThreadIDs.size())
             REPORT_ERROR("ERROR: not enough MPI nodes specified for the GPU IDs.");
 
-        command += " --gpu_ids ";
+        command += " --gpu-ids ";
         for (int igpu = 0; igpu < allThreadIDs[rank].size(); igpu++)
         {
             command += allThreadIDs[rank][igpu];
