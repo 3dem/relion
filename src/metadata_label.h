@@ -628,6 +628,7 @@ enum EMDLabel
 	EMDL_TOMO_SUBTOMOGRAM_ROT,
 	EMDL_TOMO_SUBTOMOGRAM_TILT,
 	EMDL_TOMO_SUBTOMOGRAM_PSI,
+    EMDL_TOMO_SUBTOMOGRAM_STACK2D,
 	EMDL_TOMO_SUBTOMOGRAM_BINNING,
     EMDL_TOMO_TOMOGRAM_BINNING,
     EMDL_TOMO_PARTICLE_NAME,
@@ -1329,6 +1330,7 @@ private:
 		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_ROT, EMDL_DOUBLE, "rlnTomoSubtomogramRot", "First Euler angle of a subtomogram (rot, in degrees)");
 		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_TILT, EMDL_DOUBLE, "rlnTomoSubtomogramTilt", "Second Euler angle of a subtomogram (tilt, in degrees)");
 		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_PSI, EMDL_DOUBLE, "rlnTomoSubtomogramPsi", "Third Euler angle of a subtomogram (psi, in degrees)");
+        EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_STACK2D, EMDL_BOOL, "rlnTomoSubTomosAre2DStacks", "This flag is set to true if subtomograms are saved as 2D image stacks");
 		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_BINNING, EMDL_DOUBLE, "rlnTomoSubtomogramBinning", "Binning level of a subtomogram");
         EMDL::addLabel(EMDL_TOMO_TOMOGRAM_BINNING, EMDL_DOUBLE, "rlnTomoTomogramBinning", "Binning level of a  reconstructed tomogram");
         EMDL::addLabel(EMDL_TOMO_PARTICLE_NAME, EMDL_STRING, "rlnTomoParticleName", "Name of each individual particle");

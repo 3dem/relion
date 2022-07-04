@@ -15,7 +15,20 @@ ParticleSet::ParticleSet()
 
 ParticleSet::ParticleSet(std::string filename, std::string motionFilename, bool verbose)
 {
-	optTable.read(filename, "optics");
+
+    if (genTable.read(filename,"general"))
+    {
+        genTable.getValueSafely(EMDL_TOMO_SUBTOMOGRAM_STACK2D, is_stack2d);
+    }
+    else
+    {
+        is_stack2d = false;
+        genTable.setIsList(true);
+        genTable.addObject();
+        genTable.setValue(EMDL_TOMO_SUBTOMOGRAM_STACK2D, is_stack2d);
+    }
+
+    optTable.read(filename, "optics");
 	partTable.read(filename, "particles");
 	
 	if (!optTable.containsLabel(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE))
@@ -399,6 +412,7 @@ void ParticleSet::write(const std::string& filename) const
 {
 	std::ofstream ofs(filename);
 
+    genTable.write(ofs);
 	optTable.write(ofs);
 	partTable.write(ofs);
 }
