@@ -6395,7 +6395,7 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
         }
         if (joboptions["gpu_ids"].getString().length() > 0)
         {
-            command += " --gpu-ids " + joboptions["gpu_ids"].getString();
+            command += " --gpu_ids " + joboptions["gpu_ids"].getString();
         }
     }
     command += " --i " + joboptions["in_tiltseries"].getString();
