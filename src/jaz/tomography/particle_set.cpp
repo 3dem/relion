@@ -459,7 +459,8 @@ void ParticleSet::writeTrajectories(const std::string &filename) const
 void ParticleSet::setImageFileNames(std::string data, std::string weight, ParticleIndex particle_id)
 {
 	partTable.setValue(EMDL_IMAGE_NAME, data, particle_id.value);
-	partTable.setValue(EMDL_CTF_IMAGE, weight, particle_id.value);
+    if (weight != "")
+	    partTable.setValue(EMDL_CTF_IMAGE, weight, particle_id.value);
 }
 
 d3Vector ParticleSet::getParticleOffset(ParticleIndex particle_id) const

@@ -297,6 +297,7 @@ void SubtomoProgram::writeParticleSet(
 
 	ParticleSet copy = particleSet;
 	copy.clearParticles();
+    copy.is_stack2d = do_stack2d;
 
 	int particles_removed = 0;
 
@@ -325,8 +326,8 @@ void SubtomoProgram::writeParticleSet(
 				const std::string filenameRoot = getOutputFilename(
 					part_id, t, particleSet, tomogramSet);
 
-                std::string outData = filenameRoot + "_data.mrc";
-                std::string outWeight = filenameRoot + "_weights.mrc";
+                std::string outData = (do_stack2d) ? filenameRoot + "_stack2d.mrcs" : filenameRoot + "_data.mrc";
+                std::string outWeight = (do_stack2d) ? "" : filenameRoot + "_weights.mrc";
 
                 copy.setImageFileNames(outData, outWeight, new_id);
 
