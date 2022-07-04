@@ -430,7 +430,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 		nr_browse_tabs++;
 
         browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-        browser->add("Align tiltseries");
+        browser->add("Align tilt-series");
         gui_jobwindows[nr_browse_tabs] = new JobWindow();
         gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_ALIGN_TILTSERIES);
         browse_grp[nr_browse_tabs]->end();
