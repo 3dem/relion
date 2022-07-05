@@ -433,7 +433,7 @@ void MlOptimiserMpi::initialise()
 				}
 
 				Experiment temp;
-				temp.read(fn_data);
+				temp.read(fn_data, "", "", true, true);
 
 				int t_ori_size = temp.getOpticsImageSize(0);
 				//temp.MDopt.getValue(EMDL_IMAGE_SIZE, t_ori_size, 0);

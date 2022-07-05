@@ -549,7 +549,7 @@ void ClassRanker::initialise()
 		if (!only_do_subimages && (intact_ctf_first_peak || do_ranking || (!do_skip_angular_errors && !haveAllAccuracies)) )
 		{
 			// Read in particles (otherwise wait until haveAllAccuracies or performRanking, as Liyi sometimes doesn't need mydata)
-			mydata.read(fn_data, true, true); // true true means: ignore particle_name and group name!
+			mydata.read(fn_data, "", "", true, true); // true true means: ignore particle_name and group name!
 			total_nr_particles = mydata.numberOfParticles(0);
 
 		}
@@ -1960,7 +1960,7 @@ void ClassRanker::performRanking()
 	if (mydata.numberOfParticles() == 0)
 	{
 		// Read in particles if we haven't done this already
-		mydata.read(fn_data, true, true); // true true means: ignore particle_name and group name!
+		mydata.read(fn_data, "", "", true, true); // true true means: ignore particle_name and group name!
 		if (debug>0) std::cerr << "Done with reading data.star ..." << std::endl;
 	}
 

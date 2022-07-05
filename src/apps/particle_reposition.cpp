@@ -157,7 +157,6 @@ public:
 			bool found_one = false;
 			for (long int part_id = 0; part_id < optimiser.mydata.numberOfParticles(); part_id++)
 			{
-				long int ori_img_id = optimiser.mydata.particles[part_id].images[0].id;
 				int optics_group = optimiser.mydata.getOpticsGroup(part_id, 0);
 				RFLOAT my_pixel_size = optimiser.mydata.getImagePixelSize(part_id, 0);
 				int my_image_size = optimiser.mydata.getOpticsImageSize(optics_group);
@@ -166,7 +165,7 @@ public:
 					REPORT_ERROR("ERROR: subtract code has only been validated with same pixel size for particles and micrographs... Sorry!");
 
 				FileName fn_mic2;
-				optimiser.mydata.MDimg.getValue(EMDL_MICROGRAPH_NAME, fn_mic2, ori_img_id);
+				optimiser.mydata.MDimg.getValue(EMDL_MICROGRAPH_NAME, fn_mic2, part_id);
 				FileName fn_mic2_pre, fn_mic2_jobnr, fn_mic2_post;
 				decomposePipelineFileName(fn_mic2, fn_mic2_pre, fn_mic2_jobnr, fn_mic2_post);
 
@@ -197,23 +196,23 @@ public:
 
 
 					MDcoord.addObject();
-					MDcoord.setObject(optimiser.mydata.MDimg.getObject(ori_img_id));
+					MDcoord.setObject(optimiser.mydata.MDimg.getObject(part_id));
 					MDcoord.setValue(EMDL_MICROGRAPH_NAME,fn_mic_out);
 
-					optimiser.mydata.MDimg.getValue(EMDL_IMAGE_COORD_X,  xcoord, ori_img_id);
-					optimiser.mydata.MDimg.getValue(EMDL_IMAGE_COORD_Y,  ycoord, ori_img_id);
+					optimiser.mydata.MDimg.getValue(EMDL_IMAGE_COORD_X,  xcoord, part_id);
+					optimiser.mydata.MDimg.getValue(EMDL_IMAGE_COORD_Y,  ycoord, part_id);
 					if (optimiser.mymodel.ref_dim == 3)
 					{
-						optimiser.mydata.MDimg.getValue(EMDL_ORIENT_ROT,  rot, ori_img_id);
-						optimiser.mydata.MDimg.getValue(EMDL_ORIENT_TILT, tilt, ori_img_id);
+						optimiser.mydata.MDimg.getValue(EMDL_ORIENT_ROT,  rot, part_id);
+						optimiser.mydata.MDimg.getValue(EMDL_ORIENT_TILT, tilt, part_id);
 					}
-					optimiser.mydata.MDimg.getValue(EMDL_ORIENT_PSI,  psi, ori_img_id);
-					optimiser.mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, XX(offsets), ori_img_id);
-					optimiser.mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, YY(offsets), ori_img_id);
+					optimiser.mydata.MDimg.getValue(EMDL_ORIENT_PSI,  psi, part_id);
+					optimiser.mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, XX(offsets), part_id);
+					optimiser.mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, YY(offsets), part_id);
 					if (optimiser.mymodel.data_dim == 3)
 					{
-						optimiser.mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, ZZ(offsets), ori_img_id);
-						optimiser.mydata.MDimg.getValue(EMDL_IMAGE_COORD_Z,  zcoord, ori_img_id);
+						optimiser.mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, ZZ(offsets), part_id);
+						optimiser.mydata.MDimg.getValue(EMDL_IMAGE_COORD_Z,  zcoord, part_id);
 					}
 					else
 					{
@@ -223,7 +222,7 @@ public:
 					// Offsets in pixels
 					offsets /= my_pixel_size;
 
-					optimiser.mydata.MDimg.getValue(EMDL_PARTICLE_CLASS, iclass, ori_img_id);
+					optimiser.mydata.MDimg.getValue(EMDL_PARTICLE_CLASS, iclass, part_id);
 					iclass--;
 
 					Euler_angles2matrix(rot, tilt, psi, A);
@@ -253,7 +252,7 @@ public:
 							Image<RFLOAT> Ictf;
 
 							FileName fn_ctf;
-							optimiser.mydata.MDimg.getValue(EMDL_CTF_IMAGE, fn_ctf, ori_img_id);
+							optimiser.mydata.MDimg.getValue(EMDL_CTF_IMAGE, fn_ctf, part_id);
 							Ictf.read(fn_ctf);
 
 							// If there is a redundant half, get rid of it
@@ -279,7 +278,7 @@ public:
 						}
 						else
 						{
-							ctf.readByGroup(optimiser.mydata.MDimg, &optimiser.mydata.obsModel, ori_img_id);
+							ctf.readByGroup(optimiser.mydata.MDimg, &optimiser.mydata.obsModel, part_id);
 							ctf.getFftwImage(Fctf, my_image_size, my_image_size, my_pixel_size,
 									optimiser.ctf_phase_flipped, false, optimiser.intact_ctf_first_peak, true);
 						}
@@ -354,8 +353,8 @@ public:
 						RFLOAT part_avg, part_stdev;
 						if (optimiser.do_helical_refine)
 						{
-							optimiser.mydata.MDimg.getValue(EMDL_ORIENT_TILT_PRIOR, tilt_deg, ori_img_id);
-							optimiser.mydata.MDimg.getValue(EMDL_ORIENT_PSI_PRIOR, psi_deg, ori_img_id);
+							optimiser.mydata.MDimg.getValue(EMDL_ORIENT_TILT_PRIOR, tilt_deg, part_id);
+							optimiser.mydata.MDimg.getValue(EMDL_ORIENT_PSI_PRIOR, psi_deg, part_id);
 						}
 
 						calculateBackgroundAvgStddev(Ipart, part_avg, norm_factor, norm_radius, optimiser.do_helical_refine,
@@ -365,7 +364,7 @@ public:
 						if (optimiser.do_norm_correction)
 						{
 							RFLOAT mynorm;
-							optimiser.mydata.MDimg.getValue(EMDL_IMAGE_NORM_CORRECTION, mynorm, ori_img_id);
+							optimiser.mydata.MDimg.getValue(EMDL_IMAGE_NORM_CORRECTION, mynorm, part_id);
 							// TODO: check whether this is the right way around!!!
 							norm_factor *= mynorm/optimiser.mymodel.avg_norm_correction;
 						}

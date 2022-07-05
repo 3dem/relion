@@ -27,6 +27,10 @@
 #include "src/time.h"
 #include "src/ctf.h"
 #include <src/jaz/single_particle/obs_model.h>
+#include <src/jaz/tomography/tomogram_set.h>
+#include <src/jaz/tomography/tomo_ctf_helper.h>
+#include <src/jaz/tomography/tomogram.h>
+#include <src/jaz/tomography/particle_set.h>
 
 /// Reserve large vectors with some reasonable estimate
 // Larger numbers will still be OK, but memory management might suffer
@@ -37,8 +41,6 @@
 class ExpImage
 {
 public:
-	// Position of the image in the original input STAR file
-	long int id;
 
 	// To which particle does this image belong
 	long int particle_id;
@@ -47,7 +49,7 @@ public:
 	long int optics_group_id;
 
 	// Name of this image (by this name it will be recognised upon reading)
-	std::string name;
+	FileName name;
 
 	// ID of the group that this image comes from
 	long int group_id;
@@ -67,7 +69,6 @@ public:
 	// Copy constructor needed for work with vectors
 	ExpImage(ExpImage const& copy)
 	{
-		id = copy.id;
 		particle_id = copy.particle_id;
 		optics_group_id = copy.optics_group_id;
 		name = copy.name;
@@ -80,7 +81,7 @@ public:
 	// Define assignment operator in terms of the copy constructor
 	ExpImage& operator=(ExpImage const& copy)
 	{
-		id = copy.id;
+
 		particle_id = copy.particle_id;
 		optics_group_id = copy.optics_group_id;
 		name = copy.name;
@@ -95,10 +96,13 @@ class ExpParticle
 {
 public:
 
-	// Name of this particle (by this name all the images inside it will be grouped)
-	std::string name;
+    // Position of the image in the original input STAR file
+    long int id;
 
-	// Random subset this particle belongs to
+    // Which tomogram does this particle belong to
+    int tomogram_id;
+
+    // Random subset this particle belongs to
 	int random_subset;
 
 	// Vector of all the images for this particle
@@ -113,16 +117,18 @@ public:
 	// Copy constructor needed for work with vectors
 	ExpParticle(ExpParticle const& copy)
 	{
-		name = copy.name;
-		random_subset = copy.random_subset;
+        id = copy.id;
+        tomogram_id = copy.tomogram_id;
+        random_subset = copy.random_subset;
 		images = copy.images;
 	}
 
 	// Define assignment operator in terms of the copy constructor
 	ExpParticle& operator=(ExpParticle const& copy)
 	{
-		name = copy.name;
-		random_subset = copy.random_subset;
+        id = copy.id;
+        tomogram_id = copy.tomogram_id;
+        random_subset = copy.random_subset;
 		images = copy.images;
 		return *this;
 	}
@@ -187,10 +193,17 @@ public:
 	// Number of images per optics group
 	std::vector<long int> nr_images_per_optics_group;
 
-	// One large MetaDataTable for all images
+	// One large MetaDataTable for all particles
 	MetaDataTable MDimg;
 
-	// Number of bodies in multi-body refinement
+    // TODO: Pointer to the relevant MetaDataTable for all particles (MDimg for SPA, particleSet.partTable for STA)
+    //MetaDataTable *ptrMDimg;
+
+    // For subtomogram averaging in RELION-4.1....
+    ParticleSet particleSet;
+    TomogramSet tomogramSet;
+
+    // Number of bodies in multi-body refinement
 	int nr_bodies;
 
 	// Vector with MetaDataTables for orientations of different bodies in the multi-body refinement
@@ -209,7 +222,7 @@ public:
 	RFLOAT free_space_Gb;
 
 	// Is this sub-tomograms?
-	bool is_3D;
+	bool is_tomo, is_3D;
 
 	// Empty Constructor
 	Experiment()
@@ -227,6 +240,7 @@ public:
 		groups.clear();
 		groups.reserve(MAX_NR_GROUPS);
 		particles.clear(); // reserve upon reading
+        particleSet.clearParticles();
 		sorted_idx.clear();
 		nr_particles_subset1 = nr_particles_subset2 = 0;
 		nr_bodies = 1;
@@ -234,6 +248,7 @@ public:
 		nr_parts_on_scratch.clear();
 		free_space_Gb = 10;
 		is_3D = false;
+        is_tomo = false;
 		MDimg.clear();
 		MDimg.setIsList(false);
 		MDbodies.clear();
@@ -270,9 +285,6 @@ public:
 	// Get the optics group to which the N'th image for this particle belongs
 	int getOpticsGroup(long int part_id, int img_id);
 
-	// Get the original position in the input STAR file for the N'th image for this particle
-	int getOriginalImageId(long int part_id, int img_id);
-
 	// Get the pixel size for the N-th image of this particle
 	RFLOAT getImagePixelSize(long int part_id, int img_id);
 
@@ -283,18 +295,16 @@ public:
 	void getNumberOfImagesPerOpticsGroup(std::vector<long int> &nr_particles_per_group, int random_subset = 0);
 
 	// Get the metadata-row for this image in a separate MetaDataTable
-	MetaDataTable getMetaDataImage(long int part_id, int img_id);
+	MetaDataTable getMetaDataParticle(long int part_id);
 
 	// Which micrograph (or tomogram) doe this particle image comes from?
-	FileName getMicrographName(long int ori_img_id);
-	FileName getMicrographName(long int part_id, int img_id);
+	FileName getMicrographName(long int part_id);
 
 	// Add a particle
-	long int addParticle(std::string part_name, int random_subset = 0);
+	void addParticle(int random_subset = 0, int tomogram_id = 0);
 
  	// Add an image to the given particle
-	int addImageToParticle(long int part_id, std::string img_name, long int ori_img_id, long int group_id,
-	                       int optics_group, bool unique);
+	void addImageToParticle(std::string img_name, long int part_id, long int group_id, int optics_group);
 
 	// Add a group
 	long int addGroup(std::string mic_name, int optics_group);
@@ -336,7 +346,7 @@ public:
 
 	// Read from file
 	void read(
-		FileName fn_in,
+		FileName fn_in, FileName fn_tomo, FileName fn_motion,
 		bool do_ignore_particle_name = false,
 		bool do_ignore_group_name = false, bool do_preread_images = false,
 		bool need_tiltpsipriors_for_helical_refine = false, int verb = 0);

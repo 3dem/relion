@@ -64,7 +64,7 @@ void FlexAnalyser::initialise()
 	if (fn_data == "")
 		REPORT_ERROR("ERROR: please provide the --data argument!");
 	else
-		data.read(fn_data);
+		data.read(fn_data, "", "");
 
 	if (verb > 0)
 		std::cout << " Reading in model.star file ..." << std::endl;

@@ -553,7 +553,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	// General optimiser I/O stuff
 	int general_section = parser.addSection("General options");
 	fn_data = parser.getOption("--i", "Input particles (in a star-file)", "");
-    fn_tomo = parser.getOption("--tomograms", "Star file with the tomograms (in a star-file)", "");
+    fn_tomo = parser.getOption("--tomograms", "Star file with the tomograms", "");
+    fn_motion = parser.getOption("--trajectories", "Star file with the tomogram motion trajectories", "");
 	fn_OS = parser.getOption("--ios", "Input tomo optimiser set file. It is used to set --i, --ref or --solvent_mask if they are not provided. Updated output optimiser set is created.", "");
 	fn_out = parser.getOption("--o", "Output rootname", "");
 	nr_iter = textToInteger(parser.getOption("--iter", "Maximum number of iterations to perform", "-1"));
@@ -595,6 +596,11 @@ void MlOptimiser::parseInitial(int argc, char **argv)
         {
             if (!optimisationSet.getValue(EMDL_TOMO_TOMOGRAMS_FILE_NAME, fn_tomo))
                 REPORT_ERROR("No tomograms filename was found in file " + fn_OS);
+        }
+        if (fn_motion == "")
+        {
+            if (!optimisationSet.getValue(EMDL_TOMO_TRAJECTORIES_FILE_NAME, fn_motion))
+                std::cout << " No motion trajectories were found in file " + fn_OS + ". Continuing without mask." << std::endl;
         }
 		if (fn_ref == "None")
 		{
@@ -1130,6 +1136,8 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
     	do_auto_sampling = false;
     if (!MD.getValue(EMDL_TOMO_TOMOGRAMS_FILE_NAME, fn_tomo))
         fn_tomo = "";
+    if (!MD.getValue(EMDL_TOMO_TRAJECTORIES_FILE_NAME, fn_motion))
+        fn_motion = "";
 
 	// Initialise some stuff for first-iteration only (not relevant here...)
 	do_calculate_initial_sigma_noise = false;
@@ -1152,7 +1160,8 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	bool do_preread = (do_preread_images) ? (do_parallel_disc_io || rank == 0) : false;
 	if (do_prevent_preread) do_preread = false;
 	bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
-	mydata.read(fn_data, false, false, do_preread, is_helical_segment);
+
+    mydata.read(fn_data, fn_tomo, fn_motion, false, false, do_preread, is_helical_segment);
 
 #ifdef DEBUG_READ
 	std::cerr<<"MlOptimiser::readStar before model."<<std::endl;
@@ -1257,6 +1266,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		}
 		MD.setValue(EMDL_OPTIMISER_DATA_STARFILE, fn_data);
         MD.setValue(EMDL_TOMO_TOMOGRAMS_FILE_NAME, fn_tomo);
+        MD.setValue(EMDL_TOMO_TRAJECTORIES_FILE_NAME, fn_motion);
 		MD.setValue(EMDL_OPTIMISER_SAMPLING_STARFILE, fn_sampling);
 		MD.setValue(EMDL_OPTIMISER_ITERATION_NO, iter);
 		MD.setValue(EMDL_OPTIMISER_NR_ITERATIONS, nr_iter);
@@ -1367,7 +1377,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 
 	// And write the mydata to file
 	if (do_write_data)
-		mydata.write(fn_root + "_data.star");
+        mydata.write(fn_root + "_data.star");
 
 	// And write the sampling object
 	if (do_write_sampling)
@@ -1383,7 +1393,8 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 	{
 		optimisationSet.setValue(EMDL_TOMO_PARTICLES_FILE_NAME, fn_root + "_data.star");
         optimisationSet.setValue(EMDL_TOMO_TOMOGRAMS_FILE_NAME, fn_tomo);
-		optimisationSet.setValue(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, fn_root2 + "_half1_class001_unfil.mrc");
+        optimisationSet.setValue(EMDL_TOMO_TRAJECTORIES_FILE_NAME, fn_motion);
+        optimisationSet.setValue(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, fn_root2 + "_half1_class001_unfil.mrc");
 		optimisationSet.setValue(EMDL_TOMO_REFERENCE_MAP_2_FILE_NAME, fn_root2 + "_half2_class001_unfil.mrc");
 		optimisationSet.setValue(EMDL_TOMO_REFERENCE_MASK_FILE_NAME, fn_mask);
 		if (optimisationSet.containsLabel(EMDL_TOMO_REFERENCE_FSC_FILE_NAME))
@@ -1773,7 +1784,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		bool do_preread = (do_preread_images) ? (do_parallel_disc_io || rank == 0) : false;
 		bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
 		int myverb = (rank==0) ? 1 : 0;
-		mydata.read(fn_data, true, false, do_preread, is_helical_segment, myverb); // true means ignore original particle name
+		mydata.read(fn_data, fn_tomo, fn_motion, true, false, do_preread, is_helical_segment, myverb); // true means ignore original particle name
 
 		// Without this check, the program crashes later.
 		if (mydata.numberOfParticles() == 0)
@@ -2474,6 +2485,10 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 	{
 
 		long int part_id = mydata.sorted_idx[part_id_sorted];
+
+        // Extract the relevant MetaDataTable row from MDimg
+        MDimg = mydata.getMetaDataParticle(part_id);
+
 		for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++)
 		{
 			long int optics_group = mydata.getOpticsGroup(part_id, img_id);
@@ -2486,8 +2501,6 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
 			int my_image_size = mydata.getOpticsImageSize(optics_group);
 
-			// Extract the relevant MetaDataTable row from MDimg
-			MDimg = mydata.getMetaDataImage(part_id, img_id);
 
 			// Read image from disc
 			Image<RFLOAT> img;
@@ -8777,85 +8790,80 @@ void MlOptimiser::monitorHiddenVariableChanges(long int my_first_part_id, long i
 	{
 
 		long int part_id = mydata.sorted_idx[part_id_sorted];
-		for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++, metadata_offset++)
-		{
 
-			long int ori_img_id = mydata.particles[part_id].images[img_id].id;
-			RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, img_id);
+        RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, 0);
 
-			for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
-			{
+        for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
+        {
 
-				if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
-					continue;
+            if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
+                continue;
 
-				RFLOAT old_rot, old_tilt, old_psi, old_xoff, old_yoff, old_zoff = 0.;
-				RFLOAT rot, tilt, psi, xoff, yoff, zoff = 0.;
-				int old_iclass, iclass;
+            RFLOAT old_rot, old_tilt, old_psi, old_xoff, old_yoff, old_zoff = 0.;
+            RFLOAT rot, tilt, psi, xoff, yoff, zoff = 0.;
+            int old_iclass, iclass;
 
-				if (mymodel.nr_bodies > 1)
-				{
+            if (mymodel.nr_bodies > 1)
+            {
 
-					// Old optimal parameters
-					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ROT,  old_rot, ori_img_id);
-					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_TILT, old_tilt, ori_img_id);
-					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_PSI,  old_psi, ori_img_id);
-					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, old_xoff, ori_img_id);
-					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, old_yoff, ori_img_id);
-					if (mymodel.data_dim == 3)
-					{
-						mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, old_zoff, ori_img_id);
-					}
-					old_iclass = 0;
+                // Old optimal parameters
+                mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ROT,  old_rot, part_id);
+                mydata.MDbodies[ibody].getValue(EMDL_ORIENT_TILT, old_tilt, part_id);
+                mydata.MDbodies[ibody].getValue(EMDL_ORIENT_PSI,  old_psi, part_id);
+                mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, old_xoff, part_id);
+                mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, old_yoff, part_id);
+                if (mymodel.data_dim == 3)
+                {
+                    mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, old_zoff, part_id);
+                }
+                old_iclass = 0;
 
-					// New optimal parameters
-					rot = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, 0 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS);
-					tilt = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, 1 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS);
-					psi = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, 2 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS);
-					xoff = my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, 3 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS);
-					yoff = my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, 4 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS);
-					if (mymodel.data_dim == 3)
-						zoff = my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, 5 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS);
-					iclass = 0;
+                // New optimal parameters
+                rot = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, 0 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS);
+                tilt = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, 1 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS);
+                psi = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, 2 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS);
+                xoff = my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, 3 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS);
+                yoff = my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, 4 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS);
+                if (mymodel.data_dim == 3)
+                    zoff = my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, 5 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS);
+                iclass = 0;
 
-				}
-				else
-				{
+            }
+            else
+            {
 
-					// Old optimal parameters
-					mydata.MDimg.getValue(EMDL_ORIENT_ROT,  old_rot, ori_img_id);
-					mydata.MDimg.getValue(EMDL_ORIENT_TILT, old_tilt, ori_img_id);
-					mydata.MDimg.getValue(EMDL_ORIENT_PSI,  old_psi, ori_img_id);
-					mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, old_xoff, ori_img_id);
-					mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, old_yoff, ori_img_id);
-					if (mymodel.data_dim == 3)
-					{
-						mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, old_zoff, ori_img_id);
-					}
-					mydata.MDimg.getValue(EMDL_PARTICLE_CLASS, old_iclass, ori_img_id);
+                // Old optimal parameters
+                mydata.MDimg.getValue(EMDL_ORIENT_ROT,  old_rot, part_id);
+                mydata.MDimg.getValue(EMDL_ORIENT_TILT, old_tilt, part_id);
+                mydata.MDimg.getValue(EMDL_ORIENT_PSI,  old_psi, part_id);
+                mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, old_xoff, part_id);
+                mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, old_yoff, part_id);
+                if (mymodel.data_dim == 3)
+                {
+                    mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, old_zoff, part_id);
+                }
+                mydata.MDimg.getValue(EMDL_PARTICLE_CLASS, old_iclass, part_id);
 
-					// New optimal parameters
-					rot = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT);
-					tilt = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_TILT);
-					psi = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI);
-					xoff = my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_XOFF);
-					yoff = my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_YOFF);
-					if (mymodel.data_dim == 3)
-						zoff = my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ZOFF);
-					iclass = (int)DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CLASS);
+                // New optimal parameters
+                rot = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT);
+                tilt = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_TILT);
+                psi = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI);
+                xoff = my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_XOFF);
+                yoff = my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_YOFF);
+                if (mymodel.data_dim == 3)
+                    zoff = my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ZOFF);
+                iclass = (int)DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CLASS);
 
-				}
+            }
 
-				// Some orientational distance....
-				sum_changes_optimal_orientations += sampling.calculateAngularDistance(rot, tilt, psi, old_rot, old_tilt, old_psi);
-				sum_changes_optimal_offsets += (xoff-old_xoff)*(xoff-old_xoff) + (yoff-old_yoff)*(yoff-old_yoff) + (zoff-old_zoff)*(zoff-old_zoff);
-				if (iclass != old_iclass)
-					sum_changes_optimal_classes += 1.;
-				sum_changes_count += 1.;
+            // Some orientational distance....
+            sum_changes_optimal_orientations += sampling.calculateAngularDistance(rot, tilt, psi, old_rot, old_tilt, old_psi);
+            sum_changes_optimal_offsets += (xoff-old_xoff)*(xoff-old_xoff) + (yoff-old_yoff)*(yoff-old_yoff) + (zoff-old_zoff)*(zoff-old_zoff);
+            if (iclass != old_iclass)
+                sum_changes_optimal_classes += 1.;
+            sum_changes_count += 1.;
 
-			} // end loop ibody
-
-		} // end loop img_id
+        } // end loop ibody
 
 	} //end loop part_id
 
@@ -9105,8 +9113,8 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 						if ( (imode == 0 && ang_error > 30.) || (imode == 1 && sh_error > 10.) )
 							break;
 
-						// ori_img_id to keep exactly the same as in relion-3.0....
-						init_random_generator(random_seed + mydata.getOriginalImageId(part_id, img_id));
+						// part_id to keep exactly the same as in relion-3.0....
+						init_random_generator(random_seed + part_id);
 
 						MultidimArray<Complex > F1, F2;
 						Matrix2D<RFLOAT> A1, A2;
@@ -9817,79 +9825,73 @@ void MlOptimiser::setMetaDataSubset(long int first_part_id, long int last_part_i
     {
 
 		long int part_id = mydata.sorted_idx[part_id_sorted];
-		for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++, metadata_offset++)
-		{
 
-			long int ori_img_id = mydata.particles[part_id].images[img_id].id;
-			RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, img_id);
+        RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, 0);
 
-			// SHWS: Upon request of Juha Huiskonen, 5apr2016
-			if (mymodel.ref_dim > 2)
-			{
-				mydata.MDimg.setValue(EMDL_ORIENT_ROT,  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT), ori_img_id);
-				mydata.MDimg.setValue(EMDL_ORIENT_TILT, DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_TILT), ori_img_id);
-			}
-			mydata.MDimg.setValue(EMDL_ORIENT_PSI,  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI), ori_img_id);
-			mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_XOFF), ori_img_id);
-			mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_YOFF), ori_img_id);
-			if (mymodel.data_dim == 3)
-			{
-				mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ZOFF), ori_img_id);
-			}
-			mydata.MDimg.setValue(EMDL_PARTICLE_CLASS, (int)DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CLASS) , ori_img_id);
-			mydata.MDimg.setValue(EMDL_PARTICLE_DLL,  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_DLL), ori_img_id);
-			mydata.MDimg.setValue(EMDL_PARTICLE_PMAX, DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PMAX), ori_img_id);
-			mydata.MDimg.setValue(EMDL_PARTICLE_NR_SIGNIFICANT_SAMPLES,(int)DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_NR_SIGN), ori_img_id);
-			mydata.MDimg.setValue(EMDL_IMAGE_NORM_CORRECTION, DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_NORM), ori_img_id);
+        if (mymodel.ref_dim > 2)
+        {
+            mydata.MDimg.setValue(EMDL_ORIENT_ROT,  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT), part_id);
+            mydata.MDimg.setValue(EMDL_ORIENT_TILT, DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_TILT), part_id);
+        }
+        mydata.MDimg.setValue(EMDL_ORIENT_PSI,  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI), part_id);
+        mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_XOFF), part_id);
+        mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_YOFF), part_id);
+        if (mymodel.data_dim == 3)
+        {
+            mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ZOFF), part_id);
+        }
+        mydata.MDimg.setValue(EMDL_PARTICLE_CLASS, (int)DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CLASS) , part_id);
+        mydata.MDimg.setValue(EMDL_PARTICLE_DLL,  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_DLL), part_id);
+        mydata.MDimg.setValue(EMDL_PARTICLE_PMAX, DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PMAX), part_id);
+        mydata.MDimg.setValue(EMDL_PARTICLE_NR_SIGNIFICANT_SAMPLES,(int)DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_NR_SIGN), part_id);
+        mydata.MDimg.setValue(EMDL_IMAGE_NORM_CORRECTION, DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_NORM), part_id);
 
-			// For the moment, CTF, prior and transformation matrix info is NOT updated...
-			RFLOAT prior_x = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_XOFF_PRIOR);
-			RFLOAT prior_y = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_YOFF_PRIOR);
-			if (prior_x < 999.)
-			{
-				mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_X_PRIOR_ANGSTROM, my_pixel_size * prior_x, ori_img_id);
-			}
-			if (prior_y < 999.)
-			{
-				mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_Y_PRIOR_ANGSTROM, my_pixel_size * prior_y, ori_img_id);
-			}
-			if (mymodel.data_dim == 3)
-			{
-				RFLOAT prior_z = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ZOFF_PRIOR);
-				if (prior_z < 999.)
-				{
-					mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_Z_PRIOR_ANGSTROM, my_pixel_size * prior_z, ori_img_id);
-				}
-			}
+        // For the moment, CTF, prior and transformation matrix info is NOT updated...
+        RFLOAT prior_x = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_XOFF_PRIOR);
+        RFLOAT prior_y = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_YOFF_PRIOR);
+        if (prior_x < 999.)
+        {
+            mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_X_PRIOR_ANGSTROM, my_pixel_size * prior_x, part_id);
+        }
+        if (prior_y < 999.)
+        {
+            mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_Y_PRIOR_ANGSTROM, my_pixel_size * prior_y, part_id);
+        }
+        if (mymodel.data_dim == 3)
+        {
+            RFLOAT prior_z = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ZOFF_PRIOR);
+            if (prior_z < 999.)
+            {
+                mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_Z_PRIOR_ANGSTROM, my_pixel_size * prior_z, part_id);
+            }
+        }
 
-			// For multi-body refinement
-			if (mymodel.nr_bodies > 1)
-			{
-				for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
-				{
-					int icol_rot  = 0 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
-					int icol_tilt = 1 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
-					int icol_psi  = 2 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
-					int icol_xoff = 3 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
-					int icol_yoff = 4 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
-					int icol_zoff = 5 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
-					RFLOAT rot =  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, icol_rot);
-					RFLOAT tilt = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, icol_tilt);
-					RFLOAT psi =  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, icol_psi);
-					RFLOAT xoff = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, icol_xoff);
-					RFLOAT yoff = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, icol_yoff);
-					RFLOAT zoff = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, icol_zoff);
-					mydata.MDbodies[ibody].setValue(EMDL_ORIENT_ROT, rot, ori_img_id);
-					mydata.MDbodies[ibody].setValue(EMDL_ORIENT_TILT, tilt, ori_img_id);
-					mydata.MDbodies[ibody].setValue(EMDL_ORIENT_PSI,  psi, ori_img_id);
-					mydata.MDbodies[ibody].setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, my_pixel_size * xoff, ori_img_id);
-					mydata.MDbodies[ibody].setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, my_pixel_size * yoff, ori_img_id);
-					if (mymodel.data_dim == 3)
-						mydata.MDbodies[ibody].setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, my_pixel_size * zoff, ori_img_id);
-				}
-			}
-
-		} // end for img_id
+        // For multi-body refinement
+        if (mymodel.nr_bodies > 1)
+        {
+            for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
+            {
+                int icol_rot  = 0 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+                int icol_tilt = 1 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+                int icol_psi  = 2 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+                int icol_xoff = 3 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+                int icol_yoff = 4 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+                int icol_zoff = 5 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+                RFLOAT rot =  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, icol_rot);
+                RFLOAT tilt = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, icol_tilt);
+                RFLOAT psi =  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, icol_psi);
+                RFLOAT xoff = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, icol_xoff);
+                RFLOAT yoff = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, icol_yoff);
+                RFLOAT zoff = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, icol_zoff);
+                mydata.MDbodies[ibody].setValue(EMDL_ORIENT_ROT, rot, part_id);
+                mydata.MDbodies[ibody].setValue(EMDL_ORIENT_TILT, tilt, part_id);
+                mydata.MDbodies[ibody].setValue(EMDL_ORIENT_PSI,  psi, part_id);
+                mydata.MDbodies[ibody].setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, my_pixel_size * xoff, part_id);
+                mydata.MDbodies[ibody].setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, my_pixel_size * yoff, part_id);
+                if (mymodel.data_dim == 3)
+                    mydata.MDbodies[ibody].setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, my_pixel_size * zoff, part_id);
+            }
+        }
 
 	} // end for part_id
 
@@ -9897,6 +9899,9 @@ void MlOptimiser::setMetaDataSubset(long int first_part_id, long int last_part_i
 
 void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int last_part_id, bool do_also_imagedata)
 {
+
+    // TODO!!! passing pre-read imagedata does not yet work for 2D stacks of tomo data....
+    // Also logic of img_id needs checking below....
 
     // In case we're reading images here, only open stacks once and then read multiple images
 	fImageHandler hFile;
@@ -9961,27 +9966,26 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 		for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++, metadata_offset++)
 		{
 
-			long int ori_img_id = mydata.particles[part_id].images[img_id].id;
 			RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, img_id);
 			int my_image_size = mydata.getOpticsImageSize(mydata.getOpticsGroup(part_id, img_id));
 
 			// Get the image names from the MDimg table
 			FileName fn_img="", fn_rec_img="", fn_ctf="";
 			if (!mydata.getImageNameOnScratch(part_id, img_id, fn_img))
-                            mydata.MDimg.getValue(EMDL_IMAGE_NAME, fn_img, ori_img_id);
+                            mydata.MDimg.getValue(EMDL_IMAGE_NAME, fn_img, part_id);
 
 			if (mymodel.data_dim == 3 && do_ctf_correction)
 			{
 				// Also read the CTF image from disc
 				if (!mydata.getImageNameOnScratch(part_id, img_id, fn_ctf, true))
 				{
-					if (!mydata.MDimg.getValue(EMDL_CTF_IMAGE, fn_ctf, ori_img_id))
+					if (!mydata.MDimg.getValue(EMDL_CTF_IMAGE, fn_ctf, part_id))
 						REPORT_ERROR("MlOptimiser::getMetaAndImageDataSubset ERROR: cannot find rlnCtfImage for 3D CTF correction!");
 				}
 			}
 			if (has_converged && do_use_reconstruct_images)
 			{
-				mydata.MDimg.getValue(EMDL_IMAGE_RECONSTRUCT_NAME, fn_rec_img, ori_img_id);
+				mydata.MDimg.getValue(EMDL_IMAGE_RECONSTRUCT_NAME, fn_rec_img, part_id);
 			}
 
 			if (do_also_imagedata)
@@ -10081,42 +10085,42 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 
 			// Now get the metadata
 			int iaux;
-			mydata.MDimg.getValue(EMDL_ORIENT_ROT,  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT), ori_img_id);
-			mydata.MDimg.getValue(EMDL_ORIENT_TILT, DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_TILT), ori_img_id);
-			mydata.MDimg.getValue(EMDL_ORIENT_PSI,  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI), ori_img_id);
+			mydata.MDimg.getValue(EMDL_ORIENT_ROT,  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT), part_id);
+			mydata.MDimg.getValue(EMDL_ORIENT_TILT, DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_TILT), part_id);
+			mydata.MDimg.getValue(EMDL_ORIENT_PSI,  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI), part_id);
 			RFLOAT xoff_A, yoff_A, zoff_A;
-			mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff_A, ori_img_id);
-			mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff_A, ori_img_id);
+			mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff_A, part_id);
+			mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff_A, part_id);
 			DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_XOFF) = xoff_A / my_pixel_size;
 			DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_YOFF) = yoff_A / my_pixel_size;
 			if (mymodel.data_dim == 3)
 			{
-				mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, zoff_A, ori_img_id);
+				mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, zoff_A, part_id);
 				DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ZOFF) = zoff_A / my_pixel_size;
 			}
 
-			mydata.MDimg.getValue(EMDL_PARTICLE_CLASS, iaux, ori_img_id);
+			mydata.MDimg.getValue(EMDL_PARTICLE_CLASS, iaux, part_id);
 			DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CLASS) = (RFLOAT)iaux;
-			mydata.MDimg.getValue(EMDL_PARTICLE_DLL,  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_DLL), ori_img_id);
-			mydata.MDimg.getValue(EMDL_PARTICLE_PMAX, DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PMAX), ori_img_id);
+			mydata.MDimg.getValue(EMDL_PARTICLE_DLL,  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_DLL), part_id);
+			mydata.MDimg.getValue(EMDL_PARTICLE_PMAX, DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PMAX), part_id);
 
 			// 5jul17: we do not need EMDL_PARTICLE_NR_SIGNIFICANT_SAMPLES for calculations. Send randomsubset instead!
 			if (do_split_random_halves)
-				mydata.MDimg.getValue(EMDL_PARTICLE_RANDOM_SUBSET, iaux, ori_img_id);
+				mydata.MDimg.getValue(EMDL_PARTICLE_RANDOM_SUBSET, iaux, part_id);
 			else
-				mydata.MDimg.getValue(EMDL_PARTICLE_NR_SIGNIFICANT_SAMPLES, iaux, ori_img_id);
+				mydata.MDimg.getValue(EMDL_PARTICLE_NR_SIGNIFICANT_SAMPLES, iaux, part_id);
 			DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_NR_SIGN) = (RFLOAT)iaux;
-			if (!mydata.MDimg.getValue(EMDL_IMAGE_NORM_CORRECTION, DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_NORM), ori_img_id))
+			if (!mydata.MDimg.getValue(EMDL_IMAGE_NORM_CORRECTION, DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_NORM), part_id))
 				DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_NORM) = 1.;
 
 			// If the priors are NOT set, then set their values to 999.
-			if (!mydata.MDimg.getValue(EMDL_ORIENT_ROT_PRIOR,  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT_PRIOR), ori_img_id))
+			if (!mydata.MDimg.getValue(EMDL_ORIENT_ROT_PRIOR,  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT_PRIOR), part_id))
 				DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT_PRIOR) = 999.;
-			if (!mydata.MDimg.getValue(EMDL_ORIENT_TILT_PRIOR, DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_TILT_PRIOR), ori_img_id))
+			if (!mydata.MDimg.getValue(EMDL_ORIENT_TILT_PRIOR, DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_TILT_PRIOR), part_id))
 				DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_TILT_PRIOR) = 999.;
-			if (!mydata.MDimg.getValue(EMDL_ORIENT_PSI_PRIOR,  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI_PRIOR), ori_img_id))
+			if (!mydata.MDimg.getValue(EMDL_ORIENT_PSI_PRIOR,  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI_PRIOR), part_id))
 				DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI_PRIOR) = 999.;
-			if (mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_X_PRIOR_ANGSTROM, xoff_A, ori_img_id))
+			if (mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_X_PRIOR_ANGSTROM, xoff_A, part_id))
 			{
 				DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_XOFF_PRIOR) = xoff_A / my_pixel_size;
 			}
@@ -10124,7 +10128,7 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 			{
 				DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_XOFF_PRIOR) = 999.;
 			}
-			if (mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Y_PRIOR_ANGSTROM, yoff_A, ori_img_id))
+			if (mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Y_PRIOR_ANGSTROM, yoff_A, part_id))
 			{
 				DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_YOFF_PRIOR) = yoff_A / my_pixel_size;
 			}
@@ -10134,7 +10138,7 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 			}
 			if (mymodel.data_dim == 3)
 			{
-				if (mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Z_PRIOR_ANGSTROM, zoff_A, ori_img_id))
+				if (mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Z_PRIOR_ANGSTROM, zoff_A, part_id))
 				{
 					DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ZOFF_PRIOR) = zoff_A / my_pixel_size;
 				}
@@ -10143,7 +10147,7 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 					DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ZOFF_PRIOR) = 999.;
 				}
 			}
-			if (!mydata.MDimg.getValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO,  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI_PRIOR_FLIP_RATIO), ori_img_id))
+			if (!mydata.MDimg.getValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO,  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI_PRIOR_FLIP_RATIO), part_id))
 				DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI_PRIOR_FLIP_RATIO) = 999.;
 
 			// The following per-particle parameters are passed around through metadata
@@ -10152,22 +10156,22 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 			{
 				RFLOAT DeltafU, DeltafV, azimuthal_angle, Bfac, kfac, phase_shift;
 
-				if (!mydata.MDimg.getValue(EMDL_CTF_DEFOCUSU, DeltafU, ori_img_id))
+				if (!mydata.MDimg.getValue(EMDL_CTF_DEFOCUSU, DeltafU, part_id))
 					DeltafU=0;
 
-				if (!mydata.MDimg.getValue(EMDL_CTF_DEFOCUSV, DeltafV, ori_img_id))
+				if (!mydata.MDimg.getValue(EMDL_CTF_DEFOCUSV, DeltafV, part_id))
 					DeltafV=DeltafU;
 
-				if (!mydata.MDimg.getValue(EMDL_CTF_DEFOCUS_ANGLE, azimuthal_angle, ori_img_id))
+				if (!mydata.MDimg.getValue(EMDL_CTF_DEFOCUS_ANGLE, azimuthal_angle, part_id))
 					azimuthal_angle=0;
 
-				if (!mydata.MDimg.getValue(EMDL_CTF_BFACTOR, Bfac, ori_img_id))
+				if (!mydata.MDimg.getValue(EMDL_CTF_BFACTOR, Bfac, part_id))
 					Bfac=0.;
 
-				if (!mydata.MDimg.getValue(EMDL_CTF_SCALEFACTOR, kfac, ori_img_id))
+				if (!mydata.MDimg.getValue(EMDL_CTF_SCALEFACTOR, kfac, part_id))
 					kfac=1.;
 
-				if (!mydata.MDimg.getValue(EMDL_CTF_PHASESHIFT, phase_shift, ori_img_id))
+				if (!mydata.MDimg.getValue(EMDL_CTF_PHASESHIFT, phase_shift, part_id))
 					phase_shift=0.;
 
 				DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_U) = DeltafU;
@@ -10191,13 +10195,13 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 					int icol_yoff = 4 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
 					int icol_zoff = 5 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
 					RFLOAT rot, tilt, psi, xoff, yoff, zoff=0.;
-					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ROT, rot, ori_img_id);
-					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_TILT, tilt, ori_img_id);
-					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_PSI,  psi, ori_img_id);
-					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, ori_img_id);
-					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, ori_img_id);
+					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ROT, rot, part_id);
+					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_TILT, tilt, part_id);
+					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_PSI,  psi, part_id);
+					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, part_id);
+					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, part_id);
 					if (mymodel.data_dim == 3)
-						mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, zoff, ori_img_id);
+						mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, zoff, part_id);
 					DIRECT_A2D_ELEM(exp_metadata, metadata_offset, icol_rot)  = rot;
 					DIRECT_A2D_ELEM(exp_metadata, metadata_offset, icol_tilt) = tilt;
 					DIRECT_A2D_ELEM(exp_metadata, metadata_offset, icol_psi)  = psi;

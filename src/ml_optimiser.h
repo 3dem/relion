@@ -40,10 +40,6 @@
 #include "src/helix.h"
 #include "src/local_symmetry.h"
 #include "src/acc/settings.h"
-#include <src/jaz/tomography/tomogram_set.h>
-#include <src/jaz/tomography/tomo_ctf_helper.h>
-#include <src/jaz/tomography/tomogram.h>
-#include <src/jaz/tomography/particle_set.h>
 #include <src/jaz/tomography/optimisation_set.h>
 
 #define ML_SIGNIFICANT_WEIGHT 1.e-8
@@ -151,11 +147,8 @@ public:
 	// Optimiser set table for subtomo
 	MetaDataTable optimisationSet;
 
-    // For relion-4.1 tomogram-processing as 2D stacks
-    TomogramSet tomogramSet;
-    ParticleSet particleSet;
-    // FileName for tomogramSet
-    FileName fn_tomo;
+    // For relion-4.1 tomogram-processing as 2D stacks: filenames for tomogramSet and motionTrajectories
+    FileName fn_tomo, fn_motion;
 
     // Generate a 3D model from 2D particles de novo?
 	bool is_3d_model;
