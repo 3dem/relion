@@ -15,6 +15,12 @@ ParticleSet::ParticleSet()
 
 ParticleSet::ParticleSet(std::string filename, std::string motionFilename, bool verbose)
 {
+    if (!read(filename, motionFilename, verbose))
+        REPORT_ERROR("ERROR: there are no particles in " + filename);
+}
+
+bool ParticleSet::read(std::string filename, std::string motionFilename, bool verbose)
+{
 
     if (genTable.read(filename,"general"))
     {
@@ -30,7 +36,10 @@ ParticleSet::ParticleSet(std::string filename, std::string motionFilename, bool 
 
     optTable.read(filename, "optics");
 	partTable.read(filename, "particles");
-	
+
+    long int pc = partTable.numberOfObjects();
+    if (pc == 0) return false;
+
 	if (!optTable.containsLabel(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE))
 	{
 		REPORT_ERROR("ParticleSet::ParticleSet: "
@@ -79,6 +88,8 @@ ParticleSet::ParticleSet(std::string filename, std::string motionFilename, bool 
 	{
 		motionTrajectories = Trajectory::read(motionFilename, *this);
 	}
+
+    return true;
 }
 
 void ParticleSet::reserve(int particleNumber)

@@ -26,7 +26,8 @@ class ParticleSet
 
 		ParticleSet();
 		ParticleSet(std::string filename, std::string motionFilename = "", bool verbose = true);
-		
+		bool read(std::string filename, std::string motionFilename = "", bool verbose = true);
+
 			MetaDataTable partTable, optTable, genTable;
 
             bool is_stack2d;
