@@ -35,6 +35,7 @@
 /// Reserve large vectors with some reasonable estimate
 // Larger numbers will still be OK, but memory management might suffer
 #define MAX_NR_GROUPS 2000
+using namespace gravis;
 
 ////////////// Hierarchical metadata model
 
@@ -60,7 +61,10 @@ public:
 	// Pre-read array of the image in RAM
 	MultidimArray<float> img;
 
-	// Empty Constructor
+    // Projection matrix for tilt series stacks
+    Matrix2D<RFLOAT> Aproj;
+
+    // Empty Constructor
 	ExpImage() {}
 
 	// Destructor needed for work with vectors
@@ -75,7 +79,7 @@ public:
 		group_id = copy.group_id;
 		optics_group = copy.optics_group;
 		img = copy.img;
-
+        Aproj = copy.Aproj;
 	}
 
 	// Define assignment operator in terms of the copy constructor
@@ -88,6 +92,7 @@ public:
 		group_id = copy.group_id;
 		optics_group = copy.optics_group;
 		img = copy.img;
+        Aproj = copy.Aproj;
 		return *this;
 	}
 };
@@ -288,6 +293,9 @@ public:
 	// Get the pixel size for the N-th image of this particle
 	RFLOAT getImagePixelSize(long int part_id, int img_id);
 
+    // Get the rotation matrix for Nth image of the subtomo particle
+    Matrix2D<RFLOAT> getRotationMatrix(long int part_id, int img_id);
+
 	// Get the vector of number of images per group_id
 	void getNumberOfImagesPerGroup(std::vector<long int> &nr_particles_per_group, int random_subset = 0);
 
@@ -304,7 +312,7 @@ public:
 	void addParticle(int random_subset = 0, int tomogram_id = 0);
 
  	// Add an image to the given particle
-	void addImageToParticle(std::string img_name, long int part_id, long int group_id, int optics_group);
+	void addImageToParticle(std::string img_name, long int part_id, long int group_id, int optics_group, d4Matrix *Aproj = NULL);
 
 	// Add a group
 	long int addGroup(std::string mic_name, int optics_group);

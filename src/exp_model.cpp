@@ -19,6 +19,7 @@
  ***************************************************************************/
 #include "src/exp_model.h"
 #include <sys/statvfs.h>
+using namespace gravis;
 
 long int Experiment::numberOfParticles(int random_subset)
 {
@@ -85,6 +86,11 @@ RFLOAT Experiment::getImagePixelSize(long int part_id, int img_id)
 {
 	int optics_group = particles[part_id].images[img_id].optics_group;
 	return obsModel.getPixelSize(optics_group);
+}
+
+Matrix2D<RFLOAT> Experiment::getRotationMatrix(long int part_id, int img_id)
+{
+    return particles[part_id].images[img_id].Aproj;
 }
 
 void Experiment::getNumberOfImagesPerGroup(std::vector<long int> &nr_particles_per_group, int random_subset)
@@ -157,7 +163,7 @@ void Experiment::addParticle(int random_subset, int tomogram_id)
 	return;
 }
 
-void Experiment::addImageToParticle(std::string img_name, long int part_id, long int group_id, int optics_group)
+void Experiment::addImageToParticle(std::string img_name, long int part_id, long int group_id, int optics_group, d4Matrix *Aproj)
 {
 	if (group_id >= groups.size())
 		REPORT_ERROR("Experiment::addImageToParticle: group_id out of range");
@@ -165,11 +171,24 @@ void Experiment::addImageToParticle(std::string img_name, long int part_id, long
 	if (optics_group >= obsModel.numberOfOpticsGroups())
 		REPORT_ERROR("Experiment::addImageToParticle: optics_group out of range");
 
+    Matrix2D<RFLOAT> A(3,3);
+    if (Aproj == NULL)
+    {
+        A.initIdentity();
+    }
+    else
+    {
+        for (int i = 0; i < 3; i++)
+            for (int j = 0; j < 3; j++)
+                A(i, j) = (*Aproj)(i, j);
+    }
+
 	ExpImage img;
 	img.name = img_name;
 	img.particle_id = part_id;
 	img.group_id = group_id;
 	img.optics_group = optics_group;
+    img.Aproj = A;
     nr_images_per_optics_group[optics_group]++;
 	img.optics_group_id = nr_images_per_optics_group[optics_group] - 1;
 
@@ -827,6 +846,9 @@ void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
 		// allocate 1 block of memory
 		particles.reserve(MDimg.numberOfObjects());
 
+        Tomogram tomogram;
+        FileName prev_tomo_name = "";
+
 		// Now Loop over all objects in the metadata file and fill the logical tree of the experiment
 		for (long int part_id = 0; part_id < MDimg.numberOfObjects(); part_id++)
 		{
@@ -903,15 +925,29 @@ void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
                 std::string tomo_name = MDimg.getString(EMDL_TOMO_NAME, part_id);
                 int tomo_id = tomogramSet.getTomogramIndex(tomo_name);
 
+                if (tomo_name != prev_tomo_name)
+                {
+                    tomogram = tomogramSet.loadTomogram(tomo_id, false);
+                    prev_tomo_name = tomo_name;
+                }
+
                 // Add this particle to the Experiment, with its tomogram
                 addParticle(my_random_subset, tomo_id);
+
+                // Pre-orientation of this particle in the tomogram
+                ParticleIndex id(part_id);
+                d3Matrix A = particleSet.getSubtomogramMatrix(id);
 
                 // Add all images for this particle
                 const int fc = tomogramSet.getFrameCount(tomo_id);
                 for (int f = 0; f < fc; f++)
                 {
+
+                    d4Matrix P = tomogram.projectionMatrices[f] * d4Matrix(A);
+
                     FileName my_name = integerToString(f) + "@" + img_name;
-                    addImageToParticle(img_name, part_id, group_id, optics_group);
+
+                    addImageToParticle(img_name, part_id, group_id, optics_group, &P);
                 }
 
             }
