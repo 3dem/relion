@@ -962,7 +962,7 @@ __global__ void cuda_kernel_allweights_to_mweights(
 {
 	size_t idx = blockIdx.x * block_size + threadIdx.x;
 	if (idx < orientation_num*translation_num)
-		d_mweights[d_iorient[idx/translation_num] * translation_num + idx%translation_num] =
+		d_mweights[d_iorient[idx/translation_num] * translation_num + idx%translation_num] +=
 				d_allweights[idx/translation_num * translation_num + idx%translation_num];
                 // TODO - isn't this just d_allweights[idx + idx%translation_num]?   Really?
 }

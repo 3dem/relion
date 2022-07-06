@@ -1118,6 +1118,7 @@ void getAllSquaredDifferencesCoarse(
 		buildCorrImage(baseMLO,op,corr_img,img_id,group_id);
 		corr_img.cpToDevice();
 
+        // REPORT_ERROR("TODO: Dari needs to write a function to add op.highres_Xi2_img[img_id] / 2. to all Weights, not initialise again!");
 		deviceInitValue<XFLOAT>(allWeights, (XFLOAT) (op.highres_Xi2_img[img_id] / 2.));
 		allWeights_pos = 0;
 
@@ -1158,10 +1159,11 @@ void getAllSquaredDifferencesCoarse(
 						do_CC,
 						accMLO->dataIs3D);
 
+                if (accMLO->mydata.is_tomo) REPORT_ERROR("ERROR: TODO: think about img_id* multiplication below... I added += instead of = in the GPU and CPU kernels below!!!");
 				mapAllWeightsToMweights(
 						~projectorPlans[iclass].iorientclasses,
 						&(~allWeights)[allWeights_pos],
-						&(~Mweight)[img_id*weightsPerPart],
+						&(~Mweight)[weightsPerPart],
 						projectorPlans[iclass].orientation_num,
 						translation_num,
 						accMLO->classStreams[iclass]
@@ -1179,9 +1181,9 @@ void getAllSquaredDifferencesCoarse(
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread)); // does not appear to be NEEDED FOR NON-BLOCKING CLASS STREAMS in tests, but should be to sync against classStreams
 
-		op.min_diff2[img_id] = AccUtilities::getMinOnDevice<XFLOAT>(allWeights);
-
 	} // end loop img_id
+
+    op.min_diff2 = AccUtilities::getMinOnDevice<XFLOAT>(allWeights);
 
 #ifdef TIMING
 	if (op.part_id == baseMLO->exp_my_first_part_id)
@@ -1199,12 +1201,12 @@ void getAllSquaredDifferencesFine(
 	SamplingParameters &sp,
 	MlOptimiser *baseMLO,
 	MlClass *accMLO,
-	std::vector<IndexedDataArray > &FinePassWeights,
-	std::vector<std::vector< IndexedDataArrayMask > > &FPCMasks,
+	IndexedDataArray &FinePassWeights,
+	std::vector< IndexedDataArrayMask > &FPCMasks,
 	std::vector<ProjectionParams> &FineProjectionData,
 	AccPtrFactory ptrFactory,
 	int ibody,
-	std::vector<AccPtrBundle > &bundleD2)
+	AccPtrBundle &bundleD2)
 {
 #ifdef TIMING
 	if (op.part_id == baseMLO->exp_my_first_part_id)
@@ -1283,7 +1285,8 @@ void getAllSquaredDifferencesFine(
 
 				if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
 				{
-					RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
+                    if (baseMLO->mydata.is_tomo) REPORT_ERROR("ERROR; TODO: think about the below for 2D shifts in stacks...");
+                    RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
 					RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT);
 					RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_PSI);
 					transformCartesianAndHelicalCoords(xshift, yshift, zshift, xshift, yshift, zshift, rot_deg, tilt_deg, psi_deg, (accMLO->dataIs3D) ? (3) : (2), HELICAL_TO_CART_COORDS);
@@ -1350,7 +1353,7 @@ void getAllSquaredDifferencesFine(
 
 		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
-			FPCMasks[img_id][exp_iclass].weightNum=0;
+			FPCMasks[exp_iclass].weightNum=0;
 
 			if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FineProjectionData[img_id].class_entries[exp_iclass] > 0) )
 			{
@@ -1371,8 +1374,8 @@ void getAllSquaredDifferencesFine(
 				long int nr_over_orient = baseMLO->sampling.oversamplingFactorOrientations(sp.current_oversampling);
 				long int nr_over_trans = baseMLO->sampling.oversamplingFactorTranslations(sp.current_oversampling);
 				// Prepare the mask of the weight-array for this class
-				if (FPCMasks[img_id][exp_iclass].weightNum==0)
-					FPCMasks[img_id][exp_iclass].firstPos = newDataSize;
+				if (FPCMasks[exp_iclass].weightNum==0)
+					FPCMasks[exp_iclass].firstPos = newDataSize;
 
 				long unsigned ihidden(0);
 				std::vector< long unsigned > iover_transes, ihiddens;
@@ -1400,19 +1403,19 @@ void getAllSquaredDifferencesFine(
 														thisClassProjectionData,
 														iover_transes, ihiddens,
 														nr_over_orient, nr_over_trans, img_id,
-														FinePassWeights[img_id],
-														FPCMasks[img_id][exp_iclass],   // ..and output into index-arrays mask...
+														FinePassWeights,
+														FPCMasks[exp_iclass],   // ..and output into index-arrays mask...
 														chunkSize);                    // ..based on a given maximum chunk-size
 
 				// extend size by number of significants found this class
 				newDataSize += significant_num;
-				FPCMasks[img_id][exp_iclass].weightNum = significant_num;
-				FPCMasks[img_id][exp_iclass].lastPos = FPCMasks[img_id][exp_iclass].firstPos + significant_num;
+				FPCMasks[exp_iclass].weightNum = significant_num;
+				FPCMasks[exp_iclass].lastPos = FPCMasks[exp_iclass].firstPos + significant_num;
 				CTOC(accMLO->timer,"pair_list_1");
 
 				CTIC(accMLO->timer,"IndexedArrayMemCp2");
-				bundleD2[img_id].pack(FPCMasks[img_id][exp_iclass].jobOrigin);
-				bundleD2[img_id].pack(FPCMasks[img_id][exp_iclass].jobExtent);
+				bundleD2.pack(FPCMasks[exp_iclass].jobOrigin);
+				bundleD2.pack(FPCMasks[exp_iclass].jobExtent);
 				CTOC(accMLO->timer,"IndexedArrayMemCp2");
 
 				Matrix2D<RFLOAT> MBL, MBR;
@@ -1456,12 +1459,12 @@ void getAllSquaredDifferencesFine(
 			}
 		}
 
-		bundleD2[img_id].cpToDevice();
+		bundleD2.cpToDevice();
 		AllEulers.cpToDevice();
 
-		FinePassWeights[img_id].rot_id.cpToDevice(); //FIXME this is not used
-		FinePassWeights[img_id].rot_idx.cpToDevice();
-		FinePassWeights[img_id].trans_idx.cpToDevice();
+		FinePassWeights.rot_id.cpToDevice(); //FIXME this is not used
+		FinePassWeights.rot_idx.cpToDevice();
+		FinePassWeights.trans_idx.cpToDevice();
 
 		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
@@ -1479,7 +1482,7 @@ void getAllSquaredDifferencesFine(
 				if(orientation_num==0)
 					continue;
 
-				long unsigned significant_num(FPCMasks[img_id][iclass].weightNum);
+				long unsigned significant_num(FPCMasks[iclass].weightNum);
 				if(significant_num==0)
 					continue;
 
@@ -1493,7 +1496,7 @@ void getAllSquaredDifferencesFine(
 				CTOC(accMLO->timer,"Diff2MakeKernel");
 
 				// Use the constructed mask to construct a partial class-specific input
-				IndexedDataArray thisClassFinePassWeights(FinePassWeights[img_id],FPCMasks[img_id][iclass]);
+				IndexedDataArray thisClassFinePassWeights(FinePassWeights,FPCMasks[iclass]);
 
 				CTIC(accMLO->timer,"Diff2CALL");
 
@@ -1509,8 +1512,8 @@ void getAllSquaredDifferencesFine(
 						~thisClassFinePassWeights.rot_id,
 						~thisClassFinePassWeights.rot_idx,
 						~thisClassFinePassWeights.trans_idx,
-						~FPCMasks[img_id][iclass].jobOrigin,
-						~FPCMasks[img_id][iclass].jobExtent,
+						~FPCMasks[iclass].jobOrigin,
+						~FPCMasks[iclass].jobExtent,
 						~thisClassFinePassWeights.weights,
 						op,
 						baseMLO,
@@ -1521,7 +1524,7 @@ void getAllSquaredDifferencesFine(
 						img_id,
 						iclass,
 						accMLO->classStreams[iclass],
-						FPCMasks[img_id][iclass].jobOrigin.getSize(),
+						FPCMasks[iclass].jobOrigin.getSize(),
 						((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc),
 						accMLO->dataIs3D
 						);
@@ -1536,17 +1539,19 @@ void getAllSquaredDifferencesFine(
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
-		FinePassWeights[img_id].setDataSize( newDataSize );
-
-		CTIC(accMLO->timer,"collect_data_1");
-		if(baseMLO->adaptive_oversampling!=0)
-		{
-			op.min_diff2[img_id] = (RFLOAT) AccUtilities::getMinOnDevice<XFLOAT>(FinePassWeights[img_id].weights);
-		}
-		CTOC(accMLO->timer,"collect_data_1");
-//		std::cerr << "  fine pass minweight  =  " << op.min_diff2[img_id] << std::endl;
+		FinePassWeights.setDataSize( newDataSize );
 
 	}// end loop img_id
+
+    CTIC(accMLO->timer,"collect_data_1");
+    // SHWS6July2022: only search for smallest diff2 after all img_id have been summed
+    if(baseMLO->adaptive_oversampling!=0)
+    {
+        op.min_diff2 = (RFLOAT) AccUtilities::getMinOnDevice<XFLOAT>(FinePassWeights.weights);
+    }
+    CTOC(accMLO->timer,"collect_data_1");
+//		std::cerr << "  fine pass minweight  =  " << op.min_diff2[img_id] << std::endl;
+
 #ifdef TIMING
 	if (op.part_id == baseMLO->exp_my_first_part_id)
 		baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2);
@@ -1562,8 +1567,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 											SamplingParameters &sp,
 											MlOptimiser *baseMLO,
 											MlClass *accMLO,
-											std::vector< IndexedDataArray > &PassWeights,
-											std::vector< std::vector< IndexedDataArrayMask > > &FPCMasks,
+											IndexedDataArray &PassWeights,
+											std::vector< IndexedDataArrayMask > &FPCMasks,
 											AccPtr<XFLOAT> &Mweight, // FPCMasks = Fine-Pass Class-Masks
 											AccPtrFactory ptrFactory,
 											int ibody)
@@ -1619,481 +1624,472 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 	if(exp_ipass==0 || baseMLO->adaptive_oversampling!=0)
 	{
-		op.sum_weight.clear();
-		op.sum_weight.resize(sp.nr_images, (RFLOAT)(sp.nr_images));
-		op.max_weight.clear();
-		op.max_weight.resize(sp.nr_images, (RFLOAT)-1);
+		op.sum_weight = 0.;
+		op.max_weight = (RFLOAT)-1.;
 	}
 
 	if (exp_ipass==0)
-		op.Mcoarse_significant.resizeNoCp(1,1,sp.nr_images, XSIZE(op.Mweight));
+		op.Mcoarse_significant.resizeNoCp(1,1,1, XSIZE(op.Mweight));
 
 	XFLOAT my_significant_weight;
-	op.significant_weight.clear();
-	op.significant_weight.resize(sp.nr_images, 0.);
+	op.significant_weight = 0.;
 
-	// loop over all images inside this particle
-	for (int img_id = 0; img_id < sp.nr_images; img_id++)
-	{
-		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
+    RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, 0);
 
-		RFLOAT old_offset_x, old_offset_y, old_offset_z;
+    RFLOAT old_offset_x, old_offset_y, old_offset_z;
 
-		if (baseMLO->mymodel.nr_bodies > 1)
-		{
-			old_offset_x = old_offset_y = old_offset_z = 0.;
-		}
-		else
-		{
-			old_offset_x = XX(op.old_offset[img_id]);
-			old_offset_y = YY(op.old_offset[img_id]);
-			if (accMLO->dataIs3D)
-				old_offset_z = ZZ(op.old_offset[img_id]);
-		}
+    if (baseMLO->mymodel.nr_bodies > 1)
+    {
+        old_offset_x = old_offset_y = old_offset_z = 0.;
+    }
+    else
+    {
+        old_offset_x = XX(op.old_offset);
+        old_offset_y = YY(op.old_offset);
+        if (accMLO->dataIs3D)
+            old_offset_z = ZZ(op.old_offset);
+    }
 
-		if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
-		{
-			if(exp_ipass==0)
-			{
-				int nr_coarse_weights = (sp.iclass_max-sp.iclass_min+1)*sp.nr_images * sp.nr_dir * sp.nr_psi * sp.nr_trans;
-				PassWeights[img_id].weights.setAccPtr(&(~Mweight)[img_id*nr_coarse_weights]);
-				PassWeights[img_id].weights.setHostPtr(&Mweight[img_id*nr_coarse_weights]);
-				PassWeights[img_id].weights.setSize(nr_coarse_weights);
-			}
-			PassWeights[img_id].weights.doFreeHost=false;
+    if ((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
+    {
+        if(exp_ipass==0)
+        {
+            int nr_coarse_weights = (sp.iclass_max-sp.iclass_min+1)*sp.nr_images * sp.nr_dir * sp.nr_psi * sp.nr_trans;
+            PassWeights.weights.setAccPtr(&(~Mweight)[nr_coarse_weights]);
+            PassWeights.weights.setHostPtr(&Mweight[nr_coarse_weights]);
+            PassWeights.weights.setSize(nr_coarse_weights);
+        }
+        PassWeights.weights.doFreeHost=false;
 
-			std::pair<size_t, XFLOAT> min_pair=AccUtilities::getArgMinOnDevice<XFLOAT>(PassWeights[img_id].weights);
-			PassWeights[img_id].weights.cpToHost();
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
+        std::pair<size_t, XFLOAT> min_pair=AccUtilities::getArgMinOnDevice<XFLOAT>(PassWeights.weights);
+        PassWeights.weights.cpToHost();
+        DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
-			//Set all device-located weights to zero, and only the smallest one to 1.
+        //Set all device-located weights to zero, and only the smallest one to 1.
 #ifdef _CUDA_ENABLED
-			DEBUG_HANDLE_ERROR(cudaMemsetAsync(~(PassWeights[img_id].weights), 0.f, PassWeights[img_id].weights.getSize()*sizeof(XFLOAT),0));
+        DEBUG_HANDLE_ERROR(cudaMemsetAsync(~(PassWeights.weights), 0.f, PassWeights.weights.getSize()*sizeof(XFLOAT),0));
 
-			XFLOAT unity=1;
-			DEBUG_HANDLE_ERROR(cudaMemcpyAsync( &(PassWeights[img_id].weights(min_pair.first) ), &unity, sizeof(XFLOAT), cudaMemcpyHostToDevice, 0));
+        XFLOAT unity=1;
+        DEBUG_HANDLE_ERROR(cudaMemcpyAsync( &(PassWeights.weights(min_pair.first) ), &unity, sizeof(XFLOAT), cudaMemcpyHostToDevice, 0));
 
-			PassWeights[img_id].weights.cpToHost();
-			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
+        PassWeights.weights.cpToHost();
+        DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 #else
-			deviceInitValue<XFLOAT>(PassWeights[img_id].weights, (XFLOAT)0.0);
-			PassWeights[img_id].weights[min_pair.first] = (XFLOAT)1.0;
+        deviceInitValue<XFLOAT>(PassWeights[img_id].weights, (XFLOAT)0.0);
+        PassWeights[img_id].weights[min_pair.first] = (XFLOAT)1.0;
 #endif
 
-			my_significant_weight = 0.999;
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_NR_SIGN) = (RFLOAT) 1.;
-			if (exp_ipass==0) // TODO better memset, 0 => false , 1 => true
-				for (int ihidden = 0; ihidden < XSIZE(op.Mcoarse_significant); ihidden++)
-					if (DIRECT_A2D_ELEM(op.Mweight, img_id, ihidden) >= my_significant_weight)
-						DIRECT_A2D_ELEM(op.Mcoarse_significant, img_id, ihidden) = true;
-					else
-						DIRECT_A2D_ELEM(op.Mcoarse_significant, img_id, ihidden) = false;
-			else
-			{
-				std::pair<size_t, XFLOAT> max_pair = AccUtilities::getArgMaxOnDevice<XFLOAT>(PassWeights[img_id].weights);
-				op.max_index[img_id].fineIdx = PassWeights[img_id].ihidden_overs[max_pair.first];
-				op.max_weight[img_id] = max_pair.second;
-			}
+        my_significant_weight = 0.999;
+        DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_NR_SIGN) = (RFLOAT) 1.;
+        if (exp_ipass==0) // TODO better memset, 0 => false , 1 => true
+            for (int ihidden = 0; ihidden < XSIZE(op.Mcoarse_significant); ihidden++)
+                if (DIRECT_A1D_ELEM(op.Mweight, ihidden) >= my_significant_weight)
+                    DIRECT_A1D_ELEM(op.Mcoarse_significant, ihidden) = true;
+                else
+                    DIRECT_A1D_ELEM(op.Mcoarse_significant, ihidden) = false;
+        else
+        {
+            std::pair<size_t, XFLOAT> max_pair = AccUtilities::getArgMaxOnDevice<XFLOAT>(PassWeights.weights);
+            op.max_index.fineIdx = PassWeights.ihidden_overs[max_pair.first];
+            op.max_weight = max_pair.second;
+        }
 
-		}
-		else
-		{
-
-
-			long int sumRedSize=0;
-			for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-				sumRedSize+= (exp_ipass==0) ? ceilf((float)(sp.nr_dir*sp.nr_psi)/(float)SUMW_BLOCK_SIZE) : ceil((float)FPCMasks[img_id][exp_iclass].jobNum / (float)SUMW_BLOCK_SIZE);
-
-			// loop through making translational priors for all classes this img_id - then copy all at once - then loop through kernel calls ( TODO: group kernel calls into one big kernel)
-			CTIC(accMLO->timer,"get_offset_priors");
-
-			for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-			{
-				RFLOAT myprior_x, myprior_y, myprior_z;
-				if (baseMLO->mymodel.nr_bodies > 1)
-				{
-					myprior_x = myprior_y = myprior_z = 0.;
-				}
-				else if (baseMLO->mymodel.ref_dim == 2 && !baseMLO->do_helical_refine)
-				{
-					myprior_x = XX(baseMLO->mymodel.prior_offset_class[exp_iclass]);
-					myprior_y = YY(baseMLO->mymodel.prior_offset_class[exp_iclass]);
-				}
-				else
-				{
-					myprior_x = XX(op.prior[img_id]);
-					myprior_y = YY(op.prior[img_id]);
-					if (accMLO->dataIs3D)
-						myprior_z = ZZ(op.prior[img_id]);
-				}
-
-				for (unsigned long itrans = sp.itrans_min; itrans <= sp.itrans_max; itrans++)
-				{
-
-					// If it is doing helical refinement AND Cartesian vector myprior has a length > 0, transform the vector to its helical coordinates
-					if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry))
-					{
-						RFLOAT mypriors_len2 = myprior_x * myprior_x + myprior_y * myprior_y;
-						if (accMLO->dataIs3D)
-							mypriors_len2 += myprior_z * myprior_z;
-
-						if (mypriors_len2 > 0.00001)
-						{
-							RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
-							RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT);
-							RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_PSI);
-							transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, rot_deg, tilt_deg, psi_deg, (accMLO->dataIs3D) ? (3) : (2), CART_TO_HELICAL_COORDS);
-						}
-					}
-					// (For helical refinement) Now offset, old_offset, sampling.translations and myprior are all in helical coordinates
-
-					// To speed things up, only calculate pdf_offset at the coarse sampling.
-					// That should not matter much, and that way one does not need to calculate all the OversampledTranslations
-					double pdf(0), pdf_zeros(0);
-					RFLOAT offset_x = old_offset_x + baseMLO->sampling.translations_x[itrans];
-					RFLOAT offset_y = old_offset_y + baseMLO->sampling.translations_y[itrans];
-					double tdiff2 = 0.;
-
-					if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) || (accMLO->dataIs3D) )
-						tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x);
-					tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y);
-					if (accMLO->dataIs3D)
-					{
-						RFLOAT offset_z = old_offset_z + baseMLO->sampling.translations_z[itrans];
-						if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) )
-							tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z);
-					}
-
-					// As of version 3.1, sigma_offsets are in Angstroms!
-					tdiff2 *= my_pixel_size * my_pixel_size;
-
-					// P(offset|sigma2_offset)
-					// This is the probability of the offset, given the model offset and variance.
-					if (my_sigma2_offset < 0.0001)
-					{
-						pdf_zeros = tdiff2 > 0.;
-						pdf = pdf_zeros ? 0. : 1.;
-
-					}
-					else
-					{
-						pdf_zeros = false;
-						pdf = tdiff2 / (-2. * my_sigma2_offset);
-					}
-
-					pdf_offset_zeros[(exp_iclass-sp.iclass_min)*sp.nr_trans + itrans] = pdf_zeros;
-					pdf_offset     [(exp_iclass-sp.iclass_min)*sp.nr_trans + itrans] = pdf;
-				}
-			}
-
-			pdf_offset_zeros.cpToDevice();
-			pdf_offset.cpToDevice();
-
-			CTOC(accMLO->timer,"get_offset_priors");
-			CTIC(accMLO->timer,"sumweight1");
-
-			if(exp_ipass==0)
-			{
-				AccPtr<XFLOAT>  ipartMweight(
-						Mweight,
-						img_id * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min,
-						(sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans);
-
-				pdf_offset.streamSync();
-
-				AccUtilities::kernel_weights_exponent_coarse(
-						sp.iclass_max-sp.iclass_min+1,
-						pdf_orientation,
-						pdf_orientation_zeros,
-						pdf_offset,
-						pdf_offset_zeros,
-						ipartMweight,
-						(XFLOAT)op.min_diff2[img_id],
-						sp.nr_dir*sp.nr_psi,
-						sp.nr_trans);
+    }
+    else
+    {
 
 
-				XFLOAT weights_max = AccUtilities::getMaxOnDevice<XFLOAT>(ipartMweight);
+        long int sumRedSize=0;
+        for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+            sumRedSize+= (exp_ipass==0) ? ceilf((float)(sp.nr_dir*sp.nr_psi)/(float)SUMW_BLOCK_SIZE) : ceil((float)FPCMasks[exp_iclass].jobNum / (float)SUMW_BLOCK_SIZE);
 
-				/*
-				 * Add 50 since we want to stay away from e^88, which approaches the single precision limit.
-				 * We still want as high numbers as possible to utilize most of the single precision span.
-				 * Dari - 201710
-				*/
-				AccUtilities::kernel_exponentiate( ipartMweight, 50 - weights_max);
+        // loop through making translational priors for all classes this img_id - then copy all at once - then loop through kernel calls ( TODO: group kernel calls into one big kernel)
+        CTIC(accMLO->timer,"get_offset_priors");
 
-				CTIC(accMLO->timer,"sort");
-				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
+        for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+        {
+            RFLOAT myprior_x, myprior_y, myprior_z;
+            if (baseMLO->mymodel.nr_bodies > 1)
+            {
+                myprior_x = myprior_y = myprior_z = 0.;
+            }
+            else if (baseMLO->mymodel.ref_dim == 2 && !baseMLO->do_helical_refine)
+            {
+                myprior_x = XX(baseMLO->mymodel.prior_offset_class[exp_iclass]);
+                myprior_y = YY(baseMLO->mymodel.prior_offset_class[exp_iclass]);
+            }
+            else
+            {
+                myprior_x = XX(op.prior);
+                myprior_y = YY(op.prior);
+                if (accMLO->dataIs3D)
+                    myprior_z = ZZ(op.prior);
+            }
 
-				unsigned long ipart_length = (sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans;
-				size_t offset = img_id * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min;
+            for (unsigned long itrans = sp.itrans_min; itrans <= sp.itrans_max; itrans++)
+            {
 
-				if (ipart_length > 1)
-				{
-					//Wrap the current ipart data in a new pointer
-					AccPtr<XFLOAT> unsorted_ipart(
-							Mweight,
-							offset,
-							ipart_length);
+                // If it is doing helical refinement AND Cartesian vector myprior has a length > 0, transform the vector to its helical coordinates
+                if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry))
+                {
+                    RFLOAT mypriors_len2 = myprior_x * myprior_x + myprior_y * myprior_y;
+                    if (accMLO->dataIs3D)
+                        mypriors_len2 += myprior_z * myprior_z;
 
-					AccPtr<XFLOAT> filtered = ptrFactory.make<XFLOAT>((size_t)unsorted_ipart.getSize());
+                    if (mypriors_len2 > 0.00001)
+                    {
+                        RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
+                        RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT);
+                        RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_PSI);
+                        transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, rot_deg, tilt_deg, psi_deg, (accMLO->dataIs3D) ? (3) : (2), CART_TO_HELICAL_COORDS);
+                    }
+                }
+                // (For helical refinement) Now offset, old_offset, sampling.translations and myprior are all in helical coordinates
 
-					CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_SORTSUM");
+                // To speed things up, only calculate pdf_offset at the coarse sampling.
+                // That should not matter much, and that way one does not need to calculate all the OversampledTranslations
+                double pdf(0), pdf_zeros(0);
+                RFLOAT offset_x = old_offset_x + baseMLO->sampling.translations_x[itrans];
+                RFLOAT offset_y = old_offset_y + baseMLO->sampling.translations_y[itrans];
+                double tdiff2 = 0.;
 
-					filtered.deviceAlloc();
+                if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) || (accMLO->dataIs3D) )
+                    tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x);
+                tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y);
+                if (accMLO->dataIs3D)
+                {
+                    RFLOAT offset_z = old_offset_z + baseMLO->sampling.translations_z[itrans];
+                    if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) )
+                        tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z);
+                }
+
+                // As of version 3.1, sigma_offsets are in Angstroms!
+                tdiff2 *= my_pixel_size * my_pixel_size;
+
+                // P(offset|sigma2_offset)
+                // This is the probability of the offset, given the model offset and variance.
+                if (my_sigma2_offset < 0.0001)
+                {
+                    pdf_zeros = tdiff2 > 0.;
+                    pdf = pdf_zeros ? 0. : 1.;
+
+                }
+                else
+                {
+                    pdf_zeros = false;
+                    pdf = tdiff2 / (-2. * my_sigma2_offset);
+                }
+
+                pdf_offset_zeros[(exp_iclass-sp.iclass_min)*sp.nr_trans + itrans] = pdf_zeros;
+                pdf_offset     [(exp_iclass-sp.iclass_min)*sp.nr_trans + itrans] = pdf;
+            }
+        }
+
+        pdf_offset_zeros.cpToDevice();
+        pdf_offset.cpToDevice();
+
+        CTOC(accMLO->timer,"get_offset_priors");
+        CTIC(accMLO->timer,"sumweight1");
+
+        if(exp_ipass==0)
+        {
+            AccPtr<XFLOAT>  ipartMweight(
+                    Mweight, sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min,
+                    (sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans);
+
+            pdf_offset.streamSync();
+
+            AccUtilities::kernel_weights_exponent_coarse(
+                    sp.iclass_max-sp.iclass_min+1,
+                    pdf_orientation,
+                    pdf_orientation_zeros,
+                    pdf_offset,
+                    pdf_offset_zeros,
+                    ipartMweight,
+                    (XFLOAT)op.min_diff2,
+                    sp.nr_dir*sp.nr_psi,
+                    sp.nr_trans);
+
+
+            XFLOAT weights_max = AccUtilities::getMaxOnDevice<XFLOAT>(ipartMweight);
+
+            /*
+             * Add 50 since we want to stay away from e^88, which approaches the single precision limit.
+             * We still want as high numbers as possible to utilize most of the single precision span.
+             * Dari - 201710
+            */
+            AccUtilities::kernel_exponentiate( ipartMweight, 50 - weights_max);
+
+            CTIC(accMLO->timer,"sort");
+            DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
+
+            unsigned long ipart_length = (sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans;
+            size_t offset = sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min;
+
+            if (ipart_length > 1)
+            {
+                //Wrap the current ipart data in a new pointer
+                AccPtr<XFLOAT> unsorted_ipart(
+                        Mweight,
+                        offset,
+                        ipart_length);
+
+                AccPtr<XFLOAT> filtered = ptrFactory.make<XFLOAT>((size_t)unsorted_ipart.getSize());
+
+                CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_SORTSUM");
+
+                filtered.deviceAlloc();
 
 #ifdef DEBUG_CUDA
-					if (unsorted_ipart.getSize()==0)
-						ACC_PTR_DEBUG_FATAL("Unsorted array size zero.\n");  // Hopefully Impossible
+                if (unsorted_ipart.getSize()==0)
+                    ACC_PTR_DEBUG_FATAL("Unsorted array size zero.\n");  // Hopefully Impossible
 #endif
-					size_t filteredSize = AccUtilities::filterGreaterZeroOnDevice<XFLOAT>(unsorted_ipart, filtered);
+                size_t filteredSize = AccUtilities::filterGreaterZeroOnDevice<XFLOAT>(unsorted_ipart, filtered);
 
-					if (filteredSize == 0)
-					{
-						std::cerr << std::endl;
-						std::cerr << " fn_img= " << sp.current_img << std::endl;
-						std::cerr << " img_id= " << img_id << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
-						std::cerr << " min_diff2= " << op.min_diff2[img_id] << std::endl;
+                if (filteredSize == 0)
+                {
+                    std::cerr << std::endl;
+                    std::cerr << " fn_img= " << sp.current_img << std::endl;
+                    std::cerr " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
+                    std::cerr << " min_diff2= " << op.min_diff2 << std::endl;
 
-						pdf_orientation.dumpAccToFile("error_dump_pdf_orientation");
-						pdf_offset.dumpAccToFile("error_dump_pdf_offset");
-						unsorted_ipart.dumpAccToFile("error_dump_filtered");
+                    pdf_orientation.dumpAccToFile("error_dump_pdf_orientation");
+                    pdf_offset.dumpAccToFile("error_dump_pdf_offset");
+                    unsorted_ipart.dumpAccToFile("error_dump_filtered");
 
-						std::cerr << "Dumped data: error_dump_pdf_orientation, error_dump_pdf_orientation and error_dump_unsorted." << std::endl;
+                    std::cerr << "Dumped data: error_dump_pdf_orientation, error_dump_pdf_orientation and error_dump_unsorted." << std::endl;
 
-						CRITICAL(ERRFILTEREDZERO); // "filteredSize == 0"
-					}
-					filtered.setSize(filteredSize);
+                    CRITICAL(ERRFILTEREDZERO); // "filteredSize == 0"
+                }
+                filtered.setSize(filteredSize);
 
-					AccPtr<XFLOAT> sorted =         ptrFactory.make<XFLOAT>((size_t)filteredSize);
-					AccPtr<XFLOAT> cumulative_sum = ptrFactory.make<XFLOAT>((size_t)filteredSize);
+                AccPtr<XFLOAT> sorted =         ptrFactory.make<XFLOAT>((size_t)filteredSize);
+                AccPtr<XFLOAT> cumulative_sum = ptrFactory.make<XFLOAT>((size_t)filteredSize);
 
-					sorted.accAlloc();
-					cumulative_sum.accAlloc();
+                sorted.accAlloc();
+                cumulative_sum.accAlloc();
 
-					AccUtilities::sortOnDevice<XFLOAT>(filtered, sorted);
-					AccUtilities::scanOnDevice<XFLOAT>(sorted, cumulative_sum);
+                AccUtilities::sortOnDevice<XFLOAT>(filtered, sorted);
+                AccUtilities::scanOnDevice<XFLOAT>(sorted, cumulative_sum);
 
-					CTOC(accMLO->timer,"sort");
+                CTOC(accMLO->timer,"sort");
 
-					op.sum_weight[img_id] = cumulative_sum.getAccValueAt(cumulative_sum.getSize() - 1);
+                op.sum_weight = cumulative_sum.getAccValueAt(cumulative_sum.getSize() - 1);
 
-					long int my_nr_significant_coarse_samples;
-					size_t thresholdIdx = findThresholdIdxInCumulativeSum<XFLOAT>(cumulative_sum,
-							(1 - baseMLO->adaptive_fraction) * op.sum_weight[img_id]);
+                long int my_nr_significant_coarse_samples;
+                size_t thresholdIdx = findThresholdIdxInCumulativeSum<XFLOAT>(cumulative_sum,
+                        (1 - baseMLO->adaptive_fraction) * op.sum_weight);
 
-					my_nr_significant_coarse_samples = filteredSize - thresholdIdx;
+                my_nr_significant_coarse_samples = filteredSize - thresholdIdx;
 
-					if (my_nr_significant_coarse_samples == 0)
-					{
-						std::cerr << std::endl;
-						std::cerr << " fn_img= " << sp.current_img << std::endl;
-						std::cerr << " img_id= " << img_id << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
-						std::cerr << " threshold= " << (1 - baseMLO->adaptive_fraction) * op.sum_weight[img_id] << " thresholdIdx= " << thresholdIdx << std::endl;
-						std::cerr << " op.sum_weight[img_id]= " << op.sum_weight[img_id] << std::endl;
-						std::cerr << " min_diff2= " << op.min_diff2[img_id] << std::endl;
+                if (my_nr_significant_coarse_samples == 0)
+                {
+                    std::cerr << std::endl;
+                    std::cerr << " fn_img= " << sp.current_img << std::endl;
+                    std::cerr << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
+                    std::cerr << " threshold= " << (1 - baseMLO->adaptive_fraction) * op.sum_weight << " thresholdIdx= " << thresholdIdx << std::endl;
+                    std::cerr << " op.sum_weight[img_id]= " << op.sum_weight << std::endl;
+                    std::cerr << " min_diff2= " << op.min_diff2 << std::endl;
 
-						unsorted_ipart.dumpAccToFile("error_dump_unsorted");
-						filtered.dumpAccToFile("error_dump_filtered");
-						sorted.dumpAccToFile("error_dump_sorted");
-						cumulative_sum.dumpAccToFile("error_dump_cumulative_sum");
+                    unsorted_ipart.dumpAccToFile("error_dump_unsorted");
+                    filtered.dumpAccToFile("error_dump_filtered");
+                    sorted.dumpAccToFile("error_dump_sorted");
+                    cumulative_sum.dumpAccToFile("error_dump_cumulative_sum");
 
-						std::cerr << "Written error_dump_unsorted, error_dump_filtered, error_dump_sorted, and error_dump_cumulative_sum." << std::endl;
+                    std::cerr << "Written error_dump_unsorted, error_dump_filtered, error_dump_sorted, and error_dump_cumulative_sum." << std::endl;
 
-						CRITICAL(ERRNOSIGNIFS); // "my_nr_significant_coarse_samples == 0"
-					}
+                    CRITICAL(ERRNOSIGNIFS); // "my_nr_significant_coarse_samples == 0"
+                }
 
-					if (baseMLO->maximum_significants > 0 &&
-							my_nr_significant_coarse_samples > baseMLO->maximum_significants)
-					{
-						my_nr_significant_coarse_samples = baseMLO->maximum_significants;
-						thresholdIdx = filteredSize - my_nr_significant_coarse_samples;
-					}
+                if (baseMLO->maximum_significants > 0 &&
+                        my_nr_significant_coarse_samples > baseMLO->maximum_significants)
+                {
+                    my_nr_significant_coarse_samples = baseMLO->maximum_significants;
+                    thresholdIdx = filteredSize - my_nr_significant_coarse_samples;
+                }
 
-					XFLOAT significant_weight = sorted.getAccValueAt(thresholdIdx);
+                XFLOAT significant_weight = sorted.getAccValueAt(thresholdIdx);
 
-					CTIC(accMLO->timer,"getArgMaxOnDevice");
-					std::pair<size_t, XFLOAT> max_pair = AccUtilities::getArgMaxOnDevice<XFLOAT>(unsorted_ipart);
-					CTOC(accMLO->timer,"getArgMaxOnDevice");
-					op.max_index[img_id].coarseIdx = max_pair.first;
-					op.max_weight[img_id] = max_pair.second;
+                CTIC(accMLO->timer,"getArgMaxOnDevice");
+                std::pair<size_t, XFLOAT> max_pair = AccUtilities::getArgMaxOnDevice<XFLOAT>(unsorted_ipart);
+                CTOC(accMLO->timer,"getArgMaxOnDevice");
+                op.max_index.coarseIdx = max_pair.first;
+                op.max_weight = max_pair.second;
 
-					// Store nr_significant_coarse_samples for this particle
-					// Don't do this for multibody, as it would be overwritten for each body,
-					// and we also use METADATA_NR_SIGN in the new safeguard for the gold-standard separation
-					if (baseMLO->mymodel.nr_bodies == 1)
-						DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_NR_SIGN) = (RFLOAT) my_nr_significant_coarse_samples;
+                // Store nr_significant_coarse_samples for this particle
+                // Don't do this for multibody, as it would be overwritten for each body,
+                // and we also use METADATA_NR_SIGN in the new safeguard for the gold-standard separation
+                if (baseMLO->mymodel.nr_bodies == 1)
+                    DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_NR_SIGN) = (RFLOAT) my_nr_significant_coarse_samples;
 
-					AccPtr<bool> Mcoarse_significant = ptrFactory.make<bool>(ipart_length);
-					Mcoarse_significant.setHostPtr(&op.Mcoarse_significant.data[offset]);
+                AccPtr<bool> Mcoarse_significant = ptrFactory.make<bool>(ipart_length);
+                Mcoarse_significant.setHostPtr(&op.Mcoarse_significant.data[offset]);
 
-					CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_SIG");
-					Mcoarse_significant.deviceAlloc();
+                CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_SIG");
+                Mcoarse_significant.deviceAlloc();
 
-					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-					arrayOverThreshold<XFLOAT>(unsorted_ipart, Mcoarse_significant, significant_weight);
-					Mcoarse_significant.cpToHost();
-					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-				}
-				else if (ipart_length == 1)
-				{
-					op.Mcoarse_significant.data[img_id * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min] = 1;
-				}
-				else
-					CRITICAL(ERRNEGLENGTH);
-			}
-			else
-			{
+                DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
+                arrayOverThreshold<XFLOAT>(unsorted_ipart, Mcoarse_significant, significant_weight);
+                Mcoarse_significant.cpToHost();
+                DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
+            }
+            else if (ipart_length == 1)
+            {
+                op.Mcoarse_significant.data[sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min] = 1;
+            }
+            else
+                CRITICAL(ERRNEGLENGTH);
+        }
+        else
+        {
 
-				for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
-				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
+            for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+                DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
+            DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
-				XFLOAT weights_max = -std::numeric_limits<XFLOAT>::max();
+            XFLOAT weights_max = -std::numeric_limits<XFLOAT>::max();
 
-				pdf_offset.streamSync();
+            pdf_offset.streamSync();
 
-				for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++) // TODO could use classStreams
-				{
-					if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FPCMasks[img_id][exp_iclass].weightNum > 0) )
-					{
-						// Use the constructed mask to build a partial (class-specific) input
-						// (until now, PassWeights has been an empty placeholder. We now create class-partials pointing at it, and start to fill it with stuff)
+            for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++) // TODO could use classStreams
+            {
+                if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FPCMasks[exp_iclass].weightNum > 0) )
+                {
+                    // Use the constructed mask to build a partial (class-specific) input
+                    // (until now, PassWeights has been an empty placeholder. We now create class-partials pointing at it, and start to fill it with stuff)
 
-						IndexedDataArray thisClassPassWeights(PassWeights[img_id],FPCMasks[img_id][exp_iclass]);
+                    IndexedDataArray thisClassPassWeights(PassWeights,FPCMasks[exp_iclass]);
 
-						AccPtr<XFLOAT> pdf_orientation_class =       ptrFactory.make<XFLOAT>(sp.nr_dir*sp.nr_psi),
-						               pdf_offset_class =            ptrFactory.make<XFLOAT>(sp.nr_trans);
-						AccPtr<bool>   pdf_orientation_zeros_class = ptrFactory.make<bool>(sp.nr_dir*sp.nr_psi),
-						               pdf_offset_zeros_class =      ptrFactory.make<bool>(sp.nr_trans);
+                    AccPtr<XFLOAT> pdf_orientation_class =       ptrFactory.make<XFLOAT>(sp.nr_dir*sp.nr_psi),
+                                   pdf_offset_class =            ptrFactory.make<XFLOAT>(sp.nr_trans);
+                    AccPtr<bool>   pdf_orientation_zeros_class = ptrFactory.make<bool>(sp.nr_dir*sp.nr_psi),
+                                   pdf_offset_zeros_class =      ptrFactory.make<bool>(sp.nr_trans);
 
-						pdf_orientation_class      .setAccPtr(&((~pdf_orientation)      [(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]));
-						pdf_orientation_zeros_class.setAccPtr(&((~pdf_orientation_zeros)[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]));
+                    pdf_orientation_class      .setAccPtr(&((~pdf_orientation)      [(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]));
+                    pdf_orientation_zeros_class.setAccPtr(&((~pdf_orientation_zeros)[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]));
 
-						pdf_offset_class           .setAccPtr(&((~pdf_offset)           [(exp_iclass-sp.iclass_min)*sp.nr_trans]));
-						pdf_offset_zeros_class     .setAccPtr(&((~pdf_offset_zeros)     [(exp_iclass-sp.iclass_min)*sp.nr_trans]));
+                    pdf_offset_class           .setAccPtr(&((~pdf_offset)           [(exp_iclass-sp.iclass_min)*sp.nr_trans]));
+                    pdf_offset_zeros_class     .setAccPtr(&((~pdf_offset_zeros)     [(exp_iclass-sp.iclass_min)*sp.nr_trans]));
 
-						thisClassPassWeights.weights.setStream(accMLO->classStreams[exp_iclass]);
+                    thisClassPassWeights.weights.setStream(accMLO->classStreams[exp_iclass]);
 
-						AccUtilities::kernel_exponentiate_weights_fine(
-								~pdf_orientation_class,
-								~pdf_orientation_zeros_class,
-								~pdf_offset_class,
-								~pdf_offset_zeros_class,
-								~thisClassPassWeights.weights,
-								(XFLOAT)op.min_diff2[img_id],
-								sp.nr_oversampled_rot,
-								sp.nr_oversampled_trans,
-								~thisClassPassWeights.rot_id,
-								~thisClassPassWeights.trans_idx,
-								~FPCMasks[img_id][exp_iclass].jobOrigin,
-								~FPCMasks[img_id][exp_iclass].jobExtent,
-								FPCMasks[img_id][exp_iclass].jobNum,
-								accMLO->classStreams[exp_iclass]);
+                    AccUtilities::kernel_exponentiate_weights_fine(
+                            ~pdf_orientation_class,
+                            ~pdf_orientation_zeros_class,
+                            ~pdf_offset_class,
+                            ~pdf_offset_zeros_class,
+                            ~thisClassPassWeights.weights,
+                            (XFLOAT)op.min_diff2,
+                            sp.nr_oversampled_rot,
+                            sp.nr_oversampled_trans,
+                            ~thisClassPassWeights.rot_id,
+                            ~thisClassPassWeights.trans_idx,
+                            ~FPCMasks[exp_iclass].jobOrigin,
+                            ~FPCMasks[exp_iclass].jobExtent,
+                            FPCMasks[exp_iclass].jobNum,
+                            accMLO->classStreams[exp_iclass]);
 
-						XFLOAT m = AccUtilities::getMaxOnDevice<XFLOAT>(thisClassPassWeights.weights);
+                    XFLOAT m = AccUtilities::getMaxOnDevice<XFLOAT>(thisClassPassWeights.weights);
 
-						if (m > weights_max)
-							weights_max = m;
-					}
-				}
+                    if (m > weights_max)
+                        weights_max = m;
+                }
+            }
 
-				for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++) // TODO could use classStreams
-				{
-					if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FPCMasks[img_id][exp_iclass].weightNum > 0) )
-					{
-						IndexedDataArray thisClassPassWeights(PassWeights[img_id],FPCMasks[img_id][exp_iclass]);
+            for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++) // TODO could use classStreams
+            {
+                if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FPCMasks[exp_iclass].weightNum > 0) )
+                {
+                    IndexedDataArray thisClassPassWeights(PassWeights,FPCMasks[exp_iclass]);
 
-						thisClassPassWeights.weights.setStream(accMLO->classStreams[exp_iclass]);
-						/*
-						 * Add 50 since we want to stay away from e^88, which approaches the single precision limit.
-						 * We still want as high numbers as possible to utilize most of the single precision span.
-						 * Dari - 201710
-						*/
-						AccUtilities::kernel_exponentiate( thisClassPassWeights.weights, 50 - weights_max );
-					}
-				}
+                    thisClassPassWeights.weights.setStream(accMLO->classStreams[exp_iclass]);
+                    /*
+                     * Add 50 since we want to stay away from e^88, which approaches the single precision limit.
+                     * We still want as high numbers as possible to utilize most of the single precision span.
+                     * Dari - 201710
+                    */
+                    AccUtilities::kernel_exponentiate( thisClassPassWeights.weights, 50 - weights_max );
+                }
+            }
 
-				op.min_diff2[img_id] += 50 - weights_max;
+            op.min_diff2 += 50 - weights_max;
 
-				for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
-				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
+            for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+                DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
+            DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
-				if(baseMLO->is_som_iter) {
-					op.sum_weight_class[img_id].resize(baseMLO->mymodel.nr_classes, 0);
+            if(baseMLO->is_som_iter) {
+                op.sum_weight_class.resize(baseMLO->mymodel.nr_classes, 0);
 
-					for (unsigned long exp_iclass = sp.iclass_min;
-					     exp_iclass <= sp.iclass_max; exp_iclass++) // TODO could use classStreams
-					{
-						if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) &&
-						    (FPCMasks[img_id][exp_iclass].weightNum > 0)) {
-							IndexedDataArray thisClassPassWeights(PassWeights[img_id], FPCMasks[img_id][exp_iclass]);
-							op.sum_weight_class[img_id][exp_iclass] = AccUtilities::getSumOnDevice(thisClassPassWeights.weights);
-						}
-					}
-				}
+                for (unsigned long exp_iclass = sp.iclass_min;
+                     exp_iclass <= sp.iclass_max; exp_iclass++) // TODO could use classStreams
+                {
+                    if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) &&
+                        (FPCMasks[exp_iclass].weightNum > 0)) {
+                        IndexedDataArray thisClassPassWeights(PassWeights, FPCMasks[exp_iclass]);
+                        op.sum_weight_class[exp_iclass] = AccUtilities::getSumOnDevice(thisClassPassWeights.weights);
+                    }
+                }
+            }
 
-				PassWeights[img_id].weights.cpToHost(); // note that the host-pointer is shared: we're copying to Mweight.
+            PassWeights.weights.cpToHost(); // note that the host-pointer is shared: we're copying to Mweight.
 
 
-				CTIC(accMLO->timer,"sort");
-				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-				size_t weightSize = PassWeights[img_id].weights.getSize();
+            CTIC(accMLO->timer,"sort");
+            DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
+            size_t weightSize = PassWeights.weights.getSize();
 
-				AccPtr<XFLOAT> sorted =         ptrFactory.make<XFLOAT>((size_t)weightSize);
-				AccPtr<XFLOAT> cumulative_sum = ptrFactory.make<XFLOAT>((size_t)weightSize);
+            AccPtr<XFLOAT> sorted =         ptrFactory.make<XFLOAT>((size_t)weightSize);
+            AccPtr<XFLOAT> cumulative_sum = ptrFactory.make<XFLOAT>((size_t)weightSize);
 
-				CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_FINE");
+            CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_FINE");
 
-				sorted.accAlloc();
-				cumulative_sum.accAlloc();
+            sorted.accAlloc();
+            cumulative_sum.accAlloc();
 
-				AccUtilities::sortOnDevice<XFLOAT>(PassWeights[img_id].weights, sorted);
-				AccUtilities::scanOnDevice<XFLOAT>(sorted, cumulative_sum);
-				CTOC(accMLO->timer,"sort");
+            AccUtilities::sortOnDevice<XFLOAT>(PassWeights.weights, sorted);
+            AccUtilities::scanOnDevice<XFLOAT>(sorted, cumulative_sum);
+            CTOC(accMLO->timer,"sort");
 
-				if(baseMLO->adaptive_oversampling!=0)
-				{
-					op.sum_weight[img_id] = cumulative_sum.getAccValueAt(cumulative_sum.getSize() - 1);
+            if(baseMLO->adaptive_oversampling!=0)
+            {
+                op.sum_weight = cumulative_sum.getAccValueAt(cumulative_sum.getSize() - 1);
 
-					if (op.sum_weight[img_id]==0)
-					{
-						std::cerr << std::endl;
-						std::cerr << " fn_img= " << sp.current_img << std::endl;
-						std::cerr << " op.part_id= " << op.part_id << std::endl;
-						std::cerr << " img_id= " << img_id << std::endl;
-						std::cerr << " op.min_diff2[img_id]= " << op.min_diff2[img_id] << std::endl;
-						int group_id = baseMLO->mydata.getGroupId(op.part_id, img_id);
-						std::cerr << " group_id= " << group_id << std::endl;
-						int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
-						std::cerr << " optics_group= " << optics_group << std::endl;
-						std::cerr << " ml_model.scale_correction[group_id]= " << baseMLO->mymodel.scale_correction[group_id] << std::endl;
-						std::cerr << " exp_significant_weight[img_id]= " << op.significant_weight[img_id] << std::endl;
-						std::cerr << " exp_max_weight[img_id]= " << op.max_weight[img_id] << std::endl;
-						std::cerr << " ml_model.sigma2_noise[optics_group]= " << baseMLO->mymodel.sigma2_noise[optics_group] << std::endl;
-						CRITICAL(ERRSUMWEIGHTZERO); //"op.sum_weight[img_id]==0"
-					}
+                if (op.sum_weight==0)
+                {
+                    std::cerr << std::endl;
+                    std::cerr << " fn_img= " << sp.current_img << std::endl;
+                    std::cerr << " op.part_id= " << op.part_id << std::endl;
+                    std::cerr << " op.min_diff2= " << op.min_diff2 << std::endl;
+                    int group_id = baseMLO->mydata.getGroupId(op.part_id, 0);
+                    std::cerr << " group_id= " << group_id << std::endl;
+                    int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, 0);
+                    std::cerr << " optics_group= " << optics_group << std::endl;
+                    std::cerr << " ml_model.scale_correction[group_id]= " << baseMLO->mymodel.scale_correction[group_id] << std::endl;
+                    std::cerr << " exp_significant_weight= " << op.significant_weight << std::endl;
+                    std::cerr << " exp_max_weight= " << op.max_weight << std::endl;
+                    std::cerr << " ml_model.sigma2_noise[optics_group]= " << baseMLO->mymodel.sigma2_noise[optics_group] << std::endl;
+                    CRITICAL(ERRSUMWEIGHTZERO); //"op.sum_weight[img_id]==0"
+                }
 
-					size_t thresholdIdx = findThresholdIdxInCumulativeSum<XFLOAT>(cumulative_sum, (1 - baseMLO->adaptive_fraction) * op.sum_weight[img_id]);
-					my_significant_weight = sorted.getAccValueAt(thresholdIdx);
+                size_t thresholdIdx = findThresholdIdxInCumulativeSum<XFLOAT>(cumulative_sum, (1 - baseMLO->adaptive_fraction) * op.sum_weight);
+                my_significant_weight = sorted.getAccValueAt(thresholdIdx);
 
-					CTIC(accMLO->timer,"getArgMaxOnDevice");
-					std::pair<size_t, XFLOAT> max_pair = AccUtilities::getArgMaxOnDevice<XFLOAT>(PassWeights[img_id].weights);
-					CTOC(accMLO->timer,"getArgMaxOnDevice");
-					op.max_index[img_id].fineIdx = PassWeights[img_id].ihidden_overs[max_pair.first];
-					op.max_weight[img_id] = max_pair.second;
-				}
-				else
-				{
-					my_significant_weight = sorted.getAccValueAt(0);
-				}
-			}
-			CTOC(accMLO->timer,"sumweight1");
-		}
+                CTIC(accMLO->timer,"getArgMaxOnDevice");
+                std::pair<size_t, XFLOAT> max_pair = AccUtilities::getArgMaxOnDevice<XFLOAT>(PassWeights.weights);
+                CTOC(accMLO->timer,"getArgMaxOnDevice");
+                op.max_index.fineIdx = PassWeights.ihidden_overs[max_pair.first];
+                op.max_weight = max_pair.second;
+            }
+            else
+            {
+                my_significant_weight = sorted.getAccValueAt(0);
+            }
+        }
+        CTOC(accMLO->timer,"sumweight1");
+    }
 
-		op.significant_weight[img_id] = (RFLOAT) my_significant_weight;
-		} // end loop img_id
+    op.significant_weight = (RFLOAT) my_significant_weight;
 
 
 #ifdef TIMING

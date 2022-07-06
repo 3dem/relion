@@ -140,15 +140,16 @@ public:
 	std::vector<MultidimArray<RFLOAT> > Fctf, local_Fctf, local_Minvsigma2, FstMulti;
 	std::vector<int> pointer_dir_nonzeroprior, pointer_psi_nonzeroprior;
 	std::vector<RFLOAT> directions_prior, psi_prior, local_sqrtXi2;
-	std::vector<RFLOAT> highres_Xi2_img, min_diff2;
+	std::vector<RFLOAT> highres_Xi2_img;
+    RFLOAT min_diff2;
 	MultidimArray<bool> Mcoarse_significant;
 	// And from storeWeightedSums
-	std::vector<RFLOAT> sum_weight, significant_weight, max_weight;
+	RFLOAT sum_weight, significant_weight, max_weight;
 	std::vector< std::vector<RFLOAT> > sum_weight_class;
 	Matrix1D<RFLOAT> old_offset, prior;
 	std::vector<MultidimArray<RFLOAT> > power_img;
 	MultidimArray<XFLOAT> Mweight;
-	std::vector<Indices> max_index;
+	Indices max_index;
 
 	OptimisationParamters (unsigned nr_images, unsigned long part_id):
 		metadata_offset(0),

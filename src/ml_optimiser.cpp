@@ -6460,8 +6460,6 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 		RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
 		int my_image_size = mydata.getOpticsImageSize(optics_group);
 
-		int my_metadata_offset = metadata_offset + img_id;
-
 		int exp_current_image_size;
 		if (is_for_store_wsums)
 		{
@@ -6626,9 +6624,9 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 
 					if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 					{
-						RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_ROT);
-						RFLOAT tilt_deg = DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_TILT);
-						RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_PSI);
+						RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT);
+						RFLOAT tilt_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_TILT);
+						RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI);
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 						std::cerr << "Helical xyz shift = (" << xshift << ", " << yshift << ", " << zshift << ")" << std::endl;
 #endif
@@ -6637,6 +6635,8 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 						std::cerr << "Cartesian xyz shift = (" << xshift << ", " << yshift << ", " << zshift << ")" << std::endl;
 #endif
 					}
+
+                    if (mydata.is_tomo) REPORT_ERROR("TODO: think about 2D shifts here!!");
 
 					// Shift through phase-shifts in the Fourier transform
 					// Note that the shift search range is centered around (exp_old_xoff, exp_old_yoff)
@@ -6716,23 +6716,20 @@ bool MlOptimiser::isSignificantAnyImageAnyTranslation(long int iorient, int exp_
 {
 
 	long int exp_nr_trans = exp_itrans_max - exp_itrans_min + 1;
-	for (long int ipart = 0; ipart < YSIZE(exp_Mcoarse_significant); ipart++)
-	{
-		long int ihidden = iorient * exp_nr_trans;
-		for (long int itrans = exp_itrans_min; itrans <= exp_itrans_max; itrans++, ihidden++)
-		{
+    long int ihidden = iorient * exp_nr_trans;
+    for (long int itrans = exp_itrans_min; itrans <= exp_itrans_max; itrans++, ihidden++)
+    {
 #ifdef DEBUG_CHECKSIZES
-			if (ihidden >= XSIZE(exp_Mcoarse_significant))
-			{
-				std::cerr << " ihidden= " << ihidden << " XSIZE(exp_Mcoarse_significant)= " << XSIZE(exp_Mcoarse_significant) << std::endl;
-				std::cerr << " iorient= " << iorient << " itrans= " << itrans << " exp_nr_trans= " << exp_nr_trans << std::endl;
-				REPORT_ERROR("ihidden > XSIZE: ");
-			}
+        if (ihidden >= XSIZE(exp_Mcoarse_significant))
+        {
+            std::cerr << " ihidden= " << ihidden << " XSIZE(exp_Mcoarse_significant)= " << XSIZE(exp_Mcoarse_significant) << std::endl;
+            std::cerr << " iorient= " << iorient << " itrans= " << itrans << " exp_nr_trans= " << exp_nr_trans << std::endl;
+            REPORT_ERROR("ihidden > XSIZE: ");
+        }
 #endif
-			if (DIRECT_A2D_ELEM(exp_Mcoarse_significant, ipart, ihidden))
-				return true;
-		}
-	}
+        if (DIRECT_A1D_ELEM(exp_Mcoarse_significant, ihidden))
+            return true;
+    }
 	return false;
 
 }
@@ -6742,7 +6739,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 		int exp_ipass, int exp_current_oversampling, int metadata_offset,
 		int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 		int exp_itrans_min, int exp_itrans_max, int exp_iclass_min, int exp_iclass_max,
-		std::vector<RFLOAT> &exp_min_diff2,
+		RFLOAT &exp_min_diff2,
 		std::vector<RFLOAT> &exp_highres_Xi2_img,
 		std::vector<MultidimArray<Complex > > &exp_Fimg,
 		std::vector<MultidimArray<RFLOAT> > &exp_Fctf,
@@ -6783,7 +6780,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 	long int exp_nr_oversampled_rot = sampling.oversamplingFactorOrientations(exp_current_oversampling);
 	long int exp_nr_oversampled_trans = sampling.oversamplingFactorTranslations(exp_current_oversampling);
 
-	exp_Mweight.resize(exp_nr_images, mymodel.nr_classes * exp_nr_dir * exp_nr_psi * exp_nr_trans * exp_nr_oversampled_rot * exp_nr_oversampled_trans);
+	exp_Mweight.resize(mymodel.nr_classes * exp_nr_dir * exp_nr_psi * exp_nr_trans * exp_nr_oversampled_rot * exp_nr_oversampled_trans);
 	exp_Mweight.initConstant(-999.);
 	if (exp_ipass==0)
 		exp_Mcoarse_significant.clear();
@@ -6878,7 +6875,6 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 							for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++)
 							{
 
-								int my_metadata_offset = metadata_offset + img_id;
 								RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, img_id);
 								int optics_group = mydata.getOpticsGroup(part_id, img_id);
 
@@ -6887,6 +6883,13 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 										oversampled_tilt[iover_rot],
 										oversampled_psi[iover_rot], A, false);
 
+                                Matrix2D<RFLOAT> Aproj;
+                                if (mydata.is_tomo)
+                                {
+                                    Aproj = mydata.getRotationMatrix(part_id, img_id);
+                                    REPORT_ERROR("ERROR: TODO: implement rotations of img_id tilt series");
+
+                                }
 								// Project the reference map (into Fref)
 #ifdef TIMING
 								// Only time one thread, as I also only time one MPI process
@@ -6954,10 +6957,12 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 #endif
 									// In the first pass, always proceed
 									// In the second pass, check whether this translations (&orientation) had a significant weight in the first pass
-									bool do_proceed = (exp_ipass == 0) ? true : DIRECT_A2D_ELEM(exp_Mcoarse_significant, img_id, ihidden);
+									bool do_proceed = (exp_ipass == 0) ? true : DIRECT_A1D_ELEM(exp_Mcoarse_significant, ihidden);
 									if (do_proceed)
 									{
-										// Jun01,2015 - Shaoda & Sjors, Helical refinement
+										if (mydata.is_tomo) REPORT_ERROR("ERROR: TOD: implement what to do with 2D stack translations here!");
+
+                                        // Jun01,2015 - Shaoda & Sjors, Helical refinement
 										sampling.getTranslationsInPixel(itrans, exp_current_oversampling, my_pixel_size, oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
 												(do_helical_refine) && (!ignore_helical_symmetry));
 										for (long int iover_trans = 0; iover_trans < exp_nr_oversampled_trans; iover_trans++)
@@ -7002,9 +7007,11 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 													if (mymodel.data_dim == 3)
 														zshift = (exp_current_oversampling == 0) ? (oversampled_translations_z[0]) : (oversampled_translations_z[iover_trans]);
 
-													RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_ROT);
-													RFLOAT tilt_deg = DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_TILT);
-													RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_PSI);
+                                                    if (mydata.is_tomo) REPORT_ERROR("ERROR; TODO: think about the below for 2D shifts in stacks...");
+
+													RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT);
+													RFLOAT tilt_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_TILT);
+													RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI);
 													transformCartesianAndHelicalCoords(
 																xshift, yshift, zshift,
 																xshift, yshift, zshift,
@@ -7014,7 +7021,10 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 
 													use_coarse_size = ((exp_current_oversampling == 0) && (YSIZE(Frefctf) == image_coarse_size[optics_group]))
 															|| ((exp_current_oversampling > 0) && (strict_highres_exp > 0.));
-													shiftImageInFourierTransformWithTabSincos(
+
+                                                    if (mydata.is_tomo) REPORT_ERROR("ERROR: TOD: implement what to do with 2D stack translations here!");
+
+                                                    shiftImageInFourierTransformWithTabSincos(
 															exp_local_Fimgs_shifted[img_id][0],
 															Fimg_otfshift,
 															(RFLOAT)mymodel.ori_size,
@@ -7282,12 +7292,15 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 												REPORT_ERROR("ihidden_over >= XSIZE(Mweight)");
 											}
 #endif
-											DIRECT_A2D_ELEM(exp_Mweight, img_id, ihidden_over) = diff2;
+
+
+                                            // SHWS 6July2022: += instead of =, as summing over all imag_id....
+                                            DIRECT_A1D_ELEM(exp_Mweight, ihidden_over) += diff2;
 
 											// Keep track of minimum of all diff2, only for the last image in this series
-											if (diff2 < exp_min_diff2[img_id])
+											if (img_id == mydata.numberOfImagesInParticle(part_id) -1 && diff2 < exp_min_diff2)
 											{
-												exp_min_diff2[img_id] = diff2;
+												exp_min_diff2 = diff2;
 												/*
 												if (part_id == 0)
 												{
@@ -7328,8 +7341,8 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
 		int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 		int exp_itrans_min, int exp_itrans_max, int exp_iclass_min, int exp_iclass_max,
 		MultidimArray<RFLOAT> &exp_Mweight, MultidimArray<bool> &exp_Mcoarse_significant,
-		std::vector<RFLOAT> &exp_significant_weight, std::vector<RFLOAT> &exp_sum_weight,
-		std::vector<Matrix1D<RFLOAT> > &exp_old_offset, std::vector<Matrix1D<RFLOAT> > &exp_prior, std::vector<RFLOAT> &exp_min_diff2,
+		RFLOAT &exp_significant_weight, RFLOAT &exp_sum_weight,
+		Matrix1D<RFLOAT> &exp_old_offset, Matrix1D<RFLOAT> &exp_prior, RFLOAT &exp_min_diff2,
 		std::vector<int> &exp_pointer_dir_nonzeroprior, std::vector<int> &exp_pointer_psi_nonzeroprior,
 		std::vector<RFLOAT> &exp_directions_prior, std::vector<RFLOAT> &exp_psi_prior)
 {
@@ -7353,8 +7366,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
 	long int exp_nr_oversampled_trans = sampling.oversamplingFactorTranslations(exp_current_oversampling);
 
 	// Initialising...
-	exp_sum_weight.clear();
-	exp_sum_weight.resize(exp_nr_images, 0.);
+	exp_sum_weight = 0.;
 
 	RFLOAT my_sigma2_offset = (mymodel.nr_bodies > 1) ?
 			mymodel.sigma_offset_bodies[ibody]*mymodel.sigma_offset_bodies[ibody] : mymodel.sigma2_offset;
@@ -7367,481 +7379,465 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
 	long int opt_ihidden, opt_ihidden_over;
 #endif
 
-	// loop over all images inside this particle
-	for (int img_id = 0; img_id < exp_nr_images; img_id++)
-	{
-		int my_metadata_offset = metadata_offset + img_id;
-		RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, img_id);
+    RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, 0);
 
-		RFLOAT exp_thisimage_sumweight = 0.;
-		RFLOAT old_offset_x, old_offset_y, old_offset_z;
-		if (mymodel.nr_bodies > 1)
-		{
-			old_offset_x = old_offset_y = old_offset_z = 0.;
-		}
-		else
-		{
-			old_offset_x = XX(exp_old_offset[img_id]);
-			old_offset_y = YY(exp_old_offset[img_id]);
-			if (mymodel.data_dim == 3)
-				old_offset_z = ZZ(exp_old_offset[img_id]);
-		}
+    RFLOAT exp_thisimage_sumweight = 0.;
+    RFLOAT old_offset_x, old_offset_y, old_offset_z;
+    if (mymodel.nr_bodies > 1)
+    {
+        old_offset_x = old_offset_y = old_offset_z = 0.;
+    }
+    else
+    {
+        old_offset_x = XX(exp_old_offset);
+        old_offset_y = YY(exp_old_offset);
+        if (mymodel.data_dim == 3)
+            old_offset_z = ZZ(exp_old_offset);
+    }
 
-		if ((iter == 1 && do_firstiter_cc) || do_always_cc)
-		{
-			// Binarize the squared differences array to skip marginalisation
-			RFLOAT mymindiff2 = 99.e10;
-			long int myminidx = -1;
-			// Find the smallest element in this row of exp_Mweight
-			for (long int i = 0; i < XSIZE(exp_Mweight); i++)
-			{
+    if ((iter == 1 && do_firstiter_cc) || do_always_cc)
+    {
+        // Binarize the squared differences array to skip marginalisation
+        RFLOAT mymindiff2 = 99.e10;
+        long int myminidx = -1;
+        // Find the smallest element in this row of exp_Mweight
+        for (long int i = 0; i < XSIZE(exp_Mweight); i++)
+        {
 
-				RFLOAT cc = DIRECT_A2D_ELEM(exp_Mweight, img_id, i);
-				// ignore non-determined cc
-				if (cc == -999.)
-					continue;
+            RFLOAT cc = DIRECT_A1D_ELEM(exp_Mweight, i);
+            // ignore non-determined cc
+            if (cc == -999.)
+                continue;
 
-				// just search for the maximum
-				if (cc < mymindiff2)
-				{
-					mymindiff2 = cc;
-					myminidx = i;
-				}
-			}
-			// Set all except for the best hidden variable to zero and the smallest element to 1
-			for (long int i = 0; i < XSIZE(exp_Mweight); i++)
-				DIRECT_A2D_ELEM(exp_Mweight, img_id, i)= 0.;
+            // just search for the maximum
+            if (cc < mymindiff2)
+            {
+                mymindiff2 = cc;
+                myminidx = i;
+            }
+        }
+        // Set all except for the best hidden variable to zero and the smallest element to 1
+        for (long int i = 0; i < XSIZE(exp_Mweight); i++)
+            DIRECT_A1D_ELEM(exp_Mweight, i)= 0.;
 
-			DIRECT_A2D_ELEM(exp_Mweight, img_id, myminidx)= 1.;
-			exp_thisimage_sumweight += 1.;
+        DIRECT_A1D_ELEM(exp_Mweight, myminidx)= 1.;
+        exp_thisimage_sumweight += 1.;
 
-		}
-		else
-		{
-			// Extra normalization
-			RFLOAT pdf_orientation_mean(0),pdf_offset_mean(0);
-			unsigned long pdf_orientation_count(0), pdf_offset_count(0);
-			for (int exp_iclass = exp_iclass_min; exp_iclass <= exp_iclass_max; exp_iclass++)
-			{
-				for (long int idir = exp_idir_min, iorient = 0; idir <= exp_idir_max; idir++)
-					for (long int ipsi = exp_ipsi_min; ipsi <= exp_ipsi_max; ipsi++, iorient++)
-					{
-						if (do_skip_align || do_skip_rotate)
-							pdf_orientation_mean += mymodel.pdf_class[exp_iclass];
-						else if (mymodel.orientational_prior_mode == NOPRIOR)
-							pdf_orientation_mean += DIRECT_MULTIDIM_ELEM(mymodel.pdf_direction[exp_iclass], idir);
-						else
-							pdf_orientation_mean += exp_directions_prior[idir] * exp_psi_prior[ipsi];
-						pdf_orientation_count++;
-					}
+    }
+    else
+    {
+        // Extra normalization
+        RFLOAT pdf_orientation_mean(0),pdf_offset_mean(0);
+        unsigned long pdf_orientation_count(0), pdf_offset_count(0);
+        for (int exp_iclass = exp_iclass_min; exp_iclass <= exp_iclass_max; exp_iclass++)
+        {
+            for (long int idir = exp_idir_min, iorient = 0; idir <= exp_idir_max; idir++)
+                for (long int ipsi = exp_ipsi_min; ipsi <= exp_ipsi_max; ipsi++, iorient++)
+                {
+                    if (do_skip_align || do_skip_rotate)
+                        pdf_orientation_mean += mymodel.pdf_class[exp_iclass];
+                    else if (mymodel.orientational_prior_mode == NOPRIOR)
+                        pdf_orientation_mean += DIRECT_MULTIDIM_ELEM(mymodel.pdf_direction[exp_iclass], idir);
+                    else
+                        pdf_orientation_mean += exp_directions_prior[idir] * exp_psi_prior[ipsi];
+                    pdf_orientation_count++;
+                }
 
-				RFLOAT myprior_x, myprior_y, myprior_z;
-				if (mymodel.nr_bodies > 1)
-				{
-					myprior_x = myprior_y = myprior_z = 0.;
-				}
-				else if (mymodel.ref_dim == 2 && !do_helical_refine)
-				{
-					myprior_x = XX(mymodel.prior_offset_class[exp_iclass]);
-					myprior_y = YY(mymodel.prior_offset_class[exp_iclass]);
-				}
-				else
-				{
-					myprior_x = XX(exp_prior[img_id]);
-					myprior_y = YY(exp_prior[img_id]);
-					if (mymodel.data_dim == 3)
-						myprior_z = ZZ(exp_prior[img_id]);
-				}
-				for (long int itrans = exp_itrans_min; itrans <= exp_itrans_max; itrans++)
-				{
-					RFLOAT offset_x = old_offset_x + sampling.translations_x[itrans];
-					RFLOAT offset_y = old_offset_y + sampling.translations_y[itrans];
-					RFLOAT tdiff2 = 0.;
-					if ( (!do_helical_refine) || (ignore_helical_symmetry) || (mymodel.data_dim == 3) )
-						tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x);
-					tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y);
-					if (mymodel.data_dim == 3)
-					{
-						RFLOAT offset_z = old_offset_z + sampling.translations_z[itrans];
-						if ( (!do_helical_refine) || (ignore_helical_symmetry) )
-							tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z);
-					}
-					// As of version 3.1, sigma_offsets are in Angstroms!
-					tdiff2 *= my_pixel_size * my_pixel_size;
+            RFLOAT myprior_x, myprior_y, myprior_z;
+            if (mymodel.nr_bodies > 1)
+            {
+                myprior_x = myprior_y = myprior_z = 0.;
+            }
+            else if (mymodel.ref_dim == 2 && !do_helical_refine)
+            {
+                myprior_x = XX(mymodel.prior_offset_class[exp_iclass]);
+                myprior_y = YY(mymodel.prior_offset_class[exp_iclass]);
+            }
+            else
+            {
+                myprior_x = XX(exp_prior);
+                myprior_y = YY(exp_prior);
+                if (mymodel.data_dim == 3)
+                    myprior_z = ZZ(exp_prior);
+            }
+            for (long int itrans = exp_itrans_min; itrans <= exp_itrans_max; itrans++)
+            {
+                RFLOAT offset_x = old_offset_x + sampling.translations_x[itrans];
+                RFLOAT offset_y = old_offset_y + sampling.translations_y[itrans];
+                RFLOAT tdiff2 = 0.;
+                if ( (!do_helical_refine) || (ignore_helical_symmetry) || (mymodel.data_dim == 3) )
+                    tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x);
+                tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y);
+                if (mymodel.data_dim == 3)
+                {
+                    RFLOAT offset_z = old_offset_z + sampling.translations_z[itrans];
+                    if ( (!do_helical_refine) || (ignore_helical_symmetry) )
+                        tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z);
+                }
+                // As of version 3.1, sigma_offsets are in Angstroms!
+                tdiff2 *= my_pixel_size * my_pixel_size;
 
-					// P(offset|sigma2_offset)
-					// This is the probability of the offset, given the model offset and variance.
-					RFLOAT pdf_offset;
-					if (my_sigma2_offset < 0.0001)
-						pdf_offset_mean += ( tdiff2 > 0.) ? 0. : 1.;
-					else
-						pdf_offset_mean += exp ( tdiff2 / (-2. * my_sigma2_offset) ) / ( 2. * PI * my_sigma2_offset );
-					pdf_offset_count ++;
-				}
-			}
-			pdf_orientation_mean /= (RFLOAT) pdf_orientation_count;
-			pdf_offset_mean /= (RFLOAT) pdf_offset_count;
-			// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
-			for (int exp_iclass = exp_iclass_min; exp_iclass <= exp_iclass_max; exp_iclass++)
-			{
+                // P(offset|sigma2_offset)
+                // This is the probability of the offset, given the model offset and variance.
+                RFLOAT pdf_offset;
+                if (my_sigma2_offset < 0.0001)
+                    pdf_offset_mean += ( tdiff2 > 0.) ? 0. : 1.;
+                else
+                    pdf_offset_mean += exp ( tdiff2 / (-2. * my_sigma2_offset) ) / ( 2. * PI * my_sigma2_offset );
+                pdf_offset_count ++;
+            }
+        }
+        pdf_orientation_mean /= (RFLOAT) pdf_orientation_count;
+        pdf_offset_mean /= (RFLOAT) pdf_offset_count;
+        // Loop from iclass_min to iclass_max to deal with seed generation in first iteration
+        for (int exp_iclass = exp_iclass_min; exp_iclass <= exp_iclass_max; exp_iclass++)
+        {
 
-				// Make PdfOffset calculation much faster...
-				RFLOAT myprior_x, myprior_y, myprior_z;
-				if (mymodel.nr_bodies > 1)
-				{
-					myprior_x = myprior_y = myprior_z = 0.;
-				}
-				else if (mymodel.ref_dim == 2)
-				{
-					myprior_x = XX(mymodel.prior_offset_class[exp_iclass]);
-					myprior_y = YY(mymodel.prior_offset_class[exp_iclass]);
-				}
-				else
-				{
-					myprior_x = XX(exp_prior[img_id]);
-					myprior_y = YY(exp_prior[img_id]);
-					if (mymodel.data_dim == 3)
-						myprior_z = ZZ(exp_prior[img_id]);
-				}
-				for (long int idir = exp_idir_min, iorient = 0; idir <= exp_idir_max; idir++)
-				{
-					for (long int ipsi = exp_ipsi_min; ipsi <= exp_ipsi_max; ipsi++, iorient++)
-					{
-						long int iorientclass = exp_iclass * exp_nr_dir * exp_nr_psi + iorient;
-						RFLOAT pdf_orientation;
+            // Make PdfOffset calculation much faster...
+            RFLOAT myprior_x, myprior_y, myprior_z;
+            if (mymodel.nr_bodies > 1)
+            {
+                myprior_x = myprior_y = myprior_z = 0.;
+            }
+            else if (mymodel.ref_dim == 2)
+            {
+                myprior_x = XX(mymodel.prior_offset_class[exp_iclass]);
+                myprior_y = YY(mymodel.prior_offset_class[exp_iclass]);
+            }
+            else
+            {
+                myprior_x = XX(exp_prior);
+                myprior_y = YY(exp_prior);
+                if (mymodel.data_dim == 3)
+                    myprior_z = ZZ(exp_prior);
+            }
+            for (long int idir = exp_idir_min, iorient = 0; idir <= exp_idir_max; idir++)
+            {
+                for (long int ipsi = exp_ipsi_min; ipsi <= exp_ipsi_max; ipsi++, iorient++)
+                {
+                    long int iorientclass = exp_iclass * exp_nr_dir * exp_nr_psi + iorient;
+                    RFLOAT pdf_orientation;
 
-						// Get prior for this direction
-						if (do_skip_align || do_skip_rotate)
-						{
-							pdf_orientation = mymodel.pdf_class[exp_iclass];
-						}
-						else if (mymodel.orientational_prior_mode == NOPRIOR)
-						{
-							pdf_orientation = DIRECT_MULTIDIM_ELEM(mymodel.pdf_direction[exp_iclass], idir);
-						}
-						else
-						{
-							// P(orientation) = P(idir|dir_prior) * P(ipsi|psi_prior)
-							// This is the probability of the orientation, given the gathered
-							// statistics of all assigned orientations of the dataset, since we
-							// are assigning a gaussian prior to all parameters.
-							pdf_orientation = exp_directions_prior[idir] * exp_psi_prior[ipsi];
-						}
+                    // Get prior for this direction
+                    if (do_skip_align || do_skip_rotate)
+                    {
+                        pdf_orientation = mymodel.pdf_class[exp_iclass];
+                    }
+                    else if (mymodel.orientational_prior_mode == NOPRIOR)
+                    {
+                        pdf_orientation = DIRECT_MULTIDIM_ELEM(mymodel.pdf_direction[exp_iclass], idir);
+                    }
+                    else
+                    {
+                        // P(orientation) = P(idir|dir_prior) * P(ipsi|psi_prior)
+                        // This is the probability of the orientation, given the gathered
+                        // statistics of all assigned orientations of the dataset, since we
+                        // are assigning a gaussian prior to all parameters.
+                        pdf_orientation = exp_directions_prior[idir] * exp_psi_prior[ipsi];
+                    }
 
-						if (pdf_orientation_mean != 0.)
-							pdf_orientation /= pdf_orientation_mean;
+                    if (pdf_orientation_mean != 0.)
+                        pdf_orientation /= pdf_orientation_mean;
 
-						// Loop over all translations
-						long int ihidden = iorientclass * exp_nr_trans;
-						for (long int itrans = exp_itrans_min; itrans <= exp_itrans_max; itrans++, ihidden++)
-						{
-							// May18,2015 - Shaoda & Sjors - Helical refinement (translational searches)
-							// Calculate the vector length of myprior
-							RFLOAT mypriors_len2 = myprior_x * myprior_x + myprior_y * myprior_y;
-							if (mymodel.data_dim == 3)
-								mypriors_len2 += myprior_z * myprior_z;
-							// If it is doing helical refinement AND Cartesian vector myprior has a length > 0, transform the vector to its helical coordinates
-							if ( (do_helical_refine) && (!ignore_helical_symmetry) && (mypriors_len2 > 0.00001) )
-							{
-								RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_ROT);
-								RFLOAT tilt_deg = DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_TILT);
-								RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_PSI);
-								transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, rot_deg, tilt_deg, psi_deg, mymodel.data_dim, CART_TO_HELICAL_COORDS);
-							}
-							// (For helical refinement) Now offset, old_offset, sampling.translations and myprior are all in helical coordinates
+                    // Loop over all translations
+                    long int ihidden = iorientclass * exp_nr_trans;
+                    for (long int itrans = exp_itrans_min; itrans <= exp_itrans_max; itrans++, ihidden++)
+                    {
+                        // May18,2015 - Shaoda & Sjors - Helical refinement (translational searches)
+                        // Calculate the vector length of myprior
+                        RFLOAT mypriors_len2 = myprior_x * myprior_x + myprior_y * myprior_y;
+                        if (mymodel.data_dim == 3)
+                            mypriors_len2 += myprior_z * myprior_z;
+                        // If it is doing helical refinement AND Cartesian vector myprior has a length > 0, transform the vector to its helical coordinates
+                        if ( (do_helical_refine) && (!ignore_helical_symmetry) && (mypriors_len2 > 0.00001) )
+                        {
+                            RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT);
+                            RFLOAT tilt_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_TILT);
+                            RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI);
+                            transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, rot_deg, tilt_deg, psi_deg, mymodel.data_dim, CART_TO_HELICAL_COORDS);
+                        }
+                        // (For helical refinement) Now offset, old_offset, sampling.translations and myprior are all in helical coordinates
 
-							// To speed things up, only calculate pdf_offset at the coarse sampling.
-							// That should not matter much, and that way one does not need to calculate all the OversampledTranslations
-							RFLOAT offset_x = old_offset_x + sampling.translations_x[itrans];
-							RFLOAT offset_y = old_offset_y + sampling.translations_y[itrans];
-							RFLOAT tdiff2 = 0.;
-							if ( (!do_helical_refine) || (ignore_helical_symmetry) || (mymodel.data_dim == 3) )
-								tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x);
-							tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y);
-							if (mymodel.data_dim == 3)
-							{
-								RFLOAT offset_z = old_offset_z + sampling.translations_z[itrans];
-								if ( (!do_helical_refine) || (ignore_helical_symmetry) )
-									tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z);
-							}
+                        // To speed things up, only calculate pdf_offset at the coarse sampling.
+                        // That should not matter much, and that way one does not need to calculate all the OversampledTranslations
+                        RFLOAT offset_x = old_offset_x + sampling.translations_x[itrans];
+                        RFLOAT offset_y = old_offset_y + sampling.translations_y[itrans];
+                        RFLOAT tdiff2 = 0.;
+                        if ( (!do_helical_refine) || (ignore_helical_symmetry) || (mymodel.data_dim == 3) )
+                            tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x);
+                        tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y);
+                        if (mymodel.data_dim == 3)
+                        {
+                            RFLOAT offset_z = old_offset_z + sampling.translations_z[itrans];
+                            if ( (!do_helical_refine) || (ignore_helical_symmetry) )
+                                tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z);
+                        }
 
-							// As of version 3.1, sigma_offsets are in Angstroms!
-							tdiff2 *= my_pixel_size * my_pixel_size;
+                        // As of version 3.1, sigma_offsets are in Angstroms!
+                        tdiff2 *= my_pixel_size * my_pixel_size;
 
-							// P(offset|sigma2_offset)
-							// This is the probability of the offset, given the model offset and variance.
-							RFLOAT pdf_offset;
-							if (my_sigma2_offset < 0.0001)
-								pdf_offset = ( tdiff2 > 0.) ? 0. : 1.;
-							else
-								pdf_offset = exp ( tdiff2 / (-2. * my_sigma2_offset) ) / ( 2. * PI * my_sigma2_offset );
+                        // P(offset|sigma2_offset)
+                        // This is the probability of the offset, given the model offset and variance.
+                        RFLOAT pdf_offset;
+                        if (my_sigma2_offset < 0.0001)
+                            pdf_offset = ( tdiff2 > 0.) ? 0. : 1.;
+                        else
+                            pdf_offset = exp ( tdiff2 / (-2. * my_sigma2_offset) ) / ( 2. * PI * my_sigma2_offset );
 
-							if (pdf_offset_mean > 0.)
-								pdf_offset /= pdf_offset_mean;
+                        if (pdf_offset_mean > 0.)
+                            pdf_offset /= pdf_offset_mean;
 
 #ifdef TIMING
-							// Only time one thread, as I also only time one MPI process
-							if (part_id == mydata.sorted_idx[exp_my_first_part_id])
-								timer.tic(TIMING_WEIGHT_EXP);
+                        // Only time one thread, as I also only time one MPI process
+                        if (part_id == mydata.sorted_idx[exp_my_first_part_id])
+                            timer.tic(TIMING_WEIGHT_EXP);
 #endif
-							// Now first loop over iover_rot, because that is the order in exp_Mweight as well
-							long int ihidden_over = ihidden * exp_nr_oversampled_rot * exp_nr_oversampled_trans;
-							for (long int iover_rot = 0; iover_rot < exp_nr_oversampled_rot; iover_rot++)
-							{
-								// Then loop over iover_trans
-								for (long int iover_trans = 0; iover_trans < exp_nr_oversampled_trans; iover_trans++, ihidden_over++)
-								{
-									// Only exponentiate for determined values of exp_Mweight
-									// (this is always true in the first pass, but not so in the second pass)
-									// Only deal with this sampling point if its weight was significant
-									if (DIRECT_A2D_ELEM(exp_Mweight, img_id, ihidden_over) < 0.)
-									{
-										DIRECT_A2D_ELEM(exp_Mweight, img_id, ihidden_over) = 0.;
-									}
-									else
-									{
-										// Set the weight base to the probability of the parameters given the prior
-										RFLOAT weight = pdf_orientation * pdf_offset;
-										RFLOAT diff2 = DIRECT_A2D_ELEM(exp_Mweight, img_id, ihidden_over) - exp_min_diff2[img_id];
-										// next line because of numerical precision of exp-function
+                        // Now first loop over iover_rot, because that is the order in exp_Mweight as well
+                        long int ihidden_over = ihidden * exp_nr_oversampled_rot * exp_nr_oversampled_trans;
+                        for (long int iover_rot = 0; iover_rot < exp_nr_oversampled_rot; iover_rot++)
+                        {
+                            // Then loop over iover_trans
+                            for (long int iover_trans = 0; iover_trans < exp_nr_oversampled_trans; iover_trans++, ihidden_over++)
+                            {
+                                // Only exponentiate for determined values of exp_Mweight
+                                // (this is always true in the first pass, but not so in the second pass)
+                                // Only deal with this sampling point if its weight was significant
+                                if (DIRECT_A1D_ELEM(exp_Mweight, ihidden_over) < 0.)
+                                {
+                                    DIRECT_A1D_ELEM(exp_Mweight, ihidden_over) = 0.;
+                                }
+                                else
+                                {
+                                    // Set the weight base to the probability of the parameters given the prior
+                                    RFLOAT weight = pdf_orientation * pdf_offset;
+                                    RFLOAT diff2 = DIRECT_A1D_ELEM(exp_Mweight, ihidden_over) - exp_min_diff2;
+                                    // next line because of numerical precision of exp-function
 #ifdef RELION_SINGLE_PRECISION
-										if (diff2 > 88.)
-											weight = 0.;
+                                    if (diff2 > 88.)
+                                        weight = 0.;
 #else
-										if (diff2 > 700.)
-											weight = 0.;
+                                    if (diff2 > 700.)
+                                        weight = 0.;
 #endif
-										// TODO: use tabulated exp function?
-										else weight *= exp(-diff2);
+                                    // TODO: use tabulated exp function?
+                                    else weight *= exp(-diff2);
 
 
-										//std::cerr << "ihidden_over= "<<ihidden_over << " weight= " << weight << " diff2= " << diff2
-										//		<< " pdf_orientation= " << pdf_orientation << " pdf_offset= " << pdf_offset<< std::endl;
+                                    //std::cerr << "ihidden_over= "<<ihidden_over << " weight= " << weight << " diff2= " << diff2
+                                    //		<< " pdf_orientation= " << pdf_orientation << " pdf_offset= " << pdf_offset<< std::endl;
 //#define DEBUG_PSIANGLE_PDISTRIBUTION
 #ifdef DEBUG_PSIANGLE_PDISTRIBUTION
-										std::cout << ipsi*360./sampling.NrPsiSamplings() << " "<< weight << std::endl;
+                                    std::cout << ipsi*360./sampling.NrPsiSamplings() << " "<< weight << std::endl;
 #endif
-										// Store the weight
-										DIRECT_A2D_ELEM(exp_Mweight, img_id, ihidden_over) = weight;
+                                    // Store the weight
+                                    DIRECT_A1D_ELEM(exp_Mweight, ihidden_over) = weight;
 #ifdef DEBUG_CHECKSIZES
-										if (std::isnan(weight))
-										{
-											omp_set_lock(&global_mutex);
-											std::cerr<< "weight= "<<weight<<" is not a number! " <<std::endl;
-											std::cerr << " exp_min_diff2= " << exp_min_diff2 << std::endl;
-											std::cerr << " part_id= " << part_id << " img_id= "<< img_id << std::endl;
-											std::cerr << " DIRECT_A2D_ELEM(exp_Mweight, img_id, ihidden_over)= " << DIRECT_A2D_ELEM(exp_Mweight, img_id, ihidden_over) << std::endl;
-											REPORT_ERROR("weight is not a number");
-											omp_unset_lock(&global_mutex);
-										}
+                                    if (std::isnan(weight))
+                                    {
+                                        omp_set_lock(&global_mutex);
+                                        std::cerr<< "weight= "<<weight<<" is not a number! " <<std::endl;
+                                        std::cerr << " exp_min_diff2= " << exp_min_diff2 << std::endl;
+                                        std::cerr << " part_id= " << part_id << " img_id= "<< img_id << std::endl;
+                                        std::cerr << " DIRECT_A2D_ELEM(exp_Mweight, img_id, ihidden_over)= " << DIRECT_A2D_ELEM(exp_Mweight, img_id, ihidden_over) << std::endl;
+                                        REPORT_ERROR("weight is not a number");
+                                        omp_unset_lock(&global_mutex);
+                                    }
 #endif
-										// Keep track of sum and maximum of all weights for this particle
-										// Later add all to exp_thisimage_sumweight, but inside this loop sum to local thisthread_sumweight first
-										exp_thisimage_sumweight += weight;
-									} // end if/else exp_Mweight < 0.
-								} // end loop iover_trans
-							}// end loop iover_rot
+                                    // Keep track of sum and maximum of all weights for this particle
+                                    // Later add all to exp_thisimage_sumweight, but inside this loop sum to local thisthread_sumweight first
+                                    exp_thisimage_sumweight += weight;
+                                } // end if/else exp_Mweight < 0.
+                            } // end loop iover_trans
+                        }// end loop iover_rot
 #ifdef TIMING
-							// Only time one thread, as I also only time one MPI process
-							if (part_id == mydata.sorted_idx[exp_my_first_part_id])
-								timer.toc(TIMING_WEIGHT_EXP);
+                        // Only time one thread, as I also only time one MPI process
+                        if (part_id == mydata.sorted_idx[exp_my_first_part_id])
+                            timer.toc(TIMING_WEIGHT_EXP);
 #endif
-						} // end loop itrans
-					} // end loop ipsi
-				} // end loop idir
-			} // end loop exp_iclass
-		} // end if iter==1
+                    } // end loop itrans
+                } // end loop ipsi
+            } // end loop idir
+        } // end loop exp_iclass
+    } // end if iter==1
 
-		//Store parameters for this image
-		exp_sum_weight[img_id] = exp_thisimage_sumweight;
+    //Store parameters for this image
+    exp_sum_weight = exp_thisimage_sumweight;
 
-		// Check the sum of weights is not zero
+    // Check the sum of weights is not zero
 // On a Mac, the isnan function does not compile. Just uncomment the define statement, as this is merely a debugging statement
 //#define MAC_OSX
 #ifndef MAC_OSX
-		if (exp_thisimage_sumweight == 0. || std::isnan(exp_thisimage_sumweight))
-		{
-			std::cerr << " exp_thisimage_sumweight= " << exp_thisimage_sumweight << std::endl;
-			Image<RFLOAT> It;
-			It() = exp_Mweight;
-			It.write("Mweight.spi");
-			//It() = DEBUGGING_COPY_exp_Mweight;
-			//It.write("Mweight_copy.spi");
-			It().resize(exp_Mcoarse_significant);
-			if (MULTIDIM_SIZE(It()) > 0)
-			{
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(It())
-				{
-					if (DIRECT_MULTIDIM_ELEM(exp_Mcoarse_significant, n))
-						DIRECT_MULTIDIM_ELEM(It(), n) = 1.;
-					else
-						DIRECT_MULTIDIM_ELEM(It(), n) = 0.;
-				}
-				It.write("Mcoarse_significant.spi");
-			}
-			std::cerr << " part_id= " << part_id << std::endl;
-			std::cerr << " img_id= " << img_id << std::endl;
-			/*
-			MultidimArray<Complex> Faux;
-			FourierTransformer transformer;
-			windowFourierTransform(exp_Fimg, Faux, mymodel.ori_size);
-			It().resize(mymodel.ori_size, mymodel.ori_size);
-			transformer.inverseFourierTransform(Faux, It());
-			CenterFFT(It(), false);
-			It.write("exp_Fimg.spi");
-			std::cerr << "written exp_Fimgs.spi " << std::endl;
-			*/
-			int group_id = mydata.getGroupId(part_id, img_id);
-			int optics_group = mydata.getOpticsGroup(part_id, img_id);
-			std::cerr << " group_id= " << group_id << " mymodel.scale_correction[group_id]= " << mymodel.scale_correction[group_id] << std::endl;
-			std::cerr << " exp_ipass= " << exp_ipass << std::endl;
-			std::cerr << " sampling.NrDirections(0, true)= " << sampling.NrDirections()
-					<< " sampling.NrDirections(0, false)= " << sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior) << std::endl;
-			std::cerr << " sampling.NrPsiSamplings(0, true)= " << sampling.NrPsiSamplings()
-					<< " sampling.NrPsiSamplings(0, false)= " << sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior) << std::endl;
-			std::cerr << " mymodel.sigma2_noise[optics_group]= " << mymodel.sigma2_noise[optics_group] << std::endl;
-			if (do_norm_correction)
-			{
-				std::cerr << " mymodel.avg_norm_correction= " << mymodel.avg_norm_correction << std::endl;
-				std::cerr << " wsum_model.avg_norm_correction= " << wsum_model.avg_norm_correction << std::endl;
-			}
+    if (exp_thisimage_sumweight == 0. || std::isnan(exp_thisimage_sumweight))
+    {
+        std::cerr << " exp_thisimage_sumweight= " << exp_thisimage_sumweight << std::endl;
+        Image<RFLOAT> It;
+        It() = exp_Mweight;
+        It.write("Mweight.spi");
+        //It() = DEBUGGING_COPY_exp_Mweight;
+        //It.write("Mweight_copy.spi");
+        It().resize(exp_Mcoarse_significant);
+        if (MULTIDIM_SIZE(It()) > 0)
+        {
+            FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(It())
+            {
+                if (DIRECT_MULTIDIM_ELEM(exp_Mcoarse_significant, n))
+                    DIRECT_MULTIDIM_ELEM(It(), n) = 1.;
+                else
+                    DIRECT_MULTIDIM_ELEM(It(), n) = 0.;
+            }
+            It.write("Mcoarse_significant.spi");
+        }
+        std::cerr << " part_id= " << part_id << std::endl;
+        /*
+        MultidimArray<Complex> Faux;
+        FourierTransformer transformer;
+        windowFourierTransform(exp_Fimg, Faux, mymodel.ori_size);
+        It().resize(mymodel.ori_size, mymodel.ori_size);
+        transformer.inverseFourierTransform(Faux, It());
+        CenterFFT(It(), false);
+        It.write("exp_Fimg.spi");
+        std::cerr << "written exp_Fimgs.spi " << std::endl;
+        */
+        int group_id = mydata.getGroupId(part_id, 0);
+        int optics_group = mydata.getOpticsGroup(part_id, 0);
+        std::cerr << " group_id= " << group_id << " mymodel.scale_correction[group_id]= " << mymodel.scale_correction[group_id] << std::endl;
+        std::cerr << " exp_ipass= " << exp_ipass << std::endl;
+        std::cerr << " sampling.NrDirections(0, true)= " << sampling.NrDirections()
+                << " sampling.NrDirections(0, false)= " << sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior) << std::endl;
+        std::cerr << " sampling.NrPsiSamplings(0, true)= " << sampling.NrPsiSamplings()
+                << " sampling.NrPsiSamplings(0, false)= " << sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior) << std::endl;
+        std::cerr << " mymodel.sigma2_noise[optics_group]= " << mymodel.sigma2_noise[optics_group] << std::endl;
+        if (do_norm_correction)
+        {
+            std::cerr << " mymodel.avg_norm_correction= " << mymodel.avg_norm_correction << std::endl;
+            std::cerr << " wsum_model.avg_norm_correction= " << wsum_model.avg_norm_correction << std::endl;
+        }
 
-			std::cerr << "written out Mweight.spi" << std::endl;
-			std::cerr << " exp_thisimage_sumweight= " << exp_thisimage_sumweight << std::endl;
-			std::cerr << " exp_min_diff2[img_id]= " << exp_min_diff2[img_id] << std::endl;
-			REPORT_ERROR("ERROR!!! zero sum of weights....");
-		}
+        std::cerr << "written out Mweight.spi" << std::endl;
+        std::cerr << " exp_thisimage_sumweight= " << exp_thisimage_sumweight << std::endl;
+        std::cerr << " exp_min_diff2[img_id]= " << exp_min_diff2 << std::endl;
+        REPORT_ERROR("ERROR!!! zero sum of weights....");
+    }
 #endif
-
-	} //end loop img_id
 
 	// Initialise exp_Mcoarse_significant
 	if (exp_ipass==0)
-		exp_Mcoarse_significant.resize(exp_nr_images, XSIZE(exp_Mweight));
+		exp_Mcoarse_significant.resize(XSIZE(exp_Mweight));
 
 	// Now, for each image,  find the exp_significant_weight that encompasses adaptive_fraction of exp_sum_weight
-	exp_significant_weight.clear();
-	exp_significant_weight.resize(exp_nr_images, 0.);
+	exp_significant_weight = 0.;
 
-	for (int img_id = 0; img_id < exp_nr_images; img_id++)
-	{
-
-		int my_metadata_offset = metadata_offset + img_id;
 #ifdef TIMING
 		if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 			timer.tic(TIMING_WEIGHT_SORT);
 #endif
-		MultidimArray<RFLOAT> sorted_weight;
-		// Get the relevant row for this particle
-		exp_Mweight.getRow(img_id, sorted_weight);
+    MultidimArray<RFLOAT> sorted_weight = exp_Mweight;
 
-		// Only select non-zero probabilities to speed up sorting
-		long int np = 0;
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sorted_weight)
-		{
-			if (DIRECT_MULTIDIM_ELEM(sorted_weight, n) > 0.)
-			{
-				DIRECT_MULTIDIM_ELEM(sorted_weight, np) = DIRECT_MULTIDIM_ELEM(sorted_weight, n);
-				np++;
-			}
-		}
-		sorted_weight.resize(np);
+    // Only select non-zero probabilities to speed up sorting
+    long int np = 0;
+    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sorted_weight)
+    {
+        if (DIRECT_MULTIDIM_ELEM(sorted_weight, n) > 0.)
+        {
+            DIRECT_MULTIDIM_ELEM(sorted_weight, np) = DIRECT_MULTIDIM_ELEM(sorted_weight, n);
+            np++;
+        }
+    }
+    sorted_weight.resize(np);
 
-		// Sort from low to high values
-		sorted_weight.sort();
+    // Sort from low to high values
+    sorted_weight.sort();
 
 #ifdef TIMING
-		if (part_id == mydata.sorted_idx[exp_my_first_part_id])
-			timer.toc(TIMING_WEIGHT_SORT);
+    if (part_id == mydata.sorted_idx[exp_my_first_part_id])
+        timer.toc(TIMING_WEIGHT_SORT);
 #endif
-		RFLOAT frac_weight = 0.;
-		RFLOAT my_significant_weight;
-		long int my_nr_significant_coarse_samples = 0;
-		for (long int i = XSIZE(sorted_weight) - 1; i >= 0; i--)
-		{
-			if (maximum_significants > 0 )
-			{
-				if(my_nr_significant_coarse_samples < maximum_significants)
-				{
-					if (exp_ipass==0)
-						my_nr_significant_coarse_samples++;
-					my_significant_weight = DIRECT_A1D_ELEM(sorted_weight, i);
-				}
-			}
-			else
-			{
-				if (exp_ipass==0)
-					my_nr_significant_coarse_samples++;
-				my_significant_weight = DIRECT_A1D_ELEM(sorted_weight, i);
-			}
-			frac_weight += DIRECT_A1D_ELEM(sorted_weight, i);
-			if (frac_weight > adaptive_fraction * exp_sum_weight[img_id])
-				break;
-		}
+    RFLOAT frac_weight = 0.;
+    RFLOAT my_significant_weight;
+    long int my_nr_significant_coarse_samples = 0;
+    for (long int i = XSIZE(sorted_weight) - 1; i >= 0; i--)
+    {
+        if (maximum_significants > 0 )
+        {
+            if(my_nr_significant_coarse_samples < maximum_significants)
+            {
+                if (exp_ipass==0)
+                    my_nr_significant_coarse_samples++;
+                my_significant_weight = DIRECT_A1D_ELEM(sorted_weight, i);
+            }
+        }
+        else
+        {
+            if (exp_ipass==0)
+                my_nr_significant_coarse_samples++;
+            my_significant_weight = DIRECT_A1D_ELEM(sorted_weight, i);
+        }
+        frac_weight += DIRECT_A1D_ELEM(sorted_weight, i);
+        if (frac_weight > adaptive_fraction * exp_sum_weight)
+            break;
+    }
 
 
 #ifdef DEBUG_SORT
-		// Check sorted array is really sorted
-		RFLOAT prev = 0.;
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sorted_weight)
-		{
-			if (DIRECT_MULTIDIM_ELEM(sorted_weight, n) < prev)
-			{
-				Image<RFLOAT> It;
-				It()=sorted_weight;
-				It() *= 10000;
-				It.write("sorted_weight.spi");
-				std::cerr << "written sorted_weight.spi" << std::endl;
-				REPORT_ERROR("Error in sorting!");
-			}
-			prev=DIRECT_MULTIDIM_ELEM(sorted_weight, n);
-		}
+    // Check sorted array is really sorted
+    RFLOAT prev = 0.;
+    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sorted_weight)
+    {
+        if (DIRECT_MULTIDIM_ELEM(sorted_weight, n) < prev)
+        {
+            Image<RFLOAT> It;
+            It()=sorted_weight;
+            It() *= 10000;
+            It.write("sorted_weight.spi");
+            std::cerr << "written sorted_weight.spi" << std::endl;
+            REPORT_ERROR("Error in sorting!");
+        }
+        prev=DIRECT_MULTIDIM_ELEM(sorted_weight, n);
+    }
 #endif
 
-		if (exp_ipass==0 && my_nr_significant_coarse_samples == 0)
-		{
-			std::cerr << " part_id= " << part_id << " img_id= " << img_id << " adaptive_fraction= " << adaptive_fraction << std::endl;
-			std::cerr << " frac-weight= " << frac_weight << std::endl;
-			std::cerr << " exp_sum_weight[img_id]= " << exp_sum_weight[img_id] << std::endl;
-			Image<RFLOAT> It;
-			std::cerr << " XSIZE(exp_Mweight)= " << XSIZE(exp_Mweight) << std::endl;
-			It()=exp_Mweight;
-			It() *= 10000;
-			It.write("Mweight2.spi");
-			std::cerr << "written Mweight2.spi" << std::endl;
-			std::cerr << " np= " << np << std::endl;
-			It()=sorted_weight;
-			It() *= 10000;
-			std::cerr << " XSIZE(sorted_weight)= " << XSIZE(sorted_weight) << std::endl;
-			if (XSIZE(sorted_weight) > 0)
-			{
-				It.write("sorted_weight.spi");
-				std::cerr << "written sorted_weight.spi" << std::endl;
-			}
-			REPORT_ERROR("my_nr_significant_coarse_samples == 0");
-		}
+    if (exp_ipass==0 && my_nr_significant_coarse_samples == 0)
+    {
+        std::cerr << " part_id= " << part_id << " adaptive_fraction= " << adaptive_fraction << std::endl;
+        std::cerr << " frac-weight= " << frac_weight << std::endl;
+        std::cerr << " exp_sum_weight= " << exp_sum_weight << std::endl;
+        Image<RFLOAT> It;
+        std::cerr << " XSIZE(exp_Mweight)= " << XSIZE(exp_Mweight) << std::endl;
+        It()=exp_Mweight;
+        It() *= 10000;
+        It.write("Mweight2.spi");
+        std::cerr << "written Mweight2.spi" << std::endl;
+        std::cerr << " np= " << np << std::endl;
+        It()=sorted_weight;
+        It() *= 10000;
+        std::cerr << " XSIZE(sorted_weight)= " << XSIZE(sorted_weight) << std::endl;
+        if (XSIZE(sorted_weight) > 0)
+        {
+            It.write("sorted_weight.spi");
+            std::cerr << "written sorted_weight.spi" << std::endl;
+        }
+        REPORT_ERROR("my_nr_significant_coarse_samples == 0");
+    }
 
-		if (exp_ipass==0)
-		{
-			// Store nr_significant_coarse_samples for this particle
-			// Don't do this for multibody, as it would be overwritten for each body,
-			// and we also use METADATA_NR_SIGN in the new safeguard for the gold-standard separation
-			if (mymodel.nr_bodies == 1)
-				DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_NR_SIGN) = (RFLOAT)my_nr_significant_coarse_samples;
+    if (exp_ipass==0)
+    {
+        // Store nr_significant_coarse_samples for this particle
+        // Don't do this for multibody, as it would be overwritten for each body,
+        // and we also use METADATA_NR_SIGN in the new safeguard for the gold-standard separation
+        if (mymodel.nr_bodies == 1)
+            DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_NR_SIGN) = (RFLOAT)my_nr_significant_coarse_samples;
 
-			// Keep track of which coarse samplings were significant were significant for this particle
-			for (int ihidden = 0; ihidden < XSIZE(exp_Mcoarse_significant); ihidden++)
-			{
-				if (DIRECT_A2D_ELEM(exp_Mweight, img_id, ihidden) >= my_significant_weight)
-					DIRECT_A2D_ELEM(exp_Mcoarse_significant, img_id, ihidden) = true;
-				else
-					DIRECT_A2D_ELEM(exp_Mcoarse_significant, img_id, ihidden) = false;
-			}
+        // Keep track of which coarse samplings were significant were significant for this particle
+        for (int ihidden = 0; ihidden < XSIZE(exp_Mcoarse_significant); ihidden++)
+        {
+            if (DIRECT_A1D_ELEM(exp_Mweight, ihidden) >= my_significant_weight)
+                DIRECT_A1D_ELEM(exp_Mcoarse_significant, ihidden) = true;
+            else
+                DIRECT_A1D_ELEM(exp_Mcoarse_significant, ihidden) = false;
+        }
 
-		}
-		exp_significant_weight[img_id] = my_significant_weight;
-
-	} // end loop img_id
+    }
+    exp_significant_weight = my_significant_weight;
 
 #ifdef TIMING
 	if (part_id == mydata.sorted_idx[exp_my_first_part_id])

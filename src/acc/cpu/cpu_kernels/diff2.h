@@ -741,7 +741,7 @@ inline void diff2_fine_2D(
 		for (unsigned long itrans=0; itrans<trans_num; itrans++)
 		{
 			unsigned long int iy = d_job_idx[bid]+itrans;
-			g_diff2s[iy] = s[itrans] + sum_init;
+			g_diff2s[iy] += s[itrans] + sum_init;
 		}
 	}  // for bid
 }
@@ -920,7 +920,7 @@ inline void diff2_fine_3D(
 		for (unsigned long itrans=0; itrans<trans_num; itrans++)
 		{
 			unsigned long int iy = d_job_idx[bid]+itrans;
-			g_diff2s[iy] = s[itrans] + sum_init;
+			g_diff2s[iy] += s[itrans] + sum_init;
 		}
 	} // for bid
 }
