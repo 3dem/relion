@@ -22,8 +22,213 @@ void getFourierTransformsAndCtfs(long int part_id,
 #endif
 
 	CUSTOM_ALLOCATOR_REGION_NAME("GFTCTF");
+    Matrix2D<RFLOAT> Aori;
+    Matrix1D<RFLOAT> my_projected_com(baseMLO->mymodel.data_dim), my_refined_ibody_offset(baseMLO->mymodel.data_dim);
 
-	for (int img_id = 0; img_id < sp.nr_images; img_id++)
+    // Get the norm_correction
+    RFLOAT normcorr = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_NORM);
+
+    // Safeguard against gold-standard separation
+    if (baseMLO->do_split_random_halves)
+    {
+        int halfset = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_NR_SIGN);
+        if (halfset != baseMLO->my_halfset)
+        {
+            std::cerr << "BUG!!! halfset= " << halfset << " my_halfset= " << baseMLO->my_halfset << " part_id= " << part_id << std::endl;
+            REPORT_ERROR("BUG! Mixing gold-standard separation!!!!");
+        }
+
+    }
+
+    // Get the optimal origin offsets from the previous iteration
+    // Sjors 5mar18: it is very important that my_old_offset has baseMLO->mymodel.data_dim and not just (3), as transformCartesianAndHelicalCoords will give different results!!!
+    Matrix1D<RFLOAT> my_old_offset(baseMLO->mymodel.data_dim), my_prior(baseMLO->mymodel.data_dim), my_old_offset_ori;
+    int icol_rot, icol_tilt, icol_psi, icol_xoff, icol_yoff, icol_zoff;
+    XX(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_XOFF);
+    YY(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_YOFF);
+    XX(my_prior)      = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_XOFF_PRIOR);
+    YY(my_prior)      = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_YOFF_PRIOR);
+    // Uninitialised priors were set to 999.
+    if (XX(my_prior) > 998.99 && XX(my_prior) < 999.01)
+        XX(my_prior) = 0.;
+    if (YY(my_prior) > 998.99 && YY(my_prior) < 999.01)
+        YY(my_prior) = 0.;
+
+    if (accMLO->dataIs3D)
+    {
+        ZZ(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ZOFF);
+        ZZ(my_prior)      = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ZOFF_PRIOR);
+        // Unitialised priors were set to 999.
+        if (ZZ(my_prior) > 998.99 && ZZ(my_prior) < 999.01)
+            ZZ(my_prior) = 0.;
+    }
+
+    if (baseMLO->mymodel.nr_bodies > 1)
+    {
+
+        // 17May2017: Shift image to the projected COM for this body!
+        // Aori is the original transformation matrix of the consensus refinement
+        Euler_angles2matrix(DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT),
+                            DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT),
+                            DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_PSI), Aori, false);
+        my_projected_com = Aori * baseMLO->mymodel.com_bodies[ibody];
+        // This will have made my_projected_com of size 3 again! resize to mymodel.data_dim
+        my_projected_com.resize(baseMLO->mymodel.data_dim);
+
+        // Subtract the projected COM offset, to position this body in the center
+        // Also keep the my_old_offset in my_old_offset_ori
+        my_old_offset_ori = my_old_offset;
+        my_old_offset -= my_projected_com;
+
+        // Also get refined offset for this body
+        icol_xoff = 3 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+        icol_yoff = 4 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+        icol_zoff = 5 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+        XX(my_refined_ibody_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, icol_xoff);
+        YY(my_refined_ibody_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, icol_yoff);
+        if (baseMLO->mymodel.data_dim == 3)
+            ZZ(my_refined_ibody_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, icol_zoff);
+
+        // For multi-body refinement: set the priors of the translations to zero (i.e. everything centred around consensus offset)
+        my_prior.initZeros();
+    }
+
+    // Store priors on translations
+    op.prior = my_prior;
+
+    CTOC(accMLO->timer,"init");
+
+    CTIC(accMLO->timer,"nonZeroProb");
+    // Orientational priors
+    if (baseMLO->mymodel.nr_bodies > 1 )
+    {
+
+        // Centre local searches around the orientation from the previous iteration, this one goes with overall sigma2_ang
+        // On top of that, apply prior on the deviation from (0,0,0) with mymodel.sigma_tilt_bodies[ibody] and mymodel.sigma_psi_bodies[ibody]
+        icol_rot  = 0 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+        icol_tilt = 1 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+        icol_psi  = 2 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+        RFLOAT prior_rot  = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, icol_rot);
+        RFLOAT prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, icol_tilt);
+        RFLOAT prior_psi =  DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, icol_psi);
+        baseMLO->sampling.selectOrientationsWithNonZeroPriorProbability(
+                prior_rot, prior_tilt, prior_psi,
+                sqrt(baseMLO->mymodel.sigma2_rot),
+                sqrt(baseMLO->mymodel.sigma2_tilt),
+                sqrt(baseMLO->mymodel.sigma2_psi),
+                op.pointer_dir_nonzeroprior, op.directions_prior,
+                op.pointer_psi_nonzeroprior, op.psi_prior, false, 3.,
+                baseMLO->mymodel.sigma_tilt_bodies[ibody],
+                baseMLO->mymodel.sigma_psi_bodies[ibody]);
+
+    }
+    else if (baseMLO->mymodel.orientational_prior_mode != NOPRIOR && !(baseMLO->do_skip_align ||baseMLO-> do_skip_rotate))
+    {
+        // First try if there are some fixed prior angles
+        // For multi-body refinements, ignore the original priors and get the refined residual angles from the previous iteration
+        RFLOAT prior_rot = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT_PRIOR);
+        RFLOAT prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT_PRIOR);
+        RFLOAT prior_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_PSI_PRIOR);
+        RFLOAT prior_psi_flip_ratio = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_PSI_PRIOR_FLIP_RATIO);
+
+        bool do_auto_refine_local_searches = (baseMLO->do_auto_refine) && (baseMLO->sampling.healpix_order >= baseMLO->autosampling_hporder_local_searches);
+        bool do_classification_local_searches = (! baseMLO->do_auto_refine) && (baseMLO->mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
+                                                && (baseMLO->mymodel.sigma2_rot > 0.) && (baseMLO->mymodel.sigma2_tilt > 0.) && (baseMLO->mymodel.sigma2_psi > 0.);
+        bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
+
+        // If there were no defined priors (i.e. their values were 999.), then use the "normal" angles
+        if (prior_rot > 998.99 && prior_rot < 999.01)
+            prior_rot = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
+        if (prior_tilt > 998.99 && prior_tilt < 999.01)
+            prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT);
+        if (prior_psi > 998.99 && prior_psi < 999.01)
+            prior_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_PSI);
+        if (prior_psi_flip_ratio > 998.99 && prior_psi_flip_ratio < 999.01)
+            prior_psi_flip_ratio = 0.5;
+
+        ////////// How does this work now: each particle has a different sampling object?!!!
+        // Select only those orientations that have non-zero prior probability
+
+        if (baseMLO->do_helical_refine && baseMLO->mymodel.ref_dim == 3)
+        {
+            baseMLO->sampling.selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalReconstruction(prior_rot, prior_tilt, prior_psi,
+                                                                                                      sqrt(baseMLO->mymodel.sigma2_rot), sqrt(baseMLO->mymodel.sigma2_tilt), sqrt(baseMLO->mymodel.sigma2_psi),
+                                                                                                      op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior,
+                                                                                                      do_local_angular_searches, prior_psi_flip_ratio);
+        }
+        else
+        {
+            baseMLO->sampling.selectOrientationsWithNonZeroPriorProbability(prior_rot, prior_tilt, prior_psi,
+                                                                            sqrt(baseMLO->mymodel.sigma2_rot), sqrt(baseMLO->mymodel.sigma2_tilt), sqrt(baseMLO->mymodel.sigma2_psi),
+                                                                            op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
+        }
+
+        long int nr_orients = baseMLO->sampling.NrDirections(0, &op.pointer_dir_nonzeroprior) * baseMLO->sampling.NrPsiSamplings(0, &op.pointer_psi_nonzeroprior);
+        if (nr_orients == 0)
+        {
+            std::cerr << " sampling.NrDirections()= " << baseMLO->sampling.NrDirections(0, &op.pointer_dir_nonzeroprior)
+                      << " sampling.NrPsiSamplings()= " << baseMLO->sampling.NrPsiSamplings(0, &op.pointer_psi_nonzeroprior) << std::endl;
+            REPORT_ERROR("Zero orientations fall within the local angular search. Increase the sigma-value(s) on the orientations!");
+        }
+
+    }
+    CTOC(accMLO->timer,"nonZeroProb");
+
+    // Helical reconstruction: calculate old_offset in the system of coordinates of the helix, i.e. parallel & perpendicular, depending on psi-angle!
+    // For helices do NOT apply old_offset along the direction of the helix!!
+    Matrix1D<RFLOAT> my_old_offset_helix_coords;
+    RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
+    RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT);
+    RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_PSI);
+    if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
+    {
+        // Calculate my_old_offset_helix_coords from my_old_offset and psi angle
+        transformCartesianAndHelicalCoords(my_old_offset, my_old_offset_helix_coords, rot_deg, tilt_deg, psi_deg, CART_TO_HELICAL_COORDS);
+        // We do NOT want to accumulate the offsets in the direction along the helix (which is X in the helical coordinate system!)
+        // However, when doing helical local searches, we accumulate offsets
+        // Do NOT accumulate offsets in 3D classification of helices
+        if ( (! baseMLO->do_skip_align) && (! baseMLO->do_skip_rotate) )
+        {
+            // TODO: check whether the following lines make sense
+            bool do_auto_refine_local_searches = (baseMLO->do_auto_refine) && (baseMLO->sampling.healpix_order >= baseMLO->autosampling_hporder_local_searches);
+            bool do_classification_local_searches = (! baseMLO->do_auto_refine) && (baseMLO->mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
+                                                    && (baseMLO->mymodel.sigma2_rot > 0.) && (baseMLO->mymodel.sigma2_tilt > 0.) && (baseMLO->mymodel.sigma2_psi > 0.);
+            bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
+            if (!do_local_angular_searches)
+            {
+                if (! accMLO->dataIs3D)
+                    XX(my_old_offset_helix_coords) = 0.;
+                else
+                    ZZ(my_old_offset_helix_coords) = 0.;
+            }
+        }
+        // TODO: Now re-calculate the my_old_offset in the real (or image) system of coordinate (rotate -psi angle)
+        transformCartesianAndHelicalCoords(my_old_offset_helix_coords, my_old_offset, rot_deg, tilt_deg, psi_deg, HELICAL_TO_CART_COORDS);
+    }
+    CTOC(accMLO->timer,"HelicalPrep");
+
+    // ------------------------------------------------------------------------------------------
+
+    my_old_offset.selfROUND(); // Below, this rounded my_old_offset will be applied to the actual images
+
+    // ------------------------------------------------------------------------------------------
+
+    if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
+    {
+        // Transform rounded Cartesian offsets to corresponding helical ones
+        transformCartesianAndHelicalCoords(my_old_offset, my_old_offset_helix_coords, rot_deg, tilt_deg, psi_deg, CART_TO_HELICAL_COORDS);
+        op.old_offset = my_old_offset_helix_coords;
+    }
+    else
+    {
+        // For multi-bodies: store only the old refined offset, not the constant consensus offset or the projected COM of this body
+        if (baseMLO->mymodel.nr_bodies > 1)
+            op.old_offset = my_refined_ibody_offset;
+        else
+            op.old_offset = my_old_offset;  // Not doing helical refinement. Rounded Cartesian offsets are stored.
+    }
+
+    for (int img_id = 0; img_id < sp.nr_images; img_id++)
 	{
 		CTIC(accMLO->timer,"init");
 		FileName fn_img;
@@ -31,8 +236,6 @@ void getFourierTransformsAndCtfs(long int part_id,
 		MultidimArray<Complex > Fimg;
 		MultidimArray<Complex > Faux;
 		MultidimArray<RFLOAT> Fctf, FstMulti;
-		Matrix2D<RFLOAT> Aori;
-		Matrix1D<RFLOAT> my_projected_com(baseMLO->mymodel.data_dim), my_refined_ibody_offset(baseMLO->mymodel.data_dim);
 
 		// Which group do I belong?
 		int group_id =baseMLO->mydata.getGroupId(part_id, img_id);
@@ -40,9 +243,6 @@ void getFourierTransformsAndCtfs(long int part_id,
 		// What is my optics group?
 		int optics_group = baseMLO->mydata.getOpticsGroup(part_id, img_id);
 		bool ctf_premultiplied = baseMLO->mydata.obsModel.getCtfPremultiplied(optics_group);
-
-		// metadata offset for this image in the particle
-		int my_metadata_offset = op.metadata_offset + img_id;
 
 		// Get the right line in the exp_fn_img strings (also exp_fn_recimg and exp_fn_ctfs)
 		int istop = 0;
@@ -53,160 +253,12 @@ void getFourierTransformsAndCtfs(long int part_id,
 		if (!baseMLO->mydata.getImageNameOnScratch(part_id, img_id, fn_img))
 		{
 			std::istringstream split(baseMLO->exp_fn_img);
-			for (int i = 0; i <= my_metadata_offset; i++)
+			for (int i = 0; i <= op.imagedata_offset; i++)
 				getline(split, fn_img);
 		}
 		sp.current_img = fn_img;
 
-		// Get the norm_correction
-		RFLOAT normcorr = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_NORM);
-
-		// Safeguard against gold-standard separation
-		if (baseMLO->do_split_random_halves)
-		{
-			int halfset = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_NR_SIGN);
-			if (halfset != baseMLO->my_halfset)
-			{
-				std::cerr << "BUG!!! halfset= " << halfset << " my_halfset= " << baseMLO->my_halfset << " part_id= " << part_id << std::endl;
-				REPORT_ERROR("BUG! Mixing gold-standard separation!!!!");
-			}
-
-		}
-
-		// Get the optimal origin offsets from the previous iteration
-		// Sjors 5mar18: it is very important that my_old_offset has baseMLO->mymodel.data_dim and not just (3), as transformCartesianAndHelicalCoords will give different results!!!
-		Matrix1D<RFLOAT> my_old_offset(baseMLO->mymodel.data_dim), my_prior(baseMLO->mymodel.data_dim), my_old_offset_ori;
-		int icol_rot, icol_tilt, icol_psi, icol_xoff, icol_yoff, icol_zoff;
-		XX(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_XOFF);
-		YY(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_YOFF);
-		XX(my_prior)      = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_XOFF_PRIOR);
-		YY(my_prior)      = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_YOFF_PRIOR);
-		// Uninitialised priors were set to 999.
-		if (XX(my_prior) > 998.99 && XX(my_prior) < 999.01)
-			XX(my_prior) = 0.;
-		if (YY(my_prior) > 998.99 && YY(my_prior) < 999.01)
-			YY(my_prior) = 0.;
-
-		if (accMLO->dataIs3D)
-		{
-			ZZ(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_ZOFF);
-			ZZ(my_prior)      = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_ZOFF_PRIOR);
-			// Unitialised priors were set to 999.
-			if (ZZ(my_prior) > 998.99 && ZZ(my_prior) < 999.01)
-				ZZ(my_prior) = 0.;
-		}
-
-		if (baseMLO->mymodel.nr_bodies > 1)
-		{
-
-			// 17May2017: Shift image to the projected COM for this body!
-			// Aori is the original transformation matrix of the consensus refinement
-			Euler_angles2matrix(DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_ROT),
-					            DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_TILT),
-								DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_PSI), Aori, false);
-			my_projected_com = Aori * baseMLO->mymodel.com_bodies[ibody];
-			// This will have made my_projected_com of size 3 again! resize to mymodel.data_dim
-			my_projected_com.resize(baseMLO->mymodel.data_dim);
-
-			// Subtract the projected COM offset, to position this body in the center
-			// Also keep the my_old_offset in my_old_offset_ori
-			my_old_offset_ori = my_old_offset;
-			my_old_offset -= my_projected_com;
-
-			// Also get refined offset for this body
-			icol_xoff = 3 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
-			icol_yoff = 4 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
-			icol_zoff = 5 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
-			XX(my_refined_ibody_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, icol_xoff);
-			YY(my_refined_ibody_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, icol_yoff);
-			if (baseMLO->mymodel.data_dim == 3)
-				ZZ(my_refined_ibody_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, icol_zoff);
-
-			// For multi-body refinement: set the priors of the translations to zero (i.e. everything centred around consensus offset)
-			my_prior.initZeros();
-		}
-
-		CTOC(accMLO->timer,"init");
-
-		CTIC(accMLO->timer,"nonZeroProb");
-		// Orientational priors
-		if (baseMLO->mymodel.nr_bodies > 1 )
-		{
-
-			// Centre local searches around the orientation from the previous iteration, this one goes with overall sigma2_ang
-			// On top of that, apply prior on the deviation from (0,0,0) with mymodel.sigma_tilt_bodies[ibody] and mymodel.sigma_psi_bodies[ibody]
-			icol_rot  = 0 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
-			icol_tilt = 1 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
-			icol_psi  = 2 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
-			RFLOAT prior_rot  = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, icol_rot);
-			RFLOAT prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, icol_tilt);
-			RFLOAT prior_psi =  DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, icol_psi);
-			baseMLO->sampling.selectOrientationsWithNonZeroPriorProbability(
-					prior_rot, prior_tilt, prior_psi,
-					sqrt(baseMLO->mymodel.sigma2_rot),
-					sqrt(baseMLO->mymodel.sigma2_tilt),
-					sqrt(baseMLO->mymodel.sigma2_psi),
-					op.pointer_dir_nonzeroprior, op.directions_prior,
-					op.pointer_psi_nonzeroprior, op.psi_prior, false, 3.,
-					baseMLO->mymodel.sigma_tilt_bodies[ibody],
-					baseMLO->mymodel.sigma_psi_bodies[ibody]);
-
-		}
-		else if (baseMLO->mymodel.orientational_prior_mode != NOPRIOR && !(baseMLO->do_skip_align ||baseMLO-> do_skip_rotate))
-		{
-			// First try if there are some fixed prior angles
-			// For multi-body refinements, ignore the original priors and get the refined residual angles from the previous iteration
-			RFLOAT prior_rot = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_ROT_PRIOR);
-			RFLOAT prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_TILT_PRIOR);
-			RFLOAT prior_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_PSI_PRIOR);
-			RFLOAT prior_psi_flip_ratio = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_PSI_PRIOR_FLIP_RATIO);
-
-			bool do_auto_refine_local_searches = (baseMLO->do_auto_refine) && (baseMLO->sampling.healpix_order >= baseMLO->autosampling_hporder_local_searches);
-			bool do_classification_local_searches = (! baseMLO->do_auto_refine) && (baseMLO->mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
-					&& (baseMLO->mymodel.sigma2_rot > 0.) && (baseMLO->mymodel.sigma2_tilt > 0.) && (baseMLO->mymodel.sigma2_psi > 0.);
-			bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
-
-			// If there were no defined priors (i.e. their values were 999.), then use the "normal" angles
-			if (prior_rot > 998.99 && prior_rot < 999.01)
-				prior_rot = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_ROT);
-			if (prior_tilt > 998.99 && prior_tilt < 999.01)
-				prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_TILT);
-			if (prior_psi > 998.99 && prior_psi < 999.01)
-				prior_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_PSI);
-			if (prior_psi_flip_ratio > 998.99 && prior_psi_flip_ratio < 999.01)
-				prior_psi_flip_ratio = 0.5;
-
-			////////// How does this work now: each particle has a different sampling object?!!!
-			// Select only those orientations that have non-zero prior probability
-
-			if (baseMLO->do_helical_refine && baseMLO->mymodel.ref_dim == 3)
-			{
-				baseMLO->sampling.selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalReconstruction(prior_rot, prior_tilt, prior_psi,
-										sqrt(baseMLO->mymodel.sigma2_rot), sqrt(baseMLO->mymodel.sigma2_tilt), sqrt(baseMLO->mymodel.sigma2_psi),
-										op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior,
-										do_local_angular_searches, prior_psi_flip_ratio);
-			}
-			else
-			{
-				baseMLO->sampling.selectOrientationsWithNonZeroPriorProbability(prior_rot, prior_tilt, prior_psi,
-						sqrt(baseMLO->mymodel.sigma2_rot), sqrt(baseMLO->mymodel.sigma2_tilt), sqrt(baseMLO->mymodel.sigma2_psi),
-						op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
-			}
-
-			long int nr_orients = baseMLO->sampling.NrDirections(0, &op.pointer_dir_nonzeroprior) * baseMLO->sampling.NrPsiSamplings(0, &op.pointer_psi_nonzeroprior);
-			if (nr_orients == 0)
-			{
-				std::cerr << " sampling.NrDirections()= " << baseMLO->sampling.NrDirections(0, &op.pointer_dir_nonzeroprior)
-						<< " sampling.NrPsiSamplings()= " << baseMLO->sampling.NrPsiSamplings(0, &op.pointer_psi_nonzeroprior) << std::endl;
-				REPORT_ERROR("Zero orientations fall within the local angular search. Increase the sigma-value(s) on the orientations!");
-			}
-
-		}
-		CTOC(accMLO->timer,"nonZeroProb");
-
-		// ------------------------------------------------------------------------------------------
-
-		CTIC(accMLO->timer,"readData");
+        CTIC(accMLO->timer,"readData");
 		// Get the image and recimg data
 		if (baseMLO->do_parallel_disc_io)
 		{
@@ -235,7 +287,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 				else
 				{
 					CTIC(accMLO->timer,"ParaRead2DImages");
-					img() = baseMLO->exp_imgs[my_metadata_offset];
+					img() = baseMLO->exp_imgs[op.imagedata_offset];
 					CTOC(accMLO->timer,"ParaRead2DImages");
 				}
 			}
@@ -244,7 +296,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 				FileName fn_recimg;
 				std::istringstream split2(baseMLO->exp_fn_recimg);
 				// Get the right line in the exp_fn_img string
-				for (int i = 0; i <= my_metadata_offset; i++)
+				for (int i = 0; i <= op.imagedata_offset; i++)
 					getline(split2, fn_recimg);
 				rec_img.read(fn_recimg);
 				rec_img().setXmippOrigin();
@@ -287,7 +339,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 				img().resize(baseMLO->image_full_size[optics_group], baseMLO->image_full_size[optics_group]);
 				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(img())
 				{
-					DIRECT_A2D_ELEM(img(), i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, my_metadata_offset, i, j);
+					DIRECT_A2D_ELEM(img(), i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, op.imagedata_offset, i, j);
 				}
 				img().setXmippOrigin();
 				if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
@@ -298,7 +350,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 					rec_img().resize(baseMLO->image_full_size[optics_group], baseMLO->image_full_size[optics_group]);
 					FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(rec_img())
 					{
-						DIRECT_A2D_ELEM(rec_img(), i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, my_nr_particles + my_metadata_offset, i, j);
+						DIRECT_A2D_ELEM(rec_img(), i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, my_nr_particles + op.imagedata_offset, i, j);
 					}
 					rec_img().setXmippOrigin();
 				}
@@ -367,46 +419,6 @@ void getFourierTransformsAndCtfs(long int part_id,
 		 * 			allocation-cost to that region. /BjoernF,160129
 		 */
 
-		// Apply (rounded) old offsets first
-		my_old_offset.selfROUND();
-
-		// Helical reconstruction: calculate old_offset in the system of coordinates of the helix, i.e. parallel & perpendicular, depending on psi-angle!
-		// For helices do NOT apply old_offset along the direction of the helix!!
-		Matrix1D<RFLOAT> my_old_offset_helix_coords;
-		RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_ROT);
-		RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_TILT);
-		RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_PSI);
-		if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
-		{
-			// Calculate my_old_offset_helix_coords from my_old_offset and psi angle
-			transformCartesianAndHelicalCoords(my_old_offset, my_old_offset_helix_coords, rot_deg, tilt_deg, psi_deg, CART_TO_HELICAL_COORDS);
-			// We do NOT want to accumulate the offsets in the direction along the helix (which is X in the helical coordinate system!)
-			// However, when doing helical local searches, we accumulate offsets
-			// Do NOT accumulate offsets in 3D classification of helices
-			if ( (! baseMLO->do_skip_align) && (! baseMLO->do_skip_rotate) )
-			{
-				// TODO: check whether the following lines make sense
-				bool do_auto_refine_local_searches = (baseMLO->do_auto_refine) && (baseMLO->sampling.healpix_order >= baseMLO->autosampling_hporder_local_searches);
-				bool do_classification_local_searches = (! baseMLO->do_auto_refine) && (baseMLO->mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
-						&& (baseMLO->mymodel.sigma2_rot > 0.) && (baseMLO->mymodel.sigma2_tilt > 0.) && (baseMLO->mymodel.sigma2_psi > 0.);
-				bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
-				if (!do_local_angular_searches)
-				{
-					if (! accMLO->dataIs3D)
-						XX(my_old_offset_helix_coords) = 0.;
-					else
-						ZZ(my_old_offset_helix_coords) = 0.;
-				}
-			}
-			// TODO: Now re-calculate the my_old_offset in the real (or image) system of coordinate (rotate -psi angle)
-			transformCartesianAndHelicalCoords(my_old_offset_helix_coords, my_old_offset, rot_deg, tilt_deg, psi_deg, HELICAL_TO_CART_COORDS);
-		}
-		CTOC(accMLO->timer,"HelicalPrep");
-
-		// ------------------------------------------------------------------------------------------
-
-		my_old_offset.selfROUND();
-
 		// ------------------------------------------------------------------------------------------
 
 		CTIC(accMLO->timer,"TranslateAndNormCorrect");
@@ -416,6 +428,9 @@ void getFourierTransformsAndCtfs(long int part_id,
 
 		d_img.allAlloc();
 		d_img.allInit(0);
+
+        // TODO!: think about applying 3D offsets as 2D shifts to the 2D STA stacks here...
+        if (baseMLO->mydata.is_tomo) REPORT_ERROR("GPU-version of translation for 2D stacks not yet implemented...");
 
 		XFLOAT normcorr_val = baseMLO->do_norm_correction ? (XFLOAT)(baseMLO->mymodel.avg_norm_correction / normcorr) : 1;
 		AccUtilities::TranslateAndNormCorrect(	img.data,	// input   	host-side 	MultidimArray
@@ -475,25 +490,6 @@ void getFourierTransformsAndCtfs(long int part_id,
 
 		// ------------------------------------------------------------------------------------------
 
-		if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
-		{
-			// Transform rounded Cartesian offsets to corresponding helical ones
-			transformCartesianAndHelicalCoords(my_old_offset, my_old_offset_helix_coords, rot_deg, tilt_deg, psi_deg, CART_TO_HELICAL_COORDS);
-			op.old_offset[img_id] = my_old_offset_helix_coords;
-		}
-		else
-		{
-			// For multi-bodies: store only the old refined offset, not the constant consensus offset or the projected COM of this body
-			if (baseMLO->mymodel.nr_bodies > 1)
-				op.old_offset[img_id] = my_refined_ibody_offset;
-			else
-				op.old_offset[img_id] = my_old_offset;  // Not doing helical refinement. Rounded Cartesian offsets are stored.
-		}
-		// Also store priors on translations
-		op.prior[img_id] = my_prior;
-
-		// ------------------------------------------------------------------------------------------
-
 		CTIC(accMLO->timer,"selfApplyBeamTilt");
 		baseMLO->mydata.obsModel.demodulatePhase(optics_group, Fimg);
 		baseMLO->mydata.obsModel.divideByMtf(optics_group, Fimg);
@@ -524,6 +520,9 @@ void getFourierTransformsAndCtfs(long int part_id,
 			d_img.cpToHost();
 			d_img.streamSync();
 			d_img.getHost(img());
+
+            // TODO! Think about how the direction of the individual images in tilt series stack changes the direction of the mask for STA!!
+            if (baseMLO->mydata.is_tomo) REPORT_ERROR("ERROR: softMaskOutsideMapForHelix for STA not implemented yet...");
 
 			// ...modify img...
 			if(baseMLO->do_zero_mask)
@@ -691,7 +690,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 					{
 						std::istringstream split(baseMLO->exp_fn_ctf);
 						// Get the right line in the exp_fn_img string
-						for (int i = 0; i <= my_metadata_offset; i++)
+						for (int i = 0; i <= op.imagedata_offset; i++)
 							getline(split, fn_ctf);
 					}
 					Ictf.read(fn_ctf);
@@ -719,12 +718,20 @@ void getFourierTransformsAndCtfs(long int part_id,
 				CTF ctf;
 				ctf.setValuesByGroup(
                                         &(baseMLO->mydata).obsModel, optics_group,
-					DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_CTF_DEFOCUS_U),
-					DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_CTF_DEFOCUS_V),
-					DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_CTF_DEFOCUS_ANGLE),
-					DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_CTF_BFACTOR),
-					DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_CTF_KFACTOR),
-					DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_CTF_PHASE_SHIFT));
+					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_DEFOCUS_U),
+					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_DEFOCUS_V),
+					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_DEFOCUS_ANGLE),
+					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_BFACTOR),
+					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_KFACTOR),
+					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_PHASE_SHIFT));
+
+                // Apply the dz to the defocus for 2D image stacks in STA
+                if (baseMLO->mydata.is_tomo)
+                {
+                    ctf.DeltafU += baseMLO->mydata.particles[part_id].images[img_id].dz;
+                    ctf.DeltafV += baseMLO->mydata.particles[part_id].images[img_id].dz;
+                }
+
 
 				ctf.getFftwImage(Fctf, baseMLO->image_full_size[optics_group], baseMLO->image_full_size[optics_group], my_pixel_size,
 						baseMLO->ctf_phase_flipped, baseMLO->only_flip_phases, baseMLO->intact_ctf_first_peak, true, baseMLO->do_ctf_padding);
@@ -784,15 +791,18 @@ void getFourierTransformsAndCtfs(long int part_id,
 
 					Matrix2D<RFLOAT> Aresi,  Abody;
 					// Aresi is the residual orientation for this obody
-					Euler_angles2matrix(DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, ocol_rot),
-										DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, ocol_tilt),
-										DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, ocol_psi), Aresi, false);
+					Euler_angles2matrix(DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, ocol_rot),
+										DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, ocol_tilt),
+										DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, ocol_psi), Aresi, false);
 					// The real orientation to be applied is the obody transformation applied and the original one
 					Abody = Aori * (baseMLO->mymodel.orient_bodies[obody]).transpose() * baseMLO->A_rot90 * Aresi * baseMLO->mymodel.orient_bodies[obody];
 
 					// Apply anisotropic mag and scaling
 					Abody = baseMLO->mydata.obsModel.applyAnisoMag(Abody, optics_group);
 					Abody = baseMLO->mydata.obsModel.applyScaleDifference(Abody, optics_group, baseMLO->mymodel.ori_size, baseMLO->mymodel.pixel_size);
+
+                    // TODO! The translation below will now work for 2D stacks in 2D, just like selfTranslate() didn't work upwards; Also need to apply per-image rotations, Aproj!
+                    if (baseMLO->mydata.is_tomo) REPORT_ERROR("ERROR: multibody for STA not implemented yet!");
 
 					// Get the FT of the projection in the right direction
 					MultidimArray<Complex> FTo;
@@ -819,10 +829,10 @@ void getFourierTransformsAndCtfs(long int part_id,
 					other_projected_com -= my_old_offset_ori;
 
 					// Subtract refined obody-displacement
-					XX(other_projected_com) -= DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, ocol_xoff);
-					YY(other_projected_com) -= DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, ocol_yoff);
+					XX(other_projected_com) -= DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, ocol_xoff);
+					YY(other_projected_com) -= DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, ocol_yoff);
 					if (baseMLO->mymodel.data_dim == 3)
-						ZZ(other_projected_com) -= DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, ocol_zoff);
+						ZZ(other_projected_com) -= DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, ocol_zoff);
 
 					// Add the my_old_offset=selfRound(my_old_offset_ori - my_projected_com) already applied to this image for ibody
 					other_projected_com += my_old_offset;
@@ -944,7 +954,6 @@ void getAllSquaredDifferencesCoarse(
 
 				if (baseMLO->mymodel.nr_bodies > 1)
 				{
-					// img_id=0 because in multi-body refinement we do not do movie frames!
 					RFLOAT rot_ori = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
 					RFLOAT tilt_ori = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT);
 					RFLOAT psi_ori = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_PSI);
@@ -1014,7 +1023,6 @@ void getAllSquaredDifferencesCoarse(
 
 	for (int img_id = 0; img_id < sp.nr_images; img_id++)
 	{
-		int my_metadata_offset = op.metadata_offset + img_id;
 		long int group_id = baseMLO->mydata.getGroupId(op.part_id, img_id);
 		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
 		int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
@@ -1058,9 +1066,9 @@ void getAllSquaredDifferencesCoarse(
 
 			if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
 			{
-				RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_ROT);
-				RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_TILT);
-				RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata,my_metadata_offset, METADATA_PSI);
+				RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
+				RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT);
+				RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata,op.metadata_offset, METADATA_PSI);
 				transformCartesianAndHelicalCoords(xshift, yshift, zshift, xshift, yshift, zshift, rot_deg, tilt_deg, psi_deg, (accMLO->dataIs3D) ? (3) : (2), HELICAL_TO_CART_COORDS);
 			}
 
@@ -1226,7 +1234,6 @@ void getAllSquaredDifferencesFine(
 		// Reset size without de-allocating: we will append everything significant within
 		// the current allocation and then re-allocate the then determined (smaller) volume
 
-		int my_metadata_offset = op.metadata_offset + img_id;
 		long int group_id = baseMLO->mydata.getGroupId(op.part_id, img_id);
 		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
 		int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
@@ -1276,9 +1283,9 @@ void getAllSquaredDifferencesFine(
 
 				if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
 				{
-					RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_ROT);
-					RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_TILT);
-					RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_PSI);
+					RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
+					RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT);
+					RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_PSI);
 					transformCartesianAndHelicalCoords(xshift, yshift, zshift, xshift, yshift, zshift, rot_deg, tilt_deg, psi_deg, (accMLO->dataIs3D) ? (3) : (2), HELICAL_TO_CART_COORDS);
 				}
 
@@ -1628,7 +1635,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	// loop over all images inside this particle
 	for (int img_id = 0; img_id < sp.nr_images; img_id++)
 	{
-		int my_metadata_offset = op.metadata_offset + img_id;
 		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
 
 		RFLOAT old_offset_x, old_offset_y, old_offset_z;
@@ -1675,7 +1681,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 #endif
 
 			my_significant_weight = 0.999;
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_NR_SIGN) = (RFLOAT) 1.;
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_NR_SIGN) = (RFLOAT) 1.;
 			if (exp_ipass==0) // TODO better memset, 0 => false , 1 => true
 				for (int ihidden = 0; ihidden < XSIZE(op.Mcoarse_significant); ihidden++)
 					if (DIRECT_A2D_ELEM(op.Mweight, img_id, ihidden) >= my_significant_weight)
@@ -1733,9 +1739,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 						if (mypriors_len2 > 0.00001)
 						{
-							RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_ROT);
-							RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_TILT);
-							RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_PSI);
+							RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
+							RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT);
+							RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_PSI);
 							transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, rot_deg, tilt_deg, psi_deg, (accMLO->dataIs3D) ? (3) : (2), CART_TO_HELICAL_COORDS);
 						}
 					}
@@ -1916,7 +1922,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					// Don't do this for multibody, as it would be overwritten for each body,
 					// and we also use METADATA_NR_SIGN in the new safeguard for the gold-standard separation
 					if (baseMLO->mymodel.nr_bodies == 1)
-						DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_NR_SIGN) = (RFLOAT) my_nr_significant_coarse_samples;
+						DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_NR_SIGN) = (RFLOAT) my_nr_significant_coarse_samples;
 
 					AccPtr<bool> Mcoarse_significant = ptrFactory.make<bool>(ipart_length);
 					Mcoarse_significant.setHostPtr(&op.Mcoarse_significant.data[offset]);
@@ -2226,7 +2232,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		oo_otrans.allAlloc();
 
 		int sumBlockNum =0;
-		int my_metadata_offset = op.metadata_offset + img_id;
 		int group_id = baseMLO->mydata.getGroupId(op.part_id, img_id);
 		const int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
 		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
@@ -2294,9 +2299,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					// If it is doing helical refinement AND Cartesian vector myprior has a length > 0, transform the vector to its helical coordinates
 					if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) && (mypriors_len2 > 0.00001) )
 					{
-						RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_ROT);
-						RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_TILT);
-						RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_PSI);
+						RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
+						RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT);
+						RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_PSI);
 						transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, rot_deg, tilt_deg, psi_deg, (accMLO->dataIs3D) ? (3) : (2), CART_TO_HELICAL_COORDS);
 					}
 
@@ -2423,7 +2428,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	std::vector< RFLOAT> oversampled_rot, oversampled_tilt, oversampled_psi;
 	for (long int img_id = 0; img_id < sp.nr_images; img_id++)
 	{
-		int my_metadata_offset = op.metadata_offset + img_id;
 		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
 
 		CTIC(accMLO->timer,"setMetadata");
@@ -2459,12 +2463,12 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		int icol_yoff = (baseMLO->mymodel.nr_bodies == 1) ? METADATA_YOFF : 4 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
 		int icol_zoff = (baseMLO->mymodel.nr_bodies == 1) ? METADATA_ZOFF : 5 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
 
-		RFLOAT old_rot = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, icol_rot);
-		DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, icol_rot) = rot;
-		RFLOAT old_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, icol_tilt);
-		DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, icol_tilt) = tilt;
-		RFLOAT old_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, icol_psi);
-		DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, icol_psi) = psi;
+		RFLOAT old_rot = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, icol_rot);
+		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, icol_rot) = rot;
+		RFLOAT old_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, icol_tilt);
+		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, icol_tilt) = tilt;
+		RFLOAT old_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, icol_psi);
+		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, icol_psi) = psi;
 
 		Matrix1D<RFLOAT> shifts(baseMLO->mymodel.data_dim);
 
@@ -2479,18 +2483,18 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
 			transformCartesianAndHelicalCoords(shifts, shifts, old_rot, old_tilt, old_psi, HELICAL_TO_CART_COORDS);
 
-		DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, icol_xoff) = XX(shifts);
-		DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, icol_yoff) = YY(shifts);
+		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, icol_xoff) = XX(shifts);
+		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, icol_yoff) = YY(shifts);
 		if (accMLO->dataIs3D)
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, icol_zoff) = ZZ(shifts);
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, icol_zoff) = ZZ(shifts);
 
 		if (ibody == 0)
 		{
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_CLASS) = (RFLOAT)op.max_index[img_id].iclass + 1;
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CLASS) = (RFLOAT)op.max_index[img_id].iclass + 1;
 			RFLOAT pmax = op.max_weight[img_id]/op.sum_weight[img_id];
 			if(pmax>1) //maximum normalised probability weight is (unreasonably) larger than unity
 				CRITICAL("Relion is finding a normalised probability greater than 1");
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_PMAX) = pmax;
+			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_PMAX) = pmax;
 		}
 		CTOC(accMLO->timer,"setMetadata");
 	}

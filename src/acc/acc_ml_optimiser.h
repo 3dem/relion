@@ -132,7 +132,7 @@ public:
 class OptimisationParamters
 {
 public:
-	unsigned metadata_offset;
+	unsigned metadata_offset, imagedata_offset;
 
 	unsigned long part_id;
 
@@ -145,13 +145,14 @@ public:
 	// And from storeWeightedSums
 	std::vector<RFLOAT> sum_weight, significant_weight, max_weight;
 	std::vector< std::vector<RFLOAT> > sum_weight_class;
-	std::vector<Matrix1D<RFLOAT> > old_offset, prior;
+	Matrix1D<RFLOAT> old_offset, prior;
 	std::vector<MultidimArray<RFLOAT> > power_img;
 	MultidimArray<XFLOAT> Mweight;
 	std::vector<Indices> max_index;
 
 	OptimisationParamters (unsigned nr_images, unsigned long part_id):
 		metadata_offset(0),
+        imagedata_offset(0),
 		part_id(part_id)
 	{
 		power_img.resize(nr_images);
@@ -159,8 +160,6 @@ public:
 		Fimg.resize(nr_images);
 		Fimg_nomask.resize(nr_images);
 		Fctf.resize(nr_images);
-		old_offset.resize(nr_images);
-		prior.resize(nr_images);
 		max_index.resize(nr_images);
 		sum_weight_class.resize(nr_images);
 	};
