@@ -163,7 +163,8 @@ void Experiment::addParticle(int random_subset, int tomogram_id)
 	return;
 }
 
-void Experiment::addImageToParticle(std::string img_name, long int part_id, long int group_id, int optics_group, d4Matrix *Aproj)
+void Experiment::addImageToParticle(std::string img_name, long int part_id, long int group_id, int optics_group,
+                                    d4Matrix *Aproj, RFLOAT dz)
 {
 	if (group_id >= groups.size())
 		REPORT_ERROR("Experiment::addImageToParticle: group_id out of range");
@@ -189,6 +190,7 @@ void Experiment::addImageToParticle(std::string img_name, long int part_id, long
 	img.group_id = group_id;
 	img.optics_group = optics_group;
     img.Aproj = A;
+    img.dz = dz;
     nr_images_per_optics_group[optics_group]++;
 	img.optics_group_id = nr_images_per_optics_group[optics_group] - 1;
 
@@ -937,17 +939,21 @@ void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
                 // Pre-orientation of this particle in the tomogram
                 ParticleIndex id(part_id);
                 d3Matrix A = particleSet.getSubtomogramMatrix(id);
+                const d3Vector pos = particleSet.getParticleCoord(id);
 
                 // Add all images for this particle
                 const int fc = tomogramSet.getFrameCount(tomo_id);
                 for (int f = 0; f < fc; f++)
                 {
 
-                    d4Matrix P = tomogram.projectionMatrices[f] * d4Matrix(A);
-
                     FileName my_name = integerToString(f) + "@" + img_name;
 
-                    addImageToParticle(img_name, part_id, group_id, optics_group, &P);
+                    d4Matrix P = tomogram.projectionMatrices[f] * d4Matrix(A);
+
+                    double dz_pos = tomogram.getDepthOffset(f, pos);
+                    double dz = tomogram.handedness * tomogram.optics.pixelSize * tomogram.defocusSlope * dz_pos;
+
+                    addImageToParticle(img_name, part_id, group_id, optics_group, &P, dz);
                 }
 
             }
