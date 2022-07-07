@@ -391,6 +391,17 @@ void cpu_kernel_multi( T *A,
 			T  S,
 			size_t   image_size);
 /*
+ * In place add scalar S to scalar array A
+ *
+ *  A[i] = A[i]*S
+ */
+template <typename T>
+void cpu_kernel_add(
+	T *A,
+	T S,
+	size_t size
+);
+/*
 void finalizeMstddev(   int       blockIdx_x, 
 						int       threadIdx_x,
 						XFLOAT   *Mstddev,

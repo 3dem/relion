@@ -466,6 +466,21 @@ __global__ void cuda_kernel_multi(
 		A[pixel] = A[pixel]*S;
 }
 
+/*
+ * In place add scalar S to scalar array A
+ *
+ *  A[i] = A[i]*S
+ */
+template <typename T>
+__global__ void cuda_kernel_add(
+		T *A,
+		T S,
+		int size)
+{
+	int pixel = threadIdx.x + blockIdx.x * blockDim.x;
+	if (pixel < size)
+		A[pixel] += S;
+}
 }
 
 /*

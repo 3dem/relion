@@ -1118,8 +1118,14 @@ void getAllSquaredDifferencesCoarse(
 		buildCorrImage(baseMLO,op,corr_img,img_id,group_id);
 		corr_img.cpToDevice();
 
-        if (sp.nr_images > 1) REPORT_ERROR("TODO: Dari needs to write a function to add op.highres_Xi2_img[img_id] / 2. to all Weights, not initialise again!");
-		deviceInitValue<XFLOAT>(allWeights, (XFLOAT) (op.highres_Xi2_img[img_id] / 2.));
+		AccUtilities::add<XFLOAT>(
+			BLOCK_SIZE,
+			allWeights.getStream(),
+			(XFLOAT*)~allWeights,
+			(XFLOAT) (op.highres_Xi2_img[img_id] / 2.),
+			allWeights.getSize()
+		);
+
 		allWeights_pos = 0;
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -1674,8 +1680,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
         PassWeights.weights.cpToHost();
         DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 #else
-        deviceInitValue<XFLOAT>(PassWeights[img_id].weights, (XFLOAT)0.0);
-        PassWeights[img_id].weights[min_pair.first] = (XFLOAT)1.0;
+        deviceInitValue<XFLOAT>(PassWeights.weights, (XFLOAT)0.0);
+        PassWeights.weights[min_pair.first] = (XFLOAT)1.0;
 #endif
 
         my_significant_weight = 0.999;
