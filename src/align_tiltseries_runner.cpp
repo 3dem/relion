@@ -291,7 +291,7 @@ void AlignTiltseriesRunner::joinImodWrapperResults()
             }
             else
             {
-                MDout.setValue(EMDL_TOMO_ETOMO_DIRECTIVE_FILE, "undefined", itomo);
+                MDout.setValue(EMDL_TOMO_ETOMO_DIRECTIVE_FILE, std::string("undefined"), itomo);
             }
         }
         else if (verb)

@@ -64,6 +64,25 @@ CudaKernels::cuda_kernel_multi<T><<<MultiBsize,block_size,0,stream>>>(
 }
 
 template <typename T>
+static void add(int block_size, cudaStream_t stream, T *array, T value, size_t size)
+{
+#ifdef _CUDA_ENABLED
+	size_t MultiBsize = ( (size_t) ceilf((float)size/(float)BLOCK_SIZE));
+	CudaKernels::cuda_kernel_add<T><<<MultiBsize,block_size,0,stream>>>(
+		array,
+		value,
+		size
+	);
+#else
+	CpuKernels::cpu_kernel_add<T>(
+		array,
+		value,
+		size
+	);
+#endif
+}
+
+template <typename T>
 static void translate(int block_size,
 	AccDataTypes::Image<T> &in,
 	AccDataTypes::Image<T> &out,

@@ -806,6 +806,22 @@ void cpu_kernel_multi( T *A,
 	for (size_t i = 0; i < image_size; i ++)
 		OUT[i] = A[i]*B[i]*S;
 }
+
+template <typename T>
+void cpu_kernel_add(
+	T *A,
+	T  S,
+	size_t size
+)
+{
+#ifdef DEBUG_CUDA
+	if (size < 0)
+		ACC_PTR_DEBUG_INFO("cpu_kernel_add:  image_size < 0");
+#endif
+	for (size_t i = 0; i < size; i ++)
+		A[i] += S;
+}
+
 /*
 void batch_multi(   int     blockIdx_x,
 					int     blockIdx_y,
@@ -1055,8 +1071,8 @@ template void CpuKernels::cpu_translate2D<XFLOAT>(XFLOAT *,
 template void CpuKernels::cpu_translate3D<XFLOAT>(XFLOAT *,
     XFLOAT *, size_t, int, int, int, int, int, int);
 
-template void CpuKernels::cpu_kernel_multi<XFLOAT>( XFLOAT *,
-	XFLOAT, size_t);
+template void CpuKernels::cpu_kernel_multi<XFLOAT>( XFLOAT *, XFLOAT, size_t);
+template void CpuKernels::cpu_kernel_add<XFLOAT>( XFLOAT *, XFLOAT, size_t);
 
 template void CpuKernels::cpu_kernel_make_eulers_3D<true, true, true>(int, int,
 		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned long, XFLOAT *, XFLOAT *);
