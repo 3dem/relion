@@ -254,7 +254,7 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
 
 	double Q0;
 
-    globalTable.getValueSafely(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, out.optics.pixelSize, index);
+    globalTable.getValueSafely(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, out.optics.pixelSize, index);
     globalTable.getValueSafely(EMDL_CTF_VOLTAGE, out.optics.voltage, index);
     globalTable.getValueSafely(EMDL_CTF_CS, out.optics.Cs, index);
     globalTable.getValueSafely(EMDL_CTF_Q0, Q0, index);
@@ -418,7 +418,7 @@ void TomogramSet::addTomogramFromIMODStack(
 
     const CTF& ctf0 = ctfs[0];
 
-    globalTable.setValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, pixelSize, index);
+    globalTable.setValue(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, pixelSize, index);
     globalTable.setValue(EMDL_CTF_VOLTAGE, ctf0.kV, index);
     globalTable.setValue(EMDL_CTF_CS, ctf0.Cs, index);
     globalTable.setValue(EMDL_CTF_Q0, ctf0.Q0, index);
@@ -633,14 +633,14 @@ void TomogramSet::generateSingleMetaDataTable(MetaDataTable &MDout, ObservationM
         // Store all the necessary optics stuff in an opticsGroup per tomogram
         RFLOAT pixelSize, voltage, Cs, Q0;
         std::string tomo_name = getTomogramName(t);
-        globalTable.getValueSafely(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, pixelSize, t);
+        globalTable.getValueSafely(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, pixelSize, t);
         globalTable.getValueSafely(EMDL_CTF_VOLTAGE, voltage, t);
         globalTable.getValueSafely(EMDL_CTF_CS, Cs, t);
         globalTable.getValueSafely(EMDL_CTF_Q0, Q0, t);
         obsModel.opticsMdt.addObject();
         obsModel.opticsMdt.setValue(EMDL_IMAGE_OPTICS_GROUP_NAME, tomo_name);
         obsModel.opticsMdt.setValue(EMDL_IMAGE_OPTICS_GROUP, t+1);
-        obsModel.opticsMdt.setValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, pixelSize);
+        obsModel.opticsMdt.setValue(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, pixelSize);
         obsModel.opticsMdt.setValue(EMDL_CTF_VOLTAGE, voltage);
         obsModel.opticsMdt.setValue(EMDL_CTF_CS, Cs);
         obsModel.opticsMdt.setValue(EMDL_CTF_Q0, Q0);
