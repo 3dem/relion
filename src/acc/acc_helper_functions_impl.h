@@ -342,8 +342,8 @@ void runWavgKernel(
 				wdiff2s_AA,
 				wdiff2s_XA,
 				translation_num,
-				(XFLOAT) op.sum_weight[img_id],
-				(XFLOAT) op.significant_weight[img_id],
+				(XFLOAT) op.sum_weight,
+				(XFLOAT) op.significant_weight,
 				part_scale,
 				stream
 				);
@@ -364,8 +364,8 @@ void runWavgKernel(
 				wdiff2s_AA,
 				wdiff2s_XA,
 				translation_num,
-				(XFLOAT) op.sum_weight[img_id],
-				(XFLOAT) op.significant_weight[img_id],
+				(XFLOAT) op.sum_weight,
+				(XFLOAT) op.significant_weight,
 				part_scale,
 				stream
 				);
@@ -386,8 +386,8 @@ void runWavgKernel(
 				wdiff2s_AA,
 				wdiff2s_XA,
 				translation_num,
-				(XFLOAT) op.sum_weight[img_id],
-				(XFLOAT) op.significant_weight[img_id],
+				(XFLOAT) op.sum_weight,
+				(XFLOAT) op.significant_weight,
 				part_scale,
 				stream
 				);
@@ -411,8 +411,8 @@ void runWavgKernel(
 				wdiff2s_AA,
 				wdiff2s_XA,
 				translation_num,
-				(XFLOAT) op.sum_weight[img_id],
-				(XFLOAT) op.significant_weight[img_id],
+				(XFLOAT) op.sum_weight,
+				(XFLOAT) op.significant_weight,
 				part_scale,
 				stream
 				);
@@ -433,8 +433,8 @@ void runWavgKernel(
 				wdiff2s_AA,
 				wdiff2s_XA,
 				translation_num,
-				(XFLOAT) op.sum_weight[img_id],
-				(XFLOAT) op.significant_weight[img_id],
+				(XFLOAT) op.sum_weight,
+				(XFLOAT) op.significant_weight,
 				part_scale,
 				stream
 				);
@@ -455,8 +455,8 @@ void runWavgKernel(
 				wdiff2s_AA,
 				wdiff2s_XA,
 				translation_num,
-				(XFLOAT) op.sum_weight[img_id],
-				(XFLOAT) op.significant_weight[img_id],
+				(XFLOAT) op.sum_weight,
+				(XFLOAT) op.significant_weight,
 				part_scale,
 				stream
 				);

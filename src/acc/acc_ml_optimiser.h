@@ -137,7 +137,8 @@ public:
 	unsigned long part_id;
 
 	std::vector<MultidimArray<Complex > > Fimg, Fimg_nomask, local_Fimgs_shifted, local_Fimgs_shifted_nomask;
-	std::vector<MultidimArray<RFLOAT> > Fctf, local_Fctf, local_Minvsigma2, FstMulti;
+	std::vector<MultidimArray<RFLOAT> > Fctf, local_Fctf, local_Minvsigma2;
+    MultidimArray<RFLOAT> FstMulti;
 	std::vector<int> pointer_dir_nonzeroprior, pointer_psi_nonzeroprior;
 	std::vector<RFLOAT> directions_prior, psi_prior, local_sqrtXi2;
 	std::vector<RFLOAT> highres_Xi2_img;
@@ -145,7 +146,7 @@ public:
 	MultidimArray<bool> Mcoarse_significant;
 	// And from storeWeightedSums
 	RFLOAT sum_weight, significant_weight, max_weight;
-	std::vector< std::vector<RFLOAT> > sum_weight_class;
+	std::vector<RFLOAT> sum_weight_class;
 	Matrix1D<RFLOAT> old_offset, prior;
 	std::vector<MultidimArray<RFLOAT> > power_img;
 	MultidimArray<XFLOAT> Mweight;
@@ -161,8 +162,6 @@ public:
 		Fimg.resize(nr_images);
 		Fimg_nomask.resize(nr_images);
 		Fctf.resize(nr_images);
-		max_index.resize(nr_images);
-		sum_weight_class.resize(nr_images);
 	};
 };
 

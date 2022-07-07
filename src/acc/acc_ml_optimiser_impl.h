@@ -767,7 +767,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 		if ( NZYXSIZE(FstMulti) > 0 )
 		{
 			baseMLO->applySubtomoCorrection(op.Fimg.at(img_id), op.Fimg_nomask.at(img_id), op.Fctf.at(img_id), FstMulti);
-			op.FstMulti.at(img_id) = FstMulti;
+			op.FstMulti = FstMulti;
 		}
 
 		// If we're doing multibody refinement, now subtract projections of the other bodies from both the masked and the unmasked particle
@@ -929,7 +929,7 @@ void getAllSquaredDifferencesCoarse(
 
 	std::vector<MultidimArray<Complex > > dummy;
 	std::vector<std::vector<MultidimArray<Complex > > > dummy2;
-	std::vector<MultidimArray<RFLOAT> > dummyRF;
+	MultidimArray<RFLOAT> dummyRF;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, false, op.part_id, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimg, dummy, op.Fctf, dummy2, dummy2,
 			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2, op.FstMulti, dummyRF);
@@ -1118,7 +1118,7 @@ void getAllSquaredDifferencesCoarse(
 		buildCorrImage(baseMLO,op,corr_img,img_id,group_id);
 		corr_img.cpToDevice();
 
-        // REPORT_ERROR("TODO: Dari needs to write a function to add op.highres_Xi2_img[img_id] / 2. to all Weights, not initialise again!");
+        if (sp.nr_images > 1) REPORT_ERROR("TODO: Dari needs to write a function to add op.highres_Xi2_img[img_id] / 2. to all Weights, not initialise again!");
 		deviceInitValue<XFLOAT>(allWeights, (XFLOAT) (op.highres_Xi2_img[img_id] / 2.));
 		allWeights_pos = 0;
 
@@ -1159,8 +1159,7 @@ void getAllSquaredDifferencesCoarse(
 						do_CC,
 						accMLO->dataIs3D);
 
-                if (accMLO->mydata.is_tomo) REPORT_ERROR("ERROR: TODO: think about img_id* multiplication below... I added += instead of = in the GPU and CPU kernels below!!!");
-				mapAllWeightsToMweights(
+                mapAllWeightsToMweights(
 						~projectorPlans[iclass].iorientclasses,
 						&(~allWeights)[allWeights_pos],
 						&(~Mweight)[weightsPerPart],
@@ -1219,7 +1218,7 @@ void getAllSquaredDifferencesFine(
 	CTIC(accMLO->timer,"precalculateShiftedImagesCtfsAndInvSigma2s");
 	std::vector<MultidimArray<Complex > > dummy;
 	std::vector<std::vector<MultidimArray<Complex > > > dummy2;
-	std::vector<MultidimArray<RFLOAT> > dummyRF;
+	MultidimArray<RFLOAT> dummyRF;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, false, op.part_id, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimg, dummy, op.Fctf, dummy2, dummy2,
 			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2, op.FstMulti, dummyRF);
@@ -1850,7 +1849,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
                 {
                     std::cerr << std::endl;
                     std::cerr << " fn_img= " << sp.current_img << std::endl;
-                    std::cerr " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
+                    std::cerr << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
                     std::cerr << " min_diff2= " << op.min_diff2 << std::endl;
 
                     pdf_orientation.dumpAccToFile("error_dump_pdf_orientation");
@@ -2124,10 +2123,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	// Re-do below because now also want unmasked images AND if (stricht_highres_exp >0.) then may need to resize
 	std::vector<MultidimArray<Complex > > dummy;
 	std::vector<std::vector<MultidimArray<Complex > > > dummy2;
-	std::vector<MultidimArray<RFLOAT> > exp_local_STMulti;
-	bool do_subtomo_correction = op.FstMulti.size() > 0 && NZYXSIZE(op.FstMulti[0]) > 0;
-	if (do_subtomo_correction)
-		exp_local_STMulti.resize(sp.nr_images);
+	MultidimArray<RFLOAT> exp_local_STMulti;
+	bool do_subtomo_correction = NZYXSIZE(op.FstMulti) > 0;
 
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, true, op.part_id, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimg, op.Fimg_nomask, op.Fctf, dummy2, dummy2,
@@ -2142,41 +2139,16 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	}
 
 	// For norm_correction and scale_correction of all images of this particle
-	std::vector<RFLOAT> exp_wsum_norm_correction;
-	std::vector<RFLOAT> exp_wsum_scale_correction_XA, exp_wsum_scale_correction_AA;
-	std::vector<RFLOAT> thr_wsum_signal_product_spectra, thr_wsum_reference_power_spectra;
-	exp_wsum_norm_correction.resize(sp.nr_images, 0.);
-	std::vector<MultidimArray<RFLOAT> > thr_wsum_sigma2_noise, thr_wsum_ctf2, thr_wsum_stMulti;
+	RFLOAT exp_wsum_norm_correction = 0.;
+	RFLOAT exp_wsum_scale_correction_XA = 0., exp_wsum_scale_correction_AA = 0.;
+	RFLOAT thr_wsum_signal_product_spectra = 0., thr_wsum_reference_power_spectra = 0.;
+	MultidimArray<RFLOAT> thr_wsum_sigma2_noise, thr_wsum_ctf2, thr_wsum_stMulti;
 
-	// for noise estimation (per image)
-	thr_wsum_sigma2_noise.resize(sp.nr_images);
-    thr_wsum_ctf2.resize(sp.nr_images);
-    thr_wsum_stMulti.resize(sp.nr_images);
-
-	// For scale_correction
-	if (baseMLO->do_scale_correction)
-	{
-		exp_wsum_scale_correction_XA.resize(sp.nr_images);
-		exp_wsum_scale_correction_AA.resize(sp.nr_images);
-		thr_wsum_signal_product_spectra.resize(sp.nr_images);
-		thr_wsum_reference_power_spectra.resize(sp.nr_images);
-	}
-
-	// Possibly different array sizes in different optics groups!
-	for (int img_id = 0; img_id < sp.nr_images; img_id++)
-	{
-		int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
-		thr_wsum_sigma2_noise[img_id].initZeros(baseMLO->image_full_size[optics_group]/2 + 1);
-        thr_wsum_stMulti[img_id].initZeros(baseMLO->image_full_size[optics_group]/2 + 1);
-        thr_wsum_ctf2[img_id].initZeros(baseMLO->image_full_size[optics_group]/2 + 1);
-		if (baseMLO->do_scale_correction)
-		{
-			exp_wsum_scale_correction_AA[img_id] = 0.;
-			exp_wsum_scale_correction_XA[img_id] = 0.;
-			thr_wsum_signal_product_spectra[img_id] = 0.;
-			thr_wsum_reference_power_spectra[img_id] = 0.;
-		}
-	}
+    int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, 0);
+    thr_wsum_sigma2_noise.initZeros(baseMLO->image_full_size[optics_group]/2 + 1);
+    thr_wsum_ctf2.initZeros(baseMLO->image_full_size[optics_group]/2 + 1);
+    if (do_subtomo_correction)
+        thr_wsum_stMulti.initZeros(baseMLO->image_full_size[optics_group]/2 + 1);
 
 	std::vector<RFLOAT> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
 	bool have_warned_small_scale = false;
@@ -2184,14 +2156,14 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	// Make local copies of weighted sums (except BPrefs, which are too big)
 	// so that there are not too many mutex locks below
 	std::vector<MultidimArray<RFLOAT> > thr_wsum_pdf_direction;
-	std::vector<RFLOAT> thr_wsum_norm_correction, thr_sumw_group, thr_wsum_pdf_class, thr_wsum_prior_offsetx_class, thr_wsum_prior_offsety_class;
-	RFLOAT thr_wsum_sigma2_offset;
+	std::vector<RFLOAT> thr_wsum_norm_correction, thr_wsum_pdf_class, thr_wsum_prior_offsetx_class, thr_wsum_prior_offsety_class;
+	RFLOAT thr_wsum_sigma2_offset, thr_sumw_group;
 	MultidimArray<RFLOAT> thr_metadata, zeroArray;
 	// wsum_pdf_direction is a 1D-array (of length sampling.NrDirections()) for each class
 	zeroArray.initZeros(baseMLO->sampling.NrDirections());
 	thr_wsum_pdf_direction.resize(baseMLO->mymodel.nr_classes * baseMLO->mymodel.nr_bodies, zeroArray);
 	// sumw_group is a RFLOAT for each group
-	thr_sumw_group.resize(sp.nr_images, 0.);
+	thr_sumw_group= 0.;
 	// wsum_pdf_class is a RFLOAT for each class
 	thr_wsum_pdf_class.resize(baseMLO->mymodel.nr_classes, 0.);
 	if (baseMLO->mymodel.ref_dim == 2)
@@ -2243,8 +2215,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			IndexedDataArray thisClassFinePassWeights(FinePassWeights,FPCMasks[exp_iclass]);
 
 			// Re-define the job-partition of the indexedArray of weights so that the collect-kernel can work with it.
-			//TODO: should img_id be removed from the below?
-            XXXXX
             block_nums[nr_fake_classes*img_id + fake_class] = makeJobsForCollect(thisClassFinePassWeights, FPCMasks[exp_iclass], ProjectionData[img_id].orientation_num[exp_iclass]);
 
 			bundleSWS.pack(FPCMasks[exp_iclass].jobOrigin);
@@ -2831,17 +2801,17 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			======================================================*/
 
 			int nr_classes = baseMLO->mymodel.nr_classes;
-			std::vector<RFLOAT> class_sum_weight(nr_classes, baseMLO->is_som_iter ? 0 : op.sum_weight[img_id]);
+			std::vector<RFLOAT> class_sum_weight(nr_classes, baseMLO->is_som_iter ? 0 : op.sum_weight);
 
 			if (baseMLO->is_som_iter)
 			{
-				std::vector<unsigned> s = SomGraph::arg_sort(op.sum_weight_class[img_id], false);
+				std::vector<unsigned> s = SomGraph::arg_sort(op.sum_weight_class, false);
 				unsigned bpu = s[0];
 				unsigned sbpu = s[1];
 
 				baseMLO->wsum_model.som.add_edge_activity(bpu, sbpu);
 
-				class_sum_weight[bpu] = op.sum_weight_class[img_id][bpu];
+				class_sum_weight[bpu] = op.sum_weight_class[bpu];
 				thr_wsum_pdf_class[bpu] += 1;
 				baseMLO->wsum_model.som.add_node_activity(bpu);
 				baseMLO->mymodel.som.add_node_age(bpu);
@@ -2851,7 +2821,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				for (int i = 0; i < weights.size(); i++) {
 					unsigned idx = weights[i].first;
 					float w = weights[i].second * baseMLO->som_neighbour_pull;
-					class_sum_weight[idx] = op.sum_weight_class[img_id][idx] / w;
+					class_sum_weight[idx] = op.sum_weight_class[idx] / w;
 					thr_wsum_pdf_class[idx] += w;
 					baseMLO->wsum_model.som.add_node_activity(idx, w);
 					baseMLO->mymodel.som.add_node_age(idx, w);
@@ -2910,7 +2880,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					~ctfs,
 					translation_num,
 					(XFLOAT) op.significant_weight,
-					(XFLOAT) (baseMLO->is_som_iter ? class_sum_weight[iclass] : op.sum_weight[img_id]),
+					(XFLOAT) (baseMLO->is_som_iter ? class_sum_weight[iclass] : op.sum_weight),
 					~eulers[iclass],
 					op.local_Minvsigma2[img_id].xdim,
 					op.local_Minvsigma2[img_id].ydim,
@@ -2957,8 +2927,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					if (ires > -1 && baseMLO->do_scale_correction &&
 							DIRECT_A1D_ELEM(baseMLO->mymodel.data_vs_prior_class[exp_iclass], ires) > 3.)
 					{
-						exp_wsum_scale_correction_AA[img_id] += wdiff2s[AA_offset+AAXA_pos+j];
-						exp_wsum_scale_correction_XA[img_id] += wdiff2s[XA_offset+AAXA_pos+j];
+						exp_wsum_scale_correction_AA += wdiff2s[AA_offset+AAXA_pos+j];
+						exp_wsum_scale_correction_XA += wdiff2s[XA_offset+AAXA_pos+j];
 					}
 				}
 				AAXA_pos += image_size;
@@ -2969,8 +2939,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine[optics_group], j);
 				if (ires > -1)
 				{
-					thr_wsum_sigma2_noise[img_id].data[ires] += (RFLOAT) wdiff2s[sum_offset+j];
-					exp_wsum_norm_correction[img_id] += (RFLOAT) wdiff2s[sum_offset+j]; //TODO could be gpu-reduced
+					thr_wsum_sigma2_noise.data[ires] += (RFLOAT) wdiff2s[sum_offset+j];
+					exp_wsum_norm_correction += (RFLOAT) wdiff2s[sum_offset+j]; //TODO could be gpu-reduced
 				}
 			}
 
@@ -2984,177 +2954,156 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		// loop over all images inside this particle
 		RFLOAT thr_avg_norm_correction = 0.;
 		RFLOAT thr_sum_dLL = 0., thr_sum_Pmax = 0.;
-		for (int img_id = 0; img_id < sp.nr_images; img_id++)
-		{
+        int group_id = baseMLO->mydata.getGroupId(op.part_id, 0);
+        const int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, 0);
+        RFLOAT my_pixel_size = baseMLO->mydata.getOpticsPixelSize(optics_group);
+        int my_image_size = baseMLO->mydata.getOpticsImageSize(optics_group);
 
-			int group_id = baseMLO->mydata.getGroupId(op.part_id, img_id);
-			const int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
-			RFLOAT my_pixel_size = baseMLO->mydata.getOpticsPixelSize(optics_group);
-			int my_image_size = baseMLO->mydata.getOpticsImageSize(optics_group);
+       // If the current images were smaller than the original size, fill the rest of wsum_model.sigma2_noise with the power_class spectrum of the images
+       for (int img_id = 0; img_id < sp.nr_images; img_id++)
+        {
+            for (unsigned long ires = baseMLO->image_current_size[optics_group] / 2 + 1;
+                 ires < baseMLO->image_full_size[optics_group] / 2 + 1; ires++) {
+                DIRECT_A1D_ELEM(thr_wsum_sigma2_noise, ires) += DIRECT_A1D_ELEM(op.power_img[img_id], ires);
+                // Also extend the weighted sum of the norm_correction
+                exp_wsum_norm_correction += DIRECT_A1D_ELEM(op.power_img[img_id], ires);
+            }
+        }
 
-			// If the current images were smaller than the original size, fill the rest of wsum_model.sigma2_noise with the power_class spectrum of the images
-			for (unsigned long ires = baseMLO->image_current_size[optics_group]/2 + 1; ires < baseMLO->image_full_size[optics_group]/2 + 1; ires++)
-			{
-				DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[img_id], ires) += DIRECT_A1D_ELEM(op.power_img[img_id], ires);
-				// Also extend the weighted sum of the norm_correction
-				exp_wsum_norm_correction[img_id] += DIRECT_A1D_ELEM(op.power_img[img_id], ires);
-			}
+        // Store norm_correction
+        // Multiply by old value because the old norm_correction term was already applied to the image
+        if (baseMLO->do_norm_correction && baseMLO->mymodel.nr_bodies == 1)
+        {
 
-			// Store norm_correction
-			// Multiply by old value because the old norm_correction term was already applied to the image
-			if (baseMLO->do_norm_correction && baseMLO->mymodel.nr_bodies == 1)
-			{
-				xxxxxx
-                // TODO: think on how to combine all img_id into one norm correction!!
+            RFLOAT old_norm_correction = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_NORM);
+            old_norm_correction /= baseMLO->mymodel.avg_norm_correction;
+            // The factor two below is because exp_wsum_norm_correctiom is similar to sigma2_noise, which is the variance for the real/imag components
+            // The variance of the total image (on which one normalizes) is twice this value!
+            RFLOAT normcorr = old_norm_correction * sqrt(exp_wsum_norm_correction * 2.);
+            thr_avg_norm_correction += normcorr;
 
-                RFLOAT old_norm_correction = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_NORM);
-				old_norm_correction /= baseMLO->mymodel.avg_norm_correction;
-				// The factor two below is because exp_wsum_norm_correctiom is similar to sigma2_noise, which is the variance for the real/imag components
-				// The variance of the total image (on which one normalizes) is twice this value!
-				RFLOAT normcorr = old_norm_correction * sqrt(exp_wsum_norm_correction[img_id] * 2.);
-				thr_avg_norm_correction += normcorr;
+            // Now set the new norm_correction in the relevant position of exp_metadata
+            DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_NORM) = normcorr;
 
-				// Now set the new norm_correction in the relevant position of exp_metadata
-				DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_NORM) = normcorr;
+            // Print warning for strange norm-correction values
+            if (!((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc) && DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_NORM) > 10.)
+            {
+                std::cout << " WARNING: norm_correction= "<< DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_NORM)
+                        << " for particle " << op.part_id
+                        << "; Are your groups large enough? Or is the reference on the correct greyscale?" << std::endl;
+            }
 
+        }
 
-				// Print warning for strange norm-correction values
-				if (!((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc) && DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_NORM) > 10.)
-				{
-					std::cout << " WARNING: norm_correction= "<< DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_NORM)
-							<< " for particle " << op.part_id << " in group " << group_id + 1
-							<< "; Are your groups large enough? Or is the reference on the correct greyscale?" << std::endl;
-				}
+        // Store weighted sums for scale_correction
+        if (baseMLO->do_scale_correction)
+        {
 
-			}
+            // Divide XA by the old scale_correction and AA by the square of that, because was incorporated into Fctf
+            exp_wsum_scale_correction_XA /= baseMLO->mymodel.scale_correction[group_id];
+            exp_wsum_scale_correction_AA /= baseMLO->mymodel.scale_correction[group_id] * baseMLO->mymodel.scale_correction[group_id];
 
-			// Store weighted sums for scale_correction
-			if (baseMLO->do_scale_correction)
-			{
-				xxxxxx
-                // TODO: think on how to combine all img_id into one scale correction!!
+            thr_wsum_signal_product_spectra += exp_wsum_scale_correction_XA;
+            thr_wsum_reference_power_spectra += exp_wsum_scale_correction_AA;
+        }
 
- 				// Divide XA by the old scale_correction and AA by the square of that, because was incorporated into Fctf
-				exp_wsum_scale_correction_XA[img_id] /= baseMLO->mymodel.scale_correction[group_id];
-				exp_wsum_scale_correction_AA[img_id] /= baseMLO->mymodel.scale_correction[group_id] * baseMLO->mymodel.scale_correction[group_id];
+        // Calculate DLL for each particle
+        RFLOAT logsigma2 = 0.;
+        RFLOAT remap_image_sizes = (baseMLO->mymodel.ori_size * baseMLO->mymodel.pixel_size) / (my_image_size * my_pixel_size);
+        FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(baseMLO->Mresol_fine[optics_group])
+        {
+            int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine[optics_group], n);
+            int ires_remapped = ROUND(remap_image_sizes * ires);
+            // Note there is no sqrt in the normalisation term because of the 2-dimensionality of the complex-plane
+            // Also exclude origin from logsigma2, as this will not be considered in the P-calculations
+            if (ires > 0 && ires_remapped < XSIZE(baseMLO->mymodel.sigma2_noise[optics_group]))
+                logsigma2 += log( 2. * PI * DIRECT_A1D_ELEM(baseMLO->mymodel.sigma2_noise[optics_group], ires_remapped));
+        }
 
-				thr_wsum_signal_product_spectra[img_id] += exp_wsum_scale_correction_XA[img_id];
-				thr_wsum_reference_power_spectra[img_id] += exp_wsum_scale_correction_AA[img_id];
-			}
+        RFLOAT dLL;
+        if ((baseMLO->iter==1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
+            dLL = -op.min_diff2;
+        else
+            dLL = log(op.sum_weight) - op.min_diff2 - logsigma2;
 
-			// Calculate DLL for each particle
-			RFLOAT logsigma2 = 0.;
-			RFLOAT remap_image_sizes = (baseMLO->mymodel.ori_size * baseMLO->mymodel.pixel_size) / (my_image_size * my_pixel_size);
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(baseMLO->Mresol_fine[optics_group])
-			{
-				int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine[optics_group], n);
-				int ires_remapped = ROUND(remap_image_sizes * ires);
-				// Note there is no sqrt in the normalisation term because of the 2-dimensionality of the complex-plane
-				// Also exclude origin from logsigma2, as this will not be considered in the P-calculations
-				if (ires > 0 && ires_remapped < XSIZE(baseMLO->mymodel.sigma2_noise[optics_group]))
-					logsigma2 += log( 2. * PI * DIRECT_A1D_ELEM(baseMLO->mymodel.sigma2_noise[optics_group], ires_remapped));
-			}
-			RFLOAT dLL;
+        // Store dLL of each image in the output array, and keep track of total sum
+        DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_DLL) = dLL;
+        thr_sum_dLL += dLL;
 
-            xxxx
-            // TODO: think about how to combine dLL sum_Pmax etc for all img_id
-
-			if ((baseMLO->iter==1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
-				dLL = -op.min_diff2;
-			else
-				dLL = log(op.sum_weight) - op.min_diff2 - logsigma2;
-
-			// Store dLL of each image in the output array, and keep track of total sum
-			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_DLL) = dLL;
-			thr_sum_dLL += dLL;
-
-			// Also store sum of Pmax
-			thr_sum_Pmax += DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_PMAX);
-
-		}
-
-
-
-        XXXXX Was here when leaving 6July2022: perhaps look first at legacy code?
-
+        // Also store sum of Pmax
+        thr_sum_Pmax += DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_PMAX);
 
 
 		// Now, inside a global_mutex, update the other weighted sums among all threads
 		#pragma omp critical(AccMLO_global)
-		{
-			for (int img_id = 0; img_id < sp.nr_images; img_id++)
-			{
-				long int igroup = baseMLO->mydata.getGroupId(op.part_id, img_id);
-				int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
+        {
+            long int igroup = baseMLO->mydata.getGroupId(op.part_id, 0);
+            int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, 0);
 
 
-                if (baseMLO->mydata.obsModel.getCtfPremultiplied(optics_group))
-                {
-                    RFLOAT myscale = XMIPP_MAX(0.001, baseMLO->mymodel.scale_correction[igroup]);
-                    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(baseMLO->Mresol_fine[optics_group])
-                    {
-                        int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine[optics_group], n);
-                        if (ires > -1)
-                            DIRECT_MULTIDIM_ELEM(thr_wsum_ctf2[img_id], ires) += myscale * DIRECT_MULTIDIM_ELEM(op.local_Fctf[img_id], n);
-                    }
+            if (baseMLO->mydata.obsModel.getCtfPremultiplied(optics_group)) {
+                RFLOAT myscale = XMIPP_MAX(0.001, baseMLO->mymodel.scale_correction[igroup]);
+                FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(baseMLO->Mresol_fine[optics_group]) {
+                    int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine[optics_group], n);
+                    if (ires > -1)
+                        DIRECT_MULTIDIM_ELEM(thr_wsum_ctf2, ires) +=
+                                myscale * DIRECT_MULTIDIM_ELEM(op.local_Fctf[0], n);
                 }
+            }
 
-                if (do_subtomo_correction)
-                {
-                    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(baseMLO->Mresol_fine[optics_group])
-                    {
-                        int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine[optics_group], n);
-                        if (ires > -1)
-                            DIRECT_MULTIDIM_ELEM(thr_wsum_stMulti[img_id], ires) += DIRECT_MULTIDIM_ELEM(exp_local_STMulti[img_id], n);
-                    }
+            if (do_subtomo_correction) {
+                FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(baseMLO->Mresol_fine[optics_group]) {
+                    int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine[optics_group], n);
+                    if (ires > -1)
+                        DIRECT_MULTIDIM_ELEM(thr_wsum_stMulti, ires) += DIRECT_MULTIDIM_ELEM(
+                                exp_local_STMulti, n);
                 }
+            }
 
-                int my_image_size = baseMLO->mydata.getOpticsImageSize(optics_group);
-				RFLOAT my_pixel_size = baseMLO->mydata.getOpticsPixelSize(optics_group);
-				RFLOAT remap_image_sizes = (baseMLO->mymodel.ori_size * baseMLO->mymodel.pixel_size) / (my_image_size * my_pixel_size);
-				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(thr_wsum_sigma2_noise[img_id])
-				{
-					int i_resam = ROUND(i * remap_image_sizes);
-					if (i_resam < XSIZE(baseMLO->wsum_model.sigma2_noise[optics_group]))
-					{
-						DIRECT_A1D_ELEM(baseMLO->wsum_model.sigma2_noise[optics_group], i_resam) += DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[img_id], i);
-                        DIRECT_A1D_ELEM(baseMLO->wsum_model.sumw_ctf2[optics_group], i_resam) += DIRECT_A1D_ELEM(thr_wsum_ctf2[img_id], i);
+            int my_image_size = baseMLO->mydata.getOpticsImageSize(optics_group);
+            RFLOAT my_pixel_size = baseMLO->mydata.getOpticsPixelSize(optics_group);
+            RFLOAT remap_image_sizes =
+                    (baseMLO->mymodel.ori_size * baseMLO->mymodel.pixel_size) / (my_image_size * my_pixel_size);
+            FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(thr_wsum_sigma2_noise) {
+                int i_resam = ROUND(i * remap_image_sizes);
+                if (i_resam < XSIZE(baseMLO->wsum_model.sigma2_noise[optics_group])) {
+                    DIRECT_A1D_ELEM(baseMLO->wsum_model.sigma2_noise[optics_group], i_resam) += DIRECT_A1D_ELEM(
+                            thr_wsum_sigma2_noise, i);
+                    DIRECT_A1D_ELEM(baseMLO->wsum_model.sumw_ctf2[optics_group], i_resam) += DIRECT_A1D_ELEM(
+                            thr_wsum_ctf2, i);
 
-                        if (do_subtomo_correction)
-                           DIRECT_A1D_ELEM(baseMLO->wsum_model.sumw_stMulti[optics_group], i_resam) += DIRECT_A1D_ELEM(thr_wsum_stMulti[img_id], i);
-                    }
-				}
-				baseMLO->wsum_model.sumw_group[optics_group] += thr_sumw_group[img_id];
-				if (baseMLO->do_scale_correction)
-				{
-					baseMLO->wsum_model.wsum_signal_product[igroup] += thr_wsum_signal_product_spectra[img_id];
-					baseMLO->wsum_model.wsum_reference_power[igroup] += thr_wsum_reference_power_spectra[img_id];
-				}
-			}
-			for (int n = 0; n < baseMLO->mymodel.nr_classes; n++)
-			{
-				baseMLO->wsum_model.pdf_class[n] += thr_wsum_pdf_class[n];
-				if (baseMLO->mymodel.ref_dim == 2)
-				{
-					XX(baseMLO->wsum_model.prior_offset_class[n]) += thr_wsum_prior_offsetx_class[n];
-					YY(baseMLO->wsum_model.prior_offset_class[n]) += thr_wsum_prior_offsety_class[n];
-				}
-			}
+                    if (do_subtomo_correction)
+                        DIRECT_A1D_ELEM(baseMLO->wsum_model.sumw_stMulti[optics_group], i_resam) += DIRECT_A1D_ELEM(
+                                thr_wsum_stMulti, i);
+                }
+            }
+            baseMLO->wsum_model.sumw_group[optics_group] += thr_sumw_group;
+            if (baseMLO->do_scale_correction) {
+                baseMLO->wsum_model.wsum_signal_product[igroup] += thr_wsum_signal_product_spectra;
+                baseMLO->wsum_model.wsum_reference_power[igroup] += thr_wsum_reference_power_spectra;
+            }
+            for (int n = 0; n < baseMLO->mymodel.nr_classes; n++) {
+                baseMLO->wsum_model.pdf_class[n] += thr_wsum_pdf_class[n];
+                if (baseMLO->mymodel.ref_dim == 2) {
+                    XX(baseMLO->wsum_model.prior_offset_class[n]) += thr_wsum_prior_offsetx_class[n];
+                    YY(baseMLO->wsum_model.prior_offset_class[n]) += thr_wsum_prior_offsety_class[n];
+                }
+            }
 
-			for (int n = 0; n < baseMLO->mymodel.nr_classes * baseMLO->mymodel.nr_bodies; n++)
-			{
-				if (!(baseMLO->do_skip_align || baseMLO->do_skip_rotate) )
-					baseMLO->wsum_model.pdf_direction[n] += thr_wsum_pdf_direction[n];
-			}
+            for (int n = 0; n < baseMLO->mymodel.nr_classes * baseMLO->mymodel.nr_bodies; n++) {
+                if (!(baseMLO->do_skip_align || baseMLO->do_skip_rotate))
+                    baseMLO->wsum_model.pdf_direction[n] += thr_wsum_pdf_direction[n];
+            }
 
-			baseMLO->wsum_model.sigma2_offset += thr_wsum_sigma2_offset;
+            baseMLO->wsum_model.sigma2_offset += thr_wsum_sigma2_offset;
 
-			if (baseMLO->do_norm_correction && baseMLO->mymodel.nr_bodies == 1)
-				baseMLO->wsum_model.avg_norm_correction += thr_avg_norm_correction;
+            if (baseMLO->do_norm_correction && baseMLO->mymodel.nr_bodies == 1)
+                baseMLO->wsum_model.avg_norm_correction += thr_avg_norm_correction;
 
-			baseMLO->wsum_model.LL += thr_sum_dLL;
-			baseMLO->wsum_model.ave_Pmax += thr_sum_Pmax;
-		}	
+            baseMLO->wsum_model.LL += thr_sum_dLL;
+            baseMLO->wsum_model.ave_Pmax += thr_sum_Pmax;
+
+        } // end pragma lock
 	} // end if !do_skip_maximization
 
 	CTOC(accMLO->timer,"store_post_gpu");
@@ -3395,7 +3344,7 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_D);
 				CTIC(timer,"getAllSquaredDifferencesFine");
 				getAllSquaredDifferencesFine<MlClass>(ipass, op, sp, baseMLO, myInstance, FinePassWeights, FinePassClassMasks, FineProjectionData, ptrFactory, ibody, bundleD2);
 				CTOC(timer,"getAllSquaredDifferencesFine");
-				FinePassWeights[0].weights.cpToHost();
+				FinePassWeights.weights.cpToHost();
 
 				AccPtr<XFLOAT> Mweight = ptrFactory.make<XFLOAT>(); //DUMMY
 
