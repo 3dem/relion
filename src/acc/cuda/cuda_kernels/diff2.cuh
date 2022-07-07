@@ -604,7 +604,7 @@ __global__ void cuda_kernel_diff2_CC_fine(
 		if (tid < trans_num)
 		{
 			iy=d_job_idx[bid]+tid;
-			g_diff2s[iy] = s_outs[tid];
+			g_diff2s[iy] += s_outs[tid];
 		}
 	}
 }

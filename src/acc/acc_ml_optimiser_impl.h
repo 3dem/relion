@@ -1159,31 +1159,15 @@ void getAllSquaredDifferencesCoarse(
 						do_CC,
 						accMLO->dataIs3D);
 
-                /*
-                Mweight.cpToHost();
-                for (int i= 0; i < Mweight.getSize(); i++)
-                    if (Mweight[i]>0.)std::cerr << " Mweight=" << Mweight[i] << std::endl;
-                allWeights.hostAlloc();
-                allWeights.cpToHost();
-                 for (int i= 0; i < allWeights.getSize(); i++)
-                    std::cerr << " allWweights-before =" << allWeights[i] << std::endl;
-                */
-
                 mapAllWeightsToMweights(
 						~projectorPlans[iclass].iorientclasses,
 						&(~allWeights)[allWeights_pos],
-						&(~Mweight)[weightsPerPart],
+						&(~Mweight)[0],
 						projectorPlans[iclass].orientation_num,
 						translation_num,
 						accMLO->classStreams[iclass]
 						);
 
-                /*
-                allWeights.cpToHost();
-                 for (int i= 0; i < allWeights.getSize(); i++)
-                    std::cerr << " allWweights-after =" << allWeights[i] << std::endl;
-                  exit(1);
-                  */
 				/*====================================
 				    	   Retrieve Results
 				======================================*/
@@ -1827,7 +1811,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 
             XFLOAT weights_max = AccUtilities::getMaxOnDevice<XFLOAT>(ipartMweight);
-            std::cerr <<" weights_max= " << weights_max << std::endl;
 
             /*
              * Add 50 since we want to stay away from e^88, which approaches the single precision limit.
