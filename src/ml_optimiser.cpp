@@ -5498,6 +5498,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 
     Matrix2D<RFLOAT> Aori;
     Matrix1D<RFLOAT> my_projected_com(mymodel.data_dim), my_refined_ibody_offset(mymodel.data_dim);
+    int exp_nr_images = mydata.numberOfImagesInParticle(part_id);
 
     // Get the norm_correction (for multi-body refinement: still use the one from the consensus refinement!)
     RFLOAT normcorr = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_NORM);
@@ -5771,7 +5772,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 
 
     FourierTransformer transformer;
-	for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++)
+	for (int img_id = 0; img_id < exp_nr_images; img_id++)
 	{
 		Image<RFLOAT> img, rec_img;
 		MultidimArray<Complex > Fimg, Faux;
@@ -6866,7 +6867,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 						{
 
 							// loop over all images inside this particle
-							for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++)
+							for (int img_id = 0; img_id < exp_nr_images; img_id++)
 							{
 
 								RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, img_id);
@@ -7289,14 +7290,18 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 
 
                                             // SHWS 6July2022: += instead of =, as summing over all imag_id....
-                                            DIRECT_A1D_ELEM(exp_Mweight, ihidden_over) += diff2;
+                                            if (DIRECT_A1D_ELEM(exp_Mweight, ihidden_over) < 0.)
+                                                DIRECT_A1D_ELEM(exp_Mweight, ihidden_over) = diff2;
+                                            else
+                                                DIRECT_A1D_ELEM(exp_Mweight, ihidden_over) += diff2;
 
 											// Keep track of minimum of all diff2, only for the last image in this series
-											if (img_id == mydata.numberOfImagesInParticle(part_id) -1 && diff2 < exp_min_diff2)
+											if (img_id == exp_nr_images-1 && diff2 < exp_min_diff2)
 											{
 												exp_min_diff2 = diff2;
+
 												/*
-												if (part_id == 0)
+                                                if (part_id == 0)
 												{
 													std::cerr << " part_id= " << part_id << " ihidden_over= " << ihidden_over << " diff2= " << diff2
 													<< " x= " << oversampled_translations_x[iover_trans] << " y=" <<oversampled_translations_y[iover_trans]
@@ -7307,6 +7312,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 													<< std::endl;
 												 }
 												 */
+
 											}
 
 										} // end loop iover_trans
@@ -7420,6 +7426,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
     }
     else
     {
+
         // Extra normalization
         RFLOAT pdf_orientation_mean(0),pdf_offset_mean(0);
         unsigned long pdf_orientation_count(0), pdf_offset_count(0);
@@ -7483,6 +7490,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
         }
         pdf_orientation_mean /= (RFLOAT) pdf_orientation_count;
         pdf_offset_mean /= (RFLOAT) pdf_offset_count;
+
         // Loop from iclass_min to iclass_max to deal with seed generation in first iteration
         for (int exp_iclass = exp_iclass_min; exp_iclass <= exp_iclass_max; exp_iclass++)
         {
@@ -7505,6 +7513,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
                 if (mymodel.data_dim == 3)
                     myprior_z = ZZ(exp_prior);
             }
+
             for (long int idir = exp_idir_min, iorient = 0; idir <= exp_idir_max; idir++)
             {
                 for (long int ipsi = exp_ipsi_min; ipsi <= exp_ipsi_max; ipsi++, iorient++)
@@ -7709,7 +7718,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
 
         std::cerr << "written out Mweight.spi" << std::endl;
         std::cerr << " exp_thisimage_sumweight= " << exp_thisimage_sumweight << std::endl;
-        std::cerr << " exp_min_diff2[img_id]= " << exp_min_diff2 << std::endl;
+        std::cerr << " exp_min_diff2= " << exp_min_diff2 << std::endl;
         REPORT_ERROR("ERROR!!! zero sum of weights....");
     }
 #endif

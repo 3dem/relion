@@ -1159,6 +1159,16 @@ void getAllSquaredDifferencesCoarse(
 						do_CC,
 						accMLO->dataIs3D);
 
+                /*
+                Mweight.cpToHost();
+                for (int i= 0; i < Mweight.getSize(); i++)
+                    if (Mweight[i]>0.)std::cerr << " Mweight=" << Mweight[i] << std::endl;
+                allWeights.hostAlloc();
+                allWeights.cpToHost();
+                 for (int i= 0; i < allWeights.getSize(); i++)
+                    std::cerr << " allWweights-before =" << allWeights[i] << std::endl;
+                */
+
                 mapAllWeightsToMweights(
 						~projectorPlans[iclass].iorientclasses,
 						&(~allWeights)[allWeights_pos],
@@ -1168,6 +1178,12 @@ void getAllSquaredDifferencesCoarse(
 						accMLO->classStreams[iclass]
 						);
 
+                /*
+                allWeights.cpToHost();
+                 for (int i= 0; i < allWeights.getSize(); i++)
+                    std::cerr << " allWweights-after =" << allWeights[i] << std::endl;
+                  exit(1);
+                  */
 				/*====================================
 				    	   Retrieve Results
 				======================================*/
@@ -1811,6 +1827,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 
             XFLOAT weights_max = AccUtilities::getMaxOnDevice<XFLOAT>(ipartMweight);
+            std::cerr <<" weights_max= " << weights_max << std::endl;
 
             /*
              * Add 50 since we want to stay away from e^88, which approaches the single precision limit.
@@ -3287,7 +3304,9 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_B);
 				Mweight.setSize(weightsPerPart);
 				Mweight.setHostPtr(op.Mweight.data);
 				Mweight.deviceAlloc();
-				deviceInitValue<XFLOAT>(Mweight, -std::numeric_limits<XFLOAT>::max());
+				//deviceInitValue<XFLOAT>(Mweight, -std::numeric_limits<XFLOAT>::max());
+                // SHWS 7July2022: not entirely sure about how this works, but as I'm adding to the diff2 for loop over all img_id, this can no longer be a large negative value...
+                deviceInitValue<XFLOAT>(Mweight, 0.);
 				Mweight.streamSync();
 
 				CTIC(timer,"getAllSquaredDifferencesCoarse");
