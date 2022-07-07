@@ -4059,6 +4059,7 @@ void MlOptimiser::expectationOneParticle(long int part_id_sorted, int thread_id)
 
 	// In the first iteration, multiple seeds will be generated
 	// A single random class is selected for each pool of images, and one does not marginalise over the orientations
+	// A single random class is selected for each pool of images, and one does not marginalise over the orientations
 	// The optimal orientation is based on signal-product (rather than the signal-intensity sensitive Gaussian)
 	// If do_firstiter_cc, then first perform a single iteration with K=1 and cross-correlation criteria, afterwards
 
@@ -4119,12 +4120,12 @@ void MlOptimiser::expectationOneParticle(long int part_id_sorted, int thread_id)
 		std::vector<int> exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior;
 		std::vector<RFLOAT> exp_directions_prior, exp_psi_prior, exp_local_sqrtXi2;
 		int exp_current_image_size, exp_current_oversampling;
-		std::vector<RFLOAT> exp_highres_Xi2_img, exp_min_diff2;
+		std::vector<RFLOAT> exp_highres_Xi2_img;
 		MultidimArray<RFLOAT> exp_Mweight;
 		MultidimArray<bool> exp_Mcoarse_significant;
 		// And from storeWeightedSums
-		std::vector<RFLOAT> exp_sum_weight, exp_significant_weight, exp_max_weight;
-		std::vector<Matrix1D<RFLOAT> > exp_old_offset, exp_prior;
+		RFLOAT exp_min_diff2, exp_sum_weight, exp_significant_weight, exp_max_weight;
+		Matrix1D<RFLOAT> exp_old_offset, exp_prior;
 		std::vector<RFLOAT> exp_wsum_norm_correction;
 		std::vector<MultidimArray<RFLOAT> > exp_power_imgs;
 
@@ -4146,8 +4147,6 @@ void MlOptimiser::expectationOneParticle(long int part_id_sorted, int thread_id)
 		exp_Fimg.resize(my_nr_images);
 		exp_Fimg_nomask.resize(my_nr_images);
 		exp_Fctf.resize(my_nr_images);
-		exp_old_offset.resize(my_nr_images);
-		exp_prior.resize(my_nr_images);
 
 		if (mydata.is_3D)
 		{
@@ -4213,7 +4212,7 @@ void MlOptimiser::expectationOneParticle(long int part_id_sorted, int thread_id)
 		}
 
 		// Initialise significant weight to minus one, so that all coarse sampling points will be handled in the first pass
-		exp_significant_weight.resize(my_nr_images, -1.);
+		exp_significant_weight = -1.;
 
 		// Only perform a second pass when using adaptive oversampling
 		int nr_sampling_passes = (adaptive_oversampling > 0) ? 2 : 1;
@@ -7853,14 +7852,14 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 		int exp_current_oversampling, int metadata_offset,
 		int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 		int exp_itrans_min, int exp_itrans_max, int exp_iclass_min, int exp_iclass_max,
-		std::vector<RFLOAT> &exp_min_diff2,
+		RFLOAT &exp_min_diff2,
 		std::vector<RFLOAT> &exp_highres_Xi2_img,
 		std::vector<MultidimArray<Complex > > &exp_Fimg,
 		std::vector<MultidimArray<Complex > > &exp_Fimg_nomask,
 		std::vector<MultidimArray<RFLOAT> > &exp_Fctf,
 		std::vector<MultidimArray<RFLOAT> > &exp_power_img,
-		std::vector<Matrix1D<RFLOAT> > &exp_old_offset,
-		std::vector<Matrix1D<RFLOAT> > &exp_prior,
+		Matrix1D<RFLOAT> &exp_old_offset,
+		Matrix1D<RFLOAT> &exp_prior,
 		MultidimArray<RFLOAT> &exp_Mweight,
 		MultidimArray<bool> &exp_Mcoarse_significant,
 		std::vector<RFLOAT> &exp_significant_weight,

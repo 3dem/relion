@@ -1118,7 +1118,7 @@ public:
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,
 			MultidimArray<RFLOAT> &exp_Mweight, MultidimArray<bool> &exp_Mcoarse_significant,
-			std::vector<RFLOAT> &exp_significant_weight, std::vector<RFLOAT> &exp_sum_weight,
+			RFLOAT &exp_significant_weight, RFLOAT &exp_sum_weight,
 			Matrix1D<RFLOAT> &exp_old_offset, Matrix1D<RFLOAT> &exp_prior, RFLOAT &exp_min_diff2,
 			std::vector<int> &exp_pointer_dir_nonzeroprior, std::vector<int> &exp_pointer_psi_nonzeroprior,
 			std::vector<RFLOAT> &exp_directions_prior, std::vector<RFLOAT> &exp_psi_prior);
@@ -1128,7 +1128,7 @@ public:
 			int exp_current_oversampling, int metadata_offset,
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,
-			std::vector<RFLOAT> &exp_min_diff2,
+			RFLOAT &exp_min_diff2,
 			std::vector<RFLOAT> &exp_highres_Xi2_img,
 			std::vector<MultidimArray<Complex > > &exp_Fimg,
 			std::vector<MultidimArray<Complex > > &exp_Fimg_nomask,
