@@ -49,6 +49,7 @@ public:
 
 	bool refIs3D;
 	bool dataIs3D;
+    bool shiftsIs3D;
 
 	int thread_id;
 
@@ -69,6 +70,7 @@ public:
 			transformer2(baseMLOptimiser->mymodel.data_dim),
 			refIs3D(baseMLO->mymodel.ref_dim == 3),
             dataIs3D(baseMLO->mymodel.data_dim == 3),
+            shiftsIs3D(baseMLO->mymodel.data_dim == 3 || baseMLO->mydata.is_tomo),
 #ifdef TIMING_FILES
 			timer(timing_fnm),
 #endif

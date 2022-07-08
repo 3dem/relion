@@ -2050,7 +2050,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		sampling.offset_range *= mymodel.pixel_size;
 		sampling.offset_step *= mymodel.pixel_size;
 	}
-	sampling.initialise(mymodel.ref_dim, (mymodel.data_dim == 3), do_gpu, (verb>0),
+	sampling.initialise(mymodel.ref_dim, (mymodel.data_dim == 3 || mydata.is_tomo), do_gpu, (verb>0),
 			do_local_searches_helical, (do_helical_refine) && (!ignore_helical_symmetry),
 			helical_rise_initial, helical_twist_initial);
 
@@ -2132,7 +2132,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 	sum_changes_optimal_classes = 0.;
 	sum_changes_count = 0.;
 
-	if (mymodel.data_dim == 3)
+	if (mymodel.data_dim == 3 || mydata.is_tomo)
 	{
 
 		// TODO: later do norm correction?!
@@ -2144,7 +2144,8 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 		if (do_skip_align)
 			do_shifts_onthefly = false; // on-the-fly shifts are incompatible with do_skip_align!
-		// getMetaAndImageData is not made for passing multiple volumes!
+
+        // getMetaAndImageData is not made for passing multiple volumes!
 		do_parallel_disc_io = true;
 	}
 
@@ -3104,7 +3105,7 @@ void MlOptimiser::iterate()
 						mymodel.helical_rise,
 						mymodel.helical_twist,
 						helical_nstart,
-						(mymodel.data_dim == 3),
+						(mymodel.data_dim == 3 || mydata.is_tomo),
 						(do_auto_refine || do_auto_sampling),
 						mymodel.sigma2_rot,
 						mymodel.sigma2_tilt,
@@ -3877,7 +3878,7 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
 			my_old_offset_y = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_YOFF);
 			rounded_offset_x = my_old_offset_x - ROUND(my_old_offset_x);
 			rounded_offset_y = my_old_offset_y - ROUND(my_old_offset_y);
-			if (mymodel.data_dim == 3)
+			if (mymodel.data_dim == 3 || mydata.is_tomo)
 			{
 				my_old_offset_z = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ZOFF);
 				rounded_offset_z = my_old_offset_z - ROUND(my_old_offset_z);
@@ -4867,7 +4868,7 @@ void MlOptimiser::maximizationOtherParameters()
 	if (!fix_sigma_offset && mymodel.nr_bodies == 1)
 	{
 		mymodel.sigma2_offset *= my_mu;
-		if (mymodel.data_dim == 3)
+		if (mymodel.data_dim == 3 || mydata.is_tomo)
 		{
 			if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 				mymodel.sigma2_offset += (1. - my_mu) * (wsum_model.sigma2_offset) / (2. * sum_weight);
@@ -5497,7 +5498,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 {
 
     Matrix2D<RFLOAT> Aori;
-    Matrix1D<RFLOAT> my_projected_com(mymodel.data_dim), my_refined_ibody_offset(mymodel.data_dim);
+    int shiftdim = (mymodel.data_dim == 3 || mydata.is_tomo) ? 3 : 2 ;
+    Matrix1D<RFLOAT> my_projected_com(shiftdim), my_refined_ibody_offset(shiftdim);
     int exp_nr_images = mydata.numberOfImagesInParticle(part_id);
 
     // Get the norm_correction (for multi-body refinement: still use the one from the consensus refinement!)
@@ -5516,14 +5518,14 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 
     // Get the old offsets and the priors on the offsets
     // Sjors 5mar18: it is very important that my_old_offset has baseMLO->mymodel.data_dim and not just (3), as transformCartesianAndHelicalCoords will give different results!!!
-    Matrix1D<RFLOAT> my_old_offset(mymodel.data_dim), my_prior(mymodel.data_dim), my_old_offset_ori;
+    Matrix1D<RFLOAT> my_old_offset(shiftdim), my_prior(shiftdim), my_old_offset_ori;
 
     int icol_rot, icol_tilt, icol_psi, icol_xoff, icol_yoff, icol_zoff;
     XX(my_old_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_XOFF);
     XX(my_prior)      = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_XOFF_PRIOR);
     YY(my_old_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_YOFF);
     YY(my_prior)      = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_YOFF_PRIOR);
-    if (mymodel.data_dim == 3)
+    if (mymodel.data_dim == 3 || mydata.is_tomo)
     {
         ZZ(my_old_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ZOFF);
         ZZ(my_prior)      = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ZOFF_PRIOR);
@@ -5538,7 +5540,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(
                             DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI), Aori, false);
         my_projected_com = Aori * mymodel.com_bodies[ibody];
         // This will have made my_projected_com of size 3 again! resize to mymodel.data_dim
-        my_projected_com.resize(mymodel.data_dim);
+        int shiftdim = (mymodel.data_dim == 3 || mydata.is_tomo) ? 3 : 2 ;
+        my_projected_com.resize(shiftdim);
 
 
 #ifdef DEBUG_BODIES
@@ -5560,7 +5563,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
         icol_zoff = 5 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
         XX(my_refined_ibody_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, icol_xoff);
         YY(my_refined_ibody_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, icol_yoff);
-        if (mymodel.data_dim == 3)
+        if (mymodel.data_dim == 3 || mydata.is_tomo)
             ZZ(my_refined_ibody_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, icol_zoff);
 
         // For multi-body refinement: set the priors of the translations to zero (i.e. everything centred around consensus offset)
@@ -5583,7 +5586,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
         XX(my_prior) = 0.;
     if (YY(my_prior) > 998.99 && YY(my_prior) < 999.01)
         YY(my_prior) = 0.;
-    if (mymodel.data_dim == 3 && ZZ(my_prior) > 998.99 && ZZ(my_prior) < 999.01)
+    if (mymodel.data_dim == 3 || mydata.is_tomo && ZZ(my_prior) > 998.99 && ZZ(my_prior) < 999.01)
         ZZ(my_prior) = 0.;
 
     // Store the prior on translations
@@ -5785,7 +5788,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		bool ctf_premultiplied = mydata.obsModel.getCtfPremultiplied(optics_group);
 		RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
 		int my_image_size = mydata.getOpticsImageSize(optics_group);
-
 
 		// Get the image and recimg data
 		if (do_parallel_disc_io)
@@ -6264,12 +6266,14 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 
 					// 17May2017: Body is centered at its own COM
 					// move it back to its place in the original particle image
-					Matrix1D<RFLOAT> other_projected_com(mymodel.data_dim);
+                    int shiftdim = (mymodel.data_dim == 3 || mydata.is_tomo) ? 3 : 2 ;
+                    Matrix1D<RFLOAT> other_projected_com(shiftdim);
 
 					// Projected COM for this body (using Aori, just like above for ibody and my_projected_com!!!)
 					other_projected_com = Aori * (mymodel.com_bodies[obody]);
-					// This will have made other_projected_com of size 3 again! resize to mymodel.data_dim
-					other_projected_com.resize(mymodel.data_dim);
+
+                    // This will have made other_projected_com of size 3 again! resize to mymodel.data_dim
+                    other_projected_com.resize(shiftdim);
 
 					// Do the exact same as was done for the ibody, but DONT selfROUND here, as later phaseShift applied to ibody below!!!
 					other_projected_com -= my_old_offset_ori;
@@ -6284,7 +6288,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 					// Subtract refined obody-displacement
 					XX(other_projected_com) -= DIRECT_A2D_ELEM(exp_metadata, metadata_offset, ocol_xoff);
 					YY(other_projected_com) -= DIRECT_A2D_ELEM(exp_metadata, metadata_offset, ocol_yoff);
-					if (mymodel.data_dim == 3)
+					if (mymodel.data_dim == 3 || mydata.is_tomo)
 					{
 						ZZ(other_projected_com) -= DIRECT_A2D_ELEM(exp_metadata, metadata_offset, ocol_zoff);
 					}
@@ -6615,7 +6619,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 
 					xshift = oversampled_translations_x[iover_trans];
 					yshift = oversampled_translations_y[iover_trans];
-					if (mymodel.data_dim == 3)
+					if (mymodel.data_dim == 3 || mydata.is_tomo)
 						zshift = oversampled_translations_z[iover_trans];
 
 					if ( (do_helical_refine) && (!ignore_helical_symmetry) )
@@ -6631,6 +6635,8 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 						std::cerr << "Cartesian xyz shift = (" << xshift << ", " << yshift << ", " << zshift << ")" << std::endl;
 #endif
 					}
+
+                    //// XXXXXXXXXX make 3D shift into 2D shift
 
                     if (mydata.is_tomo) REPORT_ERROR("TODO: think about 2D shifts here!!");
 
@@ -6805,7 +6811,6 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 
 			if (mymodel.nr_bodies > 1)
 			{
-				// ipart=0 because in multi-body refinement we do not do movie frames!
 				RFLOAT rot_ori = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT);
 				RFLOAT tilt_ori = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_TILT);
 				RFLOAT psi_ori = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI);
@@ -6878,13 +6883,6 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 										oversampled_tilt[iover_rot],
 										oversampled_psi[iover_rot], A, false);
 
-                                Matrix2D<RFLOAT> Aproj;
-                                if (mydata.is_tomo)
-                                {
-                                    Aproj = mydata.getRotationMatrix(part_id, img_id);
-                                    REPORT_ERROR("ERROR: TODO: implement rotations of img_id tilt series");
-
-                                }
 								// Project the reference map (into Fref)
 #ifdef TIMING
 								// Only time one thread, as I also only time one MPI process
@@ -6897,13 +6895,15 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 								if (mymodel.nr_bodies > 1)
 								{
 									Abody =  Aori * (mymodel.orient_bodies[ibody]).transpose() * A_rot90 * A * mymodel.orient_bodies[ibody];
-									Abody = mydata.obsModel.applyAnisoMag(Abody, optics_group);
+                                    if (mydata.is_tomo) Abody = mydata.getRotationMatrix(part_id, img_id) * Abody;
+                                    Abody = mydata.obsModel.applyAnisoMag(Abody, optics_group);
 									Abody = mydata.obsModel.applyScaleDifference(Abody, optics_group, mymodel.ori_size, mymodel.pixel_size);
-									(mymodel.PPref[ibody]).get2DFourierTransform(Fref, Abody);
+                                    (mymodel.PPref[ibody]).get2DFourierTransform(Fref, Abody);
 								}
 								else
 								{
-									A = mydata.obsModel.applyAnisoMag(A, optics_group);
+                                    if (mydata.is_tomo) A = mydata.getRotationMatrix(part_id, img_id) * A;
+                                    A = mydata.obsModel.applyAnisoMag(A, optics_group);
 									A = mydata.obsModel.applyScaleDifference(A, optics_group, mymodel.ori_size, mymodel.pixel_size);
 									(mymodel.PPref[exp_iclass]).get2DFourierTransform(Fref, A);
 								}
@@ -6995,12 +6995,13 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 												if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 												{
 													bool use_coarse_size = false;
+													RFLOAT xshift_in = 0., yshift_in = 0., zshift_in = 0.;
 													RFLOAT xshift = 0., yshift = 0., zshift = 0.;
 
-													xshift = (exp_current_oversampling == 0) ? (oversampled_translations_x[0]) : (oversampled_translations_x[iover_trans]);
-													yshift = (exp_current_oversampling == 0) ? (oversampled_translations_y[0]) : (oversampled_translations_y[iover_trans]);
-													if (mymodel.data_dim == 3)
-														zshift = (exp_current_oversampling == 0) ? (oversampled_translations_z[0]) : (oversampled_translations_z[iover_trans]);
+													xshift_in = (exp_current_oversampling == 0) ? (oversampled_translations_x[0]) : (oversampled_translations_x[iover_trans]);
+													yshift_in = (exp_current_oversampling == 0) ? (oversampled_translations_y[0]) : (oversampled_translations_y[iover_trans]);
+													if (mymodel.data_dim == 3 || mydata.is_tomo)
+														zshift_in = (exp_current_oversampling == 0) ? (oversampled_translations_z[0]) : (oversampled_translations_z[iover_trans]);
 
                                                     if (mydata.is_tomo) REPORT_ERROR("ERROR; TODO: think about the below for 2D shifts in stacks...");
 
@@ -7008,7 +7009,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 													RFLOAT tilt_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_TILT);
 													RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI);
 													transformCartesianAndHelicalCoords(
-																xshift, yshift, zshift,
+																xshift_in, yshift_in, zshift_in,
 																xshift, yshift, zshift,
 																rot_deg, tilt_deg, psi_deg,
 																mymodel.data_dim,
@@ -7391,7 +7392,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
     {
         old_offset_x = XX(exp_old_offset);
         old_offset_y = YY(exp_old_offset);
-        if (mymodel.data_dim == 3)
+        if (mymodel.data_dim == 3 || mydata.is_tomo)
             old_offset_z = ZZ(exp_old_offset);
     }
 
@@ -7458,7 +7459,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
             {
                 myprior_x = XX(exp_prior);
                 myprior_y = YY(exp_prior);
-                if (mymodel.data_dim == 3)
+                if (mymodel.data_dim == 3 || mydata.is_tomo)
                     myprior_z = ZZ(exp_prior);
             }
             for (long int itrans = exp_itrans_min; itrans <= exp_itrans_max; itrans++)
@@ -7466,10 +7467,10 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
                 RFLOAT offset_x = old_offset_x + sampling.translations_x[itrans];
                 RFLOAT offset_y = old_offset_y + sampling.translations_y[itrans];
                 RFLOAT tdiff2 = 0.;
-                if ( (!do_helical_refine) || (ignore_helical_symmetry) || (mymodel.data_dim == 3) )
+                if ( (!do_helical_refine) || (ignore_helical_symmetry) || (mymodel.data_dim == 3 || mydata.is_tomo) )
                     tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x);
                 tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y);
-                if (mymodel.data_dim == 3)
+                if (mymodel.data_dim == 3 || mydata.is_tomo)
                 {
                     RFLOAT offset_z = old_offset_z + sampling.translations_z[itrans];
                     if ( (!do_helical_refine) || (ignore_helical_symmetry) )
@@ -7510,7 +7511,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
             {
                 myprior_x = XX(exp_prior);
                 myprior_y = YY(exp_prior);
-                if (mymodel.data_dim == 3)
+                if (mymodel.data_dim == 3 || mydata.is_tomo)
                     myprior_z = ZZ(exp_prior);
             }
 
@@ -7549,7 +7550,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
                         // May18,2015 - Shaoda & Sjors - Helical refinement (translational searches)
                         // Calculate the vector length of myprior
                         RFLOAT mypriors_len2 = myprior_x * myprior_x + myprior_y * myprior_y;
-                        if (mymodel.data_dim == 3)
+                        if (mymodel.data_dim == 3 || mydata.is_tomo)
                             mypriors_len2 += myprior_z * myprior_z;
                         // If it is doing helical refinement AND Cartesian vector myprior has a length > 0, transform the vector to its helical coordinates
                         if ( (do_helical_refine) && (!ignore_helical_symmetry) && (mypriors_len2 > 0.00001) )
@@ -7566,10 +7567,10 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
                         RFLOAT offset_x = old_offset_x + sampling.translations_x[itrans];
                         RFLOAT offset_y = old_offset_y + sampling.translations_y[itrans];
                         RFLOAT tdiff2 = 0.;
-                        if ( (!do_helical_refine) || (ignore_helical_symmetry) || (mymodel.data_dim == 3) )
+                        if ( (!do_helical_refine) || (ignore_helical_symmetry) || (mymodel.data_dim == 3 || mydata.is_tomo) )
                             tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x);
                         tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y);
-                        if (mymodel.data_dim == 3)
+                        if (mymodel.data_dim == 3 || mydata.is_tomo)
                         {
                             RFLOAT offset_z = old_offset_z + sampling.translations_z[itrans];
                             if ( (!do_helical_refine) || (ignore_helical_symmetry) )
@@ -8021,12 +8022,14 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 							if (mymodel.nr_bodies > 1)
 							{
 								Abody = Aori * (mymodel.orient_bodies[ibody]).transpose() * A_rot90 * A * mymodel.orient_bodies[ibody];
-								Abody = mydata.obsModel.applyAnisoMag(Abody, optics_group);
+								if (mydata.is_tomo) Abody = mydata.getRotationMatrix(part_id, img_id) * Abody;
+                                Abody = mydata.obsModel.applyAnisoMag(Abody, optics_group);
 								Abody = mydata.obsModel.applyScaleDifference(Abody, optics_group, mymodel.ori_size, mymodel.pixel_size);
 							}
 							else
 							{
-								A = mydata.obsModel.applyAnisoMag(A, optics_group);
+								if (mydata.is_tomo) A = mydata.getRotationMatrix(part_id, img_id) * A;
+                                A = mydata.obsModel.applyAnisoMag(A, optics_group);
 								A = mydata.obsModel.applyScaleDifference(A, optics_group, mymodel.ori_size, mymodel.pixel_size);
 							}
 
@@ -8071,7 +8074,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 							{
 								myprior_x = XX(exp_prior);
 								myprior_y = YY(exp_prior);
-								if (mymodel.data_dim == 3)
+								if (mymodel.data_dim == 3 || mydata.is_tomo)
 								{
 									myprior_z = ZZ(exp_prior);
 									old_offset_z = ZZ(exp_old_offset);
@@ -8178,7 +8181,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 
 													xshift = oversampled_translations_x[iover_trans];
 													yshift = oversampled_translations_y[iover_trans];
-													if (mymodel.data_dim == 3)
+													if (mymodel.data_dim == 3 || mydata.is_tomo)
 														zshift = oversampled_translations_z[iover_trans];
 
 													RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT);
@@ -8291,7 +8294,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 											// May18,2015 - Shaoda & Sjors, Helical refinement (translational searches)
 											// Calculate the vector length of myprior
 											RFLOAT mypriors_len2 = myprior_x * myprior_x + myprior_y * myprior_y;
-											if (mymodel.data_dim == 3)
+											if (mymodel.data_dim == 3 || mydata.is_tomo)
 												mypriors_len2 += myprior_z * myprior_z;
 											// If it is doing helical refinement AND Cartesian vector myprior has a length > 0, transform the vector to its helical coordinates
 											if ( (do_helical_refine) && (!ignore_helical_symmetry) && (mypriors_len2 > 0.00001) )
@@ -8302,14 +8305,14 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 												transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, rot_deg, tilt_deg, psi_deg, mymodel.data_dim, CART_TO_HELICAL_COORDS);
 											}
 
-											if ( (!do_helical_refine) || (ignore_helical_symmetry) || (mymodel.data_dim == 3) )
+											if ( (!do_helical_refine) || (ignore_helical_symmetry) || (mymodel.data_dim == 3 || mydata.is_tomo) )
 											{
 												RFLOAT diffx = myprior_x - old_offset_x - oversampled_translations_x[iover_trans];
 												thr_wsum_sigma2_offset += weight * my_pixel_size * my_pixel_size * diffx * diffx;
 											}
 											RFLOAT diffy = myprior_y - old_offset_y - oversampled_translations_y[iover_trans];
 											thr_wsum_sigma2_offset += weight * my_pixel_size * my_pixel_size * diffy * diffy;
-											if (mymodel.data_dim == 3)
+											if (mymodel.data_dim == 3 || mydata.is_tomo)
 											{
 												RFLOAT diffz  = myprior_z - old_offset_z - oversampled_translations_z[iover_trans];
 												if ( (!do_helical_refine) || (ignore_helical_symmetry) )
@@ -8447,12 +8450,13 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 											DIRECT_A2D_ELEM(exp_metadata, metadata_offset, icol_tilt) = tilt;
 											RFLOAT old_psi = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, icol_psi);
 											DIRECT_A2D_ELEM(exp_metadata, metadata_offset, icol_psi) = psi;
-											Matrix1D<RFLOAT> shifts(mymodel.data_dim);
+                                            int shiftdim = (mymodel.data_dim == 3 || mydata.is_tomo) ? 3 : 2 ;
+                                            Matrix1D<RFLOAT> shifts(shiftdim);
 
 											// include old_offsets for normal refinement (i.e. non multi-body)
 											XX(shifts) = XX(exp_old_offset) + oversampled_translations_x[iover_trans];
 											YY(shifts) = YY(exp_old_offset) + oversampled_translations_y[iover_trans];
-											if (mymodel.data_dim == 3)
+											if (mymodel.data_dim == 3 || mydata.is_tomo)
 											{
 												ZZ(shifts) = ZZ(exp_old_offset) + oversampled_translations_z[iover_trans];
 											}
@@ -8514,7 +8518,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 
 											DIRECT_A2D_ELEM(exp_metadata, metadata_offset, icol_xoff) = XX(shifts);
 											DIRECT_A2D_ELEM(exp_metadata, metadata_offset, icol_yoff) = YY(shifts);
-											if (mymodel.data_dim == 3)
+											if (mymodel.data_dim == 3 || mydata.is_tomo)
 												DIRECT_A2D_ELEM(exp_metadata, metadata_offset, icol_zoff) = ZZ(shifts);
 
 											if (ibody == 0)
@@ -8793,7 +8797,7 @@ void MlOptimiser::monitorHiddenVariableChanges(long int my_first_part_id, long i
                 mydata.MDbodies[ibody].getValue(EMDL_ORIENT_PSI,  old_psi, part_id);
                 mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, old_xoff, part_id);
                 mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, old_yoff, part_id);
-                if (mymodel.data_dim == 3)
+                if (mymodel.data_dim == 3 || mydata.is_tomo)
                 {
                     mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, old_zoff, part_id);
                 }
@@ -8805,7 +8809,7 @@ void MlOptimiser::monitorHiddenVariableChanges(long int my_first_part_id, long i
                 psi = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, 2 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS);
                 xoff = my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, 3 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS);
                 yoff = my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, 4 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS);
-                if (mymodel.data_dim == 3)
+                if (mymodel.data_dim == 3 || mydata.is_tomo)
                     zoff = my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, 5 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS);
                 iclass = 0;
 
@@ -8819,7 +8823,7 @@ void MlOptimiser::monitorHiddenVariableChanges(long int my_first_part_id, long i
                 mydata.MDimg.getValue(EMDL_ORIENT_PSI,  old_psi, part_id);
                 mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, old_xoff, part_id);
                 mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, old_yoff, part_id);
-                if (mymodel.data_dim == 3)
+                if (mymodel.data_dim == 3 || mydata.is_tomo)
                 {
                     mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, old_zoff, part_id);
                 }
@@ -8831,7 +8835,7 @@ void MlOptimiser::monitorHiddenVariableChanges(long int my_first_part_id, long i
                 psi = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI);
                 xoff = my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_XOFF);
                 yoff = my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_YOFF);
-                if (mymodel.data_dim == 3)
+                if (mymodel.data_dim == 3 || mydata.is_tomo)
                     zoff = my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ZOFF);
                 iclass = (int)DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CLASS);
 
@@ -9149,7 +9153,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 						{
 							// Randomly change xoff or yoff
 							RFLOAT ran = rnd_unif();
-							if (mymodel.data_dim == 3)
+							if (mymodel.data_dim == 3 || mydata.is_tomo)
 							{
 								if (ran < 0.3333)
 									xshift = xoff1 + sh_error;
@@ -9426,7 +9430,7 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 				RFLOAT new_step = XMIPP_MIN(1.5, 0.75 * acc_trans) * std::pow(2., adaptive_oversampling);
 
 				// For subtomogram averaging: use at least half times previous step size
-				if (mymodel.data_dim == 3) // TODO: check: this might just as well work for 2D data...
+				if (mymodel.data_dim == 3 || mydata.is_tomo) // TODO: check: this might just as well work for 2D data...
 					new_step = XMIPP_MAX(sampling.offset_step / 2., new_step);
 
 				// Search ranges are five times the last observed changes in offsets
@@ -9817,7 +9821,7 @@ void MlOptimiser::setMetaDataSubset(long int first_part_id, long int last_part_i
         mydata.MDimg.setValue(EMDL_ORIENT_PSI,  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI), part_id);
         mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_XOFF), part_id);
         mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_YOFF), part_id);
-        if (mymodel.data_dim == 3)
+        if (mymodel.data_dim == 3 || mydata.is_tomo)
         {
             mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, my_pixel_size * DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ZOFF), part_id);
         }
@@ -9838,7 +9842,7 @@ void MlOptimiser::setMetaDataSubset(long int first_part_id, long int last_part_i
         {
             mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_Y_PRIOR_ANGSTROM, my_pixel_size * prior_y, part_id);
         }
-        if (mymodel.data_dim == 3)
+        if (mymodel.data_dim == 3 || mydata.is_tomo)
         {
             RFLOAT prior_z = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ZOFF_PRIOR);
             if (prior_z < 999.)
@@ -9869,7 +9873,7 @@ void MlOptimiser::setMetaDataSubset(long int first_part_id, long int last_part_i
                 mydata.MDbodies[ibody].setValue(EMDL_ORIENT_PSI,  psi, part_id);
                 mydata.MDbodies[ibody].setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, my_pixel_size * xoff, part_id);
                 mydata.MDbodies[ibody].setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, my_pixel_size * yoff, part_id);
-                if (mymodel.data_dim == 3)
+                if (mymodel.data_dim == 3 || mydata.is_tomo)
                     mydata.MDbodies[ibody].setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, my_pixel_size * zoff, part_id);
             }
         }
@@ -10078,7 +10082,7 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
         mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff_A, part_id);
         DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_XOFF) = xoff_A / my_pixel_size;
         DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_YOFF) = yoff_A / my_pixel_size;
-        if (mymodel.data_dim == 3)
+        if (mymodel.data_dim == 3 || mydata.is_tomo)
         {
             mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, zoff_A, part_id);
             DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ZOFF) = zoff_A / my_pixel_size;
@@ -10121,7 +10125,7 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
         {
             DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_YOFF_PRIOR) = 999.;
         }
-        if (mymodel.data_dim == 3)
+        if (mymodel.data_dim == 3 || mydata.is_tomo)
         {
             if (mydata.MDimg.getValue(EMDL_ORIENT_ORIGIN_Z_PRIOR_ANGSTROM, zoff_A, part_id))
             {
@@ -10185,7 +10189,7 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
                 mydata.MDbodies[ibody].getValue(EMDL_ORIENT_PSI,  psi, part_id);
                 mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, part_id);
                 mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, part_id);
-                if (mymodel.data_dim == 3)
+                if (mymodel.data_dim == 3 || mydata.is_tomo)
                     mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, zoff, part_id);
                 DIRECT_A2D_ELEM(exp_metadata, metadata_offset, icol_rot)  = rot;
                 DIRECT_A2D_ELEM(exp_metadata, metadata_offset, icol_tilt) = tilt;

@@ -23,7 +23,8 @@ void getFourierTransformsAndCtfs(long int part_id,
 
 	CUSTOM_ALLOCATOR_REGION_NAME("GFTCTF");
     Matrix2D<RFLOAT> Aori;
-    Matrix1D<RFLOAT> my_projected_com(baseMLO->mymodel.data_dim), my_refined_ibody_offset(baseMLO->mymodel.data_dim);
+    int shiftdim = (accMLO->shiftsIs3D) ? 3 : 2 ;
+    Matrix1D<RFLOAT> my_projected_com(shiftdim), my_refined_ibody_offset(shiftdim);
 
     // Get the norm_correction
     RFLOAT normcorr = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_NORM);
@@ -42,7 +43,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 
     // Get the optimal origin offsets from the previous iteration
     // Sjors 5mar18: it is very important that my_old_offset has baseMLO->mymodel.data_dim and not just (3), as transformCartesianAndHelicalCoords will give different results!!!
-    Matrix1D<RFLOAT> my_old_offset(baseMLO->mymodel.data_dim), my_prior(baseMLO->mymodel.data_dim), my_old_offset_ori;
+    Matrix1D<RFLOAT> my_old_offset(shiftdim), my_prior(shiftdim), my_old_offset_ori;
     int icol_rot, icol_tilt, icol_psi, icol_xoff, icol_yoff, icol_zoff;
     XX(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_XOFF);
     YY(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_YOFF);
@@ -54,7 +55,7 @@ void getFourierTransformsAndCtfs(long int part_id,
     if (YY(my_prior) > 998.99 && YY(my_prior) < 999.01)
         YY(my_prior) = 0.;
 
-    if (accMLO->dataIs3D)
+    if (accMLO->shiftsIs3D)
     {
         ZZ(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ZOFF);
         ZZ(my_prior)      = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ZOFF_PRIOR);
@@ -72,8 +73,9 @@ void getFourierTransformsAndCtfs(long int part_id,
                             DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT),
                             DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_PSI), Aori, false);
         my_projected_com = Aori * baseMLO->mymodel.com_bodies[ibody];
-        // This will have made my_projected_com of size 3 again! resize to mymodel.data_dim
-        my_projected_com.resize(baseMLO->mymodel.data_dim);
+        // This will have made my_projected_com of size 3 again! resize to shiftdim
+        int shiftdim = (accMLO->shiftsIs3D) ? 3 : 2 ;
+        my_projected_com.resize(shiftdim);
 
         // Subtract the projected COM offset, to position this body in the center
         // Also keep the my_old_offset in my_old_offset_ori
@@ -86,7 +88,7 @@ void getFourierTransformsAndCtfs(long int part_id,
         icol_zoff = 5 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
         XX(my_refined_ibody_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, icol_xoff);
         YY(my_refined_ibody_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, icol_yoff);
-        if (baseMLO->mymodel.data_dim == 3)
+        if (accMLO->shiftsIs3D)
             ZZ(my_refined_ibody_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, icol_zoff);
 
         // For multi-body refinement: set the priors of the translations to zero (i.e. everything centred around consensus offset)
@@ -196,10 +198,10 @@ void getFourierTransformsAndCtfs(long int part_id,
             bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
             if (!do_local_angular_searches)
             {
-                if (! accMLO->dataIs3D)
-                    XX(my_old_offset_helix_coords) = 0.;
-                else
+                if (accMLO->shiftsIs3D)
                     ZZ(my_old_offset_helix_coords) = 0.;
+                else
+                    XX(my_old_offset_helix_coords) = 0.;
             }
         }
         // TODO: Now re-calculate the my_old_offset in the real (or image) system of coordinate (rotate -psi angle)
@@ -438,7 +440,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 												normcorr_val,
 												XX(my_old_offset),
 												YY(my_old_offset),
-												(accMLO->dataIs3D) ? ZZ(my_old_offset) : 0.,
+												(accMLO->shiftsIs3D) ? ZZ(my_old_offset) : 0.,
 												accMLO->dataIs3D);
 		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
@@ -458,7 +460,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 													normcorr_val,
 													XX(my_old_offset),
 													YY(my_old_offset),
-													(accMLO->dataIs3D) ? ZZ(my_old_offset) : 0.,
+													(accMLO->shiftsIs3D) ? ZZ(my_old_offset) : 0.,
 													accMLO->dataIs3D);
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 			CTOC(accMLO->timer,"TranslateAndNormCorrect_recImg");
@@ -798,6 +800,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 					Abody = Aori * (baseMLO->mymodel.orient_bodies[obody]).transpose() * baseMLO->A_rot90 * Aresi * baseMLO->mymodel.orient_bodies[obody];
 
 					// Apply anisotropic mag and scaling
+                    if (baseMLO->mydata.is_tomo) Abody = baseMLO->mydata.getRotationMatrix(part_id, img_id) * Abody;
 					Abody = baseMLO->mydata.obsModel.applyAnisoMag(Abody, optics_group);
 					Abody = baseMLO->mydata.obsModel.applyScaleDifference(Abody, optics_group, baseMLO->mymodel.ori_size, baseMLO->mymodel.pixel_size);
 
@@ -818,12 +821,13 @@ void getFourierTransformsAndCtfs(long int part_id,
 
 					// 17May2017: Body is centered at its own COM
 					// move it back to its place in the original particle image
-					Matrix1D<RFLOAT> other_projected_com(baseMLO->mymodel.data_dim);
+                    int shiftdim = (accMLO->shiftsIs3D) ? 3 : 2 ;
+                    Matrix1D<RFLOAT> other_projected_com(shiftdim);
 
 					// Projected COM for this body (using Aori, just like above for ibody and my_projected_com!!!)
 					other_projected_com = Aori * (baseMLO->mymodel.com_bodies[obody]);
-					// This will have made other_projected_com of size 3 again! resize to mymodel.data_dim
-					other_projected_com.resize(baseMLO->mymodel.data_dim);
+					// This will have made other_projected_com of size 3 again! resize to shiftdim
+                    other_projected_com.resize(shiftdim);
 
 					// Do the exact same as was done for the ibody, but DONT selfROUND here, as later phaseShift applied to ibody below!!!
 					other_projected_com -= my_old_offset_ori;
@@ -831,14 +835,15 @@ void getFourierTransformsAndCtfs(long int part_id,
 					// Subtract refined obody-displacement
 					XX(other_projected_com) -= DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, ocol_xoff);
 					YY(other_projected_com) -= DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, ocol_yoff);
-					if (baseMLO->mymodel.data_dim == 3)
+					if (accMLO->shiftsIs3D)
 						ZZ(other_projected_com) -= DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, ocol_zoff);
 
 					// Add the my_old_offset=selfRound(my_old_offset_ori - my_projected_com) already applied to this image for ibody
 					other_projected_com += my_old_offset;
 
 					shiftImageInFourierTransform(FTo, Faux, (RFLOAT)baseMLO->image_full_size[optics_group],
-							XX(other_projected_com), YY(other_projected_com), (accMLO->dataIs3D) ? ZZ(other_projected_com) : 0.);
+							XX(other_projected_com), YY(other_projected_com),
+                            (accMLO->shiftsIs3D) ? ZZ(other_projected_com) : 0.);
 
 					// Sum the Fourier transforms of all the obodies
 					Fsum_obody += Faux;
@@ -885,10 +890,12 @@ void getFourierTransformsAndCtfs(long int part_id,
 			// 23jul17: NEW: as we haven't applied the (nonROUNDED!!)  my_refined_ibody_offset yet, do this now in the FourierTransform
 			Faux = op.Fimg.at(img_id);
 			shiftImageInFourierTransform(Faux, op.Fimg.at(img_id), (RFLOAT)baseMLO->image_full_size[optics_group],
-					XX(my_refined_ibody_offset), YY(my_refined_ibody_offset), (accMLO->dataIs3D) ? ZZ(my_refined_ibody_offset) : 0);
+					XX(my_refined_ibody_offset), YY(my_refined_ibody_offset),
+                    (accMLO->shiftsIs3D) ? ZZ(my_refined_ibody_offset) : 0);
 			Faux = op.Fimg_nomask.at(img_id);
 			shiftImageInFourierTransform(Faux, op.Fimg_nomask.at(img_id), (RFLOAT)baseMLO->image_full_size[optics_group],
-					XX(my_refined_ibody_offset), YY(my_refined_ibody_offset), (accMLO->dataIs3D) ? ZZ(my_refined_ibody_offset) : 0);
+					XX(my_refined_ibody_offset), YY(my_refined_ibody_offset),
+                    (accMLO->shiftsIs3D) ? ZZ(my_refined_ibody_offset) : 0);
 		} // end if mymodel.nr_bodies > 1
 
 
@@ -1061,7 +1068,7 @@ void getAllSquaredDifferencesCoarse(
 
 			xshift = oversampled_translations_x[0];
 			yshift = oversampled_translations_y[0];
-			if (accMLO->dataIs3D)
+			if (accMLO->shiftsIs3D)
 				zshift = oversampled_translations_z[0];
 
 			if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
@@ -1069,7 +1076,8 @@ void getAllSquaredDifferencesCoarse(
 				RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
 				RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT);
 				RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata,op.metadata_offset, METADATA_PSI);
-				transformCartesianAndHelicalCoords(xshift, yshift, zshift, xshift, yshift, zshift, rot_deg, tilt_deg, psi_deg, (accMLO->dataIs3D) ? (3) : (2), HELICAL_TO_CART_COORDS);
+				transformCartesianAndHelicalCoords(xshift, yshift, zshift, xshift, yshift, zshift, rot_deg, tilt_deg, psi_deg,
+                                                   (accMLO->shiftsIs3D) ? (3) : (2), HELICAL_TO_CART_COORDS);
 			}
 
 			trans_xyz[trans_x_offset+itrans] = -2 * PI * xshift / (double)baseMLO->image_full_size[optics_group];
@@ -1285,7 +1293,7 @@ void getAllSquaredDifferencesFine(
 
 				xshift = oversampled_translations_x[iover_trans];
 				yshift = oversampled_translations_y[iover_trans];
-				if (accMLO->dataIs3D)
+				if (accMLO->shiftsIs3D)
 					zshift = oversampled_translations_z[iover_trans];
 
 				if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
@@ -1294,7 +1302,8 @@ void getAllSquaredDifferencesFine(
                     RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
 					RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT);
 					RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_PSI);
-					transformCartesianAndHelicalCoords(xshift, yshift, zshift, xshift, yshift, zshift, rot_deg, tilt_deg, psi_deg, (accMLO->dataIs3D) ? (3) : (2), HELICAL_TO_CART_COORDS);
+					transformCartesianAndHelicalCoords(xshift, yshift, zshift, xshift, yshift, zshift, rot_deg, tilt_deg, psi_deg,
+                                                       (accMLO->shiftsIs3D) ? (3) : (2), HELICAL_TO_CART_COORDS);
 				}
 
 				trans_xyz[trans_x_offset+j] = -2 * PI * xshift / (double)baseMLO->image_full_size[optics_group];
@@ -1651,7 +1660,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
     {
         old_offset_x = XX(op.old_offset);
         old_offset_y = YY(op.old_offset);
-        if (accMLO->dataIs3D)
+        if (accMLO->shiftsIs3D)
             old_offset_z = ZZ(op.old_offset);
     }
 
@@ -1727,7 +1736,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
             {
                 myprior_x = XX(op.prior);
                 myprior_y = YY(op.prior);
-                if (accMLO->dataIs3D)
+                if (accMLO->shiftsIs3D)
                     myprior_z = ZZ(op.prior);
             }
 
@@ -1738,7 +1747,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
                 if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry))
                 {
                     RFLOAT mypriors_len2 = myprior_x * myprior_x + myprior_y * myprior_y;
-                    if (accMLO->dataIs3D)
+                    if (accMLO->shiftsIs3D)
                         mypriors_len2 += myprior_z * myprior_z;
 
                     if (mypriors_len2 > 0.00001)
@@ -1746,7 +1755,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
                         RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
                         RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT);
                         RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_PSI);
-                        transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, rot_deg, tilt_deg, psi_deg, (accMLO->dataIs3D) ? (3) : (2), CART_TO_HELICAL_COORDS);
+                        transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, rot_deg, tilt_deg, psi_deg,
+                                                           (accMLO->shiftsIs3D) ? (3) : (2), CART_TO_HELICAL_COORDS);
                     }
                 }
                 // (For helical refinement) Now offset, old_offset, sampling.translations and myprior are all in helical coordinates
@@ -1758,10 +1768,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
                 RFLOAT offset_y = old_offset_y + baseMLO->sampling.translations_y[itrans];
                 double tdiff2 = 0.;
 
-                if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) || (accMLO->dataIs3D) )
+                if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) || (accMLO->shiftsIs3D) )
                     tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x);
                 tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y);
-                if (accMLO->dataIs3D)
+                if (accMLO->shiftsIs3D)
                 {
                     RFLOAT offset_z = old_offset_z + baseMLO->sampling.translations_z[itrans];
                     if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) )
@@ -2241,7 +2251,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			{
 				myprior_x = XX(op.prior);
 				myprior_y = YY(op.prior);
-				if (baseMLO->mymodel.data_dim == 3)
+				if (accMLO->shiftsIs3D)
 				{
 					myprior_z = ZZ(op.prior);
 					old_offset_z = ZZ(op.old_offset);
@@ -2262,12 +2272,12 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				{
 					oo_otrans[otrans_x+fake_class*nr_transes+iitrans] = old_offset_x + oversampled_translations_x[iover_trans];
 					oo_otrans[otrans_y+fake_class*nr_transes+iitrans] = old_offset_y + oversampled_translations_y[iover_trans];
-					if (accMLO->dataIs3D)
+					if (accMLO->shiftsIs3D)
 						oo_otrans[otrans_z+fake_class*nr_transes+iitrans] = old_offset_z + oversampled_translations_z[iover_trans];
 
 					// Calculate the vector length of myprior
 					RFLOAT mypriors_len2 = myprior_x * myprior_x + myprior_y * myprior_y;
-					if (accMLO->dataIs3D)
+					if (accMLO->shiftsIs3D)
 						mypriors_len2 += myprior_z * myprior_z;
 
 					// If it is doing helical refinement AND Cartesian vector myprior has a length > 0, transform the vector to its helical coordinates
@@ -2276,7 +2286,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
 						RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT);
 						RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_PSI);
-						transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, rot_deg, tilt_deg, psi_deg, (accMLO->dataIs3D) ? (3) : (2), CART_TO_HELICAL_COORDS);
+						transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, rot_deg, tilt_deg, psi_deg,
+                                                           (accMLO->shiftsIs3D) ? (3) : (2), CART_TO_HELICAL_COORDS);
 					}
 
 					if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) )
@@ -2284,7 +2295,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					RFLOAT diffx = myprior_x - oo_otrans[otrans_x+fake_class*nr_transes+iitrans];
 					RFLOAT diffy = myprior_y - oo_otrans[otrans_y+fake_class*nr_transes+iitrans];
 					RFLOAT diffz = 0;
-					if (accMLO->dataIs3D)
+					if (accMLO->shiftsIs3D)
 						diffz = myprior_z - (old_offset_z + oversampled_translations_z[iover_trans]);
 
 					oo_otrans[otrans_x2y2z2+fake_class*nr_transes+iitrans] = diffx*diffx + diffy*diffy + diffz*diffz;
@@ -2442,11 +2453,12 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
     RFLOAT old_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, icol_psi);
     DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, icol_psi) = psi;
 
-    Matrix1D<RFLOAT> shifts(baseMLO->mymodel.data_dim);
+    int shiftdim = (accMLO->shiftsIs3D) ? 3 : 2 ;
+    Matrix1D<RFLOAT> shifts(shiftdim);
 
     XX(shifts) = XX(op.old_offset) + oversampled_translations_x[op.max_index.iovertrans];
     YY(shifts) = YY(op.old_offset) + oversampled_translations_y[op.max_index.iovertrans];
-    if (accMLO->dataIs3D)
+    if (accMLO->shiftsIs3D)
     {
         ZZ(shifts) = ZZ(op.old_offset) + oversampled_translations_z[op.max_index.iovertrans];
     }
@@ -2457,7 +2469,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
     DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, icol_xoff) = XX(shifts);
     DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, icol_yoff) = YY(shifts);
-    if (accMLO->dataIs3D)
+    if (accMLO->shiftsIs3D)
         DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, icol_zoff) = ZZ(shifts);
 
     if (ibody == 0)
@@ -2515,7 +2527,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 					xshift = oversampled_translations_x[iover_trans];
 					yshift = oversampled_translations_y[iover_trans];
-					if (accMLO->dataIs3D)
+					if (accMLO->shiftsIs3D)
 						zshift = oversampled_translations_z[iover_trans];
 
 					if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
@@ -2523,7 +2535,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
 						RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT);
 						RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_PSI);
-						transformCartesianAndHelicalCoords(xshift, yshift, zshift, xshift, yshift, zshift, rot_deg, tilt_deg, psi_deg, (accMLO->dataIs3D) ? (3) : (2), HELICAL_TO_CART_COORDS);
+						transformCartesianAndHelicalCoords(xshift, yshift, zshift, xshift, yshift, zshift, rot_deg, tilt_deg, psi_deg,
+                                                           (accMLO->shiftsIs3D) ? (3) : (2), HELICAL_TO_CART_COORDS);
 					}
 
 					trans_xyz[trans_x_offset+j] = -2 * PI * xshift / (double)baseMLO->image_full_size[optics_group];
