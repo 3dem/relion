@@ -811,7 +811,7 @@ void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
 		ObservationModel::loadSafely(fn_exp, obsModel, MDimg, "particles", verb);
 		nr_images_per_optics_group.resize(obsModel.numberOfOpticsGroups(), 0);
 
-        std::vector<std::vector<ParticleIndex>> particles;
+        std::vector<std::vector<ParticleIndex>> particles_idx;
         if (fn_tomo != "")
         {
             // For now read in particle table twice: once into MDimg and once into particleSet...
@@ -822,7 +822,7 @@ void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
             is_tomo = true;
 
             // For checking tomogram sanity below
-            particles = particleSet.splitByTomogram(tomogramSet, verb>0);
+            particles_idx = particleSet.splitByTomogram(tomogramSet, verb>0);
 
         }
 
@@ -938,8 +938,8 @@ void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
                     prev_tomo_name = tomo_name;
 
                     // Tomogram sanity checks
-                    tomogram.validateParticleOptics(particles[tomo_id], particleSet);
-                    particleSet.checkTrajectoryLengths(particles[tomo_id], tomogram.frameCount, "exp_model.read");
+                    tomogram.validateParticleOptics(particles_idx[tomo_id], particleSet);
+                    particleSet.checkTrajectoryLengths(particles_idx[tomo_id], tomogram.frameCount, "exp_model.read");
                 }
 
                 // Add this particle to the Experiment, with its tomogram
