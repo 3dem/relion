@@ -20,8 +20,23 @@ TomogramSet::TomogramSet()
 
 TomogramSet::TomogramSet(FileName filename, bool verbose)
 {
-    if (!read(filename, verbose))
+    bool success = read(filename, verbose);
+}
+
+bool TomogramSet::read(FileName filename, bool verbose)
+{
+
+    globalTable.read(filename, "global");
+    globalTable.setName("global");
+
+    const int tc = globalTable.numberOfObjects();
+
+    if (tc == 0 || !globalTable.containsLabel(EMDL_TOMO_TILT_SERIES_STARFILE))
     {
+        std::cerr << "Warning: " << filename
+                  << " does not have rlnTomoTiltSeriesStarFile labels. It may be written in an old format. If so, will try to convert ..."
+                  << std::endl;
+
         // This may be a tomograms.star file in the old, original relion-4.0 format. Try to convert
         FileName mydir = filename.beforeLastOf("/");
 
@@ -77,29 +92,10 @@ TomogramSet::TomogramSet(FileName filename, bool verbose)
 
             }
         }
-
     }
 
-}
 
-bool TomogramSet::read(std::string filename, bool verbose)
-{
-
-    globalTable.read(filename, "global");
-    globalTable.setName("global");
-
-    const int tc = globalTable.numberOfObjects();
-
-    if (tc == 0) return false;
-
-    if (!globalTable.containsLabel(EMDL_TOMO_TILT_SERIES_STARFILE))
-    {
-        std::cerr << "Warning: " << filename
-                  << " does not have rlnTomoTiltSeriesStarFile labels. It may be written in an old format. If so, will try to convert ..."
-                  << std::endl;
-        return false;
-    }
-
+    // Continue reading with the new way of tomograms
     if (!globalTable.containsLabel(EMDL_TOMO_NAME))
     {
         REPORT_ERROR("ERROR: input starfile for TomogramSet " + filename + " does not contain rlnTomoName label ");

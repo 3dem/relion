@@ -375,7 +375,8 @@ void SubtomoProgram::writeParticleSet(
 		const double ps_out = binning * ps_img;
 
 		copy.optTable.setValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, true, og);
-		copy.optTable.setValue(EMDL_IMAGE_DIMENSIONALITY, 3, og);
+		int datadim = (do_stack2d) ? 2 : 3;
+        copy.optTable.setValue(EMDL_IMAGE_DIMENSIONALITY, datadim, og);
 		copy.optTable.setValue(EMDL_TOMO_SUBTOMOGRAM_BINNING, binning, og);
 		copy.optTable.setValue(EMDL_IMAGE_PIXEL_SIZE, ps_out, og);
 		copy.optTable.setValue(EMDL_IMAGE_SIZE, cropSize, og);

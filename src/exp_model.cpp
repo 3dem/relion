@@ -817,7 +817,12 @@ void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
 	}
 	else
 	{
-		// MDimg and MDopt have to be read at the same time, so that the optics groups can be
+		MetaDataTable MDgen;
+        MDgen.read(fn_exp, "general");
+        if (MDgen.numberOfObjects() > 0)
+            MDgen.getValue(EMDL_TOMO_SUBTOMOGRAM_STACK2D, is_tomo);
+
+        // MDimg and MDopt have to be read at the same time, so that the optics groups can be
 		// renamed in case they are non-contiguous or not sorted
 		ObservationModel::loadSafely(fn_exp, obsModel, MDimg, "particles", verb);
 		nr_images_per_optics_group.resize(obsModel.numberOfOpticsGroups(), 0);
@@ -828,8 +833,8 @@ void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
             // For now read in particle table twice: once into MDimg and once into particleSet...
             // TODO: work with pointer to avoid duplication?
             // TODO: ObservationModel::loadSafely(fn_exp, obsModel, MDimg, "particles", verb, true, true);
-            particleSet.read(fn_exp, fn_motion, verb>0);
             tomogramSet.read(fn_tomo, verb>0);
+            particleSet.read(fn_exp, fn_motion, verb>0);
             is_tomo = true;
 
             // For checking tomogram sanity below
@@ -973,7 +978,7 @@ void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
                     double dz_pos = tomogram.getDepthOffset(f, pos);
                     double dz = tomogram.handedness * tomogram.optics.pixelSize * tomogram.defocusSlope * dz_pos;
 
-                    addImageToParticle(img_name, part_id, group_id, optics_group, &P, dz);
+                    addImageToParticle(my_name, part_id, group_id, optics_group, &P, dz);
                 }
 
             }

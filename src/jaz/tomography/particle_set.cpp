@@ -148,7 +148,7 @@ std::vector<std::vector<ParticleIndex> > ParticleSet::splitByTomogram(const Tomo
 
 	std::map<std::string, int> name_to_index;
 
-	for (int t = 0; t < tc; t++)
+    for (int t = 0; t < tc; t++)
 	{
 		const std::string name = tomogramSet.globalTable.getString(EMDL_TOMO_NAME, t);
 		name_to_index[name] = t;
@@ -419,10 +419,12 @@ void ParticleSet::shiftParticleBy(ParticleIndex particle_id, gravis::d3Vector sh
 	partTable.setValue(EMDL_IMAGE_COORD_Z, z + shift.z, particle_id.value);
 }
 
-void ParticleSet::write(const std::string& filename) const
+void ParticleSet::write(const std::string& filename)
 {
 	std::ofstream ofs(filename);
 
+    genTable.setName("general");
+    genTable.setValue(EMDL_TOMO_SUBTOMOGRAM_STACK2D, is_stack2d);
     genTable.write(ofs);
 	optTable.write(ofs);
 	partTable.write(ofs);

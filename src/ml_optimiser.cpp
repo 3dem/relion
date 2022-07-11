@@ -2457,6 +2457,8 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 	}
 	Mavg.setXmippOrigin();
 
+    Mavg.printShape(std::cout);
+
 	// Only open stacks once and then read multiple images
 	fImageHandler hFile;
 	long int dump;
@@ -2517,7 +2519,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			{
 				if (!mydata.getImageNameOnScratch(part_id, img_id, fn_img))
 				{
-					MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
+                    fn_img = mydata.particles[part_id].images[img_id].name;
 				}
 				else if (!do_parallel_disc_io)
 				{
@@ -2685,6 +2687,8 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				Matrix2D<RFLOAT> A;
 				Euler_angles2matrix(rot, tilt, psi, A, true);
 
+                if (mydata.is_tomo) A = mydata.getRotationMatrix(part_id, img_id) * A;
+
 				// At this point anisotropic magnification shouldn't matter
 				// Also: dont applyScaleDifference, as img() was rescaled to mymodel.ori_size and mymodel.pixel_size
 				//A = mydata.obsModel.applyAnisoMag(A, optics_group);
@@ -2700,7 +2704,15 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				{
 					CTF ctf;
 					ctf.readByGroup(MDimg, &mydata.obsModel, 0); // This MDimg only contains one particle!
-					ctf.getFftwImage(Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size,
+
+                    // Apply the dz to the defocus for 2D image stacks in STA
+                    if (mydata.is_tomo)
+                    {
+                        ctf.DeltafU += mydata.particles[part_id].images[img_id].dz;
+                        ctf.DeltafV += mydata.particles[part_id].images[img_id].dz;
+                    }
+
+                    ctf.getFftwImage(Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size,
 						ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true, do_ctf_padding);
 
 					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fimg)
@@ -6884,8 +6896,6 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 									bool do_proceed = (exp_ipass == 0) ? true : DIRECT_A1D_ELEM(exp_Mcoarse_significant, ihidden);
 									if (do_proceed)
 									{
-										if (mydata.is_tomo) REPORT_ERROR("ERROR: TOD: implement what to do with 2D stack translations here!");
-
                                         // Jun01,2015 - Shaoda & Sjors, Helical refinement
 										sampling.getTranslationsInPixel(itrans, exp_current_oversampling, my_pixel_size, oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
 												(do_helical_refine) && (!ignore_helical_symmetry));
@@ -8821,11 +8831,6 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 	for (int part_id = my_first_part_id; part_id <= my_last_part_id; part_id++)
     {
 		n_trials +=  mydata.numberOfImagesInParticle(part_id);
-
-		if (mydata.numberOfImagesInParticle(part_id) > 1)
-		{
-			REPORT_ERROR("ERROR: calculateExpectedAngularErrors will not work for multiple images per particle from 3.1...");
-		}
     }
 
 	// Separate angular error estimate for each of the classes
@@ -8839,7 +8844,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 
 	std::cout << " Estimating accuracies in the orientational assignment ... " << std::endl;
 	int nr_particles = (my_last_part_id - my_first_part_id + 1);
-	init_progress_bar( nr_particles * mymodel.nr_classes * mymodel.nr_bodies);
+	init_progress_bar( n_trials * mymodel.nr_classes * mymodel.nr_bodies);
 	for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
 	{
 
@@ -8947,6 +8952,12 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 							DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_KFACTOR),
 							DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_PHASE_SHIFT));
 
+                        if (mydata.is_tomo)
+                        {
+                            ctf.DeltafU += mydata.particles[part_id].images[img_id].dz;
+                            ctf.DeltafV += mydata.particles[part_id].images[img_id].dz;
+                        }
+
 						ctf.getFftwImage(Fctf, image_full_size[optics_group], image_full_size[optics_group], my_pixel_size,
 								ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true, do_ctf_padding);
 
@@ -9030,6 +9041,8 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 
 						// Get the FT of the first image
 						Euler_angles2matrix(rot1, tilt1, psi1, A1, false);
+
+                        if (mydata.is_tomo) A1 = mydata.getRotationMatrix(part_id, img_id) * A1;
 						A1 = mydata.obsModel.applyAnisoMag(A1, optics_group);
 						A1 = mydata.obsModel.applyScaleDifference(A1, optics_group, mymodel.ori_size, mymodel.pixel_size);
 						(mymodel.PPref[iclass]).get2DFourierTransform(F1, A1);
@@ -9092,13 +9105,20 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 						{
 							// Get new rotated version of reference
 							Euler_angles2matrix(rot2, tilt2, psi2, A2, false);
+                            if (mydata.is_tomo) A2 = mydata.getRotationMatrix(part_id, img_id) * A2;
 							A2 = mydata.obsModel.applyAnisoMag(A2, optics_group);
 							A2 = mydata.obsModel.applyScaleDifference(A2, optics_group, mymodel.ori_size, mymodel.pixel_size);
 							(mymodel.PPref[iclass]).get2DFourierTransform(F2, A2);
 						}
 						else
 						{
-							// Get shifted version
+                            if (mydata.is_tomo)
+                            {
+                                RFLOAT xshift, yshift, zshift;
+                                mydata.getTranslationInTiltSeries(part_id, img_id, xshift, yshift, zshift, xshift, yshift, zshift);
+                            }
+
+                            // Get shifted version
 							shiftImageInFourierTransform(F1, F2, (RFLOAT)image_full_size[optics_group], -xshift, -yshift, -zshift);
 						}
 
@@ -9869,7 +9889,7 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 			// Get the image names from the MDimg table
 			FileName fn_img="", fn_rec_img="", fn_ctf="";
 			if (!mydata.getImageNameOnScratch(part_id, img_id, fn_img))
-                mydata.MDimg.getValue(EMDL_IMAGE_NAME, fn_img, part_id);
+                fn_img = mydata.particles[part_id].images[img_id].name;
 
 			if (mymodel.data_dim == 3 && do_ctf_correction)
 			{

@@ -20,7 +20,7 @@ class TomogramSet
         TomogramSet(FileName filename, bool verbose = true);
 
         // return false if this is not a TomogramSet
-        bool read(std::string filename, bool verbose = true);
+        bool read(FileName filename, bool verbose = true);
         void write(FileName filename);
 
 		Tomogram loadTomogram(int index, bool loadImageData) const;
