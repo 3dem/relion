@@ -869,10 +869,6 @@ void MlOptimiserMpi::expectation()
 		int myverb = (node->rank == first_follower) ? 1 : 0;
 		MlOptimiser::expectationSetupCheckMemory(myverb);
 
-		// F. Precalculate AB-matrices for on-the-fly shifts
-		// Use tabulated sine and cosine values instead for 2D helical segments / 3D helical sub-tomogram averaging with on-the-fly shifts
-		if ( (do_shifts_onthefly) && (!((do_helical_refine) && (!ignore_helical_symmetry)))  && !(do_grad && iter > 1))
-			precalculateABMatrices();
 	}
 	// Follower 1 sends has_converged to everyone else (in particular the leader needs it!)
 	node->relion_MPI_Bcast(&has_converged, 1, MPI_INT, first_follower, MPI_COMM_WORLD);

@@ -3222,11 +3222,6 @@ void MlOptimiser::expectation()
 	// E. Check whether everything fits into memory
 	expectationSetupCheckMemory(verb);
 
-	// F. Precalculate AB-matrices for on-the-fly shifts
-	// Use tabulated sine and cosine values instead for 2D helical segments / 3D helical sub-tomogram averaging with on-the-fly shifts
-	if ( (do_shifts_onthefly) && (!((do_helical_refine) && (!ignore_helical_symmetry))) && !(do_grad && iter > 1))
-		precalculateABMatrices();
-
 
 #ifdef DEBUG_EXP
 	std::cerr << "Expectation: done setupCheckMemory" << std::endl;
@@ -3712,87 +3707,6 @@ void MlOptimiser::expectationSetupCheckMemory(int myverb)
 #ifdef DEBUG
 	std::cerr << "Leaving expectationSetup" << std::endl;
 #endif
-
-}
-
-void MlOptimiser::precalculateABMatrices()
-{
-
-
-
-	global_fftshifts_ab_coarse.clear();
-	global_fftshifts_ab_current.clear();
-	global_fftshifts_ab2_coarse.clear();
-	global_fftshifts_ab2_current.clear();
-	for (int optics_group = 0; optics_group < mydata.numberOfOpticsGroups(); optics_group++)
-	{
-
-		std::vector<MultidimArray<Complex> > dummy;
-		global_fftshifts_ab_coarse.push_back(dummy);
-		global_fftshifts_ab_current.push_back(dummy);
-		global_fftshifts_ab2_coarse.push_back(dummy);
-		global_fftshifts_ab2_current.push_back(dummy);
-
-		RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
-
-		// Set the global AB-matrices for the FFT phase-shifted images
-		MultidimArray<Complex> Fab_current, Fab_coarse;
-		if (mymodel.data_dim == 3)
-			Fab_current.resize(image_current_size[optics_group], image_current_size[optics_group], image_current_size[optics_group] / 2 + 1);
-		else
-			Fab_current.resize(image_current_size[optics_group], image_current_size[optics_group] / 2 + 1);
-		long int exp_nr_trans = sampling.NrTranslationalSamplings();
-		std::vector<RFLOAT> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
-		// Note that do_shifts_onthefly is incompatible with do_skip_align because of the loop below
-		for (long int itrans = 0; itrans < exp_nr_trans; itrans++)
-		{
-			// First get the non-oversampled translations as defined by the sampling object
-			// Feb01,2017 - Shaoda, obsolete, helical reconstuctions never call this function
-
-			// TODO: see how this works with multiple pixel sizes......
-			sampling.getTranslationsInPixel(itrans, 0, my_pixel_size, oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
-					(do_helical_refine) && (!ignore_helical_symmetry)); // need getTranslations to add random_perturbation
-
-			// Precalculate AB-matrices
-			RFLOAT tmp_zoff = (mymodel.data_dim == 2) ? (0.) : oversampled_translations_z[0];
-			getAbMatricesForShiftImageInFourierTransform(Fab_current, Fab_current, (RFLOAT)image_full_size[optics_group], oversampled_translations_x[0], oversampled_translations_y[0], tmp_zoff);
-
-			windowFourierTransform(Fab_current, Fab_coarse, image_coarse_size[optics_group]);
-			global_fftshifts_ab_coarse[optics_group].push_back(Fab_coarse);
-			if (adaptive_oversampling == 0)
-			{
-				global_fftshifts_ab_current[optics_group].push_back(Fab_current);
-			}
-			else
-			{
-				// Then also loop over all its oversampled relatives
-				// Then loop over all its oversampled relatives
-				// Feb01,2017 - Shaoda, obsolete, helical reconstuctions never call this function
-				sampling.getTranslationsInPixel(itrans, adaptive_oversampling, my_pixel_size, oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
-						(do_helical_refine) && (!ignore_helical_symmetry));
-				for (long int iover_trans = 0; iover_trans < oversampled_translations_x.size(); iover_trans++)
-				{
-					// Shift through phase-shifts in the Fourier transform
-					// Note that the shift search range is centered around (exp_old_xoff, exp_old_yoff)
-
-					RFLOAT tmp_zoff = (mymodel.data_dim == 2) ? (0.) : oversampled_translations_z[iover_trans];
-					getAbMatricesForShiftImageInFourierTransform(Fab_current, Fab_current, (RFLOAT)image_full_size[optics_group], oversampled_translations_x[iover_trans], oversampled_translations_y[iover_trans], tmp_zoff);
-
-					global_fftshifts_ab2_current[optics_group].push_back(Fab_current);
-					if (strict_highres_exp > 0.)
-					{
-						windowFourierTransform(Fab_current, Fab_coarse, image_coarse_size[optics_group]);
-						global_fftshifts_ab2_coarse[optics_group].push_back(Fab_coarse);
-					}
-				}
-			} // end else (adaptive_oversampling == 0)
-		} // end loop itrans
-
-#ifdef DEBUG_AB
-		std::cerr << " global_fftshifts_ab_coarse[optics_group].size()= " << global_fftshifts_ab_coarse[optics_group].size() << " global_fftshifts_ab_current[optics_group].size()= " << global_fftshifts_ab_current[optics_group].size() << std::endl;
-		std::cerr << " global_fftshifts_ab2_coarse[optics_group].size()= " << global_fftshifts_ab2_coarse[optics_group].size() << " global_fftshifts_ab2_current[optics_group].size()= " << global_fftshifts_ab2_current[optics_group].size() << std::endl;
-#endif
-	} // end loop optics_group
 
 }
 
@@ -5543,7 +5457,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(
         int shiftdim = (mymodel.data_dim == 3 || mydata.is_tomo) ? 3 : 2 ;
         my_projected_com.resize(shiftdim);
 
-
 #ifdef DEBUG_BODIES
         if (part_id == ROUND(debug1))
 			{
@@ -5696,7 +5609,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
         // We do NOT want to accumulate the offsets in the direction along the helix (which is X in the helical coordinate system!)
         // However, when doing helical local searches, we accumulate offsets
         // Do NOT accumulate offsets in 3D classification of helices
-        if ( (!do_skip_align) && (!do_skip_rotate) )
+        if (!mydata.is_tomo && (!do_skip_align) && (!do_skip_rotate) )
         {
             // TODO: check whether the following lines make sense
             bool do_auto_refine_local_searches = (do_auto_refine || do_auto_sampling) && (sampling.healpix_order >= autosampling_hporder_local_searches);
@@ -5729,7 +5642,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 #endif
     }
 
-    my_old_offset.selfROUND(); // Below, this rounded my_old_offset will be applied to the actual images
+    if (!mydata.is_tomo) my_old_offset.selfROUND(); // Below, this rounded my_old_offset will be applied to the actual images
 
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
     if ( (do_helical_refine) && (!ignore_helical_symmetry) )
@@ -5759,7 +5672,10 @@ void MlOptimiser::getFourierTransformsAndCtfs(
     {
         // For multi-bodies: store only the old refined offset, not the constant consensus offset or the projected COM of this body
         if (mymodel.nr_bodies > 1)
-            exp_old_offset = my_refined_ibody_offset;
+            if (mydata.is_tomo) // no application of my_old_offset for is_tomo!
+                exp_old_offset = my_old_offset - my_projected_com + my_refined_ibody_offset;
+            else
+                exp_old_offset = my_refined_ibody_offset;
         else
             exp_old_offset = my_old_offset;  // Not doing helical refinement. Rounded Cartesian offsets are stored.
     }
@@ -5936,15 +5852,22 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 			img() *= mymodel.avg_norm_correction / normcorr;
 		}
 
+        if (mydata.is_tomo)
+        {
+            // TODO: Need tot take projected 2D shift into account!
+            //  Therefore non-integer shift needs to be done as a FourierTransform phase-shift to prevent another interpolation...
+            //  That's a bit expensive here, but keeps us from changing a lot of code elsewhere...
+            selfTranslateSubtomoStack2D(img(), my_old_offset, part_id, img_id);
+            if (has_converged && do_use_reconstruct_images)
+                selfTranslateSubtomoStack2D(rec_img(), my_old_offset, part_id, img_id);
 
-        // TODO! Think this through for 2D stacks....
-        if (mydata.is_tomo) REPORT_ERROR("selfTranslate will not work for 2D STA stacks!");
-
-        selfTranslate(img(), my_old_offset, DONT_WRAP);
-		if (has_converged && do_use_reconstruct_images)
-		{
-			selfTranslate(rec_img(), my_old_offset, DONT_WRAP);
-		}
+        }
+        else
+        {
+            selfTranslate(img(), my_old_offset, DONT_WRAP);
+            if (has_converged && do_use_reconstruct_images)
+                selfTranslate(rec_img(), my_old_offset, DONT_WRAP);
+        }
 
 //#define DEBUG_SOFTMASK
 #ifdef DEBUG_SOFTMASK
@@ -6303,10 +6226,14 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 					}
 #endif
 
-                    // TODO! The below will now work for 2D stacks in 2D, just like selfTranslate() didn't work upwards; Also need to apply per-image rotations, Aproj!
-                    if (mydata.is_tomo) REPORT_ERROR("ERROR: multibody for STA not implemented yet!");
-
-                    shiftImageInFourierTransform(FTo, Faux, (RFLOAT)mymodel.ori_size,
+                    if (mydata.is_tomo)
+                    {
+                        RFLOAT xshift, yshift, zshift;
+                        mydata.getTranslationInTiltSeries(part_id, img_id, XX(other_projected_com), YY(other_projected_com), ZZ(other_projected_com), xshift, yshift, zshift);
+                        shiftImageInFourierTransform(FTo, Faux, (RFLOAT)mymodel.ori_size, xshift, yshift);
+                    }
+                    else
+                        shiftImageInFourierTransform(FTo, Faux, (RFLOAT)mymodel.ori_size,
 							XX(other_projected_com), YY(other_projected_com), (mymodel.data_dim == 3) ? ZZ(other_projected_com) : 0);
 
 					// Sum the Fourier transforms of all the obodies
@@ -6413,7 +6340,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmasked, bool is_for_store_wsums,
 		long int part_id, int exp_current_oversampling, int metadata_offset,
 		int exp_itrans_min, int exp_itrans_max,
-		std::vector<MultidimArray<Complex > > &exp_Fimg,
+        std::vector<MultidimArray<Complex > > &exp_Fimg,
 		std::vector<MultidimArray<Complex > > &exp_Fimg_nomask,
 		std::vector<MultidimArray<RFLOAT> > &exp_Fctf,
 		std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted,
@@ -6636,9 +6563,11 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 #endif
 					}
 
-                    //// XXXXXXXXXX make 3D shift into 2D shift
-
-                    if (mydata.is_tomo) REPORT_ERROR("TODO: think about 2D shifts here!!");
+                    // For subtomo: convert 3D shifts in the tomogram to 2D shifts in the tilt series images
+                    if (mydata.is_tomo)
+                    {
+                        mydata.getTranslationInTiltSeries(part_id, img_id, xshift, yshift, zshift, xshift, yshift, zshift);
+                    }
 
 					// Shift through phase-shifts in the Fourier transform
 					// Note that the shift search range is centered around (exp_old_xoff, exp_old_yoff)
@@ -6742,7 +6671,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 		int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 		int exp_itrans_min, int exp_itrans_max, int exp_iclass_min, int exp_iclass_max,
 		RFLOAT &exp_min_diff2,
-		std::vector<RFLOAT> &exp_highres_Xi2_img,
+        std::vector<RFLOAT> &exp_highres_Xi2_img,
 		std::vector<MultidimArray<Complex > > &exp_Fimg,
 		std::vector<MultidimArray<RFLOAT> > &exp_Fctf,
 		MultidimArray<RFLOAT> &exp_Mweight,
@@ -6992,65 +6921,41 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 											{
 												// Calculate shifted image on-the-fly to save replicating memory in multi-threaded jobs.
 												// Feb01,2017 - Shaoda, on-the-fly shifts in helical reconstuctions (2D and 3D)
-												if ( (do_helical_refine) && (!ignore_helical_symmetry) )
-												{
-													bool use_coarse_size = false;
-													RFLOAT xshift_in = 0., yshift_in = 0., zshift_in = 0.;
-													RFLOAT xshift = 0., yshift = 0., zshift = 0.;
+                                                bool use_coarse_size = ((exp_current_oversampling == 0) && (YSIZE(Frefctf) == image_coarse_size[optics_group]))
+                                                        || ((exp_current_oversampling > 0) && (strict_highres_exp > 0.));
 
-													xshift_in = (exp_current_oversampling == 0) ? (oversampled_translations_x[0]) : (oversampled_translations_x[iover_trans]);
-													yshift_in = (exp_current_oversampling == 0) ? (oversampled_translations_y[0]) : (oversampled_translations_y[iover_trans]);
-													if (mymodel.data_dim == 3 || mydata.is_tomo)
-														zshift_in = (exp_current_oversampling == 0) ? (oversampled_translations_z[0]) : (oversampled_translations_z[iover_trans]);
+                                                RFLOAT zshift = 0.;
+                                                RFLOAT xshift = (exp_current_oversampling == 0) ? (oversampled_translations_x[0]) : (oversampled_translations_x[iover_trans]);
+                                                RFLOAT yshift = (exp_current_oversampling == 0) ? (oversampled_translations_y[0]) : (oversampled_translations_y[iover_trans]);
+                                                if (mymodel.data_dim == 3 || mydata.is_tomo)
+                                                    zshift = (exp_current_oversampling == 0) ? (oversampled_translations_z[0]) : (oversampled_translations_z[iover_trans]);
 
-                                                    if (mydata.is_tomo) REPORT_ERROR("ERROR; TODO: think about the below for 2D shifts in stacks...");
+                                                if ((do_helical_refine) && (!ignore_helical_symmetry))
+                                                {
+                                                    RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT);
+                                                    RFLOAT tilt_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_TILT);
+                                                    RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI);
+                                                    transformCartesianAndHelicalCoords(
+                                                                xshift, yshift, zshift,
+                                                                xshift, yshift, zshift,
+                                                                rot_deg, tilt_deg, psi_deg,
+                                                                mymodel.data_dim,
+                                                                HELICAL_TO_CART_COORDS);
+                                                }
 
-													RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT);
-													RFLOAT tilt_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_TILT);
-													RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI);
-													transformCartesianAndHelicalCoords(
-																xshift_in, yshift_in, zshift_in,
-																xshift, yshift, zshift,
-																rot_deg, tilt_deg, psi_deg,
-																mymodel.data_dim,
-																HELICAL_TO_CART_COORDS);
+                                                // For subtomo: convert 3D shifts in the tomogram to 2D shifts in the tilt series images
+                                                if (mydata.is_tomo) mydata.getTranslationInTiltSeries(part_id, img_id,
+                                                                                                      xshift, yshift, zshift,
+                                                                                                      xshift, yshift, zshift);
 
-													use_coarse_size = ((exp_current_oversampling == 0) && (YSIZE(Frefctf) == image_coarse_size[optics_group]))
-															|| ((exp_current_oversampling > 0) && (strict_highres_exp > 0.));
+                                                shiftImageInFourierTransformWithTabSincos(
+                                                        exp_local_Fimgs_shifted[img_id][0],
+                                                        Fimg_otfshift,
+                                                        (RFLOAT)mymodel.ori_size,
+                                                        (use_coarse_size) ? (image_coarse_size[optics_group]) : (image_current_size[optics_group]),
+                                                        tab_sin, tab_cos,
+                                                        xshift, yshift, zshift);
 
-                                                    if (mydata.is_tomo) REPORT_ERROR("ERROR: TOD: implement what to do with 2D stack translations here!");
-
-                                                    shiftImageInFourierTransformWithTabSincos(
-															exp_local_Fimgs_shifted[img_id][0],
-															Fimg_otfshift,
-															(RFLOAT)mymodel.ori_size,
-															(use_coarse_size) ? (image_coarse_size[optics_group]) : (image_current_size[optics_group]),
-															tab_sin, tab_cos,
-															xshift, yshift, zshift);
-												}
-												else
-												{
-													Complex *myAB;
-													if (exp_current_oversampling == 0)
-													{
-														myAB = (YSIZE(Frefctf) == image_coarse_size[optics_group]) ? global_fftshifts_ab_coarse[optics_group][itrans].data
-																: global_fftshifts_ab_current[optics_group][itrans].data;
-													}
-													else
-													{
-														int iitrans = itrans * exp_nr_oversampled_trans +  iover_trans;
-														myAB = (strict_highres_exp > 0.) ? global_fftshifts_ab2_coarse[optics_group][iitrans].data
-																: global_fftshifts_ab2_current[optics_group][iitrans].data;
-													}
-													FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[img_id][0])
-													{
-														RFLOAT real = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[img_id][0], n)).real
-																- (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[img_id][0], n)).imag;
-														RFLOAT imag = (*(myAB + n)).real * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[img_id][0], n)).imag
-																+ (*(myAB + n)).imag *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[img_id][0], n)).real;
-														DIRECT_MULTIDIM_ELEM(Fimg_otfshift, n) = Complex(real, imag);
-													}
-												}
 												Fimg_shift = Fimg_otfshift.data;
 											}
 #ifdef TIMING
@@ -8175,24 +8080,31 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 											else
 											{
 												// Feb01,2017 - Shaoda, on-the-fly shifts in helical reconstuctions (2D and 3D)
-												if ( (do_helical_refine) && (!ignore_helical_symmetry) )
+												if ( mydata.is_tomo || ((do_helical_refine) && (!ignore_helical_symmetry)) )
 												{
-													RFLOAT xshift = 0., yshift = 0., zshift = 0.;
-
-													xshift = oversampled_translations_x[iover_trans];
-													yshift = oversampled_translations_y[iover_trans];
+													RFLOAT zshift = 0.;
+													RFLOAT xshift = oversampled_translations_x[iover_trans];
+													RFLOAT yshift = oversampled_translations_y[iover_trans];
 													if (mymodel.data_dim == 3 || mydata.is_tomo)
 														zshift = oversampled_translations_z[iover_trans];
 
-													RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT);
-													RFLOAT tilt_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_TILT);
-													RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI);
-													transformCartesianAndHelicalCoords(
-																xshift, yshift, zshift,
-																xshift, yshift, zshift,
-																rot_deg, tilt_deg, psi_deg,
-																mymodel.data_dim,
-																HELICAL_TO_CART_COORDS);
+                                                    if ((do_helical_refine) && (!ignore_helical_symmetry))
+                                                    {
+                                                        RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT);
+                                                        RFLOAT tilt_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_TILT);
+                                                        RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI);
+                                                        transformCartesianAndHelicalCoords(
+                                                                    xshift, yshift, zshift,
+                                                                    xshift, yshift, zshift,
+                                                                    rot_deg, tilt_deg, psi_deg,
+                                                                    mymodel.data_dim,
+                                                                    HELICAL_TO_CART_COORDS);
+                                                    }
+
+                                                    // For subtomo: convert 3D shifts in the tomogram to 2D shifts in the tilt series images
+                                                    if (mydata.is_tomo) mydata.getTranslationInTiltSeries(part_id, img_id,
+                                                                                                          xshift, yshift, zshift,
+                                                                                                          xshift, yshift, zshift);
 
 													// Fimg_shift
 													shiftImageInFourierTransformWithTabSincos(
@@ -10356,4 +10268,18 @@ void MlOptimiser::applySubtomoCorrection(MultidimArray<Complex > &Fimg, Multidim
 		// We don't store the multiplicity to prevent applying the corrected algorithm during reconstruction/averaging
 		FstMulti.clear();
 	}
+}
+
+void MlOptimiser::selfTranslateSubtomoStack2D(MultidimArray<RFLOAT> &img, const Matrix1D<RFLOAT> &v, long int part_id, int img_id)
+{
+    RFLOAT xshift, yshift, zshift;
+    mydata.getTranslationInTiltSeries(part_id, img_id, XX(v), YY(v), ZZ(v), xshift, yshift, zshift);
+
+    FourierTransformer transformer;
+    MultidimArray<Complex> FT, Faux;
+    transformer.FourierTransform(img, FT, false);
+    Faux = FT;
+    shiftImageInFourierTransform(Faux, FT, XSIZE(img), (RFLOAT)mymodel.ori_size, xshift, yshift);
+    transformer.inverseFourierTransform(FT, img);
+
 }

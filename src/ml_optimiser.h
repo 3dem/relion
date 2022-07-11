@@ -979,9 +979,6 @@ public:
 	/* Check whether everything fits into memory, possibly adjust nr_pool and setup thread task managers */
 	void expectationSetupCheckMemory(int myverb = 1);
 
-	/* For on-the-fly shifts, precalculates AB-matrices */
-	void precalculateABMatrices();
-
 	/* Perform the expectation integration over all k, phi and series elements for a number (some) of pooled particles
 	 * The number of pooled particles is determined by max_nr_pool and some memory checks in expectationSetup()
 	 */
@@ -1189,6 +1186,9 @@ public:
 	// Apply the Multiplicity weights to correct for Images and CTFs to properly estimate squared differences and averages
 	void applySubtomoCorrection(MultidimArray<Complex > &Fimg, MultidimArray<Complex > &Fimg_nomask ,
 								MultidimArray<RFLOAT> &Fctf, MultidimArray<RFLOAT> &FstMulti);
+
+    // Use phase-shifts in FourierTransform to prevent another interpolation for projected (non-integer) shifts in 2D subtomo stacks
+    void selfTranslateSubtomoStack2D(MultidimArray<RFLOAT> &I1, const Matrix1D<RFLOAT> &v, long int part_id, int img_id);
 
 };
 
