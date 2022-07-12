@@ -831,6 +831,8 @@ void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
         MDgen.read(fn_exp, "general");
         if (MDgen.numberOfObjects() > 0)
             MDgen.getValue(EMDL_TOMO_SUBTOMOGRAM_STACK2D, is_tomo);
+        else
+            is_tomo = false;
 
         // MDimg and MDopt have to be read at the same time, so that the optics groups can be
 		// renamed in case they are non-contiguous or not sorted
@@ -838,14 +840,16 @@ void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
 		nr_images_per_optics_group.resize(obsModel.numberOfOpticsGroups(), 0);
 
         std::vector<std::vector<ParticleIndex>> particles_idx;
-        if (fn_tomo != "")
+        if (is_tomo)
         {
+
+            if (fn_tomo == "") REPORT_ERROR("ERROR: you need to provide fn_tomo when refining 2D stacks of tilt series images");
+
             // For now read in particle table twice: once into MDimg and once into particleSet...
             // TODO: work with pointer to avoid duplication?
             // TODO: ObservationModel::loadSafely(fn_exp, obsModel, MDimg, "particles", verb, true, true);
             tomogramSet.read(fn_tomo, verb>0);
             particleSet.read(fn_exp, fn_motion, verb>0);
-            is_tomo = true;
 
             // For checking tomogram sanity below
             particles_idx = particleSet.splitByTomogram(tomogramSet, verb>0);
