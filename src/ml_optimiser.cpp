@@ -2708,8 +2708,10 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
                     // Apply the dz to the defocus for 2D image stacks in STA
                     if (mydata.is_tomo)
                     {
-                        ctf.DeltafU += mydata.particles[part_id].images[img_id].dz;
-                        ctf.DeltafV += mydata.particles[part_id].images[img_id].dz;
+                        ctf.DeltafU = mydata.particles[part_id].images[img_id].defU;
+                        ctf.DeltafV = mydata.particles[part_id].images[img_id].defV;
+                        ctf.azimuthal_angle = mydata.particles[part_id].images[img_id].defAngle;
+                        ctf.initialise();
                     }
 
                     ctf.getFftwImage(Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size,
@@ -6067,26 +6069,20 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 				CTF ctf;
 				ctf.setValuesByGroup(
 					&mydata.obsModel, optics_group,
-					DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_U),
-					DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_V),
-					DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_ANGLE),
+                    (mydata.is_tomo) ? mydata.particles[part_id].images[img_id].defU : DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_U),
+                    (mydata.is_tomo) ? mydata.particles[part_id].images[img_id].defV : DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_V),
+                    (mydata.is_tomo) ? mydata.particles[part_id].images[img_id].defAngle : DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_ANGLE),
 					DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_BFACTOR),
 					DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_KFACTOR),
 					DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_PHASE_SHIFT));
-
-                // Apply the dz to the defocus for 2D image stacks in STA
-                if (mydata.is_tomo)
-                {
-                    ctf.DeltafU += mydata.particles[part_id].images[img_id].dz;
-                    ctf.DeltafV += mydata.particles[part_id].images[img_id].dz;
-                }
 
 				ctf.getFftwImage(Fctf, image_full_size[optics_group], image_full_size[optics_group], my_pixel_size,
 						ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true, do_ctf_padding);
 
 				if (ctf_premultiplied)
 				{
-					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+					std::cerr << "ctf_premultiplied! "<<std::endl;
+                    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
 					{
 						DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 					}
@@ -6419,7 +6415,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 		{
 			exp_current_image_size = image_current_size[optics_group];
 		}
-		bool do_ctf_invsig = (exp_local_Fctf.size() > 0) ? YSIZE(exp_local_Fctf[0])  != exp_current_image_size : true; // size has changed
+		bool do_ctf_invsig = (exp_local_Fctf.size() > 0) ? YSIZE(exp_local_Fctf[img_id])  != exp_current_image_size : true; // size has changed
 		bool do_masked_shifts = (do_ctf_invsig || nr_shifts != exp_local_Fimgs_shifted[img_id].size()); // size or nr_shifts has changed
 
 		if (do_masked_shifts)
@@ -6802,7 +6798,8 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 					// if so, proceed with projecting the reference in that direction
 					bool do_proceed = (exp_ipass==0) ? true :
 						isSignificantAnyImageAnyTranslation(iorientclass, exp_itrans_min, exp_itrans_max, exp_Mcoarse_significant);
-					if (do_proceed && pdf_orientation > 0.)
+
+                    if (do_proceed && pdf_orientation > 0.)
 					{
 						// Now get the oversampled (rot, tilt, psi) triplets
 						// This will be only the original (rot,tilt,psi) triplet in the first pass (exp_current_oversampling==0)
@@ -6815,7 +6812,6 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 							// loop over all images inside this particle
 							for (int img_id = 0; img_id < exp_nr_images; img_id++)
 							{
-
 								RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, img_id);
 								int optics_group = mydata.getOpticsGroup(part_id, img_id);
 
@@ -6848,7 +6844,6 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 									A = mydata.obsModel.applyScaleDifference(A, optics_group, mymodel.ori_size, mymodel.pixel_size);
 									(mymodel.PPref[exp_iclass]).get2DFourierTransform(Fref, A);
 								}
-
 
 #ifdef TIMING
 								// Only time one thread, as I also only time one MPI process
@@ -6906,15 +6901,12 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 											if (part_id == mydata.sorted_idx[exp_my_first_part_id])
 												timer.tic(TIMING_DIFF2_GETSHIFT);
 #endif
-											/// Now get the shifted image
+                                            /// Now get the shifted image
 											// Use a pointer to avoid copying the entire array again in this highly expensive loop
 											Complex *Fimg_shift;
 											if (!do_shifts_onthefly)
 											{
-												long int ishift = img_id * exp_nr_oversampled_trans * exp_nr_images +
-														(itrans - exp_itrans_min) * exp_nr_oversampled_trans + iover_trans;
-												if (do_skip_align)
-													ishift = img_id;
+												long int ishift = (do_skip_align) ? 0 : (itrans - exp_itrans_min) * exp_nr_oversampled_trans + iover_trans;
 #ifdef DEBUG_CHECKSIZES
 												if (ishift >= exp_local_Fimgs_shifted.size())
 												{
@@ -7074,15 +7066,20 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 												//fnt.compose("Fref1_i", ihidden_over, "spi");
 												tt.write(fnt);
 
+                                                tt().resize(exp_local_Fctf[img_id]);
+                                                FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fctf[img_id])
+                                                {
+                                                    DIRECT_MULTIDIM_ELEM(tt(), n) = DIRECT_MULTIDIM_ELEM(exp_local_Fctf[img_id], n);
+                                                }
+                                                tt.write("ctf.spi");
 
-												//for (int i = 0; i< mymodel.scale_correction.size(); i++)
+                                                //for (int i = 0; i< mymodel.scale_correction.size(); i++)
 												//	std::cerr << i << " scale="<<mymodel.scale_correction[i]<<std::endl;
 												int group_id = mydata.getGroupId(part_id, img_id);
 												RFLOAT myscale = mymodel.scale_correction[group_id];
 												//std::cerr << " oversampled_rot[iover_rot]= " << oversampled_rot[iover_rot] << " oversampled_tilt[iover_rot]= " << oversampled_tilt[iover_rot] << " oversampled_psi[iover_rot]= " << oversampled_psi[iover_rot] << std::endl;
 												//std::cerr << " group_id= " << group_id << " myscale= " << myscale <<std::endl;
 												std::cerr << " itrans= " << itrans << " itrans * exp_nr_oversampled_trans +  iover_trans= " << itrans * exp_nr_oversampled_trans +  iover_trans << " ihidden= " << ihidden << std::endl;
-												std::cerr <<" part_id= "<<part_id<<" name= "<< mydata.particles[part_id].name << std::endl;
 												std::cerr <<" img_id= "<<img_id<<" name= "<< mydata.particles[part_id].images[img_id].name << std::endl;
 
 												//std::cerr << " myrank= "<< myrank<<std::endl;
@@ -7212,11 +7209,10 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                                                 DIRECT_A1D_ELEM(exp_Mweight, ihidden_over) += diff2;
 
 											// Keep track of minimum of all diff2, only for the last image in this series
-											if (img_id == exp_nr_images-1 && diff2 < exp_min_diff2)
+											if (img_id == exp_nr_images-1 && DIRECT_A1D_ELEM(exp_Mweight, ihidden_over) < exp_min_diff2)
 											{
-												exp_min_diff2 = diff2;
-
-												/*
+												exp_min_diff2 = DIRECT_A1D_ELEM(exp_Mweight, ihidden_over);
+                                                /*
                                                 if (part_id == 0)
 												{
 													std::cerr << " part_id= " << part_id << " ihidden_over= " << ihidden_over << " diff2= " << diff2
@@ -8083,9 +8079,8 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 											Complex *Fimg_shift, *Fimg_shift_nomask;
 											if (!do_shifts_onthefly)
 											{
-												long int ishift = img_id * exp_nr_oversampled_trans * exp_nr_trans + iitrans;
-												Fimg_shift = exp_local_Fimgs_shifted[img_id][ishift].data;
-												Fimg_shift_nomask = exp_local_Fimgs_shifted_nomask[img_id][ishift].data;
+												Fimg_shift = exp_local_Fimgs_shifted[img_id][iitrans].data;
+												Fimg_shift_nomask = exp_local_Fimgs_shifted_nomask[img_id][iitrans].data;
 											}
 											else
 											{
@@ -8945,20 +8940,14 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 						CTF ctf;
 						ctf.setValuesByGroup(
 							&mydata.obsModel, optics_group,
-							DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_U),
-							DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_V),
-							DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_ANGLE),
+                            (mydata.is_tomo) ? mydata.particles[part_id].images[img_id].defU : DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_U),
+							(mydata.is_tomo) ? mydata.particles[part_id].images[img_id].defV : DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_V),
+							(mydata.is_tomo) ? mydata.particles[part_id].images[img_id].defAngle : DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_ANGLE),
 							DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_BFACTOR),
 							DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_KFACTOR),
 							DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_PHASE_SHIFT));
 
-                        if (mydata.is_tomo)
-                        {
-                            ctf.DeltafU += mydata.particles[part_id].images[img_id].dz;
-                            ctf.DeltafV += mydata.particles[part_id].images[img_id].dz;
-                        }
-
-						ctf.getFftwImage(Fctf, image_full_size[optics_group], image_full_size[optics_group], my_pixel_size,
+ 						ctf.getFftwImage(Fctf, image_full_size[optics_group], image_full_size[optics_group], my_pixel_size,
 								ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true, do_ctf_padding);
 
 						// JO 5Mar2020: For both 2D and 3D data, CTF^2 will be provided if ctf_premultiplied!
@@ -10297,7 +10286,7 @@ void MlOptimiser::selfTranslateSubtomoStack2D(MultidimArray<RFLOAT> &img, const 
 
     FourierTransformer transformer;
     MultidimArray<Complex> FT, Faux;
-    transformer.FourierTransform(img, FT, false);
+    transformer.FourierTransform(img, FT, true);
     Faux = FT;
     shiftImageInFourierTransform(Faux, FT, XSIZE(img), (RFLOAT)mymodel.ori_size, xshift, yshift);
     transformer.inverseFourierTransform(FT, img);

@@ -719,21 +719,13 @@ void getFourierTransformsAndCtfs(long int part_id,
 				CTIC(accMLO->timer,"CTFRead2D");
 				CTF ctf;
 				ctf.setValuesByGroup(
-                                        &(baseMLO->mydata).obsModel, optics_group,
-					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_DEFOCUS_U),
-					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_DEFOCUS_V),
-					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_DEFOCUS_ANGLE),
-					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_BFACTOR),
-					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_KFACTOR),
-					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_PHASE_SHIFT));
-
-                // Apply the dz to the defocus for 2D image stacks in STA
-                if (baseMLO->mydata.is_tomo)
-                {
-                    ctf.DeltafU += baseMLO->mydata.particles[part_id].images[img_id].dz;
-                    ctf.DeltafV += baseMLO->mydata.particles[part_id].images[img_id].dz;
-                }
-
+                        &(baseMLO->mydata).obsModel, optics_group,
+                        (baseMLO->mydata.is_tomo) ? baseMLO->mydata.particles[part_id].images[img_id].defU : DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_DEFOCUS_U),
+                        (baseMLO->mydata.is_tomo) ? baseMLO->mydata.particles[part_id].images[img_id].defV : DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_DEFOCUS_V),
+                        (baseMLO->mydata.is_tomo) ? baseMLO->mydata.particles[part_id].images[img_id].defAngle : DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_DEFOCUS_ANGLE),
+                        DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_BFACTOR),
+                        DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_KFACTOR),
+                        DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_PHASE_SHIFT));
 
 				ctf.getFftwImage(Fctf, baseMLO->image_full_size[optics_group], baseMLO->image_full_size[optics_group], my_pixel_size,
 						baseMLO->ctf_phase_flipped, baseMLO->only_flip_phases, baseMLO->intact_ctf_first_peak, true, baseMLO->do_ctf_padding);

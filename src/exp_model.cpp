@@ -175,7 +175,7 @@ void Experiment::addParticle(int random_subset, int tomogram_id)
 }
 
 void Experiment::addImageToParticle(std::string img_name, long int part_id, long int group_id, int optics_group,
-                                    d4Matrix *Aproj, RFLOAT dz)
+                                    d4Matrix *Aproj, CTF *ctf)
 {
 	if (group_id >= groups.size())
 		REPORT_ERROR("Experiment::addImageToParticle: group_id out of range");
@@ -196,12 +196,22 @@ void Experiment::addImageToParticle(std::string img_name, long int part_id, long
     }
 
 	ExpImage img;
+    if (ctf == NULL)
+    {
+        img.defU = img.defV = img.defAngle = 0.;
+    }
+    else
+    {
+        img.defU = ctf->DeltafU;
+        img.defV = ctf->DeltafV;
+        img.defAngle = ctf->azimuthal_angle;
+    }
+
 	img.name = img_name;
 	img.particle_id = part_id;
 	img.group_id = group_id;
 	img.optics_group = optics_group;
     img.Aproj = A;
-    img.dz = dz;
     nr_images_per_optics_group[optics_group]++;
 	img.optics_group_id = nr_images_per_optics_group[optics_group] - 1;
 
@@ -975,10 +985,9 @@ void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
 
                     d4Matrix P = tomogram.projectionMatrices[f] * d4Matrix(A);
 
-                    double dz_pos = tomogram.getDepthOffset(f, pos);
-                    double dz = tomogram.handedness * tomogram.optics.pixelSize * tomogram.defocusSlope * dz_pos;
+                    CTF ctf = tomogram.getCtf(f, pos);
 
-                    addImageToParticle(my_name, part_id, group_id, optics_group, &P, dz);
+                    addImageToParticle(my_name, part_id, group_id, optics_group, &P, &ctf);
                 }
 
             }

@@ -64,8 +64,8 @@ public:
     // Projection matrix for tilt series stacks
     Matrix2D<RFLOAT> Aproj;
 
-    // Delta-Z for defocus adjustment of tilt seriers
-    RFLOAT dz;
+    // CTF information for defocus adjustment of tilt seriers
+    RFLOAT defU, defV, defAngle;
 
     // Empty Constructor
 	ExpImage() {}
@@ -83,7 +83,9 @@ public:
 		optics_group = copy.optics_group;
 		img = copy.img;
         Aproj = copy.Aproj;
-        dz = copy.dz;
+        defU = copy.defU;
+        defV = copy.defV;
+        defAngle = copy.defAngle;
 	}
 
 	// Define assignment operator in terms of the copy constructor
@@ -97,7 +99,9 @@ public:
 		optics_group = copy.optics_group;
 		img = copy.img;
         Aproj = copy.Aproj;
-        dz = copy.dz;
+        defU = copy.defU;
+        defV = copy.defV;
+        defAngle = copy.defAngle;
 		return *this;
 	}
 };
@@ -322,7 +326,7 @@ public:
 	void addParticle(int random_subset = 0, int tomogram_id = 0);
 
  	// Add an image to the given particle
-	void addImageToParticle(std::string img_name, long int part_id, long int group_id, int optics_group, d4Matrix *Aproj = NULL, RFLOAT dz = 0.);
+	void addImageToParticle(std::string img_name, long int part_id, long int group_id, int optics_group, d4Matrix *Aproj = NULL, CTF *ctf = NULL);
 
 	// Add a group
 	long int addGroup(std::string mic_name, int optics_group);
