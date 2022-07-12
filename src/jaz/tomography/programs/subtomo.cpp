@@ -519,7 +519,8 @@ void SubtomoProgram::processTomograms(
             if (do_stack2d)
             {
                 BufferedImage<float> particlesRS = NewStackHelper::inverseFourierTransformStack(particleStack);
-
+                const float sign = flip_value ? -1.f : 1.f;
+                particlesRS *= sign;
                 particlesRS.write(outData, binnedPixelSize, write_float16);
             }
             else
