@@ -971,7 +971,7 @@ void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
                 for (int f = 0; f < fc; f++)
                 {
 
-                    FileName my_name = integerToString(f) + "@" + img_name;
+                    FileName my_name = integerToString(f+1) + "@" + img_name;
 
                     d4Matrix P = tomogram.projectionMatrices[f] * d4Matrix(A);
 
