@@ -29,9 +29,15 @@ bool TomogramSet::read(FileName filename, bool verbose)
     globalTable.read(filename, "global");
     globalTable.setName("global");
 
-    const int tc = globalTable.numberOfObjects();
+    if (!globalTable.containsLabel(EMDL_TOMO_NAME))
+    {
+        REPORT_ERROR("ERROR: input starfile for TomogramSet " + filename + " does not contain rlnTomoName label ");
+    }
 
-    if (tc == 0 || !globalTable.containsLabel(EMDL_TOMO_TILT_SERIES_STARFILE))
+    const int tc = globalTable.numberOfObjects();
+    tomogramTables.resize(tc);
+
+    if (!globalTable.containsLabel(EMDL_TOMO_TILT_SERIES_STARFILE))
     {
         std::cerr << "Warning: " << filename
                   << " does not have rlnTomoTiltSeriesStarFile labels. It may be written in an old format. If so, will try to convert ..."
@@ -47,18 +53,6 @@ bool TomogramSet::read(FileName filename, bool verbose)
         }
         else
         {
-            globalTable.readStar(ifs, "global");
-            globalTable.setName("global");
-
-            if (!globalTable.containsLabel(EMDL_TOMO_NAME))
-            {
-                REPORT_ERROR("ERROR: input starfile for TomogramSet " + filename + " does not contain rlnTomoName label ");
-            }
-
-            const int tc = globalTable.numberOfObjects();
-
-            tomogramTables.resize(tc);
-
             std::vector<MetaDataTable> allTables = MetaDataTable::readAll(ifs, tc+1);
             for (int t = 0; t < tc; t++)
             {
@@ -73,48 +67,32 @@ bool TomogramSet::read(FileName filename, bool verbose)
                 tomogramTables[t] = allTables[t+1];
                 tomogramTables[t].setName(expectedNewName);
 
-                // Check there is a rlnTomoTiltMovieIndex label, otherwise add one
-                if (!tomogramTables[t].containsLabel(EMDL_MICROGRAPH_PRE_EXPOSURE) )
-                {
-                    REPORT_ERROR("ERROR: tilt series " + expectedNewName + " does not contain compulsory rlnMicrographPreExposure label");
-                }
-
-                // As this is a conversion, also save already all the tilt series starfiles in a new directory
-                // Create output directory if necessary
-                FileName fn_star = mydir + "/tilt_series/" + expectedNewName + ".star";
-                globalTable.setValue(EMDL_TOMO_TILT_SERIES_STARFILE, fn_star, t);
-                FileName newdir = fn_star.beforeLastOf("/");
-                if (!exists(newdir)) mktree(newdir);
-
-                // Write the individual tomogram starfile
-                tomogramTables[t].newSort(EMDL_MICROGRAPH_PRE_EXPOSURE);
-                tomogramTables[t].write(fn_star);
-
             }
         }
     }
-
-
-    // Continue reading with the new way of tomograms
-    if (!globalTable.containsLabel(EMDL_TOMO_NAME))
+    else
     {
-        REPORT_ERROR("ERROR: input starfile for TomogramSet " + filename + " does not contain rlnTomoName label ");
+        // The new way of reading in the tomogram STAR files
+        for (int t = 0; t < tc; t++)
+        {
+            FileName name = globalTable.getString(EMDL_TOMO_NAME, t);
+            std::string fn_star = globalTable.getString(EMDL_TOMO_TILT_SERIES_STARFILE, t);
+            std::cerr << " fn_star= " << fn_star << std::endl;
+            tomogramTables[t].read(fn_star, name);
+
+            if (!tomogramTables[t].containsLabel(EMDL_MICROGRAPH_PRE_EXPOSURE))
+                 REPORT_ERROR("ERROR: tomogramTable does not contain compulsory rlnMicrographPreExposure label");
+
+            // Make sure tilt images are again sorted in their original order when in convertBackFromSingleMetaDataTable() below,
+            // converting back from single large metadatatable for ctffind and motioncorr runners
+            int i = 0;
+            FOR_ALL_OBJECTS_IN_METADATA_TABLE(tomogramTables[t])
+            {
+                tomogramTables[t].setValue(EMDL_TOMO_TILT_MOVIE_INDEX, i);
+                i++;
+            }
+        }
     }
-
-    tomogramTables.resize(tc);
-
-    for (int t = 0; t < tc; t++)
-    {
-        FileName name = globalTable.getString(EMDL_TOMO_NAME, t);
-        std::string fn_star = globalTable.getString(EMDL_TOMO_TILT_SERIES_STARFILE, t);
-        tomogramTables[t].read(fn_star, name);
-        // Make sure tilt images are sorted on their pre-exposure (used to convert back from single large metadatatable)
-        if (tomogramTables[t].containsLabel(EMDL_MICROGRAPH_PRE_EXPOSURE))
-            tomogramTables[t].newSort(EMDL_MICROGRAPH_PRE_EXPOSURE);
-        else
-            REPORT_ERROR("ERROR: tomogramTable does not contain compulsory rlnMicrographPreExposure label");
-    }
-
     return true;
 
 }
@@ -137,6 +115,8 @@ void TomogramSet::write(FileName filename)
         FileName newdir = fn_newstar.beforeLastOf("/");
         if (!exists(newdir)) mktree(newdir);
 
+        // Deactivate the label for sorting the tilt series images
+        tomogramTables[t].deactivateLabel(EMDL_TOMO_TILT_MOVIE_INDEX);
         // Write the individual tomogram starfile
         tomogramTables[t].write(fn_newstar);
     }
@@ -172,7 +152,6 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
     if (globalTable.containsLabel(EMDL_TOMO_TILT_SERIES_NAME))
     {
         // option A: Kino's original IMOD import functionality
-
         globalTable.getValueSafely(EMDL_TOMO_TILT_SERIES_NAME, out.tiltSeriesFilename, index);
         globalTable.getValueSafely(EMDL_TOMO_FRAME_COUNT, out.frameCount, index);
 
@@ -299,7 +278,7 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
                 EMDL_TOMO_PROJECTION_Z,
                 EMDL_TOMO_PROJECTION_W });
 
-            for (int i = 0; i < 4; i++)
+             for (int i = 0; i < 4; i++)
             {
                 std::vector<double> vals;
                 m.getValueSafely(rows[i], vals, f);
@@ -669,10 +648,10 @@ void TomogramSet::convertBackFromSingleMetaDataTable(MetaDataTable &MDin)
         MetaDataTable MDsub = subsetMetaDataTable(MDin, EMDL_IMAGE_OPTICS_GROUP, t+1, t+1);
 
         // Make sure no one unsorted the tilt images in each serie...
-        if (MDsub.containsLabel(EMDL_MICROGRAPH_PRE_EXPOSURE))
+        if (MDsub.containsLabel(EMDL_TOMO_TILT_MOVIE_INDEX))
             MDsub.newSort(EMDL_MICROGRAPH_PRE_EXPOSURE);
         else
-            REPORT_ERROR("BUG: MDsub does no longer contain a rlnMicrographPreExposure label");
+            REPORT_ERROR("BUG: MDsub does no longer contain a rlnTomoTiltMovieIndex label");
 
         if (MDsub.numberOfObjects() != tomogramTables[t].numberOfObjects())
         {
