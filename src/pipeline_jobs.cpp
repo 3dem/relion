@@ -6069,7 +6069,7 @@ void RelionJob::initialiseTomoImportJob()
         joboptions["kV"] = JobOption("Voltage (kV):", 300, 80, 300, 10, "Voltage the microscope was operated on (in kV; default=300).");
         joboptions["Cs"] = JobOption("Spherical aberration (mm):", 2.7, 0.01, 4, 0.1 , "Spherical aberration of the microscope used to collect these images (in mm). Typical values are 2.7 (FEI Titan & Talos, most JEOL CRYO-ARM), 2.0 (FEI Polara), 1.4 (some JEOL CRYO-ARM) and 0.01 (microscopes with a Cs corrector).");
         joboptions["Q0"] = JobOption("Amplitude contrast:", 0.1, 0.05, 1, 0.01, "Fraction of amplitude contrast (default=0.1). Often values around 10% work better than theoretically more accurate lower values. ");
-        joboptions["dose"] = JobOption("Frame dose:", 3.0, 0.0, 10.0, 0.1 , "Electron dose (in e/A^2) per frame (image) in the tilt series.");
+        joboptions["dose"] = JobOption("Dose per tilt-image:", 3.0, 0.0, 10.0, 0.1 , "Electron dose (in e/A^2) per image in the tilt series.");
 
         joboptions["do_tiltseries"]= JobOption("Import tilt-series?", true, "Set this to Yes for importing tilt movies from SerialEM  mdoc format metadata.");
         joboptions["movie_files"] = JobOption("Tilt image movie files:", (std::string)"frames/*.mrc","File pattern pointing to the raw movie files for the tilt images");
