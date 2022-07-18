@@ -487,7 +487,7 @@ void SubtomoProgram::processTomograms(
                     part_id, t, particleSet, tomogramSet);
 
             std::string outData = (do_stack2d) ? filenameRoot + "_stack2d.mrcs" : filenameRoot + "_data.mrc";
-            std::string outWeight = filenameRoot + "_weights.mrc";
+            std::string outWeight = (do_stack2d) ? "" : filenameRoot + "_weights.mrc";
             std::string outCTF = filenameRoot + "_CTF2.mrc";
             std::string outDiv = filenameRoot + "_div.mrc";
             std::string outMulti = filenameRoot + "_multi.mrc";
