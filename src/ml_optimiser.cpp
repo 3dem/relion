@@ -5829,7 +5829,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 				img().resize(image_full_size[optics_group], image_full_size[optics_group]);
 				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(img())
 				{
-					DIRECT_A2D_ELEM(img(), i, j) = DIRECT_A3D_ELEM(exp_imagedata, imagedata_offset, i, j);
+					DIRECT_A2D_ELEM(img(), i, j) = DIRECT_A3D_ELEM(exp_imagedata, imagedata_offset + img_id, i, j);
 				}
 				img().setXmippOrigin();
 				if (has_converged && do_use_reconstruct_images)
@@ -5837,11 +5837,13 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 
 					/// TODO: this will be WRONG for multi-image particles, but I guess that's not going to happen anyway...
 					int my_nr_particles = exp_my_last_part_id - exp_my_first_part_id + 1;
+                    if (mydata.is_tomo) REPORT_ERROR("ERROR: you can not use reconstruct images for 2Dstack-subtomograms!");
+                    
 					////////////// TODO: think this through for no-threads here.....
 					rec_img().resize(image_full_size[optics_group], image_full_size[optics_group]);
 					FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(rec_img())
 					{
-						DIRECT_A2D_ELEM(rec_img(), i, j) = DIRECT_A3D_ELEM(exp_imagedata, my_nr_particles + imagedata_offset, i, j);
+						DIRECT_A2D_ELEM(rec_img(), i, j) = DIRECT_A3D_ELEM(exp_imagedata, my_nr_particles + imagedata_offset + img_id, i, j);
 					}
 					rec_img().setXmippOrigin();
 				}
