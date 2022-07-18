@@ -3771,7 +3771,7 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
 	long int my_imagedata_offset = 0;
 	exp_imgs.clear();
     int metadata_offset = 0;
-    for (long int part_id_sorted = my_first_part_id; part_id_sorted <= my_last_part_id; part_id_sorted++)
+    for (long int part_id_sorted = my_first_part_id; part_id_sorted <= my_last_part_id; part_id_sorted++, metadata_offset++)
 	{
 
     	long int part_id = mydata.sorted_idx[part_id_sorted];
@@ -3786,7 +3786,7 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
 			old_rot = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT);
 			old_tilt = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_TILT);
 			old_psi = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI);
-			sampling.addOneOrientation(old_rot, old_tilt, old_psi, do_clear);
+            sampling.addOneOrientation(old_rot, old_tilt, old_psi, do_clear);
 		}
 		else if (do_only_sample_tilt)
 		{
@@ -3828,8 +3828,6 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
 					do_clear, (do_helical_refine) && (!ignore_helical_symmetry), rot_deg, tilt_deg, psi_deg); // clear for first particle
 		}
 
-		// Store total number of images in this bunch of SomeParticles
-		metadata_offset += mydata.numberOfImagesInParticle(part_id);
 
 		// Sjors 7 March 2016 to prevent too high disk access... Read in all pooled images simultaneously
 		// Don't do this for sub-tomograms to save RAM!
@@ -5598,7 +5596,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(
     RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT);
     RFLOAT tilt_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_TILT);
     RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI);
-    //std::cerr << " rot_deg= " << rot_deg << " tilt_deg= " << tilt_deg << " psi_deg= " << psi_deg << std::endl;
     if ( (do_helical_refine) && (!ignore_helical_symmetry) )
     {
         // Calculate my_old_offset_helix_coords from my_old_offset and psi angle
@@ -5780,7 +5777,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 				}
 				else
 				{
-					img() = exp_imgs[imagedata_offset];
+					img() = exp_imgs[imagedata_offset + img_id];
 				}
 #endif
 			}
@@ -5838,7 +5835,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 					/// TODO: this will be WRONG for multi-image particles, but I guess that's not going to happen anyway...
 					int my_nr_particles = exp_my_last_part_id - exp_my_first_part_id + 1;
                     if (mydata.is_tomo) REPORT_ERROR("ERROR: you can not use reconstruct images for 2Dstack-subtomograms!");
-                    
+
 					////////////// TODO: think this through for no-threads here.....
 					rec_img().resize(image_full_size[optics_group], image_full_size[optics_group]);
 					FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(rec_img())
