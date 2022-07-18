@@ -931,7 +931,7 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
     if (verb > 0) progress_bar(fn_ori_micrographs.size());
 
 	// Write out STAR files at the end
-	// In the opticsMdt, set EMDL_MICROGRAPH_PIXEL_SIZE (i.e. possibly binned pixel size).
+	// In the opticsMdt, set EMDL_MICROGRAPH_PIXEL_SIZE (i.e. possibly binned pixel size) for SPA and EMDL_TOMO_TILT_SERIES_PIXEL_SIZE for STA
 	// Keep EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE for MTF correction
 	if (is_tomo)
     {
