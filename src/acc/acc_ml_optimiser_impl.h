@@ -289,7 +289,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 				else
 				{
 					CTIC(accMLO->timer,"ParaRead2DImages");
-					img() = baseMLO->exp_imgs[op.imagedata_offset];
+					img() = baseMLO->exp_imgs[op.imagedata_offset + img_id];
 					CTOC(accMLO->timer,"ParaRead2DImages");
 				}
 			}
@@ -341,7 +341,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 				img().resize(baseMLO->image_full_size[optics_group], baseMLO->image_full_size[optics_group]);
 				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(img())
 				{
-					DIRECT_A2D_ELEM(img(), i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, op.imagedata_offset, i, j);
+					DIRECT_A2D_ELEM(img(), i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, op.imagedata_offset + img_id, i, j);
 				}
 				img().setXmippOrigin();
 				if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
@@ -349,10 +349,12 @@ void getFourierTransformsAndCtfs(long int part_id,
 
 					/// TODO: this will be WRONG for multi-image particles, but I guess that's not going to happen anyway...
 					int my_nr_particles = baseMLO->exp_my_last_part_id - baseMLO->exp_my_first_part_id + 1;
+                    if (baseMLO->mydata.is_tomo) REPORT_ERROR("ERROR: you can not use reconstruct images for 2Dstack-subtomograms!");
+
 					rec_img().resize(baseMLO->image_full_size[optics_group], baseMLO->image_full_size[optics_group]);
 					FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(rec_img())
 					{
-						DIRECT_A2D_ELEM(rec_img(), i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, my_nr_particles + op.imagedata_offset, i, j);
+						DIRECT_A2D_ELEM(rec_img(), i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, my_nr_particles + op.imagedata_offset + img_id, i, j);
 					}
 					rec_img().setXmippOrigin();
 				}
