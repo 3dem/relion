@@ -3216,7 +3216,8 @@ void MlOptimiser::expectation()
 		int n_trials_acc = (mymodel.ref_dim==3 && mymodel.data_dim != 3) ? 100 : 10;
 		n_trials_acc = XMIPP_MIN(n_trials_acc, mydata.numberOfParticles());
 		getMetaAndImageDataSubset(0, n_trials_acc-1, false);
-		calculateExpectedAngularErrors(0, n_trials_acc-1);
+		std::cerr << " SKIPPING calculateExpectedAngularErrors!!! REACTIVATE AFTER DEBUGGING!!" << std::endl;
+        //calculateExpectedAngularErrors(0, n_trials_acc-1);
 	}
 
 	// D. Update the angular sampling (all nodes except leader)
@@ -3802,13 +3803,23 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
 			RFLOAT rot_deg, tilt_deg, psi_deg;
 			my_old_offset_x = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_XOFF);
 			my_old_offset_y = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_YOFF);
-			rounded_offset_x = my_old_offset_x - ROUND(my_old_offset_x);
-			rounded_offset_y = my_old_offset_y - ROUND(my_old_offset_y);
-			if (mymodel.data_dim == 3 || mydata.is_tomo)
-			{
-				my_old_offset_z = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ZOFF);
-				rounded_offset_z = my_old_offset_z - ROUND(my_old_offset_z);
-			}
+
+            // For for 2Dstacks in STA, there is no ROUNDING!!!
+            if (mydata.is_tomo)
+            {
+                rounded_offset_x = rounded_offset_y = rounded_offset_z = 0.;
+            }
+            else
+            {
+                rounded_offset_x = my_old_offset_x - ROUND(my_old_offset_x);
+                rounded_offset_y = my_old_offset_y - ROUND(my_old_offset_y);
+                if (mymodel.data_dim == 3 || mydata.is_tomo)
+                {
+                    my_old_offset_z = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ZOFF);
+                    rounded_offset_z = my_old_offset_z - ROUND(my_old_offset_z);
+                }
+            }
+
 			if (do_helical_refine)
 			{
 				rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT);
@@ -8374,6 +8385,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 											{
 												ZZ(shifts) = ZZ(exp_old_offset) + oversampled_translations_z[iover_trans];
 											}
+
 #ifdef DEBUG_BODIES2
 											std::cerr << ihidden_over << " weight= " << weight;
 											std::cerr << " exp_old_offset= " << exp_old_offset[img_id].transpose() << std::endl;
@@ -10287,7 +10299,7 @@ void MlOptimiser::selfTranslateSubtomoStack2D(MultidimArray<RFLOAT> &img, const 
     MultidimArray<Complex> FT, Faux;
     transformer.FourierTransform(img, FT, true);
     Faux = FT;
-    shiftImageInFourierTransform(Faux, FT, XSIZE(img), (RFLOAT)mymodel.ori_size, -xshift, -yshift);
+    shiftImageInFourierTransform(Faux, FT, (RFLOAT)mymodel.ori_size, xshift, yshift);
     transformer.inverseFourierTransform(FT, img);
 
 }
