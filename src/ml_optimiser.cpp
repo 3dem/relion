@@ -2457,9 +2457,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 	}
 	Mavg.setXmippOrigin();
 
-    Mavg.printShape(std::cout);
-
-	// Only open stacks once and then read multiple images
+    // Only open stacks once and then read multiple images
 	fImageHandler hFile;
 	long int dump;
 	FileName fn_open_stack="";
@@ -10280,6 +10278,8 @@ void MlOptimiser::applySubtomoCorrection(MultidimArray<Complex > &Fimg, Multidim
 
 void MlOptimiser::selfTranslateSubtomoStack2D(MultidimArray<RFLOAT> &img, const Matrix1D<RFLOAT> &v, long int part_id, int img_id)
 {
+
+
     RFLOAT xshift, yshift, zshift;
     mydata.getTranslationInTiltSeries(part_id, img_id, XX(v), YY(v), ZZ(v), xshift, yshift, zshift);
 
@@ -10287,7 +10287,7 @@ void MlOptimiser::selfTranslateSubtomoStack2D(MultidimArray<RFLOAT> &img, const 
     MultidimArray<Complex> FT, Faux;
     transformer.FourierTransform(img, FT, true);
     Faux = FT;
-    shiftImageInFourierTransform(Faux, FT, XSIZE(img), (RFLOAT)mymodel.ori_size, xshift, yshift);
+    shiftImageInFourierTransform(Faux, FT, XSIZE(img), (RFLOAT)mymodel.ori_size, -xshift, -yshift);
     transformer.inverseFourierTransform(FT, img);
 
 }
