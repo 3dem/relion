@@ -77,7 +77,6 @@ bool TomogramSet::read(FileName filename, bool verbose)
         {
             FileName name = globalTable.getString(EMDL_TOMO_NAME, t);
             std::string fn_star = globalTable.getString(EMDL_TOMO_TILT_SERIES_STARFILE, t);
-            std::cerr << " fn_star= " << fn_star << std::endl;
             tomogramTables[t].read(fn_star, name);
 
             if (!tomogramTables[t].containsLabel(EMDL_MICROGRAPH_PRE_EXPOSURE))
