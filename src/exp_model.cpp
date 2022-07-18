@@ -97,7 +97,6 @@ void Experiment::getTranslationInTiltSeries(long int part_id, int img_id,
                                                         double shift3d_x, double shift3d_y, double shift3d_z,
                                                         double &shift2d_x, double &shift2d_y, double &shift2d_z)
 {
-    Matrix1D<RFLOAT> shift2d(3);
     Matrix2D<RFLOAT> Aproj = particles[part_id].images[img_id].Aproj;
     shift2d_x = Aproj(0,0) * shift3d_x + Aproj(0,1) * shift3d_y + Aproj(0,2) * shift3d_z;
     shift2d_y = Aproj(1,0) * shift3d_x + Aproj(1,1) * shift3d_y + Aproj(2,2) * shift3d_z;
