@@ -516,7 +516,7 @@ int ParticleSet::getOpticsGroup(ParticleIndex particle_id) const
 {
 	if (!partTable.containsLabel(EMDL_IMAGE_OPTICS_GROUP))
 	{
-		REPORT_ERROR("ParticleSet::getPixelSize: pixel size (rlnImagePixelSize) missing from optics table");
+		REPORT_ERROR("ParticleSet::getOpticsGroup: optics group (rlnOpticsGroup) is missing from optics table");
 	}
 	
 	int out;
