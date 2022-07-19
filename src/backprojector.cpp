@@ -1078,7 +1078,7 @@ void BackProjector::updateSSNRarrays(RFLOAT tau2_fudge,
 	// Average (inverse of) sigma2 in reconstruction
 	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(sigma2)
 	{
-		if (DIRECT_A1D_ELEM(sigma2, i) > 1e-10)
+		if (DIRECT_A1D_ELEM(sigma2, i) > 1e-20)
 			DIRECT_A1D_ELEM(sigma2, i) = DIRECT_A1D_ELEM(counter, i) / DIRECT_A1D_ELEM(sigma2, i);
 		else if (DIRECT_A1D_ELEM(sigma2, i) == 0)
 			DIRECT_A1D_ELEM(sigma2, i) = 0.;
