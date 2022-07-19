@@ -653,7 +653,7 @@ void TomogramSet::convertBackFromSingleMetaDataTable(MetaDataTable &MDin)
 
         // Make sure no one unsorted the tilt images in each serie...
         if (MDsub.containsLabel(EMDL_TOMO_TILT_MOVIE_INDEX))
-            MDsub.newSort(EMDL_MICROGRAPH_PRE_EXPOSURE);
+            MDsub.newSort(EMDL_TOMO_TILT_MOVIE_INDEX);
         else
             REPORT_ERROR("BUG: MDsub does no longer contain a rlnTomoTiltMovieIndex label");
 
