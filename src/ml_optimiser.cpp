@@ -2150,7 +2150,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 	}
 
 	// Tabulated sine and cosine values (for 2D helical segments / 3D helical sub-tomogram averaging with on-the-fly shifts)
-	if ( (do_shifts_onthefly) && (do_helical_refine) && (!ignore_helical_symmetry) )
+	if ( mydata.is_tomo || ((do_shifts_onthefly) && (do_helical_refine) && (!ignore_helical_symmetry)) )
 	{
 		tab_sin.initialise(100000);
 		tab_cos.initialise(100000);
@@ -10299,7 +10299,8 @@ void MlOptimiser::selfTranslateSubtomoStack2D(MultidimArray<RFLOAT> &img, const 
     MultidimArray<Complex> FT, Faux;
     transformer.FourierTransform(img, FT, true);
     Faux = FT;
-    shiftImageInFourierTransform(Faux, FT, (RFLOAT)mymodel.ori_size, xshift, yshift);
+    
+    shiftImageInFourierTransformWithTabSincos(Faux, FT, (RFLOAT)mymodel.ori_size, mymodel.ori_size, tab_sin, tab_cos, xshift, yshift);
     transformer.inverseFourierTransform(FT, img);
 
 }
