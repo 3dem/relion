@@ -520,7 +520,15 @@ void SubtomoProgram::processTomograms(
             {
                 BufferedImage<float> particlesRS = NewStackHelper::inverseFourierTransformStack(particleStack);
                 const float sign = flip_value ? -1.f : 1.f;
-                particlesRS *= sign;
+
+                // Normalise to zero-mean and stddev one; also apply sign (contrast flip)
+                Image<float> Itmp;
+                particlesRS.copyTo(Itmp);
+                double avg,stddev;
+                Itmp().computeAvgStddev(avg, stddev);
+                particlesRS -= avg;
+                particlesRS /= sign * stddev;
+
                 particlesRS.write(outData, binnedPixelSize, write_float16);
             }
             else
