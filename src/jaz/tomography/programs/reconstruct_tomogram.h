@@ -20,7 +20,7 @@ class TomoBackprojectProgram
 			int w, h, d;
 			double spacing, angpix_spacing, x0, y0, z0, taperDist, taperFalloff;
 			FileName tomoName, outFn;
-			bool applyPreWeight, applyWeight, applyCtf, zeroDC, FourierCrop;
+			bool applyPreWeight, applyWeight, applyCtf, doWiener, zeroDC, FourierCrop;
             bool do_multiple, do_only_unfinished;
 			double SNR;
 

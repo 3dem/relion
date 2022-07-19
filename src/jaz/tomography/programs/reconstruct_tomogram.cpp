@@ -41,20 +41,29 @@ void TomoBackprojectProgram::readParameters(int argc, char *argv[])
 
 	applyWeight = !parser.checkOption("--no_weight", "Do not perform weighting in Fourier space using a Wiener filter");
 	applyPreWeight = parser.checkOption("--pre_weight", "Pre-weight the 2D slices prior to backprojection");
-	FourierCrop = parser.checkOption("--Fc", "Downsample the 2D images by Fourier cropping");
+    FourierCrop = parser.checkOption("--Fc", "Downsample the 2D images by Fourier cropping");
     do_only_unfinished = parser.checkOption("--only_do_unfinished", "Only reconstruct those tomograms that haven't finished yet");
     SNR = textToDouble(parser.getOption("--SNR", "SNR assumed by the Wiener filter", "10"));
 
 	applyCtf = !parser.checkOption("--noctf", "Ignore the CTF");
+    doWiener = !parser.checkOption("--skip_wiener", "Do multiply images with CTF, but don't divide by CTF^2 in Wiener filter");
 
-	zeroDC = !parser.checkOption("--keep_mean", "Do not zero the DC component of each frame");
+    if (!doWiener) applyCtf = true;
+
+    zeroDC = !parser.checkOption("--keep_mean", "Do not zero the DC component of each frame");
 
 	taperDist = textToDouble(parser.getOption("--td", "Tapering distance", "0.0"));
 	taperFalloff = textToDouble(parser.getOption("--tf", "Tapering falloff", "0.0"));
 
-	x0 = textToDouble(parser.getOption("--x0", "X origin", "1.0"));
-	y0 = textToDouble(parser.getOption("--y0", "Y origin", "1.0"));
-	z0 = textToDouble(parser.getOption("--z0", "Z origin", "1.0"));
+    // SHWS & Aburt 19Jul2022: use zero-origins from relion-4.1 onwards....
+	//x0 = textToDouble(parser.getOption("--x0", "X origin", "1.0"));
+	//y0 = textToDouble(parser.getOption("--y0", "Y origin", "1.0"));
+	//z0 = textToDouble(parser.getOption("--z0", "Z origin", "1.0"));
+
+    x0 = textToDouble(parser.getOption("--x0", "X origin", "0.0"));
+    y0 = textToDouble(parser.getOption("--y0", "Y origin", "0.0"));
+    z0 = textToDouble(parser.getOption("--z0", "Z origin", "0.0"));
+
 
 	spacing = textToDouble(parser.getOption("--bin", "Binning", "1.0"));
     angpix_spacing = textToDouble(parser.getOption("--binned_angpix", "OR: desired pixel size after binning", "-1"));
@@ -361,7 +370,7 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex)
 		orig, spacing, RealSpaceBackprojection::Linear, taperFalloff, taperDist);
 	
 	
-	if (applyWeight || applyCtf)
+	if ((applyWeight || applyCtf) && doWiener)
 	{
 		BufferedImage<float> psf(w1, h1, t1);
 		psf.fill(0.f);
