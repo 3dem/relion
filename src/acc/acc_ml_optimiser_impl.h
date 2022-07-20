@@ -1632,7 +1632,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 	if(exp_ipass==0 || baseMLO->adaptive_oversampling!=0)
 	{
-		op.sum_weight = 0.;
+		op.sum_weight = 1.; // initialised to one for firstiter_cc!
 		op.max_weight = (RFLOAT)-1.;
 	}
 
@@ -1662,9 +1662,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
     {
         if(exp_ipass==0)
         {
-            int nr_coarse_weights = (sp.iclass_max-sp.iclass_min+1)*sp.nr_images * sp.nr_dir * sp.nr_psi * sp.nr_trans;
-            PassWeights.weights.setAccPtr(&(~Mweight)[nr_coarse_weights]);
-            PassWeights.weights.setHostPtr(&Mweight[nr_coarse_weights]);
+            int nr_coarse_weights = (sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans;
+            PassWeights.weights.setAccPtr(&(~Mweight)[0]);
+            PassWeights.weights.setHostPtr(&Mweight[0]);
             PassWeights.weights.setSize(nr_coarse_weights);
         }
         PassWeights.weights.doFreeHost=false;
@@ -2043,7 +2043,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
             PassWeights.weights.cpToHost(); // note that the host-pointer is shared: we're copying to Mweight.
 
-
             CTIC(accMLO->timer,"sort");
             DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
             size_t weightSize = PassWeights.weights.getSize();
@@ -2099,7 +2098,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
     }
 
     op.significant_weight = (RFLOAT) my_significant_weight;
-
 
 #ifdef TIMING
 	if (op.part_id == baseMLO->exp_my_first_part_id)
@@ -2471,7 +2469,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
         DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CLASS) = (RFLOAT)op.max_index.iclass + 1;
         RFLOAT pmax = op.max_weight/op.sum_weight;
         if(pmax>1) //maximum normalised probability weight is (unreasonably) larger than unity
+        {
+            std::cerr << " op.max_weight= " << op.max_weight << " op.sum_weight= " << op.sum_weight << std::endl;
             CRITICAL("Relion is finding a normalised probability greater than 1");
+        }
         DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_PMAX) = pmax;
     }
     CTOC(accMLO->timer,"setMetadata");
@@ -3311,7 +3312,7 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_B);
 
 				CTIC(timer,"convertAllSquaredDifferencesToWeightsCoarse");
 				convertAllSquaredDifferencesToWeights<MlClass>(ipass, op, sp, baseMLO, myInstance, CoarsePassWeights, FinePassClassMasks, Mweight, ptrFactory, ibody);
-				CTOC(timer,"convertAllSquaredDifferencesToWeightsCoarse");
+                CTOC(timer,"convertAllSquaredDifferencesToWeightsCoarse");
 			}
 			else
 			{
@@ -3364,8 +3365,8 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_D);
 				AccPtr<XFLOAT> Mweight = ptrFactory.make<XFLOAT>(); //DUMMY
 
 				CTIC(timer,"convertAllSquaredDifferencesToWeightsFine");
-				convertAllSquaredDifferencesToWeights<MlClass>(ipass, op, sp, baseMLO, myInstance, FinePassWeights, FinePassClassMasks, Mweight, ptrFactory, ibody);
-				CTOC(timer,"convertAllSquaredDifferencesToWeightsFine");
+                convertAllSquaredDifferencesToWeights<MlClass>(ipass, op, sp, baseMLO, myInstance, FinePassWeights, FinePassClassMasks, Mweight, ptrFactory, ibody);
+                CTOC(timer,"convertAllSquaredDifferencesToWeightsFine");
 
 			}
 
