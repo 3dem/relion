@@ -137,8 +137,8 @@ public:
 	unsigned long part_id;
 
 	std::vector<MultidimArray<Complex > > Fimg, Fimg_nomask, local_Fimgs_shifted, local_Fimgs_shifted_nomask;
-	std::vector<MultidimArray<RFLOAT> > Fctf, local_Fctf, local_Minvsigma2;
-    MultidimArray<RFLOAT> FstMulti;
+	std::vector<MultidimArray<RFLOAT> > Fctf, local_Fctf;
+    MultidimArray<RFLOAT> FstMulti, local_Minvsigma2;
 	std::vector<int> pointer_dir_nonzeroprior, pointer_psi_nonzeroprior;
 	std::vector<RFLOAT> directions_prior, psi_prior, local_sqrtXi2;
 	std::vector<RFLOAT> highres_Xi2_img;

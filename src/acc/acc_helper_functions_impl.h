@@ -156,7 +156,7 @@ void buildCorrImage(MlOptimiser *baseMLO,
 			corr_img[i] = 1. / (op.local_sqrtXi2[img_id]*op.local_sqrtXi2[img_id]);
 	else
 		for(size_t i = 0; i < corr_img.getSize(); i++)
-			corr_img[i] = *(op.local_Minvsigma2[img_id].data + i );
+			corr_img[i] = *(op.local_Minvsigma2.data + i );
 
 	// ctf-correction or not ( NOTE this is not were the difference metric is ctf-corrected, but
 	// rather where we apply the additional correction to make the GPU-specific arithmetic equal

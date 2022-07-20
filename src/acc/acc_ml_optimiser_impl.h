@@ -1027,7 +1027,7 @@ void getAllSquaredDifferencesCoarse(
 		long int group_id = baseMLO->mydata.getGroupId(op.part_id, img_id);
 		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
 		int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
-		unsigned long image_size = op.local_Minvsigma2[img_id].nzyxdim;
+		unsigned long image_size = op.local_Minvsigma2.nzyxdim;
 
 		/*====================================
 				Generate Translations
@@ -1144,10 +1144,10 @@ void getAllSquaredDifferencesCoarse(
 			{
 				AccProjectorKernel projKernel = AccProjectorKernel::makeKernel(
 						accMLO->bundle->projectors[iproj],
-						op.local_Minvsigma2[img_id].xdim,
-						op.local_Minvsigma2[img_id].ydim,
-						op.local_Minvsigma2[img_id].zdim,
-						op.local_Minvsigma2[img_id].xdim-1);
+						op.local_Minvsigma2.xdim,
+						op.local_Minvsigma2.ydim,
+						op.local_Minvsigma2.zdim,
+						op.local_Minvsigma2.xdim-1);
 
 				runDiff2KernelCoarse(
 						projKernel,
@@ -1246,10 +1246,10 @@ void getAllSquaredDifferencesFine(
 		long int group_id = baseMLO->mydata.getGroupId(op.part_id, img_id);
 		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
 		int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
-		unsigned long image_size = op.local_Minvsigma2[img_id].nzyxdim;
+		unsigned long image_size = op.local_Minvsigma2.nzyxdim;
 
 		MultidimArray<Complex > Fref;
-		Fref.resize(op.local_Minvsigma2[img_id]);
+		Fref.resize(op.local_Minvsigma2);
 
 		/*====================================
 				Generate Translations
@@ -1497,10 +1497,10 @@ void getAllSquaredDifferencesFine(
 				CTIC(accMLO->timer,"Diff2MakeKernel");
 				AccProjectorKernel projKernel = AccProjectorKernel::makeKernel(
 						accMLO->bundle->projectors[iproj],
-						op.local_Minvsigma2[img_id].xdim,
-						op.local_Minvsigma2[img_id].ydim,
-						op.local_Minvsigma2[img_id].zdim,
-						op.local_Minvsigma2[img_id].xdim-1);
+						op.local_Minvsigma2.xdim,
+						op.local_Minvsigma2.ydim,
+						op.local_Minvsigma2.zdim,
+						op.local_Minvsigma2.xdim-1);
 				CTOC(accMLO->timer,"Diff2MakeKernel");
 
 				// Use the constructed mask to construct a partial class-specific input
@@ -2140,11 +2140,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 	// In doThreadPrecalculateShiftedImagesCtfsAndInvSigma2s() the origin of the op.local_Minvsigma2s was omitted.
 	// Set those back here
-	for (int img_id = 0; img_id < sp.nr_images; img_id++)
-	{
-		int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
-		DIRECT_MULTIDIM_ELEM(op.local_Minvsigma2[img_id], 0) = 1. / (baseMLO->sigma2_fudge * DIRECT_A1D_ELEM(baseMLO->mymodel.sigma2_noise[optics_group], 0));
-	}
+    int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, 0);
+    DIRECT_MULTIDIM_ELEM(op.local_Minvsigma2, 0) = 1. / (baseMLO->sigma2_fudge * DIRECT_A1D_ELEM(baseMLO->mymodel.sigma2_noise[optics_group], 0));
 
 	// For norm_correction and scale_correction of all images of this particle
 	RFLOAT exp_wsum_norm_correction = 0.;
@@ -2152,7 +2149,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	RFLOAT thr_wsum_signal_product_spectra = 0., thr_wsum_reference_power_spectra = 0.;
 	MultidimArray<RFLOAT> thr_wsum_sigma2_noise, thr_wsum_ctf2, thr_wsum_stMulti;
 
-    int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, 0);
     thr_wsum_sigma2_noise.initZeros(baseMLO->image_full_size[optics_group]/2 + 1);
     thr_wsum_ctf2.initZeros(baseMLO->image_full_size[optics_group]/2 + 1);
     if (do_subtomo_correction)
@@ -2630,7 +2626,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			if (baseMLO->do_map)
 				for (unsigned long i = 0; i < image_size; i++)
-					Minvsigma2s[i] = op.local_Minvsigma2[img_id].data[i];
+					Minvsigma2s[i] = op.local_Minvsigma2.data[i];
 			else
 				for (unsigned long i = 0; i < image_size; i++)
 					Minvsigma2s[i] = 1;
@@ -2775,10 +2771,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 				AccProjectorKernel projKernel = AccProjectorKernel::makeKernel(
 						accMLO->bundle->projectors[iproj],
-						op.local_Minvsigma2[img_id].xdim,
-						op.local_Minvsigma2[img_id].ydim,
-						op.local_Minvsigma2[img_id].zdim,
-						op.local_Minvsigma2[img_id].xdim-1);
+						op.local_Minvsigma2.xdim,
+						op.local_Minvsigma2.ydim,
+						op.local_Minvsigma2.zdim,
+						op.local_Minvsigma2.xdim-1);
 
 				runWavgKernel(
 						projKernel,
@@ -2864,10 +2860,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 				AccProjectorKernel projKernel = AccProjectorKernel::makeKernel(
 						accMLO->bundle->projectors[iproj],
-						op.local_Minvsigma2[img_id].xdim,
-						op.local_Minvsigma2[img_id].ydim,
-						op.local_Minvsigma2[img_id].zdim,
-						op.local_Minvsigma2[img_id].xdim - 1);
+						op.local_Minvsigma2.xdim,
+						op.local_Minvsigma2.ydim,
+						op.local_Minvsigma2.zdim,
+						op.local_Minvsigma2.xdim - 1);
 
 	#ifdef TIMING
 				if (op.part_id == baseMLO->exp_my_first_part_id)
@@ -2896,9 +2892,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					(XFLOAT) op.significant_weight,
 					(XFLOAT) (baseMLO->is_som_iter ? class_sum_weight[iclass] : op.sum_weight),
 					~eulers[iclass],
-					op.local_Minvsigma2[img_id].xdim,
-					op.local_Minvsigma2[img_id].ydim,
-					op.local_Minvsigma2[img_id].zdim,
+					op.local_Minvsigma2.xdim,
+					op.local_Minvsigma2.ydim,
+					op.local_Minvsigma2.zdim,
 					orientation_num,
 					accMLO->dataIs3D,
 					(baseMLO->do_grad),
@@ -3031,7 +3027,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
             // Note there is no sqrt in the normalisation term because of the 2-dimensionality of the complex-plane
             // Also exclude origin from logsigma2, as this will not be considered in the P-calculations
             if (ires > 0 && ires_remapped < XSIZE(baseMLO->mymodel.sigma2_noise[optics_group]))
-                logsigma2 += log( 2. * PI * DIRECT_A1D_ELEM(baseMLO->mymodel.sigma2_noise[optics_group], ires_remapped));
+                logsigma2 += sp.nr_images * log( 2. * PI * DIRECT_A1D_ELEM(baseMLO->mymodel.sigma2_noise[optics_group], ires_remapped));
         }
 
         RFLOAT dLL;
@@ -3115,7 +3111,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
                 baseMLO->wsum_model.avg_norm_correction += thr_avg_norm_correction;
 
             baseMLO->wsum_model.LL += thr_sum_dLL;
-            baseMLO->wsum_model.ave_Pmax += thr_sum_Pmax;
+            // Multiply by exp_nr_images because sumweight above has been summed over all images,
+            // and by this wsum_model.ave_Pmax will be divided in maximizationOtherParameters()..
+            baseMLO->wsum_model.ave_Pmax += sp.nr_images * thr_sum_Pmax;
 
         } // end pragma lock
 	} // end if !do_skip_maximization

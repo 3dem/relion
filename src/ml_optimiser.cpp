@@ -4051,12 +4051,12 @@ void MlOptimiser::expectationOneParticle(long int part_id_sorted, int thread_id)
         // Here define all kind of local arrays that will be needed
         std::vector<MultidimArray<Complex > > exp_Fimg, exp_Fimg_nomask;
         std::vector<std::vector<MultidimArray<Complex > > > exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask;
-        std::vector<MultidimArray<RFLOAT> > exp_Fctf, exp_local_Fctf, exp_local_Minvsigma2;
+        std::vector<MultidimArray<RFLOAT> > exp_Fctf, exp_local_Fctf;
         std::vector<int> exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior;
         std::vector<RFLOAT> exp_directions_prior, exp_psi_prior, exp_local_sqrtXi2;
         int exp_current_image_size, exp_current_oversampling;
         std::vector<RFLOAT> exp_highres_Xi2_img;
-        MultidimArray<RFLOAT> exp_Mweight, exp_STMulti;
+        MultidimArray<RFLOAT> exp_Mweight, exp_STMulti, exp_local_Minvsigma2;
         MultidimArray<bool> exp_Mcoarse_significant;
         // And from storeWeightedSums
         RFLOAT exp_min_diff2, exp_sum_weight, exp_significant_weight, exp_max_weight;
@@ -6362,7 +6362,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
         std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted_nomask,
         std::vector<MultidimArray<RFLOAT> >&exp_local_Fctf,
         std::vector<RFLOAT> &exp_local_sqrtXi2,
-        std::vector<MultidimArray<RFLOAT> >&exp_local_Minvsigma2,
+        MultidimArray<RFLOAT> &exp_local_Minvsigma2,
         MultidimArray<RFLOAT> &exp_STMulti,
         MultidimArray<RFLOAT> &exp_local_STMulti)
 {
@@ -6387,7 +6387,6 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
     exp_local_Fimgs_shifted.resize(exp_nr_images);
     if (do_also_unmasked)
         exp_local_Fimgs_shifted_nomask.resize(exp_nr_images);
-    exp_local_Minvsigma2.resize(exp_nr_images);
     exp_local_Fctf.resize(exp_nr_images);
     exp_local_sqrtXi2.resize(exp_nr_images);
 
@@ -6460,22 +6459,26 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
             // since then exp_current_image_size will be the same as the size of exp_Fctfs
             windowFourierTransform(exp_Fctf[img_id], exp_local_Fctf[img_id], exp_current_image_size);
 
-            // Also prepare Minvsigma2
-            if (mymodel.data_dim == 3)
-                exp_local_Minvsigma2[img_id].initZeros(ZSIZE(Fimg), YSIZE(Fimg), XSIZE(Fimg));
-            else
-                exp_local_Minvsigma2[img_id].initZeros(YSIZE(Fimg), XSIZE(Fimg));
-
-            // With optics_group and relevant size of Fimg, calculate inverse of sigma^2 for relevant parts of Mresol
-            FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Minvsigma2[img_id])
+            // Also prepare Minvsigma2, which is the same for all img_id...
+            if (img_id == 0)
             {
-                int ires = *(myMresol + n);
-                int ires_remapped = ROUND(remap_image_sizes * ires);
-                // Exclude origin (ires==0) from the Probability-calculation
-                // This way we are invariant to additive factors
-                if (ires > 0 && ires_remapped < XSIZE(mymodel.sigma2_noise[optics_group]))
-                    DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2[img_id], n) = 1. / (sigma2_fudge * DIRECT_A1D_ELEM(mymodel.sigma2_noise[optics_group], ires_remapped));
+                if (mymodel.data_dim == 3)
+                    exp_local_Minvsigma2.initZeros(ZSIZE(Fimg), YSIZE(Fimg), XSIZE(Fimg));
+                else
+                    exp_local_Minvsigma2.initZeros(YSIZE(Fimg), XSIZE(Fimg));
+
+                // With optics_group and relevant size of Fimg, calculate inverse of sigma^2 for relevant parts of Mresol
+                FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Minvsigma2)
+                {
+                    int ires = *(myMresol + n);
+                    int ires_remapped = ROUND(remap_image_sizes * ires);
+                    // Exclude origin (ires==0) from the Probability-calculation
+                    // This way we are invariant to additive factors
+                    if (ires > 0 && ires_remapped < XSIZE(mymodel.sigma2_noise[optics_group]))
+                        DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2, n) = 1. / (sigma2_fudge * DIRECT_A1D_ELEM(mymodel.sigma2_noise[optics_group], ires_remapped));
+                }
             }
+
         }
 
         if (do_subtomo_correction)
@@ -6491,11 +6494,11 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
                 // We also undo the division by STmult in the first pass for getAllSquareDifferences, if in this pass do_ctf_invsig is false
                 if (!do_ctf_invsig)
                 {
-                    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Minvsigma2[img_id])
+                    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Minvsigma2)
                     {
                         if (DIRECT_MULTIDIM_ELEM(STmult, n) > 0.1)
                         {
-                            DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2[img_id], n) *= DIRECT_MULTIDIM_ELEM(STmult, n);
+                            DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2, n) *= DIRECT_MULTIDIM_ELEM(STmult, n);
                         }
                     }
                 }
@@ -6504,11 +6507,11 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
             {
                 // SHWS 23may2022: For getAllSquareDifferences: use ||CTF X- CTF^2*P*V||^2 / (sigma2_noise * M)
                 // For storedWeightedSums, the factor M should not be there anymore!
-                FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Minvsigma2[img_id])
+                FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Minvsigma2)
                 {
                     if (DIRECT_MULTIDIM_ELEM(STmult, n) > 0.1)
                     {
-                        DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2[img_id], n) /= DIRECT_MULTIDIM_ELEM(STmult, n);
+                        DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2, n) /= DIRECT_MULTIDIM_ELEM(STmult, n);
                     }
                 }
             }
@@ -6694,7 +6697,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
         std::vector<int> &exp_pointer_dir_nonzeroprior, std::vector<int> &exp_pointer_psi_nonzeroprior,
         std::vector<RFLOAT> &exp_directions_prior, std::vector<RFLOAT> &exp_psi_prior,
         std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted,
-        std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2,
+        MultidimArray<RFLOAT> &exp_local_Minvsigma2,
         std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
         std::vector<RFLOAT> &exp_local_sqrtXi2,
         MultidimArray<RFLOAT> &exp_STMulti)
@@ -6761,8 +6764,8 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                 Euler_angles2matrix(rot_ori, tilt_ori, psi_ori, Aori, false);
             }
 
-            Fref.resize(exp_local_Minvsigma2[0]);
-            Frefctf.resize(exp_local_Minvsigma2[0]);
+            Fref.resize(exp_local_Minvsigma2);
+            Frefctf.resize(exp_local_Minvsigma2);
             if (do_shifts_onthefly)
                 Fimg_otfshift.resize(Frefctf);
 
@@ -6858,7 +6861,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                                     timer.toc(TIMING_DIFF_PROJ);
 #endif
 
-                                Minvsigma2 = exp_local_Minvsigma2[img_id].data;
+                                Minvsigma2 = exp_local_Minvsigma2.data;
 
                                 // Apply CTF to reference projection
                                 if (do_ctf_correction && refs_are_ctf_corrected)
@@ -7045,7 +7048,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 
                                                 FourierTransformer transformer;
                                                 MultidimArray<Complex> Fish;
-                                                Fish.resize(exp_local_Minvsigma2[img_id]);
+                                                Fish.resize(exp_local_Minvsigma2);
                                                 FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fish)
                                                 {
                                                     DIRECT_MULTIDIM_ELEM(Fish, n) = *(Fimg_shift + n);
@@ -7127,7 +7130,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                                                 Image<RFLOAT> It;
                                                 std::cerr << "Frefctf shape= "; Frefctf.printShape(std::cerr);
                                                 MultidimArray<Complex> Fish;
-                                                Fish.resize(exp_local_Minvsigma2[img_id]);
+                                                Fish.resize(exp_local_Minvsigma2);
                                                 FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fish)
                                                 {
                                                     DIRECT_MULTIDIM_ELEM(Fish, n) = *(Fimg_shift + n);
@@ -7168,7 +7171,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                                                 std::cerr << "written Frefctf.spi" << std::endl;
 
                                                 std::cerr << " exp_iclass= " << exp_iclass << std::endl;
-                                                Fref.resize(exp_local_Minvsigma2[img_id]);
+                                                Fref.resize(exp_local_Minvsigma2);
                                                 (mymodel.PPref[exp_iclass]).get2DFourierTransform(Fref, A);
                                                 transformer3.inverseFourierTransform(Fref, tt());
                                                 CenterFFT(tt(),false);
@@ -7789,7 +7792,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
         std::vector<RFLOAT> &exp_directions_prior, std::vector<RFLOAT> &exp_psi_prior,
         std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted,
         std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted_nomask,
-        std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2,
+        MultidimArray<RFLOAT> &exp_local_Minvsigma2,
         std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
         std::vector<RFLOAT> &exp_local_sqrtXi2,
         MultidimArray<RFLOAT> &exp_STMulti)
@@ -7823,10 +7826,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 
     // In doThreadPrecalculateShiftedImagesCtfsAndInvSigma2s() the origin of the exp_local_Minvsigma2s was omitted.
     // Set those back here
-    for (int img_id = 0; img_id < exp_nr_images; img_id++)
-    {
-        DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2[img_id], 0) = 1. / (sigma2_fudge * DIRECT_A1D_ELEM(mymodel.sigma2_noise[optics_group], 0));
-    }
+    DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2, 0) = 1. / (sigma2_fudge * DIRECT_A1D_ELEM(mymodel.sigma2_noise[optics_group], 0));
 
     // Initialise the maximum of all weights to a negative value
     exp_max_weight = -1.;
@@ -7998,8 +7998,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 
                             if (!do_skip_maximization)
                             {
-                                if (do_map)
-                                    Minvsigma2 = exp_local_Minvsigma2[img_id];
+                                if (do_map) Minvsigma2 = exp_local_Minvsigma2;
                                 // else Minvsigma2 was initialised to ones
                                 // Apply CTF to reference projection
                                 if (do_ctf_correction)
@@ -8577,7 +8576,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
         // Note there is no sqrt in the normalisation term because of the 2-dimensionality of the complex-plane
         // Also exclude origin from logsigma2, as this will not be considered in the P-calculations
         if (ires > 0 && ires_remapped < XSIZE(mymodel.sigma2_noise[optics_group]))
-            logsigma2 += log( 2. * PI * DIRECT_A1D_ELEM(mymodel.sigma2_noise[optics_group], ires_remapped));
+            logsigma2 += exp_nr_images * log( 2. * PI * DIRECT_A1D_ELEM(mymodel.sigma2_noise[optics_group], ires_remapped));
     }
     if (exp_sum_weight==0)
     {
@@ -8679,7 +8678,9 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
         if (do_norm_correction && mymodel.nr_bodies == 1)
             wsum_model.avg_norm_correction += thr_avg_norm_correction;
         wsum_model.LL += thr_sum_dLL;
-        wsum_model.ave_Pmax += thr_sum_Pmax;
+        // Multiply by exp_nr_images because sumweight above has been summed over all images,
+        // and by this wsum_model.ave_Pmax will be divided in maximizationOtherParameters()...
+        wsum_model.ave_Pmax += exp_nr_images * thr_sum_Pmax;
         omp_unset_lock(&global_mutex);
     } // end if !do_skip_maximization
 
@@ -8827,13 +8828,7 @@ void MlOptimiser::updateOverallChangesInHiddenVariables()
 void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long int my_last_part_id)
 {
 
-    long int n_trials = 0;
-    for (int part_id = my_first_part_id; part_id <= my_last_part_id; part_id++)
-    {
-        n_trials +=  mydata.numberOfImagesInParticle(part_id);
-    }
-
-    // Separate angular error estimate for each of the classes
+     // Separate angular error estimate for each of the classes
     acc_rot = acc_trans = 999.; // later XMIPP_MIN will be taken to find the best class...
 
     // P(X | X_1) / P(X | X_2) = exp ( |F_1 - F_2|^2 / (-2 sigma2) )
@@ -8844,7 +8839,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 
     std::cout << " Estimating accuracies in the orientational assignment ... " << std::endl;
     int nr_particles = (my_last_part_id - my_first_part_id + 1);
-    init_progress_bar( n_trials * mymodel.nr_classes * mymodel.nr_bodies);
+    init_progress_bar( nr_particles * mymodel.nr_classes * mymodel.nr_bodies);
     for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
     {
 
@@ -9178,11 +9173,11 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
                     acc_trans_class += my_pixel_size * sh_error; // now in Angstroms!
             } // end for imode
 
-            progress_bar(n_trials*iclass + metadata_offset);
+            progress_bar(nr_particles*iclass + metadata_offset);
         } // end for part_id
 
-        mymodel.acc_rot[iclass]   = acc_rot_class / (RFLOAT)n_trials;
-        mymodel.acc_trans[iclass] = acc_trans_class / (RFLOAT)n_trials;
+        mymodel.acc_rot[iclass]   = acc_rot_class / (RFLOAT)nr_particles;
+        mymodel.acc_trans[iclass] = acc_trans_class / (RFLOAT)nr_particles;
 
         // Store normalised spectral contributions to orientability
         if (mymodel.orientability_contrib[iclass].sum() > 0.)
@@ -9202,7 +9197,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
         //		<< 8 * PI * PI * mymodel.pixel_size * mymodel.pixel_size * acc_trans_class * acc_trans_class << std::endl;
 
     } // end loop iclass
-    progress_bar(n_trials * mymodel.nr_classes * mymodel.nr_bodies);
+    progress_bar(nr_particles * mymodel.nr_classes * mymodel.nr_bodies);
 
 
     std::cout << " Auto-refine: Estimated accuracy angles= " << acc_rot<< " degrees; offsets= " << acc_trans << " Angstroms" << std::endl;
