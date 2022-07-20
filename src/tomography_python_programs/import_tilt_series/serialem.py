@@ -11,6 +11,7 @@ from rich.progress import track
 
 from ._cli import cli
 from .. import utils
+from ..utils import mdoc
 from ..utils.relion import relion_pipeline_job
 
 console = rich.console.Console(record=True)
@@ -73,14 +74,10 @@ def import_tilt_series_from_serial_em(
     console.log(f'Found {len(mdoc_files)} mdoc files and {len(tilt_image_files)} image files.')
     
     # Raise error if no tilt images or mdocs found
-    if len(tilt_image_files) == 0: 
-        e = 'Could not find any image files'
-        console.log(f'ERROR: {e}')
-        raise RuntimeError(e)
+    if len(tilt_image_files) == 0:
+        raise RuntimeError('Could not find any image files')
     if len(mdoc_files) == 0:
-        e = 'Could not find any mdoc files'
-        console.log(f'ERROR: {e}')
-        raise RuntimeError(e)
+        raise RuntimeError('Could not find any mdoc files')
     
     # Get tomogram ids and construct paths for per-tilt-series STAR files
     tomogram_ids = [
@@ -121,7 +118,6 @@ def import_tilt_series_from_serial_em(
             mdoc_file=mdoc_file,
             tilt_image_files=tilt_image_files,
             dose_per_tilt_image=dose_per_tilt_image,
-            prefix=prefix,
             nominal_tilt_axis_angle=nominal_tilt_axis_angle,
         )
         starfile.write(
@@ -138,23 +134,23 @@ def import_tilt_series_from_serial_em(
 def _generate_tilt_image_dataframe(
         mdoc_file: Path,
         tilt_image_files: List[Path],
-        prefix: str,
         nominal_tilt_axis_angle: float,
         dose_per_tilt_image: Optional[float],
 ) -> pd.DataFrame:
     """Generate a dataframe containing data about images in a tilt-series."""
     df = mdocfile.read(mdoc_file, camel_to_snake=True)
-    df = df.sort_values(by="z_value", ascending=True)
-    df = utils.mdoc.add_pre_exposure_dose(mdoc_df=df, dose_per_tilt=dose_per_tilt_image)
-    df = df.sort_values(by="tilt_angle", ascending=True)
-    df = utils.mdoc.add_tilt_image_files(mdoc_df=df, tilt_image_files=tilt_image_files)
-    df['tilt_series_id'] = utils.mdoc.construct_tomogram_id(mdoc_file, prefix)
+    df['date_time'] = pd.to_datetime(df['date_time'], infer_datetime_format=True)
+    df = df.sort_values(by="date_time", ascending=True)
+    df['image_index'] = np.arange(len(df)) + 1  # 0 -> 1 indexing
+    df['pre_exposure_dose'] = mdoc.calculate_pre_exposure_dose(df, dose_per_tilt_image)
+    df['tilt_image_file'] = mdoc.match_filenames(df['sub_frame_path'], to_match=tilt_image_files)
+    df = df[df['tilt_image_file'] != None]
     df['nominal_tilt_axis_angle'] = nominal_tilt_axis_angle
 
     output_df = pd.DataFrame({
         'rlnMicrographMovieName': df['tilt_image_file'],
         'rlnTomoTiltMovieFrameCount': df['num_sub_frames'],
-        'rlnTomoTiltMovieIndex': np.array(df['z_value']) + 1,  # 0 -> 1 indexing
+        'rlnTomoTiltMovieIndex': df['image_index'],
         'rlnTomoNominalStageTiltAngle': df['tilt_angle'],
         'rlnTomoNominalTiltAxisAngle': df['nominal_tilt_axis_angle'],
         'rlnTomoNominalDefocus': df['target_defocus'],
