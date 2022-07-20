@@ -2150,7 +2150,7 @@ void MlOptimiser::initialiseGeneral(int rank)
     }
 
     // Tabulated sine and cosine values (for 2D helical segments / 3D helical sub-tomogram averaging with on-the-fly shifts)
-    if ( mydata.is_tomo || ((do_shifts_onthefly) && (do_helical_refine) && (!ignore_helical_symmetry)) )
+    if ( mydata.is_tomo || mydata.is_3D || ((do_shifts_onthefly) && (do_helical_refine) && (!ignore_helical_symmetry)) )
     {
         tab_sin.initialise(100000);
         tab_cos.initialise(100000);
