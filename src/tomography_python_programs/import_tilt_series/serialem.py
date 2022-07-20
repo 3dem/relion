@@ -46,7 +46,7 @@ def import_tilt_series_from_serial_em(
     voltage : Acceleration voltage (keV)
     spherical_aberration : Spherical aberration (mm)
     amplitude_contrast : Amplitude contrast fraction (e.g. 0.1)
-    invert_defocus_handedess: Set this to flip the handedness of the defocus geometry (default=1). 
+    invert_defocus_handedness: Set this to flip the handedness of the defocus geometry (default=1).
         The value of this parameter is either +1 or -1, and it describes whether the focus 
         increases or decreases as a function of Z distance. It has to be determined experimentally. 
     dose_per_tilt_image : dose in electrons per square angstrom in each tilt image.
