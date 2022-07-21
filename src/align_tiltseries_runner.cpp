@@ -198,7 +198,6 @@ void AlignTiltseriesRunner::executeImodWrapper(long idx_tomo, int rank)
 {
 
     RFLOAT angpix = tomogramSet.getPixelSize(idx_tomo);
-    int patch_size_pix = ROUND(patch_size / angpix);
 
     std::string command = fn_imodwrapper_exe + " ";
     // Make sure the methods are the first argument to the program!
@@ -210,7 +209,7 @@ void AlignTiltseriesRunner::executeImodWrapper(long idx_tomo, int rank)
     else if (do_imod_patchtrack)
     {
         command += " IMOD:patch-tracking";
-        command += " --unbinned-patch-size-pixels " + integerToString(patch_size_pix) + " " + integerToString(patch_size_pix);
+        command += " --patch-size-angstroms " + integerToString(patch_size);
         command += " --patch-overlap-percentage " + floatToString(patch_overlap);
     }
     else if (do_aretomo)

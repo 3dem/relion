@@ -929,7 +929,7 @@ __global__ void cuda_kernel_centerFFTbySign(T *img_in,
 	int pixel = z*xdim*ydim + y*xdim + x;
 	if(x<xdim && y<ydim && z<zdim)
 	{
-		if((x ^ y ^ z)&1 != 0)
+		if((x ^ y ^ z)&1) // i.e. (x + y + z) is an odd number
 		{
 			img_in[pixel].x *= -1;
 			img_in[pixel].y *= -1;
