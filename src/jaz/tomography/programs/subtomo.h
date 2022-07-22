@@ -43,6 +43,7 @@ class SubtomoProgram
 			bool 
 				flip_value, 
 				diag,
+                do_ctf,
                 do_stack2d,
 				do_whiten,
 				do_center, 
@@ -88,7 +89,6 @@ class SubtomoProgram
 				long int s2D,
 				long int s3D,
 				double relative_box_scale,
-				bool do_ctf,
 				int verbose,
 				BufferedImage<float>& sum_data,
 				BufferedImage<float>& sum_weights );

@@ -69,6 +69,7 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 	do_center = !parser.checkOption("--no_center", "Do not subtract the mean from the voxel values");
 
 	flip_value = !parser.checkOption("--no_ic", "Do not invert contrast (keep particles dark)");
+    do_ctf + !parser.checkOption("--no_ctf", "Do not apply CTFs");
 	write_combined = !parser.checkOption("--no_comb", "Do not write the concatenated CTF-multiplicity image");
 	write_ctf = parser.checkOption("--ctf", "Write 3D CTFs");
 	write_divided = parser.checkOption("--div", "Write CTF-corrected subtomograms");
@@ -129,8 +130,6 @@ void SubtomoProgram::run()
 	
 	if (cropSize < 0) cropSize = boxSize;
 	
-	bool do_ctf = true;
-
 	const long int s2D = boxSize;
 	
 	const long int s3D = cropSize;
@@ -171,7 +170,6 @@ void SubtomoProgram::run()
 		s2D,
 		s3D,
 		relative_box_scale,
-		do_ctf,
 		1,
 		sum_data,
 		sum_weights);
@@ -404,7 +402,6 @@ void SubtomoProgram::processTomograms(
 		long int s2D,
 		long int s3D,
 		double relative_box_scale,
-		bool do_ctf,
 		int verbosity,
 		BufferedImage<float>& sum_data,
 		BufferedImage<float>& sum_weights )
@@ -519,6 +516,9 @@ void SubtomoProgram::processTomograms(
 
             if (do_stack2d)
             {
+                // Apply dose-weights!
+
+
                 BufferedImage<float> particlesRS = NewStackHelper::inverseFourierTransformStack(particleStack);
                 const float sign = flip_value ? -1.f : 1.f;
 
@@ -545,6 +545,12 @@ void SubtomoProgram::processTomograms(
                  */
 
                 particlesRS *= sign;
+
+                const int boundary = (boxSize - cropSize) / 2;
+                if (do_circle_crop) {
+                    const double crop_boundary = do_narrow_circle_crop ? boundary : 0.0;
+                    TomoExtraction::cropCircle(particlesRS, crop_boundary, 5, num_threads);
+                }
 
                 particlesRS.write(outData, binnedPixelSize, write_float16);
             }

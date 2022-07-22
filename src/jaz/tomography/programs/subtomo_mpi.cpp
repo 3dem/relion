@@ -77,8 +77,6 @@ void SubtomoProgramMpi::run()
 
 	if (cropSize < 0) cropSize = boxSize;
 
-	bool do_ctf = true;
-
 	const long int tc = particles.size();
 	const long int s2D = boxSize;
 
@@ -115,7 +113,6 @@ void SubtomoProgramMpi::run()
 			s2D,
 			s3D,
 			relative_box_scale,
-			do_ctf,
 			verb,
 			dummy,
 			dummy);
