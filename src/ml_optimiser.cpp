@@ -7686,6 +7686,12 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
             np++;
         }
     }
+
+    if (np == 0)
+    {
+        std::cerr << " part_id= " << part_id << std::endl;
+        REPORT_ERROR("ERROR: zero non-zero weights were encountered...");
+    }
     sorted_weight.resize(np);
 
     // Sort from low to high values
