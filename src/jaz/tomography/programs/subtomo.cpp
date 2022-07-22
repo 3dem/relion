@@ -465,8 +465,9 @@ void SubtomoProgram::processTomograms(
 
 		if (verbosity > 0)
 		{
-			Log::beginProgress(
-				"Backprojecting subtomograms",
+			std::string message = (do_stack2d) ? "Extracting particles" : "Backprojecting subtomograms";
+            Log::beginProgress(
+				message,
 				(int)ceil(pc/(double)outer_thread_num));
 		}
 
@@ -521,13 +522,29 @@ void SubtomoProgram::processTomograms(
                 BufferedImage<float> particlesRS = NewStackHelper::inverseFourierTransformStack(particleStack);
                 const float sign = flip_value ? -1.f : 1.f;
 
+
+                /*
                 // Normalise to zero-mean and stddev one; also apply sign (contrast flip)
                 Image<float> Itmp;
                 particlesRS.copyTo(Itmp);
+
+                MultidimArray<float> It;
+                Itmp().getSlice(20, It);
                 double avg,stddev;
                 Itmp().computeAvgStddev(avg, stddev);
+                std::cerr << " 20 avg= " << avg << " stddev= " << stddev << std::endl;
+                for (int n=0; n < ZSIZE(Itmp()); n++)
+                {
+                    std::cerr << " n= " << n << std::endl;
+
+                    It.computeAvgStddev(avg, stddev);
+                    std::cerr << " n=" << n << " avg= " << avg << " stddev= " << stddev << std::endl;
+                }
                 particlesRS -= avg;
-                particlesRS /= sign * stddev;
+                //particlesRS /= sign * stddev;
+                 */
+
+                particlesRS *= sign;
 
                 particlesRS.write(outData, binnedPixelSize, write_float16);
             }
