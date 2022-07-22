@@ -95,7 +95,10 @@ double Tomogram::getFrameDose() const
 	return fractionalDose;
 	//cumulativeDose[frameSequence[1]] - cumulativeDose[frameSequence[0]];
 }
-
+double Tomogram::getCumulativeDose(int frame) const
+{
+    return cumulativeDose[frame];
+}
 BufferedImage<float> Tomogram::computeDoseWeight(int boxSize, double binning) const
 {
 	// @TODO: add support for B/k factors

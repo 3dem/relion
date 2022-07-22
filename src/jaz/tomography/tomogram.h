@@ -57,7 +57,8 @@ class Tomogram
 		
 		double getFrameDose() const;
 
-		
+        double getCumulativeDose(int frame) const;
+
 		BufferedImage<float> computeDoseWeight(int boxSize, double binning) const;
 		BufferedImage<float> computeNoiseWeight(int boxSize, double binning, double overlap = 2.0) const;
 

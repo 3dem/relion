@@ -172,7 +172,7 @@ void Experiment::addParticle(int random_subset, int tomogram_id)
 }
 
 void Experiment::addImageToParticle(std::string img_name, long int part_id, long int group_id, int optics_group,
-                                    d4Matrix *Aproj, CTF *ctf)
+                                    d4Matrix *Aproj, CTF *ctf, float dose)
 {
 	if (group_id >= groups.size())
 		REPORT_ERROR("Experiment::addImageToParticle: group_id out of range");
@@ -209,6 +209,7 @@ void Experiment::addImageToParticle(std::string img_name, long int part_id, long
 	img.group_id = group_id;
 	img.optics_group = optics_group;
     img.Aproj = A;
+    img.dose = dose;
     nr_images_per_optics_group[optics_group]++;
 	img.optics_group_id = nr_images_per_optics_group[optics_group] - 1;
 
@@ -988,7 +989,8 @@ void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
 
                     CTF ctf = tomogram.getCtf(f, pos);
 
-                    addImageToParticle(my_name, part_id, group_id, optics_group, &P, &ctf);
+                    float dose = tomogram.getCumulativeDose(f);
+                    addImageToParticle(my_name, part_id, group_id, optics_group, &P, &ctf, dose);
                 }
 
             }
