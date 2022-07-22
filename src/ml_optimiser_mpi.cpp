@@ -573,7 +573,7 @@ void MlOptimiserMpi::initialiseWorkLoad()
         if (do_split_random_halves)
         {
             // First do half-set 1
-            if (node->isLeader()) mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group, 1);
+            if (node->isLeader()) mydata.getNumberOfParticlesPerGroup(mymodel.nr_particles_per_group, 1);
             for (int follower = 1; follower < node->size; follower+=2)
             {
                 MPI_Status status;
@@ -583,7 +583,7 @@ void MlOptimiserMpi::initialiseWorkLoad()
 
 
             // Then do half-set 2
-            if (node->isLeader()) mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group, 2);
+            if (node->isLeader()) mydata.getNumberOfParticlesPerGroup(mymodel.nr_particles_per_group, 2);
             for (int follower = 2; follower < node->size; follower+=2)
             {
                 MPI_Status status;
@@ -594,7 +594,7 @@ void MlOptimiserMpi::initialiseWorkLoad()
         }
         else
         {
-            if (node->isLeader()) mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
+            if (node->isLeader()) mydata.getNumberOfParticlesPerGroup(mymodel.nr_particles_per_group);
             node->relion_MPI_Bcast(&mymodel.nr_particles_per_group[0], mymodel.nr_particles_per_group.size(), MPI_LONG, 0, MPI_COMM_WORLD);
         }
 

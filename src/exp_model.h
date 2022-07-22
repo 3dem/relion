@@ -311,10 +311,10 @@ public:
                                     double &shift2d_x, double &shift2d_y, double &shift2d_z);
 
     // Get the vector of number of images per group_id
-	void getNumberOfImagesPerGroup(std::vector<long int> &nr_particles_per_group, int random_subset = 0);
+	void getNumberOfParticlesPerGroup(std::vector<long int> &nr_particles_per_group, int random_subset = 0);
 
 	// Get the vector of number of images per group_id
-	void getNumberOfImagesPerOpticsGroup(std::vector<long int> &nr_particles_per_group, int random_subset = 0);
+	void getNumberOfParticlesPerOpticsGroup(std::vector<long int> &nr_particles_per_group, int random_subset = 0);
 
 	// Get the metadata-row for this image in a separate MetaDataTable
 	MetaDataTable getMetaDataParticle(long int part_id);

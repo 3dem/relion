@@ -2279,12 +2279,12 @@ void MlOptimiser::initialiseWorkLoad()
         my_halfset = debug_split_random_half;
 
         // Set the number of particles per group
-        mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group, my_halfset);
+        mydata.getNumberOfParticlesPerGroup(mymodel.nr_particles_per_group, my_halfset);
     }
     else
     {
         // Set the number of particles per group
-        mydata.getNumberOfImagesPerGroup(mymodel.nr_particles_per_group);
+        mydata.getNumberOfParticlesPerGroup(mymodel.nr_particles_per_group);
     }
 
     divide_equally(mydata.numberOfParticles(), 1, 0, my_first_particle_id, my_last_particle_id);
@@ -6911,6 +6911,8 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                                             if (part_id == mydata.sorted_idx[exp_my_first_part_id])
                                                 timer.tic(TIMING_DIFF2_GETSHIFT);
 #endif
+                                            long int ihidden_over = sampling.getPositionOversampledSamplingPoint(ihidden, exp_current_oversampling,
+                                                                                                                 iover_rot, iover_trans);
                                             /// Now get the shifted image
                                             // Use a pointer to avoid copying the entire array again in this highly expensive loop
                                             Complex *Fimg_shift;
@@ -6981,6 +6983,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                                             if (part_id == mydata.sorted_idx[exp_my_first_part_id])
                                                 timer.tic(TIMING_DIFF_DIFF2);
 #endif
+
                                             RFLOAT diff2;
                                             if ((iter == 1 && do_firstiter_cc) || do_always_cc)
                                             {
@@ -6995,7 +6998,9 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                                                     suma2 += norm(DIRECT_MULTIDIM_ELEM(Frefctf, n));
                                                 }
                                                 // Normalised cross-correlation coefficient: divide by power of reference (power of image is a constant)
-                                                diff2 /= sqrt(suma2) * exp_local_sqrtXi2[img_id];
+                                                // For multi-images, also divide by nr_images to calculate average CCF over all images
+                                                diff2 /= exp_nr_images * sqrt(suma2) * exp_local_sqrtXi2[img_id];
+
                                             }
                                             else
                                             {
@@ -7011,15 +7016,13 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                                                     diff2 += (diff_real * diff_real + diff_imag * diff_imag) * 0.5 * (*(Minvsigma2 + n));
                                                 }
                                             }
+
 #ifdef TIMING
                                             // Only time one thread, as I also only time one MPI process
                                             if (part_id == mydata.sorted_idx[exp_my_first_part_id])
                                                 timer.toc(TIMING_DIFF_DIFF2);
 #endif
 
-                                            // Store all diff2 in exp_Mweight
-                                            long int ihidden_over = sampling.getPositionOversampledSamplingPoint(ihidden, exp_current_oversampling,
-                                                                                                            iover_rot, iover_trans);
 //#define DEBUG_GETALLDIFF2
 #ifdef DEBUG_GETALLDIFF2
                                             omp_set_lock(&global_mutex);
@@ -7214,9 +7217,14 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                                             }
 #endif
 
+                                            //if (ihidden_over == 0 )
+                                            //{
+                                            //    std::cerr << "img_id= " << img_id << " Xi2= " << exp_local_sqrtXi2[img_id] << " diff2= " << diff2 << " exp_Mweight= " << DIRECT_A1D_ELEM(exp_Mweight, ihidden_over) << std::endl;
+                                            //}
 
+                                            // Store all diff2 in exp_Mweight
                                             // SHWS 6July2022: += instead of =, as summing over all imag_id....
-                                            if (DIRECT_A1D_ELEM(exp_Mweight, ihidden_over) < 0.)
+                                            if (fabs(DIRECT_A1D_ELEM(exp_Mweight, ihidden_over) + 999.) < 0.001 )
                                                 DIRECT_A1D_ELEM(exp_Mweight, ihidden_over) = diff2;
                                             else
                                                 DIRECT_A1D_ELEM(exp_Mweight, ihidden_over) += diff2;
@@ -7233,6 +7241,19 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 #endif
 
                                             }
+
+                                            /*
+                                            if (part_id == 0 && img_id == exp_nr_images-1)
+                                            {
+                                                std::cout << " ihidden_over= " << ihidden_over
+                                                << " exp_min_diff2= " << exp_min_diff2 << " diff2= " << DIRECT_A1D_ELEM(exp_Mweight, ihidden_over)
+                                                << " x= " << oversampled_translations_x[iover_trans] << " y= " <<oversampled_translations_y[iover_trans]
+                                                << " z= " << oversampled_translations_z[iover_trans]
+                                                << " rot= " << oversampled_rot[iover_rot] << " tilt= " <<  oversampled_tilt[iover_rot]
+                                                << " psi= " << oversampled_psi[iover_rot]
+                                                << std::endl;
+                                            }
+                                             */
 
                                         } // end loop iover_trans
                                     } // end if do_proceed translations
@@ -8056,12 +8077,14 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
                                 // Jun01,2015 - Shaoda & Sjors, Helical refinement
                                 sampling.getTranslationsInPixel(itrans, exp_current_oversampling, my_pixel_size, oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
                                         (do_helical_refine) && (!ignore_helical_symmetry));
+
                                 for (long int iover_trans = 0; iover_trans < exp_nr_oversampled_trans; iover_trans++, iitrans++)
                                 {
                                     // Only deal with this sampling point if its weight was significant
                                     long int ihidden_over = ihidden * exp_nr_oversampled_trans * exp_nr_oversampled_rot +
                                             iover_rot * exp_nr_oversampled_trans + iover_trans;
                                     RFLOAT weight = DIRECT_A1D_ELEM(exp_Mweight, ihidden_over);
+
                                     // Only sum weights for non-zero weights
                                     if (weight >= exp_significant_weight)
                                     {
@@ -8087,72 +8110,50 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
                                             }
                                             else
                                             {
+
+                                                RFLOAT zshift = 0.;
+                                                RFLOAT xshift = oversampled_translations_x[iover_trans];
+                                                RFLOAT yshift = oversampled_translations_y[iover_trans];
+                                                if (mymodel.data_dim == 3 || mydata.is_tomo)
+                                                    zshift = oversampled_translations_z[iover_trans];
+
                                                 // Feb01,2017 - Shaoda, on-the-fly shifts in helical reconstuctions (2D and 3D)
-                                                if ( mydata.is_tomo || ((do_helical_refine) && (!ignore_helical_symmetry)) )
+                                                if ( (do_helical_refine) && (!ignore_helical_symmetry) )
                                                 {
-                                                    RFLOAT zshift = 0.;
-                                                    RFLOAT xshift = oversampled_translations_x[iover_trans];
-                                                    RFLOAT yshift = oversampled_translations_y[iover_trans];
-                                                    if (mymodel.data_dim == 3 || mydata.is_tomo)
-                                                        zshift = oversampled_translations_z[iover_trans];
 
-                                                    if ((do_helical_refine) && (!ignore_helical_symmetry))
-                                                    {
-                                                        RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT);
-                                                        RFLOAT tilt_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_TILT);
-                                                        RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI);
-                                                        transformCartesianAndHelicalCoords(
-                                                                    xshift, yshift, zshift,
-                                                                    xshift, yshift, zshift,
-                                                                    rot_deg, tilt_deg, psi_deg,
-                                                                    mymodel.data_dim,
-                                                                    HELICAL_TO_CART_COORDS);
-                                                    }
-
-                                                    // For subtomo: convert 3D shifts in the tomogram to 2D shifts in the tilt series images
-                                                    if (mydata.is_tomo) mydata.getTranslationInTiltSeries(part_id, img_id,
-                                                                                                          xshift, yshift, zshift,
-                                                                                                          xshift, yshift, zshift);
-
-                                                    // Fimg_shift
-                                                    shiftImageInFourierTransformWithTabSincos(
-                                                            exp_local_Fimgs_shifted[img_id][0],
-                                                            Fimg_otfshift,
-                                                            (RFLOAT)image_full_size[optics_group],
-                                                            image_current_size[optics_group],
-                                                            tab_sin, tab_cos,
-                                                            xshift, yshift, zshift);
-                                                    // Fimg_shift_nomask
-                                                    shiftImageInFourierTransformWithTabSincos(
-                                                            exp_local_Fimgs_shifted_nomask[img_id][0],
-                                                            Fimg_otfshift_nomask,
-                                                            (RFLOAT)image_full_size[optics_group],
-                                                            image_current_size[optics_group],
-                                                            tab_sin, tab_cos,
-                                                            xshift, yshift, zshift);
+                                                    RFLOAT rot_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT);
+                                                    RFLOAT tilt_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_TILT);
+                                                    RFLOAT psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI);
+                                                    transformCartesianAndHelicalCoords(
+                                                                xshift, yshift, zshift,
+                                                                xshift, yshift, zshift,
+                                                                rot_deg, tilt_deg, psi_deg,
+                                                                mymodel.data_dim,
+                                                                HELICAL_TO_CART_COORDS);
                                                 }
-                                                else
-                                                {
-                                                    Complex* myAB;
-                                                    myAB = (adaptive_oversampling == 0 ) ? global_fftshifts_ab_current[optics_group][iitrans].data : global_fftshifts_ab2_current[optics_group][iitrans].data;
-                                                    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[img_id][0])
-                                                    {
-                                                        RFLOAT a = (*(myAB + n)).real;
-                                                        RFLOAT b = (*(myAB + n)).imag;
-                                                        // Fimg_shift
-                                                        RFLOAT real = a * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[img_id][0], n)).real
-                                                                - b *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[img_id][0], n)).imag;
-                                                        RFLOAT imag = a * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[img_id][0], n)).imag
-                                                                + b *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted[img_id][0], n)).real;
-                                                        DIRECT_MULTIDIM_ELEM(Fimg_otfshift, n) = Complex(real, imag);
-                                                        // Fimg_shift_nomask
-                                                        real = a * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted_nomask[img_id][0], n)).real
-                                                                - b *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted_nomask[img_id][0], n)).imag;
-                                                        imag = a * (DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted_nomask[img_id][0], n)).imag
-                                                                + b *(DIRECT_MULTIDIM_ELEM(exp_local_Fimgs_shifted_nomask[img_id][0], n)).real;
-                                                        DIRECT_MULTIDIM_ELEM(Fimg_otfshift_nomask, n) = Complex(real, imag);
-                                                    }
-                                                }
+
+                                                // For subtomo: convert 3D shifts in the tomogram to 2D shifts in the tilt series images
+                                                if (mydata.is_tomo) mydata.getTranslationInTiltSeries(part_id, img_id,
+                                                                                                      xshift, yshift, zshift,
+                                                                                                      xshift, yshift, zshift);
+
+                                                // Fimg_shift
+                                                shiftImageInFourierTransformWithTabSincos(
+                                                        exp_local_Fimgs_shifted[img_id][0],
+                                                        Fimg_otfshift,
+                                                        (RFLOAT)image_full_size[optics_group],
+                                                        image_current_size[optics_group],
+                                                        tab_sin, tab_cos,
+                                                        xshift, yshift, zshift);
+                                                // Fimg_shift_nomask
+                                                shiftImageInFourierTransformWithTabSincos(
+                                                        exp_local_Fimgs_shifted_nomask[img_id][0],
+                                                        Fimg_otfshift_nomask,
+                                                        (RFLOAT)image_full_size[optics_group],
+                                                        image_current_size[optics_group],
+                                                        tab_sin, tab_cos,
+                                                        xshift, yshift, zshift);
+
                                                 Fimg_shift = Fimg_otfshift.data;
                                                 Fimg_shift_nomask = Fimg_otfshift_nomask.data;
                                             }
@@ -8281,6 +8282,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
                                             {
                                                 Fimg_store = Fimg_shift_nomask;
                                             }
+
 //#define DEBUG_BODIES2
 #ifdef DEBUG_BODIES2
                                             FourierTransformer transformer;
