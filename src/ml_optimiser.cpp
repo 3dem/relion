@@ -6081,7 +6081,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(
                     (mydata.is_tomo) ? mydata.particles[part_id].images[img_id].defAngle : DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_ANGLE),
                     DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_BFACTOR),
                     DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_KFACTOR),
-                    DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_PHASE_SHIFT));
+                    DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_PHASE_SHIFT),
+                    (mydata.is_tomo) ? mydata.particles[part_id].images[img_id].dose : -1.);
 
                 ctf.getFftwImage(Fctf, image_full_size[optics_group], image_full_size[optics_group], my_pixel_size,
                         ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true, do_ctf_padding);
@@ -8962,7 +8963,8 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
                                         exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_ANGLE),
                                 DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_BFACTOR),
                                 DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_KFACTOR),
-                                DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_PHASE_SHIFT));
+                                DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_PHASE_SHIFT),
+                                (mydata.is_tomo) ? mydata.particles[part_id].images[img_id].dose : -1.);
 
                         ctf.getFftwImage(Fctf, image_full_size[optics_group], image_full_size[optics_group],my_pixel_size,
                                          ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true,
