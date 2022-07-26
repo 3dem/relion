@@ -17,7 +17,7 @@ long int makeJobsForDiff2Fine(
 		ProjectionParams &FineProjectionData,
 		std::vector< long unsigned > &iover_transes,
 		std::vector< long unsigned > &ihiddens,
-		long int nr_over_orient, long int nr_over_trans, int img_id,
+		long int nr_over_orient, long int nr_over_trans,
 		IndexedDataArray &FPW, // FPW=FinePassWeights
 		IndexedDataArrayMask &dataMask,
 		int chunk);

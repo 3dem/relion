@@ -136,6 +136,8 @@ public:
 
 	unsigned long part_id;
 
+	bool is_tomo;
+
 	std::vector<MultidimArray<Complex > > Fimg, Fimg_nomask, local_Fimgs_shifted, local_Fimgs_shifted_nomask;
 	std::vector<MultidimArray<RFLOAT> > Fctf, local_Fctf;
     MultidimArray<RFLOAT> FstMulti, local_Minvsigma2;
@@ -152,9 +154,10 @@ public:
 	MultidimArray<XFLOAT> Mweight;
 	Indices max_index;
 
-	OptimisationParamters (unsigned nr_images, unsigned long part_id):
+	OptimisationParamters (unsigned nr_images, unsigned long part_id, bool is_tomo):
 		metadata_offset(0),
         imagedata_offset(0),
+		is_tomo(is_tomo),
 		part_id(part_id)
 	{
 		power_img.resize(nr_images);

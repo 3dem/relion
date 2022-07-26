@@ -13,7 +13,7 @@ long int makeJobsForDiff2Fine(
 		ProjectionParams &FineProjectionData,
 		std::vector< long unsigned > &iover_transes,
 		std::vector< long unsigned > &ihiddens,
-		long int nr_over_orient, long int nr_over_trans, int img_id,
+		long int nr_over_orient, long int nr_over_trans,
 		IndexedDataArray &FPW, // FPW=FinePassWeights
 		IndexedDataArrayMask &dataMask,
 		int chunk)
@@ -37,7 +37,7 @@ long int makeJobsForDiff2Fine(
 			long int iover_trans = iover_transes[j];
 			long int ihidden = FineProjectionData.iorientclasses[i] * sp.nr_trans + ihiddens[j];
 
-			if(DIRECT_A2D_ELEM(op.Mcoarse_significant, img_id, ihidden)==1)
+			if(DIRECT_A1D_ELEM(op.Mcoarse_significant, ihidden)==1)
 			{
 				FPW.rot_id[w_base+w] = FineProjectionData.iorientclasses[i] % (sp.nr_dir*sp.nr_psi); 	// where to look for priors etc
 				FPW.rot_idx[w_base+w] = i;					// which rot for this significant task
