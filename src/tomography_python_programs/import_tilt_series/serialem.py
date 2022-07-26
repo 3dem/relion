@@ -13,6 +13,8 @@ from ._cli import cli
 from .. import utils
 from ..utils import mdoc
 from ..utils.relion import relion_pipeline_job
+from ..utils.file import match_filenames
+
 
 console = rich.console.Console(record=True)
 
@@ -72,13 +74,13 @@ def import_tilt_series_from_serial_em(
     tilt_image_files = list(Path().glob(tilt_image_movie_pattern))
     mdoc_files = sorted(list(Path().glob(mdoc_file_pattern)))
     console.log(f'Found {len(mdoc_files)} mdoc files and {len(tilt_image_files)} image files.')
-    
+
     # Raise error if no tilt images or mdocs found
     if len(tilt_image_files) == 0:
         raise RuntimeError('Could not find any image files')
     if len(mdoc_files) == 0:
         raise RuntimeError('Could not find any mdoc files')
-    
+
     # Get tomogram ids and construct paths for per-tilt-series STAR files
     tomogram_ids = [
         utils.mdoc.construct_tomogram_id(mdoc_file, prefix)
@@ -143,7 +145,8 @@ def _generate_tilt_image_dataframe(
     df = df.sort_values(by="date_time", ascending=True)
     df['image_index'] = np.arange(len(df)) + 1  # 0 -> 1 indexing
     df['pre_exposure_dose'] = mdoc.calculate_pre_exposure_dose(df, dose_per_tilt_image)
-    df['tilt_image_file'] = mdoc.match_filenames(df['sub_frame_path'], to_match=tilt_image_files)
+    df['sub_frame_basename'] = df['sub_frame_path'].apply(mdoc.basename_from_sub_frame_path)
+    df['tilt_image_file'] = match_filenames(df['sub_frame_basename'], to_match=tilt_image_files)
     df = df[df['tilt_image_file'] != None]
     df['nominal_tilt_axis_angle'] = nominal_tilt_axis_angle
 

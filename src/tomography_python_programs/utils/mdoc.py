@@ -1,7 +1,6 @@
 import os
-from os import PathLike
 from pathlib import Path
-from typing import Optional, List, Sequence
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -21,17 +20,13 @@ def calculate_pre_exposure_dose(
     return pre_exposure_dose
 
 
-def match_filenames(
-        source: Sequence[PathLike], to_match: Sequence[PathLike]
-) -> List:
-    """Match filenames which have common basenames."""
-    cache = {basename(f): f for f in to_match}
-    mdoc_basenames = get_tilt_image_basenames(source)
-    return [cache.get(name, None) for name in mdoc_basenames]
+def basename_from_sub_frame_path(filename: os.PathLike) -> str:
+    """Get a basename from an mdoc 'SubFramePath' entry.
 
-
-def get_tilt_image_basenames(mdoc_tilt_image_files: Sequence[os.PathLike]) -> map:
-    return map(lambda x: Path(str(x).split("\\")[-1]).stem, mdoc_tilt_image_files)
+    Example of a 'SubFramePath' entry:
+        "D:\\DATA\\Flo\\HGK149_20151130\\frames\\TS_01_000_0.0.mrc"
+    """
+    return basename(Path(str(filename).split("\\")[-1]))
 
 
 def construct_tomogram_id(mdoc_file: Path, prefix: str) -> str:
