@@ -98,17 +98,17 @@ long int  makeJobsForCollect(IndexedDataArray &FPW,
 	long int jobid=0;
 	dataMask.jobOrigin[jobid]=0;
 	dataMask.jobExtent[jobid]=1;
-	long int crot =FPW.rot_idx[jobid]; // set current rot
+    long int crot =FPW.rot_idx[jobid]; // set current rot
 	for(long int n=1; n<FPW.rot_idx.getSize(); n++)
 	{
-		if(FPW.rot_idx[n]==crot)
+        if(FPW.rot_idx[n]==crot)
 		{
-			dataMask.jobExtent[jobid]++;
+            dataMask.jobExtent[jobid]++;
 		}
 		else
 		{
 			jobid++;
-			dataMask.jobExtent[jobid]=1;
+            dataMask.jobExtent[jobid]=1;
 			dataMask.jobOrigin[jobid]=n;
 			crot=FPW.rot_idx[n];
 		}

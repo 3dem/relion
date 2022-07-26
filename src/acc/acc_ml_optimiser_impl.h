@@ -473,18 +473,14 @@ void getFourierTransformsAndCtfs(long int part_id,
             // If op.is_tomo: don't translate, nor normalise: just set d_img and d_rec_img from img.data and rec_img.data
             for (unsigned long i = 0; i < img.data.nzyxdim; i++)
                 d_img[i] = (XFLOAT) img().data[i];
-
             d_img.cpToDevice();
-            d_img.streamSync();
 
             if(baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
             {
                 d_rec_img.allAlloc();
                 for (unsigned long i = 0; i < rec_img.data.nzyxdim; i++)
                     d_rec_img[i] = (XFLOAT) rec_img().data[i];
-
                 d_rec_img.cpToDevice();
-                d_rec_img.streamSync();
             }
         }
 
@@ -1224,7 +1220,6 @@ void getAllSquaredDifferencesCoarse(
                          std::cerr << " allWweights-before =" << allWeights[i] << std::endl;
                      */
 
-                std::cerr << "mapallweights"<<std::endl;
                 mapAllWeightsToMweights(
 						~projectorPlans[iclass*sp.nr_images + img_id].iorientclasses,
 						&(~allWeights)[allWeights_pos],
@@ -1306,9 +1301,9 @@ void getAllSquaredDifferencesFine(
 	for (int img_id = 0; img_id < sp.nr_images; img_id++)
 	{
 
-        AccPtrBundle bundleD2( ptrFactory.makeBundle());
-        bundleD2.setSize(2*(FineProjectionData.orientationNumAllClasses*sp.nr_trans*sp.nr_oversampled_trans)*sizeof(unsigned long));
-        bundleD2.allAlloc();
+        //AccPtrBundle bundleD2( ptrFactory.makeBundle());
+        //bundleD2.setSize(2*(FineProjectionData.orientationNumAllClasses*sp.nr_trans*sp.nr_oversampled_trans)*sizeof(unsigned long));
+        //bundleD2.allAlloc();
 
 		// Reset size without de-allocating: we will append everything significant within
 		// the current allocation and then re-allocate the then determined (smaller) volume
@@ -1502,8 +1497,12 @@ void getAllSquaredDifferencesFine(
                 CTOC(accMLO->timer,"pair_list_1");
 
                 CTIC(accMLO->timer,"IndexedArrayMemCp2");
-                bundleD2.pack(FPCMasks[exp_iclass].jobOrigin);
-                bundleD2.pack(FPCMasks[exp_iclass].jobExtent);
+                //bundleD2.pack(FPCMasks[exp_iclass].jobOrigin);
+                //bundleD2.pack(FPCMasks[exp_iclass].jobExtent);
+                FPCMasks[exp_iclass].jobOrigin.deviceAlloc();
+                FPCMasks[exp_iclass].jobExtent.deviceAlloc();
+                FPCMasks[exp_iclass].jobOrigin.cpToDevice();
+                FPCMasks[exp_iclass].jobExtent.cpToDevice();
                 CTOC(accMLO->timer,"IndexedArrayMemCp2");
 
 				Matrix2D<RFLOAT> MBL, MBR;
@@ -1555,7 +1554,7 @@ void getAllSquaredDifferencesFine(
 			}
 		}
 
-		bundleD2.cpToDevice();
+//		bundleD2.cpToDevice();
 		AllEulers.cpToDevice();
 
 		FinePassWeights.rot_id.cpToDevice(); //FIXME this is not used
@@ -2208,8 +2207,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						ProjectionParams &ProjectionData,
 						std::vector<IndexedDataArrayMask > &FPCMasks,
 						AccPtrFactory ptrFactory,
-						int ibody,
-						AccPtrBundle &bundleSWS)
+						int ibody, AccPtrBundle &bundleSWS)
 {
 #ifdef TIMING
 	if (op.part_id == baseMLO->exp_my_first_part_id)
@@ -2230,6 +2228,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	// In doThreadPrecalculateShiftedImagesCtfsAndInvSigma2s() the origin of the op.local_Minvsigma2s was omitted.
 	// Set those back here
     int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, 0);
+    RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, 0);
     DIRECT_MULTIDIM_ELEM(op.local_Minvsigma2, 0) = 1. / (baseMLO->sigma2_fudge * DIRECT_A1D_ELEM(baseMLO->mymodel.sigma2_noise[optics_group], 0));
 
 	// For norm_correction and scale_correction of all images of this particle
@@ -2276,232 +2275,220 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	unsigned long nr_transes = sp.nr_trans*sp.nr_oversampled_trans;
 	unsigned long nr_fake_classes = (sp.iclass_max-sp.iclass_min+1);
 	unsigned long oversamples = sp.nr_oversampled_trans * sp.nr_oversampled_rot;
-	std::vector<long int> block_nums(sp.nr_images*nr_fake_classes);
+	std::vector<long int> block_nums(nr_fake_classes);
 
-	for (int img_id = 0; img_id < sp.nr_images; img_id++)
-	{
-		// here we introduce offsets for the oo_transes in an array as it is more efficient to
-		// copy one big array to/from GPU rather than four small arrays
-		size_t otrans_x      = 0*(size_t)sp.nr_images*nr_fake_classes*nr_transes;
-		size_t otrans_y      = 1*(size_t)sp.nr_images*nr_fake_classes*nr_transes;
-		size_t otrans_z      = 2*(size_t)sp.nr_images*nr_fake_classes*nr_transes;
-		size_t otrans_x2y2z2 = 3*(size_t)sp.nr_images*nr_fake_classes*nr_transes;
+    // here we introduce offsets for the oo_transes in an array as it is more efficient to
+    // copy one big array to/from GPU rather than four small arrays
+    size_t otrans_x      = 0*(size_t)nr_fake_classes*nr_transes;
+    size_t otrans_y      = 1*(size_t)nr_fake_classes*nr_transes;
+    size_t otrans_z      = 2*(size_t)nr_fake_classes*nr_transes;
+    size_t otrans_x2y2z2 = 3*(size_t)nr_fake_classes*nr_transes;
 
-		// Allocate space for all classes, so that we can pre-calculate data for all classes, copy in one operation, call kenrels on all classes, and copy back in one operation
-		AccPtr<XFLOAT>          oo_otrans = ptrFactory.make<XFLOAT>((size_t)sp.nr_images*nr_fake_classes*nr_transes*4);
+    // Allocate space for all classes, so that we can pre-calculate data for all classes, copy in one operation, call kenrels on all classes, and copy back in one operation
+    AccPtr<XFLOAT>          oo_otrans = ptrFactory.make<XFLOAT>((size_t)nr_fake_classes*nr_transes*4);
 
-		oo_otrans.allAlloc();
+    oo_otrans.allAlloc();
 
-		int sumBlockNum =0;
-		int group_id = baseMLO->mydata.getGroupId(op.part_id, img_id);
-		const int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
-		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
+    int sumBlockNum =0;
+    int group_id = baseMLO->mydata.getGroupId(op.part_id, 0);
 
-		CTIC(accMLO->timer,"collect_data_2_pre_kernel");
-		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-		{
-			unsigned long fake_class = exp_iclass-sp.iclass_min; // if we only have the third class to do, the third class will be the "first" we do, i.e. the "fake" first.
-			if ((baseMLO->mymodel.pdf_class[exp_iclass] == 0.) || (ProjectionData.class_entries[exp_iclass] == 0) )
-				continue;
+    CTIC(accMLO->timer,"collect_data_2_pre_kernel");
+    for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+    {
+        unsigned long fake_class = exp_iclass-sp.iclass_min; // if we only have the third class to do, the third class will be the "first" we do, i.e. the "fake" first.
+        if ((baseMLO->mymodel.pdf_class[exp_iclass] == 0.) || (ProjectionData.class_entries[exp_iclass] == 0) )
+            continue;
 
-			// Use the constructed mask to construct a partial class-specific input
-			IndexedDataArray thisClassFinePassWeights(FinePassWeights,FPCMasks[exp_iclass]);
+        // Use the constructed mask to construct a partial class-specific input
+        IndexedDataArray thisClassFinePassWeights(FinePassWeights,FPCMasks[exp_iclass]);
 
-			// Re-define the job-partition of the indexedArray of weights so that the collect-kernel can work with it.
-            block_nums[nr_fake_classes*img_id + fake_class] = makeJobsForCollect(thisClassFinePassWeights, FPCMasks[exp_iclass], ProjectionData.orientation_num[exp_iclass]);
+        // Re-define the job-partition of the indexedArray of weights so that the collect-kernel can work with it.
+        block_nums[fake_class] = makeJobsForCollect(thisClassFinePassWeights, FPCMasks[exp_iclass], ProjectionData.orientation_num[exp_iclass]);
 
-			bundleSWS.pack(FPCMasks[exp_iclass].jobOrigin);
-			bundleSWS.pack(FPCMasks[exp_iclass].jobExtent);
+        bundleSWS.pack(FPCMasks[exp_iclass].jobOrigin);
+        bundleSWS.pack(FPCMasks[exp_iclass].jobExtent);
 
-			sumBlockNum+=block_nums[nr_fake_classes*img_id + fake_class];
+        sumBlockNum+=block_nums[fake_class];
 
-			RFLOAT myprior_x, myprior_y, myprior_z, old_offset_z;
-			RFLOAT old_offset_x = XX(op.old_offset);
-			RFLOAT old_offset_y = YY(op.old_offset);
+        RFLOAT myprior_x, myprior_y, myprior_z, old_offset_z;
+        RFLOAT old_offset_x = XX(op.old_offset);
+        RFLOAT old_offset_y = YY(op.old_offset);
 
-			if (baseMLO->mymodel.ref_dim == 2 && baseMLO->mymodel.nr_bodies == 1)
-			{
-				myprior_x = XX(baseMLO->mymodel.prior_offset_class[exp_iclass]);
-				myprior_y = YY(baseMLO->mymodel.prior_offset_class[exp_iclass]);
-			}
-			else
-			{
-				myprior_x = XX(op.prior);
-				myprior_y = YY(op.prior);
-				if (accMLO->shiftsIs3D)
-				{
-					myprior_z = ZZ(op.prior);
-					old_offset_z = ZZ(op.old_offset);
-				}
-			}
+        if (baseMLO->mymodel.ref_dim == 2 && baseMLO->mymodel.nr_bodies == 1)
+        {
+            myprior_x = XX(baseMLO->mymodel.prior_offset_class[exp_iclass]);
+            myprior_y = YY(baseMLO->mymodel.prior_offset_class[exp_iclass]);
+        }
+        else
+        {
+            myprior_x = XX(op.prior);
+            myprior_y = YY(op.prior);
+            if (accMLO->shiftsIs3D)
+            {
+                myprior_z = ZZ(op.prior);
+                old_offset_z = ZZ(op.old_offset);
+            }
+        }
 
-			/*======================================================
-								COLLECT 2
-			======================================================*/
+        /*======================================================
+                            COLLECT 2
+        ======================================================*/
 
-			//Pregenerate oversampled translation objects for kernel-call
-			for (long int itrans = 0, iitrans = 0; itrans < sp.nr_trans; itrans++)
-			{
-				baseMLO->sampling.getTranslationsInPixel(itrans, baseMLO->adaptive_oversampling, my_pixel_size,
-						oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
-						(baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry));
-				for (long int iover_trans = 0; iover_trans < sp.nr_oversampled_trans; iover_trans++, iitrans++)
-				{
+        //Pregenerate oversampled translation objects for kernel-call
+        for (long int itrans = 0, iitrans = 0; itrans < sp.nr_trans; itrans++)
+        {
+            baseMLO->sampling.getTranslationsInPixel(itrans, baseMLO->adaptive_oversampling, my_pixel_size,
+                    oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
+                    (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry));
+            for (long int iover_trans = 0; iover_trans < sp.nr_oversampled_trans; iover_trans++, iitrans++)
+            {
 
-                    double zshift = 0.;
-                    double xshift = old_offset_x + oversampled_translations_x[iover_trans];
-                    double yshift = old_offset_y + oversampled_translations_y[iover_trans];
-                    if (accMLO->shiftsIs3D)
-                        zshift = old_offset_z + oversampled_translations_z[iover_trans];
+                double zshift = 0.;
+                double xshift = old_offset_x + oversampled_translations_x[iover_trans];
+                double yshift = old_offset_y + oversampled_translations_y[iover_trans];
+                if (accMLO->shiftsIs3D)
+                    zshift = old_offset_z + oversampled_translations_z[iover_trans];
 
-                    // For subtomo: convert 3D shifts in the tomogram to 2D shifts in the tilt series images
-                    if (op.is_tomo) baseMLO->mydata.getTranslationInTiltSeries(op.part_id, img_id,
-                                                                                                  xshift, yshift, zshift,
-                                                                                                  xshift, yshift, zshift);
+                oo_otrans[otrans_x+fake_class*nr_transes+iitrans] = xshift;
+                oo_otrans[otrans_y+fake_class*nr_transes+iitrans] = yshift;
+                if (accMLO->shiftsIs3D)
+                    oo_otrans[otrans_z+fake_class*nr_transes+iitrans] = zshift;
 
-                    oo_otrans[otrans_x+sp.nr_images*(fake_class*nr_transes+iitrans) + img_id] = xshift;
-                    oo_otrans[otrans_y+sp.nr_images*(fake_class*nr_transes+iitrans) + img_id] = yshift;
-                    if (accMLO->shiftsIs3D)
-                        oo_otrans[otrans_z+sp.nr_images*(fake_class*nr_transes+iitrans) + img_id] = zshift;
+                // Calculate the vector length of myprior
+                RFLOAT mypriors_len2 = myprior_x * myprior_x + myprior_y * myprior_y;
+                if (accMLO->shiftsIs3D)
+                    mypriors_len2 += myprior_z * myprior_z;
 
-					// Calculate the vector length of myprior
-					RFLOAT mypriors_len2 = myprior_x * myprior_x + myprior_y * myprior_y;
-					if (accMLO->shiftsIs3D)
-						mypriors_len2 += myprior_z * myprior_z;
+                // If it is doing helical refinement AND Cartesian vector myprior has a length > 0, transform the vector to its helical coordinates
+                if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) && (mypriors_len2 > 0.00001) )
+                {
+                    RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
+                    RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT);
+                    RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_PSI);
+                    transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, rot_deg, tilt_deg, psi_deg,
+                                                       (accMLO->shiftsIs3D) ? (3) : (2), CART_TO_HELICAL_COORDS);
+                }
 
-					// If it is doing helical refinement AND Cartesian vector myprior has a length > 0, transform the vector to its helical coordinates
-					if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) && (mypriors_len2 > 0.00001) )
-					{
-						RFLOAT rot_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
-						RFLOAT tilt_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT);
-						RFLOAT psi_deg = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_PSI);
-						transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, rot_deg, tilt_deg, psi_deg,
-                                                           (accMLO->shiftsIs3D) ? (3) : (2), CART_TO_HELICAL_COORDS);
-					}
+                RFLOAT diffx = 0.;
+                if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) )
+                    diffx = myprior_x - xshift;
+                RFLOAT diffy = myprior_y - yshift;
+                RFLOAT diffz = 0;
+                if (accMLO->shiftsIs3D)
+                    diffz = myprior_z - zshift;
 
-					if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) )
-						RFLOAT diffx = myprior_x - oo_otrans[otrans_x+sp.nr_images*(fake_class*nr_transes+iitrans) + img_id];
-					RFLOAT diffx = myprior_x - oo_otrans[otrans_x+sp.nr_images*(fake_class*nr_transes+iitrans) + img_id];
-					RFLOAT diffy = myprior_y - oo_otrans[otrans_y+sp.nr_images*(fake_class*nr_transes+iitrans) + img_id];
-					RFLOAT diffz = 0;
-					if (accMLO->shiftsIs3D)
-						diffz = myprior_z - (old_offset_z + oversampled_translations_z[iover_trans]);
+                oo_otrans[otrans_x2y2z2+fake_class*nr_transes+iitrans] = diffx*diffx + diffy*diffy + diffz*diffz;
 
-					oo_otrans[otrans_x2y2z2+sp.nr_images*(fake_class*nr_transes+iitrans) + img_id] = diffx*diffx + diffy*diffy + diffz*diffz;
-				}
-			}
-		}
+            }
+        }
+    }
 
-		bundleSWS.cpToDevice();
-		oo_otrans.cpToDevice();
+    bundleSWS.cpToDevice();
+    oo_otrans.cpToDevice();
 
-		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
+    DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
-		// here we introduce offsets for the clases in an array as it is more efficient to
-		// copy one big array to/from GPU rather than four small arrays
-		size_t offsetx_class = 0*(size_t)sumBlockNum;
-		size_t offsety_class = 1*(size_t)sumBlockNum;
-		size_t offsetz_class = 2*(size_t)sumBlockNum;
-		size_t sigma2_offset = 3*(size_t)sumBlockNum;
+    // here we introduce offsets for the clases in an array as it is more efficient to
+    // copy one big array to/from GPU rather than four small arrays
+    size_t offsetx_class = 0*(size_t)sumBlockNum;
+    size_t offsety_class = 1*(size_t)sumBlockNum;
+    size_t offsetz_class = 2*(size_t)sumBlockNum;
+    size_t sigma2_offset = 3*(size_t)sumBlockNum;
 
-		AccPtr<XFLOAT>                      p_weights = ptrFactory.make<XFLOAT>((size_t)sumBlockNum);
-		AccPtr<XFLOAT> p_thr_wsum_prior_offsetxyz_class = ptrFactory.make<XFLOAT>((size_t)sumBlockNum*4);
+    AccPtr<XFLOAT>                      p_weights = ptrFactory.make<XFLOAT>((size_t)sumBlockNum);
+    AccPtr<XFLOAT> p_thr_wsum_prior_offsetxyz_class = ptrFactory.make<XFLOAT>((size_t)sumBlockNum*4);
 
-		p_weights.allAlloc();
-		p_thr_wsum_prior_offsetxyz_class.allAlloc();
-		CTOC(accMLO->timer,"collect_data_2_pre_kernel");
-		int partial_pos=0;
+    p_weights.allAlloc();
+    p_thr_wsum_prior_offsetxyz_class.allAlloc();
+    CTOC(accMLO->timer,"collect_data_2_pre_kernel");
+    int partial_pos=0;
 
-		for (long int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-		{
-			long int fake_class = exp_iclass-sp.iclass_min; // if we only have the third class to do, the third class will be the "first" we do, i.e. the "fake" first.
-			if ((baseMLO->mymodel.pdf_class[exp_iclass] == 0.) || (ProjectionData.class_entries[exp_iclass] == 0) )
-				continue;
+    for (long int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+    {
+        long int fake_class = exp_iclass-sp.iclass_min; // if we only have the third class to do, the third class will be the "first" we do, i.e. the "fake" first.
+        if ((baseMLO->mymodel.pdf_class[exp_iclass] == 0.) || (ProjectionData.class_entries[exp_iclass] == 0) )
+            continue;
 
-			// Use the constructed mask to construct a partial class-specific input
-			IndexedDataArray thisClassFinePassWeights(FinePassWeights,FPCMasks[exp_iclass]);
+        // Use the constructed mask to construct a partial class-specific input
+        IndexedDataArray thisClassFinePassWeights(FinePassWeights,FPCMasks[exp_iclass]);
 
-			long int cpos=fake_class*nr_transes;
-			int block_num = block_nums[nr_fake_classes*img_id + fake_class];
+        long int cpos=fake_class*nr_transes;
+        int block_num = block_nums[fake_class];
 
-			runCollect2jobs(block_num,
-						&(~oo_otrans)[otrans_x+cpos],          // otrans-size -> make const
-						&(~oo_otrans)[otrans_y+cpos],          // otrans-size -> make const
-						&(~oo_otrans)[otrans_z+cpos],          // otrans-size -> make const
-						&(~oo_otrans)[otrans_x2y2z2+cpos], // otrans-size -> make const
-						~thisClassFinePassWeights.weights,
-						(XFLOAT)op.significant_weight,
-						(XFLOAT)op.sum_weight,
-						sp.nr_trans,
-						sp.nr_oversampled_trans,
-						sp.nr_oversampled_rot,
-						oversamples,
-						(baseMLO->do_skip_align || baseMLO->do_skip_rotate ),
-						&(~p_weights)[partial_pos],
-						&(~p_thr_wsum_prior_offsetxyz_class)[offsetx_class+partial_pos],
-						&(~p_thr_wsum_prior_offsetxyz_class)[offsety_class+partial_pos],
-						&(~p_thr_wsum_prior_offsetxyz_class)[offsetz_class+partial_pos],
-						&(~p_thr_wsum_prior_offsetxyz_class)[sigma2_offset+partial_pos],
-						~thisClassFinePassWeights.rot_idx,
-						~thisClassFinePassWeights.trans_idx,
-						~FPCMasks[exp_iclass].jobOrigin,
-						~FPCMasks[exp_iclass].jobExtent,
-						accMLO->dataIs3D);
-			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
+        runCollect2jobs(block_num,
+                    &(~oo_otrans)[otrans_x+cpos],          // otrans-size -> make const
+                    &(~oo_otrans)[otrans_y+cpos],          // otrans-size -> make const
+                    &(~oo_otrans)[otrans_z+cpos],          // otrans-size -> make const
+                    &(~oo_otrans)[otrans_x2y2z2+cpos], // otrans-size -> make const
+                    ~thisClassFinePassWeights.weights,
+                    (XFLOAT)op.significant_weight,
+                    (XFLOAT)op.sum_weight,
+                    sp.nr_trans,
+                    sp.nr_oversampled_trans,
+                    sp.nr_oversampled_rot,
+                    oversamples,
+                    (baseMLO->do_skip_align || baseMLO->do_skip_rotate ),
+                    &(~p_weights)[partial_pos],
+                    &(~p_thr_wsum_prior_offsetxyz_class)[offsetx_class+partial_pos],
+                    &(~p_thr_wsum_prior_offsetxyz_class)[offsety_class+partial_pos],
+                    &(~p_thr_wsum_prior_offsetxyz_class)[offsetz_class+partial_pos],
+                    &(~p_thr_wsum_prior_offsetxyz_class)[sigma2_offset+partial_pos],
+                    ~thisClassFinePassWeights.rot_idx,
+                    ~thisClassFinePassWeights.trans_idx,
+                    ~FPCMasks[exp_iclass].jobOrigin,
+                    ~FPCMasks[exp_iclass].jobExtent,
+                    accMLO->dataIs3D);
+        LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
-			partial_pos+=block_num;
-		}
+        partial_pos+=block_num;
+    }
 
-		CTIC(accMLO->timer,"collect_data_2_post_kernel");
-		p_weights.cpToHost();
-		p_thr_wsum_prior_offsetxyz_class.cpToHost();
+    CTIC(accMLO->timer,"collect_data_2_post_kernel");
+    p_weights.cpToHost();
+    p_thr_wsum_prior_offsetxyz_class.cpToHost();
 
-		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-		int iorient = 0;
-		partial_pos=0;
-		for (long int iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
-		{
-			long int fake_class = iclass-sp.iclass_min; // if we only have the third class to do, the third class will be the "first" we do, i.e. the "fake" first.
-			if ((baseMLO->mymodel.pdf_class[iclass] == 0.) || (ProjectionData.class_entries[iclass] == 0) )
-				continue;
-			int block_num = block_nums[nr_fake_classes*img_id + fake_class];
+    DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
+    int iorient = 0;
+    partial_pos=0;
+    for (long int iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
+    {
+        long int fake_class = iclass-sp.iclass_min; // if we only have the third class to do, the third class will be the "first" we do, i.e. the "fake" first.
+        if ((baseMLO->mymodel.pdf_class[iclass] == 0.) || (ProjectionData.class_entries[iclass] == 0) )
+            continue;
+        int block_num = block_nums[fake_class];
 
-			for (long int n = partial_pos; n < partial_pos+block_num; n++)
-			{
-				iorient= FinePassWeights.rot_id[FPCMasks[iclass].jobOrigin[n-partial_pos]+FPCMasks[iclass].firstPos];
+        for (long int n = partial_pos; n < partial_pos+block_num; n++)
+        {
+            iorient= FinePassWeights.rot_id[FPCMasks[iclass].jobOrigin[n-partial_pos]+FPCMasks[iclass].firstPos];
+            long int mydir, idir=floor(iorient/sp.nr_psi);
+            if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
+                mydir = idir;
+            else
+                mydir = op.pointer_dir_nonzeroprior[idir];
 
-				long int mydir, idir=floor(iorient/sp.nr_psi);
-				if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
-					mydir = idir;
-				else
-					mydir = op.pointer_dir_nonzeroprior[idir];
+            // store partials according to indices of the relevant dimension
+            unsigned ithr_wsum_pdf_direction = baseMLO->mymodel.nr_bodies > 1 ? ibody : iclass;
+            DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[ithr_wsum_pdf_direction], mydir) += p_weights[n];
+            thr_sumw_group                                                               += p_weights[n];
+            thr_wsum_pdf_class[iclass]                                                   += p_weights[n];
 
-				// store partials according to indices of the relevant dimension
-				unsigned ithr_wsum_pdf_direction = baseMLO->mymodel.nr_bodies > 1 ? ibody : iclass;
-				DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[ithr_wsum_pdf_direction], mydir) += p_weights[n];
-				thr_sumw_group                                                               += p_weights[n];
-				thr_wsum_pdf_class[iclass]                                                   += p_weights[n];
+            thr_wsum_sigma2_offset                                                       += my_pixel_size * my_pixel_size * p_thr_wsum_prior_offsetxyz_class[sigma2_offset+n];
 
-				thr_wsum_sigma2_offset                                                       += my_pixel_size * my_pixel_size * p_thr_wsum_prior_offsetxyz_class[sigma2_offset+n];
-
-				if (baseMLO->mymodel.ref_dim == 2)
-				{
-					thr_wsum_prior_offsetx_class[iclass] += my_pixel_size * p_thr_wsum_prior_offsetxyz_class[offsetx_class+n];
-					thr_wsum_prior_offsety_class[iclass] += my_pixel_size * p_thr_wsum_prior_offsetxyz_class[offsety_class+n];
-				}
-			}
-			partial_pos+=block_num;
-		} // end loop iclass
-		CTOC(accMLO->timer,"collect_data_2_post_kernel");
-	} // end loop img_id
+            if (baseMLO->mymodel.ref_dim == 2)
+            {
+                thr_wsum_prior_offsetx_class[iclass] += my_pixel_size * p_thr_wsum_prior_offsetxyz_class[offsetx_class+n];
+                thr_wsum_prior_offsety_class[iclass] += my_pixel_size * p_thr_wsum_prior_offsetxyz_class[offsety_class+n];
+            }
+        }
+        partial_pos+=block_num;
+    } // end loop iclass
+    CTOC(accMLO->timer,"collect_data_2_post_kernel");
 
 	/*======================================================
 	                     SET METADATA
 	======================================================*/
 
 	std::vector< RFLOAT> oversampled_rot, oversampled_tilt, oversampled_psi;
-    RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, 0);
-
     CTIC(accMLO->timer,"setMetadata");
 
     if(baseMLO->adaptive_oversampling!=0)
@@ -2587,8 +2574,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		for (int img_id = 0; img_id < sp.nr_images; img_id++)
 		{
 			int group_id = baseMLO->mydata.getGroupId(op.part_id, img_id);
-			const int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
-			RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
 			bool ctf_premultiplied = baseMLO->mydata.obsModel.getCtfPremultiplied(optics_group);
 
 			/*======================================================
@@ -3367,8 +3352,6 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_A);
 		//    coarse pass, declared here to keep scope to storeWS
 		ProjectionParams FineProjectionData( baseMLO->mymodel.nr_classes);
 
-		AccPtrBundle bundleSWS(ptrFactory.makeBundle());
-
 		for (int ipass = 0; ipass < nr_sampling_passes; ipass++)
 		{
 			CTIC(timer,"weightPass");
@@ -3482,10 +3465,10 @@ baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_E);
 		// For the reconstruction step use mymodel.current_size!
 		// as of 3.1, no longer necessary?
 		sp.current_image_size = baseMLO->mymodel.current_size;
+        AccPtrBundle bundleSWS(ptrFactory.makeBundle());
 
-        // SHWS6Jul2022: assume FineProjectionData has same size for all img_id, just take first one here
-		bundleSWS.setSize(2*(FineProjectionData.orientationNumAllClasses)*sizeof(unsigned long));
-		bundleSWS.allAlloc();
+        bundleSWS.setSize(2*(FineProjectionData.orientationNumAllClasses)*sizeof(unsigned long));
+        bundleSWS.allAlloc();
 
 #ifdef TIMING
 // Only time one thread
