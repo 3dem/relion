@@ -967,6 +967,7 @@ void getAllSquaredDifferencesCoarse(
 	if (accMLO->generateProjectionPlanOnTheFly)
 	{
 		CTIC(accMLO->timer,"generateProjectionSetupCoarse");
+		CTIC(accMLO->timer,"generateProjectionSetupCoarse");
 
 		projectorPlans.resize(baseMLO->mymodel.nr_classes * sp.nr_images, (CudaCustomAllocator *)accMLO->getAllocator());
 
@@ -1213,6 +1214,17 @@ void getAllSquaredDifferencesCoarse(
 						do_CC,
 						accMLO->dataIs3D);
 
+                /*
+                     Mweight.cpToHost();
+                     for (int i= 0; i < Mweight.getSize(); i++)
+                         if (Mweight[i]>0.)std::cerr << " Mweight=" << Mweight[i] << std::endl;
+                     allWeights.hostAlloc();
+                     allWeights.cpToHost();
+                      for (int i= 0; i < allWeights.getSize(); i++)
+                         std::cerr << " allWweights-before =" << allWeights[i] << std::endl;
+                     */
+
+                std::cerr << "mapallweights"<<std::endl;
                 mapAllWeightsToMweights(
 						~projectorPlans[iclass*sp.nr_images + img_id].iorientclasses,
 						&(~allWeights)[allWeights_pos],
@@ -1222,7 +1234,18 @@ void getAllSquaredDifferencesCoarse(
 						accMLO->classStreams[iclass]
 						);
 
-			}
+                /*
+                if (img_id == sp.nr_images-1)
+                {
+                    allWeights.hostAlloc();
+                    allWeights.cpToHost();
+                    std::cerr <<" allWeights.getSize()= "<<allWeights.getSize()<<std::endl;
+                     for (int i= 0; i < allWeights.getSize(); i++)
+                        std::cerr << i << " allWweights-after =" << allWeights[i] << std::endl;
+                      exit(1);
+                }
+                 */
+            }
 		} // end loop iclass
 
 		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -1253,15 +1276,15 @@ void getAllSquaredDifferencesFine(
 	std::vector< IndexedDataArrayMask > &FPCMasks,
 	ProjectionParams &FineProjectionData,
 	AccPtrFactory ptrFactory,
-	int ibody,
-	AccPtrBundle &bundleD2)
+	int ibody)
 {
 #ifdef TIMING
 	if (op.part_id == baseMLO->exp_my_first_part_id)
 		baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2);
 #endif
 
-	CUSTOM_ALLOCATOR_REGION_NAME("DIFF_FINE");
+
+    CUSTOM_ALLOCATOR_REGION_NAME("DIFF_FINE");
 	CTIC(accMLO->timer,"diff_pre_gpu");
 
 	CTIC(accMLO->timer,"precalculateShiftedImagesCtfsAndInvSigma2s");
@@ -1279,8 +1302,14 @@ void getAllSquaredDifferencesFine(
 	/*=======================================================================================
 										  Particle Iteration
 	=========================================================================================*/
+    unsigned long newDataSize(0);
 	for (int img_id = 0; img_id < sp.nr_images; img_id++)
 	{
+
+        AccPtrBundle bundleD2( ptrFactory.makeBundle());
+        bundleD2.setSize(2*(FineProjectionData.orientationNumAllClasses*sp.nr_trans*sp.nr_oversampled_trans)*sizeof(unsigned long));
+        bundleD2.allAlloc();
+
 		// Reset size without de-allocating: we will append everything significant within
 		// the current allocation and then re-allocate the then determined (smaller) volume
 
@@ -1405,7 +1434,7 @@ void getAllSquaredDifferencesFine(
 		AllEulers.setSize(9*FineProjectionData.orientationNumAllClasses*sizeof(XFLOAT));
 		AllEulers.allAlloc();
 
-		unsigned long newDataSize(0);
+		newDataSize = 0;
 
 		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
@@ -1464,8 +1493,6 @@ void getAllSquaredDifferencesFine(
                                                        FPCMasks[exp_iclass],   // ..and output into index-arrays mask...
                                                        chunkSize);                    // ..based on a given maximum chunk-size
 
-
-                std::cerr <<" img_id= " << img_id << " significant_num= " << significant_num << std::endl;
 
                 // extend size by number of significants found this class
                 newDataSize += significant_num;
@@ -1545,7 +1572,6 @@ void getAllSquaredDifferencesFine(
 			if (baseMLO->mymodel.nr_bodies > 1) iproj = ibody;
 			else                                iproj = iclass;
 
-			if ((baseMLO->mymodel.pdf_class[iclass] > 0.) && (FineProjectionData.class_entries[iclass] > 0) )
 			{
 				long unsigned orientation_num  = FineProjectionData.class_entries[iclass];
 				if(orientation_num==0)
@@ -1597,7 +1623,8 @@ void getAllSquaredDifferencesFine(
 						((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc),
 						accMLO->dataIs3D
 						);
-//				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
+
+				//DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 				CTOC(accMLO->timer,"Diff2CALL");
 
 			} // end if class significant
@@ -1607,11 +1634,11 @@ void getAllSquaredDifferencesFine(
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
-		std::cerr << "img_id= " <<img_id << "size= " << FinePassWeights.weights.getSize() << " new= " << newDataSize << std::endl;
-        // Ask Dari what to do with this!!!!
-        FinePassWeights.setDataSize( newDataSize );
 
 	}// end loop img_id
+
+    // This was moved outside the loop over img_id SHWS26Jul2022....
+    FinePassWeights.setDataSize( newDataSize );
 
     CTIC(accMLO->timer,"collect_data_1");
     // SHWS6July2022: only search for smallest diff2 after all img_id have been summed
@@ -3340,7 +3367,6 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_A);
 		//    coarse pass, declared here to keep scope to storeWS
 		ProjectionParams FineProjectionData( baseMLO->mymodel.nr_classes);
 
-		AccPtrBundle bundleD2( ptrFactory.makeBundle());
 		AccPtrBundle bundleSWS(ptrFactory.makeBundle());
 
 		for (int ipass = 0; ipass < nr_sampling_passes; ipass++)
@@ -3426,9 +3452,6 @@ baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_D);
                 FinePassWeights.setDataSize(dataSize);
                 FinePassWeights.dual_alloc_all();
 
-                bundleD2.setSize(2*(FineProjectionData.orientationNumAllClasses*sp.nr_trans*sp.nr_oversampled_trans)*sizeof(unsigned long));
-                bundleD2.allAlloc();
-
 #ifdef TIMING
 // Only time one thread
 if (thread_id == 0)
@@ -3436,7 +3459,7 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_D);
 #endif
 
 				CTIC(timer,"getAllSquaredDifferencesFine");
-				getAllSquaredDifferencesFine<MlClass>(ipass, op, sp, baseMLO, myInstance, FinePassWeights, FinePassClassMasks, FineProjectionData, ptrFactory, ibody, bundleD2);
+				getAllSquaredDifferencesFine<MlClass>(ipass, op, sp, baseMLO, myInstance, FinePassWeights, FinePassClassMasks, FineProjectionData, ptrFactory, ibody);
 				CTOC(timer,"getAllSquaredDifferencesFine");
 				FinePassWeights.weights.cpToHost();
 
