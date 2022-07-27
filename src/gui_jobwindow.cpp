@@ -549,7 +549,7 @@ void JobWindow::initialiseMotioncorrWindow()
 	place("do_float16", TOGGLE_DEACTIVATE);
 	if (is_tomo)
 	{
-	place("do_even_odd_split", TOGGLE_DEACTIVATE);
+	place("do_even_odd_split");
 	}
 
 	// Add a little spacer

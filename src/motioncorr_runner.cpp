@@ -462,8 +462,14 @@ FileName MotioncorrRunner::getOutputFileNames(FileName fn_mic)
 			break;
 		fn_root.replace(pos, 1, "_");
 	}
-
+	if (even_odd_split)
+	{
+		return fn_out + fn_root + "_EVN.mrc";
+	}
+	else
+	{
 	return fn_out + fn_root + ".mrc";
+	}
 }
 
 void MotioncorrRunner::run()
