@@ -891,7 +891,7 @@ void RelionJob::initialise(int _job_type)
     }
     else if (type == PROC_TOMO_DENOISE_TOMOGRAM)
     {
-        has_mpi = has_thread = true;
+        has_mpi = has_thread = false;
         initialiseTomoDenoiseTomogramsJob();
     }
 	else if (type == PROC_TOMO_SUBTOMO)
