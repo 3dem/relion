@@ -3066,8 +3066,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine[optics_group], j);
 				if (ires > -1)
 				{
-					thr_wsum_sigma2_noise.data[ires] += (RFLOAT) wdiff2s[sum_offset+j];
-					exp_wsum_norm_correction += (RFLOAT) wdiff2s[sum_offset+j]; //TODO could be gpu-reduced
+					// For multiple images, divide by sp.nr_images!
+                    thr_wsum_sigma2_noise.data[ires] += (RFLOAT) wdiff2s[sum_offset+j]/(RFLOAT)sp.nr_images;
+					exp_wsum_norm_correction += (RFLOAT) wdiff2s[sum_offset+j]/(RFLOAT)sp.nr_images; //TODO could be gpu-reduced
 				}
 			}
 
@@ -3090,10 +3091,12 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
        for (int img_id = 0; img_id < sp.nr_images; img_id++)
         {
             for (unsigned long ires = baseMLO->image_current_size[optics_group] / 2 + 1;
-                 ires < baseMLO->image_full_size[optics_group] / 2 + 1; ires++) {
-                DIRECT_A1D_ELEM(thr_wsum_sigma2_noise, ires) += DIRECT_A1D_ELEM(op.power_img[img_id], ires);
+                 ires < baseMLO->image_full_size[optics_group] / 2 + 1; ires++)
+            {
+                // For multiple images, divide by sp.nr_images!
+                DIRECT_A1D_ELEM(thr_wsum_sigma2_noise, ires) += DIRECT_A1D_ELEM(op.power_img[img_id], ires)/(RFLOAT)sp.nr_images;
                 // Also extend the weighted sum of the norm_correction
-                exp_wsum_norm_correction += DIRECT_A1D_ELEM(op.power_img[img_id], ires);
+                exp_wsum_norm_correction += DIRECT_A1D_ELEM(op.power_img[img_id], ires)/(RFLOAT)sp.nr_images;
             }
         }
 
@@ -3228,9 +3231,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
                 baseMLO->wsum_model.avg_norm_correction += thr_avg_norm_correction;
 
             baseMLO->wsum_model.LL += thr_sum_dLL;
-            // Multiply by exp_nr_images because sumweight above has been summed over all images,
-            // and by this wsum_model.ave_Pmax will be divided in maximizationOtherParameters()..
-            baseMLO->wsum_model.ave_Pmax += sp.nr_images * thr_sum_Pmax;
+            baseMLO->wsum_model.ave_Pmax += thr_sum_Pmax;
 
         } // end pragma lock
 	} // end if !do_skip_maximization
