@@ -4172,7 +4172,7 @@ void MlOptimiser::expectationOneParticle(long int part_id_sorted, int thread_id)
             getAllSquaredDifferences(part_id, ibody, exp_ipass, exp_current_oversampling,
                     metadata_offset, exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max,
                     exp_itrans_min, exp_itrans_max, exp_iclass_min, exp_iclass_max, exp_min_diff2, exp_highres_Xi2_img,
-                    exp_Fimg, exp_Fctf, exp_Mweight, exp_Mcoarse_significant,
+                    exp_Fimg, exp_Fctf, exp_old_offset, exp_Mweight, exp_Mcoarse_significant,
                     exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
                     exp_local_Fimgs_shifted, exp_local_Minvsigma2, exp_local_Fctf, exp_local_sqrtXi2, exp_STMulti);
 
@@ -5625,10 +5625,9 @@ void MlOptimiser::getFourierTransformsAndCtfs(
                 std::cerr << "  old_offset_helix(p1, p2, z) = (" << XX(my_old_offset_helix_coords) << ", " << YY(my_old_offset_helix_coords) << "," << ZZ(my_old_offset_helix_coords) << ")" << std::endl;
             }
 #endif
-        // We do NOT want to accumulate the offsets in the direction along the helix (which is X in the helical coordinate system!)
+        // We do NOT want to accumulate the offsets in the direction along the helix (which is X in the 2D helical coordinate system, and Z in 3D!)
         // However, when doing helical local searches, we accumulate offsets
-        // Do NOT accumulate offsets in 3D classification of helices
-        if (!mydata.is_tomo && (!do_skip_align) && (!do_skip_rotate) )
+        if ( (!do_skip_align) && (!do_skip_rotate) )
         {
             // TODO: check whether the following lines make sense
             bool do_auto_refine_local_searches = (do_auto_refine || do_auto_sampling) && (sampling.healpix_order >= autosampling_hporder_local_searches);
@@ -5692,7 +5691,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
         // For multi-bodies: store only the old refined offset, not the constant consensus offset or the projected COM of this body
         if (mymodel.nr_bodies > 1)
             if (mydata.is_tomo) // no application of my_old_offset for is_tomo!
-                exp_old_offset = my_old_offset - my_projected_com + my_refined_ibody_offset;
+                exp_old_offset = my_old_offset + my_refined_ibody_offset;
             else
                 exp_old_offset = my_refined_ibody_offset;
         else
@@ -5873,17 +5872,9 @@ void MlOptimiser::getFourierTransformsAndCtfs(
             img() *= mymodel.avg_norm_correction / normcorr;
         }
 
-        if (mydata.is_tomo)
-        {
-            // TODO: Need tot take projected 2D shift into account!
-            //  Therefore non-integer shift needs to be done as a FourierTransform phase-shift to prevent another interpolation...
-            //  That's a bit expensive here, but keeps us from changing a lot of code elsewhere...
-            selfTranslateSubtomoStack2D(img(), my_old_offset, part_id, img_id);
-            if (has_converged && do_use_reconstruct_images)
-                selfTranslateSubtomoStack2D(rec_img(), my_old_offset, part_id, img_id);
-
-        }
-        else
+        // Don't pre-shift for subtomo 2D stacks, as those are no longer integer shifts in the projections
+        // Subtomos are re-centered often anyway.
+        if (!mydata.is_tomo)
         {
             selfTranslate(img(), my_old_offset, DONT_WRAP);
             if (has_converged && do_use_reconstruct_images)
@@ -6089,7 +6080,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 
                 if (ctf_premultiplied)
                 {
-                    std::cerr << "ctf_premultiplied! "<<std::endl;
                     FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
                     {
                         DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
@@ -6233,7 +6223,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(
                     }
 
                     // Add the my_old_offset=selfRound(my_old_offset_ori - my_projected_com) already applied to this image for ibody
-                    other_projected_com += my_old_offset;
+                    if (!mydata.is_tomo)
+                        other_projected_com += my_old_offset;
 
 #ifdef DEBUG_BODIES
                     if (part_id == ROUND(debug1))
@@ -6313,13 +6304,16 @@ void MlOptimiser::getFourierTransformsAndCtfs(
             // Subtract the other-body FT from the masked exp_Fimgs
             exp_Fimg[img_id] -= Fsum_obody;
 
-            // 23jul17: NEW: as we haven't applied the (nonROUNDED!!)  my_refined_ibody_offset yet, do this now in the FourierTransform
-            Faux = exp_Fimg[img_id];
-            shiftImageInFourierTransform(Faux, exp_Fimg[img_id], (RFLOAT)image_full_size[optics_group],
-                    XX(my_refined_ibody_offset), YY(my_refined_ibody_offset), (mymodel.data_dim == 3) ? ZZ(my_refined_ibody_offset) : 0.);
-            Faux = exp_Fimg_nomask[img_id];
-            shiftImageInFourierTransform(Faux, exp_Fimg_nomask[img_id], (RFLOAT)image_full_size[optics_group],
-                    XX(my_refined_ibody_offset), YY(my_refined_ibody_offset), (mymodel.data_dim == 3) ? ZZ(my_refined_ibody_offset) : 0.);
+            if (!mydata.is_tomo)
+            {
+                // 23jul17: NEW: as we haven't applied the (nonROUNDED!!)  my_refined_ibody_offset yet, do this now in the FourierTransform
+                Faux = exp_Fimg[img_id];
+                shiftImageInFourierTransform(Faux, exp_Fimg[img_id], (RFLOAT)image_full_size[optics_group],
+                        XX(my_refined_ibody_offset), YY(my_refined_ibody_offset), (mymodel.data_dim == 3) ? ZZ(my_refined_ibody_offset) : 0.);
+                Faux = exp_Fimg_nomask[img_id];
+                shiftImageInFourierTransform(Faux, exp_Fimg_nomask[img_id], (RFLOAT)image_full_size[optics_group],
+                        XX(my_refined_ibody_offset), YY(my_refined_ibody_offset), (mymodel.data_dim == 3) ? ZZ(my_refined_ibody_offset) : 0.);
+            }
 
 #ifdef DEBUG_BODIES
             if (part_id == ROUND(debug1))
@@ -6359,6 +6353,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
         std::vector<MultidimArray<Complex > > &exp_Fimg,
         std::vector<MultidimArray<Complex > > &exp_Fimg_nomask,
         std::vector<MultidimArray<RFLOAT> > &exp_Fctf,
+        Matrix1D<RFLOAT> &exp_old_offset,
         std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted,
         std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted_nomask,
         std::vector<MultidimArray<RFLOAT> >&exp_local_Fctf,
@@ -6585,6 +6580,10 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
                     // For subtomo: convert 3D shifts in the tomogram to 2D shifts in the tilt series images
                     if (mydata.is_tomo)
                     {
+                        // exp_old_offset has not been applied (as it is selfRounded() for 2D images...), so do this now
+                        xshift += XX(exp_old_offset);
+                        yshift += YY(exp_old_offset);
+                        zshift += ZZ(exp_old_offset);
                         mydata.getTranslationInTiltSeries(part_id, img_id, xshift, yshift, zshift, xshift, yshift, zshift);
                     }
 
@@ -6693,6 +6692,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
         std::vector<RFLOAT> &exp_highres_Xi2_img,
         std::vector<MultidimArray<Complex > > &exp_Fimg,
         std::vector<MultidimArray<RFLOAT> > &exp_Fctf,
+        Matrix1D<RFLOAT> &exp_old_offset,
         MultidimArray<RFLOAT> &exp_Mweight,
         MultidimArray<bool> &exp_Mcoarse_significant,
         std::vector<int> &exp_pointer_dir_nonzeroprior, std::vector<int> &exp_pointer_psi_nonzeroprior,
@@ -6742,7 +6742,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
     MultidimArray<RFLOAT> dymmyR;
 
     precalculateShiftedImagesCtfsAndInvSigma2s(false, false, part_id, exp_current_oversampling, metadata_offset,
-            exp_itrans_min, exp_itrans_max, exp_Fimg, dummy, exp_Fctf, exp_local_Fimgs_shifted, dummy2,
+            exp_itrans_min, exp_itrans_max, exp_Fimg, dummy, exp_Fctf, exp_old_offset, exp_local_Fimgs_shifted, dummy2,
             exp_local_Fctf, exp_local_sqrtXi2, exp_local_Minvsigma2, exp_STMulti, dymmyR);
 
     // Loop only from exp_iclass_min to exp_iclass_max to deal with seed generation in first iteration
@@ -6959,9 +6959,16 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                                                 }
 
                                                 // For subtomo: convert 3D shifts in the tomogram to 2D shifts in the tilt series images
-                                                if (mydata.is_tomo) mydata.getTranslationInTiltSeries(part_id, img_id,
-                                                                                                      xshift, yshift, zshift,
-                                                                                                      xshift, yshift, zshift);
+                                                if (mydata.is_tomo)
+                                                {
+                                                    // exp_old_offset was not yet applied for subtomos!
+                                                    xshift += XX(exp_old_offset);
+                                                    yshift += YY(exp_old_offset);
+                                                    zshift += ZZ(exp_old_offset);
+                                                    mydata.getTranslationInTiltSeries(part_id, img_id,
+                                                                                      xshift, yshift, zshift,
+                                                                                      xshift, yshift, zshift);
+                                                }
 
                                                 shiftImageInFourierTransformWithTabSincos(
                                                         exp_local_Fimgs_shifted[img_id][0],
@@ -7243,7 +7250,6 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 
                                             }
 
-                                            /*
                                             if (part_id == 0 && img_id == exp_nr_images-1)
                                             {
                                                 std::cout << " ihidden_over= " << ihidden_over
@@ -7254,7 +7260,6 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                                                 << " psi= " << oversampled_psi[iover_rot]
                                                 << std::endl;
                                             }
-                                             */
 
                                         } // end loop iover_trans
                                     } // end if do_proceed translations
@@ -7849,7 +7854,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 
     // Re-do below because now also want unmasked images AND if (stricht_highres_exp >0.) then may need to resize
     precalculateShiftedImagesCtfsAndInvSigma2s(true, true, part_id, exp_current_oversampling, metadata_offset,
-            exp_itrans_min, exp_itrans_max, exp_Fimg, exp_Fimg_nomask, exp_Fctf, exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask,
+            exp_itrans_min, exp_itrans_max, exp_Fimg, exp_Fimg_nomask, exp_Fctf, exp_old_offset, exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask,
             exp_local_Fctf, exp_local_sqrtXi2, exp_local_Minvsigma2, exp_STMulti, exp_local_STMulti);
 
     // In doThreadPrecalculateShiftedImagesCtfsAndInvSigma2s() the origin of the exp_local_Minvsigma2s was omitted.
@@ -8140,9 +8145,16 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
                                                 }
 
                                                 // For subtomo: convert 3D shifts in the tomogram to 2D shifts in the tilt series images
-                                                if (mydata.is_tomo) mydata.getTranslationInTiltSeries(part_id, img_id,
-                                                                                                      xshift, yshift, zshift,
-                                                                                                      xshift, yshift, zshift);
+                                                if (mydata.is_tomo)
+                                                {
+                                                    // exp_old_offset was not yet applied for subtomos!
+                                                    xshift += XX(exp_old_offset);
+                                                    yshift += YY(exp_old_offset);
+                                                    zshift += ZZ(exp_old_offset);
+                                                    mydata.getTranslationInTiltSeries(part_id, img_id,
+                                                                                      xshift, yshift, zshift,
+                                                                                      xshift, yshift, zshift);
+                                                }
 
                                                 // Fimg_shift
                                                 shiftImageInFourierTransformWithTabSincos(
