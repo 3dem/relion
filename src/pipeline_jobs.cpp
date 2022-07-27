@@ -1586,6 +1586,11 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 	if (joboptions["do_dose_weighting"].getBoolean())
 	{
 		command += " --dose_weighting ";
+		if (joboptions["do_even_odd_split"].getBoolean() && joboptions["do_own_motioncor"].getBoolean())
+		{
+			error_message = "'Dose weighting' is not available with RELION's own implementation of MotionCor when saving images for denoising. You probably do not want to dose weight for tomography anyway.";
+			return false;
+		}
 		if (joboptions["do_save_noDW"].getBoolean())
 		{
 			command += " --save_noDW ";
