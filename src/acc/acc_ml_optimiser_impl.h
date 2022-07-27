@@ -1054,7 +1054,9 @@ void getAllSquaredDifferencesCoarse(
 	allWeights.accAlloc();
 	deviceInitValue<XFLOAT>(allWeights, 0);  // Make sure entire array initialized
 
-	long int allWeights_pos=0;	bool do_CC = (baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc;
+	long int allWeights_pos=0;
+    bool do_CC = (baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc;
+    long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
 
 	for (int img_id = 0; img_id < sp.nr_images; img_id++)
 	{
@@ -1069,7 +1071,6 @@ void getAllSquaredDifferencesCoarse(
 
 		CTIC(accMLO->timer,"translation_1");
 
-		long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
 		// here we introduce offsets for the trans_ and img_ in an array as it is more efficient to
 		// copy one big array to/from GPU rather than four small arrays
 		size_t trans_x_offset = 0*(size_t)translation_num;
@@ -1214,42 +1215,6 @@ void getAllSquaredDifferencesCoarse(
 						do_CC,
 						accMLO->dataIs3D);
 
-                /*
-                     Mweight.cpToHost();
-                     for (int i= 0; i < Mweight.getSize(); i++)
-                         if (Mweight[i]>0.)std::cerr << " Mweight=" << Mweight[i] << std::endl;
-                     allWeights.hostAlloc();
-                     allWeights.cpToHost();
-                      for (int i= 0; i < allWeights.getSize(); i++)
-                         std::cerr << " allWweights-before =" << allWeights[i] << std::endl;
-                     */
-
-                // Only after processing the last image map to Mweights!
-                if (img_id == sp.nr_images-1)
-                {
-                    mapAllWeightsToMweights(
-                            ~projectorPlans[iclass*sp.nr_images + img_id].iorientclasses,
-                            &(~allWeights)[allWeights_pos],
-                            &(~Mweight)[0],
-                            projectorPlans[iclass*sp.nr_images + img_id].orientation_num,
-                            translation_num,
-                            accMLO->classStreams[iclass]
-                            );
-                }
-
-                /*
-                if (img_id == sp.nr_images-1)
-                {
-                    Mweight.hostAlloc();
-                    Mweight.cpToHost();
-                    std::cout <<" COARSE DIFF: Mweight.getSize()= "<<Mweight.getSize()<<std::endl;
-                     for (int i= 0; i < Mweight.getSize(); i++)
-                     {
-                         std::cout << i << " Mweight-after= " << Mweight[i] << std::endl;
-                     }
-                }
-                */
-
             }
 		} // end loop iclass
 
@@ -1260,6 +1225,33 @@ void getAllSquaredDifferencesCoarse(
 	} // end loop img_id
 
     op.min_diff2 = AccUtilities::getMinOnDevice<XFLOAT>(allWeights);
+
+
+    for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
+    {
+        // For this purpose, the projectorPlans for all img_id are ok
+        mapAllWeightsToMweights(~projectorPlans[iclass*sp.nr_images + 0].iorientclasses,
+                                &(~allWeights)[allWeights_pos],
+                                &(~Mweight)[0],
+                                projectorPlans[iclass*sp.nr_images + 0].orientation_num,
+                                translation_num,
+                                accMLO->classStreams[iclass]
+                                );
+
+        /*
+        allWeights.hostAlloc();
+        allWeights.cpToHost();
+        Mweight.hostAlloc();
+        Mweight.cpToHost();
+        std::cerr << " orientation_num= " << projectorPlans[iclass*sp.nr_images + 0].orientation_num << " translation_num= " << translation_num << std::endl;
+        std::cout << "allWeights_pos= " << allWeights_pos << " COARSE DIFF: Mweight.getSize()= "<<Mweight.getSize()<<std::endl;
+        for (int i= 0; i < Mweight.getSize(); i++)
+        {
+            std::cout << i << " Mweight-after= " << Mweight[i] << " allWeights= " << allWeights[i] << std::endl;
+        }
+        */
+
+    }
 
 #ifdef TIMING
 	if (op.part_id == baseMLO->exp_my_first_part_id)
@@ -1774,6 +1766,11 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
         PassWeights.weights.cpToHost();
         DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
+        // This gives the non-reproducible results with oversampling==0 and do_firstiter_cc....
+        //if (exp_ipass==0)
+        //     for (int ihidden = 0; ihidden < XSIZE(op.Mcoarse_significant); ihidden++)
+        //        std::cerr << ihidden << " " << PassWeights.weights[ihidden] <<" " << DIRECT_A1D_ELEM(op.Mweight, ihidden) << " best-idx= " << min_pair.first << " best= " << min_pair.second << std::endl;
+
         //Set all device-located weights to zero, and only the smallest one to 1.
 #ifdef _CUDA_ENABLED
         DEBUG_HANDLE_ERROR(cudaMemsetAsync(~(PassWeights.weights), 0.f, PassWeights.weights.getSize()*sizeof(XFLOAT),0));
@@ -1788,11 +1785,12 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
         PassWeights.weights[min_pair.first] = (XFLOAT)1.0;
 #endif
 
+
         my_significant_weight = 0.999;
         DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_NR_SIGN) = (RFLOAT) 1.;
         if (exp_ipass==0) // TODO better memset, 0 => false , 1 => true
             for (int ihidden = 0; ihidden < XSIZE(op.Mcoarse_significant); ihidden++)
-                if (DIRECT_A1D_ELEM(op.Mweight, ihidden) >= my_significant_weight)
+                if (PassWeights.weights[ihidden] >= my_significant_weight)
                     DIRECT_A1D_ELEM(op.Mcoarse_significant, ihidden) = true;
                 else
                     DIRECT_A1D_ELEM(op.Mcoarse_significant, ihidden) = false;
@@ -3152,7 +3150,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
         RFLOAT dLL;
         if ((baseMLO->iter==1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
-            dLL = -op.min_diff2;
+            dLL = -op.min_diff2/sp.nr_images;
         else
             dLL = log(op.sum_weight) - op.min_diff2 - logsigma2;
 
@@ -3377,6 +3375,11 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_A);
 		//    coarse pass, declared here to keep scope to storeWS
 		ProjectionParams FineProjectionData( baseMLO->mymodel.nr_classes);
 
+        // See commented out print statements in convertAllSquaredDifferences....
+        //if (baseMLO->adaptive_oversampling == 0 && baseMLO->do_firstiter_cc)
+        //    REPORT_ERROR("ERROR; somehow oversampling==0 and firstiter_cc are giving non-reproducible results.... DEBUG later...  (randomly changing with subsequent runs)");
+
+
 		for (int ipass = 0; ipass < nr_sampling_passes; ipass++)
 		{
 			CTIC(timer,"weightPass");
@@ -3413,9 +3416,9 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_B);
 				Mweight.setSize(weightsPerPart);
 				Mweight.setHostPtr(op.Mweight.data);
 				Mweight.deviceAlloc();
-				//deviceInitValue<XFLOAT>(Mweight, -std::numeric_limits<XFLOAT>::max());
+				deviceInitValue<XFLOAT>(Mweight, -std::numeric_limits<XFLOAT>::max());
                 // SHWS 7July2022: not entirely sure about how this works, but as I'm adding to the diff2 for loop over all img_id, this can no longer be a large negative value...
-                deviceInitValue<XFLOAT>(Mweight, 0.);
+                //deviceInitValue<XFLOAT>(Mweight, 0.);
 				Mweight.streamSync();
 
 				CTIC(timer,"getAllSquaredDifferencesCoarse");
