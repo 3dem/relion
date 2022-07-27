@@ -1,1 +1,1 @@
-from .batch import batch_aretomo
+from .cli import aretomo_cli

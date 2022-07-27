@@ -1,6 +1,6 @@
 import numpy as np
 
-from tomography_preprocessing.utils.transformations import Rx, Ry, Rz, S
+from tomography_python_programs.utils.transformations import Rx, Ry, Rz, S
 
 
 def test_single_x_rotation():
@@ -88,7 +88,7 @@ def test_multiple_shift_matrices_3d():
     assert np.allclose(matrices[:, :3, :3], np.eye(3))
 
 
-def test_multiple_shift_matrices_3d():
+def test_multiple_shift_matrices_2d():
     """Generate multiple (4, 4) affine matrices from an array of 2D shift vectors."""
     shifts = np.arange(18).reshape((9, 2))
     matrices = S(shifts)

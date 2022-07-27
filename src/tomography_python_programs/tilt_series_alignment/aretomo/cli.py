@@ -1,29 +1,29 @@
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 import typer
 from rich.console import Console
+from rich.progress import track
 
 from .align_tilt_series import align_single_tilt_series
 from .._cli import cli
-from .._job_utils import create_alignment_job_directory_structure, write_aligned_tilt_series_star_file
+from .._job_utils import write_global_output
 from ... import utils
 from ...utils.relion import relion_pipeline_job
 
 console = Console(record=True)
 
+
 @cli.command(name='AreTomo')
 @relion_pipeline_job
-def batch_aretomo(
+def aretomo_cli(
         tilt_series_star_file: Path = typer.Option(...),
         output_directory: Path = typer.Option(...),
-        do_local_alignments: Optional[bool] = typer.Option(False),
-        n_patches_xy: Optional[Tuple[int, int]] = typer.Option((5,4)),
-        output_resolution: Optional[float] = typer.Option(50),
-        alignment_thickness: Optional[float] = typer.Option(800),
+        sample_thickness_nanometers: float = typer.Option(150),
+        n_patches_xy: Optional[Tuple[int, int]] = typer.Option((None, None)),
+        tilt_angle_offset_correction: bool = typer.Option(False),
         tomogram_name: Optional[str] = typer.Option(None),
-        tilt_angle_offset_correction: Optional[bool] = typer.Option(False),
-        gpu_ids: Optional[str] = typer.Option(None)
+        gpu_ids: Optional[List[int]] = typer.Option(None),
 ):
     """Align one or multiple tilt-series in AreTomo using RELION tilt-series metadata.
 
@@ -31,17 +31,11 @@ def batch_aretomo(
     ----------
     tilt_series_star_file: RELION tilt-series STAR file.
     output_directory: directory in which results will be stored.
-    do_local_alignments: flag to enable/disable local alignments in AreTomo.
     n_patches_xy: number of patches in x and y used in local alignments.
-    output_resolution: resolution for output tilt series in angstroms. Has no bearing on final resolution of tomogram.
-    alignment_thickness: thickness of intermediate reconstructions during alignments in px.
-    tomogram_name: 'rlnTomoName' for a specific tilt-series.
-    tilt_angle_offset_correction: flag to enable/disable stage tilt offset correction (-TiltCor) in AreTomo
-    gpu_ids: string to specify GPUs. GPU identifiers should be separated by colons e.g. 0:1:2:3
-
-    Returns
-    -------
-
+    sample_thickness_nanometers: thickness of intermediate reconstructions in angstroms.
+    tomogram_name: 'rlnTomoName' for a specific tilt-series (optional).
+    tilt_angle_offset_correction: enable/disable stage tilt offset correction (-TiltCor) in AreTomo.
+    gpu_ids: zero-indexed GPU identifiers as integers.
     """
     if not tilt_series_star_file.exists():
         e = 'Could not find tilt series star file'
@@ -56,19 +50,17 @@ def batch_aretomo(
         console.log(f'Aligning {tilt_series_id}...')
         align_single_tilt_series(
             tilt_series_id=tilt_series_id,
-            tilt_series_df=tilt_series_df,
-            tilt_image_df=tilt_image_df,
-            do_local_alignments=do_local_alignments,
-            output_resolution=output_resolution,
+            global_df=tilt_series_df,
+            tilt_series_df=tilt_image_df,
             n_patches_xy=n_patches_xy,
-            alignment_thickness_px=alignment_thickness,
+            sample_thickness_nanometers=sample_thickness_nanometers,
             tilt_angle_offset_correction=tilt_angle_offset_correction,
             gpu_ids=gpu_ids,
             job_directory=output_directory,
         )
     if tomogram_name is None:  # write out STAR file for set of tilt-series
         console.log('Writing aligned_tilt_series.star')
-        write_aligned_tilt_series_star_file(
+        write_global_output(
             original_tilt_series_star_file=tilt_series_star_file,
             job_directory=output_directory
         )

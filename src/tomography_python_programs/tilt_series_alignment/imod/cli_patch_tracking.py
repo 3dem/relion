@@ -4,10 +4,11 @@ from typing import Optional
 import typer
 from yet_another_imod_wrapper import align_tilt_series_using_patch_tracking
 from rich.console import Console
+from rich.progress import track
 
 from .align_tilt_series import align_single_tilt_series
 from .._cli import cli
-from .._job_utils import write_aligned_tilt_series_star_file
+from .._job_utils import write_global_output
 from ... import utils
 from ...utils.relion import relion_pipeline_job
 
@@ -16,7 +17,7 @@ console = Console(record=True)
 
 @cli.command(name='IMOD:patch-tracking')
 @relion_pipeline_job
-def batch_patch_tracking(
+def patch_tracking_cli(
         tilt_series_star_file: Path = typer.Option(...),
         output_directory: Path = typer.Option(...),
         tomogram_name: Optional[str] = typer.Option(None),
@@ -55,9 +56,9 @@ def batch_patch_tracking(
             },
             output_directory=output_directory,
         )
-    if tomogram_name is None:  # write out STAR file for set of tilt-series
+    if tomogram_name is None:  # write global output for set of tilt-series
         console.log('Writing aligned_tilt_series.star')
-        write_aligned_tilt_series_star_file(
+        write_global_output(
             original_tilt_series_star_file=tilt_series_star_file,
             job_directory=output_directory
         )

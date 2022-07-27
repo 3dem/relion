@@ -1,2 +1,2 @@
-from .batch_fiducials import batch_fiducials
-from .batch_patch_tracking import batch_patch_tracking
+from .cli_fiducials import fiducials_cli
+from .cli_patch_tracking import patch_tracking_cli
