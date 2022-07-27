@@ -1079,9 +1079,10 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 		logfile << "Limitted the number of IO threads per movie to " << n_io_threads << " thread(s)." << std::endl;
 	}
 
-	Image<float> Ihead, Igain, Iref;
+	Image<float> Ihead, Igain, Iref, Iref_odd, Iref_even;
 	std::vector<MultidimArray<fComplex> > Fframes;
 	std::vector<Image<float> > Iframes;
+	std::vector<Image<float> > Irefframes;
 	std::vector<int> frames; // 0-indexed
 
 	RFLOAT output_angpix = angpix * bin_factor;
@@ -1119,6 +1120,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 
 	const int n_frames = frames.size();
 	Iframes.resize(n_frames);
+	Irefframes.resize(n_frames);
 	Fframes.resize(n_frames);
 
 	std::vector<RFLOAT> xshifts(n_frames), yshifts(n_frames);
@@ -1458,6 +1460,8 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
         }
 
 	Iref().reshape(ny, nx);
+	Iref_even().reshape(ny, nx);
+	Iref_odd().reshape(ny, nx);
 	Iref().initZeros();
 	RCTIC(TIMING_GLOBAL_IFFT);
 	#pragma omp parallel for num_threads(n_threads)
@@ -1676,10 +1680,16 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 skip_fitting:
 	if (!do_dose_weighting || save_noDW) {
 		Iref().initZeros(Iframes[0]());
+		Iref_odd().initZeros(Iframes[0]());
+		Iref_even().initZeros(Iframes[0]());
+
+		for (int iframe = 0; iframe < n_frames; iframe++){
+			Irefframes[iframe]().initZeros(Iframes[iframe]());	
+		}
 
 		RCTIC(TIMING_REAL_SPACE_INTERPOLATION);
 		logfile << "Summing frames before dose weighting: ";
-		realSpaceInterpolation(Iref, Iframes, mic.model, logfile);
+		realSpaceInterpolation_withoutsum(Irefframes, Iframes, mic.model, logfile);
 		logfile << " done" << std::endl;
 		RCTOC(TIMING_REAL_SPACE_INTERPOLATION);
 
@@ -1689,11 +1699,49 @@ skip_fitting:
 			binNonSquareImage(Iref, bin_factor);
 		}
 		RCTOC(TIMING_BINNING);
+		
+		// Sum frames and save aligned stack
+		for (int iframe = 0; iframe < n_frames; iframe++)
+		{
+		#pragma omp parallel for num_threads(n_threads)
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iref()) {
+			DIRECT_MULTIDIM_ELEM(Iref(), n) += DIRECT_MULTIDIM_ELEM(Irefframes[iframe](), n);
+			}
+
+		// save odd even aligned stack
+		if (even_odd_split)
+		{
+		if ( iframe % 2 == 0)
+		{
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iref_even()) {
+			DIRECT_MULTIDIM_ELEM(Iref_even(), n) += DIRECT_MULTIDIM_ELEM(Irefframes[iframe](), n);			
+		}
+		}
+		else
+		{
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iref_odd()) {
+			DIRECT_MULTIDIM_ELEM(Iref_odd(), n) += DIRECT_MULTIDIM_ELEM(Irefframes[iframe](), n);			
+
+		}
+		}
+		}
+		}
 
 		// Final output
                 Iref.setSamplingRateInHeader(output_angpix, output_angpix);
 		Iref.write(!do_dose_weighting ? fn_avg : fn_avg_noDW, -1, false, WRITE_OVERWRITE, write_float16 ? Float16: Float);
 		logfile << "Written aligned but non-dose weighted sum to " << (!do_dose_weighting ? fn_avg : fn_avg_noDW) << std::endl;
+		// ODD-EVEN Output
+		if (even_odd_split)
+		{
+		Iref_odd.setSamplingRateInHeader(output_angpix, output_angpix);
+		Iref_even.setSamplingRateInHeader(output_angpix, output_angpix);
+
+		Iref_odd.write(fn_avg.withoutExtension() + "_ODD.mrc");
+		Iref_even.write(fn_avg.withoutExtension() + "_EVN.mrc");
+		logfile << "Written aligned but non-dose weighted sum of odd frames to " << (fn_avg.withoutExtension() + "_ODD.mrc") << std::endl;
+		logfile << "Written aligned but non-dose weighted sum of even frames to " << (fn_avg.withoutExtension() + "_EVN.mrc") << std::endl;
+		}
 	}
 
 	// Dose weighting
@@ -1786,6 +1834,186 @@ void MotioncorrRunner::interpolateShifts(std::vector<int> &group_start, std::vec
 #ifdef DEBUG_OWN
 		std::cout << "iframe = " << iframe << " igroup " << cur_group << " x " << interpolated_xshifts[iframe] << " y " << interpolated_yshifts[iframe] << std::endl;
 #endif
+	}
+}
+
+void MotioncorrRunner::realSpaceInterpolation_withoutsum(std::vector<Image<float> > &Ialignedframes, std::vector<Image<float> > &Iframes, MotionModel *model, std::ostream &logfile) {
+	int model_version = MOTION_MODEL_NULL;
+	if (model != NULL) {
+		model_version = model->getModelVersion();
+	}
+
+	const int n_frames = Iframes.size();
+	if (model_version == MOTION_MODEL_NULL) {
+		// Simple sum
+		for (int iframe = 0; iframe < n_frames; iframe++) {
+			logfile << "." << std::flush;
+
+			#pragma omp parallel for num_threads(n_threads)
+//			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum()) {
+//				DIRECT_MULTIDIM_ELEM(Isum(), n) += DIRECT_MULTIDIM_ELEM(Iframes[iframe](), n);
+//			}
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Ialignedframes[iframe]()) {
+				DIRECT_MULTIDIM_ELEM(Ialignedframes[iframe](), n) += DIRECT_MULTIDIM_ELEM(Iframes[iframe](), n);
+			}
+		}
+	} else if (model_version == MOTION_MODEL_THIRD_ORDER_POLYNOMIAL) { // Optimised code
+		ThirdOrderPolynomialModel *polynomial_model = (ThirdOrderPolynomialModel*)model;
+		realSpaceInterpolation_ThirdOrderPolynomial_withoutsum(Ialignedframes, Iframes, *polynomial_model, logfile);
+	} else { // general code
+		const int nx = XSIZE(Iframes[0]()), ny = YSIZE(Iframes[0]());
+		for (int iframe = 0; iframe < n_frames; iframe++) {
+			logfile << "." << std::flush;
+			const RFLOAT z = iframe;
+
+			#pragma omp parallel for num_threads(n_threads)
+			for (int iy = 0; iy < ny; iy++) {
+				const RFLOAT y = (RFLOAT)iy / ny - 0.5;
+				for (int ix = 0; ix < nx; ix++) {
+					const RFLOAT x = (RFLOAT)ix / nx - 0.5;
+					bool valid = true;
+
+					RFLOAT x_fitted, y_fitted;
+					model->getShiftAt(z, x, y, x_fitted, y_fitted);
+					x_fitted = ix - x_fitted; y_fitted = iy - y_fitted;
+
+					int x0 = FLOOR(x_fitted);
+					int y0 = FLOOR(y_fitted);
+					const int x1 = x0 + 1;
+					const int y1 = y0 + 1;
+
+					// some conditions might seem redundant but necessary when overflow happened
+					if (x0 < 0 || x1 < 0) {x0 = 0; valid = false;}
+					if (y0 < 0 || y1 < 0) {y0 = 0; valid = false;}
+					if (x1 >= nx || x0 >= nx - 1) {x0 = nx - 1; valid = false;}
+					if (y1 >= ny || y1 >= ny - 1) {y0 = ny - 1; valid = false;}
+					if (!valid) {
+/*						DIRECT_A2D_ELEM(Isum(), iy, ix) += DIRECT_A2D_ELEM(Iframes[iframe](), y0, x0);
+						if (std::isnan(DIRECT_A2D_ELEM(Isum(), iy, ix))) {
+							std::cerr << "ix = " << ix << " xfit = " << x_fitted << " iy = " << iy << " ifit = " << y_fitted << std::endl;
+						}
+*/						DIRECT_A2D_ELEM(Ialignedframes[iframe](), iy, ix) += DIRECT_A2D_ELEM(Iframes[iframe](), y0, x0);
+						if (std::isnan(DIRECT_A2D_ELEM(Ialignedframes[iframe](), iy, ix))) {
+							std::cerr << "ix = " << ix << " xfit = " << x_fitted << " iy = " << iy << " ifit = " << y_fitted << std::endl;
+						}
+
+						continue;
+					}
+
+					const RFLOAT fx = x_fitted - x0;
+					const RFLOAT fy = y_fitted - y0;
+
+					const RFLOAT d00 = DIRECT_A2D_ELEM(Iframes[iframe](), y0, x0);
+					const RFLOAT d01 = DIRECT_A2D_ELEM(Iframes[iframe](), y0, x1);
+					const RFLOAT d10 = DIRECT_A2D_ELEM(Iframes[iframe](), y1, x0);
+					const RFLOAT d11 = DIRECT_A2D_ELEM(Iframes[iframe](), y1, x1);
+
+					const RFLOAT dx0 = LIN_INTERP(fx, d00, d01);
+					const RFLOAT dx1 = LIN_INTERP(fx, d10, d11);
+					const RFLOAT val = LIN_INTERP(fy, dx0, dx1);
+#ifdef DEBUG_OWN
+					if (std::isnan(val)) {
+						std::cerr << "ix = " << ix << " xfit = " << x_fitted << " iy = " << iy << " ifit = " << y_fitted << " d00 " << d00 << " d01 " << d01 << " d10 " << d10 << " d11 " << d11 << " dx0 " << dx0 << " dx1 " << dx1 << std::endl;
+					}
+#endif
+					//DIRECT_A2D_ELEM(Isum(), iy, ix) += val;
+					DIRECT_A2D_ELEM(Ialignedframes[iframe](), iy, ix) += val;
+				} // y
+			} // x
+		} // frame
+	} // general model
+}
+
+void MotioncorrRunner::realSpaceInterpolation_ThirdOrderPolynomial_withoutsum(std::vector<Image<float> > &Ialignedframes, std::vector<Image<float> > &Iframes, ThirdOrderPolynomialModel &model, std::ostream &logfile) {
+	const int n_frames = Iframes.size();
+	const int nx = XSIZE(Iframes[0]()), ny = YSIZE(Iframes[0]());
+	const Matrix1D<RFLOAT> coeffX = model.coeffX, coeffY = model.coeffY;
+
+	for (int iframe = 0; iframe < n_frames; iframe++) {
+		logfile << "." << std::flush;
+
+		const RFLOAT z = iframe, z2 = iframe * iframe;
+		const RFLOAT z3 = z * z2;
+		// Common terms
+		const RFLOAT x_C0 = coeffX(0)  * z + coeffX(1)  * z2 + coeffX(2)  * z3;
+		const RFLOAT x_C1 = coeffX(3)  * z + coeffX(4)  * z2 + coeffX(5)  * z3;
+		const RFLOAT x_C2 = coeffX(6)  * z + coeffX(7)  * z2 + coeffX(8)  * z3;
+		const RFLOAT x_C3 = coeffX(9)  * z + coeffX(10) * z2 + coeffX(11) * z3;
+		const RFLOAT x_C4 = coeffX(12) * z + coeffX(13) * z2 + coeffX(14) * z3;
+		const RFLOAT x_C5 = coeffX(15) * z + coeffX(16) * z2 + coeffX(17) * z3;
+		const RFLOAT y_C0 = coeffY(0)  * z + coeffY(1)  * z2 + coeffY(2)  * z3;
+		const RFLOAT y_C1 = coeffY(3)  * z + coeffY(4)  * z2 + coeffY(5)  * z3;
+		const RFLOAT y_C2 = coeffY(6)  * z + coeffY(7)  * z2 + coeffY(8)  * z3;
+		const RFLOAT y_C3 = coeffY(9)  * z + coeffY(10) * z2 + coeffY(11) * z3;
+		const RFLOAT y_C4 = coeffY(12) * z + coeffY(13) * z2 + coeffY(14) * z3;
+		const RFLOAT y_C5 = coeffY(15) * z + coeffY(16) * z2 + coeffY(17) * z3;
+
+		#pragma omp parallel for num_threads(n_threads)
+		for (int iy = 0; iy < ny; iy++) {
+			const RFLOAT y = (RFLOAT)iy / ny - 0.5;
+			for (int ix = 0; ix < nx; ix++) {
+				const RFLOAT x = (RFLOAT)ix / nx - 0.5;
+				bool valid = true;
+
+				RFLOAT x_fitted = x_C0 + (x_C1 + x_C2 * x) * x + (x_C3 + x_C4 * y + x_C5 * x) * y;
+				RFLOAT y_fitted = y_C0 + (y_C1 + y_C2 * x) * x + (y_C3 + y_C4 * y + y_C5 * x) * y;
+
+#ifdef VALIDATE_OPTIMISED_CODE
+				RFLOAT x_fitted2, y_fitted2;
+				model.getShiftAt(z, x, y, x_fitted2, y_fitted2);
+				if (abs(x_fitted - x_fitted2) > 1E-4 || abs(y_fitted - y_fitted2) > 1E-4) {
+					std::cout << "error at " << x << ", " << y << " : " << x_fitted << " " << x_fitted2 << " " << y_fitted << " " << y_fitted2 << std::endl;
+				}
+#endif
+				x_fitted = ix - x_fitted; y_fitted = iy - y_fitted;
+
+				int x0 = FLOOR(x_fitted);
+				int y0 = FLOOR(y_fitted);
+				const int x1 = x0 + 1;
+				const int y1 = y0 + 1;
+
+				// some conditions might seem redundant but necessary when overflow happened
+				if (x0 < 0 || x1 < 0) {x0 = 0; valid = false;}
+				if (y0 < 0 || y1 < 0) {y0 = 0; valid = false;}
+				if (x1 >= nx || x0 >= nx - 1) {x0 = nx - 1; valid = false;}
+				if (y1 >= ny || y0 >= ny - 1) {y0 = ny - 1; valid = false;}
+				if (!valid) {
+/*					DIRECT_A2D_ELEM(Isum(), iy, ix) += DIRECT_A2D_ELEM(Iframes[iframe](), y0, x0);
+#ifdef DEBUG_OWN
+					if (std::isnan(DIRECT_A2D_ELEM(Isum(), iy, ix))) {
+						std::cerr << "ix = " << ix << " xfit = " << x_fitted << " iy = " << iy << " ifit = " << y_fitted << std::endl;
+					}
+#endif
+*/					DIRECT_A2D_ELEM(Ialignedframes[iframe](), iy, ix) += DIRECT_A2D_ELEM(Iframes[iframe](), y0, x0);
+#ifdef DEBUG_OWN
+					if (std::isnan(DIRECT_A2D_ELEM(Ialignedframes[iframe](), iy, ix))) {
+						std::cerr << "ix = " << ix << " xfit = " << x_fitted << " iy = " << iy << " ifit = " << y_fitted << std::endl;
+					}
+#endif
+					continue;
+				}
+
+				const RFLOAT fx = x_fitted - x0;
+				const RFLOAT fy = y_fitted - y0;
+
+//				std::cout << "ix = " << ix << " xfit = " << x_fitted << " iy = " << iy << " ifit = " << y_fitted << std::endl;
+				const RFLOAT d00 = DIRECT_A2D_ELEM(Iframes[iframe](), y0, x0);
+				const RFLOAT d01 = DIRECT_A2D_ELEM(Iframes[iframe](), y0, x1);
+				const RFLOAT d10 = DIRECT_A2D_ELEM(Iframes[iframe](), y1, x0);
+				const RFLOAT d11 = DIRECT_A2D_ELEM(Iframes[iframe](), y1, x1);
+
+				const RFLOAT dx0 = LIN_INTERP(fx, d00, d01);
+				const RFLOAT dx1 = LIN_INTERP(fx, d10, d11);
+				const RFLOAT val = LIN_INTERP(fy, dx0, dx1);
+#ifdef DEBUG_OWN
+				if (std::isnan(val)) {
+					std::cerr << "ix = " << ix << " xfit = " << x_fitted << " iy = " << iy << " ifit = " << y_fitted << " d00 " << d00 << " d01 " << d01 << " d10 " << d10 << " d11 " << d11 << " dx0 " << dx0 << " dx1 " << dx1 << std::endl;
+				}
+#endif
+				//DIRECT_A2D_ELEM(Isum(), iy, ix) += val;
+				DIRECT_A2D_ELEM(Ialignedframes[iframe](), iy, ix) += val;
+			}
+		}
 	}
 }
 
