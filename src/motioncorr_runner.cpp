@@ -334,11 +334,22 @@ void MotioncorrRunner::initialise()
 
 		if (continue_old)
 		{
-			FileName fn_avg = getOutputFileNames(fn_mic_given_all[imic]);
-			if (exists(fn_avg) && exists(fn_avg.withoutExtension() + ".star") &&
-                            (grouping_for_ps <= 0 || exists(fn_avg.withoutExtension() + "_PS.mrc")))
+			if (even_odd_split)
 			{
-				process_this = false; // already done
+				FileName fn_avg = getOutputFileNames(fn_mic_given_all[imic],true);
+				if (exists(fn_avg))
+				{
+			    		process_this = false; // already done
+				}
+			}
+			else
+			{
+				FileName fn_avg = getOutputFileNames(fn_mic_given_all[imic]);
+				if (exists(fn_avg) && exists(fn_avg.withoutExtension() + ".star") &&
+                            (grouping_for_ps <= 0 || exists(fn_avg.withoutExtension() + "_PS.mrc")))
+				{
+					process_this = false; // already done
+				}
 			}
 		}
 
@@ -449,7 +460,7 @@ void MotioncorrRunner::prepareGainReference(bool write_gain)
 	fn_gain_reference =fn_new_gain;
 }
 
-FileName MotioncorrRunner::getOutputFileNames(FileName fn_mic)
+FileName MotioncorrRunner::getOutputFileNames(FileName fn_mic, bool continue_even_odd)
 {
 	// If there are any dots in the filename, replace them by underscores
 	FileName fn_root = fn_mic.withoutExtension();
@@ -462,7 +473,7 @@ FileName MotioncorrRunner::getOutputFileNames(FileName fn_mic)
 			break;
 		fn_root.replace(pos, 1, "_");
 	}
-	if (even_odd_split)
+	if (continue_even_odd)
 	{
 		return fn_out + fn_root + "_EVN.mrc";
 	}
