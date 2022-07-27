@@ -107,6 +107,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	group = textToInteger(parser.getOption("--group_frames", "Average together this many frames before calculating the beam-induced shifts", "1"));
 	fn_defect = parser.getOption("--defect_file","Location of a MOTIONCOR2-style detector defect file (x y w h) or a defect map (1 means bad)", "");
 	fn_archive = parser.getOption("--archive","Location of the directory for archiving movies in 4-byte MRC format","");
+ 	even_odd_split = parser.checkOption("--even_odd_split", "Generate two images summed from odd and even movie frames. Later used for denoising in tomography.");
 	fn_other_motioncor2_args = parser.getOption("--other_motioncor2_args", "Additional arguments to MOTIONCOR2", "");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread, e.g 0:1:2:3", "");
 
@@ -199,6 +200,7 @@ void MotioncorrRunner::initialise()
 	}
 	else if (do_own)
 	{
+
 		if (patch_x <= 0 || patch_y <= 0) {
 			REPORT_ERROR("The number of patches must be a positive integer.");
 		}
@@ -596,7 +598,12 @@ bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, int rank)
 		else
 			command += " -DefectMap " + fn_defect;
 	}
-
+	
+	if (even_odd_split)
+	{
+		command += " -SplitSum 1 ";
+	}
+	
 	if (fn_archive != "")
 		command += " -ArcDir " + fn_archive;
 
@@ -880,11 +887,19 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 			{
 				MDavg.setValue(EMDL_CTF_POWER_SPECTRUM, fn_avg.withoutExtension() + "_PS.mrc");
 			}
-			if (is_tomo)
-            {
-                MDavg.setValue(EMDL_MICROGRAPH_PRE_EXPOSURE, pre_exposure_micrographs[imic]);
-            }
-            MDavg.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
+		if (is_tomo)
+        	{
+			if (even_odd_split)
+			{
+				FileName even_micrograph = fn_avg.withoutExtension() + "_EVN.mrc";
+				FileName odd_micrograph = fn_avg.withoutExtension() + "_ODD.mrc";
+				MDavg.setValue(EMDL_MICROGRAPH_EVEN, even_micrograph); 
+				MDavg.setValue(EMDL_MICROGRAPH_ODD, odd_micrograph);
+			}
+			MDavg.setValue(EMDL_MICROGRAPH_PRE_EXPOSURE, pre_exposure_micrographs[imic]);
+
+        	}
+                MDavg.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
 			MDavg.setValue(EMDL_MICROGRAPH_METADATA_NAME, fn_avg.withoutExtension() + ".star");
 			MDavg.setValue(EMDL_IMAGE_OPTICS_GROUP, optics_group_ori_micrographs[imic]);
 			FileName fn_star = fn_avg.withoutExtension() + ".star";

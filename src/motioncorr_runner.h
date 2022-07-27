@@ -150,7 +150,10 @@ public:
 
 	// Process at most this number of (unprocessed) micrographs
 	long do_at_most;
-
+	
+	// Save sums of movies from even and odd frames for denoising
+	bool even_odd_split;
+	
 	// EER parameters
 	int eer_upsampling, eer_grouping;
 
