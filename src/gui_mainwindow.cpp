@@ -443,6 +443,13 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
         browse_grp[nr_browse_tabs]->end();
         nr_browse_tabs++;
 
+	browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+        browser->add("Denoise tomograms");
+        gui_jobwindows[nr_browse_tabs] = new JobWindow();
+        gui_jobwindows[nr_browse_tabs]->initialise(PROC_TOMO_DENOISE_TOMOGRAM);
+        browse_grp[nr_browse_tabs]->end();
+        nr_browse_tabs++;
+	
         browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 		browser->add("Make pseudo-subtomos");
 		gui_jobwindows[nr_browse_tabs] = new JobWindow();
