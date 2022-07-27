@@ -829,7 +829,7 @@ void mapAllWeightsToMweights(
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 #else
 	for (size_t i=0; i < combinations; i++)
-		d_mweights[d_iorient[i/translation_num] * translation_num + i%translation_num] +=
+		d_mweights[d_iorient[i/translation_num] * translation_num + i%translation_num] =
 			d_allweights[i/translation_num * translation_num + i%translation_num];
 			// TODO - isn't this just d_allweights[idx + idx%translation_num]?   Really?
 #endif

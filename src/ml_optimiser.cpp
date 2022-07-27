@@ -7250,6 +7250,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 
                                             }
 
+                                            /*
                                             if (part_id == 0 && img_id == exp_nr_images-1)
                                             {
                                                 std::cout << " ihidden_over= " << ihidden_over
@@ -7260,6 +7261,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                                                 << " psi= " << oversampled_psi[iover_rot]
                                                 << std::endl;
                                             }
+                                            */
 
                                         } // end loop iover_trans
                                     } // end if do_proceed translations
@@ -7731,7 +7733,6 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
         if (frac_weight > adaptive_fraction * exp_sum_weight)
             break;
     }
-
 
 #ifdef DEBUG_SORT
     // Check sorted array is really sorted

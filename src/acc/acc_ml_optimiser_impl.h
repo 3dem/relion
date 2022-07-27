@@ -952,7 +952,7 @@ void getAllSquaredDifferencesCoarse(
 	std::vector<std::vector<MultidimArray<Complex > > > dummy2;
 	MultidimArray<RFLOAT> dummyRF;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, false, op.part_id, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
-			sp.itrans_min, sp.itrans_max, op.Fimg, dummy, op.Fctf, dummy2, dummy2,
+			sp.itrans_min, sp.itrans_max, op.Fimg, dummy, op.Fctf, op.old_offset, dummy2, dummy2,
 			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2, op.FstMulti, dummyRF);
 
 	CTOC(accMLO->timer,"diff_pre_gpu");
@@ -1110,6 +1110,10 @@ void getAllSquaredDifferencesCoarse(
 
             if (op.is_tomo)
             {
+                // op.old_offset was not yet applied for subtomos!
+                xshift += XX(op.old_offset);
+                yshift += YY(op.old_offset);
+                zshift += ZZ(op.old_offset);
                 baseMLO->mydata.getTranslationInTiltSeries(op.part_id, img_id,
                                                            xshift, yshift, zshift,
                                                            xshift, yshift, zshift);
@@ -1220,26 +1224,32 @@ void getAllSquaredDifferencesCoarse(
                          std::cerr << " allWweights-before =" << allWeights[i] << std::endl;
                      */
 
-                mapAllWeightsToMweights(
-						~projectorPlans[iclass*sp.nr_images + img_id].iorientclasses,
-						&(~allWeights)[allWeights_pos],
-						&(~Mweight)[0],
-						projectorPlans[iclass*sp.nr_images + img_id].orientation_num,
-						translation_num,
-						accMLO->classStreams[iclass]
-						);
+                // Only after processing the last image map to Mweights!
+                if (img_id == sp.nr_images-1)
+                {
+                    mapAllWeightsToMweights(
+                            ~projectorPlans[iclass*sp.nr_images + img_id].iorientclasses,
+                            &(~allWeights)[allWeights_pos],
+                            &(~Mweight)[0],
+                            projectorPlans[iclass*sp.nr_images + img_id].orientation_num,
+                            translation_num,
+                            accMLO->classStreams[iclass]
+                            );
+                }
 
                 /*
                 if (img_id == sp.nr_images-1)
                 {
-                    allWeights.hostAlloc();
-                    allWeights.cpToHost();
-                    std::cerr <<" allWeights.getSize()= "<<allWeights.getSize()<<std::endl;
-                     for (int i= 0; i < allWeights.getSize(); i++)
-                        std::cerr << i << " allWweights-after =" << allWeights[i] << std::endl;
-                      exit(1);
+                    Mweight.hostAlloc();
+                    Mweight.cpToHost();
+                    std::cout <<" COARSE DIFF: Mweight.getSize()= "<<Mweight.getSize()<<std::endl;
+                     for (int i= 0; i < Mweight.getSize(); i++)
+                     {
+                         std::cout << i << " Mweight-after= " << Mweight[i] << std::endl;
+                     }
                 }
-                 */
+                */
+
             }
 		} // end loop iclass
 
@@ -1287,7 +1297,7 @@ void getAllSquaredDifferencesFine(
 	std::vector<std::vector<MultidimArray<Complex > > > dummy2;
 	MultidimArray<RFLOAT> dummyRF;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, false, op.part_id, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
-			sp.itrans_min, sp.itrans_max, op.Fimg, dummy, op.Fctf, dummy2, dummy2,
+			sp.itrans_min, sp.itrans_max, op.Fimg, dummy, op.Fctf, op.old_offset, dummy2, dummy2,
 			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2, op.FstMulti, dummyRF);
 	CTOC(accMLO->timer,"precalculateShiftedImagesCtfsAndInvSigma2s");
 
@@ -1367,6 +1377,10 @@ void getAllSquaredDifferencesFine(
 
                 if (op.is_tomo)
                 {
+                    // op.old_offset was not yet applied for subtomos!
+                    xshift += XX(op.old_offset);
+                    yshift += YY(op.old_offset);
+                    zshift += ZZ(op.old_offset);
                     baseMLO->mydata.getTranslationInTiltSeries(op.part_id, img_id,
                                                                xshift, yshift, zshift,
                                                                xshift, yshift, zshift);
@@ -1487,7 +1501,6 @@ void getAllSquaredDifferencesFine(
                                                        FinePassWeights,
                                                        FPCMasks[exp_iclass],   // ..and output into index-arrays mask...
                                                        chunkSize);                    // ..based on a given maximum chunk-size
-
 
                 // extend size by number of significants found this class
                 newDataSize += significant_num;
@@ -2222,7 +2235,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	bool do_subtomo_correction = NZYXSIZE(op.FstMulti) > 0;
 
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, true, op.part_id, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
-			sp.itrans_min, sp.itrans_max, op.Fimg, op.Fimg_nomask, op.Fctf, dummy2, dummy2,
+			sp.itrans_min, sp.itrans_max, op.Fimg, op.Fimg_nomask, op.Fctf, op.old_offset, dummy2, dummy2,
 			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2, op.FstMulti, exp_local_STMulti);
 
 	// In doThreadPrecalculateShiftedImagesCtfsAndInvSigma2s() the origin of the op.local_Minvsigma2s was omitted.
@@ -2616,7 +2629,18 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
                                                            (accMLO->shiftsIs3D) ? (3) : (2), HELICAL_TO_CART_COORDS);
 					}
 
-					trans_xyz[trans_x_offset+j] = -2 * PI * xshift / (double)baseMLO->image_full_size[optics_group];
+                    if (op.is_tomo)
+                    {
+                        // op.old_offset was not yet applied for subtomos!
+                        xshift += XX(op.old_offset);
+                        yshift += YY(op.old_offset);
+                        zshift += ZZ(op.old_offset);
+                        baseMLO->mydata.getTranslationInTiltSeries(op.part_id, img_id,
+                                                                   xshift, yshift, zshift,
+                                                                   xshift, yshift, zshift);
+                    }
+
+                    trans_xyz[trans_x_offset+j] = -2 * PI * xshift / (double)baseMLO->image_full_size[optics_group];
 					trans_xyz[trans_y_offset+j] = -2 * PI * yshift / (double)baseMLO->image_full_size[optics_group];
 					trans_xyz[trans_z_offset+j] = -2 * PI * zshift / (double)baseMLO->image_full_size[optics_group];
 					j ++;
