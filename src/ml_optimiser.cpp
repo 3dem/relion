@@ -7007,7 +7007,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                                                 }
                                                 // Normalised cross-correlation coefficient: divide by power of reference (power of image is a constant)
                                                 // For multi-images, also divide by nr_images to calculate average CCF over all images
-                                                diff2 /= exp_nr_images * sqrt(suma2) * exp_local_sqrtXi2[img_id];
+                                                diff2 /= sqrt(suma2) * exp_local_sqrtXi2[img_id];
 
                                             }
                                             else
@@ -8615,7 +8615,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
     }
     RFLOAT dLL;
     if ((iter==1 && do_firstiter_cc) || do_always_cc)
-        dLL = -exp_min_diff2;
+        dLL = -exp_min_diff2/exp_nr_images;
     else
         dLL = log(exp_sum_weight) - exp_min_diff2 - logsigma2;
 
