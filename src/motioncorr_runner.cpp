@@ -1754,8 +1754,8 @@ skip_fitting:
 		Iref_odd.setSamplingRateInHeader(output_angpix, output_angpix);
 		Iref_even.setSamplingRateInHeader(output_angpix, output_angpix);
 
-		Iref_odd.write(fn_avg.withoutExtension() + "_ODD.mrc");
-		Iref_even.write(fn_avg.withoutExtension() + "_EVN.mrc");
+		Iref_odd.write(fn_avg.withoutExtension() + "_ODD.mrc", -1, false, WRITE_OVERWRITE, write_float16 ? Float16: Float);
+		Iref_even.write(fn_avg.withoutExtension() + "_EVN.mrc", -1, false, WRITE_OVERWRITE, write_float16 ? Float16: Float);
 		logfile << "Written aligned but non-dose weighted sum of odd frames to " << (fn_avg.withoutExtension() + "_ODD.mrc") << std::endl;
 		logfile << "Written aligned but non-dose weighted sum of even frames to " << (fn_avg.withoutExtension() + "_EVN.mrc") << std::endl;
 		}
