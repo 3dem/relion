@@ -224,6 +224,10 @@ private:
 	void realSpaceInterpolation(Image <float> &Isum, std::vector<Image<float> > &Iframes, MotionModel *model, std::ostream &logfile);
 
 	void realSpaceInterpolation_ThirdOrderPolynomial(Image <float> &Isum, std::vector<Image<float> > &Iframes, ThirdOrderPolynomialModel &model, std::ostream &logfile);
+	
+	void realSpaceInterpolation_withoutsum(std::vector<Image<float> > &Ialignedframes, std::vector<Image<float> > &Iframes, MotionModel *model, std::ostream &logfile);
+
+	void realSpaceInterpolation_ThirdOrderPolynomial_withoutsum(std::vector<Image<float> > &Ialignedframes, std::vector<Image<float> > &Iframes, ThirdOrderPolynomialModel &model, std::ostream &logfile);
 
 	void interpolateShifts(std::vector<int> &group_start, std::vector<int> &group_size,
 	                       std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts,
