@@ -12,17 +12,14 @@ from ..utils.transformations import S, Rx, Ry, Rz
 from ._cli import cli
 
 
-def create_alignment_job_directory_structure(output_directory: Path) -> Tuple[Path, Path, Path]:
+def create_alignment_job_directory_structure(output_directory: Path) -> Tuple[Path, Path]:
     """Create directory structure for a tilt-series alignment job."""
-    stacks_directory = output_directory / 'stacks'
-    stacks_directory.mkdir(parents=True, exist_ok=True)
-
     external_directory = output_directory / 'external'
     external_directory.mkdir(parents=True, exist_ok=True)
 
     metadata_directory = output_directory / 'tilt_series'
     metadata_directory.mkdir(parents=True, exist_ok=True)
-    return stacks_directory, external_directory, metadata_directory
+    return external_directory, metadata_directory
 
 
 def tilt_series_alignment_parameters_to_relion_projection_matrices(

@@ -34,7 +34,7 @@ def align_single_tilt_series(
     console = Console(record=True)
 
     # Create output directory structure
-    stack_directory, external_directory, metadata_directory = \
+    external_directory, metadata_directory = \
         create_alignment_job_directory_structure(output_directory)
     imod_directory = external_directory / tilt_series_id
     imod_directory.mkdir(parents=True, exist_ok=True)

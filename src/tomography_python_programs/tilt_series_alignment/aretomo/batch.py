@@ -12,7 +12,6 @@ from ...utils.relion import relion_pipeline_job
 
 console = Console(record=True)
 
-
 @cli.command(name='AreTomo')
 @relion_pipeline_job
 def batch_aretomo(
@@ -20,7 +19,7 @@ def batch_aretomo(
         output_directory: Path = typer.Option(...),
         do_local_alignments: Optional[bool] = typer.Option(False),
         n_patches_xy: Optional[Tuple[int, int]] = typer.Option((5,4)),
-        alignment_resolution: Optional[float] = typer.Option(10),
+        output_resolution: Optional[float] = typer.Option(50),
         alignment_thickness: Optional[float] = typer.Option(800),
         tomogram_name: Optional[str] = typer.Option(None),
         tilt_angle_offset_correction: Optional[bool] = typer.Option(False),
@@ -34,7 +33,7 @@ def batch_aretomo(
     output_directory: directory in which results will be stored.
     do_local_alignments: flag to enable/disable local alignments in AreTomo.
     n_patches_xy: number of patches in x and y used in local alignments.
-    alignment_resolution: resolution for intermediate alignments.
+    output_resolution: resolution for output tilt series in angstroms. Has no bearing on final resolution of tomogram.
     alignment_thickness: thickness of intermediate reconstructions during alignments in px.
     tomogram_name: 'rlnTomoName' for a specific tilt-series.
     tilt_angle_offset_correction: flag to enable/disable stage tilt offset correction (-TiltCor) in AreTomo
@@ -60,7 +59,7 @@ def batch_aretomo(
             tilt_series_df=tilt_series_df,
             tilt_image_df=tilt_image_df,
             do_local_alignments=do_local_alignments,
-            alignment_resolution=alignment_resolution,
+            output_resolution=output_resolution,
             n_patches_xy=n_patches_xy,
             alignment_thickness_px=alignment_thickness,
             tilt_angle_offset_correction=tilt_angle_offset_correction,

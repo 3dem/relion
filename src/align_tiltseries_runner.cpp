@@ -40,7 +40,7 @@ void AlignTiltseriesRunner::read(int argc, char **argv, int rank)
 
     int aretomo_section = parser.addSection("AreTomo alignment options");
     do_aretomo = parser.checkOption("--aretomo", "OR: Use AreTomo's alignment method");
-    aretomo_resolution = textToFloat(parser.getOption("--aretomo_resolution", "Maximum resolution (in A) to use in AreTomo alignments", "10"));
+    aretomo_resolution = textToFloat(parser.getOption("--aretomo_resolution", "Resolution (in A) of the tilt series output by AreTomo. Has little bearing on processing.", "10"));
     aretomo_thickness = textToFloat(parser.getOption("--aretomo_thickness", "Thickness (in A) for AreTomo alignment", "2000"));
     do_aretomo_tiltcorrect = parser.checkOption("--aretomo_tiltcorrect", "Specify to correct the tilt angle offset in the tomogram (AreTomo -TiltCor option; default=false)");
     gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread, e.g 0:1:2:3", "");
@@ -215,7 +215,7 @@ void AlignTiltseriesRunner::executeImodWrapper(long idx_tomo, int rank)
     else if (do_aretomo)
     {
         command += " AreTomo";
-        command += " --alignment-resolution " + floatToString(aretomo_resolution);
+        command += " --output-resolution " + floatToString(aretomo_resolution);
         command += " --alignment-thickness " + floatToString(aretomo_thickness);
     }
     command += " --tilt-series-star-file " + fn_in;
