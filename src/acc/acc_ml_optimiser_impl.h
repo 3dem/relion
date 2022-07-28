@@ -739,15 +739,27 @@ void getFourierTransformsAndCtfs(long int part_id,
 			{
 				CTIC(accMLO->timer,"CTFRead2D");
 				CTF ctf;
-				ctf.setValuesByGroup(
+
+                if (op.is_tomo)
+    				ctf.setValuesByGroup(
                         &(baseMLO->mydata).obsModel, optics_group,
-                        (op.is_tomo) ? baseMLO->mydata.particles[part_id].images[img_id].defU : DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_DEFOCUS_U),
-                        (op.is_tomo) ? baseMLO->mydata.particles[part_id].images[img_id].defV : DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_DEFOCUS_V),
-                        (op.is_tomo) ? baseMLO->mydata.particles[part_id].images[img_id].defAngle : DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_DEFOCUS_ANGLE),
+                        baseMLO->mydata.particles[part_id].images[img_id].defU,
+                        baseMLO->mydata.particles[part_id].images[img_id].defV,
+                        baseMLO->mydata.particles[part_id].images[img_id].defAngle,
+                        0.,
+                        1.,
+                        0.,
+                        baseMLO->mydata.particles[part_id].images[img_id].dose);
+                else
+                    ctf.setValuesByGroup(
+                        &(baseMLO->mydata).obsModel, optics_group,
+                        DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_DEFOCUS_U),
+                        DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_DEFOCUS_V),
+                        DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_DEFOCUS_ANGLE),
                         DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_BFACTOR),
                         DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_KFACTOR),
                         DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_CTF_PHASE_SHIFT),
-                        (op.is_tomo) ? baseMLO->mydata.particles[part_id].images[img_id].dose : -1.);
+                        -1.);
 
 				ctf.getFftwImage(Fctf, baseMLO->image_full_size[optics_group], baseMLO->image_full_size[optics_group], my_pixel_size,
 						baseMLO->ctf_phase_flipped, baseMLO->only_flip_phases, baseMLO->intact_ctf_first_peak, true, baseMLO->do_ctf_padding);

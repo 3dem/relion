@@ -2701,19 +2701,26 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
                 if (do_ctf_correction && mymodel.data_dim != 3)
                 {
                     CTF ctf;
-                    ctf.readByGroup(MDimg, &mydata.obsModel, 0); // This MDimg only contains one particle!
 
-                    // Apply the dz to the defocus for 2D image stacks in STA
                     if (mydata.is_tomo)
                     {
-                        ctf.DeltafU = mydata.particles[part_id].images[img_id].defU;
-                        ctf.DeltafV = mydata.particles[part_id].images[img_id].defV;
-                        ctf.azimuthal_angle = mydata.particles[part_id].images[img_id].defAngle;
-                        ctf.initialise();
+                        ctf.setValuesByGroup(
+                                &mydata.obsModel, optics_group,
+                                mydata.particles[part_id].images[img_id].defU,
+                                mydata.particles[part_id].images[img_id].defV,
+                                mydata.particles[part_id].images[img_id].defAngle,
+                                0.,
+                                1.,
+                                0.,
+                                mydata.particles[part_id].images[img_id].dose);
+                    }
+                    else
+                    {
+                        ctf.readByGroup(MDimg, &mydata.obsModel, 0); // This MDimg only contains one particle!
                     }
 
                     ctf.getFftwImage(Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size,
-                        ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true, do_ctf_padding);
+                                     ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true, do_ctf_padding);
 
                     FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fimg)
                     {
@@ -6065,15 +6072,27 @@ void MlOptimiser::getFourierTransformsAndCtfs(
             {
                 // Get parameters that change per-particle from the exp_metadata
                 CTF ctf;
-                ctf.setValuesByGroup(
-                    &mydata.obsModel, optics_group,
-                    (mydata.is_tomo) ? mydata.particles[part_id].images[img_id].defU : DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_U),
-                    (mydata.is_tomo) ? mydata.particles[part_id].images[img_id].defV : DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_V),
-                    (mydata.is_tomo) ? mydata.particles[part_id].images[img_id].defAngle : DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_ANGLE),
-                    DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_BFACTOR),
-                    DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_KFACTOR),
-                    DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_PHASE_SHIFT),
-                    (mydata.is_tomo) ? mydata.particles[part_id].images[img_id].dose : -1.);
+
+                if (mydata.is_tomo)
+                    ctf.setValuesByGroup(
+                            &mydata.obsModel, optics_group,
+                            mydata.particles[part_id].images[img_id].defU,
+                            mydata.particles[part_id].images[img_id].defV,
+                            mydata.particles[part_id].images[img_id].defAngle,
+                            0.,
+                            1.,
+                            0.,
+                            mydata.particles[part_id].images[img_id].dose);
+                else
+                    ctf.setValuesByGroup(
+                        &mydata.obsModel, optics_group,
+                        DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_U),
+                        DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_V),
+                        DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_ANGLE),
+                        DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_BFACTOR),
+                        DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_KFACTOR),
+                        DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_PHASE_SHIFT),
+                        -1.);
 
                 ctf.getFftwImage(Fctf, image_full_size[optics_group], image_full_size[optics_group], my_pixel_size,
                         ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true, do_ctf_padding);
@@ -8966,18 +8985,27 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 
                         // Get parameters that change per-particle from the exp_metadata
                         CTF ctf;
-                        ctf.setValuesByGroup(
-                                &mydata.obsModel, optics_group,
-                                (mydata.is_tomo) ? mydata.particles[part_id].images[img_id].defU : DIRECT_A2D_ELEM(
-                                        exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_U),
-                                (mydata.is_tomo) ? mydata.particles[part_id].images[img_id].defV : DIRECT_A2D_ELEM(
-                                        exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_V),
-                                (mydata.is_tomo) ? mydata.particles[part_id].images[img_id].defAngle : DIRECT_A2D_ELEM(
-                                        exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_ANGLE),
-                                DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_BFACTOR),
-                                DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_KFACTOR),
-                                DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_PHASE_SHIFT),
-                                (mydata.is_tomo) ? mydata.particles[part_id].images[img_id].dose : -1.);
+
+                        if (mydata.is_tomo)
+                            ctf.setValuesByGroup(
+                                    &mydata.obsModel, optics_group,
+                                    mydata.particles[part_id].images[img_id].defU,
+                                    mydata.particles[part_id].images[img_id].defV,
+                                    mydata.particles[part_id].images[img_id].defAngle,
+                                    0.,
+                                    1.,
+                                    0.,
+                                    mydata.particles[part_id].images[img_id].dose);
+                        else
+                            ctf.setValuesByGroup(
+                                    &mydata.obsModel, optics_group,
+                                    DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_U),
+                                    DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_V),
+                                    DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_ANGLE),
+                                    DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_BFACTOR),
+                                    DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_KFACTOR),
+                                    DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_PHASE_SHIFT),
+                                    -1.);
 
                         ctf.getFftwImage(Fctf, image_full_size[optics_group], image_full_size[optics_group],my_pixel_size,
                                          ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true,
