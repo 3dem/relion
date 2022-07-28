@@ -75,7 +75,8 @@ def relion_pipeline_job(func: Callable) -> Callable:
             func(*args, **kwargs)
             if job_directory is not None:
                 write_job_success_file(job_directory)
-        except:
+        except BaseException:
             if job_directory is not None:
                 write_job_failure_file(job_directory)
+            raise
     return pipeline_job

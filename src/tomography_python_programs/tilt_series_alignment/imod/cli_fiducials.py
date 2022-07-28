@@ -4,8 +4,9 @@ from typing import Optional
 import typer
 from yet_another_imod_wrapper import align_tilt_series_using_fiducials
 from rich.console import Console
+from rich.progress import track
 
-from .._job_utils import write_aligned_tilt_series_star_file
+from .._job_utils import write_global_output
 from .align_tilt_series import align_single_tilt_series
 from .._cli import cli
 from ... import utils
@@ -16,25 +17,16 @@ console = Console(record=True)
 
 @cli.command(name='IMOD:fiducials')
 @relion_pipeline_job
-def batch_fiducials(
-        tilt_series_star_file: Path = typer.Option(...),
-        output_directory: Path = typer.Option(...),
-        tomogram_name: Optional[str] = typer.Option(None),
-        nominal_fiducial_diameter_nanometres: float = typer.Option(...),
+def fiducials_cli(
+        tilt_series_star_file: Path = typer.Option(..., help='RELION tilt-series STAR file'),
+        output_directory: Path = typer.Option(..., help='directory in which results will be stored'),
+        nominal_fiducial_diameter_nanometers: float = typer.Option(..., help='nominal fiducial diameter in nanometers'),
+        tomogram_name: Optional[str] = typer.Option(None, help="'rlnTomoName' in RELION tilt-series metadata")
 ):
-    """Align one or multiple tilt-series with fiducials in IMOD.
-
-    Parameters
-    ----------
-    tilt_series_star_file: RELION tilt-series STAR file.
-    output_directory: directory in which results will be stored.
-    tomogram_name: 'rlnTomoName' in RELION tilt-series metadata.
-    nominal_fiducial_diameter_nanometres: nominal fiducial diameter in nanometers.
-    """
+    """Align one or multiple tilt-series with fiducials in IMOD."""
     if not tilt_series_star_file.exists():
-        e = 'Could not find tilt series star file'
-        console.log(f'ERROR: {e}')
-        raise RuntimeError(e)
+        raise RuntimeError('Could not find tilt series star file')
+
     console.log('Extracting metadata for tilt series.')
     tilt_series_metadata = utils.star.iterate_tilt_series_metadata(
         tilt_series_star_file=tilt_series_star_file,
@@ -48,13 +40,13 @@ def batch_fiducials(
             tilt_image_df=tilt_image_df,
             alignment_function=align_tilt_series_using_fiducials,
             alignment_function_kwargs={
-                'fiducial_size': nominal_fiducial_diameter_nanometres
+                'fiducial_size': nominal_fiducial_diameter_nanometers
             },
             output_directory=output_directory,
         )
     if tomogram_name is None:  # write out STAR file for set of tilt-series
         console.log('Writing aligned_tilt_series.star')
-        write_aligned_tilt_series_star_file(
+        write_global_output(
             original_tilt_series_star_file=tilt_series_star_file,
             job_directory=output_directory
         )

@@ -881,7 +881,7 @@ void RelionJob::initialise(int _job_type)
 	}
     else if (type == PROC_TOMO_ALIGN_TILTSERIES)
     {
-        has_mpi = has_thread = true;
+        has_mpi = has_thread = false;
         initialiseTomoAlignTiltSeriesJob();
     }
     else if (type == PROC_TOMO_RECONSTRUCT_TOMOGRAM)
@@ -6349,25 +6349,19 @@ void RelionJob::initialiseTomoAlignTiltSeriesJob()
 
     joboptions["in_tiltseries"] = JobOption("Input tilt series:", OUTNODE_TOMO_TOMOGRAMS, "", "STAR files (*.star)",  "Input tomogram set starfile.");
 
-    char *default_location = getenv ("RELION_IMOD_WRAPPER_EXECUTABLE");
-    char default_wrapper[] = DEFAULTIMODWRAPPERLOCATION;
-    if (default_location == NULL) default_location = default_wrapper;
-    joboptions["imod_wrapper"] = JobOption("Alister Burt's IMOD/AreTomo wrapper:", std::string(default_location), "*", ".", "Location of Alister Burt's IMOD/Wrapper script; or just its executable name if in the path. You can control the default of this field by setting environment variable RELION_IMOD_WRAPPER_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code. Note that Alister's script should find the executables to IMOD and AreTomo on its own. See Alister's documentation on how to configure this.");
-
-    joboptions["do_imod_fiducials"] = JobOption("Use IMOD's fiducial based alignment?", true, "Set to Yes to perform tilt series alignment using fiducials in IMOD.");
+    joboptions["do_imod_fiducials"] = JobOption("Use IMOD's fiducial based alignment?", false, "Set to Yes to perform tilt series alignment using fiducials in IMOD.");
     joboptions["fiducial_diameter"] = JobOption("Fiducial diameter (nm): ", 10, 1, 20, 1, "The diameter of the fiducials (in nm)");
 
     joboptions["do_imod_patchtrack"] = JobOption("Use IMOD's patch-tracking for alignment?", false, "Set to Yes to perform tilt series alignment using patch-tracking in IMOD.");
-    // TODO: check defaults with the experts
-     joboptions["patch_size"] = JobOption("Patch size (in A): ", 1000, 10, 5000, 50, "The size of the patches in Angstrom.");    joboptions["patch_overlap"] = JobOption("Patch overlap (%): ", 10, 0, 100, 10, "The overlap (0-100%) between the patches.");
+
+    joboptions["patch_size"] = JobOption("Patch size (in nm): ", 100, 1, 500, 1, "The size of the patches in Angstrom.");
+    joboptions["patch_overlap"] = JobOption("Patch overlap (%): ", 50, 0, 100, 10, "The overlap (0-100%) between the patches.");
 
     joboptions["do_aretomo"] = JobOption("Use AreTomo?", false, "Set to Yes to perform tilt series alignment using UCSF's AreTomo.");
-    joboptions["aretomo_resolution"] = JobOption("Resolution for AreTomo alignment (in A): ", 10, 1, 50, 1, "The maximum resolution (in A) used for AreTomo alignment. The images will be Fourier cropped to have their Nyquist frequency at this value.");
-    joboptions["aretomo_thickness"] = JobOption("Thickness for AreTomo alignment (in A): ", 2000, 100, 5000, 100, "The tomogram thickness (in A) used for AreTomo alignment. The images will be Fourier cropped to have their Nyquist frequency at this value.");
-	joboptions["aretomo_tiltcorrect"] = JobOption("Correct Tilt Angle Offset?", false, "Specify Yes to correct the tilt angle offset in the tomogram (applies the AreTomo -TiltCor option). This is useful for correcting slanting in tomograms which can arise due to sample mounting or milling angle. This can be useful for in situ data especially.");
-     joboptions["gpu_ids"] = JobOption("Which GPUs to use for AreTomo:", std::string(""), "Provide a list of which GPUs (e.g. 0:1:2:3) to use in AreTomo. MPI-processes are separated by ':'. For example, to place one rank on device 0 and one rank on device 1, provide '0:1'. Number of MPI should match number of GPUs given.");
-    joboptions["other_wrapper_args"] = JobOption("Other wrapper arguments:", (std::string)"",  "Other arguments that will be passed straight onto the IMOD wrapper.");
-
+//    joboptions["aretomo_resolution"] = JobOption("Resolution for AreTomo alignment (in A): ", 10, 1, 50, 1, "The maximum resolution (in A) used for AreTomo alignment. The images will be Fourier cropped to have their Nyquist frequency at this value.");
+    joboptions["aretomo_thickness"] = JobOption("Expected sample thickness (in nm): ", 200, 10, 500, 10, "This controls the thickness of intermediate reconstructions used for projection matching in AreTomo. This value is padded internally.");
+	joboptions["aretomo_tiltcorrect"] = JobOption("Correct Tilt Angle Offset?", false, "Specify Yes to correct the tilt angle offset in the tomogram (applies the AreTomo -TiltCor option). This is useful for correcting slanting in tomograms which can arise due to sample mounting or milling angle. This can be useful for in situ data.");
+    joboptions["gpu_ids"] = JobOption("Which GPUs to use for AreTomo:", std::string(""), "Provide a list of which GPUs (e.g. 0:1:2:3) to use in AreTomo. MPI-processes are separated by ':'. For example, to place one rank on device 0 and one rank on device 1, provide '0:1'.");
 }
 bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::vector<std::string> &commands,
                                        std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
@@ -6386,57 +6380,50 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
         return false;
     }
 
-    if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-        command="`which relion_run_align_tiltseries_mpi`";
-    else
-        command="`which relion_run_align_tiltseries`";
     if (error_message != "") return false;
 
+
+    command="`which relion_tomo_align_tilt_series` ";
 
     // Make sure the methods are the first argument to the program!
     if (joboptions["do_imod_fiducials"].getBoolean())
     {
-        command += " --imod_fiducials";
-        command += " --fiducial_diameter " + joboptions["fiducial_diameter"].getString();
+        command += "IMOD:fiducials ";
+        command += "--nominal-fiducial-diameter-nanometers " + joboptions["fiducial_diameter"].getString() + ' ';
     }
     else if (joboptions["do_imod_patchtrack"].getBoolean())
     {
-        command += " --imod_patchtrack";
-        command += " --patch_size " + joboptions["patch_size"].getString();
-        command += " --patch_overlap " + joboptions["patch_overlap"].getString();
+        command += "IMOD:patch-tracking ";
+        command += "--patch-size-nanometers " + joboptions["patch_size"].getString() + ' ';
+        command += " --patch-overlap-percentage " + joboptions["patch_overlap"].getString() + ' ';
     }
     else if (joboptions["do_aretomo"].getBoolean())
     {
-        command += " --aretomo";
-        command += " --aretomo_resolution " + joboptions["aretomo_resolution"].getString();
-        command += " --aretomo_thickness " + joboptions["aretomo_thickness"].getString();
+        command += "AreTomo ";
+        command += "--sample-thickness-nanometers " + joboptions["aretomo_thickness"].getString();
 
         if (joboptions["aretomo_tiltcorrect"].getBoolean())
         {
-            command += " --aretomo_tiltcorrect";
+            command += "--do-tilt-angle-offset-correction ";
         }
         if (joboptions["gpu_ids"].getString().length() > 0)
         {
-            command += " --gpu " + joboptions["gpu_ids"].getString();
+            command += "--gpu " + joboptions["gpu_ids"].getString() + ' ';
         }
     }
-    command += " --i " + joboptions["in_tiltseries"].getString();
+    command += " --tilt-series-star-file " + joboptions["in_tiltseries"].getString();
+
     Node node(joboptions["in_tiltseries"].getString(), joboptions["in_tiltseries"].node_type);
     inputNodes.push_back(node);
 
-    command += " --o " + outputname;
+    command += " --output-directory " + outputname;
     Node node2(outputname+"aligned_tilt_series.star", LABEL_TOMO_TOMOGRAMS);
     outputNodes.push_back(node2);
-
-    if ((joboptions["imod_wrapper"].getString()).length() > 0)
-        command += " --wrapper_executable " + joboptions["imod_wrapper"].getString();
-
-    if ((joboptions["other_wrapper_args"].getString()).length() > 0)
-        command += " --other_wrapper_args \" " + joboptions["other_wrapper_args"].getString() + " \"";
 
     // Other arguments for extraction
     command += " " + joboptions["other_args"].getString();
     commands.push_back(command);
+
 
     return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 

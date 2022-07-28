@@ -2486,10 +2486,6 @@ void JobWindow::initialiseTomoAlignTiltseriesWindow()
     // Add a little spacer
     current_y += STEPY/2;
 
-    place("imod_wrapper", TOGGLE_DEACTIVATE);
-    place("other_wrapper_args", TOGGLE_DEACTIVATE);
-
-
     tab1->end();
     tab2->begin();
     tab2->label("IMOD");
@@ -2527,7 +2523,7 @@ void JobWindow::initialiseTomoAlignTiltseriesWindow()
     place("do_aretomo", TOGGLE_DEACTIVATE, group3, false);
     group3->begin();
 
-    place("aretomo_resolution", TOGGLE_DEACTIVATE);
+//    place("aretomo_resolution", TOGGLE_DEACTIVATE);
     place("aretomo_thickness", TOGGLE_DEACTIVATE);
     place("aretomo_tiltcorrect", TOGGLE_DEACTIVATE);
 

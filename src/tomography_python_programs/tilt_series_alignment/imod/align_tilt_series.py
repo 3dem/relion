@@ -7,9 +7,10 @@ import pandas as pd
 from rich.console import Console
 
 from .._job_utils import (
-    create_alignment_job_directory_structure,
+    create_alignment_job_directories,
     write_single_tilt_series_alignment_output
 )
+from ._utils import get_xyz_extrinsic_euler_angles, get_specimen_shifts
 
 
 def align_single_tilt_series(
@@ -34,11 +35,8 @@ def align_single_tilt_series(
     console = Console(record=True)
 
     # Create output directory structure
-    external_directory, metadata_directory = \
-        create_alignment_job_directory_structure(output_directory)
-    imod_directory = external_directory / tilt_series_id
-    imod_directory.mkdir(parents=True, exist_ok=True)
-    tilt_image_metadata_filename = f'{tilt_series_id}.star'
+    imod_directory, metadata_directory = \
+        create_alignment_job_directories(output_directory, tilt_series_id)
 
     # Order is important in IMOD, sort by tilt angle
     tilt_image_df = tilt_image_df.sort_values(by='rlnTomoNominalStageTiltAngle', ascending=True)
@@ -46,7 +44,7 @@ def align_single_tilt_series(
     # Align tilt-series using IMOD
     # implicit assumption - one tilt-axis angle per tilt-series
     console.log('Running IMOD alignment')
-    imod_output = alignment_function(
+    etomo_output = alignment_function(
         tilt_series=np.stack([mrcfile.read(f) for f in tilt_image_df['rlnMicrographName']]),
         tilt_angles=tilt_image_df['rlnTomoNominalStageTiltAngle'],
         pixel_size=tilt_series_df['rlnTomoTiltSeriesPixelSize'],
@@ -55,12 +53,15 @@ def align_single_tilt_series(
         output_directory=imod_directory,
         **alignment_function_kwargs,
     )
-    if imod_output.contains_alignment_results:
-        console.log('Writing STAR file for aligned tilt-series')
-        write_single_tilt_series_alignment_output(
-            tilt_image_df=tilt_image_df,
-            tilt_series_id=tilt_series_id,
-            pixel_size=tilt_series_df['rlnTomoTiltSeriesPixelSize'],
-            alignment_directory=imod_directory,
-            output_star_file=metadata_directory / tilt_image_metadata_filename,
-        )
+
+    # Write out alignment metadata
+    console.log('Converting metadata and writing STAR file for aligned tilt-series')
+    euler_angles = get_xyz_extrinsic_euler_angles(etomo_output)
+    specimen_shifts_px = get_specimen_shifts(etomo_output)
+    write_single_tilt_series_alignment_output(
+        tilt_series_df=tilt_image_df,
+        tilt_series_id=tilt_series_id,
+        euler_angles=euler_angles,
+        specimen_shifts=specimen_shifts_px * tilt_series_df['rlnTomoTiltSeriesPixelSize'],
+        output_star_file=metadata_directory / f'{tilt_series_id}.star',
+    )

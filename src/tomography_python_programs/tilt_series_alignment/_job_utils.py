@@ -1,25 +1,24 @@
 from pathlib import Path
-from typing import Tuple, Optional
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
 import starfile
 import typer
 
-from .imod._utils import get_tilt_series_alignment_data, calculate_specimen_shifts, \
-    get_xyz_extrinsic_euler_angles
 from ..utils.transformations import S, Rx, Ry, Rz
 from ._cli import cli
 
 
-def create_alignment_job_directory_structure(output_directory: Path) -> Tuple[Path, Path]:
+def create_alignment_job_directories(output_directory: Path, tilt_series_id: str) -> Tuple[
+    Path, Path]:
     """Create directory structure for a tilt-series alignment job."""
-    external_directory = output_directory / 'external'
-    external_directory.mkdir(parents=True, exist_ok=True)
+    alignment_directory = output_directory / 'external' / tilt_series_id
+    alignment_directory.mkdir(parents=True, exist_ok=True)
 
     metadata_directory = output_directory / 'tilt_series'
     metadata_directory.mkdir(parents=True, exist_ok=True)
-    return external_directory, metadata_directory
+    return alignment_directory, metadata_directory
 
 
 def tilt_series_alignment_parameters_to_relion_projection_matrices(
@@ -67,26 +66,20 @@ def tilt_series_alignment_parameters_to_relion_projection_matrices(
 
 
 def write_single_tilt_series_alignment_output(
-        tilt_image_df: pd.DataFrame,
+        tilt_series_df: pd.DataFrame,
         tilt_series_id: str,
-        pixel_size: float,
-        alignment_directory: Path,
+        specimen_shifts: np.ndarray,
+        euler_angles: np.ndarray,
         output_star_file: Path,
 ):
     """Write metadata from a tilt-series alignment experiment."""
-    xf, tlt = get_tilt_series_alignment_data(alignment_directory, tilt_series_id)
-
-    shifts_px = calculate_specimen_shifts(xf)
-    tilt_image_df[['rlnTomoXShiftAngst', 'rlnTomoYShiftAngst']] = shifts_px * pixel_size
-
-    euler_angles = get_xyz_extrinsic_euler_angles(xf, tlt)
-    tilt_image_df[['rlnTomoXTilt', 'rlnTomoYTilt', 'rlnTomoZRot']] = euler_angles
-
-    starfile.write({tilt_series_id: tilt_image_df}, output_star_file)
+    tilt_series_df[['rlnTomoXTilt', 'rlnTomoYTilt', 'rlnTomoZRot']] = euler_angles
+    tilt_series_df[['rlnTomoXShiftAngst', 'rlnTomoYShiftAngst']] = specimen_shifts
+    starfile.write({tilt_series_id: tilt_series_df}, output_star_file)
 
 
 @cli.command(name='write-global-output')
-def write_aligned_tilt_series_star_file(
+def write_global_output(
         original_tilt_series_star_file: Path = typer.Option(...),
         job_directory: Path = typer.Option(...)
 ):

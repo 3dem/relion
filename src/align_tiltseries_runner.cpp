@@ -204,7 +204,7 @@ void AlignTiltseriesRunner::executeImodWrapper(long idx_tomo, int rank)
     if (do_imod_fiducials)
     {
         command += " IMOD:fiducials";
-        command += " --nominal-fiducial-diameter-nanometres " + floatToString(fiducial_diam);
+        command += " --nominal-fiducial-diameter-nanometers " + floatToString(fiducial_diam);
     }
     else if (do_imod_patchtrack)
     {
