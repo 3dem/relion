@@ -1280,6 +1280,8 @@ void getAllSquaredDifferencesFine(
 		baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2);
 #endif
 
+    // Make sure entire array initialized, as loop over img_id now sums to old value...
+    deviceInitValue<XFLOAT>(FinePassWeights.weights, 0);
 
     CUSTOM_ALLOCATOR_REGION_NAME("DIFF_FINE");
 	CTIC(accMLO->timer,"diff_pre_gpu");
