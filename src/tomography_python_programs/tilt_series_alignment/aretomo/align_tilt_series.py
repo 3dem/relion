@@ -20,7 +20,6 @@ def align_single_tilt_series(
         tilt_series_id: str,
         global_df: pd.DataFrame,
         tilt_series_df: pd.DataFrame,
-        n_patches_xy: Tuple[int, int],
         sample_thickness_nanometers: float,
         tilt_angle_offset_correction: bool,
         gpu_ids: Optional[str],
@@ -33,8 +32,6 @@ def align_single_tilt_series(
     tilt_series_id: 'rlnTomoName' in RELION tilt-series metadata.
     global_df: data from global tilt-series metadata.
     tilt_series_df: file containing information for images in a single tilt-series.
-    do_local_alignments: flag to enable local alignments.
-    n_patches_xy: number of patches in x and y for local alignments
     sample_thickness_nanometers: thickness of intermediate reconstruction during alignments.
     tilt_angle_offset_correction: flag to enable/disable stage tilt offset correction (-TiltCor) in AreTomo
     gpu_ids: string to specify GPUs. GPU identifiers should be separated by colons e.g. 0:1:2:3
@@ -59,7 +56,6 @@ def align_single_tilt_series(
         output_directory=aretomo_directory,
         sample_thickness_nanometers=sample_thickness_nanometers,
         do_local_alignments=False,
-        n_patches_xy=n_patches_xy,
         correct_tilt_angle_offset=tilt_angle_offset_correction,
         output_pixel_size=20,
         gpu_ids=gpu_ids
