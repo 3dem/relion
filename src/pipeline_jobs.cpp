@@ -6566,10 +6566,8 @@ bool RelionJob::getCommandsTomoDenoiseTomogramsJob(std::string &outputname, std:
         error_message = "ERROR: you should (only) enable ONE of the methods: cryoCARE:train (--do_cryocare_train), cryoCARE:predict (--do_cryocare_predict)";    
     }
 
-    if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-        error_message = "ERROR: cryoCARE can currently only run on 1 MPI.";
-    else
-        command="`which relion_run_denoise_tomogram`";
+    command="`which relion_run_denoise_tomogram`";
+    
     if (error_message != "") return false;
 
     command += " --i " + joboptions["in_tomoset"].getString();
