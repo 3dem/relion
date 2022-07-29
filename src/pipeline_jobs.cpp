@@ -6365,26 +6365,26 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
     if (joboptions["do_imod_fiducials"].getBoolean())
     {
         command += "IMOD:fiducials ";
-        command += "--nominal-fiducial-diameter-nanometers " + joboptions["fiducial_diameter"].getString() + ' ';
+        command += " --nominal-fiducial-diameter-nanometers " + joboptions["fiducial_diameter"].getString() + ' ';
     }
     else if (joboptions["do_imod_patchtrack"].getBoolean())
     {
         command += "IMOD:patch-tracking ";
-        command += "--patch-size-nanometers " + joboptions["patch_size"].getString() + ' ';
+        command += " --patch-size-nanometers " + joboptions["patch_size"].getString() + ' ';
         command += " --patch-overlap-percentage " + joboptions["patch_overlap"].getString() + ' ';
     }
     else if (joboptions["do_aretomo"].getBoolean())
     {
         command += "AreTomo ";
-        command += "--sample-thickness-nanometers " + joboptions["aretomo_thickness"].getString();
+        command += " --sample-thickness-nanometers " + joboptions["aretomo_thickness"].getString();
 
         if (joboptions["aretomo_tiltcorrect"].getBoolean())
         {
-            command += "--do-tilt-angle-offset-correction ";
+            command += " --do-tilt-angle-offset-correction ";
         }
         if (joboptions["gpu_ids"].getString().length() > 0)
         {
-            command += "--gpu " + joboptions["gpu_ids"].getString() + ' ';
+            command += " --gpu " + joboptions["gpu_ids"].getString() + ' ';
         }
     }
     command += " --tilt-series-star-file " + joboptions["in_tiltseries"].getString();
