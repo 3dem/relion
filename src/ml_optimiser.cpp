@@ -9886,7 +9886,7 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
         long int part_id = mydata.sorted_idx[part_id_sorted];
         nr_images += mydata.numberOfImagesInParticle(part_id);
     }
-    exp_metadata.initZeros(nr_images, METADATA_LINE_LENGTH_BEFORE_BODIES + (mymodel.nr_bodies) * METADATA_NR_BODY_PARAMS);
+    exp_metadata.initZeros(last_part_id-first_part_id+1, METADATA_LINE_LENGTH_BEFORE_BODIES + (mymodel.nr_bodies) * METADATA_NR_BODY_PARAMS);
 
     // This assumes all images in first_part_id to last_part_id have the same image_size
     // If not, then do_also_imagedata will not work! Also warn during intialiseGeneral!
