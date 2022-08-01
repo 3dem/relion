@@ -33,6 +33,10 @@ bool TomogramSet::read(FileName filename, bool verbose)
     {
         REPORT_ERROR("ERROR: input starfile for TomogramSet " + filename + " does not contain rlnTomoName label ");
     }
+    if (!globalTable.containsLabel(EMDL_TOMO_FRAME_COUNT))
+    {
+        REPORT_ERROR("ERROR: input starfile for TomogramSet " + filename + " does not contain rlnTomoFrameCount label ");
+    }
 
     const int tc = globalTable.numberOfObjects();
     tomogramTables.resize(tc);
@@ -59,6 +63,7 @@ bool TomogramSet::read(FileName filename, bool verbose)
                 FileName expectedNewName = globalTable.getString(EMDL_TOMO_NAME, t);
                 FileName name = allTables[t+1].getName();
 
+
                 if (name != expectedNewName)
                 {
                     REPORT_ERROR_STR("TomogramSet::TomogramSet: file is corrupted " << filename);
@@ -66,6 +71,18 @@ bool TomogramSet::read(FileName filename, bool verbose)
 
                 tomogramTables[t] = allTables[t+1];
                 tomogramTables[t].setName(expectedNewName);
+
+                int fc;
+                globalTable.getValue(EMDL_TOMO_FRAME_COUNT, fc, t);
+                if (tomogramTables[t].numberOfObjects() != fc)
+                {
+                    std::cerr << " t= " << t << " tomogramTables[t].numberOfObjects()= " << tomogramTables[t].numberOfObjects() << " frameCount= " << fc << std::endl;
+                    REPORT_ERROR_STR("TomogramSet::TomogramSet: tomogram table has unexpected number of objects");
+                }
+
+                // Also set the name for the titlseries STAR file
+                FileName fn_star = filename.beforeLastOf("/") + "/tilt_series/" + expectedNewName + ".star";
+                globalTable.setValue(EMDL_TOMO_TILT_SERIES_STARFILE, fn_star, t);
 
             }
         }
@@ -78,6 +95,14 @@ bool TomogramSet::read(FileName filename, bool verbose)
             FileName name = globalTable.getString(EMDL_TOMO_NAME, t);
             std::string fn_star = globalTable.getString(EMDL_TOMO_TILT_SERIES_STARFILE, t);
             tomogramTables[t].read(fn_star, name);
+
+            int fc;
+            globalTable.getValue(EMDL_TOMO_FRAME_COUNT, fc, t);
+            if (tomogramTables[t].numberOfObjects() != fc)
+            {
+                std::cerr << " t= " << t << " tomogramTables[t].numberOfObjects()= " << tomogramTables[t].numberOfObjects() << " frameCount= " << fc << std::endl;
+                REPORT_ERROR_STR("TomogramSet::TomogramSet: tomogram table has unexpected number of objects");
+            }
 
             if (!tomogramTables[t].containsLabel(EMDL_MICROGRAPH_PRE_EXPOSURE))
                  REPORT_ERROR("ERROR: tomogramTable does not contain compulsory rlnMicrographPreExposure label");
