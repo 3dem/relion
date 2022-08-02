@@ -10,7 +10,7 @@ if(POLICY CMP0042)
     cmake_policy(SET CMP0042 NEW)
 endif()
 
-# Add the path to the additional Find<module>.cmake files 
+# Add the path to the additional Find<module>.cmake files
 # which are included with the distributed RLEION-code
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
@@ -45,17 +45,17 @@ endif(NOT APPLE)
 # ---------------------------------------------------------SET SPECIFIC BUILD TYPE--
 if(NOT ${CMAKE_BUILD_TYPE} STREQUAL "")
 	string( TOLOWER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_LOWER )
-	
+
 	if( ( NOT ${CMAKE_BUILD_TYPE_LOWER} STREQUAL "none" ) AND
-	    ( NOT ${CMAKE_BUILD_TYPE_LOWER} STREQUAL "release" ) AND 
+	    ( NOT ${CMAKE_BUILD_TYPE_LOWER} STREQUAL "release" ) AND
 	    ( NOT ${CMAKE_BUILD_TYPE_LOWER} STREQUAL "debug" ) AND
-	    ( NOT ${CMAKE_BUILD_TYPE_LOWER} STREQUAL "relwithdebinfo" ) AND 
-	    ( NOT ${CMAKE_BUILD_TYPE_LOWER} STREQUAL "profiling" )  AND 
+	    ( NOT ${CMAKE_BUILD_TYPE_LOWER} STREQUAL "relwithdebinfo" ) AND
+	    ( NOT ${CMAKE_BUILD_TYPE_LOWER} STREQUAL "profiling" )  AND
 	    ( NOT ${CMAKE_BUILD_TYPE_LOWER} STREQUAL "benchmarking" ) )
 	     message( FATAL_ERROR "CMAKE_BUILD_TYPE : '${CMAKE_BUILD_TYPE}' is not a valid build type. "
 		"Valid options are: 'None', 'Release', 'Debug', 'RelWithDebInfo', and 'Profiling'." )
 	endif()
-	
+
 	message(STATUS "BUILD TYPE set to '${CMAKE_BUILD_TYPE}'")
 	SET(CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE} CACHE STRING "Choose the type of
 build, options are: 'None', 'Release', 'Debug', 'RelWithDebInfo', and 'Profiling'.")
@@ -71,21 +71,37 @@ else()
 endif()
 
 # ------------------OPTIONS WHICH ARE NEEDED TO SET BUILD-TYPES (COMPILATION FLAGS)--
-# ------------------------------------------------------------------------CUDA-ARCH--
-if(NOT DEFINED CUDA_ARCH)
+# ----------------------------------------------------------CUDA-ARCH--OR--HIP-ARCH--
+if(NOT (DEFINED CUDA_ARCH OR DEFINED HIP_ARCH))
+  if (CUDA)
     message(STATUS "Setting fallback CUDA_ARCH=50")
     set(CUDARCH "-arch=sm_50")
-else(NOT DEFINED CUDA_ARCH)
-    message(STATUS "Using provided CUDA_ARCH=${CUDA_ARCH}")
-    set(CUDARCH "-arch=sm_${CUDA_ARCH}")
-endif(NOT DEFINED CUDA_ARCH)
-    
+  else (HIP)
+    message(STATUS "Setting fallback HIP_ARCH=gfx906")
+    set(GPU_TARGETS "gfx906")
+  endif()
+else(NOT (DEFINED CUDA_ARCH OR DEFINED HIP_ARCH))
+if (CUDA)
+  message(STATUS "Using provided CUDA_ARCH=${CUDA_ARCH}")
+  set(CUDARCH "-arch=sm_${CUDA_ARCH}")
+else (HIP)
+  message(STATUS "Using provided HIP_ARCH=${HIP_ARCH}")
+  set(GPU_TARGETS "${HIP_ARCH}")
+endif()
+endif(NOT (DEFINED CUDA_ARCH OR DEFINED HIP_ARCH))
+
 # -------------------------------------------------------------------FURTHER OPTIONS--
 
 
-# CUDA on by default, so check for CPU-accelration request and possible conflicting dual-request
+# CUDA on by default, so check for other GPU/CPU-accelration request and possible conflicting dual-requests
+option(HIP "Enable HIP GPU acceleration" OFF)
 option(ALTCPU "Enable Accelerated CPU version" OFF)
-if(ALTCPU)
+if(HIP)
+  option(CUDA "Enable CUDA GPU acceleration" OFF)
+  if(HIP AND CUDA)
+    message(FATAL_ERROR "You cannot build with both CUDA=ON and HIP=ON.  Please choose one and rerun CMAKE")
+  endif()
+elseif(ALTCPU)
 	option(CUDA "Enable CUDA GPU acceleration" OFF)
 	if(ALTCPU AND CUDA)
    		message(FATAL_ERROR "You cannot build with both CUDA=ON and ALTCPU=ON.  Please choose one and rerun CMAKE")
@@ -97,23 +113,25 @@ endif()
 option(DoublePrec_CPU "DoublePrec_CPU" ON)
 option(DoublePrec_ACC "Accelerated Code use double-precision" OFF)
 option(MKLFFT "Use MKL rather than FFTW for FFT" OFF)
-option(CudaTexture "CudaTexture" ON)
+option(DeviceTexture "Texture Memory on the Device" ON)
 
 if(ALTCPU)
     message(STATUS "ALTCPU enabled - Building CPU-accelerated version of RELION")
-endif()
-
-if(CUDA)
+elseif(HIP)
+    message(STATUS "HIP enabled - Building HIP-accelerated version of RELION")
+elseif(CUDA)
     message(STATUS "CUDA enabled - Building CUDA-accelerated version of RELION")
+else()
+    message(STATUS "Acceleration not enabled - Building CPU-only version of RELION")
 endif()
 
 if(CUDA OR ALTCPU)
     add_definitions(-DACC_CUDA=2 -DACC_CPU=1)
 endif()
 
-# -----------------------------------------------DOUBLE PRECISION (CUDA-CODE) OR NOT--
+# -----------------------------------------------DOUBLE PRECISION (GPU-CODE) OR NOT--
 if(DoublePrec_CPU)
-    message(STATUS "Setting cpu precision to double")    
+    message(STATUS "Setting cpu precision to double")
 else(DoublePrec_CPU)
     message(STATUS "Setting cpu precision to single")
     add_definitions(-DRELION_SINGLE_PRECISION)
@@ -122,7 +140,7 @@ endif(DoublePrec_CPU)
 if(DoublePrec_ACC)
     message(STATUS "Setting accelerated code precision to double")
     add_definitions(-DACC_DOUBLE_PRECISION)
-	set(CudaTexture FALSE)
+	  set(DeviceTexture FALSE)
 else(DoublePrec_ACC)
     message(STATUS "Setting accelerated code precision to single")
 endif(DoublePrec_ACC)
@@ -151,7 +169,7 @@ if(CUDA_FOUND)
 		message(WARNING "Cuda version is less than 7.0, so relion will be compiled without GPU support.")
 		set(CUDA OFF)
     endif()
-    
+
     if(CUDA)
         add_definitions(-D_CUDA_ENABLED)
     endif()
@@ -159,10 +177,34 @@ else(CUDA_FOUND)
     message(STATUS "Using non-cuda compilation....")
 endif(CUDA_FOUND)
 
+if(HIP)
+    # ------------------------------------------------------------------------------HIP--
+    FIND_PACKAGE(HIP)
+endif()
+
+if(HIP_FOUND)
+    message(STATUS "Using hip wrapper to compile....")
+    if( ${HIP_VERSION} VERSION_LESS "4.0")
+		message(WARNING "ROCm version is less than 4.0, so relion will be compiled without GPU support.")
+		set(HIP OFF)
+    endif()
+
+    if(HIP)
+        add_definitions(-D_HIP_ENABLED)
+    endif()
+else(HIP_FOUND)
+    message(STATUS "Using non-hip compilation....")
+endif(HIP_FOUND)
+
 # ------------------------------------------------------------------ALLOCATOR CHOICE--
 option(CachedAlloc "CachedAlloc" ON)
 if(NOT CachedAlloc)
-    add_definitions(-DCUDA_NO_CUSTOM_ALLOCATION)
+    if (CUDA)
+        add_definitions(-DCUDA_NO_CUSTOM_ALLOCATION)
+    endif()
+    if (HIP)
+        add_definitions(-DHIP_NO_CUSTOM_ALLOCATION)
+    endif()
 	message(STATUS "Cached allocation is disabled.")
 endif(NOT CachedAlloc)
 option(CustomAllocMemGuards "CustomAllocMemGuards" OFF)
@@ -171,12 +213,20 @@ if(CustomAllocMemGuards)
     message(STATUS "Abort on out of bound write.")
 endif(CustomAllocMemGuards)
 # -------------------------------------------------------------FORCE USE OF STL-LIBS--
-option(CudaForceSTL "CudaForceSTL" OFF)
-if(CudaForceSTL)
-    add_definitions(-DCUDA_FORCESTL)
-    message(STATUS "Building cuda files wusing stl-libs for sort, min and max.")
-endif(CudaForceSTL)
-
+if (CUDA)
+    option(CudaForceSTL "CudaForceSTL" OFF)
+    if(CudaForceSTL)
+        add_definitions(-DCUDA_FORCESTL)
+        message(STATUS "Building cuda files using stl-libs for sort, min and max.")
+    endif(CudaForceSTL)
+endif()
+if (HIP)
+    option(HipForceSTL "CudaForceSTL" OFF)
+    if(HipForceSTL)
+        add_definitions(-DHIP_FORCESTL)
+        message(STATUS "Building hip files using stl-libs for sort, min and max.")
+    endif(HipForceSTL)
+endif()
 # ------------------------------------------------------------------------GUI OR NOT--
 # Skip FLTK/X11-dependent binaries or not
 option(GUI "GUI" ON)
@@ -189,7 +239,7 @@ endif()
 option(FORCE_OWN_TBB "FORCE_OWN_TBB" OFF)
 
 if (ALTCPU)
-	
+
 	if (FORCE_OWN_TBB)
 		message(STATUS "Will ignore any potentially installed system TBB lib, as per your request.")
 		include(${CMAKE_SOURCE_DIR}/cmake/BuildTBB.cmake)
@@ -277,10 +327,10 @@ if(ALTCPU)
 endif()
 
 # ---------------------------------------------------------------USE TEXTURES OR NOT--
-if(NOT CudaTexture OR ALTCPU)
+if(NOT DeviceTexture OR ALTCPU)
     add_definitions(-DPROJECTOR_NO_TEXTURES)
     message(STATUS "Texture interpolation is omitted.")
-endif(NOT CudaTexture OR ALTCPU)
+endif(NOT DeviceTexture OR ALTCPU)
 
 # --------------------------------------------------------------------------X11/FLTK--
 option(FORCE_OWN_FLTK "FORCE_OWN_FLTK" OFF)
@@ -296,9 +346,9 @@ if(GUI)
 				message(STATUS "FLTK_LIBRARIES: ${FLTK_LIBRARIES}")
 		    else()
 				message(STATUS "No FLTK installation was found")
-		    endif() 
+		    endif()
         endif(NOT FORCE_OWN_FLTK)
-        
+
 	if(NOT FLTK_FOUND)
 		include(${CMAKE_SOURCE_DIR}/cmake/BuildFLTK.cmake)
 		set(INSTALL_OWN_FLTK 1)
@@ -310,7 +360,7 @@ if(GUI)
         message( STATUS " You CAN add the flag -DGUI=OFF to avoid using X11" )
         message(FATAL_ERROR "X11 is required for GUI.")
     endif(X11_FOUND)
-    
+
 endif(GUI)
 
 # -------------------------------------------------------------------------------FFT--
@@ -318,10 +368,10 @@ endif(GUI)
 if(NOT MKLFFT)
 	option(FORCE_OWN_FFTW "FORCE_OWN_FFTW" OFF)
 	option(AMDFFTW "Use AMD optimized version of FFTW. This needs a new version of GCC (>= 8.3 recommended)." OFF)
-	
+
 	set(FFTW_DOUBLE_REQUIRED TRUE)
 	set(FFTW_SINGLE_REQUIRED TRUE)
-	
+
 	if(AMDFFTW)
 		set(FORCE_OWN_FFTW ON)
 	endif()
@@ -371,7 +421,7 @@ endif()
 #    add_definitions(-D_TORCH_ENABLED)
 #endif(TORCH)
 
-option(FETCH_TORCH_MODELS "Do download pre-trained torch models" ON)
+option(FETCH_TORCH_MODELS "Do download pre-trained torch models" OFF)
 if (FETCH_TORCH_MODELS)
     include(${CMAKE_SOURCE_DIR}/cmake/FetchTorchModels.cmake)
 endif()
@@ -396,11 +446,11 @@ list(APPEND RELION_SCRIPT_FILES
 )
 
 add_custom_target(copy_scripts ALL)
-                                
+
 foreach (SCRIPT_FILE ${RELION_SCRIPT_FILES})
     add_custom_command(TARGET copy_scripts POST_BUILD
                      COMMAND ${CMAKE_COMMAND} -E
-                     copy ${CMAKE_SOURCE_DIR}/scripts/${SCRIPT_FILE} 
+                     copy ${CMAKE_SOURCE_DIR}/scripts/${SCRIPT_FILE}
                      ${CMAKE_BINARY_DIR}/bin/relion_${SCRIPT_FILE} )
 endforeach()
 
@@ -420,7 +470,7 @@ message("BUILD_SHARED_LIBS = ${BUILD_SHARED_LIBS}")
 if(BUILD_SHARED_LIBS)
     message(STATUS "Building shared libs (smaller build size and binaries)")
 else()
-    message(STATUS "Building static libs (larger build size and binaries)")    
+    message(STATUS "Building static libs (larger build size and binaries)")
 endif()
 
 
@@ -428,10 +478,11 @@ ADD_SUBDIRECTORY(src/apps)
 
 #message(STATUS "CUDA option = ${CUDA}")
 #message(STATUS "ALTCPU option = ${ALTCPU}")
+#message(STATUS "HIP option = ${HIP}")
 #message(STATUS "DoublePrec_CPU option = ${DoublePrec_CPU}")
 #message(STATUS "DoublePrec_ACC option = ${DoublePrec_ACC}")
 #message(STATUS "MKLFFT option = ${MKLFFT}")
-#message(STATUS "CudaTexture option = ${CudaTexture}")
+#message(STATUS "DeviceTexture option = ${DeviceTexture}")
 
 #get_directory_property( DirDefs COMPILE_DEFINITIONS )
 #message(STATUS "COMPILE_DEFINITIONS = ${DirDefs}" )
@@ -444,7 +495,7 @@ ADD_SUBDIRECTORY(src/apps)
 #message(STATUS "CMAKE_EXE_LINKER_FLAGS : ${CMAKE_EXE_LINKER_FLAGS}")
 
 # -----------------------------------------------------------------------------TESTS--
-# Include testing flag(s) as precomiler 
+# Include testing flag(s) as precomiler
 # definitions and include test directives
 #enable_testing()
 #include(${CMAKE_SOURCE_DIR}/tests/RelionTests.cmake)
@@ -460,4 +511,3 @@ endif()
 #foreach (_variableName ${_variableNames})
 #    message(STATUS "${_variableName}=${${_variableName}}")
 #endforeach()
-
