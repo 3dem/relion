@@ -34,7 +34,7 @@ if (ALTCPU)
 	file(GLOB REL_SRC_H "${CMAKE_SOURCE_DIR}/src/*.h" "${CMAKE_SOURCE_DIR}/src/acc/*.h" "${CMAKE_SOURCE_DIR}/src/acc/cpu/*.h" "${CMAKE_SOURCE_DIR}/src/acc/cpu/cpu_kernels/*.h" )
 else()
 	file(GLOB REL_SRC "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_BINARY_DIR}/macros.cpp" "${CMAKE_SOURCE_DIR}/src/*.c" "${CMAKE_SOURCE_DIR}/src/acc/*.cpp" )
-	file(GLOB REL_SRC_H "${CMAKE_SOURCE_DIR}/src/*.h" "${CMAKE_SOURCE_DIR}/src/acc/*.h" ) 
+	file(GLOB REL_SRC_H "${CMAKE_SOURCE_DIR}/src/*.h" "${CMAKE_SOURCE_DIR}/src/acc/*.h" )
 endif(ALTCPU)
 
 # Remove GUI files from relion_lib
@@ -187,20 +187,20 @@ else()
 		${REL_JAZ_MESH_PROC_SRC} ${REL_JAZ_MESH_PROC_H}
 		${REL_JAZ_UTIL_SRC} ${REL_JAZ_UTIL_H}
 		${REL_JAZ_TOMO_SRC} ${REL_JAZ_TOMO_H}
-		${REL_JAZ_TOMO_PROJ_SRC} ${REL_JAZ_TOMO_PROJ_H}    
+		${REL_JAZ_TOMO_PROJ_SRC} ${REL_JAZ_TOMO_PROJ_H}
 		${REL_JAZ_TOMO_MEMBRANE_SRC} ${REL_JAZ_TOMO_MEMBRANE_H}
 		${REL_JAZ_TOMO_FILAMENT_SRC} ${REL_JAZ_TOMO_FILAMENT_H}
 		${REL_JAZ_TOMO_MOTION_SRC} ${REL_JAZ_TOMO_MOTION_H}
 		${REL_JAZ_TOMO_MOTION_MODULAR_ALIGNMENT_SRC} ${REL_JAZ_TOMO_MOTION_MODULAR_ALIGNMENT_H}
 		${REL_JAZ_TOMO_MANIFOLD_SRC} ${REL_JAZ_TOMO_MANIFOLD_H}
-		${REL_JAZ_TOMO_LATTICE_SRC} ${REL_JAZ_TOMO_LATTICE_H}    
+		${REL_JAZ_TOMO_LATTICE_SRC} ${REL_JAZ_TOMO_LATTICE_H}
 		${REL_JAZ_OPTIM_SRC} ${REL_JAZ_OPTIM_H}
 		${REL_JAZ_OPTICS_SRC} ${REL_JAZ_OPTICS_H}
 		${REL_JAZ_OPTICS_DUAL_CONTRAST_SRC} ${REL_JAZ_OPTICS_DUAL_CONTRAST_H}
-		${REL_JAZ_SEGMENTATION_SRC} ${REL_JAZ_SEGMENTATION_H} 
-		${REL_JAZ_ATOMIC_SRC} ${REL_JAZ_ATOMIC_H} 
-		${REL_JAZ_PROGRAMS_SRC} ${REL_JAZ_PROGRAMS_H} 
-		${REL_JAZ_DYNAMO_SRC} ${REL_JAZ_DYNAMO_H} 
+		${REL_JAZ_SEGMENTATION_SRC} ${REL_JAZ_SEGMENTATION_H}
+		${REL_JAZ_ATOMIC_SRC} ${REL_JAZ_ATOMIC_H}
+		${REL_JAZ_PROGRAMS_SRC} ${REL_JAZ_PROGRAMS_H}
+		${REL_JAZ_DYNAMO_SRC} ${REL_JAZ_DYNAMO_H}
 		${REL_JAZ_SPA_SRC} ${REL_JAZ_SPA_H}
 		${REL_JAZ_SPA_OPT_SRC} ${REL_JAZ_SPA_OPT_H}
 		${REL_JAZ_SPA_CTF_SRC} ${REL_JAZ_SPA_CTF_H}
@@ -211,7 +211,7 @@ else()
 		${REL_JAZ_SPA_IO_SRC} ${REL_JAZ_SPA_IO_H}
 		${REL_JAZ_SPA_PROGRAMS_SRC} ${REL_JAZ_SPA_PROGRAMS_H}
 		${REL_D3x3_SRC} ${REL_D3x3_H}
-		${REL_LBFGS_SRC} ${REL_LBFGS_H} 
+		${REL_LBFGS_SRC} ${REL_LBFGS_H}
 		${REL_SPHERICAL_HARMONICS_SRC} ${REL_SPHERICAL_HARMONICS_H})
 
 	if(GUI)
@@ -287,8 +287,34 @@ if (CUDA_FOUND)
 	target_link_libraries(relion_lib relion_jaz_gpu_util ${CUDA_CUFFT_LIBRARIES})
 	target_link_libraries(relion_lib relion_jaz_gpu_util ${CUDA_CUFFT_LIBRARIES} ${CUDA_curand_LIBRARY})
 
+else (HIP_FOUND)
+	file(GLOB REL_HIP_SRC "${CMAKE_SOURCE_DIR}/src/acc/hip/*.cpp" "${CMAKE_SOURCE_DIR}/src/acc/hip/hip_kernels/*.cpp" )
+	hip_add_library(relion_gpu_util ${REL_HIP_SRC} HIPCC_OPTIONS "-v -fPIC -fno-gpu-rdc -std=c++14" NVCC_OPTIONS)
 
-endif(CUDA_FOUND)
+	# Presently we have a number of (bad) circular dependencies between the gpu util
+	# and relion libraries, which cause errors at least on OS X with clang. Tell the
+	# compiler to ignore them.
+	if(APPLE)
+		set(new_link_flags "-undefined suppress -flat_namespace")
+		get_target_property(existing_link_flags relion_gpu_util LINK_FLAGS)
+		if(existing_link_flags)
+			set(new_link_flags "${existing_link_flags} ${new_link_flags}")
+		endif()
+		set_target_properties(relion_gpu_util PROPERTIES LINK_FLAGS "${new_link_flags}")
+	endif()
+
+	list(APPEND EXTRA_LIBS "${HIPFFT_LIBRARIES}")
+	if(BUILD_SHARED_LIBS)
+		install (TARGETS relion_gpu_util LIBRARY DESTINATION lib)
+	else()
+		target_link_libraries(relion_gpu_util relion_lib)
+		target_link_libraries(relion_gpu_util ${HIPFFT_LIBRARIES})
+	endif()
+
+	target_link_libraries(relion_lib relion_gpu_util ${HIPFFT_LIBRARIES})
+	target_link_libraries(relion_lib relion_gpu_util ${HIPFFT_LIBRARIES} ${HIPRAND_LIBRARIES})
+
+endif()
 
 if(TIFF_FOUND)
 	#message("TIFF FOUND")
@@ -336,19 +362,19 @@ foreach (_target ${RELION_TARGETS})
 	endif()
 
 	set(LIB relion_lib)
-	
+
  	add_dependencies(${_target} relion_lib)
 
 	if(NOT MKLFFT)
 		target_link_libraries(${_target} ${LIB} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
-	else()	
+	else()
 		target_link_libraries(${_target} ${LIB} ${FFTW_LIBRARIES} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
 	endif(NOT MKLFFT)
 
 	if(CUDA_FOUND)
 		target_link_libraries(${_target} relion_gpu_util)
 	endif(CUDA_FOUND)
-	
+
 	if (ALTCPU)
 		target_link_libraries(${_target} ${TBB_LIBRARIES})
 	endif(ALTCPU)
@@ -358,7 +384,7 @@ foreach (_target ${RELION_TARGETS})
 	                      XX_STANDARD_REQUIRED ON
 	                      XX_EXTENSIONS OFF
 	)
-	
+
 	list(FIND GUI_TARGETS ${_target} IS_GUI_TARGET)
 	if((NOT ${IS_GUI_TARGET} LESS 0) OR (${_target} STREQUAL "relion"))
 		add_dependencies(${_target} relion_gui_lib)
@@ -368,7 +394,7 @@ foreach (_target ${RELION_TARGETS})
 	if(TIFF_FOUND)
 		target_link_libraries(${_target} ${TIFF_LIBRARIES})
 	endif()
-    
+
 	install (TARGETS ${_target} RUNTIME DESTINATION bin)
 
 endforeach()
@@ -379,14 +405,14 @@ if(FETCH_TORCH_MODELS)
 endif()
 
 foreach (_target ${RELION_JAZ_SPA_TARGETS})
-	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)	
+	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)
 	add_executable(${_target} ${CMAKE_SOURCE_DIR}/src/jaz/single_particle/apps/${_target}.cpp)
-	set(LIB relion_lib)	
- 	add_dependencies(${_target} relion_lib)	
+	set(LIB relion_lib)
+ 	add_dependencies(${_target} relion_lib)
 	set_target_properties(${_target} PROPERTIES PREFIX "relion_")
 	target_link_libraries(${_target} ${LIB} ${FFTW_LIBRARIES} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
 	set_target_properties(${_target} PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF	)
-	
+
 	if(TIFF_FOUND)
 		target_link_libraries(${_target} ${TIFF_LIBRARIES})
 	endif()
@@ -394,36 +420,36 @@ foreach (_target ${RELION_JAZ_SPA_TARGETS})
 	if (ALTCPU)
 		target_link_libraries(${_target} ${TBB_LIBRARIES})
 	endif(ALTCPU)
-	
+
 	install (TARGETS ${_target} RUNTIME DESTINATION bin)
 endforeach()
 
 # former Dynamite programs:
 foreach (_target ${RELION_JAZ_TOMO_TARGETS})
-	GET_FILENAME_COMPONENT(_target "relion_tomo_${_target}" NAME_WE)	
+	GET_FILENAME_COMPONENT(_target "relion_tomo_${_target}" NAME_WE)
 	add_executable(${_target} ${CMAKE_SOURCE_DIR}/src/jaz/tomography/apps/${_target}.cpp)
-	set(LIB relion_lib)	
- 	add_dependencies(${_target} relion_lib)	
+	set(LIB relion_lib)
+ 	add_dependencies(${_target} relion_lib)
 	set_target_properties(${_target} PROPERTIES PREFIX "relion_tomo_")
 	target_link_libraries(${_target} ${LIB} ${FFTW_LIBRARIES} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
 	set_target_properties(${_target} PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF	)
-	
+
 	if(TIFF_FOUND)
 		target_link_libraries(${_target} ${TIFF_LIBRARIES})
 	endif()
-	
+
 	install (TARGETS ${_target} RUNTIME DESTINATION bin)
 endforeach()
 
 foreach (_target ${RELION_JAZ_EXPERIMENTAL_TARGETS})
-	GET_FILENAME_COMPONENT(_target "relion_exp_${_target}" NAME_WE)	
-	add_executable(${_target} ${CMAKE_SOURCE_DIR}/src/jaz/scripts/${_target}.cpp)		
-	set(LIB relion_lib)	
- 	add_dependencies(${_target} relion_lib)	
+	GET_FILENAME_COMPONENT(_target "relion_exp_${_target}" NAME_WE)
+	add_executable(${_target} ${CMAKE_SOURCE_DIR}/src/jaz/scripts/${_target}.cpp)
+	set(LIB relion_lib)
+ 	add_dependencies(${_target} relion_lib)
 	set_target_properties(${_target} PROPERTIES PREFIX "relion_exp_")
 	target_link_libraries(${_target} ${LIB} ${FFTW_LIBRARIES} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
 	set_target_properties(${_target} PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF	)
-	
+
 	if(TIFF_FOUND)
 		target_link_libraries(${_target} ${TIFF_LIBRARIES})
 	endif()
@@ -431,7 +457,7 @@ foreach (_target ${RELION_JAZ_EXPERIMENTAL_TARGETS})
 	if (ALTCPU)
 		target_link_libraries(${_target} ${TBB_LIBRARIES})
 	endif(ALTCPU)
-	
+
 	install (TARGETS ${_target} RUNTIME DESTINATION bin)
 endforeach()
 
@@ -448,6 +474,6 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 # Set this flag to activate bounds checking in stl-vectors (incl. strings)
-# It is useful to do this periodically, as it catches 
+# It is useful to do this periodically, as it catches
 # difficult-to-see and rare-to-manifest bugs
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GLIBCXX_DEBUG")
