@@ -1,5 +1,7 @@
+#include <hip/hip_runtime.h>
 #include "test00.h"
-#include "kernels/add.cu"
+#include "kernels/add.h"
+#include <iostream>
 
 void HipTest00 :: run()
 {

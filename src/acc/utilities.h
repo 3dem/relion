@@ -9,6 +9,11 @@
 #include "src/acc/cuda/cuda_kernels/wavg.cuh"
 #include "src/acc/cuda/cuda_kernels/diff2.cuh"
 #include "src/acc/cuda/cuda_fft.h"
+#elseif _HIP_ENABLED
+#include "src/acc/hip/hip_kernels/helper.h"
+#include "src/acc/cuda/hip_kernels/wavg.h"
+#include "src/acc/hip/hip_kernels/diff2.h"
+#include "src/acc/hip/hip_fft.h"
 #else
 #include "src/acc/cpu/cpu_kernels/helper.h"
 #include "src/acc/cpu/cpu_kernels/wavg.h"

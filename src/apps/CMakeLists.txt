@@ -291,6 +291,13 @@ else (HIP_FOUND)
 	file(GLOB REL_HIP_SRC "${CMAKE_SOURCE_DIR}/src/acc/hip/*.cpp" "${CMAKE_SOURCE_DIR}/src/acc/hip/hip_kernels/*.cpp" )
 	hip_add_library(relion_gpu_util ${REL_HIP_SRC} HIPCC_OPTIONS "-v -fPIC -fno-gpu-rdc -std=c++14" NVCC_OPTIONS)
 
+	if (${CMAKE_BUILD_TYPE_LOWER} STREQUAL "profiling")
+		find_library(ROCM_TRACER_LIB NAMES roctx64 PATHS ${HIP_ROOT_DIR}/lib ${HIP_ROOT_DIR}/../lib REQUIRED)
+		list(APPEND EXTRA_LIBS "${ROCM_TRACER_LIB}")
+		target_link_libraries(relion_gpu_util ${ROCM_TRACER_LIB})
+		message(STATUS "Adding extra library for AMD profiling: ${ROCM_TRACER_LIB}")
+	endif()
+
 	# Presently we have a number of (bad) circular dependencies between the gpu util
 	# and relion libraries, which cause errors at least on OS X with clang. Tell the
 	# compiler to ignore them.
@@ -313,6 +320,20 @@ else (HIP_FOUND)
 
 	target_link_libraries(relion_lib relion_gpu_util ${HIPFFT_LIBRARIES})
 	target_link_libraries(relion_lib relion_gpu_util ${HIPFFT_LIBRARIES} ${HIPRAND_LIBRARIES})
+
+	file(GLOB REL_JAZ_HIP_SRC "${CMAKE_SOURCE_DIR}/src/jaz/hip/*.cpp" "${CMAKE_SOURCE_DIR}/src/jaz/hip/kernels/*.cpp" )
+	hip_add_library(relion_jaz_gpu_util ${REL_JAZ_HIP_SRC})
+
+	#list(APPEND EXTRA_LIBS "${HIPFFT_LIBRARIES}")
+	#if(BUILD_SHARED_LIBS)
+	#	install (TARGETS relion_jaz_gpu_util LIBRARY DESTINATION lib)
+	#else()
+	#	target_link_libraries(relion_jaz_gpu_util relion_lib)
+	#	target_link_libraries(relion_jaz_gpu_util ${HIPFFT_LIBRARIES})
+	#endif()
+
+	target_link_libraries(relion_lib relion_jaz_gpu_util ${HIPFFT_LIBRARIES})
+	target_link_libraries(relion_lib relion_jaz_gpu_util ${HIPFFT_LIBRARIES} ${HIPRAND_LIBRARIES})
 
 endif()
 
@@ -371,9 +392,9 @@ foreach (_target ${RELION_TARGETS})
 		target_link_libraries(${_target} ${LIB} ${FFTW_LIBRARIES} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
 	endif(NOT MKLFFT)
 
-	if(CUDA_FOUND)
+	if(CUDA_FOUND OR HIP_FOUND)
 		target_link_libraries(${_target} relion_gpu_util)
-	endif(CUDA_FOUND)
+	endif()
 
 	if (ALTCPU)
 		target_link_libraries(${_target} ${TBB_LIBRARIES})
