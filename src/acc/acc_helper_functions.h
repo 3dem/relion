@@ -2,7 +2,11 @@
 #define ACC_HELPER_FUNCTIONS_H_
 
 #include "src/acc/acc_ml_optimiser.h"
-
+#ifdef _CUDA_ENABLED
+	using deviceStream_t = cudaStream_t;
+#elif _HIP_ENABLED
+	using deviceStream_t = hipStream_t;
+#endif
 /*
  * This assisting function goes over the orientations determined as significant for this image, and checks
  * which translations should be included in the list of those which differences will be calculated for.
@@ -90,7 +94,7 @@ void runWavgKernel(
 		bool refs_are_ctf_corrected,
 		bool ctf_premultiplied,
 		bool data_is_3D,
-		cudaStream_t stream);
+		deviceStream_t stream);
 
 void runBackProjectKernel(
 		AccBackprojector &BP,
@@ -114,7 +118,7 @@ void runBackProjectKernel(
 		bool data_is_3D,
 		bool do_grad,
 		bool ctf_premultiplied,
-		cudaStream_t optStream);
+		deviceStream_t optStream);
 
 template< typename T>
 void deviceInitComplexValue(AccPtr<T> &data, XFLOAT value)
@@ -140,7 +144,7 @@ void mapAllWeightsToMweights(
 		XFLOAT * d_mweights, //Mweight
 		unsigned long orientation_num, //projectorPlan.orientation_num
 		unsigned long translation_num, //translation_num
-		cudaStream_t stream
+		deviceStream_t stream
 		);
 
 #define OVER_THRESHOLD_BLOCK_SIZE 512
@@ -156,6 +160,15 @@ void arrayOverThreshold(AccPtr<T> &data, AccPtr<bool> &passed, T threshold)
 			data.getSize(),
 			OVER_THRESHOLD_BLOCK_SIZE);
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
+#elif _HIP_ENABLED
+	int grid_size = ceil((float)data.getSize()/(float)OVER_THRESHOLD_BLOCK_SIZE);
+	hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_array_over_threshold<T>), dim3(grid_size), dim3(OVER_THRESHOLD_BLOCK_SIZE), 0, data.getStream(),
+			~data,
+			~passed,
+			threshold,
+			data.getSize(),
+			OVER_THRESHOLD_BLOCK_SIZE);
+	LAUNCH_HANDLE_ERROR(hipGetLastError());
 #else
 	int Size = data.getSize();
 	for(size_t i=0; i<Size; i++)
@@ -193,6 +206,20 @@ size_t findThresholdIdxInCumulativeSum(AccPtr<T> &data, T threshold)
 		idx.cpToHost();
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(data.getStream()));
 		return idx[0];
+#elif _HIP_ENABLED
+		AccPtr<size_t >  idx(1, data.getStream(), data.getAllocator());
+		idx[0] = 0;
+
+		idx.putOnDevice();
+		hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_find_threshold_idx_in_cumulative), dim3(grid_size), dim3(FIND_IN_CUMULATIVE_BLOCK_SIZE), 0, data.getStream(),
+				~data,
+				threshold,
+				data.getSize()-1,
+				~idx,
+				FIND_IN_CUMULATIVE_BLOCK_SIZE);
+		idx.cpToHost();
+		DEBUG_HANDLE_ERROR(hipStreamSynchronize(data.getStream()));
+		return idx[0];
 #else
 		size_t idx = 0;
 		size_t size_m1 = data.getSize()-1;
@@ -219,7 +246,7 @@ void runDiff2KernelCoarse(
 		long unsigned orientation_num,
 		unsigned long translation_num,
 		unsigned long image_size,
-		cudaStream_t stream,
+		deviceStream_t stream,
 		bool do_CC,
 		bool data_is_3D);
 
@@ -246,7 +273,7 @@ void runDiff2KernelFine(
 		unsigned long image_size,
 		int img_id,
 		int exp_iclass,
-		cudaStream_t stream,
+		deviceStream_t stream,
 		long unsigned job_num_count,
 		bool do_CC,
 		bool data_is_3D);
@@ -283,14 +310,20 @@ void windowFourierTransform2(
 		size_t oX, size_t oY, size_t oZ,  //Output dimensions
 		size_t Npsi = 1,
 		size_t pos = 0,
-		cudaStream_t stream = 0);
+		deviceStream_t stream = 0);
 
 
 void selfApplyBeamTilt2(MultidimArray<Complex > &Fimg, RFLOAT beamtilt_x, RFLOAT beamtilt_y,
 		RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size);
 
 template <typename T>
-void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allocator)
+void runCenterFFT(MultidimArray< T >& v, bool forward, 
+#ifdef _CUDA_ENABLED
+	CudaCustomAllocator *allocator
+#elif _HIP_ENABLED
+	HipCustomAllocator *allocator
+#endif	
+)
 {
 	AccPtr<XFLOAT >  img_in (v.nzyxdim, allocator);   // with original data pointer
 //	AccPtr<XFLOAT >  img_aux(v.nzyxdim, allocator);   // temporary holder
@@ -349,7 +382,7 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 
 		int dim=ceilf((float)(v.nzyxdim/(float)(2*CFTT_BLOCK_SIZE)));
 		AccUtilities::centerFFT_2D(dim, 0, CFTT_BLOCK_SIZE,
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 				~img_in,
 #else
 				&img_in[0],
@@ -359,8 +392,11 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 				YSIZE(v),
 				xshift,
 				yshift);
+#ifdef _CUDA_ENABLED
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
-
+#elif _HIP_ENABLED
+		LAUNCH_HANDLE_ERROR(hipGetLastError());
+#endif
 		img_in.cpToHost();
 
 		for (unsigned long i = 0; i < v.nzyxdim; i ++)
@@ -498,13 +534,14 @@ void runCenterFFT( AccPtr< T > &img_in,
 		ySize,
 		xshift,
 		yshift);
-
+#ifdef _CUDA_ENABLED
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
-
-//	HANDLE_ERROR(cudaStreamSynchronize(0));
+	//	HANDLE_ERROR(cudaStreamSynchronize(0));
+#elif _HIP_ENABLED
+	LAUNCH_HANDLE_ERROR(hipGetLastError());
+	//	HANDLE_ERROR(hipStreamSynchronize(0));
+#endif
 //	img_aux.cpOnDevice(img_in.d_ptr); //update input image with centered kernel-output.
-
-
 }
 
 template <typename T>
@@ -543,8 +580,13 @@ void runCenterFFT( AccPtr< T > &img_in,
 			xshift,
 			yshift,
 			zshift);
+		#ifdef _CUDA_ENABLED
 			LAUNCH_HANDLE_ERROR(cudaGetLastError());
 		//	HANDLE_ERROR(cudaStreamSynchronize(0));
+		#elif _HIP_ENABLED
+			LAUNCH_HANDLE_ERROR(hipGetLastError());
+		//	HANDLE_ERROR(hipStreamSynchronize(0));
+		#endif
 		//	img_aux.cpOnDevice(img_in.d_ptr); //update input image with centered kernel-output.
 	}
 	else
@@ -567,7 +609,11 @@ void runCenterFFT( AccPtr< T > &img_in,
 			ySize,
 			xshift,
 			yshift);
+		#ifdef _CUDA_ENABLED
 			LAUNCH_HANDLE_ERROR(cudaGetLastError());
+		#elif _HIP_ENABLED
+			LAUNCH_HANDLE_ERROR(hipGetLastError());
+		#endif
 	}
 }
 
@@ -626,7 +672,11 @@ void lowPassFilterMapGPU(
 						(XFLOAT)angpix,
 						(size_t)Xdim*(size_t)Ydim*(size_t)Zdim);
 	}
+#ifdef _CUDA_ENABLED
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
+#elif _HIP_ENABLED
+	LAUNCH_HANDLE_ERROR(hipGetLastError());
+#endif
 }
 
 #endif //ACC_HELPER_FUNCTIONS_H_

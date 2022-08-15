@@ -8,6 +8,12 @@
 #include "src/acc/cuda/custom_allocator.cuh"
 #include "src/acc/cuda/cuda_mem_utils.h"
 #include "src/acc/cuda/shortcuts.cuh"
+#elif _HIP_ENABLED
+#include "src/acc/hip/hip_settings.h"
+#include <hip/hip_runtime.h>
+#include "src/acc/hip/custom_allocator.h"
+#include "src/acc/hip/hip_mem_utils.h"
+#include "src/acc/hip/shortcuts.h"
 #else
 #include "src/acc/cpu/cpu_settings.h"
 #endif
@@ -34,7 +40,7 @@ static void HandleAccPtrDebugFatal( const char *err, const char *file, int line 
 {
     	fprintf(stderr, "DEBUG ERROR: %s in %s:%d\n", err, file, line );
 		fflush(stdout);
-#ifdef DEBUG_CUDA
+#if defined(DEBUG_CUDA) || defined(DEBUG_HIP)
 		raise(SIGSEGV);
 #else
 		CRITICAL(ERRGPUKERN);
@@ -48,13 +54,17 @@ static void HandleAccPtrDebugInformational( const char *err, const char *file, i
 		fflush(stdout);
 }
 
-enum AccType {accUNSET, accCUDA, accCPU};
+enum AccType {accUNSET, accHIP, accCUDA, accCPU};
 
 
 #ifdef _CUDA_ENABLED
 typedef cudaStream_t StreamType;
 typedef CudaCustomAllocator AllocatorType;
 typedef CudaCustomAllocator::Alloc AllocationType;
+#elif _HIP_ENABLED
+typedef hipStream_t StreamType;
+typedef hipCustomAllocator AllocatorType;
+typedef HipCustomAllocator::Alloc AllocationType;
 #else
 typedef float StreamType; //Dummy type
 typedef double AllocatorType;  //Dummy type
@@ -84,10 +94,15 @@ public:
 
 	AccPtr(AllocatorType *allocator):
 		size(0), hPtr(NULL), dPtr(NULL), doFreeHost(false),
-		doFreeDevice(false), allocator(allocator), alloc(NULL), stream(cudaStreamPerThread),
+		doFreeDevice(false), allocator(allocator), alloc(NULL),
 #ifdef _CUDA_ENABLED
+		stream(cudaStreamPerThread),
 		accType(accCUDA)
+#elif _HIP_ENABLED
+		stream(hipStreamPerThread),
+		accType(accHIP)
 #else
+		stream(cudaStreamPerThread),
 		accType(accCPU)
 #endif
 	{}
@@ -97,6 +112,8 @@ public:
 		doFreeDevice(false), allocator(allocator), alloc(NULL), stream(stream),
 #ifdef _CUDA_ENABLED
 		accType(accCUDA)
+#elif _HIP_ENABLED
+		accType(accHIP)
 #else
 		accType(accCPU)
 #endif
@@ -104,10 +121,15 @@ public:
 
 	AccPtr(size_t size, AllocatorType *allocator):
 		size(size), dPtr(NULL), doFreeHost(true),
-		doFreeDevice(false), allocator(allocator), alloc(NULL), stream(cudaStreamPerThread),
+		doFreeDevice(false), allocator(allocator), alloc(NULL),
 #ifdef _CUDA_ENABLED
+		stream(cudaStreamPerThread),
 		accType(accCUDA)
+#elif _HIP_ENABLED
+		stream(hipStreamPerThread),
+		accType(accHIP)		
 #else
+		stream(cudaStreamPerThread),
 		accType(accCPU)
 #endif
 	{
@@ -120,6 +142,8 @@ public:
 		doFreeDevice(false), allocator(allocator), alloc(NULL), stream(stream),
 #ifdef _CUDA_ENABLED
 		accType(accCUDA)
+#elif _HIP_ENABLED
+		accType(accHIP)
 #else
 		accType(accCPU)
 #endif
@@ -130,30 +154,45 @@ public:
 
 	AccPtr(T * h_start, size_t size, AllocatorType *allocator):
 		size(size), hPtr(h_start), dPtr(NULL), doFreeHost(false),
-		doFreeDevice(false), allocator(allocator), alloc(NULL), stream(cudaStreamPerThread),
+		doFreeDevice(false), allocator(allocator), alloc(NULL), 
 #ifdef _CUDA_ENABLED
+		stream(cudaStreamPerThread),
 		accType(accCUDA)
+#elif  _HIP_ENABLED
+		stream(hipStreamPerThread),
+		accType(accHIP)
 #else
+		stream(cudaStreamPerThread),
 		accType(accCPU)
 #endif
 	{}
 
 	AccPtr(T * h_start, size_t size, StreamType stream, AllocatorType *allocator):
 		size(size), hPtr(h_start), dPtr(NULL), doFreeHost(false),
-		doFreeDevice(false), allocator(allocator), alloc(NULL), stream(cudaStreamPerThread),
+		doFreeDevice(false), allocator(allocator), alloc(NULL), 
 #ifdef _CUDA_ENABLED
+		stream(cudaStreamPerThread),
 		accType(accCUDA)
+#elif _HIP_ENABLED
+		stream(hipStreamPerThread),
+		accType(accHIP)
 #else
+		stream(cudaStreamPerThread),
 		accType(accCPU)
 #endif
 	{}
 
 	AccPtr(T * h_start, T * d_start, size_t size, AllocatorType *allocator):
 		size(size), hPtr(h_start), dPtr(d_start), doFreeHost(false),
-		doFreeDevice(false), allocator(allocator), alloc(NULL), stream(cudaStreamPerThread),
+		doFreeDevice(false), allocator(allocator), alloc(NULL),
 #ifdef _CUDA_ENABLED
+		stream(cudaStreamPerThread),
 		accType(accCUDA)
+#elif _HIP_ENABLED
+		stream(hipStreamPerThread),
+		accType(accHIP)
 #else
+		stream(cudaStreamPerThread),
 		accType(accCPU)
 #endif
 	{}
@@ -163,6 +202,8 @@ public:
 		doFreeDevice(false), allocator(allocator), alloc(NULL), stream(stream),
 #ifdef _CUDA_ENABLED
 		accType(accCUDA)
+#elif _HIP_ENABLED
+		accType(accHIP)
 #else
 		accType(accCPU)
 #endif
@@ -174,10 +215,15 @@ public:
 
 	AccPtr():
 		size(0), hPtr(NULL), dPtr(NULL), doFreeHost(false),
-		doFreeDevice(false), allocator(NULL), alloc(NULL), stream(cudaStreamPerThread),
+		doFreeDevice(false), allocator(NULL), alloc(NULL),
 #ifdef _CUDA_ENABLED
+		stream(cudaStreamPerThread),
 		accType(accCUDA)
+#elif _HIP_ENABLED
+		stream(hipStreamPerThread),
+		accType(accHIP)
 #else
+		stream(cudaStreamPerThread),
 		accType(accCPU)
 #endif
 	{}
@@ -187,6 +233,8 @@ public:
 		doFreeDevice(false), allocator(NULL), alloc(NULL), stream(stream),
 #ifdef _CUDA_ENABLED
 		accType(accCUDA)
+#elif _HIP_ENABLED
+		accType(accHIP)
 #else
 		accType(accCPU)
 #endif
@@ -194,10 +242,15 @@ public:
 
 	AccPtr(size_t size):
 		size(size), dPtr(NULL), doFreeHost(true),
-		doFreeDevice(false), allocator(NULL), alloc(NULL), stream(cudaStreamPerThread),
+		doFreeDevice(false), allocator(NULL), alloc(NULL),
 #ifdef _CUDA_ENABLED
+		stream(cudaStreamPerThread),
 		accType(accCUDA)
+#elif _HIP_ENABLED
+		stream(hipStreamPerThread),
+		accType(accHIP)
 #else
+		stream(cudaStreamPerThread),
 		accType(accCPU)
 #endif
 	{
@@ -210,6 +263,8 @@ public:
 		doFreeDevice(false), allocator(NULL), alloc(NULL), stream(stream),
 #ifdef _CUDA_ENABLED
 		accType(accCUDA)
+#elif _HIP_ENABLED
+		accType(accHIP)
 #else
 		accType(accCPU)
 #endif
@@ -220,30 +275,45 @@ public:
 
 	AccPtr(T * h_start, size_t size):
 		size(size), hPtr(h_start), dPtr(NULL), doFreeHost(false),
-		doFreeDevice(false), allocator(NULL), alloc(NULL), stream(cudaStreamPerThread),
+		doFreeDevice(false), allocator(NULL), alloc(NULL),
 #ifdef _CUDA_ENABLED
+		stream(cudaStreamPerThread),
 		accType(accCUDA)
+#elif _HIP_ENABLED
+		stream(hipStreamPerThread),
+		accType(accHIP)
 #else
+		stream(cudaStreamPerThread),
 		accType(accCPU)
 #endif
 	{}
 
 	AccPtr(T * h_start, size_t size, StreamType stream):
 		size(size), hPtr(h_start), dPtr(NULL), doFreeHost(false),
-		doFreeDevice(false), allocator(NULL), alloc(NULL), stream(cudaStreamPerThread),
+		doFreeDevice(false), allocator(NULL), alloc(NULL),
 #ifdef _CUDA_ENABLED
+		stream(cudaStreamPerThread),
 		accType(accCUDA)
+#elif _HIP_ENABLED
+		stream(hipStreamPerThread),
+		accType(accHIP)
 #else
+		stream(cudaStreamPerThread),
 		accType(accCPU)
 #endif
 	{}
 
 	AccPtr(T * h_start, T * d_start, size_t size):
 		size(size), hPtr(h_start), dPtr(d_start), doFreeHost(false),
-		doFreeDevice(false), allocator(NULL), alloc(NULL), stream(cudaStreamPerThread),
+		doFreeDevice(false), allocator(NULL), alloc(NULL),
 #ifdef _CUDA_ENABLED
+		stream(cudaStreamPerThread),
 		accType(accCUDA)
+#elif _HIP_ENABLED
+		stream(hipStreamPerThread),
+		accType(accHIP)
 #else
+		stream(cudaStreamPerThread),
 		accType(accCPU)
 #endif
 	{}
@@ -253,6 +323,8 @@ public:
 		doFreeDevice(false), allocator(NULL), alloc(NULL), stream(stream),
 #ifdef _CUDA_ENABLED
 		accType(accCUDA)
+#elif _HIP_ENABLED
+		accType(accHIP)
 #else
 		accType(accCPU)
 #endif
@@ -289,10 +361,19 @@ public:
 #ifdef _CUDA_ENABLED
 		if (accType == accCUDA)
 		{
-#ifdef DEBUG_CUDA
+	#ifdef DEBUG_CUDA
 			if (alloc == NULL)
 				ACC_PTR_DEBUG_FATAL("markReadyEvent called on null allocation.\n");
-#endif
+	#endif
+			alloc->markReadyEvent(stream);
+		}
+#elif _HIP_ENABLED
+		if (accType == accHIP)
+		{
+	#ifdef DEBUG_HIP
+			if (alloc == NULL)
+				ACC_PTR_DEBUG_FATAL("markReadyEvent called on null allocation.\n");
+	#endif
 			alloc->markReadyEvent(stream);
 		}
 #endif
@@ -306,12 +387,26 @@ public:
 #ifdef _CUDA_ENABLED
 		if (accType == accCUDA)
 		{
-#ifdef DEBUG_CUDA
+	#ifdef DEBUG_CUDA
 			if(size==0)
 				ACC_PTR_DEBUG_FATAL("deviceAlloc called with size == 0");
 			if (doFreeDevice)
 				ACC_PTR_DEBUG_FATAL("Device double allocation.\n");
-#endif
+	#endif
+				doFreeDevice = true;
+
+				alloc = allocator->alloc(size * sizeof(T));
+				dPtr = (T*) alloc->getPtr();
+		}
+#elif _HIP_ENABLED
+		if (accType == accHIP)
+		{
+	#ifdef DEBUG_HIP
+			if(size==0)
+				ACC_PTR_DEBUG_FATAL("deviceAlloc called with size == 0");
+			if (doFreeDevice)
+				ACC_PTR_DEBUG_FATAL("Device double allocation.\n");
+	#endif
 				doFreeDevice = true;
 
 				alloc = allocator->alloc(size * sizeof(T));
@@ -334,7 +429,7 @@ public:
 	 */
 	void hostAlloc()
 	{
-#ifdef DEBUG_CUDA
+#if defined(DEBUG_CUDA) || defined(DEBUG_HIP)
 		if(size==0)
 			ACC_PTR_DEBUG_FATAL("deviceAlloc called with size == 0");
 		if (doFreeHost)
@@ -370,7 +465,7 @@ public:
 
 	void accAlloc()
 	{
-		if (accType == accCUDA)
+		if (accType == accCUDA || accType == accHIP)
 			deviceAlloc();
 		else
 			hostAlloc();
@@ -378,7 +473,7 @@ public:
 
 	void accAlloc(size_t newSize)
 	{
-		if (accType == accCUDA)
+		if (accType == accCUDA || accType == accHIP)
 			deviceAlloc(newSize);
 		else
 			hostAlloc(newSize);
@@ -387,7 +482,7 @@ public:
 	// Allocate storage of a new size for the array
 	void resizeHost(size_t newSize)
 	{
-#ifdef DEBUG_CUDA
+#if defined(DEBUG_CUDA) || defined(DEBUG_HIP)
 		if (size==0)
 			ACC_PTR_DEBUG_INFO("Resizing from size zero (permitted).\n");
 #endif
@@ -397,7 +492,7 @@ public:
 			CRITICAL(RAMERR);
 		memset( newArr, 0x0, sizeof(T) * newSize);
 
-#ifdef DEBUG_CUDA
+#if defined(DEBUG_CUDA) || defined(DEBUG_HIP)
 		if (dPtr!=NULL)
 			ACC_PTR_DEBUG_FATAL("resizeHost: Resizing host with present device allocation.\n");
 		if (newSize==0)
@@ -412,7 +507,7 @@ public:
 	// Resize retaining as much of the original contents as possible
 	void resizeHostCopy(size_t newSize)
 	{
-#ifdef DEBUG_CUDA
+#if defined(DEBUG_CUDA) || defined(DEBUG_HIP)
 //		if (size==0)
 //			ACC_PTR_DEBUG_INFO("Resizing from size zero (permitted).\n");
 #endif
@@ -443,7 +538,7 @@ public:
 			memset( newArr, 0x0, sizeof(T) * newSize);
 		}
 
-#ifdef DEBUG_CUDA
+#if defined(DEBUG_CUDA) || defined(DEBUG_HIP)
 		if (dPtr!=NULL)
 			ACC_PTR_DEBUG_FATAL("resizeHostCopy: Resizing host with present device allocation.\n");
 		if (newSize==0)
@@ -463,11 +558,20 @@ public:
 #ifdef _CUDA_ENABLED
 		if (accType == accCUDA)
 		{
-#ifdef DEBUG_CUDA
+	#ifdef DEBUG_CUDA
 			if (dPtr == NULL)
 				ACC_PTR_DEBUG_FATAL("Memset requested before allocation in deviceInit().\n");
-#endif
+	#endif
 			cudaMemInit<T>( dPtr, value, size, stream);
+		}
+#elif _HIP_ENABLED
+		if (accType == accHIP)
+		{
+	#ifdef DEBUG_HIP
+			if (dPtr == NULL)
+				ACC_PTR_DEBUG_FATAL("Memset requested before allocation in deviceInit().\n");
+	#endif
+			hipMemInit<T>( dPtr, value, size, stream);
 		}
 #endif
 	}
@@ -477,7 +581,7 @@ public:
 	 */
 	void hostInit(int value)
 	{
-#ifdef DEBUG_CUDA
+#if defined(DEBUG_CUDA) || defined(DEBUG_HIP)
 		if (hPtr == NULL)
 			ACC_PTR_DEBUG_FATAL("Memset requested before allocation in hostInit().\n");
 #endif
@@ -489,7 +593,7 @@ public:
 	 */
 	void accInit(int value)
 	{
-		if (accType == accCUDA)
+		if (accType == accCUDA || accType == accHIP)
 			deviceInit(value);
 		else
 			hostInit(value);
@@ -501,7 +605,7 @@ public:
 	void allInit(int value)
 	{
 		hostInit(value);
-		if (accType == accCUDA)
+		if (accType == accCUDA || accType == accHIP)
 			deviceInit(value);
 	}
 
@@ -513,13 +617,24 @@ public:
 #ifdef _CUDA_ENABLED
 		if (accType == accCUDA)
 		{
-#ifdef DEBUG_CUDA
+	#ifdef DEBUG_CUDA
 			if (dPtr == NULL)
 				ACC_PTR_DEBUG_FATAL("cpToDevice() called before allocation.\n");
 			if (hPtr == NULL)
 				ACC_PTR_DEBUG_FATAL("NULL host pointer in cpToDevice().\n");
-#endif
+	#endif
 			CudaShortcuts::cpyHostToDevice<T>(hPtr, dPtr, size, stream);
+		}
+#elif _HIP_ENABLED
+		if (accType == accHIP)
+		{
+	#ifdef DEBUG_HIP
+			if (dPtr == NULL)
+				ACC_PTR_DEBUG_FATAL("cpToDevice() called before allocation.\n");
+			if (hPtr == NULL)
+				ACC_PTR_DEBUG_FATAL("NULL host pointer in cpToDevice().\n");
+	#endif
+			HipShortcuts::cpyHostToDevice<T>(hPtr, dPtr, size, stream);
 		}
 #endif
 	}
@@ -529,9 +644,9 @@ public:
 	 */
 	void cpToDevice(T * hostPtr)
 	{
-		if (accType == accCUDA)
+		if (accType == accCUDA || accType == accHIP)
 		{
-#ifdef DEBUG_CUDA
+#if defined(DEBUG_CUDA) || defined(DEBUG_HIP)
 			if (hostPtr == NULL)
 				ACC_PTR_DEBUG_FATAL("Null-pointer given in cpToDevice(hostPtr).\n");
 #endif
@@ -568,13 +683,24 @@ public:
 #ifdef _CUDA_ENABLED
 		if (accType == accCUDA)
 		{
-#ifdef DEBUG_CUDA
+	#ifdef DEBUG_CUDA
 			if (dPtr == NULL)
 				ACC_PTR_DEBUG_FATAL("cp_to_host() called before device allocation.\n");
 			if (hPtr == NULL)
 				ACC_PTR_DEBUG_FATAL("NULL host pointer in cp_to_host().\n");
-#endif
+	#endif
 			cudaCpyDeviceToHost<T>(dPtr, hPtr, size, stream);
+		}
+#elif _HIP_ENABLED
+		if (accType == accHIP)
+		{
+	#ifdef DEBUG_HIP
+			if (dPtr == NULL)
+				ACC_PTR_DEBUG_FATAL("cp_to_host() called before device allocation.\n");
+			if (hPtr == NULL)
+				ACC_PTR_DEBUG_FATAL("NULL host pointer in cp_to_host().\n");
+	#endif
+			hipCpyDeviceToHost<T>(dPtr, hPtr, size, stream);
 		}
 #endif
 	}
@@ -587,13 +713,24 @@ public:
 #ifdef _CUDA_ENABLED
 		if (accType == accCUDA)
 		{
-#ifdef DEBUG_CUDA
+	#ifdef DEBUG_CUDA
 			if (dPtr == NULL)
 				ACC_PTR_DEBUG_FATAL("cp_to_host(thisSize) called before device allocation.\n");
 			if (hPtr == NULL)
 				ACC_PTR_DEBUG_FATAL("NULL host pointer in cp_to_host(thisSize).\n");
-#endif
+	#endif
 			cudaCpyDeviceToHost<T>(dPtr, hPtr, thisSize, stream);
+		}
+#elif _HIP_ENABLED
+		if (accType == accHIP)
+		{
+	#ifdef DEBUG_HIP
+			if (dPtr == NULL)
+				ACC_PTR_DEBUG_FATAL("cp_to_host(thisSize) called before device allocation.\n");
+			if (hPtr == NULL)
+				ACC_PTR_DEBUG_FATAL("NULL host pointer in cp_to_host(thisSize).\n");
+	#endif
+			hipCpyDeviceToHost<T>(dPtr, hPtr, thisSize, stream);
 		}
 #endif
 	}
@@ -606,13 +743,24 @@ public:
 #ifdef _CUDA_ENABLED
 		if (accType == accCUDA)
 		{
-#ifdef DEBUG_CUDA
+	#ifdef DEBUG_CUDA
 			if (dPtr == NULL)
 				ACC_PTR_DEBUG_FATAL("cp_to_host(hstPtr, thisSize) called before device allocation.\n");
 			if (hstPtr == NULL)
 				ACC_PTR_DEBUG_FATAL("NULL host pointer in cp_to_host(hstPtr, thisSize).\n");
-#endif
+	#endif
 			cudaCpyDeviceToHost<T>(dPtr, hstPtr, thisSize, stream);
+		}
+#elif _HIP_ENABLED
+		if (accType == accHIP)
+		{
+	#ifdef DEBUG_HIP
+			if (dPtr == NULL)
+				ACC_PTR_DEBUG_FATAL("cp_to_host(hstPtr, thisSize) called before device allocation.\n");
+			if (hstPtr == NULL)
+				ACC_PTR_DEBUG_FATAL("NULL host pointer in cp_to_host(hstPtr, thisSize).\n");
+	#endif
+			hipCpyDeviceToHost<T>(dPtr, hstPtr, thisSize, stream);
 		}
 #endif
 	}
@@ -625,13 +773,24 @@ public:
 #ifdef _CUDA_ENABLED
 		if (accType == accCUDA)
 		{
-#ifdef DEBUG_CUDA
+	#ifdef DEBUG_CUDA
 			if (dPtr == NULL)
 				ACC_PTR_DEBUG_FATAL("cp_to_host_on_stream(s) called before device allocation.\n");
 			if (hPtr == NULL)
 				ACC_PTR_DEBUG_FATAL("NULL host pointer in cp_to_host_on_stream(s).\n");
-#endif
+	#endif
 			cudaCpyDeviceToHost<T>(dPtr, hPtr, size, s);
+		}
+#elif _HIP_ENABLED
+		if (accType == accHIP)
+		{
+	#ifdef DEBUG_HIP
+			if (dPtr == NULL)
+				ACC_PTR_DEBUG_FATAL("cp_to_host_on_stream(s) called before device allocation.\n");
+			if (hPtr == NULL)
+				ACC_PTR_DEBUG_FATAL("NULL host pointer in cp_to_host_on_stream(s).\n");
+	#endif
+			hipCpyDeviceToHost<T>(dPtr, hPtr, size, s);
 		}
 #endif
 	}
@@ -644,11 +803,20 @@ public:
 #ifdef _CUDA_ENABLED
 		if (accType == accCUDA)
 		{
-#ifdef DEBUG_CUDA
+	#ifdef DEBUG_CUDA
 			if (dstDevPtr == NULL)
 				ACC_PTR_DEBUG_FATAL("NULL-pointer given in cpOnDevice(dstDevPtr).\n");
-#endif
+	#endif
 			CudaShortcuts::cpyDeviceToDevice(dPtr, dstDevPtr, size, stream);
+		}
+#elif _HIP_ENABLED
+		if (accType == accHIP)
+		{
+	#ifdef DEBUG_HIP
+			if (dstDevPtr == NULL)
+				ACC_PTR_DEBUG_FATAL("NULL-pointer given in cpOnDevice(dstDevPtr).\n");
+	#endif
+			HipShortcuts::cpyDeviceToDevice(dPtr, dstDevPtr, size, stream);
 		}
 #endif
 	}
@@ -658,7 +826,7 @@ public:
 	 */
 	void cpOnHost(T * dstDevPtr)
 	{
-#ifdef DEBUG_CUDA
+#if defined(DEBUG_CUDA) || defined(DEBUG_HIP)
 		if (dstDevPtr == NULL)
 			ACC_PTR_DEBUG_FATAL("NULL-pointer given in cp_on_host(dstDevPtr).\n");
 		if (hPtr == NULL)
@@ -669,7 +837,7 @@ public:
 
 	void cpOnAcc(T * dstDevPtr)
 	{
-		if (accType == accCUDA)
+		if (accType == accCUDA || accType == accHIP)
 			cpOnDevice(dstDevPtr);
 		else
 			cpOnHost(dstDevPtr);
@@ -677,7 +845,7 @@ public:
 
 	void cpOnAcc(AccPtr<T> &devPtr)
 	{
-		if (accType == accCUDA)
+		if (accType == accCUDA || accType == accHIP)
 			cpOnDevice(devPtr.dPtr);
 		else
 			cpOnHost(devPtr.hPtr);
@@ -688,7 +856,7 @@ public:
 	 */
 	const T& operator[](size_t idx) const
 	{
-#ifdef DEBUG_CUDA
+#if defined(DEBUG_CUDA) || defined(DEBUG_HIP)
 		if (hPtr == NULL)
 			ACC_PTR_DEBUG_FATAL("const operator[] called with NULL host pointer.\n");
 #endif
@@ -700,7 +868,7 @@ public:
 	 */
 	T& operator[](size_t idx)
 	{
-#ifdef DEBUG_CUDA
+#if defined(DEBUG_CUDA) || defined(DEBUG_HIP)
 		if (hPtr == NULL)
 			ACC_PTR_DEBUG_FATAL("operator[] called with NULL host pointer.\n");
 #endif
@@ -712,7 +880,7 @@ public:
 	 */
 	T& operator()(size_t idx) 
 	{ 
-#ifdef DEBUG_CUDA
+#if defined(DEBUG_CUDA) || defined(DEBUG_HIP)
 			if (dPtr == NULL)
 				ACC_PTR_DEBUG_FATAL("operator(idx) called with NULL acc pointer.\n");
 #endif
@@ -725,7 +893,7 @@ public:
 	 */
 	const T& operator()(size_t idx) const 
 	{ 
-#ifdef DEBUG_CUDA
+#if defined(DEBUG_CUDA) || defined(DEBUG_HIP)
 			if (dPtr == NULL)
 				ACC_PTR_DEBUG_FATAL("operator(idx) called with NULL acc pointer.\n");
 #endif
@@ -739,9 +907,9 @@ public:
 	{
 		// TODO - this could cause considerable confusion given the above operators.  But it
 		// also simplifies code that uses it.   What to do...
-		if (accType == accCUDA)
+		if (accType == accCUDA || accType == accHIP)
 		{
-#ifdef DEBUG_CUDA
+#if defined(DEBUG_CUDA) || defined(DEBUG_HIP)
 			if (dPtr == NULL)
 				ACC_PTR_DEBUG_FATAL("operator() called with NULL device pointer.\n");
 #endif
@@ -749,7 +917,7 @@ public:
 		}
 		else
 		{
-#ifdef DEBUG_CUDA
+#if defined(DEBUG_CUDA) || defined(DEBUG_HIP)
 			if (hPtr == NULL)
 				ACC_PTR_DEBUG_FATAL("operator() called with NULL host pointer.\n");
 #endif
@@ -761,9 +929,9 @@ public:
 	{
 		// TODO - this could cause considerable confusion given the above operators.  But it
 		// also simplifies code that uses it.   What to do...
-		if (accType == accCUDA)
+		if (accType == accCUDA || accType == accHIP)
 		{
-#ifdef DEBUG_CUDA
+#if defined(DEBUG_CUDA) || defined(DEBUG_HIP)
 			if ( dPtr == 0)
 				ACC_PTR_DEBUG_FATAL("DEBUG_WARNING: \"kernel cast\" on null device pointer.\n");
 #endif
@@ -771,7 +939,7 @@ public:
 		}
 		else
 		{
-#ifdef DEBUG_CUDA
+#if defined(DEBUG_CUDA) || defined(DEBUG_HIP)
 		if ( hPtr == 0)
 			ACC_PTR_DEBUG_FATAL("DEBUG_WARNING: \"kernel cast\" on null host pointer.\n");
 #endif
@@ -784,6 +952,9 @@ public:
 #ifdef _CUDA_ENABLED
 		if (accType == accCUDA)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(stream));
+#elif _HIP_ENABLED
+		if (accType == accHIP)
+			DEBUG_HANDLE_ERROR(hipStreamSynchronize(stream));
 #endif
 	}
 
@@ -794,6 +965,15 @@ public:
 		{
 			T value;
 			cudaCpyDeviceToHost<T>(&dPtr[idx], &value, 1, stream);
+			streamSync();
+			return value;
+		}
+		else
+#elif _HIP_ENABLED
+		if (accType == accHIP)
+		{
+			T value;
+			hipCpyDeviceToHost<T>(&dPtr[idx], &value, 1, stream);
 			streamSync();
 			return value;
 		}
@@ -812,6 +992,14 @@ public:
 			streamSync();
 			return value;
 		}
+#elif _HIP_ENABLED
+		if (accType == accHIP)
+		{
+			T value;
+			hipCpyDeviceToHost<T>(&dPtr[idx], &value, 1, stream);
+			streamSync();
+			return value;
+		}
 #else
 		return NULL;
 #endif
@@ -825,6 +1013,21 @@ public:
 		{
 			T *tmp = new T[size];
 			cudaCpyDeviceToHost<T>(dPtr, tmp, size, stream);
+
+			std::ofstream f;
+			f.open(fileName.c_str());
+			streamSync();
+			for (unsigned i = 0; i < size; i ++)
+				f << tmp[i] << std::endl;
+			f.close();
+			delete [] tmp;
+		}
+		else
+#elif _HIP_ENABLED
+		if (accType == accHIP)
+		{
+			T *tmp = new T[size];
+			hipCpyDeviceToHost<T>(dPtr, tmp, size, stream);
 
 			std::ofstream f;
 			f.open(fileName.c_str());
@@ -855,7 +1058,7 @@ public:
 
 	void dumpAccToFile(std::string fileName)
 	{
-		if (accType == accCUDA)
+		if (accType == accCUDA || accType == accHIP)
 			dumpDeviceToFile(fileName);
 		else
 			dumpHostToFile(fileName);
@@ -869,10 +1072,10 @@ public:
 #ifdef _CUDA_ENABLED
 		if (accType == accCUDA)
 		{
-#ifdef DEBUG_CUDA
+	#ifdef DEBUG_CUDA
 			if (dPtr == NULL)
 				ACC_PTR_DEBUG_FATAL("Free device memory was called on NULL pointer in free_device().\n");
-#endif
+	#endif
 			doFreeDevice = false;
 
 			if (alloc->getReadyEvent() == 0)
@@ -884,6 +1087,24 @@ public:
 
 			dPtr = NULL;
 		}
+#elif _HIP_ENABLED
+		if (accType == accHIP)
+		{
+	#ifdef DEBUG_HIP
+			if (dPtr == NULL)
+				ACC_PTR_DEBUG_FATAL("Free device memory was called on NULL pointer in free_device().\n");
+	#endif
+			doFreeDevice = false;
+
+			if (alloc->getReadyEvent() == 0)
+				alloc->markReadyEvent(stream);
+			alloc->doFreeWhenReady();
+			alloc = NULL;
+
+//			DEBUG_HANDLE_ERROR(hipFree(dPtr));
+
+			dPtr = NULL;
+		}
 #endif
 	}
 
@@ -892,7 +1113,7 @@ public:
 	 */
 	void freeHost()
 	{
-#ifdef DEBUG_CUDA
+#if defined(DEBUG_CUDA) || defined(DEBUG_HIP)
 		if (hPtr == NULL)
 			ACC_PTR_DEBUG_FATAL("free_host() called on NULL pointer.\n");
 #endif
@@ -982,7 +1203,7 @@ public:
 
 	T *getAccPtr()
 	{
-		if (accType == accCUDA)
+		if (accType == accCUDA || accType == accHIP)
 			return dPtr;
 		else
 			return hPtr;
@@ -1001,7 +1222,7 @@ public:
 
 	void setDevicePtr(T *ptr)
 	{
-#ifdef DEBUG_CUDA
+#if defined(DEBUG_CUDA) || defined(DEBUG_HIP)
 			if (doFreeDevice)
 				ACC_PTR_DEBUG_FATAL("Device pointer set without freeing the old one.\n");
 #endif
@@ -1010,7 +1231,7 @@ public:
 
 	void setDevicePtr(const AccPtr<T> &ptr)
 	{
-#ifdef DEBUG_CUDA
+#if defined(DEBUG_CUDA) || defined(DEBUG_HIP)
 		if (ptr.dPtr == NULL)
 			ACC_PTR_DEBUG_FATAL("Device pointer is not set.\n");
 #endif
@@ -1019,7 +1240,7 @@ public:
 
 	void setHostPtr(T *ptr)
 	{
-#ifdef DEBUG_CUDA
+#if defined(DEBUG_CUDA) || defined(DEBUG_HIP)
 		if (doFreeHost)
 			ACC_PTR_DEBUG_FATAL("Host pointer set without freeing the old one.\n");
 #endif
@@ -1028,7 +1249,7 @@ public:
 
 	void setHostPtr(const AccPtr<T> &ptr)
 	{
-#ifdef DEBUG_CUDA
+#if defined(DEBUG_CUDA) || defined(DEBUG_HIP)
 		if (ptr.hPtr == NULL)
 			ACC_PTR_DEBUG_FATAL("Host pointer is not set.\n");
 #endif
@@ -1037,7 +1258,7 @@ public:
 
 	void setAccPtr(const AccPtr<T> &ptr)
 	{
-		if (accType == accCUDA)
+		if (accType == accCUDA || accType == accHIP)
 			setDevicePtr(ptr.hPtr);
 		else
 			setHostPtr(ptr.hPtr);
@@ -1045,7 +1266,7 @@ public:
 
 	void setAccPtr(T *ptr)
 	{
-		if (accType == accCUDA)
+		if (accType == accCUDA || accType == accHIP)
 			setDevicePtr(ptr);
 		else
 			setHostPtr(ptr);
@@ -1099,8 +1320,8 @@ public:
 	template <typename T>
 	void pack(AccPtr<T> &ptr)
 	{
-#ifdef _CUDA_ENABLED
-	#ifdef DEBUG_CUDA
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
+	#if defined DEBUG_CUDA || defined DEBUG_HIP
 		if (current_packed_pos + ptr.getSize() > size)
 			ACC_PTR_DEBUG_FATAL("Packing exceeds bundle total size.\n");
 		if (hPtr == NULL)
@@ -1123,28 +1344,28 @@ public:
 	
 	void allAlloc()
 	{
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 		AccPtr<AccPtrBundleByte>::allAlloc();
 #endif
 	}
 	
 	void allAlloc(size_t size)
 	{
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 		AccPtr<AccPtrBundleByte>::allAlloc(size);
 #endif
 	}
 	
 	void hostAlloc()
 	{
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 AccPtr<AccPtrBundleByte>::hostAlloc();
 #endif
 	}
 	
 	void hostAlloc(size_t size)
 	{
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 AccPtr<AccPtrBundleByte>::hostAlloc(size);
 #endif
 	}
@@ -1169,11 +1390,19 @@ public:
 	{}
 
 	AccPtrFactory(AllocatorType *alloc):
+#ifdef _CUDA_ENABLED
 		allocator(alloc), stream(0), accType(accCUDA)
+#elif _HIP_ENABLED
+		allocator(alloc), stream(0), accType(accHIP)
+#endif
 	{}
 
 	AccPtrFactory(AllocatorType *alloc, StreamType s):
+#ifdef _CUDA_ENABLED
 		allocator(alloc), stream(s), accType(accCUDA)
+#elif _HIP_ENABLED
+		allocator(alloc), stream(s), accType(accHIP)
+#endif
 	{}
 
 	template <typename T>

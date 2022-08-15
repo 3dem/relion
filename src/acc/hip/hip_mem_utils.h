@@ -5,7 +5,7 @@
 #include <hip/hip_runtime.h>
 #include <hiprand.h>
 #include "src/acc/hip/hip_settings.h"
-#include "src/acc/hip/custom_allocator.cuh"
+#include "src/acc/hip/custom_allocator.h"
 #endif
 
 
