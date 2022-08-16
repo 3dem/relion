@@ -63,7 +63,7 @@ typedef CudaCustomAllocator AllocatorType;
 typedef CudaCustomAllocator::Alloc AllocationType;
 #elif _HIP_ENABLED
 typedef hipStream_t StreamType;
-typedef hipCustomAllocator AllocatorType;
+typedef HipCustomAllocator AllocatorType;
 typedef HipCustomAllocator::Alloc AllocationType;
 #else
 typedef float StreamType; //Dummy type

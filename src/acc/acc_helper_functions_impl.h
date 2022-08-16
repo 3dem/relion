@@ -555,7 +555,7 @@ void runBackProjectKernel(
 #elif  _HIP_ENABLED
 		if(do_grad)
 			if(ctf_premultiplied)
-				hipLaunchKernelGGL(HIP_KERNELNAME(hip_kernel_backproject2D_SGD<true>), dim3(imageCount), dim3(BP_2D_BLOCK_SIZE), 0, optStream,
+				hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_backproject2D_SGD<true>), dim3(imageCount), dim3(BP_2D_BLOCK_SIZE), 0, optStream,
 						projector,
                         d_img_real, d_img_imag,
 						trans_x, trans_y,
@@ -566,7 +566,7 @@ void runBackProjectKernel(
 						imgX, imgY, imgX*imgY,
 						BP.mdlX, BP.mdlInitY);
 			else
-				hipLaunchKernelGGL(HIP_KERNELNAME(hip_kernel_backproject2D_SGD<false>), dim3(imageCount), dim3(BP_2D_BLOCK_SIZE), 0, optStream,
+				hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_backproject2D_SGD<false>), dim3(imageCount), dim3(BP_2D_BLOCK_SIZE), 0, optStream,
 						projector,
                         d_img_real, d_img_imag,
 						trans_x, trans_y,
@@ -578,7 +578,7 @@ void runBackProjectKernel(
 						BP.mdlX, BP.mdlInitY);
 		else
 			if(ctf_premultiplied)
-				hipLaunchKernelGGL(HIP_KERNELNAME(hip_kernel_backproject2D<true>), dim3(imageCount), dim3(BP_2D_BLOCK_SIZE), 0, optStream,
+				hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_backproject2D<true>), dim3(imageCount), dim3(BP_2D_BLOCK_SIZE), 0, optStream,
 					d_img_real, d_img_imag,
 					trans_x, trans_y,
 					d_weights, d_Minvsigma2s, d_ctfs,
@@ -588,7 +588,7 @@ void runBackProjectKernel(
 					imgX, imgY, imgX*imgY,
 					BP.mdlX, BP.mdlInitY);
 			else
-				hipLaunchKernelGGL(HIP_KERNELNAME(hip_kernel_backproject2D<false>), dim3(imageCount), dim3(BP_2D_BLOCK_SIZE), 0, optStream,
+				hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_backproject2D<false>), dim3(imageCount), dim3(BP_2D_BLOCK_SIZE), 0, optStream,
 					d_img_real, d_img_imag,
 					trans_x, trans_y,
 					d_weights, d_Minvsigma2s, d_ctfs,
@@ -677,7 +677,7 @@ void runBackProjectKernel(
                             BP.mdlX, BP.mdlY, BP.mdlInitY, BP.mdlInitZ);
 #elif _HIP_ENABLED
 				if(ctf_premultiplied)
-                    hipLaunchKernelGGL(HIP_KERNELNAME(hip_kernel_backproject3D_SGD<true, true>),dim3(imageCount), dim3(BP_DATA3D_BLOCK_SIZE), 0, optStream,
+                    hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_backproject3D_SGD<true, true>),dim3(imageCount), dim3(BP_DATA3D_BLOCK_SIZE), 0, optStream,
                             projector, d_img_real, d_img_imag,
                             trans_x, trans_y, trans_z,
                             d_weights, d_Minvsigma2s, d_ctfs,
@@ -687,7 +687,7 @@ void runBackProjectKernel(
                             imgX, imgY, imgZ, imgX * imgY * imgZ,
                             BP.mdlX, BP.mdlY, BP.mdlInitY, BP.mdlInitZ);
 				else
-                    hipLaunchKernelGGL(HIP_KERNELNAME(hip_kernel_backproject3D_SGD<true, false>),  dim3(imageCount), dim3(BP_DATA3D_BLOCK_SIZE), 0, optStream,
+                    hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_backproject3D_SGD<true, false>),  dim3(imageCount), dim3(BP_DATA3D_BLOCK_SIZE), 0, optStream,
                             projector, d_img_real, d_img_imag,
                             trans_x, trans_y, trans_z,
                             d_weights, d_Minvsigma2s, d_ctfs,
@@ -743,7 +743,7 @@ void runBackProjectKernel(
 			                BP.mdlX, BP.mdlY, BP.mdlInitY, BP.mdlInitZ);
 #elif _HIP_ENABLED
 		        if(ctf_premultiplied)
-					hipLaunchKernelGGL(HIP_KERNELNAME(hip_kernel_backproject3D_SGD<false, true>), dim3(imageCount), dim3(BP_REF3D_BLOCK_SIZE), 0, optStream,
+					hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_backproject3D_SGD<false, true>), dim3(imageCount), dim3(BP_REF3D_BLOCK_SIZE), 0, optStream,
 			                projector, d_img_real, d_img_imag,
 			                trans_x, trans_y, trans_z,
 			                d_weights, d_Minvsigma2s, d_ctfs,
@@ -753,7 +753,7 @@ void runBackProjectKernel(
 			                imgX, imgY, imgZ, imgX * imgY * imgZ,
 			                BP.mdlX, BP.mdlY, BP.mdlInitY, BP.mdlInitZ);
 			    else
-			        hipLaunchKernelGGL(HIP_KERNELNAME(hip_kernel_backproject3D_SGD<false, false>), dim3(imageCount), dim3(BP_REF3D_BLOCK_SIZE), 0, optStream,
+			        hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_backproject3D_SGD<false, false>), dim3(imageCount), dim3(BP_REF3D_BLOCK_SIZE), 0, optStream,
 			                projector, d_img_real, d_img_imag,
 			                trans_x, trans_y, trans_z,
 			                d_weights, d_Minvsigma2s, d_ctfs,
@@ -811,7 +811,7 @@ void runBackProjectKernel(
 						BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
 #elif _HIP_ENABLED
 				if(ctf_premultiplied)
-					hipLaunchKernelGGL(HIP_KERNELNAME(hip_kernel_backproject3D<true, true>), dim3(imageCount), dim3(BP_DATA3D_BLOCK_SIZE), 0, optStream,
+					hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_backproject3D<true, true>), dim3(imageCount), dim3(BP_DATA3D_BLOCK_SIZE), 0, optStream,
 						d_img_real, d_img_imag,
 						trans_x, trans_y, trans_z,
 						d_weights, d_Minvsigma2s, d_ctfs,
@@ -821,7 +821,7 @@ void runBackProjectKernel(
 						imgX, imgY, imgZ, imgX*imgY*imgZ,
 						BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
 				else
-					hipLaunchKernelGGL(HIP_KERNELNAME(hip_kernel_backproject3D<true, false>), dim3(imageCount), dim3(BP_DATA3D_BLOCK_SIZE), 0, optStream,
+					hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_backproject3D<true, false>), dim3(imageCount), dim3(BP_DATA3D_BLOCK_SIZE), 0, optStream,
 						d_img_real, d_img_imag,
 						trans_x, trans_y, trans_z,
 						d_weights, d_Minvsigma2s, d_ctfs,
@@ -877,7 +877,7 @@ void runBackProjectKernel(
 						BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
 #elif _HIP_ENABLED
 			    if(ctf_premultiplied)
-					hipLaunchKernelGGL(HIP_KERNELNAME(hip_kernel_backproject3D<false, true>), dim3(imageCount), dim3(BP_REF3D_BLOCK_SIZE), 0, optStream,
+					hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_backproject3D<false, true>), dim3(imageCount), dim3(BP_REF3D_BLOCK_SIZE), 0, optStream,
 						d_img_real, d_img_imag,
 						trans_x, trans_y, trans_z,
 						d_weights, d_Minvsigma2s, d_ctfs,
@@ -887,7 +887,7 @@ void runBackProjectKernel(
 						imgX, imgY, imgZ, imgX*imgY*imgZ,
 						BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
 			    else
-					hipLaunchKernelGGL(HIP_KERNELNAME(hip_kernel_backproject3D<false, false>), dim3(imageCount), dim3(BP_REF3D_BLOCK_SIZE), 0, optStream,
+					hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_backproject3D<false, false>), dim3(imageCount), dim3(BP_REF3D_BLOCK_SIZE), 0, optStream,
 						d_img_real, d_img_imag,
 						trans_x, trans_y, trans_z,
 						d_weights, d_Minvsigma2s, d_ctfs,
@@ -974,7 +974,7 @@ void mapAllWeightsToMweights(
 			WEIGHT_MAP_BLOCK_SIZE);
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 #elif _HIP_ENABLED
-	hipLaunchKernelGGL(HIP_KERNELNAME(hip_kernel_allweights_to_mweights), dim3(grid_size), dim3(WEIGHT_MAP_BLOCK_SIZE), 0, stream,
+	hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_allweights_to_mweights), dim3(grid_size), dim3(WEIGHT_MAP_BLOCK_SIZE), 0, stream,
 			d_iorient,
 			d_allweights,
 			d_mweights,
@@ -2022,7 +2022,7 @@ void run_updatePowerSpectrum(RFLOAT *dcounter, int sz, RFLOAT *dpower_spectrum)
 	cuda_kernel_updatePowerSpectrum<<<ceil(sz/(float)256),256>>>(dcounter, dpower_spectrum, sz);
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 #elif _HIP_ENABLED
-	hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_updatePowerSpectrum) dim3(ceil(sz/(float)256)), dim3(256), 0, 0, dcounter, dpower_spectrum, sz);
+	hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_updatePowerSpectrum), dim3(ceil(sz/(float)256)), dim3(256), 0, 0, dcounter, dpower_spectrum, sz);
 	LAUNCH_HANDLE_ERROR(hipGetLastError());
 #endif
 }

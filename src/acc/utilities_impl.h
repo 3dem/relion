@@ -289,8 +289,8 @@ void makeNoiseImage(XFLOAT sigmaFudgeFactor,
     //cudaMLO->transformer1.reals.streamSync();
 #elif _HIP_ENABLED
     // Set up states to seed and run randomization on the GPU
-    // AccDataTypes::Image<curandState > RandomStates(RND_BLOCK_NUM*RND_BLOCK_SIZE,ptrFactory);
-    AccPtr<curandState> RandomStates = RandomImage.make<hiprandState>(RND_BLOCK_NUM*RND_BLOCK_SIZE);
+    // AccDataTypes::Image<hiprandState > RandomStates(RND_BLOCK_NUM*RND_BLOCK_SIZE,ptrFactory);
+    AccPtr<hiprandState> RandomStates = RandomImage.make<hiprandState>(RND_BLOCK_NUM*RND_BLOCK_SIZE);
     RandomStates.deviceAlloc();
 
     NoiseSpectra.cpToDevice();
@@ -377,7 +377,7 @@ static void TranslateAndNormCorrect(MultidimArray<RFLOAT > &img_in,
 		CudaKernels::cuda_kernel_multi<XFLOAT><<<BSZ,BLOCK_SIZE,0,temp.getStream()>>>(temp(),normcorr,temp.getSize());
 #elif _HIP_ENABLED
 		int BSZ = ( (int) ceilf(( float)temp.getSize() /(float)BLOCK_SIZE));
-		HipKernels::hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_multi<XFLOAT>), dim3(BSZ), dim3(BLOCK_SIZE), 0, temp.getStream(), temp(), normcorr, temp.getSize());
+		hipLaunchKernelGGL(HIP_KERNEL_NAME(HipKernels::hip_kernel_multi<XFLOAT>), dim3(BSZ), dim3(BLOCK_SIZE), 0, temp.getStream(), temp(), normcorr, temp.getSize());
 #else
 		CpuKernels::cpu_kernel_multi<XFLOAT>(temp(),normcorr, temp.getSize());
 #endif
@@ -396,9 +396,9 @@ static void TranslateAndNormCorrect(MultidimArray<RFLOAT > &img_in,
 #elif _HIP_ENABLED
 	int BSZ = ( (int) ceilf(( float)temp.getSize() /(float)BLOCK_SIZE));
 	if (DATA3D)
-		HipKernels::hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_translate3D<XFLOAT>), dim3(BSZ), dim3(BLOCK_SIZE), 0, temp.getStream(), temp(), img_out(), img_in.zyxdim, img_in.xdim, img_in.ydim, img_in.zdim, xOff, yOff, zOff);
+		hipLaunchKernelGGL(HIP_KERNEL_NAME(HipKernels::hip_kernel_translate3D<XFLOAT>), dim3(BSZ), dim3(BLOCK_SIZE), 0, temp.getStream(), temp(), img_out(), img_in.zyxdim, img_in.xdim, img_in.ydim, img_in.zdim, xOff, yOff, zOff);
 	else
-		HipKernels::hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_translate2D<XFLOAT>), dim3(BSZ), dim3(BLOCK_SIZE), 0, temp.getStream(), temp(), img_out(), img_in.zyxdim, img_in.xdim, img_in.ydim, xOff, yOff);
+		hipLaunchKernelGGL(HIP_KERNEL_NAME(HipKernels::hip_kernel_translate2D<XFLOAT>), dim3(BSZ), dim3(BLOCK_SIZE), 0, temp.getStream(), temp(), img_out(), img_in.zyxdim, img_in.xdim, img_in.ydim, xOff, yOff);
 	//LAUNCH_PRIVATE_ERROR(hipGetLastError(),accMLO->errorStatus);
 #else
 	if (DATA3D)
@@ -481,7 +481,7 @@ static void softMaskBackgroundValue(
 				~g_sum,
 				~g_sum_bg);
 #elif _HIP_ENABLED
-	hpLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_softMaskBackgroundValue), dim3(block_dim), dim3(SOFTMASK_BLOCK_SIZE), 0, vol.getStream(),
+	hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_softMaskBackgroundValue), dim3(block_dim), dim3(SOFTMASK_BLOCK_SIZE), 0, vol.getStream(),
 				~vol,
 				vol.getxyz(),
 				vol.getx(),
@@ -542,7 +542,7 @@ static void cosineFilter(
 			cosine_width,
 			sum_bg_total);
 #elif _HIP_ENABLED
-	hpLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_cosineFilter), dim3(block_dim), dim3(SOFTMASK_BLOCK_SIZE), 0, vol.getStream(),
+	hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_cosineFilter), dim3(block_dim), dim3(SOFTMASK_BLOCK_SIZE), 0, vol.getStream(),
 			~vol,
 			vol.getxyz(),
 			vol.getx(),
@@ -888,7 +888,7 @@ void run_CenterFFTbySign(Complex *img_in, int xSize, int ySize, int zSize, devic
 				ySize,
 				zSize);
 	else
-		hipLaunchKernelGLL(HIP_KERNEL_NAME(hip_kernel_centerFFTbySign), gs, bs, 0, stream,
+		hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_centerFFTbySign), gs, bs, 0, stream,
 				(float2*)img_in,
 				xSize,
 				ySize,

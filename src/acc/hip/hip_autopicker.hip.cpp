@@ -35,7 +35,7 @@
 #include "src/acc/hip/hip_autopicker.h"
 
 
-AutoPickerHip::AutoPickerHIP(AutoPicker *basePicker, const char * timing_fnm) :
+AutoPickerHip::AutoPickerHip(AutoPicker *basePicker, const char * timing_fnm) :
 	node(NULL),
 	basePckr(basePicker),
 	allocator(new HipCustomAllocator(0, 1)),

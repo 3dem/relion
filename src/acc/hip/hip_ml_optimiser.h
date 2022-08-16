@@ -82,6 +82,7 @@ public:
 
    //Class streams ( for concurrent scheduling of class-specific kernels)
 	std::vector< hipStream_t > classStreams;
+	hipStream_t defaultStream = 0;
 	hipError_t errorStatus;
 
 	HipFFT transformer1;

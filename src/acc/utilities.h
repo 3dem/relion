@@ -698,7 +698,7 @@ void kernel_wavg(
 #elif _HIP_ENABLED
 	dim3 block_dim = orientation_num;//ceil((float)orientation_num/(float)REF_GROUP_SIZE);
 
-	hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_wavg<CTFPREMULTIPLIED, REFCTF,REF3D,DATA3D,block_sz>), dim3(block_dim), dim3(block_sz), (3*block_sz+9)*sizeof(XFLOAT), stream, 
+	hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_wavg<REFCTF,REF3D,DATA3D,block_sz>), dim3(block_dim), dim3(block_sz), (3*block_sz+9)*sizeof(XFLOAT), stream, 
 		g_eulers,
 		projector,
 		image_size,

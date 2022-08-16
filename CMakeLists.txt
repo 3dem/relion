@@ -70,6 +70,10 @@ else()
 	string( TOLOWER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE_LOWER )
 endif()
 
+# ----------------------------------------------------------------SET CXX STANDARD--
+set(CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 14)
+
 # ------------------OPTIONS WHICH ARE NEEDED TO SET BUILD-TYPES (COMPILATION FLAGS)--
 # ----------------------------------------------------------CUDA-ARCH--OR--HIP-ARCH--
 if(NOT (DEFINED CUDA_ARCH OR DEFINED HIP_ARCH))
@@ -78,7 +82,7 @@ if(NOT (DEFINED CUDA_ARCH OR DEFINED HIP_ARCH))
     set(CUDARCH "-arch=sm_50")
   else (HIP)
     message(STATUS "Setting fallback HIP_ARCH=gfx906")
-    set(GPU_TARGETS "gfx906")
+    set(AMDGPU_TARGETS "gfx906" CACHE STRING "AMD GPU targets to compile for")
   endif()
 else(NOT (DEFINED CUDA_ARCH OR DEFINED HIP_ARCH))
 if (CUDA)
@@ -86,7 +90,7 @@ if (CUDA)
   set(CUDARCH "-arch=sm_${CUDA_ARCH}")
 else (HIP)
   message(STATUS "Using provided HIP_ARCH=${HIP_ARCH}")
-  set(GPU_TARGETS "${HIP_ARCH}")
+  set(AMDGPU_TARGETS "${HIP_ARCH}" CACHE STRING "AMD GPU targets to compile for")
 endif()
 endif(NOT (DEFINED CUDA_ARCH OR DEFINED HIP_ARCH))
 
@@ -177,7 +181,6 @@ if(CUDA)
     endif(CUDA_FOUND)
 else(HIP)
     # ------------------------------------------------------------------------------HIP--
-    find_package(HIP REQUIRED)
     if (DEFINED ENV{ROCM_PATH})
         include($ENV{ROCM_PATH}/hip/cmake/FindHIP.cmake)
     elseif(DEFINED ENV{HIP_PATH})
@@ -185,6 +188,9 @@ else(HIP)
     else()
         include(/opt/rocm/hip/cmake/FindHIP.cmake)
     endif()
+    
+    find_package(HIP REQUIRED)
+
     if(HIP_FOUND)
       message(STATUS "Using hip wrapper to compile....")
       if( ${HIP_VERSION} VERSION_LESS "4.0")
@@ -416,12 +422,17 @@ if(TIFF_FOUND)
 	add_definitions(-DHAVE_TIFF)
 endif()
 
+# ------------------------------------------------------------------ZLIB, PNG & JPEG--
 find_package(ZLIB)
 find_package(PNG)
 if(PNG_FOUND)
 	add_definitions(-DHAVE_PNG)
-endif()
+endif(PNG_FOUND)
 
+find_package(JPEG)
+if(JPEG_FOUND)
+	add_definitions(-DHAVE_JPEG)
+endif(JPEG_FOUND)
 
 # -----------------------------------------------------------------------------Torch--
 

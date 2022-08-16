@@ -126,8 +126,8 @@ bool AccProjector::setMdlDim(
 
 
 			// -- Allocate and copy data using very clever HIP memcpy-functions
-			HANDLE_ERROR(hipMalloc3DArray(texArrayReal, &desc, volumeSize));
-			HANDLE_ERROR(hipMalloc3DArray(texArrayImag, &desc, volumeSize));
+			HANDLE_ERROR(hipMalloc3DArray(texArrayReal, &desc, volumeSize, hipArrayDefault));
+			HANDLE_ERROR(hipMalloc3DArray(texArrayImag, &desc, volumeSize, hipArrayDefault));
 
 			// -- Descriptors of the channel(s) in the texture(s)
 			resDesc_real.res.array.array = *texArrayReal;
@@ -137,8 +137,8 @@ bool AccProjector::setMdlDim(
 		}
 		else // 2D model
 		{
-			HANDLE_ERROR(hipMallocPitch(&texArrayReal2D, &pitch2D, sizeof(XFLOAT)*mdlX,mdlY));
-			HANDLE_ERROR(hipMallocPitch(&texArrayImag2D, &pitch2D, sizeof(XFLOAT)*mdlX,mdlY));
+			HANDLE_ERROR(hipMallocPitch(reinterpret_cast<void**>(&texArrayReal2D), &pitch2D, sizeof(XFLOAT)*mdlX,mdlY));
+			HANDLE_ERROR(hipMallocPitch(reinterpret_cast<void**>(&texArrayImag2D), &pitch2D, sizeof(XFLOAT)*mdlX,mdlY));
 
 			// -- Descriptors of the channel(s) in the texture(s)
 			resDesc_real.resType = hipResourceTypePitch2D;

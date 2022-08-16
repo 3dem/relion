@@ -67,7 +67,7 @@ __global__ void hip_kernel_exponentiate(
 }
 
 template<bool DATA3D>
-__global__ void cuda_kernel_collect2jobs(	XFLOAT *g_oo_otrans_x,          // otrans-size -> make const
+__global__ void hip_kernel_collect2jobs(	XFLOAT *g_oo_otrans_x,          // otrans-size -> make const
 											XFLOAT *g_oo_otrans_y,          // otrans-size -> make const
 											XFLOAT *g_oo_otrans_z,          // otrans-size -> make const
 											XFLOAT *g_myp_oo_otrans_x2y2z2, // otrans-size -> make const

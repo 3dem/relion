@@ -158,7 +158,7 @@ std::complex<XFLOAT> *pData = mdlComplex;
 		}
 	}
 
-#if def _CUDA_ENABLED || _HIP_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 	__device__ __forceinline__
 #else
 	#ifndef __INTEL_COMPILER

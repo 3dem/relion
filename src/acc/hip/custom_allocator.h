@@ -535,7 +535,7 @@ public:
 					_printState();
 
 					fflush(stdout);
-					CRITICAL(ERRHIPCAOOM);
+					CRITICAL(ERRGPUCAOOM);
 				}
 			}
 

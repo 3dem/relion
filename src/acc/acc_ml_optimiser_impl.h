@@ -703,7 +703,8 @@ void getFourierTransformsAndCtfs(long int part_id,
 					accMLO->transformer1.yFSize,
 					accMLO->transformer1.zFSize,
 					(baseMLO->image_current_size[optics_group]/2)+1, // note: NOT baseMLO->image_full_size[optics_group]/2+1
-					&(~spectrumAndXi2)[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
+					&(~spectrumAndXi2)[spectrumAndXi2.getSize()-1], // last element is the hihgres_Xi2
+					accMLO->defaultStream);
 			else
 				AccUtilities::powerClass<false>(gridSize,POWERCLASS_BLOCK_SIZE,
 					~accMLO->transformer1.fouriers,
@@ -714,7 +715,8 @@ void getFourierTransformsAndCtfs(long int part_id,
 					accMLO->transformer1.yFSize,
 					accMLO->transformer1.zFSize,
 					(baseMLO->image_current_size[optics_group]/2)+1, // note: NOT baseMLO->image_full_size[optics_group]/2+1
-					&(~spectrumAndXi2)[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
+					&(~spectrumAndXi2)[spectrumAndXi2.getSize()-1], // last element is the hihgres_Xi2
+					accMLO->defaultStream);
 
 		#ifdef _CUDA_ENABLED
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
