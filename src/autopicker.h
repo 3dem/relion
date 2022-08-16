@@ -27,6 +27,12 @@
 #include "src/acc/cuda/cuda_settings.h"
 #include "src/acc/cuda/cuda_fft.h"
 #include "src/acc/cuda/cuda_benchmark_utils.h"
+#elif _HIP_ENABLED
+#include "src/acc/hip/hip_mem_utils.h"
+#include "src/acc/acc_projector.h"
+#include "src/acc/hip/hip_settings.h"
+#include "src/acc/hip/hip_fft.h"
+#include "src/acc/hip/hip_benchmark_utils.h"
 #endif
 //#define OUTPUT_MEAN_MAP_ONLY 1
 //#define OUTPUT_STDDEV_MAP_ONLY 2
@@ -84,7 +90,7 @@ class AutoPicker
 public:
 
 	// For GPU-acceleration
-	void* cudaPicker;
+	void* gpuPicker;
 	// Available memory (in Gigabyte)
 	RFLOAT available_memory;
 	RFLOAT available_gpu_memory;

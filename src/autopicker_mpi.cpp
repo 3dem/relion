@@ -44,11 +44,11 @@ void AutoPickerMpi::read(int argc, char **argv)
 	printMpiNodesMachineNames(*node);
 }
 
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 void AutoPickerMpi::deviceInitialise()
 {
 	int devCount;
-	cudaGetDeviceCount(&devCount);
+	accGetDeviceCount(&devCount);
 
 	std::vector < std::vector < std::string > > allThreadIDs;
 	untangleDeviceIDs(gpu_ids, allThreadIDs);

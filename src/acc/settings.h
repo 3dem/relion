@@ -29,4 +29,24 @@
 	#endif
 #endif
 
+#ifdef _CUDA_ENABLED
+	#define accGPUGetDeviceCount cudaGetDeviceCount
+	#define accGPUDeviceProp cudaDeviceProp
+	#define accGPUGetDeviceProperties cudaGetDeviceProperties
+	#define accGPUDeviceSynchronize cudaDeviceSynchronize
+	#define accGPUSetDevice cudaSetDevice
+	#define accGPUMemGetInfo cudaMemGetInfo
+	#define MlOptimiserAccGPU MlOptimiserCuda
+	#define AutoPickerAccGPU AutoPickerCuda
+#elif _HIP_ENABLED
+	#define accGPUGetDeviceCount hipGetDeviceCount
+	#define accGPUDeviceProp hipDeviceProp_t
+	#define accGPUGetDeviceProperties hipGetDeviceProperties
+	#define accGPUDeviceSynchronize hipDeviceSynchronize
+	#define accGPUSetDevice hipSetDevice
+	#define accGPUMemGetInfo hipMemGetInfo
+	#define MlOptimiserAccGPU MlOptimiserHip
+	#define AutoPickerAccGPU AutoPickerHip
+#endif
+
 #endif /* ACC_SETTINGS_H_ */

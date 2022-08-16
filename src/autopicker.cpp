@@ -109,10 +109,10 @@ void AutoPicker::read(int argc, char **argv)
 	do_only_unfinished = parser.checkOption("--only_do_unfinished", "Only autopick those micrographs for which the coordinate file does not yet exist");
 	do_gpu = parser.checkOption("--gpu", "Use GPU acceleration when availiable");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
-#ifndef _CUDA_ENABLED
+#if !defined _CUDA_ENABLED && !defined _HIP_ENABLED
 if(do_gpu)
 	{
-		std::cerr << "+ WARNING : Relion was compiled without CUDA of at least version 7.0 - you do NOT have support for GPUs" << std::endl;
+		std::cerr << "+ WARNING : Relion was compiled without CUDA >= 7.0 or HIP with ROCm >= 4.0 - you do NOT have support for GPUs" << std::endl;
 		do_gpu = false;
 	}
 #endif
@@ -971,11 +971,11 @@ void AutoPicker::initialise(int rank)
 #endif
 }
 
-#ifdef _CUDA_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 void AutoPicker::deviceInitialise()
 {
 	int devCount;
-	cudaGetDeviceCount(&devCount);
+	accGetDeviceCount(&devCount);
 
 	std::vector < std::vector < std::string > > allThreadIDs;
 	untangleDeviceIDs(gpu_ids, allThreadIDs);
