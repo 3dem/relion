@@ -27,8 +27,15 @@
 #include <src/jaz/single_particle/volume.h>
 #include <src/jaz/gravis/t2Vector.h>
 
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 #include "src/acc/cuda/cuda_mem_utils.h"
+using deviceStream_t = cudaStream_t;
+#elif _HIP_ENABLED
+#include "src/acc/hip/hip_mem_utils.h"
+using deviceStream_t = hipStream_t;
+#endif
+
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 #include "src/acc/acc_ptr.h"
 void run_griddingCorrect(RFLOAT *vol, int interpolator, RFLOAT rrval, RFLOAT r_min_nn,
 						 size_t iX, size_t iY, size_t iZ);
@@ -36,9 +43,9 @@ void run_griddingCorrect(RFLOAT *vol, int interpolator, RFLOAT rrval, RFLOAT r_m
 void run_padTranslatedMap(RFLOAT *d_in, RFLOAT *d_out,
 						  size_t isX, size_t ieX, size_t isY, size_t ieY, size_t isZ, size_t ieZ, //Input dimensions
 						  size_t osX, size_t oeX, size_t osY, size_t oeY, size_t osZ, size_t oeZ,  //Output dimensions
-						  cudaStream_t stream = 0);
+						  deviceStream_t stream = 0);
 
-void run_CenterFFTbySign(Complex *img_in, int xSize, int ySize, int zSize, cudaStream_t = 0);
+void run_CenterFFTbySign(Complex *img_in, int xSize, int ySize, int zSize, deviceStream_t = 0);
 
 void run_calcPowerSpectrum(Complex *dFaux, int padoridim, Complex *ddata, int data_sz, RFLOAT *dpower_spectrum, RFLOAT *dcounter,
 											  int max_r2, int min_r2, RFLOAT normfft, RFLOAT padding_factor, RFLOAT weight,
@@ -46,7 +53,7 @@ void run_calcPowerSpectrum(Complex *dFaux, int padoridim, Complex *ddata, int da
 
 void run_updatePowerSpectrum(RFLOAT *dcounter, int sz, RFLOAT *dpower_spectrum);
 
-extern void scale(RFLOAT *img, size_t sz, RFLOAT val, cudaStream_t stream = 0);
+extern void scale(RFLOAT *img, size_t sz, RFLOAT val, deviceStream_t stream = 0);
 #endif
 
 
@@ -125,7 +132,7 @@ public:
 		// Padding factor for the map
 		if (_padding_factor_3d < 1.0)
 			REPORT_ERROR("Padding factor cannot be less than 1.");
-		
+
 		padding_factor = _padding_factor_3d;
 
 		// Interpolation scheme

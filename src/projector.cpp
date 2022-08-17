@@ -21,13 +21,17 @@
 #include <src/jaz/gravis/t3Vector.h>
 #include <src/time.h>
 #include <src/jaz/image/buffered_image.h>
-#ifdef CUDA
-#include <cufft.h>
-#include <sys/types.h>
-#include <sys/ipc.h>
-#include <sys/sem.h>
-#define SEMKEY 826976737978L /* key value for semget() */
-#define PERMS 0666
+#ifdef _CUDA_ENABLED
+	#include <cufft.h>
+#elif _HIP_ENABLED
+	#include <hipfft.h>
+#endif
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
+	#include <sys/types.h>
+	#include <sys/ipc.h>
+	#include <sys/sem.h>
+	#define SEMKEY 826976737978L /* key value for semget() */
+	#define PERMS 0666
 #endif
 //#define DEBUG
 
@@ -160,7 +164,7 @@ void Projector::computeFourierTransformMap(
 	default:
 		REPORT_ERROR("Projector::computeFourierTransformMap%%ERROR: Dimension of the data array should be 2 or 3");
 	}
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 	static int semid = -1;
 	struct sembuf op_lock[2]=  { 0, 0, 0, /* wait for sem #0 to become 0 */
 	     						 0, 1, SEM_UNDO /* then increment sem #0 by 1 */ };
@@ -172,7 +176,7 @@ void Projector::computeFourierTransformMap(
 	cufftType cufft_type = CUFFT_R2C;
 	if(sizeof(RFLOAT) == sizeof(double))
 		cufft_type = CUFFT_D2Z;
-	
+
 	if(ref_dim == 3)
 		Faux_sz *= padoridim;
 
@@ -193,18 +197,80 @@ void Projector::computeFourierTransformMap(
 		int devid;
 		size_t mem_free, mem_tot;
 		cudaDeviceProp devProp;
-		if (semid <0) 
+		if (semid <0)
 		{
 			HANDLE_ERROR(cudaGetDevice(&devid));
-			if ( ( semid=semget(SEMKEY+devid, 1, IPC_CREAT | PERMS )) < 0 ) 
-				REPORT_ERROR("semget error"); 
+			if ( ( semid=semget(SEMKEY+devid, 1, IPC_CREAT | PERMS )) < 0 )
+				REPORT_ERROR("semget error");
 		}
-		if (semop(semid, &op_lock[0], 2) < 0) 
+		if (semop(semid, &op_lock[0], 2) < 0)
 			REPORT_ERROR("semop lock error");
 
 		HANDLE_ERROR(cudaMemGetInfo(&mem_free, &mem_tot));
 		if(mem_free > mem_req)
 			allocator = new CudaCustomAllocator(mem_req, (size_t)16);
+		else
+		{
+			do_gpu = false; // change local copy of do_gpu variable
+			if (semop(semid, &op_unlock[0], 1) < 0)
+				REPORT_ERROR("semop unlock error");
+		}
+	}
+	AccPtrFactory ptrFactory(allocator);
+	AccPtr<RFLOAT> dMpad = ptrFactory.make<RFLOAT>(MULTIDIM_SIZE(Mpad));
+	AccPtr<Complex> dFaux = ptrFactory.make<Complex>(Faux_sz);
+	AccPtr<RFLOAT> dvol = ptrFactory.make<RFLOAT>(MULTIDIM_SIZE(vol_in));
+	if(do_heavy && do_gpu)
+	{
+		dvol.setHostPtr(MULTIDIM_ARRAY(vol_in));
+		dvol.accAlloc();
+		dvol.cpToDevice();
+	}
+#elif _HIP_ENABLED
+	static int semid = -1;
+	struct sembuf op_lock[2]=  { 0, 0, 0, /* wait for sem #0 to become 0 */
+							 0, 1, SEM_UNDO /* then increment sem #0 by 1 */ };
+	struct sembuf op_unlock[1]= { 0, -1, (IPC_NOWAIT | SEM_UNDO) /* decrement sem #0 by 1 (sets it to 0) */ };
+
+	size_t mem_req, ws_sz;
+	int Faux_sz = padoridim*(padoridim/2+1);
+	int n[3] = {padoridim, padoridim, padoridim};
+	hipfftType hipfft_type = HIPFFT_R2C;
+	if(sizeof(RFLOAT) == sizeof(double))
+		hipfft_type = HIPFFT_D2Z;
+
+	if(ref_dim == 3)
+		Faux_sz *= padoridim;
+
+	mem_req =  (size_t)1024;
+	if(do_heavy && do_gpu)
+	{
+		hipfftEstimateMany(ref_dim, n, NULL, 0, 0, NULL, 0, 0, hipfft_type, 1, &ws_sz);
+
+		mem_req = (size_t)sizeof(RFLOAT)*MULTIDIM_SIZE(vol_in) +                   // dvol
+			  (size_t)sizeof(Complex)*Faux_sz +                                // dFaux
+			  (size_t)sizeof(RFLOAT)*MULTIDIM_SIZE(Mpad) +                     // dMpad
+			  ws_sz + 4096;                                                    // workspace for hipFFT + extra space for alingment
+	}
+
+	HipCustomAllocator *allocator = NULL;
+	if(do_gpu && do_heavy)
+	{
+		int devid;
+		size_t mem_free, mem_tot;
+		hipDeviceProp_t devProp;
+		if (semid <0)
+		{
+			HANDLE_ERROR(hipGetDevice(&devid));
+			if ( ( semid=semget(SEMKEY+devid, 1, IPC_CREAT | PERMS )) < 0 )
+				REPORT_ERROR("semget error");
+		}
+		if (semop(semid, &op_lock[0], 2) < 0)
+			REPORT_ERROR("semop lock error");
+
+		HANDLE_ERROR(hipMemGetInfo(&mem_free, &mem_tot));
+		if(mem_free > mem_req)
+			allocator = new HipCustomAllocator(mem_req, (size_t)16);
 		else
 		{
 			do_gpu = false; // change local copy of do_gpu variable
@@ -233,7 +299,7 @@ void Projector::computeFourierTransformMap(
 	if (do_gridding)// && data_dim != 3)
 	{
 		if(do_heavy)
-#ifdef CUDA
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 			if(do_gpu)
 			{
 				vol_in.setXmippOrigin();
@@ -256,7 +322,7 @@ void Projector::computeFourierTransformMap(
 	Mpad.setXmippOrigin();
 	if(do_heavy)
 	{
-#ifdef CUDA
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 		if(do_gpu)
 		{
 			dMpad.accAlloc();
@@ -276,13 +342,13 @@ void Projector::computeFourierTransformMap(
 	TIMING_TIC(TIMING_TRANS);
 	// Calculate the oversampled Fourier transform
 	if(do_heavy)
-#ifdef CUDA
+#ifdef _CUDA_ENABLED
 		if(do_gpu)
 		{
 			dFaux.accAlloc();
 			cufftResult err;
 			cufftHandle plan;
-			
+
 			err = cufftCreate(&plan);
 			if(err != CUFFT_SUCCESS)
 				REPORT_ERROR("failed to create cufft plan");
@@ -294,7 +360,7 @@ void Projector::computeFourierTransformMap(
 			err = cufftMakePlanMany(plan, ref_dim, n, NULL, 0, 0, NULL, 0, 0, cufft_type, 1, &ws_sz);
 			if(err != CUFFT_SUCCESS)
 				REPORT_ERROR("failed to create cufft plan");
-			
+
 			// do inverse FFT (dMpad->dFaux)
 			if(sizeof(RFLOAT) == sizeof(double))
 				err = cufftExecD2Z(plan,(cufftDoubleReal*)~dMpad, (cufftDoubleComplex*)~dFaux);
@@ -305,13 +371,52 @@ void Projector::computeFourierTransformMap(
 			// deallocate plan, free mem
 			cufftDestroy(plan);
 			fft_ws.freeIfSet();
-			
+
 			size_t normfft = (size_t)padoridim*(size_t)padoridim;
 			if(ref_dim == 3) normfft *= (size_t)padoridim;
 
 			if(ref_dim == 2) Faux.reshape(padoridim,(padoridim/2+1));
 			if(ref_dim == 3) Faux.reshape(padoridim,padoridim,(padoridim/2+1));
-			
+
+			scale((RFLOAT*)~dFaux, 2*dFaux.getSize(), 1./(RFLOAT)normfft);
+		}
+		else
+#elif _HIP_ENABLED
+		if(do_gpu)
+		{
+			dFaux.accAlloc();
+			hipfftResult err;
+			hipfftHandle plan;
+
+			err = hipfftCreate(&plan);
+			if(err != HIPFFT_SUCCESS)
+				REPORT_ERROR("failed to create hipfft plan");
+			hipfftSetAutoAllocation(plan, 0); // do not allocate work area
+			//Allocate space with smart allocator
+			AccPtr<char> fft_ws = ptrFactory.make<char>(ws_sz);
+			fft_ws.accAlloc();
+			hipfftSetWorkArea(plan, ~fft_ws);
+			err = hipfftMakePlanMany(plan, ref_dim, n, NULL, 0, 0, NULL, 0, 0, hipfft_type, 1, &ws_sz);
+			if(err != HIPFFT_SUCCESS)
+				REPORT_ERROR("failed to create hipfft plan");
+
+			// do inverse FFT (dMpad->dFaux)
+			if(sizeof(RFLOAT) == sizeof(double))
+				err = hipfftExecD2Z(plan,(hipfftDoubleReal*)~dMpad, (hipfftDoubleComplex*)~dFaux);
+			else
+				err = hipfftExecR2C(plan,(hipfftReal*)~dMpad, (hipfftComplex*)~dFaux);
+			if(err != HIPFFT_SUCCESS)
+				REPORT_ERROR("failed to exec fft");
+			// deallocate plan, free mem
+			hipfftDestroy(plan);
+			fft_ws.freeIfSet();
+
+			size_t normfft = (size_t)padoridim*(size_t)padoridim;
+			if(ref_dim == 3) normfft *= (size_t)padoridim;
+
+			if(ref_dim == 2) Faux.reshape(padoridim,(padoridim/2+1));
+			if(ref_dim == 3) Faux.reshape(padoridim,padoridim,(padoridim/2+1));
+
 			scale((RFLOAT*)~dFaux, 2*dFaux.getSize(), 1./(RFLOAT)normfft);
 		}
 		else
@@ -322,7 +427,7 @@ void Projector::computeFourierTransformMap(
 	TIMING_TIC(TIMING_CENTER);
 	// Translate padded map to put origin of FT in the center
 	if(do_heavy)
-#ifdef CUDA
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 		if(do_gpu)
 		{
 			run_CenterFFTbySign(~dFaux, XSIZE(Faux), YSIZE(Faux), ZSIZE(Faux));
@@ -334,7 +439,7 @@ void Projector::computeFourierTransformMap(
 
 	TIMING_TIC(TIMING_INIT2);
 	// Free memory: Mpad no longer needed
-#ifdef CUDA
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 	dMpad.freeIfSet();
 #endif
 	Mpad.clear();
@@ -345,7 +450,7 @@ void Projector::computeFourierTransformMap(
 	// Fill data only for those points with distance to origin less than max_r
 	// (other points will be zero because of initZeros() call above
 	// Also calculate radial power spectrum
-#ifdef CUDA
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 	int fourier_mask_sz = (do_fourier_mask)?MULTIDIM_SIZE(*fourier_mask):16;
 	int fmXsz, fmYsz, fmZsz;
 	AccPtr<Complex> ddata = ptrFactory.make<Complex>(MULTIDIM_SIZE(data));
@@ -388,7 +493,7 @@ void Projector::computeFourierTransformMap(
 	if(do_heavy)
 	{
 		RFLOAT weight = 1.;
-#ifdef CUDA
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 		if(do_gpu)
 		{
 			run_calcPowerSpectrum(~dFaux, padoridim, ~ddata, YSIZE(data), ~dpower_spectrum, ~dcounter,
@@ -444,7 +549,7 @@ void Projector::computeFourierTransformMap(
 	// Calculate radial average of power spectrum
 	if(do_heavy)
 	{
-#ifdef CUDA
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 		if(do_gpu)
 		{
 			run_updatePowerSpectrum(~dcounter, dcounter.getSize(), ~dpower_spectrum);
@@ -464,7 +569,7 @@ void Projector::computeFourierTransformMap(
 	TIMING_TOC(TIMING_POW);
 
 	TIMING_TOC(TIMING_TOP);
-#ifdef CUDA
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 	ddata.freeIfSet();
 	dpower_spectrum.freeIfSet();
 	dcounter.freeIfSet();
@@ -1156,4 +1261,3 @@ void Projector::rotate3D(MultidimArray<Complex > &f3d, Matrix2D<RFLOAT> &A)
 		} // endif y-loop
 	} // endif z-loop
 }
-
