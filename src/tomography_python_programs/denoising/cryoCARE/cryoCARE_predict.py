@@ -33,9 +33,7 @@ def cryoCARE_predict(
     n_tiles: Optional[Tuple[int,int,int]] = typer.Option((1,1,1))
 
 ):
-    """Generates denoised tomograms using cryoCARE from a previously trained denoising model (.tar.gz)
-    (Euan Pyle version, https://github.com/EuanPyle/cryoCARE_mpido) branched from Thorsten Wagner 
-    version, https://github.com/thorstenwagner/cryoCARE_mpido)
+    """Generates denoised tomograms using cryoCARE (>=v0.2.0) from a previously trained denoising model (.tar.gz)
     
     Requires that two tomograms have been generated using the same sample. These can be generated via taking odd/even 
     frames during Motion Correction (optimal) or by taking odd/even tilts during tomogram reconstruction.

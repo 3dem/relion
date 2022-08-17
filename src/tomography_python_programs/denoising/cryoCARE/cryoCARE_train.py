@@ -34,8 +34,7 @@ def cryoCARE_train(
     number_training_subvolumes: Optional[int] = typer.Option(1200),
     subvolume_dimensions: Optional[int] = typer.Option(72),
 ):
-    """Trains a denoising model using cryoCARE (Euan Pyle version, https://github.com/EuanPyle/cryoCARE_mpido)
-    branched from Thorsten Wagner version, https://github.com/thorstenwagner/cryoCARE_mpido)
+    """Trains a denoising model using cryoCARE (>=v0.2.0)
     
     Requires that two tomograms have been generated using the same sample. These can be generated via taking odd/even 
     frames during Motion Correction (optimal) or by taking odd/even tilts during tomogram reconstruction.
