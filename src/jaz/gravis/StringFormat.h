@@ -24,10 +24,12 @@ namespace gravis
         s << start.string();
       };
 
-      const char*   c_str()  const
+// Takanori removed this because this is broken and not used.
+/*    const char*   c_str()  const
       {
         return s.str().c_str();
       }
+*/
       std::string   string() const
       {
         return s.str();
