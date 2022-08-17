@@ -50,8 +50,6 @@ void MicrographHandler::init(
 		std::string& metaFn)
 {
 	this->nr_omp_threads = nr_omp_threads;
-	this->firstFrame = firstFrame;
-	this->lastFrame = lastFrame;
 
 	if (corrMicFn != "")
 	{

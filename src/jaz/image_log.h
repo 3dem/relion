@@ -67,6 +67,9 @@ void ImageLog::write(
 
     switch (center)
     {
+        case NoCenter:
+	    break;
+
         case CenterXY:
         {
             Image<T> img2(w,h,d);

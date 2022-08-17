@@ -218,13 +218,6 @@ float JobOption::getNumber(std::string &errmsg)
 	}
 	else
 	{
-
-		if (&value == NULL)
-		{
-			errmsg = "Error in textToFloat of " + value;
-			return 0.;
-		}
-
 		float retval;
 		int ok = sscanf(value.c_str(), "%f", &retval);
 

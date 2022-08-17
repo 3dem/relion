@@ -18,7 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/gui_jobwindow.h"
-JobWindow::JobWindow(int _x, int _y, int _w, int _h, const char* title ) : Fl_Box(x,y,w,h,title)
+JobWindow::JobWindow(int _x, int _y, int _w, int _h, const char* title ) : Fl_Box(_x,_y,_w,_h,title)
 {
 	clear();
 	x = _x; y = _y; w = _w; h = _h;
