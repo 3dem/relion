@@ -300,8 +300,8 @@ void runCollect2jobs(	int grid_dim,
 						size_t * trans_idx,
 						size_t * jobOrigin,
 						size_t * jobExtent,
-						bool data_is_3D
-						);
+						bool data_is_3D,
+						deviceStream_t stream);
 
 void windowFourierTransform2(
 		AccPtr<ACCCOMPLEX> &d_in,
@@ -317,12 +317,12 @@ void selfApplyBeamTilt2(MultidimArray<Complex > &Fimg, RFLOAT beamtilt_x, RFLOAT
 		RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size);
 
 template <typename T>
-void runCenterFFT(MultidimArray< T >& v, bool forward, 
+void runCenterFFT(MultidimArray< T >& v, bool forward,
 #ifdef _CUDA_ENABLED
 	CudaCustomAllocator *allocator
 #elif _HIP_ENABLED
 	HipCustomAllocator *allocator
-#endif	
+#endif
 )
 {
 	AccPtr<XFLOAT >  img_in (v.nzyxdim, allocator);   // with original data pointer
@@ -680,4 +680,3 @@ void lowPassFilterMapGPU(
 }
 
 #endif //ACC_HELPER_FUNCTIONS_H_
-

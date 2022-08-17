@@ -48,7 +48,7 @@ void AutoPickerMpi::read(int argc, char **argv)
 void AutoPickerMpi::deviceInitialise()
 {
 	int devCount;
-	accGetDeviceCount(&devCount);
+	accGPUGetDeviceCount(&devCount);
 
 	std::vector < std::vector < std::string > > allThreadIDs;
 	untangleDeviceIDs(gpu_ids, allThreadIDs);

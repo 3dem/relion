@@ -975,7 +975,7 @@ void AutoPicker::initialise(int rank)
 void AutoPicker::deviceInitialise()
 {
 	int devCount;
-	accGetDeviceCount(&devCount);
+	accGPUGetDeviceCount(&devCount);
 
 	std::vector < std::vector < std::string > > allThreadIDs;
 	untangleDeviceIDs(gpu_ids, allThreadIDs);

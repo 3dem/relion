@@ -489,7 +489,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 			LAUNCH_PRIVATE_ERROR(hipGetLastError(),accMLO->errorStatus);
 			CTOC(hipMLO->timer,"normalizeAndTransform_recImg");
 		#endif
-			
+
 		}
 		else // if we don't have special images, just use the same as for alignment. But do it here, *before masking*
 		{
@@ -661,7 +661,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 		}
 
 		// ------------------------------------------------------------------------------------------
-		
+
 	#ifdef _CUDA_ENABLED
 		CTIC(cudaMLO->timer,"normalizeAndTransform");
 	#elif _HIP_ENABLED
@@ -868,7 +868,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 
 					/********************************************************************************
 					 * Currently CPU-memory for projectors is not deallocated when doing multibody
-					 * due to the previous line. See cpu_ml_optimiser.cpp, cuda_ml_optimiser.cu and 
+					 * due to the previous line. See cpu_ml_optimiser.cpp, cuda_ml_optimiser.cu and
 					 * hip_ml_optimiser.hip.cpp
 					 ********************************************************************************/
 
@@ -1183,7 +1183,7 @@ void getAllSquaredDifferencesCoarse(
 
 		deviceInitValue<XFLOAT>(allWeights, (XFLOAT) (op.highres_Xi2_img[img_id] / 2.));
 		allWeights_pos = 0;
-		
+
 	#ifdef _CUDA_ENABLED
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
@@ -2038,7 +2038,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 					CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_SIG");
 					Mcoarse_significant.deviceAlloc();
-					
+
 			#ifdef _CUDA_ENABLED
 					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 					arrayOverThreshold<XFLOAT>(unsorted_ipart, Mcoarse_significant, significant_weight);
@@ -2507,7 +2507,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						~thisClassFinePassWeights.trans_idx,
 						~FPCMasks[img_id][exp_iclass].jobOrigin,
 						~FPCMasks[img_id][exp_iclass].jobExtent,
-						accMLO->dataIs3D);
+						accMLO->dataIs3D,
+						accMLO->defaultStream);
 		#ifdef _CUDA_ENABLED
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 		#elif _HIP_ENABLED
@@ -3310,7 +3311,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			baseMLO->wsum_model.LL += thr_sum_dLL;
 			baseMLO->wsum_model.ave_Pmax += thr_sum_Pmax;
-		}	
+		}
 	} // end if !do_skip_maximization
 
 	CTOC(accMLO->timer,"store_post_gpu");

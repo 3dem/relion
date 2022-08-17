@@ -472,7 +472,7 @@ void runWavgKernel(
 				stream
 				);
 	}
-#ifdef _CUDA_ENABLED	
+#ifdef _CUDA_ENABLED
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 #elif _HIP_ENABLED
 	LAUNCH_HANDLE_ERROR(hipGetLastError());
@@ -943,7 +943,7 @@ void runBackProjectKernel(
 #endif
 #endif
 		} // do_grad is false
-	#ifdef _CUDA_ENABLED	
+	#ifdef _CUDA_ENABLED
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	#elif _HIP_ENABLED
 		LAUNCH_HANDLE_ERROR(hipGetLastError());
@@ -1375,7 +1375,7 @@ void runDiff2KernelCoarse(
 						translation_num,
 						image_size,
 						stream);
-				#ifdef _CUDA_ENABLED		
+				#ifdef _CUDA_ENABLED
 				LAUNCH_HANDLE_ERROR(cudaGetLastError());
 				#elif _HIP_ENABLED
 				LAUNCH_HANDLE_ERROR(hipGetLastError());
@@ -1416,7 +1416,7 @@ void runDiff2KernelCoarse(
 						translation_num,
 						image_size,
 						stream);
-				#ifdef _CUDA_ENABLED		
+				#ifdef _CUDA_ENABLED
 				LAUNCH_HANDLE_ERROR(cudaGetLastError());
 				#elif _HIP_ENABLED
 				LAUNCH_HANDLE_ERROR(hipGetLastError());
@@ -1480,7 +1480,7 @@ void runDiff2KernelCoarse(
 				image_size,
 				local_sqrtXi2,
 				stream);
-		#ifdef _CUDA_ENABLED		
+		#ifdef _CUDA_ENABLED
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 		#elif _HIP_ENABLED
 		LAUNCH_HANDLE_ERROR(hipGetLastError());
@@ -1592,7 +1592,7 @@ void runDiff2KernelFine(
 					job_idx,
 					job_num,
 					stream);
-		#ifdef _CUDA_ENABLED		
+		#ifdef _CUDA_ENABLED
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 		#elif _HIP_ENABLED
 		LAUNCH_HANDLE_ERROR(hipGetLastError());
@@ -1674,7 +1674,7 @@ void runDiff2KernelFine(
 				job_idx,
 				job_num,
 				stream);
-		#ifdef _CUDA_ENABLED		
+		#ifdef _CUDA_ENABLED
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 		#elif _HIP_ENABLED
 		LAUNCH_HANDLE_ERROR(hipGetLastError());
@@ -1882,13 +1882,13 @@ void windowFourierTransform2(
 
 
 	deviceInitComplexValue<ACCCOMPLEX>(d_out, (XFLOAT)0.);
-#ifdef _CUDA_ENABLED	
+#ifdef _CUDA_ENABLED
 	HANDLE_ERROR(cudaStreamSynchronize(d_out.getStream()));
 #elif _HIP_ENABLED
 	HANDLE_ERROR(hipStreamSynchronize(d_out.getStream()));
 #endif
 	if(oX==iX)
-	{		
+	{
 #ifdef _CUDA_ENABLED
 		HANDLE_ERROR(cudaStreamSynchronize(d_in.getStream()));
 		cudaCpyDeviceToDevice(&d_in(pos), ~d_out, oX*oY*oZ*Npsi, d_out.getStream() );
@@ -1989,7 +1989,7 @@ void run_calcPowerSpectrum(Complex *dFaux, int padoridim, Complex *ddata, int da
 	if(if3D)
 	{
 		bs.z = 2;
-		gs.z = ceil(padoridim/(float)bs.z); 
+		gs.z = ceil(padoridim/(float)bs.z);
 	}
 	if(sizeof(RFLOAT) == sizeof(double))
 		cuda_kernel_calcPowerSpectrum<<<gs,bs>>>((double2*)dFaux,padoridim,(double2*)ddata,data_sz,dpower_spectrum,dcounter,
@@ -2004,7 +2004,7 @@ void run_calcPowerSpectrum(Complex *dFaux, int padoridim, Complex *ddata, int da
 	if(if3D)
 	{
 		bs.z = 2;
-		gs.z = ceil(padoridim/(float)bs.z); 
+		gs.z = ceil(padoridim/(float)bs.z);
 	}
 	if(sizeof(RFLOAT) == sizeof(double))
 		hipLaunchKernelGGL(HIP_KERNEL_NAME(hip_kernel_calcPowerSpectrum), gs, bs, 0, 0, (double2*)dFaux,padoridim,(double2*)ddata,data_sz,dpower_spectrum,dcounter,

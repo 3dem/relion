@@ -49,8 +49,7 @@
 #include <cuda_profiler_api.h>
 #elif _HIP_ENABLED
 #include "src/acc/hip/hip_ml_optimiser.h"
-#include "roctracer_ext.h"
-#include <roctx.h>
+#include <roctracer/roctx.h>
 #endif
 #ifdef ALTCPU
 	#include <atomic>
@@ -71,11 +70,11 @@ static omp_lock_t global_mutex;
 
 void globalThreadExpectationSomeParticles(void *self, int thread_id)
 {
-	MlOptimiser *MLO = (MlOptimiser*)self; 
+	MlOptimiser *MLO = (MlOptimiser*)self;
 
 	try
 	{
-#if def _CUDA_ENABLED || defined _HIP_ENABLED
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 		if (MLO->do_gpu)
 			((MlOptimiserAccGPU*) MLO->gpuOptimisers[thread_id])->doThreadExpectationSomeParticles(thread_id);
 		else
@@ -4079,7 +4078,7 @@ void MlOptimiser::expectationOneParticle(long int part_id_sorted, int thread_id)
 		std::cerr << "Before getFourierTransformsAndCtfs, press any key to continue... " << std::endl;
 		std::cin >> c;
 	}
-	#pragma omp barrier	
+	#pragma omp barrier
 #endif
 
 
