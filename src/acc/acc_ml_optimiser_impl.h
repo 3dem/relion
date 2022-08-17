@@ -703,8 +703,12 @@ void getFourierTransformsAndCtfs(long int part_id,
 					accMLO->transformer1.yFSize,
 					accMLO->transformer1.zFSize,
 					(baseMLO->image_current_size[optics_group]/2)+1, // note: NOT baseMLO->image_full_size[optics_group]/2+1
-					&(~spectrumAndXi2)[spectrumAndXi2.getSize()-1], // last element is the hihgres_Xi2
-					accMLO->defaultStream);
+					&(~spectrumAndXi2)[spectrumAndXi2.getSize()-1],
+				#ifdef _CUDA_ENABLED
+					cudaStreamPerThread); // last element is the hihgres_Xi2
+				#elif _HIP_ENABLED
+					hipStreamPerThread); // last element is the hihgres_Xi2
+				#endif
 			else
 				AccUtilities::powerClass<false>(gridSize,POWERCLASS_BLOCK_SIZE,
 					~accMLO->transformer1.fouriers,
@@ -716,7 +720,11 @@ void getFourierTransformsAndCtfs(long int part_id,
 					accMLO->transformer1.zFSize,
 					(baseMLO->image_current_size[optics_group]/2)+1, // note: NOT baseMLO->image_full_size[optics_group]/2+1
 					&(~spectrumAndXi2)[spectrumAndXi2.getSize()-1], // last element is the hihgres_Xi2
-					accMLO->defaultStream);
+				#ifdef _CUDA_ENABLED
+					cudaStreamPerThread); // last element is the hihgres_Xi2
+				#elif _HIP_ENABLED
+					hipStreamPerThread); // last element is the hihgres_Xi2
+				#endif
 
 		#ifdef _CUDA_ENABLED
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
@@ -2508,10 +2516,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						~FPCMasks[img_id][exp_iclass].jobOrigin,
 						~FPCMasks[img_id][exp_iclass].jobExtent,
 						accMLO->dataIs3D,
-						accMLO->defaultStream);
 		#ifdef _CUDA_ENABLED
+						cudaStreamPerThread);
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 		#elif _HIP_ENABLED
+						hipStreamPerThread);
 			LAUNCH_PRIVATE_ERROR(hipGetLastError(),accMLO->errorStatus);
 		#endif
 
