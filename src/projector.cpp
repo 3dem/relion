@@ -393,9 +393,9 @@ void Projector::computeFourierTransformMap(
 				REPORT_ERROR("failed to create hipfft plan");
 			hipfftSetAutoAllocation(plan, 0); // do not allocate work area
 			//Allocate space with smart allocator
-			AccPtr<char> fft_ws = ptrFactory.make<char>(ws_sz);
-			fft_ws.accAlloc();
-			hipfftSetWorkArea(plan, ~fft_ws);
+			// AccPtr<char> fft_ws = ptrFactory.make<char>(ws_sz);
+			// fft_ws.accAlloc();
+			// hipfftSetWorkArea(plan, ~fft_ws);
 			err = hipfftMakePlanMany(plan, ref_dim, n, NULL, 0, 0, NULL, 0, 0, hipfft_type, 1, &ws_sz);
 			if(err != HIPFFT_SUCCESS)
 				REPORT_ERROR("failed to create hipfft plan");
@@ -409,7 +409,7 @@ void Projector::computeFourierTransformMap(
 				REPORT_ERROR("failed to exec fft");
 			// deallocate plan, free mem
 			hipfftDestroy(plan);
-			fft_ws.freeIfSet();
+			// fft_ws.freeIfSet();
 
 			size_t normfft = (size_t)padoridim*(size_t)padoridim;
 			if(ref_dim == 3) normfft *= (size_t)padoridim;
