@@ -11,7 +11,7 @@ from rich.progress import track
 
 from ._cli import cli
 from .. import utils
-from ..utils import mdoc
+from ..utils.mdoc import calculate_pre_exposure_dose, basename_from_sub_frame_path
 from ..utils.relion import relion_pipeline_job
 from ..utils.file import match_filenames
 
@@ -144,8 +144,8 @@ def _generate_tilt_image_dataframe(
     df['date_time'] = pd.to_datetime(df['date_time'], infer_datetime_format=True)
     df = df.sort_values(by="date_time", ascending=True)
     df['image_index'] = np.arange(len(df)) + 1  # 0 -> 1 indexing
-    df['pre_exposure_dose'] = mdoc.calculate_pre_exposure_dose(df, dose_per_tilt_image)
-    df['sub_frame_basename'] = df['sub_frame_path'].apply(mdoc.basename_from_sub_frame_path)
+    df['pre_exposure_dose'] = calculate_pre_exposure_dose(df, dose_per_tilt_image)
+    df['sub_frame_basename'] = df['sub_frame_path'].apply(basename_from_sub_frame_path)
     df['tilt_image_file'] = match_filenames(df['sub_frame_basename'], to_match=tilt_image_files)
     df = df[df['tilt_image_file'] != None]
     df['nominal_tilt_axis_angle'] = nominal_tilt_axis_angle
@@ -156,7 +156,8 @@ def _generate_tilt_image_dataframe(
         'rlnTomoTiltMovieIndex': df['image_index'],
         'rlnTomoNominalStageTiltAngle': df['tilt_angle'],
         'rlnTomoNominalTiltAxisAngle': df['nominal_tilt_axis_angle'],
-        'rlnTomoNominalDefocus': df['target_defocus'],
         'rlnMicrographPreExposure': df['pre_exposure_dose'],
     })
+    if 'target_defocus' in df.columns:
+        output_df['rlnTomoNominalDefocus'] = df['target_defocus']
     return output_df
