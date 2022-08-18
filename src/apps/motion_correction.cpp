@@ -17,41 +17,27 @@
  * source code. Additional authorship citations may be added, but existing
  * author citations must be preserved.
  ***************************************************************************/
+#include <src/motioncorr_own_devolved.h>
 
-#ifndef MOTIONCORR_OWN_DEVOLVED_H_
-#define MOTIONCORR_OWN_DEVOLVED_H_
 
-#include "src/mpi.h"
-#include "src/motioncorr_runner.h"
-#include "src/parallel.h"
-
-class MotioncorrOwnDevolved: public MotioncorrRunner
+int main(int argc, char *argv[])
 {
-private:
-	MpiNode *node;
+	MotioncorrOwnDevolved prm;
 
-public:
-	/** Destructor, calls MPI_Finalize */
-    ~MotioncorrOwnDevolved()
-    {
-        delete node;
-    }
+	try
+	{
+		prm.read(argc, argv);
+		prm.initialise();
+		prm.run();
+	}
+	catch (RelionError XE)
+	{
+		std::cerr << XE;
+		MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_FAILURE);
+	}
 
-    /** Read
-     * This could take care of mpi-parallelisation-dependent variables
-     */
-    void read(int argc, char **argv);
+        MPI_Barrier(MPI_COMM_WORLD);
+	return RELION_EXIT_SUCCESS;
+}
 
-    void initialise() {return;};
 
-    // Parallelized run function
-    void run();
-
-    FileName getOutputFileNames(FileName fn_mic) override;
-
-    FileName movie_path;
-    FileName micrograph_path;
-
-};
-
-#endif /* MOTIONCORR_RUNNER_MPI_H_ */
