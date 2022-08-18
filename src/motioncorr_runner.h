@@ -167,7 +167,7 @@ public:
 	void run();
 
 	// Given an input fn_mic filename, this function will determine the names of the output corrected image (fn_avg) and the corrected movie (fn_mov).
-	FileName getOutputFileNames(FileName fn_mic);
+	virtual FileName getOutputFileNames(FileName fn_mic);
 
 	// Execute MOTIONCOR2 for a single micrograph
 	bool executeMotioncor2(Micrograph &mic, int rank = 0);
