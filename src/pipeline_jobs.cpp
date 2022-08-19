@@ -6507,11 +6507,6 @@ void RelionJob::initialiseTomoDenoiseTomogramsJob()
 
     joboptions["in_tomoset"] = JobOption("Input tomogram set:", OUTNODE_TOMO_TOMOGRAMS, "", "STAR files (*.star)",  "Input tomogram set star file.");
 
-    char *default_location = getenv ("RELION_DENOISING_WRAPPER_EXECUTABLE");
-    char default_denoising_wrapper[] = DEFAULTDENOISINGWRAPPERLOCATION;
-    if (default_location == NULL) default_location = default_denoising_wrapper;
-    joboptions["denoising_wrapper"] = JobOption("Alister Burt's Denoising wrapper:", std::string(default_location), "*", ".", "Location of Alister Burt's Denoising script; or just its executable name if in the path. You can control the default of this field by setting environment variable RELION_DENOISING_WRAPPER_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code. Note that Alister's script should find the executables to denoising programs on its own. See Alister's documentation on how to configure this.");
-
     joboptions["do_cryocare_train"] = JobOption("Train denoising model:", false, "Select Yes to train cryoCARE denoising model. Input tomogram set should contain tomogram halves for denoising (to generate, select Yes to Generate tomograms for denoising in the Reconstruct tomogram tab).");
 
     joboptions["tomograms_for_training"] = JobOption("Tomograms for model training:", std::string(""), "List the tomograms to be used to train the denoising model. Ideally, these should cover the defocus range of your tomograms. List the tomograms according to their rlnTomoName, and separate the tomograms using ':'. For exampple, input should look something like: TS_01:TS_02 "); 
@@ -6526,8 +6521,6 @@ void RelionJob::initialiseTomoDenoiseTomogramsJob()
     joboptions["ntiles_y"] = JobOption("Number of tiles - Y:", std::string("2"), "Number of tiles to use in denoised tomogram generation (X, Y, and Z dimension)");
     joboptions["ntiles_z"] = JobOption("Number of tiles - Z:", std::string("2"), "Number of tiles to use in denoised tomogram generation (X, Y, and Z dimension). Default is 2,2,2. Increase if you get a \'Check failed: narrow == wide\' error in prediction.");
 
-    joboptions["other_wrapper_args"] = JobOption("Other wrapper arguments:", (std::string)"",  "Other arguments that will be passed straight onto the denoising wrapper.");
-
 }
 
 bool RelionJob::getCommandsTomoDenoiseTomogramsJob(std::string &outputname, std::vector<std::string> &commands,
@@ -6536,7 +6529,6 @@ bool RelionJob::getCommandsTomoDenoiseTomogramsJob(std::string &outputname, std:
     commands.clear();
     initialisePipeline(outputname, job_counter);
     std::string command;
-
 
     int i = 0;
     if (joboptions["do_cryocare_train"].getBoolean()) i++;
@@ -6552,60 +6544,52 @@ bool RelionJob::getCommandsTomoDenoiseTomogramsJob(std::string &outputname, std:
     {
         error_message = "ERROR: you should (only) enable ONE of the methods: cryoCARE:train (--do_cryocare_train), cryoCARE:predict (--do_cryocare_predict)";    
     }
-
-    command="`which relion_run_denoise_tomogram`";
-    
-    if (error_message != "") return false;
-
-    command += " --i " + joboptions["in_tomoset"].getString();
-    Node node(joboptions["in_tomoset"].getString(), joboptions["in_tomoset"].node_type);
-    inputNodes.push_back(node); 
-
-    command += " --o " + outputname;
-    Node node2(outputname+"tomograms.star", LABEL_TOMO_TOMOGRAMS);
-    outputNodes.push_back(node2);  
-
-    if ((joboptions["denoising_wrapper"].getString()).length() > 0)
-        command += " --wrapper_executable " + joboptions["denoising_wrapper"].getString();
-
-    if ((joboptions["other_wrapper_args"].getString()).length() > 0)
-        command += " --other_wrapper_args \" " + joboptions["other_wrapper_args"].getString() + " \"";
-
-    if (joboptions["do_cryocare_train"].getBoolean())
-    {
-        command += " --do_cryocare_train ";
-    }
-
-    if (joboptions["do_cryocare_predict"].getBoolean())
-    {
-        command += " --do_cryocare_predict ";
-    }
-
     if (joboptions["do_cryocare_train"].getBoolean() &&  joboptions["tomograms_for_training"].getString().length() == 0)
     {
 	error_message = "ERROR: cryoCARE training is enabled but the tomograms to train (--tomograms_for_training) on have not been specified.";
 	return false;
-    }        
-    if (joboptions["tomograms_for_training"].getString().length() > 0 && joboptions["do_cryocare_train"].getBoolean())
-    {    
-	command += " --tomograms_for_training " + joboptions["tomograms_for_training"].getString();
-        command += " --number_training_subvolumes " + joboptions["number_training_subvolumes"].getString();
-        command += " --subvolume_dimensions " + joboptions["subvolume_dimensions"].getString();
-    }
+    }       
     if (joboptions["do_cryocare_predict"].getBoolean() && joboptions["care_denoising_model"].getString().length() == 0)
     {
 	error_message = "ERROR: cryoCARE predict is enabled but path to the denoising model (--care_denoising_model) generated in cryoCARE:train has not been specified.";
 	return false;
-    }        
+    } 
+
+    command="`which relion_tomo_denoise` ";
+    
+    if (error_message != "") return false;
+
+    if (joboptions["do_cryocare_train"].getBoolean())
+    {
+        command += " cryoCARE:train ";
+    }
+    if (joboptions["do_cryocare_predict"].getBoolean())
+    {
+        command += " cryoCARE:predict ";
+    }
+    command += " --tilt-series-star-file " + joboptions["in_tomoset"].getString();
+    Node node(joboptions["in_tomoset"].getString(), joboptions["in_tomoset"].node_type);
+    inputNodes.push_back(node); 
+
+    command += " --output-directory " + outputname;
+    Node node2(outputname+"tomograms.star", LABEL_TOMO_TOMOGRAMS);
+    outputNodes.push_back(node2);  
+ 
+    if (joboptions["tomograms_for_training"].getString().length() > 0 && joboptions["do_cryocare_train"].getBoolean())
+    {    
+	command += " --training-tomograms " + joboptions["tomograms_for_training"].getString();
+        command += " --number-training-subvolumes " + joboptions["number_training_subvolumes"].getString();
+        command += " --subvolume-dimensions " + joboptions["subvolume_dimensions"].getString();
+    }       
 
     if (joboptions["care_denoising_model"].getString().length() > 0 && joboptions["do_cryocare_predict"].getBoolean())
     {
-        command += " --care_denoising_model " + joboptions["care_denoising_model"].getString();
+        command += " --model-name " + joboptions["care_denoising_model"].getString();
     }
 
     if (joboptions["ntiles_x"].getString().length() > 0 && joboptions["ntiles_y"].getString().length() > 0 && joboptions["ntiles_z"].getString().length() > 0 && joboptions["do_cryocare_predict"].getBoolean())
     {
-    	command += " --ntiles_x " + joboptions["ntiles_x"].getString() + " --ntiles_y " + joboptions["ntiles_y"].getString() + " --ntiles_z " + joboptions["ntiles_z"].getString();
+    	command += " --n-tiles " + joboptions["ntiles_x"].getString() + " " + joboptions["ntiles_y"].getString() + " " + joboptions["ntiles_z"].getString() + " ";
     }
 
     // Other arguments for extraction

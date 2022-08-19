@@ -54,8 +54,8 @@
 // Our own defaults at LMB are the hard-coded ones
 #define DEFAULTQSUBLOCATION "/public/EM/RELION/relion/bin/relion_qsub.csh"
 #define DEFAULTCTFFINDLOCATION "/public/EM/ctffind/ctffind.exe"
-#define DEFAULTIMODWRAPPERLOCATION "relion_tomo_align_tilt_series"
-#define DEFAULTDENOISINGWRAPPERLOCATION "relion_tomo_denoise"
+//#define DEFAULTIMODWRAPPERLOCATION "relion_tomo_align_tilt_series"
+//#define DEFAULTDENOISINGWRAPPERLOCATION "relion_tomo_denoise"
 #define DEFAULTMOTIONCOR2LOCATION "/public/EM/MOTIONCOR2/MotionCor2"
 #define DEFAULTGCTFLOCATION "/public/EM/Gctf/bin/Gctf"
 #define DEFAULTTOPAZLOCATION "/public/EM/RELION/topaz"

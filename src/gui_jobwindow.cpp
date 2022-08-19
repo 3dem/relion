@@ -2580,9 +2580,6 @@ void JobWindow::initialiseTomoDenoiseTomogramsWindow()
     // Add a little spacer
     current_y += STEPY/2;
 
-    place("denoising_wrapper", TOGGLE_DEACTIVATE);
-    place("other_wrapper_args", TOGGLE_DEACTIVATE);
-
     tab2->begin();
     tab2->label("CryoCARE: Train");
     resetHeight();
@@ -2619,7 +2616,6 @@ void JobWindow::initialiseTomoDenoiseTomogramsWindow()
     guientries["do_cryocare_predict"].cb_menu_i(); 
 
     tab3->end();
-
 }
 
 void JobWindow::initialiseTomoSubtomoWindow()

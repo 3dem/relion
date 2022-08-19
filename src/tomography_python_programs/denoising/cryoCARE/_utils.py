@@ -69,7 +69,7 @@ def generate_train_data_config_json(
     """
     number_normalisation_subvolumes = round(number_training_subvolumes * 0.1)
     train_data_config_json = json.loads(f'{{"even": {json.dumps(even_tomos)}, "odd": {json.dumps(odd_tomos)}, "patch_shape": [{subvolume_dimensions}, {subvolume_dimensions}, {subvolume_dimensions}], \
-    "num_slices": {number_training_subvolumes}, "split": 0.9, "tilt_axis": "Y", "n_normalization_samples": {number_normalisation_subvolumes}, "path": "{training_dir}"}}')
+    "num_slices": {number_training_subvolumes}, "split": 0.9, "tilt_axis": "Y", "n_normalization_samples": {number_normalisation_subvolumes}, "path": "{training_dir}", "overwrite": "overwrite"}}')
     return train_data_config_json
 
 def generate_train_config_json(
@@ -81,7 +81,7 @@ def generate_train_config_json(
     Creates a Dict which can be saved as a json file for train_config.json file
     """
     train_config_json = json.loads(f'{{"train_data": "{training_dir}", "epochs": 100, "steps_per_epoch": 200, "batch_size": 16, "unet_kern_size": 3, \
-    "unet_n_depth": 3, "unet_n_first": 16, "learning_rate": 0.0004, "model_name": "{model_name}", "path": "{output_directory}"}}')
+    "unet_n_depth": 3, "unet_n_first": 16, "learning_rate": 0.0004, "model_name": "{model_name}", "path": "{output_directory}", "overwrite": "overwrite"}}')
     return train_config_json
 
 def generate_predict_json(
@@ -96,7 +96,7 @@ def generate_predict_json(
     Creates a Dict which can be saved as a json file for predict_config.json file
     """
     predict_json = json.loads(f'{{"path": "{model_name}", "even": {json.dumps(even_tomos)}, \
-    "odd": {json.dumps(odd_tomos)}, "n_tiles": {list(n_tiles)}, "output": "{output_directory / "tomograms"}"}}')
+    "odd": {json.dumps(odd_tomos)}, "n_tiles": {list(n_tiles)}, "output": "{output_directory / "tomograms"}", "overwrite": "overwrite"}}')
     return predict_json
 
 def save_json(
