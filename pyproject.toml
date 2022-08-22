@@ -32,7 +32,8 @@ dependencies = [
     "rich",
     "einops",
     "lil_aretomo",
-    "yet-another-imod-wrapper"
+    "yet-another-imod-wrapper",
+    "makefun",
 ]
 
 # extras
@@ -60,6 +61,18 @@ dev = [
     "pytest",
     "rich",
 ]
+gui = [
+    "napari",
+    "qtpy",
+    "psygnal"
+]
+gui-pyqt = [
+    "napari",
+    "qtpy",
+    "psygnal",
+    "pyqt5",
+]
+
 
 [project.urls]
 homepage = "https://github.com/3dem/relion"
@@ -68,6 +81,8 @@ repository = "https://github.com/3dem/relion"
 # same as console_scripts entry point
 [project.scripts]
 relion_tomo_import = "tomography_python_programs.import_tilt_series:cli"
+relion_tomo_view_tilt_series = "tomography_python_programs.view_tilt_series:cli"
+relion_tomo_exclude_tilt_images = "tomography_python_programs.exclude_tilt_images:cli"
 relion_tomo_align_tilt_series = "tomography_python_programs.tilt_series_alignment:cli"
 relion_tomo_denoise = "tomography_python_programs.denoising:cli"
 
