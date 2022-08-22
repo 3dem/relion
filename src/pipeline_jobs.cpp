@@ -6540,6 +6540,11 @@ void RelionJob::initialiseTomoDenoiseTomogramsJob()
 
 bool RelionJob::getCommandsTomoDenoiseTomogramsJob(std::string &outputname, std::vector<std::string> &commands,
                                             std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
+{
+    commands.clear();
+    initialisePipeline(outputname, job_counter);
+    std::string command;
+    
     int i = 0;
     if (joboptions["do_cryocare_train"].getBoolean()) i++;
     if (joboptions["do_cryocare_predict"].getBoolean()) i++;
