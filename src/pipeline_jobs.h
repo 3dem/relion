@@ -750,7 +750,7 @@ static int get_node_type(std::string label)
 #define PROC_TOMO_RECONSTRUCT       54// Calculation of particle average from the individual tilt series images
 #define PROC_TOMO_ALIGN_TILTSERIES 55// Tilt series alignment for tomogram reconstruction
 #define PROC_TOMO_RECONSTRUCT_TOMOGRAM 56 // Reconstruction of tomograms for particle picking
-#define PROC_TOMO_DENOISE_TOMOGRAM 57 // Denoise tomograms
+#define PROC_TOMO_DENOISE_TOMOGRAM 58 // Denoise tomograms
 
 #define PROC_EXTERNAL       99// External scripts
 
