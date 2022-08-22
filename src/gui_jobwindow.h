@@ -133,6 +133,7 @@ private:
 	void placeTomoInput(bool has_tomograms, bool has_particles,
 						bool has_trajectories, bool has_manifolds, bool has_halfmaps, bool has_postprocess);
 	void initialiseTomoImportWindow();
+	void initialiseTomoExcludeTiltImagesWindow();
     void initialiseTomoReconstructTomogramsWindow();
     void initialiseTomoAlignTiltseriesWindow();
     void initialiseTomoSubtomoWindow();

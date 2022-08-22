@@ -6,6 +6,7 @@ import pandas as pd
 import starfile
 import typer
 
+from ..metadata_model import RelionTiltSeriesSet
 from ..utils.transformations import S, Rx, Ry, Rz
 from ._cli import cli
 
@@ -65,28 +66,14 @@ def tilt_series_alignment_parameters_to_relion_projection_matrices(
     return np.squeeze(transformations)
 
 
-def write_single_tilt_series_alignment_output(
-        tilt_series_df: pd.DataFrame,
-        tilt_series_id: str,
-        specimen_shifts: np.ndarray,
-        euler_angles: np.ndarray,
-        output_star_file: Path,
-):
-    """Write metadata from a tilt-series alignment experiment."""
-    tilt_series_df[['rlnTomoXTilt', 'rlnTomoYTilt', 'rlnTomoZRot']] = euler_angles
-    tilt_series_df[['rlnTomoXShiftAngst', 'rlnTomoYShiftAngst']] = specimen_shifts
-    starfile.write({tilt_series_id: tilt_series_df}, output_star_file)
-
-
-@cli.command(name='write-global-output')
 def write_global_output(
-        original_tilt_series_star_file: Path = typer.Option(...),
-        job_directory: Path = typer.Option(...)
+        input_tilt_series_set: RelionTiltSeriesSet,
+        job_directory: Path
 ):
     """Write output from a batch of tilt-series alignment experiments."""
-    df = starfile.read(original_tilt_series_star_file, always_dict=True)['global']
+    df = input_tilt_series_set.global_data
 
-    # update individual tilt series star files
+    # generate names of tilt series star files
     df['rlnTomoTiltSeriesStarFile'] = [
         job_directory / 'tilt_series' / f'{tilt_series_id}.star'
         for tilt_series_id in df['rlnTomoName']

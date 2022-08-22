@@ -4,12 +4,11 @@ from typing import Optional
 import typer
 from yet_another_imod_wrapper import align_tilt_series_using_fiducials
 from rich.console import Console
-from rich.progress import track
 
 from .._job_utils import write_global_output
 from .align_tilt_series import align_single_tilt_series
 from .._cli import cli
-from ... import utils
+from ...metadata_model import RelionTiltSeriesSet
 from ...utils.relion import relion_pipeline_job
 
 console = Console(record=True)
@@ -28,16 +27,14 @@ def fiducials_cli(
         raise RuntimeError('Could not find tilt series star file')
 
     console.log('Extracting metadata for tilt series.')
-    tilt_series_metadata = utils.star.iterate_tilt_series_metadata(
-        tilt_series_star_file=tilt_series_star_file,
-        tilt_series_id=tomogram_name
+    tilt_series_set = RelionTiltSeriesSet.from_star_file(
+        filename=tilt_series_star_file, tilt_series_id=tomogram_name
     )
-    for tilt_series_id, tilt_series_df, tilt_image_df in tilt_series_metadata:
-        console.log(f'Aligning {tilt_series_id}...')
+    for global_data, tilt_series in tilt_series_set:
+        console.log(f'Aligning {tilt_series.name}...')
         align_single_tilt_series(
-            tilt_series_id=tilt_series_id,
-            tilt_series_df=tilt_series_df,
-            tilt_image_df=tilt_image_df,
+            tilt_series=tilt_series,
+            pixel_spacing_angstroms=global_data['rlnTomoTiltSeriesPixelSize'],
             alignment_function=align_tilt_series_using_fiducials,
             alignment_function_kwargs={
                 'fiducial_size': nominal_fiducial_diameter_nanometers
@@ -47,7 +44,7 @@ def fiducials_cli(
     if tomogram_name is None:  # write out STAR file for set of tilt-series
         console.log('Writing aligned_tilt_series.star')
         write_global_output(
-            original_tilt_series_star_file=tilt_series_star_file,
+            input_tilt_series_set=tilt_series_set,
             job_directory=output_directory
         )
     console.save_html(str(output_directory / 'log.html'), clear=False)
