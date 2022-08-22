@@ -414,6 +414,11 @@ void JobWindow::initialise(int my_job_type, bool _is_tomo)
 		myjob.initialise(my_job_type);
 		initialiseTomoImportWindow();
 	}
+    else if (my_job_type == PROC_TOMO_EXCLUDE_TILT_IMAGES)
+    {
+        myjob.initialise(my_job_type);
+        initialiseTomoExcludeTiltImagesWindow();
+    }
     else if (my_job_type == PROC_TOMO_RECONSTRUCT_TOMOGRAM)
     {
         myjob.initialise(my_job_type);
@@ -2833,5 +2838,22 @@ void JobWindow::initialiseTomoReconParWindow()
 	place("sym_name", TOGGLE_DEACTIVATE);
 
 	tab2->end();
+}
+
+void JobWindow::initialiseTomoExcludeTiltImagesWindow()
+{
+    setupTabs(1);
+
+    tab1->begin();
+    tab1->label("I/O");
+    resetHeight();
+
+    place("in_tiltseries", TOGGLE_DEACTIVATE);
+
+    // Add a little spacer
+    current_y += STEPY/2;
+
+    place("cache_size", TOGGLE_DEACTIVATE);
+    tab1->end();
 }
 

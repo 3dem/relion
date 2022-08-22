@@ -4,13 +4,12 @@ from typing import Optional
 import typer
 from yet_another_imod_wrapper import align_tilt_series_using_patch_tracking
 from rich.console import Console
-from rich.progress import track
 
 from .align_tilt_series import align_single_tilt_series
 from .._cli import cli
 from .._job_utils import write_global_output
-from ... import utils
 from ...utils.relion import relion_pipeline_job
+from ...metadata_model import RelionTiltSeriesSet
 
 console = Console(record=True)
 
@@ -35,20 +34,16 @@ def patch_tracking_cli(
     patch_overlap_percentage: percentage of overlap between tracked patches.
     """
     if not tilt_series_star_file.exists():
-        e = 'Could not find tilt series star file'
-        console.log(f'ERROR: {e}')
-        raise RuntimeError(e)
+        raise RuntimeError('Could not find tilt series star file')
     console.log('Extracting metadata for tilt series.')
-    tilt_series_metadata = utils.star.iterate_tilt_series_metadata(
-        tilt_series_star_file=tilt_series_star_file,
-        tilt_series_id=tomogram_name
+    tilt_series_set = RelionTiltSeriesSet.from_star_file(
+        filename=tilt_series_star_file, tilt_series_id=tomogram_name
     )
-    for tilt_series_id, tilt_series_df, tilt_image_df in tilt_series_metadata:
-        console.log(f'Aligning {tilt_series_id}...')
+    for global_data, tilt_series in tilt_series_set:
+        console.log(f'Aligning {tilt_series.name}...')
         align_single_tilt_series(
-            tilt_series_id=tilt_series_id,
-            tilt_series_df=tilt_series_df,
-            tilt_image_df=tilt_image_df,
+            tilt_series=tilt_series,
+            pixel_spacing_angstroms=global_data['rlnTomoTiltSeriesPixelSize'],
             alignment_function=align_tilt_series_using_patch_tracking,
             alignment_function_kwargs={
                 'patch_size': int(patch_size_nanometers * 10),
@@ -59,7 +54,7 @@ def patch_tracking_cli(
     if tomogram_name is None:  # write global output for set of tilt-series
         console.log('Writing aligned_tilt_series.star')
         write_global_output(
-            original_tilt_series_star_file=tilt_series_star_file,
+            input_tilt_series_set=tilt_series_set,
             job_directory=output_directory
         )
     console.save_html(str(output_directory / 'log.html'), clear=False)
