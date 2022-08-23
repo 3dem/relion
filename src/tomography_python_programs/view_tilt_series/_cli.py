@@ -18,7 +18,7 @@ def tilt_series_viewer(
     relion_metadata = RelionTiltSeriesSet.from_star_file(tilt_series_star_file)
     for tilt_series in relion_metadata.tilt_series:
         tilt_series.data = tilt_series.data.sort_values(by='rlnTomoNominalStageTiltAngle')
-    gui_model = RelionTiltSeriesSet.as_gui_model()
+    gui_model = relion_metadata.as_gui_model()
     dock_widget = TiltSeriesBrowserWidget(viewer, gui_model, cache_size=cache_size)
     viewer.window.add_dock_widget(
         dock_widget, name='RELION tilt-series viewer', area='left'

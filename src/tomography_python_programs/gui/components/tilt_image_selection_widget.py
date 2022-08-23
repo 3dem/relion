@@ -49,9 +49,10 @@ class TiltImageSelectionWidget(QWidget):
 
     def _sync_dims_with_tilt_image_list(self):
         current_index = self.tilt_image_list_widget.currentIndex().row()
-        dims = np.asarray(self.viewer.dims.point)
-        dims[0] = current_index
-        self.viewer.dims.current_step = tuple(dims)
+        if current_index != -1:  # happens when current item not set
+            dims = np.asarray(self.viewer.dims.point)
+            dims[0] = current_index
+            self.viewer.dims.current_step = tuple(dims)
 
     @property
     def tilt_series(self) -> TiltSeries:

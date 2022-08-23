@@ -1,10 +1,9 @@
-import os
-from functools import partial
 from pathlib import Path
 
 import napari
 import typer
-from napari._qt.qthreading import thread_worker
+from napari.settings import get_settings
+from napari.utils.notifications import NotificationSeverity
 
 from .relion_tilt_image_excluder import RelionTiltImageExcluderWidget
 from ..metadata_model import RelionTiltSeriesSet
@@ -21,6 +20,8 @@ def exclude_tilt_images_cli(
         cache_size: int = typer.Option(5, help='number of cached tilt-series')
 ):
     viewer = napari.Viewer()
+    settings = get_settings()
+    settings.application.gui_notification_level = NotificationSeverity.ERROR
     relion_metadata = RelionTiltSeriesSet.from_star_file(tilt_series_star_file)
     dock_widget = RelionTiltImageExcluderWidget(
         viewer=viewer,
