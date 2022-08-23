@@ -91,6 +91,9 @@ class RelionTiltSeriesSet(BaseModel):
             for tilt_series
             in self.tilt_series
         }
+        if 'rlnTomoReconstructedTomogram' in self.global_data:
+            for tilt_series, tomogram_file in zip(self.tilt_series, self.global_data['rlnTomoReconstructedTomogram']):
+                tilt_series_set[tilt_series.name].tomogram_file = tomogram_file
         return tilt_series_set
 
     def __getitem__(self, tilt_series_id: str) -> RelionTiltSeries:

@@ -34,6 +34,7 @@ dependencies = [
     "lil_aretomo",
     "yet-another-imod-wrapper",
     "makefun",
+    "lru-dict",
 ]
 
 # extras
@@ -82,6 +83,7 @@ repository = "https://github.com/3dem/relion"
 [project.scripts]
 relion_tomo_import = "tomography_python_programs.import_tilt_series:cli"
 relion_tomo_view_tilt_series = "tomography_python_programs.view_tilt_series:cli"
+relion_tomo_view_tomograms = "tomography_python_programs.view_tomograms:cli"
 relion_tomo_exclude_tilt_images = "tomography_python_programs.exclude_tilt_images:cli"
 relion_tomo_align_tilt_series = "tomography_python_programs.tilt_series_alignment:cli"
 relion_tomo_denoise = "tomography_python_programs.denoising:cli"
