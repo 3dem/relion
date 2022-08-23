@@ -6,7 +6,7 @@ from qtpy.QtWidgets import QWidget, QLabel, QVBoxLayout
 
 from .data_models import TiltSeries
 from .selection_buttons import SelectionButtons
-from .tilt_image_list import TiltImageListWidget
+from .checkable_tilt_image_list import TiltImageListWidget
 
 
 class TiltImageSelectionWidget(QWidget):
