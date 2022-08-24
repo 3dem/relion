@@ -14,7 +14,7 @@ The more comprehensive documentation of RELION is stored [here](https://relion.r
 ## Installation
 
 More extensive options and configurations are available [here](https://relion.readthedocs.io/en/release-4.0/Installation.html),
-but the outlines to clone and install relion for typical use are made easy through [cmake](https://en.wikipedia.org/wiki/CMake).
+but the outlines to clone and install RELION for typical use are made easy through [cmake](https://en.wikipedia.org/wiki/CMake).
 
 On Debian or Ubuntu machines, installing cmake, the compiler, and additional dependencies (mpi, fftw) is as easy as:
 
@@ -28,7 +28,7 @@ RedHat-like systems (CentOS, RHEL, Scientific Linux etc) use `yum` package manag
 sudo yum install cmake git gcc gcc-c++ openmpi-devel fftw-devel libtiff-devel libpng-devel ghostscript libXft-devel libX11-devel
 ```
 
-Once git and cmake are installed, relion can be easily installed through:
+Once git and cmake are installed, RELION can be easily installed through:
 
 ```
 git clone https://github.com/3dem/relion.git
@@ -54,7 +54,7 @@ Compiling RELION with one version of MPI and running the resulting binary with m
 version can cause crash. See our wiki below for details.
 
 In any case, you have to make sure your PATH environmental variable points to the directory
-containing relion binaries. Launching RELION as `/path/to/relion` is NOT a right way; this
+containing RELION binaries. Launching RELION as `/path/to/relion` is NOT a right way; this
 starts the right GUI, but the GUI might invoke other versions of RELION in the PATH.
 
 If FLTK related errors are reported, please add `-DFORCE_OWN_FLTK=ON` to
@@ -64,6 +64,26 @@ RELION also requires libtiff. Most Linux distributions have packages like `libti
 Note that you need a developer package. You need version 4.0.x to read BigTIFF files. If you installed
 libtiff in a non-standard location, specify the location by
 `-DTIFF_INCLUDE_DIR=/path/to/include -DTIFF_LIBRARY=/path/to/libtiff.so.5`.
+
+## Building with HIP
+
+Currently the AMD GPU ROCm port and HIP optimisation of RELION are housed in an internal repo.
+Once the pre-requistes are loaded (follow the steps in previous sections), the configuration with HIP can be easily done through:
+```
+git clone git@github.com:AMD-HPC/RELION.git relion
+cd relion
+git checkout suyash/ver4.0-hip
+mkdir build
+cd build
+cmake -DCMAKE_INSTALL_PREFIX=/where/to/install/ \
+      -DCMAKE_BUILD_TYPE=release   \
+      -DHIP=on -DHIP_ARCH="gfx90a" \
+      -DGUI=off                    \
+      -DTIFF_INCLUDE_DIR=/path/to/include  \
+      -DTIFF_LIBRARY=/path/to/libtiff.so.5 \
+      -DAMDFFTW=on .. # only on AMD systems to build an optimized version of FFTW lib
+make -j
+```
 
 ## Updating
 
