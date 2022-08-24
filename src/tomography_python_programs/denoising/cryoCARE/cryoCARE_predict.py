@@ -76,6 +76,7 @@ def cryoCARE_predict(
         e = 'Could not find rlnTomoReconstructedTomogramHalf1 in tilt series star file.'
         console.log(f'ERROR: {e}')
         raise RuntimeError(e)
+    
     training_dir, tomogram_dir, tilt_series_dir = \
         create_denoising_directory_structure(
             output_directory=output_directory,
@@ -115,17 +116,18 @@ def cryoCARE_predict(
         global_star=global_star,
         tilt_series_dir=tilt_series_dir,
     )
-    
+        
     add_denoised_tomo_to_global_star(
         global_star=global_star,
         tomogram_dir=tomogram_dir,
         output_directory=output_directory,
+        tomo_name=tomo_name
     )
-    
+
     save_global_star(
         global_star=global_star,
         output_directory=output_directory,
     )    
-    
+
     console.save_html(str(output_directory / 'log.html'), clear=False)
     console.save_text(str(output_directory / 'log.txt'), clear=False)

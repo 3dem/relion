@@ -134,12 +134,19 @@ def add_denoised_tomo_to_global_star(
         global_star: pd.DataFrame,
         tomogram_dir: Path,
         output_directory: Path,
+        tomo_name: Optional[str] = None
 ):
     """
     Adds location of the denoising tomogram to the global star file.
     """
-    global_star['rlnTomoReconstructedTomogramDenoised'] = global_star.apply(lambda x: f'{tomogram_dir}/rec_{x["rlnTomoName"]}.mrc', axis=1)
-    return global_star
+    if tomo_name == None:
+        global_star['rlnTomoReconstructedTomogramDenoised'] = global_star.apply(lambda x: f'{tomogram_dir}/rec_{x["rlnTomoName"]}.mrc', axis=1)
+        return global_star
+    else:
+        if 'rlnTomoReconstructedTomogramDenoised' not in global_star.columns:
+            global_star['rlnTomoReconstructedTomogramDenoised'] = 'N/A'  
+        global_star.loc[global_star.rlnTomoName == tomo_name, 'rlnTomoReconstructedTomogramDenoised'] = f"{tomogram_dir}/rec_{global_star.loc[global_star.rlnTomoName == tomo_name, 'rlnTomoName'].values[0]}.mrc"
+        return global_star
     
 def save_global_star(
         global_star: pd.DataFrame,
