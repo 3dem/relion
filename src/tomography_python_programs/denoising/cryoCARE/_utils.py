@@ -151,4 +151,7 @@ def rename_predicted_tomograms(
     """
     even_tomos = [Path(tomo) for tomo in even_tomos]
     even_tomos = [Path(f"{tomogram_dir}/{tomo.name}") for tomo in even_tomos]
+    for tomo in even_tomos:
+        if not tomo.exists():
+            raise RuntimeError(f'{tomo} not found and it should have been generated. If OOM error, try increasing number of tiles (e.g. 8,8,8).') 
     [tomo.rename(Path(f"{tomogram_dir}/{tomo.stem.replace(even_suffix,'')}{tomo.suffix}")) for tomo in even_tomos]

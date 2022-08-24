@@ -127,8 +127,6 @@ def cryoCARE_train(
     cmd = f"cryoCARE_train.py --conf {training_dir}/{TRAIN_CONFIG_PREFIX}.json"
     subprocess.run(cmd, shell=True)  
     
-    console.log(f'Finished training denoising model.') 
-    
     save_tilt_series_stars(
         global_star=global_star,
         tilt_series_dir=tilt_series_dir,
@@ -139,7 +137,12 @@ def cryoCARE_train(
         output_directory=output_directory,
     )    
     
-    console.log(f'Denoising model can be found in {output_directory}/{MODEL_NAME}.tar.gz')
+    if Path(f'{output_directory}/{MODEL_NAME}.tar.gz').exists():
+        console.log(f'Finished training denoising model.') 
+        console.log(f'Denoising model can be found in {output_directory}/{MODEL_NAME}.tar.gz')
+    else:
+        e = f'Could not find denoising model ({MODEL_NAME}.tar.gz) in {output_directory}'
+        raise RuntimeError(e)
     
     console.save_html(str(output_directory / 'log.html'), clear=False)
     console.save_text(str(output_directory / 'log.txt'), clear=False)
