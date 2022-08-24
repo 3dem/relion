@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Tuple, List, Dict
+from typing import Tuple, List, Dict, Optional
 
 import pandas as pd
 import starfile
@@ -44,19 +44,28 @@ def generate_training_tomograms_star(
     training_tomograms_idx = pd.DataFrame(global_star.rlnTomoName.tolist()).isin(training_tomograms).values
     if not any(training_tomograms_idx):
         e = f"Could not user specified training tomograms ({', '.join(str(x) for x in training_tomograms)}) in tilt series star file"
-        console.log(f'ERROR: {e}')
         raise RuntimeError(e)
     training_tomograms_star = global_star[training_tomograms_idx]
     return training_tomograms_star
     
 def find_tomogram_halves(
         training_tomograms_star: pd.DataFrame,
+        tomo_name: Optional[str] = None
 ) -> Tuple[List, List]:
     """
     Returns lists (even and odd) of the location of the the tomograms the user wishes to train on.
     """
-    return training_tomograms_star['rlnTomoReconstructedTomogramHalf1'].values.tolist(), training_tomograms_star['rlnTomoReconstructedTomogramHalf2'].values.tolist() 
-
+    if tomo_name is None:
+        return training_tomograms_star['rlnTomoReconstructedTomogramHalf1'].values.tolist(), training_tomograms_star['rlnTomoReconstructedTomogramHalf2'].values.tolist() 
+    else:
+        training_tomograms_idx = training_tomograms_star.index[(training_tomograms_star['rlnTomoName'] == tomo_name)]
+        if len(training_tomograms_idx) == 0:
+            e = f"Could not user specified tomogram rlnTomoName {tomo_name} in tilt series star file"
+            raise RuntimeError(e)
+        training_tomograms_star = training_tomograms_star.loc[training_tomograms_idx]
+        return training_tomograms_star['rlnTomoReconstructedTomogramHalf1'].values.tolist(), training_tomograms_star['rlnTomoReconstructedTomogramHalf2'].values.tolist()
+	
+        
 def generate_train_data_config_json(
         even_tomos: List,
         odd_tomos: List,

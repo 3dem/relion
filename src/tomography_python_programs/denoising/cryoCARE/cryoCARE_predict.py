@@ -30,7 +30,8 @@ def cryoCARE_predict(
     tilt_series_star_file: Path = typer.Option(...),
     output_directory: Path = typer.Option(...),
     model_name: Path = typer.Option(...),
-    n_tiles: Optional[Tuple[int,int,int]] = typer.Option((1,1,1))
+    n_tiles: Optional[Tuple[int,int,int]] = typer.Option((1,1,1)),
+    tomo_name: Optional[str] = typer.Option(None)
 
 ):
     """Generates denoised tomograms using cryoCARE (>=v0.2.0) from a previously trained denoising model (.tar.gz)
@@ -58,6 +59,8 @@ def cryoCARE_predict(
         problems and tomogram dimensions to be wrong. We have found other useful values for this include 4,4,2 and 2,4,4 
         (default = 1,1,1). Enter as: `--n-tiles 4 4 2`
         
+    tomo_name (optional): specify one tomogram to generate. Use the name in rlnTomoName to specify tomogram.
+     
     Returns
     -------
     Denoised tomograms.
@@ -79,7 +82,7 @@ def cryoCARE_predict(
             training_job=False,
         )
     
-    even_tomos, odd_tomos = find_tomogram_halves(global_star)
+    even_tomos, odd_tomos = find_tomogram_halves(global_star, tomo_name)
 
     predict_json = generate_predict_json(
         even_tomos=even_tomos,

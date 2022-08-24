@@ -6529,6 +6529,8 @@ void RelionJob::initialiseTomoDenoiseTomogramsJob()
     joboptions["subvolume_dimensions"] = JobOption("Sub-volume dimensions (px):",72,64,256,1, "Dimensions (XYZ) in pixels of the sub-volumes to be extracted from the training tomograms. Corresponds to patch_size in cryoCARE_extract_train_data.py.");
 
     joboptions["do_cryocare_predict"] = JobOption("Generate denoised tomograms:", false, "Use the cryoCARE denoising model generated in cryoCARE:train to denoise your tomograms.");
+    
+    joboptions["denoising_tomo_name"] = JobOption("Reconstruct only this tomogram:", std::string(""), "If not left empty, the program will only reconstruct this particular tomogram. Use the name in rlnTomoName to specify tomogram.");
 
     joboptions["care_denoising_model"] = JobOption("Path to denoising model:", std::string(""), "*", ".", "Provide the path to the denoising model generated in cryoCARE:train. This should be in the output directory of a cryoCARE:train job as a .tar.gz file."); 
 
@@ -6597,6 +6599,10 @@ bool RelionJob::getCommandsTomoDenoiseTomogramsJob(std::string &outputname, std:
         command += " --subvolume-dimensions " + joboptions["subvolume_dimensions"].getString();
     }       
 
+    if (joboptions["denoising_tomo_name"].getString().length() > 0 && joboptions["do_cryocare_predict"].getBoolean())
+    {    
+	command += " --tomo-name " + joboptions["denoising_tomo_name"].getString();
+    }   
     if (joboptions["care_denoising_model"].getString().length() > 0 && joboptions["do_cryocare_predict"].getBoolean())
     {
         command += " --model-name " + joboptions["care_denoising_model"].getString();
