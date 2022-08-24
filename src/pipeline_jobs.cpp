@@ -6536,7 +6536,7 @@ void RelionJob::initialiseTomoDenoiseTomogramsJob()
 
     joboptions["ntiles_x"] = JobOption("Number of tiles - X:", std::string("2"), "Number of tiles to use in denoised tomogram generation (X, Y, and Z dimension)");
     joboptions["ntiles_y"] = JobOption("Number of tiles - Y:", std::string("2"), "Number of tiles to use in denoised tomogram generation (X, Y, and Z dimension)");
-    joboptions["ntiles_z"] = JobOption("Number of tiles - Z:", std::string("2"), "Number of tiles to use in denoised tomogram generation (X, Y, and Z dimension). Default is 2,2,2. Increase if you get a \'Check failed: narrow == wide\' error in prediction.");
+    joboptions["ntiles_z"] = JobOption("Number of tiles - Z:", std::string("2"), "Number of tiles to use in denoised tomogram generation (X, Y, and Z dimension). Default is 2,2,2. Increase if you get a Out of Memory (OOM) error in prediction. For us, 8,8,8 works well on a Nvidia GeForce RTX 2080.");
 
 }
 
