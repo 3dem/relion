@@ -2616,7 +2616,7 @@ void JobWindow::initialiseTomoDenoiseTomogramsWindow()
 
     group2->begin();
     place("care_denoising_model", TOGGLE_DEACTIVATE);
-    place3("ntiles_x", "ntiles_y", "ntiles_z", "Number of tiles - X,Y,Z", TOGGLE_DEACTIVATE);
+    place3("ntiles_x", "ntiles_y", "ntiles_z", "Number of tiles in X,Y,Z:", TOGGLE_DEACTIVATE);
     
     current_y += STEPY /2 ;
 
