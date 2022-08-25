@@ -2,6 +2,10 @@ import os
 import argparse
 import sys
 
+if (sys.version_info < (3, 0)):
+    raise Exception('This script supports Python 3 or above.')
+    print(end="")  # This script requires Python 3. A Syntax error here means you are running it in Python 2.
+
 try:
     import torch
 except ImportError:
