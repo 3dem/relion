@@ -2579,8 +2579,9 @@ void JobWindow::initialiseTomoDenoiseTomogramsWindow()
 
     place("in_tomoset", TOGGLE_DEACTIVATE);
 
-    // Add a little spacer
     current_y += STEPY/2;
+    
+    place("gpu_ids");
 
     tab2->begin();
     tab2->label("CryoCARE: Train");

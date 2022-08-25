@@ -6538,7 +6538,8 @@ void RelionJob::initialiseTomoDenoiseTomogramsJob()
     joboptions["ntiles_x"] = JobOption("Number of tiles - X:", std::string("2"), "Number of tiles to use in denoised tomogram generation (X, Y, and Z dimension)");
     joboptions["ntiles_y"] = JobOption("Number of tiles - Y:", std::string("2"), "Number of tiles to use in denoised tomogram generation (X, Y, and Z dimension)");
     joboptions["ntiles_z"] = JobOption("Number of tiles - Z:", std::string("2"), "Number of tiles to use in denoised tomogram generation (X, Y, and Z dimension). Default is 2,2,2. Increase if you get a Out of Memory (OOM) error in prediction. For us, 8,8,8 works well on a Nvidia GeForce RTX 2080.");
-
+    
+    joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "Provide a list of which GPUs (e.g. 0:1:2:3) to use in AreTomo. MPI-processes are separated by ':'. For example, to place one rank on device 0 and one rank on device 1, provide '0:1'.");
 }
 
 bool RelionJob::getCommandsTomoDenoiseTomogramsJob(std::string &outputname, std::vector<std::string> &commands,
@@ -6592,6 +6593,11 @@ bool RelionJob::getCommandsTomoDenoiseTomogramsJob(std::string &outputname, std:
     command += " --output-directory " + outputname;
     Node node2(outputname+"tomograms.star", LABEL_TOMO_TOMOGRAMS);
     outputNodes.push_back(node2);  
+    
+    if (joboptions["gpu_ids"].getString().length() > 0)
+    {
+        command += " --gpu-ids " + joboptions["gpu_ids"].getString() + ' ';
+    }
  
     if (joboptions["tomograms_for_training"].getString().length() > 0 && joboptions["do_cryocare_train"].getBoolean())
     {    
