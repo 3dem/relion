@@ -6434,7 +6434,6 @@ void RelionJob::initialiseTomoReconstructTomogramsJob()
     joboptions["ydim"] = JobOption("Unbinned tomogram height (Ydim): ", -1, -1, 6000, 100, "The tomogram Y-dimension in pixels. If a negative value is given, this will be determined from the size of the tilt series images.");
     joboptions["zdim"] = JobOption("Unbinned tomogram thickness (Zdim): ", 2000, -1, 6000, 100, "The tomogram Z-dimension in pixels. If a negative value is given, this will be determined from the size of the tilt series images.");
 
-
 }
 bool RelionJob::getCommandsTomoReconstructTomogramsJob(std::string &outputname, std::vector<std::string> &commands,
                                             std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
@@ -6463,7 +6462,9 @@ bool RelionJob::getCommandsTomoReconstructTomogramsJob(std::string &outputname, 
     command += " --d " + joboptions["zdim"].getString();
 
     command += " --binned_angpix " + joboptions["binned_angpix"].getString();
-
+    // No CTF is on by default for now
+    command += " --noctf ";
+    
     // In new version of tilt series alignments by Alister Burt, the origin is again at normal 0,0,0 position
     command += " --x0 0 --y0 0 --z0 0 ";
     
