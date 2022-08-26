@@ -50,7 +50,7 @@ def generate_training_tomograms_star(
     
 def find_tomogram_halves(
         training_tomograms_star: pd.DataFrame,
-        tomo_name: Optional[str] = None
+        tomo_name: Optional[str] = None,
 ) -> Tuple[List, List]:
     """
     Returns lists (even and odd) of the location of the the tomograms the user wishes to train on.
@@ -85,12 +85,17 @@ def generate_train_config_json(
         training_dir: Path,
         output_directory: Path,
 	model_name: str,
+        gpu: Optional[List[int]] = None,
 ) -> Dict:
     """
     Creates a Dict which can be saved as a json file for train_config.json file
     """
+    if gpu is None:
+        gpu_json =  f''
+    else:
+        gpu_json = f', "gpu_id": {gpu}'
     train_config_json = json.loads(f'{{"train_data": "{training_dir}", "epochs": 100, "steps_per_epoch": 200, "batch_size": 16, "unet_kern_size": 3, \
-    "unet_n_depth": 3, "unet_n_first": 16, "learning_rate": 0.0004, "model_name": "{model_name}", "path": "{output_directory}", "overwrite": "True"}}')
+    "unet_n_depth": 3, "unet_n_first": 16, "learning_rate": 0.0004, "model_name": "{model_name}", "path": "{output_directory}", "overwrite": "True"{gpu_json}}}')
     return train_config_json
 
 def generate_predict_json(
@@ -100,12 +105,17 @@ def generate_predict_json(
 	model_name: Path,
         output_directory: Path,
         n_tiles: Tuple[int,int,int],
+        gpu: Optional[List[int]] = None,
 ) -> Dict:
     """
     Creates a Dict which can be saved as a json file for predict_config.json file
     """
+    if gpu is None:
+        gpu_json =  f''
+    else:
+        gpu_json = f', "gpu_id": {gpu}'
     predict_json = json.loads(f'{{"path": "{model_name}", "even": {json.dumps(even_tomos)}, \
-    "odd": {json.dumps(odd_tomos)}, "n_tiles": {list(n_tiles)}, "output": "{output_directory / "tomograms"}", "overwrite": "True"}}')
+    "odd": {json.dumps(odd_tomos)}, "n_tiles": {list(n_tiles)}, "output": "{output_directory / "tomograms"}", "overwrite": "True"{gpu_json}}}')
     return predict_json
 
 def save_json(

@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 import pandas as pd
 import starfile
@@ -31,7 +31,8 @@ def cryoCARE_predict(
     output_directory: Path = typer.Option(...),
     model_name: Path = typer.Option(...),
     n_tiles: Optional[Tuple[int,int,int]] = typer.Option((1,1,1)),
-    tomo_name: Optional[str] = typer.Option(None)
+    tomo_name: Optional[str] = typer.Option(None),
+    gpu: Optional[List[int]] = typer.Option(None)
 
 ):
     """Generates denoised tomograms using cryoCARE (>=v0.2.0) from a previously trained denoising model (.tar.gz)
@@ -60,7 +61,8 @@ def cryoCARE_predict(
         (default = 1,1,1). Enter as: `--n-tiles 4 4 2`
         
     tomo_name (optional): specify one tomogram to generate. Use the name in rlnTomoName to specify tomogram.
-     
+    
+    gpu (optional): specify one GPU to use. To use multiple GPUs use the flag multiple times with a different GPU after each. 
     Returns
     -------
     Denoised tomograms.
@@ -92,6 +94,7 @@ def cryoCARE_predict(
 	model_name=model_name,
         output_directory=output_directory,
         n_tiles=n_tiles,
+        gpu=gpu,
     )
 
     save_json(

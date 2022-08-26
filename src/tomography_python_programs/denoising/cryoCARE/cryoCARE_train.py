@@ -33,6 +33,7 @@ def cryoCARE_train(
     training_tomograms: str = typer.Option(None),
     number_training_subvolumes: Optional[int] = typer.Option(1200),
     subvolume_dimensions: Optional[int] = typer.Option(72),
+    gpu: Optional[List[int]] = typer.Option(None)
 ):
     """Trains a denoising model using cryoCARE (>=v0.2.0)
     
@@ -61,6 +62,8 @@ def cryoCARE_train(
    
     subvolume_dimensions: Dimensions (for XYZ, in pixels) of the subvolumes extracted for training
     Default is 72. This number should not be lower than 64. Corresponds to patch_shape in cryoCARE_extract_train_data.py
+    
+    gpu (optional): specify one GPU to use. To use multiple GPUs use the flag multiple times with a different GPU after each.     
         
     Returns
     -------
@@ -116,6 +119,7 @@ def cryoCARE_train(
         training_dir=training_dir,
         output_directory=output_directory,
         model_name=MODEL_NAME,
+        gpu=gpu,
     )    
         
     save_json(
