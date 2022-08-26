@@ -5,7 +5,7 @@ import mrcfile
 
 from lil_aretomo import align_tilt_series as align_tilt_series_with_aretomo
 from rich.console import Console
-from typing import Optional
+from typing import Optional, List
 
 from .._job_utils import create_alignment_job_directories
 from .utils import get_specimen_shifts, get_xyz_extrinsic_euler_angles
@@ -17,7 +17,7 @@ def align_single_tilt_series(
         pixel_spacing_angstroms: float,
         sample_thickness_nanometers: float,
         tilt_angle_offset_correction: bool,
-        gpu_ids: Optional[str],
+        gpu_ids: Optional[List[int]],
         job_directory: Path,
 ):
     """Align a single tilt-series in AreTomo using RELION tilt-series metadata.
@@ -28,7 +28,7 @@ def align_single_tilt_series(
     pixel_spacing_angstroms: pixel spacing in Angstroms.
     sample_thickness_nanometers: thickness of intermediate reconstruction during alignments.
     tilt_angle_offset_correction: flag to enable/disable stage tilt offset correction (-TiltCor) in AreTomo
-    gpu_ids: string to specify GPUs. GPU identifiers should be separated by colons e.g. 0:1:2:3
+    gpu_ids: List of integers to specify zero-indexed GPU IDs. 
     job_directory: directory in which results will be stored.
     """
     console = Console(record=True)
