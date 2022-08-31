@@ -569,8 +569,8 @@ void TiltHelper::insertTilt(
 	oddZernikeCoeffs[1] += 2.0 * Z3x;
 	oddZernikeCoeffs[0] += 2.0 * Z3y;
 
-	oddZernikeCoeffs[4] = Z3x;
-	oddZernikeCoeffs[3] = Z3y;
+	oddZernikeCoeffs[4] += Z3x;
+	oddZernikeCoeffs[3] += Z3y;
 }
 
 std::vector<double> TiltHelper::fitBasisLin(
