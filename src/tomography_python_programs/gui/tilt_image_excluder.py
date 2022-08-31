@@ -22,7 +22,7 @@ class TiltImageExcluderWidget(QWidget):
         super().__init__(*args, **kwargs)
         self.viewer = viewer
         self.tilt_series = tilt_series
-        self.selected_tilt_images: Dict[str, np.ndarray] = {}  # id: indices into tilt image list
+        self.selected_tilt_images: Dict[str, np.ndarray] = {}  # {tilt_series_id: idx}
         self._set_default_excluded_images()
 
         first_tilt_series = self.tilt_series[list(self.tilt_series.keys())[0]]
