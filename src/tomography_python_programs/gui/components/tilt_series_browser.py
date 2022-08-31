@@ -99,6 +99,7 @@ class TiltSeriesBrowserWidget(QWidget):
     def _load_new_tilt_series(self, tilt_series_id: str, add_to_viewer: bool) -> None:
         if tilt_series_id in self._cache:
             self._load_new_tilt_series_from_cache(tilt_series_id, add_to_viewer)
+            self.tilt_series_changed.emit()
             return
         tilt_images = self.tilt_series[tilt_series_id].tilt_image_files
         worker = _read_tilt_series(tilt_series_id, list(tilt_images))
