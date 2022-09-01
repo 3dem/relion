@@ -52,7 +52,8 @@ def align_single_tilt_series(
         do_local_alignments=False,
         correct_tilt_angle_offset=tilt_angle_offset_correction,
         output_pixel_size=20,
-        gpu_ids=gpu_ids
+        gpu_ids=gpu_ids,
+        skip_if_completed=True
     )
 
     console.log('Writing STAR file for aligned tilt-series')
