@@ -37,7 +37,8 @@ def fiducials_cli(
             pixel_spacing_angstroms=global_data['rlnTomoTiltSeriesPixelSize'],
             alignment_function=align_tilt_series_using_fiducials,
             alignment_function_kwargs={
-                'fiducial_size': nominal_fiducial_diameter_nanometers
+                'fiducial_size': nominal_fiducial_diameter_nanometers,
+                'skip_if_completed': True
             },
             output_directory=output_directory,
         )
