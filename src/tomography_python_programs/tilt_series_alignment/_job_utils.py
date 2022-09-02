@@ -88,4 +88,4 @@ def write_global_output(
 
     # check which output files were succesfully generated, take only those
     df = df[df['rlnTomoTiltSeriesStarFile'].apply(lambda x: x.exists())]
-    starfile.write({'global': df}, job_directory / 'aligned_tilt_series.star')
+    starfile.write({'global': df}, job_directory / 'aligned_tilt_series.star', overwrite=True)

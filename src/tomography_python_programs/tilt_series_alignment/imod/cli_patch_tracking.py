@@ -48,6 +48,7 @@ def patch_tracking_cli(
             alignment_function_kwargs={
                 'patch_size': int(patch_size_nanometers * 10),
                 'patch_overlap_percentage': patch_overlap_percentage,
+                'skip_if_completed': True
             },
             output_directory=output_directory,
         )
