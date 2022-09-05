@@ -6430,9 +6430,9 @@ void RelionJob::initialiseTomoReconstructTomogramsJob()
 
     joboptions["binned_angpix"] = JobOption("Binned pixel size (A): ", 10., 1, 20, 1, "The tomogram will be downscaled to this pixel size. For particle picking, often binning to pixel sizes of 5-10 A gives good enough tomograms. Note that the downsized tomograms are only used for picking; subsequent subtomogram averaging will not use these.");
 
-    joboptions["xdim"] = JobOption("Unbinned tomogram width (Xdim): ", -1, -1, 6000, 100, "The tomogram X-dimension in pixels. If a negative value is given, this will be determined from the size of the tilt series images.");
-    joboptions["ydim"] = JobOption("Unbinned tomogram height (Ydim): ", -1, -1, 6000, 100, "The tomogram Y-dimension in pixels. If a negative value is given, this will be determined from the size of the tilt series images.");
-    joboptions["zdim"] = JobOption("Unbinned tomogram thickness (Zdim): ", 2000, -1, 6000, 100, "The tomogram Z-dimension in pixels. If a negative value is given, this will be determined from the size of the tilt series images.");
+    joboptions["xdim"] = JobOption("Unbinned tomogram width (Xdim): ", 4000, 1, 6000, 100, "The tomogram X-dimension in unbinned pixels.");
+    joboptions["ydim"] = JobOption("Unbinned tomogram height (Ydim): ", 4000, 1, 6000, 100, "The tomogram Y-dimension in unbinned pixels.");
+    joboptions["zdim"] = JobOption("Unbinned tomogram thickness (Zdim): ", 2000, 1, 6000, 100, "The tomogram Z-dimension in unbinned pixels.");
 
 }
 bool RelionJob::getCommandsTomoReconstructTomogramsJob(std::string &outputname, std::vector<std::string> &commands,
