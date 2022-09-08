@@ -34,6 +34,7 @@ void TomoBackprojectProgram::readParameters(int argc, char *argv[])
 
 	tomoName = parser.getOption("--tn", "Tomogram name", "*");
 	outFn = parser.getOption("--o", "Output filename (or output directory in case of reconstructing multiple tomograms)");
+ 	do_even_odd_tomograms = parser.checkOption("--generate_split_tomograms", "Reconstruct tomograms from even/odd movie frames or tilt image index for denoising");
 
     w = textToInteger(parser.getOption("--w", "Width"));
 	h = textToInteger(parser.getOption("--h", "Height" ));
@@ -98,7 +99,7 @@ void TomoBackprojectProgram::initialise()
 
         for (int idx = 0; idx < tomogramSet.size(); idx++)
         {
-            if (do_only_unfinished && exists(getOutputFileName(idx)))
+            if (do_only_unfinished && exists(getOutputFileName(idx,false,false)))
                 continue;
             tomoIndexTodo.push_back(idx);
         }
@@ -118,7 +119,7 @@ void TomoBackprojectProgram::initialise()
     std::cout << " + Reconstructing " << tomoIndexTodo.size() << " tomograms: " << std::endl;
     for (int idx = 0; idx < tomoIndexTodo.size(); idx++)
     {
-        std::cout << "  - " << tomogramSet.getTomogramName(tomoIndexTodo[idx]) << std::endl;
+ 	std::cout << "  - " << tomogramSet.getTomogramName(tomoIndexTodo[idx]) << std::endl;
     }
 
 }
@@ -141,8 +142,16 @@ void TomoBackprojectProgram::run(int rank, int size)
         if (pipeline_control_check_abort_job())
             exit(RELION_EXIT_ABORTED);
 
-        reconstructOneTomogram(tomoIndexTodo[idx]);
-
+        if (do_even_odd_tomograms)
+	{
+		reconstructOneTomogram(tomoIndexTodo[idx],true,false); // true/false indicates to reconstruct tomogram from even frames
+		reconstructOneTomogram(tomoIndexTodo[idx],false,true); // false/true indicates from odd frames
+	}
+	else
+	{
+		reconstructOneTomogram(tomoIndexTodo[idx],false,false);
+	}
+	
         if (idx % barstep == 0)
             progress_bar(idx);
     }
@@ -240,10 +249,23 @@ void TomoBackprojectProgram::getProjectMatrices(Tomogram &tomogram, MetaDataTabl
     }
 }
 
-void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex)
+void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex, bool doEven, bool doOdd)
 {
-    Tomogram tomogram = tomogramSet.loadTomogram(tomoIndex, true);
+    Tomogram tomogram;
 
+    if (doEven)
+    {
+    	tomogram = tomogramSet.loadTomogram(tomoIndex, true, true, false);
+    }
+    else if (doOdd)
+    {
+    	tomogram = tomogramSet.loadTomogram(tomoIndex, true, false, true);
+    }
+    else
+    {
+        tomogram = tomogramSet.loadTomogram(tomoIndex, true);
+    }
+    
 	if (zeroDC) Normalization::zeroDC_stack(tomogram.stack);
 	
 	const int fc = tomogram.frameCount;
@@ -393,22 +415,58 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex)
     if (!do_multiple) Log::print("Writing output");
 
     const double samplingRate = tomogramSet.getPixelSize(tomoIndex) * spacing;
-    out.write(getOutputFileName(tomoIndex), samplingRate);
+
+    if (doEven)
+    	out.write(getOutputFileName(tomoIndex, true, false), samplingRate);
+    else if (doOdd)
+    	out.write(getOutputFileName(tomoIndex, false, true), samplingRate);
+    else 
+        out.write(getOutputFileName(tomoIndex, false, false), samplingRate);
+
 
     // Also add the tomogram sizes and name to the tomogramSet
     tomogramSet.globalTable.setValue(EMDL_TOMO_SIZE_X, w, tomoIndex);
     tomogramSet.globalTable.setValue(EMDL_TOMO_SIZE_Y, h, tomoIndex);
     tomogramSet.globalTable.setValue(EMDL_TOMO_SIZE_Z, d, tomoIndex);
-    tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME, getOutputFileName(tomoIndex), tomoIndex);
 
+    if (doEven)
+    	tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_HALF1_FILE_NAME, getOutputFileName(tomoIndex, true, false), tomoIndex);
+    else if (doOdd)
+	tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_HALF2_FILE_NAME, getOutputFileName(tomoIndex, false, true), tomoIndex);
+    else  
+    {
+    tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME, getOutputFileName(tomoIndex, false, false), tomoIndex);
+    }  
 }
 
-FileName TomoBackprojectProgram::getOutputFileName(int index)
+FileName TomoBackprojectProgram::getOutputFileName(int index, bool nameEven, bool nameOdd)
 {
     // If we're reconstructing many tomograms, or the output filename is a directory: use standardized output filenames
     FileName fn_result = outFn;
 
-    if (do_multiple) fn_result += "tomograms/rec_" + tomogramSet.getTomogramName(index)+".mrc";
+   if (do_multiple) 
+    {
+    	if (do_even_odd_tomograms)
+	{
+		if (nameEven)
+		{
+			fn_result += "tomograms/rec_" + tomogramSet.getTomogramName(index)+"_half1.mrc";
+		}
+		else if (nameOdd)
+		{
+			fn_result += "tomograms/rec_" + tomogramSet.getTomogramName(index)+"_half2.mrc";
+		}
+		else
+		{
+    			fn_result += "tomograms/rec_" + tomogramSet.getTomogramName(index)+".mrc";
+		}
+	}
+	else
+	{
+    	fn_result += "tomograms/rec_" + tomogramSet.getTomogramName(index)+".mrc";
+	}
+    }
+
 
     if (!exists(fn_result.beforeLastOf("/"))) mktree(fn_result.beforeLastOf("/"));
 

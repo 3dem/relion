@@ -22,6 +22,7 @@ class TomoBackprojectProgram
 			FileName tomoName, outFn;
 			bool applyPreWeight, applyWeight, applyCtf, doWiener, zeroDC, FourierCrop;
             bool do_multiple, do_only_unfinished;
+	     	    	bool do_even_odd_tomograms;
 			double SNR;
 
             std::vector<long> tomoIndexTodo;
@@ -32,10 +33,9 @@ class TomoBackprojectProgram
 		void initialise();
         void run(int rank = 0, int size = 1);
         void getProjectMatrices(Tomogram &tomogram, MetaDataTable &tomogramTable);
-        void reconstructOneTomogram(int tomoIndex);
-
+        void reconstructOneTomogram(int tomoIndex, bool doEven, bool doOdd);
     private:
-        FileName getOutputFileName(int index);
+        FileName getOutputFileName(int index, bool nameEven, bool nameOdd);
 };
 
 #endif

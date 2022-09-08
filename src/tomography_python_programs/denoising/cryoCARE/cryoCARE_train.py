@@ -33,9 +33,9 @@ def cryoCARE_train(
     training_tomograms: str = typer.Option(None),
     number_training_subvolumes: Optional[int] = typer.Option(1200),
     subvolume_dimensions: Optional[int] = typer.Option(72),
+    gpu: Optional[List[int]] = typer.Option(None)
 ):
-    """Trains a denoising model using cryoCARE (Euan Pyle version, https://github.com/EuanPyle/cryoCARE_mpido)
-    branched from Thorsten Wagner version, https://github.com/thorstenwagner/cryoCARE_mpido)
+    """Trains a denoising model using cryoCARE (>=v0.2.0)
     
     Requires that two tomograms have been generated using the same sample. These can be generated via taking odd/even 
     frames during Motion Correction (optimal) or by taking odd/even tilts during tomogram reconstruction.
@@ -62,6 +62,8 @@ def cryoCARE_train(
    
     subvolume_dimensions: Dimensions (for XYZ, in pixels) of the subvolumes extracted for training
     Default is 72. This number should not be lower than 64. Corresponds to patch_shape in cryoCARE_extract_train_data.py
+    
+    gpu (optional): specify one GPU to use. To use multiple GPUs use the flag multiple times with a different GPU after each.     
         
     Returns
     -------
@@ -117,6 +119,7 @@ def cryoCARE_train(
         training_dir=training_dir,
         output_directory=output_directory,
         model_name=MODEL_NAME,
+        gpu=gpu,
     )    
         
     save_json(
@@ -128,8 +131,6 @@ def cryoCARE_train(
     cmd = f"cryoCARE_train.py --conf {training_dir}/{TRAIN_CONFIG_PREFIX}.json"
     subprocess.run(cmd, shell=True)  
     
-    console.log(f'Finished training denoising model.') 
-    
     save_tilt_series_stars(
         global_star=global_star,
         tilt_series_dir=tilt_series_dir,
@@ -140,7 +141,12 @@ def cryoCARE_train(
         output_directory=output_directory,
     )    
     
-    console.log(f'Denoising model can be found in {output_directory}/{MODEL_NAME}.tar.gz')
+    if Path(f'{output_directory}/{MODEL_NAME}.tar.gz').exists():
+        console.log(f'Finished training denoising model.') 
+        console.log(f'Denoising model can be found in {output_directory}/{MODEL_NAME}.tar.gz')
+    else:
+        e = f'Could not find denoising model ({MODEL_NAME}.tar.gz) in {output_directory}'
+        raise RuntimeError(e)
     
     console.save_html(str(output_directory / 'log.html'), clear=False)
     console.save_text(str(output_directory / 'log.txt'), clear=False)

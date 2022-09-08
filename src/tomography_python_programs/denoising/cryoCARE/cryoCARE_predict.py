@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 import pandas as pd
 import starfile
@@ -30,12 +30,12 @@ def cryoCARE_predict(
     tilt_series_star_file: Path = typer.Option(...),
     output_directory: Path = typer.Option(...),
     model_name: Path = typer.Option(...),
-    n_tiles: Optional[Tuple[int,int,int]] = typer.Option((1,1,1))
+    n_tiles: Optional[Tuple[int,int,int]] = typer.Option((1,1,1)),
+    tomo_name: Optional[str] = typer.Option(None),
+    gpu: Optional[List[int]] = typer.Option(None)
 
 ):
-    """Generates denoised tomograms using cryoCARE from a previously trained denoising model (.tar.gz)
-    (Euan Pyle version, https://github.com/EuanPyle/cryoCARE_mpido) branched from Thorsten Wagner 
-    version, https://github.com/thorstenwagner/cryoCARE_mpido)
+    """Generates denoised tomograms using cryoCARE (>=v0.2.0) from a previously trained denoising model (.tar.gz)
     
     Requires that two tomograms have been generated using the same sample. These can be generated via taking odd/even 
     frames during Motion Correction (optimal) or by taking odd/even tilts during tomogram reconstruction.
@@ -60,6 +60,9 @@ def cryoCARE_predict(
         problems and tomogram dimensions to be wrong. We have found other useful values for this include 4,4,2 and 2,4,4 
         (default = 1,1,1). Enter as: `--n-tiles 4 4 2`
         
+    tomo_name (optional): specify one tomogram to generate. Use the name in rlnTomoName to specify tomogram.
+    
+    gpu (optional): specify one GPU to use. To use multiple GPUs use the flag multiple times with a different GPU after each. 
     Returns
     -------
     Denoised tomograms.
@@ -75,13 +78,14 @@ def cryoCARE_predict(
         e = 'Could not find rlnTomoReconstructedTomogramHalf1 in tilt series star file.'
         console.log(f'ERROR: {e}')
         raise RuntimeError(e)
+    
     training_dir, tomogram_dir, tilt_series_dir = \
         create_denoising_directory_structure(
             output_directory=output_directory,
             training_job=False,
         )
     
-    even_tomos, odd_tomos = find_tomogram_halves(global_star)
+    even_tomos, odd_tomos = find_tomogram_halves(global_star, tomo_name)
 
     predict_json = generate_predict_json(
         even_tomos=even_tomos,
@@ -90,6 +94,7 @@ def cryoCARE_predict(
 	model_name=model_name,
         output_directory=output_directory,
         n_tiles=n_tiles,
+        gpu=gpu,
     )
 
     save_json(
@@ -114,17 +119,18 @@ def cryoCARE_predict(
         global_star=global_star,
         tilt_series_dir=tilt_series_dir,
     )
-    
+        
     add_denoised_tomo_to_global_star(
         global_star=global_star,
         tomogram_dir=tomogram_dir,
         output_directory=output_directory,
+        tomo_name=tomo_name
     )
-    
+
     save_global_star(
         global_star=global_star,
         output_directory=output_directory,
     )    
-    
+
     console.save_html(str(output_directory / 'log.html'), clear=False)
     console.save_text(str(output_directory / 'log.txt'), clear=False)

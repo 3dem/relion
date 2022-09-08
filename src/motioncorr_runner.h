@@ -150,7 +150,10 @@ public:
 
 	// Process at most this number of (unprocessed) micrographs
 	long do_at_most;
-
+	
+	// Save sums of movies from even and odd frames for denoising
+	bool even_odd_split;
+	
 	// EER parameters
 	int eer_upsampling, eer_grouping;
 
@@ -177,7 +180,7 @@ public:
 	void run();
 
 	// Given an input fn_mic filename, this function will determine the names of the output corrected image (fn_avg) and the corrected movie (fn_mov).
-	FileName getOutputFileNames(FileName fn_mic);
+	FileName getOutputFileNames(FileName fn_mic, bool continue_even_odd = false);
 
 	// Execute MOTIONCOR2 for a single micrograph
 	bool executeMotioncor2(Micrograph &mic, int rank = 0);
@@ -221,6 +224,10 @@ private:
 	void realSpaceInterpolation(Image <float> &Isum, std::vector<Image<float> > &Iframes, MotionModel *model, std::ostream &logfile);
 
 	void realSpaceInterpolation_ThirdOrderPolynomial(Image <float> &Isum, std::vector<Image<float> > &Iframes, ThirdOrderPolynomialModel &model, std::ostream &logfile);
+	
+	void realSpaceInterpolation_withoutsum(std::vector<Image<float> > &Ialignedframes, std::vector<Image<float> > &Iframes, MotionModel *model, std::ostream &logfile);
+
+	void realSpaceInterpolation_ThirdOrderPolynomial_withoutsum(std::vector<Image<float> > &Ialignedframes, std::vector<Image<float> > &Iframes, ThirdOrderPolynomialModel &model, std::ostream &logfile);
 
 	void interpolateShifts(std::vector<int> &group_start, std::vector<int> &group_size,
 	                       std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts,
