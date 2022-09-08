@@ -774,7 +774,7 @@ int ObservationModel::getOpticsGroup(const MetaDataTable &particlesMdt, long int
 {
 	int opticsGroup = -1;
 	if (!particlesMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle))
-		REPORT_ERROR("ObservationModel::getOpticsGroup: Failed to get optics group for particle #" + particle);
+		REPORT_ERROR("ObservationModel::getOpticsGroup: Failed to get optics group for particle #" + std::to_string(particle));
 	opticsGroup--;
 
 	return opticsGroup;

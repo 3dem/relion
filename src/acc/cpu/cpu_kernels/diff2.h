@@ -433,6 +433,7 @@ inline void diff2_coarse(
 	}
 
 	XFLOAT diff2s[translation_num][eulers_per_block];
+	XFLOAT diffi[eulers_per_block];
 
 	for (unsigned long block = 0; block < grid_size; block++) {
 		//Prefetch euler matrices with cacheline friendly index
@@ -538,8 +539,13 @@ inline void diff2_coarse(
 					}					
 				}  // tid  						
 #endif  // not Intel Compiler
-				
-				#pragma omp simd
+
+				for (int j = 0; j < eulers_per_block; j ++)
+					diffi[j] = 0.0;
+
+#if _OPENMP > 201307	// For OpenMP 4.5 and later
+				#pragma omp simd reduction(+:diffi[:eulers_per_block])
+#endif
 				for (int tid=0; tid<block_sz; tid++) {
 // This will generate masked SVML routines for Intel compiler
 					unsigned long pixel = (unsigned long)start + (unsigned long)tid;
@@ -583,9 +589,11 @@ inline void diff2_coarse(
 						XFLOAT diff_real =  s_ref_real[j][tid] - real;
 						XFLOAT diff_imag =  s_ref_imag[j][tid] - imag;
 
-						diff2s[i][j] += (diff_real * diff_real + diff_imag * diff_imag) * s_corr[pass][tid];
+						diffi[j] += (diff_real * diff_real + diff_imag * diff_imag) * s_corr[pass][tid];
 					}
 				} // for tid
+				for (int j = 0; j < eulers_per_block; j ++)
+					diff2s[i][j] += diffi[j];
 			}  // for each translation
 		}  // for each pass
 

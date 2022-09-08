@@ -2439,9 +2439,12 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
     int total_nr_particles_todo = minimum_nr_particles_sigma2_noise * mymodel.nr_optics_groups;
     int barstep;
 
+    // Check that we always have at least 5 particles per class if no references are provided
+    if (fn_ref == "None") total_nr_particles_todo = XMIPP_MAX(mymodel.nr_classes*5, total_nr_particles_todo);
+
     if (myverb > 0)
     {
-        std::cout << " Estimating initial noise spectra " << std::endl;
+        std::cout << " Estimating initial noise spectra from " << total_nr_particles_todo << " particles " << std::endl;
         init_progress_bar(total_nr_particles_todo);
         barstep = XMIPP_MAX(1, total_nr_particles_todo / 60);
     }
@@ -2672,16 +2675,8 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
                     tilt = (mymodel.ref_dim == 2) ? 0. : rnd_unif() * 180.;
                     psi  = rnd_unif() * 360.;
                 }
-                int iclass  = rnd_unif() * mymodel.nr_classes;
-                if (iclass == mymodel.nr_classes) iclass = mymodel.nr_classes - 1;
-                if (iclass >= mymodel.nr_classes)
-                {
-                    // Should not happen but without this some people get errors in Set2DFourierTransform
-                    // TODO: investigate
-                    std::cerr << "WARNING: numerical issue in initial class assignment. Your result is NOT compromised but please report this to our issue tracker.\n";
-                    std::cerr << "         iclass = " << iclass << " nr_classes = " << mymodel.nr_classes << " sizeof(RFLOAT) = " << sizeof(RFLOAT) << std::endl;
-                    iclass = mymodel.nr_classes - 1;
-                }
+                // SHWS 25Aug2022: make sure all classes have particles in them, their order has been randomised already
+                int iclass  = part_id_sorted % mymodel.nr_classes;
                 Matrix2D<RFLOAT> A;
                 Euler_angles2matrix(rot, tilt, psi, A, true);
 

@@ -138,8 +138,8 @@ void TIFFConverter::estimate(FileName fn_movie)
 				stable++;
 		}
 
-		printf(" %s Frame %03d #Changed %10d #Mismatch %10d, #Negative %10d, #Unreliable %10d / %10d\n",
-			   fn_movie.c_str(), iframe + 1, changed, error, negative, (int)(YXSIZE(defects()) - stable), (int)(YXSIZE(defects())));
+		printf(" %s Frame %03d #Changed %10d #Mismatch %10d, #Negative %10d, #Unreliable %10ld / %10ld\n",
+		       fn_movie.c_str(), iframe + 1, changed, error, negative, YXSIZE(defects()) - stable, YXSIZE(defects()));
 	}
 }
 
