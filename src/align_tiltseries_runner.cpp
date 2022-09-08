@@ -40,7 +40,7 @@ void AlignTiltseriesRunner::read(int argc, char **argv, int rank)
 
     int aretomo_section = parser.addSection("AreTomo alignment options");
     do_aretomo = parser.checkOption("--aretomo", "OR: Use AreTomo's alignment method");
-    aretomo_resolution = textToFloat(parser.getOption("--aretomo_resolution", "Maximum resolution (in A) to use in AreTomo alignments", "10"));
+    aretomo_resolution = textToFloat(parser.getOption("--aretomo_resolution", "Resolution (in A) of the tilt series output by AreTomo. Has little bearing on processing.", "10"));
     aretomo_thickness = textToFloat(parser.getOption("--aretomo_thickness", "Thickness (in A) for AreTomo alignment", "2000"));
     do_aretomo_tiltcorrect = parser.checkOption("--aretomo_tiltcorrect", "Specify to correct the tilt angle offset in the tomogram (AreTomo -TiltCor option; default=false)");
     gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread, e.g 0:1:2:3", "");
@@ -198,25 +198,24 @@ void AlignTiltseriesRunner::executeImodWrapper(long idx_tomo, int rank)
 {
 
     RFLOAT angpix = tomogramSet.getPixelSize(idx_tomo);
-    int patch_size_pix = ROUND(patch_size / angpix);
 
     std::string command = fn_imodwrapper_exe + " ";
     // Make sure the methods are the first argument to the program!
     if (do_imod_fiducials)
     {
         command += " IMOD:fiducials";
-        command += " --nominal-fiducial-diameter-nanometres " + floatToString(fiducial_diam);
+        command += " --nominal-fiducial-diameter-nanometers " + floatToString(fiducial_diam);
     }
     else if (do_imod_patchtrack)
     {
         command += " IMOD:patch-tracking";
-        command += " --unbinned-patch-size-pixels " + integerToString(patch_size_pix) + " " + integerToString(patch_size_pix);
+        command += " --patch-size-angstroms " + integerToString(patch_size);
         command += " --patch-overlap-percentage " + floatToString(patch_overlap);
     }
     else if (do_aretomo)
     {
         command += " AreTomo";
-        command += " --alignment-resolution " + floatToString(aretomo_resolution);
+        command += " --output-resolution " + floatToString(aretomo_resolution);
         command += " --alignment-thickness " + floatToString(aretomo_thickness);
     }
     command += " --tilt-series-star-file " + fn_in;

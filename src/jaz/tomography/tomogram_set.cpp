@@ -150,7 +150,7 @@ void TomogramSet::write(FileName filename)
 
 }
 
-Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
+Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenFramesOnly, bool loadOddFramesOnly) const //Set loadEven/OddFramesOnly to True to loadImageData from rlnTomoMicrographNameEven/Odd rather than rlnMicrographName
 {
 	Tomogram out;
 
@@ -208,14 +208,35 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
         out.frameCount = m.numberOfObjects();
 
         // Get image size from the first image in the tomogramTable
-        if (!m.containsLabel(EMDL_MICROGRAPH_NAME))
+        if (!m.containsLabel(EMDL_MICROGRAPH_NAME) && !loadEvenFramesOnly && !loadOddFramesOnly)
         {
             REPORT_ERROR("ERROR: tomogramTable for " + tomoName + " does not contain a rlnMicrographName label, yet the globalTable also does not contain a rlnTomoTiltSeriesName label!");
         }
+	
+	if (!m.containsLabel(EMDL_MICROGRAPH_ODD) && loadOddFramesOnly)
+        {
+            REPORT_ERROR("ERROR: tomogramTable for " + tomoName + " does not contain a rlnTomoMicrographNameOdd label");
+        }
 
+	if (!m.containsLabel(EMDL_MICROGRAPH_EVEN) && loadEvenFramesOnly)
+        {
+            REPORT_ERROR("ERROR: tomogramTable for " + tomoName + " does not contain a rlnTomoMicrographNameEven label");
+        }
+	
         std::string fn_img;
-        m.getValueSafely(EMDL_MICROGRAPH_NAME, fn_img, 0);
-        Image<RFLOAT> I;
+        if (loadEvenFramesOnly)
+        {	
+		m.getValueSafely(EMDL_MICROGRAPH_EVEN, fn_img, 0);
+	}
+	else if (loadOddFramesOnly)
+        {	
+		m.getValueSafely(EMDL_MICROGRAPH_ODD, fn_img, 0);
+	}
+	else
+	{
+        	m.getValueSafely(EMDL_MICROGRAPH_NAME, fn_img, 0);
+        }
+	Image<RFLOAT> I;
         I.read(fn_img,false); // false means don't read the actual image data, only the header
 
         stackSize.x = XSIZE(I());
@@ -227,7 +248,18 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData) const
             Image<RFLOAT> myStack(stackSize.x, stackSize.y, stackSize.z);
             for (int f = 0; f < out.frameCount; f++)
             {
-                m.getValueSafely(EMDL_MICROGRAPH_NAME, fn_img, f);
+    	        if (loadEvenFramesOnly)
+        	{	
+			m.getValueSafely(EMDL_MICROGRAPH_EVEN, fn_img, f);
+		}
+		else if (loadOddFramesOnly)
+        	{	
+			m.getValueSafely(EMDL_MICROGRAPH_ODD, fn_img, f);
+		}	
+		else
+		{
+        		m.getValueSafely(EMDL_MICROGRAPH_NAME, fn_img, f);
+        	}	
                 Image<RFLOAT> I2;
                 I2.read(fn_img);
 

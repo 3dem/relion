@@ -483,7 +483,9 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 			type != PROC_TOMO_ALIGN &&
             type != PROC_TOMO_ALIGN_TILTSERIES &&
             type != PROC_TOMO_RECONSTRUCT_TOMOGRAM &&
+	     	    type != PROC_TOMO_DENOISE_TOMOGRAM &&
 			type != PROC_TOMO_RECONSTRUCT &&
+			type != PROC_TOMO_EXCLUDE_TILT_IMAGES &&
 		    type != PROC_EXTERNAL)
 			return false;
 
@@ -878,15 +880,30 @@ void RelionJob::initialise(int _job_type)
 		has_mpi = has_thread = false;
 		initialiseTomoImportJob();
 	}
+    else if (type == PROC_TOMO_EXCLUDE_TILT_IMAGES)
+    {
+        has_mpi = has_thread = false;
+        initialiseTomoExcludeTiltImagesJob();
+    }
     else if (type == PROC_TOMO_ALIGN_TILTSERIES)
     {
-        has_mpi = has_thread = true;
+        has_mpi = has_thread = false;
         initialiseTomoAlignTiltSeriesJob();
     }
     else if (type == PROC_TOMO_RECONSTRUCT_TOMOGRAM)
     {
         has_mpi = has_thread = true;
         initialiseTomoReconstructTomogramsJob();
+    }
+    else if (type == PROC_TOMO_DENOISE_TOMOGRAM)
+    {
+        has_mpi = has_thread = false;
+        initialiseTomoDenoiseTomogramsJob();
+    }
+else if (type == PROC_TOMO_EXCLUDE_TILT_IMAGES)
+    {
+        has_mpi = has_thread = false;
+        initialiseTomoExcludeTiltImagesJob();
     }
 	else if (type == PROC_TOMO_SUBTOMO)
 	{
@@ -1143,9 +1160,17 @@ bool RelionJob::getCommands(std::string &outputname, std::vector<std::string> &c
     {
         result = getCommandsTomoAlignTiltSeriesJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
     }
+    else if (type == PROC_TOMO_EXCLUDE_TILT_IMAGES)
+    {
+        result = getCommandsTomoExcludeTiltImagesJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
+    }
     else if (type == PROC_TOMO_RECONSTRUCT_TOMOGRAM)
     {
         result = getCommandsTomoReconstructTomogramsJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
+    }
+    else if (type == PROC_TOMO_DENOISE_TOMOGRAM)
+    {
+        result = getCommandsTomoDenoiseTomogramsJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
     }
 
     else if (type == PROC_TOMO_RECONSTRUCT)
@@ -1398,6 +1423,10 @@ void RelionJob::initialiseMotioncorrJob()
 	joboptions["last_frame_sum"] = JobOption("Last frame for corrected sum:", -1, 0, 32, 1, "Last frame to use in corrected average. Values equal to or smaller than 0 mean 'use all frames'.");
 	joboptions["eer_grouping"] = JobOption("EER fractionation:", 32, 1, 100, 1, "The number of hardware frames to group into one fraction. This option is relevant only for Falcon4 movies in the EER format. Note that all 'frames' in the GUI (e.g. first and last frame for corrected sum, dose per frame) refer to fractions, not raw detector frames. See https://www3.mrc-lmb.cam.ac.uk/relion/index.php/Image_compression#Falcon4_EER for detailed guidance on EER processing.");
 	joboptions["do_float16"] = JobOption("Write output in float16?", true ,"If set to Yes, RelionCor2 will write output images in float16 MRC format. This will save a factor of two in disk space compared to the default of writing in float32. Note that RELION and CCPEM will read float16 images, but other programs may not (yet) do so. For example, Gctf will not work with float16 images. Also note that this option does not work with UCSF MotionCor2. For CTF estimation, use CTFFIND-4.1 with pre-calculated power spectra (activate the 'Save sum of power spectra' option).");
+	if (is_tomo)
+	{
+	joboptions["do_even_odd_split"] = JobOption("Save images for denoising?", false ,"If set to Yes, MotionCor2 will write output images summed from both the even frames of the input movie and the odd frames of the input movie. This generates two versions of the same movie which essential if you wish to carry out denoising later. If you are unsure whether you will need denoising later, it is best to select Yes, but be aware this option increases the processing time for MotionCor. At the moment, this is only available in Shawn Zheng's MotionCor2 (>=v1.3.0)  and therefore do_float_16 must equal false too.");
+	}
 
 	// Motioncor2
 	char *default_location = getenv ("RELION_MOTIONCOR2_EXECUTABLE");
@@ -1429,9 +1458,9 @@ Note that multiple MotionCor2 processes should not share a GPU; otherwise, it ca
 
 	// Dose-weight
 	if (is_tomo)
-        joboptions["do_dose_weighting"] = JobOption("Do dose-weighting?", true ,"If set to Yes, the averaged micrographs will be dose-weighted.");
-	else
         joboptions["do_dose_weighting"] = JobOption("Do dose-weighting?", false ,"If set to Yes, the averaged micrographs will be dose-weighted.");
+	else
+        joboptions["do_dose_weighting"] = JobOption("Do dose-weighting?", true ,"If set to Yes, the averaged micrographs will be dose-weighted.");
 
     joboptions["do_save_noDW"] = JobOption("Save non-dose weighted as well?", false, "Aligned but non-dose weighted images are sometimes useful in CTF estimation, although there is no difference in most cases. Whichever the choice, CTF refinement job is always done on dose-weighted particles.");
 	joboptions["dose_per_frame"] = JobOption("Dose per frame (e/A2):", 1, 0, 5, 0.2, "Dose per movie frame (in electrons per squared Angstrom).");
@@ -1482,6 +1511,11 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 	command += " --first_frame_sum " + joboptions["first_frame_sum"].getString();
 	command += " --last_frame_sum " + joboptions["last_frame_sum"].getString();
 
+	if (joboptions["do_even_odd_split"].getBoolean())
+        {
+            command += " --even_odd_split ";
+        }
+	
 	if (joboptions["do_own_motioncor"].getBoolean())
 	{
 		label += ".own";
@@ -1567,6 +1601,11 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 	if (joboptions["do_dose_weighting"].getBoolean())
 	{
 		command += " --dose_weighting ";
+		if (joboptions["do_even_odd_split"].getBoolean() && joboptions["do_own_motioncor"].getBoolean())
+		{
+			error_message = "'Dose weighting' is not available with RELION's own implementation of MotionCor when saving images for denoising. You probably do not want to dose weight for tomography anyway.";
+			return false;
+		}
 		if (joboptions["do_save_noDW"].getBoolean())
 		{
 			command += " --save_noDW ";
@@ -6325,27 +6364,19 @@ void RelionJob::initialiseTomoAlignTiltSeriesJob()
 
     joboptions["in_tiltseries"] = JobOption("Input tilt series:", OUTNODE_TOMO_TOMOGRAMS, "", "STAR files (*.star)",  "Input tomogram set starfile.");
 
-    char *default_location = getenv ("RELION_IMOD_WRAPPER_EXECUTABLE");
-    char default_wrapper[] = DEFAULTIMODWRAPPERLOCATION;
-    if (default_location == NULL) default_location = default_wrapper;
-    joboptions["imod_wrapper"] = JobOption("Alister Burt's IMOD/AreTomo wrapper:", std::string(default_location), "*", ".", "Location of Alister Burt's IMOD/Wrapper script; or just its executable name if in the path. You can control the default of this field by setting environment variable RELION_IMOD_WRAPPER_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code. Note that Alister's script should find the executables to IMOD and AreTomo on its own. See Alister's documentation on how to configure this.");
-
-    joboptions["do_imod_fiducials"] = JobOption("Use IMOD's fiducial based alignment?", true, "Set to Yes to perform tilt series alignment using fiducials in IMOD.");
+    joboptions["do_imod_fiducials"] = JobOption("Use IMOD's fiducial based alignment?", false, "Set to Yes to perform tilt series alignment using fiducials in IMOD.");
     joboptions["fiducial_diameter"] = JobOption("Fiducial diameter (nm): ", 10, 1, 20, 1, "The diameter of the fiducials (in nm)");
 
     joboptions["do_imod_patchtrack"] = JobOption("Use IMOD's patch-tracking for alignment?", false, "Set to Yes to perform tilt series alignment using patch-tracking in IMOD.");
-    // TODO: check defaults with the experts
-    joboptions["patch_size"] = JobOption("Patch size (in A): ", 10, 1, 50, 1, "The size of the patches in Angstrom.");
-    joboptions["patch_overlap"] = JobOption("Patch overlap (%): ", 10, 0, 100, 10, "The overlap (0-100%) between the patches.");
+
+    joboptions["patch_size"] = JobOption("Patch size (in nm): ", 100, 1, 500, 1, "The size of the patches in Angstrom.");
+    joboptions["patch_overlap"] = JobOption("Patch overlap (%): ", 50, 0, 100, 10, "The overlap (0-100%) between the patches.");
 
     joboptions["do_aretomo"] = JobOption("Use AreTomo?", false, "Set to Yes to perform tilt series alignment using UCSF's AreTomo.");
-    joboptions["aretomo_resolution"] = JobOption("Resolution for AreTomo alignment (in A): ", 10, 1, 50, 1, "The maximum resolution (in A) used for AreTomo alignment. The images will be Fourier cropped to have their Nyquist frequency at this value.");
-    joboptions["aretomo_thickness"] = JobOption("Thickness for AreTomo alignment (in A): ", 2000, 100, 5000, 100, "The tomogram thickness (in A) used for AreTomo alignment. The images will be Fourier cropped to have their Nyquist frequency at this value.");
-	joboptions["aretomo_tiltcorrect"] = JobOption("Correct Tilt Angle Offset?", false, "Specify Yes to correct the tilt angle offset in the tomogram (applies the AreTomo -TiltCor option). This is useful for correcting slanting in tomograms which can arise due to sample mounting or milling angle. This can be useful for in situ data especially.");
+//    joboptions["aretomo_resolution"] = JobOption("Resolution for AreTomo alignment (in A): ", 10, 1, 50, 1, "The maximum resolution (in A) used for AreTomo alignment. The images will be Fourier cropped to have their Nyquist frequency at this value.");
+    joboptions["aretomo_thickness"] = JobOption("Expected sample thickness (in nm): ", 200, 10, 500, 10, "This controls the thickness of intermediate reconstructions used for projection matching in AreTomo. This value is padded internally.");
+	joboptions["aretomo_tiltcorrect"] = JobOption("Correct Tilt Angle Offset?", false, "Specify Yes to correct the tilt angle offset in the tomogram (applies the AreTomo -TiltCor option). This is useful for correcting slanting in tomograms which can arise due to sample mounting or milling angle. This can be useful for in situ data.");
     joboptions["gpu_ids"] = JobOption("Which GPUs to use for AreTomo:", std::string(""), "Provide a list of which GPUs (e.g. 0:1:2:3) to use in AreTomo. MPI-processes are separated by ':'. For example, to place one rank on device 0 and one rank on device 1, provide '0:1'.");
-
-    joboptions["other_wrapper_args"] = JobOption("Other wrapper arguments:", (std::string)"",  "Other arguments that will be passed straight onto the IMOD wrapper.");
-
 }
 bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::vector<std::string> &commands,
                                        std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
@@ -6364,57 +6395,50 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
         return false;
     }
 
-    if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-        command="`which relion_run_align_tiltseries_mpi`";
-    else
-        command="`which relion_run_align_tiltseries`";
     if (error_message != "") return false;
 
+
+    command="`which relion_tomo_align_tilt_series` ";
 
     // Make sure the methods are the first argument to the program!
     if (joboptions["do_imod_fiducials"].getBoolean())
     {
-        command += " --imod_fiducials";
-        command += " --fiducial_diameter " + joboptions["fiducial_diameter"].getString();
+        command += "IMOD:fiducials ";
+        command += " --nominal-fiducial-diameter-nanometers " + joboptions["fiducial_diameter"].getString() + ' ';
     }
     else if (joboptions["do_imod_patchtrack"].getBoolean())
     {
-        command += " --imod_patchtrack";
-        command += " --patch_size " + joboptions["patch_size"].getString();
-        command += " --patch_overlap " + joboptions["patch_overlap"].getString();
+        command += "IMOD:patch-tracking ";
+        command += " --patch-size-nanometers " + joboptions["patch_size"].getString() + ' ';
+        command += " --patch-overlap-percentage " + joboptions["patch_overlap"].getString() + ' ';
     }
     else if (joboptions["do_aretomo"].getBoolean())
     {
-        command += " --aretomo";
-        command += " --aretomo_resolution " + joboptions["aretomo_resolution"].getString();
-        command += " --aretomo_thickness " + joboptions["aretomo_thickness"].getString();
+        command += "AreTomo ";
+        command += " --sample-thickness-nanometers " + joboptions["aretomo_thickness"].getString();
 
         if (joboptions["aretomo_tiltcorrect"].getBoolean())
         {
-            command += " --aretomo_tiltcorrect";
+            command += " --do-tilt-angle-offset-correction ";
         }
         if (joboptions["gpu_ids"].getString().length() > 0)
         {
-            command += " --gpu " + joboptions["gpu_ids"].getString();
+            command += " --gpu " + joboptions["gpu_ids"].getString() + ' ';
         }
     }
-    command += " --i " + joboptions["in_tiltseries"].getString();
+    command += " --tilt-series-star-file " + joboptions["in_tiltseries"].getString();
+
     Node node(joboptions["in_tiltseries"].getString(), joboptions["in_tiltseries"].node_type);
     inputNodes.push_back(node);
 
-    command += " --o " + outputname;
+    command += " --output-directory " + outputname;
     Node node2(outputname+"aligned_tilt_series.star", LABEL_TOMO_TOMOGRAMS);
     outputNodes.push_back(node2);
-
-    if ((joboptions["imod_wrapper"].getString()).length() > 0)
-        command += " --wrapper_executable " + joboptions["imod_wrapper"].getString();
-
-    if ((joboptions["other_wrapper_args"].getString()).length() > 0)
-        command += " --other_wrapper_args \" " + joboptions["other_wrapper_args"].getString() + " \"";
 
     // Other arguments for extraction
     command += " " + joboptions["other_args"].getString();
     commands.push_back(command);
+
 
     return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 
@@ -6427,13 +6451,14 @@ void RelionJob::initialiseTomoReconstructTomogramsJob()
     addTomoInputOptions(true, false, false, false, false, false);
 
     joboptions["tomo_name"] = JobOption("Reconstruct only this tomogram:", std::string(""), "If not left empty, the program will only reconstruct this particular tomogram");
+    joboptions["generate_split_tomograms"] = JobOption("Generate tomograms for denoising?:", false, "Generate tomograms for input into a denoising job. For this option to work, Save images for denoising? should have been True during Motion Correction. Additionally, adjust zdim to minimise the amount of empty space without sample within the tomograms.");
+
 
     joboptions["binned_angpix"] = JobOption("Binned pixel size (A): ", 10., 1, 20, 1, "The tomogram will be downscaled to this pixel size. For particle picking, often binning to pixel sizes of 5-10 A gives good enough tomograms. Note that the downsized tomograms are only used for picking; subsequent subtomogram averaging will not use these.");
 
-    joboptions["xdim"] = JobOption("Unbinned tomogram width (Xdim): ", -1, -1, 6000, 100, "The tomogram X-dimension in pixels. If a negative value is given, this will be determined from the size of the tilt series images.");
-    joboptions["ydim"] = JobOption("Unbinned tomogram height (Ydim): ", -1, -1, 6000, 100, "The tomogram Y-dimension in pixels. If a negative value is given, this will be determined from the size of the tilt series images.");
-    joboptions["zdim"] = JobOption("Unbinned tomogram thickness (Zdim): ", 2000, -1, 6000, 100, "The tomogram Z-dimension in pixels. If a negative value is given, this will be determined from the size of the tilt series images.");
-
+    joboptions["xdim"] = JobOption("Unbinned tomogram width (Xdim): ", 4000, 1, 6000, 100, "The tomogram X-dimension in unbinned pixels.");
+    joboptions["ydim"] = JobOption("Unbinned tomogram height (Ydim): ", 4000, 1, 6000, 100, "The tomogram Y-dimension in unbinned pixels.");
+    joboptions["zdim"] = JobOption("Unbinned tomogram thickness (Zdim): ", 2000, 1, 6000, 100, "The tomogram Z-dimension in unbinned pixels.");
 
 }
 bool RelionJob::getCommandsTomoReconstructTomogramsJob(std::string &outputname, std::vector<std::string> &commands,
@@ -6458,12 +6483,19 @@ bool RelionJob::getCommandsTomoReconstructTomogramsJob(std::string &outputname, 
     if (joboptions["tomo_name"].getString().length() > 0)
         command += " --tn " + joboptions["tomo_name"].getString();
 
+    if (joboptions["generate_split_tomograms"].getBoolean())
+    {
+        command += " --generate_split_tomograms ";
+    }
+
     command += " --w " + joboptions["xdim"].getString();
     command += " --h " + joboptions["ydim"].getString();
     command += " --d " + joboptions["zdim"].getString();
 
     command += " --binned_angpix " + joboptions["binned_angpix"].getString();
-
+    // No CTF is on by default for now
+    command += " --noctf ";
+    
     // In new version of tilt series alignments by Alister Burt, the origin is again at normal 0,0,0 position
     command += " --x0 0 --y0 0 --z0 0 ";
     
@@ -6485,8 +6517,151 @@ bool RelionJob::getCommandsTomoReconstructTomogramsJob(std::string &outputname, 
     return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 
 }
+void RelionJob::initialiseTomoDenoiseTomogramsJob()
+{
+    hidden_name = ".gui_tomo_denoise_tomogram";
 
+    joboptions["in_tomoset"] = JobOption("Input tomogram set:", OUTNODE_TOMO_TOMOGRAMS, "", "STAR files (*.star)",  "Input tomogram set star file.");
 
+    joboptions["do_cryocare_train"] = JobOption("Train denoising model:", false, "Select Yes to train cryoCARE denoising model. Input tomogram set should contain tomogram halves for denoising (to generate, select Yes to Generate tomograms for denoising in the Reconstruct tomogram tab).");
+
+    joboptions["tomograms_for_training"] = JobOption("Tomograms for model training:", std::string(""), "List the tomograms to be used to train the denoising model. Ideally, these should cover the defocus range of your tomograms. List the tomograms according to their rlnTomoName, and separate the tomograms using ':'. For exampple, input should look something like: TS_01:TS_02 "); 
+    joboptions["number_training_subvolumes"] = JobOption("Number of sub-volumes per tomogram:",1200,100,2000,100, "Number of sub-volumes to be extracted per training tomogram. Corresponds to num_slices in cryoCARE_extract_train_data.py.");
+    joboptions["subvolume_dimensions"] = JobOption("Sub-volume dimensions (px):",72,64,256,1, "Dimensions (XYZ) in pixels of the sub-volumes to be extracted from the training tomograms. Corresponds to patch_size in cryoCARE_extract_train_data.py.");
+
+    joboptions["do_cryocare_predict"] = JobOption("Generate denoised tomograms:", false, "Use the cryoCARE denoising model generated in cryoCARE:train to denoise your tomograms.");
+    
+    joboptions["denoising_tomo_name"] = JobOption("Reconstruct only this tomogram:", std::string(""), "If not left empty, the program will only reconstruct this particular tomogram. Use the name in rlnTomoName to specify tomogram.");
+
+    joboptions["care_denoising_model"] = JobOption("Path to denoising model:", std::string(""), "*", ".", "Provide the path to the denoising model generated in cryoCARE:train. This should be in the output directory of a cryoCARE:train job as a .tar.gz file."); 
+
+    joboptions["ntiles_x"] = JobOption("Number of tiles - X:", std::string("2"), "Number of tiles to use in denoised tomogram generation (X, Y, and Z dimension)");
+    joboptions["ntiles_y"] = JobOption("Number of tiles - Y:", std::string("2"), "Number of tiles to use in denoised tomogram generation (X, Y, and Z dimension)");
+    joboptions["ntiles_z"] = JobOption("Number of tiles - Z:", std::string("2"), "Number of tiles to use in denoised tomogram generation (X, Y, and Z dimension). Default is 2,2,2. Increase if you get a Out of Memory (OOM) error in prediction. For us, 8,8,8 works well on a Nvidia GeForce RTX 2080.");
+    
+    joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "Provide a list of which GPUs (e.g. 0:1:2:3) to use in AreTomo. MPI-processes are separated by ':'. For example, to place one rank on device 0 and one rank on device 1, provide '0:1'.");
+}
+
+bool RelionJob::getCommandsTomoDenoiseTomogramsJob(std::string &outputname, std::vector<std::string> &commands,
+                                            std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
+{
+    commands.clear();
+    initialisePipeline(outputname, job_counter);
+    std::string command;
+    
+    int i = 0;
+    if (joboptions["do_cryocare_train"].getBoolean()) i++;
+    if (joboptions["do_cryocare_predict"].getBoolean()) i++;
+
+    if (i != 1)
+    {
+        error_message = "ERROR: you should (only) enable ONE of the methods: cryoCARE:train (--do_cryocare_train), cryoCARE:predict (--do_cryocare_predict)";
+        return false;
+    }
+
+    if (joboptions["do_cryocare_train"].getBoolean() && joboptions["do_cryocare_predict"].getBoolean())
+    {
+        error_message = "ERROR: you should (only) enable ONE of the methods: cryoCARE:train (--do_cryocare_train), cryoCARE:predict (--do_cryocare_predict)";    
+    }
+    if (joboptions["do_cryocare_train"].getBoolean() &&  joboptions["tomograms_for_training"].getString().length() == 0)
+    {
+	error_message = "ERROR: cryoCARE training is enabled but the tomograms to train (--tomograms_for_training) on have not been specified.";
+	return false;
+    }       
+    if (joboptions["do_cryocare_predict"].getBoolean() && joboptions["care_denoising_model"].getString().length() == 0)
+    {
+	error_message = "ERROR: cryoCARE predict is enabled but path to the denoising model (--care_denoising_model) generated in cryoCARE:train has not been specified.";
+	return false;
+    } 
+
+    command="`which relion_tomo_denoise` ";
+    
+    if (error_message != "") return false;
+
+    if (joboptions["do_cryocare_train"].getBoolean())
+    {
+        command += " cryoCARE:train ";
+    }
+    if (joboptions["do_cryocare_predict"].getBoolean())
+    {
+        command += " cryoCARE:predict ";
+    }
+    command += " --tilt-series-star-file " + joboptions["in_tomoset"].getString();
+    Node node(joboptions["in_tomoset"].getString(), joboptions["in_tomoset"].node_type);
+    inputNodes.push_back(node); 
+
+    command += " --output-directory " + outputname;
+    Node node2(outputname+"tomograms.star", LABEL_TOMO_TOMOGRAMS);
+    outputNodes.push_back(node2);  
+    
+    if (joboptions["gpu_ids"].getString().length() > 0)
+    {
+        command += " --gpu " + joboptions["gpu_ids"].getString() + ' ';
+    }
+ 
+    if (joboptions["tomograms_for_training"].getString().length() > 0 && joboptions["do_cryocare_train"].getBoolean())
+    {    
+	command += " --training-tomograms " + joboptions["tomograms_for_training"].getString();
+        command += " --number-training-subvolumes " + joboptions["number_training_subvolumes"].getString();
+        command += " --subvolume-dimensions " + joboptions["subvolume_dimensions"].getString();
+    }       
+
+    if (joboptions["denoising_tomo_name"].getString().length() > 0 && joboptions["do_cryocare_predict"].getBoolean())
+    {    
+	command += " --tomo-name " + joboptions["denoising_tomo_name"].getString();
+    }   
+    if (joboptions["care_denoising_model"].getString().length() > 0 && joboptions["do_cryocare_predict"].getBoolean())
+    {
+        command += " --model-name " + joboptions["care_denoising_model"].getString();
+    }
+
+    if (joboptions["ntiles_x"].getString().length() > 0 && joboptions["ntiles_y"].getString().length() > 0 && joboptions["ntiles_z"].getString().length() > 0 && joboptions["do_cryocare_predict"].getBoolean())
+    {
+    	command += " --n-tiles " + joboptions["ntiles_x"].getString() + " " + joboptions["ntiles_y"].getString() + " " + joboptions["ntiles_z"].getString() + " ";
+    }
+
+    // Other arguments for extraction
+    command += " " + joboptions["other_args"].getString();
+    commands.push_back(command);
+
+    return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
+}
+
+void RelionJob::initialiseTomoExcludeTiltImagesJob()
+{
+    hidden_name = ".gui_tomo_exclude_tilt_images";
+
+    joboptions["in_tiltseries"] = JobOption("Input tilt series:", OUTNODE_TOMO_TOMOGRAMS, "", "STAR files (*.star)",  "Input tilt series starfile.");
+    joboptions["cache_size"] = JobOption("Number of cached tilt series ", 5, 1, 10, 1, "This controls the number of cached tilt series in Napari.");
+}
+
+bool RelionJob::getCommandsTomoExcludeTiltImagesJob(std::string &outputname, std::vector<std::string> &commands,
+                                       std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
+{
+    commands.clear();
+    initialisePipeline(outputname, job_counter);
+    std::string command;
+
+    if (error_message != "") return false;
+
+    command="`which relion_tomo_exclude_tilt_images` ";
+
+    command += " --tilt-series-star-file " + joboptions["in_tiltseries"].getString();
+    command += " --cache-size " + joboptions["cache_size"].getString() + ' ';
+
+    Node node(joboptions["in_tiltseries"].getString(), joboptions["in_tiltseries"].node_type);
+    inputNodes.push_back(node);
+
+    command += " --output-directory " + outputname;
+    Node node2(outputname+"selected_tilt_series.star", LABEL_TOMO_TOMOGRAMS);
+    outputNodes.push_back(node2);
+
+    // Other arguments for extraction
+    command += " " + joboptions["other_args"].getString();
+    commands.push_back(command);
+
+    return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
+} 
 
 void RelionJob::initialiseTomoSubtomoJob()
 {

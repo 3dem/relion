@@ -23,7 +23,7 @@ class TomogramSet
         bool read(FileName filename, bool verbose = true);
         void write(FileName filename);
 
-		Tomogram loadTomogram(int index, bool loadImageData) const;
+		Tomogram loadTomogram(int index, bool loadImageData, bool loadEvenFrames = false, bool loadOddFrames = false) const;
 			
 		void addTomogramFromIMODStack(
 			std::string tomoName, std::string stackFilename,

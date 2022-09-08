@@ -54,7 +54,8 @@
 // Our own defaults at LMB are the hard-coded ones
 #define DEFAULTQSUBLOCATION "/public/EM/RELION/relion/bin/relion_qsub.csh"
 #define DEFAULTCTFFINDLOCATION "/public/EM/ctffind/ctffind.exe"
-#define DEFAULTIMODWRAPPERLOCATION "relion_tomo_align_tilt_series"
+//#define DEFAULTIMODWRAPPERLOCATION "relion_tomo_align_tilt_series"
+//#define DEFAULTDENOISINGWRAPPERLOCATION "relion_tomo_denoise"
 #define DEFAULTMOTIONCOR2LOCATION "/public/EM/MOTIONCOR2/MotionCor2"
 #define DEFAULTGCTFLOCATION "/public/EM/Gctf/bin/Gctf"
 #define DEFAULTTOPAZLOCATION "/public/EM/RELION/topaz"
@@ -682,8 +683,10 @@ static int get_node_type(std::string label)
 #define PROC_TOMO_IMPORT_DIRNAME      "ImportTomo"              // Import for tomography GUI
 #define PROC_TOMO_SUBTOMO_DIRNAME     "PseudoSubtomo"           // Creation of pseudo-subtomograms from tilt series images
 #define PROC_TOMO_CTFREFINE_DIRNAME   "CtfRefineTomo"           // CTF refinement (defocus & aberrations) for tomography
+#define PROC_TOMO_EXCLUDE_TILT_IMAGES_DIRNAME   "ExcludeTiltImages"  // Exclusion of bad tilt-images from tilt-series
 #define PROC_TOMO_ALIGN_DIRNAME       "FrameAlignTomo"          // Frame alignment and particle polishing for subtomography
 #define PROC_TOMO_RECONSTRUCT_DIRNAME "ReconstructParticleTomo" // Calculation of particle average from the individual tilt series images
+#define PROC_TOMO_DENOISE_DIRNAME "DenoiseTomo" // Denoise tomograms
 #define PROC_EXTERNAL_DIRNAME         "External"     // For running non-relion programs
 #define PROC_TOMO_ALIGN_TILTSERIES_DIRNAME "AlignTiltSeries" // Tilt series alignment for tomogram reconstruction
 #define PROC_TOMO_RECONSTRUCT_TOMOGRAM_DIRNAME "ReconstructTomograms" // Reconstruction of tomograms for particle picking
@@ -709,10 +712,12 @@ static int get_node_type(std::string label)
 #define PROC_MOTIONREFINE_LABELNEW     "relion.polish"       // Jasenko's motion fitting program for Bayesian polishing (to replace MovieRefine?)
 #define PROC_CTFREFINE_LABELNEW        "relion.ctfrefine"    // Jasenko's program for defocus and beamtilt optimisation
 #define PROC_TOMO_IMPORT_LABELNEW      "relion.importtomo"              // Import for tomography GUI
+#define PROC_TOMO_EXCLUDE_TILT_IMAGES_LABELNEW "relion.excludetilts"    // Exclude bad tilt-images
 #define PROC_TOMO_SUBTOMO_LABELNEW     "relion.pseudosubtomo"           // Creation of pseudo-subtomograms from tilt series images
 #define PROC_TOMO_CTFREFINE_LABELNEW   "relion.ctfrefinetomo"           // CTF refinement (defocus & aberrations) for tomography
 #define PROC_TOMO_ALIGN_LABELNEW       "relion.framealigntomo"          // Frame alignment and particle polishing for subtomography
 #define PROC_TOMO_RECONSTRUCT_LABELNEW "relion.reconstructparticletomo" // Calculation of particle average from the individual tilt series images
+#define PROC_TOMO_DENOISE_LABELNEW "relion.denoisetomo" // Denoise tomograms
 #define PROC_EXTERNAL_LABELNEW         "relion.external"     // For running non-relion programs
 #define PROC_TOMO_ALIGN_TILTSERIES_LABELNEW "relion.aligntiltseries" // Tilt series alignment for tomogram reconstruction
 #define PROC_TOMO_RECONSTRUCT_TOMOGRAM_LABELNEW "relion.reconstructtomograms" // Reconstruction of tomograms for particle picking
@@ -747,6 +752,8 @@ static int get_node_type(std::string label)
 #define PROC_TOMO_RECONSTRUCT       54// Calculation of particle average from the individual tilt series images
 #define PROC_TOMO_ALIGN_TILTSERIES 55// Tilt series alignment for tomogram reconstruction
 #define PROC_TOMO_RECONSTRUCT_TOMOGRAM 56 // Reconstruction of tomograms for particle picking
+#define PROC_TOMO_EXCLUDE_TILT_IMAGES 57 // Exclude bad tilt-images from tilt-series
+#define PROC_TOMO_DENOISE_TOMOGRAM 58 // Denoise tomograms
 
 #define PROC_EXTERNAL       99// External scripts
 
@@ -777,6 +784,8 @@ static std::map<int, std::string> proc_type2dirname = {{PROC_IMPORT, PROC_IMPORT
 		{PROC_TOMO_RECONSTRUCT, PROC_TOMO_RECONSTRUCT_DIRNAME},
         {PROC_TOMO_ALIGN_TILTSERIES,     PROC_TOMO_ALIGN_TILTSERIES_DIRNAME},
         {PROC_TOMO_RECONSTRUCT_TOMOGRAM, PROC_TOMO_RECONSTRUCT_TOMOGRAM_DIRNAME},
+ 	{PROC_TOMO_DENOISE_TOMOGRAM, PROC_TOMO_DENOISE_DIRNAME},
+	{PROC_TOMO_EXCLUDE_TILT_IMAGES, PROC_TOMO_EXCLUDE_TILT_IMAGES_DIRNAME},
 		{PROC_EXTERNAL,         PROC_EXTERNAL_DIRNAME}};
 
 static std::map<int, std::string> proc_type2labelnew = {{PROC_IMPORT, PROC_IMPORT_LABELNEW},
@@ -805,6 +814,8 @@ static std::map<int, std::string> proc_type2labelnew = {{PROC_IMPORT, PROC_IMPOR
 		{PROC_TOMO_RECONSTRUCT, PROC_TOMO_RECONSTRUCT_LABELNEW},
         {PROC_TOMO_ALIGN_TILTSERIES,     PROC_TOMO_ALIGN_TILTSERIES_LABELNEW},
         {PROC_TOMO_RECONSTRUCT_TOMOGRAM, PROC_TOMO_RECONSTRUCT_TOMOGRAM_LABELNEW},
+ 	{PROC_TOMO_DENOISE_TOMOGRAM, PROC_TOMO_DENOISE_LABELNEW},
+	{PROC_TOMO_EXCLUDE_TILT_IMAGES, PROC_TOMO_EXCLUDE_TILT_IMAGES_LABELNEW},
         {PROC_EXTERNAL,         PROC_EXTERNAL_LABELNEW}};
 
 static std::map<std::string, int> proc_dirname2type = {
@@ -834,6 +845,8 @@ static std::map<std::string, int> proc_dirname2type = {
 		{PROC_TOMO_RECONSTRUCT_DIRNAME, PROC_TOMO_RECONSTRUCT},
         {PROC_TOMO_ALIGN_TILTSERIES_DIRNAME,     PROC_TOMO_ALIGN_TILTSERIES},
         {PROC_TOMO_RECONSTRUCT_TOMOGRAM_DIRNAME, PROC_TOMO_RECONSTRUCT_TOMOGRAM},
+        {PROC_TOMO_DENOISE_DIRNAME, PROC_TOMO_DENOISE_TOMOGRAM},
+	{PROC_TOMO_EXCLUDE_TILT_IMAGES_DIRNAME, PROC_TOMO_EXCLUDE_TILT_IMAGES},
         {PROC_EXTERNAL_DIRNAME,         PROC_EXTERNAL}};
 
 static std::map<std::string, int> proc_labelnew2type = {
@@ -863,6 +876,8 @@ static std::map<std::string, int> proc_labelnew2type = {
 		{PROC_TOMO_RECONSTRUCT_LABELNEW, PROC_TOMO_RECONSTRUCT},
         {PROC_TOMO_ALIGN_TILTSERIES_LABELNEW,     PROC_TOMO_ALIGN_TILTSERIES},
         {PROC_TOMO_RECONSTRUCT_TOMOGRAM_LABELNEW, PROC_TOMO_RECONSTRUCT_TOMOGRAM},
+ 	{PROC_TOMO_DENOISE_LABELNEW, PROC_TOMO_DENOISE_TOMOGRAM},
+	{PROC_TOMO_EXCLUDE_TILT_IMAGES_LABELNEW, PROC_TOMO_EXCLUDE_TILT_IMAGES},
         {PROC_EXTERNAL_LABELNEW,         PROC_EXTERNAL}};
 
 
@@ -1263,7 +1278,13 @@ public:
     bool getCommandsTomoReconstructTomogramsJob(std::string &outputname, std::vector<std::string> &commands,
                                   std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
-
+    void initialiseTomoDenoiseTomogramsJob();
+    bool getCommandsTomoDenoiseTomogramsJob(std::string &outputname, std::vector<std::string> &commands,
+                                  std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+    void initialiseTomoExcludeTiltImagesJob();
+    bool getCommandsTomoExcludeTiltImagesJob(std::string &outputname, std::vector<std::string> &commands,
+                                  std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+				  
     void initialiseTomoSubtomoJob();
 	bool getCommandsTomoSubtomoJob(std::string &outputname, std::vector<std::string> &commands,
 								   std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);

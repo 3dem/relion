@@ -414,6 +414,11 @@ void JobWindow::initialise(int my_job_type, bool _is_tomo)
 		myjob.initialise(my_job_type);
 		initialiseTomoImportWindow();
 	}
+    else if (my_job_type == PROC_TOMO_EXCLUDE_TILT_IMAGES)
+    {
+        myjob.initialise(my_job_type);
+        initialiseTomoExcludeTiltImagesWindow();
+    }
     else if (my_job_type == PROC_TOMO_RECONSTRUCT_TOMOGRAM)
     {
         myjob.initialise(my_job_type);
@@ -423,6 +428,11 @@ void JobWindow::initialise(int my_job_type, bool _is_tomo)
     {
         myjob.initialise(my_job_type);
         initialiseTomoAlignTiltseriesWindow();
+    }
+        else if (my_job_type == PROC_TOMO_DENOISE_TOMOGRAM)
+    {
+        myjob.initialise(my_job_type);
+        initialiseTomoDenoiseTomogramsWindow();
     }
 	else if (my_job_type == PROC_TOMO_SUBTOMO)
 	{
@@ -542,6 +552,10 @@ void JobWindow::initialiseMotioncorrWindow()
 	place("pre_exposure", TOGGLE_DEACTIVATE);
 	place("eer_grouping", TOGGLE_DEACTIVATE);
 	place("do_float16", TOGGLE_DEACTIVATE);
+	if (is_tomo)
+	{
+	place("do_even_odd_split");
+	}
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -2477,10 +2491,6 @@ void JobWindow::initialiseTomoAlignTiltseriesWindow()
     // Add a little spacer
     current_y += STEPY/2;
 
-    place("imod_wrapper", TOGGLE_DEACTIVATE);
-    place("other_wrapper_args", TOGGLE_DEACTIVATE);
-
-
     tab1->end();
     tab2->begin();
     tab2->label("IMOD");
@@ -2518,7 +2528,7 @@ void JobWindow::initialiseTomoAlignTiltseriesWindow()
     place("do_aretomo", TOGGLE_DEACTIVATE, group3, false);
     group3->begin();
 
-    place("aretomo_resolution", TOGGLE_DEACTIVATE);
+//    place("aretomo_resolution", TOGGLE_DEACTIVATE);
     place("aretomo_thickness", TOGGLE_DEACTIVATE);
     place("aretomo_tiltcorrect", TOGGLE_DEACTIVATE);
 
@@ -2545,10 +2555,11 @@ void JobWindow::initialiseTomoReconstructTomogramsWindow()
     place("xdim", TOGGLE_DEACTIVATE);
     place("ydim", TOGGLE_DEACTIVATE);
     place("zdim", TOGGLE_DEACTIVATE);
-
+    place("binned_angpix", TOGGLE_DEACTIVATE);
+    
     current_y += STEPY /2 ;
 
-    place("binned_angpix", TOGGLE_DEACTIVATE);
+    place("generate_split_tomograms", TOGGLE_DEACTIVATE);
 
     current_y += STEPY /2 ;
 
@@ -2556,6 +2567,63 @@ void JobWindow::initialiseTomoReconstructTomogramsWindow()
 
 	tab2->end();
 
+}
+
+void JobWindow::initialiseTomoDenoiseTomogramsWindow()
+{
+    setupTabs(3);
+
+    tab1->begin();
+    tab1->label("I/O");
+    resetHeight();
+
+    place("in_tomoset", TOGGLE_DEACTIVATE);
+
+    current_y += STEPY/2;
+    
+    place("gpu_ids");
+
+    tab2->begin();
+    tab2->label("CryoCARE: Train");
+    resetHeight();
+
+    group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group1->end();
+    place("do_cryocare_train", TOGGLE_DEACTIVATE, group1, false);
+
+    current_y += STEPY /2 ;
+
+    group1->begin();
+    place("tomograms_for_training", TOGGLE_DEACTIVATE);
+    place("number_training_subvolumes", TOGGLE_DEACTIVATE);
+    place("subvolume_dimensions", TOGGLE_DEACTIVATE);
+    group1->end();
+    guientries["do_cryocare_train"].cb_menu_i(); 
+
+    tab2->end();
+
+    tab3->begin();
+    tab3->label("CryoCARE: Predict");
+    resetHeight();
+
+    group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group2->end();
+    place("do_cryocare_predict", TOGGLE_DEACTIVATE, group2, false);
+
+    current_y += STEPY /2 ;
+
+    group2->begin();
+    place("care_denoising_model", TOGGLE_DEACTIVATE);
+    place3("ntiles_x", "ntiles_y", "ntiles_z", "Number of tiles in X,Y,Z:", TOGGLE_DEACTIVATE);
+    
+    current_y += STEPY /2 ;
+
+    place("denoising_tomo_name", TOGGLE_DEACTIVATE);
+    
+    group2->end();
+    guientries["do_cryocare_predict"].cb_menu_i(); 
+
+    tab3->end();
 }
 
 void JobWindow::initialiseTomoSubtomoWindow()
@@ -2773,5 +2841,22 @@ void JobWindow::initialiseTomoReconParWindow()
 	place("sym_name", TOGGLE_DEACTIVATE);
 
 	tab2->end();
+}
+
+void JobWindow::initialiseTomoExcludeTiltImagesWindow()
+{
+    setupTabs(1);
+
+    tab1->begin();
+    tab1->label("I/O");
+    resetHeight();
+
+    place("in_tiltseries", TOGGLE_DEACTIVATE);
+
+    // Add a little spacer
+    current_y += STEPY/2;
+
+    place("cache_size", TOGGLE_DEACTIVATE);
+    tab1->end();
 }
 
