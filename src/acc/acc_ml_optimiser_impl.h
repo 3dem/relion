@@ -979,7 +979,6 @@ void getAllSquaredDifferencesCoarse(
 
 		projectorPlans.resize(baseMLO->mymodel.nr_classes * sp.nr_images, (CudaCustomAllocator *)accMLO->getAllocator());
 
-
 		for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
 		{
 			if (baseMLO->mymodel.pdf_class[iclass] > 0.)
@@ -1054,7 +1053,7 @@ void getAllSquaredDifferencesCoarse(
 		CTOC(accMLO->timer,"generateProjectionSetupCoarse");
 	}
 	else
-		projectorPlans = accMLO->bundle->coarseProjectionPlans;
+        projectorPlans = accMLO->bundle->coarseProjectionPlans;
 
 	// Loop only from sp.iclass_min to sp.iclass_max to deal with seed generation in first iteration
 	size_t allWeights_size(0);
@@ -1066,7 +1065,6 @@ void getAllSquaredDifferencesCoarse(
 	allWeights.accAlloc();
 	deviceInitValue<XFLOAT>(allWeights, 0);  // Make sure entire array initialized
 
-	long int allWeights_pos=0;
     bool do_CC = (baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc;
     long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
 
@@ -1190,15 +1188,11 @@ void getAllSquaredDifferencesCoarse(
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
-		for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
+		for (unsigned long iclass = sp.iclass_min, allWeights_pos=0; iclass <= sp.iclass_max; iclass++)
 		{
 			int iproj;
 			if (baseMLO->mymodel.nr_bodies > 1) iproj = ibody;
 			else                                iproj = iclass;
-
-            // The below only works if all projectorPlans have the same number of orientations...
-            // But that should be oK; SHWS 26Jul2022
-            allWeights_pos = (iclass-sp.iclass_min)*projectorPlans[iclass*sp.nr_images + img_id].orientation_num*translation_num;
 
 			if ( projectorPlans[iclass].orientation_num > 0 )
 			{
@@ -1209,7 +1203,7 @@ void getAllSquaredDifferencesCoarse(
 						op.local_Minvsigma2.zdim,
 						op.local_Minvsigma2.xdim-1);
 
-				runDiff2KernelCoarse(
+                runDiff2KernelCoarse(
 						projKernel,
 						&(~trans_xyz)[trans_x_offset], //~trans_x,
 						&(~trans_xyz)[trans_y_offset], //~trans_y,
@@ -1227,7 +1221,11 @@ void getAllSquaredDifferencesCoarse(
 						do_CC,
 						accMLO->dataIs3D);
 
+				allWeights_pos += projectorPlans[iclass*sp.nr_images + img_id].orientation_num*translation_num;
+
             }
+
+
 		} // end loop iclass
 
 		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -1239,33 +1237,34 @@ void getAllSquaredDifferencesCoarse(
     op.min_diff2 = AccUtilities::getMinOnDevice<XFLOAT>(allWeights);
 
 
-    for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
+    for (unsigned long iclass = sp.iclass_min, allWeights_pos=0; iclass <= sp.iclass_max; iclass++)
     {
-        // For this purpose, the projectorPlans for all img_id are ok
-        allWeights_pos = (iclass-sp.iclass_min)*projectorPlans[iclass*sp.nr_images + 0].orientation_num*translation_num;
-        mapAllWeightsToMweights(~projectorPlans[iclass*sp.nr_images + 0].iorientclasses,
-                                &(~allWeights)[allWeights_pos],
-                                &(~Mweight)[0],
-                                projectorPlans[iclass*sp.nr_images + 0].orientation_num,
-                                translation_num,
-                                accMLO->classStreams[iclass]
-                                );
-
-        /*
-        allWeights.hostAlloc();
-        allWeights.cpToHost();
-        Mweight.hostAlloc();
-        Mweight.cpToHost();
-        std::cerr << " orientation_num= " << projectorPlans[iclass*sp.nr_images + 0].orientation_num << " translation_num= " << translation_num << std::endl;
-        std::cout << "allWeights_pos= " << allWeights_pos << " COARSE DIFF: Mweight.getSize()= "<<Mweight.getSize()<<std::endl;
-        for (int i= 0; i < Mweight.getSize(); i++)
+        if ( projectorPlans[iclass].orientation_num > 0 )
         {
-            std::cout << i << " Mweight-after= " << Mweight[i] << " allWeights= " << allWeights[i] << std::endl;
-        }
-        */
+            mapAllWeightsToMweights(~projectorPlans[iclass*sp.nr_images + 0].iorientclasses,
+                                    &(~allWeights)[allWeights_pos],
+                                    &(~Mweight)[0],
+                                    projectorPlans[iclass*sp.nr_images + 0].orientation_num,
+                                    translation_num,
+                                    accMLO->classStreams[iclass]
+                                    );
 
+            allWeights_pos += projectorPlans[iclass*sp.nr_images + 0].orientation_num*translation_num;
+
+        }
     }
 
+    /*
+    Mweight.hostAlloc();
+    Mweight.cpToHost();
+    std::cerr << " orientation_num= " << projectorPlans[0].orientation_num << " translation_num= " << translation_num << std::endl;
+    std::cout << " COARSE DIFF: Mweight.getSize()= "<<Mweight.getSize() << " allWeights_size= " << allWeights_size <<std::endl;
+    for (int i= 0; i < Mweight.getSize(); i++)
+    {
+        std::cout << i << " Mweight-after= " << Mweight[i] << std::endl;
+    }
+    exit(0);
+    */
 #ifdef TIMING
 	if (op.part_id == baseMLO->exp_my_first_part_id)
 		baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF1);
