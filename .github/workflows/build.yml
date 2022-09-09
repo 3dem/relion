@@ -5,6 +5,9 @@ name: Build RELION
 jobs:
   build_on_x86_64:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        altcpu: [ON, OFF]
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies
@@ -12,10 +15,13 @@ jobs:
           sudo apt-get update -q -y && \
           sudo apt-get install -q -y cmake git build-essential mpi-default-bin mpi-default-dev libfftw3-dev libtiff-dev libfltk1.3-dev
       - name: Build RELION for Linux x86_64
-        run: mkdir build && cd build && cmake .. && make
+        run: mkdir build && cd build && cmake -DALTCPU=${{ matrix.altcpu }} .. && make
 
   build_on_aarch64:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        altcpu: [ON, OFF]
     steps:
       - uses: actions/checkout@v3
       - name: Build RELION for Linux aarch64
@@ -33,5 +39,5 @@ jobs:
             cd /relion
             mkdir build
             cd build
-            cmake ..
+            cmake -DALTCPU=${{ matrix.altcpu }} ..
             make
