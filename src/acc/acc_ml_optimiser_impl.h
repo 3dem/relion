@@ -1242,6 +1242,7 @@ void getAllSquaredDifferencesCoarse(
     for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
     {
         // For this purpose, the projectorPlans for all img_id are ok
+        allWeights_pos = (iclass-sp.iclass_min)*projectorPlans[iclass*sp.nr_images + 0].orientation_num*translation_num;
         mapAllWeightsToMweights(~projectorPlans[iclass*sp.nr_images + 0].iorientclasses,
                                 &(~allWeights)[allWeights_pos],
                                 &(~Mweight)[0],
