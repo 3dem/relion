@@ -1009,7 +1009,7 @@ void getAllSquaredDifferencesCoarse(
                     {
                         mag.initIdentity(3);
                     }
-                    int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, 0); // get optics group of first image for this particle...
+                    int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id); // get optics group of first image for this particle...
 
                     mag = baseMLO->mydata.obsModel.applyAnisoMag(mag, optics_group);
                     mag = baseMLO->mydata.obsModel.applyScaleDifference(mag, optics_group, baseMLO->mymodel.ori_size, baseMLO->mymodel.pixel_size);
@@ -1194,7 +1194,7 @@ void getAllSquaredDifferencesCoarse(
 			if (baseMLO->mymodel.nr_bodies > 1) iproj = ibody;
 			else                                iproj = iclass;
 
-			if ( projectorPlans[iclass].orientation_num > 0 )
+			if ( projectorPlans[iclass*sp.nr_images + img_id].orientation_num > 0 )
 			{
 				AccProjectorKernel projKernel = AccProjectorKernel::makeKernel(
 						accMLO->bundle->projectors[iproj],
