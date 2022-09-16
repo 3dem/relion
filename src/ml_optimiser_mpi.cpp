@@ -962,10 +962,14 @@ void MlOptimiserMpi::expectation()
 			if (free < required_free)
 			{
 				printf("WARNING: Ignoring required free GPU memory amount of %zu MB, due to space insufficiency.\n", required_free/1000000);
-				allocationSize = (double)free *0.7;
+				allocationSize = (double)free *0.3;
 			}
 			else
-				allocationSize = free - required_free;
+			{
+				// allocationSize = free - required_free;
+				allocationSize = (double)free *0.3;
+				printf("WARNING: due to 296623 ticket, use 30% of free GPU memory as allocationSize %zu MB.\n", allocationSize/1000000);
+			}
 
 			if (allocationSize < 200000000)
 				printf("WARNING: The available space on the GPU after initialization (%zu MB) might be insufficient for the expectation step.\n", allocationSize/1000000);

@@ -7,7 +7,7 @@ if(CUDA)
     set(EXTRA_NVCC_FLAGS "-D__INTEL_COMPILER --default-stream per-thread --std=c++11")
     set(RELION_NVCC_FLAGS "${CUDARCH} ${WARN_DBL} ${EXTRA_NVCC_FLAGS}" CACHE STRING "" FORCE)
 else (HIP)
-    set(EXTRA_HIPCC_FLAGS "-v -fPIC -fno-gpu-rdc --default-stream per-thread --std=c++14")
+    set(EXTRA_HIPCC_FLAGS "-v -fPIC -fno-gpu-rdc --default-stream per-thread --std=c++14 ")
     set(RELION_HIPCC_FLAGS "${HIPARCH} ${WARN_DBL} ${EXTRA_HIPCC_FLAGS}" CACHE STRING "" FORCE)
 endif()
 #message(STATUS "RELION_NVCC_FLAGS: ${RELION_NVCC_FLAGS}")
@@ -27,7 +27,7 @@ set(RELION_FLAGS_DEBUG "-O0" CACHE STRING "")
 if(CUDA)
     set(RELION_NVCC_FLAGS_DEBUG "${RELION_NVCC_FLAGS}" CACHE STRING "")
 else(HIP)
-    set(RELION_HIPCC_FLAGS_DEBUG "${RELION_HIPCC_FLAGS}" CACHE STRING "")
+    set(RELION_HIPCC_FLAGS_DEBUG "${RELION_HIPCC_FLAGS} -ggdb" CACHE STRING "")
 endif()
 
 # -- Linker flags ---------------------------------------------------
@@ -70,7 +70,7 @@ endif()
 if(CUDA)
     set(RELION_NVCC_FLAGS_RELWITHDEBINFO "${RELION_NVCC_FLAGS}" CACHE STRING "")
 else(HIP)
-    set(RELION_HIPCC_FLAGS_RELWITHDEBINFO "${RELION_HIPCC_FLAGS}" CACHE STRING "")
+    set(RELION_HIPCC_FLAGS_RELWITHDEBINFO "${RELION_HIPCC_FLAGS} -ggdb" CACHE STRING "")
 endif()
 
 # -- Linker flags ---------------------------------------------------
@@ -116,7 +116,7 @@ endif()
 #     --restrict         Programmer assertion that all kernel pointer parameters are restrict pointers.
 
 # -- Compiler flags -------------------------------------------------
-set(RELION_FLAGS_RELEASE "" CACHE STRING "")
+set(RELION_FLAGS_RELEASE " " CACHE STRING "")
 if(CUDA)
     set(RELION_NVCC_FLAGS_RELEASE "${RELION_NVCC_FLAGS} --disable-warnings" CACHE STRING "")
 else(HIP)
@@ -188,7 +188,7 @@ else(HIP)
 
     # -- Compiler flags -------------------------------------------------
     set(RELION_FLAGS_PROFILING "" CACHE STRING "")
-    set(RELION_HIPCC_FLAGS_PROFILING "${RELION_HIPCC_FLAGS} -lineinfo" CACHE STRING "")
+    set(RELION_HIPCC_FLAGS_PROFILING "${RELION_HIPCC_FLAGS} -lineinfo -ggdb" CACHE STRING "")
     # -- Linker flags ---------------------------------------------------
     set(RELION_LINKER_FLAGS_PROFILING  "")
 

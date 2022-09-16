@@ -822,4 +822,4 @@ __global__ void hip_kernel_backproject2D_SGD(
 	}
 }
 
-#endif /* HIP_PB_KERNELS_H_ */
+#endif /* HIP_BP_KERNELS_H_ */
