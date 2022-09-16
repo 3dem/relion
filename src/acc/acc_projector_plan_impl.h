@@ -120,7 +120,6 @@ void AccProjectorPlan::setup(
 	AccPtr<XFLOAT> alphas =  eulers.make<XFLOAT>(nr_dir * nr_psi * nr_oversampled_rot * 9);
 	AccPtr<XFLOAT> betas =   eulers.make<XFLOAT>(nr_dir * nr_psi * nr_oversampled_rot * 9);
 	AccPtr<XFLOAT> gammas =  eulers.make<XFLOAT>(nr_dir * nr_psi * nr_oversampled_rot * 9);
-	AccPtr<XFLOAT> perturb = eulers.make<XFLOAT>((size_t)9);
 	AccPtr<XFLOAT> adjustL = eulers.make<XFLOAT>((size_t)9);
 	AccPtr<XFLOAT> adjustR = eulers.make<XFLOAT>((size_t)9);
 
@@ -276,6 +275,7 @@ void AccProjectorPlan::setup(
 		adjustL.hostAlloc();
 		for (int i = 0; i < 9; i ++)
 			adjustL[i] = (XFLOAT) L.mdata[i];
+        adjustL.resizeHostCopy(9);
 		adjustL.putOnDevice();
 	}
 
@@ -284,7 +284,8 @@ void AccProjectorPlan::setup(
 		adjustR.hostAlloc();
 		for (int i = 0; i < 9; i ++)
 			adjustR[i] = (XFLOAT) R.mdata[i];
-		adjustR.putOnDevice();
+        adjustR.resizeHostCopy(9);
+        adjustR.putOnDevice();
 	}
 
 	int grid_size = ceil((float)orientation_num/(float)BLOCK_SIZE);
