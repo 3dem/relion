@@ -43,6 +43,7 @@ public:
     void read(int argc, char **argv);
 
     void initialise() {return;};
+    void addClArgs();
 
     // Parallelized run function
     void run();

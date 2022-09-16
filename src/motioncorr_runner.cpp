@@ -77,6 +77,17 @@
 void MotioncorrRunner::read(int argc, char **argv, int rank)
 {
 	parser.setCommandLine(argc, argv);
+	addClArgs();
+	// Initialise verb for non-parallel execution
+	verb = 1;
+
+	// Check for errors in the command-line option
+	if (parser.checkForErrors())
+		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
+}
+
+void MotioncorrRunner::addClArgs()
+{
 	int gen_section = parser.addSection("General options");
 	fn_in = parser.getOption("--i", "STAR file with all input micrographs, or a Linux wildcard with all micrographs to operate on");
 	fn_out = parser.getOption("--o", "Name for the output directory", "MotionCorr");
@@ -144,12 +155,6 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	dose_motionstats_cutoff = textToFloat(parser.getOption("--dose_motionstats_cutoff", "Electron dose (in electrons/A2) at which to distinguish early/late global accumulated motion in output statistics", "4."));
 	if (ccf_downsample > 1) REPORT_ERROR("--ccf_downsample cannot exceed 1.");
 	if (skip_defect && !do_own) REPORT_ERROR("--skip_decet is valid only for --use_own");
-	// Initialise verb for non-parallel execution
-	verb = 1;
-
-	// Check for errors in the command-line option
-	if (parser.checkForErrors())
-		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 }
 
 void MotioncorrRunner::usage()

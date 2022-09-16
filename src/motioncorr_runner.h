@@ -155,6 +155,9 @@ public:
 	// Read command line arguments
 	void read(int argc, char **argv, int rank = 0);
 
+	// Add command line arguments to the parser
+	virtual void addClArgs();
+
 	// Print usage instructions
 	void usage();
 
