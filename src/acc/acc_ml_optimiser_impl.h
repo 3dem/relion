@@ -975,7 +975,6 @@ void getAllSquaredDifferencesCoarse(
 	if (accMLO->generateProjectionPlanOnTheFly)
 	{
 		CTIC(accMLO->timer,"generateProjectionSetupCoarse");
-		CTIC(accMLO->timer,"generateProjectionSetupCoarse");
 
 		projectorPlans.resize(baseMLO->mymodel.nr_classes * sp.nr_images, (CudaCustomAllocator *)accMLO->getAllocator());
 
@@ -1751,7 +1750,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
     RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, 0);
 
-    RFLOAT old_offset_x, old_offset_y, old_offset_z;
+    RFLOAT old_offset_x(0.), old_offset_y(0.), old_offset_z(0.);
 
     if (baseMLO->mymodel.nr_bodies > 1)
     {
@@ -1829,7 +1828,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
         for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
         {
-            RFLOAT myprior_x, myprior_y, myprior_z;
+            RFLOAT myprior_x(0.), myprior_y(0.), myprior_z(0.);
             if (baseMLO->mymodel.nr_bodies > 1)
             {
                 myprior_x = myprior_y = myprior_z = 0.;
@@ -2335,7 +2334,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
         sumBlockNum+=block_nums[fake_class];
 
-        RFLOAT myprior_x, myprior_y, myprior_z, old_offset_z;
+        RFLOAT myprior_x(0.), myprior_y(0.), myprior_z(0.), old_offset_z(0.);
         RFLOAT old_offset_x = XX(op.old_offset);
         RFLOAT old_offset_y = YY(op.old_offset);
 
@@ -2625,7 +2624,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 				for (long int iover_trans = 0; iover_trans < oversampled_translations_x.size(); iover_trans++)
 				{
-					RFLOAT xshift = 0., yshift = 0., zshift = 0.;
+					RFLOAT xshift(0.), yshift(0.), zshift(0.);
 
 					xshift = oversampled_translations_x[iover_trans];
 					yshift = oversampled_translations_y[iover_trans];
