@@ -61,6 +61,7 @@
 #define DEFAULTTOPAZLOCATION "/public/EM/RELION/topaz"
 #define DEFAULTRESMAPLOCATION "/public/EM/ResMap/ResMap-1.1.4-linux64"
 #define DEFAULTPYTHONLOCATION "python"
+#define DEFAULTMODELANGELOLOCATION "/public/EM/model-angelo/model-angelo"
 #define DEFAULTQSUBCOMMAND "qsub"
 #define DEFAULTQUEUENAME "openmpi"
 #define DEFAULTMININIMUMDEDICATED 1
@@ -690,6 +691,7 @@ static int get_node_type(std::string label)
 #define PROC_EXTERNAL_DIRNAME         "External"     // For running non-relion programs
 #define PROC_TOMO_ALIGN_TILTSERIES_DIRNAME "AlignTiltSeries" // Tilt series alignment for tomogram reconstruction
 #define PROC_TOMO_RECONSTRUCT_TOMOGRAM_DIRNAME "ReconstructTomograms" // Reconstruction of tomograms for particle picking
+#define PROC_BUILD_MODEL_DIRNAME  "BuildModel" // Atomic model building
 
 // All the directory names of the different types of jobs defined inside the pipeline
 #define PROC_IMPORT_LABELNEW           "relion.import"       // Import any file as a Node of a given type
@@ -721,6 +723,7 @@ static int get_node_type(std::string label)
 #define PROC_EXTERNAL_LABELNEW         "relion.external"     // For running non-relion programs
 #define PROC_TOMO_ALIGN_TILTSERIES_LABELNEW "relion.aligntiltseries" // Tilt series alignment for tomogram reconstruction
 #define PROC_TOMO_RECONSTRUCT_TOMOGRAM_LABELNEW "relion.reconstructtomograms" // Reconstruction of tomograms for particle picking
+#define PROC_BUILD_MODEL_LABELNEW  "relion.buildmodel" // Atomic model building
 
 
 #define PROC_IMPORT         0 // Import any file as a Node of a given type
@@ -754,7 +757,7 @@ static int get_node_type(std::string label)
 #define PROC_TOMO_RECONSTRUCT_TOMOGRAM 56 // Reconstruction of tomograms for particle picking
 #define PROC_TOMO_EXCLUDE_TILT_IMAGES 57 // Exclude bad tilt-images from tilt-series
 #define PROC_TOMO_DENOISE_TOMOGRAM 58 // Denoise tomograms
-
+#define PROC_BUILD_MODEL 59 // Build atomic model
 #define PROC_EXTERNAL       99// External scripts
 
 
@@ -784,8 +787,9 @@ static std::map<int, std::string> proc_type2dirname = {{PROC_IMPORT, PROC_IMPORT
 		{PROC_TOMO_RECONSTRUCT, PROC_TOMO_RECONSTRUCT_DIRNAME},
         {PROC_TOMO_ALIGN_TILTSERIES,     PROC_TOMO_ALIGN_TILTSERIES_DIRNAME},
         {PROC_TOMO_RECONSTRUCT_TOMOGRAM, PROC_TOMO_RECONSTRUCT_TOMOGRAM_DIRNAME},
- 	{PROC_TOMO_DENOISE_TOMOGRAM, PROC_TOMO_DENOISE_DIRNAME},
-	{PROC_TOMO_EXCLUDE_TILT_IMAGES, PROC_TOMO_EXCLUDE_TILT_IMAGES_DIRNAME},
+ 	    {PROC_TOMO_DENOISE_TOMOGRAM, PROC_TOMO_DENOISE_DIRNAME},
+    	{PROC_TOMO_EXCLUDE_TILT_IMAGES, PROC_TOMO_EXCLUDE_TILT_IMAGES_DIRNAME},
+        {PROC_BUILD_MODEL, PROC_BUILD_MODEL_DIRNAME},
 		{PROC_EXTERNAL,         PROC_EXTERNAL_DIRNAME}};
 
 static std::map<int, std::string> proc_type2labelnew = {{PROC_IMPORT, PROC_IMPORT_LABELNEW},
@@ -814,8 +818,9 @@ static std::map<int, std::string> proc_type2labelnew = {{PROC_IMPORT, PROC_IMPOR
 		{PROC_TOMO_RECONSTRUCT, PROC_TOMO_RECONSTRUCT_LABELNEW},
         {PROC_TOMO_ALIGN_TILTSERIES,     PROC_TOMO_ALIGN_TILTSERIES_LABELNEW},
         {PROC_TOMO_RECONSTRUCT_TOMOGRAM, PROC_TOMO_RECONSTRUCT_TOMOGRAM_LABELNEW},
- 	{PROC_TOMO_DENOISE_TOMOGRAM, PROC_TOMO_DENOISE_LABELNEW},
-	{PROC_TOMO_EXCLUDE_TILT_IMAGES, PROC_TOMO_EXCLUDE_TILT_IMAGES_LABELNEW},
+ 	    {PROC_TOMO_DENOISE_TOMOGRAM, PROC_TOMO_DENOISE_LABELNEW},
+	    {PROC_TOMO_EXCLUDE_TILT_IMAGES, PROC_TOMO_EXCLUDE_TILT_IMAGES_LABELNEW},
+        {PROC_BUILD_MODEL, PROC_BUILD_MODEL_LABELNEW},
         {PROC_EXTERNAL,         PROC_EXTERNAL_LABELNEW}};
 
 static std::map<std::string, int> proc_dirname2type = {
@@ -846,7 +851,8 @@ static std::map<std::string, int> proc_dirname2type = {
         {PROC_TOMO_ALIGN_TILTSERIES_DIRNAME,     PROC_TOMO_ALIGN_TILTSERIES},
         {PROC_TOMO_RECONSTRUCT_TOMOGRAM_DIRNAME, PROC_TOMO_RECONSTRUCT_TOMOGRAM},
         {PROC_TOMO_DENOISE_DIRNAME, PROC_TOMO_DENOISE_TOMOGRAM},
-	{PROC_TOMO_EXCLUDE_TILT_IMAGES_DIRNAME, PROC_TOMO_EXCLUDE_TILT_IMAGES},
+	    {PROC_TOMO_EXCLUDE_TILT_IMAGES_DIRNAME, PROC_TOMO_EXCLUDE_TILT_IMAGES},
+        {PROC_BUILD_MODEL_DIRNAME, PROC_BUILD_MODEL},
         {PROC_EXTERNAL_DIRNAME,         PROC_EXTERNAL}};
 
 static std::map<std::string, int> proc_labelnew2type = {
@@ -876,8 +882,9 @@ static std::map<std::string, int> proc_labelnew2type = {
 		{PROC_TOMO_RECONSTRUCT_LABELNEW, PROC_TOMO_RECONSTRUCT},
         {PROC_TOMO_ALIGN_TILTSERIES_LABELNEW,     PROC_TOMO_ALIGN_TILTSERIES},
         {PROC_TOMO_RECONSTRUCT_TOMOGRAM_LABELNEW, PROC_TOMO_RECONSTRUCT_TOMOGRAM},
- 	{PROC_TOMO_DENOISE_LABELNEW, PROC_TOMO_DENOISE_TOMOGRAM},
-	{PROC_TOMO_EXCLUDE_TILT_IMAGES_LABELNEW, PROC_TOMO_EXCLUDE_TILT_IMAGES},
+ 	    {PROC_TOMO_DENOISE_LABELNEW, PROC_TOMO_DENOISE_TOMOGRAM},
+	    {PROC_TOMO_EXCLUDE_TILT_IMAGES_LABELNEW, PROC_TOMO_EXCLUDE_TILT_IMAGES},
+        {PROC_BUILD_MODEL_LABELNEW, PROC_BUILD_MODEL},
         {PROC_EXTERNAL_LABELNEW,         PROC_EXTERNAL}};
 
 
@@ -1300,6 +1307,11 @@ public:
 	void initialiseTomoReconPartJob();
 	bool getCommandsTomoReconPartJob(std::string &outputname, std::vector<std::string> &commands,
 									 std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+
+    void initialiseBuildModelJob();
+    bool getCommandsBuildModelJob(std::string &outputname, std::vector<std::string> &commands,
+                                     std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+
 
 };
 

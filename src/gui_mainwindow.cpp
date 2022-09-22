@@ -629,6 +629,18 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 	browse_grp[nr_browse_tabs]->end();
 	nr_browse_tabs++;
 
+    if (!_do_tomo)
+    {
+
+        browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+        browser->add("Model building");
+        gui_jobwindows[nr_browse_tabs] = new JobWindow();
+        gui_jobwindows[nr_browse_tabs]->initialise(PROC_BUILD_MODEL);
+        browse_grp[nr_browse_tabs]->end();
+        nr_browse_tabs++;
+
+    }
+
 	browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("External");
 	gui_jobwindows[nr_browse_tabs] = new JobWindow();
@@ -1088,9 +1100,9 @@ void GuiMainWindow::fillStdOutAndErr()
 			in.close();
 		}
 		// Scroll to the bottom
-		disp_stdout->insert_position(textbuff_stdout->length()-1);
+		disp_stdout->insert_position(textbuff_stdout->length());
 		disp_stdout->show_insert_position();
-		disp_expand_stdout->insert_position(textbuff_stdout->length()-1);
+		disp_expand_stdout->insert_position(textbuff_stdout->length());
 		disp_expand_stdout->show_insert_position();
 	}
 	else
@@ -1113,9 +1125,9 @@ void GuiMainWindow::fillStdOutAndErr()
 			in.close();
 		}
 		// Scroll to the bottom
-		disp_stderr->insert_position(textbuff_stderr->length()-1);
+		disp_stderr->insert_position(textbuff_stderr->length());
 		disp_stderr->show_insert_position();
-		disp_expand_stderr->insert_position(textbuff_stderr->length()-1);
+		disp_expand_stderr->insert_position(textbuff_stderr->length());
 		disp_expand_stderr->show_insert_position();
 	}
 	else

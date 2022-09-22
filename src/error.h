@@ -139,12 +139,12 @@ This is a developer error message which you cannot fix \n\
 through changing the run config. Either your data is broken or\n\
 an unforseen combination of options was encountered. Please report\n\
 this error, the command used and a brief description to\n\
-the relion developers at \n\n github.com/3dem/relion/issues \n\n"
+the relion developers at \n\n github.com/3dem/relion/issues \n"
 
 #define ADVERR "\n\
 This error is normally only displayed when using advanced \n\
 features or build-utilities for code development or benchmarking.\n\
-You can ask the relion developers for assistance at \n\n github.com/3dem/relion/issues"
+You can ask the relion developers for assistance at github.com/3dem/relion/issues"
 
 #define ERR_GPUID ("\
 There was an issue with the GPU-ids. Either \n \t\
@@ -179,7 +179,7 @@ If this occurred at the middle or end of a run, it might be that\n\n\
 \t   configurations may occur. See also above point regarding \n\
 \t   double precision.\n\
 If none of the above applies, please report the error to the relion\n\
-developers at    github.com/3dem/relion/issues\n\n")
+developers at github.com/3dem/relion/issues.")
 
 
 #define ERRCUDACAOOM ("\n\
@@ -209,9 +209,9 @@ but doing this in a general and memory-efficient way is difficult.\n\n\
    adding the --maxsig <P>, flag, where P is an integer limit, but you \n\
    should probably also consult expertise or re-evaluate your data and/or \n\
    input reference. Seeing large such values means relion is finding nothing\n\
-   to align.\n\n\
+   to align.\n\
 If none of the above applies, please report the error to the relion\n\
-developers at    github.com/3dem/relion/issues\n\n")
+developers at github.com/3dem/relion/issues.\n")
 
 #define ERR_CANZ      ("There is an allocation on the GPU left between iterations." DEVERR)
 #define ERR_CAMUX     ("A mutex could not be created for a GPU memory allocation." DEVERR)
@@ -261,20 +261,18 @@ A particle image was compared to the reference and resulted in all-zero\n\
 weights (for all orientations). This should not happen, unless your data\n\
 has very special characteristics. This has historically happened for some \n\
 lower-precision calculations, but multiple fallbacks have since been \n\
-implemented. Please report this error to the relion developers at \n\n\
-	         github.com/3dem/relion/issues  \n ")
+implemented. Please report this error to the relion developers at \n\
+github.com/3dem/relion/issues  \n ")
 
 #define ERRNOSIGNIFS ("The number of contributing orientations for an image\n\
 was found to be zero. This should not happen, unless your data\n\
 has very special characteristics. Please report this error to \n\
-the relion developers at \n\n\
-	         github.com/3dem/relion/issues   ")
+the relion developers at github.com/3dem/relion/issues   ")
 
 #define ERRSUMWEIGHTZERO ("The sum of weights for all orientations was\n\
 found to be zero for an image. This should not happen, unless your data\n\
 has very special characteristics. Please report this error to \n\
-the relion developers at \n\n\
-			 github.com/3dem/relion/issues   ")
+the relion developers at github.com/3dem/relion/issues   ")
 
 #define ERRNUMFAILSAFE ("Relion had to use extra-precision fallbacks too many times.\n\n\
 In some cases relion find it difficult to reconcile the data with the\n\

@@ -142,6 +142,8 @@ private:
 	void initialiseTomoAlignWindow();
 	void initialiseTomoReconParWindow();
 
+    void initialiseBuildModelWindow();
+
 };
 
 
