@@ -1175,13 +1175,17 @@ void getAllSquaredDifferencesCoarse(
 		buildCorrImage(baseMLO,op,corr_img,img_id,group_id);
 		corr_img.cpToDevice();
 
-		AccUtilities::add<XFLOAT>(
-			BLOCK_SIZE,
-			allWeights.getStream(),
-			(XFLOAT*)~allWeights,
-			(XFLOAT) (op.highres_Xi2_img[img_id] / 2.),
-			allWeights.getSize()
-		);
+        // do_CC does not seem Xi2 in the input allWeights!
+        if (!do_CC)
+        {
+            AccUtilities::add<XFLOAT>(
+                BLOCK_SIZE,
+                allWeights.getStream(),
+                (XFLOAT*)~allWeights,
+                (XFLOAT) (op.highres_Xi2_img[img_id] / 2.),
+                allWeights.getSize()
+            );
+        }
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
@@ -1221,7 +1225,6 @@ void getAllSquaredDifferencesCoarse(
 						accMLO->dataIs3D);
 
 				allWeights_pos += projectorPlans[iclass*sp.nr_images + img_id].orientation_num*translation_num;
-
             }
 
 
@@ -1234,7 +1237,7 @@ void getAllSquaredDifferencesCoarse(
 	} // end loop img_id
 
     op.min_diff2 = AccUtilities::getMinOnDevice<XFLOAT>(allWeights);
-
+    //std::cerr << " min_diff2 coarse= " << op.min_diff2 << std::endl;
 
     for (unsigned long iclass = sp.iclass_min, allWeights_pos=0; iclass <= sp.iclass_max; iclass++)
     {
@@ -1258,12 +1261,13 @@ void getAllSquaredDifferencesCoarse(
     Mweight.cpToHost();
     std::cerr << " orientation_num= " << projectorPlans[0].orientation_num << " translation_num= " << translation_num << std::endl;
     std::cout << " COARSE DIFF: Mweight.getSize()= "<<Mweight.getSize() << " allWeights_size= " << allWeights_size <<std::endl;
-    for (int i= 0; i < Mweight.getSize(); i++)
+    for (int i= 0; i < 7; i++)
     {
         std::cout << i << " Mweight-after= " << Mweight[i] << std::endl;
     }
     exit(0);
     */
+
 #ifdef TIMING
 	if (op.part_id == baseMLO->exp_my_first_part_id)
 		baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF1);
@@ -1664,7 +1668,7 @@ void getAllSquaredDifferencesFine(
         op.min_diff2 = (RFLOAT) AccUtilities::getMinOnDevice<XFLOAT>(FinePassWeights.weights);
     }
     CTOC(accMLO->timer,"collect_data_1");
-//		std::cerr << "  fine pass minweight  =  " << op.min_diff2[img_id] << std::endl;
+    //std::cerr << "  fine pass minweight  =  " << op.min_diff2 << std::endl;
 
 #ifdef TIMING
 	if (op.part_id == baseMLO->exp_my_first_part_id)
@@ -1689,6 +1693,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 {
 #ifdef TIMING
 	if (op.part_id == baseMLO->exp_my_first_part_id)
+	{
 	{
 		if (exp_ipass == 0) baseMLO->timer.tic(baseMLO->TIMING_ESP_WEIGHT1);
 		else baseMLO->timer.tic(baseMLO->TIMING_ESP_WEIGHT2);
@@ -3374,6 +3379,9 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_A);
 		//int nr_sampling_passes = (baseMLO->adaptive_oversampling > 0) ? 2 : 1;
 		// But on the gpu the data-structures are different between passes, so we need to make a symbolic pass to set the weights up for storeWS
 		int nr_sampling_passes = 2;
+        // This will not work for maxCC!
+        if (baseMLO->adaptive_oversampling == 0 && (baseMLO->do_firstiter_cc || baseMLO->do_always_cc) )
+            REPORT_ERROR("ERROR-SHWS23sep2022: GPU code will not work for maxCC without oversampling...");
 
 		/// -- This is a iframe-indexed vector, each entry of which is a dense data-array. These are replacements to using
 		//    Mweight in the sparse (Fine-sampled) pass, coarse is unused but created empty input for convert ( FIXME )
@@ -3393,7 +3401,7 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_A);
         //    REPORT_ERROR("ERROR; somehow oversampling==0 and firstiter_cc are giving non-reproducible results.... DEBUG later...  (randomly changing with subsequent runs)");
 
 
-		for (int ipass = 0; ipass < nr_sampling_passes; ipass++)
+        for (int ipass = 0; ipass < nr_sampling_passes; ipass++)
 		{
 			CTIC(timer,"weightPass");
 #ifdef TIMING
