@@ -453,7 +453,9 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 #ifdef ACC_DOUBLE_PRECISION
 	g_diff2s[iorient * translation_num + itrans] = - ( s_weight[0] / sqrt(s_norm[0]));
 #else
-	g_diff2s[iorient * translation_num + itrans] += - ( s_weight[0] / sqrtf(s_norm[0]));
+    cuda_atomic_add(&g_diff2s[iorient * translation_num + itrans], - ( s_weight[0] / (block_sz * sqrtf(s_norm[0]))) );
+    //g_diff2s[iorient * translation_num + itrans] += - ( s_weight[0] / sqrtf(s_norm[0]));
+
 #endif
 }
 
