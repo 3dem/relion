@@ -454,6 +454,11 @@ void JobWindow::initialise(int my_job_type, bool _is_tomo)
 		myjob.initialise(my_job_type);
 		initialiseTomoReconParWindow();
 	}
+    else if (my_job_type == PROC_BUILD_MODEL)
+    {
+        myjob.initialise(my_job_type);
+        initialiseBuildModelWindow();
+    }
 	else if (my_job_type == PROC_EXTERNAL)
 	{
 		myjob.initialise(my_job_type);
@@ -2860,3 +2865,39 @@ void JobWindow::initialiseTomoExcludeTiltImagesWindow()
     tab1->end();
 }
 
+void JobWindow::initialiseBuildModelWindow()
+{
+	setupTabs(2);
+
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
+
+    place("fn_post", TOGGLE_DEACTIVATE);
+
+	current_y += STEPY /2 ;
+
+	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group1->end();
+	place("have_fasta", TOGGLE_DEACTIVATE, group1);
+
+	group1->begin();
+	place("fn_fasta", TOGGLE_DEACTIVATE);
+
+	group1->end();
+	guientries["have_fasta"].cb_menu_i();
+
+    tab1->end();
+
+	tab2->begin();
+	tab2->label("ModelAngelo");
+	resetHeight();
+
+    place("fn_modelangelo_exe", TOGGLE_DEACTIVATE);
+
+	current_y += STEPY /2 ;
+
+    place("gpu_id", TOGGLE_DEACTIVATE);
+
+	tab2->end();
+}

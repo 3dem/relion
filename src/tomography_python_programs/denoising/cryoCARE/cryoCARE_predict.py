@@ -71,9 +71,14 @@ def cryoCARE_predict(
         e = 'Could not find tilt series star file'
         console.log(f'ERROR: {e}')
         raise RuntimeError(e)    
-      
+    
     global_star = starfile.read(tilt_series_star_file, always_dict=True)['global']
     
+    if not model_name.exists():
+        e = f'Could not find denoising model'
+        console.log(f'ERROR: {e}')
+        raise RuntimeError(e)
+
     if not 'rlnTomoReconstructedTomogramHalf1' in global_star.columns:
         e = 'Could not find rlnTomoReconstructedTomogramHalf1 in tilt series star file.'
         console.log(f'ERROR: {e}')

@@ -35,6 +35,7 @@ dependencies = [
     "yet-another-imod-wrapper",
     "makefun",
     "lru-dict",
+    "superqt",
 ]
 
 # extras
