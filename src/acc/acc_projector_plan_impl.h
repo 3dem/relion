@@ -257,7 +257,7 @@ void AccProjectorPlan::setup(
 	iorientclasses.putOnDevice();
 
 	eulers.resizeHostCopy(orientation_num * 9);
-	eulers.deviceAlloc();
+	eulers.putOnDevice();
 
 	alphas.resizeHostCopy(orientation_num);
 	alphas.putOnDevice();
