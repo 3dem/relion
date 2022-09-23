@@ -1057,7 +1057,7 @@ void getAllSquaredDifferencesCoarse(
 	// Loop only from sp.iclass_min to sp.iclass_max to deal with seed generation in first iteration
 	size_t allWeights_size(0);
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-		allWeights_size += projectorPlans[exp_iclass].orientation_num * sp.nr_trans*sp.nr_oversampled_trans;
+		allWeights_size += projectorPlans[exp_iclass*sp.nr_images + 0].orientation_num * sp.nr_trans*sp.nr_oversampled_trans;
 
 	AccPtr<XFLOAT> allWeights = ptrFactory.make<XFLOAT>(allWeights_size);
 
@@ -1241,7 +1241,7 @@ void getAllSquaredDifferencesCoarse(
 
     for (unsigned long iclass = sp.iclass_min, allWeights_pos=0; iclass <= sp.iclass_max; iclass++)
     {
-        if ( projectorPlans[iclass].orientation_num > 0 )
+        if ( projectorPlans[iclass*sp.nr_images + 0].orientation_num > 0 )
         {
             mapAllWeightsToMweights(~projectorPlans[iclass*sp.nr_images + 0].iorientclasses,
                                     &(~allWeights)[allWeights_pos],
