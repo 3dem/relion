@@ -7172,6 +7172,9 @@ bool RelionJob::getCommandsBuildModelJob(std::string &outputname, std::vector<st
     command += " -o " + outputname;
     command += " -d " + joboptions["gpu_id"].getString();
 
+    //ModelAngelo has its own pipeline control option. :-)
+    command += " --pipeline_control ";
+
     // Other arguments for extraction
     command += " " + joboptions["other_args"].getString();
     commands.push_back(command);
