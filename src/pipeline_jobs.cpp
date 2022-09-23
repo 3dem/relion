@@ -7155,6 +7155,9 @@ bool RelionJob::getCommandsBuildModelJob(std::string &outputname, std::vector<st
     FileName fn_post =  joboptions["fn_post"].getString();
     FileName fn_map = fn_post.withoutExtension()+"_masked.mrc";
 
+    Node node(joboptions["fn_post"].getString(), joboptions["fn_post"].node_type);
+    inputNodes.push_back(node);
+
     if (joboptions["have_fasta"].getBoolean())
     {
         command += " build ";

@@ -519,7 +519,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe,
 	}
 
 	browse_grp[nr_browse_tabs] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("3D initial model");
+	browser->add("3D initial reference");
 	gui_jobwindows[nr_browse_tabs] = new JobWindow();
 	gui_jobwindows[nr_browse_tabs]->initialise(PROC_INIMODEL);
 	browse_grp[nr_browse_tabs]->end();
