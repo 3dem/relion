@@ -100,8 +100,8 @@ void MlDeviceBundle::setupFixedSizedObjects()
 	else
 		generateProjectionPlanOnTheFly = false;
 
-    //std::cerr << "DEBUG: setting generateProjectionPlanOnTheFly = true;" << std::endl;
-    //generateProjectionPlanOnTheFly = true;
+    std::cerr << "DEBUG: setting generateProjectionPlanOnTheFly = true;" << std::endl;
+    generateProjectionPlanOnTheFly = true;
 
 	unsigned nr_proj = baseMLO->mymodel.PPref.size();
 	unsigned nr_bproj = baseMLO->wsum_model.BPref.size();

@@ -2416,7 +2416,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 // TODO fix bundling
 //    bundleSWS.cpToDevice();
-//    oo_otrans.cpToDevice();
+    oo_otrans.cpToDevice();
 
     DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
