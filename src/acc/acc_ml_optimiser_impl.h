@@ -2333,9 +2333,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
         // Re-define the job-partition of the indexedArray of weights so that the collect-kernel can work with it.
         block_nums[fake_class] = makeJobsForCollect(thisClassFinePassWeights, FPCMasks[exp_iclass], ProjectionData.orientation_num[exp_iclass]);
-
-        bundleSWS.pack(FPCMasks[exp_iclass].jobOrigin);
-        bundleSWS.pack(FPCMasks[exp_iclass].jobExtent);
+// TODO fix bundling
+//        bundleSWS.pack(FPCMasks[exp_iclass].jobOrigin);
+//        bundleSWS.pack(FPCMasks[exp_iclass].jobExtent);
 
         sumBlockNum+=block_nums[fake_class];
 
@@ -2410,10 +2410,13 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
             }
         }
+		FPCMasks[exp_iclass].jobOrigin.cpToDevice();
+		FPCMasks[exp_iclass].jobExtent.cpToDevice();
     }
 
-    bundleSWS.cpToDevice();
-    oo_otrans.cpToDevice();
+// TODO fix bundling
+//    bundleSWS.cpToDevice();
+//    oo_otrans.cpToDevice();
 
     DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
