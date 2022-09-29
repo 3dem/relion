@@ -1054,6 +1054,14 @@ void getAllSquaredDifferencesCoarse(
 	else
         projectorPlans = accMLO->bundle->coarseProjectionPlans;
 
+
+
+
+	//TODO remove this at some point
+	DEBUG_HANDLE_ERROR(cudaDeviceSynchronize());
+
+
+
 	// Loop only from sp.iclass_min to sp.iclass_max to deal with seed generation in first iteration
 	size_t allWeights_size(0);
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -1297,6 +1305,7 @@ void getAllSquaredDifferencesFine(
 
     // Make sure entire array initialized, as loop over img_id now sums to old value...
     deviceInitValue<XFLOAT>(FinePassWeights.weights, 0);
+	FinePassWeights.weights.streamSync();
 
     CUSTOM_ALLOCATOR_REGION_NAME("DIFF_FINE");
 	CTIC(accMLO->timer,"diff_pre_gpu");
@@ -1317,12 +1326,6 @@ void getAllSquaredDifferencesFine(
 										  Particle Iteration
 	=========================================================================================*/
     unsigned long newDataSize(0);
-
-	for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-	{
-		FPCMasks[exp_iclass].jobOrigin.deviceAlloc();
-		FPCMasks[exp_iclass].jobExtent.deviceAlloc();
-	}
 
 	for (int img_id = 0; img_id < sp.nr_images; img_id++)
 	{
@@ -1528,6 +1531,11 @@ void getAllSquaredDifferencesFine(
                 CTIC(accMLO->timer,"IndexedArrayMemCp2");
                 //bundleD2.pack(FPCMasks[exp_iclass].jobOrigin);
                 //bundleD2.pack(FPCMasks[exp_iclass].jobExtent);
+
+				FPCMasks[exp_iclass].jobOrigin.freeIfSet();
+				FPCMasks[exp_iclass].jobExtent.freeIfSet();
+				FPCMasks[exp_iclass].jobOrigin.deviceAlloc();
+				FPCMasks[exp_iclass].jobExtent.deviceAlloc();
                 FPCMasks[exp_iclass].jobOrigin.cpToDevice();
                 FPCMasks[exp_iclass].jobExtent.cpToDevice();
                 CTOC(accMLO->timer,"IndexedArrayMemCp2");
