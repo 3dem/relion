@@ -22,6 +22,7 @@ __device__ inline void hip_atomic_add(float* address, float value)
 {
 	atomicAddNoRet(address,value);
 	// unsafeAtomicAdd(address,value);
+	// atomicAdd(address,value);
 }
 #endif
 

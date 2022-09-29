@@ -73,6 +73,7 @@ endif()
 # ----------------------------------------------------------------SET CXX STANDARD--
 set(CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 14)
+set(CXX_EXTENSIONS OFF)
 
 # ------------------OPTIONS WHICH ARE NEEDED TO SET BUILD-TYPES (COMPILATION FLAGS)--
 # ----------------------------------------------------------CUDA-ARCH--OR--HIP-ARCH--
@@ -82,7 +83,7 @@ if(NOT (DEFINED CUDA_ARCH OR DEFINED HIP_ARCH))
     set(CUDARCH "-arch=sm_50")
   else (HIP)
     message(STATUS "Setting fallback HIP_ARCH=gfx906")
-    set(AMDGPU_TARGETS "gfx906" CACHE STRING "AMD GPU targets to compile for")
+    set(AMDGPU_TARGETS "gfx906" CACHE STRING "Semicolon delimited list of AMD GPU targets to compile for (e.g gf908;gfx90a)")
   endif()
 else(NOT (DEFINED CUDA_ARCH OR DEFINED HIP_ARCH))
 if (CUDA)
@@ -90,8 +91,8 @@ if (CUDA)
   set(CUDARCH "-arch=sm_${CUDA_ARCH}")
 else (HIP)
   message(STATUS "Using provided HIP_ARCH=${HIP_ARCH}")
-  set(AMDGPU_TARGETS "${HIP_ARCH}" CACHE STRING "AMD GPU targets to compile for")
-endif()
+  set(AMDGPU_TARGETS "${HIP_ARCH}" CACHE STRING "Semicolon delimited list of AMD GPU targets to compile for (e.g gf908;gfx90a)")
+  endif()
 endif(NOT (DEFINED CUDA_ARCH OR DEFINED HIP_ARCH))
 
 # -------------------------------------------------------------------FURTHER OPTIONS--
@@ -130,7 +131,7 @@ else()
 endif()
 
 if(CUDA OR ALTCPU)
-    add_definitions(-DACC_CUDA=2 -DACC_CPU=1)
+    add_definitions(-DACC_HIP=3 -DACC_CUDA=2 -DACC_CPU=1)
 endif()
 
 # -----------------------------------------------DOUBLE PRECISION (GPU-CODE) OR NOT--
@@ -185,16 +186,18 @@ else(HIP)
         include($ENV{ROCM_PATH}/hip/cmake/FindHIP.cmake)
     elseif(DEFINED ENV{HIP_PATH})
         include($ENV{HIP_PATH}/cmake/FindHIP.cmake)
+    elseif(EXISTS "${CMAKE_SOURCE_DIR}/cmake/FindHIP.cmake")
+        include(${CMAKE_SOURCE_DIR}/cmake/FindHIP.cmake)
     else()
         include(/opt/rocm/hip/cmake/FindHIP.cmake)
     endif()
-    
+
     find_package(HIP REQUIRED)
 
     if(HIP_FOUND)
       message(STATUS "Using hip wrapper to compile....")
-      if( ${HIP_VERSION} VERSION_LESS "4.0")
-		      message(WARNING "ROCm version is less than 4.0, so relion will be compiled without GPU support.")
+      if( ${HIP_VERSION} VERSION_LESS "5.0")
+		      message(WARNING "ROCm version is less than 5.0, so relion will be compiled without GPU support.")
           set(HIP OFF)
       endif()
       if(HIP)
@@ -207,7 +210,7 @@ else(HIP)
           endforeach()
       endif()
     else(HIP_FOUND)
-        message(FATAL_ERROR "HIP enabled but unlable to locate packages...")
+        message(FATAL_ERROR "HIP enabled but unlable to locate packages. ROCm >= 5.0 is required to configure RELION with HIP using CMake.")
     endif(HIP_FOUND)
 endif()
 # ------------------------------------------------------------------ALLOCATOR CHOICE--

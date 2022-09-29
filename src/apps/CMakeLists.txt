@@ -404,8 +404,6 @@ foreach (_target ${RELION_TARGETS})
 	endif(ALTCPU)
 
 	set_target_properties(${_target} PROPERTIES
-	                      XX_STANDARD 11
-	                      XX_STANDARD_REQUIRED ON
 	                      XX_EXTENSIONS OFF
 	)
 
@@ -435,7 +433,7 @@ foreach (_target ${RELION_JAZ_SPA_TARGETS})
  	add_dependencies(${_target} relion_lib)
 	set_target_properties(${_target} PROPERTIES PREFIX "relion_")
 	target_link_libraries(${_target} ${LIB} ${FFTW_LIBRARIES} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
-	set_target_properties(${_target} PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF	)
+	set_target_properties(${_target} PROPERTIES CXX_EXTENSIONS OFF	)
 
 	if(TIFF_FOUND)
 		target_link_libraries(${_target} ${TIFF_LIBRARIES})
@@ -456,7 +454,7 @@ foreach (_target ${RELION_JAZ_TOMO_TARGETS})
  	add_dependencies(${_target} relion_lib)
 	set_target_properties(${_target} PROPERTIES PREFIX "relion_tomo_")
 	target_link_libraries(${_target} ${LIB} ${FFTW_LIBRARIES} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
-	set_target_properties(${_target} PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF	)
+	set_target_properties(${_target} PROPERTIES CXX_EXTENSIONS OFF	)
 
 	if(TIFF_FOUND)
 		target_link_libraries(${_target} ${TIFF_LIBRARIES})
@@ -472,7 +470,7 @@ foreach (_target ${RELION_JAZ_EXPERIMENTAL_TARGETS})
  	add_dependencies(${_target} relion_lib)
 	set_target_properties(${_target} PROPERTIES PREFIX "relion_exp_")
 	target_link_libraries(${_target} ${LIB} ${FFTW_LIBRARIES} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
-	set_target_properties(${_target} PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON CXX_EXTENSIONS OFF	)
+	set_target_properties(${_target} PROPERTIES CXX_EXTENSIONS OFF	)
 
 	if(TIFF_FOUND)
 		target_link_libraries(${_target} ${TIFF_LIBRARIES})
@@ -495,7 +493,7 @@ if(OPENMP_FOUND)
 endif()
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -std=c++14")
 
 # Set this flag to activate bounds checking in stl-vectors (incl. strings)
 # It is useful to do this periodically, as it catches
