@@ -1317,6 +1317,13 @@ void getAllSquaredDifferencesFine(
 										  Particle Iteration
 	=========================================================================================*/
     unsigned long newDataSize(0);
+
+	for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+	{
+		FPCMasks[exp_iclass].jobOrigin.deviceAlloc();
+		FPCMasks[exp_iclass].jobExtent.deviceAlloc();
+	}
+
 	for (int img_id = 0; img_id < sp.nr_images; img_id++)
 	{
 
@@ -1521,8 +1528,6 @@ void getAllSquaredDifferencesFine(
                 CTIC(accMLO->timer,"IndexedArrayMemCp2");
                 //bundleD2.pack(FPCMasks[exp_iclass].jobOrigin);
                 //bundleD2.pack(FPCMasks[exp_iclass].jobExtent);
-                FPCMasks[exp_iclass].jobOrigin.deviceAlloc();
-                FPCMasks[exp_iclass].jobExtent.deviceAlloc();
                 FPCMasks[exp_iclass].jobOrigin.cpToDevice();
                 FPCMasks[exp_iclass].jobExtent.cpToDevice();
                 CTOC(accMLO->timer,"IndexedArrayMemCp2");
