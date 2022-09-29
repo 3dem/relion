@@ -33,12 +33,16 @@ Once git and cmake are installed, relion can be easily installed through:
 ```
 git clone https://github.com/3dem/relion.git
 cd relion
-git checkout ver4.0
+git checkout master # or ver4.0; see below
 mkdir build
 cd build
 cmake ..
 make
 ```
+
+By performing `git checkout ver4.0` instead of `git checkout master`, you can access the latest
+(developmental) updates for RELION 4.0.x. The code there is not tested as throughfully as that in
+the master branch and not generally recommended.
 
 The binaries will be produced in the `build/bin` directory. If you want to copy binaries
 into somewhere else, run `cmake` with `-DCMAKE_INSTALL_PREFIX=/where/to/install/` and
