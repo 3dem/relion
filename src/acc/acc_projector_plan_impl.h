@@ -257,7 +257,7 @@ void AccProjectorPlan::setup(
 	iorientclasses.putOnDevice();
 
 	eulers.resizeHostCopy(orientation_num * 9);
-	eulers.putOnDevice();
+	eulers.deviceAlloc();
 
 	alphas.resizeHostCopy(orientation_num);
 	alphas.putOnDevice();
@@ -275,7 +275,6 @@ void AccProjectorPlan::setup(
 		adjustL.hostAlloc();
 		for (int i = 0; i < 9; i ++)
 			adjustL[i] = (XFLOAT) L.mdata[i];
-        adjustL.resizeHostCopy(9);
 		adjustL.putOnDevice();
 	}
 
@@ -284,8 +283,7 @@ void AccProjectorPlan::setup(
 		adjustR.hostAlloc();
 		for (int i = 0; i < 9; i ++)
 			adjustR[i] = (XFLOAT) R.mdata[i];
-        adjustR.resizeHostCopy(9);
-        adjustR.putOnDevice();
+		adjustR.putOnDevice();
 	}
 
 	int grid_size = ceil((float)orientation_num/(float)BLOCK_SIZE);
