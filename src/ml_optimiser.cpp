@@ -6491,7 +6491,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 
         if (do_subtomo_correction)
 		{
-			MultidimArray<double> STmult;
+			MultidimArray<RFLOAT> STmult;
             windowFourierTransform(exp_STMulti[img_id], STmult, exp_current_image_size);
 
             if (is_for_store_wsums)
