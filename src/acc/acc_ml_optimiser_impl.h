@@ -1532,8 +1532,8 @@ void getAllSquaredDifferencesFine(
                 //bundleD2.pack(FPCMasks[exp_iclass].jobOrigin);
                 //bundleD2.pack(FPCMasks[exp_iclass].jobExtent);
 
-				FPCMasks[exp_iclass].jobOrigin.freeIfSet();
-				FPCMasks[exp_iclass].jobExtent.freeIfSet();
+				FPCMasks[exp_iclass].jobOrigin.freeDeviceIfSet();
+				FPCMasks[exp_iclass].jobExtent.freeDeviceIfSet();
 				FPCMasks[exp_iclass].jobOrigin.deviceAlloc();
 				FPCMasks[exp_iclass].jobExtent.deviceAlloc();
                 FPCMasks[exp_iclass].jobOrigin.cpToDevice();
