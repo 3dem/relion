@@ -69,7 +69,7 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
 	do_center = !parser.checkOption("--no_center", "Do not subtract the mean from the voxel values");
 
 	flip_value = !parser.checkOption("--no_ic", "Do not invert contrast (keep particles dark)");
-    do_ctf + !parser.checkOption("--no_ctf", "Do not apply CTFs");
+    do_ctf = !parser.checkOption("--no_ctf", "Do not apply CTFs");
 	write_combined = !parser.checkOption("--no_comb", "Do not write the concatenated CTF-multiplicity image");
 	write_ctf = parser.checkOption("--ctf", "Write 3D CTFs");
 	write_divided = parser.checkOption("--div", "Write CTF-corrected subtomograms");
