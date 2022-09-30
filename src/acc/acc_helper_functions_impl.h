@@ -23,6 +23,8 @@ long int makeJobsForDiff2Fine(
 	// (this will be reduced at exit of this function)
 	dataMask.setNumberOfJobs(orientation_num*translation_num);
 	dataMask.setNumberOfWeights(orientation_num*translation_num);
+	dataMask.jobOrigin.freeHostIfSet();
+	dataMask.jobExtent.freeHostIfSet();
 	dataMask.jobOrigin.hostAlloc();
 	dataMask.jobExtent.hostAlloc();
 
