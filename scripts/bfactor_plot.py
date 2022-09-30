@@ -3,7 +3,7 @@
 bfactor_plot
 ---------
 
-Pipeline setup script for automated processing with RELION 3.
+Pipeline setup script for automated processing with RELION 4.
 
 Authors: Sjors H.W. Scheres, Takanori Nakane & Colin Palmer
 
@@ -244,8 +244,8 @@ def WaitForJob(wait_for_this_job, seconds_wait):
             print(" ERROR: cannot find ", wait_for_this_job, " in ", PIPELINE_STAR)
             exit(1)
 
-        status = int(pipeline['pipeline_processes']['rlnPipeLineProcessStatus'][myjobnr])
-        if status == 2:
+        status = pipeline['pipeline_processes']['rlnPipeLineProcessStatusLabel'][myjobnr]
+        if status == "Succeeded":
             print(" RELION_IT: job in", wait_for_this_job, "has finished now")
             return
         else:

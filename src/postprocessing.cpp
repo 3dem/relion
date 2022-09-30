@@ -525,6 +525,11 @@ RFLOAT Postprocessing::sharpenMap()
 		}
 		applyBFactorToMap(FT, XSIZE(I1()), global_bfactor, angpix);
 	}
+        else
+        {
+            // Write a warning that the map will not be sharpened
+            std::cerr << " WARNING: map will not be sharpened. This map may be used as reference for subsequent refinements, but you would need to run a postprocessing job with B-factor sharpening to better visualise high-resolution features." << std::endl;
+        }
 
 	makeGuinierPlot(FT, guiniersharpen);
 

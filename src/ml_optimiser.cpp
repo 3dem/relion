@@ -3283,6 +3283,12 @@ void MlOptimiser::expectation()
             size_t free, total, allocationSize;
             HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
 
+        if (do_subtomo_correction)
+		{
+			MultidimArray<RFLOAT> STmult;
+            windowFourierTransform(exp_STMulti[img_id], STmult, exp_current_image_size);
+
+
             size_t required_free = requested_free_gpu_memory + GPU_THREAD_MEMORY_OVERHEAD_MB*1000*1000*threadcountOnDevice[i];
 
             if (free < required_free)
