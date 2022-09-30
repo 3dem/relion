@@ -372,7 +372,7 @@ void SubtomoProgram::writeParticleSet(
 		const double ps_img = copy.optTable.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, og);
 		const double ps_out = binning * ps_img;
 
-		copy.optTable.setValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, !do_stack2d, og);
+		copy.optTable.setValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, do_ctf, og);
 		int datadim = (do_stack2d) ? 2 : 3;
         copy.optTable.setValue(EMDL_IMAGE_DIMENSIONALITY, datadim, og);
 		copy.optTable.setValue(EMDL_TOMO_SUBTOMOGRAM_BINNING, binning, og);
@@ -514,116 +514,83 @@ void SubtomoProgram::processTomograms(
                     tomogram.stack, s02D, binning, tomogram, traj, isVisible,
                     particleStack, projCut, inner_thread_num, do_circle_precrop);
 
-            if (do_stack2d)
-            {
-                // Apply dose-weights!
+            if (!do_ctf) weightStack.fill(1.f);
 
+            const int og = particleSet.getOpticsGroup(part_id);
 
-                BufferedImage<float> particlesRS = NewStackHelper::inverseFourierTransformStack(particleStack);
-                const float sign = flip_value ? -1.f : 1.f;
+            const BufferedImage<double> *gammaOffset =
+                    aberrationsCache.hasSymmetrical ? &aberrationsCache.symmetrical[og] : 0;
 
+            const float sign = flip_value ? -1.f : 1.f;
+            for (int f = 0; f < fc; f++) {
+                if (!isVisible[f]) continue;
 
-                /*
-                // Normalise to zero-mean and stddev one; also apply sign (contrast flip)
-                Image<float> Itmp;
-                particlesRS.copyTo(Itmp);
+                d3Matrix A;
 
-                MultidimArray<float> It;
-                Itmp().getSlice(20, It);
-                double avg,stddev;
-                Itmp().computeAvgStddev(avg, stddev);
-                std::cerr << " 20 avg= " << avg << " stddev= " << stddev << std::endl;
-                for (int n=0; n < ZSIZE(Itmp()); n++)
-                {
-                    std::cerr << " n= " << n << std::endl;
-
-                    It.computeAvgStddev(avg, stddev);
-                    std::cerr << " n=" << n << " avg= " << avg << " stddev= " << stddev << std::endl;
+                if (apply_orientations) {
+                    A = particleSet.getMatrix3x3(part_id);
+                } else {
+                    A = particleSet.getSubtomogramMatrix(part_id);
                 }
-                particlesRS -= avg;
-                //particlesRS /= sign * stddev;
-                 */
 
-                particlesRS *= sign;
+                projPart[f] = projCut[f] * d4Matrix(A);
 
-                const int boundary = (boxSize - cropSize) / 2;
-                if (do_circle_crop) {
-                    const double crop_boundary = do_narrow_circle_crop ? boundary : 0.0;
-                    TomoExtraction::cropCircle(particlesRS, crop_boundary, 5, num_threads);
+                if (do_ctf) {
+                    const d3Vector pos = (apply_offsets) ? particleSet.getPosition(part_id)
+                                                         : particleSet.getParticleCoord(part_id);
+
+                    CTF ctf = tomogram.getCtf(f, pos);
+                    BufferedImage<float> ctfImg(sh2D, s2D);
+                    ctf.draw(s2D, s2D, binnedPixelSize, gammaOffset, &ctfImg(0, 0, 0));
+
+
+                    for (int y = 0; y < s2D; y++)
+                        for (int x = 0; x < xRanges(y, f); x++) {
+                            const double c = ctfImg(x, y) * doseWeights(x, y, f);
+
+                            particleStack(x, y, f) *= sign * c;
+                            weightStack(x, y, f) = c * c;
+                        }
                 }
+
+            }
+
+            // If we're not doing CTF premultiplication, we may still want to invert the contrast
+            if (!do_ctf) particleStack *= sign;
+
+            aberrationsCache.correctObservations(particleStack, og);
+
+            if (do_whiten) {
+                particleStack *= noiseWeights;
+                weightStack *= noiseWeights;
+            }
+
+            const int boundary = (boxSize - cropSize) / 2;
+
+            BufferedImage<float> particlesRS;
+            if (do_gridding_precorrection || do_circle_crop || do_stack2d) {
+
+                particlesRS = NewStackHelper::inverseFourierTransformStack(particleStack);
+            }
+
+            if (do_circle_crop) {
+                const double crop_boundary = do_narrow_circle_crop ? boundary : 0.0;
+                TomoExtraction::cropCircle(particlesRS, crop_boundary, 5, num_threads);
+            }
+
+            if (do_gridding_precorrection) {
+                TomoExtraction::griddingPreCorrect(particlesRS, boundary, num_threads);
+            }
+
+            if (do_stack2d) {
 
                 particlesRS.write(outData, binnedPixelSize, write_float16);
-            }
-            else
-            {
 
-                if (!do_ctf) weightStack.fill(1.f);
+            } else {
 
+                particleStack = NewStackHelper::FourierTransformStack(particlesRS);
 
-                const int og = particleSet.getOpticsGroup(part_id);
-
-                const BufferedImage<double> *gammaOffset =
-                        aberrationsCache.hasSymmetrical ? &aberrationsCache.symmetrical[og] : 0;
-
-                for (int f = 0; f < fc; f++) {
-                    if (!isVisible[f]) continue;
-
-                    d3Matrix A;
-
-                    if (apply_orientations) {
-                        A = particleSet.getMatrix3x3(part_id);
-                    } else {
-                        A = particleSet.getSubtomogramMatrix(part_id);
-                    }
-
-                    projPart[f] = projCut[f] * d4Matrix(A);
-
-                    if (do_ctf) {
-                        const d3Vector pos = (apply_offsets) ? particleSet.getPosition(part_id)
-                                                             : particleSet.getParticleCoord(part_id);
-
-                        CTF ctf = tomogram.getCtf(f, pos);
-                        BufferedImage<float> ctfImg(sh2D, s2D);
-                        ctf.draw(s2D, s2D, binnedPixelSize, gammaOffset, &ctfImg(0, 0, 0));
-
-                        const float sign = flip_value ? -1.f : 1.f;
-
-                        for (int y = 0; y < s2D; y++)
-                            for (int x = 0; x < xRanges(y, f); x++) {
-                                const double c = ctfImg(x, y) * doseWeights(x, y, f);
-
-                                particleStack(x, y, f) *= sign * c;
-                                weightStack(x, y, f) = c * c;
-                            }
-                    }
-                }
-
-                aberrationsCache.correctObservations(particleStack, og);
-
-                if (do_whiten) {
-                    particleStack *= noiseWeights;
-                    weightStack *= noiseWeights;
-                }
-
-                const int boundary = (boxSize - cropSize) / 2;
-
-                if (do_gridding_precorrection || do_circle_crop) {
-                    BufferedImage<float> particlesRS;
-
-                    particlesRS = NewStackHelper::inverseFourierTransformStack(particleStack);
-
-                    if (do_circle_crop) {
-                        const double crop_boundary = do_narrow_circle_crop ? boundary : 0.0;
-                        TomoExtraction::cropCircle(particlesRS, crop_boundary, 5, num_threads);
-                    }
-
-                    if (do_gridding_precorrection) {
-                        TomoExtraction::griddingPreCorrect(particlesRS, boundary, num_threads);
-                    }
-
-                    particleStack = NewStackHelper::FourierTransformStack(particlesRS);
-                }
-
+                // Write 3D subtomograms
                 BufferedImage<fComplex> dataImgFS(sh3D, s3D, s3D);
                 dataImgFS.fill(fComplex(0.0, 0.0));
 
@@ -753,7 +720,7 @@ void SubtomoProgram::processTomograms(
                     dataImgDivRS.write(outDiv, binnedPixelSize, write_float16);
                 }
             }
-        } // end if !do_stack2d
+        } // end if do_stack2d
 
 		if (verbosity > 0)
 		{
