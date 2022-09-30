@@ -359,6 +359,7 @@ void ReconstructParticleProgram::processTomograms(
 			const BufferedImage<double>* gammaOffset =
 				aberrationsCache.hasSymmetrical? &aberrationsCache.symmetrical[og] : 0;
 
+            const float sign = flip_value? -1.f : 1.f;
 			for (int f = 0; f < fc; f++)
 			{
 				if (!isVisible[f]) continue;
@@ -372,13 +373,12 @@ void ReconstructParticleProgram::processTomograms(
 					BufferedImage<float> ctfImg(sh,s);
 					ctf.draw(s, s, binnedPixelSize, gammaOffset, &ctfImg(0,0,0));
 
-					const float scale = flip_value? -1.f : 1.f;
 
 					for (int y = 0; y < s;  y++)
 					{
 						for (int x = 0; x < xRanges(y,f); x++)
 						{
-							const float c = scale * ctfImg(x,y) * doseWeights(x,y,f);
+							const float c = sign * ctfImg(x,y) * doseWeights(x,y,f);
 
 							particleStack[th](x,y,f) *= c;
 							weightStack[th](x,y,f) = c * c;
@@ -391,7 +391,12 @@ void ReconstructParticleProgram::processTomograms(
 						}
 					}
 				}
+
+                // If we're not doing CTF premultiplication, we may still want to invert the contrast
+                if (!do_ctf) particleStack[th] *= sign;
+
 			}
+
 
 			if (aberrationsCache.hasAntisymmetrical)
 			{
