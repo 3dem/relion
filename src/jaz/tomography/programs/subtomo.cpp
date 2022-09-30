@@ -329,8 +329,8 @@ void SubtomoProgram::writeParticleSet(
 
                 if (apply_offsets)
                 {
-                    const d3Vector pos = particleSet.getPosition(part_id);
-
+                    const d3Matrix A_subtomogram = particleSet.getSubtomogramMatrix(part_id);
+                    const d3Vector pos = particleSet.getParticleCoord(part_id) - (A_subtomogram * particleSet.getParticleOffset(part_id)) / originalPixelSize;
                     copy.setParticleOffset(new_id, d3Vector(0,0,0));
                     copy.setParticleCoord(new_id, pos);
                 }

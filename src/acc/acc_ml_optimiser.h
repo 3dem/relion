@@ -75,7 +75,7 @@ public:
 	void fineIndexToFineIndices(SamplingParameters sp) // converts an "ihidden_over" (finely sampled) index to partial indices (and coarse index)
 	{
 		int oversamples = sp.nr_oversampled_rot*sp.nr_oversampled_trans;
-		int t_idx = fineIdx;
+		size_t t_idx = fineIdx;
 		iclass = floor( t_idx / ( sp.nr_dir * sp.nr_psi * sp.nr_trans * oversamples ));
 		t_idx   -= iclass     * ( sp.nr_dir * sp.nr_psi * sp.nr_trans * oversamples );
 		idir   = floor( t_idx / ( sp.nr_psi * sp.nr_trans * oversamples ));

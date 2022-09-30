@@ -45,6 +45,13 @@
 */
 
 // We cannot simply cast pointers; it will break the strict aliasing rule.
+//
+// Strictly speaking, type-punning via union is allowed in C11 but
+// appears to be an undefined behavior in C++11.
+// https://stackoverflow.com/questions/11373203/accessing-inactive-union-member-and-undefined-behavior
+// However, at least GCC and ICC support this. (Am I correct??)
+// http://gcc.gnu.org/onlinedocs/gcc-4.7.1/gcc/Structures-unions-enumerations-and-bit_002dfields-implementation.html#Structures-unions-enumerations-and-bit_002dfields-implementation
+// https://www.intel.com/content/www/us/en/developer/articles/technical/pointer-aliasing-and-vectorization.html
 typedef union
 {
 	float f;

@@ -30,7 +30,7 @@ class ctf_toolbox_parameters
 {
 	public:
 	FileName fn_in, fn_out, fn_sim;
-	bool do_intact_ctf_until_first_peak, do_intact_ctf_after_first_peak, do_ctf_pad;
+	bool do_intact_ctf_until_first_peak, do_intact_ctf_after_first_peak, do_ctf_pad, do_apply_orient;
 	RFLOAT profile_angle, sim_angpix, kV, Q0, Cs, defU, defV, defAng, phase_shift;
 	int verb;
 
@@ -58,6 +58,7 @@ class ctf_toolbox_parameters
 		int general_section = parser.addSection("Pre-multiply options");
 		fn_in = parser.getOption("--i", "Input STAR file with CTF information", "");
 		fn_out = parser.getOption("--o", "Output rootname (for multiple images: insert this string before each image's extension)", "");
+        do_apply_orient = parser.checkOption("--apply_orient", "Also apply the in-plane rotation and translation to the CTF-premultiplied images");
 
 		int sim_section = parser.addSection("OR: simulate options");
 		fn_sim = parser.getOption("--simulate", "Output name for simulated CTF image","");
@@ -78,7 +79,6 @@ class ctf_toolbox_parameters
 		do_intact_ctf_until_first_peak = parser.checkOption("--ctf_intact_first_peak", "Leave CTFs intact until first peak");
 		do_intact_ctf_after_first_peak = parser.checkOption("--ctf_intact_after_first_peak", "Leave CTFs intact after first peak");
 		do_ctf_pad = parser.checkOption("--ctf_pad", "Pre-multiply with a 2x finer-sampled CTF that is then downscaled");
-
 		// Check for errors in the command-line option
 		if (parser.checkForErrors())
 			REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
@@ -182,6 +182,21 @@ class ctf_toolbox_parameters
 				}
 
 				transformer.inverseFourierTransform(Fimg, img());
+
+                if (do_apply_orient)
+                {
+                    RFLOAT psi;
+					Matrix1D<RFLOAT> offset(2);
+					Matrix2D<RFLOAT> A;
+					MD.getValue(EMDL_ORIENT_PSI, psi);
+					MD.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, XX(offset));
+					MD.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, YY(offset));
+                    offset /= angpix;
+                    rotation2DMatrix(psi, A);
+                    MAT_ELEM(A, 0, 2) = COSD(psi) * XX(offset) - SIND(psi) * YY(offset);
+                    MAT_ELEM(A, 1, 2) = COSD(psi) * YY(offset) + SIND(psi) * XX(offset);
+                    selfApplyGeometry(img(), A, IS_NOT_INV, DONT_WRAP);
+                }
 
 				// Write out the result
 				// Check whether fn_out has an "@": if so REPLACE the corresponding frame in the output stack!
