@@ -553,9 +553,9 @@ void MlOptimiser::parseInitial(int argc, char **argv)
     // General optimiser I/O stuff
     int general_section = parser.addSection("General options");
     fn_data = parser.getOption("--i", "Input particles (in a star-file)", "");
-    fn_tomo = parser.getOption("--tomograms", "Star file with the tomograms", "");
+    fn_tomo = parser.getOption("--tomograms", "Star file with the tomograms, in case subtomos are handled as 2D stacks", "");
     fn_motion = parser.getOption("--trajectories", "Star file with the tomogram motion trajectories", "");
-    fn_OS = parser.getOption("--ios", "Input tomo optimiser set file. It is used to set --i, --ref or --solvent_mask if they are not provided. Updated output optimiser set is created.", "");
+    fn_OS = parser.getOption("--ios", "Input tomo optimisation set file. It is used to set --i, --tomograms, --ref or --solvent_mask if they are not provided. Updated output optimiser set is created.", "");
     fn_out = parser.getOption("--o", "Output rootname", "");
     nr_iter = textToInteger(parser.getOption("--iter", "Maximum number of iterations to perform", "-1"));
     tau2_fudge_arg = textToFloat(parser.getOption("--tau2_fudge", "Regularisation parameter (values higher than 1 give more weight to the data)", "-1"));
