@@ -46,21 +46,6 @@ public:
 	// To which particle does this image belong
 	long int particle_id;
 
-	// This is the Nth image in this optics_group, for writing to scratch disk: filenames
-	long int optics_group_id;
-
-	// Name of this image (by this name it will be recognised upon reading)
-	FileName name;
-
-	// ID of the group that this image comes from
-	long int group_id;
-
-	// The optics group for this image
-	int optics_group;
-
-	// Pre-read array of the image in RAM
-	MultidimArray<float> img;
-
     // Projection matrix for tilt series stacks
     Matrix2D<RFLOAT> Aproj;
 
@@ -77,12 +62,7 @@ public:
 	ExpImage(ExpImage const& copy)
 	{
 		particle_id = copy.particle_id;
-		optics_group_id = copy.optics_group_id;
-		name = copy.name;
-		group_id = copy.group_id;
-		optics_group = copy.optics_group;
-		img = copy.img;
-        Aproj = copy.Aproj;
+		Aproj = copy.Aproj;
         defU = copy.defU;
         defV = copy.defV;
         defAngle = copy.defAngle;
@@ -94,11 +74,6 @@ public:
 	{
 
 		particle_id = copy.particle_id;
-		optics_group_id = copy.optics_group_id;
-		name = copy.name;
-		group_id = copy.group_id;
-		optics_group = copy.optics_group;
-		img = copy.img;
         Aproj = copy.Aproj;
         defU = copy.defU;
         defV = copy.defV;
@@ -115,8 +90,23 @@ public:
     // Position of the image in the original input STAR file
     long int id;
 
+    // Name of this particle (by this name it will be recognised upon reading)
+    FileName name;
+
+    // Pre-read array of the image in RAM
+    MultidimArray<float> img;
+
     // Which tomogram does this particle belong to
     int tomogram_id;
+
+    // ID of the group that this particle comes from
+    long int group_id;
+
+    // The optics group for this particle
+    int optics_group;
+
+    // This is the Nth particle in its optics_group, for writing to scratch disk: filenames
+    long int optics_group_id;
 
     // Random subset this particle belongs to
 	int random_subset;
@@ -134,8 +124,13 @@ public:
 	ExpParticle(ExpParticle const& copy)
 	{
         id = copy.id;
+        name = copy.name;
+        img = copy.img;
         tomogram_id = copy.tomogram_id;
+        group_id = copy.group_id;
         random_subset = copy.random_subset;
+        optics_group = copy.optics_group;
+        optics_group_id = copy.optics_group_id;
 		images = copy.images;
 	}
 
@@ -143,9 +138,14 @@ public:
 	ExpParticle& operator=(ExpParticle const& copy)
 	{
         id = copy.id;
+        name = copy.name;
+        img = copy.img;
         tomogram_id = copy.tomogram_id;
+        group_id = copy.group_id;
         random_subset = copy.random_subset;
-		images = copy.images;
+        optics_group = copy.optics_group;
+        optics_group_id = copy.optics_group_id;
+        images = copy.images;
 		return *this;
 	}
 
@@ -207,7 +207,7 @@ public:
 	long int nr_particles_subset1, nr_particles_subset2;
 
 	// Number of images per optics group
-	std::vector<long int> nr_images_per_optics_group;
+	std::vector<long int> nr_particles_per_optics_group;
 
 	// One large MetaDataTable for all particles
 	MetaDataTable MDimg;
@@ -295,14 +295,14 @@ public:
 	// Get the random_subset for this particle
 	int getRandomSubset(long int part_id);
 
-	// Get the group_id for the N'th image for this particle
-	long int getGroupId(long int part_id, int img_id);
+	// Get the group_id for this particle
+	long int getGroupId(long int part_id);
 
-	// Get the optics group to which the N'th image for this particle belongs
-	int getOpticsGroup(long int part_id, int img_id);
+	// Get the optics group to which this particle belongs
+	int getOpticsGroup(long int part_id);
 
-	// Get the pixel size for the N-th image of this particle
-	RFLOAT getImagePixelSize(long int part_id, int img_id);
+	// Get the pixel size for (all) the images of this particle
+	RFLOAT getImagePixelSize(long int part_id);
 
     // Get the rotation matrix for Nth image of the subtomo particle
     Matrix2D<RFLOAT> getRotationMatrix(long int part_id, int img_id);
@@ -325,10 +325,10 @@ public:
 	FileName getMicrographName(long int part_id);
 
 	// Add a particle
-	void addParticle(int random_subset = 0, int tomogram_id = 0);
+	void addParticle(std::string img_name, int optics_group, long int group_id, int random_subset = 0, int tomogram_id = 0);
 
  	// Add an image to the given particle
-	void addImageToParticle(std::string img_name, long int part_id, long int group_id, int optics_group, d4Matrix *Aproj = NULL, CTF *ctf = NULL, float dose = 0.);
+	void addImageToParticle(long int part_id, d4Matrix *Aproj = NULL, CTF *ctf = NULL, float dose = 0.);
 
 	// Add a group
 	long int addGroup(std::string mic_name, int optics_group);
@@ -347,7 +347,7 @@ public:
 	void initialiseBodies(int _nr_bodies);
 
 	// Get the image name for a given part_id
-	bool getImageNameOnScratch(long int part_id, int img_id, FileName &fn_img, bool is_ctf_image = false);
+	bool getImageNameOnScratch(long int part_id, FileName &fn_img, bool is_ctf_image = false);
 
 	// For parallel executions, lock the scratch directory with a unique code, so we won't copy the same data many times to the same position
 	// This determines the lockname and removes the lock if it exists
@@ -385,7 +385,7 @@ private:
 	{
 	    const std::vector<ExpParticle>& particles;
 	    compareOpticsGroupsParticles(const std::vector<ExpParticle>& particles) : particles(particles) { }
-	    bool operator()(const long int i, const long int j) { return particles[i].images[0].optics_group < particles[j].images[0].optics_group;}
+	    bool operator()(const long int i, const long int j) { return particles[i].optics_group < particles[j].optics_group;}
 	};
 
 	struct compareRandomSubsetParticles

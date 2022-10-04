@@ -1064,8 +1064,8 @@ void ClassRanker::calculateExpectedAngularErrors(int iclass, classFeatures &cf)
 		{
 			// SHWS 6Feb2020: just work with noise spectrum from group 0 to save time!
 			int group_id = 0; // mydata.getGroupId(part_id, 0);
-			RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, 0);
-			const int optics_group = mydata.getOpticsGroup(part_id, 0);
+			RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id);
+			const int optics_group = mydata.getOpticsGroup(part_id);
 			int my_image_size = (mydata.obsModel.hasBoxSizes) ? mydata.getOpticsImageSize(optics_group) : mymodel.ori_size;
 			bool ctf_premultiplied = mydata.obsModel.getCtfPremultiplied(optics_group);
 

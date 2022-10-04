@@ -2462,7 +2462,6 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 
     // Only open stacks once and then read multiple images
     fImageHandler hFile;
-    long int dump;
     FileName fn_open_stack="";
 
     long nr_particles_done = 0;
@@ -2489,13 +2488,60 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
     {
 
         long int part_id = mydata.sorted_idx[part_id_sorted];
+        long int optics_group = mydata.getOpticsGroup(part_id);
 
         // Extract the relevant MetaDataTable row from MDimg
         MDimg = mydata.getMetaDataParticle(part_id);
 
+        // Read image from disc
+        Image<RFLOAT> img;
+        if (do_preread_images && do_parallel_disc_io)
+        {
+            img().reshape(mydata.particles[part_id].img);
+            FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mydata.particles[part_id].img)
+            {
+                DIRECT_MULTIDIM_ELEM(img(), n) = (RFLOAT)DIRECT_MULTIDIM_ELEM(mydata.particles[part_id].img, n);
+            }
+        }
+        else
+        {
+            long int dump;
+            if (!mydata.getImageNameOnScratch(part_id, fn_img))
+            {
+                fn_img = mydata.particles[part_id].name;
+            }
+            else if (!do_parallel_disc_io)
+            {
+                // When not doing parallel disk IO,
+                // only those MPI processes running on the same node as the leader have scratch.
+                fn_img.decompose(dump, fn_stack);
+                if (!exists(fn_stack))
+                    MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
+            }
+
+            fn_img.decompose(dump, fn_stack);
+            if (fn_stack != fn_open_stack)
+            {
+                hFile.openFile(fn_stack, WRITE_READONLY);
+                fn_open_stack = fn_stack;
+            }
+            img.readFromOpenFile(fn_img, hFile, -1, false);
+            img().setXmippOrigin();
+        }
+
+        Image<RFLOAT> wholestack;
+        if (mydata.is_tomo) wholestack=img;
+
         for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++)
         {
-            long int optics_group = mydata.getOpticsGroup(part_id, img_id);
+
+            // For 2D stacks in subtomogram averaging:
+            if (mydata.is_tomo)
+            {
+                MultidimArray<RFLOAT> my_img;
+                wholestack().getImage(img_id, my_img);
+                img() = my_img;
+            }
 
             if (nr_particles_done_per_optics_group[optics_group] >= minimum_nr_particles_sigma2_noise)
             {
@@ -2504,42 +2550,6 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 
             RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
             int my_image_size = mydata.getOpticsImageSize(optics_group);
-
-
-            // Read image from disc
-            Image<RFLOAT> img;
-            if (do_preread_images && do_parallel_disc_io)
-            {
-                img().reshape(mydata.particles[part_id].images[img_id].img);
-                FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mydata.particles[part_id].images[img_id].img)
-                {
-                    DIRECT_MULTIDIM_ELEM(img(), n) = (RFLOAT)DIRECT_MULTIDIM_ELEM(mydata.particles[part_id].images[img_id].img, n);
-                }
-            }
-            else
-            {
-                if (!mydata.getImageNameOnScratch(part_id, img_id, fn_img))
-                {
-                    fn_img = mydata.particles[part_id].images[img_id].name;
-                }
-                else if (!do_parallel_disc_io)
-                {
-                    // When not doing parallel disk IO,
-                    // only those MPI processes running on the same node as the leader have scratch.
-                    fn_img.decompose(dump, fn_stack);
-                    if (!exists(fn_stack))
-                        MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
-                }
-
-                fn_img.decompose(dump, fn_stack);
-                if (fn_stack != fn_open_stack)
-                {
-                    hFile.openFile(fn_stack, WRITE_READONLY);
-                    fn_open_stack = fn_stack;
-                }
-                img.readFromOpenFile(fn_img, hFile, -1, false);
-                img().setXmippOrigin();
-            }
 
             // May24,2015 - Shaoda & Sjors, Helical refinement
             RFLOAT psi_prior = 0., tilt_prior = 0.;
@@ -3828,12 +3838,7 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
                 psi_deg = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI);
             }
 
-            // TODO: this will not work if pixel size is different for different images in one particle....
-            // TODO: this will not work if pixel size is different for different images in one particle....
-            // TODO: this will not work if pixel size is different for different images in one particle....
-            // TODO: this will not work if pixel size is different for different images in one particle....
-            // TODO: this will not work if pixel size is different for different images in one particle....
-            RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, 0);
+            RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id);
             sampling.addOneTranslation(rounded_offset_x * my_pixel_size, rounded_offset_y * my_pixel_size, rounded_offset_z * my_pixel_size,
                     do_clear, (do_helical_refine) && (!ignore_helical_symmetry), rot_deg, tilt_deg, psi_deg); // clear for first particle
         }
@@ -3844,36 +3849,32 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
         if (do_parallel_disc_io && !do_preread_images && mymodel.data_dim != 3)
         {
             // Read in the actual image from disc, only open/close common stacks once
-            // Read in all images, only open/close common stacks once
-            for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++,my_imagedata_offset++)
+
+            // Get the filename
+            if (!mydata.getImageNameOnScratch(part_id, fn_img))
             {
-
-                // Get the filename
-                if (!mydata.getImageNameOnScratch(part_id, img_id, fn_img))
+                std::istringstream split(exp_fn_img);
+                for (int i = 0; i <= my_imagedata_offset; i++)
                 {
-                    std::istringstream split(exp_fn_img);
-                    for (int i = 0; i <= my_imagedata_offset; i++)
-                    {
-                        getline(split, fn_img);
-                    }
+                    getline(split, fn_img);
                 }
+            }
 
-                // Only open again a new stackname
-                fn_img.decompose(dump, fn_stack);
-                if (fn_stack != fn_open_stack)
-                {
-                    hFile.openFile(fn_stack, WRITE_READONLY);
-                    fn_open_stack = fn_stack;
-                }
-                Image<RFLOAT> img;
+
+            // Only open again a new stackname
+            fn_img.decompose(dump, fn_stack);
+            if (fn_stack != fn_open_stack)
+            {
+                hFile.openFile(fn_stack, WRITE_READONLY);
+                fn_open_stack = fn_stack;
+            }
+            Image<RFLOAT> img;
 #ifdef DEBUG_BODIES
-                std::cerr << " fn_img= " << fn_img << " part_id= " << part_id << std::endl;
+            std::cerr << " fn_img= " << fn_img << " part_id= " << part_id << std::endl;
 #endif
-                img.readFromOpenFile(fn_img, hFile, -1, false);
-                img().setXmippOrigin();
-                exp_imgs.push_back(img());
-
-            } // end loop over all images in this particle
+            img.readFromOpenFile(fn_img, hFile, -1, false);
+            img().setXmippOrigin();
+            exp_imgs.push_back(img());
 
         } // end if do_parallel_disc_io
 
@@ -5710,40 +5711,37 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 #endif
 
 
-    FourierTransformer transformer;
-    for (int img_id = 0; img_id < exp_nr_images; img_id++)
+    // To which group do I belong?
+    int group_id = mydata.getGroupId(part_id);
+    // What is my optics group?
+    int optics_group = mydata.getOpticsGroup(part_id);
+    bool ctf_premultiplied = mydata.obsModel.getCtfPremultiplied(optics_group);
+    RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
+    int my_image_size = mydata.getOpticsImageSize(optics_group);
+
+    Image<RFLOAT> img, rec_img;
+    MultidimArray<Complex > Fimg, Faux;
+    MultidimArray<RFLOAT> Fctf, FstMulti; // SubtomoWeights
+
+    // Get the image and recimg data for this particle
+    if (do_parallel_disc_io)
     {
-        Image<RFLOAT> img, rec_img;
-        MultidimArray<Complex > Fimg, Faux;
-        MultidimArray<RFLOAT> Fctf, FstMulti; // SubtomoWeights
-
-        // To which group do I belong?
-        int group_id = mydata.getGroupId(part_id, img_id);
-        // What is my optics group?
-        int optics_group = mydata.getOpticsGroup(part_id, img_id);
-        bool ctf_premultiplied = mydata.obsModel.getCtfPremultiplied(optics_group);
-        RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
-        int my_image_size = mydata.getOpticsImageSize(optics_group);
-
-        // Get the image and recimg data
-        if (do_parallel_disc_io)
+        // If all followers had preread images into RAM: get those now
+        if (do_preread_images)
         {
-            // If all followers had preread images into RAM: get those now
-            if (do_preread_images)
-            {
-                img().reshape(mydata.particles[part_id].images[img_id].img);
+            img().reshape(mydata.particles[part_id].img);
 
-                FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mydata.particles[part_id].images[img_id].img)
-                {
-                    DIRECT_MULTIDIM_ELEM(img(), n) = (RFLOAT)DIRECT_MULTIDIM_ELEM(mydata.particles[part_id].images[img_id].img, n);
-                }
-            }
-            else
+            FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mydata.particles[part_id].img)
             {
+                DIRECT_MULTIDIM_ELEM(img(), n) = (RFLOAT)DIRECT_MULTIDIM_ELEM(mydata.particles[part_id].img, n);
+            }
+        }
+        else
+        {
 
 //#define DEBUG_SIMULTANEOUS_READ
 #ifdef DEBUG_SIMULTANEOUS_READ
-                // Read from disc
+            // Read from disc
                 FileName fn_img;
                 std::istringstream split(exp_fn_img);
                 for (int i = 0; i <= my_imagedata_offset; i++)
@@ -5770,98 +5768,76 @@ void MlOptimiser::getFourierTransformsAndCtfs(
                     REPORT_ERROR("unequal pre-read images... BUG!");
                 }
 #else
-                if (mymodel.data_dim == 3)
-                {
-
-                    // Read sub-tomograms from disc in parallel (to save RAM in exp_imgs)
-                    FileName fn_img;
-                    if (!mydata.getImageNameOnScratch(part_id, img_id, fn_img))
-                    {
-                        std::istringstream split(exp_fn_img);
-                        for (int i = 0; i <= imagedata_offset; i++)
-                            getline(split, fn_img);
-                    }
-                    img.read(fn_img);
-                    img().setXmippOrigin();
-                }
-                else
-                {
-                    img() = exp_imgs[imagedata_offset + img_id];
-                }
-#endif
-            }
-            if (has_converged && do_use_reconstruct_images)
-            {
-
-                FileName fn_recimg;
-                std::istringstream split2(exp_fn_recimg);
-                // Get the right line in the exp_fn_img string
-                for (int i = 0; i <= imagedata_offset; i++)
-                    getline(split2, fn_recimg);
-                rec_img.read(fn_recimg);
-                rec_img().setXmippOrigin();
-            }
-        }
-        else
-        {
-
-            // Unpack the image from the imagedata
             if (mymodel.data_dim == 3)
             {
-                img().resize(image_full_size[optics_group], image_full_size[optics_group], image_full_size[optics_group]);
-                // Only allow a single image per call of this function!!! nr_pool needs to be set to 1!!!!
-                // This will save memory, as we'll need to store all translated images in memory....
-                FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(img())
+
+                // Read sub-tomograms from disc in parallel (to save RAM in exp_imgs)
+                FileName fn_img;
+                if (!mydata.getImageNameOnScratch(part_id, fn_img))
                 {
-                    DIRECT_A3D_ELEM(img(), k, i, j) = DIRECT_A3D_ELEM(exp_imagedata, k, i, j);
+                    std::istringstream split(exp_fn_img);
+                    for (int i = 0; i <= imagedata_offset; i++)
+                        getline(split, fn_img);
                 }
+                img.read(fn_img);
                 img().setXmippOrigin();
-
-                if (has_converged && do_use_reconstruct_images)
-                {
-                    rec_img().resize(image_full_size[optics_group], image_full_size[optics_group], image_full_size[optics_group]);
-                    int offset = (do_ctf_correction) ? 2 * image_full_size[optics_group] : image_full_size[optics_group];
-                    FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(rec_img())
-                    {
-                        DIRECT_A3D_ELEM(rec_img(), k, i, j) = DIRECT_A3D_ELEM(exp_imagedata, offset + k, i, j);
-                    }
-                    rec_img().setXmippOrigin();
-
-                }
-
             }
             else
             {
-                img().resize(image_full_size[optics_group], image_full_size[optics_group]);
-                FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(img())
-                {
-                    DIRECT_A2D_ELEM(img(), i, j) = DIRECT_A3D_ELEM(exp_imagedata, imagedata_offset + img_id, i, j);
-                }
-                img().setXmippOrigin();
-                if (has_converged && do_use_reconstruct_images)
-                {
-
-                    /// TODO: this will be WRONG for multi-image particles, but I guess that's not going to happen anyway...
-                    int my_nr_particles = exp_my_last_part_id - exp_my_first_part_id + 1;
-                    if (mydata.is_tomo) REPORT_ERROR("ERROR: you can not use reconstruct images for 2Dstack-subtomograms!");
-
-                    ////////////// TODO: think this through for no-threads here.....
-                    rec_img().resize(image_full_size[optics_group], image_full_size[optics_group]);
-                    FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(rec_img())
-                    {
-                        DIRECT_A2D_ELEM(rec_img(), i, j) = DIRECT_A3D_ELEM(exp_imagedata, my_nr_particles + imagedata_offset + img_id, i, j);
-                    }
-                    rec_img().setXmippOrigin();
-                }
+                img() = exp_imgs[imagedata_offset];
             }
+#endif
+        }
+        if (has_converged && do_use_reconstruct_images)
+        {
+
+            FileName fn_recimg;
+            std::istringstream split2(exp_fn_recimg);
+            // Get the right line in the exp_fn_img string
+            for (int i = 0; i <= imagedata_offset; i++)
+                getline(split2, fn_recimg);
+            rec_img.read(fn_recimg);
+            rec_img().setXmippOrigin();
+        }
+    }
+    else // !do_parallel_disc_io
+    {
+
+        if (mymodel.data_dim == 3 || mydata.is_tomo) REPORT_ERROR("BUG: no STA for !do_parallel_disc_io");
+
+        // Unpack the image from the imagedata
+        img().resize(image_full_size[optics_group], image_full_size[optics_group]);
+        FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(img())
+        {
+            DIRECT_A2D_ELEM(img(), i, j) = DIRECT_A3D_ELEM(exp_imagedata, imagedata_offset, i, j);
+        }
+        img().setXmippOrigin();
+        if (has_converged && do_use_reconstruct_images)
+        {
+
+            int nr_images = 0;
+            for (long int part_id_sorted = exp_my_first_part_id; part_id_sorted <= exp_my_last_part_id; part_id_sorted++)
+            {
+                long int part_id_p = mydata.sorted_idx[part_id_sorted];
+                nr_images += mydata.numberOfImagesInParticle(part_id_p);
+            }
+
+            rec_img().resize(image_full_size[optics_group], image_full_size[optics_group]);
+            FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(rec_img())
+            {
+                DIRECT_A2D_ELEM(rec_img(), i, j) = DIRECT_A3D_ELEM(exp_imagedata, nr_images + imagedata_offset, i, j);
+            }
+            rec_img().setXmippOrigin();
         }
 
-        // Apply the norm_correction term
-        if (do_norm_correction)
-        {
+    }
+
+    // Apply the norm_correction term
+    if (do_norm_correction)
+    {
 //#define DEBUG_NORM
 #ifdef DEBUG_NORM
-            if (normcorr < 0.001 || normcorr > 1000. || mymodel.avg_norm_correction < 0.001 || mymodel.avg_norm_correction > 1000.)
+        if (normcorr < 0.001 || normcorr > 1000. || mymodel.avg_norm_correction < 0.001 || mymodel.avg_norm_correction > 1000.)
             {
                 std::cerr << " ** normcorr= " << normcorr << std::endl;
                 std::cerr << " ** mymodel.avg_norm_correction= " << mymodel.avg_norm_correction << std::endl;
@@ -5871,16 +5847,31 @@ void MlOptimiser::getFourierTransformsAndCtfs(
                 REPORT_ERROR("Very small or very big (avg) normcorr!");
             }
 #endif
-            img() *= mymodel.avg_norm_correction / normcorr;
-        }
+        img() *= mymodel.avg_norm_correction / normcorr;
+    }
 
-        // Don't pre-shift for subtomo 2D stacks, as those are no longer integer shifts in the projections
-        // Subtomos are re-centered often anyway.
-        if (!mydata.is_tomo)
+    // Don't pre-shift for subtomo 2D stacks, as those are no longer integer shifts in the projections
+    // Subtomos are re-centered often anyway.
+    if (!mydata.is_tomo)
+    {
+        selfTranslate(img(), my_old_offset, DONT_WRAP);
+        if (has_converged && do_use_reconstruct_images)
+            selfTranslate(rec_img(), my_old_offset, DONT_WRAP);
+    }
+
+    Image<RFLOAT> wholestack;
+    if (mydata.is_tomo) wholestack=img;
+
+    FourierTransformer transformer;
+    for (int img_id = 0; img_id < exp_nr_images; img_id++)
+    {
+
+        // For 2D stacks in subtomogram averaging:
+        if (mydata.is_tomo)
         {
-            selfTranslate(img(), my_old_offset, DONT_WRAP);
-            if (has_converged && do_use_reconstruct_images)
-                selfTranslate(rec_img(), my_old_offset, DONT_WRAP);
+            MultidimArray<RFLOAT> my_img;
+            wholestack().getImage(img_id, my_img);
+            img() = my_img;
         }
 
 //#define DEBUG_SOFTMASK
@@ -6042,7 +6033,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
                 {
                     // Read CTF-image from disc
                     FileName fn_ctf;
-                    if (!mydata.getImageNameOnScratch(part_id, img_id, fn_ctf, true))
+                    if (!mydata.getImageNameOnScratch(part_id, fn_ctf, true))
                     {
                         std::istringstream split(exp_fn_ctf);
                         // Get the right line in the exp_fn_img string
@@ -6402,37 +6393,37 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 
     bool do_subtomo_correction = NZYXSIZE(exp_STMulti) > 0;
 
+    int group_id = mydata.getGroupId(part_id);
+    int optics_group = mydata.getOpticsGroup(part_id);
+    RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
+    int my_image_size = mydata.getOpticsImageSize(optics_group);
+
+    int exp_current_image_size;
+    if (is_for_store_wsums)
+    {
+        // Always use full size of images for weighted sums in reconstruction!
+        exp_current_image_size = image_current_size[optics_group];
+    }
+    else if (strict_highres_exp > 0.)
+    {
+        // Use smaller images in both passes and keep a maximum on coarse_size, just like in FREALIGN
+        exp_current_image_size = image_coarse_size[optics_group];
+    }
+    else if (adaptive_oversampling > 0)
+    {
+        // Use smaller images in the first pass, larger ones in the second pass
+        exp_current_image_size = (exp_current_oversampling == 0) ? image_coarse_size[optics_group] : image_current_size[optics_group];
+    }
+    else
+    {
+        exp_current_image_size = image_current_size[optics_group];
+    }
+    bool do_ctf_invsig = (exp_local_Fctf.size() > 0) ? YSIZE(exp_local_Fctf[0])  != exp_current_image_size : true; // size has changed
+    bool do_masked_shifts = (do_ctf_invsig || nr_shifts != exp_local_Fimgs_shifted[0].size()); // size or nr_shifts has changed
+
     MultidimArray<Complex > Fimg, Fimg_nomask;
     for (int img_id = 0, my_trans_image = 0; img_id < exp_nr_images; img_id++)
     {
-
-        int group_id = mydata.getGroupId(part_id, img_id);
-        int optics_group = mydata.getOpticsGroup(part_id, img_id);
-        RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
-        int my_image_size = mydata.getOpticsImageSize(optics_group);
-
-        int exp_current_image_size;
-        if (is_for_store_wsums)
-        {
-            // Always use full size of images for weighted sums in reconstruction!
-            exp_current_image_size = image_current_size[optics_group];
-        }
-        else if (strict_highres_exp > 0.)
-        {
-            // Use smaller images in both passes and keep a maximum on coarse_size, just like in FREALIGN
-            exp_current_image_size = image_coarse_size[optics_group];
-        }
-        else if (adaptive_oversampling > 0)
-        {
-            // Use smaller images in the first pass, larger ones in the second pass
-            exp_current_image_size = (exp_current_oversampling == 0) ? image_coarse_size[optics_group] : image_current_size[optics_group];
-        }
-        else
-        {
-            exp_current_image_size = image_current_size[optics_group];
-        }
-        bool do_ctf_invsig = (exp_local_Fctf.size() > 0) ? YSIZE(exp_local_Fctf[img_id])  != exp_current_image_size : true; // size has changed
-        bool do_masked_shifts = (do_ctf_invsig || nr_shifts != exp_local_Fimgs_shifted[img_id].size()); // size or nr_shifts has changed
 
         if (do_masked_shifts)
         {
@@ -6744,6 +6735,10 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
     long int exp_nr_oversampled_rot = sampling.oversamplingFactorOrientations(exp_current_oversampling);
     long int exp_nr_oversampled_trans = sampling.oversamplingFactorTranslations(exp_current_oversampling);
 
+    int group_id = mydata.getGroupId(part_id);
+    RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id);
+    int optics_group = mydata.getOpticsGroup(part_id);
+
     exp_Mweight.resize(mymodel.nr_classes * exp_nr_dir * exp_nr_psi * exp_nr_trans * exp_nr_oversampled_rot * exp_nr_oversampled_trans);
     exp_Mweight.initConstant(-999.);
     if (exp_ipass==0)
@@ -6837,8 +6832,6 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                             // loop over all images inside this particle
                             for (int img_id = 0; img_id < exp_nr_images; img_id++)
                             {
-                                RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, img_id);
-                                int optics_group = mydata.getOpticsGroup(part_id, img_id);
 
                                 // Get the Euler matrix
                                 Euler_angles2matrix(oversampled_rot[iover_rot],
@@ -6893,7 +6886,6 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 
                                 if (do_scale_correction)
                                 {
-                                    int group_id = mydata.getGroupId(part_id, img_id);
                                     RFLOAT myscale = mymodel.scale_correction[group_id];
                                     FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Frefctf)
                                     {
@@ -7113,7 +7105,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 
                                                 //for (int i = 0; i< mymodel.scale_correction.size(); i++)
                                                 //	std::cerr << i << " scale="<<mymodel.scale_correction[i]<<std::endl;
-                                                int group_id = mydata.getGroupId(part_id, img_id);
+                                                int group_id = mydata.getGroupId(part_id);
                                                 RFLOAT myscale = mymodel.scale_correction[group_id];
                                                 //std::cerr << " oversampled_rot[iover_rot]= " << oversampled_rot[iover_rot] << " oversampled_tilt[iover_rot]= " << oversampled_tilt[iover_rot] << " oversampled_psi[iover_rot]= " << oversampled_psi[iover_rot] << std::endl;
                                                 //std::cerr << " group_id= " << group_id << " myscale= " << myscale <<std::endl;
@@ -7144,7 +7136,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                                                 std::cerr << " exp_current_oversampling= " << exp_current_oversampling << std::endl;
                                                 std::cerr << " ihidden_over= " << ihidden_over << " XSIZE(Mweight)= " << XSIZE(exp_Mweight) << std::endl;
                                                 std::cerr << " (mymodel.PPref[exp_iclass]).ori_size= " << (mymodel.PPref[exp_iclass]).ori_size << " (mymodel.PPref[exp_iclass]).r_max= " << (mymodel.PPref[exp_iclass]).r_max << std::endl;
-                                                int group_id = mydata.getGroupId(part_id, img_id);
+                                                int group_id = mydata.getGroupId(part_id);
                                                 std::cerr << " mymodel.scale_correction[group_id]= " << mymodel.scale_correction[group_id] << std::endl;
                                                 if (std::isnan(mymodel.scale_correction[group_id]))
                                                 {
@@ -7341,7 +7333,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
     long int opt_ihidden, opt_ihidden_over;
 #endif
 
-    RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, 0);
+    RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id);
 
     RFLOAT exp_thisimage_sumweight = 0.;
     RFLOAT old_offset_x, old_offset_y, old_offset_z;
@@ -7663,8 +7655,8 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
         It.write("exp_Fimg.spi");
         std::cerr << "written exp_Fimgs.spi " << std::endl;
         */
-        int group_id = mydata.getGroupId(part_id, 0);
-        int optics_group = mydata.getOpticsGroup(part_id, 0);
+        int group_id = mydata.getGroupId(part_id);
+        int optics_group = mydata.getOpticsGroup(part_id);
         std::cerr << " group_id= " << group_id << " mymodel.scale_correction[group_id]= " << mymodel.scale_correction[group_id] << std::endl;
         std::cerr << " exp_ipass= " << exp_ipass << std::endl;
         std::cerr << " sampling.NrDirections(0, true)= " << sampling.NrDirections()
@@ -7858,9 +7850,9 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
     long int exp_nr_oversampled_trans = sampling.oversamplingFactorTranslations(exp_current_oversampling);
 
     // Assuming one group_id and optics_group for all images in this particle....
-    int group_id = mydata.getGroupId(part_id, 0);
-    const int optics_group = mydata.getOpticsGroup(part_id, 0);
-    RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, 0);
+    int group_id = mydata.getGroupId(part_id);
+    const int optics_group = mydata.getOpticsGroup(part_id);
+    RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id);
     int my_image_size = mydata.getOpticsImageSize(optics_group);
     bool ctf_premultiplied = mydata.obsModel.getCtfPremultiplied(optics_group);
 
@@ -7886,7 +7878,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 
     //Sigma2_noise estimation
     MultidimArray<RFLOAT> thr_wsum_sigma2_noise, thr_wsum_ctf2, thr_wsum_stMulti;
-    mydata.getOpticsGroup(part_id, 0);
+    mydata.getOpticsGroup(part_id);
     thr_wsum_sigma2_noise.initZeros(image_full_size[optics_group]/2 + 1);
     thr_wsum_ctf2.initZeros(image_full_size[optics_group]/2 + 1);
     if (do_subtomo_correction)
@@ -8619,7 +8611,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
         std::cerr << " part_id= " << part_id << std::endl;
         std::cerr << " exp_min_diff2= " << exp_min_diff2<< std::endl;
         std::cerr << " logsigma2= " << logsigma2 << std::endl;
-        int group_id = mydata.getGroupId(part_id, 0);
+        int group_id = mydata.getGroupId(part_id);
         std::cerr << " group_id= " << group_id << std::endl;
         std::cerr << " ml_model.scale_correction[group_id]= " << mymodel.scale_correction[group_id] << std::endl;
         std::cerr << " exp_significant_weight= " << exp_significant_weight << std::endl;
@@ -8645,8 +8637,8 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
     {
         omp_set_lock(&global_mutex);
 
-        long int igroup = mydata.getGroupId(part_id, 0);
-        int optics_group = mydata.getOpticsGroup(part_id, 0);
+        long int igroup = mydata.getGroupId(part_id);
+        int optics_group = mydata.getOpticsGroup(part_id);
         if (do_subtomo_correction)
         {
             FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mresol_fine[optics_group])
@@ -8735,7 +8727,7 @@ void MlOptimiser::monitorHiddenVariableChanges(long int my_first_part_id, long i
 
         long int part_id = mydata.sorted_idx[part_id_sorted];
 
-        RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, 0);
+        RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id);
 
         for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
         {
@@ -8908,9 +8900,9 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
             std::vector<MultidimArray<RFLOAT> > Fctfs;
             long int part_id = mydata.sorted_idx[part_id_sorted];
 
-            int group_id = mydata.getGroupId(part_id, 0);
-            RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, 0);
-            const int optics_group = mydata.getOpticsGroup(part_id, 0);
+            int group_id = mydata.getGroupId(part_id);
+            RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id);
+            const int optics_group = mydata.getOpticsGroup(part_id);
             bool ctf_premultiplied = mydata.obsModel.getCtfPremultiplied(optics_group);
 
             // Set current_image_size to the coarse_size to calculate expected angular errors
@@ -8942,7 +8934,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
                         Image<RFLOAT> Ictf;
                         // Read CTF-image from disc
                         FileName fn_ctf;
-                        if (!mydata.getImageNameOnScratch(part_id, img_id, fn_ctf, true))
+                        if (!mydata.getImageNameOnScratch(part_id, fn_ctf, true))
                         {
                             std::istringstream split(exp_fn_ctf);
                             // Get the right line in the exp_fn_img string
@@ -9785,7 +9777,7 @@ void MlOptimiser::setMetaDataSubset(long int first_part_id, long int last_part_i
 
         long int part_id = mydata.sorted_idx[part_id_sorted];
 
-        RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, 0);
+        RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id);
 
         if (mymodel.ref_dim > 2)
         {
@@ -9885,167 +9877,113 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 
     // This assumes all images in first_part_id to last_part_id have the same image_size
     // If not, then do_also_imagedata will not work! Also warn during intialiseGeneral!
-    int common_image_size = mydata.getOpticsImageSize(mydata.getOpticsGroup(first_part_id, 0));
+    int common_image_size = mydata.getOpticsImageSize(mydata.getOpticsGroup(first_part_id));
 
     if (do_also_imagedata)
     {
-        if (mymodel.data_dim == 3)
-        {
-            if (nr_images > 1)
-                REPORT_ERROR("MlOptimiser::getMetaAndImageDataSubset ERROR: cannot get multiple images for 3D data!");
+        if (mymodel.data_dim == 3 || mydata.is_tomo) REPORT_ERROR("BUG: there should not be do_also_imagedata, i.e !do_parallel_disc_io for STA...");
 
-            if (do_ctf_correction)
-            {
-                if (has_converged && do_use_reconstruct_images)
-                    exp_imagedata.resize(3*common_image_size, common_image_size, common_image_size);
-                else
-                    exp_imagedata.resize(2*common_image_size, common_image_size, common_image_size);
-            }
-            else
-            {
-                if (has_converged && do_use_reconstruct_images)
-                    exp_imagedata.resize(2*common_image_size, common_image_size, common_image_size);
-                else
-                    exp_imagedata.resize(common_image_size, common_image_size, common_image_size);
-            }
-        }
+        if (has_converged && do_use_reconstruct_images)
+            exp_imagedata.resize(2*nr_images, common_image_size, common_image_size);
         else
-        {
-            if (has_converged && do_use_reconstruct_images)
-                exp_imagedata.resize(2*nr_images, common_image_size, common_image_size);
-            else
-                exp_imagedata.resize(nr_images, common_image_size, common_image_size);
-        }
+            exp_imagedata.resize(nr_images, common_image_size, common_image_size);
     }
 
     for (long int part_id_sorted = first_part_id, metadata_offset = 0, imagedata_offset = 0; part_id_sorted <= last_part_id; part_id_sorted++, metadata_offset++)
     {
 
         long int part_id = mydata.sorted_idx[part_id_sorted];
-        for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++, imagedata_offset++)
+        RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id);
+        int my_image_size = mydata.getOpticsImageSize(mydata.getOpticsGroup(part_id));
+
+        // Get the image names from the MDimg table
+        FileName fn_img="", fn_rec_img="", fn_ctf="";
+        if (!mydata.getImageNameOnScratch(part_id, fn_img))
+            fn_img = mydata.particles[part_id].name;
+
+        if (mymodel.data_dim == 3 && do_ctf_correction)
         {
-
-            RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, img_id);
-            int my_image_size = mydata.getOpticsImageSize(mydata.getOpticsGroup(part_id, img_id));
-
-            // Get the image names from the MDimg table
-            FileName fn_img="", fn_rec_img="", fn_ctf="";
-            if (!mydata.getImageNameOnScratch(part_id, img_id, fn_img))
-                fn_img = mydata.particles[part_id].images[img_id].name;
-
-            if (mymodel.data_dim == 3 && do_ctf_correction)
+            // Also read the CTF image from disc
+            if (!mydata.getImageNameOnScratch(part_id, fn_ctf, true))
             {
-                // Also read the CTF image from disc
-                if (!mydata.getImageNameOnScratch(part_id, img_id, fn_ctf, true))
-                {
-                    if (!mydata.MDimg.getValue(EMDL_CTF_IMAGE, fn_ctf, part_id))
-                        REPORT_ERROR("MlOptimiser::getMetaAndImageDataSubset ERROR: cannot find rlnCtfImage for 3D CTF correction!");
-                }
+                if (!mydata.MDimg.getValue(EMDL_CTF_IMAGE, fn_ctf, part_id))
+                    REPORT_ERROR("MlOptimiser::getMetaAndImageDataSubset ERROR: cannot find rlnCtfImage for 3D CTF correction!");
             }
-            if (has_converged && do_use_reconstruct_images)
+        }
+        if (has_converged && do_use_reconstruct_images)
+        {
+            mydata.MDimg.getValue(EMDL_IMAGE_RECONSTRUCT_NAME, fn_rec_img, part_id);
+        }
+
+        if (do_also_imagedata)
+        {
+            if (my_image_size != common_image_size)
+                REPORT_ERROR("ERROR: non-parallel disc I/O is not supported when images with different box sizes are present in the data set.");
+
+            // First read the image from disc or get it from the preread images in the mydata structure
+            Image<RFLOAT> img, rec_img;
+            if (do_preread_images)
             {
-                mydata.MDimg.getValue(EMDL_IMAGE_RECONSTRUCT_NAME, fn_rec_img, part_id);
-            }
-
-            if (do_also_imagedata)
-            {
-                if (my_image_size != common_image_size)
-                    REPORT_ERROR("ERROR: non-parallel disc I/O is not supported when images with different box sizes are present in the data set.");
-
-                // First read the image from disc or get it from the preread images in the mydata structure
-                Image<RFLOAT> img, rec_img;
-                if (do_preread_images)
+                img().reshape(mydata.particles[part_id].img);
+                FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mydata.particles[part_id].img)
                 {
-                    img().reshape(mydata.particles[part_id].images[img_id].img);
-                    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mydata.particles[part_id].images[img_id].img)
-                    {
-                        DIRECT_MULTIDIM_ELEM(img(), n) = (RFLOAT)DIRECT_MULTIDIM_ELEM(mydata.particles[part_id].images[img_id].img, n);
-                    }
-                }
-                else
-                {
-                    // only open new stacks
-                    fn_img.decompose(dump, fn_stack);
-                    if (fn_stack != fn_open_stack)
-                    {
-                        hFile.openFile(fn_stack, WRITE_READONLY);
-                        fn_open_stack = fn_stack;
-                    }
-                    img.readFromOpenFile(fn_img, hFile, -1, false);
-                    img().setXmippOrigin();
-                }
-                if (XSIZE(img()) != XSIZE(exp_imagedata) || YSIZE(img()) != YSIZE(exp_imagedata) )
-                {
-                    std::cerr << " fn_img= " << fn_img << " XSIZE(img())= " << XSIZE(img()) << " YSIZE(img())= " << YSIZE(img()) << std::endl;
-                    std::cerr << " while XSIZE(exp_imagedata)= " << XSIZE(exp_imagedata) << " and YSIZE(exp_imagedata)= " << YSIZE(exp_imagedata) << std::endl;
-                    REPORT_ERROR("MlOptimiser::getMetaAndImageDataSubset ERROR: incorrect image size");
-                }
-                if (has_converged && do_use_reconstruct_images)
-                {
-                    rec_img.read(fn_rec_img);
-                    if (XSIZE(rec_img()) != XSIZE(exp_imagedata) || YSIZE(rec_img()) != YSIZE(exp_imagedata) )
-                    {
-                        std::cerr << " fn_rec_img= " << fn_rec_img << " XSIZE(rec_img())= " << XSIZE(rec_img()) << " YSIZE(rec_img())= " << YSIZE(rec_img()) << std::endl;
-                        REPORT_ERROR("MlOptimiser::getMetaAndImageDataSubset ERROR: incorrect reconstruct_image size");
-                    }
-                }
-                if (mymodel.data_dim == 3)
-                {
-
-                    FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(img())
-                    {
-                        DIRECT_A3D_ELEM(exp_imagedata, k, i, j) = DIRECT_A3D_ELEM(img(), k, i, j);
-                    }
-
-                    if (do_ctf_correction)
-                    {
-                        img.read(fn_ctf);
-                        FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(img())
-                        {
-                            DIRECT_A3D_ELEM(exp_imagedata, my_image_size + k, i, j) = DIRECT_A3D_ELEM(img(), k, i, j);
-                        }
-                    }
-
-                    if (has_converged && do_use_reconstruct_images)
-                    {
-                        int offset = (do_ctf_correction) ? 2 * my_image_size : my_image_size;
-                        FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(img())
-                        {
-                            DIRECT_A3D_ELEM(exp_imagedata, offset + k, i, j) = DIRECT_A3D_ELEM(rec_img(), k, i, j);
-                        }
-                    }
-
-                }
-                else
-                {
-                    FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(img())
-                    {
-                        DIRECT_A3D_ELEM(exp_imagedata, imagedata_offset, i, j) = DIRECT_A2D_ELEM(img(), i, j);
-                    }
-
-                    if (has_converged && do_use_reconstruct_images)
-                    {
-                        FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(rec_img())
-                        {
-                            DIRECT_A3D_ELEM(exp_imagedata, imagedata_offset, i, j) = DIRECT_A2D_ELEM(rec_img(), i, j);
-                        }
-                    }
-
+                    DIRECT_MULTIDIM_ELEM(img(), n) = (RFLOAT)DIRECT_MULTIDIM_ELEM(mydata.particles[part_id].img, n);
                 }
             }
             else
             {
-                exp_fn_img += fn_img + "\n";
-                if (fn_ctf != "")
-                    exp_fn_ctf += fn_ctf + "\n";
-                if (fn_rec_img != "")
-                    exp_fn_recimg += fn_rec_img + "\n";
+                // only open new stacks
+                fn_img.decompose(dump, fn_stack);
+                if (fn_stack != fn_open_stack)
+                {
+                    hFile.openFile(fn_stack, WRITE_READONLY);
+                    fn_open_stack = fn_stack;
+                }
+                img.readFromOpenFile(fn_img, hFile, -1, false);
+                img().setXmippOrigin();
             }
 
-        } // end for img_id
+            if (XSIZE(img()) != XSIZE(exp_imagedata) || YSIZE(img()) != YSIZE(exp_imagedata) )
+            {
+                std::cerr << " fn_img= " << fn_img << " XSIZE(img())= " << XSIZE(img()) << " YSIZE(img())= " << YSIZE(img()) << std::endl;
+                std::cerr << " while XSIZE(exp_imagedata)= " << XSIZE(exp_imagedata) << " and YSIZE(exp_imagedata)= " << YSIZE(exp_imagedata) << std::endl;
+                REPORT_ERROR("MlOptimiser::getMetaAndImageDataSubset ERROR: incorrect image size");
+            }
+
+            if (has_converged && do_use_reconstruct_images)
+            {
+                rec_img.read(fn_rec_img);
+                if (XSIZE(rec_img()) != XSIZE(exp_imagedata) || YSIZE(rec_img()) != YSIZE(exp_imagedata) )
+                {
+                    std::cerr << " fn_rec_img= " << fn_rec_img << " XSIZE(rec_img())= " << XSIZE(rec_img()) << " YSIZE(rec_img())= " << YSIZE(rec_img()) << std::endl;
+                    REPORT_ERROR("MlOptimiser::getMetaAndImageDataSubset ERROR: incorrect reconstruct_image size");
+                }
+            }
+
+            FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(img())
+            {
+                DIRECT_A3D_ELEM(exp_imagedata, imagedata_offset, i, j) = DIRECT_A2D_ELEM(img(), i, j);
+            }
+
+            if (has_converged && do_use_reconstruct_images)
+            {
+                FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(rec_img())
+                {
+                    DIRECT_A3D_ELEM(exp_imagedata, nr_images + imagedata_offset, i, j) = DIRECT_A2D_ELEM(rec_img(), i, j);
+                }
+            }
+
+        }
+        else
+        {
+            exp_fn_img += fn_img + "\n";
+            if (fn_ctf != "")
+                exp_fn_ctf += fn_ctf + "\n";
+            if (fn_rec_img != "")
+                exp_fn_recimg += fn_rec_img + "\n";
+        }
 
         // Now get the metadata
-        RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, 0); // pixel size has to be the same for all images in a particle...
 
         int iaux;
         mydata.MDimg.getValue(EMDL_ORIENT_ROT,  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ROT), part_id);

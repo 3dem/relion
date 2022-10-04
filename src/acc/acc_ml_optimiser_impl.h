@@ -230,138 +230,115 @@ void getFourierTransformsAndCtfs(long int part_id,
             op.old_offset = my_old_offset;  // Not doing helical refinement. Rounded Cartesian offsets are stored.
     }
 
+    // Which group do I belong?
+    int group_id =baseMLO->mydata.getGroupId(part_id);
+    RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(part_id);
+    // What is my optics group?
+    int optics_group = baseMLO->mydata.getOpticsGroup(part_id);
+    bool ctf_premultiplied = baseMLO->mydata.obsModel.getCtfPremultiplied(optics_group);
+
+    FileName fn_img;
+    Image<RFLOAT> img, rec_img;
+    if (!baseMLO->mydata.getImageNameOnScratch(part_id, fn_img))
+    {
+        std::istringstream split(baseMLO->exp_fn_img);
+        for (int i = 0; i <= op.imagedata_offset; i++)
+            getline(split, fn_img);
+    }
+    sp.current_img = fn_img;
+
+    CTIC(accMLO->timer,"readData");
+    // Get the image and recimg data
+    if (baseMLO->do_parallel_disc_io)
+    {
+
+        // If all followers had preread images into RAM: get those now
+        if (baseMLO->do_preread_images)
+        {
+
+            img().reshape(baseMLO->mydata.particles[part_id].img);
+            CTIC(accMLO->timer,"ParaReadPrereadImages");
+            FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(baseMLO->mydata.particles[part_id].img)
+            {
+                DIRECT_MULTIDIM_ELEM(img(), n) = (RFLOAT)DIRECT_MULTIDIM_ELEM(baseMLO->mydata.particles[part_id].img, n);
+            }
+            CTOC(accMLO->timer,"ParaReadPrereadImages");
+        }
+        else
+        {
+            if (accMLO->dataIs3D)
+            {
+                CTIC(accMLO->timer,"ParaRead3DImages");
+                img.read(fn_img);
+                img().setXmippOrigin();
+                CTOC(accMLO->timer,"ParaRead3DImages");
+            }
+            else
+            {
+                CTIC(accMLO->timer,"ParaRead2DImages");
+                img() = baseMLO->exp_imgs[op.imagedata_offset];
+                CTOC(accMLO->timer,"ParaRead2DImages");
+            }
+        }
+        if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
+        {
+            FileName fn_recimg;
+            std::istringstream split2(baseMLO->exp_fn_recimg);
+            // Get the right line in the exp_fn_img string
+            for (int i = 0; i <= op.imagedata_offset; i++)
+                getline(split2, fn_recimg);
+            rec_img.read(fn_recimg);
+            rec_img().setXmippOrigin();
+        }
+    }
+    else
+    {
+        // Unpack the image from the imagedata
+        if (accMLO->dataIs3D || op.is_tomo) REPORT_ERROR("BUG: STA should always use parallel disc IO");
+
+        CTIC(accMLO->timer,"Read2DImages");
+        img().resize(baseMLO->image_full_size[optics_group], baseMLO->image_full_size[optics_group]);
+        FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(img())
+            {
+                DIRECT_A2D_ELEM(img(), i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, op.imagedata_offset, i, j);
+            }
+        img().setXmippOrigin();
+        if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
+        {
+
+            /// TODO: this will be WRONG for multi-image particles, but I guess that's not going to happen anyway...
+            int my_nr_particles = baseMLO->exp_my_last_part_id - baseMLO->exp_my_first_part_id + 1;
+            if (op.is_tomo) REPORT_ERROR("ERROR: you can not use reconstruct images for 2Dstack-subtomograms!");
+
+            rec_img().resize(baseMLO->image_full_size[optics_group], baseMLO->image_full_size[optics_group]);
+            FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(rec_img())
+                {
+                    DIRECT_A2D_ELEM(rec_img(), i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, my_nr_particles + op.imagedata_offset, i, j);
+                }
+            rec_img().setXmippOrigin();
+        }
+        CTOC(accMLO->timer,"Read2DImages");
+
+    }
+    CTOC(accMLO->timer,"readData");
+
+    Image<RFLOAT> wholestack;
+    if (op.is_tomo) wholestack=img;
+
     for (int img_id = 0; img_id < sp.nr_images; img_id++)
 	{
 		CTIC(accMLO->timer,"init");
-		FileName fn_img;
-		Image<RFLOAT> img, rec_img;
 		MultidimArray<Complex > Fimg;
 		MultidimArray<Complex > Faux;
 		MultidimArray<RFLOAT> Fctf, FstMulti;
 
-		// Which group do I belong?
-		int group_id =baseMLO->mydata.getGroupId(part_id, img_id);
-		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(part_id, img_id);
-		// What is my optics group?
-		int optics_group = baseMLO->mydata.getOpticsGroup(part_id, img_id);
-		bool ctf_premultiplied = baseMLO->mydata.obsModel.getCtfPremultiplied(optics_group);
-
-		// Get the right line in the exp_fn_img strings (also exp_fn_recimg and exp_fn_ctfs)
-		int istop = 0;
-		for (long int ii = baseMLO->exp_my_first_part_id; ii < part_id; ii++)
-                    istop += baseMLO->mydata.numberOfImagesInParticle(part_id);
-		istop += img_id;
-
-		if (!baseMLO->mydata.getImageNameOnScratch(part_id, img_id, fn_img))
-		{
-			std::istringstream split(baseMLO->exp_fn_img);
-			for (int i = 0; i <= op.imagedata_offset; i++)
-				getline(split, fn_img);
-		}
-		sp.current_img = fn_img;
-
-        CTIC(accMLO->timer,"readData");
-		// Get the image and recimg data
-		if (baseMLO->do_parallel_disc_io)
-		{
-
-			// If all followers had preread images into RAM: get those now
-			if (baseMLO->do_preread_images)
-			{
-
-                img().reshape(baseMLO->mydata.particles[part_id].images[img_id].img);
-                CTIC(accMLO->timer,"ParaReadPrereadImages");
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(baseMLO->mydata.particles[part_id].images[img_id].img)
-				{
-                	DIRECT_MULTIDIM_ELEM(img(), n) = (RFLOAT)DIRECT_MULTIDIM_ELEM(baseMLO->mydata.particles[part_id].images[img_id].img, n);
-				}
-				CTOC(accMLO->timer,"ParaReadPrereadImages");
-			}
-			else
-			{
-				if (accMLO->dataIs3D)
-				{
-					CTIC(accMLO->timer,"ParaRead3DImages");
-					img.read(fn_img);
-					img().setXmippOrigin();
-					CTOC(accMLO->timer,"ParaRead3DImages");
-				}
-				else
-				{
-					CTIC(accMLO->timer,"ParaRead2DImages");
-					img() = baseMLO->exp_imgs[op.imagedata_offset + img_id];
-					CTOC(accMLO->timer,"ParaRead2DImages");
-				}
-			}
-			if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
-			{
-				FileName fn_recimg;
-				std::istringstream split2(baseMLO->exp_fn_recimg);
-				// Get the right line in the exp_fn_img string
-				for (int i = 0; i <= op.imagedata_offset; i++)
-					getline(split2, fn_recimg);
-				rec_img.read(fn_recimg);
-				rec_img().setXmippOrigin();
-			}
-		}
-		else
-		{
-			// Unpack the image from the imagedata
-			if (accMLO->dataIs3D)
-			{
-				CTIC(accMLO->timer,"Read3DImages");
-				CTIC(accMLO->timer,"resize");
-				img().resize(baseMLO->image_full_size[optics_group], baseMLO->image_full_size[optics_group], baseMLO->image_full_size[optics_group]);
-				CTOC(accMLO->timer,"resize");
-				// Only allow a single image per call of this function!!! nr_pool needs to be set to 1!!!!
-				// This will save memory, as we'll need to store all translated images in memory....
-				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(img())
-				{
-					DIRECT_A3D_ELEM(img(), k, i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, k, i, j);
-				}
-				img().setXmippOrigin();
-
-				if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
-				{
-					rec_img().resize(baseMLO->image_full_size[optics_group], baseMLO->image_full_size[optics_group], baseMLO->image_full_size[optics_group]);
-					int offset = (baseMLO->do_ctf_correction) ? 2 * baseMLO->image_full_size[optics_group] : baseMLO->image_full_size[optics_group];
-					FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(rec_img())
-					{
-						DIRECT_A3D_ELEM(rec_img(), k, i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, offset + k, i, j);
-					}
-					rec_img().setXmippOrigin();
-
-				}
-				CTOC(accMLO->timer,"Read3DImages");
-
-			}
-			else
-			{
-				CTIC(accMLO->timer,"Read2DImages");
-				img().resize(baseMLO->image_full_size[optics_group], baseMLO->image_full_size[optics_group]);
-				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(img())
-				{
-					DIRECT_A2D_ELEM(img(), i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, op.imagedata_offset + img_id, i, j);
-				}
-				img().setXmippOrigin();
-				if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
-				{
-
-					/// TODO: this will be WRONG for multi-image particles, but I guess that's not going to happen anyway...
-					int my_nr_particles = baseMLO->exp_my_last_part_id - baseMLO->exp_my_first_part_id + 1;
-                    if (op.is_tomo) REPORT_ERROR("ERROR: you can not use reconstruct images for 2Dstack-subtomograms!");
-
-					rec_img().resize(baseMLO->image_full_size[optics_group], baseMLO->image_full_size[optics_group]);
-					FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(rec_img())
-					{
-						DIRECT_A2D_ELEM(rec_img(), i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, my_nr_particles + op.imagedata_offset + img_id, i, j);
-					}
-					rec_img().setXmippOrigin();
-				}
-				CTOC(accMLO->timer,"Read2DImages");
-			}
-		}
-		CTOC(accMLO->timer,"readData");
+        // For 2D stacks in subtomogram averaging:
+        if (op.is_tomo)
+        {
+            MultidimArray<RFLOAT> my_img;
+            wholestack().getImage(img_id, my_img);
+            img() = my_img;
+        }
 
 		// ------------------------------------------------------------------------------------------
 
@@ -709,7 +686,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 					CTIC(accMLO->timer,"CTFRead3D_disk");
 					// Read CTF-image from disc
 					FileName fn_ctf;
-					if (!baseMLO->mydata.getImageNameOnScratch(part_id, img_id, fn_ctf, true))
+					if (!baseMLO->mydata.getImageNameOnScratch(part_id, fn_ctf, true))
 					{
 						std::istringstream split(baseMLO->exp_fn_ctf);
 						// Get the right line in the exp_fn_img string
@@ -971,7 +948,11 @@ void getAllSquaredDifferencesCoarse(
 
 	std::vector< AccProjectorPlan > projectorPlans(0, (CudaCustomAllocator *)accMLO->getAllocator());
 
-	//If particle specific sampling plan required
+    int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id); // get optics group of first image for this particle...
+    long int group_id = baseMLO->mydata.getGroupId(op.part_id);
+    RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id);
+
+    //If particle specific sampling plan required
 	if (accMLO->generateProjectionPlanOnTheFly)
 	{
 		CTIC(accMLO->timer,"generateProjectionSetupCoarse");
@@ -1008,7 +989,6 @@ void getAllSquaredDifferencesCoarse(
                     {
                         mag.initIdentity(3);
                     }
-                    int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id); // get optics group of first image for this particle...
 
                     mag = baseMLO->mydata.obsModel.applyAnisoMag(mag, optics_group);
                     mag = baseMLO->mydata.obsModel.applyScaleDifference(mag, optics_group, baseMLO->mymodel.ori_size, baseMLO->mymodel.pixel_size);
@@ -1060,8 +1040,6 @@ void getAllSquaredDifferencesCoarse(
 	//TODO remove this at some point
 	DEBUG_HANDLE_ERROR(cudaDeviceSynchronize());
 
-
-
 	// Loop only from sp.iclass_min to sp.iclass_max to deal with seed generation in first iteration
 	size_t allWeights_size(0);
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -1075,12 +1053,10 @@ void getAllSquaredDifferencesCoarse(
     bool do_CC = (baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc;
     long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
 
+    unsigned long image_size = op.local_Minvsigma2.nzyxdim;
+
 	for (int img_id = 0; img_id < sp.nr_images; img_id++)
 	{
-		long int group_id = baseMLO->mydata.getGroupId(op.part_id, img_id);
-		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
-		int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
-		unsigned long image_size = op.local_Minvsigma2.nzyxdim;
 
 		/*====================================
 				Generate Translations
@@ -1327,7 +1303,12 @@ void getAllSquaredDifferencesFine(
 	=========================================================================================*/
     unsigned long newDataSize(0);
 
-	for (int img_id = 0; img_id < sp.nr_images; img_id++)
+    long int group_id = baseMLO->mydata.getGroupId(op.part_id);
+    RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id);
+    int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id);
+    unsigned long image_size = op.local_Minvsigma2.nzyxdim;
+
+    for (int img_id = 0; img_id < sp.nr_images; img_id++)
 	{
 
         //AccPtrBundle bundleD2( ptrFactory.makeBundle());
@@ -1337,10 +1318,6 @@ void getAllSquaredDifferencesFine(
 		// Reset size without de-allocating: we will append everything significant within
 		// the current allocation and then re-allocate the then determined (smaller) volume
 
-		long int group_id = baseMLO->mydata.getGroupId(op.part_id, img_id);
-		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
-		int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
-		unsigned long image_size = op.local_Minvsigma2.nzyxdim;
 
 		MultidimArray<Complex > Fref;
 		Fref.resize(op.local_Minvsigma2);
@@ -1766,7 +1743,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	XFLOAT my_significant_weight;
 	op.significant_weight = 0.;
 
-    RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, 0);
+    RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id);
 
     RFLOAT old_offset_x(0.), old_offset_y(0.), old_offset_z(0.);
 
@@ -2199,9 +2176,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
                     std::cerr << " fn_img= " << sp.current_img << std::endl;
                     std::cerr << " op.part_id= " << op.part_id << std::endl;
                     std::cerr << " op.min_diff2= " << op.min_diff2 << std::endl;
-                    int group_id = baseMLO->mydata.getGroupId(op.part_id, 0);
+                    int group_id = baseMLO->mydata.getGroupId(op.part_id);
                     std::cerr << " group_id= " << group_id << std::endl;
-                    int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, 0);
+                    int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id);
                     std::cerr << " optics_group= " << optics_group << std::endl;
                     std::cerr << " ml_model.scale_correction[group_id]= " << baseMLO->mymodel.scale_correction[group_id] << std::endl;
                     std::cerr << " exp_significant_weight= " << op.significant_weight << std::endl;
@@ -2267,10 +2244,13 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			sp.itrans_min, sp.itrans_max, op.Fimg, op.Fimg_nomask, op.Fctf, op.old_offset, dummy2, dummy2,
 			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2, op.FstMulti, exp_local_STMulti);
 
-	// In doThreadPrecalculateShiftedImagesCtfsAndInvSigma2s() the origin of the op.local_Minvsigma2s was omitted.
-	// Set those back here
-    int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, 0);
-    RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, 0);
+    int group_id = baseMLO->mydata.getGroupId(op.part_id);
+    int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id);
+    RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id);
+    int my_image_size = baseMLO->mydata.getOpticsImageSize(optics_group);
+
+    // In doThreadPrecalculateShiftedImagesCtfsAndInvSigma2s() the origin of the op.local_Minvsigma2s was omitted.
+    // Set those back here
     DIRECT_MULTIDIM_ELEM(op.local_Minvsigma2, 0) = 1. / (baseMLO->sigma2_fudge * DIRECT_A1D_ELEM(baseMLO->mymodel.sigma2_noise[optics_group], 0));
 
 	// For norm_correction and scale_correction of all images of this particle
@@ -2332,7 +2312,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
     oo_otrans.allAlloc();
 
     int sumBlockNum =0;
-    int group_id = baseMLO->mydata.getGroupId(op.part_id, 0);
 
     CTIC(accMLO->timer,"collect_data_2_pre_kernel");
     for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -2616,10 +2595,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	{
 		CTIC(accMLO->timer,"maximization");
 
+        int group_id = baseMLO->mydata.getGroupId(op.part_id);
+        bool ctf_premultiplied = baseMLO->mydata.obsModel.getCtfPremultiplied(optics_group);
+
 		for (int img_id = 0; img_id < sp.nr_images; img_id++)
 		{
-			int group_id = baseMLO->mydata.getGroupId(op.part_id, img_id);
-			bool ctf_premultiplied = baseMLO->mydata.obsModel.getCtfPremultiplied(optics_group);
 
 			/*======================================================
 			                     TRANSLATIONS
@@ -3114,13 +3094,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		// loop over all images inside this particle
 		RFLOAT thr_avg_norm_correction = 0.;
 		RFLOAT thr_sum_dLL = 0., thr_sum_Pmax = 0.;
-        int group_id = baseMLO->mydata.getGroupId(op.part_id, 0);
-        const int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, 0);
-        RFLOAT my_pixel_size = baseMLO->mydata.getOpticsPixelSize(optics_group);
-        int my_image_size = baseMLO->mydata.getOpticsImageSize(optics_group);
 
-       // If the current images were smaller than the original size, fill the rest of wsum_model.sigma2_noise with the power_class spectrum of the images
-       for (int img_id = 0; img_id < sp.nr_images; img_id++)
+        // If the current images were smaller than the original size, fill the rest of wsum_model.sigma2_noise with the power_class spectrum of the images
+        for (int img_id = 0; img_id < sp.nr_images; img_id++)
         {
             for (unsigned long ires = baseMLO->image_current_size[optics_group] / 2 + 1;
                  ires < baseMLO->image_full_size[optics_group] / 2 + 1; ires++)
@@ -3199,8 +3175,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		// Now, inside a global_mutex, update the other weighted sums among all threads
 		#pragma omp critical(AccMLO_global)
         {
-            long int igroup = baseMLO->mydata.getGroupId(op.part_id, 0);
-            int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, 0);
+            long int igroup = baseMLO->mydata.getGroupId(op.part_id);
+            int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id);
 
 
             if (baseMLO->mydata.obsModel.getCtfPremultiplied(optics_group)) {

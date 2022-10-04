@@ -67,14 +67,14 @@ int Experiment::getOpticsImageSize(int optics_group)
 	return obsModel.getBoxSize(optics_group);
 }
 
-long int Experiment::getGroupId(long int part_id, int img_id)
+long int Experiment::getGroupId(long int part_id)
 {
-	return (particles[part_id].images[img_id]).group_id;
+	return particles[part_id].group_id;
 }
 
-int Experiment::getOpticsGroup(long part_id, int img_id)
+int Experiment::getOpticsGroup(long part_id)
 {
-	return particles[part_id].images[img_id].optics_group;
+	return particles[part_id].optics_group;
 }
 
 int Experiment::getRandomSubset(long int part_id)
@@ -82,9 +82,9 @@ int Experiment::getRandomSubset(long int part_id)
 	return particles[part_id].random_subset;
 }
 
-RFLOAT Experiment::getImagePixelSize(long int part_id, int img_id)
+RFLOAT Experiment::getImagePixelSize(long int part_id)
 {
-	int optics_group = particles[part_id].images[img_id].optics_group;
+	int optics_group = particles[part_id].optics_group;
 	return obsModel.getPixelSize(optics_group);
 }
 
@@ -113,7 +113,7 @@ void Experiment::getNumberOfParticlesPerGroup(std::vector<long int> &nr_particle
 	{
 		if (random_subset == 0 || particles[part_id].random_subset == random_subset)
 		{
-			nr_particles_per_group[particles[part_id].images[0].group_id] += 1;
+			nr_particles_per_group[particles[part_id].group_id] += 1;
 		}
 	}
 
@@ -129,7 +129,7 @@ void Experiment::getNumberOfParticlesPerOpticsGroup(std::vector<long int> &nr_pa
 	{
 		if (random_subset == 0 || particles[part_id].random_subset == random_subset)
 		{
-			nr_particles_per_optics_group[particles[part_id].images[0].optics_group] += 1;
+			nr_particles_per_optics_group[particles[part_id].optics_group] += 1;
 		}
 	}
 }
@@ -156,29 +156,35 @@ FileName Experiment::getMicrographName(long int part_id)
 	return micname;
 }
 
-void Experiment::addParticle(int random_subset, int tomogram_id)
+void Experiment::addParticle(std::string img_name, int optics_group, long int group_id, int random_subset, int tomogram_id)
 {
 
-	ExpParticle particle;
+    if (optics_group >= obsModel.numberOfOpticsGroups())
+        REPORT_ERROR("Experiment::addImageToParticle: optics_group out of range");
+
+    if (group_id >= groups.size())
+        REPORT_ERROR("Experiment::addImageToParticle: group_id out of range");
+
+    ExpParticle particle;
 	particle.id = particles.size();
+    particle.name = img_name;
     particle.tomogram_id = tomogram_id;
 	particle.random_subset = random_subset;
+    particle.optics_group = optics_group;
+    particle.group_id = group_id;
+
+    nr_particles_per_optics_group[optics_group]++;
+    particle.optics_group_id = nr_particles_per_optics_group[optics_group] - 1;
 
 	// Push back this particle in the particles vector and its sorted index in sorted_idx
 	sorted_idx.push_back(particles.size());
 	particles.push_back(particle);
 
-	return;
+    return;
 }
 
-void Experiment::addImageToParticle(std::string img_name, long int part_id, long int group_id, int optics_group,
-                                    d4Matrix *Aproj, CTF *ctf, float dose)
+void Experiment::addImageToParticle(long int part_id, d4Matrix *Aproj, CTF *ctf, float dose)
 {
-	if (group_id >= groups.size())
-		REPORT_ERROR("Experiment::addImageToParticle: group_id out of range");
-
-	if (optics_group >= obsModel.numberOfOpticsGroups())
-		REPORT_ERROR("Experiment::addImageToParticle: optics_group out of range");
 
     Matrix2D<RFLOAT> A(3,3);
     if (Aproj == NULL)
@@ -204,17 +210,9 @@ void Experiment::addImageToParticle(std::string img_name, long int part_id, long
         img.defAngle = ctf->azimuthal_angle;
     }
 
-	img.name = img_name;
 	img.particle_id = part_id;
-	img.group_id = group_id;
-	img.optics_group = optics_group;
-    img.Aproj = A;
+	img.Aproj = A;
     img.dose = dose;
-    nr_images_per_optics_group[optics_group]++;
-	img.optics_group_id = nr_images_per_optics_group[optics_group] - 1;
-
-	if (img.optics_group_id < 0)
-		REPORT_ERROR("Logic error in Experiment::addImageToParticle.");
 
 	// Push back this particle in the particles vector
 	particles[part_id].images.push_back(img);
@@ -477,10 +475,13 @@ void Experiment::initialiseBodies(int _nr_bodies)
 	}
 }
 
-bool Experiment::getImageNameOnScratch(long int part_id, int img_id, FileName &fn_img, bool is_ctf_image)
+bool Experiment::getImageNameOnScratch(long int part_id, FileName &fn_img, bool is_ctf_image)
 {
-	int optics_group = getOpticsGroup(part_id, img_id);
-	long int my_id = particles[part_id].images[img_id].optics_group_id;
+	int optics_group = getOpticsGroup(part_id);
+    //TODO: move optics_group_id to particle, not image!!!!
+	long int my_id = particles[part_id].optics_group_id;
+
+    //REPORT_ERROR("DEBUG: STILL NEED TO ACCOUNT FOR MULTIPLE IMAGES PER PARTICLE HEREE!!!!!! UNFINISHED CODE....");
 
 #ifdef DEBUG_SCRATCH
 	std::cerr << "part_id = " << part_id << " img_id = " << img_id << " my_id = " << my_id << " nr_parts_on_scratch[" << optics_group << "] = " << nr_parts_on_scratch[optics_group] << std::endl;
@@ -495,6 +496,10 @@ bool Experiment::getImageNameOnScratch(long int part_id, int img_id, FileName &f
 			else
 				fn_img = fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particle" + integerToString(my_id+1)+".mrc";
 		}
+        else if (is_tomo)
+        {
+            fn_img = fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particle" + integerToString(my_id+1)+".mrcs";
+        }
 		else
 		{
 			// Write different optics groups into different stacks, as sizes might be different
@@ -631,7 +636,7 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 
     // This function relies on prepareScratchDirectory() being called before!
 
-	long int nr_part = MDimg.numberOfObjects();
+	long int nr_part = particles.size();
 	int barstep;
 	if (verb > 0 && do_copy)
 	{
@@ -656,36 +661,31 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 
 	FileName prev_img_name = "/Unlikely$filename$?*!";
 	int prev_optics_group = -999;
-	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
+    for (long int part_id = 0; part_id < particles.size(); part_id++)
 	{
 		// TODO: think about MPI_Abort here....
-		if (current_object % check_abort_frequency == 0 && pipeline_control_check_abort_job())
+		if (part_id % check_abort_frequency == 0 && pipeline_control_check_abort_job())
 			exit(RELION_EXIT_ABORTED);
 
-		long int imgno;
-		FileName fn_img, fn_ctf, fn_stack, fn_new;
-		Image<RFLOAT> img;
-		MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
+        long int imgno;
+        FileName fn_ctf, fn_stack, fn_new;
+        Image<RFLOAT> img;
+        FileName fn_img = particles[part_id].name;
+        int optics_group = particles[part_id].optics_group;
 
-		int optics_group = 0;
-		if (MDimg.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group))
-		{
-			optics_group--;
-		}
-
-		// Get the size of the first particle
+        // Get the size of the first particle
 		if (nr_parts_on_scratch[optics_group] == 0)
 		{
 			Image<RFLOAT> tmp;
 			tmp.read(fn_img, false); // false means: only read the header!
-			one_part_space = ZYXSIZE(tmp())*sizeof(float); // MRC images are stored in floats!
+			one_part_space = NZYXSIZE(tmp())*sizeof(float); // MRC images are stored in floats!
 			bool myis3D = (ZSIZE(tmp()) > 1);
 			if (myis3D != is_3D)
 				REPORT_ERROR("BUG: inconsistent is_3D values!");
-			// add MRC header size for subtomograms, which are stored as 1 MRC file each
-			if (is_3D)
+			// add MRC header size for subtomograms (in 3D or as 2D stack), which are stored as 1 MRC file each
+			if (is_3D || is_tomo) one_part_space += 1024;
+            if (is_3D)
 			{
-				one_part_space += 1024;
 				also_do_ctf_image = MDimg.containsLabel(EMDL_CTF_IMAGE);
 				if (also_do_ctf_image)
 					one_part_space *= 2;
@@ -695,79 +695,87 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 #endif
 		}
 
-		bool is_duplicate = (prev_img_name == fn_img && prev_optics_group == optics_group);
-		// Read in the particle image, and write out on scratch
-		if (do_copy && !is_duplicate)
-		{
+        bool is_duplicate = (prev_img_name == fn_img && prev_optics_group == optics_group);
+        // Read in the particle image, and write out on scratch
+        if (do_copy && !is_duplicate)
+        {
 #ifdef DEBUG_SCRATCH
-			std::cerr << "used_space = " << used_space << std::endl;
+            std::cerr << "used_space = " << used_space << std::endl;
 #endif
-			// Now we have the particle in memory
-			// See how much space it occupies
-			used_space += one_part_space;
-			// If there is no more space, exit the loop over all objects to stop copying files and change filenames in MDimg
-			if (used_space > max_space)
-			{
-				char nodename[64] = "undefined";
-				gethostname(nodename,sizeof(nodename));
-				std::string myhost(nodename);
-				std::cerr << " Warning: scratch space full on " << myhost << ". Remaining " << nr_part - total_nr_parts_on_scratch << " particles will be read from where they were."<< std::endl;
-				break;
-			}
+            // Now we have the particle in memory
+            // See how much space it occupies
+            used_space += one_part_space;
+            // If there is no more space, exit the loop over all objects to stop copying files and change filenames in MDimg
+            if (used_space > max_space)
+            {
+                char nodename[64] = "undefined";
+                gethostname(nodename,sizeof(nodename));
+                std::string myhost(nodename);
+                std::cerr << " Warning: scratch space full on " << myhost << ". Remaining " << nr_part - total_nr_parts_on_scratch << " particles will be read from where they were."<< std::endl;
+                break;
+            }
 
-			if (is_3D)
-			{
-				// For subtomograms, write individual .mrc files,possibly also CTF images
-				img.read(fn_img);
-				fn_new = fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particle" + integerToString(nr_parts_on_scratch[optics_group]+1)+".mrc";
-				img.write(fn_new);
-				if (also_do_ctf_image)
-				{
-					FileName fn_ctf;
-					MDimg.getValue(EMDL_CTF_IMAGE, fn_ctf);
-					img.read(fn_ctf);
-					fn_new = fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particle_ctf" + integerToString(nr_parts_on_scratch[optics_group]+1)+".mrc";
-					img.write(fn_new);
-				}
-			}
-			else
-			{
-				// Only open/close new stacks, so check if this is a new stack
-				fn_img.decompose(imgno, fn_stack);
-				if (fn_stack != fn_open_stack)
-				{
-					// Manual closing isn't necessary: if still open, then openFile will first close the filehandler
-					// Also closing the last one isn't necessary, as destructor will do this.
-					//if (fn_open_stack != "")
-					//	hFile.closeFile();
-					hFile.openFile(fn_stack, WRITE_READONLY);
-					fn_open_stack = fn_stack;
-				}
-				img.readFromOpenFile(fn_img, hFile, -1, false);
+            if (is_3D)
+            {
+                // For subtomograms, write individual .mrc files,possibly also CTF images
+                img.read(fn_img);
+                fn_new = fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particle" + integerToString(nr_parts_on_scratch[optics_group]+1)+".mrc";
+                img.write(fn_new);
+                if (also_do_ctf_image)
+                {
+                    FileName fn_ctf;
+                    MDimg.getValue(EMDL_CTF_IMAGE, fn_ctf);
+                    img.read(fn_ctf);
+                    fn_new = fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particle_ctf" + integerToString(nr_parts_on_scratch[optics_group]+1)+".mrc";
+                    img.write(fn_new);
+                }
+            }
+            else if (is_tomo)
+            {
+                 // For subtomograms as 2D stacks, write individual .mrcs files
+                img.read(fn_img);
+                fn_new = fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particle" + integerToString(nr_parts_on_scratch[optics_group]+1)+".mrcs";
+                img.write(fn_new);
+            }
+            else
+            {
+                // Only open/close new stacks, so check if this is a new stack
+                fn_img.decompose(imgno, fn_stack);
+                if (fn_stack != fn_open_stack)
+                {
+                    // Manual closing isn't necessary: if still open, then openFile will first close the filehandler
+                    // Also closing the last one isn't necessary, as destructor will do this.
+                    //if (fn_open_stack != "")
+                    //	hFile.closeFile();
+                    hFile.openFile(fn_stack, WRITE_READONLY);
+                    fn_open_stack = fn_stack;
+                }
+                img.readFromOpenFile(fn_img, hFile, -1, false);
 
-				fn_new.compose(nr_parts_on_scratch[optics_group]+1, fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particles.mrcs");
-				if (nr_parts_on_scratch[optics_group] == 0)
-					img.write(fn_new, -1, false, WRITE_OVERWRITE);
-				else
-					img.write(fn_new, -1, true, WRITE_APPEND);
+                fn_new.compose(nr_parts_on_scratch[optics_group]+1, fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particles.mrcs");
+                if (nr_parts_on_scratch[optics_group] == 0)
+                    img.write(fn_new, -1, false, WRITE_OVERWRITE);
+                else
+                    img.write(fn_new, -1, true, WRITE_APPEND);
 
 #ifdef DEBUG_SCRATCH
-				std::cerr << "Cached " << fn_img << " to " << fn_new << std::endl;
+                std::cerr << "Cached " << fn_img << " to " << fn_new << std::endl;
 #endif
-			}
-		}
+            }
+        }
 
-		// Update the counter and progress bar
-		if (!is_duplicate)
-			nr_parts_on_scratch[optics_group]++;
-		total_nr_parts_on_scratch++;
+        // Update the counter and progress bar
+        if (!is_duplicate)
+            nr_parts_on_scratch[optics_group]++;
+        total_nr_parts_on_scratch++;
 
-		prev_img_name = fn_img;
-		prev_optics_group = optics_group;
+        prev_img_name = fn_img;
+        prev_optics_group = optics_group;
 
-		if (verb > 0 && total_nr_parts_on_scratch % barstep == 0)
-			progress_bar(total_nr_parts_on_scratch);
-	}
+        if (verb > 0 && total_nr_parts_on_scratch % barstep == 0)
+            progress_bar(total_nr_parts_on_scratch);
+
+	} // end loop part_id
 
 	if (verb)
 	{
@@ -835,7 +843,8 @@ void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
         // MDimg and MDopt have to be read at the same time, so that the optics groups can be
 		// renamed in case they are non-contiguous or not sorted
 		ObservationModel::loadSafely(fn_exp, obsModel, MDimg, "particles", verb);
-		nr_images_per_optics_group.resize(obsModel.numberOfOpticsGroups(), 0);
+		// The below is useful for filenames on scratch disk (related to avoiding copying duplicate particles when doing symmetry expansion)
+        nr_particles_per_optics_group.resize(obsModel.numberOfOpticsGroups(), 0);
 
         std::vector<std::vector<ParticleIndex>> particles_idx;
         if (is_tomo)
@@ -971,7 +980,7 @@ void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
                 }
 
                 // Add this particle to the Experiment, with its tomogram
-                addParticle(my_random_subset, tomo_id);
+                addParticle(img_name, optics_group, group_id, my_random_subset, tomo_id);
 
                 // Pre-orientation of this particle in the tomogram
                 ParticleIndex id(part_id);
@@ -983,24 +992,22 @@ void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
                 for (int f = 0; f < fc; f++)
                 {
 
-                    FileName my_name = integerToString(f+1) + "@" + img_name;
-
                     d4Matrix P = tomogram.projectionMatrices[f] * d4Matrix(A);
 
                     CTF ctf = tomogram.getCtf(f, pos);
 
                     float dose = tomogram.getCumulativeDose(f);
-                    addImageToParticle(my_name, part_id, group_id, optics_group, &P, &ctf, dose);
+                    addImageToParticle(part_id, &P, &ctf, dose);
                 }
 
             }
             else
             {
                 // Add this particle to the Experiment
-                addParticle(my_random_subset);
+                addParticle(img_name, optics_group, group_id, my_random_subset);
 
                 // Create a new image in this particle
-                addImageToParticle(img_name, part_id, group_id, optics_group);
+                addImageToParticle(part_id);
             }
 #ifdef DEBUG_READ
                 timer.tic(tori);
@@ -1008,17 +1015,23 @@ void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
             if (do_preread_images)
             {
                 Image<float> img;
-                for (int img_id = 0; img_id < particles[part_id].numberOfImages(); img_id++)
+                if (is_tomo || is_3D)
                 {
-                    particles[part_id].images[img_id].name.decompose(dump, fn_stack);
-                    if (fn_stack != fn_open_stack) {
+                    img.read(img_name);
+                    particles[part_id].img = img();
+                }
+                else
+                {
+                    img_name.decompose(dump, fn_stack);
+                    if (fn_stack != fn_open_stack)
+                    {
                         hFile.openFile(fn_stack, WRITE_READONLY);
                         fn_open_stack = fn_stack;
                     }
-                    img.readFromOpenFile(particles[part_id].images[img_id].name, hFile, -1, false);
+                    img.readFromOpenFile(img_name, hFile, -1, false);
                     img().setXmippOrigin();
-                    particles[part_id].images[img_id].img = img();
-                }
+                    particles[part_id].img = img();
+    			}
             }
 
 #ifdef DEBUG_READ

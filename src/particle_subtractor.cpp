@@ -464,8 +464,8 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 {
 	// Read the particle image
 	Image<RFLOAT> img;
-	int optics_group = opt.mydata.getOpticsGroup(part_id, imgno);
-	img.read(opt.mydata.particles[part_id].images[0].name);
+	int optics_group = opt.mydata.getOpticsGroup(part_id);
+	img.read(opt.mydata.particles[part_id].name);
 	img().setXmippOrigin();
 
 	// Make sure gold-standard is adhered to!
@@ -477,7 +477,7 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 	}
 
 	// Get the consensus class, orientational parameters and norm (if present)
-	RFLOAT my_pixel_size = opt.mydata.getImagePixelSize(part_id, 0);
+	RFLOAT my_pixel_size = opt.mydata.getImagePixelSize(part_id);
 	RFLOAT remap_image_sizes = (opt.mymodel.ori_size * opt.mymodel.pixel_size) / (XSIZE(img()) * my_pixel_size);
 	Matrix1D<RFLOAT> my_old_offset(3), my_residual_offset(3), centering_offset(3);
 	Matrix2D<RFLOAT> Aori;
@@ -739,7 +739,7 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 
 	if (opt.do_scale_correction)
 	{
-		int group_id = opt.mydata.getGroupId(part_id, 0);
+		int group_id = opt.mydata.getGroupId(part_id);
 		RFLOAT myscale = opt.mymodel.scale_correction[group_id];
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fsubtract)
 		{
@@ -811,7 +811,7 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, l
 		// Now write out the image & set filenames in output metadatatable
 		FileName fn_img = getParticleName(counter, rank, optics_group);
 		opt.mydata.MDimg.setValue(EMDL_IMAGE_NAME, fn_img, part_id);
-		opt.mydata.MDimg.setValue(EMDL_IMAGE_ORI_NAME, opt.mydata.particles[part_id].images[0].name, part_id);
+		opt.mydata.MDimg.setValue(EMDL_IMAGE_ORI_NAME, opt.mydata.particles[part_id].name, part_id);
 		//Also set the original order in the input STAR file for later combination
 		opt.mydata.MDimg.setValue(EMDL_IMAGE_ID, part_id, part_id);
 		MDimg_out.addObject();

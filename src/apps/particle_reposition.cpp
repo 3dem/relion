@@ -157,8 +157,8 @@ public:
 			bool found_one = false;
 			for (long int part_id = 0; part_id < optimiser.mydata.numberOfParticles(); part_id++)
 			{
-				int optics_group = optimiser.mydata.getOpticsGroup(part_id, 0);
-				RFLOAT my_pixel_size = optimiser.mydata.getImagePixelSize(part_id, 0);
+				int optics_group = optimiser.mydata.getOpticsGroup(part_id);
+				RFLOAT my_pixel_size = optimiser.mydata.getImagePixelSize(part_id);
 				int my_image_size = optimiser.mydata.getOpticsImageSize(optics_group);
 
 				if (do_subtract && fabs(my_pixel_size - mic_pixel_size) > 1e-6)
@@ -304,7 +304,7 @@ public:
 
 					if (optimiser.do_scale_correction)
 					{
-						int group_id = optimiser.mydata.getGroupId(part_id, 0);
+						int group_id = optimiser.mydata.getGroupId(part_id);
 						RFLOAT myscale = optimiser.mymodel.scale_correction[group_id];
 						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fref)
 						{

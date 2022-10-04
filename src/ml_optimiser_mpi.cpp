@@ -1214,7 +1214,7 @@ void MlOptimiserMpi::expectation()
 					else
 					{
 						// new in 3.1: first send the image_size of these particles (as no longer necessarily the same as mymodel.ori_size...)
-						int my_image_size = mydata.getOpticsImageSize(mydata.getOpticsGroup(JOB_FIRST, 0));
+						int my_image_size = mydata.getOpticsImageSize(mydata.getOpticsGroup(JOB_FIRST));
 						node->relion_MPI_Send(&my_image_size, 1, MPI_INT, this_follower, MPITAG_IMAGE_SIZE, MPI_COMM_WORLD);
 
 						// Send imagedata to the followers
