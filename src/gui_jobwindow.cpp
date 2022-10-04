@@ -361,7 +361,7 @@ void JobWindow::initialise(int my_job_type, bool _is_tomo)
 	}
 	else if (my_job_type == PROC_3DCLASS)
 	{
-		myjob.initialise(my_job_type);
+        myjob.initialise(my_job_type);
 		initialiseClass3DWindow();
 	}
 	else if (my_job_type == PROC_3DAUTO)
@@ -1380,7 +1380,17 @@ void JobWindow::initialiseInimodelWindow()
 	tab1->label("I/O");
 	resetHeight();
 
-	place("fn_img", TOGGLE_DEACTIVATE);
+    if (is_tomo)
+    {
+        place("in_optimisation", TOGGLE_DEACTIVATE);
+        current_y += STEPY /2 ;
+    }
+
+    place("fn_img", TOGGLE_DEACTIVATE);
+    if (is_tomo)
+    {
+        place("fn_tomo", TOGGLE_DEACTIVATE);
+    }
 	place("fn_cont", TOGGLE_REACTIVATE);
 
 	tab1->end();
@@ -1460,7 +1470,17 @@ void JobWindow::initialiseClass3DWindow()
 	tab1->label("I/O");
 	resetHeight();
 
-	place("fn_img", TOGGLE_DEACTIVATE);
+    if (is_tomo)
+    {
+        place("in_optimisation", TOGGLE_DEACTIVATE);
+        current_y += STEPY /2 ;
+    }
+
+    place("fn_img", TOGGLE_DEACTIVATE);
+    if (is_tomo)
+    {
+        place("fn_tomo", TOGGLE_DEACTIVATE);
+    }
 	place("fn_cont", TOGGLE_REACTIVATE);
 	place("fn_ref", TOGGLE_DEACTIVATE);
 	place("fn_mask");
@@ -1648,6 +1668,10 @@ void JobWindow::initialiseAutorefineWindow()
 	}
 
 	place("fn_img", TOGGLE_DEACTIVATE);
+	if (is_tomo)
+	{
+		place("fn_tomo", TOGGLE_DEACTIVATE);
+	}
 	place("fn_cont", TOGGLE_REACTIVATE);
 	place("fn_ref", TOGGLE_DEACTIVATE);
 	place("fn_mask");

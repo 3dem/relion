@@ -3321,10 +3321,18 @@ void RelionJob::initialiseInimodelJob()
 {
 	hidden_name = ".gui_inimodel";
 
+	if (is_tomo)
+	{
+		joboptions["in_optimisation"] = JobOption("Input optimisation set: ", OUTNODE_TOMO_OPTIMISATION, "", "Optimisation set STAR file (*.star)", "Input tomo optimisation set. Input images STAR file, reference halfmaps and reference mask files will be extracted. If input files are specified below, then they will override the components in this optimisation set.");
+	}
 	joboptions["fn_img"] = JobOption("Input images STAR file:", NODE_PARTS_CPIPE, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \
 In Gradient optimisation, it is very important that there are particles from enough different orientations. One only needs a few thousand to 10k particles. When selecting good 2D classes in the Subset Selection jobtype, use the option to select a maximum number of particles from each class to generate more even angular distributions for SGD.\
 \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
 nor will it be possible to perform noise spectra estimation or intensity scale corrections in image groups. Therefore, running RELION with an input stack will in general provide sub-optimal results and is therefore not recommended!! Use the Preprocessing procedure to get the input STAR file in a semi-automated manner. Read the RELION wiki for more information.");
+    if (is_tomo)
+    {
+        joboptions["fn_tomo"] = JobOption("Input tomograms: ", OUTNODE_TOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "Input tomogram set, for 2D stacks of subtomograms only");
+    }
 	joboptions["fn_cont"] = JobOption("Continue from here: ", std::string(""), "STAR Files (*_optimiser.star)", "CURRENT_ODIR", "Select the *_optimiser.star file for the iteration \
 from which you want to continue a previous run. \
 Note that the Output rootname of the continued run and the rootname of the previous run cannot be the same. \
@@ -3421,12 +3429,24 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 		//int it = (int)textToFloat((joboptions["fn_cont"].getString().substr(pos_it+3, 6)).c_str());
 		//fn_run += "_ct" + floatToString(it);
 		command += " --continue " + joboptions["fn_cont"].getString();
+
+		// If is_continue we still need tomo optimisation set to create output optimisation set
+		if (is_tomo && joboptions["in_optimisation"].getString() != "")
+		{
+			FileName fn_OS = joboptions["in_optimisation"].getString();
+			Node node(fn_OS, joboptions["in_optimisation"].node_type);
+			inputNodes.push_back(node);
+			command += " --ios " + fn_OS;
+		}
+
 	}
 
 	command += " --o " + outputname + fn_run;
         command += " --iter " + joboptions["nr_iter"].getString();
 
-	int total_nr_iter = joboptions["nr_iter"].getNumber(error_message);
+    if (is_tomo) label += ".tomo";
+
+    int total_nr_iter = joboptions["nr_iter"].getNumber(error_message);
 	if (error_message != "") return false;
     int nr_classes = joboptions["nr_classes"].getNumber(error_message);
 	if (error_message != "") return false;
@@ -3436,14 +3456,39 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 	{
 		command += " --grad --denovo_3dref ";
 
-		if (joboptions["fn_img"].getString() == "")
+		// If tomo optimiser set is passed, fn_img and fn_ref can be empty
+		if (is_tomo && joboptions["in_optimisation"].getString() != "")
+		{
+			// Optimiser set should contain particles, halfmap and refmask or they should be set especifically
+			// If Optimiset set is passed without halfmaps or refmask, they cannot be set as "None" in the GUI.
+			FileName fn_OS = joboptions["in_optimisation"].getString();
+			Node node(fn_OS, joboptions["in_optimisation"].node_type);
+			inputNodes.push_back(node);
+			command += " --ios " + fn_OS;
+
+			Node node1( outputname + fn_run + "_optimisation_set.star", LABEL_TOMO_OPTIMISATION);
+			outputNodes.push_back(node1);
+
+		}
+		else if (joboptions["fn_img"].getString() == "")
 		{
 			error_message = "ERROR: empty field for input STAR file...";
 			return false;
 		}
-		command += " --i " + joboptions["fn_img"].getString();
-		Node node(joboptions["fn_img"].getString(), joboptions["fn_img"].node_type);
-		inputNodes.push_back(node);
+
+		if (joboptions["fn_img"].getString() != "")
+		{
+            command += " --i " + joboptions["fn_img"].getString();
+            Node node(joboptions["fn_img"].getString(), joboptions["fn_img"].node_type);
+            inputNodes.push_back(node);
+        }
+
+        if (is_tomo && joboptions["fn_tomo"].getString() != "")
+        {
+            command += " --tomograms " + joboptions["fn_tomo"].getString();
+            Node node(joboptions["fn_tomo"].getString(), joboptions["fn_tomo"].node_type);
+            inputNodes.push_back(node);
+        }
 
 		// CTF stuff
 		if (joboptions["do_ctf_correction"].getBoolean())
@@ -3552,8 +3597,16 @@ void RelionJob::initialiseClass3DJob()
 {
 	hidden_name = ".gui_class3d";
 
+	if (is_tomo)
+	{
+		joboptions["in_optimisation"] = JobOption("Input optimisation set: ", OUTNODE_TOMO_OPTIMISATION, "", "Optimisation set STAR file (*.star)", "Input tomo optimisation set. Input images STAR file, reference halfmaps and reference mask files will be extracted. If input files are specified below, then they will override the components in this optimisation set.");
+	}
 	joboptions["fn_img"] = JobOption("Input images STAR file:", NODE_PARTS_CPIPE, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
 nor will it be possible to perform noise spectra estimation or intensity scale corrections in image groups. Therefore, running RELION with an input stack will in general provide sub-optimal results and is therefore not recommended!! Use the Preprocessing procedure to get the input STAR file in a semi-automated manner. Read the RELION wiki for more information.");
+    if (is_tomo)
+    {
+        joboptions["fn_tomo"] = JobOption("Input tomograms: ", OUTNODE_TOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "Input tomogram set, for 2D stacks of subtomograms only");
+    }
 	joboptions["fn_cont"] = JobOption("Continue from here: ", std::string(""), "STAR Files (*_optimiser.star)", "CURRENT_ODIR", "Select the *_optimiser.star file for the iteration \
 from which you want to continue a previous run. \
 Note that the Output rootname of the continued run and the rootname of the previous run cannot be the same. \
@@ -3777,6 +3830,13 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 		//int it = (int)textToFloat((joboptions["fn_cont"].getString().substr(pos_it+3, 6)).c_str());
 		//fn_run += "_ct" + floatToString(it);;
 		command += " --continue " + joboptions["fn_cont"].getString();
+
+		// If is_continue we still need tomo optimisation set to create output optimisation set
+		if (is_tomo && joboptions["in_optimisation"].getString() != "")
+		{
+			FileName fn_OS = joboptions["in_optimisation"].getString();
+			command += " --ios " + fn_OS;
+		}
 	}
 
 	command += " --o " + outputname + fn_run;
@@ -3791,20 +3851,46 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 
 	if (!is_continue)
 	{
-		if (joboptions["fn_img"].getString() == "")
+        // If tomo optimiser set is passed, fn_img and fn_ref can be empty
+		if (is_tomo && joboptions["in_optimisation"].getString() != "")
 		{
-			error_message = "ERROR: empty field for input STAR file...";
-			return false;
-		}
-		command += " --i " + joboptions["fn_img"].getString();
-		Node node(joboptions["fn_img"].getString(), joboptions["fn_img"].node_type);
-		inputNodes.push_back(node);
+			// Optimiser set should contain particles, halfmap and refmask or they should be set especifically
+			// If Optimiset set is passed without halfmaps or refmask, they cannot be set as "None" in the GUI.
+			FileName fn_OS = joboptions["in_optimisation"].getString();
+			Node node(fn_OS, joboptions["in_optimisation"].node_type);
+			inputNodes.push_back(node);
+			command += " --ios " + fn_OS;
 
-		if (joboptions["fn_ref"].getString() == "")
+			Node node1( outputname + fn_run + "_optimisation_set.star", LABEL_TOMO_OPTIMISATION);
+			outputNodes.push_back(node1);
+
+			if (joboptions["fn_ref"].getString() == "" && !joboptions["ref_correct_greyscale"].getBoolean())
+				command += " --firstiter_cc";
+		}
+		else if (joboptions["fn_img"].getString() == "")
 		{
-			error_message = "ERROR: empty field for reference. Type None for de-novo subtomogram averaging, provide reference for single-particle analysis.";
+            error_message = "ERROR: empty field for input STAR file...";
 			return false;
 		}
+        else if (joboptions["fn_ref"].getString() == "")
+        {
+            error_message = "ERROR: empty field for reference. Type None for de-novo subtomogram averaging, provide reference for single-particle analysis.";
+            return false;
+        }
+
+		if (joboptions["fn_img"].getString() != "")
+		{
+            command += " --i " + joboptions["fn_img"].getString();
+            Node node(joboptions["fn_img"].getString(), joboptions["fn_img"].node_type);
+            inputNodes.push_back(node);
+        }
+
+        if (is_tomo && joboptions["fn_tomo"].getString() != "")
+        {
+            command += " --tomograms " + joboptions["fn_tomo"].getString();
+            Node node(joboptions["fn_tomo"].getString(), joboptions["fn_tomo"].node_type);
+            inputNodes.push_back(node);
+        }
 
 		if (joboptions["fn_ref"].getString() != "None")
 		{
@@ -4030,6 +4116,10 @@ void RelionJob::initialiseAutorefineJob()
 	}
 	joboptions["fn_img"] = JobOption("Input images STAR file:", NODE_PARTS_CPIPE, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
 nor will it be possible to perform noise spectra estimation or intensity scale corrections in image groups. Therefore, running RELION with an input stack will in general provide sub-optimal results and is therefore not recommended!! Use the Preprocessing procedure to get the input STAR file in a semi-automated manner. Read the RELION wiki for more information.");
+    if (is_tomo)
+    {
+        joboptions["fn_tomo"] = JobOption("Input tomograms: ", OUTNODE_TOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "Input tomogram set, for 2D stacks of subtomograms only");
+    }
 	joboptions["fn_cont"] = JobOption("Continue from here: ", std::string(""), "STAR Files (*_it*_optimiser.star)", "CURRENT_ODIR", "Select the *_optimiser.star file for the iteration \
 from which you want to continue a previous run. \
 Note that the Output rootname of the continued run and the rootname of the previous run cannot be the same. \
@@ -4237,8 +4327,6 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 		if (is_tomo && joboptions["in_optimisation"].getString() != "")
 		{
 			FileName fn_OS = joboptions["in_optimisation"].getString();
-			Node node(fn_OS, joboptions["in_optimisation"].node_type);
-			inputNodes.push_back(node);
 			command += " --ios " + fn_OS;
 		}
 	}
@@ -4288,6 +4376,14 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 			Node node(joboptions["fn_img"].getString(), joboptions["fn_img"].node_type);
 			inputNodes.push_back(node);
 		}
+
+        if (is_tomo && joboptions["fn_tomo"].getString() != "")
+        {
+            command += " --tomograms " + joboptions["fn_tomo"].getString();
+            Node node(joboptions["fn_tomo"].getString(), joboptions["fn_tomo"].node_type);
+            inputNodes.push_back(node);
+        }
+
 
 		FileName fn_ref = joboptions["fn_ref"].getString();
 		if (fn_ref != "" && fn_ref != "None")
