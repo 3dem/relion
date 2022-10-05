@@ -602,11 +602,6 @@ void MlOptimiser::parseInitial(int argc, char **argv)
             if (!optimisationSet.getValue(EMDL_TOMO_TRAJECTORIES_FILE_NAME, fn_motion))
                 std::cout << " No motion trajectories were found in file " + fn_OS + ". Continuing without mask." << std::endl;
         }
-        if (fn_ref == "None")
-        {
-            if (!optimisationSet.getValue(EMDL_TOMO_REFERENCE_MAP_1_FILE_NAME, fn_ref))
-                REPORT_ERROR("No reference half map filenames were found in file " + fn_OS);
-        }
         if (fn_mask == "None")
         {
             if (!optimisationSet.getValue(EMDL_TOMO_REFERENCE_MASK_FILE_NAME, fn_mask))
