@@ -588,7 +588,10 @@ void SubtomoProgram::processTomograms(
 
             } else {
 
-                particleStack = NewStackHelper::FourierTransformStack(particlesRS);
+                if (do_gridding_precorrection || do_circle_crop)
+                {
+                    particleStack = NewStackHelper::FourierTransformStack(particlesRS);
+                }
 
                 // Write 3D subtomograms
                 BufferedImage<fComplex> dataImgFS(sh3D, s3D, s3D);
@@ -739,8 +742,8 @@ BufferedImage<float> SubtomoProgram::cropAndTaper(const BufferedImage<float>& im
 	
 	ctfImgRS = Centering::fftwFullToHumanFull(ctfImgRS);
 	ctfImgRS = Padding::unpadCenter3D_full(ctfImgRS, boundary);
-	
-	Reconstruction::GaussEnvelope(ctfImgRS, env_sigma, do_center, num_threads);				
+
+    Reconstruction::GaussEnvelope(ctfImgRS, env_sigma, do_center, num_threads);
 	Reconstruction::taper(ctfImgRS, taper, do_center, num_threads);
 	
 	BufferedImage<float> ctfImgRS_cent = Centering::humanFullToFftwFull(ctfImgRS);
