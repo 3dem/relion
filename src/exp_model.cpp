@@ -722,7 +722,7 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
                 if (also_do_ctf_image)
                 {
                     FileName fn_ctf;
-                    MDimg.getValue(EMDL_CTF_IMAGE, fn_ctf);
+                    MDimg.getValue(EMDL_CTF_IMAGE, fn_ctf, part_id);
                     img.read(fn_ctf);
                     fn_new = fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particle_ctf" + integerToString(nr_parts_on_scratch[optics_group]+1)+".mrc";
                     img.write(fn_new);
