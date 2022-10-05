@@ -132,7 +132,7 @@ public:
 class OptimisationParamters
 {
 public:
-	unsigned metadata_offset, imagedata_offset;
+	unsigned metadata_offset;
 
 	unsigned long part_id;
 
@@ -156,8 +156,7 @@ public:
 
 	OptimisationParamters (unsigned nr_images, unsigned long part_id, bool is_tomo):
 		metadata_offset(0),
-        imagedata_offset(0),
-		is_tomo(is_tomo),
+        is_tomo(is_tomo),
 		part_id(part_id)
 	{
 		power_img.resize(nr_images);

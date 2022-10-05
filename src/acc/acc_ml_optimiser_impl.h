@@ -242,7 +242,7 @@ void getFourierTransformsAndCtfs(long int part_id,
     if (!baseMLO->mydata.getImageNameOnScratch(part_id, fn_img))
     {
         std::istringstream split(baseMLO->exp_fn_img);
-        for (int i = 0; i <= op.imagedata_offset; i++)
+        for (int i = 0; i <= op.metadata_offset; i++)
             getline(split, fn_img);
     }
     sp.current_img = fn_img;
@@ -276,7 +276,7 @@ void getFourierTransformsAndCtfs(long int part_id,
             else
             {
                 CTIC(accMLO->timer,"ParaRead2DImages");
-                img() = baseMLO->exp_imgs[op.imagedata_offset];
+                img() = baseMLO->exp_imgs[op.metadata_offset];
                 CTOC(accMLO->timer,"ParaRead2DImages");
             }
         }
@@ -285,7 +285,7 @@ void getFourierTransformsAndCtfs(long int part_id,
             FileName fn_recimg;
             std::istringstream split2(baseMLO->exp_fn_recimg);
             // Get the right line in the exp_fn_img string
-            for (int i = 0; i <= op.imagedata_offset; i++)
+            for (int i = 0; i <= op.metadata_offset; i++)
                 getline(split2, fn_recimg);
             rec_img.read(fn_recimg);
             rec_img().setXmippOrigin();
@@ -300,7 +300,7 @@ void getFourierTransformsAndCtfs(long int part_id,
         img().resize(baseMLO->image_full_size[optics_group], baseMLO->image_full_size[optics_group]);
         FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(img())
             {
-                DIRECT_A2D_ELEM(img(), i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, op.imagedata_offset, i, j);
+                DIRECT_A2D_ELEM(img(), i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, op.metadata_offset, i, j);
             }
         img().setXmippOrigin();
         if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
@@ -313,7 +313,7 @@ void getFourierTransformsAndCtfs(long int part_id,
             rec_img().resize(baseMLO->image_full_size[optics_group], baseMLO->image_full_size[optics_group]);
             FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(rec_img())
                 {
-                    DIRECT_A2D_ELEM(rec_img(), i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, my_nr_particles + op.imagedata_offset, i, j);
+                    DIRECT_A2D_ELEM(rec_img(), i, j) = DIRECT_A3D_ELEM(baseMLO->exp_imagedata, my_nr_particles + op.metadata_offset, i, j);
                 }
             rec_img().setXmippOrigin();
         }
@@ -690,7 +690,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 					{
 						std::istringstream split(baseMLO->exp_fn_ctf);
 						// Get the right line in the exp_fn_img string
-						for (int i = 0; i <= op.imagedata_offset; i++)
+						for (int i = 0; i <= op.metadata_offset; i++)
 							getline(split, fn_ctf);
 					}
 					Ictf.read(fn_ctf);
@@ -3322,8 +3322,7 @@ void accDoExpectationOneParticle(MlClass *myInstance, unsigned long part_id_sort
 		for (long int iori = baseMLO->exp_my_first_part_id; iori <= baseMLO->exp_my_last_part_id; iori++)
 		{
 			if (iori == part_id_sorted) break;
-			op.imagedata_offset += baseMLO->mydata.numberOfImagesInParticle(iori);
-            op.metadata_offset += 1;
+			op.metadata_offset += 1;
 		}
 #ifdef TIMING
 // Only time one thread

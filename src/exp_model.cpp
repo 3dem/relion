@@ -631,8 +631,6 @@ void Experiment::deleteDataOnScratch()
 
 void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf_image, RFLOAT keep_free_scratch_Gb)
 {
-	if (is_tomo) REPORT_ERROR("ERROR: copying particles to scratch has not yet been implemented for relion-4.1 2D stack STA....");
-    // TODO: the loop over MDimg below should be replaced by a loop over all particles and img_id therein....
 
     // This function relies on prepareScratchDirectory() being called before!
 

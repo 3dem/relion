@@ -3778,7 +3778,6 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
     FileName fn_img, fn_stack, fn_open_stack="";
 
     // Store total number of particle images in this bunch of SomeParticles, and set translations and orientations for skip_align/rotate
-    long int my_imagedata_offset = 0;
     exp_imgs.clear();
     int metadata_offset = 0;
     for (long int part_id_sorted = my_first_part_id; part_id_sorted <= my_last_part_id; part_id_sorted++, metadata_offset++)
@@ -3854,12 +3853,11 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
             if (!mydata.getImageNameOnScratch(part_id, fn_img))
             {
                 std::istringstream split(exp_fn_img);
-                for (int i = 0; i <= my_imagedata_offset; i++)
+                for (int i = 0; i <= metadata_offset; i++)
                 {
                     getline(split, fn_img);
                 }
             }
-
 
             // Only open again a new stackname
             fn_img.decompose(dump, fn_stack);
@@ -4070,12 +4068,10 @@ void MlOptimiser::expectationOneParticle(long int part_id_sorted, int thread_id)
         int my_nr_images = mydata.numberOfImagesInParticle(part_id);
         // Global exp_metadata array has metadata of all ori_particles. Where does my_ori_particle start?
         int metadata_offset = 0;
-        int imagedata_offset = 0;
         for (long int iori = exp_my_first_part_id; iori <= exp_my_last_part_id; iori++)
         {
             if (iori == part_id_sorted)
                 break;
-            imagedata_offset += mydata.numberOfImagesInParticle(mydata.sorted_idx[iori]);
             metadata_offset += 1;
         }
 
@@ -4094,7 +4090,7 @@ void MlOptimiser::expectationOneParticle(long int part_id_sorted, int thread_id)
             timer.tic(TIMING_ESP_FT);
         }
 #endif
-        getFourierTransformsAndCtfs(part_id, ibody, metadata_offset, imagedata_offset, exp_Fimg, exp_Fimg_nomask, exp_Fctf,
+        getFourierTransformsAndCtfs(part_id, ibody, metadata_offset, exp_Fimg, exp_Fimg_nomask, exp_Fctf,
                 exp_old_offset, exp_prior, exp_power_imgs, exp_highres_Xi2_img,
                 exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior,
                 exp_directions_prior, exp_psi_prior, exp_STMulti);
@@ -5419,7 +5415,7 @@ void MlOptimiser::updateImageSizeAndResolutionPointers()
 
 
 void MlOptimiser::getFourierTransformsAndCtfs(
-        long int part_id, int ibody, int metadata_offset, int imagedata_offset,
+        long int part_id, int ibody, int metadata_offset,
         std::vector<MultidimArray<Complex > > &exp_Fimg,
         std::vector<MultidimArray<Complex > > &exp_Fimg_nomask,
         std::vector<MultidimArray<RFLOAT> > &exp_Fctf,
@@ -5739,35 +5735,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(
         else
         {
 
-//#define DEBUG_SIMULTANEOUS_READ
-#ifdef DEBUG_SIMULTANEOUS_READ
-            // Read from disc
-                FileName fn_img;
-                std::istringstream split(exp_fn_img);
-                for (int i = 0; i <= my_imagedata_offset; i++)
-                    getline(split, fn_img);
-
-                img.read(fn_img);
-                img().setXmippOrigin();
-
-                // Check that this is the same as the image in exp_imgs vector
-                Image<RFLOAT> diff;
-                if (my_imagedata_offset >= exp_imgs.size())
-                {
-                    std::cerr << " my_imagedata_offset= " <<my_imagedata_offset << " exp_imgs.size()= "<<exp_imgs.size()<<std::endl;
-                    REPORT_ERROR("BUG: my_imagedata_offset runs out of bounds!");
-                }
-                diff() = img() - exp_imgs[my_imagedata_offset];
-                if (diff().computeMax() > 1e-6)
-                {
-                    std::cerr << "metadata_offset= " <<metadata_offset<<" fn_img=" << fn_img << " diff avg=" << diff().computeAvg()<<std::endl;
-                    diff.write("diff.spi");
-                    diff()= exp_imgs[metadata_offset];
-                    diff.write("preread.spi");
-                    img.write("img.spi");
-                    REPORT_ERROR("unequal pre-read images... BUG!");
-                }
-#else
             if (mymodel.data_dim == 3)
             {
 
@@ -5776,7 +5743,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
                 if (!mydata.getImageNameOnScratch(part_id, fn_img))
                 {
                     std::istringstream split(exp_fn_img);
-                    for (int i = 0; i <= imagedata_offset; i++)
+                    for (int i = 0; i <= metadata_offset; i++)
                         getline(split, fn_img);
                 }
                 img.read(fn_img);
@@ -5784,9 +5751,9 @@ void MlOptimiser::getFourierTransformsAndCtfs(
             }
             else
             {
-                img() = exp_imgs[imagedata_offset];
+                img() = exp_imgs[metadata_offset];
             }
-#endif
+
         }
         if (has_converged && do_use_reconstruct_images)
         {
@@ -5794,7 +5761,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
             FileName fn_recimg;
             std::istringstream split2(exp_fn_recimg);
             // Get the right line in the exp_fn_img string
-            for (int i = 0; i <= imagedata_offset; i++)
+            for (int i = 0; i <= metadata_offset; i++)
                 getline(split2, fn_recimg);
             rec_img.read(fn_recimg);
             rec_img().setXmippOrigin();
@@ -5809,7 +5776,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
         img().resize(image_full_size[optics_group], image_full_size[optics_group]);
         FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(img())
         {
-            DIRECT_A2D_ELEM(img(), i, j) = DIRECT_A3D_ELEM(exp_imagedata, imagedata_offset, i, j);
+            DIRECT_A2D_ELEM(img(), i, j) = DIRECT_A3D_ELEM(exp_imagedata, metadata_offset, i, j);
         }
         img().setXmippOrigin();
         if (has_converged && do_use_reconstruct_images)
@@ -5825,7 +5792,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
             rec_img().resize(image_full_size[optics_group], image_full_size[optics_group]);
             FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(rec_img())
             {
-                DIRECT_A2D_ELEM(rec_img(), i, j) = DIRECT_A3D_ELEM(exp_imagedata, nr_images + imagedata_offset, i, j);
+                DIRECT_A2D_ELEM(rec_img(), i, j) = DIRECT_A3D_ELEM(exp_imagedata, nr_images + metadata_offset, i, j);
             }
             rec_img().setXmippOrigin();
         }
@@ -8894,7 +8861,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
         RFLOAT acc_trans_class = 0.;
         // Particles are already in random order, so just move from 0 to n_trials
         long int sum_nr_images = 0;
-        for (long int part_id_sorted = my_first_part_id, metadata_offset = 0, imagedata_offset = 0; part_id_sorted <= my_last_part_id; part_id_sorted++, metadata_offset++)
+        for (long int part_id_sorted = my_first_part_id, metadata_offset = 0; part_id_sorted <= my_last_part_id; part_id_sorted++, metadata_offset++)
         {
 
             std::vector<MultidimArray<RFLOAT> > Fctfs;
@@ -8924,7 +8891,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
             // Pre-calculate CTFs for all img_id of this particle
             if (do_ctf_correction)
             {
-                for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++, imagedata_offset++)
+                for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++)
                 {
 
                     MultidimArray<RFLOAT> Fctf;
@@ -8938,7 +8905,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
                         {
                             std::istringstream split(exp_fn_ctf);
                             // Get the right line in the exp_fn_img string
-                            for (int i = 0; i <= imagedata_offset; i++)
+                            for (int i = 0; i <= metadata_offset; i++)
                                 getline(split, fn_ctf);
                         }
                         Ictf.read(fn_ctf);
@@ -9889,7 +9856,7 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
             exp_imagedata.resize(nr_images, common_image_size, common_image_size);
     }
 
-    for (long int part_id_sorted = first_part_id, metadata_offset = 0, imagedata_offset = 0; part_id_sorted <= last_part_id; part_id_sorted++, metadata_offset++)
+    for (long int part_id_sorted = first_part_id, metadata_offset = 0; part_id_sorted <= last_part_id; part_id_sorted++, metadata_offset++)
     {
 
         long int part_id = mydata.sorted_idx[part_id_sorted];
@@ -9962,14 +9929,14 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 
             FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(img())
             {
-                DIRECT_A3D_ELEM(exp_imagedata, imagedata_offset, i, j) = DIRECT_A2D_ELEM(img(), i, j);
+                DIRECT_A3D_ELEM(exp_imagedata, metadata_offset, i, j) = DIRECT_A2D_ELEM(img(), i, j);
             }
 
             if (has_converged && do_use_reconstruct_images)
             {
                 FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(rec_img())
                 {
-                    DIRECT_A3D_ELEM(exp_imagedata, nr_images + imagedata_offset, i, j) = DIRECT_A2D_ELEM(rec_img(), i, j);
+                    DIRECT_A3D_ELEM(exp_imagedata, nr_images + metadata_offset, i, j) = DIRECT_A2D_ELEM(rec_img(), i, j);
                 }
             }
 

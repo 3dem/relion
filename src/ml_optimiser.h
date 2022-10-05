@@ -1054,7 +1054,7 @@ public:
 
 	/* Read image and its metadata from disc (threaded over all pooled particles)
 	 */
-	void getFourierTransformsAndCtfs(long int part_id, int ibody, int metadata_offset, int imagedata_offset,
+	void getFourierTransformsAndCtfs(long int part_id, int ibody, int metadata_offset,
 			std::vector<MultidimArray<Complex > > &exp_Fimg,
 			std::vector<MultidimArray<Complex > > &exp_Fimg_nomask,
 			std::vector<MultidimArray<RFLOAT> > &exp_Fctf,
