@@ -935,7 +935,6 @@ void getAllSquaredDifferencesCoarse(
 	CUSTOM_ALLOCATOR_REGION_NAME("DIFF_COARSE");
 
 	CTIC(accMLO->timer,"diff_pre_gpu");
-	unsigned long weightsPerPart(baseMLO->mymodel.nr_classes * sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.nr_oversampled_rot * sp.nr_oversampled_trans);
 
 	std::vector<MultidimArray<Complex > > dummy;
 	std::vector<std::vector<MultidimArray<Complex > > > dummy2;
