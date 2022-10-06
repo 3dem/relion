@@ -18,8 +18,6 @@
 #include <src/time.h>
 #include <mpi.h>
 #include <iostream>
-#include <src/strings.h>
-#include <src/jaz/image/stack_helper.h>
 
 using namespace gravis;
 
