@@ -5910,11 +5910,21 @@ void MlOptimiser::getFourierTransformsAndCtfs(
             // May24,2014 - Shaoda & Sjors, Helical refinement
             if (is_helical_segment)
             {
-                // TODO! Think about how the direction of the individual images in tilt series stack changes the direction of the mask for STA!!
-                if (mydata.is_tomo) REPORT_ERROR("ERROR: softMaskOutsideMapForHelix for STA not implemented yet...");
-
-                softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, my_mask_radius,
-                        (helical_tube_outer_diameter / (2. * my_pixel_size)), width_mask_edge, &Mnoise);
+                RFLOAT myrot_deg, mytilt_deg, mypsi_deg;
+                if (mydata.is_tomo)
+                {
+                    Matrix2D<RFLOAT> A;
+                    Euler_angles2matrix(0, tilt_deg, psi_deg, A, false);
+                    A = mydata.getRotationMatrix(part_id, img_id) * A;
+                    Euler_matrix2angles(A, myrot_deg, mytilt_deg, mypsi_deg);
+                }
+                else
+                {
+                    mypsi_deg = psi_deg;
+                    mytilt_deg = tilt_deg;
+                }
+                softMaskOutsideMapForHelix(img(), mypsi_deg, mytilt_deg, my_mask_radius,
+                    (helical_tube_outer_diameter / (2. * my_pixel_size)), width_mask_edge, &Mnoise);
             }
             else
                 softMaskOutsideMap(img(), my_mask_radius, (RFLOAT)width_mask_edge, &Mnoise);

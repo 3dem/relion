@@ -521,13 +521,24 @@ void getFourierTransformsAndCtfs(long int part_id,
 			d_img.streamSync();
 			d_img.getHost(img());
 
-            // TODO! Think about how the direction of the individual images in tilt series stack changes the direction of the mask for STA!!
-            if (op.is_tomo) REPORT_ERROR("ERROR: softMaskOutsideMapForHelix for STA not implemented yet...");
+            RFLOAT myrot_deg, mytilt_deg, mypsi_deg;
+            if (op.is_tomo)
+            {
+                Matrix2D<RFLOAT> A;
+                Euler_angles2matrix(0, tilt_deg, psi_deg, A, false);
+                A = baseMLO->mydata.getRotationMatrix(part_id, img_id) * A;
+                Euler_matrix2angles(A, myrot_deg, mytilt_deg, mypsi_deg);
+            }
+            else
+            {
+                mypsi_deg = psi_deg;
+                mytilt_deg = tilt_deg;
+            }
 
 			// ...modify img...
 			if(baseMLO->do_zero_mask)
 			{
-				softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, my_mask_radius,
+				softMaskOutsideMapForHelix(img(), mypsi_deg, mytilt_deg, my_mask_radius,
 						(baseMLO->helical_tube_outer_diameter / (2. * my_pixel_size)),
 						baseMLO->width_mask_edge);
 			}
@@ -538,7 +549,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 				RandomImage.cpToHost();
 				Mnoise.resize(img());
 				RandomImage.getHost(Mnoise);
-				softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, my_mask_radius,
+				softMaskOutsideMapForHelix(img(), mypsi_deg, mytilt_deg, my_mask_radius,
 						(baseMLO->helical_tube_outer_diameter / (2. * my_pixel_size)),
 						baseMLO->width_mask_edge,
 						&Mnoise);
