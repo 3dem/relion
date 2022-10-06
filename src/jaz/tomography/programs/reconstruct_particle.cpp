@@ -18,7 +18,8 @@
 #include <src/time.h>
 #include <mpi.h>
 #include <iostream>
-
+#include <src/strings.h>
+#include <src/jaz/image/stack_helper.h>
 
 using namespace gravis;
 
@@ -62,6 +63,7 @@ void ReconstructParticleProgram::readBasicParameters(int argc, char *argv[])
 	cropSize = textToInteger(parser.getOption("--crop", "Size of (additionally output) cropped image", "-1"));
 
 	do_whiten = parser.checkOption("--whiten", "Whiten the noise by flattening the power spectrum");
+    do_ctf = !parser.checkOption("--no_ctf", "Do not apply CTFs");
 
 	binning = textToDouble(parser.getOption("--bin", "Binning factor", "1"));
 	taper = textToDouble(parser.getOption("--taper", "Taper against the sphere by this number of pixels (only if cropping)", "10"));
@@ -112,7 +114,6 @@ void ReconstructParticleProgram::run()
 	const int s02D = (int)(binning * s + 0.5);
 	
 	const bool flip_value = true;
-	const bool do_ctf = true;
 
 	Tomogram tomo0 = tomoSet.loadTomogram(0, false);
 	const double binnedOutPixelSize = tomo0.optics.pixelSize * binning;
@@ -589,6 +590,14 @@ void ReconstructParticleProgram::reconstruct(
 {
 	Reconstruction::griddingCorrect3D_sinc2(
 			dataImgFS, dataImgRS, true, num_threads);
+
+    //SHWS keep greyscale compatible with relion_refine
+    // Jasenko does normalization=Both on forward FT of 2D images and backward IFT on 3D images
+    // This will be dividing by sqrt(size) = sqrt(dim*dim) in the forward pass
+    // and sqrt(size) = sqrt(dim*dim*dim) in the backward pass
+    // relion_refine does dim in both passes.
+    // Correct for that inconsistency here; assuming that xdim=ydim=zdim!
+    dataImgRS /= sqrt(dataImgRS.xdim);
 
 	if (SNR > 0.0)
 	{

@@ -25,7 +25,7 @@ class ReconstructParticleProgram
 			bool
 				do_whiten, no_reconstruction, only_do_unfinished,
 				run_from_GUI, run_from_MPI,
-				no_backup, do_circle_crop;
+				no_backup, do_circle_crop, do_ctf;
 
 			int boxSize, cropSize, num_threads, outer_threads, inner_threads, max_mem_GB;
 
