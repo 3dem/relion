@@ -462,9 +462,8 @@ void SubtomoProgram::processTomograms(
 
 		if (verbosity > 0)
 		{
-			std::string message = (do_stack2d) ? "Extracting particles" : "Backprojecting subtomograms";
             Log::beginProgress(
-				message,
+				"Extracting particles",
 				(int)ceil(pc/(double)outer_thread_num));
 		}
 
