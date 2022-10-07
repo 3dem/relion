@@ -2536,6 +2536,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
                 MultidimArray<RFLOAT> my_img;
                 wholestack().getImage(img_id, my_img);
                 img() = my_img;
+                if (img().computeStddev() == 0.) continue;
             }
 
             if (nr_particles_done_per_optics_group[optics_group] >= minimum_nr_particles_sigma2_noise)
@@ -5834,6 +5835,13 @@ void MlOptimiser::getFourierTransformsAndCtfs(
             MultidimArray<RFLOAT> my_img;
             wholestack().getImage(img_id, my_img);
             img() = my_img;
+
+            // Check whether this image is empty
+            if (img().computeStddev() == 0.)
+            {
+                mydata.particles[part_id].images[img_id].is_empty = true;
+                continue;
+            }
         }
 
 //#define DEBUG_SOFTMASK
@@ -6397,6 +6405,8 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
     for (int img_id = 0, my_trans_image = 0; img_id < exp_nr_images; img_id++)
     {
 
+        if (mydata.is_tomo && mydata.particles[part_id].images[img_id].is_empty) continue;
+
         if (do_masked_shifts)
         {
             windowFourierTransform(exp_Fimg[img_id], Fimg, exp_current_image_size);
@@ -6804,6 +6814,8 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                             // loop over all images inside this particle
                             for (int img_id = 0; img_id < exp_nr_images; img_id++)
                             {
+
+                                if (mydata.is_tomo && mydata.particles[part_id].images[img_id].is_empty) continue;
 
                                 // Get the Euler matrix
                                 Euler_angles2matrix(oversampled_rot[iover_rot],
@@ -7935,6 +7947,8 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
                     for (int img_id = 0; img_id < exp_nr_images; img_id++)
                     {
 
+                        if (mydata.is_tomo && mydata.particles[part_id].images[img_id].is_empty) continue;
+
                         // Loop over all oversampled orientations (only a single one in the first pass)
                         for (long int iover_rot = 0; iover_rot < exp_nr_oversampled_rot; iover_rot++)
                         {
@@ -8522,6 +8536,8 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
     // loop over all images inside this particle
     for (int img_id = 0; img_id < exp_nr_images; img_id++)
     {
+        if (mydata.is_tomo && mydata.particles[part_id].images[img_id].is_empty) continue;
+
         // If the current images were smaller than the original size, fill the rest of wsum_model.sigma2_noise with the power_class spectrum of the images
         for (int ires = image_current_size[optics_group]/2 + 1; ires < image_full_size[optics_group]/2 + 1; ires++)
         {
@@ -8899,6 +8915,8 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
                 for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++)
                 {
 
+                    if (mydata.is_tomo && mydata.particles[part_id].images[img_id].is_empty) continue;
+
                     MultidimArray<RFLOAT> Fctf;
                     // Get CTF for this particle
                     if (mymodel.data_dim == 3)
@@ -9052,6 +9070,9 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
                     my_snr = 0.;
                     for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++)
                     {
+
+                        if (mydata.is_tomo && mydata.particles[part_id].images[img_id].is_empty) continue;
+
                         if (mymodel.data_dim == 2)
                             F1.initZeros(current_image_size, current_image_size/ 2 + 1);
                         else

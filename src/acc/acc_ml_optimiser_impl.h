@@ -338,6 +338,13 @@ void getFourierTransformsAndCtfs(long int part_id,
             MultidimArray<RFLOAT> my_img;
             wholestack().getImage(img_id, my_img);
             img() = my_img;
+
+            // Check whether this image is empty
+            if (img().computeStddev() == 0.)
+            {
+                baseMLO->mydata.particles[part_id].images[img_id].is_empty = true;
+                continue;
+            }
         }
 
 		// ------------------------------------------------------------------------------------------
@@ -977,6 +984,8 @@ void getAllSquaredDifferencesCoarse(
                 for (unsigned long img_id = 0; img_id < sp.nr_images; img_id++)
 		        {
 
+                    if (op.is_tomo && baseMLO->mydata.particles[op.part_id].images[img_id].is_empty) continue;
+
                     Matrix2D<RFLOAT> MBL, MBR, Aori;
 
                     if (baseMLO->mymodel.nr_bodies > 1)
@@ -1067,6 +1076,9 @@ void getAllSquaredDifferencesCoarse(
 
 	for (int img_id = 0; img_id < sp.nr_images; img_id++)
 	{
+
+        // Make sure the image is not all-zeros, this can happen with 2D stacks of subtomos being outside visibility
+        if (op.is_tomo && baseMLO->mydata.particles[op.part_id].images[img_id].is_empty) continue;
 
 		/*====================================
 				Generate Translations
@@ -1320,6 +1332,8 @@ void getAllSquaredDifferencesFine(
 
     for (int img_id = 0; img_id < sp.nr_images; img_id++)
 	{
+
+        if (op.is_tomo && baseMLO->mydata.particles[op.part_id].images[img_id].is_empty) continue;
 
         //AccPtrBundle bundleD2( ptrFactory.makeBundle());
         //bundleD2.setSize(2*(FineProjectionData.orientationNumAllClasses*sp.nr_trans*sp.nr_oversampled_trans)*sizeof(unsigned long));
@@ -2611,6 +2625,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		for (int img_id = 0; img_id < sp.nr_images; img_id++)
 		{
 
+            if (op.is_tomo && baseMLO->mydata.particles[op.part_id].images[img_id].is_empty) continue;
+
 			/*======================================================
 			                     TRANSLATIONS
 			======================================================*/
@@ -3108,6 +3124,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
         // If the current images were smaller than the original size, fill the rest of wsum_model.sigma2_noise with the power_class spectrum of the images
         for (int img_id = 0; img_id < sp.nr_images; img_id++)
         {
+            if (op.is_tomo && baseMLO->mydata.particles[op.part_id].images[img_id].is_empty) continue;
+
             for (unsigned long ires = baseMLO->image_current_size[optics_group] / 2 + 1;
                  ires < baseMLO->image_full_size[optics_group] / 2 + 1; ires++)
             {

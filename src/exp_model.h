@@ -49,6 +49,9 @@ public:
     // Projection matrix for tilt series stacks
     Matrix2D<RFLOAT> Aproj;
 
+    // Flag to monitor whether this images is all-zero
+    bool is_empty;
+
     // CTF information for defocus adjustment of tilt seriers
     float defU, defV, defAngle, dose;
 
@@ -63,6 +66,7 @@ public:
 	{
 		particle_id = copy.particle_id;
 		Aproj = copy.Aproj;
+        is_empty =copy.is_empty;
         defU = copy.defU;
         defV = copy.defV;
         defAngle = copy.defAngle;
@@ -75,6 +79,7 @@ public:
 
 		particle_id = copy.particle_id;
         Aproj = copy.Aproj;
+        is_empty =copy.is_empty;
         defU = copy.defU;
         defV = copy.defV;
         defAngle = copy.defAngle;
