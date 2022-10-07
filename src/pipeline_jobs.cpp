@@ -19,7 +19,7 @@
  ***************************************************************************/
 #include "src/pipeline_jobs.h"
 
-std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, int dim, int nr_bodies, std::string jobtype)
+std::vector<Node> getOutputNodesRefine(std::string outputname, std::string jobtype, int iter, int K, int dim, int nr_bodies, bool _is_tomo)
 {
 	std::vector<Node> result;
 
@@ -54,14 +54,16 @@ std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, 
 	{
 		if (jobtype == "Refine3D")
 		{
-			Node node1(fn_out + "_data.star", LABEL_REFINE3D_PARTS);
+			std::string label = (_is_tomo) ? LABEL_TOMO_PARTS : LABEL_REFINE3D_PARTS;
+            Node node1(fn_out + "_data.star", label);
             Node node2(fn_out + "_optimiser.star", LABEL_REFINE3D_OPT);
     		result.push_back(node1);
             result.push_back(node2);
 		}
 		if (jobtype == "Class3D")
 		{
-			Node node1(fn_out + "_data.star", LABEL_CLASS3D_PARTS);
+            std::string label = (_is_tomo) ? LABEL_TOMO_PARTS : LABEL_REFINE3D_PARTS;
+            Node node1(fn_out + "_data.star", label);
             Node node2(fn_out + "_optimiser.star", LABEL_CLASS3D_OPT);
     		result.push_back(node1);
             result.push_back(node2);
@@ -75,7 +77,7 @@ std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, 
 		}
 
 
-                // For auto-refine: also output the run_half1_class001_unfil.mrc map
+        // For auto-refine: also output the run_half1_class001_unfil.mrc map
 		if (iter < 0)
 		{
 			if (jobtype == "Refine3D")
@@ -3185,7 +3187,7 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
             return false;
         }
 
-	outputNodes = getOutputNodesRefine(outputname + fn_run, my_iter, my_classes, 2, 1, "Class2D");
+	outputNodes = getOutputNodesRefine(outputname + fn_run, "Class2D", my_iter, my_classes, 2, 1, is_tomo);
 
 	if (!is_continue)
 	{
@@ -3323,7 +3325,7 @@ void RelionJob::initialiseInimodelJob()
 
 	if (is_tomo)
 	{
-		joboptions["in_optimisation"] = JobOption("Input optimisation set: ", OUTNODE_TOMO_OPTIMISATION, "", "Optimisation set STAR file (*.star)", "Input tomo optimisation set. Input images STAR file, reference halfmaps and reference mask files will be extracted. If input files are specified below, then they will override the components in this optimisation set.");
+		joboptions["in_optimisation"] = JobOption("Input optimisation set: ", OUTNODE_TOMO_OPTIMISATION, "", "Optimisation set STAR file (*optimisation_set.star)", "Input tomo optimisation set. Input images STAR file, reference halfmaps and reference mask files will be extracted. If input files are specified below, then they will override the components in this optimisation set.");
 	}
 	joboptions["fn_img"] = JobOption("Input images STAR file:", NODE_PARTS_CPIPE, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \
 In Gradient optimisation, it is very important that there are particles from enough different orientations. One only needs a few thousand to 10k particles. When selecting good 2D classes in the Subset Selection jobtype, use the option to select a maximum number of particles from each class to generate more even angular distributions for SGD.\
@@ -3599,7 +3601,7 @@ void RelionJob::initialiseClass3DJob()
 
 	if (is_tomo)
 	{
-		joboptions["in_optimisation"] = JobOption("Input optimisation set: ", OUTNODE_TOMO_OPTIMISATION, "", "Optimisation set STAR file (*.star)", "Input tomo optimisation set. Input images STAR file, reference halfmaps and reference mask files will be extracted. If input files are specified below, then they will override the components in this optimisation set.");
+		joboptions["in_optimisation"] = JobOption("Input optimisation set: ", OUTNODE_TOMO_OPTIMISATION, "", "Optimisation set STAR file (*optimisation_set.star)", "Input tomo optimisation set. Input images STAR file, reference halfmaps and reference mask files will be extracted. If input files are specified below, then they will override the components in this optimisation set.");
 	}
 	joboptions["fn_img"] = JobOption("Input images STAR file:", NODE_PARTS_CPIPE, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
 nor will it be possible to perform noise spectra estimation or intensity scale corrections in image groups. Therefore, running RELION with an input stack will in general provide sub-optimal results and is therefore not recommended!! Use the Preprocessing procedure to get the input STAR file in a semi-automated manner. Read the RELION wiki for more information.");
@@ -3847,7 +3849,7 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 	int my_classes = (int)joboptions["nr_classes"].getNumber(error_message);
 	if (error_message != "") return false;
 
-	outputNodes = getOutputNodesRefine(outputname + fn_run, my_iter, my_classes, 3, 1, "Class3D");
+	outputNodes = getOutputNodesRefine(outputname + fn_run, "Class3D", my_iter, my_classes, 3, 1, is_tomo);
 
 	if (!is_continue)
 	{
@@ -4112,7 +4114,7 @@ void RelionJob::initialiseAutorefineJob()
 
 	if (is_tomo)
 	{
-		joboptions["in_optimisation"] = JobOption("Input optimisation set: ", OUTNODE_TOMO_OPTIMISATION, "", "Optimisation set STAR file (*.star)", "Input tomo optimisation set. Input images STAR file, reference halfmaps and reference mask files will be extracted. If input files are specified below, then they will override the components in this optimisation set.");
+		joboptions["in_optimisation"] = JobOption("Input optimisation set: ", OUTNODE_TOMO_OPTIMISATION, "", "Optimisation set STAR file (*optimisation_set.star)", "Input tomo optimisation set. Input images STAR file, reference halfmaps and reference mask files will be extracted. If input files are specified below, then they will override the components in this optimisation set.");
 	}
 	joboptions["fn_img"] = JobOption("Input images STAR file:", NODE_PARTS_CPIPE, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
 nor will it be possible to perform noise spectra estimation or intensity scale corrections in image groups. Therefore, running RELION with an input stack will in general provide sub-optimal results and is therefore not recommended!! Use the Preprocessing procedure to get the input STAR file in a semi-automated manner. Read the RELION wiki for more information.");
@@ -4333,7 +4335,7 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 
 	command += " --o " + outputname + fn_run;
 	// TODO: add bodies!! (probably in next version)
-	outputNodes = getOutputNodesRefine(outputname + fn_run, -1, 1, 3, 1, "Refine3D");
+	outputNodes = getOutputNodesRefine(outputname + fn_run, "Refine3D", -1, 1, 3, 1, is_tomo);
 
 	if (is_tomo) label += ".tomo";
 
@@ -4713,7 +4715,7 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 			fn_run = "run_ct" + floatToString(it);
 			command += " --continue " + joboptions["fn_cont"].getString();
 			command += " --o " + outputname + fn_run;
-			outputNodes = getOutputNodesRefine(outputname + fn_run, -1, 1, 3, nr_bodies, "MultiBody");
+			outputNodes = getOutputNodesRefine(outputname + fn_run, "MultiBody", -1, 1, 3, nr_bodies, is_tomo);
 
 		}
 		else
@@ -4721,7 +4723,7 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 			fn_run = "run";
 			command += " --continue " + joboptions["fn_in"].getString();
 			command += " --o " + outputname + fn_run;
-			outputNodes = getOutputNodesRefine(outputname + "run", -1, 1, 3, nr_bodies, "MultiBody");
+			outputNodes = getOutputNodesRefine(outputname + "run", "MultiBody", -1, 1, 3, nr_bodies, is_tomo);
 			command += " --solvent_correct_fsc --multibody_masks " + joboptions["fn_bodies"].getString();
 
 			Node node(joboptions["fn_in"].getString(), LABEL_REFINE3D_OPT);
@@ -5250,7 +5252,7 @@ void RelionJob::initialisePostprocessJob()
 
 	if (is_tomo)
 	{
-		joboptions["in_optimisation"] = JobOption("Input optimisation set: ", OUTNODE_TOMO_OPTIMISATION, "", "Optimisation set STAR file (*.star)", "Input tomo optimisation set. Half map files will be extracted. If half maps are specified below, then they will override the components in this optimisation set.");
+		joboptions["in_optimisation"] = JobOption("Input optimisation set: ", OUTNODE_TOMO_OPTIMISATION, "", "Optimisation set STAR file (*optimisation_set.star)", "Input tomo optimisation set. Half map files will be extracted. If half maps are specified below, then they will override the components in this optimisation set.");
 	}
 	joboptions["fn_in"] = JobOption("One of the 2 unfiltered half-maps:", NODE_HALFMAP_CPIPE, "", "MRC map files (*half1*.mrc)",  "Provide one of the two unfiltered half-reconstructions that were output upon convergence of a 3D auto-refine run.");
 	joboptions["fn_mask"] = JobOption("Solvent mask:", NODE_MASK_CPIPE, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a soft mask where the protein is white (1) and the solvent is black (0). Often, the softer the mask the higher resolution estimates you will get. A soft edge of 5-10 pixels is often a good edge width.");
@@ -6039,7 +6041,7 @@ void RelionJob::addTomoInputOptions(bool has_tomograms, bool has_particles,
 		bool has_trajectories, bool has_manifolds, bool has_halfmaps, bool has_postprocess)
 {
     // Optional input nodes
-     joboptions["in_optimisation"] = JobOption("Input optimisation set: ", OUTNODE_TOMO_OPTIMISATION, "", "Optimisation set STAR file (*.star)", "Input optimisation set. This will be passed with a --i argument to the executable. If any inidividual components of the optimisation set are specified below, then they will override the components in this optimisation set.");
+     joboptions["in_optimisation"] = JobOption("Input optimisation set: ", OUTNODE_TOMO_OPTIMISATION, "", "Optimisation set STAR file (*optimisation_set.star)", "Input optimisation set. This will be passed with a --i argument to the executable. If any inidividual components of the optimisation set are specified below, then they will override the components in this optimisation set.");
      if (has_particles) joboptions["in_particles"] = JobOption("Input particle set: ", OUTNODE_TOMO_PARTS, "", "Particle STAR file (*.star)", "Input particle set. This will be passed with a --p argument to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
      if (has_tomograms) joboptions["in_tomograms"] = JobOption("Input tomogram set: ", OUTNODE_TOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "Input tomogram set. This will be passed with a --m argument to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
      if (has_trajectories) joboptions["in_trajectories"] = JobOption("Input trajectory set: ", OUTNODE_TOMO_TRAJECTORIES, "", "Trajectory set STAR file (*.star)", "Input trajectory set. This will be passed with a --mot argument to the executable. If specified, this will override the entry in the input optimisation set. If left empty, the entry from the optimisation set will be used.");
@@ -6853,7 +6855,7 @@ void RelionJob::initialiseTomoCtfRefineJob()
 {
         hidden_name = ".gui_tomo_refine_ctf";
 
-	addTomoInputOptions(true, true, true, false, true, true);
+	    addTomoInputOptions(true, true, true, false, true, true);
 
     	joboptions["box_size"] = JobOption("Box size for estimation (pix):", 128, 32, 512, 16, "Box size to be used for the estimation. Note that this can be larger than the box size of the reference map. A sufficiently large box size allows more of the high-frequency signal to be captured that has been delocalised by the CTF.");
     	joboptions["do_defocus"] = JobOption("Refine defocus?", true, "If set to Yes, then estimate the defoci of the individual tilt images.");

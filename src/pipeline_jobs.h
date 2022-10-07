@@ -423,7 +423,7 @@ static bool do_allow_change_minimum_dedicated;
 #define LABEL_TOMO_TOMOGRAMS           "ProcessData.star.relion.tomo.relion.tomogram_set"
 #define LABEL_TOMO_TRAJECTORIES        "ProcessData.star.relion.tomo.relion.trajectory_set"
 #define LABEL_TOMO_MANIFOLDS           "ProcessData.star.relion.tomo.manifoldset"
-#define LABEL_TOMO_PARTS               "Particles.star.relion.tomo"
+#define LABEL_TOMO_PARTS               "ParticlesData.star.relion.tomo"
 #define LABEL_TOMO_MAP                 "DensityMap.mrc.relion.tomo.subvolume"
 #define LABEL_TOMO_HALFMAP             "DensityMap.mrc.relion.tomo.halfmap"
 #define LABEL_TOMO_POST                "ProcessData.star.relion.tomo.postprocess"
@@ -1003,7 +1003,7 @@ class Node
 };
 
 // Helper function to get the outputnames of refine jobs
-std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, int dim, int nr_bodies=1);
+std::vector<Node> getOutputNodesRefine(std::string outputname, std::string jobtype, int iter, int K, int dim, int nr_bodies=1, bool _is_tomo = false);
 
 // One class to store any type of Option for a GUI entry
 class JobOption
