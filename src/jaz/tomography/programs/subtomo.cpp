@@ -584,7 +584,8 @@ void SubtomoProgram::processTomograms(
 
             if (do_stack2d) {
 
-                particlesRS.write(outData, binnedPixelSize, write_float16);
+                BufferedImage<float> cropParticlesRS = Padding::unpadCenter2D_full(particlesRS, boundary);
+                cropParticlesRS.write(outData, binnedPixelSize, write_float16);
 
             } else {
 
@@ -627,6 +628,14 @@ void SubtomoProgram::processTomograms(
                 }
 
                 FFT::inverseFourierTransform(dataImgFS, dataImgRS, FFT::Both);
+
+                //SHWS keep greyscale compatible with relion_refine
+                // Jasenko does normalization=Both on forward FT of 2D images and backward IFT on 3D images
+                // This will be dividing by sqrt(size) = sqrt(dim*dim) in the forward pass
+                // and sqrt(size) = sqrt(dim*dim*dim) in the backward pass
+                // relion_refine does dim in both passes.
+                // Correct for that inconsistency here; assuming that xdim=ydim=zdim!
+                dataImgRS /= sqrt(dataImgRS.xdim);
 
                 if (do_cone_weight) {
                     FFT::FourierTransform(dataImgRS, dataImgFS);
