@@ -573,8 +573,7 @@ void SubtomoProgram::processTomograms(
                 particlesRS = NewStackHelper::inverseFourierTransformStack(particleStack);
             }
 
-            // Dont circle crop 2D stacks
-            if (do_circle_crop && !do_stack2d) {
+            if (do_circle_crop) {
                 const double crop_boundary = do_narrow_circle_crop ? boundary : 0.0;
                 TomoExtraction::cropCircle(particlesRS, crop_boundary, 5, num_threads);
             }
