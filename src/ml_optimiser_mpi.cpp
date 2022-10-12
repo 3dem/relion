@@ -1477,6 +1477,9 @@ void MlOptimiserMpi::expectation()
 				std::cerr << "Faux thread id: " << b->thread_id << std::endl;
 #endif
 
+				for (int j = 0; j < b->projectors.size(); j++)
+					b->projectors[j].clear();
+
 				for (int j = 0; j < b->backprojectors.size(); j++)
 				{
 					unsigned long s = wsum_model.BPref[j].data.nzyxdim;
@@ -1493,7 +1496,6 @@ void MlOptimiserMpi::expectation()
 						wsum_model.BPref[j].weight.data[n] += (RFLOAT) weights[n];
 					}
 
-					b->projectors[j].clear();
 					b->backprojectors[j].clear();
 				}
 
