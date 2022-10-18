@@ -1310,7 +1310,7 @@ void ObservationModel::loadSafely(std::string filename, ObservationModel& obsMod
 		MetaDataTable oldMdt;
 		oldMdt.read(filename);
 
-		StarConverter::convert_3p0_particlesTo_3p1(oldMdt, particlesMdt, opticsMdt, mytablename, do_die_upon_error);
+		StarConverter::convert_3p0_particlesTo_3p1(oldMdt, particlesMdt, opticsMdt, mytablename, -1, do_die_upon_error);
 		if (!do_die_upon_error && opticsMdt.numberOfObjects() == 0) return; // return an empty optics table if error was raised
 
 		if (mytablename == "" || mytablename == "discover")

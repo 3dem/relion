@@ -1,7 +1,7 @@
 #include "star_converter.h"
 
 void StarConverter::convert_3p0_particlesTo_3p1(const MetaDataTable &in, MetaDataTable &outParticles, MetaDataTable &outOptics,
-                                                std::string tablename, bool do_die_upon_error)
+                                                std::string tablename, int box_size, bool do_die_upon_error)
 {
 	int ver = in.getVersion();
 	int curVer = MetaDataTable::getCurrentVersion();
@@ -190,43 +190,53 @@ void StarConverter::convert_3p0_particlesTo_3p1(const MetaDataTable &in, MetaDat
 					}
 				}
 
-				try
+				if (box_size > 0)
 				{
-					Image<double> img;
-					img.read(fn_img, false); // false means read only header, skip real data
-					int image_size = img().xdim;
-
-					if (image_size % 2 != 0)
-					{
-						REPORT_ERROR("ERROR: this program only works with even values for the image dimensions!");
-					}
-
-					if (image_size != img().ydim)
-					{
-						REPORT_ERROR("ERROR: xsize != ysize: only squared images are allowed");
-					}
-
-					outOptics.setValue(EMDL_IMAGE_SIZE, image_size, g);
+					outOptics.setValue(EMDL_IMAGE_SIZE, box_size, g);
+					outOptics.setValue(EMDL_IMAGE_DIMENSIONALITY, 2, g);
 					found_this_group[g] = true;
 					nr_optics_groups_found++;
-
-					if (img().zdim > 1)
-					{
-						if (image_size != img().zdim)
-						{
-							REPORT_ERROR("ERROR: xsize != zsize: only cube 3D images allowed");
-						}
-						outOptics.setValue(EMDL_IMAGE_DIMENSIONALITY, 3, g);
-					}
-					else
-					{
-						outOptics.setValue(EMDL_IMAGE_DIMENSIONALITY, 2, g);
-					}
 				}
-				catch (RelionError e)
+				else
 				{
-					std::cerr << "Warning: " << fn_img << " not found.\n";
-					break;
+					try
+					{
+						Image<double> img;
+						img.read(fn_img, false); // false means read only header, skip real data
+						int image_size = img().xdim;
+
+						if (image_size % 2 != 0)
+						{
+							REPORT_ERROR("ERROR: this program only works with even values for the image dimensions!");
+						}
+
+						if (image_size != img().ydim)
+						{
+							REPORT_ERROR("ERROR: xsize != ysize: only squared images are allowed");
+						}
+
+						outOptics.setValue(EMDL_IMAGE_SIZE, image_size, g);
+						found_this_group[g] = true;
+						nr_optics_groups_found++;
+
+						if (img().zdim > 1)
+						{
+							if (image_size != img().zdim)
+							{
+								REPORT_ERROR("ERROR: xsize != zsize: only cube 3D images allowed");
+							}
+							outOptics.setValue(EMDL_IMAGE_DIMENSIONALITY, 3, g);
+						}
+						else
+						{
+							outOptics.setValue(EMDL_IMAGE_DIMENSIONALITY, 2, g);
+						}
+					}
+					catch (RelionError e)
+					{
+						std::cerr << "Warning: " << fn_img << " not found.\n";
+						break;
+					}
 				}
 			}
 

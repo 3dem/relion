@@ -13,6 +13,7 @@ class StarConverter
 						MetaDataTable& outParticles,
 						MetaDataTable& outOptics,
 						std::string tablename = "particles",
+						int box_size = -1,
 						bool do_die_upon_error = true);
 
 	protected:
