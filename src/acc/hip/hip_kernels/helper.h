@@ -133,7 +133,7 @@ __global__ void hip_kernel_collect2jobs(	XFLOAT *g_oo_otrans_x,          // otra
 			else
 				weight = (XFLOAT)0.0;
 
-			s_o_weights[tid] 					+= weight;
+			s_o_weights[tid] 					          += weight;
 			s_thr_wsum_sigma2_offset[tid]       += weight * g_myp_oo_otrans_x2y2z2[iy];
 			s_thr_wsum_prior_offsetx_class[tid] += weight *          g_oo_otrans_x[iy];
 			s_thr_wsum_prior_offsety_class[tid] += weight *          g_oo_otrans_y[iy];
@@ -356,7 +356,7 @@ __global__ void hip_kernel_translate3D(	T * g_image_in,
 //											XFLOAT * g_highres_Xi2);
 
 //----------------------------------------------------------------------------
-__global__ void hip_kernel_probRatio(  XFLOAT *d_Mccf,
+__global__ void hip_kernel_probRatio(  	XFLOAT *d_Mccf,
 										XFLOAT *d_Mpsi,
 										XFLOAT *d_Maux,
 										XFLOAT *d_Mmean,
@@ -370,67 +370,67 @@ __global__ void hip_kernel_probRatio(  XFLOAT *d_Mccf,
 										int startPsi,
 										int totalPsis);
 
-__global__ void hip_kernel_rotateOnly(   ACCCOMPLEX *d_Faux,
-						  	  	  	  	  XFLOAT psi,
-						  	  			  AccProjectorKernel projector,
-						  	  			  int startPsi);
+__global__ void hip_kernel_rotateOnly( 	ACCCOMPLEX *d_Faux,
+						  	  	  	  	XFLOAT psi,
+						  	  			AccProjectorKernel projector,
+						  	  			int startPsi);
 
-__global__ void hip_kernel_rotateAndCtf( ACCCOMPLEX *d_Faux,
-						  	  	  	  	  XFLOAT *d_ctf,
-						  	  	  	  	  XFLOAT psi,
-						  	  			  AccProjectorKernel projector,
-						  	  			  int startPsi = 0);
+__global__ void hip_kernel_rotateAndCtf( 	ACCCOMPLEX *d_Faux,
+						  	  	  	  	  	XFLOAT *d_ctf,
+						  	  	  	  	  	XFLOAT psi,
+						  	  			  	AccProjectorKernel projector,
+						  	  			  	int startPsi = 0);
 
 /*
  * Multiplies complex array A (in-place) by B, pixel-by-pixel, after conjugating A
  */
-__global__ void hip_kernel_convol_A(	 ACCCOMPLEX *d_A,
-									 	 ACCCOMPLEX *d_B,
-									 	 int image_size);
+__global__ void hip_kernel_convol_A(	ACCCOMPLEX *d_A,
+									 	ACCCOMPLEX *d_B,
+									 	int image_size);
 
 /*
  * Multiplies complex array A (in-place) by B, pixel-by-pixel, after conjugating A, writes to C
  */
-__global__ void hip_kernel_convol_A(	 ACCCOMPLEX *d_A,
-									 	 ACCCOMPLEX *d_B,
-									 	 ACCCOMPLEX *d_C,
-									 	 int image_size);
+__global__ void hip_kernel_convol_A(	ACCCOMPLEX *d_A,
+									 	ACCCOMPLEX *d_B,
+									 	ACCCOMPLEX *d_C,
+									 	int image_size);
 
 /*
  * Multiplies many complex arrays A (in-place) by a single B, pixel-by-pixel, after conjugating A
  */
-__global__ void hip_kernel_batch_convol_A(	 ACCCOMPLEX *d_A,
-									 	 	 ACCCOMPLEX *d_B,
-									 	 	 int image_size);
+__global__ void hip_kernel_batch_convol_A(	ACCCOMPLEX *d_A,
+									 	 	ACCCOMPLEX *d_B,
+									 	 	int image_size);
 
 /*
 * Multiplies many complex arrays A (not in-place) by a single B, pixel-by-pixel, after conjugating A
 */
-__global__ void hip_kernel_batch_convol_A( ACCCOMPLEX *d_A,
-								ACCCOMPLEX *d_B,
-								ACCCOMPLEX *d_C,
-								int image_size);
+__global__ void hip_kernel_batch_convol_A( 	ACCCOMPLEX *d_A,
+											ACCCOMPLEX *d_B,
+											ACCCOMPLEX *d_C,
+											int image_size);
 
 /*
  * Multiplies complex array A (in-place) by B, pixel-by-pixel, after conjugating B
  */
-__global__ void hip_kernel_convol_B(	 ACCCOMPLEX *d_A,
-									 	 ACCCOMPLEX *d_B,
-									 	 int image_size);
+__global__ void hip_kernel_convol_B(	ACCCOMPLEX *d_A,
+										ACCCOMPLEX *d_B,
+										int image_size);
 
 /*
  * Multiplies complex array A (in-place) by B, pixel-by-pixel, after conjugating B, writes to C
  */
-__global__ void hip_kernel_convol_B(	 ACCCOMPLEX *d_A,
-									 	 ACCCOMPLEX *d_B,
-									 	 ACCCOMPLEX *d_C,
-									 	 int image_size);
+__global__ void hip_kernel_convol_B(	ACCCOMPLEX *d_A,
+										ACCCOMPLEX *d_B,
+										ACCCOMPLEX *d_C,
+										int image_size);
 /*
  * Multiplies many complex arrays A (in-place) by a single one B, pixel-by-pixel, after conjugating B
  */
-__global__ void hip_kernel_batch_convol_B(	 ACCCOMPLEX *d_A,
-									 	 	 ACCCOMPLEX *d_B,
-									 	 	 int image_size);
+__global__ void hip_kernel_batch_convol_B(	ACCCOMPLEX *d_A,
+											ACCCOMPLEX *d_B,
+											int image_size);
 
 /*
  * Multiplies scalar array A by a scalar S
@@ -438,10 +438,10 @@ __global__ void hip_kernel_batch_convol_B(	 ACCCOMPLEX *d_A,
  *  OUT[i] = A[i]*S
  */
 template <typename T>
-__global__ void hip_kernel_multi( T *A,
-								   T *OUT,
-								   T S,
-		  	  	  	  	  	  	   int image_size)
+__global__ void hip_kernel_multi( 	T *A,
+									T *OUT,
+									T S,
+		  	  	  	  	  	  	   	int image_size)
 {
 	int pixel = threadIdx.x + blockIdx.x*blockDim.x;
 	if(pixel<image_size)
@@ -456,10 +456,9 @@ namespace HipKernels
  *  A[i] = A[i]*S
  */
 template <typename T>
-__global__ void hip_kernel_multi(
-		T *A,
-		T S,
-		int image_size)
+__global__ void hip_kernel_multi( 	T *A,
+									T S,
+									int image_size)
 {
 	int pixel = threadIdx.x + blockIdx.x*blockDim.x;
 	if(pixel<image_size)
@@ -474,11 +473,11 @@ __global__ void hip_kernel_multi(
  *  OUT[i] = A[i]*B[i]*S
  */
 template <typename T>
-__global__ void hip_kernel_multi( T *A,
-								   T *B,
-								   T *OUT,
-								   T S,
-		  	  	  	  	  	  	   int image_size)
+__global__ void hip_kernel_multi(	T *A,
+									T *B,
+									T *OUT,
+									T S,
+				  	  	  	  	  	int image_size)
 {
 	int pixel = threadIdx.x + blockIdx.x*blockDim.x;
 	if(pixel<image_size)
@@ -486,9 +485,9 @@ __global__ void hip_kernel_multi( T *A,
 }
 
 __global__ void hip_kernel_finalizeMstddev( XFLOAT *Mstddev,
-											 XFLOAT *aux,
-											 XFLOAT S,
-											 int image_size);
+											XFLOAT *aux,
+											XFLOAT S,
+											int image_size);
 
 /*
  * In place squares array in place
@@ -940,7 +939,7 @@ __global__ void hip_kernel_centerFFTbySign(T *img_in,
 template __global__ void hip_kernel_centerFFTbySign<double2>(double2*, int, int, int);
 template __global__ void hip_kernel_centerFFTbySign<float2>(float2*, int, int, int);
 
-#if !defined(__HIP_ARCH__) || __HIP_ARCH__ >= gfx906
+#if !defined(__HIP_ARCH__) || __HIP_ARCH__ != gfx906
 #else
 __device__ double atomicAdd(double* address, double val)
 {

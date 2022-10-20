@@ -54,9 +54,6 @@ __global__ void hip_kernel_diff2_coarse(
 	__shared__ XFLOAT s_real[block_sz];
 	__shared__ XFLOAT s_imag[block_sz];
 	__shared__ XFLOAT s_corr[block_sz];
-	__shared__ XFLOAT s_x[block_sz/prefetch_fraction];
-	__shared__ XFLOAT s_y[block_sz/prefetch_fraction];
-	__shared__ XFLOAT s_z[block_sz/prefetch_fraction];
 
 	XFLOAT diff2s[eulers_per_block] = {0.f};
 
@@ -83,8 +80,6 @@ __global__ void hip_kernel_diff2_coarse(
 				y = floorfracf( xy,   projector.imgX);
 				if (z > projector.maxR)
 					z -= projector.imgZ;
-				
-				s_z[tid/prefetch_fraction] = z;
 			}
 			else
 			{
@@ -93,11 +88,8 @@ __global__ void hip_kernel_diff2_coarse(
 			}
 			if (y > projector.maxR)
 				y -= projector.imgY;
-			
-			s_x[tid/prefetch_fraction] = x;
-			s_y[tid/prefetch_fraction] = y;
 
-//			#pragma unroll
+			#pragma unroll
 			for (int i = tid%prefetch_fraction; i < eulers_per_block; i += prefetch_fraction)
 			{
 				if(DATA3D) // if DATA3D, then REF3D as well.
@@ -154,12 +146,30 @@ __global__ void hip_kernel_diff2_coarse(
 		{
 			if((init_pixel + i) >= image_size) break;
 
+			int x,y,z,xy;
+			if(DATA3D)
+			{
+				z =  floorfracf( init_pixel + i   ,  projector.imgX*projector.imgY); //TODO optimize index extraction.
+				xy =           ( init_pixel + i ) % (projector.imgX*projector.imgY);
+				x =             xy  % projector.imgX;
+				y = floorfracf( xy,   projector.imgX);
+				if (z > projector.maxR)
+					z -= projector.imgZ;
+			}
+			else
+			{
+				x =           ( init_pixel + i ) % projector.imgX;
+				y = floorfracf( init_pixel + i   , projector.imgX);
+			}
+			if (y > projector.maxR)
+				y -= projector.imgY;
+
 			XFLOAT real, imag;
 
 			if(DATA3D)
-				translatePixel(s_x[i], s_y[i], s_z[i], tx, ty, tz, s_real[i + init_pixel % block_sz], s_imag[i + init_pixel % block_sz], real, imag);
+				translatePixel(x, y, z, tx, ty, tz, s_real[i + init_pixel % block_sz], s_imag[i + init_pixel % block_sz], real, imag);
 			else
-				translatePixel(s_x[i], s_y[i], tx, ty, s_real[i + init_pixel % block_sz], s_imag[i + init_pixel % block_sz], real, imag);
+				translatePixel(x, y,    tx, ty,     s_real[i + init_pixel % block_sz], s_imag[i + init_pixel % block_sz], real, imag);
 
 
 			#pragma unroll
@@ -204,46 +214,30 @@ __global__ void hip_kernel_diff2_fine(
 	unsigned long bid = blockIdx.x;
 	unsigned long tid = threadIdx.x;
 
-	unsigned warp_num = blockDim.x/warpSize;
-	unsigned warp_id  = tid/warpSize;
-	unsigned lane_id  = tid % warpSize;
-
 //    // Specialize BlockReduce for a 1D block of 128 threads on type XFLOAT
 //    typedef hipcub::BlockReduce<XFLOAT, 128> BlockReduce;
 //    // Allocate shared memory for BlockReduce
 //    __shared__ typename BlockReduce::TempStorage temp_storage;
 
 	unsigned long pixel;
-	XFLOAT ref_real, ref_imag, shifted_real, shifted_imag, diff_real, diff_imag;
+	XFLOAT ref_real, ref_imag,
+		shifted_real, shifted_imag,
+		diff_real, diff_imag;
 
-	extern __shared__ XFLOAT s_sum[];
-	__shared__ XFLOAT s_trans_x[chunk_sz];
-    __shared__ XFLOAT s_trans_y[chunk_sz];
-    __shared__ XFLOAT s_trans_z[chunk_sz];
-    __shared__ XFLOAT s_eulers[9]; 
+	__shared__ XFLOAT s[block_sz*chunk_sz]; //We MAY have to do up to chunk_sz translations in each block
+	__shared__ XFLOAT s_outs[chunk_sz];
 	// inside the padded 2D orientation gri
 //	if( bid < todo_blocks ) // we only need to make
 	{
 		unsigned trans_num  = (unsigned)d_job_num[bid]; //how many transes we have for this rot
-		
+		for (int itrans=0; itrans<trans_num; itrans++)
+		{
+			s[itrans*block_sz+tid] = (XFLOAT)0.0;
+		}
 		// index of comparison
 		unsigned long int ix = d_rot_idx[d_job_idx[bid]];
-		unsigned long int iy = d_trans_idx[d_job_idx[bid]];
+		unsigned long int iy;
 		unsigned pass_num(ceilfracf(image_size,block_sz));
-		XFLOAT r_sum[chunk_sz] = {0.f};
-
-		if (tid < trans_num) {
-            s_trans_x[tid] = trans_x[iy + tid];
-            s_trans_y[tid] = trans_y[iy + tid];
-            if(REF3D) {
-                s_trans_z[tid] = trans_z[iy + tid];
-            }
-        }
-        if (tid < 9) {
-            s_eulers[tid] = g_eulers[ix*9 +tid];
-        }
-        __syncthreads();
-
 
 		for (unsigned pass = 0; pass < pass_num; pass++) // finish an entire ref image each block
 		{
@@ -282,65 +276,59 @@ __global__ void hip_kernel_diff2_fine(
 				if(DATA3D)
 					projector.project3Dmodel(
 						x,y,z,
-						s_eulers[0], s_eulers[1], s_eulers[2],
-                        s_eulers[3], s_eulers[4], s_eulers[5],
-                        s_eulers[6], s_eulers[7], s_eulers[8],
+						__ldg(&g_eulers[ix*9  ]), __ldg(&g_eulers[ix*9+1]), __ldg(&g_eulers[ix*9+2]),
+						__ldg(&g_eulers[ix*9+3]), __ldg(&g_eulers[ix*9+4]), __ldg(&g_eulers[ix*9+5]),
+						__ldg(&g_eulers[ix*9+6]), __ldg(&g_eulers[ix*9+7]), __ldg(&g_eulers[ix*9+8]),
 						ref_real, ref_imag);
 				else if(REF3D)
 					projector.project3Dmodel(
 						x,y,
-						s_eulers[0], s_eulers[1],
-                        s_eulers[3], s_eulers[4],
-                        s_eulers[6], s_eulers[7],
+						__ldg(&g_eulers[ix*9  ]), __ldg(&g_eulers[ix*9+1]),
+						__ldg(&g_eulers[ix*9+3]), __ldg(&g_eulers[ix*9+4]),
+						__ldg(&g_eulers[ix*9+6]), __ldg(&g_eulers[ix*9+7]),
 						ref_real, ref_imag);
 				else
 					projector.project2Dmodel(
 						x,y,
-						s_eulers[0], s_eulers[1],
-                        s_eulers[3], s_eulers[4],
+						__ldg(&g_eulers[ix*9  ]), __ldg(&g_eulers[ix*9+1]),
+						__ldg(&g_eulers[ix*9+3]), __ldg(&g_eulers[ix*9+4]),
 						ref_real, ref_imag);
 
-				for (int itrans=0; itrans<7; itrans++) // finish all translations in each partial pass
+				for (int itrans=0; itrans<trans_num; itrans++) // finish all translations in each partial pass
 				{
-					if (trans_num > itrans)
-					{
-						if(DATA3D)
-							translatePixel(x, y, z, s_trans_x[itrans], s_trans_y[itrans], s_trans_z[itrans], g_imgs_real[pixel], g_imgs_imag[pixel], shifted_real, shifted_imag);
-						else
-							translatePixel(x, y, s_trans_x[itrans], s_trans_y[itrans], g_imgs_real[pixel], g_imgs_imag[pixel], shifted_real, shifted_imag);
+					iy = d_trans_idx[d_job_idx[bid]] + itrans;
 
-						diff_real =  ref_real - shifted_real;
-						diff_imag =  ref_imag - shifted_imag;
-						r_sum[itrans] += (diff_real * diff_real + diff_imag * diff_imag) * (XFLOAT)0.5 * g_corr_img[pixel];
-					}
+					if(DATA3D)
+						translatePixel(x, y, z, trans_x[iy], trans_y[iy], trans_z[iy], g_imgs_real[pixel], g_imgs_imag[pixel], shifted_real, shifted_imag);
+					else
+						translatePixel(x, y, trans_x[iy], trans_y[iy], g_imgs_real[pixel], g_imgs_imag[pixel], shifted_real, shifted_imag);
+
+					diff_real =  ref_real - shifted_real;
+					diff_imag =  ref_imag - shifted_imag;
+					s[itrans*block_sz + tid] += (diff_real * diff_real + diff_imag * diff_imag) * (XFLOAT)0.5 * __ldg(&g_corr_img[pixel]);
 				}
 			}
+			__syncthreads();
 		}
-
-		for (int itrans = 0; itrans < trans_num; itrans++)
+		for(int j=(block_sz/2); j>0; j/=2)
 		{
-			XFLOAT val = r_sum[itrans];
-			for (int offset = warpSize/2; offset > 0; offset /= 2)
+			if(tid<j)
 			{
-				val += __shfl_down(val, offset);
+				for (int itrans=0; itrans<trans_num; itrans++) // finish all translations in each partial pass
+				{
+					s[itrans*block_sz+tid] += s[itrans*block_sz+tid+j];
+				}
 			}
-			if (lane_id == 0)
-			{
-				s_sum[itrans*warp_num + warp_id] = val;
-			}
+			__syncthreads();
 		}
-
-		__syncthreads();
-
 		if (tid < trans_num)
 		{
-			XFLOAT result = sum_init;
-			iy = d_job_idx[bid] + tid;
-			for (int i = 0; i < warp_num; i++)
-			{
-				result = result + s_sum[tid*warp_num + i];
-			}
-			g_diff2s[iy] = result;
+			s_outs[tid]=s[tid*block_sz]+sum_init;
+		}
+		if (tid < trans_num)
+		{
+			iy=d_job_idx[bid]+tid;
+			g_diff2s[iy] = s_outs[tid];
 		}
 	}
 }
@@ -447,7 +435,7 @@ __global__ void hip_kernel_diff2_CC_coarse(
 			if(DATA3D)
 				translatePixel(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], g_imgs_real[pixel], g_imgs_imag[pixel], real, imag);
 			else
-				translatePixel(x, y, g_trans_x[itrans], g_trans_y[itrans], g_imgs_real[pixel], g_imgs_imag[pixel], real, imag);
+				translatePixel(x, y,    g_trans_x[itrans], g_trans_y[itrans],                    g_imgs_real[pixel], g_imgs_imag[pixel], real, imag);
 
 			s_weight[tid] += (ref_real * real     + ref_imag * imag)      * __ldg(&g_corr_img[pixel]);
 			s_norm[tid]   += (ref_real * ref_real + ref_imag * ref_imag ) * __ldg(&g_corr_img[pixel]);

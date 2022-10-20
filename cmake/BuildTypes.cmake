@@ -7,11 +7,15 @@ if(CUDA)
     set(EXTRA_NVCC_FLAGS "-D__INTEL_COMPILER --default-stream per-thread --std=c++11")
     set(RELION_NVCC_FLAGS "${CUDARCH} ${WARN_DBL} ${EXTRA_NVCC_FLAGS}" CACHE STRING "" FORCE)
 else (HIP)
-    set(EXTRA_HIPCC_FLAGS "-fno-gpu-rdc -munsafe-fp-atomics -fgpu-default-stream=legacy")
+    if (${HIP_VERSION} VERSION_LESS "5.3" )
+        set(EXTRA_HIPCC_FLAGS "-fgpu-default-stream=legacy -fno-gpu-rdc -munsafe-fp-atomics")
+    else()
+        set(EXTRA_HIPCC_FLAGS "-fno-gpu-rdc -munsafe-fp-atomics -fgpu-default-stream=per-thread")
+    endif()
     set(RELION_HIPCC_FLAGS "${EXTRA_HIPCC_FLAGS}" CACHE STRING "Compiler flags for HIP" FORCE)
 endif()
-#message(STATUS "RELION_NVCC_FLAGS: ${RELION_NVCC_FLAGS}")
-#message(STATUS "RELION_HIPCC_FLAGS: ${RELION_HIPCC_FLAGS}")
+# message(STATUS "RELION_NVCC_FLAGS: ${RELION_NVCC_FLAGS}")
+# message(STATUS "RELION_HIPCC_FLAGS: ${RELION_HIPCC_FLAGS}")
 # --------------------------
 #        Debug BUILD
 # --------------------------
@@ -23,7 +27,7 @@ endif()
 #                           it implies --ptxas-options=--verbose.
 
 # -- Compiler flags -------------------------------------------------
-set(RELION_FLAGS_DEBUG "-O0" CACHE STRING "")
+set(RELION_FLAGS_DEBUG "-O0 -DDEBUG" CACHE STRING "")
 if(CUDA)
     set(RELION_NVCC_FLAGS_DEBUG "${RELION_NVCC_FLAGS}" CACHE STRING "")
 else(HIP)
@@ -53,9 +57,9 @@ else(HIP)
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${RELION_DEFINITIONS_DEBUG}")
 endif()
 
-#message(STATUS "Set the extra flags for Debug build type")
-#message(STATUS "RELION_NVCC_FLAGS_DEBUG : ${RELION_NVCC_FLAGS_DEBUG}")
-#message(STATUS "CUDA_NVCC_FLAGS_DEBUG : ${CUDA_NVCC_FLAGS_DEBUG}")
+# message(STATUS "Set the extra flags for Debug build type")
+# message(STATUS "RELION_NVCC_FLAGS_DEBUG : ${RELION_NVCC_FLAGS_DEBUG}")
+# message(STATUS "CUDA_NVCC_FLAGS_DEBUG : ${CUDA_NVCC_FLAGS_DEBUG}")
 # message(STATUS "CMAKE_CXX_FLAGS_DEBUG : ${CMAKE_CXX_FLAGS_DEBUG}")
 #--------------------------------------------------------------------
 
@@ -65,7 +69,7 @@ endif()
 # --------------------------
 #        RELWITHDEBINFO BUILD
 # --------------------------
-set(RELION_FLAGS_RELWITHDEBINFO "-O2" CACHE STRING "")
+set(RELION_FLAGS_RELWITHDEBINFO "-O2 -DDEBUG" CACHE STRING "")
 # -- Compiler flags -------------------------------------------------
 if(CUDA)
     set(RELION_NVCC_FLAGS_RELWITHDEBINFO "${RELION_NVCC_FLAGS}" CACHE STRING "")
@@ -86,16 +90,16 @@ if(CUDA)
     set(RELION_DEFINITIONS_RELWITHDEBINFO "-DDEBUG_CUDA")
     set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} ${RELION_DEFINITIONS_RELWITHDEBINFO}")
 else(HIP)
-    set(CMAKE_CXX__FLAGS_RELWITHDEBINFO        "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} ${RELION_HIPCC_FLAGS_RELWITHDEBINFO}")
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO        "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} ${RELION_HIPCC_FLAGS_RELWITHDEBINFO}")
     # -- Add preprocessor defintions ------------------------------------
     set(RELION_DEFINITIONS_RELWITHDEBINFO "-DDEBUG_HIP")
     set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} ${RELION_DEFINITIONS_RELWITHDEBINFO}")
 endif()
 
 
-#message(STATUS "Set the extra flags for RELWITHDEBINFO build type")
-#message(STATUS "RELION_NVCC_FLAGS_RELWITHDEBINFO : ${RELION_NVCC_FLAGS_RELWITHDEBINFO}")
-#message(STATUS "CUDA_NVCC_FLAGS_RELWITHDEBINFO : ${CUDA_NVCC_FLAGS_RELWITHDEBINFO}")
+# message(STATUS "Set the extra flags for RELWITHDEBINFO build type")
+# message(STATUS "RELION_NVCC_FLAGS_RELWITHDEBINFO : ${RELION_NVCC_FLAGS_RELWITHDEBINFO}")
+# message(STATUS "CUDA_NVCC_FLAGS_RELWITHDEBINFO : ${CUDA_NVCC_FLAGS_RELWITHDEBINFO}")
 # message(STATUS "CMAKE_CXX_FLAGS_RELWITHDEBINFO : ${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
 #--------------------------------------------------------------------
 
@@ -141,7 +145,7 @@ endif()
 set(RELION_DEFINITIONS_RELEASE "")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${RELION_DEFINITIONS_RELEASE}")
 
-#message(STATUS "RELION_FLAGS_PROFILING : ${RELION_FLAGS_PROFILING}")
+# message(STATUS "RELION_FLAGS_PROFILING : ${RELION_FLAGS_PROFILING}")
 # message(STATUS "CMAKE_CXX_FLAGS_RELEASE : ${CMAKE_CXX_FLAGS_RELEASE}")
 #--------------------------------------------------------------------
 
@@ -189,21 +193,21 @@ else(HIP)
 
 
     # -- Compiler flags -------------------------------------------------
-    set(RELION_FLAGS_PROFILING "" CACHE STRING "")
+    set(RELION_FLAGS_PROFILING "-O2" CACHE STRING "")
     set(RELION_HIPCC_FLAGS_PROFILING "${RELION_HIPCC_FLAGS} -g -ggdb" CACHE STRING "Semicolon delimited flags")
     # -- Linker flags ---------------------------------------------------
     set(RELION_LINKER_FLAGS_PROFILING  "")
 
     # -- Append compiler and linker flags -------------------------------
-    set(CMAKE_CXX_FLAGS_PROFILING        "${CMAKE_CXX_FLAGS_RELEASE} ${RELION_FLAGS_PROFILING} ${RELION_HIPCC_FLAGS_RELEASE}")
-    set(CMAKE_C_FLAGS_PROFILING          "${CMAKE_C_FLAGS_RELEASE} ${RELION_FALAGS_PROFILING}")
+    set(CMAKE_CXX_FLAGS_PROFILING        "${RELION_FLAGS_PROFILING} ${RELION_HIPCC_FLAGS_PROFILING}")
+    set(CMAKE_C_FLAGS_PROFILING          "${RELION_FLAGS_PROFILING} ${RELION_HIPCC_FLAGS_PROFILING}")
     set(CMAKE_EXE_LINKER_FLAGS_PROFILING "${CMAKE_EXE_LINKER_FLAGS_RELEASE} ${RELION_LINKER_FLAGS_PROFILING}")
 
     # -- Add preprocessor defintions ------------------------------------
-    set(RELION_DEFINITIONS_PROFILING "-DHIP_PROFILING")
+    set(RELION_DEFINITIONS_PROFILING "-DHIP_PROFILING -DDEBUG_HIP -DDEBUG")
     set(CMAKE_CXX_FLAGS_PROFILING "${CMAKE_CXX_FLAGS_PROFILING} ${RELION_DEFINITIONS_PROFILING}")
 
-    #message(STATUS "RELION_FLAGS_PROFILING : ${RELION_FLAGS_PROFILING}")
+    # message(STATUS "RELION_FLAGS_PROFILING : ${RELION_FLAGS_PROFILING}")
     # message(STATUS "CMAKE_CXX_FLAGS_PROFILING : ${CMAKE_CXX_FLAGS_PROFILING}")
     #--------------------------------------------------------------------
 endif()
@@ -242,3 +246,4 @@ else(HIP)
     set(CMAKE_CXX_FLAGS_BENCHMARKING "${CMAKE_CXX_FLAGS_BENCHMARKING} ${RELION_DEFINITIONS_BENCHMARKING}")
 endif()
 #--------------------------------------------------------------------
+# message(STATUS "CMAKE_CXX_FLAGS_BENCHMARKING : ${CMAKE_CXX_FLAGS_BENCHMARKING}")

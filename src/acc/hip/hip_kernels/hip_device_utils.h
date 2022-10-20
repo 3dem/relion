@@ -20,9 +20,9 @@ __device__ inline double hip_atomic_add(double* address, double val)
 #else
 __device__ inline void hip_atomic_add(float* address, float value)
 {
-	atomicAddNoRet(address,value);
+	// atomicAddNoRet(address,value);
 	// unsafeAtomicAdd(address,value);
-	// atomicAdd(address,value);
+	atomicAdd(address,value);
 }
 #endif
 

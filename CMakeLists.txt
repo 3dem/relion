@@ -73,7 +73,7 @@ endif()
 # ----------------------------------------------------------------SET CXX STANDARD--
 set(CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 14)
-set(CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 # ------------------OPTIONS WHICH ARE NEEDED TO SET BUILD-TYPES (COMPILATION FLAGS)--
 # ----------------------------------------------------------CUDA-ARCH--OR--HIP-ARCH--
@@ -155,10 +155,6 @@ if(MDT_TYPE_CHECK)
     add_definitions(-DMETADATA_TABLE_TYPE_CHECK)
 endif()
 
-# ----------------------------------------------------------INCLUDE ALL BUILD TYPES--
- #This *has* to be AFTER project()
-include(${CMAKE_SOURCE_DIR}/cmake/BuildTypes.cmake)
-
 if(CUDA)
     # -----------------------------------------------------------------------------CUDA--
     # DOC: http://www.cmake.org/cmake/help/v3.0/module/FindCUDA.html
@@ -213,6 +209,11 @@ else(HIP)
         message(FATAL_ERROR "HIP enabled but unlable to locate packages. ROCm >= 5.0 is required to configure RELION with HIP using CMake.")
     endif(HIP_FOUND)
 endif()
+
+# ----------------------------------------------------------INCLUDE ALL BUILD TYPES--
+ #This *has* to be AFTER project()
+ include(${CMAKE_SOURCE_DIR}/cmake/BuildTypes.cmake)
+ 
 # ------------------------------------------------------------------ALLOCATOR CHOICE--
 option(CachedAlloc "CachedAlloc" ON)
 if(NOT CachedAlloc)

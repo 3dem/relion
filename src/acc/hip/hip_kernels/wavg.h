@@ -31,7 +31,7 @@ __global__ void hip_kernel_wavg(
 		XFLOAT significant_weight,
 		XFLOAT part_scale)
 {
-	#if 1
+	#if 0
 	float4 ref_real, ref_imag, img_real, img_imag, trans_real, trans_imag;
 
 	int bid = blockIdx.x; //block ID

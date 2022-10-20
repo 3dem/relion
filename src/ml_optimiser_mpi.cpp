@@ -962,13 +962,25 @@ void MlOptimiserMpi::expectation()
 			if (free < required_free)
 			{
 				printf("WARNING: Ignoring required free GPU memory amount of %zu MB, due to space insufficiency.\n", required_free/1000000);
-				allocationSize = (double)free *0.3;
+				#ifdef _CUDA_ENABLED
+					allocationSize = (double)free *0.7;
+				#elif defined _HIP_ENABLED
+					allocationSize = (double)free *0.7;
+				#endif
 			}
 			else
 			{
-				// allocationSize = free - required_free;
-				allocationSize = (double)free *0.3;
-				printf("WARNING: due to 296623 ticket, use 30% of free GPU memory as allocationSize %zu MB.\n", allocationSize/1000000);
+				#ifdef _CUDA_ENABLED	
+					allocationSize = free - required_free;
+				#elif defined _HIP_ENABLED
+					allocationSize = free - required_free;
+					// allocationSize = (double)free *0.5;
+					// #ifdef DEBUG_HIP
+					// 	printf("WARNING: due to 296623 ticket, use 50%% of free GPU memory as allocationSize %zu MB.\n", allocationSize/1000000);
+					// #else
+					// 	printf("WARNING: Using 50%% of free GPU memory as allocationSize %zu MB.\n", allocationSize/1000000);
+					// #endif
+				#endif
 			}
 
 			if (allocationSize < 200000000)
