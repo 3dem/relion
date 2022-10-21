@@ -372,7 +372,8 @@ void SubtomoProgram::writeParticleSet(
 		const double ps_img = copy.optTable.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, og);
 		const double ps_out = binning * ps_img;
 
-		copy.optTable.setValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, true, og);
+        bool is_premultiplied = (do_stack2d) ? do_ctf : true;
+		copy.optTable.setValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, is_premultiplied, og);
 		int datadim = (do_stack2d) ? 2 : 3;
         copy.optTable.setValue(EMDL_IMAGE_DIMENSIONALITY, datadim, og);
 		copy.optTable.setValue(EMDL_TOMO_SUBTOMOGRAM_BINNING, binning, og);
@@ -550,9 +551,9 @@ void SubtomoProgram::processTomograms(
                             particleStack(x, y, f) *= sign * c;
                             weightStack(x, y, f) = c * c;
                         }
-                }
+                } // end if do_ctf
 
-            }
+            } // end for f
 
             // If we're not doing CTF premultiplication, we may still want to invert the contrast
             if (!do_ctf) particleStack *= sign;
@@ -570,6 +571,7 @@ void SubtomoProgram::processTomograms(
             if (do_gridding_precorrection || do_circle_crop || do_stack2d) {
 
                 particlesRS = NewStackHelper::inverseFourierTransformStack(particleStack);
+
             }
 
             if (do_circle_crop) {
@@ -621,20 +623,11 @@ void SubtomoProgram::processTomograms(
                 Centering::shiftInSitu(dataImgFS);
 
                 // correct FT scale after the implicit cropping:
-
                 if (s3D != s2D) {
                     dataImgFS *= (float) sqrt(s2D / (double) s3D);
                 }
 
                 FFT::inverseFourierTransform(dataImgFS, dataImgRS, FFT::Both);
-
-                //SHWS keep greyscale compatible with relion_refine
-                // Jasenko does normalization=Both on forward FT of 2D images and backward IFT on 3D images
-                // This will be dividing by sqrt(size) = sqrt(dim*dim) in the forward pass
-                // and sqrt(size) = sqrt(dim*dim*dim) in the backward pass
-                // relion_refine does dim in both passes.
-                // Correct for that inconsistency here; assuming that xdim=ydim=zdim!
-                dataImgRS /= sqrt(dataImgRS.xdim);
 
                 if (do_cone_weight) {
                     FFT::FourierTransform(dataImgRS, dataImgFS);
