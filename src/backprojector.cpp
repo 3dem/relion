@@ -1391,6 +1391,15 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	ttt()=weight;
 	ttt.write("reconstruct_initial_weight.spi");
 	std::cerr << " pad_size= " << pad_size << " padding_factor= " << padding_factor << " max_r2= " << max_r2 << std::endl;
+    FourierTransformer transformer2;
+    ttt().resize(vol_out);
+    transformer2.setReal(ttt()); // Fake set real. 1. Allocate space for Fconv 2. calculate plans.
+	MultidimArray<Complex>& Fconv2 = transformer2.getFourierReference();
+    Fconv2.initZeros(); // to remove any stuff from the input volume
+    Projector::decenter(data, Fconv2, max_r2);
+    windowToOridimRealSpace(transformer2, ttt(), printTimes);
+    ttt.write("reconstruct_initial_data.spi");
+    std::cerr << "DEBUG_RECONSTRUCT: Written out reconstruct_initial_weight.spi and reconstruct_initial_data.spi" << std::endl;
 #endif
 
 	// Set Fconv to the right size
