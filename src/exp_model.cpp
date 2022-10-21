@@ -849,7 +849,7 @@ void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
         if (is_tomo)
         {
 
-            if (fn_tomo == "") REPORT_ERROR("ERROR: you need to provide fn_tomo when refining 2D stacks of tilt series images");
+            if (fn_tomo == "") REPORT_ERROR("ERROR: you need to provide --tomograms when refining 2D stacks of tilt series images");
 
             // For now read in particle table twice: once into MDimg and once into particleSet...
             // TODO: work with pointer to avoid duplication?
