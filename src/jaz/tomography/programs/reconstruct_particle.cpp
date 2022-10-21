@@ -589,14 +589,6 @@ void ReconstructParticleProgram::reconstruct(
 	Reconstruction::griddingCorrect3D_sinc2(
 			dataImgFS, dataImgRS, true, num_threads);
 
-    //SHWS keep greyscale compatible with relion_refine
-    // Jasenko does normalization=Both on forward FT of 2D images and backward IFT on 3D images
-    // This will be dividing by sqrt(size) = sqrt(dim*dim) in the forward pass
-    // and sqrt(size) = sqrt(dim*dim*dim) in the backward pass
-    // relion_refine does dim in both passes.
-    // Correct for that inconsistency here; assuming that xdim=ydim=zdim!
-    dataImgRS /= sqrt(dataImgRS.xdim);
-
 	if (SNR > 0.0)
 	{
 		Reconstruction::ctfCorrect3D_Wiener(
