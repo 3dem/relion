@@ -31,6 +31,7 @@ def import_tilt_series_from_serial_em(
         spherical_aberration: float = typer.Option(...),
         amplitude_contrast: float = typer.Option(...),
         invert_defocus_handedness: Optional[bool] = typer.Option(None),
+        images_are_motion_corrected: bool = typer.Option(False),
         dose_per_tilt_image: Optional[float] = None,
         prefix: str = '',
         mtf_file: Optional[Path] = None,
@@ -52,6 +53,7 @@ def import_tilt_series_from_serial_em(
     invert_defocus_handedness: Set this to flip the handedness of the defocus geometry (default=1).
         The value of this parameter is either +1 or -1, and it describes whether the focus 
         increases or decreases as a function of Z distance. It has to be determined experimentally. 
+    images_are_motion_corrected : Set this if your raw images have already been motion corrected and/or are not movies.
     dose_per_tilt_image : dose in electrons per square angstrom in each tilt image.
         If set, this will override the values from the mdoc file
     prefix : a prefix which will be added to the tilt-series name.
@@ -101,6 +103,8 @@ def import_tilt_series_from_serial_em(
     global_df['rlnSphericalAberration'] = spherical_aberration
     global_df['rlnAmplitudeContrast'] = amplitude_contrast
     global_df['rlnMicrographOriginalPixelSize'] = nominal_pixel_size
+    if images_are_motion_corrected:
+        global_df['rlnTomoTiltSeriesPixelSize'] = nominal_pixel_size
     global_df['rlnTomoHand'] = -1 if invert_defocus_handedness else 1
     if mtf_file is not None:
         global_df['rlnMtfFileName'] = mtf_file
@@ -121,6 +125,7 @@ def import_tilt_series_from_serial_em(
             tilt_image_files=tilt_image_files,
             dose_per_tilt_image=dose_per_tilt_image,
             nominal_tilt_axis_angle=nominal_tilt_axis_angle,
+            images_are_motion_corrected=images_are_motion_corrected
         )
         starfile.write(
             data={f'{tomogram_id}': tilt_image_df},
@@ -138,6 +143,7 @@ def _generate_tilt_image_dataframe(
         tilt_image_files: List[Path],
         nominal_tilt_axis_angle: float,
         dose_per_tilt_image: Optional[float],
+        images_are_motion_corrected: Optional[bool]
 ) -> pd.DataFrame:
     """Generate a dataframe containing data about images in a tilt-series."""
     df = mdocfile.read(mdoc_file, camel_to_snake=True)
@@ -151,13 +157,20 @@ def _generate_tilt_image_dataframe(
     df['nominal_tilt_axis_angle'] = nominal_tilt_axis_angle
 
     output_df = pd.DataFrame({
-        'rlnMicrographMovieName': df['tilt_image_file'],
-        'rlnTomoTiltMovieFrameCount': df['num_sub_frames'],
-        'rlnTomoTiltMovieIndex': df['image_index'],
         'rlnTomoNominalStageTiltAngle': df['tilt_angle'],
         'rlnTomoNominalTiltAxisAngle': df['nominal_tilt_axis_angle'],
         'rlnMicrographPreExposure': df['pre_exposure_dose'],
     })
+    
+    if not images_are_motion_corrected:
+        movie_information_df=pd.DataFrame({
+            'rlnMicrographMovieName': df['tilt_image_file'],
+            'rlnTomoTiltMovieFrameCount': df['num_sub_frames'],
+            'rlnTomoTiltMovieIndex': df['image_index']
+        })
+        output_df=pd.concat([movie_information_df, output_df], axis=1)
     if 'target_defocus' in df.columns:
         output_df['rlnTomoNominalDefocus'] = df['target_defocus']
+    if images_are_motion_corrected:
+        output_df['rlnMicrographName'] = df['tilt_image_file']
     return output_df

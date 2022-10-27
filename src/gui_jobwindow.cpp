@@ -2407,6 +2407,7 @@ void JobWindow::initialiseTomoImportWindow()
     place("tilt_axis_angle", TOGGLE_DEACTIVATE);
     place("mtf_file", TOGGLE_DEACTIVATE);
     place("flip_tiltseries_hand", TOGGLE_DEACTIVATE);
+    place("images_are_motion_corrected", TOGGLE_DEACTIVATE);
 
     group4->end();
     guientries["do_tiltseries"].cb_menu_i(); // make default active

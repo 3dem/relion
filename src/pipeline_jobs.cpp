@@ -6119,7 +6119,8 @@ void RelionJob::initialiseTomoImportJob()
         joboptions["prefix"] = JobOption("Prefix:", (std::string)"","Optional prefix added to avoid tilt-series name collisions when dealing with multiple datasets.");
         joboptions["tilt_axis_angle"] = JobOption("Tilt axis angle (deg):", 85.0, 0.0, 180.0, 1.0 , "Nominal value for the tilt-axis rotation angle (positive is CCW from Y)");
         joboptions["mtf_file"] = JobOption("MTF file:", (std::string)"","MTF file for the detector");
-        joboptions["flip_tiltseries_hand"] = JobOption("Invert Defocus Handedness?", false, "Specify Yes to flip the handedness of the defocus geometry (default = 1, the same as the tutorial dataset: EMPIAR-10164)");
+        joboptions["flip_tiltseries_hand"] = JobOption("Invert defocus handedness?", false, "Specify Yes to flip the handedness of the defocus geometry (default = 1, the same as the tutorial dataset: EMPIAR-10164)");
+	joboptions["images_are_motion_corrected"] = JobOption("Movies already motion corrected?", false, "Select Yes if your input images in 'Tilt image movie files' have already been motion corrected and/or are summed single frame images. Make sure the image file names match the corresponding image file names under SubFramePath in the mdoc files");
 
        	joboptions["do_tomo"] = JobOption("Import tomograms?", false, "Set this to Yes for importing tomogram directories from IMOD.");
         joboptions["io_tomos"] = JobOption("Append to tomograms set: ", OUTNODE_TOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "The imported tomograms will be output into this tomogram set. If any tomograms were already in this tomogram set, then the newly imported ones will be added to those.");
@@ -6202,7 +6203,9 @@ bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<st
         if (joboptions["mtf_file"].getString() != "")
             command += " --mtf-file " + joboptions["mtf_file"].getString();
         if (joboptions["flip_tiltseries_hand"].getBoolean())
-            command += " --invert-defocus-handedness";
+            command += " --invert-defocus-handedness ";
+	if (joboptions["images_are_motion_corrected"].getBoolean())
+            command += " --images-are-motion-corrected ";
         command += " --output-directory " + outputname;
         Node node(outputname+"tilt_series.star", LABEL_TOMO_TOMOGRAMS);
 		outputNodes.push_back(node);
