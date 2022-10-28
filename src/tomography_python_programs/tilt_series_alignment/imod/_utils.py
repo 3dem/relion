@@ -20,7 +20,8 @@ def get_xyz_extrinsic_euler_angles(etomo_output: EtomoOutput) -> np.ndarray:
     xf = XF.from_file(etomo_output.xf_file)
     tilt_angles = read_tlt(etomo_output.tlt_file)
     tilt_angle_offset = get_tilt_angle_offset(etomo_output.align_log_file)
-    tilt_angles -= tilt_angle_offset
+    if tilt_angle_offset is not None:
+        tilt_angles -= tilt_angle_offset
     n_images = len(tilt_angles)
     euler_angles = np.empty(shape=(n_images, 3))
     euler_angles[:, 0] = 0
