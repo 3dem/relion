@@ -23,7 +23,9 @@ def calculate_pre_exposure_dose(
     elif dose_per_tilt_image is not None:
         pre_exposure_dose = dose_per_tilt_image * np.arange(len(df))
     elif dose_per_movie_frame is not None:
-        pre_exposure_dose = dose_per_movie_frame * df["num_sub_frames"] * np.arange(len(df))
+        cumulative_frame_number = np.cumsum(df["num_sub_frames"])
+        post_exposure_dose = dose_per_movie_frame * cumulative_frame_number
+        pre_exposure_dose = np.pad(post_exposure_dose, pad_width=(1, 0))[:-1]
     else:
         warnings.warn('no dose information found in mdoc or provided, defaulting to zero.')
         pre_exposure_dose = [0] * len(df)
