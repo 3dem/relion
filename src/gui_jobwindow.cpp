@@ -2386,7 +2386,10 @@ void JobWindow::initialiseTomoImportWindow()
 	place("kV", TOGGLE_DEACTIVATE);
 	place("Cs", TOGGLE_DEACTIVATE);
 	place("Q0", TOGGLE_DEACTIVATE);
-	place("dose", TOGGLE_DEACTIVATE);
+	// Add a little spacer
+	current_y += STEPY/2;
+	place("dose_per_tilt_image", TOGGLE_DEACTIVATE);
+	place("dose_per_movie_frame", TOGGLE_DEACTIVATE);
 
     tab1->end();
 
