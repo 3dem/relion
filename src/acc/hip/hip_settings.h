@@ -1,3 +1,6 @@
+/* Portions of this code are under:
+   Copyright (c) 2022 Advanced Micro Devices, Inc. All rights reserved.
+*/
 #ifndef HIP_SETTINGS_H_
 #define HIP_SETTINGS_H_
 
@@ -15,7 +18,7 @@
 #include <hiprand.h>
 
 // Required compute capability
-#define HIP_CC_MAJOR 4
+#define HIP_CC_MAJOR 5
 #define HIP_CC_MINOR 0
 
 #define LAUNCH_CHECK

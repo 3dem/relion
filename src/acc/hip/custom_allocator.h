@@ -1,3 +1,6 @@
+/* Portions of this code are under:
+   Copyright (c) 2022 Advanced Micro Devices, Inc. All rights reserved.
+*/
 #ifndef HIP_CUSTOM_ALLOCATOR_H_
 #define HIP_CUSTOM_ALLOCATOR_H_
 // This is where custom allocator should be. Commented out for now, to avoid double declaration.

@@ -1,3 +1,6 @@
+/* Portions of this code are under:
+   Copyright (c) 2022 Advanced Micro Devices, Inc. All rights reserved.
+*/
 #ifndef HIP_ML_OPTIMISER_H_
 #define HIP_ML_OPTIMISER_H_
 
@@ -135,11 +138,11 @@ public:
 				HANDLE_ERROR(hipStreamDestroy(classStreams[i]));
 	}
 
-	HipCustomAllocator *getAllocator()	
+	HipCustomAllocator *getAllocator()
 	{
 		return (bundle->allocator);
 	};
-	
+
 };
 
 #endif

@@ -1,3 +1,6 @@
+/* Portions of this code are under:
+   Copyright (c) 2022 Advanced Micro Devices, Inc. All rights reserved.
+*/
 #include "hip/hip_runtime.h"
 #include "src/acc/settings.h"
 #include "src/acc/hip/hip_kernels/hip_device_utils.h"
@@ -630,7 +633,7 @@ __global__ void hip_kernel_rotateAndCtf( ACCCOMPLEX *d_Faux,
 			sincosf((proj+startPsi)*psi, &sa, &ca);
 		#endif
 		ACCCOMPLEX val;
-		
+
 		projector.project2Dmodel(	 x,y,
 									 ca,
 									-sa,

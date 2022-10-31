@@ -1,3 +1,6 @@
+/* Portions of this code are under:
+   Copyright (c) 2022 Advanced Micro Devices, Inc. All rights reserved.
+*/
 #ifndef HIP_DIFF2_KERNELS_H_
 #define HIP_DIFF2_KERNELS_H_
 

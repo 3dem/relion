@@ -1,3 +1,6 @@
+/* Portions of this code are under:
+   Copyright (c) 2022 Advanced Micro Devices, Inc. All rights reserved.
+*/
 #undef ALTCPU
 #include <hip/hip_runtime.h>
 #include "src/ml_optimiser.h"

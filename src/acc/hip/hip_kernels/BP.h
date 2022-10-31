@@ -1,3 +1,6 @@
+/* Portions of this code are under:
+   Copyright (c) 2022 Advanced Micro Devices, Inc. All rights reserved.
+*/
 #ifndef HIP_BP_KERNELS_H_
 #define HIP_BP_KERNELS_H_
 
@@ -201,10 +204,10 @@ __global__ void hip_kernel_backproject3D(
 {
 	unsigned tid = threadIdx.x;
 	unsigned img = blockIdx.x;
-	
+
 	int img_y_half = img_y / 2;
 	int img_z_half = img_z / 2;
-	
+
 	int max_r2_vol = max_r2 * padding_factor * padding_factor;
 
 	__shared__ XFLOAT s_eulers[9];
@@ -240,7 +243,7 @@ __global__ void hip_kernel_backproject3D(
 			xy = pixel % (img_x*img_y);
 			x =             xy  % img_x;
 			y = floorfracf( xy,   img_x);
-			
+
 			if (z > img_z_half)
 			{
 				z = z - img_z;
@@ -258,7 +261,7 @@ __global__ void hip_kernel_backproject3D(
 		{
 			y = y - img_y;
 		}
-		
+
 		//WAVG
 		minvsigma2 = __ldg(&g_Minvsigma2s[pixel]);
 		ctf = __ldg(&g_ctfs[pixel]);
@@ -286,7 +289,7 @@ __global__ void hip_kernel_backproject3D(
 					weight = (weight / weight_norm) * ctf * minvsigma2;
 					Fweight += weight * ctf;
 				}
-				
+
 				if(DATA3D)
 					translatePixel(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, temp_real, temp_imag);
 				else
@@ -315,12 +318,12 @@ __global__ void hip_kernel_backproject3D(
 				yp = (s_eulers[3] * x + s_eulers[4] * y ) * padding_factor;
 				zp = (s_eulers[6] * x + s_eulers[7] * y ) * padding_factor;
 			}
-			
+
 			// Only consider pixels that are projected inside the sphere in output coordinates.
-			//     --JZ, Oct. 18. 2018			
+			//     --JZ, Oct. 18. 2018
 			if ( ( xp * xp + yp * yp  + zp * zp ) > max_r2_vol)
 				continue;
-		
+
 			// Only asymmetric half is stored
 			if (xp < (XFLOAT) 0.0)
 			{
@@ -434,10 +437,10 @@ __global__ void hip_kernel_backproject3D_SGD(
 {
 	unsigned tid = threadIdx.x;
 	unsigned img = blockIdx.x;
-	
+
 	int img_y_half = img_y / 2;
 	int img_z_half = img_z / 2;
-	
+
 	int max_r2_vol = max_r2 * padding_factor * padding_factor;
 
 	__shared__ XFLOAT s_eulers[9];
@@ -473,7 +476,7 @@ __global__ void hip_kernel_backproject3D_SGD(
 			xy = pixel % (img_x*img_y);
 			x =             xy  % img_x;
 			y = floorfracf( xy,   img_x);
-			
+
 			if (z > img_z_half)
 			{
 				z = z - img_z;
@@ -567,12 +570,12 @@ __global__ void hip_kernel_backproject3D_SGD(
 				yp = (s_eulers[3] * x + s_eulers[4] * y ) * padding_factor;
 				zp = (s_eulers[6] * x + s_eulers[7] * y ) * padding_factor;
 			}
-			
+
 			// Only consider pixels that are projected inside the sphere in output coordinates.
-			//     --JZ, Nov. 26th 2018			
+			//     --JZ, Nov. 26th 2018
 			if ( ( xp * xp + yp * yp  + zp * zp ) > max_r2_vol)
 				continue;
-			
+
 			// Only asymmetric half is stored
 			if (xp < (XFLOAT) 0.0)
 			{

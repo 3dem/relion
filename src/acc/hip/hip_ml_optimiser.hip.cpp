@@ -1,3 +1,6 @@
+/* Portions of this code are under:
+   Copyright (c) 2022 Advanced Micro Devices, Inc. All rights reserved.
+*/
 #undef ALTCPU
 #include <sys/time.h>
 #include <stdio.h>
@@ -293,4 +296,3 @@ void MlOptimiserHip::doThreadExpectationSomeParticles(int thread_id)
 		baseMLO->timer.toc(baseMLO->TIMING_ESP_THR);
 #endif
 }
-
