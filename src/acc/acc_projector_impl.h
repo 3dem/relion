@@ -157,7 +157,10 @@ bool AccProjector::setMdlDim(
 		}
 
 		// -- Decriptors of the texture(s) and methods used for reading it(them) --
-		texDesc.filterMode       = hipFilterModeLinear;
+		if(mdlZ!=0)  // 3D model
+			texDesc.filterMode       = hipFilterModePoint;
+		else // 2D model
+			texDesc.filterMode       = hipFilterModeLinear;
 		texDesc.readMode         = hipReadModeElementType;
 		texDesc.normalizedCoords = false;
 
@@ -298,7 +301,7 @@ void AccProjector::initMdl(Complex *data)
 
 void AccProjector::clear()
 {
-#if defined _CUDA_ENABLED || defined _HIP_ENABLED 
+#if defined _CUDA_ENABLED || defined _HIP_ENABLED
 	if (mdlReal != 0)
 	{
 #ifndef PROJECTOR_NO_TEXTURES
@@ -314,7 +317,7 @@ void AccProjector::clear()
 
 		if(mdlZ!=0) //3D case
 		{
-		#ifdef _CUDA_ENABLED	
+		#ifdef _CUDA_ENABLED
 			cudaFreeArray(*texArrayReal);
 			cudaFreeArray(*texArrayImag);
 		#elif _HIP_ENABLED
