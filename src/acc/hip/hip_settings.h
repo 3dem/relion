@@ -104,7 +104,7 @@ static void LaunchHandleError( hipError_t err, const char *file, int line )
 
 
 // FINE DIFF ---------------------------
-#define D2F_BLOCK_SIZE_2D 			   256
+#define D2F_BLOCK_SIZE_2D 			   512 //256
 #define D2F_CHUNK_2D 				         7
 
 #define D2F_BLOCK_SIZE_REF3D 	     256
@@ -117,7 +117,7 @@ static void LaunchHandleError( hipError_t err, const char *file, int line )
 
 // WAVG --------------------------------
 #define WAVG_BLOCK_SIZE_DATA3D	   512
-#define WAVG_BLOCK_SIZE 	 		     256
+#define WAVG_BLOCK_SIZE 	 		     512 //256
 // -------------------------------------
 
 
@@ -139,8 +139,8 @@ static void LaunchHandleError( hipError_t err, const char *file, int line )
 #define BACKPROJECTION4_BLOCK_SIZE 64
 #define BACKPROJECTION4_GROUP_SIZE 16
 #define BACKPROJECTION4_PREFETCH_COUNT 3
-#define BP_2D_BLOCK_SIZE          128
-#define BP_REF3D_BLOCK_SIZE       128
+#define BP_2D_BLOCK_SIZE          512 //128
+#define BP_REF3D_BLOCK_SIZE       1024 //128
 #define BP_DATA3D_BLOCK_SIZE      640
 
 
