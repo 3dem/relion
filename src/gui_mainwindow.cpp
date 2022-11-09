@@ -1460,6 +1460,44 @@ void GuiMainWindow::cb_display_io_node_i()
 		// Other arguments for extraction
 		command += " " + manualpickjob.joboptions["other_args"].getString() + " &";
 	}
+    else if (pipeline.nodeList[mynode].type.find(LABEL_TOMO_TILTSERIES) != std::string::npos )
+    {
+
+        command = "relion_tomo_view_tilt_series --tilt-series-star-file " + pipeline.nodeList[mynode].name;
+
+        // Read cache-size from gui_tomo_exclude_tilt_imagesjob.star if that file exists
+		RelionJob excludetiltseriesjob;
+		FileName fn_job = ".gui_tomo_exclude_tilt_images";
+		bool iscont=false;
+		if (exists(fn_job+"job.star"))
+		{
+			excludetiltseriesjob.read(fn_job.c_str(), iscont, true); // true means do initialise
+            command += " --cash-size " + excludetiltseriesjob.joboptions["cache_size"].getString();
+        }
+
+        // Run in the background
+        command += " &";
+
+    }
+    else if (pipeline.nodeList[mynode].type.find(LABEL_TOMO_TOMOGRAMS) != std::string::npos )
+    {
+
+        command = "relion_tomo_view_tomograms --tilt-series-star-file " + pipeline.nodeList[mynode].name;
+
+        // Read cache-size from gui_tomo_exclude_tilt_imagesjob.star if that file exists
+        RelionJob excludetiltseriesjob;
+        FileName fn_job = ".gui_tomo_exclude_tilt_images";
+        bool iscont=false;
+        if (exists(fn_job+"job.star"))
+        {
+            excludetiltseriesjob.read(fn_job.c_str(), iscont, true); // true means do initialise
+            command += " --cash-size " + excludetiltseriesjob.joboptions["cache_size"].getString();
+        }
+
+        // Run in the background
+        command += " &";
+
+    }
 	else if (pipeline.nodeList[mynode].type.find(LABEL_LOGFILE_CPIPE) != std::string::npos ||
 			 pipeline.nodeList[mynode].type.find(NODE_PDF_LOGFILE_LABEL) != std::string::npos )
 	{
