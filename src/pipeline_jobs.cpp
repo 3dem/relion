@@ -1422,8 +1422,8 @@ void RelionJob::initialiseMotioncorrJob()
     {
 	    joboptions["input_star_mics"] = JobOption("Input movies STAR file:", NODE_MOVIES_CPIPE, "", "STAR files (*.star)", "A STAR file with all micrographs to run MOTIONCORR on");
 	}
-    joboptions["first_frame_sum"] = JobOption("First frame for corrected sum:", 1, 1, 32, 1, "First frame to use in corrected average (starts counting at 1). ");
-	joboptions["last_frame_sum"] = JobOption("Last frame for corrected sum:", -1, 0, 32, 1, "Last frame to use in corrected average. Values equal to or smaller than 0 mean 'use all frames'.");
+    if (!is_tomo) joboptions["first_frame_sum"] = JobOption("First frame for corrected sum:", 1, 1, 32, 1, "First frame to use in corrected average (starts counting at 1). ");
+	if (!is_tomo) joboptions["last_frame_sum"] = JobOption("Last frame for corrected sum:", -1, 0, 32, 1, "Last frame to use in corrected average. Values equal to or smaller than 0 mean 'use all frames'.");
 	joboptions["eer_grouping"] = JobOption("EER fractionation:", 32, 1, 100, 1, "The number of hardware frames to group into one fraction. This option is relevant only for Falcon4 movies in the EER format. Note that all 'frames' in the GUI (e.g. first and last frame for corrected sum, dose per frame) refer to fractions, not raw detector frames. See https://www3.mrc-lmb.cam.ac.uk/relion/index.php/Image_compression#Falcon4_EER for detailed guidance on EER processing.");
 	joboptions["do_float16"] = JobOption("Write output in float16?", true ,"If set to Yes, RelionCor2 will write output images in float16 MRC format. This will save a factor of two in disk space compared to the default of writing in float32. Note that RELION and CCPEM will read float16 images, but other programs may not (yet) do so. For example, Gctf will not work with float16 images. Also note that this option does not work with UCSF MotionCor2. For CTF estimation, use CTFFIND-4.1 with pre-calculated power spectra (activate the 'Save sum of power spectra' option).");
 	if (is_tomo)
@@ -1460,14 +1460,10 @@ Note that multiple MotionCor2 processes should not share a GPU; otherwise, it ca
 	joboptions["other_motioncor2_args"] = JobOption("Other MOTIONCOR2 arguments", std::string(""), "Additional arguments that need to be passed to MOTIONCOR2.");
 
 	// Dose-weight
-	if (is_tomo)
-        joboptions["do_dose_weighting"] = JobOption("Do dose-weighting?", false ,"If set to Yes, the averaged micrographs will be dose-weighted.");
-	else
-        joboptions["do_dose_weighting"] = JobOption("Do dose-weighting?", true ,"If set to Yes, the averaged micrographs will be dose-weighted.");
-
-    joboptions["do_save_noDW"] = JobOption("Save non-dose weighted as well?", false, "Aligned but non-dose weighted images are sometimes useful in CTF estimation, although there is no difference in most cases. Whichever the choice, CTF refinement job is always done on dose-weighted particles.");
+	if (!is_tomo) joboptions["do_dose_weighting"] = JobOption("Do dose-weighting?", true ,"If set to Yes, the averaged micrographs will be dose-weighted.");
+    if (!is_tomo) joboptions["do_save_noDW"] = JobOption("Save non-dose weighted as well?", false, "Aligned but non-dose weighted images are sometimes useful in CTF estimation, although there is no difference in most cases. Whichever the choice, CTF refinement job is always done on dose-weighted particles.");
 	joboptions["dose_per_frame"] = JobOption("Dose per frame (e/A2):", 1, 0, 5, 0.2, "Dose per movie frame (in electrons per squared Angstrom).");
-	joboptions["pre_exposure"] = JobOption("Pre-exposure (e/A2):", 0, 0, 5, 0.5, "Pre-exposure dose (in electrons per squared Angstrom).");
+	if (!is_tomo) joboptions["pre_exposure"] = JobOption("Pre-exposure (e/A2):", 0, 0, 5, 0.5, "Pre-exposure dose (in electrons per squared Angstrom).");
 
 	joboptions["do_save_ps"] = JobOption("Save sum of power spectra?", true, "Sum of non-dose weighted power spectra provides better signal for CTF estimation. The power spectra can be used by CTFFIND4 but not by GCTF. This option is not available for UCSF MotionCor2. You must use this option when writing in float16.");
 	joboptions["group_for_ps"] = JobOption("Sum power spectra every e/A2:", 4, 0, 10, 0.5, "McMullan et al (Ultramicroscopy, 2015) sugggest summing power spectra every 4.0 e/A2 gives optimal Thon rings");
@@ -1511,10 +1507,10 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 	Node node4(outputname + "logfile.pdf", LABEL_MOCORR_LOG);
 	outputNodes.push_back(node4);
 
-	command += " --first_frame_sum " + joboptions["first_frame_sum"].getString();
-	command += " --last_frame_sum " + joboptions["last_frame_sum"].getString();
+	if (!is_tomo) command += " --first_frame_sum " + joboptions["first_frame_sum"].getString();
+	if (!is_tomo) command += " --last_frame_sum " + joboptions["last_frame_sum"].getString();
 
-	if (joboptions["do_even_odd_split"].getBoolean())
+	if (is_tomo && joboptions["do_even_odd_split"].getBoolean())
         {
             command += " --even_odd_split ";
         }
@@ -1562,7 +1558,7 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 	command += " --bin_factor " + joboptions["bin_factor"].getString();
 	command += " --bfactor " + joboptions["bfactor"].getString();
 	command += " --dose_per_frame " + joboptions["dose_per_frame"].getString();
-	command += " --preexposure " + joboptions["pre_exposure"].getString();
+	if (!is_tomo) command += " --preexposure " + joboptions["pre_exposure"].getString();
 	command += " --patch_x " + joboptions["patch_x"].getString();
 	command += " --patch_y " + joboptions["patch_y"].getString();
 	command += " --eer_grouping " + joboptions["eer_grouping"].getString();
@@ -1601,14 +1597,9 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 		command += " --gain_flip " + integerToString(gain_flip);
 	}
 
-	if (joboptions["do_dose_weighting"].getBoolean())
+	if (!is_tomo && joboptions["do_dose_weighting"].getBoolean())
 	{
 		command += " --dose_weighting ";
-		if (joboptions["do_even_odd_split"].getBoolean() && joboptions["do_own_motioncor"].getBoolean())
-		{
-			error_message = "'Dose weighting' is not available with RELION's own implementation of MotionCor when saving images for denoising. You probably do not want to dose weight for tomography anyway.";
-			return false;
-		}
 		if (joboptions["do_save_noDW"].getBoolean())
 		{
 			command += " --save_noDW ";

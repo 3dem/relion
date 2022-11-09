@@ -551,28 +551,27 @@ void JobWindow::initialiseMotioncorrWindow()
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	place("first_frame_sum", TOGGLE_DEACTIVATE);
-	place("last_frame_sum", TOGGLE_DEACTIVATE);
-	place("dose_per_frame", TOGGLE_DEACTIVATE);
-	place("pre_exposure", TOGGLE_DEACTIVATE);
+    if (!is_tomo) place("first_frame_sum", TOGGLE_DEACTIVATE);
+    if (!is_tomo) place("last_frame_sum", TOGGLE_DEACTIVATE);
+    place("dose_per_frame", TOGGLE_DEACTIVATE);
+	if (!is_tomo) place("pre_exposure", TOGGLE_DEACTIVATE);
 	place("eer_grouping", TOGGLE_DEACTIVATE);
 	place("do_float16", TOGGLE_DEACTIVATE);
-	if (is_tomo)
-	{
-	place("do_even_odd_split");
-	}
+	if (is_tomo) place("do_even_odd_split");
 
 	// Add a little spacer
 	current_y += STEPY/2;
+    if (!is_tomo)
+    {
+        group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+        group1->end();
+        place("do_dose_weighting", TOGGLE_DEACTIVATE, group1);
+        group1->begin();
+        place("do_save_noDW", TOGGLE_DEACTIVATE);
+        group1->end();
 
-	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group1->end();
-	place("do_dose_weighting", TOGGLE_DEACTIVATE, group1);
-	group1->begin();
-	place("do_save_noDW", TOGGLE_DEACTIVATE);
-	group1->end();
-
-	guientries["do_dose_weighting"].cb_menu_i(); // make default active
+        guientries["do_dose_weighting"].cb_menu_i(); // make default active
+    }
 
 	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group2->end();
