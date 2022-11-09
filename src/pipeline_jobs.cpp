@@ -6203,7 +6203,7 @@ bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<st
 	if (joboptions["images_are_motion_corrected"].getBoolean())
             command += " --images-are-motion-corrected ";
         command += " --output-directory " + outputname;
-        Node node(outputname+"tilt_series.star", LABEL_TOMO_TOMOGRAMS);
+        Node node(outputname+"tilt_series.star", LABEL_TOMO_TILTSERIES);
 		outputNodes.push_back(node);
 
     }
@@ -6283,6 +6283,8 @@ bool RelionJob::getCommandsTomoImportJob(std::string &outputname, std::vector<st
 		std::string mynodetype;
 		if (node_type == "Particles STAR file (.star)")
 			mynodetype = LABEL_TOMO_PARTS;
+        else if (node_type == "Set of tiltseries STAR file (.star)")
+            mynodetype = LABEL_TOMO_TILTSERIES;
 		else if (node_type == "Set of tomograms STAR file (.star)")
 			mynodetype = LABEL_TOMO_TOMOGRAMS;
 		else if (node_type == "Multiple (2D or 3D) references (.star or .mrcs)")
@@ -6364,7 +6366,7 @@ void RelionJob::initialiseTomoAlignTiltSeriesJob()
 {
     hidden_name = ".gui_tomo_align_tiltseries";
 
-    joboptions["in_tiltseries"] = JobOption("Input tilt series:", OUTNODE_TOMO_TOMOGRAMS, "", "STAR files (*.star)",  "Input tomogram set starfile.");
+    joboptions["in_tiltseries"] = JobOption("Input tilt series:", OUTNODE_TOMO_TILTSERIES, "", "STAR files (*.star)",  "Input tomogram set starfile.");
 
     joboptions["do_imod_fiducials"] = JobOption("Use IMOD's fiducial based alignment?", false, "Set to Yes to perform tilt series alignment using fiducials in IMOD.");
     joboptions["fiducial_diameter"] = JobOption("Fiducial diameter (nm): ", 10, 1, 20, 1, "The diameter of the fiducials (in nm)");
@@ -6434,7 +6436,7 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
     inputNodes.push_back(node);
 
     command += " --output-directory " + outputname;
-    Node node2(outputname+"aligned_tilt_series.star", LABEL_TOMO_TOMOGRAMS);
+    Node node2(outputname+"aligned_tilt_series.star", LABEL_TOMO_TILTSERIES);
     outputNodes.push_back(node2);
 
     // Other arguments for extraction
@@ -6634,7 +6636,7 @@ void RelionJob::initialiseTomoExcludeTiltImagesJob()
 {
     hidden_name = ".gui_tomo_exclude_tilt_images";
 
-    joboptions["in_tiltseries"] = JobOption("Input tilt series:", OUTNODE_TOMO_TOMOGRAMS, "", "STAR files (*.star)",  "Input tilt series starfile.");
+    joboptions["in_tiltseries"] = JobOption("Input tilt series:", OUTNODE_TOMO_TILTSERIES, "", "STAR files (*.star)",  "Input tilt series starfile.");
     joboptions["cache_size"] = JobOption("Number of cached tilt series ", 5, 1, 10, 1, "This controls the number of cached tilt series in Napari.");
 }
 
@@ -6656,7 +6658,7 @@ bool RelionJob::getCommandsTomoExcludeTiltImagesJob(std::string &outputname, std
     inputNodes.push_back(node);
 
     command += " --output-directory " + outputname;
-    Node node2(outputname+"selected_tilt_series.star", LABEL_TOMO_TOMOGRAMS);
+    Node node2(outputname+"selected_tilt_series.star", LABEL_TOMO_TILTSERIES);
     outputNodes.push_back(node2);
 
     // Other arguments for extraction
