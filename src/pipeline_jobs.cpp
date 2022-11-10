@@ -6471,8 +6471,7 @@ bool RelionJob::getCommandsTomoReconstructTomogramsJob(std::string &outputname, 
     std::string command;
 
     if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-        //command="`which relion_tomo_reconstruct_tomogram_mpi`";
-	error_message = "ERROR: MPI is not currently supported for Reconstruct Tomograms.";
+        command="`which relion_tomo_reconstruct_tomogram_mpi`";
     else
         command="`which relion_tomo_reconstruct_tomogram`";
     if (error_message != "") return false;
