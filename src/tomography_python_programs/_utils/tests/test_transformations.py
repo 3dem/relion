@@ -1,6 +1,6 @@
 import numpy as np
 
-from tomography_python_programs.utils.transformations import Rx, Ry, Rz, S
+from tomography_python_programs._utils.transformations import Rx, Ry, Rz, S
 
 
 def test_single_x_rotation():

@@ -37,7 +37,7 @@ def test_gui_data_model_from_relion_metadata(relion_metadata, run_in_project_dir
 
 
 def test_gui_data_model_includes_tomogram_file(relion_metadata, run_in_project_directory):
-    """Test that gui model generated from relion metadata references tomograms."""
+    """Test that _gui model generated from relion metadata references tomograms."""
     gui_model = relion_metadata.as_gui_model()
     tilt_series = gui_model[list(gui_model.keys())[0]]
     assert tilt_series.tomogram_file is not None

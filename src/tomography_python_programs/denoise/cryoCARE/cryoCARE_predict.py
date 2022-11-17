@@ -20,7 +20,7 @@ from ._utils import (
 )
 from .constants import PREDICT_CONFIG_PREFIX, EVEN_SUFFIX 
 from .._cli import cli
-from ...utils.relion import relion_pipeline_job
+from ..._utils.relion import relion_pipeline_job
 
 console = rich.console.Console(record=True)
 
@@ -35,7 +35,7 @@ def cryoCARE_predict(
     gpu: Optional[List[int]] = typer.Option(None)
 
 ):
-    """Generates denoised tomograms using cryoCARE (>=v0.2.0) from a previously trained denoising model (.tar.gz)
+    """Generates denoised tomograms using cryoCARE (>=v0.2.0) from a previously trained denoise model (.tar.gz)
     
     Requires that two tomograms have been generated using the same sample. These can be generated via taking odd/even 
     frames during Motion Correction (optimal) or by taking odd/even tilts during tomogram reconstruction.
@@ -53,7 +53,7 @@ def cryoCARE_predict(
     
     output_directory: directory in which results will be stored.
     	
-    model_name: user should provide the path to the model.tar.gz produced by a previous cryoCARE denoising job. 
+    model_name: user should provide the path to the model.tar.gz produced by a previous cryoCARE denoise job.
 	
     n-tiles (optional): Initial tiles per dimension during prediction step. Should get increased 
         if the tiles do not fit on the GPU. However, sometimes this parameter is a source of errors causing out of memory 
@@ -75,7 +75,7 @@ def cryoCARE_predict(
     global_star = starfile.read(tilt_series_star_file, always_dict=True)['global']
     
     if not model_name.exists():
-        e = f'Could not find denoising model'
+        e = f'Could not find denoise model'
         console.log(f'ERROR: {e}')
         raise RuntimeError(e)
 

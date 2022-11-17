@@ -12,8 +12,8 @@ def create_denoising_directory_structure(
         training_job: bool,
 ) -> Tuple[Path, Path, Path]:
     """
-    Creates directory structure for denoising jobs. Doe not create tomogram directory if the job is for training a
-    denoising model as no tomograms are generated in this step.
+    Creates directory structure for denoise jobs. Doe not create tomogram directory if the job is for training a
+    denoise model as no tomograms are generated in this step.
     """
     training_dir = output_directory / 'external' / 'training' 
     training_dir.mkdir(parents=True, exist_ok=True)
@@ -147,7 +147,7 @@ def add_denoised_tomo_to_global_star(
         tomo_name: Optional[str] = None
 ):
     """
-    Adds location of the denoising tomogram to the global star file.
+    Adds location of the denoise tomogram to the global star file.
     """
     if tomo_name == None:
         global_star['rlnTomoReconstructedTomogramDenoised'] = global_star.apply(lambda x: f'{tomogram_dir}/rec_{x["rlnTomoName"]}.mrc', axis=1)

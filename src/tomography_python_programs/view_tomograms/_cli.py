@@ -3,7 +3,7 @@ from pathlib import Path
 import napari
 import typer
 
-from ..gui.components.tomogram_browser import TomogramBrowserWidget
+from .._gui.components.tomogram_browser import TomogramBrowserWidget
 from ..metadata_model import RelionTiltSeriesSet
 
 cli = typer.Typer(add_completion=False)

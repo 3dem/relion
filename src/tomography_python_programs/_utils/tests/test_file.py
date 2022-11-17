@@ -2,7 +2,7 @@ from pathlib import Path
 import pytest
 import numpy as np
 
-from tomography_python_programs.utils.file import basename, match_filenames
+from tomography_python_programs._utils.file import basename, match_filenames
 
 
 @pytest.mark.parametrize(

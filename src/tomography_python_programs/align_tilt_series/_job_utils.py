@@ -7,7 +7,7 @@ import starfile
 import typer
 
 from ..metadata_model import RelionTiltSeriesSet
-from ..utils.transformations import S, Rx, Ry, Rz
+from .._utils.transformations import S, Rx, Ry, Rz
 from ._cli import cli
 
 

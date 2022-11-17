@@ -6,7 +6,7 @@ import pandas as pd
 import starfile
 from pydantic import BaseModel, validator
 
-from tomography_python_programs.gui.components.data_models import TiltSeries, TiltSeriesSet
+from tomography_python_programs._gui.components.data_models import TiltSeries, TiltSeriesSet
 
 
 class RelionTiltSeries(BaseModel):

@@ -7,7 +7,7 @@ from napari.utils.notifications import NotificationSeverity
 
 from .relion_tilt_image_excluder import RelionTiltImageExcluderWidget
 from ..metadata_model import RelionTiltSeriesSet
-from ..utils.relion import relion_pipeline_job
+from .._utils.relion import relion_pipeline_job
 
 cli = typer.Typer(add_completion=False)
 

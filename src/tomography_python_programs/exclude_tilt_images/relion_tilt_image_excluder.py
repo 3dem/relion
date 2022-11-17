@@ -2,7 +2,7 @@ from pathlib import Path
 
 import napari
 
-from ..gui.tilt_image_excluder import TiltImageExcluderWidget
+from .._gui.tilt_image_excluder import TiltImageExcluderWidget
 from ..metadata_model import RelionTiltSeriesSet
 
 

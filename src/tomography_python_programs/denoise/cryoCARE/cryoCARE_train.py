@@ -21,7 +21,7 @@ from ._utils import (
 )
 from .constants import TRAIN_CONFIG_PREFIX, TRAIN_DATA_CONFIG_PREFIX, MODEL_NAME
 from .._cli import cli
-from ...utils.relion import relion_pipeline_job
+from ..._utils.relion import relion_pipeline_job
 
 console = rich.console.Console(record=True)
 
@@ -35,7 +35,7 @@ def cryoCARE_train(
     subvolume_dimensions: Optional[int] = typer.Option(72),
     gpu: Optional[List[int]] = typer.Option(None)
 ):
-    """Trains a denoising model using cryoCARE (>=v0.2.0)
+    """Trains a denoise model using cryoCARE (>=v0.2.0)
     
     Requires that two tomograms have been generated using the same sample. These can be generated via taking odd/even 
     frames during Motion Correction (optimal) or by taking odd/even tilts during tomogram reconstruction.
@@ -53,7 +53,7 @@ def cryoCARE_train(
     
     output_directory: directory in which results will be stored.
     
-    training_tomograms: tomograms which are to be used for denoising neural network training.
+    training_tomograms: tomograms which are to be used for denoise neural network training.
         User should enter tomogram names as rlnTomoName, separated by colons, e.g. TS_1:TS_2
 
     number_training_subvolumes: Number of sub-volumes to be extracted per training tomogram
@@ -67,7 +67,7 @@ def cryoCARE_train(
         
     Returns
     -------
-    A denoising model (denoising_model.tar.gz) in the external/training/ subdirectory of the output directory.
+    A denoise model (denoising_model.tar.gz) in the external/training/ subdirectory of the output directory.
     """
     if not tilt_series_star_file.exists():
         e = 'Could not find tilt series star file'
@@ -96,7 +96,7 @@ def cryoCARE_train(
 
     even_tomos, odd_tomos = find_tomogram_halves(training_tomograms_star)
 
-    console.log('Beginning to train denoising model.')
+    console.log('Beginning to train denoise model.')
     
     train_data_config_json = generate_train_data_config_json(
         even_tomos=even_tomos,
@@ -142,10 +142,10 @@ def cryoCARE_train(
     )    
     
     if Path(f'{output_directory}/{MODEL_NAME}.tar.gz').exists():
-        console.log(f'Finished training denoising model.') 
+        console.log(f'Finished training denoise model.')
         console.log(f'Denoising model can be found in {output_directory}/{MODEL_NAME}.tar.gz')
     else:
-        e = f'Could not find denoising model ({MODEL_NAME}.tar.gz) in {output_directory}'
+        e = f'Could not find denoise model ({MODEL_NAME}.tar.gz) in {output_directory}'
         raise RuntimeError(e)
     
     console.save_html(str(output_directory / 'log.html'), clear=False)

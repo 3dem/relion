@@ -3,7 +3,7 @@ from pathlib import Path
 import napari
 import typer
 
-from ..gui.components.tilt_series_browser import TiltSeriesBrowserWidget
+from .._gui.components.tilt_series_browser import TiltSeriesBrowserWidget
 from ..metadata_model import RelionTiltSeriesSet
 
 cli = typer.Typer(add_completion=False)

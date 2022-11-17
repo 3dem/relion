@@ -1,32 +1,33 @@
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 import typer
-from yet_another_imod_wrapper import align_tilt_series_using_fiducials
 from rich.console import Console
 
-from .._job_utils import write_global_output
 from .align_tilt_series import align_single_tilt_series
 from .._cli import cli
+from .._job_utils import write_global_output
 from ...metadata_model import RelionTiltSeriesSet
-from ...utils.relion import relion_pipeline_job
+from ..._utils.relion import relion_pipeline_job
 
 console = Console(record=True)
 
 
-@cli.command(name='IMOD:fiducials')
+@cli.command(name='AreTomo')
 @relion_pipeline_job
-def fiducials_cli(
+def aretomo_cli(
         tilt_series_star_file: Path = typer.Option(..., help='RELION tilt-series STAR file'),
         output_directory: Path = typer.Option(..., help='directory in which results will be stored'),
-        nominal_fiducial_diameter_nanometers: float = typer.Option(..., help='nominal fiducial diameter in nanometers'),
-        tomogram_name: Optional[str] = typer.Option(None, help="'rlnTomoName' in RELION tilt-series metadata")
+        sample_thickness_nanometers: float = typer.Option(150, help='estimated sample thickness in nanometers'),
+        do_tilt_angle_offset_correction: bool = typer.Option(False, help='enable/disable stage tilt offset correction (-TiltCor in AreTomo)'),
+        tomogram_name: Optional[str] = typer.Option(None, help="'rlnTomoName' for a specific tilt-series"),
+        gpu: Optional[List[int]] = typer.Option(None, help="zero-indexed GPU identifiers as integers"),
 ):
-    """Align one or multiple tilt-series with fiducials in IMOD."""
+    """Align one or multiple tilt-series in AreTomo."""
     if not tilt_series_star_file.exists():
         raise RuntimeError('Could not find tilt series star file')
+    console.log('Extracting metadata from STAR file')
 
-    console.log('Extracting metadata for tilt series.')
     tilt_series_set = RelionTiltSeriesSet.from_star_file(
         filename=tilt_series_star_file, tilt_series_id=tomogram_name
     )
@@ -35,12 +36,10 @@ def fiducials_cli(
         align_single_tilt_series(
             tilt_series=tilt_series,
             pixel_spacing_angstroms=global_data['rlnTomoTiltSeriesPixelSize'],
-            alignment_function=align_tilt_series_using_fiducials,
-            alignment_function_kwargs={
-                'fiducial_size': nominal_fiducial_diameter_nanometers,
-                'skip_if_completed': True
-            },
-            output_directory=output_directory,
+            sample_thickness_nanometers=sample_thickness_nanometers,
+            tilt_angle_offset_correction=do_tilt_angle_offset_correction,
+            gpu_ids=gpu,
+            job_directory=output_directory,
         )
     if tomogram_name is None:  # write out STAR file for set of tilt-series
         console.log('Writing aligned_tilt_series.star')
