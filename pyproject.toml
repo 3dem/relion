@@ -32,7 +32,7 @@ dependencies = [
     "rich",
     "einops",
     "lil_aretomo",
-    "yet-another-imod-wrapper",
+    "yet-another-imod-wrapper>=0.0.9",
     "makefun",
     "lru-dict",
     "superqt",
