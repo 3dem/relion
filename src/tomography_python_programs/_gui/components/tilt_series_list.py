@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import QListWidget, QListWidgetItem
 
-from .data_models import TiltSeriesSet, TiltSeries
+from ..._metadata_models.gui.tilt_series_set import TiltSeriesSet
+from ..._metadata_models.gui.tilt_series import TiltSeries
 
 
 class QTiltSeriesItem(QListWidgetItem):

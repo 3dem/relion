@@ -11,7 +11,9 @@ from qtpy.QtWidgets import QWidget, QVBoxLayout, QLabel, QSizePolicy
 from superqt.combobox import QSearchableComboBox
 from lru import LRU
 
-from .data_models import TiltSeriesSet, TiltSeries, LazyTiltSeriesData
+from ..._metadata_models.gui.lazy_tilt_series_data import LazyTiltSeriesData
+from ..._metadata_models.gui.tilt_series_set import TiltSeriesSet
+from ..._metadata_models.gui.tilt_series import TiltSeries
 from .tilt_series_list import TiltSeriesListWidget
 
 

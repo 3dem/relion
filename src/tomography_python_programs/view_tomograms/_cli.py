@@ -4,7 +4,7 @@ import napari
 import typer
 
 from .._gui.components.tomogram_browser import TomogramBrowserWidget
-from ..metadata_model import RelionTiltSeriesSet
+from .._metadata_models.relion.tilt_series_set import TiltSeriesSet
 
 cli = typer.Typer(add_completion=False)
 
@@ -15,7 +15,7 @@ def tomogram_viewer(
         cache_size: int = typer.Option(3, help='number of cached tomograms')
 ):
     viewer = napari.Viewer(ndisplay=3)
-    relion_metadata = RelionTiltSeriesSet.from_star_file(tilt_series_star_file)
+    relion_metadata = TiltSeriesSet.from_star_file(tilt_series_star_file)
     gui_model = relion_metadata.as_gui_model()
     dock_widget = TomogramBrowserWidget(viewer, gui_model, cache_size=cache_size)
     viewer.window.add_dock_widget(

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from tomography_python_programs.metadata_model import RelionTiltSeriesSet
+from tomography_python_programs._metadata_models.relion.tilt_series_set import TiltSeriesSet
 
 
 @pytest.fixture
@@ -22,8 +22,8 @@ def global_relion_metadata_file(test_project_directory) -> Path:
 
 
 @pytest.fixture
-def relion_metadata(global_relion_metadata_file) -> RelionTiltSeriesSet:
-    return RelionTiltSeriesSet.from_star_file(global_relion_metadata_file)
+def relion_metadata(global_relion_metadata_file) -> TiltSeriesSet:
+    return TiltSeriesSet.from_star_file(global_relion_metadata_file)
 
 
 @pytest.fixture

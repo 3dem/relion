@@ -4,7 +4,7 @@ from psygnal import Signal
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import QWidget, QLabel, QVBoxLayout
 
-from .data_models import TiltSeries
+from ..._metadata_models.gui.tilt_series import TiltSeries
 from .selection_buttons import SelectionButtons
 from .checkable_tilt_image_list import TiltImageListWidget
 

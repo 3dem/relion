@@ -9,11 +9,11 @@ from typing import Optional, List
 
 from .._job_utils import create_alignment_job_directories
 from .utils import get_specimen_shifts, get_xyz_extrinsic_euler_angles
-from ...metadata_model import RelionTiltSeries
+from ..._metadata_models.relion.tilt_series import TiltSeries
 
 
 def align_single_tilt_series(
-        tilt_series: RelionTiltSeries,
+        tilt_series: TiltSeries,
         pixel_spacing_angstroms: float,
         sample_thickness_nanometers: float,
         tilt_angle_offset_correction: bool,
@@ -61,5 +61,5 @@ def align_single_tilt_series(
         get_xyz_extrinsic_euler_angles(aretomo_output.aln_file)
     df[['rlnTomoXShiftAngst', 'rlnTomoYShiftAngst']] = \
         get_specimen_shifts(aretomo_output.aln_file) * pixel_spacing_angstroms
-    RelionTiltSeries(name=tilt_series.name, data=df).write_star_file(
+    TiltSeries(name=tilt_series.name, data=df).write_star_file(
         metadata_directory / f'{tilt_series.name}.star')

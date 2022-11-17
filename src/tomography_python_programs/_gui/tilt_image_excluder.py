@@ -4,7 +4,7 @@ import napari
 import numpy as np
 from qtpy.QtWidgets import QWidget, QVBoxLayout, QPushButton, QSizePolicy
 
-from .components.data_models import TiltSeriesSet
+from .._metadata_models.gui.tilt_series_set import TiltSeriesSet
 from .components.tilt_image_selection_widget import TiltImageSelectionWidget
 from .components.tilt_series_browser import TiltSeriesBrowserWidget
 

@@ -5,7 +5,8 @@ from psygnal import Signal
 from qtpy.QtWidgets import QWidget, QVBoxLayout, QLabel, QSizePolicy
 from lru import LRU
 
-from .data_models import TiltSeriesSet, TiltSeries
+from ..._metadata_models.gui.tilt_series_set import TiltSeriesSet
+from ..._metadata_models.gui.tilt_series import TiltSeries
 from .tilt_series_list import TiltSeriesListWidget
 
 
