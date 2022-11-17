@@ -6605,16 +6605,16 @@ bool RelionJob::getCommandsTomoDenoiseTomogramsJob(std::string &outputname, std:
     {    
 	command += " --training-tomograms " + joboptions["tomograms_for_training"].getString();
         command += " --number-training-subvolumes " + joboptions["number_training_subvolumes"].getString();
-        command += " --subvolume-dimensions " + joboptions["subvolume_dimensions"].getString();
+        command += " --subvolume-sidelength " + joboptions["subvolume_dimensions"].getString();
     }       
 
     if (joboptions["denoising_tomo_name"].getString().length() > 0 && joboptions["do_cryocare_predict"].getBoolean())
     {    
-	command += " --tomo-name " + joboptions["denoising_tomo_name"].getString();
+	command += " --tomogram-name " + joboptions["denoising_tomo_name"].getString();
     }   
     if (joboptions["care_denoising_model"].getString().length() > 0 && joboptions["do_cryocare_predict"].getBoolean())
     {
-        command += " --model-name " + joboptions["care_denoising_model"].getString();
+        command += " --model-file " + joboptions["care_denoising_model"].getString();
     }
 
     if (joboptions["ntiles_x"].getString().length() > 0 && joboptions["ntiles_y"].getString().length() > 0 && joboptions["ntiles_z"].getString().length() > 0 && joboptions["do_cryocare_predict"].getBoolean())
