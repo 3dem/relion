@@ -6599,7 +6599,22 @@ bool RelionJob::getCommandsTomoDenoiseTomogramsJob(std::string &outputname, std:
     Node node2(outputname+"tomograms.star", LABEL_TOMO_TOMOGRAMS);
     outputNodes.push_back(node2);  
     
-    if (joboptions["gpu_ids"].getString().length() > 0)
+    if (joboptions["gpu_ids"].getString().length() >= 2)
+    // iterate over gpu ids and append separate --gpu args
+    {
+        std::string s = joboptions["gpu_ids"].getString();
+        std::string delimiter = ":";
+
+        size_t pos = 0;
+        std::string token;
+        while ((pos = s.find(delimiter)) != std::string::npos)
+        {
+            token = s.substr(0, pos);
+            command += " --gpu " + token + ' ';
+            s.erase(0, pos + delimiter.length());
+        }
+    }
+    else if (joboptions["gpu_ids"].getString().length() > 0)
     {
         command += " --gpu " + joboptions["gpu_ids"].getString() + ' ';
     }
