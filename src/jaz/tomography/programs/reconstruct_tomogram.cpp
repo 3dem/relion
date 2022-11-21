@@ -489,10 +489,8 @@ FileName TomoBackprojectProgram::getOutputFileName(int index, bool nameEven, boo
     // If we're reconstructing many tomograms, or the output filename is a directory: use standardized output filenames
     FileName fn_result = outFn;
 
-   if (do_multiple) 
+    if (do_even_odd_tomograms)
     {
-    	if (do_even_odd_tomograms)
-	{
 		if (nameEven)
 		{
 			fn_result += "tomograms/rec_" + tomogramSet.getTomogramName(index)+"_half1.mrc";
@@ -501,17 +499,11 @@ FileName TomoBackprojectProgram::getOutputFileName(int index, bool nameEven, boo
 		{
 			fn_result += "tomograms/rec_" + tomogramSet.getTomogramName(index)+"_half2.mrc";
 		}
-		else
-		{
-    			fn_result += "tomograms/rec_" + tomogramSet.getTomogramName(index)+".mrc";
-		}
-	}
+    }
 	else
 	{
-    	fn_result += "tomograms/rec_" + tomogramSet.getTomogramName(index)+".mrc";
+	    fn_result += "tomograms/rec_" + tomogramSet.getTomogramName(index)+".mrc";
 	}
-    }
-
 
     if (!exists(fn_result.beforeLastOf("/"))) mktree(fn_result.beforeLastOf("/"));
 
