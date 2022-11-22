@@ -278,10 +278,9 @@ d3Vector ParticleSet::getPosition(ParticleIndex particle_id) const
 	d3Vector out = getParticleCoord(particle_id) - (A_subtomogram * getParticleOffset(particle_id)) / originalPixelSize;
 
     // /* SHWS & ABurt 19Jul2022: let's no longer do this in relion-4.1
-	std::cerr <<" DEBUGGING: temporarily activated +1 in getPosition again for working with tutorial data set..." << std::endl;
-    out.x += 1.0;
-	out.y += 1.0;
-	out.z += 1.0;
+    //out.x += 1.0;
+	//out.y += 1.0;
+	//out.z += 1.0;
 	// */
 
 	return out;
