@@ -6426,10 +6426,25 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
         {
             command += " --do-tilt-angle-offset-correction ";
         }
-        if (joboptions["gpu_ids"].getString().length() > 0)
-        {
-            command += " --gpu " + joboptions["gpu_ids"].getString() + ' ';
-        }
+        if (joboptions["gpu_ids"].getString().length() >= 2)
+    	// iterate over gpu ids and append separate --gpu args
+    	{
+        	std::string s = joboptions["gpu_ids"].getString();
+       	 	std::string delimiter = ":";
+		
+		size_t last = 0;
+		size_t next = 0;
+        	while ((next = s.find(delimiter, last)) != std::string::npos)
+       		{
+        	    command += " --gpu " + s.substr(last, next-last) + ' ';
+		    last = next + 1;
+        	}
+		command += " --gpu " + s.substr(last) + ' ';
+    	}
+    	else if (joboptions["gpu_ids"].getString().length() > 0)
+    	{
+        	command += " --gpu " + joboptions["gpu_ids"].getString() + ' ';
+    	}
     }
     command += " --tilt-series-star-file " + joboptions["in_tiltseries"].getString();
 
@@ -6544,7 +6559,7 @@ void RelionJob::initialiseTomoDenoiseTomogramsJob()
     joboptions["ntiles_y"] = JobOption("Number of tiles - Y:", std::string("2"), "Number of tiles to use in denoised tomogram generation (X, Y, and Z dimension)");
     joboptions["ntiles_z"] = JobOption("Number of tiles - Z:", std::string("2"), "Number of tiles to use in denoised tomogram generation (X, Y, and Z dimension). Default is 2,2,2. Increase if you get a Out of Memory (OOM) error in prediction. For us, 8,8,8 works well on a Nvidia GeForce RTX 2080.");
     
-    joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "Provide a list of which GPUs (e.g. 0:1:2:3) to use in AreTomo. MPI-processes are separated by ':'. For example, to place one rank on device 0 and one rank on device 1, provide '0:1'.");
+    joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "Provide a list of which GPUs (e.g. 0:1:2:3) to use in CryoCARE. MPI-processes are separated by ':'. For example, to place one rank on device 0 and one rank on device 1, provide '0:1'.");
 }
 
 bool RelionJob::getCommandsTomoDenoiseTomogramsJob(std::string &outputname, std::vector<std::string> &commands,
@@ -6605,14 +6620,14 @@ bool RelionJob::getCommandsTomoDenoiseTomogramsJob(std::string &outputname, std:
         std::string s = joboptions["gpu_ids"].getString();
         std::string delimiter = ":";
 
-        size_t pos = 0;
-        std::string token;
-        while ((pos = s.find(delimiter)) != std::string::npos)
+	size_t last = 0;
+	size_t next = 0;
+        while ((next = s.find(delimiter, last)) != std::string::npos)
         {
-            token = s.substr(0, pos);
-            command += " --gpu " + token + ' ';
-            s.erase(0, pos + delimiter.length());
+            command += " --gpu " + s.substr(last, next-last) + ' ';
+	    last = next + 1;
         }
+	command += " --gpu " + s.substr(last) + ' ';
     }
     else if (joboptions["gpu_ids"].getString().length() > 0)
     {
