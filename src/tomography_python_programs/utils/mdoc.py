@@ -1,4 +1,5 @@
 import os
+import warnings
 from pathlib import Path
 from typing import Optional
 
@@ -9,14 +10,25 @@ from .file import basename
 
 
 def calculate_pre_exposure_dose(
-        mdoc_df: pd.DataFrame, dose_per_tilt: Optional[float] = None
+        df: pd.DataFrame,
+        dose_per_tilt_image: Optional[float] = None,
+        dose_per_movie_frame: Optional[float] = None,
 ) -> np.ndarray:
-    if "exposure_dose" in mdoc_df.columns and dose_per_tilt is None:
-        pre_exposure_dose = np.cumsum(mdoc_df["exposure_dose"].to_numpy())
-    elif dose_per_tilt is not None:
-        pre_exposure_dose = dose_per_tilt * np.arange(len(mdoc_df))
+    """Assumes that mdoc dataframe is already sorted by datetime."""
+    if dose_per_tilt_image is not None and dose_per_movie_frame is not None:
+        raise ValueError('only one of dose_per_tilt_image and dose_per_movie_frame can be set.')
+    dose_override_provided = dose_per_tilt_image is not None or dose_per_movie_frame is not None
+    if "exposure_dose" in df.columns and dose_override_provided is False:
+        pre_exposure_dose = np.cumsum(df["exposure_dose"].to_numpy())
+    elif dose_per_tilt_image is not None:
+        pre_exposure_dose = dose_per_tilt_image * np.arange(len(df))
+    elif dose_per_movie_frame is not None:
+        cumulative_frame_number = np.cumsum(df["num_sub_frames"])
+        post_exposure_dose = dose_per_movie_frame * cumulative_frame_number
+        pre_exposure_dose = np.pad(post_exposure_dose, pad_width=(1, 0))[:-1]
     else:
-        pre_exposure_dose = [0] * len(mdoc_df)
+        warnings.warn('no dose information found in mdoc or provided, defaulting to zero.')
+        pre_exposure_dose = [0] * len(df)
     return pre_exposure_dose
 
 

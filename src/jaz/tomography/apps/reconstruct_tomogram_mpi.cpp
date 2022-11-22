@@ -39,6 +39,7 @@ int main(int argc, char *argv[])
 		program.readParameters(argc, argv);
         program.initialise();
 		program.run(rank, size);
+        program.writeOutput(true);
 	}
 	catch (RelionError e)
 	{

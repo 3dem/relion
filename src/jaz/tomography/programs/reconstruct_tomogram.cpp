@@ -142,7 +142,7 @@ void TomoBackprojectProgram::run(int rank, int size)
         if (pipeline_control_check_abort_job())
             exit(RELION_EXIT_ABORTED);
 
-        if (do_even_odd_tomograms)
+    if (do_even_odd_tomograms)
 	{
 		reconstructOneTomogram(tomoIndexTodo[idx],true,false); // true/false indicates to reconstruct tomogram from even frames
 		reconstructOneTomogram(tomoIndexTodo[idx],false,true); // false/true indicates from odd frames
@@ -158,15 +158,26 @@ void TomoBackprojectProgram::run(int rank, int size)
 
     progress_bar(nr_todo);
 
+}
+
+
+void TomoBackprojectProgram::writeOutput(bool do_all_metadata)
+{
     // If we were doing multiple tomograms, then also write the updated tomograms.star.
     if (do_multiple)
     {
-        tomogramSet.write(outFn + "tomograms.star");
+
+        if (do_all_metadata) setMetaDataAllTomograms();
+
+        if (do_multiple) tomogramSet.write(outFn + "tomograms.star");
+
+        std::cout << " Written out: " << outFn << "tomograms.star" << std::endl;
+
     }
 
-    std::cout << " Done!" << std::endl;
-
 }
+
+
 void TomoBackprojectProgram::getProjectMatrices(Tomogram &tomogram, MetaDataTable &tomogramTable)
 {
 /* From Alister Burt
@@ -437,6 +448,40 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex, bool doEven, 
     {
     tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME, getOutputFileName(tomoIndex, false, false), tomoIndex);
     }  
+}
+
+void TomoBackprojectProgram::setMetaDataAllTomograms()
+{
+
+    for (int idx = 0; idx < tomoIndexTodo.size(); idx++)
+    {
+
+        int tomoIndex = tomoIndexTodo[idx];
+
+        double pixelSizeAct = tomogramSet.getPixelSize(tomoIndex);
+        if (angpix_spacing > 0.) spacing = angpix_spacing / pixelSizeAct;
+        if (std::abs(spacing - 1.0) > 1e-2)
+            tomogramSet.globalTable.setValue(EMDL_TOMO_TOMOGRAM_BINNING, spacing, tomoIndex);
+
+        // Also add the tomogram sizes and name to the tomogramSet
+        tomogramSet.globalTable.setValue(EMDL_TOMO_SIZE_X, w, tomoIndex);
+        tomogramSet.globalTable.setValue(EMDL_TOMO_SIZE_Y, h, tomoIndex);
+        tomogramSet.globalTable.setValue(EMDL_TOMO_SIZE_Z, d, tomoIndex);
+
+        if (do_even_odd_tomograms)
+        {
+            tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_HALF1_FILE_NAME,
+                                             getOutputFileName(tomoIndex, true, false), tomoIndex);
+            tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_HALF2_FILE_NAME,
+                                             getOutputFileName(tomoIndex, false, true), tomoIndex);
+        }
+        else
+        {
+            tomogramSet.globalTable.setValue(EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_FILE_NAME,
+                                             getOutputFileName(tomoIndex, false, false), tomoIndex);
+        }
+    }
+
 }
 
 FileName TomoBackprojectProgram::getOutputFileName(int index, bool nameEven, bool nameOdd)

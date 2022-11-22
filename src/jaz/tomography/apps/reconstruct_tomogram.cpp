@@ -11,6 +11,7 @@ int main(int argc, char *argv[])
 		program.readParameters(argc, argv);
         program.initialise();
 		program.run();
+        program.writeOutput();
 	}
 	catch (RelionError e)
 	{

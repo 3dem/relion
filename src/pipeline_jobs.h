@@ -109,6 +109,7 @@ static const std::vector<std::string> job_nodetype_options{
 
 static const std::vector<std::string> job_nodetype_options_tomo{
 	"Set of tomograms STAR file (.star)",
+    "Set of tiltseries STAR file (.star)",
 	"Particles STAR file (.star)",
 	"Multiple (2D or 3D) references (.star or .mrcs)",
 	"3D reference (.mrc)",
@@ -341,6 +342,7 @@ static bool do_allow_change_minimum_dedicated;
 #define OUTNODE_TOMO_POST_LOG			209
 #define OUTNODE_TOMO_FRAMEALIGN_LOG	    210
 #define OUTNODE_TOMO_CTFREFINE_LOG		211
+#define OUTNODE_TOMO_TILTSERIES   		212
 
 #define LABEL_MOVIES_CPIPE             "MicrographMoviesData.star.relion"
 #define LABEL_MICS_CPIPE               "MicrographsData.star.relion"
@@ -430,6 +432,7 @@ static bool do_allow_change_minimum_dedicated;
 #define LABEL_TOMO_POST_LOG            "LogFile.pdf.relion.tomo.postprocess"
 #define LABEL_TOMO_FRAMEALIGN_LOG      "LogFile.pdf.relion.tomo.framealign"
 #define LABEL_TOMO_CTFREFINE_LOG       "LogFile.pdf.relion.tomo.ctfrefine"
+#define LABEL_TOMO_TILTSERIES          "ProcessData.star.relion.tomo.relion.tiltseries_set"
 
 
 static std::map<int, std::string> node_type2pipeliner_label = {{NODE_MOVIES_CPIPE, LABEL_MOVIES_CPIPE},
@@ -517,8 +520,9 @@ static std::map<int, std::string> node_type2pipeliner_label = {{NODE_MOVIES_CPIP
 	{OUTNODE_TOMO_HALFMAP, LABEL_TOMO_HALFMAP},
 	{OUTNODE_TOMO_POST, LABEL_TOMO_POST},
 	{OUTNODE_TOMO_POST_LOG, LABEL_TOMO_POST_LOG},
-        {OUTNODE_TOMO_FRAMEALIGN_LOG, LABEL_TOMO_FRAMEALIGN_LOG},
-        {OUTNODE_TOMO_CTFREFINE_LOG, LABEL_TOMO_CTFREFINE_LOG}};
+    {OUTNODE_TOMO_FRAMEALIGN_LOG, LABEL_TOMO_FRAMEALIGN_LOG},
+    {OUTNODE_TOMO_CTFREFINE_LOG, LABEL_TOMO_CTFREFINE_LOG},
+    {OUTNODE_TOMO_TILTSERIES, LABEL_TOMO_TILTSERIES}};
 
 
 static std::map<std::string, int> pipeliner_label2type = {{LABEL_MOVIES_CPIPE, NODE_MOVIES_CPIPE},
@@ -607,7 +611,8 @@ static std::map<std::string, int> pipeliner_label2type = {{LABEL_MOVIES_CPIPE, N
 	{LABEL_TOMO_POST, OUTNODE_TOMO_POST},
 	{LABEL_TOMO_POST_LOG, OUTNODE_TOMO_POST_LOG},
 	{LABEL_TOMO_FRAMEALIGN_LOG, OUTNODE_TOMO_FRAMEALIGN_LOG},
-        {LABEL_TOMO_CTFREFINE_LOG, OUTNODE_TOMO_CTFREFINE_LOG} };
+    {LABEL_TOMO_CTFREFINE_LOG, OUTNODE_TOMO_CTFREFINE_LOG},
+    {LABEL_TOMO_TILTSERIES, OUTNODE_TOMO_TILTSERIES}};
 
 //// Conversion dict for CCPEM-pipeliner compatibility
 static std::map<std::string, int> node_label2type = {{NODE_MOVIES_LABEL, NODE_MOVIES},
@@ -626,7 +631,8 @@ static std::map<std::string, int> node_label2type = {{NODE_MOVIES_LABEL, NODE_MO
 		{NODE_TOMO_OPTIMISATION_LABEL, OUTNODE_TOMO_OPTIMISATION},
 		{NODE_TOMO_TOMOGRAMS_LABEL,    OUTNODE_TOMO_TOMOGRAMS},
 		{NODE_TOMO_TRAJECTORIES_LABEL, OUTNODE_TOMO_TRAJECTORIES},
-		{NODE_TOMO_MANIFOLDS_LABEL,    OUTNODE_TOMO_MANIFOLDS} };
+		{NODE_TOMO_MANIFOLDS_LABEL,    OUTNODE_TOMO_MANIFOLDS},
+        {NODE_TOMO_TILTSERIES_LABEL,    OUTNODE_TOMO_TILTSERIES}};
 
 static std::string get_node_label(int type)
 {
