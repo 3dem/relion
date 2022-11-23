@@ -544,13 +544,19 @@ void SubtomoProgram::processTomograms(
                     ctf.draw(s2D, s2D, binnedPixelSize, gammaOffset, &ctfImg(0, 0, 0));
 
 
-                    for (int y = 0; y < s2D; y++)
+                    for (int y = 0; y < s2D; y++) {
                         for (int x = 0; x < xRanges(y, f); x++) {
                             const double c = ctfImg(x, y) * doseWeights(x, y, f);
 
                             particleStack(x, y, f) *= sign * c;
                             weightStack(x, y, f) = c * c;
                         }
+                        // SHWS 23nov22: for writing out 2D stacks: need to set everything outside the xRanges to zero!
+                        for (int x = xRanges(y, f); x < sh2D; x++) {
+                            particleStack(x, y, f) = 0.;
+                            weightStack(x, y, f) = 0.;
+                        }
+                    }
                 } // end if do_ctf
 
             } // end for f
