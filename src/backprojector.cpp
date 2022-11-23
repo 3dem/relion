@@ -1384,7 +1384,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	const int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
 	RFLOAT oversampling_correction = (ref_dim == 3) ? (padding_factor * padding_factor * padding_factor) : (padding_factor * padding_factor);
 
-#define DEBUG_RECONSTRUCT
+//#define DEBUG_RECONSTRUCT
 #ifdef DEBUG_RECONSTRUCT
 	Image<RFLOAT> ttt;
 	FileName fnttt;
