@@ -1560,7 +1560,8 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 
 	command += " --bin_factor " + joboptions["bin_factor"].getString();
 	command += " --bfactor " + joboptions["bfactor"].getString();
-	command += " --dose_per_frame " + joboptions["dose_per_frame"].getString();
+	if (!is_tomo) command += " --dose_per_frame " + joboptions["dose_per_frame"].getString();
+	if (is_tomo) command += " --dose_per_frame 1 ";
 	if (!is_tomo) command += " --preexposure " + joboptions["pre_exposure"].getString();
 	command += " --patch_x " + joboptions["patch_x"].getString();
 	command += " --patch_y " + joboptions["patch_y"].getString();
@@ -1619,7 +1620,12 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 
 		float dose_for_ps = joboptions["group_for_ps"].getNumber(error_message);
 		if (error_message != "") return false;
-		float dose_rate = joboptions["dose_per_frame"].getNumber(error_message);
+
+        float dose_rate = 1.0;
+		if (!is_tomo)
+		{
+		dose_rate = joboptions["dose_per_frame"].getNumber(error_message);
+		}
 		if (error_message != "") return false;
 		if (dose_rate <= 0)
 		{
