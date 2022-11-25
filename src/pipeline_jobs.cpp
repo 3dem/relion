@@ -1671,7 +1671,7 @@ void RelionJob::initialiseCtffindJob()
         joboptions["input_star_mics"] = JobOption("Input micrographs STAR file:", NODE_MICS_CPIPE, "", "STAR files (*.star)", "A STAR file with all micrographs to run CTFFIND or Gctf on");
     }
 
-    joboptions["use_noDW"] = JobOption("Use micrograph without dose-weighting?", false, "If set to Yes, the CTF estimation will be done using the micrograph without dose-weighting as in rlnMicrographNameNoDW (_noDW.mrc from MotionCor2). If set to No, the normal rlnMicrographName will be used.");
+    if (!is_tomo) joboptions["use_noDW"] = JobOption("Use micrograph without dose-weighting?", false, "If set to Yes, the CTF estimation will be done using the micrograph without dose-weighting as in rlnMicrographNameNoDW (_noDW.mrc from MotionCor2). If set to No, the normal rlnMicrographName will be used.");
 
 	joboptions["do_phaseshift"] = JobOption("Estimate phase shifts?", false, "If set to Yes, CTFFIND4 will estimate the phase shift, e.g. as introduced by a Volta phase-plate");
 	joboptions["phase_min"] = JobOption("Phase shift (deg) - Min:", std::string("0"), "Minimum, maximum and step size (in degrees) for the search of the phase shift");
@@ -1766,9 +1766,11 @@ bool RelionJob::getCommandsCtffindJob(std::string &outputname, std::vector<std::
 	command += " --FStep " + joboptions["dfstep"].getString();
 	command += " --dAst " + joboptions["dast"].getString();
 
-	if (joboptions["use_noDW"].getBoolean())
-		command += " --use_noDW ";
-
+	if (!is_tomo)
+	{
+	    if (joboptions["use_noDW"].getBoolean())
+		    command += " --use_noDW ";
+        }
 	if (joboptions["do_phaseshift"].getBoolean())
 	{
 		command += " --do_phaseshift ";

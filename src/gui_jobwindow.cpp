@@ -618,7 +618,7 @@ void JobWindow::initialiseCtffindWindow()
 	resetHeight();
 
     place("input_star_mics", TOGGLE_DEACTIVATE);
-	place("use_noDW", TOGGLE_DEACTIVATE);
+	if (!is_tomo) place("use_noDW", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
