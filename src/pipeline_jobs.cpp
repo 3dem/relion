@@ -1462,11 +1462,14 @@ Note that multiple MotionCor2 processes should not share a GPU; otherwise, it ca
 	// Dose-weight
 	if (!is_tomo) joboptions["do_dose_weighting"] = JobOption("Do dose-weighting?", true ,"If set to Yes, the averaged micrographs will be dose-weighted.");
     if (!is_tomo) joboptions["do_save_noDW"] = JobOption("Save non-dose weighted as well?", false, "Aligned but non-dose weighted images are sometimes useful in CTF estimation, although there is no difference in most cases. Whichever the choice, CTF refinement job is always done on dose-weighted particles.");
-	joboptions["dose_per_frame"] = JobOption("Dose per frame (e/A2):", 1, 0, 5, 0.2, "Dose per movie frame (in electrons per squared Angstrom).");
+	if (!is_tomo) joboptions["dose_per_frame"] = JobOption("Dose per frame (e/A2):", 1, 0, 5, 0.2, "Dose per movie frame (in electrons per squared Angstrom).");
 	if (!is_tomo) joboptions["pre_exposure"] = JobOption("Pre-exposure (e/A2):", 0, 0, 5, 0.5, "Pre-exposure dose (in electrons per squared Angstrom).");
 
 	joboptions["do_save_ps"] = JobOption("Save sum of power spectra?", true, "Sum of non-dose weighted power spectra provides better signal for CTF estimation. The power spectra can be used by CTFFIND4 but not by GCTF. This option is not available for UCSF MotionCor2. You must use this option when writing in float16.");
-	joboptions["group_for_ps"] = JobOption("Sum power spectra every e/A2:", 4, 0, 10, 0.5, "McMullan et al (Ultramicroscopy, 2015) sugggest summing power spectra every 4.0 e/A2 gives optimal Thon rings");
+	if (!is_tomo) joboptions["group_for_ps"] = JobOption("Sum power spectra every e/A2:", 4, 0, 10, 0.5, "McMullan et al (Ultramicroscopy, 2015) suggest summing power spectra every 4.0 e/A2 gives optimal Thon rings");
+	else {
+	    joboptions["group_for_ps"] = JobOption("Sum power spectra every n frames:", 4, 0, 10, 0.5, "McMullan et al (Ultramicroscopy, 2015) suggest summing power spectra every 4.0 e/A2 gives optimal Thon rings");
+	}
 }
 
 bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<std::string> &commands,
@@ -1557,7 +1560,8 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 
 	command += " --bin_factor " + joboptions["bin_factor"].getString();
 	command += " --bfactor " + joboptions["bfactor"].getString();
-	command += " --dose_per_frame " + joboptions["dose_per_frame"].getString();
+	if (!is_tomo) command += " --dose_per_frame " + joboptions["dose_per_frame"].getString();
+	if (is_tomo) command += " --dose_per_frame 1 ";
 	if (!is_tomo) command += " --preexposure " + joboptions["pre_exposure"].getString();
 	command += " --patch_x " + joboptions["patch_x"].getString();
 	command += " --patch_y " + joboptions["patch_y"].getString();
@@ -1616,7 +1620,12 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 
 		float dose_for_ps = joboptions["group_for_ps"].getNumber(error_message);
 		if (error_message != "") return false;
-		float dose_rate = joboptions["dose_per_frame"].getNumber(error_message);
+
+        float dose_rate = 1.0;
+		if (!is_tomo)
+		{
+		dose_rate = joboptions["dose_per_frame"].getNumber(error_message);
+		}
 		if (error_message != "") return false;
 		if (dose_rate <= 0)
 		{
@@ -6425,10 +6434,25 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
         {
             command += " --do-tilt-angle-offset-correction ";
         }
-        if (joboptions["gpu_ids"].getString().length() > 0)
-        {
-            command += " --gpu " + joboptions["gpu_ids"].getString() + ' ';
-        }
+        if (joboptions["gpu_ids"].getString().length() >= 2)
+    	// iterate over gpu ids and append separate --gpu args
+    	{
+        	std::string s = joboptions["gpu_ids"].getString();
+       	 	std::string delimiter = ":";
+		
+		size_t last = 0;
+		size_t next = 0;
+        	while ((next = s.find(delimiter, last)) != std::string::npos)
+       		{
+        	    command += " --gpu " + s.substr(last, next-last) + ' ';
+		    last = next + 1;
+        	}
+		command += " --gpu " + s.substr(last) + ' ';
+    	}
+    	else if (joboptions["gpu_ids"].getString().length() > 0)
+    	{
+        	command += " --gpu " + joboptions["gpu_ids"].getString() + ' ';
+    	}
     }
     command += " --tilt-series-star-file " + joboptions["in_tiltseries"].getString();
 
@@ -6473,8 +6497,7 @@ bool RelionJob::getCommandsTomoReconstructTomogramsJob(std::string &outputname, 
     std::string command;
 
     if (joboptions["nr_mpi"].getNumber(error_message) > 1)
-        //command="`which relion_tomo_reconstruct_tomogram_mpi`";
-	error_message = "ERROR: MPI is not currently supported for Reconstruct Tomograms.";
+        command="`which relion_tomo_reconstruct_tomogram_mpi`";
     else
         command="`which relion_tomo_reconstruct_tomogram`";
     if (error_message != "") return false;
@@ -6544,7 +6567,7 @@ void RelionJob::initialiseTomoDenoiseTomogramsJob()
     joboptions["ntiles_y"] = JobOption("Number of tiles - Y:", std::string("2"), "Number of tiles to use in denoised tomogram generation (X, Y, and Z dimension)");
     joboptions["ntiles_z"] = JobOption("Number of tiles - Z:", std::string("2"), "Number of tiles to use in denoised tomogram generation (X, Y, and Z dimension). Default is 2,2,2. Increase if you get a Out of Memory (OOM) error in prediction. For us, 8,8,8 works well on a Nvidia GeForce RTX 2080.");
     
-    joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "Provide a list of which GPUs (e.g. 0:1:2:3) to use in AreTomo. MPI-processes are separated by ':'. For example, to place one rank on device 0 and one rank on device 1, provide '0:1'.");
+    joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "Provide a list of which GPUs (e.g. 0:1:2:3) to use in CryoCARE. MPI-processes are separated by ':'. For example, to place one rank on device 0 and one rank on device 1, provide '0:1'.");
 }
 
 bool RelionJob::getCommandsTomoDenoiseTomogramsJob(std::string &outputname, std::vector<std::string> &commands,
@@ -6599,7 +6622,22 @@ bool RelionJob::getCommandsTomoDenoiseTomogramsJob(std::string &outputname, std:
     Node node2(outputname+"tomograms.star", LABEL_TOMO_TOMOGRAMS);
     outputNodes.push_back(node2);  
     
-    if (joboptions["gpu_ids"].getString().length() > 0)
+    if (joboptions["gpu_ids"].getString().length() >= 2)
+    // iterate over gpu ids and append separate --gpu args
+    {
+        std::string s = joboptions["gpu_ids"].getString();
+        std::string delimiter = ":";
+
+	size_t last = 0;
+	size_t next = 0;
+        while ((next = s.find(delimiter, last)) != std::string::npos)
+        {
+            command += " --gpu " + s.substr(last, next-last) + ' ';
+	    last = next + 1;
+        }
+	command += " --gpu " + s.substr(last) + ' ';
+    }
+    else if (joboptions["gpu_ids"].getString().length() > 0)
     {
         command += " --gpu " + joboptions["gpu_ids"].getString() + ' ';
     }
@@ -6608,16 +6646,16 @@ bool RelionJob::getCommandsTomoDenoiseTomogramsJob(std::string &outputname, std:
     {    
 	command += " --training-tomograms " + joboptions["tomograms_for_training"].getString();
         command += " --number-training-subvolumes " + joboptions["number_training_subvolumes"].getString();
-        command += " --subvolume-dimensions " + joboptions["subvolume_dimensions"].getString();
+        command += " --subvolume-sidelength " + joboptions["subvolume_dimensions"].getString();
     }       
 
     if (joboptions["denoising_tomo_name"].getString().length() > 0 && joboptions["do_cryocare_predict"].getBoolean())
     {    
-	command += " --tomo-name " + joboptions["denoising_tomo_name"].getString();
+	command += " --tomogram-name " + joboptions["denoising_tomo_name"].getString();
     }   
     if (joboptions["care_denoising_model"].getString().length() > 0 && joboptions["do_cryocare_predict"].getBoolean())
     {
-        command += " --model-name " + joboptions["care_denoising_model"].getString();
+        command += " --model-file " + joboptions["care_denoising_model"].getString();
     }
 
     if (joboptions["ntiles_x"].getString().length() > 0 && joboptions["ntiles_y"].getString().length() > 0 && joboptions["ntiles_z"].getString().length() > 0 && joboptions["do_cryocare_predict"].getBoolean())

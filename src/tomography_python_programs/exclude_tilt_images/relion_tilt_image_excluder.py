@@ -2,15 +2,15 @@ from pathlib import Path
 
 import napari
 
-from ..gui.tilt_image_excluder import TiltImageExcluderWidget
-from ..metadata_model import RelionTiltSeriesSet
+from .._gui.tilt_image_excluder import TiltImageExcluderWidget
+from .._metadata_models.relion.tilt_series_set import TiltSeriesSet
 
 
 class RelionTiltImageExcluderWidget(TiltImageExcluderWidget):
     def __init__(
             self,
             viewer: napari.Viewer,
-            relion_metadata: RelionTiltSeriesSet,
+            relion_metadata: TiltSeriesSet,
             cache_size: int,
             output_global_metadata_file: Path,
             *args,
