@@ -1893,7 +1893,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
                 RFLOAT offset_y = old_offset_y + baseMLO->sampling.translations_y[itrans];
                 double tdiff2 = 0.;
 
-                if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) || (accMLO->shiftsIs3D) )
+                if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) )
                     tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x);
                 tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y);
                 if (accMLO->shiftsIs3D)

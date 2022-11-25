@@ -7404,7 +7404,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
                 RFLOAT offset_x = old_offset_x + sampling.translations_x[itrans];
                 RFLOAT offset_y = old_offset_y + sampling.translations_y[itrans];
                 RFLOAT tdiff2 = 0.;
-                if ( (!do_helical_refine) || (ignore_helical_symmetry) || (mymodel.data_dim == 3 || mydata.is_tomo) )
+                if ( (!do_helical_refine) || (ignore_helical_symmetry) )
                     tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x);
                 tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y);
                 if (mymodel.data_dim == 3 || mydata.is_tomo)
@@ -7504,7 +7504,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
                         RFLOAT offset_x = old_offset_x + sampling.translations_x[itrans];
                         RFLOAT offset_y = old_offset_y + sampling.translations_y[itrans];
                         RFLOAT tdiff2 = 0.;
-                        if ( (!do_helical_refine) || (ignore_helical_symmetry) || (mymodel.data_dim == 3 || mydata.is_tomo) )
+                        if ( (!do_helical_refine) || (ignore_helical_symmetry) )
                             tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x);
                         tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y);
                         if (mymodel.data_dim == 3 || mydata.is_tomo)
@@ -8238,7 +8238,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
                                                 transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, rot_deg, tilt_deg, psi_deg, mymodel.data_dim, CART_TO_HELICAL_COORDS);
                                             }
 
-                                            if ( (!do_helical_refine) || (ignore_helical_symmetry) || (mymodel.data_dim == 3 || mydata.is_tomo) )
+                                            if ( (!do_helical_refine) || (ignore_helical_symmetry) )
                                             {
                                                 RFLOAT diffx = myprior_x - old_offset_x - oversampled_translations_x[iover_trans];
                                                 thr_wsum_sigma2_offset += weight * my_pixel_size * my_pixel_size * diffx * diffx;
