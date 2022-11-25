@@ -375,10 +375,15 @@ int ParticleSet::getHalfSet(ParticleIndex particle_id) const
 
 void ParticleSet::moveParticleTo(ParticleIndex particle_id, gravis::d3Vector pos)
 {
-	partTable.setValue(EMDL_IMAGE_COORD_X, pos.x - 1.0, particle_id.value);
-	partTable.setValue(EMDL_IMAGE_COORD_Y, pos.y - 1.0, particle_id.value);
-	partTable.setValue(EMDL_IMAGE_COORD_Z, pos.z - 1.0, particle_id.value);
-	
+	// SHWS 25nov22: as of relion-4.1, the origin is now at 0,0,0 again
+    //partTable.setValue(EMDL_IMAGE_COORD_X, pos.x - 1.0, particle_id.value);
+	//partTable.setValue(EMDL_IMAGE_COORD_Y, pos.y - 1.0, particle_id.value);
+	//partTable.setValue(EMDL_IMAGE_COORD_Z, pos.z - 1.0, particle_id.value);
+
+    partTable.setValue(EMDL_IMAGE_COORD_X, pos.x, particle_id.value);
+    partTable.setValue(EMDL_IMAGE_COORD_Y, pos.y, particle_id.value);
+    partTable.setValue(EMDL_IMAGE_COORD_Z, pos.z, particle_id.value);
+
 	partTable.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, 0.0, particle_id.value);
 	partTable.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, 0.0, particle_id.value);
 	partTable.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, 0.0, particle_id.value);
