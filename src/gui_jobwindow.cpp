@@ -553,7 +553,7 @@ void JobWindow::initialiseMotioncorrWindow()
 
     if (!is_tomo) place("first_frame_sum", TOGGLE_DEACTIVATE);
     if (!is_tomo) place("last_frame_sum", TOGGLE_DEACTIVATE);
-    place("dose_per_frame", TOGGLE_DEACTIVATE);
+    if (!is_tomo) place("dose_per_frame", TOGGLE_DEACTIVATE);
 	if (!is_tomo) place("pre_exposure", TOGGLE_DEACTIVATE);
 	place("eer_grouping", TOGGLE_DEACTIVATE);
 	place("do_float16", TOGGLE_DEACTIVATE);

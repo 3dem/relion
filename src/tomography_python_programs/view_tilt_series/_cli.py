@@ -3,8 +3,8 @@ from pathlib import Path
 import napari
 import typer
 
-from ..gui.components.tilt_series_browser import TiltSeriesBrowserWidget
-from ..metadata_model import RelionTiltSeriesSet
+from .._gui.components.tilt_series_browser import TiltSeriesBrowserWidget
+from .._metadata_models.relion.tilt_series_set import TiltSeriesSet
 
 cli = typer.Typer(add_completion=False)
 
@@ -15,7 +15,7 @@ def tilt_series_viewer(
         cache_size: int = typer.Option(5, help='number of cached tilt-series')
 ):
     viewer = napari.Viewer(ndisplay=3)
-    relion_metadata = RelionTiltSeriesSet.from_star_file(tilt_series_star_file)
+    relion_metadata = TiltSeriesSet.from_star_file(tilt_series_star_file)
     for tilt_series in relion_metadata.tilt_series:
         tilt_series.data = tilt_series.data.sort_values(by='rlnTomoNominalStageTiltAngle')
     gui_model = relion_metadata.as_gui_model()

@@ -327,9 +327,10 @@ void FrameAlignmentProgram::writeTempData(
 	{
 		temp_positions.addObject();
 
-		temp_positions.setValue(EMDL_IMAGE_COORD_X, pos[p].x - 1, p);
-		temp_positions.setValue(EMDL_IMAGE_COORD_Y, pos[p].y - 1, p);
-		temp_positions.setValue(EMDL_IMAGE_COORD_Z, pos[p].z - 1, p);
+        // SHWS 25nov22 : not sure whether this change is needed in archive, but as of relion-4.1, the origin is back at 0,0,0
+		temp_positions.setValue(EMDL_IMAGE_COORD_X, pos[p].x, p);
+		temp_positions.setValue(EMDL_IMAGE_COORD_Y, pos[p].y, p);
+		temp_positions.setValue(EMDL_IMAGE_COORD_Z, pos[p].z, p);
 	}
 
 	temp_positions.write(temp_filename_root + "_positions.star");

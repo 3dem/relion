@@ -10,10 +10,10 @@ import typer
 from rich.progress import track
 
 from ._cli import cli
-from .. import utils
-from ..utils.mdoc import calculate_pre_exposure_dose, basename_from_sub_frame_path
-from ..utils.relion import relion_pipeline_job
-from ..utils.file import match_filenames
+from .. import _utils
+from .._utils.mdoc import calculate_pre_exposure_dose, basename_from_sub_frame_path
+from .._utils.relion import relion_pipeline_job
+from .._utils.file import match_filenames
 
 
 console = rich.console.Console(record=True)
@@ -90,7 +90,7 @@ def import_tilt_series_from_serial_em(
 
     # Get tomogram ids and construct paths for per-tilt-series STAR files
     tomogram_ids = [
-        utils.mdoc.construct_tomogram_id(mdoc_file, prefix)
+        _utils.mdoc.construct_tomogram_id(mdoc_file, prefix)
         for mdoc_file in mdoc_files
     ]
     tilt_series_star_files = [
