@@ -5,6 +5,7 @@ import starfile
 import rich
 import typer
 import subprocess
+import os
 
 from ._utils import (
     create_denoising_directory_structure,
@@ -22,6 +23,7 @@ from .._cli import cli
 from ..._utils.relion import relion_pipeline_job
 
 console = rich.console.Console(record=True)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  
 
 
 @cli.command(name='cryoCARE:train')
@@ -109,7 +111,7 @@ def cryoCARE_train(
     )
 
     cmd = f"cryoCARE_extract_train_data.py --conf {training_dir}/{TRAIN_DATA_CONFIG_PREFIX}.json"
-    subprocess.run(cmd, shell=True)
+    subprocess.run(cmd, shell=True, stderr=subprocess.STDOUT)
 
     train_config_json = generate_train_config_json(
         training_dir=training_dir,
@@ -141,7 +143,7 @@ def cryoCARE_train(
         console.log(f'Finished training denoise model.')
         console.log(f'Denoising model can be found in {output_directory}/{MODEL_NAME}.tar.gz')
     else:
-        e = f'Could not find denoise model ({MODEL_NAME}.tar.gz) in {output_directory}'
+        e = f'Could not find denoise model ({MODEL_NAME}.tar.gz) in {output_directory}. Training has likely failed.'
         raise RuntimeError(e)
 
     console.save_html(str(output_directory / 'log.html'), clear=False)
