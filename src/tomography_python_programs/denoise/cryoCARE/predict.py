@@ -5,6 +5,7 @@ import starfile
 import rich
 import typer
 import subprocess
+import os
 
 from ._utils import (
     create_denoising_directory_structure,
@@ -21,7 +22,7 @@ from .._cli import cli
 from ..._utils.relion import relion_pipeline_job
 
 console = rich.console.Console(record=True)
-
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  
 
 @cli.command(name='cryoCARE:predict')
 @relion_pipeline_job
@@ -106,7 +107,7 @@ def cryoCARE_predict(
 
     console.log('Generating denoised tomograms')
     cmd = f"cryoCARE_predict.py --conf {training_dir}/{PREDICT_CONFIG_PREFIX}.json"
-    subprocess.run(cmd, shell=True)
+    subprocess.run(cmd, shell=True, stderr=subprocess.STDOUT)
     rename_predicted_tomograms(
         even_tomos=even_tomos,
         tomogram_dir=tomogram_dir,
