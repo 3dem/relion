@@ -27,8 +27,9 @@ class SubtomoProgram
 			
 			int 
 				boxSize, 
-				cropSize, 
-				num_threads;
+				cropSize,
+                min_frames,
+                num_threads;
 			
 			double 
 				SNR,

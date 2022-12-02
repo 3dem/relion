@@ -51,6 +51,7 @@ void SubtomoProgram::readBasicParameters(IOParser& parser)
     rescale_coords = textToDouble(parser.getOption("--rescale_coords", "Rescale input particles by this factor", "1."));
 	write_multiplicity = parser.checkOption("--multi", "Write out multiplicity volumes");
 	SNR = textToDouble(parser.getOption("--SNR", "Assumed signal-to-noise ratio (negative means use a heuristic)", "-1"));
+    min_frames = textToInteger(parser.getOption("--min_frames", "Minimum number of lowest-dose tilt series frames that needs to be inside the box (default is half the number of frames)", "-1"));
 
 	do_cone_weight = parser.checkOption("--cone_weight", "Weight down a double cone along Z");
 	const double alpha = 0.5 * textToDouble(parser.getOption("--cone_angle", "Opening angle of the cone in degrees", "10"));
@@ -314,7 +315,8 @@ void SubtomoProgram::writeParticleSet(
 			const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
 						part_id, tomogram.frameCount, tomogram.optics.pixelSize, !apply_offsets);
 
-			if (tomogram.isVisibleAtAll(traj, boxSize / 2.0))
+            int my_min_frames = (min_frames < 0 ) ? tomogram.frameCount / 2 : min_frames;
+			if (tomogram.isVisibleFirstFrames(traj, boxSize / 2.0, my_min_frames))
 			{
 				const ParticleIndex new_id = copy.addParticle(particleSet, part_id);
 
@@ -499,7 +501,8 @@ void SubtomoProgram::processTomograms(
             const std::vector<d3Vector> traj = particleSet.getTrajectoryInPixels(
                     part_id, fc, tomogram.optics.pixelSize, !apply_offsets);
 
-            if (!tomogram.isVisibleAtAll(traj, s2D / 2.0)) {
+            int my_min_frames = (min_frames < 0 ) ? tomogram.frameCount / 2 : min_frames;
+            if (!tomogram.isVisibleFirstFrames(traj, s2D / 2.0, my_min_frames)) {
                 continue;
             }
 

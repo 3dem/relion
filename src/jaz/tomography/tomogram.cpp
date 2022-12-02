@@ -76,6 +76,25 @@ bool Tomogram::isVisibleAtAll(const std::vector<d3Vector> &trajectory, double ra
 	return !all_outside;
 }
 
+bool Tomogram::isVisibleFirstFrames(const std::vector<d3Vector> &trajectory, double radius, int min_frames) const
+{
+	std::vector<bool> vis = determineVisiblity(trajectory, radius);
+
+	bool all_inside = true;
+    std::vector<int> sorted_frames = IndexSort<double>::sortIndices(cumulativeDose);
+
+    for (int i = 0; i < min_frames; i++)
+	{
+        if (!vis[sorted_frames[i]])
+		{
+			all_inside = false;
+			break;
+		}
+	}
+
+    return all_inside;
+}
+
 std::vector<bool> Tomogram::determineVisiblity(const std::vector<d3Vector>& trajectory, double radius) const
 {
 	const int fc = trajectory.size();
