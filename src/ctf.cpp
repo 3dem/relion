@@ -143,7 +143,7 @@ void CTF::setValues(RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng, RFLOAT _voltage,
 	scale           = _scale;
 	Q0              = _Q0;
 	phase_shift     = _phase_shift;
-        dose            = _dose;
+    dose            = _dose;
 
 	initialise();
 }
@@ -161,11 +161,14 @@ void CTF::setValuesByGroup(ObservationModel *obs, int _opticsGroup,
 	Bfac            = _Bfac;
 	scale           = _scale;
 	phase_shift     = _phase_shift;
-        dose            = _dose;
+    dose            = _dose;
 
-	obs->opticsMdt.getValue(EMDL_CTF_VOLTAGE, kV, opticsGroup);
-	obs->opticsMdt.getValue(EMDL_CTF_CS, Cs, opticsGroup);
-	obs->opticsMdt.getValue(EMDL_CTF_Q0, Q0, opticsGroup);
+	if (!obs->opticsMdt.getValue(EMDL_CTF_VOLTAGE, kV, opticsGroup))
+        REPORT_ERROR("ERROR: no rlnVoltage label was found in the CTF parameters");
+	if (!obs->opticsMdt.getValue(EMDL_CTF_CS, Cs, opticsGroup))
+        REPORT_ERROR("ERROR: no rlnSphericalAberration label was found in the CTF parameters");
+	if (!obs->opticsMdt.getValue(EMDL_CTF_Q0, Q0, opticsGroup))
+        REPORT_ERROR("ERROR: no rlnAmplitudeContrast label was found in the CTF parameters");
 
 	initialise();
 
