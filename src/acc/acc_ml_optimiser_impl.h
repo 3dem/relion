@@ -3465,7 +3465,7 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_D);
 #endif
 
 				CTIC(timer,"getAllSquaredDifferencesFine");
-				getAllSquaredDifferencesFine<MlClass>(ipass, op, sp, baseMLO, myInstance, FinePassWeights, FinePassClassMasks, FineProjectionData, ptrFactory, ibody);
+				getAllSquaredDifferencesFine<MlClass>(ipass, op, sp, baseMLO, myInstance, FinePassWeights, FinePassClassMasks, FineProjectionData, ptrFactory, ibody, bundleD2);
 				CTOC(timer,"getAllSquaredDifferencesFine");
 				FinePassWeights.weights.cpToHost();
 
