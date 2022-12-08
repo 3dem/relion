@@ -1047,12 +1047,6 @@ void getAllSquaredDifferencesCoarse(
 	else
         projectorPlans = accMLO->bundle->coarseProjectionPlans;
 
-
-
-
-	//TODO remove this at some point
-	DEBUG_HANDLE_ERROR(cudaDeviceSynchronize());
-
 	// Loop only from sp.iclass_min to sp.iclass_max to deal with seed generation in first iteration
 	size_t allWeights_size(0);
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -1184,6 +1178,7 @@ void getAllSquaredDifferencesCoarse(
             );
         }
 
+        // TODO: is this really necessary?
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
@@ -1221,12 +1216,26 @@ void getAllSquaredDifferencesCoarse(
 						do_CC,
 						accMLO->dataIs3D);
 
+				if (img_id == sp.nr_images - 1)
+                    mapAllWeightsToMweights(
+						~projectorPlans[iclass*sp.nr_images + img_id].iorientclasses,
+						&(~allWeights)[allWeights_pos],
+						&(~Mweight)[0],
+						projectorPlans[iclass*sp.nr_images + img_id].orientation_num,
+						translation_num,
+						accMLO->classStreams[iclass]
+						);
+
+				/*====================================
+				    	   Retrieve Results
+				======================================*/
 				allWeights_pos += projectorPlans[iclass*sp.nr_images + img_id].orientation_num*translation_num;
             }
 
 
 		} // end loop iclass
 
+        // TODO: is this really necessary?
 		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread)); // does not appear to be NEEDED FOR NON-BLOCKING CLASS STREAMS in tests, but should be to sync against classStreams
@@ -1235,35 +1244,6 @@ void getAllSquaredDifferencesCoarse(
 
     op.min_diff2 = AccUtilities::getMinOnDevice<XFLOAT>(allWeights);
     //std::cerr << " min_diff2 coarse= " << op.min_diff2 << std::endl;
-
-    for (unsigned long iclass = sp.iclass_min, allWeights_pos=0; iclass <= sp.iclass_max; iclass++)
-    {
-        if ( projectorPlans[iclass*sp.nr_images + 0].orientation_num > 0 )
-        {
-            mapAllWeightsToMweights(~projectorPlans[iclass*sp.nr_images + 0].iorientclasses,
-                                    &(~allWeights)[allWeights_pos],
-                                    &(~Mweight)[0],
-                                    projectorPlans[iclass*sp.nr_images + 0].orientation_num,
-                                    translation_num,
-                                    accMLO->classStreams[iclass]
-                                    );
-
-            allWeights_pos += projectorPlans[iclass*sp.nr_images + 0].orientation_num*translation_num;
-
-        }
-    }
-
-    /*
-    Mweight.hostAlloc();
-    Mweight.cpToHost();
-    std::cerr << " orientation_num= " << projectorPlans[0].orientation_num << " translation_num= " << translation_num << std::endl;
-    std::cout << " COARSE DIFF: Mweight.getSize()= "<<Mweight.getSize() << " allWeights_size= " << allWeights_size <<std::endl;
-    for (int i= 0; i < 7; i++)
-    {
-        std::cout << i << " Mweight-after= " << Mweight[i] << std::endl;
-    }
-    exit(0);
-    */
 
 #ifdef TIMING
 	if (op.part_id == baseMLO->exp_my_first_part_id)
@@ -1285,7 +1265,8 @@ void getAllSquaredDifferencesFine(
 	std::vector< IndexedDataArrayMask > &FPCMasks,
 	ProjectionParams &FineProjectionData,
 	AccPtrFactory ptrFactory,
-	int ibody)
+	int ibody,
+	AccPtrBundle &bundleD2)
 {
 #ifdef TIMING
 	if (op.part_id == baseMLO->exp_my_first_part_id)
@@ -1323,10 +1304,6 @@ void getAllSquaredDifferencesFine(
 
     for (int img_id = 0; img_id < sp.nr_images; img_id++)
 	{
-
-        //AccPtrBundle bundleD2( ptrFactory.makeBundle());
-        //bundleD2.setSize(2*(FineProjectionData.orientationNumAllClasses*sp.nr_trans*sp.nr_oversampled_trans)*sizeof(unsigned long));
-        //bundleD2.allAlloc();
 
 		// Reset size without de-allocating: we will append everything significant within
 		// the current allocation and then re-allocate the then determined (smaller) volume
@@ -1519,15 +1496,15 @@ void getAllSquaredDifferencesFine(
                 CTOC(accMLO->timer,"pair_list_1");
 
                 CTIC(accMLO->timer,"IndexedArrayMemCp2");
-                //bundleD2.pack(FPCMasks[exp_iclass].jobOrigin);
-                //bundleD2.pack(FPCMasks[exp_iclass].jobExtent);
+                bundleD2.pack(FPCMasks[exp_iclass].jobOrigin);
+                bundleD2.pack(FPCMasks[exp_iclass].jobExtent);
 
-				FPCMasks[exp_iclass].jobOrigin.freeDeviceIfSet();
-				FPCMasks[exp_iclass].jobExtent.freeDeviceIfSet();
-				FPCMasks[exp_iclass].jobOrigin.deviceAlloc();
-				FPCMasks[exp_iclass].jobExtent.deviceAlloc();
-                FPCMasks[exp_iclass].jobOrigin.cpToDevice();
-                FPCMasks[exp_iclass].jobExtent.cpToDevice();
+				//FPCMasks[exp_iclass].jobOrigin.freeDeviceIfSet();
+				//FPCMasks[exp_iclass].jobExtent.freeDeviceIfSet();
+				//FPCMasks[exp_iclass].jobOrigin.deviceAlloc();
+				//FPCMasks[exp_iclass].jobExtent.deviceAlloc();
+                //FPCMasks[exp_iclass].jobOrigin.cpToDevice();
+                //FPCMasks[exp_iclass].jobExtent.cpToDevice();
                 CTOC(accMLO->timer,"IndexedArrayMemCp2");
 
 				Matrix2D<RFLOAT> MBL, MBR;
@@ -1579,7 +1556,7 @@ void getAllSquaredDifferencesFine(
 			}
 		}
 
-//		bundleD2.cpToDevice();
+		bundleD2.cpToDevice();
 		AllEulers.cpToDevice();
 
 		FinePassWeights.rot_id.cpToDevice(); //FIXME this is not used
@@ -1811,7 +1788,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
         DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_NR_SIGN) = (RFLOAT) 1.;
         if (exp_ipass==0) // TODO better memset, 0 => false , 1 => true
             for (int ihidden = 0; ihidden < XSIZE(op.Mcoarse_significant); ihidden++)
-                if (PassWeights.weights[ihidden] >= my_significant_weight)
+                if (DIRECT_A1D_ELEM(op.Mweight, ihidden) >= my_significant_weight)
                     DIRECT_A1D_ELEM(op.Mcoarse_significant, ihidden) = true;
                 else
                     DIRECT_A1D_ELEM(op.Mcoarse_significant, ihidden) = false;
@@ -2338,9 +2315,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
         // Re-define the job-partition of the indexedArray of weights so that the collect-kernel can work with it.
         block_nums[fake_class] = makeJobsForCollect(thisClassFinePassWeights, FPCMasks[exp_iclass], ProjectionData.orientation_num[exp_iclass]);
-// TODO fix bundling
-//        bundleSWS.pack(FPCMasks[exp_iclass].jobOrigin);
-//        bundleSWS.pack(FPCMasks[exp_iclass].jobExtent);
+
+        bundleSWS.pack(FPCMasks[exp_iclass].jobOrigin);
+        bundleSWS.pack(FPCMasks[exp_iclass].jobExtent);
 
         sumBlockNum+=block_nums[fake_class];
 
@@ -2415,12 +2392,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
             }
         }
-		FPCMasks[exp_iclass].jobOrigin.cpToDevice();
-		FPCMasks[exp_iclass].jobExtent.cpToDevice();
     }
 
-// TODO fix bundling
-//    bundleSWS.cpToDevice();
+    bundleSWS.cpToDevice();
     oo_otrans.cpToDevice();
 
     DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
@@ -3401,10 +3375,7 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_A);
 		//    coarse pass, declared here to keep scope to storeWS
 		ProjectionParams FineProjectionData( baseMLO->mymodel.nr_classes);
 
-        // See commented out print statements in convertAllSquaredDifferences....
-        //if (baseMLO->adaptive_oversampling == 0 && baseMLO->do_firstiter_cc)
-        //    REPORT_ERROR("ERROR; somehow oversampling==0 and firstiter_cc are giving non-reproducible results.... DEBUG later...  (randomly changing with subsequent runs)");
-
+		AccPtrBundle bundleD2(ptrFactory.makeBundle());
 
         for (int ipass = 0; ipass < nr_sampling_passes; ipass++)
 		{
@@ -3443,8 +3414,6 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_B);
 				Mweight.setHostPtr(op.Mweight.data);
 				Mweight.deviceAlloc();
 				deviceInitValue<XFLOAT>(Mweight, -std::numeric_limits<XFLOAT>::max());
-                // SHWS 7July2022: not entirely sure about how this works, but as I'm adding to the diff2 for loop over all img_id, this can no longer be a large negative value...
-                //deviceInitValue<XFLOAT>(Mweight, 0.);
 				Mweight.streamSync();
 
 				CTIC(timer,"getAllSquaredDifferencesCoarse");
@@ -3519,10 +3488,6 @@ baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_E);
 		// For the reconstruction step use mymodel.current_size!
 		// as of 3.1, no longer necessary?
 		sp.current_image_size = baseMLO->mymodel.current_size;
-        AccPtrBundle bundleSWS(ptrFactory.makeBundle());
-
-        bundleSWS.setSize(2*(FineProjectionData.orientationNumAllClasses)*sizeof(unsigned long));
-        bundleSWS.allAlloc();
 
 #ifdef TIMING
 // Only time one thread
@@ -3530,6 +3495,11 @@ if (thread_id == 0)
 baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_E);
 #endif
 		CTIC(timer,"storeWeightedSums");
+
+        AccPtrBundle bundleSWS(ptrFactory.makeBundle());
+        bundleSWS.setSize(2*(FineProjectionData.orientationNumAllClasses)*sizeof(unsigned long));
+        bundleSWS.allAlloc();
+
 		storeWeightedSums<MlClass>(op, sp, baseMLO, myInstance, FinePassWeights, FineProjectionData, FinePassClassMasks, ptrFactory, ibody, bundleSWS);
 		CTOC(timer,"storeWeightedSums");
 
