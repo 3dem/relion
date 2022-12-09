@@ -1046,7 +1046,7 @@ void getAllSquaredDifferencesCoarse(
 	}
 	else
         projectorPlans = accMLO->bundle->coarseProjectionPlans;
-    
+
 	// Loop only from sp.iclass_min to sp.iclass_max to deal with seed generation in first iteration
 	size_t allWeights_size(0);
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -1302,10 +1302,6 @@ void getAllSquaredDifferencesFine(
     for (int img_id = 0; img_id < sp.nr_images; img_id++)
 	{
 
-        //AccPtrBundle bundleD2( ptrFactory.makeBundle());
-        //bundleD2.setSize(2*(FineProjectionData.orientationNumAllClasses*sp.nr_trans*sp.nr_oversampled_trans)*sizeof(unsigned long));
-        //bundleD2.allAlloc();
-
 		// Reset size without de-allocating: we will append everything significant within
 		// the current allocation and then re-allocate the then determined (smaller) volume
 
@@ -1500,7 +1496,7 @@ void getAllSquaredDifferencesFine(
                 //bundleD2.pack(FPCMasks[exp_iclass].jobOrigin);
                 //bundleD2.pack(FPCMasks[exp_iclass].jobExtent);
 
-				FPCMasks[exp_iclass].jobOrigin.freeDeviceIfSet();
+                FPCMasks[exp_iclass].jobOrigin.freeDeviceIfSet();
 				FPCMasks[exp_iclass].jobExtent.freeDeviceIfSet();
 				FPCMasks[exp_iclass].jobOrigin.deviceAlloc();
 				FPCMasks[exp_iclass].jobExtent.deviceAlloc();
@@ -3406,7 +3402,7 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_B);
 
 			op.min_diff2 = 0.;
 
-			if (ipass == 0)
+            if (ipass == 0)
 			{
 				unsigned long weightsPerPart(baseMLO->mymodel.nr_classes * sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.nr_oversampled_rot * sp.nr_oversampled_trans);
 
@@ -3470,7 +3466,11 @@ if (thread_id == 0)
 baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_D);
 #endif
 
-				CTIC(timer,"getAllSquaredDifferencesFine");
+                //AccPtrBundle bundleD2(ptrFactory.makeBundle());
+				//bundleD2.setSize(2*(FineProjectionData.orientationNumAllClasses*sp.nr_trans*sp.nr_oversampled_trans)*sizeof(unsigned long));
+				//bundleD2.allAlloc();
+
+                CTIC(timer,"getAllSquaredDifferencesFine");
 				getAllSquaredDifferencesFine<MlClass>(ipass, op, sp, baseMLO, myInstance, FinePassWeights, FinePassClassMasks, FineProjectionData, ptrFactory, ibody);
 				CTOC(timer,"getAllSquaredDifferencesFine");
 				FinePassWeights.weights.cpToHost();
