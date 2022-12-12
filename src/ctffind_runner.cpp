@@ -839,6 +839,8 @@ void CtffindRunner::executeCtffind4(long int imic)
 	}
 	else
 		fh << "no" << std::endl;
+	// Set determine sample tilt? (as of ctffind-4.1.15)
+	fh << "no" << std::endl;
 	// Set expert options?
 	fh << "no" << std::endl;
 
