@@ -1783,7 +1783,7 @@ void pickerViewerCanvas::draw()
 			if (fom < minimum_pick_fom) continue;
 		}
 
-		if (color_label != EMDL_UNDEFINED)
+        if (color_label != EMDL_UNDEFINED)
 		{
 			RFLOAT colval;
 			if (EMDL::isInt(color_label))
@@ -1828,8 +1828,17 @@ void pickerViewerCanvas::draw()
 				}
 			}
 		}
-		else
-		{
+		else if (MDcoords.containsLabel(EMDL_PARTICLE_SELECTION_TYPE))
+        {
+            int selected;
+            MDcoords.getValue(EMDL_PARTICLE_SELECTION_TYPE, selected);
+            if (selected >= 1 && selected <= 6)
+                fl_color(color_choices[selected - 1].labelcolor_);
+            else
+                REPORT_ERROR("ERROR: rlnParticleSelectionType in coordinate file has value outside allowed [1,6] range");
+        }
+        else
+        {
 			fl_color(FL_GREEN);
 		}
 
@@ -1907,7 +1916,7 @@ int pickerViewerCanvas::handle(int ev)
 			MDcoords.setValue(EMDL_IMAGE_COORD_X, xcoor);
 			MDcoords.setValue(EMDL_IMAGE_COORD_Y, ycoor);
 			// No autopicking, but still always fill in the parameters for autopicking with dummy values (to prevent problems in joining autopicked and manually picked coordinates)
-			MDcoords.setValue(EMDL_PARTICLE_CLASS, iaux);
+			MDcoords.setValue(EMDL_PARTICLE_SELECTION_TYPE, iaux);
 			MDcoords.setValue(EMDL_ORIENT_PSI, aux);
 			MDcoords.setValue(EMDL_PARTICLE_AUTOPICK_FOM, aux);
 

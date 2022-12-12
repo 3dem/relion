@@ -97,11 +97,6 @@ void MlOptimiserMpi::initialise()
 
 	// Print information about MPI nodes:
 	printMpiNodesMachineNames(*node, nr_threads);
-#ifdef _CUDA_ENABLED
-    /************************************************************************/
-	//Setup GPU related resources
-	int devCount, deviceAffinity;
-	bool is_split(false);
 
 	if (gradient_refine && !do_split_random_halves) {
 		if (node->isLeader())
@@ -111,6 +106,11 @@ void MlOptimiserMpi::initialise()
 	}
 
 	grad_pseudo_halfsets = gradient_refine && !do_split_random_halves;
+#ifdef _CUDA_ENABLED
+    /************************************************************************/
+	//Setup GPU related resources
+	int devCount, deviceAffinity;
+	bool is_split(false);
 
 	if (do_gpu)
 	{
@@ -1477,6 +1477,9 @@ void MlOptimiserMpi::expectation()
 				std::cerr << "Faux thread id: " << b->thread_id << std::endl;
 #endif
 
+				for (int j = 0; j < b->projectors.size(); j++)
+					b->projectors[j].clear();
+
 				for (int j = 0; j < b->backprojectors.size(); j++)
 				{
 					unsigned long s = wsum_model.BPref[j].data.nzyxdim;
@@ -1493,7 +1496,6 @@ void MlOptimiserMpi::expectation()
 						wsum_model.BPref[j].weight.data[n] += (RFLOAT) weights[n];
 					}
 
-					b->projectors[j].clear();
 					b->backprojectors[j].clear();
 				}
 
