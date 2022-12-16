@@ -150,14 +150,14 @@ void TomogramSet::write(FileName filename)
 
 }
 
-Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenFramesOnly, bool loadOddFramesOnly) const //Set loadEven/OddFramesOnly to True to loadImageData from rlnTomoMicrographNameEven/Odd rather than rlnMicrographName
+Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenFramesOnly, bool loadOddFramesOnly, RFLOAT max_dose) const //Set loadEven/OddFramesOnly to True to loadImageData from rlnTomoMicrographNameEven/Odd rather than rlnMicrographName
 {
 	Tomogram out;
 
-	std::string tomoName;
+    std::string tomoName;
     i3Vector stackSize;
 
-	globalTable.getValueSafely(EMDL_TOMO_NAME, tomoName, index);
+    globalTable.getValueSafely(EMDL_TOMO_NAME, tomoName, index);
     const MetaDataTable& m = tomogramTables[index];
 
     if (globalTable.containsLabel(EMDL_TOMO_SIZE_X) &&
@@ -173,30 +173,84 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
         out.w0 = out.h0 = out.d0 = -999;
     }
 
+    // Select only a subset of the tilt series images with the lowest dose
+    out.frameCount = tomogramTables[index].numberOfObjects();
+
+    out.nr_selected_frames =  out.frameCount;
+    if (max_dose > 0.)
+    {
+        out.nr_selected_frames = 0;
+        for (int f = 0, fp = 0; f < out.frameCount; f++)
+        {
+            double mydose;
+            tomogramTables[index].getValueSafely(EMDL_MICROGRAPH_PRE_EXPOSURE, mydose, f);
+            if (mydose <= max_dose)
+            {
+                out.selectedFrameIndex.push_back(out.nr_selected_frames);
+                out.nr_selected_frames++;
+            }
+            else
+            {
+                out.selectedFrameIndex.push_back(-1);
+            }
+        }
+    }
+    else
+    {
+        // all frames are selected
+        for (int f = 0; f < out.frameCount; f++)
+        {
+            out.selectedFrameIndex.push_back(f);
+        }
+    }
+
     if (globalTable.containsLabel(EMDL_TOMO_TILT_SERIES_NAME))
     {
         // option A: Kino's original IMOD import functionality
         globalTable.getValueSafely(EMDL_TOMO_TILT_SERIES_NAME, out.tiltSeriesFilename, index);
-        globalTable.getValueSafely(EMDL_TOMO_FRAME_COUNT, out.frameCount, index);
+        int fc;
+        globalTable.getValueSafely(EMDL_TOMO_FRAME_COUNT, fc, index);
+        if (fc != out.frameCount) REPORT_ERROR("ERROR: rlnTomoFrameCount is not equal to number of entries in tomogram STAR file");
+
+        t3Vector<long int> isl = ImageFileHelper::getSize(out.tiltSeriesFilename);
+        stackSize.x = isl.x;
+        stackSize.y = isl.y;
+        stackSize.z = out.nr_selected_frames;
 
         if (loadImageData)
         {
-            out.stack.read(out.tiltSeriesFilename);
+            if (max_dose > 0.)
+            {
+                Image<RFLOAT> myStack(stackSize.x, stackSize.y, stackSize.z);
+                for (int f = 0; f < out.frameCount; f++)
+                {
+                    if (out.selectedFrameIndex[f] >= 0)
+                    {
+                        Image<RFLOAT> I2;
+                        FileName fn_img;
+                        fn_img.compose(f+1,out.tiltSeriesFilename+":mrcs");
+                        I2.read(fn_img);
+
+                        if (XSIZE(I2()) != stackSize.x || YSIZE(I2()) != stackSize.y)
+                        {
+                            REPORT_ERROR("ERROR: unequal image dimensions in the individual tilt series images of tomogram: " + tomoName);
+                        }
+                        myStack().setSlice(out.selectedFrameIndex[f], I2());
+                    }
+                }
+                out.stack.copyDataAndSizeFrom(myStack);
+            }
+            else
+            {
+                out.stack.read(out.tiltSeriesFilename);
+            }
+
             out.hasImage = true;
 
-            stackSize.x = out.stack.xdim;
-            stackSize.y = out.stack.ydim;
-            stackSize.z = out.stack.zdim;
         }
         else
         {
             out.hasImage = false;
-
-            t3Vector<long int> isl = ImageFileHelper::getSize(out.tiltSeriesFilename);
-
-            stackSize.x = isl.x;
-            stackSize.y = isl.y;
-            stackSize.z = isl.z;
         }
 
     }
@@ -205,7 +259,6 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
         // option B: new functionality to work directly with images from RELION's motioncorr runner
 
         out.tiltSeriesFilename = "";
-        out.frameCount = m.numberOfObjects();
 
         // Get image size from the first image in the tomogramTable
         if (!m.containsLabel(EMDL_MICROGRAPH_NAME) && !loadEvenFramesOnly && !loadOddFramesOnly)
@@ -213,63 +266,71 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
             REPORT_ERROR("ERROR: tomogramTable for " + tomoName + " does not contain a rlnMicrographName label, yet the globalTable also does not contain a rlnTomoTiltSeriesName label!");
         }
 	
-	if (!m.containsLabel(EMDL_MICROGRAPH_ODD) && loadOddFramesOnly)
+        if (!m.containsLabel(EMDL_MICROGRAPH_ODD) && loadOddFramesOnly)
         {
             REPORT_ERROR("ERROR: tomogramTable for " + tomoName + " does not contain a rlnTomoMicrographNameOdd label");
         }
 
-	if (!m.containsLabel(EMDL_MICROGRAPH_EVEN) && loadEvenFramesOnly)
+        if (!m.containsLabel(EMDL_MICROGRAPH_EVEN) && loadEvenFramesOnly)
         {
             REPORT_ERROR("ERROR: tomogramTable for " + tomoName + " does not contain a rlnTomoMicrographNameEven label");
         }
 	
         std::string fn_img;
         if (loadEvenFramesOnly)
-        {	
-		m.getValueSafely(EMDL_MICROGRAPH_EVEN, fn_img, 0);
-	}
-	else if (loadOddFramesOnly)
-        {	
-		m.getValueSafely(EMDL_MICROGRAPH_ODD, fn_img, 0);
-	}
-	else
-	{
+        {
+            m.getValueSafely(EMDL_MICROGRAPH_EVEN, fn_img, 0);
+        }
+        else if (loadOddFramesOnly)
+        {
+            m.getValueSafely(EMDL_MICROGRAPH_ODD, fn_img, 0);
+        }
+        else
+        {
         	m.getValueSafely(EMDL_MICROGRAPH_NAME, fn_img, 0);
         }
-	Image<RFLOAT> I;
+
+        Image<RFLOAT> I;
         I.read(fn_img,false); // false means don't read the actual image data, only the header
 
         stackSize.x = XSIZE(I());
         stackSize.y = YSIZE(I());
-        stackSize.z = out.frameCount;
+        stackSize.z = out.nr_selected_frames;
 
         if (loadImageData)
         {
             Image<RFLOAT> myStack(stackSize.x, stackSize.y, stackSize.z);
             for (int f = 0; f < out.frameCount; f++)
             {
-    	        if (loadEvenFramesOnly)
-        	{	
-			m.getValueSafely(EMDL_MICROGRAPH_EVEN, fn_img, f);
-		}
-		else if (loadOddFramesOnly)
-        	{	
-			m.getValueSafely(EMDL_MICROGRAPH_ODD, fn_img, f);
-		}	
-		else
-		{
-        		m.getValueSafely(EMDL_MICROGRAPH_NAME, fn_img, f);
-        	}	
-                Image<RFLOAT> I2;
-                I2.read(fn_img);
-
-                if (XSIZE(I2()) != stackSize.x || YSIZE(I2()) != stackSize.y)
+    	        if (out.selectedFrameIndex[f] >= 0)
                 {
-                    REPORT_ERROR("ERROR: unequal image dimensions in the individual tilt series images of tomogram: " + tomoName);
+
+                    if (loadEvenFramesOnly)
+                    {
+                        m.getValueSafely(EMDL_MICROGRAPH_EVEN, fn_img, f);
+                    }
+                    else if (loadOddFramesOnly)
+                    {
+                        m.getValueSafely(EMDL_MICROGRAPH_ODD, fn_img, f);
+                    }
+                    else
+                    {
+                        m.getValueSafely(EMDL_MICROGRAPH_NAME, fn_img, f);
+                    }
+
+                    Image<RFLOAT> I2;
+                    I2.read(fn_img);
+
+                    if (XSIZE(I2()) != stackSize.x || YSIZE(I2()) != stackSize.y)
+                    {
+                        REPORT_ERROR("ERROR: unequal image dimensions in the individual tilt series images of tomogram: " + tomoName);
+                    }
+                    myStack().setSlice(out.selectedFrameIndex[f], I2());
                 }
-                myStack().setSlice(f, I2());
             }
+
             out.stack.copyDataAndSizeFrom(myStack);
+            out.hasImage = true;
         }
         else
         {
@@ -295,9 +356,8 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
     globalTable.getValueSafely(EMDL_CTF_CS, out.optics.Cs, index);
     globalTable.getValueSafely(EMDL_CTF_Q0, Q0, index);
 
-	out.hasDeformations = (
-		globalTable.containsLabel(EMDL_TOMO_DEFORMATION_GRID_SIZE_X) &&
-		globalTable.containsLabel(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y) );
+	out.hasDeformations = (globalTable.containsLabel(EMDL_TOMO_DEFORMATION_GRID_SIZE_X) &&
+                           globalTable.containsLabel(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y) );
 
 	i2Vector deformationGridSize;
 	std::string deformationType = "";
@@ -370,8 +430,7 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
 
 		m.getValueSafely(EMDL_MICROGRAPH_PRE_EXPOSURE, out.cumulativeDose[f], f);
 
-		if (out.hasDeformations &&
-			m.containsLabel(EMDL_TOMO_DEFORMATION_COEFFICIENTS))
+		if (out.hasDeformations && m.containsLabel(EMDL_TOMO_DEFORMATION_COEFFICIENTS))
 		{
 			const std::vector<double> coeffs = m.getDoubleVector(
 					EMDL_TOMO_DEFORMATION_COEFFICIENTS, f);

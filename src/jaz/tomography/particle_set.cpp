@@ -25,10 +25,15 @@ bool ParticleSet::read(std::string filename, std::string motionFilename, bool ve
     if (genTable.read(filename,"general"))
     {
         genTable.getValueSafely(EMDL_TOMO_SUBTOMOGRAM_STACK2D, is_stack2d);
+        if (genTable.containsLabel(EMDL_TOMO_SUBTOMOGRAM_MAXDOSE))
+            genTable.getValueSafely(EMDL_TOMO_SUBTOMOGRAM_MAXDOSE, max_dose);
+        else
+            max_dose = -1.;
     }
     else
     {
         is_stack2d = false;
+        max_dose = -1.;
         genTable.setIsList(true);
         genTable.addObject();
         genTable.setValue(EMDL_TOMO_SUBTOMOGRAM_STACK2D, is_stack2d);
@@ -432,6 +437,7 @@ void ParticleSet::write(const std::string& filename)
 
     genTable.setName("general");
     genTable.setValue(EMDL_TOMO_SUBTOMOGRAM_STACK2D, is_stack2d);
+    genTable.setValue(EMDL_TOMO_SUBTOMOGRAM_MAXDOSE, max_dose);
     genTable.write(ofs);
 	optTable.write(ofs);
 	partTable.write(ofs);

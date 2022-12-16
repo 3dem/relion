@@ -45,6 +45,7 @@ class TomoExtraction
 		static void extractAt2D_Fourier(
 				const RawImage<T>& stack, int s, double bin,
 				const std::vector<gravis::d4Matrix>& projIn,
+                const std::vector<int>& selectedFrameIndex,
 				const std::vector<gravis::d2Vector>& centers,
 				const std::vector<bool>& isVisible,
 				RawImage<tComplex<T>>& out,
@@ -113,8 +114,8 @@ void TomoExtraction::extractFrameAt3D_Fourier(
 	const gravis::d2Vector center2D = tomogram.projectPoint(center, f);
 
 	extractAt2D_Fourier(
-		stack.getConstSliceRef(f), s, bin, {tomogram.projectionMatrices[f]},
-		{center2D}, {true}, out, projVec, num_threads, circle_crop);
+		stack.getConstSliceRef(f), s, bin, {tomogram.projectionMatrices[f]}, {tomogram.selectedFrameIndex},
+        {center2D}, {true}, out, projVec, num_threads, circle_crop);
 	
 	projOut = projVec[0];
 }
@@ -139,7 +140,7 @@ void TomoExtraction::extractAt3D_Fourier(
 	}
 	
 	extractAt2D_Fourier(
-		stack, s, bin, tomogram.projectionMatrices, centers, isVisible,
+		stack, s, bin, tomogram.projectionMatrices, tomogram.selectedFrameIndex, centers, isVisible,
 		out, projOut, num_threads, circle_crop);
 }
 
@@ -147,6 +148,7 @@ template <typename T>
 void TomoExtraction::extractAt2D_Fourier(
 		const RawImage<T>& stack, int s, double bin,
 		const std::vector<gravis::d4Matrix>& projIn,
+        const std::vector<int>& selectedFrameIndex,
 		const std::vector<gravis::d2Vector>& centers,
 		const std::vector<bool>& isVisible,
 		RawImage<tComplex<T>>& out,
@@ -155,23 +157,26 @@ void TomoExtraction::extractAt2D_Fourier(
 		bool circle_crop)
 {
 	const int sh = s/2 + 1;
-	const int fc = stack.zdim;
-
 	const int sb = (int)(s / bin + 0.5);
-	const int sbh = sb/2 + 1;
-	
-	BufferedImage<T> smallStack(s,s,fc);
-	projOut.resize(fc);
+
+	std::vector<gravis::d2Vector> integralShift;
 			
-	std::vector<gravis::d2Vector> integralShift(fc);
-			
-	for (int f = 0; f < fc; f++)
+	int nr_selected_frames = 0;
+    for (int f = 0; f < selectedFrameIndex.size(); f++)
 	{
-		integralShift[f] = gravis::d2Vector(
-				round(centers[f].x) - s/2,
-				round(centers[f].y) - s/2);
+        int fp = selectedFrameIndex[f];
+        if (fp >= 0)
+        {
+            integralShift.push_back(gravis::d2Vector(
+                    round(centers[f].x) - s/2,
+                    round(centers[f].y) - s/2));
+            nr_selected_frames++;
+        }
 	}
-	
+
+    BufferedImage<T> smallStack(s,s,nr_selected_frames);
+    projOut.resize(nr_selected_frames);
+
 	extractSquares(stack, s, s, integralShift, isVisible, smallStack, false, num_threads);
 	
 	if (circle_crop) 
@@ -179,21 +184,25 @@ void TomoExtraction::extractAt2D_Fourier(
 		cropCircle(smallStack, 0, EDGE_FALLOFF, num_threads);
 	}
 	
-	std::vector<gravis::d2Vector> posInNewImg(fc);
+	std::vector<gravis::d2Vector> posInNewImg(nr_selected_frames);
 	
-	for (int f = 0; f < fc; f++)
+	for (int f = 0; f < selectedFrameIndex.size(); f++)
 	{
-		projOut[f] = projIn[f];
-		
-		projOut[f](0,3) += sb/2 - centers[f].x;
-		projOut[f](1,3) += sb/2 - centers[f].y;
-		
-		posInNewImg[f] = (centers[f] - integralShift[f]) / bin;
-	}	
-	
-	BufferedImage<tComplex<T>> smallStackFS(sh,s,fc);
+        int fp = selectedFrameIndex[f];
+        if (fp >= 0)
+        {
+            projOut[fp] = projIn[f];
 
-	NewStackHelper::FourierTransformStack_fast(smallStack, smallStackFS, true, num_threads);
+            projOut[fp](0,3) += sb/2 - centers[f].x;
+            projOut[fp](1,3) += sb/2 - centers[f].y;
+
+            posInNewImg[fp] = (centers[f] - integralShift[fp]) / bin;
+        }
+    }
+
+	BufferedImage<tComplex<T>> smallStackFS(sh,s,nr_selected_frames);
+
+    NewStackHelper::FourierTransformStack_fast(smallStack, smallStackFS, true, num_threads);
 
 	if (bin != 1.0)
 	{
@@ -251,7 +260,7 @@ void TomoExtraction::extractAt2D_real(
 	
 	BufferedImage<T> smallStack(s,s,fc);
 	projOut.resize(fc);
-			
+
 	std::vector<gravis::d2Vector> integralShift(fc);
 
 	for (int f = 0; f < fc; f++)

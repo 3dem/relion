@@ -23,7 +23,8 @@ class TomogramSet
         bool read(FileName filename, bool verbose = true);
         void write(FileName filename);
 
-		Tomogram loadTomogram(int index, bool loadImageData, bool loadEvenFrames = false, bool loadOddFrames = false) const;
+        // If max_dose is positive, then only images with cumulativeDose less than or equal to max_dose will be loaded.
+		Tomogram loadTomogram(int index, bool loadImageData, bool loadEvenFrames = false, bool loadOddFrames = false, RFLOAT max_dose = -1.) const;
 			
 		void addTomogramFromIMODStack(
 			std::string tomoName, std::string stackFilename,

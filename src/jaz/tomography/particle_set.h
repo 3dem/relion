@@ -31,6 +31,7 @@ class ParticleSet
 			MetaDataTable partTable, optTable, genTable;
 
             bool is_stack2d;
+            double max_dose;
 			bool hasMotion;
 			std::vector<Trajectory> motionTrajectories;
 

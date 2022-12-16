@@ -631,7 +631,8 @@ EMDL_TOMO_RECONSTRUCTED_TOMOGRAM_HALF1_FILE_NAME,
 	EMDL_TOMO_TILT_SERIES_PIXEL_SIZE,
 	EMDL_MICROGRAPH_EVEN,
 	EMDL_MICROGRAPH_ODD,
-	EMDL_TOMO_SUBTOMOGRAM_ROT,
+    EMDL_TOMO_SUBTOMOGRAM_MAXDOSE,
+    EMDL_TOMO_SUBTOMOGRAM_ROT,
 	EMDL_TOMO_SUBTOMOGRAM_TILT,
 	EMDL_TOMO_SUBTOMOGRAM_PSI,
     EMDL_TOMO_SUBTOMOGRAM_STACK2D,
@@ -1338,7 +1339,8 @@ private:
 
 		EMDL::addLabel(EMDL_TOMO_FIDUCIALS_STARFILE, EMDL_STRING, "rlnTomoFiducialsStarFile", "STAR file containing the 3D locations of fiducial markers");
 		EMDL::addLabel(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, EMDL_DOUBLE, "rlnTomoTiltSeriesPixelSize", "Pixel size of the original tilt series");
-		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_ROT, EMDL_DOUBLE, "rlnTomoSubtomogramRot", "First Euler angle of a subtomogram (rot, in degrees)");
+        EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_MAXDOSE, EMDL_DOUBLE, "rlnTomoSubTomosMaxDose", "Maximum dose (in e/A2) used to extract subtomogram particles");
+        EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_ROT, EMDL_DOUBLE, "rlnTomoSubtomogramRot", "First Euler angle of a subtomogram (rot, in degrees)");
 		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_TILT, EMDL_DOUBLE, "rlnTomoSubtomogramTilt", "Second Euler angle of a subtomogram (tilt, in degrees)");
 		EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_PSI, EMDL_DOUBLE, "rlnTomoSubtomogramPsi", "Third Euler angle of a subtomogram (psi, in degrees)");
         EMDL::addLabel(EMDL_TOMO_SUBTOMOGRAM_STACK2D, EMDL_BOOL, "rlnTomoSubTomosAre2DStacks", "This flag is set to true if subtomograms are saved as 2D image stacks");
