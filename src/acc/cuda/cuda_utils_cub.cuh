@@ -1,6 +1,7 @@
 #ifndef CUDA_UTILS_CUB_CUH_
 #define CUDA_UTILS_CUB_CUH_
 
+#include <cuda.h> // For CUDA_VERSION
 #include <cuda_runtime.h>
 #include "src/acc/cuda/cuda_settings.h"
 #include "src/acc/cuda/cuda_mem_utils.h"
@@ -13,11 +14,15 @@
 	#undef CubLog
 #endif
 
-#define CUB_NS_QUALIFIER ::cub // for compatibility with CUDA 11.5
-#include "src/acc/cuda/cub/device/device_radix_sort.cuh"
-#include "src/acc/cuda/cub/device/device_reduce.cuh"
-#include "src/acc/cuda/cub/device/device_scan.cuh"
-#include "src/acc/cuda/cub/device/device_select.cuh"
+#if (CUDA_VERSION >= 11000)
+    #include <cub/cub.cuh>
+#else
+    // #define CUB_NS_QUALIFIER ::cub // for compatibility with CUDA 11.5
+    #include "src/acc/cuda/cub/device/device_radix_sort.cuh"
+    #include "src/acc/cuda/cub/device/device_reduce.cuh"
+    #include "src/acc/cuda/cub/device/device_scan.cuh"
+    #include "src/acc/cuda/cub/device/device_select.cuh"
+#endif
 
 namespace CudaKernels
 {
