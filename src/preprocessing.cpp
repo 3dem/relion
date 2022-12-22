@@ -65,6 +65,7 @@ void Preprocessing::read(int argc, char **argv, int rank)
 
 	int extract_section = parser.addSection("Particle extraction");
 	do_extract = parser.checkOption("--extract", "Extract all particles from the micrographs");
+    selection_type = textToInteger(parser.getOption("--selection_type", "Only extract particles with this selection type in the coordinate files (default = extract all)", "0"));
 	extract_size = textToInteger(parser.getOption("--extract_size", "Size of the box to extract the particles in (in pixels)", "-1"));
 	do_premultiply_ctf = parser.checkOption("--premultiply_ctf", "Premultiply the micrograph/frame with its CTF prior to particle extraction");
 	premultiply_ctf_extract_size = textToInteger(parser.getOption("--premultiply_extract_size", "Size of the box to extract the particles in (in pixels) before CTF premultiplication", "-1"));
@@ -468,6 +469,9 @@ void Preprocessing::joinAllStarFiles()
 			}
 		}
 
+        // Don't drag the new rlnParticleSelectionType along the entire processing workflow...
+        MDout.deactivateLabel(EMDL_PARTICLE_SELECTION_TYPE);
+
 		ObservationModel::saveNew(MDout, myOutObsModel->opticsMdt, fn_part_star, "particles");
 		std::cout << " Written out STAR file with " << MDout.numberOfObjects() << " particles in " << fn_part_star<< std::endl;
 	}
@@ -723,6 +727,13 @@ bool Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 			readCoordinates(fn_coord, MDin);
 	}
 	TIMING_TOC(TIMING_READ_COORD);
+
+    // If a selection type was given, then only select this type
+    if (selection_type > 0)
+    {
+        if (!MDin.containsLabel(EMDL_PARTICLE_SELECTION_TYPE)) REPORT_ERROR("ERROR: cannot find rlnParticleSelectionType in coordinate file, but --selection_type argument was specified.");
+        MDin = subsetMetaDataTable(MDin,EMDL_PARTICLE_SELECTION_TYPE, selection_type, selection_type);
+    }
 
 	// If an extract_minimum_fom was given, remove
 	if (fabs(extract_minimum_fom + 999.) > 1e-6)
