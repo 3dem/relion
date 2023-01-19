@@ -2684,7 +2684,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
                 // SHWS 25Aug2022: make sure all classes have particles in them, their order has been randomised already
                 int iclass  = part_id_sorted % mymodel.nr_classes;
                 Matrix2D<RFLOAT> A;
-                Euler_angles2matrix(rot, tilt, psi, A, true);
+                Euler_angles2matrix(rot, tilt, psi, A, false);
 
                 if (mydata.is_tomo) A = mydata.getRotationMatrix(part_id, img_id) * A;
 
