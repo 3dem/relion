@@ -832,16 +832,12 @@ void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
 	}
 	else
 	{
-		MetaDataTable MDgen;
-        MDgen.read(fn_exp, "general");
-        if (MDgen.numberOfObjects() > 0)
-            MDgen.getValue(EMDL_TOMO_SUBTOMOGRAM_STACK2D, is_tomo);
-        else
-            is_tomo = false;
 
         // MDimg and MDopt have to be read at the same time, so that the optics groups can be
 		// renamed in case they are non-contiguous or not sorted
 		ObservationModel::loadSafely(fn_exp, obsModel, MDimg, "particles", verb);
+        is_tomo = obsModel.isTomoStack2D;
+
 		// The below is useful for filenames on scratch disk (related to avoiding copying duplicate particles when doing symmetry expansion)
         nr_particles_per_optics_group.resize(obsModel.numberOfOpticsGroups(), 0);
 
@@ -1159,7 +1155,7 @@ void Experiment::write(FileName fn_out)
 {
     std::ofstream ofs(fn_out);
 
-    if (is_tomo) particleSet.genTable.write(ofs);
+    if (is_tomo) obsModel.generalMdt.write(ofs);
 
     obsModel.opticsMdt.write(ofs);
     MDimg.write(ofs);

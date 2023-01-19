@@ -307,7 +307,7 @@ int main(int argc, char *argv[])
 
 	Log::endProgress();
 
-	ObservationModel::saveNew(output_particles, obs_model.opticsMdt, outDir + "particles.star");
+	ObservationModel::saveNew(output_particles, obs_model.opticsMdt, obs_model.generalMdt, outDir + "particles.star");
 
 	return 0;
 }

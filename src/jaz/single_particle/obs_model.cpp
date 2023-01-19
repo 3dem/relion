@@ -1428,16 +1428,31 @@ void ObservationModel::loadSafely(std::string filename, ObservationModel& obsMod
 			}
 		}
 	}
+
+    // Deal with subtomogram_stack2d table
+    obsModel.generalMdt.read(filename, "general");
+    if (obsModel.generalMdt.numberOfObjects() > 0)
+        obsModel.generalMdt.getValue(EMDL_TOMO_SUBTOMOGRAM_STACK2D, obsModel.isTomoStack2D);
+    else
+        obsModel.isTomoStack2D = false;
+
 }
 
 void ObservationModel::saveNew(
 		MetaDataTable &particlesMdt,
 		MetaDataTable &opticsMdt,
+        MetaDataTable &generalMdt,
 		std::string filename,
 		std::string tablename)
 {
 	std::string tmpfilename = filename + ".tmp";
 	std::ofstream of(tmpfilename);
+
+	if (generalMdt.numberOfObjects() > 0)
+    {
+        generalMdt.setName("general");
+        generalMdt.write(of);
+    }
 
 	opticsMdt.setName("optics");
 	opticsMdt.write(of);
@@ -1452,6 +1467,12 @@ void ObservationModel::save(MetaDataTable &particlesMdt, std::string filename, s
 {
 	std::string tmpfilename = filename + ".tmp";
 	std::ofstream of(tmpfilename);
+
+    if (generalMdt.numberOfObjects() > 0)
+    {
+        generalMdt.setName("general");
+        generalMdt.write(of);
+    }
 
 	opticsMdt.setName("optics");
 	opticsMdt.write(of);

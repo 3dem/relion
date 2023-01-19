@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
 		}
 	}
 	
-	ObservationModel::saveNew(particleOut, opticsOut, destFn);
+	ObservationModel::saveNew(particleOut, opticsOut, obsModels[0].generalMdt, destFn);
 	
 	return RELION_EXIT_SUCCESS;
 }

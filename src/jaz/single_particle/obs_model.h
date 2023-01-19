@@ -42,11 +42,11 @@ class ObservationModel
 		ObservationModel(const MetaDataTable &opticsMdt, bool do_die_upon_error = true);
 
 
-			MetaDataTable opticsMdt;
+			MetaDataTable opticsMdt, generalMdt;
 
 			bool
 				hasEvenZernike, hasOddZernike, hasMagMatrices,
-				hasBoxSizes, hasMultipleMtfs;
+				hasBoxSizes, hasMultipleMtfs, isTomoStack2D;
 
 
 
@@ -150,7 +150,7 @@ class ObservationModel
 				int verb = 0, bool do_die_upon_error = true);
 
 		static void saveNew(
-				MetaDataTable& particlesMdt, MetaDataTable& opticsMdt,
+				MetaDataTable& particlesMdt, MetaDataTable& opticsMdt, MetaDataTable& generalMdt,
 				std::string filename, std::string _tablename = "particles");
 
 		void save(

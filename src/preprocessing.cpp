@@ -472,7 +472,7 @@ void Preprocessing::joinAllStarFiles()
         // Don't drag the new rlnParticleSelectionType along the entire processing workflow...
         MDout.deactivateLabel(EMDL_PARTICLE_SELECTION_TYPE);
 
-		ObservationModel::saveNew(MDout, myOutObsModel->opticsMdt, fn_part_star, "particles");
+		ObservationModel::saveNew(MDout, myOutObsModel->opticsMdt, myOutObsModel->generalMdt, fn_part_star, "particles");
 		std::cout << " Written out STAR file with " << MDout.numberOfObjects() << " particles in " << fn_part_star<< std::endl;
 	}
 }

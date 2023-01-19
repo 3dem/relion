@@ -117,15 +117,9 @@ void Reconstructor::initialise()
 	// Read MetaData file, which should have the image names and their angles!
 	if (fn_debug == "")
 	{
-        MetaDataTable MDgen;
-        MDgen.read(fn_sel, "general");
-        if (MDgen.numberOfObjects() > 0)
-            MDgen.getValue(EMDL_TOMO_SUBTOMOGRAM_STACK2D, is_tomo);
-        else
-            is_tomo = false;
-        if (is_tomo) REPORT_ERROR("ERROR: reconstruct does not yet work with 2D subtomogram stacks....");
-
         ObservationModel::loadSafely(fn_sel, obsModel, DF, "particles", 0, false);
+        if (obsModel.isTomoStack2D) REPORT_ERROR("ERROR: reconstruct does not yet work with 2D subtomogram stacks....");
+
 		if (obsModel.opticsMdt.numberOfObjects() == 0)
 		{
 			do_ignore_optics = true;
