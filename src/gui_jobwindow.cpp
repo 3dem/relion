@@ -2553,7 +2553,11 @@ void JobWindow::initialiseTomoReconstructTomogramsWindow()
 {
     setupTabs(2);
 
-    placeTomoInput(true, false, false, false, false, false);
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
+    
+    place("in_tiltseries", TOGGLE_DEACTIVATE);
 
 	tab2->begin();
 	tab2->label("Reconstruct");

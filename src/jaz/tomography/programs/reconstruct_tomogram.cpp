@@ -203,7 +203,9 @@ void TomoBackprojectProgram::getProjectMatrices(Tomogram &tomogram, MetaDataTabl
           tomogramTable.containsLabel(EMDL_TOMO_ZROT) &&
           tomogramTable.containsLabel(EMDL_TOMO_XSHIFT_ANGST) &&
           tomogramTable.containsLabel(EMDL_TOMO_YSHIFT_ANGST)))
+
         REPORT_ERROR("ERROR: at least one of the input tilt series star file(s) does not contain projections matrices, NOR rlnTomoXTilt, rlnTomoYtilt, rlnTomoZRot, rlnTomoXShiftAngst or rlnTomoYShiftAng.");
+
 
     double pixelSizeAct = tomogram.optics.pixelSize;
     const int fc = tomogram.frameCount;

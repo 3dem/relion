@@ -29,27 +29,27 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 @cli.command(name='cryoCARE:train')
 @relion_pipeline_job
 def cryoCARE_train(
-        tilt_series_star_file: Path = typer.Option(...),
+        tomogram_star_file: Path = typer.Option(...),
         output_directory: Path = typer.Option(...),
         training_tomograms: Optional[str] = typer.Option(None),
         number_training_subvolumes: int = typer.Option(1200),
         subvolume_sidelength: int = typer.Option(72),
         gpu: Optional[List[int]] = typer.Option(None)
 ):
-    """Train a denoising model using cryoCARE (>=v0.2.0)
+    """Train a denoising model using cryoCARE (>=v0.2.1)
     
     Requires that two tomograms have been generated using the same sample.
     These can be generated via taking odd/even frames during motion correction
     (optimal) or by taking odd/even tilts during tomogram reconstruction.
 
-    The location of tomograms should be specified in the global star file for all tilt series with the headers:
+    The location of tomograms should be specified in the tomogram star file for all tilt series with the headers:
     `rlnTomoReconstructedTomogramHalf1` and `rlnTomoReconstructedTomogramHalf2`.
 
 
     Parameters
     ----------
-    tilt_series_star_file: Path
-        RELION tilt-series STAR file.
+    tomogram_star_file: Path
+        RELION global tomogram STAR file from a RELION Reconstruct Tomogram job.
     output_directory: Path
         directory in which results will be stored.
     training_tomograms: Optional[str]
@@ -67,15 +67,15 @@ def cryoCARE_train(
     gpu: Optional[List[int]]
         Specify which GPU to use.
     """
-    if not tilt_series_star_file.exists():
-        e = 'Could not find tilt series star file'
+    if not tomogram_star_file.exists():
+        e = 'Could not find tomogram star file'
         console.log(f'ERROR: {e}')
         raise RuntimeError(e)
 
-    global_star = starfile.read(tilt_series_star_file, always_dict=True)['global']
+    global_star = starfile.read(tomogram_star_file, always_dict=True)['global']
 
     if not 'rlnTomoReconstructedTomogramHalf1' in global_star.columns:
-        e = 'Could not find rlnTomoReconstructedTomogramHalf1 in tilt series star file.'
+        e = 'Could not find rlnTomoReconstructedTomogramHalf1 in tomogram star file.'
         console.log(f'ERROR: {e}')
         raise RuntimeError(e)
 

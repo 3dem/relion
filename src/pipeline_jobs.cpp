@@ -1416,7 +1416,7 @@ void RelionJob::initialiseMotioncorrJob()
 
     if (is_tomo)
     {
-        joboptions["input_star_mics"] = JobOption("Input tilt series set: ", OUTNODE_TOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "Input tomogram set.");
+        joboptions["input_star_mics"] = JobOption("Input tilt series: ", OUTNODE_TOMO_TILTSERIES, "", "Tomogram set STAR file (*.star)", "Input global tilt series star file");
     }
     else
     {
@@ -1664,7 +1664,7 @@ void RelionJob::initialiseCtffindJob()
 
     if (is_tomo)
     {
-        joboptions["input_star_mics"] = JobOption("Input tilt series set: ", OUTNODE_TOMO_TOMOGRAMS, "", "Tomograms set STAR file (*.star)", "Input tomograms set. ...");
+        joboptions["input_star_mics"] = JobOption("Input tilt series: ", OUTNODE_TOMO_TILTSERIES, "", "Tomograms set STAR file (*.star)", "Input global tilt series star file.");
     }
     else
     {
@@ -6144,8 +6144,8 @@ void RelionJob::initialiseTomoImportJob()
     	joboptions["hand"] = JobOption("Tilt handedness:", (std::string)"", "Set this to indicate the handedness of the tilt geometry (default=-1). The value of this parameter is either +1 or -1, and it describes whether the focus increases or decreases as a function of Z distance. It has to be determined experimentally. In our experiments, it has always been -1. Y If this values varies among the input tomograms, then append opposite values to tomogram set using another Import tomo job.");
 
         joboptions["do_coords"] = JobOption("Import coordinates?", false, "Set this to Yes for importing particle coordinates.");
-        joboptions["part_star"] = JobOption("STAR file with coordinates: ", "", "Input file (*.star)", ".", "Provide a STAR file with the following information to input particles: \n \n TODO TODO TODO ");
-        joboptions["part_tomos"] = JobOption("Tomograms set: ", OUTNODE_TOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "The tomograms set from which these particles were picked.");
+        joboptions["part_star"] = JobOption("STAR file with coordinates: ", "", "Input file (*.star)", ".", "Provide a STAR file with the following information to input particles: \n \n rlnTomoName: Name of the tomogram to which a particle belongs \n \n rlnCoordinate<X/Y/Z>: the 3D coordinates within that tomogram. \n \n If the input file also contains the particle angle columns rlnAngle<Rot/Tilt/Psi>, or any other column, they are also imported.");
+        joboptions["part_tomos"] = JobOption("Tomograms star:", OUTNODE_TOMO_TOMOGRAMS, "", "Tomogram set STAR file (*.star)", "The tomograms set or global tilt series star from which these particles were picked.");
         joboptions["do_coords_flipZ"] = JobOption("Flip Z coordinates?", false, "Set this to Yes if you want to flip particles Z coordinate. Use it in case imported tomograms Z axis are flipped compared to tomograms used for picking.");
 
         joboptions["do_other"] = JobOption("Import other node types?", false, "Set this to Yes  if you plan to import anything else than movies or micrographs");
@@ -6377,7 +6377,7 @@ void RelionJob::initialiseTomoAlignTiltSeriesJob()
 {
     hidden_name = ".gui_tomo_align_tiltseries";
 
-    joboptions["in_tiltseries"] = JobOption("Input tilt series:", OUTNODE_TOMO_TILTSERIES, "", "STAR files (*.star)",  "Input tomogram set starfile.");
+    joboptions["in_tiltseries"] = JobOption("Input tilt series:", OUTNODE_TOMO_TILTSERIES, "", "STAR files (*.star)",  "Input global tilt series star file.");
 
     joboptions["do_imod_fiducials"] = JobOption("Use IMOD's fiducial based alignment?", false, "Set to Yes to perform tilt series alignment using fiducials in IMOD.");
     joboptions["fiducial_diameter"] = JobOption("Fiducial diameter (nm): ", 10, 1, 20, 1, "The diameter of the fiducials (in nm)");
@@ -6456,6 +6456,11 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
         	command += " --gpu " + joboptions["gpu_ids"].getString() + ' ';
     	}
     }
+    if (joboptions["in_tiltseries"].getString() == "")
+    {
+    	error_message = "ERROR: you need to provide an input STAR file";
+	return false;
+    }
     command += " --tilt-series-star-file " + joboptions["in_tiltseries"].getString();
 
     Node node(joboptions["in_tiltseries"].getString(), joboptions["in_tiltseries"].node_type);
@@ -6477,9 +6482,9 @@ bool RelionJob::getCommandsTomoAlignTiltSeriesJob(std::string &outputname, std::
 void RelionJob::initialiseTomoReconstructTomogramsJob()
 {
     hidden_name = ".gui_tomo_reconstruct_tomograms";
-
-    addTomoInputOptions(true, false, false, false, false, false);
-
+    
+    joboptions["in_tiltseries"] = JobOption("Input tilt series:", OUTNODE_TOMO_TILTSERIES, "", "STAR files (*.star)",  "Input global tilt series star file.");
+    
     joboptions["tomo_name"] = JobOption("Reconstruct only this tomogram:", std::string(""), "If not left empty, the program will only reconstruct this particular tomogram");
     joboptions["generate_split_tomograms"] = JobOption("Generate tomograms for denoising?:", false, "Generate tomograms for input into a denoising job. For this option to work, Save images for denoising? should have been True during Motion Correction. Additionally, adjust zdim to minimise the amount of empty space without sample within the tomograms.");
 
@@ -6503,12 +6508,18 @@ bool RelionJob::getCommandsTomoReconstructTomogramsJob(std::string &outputname, 
     else
         command="`which relion_tomo_reconstruct_tomogram`";
     if (error_message != "") return false;
+    
+    if (joboptions["in_tiltseries"].getString() == "")
+    {
+    	error_message = "ERROR: you need to provide an input STAR file";
+	return false;
+    }
+    
+    command += " --t " + joboptions["in_tiltseries"].getString();
 
-    // I/O
-    error_message = getTomoInputCommmand(command, HAS_COMPULSORY, HAS_NOT, HAS_NOT, HAS_NOT, HAS_NOT,
-                                         HAS_NOT);
-    if (error_message != "") return false;
-
+    Node node(joboptions["in_tiltseries"].getString(), joboptions["in_tiltseries"].node_type);
+    inputNodes.push_back(node);
+ 
     command += " --o " + outputname;
     if (joboptions["tomo_name"].getString().length() > 0)
         command += " --tn " + joboptions["tomo_name"].getString();
@@ -6551,9 +6562,9 @@ void RelionJob::initialiseTomoDenoiseTomogramsJob()
 {
     hidden_name = ".gui_tomo_denoise_tomogram";
 
-    joboptions["in_tomoset"] = JobOption("Input tomogram set:", OUTNODE_TOMO_TOMOGRAMS, "", "STAR files (*.star)",  "Input tomogram set star file.");
+    joboptions["in_tomoset"] = JobOption("Input tomograms.star:", OUTNODE_TOMO_TILTSERIES, "", "STAR files (*.star)",  "Input global tomograms star file. Must contain rlnTomoReconstructedTomogramHalf1 and rlnTomoReconstructedTomogramHalf2 labels denoting the tomogram halves generated for denoising in a Reconstruct tomograms job.");
 
-    joboptions["do_cryocare_train"] = JobOption("Train denoising model:", false, "Select Yes to train cryoCARE denoising model. Input tomogram set should contain tomogram halves for denoising (to generate, select Yes to Generate tomograms for denoising in the Reconstruct tomogram tab).");
+    joboptions["do_cryocare_train"] = JobOption("Train denoising model:", false, "Select Yes to train cryoCARE denoising model.");
 
     joboptions["tomograms_for_training"] = JobOption("Tomograms for model training:", std::string(""), "List the tomograms to be used to train the denoising model. Ideally, these should cover the defocus range of your tomograms. List the tomograms according to their rlnTomoName, and separate the tomograms using ':'. For exampple, input should look something like: TS_01:TS_02 "); 
     joboptions["number_training_subvolumes"] = JobOption("Number of sub-volumes per tomogram:",1200,100,2000,100, "Number of sub-volumes to be extracted per training tomogram. Corresponds to num_slices in cryoCARE_extract_train_data.py.");
@@ -6616,7 +6627,12 @@ bool RelionJob::getCommandsTomoDenoiseTomogramsJob(std::string &outputname, std:
     {
         command += " cryoCARE:predict ";
     }
-    command += " --tilt-series-star-file " + joboptions["in_tomoset"].getString();
+    if (joboptions["in_tomoset"].getString() == "")
+    {
+    	error_message = "ERROR: you need to provide an input STAR file";
+	return false;
+    }
+    command += " --tomogram-star-file " + joboptions["in_tomoset"].getString();
     Node node(joboptions["in_tomoset"].getString(), joboptions["in_tomoset"].node_type);
     inputNodes.push_back(node); 
 
@@ -6676,7 +6692,7 @@ void RelionJob::initialiseTomoExcludeTiltImagesJob()
 {
     hidden_name = ".gui_tomo_exclude_tilt_images";
 
-    joboptions["in_tiltseries"] = JobOption("Input tilt series:", OUTNODE_TOMO_TILTSERIES, "", "STAR files (*.star)",  "Input tilt series starfile.");
+    joboptions["in_tiltseries"] = JobOption("Input tilt series:", OUTNODE_TOMO_TILTSERIES, "", "STAR files (*.star)",  "Input global tilt series star file.");
     joboptions["cache_size"] = JobOption("Number of cached tilt series ", 5, 1, 10, 1, "This controls the number of cached tilt series in Napari.");
 }
 
@@ -6690,7 +6706,13 @@ bool RelionJob::getCommandsTomoExcludeTiltImagesJob(std::string &outputname, std
     if (error_message != "") return false;
 
     command="`which relion_tomo_exclude_tilt_images` ";
-
+    
+    if (joboptions["in_tiltseries"].getString() == "")
+    {
+    	error_message = "ERROR: you need to provide an input STAR file";
+	return false;
+    }
+    
     command += " --tilt-series-star-file " + joboptions["in_tiltseries"].getString();
     command += " --cache-size " + joboptions["cache_size"].getString() + ' ';
 
