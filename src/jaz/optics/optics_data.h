@@ -10,7 +10,7 @@ class OpticsData
 		OpticsData();
 		OpticsData(std::string optFn, int verbosity = 1);
 		
-		double voltage, pixelSize, Cs;
+		double voltage, pixelSize, Cs, Q0;
 };
 
 #endif

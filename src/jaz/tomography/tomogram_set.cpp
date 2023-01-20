@@ -344,8 +344,6 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
 
 	globalTable.getValueSafely(EMDL_TOMO_HANDEDNESS, out.handedness, index);
 
-	double Q0;
-
     // Now that we do notioncorrection on tomogram_sets, the micrograph pixel size may not have been set yet...
     if (globalTable.containsLabel(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE))
         globalTable.getValueSafely(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, out.optics.pixelSize, index);
@@ -354,7 +352,7 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
 
     globalTable.getValueSafely(EMDL_CTF_VOLTAGE, out.optics.voltage, index);
     globalTable.getValueSafely(EMDL_CTF_CS, out.optics.Cs, index);
-    globalTable.getValueSafely(EMDL_CTF_Q0, Q0, index);
+    globalTable.getValueSafely(EMDL_CTF_Q0, out.optics.Q0, index);
 
 	out.hasDeformations = (globalTable.containsLabel(EMDL_TOMO_DEFORMATION_GRID_SIZE_X) &&
                            globalTable.containsLabel(EMDL_TOMO_DEFORMATION_GRID_SIZE_Y) );
@@ -417,7 +415,7 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
 		m.getValueSafely(EMDL_CTF_DEFOCUSV, ctf.DeltafV, f);
 		m.getValueSafely(EMDL_CTF_DEFOCUS_ANGLE, ctf.azimuthal_angle, f);
 
-		ctf.Q0 = Q0;
+		ctf.Q0 = out.optics.Q0;
 		ctf.Cs = out.optics.Cs;
 		ctf.kV = out.optics.voltage;
 

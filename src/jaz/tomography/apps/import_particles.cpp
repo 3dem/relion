@@ -218,6 +218,7 @@ int main(int argc, char *argv[])
 			opticsTable.setValue(EMDL_IMAGE_OPTICS_GROUP_NAME, opticsGroupName, optGroup);
 			opticsTable.setValue(EMDL_CTF_CS, tomogram.optics.Cs, optGroup);
 			opticsTable.setValue(EMDL_CTF_VOLTAGE, tomogram.optics.voltage, optGroup);
+            opticsTable.setValue(EMDL_CTF_Q0, tomogram.optics.Q0, optGroup);
 			opticsTable.setValue(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, tomogram.optics.pixelSize, optGroup);
 
 			// _rlnMicrographBinning, _rlnCtfDataAreCtfPremultiplied, _rlnImageDimensionality,

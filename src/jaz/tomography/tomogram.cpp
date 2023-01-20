@@ -296,6 +296,16 @@ bool Tomogram::validateParticleOptics(
 				Cs_good = std::abs(Cs_tomogram - Cs_particles) < eps;
 			}
 
+            bool Q0_good = true;
+
+            if (particleSet.optTable.labelExists(EMDL_CTF_Q0))
+            {
+                const double Q0_particles = particleSet.optTable.getDouble(EMDL_CTF_Q0, g);
+                const double Q0_tomogram = optics.Q0;
+
+                Q0_good = std::abs(Q0_tomogram - Q0_particles) < eps;
+            }
+
 			bool u_good = true;
 
 			if (particleSet.optTable.labelExists(EMDL_CTF_VOLTAGE))
@@ -316,7 +326,7 @@ bool Tomogram::validateParticleOptics(
 				s_good = std::abs(s_particles - s_tomogram) < eps;
 			}
 
-			if (Cs_good && u_good && s_good)
+			if (Cs_good && u_good && s_good && Q0_good)
 			{
 				valid[g] = true;
 			}
