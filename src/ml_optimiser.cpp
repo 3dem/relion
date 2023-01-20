@@ -6808,6 +6808,8 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                             for (int img_id = 0; img_id < exp_nr_images; img_id++)
                             {
 
+                                if (mydata.is_tomo && mydata.particles[part_id].images[img_id].is_empty) continue;
+
                                 // Get the Euler matrix
                                 Euler_angles2matrix(oversampled_rot[iover_rot],
                                         oversampled_tilt[iover_rot],
@@ -6989,7 +6991,6 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
                                                 // Normalised cross-correlation coefficient: divide by power of reference (power of image is a constant)
                                                 // For multi-images, also divide by nr_images to calculate average CCF over all images
                                                 diff2 /= sqrt(suma2) * exp_local_sqrtXi2[img_id];
-
                                             }
                                             else
                                             {
@@ -7937,6 +7938,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
                     // The order of the looping here has changed for 3.1: different img_id have different optics_group and therefore different applyAnisoMag....
                     for (int img_id = 0; img_id < exp_nr_images; img_id++)
                     {
+                        if (mydata.is_tomo && mydata.particles[part_id].images[img_id].is_empty) continue;
 
                         // Loop over all oversampled orientations (only a single one in the first pass)
                         for (long int iover_rot = 0; iover_rot < exp_nr_oversampled_rot; iover_rot++)
