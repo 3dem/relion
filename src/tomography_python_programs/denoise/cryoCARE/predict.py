@@ -1,8 +1,8 @@
 from pathlib import Path
 from typing import Optional, Tuple, List
+from rich.console import Console
 
 import starfile
-import rich
 import typer
 import subprocess
 import os
@@ -21,7 +21,7 @@ from .constants import PREDICT_CONFIG_PREFIX, EVEN_SUFFIX
 from .._cli import cli
 from ..._utils.relion import relion_pipeline_job
 
-console = rich.console.Console(record=True)
+console = Console(record=True)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  
 
 @cli.command(name='cryoCARE:predict')
