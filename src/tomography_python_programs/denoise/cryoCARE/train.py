@@ -1,8 +1,8 @@
 from pathlib import Path
 from typing import Optional, List
+from rich.console import Console
 
 import starfile
-import rich
 import typer
 import subprocess
 import os
@@ -22,7 +22,7 @@ from .constants import TRAIN_CONFIG_PREFIX, TRAIN_DATA_CONFIG_PREFIX, MODEL_NAME
 from .._cli import cli
 from ..._utils.relion import relion_pipeline_job
 
-console = rich.console.Console(record=True)
+console = Console(record=True)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  
 
 
