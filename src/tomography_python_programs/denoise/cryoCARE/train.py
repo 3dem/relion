@@ -4,7 +4,6 @@ from rich.console import Console
 
 import starfile
 import typer
-import rich
 import subprocess
 import os
 
