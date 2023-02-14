@@ -70,7 +70,7 @@ void EERRenderer::render16K(MultidimArray<T> &image, std::vector<unsigned int> &
 	{
 		int x = ((positions[i] & 4095) << 2) | (symbols[i] & 3); // 4095 = 111111111111b, 3 = 00000011b
 		int y = ((positions[i] >> 12) << 2) | ((symbols[i] & 12) >> 2); //  4096 = 2^12, 12 = 00001100b
-			DIRECT_A2D_ELEM(image, y, x)++;
+		DIRECT_A2D_ELEM(image, y, x)++;
 	}
 }
 
@@ -82,7 +82,7 @@ void EERRenderer::render8K(MultidimArray<T> &image, std::vector<unsigned int> &p
 	{
 		int x = ((positions[i] & 4095) << 1) | ((symbols[i] & 2) >> 1); // 4095 = 111111111111b, 2 = 00000010b
 		int y = ((positions[i] >> 12) << 1) | ((symbols[i] & 8) >> 3); //  4096 = 2^12, 8 = 00001000b
-			DIRECT_A2D_ELEM(image, y, x)++;
+		DIRECT_A2D_ELEM(image, y, x)++;
 	}
 }
 
@@ -93,7 +93,18 @@ void EERRenderer::render4K(MultidimArray<T> &image, std::vector<unsigned int> &p
 	{
 		int x = positions[i] & 4095; // 4095 = 111111111111b
 		int y = positions[i] >> 12; //  4096 = 2^12
-			DIRECT_A2D_ELEM(image, y, x)++;
+		DIRECT_A2D_ELEM(image, y, x)++;
+	}
+}
+
+template <typename T>
+void EERRenderer::render2K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons)
+{
+	for (int i = 0; i < n_electrons; i++)
+	{
+		int x = (positions[i] & 4095) >> 1; // 4095 = 111111111111b
+		int y = (positions[i] >> 12) >> 1; //  4096 = 2^12
+		DIRECT_A2D_ELEM(image, y, x)++;
 	}
 }
 
@@ -112,12 +123,12 @@ void EERRenderer::read(FileName _fn_movie, int eer_upsampling)
 	if (ready)
 		REPORT_ERROR("Logic error: you cannot recycle EERRenderer for multiple files (now)");
 
-	if (eer_upsampling == 1 || eer_upsampling == 2 || eer_upsampling == 3)
+	if (eer_upsampling == -1 || eer_upsampling == 1 || eer_upsampling == 2 || eer_upsampling == 3)
 		this->eer_upsampling = eer_upsampling;
 	else
 	{
 		std::cerr << "EERRenderer::read: eer_upsampling = " << eer_upsampling << std::endl;
-		REPORT_ERROR("EERRenderer::read: eer_upsampling must be 1, 2 or 3.");
+		REPORT_ERROR("EERRenderer::read: eer_upsampling must be -1, 1, 2 or 3.");
 	}
 
 	fn_movie = _fn_movie;
@@ -289,6 +300,9 @@ int EERRenderer::getWidth()
 	if (!ready)
 		REPORT_ERROR("EERRenderer::getNFrames called before ready.");
 
+	if (eer_upsampling == -1)
+		return EER_IMAGE_WIDTH >> 1;
+
 	return EER_IMAGE_WIDTH << (eer_upsampling - 1);
 }
 
@@ -296,6 +310,9 @@ int EERRenderer::getHeight()
 {
 	if (!ready)
 		REPORT_ERROR("EERRenderer::getNFrames called before ready.");
+
+	if (eer_upsampling == -1)
+		return EER_IMAGE_HEIGHT >> 1;
 
 	return EER_IMAGE_HEIGHT << (eer_upsampling - 1);
 }
@@ -447,6 +464,8 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 			render8K(image, positions, symbols, n_electron);
 		else if (eer_upsampling == 1)
 			render4K(image, positions, symbols, n_electron);
+		else if (eer_upsampling == -1)
+			render2K(image, positions, symbols, n_electron);
 		else
 			REPORT_ERROR("Invalid EER upsamle");
 		RCTOC(TIMING_RENDER_ELECTRONS);

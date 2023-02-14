@@ -44,6 +44,9 @@ class EERRenderer {
 	template <typename T>
 	void render4K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons);
 
+	template <typename T>
+	void render2K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons);
+
 	static TIFFErrorHandler prevTIFFWarningHandler;
 
 	public:
@@ -80,6 +83,9 @@ class EERRenderer {
 
 	void read(FileName _fn_movie, int eer_upsampling=2);
 
+	// Due to a limitation in libtiff (not TIFF specification!),
+	// the maximum number of frames is 65535.
+	// See https://www.asmail.be/msg0055011809.html.
 	int getNFrames();
 	int getWidth();
 	int getHeight();
