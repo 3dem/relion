@@ -1664,7 +1664,8 @@ class MRCBZ2Reader
 		std::string commandline = "pbzip2 -cdkp" + integerToString(n_threads) + " " + filename + " 2>/dev/null";
 		pipe = popen(commandline.c_str(), "r");
 		if (pipe == NULL)
-			REPORT_ERROR("MRCBZ2Reader: error in opening decompression pipe for " + filename);
+			REPORT_ERROR("MRCBZ2Reader: error in opening decompression pipe for " + filename +\
+				     ". Do you have pbzip2 in the PATH? Is the movie accessible and intact?");
 
 		Image<float>::MRChead *header = new Image<float>::MRChead();
 		if (fread(header, MRCSIZE, 1, pipe) < 1)
