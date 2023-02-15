@@ -542,6 +542,17 @@ public:
 		return err;
 	}
 
+	/** Read a frame from a pipe that has already been opened
+	 *
+	 */
+	int readFrameFromOpenPipe(const FileName &name, fImageHandler &hFile, long int select_img, bool is_2D = false)
+	{
+		int err = 0;
+		err = _read(name, hFile, true, select_img, false, is_2D);
+		// Reposition file pointer for a next read
+		rewind(fimg);
+		return err;
+	}
 	/** General write function
 	 * select_img= which slice should I replace
 	 * overwrite = 0, append slice
@@ -950,7 +961,7 @@ public:
 
 	/** Read the raw data
 	  */
-	int readData(FILE* fimg, long int select_img, DataType datatype, unsigned long pad)
+	int readData(FILE* fimg, long int select_img, DataType datatype, unsigned long pad, bool dont_seek=false)
 	{
 //#define DEBUG
 #ifdef DEBUG
@@ -958,7 +969,14 @@ public:
 		std::cerr<<" readData flag= "<<dataflag<<std::endl;
 #endif
 
-		if ( dataflag < 1 )
+		if (dont_seek && select_img > 0)
+			REPORT_ERROR("Image::readData: select_img doesn't make sense when dont_seek");
+		if (dont_seek && pad != 0)
+			REPORT_ERROR("Image::readData: pad must be 0 when dont_seek");
+
+		// This is dirty but dont_seek means we are reading from a pipe
+		// and we DO want to read an image!
+		if ( !dont_seek && dataflag < 1 )
 			return 0;
 
 		size_t myoffset, readsize, readsize_n, pagemax = 1073741824; // 1 GB
@@ -1026,7 +1044,6 @@ public:
 			//#define DEBUG
 
 #ifdef DEBUG
-
 			data.printShape();
 			printf("DEBUG: Page size: %ld offset= %d \n", pagesize, offset);
 			printf("DEBUG: Swap = %d  Pad = %ld  Offset = %ld\n", swap, pad, offset);
@@ -1039,9 +1056,13 @@ public:
 				page = (char *) askMemory(pagesize*sizeof(char));
 
 			// Because we requested XYSIZE to be even for UHalf, this is always safe.
-			int error_fseek = fseek(fimg, myoffset, SEEK_SET);
-			if (error_fseek != 0)
-				return -1;
+			int error_fseek;
+			if (!dont_seek)
+			{
+				error_fseek = fseek(fimg, myoffset, SEEK_SET);
+				if (error_fseek != 0)
+					return -1;
+			}
 
 			for (size_t myn=0; myn<NSIZE(data); myn++)
 			{
@@ -1417,6 +1438,8 @@ private:
 		if (ext_name.contains("spi") || ext_name.contains("xmp")  ||
 			ext_name.contains("stk") || ext_name.contains("vol"))
 			err = readSPIDER(select_img);
+		else if (ext_name.contains("bz2"))
+			REPORT_ERROR("BUG: bzip2-ed movies should be handled by MRCBZ2Reader, not by Image.");
 		else if (ext_name.contains("mrcs") || (is_2D && ext_name.contains("mrc")) || //mrc stack MUST go BEFORE plain MRC
 				ext_name.contains("st")) //stk stack MUST go BEFORE plain st
 			err = readMRC(select_img, true, name);
@@ -1561,6 +1584,134 @@ private:
 		if (!_exists)
 			hFile.exist = _exists = true;
 	}
+};
+
+class MRCBZ2Reader
+{
+/*
+	A class to read bzip2-ed MRC movies
+
+	We use pbzip2, which must be in the PATH, to decompres in parallel.
+	pbzip2 can decompress in parallel only when the file was
+	compressed by pbzip2, not the original bzip2.
+
+	Since the bzip2 stream does not allow random access, we can only read frames
+	in sequence. We can read all frames or some frames in order
+	(e.g. 3, 4, 7, 8) but cannot go back (e.g. 3, 4, 1, 2).
+
+	This class is NOT thread safe.
+
+	Typical usage is:
+
+	MRCBZ2Reader reader;
+	reader.read("XXX.mrc.bz2", n_threads);
+	
+	// Image size is accessible via reader.Ihead()
+	nx = XSIZE(reader.Ihead());
+	// You cannot copy Ihead() because its "data" buffer is not allocated.
+
+	// Read one frame
+	// frame_index is 0-indexed and must be in-order.
+	Image<T> image;
+	reader.readFrameInto(image, frame_index);
+ */
+
+	public:
+
+	FILE *pipe;
+	// This is only to read the header. The type doesn't matter.
+	Image<float> Ihead;
+	int current_frame;
+	DataType datatype;
+
+	static bool isMRCBZ2(FileName filename)
+	{
+		if (filename.length() < 9)
+			return false;
+
+		return filename.substr(filename.length() - 8, 8) == ".mrc.bz2";
+	}
+
+	void skip(size_t byte)
+	{
+		if (pipe == NULL)
+			REPORT_ERROR("MRCBZ2Reader::skip() called before a file is opened.");
+
+		const size_t blocksize = 10000000; // 10 MB
+		char *dummy = new char[blocksize]; // use heap to avoid stack overflow
+
+		while (byte > 0)
+		{
+			size_t to_read = blocksize;
+			if (to_read > byte)
+				to_read = byte;
+
+			if (fread(dummy, to_read, 1, pipe) < 1)
+			{
+				REPORT_ERROR("MRCBZ2Reader::skip(): failed to seek");
+			}
+
+			byte -= to_read;
+		}
+
+		delete[] dummy;
+	}
+
+	MRCBZ2Reader()
+	{
+		pipe = NULL;
+	}
+
+	void read(FileName filename, int n_threads)
+	{
+		if (pipe != NULL)
+			REPORT_ERROR("MRCBZ2Reader::read() called twice.");
+
+		// -c: to stdout, -d: decompress. -k: keep the original, -p: number of threads
+		// I'm not sure if discarding STDERR is the right thing to do but
+		// without this there are too many false alarms ("ERROR: Unexpected error. Aborting!")
+		// when the pipe is closed without reading all frames.
+		std::string commandline = "pbzip2 -cdkp" + integerToString(n_threads) + " " + filename + " 2>/dev/null";
+		pipe = popen(commandline.c_str(), "r");
+		if (pipe == NULL)
+			REPORT_ERROR("MRCBZ2Reader: error in opening decompression pipe for " + filename);
+
+		Image<float>::MRChead *header = new Image<float>::MRChead();
+		if (fread(header, MRCSIZE, 1, pipe) < 1)
+			REPORT_ERROR("MRCBZ2Reader: error in reading header of image " + filename);
+		datatype = Ihead.parseMRCHeader(header, -1, true /* isStack */, filename);
+		this->skip(header->nsymbt);
+		current_frame = 0;
+		delete header;
+	};
+
+	template<typename T>
+	void readFrameInto(Image<T> &image, size_t frame)
+	{
+		if (pipe == NULL)
+			REPORT_ERROR("MRCBZ2Reader::readFrameInto() called before a file is opened.");
+//		std::cout << "MRCBZ2Reader::readFrameInto(): frame = " << frame << " current_frame = " << current_frame << std::endl;
+
+		if (frame < current_frame)
+			REPORT_ERROR("MRCBZ2Reader::readFrameInto() cannot rewind a pipe.");
+		else if (frame > current_frame)
+			skip((size_t)Ihead.data.xdim * Ihead.data.ydim * (current_frame - frame) * gettypesize(datatype));
+
+		current_frame = frame + 1;
+		image.data.setXdim(Ihead.data.xdim);
+		image.data.setYdim(Ihead.data.ydim);
+		image.data.setZdim(1);
+		image.data.setNdim(1);
+		image.readData(pipe, -1 /* select_img*/, datatype, 0 /* pad */, true /* dont_seek*/);
+	}
+
+	~MRCBZ2Reader()
+	{
+		if (pipe != NULL)
+			fclose(pipe);
+	}
+
+	MRCBZ2Reader(const MRCBZ2Reader&) = delete;
 };
 
 // Some image-specific operations

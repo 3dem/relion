@@ -1,6 +1,6 @@
 /***************************************************************************
  *
- * Author: "Sjors H.W. Scheres"
+ * Author: "Sjors H.W. Scheres", "Takanori Nakane"
  * MRC Laboratory of Molecular Biology
  *
  * This program is free software; you can redistribute it and/or modify
@@ -140,22 +140,8 @@ int systype()
 	return type;
 }
 
-// I/O prototypes
-/** MRC Reader
-  * @ingroup MRC
-*/
-int readMRC(long int img_select, bool isStack=false, const FileName &name="")
+DataType parseMRCHeader(MRChead *header, long int img_select,  bool isStack=false, const FileName &name="")
 {
-#undef DEBUG
-//#define DEBUG
-#ifdef DEBUG
-	printf("DEBUG readMRC: Reading MRC file\n");
-#endif
-
-	MRChead *header = (MRChead*)askMemory(sizeof(MRChead));
-	if (fread(header, MRCSIZE, 1, fimg) < 1)
-		REPORT_ERROR("rwMRC: error in reading header of image " + name);
-
 	// Determine byte order and swap bytes if from little-endian machine
 	swap = 0;
 	char *b = (char*) header;
@@ -255,6 +241,27 @@ int readMRC(long int img_select, bool isStack=false, const FileName &name="")
 		MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, (RFLOAT)header->b / header->my);
 	if (header->mz && header->c != 0)//zx
 		MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, (RFLOAT)header->c / header->mz);
+
+	return datatype;
+}
+
+// I/O prototypes
+/** MRC Reader
+  * @ingroup MRC
+*/
+int readMRC(long int img_select, bool isStack=false, const FileName &name="")
+{
+#undef DEBUG
+//#define DEBUG
+#ifdef DEBUG
+	printf("DEBUG readMRC: Reading MRC file\n");
+#endif
+
+	MRChead *header = (MRChead*)askMemory(sizeof(MRChead));
+	if (fread(header, MRCSIZE, 1, fimg) < 1)
+		REPORT_ERROR("rwMRC: error in reading header of image " + name);
+
+	DataType datatype = parseMRCHeader(header, img_select, isStack, name);
 
 	if (isStack && dataflag<0) // Don't read the individual header and the data if not necessary
 	{

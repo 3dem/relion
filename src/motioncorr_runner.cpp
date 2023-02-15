@@ -1003,10 +1003,12 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	std::ofstream logfile;
 	logfile.open(fn_log);
 
-	// EER related things
+	// EER and MRC.BZ2 related things
 	// TODO: will be refactored
 	EERRenderer renderer;
-	const bool isEER = EERRenderer::isEER(mic.getMovieFilename());
+	const bool isEER = EERRenderer::isEER(fn_mic);
+	MRCBZ2Reader bz2reader;
+	const bool isMRCBZ2 = MRCBZ2Reader::isMRCBZ2(fn_mic);
 
 	int n_io_threads = n_threads;
 	logfile << "Working on " << fn_mic << " with " << n_threads << " thread(s)." << std::endl << std::endl;
@@ -1029,16 +1031,21 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	int nx, ny, nn;
 
 	// Check image size
-	if (!isEER)
-	{
-		Ihead.read(fn_mic, false, -1, false, true); // select_img -1, mmap false, is_2D true
-		nx = XSIZE(Ihead()); ny = YSIZE(Ihead()); nn = NSIZE(Ihead());
-	}
-	else
+	if (isEER)
 	{
 		renderer.read(fn_mic, eer_upsampling);
 		nx = renderer.getWidth(); ny = renderer.getHeight();
 		nn = renderer.getNFrames() / eer_grouping; // remaining frames are truncated
+	}
+	else if (isMRCBZ2)
+	{
+		bz2reader.read(fn_mic, n_io_threads);
+		nx = XSIZE(bz2reader.Ihead()); ny = YSIZE(bz2reader.Ihead()); nn = NSIZE(bz2reader.Ihead());
+	}
+	else
+	{
+		Ihead.read(fn_mic, false, -1, false, true); // select_img -1, mmap false, is_2D true
+		nx = XSIZE(Ihead()); ny = YSIZE(Ihead()); nn = NSIZE(Ihead());
 	}
 
 	// Which frame to use?
@@ -1113,12 +1120,14 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 
 	// Read images
 	RCTIC(TIMING_READ_MOVIE);
-	#pragma omp parallel for num_threads(n_io_threads)
+	#pragma omp parallel for num_threads(isMRCBZ2 ? 1 : n_io_threads)
 	for (int iframe = 0; iframe < n_frames; iframe++) {
-		if (!isEER)
-			Iframes[iframe].read(fn_mic, true, frames[iframe], false, true); // mmap false, is_2D true
-		else
+		if (isEER)
 			renderer.renderFrames(frames[iframe] * eer_grouping + 1, (frames[iframe] + 1) * eer_grouping, Iframes[iframe]());
+		else if (isMRCBZ2)
+			bz2reader.readFrameInto(Iframes[iframe], frames[iframe]);
+		else
+			Iframes[iframe].read(fn_mic, true, frames[iframe], false, true); // mmap false, is_2D true
 	}
 	RCTOC(TIMING_READ_MOVIE);
 
