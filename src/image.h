@@ -542,17 +542,6 @@ public:
 		return err;
 	}
 
-	/** Read a frame from a pipe that has already been opened
-	 *
-	 */
-	int readFrameFromOpenPipe(const FileName &name, fImageHandler &hFile, long int select_img, bool is_2D = false)
-	{
-		int err = 0;
-		err = _read(name, hFile, true, select_img, false, is_2D);
-		// Reposition file pointer for a next read
-		rewind(fimg);
-		return err;
-	}
 	/** General write function
 	 * select_img= which slice should I replace
 	 * overwrite = 0, append slice
