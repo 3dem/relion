@@ -1648,7 +1648,8 @@ class MRCBZ2Reader
 
 			if (fread(dummy, to_read, 1, pipe) < 1)
 			{
-				REPORT_ERROR("MRCBZ2Reader::skip(): failed to seek");
+				REPORT_ERROR("MRCBZ2Reader::skip(): failed to seek; current_frame = " +\
+				             integerToString(current_frame) + " byte = " + integerToString(byte));
 			}
 
 			byte -= to_read;
@@ -1695,7 +1696,7 @@ class MRCBZ2Reader
 		if (frame < current_frame)
 			REPORT_ERROR("MRCBZ2Reader::readFrameInto() cannot rewind a pipe.");
 		else if (frame > current_frame)
-			skip((size_t)Ihead.data.xdim * Ihead.data.ydim * (current_frame - frame) * gettypesize(datatype));
+			skip((size_t)Ihead.data.xdim * Ihead.data.ydim * (frame - current_frame) * gettypesize(datatype));
 
 		current_frame = frame + 1;
 		image.data.setXdim(Ihead.data.xdim);

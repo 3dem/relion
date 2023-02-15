@@ -48,8 +48,19 @@ BufferedImage<T> MovieLoader::readDense(
 			RFLOAT hot,
 			int num_threads)
 {
+	const bool isMRCBZ2 = MRCBZ2Reader::isMRCBZ2(movieFn);
+
+	MRCBZ2Reader bz2reader;
+
 	Image<float> mgStack;
-	mgStack.read(movieFn, false, -1, false, true); // final true means 2D movies, not 3D map
+	if (isMRCBZ2)
+	{
+		bz2reader.read(movieFn, num_threads);
+		// mgStack = bz2reader.Ihead() causes SEGV, because the array is not allocated.
+		mgStack().copyShape(bz2reader.Ihead());
+	}
+	else
+		mgStack.read(movieFn, false, -1, false, true); // final true means 2D movies, not 3D map
 
 	const std::string tag = "MovieLoader::readDense: ";
 
@@ -90,7 +101,11 @@ BufferedImage<T> MovieLoader::readDense(
 	for (long f = 0; f < fc; f++)
 	{
 		Image<float> muGraphFrame_xmipp;
-		muGraphFrame_xmipp.read(movieFn, true, frame0 + f, false, true);
+
+		if (isMRCBZ2)
+			bz2reader.readFrameInto(muGraphFrame_xmipp, frame0 + f);
+		else
+			muGraphFrame_xmipp.read(movieFn, true, frame0 + f, false, true);
 
 		RawImage<T> muGraphFrame(muGraphFrame_xmipp);
 
