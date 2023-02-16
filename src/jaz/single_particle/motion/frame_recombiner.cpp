@@ -320,7 +320,7 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 
 		// This is an ugly code duplication.
 		// Frame-by-frame reading (the normal route) is more memory efficient but
-		// calling loadMovie every frame is prohibitively slow for MRC.BZ2.
+		// calling loadMovie every frame is prohibitively slow for compressed MRC.
 		// Ideally, loadMovie should be refactored to take an existing
 		// CompressedMRCReader (and probably EERRenderer).
 		if (readAtOnce)

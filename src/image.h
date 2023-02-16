@@ -1578,13 +1578,13 @@ private:
 class CompressedMRCReader
 {
 /*
-	A class to read bzip2-ed MRC movies
+	A class to read compressed MRC movies
 
-	We use pbzip2, which must be in the PATH, to decompres in parallel.
-	pbzip2 can decompress in parallel only when the file was
-	compressed by pbzip2, not the original bzip2.
+	We use pbzip2/xz/zstd, which must be in the PATH, to decompress.
+	pbzip2 can decompress in parallel when the file was compressed by
+	pbzip2, not the original bzip2.
 
-	Since the bzip2 stream does not allow random access, we can only read frames
+	Since these compressed streams do not allow random access, we can only read frames
 	in sequence. We can read all frames or some frames in order
 	(e.g. 3, 4, 7, 8) but cannot go back (e.g. 3, 4, 1, 2).
 

@@ -1003,7 +1003,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	std::ofstream logfile;
 	logfile.open(fn_log);
 
-	// EER and MRC.BZ2 related things
+	// EER and compressed MRC related things
 	// TODO: will be refactored
 	EERRenderer renderer;
 	const bool isEER = EERRenderer::isEER(fn_mic);
