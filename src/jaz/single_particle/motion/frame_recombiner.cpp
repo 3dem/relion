@@ -285,8 +285,8 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 		priorShift = MotionHelper::readTracksInPix(fn_root + "_tracks.star", angpix_out[ogmg]);
 
 		const std::string movieFn = micrographHandler->getMovieFilename(mdtOut);
-		const bool isMRCBZ2 = MRCBZ2Reader::isMRCBZ2(movieFn);
-		const bool readAtOnce = isMRCBZ2;
+		const bool isCompressedMRC = CompressedMRCReader::isCompressedMRC(movieFn);
+		const bool readAtOnce = isCompressedMRC;
 
 		std::vector<std::vector<d2Vector>> shift(pc);
 			
@@ -322,7 +322,7 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 		// Frame-by-frame reading (the normal route) is more memory efficient but
 		// calling loadMovie every frame is prohibitively slow for MRC.BZ2.
 		// Ideally, loadMovie should be refactored to take an existing
-		// MRCBZ2Reader (and probably EERRenderer).
+		// CompressedMRCReader (and probably EERRenderer).
 		if (readAtOnce)
 		{
 			std::vector<std::vector<Image<Complex>>> fullFrame = micrographHandler->loadMovie(

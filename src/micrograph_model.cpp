@@ -564,9 +564,9 @@ void Micrograph::setMovie(FileName fnMovie, FileName fnGain, RFLOAT binning)
 	{
 		Image<float> Ihead;
 
-		if (MRCBZ2Reader::isMRCBZ2(fnMovie))
+		if (CompressedMRCReader::isCompressedMRC(fnMovie))
 		{
-			MRCBZ2Reader reader;
+			CompressedMRCReader reader;
 			reader.read(fnMovie, 1);
 			Ihead().copyShape(reader.Ihead());
 		}

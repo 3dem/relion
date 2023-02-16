@@ -1427,8 +1427,8 @@ private:
 		if (ext_name.contains("spi") || ext_name.contains("xmp")  ||
 			ext_name.contains("stk") || ext_name.contains("vol"))
 			err = readSPIDER(select_img);
-		else if (ext_name.contains("bz2"))
-			REPORT_ERROR("BUG: bzip2-ed movies should be handled by MRCBZ2Reader, not by Image.");
+		else if (ext_name.contains("bz2") || ext_name.contains("xz") || ext_name.contains("zst"))
+			REPORT_ERROR("BUG: compressed MRC movies should be handled by CompressedMRCReader, not by Image.");
 		else if (ext_name.contains("mrcs") || (is_2D && ext_name.contains("mrc")) || //mrc stack MUST go BEFORE plain MRC
 				ext_name.contains("st")) //stk stack MUST go BEFORE plain st
 			err = readMRC(select_img, true, name);
@@ -1575,7 +1575,7 @@ private:
 	}
 };
 
-class MRCBZ2Reader
+class CompressedMRCReader
 {
 /*
 	A class to read bzip2-ed MRC movies
@@ -1592,7 +1592,7 @@ class MRCBZ2Reader
 
 	Typical usage is:
 
-	MRCBZ2Reader reader;
+	CompressedMRCReader reader;
 	reader.read("XXX.mrc.bz2", n_threads);
 	
 	// Image size is accessible via reader.Ihead()
@@ -1608,23 +1608,21 @@ class MRCBZ2Reader
 	public:
 
 	FILE *pipe;
+	std::string commandline;
 	// This is only to read the header. The type doesn't matter.
 	Image<float> Ihead;
 	int current_frame;
 	DataType datatype;
 
-	static bool isMRCBZ2(FileName filename)
+	static bool isCompressedMRC(FileName filename)
 	{
-		if (filename.length() < 9)
-			return false;
-
-		return filename.substr(filename.length() - 8, 8) == ".mrc.bz2";
+		return filename.endsWith(".mrc.bz2") || filename.endsWith(".mrc.xz") || filename.endsWith(".mrc.zst");
 	}
 
 	void skip(size_t byte)
 	{
 		if (pipe == NULL)
-			REPORT_ERROR("MRCBZ2Reader::skip() called before a file is opened.");
+			REPORT_ERROR("CompressedMRCReader::skip() called before a file is opened.");
 
 		const size_t blocksize = 10000000; // 10 MB
 		char *dummy = new char[blocksize]; // use heap to avoid stack overflow
@@ -1637,8 +1635,9 @@ class MRCBZ2Reader
 
 			if (fread(dummy, to_read, 1, pipe) < 1)
 			{
-				REPORT_ERROR("MRCBZ2Reader::skip(): failed to seek; current_frame = " +\
-				             integerToString(current_frame) + " byte = " + integerToString(byte));
+				REPORT_ERROR("CompressedMRCReader::skip(): failed to seek; current_frame = " +\
+				             integerToString(current_frame) + " byte = " + integerToString(byte) +\
+				             "\nCommand line for the pipe: " + commandline);
 			}
 
 			byte -= to_read;
@@ -1647,7 +1646,7 @@ class MRCBZ2Reader
 		delete[] dummy;
 	}
 
-	MRCBZ2Reader()
+	CompressedMRCReader()
 	{
 		pipe = NULL;
 	}
@@ -1655,21 +1654,32 @@ class MRCBZ2Reader
 	void read(FileName filename, int n_threads)
 	{
 		if (pipe != NULL)
-			REPORT_ERROR("MRCBZ2Reader::read() called twice.");
+			REPORT_ERROR("CompressedMRCReader::read() called twice.");
 
 		// -c: to stdout, -d: decompress. -k: keep the original, -p: number of threads
+		if (filename.endsWith("bz2"))
+			commandline = "pbzip2 -cdkp" + integerToString(n_threads);
+		else if (filename.endsWith("xz"))
+			commandline = "xz -cdk";
+		else if (filename.endsWith("zst"))
+			commandline = "zstd -cdk";
+		else
+			REPORT_ERROR("CompressedMRCReader: Unknown file extension in " + filename);
+
 		// I'm not sure if discarding STDERR is the right thing to do but
 		// without this there are too many false alarms ("ERROR: Unexpected error. Aborting!")
 		// when the pipe is closed without reading all frames.
-		std::string commandline = "pbzip2 -cdkp" + integerToString(n_threads) + " " + filename + " 2>/dev/null";
+		commandline += " " + filename + " 2>/dev/null";
 		pipe = popen(commandline.c_str(), "r");
 		if (pipe == NULL)
-			REPORT_ERROR("MRCBZ2Reader: error in opening decompression pipe for " + filename +\
-				     ". Do you have pbzip2 in the PATH? Is the movie accessible and intact?");
+			REPORT_ERROR("CompressedMRCReader: error in opening decompression pipe for " + filename +\
+				     ". Do you have pbzip2, xz, zstd in the PATH? Is the movie accessible and intact?\n" + \
+				     "Command line for the pipe: " + commandline);
 
 		Image<float>::MRChead *header = new Image<float>::MRChead();
 		if (fread(header, MRCSIZE, 1, pipe) < 1)
-			REPORT_ERROR("MRCBZ2Reader: error in reading header of image " + filename);
+			REPORT_ERROR("CompressedMRCReader: error in reading header of image " + filename + \
+			             "Command line for the pipe: " + commandline);
 		datatype = Ihead.parseMRCHeader(header, -1, true /* isStack */, filename);
 		this->skip(header->nsymbt);
 		current_frame = 0;
@@ -1680,11 +1690,11 @@ class MRCBZ2Reader
 	void readFrameInto(Image<T> &image, size_t frame)
 	{
 		if (pipe == NULL)
-			REPORT_ERROR("MRCBZ2Reader::readFrameInto() called before a file is opened.");
-//		std::cout << "MRCBZ2Reader::readFrameInto(): frame = " << frame << " current_frame = " << current_frame << std::endl;
+			REPORT_ERROR("CompressedMRCReader::readFrameInto() called before a file is opened.");
+//		std::cout << "CompressedMRCReader::readFrameInto(): frame = " << frame << " current_frame = " << current_frame << std::endl;
 
 		if (frame < current_frame)
-			REPORT_ERROR("MRCBZ2Reader::readFrameInto() cannot rewind a pipe.");
+			REPORT_ERROR("CompressedMRCReader::readFrameInto() cannot rewind a pipe.");
 		else if (frame > current_frame)
 			skip((size_t)Ihead.data.xdim * Ihead.data.ydim * (frame - current_frame) * gettypesize(datatype));
 
@@ -1693,16 +1703,20 @@ class MRCBZ2Reader
 		image.data.setYdim(Ihead.data.ydim);
 		image.data.setZdim(1);
 		image.data.setNdim(1);
-		image.readData(pipe, -1 /* select_img*/, datatype, 0 /* pad */, true /* dont_seek*/);
+
+		const int ret = image.readData(pipe, -1 /* select_img*/, datatype, 0 /* pad */, true /* dont_seek*/);
+		if (ret == -2)
+			REPORT_ERROR((std::string)"CompressedMRCReader::readFrameInto() failed to read data from the pipe.\n" + \
+			             "Command line for the pipe: " + commandline);
 	}
 
-	~MRCBZ2Reader()
+	~CompressedMRCReader()
 	{
 		if (pipe != NULL)
 			fclose(pipe);
 	}
 
-	MRCBZ2Reader(const MRCBZ2Reader&) = delete;
+	CompressedMRCReader(const CompressedMRCReader&) = delete;
 };
 
 // Some image-specific operations
