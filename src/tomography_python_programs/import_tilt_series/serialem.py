@@ -11,7 +11,7 @@ from rich.progress import track
 
 from ._cli import cli
 from .. import _utils
-from .._utils.mdoc import calculate_pre_exposure_dose, basename_from_sub_frame_path
+from .._utils.mdoc import calculate_pre_exposure_dose, basename_from_sub_frame_path, remove_missing_images
 from .._utils.relion import relion_pipeline_job
 from .._utils.file import match_filenames
 
@@ -162,8 +162,9 @@ def _generate_tilt_image_dataframe(
     )
     df['sub_frame_basename'] = df['SubFramePath'].apply(basename_from_sub_frame_path)
     df['tilt_image_file'] = match_filenames(df['sub_frame_basename'], to_match=tilt_image_files)
-    df = df[df['tilt_image_file'] != None]
     df['nominal_tilt_axis_angle'] = nominal_tilt_axis_angle
+    if df['tilt_image_file'].isnull().any():
+        df = remove_missing_images(df, mdoc_file)
 
     output_df = pd.DataFrame({
         'rlnTomoNominalStageTiltAngle': df['TiltAngle'],

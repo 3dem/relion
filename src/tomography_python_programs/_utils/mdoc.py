@@ -1,5 +1,6 @@
 import os
 import warnings
+import rich
 from pathlib import Path
 from typing import Optional
 
@@ -47,3 +48,13 @@ def construct_tomogram_id(mdoc_file: Path, prefix: str) -> str:
         return f'{basename(mdoc_file)}'
     else:
         return f'{prefix}_{basename(mdoc_file)}'
+
+
+def remove_missing_images(df: pd.DataFrame, mdoc_file: Path) -> pd.DataFrame:
+    """Removes images from dataframe if image specified in mdoc file cannot be found, and warns user"""
+    console = rich.console.Console(record=True)
+    missing_images =  df['SubFramePath'].loc[df['tilt_image_file'].isnull()] 
+    for missing_image in missing_images:
+        missing_image = Path(str(missing_image).split("\\")[-1])
+        console.log(f'WARNING: Image {missing_image} from {mdoc_file} not found in image files.')
+    return df[df['tilt_image_file'].notna()]
