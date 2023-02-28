@@ -22,6 +22,7 @@ def tomogram_viewer(
         dock_widget, name='RELION tomogram viewer', area='left'
     )
     viewer.axes.visible = True
+    viewer.axes.labels = False
     viewer.camera.angles = (-15, 30, 150)
     viewer.camera.zoom *= 0.7
     viewer.text_overlay.text = """
