@@ -4612,6 +4612,8 @@ void MlOptimiser::maximization()
 							mymodel.tau2_class[iclass],
 							mymodel.sigma2_class[iclass],
 							mymodel.data_vs_prior_class[iclass],
+							mymodel.pixel_size,
+							particle_diameter,
 							(do_join_random_halves || do_always_join_random_halves),
 							mymodel.tau2_fudge_factor,
 							1); // verbose
