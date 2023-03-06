@@ -1616,7 +1616,8 @@ class CompressedMRCReader
 
 	static bool isCompressedMRC(FileName filename)
 	{
-		return filename.endsWith(".mrc.bz2") || filename.endsWith(".mrc.xz") || filename.endsWith(".mrc.zst");
+		return filename.endsWith(".mrc.bz2") || filename.endsWith(".mrc.xz") || filename.endsWith(".mrc.zst")
+		    || filename.endsWith(".mrcs.bz2") || filename.endsWith(".mrcs.xz") || filename.endsWith(".mrcs.zst");
 	}
 
 	void skip(size_t byte)
