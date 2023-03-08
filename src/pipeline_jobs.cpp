@@ -6580,7 +6580,7 @@ void RelionJob::initialiseTomoDenoiseTomogramsJob()
     joboptions["ntiles_y"] = JobOption("Number of tiles - Y:", std::string("2"), "Number of tiles to use in denoised tomogram generation (X, Y, and Z dimension)");
     joboptions["ntiles_z"] = JobOption("Number of tiles - Z:", std::string("2"), "Number of tiles to use in denoised tomogram generation (X, Y, and Z dimension). Default is 2,2,2. Increase if you get a Out of Memory (OOM) error in prediction. For us, 8,8,8 works well on a Nvidia GeForce RTX 2080.");
     
-    joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "Provide a list of which GPUs (e.g. 0:1:2:3) to use in CryoCARE. MPI-processes are separated by ':'. For example, to place one rank on device 0 and one rank on device 1, provide '0:1'.");
+    joboptions["gpu_ids"] = JobOption("Which GPU to use:", std::string(""), "State which GPU (e.g. 0) to use in CryoCARE. Only a single GPU can be used. This must be provided.");
 }
 
 bool RelionJob::getCommandsTomoDenoiseTomogramsJob(std::string &outputname, std::vector<std::string> &commands,
@@ -6640,33 +6640,28 @@ bool RelionJob::getCommandsTomoDenoiseTomogramsJob(std::string &outputname, std:
     Node node2(outputname+"tomograms.star", LABEL_TOMO_TOMOGRAMS);
     outputNodes.push_back(node2);  
     
-    if (joboptions["gpu_ids"].getString().length() >= 2)
-    // iterate over gpu ids and append separate --gpu args
+    if (joboptions["gpu_ids"].getString().length() > 0)
     {
         std::string s = joboptions["gpu_ids"].getString();
-        std::string delimiter = ":";
-
-	size_t last = 0;
-	size_t next = 0;
-        while ((next = s.find(delimiter, last)) != std::string::npos)
-        {
-            command += " --gpu " + s.substr(last, next-last) + ' ';
-	    last = next + 1;
-        }
-	command += " --gpu " + s.substr(last) + ' ';
+	if (s.find(':') != std::string::npos || s.find(',') != std::string::npos) 
+	{
+	    error_message = "ERROR: cryoCARE cannot currently use MPI or multiple GPUs in parallel. Only select one GPU.";
+	    return false;
+	}
+	else
+	    command += " --gpu " + joboptions["gpu_ids"].getString() + ' ';
     }
-    else if (joboptions["gpu_ids"].getString().length() > 0)
+    else
     {
-        command += " --gpu " + joboptions["gpu_ids"].getString() + ' ';
+        error_message = "ERROR: You must state desired GPU ID.";
+	return false;
     }
- 
     if (joboptions["tomograms_for_training"].getString().length() > 0 && joboptions["do_cryocare_train"].getBoolean())
     {    
 	command += " --training-tomograms " + joboptions["tomograms_for_training"].getString();
         command += " --number-training-subvolumes " + joboptions["number_training_subvolumes"].getString();
         command += " --subvolume-sidelength " + joboptions["subvolume_dimensions"].getString();
     }       
-
     if (joboptions["denoising_tomo_name"].getString().length() > 0 && joboptions["do_cryocare_predict"].getBoolean())
     {    
 	command += " --tomogram-name " + joboptions["denoising_tomo_name"].getString();
@@ -6675,7 +6670,6 @@ bool RelionJob::getCommandsTomoDenoiseTomogramsJob(std::string &outputname, std:
     {
         command += " --model-file " + joboptions["care_denoising_model"].getString();
     }
-
     if (joboptions["ntiles_x"].getString().length() > 0 && joboptions["ntiles_y"].getString().length() > 0 && joboptions["ntiles_z"].getString().length() > 0 && joboptions["do_cryocare_predict"].getBoolean())
     {
     	command += " --n-tiles " + joboptions["ntiles_x"].getString() + " " + joboptions["ntiles_y"].getString() + " " + joboptions["ntiles_z"].getString() + " ";
