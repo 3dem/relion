@@ -6651,6 +6651,11 @@ bool RelionJob::getCommandsTomoDenoiseTomogramsJob(std::string &outputname, std:
 	else
 	    command += " --gpu " + joboptions["gpu_ids"].getString() + ' ';
     }
+    else
+    {
+        error_message = "ERROR: You must state desired GPU ID.";
+	return false;
+    }
     if (joboptions["tomograms_for_training"].getString().length() > 0 && joboptions["do_cryocare_train"].getBoolean())
     {    
 	command += " --training-tomograms " + joboptions["tomograms_for_training"].getString();
