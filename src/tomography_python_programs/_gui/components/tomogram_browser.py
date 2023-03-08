@@ -57,8 +57,8 @@ class TomogramBrowserWidget(QWidget):
         self._selected_tilt_series = value
 
     def _on_tomogram_selection_change(self):
-        self.selected_tilt_series = self.tilt_series_list_widget.selected_tilt_series_in_view()
         self.changing_tomogram.emit()
+        self.selected_tilt_series = self.tilt_series_list_widget.selected_tilt_series_in_view()
         self._load_tomogram(self.selected_tilt_series.name, add_to_viewer=True)
         self._preload_next_tomograms()
 
