@@ -43,7 +43,7 @@ def generate_training_tomograms_star(
     """
     training_tomograms_idx = pd.DataFrame(global_star.rlnTomoName.tolist()).isin(training_tomograms).values
     if not any(training_tomograms_idx):
-        e = f"Could not user specified training tomograms ({', '.join(str(x) for x in training_tomograms)}) in tilt series star file"
+        e = f"Could not user specified training tomograms ({', '.join(str(x) for x in training_tomograms)}) in tomogram star file"
         raise RuntimeError(e)
     training_tomograms_star = global_star[training_tomograms_idx]
     return training_tomograms_star
@@ -60,7 +60,7 @@ def find_tomogram_halves(
     else:
         training_tomograms_idx = training_tomograms_star.index[(training_tomograms_star['rlnTomoName'] == tomo_name)]
         if len(training_tomograms_idx) == 0:
-            e = f"Could not user specified tomogram rlnTomoName {tomo_name} in tilt series star file"
+            e = f"Could not user specified tomogram rlnTomoName {tomo_name} in tomogram star file"
             raise RuntimeError(e)
         training_tomograms_star = training_tomograms_star.loc[training_tomograms_idx]
         return training_tomograms_star['rlnTomoReconstructedTomogramHalf1'].values.tolist(), training_tomograms_star['rlnTomoReconstructedTomogramHalf2'].values.tolist()

@@ -88,7 +88,7 @@ void AlignTiltseriesRunner::initialise(bool is_leader)
     // Check if this is a TomographyExperiment starfile, if not raise an error
     if (!tomogramSet.read(fn_in, 1))
     {
-        REPORT_ERROR("ERROR: the input file is not a valid tomograms.star file");
+        REPORT_ERROR("ERROR: the input file is not a valid tilt series star file");
     }
 
 	idx_tomograms_all.clear();

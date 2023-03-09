@@ -1,10 +1,11 @@
 from pathlib import Path
 from typing import Optional, List
+from rich.console import Console
 
 import starfile
-import rich
 import typer
 import subprocess
+import os
 
 from ._utils import (
     create_denoising_directory_structure,
@@ -21,33 +22,34 @@ from .constants import TRAIN_CONFIG_PREFIX, TRAIN_DATA_CONFIG_PREFIX, MODEL_NAME
 from .._cli import cli
 from ..._utils.relion import relion_pipeline_job
 
-console = rich.console.Console(record=True)
+console = Console(record=True)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  
 
 
 @cli.command(name='cryoCARE:train')
 @relion_pipeline_job
 def cryoCARE_train(
-        tilt_series_star_file: Path = typer.Option(...),
+        tomogram_star_file: Path = typer.Option(...),
         output_directory: Path = typer.Option(...),
         training_tomograms: Optional[str] = typer.Option(None),
         number_training_subvolumes: int = typer.Option(1200),
         subvolume_sidelength: int = typer.Option(72),
         gpu: Optional[List[int]] = typer.Option(None)
 ):
-    """Train a denoising model using cryoCARE (>=v0.2.0)
+    """Train a denoising model using cryoCARE (>=v0.2.1)
     
     Requires that two tomograms have been generated using the same sample.
     These can be generated via taking odd/even frames during motion correction
     (optimal) or by taking odd/even tilts during tomogram reconstruction.
 
-    The location of tomograms should be specified in the global star file for all tilt series with the headers:
+    The location of tomograms should be specified in the tomogram star file for all tilt series with the headers:
     `rlnTomoReconstructedTomogramHalf1` and `rlnTomoReconstructedTomogramHalf2`.
 
 
     Parameters
     ----------
-    tilt_series_star_file: Path
-        RELION tilt-series STAR file.
+    tomogram_star_file: Path
+        RELION global tomogram STAR file from a RELION Reconstruct Tomogram job.
     output_directory: Path
         directory in which results will be stored.
     training_tomograms: Optional[str]
@@ -65,15 +67,15 @@ def cryoCARE_train(
     gpu: Optional[List[int]]
         Specify which GPU to use.
     """
-    if not tilt_series_star_file.exists():
-        e = 'Could not find tilt series star file'
+    if not tomogram_star_file.exists():
+        e = 'Could not find tomogram star file'
         console.log(f'ERROR: {e}')
         raise RuntimeError(e)
 
-    global_star = starfile.read(tilt_series_star_file, always_dict=True)['global']
+    global_star = starfile.read(tomogram_star_file, always_dict=True)['global']
 
     if not 'rlnTomoReconstructedTomogramHalf1' in global_star.columns:
-        e = 'Could not find rlnTomoReconstructedTomogramHalf1 in tilt series star file.'
+        e = 'Could not find rlnTomoReconstructedTomogramHalf1 in tomogram star file.'
         console.log(f'ERROR: {e}')
         raise RuntimeError(e)
 
@@ -109,7 +111,7 @@ def cryoCARE_train(
     )
 
     cmd = f"cryoCARE_extract_train_data.py --conf {training_dir}/{TRAIN_DATA_CONFIG_PREFIX}.json"
-    subprocess.run(cmd, shell=True)
+    subprocess.run(cmd, shell=True, stderr=subprocess.STDOUT)
 
     train_config_json = generate_train_config_json(
         training_dir=training_dir,
@@ -141,7 +143,7 @@ def cryoCARE_train(
         console.log(f'Finished training denoise model.')
         console.log(f'Denoising model can be found in {output_directory}/{MODEL_NAME}.tar.gz')
     else:
-        e = f'Could not find denoise model ({MODEL_NAME}.tar.gz) in {output_directory}'
+        e = f'Could not find denoise model ({MODEL_NAME}.tar.gz) in {output_directory}. Training has likely failed.'
         raise RuntimeError(e)
 
     console.save_html(str(output_directory / 'log.html'), clear=False)

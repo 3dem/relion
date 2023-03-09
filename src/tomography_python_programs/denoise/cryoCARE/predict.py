@@ -1,10 +1,11 @@
 from pathlib import Path
 from typing import Optional, Tuple, List
+from rich.console import Console
 
 import starfile
-import rich
 import typer
 import subprocess
+import os
 
 from ._utils import (
     create_denoising_directory_structure,
@@ -20,13 +21,13 @@ from .constants import PREDICT_CONFIG_PREFIX, EVEN_SUFFIX
 from .._cli import cli
 from ..._utils.relion import relion_pipeline_job
 
-console = rich.console.Console(record=True)
-
+console = Console(record=True)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'  
 
 @cli.command(name='cryoCARE:predict')
 @relion_pipeline_job
 def cryoCARE_predict(
-        tilt_series_star_file: Path = typer.Option(...),
+        tomogram_star_file: Path = typer.Option(...),
         output_directory: Path = typer.Option(...),
         model_file: Path = typer.Option(...),
         n_tiles: Optional[Tuple[int, int, int]] = typer.Option((1, 1, 1)),
@@ -34,20 +35,20 @@ def cryoCARE_predict(
         gpu: Optional[List[int]] = typer.Option(None)
 
 ):
-    """Denoise tomograms using cryoCARE (>=v0.2.0).
+    """Denoise tomograms using cryoCARE (>=v0.2.1).
     
     Requires that two tomograms have been generated using the same sample.
     These can be generated via taking odd/even frames during motion correction
     (optimal) or by taking odd/even tilts during tomogram reconstruction.
 
     The location of these tomograms should be specified in the
-    global star file for all tilt series with the headers:
+    global star file for all tomograms with the headers:
     `rlnTomoReconstructedTomogramHalf1` and `rlnTomoReconstructedTomogramHalf2`.
 
     Parameters
     ----------
-    tilt_series_star_file: Path
-        RELION tilt-series STAR file.
+    tomogram_star_file: Path
+        RELION tomogram STAR file from a RELION Reconstruct Tomogram job.
     output_directory: Path
         directory in which results will be stored.
     model_file: Path
@@ -67,12 +68,12 @@ def cryoCARE_predict(
         times with a different GPU after each.
         e.g. `--gpu 0 --gpu 1`
     """
-    if not tilt_series_star_file.exists():
-        e = 'Could not find tilt series star file'
+    if not tomogram_star_file.exists():
+        e = 'Could not find tomogram star file'
         console.log(f'ERROR: {e}')
         raise RuntimeError(e)
 
-    global_star = starfile.read(tilt_series_star_file, always_dict=True)['global']
+    global_star = starfile.read(tomogram_star_file, always_dict=True)['global']
 
     if not model_file.exists():
         e = f'Could not find denoise model'
@@ -80,7 +81,7 @@ def cryoCARE_predict(
         raise RuntimeError(e)
 
     if not 'rlnTomoReconstructedTomogramHalf1' in global_star.columns:
-        e = 'Could not find rlnTomoReconstructedTomogramHalf1 in tilt series star file.'
+        e = 'Could not find rlnTomoReconstructedTomogramHalf1 in tomogram star file.'
         console.log(f'ERROR: {e}')
         raise RuntimeError(e)
     training_dir, tomogram_dir, tilt_series_dir = \
@@ -106,7 +107,7 @@ def cryoCARE_predict(
 
     console.log('Generating denoised tomograms')
     cmd = f"cryoCARE_predict.py --conf {training_dir}/{PREDICT_CONFIG_PREFIX}.json"
-    subprocess.run(cmd, shell=True)
+    subprocess.run(cmd, shell=True, stderr=subprocess.STDOUT)
     rename_predicted_tomograms(
         even_tomos=even_tomos,
         tomogram_dir=tomogram_dir,
