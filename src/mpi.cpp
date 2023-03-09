@@ -157,6 +157,9 @@ MpiNode::MpiNode(int &argc, char ** argv)
 		else
 			coll_blocksize = defBlock;
 	}
+	// Make it multiple of 8 bytes
+	p2p_blocksize = (p2p_blocksize / 8ULL) * 8ULL;
+	coll_blocksize = (coll_blocksize / 8ULL) * 8ULL;
 
 	if (rank == 0)
 	{
