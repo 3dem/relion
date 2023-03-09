@@ -1916,7 +1916,7 @@ void MlOptimiserMpi::combineWeightedSumsTwoRandomHalves()
 		{
 			if (verb > 0) std::cout << " Combining two random halves ..."<< std::endl;
 			wsum_model.pack(Mpack);
-			Msum.initZeros(Mpack);
+			Msum.resize(wsum_model.getPackSize());
 			node->relion_MPI_Recv(MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MY_MPI_DOUBLE, 2, MPITAG_PACK, MPI_COMM_WORLD, status);
 			Mpack += Msum;
 		}
