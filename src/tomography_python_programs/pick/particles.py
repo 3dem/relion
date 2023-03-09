@@ -38,7 +38,7 @@ class PickIsolatedParticlesWidget(QWidget):
         self.save_button.setToolTip(
             'save particles for the current tomogram to disk.'
         )
-        self.annotator = n3d.annotators.PointAnnotator(
+        self.annotator = PointAnnotator(
             viewer=viewer, enabled=True
         )
 
