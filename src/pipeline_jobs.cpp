@@ -477,7 +477,8 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
             type != PROC_TOMO_ALIGN_TILTSERIES &&
             type != PROC_TOMO_RECONSTRUCT_TOMOGRAM &&
             type != PROC_TOMO_DENOISE_TOMOGRAM &&
-			type != PROC_TOMO_RECONSTRUCT &&
+            type != PROC_TOMO_PICK_TOMOGRAM &&
+            type != PROC_TOMO_RECONSTRUCT &&
 			type != PROC_TOMO_EXCLUDE_TILT_IMAGES &&
             type != PROC_BUILD_MODEL &&
             type != PROC_EXTERNAL)
@@ -894,7 +895,12 @@ void RelionJob::initialise(int _job_type)
         has_mpi = has_thread = false;
         initialiseTomoDenoiseTomogramsJob();
     }
-else if (type == PROC_TOMO_EXCLUDE_TILT_IMAGES)
+    else if (type == PROC_TOMO_PICK_TOMOGRAM)
+    {
+        has_mpi = has_thread = false;
+        initialiseTomoPickTomogramsJob();
+    }
+    else if (type == PROC_TOMO_EXCLUDE_TILT_IMAGES)
     {
         has_mpi = has_thread = false;
         initialiseTomoExcludeTiltImagesJob();
@@ -1171,11 +1177,13 @@ bool RelionJob::getCommands(std::string &outputname, std::vector<std::string> &c
     {
         result = getCommandsTomoDenoiseTomogramsJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
     }
-
+    else if (type == PROC_TOMO_PICK_TOMOGRAM)
+    {
+        result = getCommandsTomoPickTomogramsJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
+    }
     else if (type == PROC_TOMO_RECONSTRUCT)
 	{
-		result = getCommandsTomoReconPartJob(outputname, commands, final_command, do_makedir, job_counter,
-											 error_message);
+		result = getCommandsTomoReconPartJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
 	else if (type == PROC_BUILD_MODEL)
 	{
@@ -6682,12 +6690,66 @@ bool RelionJob::getCommandsTomoDenoiseTomogramsJob(std::string &outputname, std:
     return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
 
+void RelionJob::initialiseTomoPickTomogramsJob()
+{
+    hidden_name = ".gui_tomo_pick_tomogram";
+
+    joboptions["in_tomoset"] = JobOption("Input tomograms.star:", OUTNODE_TOMO_TOMOGRAMS, "", "STAR files (*.star)",  "Input tomograms star file that contains the reconstructed tomograms in which to pick particles. ");
+    //joboptions["cache_size"] = JobOption("Number of cached tomograms:", 5, 1, 10, 1, "This controls the number of cached tomograms in Napari.");
+
+ 	joboptions["pick_mode"] = JobOption("Picking mode:", job_tomo_pick_mode, 1, "Type of picking mode to use: particles, spheres or (todo:) cylinders.");
+
+}
+bool RelionJob::getCommandsTomoPickTomogramsJob(std::string &outputname, std::vector<std::string> &commands,
+                                       std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
+{
+    commands.clear();
+    initialisePipeline(outputname, job_counter);
+    std::string command;
+
+    if (error_message != "") return false;
+
+    command="`which relion_tomo_pick` ";
+
+    if (joboptions["in_tomoset"].getString() == "")
+    {
+        error_message = "ERROR: you need to provide an input STAR file";
+        return false;
+    }
+
+    if (joboptions["pick_mode"].getString() == "surfaces" || joboptions["pick_mode"].getString() == "filaments")
+    {
+        error_message = "ERROR: sorry 'surfaces/filaments' picking is yet to be implemented. Please bear with us...";
+        return false;
+    }
+
+    command += " " + joboptions["pick_mode"].getString();
+    command += " --tilt-series-star-file " + joboptions["in_tomoset"].getString();
+    //command += " --cache-size " + joboptions["cache_size"].getString() + ' ';
+
+    Node node(joboptions["in_tomoset"].getString(), joboptions["in_tomoset"].node_type);
+    inputNodes.push_back(node);
+
+    command += " --output-directory " + outputname;
+    Node node2(outputname+"annotations.star", LABEL_TOMO_PARTS);
+    outputNodes.push_back(node2);
+
+    // Other arguments for extraction
+    command += " " + joboptions["other_args"].getString();
+    commands.push_back(command);
+
+    return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
+
+
+}
+
 void RelionJob::initialiseTomoExcludeTiltImagesJob()
 {
     hidden_name = ".gui_tomo_exclude_tilt_images";
 
     joboptions["in_tiltseries"] = JobOption("Input tilt series:", OUTNODE_TOMO_TILTSERIES, "", "STAR files (*.star)",  "Input global tilt series star file.");
     joboptions["cache_size"] = JobOption("Number of cached tilt series ", 5, 1, 10, 1, "This controls the number of cached tilt series in Napari.");
+
 }
 
 bool RelionJob::getCommandsTomoExcludeTiltImagesJob(std::string &outputname, std::vector<std::string> &commands,
