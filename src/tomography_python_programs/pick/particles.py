@@ -11,6 +11,7 @@ from ._cli import cli
 from .._metadata_models.relion.tilt_series_set import TiltSeriesSet
 from .._metadata_models.gui.tilt_series_set import TiltSeriesSet as GuiTiltSeriesSet
 from .._gui.components.tomogram_browser import TomogramBrowserWidget
+from .._utils.relion import relion_pipeline_job
 
 COMMAND_NAME = 'particles'
 
@@ -101,6 +102,7 @@ class PickIsolatedParticlesWidget(QWidget):
 
 
 @cli.command(name=COMMAND_NAME, no_args_is_help=True)
+@relion_pipeline_job
 def pick_isolated_particles_cli(
     tilt_series_star_file: Path = Option(...),
     output_directory: Path = Option(...),
