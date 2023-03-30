@@ -21,6 +21,7 @@
 //#define DEBUG_SAMPLING
 //#define DEBUG_CHECKSIZES
 //#define DEBUG_HELICAL_ORIENTATIONAL_SEARCH
+#define FIBO
 
 void HealpixSampling::clear()
 {
@@ -497,8 +498,11 @@ void HealpixSampling::setOrientations(int _order, RFLOAT _psi_step)
 		RFLOAT rot, tilt;
 		for (long int ipix = 0; ipix < healpix_base.Npix(); ipix++)
 		{
-			getDirectionFromHealPix(ipix, rot, tilt);
-
+#ifdef FIBO
+            getDirectionFromFibo(ipix, healpix_base.Npix(), rot, tilt);
+#else
+            getDirectionFromHealPix(ipix, rot, tilt);
+#endif
 			// Push back as Matrix1D's in the vectors
 			rot_angles.push_back(rot);
 			tilt_angles.push_back(tilt);
@@ -1534,6 +1538,19 @@ void HealpixSampling::checkDirection(RFLOAT &rot, RFLOAT &tilt)
 
 }
 
+#ifdef FIBO
+void HealpixSampling::getDirectionFromFibo(long int ipix, int npix, RFLOAT &rot, RFLOAT &tilt)
+{
+    static const float GOLDEN_RATIO = (1 + sqrt(5)) / 2;
+    static const float eps = 0.36;
+
+    rot = RAD2DEG(2 * PI * ipix / GOLDEN_RATIO);
+    tilt = ACOSD(1 - 2 * (ipix + eps) / (npix - 1 + 2 * eps));
+
+    // The geometrical considerations about the symmetry below require that rot = [-180,180] and tilt [0,180]
+    checkDirection(rot, tilt);
+}
+#else
 void HealpixSampling::getDirectionFromHealPix(long int ipix, RFLOAT &rot, RFLOAT &tilt)
 {
     // this one always has to be double (also for SINGLE_PRECISION CALCULATIONS) for call to external library
@@ -1546,6 +1563,8 @@ void HealpixSampling::getDirectionFromHealPix(long int ipix, RFLOAT &rot, RFLOAT
     checkDirection(rot, tilt);
 
 }
+#endif // FIBO
+
 
 RFLOAT HealpixSampling::getTranslationalSampling(int adaptive_oversampling)
 {

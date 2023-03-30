@@ -20,6 +20,7 @@
 
 #ifndef _HEALPIX_SAMPLING_HH
 #define _HEALPIX_SAMPLING_HH
+#define FIBO
 
 #include "src/Healpix_2.15a/healpix_base.h"
 #include "src/metadata_table.h"
@@ -274,7 +275,11 @@ public:
     /* Get the rot and tilt angles in the center of the ipix'th HEALPix sampling pixel
      * This involves calculations in the HEALPix library
      */
+#ifdef FIBO
+    void getDirectionFromFibo(long int ipix, int npix, RFLOAT &rot, RFLOAT &tilt);
+#else
     void getDirectionFromHealPix(long int ipix, RFLOAT &rot, RFLOAT &tilt);
+#endif
 
     /* Get the translational sampling step in Angstroms */
     RFLOAT getTranslationalSampling(int adaptive_oversampling = 0);
