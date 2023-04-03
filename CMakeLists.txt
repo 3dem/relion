@@ -276,6 +276,11 @@ if(ALTCPU)
     add_definitions(-DALTCPU)
 endif()
 
+# ----------------------------------------------------------------- MPI COLLECTIVE --
+if(ALTCPU)
+    add_definitions(-DUSE_MPI_COLLECTIVE)	# Adding MPI collective for some routines
+endif()
+
 # ---------------------------------------------------------------USE TEXTURES OR NOT--
 if(NOT CudaTexture OR ALTCPU)
     add_definitions(-DPROJECTOR_NO_TEXTURES)
