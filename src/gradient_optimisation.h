@@ -434,20 +434,23 @@ public:
 			else
 				blobs_x[i] = random_normal<T>() * diameter / 7. + box.xdim / 2.;
 			blobs_y[i] = random_normal<T>() * diameter / 7. + box.ydim / 2.;
+
+			if (blobs_y[i] < amp_box.ydim && blobs_x[i] < amp_box.xdim)
+				blobs_amp[i] = fabs(amp_box.data[(long) blobs_y[i] * amp_box.xdim + (long) blobs_x[i]]);
+			else
+				blobs_amp[i] = 0;
 		}
 
-		for (int i = 0; i < nr_blobs; i ++)
-			blobs_amp[i] = fabs(amp_box.data[(long) blobs_y[i] * amp_box.xdim + (long) blobs_x[i]]);
-
 		T sigma_inv = 10. / diameter;
-		for (int y = 0; y < box.ydim; y ++)
-			for (int x = 0; x < box.xdim; x ++)
-				for (int i = 0; i < nr_blobs; i ++)
-				{
-					T xp = (x-blobs_x[i]) * sigma_inv;
-					T yp = (y-blobs_y[i]) * sigma_inv;
-					box.data[y * box.xdim + x] += exp(-xp*xp -yp*yp) * blobs_amp[i];
-				}
+		for (int i = 0; i < nr_blobs; i ++)
+			if (blobs_amp[i] > 0)
+				for (int y = 0; y < box.ydim; y ++)
+					for (int x = 0; x < box.xdim; x ++)
+					{
+						T xp = (x-blobs_x[i]) * sigma_inv;
+						T yp = (y-blobs_y[i]) * sigma_inv;
+						box.data[y * box.xdim + x] += exp(-xp*xp -yp*yp) * blobs_amp[i];
+					}
 	}
 
 	template<typename T>
@@ -467,31 +470,34 @@ public:
 				blobs_z[i] = ((T) rand() / (T) RAND_MAX) * box.zdim;
 			else
 				blobs_z[i] = random_normal<T>() * diameter / 6. + box.zdim / 2.;
-		}
 
-		for (int i = 0; i < nr_blobs; i ++)
-			blobs_amp[i] = fabs(amp_box.data[
-				(long) blobs_z[i] * amp_box.yxdim +
-				(long) blobs_y[i] * amp_box.xdim +
-				(long) blobs_x[i]
-			]);
+			if (blobs_z[i] < amp_box.zdim && blobs_y[i] < amp_box.ydim && blobs_x[i] < amp_box.xdim)
+				blobs_amp[i] = fabs(amp_box.data[
+						(long) blobs_z[i] * amp_box.yxdim +
+						(long) blobs_y[i] * amp_box.xdim +
+						(long) blobs_x[i]
+				]);
+			else
+				blobs_amp[i] = 0;
+		}
 
 		T span = diameter/3.;
 		T sigma_inv = 10./diameter;
 		for (int i = 0; i < nr_blobs; i ++)
-			for (int z = XMIPP_MAX(0, blobs_z[i]-span);
-				z < XMIPP_MIN(box.zdim, blobs_z[i]+span); z ++)
-				for (int y = XMIPP_MAX(0, blobs_y[i]-span);
-					y < XMIPP_MIN(box.ydim, blobs_y[i]+span); y ++)
-					for (int x = XMIPP_MAX(0, blobs_x[i]-span);
-						x < XMIPP_MIN(box.xdim, blobs_x[i]+span); x ++)
-					{
-						T xp = (x-blobs_x[i]) * sigma_inv;
-						T yp = (y-blobs_y[i]) * sigma_inv;
-						T zp = (z-blobs_z[i]) * sigma_inv;
-						box.data[z * amp_box.yxdim + y * box.xdim + x] +=
-								exp(-xp*xp -yp*yp -zp*zp) * blobs_amp[i];
-					}
+			if (blobs_amp[i] > 0)
+				for (int z = XMIPP_MAX(0, blobs_z[i]-span);
+					z < XMIPP_MIN(box.zdim, blobs_z[i]+span); z ++)
+					for (int y = XMIPP_MAX(0, blobs_y[i]-span);
+						y < XMIPP_MIN(box.ydim, blobs_y[i]+span); y ++)
+						for (int x = XMIPP_MAX(0, blobs_x[i]-span);
+							x < XMIPP_MIN(box.xdim, blobs_x[i]+span); x ++)
+						{
+							T xp = (x-blobs_x[i]) * sigma_inv;
+							T yp = (y-blobs_y[i]) * sigma_inv;
+							T zp = (z-blobs_z[i]) * sigma_inv;
+							box.data[z * amp_box.yxdim + y * box.xdim + x] +=
+									exp(-xp*xp -yp*yp -zp*zp) * blobs_amp[i];
+						}
 	}
 
 };
