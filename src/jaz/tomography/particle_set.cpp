@@ -561,10 +561,19 @@ d3Vector ParticleSet::getParticleOffset(ParticleIndex particle_id) const
 {
 	d3Vector out;
 	
-	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_X_ANGSTROM, out.x, particle_id.value);
-	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, out.y, particle_id.value);
-	partTable.getValueSafely(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, out.z, particle_id.value);
-	
+	if (partTable.containsLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM))
+        partTable.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, out.x, particle_id.value);
+	else
+        out.x = 0.;
+	if (partTable.containsLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM))
+        partTable.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, out.y, particle_id.value);
+	else
+        out.y = 0.;
+    if (partTable.containsLabel(EMDL_ORIENT_ORIGIN_Z_ANGSTROM))
+        partTable.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, out.z, particle_id.value);
+    else
+        out.z = 0.;
+
 	return out;
 }
 
