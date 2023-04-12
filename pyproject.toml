@@ -36,6 +36,7 @@ dependencies = [
     "makefun",
     "lru-dict",
     "superqt",
+    "napari-threedee",
 ]
 
 # extras

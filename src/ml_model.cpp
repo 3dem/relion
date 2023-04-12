@@ -1798,15 +1798,7 @@ void MlWsumModel::initZeros()
 
 }
 
-//#define DEBUG_PACK
-#ifdef DEBUG_PACK
-#define MAX_PACK_SIZE	  100000
-#else
-// Approximately 1024*1024*1024/8/2 ~ 0.5 Gb
-#define MAX_PACK_SIZE 67101000
-#endif
-
-void MlWsumModel::pack(MultidimArray<RFLOAT> &packed)
+unsigned long long MlWsumModel::getPackSize()
 {
 	unsigned long long packed_size = 0;
 	int spectral_size = (ori_size / 2) + 1;
@@ -1823,14 +1815,31 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed)
 
 	// for all class-related stuff
 	// data is complex: multiply by two!
-	packed_size += nr_classes * nr_bodies * 2 * (unsigned long long)BPref[0].getSize();
-	packed_size += nr_classes * nr_bodies * (unsigned long long)BPref[0].getSize();
-	packed_size += nr_classes * nr_bodies * (unsigned long long)nr_directions;
+	packed_size += nr_classes * nr_bodies * 2 * (unsigned long long) BPref[0].getSize(); // BPref.data
+	packed_size += nr_classes * nr_bodies * (unsigned long long) BPref[0].getSize(); // BPref.weight
+	packed_size += nr_classes * nr_bodies * (unsigned long long) nr_directions; // pdf_directions
+
 	// for pdf_class
 	packed_size += nr_classes;
+
 	// for priors for each class
 	if (ref_dim==2)
 		packed_size += nr_classes*2;
+
+	return packed_size;
+}
+
+//#define DEBUG_PACK
+#ifdef DEBUG_PACK
+#define MAX_PACK_SIZE	  100000
+#else
+// Approximately 1024*1024*1024/8/2 ~ 0.5 Gb
+#define MAX_PACK_SIZE 67101000
+#endif
+
+void MlWsumModel::pack(MultidimArray<RFLOAT> &packed)
+{
+	unsigned long long packed_size = getPackSize();
 
 	// Get memory for the packed array
 	packed.clear();

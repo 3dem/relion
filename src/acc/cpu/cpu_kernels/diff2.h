@@ -544,7 +544,7 @@ inline void diff2_coarse(
 					diffi[j] = 0.0;
 
 #if _OPENMP > 201307	// For OpenMP 4.5 and later
-				#pragma omp simd reduction(+:diffi[:eulers_per_block])
+				#pragma omp simd reduction(+:diffi)
 #endif
 				for (int tid=0; tid<block_sz; tid++) {
 // This will generate masked SVML routines for Intel compiler

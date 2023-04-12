@@ -78,6 +78,15 @@ public:
 	MPI_Group worldG, followerG; // groups of ranks (in practice only used to create communicators)
 	MPI_Comm worldC, followerC; // communicators
 	int followerRank; // index of follower within the follower-group (and communicator)
+#ifdef USE_MPI_COLLECTIVE
+	MPI_Comm splitC;	// communicator when doing split random halves
+	int splitRank;		// index of ranks within the split random halves group
+
+	MPI_Comm root_evenC, root_oddC;	// communicators for root+[even or odd] ranks
+
+	// Prints splitRank(split_random_halves case run) for the given nrank
+	int getSplitRank(const int nrank) const;
+#endif
 
 	MpiNode(int &argc, char ** argv);
 
@@ -93,7 +102,7 @@ public:
 	std::string getHostName() const;
 
 	/** Wait on a barrier for the other MPI nodes */
-	void barrierWait();
+	void barrierWait(MPI_Comm comm = MPI_COMM_WORLD);
 
 	/** Build in some better error handling and (hopefully better) robustness to communication failures in the MPI_Send/MPI_Recv pairs....
 	 */
@@ -101,10 +110,17 @@ public:
 
 	int relion_MPI_Recv(void *buf, std::ptrdiff_t count, MPI_Datatype datatype, int source, int tag, MPI_Comm comm, MPI_Status &status);
 
-	int relion_MPI_Bcast(void *buffer, long int count, MPI_Datatype datatype, int root, MPI_Comm comm);
+	int relion_MPI_Bcast(void *buffer, std::ptrdiff_t count, MPI_Datatype datatype, int root, MPI_Comm comm);
 
 	/* Better error handling of MPI error messages */
 	void report_MPI_ERROR(int error_code);
+
+#ifdef USE_MPI_COLLECTIVE
+	int relion_MPI_Allreduce(void *sendB, void *recvB, std::ptrdiff_t count, MPI_Datatype datatype, MPI_Op op, MPI_Comm comm);
+
+private:
+	std::ptrdiff_t p2p_blocksize, coll_blocksize;	// Block size for point-to-point and collective MPI communiucation
+#endif
 
 };
 
