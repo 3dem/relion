@@ -429,10 +429,15 @@ void JobWindow::initialise(int my_job_type, bool _is_tomo)
         myjob.initialise(my_job_type);
         initialiseTomoAlignTiltseriesWindow();
     }
-        else if (my_job_type == PROC_TOMO_DENOISE_TOMOGRAM)
+    else if (my_job_type == PROC_TOMO_DENOISE_TOMOGRAM)
     {
         myjob.initialise(my_job_type);
         initialiseTomoDenoiseTomogramsWindow();
+    }
+    else if (my_job_type == PROC_TOMO_PICK_TOMOGRAM)
+    {
+        myjob.initialise(my_job_type);
+        initialiseTomoPickTomogramsWindow();
     }
 	else if (my_job_type == PROC_TOMO_SUBTOMO)
 	{
@@ -618,7 +623,7 @@ void JobWindow::initialiseCtffindWindow()
 	resetHeight();
 
     place("input_star_mics", TOGGLE_DEACTIVATE);
-	place("use_noDW", TOGGLE_DEACTIVATE);
+	if (!is_tomo) place("use_noDW", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -2577,7 +2582,11 @@ void JobWindow::initialiseTomoReconstructTomogramsWindow()
 {
     setupTabs(2);
 
-    placeTomoInput(true, false, false, false, false, false);
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
+    
+    place("in_tiltseries", TOGGLE_DEACTIVATE);
 
 	tab2->begin();
 	tab2->label("Reconstruct");
@@ -2656,6 +2665,26 @@ void JobWindow::initialiseTomoDenoiseTomogramsWindow()
     guientries["do_cryocare_predict"].cb_menu_i(); 
 
     tab3->end();
+}
+
+void JobWindow::initialiseTomoPickTomogramsWindow()
+{
+
+    setupTabs(1);
+
+    tab1->begin();
+    tab1->label("I/O");
+    resetHeight();
+
+    place("in_tomoset", TOGGLE_DEACTIVATE);
+    //place("cache_size", TOGGLE_DEACTIVATE);
+
+    // Add a little spacer
+    current_y += STEPY/2;
+
+    place("pick_mode", TOGGLE_DEACTIVATE);
+    tab1->end();
+
 }
 
 void JobWindow::initialiseTomoSubtomoWindow()

@@ -60,7 +60,7 @@ class TomogramSet
 		int getFrameCount(int index) const;
 		int getMaxFrameCount() const;
 		double getOriginalPixelSize(int index) const;
-		double getPixelSize(int index) const;
+		double getTiltSeriesPixelSize(int index) const;
 		std::string getOpticsGroupName(int index) const;
 
         // SHWS 6Apr2022: Make one big metadatatable with all movies/micrographs (to be used for motioncorr and ctffind runners)

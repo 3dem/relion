@@ -5,7 +5,7 @@ from psygnal import Signal
 from qtpy.QtWidgets import QWidget, QVBoxLayout, QLabel, QSizePolicy
 from lru import LRU
 
-from ..._metadata_models.gui.tilt_series_set import TiltSeriesSet
+from ..._metadata_models.gui.tilt_series_set import TiltSeriesSet as GuiTiltSeriesSet
 from ..._metadata_models.gui.tilt_series import TiltSeries
 from .tilt_series_list import TiltSeriesListWidget
 
@@ -17,7 +17,7 @@ class TomogramBrowserWidget(QWidget):
     def __init__(
             self,
             viewer: napari.Viewer,
-            tilt_series: TiltSeriesSet,
+            tilt_series: GuiTiltSeriesSet,
             cache_size: int,
             *args,
             **kwargs
@@ -57,8 +57,8 @@ class TomogramBrowserWidget(QWidget):
         self._selected_tilt_series = value
 
     def _on_tomogram_selection_change(self):
-        self.selected_tilt_series = self.tilt_series_list_widget.selected_tilt_series_in_view()
         self.changing_tomogram.emit()
+        self.selected_tilt_series = self.tilt_series_list_widget.selected_tilt_series_in_view()
         self._load_tomogram(self.selected_tilt_series.name, add_to_viewer=True)
         self._preload_next_tomograms()
 
@@ -70,8 +70,9 @@ class TomogramBrowserWidget(QWidget):
                 data=tomogram,
                 name='tomogram',
                 depiction='plane',
-                plane={'thickness': 5},
+                plane={'thickness': 1},
                 rendering='minip',
+                blending='translucent',
             )
         self._on_tomogram_loaded()
 
@@ -96,6 +97,8 @@ class TomogramBrowserWidget(QWidget):
         layer.depiction = 'plane'
         layer.plane.position = np.array(layer.data.shape) / 2
         layer.plane.normal = (1, 0, 0)
+        self.viewer.layers.selection = [layer]
+        self.tomogram_changed.emit()
 
     def _preload_next_tomograms(self):
         tilt_series_ids = list(self.tilt_series.keys())

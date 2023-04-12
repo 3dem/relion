@@ -88,7 +88,7 @@ void AlignTiltseriesRunner::initialise(bool is_leader)
     // Check if this is a TomographyExperiment starfile, if not raise an error
     if (!tomogramSet.read(fn_in, 1))
     {
-        REPORT_ERROR("ERROR: the input file is not a valid tomograms.star file");
+        REPORT_ERROR("ERROR: the input file is not a valid tilt series star file");
     }
 
 	idx_tomograms_all.clear();
@@ -197,7 +197,7 @@ void AlignTiltseriesRunner::run()
 void AlignTiltseriesRunner::executeImodWrapper(long idx_tomo, int rank)
 {
 
-    RFLOAT angpix = tomogramSet.getPixelSize(idx_tomo);
+    RFLOAT angpix = tomogramSet.getTiltSeriesPixelSize(idx_tomo);
 
     std::string command = fn_imodwrapper_exe + " ";
     // Make sure the methods are the first argument to the program!

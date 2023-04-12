@@ -660,6 +660,7 @@ std::string TomogramSet::getTomogramName(int index) const
 	return name;
 }
 
+
 int TomogramSet::getTomogramIndexSafely(std::string tomogramName) const
 {
 	int t = getTomogramIndex(tomogramName);
@@ -701,7 +702,7 @@ double TomogramSet::getOriginalPixelSize(int index) const
 	return globalTable.getDouble(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, index);
 }
 
-double TomogramSet::getPixelSize(int index) const
+double TomogramSet::getTiltSeriesPixelSize(int index) const
 {
 	return globalTable.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, index);
 }

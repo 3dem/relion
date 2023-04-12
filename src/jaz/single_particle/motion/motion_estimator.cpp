@@ -436,6 +436,7 @@ void MotionEstimator::prepMicrograph(
 
 			for (int f = 0; f < fc; f++)
 			{
+
 				MotionHelper::noiseNormalize(movie[p][f], sigma2, movie[p][f]);
 			}
 		}

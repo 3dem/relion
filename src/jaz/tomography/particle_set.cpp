@@ -13,13 +13,13 @@ using namespace gravis;
 ParticleSet::ParticleSet()
 {}
 
-ParticleSet::ParticleSet(std::string filename, std::string motionFilename, bool verbose)
+ParticleSet::ParticleSet(std::string filename, std::string motionFilename, bool verbose, const TomogramSet *tomogramSet)
 {
-    if (!read(filename, motionFilename, verbose))
+    if (!read(filename, motionFilename, verbose, tomogramSet))
         REPORT_ERROR("ERROR: there are no particles in " + filename);
 }
 
-bool ParticleSet::read(std::string filename, std::string motionFilename, bool verbose)
+bool ParticleSet::read(std::string filename, std::string motionFilename, bool verbose, const TomogramSet *tomogramSet)
 {
 
     if (genTable.read(filename,"general"))
@@ -40,8 +40,76 @@ bool ParticleSet::read(std::string filename, std::string motionFilename, bool ve
     }
 
     optTable.read(filename, "optics");
-	partTable.read(filename, "particles");
+    partTable.read(filename, "particles");
 
+    // subtomo can call to this function without a good particleSet yet, when coming straight out of subtomogram particle picking
+    // In that case, initialise optics groups from the tomogramSet
+    if (optTable.numberOfObjects() == 0)
+    {
+
+        // Check which tomo_names are present in the partTable
+        std::vector<std::string> tomo_names;
+        std::string my_prev_name="";
+        std::map<std::string, int> tomoname_to_optics_group;
+        FOR_ALL_OBJECTS_IN_METADATA_TABLE(partTable)
+        {
+            std::string myname;
+            partTable.getValue(EMDL_TOMO_NAME, myname);
+            if (myname != my_prev_name)
+            {
+                bool is_new = true;
+                for (size_t i = 0; i < tomo_names.size(); i++)
+                {
+                    if (myname == tomo_names[i]) is_new = false;
+                }
+                if (is_new)
+                {
+                    tomo_names.push_back(myname);
+                    tomoname_to_optics_group.insert(std::make_pair(myname, tomo_names.size()));
+                }
+            }
+            my_prev_name = myname;
+        }
+
+        // construct optics table with those tomo_names that are present in the partTable
+        optTable.setName("optics");
+        if (!tomogramSet->globalTable.containsLabel(EMDL_CTF_VOLTAGE))
+            REPORT_ERROR("ERROR: tomogramSet->globalTable does not contain rlnVoltage label");
+         if (!tomogramSet->globalTable.containsLabel(EMDL_CTF_Q0))
+            REPORT_ERROR("ERROR: tomogramSet->globalTable does not contain rlnAmplitudeContrast label");
+       if (!tomogramSet->globalTable.containsLabel(EMDL_CTF_CS))
+            REPORT_ERROR("ERROR: tomogramSet->globalTable does not contain rlnSphericalAberration label");
+        if (!tomogramSet->globalTable.containsLabel(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE))
+            REPORT_ERROR("ERROR: tomogramSet->globalTable does not contain rlnTomoTiltSeriesPixelSize label");
+        for (size_t i = 0; i < tomo_names.size(); i++)
+        {
+            int idx = tomogramSet->getTomogramIndex(tomo_names[i]);
+            double Q0, Cs, kV, tiltSeriesPixelSize;
+            tomogramSet->globalTable.getValue(EMDL_CTF_VOLTAGE, kV, idx);
+            tomogramSet->globalTable.getValue(EMDL_CTF_CS, Cs, idx);
+            tomogramSet->globalTable.getValue(EMDL_CTF_Q0, Q0, idx);
+            tomogramSet->globalTable.getValue(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, tiltSeriesPixelSize, idx);
+
+            optTable.addObject();
+            optTable.setValue(EMDL_CTF_VOLTAGE, kV);
+            optTable.setValue(EMDL_CTF_CS, Cs);
+            optTable.setValue(EMDL_CTF_Q0, Q0);
+            optTable.setValue(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, tiltSeriesPixelSize);
+            optTable.setValue(EMDL_IMAGE_OPTICS_GROUP, tomoname_to_optics_group[ tomo_names[i] ]);
+            optTable.setValue(EMDL_IMAGE_OPTICS_GROUP_NAME, tomo_names[i]);
+        }
+
+        // Now also set optics groups in partTable
+        FOR_ALL_OBJECTS_IN_METADATA_TABLE(partTable)
+        {
+            std::string myname;
+            partTable.getValue(EMDL_TOMO_NAME, myname);
+            partTable.setValue(EMDL_IMAGE_OPTICS_GROUP, tomoname_to_optics_group[myname]);
+        }
+
+    }
+
+    
     long int pc = partTable.numberOfObjects();
     if (pc == 0) return false;
 
@@ -276,11 +344,11 @@ d3Vector ParticleSet::getPosition(ParticleIndex particle_id) const
 {
 	const int og = getOpticsGroup(particle_id);
 	
-	const double originalPixelSize = getOriginalPixelSize(og);
+	const double tiltSeriesPixelSize = getTiltSeriesPixelSize(og);
 
 	const d3Matrix A_subtomogram = getSubtomogramMatrix(particle_id);
 
-	d3Vector out = getParticleCoord(particle_id) - (A_subtomogram * getParticleOffset(particle_id)) / originalPixelSize;
+	d3Vector out = getParticleCoord(particle_id) - (A_subtomogram * getParticleOffset(particle_id)) / tiltSeriesPixelSize;
 
     // /* SHWS & ABurt 19Jul2022: let's no longer do this in relion-4.1
     //out.x += 1.0;
@@ -547,23 +615,11 @@ int ParticleSet::numberOfOpticsGroups() const
 	return optTable.numberOfObjects();
 }
 
-double ParticleSet::getBinnedPixelSize(int opticsGroup) const
-{
-	if (!optTable.containsLabel(EMDL_IMAGE_PIXEL_SIZE))
-	{
-		REPORT_ERROR("ParticleSet::getBinnedPixelSize: pixel size (rlnImagePixelSize) missing from optics table");
-	}
-	
-	double out;
-	optTable.getValueSafely(EMDL_IMAGE_PIXEL_SIZE, out, opticsGroup);
-	return out;
-}
-
-double ParticleSet::getOriginalPixelSize(int opticsGroup) const
+double ParticleSet::getTiltSeriesPixelSize(int opticsGroup) const
 {
 	if (!optTable.containsLabel(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE))
 	{
-		REPORT_ERROR("ParticleSet::getOriginalPixelSize: tilt series pixel size (rlnTomoTiltSeriesPixelSize) missing from optics table");
+		REPORT_ERROR("ParticleSet::getTiltSeriesPixelSize: tilt series pixel size (rlnTomoTiltSeriesPixelSize) missing from optics table");
 	}
 	
 	double out;

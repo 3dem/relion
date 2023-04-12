@@ -137,6 +137,7 @@ private:
     void initialiseTomoReconstructTomogramsWindow();
     void initialiseTomoAlignTiltseriesWindow();
     void initialiseTomoDenoiseTomogramsWindow();
+    void initialiseTomoPickTomogramsWindow();
     void initialiseTomoSubtomoWindow();
 	void initialiseTomoCtfRefineWindow();
 	void initialiseTomoAlignWindow();

@@ -30,6 +30,7 @@ def align_single_tilt_series(
     output_directory: directory in which results will be stored.
     """
     console = Console(record=True)
+    error_console = Console(stderr=True, style="bold red")
 
     # Create output directory structure
     imod_directory, metadata_directory = \
@@ -41,21 +42,24 @@ def align_single_tilt_series(
     # Align tilt-series using IMOD
     # implicit assumption - one tilt-axis angle per tilt-series
     console.log('Running IMOD alignment')
-    etomo_output = alignment_function(
-        tilt_series=np.stack([mrcfile.read(f) for f in df['rlnMicrographName']]),
-        tilt_angles=df['rlnTomoNominalStageTiltAngle'],
-        pixel_size=pixel_spacing_angstroms,
-        nominal_rotation_angle=df['rlnTomoNominalTiltAxisAngle'][0],
-        basename=tilt_series.name,
-        output_directory=imod_directory,
-        **alignment_function_kwargs,
-    )
+    try:
+        etomo_output = alignment_function(
+            tilt_series=np.stack([mrcfile.read(f) for f in df['rlnMicrographName']]),
+            tilt_angles=df['rlnTomoNominalStageTiltAngle'],
+            pixel_size=pixel_spacing_angstroms,
+            nominal_rotation_angle=df['rlnTomoNominalTiltAxisAngle'][0],
+            basename=tilt_series.name,
+            output_directory=imod_directory,
+            **alignment_function_kwargs,
+        )
 
-    # Write out alignment metadata
-    console.log('Converting metadata and writing STAR file for aligned tilt-series')
-    df[['rlnTomoXTilt', 'rlnTomoYTilt', 'rlnTomoZRot']] = get_xyz_extrinsic_euler_angles(
-        etomo_output)
-    df[['rlnTomoXShiftAngst', 'rlnTomoYShiftAngst']] = get_specimen_shifts(
-        etomo_output) * pixel_spacing_angstroms
-    TiltSeries(name=tilt_series.name, data=df).write_star_file(
-        metadata_directory / f'{tilt_series.name}.star')
+        # Write out alignment metadata
+        console.log('Converting metadata and writing STAR file for aligned tilt-series')
+        df[['rlnTomoXTilt', 'rlnTomoYTilt', 'rlnTomoZRot']] = get_xyz_extrinsic_euler_angles(
+            etomo_output)
+        df[['rlnTomoXShiftAngst', 'rlnTomoYShiftAngst']] = get_specimen_shifts(
+            etomo_output) * pixel_spacing_angstroms
+        TiltSeries(name=tilt_series.name, data=df).write_star_file(
+            metadata_directory / f'{tilt_series.name}.star')
+    except RuntimeError:
+        error_console.log(f'ERROR: alignment for {tilt_series.name} failed')

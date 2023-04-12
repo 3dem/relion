@@ -11,7 +11,7 @@ from rich.progress import track
 
 from ._cli import cli
 from .. import _utils
-from .._utils.mdoc import calculate_pre_exposure_dose, basename_from_sub_frame_path
+from .._utils.mdoc import calculate_pre_exposure_dose, basename_from_sub_frame_path, remove_missing_images
 from .._utils.relion import relion_pipeline_job
 from .._utils.file import match_filenames
 
@@ -153,20 +153,21 @@ def _generate_tilt_image_dataframe(
         images_are_motion_corrected: Optional[bool],
 ) -> pd.DataFrame:
     """Generate a dataframe containing data about images in a tilt-series."""
-    df = mdocfile.read(mdoc_file, camel_to_snake=True)
-    df['date_time'] = pd.to_datetime(df['date_time'], infer_datetime_format=True)
-    df = df.sort_values(by="date_time", ascending=True)
+    df = mdocfile.read(mdoc_file)
+    df['DateTime'] = pd.to_datetime(df['DateTime'], infer_datetime_format=True)
+    df = df.sort_values(by="DateTime", ascending=True)
     df['image_index'] = np.arange(len(df)) + 1  # 0 -> 1 indexing
     df['pre_exposure_dose'] = calculate_pre_exposure_dose(
         df, dose_per_tilt_image=dose_per_tilt_image, dose_per_movie_frame=dose_per_movie_frame,
     )
-    df['sub_frame_basename'] = df['sub_frame_path'].apply(basename_from_sub_frame_path)
+    df['sub_frame_basename'] = df['SubFramePath'].apply(basename_from_sub_frame_path)
     df['tilt_image_file'] = match_filenames(df['sub_frame_basename'], to_match=tilt_image_files)
-    df = df[df['tilt_image_file'] != None]
     df['nominal_tilt_axis_angle'] = nominal_tilt_axis_angle
+    if df['tilt_image_file'].isnull().any():
+        df = remove_missing_images(df, mdoc_file)
 
     output_df = pd.DataFrame({
-        'rlnTomoNominalStageTiltAngle': df['tilt_angle'],
+        'rlnTomoNominalStageTiltAngle': df['TiltAngle'],
         'rlnTomoNominalTiltAxisAngle': df['nominal_tilt_axis_angle'],
         'rlnMicrographPreExposure': df['pre_exposure_dose'],
     })
@@ -174,12 +175,12 @@ def _generate_tilt_image_dataframe(
     if not images_are_motion_corrected:
         movie_information_df=pd.DataFrame({
             'rlnMicrographMovieName': df['tilt_image_file'],
-            'rlnTomoTiltMovieFrameCount': df['num_sub_frames'],
+            'rlnTomoTiltMovieFrameCount': df['NumSubFrames'],
             'rlnTomoTiltMovieIndex': df['image_index']
         })
         output_df=pd.concat([movie_information_df, output_df], axis=1)
-    if 'target_defocus' in df.columns:
-        output_df['rlnTomoNominalDefocus'] = df['target_defocus']
+    if 'TargetDefocus' in df.columns:
+        output_df['rlnTomoNominalDefocus'] = df['TargetDefocus']
     if images_are_motion_corrected:
         output_df['rlnMicrographName'] = df['tilt_image_file']
     return output_df
