@@ -45,7 +45,7 @@
 #ifndef MACROS_H
 #define MACROS_H
 
-#define RELION_SHORT_VERSION "4.1-alpha-1"
+#define RELION_SHORT_VERSION "5.0-alpha-1"
 extern const char *g_RELION_VERSION;
 
 #include <math.h>

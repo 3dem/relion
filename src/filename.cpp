@@ -694,3 +694,13 @@ FileName getOutputFileWithNewUniqueDate(FileName fn_input, FileName fn_new_outpu
 	return fn_new_outputdir + fn_post;
 }
 
+bool FileName::endsWith(const std::string& target) const
+{
+	size_t target_len = target.length();
+	size_t my_len = this->length();
+
+	if (my_len < target_len)
+		return false;
+
+	return this->substr(my_len - target_len, target_len) == target;
+}

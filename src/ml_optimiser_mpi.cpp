@@ -2096,6 +2096,8 @@ void MlOptimiserMpi::maximization()
 									mymodel.tau2_class[ith_recons],
 									mymodel.sigma2_class[ith_recons],
 									mymodel.data_vs_prior_class[ith_recons],
+									mymodel.pixel_size,
+									particle_diameter,
 									(do_join_random_halves || do_always_join_random_halves),
 									mymodel.tau2_fudge_factor,
 									node->rank==1); // only first followers is verbose
@@ -2232,6 +2234,8 @@ void MlOptimiserMpi::maximization()
 										mymodel.tau2_class[ith_recons],
 										mymodel.sigma2_class[ith_recons],
 										mymodel.data_vs_prior_class[ith_recons],
+										mymodel.pixel_size,
+										particle_diameter,
 										(do_join_random_halves || do_always_join_random_halves),
 										mymodel.tau2_fudge_factor);
 							}

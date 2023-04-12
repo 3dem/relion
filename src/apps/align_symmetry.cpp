@@ -135,7 +135,7 @@ public:
 	{
 
 		// When providing a model.star file, in C1 one cannot select class based on best diff2
-		if (fn_in.contains("model.star") && (fn_sym.contains("C1") || fn_sym.contains("c1")))
+		if (fn_in.contains("model.star") && (fn_sym == "C1" || fn_sym == "c1"))
 		{
 			if (!(do_select_resol ||do_select_size ))
 				REPORT_ERROR("ERROR: In symmetry C1, one has to select based on class size or resolution!");
@@ -192,7 +192,7 @@ public:
 			vol_in.read(fn_ins[imap]);
 
 
-			if ( fn_sym.contains("C1") || fn_sym.contains("c1") )
+			if ( fn_sym == "C1" || fn_sym == "c1" )
 			{
 				// Just write out the selected map again
 				vol_in.write(fn_out);

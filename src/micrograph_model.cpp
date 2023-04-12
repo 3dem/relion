@@ -562,8 +562,16 @@ void Micrograph::setMovie(FileName fnMovie, FileName fnGain, RFLOAT binning)
 	}
 	else
 	{
-		Image<RFLOAT> Ihead;
-		Ihead.read(fnMovie, false, -1, false, true); // select_img -1, mmap false, is_2D true
+		Image<float> Ihead;
+
+		if (CompressedMRCReader::isCompressedMRC(fnMovie))
+		{
+			CompressedMRCReader reader;
+			reader.read(fnMovie, 1);
+			Ihead().copyShape(reader.Ihead());
+		}
+		else
+			Ihead.read(fnMovie, false, -1, false, true); // select_img -1, mmap false, is_2D true
 
 		width = XSIZE(Ihead());
 		height = YSIZE(Ihead());
