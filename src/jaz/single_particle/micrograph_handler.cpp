@@ -649,6 +649,7 @@ std::string MicrographHandler::getMovieFilename(const MetaDataTable& mdt, bool d
 	}
 	else
 	{
+		// Does this make sense!?
 		return metaFn;
 	}
 }

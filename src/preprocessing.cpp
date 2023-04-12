@@ -439,6 +439,8 @@ void Preprocessing::joinAllStarFiles()
 
 			if (do_premultiply_ctf)
 				myOutObsModel->opticsMdt.setValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, true);
+			else // we have to explicitly set this to false so that this is not inherited from the input run_data.star.
+				myOutObsModel->opticsMdt.setValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, false);
 
 			int igroup;
 			myOutObsModel->opticsMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, igroup);

@@ -96,40 +96,37 @@ class MicrographHandler
 		std::vector<std::vector<gravis::d2Vector>>& tracks_out,
 		bool unregGlob, 
 		std::vector<gravis::d2Vector>& globalComponent_out);
+
+	std::string getMicrographMetadataFilename(
+			const MetaDataTable& mdt,
+			bool die_on_error);
+
+	Micrograph loadMicrographMetadata(
+			const MetaDataTable& mdt,
+			bool die_on_error);
+
+	std::string getMovieFilename(
+			const MetaDataTable& mdt, bool die_on_error = true);
 	
-	
+	std::string getMetaName(
+			std::string micName, bool die_on_error = true);
+
 	protected:
 
-	
 		Image<RFLOAT> lastGainRef;
 		MultidimArray<bool> lastDefectMask;
 		std::string last_gainFn, last_movieFn;
 	
 		std::map<std::string, std::string> mic2meta;
-		
 
 	void loadInitial(
 			const std::vector<MetaDataTable>& mdts, bool verb,
 			int& fc, double& dosePerFrame, std::string& metaFn);
-		
-	std::string getMetaName(
-			std::string micName, bool die_on_error = true);
-	
-	std::string getMicrographMetadataFilename(
-			const MetaDataTable& mdt, 
-			bool die_on_error);
-	
-	Micrograph loadMicrographMetadata(
-			const MetaDataTable& mdt, 
-			bool die_on_error);
-	
+
 	int determineFrameCount(
 			const MetaDataTable& mdt);
-	
+
 	bool isMoviePresent(
-			const MetaDataTable& mdt, bool die_on_error = true);
-	
-	std::string getMovieFilename(
 			const MetaDataTable& mdt, bool die_on_error = true);
 };
 
