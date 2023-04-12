@@ -286,7 +286,7 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex, bool doEven, 
 	BufferedImage<float> stackAct;
 	std::vector<d4Matrix> projAct(fc);
 
-	double pixelSizeAct = tomogramSet.getPixelSize(tomoIndex);
+	double pixelSizeAct = tomogramSet.getTiltSeriesPixelSize(tomoIndex);
 
 	if (angpix_spacing > 0.)
     {
@@ -427,7 +427,7 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex, bool doEven, 
 
     if (!do_multiple) Log::print("Writing output");
 
-    const double samplingRate = tomogramSet.getPixelSize(tomoIndex) * spacing;
+    const double samplingRate = tomogramSet.getTiltSeriesPixelSize(tomoIndex) * spacing;
 
     if (doEven)
     	out.write(getOutputFileName(tomoIndex, true, false), samplingRate);
@@ -460,7 +460,7 @@ void TomoBackprojectProgram::setMetaDataAllTomograms()
 
         int tomoIndex = tomoIndexTodo[idx];
 
-        double pixelSizeAct = tomogramSet.getPixelSize(tomoIndex);
+        double pixelSizeAct = tomogramSet.getTiltSeriesPixelSize(tomoIndex);
         if (angpix_spacing > 0.) spacing = angpix_spacing / pixelSizeAct;
         if (std::abs(spacing - 1.0) > 1e-2)
             tomogramSet.globalTable.setValue(EMDL_TOMO_TOMOGRAM_BINNING, spacing, tomoIndex);

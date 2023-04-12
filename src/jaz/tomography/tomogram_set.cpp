@@ -236,8 +236,9 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
 	else
 	{
         	m.getValueSafely(EMDL_MICROGRAPH_NAME, fn_img, 0);
-        }
-	Image<RFLOAT> I;
+
+    }
+        Image<RFLOAT> I;
         I.read(fn_img,false); // false means don't read the actual image data, only the header
 
         stackSize.x = XSIZE(I());
@@ -604,6 +605,7 @@ std::string TomogramSet::getTomogramName(int index) const
 	return name;
 }
 
+
 int TomogramSet::getTomogramIndexSafely(std::string tomogramName) const
 {
 	int t = getTomogramIndex(tomogramName);
@@ -645,7 +647,7 @@ double TomogramSet::getOriginalPixelSize(int index) const
 	return globalTable.getDouble(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, index);
 }
 
-double TomogramSet::getPixelSize(int index) const
+double TomogramSet::getTiltSeriesPixelSize(int index) const
 {
 	return globalTable.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, index);
 }

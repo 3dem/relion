@@ -123,7 +123,8 @@ void SubtomoProgram::run()
 {
 	TomogramSet tomogramSet(optimisationSet.tomograms, true);
 
-	ParticleSet particleSet(optimisationSet.particles, optimisationSet.trajectories, true);
+    // TODO: Introduce optics parameters from tomogramSet if they are not present yet in particleSet
+	ParticleSet particleSet(optimisationSet.particles, optimisationSet.trajectories, true, &tomogramSet);
 	std::vector<std::vector<ParticleIndex> > particles = particleSet.splitByTomogram(tomogramSet, true);
 	
 	if (cropSize < 0) cropSize = boxSize;
@@ -138,7 +139,7 @@ void SubtomoProgram::run()
 	const long int s02D = (int)(binning * s2D + 0.5);
 	
 	const double relative_box_scale = cropSize / (double) boxSize;
-	const double binned_pixel_size = binning * particleSet.getOriginalPixelSize(0);
+	const double binned_pixel_size = binning * particleSet.getTiltSeriesPixelSize(0);
 
 	initialise(particleSet, particles, tomogramSet);
 
@@ -176,7 +177,7 @@ void SubtomoProgram::run()
 
 	if (do_sum_all)
 	{
-		const double pixel_size = binning * tomogramSet.getPixelSize(0);
+		const double pixel_size = binning * tomogramSet.getTiltSeriesPixelSize(0);
 
 		sum_data.write(outDir + "sum_data.mrc", pixel_size);
 		Centering::fftwHalfToHumanFull(sum_weights).write(outDir + "sum_weight.mrc", pixel_size);
@@ -317,7 +318,7 @@ void SubtomoProgram::writeParticleSet(
 				const ParticleIndex new_id = copy.addParticle(particleSet, part_id);
 
 				const int opticsGroup = particleSet.getOpticsGroup(part_id);
-				const double originalPixelSize = particleSet.getOriginalPixelSize(opticsGroup);
+				const double tiltSeriesPixelSize = particleSet.getTiltSeriesPixelSize(opticsGroup);
 
 				const std::string filenameRoot = getOutputFilename(
 					part_id, t, particleSet, tomogramSet);
@@ -330,7 +331,7 @@ void SubtomoProgram::writeParticleSet(
                 if (apply_offsets)
                 {
                     const d3Matrix A_subtomogram = particleSet.getSubtomogramMatrix(part_id);
-                    const d3Vector pos = particleSet.getParticleCoord(part_id) - (A_subtomogram * particleSet.getParticleOffset(part_id)) / originalPixelSize;
+                    const d3Vector pos = particleSet.getParticleCoord(part_id) - (A_subtomogram * particleSet.getParticleOffset(part_id)) / tiltSeriesPixelSize;
                     copy.setParticleOffset(new_id, d3Vector(0,0,0));
                     copy.setParticleCoord(new_id, pos);
                 }

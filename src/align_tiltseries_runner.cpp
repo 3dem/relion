@@ -197,7 +197,7 @@ void AlignTiltseriesRunner::run()
 void AlignTiltseriesRunner::executeImodWrapper(long idx_tomo, int rank)
 {
 
-    RFLOAT angpix = tomogramSet.getPixelSize(idx_tomo);
+    RFLOAT angpix = tomogramSet.getTiltSeriesPixelSize(idx_tomo);
 
     std::string command = fn_imodwrapper_exe + " ";
     // Make sure the methods are the first argument to the program!

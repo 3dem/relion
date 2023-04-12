@@ -25,7 +25,7 @@ class ParticleSet
 	public:
 
 		ParticleSet();
-		ParticleSet(std::string filename, std::string motionFilename = "", bool verbose = true);
+		ParticleSet(std::string filename, std::string motionFilename = "", bool verbose = true, const TomogramSet *tomogramSet = NULL);
 		
 			MetaDataTable partTable, optTable;
 
@@ -70,8 +70,7 @@ class ParticleSet
 		void setOpticsGroup(ParticleIndex particle_id, int zeroBasedId);
 		int numberOfOpticsGroups() const;
 		
-		double getBinnedPixelSize(int opticsGroup) const;
-		double getOriginalPixelSize(int opticsGroup) const;
+		double getTiltSeriesPixelSize(int opticsGroup) const;
 
 
 		std::vector<gravis::d3Vector> getTrajectoryInPixels(ParticleIndex particle_id, int fc, double pixelSize, bool from_original_coordinate = false) const;
