@@ -80,7 +80,9 @@ class TomogramBrowserWidget(QWidget):
         if tilt_series_id in self._cache:
             self._load_tomogram_from_cache(tilt_series_id, add_to_viewer)
             return
+        denoised_tomogram_file = self.tilt_series[tilt_series_id].denoised_tomogram_file
         tomogram_file = self.tilt_series[tilt_series_id].tomogram_file
+        tomogram_file = denoised_tomogram_file if denoised_tomogram_file is not None else tomogram_file
         tomogram = mrcfile.read(tomogram_file)
         self._cache[tilt_series_id] = tomogram
         if add_to_viewer:
