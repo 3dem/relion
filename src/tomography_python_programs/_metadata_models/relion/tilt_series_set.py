@@ -81,6 +81,11 @@ class TiltSeriesSet(BaseModel):
                     self.tilt_series, self.global_data['rlnTomoReconstructedTomogram']
             ):
                 tilt_series_set[gui_tilt_series.name].tomogram_file = tomogram_file
+        if 'rlnTomoReconstructedTomogramDenoised' in self.global_data:
+            for gui_tilt_series, tomogram_file in zip(
+                    self.tilt_series, self.global_data['rlnTomoReconstructedTomogramDenoised']
+            ):
+                tilt_series_set[gui_tilt_series.name].denoised_tomogram_file = tomogram_file
         return tilt_series_set
 
     def __getitem__(self, tilt_series_id: str) -> TiltSeries:
