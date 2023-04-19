@@ -37,9 +37,10 @@ int main(int argc, char *argv[])
 		TomoBackprojectProgram program;
 
 		program.readParameters(argc, argv);
-        program.initialise();
+        program.initialise(rank==0);
 		program.run(rank, size);
-        program.writeOutput(true);
+        MPI_Barrier(MPI_COMM_WORLD);
+        if (rank==0) program.writeOutput(true);
 	}
 	catch (RelionError e)
 	{

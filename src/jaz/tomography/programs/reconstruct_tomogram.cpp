@@ -86,7 +86,7 @@ void TomoBackprojectProgram::readParameters(int argc, char *argv[])
 
 	ZIO::ensureParentDir(outFn);
 }
-void TomoBackprojectProgram::initialise()
+void TomoBackprojectProgram::initialise(bool verbose)
 {
     if (!tomogramSet.read(optimisationSet.tomograms))
         REPORT_ERROR("ERROR: there was a problem reading the tomogram set");
@@ -116,10 +116,13 @@ void TomoBackprojectProgram::initialise()
         do_multiple = false;
     }
 
-    std::cout << " + Reconstructing " << tomoIndexTodo.size() << " tomograms: " << std::endl;
-    for (int idx = 0; idx < tomoIndexTodo.size(); idx++)
+    if (verbose)
     {
- 	std::cout << "  - " << tomogramSet.getTomogramName(tomoIndexTodo[idx]) << std::endl;
+        std::cout << " + Reconstructing " << tomoIndexTodo.size() << " tomograms: " << std::endl;
+        for (int idx = 0; idx < tomoIndexTodo.size(); idx++)
+        {
+            std::cout << "  - " << tomogramSet.getTomogramName(tomoIndexTodo[idx]) << std::endl;
+        }
     }
 
 }
@@ -129,10 +132,10 @@ void TomoBackprojectProgram::run(int rank, int size)
     long my_first_idx, my_last_idx;
     divide_equally(tomoIndexTodo.size(), size, rank , my_first_idx, my_last_idx);
 
-    std::cout << " + Reconstructing ... " << std::endl;
     int barstep, nr_todo = my_last_idx-my_first_idx+1;
     if (rank == 0)
     {
+        std::cout << " + Reconstructing ... " << std::endl;
         init_progress_bar(nr_todo);
         barstep = XMIPP_MAX(1, nr_todo / 60);
     }
@@ -152,11 +155,11 @@ void TomoBackprojectProgram::run(int rank, int size)
 		reconstructOneTomogram(tomoIndexTodo[idx],false,false);
 	}
 	
-        if (idx % barstep == 0)
+        if (rank == 0 && idx % barstep == 0)
             progress_bar(idx);
     }
 
-    progress_bar(nr_todo);
+    if (rank == 0) progress_bar(nr_todo);
 
 }
 
@@ -288,7 +291,7 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex, bool doEven, 
 
 	double pixelSizeAct = tomogramSet.getTiltSeriesPixelSize(tomoIndex);
 
-	if (angpix_spacing > 0.)
+    if (angpix_spacing > 0.)
     {
         spacing = angpix_spacing / pixelSizeAct;
     }

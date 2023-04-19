@@ -699,12 +699,16 @@ int TomogramSet::getMaxFrameCount() const
 
 double TomogramSet::getOriginalPixelSize(int index) const
 {
+    if (!globalTable.containsLabel(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE))
+        REPORT_ERROR("ERROR: cannot find rlnMicrographOriginalPixelSize label in star file.");
 	return globalTable.getDouble(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, index);
 }
 
 double TomogramSet::getTiltSeriesPixelSize(int index) const
 {
-	return globalTable.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, index);
+	if (!globalTable.containsLabel(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE))
+        REPORT_ERROR("ERROR: cannot find rlnTomoTiltSeriesPixelSize label in star file.");
+    return globalTable.getDouble(EMDL_TOMO_TILT_SERIES_PIXEL_SIZE, index);
 }
 
 std::string TomogramSet::getOpticsGroupName(int index) const
