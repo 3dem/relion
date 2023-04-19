@@ -79,7 +79,8 @@ class SubtomoProgram
 		void initialise(
 				ParticleSet& particleSet,
 				const std::vector<std::vector<ParticleIndex>>& particles,
-				const TomogramSet& tomogramSet);
+				const TomogramSet& tomogramSet,
+                bool verbose = true);
 
 		void processTomograms(
 				const std::vector<int>& tomoIndices,

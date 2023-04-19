@@ -43,7 +43,7 @@ bool TomogramSet::read(FileName filename, bool verbose)
 
     if (!globalTable.containsLabel(EMDL_TOMO_TILT_SERIES_STARFILE))
     {
-        std::cerr << "Warning: " << filename
+        if (verbose) std::cerr << "Warning: " << filename
                   << " does not have rlnTomoTiltSeriesStarFile labels. It may be written in an old format. If so, will try to convert ..."
                   << std::endl;
 

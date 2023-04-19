@@ -208,7 +208,8 @@ void SubtomoProgram::run()
 void SubtomoProgram::initialise(
 		ParticleSet& particleSet,
 		const std::vector<std::vector<ParticleIndex>>& particles,
-		const TomogramSet& tomogramSet)
+		const TomogramSet& tomogramSet,
+        bool verbose)
 {
 	const int tc = tomogramSet.size();
 
@@ -227,14 +228,17 @@ void SubtomoProgram::initialise(
 
 	directoriesPerTomogram = firstName.find_first_of('/') == std::string::npos;
 
-	if (directoriesPerTomogram)
-	{
-		Log::print("No slashes found in first particle name: creating subdirectories for each tomogram");
-	}
-	else
-	{
-		Log::print("Slash found in first particle name: not creating subdirectories for each tomogram");
-	}
+    if (verbose)
+    {
+        if (directoriesPerTomogram)
+        {
+            Log::print("No slashes found in first particle name: creating subdirectories for each tomogram");
+        }
+        else
+        {
+            Log::print("Slash found in first particle name: not creating subdirectories for each tomogram");
+        }
+    }
 
 	for (int t = 0; t < tc; t++)
 	{
@@ -247,7 +251,7 @@ void SubtomoProgram::initialise(
 
     if (std::abs(rescale_coords - 1.0) > 1e-2)
     {
-        Log::print("Rescaling input coordinates ... ");
+        if (verbose) Log::print("Rescaling input coordinates ... ");
 
         for (int t = 0; t < tc; t++)
         {
@@ -268,7 +272,7 @@ void SubtomoProgram::initialise(
         }
     }
 
-	writeParticleSet(particleSet, particles, tomogramSet);
+	if (verbose) writeParticleSet(particleSet, particles, tomogramSet);
 }
 
 std::string SubtomoProgram::getOutputFilename(
