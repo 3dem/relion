@@ -169,10 +169,10 @@ void TomoBackprojectProgram::writeOutput(bool do_all_metadata)
     // If we were doing multiple tomograms, then also write the updated tomograms.star.
     if (do_multiple)
     {
-
+        // for MPI program
         if (do_all_metadata) setMetaDataAllTomograms();
 
-        if (do_multiple) tomogramSet.write(outFn + "tomograms.star");
+        tomogramSet.write(outFn + "tomograms.star");
 
         std::cout << " Written out: " << outFn << "tomograms.star" << std::endl;
 
@@ -458,10 +458,13 @@ void TomoBackprojectProgram::reconstructOneTomogram(int tomoIndex, bool doEven, 
 void TomoBackprojectProgram::setMetaDataAllTomograms()
 {
 
-    for (int idx = 0; idx < tomoIndexTodo.size(); idx++)
+    for (int tomoIndex = 0; tomoIndex < tomogramSet.size(); tomoIndex++)
     {
 
-        int tomoIndex = tomoIndexTodo[idx];
+        // SHWS 19apr2023: need to do this again for all tomograms: after completion of MPI job, leader does not know about the tomograms of the followers.
+        Tomogram tomogram;
+        tomogram = tomogramSet.loadTomogram(tomoIndex, false);
+        if (!tomogram.hasMatrices) getProjectMatrices(tomogram, tomogramSet.tomogramTables[tomoIndex]);
 
         double pixelSizeAct = tomogramSet.getTiltSeriesPixelSize(tomoIndex);
         if (angpix_spacing > 0.) spacing = angpix_spacing / pixelSizeAct;

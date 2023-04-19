@@ -227,6 +227,10 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
         }
         else
         {
+            // Still set image size in header, as this is used for example in TomoBackprojectProgram::getProjectMatrices
+            out.stack.xdim = stackSize.x;
+            out.stack.ydim = stackSize.y;
+            out.stack.zdim = stackSize.z;
             out.hasImage = false;
         }
 
@@ -311,6 +315,10 @@ Tomogram TomogramSet::loadTomogram(int index, bool loadImageData, bool loadEvenF
         }
         else
         {
+            // Still set image size in header, as this is used for example in TomoBackprojectProgram::getProjectMatrices
+            out.stack.xdim = stackSize.x;
+            out.stack.ydim = stackSize.y;
+            out.stack.zdim = stackSize.z;
             out.hasImage = false;
         }
 
