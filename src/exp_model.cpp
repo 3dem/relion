@@ -1015,7 +1015,6 @@ void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
                 Image<float> img;
                 if (is_tomo || is_3D)
                 {
-                    std::cerr << part_id << " img_name= " << img_name << std::endl;
                     img.read(img_name);
                     particles[part_id].img = img();
                 }
