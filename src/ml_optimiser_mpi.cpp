@@ -107,6 +107,12 @@ void MlOptimiserMpi::initialise()
 
 	grad_pseudo_halfsets = gradient_refine && !do_split_random_halves;
 
+#ifdef _CUDA_ENABLED
+    /************************************************************************/
+	//Setup GPU related resources
+	int devCount, deviceAffinity;
+	bool is_split(false);
+
 	if (do_gpu)
 	{
 		MPI_Status status;
