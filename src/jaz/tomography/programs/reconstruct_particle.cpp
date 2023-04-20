@@ -103,7 +103,10 @@ void ReconstructParticleProgram::run()
 	TomogramSet tomoSet(optimisationSet.tomograms, true);
 	ParticleSet particleSet(optimisationSet.particles, optimisationSet.trajectories, true, &tomoSet);
 
-	std::vector<std::vector<ParticleIndex>> particles = particleSet.splitByTomogram(tomoSet, true);
+    if (!particleSet.hasHalfSets())
+        Log::warn("The input particles  in "+optimisationSet.particles+ " have no rlnRandomSubset to specify halfsets, joining all particles in half1");
+
+    std::vector<std::vector<ParticleIndex>> particles = particleSet.splitByTomogram(tomoSet, true);
 	
 	const int tc = particles.size();
 	const int s = boxSize;
@@ -167,7 +170,7 @@ void ReconstructParticleProgram::run()
 
 	if (no_reconstruction) return;
 
-	finalise(dataImgFS, ctfImgFS, binnedOutPixelSize);
+	finalise(dataImgFS, ctfImgFS, particleSet, binnedOutPixelSize);
 
 	// Delete temporary files
 	// No error checking - do not bother the user if it fails
@@ -196,7 +199,7 @@ void ReconstructParticleProgram::processTomograms(
 	const int sh = s/2 + 1;
 	const int tc = tomoIndices.size();
 
-	if (verbosity > 0 && !per_tomogram_progress)
+    if (verbosity > 0 && !per_tomogram_progress)
 	{
 		int total_particles_on_first_thread = 0;
 
@@ -351,7 +354,7 @@ void ReconstructParticleProgram::processTomograms(
 
 			const d4Matrix particleToTomo = particleSet.getMatrix4x4(part_id, s,s,s);
 
-			const int halfSet = particleSet.getHalfSet(part_id);
+            const int halfSet = (particleSet.hasHalfSets()) ? particleSet.getHalfSet(part_id) : 0;
 
 			const int og = particleSet.getOpticsGroup(part_id);
 
@@ -440,8 +443,8 @@ void ReconstructParticleProgram::processTomograms(
 			}
 
 			//Save temporary files
-
-			for (int half = 0; half < 2; half++)
+            int halfmax = particleSet.hasHalfSets() ? 2 : 1;
+			for (int half = 0; half < halfmax; half++)
 			{
 				BufferedImage<double> tmpDataImg(sh, s, s*2);
 
@@ -500,6 +503,7 @@ void ReconstructParticleProgram::processTomograms(
 void ReconstructParticleProgram::finalise(
 	std::vector<BufferedImage<dComplex>>& dataImgFS,
 	std::vector<BufferedImage<double>>& ctfImgFS,
+    const ParticleSet& particleSet,
 	const double binnedOutPixelSize)
 {
 	const int s = dataImgFS[0].ydim;
@@ -508,27 +512,41 @@ void ReconstructParticleProgram::finalise(
 
 	std::vector<BufferedImage<double>> dataImgRS(2), dataImgDivRS(2);
 
-	BufferedImage<dComplex> dataImgFS_both = dataImgFS[0] + dataImgFS[1];
-	BufferedImage<double> ctfImgFS_both = ctfImgFS[0] + ctfImgFS[1];
+	BufferedImage<dComplex> dataImgFS_both;
+	BufferedImage<double> ctfImgFS_both;
 
 
 	Log::beginSection("Reconstructing");
 
-	for (int half = 0; half < 2; half++)
-	{
-		Log::print("Half " + ZIO::itoa(half));
+    if (particleSet.hasHalfSets())
+    {
+        dataImgFS_both = dataImgFS[0] + dataImgFS[1];
+        ctfImgFS_both = ctfImgFS[0] + ctfImgFS[1];
 
-		dataImgRS[half] = BufferedImage<double>(s,s,s);
-		dataImgDivRS[half] = BufferedImage<double>(s,s,s);
+        for (int half = 0; half < 2; half++)
+        {
+            Log::print("Half " + ZIO::itoa(half));
 
-		reconstruct(
-			dataImgRS[half], dataImgDivRS[half], ctfImgFS[half],
-			dataImgFS[half]);
+            dataImgRS[half] = BufferedImage<double>(s,s,s);
+            dataImgDivRS[half] = BufferedImage<double>(s,s,s);
 
-		writeOutput(
-			dataImgDivRS[half], dataImgRS[half], ctfImgFS[half],
-			"half"+ZIO::itoa(half+1), binnedOutPixelSize);
-	}
+            reconstruct(
+                    dataImgRS[half], dataImgDivRS[half], ctfImgFS[half],
+                    dataImgFS[half]);
+
+            writeOutput(
+                    dataImgDivRS[half], dataImgRS[half], ctfImgFS[half],
+                    "half"+ZIO::itoa(half+1), binnedOutPixelSize);
+        }
+    }
+    else
+    {
+        dataImgFS_both = dataImgFS[0];
+        ctfImgFS_both = ctfImgFS[0];
+
+        dataImgRS[0] = BufferedImage<double>(s,s,s);
+        dataImgDivRS[0] = BufferedImage<double>(s,s,s);
+    }
 
 	reconstruct(
 		dataImgRS[0], dataImgDivRS[0], ctfImgFS_both,
@@ -538,12 +556,15 @@ void ReconstructParticleProgram::finalise(
 		dataImgDivRS[0], dataImgRS[0], ctfImgFS[0],
 			"merged", binnedOutPixelSize);
 
-	optimisationSet.refMap1 = outDir + "half1.mrc";
-	optimisationSet.refMap2 = outDir + "half2.mrc";
-	optimisationSet.refFSC = "";
-	optimisationSet.write(outDir + "optimisation_set.star");
+	if (particleSet.hasHalfSets())
+    {
+        optimisationSet.refMap1 = outDir + "half1.mrc";
+        optimisationSet.refMap2 = outDir + "half2.mrc";
+        optimisationSet.refFSC = "";
+        optimisationSet.write(outDir + "optimisation_set.star");
+    }
 
-	Log::endSection();
+    Log::endSection();
 }
 
 void ReconstructParticleProgram::symmetrise(

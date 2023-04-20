@@ -60,7 +60,8 @@ class ReconstructParticleProgram
 		void finalise(
 				std::vector<BufferedImage<dComplex>>& dataImgFS,
 				std::vector<BufferedImage<double>>& ctfImgFS,
-				const double binnedOutPixelSize);
+                const ParticleSet& dataSet,
+                const double binnedOutPixelSize);
 
 		void symmetrise(
 				std::vector<BufferedImage<dComplex>>& dataImgFS,

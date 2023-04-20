@@ -55,6 +55,7 @@ class ParticleSet
 		
 		std::string getName(ParticleIndex particle_id) const;
 		int getHalfSet(ParticleIndex particle_id) const;
+        bool hasHalfSets() const;
 		
 		void moveParticleTo(ParticleIndex particle_id, gravis::d3Vector pos);
 		void shiftParticleBy(ParticleIndex particle_id, gravis::d3Vector shift);

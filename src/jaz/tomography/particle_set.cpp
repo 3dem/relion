@@ -464,11 +464,18 @@ std::string ParticleSet::getName(ParticleIndex particle_id) const
 
 int ParticleSet::getHalfSet(ParticleIndex particle_id) const
 {
-	int s;
-	partTable.getValueSafely(EMDL_PARTICLE_RANDOM_SUBSET, s, particle_id.value);
+	if (!hasHalfSets())
+        REPORT_ERROR("ERROR: function getHalfSet was called without having halfsets in the particle star file.");
+
+    int s;
+	partTable.getValue(EMDL_PARTICLE_RANDOM_SUBSET, s, particle_id.value);
 	return s - 1;
 }
 
+bool ParticleSet::hasHalfSets() const
+{
+    return partTable.containsLabel(EMDL_PARTICLE_RANDOM_SUBSET);
+}
 
 void ParticleSet::moveParticleTo(ParticleIndex particle_id, gravis::d3Vector pos)
 {

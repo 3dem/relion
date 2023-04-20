@@ -68,6 +68,9 @@ void ReconstructParticleProgramMpi::run()
 	TomogramSet tomoSet(optimisationSet.tomograms, verb > 0);
 	ParticleSet particleSet(optimisationSet.particles, optimisationSet.trajectories, verb > 0, &tomoSet);
 
+    if (verb > 0 && !particleSet.hasHalfSets())
+        Log::warn("The input particles  in "+optimisationSet.particles+ " have no rlnRandomSubset to specify halfsets, joining all particles in half1");
+
 	std::vector<std::vector<ParticleIndex>> particles = particleSet.splitByTomogram(tomoSet, verb > 0);
 
 	const int tc = particles.size();
@@ -153,7 +156,8 @@ void ReconstructParticleProgramMpi::run()
 		}
 	}
 
-	for (int i = 0; i < 2; i++)
+    int halfmax = (particleSet.hasHalfSets()) ? 2 : 1;
+	for (int i = 0; i < halfmax; i++)
 	{
 		if (node->isLeader())
 		{
@@ -171,7 +175,7 @@ void ReconstructParticleProgramMpi::run()
 	{
 		if (no_reconstruction) return;
 
-		finalise(sumDataImgFS, sumCtfImgFS, binnedOutPixelSize);
+		finalise(sumDataImgFS, sumCtfImgFS, particleSet, binnedOutPixelSize);
 	}
 
 	// Delete temporary files (or try to; no error checking intentional)
