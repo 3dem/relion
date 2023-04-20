@@ -101,7 +101,7 @@ void ReconstructParticleProgram::run()
 	Log::beginSection("Initialising");
 
 	TomogramSet tomoSet(optimisationSet.tomograms, true);
-	ParticleSet particleSet(optimisationSet.particles, optimisationSet.trajectories, true);
+	ParticleSet particleSet(optimisationSet.particles, optimisationSet.trajectories, true, &tomoSet);
 
 	std::vector<std::vector<ParticleIndex>> particles = particleSet.splitByTomogram(tomoSet, true);
 	
