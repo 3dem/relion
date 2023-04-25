@@ -794,7 +794,7 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 }
 
 // Read from file
-void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
+bool Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
                       bool do_ignore_particle_name, bool do_ignore_group_name, bool do_preread_images,
                       bool need_tiltpsipriors_for_helical_refine, bool set_offset_priors_to_offsets, int verb)
 {
@@ -814,6 +814,8 @@ void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
 	timer.tic(tall);
 	timer.tic(tread);
 #endif
+
+    bool remove_priors_again = false;
 
 	is_tomo = false;
 
@@ -1140,6 +1142,7 @@ void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
             {
                 MDimg.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, off);
                 MDimg.setValue(EMDL_ORIENT_ORIGIN_X_PRIOR_ANGSTROM, off);
+                remove_priors_again = true;
             }
             if (!MDimg.containsLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR_ANGSTROM))
             {
@@ -1158,6 +1161,8 @@ void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
     // TODO! Make use of pointers to avoid duplication of entire MDimg here...
     if (is_tomo) particleSet.partTable = MDimg;
 
+    // Keep track whether priors that were added above should be removed again later...
+    return remove_priors_again;
 
 #ifdef DEBUG_READ
 	timer.toc(tdef);

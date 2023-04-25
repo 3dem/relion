@@ -622,8 +622,10 @@ public:
 	// Prepare for automated 2D class average selection: nice to have access to unmasked reference
 	bool do_write_unmasked_refs;
 
-    // (Fixed) directional variance in origin offsets (in Angstroms)
+    // User-specified (and fixed) directional offset searches in X/Y/Z directions (in Angstroms)
     RFLOAT offset_range_x, offset_range_y, offset_range_z;
+    // Remove priors from particle star file after user-specified offset searches?
+    bool remove_offset_priors_again;
 
     /////////// Keep track of hidden variable changes ////////////////////////
 

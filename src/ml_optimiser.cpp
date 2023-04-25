@@ -1168,7 +1168,7 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
     if (do_prevent_preread) do_preread = false;
     bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
 
-    mydata.read(fn_data, fn_tomo, fn_motion, false, false,
+    remove_offset_priors_again = mydata.read(fn_data, fn_tomo, fn_motion, false, false,
                 do_preread, is_helical_segment, offset_range_x > 0.);
 
 #ifdef DEBUG_READ
@@ -1389,7 +1389,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 
     // And write the mydata to file
     if (do_write_data)
-        mydata.write(fn_root + "_data.star", offset_range_x > 0.);
+        mydata.write(fn_root + "_data.star", remove_offset_priors_again);
 
     // And write the sampling object
     if (do_write_sampling)
@@ -1796,7 +1796,7 @@ void MlOptimiser::initialiseGeneral(int rank)
         bool do_preread = (do_preread_images) ? (do_parallel_disc_io || rank == 0) : false;
         bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
         int myverb = (rank==0) ? 1 : 0;
-        mydata.read(fn_data, fn_tomo, fn_motion, true, false,
+        remove_offset_priors_again = mydata.read(fn_data, fn_tomo, fn_motion, true, false,
                     do_preread, is_helical_segment, offset_range_x > 0., myverb); // true means ignore original particle name
 
         // Without this check, the program crashes later.

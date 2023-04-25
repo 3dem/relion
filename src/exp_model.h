@@ -374,7 +374,7 @@ public:
 	void copyParticlesToScratch(int verb, bool do_copy = true, bool also_do_ctf_image = false, RFLOAT free_scratch_Gb = 10);
 
 	// Read from file
-	void read(
+	bool read(
 		FileName fn_in, FileName fn_tomo, FileName fn_motion,
 		bool do_ignore_particle_name = false,
 		bool do_ignore_group_name = false, bool do_preread_images = false,
