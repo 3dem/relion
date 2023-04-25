@@ -640,6 +640,12 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 
     sampling.offset_range = textToFloat(parser.getOption("--offset_range", "Search range for origin offsets (in pixels)", "6"));
     sampling.offset_step = textToFloat(parser.getOption("--offset_step", "Sampling rate (before oversampling) for origin offsets (in pixels)", "2"));
+
+    // SHWS 25apr2023 for subtomogram averaging
+    offset_range_x = textToFloat(parser.getOption("--offset_range_x", "Range for sampling offsets in X-direction (in Angstrom; default=auto)", "-1"));
+    offset_range_y = textToFloat(parser.getOption("--offset_range_y", "Range for sampling offsets in X-direction (in Angstrom; default=auto)", "-1"));
+    offset_range_z = textToFloat(parser.getOption("--offset_range_z", "Range for sampling offsets in X-direction (in Angstrom; default=auto)", "-1"));
+
     // Jun19,2015 - Shaoda, Helical refinement
     sampling.helical_offset_step = textToFloat(parser.getOption("--helical_offset_step", "Sampling rate (before oversampling) for offsets along helical axis (in Angstroms)", "-1"));
     sampling.perturbation_factor = textToFloat(parser.getOption("--perturb", "Perturbation factor for the angular sampling (0=no perturb; 0.5=perturb)", "0.5"));
@@ -1133,6 +1139,12 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
         fn_tomo = "";
     if (!MD.getValue(EMDL_TOMO_TRAJECTORIES_FILE_NAME, fn_motion))
         fn_motion = "";
+    if (!MD.getValue(EMDL_OPTIMISER_OFFSET_RANGE_X, offset_range_x))
+        offset_range_x = -1.;
+    if (!MD.getValue(EMDL_OPTIMISER_OFFSET_RANGE_Y, offset_range_y))
+        offset_range_y = -1.;
+    if (!MD.getValue(EMDL_OPTIMISER_OFFSET_RANGE_Z, offset_range_z))
+        offset_range_z = -1.;
 
     // Initialise some stuff for first-iteration only (not relevant here...)
     do_calculate_initial_sigma_noise = false;
@@ -1356,6 +1368,10 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
         MD.setValue(EMDL_OPTIMISER_FIX_SIGMA_NOISE, fix_sigma_noise);
         MD.setValue(EMDL_OPTIMISER_FIX_SIGMA_OFFSET, fix_sigma_offset);
         MD.setValue(EMDL_OPTIMISER_MAX_NR_POOL, nr_pool);
+        MD.setValue(EMDL_OPTIMISER_OFFSET_RANGE_X, offset_range_x);
+        MD.setValue(EMDL_OPTIMISER_OFFSET_RANGE_Y, offset_range_y);
+        MD.setValue(EMDL_OPTIMISER_OFFSET_RANGE_Z, offset_range_z);
+
 
         MD.write(fh);
         fh.close();
@@ -2126,6 +2142,17 @@ void MlOptimiser::initialiseGeneral(int rank)
     sum_changes_optimal_offsets = 0.;
     sum_changes_optimal_classes = 0.;
     sum_changes_count = 0.;
+
+    int check = 0;
+    if (offset_range_x > 0.) check++;
+    if (offset_range_y > 0.) check++;
+    if (offset_range_z > 0.) check++;
+    int mymincheck = (mymodel.data_dim == 3 || mydata.is_tomo) ? 3 : 2;
+    if (check > 0)
+    {
+        if (check < mymincheck) REPORT_ERROR("ERROR: set ranges for all of X,Y (&Z) directions (for tomos)!");
+        std::cout << " Using user-specified ranges on offset searches... " << std::endl;
+    }
 
     if (mymodel.data_dim == 3 || mydata.is_tomo)
     {
@@ -5461,6 +5488,13 @@ void MlOptimiser::getFourierTransformsAndCtfs(
         ZZ(my_old_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ZOFF);
         ZZ(my_prior)      = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ZOFF_PRIOR);
     }
+
+    // If user-specified search ranges are used, and if offset priors are not specified, then use priors centered on the old offsets
+    if (offset_range_x > 0.) // after initialise() this implies also y/z ranges are > 0
+    {
+        if (XX(my_prior) > 998.99 && XX(my_prior) < 999.01) my_prior = my_old_offset;
+    }
+
     if (mymodel.nr_bodies > 1)
     {
 
@@ -7300,8 +7334,20 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
     // Initialising...
     exp_sum_weight = 0.;
 
-    RFLOAT my_sigma2_offset = (mymodel.nr_bodies > 1) ?
+    RFLOAT my_sigma2_offset_x, my_sigma2_offset_y, my_sigma2_offset_z;
+    if (offset_range_x > 0.) // after initialise() this implies also y/z ranges are > 0
+    {
+        my_sigma2_offset_x = (offset_range_x * offset_range_x) / 9.; // The search ranges are 3 sigma wide
+        my_sigma2_offset_y = (offset_range_y * offset_range_y) / 9.; // The search ranges are 3 sigma wide
+        my_sigma2_offset_z = (offset_range_z * offset_range_z) / 9.; // The search ranges are 3 sigma wide
+    }
+    else
+    {
+        my_sigma2_offset_x = my_sigma2_offset_y = my_sigma2_offset_z = (mymodel.nr_bodies > 1) ?
             mymodel.sigma_offset_bodies[ibody]*mymodel.sigma_offset_bodies[ibody] : mymodel.sigma2_offset;
+    }
+    RFLOAT my_offset_norm = 2. * PI * sqrt(my_sigma2_offset_x) * sqrt(my_sigma2_offset_y);
+    if (mymodel.data_dim == 3 || mydata.is_tomo) my_offset_norm *= sqrt(2. * PI * my_sigma2_offset_z);
 
 //#define DEBUG_CONVERTDIFF2W
 #ifdef DEBUG_CONVERTDIFF2W
@@ -7399,13 +7445,13 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
                 RFLOAT offset_y = old_offset_y + sampling.translations_y[itrans];
                 RFLOAT tdiff2 = 0.;
                 if ( (!do_helical_refine) || (ignore_helical_symmetry) )
-                    tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x);
-                tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y);
+                    tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x) / (-2. * my_sigma2_offset_x);
+                tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y) / (-2. * my_sigma2_offset_y);
                 if (mymodel.data_dim == 3 || mydata.is_tomo)
                 {
                     RFLOAT offset_z = old_offset_z + sampling.translations_z[itrans];
                     if ( (!do_helical_refine) || (ignore_helical_symmetry) )
-                        tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z);
+                        tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z) / (-2. * my_sigma2_offset_z);
                 }
                 // As of version 3.1, sigma_offsets are in Angstroms!
                 tdiff2 *= my_pixel_size * my_pixel_size;
@@ -7413,10 +7459,12 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
                 // P(offset|sigma2_offset)
                 // This is the probability of the offset, given the model offset and variance.
                 RFLOAT pdf_offset;
-                if (my_sigma2_offset < 0.0001)
+                if (my_sigma2_offset_x < 0.0001)
                     pdf_offset_mean += ( tdiff2 > 0.) ? 0. : 1.;
                 else
-                    pdf_offset_mean += exp ( tdiff2 / (-2. * my_sigma2_offset) ) / ( 2. * PI * my_sigma2_offset );
+                {
+                    pdf_offset_mean += exp(tdiff2) / my_offset_norm;
+                }
                 pdf_offset_count ++;
             }
         }
@@ -7499,13 +7547,13 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
                         RFLOAT offset_y = old_offset_y + sampling.translations_y[itrans];
                         RFLOAT tdiff2 = 0.;
                         if ( (!do_helical_refine) || (ignore_helical_symmetry) )
-                            tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x);
-                        tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y);
+                            tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x) / (-2. * my_sigma2_offset_x);
+                        tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y) / (-2. * my_sigma2_offset_y);
                         if (mymodel.data_dim == 3 || mydata.is_tomo)
                         {
                             RFLOAT offset_z = old_offset_z + sampling.translations_z[itrans];
                             if ( (!do_helical_refine) || (ignore_helical_symmetry) )
-                                tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z);
+                                tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z) / (-2. * my_sigma2_offset_z);
                         }
 
                         // As of version 3.1, sigma_offsets are in Angstroms!
@@ -7514,10 +7562,12 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
                         // P(offset|sigma2_offset)
                         // This is the probability of the offset, given the model offset and variance.
                         RFLOAT pdf_offset;
-                        if (my_sigma2_offset < 0.0001)
+                        if (my_sigma2_offset_x < 0.0001)
                             pdf_offset = ( tdiff2 > 0.) ? 0. : 1.;
                         else
-                            pdf_offset = exp ( tdiff2 / (-2. * my_sigma2_offset) ) / ( 2. * PI * my_sigma2_offset );
+                        {
+                            pdf_offset = exp ( tdiff2 ) / my_offset_norm;
+                        }
 
                         if (pdf_offset_mean > 0.)
                             pdf_offset /= pdf_offset_mean;

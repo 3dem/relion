@@ -622,7 +622,10 @@ public:
 	// Prepare for automated 2D class average selection: nice to have access to unmasked reference
 	bool do_write_unmasked_refs;
 
-	/////////// Keep track of hidden variable changes ////////////////////////
+    // (Fixed) directional variance in origin offsets (in Angstroms)
+    RFLOAT offset_range_x, offset_range_y, offset_range_z;
+
+    /////////// Keep track of hidden variable changes ////////////////////////
 
 	// Changes from one iteration to the next in the angles
 	RFLOAT current_changes_optimal_orientations, sum_changes_optimal_orientations;

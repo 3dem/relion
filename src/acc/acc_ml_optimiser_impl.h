@@ -1677,8 +1677,18 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	}
 #endif
 
-	RFLOAT my_sigma2_offset = (baseMLO->mymodel.nr_bodies > 1) ?
+    RFLOAT my_sigma2_offset_x, my_sigma2_offset_y, my_sigma2_offset_z;
+    if (baseMLO->offset_range_x > 0.) // after initialise() this implies also y/z ranges are > 0
+    {
+        my_sigma2_offset_x = (baseMLO->offset_range_x * baseMLO->offset_range_x) / 9.; // The search ranges are 3 sigma wide
+        my_sigma2_offset_y = (baseMLO->offset_range_y * baseMLO->offset_range_y) / 9.; // The search ranges are 3 sigma wide
+        my_sigma2_offset_z = (baseMLO->offset_range_z * baseMLO->offset_range_z) / 9.; // The search ranges are 3 sigma wide
+    }
+    else
+    {
+        my_sigma2_offset_x = my_sigma2_offset_y = my_sigma2_offset_z = (baseMLO->mymodel.nr_bodies > 1) ?
 			baseMLO->mymodel.sigma_offset_bodies[ibody]*baseMLO->mymodel.sigma_offset_bodies[ibody] : baseMLO->mymodel.sigma2_offset;
+    }
 
 	// Ready the "prior-containers" for all classes (remake every img_id)
 	AccPtr<XFLOAT>  pdf_orientation       = ptrFactory.make<XFLOAT>((size_t)((sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi));
@@ -1857,13 +1867,13 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
                 double tdiff2 = 0.;
 
                 if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) )
-                    tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x);
-                tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y);
+                    tdiff2 += (offset_x - myprior_x) * (offset_x - myprior_x) / (-2. * my_sigma2_offset_x);
+                tdiff2 += (offset_y - myprior_y) * (offset_y - myprior_y) / (-2. * my_sigma2_offset_y);
                 if (accMLO->shiftsIs3D)
                 {
                     RFLOAT offset_z = old_offset_z + baseMLO->sampling.translations_z[itrans];
                     if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) )
-                        tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z);
+                        tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z) / (-2. * my_sigma2_offset_z);
                 }
 
                 // As of version 3.1, sigma_offsets are in Angstroms!
@@ -1871,7 +1881,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
                 // P(offset|sigma2_offset)
                 // This is the probability of the offset, given the model offset and variance.
-                if (my_sigma2_offset < 0.0001)
+                if (my_sigma2_offset_x < 0.0001)
                 {
                     pdf_zeros = tdiff2 > 0.;
                     pdf = pdf_zeros ? 0. : 1.;
@@ -1880,7 +1890,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
                 else
                 {
                     pdf_zeros = false;
-                    pdf = tdiff2 / (-2. * my_sigma2_offset);
+                    pdf = tdiff2;
                 }
 
                 pdf_offset_zeros[(exp_iclass-sp.iclass_min)*sp.nr_trans + itrans] = pdf_zeros;
