@@ -796,7 +796,7 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 // Read from file
 void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
                       bool do_ignore_particle_name, bool do_ignore_group_name, bool do_preread_images,
-                      bool need_tiltpsipriors_for_helical_refine, int verb)
+                      bool need_tiltpsipriors_for_helical_refine, bool set_offset_priors_to_offsets, int verb)
 {
 
 //#define DEBUG_READ
@@ -1132,6 +1132,26 @@ void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
 				MDimg.setValue(EMDL_ORIENT_PSI, psi);
 			}
 		}
+
+        if (set_offset_priors_to_offsets)
+        {
+            RFLOAT off;
+            if (!MDimg.containsLabel(EMDL_ORIENT_ORIGIN_X_PRIOR_ANGSTROM))
+            {
+                MDimg.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, off);
+                MDimg.setValue(EMDL_ORIENT_ORIGIN_X_PRIOR_ANGSTROM, off);
+            }
+            if (!MDimg.containsLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR_ANGSTROM))
+            {
+                MDimg.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, off);
+                MDimg.setValue(EMDL_ORIENT_ORIGIN_Y_PRIOR_ANGSTROM, off);
+            }
+            if (have_zcoord && !MDimg.containsLabel(EMDL_ORIENT_ORIGIN_Z_PRIOR_ANGSTROM))
+            {
+                MDimg.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, off);
+                MDimg.setValue(EMDL_ORIENT_ORIGIN_Z_PRIOR_ANGSTROM, off);
+            }
+        }
 	}
 
     // Make sure the partTable in particleSet is kept the same as MDimg in Experiment, for reading from it in ml_optimiser.cpp
@@ -1151,13 +1171,22 @@ void Experiment::read(FileName fn_exp, FileName fn_tomo, FileName fn_motion,
 }
 
 // Write to file
-void Experiment::write(FileName fn_out)
+void Experiment::write(FileName fn_out, bool remove_offset_priors)
 {
     std::ofstream ofs(fn_out);
 
     if (is_tomo) obsModel.generalMdt.write(ofs);
 
     obsModel.opticsMdt.write(ofs);
+    if (remove_offset_priors)
+    {
+        if (MDimg.containsLabel(EMDL_ORIENT_ORIGIN_X_PRIOR_ANGSTROM))
+            MDimg.deactivateLabel(EMDL_ORIENT_ORIGIN_X_PRIOR_ANGSTROM);
+        if (MDimg.containsLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR_ANGSTROM))
+            MDimg.deactivateLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR_ANGSTROM);
+        if (MDimg.containsLabel(EMDL_ORIENT_ORIGIN_Z_PRIOR_ANGSTROM))
+            MDimg.deactivateLabel(EMDL_ORIENT_ORIGIN_Z_PRIOR_ANGSTROM);
+    }
     MDimg.write(ofs);
 
     if (nr_bodies > 1)

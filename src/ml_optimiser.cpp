@@ -1168,7 +1168,8 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
     if (do_prevent_preread) do_preread = false;
     bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
 
-    mydata.read(fn_data, fn_tomo, fn_motion, false, false, do_preread, is_helical_segment);
+    mydata.read(fn_data, fn_tomo, fn_motion, false, false,
+                do_preread, is_helical_segment, offset_range_x > 0.);
 
 #ifdef DEBUG_READ
     std::cerr<<"MlOptimiser::readStar before model."<<std::endl;
@@ -1388,7 +1389,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 
     // And write the mydata to file
     if (do_write_data)
-        mydata.write(fn_root + "_data.star");
+        mydata.write(fn_root + "_data.star", offset_range_x > 0.);
 
     // And write the sampling object
     if (do_write_sampling)
@@ -1795,7 +1796,8 @@ void MlOptimiser::initialiseGeneral(int rank)
         bool do_preread = (do_preread_images) ? (do_parallel_disc_io || rank == 0) : false;
         bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
         int myverb = (rank==0) ? 1 : 0;
-        mydata.read(fn_data, fn_tomo, fn_motion, true, false, do_preread, is_helical_segment, myverb); // true means ignore original particle name
+        mydata.read(fn_data, fn_tomo, fn_motion, true, false,
+                    do_preread, is_helical_segment, offset_range_x > 0., myverb); // true means ignore original particle name
 
         // Without this check, the program crashes later.
         if (mydata.numberOfParticles() == 0)
@@ -5487,12 +5489,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(
     {
         ZZ(my_old_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ZOFF);
         ZZ(my_prior)      = DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ZOFF_PRIOR);
-    }
-
-    // If user-specified search ranges are used, and if offset priors are not specified, then use priors centered on the old offsets
-    if (offset_range_x > 0.) // after initialise() this implies also y/z ranges are > 0
-    {
-        if (XX(my_prior) > 998.99 && XX(my_prior) < 999.01) my_prior = my_old_offset;
     }
 
     if (mymodel.nr_bodies > 1)
